@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROTFALL: LEGACY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+
+<!-- ============ TITLE SCREEN ============ -->
+<div id="titlescreen" class="screen">
+  <canvas id="titlecanvas"></canvas>
+  <div class="title-content">
+    <h1 class="game-title">ROTFALL</h1>
+    <h2 class="game-sub">LEGACY</h2>
+    <div class="menu-plaques">
+      <button class="plaque" data-act="continue">Fortsetzen</button>
+      <button class="plaque" data-act="new">Neue Geschichte</button>
+      <button class="plaque" data-act="chronicle">Chronik</button>
+      <button class="plaque" data-act="settings">Einstellungen</button>
+    </div>
+    <div id="legacy-summary" class="legacy-summary"></div>
+  </div>
+</div>
+
+<!-- ============ CHARACTER CREATION ============ -->
+<div id="creation" class="screen hidden">
+  <div class="creation-grid">
+    <div class="panel cr-left">
+      <div class="panel-title">Gestalt</div>
+      <canvas id="cr-preview" width="160" height="240"></canvas>
+      <div class="cr-appearance"></div>
+    </div>
+    <div class="panel cr-mid">
+      <div class="panel-title">Wer bist du?</div>
+      <label class="field">Name
+        <input id="cr-name" maxlength="18" value="Ragnar">
+      </label>
+      <label class="field">Haus
+        <input id="cr-house" maxlength="18" value="Ragnar">
+      </label>
+      <div class="cr-origins" id="cr-origins"></div>
+      <div id="cr-origin-desc" class="cr-desc"></div>
+      <div class="panel-title">Körperbau</div>
+      <div class="cr-builds" id="cr-builds"></div>
+      <div class="cr-build-desc" id="cr-build-desc"></div>
+    </div>
+    <div class="panel cr-right">
+      <div class="panel-title">Anlagen</div>
+      <div id="cr-attrs" class="cr-attrs"></div>
+      <div class="cr-start" id="cr-start-gear"></div>
+      <button class="plaque wide" id="cr-begin">In die Welt treten</button>
+      <button class="plaque wide ghost" id="cr-back">Zur&uuml;ck</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="game" class="screen hidden">
+  <header id="topbar">
+    <div class="brand"><span class="sigil"></span>ROTFALL</div>
+    <nav id="nav"></nav>
+    <div class="worldclock">
+      <span id="clock-weather" class="wicon"></span>
+      <span id="clock-time"></span>
+      <span id="clock-gold" class="gold"></span>
+    </div>
+  </header>
+
+  <main id="stage">
+    <aside id="leftpanel" class="panel">
+      <div class="portrait-row">
+        <canvas id="pc-portrait" width="56" height="56"></canvas>
+        <div class="pc-ident">
+          <div id="pc-name" class="pc-name">&mdash;</div>
+          <div id="pc-class" class="pc-class">&mdash;</div>
+          <div id="pc-rank" class="pc-rank">&mdash;</div>
+        </div>
+      </div>
+      <div id="pc-bars"></div>
+      <div id="pc-status" class="status-row"></div>
+      <div id="pc-body" class="pc-body"></div>
+      <div class="panel-sep"></div>
+      <div class="panel-title" id="party-title">GRUPPE 0 / 3</div>
+      <div id="party-list"></div>
+      <div class="panel-sep"></div>
+      <div class="panel-title">VORRAT</div>
+      <div id="res-list" class="res-list"></div>
+    </aside>
+
+    <div id="viewport">
+      <canvas id="game-canvas"></canvas>
+      <div id="dialogue" class="dialogue hidden">
+        <div class="dlg-portrait"><canvas id="dlg-portrait" width="64" height="64"></canvas></div>
+        <div class="dlg-body">
+          <div id="dlg-name" class="dlg-name"></div>
+          <div id="dlg-text" class="dlg-text"></div>
+          <div id="dlg-choices" class="dlg-choices"></div>
+        </div>
+      </div>
+      <div id="toast" class="toast hidden"></div>
+      <div id="prompt" class="prompt hidden"></div>
+    </div>
+
+    <aside id="rightpanel" class="panel">
+      <div id="context"></div>
+    </aside>
+  </main>
+
+  <footer id="bottombar">
+    <div id="logwrap" class="panel">
+      <div class="log-filters" id="log-filters"></div>
+      <div id="log"></div>
+    </div>
+    <div id="hotbar" class="panel"></div>
+  </footer>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div id="modal" class="modal hidden">
+  <div class="modal-frame">
+    <div class="modal-head"><span id="modal-title"></span><button id="modal-close" aria-label="Schließen"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.4"/></svg></button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="deathscreen" class="screen hidden">
+  <div class="death-inner">
+    <h1 id="death-name">GEFALLEN</h1>
+    <div id="death-stats"></div>
+    <div class="death-actions">
+      <button class="plaque" id="death-legacy">Erbe</button>
+      <button class="plaque ghost" id="death-chronicle">Chronik</button>
+    </div>
+  </div>
+</div>
+
+<div id="successor" class="screen hidden">
+  <div class="succ-inner">
+    <h1>DAS ERBE</h1>
+    <p class="succ-sub">Der Charakter stirbt. Die Geschichte geht weiter.</p>
+    <div id="succ-cards"></div>
+  </div>
+</div>
+
+<script type="module" src="src/game.js"></script>
+</body>
+</html>
