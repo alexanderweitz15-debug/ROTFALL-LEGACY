@@ -239,11 +239,13 @@ function spawnNpcDef(def) {
              def.faction === 'undead' ? '#232a28' : pick(CLOTH), armor: def.key === 'kelan' ? '#b9b19c' : def.key === 'borin' ? '#6b6155' : null,
              helm: def.key === 'kelan' ? '#c3bba5' : null } });
     c.home = home; c.anchor = { x: pos.x, y: pos.y };
-    if (def.undead) c.pal.skin = '#b9b3a2';
+    if (def.undead) { c.pal.skin = '#b9b3a2'; c.pal.glow = '#4e8f7a'; }
+    c.hooded = !!def.undead || def.faction === 'undead' || ['morvath', 'rook', 'kelan'].includes(def.key);
     const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', morvath:'staff' }[def.key];
     if (w) c.equip.weapon = mkItem(w);
-    if (def.key === 'borin') c.equip.offhand = mkItem('kite_shield');
-    if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass'); }
+    if (def.key === 'borin') { c.equip.offhand = mkItem('kite_shield'); c.pal.shield = '#4a3f30'; c.pal.shieldBoss = '#8a8172'; }
+    if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass');
+      c.pal.crest = '#9b2e26'; c.pal.shield = '#d9d2c0'; c.pal.shieldBoss = '#9b2e26'; }   // Orden: Elfenbein & Rot
     for (const [k, v] of Object.entries({ onehanded:6, defense:4, survival:4 })) c.skills[k] = (c.skills[k] || 0) + v;
     recalc(c); B.fullHeal(c);
     S.ents.world.push(c);
@@ -273,6 +275,20 @@ const SPAWN_AREAS = [
   { map:'mine', x:45, y:38, r:10, types:['goblin','goblin','goblin_warrior'], cap:10 },
   { map:'mine', x:31, y:26, r:9, types:['goblin_warrior','goblin'], cap:7 },
   { map:'mine', x:20, y:36, r:7, types:['goblin'], cap:4 },
+  // --- Großregionen (512×512) ---
+  { map:'world', x:60, y:300, r:44, types:['wolf','wolf','boar','goblin'], cap:16 },       // Westwald
+  { map:'world', x:44, y:300, r:14, types:['wolf','wolf','bandit'], cap:9 },               // Wolfsschlucht
+  { map:'world', x:140, y:410, r:16, types:['skeleton','goblin','wolf'], cap:10 },         // Südsumpf / Tempel
+  { map:'world', x:250, y:250, r:20, types:['bandit','wolf'], cap:6 },                     // Mittelland um Kreuzweg
+  { map:'world', x:440, y:155, r:44, types:['bandit','bandit_archer','goblin_warrior'], cap:16 }, // Rote Wüste
+  { map:'world', x:380, y:92, r:14, types:['bandit','goblin'], cap:7 },                    // um Aschfurt
+  { map:'world', x:300, y:34, r:34, types:['wolf','goblin_warrior','skeleton'], cap:14 },  // Frostkamm
+  { map:'world', x:250, y:36, r:10, types:['goblin_warrior','skeleton'], cap:8 },          // Tiefhall
+  // Totenreich (SO): dichte Untoten-Patrouillen
+  { map:'world', x:362, y:380, r:18, types:['skeleton','skeleton','goblin_warrior'], cap:14 }, // Alt-Vharn
+  { map:'world', x:404, y:437, r:16, types:['skeleton','skeleton'], cap:12 },              // Nekropole
+  { map:'world', x:431, y:430, r:20, types:['skeleton','skeleton','goblin_warrior'], cap:18 }, // Schwarze Feste
+  { map:'world', x:392, y:348, r:14, types:['skeleton'], cap:8 },                          // Nekromanten-Turm
 ];
 
 const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'valen_soldier', 'gorak']);
@@ -323,7 +339,8 @@ export function newGame(cfg) {
   const o = ORIGINS[cfg.origin];
   const start = freeSpotNear('world', 66, 70, 3);
   const p = makeChar({ kind:'player', key:'player', name: cfg.name, age: ri(19, 26), x: start.x, y: start.y,
-    attrs: baseAttrs(), skills: { ...o.skills },            // Herkunftsbonus wird unten addiert, nicht überschrieben traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
+    attrs: baseAttrs(), skills: { ...o.skills },            // Herkunftsbonus wird unten addiert, nicht überschrieben
+    traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
     origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   p.attributes = Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
   p.invCap = 24; p.attrPoints = 0; p.hotbar = [];
@@ -404,7 +421,7 @@ function loop(now) {
   catch (err) { if (!loop.failed) { loop.failed = true; console.error(err); log('Interner Fehler: ' + err.message, 'world'); } }
 }
 
-let hudTimer = 0, simTimer = 0, respawnTimer = 0, lastHour = -1, lastDay = 1;
+let hudTimer = 0, simTimer = 0, respawnTimer = 0, lastHour = -1, lastDay = 1, travelTimer = 0, encCooldown = 0;
 function update(dt, now) {
   const p = S.player;
   // Zeit
@@ -461,6 +478,60 @@ function update(dt, now) {
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
   simTimer += dt;
   if (simTimer > 4000) { simTimer = 0; questCheck(); if (S.map === 'world') SIM.battleCheck(); }
+  travelTimer += dt;
+  if (travelTimer > 6000) { travelTimer = 0; travelTick(); }
+}
+
+// ================= Reise-Begegnungen =================
+// Unterwegs in der Wildnis soll ständig etwas passieren: Hinterhalte je nach Biom,
+// fahrende Händler, Reisende. Nur fern der Städte, nur wenn der Spieler wirklich reist.
+const AMBUSH_BY_TILE = {
+  [T.ASH]: ['skeleton', 'skeleton', 'goblin_warrior'],
+  [T.SAND]: ['bandit', 'bandit_archer', 'goblin_warrior'],
+  [T.MARSH]: ['skeleton', 'goblin', 'wolf'],
+  [T.ROCK]: ['wolf', 'goblin_warrior'], [T.STONE]: ['wolf', 'goblin_warrior'],
+};
+function regionThreat(tx, ty) {
+  const here = locAt(tx, ty); if (here) return here.threat;
+  let bt = 1, bd = 1e9;
+  for (const l of LOCATIONS) { const d = Math.hypot(l.x - tx, l.y - ty); if (d < bd) { bd = d; bt = l.threat; } }
+  return Math.max(1, bt - 1);
+}
+function travelTick() {
+  const p = S.player;
+  if (S.map !== 'world' || !p.alive || p.downed) return;
+  if (performance.now() < encCooldown) return;
+  const tx = p.x / TS | 0, ty = p.y / TS | 0;
+  const here = locAt(tx, ty);
+  if (here && (here.kind === 'village' || here.kind === 'city')) return;   // in Siedlungen nicht
+  if (Math.hypot(tx - 66, ty - 70) < 30) return;                            // Startgebiet verschonen
+  const moving = Math.abs(p.vx) > 0.05 || Math.abs(p.vy) > 0.05;
+  if (!moving) return;
+  const threat = regionThreat(tx, ty);
+  if (!chance(0.12 + threat * 0.05)) return;
+  encCooldown = performance.now() + 26000;                                  // kein Dauerfeuer
+  const dir = Math.atan2(p.vy, p.vx) + (rnd() - 0.5);                       // grob in Reiserichtung
+  const ox = Math.round(Math.cos(dir) * ri(9, 13)), oy = Math.round(Math.sin(dir) * ri(9, 13));
+  const roll = rnd();
+  if (roll < 0.6) {                                                         // Hinterhalt
+    const types = AMBUSH_BY_TILE[tileAt('world', tx, ty)] || ['wolf', 'goblin', 'bandit'];
+    const n = ri(1, 2 + Math.floor(threat / 2));
+    for (let i = 0; i < n; i++) { const e = spawnEnemy(pick(types), 'world', tx + ox + ri(-2, 2), ty + oy + ri(-2, 2)); if (e) { e.encounter = true; e.aggroId = p.id; e.aiState = 'pursue'; } }
+    log('Aus dem Gelände treten Feinde hervor.', 'combat'); UI.toast('ÜBERFALL', 2600);
+  } else if (roll < 0.82) {                                                 // fahrender Händler
+    const pos = freeSpotNear('world', tx + ox, ty + oy, 3);
+    const c = makeChar({ name: 'Fahrender Händler', prof: 'Händler', x: pos.x, y: pos.y, level: ri(3, 6),
+      traits: ['klug', 'praktisch'], greet: '„Weit weg von jeder Stadt — genau da braucht man einen Händler.“' });
+    c.shop = true; c.brave = true; c.encounter = true; c.anchor = { x: pos.x, y: pos.y };
+    c.equip.weapon = mkItem('dagger'); S.ents.world.push(c);
+    log('Ein fahrender Händler kreuzt deinen Weg.', 'world'); UI.toast('Fahrender Händler', 2400);
+  } else {                                                                  // Reisender (Gerücht)
+    const pos = freeSpotNear('world', tx + ox, ty + oy, 3);
+    const c = makeChar({ name: pick(['Reisender', 'Pilgerin', 'Bote', 'Wanderin']), prof: 'Reisender', x: pos.x, y: pos.y, level: ri(1, 4),
+      traits: [pick(['furchtsam', 'neugierig', 'müde'])], greet: '„Die Straßen sind nicht mehr sicher. Aber wann waren sie das je.“' });
+    c.brave = false; c.encounter = true; c.anchor = { x: pos.x, y: pos.y };
+    S.ents.world.push(c);
+  }
 }
 
 let shake = 0, shakeT = 0;
@@ -534,7 +605,7 @@ function controlPlayer(dt) {
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
   } else { p.vx = p.vy = 0; }
   p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
-  if (mouse.down || keys.has(' ')) attack(p);
+  if (mouse.down || keys.has(' ')) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
   // Dungeon-Fallen
   const haz = S.ents[S.map].find(e => e.hazard && dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
   if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, 'Fallgrube'); camShake(6, 160); }
@@ -562,7 +633,9 @@ function resolveSwing(c) {
   if (it && it.ranged) return shoot(c, it, mult);
   const reach = (it ? it.reach : 30) + (c.r || 10);
   const arc = it ? (it.arc || 1.4) : 1.4;
-  const foes = hostilesOf(c);
+  const force = c === S.player && c.forceStrike; c.forceStrike = false;   // Strg: bewusst auch Neutrale treffen
+  let foes = hostilesOf(c);
+  if (force) foes = foes.concat(S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && !foes.includes(e) && !S.party.includes(e.id)));
   let hitAny = false;
   for (const f of foes) {
     if (!f.alive || f.downed) continue;
@@ -572,6 +645,7 @@ function resolveSwing(c) {
     let diff = Math.abs(normAng(ang - c.aim));
     if (diff > arc / 2 + 0.25) continue;
     hitAny = true;
+    if (f.kind === 'npc' && !isHostile(c, f)) provoke(f, c);   // Angriff auf Neutrale hat Folgen
     hit(c, f, mult, kind);
     if (it && it.wtype !== 'spear') break;                   // nur Speer trifft mehrere in Linie
   }
@@ -917,6 +991,21 @@ function updateNpc(e, dt) {
   if (S.party.includes(e.id)) return partyAI(e, dt);
   const p = S.player;
   if (dist(e, p) > 900) { e.vx = e.vy = 0; return; }
+  if (e.fleeing && !e.angry) {                         // provozierter Zivilist/Händler flieht vor dem Spieler
+    const d = dist(e, p);
+    if (d > 360 || !p.alive) { e.fleeing = false; e.vx = e.vy = 0; return; }
+    const a = Math.atan2(e.y - p.y, e.x - p.x), sp = 1.5 * dt / 16;
+    moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp);
+    return;
+  }
+  if (e.angry) {                                       // provozierte Wache/Krieger jagt den Spieler
+    if (!p.alive) { e.angry = false; return; }
+    e.aim = Math.atan2(p.y - e.y, p.x - e.x);
+    const d = dist(e, p), sp = 1.35 * dt / 16;
+    if (d > 34) moveEnt(e, Math.cos(e.aim) * sp, Math.sin(e.aim) * sp);
+    else { e.vx = e.vy = 0; if (e.atkCd <= 0 && e.swing <= 0) attack(e); }
+    return;
+  }
   // Hysterese: bemerken ab 220 px, loslassen erst ab 340 px. Ohne sie pendelt die Figur an der Grenze (Zittern).
   const held = e.threatId ? byId(e.threatId) : null;
   const keep = held && held.alive && held.map === e.map && teamOf(held) === 'foe' && dist(e, held) < 340;
@@ -1010,6 +1099,39 @@ function remember(c, key, about) {
   if (c.memories.length > 24) c.memories.shift();
   if (key === 'saved_life') addRel(c.key, 15);
   if (key === 'friend_died') c.morale -= 8;
+}
+
+// ================= Angriff auf Neutrale: Reaktion, Alarm, Ruf =================
+const GUARDISH = c => c.guard || c.hostile || c.brave || c.faction === 'valen' || c.faction === 'order' ||
+  ['borin', 'kelan', 'rook', 'havel', 'aldric'].includes(c.key);
+function provoke(target, attacker) {
+  if (attacker !== S.player || !target.alive) return;
+  const firstTime = !target.provoked;
+  target.provoked = true; target.lastHurt = performance.now();
+  // Rolle bestimmt die Reaktion
+  if (GUARDISH(target)) { target.angry = true; target.brave = true; target.aggroId = S.player.id; }
+  else { target.fleeing = true; if (target.shop) target.shopClosed = true; }   // Zivilisten und Händler fliehen
+  if (!firstTime) return;                                                       // Ruf/Alarm nur einmal je Tat
+  // Zeugen im Umkreis (Distanz = Kern des Alarms; Wände zählen grob über Distanz)
+  const witnesses = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e !== target && !S.party.includes(e.id) && dist(e, target) < 240);
+  for (const w of witnesses) {
+    w.alarmed = true;
+    const ally = GUARDISH(w) || (w.faction && w.faction === target.faction) || w.kin;
+    if (ally && GUARDISH(w)) { w.angry = true; w.brave = true; w.aggroId = S.player.id; }   // Wachen/Krieger greifen ein
+    else { w.fleeing = true; }                                                               // Übrige fliehen/schreien
+  }
+  addRel(target.key, -35);
+  const seen = witnesses.length;
+  if (target.faction && S.factions[target.faction] != null) {
+    const drop = 4 + Math.min(seen, 5) * 3;                                     // eine Tat stellt nicht die ganze Fraktion um
+    S.factions[target.faction] = clamp(S.factions[target.faction] - drop, -100, 100);
+    log(`${FACTIONS[target.faction]?.name || 'Fraktion'}: Ansehen −${drop} (Zeugen: ${seen}).`, 'faction');
+    if (S.factions[target.faction] <= -60 && S.ranks[target.faction] >= 0) { S.ranks[target.faction] = -1; log(`${FACTIONS[target.faction].name} verstößt dich.`, 'faction'); }
+  }
+  const here = locAt(S.player.x / TS | 0, S.player.y / TS | 0);
+  if (here) chronicle(`Blut in ${here.name}`, 'crime', `${S.player.name} hebt die Hand gegen ${target.name}.`);
+  log(`Du greifst ${target.name} an!`, 'combat');
+  UI.toast(seen ? `${seen} Zeuge${seen > 1 ? 'n' : ''}! Dein Ruf leidet.` : 'Niemand hat es gesehen …', 3200);
 }
 
 // ================= Interaktion =================
@@ -1286,7 +1408,9 @@ function respawnTick() {
   const W = S.ents.world;
   for (let i = W.length - 1; i >= 0; i--) {
     const e = W[i];
-    if (e.kind === 'enemy' && e.armyId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400)) W.splice(i, 1);
+    if (e.kind === 'enemy' && e.armyId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400)) { W.splice(i, 1); continue; }
+    // Reise-Begegnungen räumen sich auf, sobald der Spieler weit weg ist
+    if (e.encounter && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
   }
   for (const a of SPAWN_AREAS) {
     const count = S.ents[a.map].filter(e => e.kind === 'enemy' && !e.boss &&
@@ -1772,9 +1896,10 @@ function drawWorldmap(cv) {
   const ox = (w - m.w * sc) / 2, oy = (h - m.h * sc) / 2;
   c.fillStyle = '#0b0a08'; c.fillRect(0, 0, w, h);
   const col = { 0:'#313b25', 1:'#403528', 2:'#5a4d3a', 3:'#22384a', 4:'#2f3622', 5:'#42403a', 6:'#4a3a28', 7:'#35322e', 8:'#3b372f', 9:'#544d3a', 12:'#332f2b', 13:'#4b4026' };
-  for (let y = 0; y < m.h; y += 1) for (let x = 0; x < m.w; x += 1) {
+  const step = m.w > 300 ? 2 : 1;                            // große Welt: herunterrechnen, damit die Karte flüssig bleibt
+  for (let y = 0; y < m.h; y += step) for (let x = 0; x < m.w; x += step) {
     c.fillStyle = col[m.tiles[y * m.w + x]] || '#313b25';
-    c.fillRect(ox + x * sc, oy + y * sc, Math.ceil(sc), Math.ceil(sc));
+    c.fillRect(ox + x * sc, oy + y * sc, Math.ceil(sc * step), Math.ceil(sc * step));
   }
   // Nebel des Krieges
   c.fillStyle = 'rgba(8,7,6,.82)';

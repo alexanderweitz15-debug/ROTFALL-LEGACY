@@ -20,6 +20,22 @@ export const LOCATIONS = [
   { key:'shrine',    name:'Waldschrein',        x:76, y:52, r:5,  kind:'shrine',  threat:1, faction:'order' },
   { key:'ruins',     name:'Kleine Ruine',       x:40, y:40, r:7,  kind:'ruin',    threat:2 },
   { key:'northcity', name:'Nordfurt',           x:118,y:56, r:8,  kind:'city',    threat:0, faction:'valen' },
+  // --- Großregionen des erweiterten Grenzlands (512×512) ---
+  { key:'oldbridge', name:'Steinbrücke',        x:110,y:300,r:10, kind:'road',    threat:1 },
+  { key:'westwald',  name:'Westwald',           x:60, y:300,r:40, kind:'wild',    threat:2 },
+  { key:'wolfden',   name:'Wolfsschlucht',      x:44, y:300,r:16, kind:'wild',    threat:3 },
+  { key:'saltport',  name:'Salzhafen',          x:150,y:450,r:16, kind:'city',    threat:0, faction:'valen' },
+  { key:'sunkentemple',name:'Versunkener Tempel',x:140,y:410,r:11,kind:'ruin',    threat:3 },
+  { key:'kreuzweg',  name:'Kreuzweg',           x:250,y:250,r:14, kind:'village', threat:1, faction:'merch' },
+  { key:'deephall',  name:'Tiefhall',           x:250,y:36, r:10, kind:'dungeon', threat:3 },
+  { key:'frostpeak', name:'Frostkamm',          x:330,y:30, r:34, kind:'wild',    threat:2 },
+  { key:'ashford',   name:'Aschfurt',           x:380,y:92, r:12, kind:'village', threat:1, faction:'merch' },
+  { key:'redwaste',  name:'Rote Wüste',         x:440,y:155,r:48, kind:'wild',    threat:2 },
+  { key:'sonnwacht', name:'Sonnwacht',          x:456,y:256,r:16, kind:'city',    threat:1, faction:'order' },
+  { key:'altvharn',  name:'Alt-Vharn',          x:362,y:380,r:16, kind:'ruin',    threat:4, faction:'undead' },
+  { key:'necropolis',name:'Große Nekropole',    x:404,y:437,r:14, kind:'ruin',    threat:4, faction:'undead' },
+  { key:'blackkeep', name:'Die Schwarze Feste', x:431,y:430,r:18, kind:'city',    threat:5, faction:'undead' },
+  { key:'mistisle',  name:'Nebelinsel',         x:90, y:500,r:12, kind:'wild',    threat:2 },
 ];
 
 export function locAt(tx, ty) {
@@ -81,7 +97,7 @@ function house(map, x, y, w, h, doorSide = 'S') {
 export function genWorld() {
   props.length = 0;
   seedRng(S.seed);
-  const w = 128, h = 128, tiles = new Uint8Array(w * h).fill(T.GRASS);
+  const w = 512, h = 512, tiles = new Uint8Array(w * h).fill(T.GRASS);
   MAPS.world = { w, h, tiles };
 
   // Gelände
@@ -177,6 +193,214 @@ export function genWorld() {
 
   // Moorruine mit Grabsiegel
   prop('marsh_ruin', 48, 104, { label:'Versunkener Stein', loot:['grave_seal'] });
+
+  // ======================================================================
+  //  DAS GRENZLAND VON EORL — große, zusammenhängende Welt (512×512)
+  //  Greenmark ist nur die Heimat im Nordwesten. Dahinter liegen Großregionen,
+  //  durch bewussten Raum getrennt: Reisen → Entdecken → Risiko → Belohnung.
+  // ======================================================================
+  const nz = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  // Biom-Zentren (Voronoi-artig). base = Grundkachel der Region.
+  const BIOME = { plains:T.GRASS, forest:T.GRASS, desert:T.SAND, badland:T.SAND, marsh:T.MARSH, mountain:T.STONE, blight:T.ASH };
+  const centers = [
+    { x:70,  y:70,  b:'plains'   },  // Greenmark (geschützt)
+    { x:60,  y:300, b:'forest'   },  // Westwald
+    { x:150, y:410, b:'marsh'    },  // Südsumpf
+    { x:250, y:250, b:'plains'   },  // Mittelland
+    { x:250, y:40,  b:'mountain' },  // Nordgebirge
+    { x:340, y:36,  b:'mountain' },  // Frostkamm
+    { x:430, y:150, b:'desert'   },  // Rote Wüste
+    { x:380, y:90,  b:'badland'  },  // Aschmark
+    { x:445, y:280, b:'plains'   },  // Ostmark (Orden)
+    { x:330, y:360, b:'badland'  },  // Grenzöde (sichtbarer Rand zum Totenreich)
+    { x:410, y:410, b:'blight'   },  // Totenreich-Kern
+    { x:360, y:460, b:'blight'   },
+    { x:470, y:440, b:'blight'   },
+    { x:120, y:180, b:'plains'   },  // südliche Ebenen
+  ];
+  const protectedNW = (x, y) => x < 140 && y < 150;      // Greenmark bleibt handgebaut
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (protectedNW(x, y)) continue;
+    const idx = y * w + x; if (tiles[idx] !== T.GRASS) continue;   // handgebaute Kacheln nie überschreiben
+    const jx = x + (nz(x, y) - 0.5) * 26, jy = y + (nz(y, x) - 0.5) * 26;   // organische Ränder
+    let best = null, bd = 1e9;
+    for (const c of centers) { const d = (c.x - jx) ** 2 + (c.y - jy) ** 2; if (d < bd) { bd = d; best = c; } }
+    const base = BIOME[best.b];
+    if (base !== T.GRASS) tiles[idx] = base;
+  }
+
+  // ---- Große Gewässer: Südmeer, Inseln, Bergseen, Ostfluss ----
+  for (let x = 0; x < w; x++) { const line = 476 + Math.round(Math.sin(x / 20) * 4); for (let y = line; y < h; y++) setTile('world', x, y, T.WATER); }
+  for (let x = 0; x < w; x++) { const line = 476 + Math.round(Math.sin(x / 20) * 4); for (let y = line - 3; y < line; y++) if (tileAt('world', x, y) !== T.WATER) setTile('world', x, y, T.SAND); }
+  blob('world', 90, 500, 16, T.GRASS, 0.9); blob('world', 300, 505, 12, T.SAND, 0.85);   // Inseln (Insel-Kerne)
+  blob('world', 90, 500, 12, T.GRASS, 0.7);
+  blob('world', 250, 120, 10, T.WATER, 0.8); blob('world', 300, 300, 13, T.WATER, 0.8);    // Bergsee, Mittelsee
+  blob('world', 175, 200, 9, T.WATER, 0.75);
+  for (let y = 40; y < 476; y++) { const rx = 300 + Math.round(Math.sin(y / 30) * 6); if (tileAt('world', rx, y) !== T.ASH) { setTile('world', rx, y, T.WATER); setTile('world', rx + 1, y, T.WATER); } }  // Ostfluss
+
+  // ---- Straßennetz: die großen Handelsstraßen ----
+  const road = (x0, y0, x1, y1, wob = 1) => {                 // grobe Straße mit Knick
+    let x = x0, y = y0;
+    const step = () => { const t = tileAt('world', x, y); if (t !== T.WATER) setTile('world', x, y, t === T.ASH ? T.DIRT : T.ROAD); else { setTile('world', x, y, T.PLANK); setTile('world', x, y + 1, T.PLANK); } };
+    while (x !== x1) { step(); if (wob && chance(0.3)) setTile('world', x, y + 1, tileAt('world', x, y + 1) === T.WATER ? T.PLANK : T.ROAD); x += x < x1 ? 1 : -1; }
+    while (y !== y1) { step(); if (wob && chance(0.3)) setTile('world', x + 1, y, tileAt('world', x + 1, y) === T.WATER ? T.PLANK : T.ROAD); y += y < y1 ? 1 : -1; }
+  };
+  road(118, 64, 380, 90);           // Oststraße: Nordfurt → Aschfurt
+  road(64, 74, 118, 300);           // Südstraße: Eren → Steinbrücke-Region
+  road(118, 300, 150, 448);         // weiter zur Küste: → Salzhafen
+  road(120, 250, 250, 250);         // Mittellandstraße West
+  road(250, 250, 445, 275);         // Mittellandstraße Ost → Ostmark/Sonnwacht
+  road(250, 64, 250, 250);          // Nordachse: Nordgebirge → Mittelland
+  road(330, 360, 410, 410, 0);      // Aschenpfad ins Totenreich (kein Wobble, karg)
+  prop('sign', 110, 300, { label:'Steinbrücke' });
+  for (let i = 0; i < 6; i++) prop('rubble', ri(105, 113), ri(296, 306));
+
+  // ---- Wälder: dichte Baumgürtel je Biom ----
+  const forestBelt = (cx, cy, r, n, kind = 'tree') => { for (let i = 0; i < n; i++) { const x = cx + ri(-r, r), y = cy + ri(-r, r);
+    if (Math.hypot(x - cx, y - cy) < r && tileAt('world', x, y) === T.GRASS && chance(0.5)) prop(kind, x, y, kind === 'tree' ? { solid:true, r:12, hp:3 } : {}); } };
+  forestBelt(60, 300, 60, 1600);    // Westwald
+  forestBelt(210, 200, 46, 600);    // Mittellandhaine
+  forestBelt(150, 150, 40, 500);    // Übergangswald
+  for (let i = 0; i < 140; i++) prop('bush', ri(20, 120), ri(240, 360), { harvest:'herb' });
+
+  // ---- Salzhafen: große Hafenstadt an der Südküste ----
+  rect('world', 138, 438, 26, 24, T.DIRT);
+  for (let x = 138; x < 164; x++) setTile('world', x, 450, T.ROAD);
+  house('world', 140, 440, 6, 5, 'S'); prop('sign', 143, 445, { label:'Salzhafen — Kontor', tag:'harbor' });
+  house('world', 150, 440, 5, 4, 'S'); house('world', 158, 440, 5, 4, 'S');
+  house('world', 140, 452, 5, 4, 'N'); house('world', 152, 452, 6, 5, 'N');
+  prop('stall', 147, 449, { tag:'market' }); prop('stall', 149, 449, { tag:'market' });
+  prop('well', 150, 451, { solid:true }); prop('board', 145, 450, { label:'Anschlagbrett', tag:'board' });
+  for (let i = 0; i < 12; i++) prop('crate', ri(139, 162), ri(439, 461));
+  for (let d = 0; d < 8; d++) { setTile('world', 146, 463 + d, T.PLANK); setTile('world', 147, 463 + d, T.PLANK); setTile('world', 156, 463 + d, T.PLANK); }   // Stege
+  prop('cart', 142, 460); prop('campfire_static', 159, 458);
+
+  // ---- Kreuzweg: Söldnerstadt im Herzen des Mittellands ----
+  rect('world', 240, 240, 22, 18, T.DIRT);
+  for (let x = 240; x < 262; x++) setTile('world', x, 250, T.ROAD);
+  house('world', 242, 242, 6, 5, 'S'); prop('sign', 245, 247, { label:'Kreuzweg — Rasthaus', tag:'tavern' });
+  house('world', 250, 242, 5, 4, 'S'); house('world', 256, 243, 5, 4, 'W');
+  house('world', 242, 252, 5, 4, 'N'); house('world', 254, 251, 6, 5, 'N');
+  prop('stall', 248, 249, { tag:'market' }); prop('stall', 250, 249, { tag:'market' });
+  prop('well', 250, 247, { solid:true }); prop('board', 246, 250, { label:'Anschlagbrett', tag:'board' });
+  prop('anvil', 253, 246, { tag:'smithy', solid:true });
+  for (let i = 0; i < 10; i++) prop('crate', ri(241, 260), ri(241, 257));
+
+  // ---- Aschfurt: befestigter Grenzposten (Händlerland) ----
+  rect('world', 372, 84, 16, 16, T.DIRT);
+  for (let x = 372; x < 388; x++) { setTile('world', x, 84, T.WALL); if (x < 378 || x > 381) setTile('world', x, 99, T.WALL); }
+  for (let y = 84; y < 100; y++) { setTile('world', 372, y, T.WALL); setTile('world', 387, y, T.WALL); }
+  house('world', 375, 87, 5, 4, 'S'); house('world', 381, 87, 5, 4, 'S');
+  prop('stall', 378, 94, { tag:'market' }); prop('well', 380, 96, { solid:true });
+  prop('sign', 376, 93, { label:'Aschfurt — Tor' }); prop('board', 382, 94, { label:'Anschlagbrett', tag:'board' });
+  prop('watchtower_ruin', 373, 85, { solid:true });
+
+  // ---- Sonnwacht: Feste des Ordens im Osten (Fraktionsgebiet) ----
+  rect('world', 446, 246, 20, 20, T.STONE);
+  for (let x = 446; x < 466; x++) { setTile('world', x, 246, T.WALL); if (x < 453 || x > 458) setTile('world', x, 265, T.WALL); }
+  for (let y = 246; y < 266; y++) { setTile('world', 446, y, T.WALL); setTile('world', 465, y, T.WALL); }
+  house('world', 449, 249, 6, 5, 'S'); house('world', 458, 249, 5, 4, 'S');
+  prop('shrine', 456, 256, { label:'Schrein des Ordens', tag:'shrine' });
+  prop('torch', 450, 248, {}); prop('torch', 462, 248, {});
+  prop('banner_torn', 450, 246); prop('sign', 454, 261, { label:'Sonnwacht — Feste des Ordens' });
+  prop('watchtower_ruin', 447, 247, { solid:true }); prop('watchtower_ruin', 463, 247, { solid:true });
+  prop('chest', 456, 258, { loot:['order_seal', 'potion'], label:'Ordenskapelle' });
+
+  // ---- Frostkamm & Tiefhall: nördliches Hochgebirge ----
+  for (let i = 0; i < 140; i++) blob('world', ri(180, 380), ri(6, 60), ri(3, 8), T.ROCK, 0.72);
+  rect('world', 244, 32, 12, 10, T.DFLOOR);
+  prop('mine_entrance', 250, 36, { solid:false, label:'Tiefhall', tag:'delve' });
+  prop('chest', 250, 34, { loot:['plate_cuirass', 'iron', 'iron'], label:'Tiefhall-Hort' });
+  for (let i = 0; i < 24; i++) prop('ore_node', ri(200, 360), ri(8, 56), { harvest:'iron', solid:true });
+  prop('banner_torn', 330, 24); prop('camp_ruin', 300, 50, { label:'Erfrorenes Lager' });
+
+  // ---- Rote Wüste: Dünen und Mesas im Osten ----
+  for (let i = 0; i < 60; i++) blob('world', ri(380, 500), ri(90, 220), ri(3, 6), T.ROCK, 0.55);   // Mesas
+  for (let i = 0; i < 90; i++) prop('dead_tree', ri(380, 500), ri(90, 220), { solid:true });
+  for (let i = 0; i < 40; i++) prop('rock_node', ri(380, 500), ri(90, 220), { harvest:'stone', solid:true });
+  prop('camp_ruin', 430, 150, { label:'Verbrannte Karawane' });
+  prop('chest', 470, 180, { loot:['greatsword', 'iron', 'potion'], label:'Wüstengruft' });
+
+  // ---- Wolfsschlucht: gefährliche Felsschlucht im Westen ----
+  blob('world', 44, 300, 16, T.ROCK, 0.7); rect('world', 40, 296, 10, 10, T.DIRT);
+  for (let i = 0; i < 14; i++) prop('rock_node', ri(36, 54), ri(292, 310), { harvest:'stone', solid:true });
+  for (let i = 0; i < 8; i++) prop('bone', ri(40, 50), ri(296, 306));
+  prop('chest', 45, 300, { loot:['longbow', 'potion'], label:'Räuberversteck' });
+  prop('fallen_tree', 48, 305, { solid:true });
+
+  // ---- Südsumpf & Versunkener Tempel ----
+  for (let i = 0; i < 40; i++) blob('world', ri(90, 200), ri(380, 450), ri(1, 3), T.WATER, 0.7);
+  rect('world', 136, 406, 9, 9, T.STONE);
+  prop('marsh_ruin', 140, 410, { label:'Versunkener Tempel' });
+  for (let i = 0; i < 6; i++) prop('broken_pillar', ri(136, 145), ri(406, 415), { solid:true });
+  prop('chest', 142, 412, { loot:['staff', 'potion', 'order_seal'], label:'Tempelkammer' });
+  for (let i = 0; i < 10; i++) prop('gravestone', ri(132, 150), ri(404, 418));
+
+  // ======================================================================
+  //  DAS TOTENREICH — großes, zusammenhängendes Untoten-Einflussgebiet (SO)
+  //  Verseuchte Asche, ruinierte Stadt, Nekropole, Nekromanten-Türme, Feste.
+  // ======================================================================
+  for (let i = 0; i < 40; i++) prop('dead_tree', ri(320, 500), ri(340, 470), { solid:true });   // toter Wald
+  for (let i = 0; i < 30; i++) prop('gravestone', ri(320, 500), ri(340, 470));
+  // sichtbare Grenze zur Ostmark
+  for (let y = 320; y < 400; y++) { const bx = 322 + Math.round(Math.sin(y / 12) * 3); prop('bone_spire', bx, y, { solid:true }); y += 6; }
+
+  // Alt-Vharn: ruinierte Stadt der Untoten
+  rect('world', 350, 372, 24, 18, T.ASH);
+  for (let x = 350; x < 374; x++) if (chance(0.6)) setTile('world', x, 372, T.DWALL);
+  for (let y = 372; y < 390; y++) if (chance(0.6)) setTile('world', 350, y, T.DWALL);
+  for (let i = 0; i < 16; i++) prop('rubble', ri(351, 372), ri(373, 388));
+  for (let i = 0; i < 8; i++) prop('broken_pillar', ri(352, 371), ri(374, 388), { solid:true });
+  prop('crypt', 360, 380, { solid:true, label:'Alt-Vharn — Gruft' });
+  prop('chest', 362, 382, { loot:['grave_seal', 'chain_hauberk'], label:'Gruft von Alt-Vharn' });
+  prop('sign', 356, 390, { label:'Alt-Vharn — was von der Stadt blieb' });
+
+  // Nekromanten-Türme (zwei Wachtürme des Reichs)
+  const necroTower = (tx, ty) => { rect('world', tx - 1, ty - 1, 3, 3, T.DWALL); prop('obelisk', tx, ty, { solid:true, label:'Nekromanten-Turm' });
+    prop('torch', tx - 2, ty, {}); prop('torch', tx + 2, ty, {}); prop('bone_spire', tx, ty + 3, { solid:true }); };
+  necroTower(392, 348); necroTower(452, 402);
+
+  // Nekropole: großes Gräberfeld
+  rect('world', 396, 430, 20, 16, T.ASH);
+  for (let i = 0; i < 30; i++) prop('gravestone', ri(397, 415), ri(431, 445));
+  prop('crypt', 404, 437, { solid:true, label:'Große Nekropole' });
+  prop('obelisk', 400, 433, { solid:true });
+
+  // Die Schwarze Feste: Thron der Stillen Schar
+  rect('world', 420, 418, 24, 24, T.ASH);
+  for (let x = 420; x < 444; x++) { setTile('world', x, 418, T.DWALL); if (x < 428 || x > 433) setTile('world', x, 441, T.DWALL); }
+  for (let y = 418; y < 442; y++) { setTile('world', 420, y, T.DWALL); setTile('world', 443, y, T.DWALL); }
+  rect('world', 427, 425, 9, 9, T.DFLOOR);
+  prop('crypt', 431, 430, { solid:true, label:'Thron der Stillen Schar' });
+  prop('bone_spire', 423, 421, { solid:true }); prop('bone_spire', 440, 421, { solid:true });
+  prop('bone_spire', 423, 438, { solid:true }); prop('bone_spire', 440, 438, { solid:true });
+  prop('obelisk', 431, 436, { solid:true, label:'Nekromantischer Obelisk' });
+  prop('torch', 427, 423, {}); prop('torch', 435, 423, {});
+  prop('banner_torn', 427, 418); prop('banner_torn', 435, 418);
+  prop('chest', 431, 432, { loot:['grave_seal', 'potion', 'plate_cuirass'], label:'Grabkammer der Feste' });
+
+  // ======================================================================
+  //  ENTDECKEN — Streugut der Wildnis: nicht jeder Ort trägt eine Quest.
+  // ======================================================================
+  const inWild = (x, y) => !protectedNW(x, y) && ![T.WATER, T.ROAD, T.PLANK, T.WALL, T.DWALL].includes(tileAt('world', x, y));
+  const cacheLoot = [['potion','longsword'], ['kite_shield','iron'], ['bandage','herb','herb'], ['dried_meat','bread'],
+    ['chain_hauberk'], ['longbow'], ['iron_helm','potion'], ['mace','bandage'], ['leather_jerkin','bread']];
+  let placed = 0;
+  for (let i = 0; i < 900 && placed < 60; i++) {           // versteckte Truhen/Verstecke
+    const x = ri(20, 500), y = ri(20, 500);
+    if (inWild(x, y) && Math.hypot(x - 70, y - 70) > 60) { prop('chest', x, y, { loot: pick(cacheLoot), label: pick(['Verstecktes Bündel', 'Vergessene Truhe', 'Beutelager', 'Alter Vorrat']) }); placed++; }
+  }
+  for (let i = 0; i < 500; i++) {                          // verlassene Lager (Umgebungsstorytelling)
+    const x = ri(20, 500), y = ri(20, 500);
+    if (inWild(x, y) && chance(0.5)) { prop('camp_ruin', x, y, { label: pick(['Verlassenes Lager', 'Ausgebranntes Feuer', 'Zurückgelassene Habe']) });
+      if (chance(0.4)) prop('crate', x + ri(-2, 2), y + ri(-2, 2), { loot: pick(cacheLoot) }); }
+  }
+  for (let i = 0; i < 400; i++) {                          // Ruinen und Säulen
+    const x = ri(20, 500), y = ri(20, 500);
+    if (inWild(x, y) && chance(0.4)) prop(pick(['broken_pillar', 'rubble', 'gravestone', 'fallen_tree']), x, y, { solid: chance(0.5) });
+  }
+  for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
+  for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   return props.filter(p => p.type !== 'tree' || tileAt('world', p.x / TS | 0, p.y / TS | 0) === T.GRASS);

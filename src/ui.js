@@ -215,7 +215,9 @@ export function renderContext(target) {
 }
 const propName = t => ({ tree:'Baum', bush:'Strauch', rock_node:'Felsbrocken', ore_node:'Erzader', crate:'Kiste', chest:'Truhe',
   well:'Brunnen', sign:'Schild', board:'Anschlagbrett', anvil:'Amboss', shrine:'Schrein', gravestone:'Grabstein',
-  mine_entrance:'Grubeneingang', mine_exit:'Ausgang', campfire_static:'Feuerstelle', claim_stone:'Grenzstein' }[t] || 'Objekt');
+  mine_entrance:'Grubeneingang', mine_exit:'Ausgang', campfire_static:'Feuerstelle', claim_stone:'Grenzstein',
+  dead_tree:'Toter Baum', bone_spire:'Knochenturm', obelisk:'Obelisk', watchtower_ruin:'Turmruine',
+  marsh_ruin:'Ruine', broken_pillar:'Gebrochene Säule', crypt:'Gruft' }[t] || 'Objekt');
 
 export function relLabel(v) {
   if (v <= -60) return 'Feind'; if (v <= -20) return 'Rivale'; if (v < 10) return 'Fremder';
@@ -683,7 +685,7 @@ function settingsUI(body) {
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
-      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br>E — Interagieren<br>Q — Ausweichen<br>1–8 — Fähigkeiten<br>
+      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>1–8 — Fähigkeiten<br>
       I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button></div>

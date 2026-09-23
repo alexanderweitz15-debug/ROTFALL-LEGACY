@@ -116,6 +116,14 @@ function shadow(x, y, r, a = 0.35) {
   ctx.beginPath(); ctx.ellipse(x, y + 2, r, r * 0.45, 0, 0, 7); ctx.fill();
 }
 
+// Trefferblitz: kurzes helles Aufleuchten der Figur nach einem Treffer. Nutzt e.lastHurt (gleicher Zeitgeber wie now).
+const FLASH_MS = 130;
+function flashAlpha(e, now) {
+  if (!e || !e.lastHurt) return 0;
+  const dt = now - e.lastHurt;
+  return dt >= 0 && dt < FLASH_MS ? (1 - dt / FLASH_MS) * 0.6 : 0;
+}
+
 function drawEntity(e, now) {
   switch (e.kind) {
     case 'prop': return drawProp(e, now);
@@ -290,6 +298,34 @@ function drawProp(e, now) {
       ctx.fillStyle = '#7d7466';
       for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + i * 5 - 2, y + 3); ctx.lineTo(x + i * 5, y - 8); ctx.lineTo(x + i * 5 + 2, y + 3); ctx.fill(); }
       break;
+    case 'dead_tree': {                                   // kahler Baum: Wüste und Blight
+      shadow(x, y + 5, 10, .3);
+      ctx.strokeStyle = '#3a2e20'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x, y - 20);
+      ctx.moveTo(x, y - 8); ctx.lineTo(x - 9, y - 18); ctx.moveTo(x, y - 12); ctx.lineTo(x + 8, y - 22);
+      ctx.moveTo(x, y - 4); ctx.lineTo(x + 6, y - 10); ctx.stroke(); ctx.lineCap = 'butt';
+      break; }
+    case 'bone_spire': {                                  // Knochenturm der Untoten
+      shadow(x, y + 4, 10, .35);
+      const g = Math.sin(now / 500 + x) * 0.5 + 0.5;
+      ctx.fillStyle = '#cfc8b4';
+      ctx.beginPath(); ctx.moveTo(x - 7, y + 4); ctx.lineTo(x - 3, y - 30); ctx.lineTo(x, y - 34); ctx.lineTo(x + 3, y - 30); ctx.lineTo(x + 7, y + 4); ctx.fill();
+      ctx.fillStyle = '#a79f8b'; for (let i = 0; i < 4; i++) ctx.fillRect(x - 5 + i, y - 6 - i * 7, 10 - i * 2, 2);
+      ctx.fillStyle = `rgba(78,143,122,${.3 + g * .4})`; ctx.beginPath(); ctx.arc(x, y - 33, 3, 0, 7); ctx.fill();
+      break; }
+    case 'obelisk': {                                     // nekromantischer Obelisk
+      shadow(x, y + 4, 12, .4);
+      ctx.fillStyle = '#20262a'; ctx.beginPath(); ctx.moveTo(x - 7, y + 4); ctx.lineTo(x - 5, y - 34); ctx.lineTo(x, y - 40); ctx.lineTo(x + 5, y - 34); ctx.lineTo(x + 7, y + 4); ctx.fill();
+      ctx.strokeStyle = `rgba(78,143,122,${.4 + .3 * Math.sin(now / 300)})`; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.lineTo(x, y - 8); ctx.moveTo(x - 3, y - 22); ctx.lineTo(x + 3, y - 22); ctx.stroke();
+      break; }
+    case 'watchtower_ruin':                               // verfallener Wachturm
+      shadow(x, y + 5, 13, .4);
+      ctx.fillStyle = '#3a3733'; ctx.fillRect(x - 9, y - 30, 18, 34);
+      ctx.fillStyle = '#2b2824'; ctx.fillRect(x - 9, y - 30, 18, 4);
+      ctx.fillStyle = '#16140f'; ctx.fillRect(x - 4, y - 14, 8, 12);
+      ctx.fillStyle = '#4a463f'; for (let i = 0; i < 3; i++) ctx.fillRect(x - 9 + i * 7, y - 34, 4, 5);
+      break;
     default:
       ctx.fillStyle = '#4a443c'; ctx.fillRect(x - 7, y - 7, 14, 12);
   }
@@ -298,6 +334,14 @@ function drawProp(e, now) {
 // ---- Sprite-Bausteine ----
 const SKIN = ['#d6b089', '#b98f66', '#8d6644', '#f0d2ae', '#6d4a30'];
 const HAIR = ['#2b2118', '#5a3a1e', '#8a7a52', '#c9bfa6', '#7d2f1d'];
+// Farbe abdunkeln (amt<0) oder aufhellen (amt>0): für Kontur, Schatten, Kapuzen im Referenz-Grimdark-Stil.
+function shade(hex, amt) {
+  if (!hex || hex[0] !== '#' || hex.length < 7) return hex || '#000';
+  let r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const t = Math.abs(amt), f = amt < 0 ? 0 : 255;
+  r = Math.round(r + (f - r) * t); g = Math.round(g + (f - g) * t); b = Math.round(b + (f - b) * t);
+  return `rgb(${r},${g},${b})`;
+}
 
 export function drawHumanoid(e, now, override) {
   const c = override || ctx;
@@ -320,12 +364,24 @@ export function drawHumanoid(e, now, override) {
   // Von vorn (Blick nach unten) ist die rechte Körperseite links im Bild.
   const bd = e.body, off = k => bd && bd[k].hp <= 0;
   const [screenL, screenR] = face === 0 ? ['r', 'l'] : ['l', 'r'];
+  const hooded = e.hooded || !!(e.equip && e.equip.cloak) || !!p.hood;
+  // Dunkle Kontur: vergrößerte Silhouette dahinter (Referenz: klare Outline um jede Figur).
+  c.fillStyle = '#0b0a08';
+  c.beginPath(); c.arc(x, y - 25 + bob, hooded ? 8.4 : 7.3, 0, 7); c.fill();
+  c.fillRect(x - 8.3, y - 21 + bob, 16.6, 16.5);
+  c.fillRect(x - 6, y - 6 + bob, 5, 10.5); c.fillRect(x + 1, y - 6 + bob, 5, 10.5);
+  c.fillRect(x - 10, y - 20 + bob, 4, 12); c.fillRect(x + 6, y - 20 + bob, 4, 12);
   // Beine
   const step = walking ? Math.sin(now / 90 + (e.seed || 0)) * 3 : 0;
   c.fillStyle = off(screenL + 'leg') ? '#4a1c16' : '#2f2519'; c.fillRect(x - 5, y - 6 + bob, 4, 9 + step * 0.3);
   c.fillStyle = off(screenR + 'leg') ? '#4a1c16' : '#2f2519'; c.fillRect(x + 1, y - 6 + bob, 4, 9 - step * 0.3);
-  // Umhang
-  if (e.equip && e.equip.cloak) { c.fillStyle = p.cloak || '#5b2a20'; c.fillRect(x - 8, y - 22 + bob, 16, 18); }
+  // Umhang: zerlumpter Saum wie bei den Referenzfiguren
+  if (e.equip && e.equip.cloak) {
+    c.fillStyle = p.cloak || shade(cloth, -0.35);
+    c.beginPath(); c.moveTo(x - 8, y - 22 + bob); c.lineTo(x + 8, y - 22 + bob); c.lineTo(x + 7, y - 3 + bob);
+    c.lineTo(x + 4, y - 5 + bob); c.lineTo(x + 1, y - 2 + bob); c.lineTo(x - 2, y - 5 + bob); c.lineTo(x - 5, y - 2 + bob); c.lineTo(x - 8, y - 4 + bob); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(x - 8, y - 12 + bob, 16, 9);
+  }
   // Rumpf
   c.fillStyle = cloth; c.fillRect(x - 7, y - 20 + bob, 14, 15);
   if (p.armor) { c.fillStyle = p.armor; c.fillRect(x - 7, y - 20 + bob, 14, 9); c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(x - 7, y - 20 + bob, 14, 2); }
@@ -333,23 +389,63 @@ export function drawHumanoid(e, now, override) {
   // Arme
   c.fillStyle = off(screenL + 'arm') ? '#6b2a20' : skin; c.fillRect(x - 9, y - 19 + bob + (off(screenL + 'arm') ? 3 : 0), 3, 10);
   c.fillStyle = off(screenR + 'arm') ? '#6b2a20' : skin; c.fillRect(x + 6, y - 19 + bob + (off(screenR + 'arm') ? 3 : 0), 3, 10);
-  // Kopf
-  c.fillStyle = skin; c.beginPath(); c.arc(x, y - 25 + bob, 6, 0, 7); c.fill();
-  if (face !== 1) { c.fillStyle = 'rgba(20,14,10,.75)';
-    if (face === 0) { c.fillRect(x - 3, y - 26 + bob, 1.6, 2); c.fillRect(x + 1.5, y - 26 + bob, 1.6, 2); }
-    if (face === 2) { c.fillRect(x - 4, y - 26 + bob, 1.6, 2); }
-    if (face === 3) { c.fillRect(x + 2.5, y - 26 + bob, 1.6, 2); }
+  // Kopf — unter der Kapuze im Schatten
+  const glow = p.glow;
+  c.fillStyle = hooded ? shade(skin, -0.5) : skin; c.beginPath(); c.arc(x, y - 25 + bob, 6, 0, 7); c.fill();
+  // Augen: Untote/Verkapuzte leuchten, sonst dunkle Punkte
+  if (face !== 1) {
+    if (glow || hooded) { c.fillStyle = glow || 'rgba(206,66,52,.9)';
+      if (face === 0) { c.fillRect(x - 3, y - 25.6 + bob, 1.9, 1.9); c.fillRect(x + 1.3, y - 25.6 + bob, 1.9, 1.9); }
+      else if (face === 2) c.fillRect(x - 4, y - 25.6 + bob, 1.9, 1.9);
+      else c.fillRect(x + 2.3, y - 25.6 + bob, 1.9, 1.9);
+    } else { c.fillStyle = 'rgba(20,14,10,.75)';
+      if (face === 0) { c.fillRect(x - 3, y - 26 + bob, 1.6, 2); c.fillRect(x + 1.5, y - 26 + bob, 1.6, 2); }
+      if (face === 2) c.fillRect(x - 4, y - 26 + bob, 1.6, 2);
+      if (face === 3) c.fillRect(x + 2.5, y - 26 + bob, 1.6, 2);
+    }
   }
-  // Haar / Helm
-  if (p.helm) { c.fillStyle = p.helm; c.beginPath(); c.arc(x, y - 26 + bob, 6.6, Math.PI, 0); c.fill(); c.fillRect(x - 6.6, y - 26 + bob, 13, 3); }
-  else { c.fillStyle = hair; c.beginPath(); c.arc(x, y - 27 + bob, 6.2, Math.PI, 0); c.fill(); c.fillRect(x - 6, y - 27 + bob, 12, 3); }
+  // Kopfbedeckung: Helm ▸ Kapuze ▸ Haar
+  if (p.helm) {
+    if (p.crest) {                                                                    // Helmbusch der Ritter (Referenz: Federkämme)
+      c.fillStyle = p.crest; const dx = face === 2 ? -1 : 1;
+      c.beginPath(); c.moveTo(x - 1, y - 30 + bob); c.quadraticCurveTo(x + dx * 7, y - 39 + bob, x + dx * 3, y - 29 + bob);
+      c.quadraticCurveTo(x + dx * 2, y - 31 + bob, x - 1, y - 30 + bob); c.fill();
+      c.fillStyle = shade(p.crest, -0.3); c.beginPath(); c.moveTo(x - 1, y - 30 + bob); c.quadraticCurveTo(x + dx * 4, y - 36 + bob, x + dx * 2, y - 30 + bob); c.fill();
+    }
+    c.fillStyle = p.helm; c.beginPath(); c.arc(x, y - 26 + bob, 6.6, Math.PI, 0); c.fill(); c.fillRect(x - 6.6, y - 26 + bob, 13, 3);
+    c.fillStyle = 'rgba(240,236,220,.14)'; c.fillRect(x - 6.6, y - 27 + bob, 13, 1.4);
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x - 4, y - 24.5 + bob, 8, 1.4);       // Visierschlitz
+  } else if (hooded) {
+    const hoodCol = p.hood || shade(cloth, -0.5);
+    c.fillStyle = hoodCol;
+    c.beginPath(); c.arc(x, y - 26 + bob, 8, Math.PI * 1.03, -0.03); c.fill();      // Haube
+    c.fillRect(x - 8, y - 26 + bob, 16, 5);
+    c.beginPath(); c.moveTo(x - 8, y - 27 + bob); c.lineTo(x - 4.4, y - 19 + bob); c.lineTo(x - 8.6, y - 18 + bob); c.closePath(); c.fill();   // Kanten ums Gesicht
+    c.beginPath(); c.moveTo(x + 8, y - 27 + bob); c.lineTo(x + 4.4, y - 19 + bob); c.lineTo(x + 8.6, y - 18 + bob); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.arc(x, y - 27.5 + bob, 5.2, Math.PI, 0); c.fill();                                        // Gesichtsschatten
+    c.fillStyle = 'rgba(240,236,220,.07)'; c.beginPath(); c.arc(x, y - 26 + bob, 8, Math.PI, Math.PI * 1.42); c.fill();                        // Randlicht
+  } else {
+    c.fillStyle = hair; c.beginPath(); c.arc(x, y - 27 + bob, 6.2, Math.PI, 0); c.fill(); c.fillRect(x - 6, y - 27 + bob, 12, 3);
+  }
   // Waffe
   if (armed) drawWeapon(c, e, now, bob);
-  if (e.equip && e.equip.offhand) {
-    c.fillStyle = '#5b452a'; c.beginPath(); c.ellipse(x + (face === 2 ? 10 : -10), y - 14 + bob, 4.5, 7, 0, 0, 7); c.fill();
-    c.fillStyle = '#7d7466'; c.beginPath(); c.arc(x + (face === 2 ? 10 : -10), y - 14 + bob, 1.8, 0, 7); c.fill();
+  if (e.equip && e.equip.offhand) {                                  // Wappenschild (Referenz: Ritterschilde)
+    const shx = x + (face === 2 ? 10 : -10), shy = y - 14 + bob;
+    c.fillStyle = '#1a1611';
+    c.beginPath(); c.moveTo(shx - 5, shy - 7); c.lineTo(shx + 5, shy - 7); c.lineTo(shx + 5, shy + 2); c.quadraticCurveTo(shx, shy + 10, shx - 5, shy + 2); c.closePath(); c.fill();
+    c.fillStyle = p.shield || '#4a3f30';
+    c.beginPath(); c.moveTo(shx - 4, shy - 6); c.lineTo(shx + 4, shy - 6); c.lineTo(shx + 4, shy + 1.5); c.quadraticCurveTo(shx, shy + 8, shx - 4, shy + 1.5); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(240,236,220,.14)'; c.fillRect(shx - 4, shy - 6, 8, 1.4);
+    c.fillStyle = p.shieldBoss || '#8a8172'; c.beginPath(); c.arc(shx, shy - 1.5, 1.7, 0, 7); c.fill();
   }
   c.restore();
+  const fa = flashAlpha(e, now);
+  if (fa > 0) {
+    c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = fa; c.fillStyle = '#ffe9c8';
+    c.beginPath(); c.arc(x, y - 25 + bob, 6.6, 0, 7); c.fill();
+    c.fillRect(x - 8, y - 21 + bob, 16, 17);
+    c.restore();
+  }
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 34, 4, 0, 7); c.stroke(); }
 }
 
@@ -368,19 +464,34 @@ function drawWeapon(c, e, now, bob) {
     c.fillStyle = '#4a3a22'; c.fillRect(0, -1.5, 24, 3);
     c.fillStyle = 'rgba(120,90,160,.8)'; c.beginPath(); c.arc(25, 0, 3.5, 0, 7); c.fill();
   } else {
+    const glowCol = it.rarity === 'legendary' ? 'rgba(232,182,72,0.55)' : it.rarity === 'epic' ? 'rgba(206,150,86,0.4)' : it.holy ? 'rgba(214,198,150,0.4)' : null;
+    if (glowCol) {                                                    // leuchtende Klinge (Referenz: glühende Waffen)
+      c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = glowCol; c.lineCap = 'round'; c.lineWidth = 5;
+      c.beginPath(); c.moveTo(3, 0); c.lineTo(len + 6, 0); c.stroke(); c.restore();
+    }
     c.fillStyle = '#2f2519'; c.fillRect(-3, -1.6, 6, 3.2);           // Griff
     c.fillStyle = '#6d6154'; c.fillRect(2, -2.8, 2.5, 5.6);          // Parier
-    c.fillStyle = it.rarity === 'epic' ? '#b39b6a' : '#a8a196';
+    c.fillStyle = it.rarity === 'legendary' ? '#d8b25a' : it.rarity === 'epic' ? '#b39b6a' : '#a8a196';
     if (it.wtype === 'axe') { c.fillRect(3, -1.4, len * .7, 2.8); c.beginPath(); c.moveTo(len * .6, -7); c.lineTo(len * .95, 0); c.lineTo(len * .6, 7); c.fill(); }
     else if (it.wtype === 'spear') { c.fillRect(3, -1.1, len, 2.2); c.beginPath(); c.moveTo(len + 3, -3); c.lineTo(len + 10, 0); c.lineTo(len + 3, 3); c.fill(); }
     else if (it.wtype === 'mace') { c.fillRect(3, -1.4, len * .7, 2.8); c.beginPath(); c.arc(len * .8, 0, 4.5, 0, 7); c.fill(); }
-    else { c.fillRect(3, -1.6, len, 3.2); c.beginPath(); c.moveTo(len + 3, -1.6); c.lineTo(len + 7, 0); c.lineTo(len + 3, 1.6); c.fill(); }
+    else { c.fillRect(3, -1.6, len, 3.2); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(3, -1.6, len, 1);   // Klingenglanz
+      c.fillStyle = it.rarity === 'legendary' ? '#d8b25a' : it.rarity === 'epic' ? '#b39b6a' : '#a8a196';
+      c.beginPath(); c.moveTo(len + 3, -1.6); c.lineTo(len + 7, 0); c.lineTo(len + 3, 1.6); c.fill(); }
   }
   c.restore();
-  if (sw > 0 && !it.ranged) {                                        // Hiebbogen
-    const arc = it.arc || 1.4;
-    c.strokeStyle = `rgba(230,226,210,${0.45 * (1 - sw)})`; c.lineWidth = 3 * (1 - sw) + 1;
-    c.beginPath(); c.arc(e.x, e.y - 12, (it.reach || 40) * 0.8, dir - arc / 2, dir + arc / 2); c.stroke();
+  if (sw > 0 && !it.ranged) {                                        // Hiebbogen: heller, verjüngter Klingenschweif
+    const arc = it.arc || 1.4, R = (it.reach || 40) * 0.85, fade = 1 - sw;
+    const heavy = it.wtype === 'great' || it.wtype === 'axe' || it.wtype === 'mace';
+    c.lineCap = 'round';
+    c.strokeStyle = `rgba(244,238,218,${0.5 * fade})`; c.lineWidth = (heavy ? 5 : 3) * fade + 1.2;
+    c.beginPath(); c.arc(e.x, e.y - 12, R, dir - arc / 2, dir + arc / 2); c.stroke();
+    c.strokeStyle = `rgba(255,255,255,${0.55 * fade})`; c.lineWidth = (heavy ? 2 : 1.2) * fade + 0.5;
+    c.beginPath(); c.arc(e.x, e.y - 12, R, dir - arc / 2, dir + arc / 2); c.stroke();
+    const le = dir + arc / 2;                                         // Glanz an der Klingenspitze
+    c.fillStyle = `rgba(255,250,235,${0.6 * fade})`;
+    c.beginPath(); c.arc(e.x + Math.cos(le) * R, e.y - 12 + Math.sin(le) * R, 2 * fade + 0.6, 0, 7); c.fill();
+    c.lineCap = 'butt';
   }
 }
 
@@ -401,6 +512,9 @@ function drawCreature(e, now) {
     else { ctx.beginPath(); ctx.moveTo(hx - 4, e.y - 15 + bob); ctx.lineTo(hx - 1, e.y - 21 + bob); ctx.lineTo(hx + 2, e.y - 15 + bob); ctx.fill(); }
     ctx.fillStyle = p.eye; ctx.fillRect(hx + (e.facing === 2 ? -4 : 2), e.y - 11 + bob, 2, 2);
     ctx.fillStyle = p.dark; ctx.fillRect(e.x + (e.facing === 2 ? 12 : -16), e.y - 12 + bob, 5, 3);
+    const fw = flashAlpha(e, now);
+    if (fw > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fw; ctx.fillStyle = '#ffe9c8';
+      ctx.beginPath(); ctx.ellipse(e.x, e.y - 8 + bob, big ? 15 : 14, big ? 10 : 8, 0, 0, 7); ctx.arc(hx, e.y - 10 + bob, big ? 8 : 7, 0, 7); ctx.fill(); ctx.restore(); }
     return;
   }
   if (e.mtype === 'gorak') {
@@ -419,12 +533,23 @@ function drawCreature(e, now) {
       ctx.strokeStyle = `rgba(200,60,40,${0.3 + 0.4 * Math.sin(now / 60)})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y - 10, m.reach + 12, (e.aim ?? 0) - 0.9, (e.aim ?? 0) + 0.9); ctx.stroke();
     }
+    const fg = flashAlpha(e, now);
+    if (fg > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fg; ctx.fillStyle = '#ffe9c8';
+      ctx.fillRect(e.x - 18, y0(e) - 4 + bob, 36, 30); ctx.beginPath(); ctx.arc(e.x, y0(e) - 14 + bob, 12, 0, 7); ctx.fill(); ctx.restore(); }
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Skelett)
   const scale = e.mtype === 'goblin' ? 0.8 : 1;
-  const proxy = { ...e, pal: { skin: p.skin || p.metal, cloth: p.cloth, hair: '#241c14', armor: e.mtype === 'skeleton' ? null : p.metal },
+  const hood = e.hooded || e.mtype === 'skeleton' || e.mtype === 'bandit' || e.mtype === 'bandit_archer';
+  const proxy = { ...e, hooded: hood,
+                  pal: { skin: p.skin || p.metal, cloth: p.cloth, hair: '#241c14', armor: e.mtype === 'skeleton' ? null : p.metal, glow: p.glow },
                   equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null, offhand: e.shield } };
+  if (e.mtype === 'valen_soldier') {                    // Valens Soldaten als Ritter (blauer Helmbusch, Wappenschild)
+    proxy.hooded = false; Object.assign(proxy.pal, { helm: '#9aa3b0', crest: '#39599c', shield: '#2f4260', shieldBoss: '#b9c3d2' });
+    proxy.equip.offhand = { key: 'kite_shield' };
+  } else if (e.mtype === 'goblin_warrior') {
+    Object.assign(proxy.pal, { shield: '#3d2f20', shieldBoss: '#6b6156' });
+  }
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(scale, scale); ctx.translate(-e.x, -e.y);
   drawHumanoid(proxy, now);
   ctx.restore();
@@ -648,12 +773,15 @@ export function drawItemIconTo(canvas, key) {
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
   c.clearRect(0, 0, w, h); if (!it) return;
   c.save(); c.translate(w / 2, h / 2); const s = w / 48; c.scale(s, s);
+  c.shadowColor = 'rgba(6,5,4,0.9)'; c.shadowBlur = 1.6; c.shadowOffsetY = 1;   // einheitliche dunkle Kontur wie bei den Referenz-Assets
   const metal = it.rarity === 'legendary' ? '#d8b25a' : it.rarity === 'epic' ? '#b39b6a' : '#a8a196';
   const wood = '#5b452a';
   if (it.slot === 'weapon') {
     c.rotate(-0.7);
     if (it.wtype === 'bow') { c.strokeStyle = wood; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 13, -1.8, 1.8); c.stroke(); c.strokeStyle = '#ddd3c0'; c.lineWidth = 1; c.beginPath(); c.moveTo(-3, -12.8); c.lineTo(-3, 12.8); c.stroke(); }
-    else if (it.wtype === 'staff') { c.fillStyle = wood; c.fillRect(-2, -18, 4, 34); c.fillStyle = '#7b5aa0'; c.beginPath(); c.arc(0, -19, 5, 0, 7); c.fill(); }
+    else if (it.wtype === 'staff') { c.fillStyle = wood; c.fillRect(-2, -18, 4, 34);   // Zauberstab: blauer Kristall
+      c.fillStyle = '#3f6fb0'; c.beginPath(); c.moveTo(0, -25); c.lineTo(4, -19); c.lineTo(0, -13); c.lineTo(-4, -19); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(150,200,255,.8)'; c.beginPath(); c.moveTo(0, -23); c.lineTo(2, -19); c.lineTo(0, -16); c.closePath(); c.fill(); }
     else if (it.wtype === 'axe') { c.fillStyle = wood; c.fillRect(-2, -16, 4, 32); c.fillStyle = metal; c.beginPath(); c.moveTo(2, -14); c.lineTo(15, -8); c.lineTo(15, 2); c.lineTo(2, 0); c.fill(); }
     else if (it.wtype === 'spear') { c.fillStyle = wood; c.fillRect(-1.5, -14, 3, 32); c.fillStyle = metal; c.beginPath(); c.moveTo(-4, -14); c.lineTo(0, -22); c.lineTo(4, -14); c.fill(); }
     else if (it.wtype === 'mace') { c.fillStyle = wood; c.fillRect(-2, -8, 4, 26); c.fillStyle = metal; c.beginPath(); c.arc(0, -12, 7, 0, 7); c.fill(); }

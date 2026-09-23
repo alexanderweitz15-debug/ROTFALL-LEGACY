@@ -12,7 +12,8 @@ export function initSim() {
   S.towns ||= structuredClone(TOWNS);
   if (!S.war || !S.war.nodes) S.war = {
     nodes: structuredClone(WAR_NODES),
-    armies: [newArmy('undead', 'graveyard', 40), newArmy('valen', 'northcity', 50)],
+    armies: [newArmy('undead', 'graveyard', 40), newArmy('valen', 'northcity', 50),
+             newArmy('undead', 'blackkeep', 34), newArmy('valen', 'saltport', 28)],
     battles: [],
   };
   S.priceSeen ||= {};

@@ -230,6 +230,15 @@ export const WAR_NODES = {
   graveyard: { owner:'undead', garrison:10 }, marsh: { owner:null, garrison:0 }, fortress: { owner:null, garrison:0 },
   ruins: { owner:null, garrison:0 }, eren: { owner:'valen', garrison:14 }, road: { owner:'valen', garrison:4 },
   northcity: { owner:'valen', garrison:40 },
+  // Südost-Front: das Totenreich gegen Ostmark und Mittelland
+  blackkeep: { owner:'undead', garrison:40 }, necropolis: { owner:'undead', garrison:22 },
+  altvharn: { owner:'undead', garrison:16 }, sonnwacht: { owner:'order', garrison:20 },
+  kreuzweg: { owner:null, garrison:0 }, ashford: { owner:'valen', garrison:8 },
+  saltport: { owner:'valen', garrison:14 }, oldbridge: { owner:null, garrison:0 },
 };
 export const WAR_EDGES = [['graveyard','marsh'], ['graveyard','fortress'], ['marsh','eren'], ['fortress','eren'],
-  ['fortress','ruins'], ['ruins','eren'], ['eren','road'], ['road','northcity']];
+  ['fortress','ruins'], ['ruins','eren'], ['eren','road'], ['road','northcity'],
+  // Süd-/Ostfront
+  ['blackkeep','necropolis'], ['necropolis','altvharn'], ['altvharn','sonnwacht'], ['altvharn','oldbridge'],
+  ['sonnwacht','ashford'], ['ashford','northcity'], ['kreuzweg','oldbridge'], ['kreuzweg','ashford'],
+  ['kreuzweg','eren'], ['oldbridge','saltport'], ['oldbridge','eren']];
