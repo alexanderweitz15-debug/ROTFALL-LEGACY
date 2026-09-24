@@ -1,9 +1,10 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
-import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt } from './world.js';
+import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES } from './data.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES } from './world.js';
 import * as R from './render.js';
+import * as HB from './buildings.js';
 import * as UI from './ui.js';
 import * as SIM from './sim.js';
 import * as B from './body.js';
@@ -16,6 +17,7 @@ let combat = [];                        // lebende Kämpfer der aktuellen Karte,
 const keys = new Set();
 let mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false };
 const solidIndex = { world: new Map(), mine: new Map() };
+occupied.at = (map, tx, ty) => !!solidIndex[map]?.get(tx + ',' + ty)?.length;   // Spawns nie in Bäume/Felsen setzen
 
 // ================= Charaktere =================
 const SKIN = ['#d6b089', '#b98f66', '#8d6644', '#f0d2ae', '#6d4a30'];
@@ -211,8 +213,9 @@ function removeSolid(e) {
 }
 function solidPropAt(map, x, y, r) {
   const tx = (x / TS) | 0, ty = (y / TS) | 0, idx = solidIndex[map];
+  if (!idx || !idx.size) return null;                         // Karte ohne Objekt-Index (z. B. Selbsttest-Sandbox)
   for (let j = ty - 1; j <= ty + 1; j++) for (let i = tx - 1; i <= tx + 1; i++) {
-    const arr = idx.get(i + ',' + j); if (!arr) continue;
+    const arr = idx.get(i + ',' + j); if (!arr || !arr.length) continue;
     for (const p of arr) {
       if (p.kind === 'building') {
         const hw = p.def.w * TS / 2, hh = p.def.h * TS / 2;
@@ -224,7 +227,7 @@ function solidPropAt(map, x, y, r) {
 }
 
 const NPC_SPOTS = {
-  village:[60,62], tavern:[55,60], market:[60,62], smithy:[64,60], healer:[69,60], farm:[60,70],
+  village:[60,62], tavern:[55,60], market:[60,62], smithy:[65,63], healer:[69,60], farm:[60,70],
   shrine:[76,52], banditcamp:[66,116], graveyard:[34,96], mayor:[54,69], northcity:[119,60],
 };
 function spawnNPCs() {
@@ -262,6 +265,33 @@ function spawnVillagers() {
       traits: [pick(['gütig', 'mürrisch', 'neugierig', 'faul'])] });
     c.anchor = { x: pos.x, y: pos.y }; c.villager = true;
     if (c.prof === 'Wache') { c.equip.weapon = mkItem('spear'); c.faction = 'valen'; c.guard = true; }
+    S.ents.world.push(c);
+  }
+}
+
+// Wachposten je Siedlung: an Toren/Einfallstraßen und am Platz. Wer die Wache stellt, bestimmt Ausrüstung und Farbe.
+const GUARD_POSTS = {
+  eren:      { faction: 'valen', posts: [[51, 64], [71, 64], [61, 57]] },
+  northcity: { faction: 'valen', posts: [[113, 59], [125, 59], [119, 52]] },
+  saltport:  { faction: 'valen', posts: [[139, 450], [163, 450], [150, 456]] },
+  kreuzweg:  { faction: 'merch', posts: [[241, 250], [261, 250]] },
+  ashford:   { faction: 'merch', posts: [[379, 98], [381, 97], [380, 90]] },
+  sonnwacht: { faction: 'order', posts: [[454, 264], [457, 264], [455, 252]] },
+};
+const GUARD_KIT = {
+  valen: { prof: 'Torwache', cloth: '#33415c', weapon: 'spear', chest: 'chain_hauberk', head: 'iron_helm' },
+  merch: { prof: 'Söldnerwache', cloth: '#5a4630', weapon: 'spear', chest: 'leather_jerkin', head: 'leather_cap' },
+  order: { prof: 'Ordenswache', cloth: '#c7bda6', weapon: 'longsword', chest: 'chain_hauberk', offhand: 'kite_shield' },
+};
+function spawnGuardPosts() {
+  for (const [town, g] of Object.entries(GUARD_POSTS)) for (const [tx, ty] of g.posts) {
+    const k = GUARD_KIT[g.faction], pos = freeSpotNear('world', tx, ty, 1);
+    const c = makeChar({ name: pick(['Aldo', 'Berit', 'Conrad', 'Dagna', 'Egil', 'Frida', 'Gunnar', 'Hedda', 'Ivo', 'Jutta']), prof: k.prof,
+      x: pos.x, y: pos.y, level: ri(4, 7), faction: g.faction, traits: ['diszipliniert'], attrs: { strength: 11, endurance: 11 },
+      pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: k.cloth, crest: g.faction === 'order' ? '#9b2e26' : null } });
+    for (const sl of ['weapon', 'chest', 'head', 'offhand']) if (k[sl]) c.equip[sl] = mkItem(k[sl]);
+    c.anchor = { x: pos.x, y: pos.y }; c.guard = true; c.post = town; c.skills.onehanded = 20; c.skills.polearms = 20;
+    recalc(c); B.fullHeal(c);
     S.ents.world.push(c);
   }
 }
@@ -330,13 +360,14 @@ export function newGame(cfg) {
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
-    settlement: null, flags: {}, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
+    settlement: null, flags: { gen2: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p));
   genMine().forEach(p => S.ents.mine.push(p));
   indexSolids('world'); indexSolids('mine');
   spawnNPCs();
+  spawnGuardPosts();
   initialSpawns();
   bindSim(); SIM.initSim();
 
@@ -398,7 +429,14 @@ export function continueGame() {
   const data = loadRaw(); if (!data) return;
   applySave(data);
   seedRng(S.seed);
-  genWorld(); genMine();                       // nur Kacheln, Props kommen aus dem Spielstand
+  const fresh = genWorld(); genMine();         // Kacheln (+ Gebäudedaten); Props kommen aus dem Spielstand …
+  if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
+    const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
+    const inTown = e => e.kind === 'prop' && !e.loot && R.some(([a, b, c, d]) => e.x / TS >= a && e.x / TS < c && e.y / TS >= b && e.y / TS < d);
+    S.ents.world = S.ents.world.filter(e => !inTown(e));
+    for (const p of fresh) if (inTown(p)) S.ents.world.push(p);
+    S.flags.gen2 = true;
+  }
   S.player = byId(S.player.id) || S.ents.world.find(e => e.kind === 'player') || S.player;
   if (!S.ents[S.map].includes(S.player)) S.ents[S.map].push(S.player);
   if (S.settlement) S.settlement.buildings = S.ents[S.settlement.map || 'world'].filter(e => e.kind === 'building');
@@ -413,6 +451,7 @@ export function continueGame() {
   for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && def.key === 'gerold') spawnNpcDef(def);
   bindSim(); SIM.initSim();
   indexSolids('world'); indexSolids('mine');
+  if (!S.ents.world.some(e => e.post)) spawnGuardPosts();       // ältere Stände: Wachposten nachrüsten (nach dem Objekt-Index)
   log('Die Welt erinnert sich.', 'world');
   startGame();
 }
@@ -431,7 +470,9 @@ function loop(now) {
   catch (err) { if (!loop.failed) { loop.failed = true; console.error(err); log('Interner Fehler: ' + err.message, 'world'); } }
 }
 
-let hudTimer = 0, simTimer = 0, respawnTimer = 0, lastHour = -1, lastDay = 1, travelTimer = 0, encCooldown = 0;
+let hudTimer = 0, simTimer = 0, respawnTimer = 0, lastHour = -1, lastDay = 1, travelTimer = 0, encCooldown = 0, pursuitT = 0;
+let lastHouse = null;
+const clock = () => S.day * 1440 + S.minute;                  // Spieluhr in Spielminuten (1 s Echtzeit = 1 min), wird gespeichert
 function update(dt, now) {
   const p = S.player;
   // Zeit
@@ -446,17 +487,17 @@ function update(dt, now) {
   if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
   if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
 
-  combat = S.ents[S.map].filter(e => e.alive && COMBAT_KINDS.has(e.kind));
+  // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
+  // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
+  combat = S.ents[S.map].filter(e => e.alive && COMBAT_KINDS.has(e.kind) && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
   for (const c of S.ents.world) if (c.kind === 'caravan' && c.alive) {
     const near = performance.now() - (c.lastHurt || -1e9) < 4000;          // hält nur, solange sie angegriffen wird
     SIM.caravanFrame(c, dt, p, near);
   }
   if (p.alive) controlPlayer(dt);
-  for (const e of [...S.ents[S.map]]) {
-    if (e.kind === 'enemy') updateEnemy(e, dt);
-    else if (e.kind === 'npc') updateNpc(e, dt);
-    if (e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') tickCombatant(e, dt);
-  }
+  for (const e of [...S.ents[S.map]]) think(e, dt);
+  pursuitT = (pursuitT || 0) + dt;
+  if (pursuitT > 250) { pursuitT = 0; arrivingPursuers(); }
   updateProjectiles(dt);
   updateFx(dt);
   updateBuildings(dt);
@@ -490,6 +531,8 @@ function update(dt, now) {
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6) (S.flags.seen ||= {})[l.key] = true;
     if (S.map === 'mine') (S.flags.seen ||= {}).mine = true;
+    const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
+    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type].label} · ${LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
   }
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
@@ -502,6 +545,15 @@ function update(dt, now) {
   if (simTimer > 4000) { simTimer = 0; questCheck(); if (S.map === 'world') SIM.battleCheck(); }
   travelTimer += dt;
   if (travelTimer > 6000) { travelTimer = 0; travelTick(); }
+}
+
+// Eine Entität einen Schritt denken lassen. Einziger Einstieg in die KI: wer am Boden liegt oder tot ist, entscheidet nichts.
+function think(e, dt) {
+  if (!e.alive) return;
+  if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
+  else if (e.kind === 'enemy') updateEnemy(e, dt);
+  else if (e.kind === 'npc') updateNpc(e, dt);
+  if (e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') tickCombatant(e, dt);
 }
 
 // ================= Reise-Begegnungen =================
@@ -531,9 +583,11 @@ function travelTick() {
   if (!moving) return;
   const threat = regionThreat(tx, ty);
   if (!chance(0.12 + threat * 0.05)) return;
-  encCooldown = performance.now() + 26000;                                  // kein Dauerfeuer
+  // Ruhe-Regel (GDD §Spawns): Heimat ruhig, Wildnis mittel, Totenreich dicht
+  encCooldown = performance.now() + ({ greenmark: 40000, blight: 14000, badland: 20000 }[regionAt(tx, ty)] || 26000);
   const dir = Math.atan2(p.vy, p.vx) + (rnd() - 0.5);                       // grob in Reiserichtung
-  const ox = Math.round(Math.cos(dir) * ri(9, 13)), oy = Math.round(Math.sin(dir) * ri(9, 13));
+  const V = R.view(), far = Math.ceil((Math.hypot(V.W, V.H) / (2 * R.cam.zoom) + 48) / TS);   // knapp außerhalb des Bildes, nicht vor der Nase
+  const ox = Math.round(Math.cos(dir) * ri(far, far + 3)), oy = Math.round(Math.sin(dir) * ri(far, far + 3));
   const roll = rnd();
   if (roll < 0.6) {                                                         // Hinterhalt
     const types = AMBUSH_BY_TILE[tileAt('world', tx, ty)] || ['wolf', 'goblin', 'bandit'];
@@ -561,7 +615,7 @@ function camShake(amount, ms) { if (!S.settings.motion) return; shake = amount; 
 
 function tickCombatant(c, dt) {
   if (!c.alive) return;
-  if (c.swing > 0) {
+  if (c.swing > 0 && !c.downed) {
     c.swing += dt / (c.swingDur || 500);
     if (!c.hitDone && c.swing >= 0.42) {
       c.hitDone = true;
@@ -586,8 +640,8 @@ function tickCombatant(c, dt) {
   if (c.downed) {
     c.downTimer -= dt;
     if (c.downTimer <= 0) die(c, c.lastCause || 'Wunden', c.lastKiller);
-    else if (c !== S.player) {
-      const helper = [S.player, ...partyMembers()].find(h => h !== c && h.alive && !h.downed && dist(h, c) < 40);
+    else if (c !== S.player) {                                // nur wer nicht verfeindet ist, hilft auf
+      const helper = [S.player, ...partyMembers()].find(h => h !== c && h.alive && !h.downed && !c.angry && !isHostile(h, c) && dist(h, c) < 40);
       if (helper) stabilize(c, helper);
     } else {
       const helper = partyMembers().find(h => h.alive && !h.downed && dist(h, c) < 50);
@@ -599,16 +653,86 @@ function tickCombatant(c, dt) {
 // ================= Bewegung =================
 function moveEnt(e, dx, dy) {
   const r = e.r || 10;
+  // Wer schon in einem festen Objekt steckt (alter Spielstand, Rückstoß), darf sich herausbewegen — nur nicht tiefer hinein
+  const blockedBy = (x, y) => { const q = solidPropAt(e.map, x, y, r);   // nur bei Blockade prüfen: stehe ich schon drin und will heraus?
+    return q && !(solidPropAt(e.map, e.x, e.y, r) === q && Math.hypot(x - q.x, y - q.y) > Math.hypot(e.x - q.x, e.y - q.y)); };
   if (dx) {
     const nx = e.x + dx;
-    if (!solidTile(e.map, nx + Math.sign(dx) * r, e.y) && !solidPropAt(e.map, nx, e.y, r)) e.x = nx;
+    if (!solidTile(e.map, nx + Math.sign(dx) * r, e.y) && !blockedBy(nx, e.y)) e.x = nx;
   }
   if (dy) {
     const ny = e.y + dy;
-    if (!solidTile(e.map, e.x, ny + Math.sign(dy) * r) && !solidPropAt(e.map, e.x, ny, r)) e.y = ny;
+    if (!solidTile(e.map, e.x, ny + Math.sign(dy) * r) && !blockedBy(e.x, ny)) e.y = ny;
   }
   e.vx = dx; e.vy = dy;
   if (Math.abs(dx) > Math.abs(dy)) e.facing = dx > 0 ? 3 : 2; else if (dy) e.facing = dy > 0 ? 0 : 1;
+}
+
+// Zielgerichtetes Gehen: geradeaus, solange es geht (billig, sieht natürlich aus). Blockiert eine Mauer/ein Baum und ist
+// ein Ziel bekannt, sucht A* auf dem Kachelraster einen Weg (gecacht, max. 3 s bzw. bis das Ziel 2 Kacheln weiterzieht).
+// Ohne Ziel (Flucht, Seitschritt) wird seitlich in 35°-Schritten getastet und die gefundene Seite kurz beibehalten.
+function seek(e, a, sp, dt = 16, goal = null) {
+  if (e.path && (!goal || (e.path.t -= dt) <= 0 || Math.hypot(goal.x - e.path.gx, goal.y - e.path.gy) > 64 || e.path.i >= e.path.pts.length)) e.path = null;
+  if (e.path) {
+    const wp = e.path.pts[e.path.i];
+    if (Math.hypot(wp.x - e.x, wp.y - e.y) < 12) e.path.i++;
+    a = Math.atan2(wp.y - e.y, wp.x - e.x);
+  } else if (e.detour) { e.detour.t -= dt; if (e.detour.t <= 0) e.detour = null; else a += e.detour.off; }
+  const x0 = e.x, y0 = e.y;
+  moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp);
+  if (Math.hypot(e.x - x0, e.y - y0) > sp * 0.5) return;
+  if (e.path) { e.path = null; e.pathFail = performance.now() + 600; }   // Wegpunkt klemmt (Objektkante): kurz seitlich tasten
+  else if (goal && !(e.pathFail > performance.now())) {
+    const pts = findPath(e.map, e.x, e.y, goal.x, goal.y);
+    if (pts) { e.path = { pts, i: 0, t: 3000, gx: goal.x, gy: goal.y }; return; }
+    e.pathFail = performance.now() + 1000;                        // kein Weg: nicht jede Frame neu rechnen
+  }
+  const side = e.detourSide || (chance(0.5) ? 1 : -1);
+  for (const k of [1, 2, 3]) for (const s of [side, -side]) {
+    const off = s * k * 0.6;
+    e.x = x0; e.y = y0; moveEnt(e, Math.cos(a + off) * sp, Math.sin(a + off) * sp);
+    if (Math.hypot(e.x - x0, e.y - y0) > sp * 0.5) { e.detourSide = s; e.detour = { off, t: 450 }; return; }
+  }
+  e.detourSide = -side;                                          // ganz eingekeilt: nächstes Mal die andere Seite
+}
+
+// A* auf dem Kachelraster, begrenzt auf ein Fenster um Start und Ziel (±14 Kacheln, höchstens 56×56).
+// Blockiert: feste Kacheln und Kacheln mit festen Objekten (Bäume, Felsen, Gebäude). Diagonalen nur ohne Eckenschneiden.
+function findPath(map, x0, y0, x1, y1) {
+  const sx = x0 / TS | 0, sy = y0 / TS | 0, gx = x1 / TS | 0, gy = y1 / TS | 0;
+  const minX = Math.max(0, Math.min(sx, gx) - 14), minY = Math.max(0, Math.min(sy, gy) - 14);
+  const W = Math.min(56, Math.max(sx, gx) + 14 - minX + 1), H = Math.min(56, Math.max(sy, gy) + 14 - minY + 1);
+  if (gx - minX >= W || gy - minY >= H) return null;              // Ziel außerhalb des Fensters: zu weit für eine lokale Suche
+  const idx = solidIndex[map];
+  const blocked = (i, j) => { const tx = i + minX, ty = j + minY;
+    if (i < 0 || j < 0 || i >= W || j >= H || SOLID.has(tileAt(map, tx, ty))) return true;
+    const arr = idx && idx.get(tx + ',' + ty); return !!(arr && arr.length) && !(tx === gx && ty === gy); };
+  const N = W * H, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const heap = [], push = (k, f) => { heap.push([f, k]); let i = heap.length - 1;
+    while (i > 0) { const q = (i - 1) >> 1; if (heap[q][0] <= heap[i][0]) break; [heap[q], heap[i]] = [heap[i], heap[q]]; i = q; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0;
+    for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+      if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top[1]; };
+  const s = (sy - minY) * W + (sx - minX), goalK = (gy - minY) * W + (gx - minX);
+  const hh = k => { const i = k % W, j = (k / W) | 0; const dx = Math.abs(i - (gx - minX)), dy = Math.abs(j - (gy - minY)); return Math.max(dx, dy) + 0.41 * Math.min(dx, dy); };
+  g[s] = 0; push(s, hh(s));
+  let steps = 0;
+  while (heap.length && steps++ < 2400) {
+    const k = pop(); if (closed[k]) continue; closed[k] = 1;
+    if (k === goalK) {
+      const pts = []; for (let c = k; c !== s && c >= 0; c = from[c]) pts.push({ x: (c % W + minX) * TS + TS / 2, y: (((c / W) | 0) + minY) * TS + TS / 2 });
+      return pts.reverse();
+    }
+    const i = k % W, j = (k / W) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      const ni = i + di, nj = j + dj;
+      if (blocked(ni, nj) || (di && dj && (blocked(i + di, j) || blocked(i, j + dj)))) continue;
+      const nk = nj * W + ni, ng = g[k] + (di && dj ? 1.41 : 1);
+      if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(nk, ng + hh(nk)); }
+    }
+  }
+  return null;
 }
 
 function controlPlayer(dt) {
@@ -677,14 +801,20 @@ function resolveSwing(c) {
   let foes = hostilesOf(c);
   if (force) foes = foes.concat(S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && !foes.includes(e) && !S.party.includes(e.id)));
   let hitAny = false;
+  foes.sort((a, b) => (a.downed ? 1 : 0) - (b.downed ? 1 : 0));   // Stehende zuerst, Gnadenstoß nur ohne andere Ziele im Bogen
   for (const f of foes) {
-    if (!f.alive || f.downed) continue;
+    if (!f.alive || (f.downed && !isHostile(c, f))) continue;  // gestürzte Feinde lassen sich erledigen, Neutrale nicht
     const d = dist(c, f);
     if (d > reach + (f.r || 10)) continue;
     const ang = Math.atan2(f.y - c.y, f.x - c.x);
     let diff = Math.abs(normAng(ang - c.aim));
     if (diff > arc / 2 + 0.25) continue;
     hitAny = true;
+    if (f.downed) {                                            // Gnadenstoß: ein gestürzter Feind wird erledigt
+      fx(f.x, f.y - 6, 'blood', 8); sfx('hit', feelOf(c).w, earVol(f));
+      die(f, `Gnadenstoß durch ${c.name}`, c);
+      break;
+    }
     if (f.kind === 'npc' && !isHostile(c, f)) provoke(f, c);   // Angriff auf Neutrale hat Folgen
     hit(c, f, mult, kind);
     if (it && it.wtype !== 'spear') break;                   // nur Speer trifft mehrere in Linie
@@ -765,6 +895,13 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   target.lastCause = cause; target.lastKiller = source ? source.id : null;
   if (source) target.aggroId = source.id;
   target.lastHurt = performance.now();
+  if (target.kind === 'enemy' && source && source.id && isHostile(target, source)) {   // Gruppe/Rudel: Gleiche eilen zu Hilfe
+    for (const o of S.ents[target.map]) {
+      if (o === target || o.kind !== 'enemy' || !o.alive || o.faction !== target.faction || dist(o, target) > 240) continue;
+      const cur = o.aggroId && byId(o.aggroId);
+      if (!cur || !cur.alive || dist(o, cur) > 300) { o.aggroId = source.id; o.aiState = 'pursue'; }
+    }
+  }
   if (source && source !== target && target.kind !== 'caravan' && !target.downed && source.map === target.map) {
     // Rückstoß: kurzer Stoß weg vom Angreifer, kollisionssicher über moveEnt; Blickrichtung bleibt
     const a = Math.atan2(target.y - source.y, target.x - source.x), f = target.facing;
@@ -811,6 +948,9 @@ function limbLost(c, part) {
 }
 function downed(c, cause, source) {
   c.downed = true; if (!c.body) c.hp = 0; c.downTimer = c === S.player ? 15000 : 11000;
+  // Wer fällt, bricht alles ab: kein halber Schlag, keine Ansage, kein Ziel, kein Weg
+  c.swing = 0; c.hitDone = false; c.telegraph = 0; c.windup = false; c.special = null; c.leap = null; c.draw = 0;
+  c.channel = null; c.wander = null; c.threatId = null; c.vx = c.vy = 0;
   c.lastCause = cause; c.lastKiller = source ? source.id : null;
   log(`${c.name} bricht zusammen.`, 'combat');
   if (c === S.player) UI.toast('Du bist am Boden. Deine Gruppe hat kurz Zeit.', 3500);
@@ -826,7 +966,10 @@ function stabilize(c, helper) {
 
 function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
+  const wasFoe = teamOf(c) === 'foe';                          // vor dem Aufräumen: war es ein Feind oder ein Unschuldiger?
   c.alive = false; c.downed = false;
+  c.swing = 0; c.telegraph = 0; c.special = null; c.leap = null; c.draw = 0; c.vx = c.vy = 0;   // terminal: kein Rest-Verhalten
+  c.aggroId = null; c.threatId = null; c.angry = false; c.follow = null; c.lurk = null;
   const arr = S.ents[c.map];
   if (c.kind === 'caravan') {
     SIM.caravanDied(c);
@@ -870,6 +1013,7 @@ function die(c, cause = 'Wunden', source) {
   }
   // Person
   const isParty = S.party.includes(c.id);
+  if ((source === S.player || source === S.player.id) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   chronicle(`${c.name} gefallen`, 'death', `${cause}. Jahr ${year()}, Tag ${S.day}.`);
   makeGrave(c, cause);
@@ -877,6 +1021,25 @@ function die(c, cause = 'Wunden', source) {
   if (isParty) S.party = S.party.filter(id => id !== c.id);
   const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
   if (c === S.player) playerDeath(cause, source);
+}
+
+// Der Spieler hat einen Menschen getötet: Zeugen fürchten ihn einen Tag, Wachen greifen ein, die Gruppe urteilt.
+// Ein Unschuldiger (kein Feind im Moment des Todes) wiegt schwerer als ein zorniger Angreifer.
+function bloodshed(victim, wasFoe) {
+  const p = S.player, now = clock();
+  for (const w of S.ents[victim.map]) {
+    if (w.kind !== 'npc' || !w.alive || w.downed || S.party.includes(w.id) || dist(w, victim) > 300) continue;
+    if (w.guard && !wasFoe) { w.angry = true; w.brave = true; w.aggroId = p.id; w.sawPlayer = now; }
+    else if (!w.guard) { w.afraid = now + 1440; w.fleeing = !w.brave; }
+  }
+  if (wasFoe) return;
+  S.flags.murders = (S.flags.murders || 0) + 1;
+  for (const m of partyMembers()) {
+    if ((m.traits || []).includes('grausam')) continue;
+    m.morale -= 10; remember(m, 'killed_kin', victim.name);
+  }
+  const m = partyMembers().find(x => !(x.traits || []).includes('grausam'));
+  if (m) log(`${m.name}: „${victim.name} hat dir nichts getan.“`, 'party');
 }
 
 function makeGrave(c, cause) {
@@ -942,7 +1105,7 @@ function updateProjectiles(dt) {
     p.x += p.vx * dt / 16; p.y += p.vy * dt / 16; p.life -= dt;
     if (solidTile(p.map, p.x, p.y) || solidPropAt(p.map, p.x, p.y, 3)) { fx(p.x, p.y, 'spark', 3); p.life = 0; continue; }
     for (const e of S.ents[p.map]) {
-      if (!(e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') || !e.alive || e.id === p.owner) continue;
+      if (!(e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') || !e.alive || e.downed || e.id === p.owner) continue;   // Pfeile fliegen über Liegende
       const own = byId(p.owner);
       if (!own || teamOf(own) === teamOf(e)) continue;
       if (dist(p, e) < (e.r || 10) + 5) {
@@ -980,12 +1143,12 @@ function updateEnemy(e, dt) {
   const m = MONSTERS[e.mtype];
   const targets = combat.filter(t => !t.downed && t !== e && isHostile(e, t) && (t.kind !== 'caravan' || e.faction === 'bandit'));   // nur Banditen rauben Wagen
   const ag = e.aggroId ? byId(e.aggroId) : null;
-  let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < m.sight * 1.6 ? ag : nearestTarget(e, targets, m.sight);
+  const sight = m.sight * (e.wary > clock() ? 1.5 : 1);           // nach abgebrochener Jagd: wachsamer
+  let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
   const sp = m.speed * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e);
   if (e.hp < e.maxHp * 0.2 && !e.boss && !e.fleeing && chance(0.004)) { e.fleeing = true; log(`${m.name} flieht.`, 'combat'); }
   if (e.fleeing && tgt) {
-    const a = Math.atan2(e.y - tgt.y, e.x - tgt.x);
-    moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp);
+    seek(e, Math.atan2(e.y - tgt.y, e.x - tgt.x), sp, dt);
     if (dist(e, tgt) > m.sight * 1.5) { e.fleeing = false; e.aggroId = null; }
     return;
   }
@@ -994,7 +1157,7 @@ function updateEnemy(e, dt) {
     if (e.aiTimer <= 0) { e.aiTimer = ri(1200, 3600); e.wander = { x: e.anchor.x + ri(-90, 90), y: e.anchor.y + ri(-90, 90) }; }
     if (e.wander) {
       const d = Math.hypot(e.wander.x - e.x, e.wander.y - e.y);
-      if (d > 8) { const a = Math.atan2(e.wander.y - e.y, e.wander.x - e.x); moveEnt(e, Math.cos(a) * sp * 0.45, Math.sin(a) * sp * 0.45); }
+      if (d > 8) seek(e, Math.atan2(e.wander.y - e.y, e.wander.x - e.x), sp * 0.45, dt, e.wander);
       else e.vx = e.vy = 0;
     }
     return;
@@ -1016,7 +1179,7 @@ function updateEnemy(e, dt) {
   if (d > reach * 0.8) {
     // Goblins tänzeln seitlich heran, statt stur geradeaus zu laufen
     const side = (e.mtype === 'goblin' || e.mtype === 'goblin_warrior') && d > reach * 1.4 ? Math.sin(performance.now() / 240 + e.seed * 9) * 0.8 : 0;
-    moveEnt(e, (Math.cos(e.aim) - Math.sin(e.aim) * side) * sp, (Math.sin(e.aim) + Math.cos(e.aim) * side) * sp);
+    seek(e, e.aim + Math.atan(side), sp * Math.hypot(1, side), dt, tgt);
   }
   else {
     e.vx = e.vy = 0;
@@ -1117,7 +1280,7 @@ function bossAI(e, tgt, d, reach, sp, dt, m) {
     }
     if (d < 120 && e.quakeCd <= 0) { e.special = { kind: 'quake', t: 800 }; e.quakeCd = 6500; return; }
   }
-  if (d > reach * 0.8) { moveEnt(e, Math.cos(e.aim) * sp2, Math.sin(e.aim) * sp2); return; }
+  if (d > reach * 0.8) { seek(e, e.aim, sp2, dt, tgt); return; }
   e.vx = e.vy = 0;
   if (e.atkCd <= 0 && e.swing <= 0) {
     if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
@@ -1148,37 +1311,61 @@ function updateNpc(e, dt) {
   if (e.fleeing && !e.angry) {                         // provozierter Zivilist/Händler flieht vor dem Spieler
     const d = dist(e, p);
     if (d > 360 || !p.alive) { e.fleeing = false; e.vx = e.vy = 0; return; }
-    const a = Math.atan2(e.y - p.y, e.x - p.x), sp = 1.5 * dt / 16;
-    moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp);
+    seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.5 * dt / 16, dt);
     return;
   }
   if (e.angry) {                                       // provozierte Wache/Krieger jagt den Spieler
-    if (!p.alive) { e.angry = false; return; }
+    const d = dist(e, p), home = e.anchor || e, now = clock();
+    if (!p.alive || p.map !== e.map) return calmDown(e, null);
+    if (p.downed) return calmDown(e, 'subdued');       // Spieler liegt: der Kampf ist entschieden
+    // Leine / Spur verloren — zuerst prüfen: wer 12 Spielminuten nichts sah, hat schon aufgegeben (auch wenn man zurückkommt)
+    if (Math.hypot(e.x - home.x, e.y - home.y) > 640 || now - (e.sawPlayer ?? now) > 12) return calmDown(e, 'lost');
+    if (d < 320) e.sawPlayer = now;                    // Sichtkontakt hält den Zorn wach
     e.aim = Math.atan2(p.y - e.y, p.x - e.x);
-    const d = dist(e, p), sp = 1.35 * dt / 16;
-    if (d > 34) moveEnt(e, Math.cos(e.aim) * sp, Math.sin(e.aim) * sp);
+    if (d > 34) seek(e, e.aim, 1.35 * dt / 16, dt, p);
     else { e.vx = e.vy = 0; if (e.atkCd <= 0 && e.swing <= 0) attack(e); }
     return;
   }
-  // Hysterese: bemerken ab 220 px, loslassen erst ab 340 px. Ohne sie pendelt die Figur an der Grenze (Zittern).
+  // Hysterese: bemerken ab 220 px (Wachen 300), loslassen erst ab 340 px. Ohne sie pendelt die Figur an der Grenze.
+  // Ein Alarm (von einer anderen Wache) zieht bis 700 px heran.
+  const now = clock(), foe = x => x && x.alive && x.map === e.map && teamOf(x) === 'foe';
   const held = e.threatId ? byId(e.threatId) : null;
-  const keep = held && held.alive && held.map === e.map && teamOf(held) === 'foe' && dist(e, held) < 340;
-  const f = keep ? held : (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && x.alive && teamOf(x) === 'foe' && dist(e, x) < 220);
+  const called = e.alarm && e.alarm.until > now ? byId(e.alarm.id) : null;
+  const f = foe(held) && dist(e, held) < 340 ? held : foe(called) && dist(e, called) < 700 ? called :
+    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && dist(e, x) < (e.guard ? 300 : 220));
   e.threatId = f ? f.id : null;
-  if (f) {
-    if (e.guard || e.hostile || e.angry) {
+  const home = e.anchor || e, leashed = DEFENDERS.has(e.key) && !e.guard && Math.hypot(e.x - home.x, e.y - home.y) > 360;
+  if (f && !leashed) {
+    if (e.shop) e.shopClosed = Math.max(e.shopClosed || 0, now + 10);   // Kampf in der Nähe: Stand zu, bis Ruhe ist
+    if (e.guard || e.hostile || e.angry || DEFENDERS.has(e.key)) {   // Wachen und kampferprobte Bewohner stellen sich
+      if (e.guard && !(e.calledAt > now - 5)) { e.calledAt = now; raiseAlarm(e, f); }
       e.aim = Math.atan2(f.y - e.y, f.x - e.x);
-      const sp = 1.3 * dt / 16;
-      if (dist(e, f) > 34) moveEnt(e, Math.cos(e.aim) * sp, Math.sin(e.aim) * sp);
+      const d = dist(e, f), reach = ITEMS[e.equip.weapon?.key]?.ranged ? 200 : 34;   // Schützen halten Abstand
+      if (d > reach) seek(e, e.aim, (d > 160 ? 1.7 : 1.3) * dt / 16, dt, f);   // aus der Ferne herbeieilen
       else { e.vx = e.vy = 0; if (e.atkCd <= 0) attack(e); }
       return;
     }
-    if (!e.brave) {                                              // Zivilisten fliehen
-      const a = Math.atan2(e.y - f.y, e.x - f.x), sp = 1.5 * dt / 16;
-      moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp);
+    if (!e.brave) { seek(e, Math.atan2(e.y - f.y, e.x - f.x), 1.5 * dt / 16, dt); return; }   // Zivilisten fliehen
+  }
+  // Spieler liegt am Boden (nicht durch uns): Wachen eilen herbei und richten ihn auf, Zivilisten holen Hilfe
+  if (p.downed && p.alive) {
+    const d = dist(e, p), carer = e.guard || DEFENDERS.has(e.key) || e.prof === 'Heilerin';   // Wache, Kämpfer, Heilerin helfen selbst
+    if (carer && (d < (e.guard ? 520 : 360) || e.aid > now)) {
+      e.aim = Math.atan2(p.y - e.y, p.x - e.x);
+      if (d > 26) seek(e, e.aim, 1.8 * dt / 16, dt, p);
+      else { e.vx = e.vy = 0; e.aid = 0; stabilize(p, e);
+        log(`${e.name}: ${e.prof === 'Heilerin' ? '„Ruhig. Ich hab dich.“' : '„Steh auf. Auf dieser Straße stirbt heute niemand.“'}`, 'party'); }
       return;
     }
-  }
+    if (!carer && !e.brave && d < 300 && !e.calledHelp) {
+      e.calledHelp = true;
+      const g = S.ents[e.map].filter(o => o.kind === 'npc' && o.guard && o.alive && !o.downed && !o.angry && dist(o, e) < 1400)
+        .sort((a, b) => dist(a, p) - dist(b, p))[0];
+      if (g && !(g.aid > now)) { g.aid = now + 25; log(`${e.name} rennt los und holt ${g.name}.`, 'party'); }   // einer genügt
+    }
+  } else e.calledHelp = false;
+  // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
+  if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
   // Tagesablauf
   const h = S.minute / 60;
   let target = e.anchor;
@@ -1189,10 +1376,36 @@ function updateNpc(e, dt) {
   if (e.aiTimer <= 0) { e.aiTimer = ri(2200, 5200); e.wander = { x: target.x + ri(-46, 46), y: target.y + ri(-40, 40) }; }
   if (e.wander) {
     const d = Math.hypot(e.wander.x - e.x, e.wander.y - e.y);
-    if (d > 10) { const a = Math.atan2(e.wander.y - e.y, e.wander.x - e.x); const sp = 0.9 * dt / 16;
-      moveEnt(e, Math.cos(a) * sp, Math.sin(a) * sp); }
+    if (d > 10) seek(e, Math.atan2(e.wander.y - e.y, e.wander.x - e.x), 0.9 * dt / 16, dt, e.wander);
     else e.vx = e.vy = 0;
   }
+}
+
+// Kampferprobte Bewohner: wehren Feinde nahe ihrem Posten ab (Leine 360 px), laufen aber keinen Alarmen hinterher
+const DEFENDERS = new Set(['borin', 'kelan', 'aldric', 'tomas']);
+
+// Eine Wache, die kämpft, ruft die Wachen im Umkreis herbei (leichtgewichtiger Alarm statt Glocken-Simulation)
+function raiseAlarm(e, f) {
+  const until = clock() + 8;
+  for (const o of S.ents[e.map])
+    if (o !== e && o.kind === 'npc' && o.guard && o.alive && !o.downed && !o.angry && !o.threatId && dist(o, e) < 480) o.alarm = { id: f.id, until };
+}
+
+// Zorn endet bewusst: Spur verloren/zu weit vom Posten (→ zurück, misstrauisch) oder Spieler überwältigt
+// (→ die Ordnungsmacht nimmt Buße und lässt ihn leben; ein Handgemenge ist kein Todesurteil).
+function calmDown(e, why) {
+  const p = S.player;
+  const group = why === 'subdued' ? S.ents[e.map].filter(o => o.kind === 'npc' && o.angry && dist(o, p) < 600) : [e];
+  for (const o of group) { o.angry = false; o.aggroId = null; o.aiTimer = 0; o.wander = null; o.swing = 0; o.wary = clock() + 180; }
+  if (why === 'lost' && dist(e, p) < 800) log(`${e.name} gibt die Verfolgung auf und kehrt zurück.`, 'combat');
+  if (why !== 'subdued') return;
+  const law = group.find(o => o.guard || o.faction === 'valen' || o.faction === 'order');
+  if (!law) return log('Sie lassen von dir ab und gehen. Niemand hilft dir auf.', 'combat');
+  const fine = Math.min(S.gold, 30);
+  S.gold -= fine;
+  p.downed = false; B.healPart(p, 'torso', Math.max(4, p.body.torso.max * 0.2) - p.body.torso.hp);   // aufgerichtet, nicht gepflegt
+  log(`${law.name} nimmt dir ${fine} Gold als Buße ab. „Beim nächsten Mal hängst du.“`, 'faction');
+  UI.toast(fine ? `Buße: ${fine} Gold` : 'Verwarnt', 3200);
 }
 
 function partyAI(m, dt) {
@@ -1217,18 +1430,17 @@ function partyAI(m, dt) {
     }
   }
   if (cmd === 'retreat' || (m.morale < 22 && chance(0.002))) {
-    const a = Math.atan2(p.y - m.y, p.x - m.x);
-    if (dist(m, p) > 60) moveEnt(m, Math.cos(a) * sp, Math.sin(a) * sp); else m.vx = m.vy = 0;
+    if (dist(m, p) > 60) seek(m, Math.atan2(p.y - m.y, p.x - m.x), sp, dt, p); else m.vx = m.vy = 0;
     return;
   }
-  const foe = foes[0];
+  const foe = foes.sort((a, b) => dist(m, a) - dist(m, b))[0];   // der nächste Feind, nicht der erste in der Liste
   if (foe && cmd !== 'hold' || (foe && cmd === 'hold' && dist(m, foe) < 90)) {
     m.aim = Math.atan2(foe.y - m.y, foe.x - m.x);
     const it = m.equip.weapon ? ITEMS[m.equip.weapon.key] : null;
     const want = it && it.ranged ? 170 : (it ? it.reach : 30) + 12;
     const d = dist(m, foe);
     if (it && it.ranged && d < 110) moveEnt(m, -Math.cos(m.aim) * sp, -Math.sin(m.aim) * sp);
-    else if (d > want) moveEnt(m, Math.cos(m.aim) * sp, Math.sin(m.aim) * sp);
+    else if (d > want) seek(m, m.aim, sp, dt, foe);
     else { m.vx = m.vy = 0; attack(m); }
     if (chance(0.0006)) remember(m, 'fought_together', p.name);
     return;
@@ -1239,7 +1451,7 @@ function partyAI(m, dt) {
   const ang = (idx / Math.max(1, S.party.length)) * Math.PI * 2;
   const tx = p.x + Math.cos(ang) * 46, ty = p.y + Math.sin(ang) * 46;
   const d = Math.hypot(tx - m.x, ty - m.y);
-  if (d > 26) { const a = Math.atan2(ty - m.y, tx - m.x); moveEnt(m, Math.cos(a) * sp * Math.min(1.6, d / 60), Math.sin(a) * sp * Math.min(1.6, d / 60)); }
+  if (d > 26) seek(m, Math.atan2(ty - m.y, tx - m.x), sp * Math.min(1.6, d / 60), dt, p);
   else m.vx = m.vy = 0;
 }
 
@@ -1256,22 +1468,25 @@ function remember(c, key, about) {
 }
 
 // ================= Angriff auf Neutrale: Reaktion, Alarm, Ruf =================
-const GUARDISH = c => c.guard || c.hostile || c.brave || c.faction === 'valen' || c.faction === 'order' ||
-  ['borin', 'kelan', 'rook', 'havel', 'aldric'].includes(c.key);
+const GUARDISH = c => c.prof !== 'Heilerin' && (c.guard || c.hostile || c.brave || c.faction === 'valen' || c.faction === 'order' ||
+  ['borin', 'kelan', 'rook', 'havel', 'aldric'].includes(c.key));   // die Heilerin kämpft nicht, sie flieht
 function provoke(target, attacker) {
   if (attacker !== S.player || !target.alive) return;
   const firstTime = !target.provoked;
-  target.provoked = true; target.lastHurt = performance.now();
+  target.provoked = true; target.lastHurt = performance.now(); target.sawPlayer = clock();
   // Rolle bestimmt die Reaktion
   if (GUARDISH(target)) { target.angry = true; target.brave = true; target.aggroId = S.player.id; }
-  else { target.fleeing = true; if (target.shop) target.shopClosed = true; }   // Zivilisten und Händler fliehen
+  else { target.fleeing = true; if (target.shop) target.shopClosed = clock() + 1440; }   // Zivilisten und Händler fliehen; Laden bis morgen zu
   if (!firstTime) return;                                                       // Ruf/Alarm nur einmal je Tat
+  const critic = partyMembers().find(m => !(m.traits || []).includes('grausam'));   // die Gruppe sieht es
+  for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 5;
+  if (critic) log(`${critic.name}: „Was tust du da?!“`, 'party');
   // Zeugen im Umkreis (Distanz = Kern des Alarms; Wände zählen grob über Distanz)
   const witnesses = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e !== target && !S.party.includes(e.id) && dist(e, target) < 240);
   for (const w of witnesses) {
     w.alarmed = true;
     const ally = GUARDISH(w) || (w.faction && w.faction === target.faction) || w.kin;
-    if (ally && GUARDISH(w)) { w.angry = true; w.brave = true; w.aggroId = S.player.id; }   // Wachen/Krieger greifen ein
+    if (ally && GUARDISH(w)) { w.angry = true; w.brave = true; w.aggroId = S.player.id; w.sawPlayer = clock(); }   // Wachen/Krieger greifen ein
     else { w.fleeing = true; }                                                               // Übrige fliehen/schreien
   }
   addRel(target.key, -35);
@@ -1379,19 +1594,73 @@ function doInteract() {
   }
 }
 
+// Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
+const ARRIVAL = { mine: () => MAPS.mine.entry, world: () => ({ x: 62 * TS + TS / 2, y: 21 * TS + TS / 2 }) };
 function travel(to) {
-  const p = S.player;
+  const p = S.player, from = S.map;
+  leavePursuit(from, to);
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
   const members = partyMembers();
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   S.map = to; p.map = to;
-  const spot = to === 'mine' ? MAPS.mine.entry : freeSpotNear('world', 62, 20, 3);
+  const spot = ARRIVAL[to]();
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
   for (const m of members) { m.map = to; m.x = p.x + ri(-24, 24); m.y = p.y + ri(-24, 24); S.ents[to].push(m); }
   log(to === 'mine' ? 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' : 'Du kehrst an die Oberfläche zurück.', 'world');
   UI.toast(to === 'mine' ? 'Verlassene Grube' : 'Greenmark-Grenzland');
+  arrivePursuit(to);
   save();
+}
+
+// ================= Verfolgung über Kartengrenzen =================
+// Ein Kartenwechsel setzt keinen Kampfzustand stillschweigend zurück (GDD §Übergänge):
+// Wer Innenräume betreten kann (MONSTERS.interiors), folgt nach seiner Laufzeit zur Tür durch dieselbe Tür.
+// Tiere lauern 90 Spielminuten am Eingang, danach misstrauisch zurück. Gorak hält seine Halle.
+// Die Karte, die der Spieler verlässt, ruht (nur S.map wird simuliert) — Fristen laufen daher auf der Spieluhr.
+function leavePursuit(from, to) {
+  const p = S.player, now = clock(); let n = 0;
+  for (const e of S.ents[from]) {
+    if (e.kind !== 'enemy' || !e.alive || !isHostile(e, p)) continue;
+    const m = MONSTERS[e.mtype], d = dist(e, p);
+    if (d > 560 || !(e.aggroId === p.id || (e.aiState === 'pursue' && d < m.sight))) continue;
+    if (m.boss) { e.aggroId = null; e.aiState = 'idle'; continue; }
+    if (m.interiors && n < 4) { n++; e.follow = { to, at: now + d / (m.speed * 62.5) + 1.5 }; }   // enge Tür: höchstens vier
+    else e.lurk = { until: now + 90 };
+  }
+}
+function arrivingPursuers() {                                   // alle 250 ms: wer die Tür erreicht hat, kommt herein
+  const now = clock(), p = S.player; let came = 0;
+  for (const k of Object.keys(S.ents)) {
+    if (k === S.map) continue;
+    const arr = S.ents[k];
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const e = arr[i];
+      if (!e.follow) continue;
+      if (!e.alive || now > e.follow.at + 60) { e.follow = null; continue; }   // zu spät: Spur kalt
+      if (e.follow.to !== S.map || now < e.follow.at) continue;
+      arr.splice(i, 1); e.follow = null;
+      const door = S.ents[S.map].find(o => o.portal === k) || p;
+      e.map = S.map; e.x = door.x + ri(-10, 10); e.y = door.y + ri(-6, 6);
+      e.anchor = { x: e.x, y: e.y }; e.aggroId = p.id; e.aiState = 'pursue';
+      S.ents[S.map].push(e); came++;
+      log(`${MONSTERS[e.mtype].name} folgt dir durch den Eingang!`, 'combat');
+    }
+  }
+  if (came) UI.toast(came > 1 ? `${came} VERFOLGER` : 'VERFOLGER', 2200);
+}
+function arrivePursuit(to) {                                     // Rückkehr: Lauernde und Umgekehrte stehen vor der Tür
+  const p = S.player, now = clock(), tx = p.x / TS | 0, ty = p.y / TS | 0;
+  for (const e of S.ents[to]) {
+    if (e.kind !== 'enemy' || !e.alive || !(e.follow || e.lurk)) continue;
+    const waiting = e.follow || now < e.lurk.until;
+    if (waiting) {
+      const s = freeSpotNear(to, tx, ty + 3, 2);
+      e.x = s.x; e.y = s.y; e.aggroId = p.id; e.aiState = 'pursue';
+      log(`${MONSTERS[e.mtype].name} hat am Eingang gewartet.`, 'combat');
+    } else { e.x = e.anchor.x; e.y = e.anchor.y; e.aggroId = null; e.aiState = 'idle'; e.wary = now + 300; }   // aufgegeben, wachsam
+    e.follow = null; e.lurk = null;
+  }
 }
 
 function claimPlace(t) {
@@ -1564,7 +1833,7 @@ function respawnTick() {
     const e = W[i];
     if (e.kind === 'enemy' && e.armyId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400)) { W.splice(i, 1); continue; }
     // Reise-Begegnungen räumen sich auf, sobald der Spieler weit weg ist
-    if (e.encounter && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
+    if (e.encounter && !e.follow && !e.lurk && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
   }
   for (const a of SPAWN_AREAS) {
     const count = S.ents[a.map].filter(e => e.kind === 'enemy' && !e.boss &&
@@ -1578,7 +1847,12 @@ function respawnTick() {
 
 // ================= Dialog =================
 function talk(npc) {
-  const p = S.player, rel = S.relations[npc.key] ?? 0;
+  const p = S.player, rel = S.relations[npc.key] ?? 0, now = clock();
+  const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
+  // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
+  if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
+  if (npc.fleeing || npc.afraid > now) return UI.dialogue(npc, '„Bleib weg von mir!“', leave);
+  if (npc.threatId && byId(npc.threatId)?.alive) return UI.dialogue(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', leave);
   const choices = [];
   // Quests des Gebers
   for (const [k, Q] of Object.entries(QUESTS)) {
@@ -1593,14 +1867,18 @@ function talk(npc) {
   if (npc.faction && S.ranks[npc.faction] === -1 && ['valen', 'order', 'undead'].includes(npc.faction))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
-  if (npc.shop && occupied) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Handel? Die Toten halten die Stadt. Ich verstecke, was ich habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if (npc.shop && npc.shopClosed > now) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
+    npc.provoked ? '„Für dich ist heute geschlossen. Vielleicht für immer.“' : '„Der Stand ist zu, bis sich die Lage beruhigt.“', leave) });
+  else if (npc.shop && occupied) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Handel? Die Toten halten die Stadt. Ich verstecke, was ich habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (npc.recruit && !S.party.includes(npc.id)) choices.push({ text: 'Komm mit mir.', fn: () => recruit(npc) });
   if (S.party.includes(npc.id)) choices.push({ text: 'Bleib hier.', fn: () => { dismiss(npc); UI.closeDialogue(); } });
   choices.push({ text: 'Was gibt es Neues?', fn: () => gossip(npc) });
   choices.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
-  UI.dialogue(npc, npc.greet, choices);
+  // Ruf färbt die Begrüßung: nach einer Tat gegen jemanden ist der Ton kalt
+  const greet = rel <= -30 ? '„Du. Sag, was du willst, und dann geh.“' : npc.wary > now && npc.provoked ? '„Ich behalte dich im Auge.“' : npc.greet;
+  UI.dialogue(npc, greet, choices);
   if (rel === 0) addRel(npc.key, 1);
 }
 
@@ -2019,9 +2297,16 @@ function makeSuccessorCandidates() {
       traits: [pick(['mutig', 'ehrgeizig', 'loyal', 'misstrauisch', 'gütig'])],
       cls: pick(['wanderer', 'warrior', 'archer']), pal: { ...S.player.pal, cloth: pick(CLOTH) } });
     c.relation = rel + ' von ' + S.player.name;
+    kinKit(c);
     out.push(c);
   }
   return out.slice(0, 3);
+}
+// Verwandte kommen mit eigener, bescheidener Habe (die Ausrüstung des Toten liegt am Grab)
+function kinKit(c) {
+  c.equip.weapon = mkItem(({ archer: 'shortbow', warrior: 'rusty_sword' })[c.currentClass] || 'dagger');
+  c.equip.chest = mkItem(chance(0.3) ? 'leather_jerkin' : 'cloth_shirt');
+  addItem(c, 'bread', 2); addItem(c, 'bandage', 1);
 }
 function chooseSuccessor() {
   const cands = makeSuccessorCandidates();
@@ -2330,6 +2615,129 @@ export function selftest() {
   }));
   ok('Sprites: Waffen & Kacheln', Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => filled(SP.weaponSprite(k, i.rarity, i.holy, i.wtype).cv))
     && Object.values(T).every(t => filled(SP.tileTexture(t, 0, ['#3c4a2c', '#43522f', '#364325'], 'grass'))));
+  // ---- KI, Verbrechen & Übergänge: echte Funktionen auf zwei Mini-Karten; der Spielstand wird danach wiederhergestellt ----
+  const sandbox = fn => {
+    const keep = { player: S.player, map: S.map, gold: S.gold, day: S.day, minute: S.minute, party: S.party, kills: S.kills, combat,
+      deep: structuredClone({ flags: S.flags, relations: S.relations, factions: S.factions, ranks: S.ranks }) };
+    S._quiet = true;
+    for (const k of ['__a', '__b']) { MAPS[k] = { w: 40, h: 40, tiles: new Uint8Array(1600).fill(T.GRASS) }; S.ents[k] = []; solidIndex[k] = new Map(); }
+    try { return fn(); } catch (err) { console.error(err); return false; }
+    finally {
+      Object.assign(S, { player: keep.player, map: keep.map, gold: keep.gold, day: keep.day, minute: keep.minute, party: keep.party, kills: keep.kills }, keep.deep);
+      combat = keep.combat;
+      for (const k of ['__a', '__b']) { delete MAPS[k]; delete S.ents[k]; delete solidIndex[k]; }
+      S._quiet = false;
+    }
+  };
+  const actor = (x, y, o = {}) => { const a = makeChar({ name: 'Probe', map: '__a', x, y, ...o }); a.anchor = { x, y }; S.ents.__a.push(a); return a; };
+  const stage = () => { const p = actor(300, 300, { kind: 'player' }); S.player = p; S.map = '__a'; S.party = []; return p; };
+  const knockOut = (c, by) => { B.damagePart(c, 'torso', 999); downed(c, 'Test', by); };
+  ok('KI: Boden/Tod ist terminal (keine Bewegung, kein Resthieb)', sandbox(() => {
+    const p = stage(), g = actor(380, 300, { faction: 'valen' });
+    g.guard = true; g.angry = true; g.aggroId = p.id; g.sawPlayer = clock(); g.swing = 0.3;
+    knockOut(g, p);
+    const x0 = g.x, y0 = g.y, hp0 = B.vital(p);
+    combat = S.ents.__a.filter(e => e.alive);
+    for (let i = 0; i < 90; i++) think(g, 16);
+    const v = actor(420, 300); v.angry = true; die(v, 'Test', p);
+    const vx = v.x; for (let i = 0; i < 30; i++) think(v, 16);
+    return g.x === x0 && g.y === y0 && g.swing === 0 && B.vital(p) === hp0 && v.x === vx && !v.angry && !v.aggroId;
+  }));
+  ok('Gestürzter Feind wird nicht aufgerichtet, Verbündeter schon', sandbox(() => {
+    const p = stage(), g = actor(310, 300), h = actor(300, 320);
+    g.angry = true; knockOut(g, p); knockOut(h, null);
+    for (let i = 0; i < 5; i++) { tickCombatant(g, 16); tickCombatant(h, 16); }
+    return g.downed && !h.downed;
+  }));
+  ok('Gnadenstoß erledigt einen gestürzten Feind', sandbox(() => {
+    const p = stage(), g = actor(325, 300);
+    g.angry = true; knockOut(g, p); p.aim = 0; p.equip.weapon = mkItem('longsword');
+    resolveSwing(p);
+    return !g.alive;
+  }));
+  ok('Zorn hat eine Leine: Spur verloren, zu weit vom Posten, Spieler überwältigt → Buße', sandbox(() => {
+    const p = stage();
+    const far = actor(1000, 300); far.anchor = { x: 300, y: 300 }; far.angry = true; far.sawPlayer = clock(); p.x = 1080;
+    updateNpc(far, 16);
+    p.x = 300; const lost = actor(300, 900); lost.angry = true; lost.sawPlayer = clock() - 20;
+    updateNpc(lost, 16);
+    const law = actor(320, 300, { faction: 'valen' }); law.guard = true; law.angry = true; law.sawPlayer = clock();
+    S.gold = 50; knockOut(p, law); updateNpc(law, 16);
+    return !far.angry && !lost.angry && !law.angry && !p.downed && S.gold === 20;
+  }));
+  ok('Übergänge: Bandit folgt nach Laufzeit, Wolf lauert, Gorak hält seine Halle', sandbox(() => {
+    const p = stage();
+    const b = spawnEnemy('bandit', '__a', 11, 9), w = spawnEnemy('wolf', '__a', 9, 11), gk = spawnEnemy('gorak', '__a', 12, 12);
+    for (const e of [b, w, gk]) { e.aggroId = p.id; e.aiState = 'pursue'; }
+    leavePursuit('__a', '__b');
+    const left = !!b.follow && !!w.lurk && !gk.follow && !gk.lurk && !gk.aggroId;
+    S.ents.__a.splice(S.ents.__a.indexOf(p), 1); p.map = '__b'; S.map = '__b'; S.ents.__b.push(p);
+    arrivingPursuers(); const early = S.ents.__b.includes(b);           // braucht Laufzeit bis zur Tür
+    S.minute += 6; arrivingPursuers();
+    const came = S.ents.__b.includes(b) && b.map === '__b' && b.aggroId === p.id && !S.ents.__a.includes(b);
+    S.ents.__b.splice(S.ents.__b.indexOf(p), 1); p.map = '__a'; S.map = '__a'; S.ents.__a.push(p);
+    arrivePursuit('__a');
+    const lurked = w.aggroId === p.id && !w.lurk && dist(w, p) < 200;
+    const w2 = spawnEnemy('wolf', '__a', 25, 25); w2.aggroId = p.id; w2.lurk = { until: clock() - 1 };
+    arrivePursuit('__a');
+    return left && !early && came && lurked && !w2.aggroId && w2.wary > clock();
+  }));
+  const guard = (x, y) => { const g = actor(x, y, { faction: 'valen' }); g.guard = true; g.equip.weapon = mkItem('spear'); return g; };
+  const frames = (n, list) => { for (let i = 0; i < n; i++) { combat = S.ents.__a.filter(e => e.alive); for (const e of list) think(e, 16); } };
+  ok('Reaktion: kämpfende Wache ruft Wachen im Umkreis herbei', sandbox(() => {
+    stage(); const gob = spawnEnemy('goblin', '__a', 30, 10), a = guard(gob.x - 200, gob.y), b = guard(gob.x - 600, gob.y);
+    gob.atkCd = 1e9; const d0 = dist(b, gob);
+    frames(1, [a]); frames(40, [b]);
+    return !!b.alarm && dist(b, gob) < d0 - 30;
+  }));
+  ok('Reaktion: Wache richtet den bewusstlosen Spieler auf, Zivilist holt Hilfe', sandbox(() => {
+    const p = stage(), civ = actor(360, 300), g = guard(300, 1100);
+    knockOut(p, null);
+    frames(1, [civ]);
+    const called = g.aid > clock();
+    frames(700, [g]);
+    return called && !p.downed;
+  }));
+  ok('Reaktion: Bluttat — Zeugen fürchten den Spieler, Wache wird zornig', sandbox(() => {
+    const p = stage(), v = actor(330, 300), w = actor(360, 330), g = guard(300, 360);
+    die(v, 'Test', p);
+    return w.afraid > clock() && g.angry && !v.alive;
+  }));
+  ok('Reaktion: Rudel hilft, Händler schließt bei Kampf', sandbox(() => {
+    const p = stage(), w1 = spawnEnemy('wolf', '__a', 20, 20), w2 = spawnEnemy('wolf', '__a', 22, 20);
+    w2.x = w1.x + 60; w2.y = w1.y;
+    hurt(w1, 1, p, 'Test');
+    const m = actor(w1.x + 100, w1.y); m.shop = true;
+    frames(1, [m]);
+    return w2.aggroId === p.id && m.shopClosed > clock();
+  }));
+  ok('Wegfindung: Verfolger umgeht eine Mauer statt davor festzustecken', sandbox(() => {
+    for (let y = 4; y <= 16; y++) setTile('__a', 15, y, T.WALL);
+    const p = stage(); p.x = 19 * TS; p.y = 10 * TS + 16;
+    const sk = spawnEnemy('skeleton', '__a', 12, 10); sk.x = 13 * TS + 16; sk.y = 10 * TS + 16; sk.aggroId = p.id;
+    for (let i = 0; i < 900 && dist(sk, p) > 50; i++) { combat = S.ents.__a.filter(e => e.alive); sk.atkCd = 1e9; think(sk, 16); }
+    return dist(sk, p) <= 50;
+  }));
+  ok('Spawns landen nie in Bäumen; Eingeklemmte kommen frei', sandbox(() => {
+    const tree = { id: uid(), kind: 'prop', type: 'tree', map: '__a', x: 10 * TS + 16, y: 10 * TS + 16, r: 12, solid: true };
+    S.ents.__a.push(tree); addSolid(tree);
+    let inTree = 0; for (let i = 0; i < 60; i++) { const s = freeSpotNear('__a', 10, 10, 1); if (s.x === tree.x && s.y === tree.y) inTree++; }
+    const stuck = actor(tree.x, tree.y); for (let i = 0; i < 20; i++) moveEnt(stuck, 1.2, 0);
+    return inTree === 0 && dist(stuck, tree) > 15;
+  }));
+  ok('Gebäude: jeder Typ × jede Stadt ergibt ein Sprite in Grundrissbreite (Tag und Nacht)', Object.keys(HB.BTYPES).every(t => Object.keys(HB.TOWN_STYLE).every(town => {
+    const b = { id: 't', x: 3, y: 4, w: 5, h: 4, door: 'S', type: t, town, seed: 7 }, cv = HB.houseSprite(b, false), cn = HB.houseSprite(b, true);
+    return cv.width === 5 * 16 + 4 && filled(cv) && filled(cn);
+  })));
+  if (HOUSES.length) ok('Gebäude: Türen frei, keine Möbel in der Türachse (geladene Welt)', HOUSES.every(b => {
+    const [dx, dy] = b.doorTile, ix = dx + (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0), iy = dy + (b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0);
+    const ox = dx - (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0), oy = dy + (b.door === 'S' ? 1 : b.door === 'N' ? -1 : 0);
+    return ![[dx, dy], [ix, iy], [ox, oy]].some(([x, y]) => occupied.at(b.map, x, y) || SOLID.has(tileAt(b.map, x, y)));
+  }));
+  ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
+    return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());
+  ok('Daten: jeder Gegner definiert interiors, jede Herkunfts-Fertigkeit hat einen Namen',
+    Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
   return out;
@@ -2378,7 +2786,7 @@ function buildCreation() {
   row('Kleidung', CLOTH, 'cloth');
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
-    const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).join(', ')}</small>`);
+    const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).map(s => SKILL_NAMES[s] || s).join(', ')}</small>`);
     b.onclick = () => { origin = k; [...ob.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); renderOrigin(); };
     ob.appendChild(b);
   }
@@ -2469,5 +2877,8 @@ function boot() {
   buildCreation();
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
+  // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest };
 }
 boot();

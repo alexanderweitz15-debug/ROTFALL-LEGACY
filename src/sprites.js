@@ -38,7 +38,7 @@ export function ramp(h) {
 }
 
 // ---------------- Pixelraster ----------------
-class G {
+export class G {
   constructor(w, h, oy = 0, ox = 0) { this.w = w; this.h = h; this.oy = oy; this.ox = ox; this.a = new Array(w * h).fill(null); }
   p(x, y, c) { y += this.oy; x += this.ox; if (c && x >= 0 && y >= 0 && x < this.w && y < this.h) this.a[y * this.w + x] = c; }
   r(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.p(x + i, y + j, c); }
@@ -47,7 +47,7 @@ class G {
   flipY() { const n = new G(this.w, this.h); for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) n.a[y * this.w + x] = this.a[(this.h - 1 - y) * this.w + x]; return n; }
   rotCW() { const n = new G(this.h, this.w); for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) n.a[x * n.w + (this.h - 1 - y)] = this.a[y * this.w + x]; return n; }
 }
-function toCanvas(g, outline = true) {
+export function toCanvas(g, outline = true) {
   const cv = document.createElement('canvas'); cv.width = g.w; cv.height = g.h;
   const c = cv.getContext('2d');
   const a = g.a.slice();
@@ -116,6 +116,9 @@ export function humanSpec(e) {
   else if (prof === 'Händlerin' || prof === 'Kontorhändler' || prof === 'Händler') { s.pouch = 1; s.strap = 1; s.scarf = '#8c6a2e';
     if (prof !== 'Händlerin') { s.helm = s.helm || 'hat'; s.helmCol = s.helmCol || '#3a2c20'; s.beard = 1; } }
   else if (prof === 'Wache') { s.helm = 'nasal'; s.helmCol = '#8b8a85'; s.armor = 'chain'; s.armorCol = '#7c7b76'; s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }
+  else if (prof === 'Torwache') { s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }                   // Valen: Blau, Silberwinkel
+  else if (prof === 'Ordenswache') { s.tabard = '#d9d2c0'; s.mark = 'cross'; s.markCol = '#9b2e26'; s.helm = 'great'; s.helmCol = '#b9b19c'; }   // Orden: Elfenbein & Rot
+  else if (prof === 'Söldnerwache') { s.scarf = '#7a5a2a'; s.strap = 1; s.pouch = 1; s.beard = s.hs & 1; }             // gekauft, nicht vereidigt
   else if (prof === 'Ehemaliger Söldner') { s.beard = 1; s.strap = 1; s.pouch = 1; }
   else if (prof === 'Jägerbursche') { s.hooded = 1; s.hood = '#3a4a2c'; s.cloak = '#2e3a24'; s.quiver = 1; s.strap = 1; }
   else if (prof === 'Bandenführer') { s.hooded = 1; s.hood = '#2a2119'; s.cloak = '#211a14'; s.face = 'cloth'; s.scarf = '#7a2a20'; s.strap = 1; s.armor = s.armor || 'leather'; s.armorCol = s.armorCol || '#4a3525'; }

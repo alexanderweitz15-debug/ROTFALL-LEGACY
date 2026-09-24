@@ -1,6 +1,6 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
-import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS } from './data.js';
+import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES } from './data.js';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS } from './world.js';
 import { townState, townPrice } from './sim.js';
@@ -234,7 +234,11 @@ const propName = t => ({ tree:'Baum', bush:'Strauch', rock_node:'Felsbrocken', o
   dead_tree:'Toter Baum', bone_spire:'Knochenturm', obelisk:'Obelisk', watchtower_ruin:'Turmruine',
   marsh_ruin:'Ruine', broken_pillar:'Gebrochene Säule', crypt:'Gruft', wayshrine:'Wegschrein', candles:'Kerzen',
   waysign:'Wegweiser', barrel:'Fass', tower_ruin:'Alter Wachturm', bones:'Knochen', broken_cart:'Umgestürzter Wagen',
-  firepit:'Kalte Feuerstelle', debris:'Verstreute Waren', blood:'Blutspur', flowers_prop:'Blumen' }[t] || 'Objekt');
+  firepit:'Kalte Feuerstelle', debris:'Verstreute Waren', blood:'Blutspur', flowers_prop:'Blumen',
+  sack:'Sack', crate_stack:'Kistenstapel', table:'Tisch', bench:'Bank', bed:'Bett', bunk:'Etagenbett', shelf:'Regal',
+  hearth:'Herdfeuer', forge:'Esse', counter:'Theke', desk:'Schreibpult', workbench_int:'Werkbank', cask_rack:'Fassgestell',
+  weapon_rack:'Waffenständer', altar_small:'Altar', camp_ruin:'Verlassenes Lager', fallen_tree:'Umgestürzter Baum', rubble:'Geröll',
+  mushrooms:'Pilze', standing_stone:'Menhir', tent_prop:'Zelt', cart:'Karren', stall:'Marktstand', scarecrow:'Vogelscheuche', fence:'Zaun' }[t] || 'Objekt');
 
 export function relLabel(v) {
   if (v <= -60) return 'Feind'; if (v <= -20) return 'Rivale'; if (v < 10) return 'Fremder';
@@ -456,8 +460,7 @@ function woundNotes(c, click) {
 function charUI(body, who) {
   const p = who || S.player, isPlayer = p === S.player;
   const ATTRS = { strength:'Stärke', agility:'Beweglichkeit', endurance:'Ausdauer', intelligence:'Intelligenz', perception:'Wahrnehmung', willpower:'Willenskraft' };
-  const SKILLS = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-    medicine:'Medizin', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
+  const SKILLS = SKILL_NAMES;
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);

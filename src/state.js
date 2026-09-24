@@ -56,6 +56,7 @@ export function year() { return 17 + Math.floor((S.day - 1) / 60); }
 const logListeners = [];
 export function onLog(fn) { logListeners.push(fn); }
 export function log(text, cat = 'world') {
+  if (S._quiet) return;                           // Selbsttest-Sandbox: keine Einträge im echten Protokoll
   const e = { t: timeStr(), text, cat };
   S.log.push(e);
   if (S.log.length > 220) S.log.shift();
@@ -63,6 +64,7 @@ export function log(text, cat = 'world') {
 }
 
 export function chronicle(text, kind = 'event', detail = '') {
+  if (S._quiet) return;
   S.chronicle.push({ year: year(), day: S.day, text, kind, detail });
   if (kind === 'death') log(text, 'death'); 
 }
@@ -86,7 +88,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty']);
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet']);
 export function save() {
   try {
     const out = {};

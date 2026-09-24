@@ -1,5 +1,6 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
 import { S, rnd, ri, pick, chance, seedRng, uid } from './state.js';
+import { FURNISH } from './buildings.js';
 
 export const TS = 32;                // Kachelgröße
 export const T = { GRASS:0, DIRT:1, ROAD:2, WATER:3, MARSH:4, STONE:5, PLANK:6, ROCK:7, WALL:8, SAND:9, DFLOOR:10, DWALL:11, ASH:12, FIELD:13 };
@@ -88,13 +89,26 @@ function blob(map, cx, cy, r, t, density = 1) {
     if (d <= r * (0.75 + rnd() * 0.35) && chance(density)) setTile(map, i, j, t);
   }
 }
-function house(map, x, y, w, h, doorSide = 'S') {
+// Gebäude: Kacheln (Mauern, Dielen, Türlücke) + Datensatz in HOUSES (Typ, Stadt → Dach, Fassade, Innenausstattung).
+// HOUSES entsteht bei jeder Generierung neu aus dem Seed (nicht gespeichert); Möbel sind Props (gen: 2).
+export const HOUSES = [];
+function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   rect(map, x, y, w, h, T.WALL);
   rect(map, x + 1, y + 1, w - 2, h - 2, T.PLANK);
-  if (doorSide === 'S') setTile(map, x + (w >> 1), y + h - 1, T.PLANK);
-  if (doorSide === 'N') setTile(map, x + (w >> 1), y, T.PLANK);
-  if (doorSide === 'W') setTile(map, x, y + (h >> 1), T.PLANK);
-  if (doorSide === 'E') setTile(map, x + w - 1, y + (h >> 1), T.PLANK);
+  const door = doorSide === 'S' ? [x + (w >> 1), y + h - 1] : doorSide === 'N' ? [x + (w >> 1), y] : doorSide === 'W' ? [x, y + (h >> 1)] : [x + w - 1, y + (h >> 1)];
+  setTile(map, door[0], door[1], T.PLANK);
+  const b = { id: 'h' + x + '_' + y, map, x, y, w, h, door: doorSide, doorTile: door, type: meta.type || 'house', town: meta.town, seed: (x * 31 + y * 17) % 997 + 1 };
+  HOUSES.push(b);
+  // Innenausstattung: die Kachel hinter der Tür bleibt frei; keine zwei Möbel auf einer Kachel
+  const inside = [door[0] + (doorSide === 'W' ? 1 : doorSide === 'E' ? -1 : 0), door[1] + (doorSide === 'S' ? -1 : doorSide === 'N' ? 1 : 0)];
+  const used = new Set([inside.join(',')]);
+  for (const [kind, ox, oy] of FURNISH[b.type] || []) {
+    const tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy, k = tx + ',' + ty;
+    if (tx < x + 1 || tx > x + w - 2 || ty < y + 1 || ty > y + h - 2 || used.has(k)) continue;
+    used.add(k);
+    prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack'].includes(kind), r: 10 });
+  }
+  return b;
 }
 
 const nz = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
@@ -255,7 +269,7 @@ function gruben() {
 
 // ---------------- Oberwelt ----------------
 export function genWorld() {
-  props.length = 0;
+  props.length = 0; HOUSES.length = 0;
   seedRng(S.seed);
   const w = 512, h = 512, tiles = new Uint8Array(w * h).fill(T.GRASS);
   MAPS.world = { w, h, tiles };
@@ -282,17 +296,21 @@ export function genWorld() {
   // ---- Eren ----
   rect('world', 50, 56, 22, 18, T.DIRT);
   for (let x = 50; x < 72; x++) setTile('world', x, 64, T.ROAD);
-  house('world', 53, 58, 6, 5, 'S'); prop('sign', 56, 63, { label:'Taverne „Zur Grauen Hand“', tag:'tavern' });
-  house('world', 62, 58, 5, 4, 'S'); prop('anvil', 64, 62, { tag:'smithy', solid:true });
-  house('world', 68, 59, 5, 4, 'W'); prop('sign', 67, 61, { label:'Heilerin', tag:'healer' });
-  house('world', 52, 68, 5, 4, 'N'); prop('sign', 54, 67, { label:'Haus des Vorstehers', tag:'mayor' });
-  house('world', 66, 68, 6, 5, 'N');
+  // Schilder stehen neben der Tür, nie davor; Waren und Fässer dort, wo gearbeitet und gehandelt wird
+  house('world', 53, 58, 6, 5, 'S', { type:'tavern', town:'eren' }); prop('sign', 58, 63, { label:'Taverne „Zur Grauen Hand“', tag:'tavern' });
+  house('world', 62, 58, 5, 4, 'S', { type:'smithy', town:'eren' }); prop('anvil', 66, 62, { tag:'smithy', solid:true, label:'Aldrics Amboss' });
+  house('world', 68, 59, 5, 4, 'W', { type:'healer', town:'eren' }); prop('sign', 67, 63, { label:'Heilerin', tag:'healer' });
+  house('world', 52, 68, 5, 4, 'N', { type:'hall', town:'eren' }); prop('sign', 56, 67, { label:'Haus des Vorstehers', tag:'mayor' });
+  house('world', 66, 68, 6, 5, 'N', { type:'house', town:'eren' });
   rect('world', 58, 68, 6, 4, T.FIELD); prop('scarecrow', 60, 70);
   prop('stall', 59, 62, { tag:'market' }); prop('stall', 61, 62, { tag:'market' });
   prop('well', 60, 66, { solid:true });
   prop('board', 58, 65, { label:'Anschlagbrett', tag:'board' });
   prop('campfire_static', 57, 61);
-  for (let i = 0; i < 12; i++) prop('crate', ri(51, 71), ri(57, 73));
+  for (let i = 0; i < 12; i++) { ri(51, 71); ri(57, 73); }   // ehem. Zufallskisten: Zufallszüge bleiben, damit ältere Spielstände dieselbe Welt erzeugen
+  for (const [x, y] of [[53, 63], [54, 63]]) prop('barrel', x, y, { solid:true, r:9, label:'Bierfass der Taverne' });   // vor der Taverne
+  prop('crate', 62, 63, { label:'Marktware' }); prop('crate', 63, 63, { label:'Marktware', v:1 }); prop('sack', 60, 62, { label:'Getreidesack' });
+  prop('barrel', 62, 62, { solid:true, r:9, label:'Löschwasser der Schmiede' });
   for (let i = 0; i < 8; i++) prop('fence', 57 + i, 72, { solid:true });
 
   // ---- Wald ----
@@ -351,7 +369,7 @@ export function genWorld() {
   // ---- Nordfurt (Randstadt) ----
   rect('world', 112, 50, 14, 13, T.STONE);
   for (let x = 112; x < 126; x++) setTile('world', x, 50, T.WALL);
-  house('world', 114, 53, 5, 4, 'S'); house('world', 120, 53, 5, 4, 'S');
+  house('world', 114, 53, 5, 4, 'S', { type:'kontor', town:'northcity' }); house('world', 120, 53, 5, 4, 'S', { type:'barracks', town:'northcity' });
   prop('sign', 113, 57, { label:'Nordfurt — Tor' });
 
   // Moorruine mit Grabsiegel
@@ -410,31 +428,35 @@ export function genWorld() {
   // ---- Salzhafen: große Hafenstadt an der Südküste ----
   rect('world', 138, 438, 26, 24, T.DIRT);
   for (let x = 138; x < 164; x++) setTile('world', x, 450, T.ROAD);
-  house('world', 140, 440, 6, 5, 'S'); prop('sign', 143, 445, { label:'Salzhafen — Kontor', tag:'harbor' });
-  house('world', 150, 440, 5, 4, 'S'); house('world', 158, 440, 5, 4, 'S');
-  house('world', 140, 452, 5, 4, 'N'); house('world', 152, 452, 6, 5, 'N');
+  house('world', 140, 440, 6, 5, 'S', { type:'kontor', town:'saltport' }); prop('sign', 145, 445, { label:'Salzhafen — Kontor', tag:'harbor' });
+  house('world', 150, 440, 5, 4, 'S', { type:'house', town:'saltport' }); house('world', 158, 440, 5, 4, 'S', { type:'barracks', town:'saltport' });
+  house('world', 140, 452, 5, 4, 'N', { type:'house', town:'saltport' }); house('world', 152, 452, 6, 5, 'N', { type:'tavern', town:'saltport' });
   prop('stall', 147, 449, { tag:'market' }); prop('stall', 149, 449, { tag:'market' });
   prop('well', 150, 451, { solid:true }); prop('board', 145, 450, { label:'Anschlagbrett', tag:'board' });
-  for (let i = 0; i < 12; i++) prop('crate', ri(139, 162), ri(439, 461));
+  for (let i = 0; i < 12; i++) { ri(139, 162); ri(439, 461); }   // RNG-Folge stabil (s. Eren)
+  for (const [x, y, k] of [[145, 462, 'crate'], [145, 461, 'crate'], [148, 462, 'sack'], [155, 462, 'crate'], [157, 462, 'barrel'], [158, 462, 'sack']])   // Umschlag an den Stegen
+    prop(k, x, y, { solid: k !== 'sack', r: 9, label: k === 'sack' ? 'Salzsack' : 'Hafenfracht', v: (x + y) % 3 });
   for (let d = 0; d < 8; d++) { setTile('world', 146, 463 + d, T.PLANK); setTile('world', 147, 463 + d, T.PLANK); setTile('world', 156, 463 + d, T.PLANK); }   // Stege
   prop('cart', 142, 460); prop('campfire_static', 159, 458);
 
   // ---- Kreuzweg: Söldnerstadt im Herzen des Mittellands ----
   rect('world', 240, 240, 22, 18, T.DIRT);
   for (let x = 240; x < 262; x++) setTile('world', x, 250, T.ROAD);
-  house('world', 242, 242, 6, 5, 'S'); prop('sign', 245, 247, { label:'Kreuzweg — Rasthaus', tag:'tavern' });
-  house('world', 250, 242, 5, 4, 'S'); house('world', 256, 243, 5, 4, 'W');
-  house('world', 242, 252, 5, 4, 'N'); house('world', 254, 251, 6, 5, 'N');
+  house('world', 242, 242, 6, 5, 'S', { type:'tavern', town:'kreuzweg' }); prop('sign', 247, 247, { label:'Kreuzweg — Rasthaus', tag:'tavern' });
+  house('world', 250, 242, 5, 4, 'S', { type:'house', town:'kreuzweg' }); house('world', 256, 243, 5, 4, 'W', { type:'smithy', town:'kreuzweg' });
+  house('world', 242, 252, 5, 4, 'N', { type:'house', town:'kreuzweg' }); house('world', 254, 251, 6, 5, 'N', { type:'merc', town:'kreuzweg' });
   prop('stall', 248, 249, { tag:'market' }); prop('stall', 250, 249, { tag:'market' });
   prop('well', 250, 247, { solid:true }); prop('board', 246, 250, { label:'Anschlagbrett', tag:'board' });
   prop('anvil', 253, 246, { tag:'smithy', solid:true });
-  for (let i = 0; i < 10; i++) prop('crate', ri(241, 260), ri(241, 257));
+  for (let i = 0; i < 10; i++) { ri(241, 260); ri(241, 257); }   // RNG-Folge stabil (s. Eren)
+  for (const [x, y, k] of [[247, 248, 'crate'], [251, 248, 'crate'], [252, 248, 'sack'], [243, 247, 'barrel'], [244, 247, 'barrel']])   // Marktstände, Rasthaus
+    prop(k, x, y, { solid: k !== 'sack', r: 9, label: k === 'barrel' ? 'Fass des Rasthauses' : 'Marktware', v: (x + y) % 3 });
 
   // ---- Aschfurt: befestigter Grenzposten (Händlerland) ----
   rect('world', 372, 84, 16, 16, T.DIRT);
   for (let x = 372; x < 388; x++) { setTile('world', x, 84, T.WALL); if (x < 378 || x > 381) setTile('world', x, 99, T.WALL); }
   for (let y = 84; y < 100; y++) { setTile('world', 372, y, T.WALL); setTile('world', 387, y, T.WALL); }
-  house('world', 375, 87, 5, 4, 'S'); house('world', 381, 87, 5, 4, 'S');
+  house('world', 375, 87, 5, 4, 'S', { type:'kontor', town:'ashford' }); house('world', 381, 87, 5, 4, 'S', { type:'barracks', town:'ashford' });
   prop('stall', 378, 94, { tag:'market' }); prop('well', 380, 96, { solid:true });
   prop('sign', 376, 93, { label:'Aschfurt — Tor' }); prop('board', 382, 94, { label:'Anschlagbrett', tag:'board' });
   prop('watchtower_ruin', 373, 85, { solid:true });
@@ -443,7 +465,7 @@ export function genWorld() {
   rect('world', 446, 246, 20, 20, T.STONE);
   for (let x = 446; x < 466; x++) { setTile('world', x, 246, T.WALL); if (x < 453 || x > 458) setTile('world', x, 265, T.WALL); }
   for (let y = 246; y < 266; y++) { setTile('world', 446, y, T.WALL); setTile('world', 465, y, T.WALL); }
-  house('world', 449, 249, 6, 5, 'S'); house('world', 458, 249, 5, 4, 'S');
+  house('world', 449, 249, 6, 5, 'S', { type:'chapel', town:'sonnwacht' }); house('world', 458, 249, 5, 4, 'S', { type:'barracks', town:'sonnwacht' });
   prop('shrine', 456, 256, { label:'Schrein des Ordens', tag:'shrine' });
   prop('torch', 450, 248, {}); prop('torch', 462, 248, {});
   prop('banner_torn', 450, 246); prop('sign', 454, 261, { label:'Sonnwacht — Feste des Ordens' });
@@ -474,6 +496,7 @@ export function genWorld() {
 
   // ---- Südsumpf & Versunkener Tempel ----
   for (let i = 0; i < 40; i++) blob('world', ri(90, 200), ri(380, 450), ri(1, 3), T.WATER, 0.7);
+  for (let y = 438; y < 463; y++) for (let x = 138; x < 164; x++) if (tileAt('world', x, y) === T.WATER) setTile('world', x, y, T.DIRT);   // Sumpflöcher nicht in Salzhafen (ohne Zufall)
   rect('world', 136, 406, 9, 9, T.STONE);
   prop('marsh_ruin', 140, 410, { label:'Versunkener Tempel' });
   for (let i = 0; i < 6; i++) prop('broken_pillar', ri(136, 145), ri(406, 415), { solid:true });
@@ -532,15 +555,23 @@ export function genWorld() {
   const inWild = (x, y) => !protectedNW(x, y) && ![T.WATER, T.ROAD, T.PLANK, T.WALL, T.DWALL].includes(tileAt('world', x, y));
   const cacheLoot = [['potion','longsword'], ['kite_shield','iron'], ['bandage','herb','herb'], ['dried_meat','bread'],
     ['chain_hauberk'], ['longbow'], ['iron_helm','potion'], ['mace','bandage'], ['leather_jerkin','bread']];
+  // Verstecke: nie eine Truhe allein im Nichts — jede hat eine kleine Geschichte, die ihren Fundort erklärt
+  const CACHE = {
+    traveler: (x, y, loot) => { prop('chest', x, y, { loot, label: 'Bündel eines toten Reisenden' }); prop('bones', x + 1, y + 1, { r: 6 }); prop('blood', x - 1, y + 1, { r: 4 }); },
+    roots:    (x, y, loot) => { prop('fallen_tree', x, y - 1, { solid: true }); prop('chest', x + 1, y, { loot, label: 'Versteck unter Wurzeln' }); },
+    camp:     (x, y, loot) => { prop('camp_ruin', x, y, { label: 'Kaltes Lager' }); prop('firepit', x + 2, y, { r: 8 }); prop('chest', x - 1, y + 1, { loot, label: 'Zurückgelassene Truhe' }); },
+    smuggler: (x, y, loot) => { prop('broken_pillar', x, y, { solid: true }); prop('rubble', x + 1, y + 1); prop('chest', x - 1, y, { loot, label: 'Schmugglerversteck' }); },
+  };
   let placed = 0;
-  for (let i = 0; i < 900 && placed < 60; i++) {           // versteckte Truhen/Verstecke
+  for (let i = 0; i < 900 && placed < 60; i++) {
     const x = ri(20, 500), y = ri(20, 500);
-    if (inWild(x, y) && Math.hypot(x - 70, y - 70) > 60) { prop('chest', x, y, { loot: pick(cacheLoot), label: pick(['Verstecktes Bündel', 'Vergessene Truhe', 'Beutelager', 'Alter Vorrat']) }); placed++; }
+    if (inWild(x, y) && Math.hypot(x - 70, y - 70) > 60) { CACHE[pick(Object.keys(CACHE))](x, y, pick(cacheLoot)); placed++; }
   }
-  for (let i = 0; i < 500; i++) {                          // verlassene Lager (Umgebungsstorytelling)
+  for (let i = 0; i < 500; i++) {                          // verlassene Lager (Umgebungsstorytelling): Feuer, Habe, manchmal Spuren
     const x = ri(20, 500), y = ri(20, 500);
     if (inWild(x, y) && chance(0.5)) { prop('camp_ruin', x, y, { label: pick(['Verlassenes Lager', 'Ausgebranntes Feuer', 'Zurückgelassene Habe']) });
-      if (chance(0.4)) prop('crate', x + ri(-2, 2), y + ri(-2, 2), { loot: pick(cacheLoot) }); }
+      if (chance(0.4)) { prop('crate', x + ri(1, 2), y + ri(-1, 1), { loot: pick(cacheLoot), label: 'Zurückgelassene Kiste' }); prop('firepit', x - 2, y + 1, { r: 8 }); }
+      else if (nz(x, y) > 0.7) prop('bones', x + 1, y + 2, { r: 6 }); }   // Hash statt Zufall: RNG-Folge stabil
   }
   for (let i = 0; i < 400; i++) {                          // Ruinen und Säulen
     const x = ri(20, 500), y = ri(20, 500);
@@ -600,10 +631,12 @@ export function genMine() {
   return props.slice();
 }
 
+// Feste Objekte (Bäume, Felsen, Gebäude) kennt nur game.js (Objekt-Index); es trägt hier die Prüfung ein.
+export const occupied = { at: null };                // (map, tx, ty) → true, wenn ein festes Objekt auf der Kachel steht
 export function freeSpotNear(map, tx, ty, radius = 6) {
   for (let i = 0; i < 200; i++) {
     const x = tx + ri(-radius, radius), y = ty + ri(-radius, radius);
-    if (!SOLID.has(tileAt(map, x, y))) return { x: x * TS + TS / 2, y: y * TS + TS / 2 };
+    if (!SOLID.has(tileAt(map, x, y)) && !(occupied.at && occupied.at(map, x, y))) return { x: x * TS + TS / 2, y: y * TS + TS / 2 };
   }
   return { x: tx * TS, y: ty * TS };
 }

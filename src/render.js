@@ -1,6 +1,7 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp } from './state.js';
-import { MAPS, T, TS, tileAt, regionAt } from './world.js';
+import { MAPS, T, TS, tileAt, regionAt, HOUSES } from './world.js';
+import * as HB from './buildings.js';
 import { ITEMS, MONSTERS } from './data.js';
 import { buildOf } from './body.js';
 import * as SP from './sprites.js';
@@ -68,8 +69,10 @@ export function drawFrame(now) {
       ctx.drawImage(chunkCanvas(m, cx, cy), cx * CH * TS, cy * CH * TS, CH * TS + 0.5, CH * TS + 0.5);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER) drawWater(tx, ty, now);
 
-  // Objekte nach y sortiert
+  // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = S.ents[S.map].filter(e => e.x > cam.x - 80 && e.x < cam.x + W / cam.zoom + 80 && e.y > cam.y - 100 && e.y < cam.y + H / cam.zoom + 120);
+  for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
+    list.push(houseEnt(b));
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
   for (const e of list) drawEntity(e, now);
   for (const p of S.projectiles) drawProjectile(p);
@@ -270,6 +273,40 @@ function drawEntity(e, now) {
     case 'npc': case 'player': return drawHumanoid(e, now);
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
+    case 'house': return drawHouse(e.b, now);
+  }
+}
+
+// ---------------- Gebäude ----------------
+// Sprite je Gebäude (Tag/Nacht) gecacht. Steht der Spieler im Haus (Innenfläche oder Türkachel), blendet das Dach
+// weich aus: man sieht den Innenraum. Schornsteine rauchen, nachts leuchten die Fenster.
+const houseEnts = new Map(), houseCache = new Map(), roofAlpha = new Map();
+function houseEnt(b) { let e = houseEnts.get(b); if (!e) { e = { kind: 'house', b, x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS - 2 }; houseEnts.set(b, e); } return e; }
+export function playerInside(b, p = S.player) {
+  if (!p || p.map !== b.map) return false;
+  const tx = p.x / TS | 0, ty = p.y / TS | 0;
+  return (tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1) || (tx === b.doorTile[0] && ty === b.doorTile[1]);
+}
+const isNight = () => { const h = S.minute / 60; return h >= 19 || h < 6; };
+function drawHouse(b, now) {
+  const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd');
+  let cv = houseCache.get(key);
+  if (!cv) { if (houseCache.size > 120) houseCache.clear(); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
+  const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
+  const a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15;
+  roofAlpha.set(b, a);
+  const x0 = b.x * TS - OV * PX, y0 = b.y * TS - RISE * PX;
+  ctx.globalAlpha = a;
+  ctx.drawImage(cv, x0, y0, cv.width * PX, cv.height * PX);
+  ctx.globalAlpha = 1;
+  const ch = a > 0.5 && HB.chimneyOf(b);
+  if (ch) {                                                         // Rauch: Pixelwölkchen steigen auf und verwehen
+    const cx = x0 + ch.x * PX, cy = y0 + ch.y * PX;
+    for (let i = 0; i < 4; i++) {
+      const k = ((now / 2600 + i / 4 + b.seed * 0.13) % 1), sx = cx + Math.sin(k * 5 + i) * 4 + k * 12, sy = cy - k * 46, s = (1 + k * 3) | 0;
+      ctx.fillStyle = `rgba(${ch.soot ? '62,56,50' : '120,116,108'},${(1 - k) * 0.45})`;
+      ctx.fillRect(Math.round(sx / 2) * 2 - s, Math.round(sy / 2) * 2 - s, s * 2, s * 2);
+    }
   }
 }
 
@@ -291,7 +328,8 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const PROP_PERIOD = { campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const VARIANTS = { crate: 3, barrel: 3 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const PROP_PERIOD = { hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
 const PROP_BOX = { tower_ruin: 192 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
@@ -302,6 +340,8 @@ function drawPropPixel(e, now) {
   let sp = null;
   if (e.type === 'tree') { v = (h2(e.x | 0, e.y | 0) * 3) | 0; const list = REGION[e.map === 'world' ? regionOfProp(e) : 'greenmark'].trees;
     sp = list[v % list.length]; key += sp + v + (e.hp < 3 ? 'c' : ''); }
+  let variant = 0;
+  if (VARIANTS[e.type]) { variant = e.v ?? ((h2(e.x | 0, (e.y | 0) + 3) * VARIANTS[e.type]) | 0); key += 'v' + variant; }
   if (e.depleted) key += 'd';
   if (e.opened) key += 'o';
   if (per) { ph = ((now / per * 6 + h2(e.x | 0, 7) * 6) | 0) % 6; key += '#' + ph; }
@@ -313,7 +353,7 @@ function drawPropPixel(e, now) {
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(0.5, 0, 0, 0.5, 0, 0);
     ctx = o;
-    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
+    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
     SP.pixelize(o, B / 2, B / 2, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
     propCache.set(key, cv);
@@ -370,13 +410,107 @@ function drawProp(e, now) {
       ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x - 6, y - 7, 7, 3);
       if (e.type === 'ore_node' && !e.depleted) { ctx.fillStyle = '#8a6f3f'; ctx.fillRect(x - 3, y - 3, 3, 3); ctx.fillRect(x + 4, y + 1, 3, 3); }
       break;
-    case 'crate': case 'chest': {
-      shadow(x, y + 4, 10, .3);
-      ctx.fillStyle = e.type === 'chest' ? '#4a3521' : '#513f28';
-      ctx.fillRect(x - 10, y - 12, 20, 16);
-      ctx.strokeStyle = '#2b2116'; ctx.lineWidth = 1; ctx.strokeRect(x - 10.5, y - 12.5, 21, 17);
-      ctx.fillStyle = '#6d6154'; ctx.fillRect(x - 10, y - 5, 20, 2);
-      if (e.type === 'chest') { ctx.fillStyle = e.opened ? '#4a4237' : '#bd9433'; ctx.fillRect(x - 2, y - 6, 4, 5); }
+    case 'crate': case 'crate_stack': {                   // Kiste: Bretter, Strebe/Eisenband/Schaden; offen = Deckel ab
+      const v = e._var || 0, opened = e.opened;
+      const box = (bx, by, vv) => {
+        const W = ['#6a5134', '#5f4a30', '#574632'][vv], L = ['#846644', '#77603f', '#6e5a40'][vv], D = '#33261a';
+        shadow(bx, by + 4, 12, .3);
+        ctx.fillStyle = W; ctx.fillRect(bx - 11, by - 15, 22, 17);                      // Front
+        ctx.fillStyle = L; ctx.fillRect(bx - 11, by - 20, 22, 5);                       // Deckel (Aufsicht)
+        ctx.fillStyle = D; ctx.fillRect(bx - 11, by - 10, 22, 1.5); ctx.fillRect(bx - 11, by - 5, 22, 1.5); ctx.fillRect(bx - 1, by - 20, 1.5, 5);
+        ctx.fillStyle = 'rgba(255,230,180,.12)'; ctx.fillRect(bx - 11, by - 15, 3, 17);
+        if (vv === 0) { ctx.strokeStyle = D; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 9, by); ctx.lineTo(bx + 9, by - 14); ctx.stroke(); }
+        if (vv === 1) { ctx.fillStyle = '#4a4843'; ctx.fillRect(bx - 7, by - 20, 3, 22); ctx.fillRect(bx + 5, by - 20, 3, 22);
+          ctx.fillStyle = '#8a857a'; ctx.fillRect(bx - 6, by - 12, 1.5, 1.5); ctx.fillRect(bx + 6, by - 12, 1.5, 1.5); }
+        if (vv === 2) { ctx.fillStyle = '#1c150e'; ctx.beginPath(); ctx.moveTo(bx + 11, by - 20); ctx.lineTo(bx + 3, by - 20); ctx.lineTo(bx + 11, by - 9); ctx.fill();
+          ctx.fillStyle = L; ctx.fillRect(bx + 4, by - 23, 2, 4); ctx.fillRect(bx + 8, by - 22, 2, 3); }   // gesplitterte Ecke
+      };
+      if (e.type === 'crate_stack') { box(x - 3, y, 1); box(x + 4, y - 17, 0); break; }
+      box(x, y, v);
+      if (opened) { ctx.fillStyle = '#1c150e'; ctx.fillRect(x - 9, y - 19, 18, 3); ctx.fillStyle = '#6e5a40'; ctx.fillRect(x + 8, y - 24, 12, 4); }   // Deckel daneben
+      break; }
+    case 'chest': {                                       // Truhe: gewölbter Deckel, Eisenbänder, Schloss; offen = Deckel hoch
+      shadow(x, y + 4, 12, .32);
+      const Wd = '#4e3722', Lt = '#6a4b2e', Ir = '#3e3c38';
+      ctx.fillStyle = Wd; ctx.fillRect(x - 12, y - 12, 24, 14);
+      if (e.opened) { ctx.fillStyle = Lt; ctx.fillRect(x - 12, y - 24, 24, 9); ctx.fillStyle = '#16100a'; ctx.fillRect(x - 10, y - 14, 20, 4);
+        ctx.fillStyle = Ir; ctx.fillRect(x - 8, y - 24, 3, 9); ctx.fillRect(x + 5, y - 24, 3, 9); }
+      else { ctx.fillStyle = Lt; ctx.beginPath(); ctx.ellipse(x, y - 12, 12, 6, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(x - 12, y - 13, 24, 2);
+        ctx.fillStyle = Ir; ctx.fillRect(x - 8, y - 18, 3, 20); ctx.fillRect(x + 5, y - 18, 3, 20);
+        ctx.fillStyle = '#bd9433'; ctx.fillRect(x - 2, y - 11, 4, 5); ctx.fillStyle = '#2a1e10'; ctx.fillRect(x - 0.5, y - 9, 1, 2); }
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 12, y - 2, 24, 4);
+      break; }
+    case 'sack': {                                        // Sack: prall, oben gebunden
+      shadow(x, y + 4, 9, .3);
+      ctx.fillStyle = '#8f7f5c'; ctx.beginPath(); ctx.ellipse(x, y - 6, 9, 9, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#a8986f'; ctx.beginPath(); ctx.ellipse(x - 3, y - 9, 4, 4, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#6e603f'; ctx.fillRect(x - 3, y - 17, 6, 4); ctx.fillStyle = '#3e3224'; ctx.fillRect(x - 3, y - 14, 6, 1.5);
+      ctx.fillStyle = 'rgba(30,24,16,.35)'; ctx.fillRect(x + 3, y - 8, 4, 8);
+      break; }
+    case 'table': {                                       // Tisch mit Becher/Teller
+      shadow(x, y + 4, 16, .3);
+      ctx.fillStyle = '#3a2c1c'; ctx.fillRect(x - 12, y - 8, 3, 10); ctx.fillRect(x + 9, y - 8, 3, 10);
+      ctx.fillStyle = '#6e5238'; ctx.fillRect(x - 15, y - 16, 30, 9); ctx.fillStyle = '#846444'; ctx.fillRect(x - 15, y - 16, 30, 2);
+      ctx.fillStyle = '#2e2218'; ctx.fillRect(x - 15, y - 8, 30, 2);
+      ctx.fillStyle = '#9a9488'; ctx.fillRect(x - 8, y - 15, 5, 4); ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x + 4, y - 16, 4, 5);
+      break; }
+    case 'bench':
+      shadow(x, y + 3, 14, .25);
+      ctx.fillStyle = '#3a2c1c'; ctx.fillRect(x - 12, y - 4, 3, 6); ctx.fillRect(x + 9, y - 4, 3, 6);
+      ctx.fillStyle = '#6a4e34'; ctx.fillRect(x - 14, y - 8, 28, 5); ctx.fillStyle = '#80603f'; ctx.fillRect(x - 14, y - 8, 28, 1.5);
+      break;
+    case 'bed': case 'bunk': {                            // Bett (Etagenbett im Wachhaus)
+      shadow(x, y + 4, 14, .3);
+      const blanket = e.type === 'bunk' ? '#3e4a5a' : ['#6a3a30', '#3e4a3a', '#5a4a6a'][((x + y) | 0) % 3];
+      ctx.fillStyle = '#3e2e1e'; ctx.fillRect(x - 11, y - 22, 22, 26);
+      ctx.fillStyle = '#c9bfa6'; ctx.fillRect(x - 9, y - 20, 18, 6);
+      ctx.fillStyle = blanket; ctx.fillRect(x - 9, y - 14, 18, 16); ctx.fillStyle = 'rgba(255,240,210,.14)'; ctx.fillRect(x - 9, y - 14, 18, 2);
+      if (e.type === 'bunk') { ctx.fillStyle = '#3e2e1e'; ctx.fillRect(x - 11, y - 34, 3, 14); ctx.fillRect(x + 8, y - 34, 3, 14); ctx.fillRect(x - 11, y - 34, 22, 4); }
+      break; }
+    case 'shelf': {                                       // Regal an der Wand: Krüge, Bücher, Kräuter
+      shadow(x, y + 3, 12, .25);
+      ctx.fillStyle = '#3e2e1e'; ctx.fillRect(x - 12, y - 28, 24, 30);
+      ctx.fillStyle = '#5a4430'; for (const sy of [-20, -11, -2]) ctx.fillRect(x - 11, y + sy, 22, 2);
+      const cols = ['#8a5a3a', '#4a5a6a', '#6a7a4a', '#9a8a5a', '#6a3a3a'];
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = cols[(i * 3 + (x | 0)) % 5]; ctx.fillRect(x - 10 + i * 3.5, y - 26 + ((i & 1) * 2), 3, 6 - (i & 1) * 2); ctx.fillRect(x - 10 + i * 3.5, y - 17, 3, 6); }
+      break; }
+    case 'hearth': case 'forge': {                        // Feuerstelle / Esse: Stein, Glut (flackert)
+      const t = now / 565, fl = 0.75 + 0.25 * Math.sin(t * 5.3);
+      shadow(x, y + 4, 15, .3);
+      ctx.fillStyle = '#5a554c'; ctx.fillRect(x - 14, y - 20, 28, 22);
+      ctx.fillStyle = '#6c665c'; for (let i = 0; i < 4; i++) ctx.fillRect(x - 14 + i * 7, y - 20, 6, 4);
+      ctx.fillStyle = '#16120e'; ctx.fillRect(x - 9, y - 14, 18, 12);
+      ctx.fillStyle = `rgba(210,90,30,${fl})`; ctx.fillRect(x - 7, y - 8, 14, 5);
+      ctx.fillStyle = `rgba(250,180,70,${fl})`; ctx.fillRect(x - 4, y - 10, 8, 4); ctx.fillRect(x - 1, y - 13, 3, 3);
+      if (e.type === 'forge') { ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x + 14, y - 10, 8, 8); ctx.fillStyle = '#6a5040'; ctx.fillRect(x + 14, y - 10, 8, 2); }   // Blasebalg
+      break; }
+    case 'counter': case 'desk': case 'workbench_int': {  // Theke / Schreibpult / Werkbank
+      shadow(x, y + 4, 15, .3);
+      ctx.fillStyle = '#4e3a26'; ctx.fillRect(x - 15, y - 12, 30, 14);
+      ctx.fillStyle = '#6e5238'; ctx.fillRect(x - 15, y - 16, 30, 5); ctx.fillStyle = '#2e2218'; ctx.fillRect(x - 15, y - 11, 30, 1.5);
+      if (e.type === 'counter') { ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x - 10, y - 20, 4, 5); ctx.fillRect(x + 2, y - 20, 4, 5); ctx.fillStyle = '#c9bfa6'; ctx.fillRect(x - 10, y - 20, 4, 1); }
+      if (e.type === 'desk') { ctx.fillStyle = '#d6ccb2'; ctx.fillRect(x - 10, y - 16, 8, 4); ctx.fillRect(x - 6, y - 15, 7, 3); ctx.fillStyle = '#e8c070'; ctx.fillRect(x + 8, y - 21, 2, 5); }
+      if (e.type === 'workbench_int') { ctx.fillStyle = '#4a4843'; ctx.fillRect(x - 9, y - 18, 10, 2); ctx.fillRect(x + 4, y - 19, 2, 4); ctx.fillStyle = '#6a5a44'; ctx.fillRect(x - 3, y - 18, 3, 2); }
+      break; }
+    case 'cask_rack': {                                   // liegende Fässer auf einem Gestell
+      shadow(x, y + 4, 15, .3);
+      ctx.fillStyle = '#3a2c1c'; ctx.fillRect(x - 15, y - 4, 30, 5);
+      for (const ox of [-8, 8]) { ctx.fillStyle = '#5b412a'; ctx.beginPath(); ctx.ellipse(x + ox, y - 11, 8, 8, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#6e5033'; ctx.beginPath(); ctx.ellipse(x + ox - 1, y - 12, 5, 5, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x + ox - 1, y - 12, 2, 2); }
+      break; }
+    case 'weapon_rack': {                                 // Waffenständer: Speer, Schwert, Axt
+      shadow(x, y + 3, 12, .25);
+      ctx.fillStyle = '#3e2e1e'; ctx.fillRect(x - 12, y - 4, 24, 4); ctx.fillRect(x - 12, y - 22, 24, 3);
+      ctx.fillStyle = '#8a8f98'; ctx.fillRect(x - 8, y - 30, 2, 28); ctx.fillRect(x - 9, y - 32, 4, 4);
+      ctx.fillStyle = '#a8adb4'; ctx.fillRect(x - 1, y - 26, 3, 20); ctx.fillStyle = '#5a4430'; ctx.fillRect(x - 3, y - 8, 7, 2);
+      ctx.fillStyle = '#5a4430'; ctx.fillRect(x + 7, y - 24, 2, 22); ctx.fillStyle = '#8a8f98'; ctx.fillRect(x + 8, y - 24, 6, 7);
+      break; }
+    case 'altar_small': {                                 // Altar mit Tuch des Ordens
+      shadow(x, y + 4, 14, .3);
+      ctx.fillStyle = '#8f8a7e'; ctx.fillRect(x - 13, y - 14, 26, 16); ctx.fillStyle = '#a7a194'; ctx.fillRect(x - 13, y - 16, 26, 3);
+      ctx.fillStyle = '#d9d2c0'; ctx.fillRect(x - 6, y - 16, 12, 14); ctx.fillStyle = '#9b2e26'; ctx.fillRect(x - 1, y - 14, 2, 8); ctx.fillRect(x - 3, y - 12, 6, 2);
+      ctx.fillStyle = '#e8c070'; ctx.fillRect(x - 11, y - 21, 2, 5); ctx.fillRect(x + 9, y - 21, 2, 5);
       break; }
     case 'well':
       shadow(x, y + 4, 13, .35);
@@ -576,13 +710,17 @@ function drawProp(e, now) {
       ctx.fillStyle = '#5a452b'; ctx.fillRect(x - 5, y - 44, 10, 8);
       ctx.fillStyle = 'rgba(20,14,8,.6)'; ctx.fillRect(x + 2, y - 31, 10, 1.5); ctx.fillRect(x - 12, y - 19, 10, 1.5); ctx.fillRect(x - 3, y - 41, 6, 1.5);
       break;
-    case 'barrel':
+    case 'barrel': {                                      // Fass: Dauben, Eisenreifen; Varianten: Deckel / offen mit Wasser / Deckel mit Kelle
+      const v = e._var || 0;
       shadow(x, y + 4, 9, .35);
-      ctx.fillStyle = '#5b412a'; ctx.fillRect(x - 8, y - 18, 16, 21);
-      ctx.fillStyle = '#6e5033'; ctx.fillRect(x - 8, y - 18, 5, 21);
-      ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x - 8, y - 14, 16, 2); ctx.fillRect(x - 8, y - 4, 16, 2);   // Reifen
-      ctx.fillStyle = '#4a3522'; ctx.beginPath(); ctx.ellipse(x, y - 18, 8, 3, 0, 0, 7); ctx.fill();
-      break;
+      ctx.fillStyle = '#5b412a'; ctx.beginPath(); ctx.moveTo(x - 8, y - 18); ctx.quadraticCurveTo(x - 11, y - 8, x - 8, y + 3); ctx.lineTo(x + 8, y + 3); ctx.quadraticCurveTo(x + 11, y - 8, x + 8, y - 18); ctx.fill();
+      ctx.fillStyle = '#6e5033'; ctx.fillRect(x - 7, y - 17, 4, 19);
+      ctx.fillStyle = 'rgba(20,14,8,.35)'; ctx.fillRect(x - 1, y - 17, 1, 19); ctx.fillRect(x + 4, y - 17, 1, 19);   // Dauben
+      ctx.fillStyle = '#3a3834'; ctx.fillRect(x - 9, y - 14, 18, 2); ctx.fillRect(x - 9, y - 3, 18, 2);          // Reifen
+      ctx.fillStyle = v === 1 ? '#1d2a33' : '#4a3522'; ctx.beginPath(); ctx.ellipse(x, y - 18, 8, 3, 0, 0, 7); ctx.fill();
+      if (v === 1) { ctx.fillStyle = '#4a6070'; ctx.fillRect(x - 3, y - 19, 3, 1); }
+      if (v === 2) { ctx.fillStyle = '#6a5a44'; ctx.fillRect(x - 2, y - 20, 9, 2); ctx.fillRect(x + 6, y - 22, 3, 3); }
+      break; }
     case 'bones':                                         // Schädel und Knochen
       ctx.fillStyle = '#cfc6b0'; ctx.beginPath(); ctx.arc(x - 3, y - 4, 4.5, 0, 7); ctx.fill(); ctx.fillRect(x - 6, y - 2, 6, 3);
       ctx.fillStyle = '#1a1612'; ctx.fillRect(x - 5, y - 5, 2, 2); ctx.fillRect(x - 2, y - 5, 2, 2);
@@ -961,6 +1099,24 @@ export function ambient() {
   a += (REGION[curRegion] && REGION[curRegion].dark) || 0;          // Wald und Totenreich sind dunkler
   return clamp(a, 0, 0.86);
 }
+// Lichtquellen stehen still: einmal je Karte sammeln statt jedes Bild alle ~6500 Objekte zu prüfen.
+// Neu gesammelt, wenn sich die Objektzahl der Karte ändert (Bau, Abriss, Laden) oder die Karte wechselt.
+let lightCache = { map: null, n: -1, list: [] };
+function staticLights() {
+  const arr = S.ents[S.map], n = arr.length * 64 + (S.settlement ? S.settlement.buildings.reduce((k, b) => k + (b.built >= 1), 0) : 0);   // + fertige Bauten
+  if (lightCache.map === S.map && lightCache.n === n) return lightCache.list;
+  const list = [];
+  for (const e of arr) {
+    if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static')) list.push({ x: e.x, y: e.y, r: e.type === 'torch' ? 95 : 140 });
+    if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
+    if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });
+    if (e.kind === 'prop' && e.type === 'shrine') list.push({ x: e.x, y: e.y, r: 90 });
+    if (e.kind === 'prop' && e.type === 'candles') list.push({ x: e.x, y: e.y - 8, r: 60 });
+    if (e.kind === 'prop' && (e.type === 'hearth' || e.type === 'forge')) list.push({ x: e.x, y: e.y - 8, r: 80 });
+  }
+  lightCache = { map: S.map, n, list };
+  return list;
+}
 function drawLight(now) {
   const a = ambient();
   if (a < 0.06) return;
@@ -972,16 +1128,11 @@ function drawLight(now) {
   dctx.fillStyle = `rgba(${night},${a})`;
   dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
-  const lights = [];
   const pl = S.player;
+  const lights = [...staticLights()];
   if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: S.map === 'mine' ? 150 : 120 });
-  for (const e of S.ents[S.map]) {
-    if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static')) lights.push({ x: e.x, y: e.y, r: e.type === 'torch' ? 95 : 140 });
-    if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) lights.push({ x: e.x, y: e.y, r: 150 });
-    if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) lights.push({ x: e.x, y: e.y, r: 110 });
-    if (e.kind === 'prop' && e.type === 'shrine') lights.push({ x: e.x, y: e.y, r: 90 });
-    if (e.kind === 'prop' && e.type === 'candles') lights.push({ x: e.x, y: e.y - 8, r: 60 });
-  }
+  if (isNight()) for (const b of HOUSES) if (b.map === S.map)       // erleuchtete Fenster werfen warmes Licht auf die Straße
+    lights.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
   for (const l of lights) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260) continue;

@@ -12,6 +12,9 @@ export const ORIGINS = {
                attrs:{agility:1,perception:1,willpower:1}, skills:{survival:4,trading:4}, gear:['rusty_sword','cloth_shirt','bread'], gold:30 },
 };
 
+export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
+  medicine:'Medizin', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
+
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär' };
 
 // wtype steuert Angriffsverhalten: reach(px), arc(rad), speed(ms), stam
@@ -75,16 +78,17 @@ export const LOOT = {
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
 };
 
+// interiors: folgt dem Spieler durch Eingänge (Grube, Dungeons). Tiere nicht — sie lauern draußen (GDD §Übergänge).
 export const MONSTERS = {
-  wolf:      { name:'Wolf', hp:30, dmg:7, speed:1.55, reach:26, atk:900, xp:12, sight:220, r:11, threat:1, faction:'beast', pal:{body:'#5b5145',dark:'#3a332b',eye:'#c8a545'} },
-  boar:      { name:'Wildschwein', hp:46, dmg:11, speed:1.35, reach:26, atk:1200, xp:16, sight:170, r:13, threat:1, faction:'beast', pal:{body:'#4b3f34',dark:'#2f271f',eye:'#b8503a'} },
-  goblin:    { name:'Goblin', hp:28, dmg:6, speed:1.35, reach:28, atk:820, xp:12, sight:210, r:10, threat:1, faction:'goblin', pal:{skin:'#6d7a45',cloth:'#4a3a28',metal:'#6b6156'} },
-  goblin_warrior:{ name:'Goblin-Krieger', hp:54, dmg:11, speed:1.25, reach:32, atk:1000, xp:26, sight:230, r:12, threat:2, faction:'goblin', pal:{skin:'#5f6e3c',cloth:'#3d2f20',metal:'#8a7f6d'} },
-  bandit:    { name:'Bandit', hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2, faction:'bandit', pal:{skin:'#b2926f',cloth:'#4a3226',metal:'#7d7364'} },
-  bandit_archer:{ name:'Banditenschütze', hp:36, dmg:9, speed:1.35, reach:300, atk:1500, ranged:true, xp:24, sight:320, r:11, threat:2, faction:'bandit', pal:{skin:'#b2926f',cloth:'#3f4a2e',metal:'#7d7364'} },
-  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
-  valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
-  gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
+  wolf:      { name:'Wolf', hp:30, dmg:7, speed:1.55, reach:26, atk:900, xp:12, sight:220, r:11, threat:1, faction:'beast', interiors:false, pal:{body:'#5b5145',dark:'#3a332b',eye:'#c8a545'} },
+  boar:      { name:'Wildschwein', hp:46, dmg:11, speed:1.35, reach:26, atk:1200, xp:16, sight:170, r:13, threat:1, faction:'beast', interiors:false, pal:{body:'#4b3f34',dark:'#2f271f',eye:'#b8503a'} },
+  goblin:    { name:'Goblin', hp:28, dmg:6, speed:1.35, reach:28, atk:820, xp:12, sight:210, r:10, threat:1, faction:'goblin', interiors:true, pal:{skin:'#6d7a45',cloth:'#4a3a28',metal:'#6b6156'} },
+  goblin_warrior:{ name:'Goblin-Krieger', hp:54, dmg:11, speed:1.25, reach:32, atk:1000, xp:26, sight:230, r:12, threat:2, faction:'goblin', interiors:true, pal:{skin:'#5f6e3c',cloth:'#3d2f20',metal:'#8a7f6d'} },
+  bandit:    { name:'Bandit', hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2, faction:'bandit', interiors:true, pal:{skin:'#b2926f',cloth:'#4a3226',metal:'#7d7364'} },
+  bandit_archer:{ name:'Banditenschütze', hp:36, dmg:9, speed:1.35, reach:300, atk:1500, ranged:true, xp:24, sight:320, r:11, threat:2, faction:'bandit', interiors:true, pal:{skin:'#b2926f',cloth:'#3f4a2e',metal:'#7d7364'} },
+  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
+  gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };
 
 // Klassenbaum: parent = Voraussetzung

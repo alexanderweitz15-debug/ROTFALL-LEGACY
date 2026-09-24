@@ -29,6 +29,7 @@ WASD bewegen · Linksklick/Leertaste angreifen · Rechtsklick Ziel wählen · E 
 | `src/data.js` | Items, Gegner, NPCs, Klassen, Fähigkeiten, Fraktionen, Gebäude, Quests |
 | `src/world.js` | Greenmark-Grenzland (512×512, 26 Orte, Totenreich im Südosten) und Verlassene Grube, Kacheln, Kollision |
 | `src/sprites.js` | Pixel-Sprite-System: Raster, Paletten-Rampen, Kontur, Posen/Animationen, Waffen, Tiere, Boss, Bodentexturen |
+| `src/buildings.js` | Gebäude als Pixel-Art: Dach je Stadt (Stroh/Schindel/Schiefer/Ziegel), Fassade, Funktionszeichen, Innenausstattung |
 | `src/sfx.js` | Klangsynthese (WebAudio, ohne Dateien): Schwung/Treffer nach Waffengewicht, Knochen, Metall, Schritte, Ausweichen, Magie, Wind |
 | `src/render.js` | Canvas-Rendering: Kachel-Chunks, Sprites, pixelisierte Props, Licht, Wetter, Effekte |
 | `src/ui.js` | HUD, Kontextpanel, Dialog, Fenster (Inventar, Gruppe, Lager, Fraktion, Chronik, Karte) |
@@ -82,3 +83,9 @@ Kreuzung mit Wegweiser → Wachturm-Ruine (Landmarke, Untote) → überfallenes 
   Skelette holen sichtbar aus (Ansage als Pixelbogen).
 - **Treffer**: Hit-Stop, Aufprallstern (Krit mit Ring und Zoomstoß), Rückstoß, Blut bzw. Knochensplitter, Klang nach Waffengewicht.
 - **Kamera** schaut leicht zur Maus voraus; „Reduzierte Bewegung“ schaltet Wackeln, Zoomstoß und Vorlauf ab. Lautstärke in den Einstellungen.
+
+## Entwicklung
+
+- `index.html?test` — Selbsttest (Konsole + Hinweis im Spiel).
+- `index.html?dev` — `window.RF`: Zustand und Kernfunktionen für Browser-Tests (`RF.tick(ms)` simuliert auch bei verstecktem Tab).
+- Projektdokumente unter `docs/`: Bug-Ledger, GDD, Changelog, Session-Log, Phasenstatus, Style Guide, Datenmodelle.
