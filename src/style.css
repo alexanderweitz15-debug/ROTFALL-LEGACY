@@ -337,13 +337,14 @@ input{caret-color:var(--gold)}
 /* ---- Körpertafel ---- */
 .bodychart{width:44px;height:80px;flex:0 0 auto}
 .bodychart.big{width:100%;height:auto;max-height:460px}
-.bp{stroke:#cfc3a8;stroke-width:1.1;stroke-linejoin:round;transition:fill .18s}
-.bp-heil{fill:rgba(216,205,182,.08)}
-.bp-verwundet{fill:#8a6a2c}
-.bp-kritisch{fill:#8c2a22}
-.bp-aus{stroke:#c05236;stroke-dasharray:3 2}
+.bodychart{image-rendering:pixelated}
+.bp{transition:fill .18s}
+.bp-heil{fill:#4a4234} .bp-heil .bp-hi{fill:#5e5442}
+.bp-verwundet{fill:#8a6a2c} .bp-verwundet .bp-hi{fill:#a8843a}
+.bp-kritisch{fill:#8c2a22} .bp-kritisch .bp-hi{fill:#b0402e}
+.bp-aus .bp-hi{fill:#c05236}
 .bp-click{cursor:pointer}
-.bp-click:hover{stroke:var(--gold);stroke-width:2}
+.bp-click:hover{fill:#bd9433} .bp-click:hover .bp-hi{fill:#e0b85a}
 .pc-body{display:flex;gap:10px;align-items:center;padding:4px 10px 2px}
 .pc-wounds{font-size:12px;line-height:1.5;color:#a79b83}
 .pc-wounds em{font-style:normal;color:#c78b78}
@@ -402,3 +403,42 @@ input{caret-color:var(--gold)}
 
 @media (max-width:1180px){ .tafel{grid-template-columns:1fr 1fr} .tafel-koerper{grid-column:1/-1;order:-1} }
 @media (max-width:820px){ .tafel{grid-template-columns:1fr} .tafel-koerper{grid-template-columns:1fr} .bodychart.big{max-height:300px} }
+
+/* Pixel-Art-Anbindung: Canvas-Inhalte (Sprites, Icons, Porträts) ohne Weichzeichnung;
+   Balken und Slots mit harten 2-px-Kanten und Stufen-Shading wie die Sprites (Licht oben links). */
+canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+#titlecanvas{image-rendering:auto}
+.bar-track{height:10px;border:2px solid #0c0a08;outline:1px solid #3b3227;background:#100d0a}
+.bar-fill.hp{background:linear-gradient(180deg,#d0553f 0 2px,#a3342a 2px 7px,#6d1c15 7px)}
+.bar-fill.sta{background:linear-gradient(180deg,#c4ae52 0 2px,#8e7c33 2px 7px,#5d5220 7px)}
+.bar-fill.mana{background:linear-gradient(180deg,#5a9ac0 0 2px,#336a8c 2px 7px,#23425a 7px)}
+.bar-fill.xp{background:linear-gradient(180deg,#b09a52 0 2px,#7a6a33 2px 7px,#4a3f1d 7px)}
+.bar-track::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(0,0,0,.45) 9px 10px)}
+.slot,.cell{box-shadow:inset 2px 2px 0 #0a0806,inset -2px -2px 0 #2a2219}
+.slot:hover,.cell:hover{box-shadow:inset 2px 2px 0 #0a0806,inset -2px -2px 0 #4a3a22}
+.panel::before,.panel::after{width:4px;height:4px;background:#6b5a40;box-shadow:1px 1px 0 #0c0a08}
+.hairbtn{font-size:11px;padding:3px 7px;background:#171310;border:1px solid #3b3227;color:var(--dim);font-family:"Cinzel",serif;letter-spacing:.06em}
+.hairbtn.sel{border-color:var(--gold);color:#e7dcc2}
+
+/* Mobil: Grid darf schrumpfen (vorher drückte die Navigationsleiste die Spielfläche auf ~1200 px Breite). */
+#game{grid-template-columns:minmax(0,1fr)}
+#topbar,#stage,#bottombar,#viewport{min-width:0}
+@media (max-width:820px){
+  #topbar{gap:8px;padding:0 8px}
+  .brand{font-size:15px;letter-spacing:.14em}
+  #nav{overflow-x:auto;min-width:0;scrollbar-width:none}
+  #nav::-webkit-scrollbar{display:none}
+  #nav button{padding:7px 7px;white-space:nowrap}
+  .worldclock{display:none}
+  #hotbar{overflow-x:auto;justify-content:flex-start;min-width:0}
+  .slot{flex:0 0 42px;width:42px;height:42px}
+}
+
+/* Tooltip im Spielstil: dunkle Tafel, harte 2-px-Kante mit Licht oben links, Nieten, Cinzel. Kein Browser-Kasten. */
+.tip{position:fixed;left:0;top:0;z-index:60;pointer-events:none;display:none;max-width:260px;padding:6px 10px 7px;
+  background:#15110c;color:#e7dcc2;font:12px/1.45 "Spectral",Georgia,serif;letter-spacing:.02em;white-space:pre-line;
+  border:2px solid #0c0a08;box-shadow:inset 2px 2px 0 #4a3d2b,inset -2px -2px 0 #0a0806,0 0 0 1px #6b5630,4px 4px 0 rgba(0,0,0,.45)}
+.tip.on{display:block}
+.tip::before,.tip::after{content:"";position:absolute;top:3px;width:3px;height:3px;background:#8a7448}
+.tip::before{left:3px} .tip::after{right:3px}

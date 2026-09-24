@@ -1,12 +1,14 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, log, chronicle, save, loadRaw, applySave, hasSave, seedRng, rnd, ri, pick, chance,
+import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear } from './world.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt } from './world.js';
 import * as R from './render.js';
 import * as UI from './ui.js';
 import * as SIM from './sim.js';
 import * as B from './body.js';
+import * as SP from './sprites.js';
+import { sfx, ambience, ambienceTick } from './sfx.js';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -265,6 +267,8 @@ function spawnVillagers() {
 }
 
 const SPAWN_AREAS = [
+  { map:'world', x:65, y:29, r:3, types:['goblin','goblin','goblin_warrior'], cap:3 },   // Grubenpfad: Plünderer im Händlerlager
+  { map:'world', x:57, y:39, r:3, types:['skeleton','skeleton'], cap:2 },               // Grubenpfad: tote Wache am Turm
   { map:'world', x:88, y:44, r:24, types:['wolf','wolf','boar','goblin'], cap:14 },
   { map:'world', x:60, y:88, r:16, types:['wolf','goblin','skeleton'], cap:8 },
   { map:'world', x:66, y:116, r:10, types:['bandit','bandit','bandit_archer'], cap:9 },
@@ -321,7 +325,7 @@ function initialSpawns() {
 export function newGame(cfg) {
   const keep = { settings: S.settings };
   Object.assign(S, {
-    ver: 1, seed: Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
+    ver: SAVE_VERSION, seed: Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
     weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
@@ -382,10 +386,11 @@ function startGame() {
   $('creation').classList.add('hidden');
   $('game').classList.remove('hidden');
   R.initCanvas($('game-canvas'));
-  R.cam.zoom = 1.3;
+  R.cam.zoom = R.cam.base = 1.3; R.cam.cz = 0;
   UI.refreshHUD(); UI.renderContext(null);
   running = true; last = performance.now();
   requestAnimationFrame(loop);
+  ambience(true);
   save();
 }
 
@@ -413,11 +418,16 @@ export function continueGame() {
 }
 
 // ================= Schleife =================
+let hitStop = 0, ambT = 0;
 function loop(now) {
   if (!running) return;
   const dt = Math.min(50, now - last); last = now;
   requestAnimationFrame(loop);                              // zuerst: ein Fehler darf die Schleife nicht beenden
-  try { if (!S.paused) update(dt, now); R.drawFrame(now); }
+  try {
+    if (hitStop > 0) hitStop -= dt;                             // Hit-Stop: Welt steht kurz, Bild läuft weiter
+    else if (!S.paused) update(dt, now);
+    R.drawFrame(now);
+  }
   catch (err) { if (!loop.failed) { loop.failed = true; console.error(err); log('Interner Fehler: ' + err.message, 'world'); } }
 }
 
@@ -452,7 +462,14 @@ function update(dt, now) {
   updateBuildings(dt);
   // Kamera
   const V = R.view();
-  const tx = p.x - V.W / (2 * R.cam.zoom), ty = p.y - V.H / (2 * R.cam.zoom);
+  // Kampf-Zoom: rückt sanft ~8 % heran, solange ein Feind nahe und auf den Spieler aus ist; langsam zurück.
+  const engaged = S.settings.motion && combat.some(e => e.kind === 'enemy' && e.alive && isHostile(p, e) && dist(p, e) < 240 && (e.aggroId === p.id || e.aiState === 'pursue'));
+  R.cam.cz = (R.cam.cz || 0) + ((engaged ? 0.08 : 0) - (R.cam.cz || 0)) * Math.min(1, dt / (engaged ? 700 : 1400));
+  R.cam.zoom = (R.cam.base || 1.3) * (1 + R.cam.cz);
+  const look = S.settings.motion ? 0.14 : 0;                    // Blickvorlauf zur Maus (max. ~40 px)
+  const lx = clamp((mouse.wx - p.x) * look, -40, 40), ly = clamp((mouse.wy - p.y) * look, -30, 30);
+  const tx = p.x + lx - V.W / (2 * R.cam.zoom), ty = p.y + ly - V.H / (2 * R.cam.zoom);
+  R.cam.punch = Math.max(0, (R.cam.punch || 0) - dt * 0.00025);
   R.cam.x += (tx - R.cam.x) * Math.min(1, dt / 120);
   R.cam.y += (ty - R.cam.y) * Math.min(1, dt / 120);
   const m = MAPS[S.map];
@@ -473,6 +490,11 @@ function update(dt, now) {
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6) (S.flags.seen ||= {})[l.key] = true;
     if (S.map === 'mine') (S.flags.seen ||= {}).mine = true;
+  }
+  ambT = (ambT || 0) + dt;
+  if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
+    ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
+    ambienceTick(S.map === 'mine' ? 'blight' : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'));
   }
   respawnTimer += dt;
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
@@ -541,7 +563,12 @@ function tickCombatant(c, dt) {
   if (!c.alive) return;
   if (c.swing > 0) {
     c.swing += dt / (c.swingDur || 500);
-    if (!c.hitDone && c.swing >= 0.42) { c.hitDone = true; resolveSwing(c); }
+    if (!c.hitDone && c.swing >= 0.42) {
+      c.hitDone = true;
+      const L = feelOf(c).lunge, f = c.facing;                  // Ausfallschritt: der Schlag hat Gewicht
+      if (L && !c.downed && c.mtype !== 'wolf' && c.mtype !== 'boar') { moveEnt(c, Math.cos(c.aim) * L, Math.sin(c.aim) * L); c.facing = f; }
+      resolveSwing(c);
+    }
     if (c.swing >= 1) { c.swing = 0; c.hitDone = false; }
   }
   c.atkCd = Math.max(0, c.atkCd - dt);
@@ -589,7 +616,8 @@ function controlPlayer(dt) {
   if (p.downed) { p.vx = p.vy = 0; return; }
   p.dodgeCd = Math.max(0, (p.dodgeCd || 0) - dt);
   if (p.dodge) {                                            // Ausweichrolle: feste Dauer, unverwundbar, keine Steuerung
-    const d = p.dodge, sp = DODGE.dist / DODGE.dur * dt;
+    const d = p.dodge, ease = k => 1 - (1 - k) * (1 - k);      // schneller Antritt, weiches Auslaufen
+    const sp = DODGE.dist * (ease(Math.min(1, (d.t + dt) / DODGE.dur)) - ease(d.t / DODGE.dur));
     moveEnt(p, d.ax * sp, d.ay * sp);
     d.t += dt;
     if (d.t % 55 < dt) S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ghost', s: 1, life: 220, maxLife: 220, face: p.facing });
@@ -603,6 +631,7 @@ function controlPlayer(dt) {
     const l = Math.hypot(dx, dy), sp = speedOf(p) * dt / 16;
     moveEnt(p, dx / l * sp, dy / l * sp);
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
+    p.stepT = (p.stepT || 0) + dt; if (p.stepT > 300) { p.stepT = 0; sfx('step'); }
   } else { p.vx = p.vy = 0; }
   p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
   if (mouse.down || keys.has(' ')) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
@@ -612,6 +641,16 @@ function controlPlayer(dt) {
 }
 
 // ================= Kampf =================
+// Waffengefühl: Gewicht (Klang/Sweep), Hit-Stop (ms), Kamerawackeln, Ausfallschritt beim Schlag (px).
+const FEEL = {
+  dagger: { w: 0.05, stop: 28, shake: 1.5, lunge: 6 }, sword: { w: 0.35, stop: 50, shake: 3, lunge: 6 },
+  spear:  { w: 0.3,  stop: 45, shake: 2.5, lunge: 4 }, axe:   { w: 0.6,  stop: 72, shake: 4.5, lunge: 5 },
+  mace:   { w: 0.65, stop: 78, shake: 5, lunge: 4 },   great: { w: 1,    stop: 100, shake: 7, lunge: 9 },
+  staff:  { w: 0.3,  stop: 40, shake: 2, lunge: 3 },   bow:   { w: 0.2,  stop: 30, shake: 1.5, lunge: 0 },
+  none:   { w: 0.15, stop: 35, shake: 2, lunge: 4 },
+};
+const feelOf = c => { const w = c && c.equip && c.equip.weapon; return FEEL[(w && ITEMS[w.key]?.wtype) || (c && c.mtype === 'gorak' ? 'great' : 'none')]; };
+const earVol = e => clamp(1 - dist(S.player, e) / 650, 0, 1);    // Lautstärke nach Entfernung zum Spieler
 function attack(c, forceDir) {
   if (c.swing > 0 || c.atkCd > 0 || c.downed || !c.alive) return;
   const w = c.equip.weapon, it = w ? ITEMS[w.key] : null;
@@ -622,6 +661,7 @@ function attack(c, forceDir) {
   c.atkCd = c.swingDur * 0.55;
   c.swing = 0.001; c.hitDone = false;
   if (forceDir != null) c.aim = forceDir;
+  sfx(it && it.ranged ? 'bow' : 'swing', feelOf(c).w, earVol(c));
   if (it && it.ranged) { c.hitDone = false; }
 }
 
@@ -651,7 +691,7 @@ function resolveSwing(c) {
   }
   if (!hitAny) {
     const px = c.x + Math.cos(c.aim) * reach, py = c.y + Math.sin(c.aim) * reach;
-    if (solidTile(c.map, px, py) || solidPropAt(c.map, px, py, 6)) { fx(px, py, 'spark', 4); sfxHit(false); }
+    if (solidTile(c.map, px, py) || solidPropAt(c.map, px, py, 6)) { fx(px, py, 'spark', 4); sfx('metal', 0.3, earVol(c)); }
   }
   if (w && w.cond != null) { w.cond = Math.max(0.05, w.cond - 0.0016); }
 }
@@ -700,13 +740,19 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (off && chance(ITEMS[off.key].block * 0.7) && !target.downed) {
     fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
-    sfxHit(false); return;
+    sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
   dmg = Math.max(1, dmg - armor * 0.55);
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
-  if (attacker === S.player) camShake(crit ? 7 : 3, crit ? 160 : 80);
+  const fl = feelOf(attacker), mine = attacker === S.player;
+  if (mine || target === S.player) hitStop = Math.max(hitStop, (mine ? fl.stop : 40) + (crit ? 40 : 0));
+  if (mine) { camShake(fl.shake * (crit ? 1.8 : 1), 90 + fl.w * 90); if (crit && S.settings.motion) R.cam.punch = 0.04; }
+  else if (target === S.player) camShake(4, 120);
+  const a = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+  const ix = target.x - Math.cos(a) * 6, iy = target.y - 14 - Math.sin(a) * 3;
+  S.fx.push({ x: ix, y: iy, vx: 0, vy: 0, type: crit ? 'crit' : 'impact', a, s: 1 + fl.w, life: crit ? 260 : 170, maxLife: crit ? 260 : 170 });
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
@@ -719,14 +765,22 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   target.lastCause = cause; target.lastKiller = source ? source.id : null;
   if (source) target.aggroId = source.id;
   target.lastHurt = performance.now();
+  if (source && source !== target && target.kind !== 'caravan' && !target.downed && source.map === target.map) {
+    // Rückstoß: kurzer Stoß weg vom Angreifer, kollisionssicher über moveEnt; Blickrichtung bleibt
+    const a = Math.atan2(target.y - source.y, target.x - source.x), f = target.facing;
+    const kb = Math.min(12, 2 + dmg * 0.25) * (crit ? 1.6 : 1) * (target.boss ? 0.25 : 1);
+    moveEnt(target, Math.cos(a) * kb, Math.sin(a) * kb); target.facing = f;
+  }
   if (target.aiState === 'idle' || target.aiState === 'patrol') target.aiState = 'pursue';
   float(target, (crit ? '' : '') + Math.round(dmg), crit ? 'rgba(212,175,55,ALPHA)' : 'rgba(228,220,200,ALPHA)', crit);
   const lvl = S.settings.violence;
-  if (lvl !== 'low') fx(target.x, target.y - 12, 'blood', crit ? 9 : lvl === 'reduced' ? 3 : 5);
+  const bony = target.mtype === 'skeleton';
+  if (bony) fx(target.x, target.y - 14, 'bone', crit ? 8 : 5);
+  else if (lvl !== 'low') fx(target.x, target.y - 12, 'blood', crit ? 9 : lvl === 'reduced' ? 3 : 5);
   if (lvl === 'standard' && (crit || dmg > 12)) S.ents[target.map].push({ id: uid(), kind:'decal', map: target.map, x: target.x, y: target.y + 4, r: 6 + rnd() * 6, life: 12000, maxLife: 12000, transient: true });
   if (dmg > 10 && chance(0.25) && !(target.status || []).some(s => s.key === 'bleeding'))
     (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000 });
-  sfxHit(crit);
+  sfx(bony ? 'bone' : crit ? 'crit' : 'hit', source ? feelOf(source).w : 0.3, earVol(target));
   if (result === 'disabled') limbLost(target, part);
   if (result === 'decap') {
     fx(target.x, target.y - 26, 'blood', 16); camShake(8, 200);
@@ -781,11 +835,17 @@ function die(c, cause = 'Wunden', source) {
     return;
   }
   if (c.kind === 'enemy' && c.armyId) SIM.unitDied(c);
+  if (c.kind === 'enemy' && dist(S.player, c) < 700) {        // Todes-Effekt: Blut bzw. Knochen + Seelenfunken, Staub
+    const bony = c.mtype === 'skeleton';
+    fx(c.x, c.y - 12, bony ? 'bone' : 'blood', 12); if (bony) fx(c.x, c.y - 20, 'necro', 10); fx(c.x, c.y + 2, 'dust', 5);
+    sfx(bony ? 'bone' : 'death', 0.5, earVol(c));
+  }
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
     if (dist(S.player, c) < 500) log(`${m.name} fällt.`, 'combat');
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
-    arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: m.pal?.cloth || '#3a3229', transient: true });
+    arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: m.pal?.cloth || '#3a3229', transient: true,
+      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now() });
     return;
   }
   if (c.kind === 'enemy') {
@@ -804,7 +864,8 @@ function die(c, cause = 'Wunden', source) {
     }
     onKill(c.mtype);
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
-    arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: MONSTERS[c.mtype].pal?.cloth || '#3a3229', transient: true });
+    arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: MONSTERS[c.mtype].pal?.cloth || '#3a3229', transient: true,
+      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now() });
     return;
   }
   // Person
@@ -854,6 +915,7 @@ function levelUp(c) {
 // ================= Effekte =================
 function fx(x, y, type, n = 6) {
   if (S.settings.violence === 'low' && type === 'blood') return;
+  if (type === 'heal' && S.player) sfx('heal', 0, clamp(1 - Math.hypot(S.player.x - x, S.player.y - y) / 650, 0, 1));
   for (let i = 0; i < n; i++) {
     const a = rnd() * Math.PI * 2, sp = 0.6 + rnd() * 2.2;
     S.fx.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8, type, s: 1.5 + rnd() * 2.4, life: 380 + rnd() * 420, maxLife: 700 });
@@ -862,8 +924,10 @@ function fx(x, y, type, n = 6) {
 function float(e, text, color, big = false) {
   S.floats.push({ x: e.x + ri(-6, 6), y: e.y - 26, rise: 0, text, color, big, life: 900, maxLife: 900 });
 }
+const RISING = new Set(['heal', 'necro', 'shadow']);           // Magie steigt auf, Blut und Splitter fallen
+const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock']);     // bleiben am Ort
 function updateFx(dt) {
-  for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * 0.14; f.life -= dt; }
+  for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   for (const f of S.floats) { f.rise += dt / 22; f.life -= dt; }
   S.floats = S.floats.filter(f => f.life > 0);
@@ -895,22 +959,10 @@ function hurtFromProjectile(attacker, target, p) {
   let dmg = p.dmg * (crit ? 2 : 1) * (p.mult || 1);
   const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.2 : armorOf(target));
   dmg = Math.max(1, dmg - armor * 0.5);
-  if (p.kind === 'fire') fx(p.x, p.y, 'fire', 12);
+  if (p.kind === 'fire') { fx(p.x, p.y, 'fire', 12); sfx('fire', 0.5, earVol(target)); }
   if (p.kind === 'shadow') fx(p.x, p.y, 'shadow', 10);
   hurt(target, dmg, attacker, attacker.name, crit, p.kind === 'fire' ? 'fire' : 'physical');
   if (attacker.skills) attacker.skills.archery = Math.min(100, (attacker.skills.archery || 0) + 0.15);
-}
-let audioCtx = null;
-function sfxHit(crit) {
-  try {
-    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = crit ? 'square' : 'triangle';
-    o.frequency.value = crit ? 180 : 110 + Math.random() * 40;
-    g.gain.value = 0.05; o.connect(g); g.connect(audioCtx.destination);
-    o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
-    o.stop(audioCtx.currentTime + 0.13);
-  } catch (e) { /* Audio optional */ }
 }
 
 // ================= KI =================
@@ -949,18 +1001,23 @@ function updateEnemy(e, dt) {
   }
   e.aim = Math.atan2(tgt.y - e.y, tgt.x - e.x);
   const d = dist(e, tgt), reach = m.reach + (tgt.r || 10);
-  if (m.ranged) {
-    if (d < 120) { moveEnt(e, -Math.cos(e.aim) * sp, -Math.sin(e.aim) * sp); }
-    else if (d > m.reach * 0.9) moveEnt(e, Math.cos(e.aim) * sp, Math.sin(e.aim) * sp);
-    else e.vx = e.vy = 0;
-    if (d < m.reach && e.atkCd <= 0) {
-      e.atkCd = m.atk;
-      S.projectiles.push({ id: uid(), kind:'arrow', map: e.map, x: e.x + Math.cos(e.aim) * 12, y: e.y - 10 + Math.sin(e.aim) * 8,
-        vx: Math.cos(e.aim) * 6, vy: Math.sin(e.aim) * 6, owner: e.id, dmg: m.dmg * (1 + e.level * 0.05), life: 1600, team:'foe' });
-    }
-    return;
+  if (e.mtype === 'wolf') {                                   // Wolf: duckt sich kurz (Ansage), springt dann an
+    if (e.leap) { e.leap.t -= dt; moveEnt(e, e.leap.ax * sp * 3.4, e.leap.ay * sp * 3.4); if (e.leap.t <= 0) { e.leap = null; e.atkCd = 0; } return; }
+    e.leapCd = (e.leapCd || 0) - dt;
+    if (e.telegraph > 0) { e.vx = e.vy = 0; if (e.telegraph <= dt) { e.leap = { t: 190, ax: Math.cos(e.aim), ay: Math.sin(e.aim) }; sfx('dodge', 0, earVol(e)); } return; }
+    if (d < 130 && d > reach && e.leapCd <= 0) { e.telegraph = 280; e.leapCd = 2800; e.vx = e.vy = 0; return; }
   }
-  if (d > reach * 0.8) moveEnt(e, Math.cos(e.aim) * sp, Math.sin(e.aim) * sp);
+  if (e.retreat > 0) {                                        // Goblin: nach dem Hieb zurückspringen (Hit & Run)
+    e.retreat -= dt; moveEnt(e, -Math.cos(e.aim) * sp, -Math.sin(e.aim) * sp); return;
+  }
+  if (m.ranged) return archerAI(e, tgt, d, sp, dt, m);
+  if (e.mtype === 'gorak') return bossAI(e, tgt, d, reach, sp, dt, m);
+  if (e.mtype === 'bandit' && banditAI(e, tgt, d, reach, sp, dt, m)) return;
+  if (d > reach * 0.8) {
+    // Goblins tänzeln seitlich heran, statt stur geradeaus zu laufen
+    const side = (e.mtype === 'goblin' || e.mtype === 'goblin_warrior') && d > reach * 1.4 ? Math.sin(performance.now() / 240 + e.seed * 9) * 0.8 : 0;
+    moveEnt(e, (Math.cos(e.aim) - Math.sin(e.aim) * side) * sp, (Math.sin(e.aim) + Math.cos(e.aim) * side) * sp);
+  }
   else {
     e.vx = e.vy = 0;
     if (e.atkCd <= 0 && e.swing <= 0) {
@@ -970,6 +1027,102 @@ function updateEnemy(e, dt) {
       e.atkCd = m.atk; e.swingDur = m.atk * 0.5; e.swing = 0.001; e.hitDone = false;
       e.enemySwing = true;
     }
+  }
+}
+
+// Bogenschütze: Wunschabstand ~190 px. Spannt sichtbar (Ansage), schießt, wechselt dann seitlich die Stellung.
+// Kommt man zu nahe, springt er zurück (mit Abklingzeit, damit man ihn stellen kann).
+function archerAI(e, tgt, d, sp, dt, m) {
+  const cs = Math.cos(e.aim), sn = Math.sin(e.aim), want = 190;
+  e.hopCd = (e.hopCd || 0) - dt;
+  if (e.draw > 0) {                                           // Bogen gespannt: steht, zielt, schießt am Ende
+    e.vx = e.vy = 0; e.draw -= dt;
+    if (e.draw <= 0) {
+      e.atkCd = m.atk; e.repos = 500 + rnd() * 600; e.circle = chance(0.5) ? 1 : -1;
+      S.projectiles.push({ id: uid(), kind:'arrow', map: e.map, x: e.x + cs * 12, y: e.y - 10 + sn * 8,
+        vx: cs * 7, vy: sn * 7, owner: e.id, dmg: m.dmg * (1 + e.level * 0.05), life: 1600, team:'foe' });
+      sfx('bow', 0.2, earVol(e));
+    }
+    return;
+  }
+  if (e.hop > 0) { e.hop -= dt; moveEnt(e, -cs * sp * 3, -sn * sp * 3); return; }
+  if (d < 110 && e.hopCd <= 0) { e.hop = 220; e.hopCd = 2200; fx(e.x, e.y + 4, 'dust', 4); sfx('dodge', 0, earVol(e)); return; }
+  const radial = d < want * 0.8 ? -1 : d > Math.min(m.reach * 0.85, 280) ? 1 : 0;
+  const side = e.repos > 0 ? (e.circle || 1) : 0; if (e.repos > 0) e.repos -= dt;
+  if (radial || side) moveEnt(e, (cs * radial - sn * side) * sp, (sn * radial + cs * side) * sp); else e.vx = e.vy = 0;
+  if (d < m.reach && e.atkCd <= 0 && !e.repos) e.draw = 520;   // Ansage: 0,5 s Bogen spannen
+  if (e.repos <= 0) e.repos = 0;
+}
+
+// Bandit: Duellant. Umkreist knapp außerhalb der Reichweite, solange sein Hieb abklingt, weicht nach dem Treffer
+// zurück und macht einen Seitschritt, wenn der Spieler ausholt. Sonst greift er normal an (Standardlogik).
+function banditAI(e, tgt, d, reach, sp, dt, m) {
+  const cs = Math.cos(e.aim), sn = Math.sin(e.aim), ring = reach * 1.8;
+  e.circle ||= chance(0.5) ? 1 : -1; e.sideCd = (e.sideCd || 0) - dt;
+  if (e.sidestep > 0) { e.sidestep -= dt; moveEnt(e, -sn * e.circle * sp * 2.2, cs * e.circle * sp * 2.2); return true; }
+  if (tgt.swing > 0 && tgt.swing < 0.35 && d < reach * 1.4 && e.sideCd <= 0 && chance(0.6)) {   // reagiert aufs Ausholen
+    e.sidestep = 200; e.sideCd = 1600; e.circle = -e.circle; fx(e.x, e.y + 4, 'dust', 3); return true;
+  }
+  if (e.atkCd > m.atk * 0.4) {                                // eben zugeschlagen: zurück und seitlich weg
+    if (d < ring) { moveEnt(e, (-cs - sn * e.circle * 0.6) * sp * 0.9, (-sn + cs * e.circle * 0.6) * sp * 0.9); return true; }
+  }
+  if (e.atkCd > 0 && d > reach) {                             // Abklingzeit: Abstand halten und umkreisen
+    const radial = clamp((d - ring) / ring, -1, 1);
+    moveEnt(e, (cs * radial - sn * e.circle) * sp * 0.75, (sn * radial + cs * e.circle) * sp * 0.75); return true;
+  }
+  return false;                                               // bereit: Standard-Anlauf und Hieb
+}
+
+// Gorak (Boss): Phase 1 schwerer Hieb mit Ansage. Unter 50 % Leben: Brüllen (Phasenwechsel), schneller,
+// dazu Sturmangriff (Linie als Ansage, prallt an Wänden ab und taumelt) und Bodenbeben (Ring als Ansage, Flächenschaden).
+const shockFx = (x, y) => S.fx.push({ x, y, vx: 0, vy: 0, type: 'shock', s: 1, life: 520, maxLife: 520 });
+function bossAI(e, tgt, d, reach, sp, dt, m) {
+  const now = performance.now();
+  if (!e.phase) e.phase = 1;
+  if (e.phase === 1 && e.hp <= e.maxHp * 0.5) {
+    e.phase = 2; e.roar = 1000; e.telegraph = 0; e.special = null; e.invuln = true;
+    log(`${m.name} brüllt vor Wut!`, 'combat'); UI.toast('GORAK RAST', 2200);
+    camShake(9, 500); shockFx(e.x, e.y); fx(e.x, e.y - 10, 'dust', 14); sfx('death', 1, earVol(e));
+  }
+  if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
+  if (e.stagger > 0) { e.stagger -= dt; e.vx = e.vy = 0; return; }
+  const fast = e.phase === 2 ? 1.35 : 1, sp2 = sp * fast;
+  e.chargeCd = (e.chargeCd || 3000) - dt; e.quakeCd = (e.quakeCd || 2000) - dt;
+  const sa = e.special;
+  if (sa) {
+    sa.t -= dt;
+    if (sa.kind === 'charge') {
+      if (sa.t > 0) { e.vx = e.vy = 0; return; }                          // Ansage läuft
+      sa.run = (sa.run ?? 480) - dt;
+      const x0 = e.x, y0 = e.y; moveEnt(e, sa.ax * sp * 4.2, sa.ay * sp * 4.2);
+      if (!sa.hit && dist(e, tgt) < reach) { sa.hit = true; hit(e, tgt, 1.3); }
+      if (Math.hypot(e.x - x0, e.y - y0) < 0.5) {                           // gegen die Wand: taumelt, verwundbar
+        e.special = null; e.stagger = 900; camShake(7, 250); fx(e.x, e.y - 20, 'spark', 10); sfx('metal', 1, earVol(e));
+      } else if (sa.run <= 0) e.special = null;
+      if (now % 60 < dt) fx(e.x, e.y + 4, 'dust', 2);
+      return;
+    }
+    if (sa.kind === 'quake') {
+      e.vx = e.vy = 0;
+      if (sa.t <= 0) {
+        e.special = null; camShake(8, 300); shockFx(e.x, e.y); fx(e.x, e.y, 'dust', 16); sfx('crit', 1, earVol(e));
+        for (const t of combat) if (t.alive && !t.invuln && t !== e && isHostile(e, t) && dist(e, t) < 110) hit(e, t, 0.8);
+      }
+      return;
+    }
+  }
+  if (e.phase === 2 && e.swing <= 0 && e.telegraph <= 0) {
+    if (d > reach * 1.6 && d < 320 && e.chargeCd <= 0) {
+      e.special = { kind: 'charge', t: 650, ax: Math.cos(e.aim), ay: Math.sin(e.aim) }; e.chargeCd = 5200; return;
+    }
+    if (d < 120 && e.quakeCd <= 0) { e.special = { kind: 'quake', t: 800 }; e.quakeCd = 6500; return; }
+  }
+  if (d > reach * 0.8) { moveEnt(e, Math.cos(e.aim) * sp2, Math.sin(e.aim) * sp2); return; }
+  e.vx = e.vy = 0;
+  if (e.atkCd <= 0 && e.swing <= 0) {
+    if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
+    if (e.telegraph > 0) return;
+    e.windup = false; e.atkCd = m.atk / fast; e.swingDur = m.atk * 0.5 / fast; e.swing = 0.001; e.hitDone = false;
   }
 }
 
@@ -984,6 +1137,7 @@ function resolveSwingEnemy(e) {
     hit(e, t, 1);
     if (!m.boss) break;
   }
+  if (e.mtype === 'goblin' || e.mtype === 'goblin_warrior') e.retreat = 380;
 }
 
 function updateNpc(e, dt) {
@@ -1009,7 +1163,7 @@ function updateNpc(e, dt) {
   // Hysterese: bemerken ab 220 px, loslassen erst ab 340 px. Ohne sie pendelt die Figur an der Grenze (Zittern).
   const held = e.threatId ? byId(e.threatId) : null;
   const keep = held && held.alive && held.map === e.map && teamOf(held) === 'foe' && dist(e, held) < 340;
-  const f = keep ? held : S.ents[e.map].find(x => x.kind === 'enemy' && x.alive && teamOf(x) === 'foe' && dist(e, x) < 220);
+  const f = keep ? held : (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && x.alive && teamOf(x) === 'foe' && dist(e, x) < 220);
   e.threatId = f ? f.id : null;
   if (f) {
     if (e.guard || e.hostile || e.angry) {
@@ -1768,6 +1922,7 @@ function useAbility(key) {
   p.cooldowns[key] = ab.cd;
   if (ab.mana) p.mana -= ab.mana;
   if (ab.stam) p.stamina -= ab.stam;
+  if (ab.mana) { p.castT = performance.now(); sfx('magic'); }   // Zauber-Pose (render: 'cast')
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b));
   switch (key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
@@ -1844,12 +1999,20 @@ function playerDeath(cause, source) {
 function makeSuccessorCandidates() {
   const out = [];
   for (const m of partyMembers()) { m.relation = 'Gefährte'; out.push(m); }
-  // Verwandter taucht auf
-  const kinTypes = [['Sohn', 17, 'son'], ['Tochter', 19, 'daughter'], ['Vetter', 27, 'cousin'], ['Schwester', 31, 'sister']];
-  while (out.length < 3) {
-    const [rel, age] = pick(kinTypes);
-    const names = ['Tomas', 'Elric', 'Sigrun', 'Halla', 'Ivar', 'Brenna', 'Kord', 'Rana'];
-    const c = makeChar({ name: `${pick(names)} ${S.legacy.gen > 1 ? 'II' : ''}`.trim(), age: age + ri(-2, 6),
+  // Familie ist Glückssache: ob es Kinder, Eltern oder Geschwister gibt, hängt vom Alter des Toten und vom Zufall ab.
+  // Mit jeder Generation dünnt das Haus aus; bleibt niemand, erlischt es.
+  const age = S.player.age || 25, luck = Math.max(0.35, 1 - (S.legacy.gen - 1) * 0.12), kin = [];
+  if (age >= 34 && chance(0.45 * luck)) kin.push(['Sohn', ri(16, Math.min(age - 18, 32))]);
+  if (age >= 34 && chance(0.45 * luck)) kin.push(['Tochter', ri(16, Math.min(age - 18, 32))]);
+  if (age <= 44 && chance(0.3 * luck)) kin.push(['Vater', age + ri(20, 28)]);
+  if (age <= 44 && chance(0.3 * luck)) kin.push(['Mutter', age + ri(19, 26)]);
+  if (chance(0.35 * luck)) kin.push([pick(['Bruder', 'Schwester']), Math.max(16, age + ri(-6, 6))]);
+  if (chance(0.2 * luck)) kin.push([pick(['Vetter', 'Base']), Math.max(16, age + ri(-8, 8))]);
+  for (const [rel, kage] of kin) {
+    if (out.length >= 3) break;
+    const female = ['Tochter', 'Mutter', 'Schwester', 'Base'].includes(rel);
+    const names = female ? ['Sigrun', 'Halla', 'Brenna', 'Rana', 'Ilse', 'Wenna'] : ['Tomas', 'Elric', 'Ivar', 'Kord', 'Hamo', 'Jorg'];
+    const c = makeChar({ name: `${pick(names)} ${S.legacy.gen > 1 ? 'II' : ''}`.trim(), age: kage,
       x: S.player.x, y: S.player.y, level: Math.max(1, Math.floor(S.player.level * 0.4)),
       attrs: { strength: ri(7, 13), agility: ri(7, 13), endurance: ri(7, 12), intelligence: ri(6, 12), perception: ri(7, 12), willpower: ri(6, 12) },
       skills: { onehanded: ri(2, 10), archery: ri(2, 10), survival: ri(3, 9) },
@@ -1862,6 +2025,14 @@ function makeSuccessorCandidates() {
 }
 function chooseSuccessor() {
   const cands = makeSuccessorCandidates();
+  if (!cands.length) {                                        // niemand mehr da: das Haus erlischt
+    chronicle(`Haus ${S.legacy.house} ist erloschen`, 'legacy', `Nach ${S.legacy.gen} Generation(en) blieb niemand, der den Namen trägt.`);
+    log(`Haus ${S.legacy.house} ist erloschen. Niemand trägt den Namen weiter.`, 'death');
+    UI.toast(`HAUS ${S.legacy.house.toUpperCase()} IST ERLOSCHEN`, 6000);
+    running = false; wipeSave();
+    setTimeout(() => location.reload(), 6000);
+    return;
+  }
   UI.showSuccessors(cands, c => adoptSuccessor(c));
 }
 function adoptSuccessor(c) {
@@ -1876,12 +2047,16 @@ function adoptSuccessor(c) {
   for (const f of Object.keys(S.factions)) S.factions[f] = Math.round(S.factions[f] * 0.5);
   S.legacy.gen++;
   recalc(c); B.fullHeal(c); c.mana = c.maxMana;
-  if (!S.ents[S.map].includes(c)) S.ents[S.map].push(c);
-  c.map = S.map;
+  // Neubeginn fern vom Tod: der Erbe trifft im Heimatdorf ein (nicht am Grab neben dem Mörder), die Gruppe mit ihm.
+  const home = freeSpotNear('world', 60, 66, 4), group = [c, ...partyMembers().filter(m => m !== c)];
+  for (const m of group) { for (const k of ['world', 'mine']) { const a = S.ents[k], i = a.indexOf(m); if (i >= 0) a.splice(i, 1); }
+    m.map = 'world'; m.x = home.x + (m === c ? 0 : ri(-30, 30)); m.y = home.y + (m === c ? 0 : ri(-30, 30)); S.ents.world.push(m); }
+  S.map = 'world';
+  c.invuln = true; setTimeout(() => { if (S.player === c && !c.dodge) c.invuln = false; }, 3000);   // kurze Schonfrist
   S.player = c;
   syncHotbar();
   chronicle(`${c.name} übernimmt Haus ${S.legacy.house}`, 'legacy',
-    `Generation ${S.legacy.gen}. ${old.name} liegt in ${S.map === 'mine' ? 'der Grube' : 'der Erde von Greenmark'}.`);
+    `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : 'der Erde von Greenmark'}.`);
   log(`${c.name} führt Haus ${S.legacy.house} weiter. Generation ${S.legacy.gen}.`, 'death');
   S.paused = false;
   UI.toast(`GENERATION ${S.legacy.gen} — ${c.name}`, 5000);
@@ -2022,7 +2197,7 @@ function bindInput() {
   cv.addEventListener('contextmenu', e => e.preventDefault());
   cv.addEventListener('wheel', e => {
     e.preventDefault();
-    R.cam.zoom = clamp(R.cam.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.7, 2.4);
+    R.cam.base = clamp((R.cam.base || R.cam.zoom) * (e.deltaY > 0 ? 0.9 : 1.1), 0.7, 2.4);
   }, { passive: false });
   window.addEventListener('beforeunload', () => { if (running) save(); });
 }
@@ -2048,7 +2223,7 @@ function dodge() {
   const ax = l ? dx / l : -Math.cos(p.aim), ay = l ? dy / l : -Math.sin(p.aim);
   p.stamina -= DODGE.stam; p.dodgeCd = DODGE.cd + DODGE.dur;
   p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0;
-  fx(p.x, p.y + 4, 'dust', 6);
+  fx(p.x, p.y + 4, 'dust', 6); sfx('dodge');
   return true;
 }
 function startPlacing(type) {
@@ -2141,6 +2316,20 @@ export function selftest() {
   ok('Alle Startgegenstände definiert', Object.values(ORIGINS).every(o => o.gear.every(g => !!ITEMS[g])));
   ok('Alle Klassenfähigkeiten definiert', Object.values(CLASSES).every(cl => (cl.abilities || []).every(a => !!ABILITIES[a])));
   ok('Lootlisten gültig', Object.values(LOOT).flat().every(([k]) => !!ITEMS[k]));
+  // Sprite-System: jede Figur/Pose/Richtung liefert ein nicht-leeres Raster in der festgelegten Größe
+  const filled = cv => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; };
+  ok('Sprites: Figuren aller NPCs, alle Posen', NPCS.every(n => {
+    const sp = SP.humanSpec({ ...n, seed: 1, pal: { skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28' }, equip: {} });
+    return ['S', 'N', 'W', 'E'].every(d => ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'a1', 'a2', 'hit', 'cast', 'kneel'].every(ps => {
+      const f = SP.humanFrame(sp, d, ps); return f.width === 20 && f.height === 25 && (ps !== 'i0' || filled(f)); }));
+  }));
+  ok('Sprites: alle Gegnertypen', Object.entries(MONSTERS).every(([k, m]) => {
+    const e = { mtype: k, seed: 1 };
+    const f = k === 'wolf' || k === 'boar' ? SP.beastFrame(k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
+    return filled(f);
+  }));
+  ok('Sprites: Waffen & Kacheln', Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => filled(SP.weaponSprite(k, i.rarity, i.holy, i.wtype).cv))
+    && Object.values(T).every(t => filled(SP.tileTexture(t, 0, ['#3c4a2c', '#43522f', '#364325'], 'grass'))));
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
   return out;
@@ -2176,7 +2365,17 @@ function buildCreation() {
     ap.appendChild(r);
   };
   ap.innerHTML = '';
-  row('Haut', SKIN, 'skin'); row('Haar', HAIR, 'hair'); row('Kleidung', CLOTH, 'cloth');
+  row('Haut', SKIN, 'skin'); row('Haar', HAIR, 'hair');
+  pal.hs = 0;                                                        // Frisur (Pixel-Sprite)
+  ap.appendChild(el2('label', '', 'Frisur'));
+  const hr = el2('div', 'swatchrow');
+  ['Kurz', 'Lang', 'Kahl', 'Zopf'].forEach((n, i) => {
+    const b = el2('button', 'hairbtn' + (i === 0 ? ' sel' : ''), n);
+    b.onclick = () => { pal.hs = i; [...hr.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); drawPreview(); };
+    hr.appendChild(b);
+  });
+  ap.appendChild(hr);
+  row('Kleidung', CLOTH, 'cloth');
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
     const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).join(', ')}</small>`);
@@ -2201,7 +2400,10 @@ function buildCreation() {
     g.addColorStop(0, 'rgba(120,95,60,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g; c.fillRect(0, 0, cv.width, cv.height);
     c.save(); c.translate(80, 200); c.scale(3.4, 3.4);
-    R.drawHumanoid({ x:0, y:0, pal, facing:0, seed:1, build, equip:{ weapon:{ key: ORIGINS[origin].gear.find(k => ITEMS[k].slot === 'weapon') || 'rusty_sword' } }, aim:0.5 }, performance.now(), c);
+    const eq = {};                                                    // Vorschau trägt die Startausrüstung der Herkunft
+    for (const k of ORIGINS[origin].gear) { const sl = ITEMS[k].slot; if (['weapon', 'offhand', 'head', 'chest', 'cloak'].includes(sl) && !eq[sl]) eq[sl] = { key: k }; }
+    if (!eq.weapon) eq.weapon = { key: 'rusty_sword' };
+    R.drawHumanoid({ kind:'player', x:0, y:0, pal, facing:0, seed:1, build, equip: eq, aim:0.5 }, performance.now(), c);
     c.restore();
   }
   renderOrigin(); renderBuild();

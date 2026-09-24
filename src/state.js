@@ -1,6 +1,6 @@
 // Globaler Spielzustand + Hilfsfunktionen. Ein mutierbares Objekt, absichtlich ohne Store-Framework.
 export const SAVE_KEY = 'rotfall.legacy.save';
-export const SAVE_VERSION = 2;   // 2: erweitertes Grenzland (256×256). Ältere Stände sind geometrisch inkompatibel.
+export const SAVE_VERSION = 2;   // 2: erweitertes Grenzland (512×512). Ältere Stände sind geometrisch inkompatibel.
 
 export const S = {
   ver: SAVE_VERSION,
@@ -24,7 +24,7 @@ export const S = {
   legacy: { house: 'Ragnar', gen: 1, ancestors: [] },
   settlement: null,
   flags: {},
-  settings: { violence: 'standard', motion: true, textScale: 1 },
+  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7 },
   kills: 0, battles: 0,
   log: [],
   // transient (nicht gespeichert)
@@ -68,8 +68,19 @@ export function chronicle(text, kind = 'event', detail = '') {
 }
 
 export function ents(map = S.map) { return S.ents[map]; }
+// id → Entity. Index statt linearer Suche über ~3500 Entities (wird pro Frame vielfach gerufen: Aggro, Gruppe, Bedrohung).
+// Alle 250 ms neu aufgebaut und sofort bei neuem Weltstand; ein Treffer wird geprüft (gleiche Karte, noch dort), ein Fehlgriff sucht linear nach.
+let idIndex = new Map(), idStamp = 0, idEnts = null, idWorld = null;
 export function byId(id) {
-  for (const m of Object.keys(S.ents)) { const e = S.ents[m].find(x => x.id === id); if (e) return e; }
+  if (id == null) return null;
+  const now = performance.now();
+  if (idEnts !== S.ents || idWorld !== S.ents.world || now - idStamp > 250) {
+    idIndex = new Map(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world;
+    for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) idIndex.set(e.id, e);
+  }
+  const hit = idIndex.get(id);
+  if (hit && S.ents[hit.map] && (hit.alive !== false || S.ents[hit.map].includes(hit))) return hit;
+  for (const m of Object.keys(S.ents)) { const e = S.ents[m].find(x => x.id === id); if (e) { idIndex.set(id, e); return e; } }
   return null;
 }
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
@@ -102,7 +113,7 @@ export function loadRaw() {
   } catch (err) { console.warn('Spielstand unlesbar', err); return null; }
 }
 function migrate(data) {
-  // v1 → v2: Die Welt wurde von 128×128 auf 256×256 vergrößert. Alte Positionen und Kriegsknoten
+  // v1 → v2: Die Welt wurde von 128×128 auf 512×512 vergrößert. Alte Positionen und Kriegsknoten
   // passen nicht mehr zur neuen Geometrie, darum wird ein inkompatibler Stand verworfen statt halb geladen.
   if ((data.ver || 1) < 2) { wipeSave(); return null; }
   data.ver = SAVE_VERSION; return data;

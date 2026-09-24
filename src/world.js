@@ -20,6 +20,9 @@ export const LOCATIONS = [
   { key:'shrine',    name:'Waldschrein',        x:76, y:52, r:5,  kind:'shrine',  threat:1, faction:'order' },
   { key:'ruins',     name:'Kleine Ruine',       x:40, y:40, r:7,  kind:'ruin',    threat:2 },
   { key:'northcity', name:'Nordfurt',           x:118,y:56, r:8,  kind:'city',    threat:0, faction:'valen' },
+  { key:'grubenpfad',name:'Grubenpfad',         x:62, y:40, r:9,  kind:'road',    threat:1 },
+  { key:'oldtower',  name:'Alter Wachturm',     x:56, y:37, r:4,  kind:'ruin',    threat:2 },
+  { key:'raidcamp',  name:'Überfallenes Lager', x:67, y:28, r:4,  kind:'camp',    threat:2 },
   // --- Großregionen des erweiterten Grenzlands (512×512) ---
   { key:'oldbridge', name:'Steinbrücke',        x:110,y:300,r:10, kind:'road',    threat:1 },
   { key:'westwald',  name:'Westwald',           x:60, y:300,r:40, kind:'wild',    threat:2 },
@@ -60,6 +63,7 @@ export function setTile(map, tx, ty, v) {
   const m = MAPS[map];
   if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) return;
   m.tiles[ty * m.w + tx] = v;
+  m.ver = (m.ver || 0) + 1;                      // Render-Chunks neu backen
 }
 export function solidTile(map, px, py) {
   return SOLID.has(tileAt(map, Math.floor(px / TS), Math.floor(py / TS)));
@@ -93,6 +97,162 @@ function house(map, x, y, w, h, doorSide = 'S') {
   if (doorSide === 'E') setTile(map, x + w - 1, y + (h >> 1), T.PLANK);
 }
 
+const nz = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+// Biom-Zentren (Voronoi-artig). base = Grundkachel der Region.
+const BIOME = { plains:T.GRASS, forest:T.GRASS, desert:T.SAND, badland:T.SAND, marsh:T.MARSH, mountain:T.STONE, blight:T.ASH };
+const centers = [
+  { x:70,  y:70,  b:'plains'   },  // Greenmark (geschützt)
+  { x:60,  y:300, b:'forest'   },  // Westwald
+  { x:150, y:410, b:'marsh'    },  // Südsumpf
+  { x:250, y:250, b:'plains'   },  // Mittelland
+  { x:250, y:40,  b:'mountain' },  // Nordgebirge
+  { x:340, y:36,  b:'mountain' },  // Frostkamm
+  { x:430, y:150, b:'desert'   },  // Rote Wüste
+  { x:380, y:90,  b:'badland'  },  // Aschmark
+  { x:445, y:280, b:'plains'   },  // Ostmark (Orden)
+  { x:330, y:360, b:'badland'  },  // Grenzöde (sichtbarer Rand zum Totenreich)
+  { x:410, y:410, b:'blight'   },  // Totenreich-Kern
+  { x:360, y:460, b:'blight'   },
+  { x:470, y:440, b:'blight'   },
+  { x:120, y:180, b:'plains'   },  // südliche Ebenen
+];
+const protectedNW = (x, y) => x < 140 && y < 150;      // Greenmark bleibt handgebaut
+// Region einer Kachel (gleiche Formel wie die Generierung): 'greenmark' im handgebauten Nordwesten, sonst das Biom.
+// Renderer und Klang nutzen sie für Farbwelt, Vegetation, Nahdetails, Atmosphäre und Umgebungsgeräusche.
+const vn = (x, y) => {                                     // weiches Wertrauschen: Grenzen wellig statt pixelig verrauscht
+  const xi = Math.floor(x), yi = Math.floor(y), u = x - xi, v = y - yi, s = t => t * t * (3 - 2 * t);
+  const a = nz(xi, yi), b = nz(xi + 1, yi), c = nz(xi, yi + 1), d = nz(xi + 1, yi + 1), U = s(u), V = s(v);
+  return a + (b - a) * U + (c - a) * V + (a - b - c + d) * U * V;
+};
+function biomeAt(x, y) {
+  const jx = x + (vn(x / 14, y / 14) - 0.5) * 44 + (vn(x / 5, y / 5) - 0.5) * 8;
+  const jy = y + (vn(y / 14 + 50, x / 14) - 0.5) * 44 + (vn(y / 5, x / 5 + 50) - 0.5) * 8;
+  let best = null, bd = 1e9;
+  for (const c of centers) { const d = (c.x - jx) ** 2 + (c.y - jy) ** 2; if (d < bd) { bd = d; best = c; } }
+  return best.b;
+}
+export const regionAt = (tx, ty) => protectedNW(tx, ty) ? 'greenmark' : biomeAt(tx, ty);
+
+// ---------------- Szenen: kleine, komponierte Orte, die eine Geschichte erzählen ----------------
+// Keine Zufallsstreuung: jede Szene ist ein festes Arrangement. Gras darunter wird zur Lichtung,
+// Bäume dort entfernt der Schlussfilter von genWorld.
+const clearing = (x, y, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++)
+  if (i * i + j * j <= r * r && tileAt('world', x + i, y + j) === T.GRASS) setTile('world', x + i, y + j, T.DIRT); };
+function scene(kind, x, y) {
+  const P = (t, dx, dy, o = {}) => prop(t, x + dx, y + dy, o);
+  const barrel = (dx, dy) => P('barrel', dx, dy, { solid: true, r: 9 });
+  switch (kind) {
+    case 'huntcamp': clearing(x, y, 3); P('tent_prop', 0, -1, { solid: true }); P('firepit', 2, 1, { r: 8 }); barrel(-2, 1); P('bones', 3, -1, { r: 6 }); P('crate', -1, 2); break;
+    case 'mushrooms': clearing(x, y, 2); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P('mushrooms', Math.round(Math.cos(a) * 3), Math.round(Math.sin(a) * 2), { r: 4 }); } break;
+    case 'battlefield': for (let i = 0; i < 7; i++) P(i % 2 ? 'bones' : 'blood', ri(-4, 4), ri(-3, 3), { r: 5 });
+      P('banner_torn', 0, 0); P('debris', 2, 2, { r: 6 }); P('debris', -3, 1, { r: 6 }); P('rubble', -1, -3); break;
+    case 'wreck': P('broken_cart', 0, 0, { solid: true, r: 14, label: 'Zerstörter Wagen' }); P('debris', 2, 1, { r: 6 }); P('bones', -2, 2, { r: 6 }); barrel(3, -1); P('blood', 1, 2, { r: 4 }); break;
+    case 'shrine': clearing(x, y, 2); P('wayshrine', 0, 0, { solid: true, r: 8, label: 'Wegschrein' }); P('candles', 1, 1, { r: 6 }); P('flowers_prop', -1, 1, { r: 4 }); break;
+    case 'stones': clearing(x, y, 3); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2;
+      P('standing_stone', Math.round(Math.cos(a) * 3), Math.round(Math.sin(a) * 2), { solid: true, r: 9, label: 'Steinkreis' }); } P('candles', 0, 0, { r: 6 }); break;
+    case 'frozen': P('firepit', 0, 0, { r: 8 }); P('bones', 1, 1, { r: 6 }); P('tent_prop', -2, -1, { solid: true }); P('banner_torn', 2, -1); P('crate', -1, 2); break;
+    case 'altar': P('obelisk', 0, 0, { solid: true, label: 'Nekromantischer Altar' }); P('candles', -1, 1, { r: 6 }); P('candles', 1, 1, { r: 6 });
+      for (let i = 0; i < 4; i++) P('bones', ri(-3, 3), ri(-2, 3), { r: 6 }); break;
+    case 'drowned': for (let i = 0; i < 4; i++) P('gravestone', ri(-3, 3), ri(-2, 2)); P('candles', 0, 1, { r: 6 }); P('broken_pillar', 2, -1, { solid: true }); break;
+    case 'farm': rect('world', x - 3, y - 2, 6, 4, T.FIELD); for (let i = -3; i < 3; i++) P('fence', i, 3, { solid: true }); P('scarecrow', 0, 0); barrel(4, 0); break;
+    case 'village': for (let i = -4; i < 4; i++) if (i !== 0) P('fence', i, -4, { solid: true }); P('campfire_static', 0, 0); barrel(2, 1); barrel(3, 1); P('cart', -3, 1); break;
+    case 'tower': clearing(x, y, 3); P('tower_ruin', 0, 0, { solid: true, r: 22, label: 'Verfallener Wachturm' }); P('rubble', 2, 2); P('rubble', -3, 1); P('bones', 1, 2, { r: 6 }); break;
+  }
+}
+// Welche Szenen zu welchem Ort passen (aus Region und Geschichte des Ortes abgeleitet)
+const SCENES = {
+  forest: ['huntcamp', 'mushrooms'], fortress: ['battlefield', 'tower'], marsh: ['drowned'], banditcamp: ['wreck'],
+  graveyard: ['drowned'], ruins: ['tower'], northcity: ['farm', 'village'], road: ['wreck'],
+  westwald: ['huntcamp', 'mushrooms', 'shrine', 'mushrooms', 'tower'], wolfden: ['battlefield', 'huntcamp'],
+  oldbridge: ['wreck', 'shrine'], saltport: ['village', 'wreck', 'farm'], sunkentemple: ['drowned', 'drowned'],
+  kreuzweg: ['village', 'farm', 'shrine'], deephall: ['frozen', 'stones'], frostpeak: ['frozen', 'stones', 'tower'],
+  ashford: ['village', 'battlefield'], redwaste: ['wreck', 'stones', 'wreck'], sonnwacht: ['shrine', 'farm', 'battlefield'],
+  altvharn: ['altar', 'battlefield'], necropolis: ['altar'], blackkeep: ['battlefield', 'altar'], mistisle: ['drowned', 'shrine'],
+};
+// Regionstypische Gruppen auf einem gejitterten Raster: Haine, Felsgruppen, Knochenfelder — Rhythmus aus Dichte und Luft.
+function regionClusters() {
+  const tree = (x, y) => prop('tree', x, y, { solid: true, r: 12, hp: 3 });
+  const around = (x, y, n, fn, rad = 2) => { for (let i = 0; i < n; i++) fn(x + ri(-rad, rad), y + ri(-rad, rad)); };
+  const bad = t => [T.WATER, T.ROAD, T.PLANK, T.WALL, T.DWALL, T.ROCK, T.FIELD].includes(t);
+  for (let cy = 8; cy < 470; cy += 14) for (let cx = 8; cx < 505; cx += 14) {
+    const x = cx + ri(-5, 5), y = cy + ri(-5, 5);
+    if (protectedNW(x, y) || bad(tileAt('world', x, y)) || !chance(0.55)) continue;
+    const here = locAt(x, y); if (here && (here.kind === 'village' || here.kind === 'city')) continue;
+    switch (biomeAt(x, y)) {
+      case 'blight': if (chance(0.3)) { prop('bone_spire', x, y, { solid: true }); around(x, y, 2, (a, b) => prop('gravestone', a, b)); }
+        else { around(x, y, ri(3, 5), tree); around(x, y, 2, (a, b) => prop('bones', a, b, { r: 6 }), 3); } break;
+      case 'badland': around(x, y, ri(1, 2), tree); prop('rubble', x + 2, y + 1); if (chance(0.5)) prop('bones', x - 2, y + 1, { r: 6 }); break;
+      case 'desert': around(x, y, 2, (a, b) => prop('rock_node', a, b, { harvest: 'stone', solid: true }), 3); if (chance(0.5)) tree(x + 3, y); if (chance(0.3)) prop('bones', x, y + 2, { r: 6 }); break;
+      case 'mountain': around(x, y, ri(2, 4), tree); around(x, y, 2, (a, b) => prop('rock_node', a, b, { harvest: 'stone', solid: true }), 3); break;
+      case 'marsh': around(x, y, ri(2, 3), tree); if (chance(0.5)) prop('bush', x + 2, y + 2, { harvest: 'herb' }); break;
+      case 'forest': prop('fallen_tree', x, y, { solid: true }); around(x, y, 2, (a, b) => prop('bush', a, b, { harvest: 'herb' }), 3); if (chance(0.25)) prop('mushrooms', x + 2, y - 1, { r: 4 }); break;
+      default: if (chance(0.6)) around(x, y, ri(3, 6), tree, 3); else { around(x, y, 2, (a, b) => prop('bush', a, b, { harvest: 'herb' })); if (chance(0.4)) prop('rock_node', x, y, { harvest: 'stone', solid: true }); }
+    }
+  }
+}
+function placeScenes() {
+  const free = (x, y) => { for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++)
+    if ([T.WATER, T.WALL, T.DWALL, T.ROCK, T.ROAD, T.PLANK].includes(tileAt('world', x + i, y + j))) return false; return true; };
+  for (const l of LOCATIONS) (SCENES[l.key] || []).forEach((kind, i) => {
+    for (let k = 0; k < 8; k++) {                          // Ring um den Ort, feste Winkel je Szene
+      const a = i * 2.4 + k * 0.8 + l.x * 0.1, rr = l.r + 4 + (i % 2) * 4 + k;
+      const x = Math.round(l.x + Math.cos(a) * rr), y = Math.round(l.y + Math.sin(a) * rr);
+      if (x > 6 && y > 6 && x < 505 && y < 470 && free(x, y)) { scene(kind, x, y); break; }
+    }
+  });
+}
+
+// ---------------- Grubenpfad (Vertical Slice) ----------------
+// Bewusst gebaute Route Eren → Grube. Jede Station erzählt ein Stück:
+// Wegschrein (Aufbruch) → Waldweg → Kreuzung mit Wegweiser → Wachturm-Ruine (Landmarke, Untote)
+// → überfallenes Händlerlager (Goblins, Blut, zerbrochene Waren) → Blutspur → Grubeneingang.
+export const pathX = y => 62 + Math.round(Math.sin(y / 6) * 3);    // gewundener Weg (auch für Spawns)
+function gruben() {
+  for (let y = 18; y < 57; y++) {                       // Hauptweg, 2 Kacheln breit, mit ausgefransten Rändern
+    const x = pathX(y); setTile('world', x, y, T.ROAD); setTile('world', x + 1, y, T.ROAD);
+    if (chance(0.35)) setTile('world', x - 1, y, T.DIRT); if (chance(0.35)) setTile('world', x + 2, y, T.DIRT);
+  }
+  const trail = (x0, y0, x1, y1) => {                   // schmaler Nebenpfad mit leichtem Schlängeln
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) { const t = i / n, x = Math.round(x0 + (x1 - x0) * t + Math.sin(t * 9) * 1.2), y = Math.round(y0 + (y1 - y0) * t);
+      setTile('world', x, y, T.DIRT); if (chance(0.4)) setTile('world', x, y + 1, T.DIRT); }
+  };
+  // 1) Wegschrein am Dorfrand
+  const sx = pathX(54);
+  prop('wayshrine', sx + 3, 54, { solid: true, r: 8, label: 'Wegschrein' }); prop('candles', sx + 4, 55, { r: 6 });
+  prop('flowers_prop', sx + 3, 55, { r: 4 });
+  // 2) Kreuzung mit Wegweiser: West zur Kleinen Ruine, Ost zum Waldschrein
+  const cx = pathX(46);
+  blob('world', cx, 46, 3, T.DIRT, 0.9);
+  trail(cx - 2, 46, 44, 41); trail(cx + 3, 46, 74, 51);
+  prop('waysign', cx + 3, 44, { solid: true, r: 6, label: 'Wegweiser: Grube ↑ · Ruine ← · Schrein →' });
+  prop('barrel', cx - 3, 44, { solid: true, r: 9 }); prop('crate', cx - 3, 45);
+  // 3) Wachturm-Ruine: weithin sichtbare Landmarke auf einer Lichtung, Knochen der letzten Wache
+  blob('world', 56, 37, 4, T.STONE, 0.85); blob('world', 56, 37, 5, T.DIRT, 0.5);
+  prop('tower_ruin', 55, 36, { solid: true, r: 22, label: 'Alter Wachturm' });
+  for (const [x, y] of [[58, 39], [53, 38], [57, 34]]) prop('rubble', x, y);
+  prop('bones', 58, 37, { r: 6 }); prop('banner_torn', 52, 36);
+  trail(pathX(38) - 1, 38, 59, 38);
+  // 4) Überfallenes Händlerlager: umgestürzter Wagen, verstreute Waren, kalte Feuerstelle, Blut
+  const kx = pathX(29) + 5;
+  blob('world', kx, 29, 4, T.DIRT, 0.9);
+  prop('broken_cart', kx, 28, { solid: true, r: 14, label: 'Umgestürzter Händlerwagen' });
+  prop('firepit', kx - 3, 30, { r: 8 }); prop('tent_prop', kx + 3, 27, { solid: true });
+  prop('barrel', kx + 2, 30, { solid: true, r: 9 }); prop('debris', kx - 1, 31, { r: 6 }); prop('debris', kx + 3, 31, { r: 6 });
+  prop('crate', kx - 2, 27); prop('chest', kx + 4, 29, { loot: ['bandage', 'potion'], label: 'Aufgebrochene Kiste' });
+  for (const [x, y] of [[kx - 1, 29], [kx + 1, 30]]) prop('blood', x, y, { r: 4 });
+  // 5) Blutspur vom Lager zur Grube — wer ihr folgt, findet den Eingang
+  for (let y = 27; y > 20; y -= 2) prop('blood', pathX(y) + (y & 2 ? 1 : 0), y, { r: 4 });
+  prop('bones', 60, 21, { r: 6 }); prop('candles', 64, 20, { r: 6 }); prop('bones', 65, 21, { r: 6 });
+  // Dichter Wald links und rechts des Wegs, Lichtungen bleiben frei (keine Graskachel)
+  for (let y = 21; y < 53; y++) for (let k = 0; k < 5; k++) {
+    const side = chance(0.5) ? -1 : 1, x = pathX(y) + (side < 0 ? -ri(3, 11) : ri(4, 12));
+    if (tileAt('world', x, y) === T.GRASS && chance(0.55)) prop('tree', x, y, { solid: true, r: 12, hp: 3 });
+  }
+  for (let i = 0; i < 26; i++) { const y = ri(22, 52), x = pathX(y) + (chance(0.5) ? -ri(2, 6) : ri(3, 7));
+    if (tileAt('world', x, y) === T.GRASS) prop(chance(0.6) ? 'bush' : 'rock_node', x, y, chance(0.6) ? { harvest: 'herb' } : { harvest: 'stone', solid: true }); }
+}
+
 // ---------------- Oberwelt ----------------
 export function genWorld() {
   props.length = 0;
@@ -101,7 +261,7 @@ export function genWorld() {
   MAPS.world = { w, h, tiles };
 
   // Gelände
-  for (let i = 0; i < 260; i++) blob('world', ri(4, w - 5), ri(4, h - 5), ri(2, 5), T.DIRT, 0.5);
+  for (let i = 0; i < 260; i++) blob('world', ri(4, w - 5), ri(4, h - 5), ri(2, 5), T.DIRT, 0.92);   // zusammenhängende Erdflecken
   blob('world', 52, 100, 17, T.MARSH, 0.9);
   blob('world', 46, 108, 9, T.MARSH, 0.8);
   for (let i = 0; i < 26; i++) blob('world', ri(40, 64), ri(90, 112), ri(1, 3), T.WATER, 0.7);
@@ -112,8 +272,11 @@ export function genWorld() {
   blob('world', 14, 110, 7, T.ROCK, 0.55);
 
   // Straßen
-  for (let x = 20; x < 120; x++) { setTile('world', x, 64, T.ROAD); if (chance(0.5)) setTile('world', x, 63, T.ROAD); }
-  for (let y = 18; y < 64; y++) { setTile('world', 62, y, T.ROAD); if (chance(0.4)) setTile('world', 63, y, T.ROAD); }
+  for (let x = 20; x < 120; x++) {                       // Alte Straße: außerhalb Erens leicht geschwungen
+    const y = x > 49 && x < 73 ? 64 : 64 + Math.round(Math.sin(x / 9) * 1.4);
+    setTile('world', x, y, T.ROAD); if (chance(0.5)) setTile('world', x, y - 1, T.ROAD);
+  }
+  gruben();
   for (let y = 64; y < 116; y++) { setTile('world', 60, y, T.DIRT); if (chance(0.3)) setTile('world', 61, y, T.DIRT); }
 
   // ---- Eren ----
@@ -199,33 +362,10 @@ export function genWorld() {
   //  Greenmark ist nur die Heimat im Nordwesten. Dahinter liegen Großregionen,
   //  durch bewussten Raum getrennt: Reisen → Entdecken → Risiko → Belohnung.
   // ======================================================================
-  const nz = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
-  // Biom-Zentren (Voronoi-artig). base = Grundkachel der Region.
-  const BIOME = { plains:T.GRASS, forest:T.GRASS, desert:T.SAND, badland:T.SAND, marsh:T.MARSH, mountain:T.STONE, blight:T.ASH };
-  const centers = [
-    { x:70,  y:70,  b:'plains'   },  // Greenmark (geschützt)
-    { x:60,  y:300, b:'forest'   },  // Westwald
-    { x:150, y:410, b:'marsh'    },  // Südsumpf
-    { x:250, y:250, b:'plains'   },  // Mittelland
-    { x:250, y:40,  b:'mountain' },  // Nordgebirge
-    { x:340, y:36,  b:'mountain' },  // Frostkamm
-    { x:430, y:150, b:'desert'   },  // Rote Wüste
-    { x:380, y:90,  b:'badland'  },  // Aschmark
-    { x:445, y:280, b:'plains'   },  // Ostmark (Orden)
-    { x:330, y:360, b:'badland'  },  // Grenzöde (sichtbarer Rand zum Totenreich)
-    { x:410, y:410, b:'blight'   },  // Totenreich-Kern
-    { x:360, y:460, b:'blight'   },
-    { x:470, y:440, b:'blight'   },
-    { x:120, y:180, b:'plains'   },  // südliche Ebenen
-  ];
-  const protectedNW = (x, y) => x < 140 && y < 150;      // Greenmark bleibt handgebaut
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (protectedNW(x, y)) continue;
     const idx = y * w + x; if (tiles[idx] !== T.GRASS) continue;   // handgebaute Kacheln nie überschreiben
-    const jx = x + (nz(x, y) - 0.5) * 26, jy = y + (nz(y, x) - 0.5) * 26;   // organische Ränder
-    let best = null, bd = 1e9;
-    for (const c of centers) { const d = (c.x - jx) ** 2 + (c.y - jy) ** 2; if (d < bd) { bd = d; best = c; } }
-    const base = BIOME[best.b];
+    const base = BIOME[biomeAt(x, y)];
     if (base !== T.GRASS) tiles[idx] = base;
   }
 
@@ -240,6 +380,9 @@ export function genWorld() {
 
   // ---- Straßennetz: die großen Handelsstraßen ----
   const road = (x0, y0, x1, y1, wob = 1) => {                 // grobe Straße mit Knick
+    prop('waysign', x0 + 2, y0 + 2, { solid: true, r: 6, label: 'Wegweiser' });
+    const mx = x1, my = Math.round((y0 + y1) / 2) + 3;          // Knickpunkt: Rast oder Überfall
+    if (tileAt('world', mx, my) !== T.WATER) scene(regionAt(mx, my) === 'blight' || regionAt(mx, my) === 'badland' ? 'wreck' : 'shrine', mx + 3, my);
     let x = x0, y = y0;
     const step = () => { const t = tileAt('world', x, y); if (t !== T.WATER) setTile('world', x, y, t === T.ASH ? T.DIRT : T.ROAD); else { setTile('world', x, y, T.PLANK); setTile('world', x, y + 1, T.PLANK); } };
     while (x !== x1) { step(); if (wob && chance(0.3)) setTile('world', x, y + 1, tileAt('world', x, y + 1) === T.WATER ? T.PLANK : T.ROAD); x += x < x1 ? 1 : -1; }
@@ -259,6 +402,7 @@ export function genWorld() {
   const forestBelt = (cx, cy, r, n, kind = 'tree') => { for (let i = 0; i < n; i++) { const x = cx + ri(-r, r), y = cy + ri(-r, r);
     if (Math.hypot(x - cx, y - cy) < r && tileAt('world', x, y) === T.GRASS && chance(0.5)) prop(kind, x, y, kind === 'tree' ? { solid:true, r:12, hp:3 } : {}); } };
   forestBelt(60, 300, 60, 1600);    // Westwald
+  forestBelt(60, 300, 34, 1800);    // Westwald-Kern: dichter, dunkler Hochwald
   forestBelt(210, 200, 46, 600);    // Mittellandhaine
   forestBelt(150, 150, 40, 500);    // Übergangswald
   for (let i = 0; i < 140; i++) prop('bush', ri(20, 120), ri(240, 360), { harvest:'herb' });
@@ -379,6 +523,9 @@ export function genWorld() {
   prop('banner_torn', 427, 418); prop('banner_torn', 435, 418);
   prop('chest', 431, 432, { loot:['grave_seal', 'potion', 'plate_cuirass'], label:'Grabkammer der Feste' });
 
+  placeScenes();
+  regionClusters();
+
   // ======================================================================
   //  ENTDECKEN — Streugut der Wildnis: nicht jeder Ort trägt eine Quest.
   // ======================================================================
@@ -403,7 +550,9 @@ export function genWorld() {
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
-  return props.filter(p => p.type !== 'tree' || tileAt('world', p.x / TS | 0, p.y / TS | 0) === T.GRASS);
+  // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
+  const noTree = new Set([T.DIRT, T.ROAD, T.PLANK, T.FIELD, T.WATER, T.WALL, T.DWALL, T.ROCK, T.DFLOOR]);
+  return props.filter(p => p.type !== 'tree' || !noTree.has(tileAt('world', p.x / TS | 0, p.y / TS | 0)));
 }
 
 // ---------------- Grube (Dungeon) ----------------

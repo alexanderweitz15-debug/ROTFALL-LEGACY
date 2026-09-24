@@ -1,10 +1,11 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
 import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS } from './data.js';
-import { drawPortraitTo, drawItemIconTo, cam } from './render.js';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS } from './world.js';
 import { townState, townPrice } from './sim.js';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js';
+import { sfx, ambience } from './sfx.js';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -43,6 +44,20 @@ export function initUI() {
   $('modal-close').onclick = closeModal;
   $('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
   onLog(() => renderLog());
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button')) sfx('ui'); });
+  // Tooltips: title-Attribute werden abgefangen (kein Browser-Kasten) und als Pixel-Tafel gezeigt.
+  const tip = el('div', 'tip'); tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip);
+  const tipText = t => { const n = t.closest && t.closest('[title],[data-tip]');
+    if (n && n.hasAttribute('title')) { n.dataset.tip = n.getAttribute('title'); n.removeAttribute('title'); } return n; };
+  document.addEventListener('mouseover', e => {
+    const n = tipText(e.target), text = n && n.dataset.tip;
+    if (!text) { tip.classList.remove('on'); return; }
+    tip.textContent = text; tip.classList.add('on');
+  });
+  document.addEventListener('mousemove', e => { if (!tip.classList.contains('on')) return;
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 6), y = Math.min(e.clientY + 18, innerHeight - tip.offsetHeight - 6);
+    tip.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; });
+  document.addEventListener('mouseout', e => { if (!e.relatedTarget || !tipText(e.relatedTarget)) tip.classList.remove('on'); });
   renderHotbar();
 }
 
@@ -217,7 +232,9 @@ const propName = t => ({ tree:'Baum', bush:'Strauch', rock_node:'Felsbrocken', o
   well:'Brunnen', sign:'Schild', board:'Anschlagbrett', anvil:'Amboss', shrine:'Schrein', gravestone:'Grabstein',
   mine_entrance:'Grubeneingang', mine_exit:'Ausgang', campfire_static:'Feuerstelle', claim_stone:'Grenzstein',
   dead_tree:'Toter Baum', bone_spire:'Knochenturm', obelisk:'Obelisk', watchtower_ruin:'Turmruine',
-  marsh_ruin:'Ruine', broken_pillar:'Gebrochene Säule', crypt:'Gruft' }[t] || 'Objekt');
+  marsh_ruin:'Ruine', broken_pillar:'Gebrochene Säule', crypt:'Gruft', wayshrine:'Wegschrein', candles:'Kerzen',
+  waysign:'Wegweiser', barrel:'Fass', tower_ruin:'Alter Wachturm', bones:'Knochen', broken_cart:'Umgestürzter Wagen',
+  firepit:'Kalte Feuerstelle', debris:'Verstreute Waren', blood:'Blutspur', flowers_prop:'Blumen' }[t] || 'Objekt');
 
 export function relLabel(v) {
   if (v <= -60) return 'Feind'; if (v <= -20) return 'Rivale'; if (v < 10) return 'Fremder';
@@ -225,10 +242,15 @@ export function relLabel(v) {
 }
 
 // ---------------- Hotbar ----------------
+let hbSig = '';
 export function renderHotbar() {
   const hb = $('hotbar'); if (!hb) return;
   const p = S.player; if (!p) return;
   const slots = p.hotbar || [];
+  // Nur neu aufbauen, wenn sich Belegung, Anzahl oder Abklingzeit (Viertelsekunden) ändern — sonst flackern die Icons.
+  const sig = slots.map(s => !s ? '-' : s.type + ':' + s.key + ':' + (s.type === 'item' ? countItem(s.key) : Math.ceil((p.cooldowns?.[s.key] || 0) / 250))).join('|');
+  if (sig === hbSig && hb.childElementCount) return;
+  hbSig = sig;
   hb.innerHTML = '';
   for (let i = 0; i < 8; i++) {
     const s = slots[i];
@@ -237,12 +259,12 @@ export function renderHotbar() {
     if (s) {
       if (s.type === 'item') {
         const cv = el('canvas'); cv.width = cv.height = 48; d.appendChild(cv);
-        d.innerHTML += `<u>${countItem(s.key)}</u>`;
+        d.insertAdjacentHTML('beforeend', `<u>${countItem(s.key)}</u>`);
         setTimeout(() => drawItemIconTo(cv, s.key), 0);
         d.title = ITEMS[s.key]?.name || '';
       } else {
         const ab = ABILITIES[s.key];
-        d.innerHTML += `<span style="font-size:10px;text-align:center;line-height:1.1;color:#cbbf8a;padding:0 2px">${ab.name}</span>`;
+        d.insertAdjacentHTML('beforeend', `<span style="font-size:10px;text-align:center;line-height:1.1;color:#cbbf8a;padding:0 2px">${ab.name}</span>`);
         d.title = ab.desc;
         const cd = (p.cooldowns?.[s.key] || 0);
         if (cd > 0) { const c = el('div', 'cd'); c.style.height = `${clamp(cd / ab.cd * 100, 0, 100)}%`; c.style.top = 'auto'; c.style.bottom = '0'; d.appendChild(c); }
@@ -321,8 +343,8 @@ function invUI(body) {
     if (slot) {
       const it = ITEMS[slot.key];
       const cv = el('canvas'); cv.width = cv.height = 52; c.appendChild(cv);
-      if (slot.count > 1) c.innerHTML += `<span class="cnt">${slot.count}</span>`;
-      if (slot.cond != null && slot.cond < 1) c.innerHTML += `<span class="cond"><i style="width:${slot.cond * 100}%;background:${slot.cond > .5 ? '#5c6b3c' : '#8c3b2a'}"></i></span>`;
+      if (slot.count > 1) c.insertAdjacentHTML('beforeend', `<span class="cnt">${slot.count}</span>`);
+      if (slot.cond != null && slot.cond < 1) c.insertAdjacentHTML('beforeend', `<span class="cond"><i style="width:${slot.cond * 100}%;background:${slot.cond > .5 ? '#5c6b3c' : '#8c3b2a'}"></i></span>`);
       c.title = it.name;
       setTimeout(() => drawItemIconTo(cv, slot.key), 0);
       c.onclick = () => { selIdx = i; showDetail(slot, i); };
@@ -339,7 +361,7 @@ function invUI(body) {
       const c = el('div', 'cell');
       if (slot) {
         const cv = el('canvas'); cv.width = cv.height = 52; c.appendChild(cv);
-        if (slot.count > 1) c.innerHTML += `<span class="cnt">${slot.count}</span>`;
+        if (slot.count > 1) c.insertAdjacentHTML('beforeend', `<span class="cnt">${slot.count}</span>`);
         setTimeout(() => drawItemIconTo(cv, slot.key), 0);
         c.title = ITEMS[slot.key].name + ' (Klick: entnehmen)';
         c.onclick = () => { A.takeFromStash(i); refreshModal(); };
@@ -395,25 +417,29 @@ const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', ches
 
 // ---- Körpertafel (Trefferzonen) ----
 // Vorderansicht wie auf einer Feldschertafel: die rechte Körperseite liegt im Bild links.
-const PART_SHAPE = {
-  head:  'M60 8 C71 8 78 16 78 27 C78 39 70 46 60 46 C50 46 42 39 42 27 C42 16 49 8 60 8 Z',
-  torso: 'M40 52 L80 52 C88 54 90 60 89 70 L85 118 C84 126 78 130 70 130 L50 130 C42 130 36 126 35 118 L31 70 C30 60 32 54 40 52 Z',
-  rarm:  'M31 56 C24 58 20 64 18 74 L12 120 C11 128 16 131 20 128 L27 118 L33 78 Z',
-  larm:  'M89 56 C96 58 100 64 102 74 L108 120 C109 128 104 131 100 128 L93 118 L87 78 Z',
-  rleg:  'M40 134 L58 134 L56 204 C55 212 50 214 45 212 L41 208 L38 150 Z',
-  lleg:  'M62 134 L80 134 L82 150 L79 208 L75 212 C70 214 65 212 64 204 Z',
+// Pixelfigur auf einem 30×54-Raster (dieselbe Sprache wie die Sprites): Rechtecke, harte Kanten, dunkle Kontur.
+const PART_PX = {
+  head:  [[11, 1, 8, 1], [10, 2, 10, 8], [11, 10, 8, 1]],
+  torso: [[9, 12, 12, 2], [8, 14, 14, 12], [9, 26, 12, 5]],
+  rarm:  [[5, 13, 3, 2], [4, 15, 3, 10], [3, 25, 3, 5]],
+  larm:  [[22, 13, 3, 2], [23, 15, 3, 10], [24, 25, 3, 5]],
+  rleg:  [[9, 32, 5, 16], [8, 48, 6, 3]],
+  lleg:  [[16, 32, 5, 16], [16, 48, 6, 3]],
 };
 const STATE_WORD = { heil:'heil', verwundet:'verwundet', kritisch:'kritisch', aus:'ausgefallen' };
 export function bodyChart(c, { big = false, click = false } = {}) {
   if (!c.body) return '';
   const uid = 'h' + Math.random().toString(36).slice(2, 7);
-  return `<svg class="bodychart ${big ? 'big' : ''}" viewBox="0 0 120 218" role="img" aria-label="Körperzustand ${c.name}">
-    <defs><pattern id="${uid}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="5" height="5" fill="#2a120e"/><line x1="0" y1="0" x2="0" y2="5" stroke="#8c2a22" stroke-width="2"/></pattern></defs>
+  const rects = (list, pad, attrs = '') => list.map(([x, y, w, h]) => `<rect x="${x - pad}" y="${y - pad}" width="${w + pad * 2}" height="${h + pad * 2}"${attrs}/>`).join('');
+  return `<svg class="bodychart ${big ? 'big' : ''}" viewBox="0 0 30 54" shape-rendering="crispEdges" role="img" aria-label="Körperzustand ${c.name}">
+    <defs><pattern id="${uid}" width="2" height="2" patternUnits="userSpaceOnUse">
+      <rect width="2" height="2" fill="#2a120e"/><rect width="1" height="1" fill="#8c2a22"/><rect x="1" y="1" width="1" height="1" fill="#8c2a22"/></pattern></defs>
+    <g fill="#0c0a08">${PARTS.map(p => rects(PART_PX[p], 1)).join('')}</g>
     ${PARTS.map(p => {
       const st = partState(c.body[p]);
-      return `<path d="${PART_SHAPE[p]}" class="bp bp-${st}${click ? ' bp-click' : ''}" data-part="${p}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>
-        <title>${PART_NAME[p]}: ${Math.max(0, Math.round(c.body[p].hp))}/${c.body[p].max} — ${STATE_WORD[st]}</title></path>`;
+      const label = `${PART_NAME[p]}: ${Math.max(0, Math.round(c.body[p].hp))}/${c.body[p].max} — ${STATE_WORD[st]}`;
+      return `<g class="bp bp-${st}${click ? ' bp-click' : ''}" data-part="${p}" data-tip="${label}" aria-label="${label}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>${rects(PART_PX[p], 0)}
+        ${rects(PART_PX[p].slice(0, 1), 0, ' class="bp-hi"')}</g>`;
     }).join('')}
   </svg>`;
 }
@@ -464,6 +490,7 @@ function charUI(body, who) {
     </section>
     <section class="tafel-ruest">
       <h3>Rüstzeug</h3>
+      <canvas id="ch-figure" width="232" height="110" style="display:block;margin:0 0 8px;background:#120f0b;border:1px solid #2f271d"></canvas>
       <dl class="ledger-list">${EQ.map(([k, n]) => `<div><dt>${n}</dt><dd>${p.equip[k] ? ITEMS[p.equip[k].key].name : '—'}</dd></div>`).join('')}</dl>
       <h3>Klassenweg</h3>
       <ol class="path">${chain.map((c, i) => `<li class="${i === chain.length - 1 ? 'now' : ''}">${CLASSES[c].name}</li>`).join('')}</ol>
@@ -474,6 +501,7 @@ function charUI(body, who) {
       <dl class="ledger-list">${skills.map(([k, n]) => `<div><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
     </section>
   </div>`;
+  if ($('ch-figure')) drawFigureTo($('ch-figure'), p);
   const doBandage = part => { A.bandage(p, part); closeModal(); };
   body.querySelectorAll('[data-part]').forEach(el => el.addEventListener('click', () => doBandage(el.dataset.part)));
   if ($('ap-box')) [...$('ap-box').querySelectorAll('button')].forEach(b => b.onclick = () => { A.spendAttr(b.dataset.a); refreshModal(); });
@@ -681,6 +709,9 @@ function settingsUI(body) {
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
+      <h3 style="margin-top:14px">Ton</h3>
+      <div class="ctx-actions">${[[0, 'Aus'], [0.35, 'Leise'], [0.7, 'Normal'], [1, 'Laut']].map(([v, n]) =>
+        `<button data-vol="${v}" class="${(S.settings.volume ?? 0.7) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
       <h3 style="margin-top:14px">Textgröße</h3>
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
@@ -693,6 +724,7 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
+  [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = () => { A.saveNow(); toast('Gespeichert'); };
   $('quit').onclick = () => { A.saveNow(); location.reload(); };
 }

@@ -82,7 +82,7 @@ export const MONSTERS = {
   goblin_warrior:{ name:'Goblin-Krieger', hp:54, dmg:11, speed:1.25, reach:32, atk:1000, xp:26, sight:230, r:12, threat:2, faction:'goblin', pal:{skin:'#5f6e3c',cloth:'#3d2f20',metal:'#8a7f6d'} },
   bandit:    { name:'Bandit', hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2, faction:'bandit', pal:{skin:'#b2926f',cloth:'#4a3226',metal:'#7d7364'} },
   bandit_archer:{ name:'Banditenschütze', hp:36, dmg:9, speed:1.35, reach:300, atk:1500, ranged:true, xp:24, sight:320, r:11, threat:2, faction:'bandit', pal:{skin:'#b2926f',cloth:'#3f4a2e',metal:'#7d7364'} },
-  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, xp:28, sight:240, r:11, threat:2, faction:'undead', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };

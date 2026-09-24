@@ -1,0 +1,6 @@
+{
+  "assets": [
+    { "asset_id": "ca0b76dc-be52-4024-bf7e-9b11aa95b5dc", "sha12": "2c5ae92eb2dc", "label": "wanderer_base (top-down, Stil-Test)", "file": "wanderer_base.png" },
+    { "asset_id": "31cbc0a5-f883-4b83-81c1-46b2ceaa3534", "label": "wanderer_idle (8 Frames)", "file": "wanderer_idle.webp" }
+  ]
+}

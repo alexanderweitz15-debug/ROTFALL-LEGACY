@@ -27,8 +27,10 @@ WASD bewegen · Linksklick/Leertaste angreifen · Rechtsklick Ziel wählen · E 
 |---|---|
 | `src/state.js` | Spielzustand, Seed-RNG, Log, Chronik, Speichern (localStorage, versioniert) |
 | `src/data.js` | Items, Gegner, NPCs, Klassen, Fähigkeiten, Fraktionen, Gebäude, Quests |
-| `src/world.js` | Greenmark-Grenzland (128×128) und Verlassene Grube, Kacheln, Kollision |
-| `src/render.js` | Canvas-Rendering: Kacheln, prozedurale Sprites, Licht, Wetter, Effekte |
+| `src/world.js` | Greenmark-Grenzland (512×512, 26 Orte, Totenreich im Südosten) und Verlassene Grube, Kacheln, Kollision |
+| `src/sprites.js` | Pixel-Sprite-System: Raster, Paletten-Rampen, Kontur, Posen/Animationen, Waffen, Tiere, Boss, Bodentexturen |
+| `src/sfx.js` | Klangsynthese (WebAudio, ohne Dateien): Schwung/Treffer nach Waffengewicht, Knochen, Metall, Schritte, Ausweichen, Magie, Wind |
+| `src/render.js` | Canvas-Rendering: Kachel-Chunks, Sprites, pixelisierte Props, Licht, Wetter, Effekte |
 | `src/ui.js` | HUD, Kontextpanel, Dialog, Fenster (Inventar, Gruppe, Lager, Fraktion, Chronik, Karte) |
 | `src/sim.js` | Weltsimulation: Stadtmärkte (Angebot/Nachfrage), Karawanen, Heere, Front, Eroberung, Flüchtlinge |
 | `src/game.js` | Schleife, Kampf, KI, Gruppe, Quests, Siedlung, Weltsimulation, Tod und Erbe |
@@ -44,7 +46,7 @@ WASD bewegen · Linksklick/Leertaste angreifen · Rechtsklick Ziel wählen · E 
 ## Bewusst nicht enthalten (spätere Phasen laut GDD)
 
 Backend/Datenbank (localStorage genügt für Einzelspieler), Phaser (Canvas 2D reicht), Verbrechen/Kopfgeld,
-Seefahrt, RTS-Schlachten, Mehrspieler, handgezeichnete Sprite-Assets (Figuren sind prozedural gezeichnet).
+Seefahrt, RTS-Schlachten, Mehrspieler. Es gibt keine Bilddateien: alle Sprites entstehen im Code als echtes Pixelraster.
 
 ## Revision: Körper, Verbände, Ausweichen
 
@@ -54,3 +56,29 @@ Seefahrt, RTS-Schlachten, Mehrspieler, handgezeichnete Sprite-Assets (Figuren si
 - **Körperbau:** 5 Varianten (ausgewogen, drahtig, bullig, hochgewachsen, gedrungen) mit Spielunterschieden.
 - **Wundarzt-Tafel:** Charaktermenü mit Körpersilhouette, die nach HP eingefärbt ist. Screenshots liegen in `docs/screenshots/`.
 - **Jitter-Fix:** KI nutzt Hysterese beim Bedrohungs-Tracking.
+
+## Grafik: Pixel-Sprite-System
+
+Art Direction sind die Referenzblätter (grimdark, gedrungene Figuren, Kapuzen, Masken, zerlumpte Säume).
+Alle Figuren folgen denselben Regeln (`src/sprites.js`):
+
+- **Raster** 20×25 Sprite-Pixel für Humanoide, 28×18 für Tiere, 34×38 für den Boss; **2 Welt-Einheiten je Pixel**, ohne Glättung.
+- **Pivot** Fußmitte; Hitboxen bleiben unverändert.
+- **Kontur** 1 px fast schwarz um jede Silhouette. **Licht** von oben links; Rampen hell/basis/schatten/tief mit Farbverschiebung.
+- **Palette** gedämpft (Eingangsfarben werden entsättigt); Akzente: Ordens-Rot, Valen-Blau, Nekro-Türkis.
+- **Animationen** Idle (2), Laufen (4), Ausholen, Schlag, Treffer, Zaubern, Ausweichrolle, Knien/Sterben, Liegen.
+- Aussehen folgt der Ausrüstung (Leder, Kette, Platte, Helme, Umhang/Kapuze, Schilde mit Wappen) und dem Beruf der NPCs.
+- Props, Gebäude, Gräber und Item-Icons werden einmal gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
+- Boden: 16×16-Texturen je Kacheltyp, zu Chunks gebacken, mit ausgefransten Übergängen und Uferkanten.
+
+## Vertical Slice: der Grubenpfad
+
+Qualitätsmaßstab für den Rest des Spiels. Von Eren nach Norden: Wegschrein → gewundener Waldweg →
+Kreuzung mit Wegweiser → Wachturm-Ruine (Landmarke, Untote) → überfallenes Händlerlager (Goblins, Blutspur) → Grube.
+
+- **Waffen** haben eigene Pixel-Designs und eigenes Gefühl (`FEEL` in `game.js`): Gewicht, Hit-Stop, Kamerawackeln, Ausfallschritt.
+  Schwünge mit Ausholen → Schlag → Nachschwung, Speer und Dolch stoßen; die Klingenspur folgt der echten Bahn.
+- **Gegner** verhalten sich unterschiedlich: Wolf duckt sich und springt, Goblins tänzeln seitlich und springen nach dem Hieb zurück,
+  Skelette holen sichtbar aus (Ansage als Pixelbogen).
+- **Treffer**: Hit-Stop, Aufprallstern (Krit mit Ring und Zoomstoß), Rückstoß, Blut bzw. Knochensplitter, Klang nach Waffengewicht.
+- **Kamera** schaut leicht zur Maus voraus; „Reduzierte Bewegung“ schaltet Wackeln, Zoomstoß und Vorlauf ab. Lautstärke in den Einstellungen.
