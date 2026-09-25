@@ -583,7 +583,7 @@ export function poseOf(e, now, bow) {
 // Jede Waffe hat ein eigenes Design (Form, Griff, Material, Abnutzung). Seltene/heilige Klingen tragen Runen.
 const WPN = new Map();
 const WOOD = () => ramp('#5b452a'), WRAP = () => ramp('#3a2a1c'), IRON = () => ramp('#6d6154');
-function steelOf(r) { return ramp(r === 'legendary' ? '#d8b25a' : r === 'epic' ? '#b7a27a' : r === 'rare' ? '#b4b8bd' : '#a8a196'); }
+function steelOf(r) { return ramp(r === 'mythic' ? '#a9d4e8' : r === 'legendary' ? '#d8b25a' : r === 'epic' ? '#b7a27a' : r === 'rare' ? '#b4b8bd' : '#a8a196'); }
 function wrapGrip(g, x0, x1, y) { const W = WRAP(); for (let x = x0; x <= x1; x++) g.p(x, y, (x & 1) ? W.b : W.hi); }
 const DESIGNS = {
   rusty_sword(g, St) {                                   // kurz, schartig, rostfleckig
@@ -719,8 +719,8 @@ export function weaponSprite(key, rarity, holy, wtype) {
     const [W0, H0] = SIZE[d]; g = new G(W0, H0);
     info = DESIGNS[d](g, St);
   }
-  const runes = rarity === 'legendary' || rarity === 'epic' || holy;
-  if (runes && info.blade) { const [x0, x1, y] = info.blade, rc = holy ? '#f2e6b0' : rarity === 'legendary' ? '#ffd27a' : '#e0a060';
+  const runes = rarity === 'mythic' || rarity === 'legendary' || rarity === 'epic' || holy;
+  if (runes && info.blade) { const [x0, x1, y] = info.blade, rc = holy ? '#f2e6b0' : rarity === 'mythic' ? '#e8f8ff' : rarity === 'legendary' ? '#ffd27a' : '#e0a060';
     for (let x = x0 + 2; x < x1 - 1; x += 3) g.p(x, y, rc); }
   w = { cv: toCanvas(g), ...info, runes };
   WPN.set(k, w); return w;

@@ -15,7 +15,34 @@ export const ORIGINS = {
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
   medicine:'Medizin', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
 
-export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär' };
+export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
+// ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
+// Abgestuft, jede Stufe deutlich seltener; gefährliche Gegner (threat) heben die Chancen ab „Selten“ an. Mythisch nie zufällig.
+export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+export const RARITY_DROP = { common:0.62, uncommon:0.24, rare:0.10, epic:0.035, legendary:0.005 };
+export const RARITY_VALUE = { common:1, uncommon:1.35, rare:1.9, epic:3, legendary:5, mythic:8 };
+export const RARITY_AFFIXES = { common:0, uncommon:1, rare:2, epic:3, legendary:2, mythic:0 };   // episch: davon 1 spielverändernd
+// Affixe: kleine Werte (minor) und spielverändernde (major). v = [min, max]; Anzeige über fmt.
+export const AFFIXES = {
+  sharp:   { slots:['weapon'], name:'Schärfe',      v:[0.06, 0.14], fmt:v => `Schaden +${Math.round(v * 100)} %` },
+  swift:   { slots:['weapon'], name:'Leichtigkeit', v:[0.05, 0.12], fmt:v => `Schlagtempo +${Math.round(v * 100)} %` },
+  keen:    { slots:['weapon'], name:'Auge',         v:[0.03, 0.07], fmt:v => `Kritische Treffer +${Math.round(v * 100)} %` },
+  pierce:  { slots:['weapon'], name:'Durchschlag',  v:[0.10, 0.25], fmt:v => `Panzerbrechend +${Math.round(v * 100)} %` },
+  vigor:   { slots:['weapon'], name:'Atem',         v:[0.10, 0.25], fmt:v => `Ausdauer je Hieb −${Math.round(v * 100)} %` },
+  sturdy:  { slots:['chest', 'head', 'offhand', 'feet', 'cloak'], name:'Härte', v:[1, 3], int:true, fmt:v => `Rüstung +${v}` },
+  vital:   { slots:['chest', 'head', 'cloak'], name:'Lebenskraft', v:[0.03, 0.07], fmt:v => `Leben +${Math.round(v * 100)} %` },
+  fleet:   { slots:['feet', 'cloak', 'chest'], name:'Leichtfuß', v:[0.02, 0.05], fmt:v => `Tempo +${Math.round(v * 100)} %` },
+  enduring:{ slots:['chest', 'head', 'feet', 'cloak'], name:'Zähigkeit', v:[8, 16], int:true, fmt:v => `Ausdauer +${v}` },
+  leech:   { slots:['weapon'], name:'Blutzoll', major:true, v:[0.04, 0.08], fmt:v => `${Math.round(v * 100)} % des Schadens heilen dich` },
+  rend:    { slots:['weapon'], name:'Zerfetzen', major:true, v:[0.20, 0.35], fmt:v => `+${Math.round(v * 100)} % Chance auf Blutung` },
+  thorns:  { slots:['chest', 'offhand'], name:'Dornen', major:true, v:[0.15, 0.25], fmt:v => `${Math.round(v * 100)} % des Nahkampfschadens zurück` },
+};
+// Legendär: ein fester Sondereffekt je Exemplar (zufällig aus der Liste des Slots) + 2 Affixe.
+export const LEGENDS = {
+  thirst:  { slots:['weapon'], name:'Blutdurst', desc:'Jeder Todesstoß heilt 8 % deines Lebens.' },
+  echo:    { slots:['weapon'], name:'Nachhall', desc:'20 % Chance, dass ein Hieb ein zweites Mal trifft (halber Schaden).' },
+  bastion: { slots:['chest', 'offhand', 'head'], name:'Ahnenwall', desc:'Unter 30 % Leben: Rüstung +8.' },
+};
 
 // wtype steuert Angriffsverhalten: reach(px), arc(rad), speed(ms), stam
 export const ITEMS = {
@@ -73,8 +100,10 @@ export const ITEMS = {
   salt:  { name:'Salzsack', slot:'material', good:true, stack:20, rarity:'common', value:8 },
   cloth: { name:'Tuchballen', slot:'material', good:true, stack:20, rarity:'common', value:12 },
 
+  nachtfrost:   { name:'Nachtfrost', slot:'weapon', wtype:'great', dmg:27, reach:58, arc:2.4, speed:1000, stam:18, rarity:'mythic', unique:true, value:900, skill:'twohanded', twohand:true, frost:true,
+                  lore:'Hrodvars Klinge. Wo sie trifft, gefriert der Atem: Getroffene werden langsam. Es gibt nur eine.' },
   gorak_cleaver:{ name:'Goraks Hackmesser', slot:'weapon', wtype:'axe', dmg:18, reach:44, arc:1.5, speed:760, stam:13, ap:0.3,
-                  rarity:'epic', value:340, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden.' },
+                  rarity:'legendary', unique:true, leg:'thirst', value:520, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden — es trinkt.' },
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
   soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
@@ -93,7 +122,7 @@ export const LOOT = {
   skeleton:  [['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
   crypt_warden:[['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
-  hrodvar:   [['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
+  hrodvar:   [['nachtfrost',1],['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
 };
 
 // interiors: folgt dem Spieler durch Eingänge (Grube, Dungeons). Tiere nicht — sie lauern draußen (GDD §Übergänge).

@@ -238,7 +238,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .item-detail .lore{font-style:italic;color:#8b8069;margin:8px 0}
 .item-detail .stat{display:flex;justify-content:space-between;border-bottom:1px dotted #241e17}
 .item-detail .better{color:#7fa055} .item-detail .worse{color:#b3543f}
-.r-common{color:#b7ab92}.r-uncommon{color:#89a05a}.r-rare{color:#5f92bd}.r-epic{color:#a077bb}.r-legendary{color:var(--gold)}
+.r-common{color:#b7ab92}.r-uncommon{color:#89a05a}.r-rare{color:#5f92bd}.r-epic{color:#a077bb}.r-legendary{color:var(--gold)}.r-mythic{color:#9fd3ea}
+.cell.r-mythic{border-color:#7fb8d0;box-shadow:inset 0 0 0 2px #120f0b,inset 0 0 0 3px rgba(150,215,240,.45)}
+.affix{color:#c9bfa6;font-size:12px}.affix.major{color:#d8b0e0}.legend-fx{color:var(--gold);font-size:12px}
 
 /* character sheet */
 .sheet{display:grid;grid-template-columns:220px 1fr 1fr;gap:20px}

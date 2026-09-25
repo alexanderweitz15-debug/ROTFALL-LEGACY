@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
-import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES } from './data.js';
+import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES } from './data.js';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
@@ -63,9 +63,9 @@ const outside = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0);
 export function recalc(c) {
   const a = c.attributes;
   c.tfx = c.tree ? treeFx(c) : null;
-  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1) * (1 + tfx(c, 'hp'));   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
+  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1) * (1 + tfx(c, 'hp') + afx(c, 'vital'));   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
   if (c.body) B.rescale(c, base); else B.initBody(c, base);
-  c.maxStamina = 60 + a.endurance * 3 + a.agility * 2 + B.buildOf(c).stamina + (c.pactCost?.stamina || 0) + tfx(c, 'stam');
+  c.maxStamina = 60 + a.endurance * 3 + a.agility * 2 + B.buildOf(c).stamina + (c.pactCost?.stamina || 0) + tfx(c, 'stam') + afx(c, 'enduring');
   const magic = ['mage', 'cleric', 'paladin'].includes(c.currentClass);   // Titelklassen haben ihre eigene Ressource, kein Mana
   c.maxMana = magic ? 30 + a.intelligence * 4 + a.willpower * 2 + tfx(c, 'mana') : 0;
   if (c.kind === 'player') c.invCap = 24 + tfx(c, 'invCap');
@@ -75,6 +75,7 @@ export function armorOf(c) {
   if (!c.equip) return c.armor || 0;                       // Karawane, Gegner
   let v = 0;
   for (const k of Object.keys(c.equip)) { const it = c.equip[k]; if (it && ITEMS[it.key].armor) v += ITEMS[it.key].armor * (0.4 + 0.6 * (it.cond ?? 1)); }
+  v += afx(c, 'sturdy') + (hasLeg(c, 'bastion') && c.hp < c.maxHp * 0.3 ? 8 : 0);   // Härte, Ahnenwall
   const bless = (c.status || []).find(s => s.key === 'blessing');
   v = (v + tfx(c, 'armor') + (node(c, 'k_grove') && inNature(c) ? 3 : 0)) * (node(c, 'k_bulwark') ? 1.3 : 1);
   return Math.round(v + (bless ? 5 : 0));
@@ -84,7 +85,7 @@ export function damageOf(c) {
   const base = (it ? it.dmg * (0.55 + 0.45 * (w.cond ?? 1)) : 3) * (B.isDisabled(c, 'rarm') ? 0.3 : 1);
   const skill = it ? (c.skills[it.skill] || 0) : (c.skills.unarmed || 0);
   const attr = it && it.ranged ? c.attributes.agility : c.attributes.strength;
-  let m = 1 + tfx(c, 'dmg');
+  let m = 1 + tfx(c, 'dmg') + afx(c, 'sharp');
   if (node(c, 'k_berserk') && c.hp < c.maxHp * 0.3) m += 0.25;                       // Berserker: nah am Tod gefährlicher
   if (node(c, 'k_grove')) m += inNature(c) ? 0.15 : -0.10;                            // Hüter des Hains
   if (node(c, 'k_legion') && c.titleClass === 'necromancer') m -= 0.20;               // Legion: Feldherr, kein Fechter
@@ -97,16 +98,51 @@ function speedOf(c) {
   s *= (1 - off - ch);
   if (c.stamina <= 0) s *= 0.55;
   if (c.status && c.status.some(t => t.key === 'chilled')) s *= 0.6;   // Hrodvars Eiskreis
-  s *= (1 + tfx(c, 'speed')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
+  s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c);
 }
 
 // ================= Items =================
-function mkItem(key, count = 1) {
+const GEAR = new Set(['weapon', 'offhand', 'head', 'chest', 'feet', 'cloak']);
+// roll: Fund (Beute/Truhe) — Rarität würfeln (nie unter der Grundrarität), Affixe je Stufe. bonus: Gefahr des Fundorts (0–3).
+function mkItem(key, count = 1, roll = null) {
   const it = ITEMS[key]; if (!it) return null;
   const o = { key, count: it.stack ? count : 1 };
   if (it.slot !== 'material' && it.slot !== 'consumable') o.cond = 0.55 + rnd() * 0.45;
+  if (roll && GEAR.has(it.slot) && !it.unique) rollRarity(o, it, roll.bonus || 0);
   return o;
+}
+export function rollRarity(o, it, bonus = 0) {
+  let r = rnd(), tier = 'common';
+  const w = Object.entries(RARITY_DROP).map(([k, p]) => [k, RARITY_ORDER.indexOf(k) >= 2 ? p * (1 + bonus * 0.5) : p]);
+  const sum = w.reduce((n, [, p]) => n + p, 0); r *= sum;
+  for (const [k, p] of w) { if (r < p) { tier = k; break; } r -= p; }
+  const base = it.rarity || 'common';
+  if (RARITY_ORDER.indexOf(tier) <= RARITY_ORDER.indexOf(base)) return o;          // nicht besser als die Grundware
+  o.rar = tier; o.afx = {};
+  const pool = Object.entries(AFFIXES).filter(([k, A]) => A.slots.includes(it.slot) && !(it.ranged && ['rend', 'leech'].includes(k)));   // Geschosse heilen/zerfetzen nicht (laufen nicht über hit)
+  const take = (major) => { const c = pool.filter(([k, A]) => !!A.major === major && !(k in o.afx)); if (!c.length) return;
+    const [k, A] = pick(c), v = A.v[0] + rnd() * (A.v[1] - A.v[0]); o.afx[k] = A.int ? Math.round(v) : Math.round(v * 100) / 100; };
+  const n = RARITY_AFFIXES[tier];
+  if (tier === 'epic') { take(true); take(false); take(false); }                  // episch: einer davon spielverändernd
+  else for (let i = 0; i < n; i++) take(false);
+  if (tier === 'legendary') { const L = Object.entries(LEGENDS).filter(([, x]) => x.slots.includes(it.slot)); if (L.length) o.leg = pick(L)[0]; }
+  if (!Object.keys(o.afx).length) delete o.afx;
+  return o;
+}
+export const rarOf = o => (o && o.rar) || (o && ITEMS[o.key]?.rarity) || 'common';
+export const legOf = o => (o && (o.leg || ITEMS[o.key]?.leg)) || null;
+function afx(c, k) {                                           // Summe eines Affixes über die angelegte Ausrüstung
+  let v = 0; if (!c.equip) return 0;
+  for (const s of Object.values(c.equip)) if (s && s.afx && s.afx[k]) v += s.afx[k];
+  return v;
+}
+const hasLeg = (c, k) => !!c.equip && Object.values(c.equip).some(s => s && legOf(s) === k);
+function giveItem(c, inst) {                                   // ein gefundenes Exemplar behalten (Zustand, Rarität, Affixe)
+  const it = ITEMS[inst.key]; if (!it) return false;
+  if (it.res || it.stack) return addItem(c, inst.key, inst.count || 1);
+  if (c.inv.length >= c.invCap) { if (c === S.player) UI.toast('Tasche voll'); return false; }
+  c.inv.push(inst); return true;
 }
 function addItem(c, key, count = 1) {
   const it = ITEMS[key]; if (!it) return false;
@@ -1153,12 +1189,12 @@ const earVol = e => clamp(1 - dist(S.player, e) / 650, 0, 1);    // Lautstärke 
 function attack(c, forceDir) {
   if (c.swing > 0 || c.atkCd > 0 || c.downed || !c.alive) return;
   const w = c.equip.weapon, it = w ? ITEMS[w.key] : null;
-  const cost = it ? it.stam : 4;
+  const cost = (it ? it.stam : 4) * (1 - Math.min(0.5, afx(c, 'vigor')));
   if (c.stamina < cost) { if (c === S.player && chance(0.02)) UI.toast('Zu erschöpft'); return; }
   if (it && it.reload && c.reloadUntil > performance.now()) return;   // Armbrust wird gespannt
   if (it && it.manaShot) { if ((c.mana || 0) < it.manaShot) { if (c === S.player && !(c.manaWarn > performance.now())) { c.manaWarn = performance.now() + 1500; UI.toast(c.maxMana ? 'Zu wenig Mana für den Zauberstab' : 'Den Zauberstab führt nur, wer Magie gelernt hat (Magier, Kleriker, Paladin).'); } return; } c.mana -= it.manaShot; }
   c.stamina -= cost;
-  c.swingDur = it ? it.speed : 450;
+  c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift')));
   c.atkCd = c.swingDur * 0.55;
   c.swing = 0.001; c.hitDone = false;
   if (forceDir != null) c.aim = forceDir;
@@ -1244,14 +1280,14 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
   if (attacker.titleClass === 'necromancer') dmg *= 0.85;             // Makel: Die Toten zehren
   // Kritisch
-  const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit');
+  const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen');
   const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < 1;
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
   // Heilig gegen Untot
   if (kind === 'holy' && (target.mtype === 'skeleton' || target.undead)) dmg *= 2.1;
   // Rüstung / Block
-  const ap = it ? (it.ap || 0) : 0;
+  const ap = Math.min(0.9, (it ? (it.ap || 0) : 0) + afx(attacker, 'pierce'));
   const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.6 : armorOf(target)) * (1 - ap);
   const off = target.equip && target.equip.offhand;
   // Aktive Deckung / Parade (nur der Spieler; eigenes Feld cover — guard ist das Flag der Stadtwachen). Rüstung wirkt vor dem Block.
@@ -1265,6 +1301,10 @@ function hit(attacker, target, mult, kind = 'physical') {
   }
   dmg = Math.max(1, dmg - armor * 0.55);
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
+  const lee = afx(attacker, 'leech'); if (lee && attacker.alive) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
+  if (afx(attacker, 'rend') && target.alive && chance(afx(attacker, 'rend')) && !(target.status || []).some(s => s.key === 'bleeding')) (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000 });
+  if (it && it.frost && target.alive && !(target.status || []).some(q => q.key === 'chilled')) (target.status ||= []).push({ key: 'chilled', name: 'Durchfroren', left: 2500, desc: 'Langsamer (−40 %).' });
+  if (hasLeg(attacker, 'echo') && target.alive && !attacker._echo && chance(0.2)) { attacker._echo = true; hurt(target, dmg * 0.5, attacker, attacker.name); attacker._echo = false; fx(target.x, target.y - 14, 'spark', 5); }
   if (crush && target.alive && !target.downed) { target.stagger = Math.max(target.stagger || 0, MONSTERS[target.mtype]?.boss ? 300 : 650); target.swing = 0; target.telegraph = 0; target.windup = false; }   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
@@ -1281,6 +1321,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (!target.alive || target.invuln) return;
   if (source && target.hexed > performance.now()) dmg *= 1.25;        // Fluch des Hexenmeisters
   if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
+  const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
+  if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
   if (ward && dmg > 0) {                                              // Knochenschild fängt ab, bis er bricht
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
@@ -1384,6 +1426,7 @@ function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
   const wasFoe = teamOf(c) === 'foe';                          // vor dem Aufräumen: war es ein Feind oder ein Unschuldiger?
   titleOnDeath(c);
+  if (source && source.alive && source !== c && hasLeg(source, 'thirst') && wasFoe) { const h = source.maxHp * 0.08; if (source.body) B.heal(source, h); else source.hp = Math.min(source.maxHp, source.hp + h); float(source, '+' + Math.round(h), 'rgba(150,40,30,ALPHA)'); }   // Blutdurst
   if (c.mtype === 'crypt_warden') S.flags.wardenSlain = true;
   if (c.mtype === 'hrodvar') S.flags.hrodvarSlain = true;
   c.alive = false; c.downed = false;
@@ -1474,7 +1517,8 @@ function makeGrave(c, cause) {
 
 function dropLoot(e) {
   const table = LOOT[e.mtype] || [];
-  for (const [key, p] of table) if (chance(p)) dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key));
+  const bonus = Math.max(0, (MONSTERS[e.mtype]?.threat || 1) - 1) + (e.boss ? 1 : 0);   // gefährlicher Gegner, bessere Chancen
+  for (const [key, p] of table) if (chance(p)) dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }));
   if (chance(0.5)) { const g = ri(1, 6) + e.level; S.gold += g; float(e, `+${g} Gold`, 'rgba(189,148,51,ALPHA)'); }
 }
 function dropItemAt(map, x, y, item) {
@@ -1568,7 +1612,7 @@ function updateEnemy(e, dt) {
   const ag = e.aggroId ? byId(e.aggroId) : null;
   const sight = m.sight * (e.wary > clock() ? 1.5 : 1);           // nach abgebrochener Jagd: wachsamer
   let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
-  const sp = m.speed * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1);   // Ranken halten
+  const sp = m.speed * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1) * ((e.status || []).some(q => q.key === 'chilled') ? 0.6 : 1);   // Ranken halten, Frost bremst
   if (e.hp < e.maxHp * 0.2 && !e.boss && !e.fleeing && !e.servant && chance(0.004)) { e.fleeing = true; log(`${m.name} flieht.`, 'combat'); }
   if (e.fleeing && tgt) {
     seek(e, Math.atan2(e.y - tgt.y, e.x - tgt.x), sp, dt);
@@ -2040,7 +2084,7 @@ function doInteract() {
   if (t.kind === 'npc') return talk(t);
   if (!t.portal) act(p, t.type === 'tree' || t.harvest === 'stone' || t.harvest === 'iron' ? 'work' : 'kneel', t.type === 'shrine' ? 1100 : t.type === 'board' ? 0 : 420, t);
   if (t.kind === 'item') {
-    if (addItem(p, t.item.key, t.item.count || 1)) {
+    if (giveItem(p, t.item)) {                                // das Exemplar selbst (Zustand, Rarität), nicht eine neue Kopie
       log(`Aufgehoben: ${ITEMS[t.item.key].name}.`, 'world');
       S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1);
       onItemGained(t.item.key);
@@ -2082,7 +2126,8 @@ function doInteract() {
   }
   if (t.loot && t.loot.length && !t.opened) {
     t.opened = true;
-    for (const k of t.loot) { addItem(p, k); onItemGained(k); log(`Gefunden: ${ITEMS[k].name}.`, 'world'); }
+    for (const k of t.loot) { const o = mkItem(k, 1, { bonus: 1 }); if (!giveItem(p, o)) dropItemAt(p.map, p.x + ri(-12, 12), p.y + 10, o); onItemGained(k);
+      log(`Gefunden: ${ITEMS[k].name}${o.rar ? ` (${RARITY[o.rar]})` : ''}.`, 'world'); }
     UI.toast(`${t.label || 'Behälter'} geöffnet`);
     return;
   }
@@ -2782,12 +2827,12 @@ function partyCommand(cmd) {
 }
 
 // ================= Handel =================
-function price(key, isBuy, npc) {
+function price(key, isBuy, npc, inst = null) {
   if (ITEMS[key].good && npc && S.towns[npc.town || 'eren']) {
     const p = SIM.townPrice(npc.town || 'eren', key, isBuy), t = (S.player.skills.trading || 0) / 100;
     return Math.max(1, Math.round(isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)));
   }
-  const v = ITEMS[key].value * (S.prices || 1);
+  const v = ITEMS[key].value * (S.prices || 1) * (inst ? RARITY_VALUE[rarOf(inst)] || 1 : 1);
   const t = (S.player.skills.trading || 0) / 100;
   return Math.max(1, Math.round(isBuy ? v * (1.35 - t * 0.3) : v * (0.45 + t * 0.25)));
 }
@@ -2826,8 +2871,8 @@ function buy(npc, key) {
 }
 function sell(idx, npc) {
   const slot = S.player.inv[idx]; if (!slot) return;
-  const c = price(slot.key, false, npc);
-  S.gold += c; removeItem(S.player, slot.key, 1);
+  const c = price(slot.key, false, npc, slot);
+  S.gold += c; if ((slot.count || 1) > 1) slot.count--; else S.player.inv.splice(idx, 1);   // genau dieses Exemplar
   if (ITEMS[slot.key].good && npc) S.towns[npc.town || 'eren'].stock[slot.key] += 1;
   S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3);
   log(`Verkauft: ${ITEMS[slot.key].name} für ${c} Gold.`, 'economy');
@@ -3823,6 +3868,21 @@ export function selftest() {
     p.swing = 0; p.atkCd = 0; attack(p); const refused = !(p.swing > 0);
     S.projectiles.length = n0;
     return data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused;
+  }));
+  ok('Rarität (Phase 8): Verteilung abgestuft, nie mythisch zufällig, Unikate fest; Affixe je Stufe (episch: 1 spielverändernd, legendär: Sondereffekt); Affixe wirken; Aufheben behält das Exemplar', sandbox(() => {
+    seedRng(21); const n = {}; let ok1 = true;
+    for (let i = 0; i < 4000; i++) { const o = mkItem('rusty_sword', 1, { bonus: 0 }), r = rarOf(o); n[r] = (n[r] || 0) + 1;
+      const k = Object.keys(o.afx || {}); if (r === 'uncommon' && k.length !== 1) ok1 = false; if (r === 'rare' && k.length !== 2) ok1 = false;
+      if (r === 'epic' && (k.length !== 3 || !k.some(x => AFFIXES[x].major))) ok1 = false; if (r === 'legendary' && !o.leg) ok1 = false; }
+    const dist = n.common > n.uncommon && n.uncommon > n.rare && n.rare > (n.epic || 0) && (n.epic || 0) >= (n.legendary || 0) && !n.mythic;
+    const unique = rarOf(mkItem('nachtfrost', 1, { bonus: 3 })) === 'mythic' && !mkItem('gorak_cleaver', 1, { bonus: 3 }).afx;
+    const p = stage(); p.equip.weapon = mkItem('longsword'); p.equip.weapon.cond = 1; const d0 = damageOf(p);
+    p.equip.weapon.afx = { sharp: 0.1 }; const d1 = damageOf(p);
+    const a0 = armorOf(p); p.equip.chest = { key: 'leather_jerkin', cond: 1, afx: { sturdy: 3 } }; const a1 = armorOf(p) - ITEMS.leather_jerkin.armor;
+    p.equip.weapon.afx = { leech: 0.5 }; const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 20; w.y = p.y; B.damagePart(p, 'torso', 20); const hb = p.hp; seedRng(3); hit(p, w, 1); const healed = p.hp > hb;
+    p.equip.chest.afx = { thorns: 0.5 }; const wh = w.hp; hurt(p, 10, w, 'Test'); const thorn = w.hp < wh;
+    const inst = { key: 'longsword', cond: 0.8, rar: 'rare', afx: { keen: 0.05, swift: 0.1 } }; p.inv = []; giveItem(p, inst); const kept = p.inv[0] === inst;
+    return ok1 && dist && unique && d1 > d0 * 1.05 && a1 >= a0 + 3 && healed && thorn && kept;
   }));
   ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
     const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';

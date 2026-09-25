@@ -1,6 +1,6 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
-import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js';
 import { townState, townPrice } from './sim.js';
@@ -357,7 +357,7 @@ function invUI(body) {
   const grid = $('ig');
   for (let i = 0; i < p.invCap; i++) {
     const slot = p.inv[i];
-    const c = el('div', 'cell' + (slot ? ' r-' + (ITEMS[slot.key]?.rarity || 'common') : ''));
+    const c = el('div', 'cell' + (slot ? ' r-' + (slot.rar || ITEMS[slot.key]?.rarity || 'common') : ''));   // Rarität des Exemplars
     if (slot) {
       const it = ITEMS[slot.key];
       const cv = el('canvas'); cv.width = cv.height = 52; c.appendChild(cv);
@@ -402,8 +402,11 @@ function showDetail(slot, i) {
   const it = ITEMS[slot.key], p = S.player, d = $('det');
   const cur = it.slot && p.equip[it.slot];
   const cmp = (a, b) => a === b ? '' : a > b ? `<span class="better">+${+(a - b).toFixed(1)}</span>` : `<span class="worse">${+(a - b).toFixed(1)}</span>`;
-  let h = `<h3 class="r-${it.rarity}">${slot.name || it.name}</h3>
-    <div class="s-key">${RARITY[it.rarity]} · ${slotLabel(it.slot)}</div>`;
+  const rar = slot.rar || it.rarity || 'common', leg = slot.leg || it.leg;
+  let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3>
+    <div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
+  for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;
+  if (leg && LEGENDS[leg]) h += `<div class="legend-fx">«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
   if (it.lore || slot.lore) h += `<div class="lore">${slot.lore || it.lore}</div>`;
   if (slot.history) h += `<div class="lore">${slot.history.join('<br>')}</div>`;
   if (it.dmg) h += `<div class="stat"><span>Schaden</span><b>${it.dmg} ${cur && ITEMS[cur.key].dmg ? cmp(it.dmg, ITEMS[cur.key].dmg) : ''}</b></div>`;
@@ -415,7 +418,7 @@ function showDetail(slot, i) {
   if (it.block) h += `<div class="stat"><span>Block</span><b>${Math.round(it.block * 100)}%</b></div>`;
   if (it.heal) h += `<div class="stat"><span>Heilung</span><b>${it.heal}</b></div>`;
   if (slot.cond != null) h += `<div class="stat"><span>Zustand</span><b>${Math.round(slot.cond * 100)}%</b></div>`;
-  h += `<div class="stat"><span>Wert</span><b>${it.value} Gold</b></div>`;
+  h += `<div class="stat"><span>Wert</span><b>${Math.round(it.value * (RARITY_VALUE[rar] || 1))} Gold</b></div>`;
   h += `<div class="ctx-actions">
       ${it.slot === 'consumable' ? `<button id="d-use">${it.use === 'bandage' ? 'Anlegen' : 'Benutzen'}</button>` : it.slot !== 'material' ? '<button id="d-use">Anlegen</button>' : ''}
       ${it.slot === 'consumable' || it.slot === 'weapon' ? '<button id="d-hot">Auf Leiste legen</button>' : ''}

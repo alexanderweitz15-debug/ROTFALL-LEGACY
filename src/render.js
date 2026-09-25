@@ -1300,7 +1300,7 @@ function drawWeapon(c, e, now, it) {
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
   const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
-  const W = SP.weaponSprite(e.equip.weapon.key, it.rarity, it.holy, wt);
+  const W = SP.weaponSprite(e.equip.weapon.key, e.equip.weapon.rar || it.rarity, it.holy, wt);   // Rarität des Exemplars
   const ranged = wt === 'bow' || wt === 'crossbow' || wt === 'wand';
   const sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
   const sgn = Math.cos(dir) < 0 ? -1 : 1;                           // nach links gespiegelt: Waffe hängt unten, Hieb von oben
@@ -1453,9 +1453,9 @@ function groundIcon(key) {
 function drawGroundItem(e, now) {
   const f = Math.round(Math.sin(now / 400 + e.seed) * 1.5) * 2;
   shadow(e.x, e.y + 2, 7, .3);
-  const it = ITEMS[e.item.key] || {};
-  if (it.rarity && it.rarity !== 'common') {
-    const col = { uncommon:'137,160,90', rare:'95,146,189', epic:'160,119,187', legendary:'189,148,51' }[it.rarity] || '183,171,146';
+  const it = ITEMS[e.item.key] || {}, rar = e.item.rar || it.rarity;
+  if (rar && rar !== 'common') {
+    const col = { uncommon:'137,160,90', rare:'95,146,189', epic:'160,119,187', legendary:'189,148,51', mythic:'150,215,240' }[rar] || '183,171,146';
     ctx.fillStyle = `rgba(${col},${.16 + .08 * Math.sin(now / 300)})`;
     ctx.beginPath(); ctx.arc(e.x, e.y - 7 + f, 12, 0, 7); ctx.fill();
   }
