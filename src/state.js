@@ -1,6 +1,6 @@
 // Globaler Spielzustand + Hilfsfunktionen. Ein mutierbares Objekt, absichtlich ohne Store-Framework.
 export const SAVE_KEY = 'rotfall.legacy.save';
-export const SAVE_VERSION = 2;   // 2: erweitertes Grenzland (512×512). Ältere Stände sind geometrisch inkompatibel.
+export const SAVE_VERSION = 3;   // 2: erweitertes Grenzland (512×512); 3: Weltmaßstab ×1,5 (768×768), v2 wird beim Laden umgerechnet
 
 export const S = {
   ver: SAVE_VERSION,
@@ -119,6 +119,8 @@ function migrate(data) {
   // v1 → v2: Die Welt wurde von 128×128 auf 512×512 vergrößert. Alte Positionen und Kriegsknoten
   // passen nicht mehr zur neuen Geometrie, darum wird ein inkompatibler Stand verworfen statt halb geladen.
   if ((data.ver || 1) < 2) { wipeSave(); return null; }
+  // v2 → v3: dieselbe Welt (gleicher Seed), nur größer. Positionen rechnet continueGame nach der Weltgenerierung um.
+  if (data.ver === 2) (data.flags ||= {}).rescale = true;
   data.ver = SAVE_VERSION; return data;
 }
 export function applySave(data) {

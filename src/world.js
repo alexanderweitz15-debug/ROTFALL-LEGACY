@@ -8,6 +8,14 @@ export const SOLID = new Set([T.WATER, T.ROCK, T.WALL, T.DWALL]);
 export const SLOW = { [T.MARSH]:0.55, [T.WATER]:0.4, [T.SAND]:0.85 };
 
 export const MAPS = {};              // {world:{w,h,tiles}, mine:{...}}
+// Weltmaßstab (Session 5, Nutzerwunsch: größere Karte, mehr Abstand). Die Oberwelt wird im Entwurfsmaßstab (512×512) erzeugt —
+// alle handgesetzten Orte, Straßen, Szenen stehen so im Code — und dann um WS hochgerechnet (768×768). Häuser werden erst danach
+// im Weltmaßstab gebaut, damit sie nicht verzerren. wT: Entwurfskachel → Weltkachel (Mitte), dT: Weltkachel → Entwurfskachel.
+export const WS = 1.5;
+export const wT = v => Math.floor((v + 0.5) * WS);
+export const dT = v => Math.floor(v / WS);
+const wRect = ([x0, y0, x1, y1]) => [Math.ceil(x0 * WS), Math.ceil(y0 * WS), Math.ceil((x1 + 1) * WS) - 1, Math.ceil((y1 + 1) * WS) - 1];
+let phase = 'design';                // 'design' während der Entwurfsgenerierung, danach 'world'
 
 export const LOCATIONS = [
   { key:'eren',      name:'Eren',               x:60, y:64, r:14, kind:'village', threat:0, faction:'valen' },
@@ -152,8 +160,9 @@ function biomeAt(x, y) {
 const rawRegion = (tx, ty) => protectedNW(tx, ty) ? 'greenmark' : biomeAt(tx, ty);
 // Eine Siedlung hat eine Region (die ihres Ankers): Nordfurts gestreckte Osthälfte läge sonst im Gebirge (Geröll, Schnee
 // zwischen den Häusern). Erst nach der Generierung — sie selbst sieht die rohe Region, damit ihre Zufallsfolge gleich bleibt.
-let townsBuilt = false;
-export const regionAt = (tx, ty) => { if (townsBuilt) { const k = townAt(tx, ty); if (k) return rawRegion(...TOWN_PLAN[k].spread.a); } return rawRegion(tx, ty); };
+// Laufzeit (phase 'world'): Weltkacheln → Entwurfsregion. Während der Entwurfsgenerierung die rohe Entwurfsregion.
+export const regionAt = (tx, ty) => { if (phase === 'design') return rawRegion(tx, ty);
+  const k = townAt(tx, ty); return k ? rawRegion(...TOWN_PLAN[k].spread.a) : rawRegion(dT(tx), dT(ty)); };
 
 // ---------------- Szenen: kleine, komponierte Orte, die eine Geschichte erzählen ----------------
 // Keine Zufallsstreuung: jede Szene ist ein festes Arrangement. Gras darunter wird zur Lichtung,
@@ -282,10 +291,11 @@ function gruben() {
 // Kachelkoordinaten, Rechtecke inklusiv. old = Kern vor dem Ausbau (seine Häuser bleiben stehen), area = ganze Siedlung,
 // square = Platz (Treffpunkt der Bewohner am Tag). perHead = Kacheln Siedlungsfläche je Kopf (Bewohner + Wachen + Figuren
 // mit Namen): die Einwohnerzahl folgt der Fläche, nicht der Häuserzahl (Stadt dichter als Dorf, Grenzposten am dünnsten).
-export const seaLine = x => 476 + Math.round(Math.sin(x / 20) * 4);   // Küstenlinie der Südsee (wie die Generierung)
+const seaLineD = x => 476 + Math.round(Math.sin(x / 20) * 4);          // Küstenlinie der Südsee im Entwurf (wie die Generierung)
+export const seaLine = x => Math.ceil(seaLineD(dT(x)) * WS);            // … in Weltkacheln (erste Wasserzeile)
 export const TOWN_PLAN = {
   eren: {                                                         // Heimatdorf: Ackerbau, Rast an der Alten Straße
-    area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66], spread: { s: [1.2, 1.35], a: [58, 64] }, perHead: 95,   // West: Alte Feste, Nord: Grubenpfad
+    area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66], spread: { s: [1.4, 1.5], a: [58, 64] }, perHead: 95, outskirts: ['cottage', 'house', 'barn', 'house', 'cottage'],   // West: Alte Feste, Nord: Grubenpfad
     streets: [[T.ROAD, 50, 64, 71, 64], [T.DIRT, 46, 55, 49, 56], [T.DIRT, 48, 57, 49, 63], [T.DIRT, 76, 61, 77, 63], [T.DIRT, 82, 61, 82, 63], [T.DIRT, 53, 72, 54, 75]],
     houses: [['house', 43, 58, 5, 4, 'S'], ['cottage', 37, 58, 4, 4, 'S'], ['house', 44, 51, 5, 4, 'S'], ['barn', 36, 66, 6, 5, 'N'],
       ['bakery', 44, 66, 5, 4, 'N'], ['house', 74, 57, 5, 4, 'S'], ['cottage', 80, 57, 4, 4, 'S'], ['house', 74, 66, 5, 4, 'N'],
@@ -295,7 +305,7 @@ export const TOWN_PLAN = {
       ['lantern', 50, 62], ['lantern', 73, 63], ['flowers_prop', 47, 62], ['sack', 47, 65, { label: 'Mehlsack' }], ['barrel', 43, 65, { label: 'Regentonne' }]],
   },
   northcity: {                                                    // Grenzstadt der Valen: Handel am Fluss, Garnison
-    area: [111, 44, 147, 73], old: [112, 50, 125, 62], square: [137, 60], spread: { s: 1.5, a: [111, 64] }, perHead: 55,
+    area: [111, 44, 147, 73], old: [112, 50, 125, 62], square: [137, 60], spread: { s: 1.7, a: [111, 64] }, perHead: 55, outskirts: ['cottage', 'house'],
     fill: [[T.GRASS, 111, 44, 147, 73]],                                        // Grund innerhalb der Mauer (die Osthälfte liegt schon im Gebirgsgeröll)
     plazas: [[T.STONE, 133, 58, 146, 62]],                                      // Markt; sonst kein Flächenpflaster mehr (Höfe, Gärten)
     walls: { rect: [111, 44, 147, 73], gates: [[111, 62, 111, 64], [147, 63, 147, 65], [118, 73, 119, 73], [128, 44, 129, 44]] },
@@ -309,13 +319,13 @@ export const TOWN_PLAN = {
       ['lantern', 130, 47], ['lantern', 127, 61], ['laundry', 126, 69], ['trough', 145, 71]],
     // grow: erst durch die Streckung möglich, darum in Weltkoordinaten. Reihe zur Hauptstraße, Garnisonsstall an der
     // Südmauer, Hinterhäuser; Gemüsebeete in den Höfen.
-    grow: { houses: [['house', 115, 57, 5, 4, 'S'], ['cottage', 123, 57, 4, 4, 'S'], ['house', 130, 57, 5, 4, 'S'],
+    grow: { s0: 1.5, houses: [['house', 115, 57, 5, 4, 'S'], ['cottage', 123, 57, 4, 4, 'S'], ['house', 130, 57, 5, 4, 'S'],
         ['house', 115, 73, 5, 4, 'N'], ['stable', 132, 73, 6, 5, 'N'], ['cottage', 148, 73, 4, 4, 'N'], ['house', 157, 73, 5, 4, 'N']],
       gardens: [[123, 45, 127, 47], [147, 45, 151, 47], [133, 45, 136, 47], [125, 74, 129, 76]],
       props: [['sack', 128, 48, { label: 'Kartoffelsack' }], ['laundry', 121, 56], ['hay', 139, 76], ['trough', 131, 77]] },
   },
   saltport: {                                                     // Hafenstadt: Salz, Fisch, Umschlag an Kai und Stegen
-    area: [132, 431, 174, 488], old: [138, 438, 163, 463], square: [157, 447], spread: { s: 1.3, a: [148, 472] }, perHead: 70,
+    area: [132, 431, 174, 488], old: [138, 438, 163, 463], square: [157, 447], spread: { s: 1.45, a: [148, 472] }, perHead: 70, outskirts: ['fisher', 'house', 'cottage', 'store', 'fisher', 'house', 'cottage'],
     fill: [[T.DIRT, 132, 431, 174, 471, 'ragged']],
     clear: [[T.DIRT, 146, 463, 147, 471], [T.DIRT, 156, 463, 156, 471]],     // alte Stege endeten im Sumpf
     streets: [[T.ROAD, 147, 431, 148, 476], [T.ROAD, 149, 436, 150, 437], [T.ROAD, 132, 450, 174, 450], [T.ROAD, 132, 463, 174, 464],
@@ -334,7 +344,7 @@ export const TOWN_PLAN = {
       ['lantern', 146, 449], ['lantern', 163, 449], ['laundry', 138, 446], ['net_rack', 149, 462]],
   },
   kreuzweg: {                                                     // Marktflecken an der Kreuzung: Söldner, Rast, Handel
-    area: [225, 230, 277, 271], old: [240, 240, 261, 257], square: [250, 261], spread: { s: 1.35, a: [249, 250] }, perHead: 90,
+    area: [225, 230, 277, 271], old: [240, 240, 261, 257], square: [250, 261], spread: { s: 1.5, a: [249, 250] }, perHead: 90, outskirts: ['house', 'cottage', 'stable'],
     streets: [[T.ROAD, 248, 236, 249, 249], [T.ROAD, 225, 250, 277, 250],
       [T.DIRT, 230, 247, 230, 249], [T.DIRT, 236, 247, 236, 249], [T.DIRT, 232, 239, 239, 240], [T.DIRT, 238, 241, 239, 249],
       [T.DIRT, 266, 248, 266, 249], [T.DIRT, 273, 248, 273, 249], [T.DIRT, 265, 239, 274, 240], [T.DIRT, 269, 241, 269, 249],
@@ -352,7 +362,7 @@ export const TOWN_PLAN = {
       ['lantern', 247, 257], ['lantern', 240, 249], ['lantern', 261, 249], ['hay', 234, 261]],
   },
   ashford: {                                                      // Grenzposten: Kernburg, Vorstadt hinter Palisaden, Karawanenhof
-    area: [357, 83, 395, 109], old: [372, 84, 387, 99], square: [379, 94], oldWalls: true, spread: { s: 1.5, a: [380, 92] }, perHead: 100,
+    area: [357, 83, 395, 109], old: [372, 84, 387, 99], square: [379, 94], oldWalls: true, spread: { s: 1.7, a: [380, 92] }, perHead: 100, outskirts: ['cottage', 'house', 'stable'],
     oldFloor: T.DIRT, coreWalls: [372, 84, 387, 99],
     clear: [[T.DIRT, 380, 84, 380, 84], [T.DIRT, 372, 92, 372, 93], [T.DIRT, 378, 99, 381, 99]],       // Nordtor (die Oststraße endete an der Mauer), Westtor
     fill: [[T.DIRT, 358, 84, 371, 99, 'ragged'], [T.DIRT, 364, 101, 394, 108, 'ragged']],
@@ -362,12 +372,12 @@ export const TOWN_PLAN = {
       ['stable', 368, 104, 6, 5, 'N'], ['house', 384, 104, 5, 4, 'N'], ['cottage', 390, 104, 4, 4, 'N', 2]],
     props: [['trough', 375, 104], ['hay', 366, 106], ['cart', 381, 105], ['crate', 358, 94, { label: 'Handelsware' }], ['barrel', 358, 91, { label: 'Wasserfass' }],
       ['anvil', 365, 91, { label: 'Amboss' }], ['lantern', 379, 97], ['lantern', 370, 91], ['lantern', 377, 101]],
-    grow: { houses: [['house', 371, 96, 5, 4, 'N'], ['store', 384, 96, 6, 5, 'N'], ['house', 375, 110, 5, 4, 'N']],
+    grow: { s0: 1.5, houses: [['house', 371, 96, 5, 4, 'N'], ['store', 384, 96, 6, 5, 'N'], ['house', 375, 110, 5, 4, 'N']],
       gardens: [[350, 82, 354, 84]],
       props: [['crate', 390, 95, { label: 'Handelsware' }], ['barrel', 389, 95, { label: 'Wasserfass' }]] },
   },
   sonnwacht: {                                                    // Ordensfeste: Kernburg mit Komturei, Unterstadt der Pilger
-    area: [435, 245, 476, 290], old: [446, 246, 465, 265], square: [455, 277], oldWalls: true, spread: { s: 1.3, a: [455, 250] }, perHead: 85,   // y 250: Westtor auf der Mittellandstraße
+    area: [435, 245, 476, 290], old: [446, 246, 465, 265], square: [455, 277], oldWalls: true, spread: { s: 1.45, a: [455, 250] }, perHead: 85, outskirts: ['house', 'cottage', 'house', 'barn', 'house', 'cottage', 'house'],   // y 250: Westtor auf der Mittellandstraße
     oldFloor: T.STONE, coreWalls: [446, 246, 465, 265],
     clear: [[T.STONE, 446, 250, 446, 251], [T.STONE, 453, 265, 458, 265]],                       // Westtor zur Mittellandstraße
     fill: [[T.DIRT, 436, 266, 476, 289, 'ragged']],
@@ -388,7 +398,7 @@ export const TOWN_PLAN = {
 // Der Anker liegt auf der Durchgangsstraße bzw. am Kai/Fluss, damit Straßen außerhalb anschließen und die
 // Stadt nicht über Fluss/Küste wächst. Häuser werden an der Türseite verankert: die Tür bleibt an ihrer Straße.
 const spS = (P, ax) => Array.isArray(P.spread.s) ? P.spread.s[ax] : P.spread.s;   // s: Faktor oder [sx, sy]
-const sp = (P, v, ax) => P.spread.a[ax] + (v - P.spread.a[ax]) * spS(P, ax);
+const sp = (P, v, ax) => P.spread.a[ax] * WS + (v - P.spread.a[ax]) * spS(P, ax);   // Anker wandert mit der Karte, die Stadt streckt um s
 const spR = (P, v, ax) => Math.round(sp(P, v, ax));
 const spRect = (P, [x0, y0, x1, y1, ...rest]) => [spR(P, x0, 0), spR(P, y0, 1), spR(P, x1 + 1, 0) - 1, spR(P, y1 + 1, 1) - 1, ...rest];
 export function spreadHouse(P, x, y, w, h, door) {
@@ -396,12 +406,21 @@ export function spreadHouse(P, x, y, w, h, door) {
   const ny = door === 'N' ? spR(P, y, 1) : door === 'S' ? spR(P, y + h, 1) - h : Math.round(sp(P, y + h / 2, 1) - h / 2);
   return [nx, ny];
 }
-// Entwurfspunkt → Weltkachel. Außerhalb jeder Siedlung unverändert. Für alle festen Stadtkoordinaten in game.js/sim.js
-// (Wachposten, Arbeitsplätze, Karawanenroute, Startpunkt).
-export function townPt(x, y) {
+// Entwurfspunkt → Weltkachel: in einer Siedlung über deren Streckung, sonst über den Weltmaßstab. Für alle festen
+// Koordinaten in game.js/sim.js (Wachposten, Arbeitsplätze, Spawngebiete, Karawanenroute, Startpunkt, Ankunft).
+export function worldPt(x, y) {
   for (const P of Object.values(TOWN_PLAN)) { const [x0, y0, x1, y1] = P.design.area;
     if (x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2) return [spR(P, x, 0), spR(P, y, 1)]; }
-  return [x, y];
+  return [wT(x), wT(y)];
+}
+export const townPt = worldPt;
+// grow-Einträge wurden in Weltkoordinaten einer früheren Fassung gebaut (Maßstab 1, Streckung s0). Umrechnung: gleiche
+// Lage zum Anker, Abstände mit s/s0 — Häuser an der Türseite verankert wie im Entwurf.
+function growPt(P, v, ax) { const a = P.spread.a[ax], k = spS(P, ax) / (P.grow.s0 || spS(P, ax)); return a * WS + (v - a) * k; }
+function growHouse(P, x, y, w, h, door) {
+  const R = (v, ax) => Math.round(growPt(P, v, ax));
+  return [door === 'W' ? R(x, 0) : door === 'E' ? R(x + w, 0) - w : Math.round(growPt(P, x + w / 2, 0) - w / 2),
+          door === 'N' ? R(y, 1) : door === 'S' ? R(y + h, 1) - h : Math.round(growPt(P, y + h / 2, 1) - h / 2)];
 }
 for (const [key, P] of Object.entries(TOWN_PLAN)) {
   P.design = { area: P.area.slice(), old: P.old.slice(), clear: (P.clear || []).map(r => r.slice()), houses: P.houses };
@@ -419,9 +438,14 @@ for (const [key, P] of Object.entries(TOWN_PLAN)) {
     P.harbor = { x0: spR(P, H.x0, 0), x1: spR(P, H.x1 + 1, 0) - 1, top: spR(P, H.top, 1), piers: H.piers.map(x => spR(P, x, 0)), boats: H.boats.map(([x, d]) => [spR(P, x, 0), d]) }; }
   P.houses = P.houses.map(([type, x, y, w, h, door, wear]) => [type, ...spreadHouse(P, x, y, w, h, door), w, h, door, wear, 'h' + x + '_' + y, x, y]);
   P.props = (P.props || []).map(([kind, x, y, o]) => { const [nx, ny] = attachedPt(P, x, y); return [kind, nx, ny, o]; });
+  if (P.grow) { const G = P.grow, R = (v, ax) => Math.round(growPt(P, v, ax));
+    P.grow = { houses: (G.houses || []).map(([type, x, y, w, h, door, wear]) => [type, ...growHouse(P, x, y, w, h, door), w, h, door, wear, 'g' + x + '_' + y, x, y]),
+      gardens: (G.gardens || []).map(([x0, y0, x1, y1]) => [R(x0, 0), R(y0, 1), R(x1 + 1, 0) - 1, R(y1 + 1, 1) - 1]),
+      props: (G.props || []).map(([kind, x, y, o]) => [kind, R(x, 0), R(y, 1), o]) }; }
   const L = LOCATIONS.find(l => l.key === key);
-  if (L) { [L.x, L.y] = [spR(P, L.x, 0), spR(P, L.y, 1)]; L.r = Math.round(L.r * Math.max(spS(P, 0), spS(P, 1))); }
+  if (L) { [L.x, L.y] = [spR(P, L.x, 0), spR(P, L.y, 1)]; L.r = Math.round(L.r * Math.max(spS(P, 0), spS(P, 1))); L.town = true; }
 }
+for (const L of LOCATIONS) if (!L.town) { L.x = wT(L.x); L.y = wT(L.y); L.r = Math.round(L.r * WS); }   // übrige Orte: Weltmaßstab
 // Props neben einem Haus (Schild an der Tür, Fässer vor der Schenke) ziehen mit dem Haus um; freie Props strecken.
 function attachedPt(P, x, y, extra = []) {
   for (const [, hx, hy, w, h, door] of [...P.design.houses, ...extra])
@@ -435,8 +459,9 @@ export function townAt(tx, ty, m = 0) {                    // m: Rand in Kacheln
 const SOLID_PROP = new Set(['hay', 'boat', 'net_rack', 'trough', 'barrel', 'well', 'anvil', 'crate_stack', 'palisade_prop', 'fence']);
 const NATURE = new Set(['tree', 'bush', 'flowers_prop', 'rock_node', 'dead_tree']);   // darf zwischen den Häusern bleiben, wenn es nichts verstellt
 const NATURAL = new Set([T.GRASS, T.MARSH, T.SAND, T.FIELD, T.ASH, T.ROCK]);
-const naturalAt = (x, y) => protectedNW(x, y) ? T.GRASS : BIOME[biomeAt(x, y)];
+const naturalAt = (x, y) => { const X = dT(x), Y = dT(y); return protectedNW(X, Y) ? T.GRASS : BIOME[biomeAt(X, Y)]; };   // Weltkachel
 const PAVED = new Set([T.ROAD, T.STONE, T.PLANK]);
+const HOUSE_SIZE = { house: [5, 4], cottage: [4, 4], barn: [6, 5], fisher: [4, 4], store: [6, 5], stable: [6, 5], manor: [5, 5], bakery: [5, 4] };
 const SCATTER = new Set(['camp_ruin', 'rubble', 'bones', 'debris', 'broken_pillar', 'gravestone', 'firepit', 'tent_prop', 'blood', 'broken_cart', 'bone_spire']);
 const TRAMPLE = new Set([T.GRASS, T.MARSH, T.SAND, T.ASH]);            // hier darf ein Trampelpfad entstehen
 function expandTowns(wild) {
@@ -460,7 +485,7 @@ function expandTowns(wild) {
     let k0 = 0;
     for (const p of props) {
       if (coreIds.has(p.house)) continue;                               // Möbel entstehen im neuen Haus neu
-      const tx = p.x / TS | 0, ty = p.y / TS | 0;
+      const [tx, ty] = p._d || [dT(p.x / TS | 0), dT(p.y / TS | 0)];        // Entwurfskachel (die Hochrechnung merkt sie sich)
       if ((p.map || 'world') === 'world' && inR(P.design.old, tx, ty) && !NATURE.has(p.type) && !wild.has(p)) {
         if (p.type === 'fence' || p.type === 'scarecrow') continue;      // Kernfeld: Zaun und Scheuche setzt der Plan neu
         const [nx, ny] = attachedPt(P, tx, ty, core); p.x = nx * TS + TS / 2; p.y = ny * TS + TS / 2; moved.add(p);
@@ -469,9 +494,9 @@ function expandTowns(wild) {
     }
     props.length = k0;
     near_h = own();
-    for (const r of [P.design.old, ...P.design.clear.map(c => c.slice(1))]) box(r, (x, y) => { if (tileAt('world', x, y) !== T.WATER) setTile('world', x, y, naturalAt(x, y)); });
+    for (const r of [P.design.old, ...P.design.clear.map(c => c.slice(1))]) box(wRect(r), (x, y) => { if (tileAt('world', x, y) !== T.WATER) setTile('world', x, y, naturalAt(x, y)); });
     const houses = [...core.map(([type, x, y, w, h, door, wear]) => [type, ...spreadHouse(P, x, y, w, h, door), w, h, door, wear, 'h' + x + '_' + y, x, y]), ...P.houses,
-      ...(P.grow?.houses || []).map(([type, x, y, w, h, door, wear]) => [type, x, y, w, h, door, wear, 'g' + x + '_' + y, x, y])];
+      ...(P.grow?.houses || [])];
     const mark = props.length;
 
     for (const [t, ...r] of P.fill || []) box(r, (x, y) => {          // Grund: Pflaster bzw. festgetretene Erde; Ränder ausgefranst
@@ -509,6 +534,32 @@ function expandTowns(wild) {
       });
       house('world', x, y, w, h, door, { type, town, wear, id, hx, hy });
       near_h = own();
+    }
+    // Randhäuser (Session 5): die größere Karte lässt Platz für Außengehöfte und Vorstadthäuser. Regeln statt Koordinaten:
+    // freier Grund (kein Hof, keine Straße, kein Acker, kein Wasser/Fels), ≥ 3 Kacheln zu jedem Haus, ≥ 2 zum Stadtrand,
+    // Tür zur nächsten Straße (≤ 8 Kacheln). Reihenfolge der Kandidaten nach Hash — deterministisch, aber nicht im Raster.
+    if (P.outskirts) {
+      const OK = new Set([T.GRASS, T.DIRT, T.SAND, T.ASH, T.MARSH, T.STONE]), [ax0, ay0, ax1, ay1] = P.area;
+      const free = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
+        if (!OK.has(tileAt('world', x, y)) || claimed.has(K(x, y))) return false; return true; };
+      const gapOK = (x, y, w, h) => near_h.every(b => Math.max(b.x - x - w, x - b.x - b.w, b.y - y - h, y - b.y - b.h) >= 3);
+      const streetDist = (x, y) => { for (let r = 1; r <= 8; r++) for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++)
+        if ((Math.abs(i) === r || Math.abs(j) === r) && street.has(K(x + i, y + j))) return r; return 99; };
+      const cands = [];
+      for (let y = ay0 + 2; y <= ay1 - 7; y++) for (let x = ax0 + 2; x <= ax1 - 7; x++) cands.push([nz(x * 3 + 11, y * 5 + 7), x, y]);
+      cands.sort((a, b) => a[0] - b[0]);
+      let n = 0;
+      for (const [, x, y] of cands) {
+        if (n >= P.outskirts.length) break;
+        const type = P.outskirts[n], [w, h] = HOUSE_SIZE[type] || [5, 4];
+        if (x + w > ax1 - 2 || y + h > ay1 - 2 || !free(x - 1, y - 1, x + w, y + h) || !gapOK(x, y, w, h)) continue;
+        const sides = [['S', x + (w >> 1), y + h], ['N', x + (w >> 1), y - 1], ['W', x - 1, y + (h >> 1)], ['E', x + w, y + (h >> 1)]]
+          .map(([d, fx, fy]) => [d, streetDist(fx, fy)]).sort((a, b) => a[1] - b[1]);
+        if (sides[0][1] > 8) continue;
+        box([x - 1, y - 1, x + w, y + h], (i, j) => { if (NATURAL.has(tileAt('world', i, j))) setTile('world', i, j, T.DIRT); claimed.add(K(i, j)); });
+        house('world', x, y, w, h, sides[0][0], { type, town, id: 'o' + town + n, hx: x, hy: y });
+        near_h = own(); n++;
+      }
     }
     if (P.palisade) { const [x0, y0, x1, y1] = P.palisade.rect, gate = (x, y) => P.palisade.gates.some(g => inR(g, x, y));
       box(P.palisade.rect, (x, y) => {
@@ -591,7 +642,7 @@ function expandTowns(wild) {
 
 // ---------------- Oberwelt ----------------
 export function genWorld() {
-  props.length = 0; HOUSES.length = 0; townsBuilt = false;
+  props.length = 0; HOUSES.length = 0; phase = 'design';
   seedRng(S.seed);
   const w = 512, h = 512, tiles = new Uint8Array(w * h).fill(T.GRASS);
   MAPS.world = { w, h, tiles };
@@ -903,14 +954,49 @@ export function genWorld() {
   for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
-  expandTowns(new Set(props.slice(handMark)));             // zuletzt und ohne rnd(): Zufallsfolge oben bleibt stabil
   pactScenes();
-  townsBuilt = true;
+  const wild = new Set(props.slice(handMark));
+  resampleWorld();                                         // Entwurf → Weltmaßstab (ohne rnd())
+  phase = 'world';
+  expandTowns(wild);                                       // zuletzt und ohne rnd(): Zufallsfolge oben bleibt stabil
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
   const noTree = new Set([T.DIRT, T.ROAD, T.PLANK, T.FIELD, T.WATER, T.WALL, T.DWALL, T.ROCK, T.DFLOOR]);
+  for (const p of props) delete p._d;                        // nur für den Umzug gebraucht, nicht speichern
   return props.filter(p => p.type !== 'tree' || !noTree.has(tileAt('world', p.x / TS | 0, p.y / TS | 0)));
+}
+
+// ---------------- Hochrechnung Entwurf → Weltmaßstab (Session 5) ----------------
+// Gelände: nächster Nachbar (Straßen, Flüsse, Mauern werden 1–2 Kacheln breit). Props: auf die Mitte ihrer Entwurfskachel,
+// die Entwurfskachel bleibt als _d erhalten (Stadtumzug). Zäune und Palisaden werden lückenlos nachgezogen. Wälder würden
+// um den Faktor WS² dünner: je Baum entsteht mit Wahrscheinlichkeit 1/2 ein zweiter in der Zwischenkachel (Hash, kein rnd()).
+function resampleWorld() {
+  const D = MAPS.world, W = Math.round(D.w * WS), H = Math.round(D.h * WS), t = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) { const row = Math.min(D.h - 1, dT(y)) * D.w;
+    for (let x = 0; x < W; x++) t[y * W + x] = D.tiles[row + Math.min(D.w - 1, dT(x))]; }
+  MAPS.world = { w: W, h: H, tiles: t, design: { w: D.w, h: D.h } };
+  const line = { fence: new Map(), palisade_prop: new Map() }, taken = new Set(), K = (x, y) => x + ',' + y;
+  for (const p of props) {
+    if ((p.map || 'world') !== 'world') continue;
+    const dx = p.x / TS | 0, dy = p.y / TS | 0; p._d = [dx, dy];
+    p.x = wT(dx) * TS + TS / 2; p.y = wT(dy) * TS + TS / 2; taken.add(K(wT(dx), wT(dy)));
+    if (line[p.type]) line[p.type].set(K(dx, dy), p);
+  }
+  for (const [type, m] of Object.entries(line)) for (const [k, p] of m) {
+    const [dx, dy] = p._d;
+    for (const [ox, oy] of [[1, 0], [0, 1]]) { if (!m.has(K(dx + ox, dy + oy))) continue;
+      for (let i = (ox ? wT(dx) : wT(dy)) + 1; i < (ox ? wT(dx + 1) : wT(dy + 1)); i++) {
+        const x = ox ? i : wT(dx), y = ox ? wT(dy) : i;
+        if (!taken.has(K(x, y))) { taken.add(K(x, y)); prop(type, 0, 0, { ...p, id: uid(), x: x * TS + TS / 2, y: y * TS + TS / 2, _d: [dT(x), dT(y)] }); } } }
+  }
+  const trees = props.filter(p => p.type === 'tree' && (p.map || 'world') === 'world');
+  for (const p of trees) {
+    const [dx, dy] = p._d; if (nz(dx * 3 + 1, dy * 7 + 2) < 0.5) continue;
+    const x = wT(dx) + (nz(dx, dy) < 0.5 ? 1 : 0), y = wT(dy) + (nz(dx, dy) < 0.5 ? 0 : 1);
+    if (x >= W || y >= H || taken.has(K(x, y)) || tileAt('world', x, y) !== T.GRASS) continue;
+    taken.add(K(x, y)); prop('tree', 0, 0, { solid: true, r: 12, hp: 3, x: x * TS + TS / 2, y: y * TS + TS / 2, _d: [dT(x), dT(y)] });
+  }
 }
 
 // ---------------- Totenreich: Orte des Paktes (Session 4) ----------------

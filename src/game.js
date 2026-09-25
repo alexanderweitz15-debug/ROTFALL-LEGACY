@@ -2,7 +2,7 @@
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, townPt } from './world.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
 import * as UI from './ui.js';
@@ -238,7 +238,7 @@ function spawnNPCs() {
 function spawnNpcDef(def) {
   const spots = NPC_SPOTS;
   {
-    const home = townPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
+    const home = worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
     const pos = freeSpotNear('world', home[0] + ri(-2, 2), home[1] + ri(-2, 2), 4);
     const c = makeChar({ ...def, x: pos.x, y: pos.y, level: def.key === 'kelan' ? 12 : def.key === 'rook' ? 8 : ri(3, 7),
       pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: def.faction === 'order' ? '#c7bda6' : def.faction === 'valen' ? '#33415c' :
@@ -275,7 +275,7 @@ const GUARD_KIT = {
 // Idempotent: vorhandene Wachen einer Siedlung beziehen die (neuen) Posten der Reihe nach, nur fehlende kommen hinzu.
 function spawnGuardPosts() {
   for (const [town, g] of Object.entries(GUARD_POSTS)) g.posts.forEach(([tx, ty], i) => {
-    const k = GUARD_KIT[g.faction], pos = freeSpotNear('world', ...townPt(tx, ty), 1);
+    const k = GUARD_KIT[g.faction], pos = freeSpotNear('world', ...worldPt(tx, ty), 1);
     const had = S.ents.world.filter(c => c.kind === 'npc' && c.guard && c.post === town && c.alive)[i];
     if (had) { had.anchor = { x: pos.x, y: pos.y }; had.x = pos.x; had.y = pos.y; had.wander = null; return; }
     const c = makeChar({ name: pick(['Aldo', 'Berit', 'Conrad', 'Dagna', 'Egil', 'Frida', 'Gunnar', 'Hedda', 'Ivo', 'Jutta']), prof: k.prof,
@@ -385,7 +385,7 @@ function assignNpcDays() {                         // idempotent: bei Neustart u
   const used = {};                                 // Innenplätze je Haus, damit sich niemand auf eine Kachel stapelt
   const spot = (where, npc) => {
     if (where === 'field') { const f = (TOWN_PLAN.eren.fields || [])[0]; if (f) return { x: ((f[0] + f[2]) / 2) * TS, y: ((f[1] + f[3]) / 2) * TS }; where = [60, 70]; }
-    if (typeof where[0] === 'number') { const s = freeSpotNear('world', ...townPt(where[0], where[1]), 1); return { x: s.x, y: s.y }; }
+    if (typeof where[0] === 'number') { const s = freeSpotNear('world', ...worldPt(where[0], where[1]), 1); return { x: s.x, y: s.y }; }
     const b = HOUSES.find(h => h.id === where[0]); if (!b) return null;
     const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
     if (where[1] === 'front') return { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
@@ -435,6 +435,9 @@ const SPAWN_AREAS = [
   { map:'world', x:392, y:348, r:14, types:['skeleton'], cap:8 },                          // Nekromanten-Turm
 ];
 
+for (const a of SPAWN_AREAS) if (a.map === 'world') {          // Entwurf → Weltmaßstab: Gebiete wachsen mit, Dichte sinkt leicht (mehr Ruhe)
+  [a.x, a.y] = worldPt(a.x, a.y); a.r = Math.round(a.r * WS); if (a.r >= 12) a.cap = Math.round(a.cap * 1.25);
+}
 const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'crypt_warden', 'valen_soldier', 'gorak']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
@@ -531,7 +534,7 @@ export function newGame(cfg) {
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
-  const start = freeSpotNear('world', ...townPt(66, 70), 3);
+  const start = freeSpotNear('world', ...worldPt(66, 70), 3);
   const p = makeChar({ kind:'player', key:'player', name: cfg.name, age: ri(19, 26), x: start.x, y: start.y,
     attrs: baseAttrs(), skills: { ...o.skills },            // Herkunftsbonus wird unten addiert, nicht überschrieben
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
@@ -584,11 +587,38 @@ function startGame() {
   save();
 }
 
+// Spielstand v2 (512×512) → v3 (Weltmaßstab WS). Props entstehen neu aus der Generierung (Kacheln sind ohnehin neu);
+// Truhen und Kisten behalten, was schon herausgenommen wurde (gleicher Typ + Etikett, nächste Lage). Alle anderen Einträge
+// der Oberwelt — Spieler, Figuren, Gegner, Gräber, liegende Gegenstände, Karawanen, Lagergebäude — wandern mit der Karte.
+// Stadtbewohner entstehen neu (ihre Häuser stehen woanders), Wachen beziehen ihre Posten neu.
+function rescaleSave(fresh) {
+  const W = S.ents.world, sc = o => { if (o && typeof o.x === 'number' && typeof o.y === 'number') { o.x *= WS; o.y *= WS; } };
+  const old = W.filter(e => e.kind === 'prop' && e.loot);
+  const keep = W.filter(e => e.kind !== 'prop' && !(e.kind === 'npc' && e.villager && !S.party.includes(e.id)));
+  for (const e of keep) {
+    sc(e); for (const k of ['anchor', 'wander', 'schedulePos', 'eve', 'target']) sc(e[k]);
+    if (Array.isArray(e.home) && typeof e.home[0] === 'number') e.home = e.home.map(v => Math.round(v * WS));
+  }
+  if (S.player && S.player.map === 'world' && !keep.includes(S.player)) sc(S.player);
+  for (const p of fresh) if (p.loot) {                      // Behälter: ausgeräumter Zustand bleibt
+    const cand = old.filter(o => o.type === p.type && o.label === p.label).sort((a, b) => Math.hypot(a.x * WS - p.x, a.y * WS - p.y) - Math.hypot(b.x * WS - p.x, b.y * WS - p.y))[0];
+    if (cand && Math.hypot(cand.x * WS - p.x, cand.y * WS - p.y) < 6 * TS) { p.loot = cand.loot; p.opened = cand.opened; old.splice(old.indexOf(cand), 1); }
+  }
+  S.ents.world = [...fresh, ...keep];
+  if (S.settlement && (S.settlement.map || 'world') === 'world') sc(S.settlement);
+  indexSolids('world');
+  for (const e of S.ents.world)
+    if (e.kind !== 'prop' && (solidTile('world', e.x, e.y) || solidPropAt('world', e.x, e.y, 4))) { const s = freeSpotNear('world', e.x / TS | 0, e.y / TS | 0, 6); e.x = s.x; e.y = s.y; }
+  spawnGuardPosts(); spawnResidents();
+  Object.assign(S.flags, { gen2: true, gen3: true, gen4: true, pact1: true, rescale: false });
+  log('Die Welt ist weiter geworden. (Spielstand auf die größere Karte umgerechnet.)', 'world');
+}
 export function continueGame() {
   const data = loadRaw(); if (!data) return;
   applySave(data);
   seedRng(S.seed);
   const fresh = genWorld(); genMine();         // Kacheln (+ Gebäudedaten); Props kommen aus dem Spielstand …
+  if (S.flags?.rescale) rescaleSave(fresh);
   if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
     const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
     const inTown = e => e.kind === 'prop' && !e.loot && R.some(([a, b, c, d]) => e.x / TS >= a && e.x / TS < c && e.y / TS >= b && e.y / TS < d);
@@ -643,7 +673,7 @@ export function continueGame() {
     S.flags.pact1 = true;
   }
   for (const c of [S.player, ...S.ents.world.filter(e => e.kind === 'npc')]) if (c?.knownClasses?.includes('warlock')) {   // Hexenmeister war eine Grundklasse
-    c.knownClasses = c.knownClasses.filter(k => k !== 'warlock'); if (!c.knownClasses.length) c.knownClasses.push('wanderer');
+    c.knownClasses = c.knownClasses.filter(k => k !== 'warlock'); if (!c.knownClasses.length) c.knownClasses.push(c === S.player ? 'wanderer' : 'mage');   // NPC-Zauberer bleiben Magier
     if (c.currentClass === 'warlock') { c.currentClass = c.knownClasses.includes('mage') ? 'mage' : c.knownClasses[0] || 'wanderer'; c.abilities = [...(CLASSES[c.currentClass].abilities || [])]; }
     if (c === S.player) { (c.titleClasses ||= []).includes('warlock') || c.titleClasses.push('warlock'); c.titleClass = 'warlock'; c.pal = { ...c.pal, glow: TITLE_CLASSES.warlock.glow }; }
     recalc(c); if (c === S.player) syncHotbar();
@@ -780,7 +810,8 @@ function travelTick() {
   const tx = p.x / TS | 0, ty = p.y / TS | 0;
   const here = locAt(tx, ty);
   if (here && (here.kind === 'village' || here.kind === 'city')) return;   // in Siedlungen nicht
-  if (Math.hypot(tx - 66, ty - 70) < 30) return;                            // Startgebiet verschonen
+  const [sx0, sy0] = worldPt(66, 70);
+  if (Math.hypot(tx - sx0, ty - sy0) < 30 * WS) return;                     // Startgebiet verschonen
   const moving = Math.abs(p.vx) > 0.05 || Math.abs(p.vy) > 0.05;
   if (!moving) return;
   const threat = regionThreat(tx, ty);
@@ -1855,7 +1886,7 @@ function doInteract() {
 }
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
-const ARRIVAL = { mine: () => MAPS.mine.entry, world: () => ({ x: 62 * TS + TS / 2, y: 21 * TS + TS / 2 }) };
+const ARRIVAL = { mine: () => MAPS.mine.entry, world: () => { const [x, y] = worldPt(62, 21); return { x: x * TS + TS / 2, y: y * TS + TS / 2 }; } };   // vor dem Grubeneingang
 function travel(to) {
   const p = S.player, from = S.map;
   leavePursuit(from, to);
@@ -2333,7 +2364,7 @@ function lilaOutcome(npc) {
     { text: 'Banditen halten sie. Ich hole sie zurück.', fn: () => {
       finishLila('Versprechen gegeben: Lila wird zurückgebracht.', { xp:40 });
       S.flags.lilaPromise = true;
-      if (lila) { lila.home = 'village'; lila.anchor = { x: 60 * TS, y: 68 * TS }; lila.x = lila.anchor.x; lila.y = lila.anchor.y; }
+      if (lila) { const [lx, ly] = worldPt(60, 68); lila.home = 'village'; lila.anchor = { x: lx * TS, y: ly * TS }; lila.x = lila.anchor.x; lila.y = lila.anchor.y; }
       S.gold += 0;
       log('Lila kehrt nach Eren zurück.', 'quest'); addRel('jorun', 25);
     } },
@@ -2778,7 +2809,7 @@ function adoptSuccessor(c) {
   S.legacy.gen++;
   recalc(c); B.fullHeal(c); c.mana = c.maxMana;
   // Neubeginn fern vom Tod: der Erbe trifft im Heimatdorf ein (nicht am Grab neben dem Mörder), die Gruppe mit ihm.
-  const home = freeSpotNear('world', ...townPt(60, 66), 4), group = [c, ...partyMembers().filter(m => m !== c)];
+  const home = freeSpotNear('world', ...worldPt(60, 66), 4), group = [c, ...partyMembers().filter(m => m !== c)];
   for (const m of group) { for (const k of ['world', 'mine']) { const a = S.ents[k], i = a.indexOf(m); if (i >= 0) a.splice(i, 1); }
     m.map = 'world'; m.x = home.x + (m === c ? 0 : ri(-30, 30)); m.y = home.y + (m === c ? 0 : ri(-30, 30)); S.ents.world.push(m); }
   S.map = 'world';
@@ -3328,6 +3359,15 @@ export function selftest() {
     }));
     ok('Spawns: keine ruhenden Gegner zwischen den Häusern einer Siedlung', S.ents.world.every(e =>
       e.kind !== 'enemy' || !e.alive || e.aggroId || e.encounter || e.follow || !townAt(e.x / TS | 0, e.y / TS | 0)));
+    ok('Weltmaßstab: Karte 768×768, jede Stadt zu Fuß von Eren erreichbar, kein fester Gegenstand auf Mauer/Wasser/Fels', (() => {
+      const m = MAPS.world, seen = new Uint8Array(m.w * m.h), [sx, sy] = TOWN_PLAN.eren.square, q = [sy * m.w + sx];
+      seen[q[0]] = 1;
+      for (let h = 0; h < q.length; h++) { const i = q[h], x = i % m.w, y = (i / m.w) | 0;
+        for (const j of [i - 1, i + 1, i - m.w, i + m.w]) { const jx = j % m.w; if (j < 0 || j >= m.tiles.length || seen[j] || Math.abs(jx - x) > 1 || SOLID.has(m.tiles[j])) continue; seen[j] = 1; q.push(j); } }
+      const towns = Object.values(TOWN_PLAN).every(P => seen[P.square[1] * m.w + P.square[0]]);
+      const props = S.ents.world.every(e => e.kind !== 'prop' || !e.solid || e.type === 'boat' || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0)) || ['obelisk', 'crypt', 'tower_ruin', 'watchtower_ruin', 'palisade_prop', 'rock_node', 'ore_node', 'dead_tree', 'fallen_tree', 'rubble', 'broken_pillar'].includes(e.type));   // Natur/Trümmer dürfen im Fels/See liegen
+      return m.w === 768 && m.h === 768 && towns && props;
+    })());
     ok('Karawanenroute: kein Abschnitt durch Haus, Wasser oder Mauer (Karawanen fahren ohne Kollision)', SIM.ROUTE.every(([x, y], i) => {
       if (!i) return true; const [a, b] = SIM.ROUTE[i - 1], n = Math.max(Math.abs(x - a), Math.abs(y - b), 1);
       for (let k = 0; k <= n; k++) { const tx = Math.round(a + (x - a) * k / n), ty = Math.round(b + (y - b) * k / n);
