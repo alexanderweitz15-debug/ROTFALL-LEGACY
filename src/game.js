@@ -1,5 +1,5 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+import { S, DBG, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES } from './data.js';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
@@ -95,7 +95,7 @@ export function damageOf(c) {
   return (base + attr * 0.35 + skill * 0.22) * Math.max(0.2, m);
 }
 function speedOf(c) {
-  let s = 2.25 + c.attributes.agility * 0.045;
+  let s = (2.25 + c.attributes.agility * 0.045) * (c === S.player ? DBG.speed : 1);
   const off = c.equip.offhand && ITEMS[c.equip.offhand.key].slow || 0;
   const ch = c.equip.chest && ITEMS[c.equip.chest.key].slow || 0;
   s *= (1 - off - ch);
@@ -875,7 +875,8 @@ const hourNow = () => S.minute / 60;                  // Spieluhr in Spielminute
 function update(dt, now) {
   const p = S.player;
   // Zeit
-  S.minute += dt / 1000;
+  if (!DBG.freeze) S.minute += dt / 1000;
+  if (DBG.stam && p) { p.stamina = p.maxStamina; p.mana = p.maxMana; }
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
   S.weatherLeft -= dt / 1000;
   if (S.weatherLeft <= 0) {
@@ -1079,6 +1080,7 @@ function tickCombatant(c, dt) {
 // ================= Bewegung =================
 function moveEnt(e, dx, dy) {
   const r = e.r || 10;
+  if (DBG.noclip && e === S.player) { e.x += dx; e.y += dy; e.vx = dx; e.vy = dy; if (Math.abs(dx) > Math.abs(dy)) e.facing = dx > 0 ? 3 : 2; else if (dy) e.facing = dy > 0 ? 0 : 1; return; }
   // Wer schon in einem festen Objekt steckt (alter Spielstand, Rückstoß), darf sich herausbewegen — nur nicht tiefer hinein
   const blockedBy = (x, y) => { const q = solidPropAt(e.map, x, y, r);   // nur bei Blockade prüfen: stehe ich schon drin und will heraus?
     return q && !(solidPropAt(e.map, e.x, e.y, r) === q && Math.hypot(x - q.x, y - q.y) > Math.hypot(e.x - q.x, e.y - q.y)); };
@@ -1300,6 +1302,7 @@ function teamOf(c) {
 }
 function isHostile(a, b) {
   if (a.faction && a.faction === b.faction && a.kind !== 'player' && b.kind !== 'player' && !a.angry && !b.angry && !a.servant && !b.servant) return false;   // Gleiche Fraktion: kein Kampf (Stille Wächter vs. Skelette)
+  if (DBG.calm && (a === S.player || b === S.player)) return false;   // Debug: niemand greift den Spieler an
   const ta = teamOf(a), tb = teamOf(b);
   return ta !== tb && ta !== 'neutral' && tb !== 'neutral';
 }
@@ -1359,7 +1362,7 @@ function hit(attacker, target, mult, kind = 'physical') {
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
-  if (!target.alive || target.invuln) return;
+  if (!target.alive || target.invuln || (DBG.god && target === S.player)) return;
   if (target.mtype === 'wraith' && target.phased > performance.now() && kind === 'physical') { float(target, 'körperlos', 'rgba(200,220,240,ALPHA)'); return; }   // Geist: nach Treffer kurz ungreifbar
   if (target.mtype === 'bear' && source) target.provoked = true;
   target.lastKind = kind;
@@ -3469,7 +3472,7 @@ function bindInput() {
     const k = e.key.toLowerCase();
     if (e.ctrlKey && e.shiftKey && k === 'd') { e.preventDefault(); toggleDebug(); return; }
     if ($('game').classList.contains('hidden')) return;
-    if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+    if (['input', 'textarea', 'select'].includes(document.activeElement.tagName.toLowerCase())) return;
     keys.add(k);
     if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else UI.openModal('settings'); }
     if (UI.dialogueOpen() || UI.modalOpen) return;
@@ -3681,37 +3684,132 @@ function tryPlace() {
 }
 
 // ================= Debug =================
+// Strg+Shift+D. Schalter liegen in DBG (state.js) und werden nie gespeichert. Das Menü ist ein Prüfwerkzeug: alles,
+// was ein Tester sonst mühsam erspielen müsste (Ort, Gegner, Gegenstand, Klasse, Auftrag), ist direkt erreichbar.
+function dbgTeleport(map, x, y) {
+  if (S.map !== map) travel(map);
+  const p = S.player, f = freeSpotNear(map, x / TS | 0, y / TS | 0, 10) || { x, y };
+  p.x = f.x; p.y = f.y; p.path = null; R.cam.x = p.x - R.view().W / 2 / R.cam.zoom; R.cam.y = p.y - R.view().H / 2 / R.cam.zoom;
+  for (const c of S.party || []) { const m = byId(c); if (m && m.map === map) { m.x = p.x + ri(-30, 30); m.y = p.y + ri(-30, 30); } }
+}
+// Erreichbarkeit wie moveEnt (Radius 10, Kacheln + feste Objekte), Raster 16 px, Flutfüllung ab dem Spieler
+function reachMap(map = S.map, from = S.player) {
+  const M = MAPS[map], G = 16, w = M.w * 2, h = M.h * 2, r = 10, okc = new Int8Array(w * h).fill(-1), seen = new Uint8Array(w * h);
+  const OK = (i, j) => { const k = i + j * w; if (okc[k] < 0) { const x = i * G, y = j * G;
+    okc[k] = !solidTile(map, x + r, y) && !solidTile(map, x - r, y) && !solidTile(map, x, y + r) && !solidTile(map, x, y - r) && !solidPropAt(map, x, y, r) ? 1 : 0; } return okc[k]; };
+  const s0 = Math.round(from.x / G) + Math.round(from.y / G) * w, q = [s0]; seen[s0] = 1;
+  while (q.length) { const k = q.pop(), i = k % w, j = (k / w) | 0;
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ni = i + a, nj = j + b; if (ni < 0 || nj < 0 || ni >= w || nj >= h) continue;
+      const nk = ni + nj * w; if (!seen[nk] && OK(ni, nj)) { seen[nk] = 1; q.push(nk); } } }
+  const near = (x, y, rad = 24) => { for (let j = Math.floor((y - rad) / G); j <= Math.floor((y + rad) / G); j++) for (let i = Math.floor((x - rad) / G); i <= Math.floor((x + rad) / G); i++)
+    if (i >= 0 && j >= 0 && i < w && j < h && seen[i + j * w]) return true; return false; };
+  return { map, G, w, h, seen, okc, OK, near };
+}
+function reachReport(RM) {
+  const out = [];
+  if (RM.map === 'world') for (const L of LOCATIONS) { let tot = 0, re = 0; const Rr = L.r * 2, ci = L.x * 2, cj = L.y * 2;
+    for (let j = cj - Rr; j <= cj + Rr; j += 2) for (let i = ci - Rr; i <= ci + Rr; i += 2) { if ((i - ci) ** 2 + (j - cj) ** 2 > Rr * Rr || i < 0 || j < 0 || i >= RM.w || j >= RM.h || !RM.OK(i, j)) continue; tot++; if (RM.seen[i + j * RM.w]) re++; }
+    if (re < tot * 0.6) out.push(`${L.name}: ${Math.round(re / Math.max(1, tot) * 100)} % erreichbar`); }
+  for (const e of S.ents[RM.map]) {
+    if (e.kind === 'prop' && e.portal && !RM.near(e.x, e.y, 40)) out.push(`Eingang ${e.label || e.portal} (${e.x / TS | 0},${e.y / TS | 0})`);
+    if ((e.kind === 'npc' || e.kind === 'enemy') && e.alive && !RM.near(e.x, e.y, 24)) out.push(`${e.name || MONSTERS[e.mtype]?.name || e.kind} eingeschlossen (${e.x / TS | 0},${e.y / TS | 0})`);
+  }
+  return out;
+}
 function toggleDebug() {
   let d = $('debugpanel');
   if (d) { d.remove(); return; }
   d = document.createElement('div');
   d.id = 'debugpanel'; d.className = 'panel';
-  const acts = {
-    '+500 Gold': () => S.gold += 500,
-    '+Material': () => { S.res.wood += 100; S.res.stone += 100; S.res.iron += 50; S.res.food += 20; },
-    'Heilen': () => { B.fullHeal(S.player); S.player.stamina = S.player.maxStamina; S.player.mana = S.player.maxMana; S.player.downed = false; },
-    'Stufe +1': () => levelUp(S.player),
-    'Wolf spawnen': () => spawnEnemy('wolf', S.map, S.player.x / TS + 3 | 0, S.player.y / TS | 0),
-    'Untoten spawnen': () => spawnEnemy('skeleton', S.map, S.player.x / TS + 3 | 0, S.player.y / TS | 0),
-    'Gute Waffe': () => addItem(S.player, 'greatsword'),
-    'Zeit +6h': () => S.minute = (S.minute + 360) % 1440,
-    'Wetter wechseln': () => S.weather = pick(['clear', 'rain', 'fog', 'cloudy']),
-    'Paladin freischalten': () => unlockClass('paladin'),
-    'Ruf +25 (alle)': () => { for (const f of Object.keys(S.factions)) S.factions[f] += 25; checkRankUp(); },
-    'Zur Grube': () => travel('mine'),
-    'Zur Tiefhall': () => travel('deep'),
-    'Spieler töten': () => { S.player.body.torso.hp = 0; B.syncHp(S.player); downed(S.player, 'Debug'); S.player.downTimer = 1; },
-    'Linken Arm brechen': () => { const r = B.damagePart(S.player, 'larm', 999); if (r === 'disabled' || r === 'down') limbLost(S.player, 'larm'); },
-    '+3 Verbände': () => addItem(S.player, 'bandage', 3),
-    'Selbsttest': () => selftest(),
+  const p = () => S.player, here = () => [S.player.x / TS | 0, S.player.y / TS | 0];
+  const up = () => { p().xp = Math.max(p().xp, p().xpNext); levelUp(p()); };   // Stufe ohne negative Erfahrung
+  const opt = list => list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  const byName = o => Object.entries(o).sort((a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0], 'de'));
+  const places = [...LOCATIONS.map(L => ['world:' + L.key, L.name]), ['map:mine', 'Grube (innen)'], ['map:deep', 'Tiefhall (innen)']];
+  const sections = {
+    Spieler: [
+      ['Gottmodus', 'god'], ['Endlos Ausdauer/Mana', 'stam'], ['Durch Wände', 'noclip'],
+      ['sel', 'speed', [[1, 'Tempo ×1'], [2, 'Tempo ×2'], [4, 'Tempo ×4']], v => DBG.speed = +v],
+      ['Heilen', () => { B.fullHeal(p()); p().stamina = p().maxStamina; p().mana = p().maxMana; p().downed = false; p().status = (p().status || []).filter(t => t.good); }],
+      ['Stufe +1', () => up()], ['Stufe +5', () => { for (let i = 0; i < 5; i++) up(); }],
+      ['+5 Talentpunkte', () => p().skillPoints = (p().skillPoints || 0) + 5], ['+5 Attributpunkte', () => p().attrPoints = (p().attrPoints || 0) + 5],
+      ['+500 Gold', () => S.gold += 500], ['+Material', () => { S.res.wood += 100; S.res.stone += 100; S.res.iron += 50; S.res.food += 20; }],
+      ['Linken Arm brechen', () => { const r = B.damagePart(p(), 'larm', 999); if (r === 'disabled' || r === 'down') limbLost(p(), 'larm'); }],
+      ['Spieler töten', () => { p().body.torso.hp = 0; B.syncHp(p()); downed(p(), 'Debug'); p().downTimer = 1; }],
+    ],
+    Gegenstand: [
+      ['sel', 'item', byName(ITEMS).map(([k, v]) => [k, v.name])],
+      ['sel', 'rar', [['', 'Rarität: zufällig'], ...RARITY_ORDER.map(r => [r, RARITY[r]])]],
+      ['sel', 'cnt', [[1, '1×'], [5, '5×'], [20, '20×']]],
+      ['Geben', () => { const k = val('item'), n = +val('cnt'), r = val('rar');
+        for (let i = 0; i < (ITEMS[k].stack ? 1 : n); i++) { const o = mkItem(k, ITEMS[k].stack ? n : 1, { bonus: 0 }); if (r) { o.rar = r; if (r !== 'common' && !o.afx) o.afx = []; }
+          if (!giveItem(p(), o)) dropItemAt(S.map, p().x, p().y + 12, o); }
+        log(`Debug: ${n}× ${ITEMS[k].name}${r ? ' (' + RARITY[r] + ')' : ''}.`, 'world'); }],
+      ['Inventar leeren', () => { p().inv = []; }],
+    ],
+    Kampf: [
+      ['sel', 'mob', byName(MONSTERS).map(([k, v]) => [k, v.name])],
+      ['sel', 'mobn', [[1, '1×'], [3, '3×'], [6, '6×']]],
+      ['Spawnen', () => { const [x, y] = here(); for (let i = 0; i < +val('mobn'); i++) spawnEnemy(val('mob'), S.map, x + 4 + ri(-1, 1), y + ri(-2, 2)); }],
+      ['Gegner hier töten', () => { for (const e of S.ents[S.map].filter(e => e.kind === 'enemy' && e.alive && dist(e, p()) < 700)) die(e, 'Debug', p()); }],
+      ['Niemand greift an', 'calm'],
+    ],
+    Welt: [
+      ['sel', 'place', places],
+      ['Hinreisen', () => { const [t, k] = val('place').split(':');
+        if (t === 'map') return travel(k);
+        const L = LOCATIONS.find(l => l.key === k); dbgTeleport('world', L.x * TS + TS / 2, L.y * TS + TS / 2); }],
+      ['sel', 'hour', [...Array(24)].map((_, h) => [h, `${String(h).padStart(2, '0')}:00 Uhr`])],
+      ['Uhrzeit setzen', () => S.minute = +val('hour') * 60],
+      ['Zeit anhalten', 'freeze'],
+      ['sel', 'wx', [['clear', 'Klar'], ['cloudy', 'Bewölkt'], ['rain', 'Regen'], ['fog', 'Nebel']]],
+      ['Wetter setzen', () => { S.weather = val('wx'); S.weatherLeft = 600; }],
+      ['Ruf +25 (alle)', () => { for (const f of Object.keys(S.factions)) S.factions[f] += 25; checkRankUp(); }],
+      ['Ruf −25 (alle)', () => { for (const f of Object.keys(S.factions)) S.factions[f] -= 25; }],
+    ],
+    'Klasse & Auftrag': [
+      ['sel', 'cls', byName(CLASSES).map(([k, v]) => [k, v.name])],
+      ['Klasse freischalten', () => unlockClass(val('cls'))],
+      ['sel', 'tcls', byName(TITLE_CLASSES).map(([k, v]) => [k, v.name])],
+      ['Titelklasse annehmen', () => unlockTitle(val('tcls'), 'Debug')],
+      ['sel', 'quest', byName(QUESTS).map(([k, v]) => [k, `${v.name}${S.quests[k] ? ' · ' + S.quests[k].state : ''}`])],
+      ['Auftrag starten', () => { startQuest(val('quest')); log(`Debug: Auftrag ${QUESTS[val('quest')].name} gestartet.`, 'quest'); }],
+      ['Ziele erfüllen', () => { const k = val('quest'), st = S.quests[k] || (startQuest(k), S.quests[k]); QUESTS[k].objectives.forEach((o, i) => st.progress[i] = o.count || 1); log('Debug: Ziele erfüllt — beim Auftraggeber abgeben.', 'quest'); }],
+      ['Als erledigt setzen', () => { const k = val('quest'); (S.quests[k] ||= { progress: [] }).state = 'done'; }],
+    ],
+    'Anzeige & Test': [
+      ['Kollisionen zeigen', 'hitbox'], ['NPC-Zustand zeigen', 'npcInfo'], ['FPS & Objekte', 'fps'],
+      ['Erreichbarkeit prüfen', () => { const t0 = performance.now(), RM = reachMap(), bad = reachReport(RM); DBG.reach = RM;
+        log(`Erreichbarkeit (${S.map}, ${Math.round(performance.now() - t0)} ms): ${bad.length ? bad.length + ' Probleme — ' + bad.slice(0, 8).join(' · ') : 'alles erreichbar'}`, 'world');
+        console.table(bad); UI.toast(bad.length ? `${bad.length} unerreichbare Stellen (Log, Konsole, rosa Karte)` : 'Alles erreichbar'); }],
+      ['Erreichbarkeit ausblenden', () => DBG.reach = null],
+      ['Spielstand speichern', () => { save(); UI.toast('Gespeichert'); }],
+      ['Spielstand exportieren', () => { save(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(loadRaw())], { type: 'application/json' }));
+        a.download = `rotfall-tag${S.day}.json`; a.click(); }],
+      ['Selbsttest', () => selftest()],
+    ],
   };
-  d.innerHTML = '<div class="panel-title">DEBUG</div>';
-  for (const [label, fn] of Object.entries(acts)) {
-    const b = document.createElement('button'); b.textContent = label;
-    b.onclick = () => { fn(); UI.refreshHUD(); };
-    d.appendChild(b);
+  const val = id => d.querySelector(`[data-dbg="${id}"]`).value;
+  d.innerHTML = '<div class="panel-title">DEBUG <span class="dbg-x" title="Schließen (Strg+Shift+D)">×</span></div><div class="dbg-fps"></div>';
+  d.querySelector('.dbg-x').onclick = () => d.remove();
+  for (const [title, rows] of Object.entries(sections)) {
+    const sec = document.createElement('details'); sec.open = title === 'Spieler' || title === 'Anzeige & Test';
+    sec.innerHTML = `<summary>${title}</summary>`;
+    for (const row of rows) {
+      if (row[0] === 'sel') { const el = document.createElement('select'); el.dataset.dbg = row[1]; el.innerHTML = opt(row[2]);
+        if (row[1] === 'speed') el.value = DBG.speed; if (row[3]) el.onchange = () => row[3](el.value); sec.appendChild(el); continue; }
+      const b = document.createElement('button'), [label, fn] = row;
+      if (typeof fn === 'string') { const sync = () => { b.textContent = `${DBG[fn] ? '☑' : '☐'} ${label}`; b.classList.toggle('on', !!DBG[fn]); }; sync(); b.onclick = () => { DBG[fn] = !DBG[fn]; sync(); }; }
+      else { b.textContent = label; b.onclick = () => { try { fn(); } catch (err) { console.error(err); UI.toast('Debug-Fehler: ' + err.message); } UI.refreshHUD(); }; }
+      sec.appendChild(b);
+    }
+    d.appendChild(sec);
   }
   document.body.appendChild(d);
+  const fpsEl = d.querySelector('.dbg-fps'); let last = performance.now(), frames = 0;
+  (function tickFps() { if (!d.isConnected) return; frames++; const now = performance.now();
+    if (now - last > 500) { fpsEl.textContent = DBG.fps ? `${Math.round(frames * 1000 / (now - last))} FPS · ${S.ents[S.map].length} Objekte · ${combat.length} Kämpfer · ${S.map} ${here().join(',')}` : `${S.map} ${here().join(',')}`; frames = 0; last = now; }
+    requestAnimationFrame(tickFps); })();
 }
 
 // ================= Selbsttest (ponytail: eine laufbare Prüfung) =================

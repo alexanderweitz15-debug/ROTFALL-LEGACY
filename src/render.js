@@ -1,5 +1,5 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp } from './state.js';
+import { S, DBG, clamp } from './state.js';
 import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js';
 import * as HB from './buildings.js';
 import { ITEMS, MONSTERS } from './data.js';
@@ -86,6 +86,7 @@ export function drawFrame(now) {
     ctx.fillStyle = 'rgba(12,10,8,.85)'; ctx.fillRect(t.x - 16, t.y - 46, 32, 5);
     ctx.fillStyle = '#b8a370'; ctx.fillRect(t.x - 15, t.y - 45, 30 * k, 3);
   }
+  if (DBG.hitbox || DBG.npcInfo || DBG.reach) drawDebug(m, x0, y0, x1, y1, list);
 
   ctx.restore();
   drawLight(now);
@@ -584,6 +585,37 @@ function drawEntity(e, now) {
 // weich aus: man sieht den Innenraum. Schornsteine rauchen, nachts leuchten die Fenster.
 const houseEnts = new Map(), houseCache = new Map(), roofAlpha = new Map();
 function houseEnt(b) { let e = houseEnts.get(b); if (!e) { e = { kind: 'house', b, x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS - 2 }; houseEnts.set(b, e); } return e; }
+// Debug-Einblendungen (Strg+Shift+D): Kollision, NPC-Zustand, nicht erreichbare Stellen
+function drawDebug(m, x0, y0, x1, y1, list) {
+  ctx.save(); ctx.lineWidth = 1;
+  const RM = DBG.reach;
+  if (RM && RM.map === S.map) {
+    ctx.fillStyle = 'rgba(255,0,200,.35)';
+    for (let j = y0 * 2; j <= y1 * 2 + 1; j++) for (let i = x0 * 2; i <= x1 * 2 + 1; i++) { const k = i + j * RM.w;
+      if (i >= 0 && j >= 0 && i < RM.w && j < RM.h && !RM.seen[k] && RM.OK(i, j)) ctx.fillRect(i * RM.G - 8, j * RM.G - 8, 16, 16); }
+  }
+  if (DBG.hitbox) {
+    ctx.fillStyle = 'rgba(220,40,40,.22)';
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { const t = m.tiles[ty * m.w + tx]; if (t === T.WATER || t === T.ROCK || t === T.WALL || t === T.DWALL) ctx.fillRect(tx * TS, ty * TS, TS, TS); }
+    for (const e of list) {
+      if (e.kind === 'prop' && e.solid) { ctx.strokeStyle = 'rgba(255,70,70,.9)'; ctx.beginPath(); ctx.arc(e.x, e.y, (e.r || 12) * 0.75, 0, Math.PI * 2); ctx.stroke(); }
+      else if (e.alive) { ctx.strokeStyle = e.kind === 'enemy' ? 'rgba(255,160,60,.9)' : 'rgba(80,220,255,.9)'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r || 10, 0, Math.PI * 2); ctx.stroke(); }
+    }
+  }
+  if (DBG.npcInfo) {
+    ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    for (const e of list) {
+      if (!e.alive || (e.kind !== 'npc' && e.kind !== 'enemy')) continue;
+      const goal = e.schedulePos || e.moveTo;
+      if (goal && goal.x != null) { ctx.strokeStyle = 'rgba(120,255,140,.55)'; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(goal.x, goal.y); ctx.stroke(); }
+      const txt = [e.name || e.mtype, e.aiState, e.sitting ? 'sitzt' : '', e.stamina != null && e.maxStamina ? `A${Math.round(e.stamina)}/${Math.round(e.maxStamina)}` : ''].filter(Boolean).join(' · ');
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; const w = ctx.measureText(txt).width + 6; ctx.fillRect(e.x - w / 2, e.y - 62, w, 11);
+      ctx.fillStyle = '#e8f0c8'; ctx.fillText(txt, e.x, e.y - 53);
+    }
+  }
+  ctx.restore();
+}
+
 export function playerInside(b, p = S.player) {
   if (!p || p.map !== b.map) return false;
   const tx = p.x / TS | 0, ty = p.y / TS | 0;

@@ -311,7 +311,12 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .succ-card .row{display:flex;justify-content:space-between;font-size:12px;color:#a79b83;border-bottom:1px dotted #241e17}
 
 /* debug */
-#debugpanel{position:fixed;right:8px;top:64px;width:210px;z-index:30;padding:8px;font-size:12px}
+#debugpanel{position:fixed;right:8px;top:64px;width:240px;max-height:calc(100vh - 80px);overflow-y:auto;z-index:30;padding:8px;font-size:12px}
+#debugpanel summary{cursor:pointer;color:#c9b27a;margin:6px 0 3px;font-weight:bold}
+#debugpanel select{display:block;width:100%;margin:2px 0;background:#161209;color:#d8ccb0;border:1px solid #2f271d;font-size:11px}
+#debugpanel button.on{border-color:#8a7a3a;color:#f0dc90}
+#debugpanel .dbg-fps{font-family:monospace;font-size:10px;color:#9c9a88;margin-bottom:4px}
+#debugpanel .dbg-x{float:right;cursor:pointer;padding:0 4px}
 #debugpanel button{display:block;width:100%;text-align:left;background:#161209;border:1px solid #2f271d;
   margin-bottom:2px;padding:4px 6px;font-size:12px}
 

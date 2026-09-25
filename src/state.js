@@ -2,6 +2,8 @@
 export const SAVE_KEY = 'rotfall.legacy.save';
 export const SAVE_VERSION = 3;   // 2: erweitertes Grenzland (512×512); 3: Weltmaßstab ×1,5 (768×768), v2 wird beim Laden umgerechnet
 
+// Debug-Schalter (Strg+Shift+D): nur zur Laufzeit, nie im Spielstand
+export const DBG = { god: false, noclip: false, speed: 1, stam: false, freeze: false, calm: false, hitbox: false, npcInfo: false, reach: null, fps: false };
 export const S = {
   ver: SAVE_VERSION,
   seed: 1,
