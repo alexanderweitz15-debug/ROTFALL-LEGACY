@@ -448,6 +448,29 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 ### BUG-071 — (vor Auslieferung) removeItem nur aus dem ersten Stapel, Leiste zu kurz für aktive Talente
 - Gefunden per code-review. Lösung: Entnahme über alle Stapel; Leiste 10 Plätze. BEHOBEN
 
+### BUG-072 — Orte und Gegner nicht erreichbar (Fels- und Prop-Taschen)
+- Gefunden mit der Erreichbarkeitsprüfung (Debug → „Erreichbarkeit prüfen“, Seeds 12345/777/4242 gleich):
+  **Wolfsschlucht** nur ~50 % begehbar — ein Felsgürtel schließt das Innere ein, dort stehen Wölfe, die man nie
+  erreicht (≈ Kachel 59–83, 436–467). **Frostkamm**: Taschen, die Bäume/Felsbrocken (feste Props) abriegeln, mit
+  eingeschlossenen Goblin-Kriegern (≈ 364,65 · 426–457,33–81 · 480,46 · 656,207).
+- Häuser, Türen, Portale (Grube, Tiefhall) und alle anderen Orte sind erreichbar (geprüft).
+- Ursache: Generierung prüft nie Zusammenhang; Fels-Blobs und Prop-Streuung dürfen Flächen abschließen.
+- Geplante Lösung (Wurzel, kein Einzelfall): Durchgang am Ende von `genWorld` vor `baseProps` — Flutfüllung ab Eren,
+  Dijkstra zum billigsten Durchbruch (Fels → Erde, blockierende feste Props entfernen, Wasser/Mauern nie), ohne `rnd()`;
+  Selbsttest „jeder Ort zu Fuß erreichbar“. WORLD · HIGH · OFFEN
+
+### BUG-073 — Nebelinsel ohne jeden Zugang
+- Insel (Entwurf 90,500) ist rundum Wasser; kein Boot, keine Fähre, keine Furt. Szenen dort sind unerreichbar.
+- Geplante Lösung: Fähre im Salzhafen (Fährmann/Boot-Prop, Hin- und Rückfahrt, kleiner Preis). WORLD · HIGH · OFFEN
+
+### BUG-074 — Debug „Stufe +1/+5“ macht die Erfahrung negativ
+- `levelUp` zieht `xpNext` ab, ohne dass die Erfahrung da ist. Lösung: vorher `xp = max(xp, xpNext)`. DEBUG · LOW · OFFEN
+
+### BUG-075 — Feinde greifen normale Bürger nicht an, wenn der Spieler fern ist (Nutzermeldung)
+- Vom Nutzer gemeldet, Ursache ungeprüft. Verdacht: `combat` wird je Frame nur im Umkreis von 1700 px um den Spieler
+  gebildet (`update`), außerhalb läuft keine Kampf-KI. Welt soll ohne den Spieler weiterleben (§39/§41).
+  AI/SIM · HIGH · OFFEN
+
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.
 - Kein Skill Tree (Klassenkette + Fertigkeitswerte) → Phase 9.

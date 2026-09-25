@@ -4,6 +4,27 @@ Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund
 
 ## Session 7 — 2026-09-25 · Phasen abschließen (Nutzer: „schließ die restlichen Phasen ab“)
 
+### Debug-Menü (game.js, state.js, render.js, style.css) — Prüfwerkzeug für Tests
+- Strg+Shift+D. Aufklappbare Abschnitte: **Spieler** (Gottmodus, endlos Ausdauer/Mana, durch Wände, Tempo ×1/×2/×4,
+  Heilen, Stufe +1/+5, Talent-/Attributpunkte, Gold, Material, Arm brechen, Spieler töten), **Gegenstand** (jeder
+  Gegenstand, Rarität, Anzahl; Inventar leeren), **Kampf** (jeder Gegnertyp 1×/3×/6×, Gegner in der Nähe töten,
+  „Niemand greift an“), **Welt** (Reise zu jedem Ort inkl. Grube/Tiefhall, Uhrzeit, Zeit anhalten, Wetter, Ruf ±25),
+  **Klasse & Auftrag** (Klasse/Titelklasse freischalten, Auftrag starten/Ziele erfüllen/als erledigt setzen),
+  **Anzeige & Test** (Kollisionen, NPC-Zustand mit Linie zum Tagesziel, FPS/Objekte, Erreichbarkeit prüfen mit rosa
+  Karte + Liste im Log/Konsole, Speichern, Spielstand als JSON exportieren, Selbsttest).
+- Schalter liegen in `DBG` (state.js) und werden nie gespeichert. Einhängepunkte: `hurt` (Gott), `moveEnt` (durch Wände),
+  `speedOf` (Tempo), `update` (Zeit anhalten, Ausdauer), `isHostile` (niemand greift an).
+- Neue Funktionen `dbgTeleport`, `reachMap` (Flutfüllung, Raster 16 px, Radius 10, `solidTile` + `solidPropAt`),
+  `reachReport`; `drawDebug` in render.js. `RF.solidPropAt` im Dev-Modus freigegeben.
+- Tasten gehen nicht ins Spiel, solange ein Auswahlfeld den Fokus hat.
+- Bekannt: „Stufe +1/+5“ ruft `levelUp` direkt → Erfahrung wird negativ (BUG-074, stammt aus dem alten Menü).
+
+### Phase 11 (Teil 1) — neue Wesen (data.js, game.js, render.js, sprites.js)
+- Kultist (heilt Verbündete), Ghul (Griff verlangsamt, lässt Tote aufstehen: `S.rising`), Geist (nach Treffer kurz
+  körperlos gegen physischen Schaden), Bär (greift erst an, wenn gereizt; Größe 1,45), Wildhund (flankiert im Rudel),
+  Hirsch (`prey:true`, Team 'prey', flieht). `SCALING` in data.js: jedes Wesen `scaling:{enabled:false}`, außer
+  ausdrücklich gelistet.
+
 ### Phase 9/10 — Skill-Baum & Klassen (data.js, game.js, ui.js, style.css)
 - Klassen berserker/assassin/bard/alchemist (+`weak`), Fähigkeiten in `classAbility`, Status frenzy/song/poison_coat/poisoned,
   `cowed`/`confused`; Lehrer-Folgen `teachable`, Umlernen `respec`; aktive Knoten (`grants`, `treeAbilities`); `splashAt`;

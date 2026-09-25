@@ -1,6 +1,6 @@
 # Phasenstatus — Rotfall: Legacy
 
-Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
+Letzte Aktualisierung: Session 7 (2026-09-25). Nächster Einstieg: SESSION_LOG.md (Session 7: Nutzer-Rückmeldung hat Vorrang) → offene HIGH-Einträge in BUGS.md (072–075).
 
 | # | Phase | Status | DoD erfüllt | Fehlt noch |
 |---|---|---|---|---|
@@ -15,7 +15,7 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 8 | Rarity & Loot | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Rarität je Exemplar, 12 Affixe, 3 legendäre Effekte, 2 Unikate, Tabelle im GDD |
 | 9 | Skill Tree | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: aktive Knoten (3), Umlernen beim Lehrer, 4 Titelzweige. Balancing nur im Spiel prüfbar |
 | 10 | Classes | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | 14 Grundklassen (+Berserker, Assassine, Barde, Alchemist), 4 Titelklassen; jede lernbar, jede mit Schwäche. Kopfgeldjäger → Phase 17 |
-| 11 | Enemy Expansion | NICHT BEGONNEN | — | |
+| 11 | Enemy Expansion | IN ARBEIT | teilweise | Session 7: sechs neue Wesen mit eigenem Verhalten. Offen: Datenblätter im GDD, Anti-Cheese (Hechtsprung, Spezialangriffe, Gegner-Ausdauer) |
 | 12 | Bosses | IN ARBEIT | teilweise | Gorak (Sturm, Beben), Hrodvar (Eiskreis, Leibwache, Session 6). Offen: Bosse der Oberwelt, Beute mit Eigenschaften (Phase 8) |
 | 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
 | 14 | Dungeons | IN ARBEIT | teilweise | Session 6: Tiefhall (gebaute Halle, 8 Räume, Boss), Dungeon-Register. Offen: Rätsel/Fallen jenseits Stacheln, Questanbindung, dritter Dungeon |
@@ -97,4 +97,9 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 - [x] Unumkehrbarkeit im GDD dokumentiert
 
 ## Nächster sinnvoller Schritt
-Rückmeldung des Nutzers zur großen Karte (Reisewege). Dann BUG-017/057 Spielstandgröße, BUG-011 Karawane, BUG-009 Tiefhall.
+Nutzer-Rückmeldung aus Session 7 zuerst (Reihenfolge, Details im SESSION_LOG):
+1. Erreichbarkeit (BUG-072/073) · 2. Gegner-Ausdauer + Hechtsprung/Spezialangriffe gegen Rückwärts-Cheese ·
+3. ganze Figur dreht mit Zielrichtung · 4. NPC-Tagesablauf überarbeiten, Gedränge in Städten auflösen ·
+5. Questbrett in jeder größeren Stadt (Ort + NPC) · 6. Feinde greifen Bürger auch ohne Spieler an (BUG-075) ·
+7. Spieltest-Agent neu starten, Bericht in BUGS.md. Danach Phase 11 abschließen, dann 12–22.
+Werkzeug: Debug-Menü Strg+Shift+D („Erreichbarkeit prüfen“, „NPC-Zustand zeigen“, „Kollisionen zeigen“).

@@ -2,6 +2,32 @@
 
 Neueste oben.
 
+### Session 7 — 2026-09-25 · Phasen abschließen, dann Nutzer-Rückmeldung (Vorrang)
+**Vorgefunden:** Selbsttest 69/69; Phasen 6–10 offen.
+**Gemacht:** Phasen 6–10 technisch abgeschlossen (Deckung/Parade, 19 Waffen, Rarität je Exemplar, vier neue Klassen,
+aktive Talente, Umlernen). Phase 11 Teil 1: sechs neue Wesen (Kultist, Ghul, Geist, Bär, Wildhund, Hirsch). Selbsttest
+76/76. Alles nach `main` übernommen (auf Nutzerwunsch, Fast-Forward). Danach **Debug-Menü ausgebaut** (Strg+Shift+D, siehe
+CHANGELOG) und eine Erreichbarkeitsprüfung gebaut (Flutfüllung mit denselben Regeln wie `moveEnt`, im Debug-Menü
+„Erreichbarkeit prüfen“).
+**Nutzer-Rückmeldung (hat Vorrang vor Phase 11–22, §55 Kern vor Inhalt) — ALLES NOCH OFFEN:**
+1. Erreichbarkeit: „an viele Orte kommt man nicht hin“ → BUG-072/073 (Ursache gefunden, nicht behoben).
+2. Gegner lassen sich durch Rückwärtslaufen und Hauen austricksen → Hechtsprung/Ausfall und Spezialangriffe für Gegner.
+3. Ausdauer-System: Gegner haben tendenziell etwas mehr Ausdauer als der Spieler (Felder `stamina`/`maxStamina` gibt es
+   schon an allen Figuren — vorhandenes System prüfen und ausbauen, nicht neu erfinden).
+4. Waffenanimation: nicht nur die Waffe folgt der Maus, die ganze Figur dreht sich mit (`facing` aus `aim`).
+5. Städte überfüllt, alle stehen aneinander; Tagesablauf der NPCs überarbeiten (rollenabhängig §41, Abstand, keine Klumpen).
+6. Questbrett in jeder größeren Stadt: nennt Ort und NPC, zu dem man muss. Es gibt schon `board`-Props (Anschlagbrett)
+   in Eren, Nordfurt, Salzhafen, Kreuzweg, Aschfurt — dort ansetzen.
+7. Feinde greifen normale Bürger nicht an, wenn der Spieler nicht in der Nähe ist → BUG-075 (ungeprüft).
+8. Spieltest „wie ein Mensch“ per Hintergrund-Agent: wurde abgebrochen, **kein Bericht entstanden** — neu starten.
+**Gefundene neue Probleme:** BUG-072–075.
+**Offen geblieben:** Punkte 1–8 oben; Phase 11 Datenblätter im GDD; Phase 12 (dritte Bossphase, Regionsbosse §73) bis 22.
+**Nächster Schritt:** Reihenfolge wie oben 1 → 7, danach Spieltest. Für 1: generischer Durchgang am Ende von `genWorld`
+(vor `baseProps`): Flutfüllung ab Eren, für jede abgeschnittene Fläche per Dijkstra den billigsten Durchbruch suchen
+(Fels → Erde, blockierende feste Props entfernen, Wasser/Mauern nie), ohne `rnd()`; Nebelinsel bekommt eine Fähre in
+Salzhafen; Selbsttest „jeder Ort zu Fuß erreichbar“.
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 76/76 melden. Debug: Strg+Shift+D.
+
 ### Session 6 — 2026-09-25 · Spielstand, Karawane, Tiefhall („weiter“)
 **Vorgefunden:** Selbsttest 60/60; offen laut Plan: BUG-017/057 Spielstand 1,4 MB, BUG-011 Karawane, BUG-009 Tiefhall.
 **Gemacht:** Diff-Speichern der Props (1,43 → 0,53 MB, alte v2/v3-Stände getestet); Karawane als Zug mit Gespann,
