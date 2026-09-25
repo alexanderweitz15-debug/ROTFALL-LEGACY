@@ -434,7 +434,7 @@ const NPC_DAY = {
   aldric: { work: ['h62_58', 'front'], eve: ['h53_58', 'in'], night: ['h62_58', 'in'] },      // wohnt über der Werkstatt
   jorun:  { work: 'field', eve: ['h66_76', 'front'], night: ['h66_76', 'in'] },
   gerold: { work: ['h114_53', 'front'], till: 20, eve: ['h120_45', 'in'], night: ['h120_45', 'in'] },
-  brann:  { work: ['h138_53', 'front'], eve: ['h131_53', 'in'], night: ['h138_53', 'in'] },     // Schmiede → Schenke → über der Werkstatt
+  brann:  { work: ['h138_53', 'front'], till: 18, eve: ['h131_53', 'in'], night: ['h138_53', 'in'] },     // Schmiede → Schenke → über der Werkstatt
   ilva:   { work: [453, 257], eve: ['h449_249', 'in'], night: ['h449_249', 'in'] },            // Übungsplatz vor der Kapelle → Kapelle
 };
 function assignNpcDays() {                         // idempotent: bei Neustart und bei jedem Laden (Häuser werden neu erzeugt)
@@ -766,6 +766,8 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
+  for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
+    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith']) if (def[k] !== undefined) e[k] = def[k]; }
   for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
@@ -1118,7 +1120,7 @@ function controlPlayer(dt) {
   if (p.channel) { p.vx = p.vy = 0; p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x); return; }
   updateGuard(p, keys.has('shift') || touch.guard);
   if (dx || dy) {
-    const l = Math.hypot(dx, dy), sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : 1);   // in Deckung: kleine Schritte
+    const l = Math.hypot(dx, dy), sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : p.reloadUntil > performance.now() ? 0.6 : 1);   // Deckung: kleine Schritte; Armbrust spannen: langsam
     moveEnt(p, dx / l * sp, dy / l * sp);
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
     p.stepT = (p.stepT || 0) + dt; if (p.stepT > 300) { p.stepT = 0; sfx('step'); }
@@ -1140,6 +1142,9 @@ const FEEL = {
   spear:  { w: 0.3,  stop: 45, shake: 2.5, lunge: 4, stag: 0.4 },  axe:   { w: 0.6,  stop: 72, shake: 4.5, lunge: 5, stag: 0.7 },
   mace:   { w: 0.65, stop: 78, shake: 5, lunge: 4, stag: 0.9 },    great: { w: 1,    stop: 100, shake: 7, lunge: 9, stag: 1 },
   staff:  { w: 0.3,  stop: 40, shake: 2, lunge: 3, stag: 0.3 },    bow:   { w: 0.2,  stop: 30, shake: 1.5, lunge: 0, stag: 0.15 },
+  rapier: { w: 0.12, stop: 32, shake: 1.5, lunge: 8, stag: 0.15 }, hammer: { w: 1.15, stop: 118, shake: 8, lunge: 6, stag: 1.2 },
+  polearm:{ w: 0.7,  stop: 70, shake: 4.5, lunge: 5, stag: 0.6 },  crossbow: { w: 0.45, stop: 40, shake: 3, lunge: 0, stag: 0.5 },
+  wand:   { w: 0.1,  stop: 25, shake: 1, lunge: 0, stag: 0.1 },
   none:   { w: 0.15, stop: 35, shake: 2, lunge: 4, stag: 0.2 },
 };
 const stagOf = c => { const w = c && c.equip && c.equip.weapon, it = w && ITEMS[w.key]; return it && it.stagger ? Math.min(1.2, it.stagger * 0.6) : feelOf(c).stag; };
@@ -1150,6 +1155,8 @@ function attack(c, forceDir) {
   const w = c.equip.weapon, it = w ? ITEMS[w.key] : null;
   const cost = it ? it.stam : 4;
   if (c.stamina < cost) { if (c === S.player && chance(0.02)) UI.toast('Zu erschöpft'); return; }
+  if (it && it.reload && c.reloadUntil > performance.now()) return;   // Armbrust wird gespannt
+  if (it && it.manaShot) { if ((c.mana || 0) < it.manaShot) { if (c === S.player && !(c.manaWarn > performance.now())) { c.manaWarn = performance.now() + 1500; UI.toast(c.maxMana ? 'Zu wenig Mana für den Zauberstab' : 'Den Zauberstab führt nur, wer Magie gelernt hat (Magier, Kleriker, Paladin).'); } return; } c.mana -= it.manaShot; }
   c.stamina -= cost;
   c.swingDur = it ? it.speed : 450;
   c.atkCd = c.swingDur * 0.55;
@@ -1186,8 +1193,9 @@ function resolveSwing(c) {
       break;
     }
     if (f.kind === 'npc' && !isHostile(c, f)) provoke(f, c);   // Angriff auf Neutrale hat Folgen
-    hit(c, f, mult, kind);
-    if (it && it.wtype !== 'spear') break;                   // nur Speer trifft mehrere in Linie
+    const tip = it && it.sweep ? (d < reach * 0.45 ? 0.6 : d > reach * 0.7 ? 1.15 : 1) : 1;   // Hellebarde: an der Spitze stark, am Schaft halb
+    hit(c, f, mult * tip, kind);
+    if (it && it.wtype !== 'spear' && !it.sweep) break;      // Speer trifft in Linie, Hellebarde fegt den Bogen
   }
   if (!hitAny) {
     const px = c.x + Math.cos(c.aim) * reach, py = c.y + Math.sin(c.aim) * reach;
@@ -1197,8 +1205,12 @@ function resolveSwing(c) {
 }
 
 function shoot(c, it, mult = 1) {
-  S.projectiles.push({ id: uid(), kind:'arrow', map: c.map, x: c.x + Math.cos(c.aim) * 14, y: c.y - 12 + Math.sin(c.aim) * 8,
-    vx: Math.cos(c.aim) * 7.2, vy: Math.sin(c.aim) * 7.2, owner: c.id, dmg: damageOf(c) * mult, life: 1400, team: teamOf(c) });
+  const bolt = it.wtype === 'crossbow', spark = it.wtype === 'wand', v = bolt ? 10 : spark ? 6.2 : 7.2;
+  const dmg = spark ? (it.dmg + (c.attributes?.intelligence || 8) * 0.9) * spellMul(c) * mult : damageOf(c) * mult;
+  S.projectiles.push({ id: uid(), kind: bolt ? 'bolt' : spark ? 'spark' : 'arrow', map: c.map, x: c.x + Math.cos(c.aim) * 14, y: c.y - 12 + Math.sin(c.aim) * 8,
+    vx: Math.cos(c.aim) * v, vy: Math.sin(c.aim) * v, owner: c.id, dmg, ap: it.ap || 0, life: bolt ? 1100 : 1400, team: teamOf(c) });
+  if (bolt) { c.reloadUntil = performance.now() + it.reload; if (c === S.player) sfx('metal', 0.3); }   // abgedrückt: jetzt spannen
+  if (spark) { fx(c.x + Math.cos(c.aim) * 16, c.y - 14 + Math.sin(c.aim) * 8, 'frost', 4); sfx('magic', 0.3, earVol(c)); }
 }
 
 function normAng(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
@@ -1228,9 +1240,11 @@ function hostilesOf(c) {
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && attacker.equip.weapon, it = w ? ITEMS[w.key] : null;
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * (attacker.disarmed ? 0.4 : 1) : damageOf(attacker)) * mult;
+  const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
+  if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
   if (attacker.titleClass === 'necromancer') dmg *= 0.85;             // Makel: Die Toten zehren
   // Kritisch
-  const critChance = 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit');
+  const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit');
   const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < 1;
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
@@ -1241,15 +1255,17 @@ function hit(attacker, target, mult, kind = 'physical') {
   const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.6 : armorOf(target)) * (1 - ap);
   const off = target.equip && target.equip.offhand;
   // Aktive Deckung / Parade (nur der Spieler; eigenes Feld cover — guard ist das Flag der Stadtwachen). Rüstung wirkt vor dem Block.
-  const cov = target.cover ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55)) : false;
+  const crush = it && it.crush;                                      // Kriegshammer: kein Schild hält ihn, Deckung kostet doppelt
+  const cov = target.cover ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
   if (cov === true) return;
-  if (off && !target.cover && cov !== 'broken' && chance(ITEMS[off.key].block * 0.7) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
+  if (off && !crush && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
     fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
   dmg = Math.max(1, dmg - armor * 0.55);
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
+  if (crush && target.alive && !target.downed) { target.stagger = Math.max(target.stagger || 0, MONSTERS[target.mtype]?.boss ? 300 : 650); target.swing = 0; target.telegraph = 0; target.windup = false; }   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
   const fl = feelOf(attacker), mine = attacker === S.player;
@@ -1525,7 +1541,7 @@ function updateProjectiles(dt) {
 function hurtFromProjectile(attacker, target, p) {
   const crit = chance(0.12);
   let dmg = p.dmg * (crit ? 2 : 1) * (p.mult || 1);
-  const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.2 : armorOf(target));
+  const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.2 : armorOf(target)) * (1 - (p.ap || 0));   // Bolzen schlagen durch
   dmg = Math.max(1, dmg - armor * 0.5);
   if (p.kind === 'fire') { fx(p.x, p.y, 'fire', 12); sfx('fire', 0.5, earVol(target)); }
   if (p.kind === 'shadow') fx(p.x, p.y, 'shadow', 10);
@@ -2784,7 +2800,7 @@ function shopStock(npc) {
     for (let i = 0; i < 7; i++) { const k = pick(pool); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
   }
   const tk = S.towns[npc.town || 'eren'] ? npc.town || 'eren' : null;      // Orte ohne Markt (Vharnholm) handeln nur mit Waren
-  if (!tk) return npc._stock;
+  if (!tk || npc.market === false) return npc._stock;          // Schmiede u. ä.: nur eigene Ware, kein Getreide
   const town = S.towns[tk];
   SIM.notePrices(tk);
   const goods = ['grain', 'salt', 'cloth', 'pelt'].filter(g => town.stock[g] >= 1).map(g => ({ key: g, count: Math.floor(town.stock[g]) }));
@@ -3388,6 +3404,7 @@ function guarded(attacker, target, dmg) {
     fx(target.x + Math.cos(target.aim) * 14, target.y - 14 + Math.sin(target.aim) * 8, 'spark', 14); float(target, 'Parade!', 'rgba(240,220,150,ALPHA)');
     sfx('metal', 1, 1); hitStop = Math.max(hitStop, 120); camShake(4, 120); target.stamina = Math.max(0, target.stamina - 3);
     g.since = -1e9;                                                  // eine Parade je Deckung, danach nur noch Block
+    target.riposteUntil = now + 1200;                                // Rapier: der nächste Stich ist eine Riposte
     return true;
   }
   const shield = ITEMS[target.equip?.offhand?.key]?.block, cost = dmg * (shield ? 0.8 : 1.2);
@@ -3788,6 +3805,24 @@ export function selftest() {
     const p = stage(); p.stamina = 100; p.dodgeCd = 0; keys.clear(); p.aim = 0; dodge();
     let vulnerableEarly = false; for (let t = 0; t < DODGE.dur; t += 16) { controlPlayer(16); if (p.dodge && !p.invuln && p.dodge.t < DODGE.dur - 56) vulnerableEarly = true; }
     return !vulnerableEarly && !p.dodge && !p.invuln && p.landT > performance.now();
+  }));
+  ok('Waffen (Phase 7): jede Waffe hat Gefühl (FEEL) und Bild; Rapier-Riposte nach Parade, Hammer ignoriert Schild und lässt taumeln, Hellebarde fegt (Spitze stärker), Armbrust spannt nach, Zauberstab kostet Mana', sandbox(() => {
+    const weapons = Object.entries(ITEMS).filter(([, it]) => it.slot === 'weapon');
+    const data = weapons.every(([k, it]) => FEEL[it.wtype] && SP.weaponSprite(k, it.rarity, it.holy, it.wtype).cv.width > 0);
+    const p = stage(); p.aim = 0; combat = S.ents.__a;
+    const mk = (x, y = 0) => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + x; e.y = p.y + y; e.stagger = 0; return e; };
+    const dealt = (w, e, mult = 1) => { p.equip.weapon = mkItem(w); const h = e.hp; seedRng(4); hit(p, e, mult); return h - e.hp; };
+    const a = mk(30), plain = dealt('rapier', a); p.riposteUntil = performance.now() + 1000; const rip = dealt('rapier', mk(30));
+    const sh = mk(30); sh.equip = { offhand: { key: 'kite_shield' } }; ITEMS.__wall = { slot: 'offhand', block: 1.43 }; sh.equip.offhand = { key: '__wall' };
+    const blockedSword = dealt('longsword', sh), crushed = dealt('warhammer', sh); delete ITEMS.__wall; sh.equip.offhand = null; a.alive = sh.alive = false;
+    const near = mk(24, 0), far = mk(80, 6); p.equip.weapon = mkItem('halberd'); const hn = near.hp, hf = far.hp; seedRng(4); resolveSwing(p);
+    p.equip.weapon = mkItem('crossbow'); p.stamina = 100; p.swing = 0; p.atkCd = 0; const n0 = S.projectiles.length; resolveSwing(p);
+    const shot = S.projectiles.length === n0 + 1 && S.projectiles.at(-1).kind === 'bolt' && p.reloadUntil > performance.now();
+    attack(p); const noReshoot = !(p.swing > 0);
+    p.reloadUntil = 0; p.equip.weapon = mkItem('wand'); p.maxMana = 50; p.mana = 5; p.swing = 0; p.atkCd = 0; attack(p); const paid = p.mana === 1;
+    p.swing = 0; p.atkCd = 0; attack(p); const refused = !(p.swing > 0);
+    S.projectiles.length = n0;
+    return data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused;
   }));
   ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
     const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';

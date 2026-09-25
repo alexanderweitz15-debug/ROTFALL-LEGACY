@@ -655,6 +655,38 @@ const DESIGNS = {
     g.r(21, 4, 3, 3, C.b); g.p(22, 3, C.hi); g.p(21, 4, C.hi); g.p(24, 5, C.sh); g.p(22, 7, C.dk); g.p(23, 5, '#cfe6ff');
     return { gx: 6, gy: 5, blade: null, orb: [22, 5] };
   },
+  rapier(g, St) {                                        // Korbgefäß, lange schmale Klinge, Ricasso
+    wrapGrip(g, 2, 4, 4); g.p(1, 4, IRON().b); g.p(0, 4, IRON().hi);
+    g.r(5, 1, 1, 7, IRON().b); g.p(5, 1, IRON().hi); g.p(6, 1, IRON().sh); g.p(6, 7, IRON().sh); g.p(4, 2, IRON().sh); g.p(4, 6, IRON().sh);   // Bügel
+    g.r(6, 4, 3, 1, St.b); g.r(9, 4, 17, 1, St.hi); g.p(26, 4, St.b); g.p(27, 4, St.sh);
+    return { gx: 3, gy: 4, blade: [9, 26, 4] };
+  },
+  warhammer(g, St) {                                     // langer Schaft, Hammerkopf, Rückseitendorn
+    const W = WOOD(); g.r(1, 7, 20, 1, W.b); g.r(1, 8, 20, 1, W.sh); wrapGrip(g, 2, 6, 7); g.p(10, 7, W.hi);
+    g.r(19, 3, 5, 9, St.b); g.r(19, 3, 5, 1, St.hi); g.r(23, 4, 1, 8, St.sh); g.r(19, 11, 5, 1, St.dk);
+    g.r(24, 5, 2, 5, St.sh); g.p(25, 5, St.b);                              // Schlagfläche
+    g.p(18, 6, St.sh); g.p(17, 6, St.sh); g.p(16, 7, St.sh);                  // Dorn
+    return { gx: 5, gy: 7, blade: null };
+  },
+  halberd(g, St) {                                       // Schaft, Beilblatt, Haken, Stoßspitze
+    const W = WOOD(); g.r(1, 7, 29, 1, W.b); g.r(1, 8, 29, 1, W.sh); g.p(10, 7, W.hi); g.p(20, 8, W.dk);
+    for (const [x, y0, y1] of [[27, 1, 7], [28, 0, 7], [29, 1, 7], [30, 2, 7]]) g.r(x, y0, 1, y1 - y0 + 1, x === 28 ? St.hi : St.b);
+    g.p(27, 9, St.sh); g.p(28, 10, St.sh);                                   // Haken
+    g.r(31, 7, 5, 1, St.hi); g.r(31, 8, 4, 1, St.b); g.p(36, 7, St.sh);      // Spitze
+    return { gx: 9, gy: 7, blade: [31, 36, 7] };
+  },
+  crossbow(g, St) {                                      // Schaft nach vorn, Bogen quer, Sehne, Abzug
+    const W = WOOD(); g.r(1, 5, 16, 2, W.b); g.r(1, 6, 16, 1, W.sh); g.p(3, 5, W.hi); g.r(2, 7, 2, 2, W.sh);   // Schaft, Kolben
+    g.r(15, 0, 1, 12, St.b); g.p(15, 0, St.hi); g.p(14, 0, St.sh); g.p(14, 11, St.sh);                            // Bogen (Stahl)
+    for (let y = 1; y <= 10; y++) g.p(12, y, '#c9bfa6');                                                          // Sehne gespannt
+    g.p(8, 7, IRON().b); g.p(8, 8, IRON().sh);                                                                     // Abzug
+    return { gx: 4, gy: 6, blade: null };
+  },
+  wand(g) {                                              // kurzer Stab, gebundener Kristall
+    const W = WOOD(), C = ramp('#6f8fd0'); g.r(1, 3, 10, 1, W.b); g.r(1, 4, 10, 1, W.sh); g.p(4, 3, W.dk);
+    g.r(11, 2, 3, 3, C.b); g.p(12, 1, C.hi); g.p(11, 2, C.hi); g.p(13, 4, C.sh); g.p(12, 3, '#e8f4ff');
+    return { gx: 2, gy: 3, blade: null, orb: [12, 3] };
+  },
   gorak_cleaver(g, St) {      // eigener dunkler Stahl                                 // riesiges Hackmesser: Loch, Rost, gezackte Kante
     wrapGrip(g, 1, 7, 7); const R = ramp('#7a4a2a'); St = ramp('#7d766a');
     g.r(8, 2, 15, 9, St.b); g.r(8, 2, 15, 1, St.hi); g.r(8, 10, 15, 1, St.sh); g.r(22, 3, 1, 7, St.hi);
@@ -665,8 +697,10 @@ const DESIGNS = {
   },
 };
 const SIZE = { rusty_sword: [18, 7], longsword: [25, 9], greatsword: [32, 11], axe: [18, 13], greataxe: [27, 17], mace: [17, 11],
-  spear: [36, 10], dagger: [14, 7], pickaxe: [17, 15], staff: [26, 11], gorak_cleaver: [25, 13] };
-const BY_TYPE = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff' };
+  spear: [36, 10], dagger: [14, 7], pickaxe: [17, 15], staff: [26, 11], gorak_cleaver: [25, 13],
+  rapier: [28, 9], warhammer: [27, 13], halberd: [37, 12], crossbow: [18, 12], wand: [15, 6] };
+const BY_TYPE = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff',
+  rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand' };
 
 export function weaponSprite(key, rarity, holy, wtype) {
   const k = key + '|' + rarity + '|' + (holy ? 1 : 0);

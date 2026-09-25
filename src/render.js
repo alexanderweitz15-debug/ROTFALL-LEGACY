@@ -1247,7 +1247,7 @@ export function drawHumanoid(e, now, override) {
     return;
   }
   const w = e.equip && e.equip.weapon, wit = w ? ITEMS[w.key] || {} : null;
-  const pz = SP.poseOf(e, now, wit && wit.wtype === 'bow');
+  const pz = SP.poseOf(e, now, wit && ['bow', 'crossbow', 'wand'].includes(wit.wtype));   // Fernwaffen: Zielhaltung statt Schwung
   if (pz.pose === 'tuck') {                                         // Ausweichrolle: Kugel in 90°-Schritten gedreht
     const f = SP.humanFrame(spec, 'S', 'tuck'), sgn = e.dodge && e.dodge.ax < 0 ? -1 : 1;
     c.save(); c.translate(Math.round(x), Math.round(y - 8)); c.rotate(pz.rot * Math.PI / 2 * sgn);
@@ -1281,14 +1281,14 @@ export function drawHumanoid(e, now, override) {
 const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
 function swingOf(wt, sw, arc) {
   if (sw <= 0) return { a: 0.6, ext: 0 };
-  if (wt === 'spear' || wt === 'dagger') {                          // Stoß: zurückziehen, vorschnellen, einholen
-    const back = wt === 'spear' ? -9 : -4, fwd = wt === 'spear' ? 22 : 11;
+  if (wt === 'spear' || wt === 'dagger' || wt === 'rapier') {       // Stoß: zurückziehen, vorschnellen, einholen
+    const back = wt === 'spear' ? -9 : wt === 'rapier' ? -6 : -4, fwd = wt === 'spear' ? 22 : wt === 'rapier' ? 17 : 11;
     if (sw < 0.3) return { a: 0.15 * (1 - sw / 0.3), ext: back * eo(sw / 0.3) };
     if (sw < 0.45) return { a: 0, ext: back + (fwd - back) * ei((sw - 0.3) / 0.15) };
     return { a: 0, ext: fwd * (1 - eo((sw - 0.45) / 0.55)) };
   }
-  const heavy = wt === 'great' || wt === 'axe' || wt === 'mace';
-  const w0 = heavy ? 0.36 : 0.28, half = arc / 2;
+  const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm';
+  const w0 = wt === 'hammer' ? 0.44 : heavy ? 0.36 : 0.28, half = arc / 2;           // Hammer: langes Ausholen
   const start = -half - (heavy ? 0.75 : 0.4), end = half + (heavy ? 0.5 : 0.28);
   if (sw < w0) return { a: 0.6 + (start - 0.6) * eo(sw / w0), ext: heavy ? -3 * sw / w0 : 0 };       // ausholen
   if (sw < 0.5) return { a: start + (end - start) * ei((sw - w0) / (0.5 - w0)), ext: 2 };            // Schlag
@@ -1301,13 +1301,14 @@ function drawWeapon(c, e, now, it) {
   const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
   const W = SP.weaponSprite(e.equip.weapon.key, it.rarity, it.holy, wt);
-  const sv = wt === 'bow' ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
+  const ranged = wt === 'bow' || wt === 'crossbow' || wt === 'wand';
+  const sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
   const sgn = Math.cos(dir) < 0 ? -1 : 1;                           // nach links gespiegelt: Waffe hängt unten, Hieb von oben
   const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + low - (e.cover ? 4 : 0) + Math.sin(dir) * (5 + sv.ext * 0.6);   // kniend: Hand tiefer
   const len = (W.cv.width - W.gx) * PX;
   // Klingenspur: dieselbe Kurve, ein paar Schritte zurück ausgewertet — die Spur folgt genau der Klinge
   if (sw > 0 && !it.ranged && !A) {
-    const heavy = wt === 'great' || wt === 'axe' || wt === 'mace', thrust = wt === 'spear' || wt === 'dagger';
+    const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm', thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
     const col = W.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210';
     for (let k = 1; k <= 7; k++) {
       const past = sw - k * 0.022; if (past <= 0) break;
@@ -1320,8 +1321,8 @@ function drawWeapon(c, e, now, it) {
     }
   }
   c.save(); c.translate(hx, hy);
-  c.rotate(wt === 'bow' ? dir : a);
-  if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);          // nach Blickrichtung, nie mitten im Schwung
+  c.rotate(ranged ? dir : a);
+  if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);          // nach Blickrichtung, nie mitten im Schwung (Bogen ist symmetrisch)
   c.drawImage(W.cv, -W.gx * PX, -W.gy * PX, W.cv.width * PX, W.cv.height * PX);
   if (W.orb) {                                                      // Kristall des Stabs flackert (Magie sichtbar, kein Glühschleier)
     const f = ((now / 90 + (e.seed || 0)) | 0) % 5;
@@ -1528,6 +1529,12 @@ function drawProjectile(p) {
     ctx.fillStyle = '#c2582a'; ctx.fillRect(-6, -6, 12, 12); ctx.fillRect(-8, -4, 16, 8);
     ctx.fillStyle = '#f0b050'; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#ffe6a8'; ctx.fillRect(0, -2, 4, 4);
   }
+  else if (p.kind === 'bolt') {                                      // Armbrustbolzen: kurz, dick, Eisenspitze
+    ctx.fillStyle = OUT_COL; ctx.fillRect(-7, -2, 16, 4); ctx.fillStyle = '#8a7658'; ctx.fillRect(-5, -1, 10, 2);
+    ctx.fillStyle = '#6d6154'; ctx.fillRect(5, -2, 4, 4); ctx.fillStyle = '#c9bfa6'; ctx.fillRect(-7, -2, 2, 4); }
+  else if (p.kind === 'spark') {                                     // Funke des Zauberstabs
+    ctx.fillStyle = 'rgba(120,170,230,.5)'; ctx.fillRect(-10, -2, 8, 4);
+    ctx.fillStyle = '#8fb7e8'; ctx.fillRect(-3, -4, 8, 8); ctx.fillStyle = '#e8f4ff'; ctx.fillRect(-1, -2, 4, 4); }
   else {                                                             // Schattenblitz
     ctx.fillStyle = 'rgba(60,34,70,.7)'; ctx.fillRect(-14, -2, 8, 4);
     ctx.fillStyle = '#5b3a6b'; ctx.fillRect(-6, -6, 12, 12); ctx.fillRect(-8, -4, 16, 8);
