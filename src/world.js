@@ -1138,7 +1138,7 @@ export function genDeep() {
   for (const dx of [-5, 5]) { prop('campfire_static', throne.cx + dx, throne.y + 3, { ...o, solid: true, label: 'Kohlebecken' }); prop('banner_torn', throne.cx + dx, throne.y, o); }
   for (let i = 0; i < 4; i++) prop('broken_pillar', throne.x + 2 + i * 6, throne.y + throne.h - 3, { ...o, solid: true, r: 11, intact: true });
   // Hort und Versteck
-  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['plate_cuirass', 'iron', 'iron', 'potion'], label: 'Tiefhall-Hort' });
+  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['kings_iron', 'plate_cuirass', 'iron', 'potion'], label: 'Tiefhall-Hort' });
   for (let i = 0; i < 3; i++) prop(pick(['crate_stack', 'barrel', 'sack']), ri(hoard.x, hoard.x + hoard.w - 1), ri(hoard.y, hoard.y + hoard.h - 1), { ...o, solid: true });
   prop('chest', secret.cx, secret.cy, { ...o, loot: ['kite_shield', 'potion'], label: 'Vergessene Nische' });
   for (const r of rooms) for (let i = 0; i < 2; i++) prop('torch', ri(r.x, r.x + r.w - 1), r.y, o);   // Fackeln an den Nordwänden

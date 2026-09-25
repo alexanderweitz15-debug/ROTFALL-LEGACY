@@ -21,6 +21,8 @@ export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Se
 export const ITEMS = {
   rusty_sword:  { name:'Rostiges Kurzschwert', slot:'weapon', wtype:'sword', dmg:7, reach:40, arc:1.5, speed:520, stam:7, rarity:'common', value:18, skill:'onehanded' },
   longsword:    { name:'Langschwert', slot:'weapon', wtype:'sword', dmg:12, reach:46, arc:1.6, speed:560, stam:9, rarity:'uncommon', value:90, skill:'onehanded' },
+  frostblade:   { name:'Frostklinge', slot:'weapon', wtype:'sword', dmg:16, reach:48, arc:1.6, speed:560, stam:9, rarity:'epic', value:320, skill:'onehanded',
+                  lore:'Königseisen aus der Tiefhall, in Nordfurt geschmiedet. Im Warmen beschlägt die Klinge.' },
   greatsword:   { name:'Zweihänder', slot:'weapon', wtype:'great', dmg:22, reach:56, arc:2.5, speed:980, stam:18, rarity:'rare', value:220, skill:'twohanded', twohand:true },
   axe:          { name:'Beil', slot:'weapon', wtype:'axe', dmg:11, reach:38, arc:1.2, speed:680, stam:10, ap:0.25, rarity:'common', value:34, skill:'onehanded', tool:'chop' },
   greataxe:     { name:'Große Axt', slot:'weapon', wtype:'great', dmg:25, reach:52, arc:2.2, speed:1080, stam:20, ap:0.35, rarity:'rare', value:260, skill:'twohanded', twohand:true, tool:'chop' },
@@ -66,6 +68,7 @@ export const ITEMS = {
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
   soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
+  kings_iron:   { name:'Königseisen', slot:'material', stack:1, rarity:'rare', value:0, lore:'Ein Barren mit dem Hammerzeichen der alten Bergleute. Kalt, auch in der Hand.' },
   ancestor_urn: { name:'Ahnenurne', slot:'material', stack:1, rarity:'epic', value:0, lore:'Asche von tausend Namen. Wer sie trägt, hört sie flüstern.' },
 };
 
@@ -300,6 +303,9 @@ export const NPCS = [
   { key:'mira', name:'Mira', prof:'Hüterin des Hains', faction:null, age:66, home:'grove',
     traits:['geduldig','gütig'], attrs:{willpower:14,perception:13}, cls:'wanderer', recruit:false,
     greet:'„Tritt leise. Hier wachsen Dinge, die älter sind als dein Königreich.“' },
+  { key:'brann', name:'Brann', prof:'Meisterschmiedin', faction:'valen', age:44, home:'northsmith',
+    traits:['stolz','genau'], attrs:{strength:13,crafting:16}, cls:'warrior', recruit:false, smith:true,
+    greet:'„Nordfurter Stahl hält. Aber es gab einmal Besseres — tief unter dem Frostkamm.“' },
   { key:'sael', name:'Sael', prof:'Totenschreiber', faction:'undead', age:0, home:'vharnholm', undead:true,
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
     pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','dagger','traveler_cloak'],
@@ -351,6 +357,9 @@ export const QUESTS = {
   q_graverobbers: { name:'Grabräuber in der Asche', giver:'sael', desc:'Lebende graben in der Nekropole und am Knochenwald nach Grabgut. Sie nehmen die Namen mit. Bring fünf von ihnen zum Schweigen — dann schreibt Vharnholm deinen Namen in die gute Spalte.',
     objectives:[{type:'kill',target:'bandit',count:5,text:'Grabräuber töten'}],
     reward:{gold:90,xp:140,rep:{undead:15,valen:-5}}, turnin:'sael' },
+  q_kingsiron: { name:'Königseisen', giver:'brann', desc:'Unter dem Frostkamm liegt die Tiefhall. Die alten Bergleute schmolzen dort Eisen nur für ihren König — und der König soll sie nie verlassen haben. Bring mir einen Barren aus seinem Hort, und ich schmiede dir eine Klinge, wie Nordfurt keine zweite hat.',
+    objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
+    reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
   q_grove: { name:'Der Ruf des Hains', giver:'mira', desc:'Das Rudel der Wolfsschlucht treibt sich im Hain herum, seit die Quelle krank ist. Vertreib vier Wölfe und bring mir drei Heilkraut für die Quelle. Dann sehen wir, ob der Wald dich will.',
     objectives:[{type:'kill',target:'wolf',count:4,text:'Wölfe vertreiben'}, {type:'item',target:'herb',count:3,text:'Heilkraut für die Quelle'}],
     reward:{xp:150}, turnin:'mira', pact:true },

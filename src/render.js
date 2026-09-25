@@ -933,16 +933,18 @@ function drawProp(e, now) {
       ctx.fillStyle = '#a8adb4'; ctx.fillRect(x - 1, y - 26, 3, 20); ctx.fillStyle = '#5a4430'; ctx.fillRect(x - 3, y - 8, 7, 2);
       ctx.fillStyle = '#5a4430'; ctx.fillRect(x + 7, y - 24, 2, 22); ctx.fillStyle = '#8a8f98'; ctx.fillRect(x + 8, y - 24, 6, 7);
       break; }
-    case 'throne': {                                      // Thron unter dem Eis (Tiefhall): Blockstein, hohe Lehne, Reif, blasser Eisschein
-      shadow(x, y + 5, 20, .4);
-      ctx.fillStyle = '#3e4449'; ctx.fillRect(x - 18, y - 4, 36, 8);                                         // Stufe
-      ctx.fillStyle = '#566068'; ctx.fillRect(x - 14, y - 42, 28, 30);                                       // Lehne
-      ctx.fillStyle = '#6b767e'; ctx.fillRect(x - 14, y - 42, 28, 3); ctx.fillRect(x - 10, y - 48, 20, 7);  // Krone der Lehne
-      ctx.fillStyle = '#4a5359'; ctx.fillRect(x - 17, y - 22, 6, 18); ctx.fillRect(x + 11, y - 22, 6, 18); // Armlehnen
-      ctx.fillStyle = '#5e6a72'; ctx.fillRect(x - 11, y - 14, 22, 10);                                       // Sitz
-      ctx.fillStyle = '#2f353a'; ctx.fillRect(x - 1, y - 38, 2, 20); ctx.fillRect(x - 6, y - 32, 12, 2);    // eingemeißelter Hammer
-      ctx.fillStyle = 'rgba(200,230,245,.55)'; ctx.fillRect(x - 14, y - 42, 9, 2); ctx.fillRect(x + 6, y - 30, 8, 2); ctx.fillRect(x - 17, y - 22, 6, 2);   // Reif
-      ctx.fillStyle = 'rgba(150,210,245,.18)'; ctx.beginPath(); ctx.ellipse(x, y - 24, 22, 28, 0, 0, 7); ctx.fill();
+    case 'throne': {                                      // Thron unter dem Eis (Tiefhall): breite Stufe, gestufte Lehne, Armlehnen, Eiskristall
+      shadow(x, y + 5, 24, .4);
+      ctx.fillStyle = '#353b40'; ctx.fillRect(x - 24, y - 2, 48, 7); ctx.fillStyle = '#454c52'; ctx.fillRect(x - 24, y - 2, 48, 2);   // Stufe
+      ctx.fillStyle = '#4f5960'; ctx.fillRect(x - 17, y - 40, 34, 28);                                                       // Lehne
+      for (const [dx, h] of [[-17, 6], [-7, 10], [3, 10], [13, 6]]) ctx.fillRect(x + dx, y - 40 - h, 4 + (dx === -7 || dx === 3 ? 0 : 0), h);   // Zinnen
+      ctx.fillStyle = '#5d6970'; ctx.fillRect(x - 7, y - 50, 14, 10);                                                        // Mittelstück
+      ctx.fillStyle = '#434c52'; ctx.fillRect(x - 22, y - 20, 8, 18); ctx.fillRect(x + 14, y - 20, 8, 18);                  // Armlehnen
+      ctx.fillStyle = '#5a656c'; ctx.fillRect(x - 22, y - 22, 8, 3); ctx.fillRect(x + 14, y - 22, 8, 3);
+      ctx.fillStyle = '#39414a'; ctx.fillRect(x - 14, y - 12, 28, 10);                                                       // Sitz (Schatten)
+      ctx.fillStyle = '#9fd8ff'; ctx.beginPath(); ctx.moveTo(x, y - 36); ctx.lineTo(x + 5, y - 29); ctx.lineTo(x, y - 22); ctx.lineTo(x - 5, y - 29); ctx.fill();   // Eiskristall
+      ctx.fillStyle = 'rgba(210,235,250,.5)'; ctx.fillRect(x - 17, y - 40, 10, 2); ctx.fillRect(x + 8, y - 26, 9, 2); ctx.fillRect(x - 22, y - 22, 8, 1);    // Reif
+      ctx.fillStyle = 'rgba(150,210,245,.16)'; ctx.beginPath(); ctx.ellipse(x, y - 26, 26, 30, 0, 0, 7); ctx.fill();
       break; }
     case 'altar_small': {                                 // Altar mit Tuch des Ordens
       shadow(x, y + 4, 14, .3);
@@ -1344,6 +1346,11 @@ function sideDir(e) {
 function drawCreature(e, now) {
   const m = MONSTERS[e.mtype] || {};
   const p = m.pal || {};
+  if (e.special && e.special.kind === 'frost' && e.special.t > 0) {       // Hrodvars Eiskreis: Ansage-Ring, zieht sich zusammen
+    const k = 1 - e.special.t / 900; ctx.fillStyle = `rgba(160,215,245,${0.35 + 0.4 * k})`;
+    for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * 105) - 2, Math.round(e.y + Math.sin(a) * 66) - 2, 4, 4); }
+    ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 105, 66, 0, 0, 7); ctx.fill();
+  }
   if (e.mtype === 'wolf' || e.mtype === 'boar') {
     const moving = e.vx || e.vy, sw = e.swing || 0;
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
@@ -1549,12 +1556,13 @@ function drawFx(now) {
     }
     else if (f.type === 'shadow') { ctx.fillStyle = 'rgba(110,74,125,.8)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'fire') { ctx.fillStyle = `rgba(${230 - t * 80 | 0},${140 - t * 90 | 0},60,.9)`; ctx.fillRect(f.x, f.y, f.s, f.s); }
+    else if (f.type === 'frost') { ctx.fillStyle = 'rgba(190,230,250,.85)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'necro') { ctx.fillStyle = 'rgba(78,143,122,.7)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'ghost') {                         // Nachbild der Ausweichrolle: helle Silhouette der gerollten Figur
       const pl = S.player; if (pl) { const fr = SP.flashOf(SP.humanFrame(SP.humanSpec(pl), 'S', 'tuck'));
         ctx.globalAlpha *= 0.3; ctx.drawImage(fr, f.x - 10 * PX, f.y - 8 - 16 * PX, fr.width * PX, fr.height * PX); } }
     else if (f.type === 'shock') {                         // Bodenbeben: Staubring breitet sich aus
-      const r = 14 + t * 110; ctx.fillStyle = t < 0.5 ? '#8a7a5a' : '#5a4d38';
+      const r = 14 + t * 110; ctx.fillStyle = f.ice ? (t < 0.5 ? '#bfe3f5' : '#7fb0c8') : t < 0.5 ? '#8a7a5a' : '#5a4d38';   // ice: Hrodvars Eiskreis
       for (let i = 0; i < 40; i++) { const an = i / 40 * Math.PI * 2, j = (i * 7) % 3 * 2;
         ctx.fillRect(Math.round(f.x + Math.cos(an) * (r + j)) - 2, Math.round(f.y + Math.sin(an) * (r + j) * 0.6) - 2, 4, 4); } }
     else if (f.type === 'ring') {                          // Segen/Stärkung: Pixelring, der sich ausbreitet

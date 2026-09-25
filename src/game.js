@@ -96,6 +96,7 @@ function speedOf(c) {
   const ch = c.equip.chest && ITEMS[c.equip.chest.key].slow || 0;
   s *= (1 - off - ch);
   if (c.stamina <= 0) s *= 0.55;
+  if (c.status && c.status.some(t => t.key === 'chilled')) s *= 0.6;   // Hrodvars Eiskreis
   s *= (1 + tfx(c, 'speed')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c);
 }
@@ -253,6 +254,7 @@ const NPC_SPOTS = {
   altvharn:[359,385], necrotower:[392,350],                 // Totenreich: Ysra am Ahnenaltar, Vhal im Schattenkreis
   grove:[82,290],                                           // Westwald: Mira im Alten Hain
   vharnholm:[489,441],                                      // Totenreich: Sael am Markt von Vharnholm
+  northsmith:[139,57],                                      // Nordfurt: Brann vor der Schmiede
 };
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
@@ -269,7 +271,7 @@ function spawnNpcDef(def) {
     c.home = home; c.anchor = { x: pos.x, y: pos.y };
     if (def.undead) { c.pal.skin = '#b9b3a2'; c.pal.glow = def.key === 'vhal' ? '#b07ae0' : '#4e8f7a'; }
     c.hooded = !!def.undead || def.faction === 'undead' || ['morvath', 'rook', 'kelan'].includes(def.key);
-    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', morvath:'staff' }[def.key];
+    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', morvath:'staff' }[def.key];
     if (w) c.equip.weapon = mkItem(w);
     if (def.key === 'borin') { c.equip.offhand = mkItem('kite_shield'); c.pal.shield = '#4a3f30'; c.pal.shieldBoss = '#8a8172'; }
     if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass');
@@ -428,6 +430,7 @@ const NPC_DAY = {
   aldric: { work: ['h62_58', 'front'], eve: ['h53_58', 'in'], night: ['h62_58', 'in'] },      // wohnt über der Werkstatt
   jorun:  { work: 'field', eve: ['h66_76', 'front'], night: ['h66_76', 'in'] },
   gerold: { work: ['h114_53', 'front'], till: 20, eve: ['h120_45', 'in'], night: ['h120_45', 'in'] },
+  brann:  { work: ['h138_53', 'front'], eve: ['h131_53', 'in'], night: ['h138_53', 'in'] },     // Schmiede → Schenke → über der Werkstatt
 };
 function assignNpcDays() {                         // idempotent: bei Neustart und bei jedem Laden (Häuser werden neu erzeugt)
   const used = {};                                 // Innenplätze je Haus, damit sich niemand auf eine Kachel stapelt
@@ -742,7 +745,7 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael'].includes(def.key)) spawnNpcDef(def);
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -1329,6 +1332,7 @@ function die(c, cause = 'Wunden', source) {
   const wasFoe = teamOf(c) === 'foe';                          // vor dem Aufräumen: war es ein Feind oder ein Unschuldiger?
   titleOnDeath(c);
   if (c.mtype === 'crypt_warden') S.flags.wardenSlain = true;
+  if (c.mtype === 'hrodvar') S.flags.hrodvarSlain = true;
   c.alive = false; c.downed = false;
   c.swing = 0; c.telegraph = 0; c.special = null; c.leap = null; c.draw = 0; c.vx = c.vy = 0;   // terminal: kein Rest-Verhalten
   c.aggroId = null; c.threatId = null; c.angry = false; c.follow = null; c.lurk = null;
@@ -1544,6 +1548,7 @@ function updateEnemy(e, dt) {
   }
   if (m.ranged) return archerAI(e, tgt, d, sp, dt, m);
   if (e.mtype === 'gorak') return bossAI(e, tgt, d, reach, sp, dt, m);
+  if (e.mtype === 'hrodvar') return frostKingAI(e, tgt, d, reach, sp, dt, m);
   if (e.mtype === 'bandit' && banditAI(e, tgt, d, reach, sp, dt, m)) return;
   if (d > reach * 0.8) {
     // Goblins tänzeln seitlich heran, statt stur geradeaus zu laufen
@@ -1654,6 +1659,44 @@ function bossAI(e, tgt, d, reach, sp, dt, m) {
     if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
     if (e.telegraph > 0) return;
     e.windup = false; e.atkCd = m.atk / fast; e.swingDur = m.atk * 0.5 / fast; e.swing = 0.001; e.hitDone = false;
+  }
+}
+
+// Hrodvar (Tiefhall): schwerer Zweihänderhieb mit Ansage. Eiskreis (blauer Ring als Ansage 900 ms, dann Schaden im
+// Umkreis und „Durchfroren“ 4 s, −40 % Tempo) — wer den Ring sieht, tritt heraus. Unter 50 %: einmal die Leibwache rufen
+// (drei Tote, kurze Unverwundbarkeit), danach schneller. Gegenstück zu Gorak: nicht rennen, sondern Raum verweigern.
+function frostKingAI(e, tgt, d, reach, sp, dt, m) {
+  if (!e.phase) e.phase = 1;
+  if (e.phase === 1 && e.hp <= e.maxHp * 0.5) {
+    e.phase = 2; e.roar = 900; e.telegraph = 0; e.special = null; e.invuln = true;
+    log(`${m.name} schlägt den Zweihänder auf den Stein. Die Leibwache erhebt sich!`, 'combat'); UI.toast('DIE LEIBWACHE ERHEBT SICH', 2200);
+    camShake(7, 400); S.fx.push({ x: e.x, y: e.y, vx: 0, vy: 0, type: 'shock', ice: true, s: 1, life: 520, maxLife: 520 });
+    for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2, g = spawnEnemy('skeleton', e.map, (e.x / TS | 0) + Math.round(Math.cos(a) * 3), (e.y / TS | 0) + Math.round(Math.sin(a) * 2), { level: 7 });
+      g.aggroId = tgt.id; g.aiState = 'pursue'; fx(g.x, g.y - 10, 'frost', 10); }
+  }
+  if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
+  const fast = e.phase === 2 ? 1.25 : 1;
+  e.frostCd = (e.frostCd ?? 2500) - dt;
+  const sa = e.special;
+  if (sa && sa.kind === 'frost') {
+    sa.t -= dt; e.vx = e.vy = 0;
+    if (sa.t <= 0) {
+      e.special = null; camShake(6, 250); sfx('crit', 1, earVol(e));
+      S.fx.push({ x: e.x, y: e.y, vx: 0, vy: 0, type: 'shock', ice: true, s: 1, life: 520, maxLife: 520 }); fx(e.x, e.y - 6, 'frost', 18);
+      for (const t of combat) if (t.alive && !t.invuln && t !== e && isHostile(e, t) && dist(e, t) < 105) {
+        hit(e, t, 0.7);
+        if (!(t.status ||= []).some(q => q.key === 'chilled')) t.status.push({ key: 'chilled', name: 'Durchfroren', left: 4000, desc: 'Langsamer (−40 %).' });
+      }
+    }
+    return;
+  }
+  if (e.swing <= 0 && e.telegraph <= 0 && d < 130 && e.frostCd <= 0) { e.special = { kind: 'frost', t: 900 }; e.frostCd = e.phase === 2 ? 5200 : 7000; return; }
+  if (d > reach * 0.8) { seek(e, e.aim, sp * fast, dt, tgt); return; }
+  e.vx = e.vy = 0;
+  if (e.atkCd <= 0 && e.swing <= 0) {
+    if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
+    if (e.telegraph > 0) return;
+    e.windup = false; e.atkCd = m.atk / fast; e.swingDur = m.atk * 0.5 / fast; e.swing = 0.001; e.hitDone = false; e.enemySwing = true;
   }
 }
 
@@ -2298,6 +2341,7 @@ function talk(npc) {
 function gossip(npc) {
   const lines = [
     `„Die Grube im Norden ist verloren. Etwas Großes hat sich dort eingerichtet.“`,
+    `„Im Frostkamm gibt es eine Treppe ins Eis. Wer runtergeht, hört Hämmer, sagen sie. Niemand schmiedet da unten.“`,
     `„An der Nordfurt sammelt Valen Männer. Das bedeutet nie etwas Gutes.“`,
     `„Der Friedhof im Süden — geh nachts nicht hin.“`,
     `„Rook sitzt im Moor. Er zahlt gut, aber nicht lange.“`,
@@ -2311,7 +2355,7 @@ function gossip(npc) {
 }
 const TOWN_GOSSIP = {
   eren: ['„Seit die Grube verloren ist, backt Eren kleinere Brote. Aber wir backen noch.“', '„Die Scheunen sind halb leer. Der Winter wird lang.“'],
-  northcity: ['„Nordfurt hat Mauern. Das beruhigt die Leute — bis sie fragen, warum.“', '„Die Garnison zahlt pünktlich. Das ist mehr, als man vom König sagen kann.“'],
+  northcity: ['„Brann schmiedet den besten Stahl im Norden. Sie sagt, unter dem Frostkamm gab es mal besseren.“', '„Nordfurt hat Mauern. Das beruhigt die Leute — bis sie fragen, warum.“', '„Die Garnison zahlt pünktlich. Das ist mehr, als man vom König sagen kann.“'],
   saltport: ['„Das Salz geht nach Norden, das Silber kommt zurück. Meistens.“', '„Die Boote fahren nicht mehr weit raus. Draußen treibt Asche auf dem Wasser.“'],
   kreuzweg: ['„Hier kreuzen sich die Straßen — und die Klingen. Söldner sind gut fürs Geschäft, bis sie es nicht mehr sind.“', '„Wer den Markt am Kreuzweg hält, hält das Mittelland.“'],
   ashford: ['„Die Karawanen halten hier, weil dahinter nur noch Asche kommt.“', '„Die Palisade ist neu. Die Angst dahinter ist alt.“'],
@@ -2425,11 +2469,16 @@ function questAvailable(k) {
   if (k === 'q_rook') return (S.relations.rook ?? 0) >= 10;
   return true;
 }
+function startQuest(k) {                                   // was schon erledigt ist, zählt (Boss vorher erschlagen, Gegenstand dabei)
+  S.quests[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
+    o.type === 'item' ? S.player.inv.filter(x => x.key === o.target).reduce((n, x) => n + (x.count || 1), 0)
+    : o.type === 'kill' && o.target === 'hrodvar' && S.flags.hrodvarSlain ? 1 : 0) };
+}
 function offerQuest(npc, k) {
   const Q = QUESTS[k];
   UI.dialogue(npc, Q.desc, [
     { text: 'Ich mache es.', fn: () => {
-      S.quests[k] = { state:'active', progress: Q.objectives.map(() => 0) };
+      startQuest(k);
       log(`Auftrag angenommen: ${Q.name}`, 'quest');
       if (k === 'q_paladin3') {
         S.flags.holdShrine = true;
@@ -2454,6 +2503,8 @@ function turnIn(npc, k) {
   if (r.xp) gainXp(S.player, r.xp);
   if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] += v; log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
+  if (r.take) removeItem(S.player, r.take, 1);
+  if (r.item) { addItem(S.player, r.item); log(`Erhalten: ${ITEMS[r.item].name}.`, 'economy'); }
   if (r.unlock) unlockClass(r.unlock);
   addRel(npc.key, 8);
   log(`Auftrag abgeschlossen: ${Q.name}`, 'quest');
@@ -3556,6 +3607,26 @@ export function selftest() {
       S.ranks.undead = 0; urnRite(crypt);
       return closed && open && fight && teamOf(warden) === 'player' && hasItem(p, 'ancestor_urn', 1);
     } finally { S.quests.q_undead = keepQ.u; S.quests.q_pact = keepQ.p; if (!keepQ.u) delete S.quests.q_undead; if (!keepQ.p) delete S.quests.q_pact; }
+  }));
+  ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
+    const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';
+    combat = S.ents.__a.filter(e => e.alive); const v0 = speedOf(p), hp0 = B.vital(p);
+    h.frostCd = 0; updateEnemy(h, 16); const warned = h.special?.kind === 'frost';
+    for (let t = 0; t < 1000; t += 16) updateEnemy(h, 16);
+    const chilled = p.status.some(q => q.key === 'chilled') && speedOf(p) < v0 * 0.7 && B.vital(p) < hp0;
+    h.hp = h.maxHp * 0.45; h.special = null; updateEnemy(h, 16); updateEnemy(h, 16);
+    const guards = S.ents.__a.filter(e => e.mtype === 'skeleton' && e.alive).length;
+    h.hp = h.maxHp * 0.3; for (let t = 0; t < 1200; t += 16) updateEnemy(h, 16);
+    return warned && chilled && guards === 3 && S.ents.__a.filter(e => e.mtype === 'skeleton').length === 3;
+  }));
+  ok('Königseisen: Abgabe nimmt den Barren, gibt die Frostklinge; ein vorher erschlagener Hrodvar zählt', sandbox(() => {
+    const p = stage(), keep = S.quests.q_kingsiron, brann = actor(320, 300); brann.key = 'brann';
+    try {
+      S.flags.hrodvarSlain = true; addItem(p, 'kings_iron');
+      startQuest('q_kingsiron');
+      const ready = questComplete('q_kingsiron'); turnIn(brann, 'q_kingsiron'); UI.closeDialogue();
+      return ready && hasItem(p, 'frostblade', 1) && !hasItem(p, 'kings_iron', 1) && S.quests.q_kingsiron.state === 'done';
+    } finally { if (keep) S.quests.q_kingsiron = keep; else delete S.quests.q_kingsiron; }
   }));
   ok('Pakt-Folge: Ordenswache greift Paktgebundene an (Ruf ≤ −25), vor dem Pakt und solange misstrauisch nicht', sandbox(() => {
     const p = stage(), g = actor(380, 300, { faction: 'order' }); g.guard = true; combat = S.ents.__a.filter(e => e.alive);
