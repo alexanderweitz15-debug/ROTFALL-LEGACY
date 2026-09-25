@@ -290,5 +290,22 @@ Klassenbaum — Kandidat, als Titel der Stillen Schar neu gedacht zu werden). Je
 - **Regel: gleiche Fraktion bekämpft sich nicht** (außer zornig oder Diener). Vorher flohen untote Figuren (Morvath) vor
   den Skeletten ihrer eigenen Fraktion und verweigerten deshalb das Gespräch.
 
+## Karawanen (Session 6)
+- Ein Zug, nicht ein Objekt: Leitwagen (Lebenspunkte, Ladung, Ziel der Räuber) mit Kutscher und zwei Ochsen, Beiwagen mit
+  Maultier auf der Spur des Leitwagens, zwei angeheuerte Wachen (Söldner Stufe 2–4, keine Stadtwache).
+- Wachen: seitlich am Leitwagen und hinter dem Beiwagen, stellen Räuber, entfernen sich nie weiter als 420 px vom Zug.
+  Außer Sicht gehen sie auf ihrem Platz mit. Gefallene ersetzt die nächste Stadt; nach Verlust der Karawane gehen sie.
+- Fahrt: Route über die Straße (aus der Karte berechnet), 40 Spielminuten Rast am Tor, dann zurück.
+- Hinterhalt (35 %, halbe Strecke): in Sicht 3 Räuber + 1 je Wache; außer Sicht wehren Wachen mit 30 % + 15 % je Wache
+  ab (eine kann fallen), sonst verliert der Zug die halbe Ladung. Geleitschutz des Spielers: 30 Gold, Händlerruf +4.
+
+## Tiefhall (Session 6, Phase 14)
+- Königshalle der alten Bergleute unter dem Frostkamm — gebaut, nicht gegraben: das Gegenstück zur Grube.
+- Räume: Vorhalle (Frosttreppe) → Säulenhalle (Banner, Inschrift) → Eiskammern (Eiszapfen, Erfrorener, Versteck) /
+  Ahnengruft (Grabsteinreihen, Ahnenstein) / Schmiede der Tiefe (Esse, Königsamboss, Erz, Goblins graben) →
+  Thronsaal (Thron unter dem Eis, Kohlebecken, Hrodvar mit zwei Leibwächtern) → Hort.
+- Hrodvar, König unter dem Eis: untoter Zweihänder, Stufe 11 — Endgegner für Stufe ~8–10. Eigene Angriffsmuster: Phase 12.
+- Offen: Wer in der Welt weiß von der Tiefhall? (Questanbindung, z. B. Schmied in Nordfurt sucht Königseisen.)
+
 ## Offene Designfragen
 - Rarität/Affixe, Skill Tree, Klassen: siehe PHASE_STATUS (Phasen 8–10).

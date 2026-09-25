@@ -2,6 +2,17 @@
 
 Neueste oben.
 
+### Session 6 — 2026-09-25 · Spielstand, Karawane, Tiefhall („weiter“)
+**Vorgefunden:** Selbsttest 60/60; offen laut Plan: BUG-017/057 Spielstand 1,4 MB, BUG-011 Karawane, BUG-009 Tiefhall.
+**Gemacht:** Diff-Speichern der Props (1,43 → 0,53 MB, alte v2/v3-Stände getestet); Karawane als Zug mit Gespann,
+Kutscher, Beiwagen und zwei Wachen, Route aus der Straße; Tiefhall als zweiter Dungeon mit Boss Hrodvar und
+Dungeon-Register. Nebenbei: BUG-058 (Props nach Laden verändert), BUG-059 (Leichen-Radius), BUG-060 (Säulen).
+Selbsttest 64/64 auf fünf Seeds.
+**Gefundene neue Probleme:** BUG-058–064 (062 Beiwagen-Sprung, 063 Balance, 064 Boss ohne Muster offen).
+**Offen geblieben:** Hrodvar ohne Spezialangriffe; Tiefhall ohne Quest; Bewohner machen 430 KB des Spielstands aus.
+**Nächster Schritt:** laut Nutzer weiter mit neuem Inhalt (siehe Einträge darüber, falls vorhanden).
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 64/64 melden.
+
 ### Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich (Nutzerwunsch)
 **Vorgefunden:** Selbsttest 54/54; offen: Karte nicht vergrößert, Diener folgen nicht, kein Skill-Baum, Totenreich dünn.
 **Gemacht:** Welt 768×768 (Hochrechnung aus dem Entwurf, Spielstand v3 mit Umrechnung), Städte +15 % gestreckt mit

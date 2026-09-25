@@ -2,6 +2,28 @@
 
 Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund (Master-Prompt §2, Punkte 1–4).
 
+## Session 6 — 2026-09-25 · Spielstand, Karawane, Tiefhall
+
+### Spielstand (state.js, world.js, game.js) — BUG-017, BUG-057, BUG-058
+- Props tragen `gk` (Typ@Kachel); `setPropBase` hält den Grundzustand nach jeder Generierung fest; `saveData` schreibt
+  nur Abweichungen und `propsGone`, Zahlen auf 2 Nachkommastellen; `mergeProps`/`adoptPropKeys` beim Laden.
+  1,43 → 0,53 MB. Speichern 28 → 38 ms (Signaturvergleich), Speichern ist ereignisgesteuert.
+- continueGame fasst Props nicht mehr an (act/hexed/rooted) — sonst wich jedes Prop nach dem Laden ab.
+
+### Karawane (sim.js, game.js, render.js, ui.js) — BUG-011, BUG-061
+- Zug aus Leitwagen (Kutscher, zwei Ochsen, Plane) und Beiwagen (Maultier, sichtbare Ladung) auf der Spur des
+  Leitwagens; Maßstab 1,5. Zwei Karawanenwachen (`escort`, `slot`), Rast am Tor, Hinterhalt nach Wachenzahl.
+- **Refactoring nach §2, Punkt 2** (Duplikation): `guardChar` aus `spawnGuardPosts` gelöst — zweiter Nutzer.
+- Route per Dijkstra aus der Straße (`buildRoute`) statt fester Wegpunkte.
+
+### Tiefhall (world.js, game.js, render.js, ui.js, data.js, sprites.js, state.js) — BUG-009, BUG-060
+- **Refactoring nach §2, Punkt 1** (blockierte die Erweiterung): `DUNGEONS`/`MAP_KEYS` statt ~25 fester 'mine'-Stellen.
+- `genDeep`, Thron-Objekt, Säulen neu gezeichnet, Hrodvar (Boss) mit Beute, Spawngebiete, Migration deep1,
+  Ankunft vor dem benutzten Eingang.
+
+### Kleinkram
+- Leichen: Alter nie negativ (BUG-059).
+
 ## Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich
 
 Nutzerwunsch: Weltkarte größer (mehr Häuser, mehr Abstand), Diener folgen, Skill-Baum mit allgemeinen Knoten und eigenen

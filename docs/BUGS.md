@@ -118,7 +118,9 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 ## MEDIUM
 
 ### BUG-009 — Tiefhall sieht aus wie ein Mineneingang, ist aber nicht betretbar
-- Kategorie: SZENENÜBERGANG / CONTENT · Status: OFFEN (Phase 14)
+- Lösung (Session 6): eigener Dungeon `deep` (genDeep), Register `DUNGEONS`/`MAP_KEYS` statt fest verdrahtetem 'mine',
+  Boss Hrodvar, Hort nach innen verlegt, Migration deep1. Selbsttest: alle Räume vom Treppenfuß begehbar.
+- Kategorie: SZENENÜBERGANG / CONTENT · Status: BEHOBEN
 
 ### BUG-010 — Keine Wegfindung: Verfolger laufen stur geradeaus und hängen an Mauern/Bäumen
 - Ursache: `moveEnt` gleitet nur achsweise; kein Umgehen von Hindernissen.
@@ -137,7 +139,9 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Kategorie: SPAWNING / PATHING · Priorität: HIGH · Status: VERIFIZIERT
 
 ### BUG-011 — Karawane ist ein einzelnes Objekt ohne Wagen, Tiere, Wachen
-- Kategorie: WORLD LOGIC / VISUAL · Status: OFFEN (Phase 16)
+- Lösung (Session 6): Leitwagen mit Kutscher und zwei Ochsen, Beiwagen mit Maultier auf der Spur, zwei Karawanenwachen
+  als echte Figuren (Platz am Zug, Leine 420 px, Ersatz bei Ankunft), Rast am Tor, Hinterhalt nach Wachenzahl.
+- Kategorie: WORLD LOGIC / VISUAL · Status: BEHOBEN (Bild: `screenshots/karawane-2.png`)
 
 ### BUG-012 — Mobil nicht spielbar: keine Touch-Steuerung
 - Layout passt (keine horizontale Scrollbar), aber es gibt keine Touch-Eingabe (0 Treffer für touch/pointer).
@@ -216,7 +220,7 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 
 ### BUG-017 — Spielstand ~800 KB (alle Props werden gespeichert)
 - Risiko für das localStorage-Limit (~5 MB), wenn die Welt wächst. Props sind aus dem Seed reproduzierbar.
-- Kategorie: SAVE-LOAD / PERFORMANCE · Priorität: LOW · Status: OFFEN (Phase 20)
+- Lösung (Session 6): nur vom Seed abweichende Props werden gespeichert (siehe BUG-057). SAVE-LOAD · BEHOBEN
 
 ---
 
@@ -373,11 +377,47 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Lösung: drei Wuchsformen in Baumgröße, im Totenreich teils mit aufgehängten Knochen. VISUAL · MEDIUM · BEHOBEN (Bild)
 
 ### BUG-057 — Spielstand wächst mit der Karte (1,1 → 1,4 MB) — gehört zu BUG-017
-- Ursache wie BUG-017: alle ~8300 Props werden gespeichert, auch unveränderte. SAVE-LOAD · MEDIUM · OFFEN (Phase 20)
+- Ursache wie BUG-017: alle ~8300 Props werden gespeichert, auch unveränderte. SAVE-LOAD · MEDIUM · BEHOBEN (Session 6)
+- Lösung: Erzeugungsschlüssel `gk` = Typ@Kachel (nicht Index — spätere Generierungsänderungen verschieben sonst alle
+  Stände), Grundzustand nach genWorld/genMine/genDeep, gespeichert werden Abweichungen + `propsGone`. Alte Vollstände
+  übernehmen die Schlüssel beim Laden. Neu gestartet 1,43 MB → 0,53 MB; alter v3-Vollstand nach erstem Speichern 0,55 MB.
+  Rest: ~300 Figuren à 1,4 KB (430 KB) — Bewohner sind nicht aus dem Seed reproduzierbar (Zustand), bewusst gespeichert.
 
 ### BUG-051 — Leeres Totenreich — Stand
 - Session 5: Vharnholm, Knochenwald, Aschensee, Seelenbrunnen, Grabräuber. Die Ostküste nördlich des Knochenwalds und
   die Grenzöde bleiben dünn. CONTENT · MEDIUM · IN ARBEIT
+
+## Session 6 — Spielstand, Karawane, Tiefhall
+
+### BUG-058 — Nach jedem Laden wich jedes Prop vom Grundzustand ab
+- Ursache: continueGame setzte `act/hexed/rooted` auf allen Einträgen, auch auf Props. Mit dem Diff-Speichern wäre
+  der Spielstand nach dem ersten Laden wieder voll gewesen. Gefunden durch den neuen Selbsttest.
+- Lösung: Props überspringen (und alte Felder entfernen). SAVE-LOAD · HIGH · BEHOBEN
+
+### BUG-059 — Frame brach mit „negative radius“ ab (Blutlache einer Leiche)
+- Ursache: Alter = Frame-Zeitstempel − `born` (performance.now beim Tod); stirbt etwas während eines langen
+  Update-Schritts, ist das Alter negativ. Im Spiel selten, im Test sicher. Lösung: Alter ≥ 0. RENDER · MEDIUM · BEHOBEN
+
+### BUG-060 — Säulen (broken_pillar) als Mini-Gruft mit grüner Tür gezeichnet
+- Teilte den Zeichenfall mit crypt/marsh_ruin (Platzhalter). Jetzt Säule mit Bruchkante bzw. ganz (`intact`).
+  VISUAL · MEDIUM · BEHOBEN
+
+### BUG-061 — Karawane fuhr neben der Straße über die Wiese
+- Ursache: feste Wegpunkte im Entwurfsmaßstab; nach der Streckung (Session 5) lagen sie 3 Kacheln neben der Straße.
+- Lösung: Route aus der Karte (Dijkstra über Straßenkacheln), 98 % Straße/Brücke; Selbsttest ≥ 90 %. WORLD · BEHOBEN
+
+### BUG-062 — Beiwagen springt beim Wenden auf die andere Seite
+- Nach der Rast wird die Spur neu begonnen; der Beiwagen steht dann schlagartig hinter dem Leitwagen. Passiert am Tor.
+  VISUAL · LOW · OFFEN (Wendekreis fahren)
+
+### BUG-063 — Stadtwachen/Söldner deutlich stärker als Banditen
+- Zwei Wachen Stufe 4–7 schlugen 5 Banditen ohne Schaden am Wagen. Karawanenwachen jetzt Stufe 2–4, Hinterhalt +1
+  Räuber je Wache — Ergebnis streut jetzt (Wache fällt, Wagen beschädigt). Grundsätzliche Kampfbalance bleibt offen.
+  BALANCE · MEDIUM · TEILWEISE (Phase 11)
+
+### BUG-064 — Hrodvar ohne eigene Angriffsmuster, Tiefhall ohne Questanbindung
+- Hrodvar ist ein starker Untoter mit Zweihänder (Stufe 11), aber ohne Spezialangriffe wie Gorak. Niemand in der Welt
+  erwähnt die Tiefhall. CONTENT · MEDIUM · OFFEN (Phase 12 Bosse)
 
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.

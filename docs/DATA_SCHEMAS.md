@@ -138,3 +138,17 @@ k_legion: { branch: 'necromancer', row: 2, type: 'keystone' /* oder 'notable', s
 SKILL_BRANCHES[b] = { name, desc, title? /* Zweig versiegelt ohne diese Titelklasse */ }
 ```
 Spieler: `skillPoints`, `tree` ({ knoten: 1 }), `tfx` (Laufzeit-Summe). Titelklasse: `MAX_TITLES = 2`, `cost.attr`.
+
+## Spielstand — Session 6
+- `ents[map]`: alle Karten aus `MAP_KEYS` (world, mine, deep). Props mit `gk` (Typ@Kachel[#n]) nur, wenn sie vom
+  Grundzustand abweichen; `propsGone[map]`: Schlüssel entfernter erzeugter Props. Props ohne `gk` (gebaut, alt) voll.
+- Migrationen, die erzeugte Props einsetzen, müssen mit dem zusammengeführten Stand rechnen (erzeugte Props stecken
+  nach `mergeProps` schon in `S.ents`).
+
+## Karawane (`kind:'caravan'`) — Session 6
+`{ dir, wp, cargo, trail:[[x,y]…] (≤ 24 Punkte à 12 px), restUntil (Spielminuten), crew:1 }`; Wachen sind NPCs mit
+`escort: <caravan id>`, `slot: 0|1`; nach Verlust `escortLost:true`.
+
+## Dungeon (`DUNGEONS` in world.js) — Session 6
+`{ name, floor: 'scree'|'dfloor', amb: <Klangregion>, enter: <Ankunftstext> }`; Karte `MAPS[key]` mit `rooms[{x,y,w,h,cx,cy,tag}]`
+und `entry`. Portal: Prop mit `portal: <map>`; Ankunft an der Oberfläche vor dem Portal, das auf die verlassene Karte zeigt.

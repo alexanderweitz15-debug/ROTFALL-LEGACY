@@ -1,13 +1,13 @@
 # Phasenstatus — Rotfall: Legacy
 
-Letzte Aktualisierung: Session 5 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
+Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
 
 | # | Phase | Status | DoD erfüllt | Fehlt noch |
 |---|---|---|---|---|
 | 0 | Complete Playthrough & Audit | ABGESCHLOSSEN | JA | — (zweiter Durchlauf ist Phase 21) |
 | 1 | Critical Bugfixes | ABGESCHLOSSEN | JA | — |
 | 2 | World Logic & NPC Reactions | ABGESCHLOSSEN | JA (Grundsystem) | Kopfgeld/Gefängnis → Phase 17 |
-| 3 | Szenenübergänge, Pathfinding, Spawns | ABGESCHLOSSEN | JA | Tiefhall betretbar machen → Phase 14 |
+| 3 | Szenenübergänge, Pathfinding, Spawns | ABGESCHLOSSEN | JA | — (Tiefhall betretbar seit Session 6) |
 | 4 | Gebäude & Props | ABGESCHLOSSEN | JA, mit Grenzen | Nordseiten/Nord-Türen nur angedeutet; Wildnis-Szenen nur in neuen Spielständen |
 | 5 | Visual Style Revision (restliche Welt) | TESTEN | JA, im Kern | Session 3: Testbereich §25, Fels, Wasser, Boden, Mauern, Grube, Titel. Offen: Leere Flächen (Totenreich) sind Inhalt → Phase 16 |
 | 6 | Animation & Combat Polish | IN ARBEIT | teilweise | Session 3: Taumeln/Unterbrechen, rutschender Rückstoß, Interaktionsposen. Treffer-Klang je Material. Offen: Sitzen/Handeln-Posen; Klänge vom Nutzer gegenhören lassen |
@@ -18,13 +18,13 @@ Letzte Aktualisierung: Session 5 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
 | 12 | Bosses | NICHT BEGONNEN | — | |
 | 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
-| 14 | Dungeons | NICHT BEGONNEN | — | BUG-009 Tiefhall |
+| 14 | Dungeons | IN ARBEIT | teilweise | Session 6: Tiefhall (gebaute Halle, 8 Räume, Boss), Dungeon-Register. Offen: Rätsel/Fallen jenseits Stacheln, Questanbindung, dritter Dungeon |
 | 15 | NPCs & Wildlife | IN ARBEIT | — | Bewohner mit Tagesablauf ✓; benannte NPCs, Tiere offen |
-| 16 | World Simulation | IN ARBEIT | — | Session 5: Totenreich erweitert (Vharnholm, Knochenwald, Aschensee). BUG-011 Karawane offen |
+| 16 | World Simulation | IN ARBEIT | — | Session 6: Karawane als Zug mit Wachen, Route aus der Straße (BUG-011 ✓). Offen: nur eine Route (Eren–Nordfurt) |
 | 17 | Factions & Consequences | NICHT BEGONNEN | — | Kopfgeld |
 | 18 | Audio & Atmosphere | NICHT BEGONNEN | — | Schmiede-/Tavernengeräusche an Gebäude koppeln |
 | 19 | UI Polish | IN ARBEIT | — | Touch-Steuerung ✓ (Session 3, Gerätetest offen) |
-| 20 | Performance | TEILWEISE | — | Wald-Zeichnen 2,8 ms (Budget 2,0); Spielstand 800 KB (BUG-017) |
+| 20 | Performance | TEILWEISE | — | Spielstand 0,53 MB (BUG-017/057 ✓). Offen: Wald-Zeichnen 2,8 ms (Budget 2,0), im echten Browser messen |
 | 21 | Second Complete Playthrough | NICHT BEGONNEN | — | |
 | 22 | Final Quality Pass | NICHT BEGONNEN | — | |
 
