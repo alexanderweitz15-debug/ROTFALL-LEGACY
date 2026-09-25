@@ -1891,13 +1891,13 @@ function travel(to) {
   const p = S.player, from = S.map;
   leavePursuit(from, to);
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
-  const members = partyMembers();
+  const members = [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   S.map = to; p.map = to;
   const spot = ARRIVAL[to]();
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
-  for (const m of members) { m.map = to; m.x = p.x + ri(-24, 24); m.y = p.y + ri(-24, 24); S.ents[to].push(m); }
+  for (const m of members) { m.map = to; m.x = p.x + ri(-24, 24); m.y = p.y + ri(-24, 24); if (m.servant) { m.anchor = { x: m.x, y: m.y }; m.aggroId = null; } S.ents[to].push(m); }
   log(to === 'mine' ? 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' : 'Du kehrst an die Oberfläche zurück.', 'world');
   UI.toast(to === 'mine' ? 'Verlassene Grube' : 'Greenmark-Grenzland');
   arrivePursuit(to);
@@ -3280,6 +3280,14 @@ export function selftest() {
     setTres(p, 90); const b0 = sum(); tickCombatant(p, 1000); const burn = sum() < b0;
     setTres(p, 95); corrupt(p, 10); const burst = tres(p) === 60;
     return cursed && plus && decay && burn && burst && p.maxMana === 0;
+  }));
+  ok('Diener folgen ihrem Herrn durch einen Eingang (Kartenwechsel), fremde Untote nicht', sandbox(() => {
+    const p = stage(); if (!unlockTitle('necromancer', 'Test')) return false;
+    const sv = spawnEnemy('skeleton', '__a', 10, 9); Object.assign(sv, { servant: p.id, transient: true, until: performance.now() + 60000 });
+    const other = spawnEnemy('skeleton', '__a', 30, 30);
+    ARRIVAL.__b = () => ({ x: 5 * TS, y: 5 * TS });
+    try { travel('__b'); } finally { delete ARRIVAL.__b; }
+    return S.ents.__b.includes(sv) && sv.map === '__b' && !S.ents.__a.includes(sv) && S.ents.__a.includes(other) && dist(sv, p) < 60;
   }));
   ok('Pakt: öffnet sich erst nach dem Grabsiegel; die Gruft ruft für Fremde den Wächter, einem der Schar gibt sie die Urne', sandbox(() => {
     const keepQ = { u: S.quests.q_undead, p: S.quests.q_pact };
