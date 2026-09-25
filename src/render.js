@@ -683,6 +683,7 @@ const PROP_BOX = { tower_ruin: 192, boat: 128 };                   // Kantenlän
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
+const PROP_RES = 1;                                       // Pixel je Welt-Einheit (vorher 0,5 = grobes 2er-Raster)
 function drawPropPixel(e, now) {
   const per = PROP_PERIOD[e.type];
   let key = e.type, v = 0, ph = 0;
@@ -701,16 +702,16 @@ function drawPropPixel(e, now) {
   if (!cv) {
     if (propCache.size > 600) propCache.clear();
     const B = PROP_BOX[e.type] || 96;
-    cv = document.createElement('canvas'); cv.width = cv.height = B / 2;
+    cv = document.createElement('canvas'); cv.width = cv.height = B * PROP_RES;   // G5: feines Raster (1 Welt je Pixel) wie Figuren
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
-    o.setTransform(0.5, 0, 0, 0.5, 0, 0);
+    o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0);
     ctx = o;
     try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
-    SP.pixelize(o, B / 2, B / 2, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
+    SP.pixelize(o, B * PROP_RES, B * PROP_RES, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
     propCache.set(key, cv);
   }
-  const B = cv.width * 2;
+  const B = cv.width / PROP_RES;
   ctx.drawImage(cv, e.x - B / 2, e.y - B * 0.73, B, B);
 }
 
@@ -1243,7 +1244,7 @@ export function drawHumanoid(e, now, override) {
   c.beginPath(); c.ellipse(x, y + 5, 10, 4, 0, 0, 7); c.fill();
   if (e.downed) {                                                   // am Boden: liegende Figur, leicht atmend
     const f = SP.humanFrame(spec, 'W', 'down'), br = ((now / 700) | 0) & 1;
-    c.drawImage(f, x - 12.5 * PX, y + 6 - 16 * PX - br, f.width * PX, f.height * PX);
+    SP.blit(c, f, x, y + 6 - br);
     return;
   }
   const w = e.equip && e.equip.weapon, wit = w ? ITEMS[w.key] || {} : null;
@@ -1251,29 +1252,30 @@ export function drawHumanoid(e, now, override) {
   if (pz.pose === 'tuck') {                                         // Ausweichrolle: Kugel in 90°-Schritten gedreht
     const f = SP.humanFrame(spec, 'S', 'tuck'), sgn = e.dodge && e.dodge.ax < 0 ? -1 : 1;
     c.save(); c.translate(Math.round(x), Math.round(y - 8)); c.rotate(pz.rot * Math.PI / 2 * sgn);
-    c.drawImage(f, -10 * PX, -16 * PX, f.width * PX, f.height * PX); c.restore();
+    SP.blit(c, f, 0, 0); c.restore();
     return;
   }
-  const f = SP.humanFrame(spec, pz.dir, pz.pose);
-  const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
   const armed = w && !e.sitting;                                   // wer sitzt, hat die Waffe abgelegt
-  if (armed && behind) drawWeapon(c, e, now, wit);
+  const wp = armed ? weaponPose(e, now, wit, pz) : null, melee = wp && !wp.ranged;
+  const f = SP.humanFrame(spec, pz.dir, pz.pose, melee ? wp.armSide : null);   // Nahkampf: Waffenarm zeichnet drawArm zur Hand
+  const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
+  if (armed && behind) { if (melee) drawArm(c, e, spec, wp, f); drawWeapon(c, e, now, wit, wp); }
   const [sx, sy] = buildOf(e).scale;
   c.save(); c.translate(x, y + 6); c.scale(sx, sy);
-  c.drawImage(f, -10 * PX, -23 * PX, f.width * PX, f.height * PX);
+  SP.blit(c, f, 0, 0);
   const bd = e.body;                                                // verlorene/zerstörte Gliedmaßen: blutige Stellen
   if (bd && pz.dir) for (const k of ['rarm', 'larm', 'rleg', 'lleg']) if (bd[k] && bd[k].hp <= 0) {
     const [gx, gy] = LIMB_PX[pz.dir][k]; c.fillStyle = '#6b1a12'; c.fillRect((gx - 10) * PX, (gy + 1 - 23) * PX, 2 * PX, 2 * PX);
   }
   const fa = flashAlpha(e, now);
-  if (fa > 0) { c.globalAlpha = fa; c.drawImage(SP.flashOf(f), -10 * PX, -23 * PX, f.width * PX, f.height * PX); c.globalAlpha = 1; }
+  if (fa > 0) { c.globalAlpha = fa; const fl = SP.flashOf(f); Object.assign(fl, { px: f.px, ox: f.ox, oy: f.oy }); SP.blit(c, fl, 0, 0); c.globalAlpha = 1; }
   c.restore();
   if (spec.glow && pz.dir !== 'N') {                                // Glimmen der Untoten-Augen
     c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0));
-    c.beginPath(); c.arc(x, y - 29, 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    c.beginPath(); c.arc(x, y - (f.px === 1 ? 40 : 29), 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';   // Augenhöhe je Raster
   }
-  if (armed && !behind) drawWeapon(c, e, now, wit);
-  if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 44, 4, 0, 7); c.stroke(); }
+  if (armed && !behind) { if (melee) drawArm(c, e, spec, wp, f); drawWeapon(c, e, now, wit, wp); }
+  if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - (f.px === 1 ? 58 : 44), 4, 0, 7); c.stroke(); }
 }
 
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
@@ -1294,44 +1296,76 @@ function swingOf(wt, sw, arc) {
   if (sw < 0.5) return { a: start + (end - start) * ei((sw - w0) / (0.5 - w0)), ext: 2 };            // Schlag
   return { a: end + (0.6 - end) * eo((sw - 0.5) / 0.5), ext: 2 * (1 - (sw - 0.5) * 2) };             // Nachschwung
 }
-function drawWeapon(c, e, now, it) {
-  it = it || ITEMS[e.equip.weapon.key] || {};
+// Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
+// Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
+const RANGED_W = new Set(['bow', 'crossbow', 'wand']);
+function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
   const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
-  const W = SP.weaponSprite(e.equip.weapon.key, e.equip.weapon.rar || it.rarity, it.holy, wt);   // Rarität des Exemplars
-  const ranged = wt === 'bow' || wt === 'crossbow' || wt === 'wand';
+  const ranged = RANGED_W.has(wt), sgn = Math.cos(dir) < 0 ? -1 : 1;   // nach links gespiegelt: Waffe hängt unten, Hieb von oben
+  const thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
+  const side = pz.dir === 'W' || pz.dir === 'E', armSide = side ? 'near' : (Math.cos(dir) < 0 ? 'L' : 'R');
+  const [sox, soy] = SP.shoulderOf(pz.dir, pz.pose, armSide === 'L' ? 'L' : 'R'), shx = e.x + sox, shy = e.y + 6 + soy;
+  const hand = (swv, sv) => {                                         // Hand für einen Schwungzustand
+    if (ranged) return [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5];
+    const active = swv > 0 || e.cover || (A && A.kind === 'work');
+    if (!active) return [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
+    if (thrust) { const r = 11 + sv.ext * 0.8; return [shx + Math.cos(dir) * r, shy + 6 + low + Math.sin(dir) * r * 0.8]; }
+    const ha = dir + sv.a * sgn * 0.55, r = 13 + sv.ext * 0.5;       // Hand läuft mit der Klinge um die Schulter
+    return [shx + Math.cos(ha) * r, shy + 5 + low - (e.cover ? 4 : 0) + Math.sin(ha) * r * 0.75];
+  };
   const sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
-  const sgn = Math.cos(dir) < 0 ? -1 : 1;                           // nach links gespiegelt: Waffe hängt unten, Hieb von oben
-  const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + low - (e.cover ? 4 : 0) + Math.sin(dir) * (5 + sv.ext * 0.6);   // kniend: Hand tiefer
-  const len = (W.cv.width - W.gx) * PX;
-  // Klingenspur: dieselbe Kurve, ein paar Schritte zurück ausgewertet — die Spur folgt genau der Klinge
+  const [hx, hy] = hand(sw, sv);
+  return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a: dir + sv.a * sgn, hx, hy, shx, shy, armSide, hand };
+}
+// Arm von der Schulter zur Hand (feines Raster): Kontur, Ärmel mit Licht oben links, Hand/Handschuh
+function drawArm(c, e, spec, wp, f) {
+  // Farben einmal je Figurenbild (Frame ist nach Spec gecacht)
+  const L = f._look || (f._look = SP.lookOf(spec)), sl = L.armor === 'plate' || L.armor === 'chain' ? L.armorR : L.robe || L.cloth, hd = L.glove || L.skin;
+  const x0 = wp.shx, y0 = wp.shy, x1 = wp.hx, y1 = wp.hy, n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+  const mx = (x0 + x1) / 2 + (x1 > x0 ? -1.5 : 1.5), my = (y0 + y1) / 2 + 2.5;   // Ellbogen leicht nach außen/unten
+  const pt = t => t < 0.5 ? [x0 + (mx - x0) * t * 2, y0 + (my - y0) * t * 2] : [mx + (x1 - mx) * (t - 0.5) * 2, my + (y1 - my) * (t - 0.5) * 2];
+  const stamp = (col, r, w) => { c.fillStyle = col; for (let i = 0; i <= n; i++) { const [px, py] = pt(i / n); c.fillRect(Math.round(px - r), Math.round(py - r), w, w); } };
+  stamp('#0c0a08', 3, 7); stamp(sl.sh, 2, 5); stamp(sl.b, 2, 3);
+  c.fillStyle = sl.hi; for (let i = 1; i < n * 0.45; i++) { const [px, py] = pt(i / n); c.fillRect(Math.round(px - 2), Math.round(py - 2), 1, 1); }
+  c.fillStyle = '#0c0a08'; c.fillRect(Math.round(x1) - 3, Math.round(y1) - 3, 7, 7);
+  c.fillStyle = hd.b; c.fillRect(Math.round(x1) - 2, Math.round(y1) - 2, 5, 5); c.fillStyle = hd.hi; c.fillRect(Math.round(x1) - 2, Math.round(y1) - 2, 2, 1);
+  c.fillStyle = hd.sh; c.fillRect(Math.round(x1), Math.round(y1) + 1, 3, 2);
+}
+function drawWeapon(c, e, now, it, wp) {
+  it = it || ITEMS[e.equip.weapon.key] || {};
+  wp = wp || weaponPose(e, now, it, SP.poseOf(e, now, RANGED_W.has(it.wtype)));
+  const { A, sw, dir, wt, arc, ranged, sgn, sv, a, hx, hy } = wp;
+  const W = SP.weaponSprite(e.equip.weapon.key, e.equip.weapon.rar || it.rarity, it.holy, wt);   // Rarität des Exemplars
+  const WP = W.px || PX, len = (W.cv.width - W.gx) * WP;
+  // Klingenspur: dieselbe Kurve ein paar Schritte zurück — Hand und Klinge der Vergangenheit, die Spur folgt der Klinge
   if (sw > 0 && !it.ranged && !A) {
-    const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm', thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
+    const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm';
     const col = W.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210';
     for (let k = 1; k <= 7; k++) {
       const past = sw - k * 0.022; if (past <= 0) break;
       const pv = swingOf(wt, past, arc), t = 1 - k / 8;
       if (Math.abs(pv.a - sv.a) < 0.02 && Math.abs(pv.ext - sv.ext) < 0.5) continue;   // keine Bewegung, keine Spur
-      const pa = dir + pv.a * sgn, r = thrust ? len * 0.8 + pv.ext : len * 0.9;
-      const bx = thrust ? e.x + Math.cos(dir) * (8 + r) : hx + Math.cos(pa) * r, by = thrust ? e.y - 12 + Math.sin(dir) * (5 + r * 0.6) : hy + Math.sin(pa) * r;
-      const s = Math.round((heavy ? 3 : 2) * t + 1) * PX / 2;
-      c.fillStyle = `rgba(${col},${0.65 * t})`; c.fillRect(Math.round(bx - s), Math.round(by - s), s * 2, s * 2);
+      const ph = wp.hand(past, pv), pa = wp.thrust ? dir : dir + pv.a * sgn, r = len * 0.9;
+      const bx = ph[0] + Math.cos(pa) * r, by = ph[1] + Math.sin(pa) * r;
+      const s2 = Math.round((heavy ? 3 : 2) * t + 1) * PX / 2;
+      c.fillStyle = `rgba(${col},${0.65 * t})`; c.fillRect(Math.round(bx - s2), Math.round(by - s2), s2 * 2, s2 * 2);
     }
   }
-  c.save(); c.translate(hx, hy);
+  c.save(); c.translate(Math.round(hx), Math.round(hy));
   c.rotate(ranged ? dir : a);
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);          // nach Blickrichtung, nie mitten im Schwung (Bogen ist symmetrisch)
-  c.drawImage(W.cv, -W.gx * PX, -W.gy * PX, W.cv.width * PX, W.cv.height * PX);
+  c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
   if (W.orb) {                                                      // Kristall des Stabs flackert (Magie sichtbar, kein Glühschleier)
     const f = ((now / 90 + (e.seed || 0)) | 0) % 5;
     c.fillStyle = f === 0 ? '#e8f4ff' : f < 3 ? '#8fb7e8' : '#5f8fd0';
-    c.fillRect((W.orb[0] - W.gx) * PX, (W.orb[1] - W.gy - 2) * PX, PX, PX);
+    c.fillRect((W.orb[0] - W.gx) * WP, (W.orb[1] - W.gy - 2) * WP, 2, 2);
   }
   if (W.runes && ((now / 140 + (e.seed || 0)) | 0) % 6 === 0) {   // Runen pulsieren kurz auf
     c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5;
-    c.drawImage(W.cv, -W.gx * PX, -W.gy * PX, W.cv.width * PX, W.cv.height * PX);
+    c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
     c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   }
   c.restore();
@@ -1358,11 +1392,11 @@ function drawCreature(e, now) {
     if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
-    const f = SP.beastFrame(e.mtype === 'wild_dog' ? 'wolf' : e.mtype, p, sideDir(e), pose, fr);   // Hund: Wolfsgestalt, eigene Farben
+    const f = SP.beastFrame(e.mtype, p, sideDir(e), pose, fr);
     shadow(e.x, e.y + 3, (e.r + 4) / K, .35);
-    ctx.drawImage(f, e.x - 15 * PX, e.y + 5 - 17 * PX, f.width * PX, f.height * PX);
+    SP.blit(ctx, f, e.x, e.y + 5);
     const fw = flashAlpha(e, now);
-    if (fw > 0) { ctx.globalAlpha = fw; ctx.drawImage(SP.flashOf(f), e.x - 15 * PX, e.y + 5 - 17 * PX, f.width * PX, f.height * PX); ctx.globalAlpha = 1; }
+    if (fw > 0) { ctx.globalAlpha = fw; SP.blit(ctx, Object.assign(SP.flashOf(f), { px: f.px, ox: f.ox, oy: f.oy }), e.x, e.y + 5); ctx.globalAlpha = 1; }
     if (K !== 1) ctx.restore();
     if (e.mtype === 'bear' && e.telegraph > 0) dottedLine(e.x, e.y - 8, e.aim ?? 0, 200, now);   // Ansage des Sturmlaufs
     return;
@@ -1377,16 +1411,16 @@ function drawCreature(e, now) {
     const fr = moving ? ((now / 160) | 0) & 3 : ((now / 500) | 0) & 1;
     const dir = sideDir(e), f = SP.bruteFrame(p, dir, pose, fr);
     shadow(e.x, e.y + 5, 24, .45);
-    const dx = e.x - 17 * PX, dy = e.y + 8 - 35 * PX;
     // Hackmesser: großes Pixel-Beil, beim Ausholen erhoben
     const a = (e.aim ?? 0) + (sw > 0 ? -0.9 + sw * 1.8 : pose === 'a1' ? -1.6 : 0.5);
     const W = SP.weaponSprite('gorak_cleaver', 'common', false, 'axe');
-    ctx.save(); ctx.translate(e.x + Math.cos(a) * 18, e.y - 30 + Math.sin(a) * 10); ctx.rotate(a); if (Math.cos(a) < 0) ctx.scale(1, -1);
-    ctx.drawImage(W.cv, -W.gx * PX * 1.6, -W.gy * PX * 1.6, W.cv.width * PX * 1.6, W.cv.height * PX * 1.6); ctx.restore();
-    ctx.drawImage(f, dx, dy, f.width * PX, f.height * PX);
+    const fl = dir === 'W' ? -1 : 1, hp = pose === 'a1' ? [23.5, -61] : [22, -10];   // Messer sitzt in der Hand (erhoben bzw. hängend)
+    ctx.save(); ctx.translate(Math.round(e.x + hp[0] * fl), Math.round(e.y + hp[1])); ctx.rotate(a); if (Math.cos(a) < 0) ctx.scale(1, -1);
+    const GP = (W.px || PX) * 1.6; ctx.drawImage(W.cv, -W.gx * GP, -W.gy * GP, W.cv.width * GP, W.cv.height * GP); ctx.restore();
+    SP.blit(ctx, f, e.x, e.y + 8);
     if (e.telegraph > 0) telegraphArc(e, m.reach + 12, 0.9, now);
     const fg = flashAlpha(e, now);
-    if (fg > 0) { ctx.globalAlpha = fg; ctx.drawImage(SP.flashOf(f), dx, dy, f.width * PX, f.height * PX); ctx.globalAlpha = 1; }
+    if (fg > 0) { ctx.globalAlpha = fg; SP.blit(ctx, Object.assign(SP.flashOf(f), { px: f.px, ox: f.ox, oy: f.oy }), e.x, e.y + 8); ctx.globalAlpha = 1; }
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
@@ -1421,16 +1455,16 @@ function drawCorpse(e, now) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
   } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
-    const f = SP.beastFrame(e.mtype === 'wild_dog' ? 'wolf' : e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
-    ctx.drawImage(f, e.x - 15 * PX, e.y + 5 - (age < 160 ? 17 : 12) * PX, f.width * PX, f.height * PX);
+    const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
+    SP.blit(ctx, f, e.x, e.y + 5);
   } else if (e.mtype === 'gorak') {
     const f = SP.bruteFrame(m.pal || {}, 'E', '', 0), k = Math.min(1, age / 500);
-    ctx.save(); ctx.translate(e.x, e.y + 6); ctx.rotate(k * Math.PI / 2); ctx.drawImage(f, -17 * PX, -35 * PX, f.width * PX, f.height * PX); ctx.restore();
+    ctx.save(); ctx.translate(e.x, e.y + 6); ctx.rotate(k * Math.PI / 2); SP.blit(ctx, f, 0, 2); ctx.restore();
   } else {
     const spec = SP.monsterSpec(e, m), sc = e.mtype === 'goblin' ? 0.82 : 1;
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.scale(sc, sc);
-    if (age < 320) { const f = SP.humanFrame(spec, 'S', age < 130 ? 'hit' : 'kneel'); ctx.drawImage(f, -10 * PX, -23 * PX, f.width * PX, f.height * PX); }
-    else { const f = SP.humanFrame(spec, 'W', 'dead'); ctx.drawImage(f, -12.5 * PX, -16 * PX, f.width * PX, f.height * PX); }
+    if (age < 320) SP.blit(ctx, SP.humanFrame(spec, 'S', age < 130 ? 'hit' : 'kneel'), 0, 0);
+    else SP.blit(ctx, SP.humanFrame(spec, 'W', 'dead'), 0, 0);
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -1571,8 +1605,8 @@ function drawFx(now) {
     else if (f.type === 'frost') { ctx.fillStyle = 'rgba(190,230,250,.85)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'necro') { ctx.fillStyle = 'rgba(78,143,122,.7)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'ghost') {                         // Nachbild der Ausweichrolle: helle Silhouette der gerollten Figur
-      const pl = S.player; if (pl) { const fr = SP.flashOf(SP.humanFrame(SP.humanSpec(pl), 'S', 'tuck'));
-        ctx.globalAlpha *= 0.3; ctx.drawImage(fr, f.x - 10 * PX, f.y - 8 - 16 * PX, fr.width * PX, fr.height * PX); } }
+      const pl = S.player; if (pl) { const tk = SP.humanFrame(SP.humanSpec(pl), 'S', 'tuck'), fr = Object.assign(SP.flashOf(tk), { px: tk.px, ox: tk.ox, oy: tk.oy });
+        ctx.globalAlpha *= 0.3; SP.blit(ctx, fr, f.x, f.y - 8); } }
     else if (f.type === 'shock') {                         // Bodenbeben: Staubring breitet sich aus
       const r = 14 + t * 110; ctx.fillStyle = f.ice ? (t < 0.5 ? '#bfe3f5' : '#7fb0c8') : t < 0.5 ? '#8a7a5a' : '#5a4d38';   // ice: Hrodvars Eiskreis
       for (let i = 0; i < 40; i++) { const an = i / 40 * Math.PI * 2, j = (i * 7) % 3 * 2;
@@ -1717,8 +1751,8 @@ export function drawPortraitTo(canvas, ch) {
   g.addColorStop(0, 'rgba(90,76,56,.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = g; c.fillRect(0, 0, w, h);
   if (ch) {
-    const f = SP.humanFrame(ch.spec || SP.humanSpec(ch), 'S', 'i0');
-    const sx = 2, sy = 0, cw = 16, chh = 15, k = Math.max(1, Math.floor(Math.min(w / cw, h / chh)));
+    const f = SP.humanFrame(ch.spec || SP.humanSpec(ch), 'S', 'i0'), fine = f.px === 1;   // Porträt: Kopf und Schultern
+    const sx = fine ? 7 : 2, sy = fine ? 1 : 0, cw = fine ? 26 : 16, chh = fine ? 26 : 15, k = Math.max(1, Math.floor(Math.min(w / cw, h / chh)));
     c.drawImage(f, sx, sy, cw, chh, Math.round((w - cw * k) / 2), h - chh * k, cw * k, chh * k);
   }
   c.strokeStyle = 'rgba(0,0,0,.5)'; c.strokeRect(0.5, 0.5, w - 1, h - 1);
@@ -1730,9 +1764,9 @@ export function drawFigureTo(canvas, ch) {
   c.imageSmoothingEnabled = false; c.clearRect(0, 0, w, h);
   const spec = ch.spec || SP.humanSpec(ch), k = Math.max(1, Math.floor(h / 26));
   ['S', 'W', 'N'].forEach((d, i) => {
-    const f = SP.humanFrame(spec, d, 'i0'), x = Math.round(w / 2 + (i - 1) * 18 * k - 10 * k);
-    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x + 5 * k, h - 3 * k, 10 * k, k);
-    c.drawImage(f, x, h - 25 * k - k, 20 * k, 25 * k);
+    const f = SP.humanFrame(spec, d, 'i0'), cx = Math.round(w / 2 + (i - 1) * 18 * k), sc = k * (f.px || 2) / 2;   // 1 alter Sprite-Pixel = k
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(cx - 5 * k, h - 3 * k, 10 * k, k);
+    c.drawImage(f, Math.round(cx - f.ox * sc), Math.round(h - k - f.oy * sc), Math.round(f.width * sc), Math.round(f.height * sc));
   });
 }
 
@@ -1907,7 +1941,8 @@ export function drawTitleScene(canvas, t) {
   // Rastende am Feuer: dieselben Pixel-Sprites wie im Spiel, hier 1:1 im Szenenraster
   o.filter = 'brightness(0.62) sepia(0.25)';
   const A = SP.humanFrame(TITLE_A, 'E', t % 1300 < 650 ? 'i0' : 'i1'), B = SP.humanFrame(TITLE_B, 'W', 'i0');
-  o.drawImage(A, fx - 12 - A.width, fy + 4 - 23); o.drawImage(B, fx + 12, fy + 4 - 23);
+  const sa = (A.px || 2) / 2, sb = (B.px || 2) / 2;                  // Szenenraster = alter Sprite-Pixel; feine Frames halb so groß
+  o.drawImage(A, fx - 12 - A.width * sa, fy + 4 - A.oy * sa, A.width * sa, A.height * sa); o.drawImage(B, fx + 12, fy + 4 - B.oy * sb, B.width * sb, B.height * sb);
   o.filter = 'none';
   for (let x = 0; x < lw; x += 2) {                         // Gras vorn, wiegt im Wind
     const sw = Math.round(Math.sin(t / 900 + x / 14) * 1), hh = 4 + (h2(x, 3) * 4 | 0);

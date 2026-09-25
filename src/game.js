@@ -606,6 +606,8 @@ function styleArea(on = true) {
   const gd = makeChar({ name: 'Wache', prof: 'Wache', map: K, x: 18 * TS, y: 11 * TS, faction: 'valen' }); gd.guard = true; gd.anchor = { x: gd.x, y: gd.y }; S.ents[K].push(gd);
   ['bandit', 'skeleton', 'wolf', 'goblin', 'bandit_archer', 'gorak'].forEach((mt, i) => {
     const e = spawnEnemy(mt, K, 3 + i * 2 + (i > 3 ? 1 : 0), 10); e.x = (3 + i * 2) * TS + TS / 2; e.y = 10 * TS + 8; e.aiState = 'idle'; e.stat = true; });
+  Object.keys(MONSTERS).filter(k => !['bandit', 'skeleton', 'wolf', 'goblin', 'bandit_archer', 'gorak'].includes(k)).forEach((mt, i) => {   // übrige Gegner: Reihe vor den Häusern
+    const e = spawnEnemy(mt, K, 2 + i * 3, 6); e.x = (2 + i * 3) * TS + TS / 2; e.y = 6 * TS + 20; e.aiState = 'idle'; e.stat = true; });
   const fx = (type, tx, ty, o = {}) => S.fx.push({ x: tx * TS, y: ty * TS, vx: 0, vy: 0, type, s: 2, a: 0, life: 110, maxLife: 200, style: true, ...o });
   ['impact', 'crit', 'spark', 'blood', 'heal', 'fire', 'shock', 'ring', 'necro', 'ghost'].forEach((t, i) => fx(t, 3 + i * 3, 7, t === 'ghost' ? { face: 0 } : {}));
   const p = S.player; styleKeep = { map: S.map, pos: { map: p.map, x: p.x, y: p.y }, paused: S.paused };
@@ -1707,7 +1709,7 @@ function updateEnemy(e, dt) {
     const side = ((e.seed | 0) % 2 ? 1 : -1) * 0.9 * Math.min(1, (d - reach) / 120);
     seek(e, e.aim + side, sp, dt, tgt); return;
   }
-  if (e.mtype === 'cultist') cultistHeal(e, m);
+  if (e.mtype === 'cultist') cultistHeal(e, m, dt);
   if (e.retreat > 0) {                                        // Goblin: nach dem Hieb zurückspringen (Hit & Run)
     e.retreat -= dt; moveEnt(e, -Math.cos(e.aim) * sp, -Math.sin(e.aim) * sp); return;
   }
@@ -1755,8 +1757,8 @@ function bearAI(e, tgt, d, reach, sp, dt, m) {
   return false;
 }
 // Kultist: heilt verwundete Untote in der Nähe (sichtbar, unterbrechbar durch Taumeln), sonst Schütze mit Schattenblitz.
-function cultistHeal(e, m) {
-  e.healCd = (e.healCd || 2000) - 16;
+function cultistHeal(e, m, dt = 16) {
+  e.healCd = (e.healCd || 2000) - dt;                          // echte Frame-Zeit (vorher fest 16 ms → bildratenabhängig)
   if (e.healCd > 0 || e.stagger > 0) return;
   const ally = S.ents[e.map].find(o => o !== e && o.alive && o.kind === 'enemy' && o.faction === 'undead' && o.hp < o.maxHp * 0.6 && dist(e, o) < 220);
   if (!ally) return;
@@ -3753,12 +3755,12 @@ export function selftest() {
   ok('Sprites: Figuren aller NPCs, alle Posen', NPCS.every(n => {
     const sp = SP.humanSpec({ ...n, seed: 1, pal: { skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28' }, equip: {} });
     return ['S', 'N', 'W', 'E'].every(d => ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'a1', 'a2', 'hit', 'cast', 'kneel', 'guard', 'sit', 'trade'].every(ps => {
-      const f = SP.humanFrame(sp, d, ps); return f.width === 20 && f.height === 25 && (ps !== 'i0' || filled(f)); }));
+      const f = SP.humanFrame(sp, d, ps); return f.px > 0 && f.ox != null && f.oy != null && f.width * f.px >= 40 && (ps !== 'i0' || filled(f)); }));   // v2: Größe/Pivot je Frame
   }));
   ok('Sprites: alle Gegnertypen', Object.entries(MONSTERS).every(([k, m]) => {
     const e = { mtype: k, seed: 1 };
     const beast = ['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(k);
-    const f = beast ? SP.beastFrame(k === 'wild_dog' ? 'wolf' : k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
+    const f = beast ? SP.beastFrame(k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
     return filled(f);
   }));
   ok('Sprites: Waffen & Kacheln', Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => filled(SP.weaponSprite(k, i.rarity, i.holy, i.wtype).cv))
@@ -3766,12 +3768,15 @@ export function selftest() {
   // ---- KI, Verbrechen & Übergänge: echte Funktionen auf zwei Mini-Karten; der Spielstand wird danach wiederhergestellt ----
   const sandbox = fn => {
     const keep = { player: S.player, map: S.map, gold: S.gold, day: S.day, minute: S.minute, party: S.party, kills: S.kills, combat,
+      projectiles: S.projectiles, rising: S.rising,
       deep: structuredClone({ flags: S.flags, relations: S.relations, factions: S.factions, ranks: S.ranks }) };
     S._quiet = true;
+    S.projectiles = []; S.rising = [];              // Geschosse/Auferstehungen gehören zur Probe, nicht zur Welt (und umgekehrt)
     for (const k of ['__a', '__b']) { MAPS[k] = { w: 40, h: 40, tiles: new Uint8Array(1600).fill(T.GRASS) }; S.ents[k] = []; solidIndex[k] = new Map(); }
     try { return fn(); } catch (err) { console.error(err); return false; }
     finally {
-      Object.assign(S, { player: keep.player, map: keep.map, gold: keep.gold, day: keep.day, minute: keep.minute, party: keep.party, kills: keep.kills }, keep.deep);
+      Object.assign(S, { player: keep.player, map: keep.map, gold: keep.gold, day: keep.day, minute: keep.minute, party: keep.party, kills: keep.kills,
+        projectiles: keep.projectiles, rising: keep.rising }, keep.deep);
       combat = keep.combat;
       for (const k of ['__a', '__b']) { delete MAPS[k]; delete S.ents[k]; delete solidIndex[k]; }
       S._quiet = false;
@@ -3873,6 +3878,46 @@ export function selftest() {
     const stuck = actor(tree.x, tree.y); for (let i = 0; i < 20; i++) moveEnt(stuck, 1.2, 0);
     return inTree === 0 && dist(stuck, tree) > 15;
   }));
+  // ---- Phase 11: jeder neue Gegner verhält sich so, wie sein Datenblatt (GDD) es verspricht ----
+  ok('Gegner: Wiedergänger steht einmal wieder auf — nicht nach Feuer, nicht zweimal', sandbox(() => {
+    stage(); const n0 = S.rising.length;
+    const g1 = spawnEnemy('ghoul', '__a', 10, 10); g1.lastKind = 'physical'; die(g1, 'Test');
+    const g2 = spawnEnemy('ghoul', '__a', 12, 10); g2.lastKind = 'fire'; die(g2, 'Test');
+    const g3 = spawnEnemy('ghoul', '__a', 14, 10, { risen: true }); g3.lastKind = 'physical'; die(g3, 'Test');
+    return S.rising.length - n0 === 1;
+  }));
+  ok('Gegner: Geist ist nach einem Treffer kurz körperlos — Heiliges trifft trotzdem', sandbox(() => {
+    const p = stage(), w = spawnEnemy('wraith', '__a', 11, 9); w.x = p.x + 30; w.y = p.y;
+    p.equip.weapon = mkItem('longsword'); hit(p, w, 1); const hp1 = w.hp; hit(p, w, 1); const hp2 = w.hp; hurt(w, 5, p, 'Test', false, 'holy');
+    return hp1 < w.maxHp && hp2 === hp1 && w.hp < hp2;
+  }));
+  ok('Gegner: Bär greift nur an, wer ins Revier tritt oder ihn verletzt', sandbox(() => {
+    const p = stage(), b = spawnEnemy('bear', '__a', 10, 10); b.x = p.x + 200; b.y = p.y; const x0 = b.x;
+    combat = S.ents.__a.filter(e => e.alive); for (let i = 0; i < 40; i++) think(b, 16);
+    const calm = Math.abs(b.x - x0) < 40 && !b.charge;
+    hurt(b, 2, p, 'Test'); for (let i = 0; i < 60; i++) think(b, 16);
+    return calm && b.provoked && (b.x < x0 - 10 || b.chargeWind || b.charge);
+  }));
+  ok('Gegner: Hirsch flieht vor dem Spieler und greift nie an (jagdbar, aber kein Angreifer)', sandbox(() => {
+    const p = stage(), d = spawnEnemy('deer', '__a', 10, 10); d.x = p.x + 80; d.y = p.y; const d0 = dist(d, p), hp0 = B.vital(p);
+    combat = S.ents.__a.filter(e => e.alive); let swung = false;
+    for (let i = 0; i < 60; i++) { think(d, 16); if (d.swing > 0) swung = true; }
+    return dist(d, p) > d0 + 30 && !swung && B.vital(p) === hp0 && teamOf(d) === 'prey';
+  }));
+  ok('Gegner: Kultist heilt verwundete Untote in Reichweite, nicht jedes Bild (Abklingzeit)', sandbox(() => {
+    const p = stage(), c = spawnEnemy('cultist', '__a', 10, 10), s = spawnEnemy('skeleton', '__a', 12, 10);
+    p.x = c.x + 250; p.y = c.y; p.invuln = true;                 // Feind in Sicht (sonst ruht der Kult), Schattenblitze zählen nicht
+    s.x = c.x + 60; s.y = c.y; s.hp = s.maxHp * 0.3; const h0 = s.hp;
+    combat = S.ents.__a.filter(e => e.alive); for (let i = 0; i < 180; i++) think(c, 16);
+    const h1 = s.hp; for (let i = 0; i < 60; i++) think(c, 16);
+    return h1 > h0 && s.hp === h1;
+  }));
+  ok('Gegner: Wilder Hund hat eine eigene Gestalt (kein umgefärbter Wolf)', (() => {
+    const a = SP.beastFrame('wild_dog', MONSTERS.wild_dog.pal, 'W', '', 1), b = SP.beastFrame('wolf', MONSTERS.wolf.pal, 'W', '', 1);
+    const da = a.getContext('2d').getImageData(0, 0, a.width, a.height).data, db = b.getContext('2d').getImageData(0, 0, b.width, b.height).data;
+    let diffShape = 0; for (let i = 3; i < da.length; i += 4) if ((da[i] > 0) !== (db[i] > 0)) diffShape++;
+    return diffShape > 20;
+  })());
   ok('Kampf: schwere Waffen unterbrechen die Ansage, leichte nicht; Rückstoß rutscht über mehrere Frames', sandbox(() => {
     const p = stage(), probe = w => {                   // Zufall fest: ein Krit (×1,5 Rückstoß) hing sonst am Seed des Spielstands
       seedRng(7); p.equip.weapon = mkItem(w); const b = spawnEnemy('bandit', '__a', 12, 9); b.x = p.x + 40; b.y = p.y; b.telegraph = 400; b.windup = true;

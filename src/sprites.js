@@ -12,6 +12,12 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js';
+export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
+// Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
+// Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
+const meta = (f, px, ox, oy) => { f.px = px; f.ox = ox; f.oy = oy; return f; };
+export function blit(c, f, dx, dy) { const px = f.px || PX; c.drawImage(f, dx - (f.ox ?? 10) * px, dy - (f.oy ?? 23) * px, f.width * px, f.height * px); }
 const OUT = '#0c0a08';
 const DEEP = '#0d0b0a';
 
@@ -165,6 +171,7 @@ export function monsterSpec(e, m) {
 }
 
 const specKey = s => { let k = ''; for (const f of SPEC_KEYS) k += s[f] + '|'; return k; };
+export const lookOf = s => resolve(s, specKey(s));             // aufgelöste Spec (Rampen) für figure.js
 const lookCache = new Map();
 function resolve(s, k) {
   let L = lookCache.get(k); if (L) return L;
@@ -531,6 +538,16 @@ function paintTuck(L) {
   return g;
 }
 
+// Ausweichrolle v2: zusammengerollte Figur im feinen Raster (Kugel mit Kapuze/Kopf, Stiefel, Gürtel), um die Mitte gedreht
+function paintTuck2(L) {
+  const g = new G(40, 40), C = L.cloak || L.robe || L.cloth, H = L.hooded ? (L.hood || C) : L.hair, Bo = L.boots || L.skin;
+  for (let j = -11; j <= 11; j++) for (let i = -11; i <= 11; i++) { const d = i * i + j * j; if (d > 121) continue;
+    g.p(20 + i, 20 + j, d > 100 ? (i + j < 0 ? C.hi : C.dk) : i + j < -8 ? C.hi : i + j > 8 ? C.dk : i + j > 1 ? C.sh : C.b); }
+  for (let j = -8; j <= -2; j++) for (let i = -9; i <= -3; i++) if (i * i + j * j < 40) g.p(20 + i, 20 + j, i + j < -12 ? H.hi : H.b);
+  g.r(27, 25, 5, 4, Bo.sh); g.r(27, 25, 5, 1, Bo.b); g.r(14, 22, 12, 2, L.belt.dk); g.p(19, 22, L.gold.b);
+  return g;
+}
+
 // ---------------- Frame-Cache ----------------
 const frameCache = new Map();
 function cacheGet(k, make) {
@@ -539,19 +556,26 @@ function cacheGet(k, make) {
   f = make(); frameCache.set(k, f); return f;
 }
 // dir: 'S' | 'N' | 'W' | 'E'. pose: i0 i1 w0..w3 a1 a2 hit cast kneel tuck down dead
-export function humanFrame(spec, dir, pose) {
+export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waffenarm weglassen (zeichnet der Renderer zur Waffe)
   const sk = specKey(spec);
-  return cacheGet(sk + dir + pose, () => {
+  return cacheGet(sk + dir + pose + (noArm || ''), () => {
     const L = resolve(spec, sk);
-    if (pose === 'tuck') return toCanvas(paintTuck(L));
+    if (!OLD_FIGURES) {                                               // v2: Menschen, Untote, Goblins
+      const asG = o => { const g = new G(o.w, o.h); g.a = o.a; return g; };
+      if (pose === 'tuck') return meta(toCanvas(paintTuck2(L)), 1, 20, 20);
+      if (pose === 'down' || pose === 'dead') return meta(toCanvas(asG(paintHuman(pose === 'dead' ? { ...L, glow: '' } : L, 'W', 'i0')).rotCW()), 1, 30, 31);
+      const g = asG(paintHuman(L, dir === 'E' ? 'W' : dir, pose, noArm));
+      return meta(toCanvas(dir === 'E' ? g.flipX() : g), 1, FW2 / 2, 57);
+    }
+    if (pose === 'tuck') return meta(toCanvas(paintTuck(L)), PX, 10, 16);
     if (pose === 'down' || pose === 'dead') {
       const s2 = pose === 'dead' ? { ...L, glow: '' } : L;
-      return toCanvas(paintSide(s2, 'i0').rotCW());
+      return meta(toCanvas(paintSide(s2, 'i0').rotCW()), PX, 12.5, 16);
     }
-    if (dir === 'S') return toCanvas(paintFront(L, pose, false));
-    if (dir === 'N') return toCanvas(paintFront(L, pose, true));
+    if (dir === 'S') return meta(toCanvas(paintFront(L, pose, false)), PX, 10, 23);
+    if (dir === 'N') return meta(toCanvas(paintFront(L, pose, true)), PX, 10, 23);
     const g = paintSide(L, pose);
-    return toCanvas(dir === 'E' ? g.flipX() : g);
+    return meta(toCanvas(dir === 'E' ? g.flipX() : g), PX, 10, 23);
   });
 }
 
@@ -588,6 +612,7 @@ export function poseOf(e, now, bow) {
 // ---------------- Waffen (liegend, Spitze nach +x, Griff bei gx/gy) ----------------
 // Jede Waffe hat ein eigenes Design (Form, Griff, Material, Abnutzung). Seltene/heilige Klingen tragen Runen.
 const WPN = new Map();
+const OLD_WEAPONS = false, OLD_FIGURES = false;                                          // Rückfall auf die 2-px-Designs (nur zum Vergleich)
 const WOOD = () => ramp('#5b452a'), WRAP = () => ramp('#3a2a1c'), IRON = () => ramp('#6d6154');
 function steelOf(r) { return ramp(r === 'mythic' ? '#a9d4e8' : r === 'legendary' ? '#d8b25a' : r === 'epic' ? '#b7a27a' : r === 'rare' ? '#b4b8bd' : '#a8a196'); }
 function wrapGrip(g, x0, x1, y) { const W = WRAP(); for (let x = x0; x <= x1; x++) g.p(x, y, (x & 1) ? W.b : W.hi); }
@@ -713,7 +738,10 @@ export function weaponSprite(key, rarity, holy, wtype) {
   let w = WPN.get(k); if (w) return w;
   const St = steelOf(rarity);
   let g, info;
-  if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
+  if (!OLD_WEAPONS) {                                               // G3: feines Raster (1 Welt je Pixel)
+    const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON());
+    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, px: 1 };
+  } else if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
     const L = key === 'longbow' ? 12 : 8, wood = WOOD(), grip = WRAP();
     g = new G(9, L * 2 + 3); info = { gx: 2, gy: L + 1, blade: null };
     for (let y = 1; y <= L * 2 + 1; y++) { const t = (y - L - 1) / L, x = Math.round(1 + 4 * (1 - t * t));
@@ -727,8 +755,8 @@ export function weaponSprite(key, rarity, holy, wtype) {
   }
   const runes = rarity === 'mythic' || rarity === 'legendary' || rarity === 'epic' || holy;
   if (runes && info.blade) { const [x0, x1, y] = info.blade, rc = holy ? '#f2e6b0' : rarity === 'mythic' ? '#e8f8ff' : rarity === 'legendary' ? '#ffd27a' : '#e0a060';
-    for (let x = x0 + 2; x < x1 - 1; x += 3) g.p(x, y, rc); }
-  w = { cv: toCanvas(g), ...info, runes };
+    for (let x = x0 + 2; x < x1 - 1; x += 3) { g.p(x, y, rc); if (info.px === 1) g.p(x + 1, y, rc); } }
+  w = { cv: toCanvas(g), px: PX, ...info, runes };
   WPN.set(k, w); return w;
 }
 
@@ -739,9 +767,9 @@ function paintBeast(type, pal, frame, act) {
   const belly = ramp(mix(pal.body || '#5b5145', '#c8b89a', boar ? 0.12 : 0.32));
   const sw = [1, 0, -1, 0][frame & 3], lunge = act === 'a2' ? -2 : act === 'a1' ? 1 : 0, low = act === 'a1' ? 1 : 0;
   // Beine: Oberschenkel 2 px, Unterschenkel 1 px, Pfote/Huf 2 px; ferne Beine dunkel
-  const bear = type === 'bear', deer = type === 'deer';
-  const legTop = boar ? 11 : bear ? 12 : deer ? 10 : 10, legBot = boar ? 15 : bear ? 15 : deer ? 17 : 16;
-  const legs = boar ? [[8, 0], [10, 1], [17, 0], [19, 1]] : bear ? [[6, 0], [8, 1], [17, 0], [19, 1]] : deer ? [[8, 0], [9, 1], [17, 0], [18, 1]] : [[7, 0], [9, 1], [17, 0], [19, 1]];
+  const bear = type === 'bear', deer = type === 'deer', dog = type === 'wild_dog';
+  const legTop = boar ? 11 : bear ? 12 : deer ? 10 : dog ? 10 : 10, legBot = boar ? 15 : bear ? 15 : deer ? 17 : 16;
+  const legs = dog ? [[9, 0], [10, 1], [17, 0], [18, 1]] : boar ? [[8, 0], [10, 1], [17, 0], [19, 1]] : bear ? [[6, 0], [8, 1], [17, 0], [19, 1]] : deer ? [[8, 0], [9, 1], [17, 0], [18, 1]] : [[7, 0], [9, 1], [17, 0], [19, 1]];
   for (const [lx, near] of legs) {
     const s = (near ? sw : -sw), C = near ? F : D;
     g.r(lx, legTop, 2, 2, C.sh);
@@ -759,6 +787,24 @@ function paintBeast(type, pal, frame, act) {
     g.r(hx - 1, 7 + hy, 3, 2, belly.b); g.p(hx - 1, 7 + hy, DEEP); g.p(hx + 2, 5 + hy, eye);
     if (act === 'a2') { g.r(hx - 1, 9 + hy, 3, 1, DEEP); g.p(hx, 9 + hy, '#e0d6bc'); }
     g.p(23, 6, D.b); return g;
+  }
+  if (dog) {                                             // Wilder Hund: schmal, hochbeinig, ausgehungert (Rippen), Schlappohr,
+    for (let x = 8; x <= 19; x++) {                      // Sichelrute nach oben, gefleckt — kein umgefärbter Wolf
+      const top = x <= 11 ? 6 : 7, bot = x <= 10 ? 10 : x <= 16 ? 9 : 10;
+      for (let y = top; y <= bot; y++) g.p(x, y, y === top ? F.hi : y === bot ? (x <= 11 ? belly.b : F.sh) : F.b);
+    }
+    for (const [x, y] of [[13, 7], [14, 8], [16, 7], [10, 8]]) g.p(x, y, D.b);           // Flecken
+    g.p(12, 8, F.sh); g.p(14, 7, F.sh); g.p(12, 9, belly.sh);                            // Rippen, eingefallene Flanke
+    const hx = lunge, hy = low + (act === 'a2' ? 1 : 0);
+    g.r(5 + hx, 5 + hy, 3, 4, F.b); g.p(7 + hx, 5 + hy, F.hi);                              // dünner Hals
+    g.r(2 + hx, 4 + hy, 4, 3, F.b); g.r(3 + hx, 4 + hy, 2, 1, F.hi);                        // Kopf
+    g.r(0 + hx, 6 + hy, 3, 1, F.b); g.p(hx, 6 + hy, DEEP); g.p(hx + 1, 7 + hy, F.sh);       // spitze Schnauze
+    g.p(5 + hx, 4 + hy, D.b); g.p(6 + hx, 5 + hy, D.b); g.p(6 + hx, 6 + hy, D.sh);          // Schlappohr
+    g.p(3 + hx, 5 + hy, eye);
+    if (act === 'a2') { g.r(hx, 7 + hy, 2, 1, DEEP); g.p(hx + 1, 7 + hy, '#e0d6bc'); }
+    const wag = [0, -1, 0, 1][frame & 3];                                                // Rute wippt beim Laufen
+    g.p(20, 6, F.b); g.p(21, 5, F.b); g.p(22, 4 + wag, F.b); g.p(22, 3 + wag, F.hi); g.p(21, 3 + wag, D.b);
+    return g;
   }
   if (type === 'deer') {                                  // Hirsch: schlanker Rumpf, hohe Beine, Geweih, heller Spiegel
     for (let x = 7; x <= 19; x++) { const top = 5, bot = x <= 9 ? 9 : 10; for (let y = top; y <= bot; y++) g.p(x, y, y === top ? F.hi : y === bot ? belly.b : F.b); }
@@ -804,10 +850,15 @@ function paintBeast(type, pal, frame, act) {
   return g;
 }
 export function beastFrame(type, pal, dir, pose, frame) {
-  return cacheGet('beast|' + type + dir + pose + frame, () => {
+  return cacheGet('beast|' + type + '|' + (pal.body || '') + dir + pose + frame, () => {
+    if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster
+      const o = paintBeast2(type, pal, frame, pose === 'dead' ? '' : pose), g0 = new G(o.w, o.h); g0.a = o.a;
+      const g1 = pose === 'dead' ? g0.flipY() : g0;
+      return meta(toCanvas(dir === 'E' ? g1.flipX() : g1), 1, BEOX, pose === 'dead' ? o.h - 15 : BEOY);   // tot: liegt auf dem Rücken
+    }   // Palette im Schlüssel: sonst erbt ein Tier die Farben eines anderen
     let g = paintBeast(type, pal, frame, pose);
     if (pose === 'dead') g = g.flipY();
-    return toCanvas(dir === 'E' ? g.flipX() : g);
+    return meta(toCanvas(dir === 'E' ? g.flipX() : g), PX, 15, pose === 'dead' ? 12 : 17);
   });
 }
 
@@ -851,7 +902,14 @@ function paintBrute(pal, frame, act) {
   return g;
 }
 export function bruteFrame(pal, dir, pose, frame) {
-  return cacheGet('brute|' + dir + pose + frame, () => { const g = paintBrute(pal, frame, pose); return toCanvas(dir === 'W' ? g.flipX() : g); });
+  return cacheGet('brute|' + dir + pose + frame, () => {
+    if (!OLD_FIGURES) {                                               // G4: Gorak als Goblin-Hüne im feinen Raster (Hackmesser zeichnet der Renderer)
+      const look = { goblin: 1, noClub: 1, skin: pal.skin || '#556b34', hood: '#2a2019', cloak: mix(pal.cloth || '#33261a', '#000', 0.25), cloth: pal.cloth || '#33261a',
+        leather: '#3e2e22', strap: '#5a4230', metal: pal.metal || '#9a8e78', pants: '#2a2420', boots: '#1c1712', wrap: '#6e604c', eye: '#e0c24a' };
+      const o = paintBrute2(look, pose === 'a1' || pose === 'a2' ? pose : frame ? 'walk' : 'i0', frame), g = new G(o.w, o.h); g.a = o.a;
+      return meta(toCanvas(dir === 'W' ? g.flipX() : g), 1, BOX, BOY);
+    }
+    const g = paintBrute(pal, frame, pose); return meta(toCanvas(dir === 'W' ? g.flipX() : g), PX, 17, 35); });
 }
 
 // ---------------- Pixelisieren (Props, Icons): Vektorzeichnung → echtes Pixelraster ----------------
