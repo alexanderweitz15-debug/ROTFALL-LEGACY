@@ -3564,7 +3564,7 @@ export function selftest() {
       for (let h = 0; h < q.length; h++) { const i = q[h], x = i % m.w, y = (i / m.w) | 0;
         for (const j of [i - 1, i + 1, i - m.w, i + m.w]) { const jx = j % m.w; if (j < 0 || j >= m.tiles.length || seen[j] || Math.abs(jx - x) > 1 || SOLID.has(m.tiles[j])) continue; seen[j] = 1; q.push(j); } }
       const towns = Object.values(TOWN_PLAN).every(P => seen[P.square[1] * m.w + P.square[0]]);
-      const props = S.ents.world.every(e => e.kind !== 'prop' || !e.solid || e.type === 'boat' || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0)) || ['obelisk', 'crypt', 'tower_ruin', 'watchtower_ruin', 'palisade_prop', 'rock_node', 'ore_node', 'dead_tree', 'fallen_tree', 'rubble', 'broken_pillar'].includes(e.type));   // Natur/Trümmer dürfen im Fels/See liegen
+      const props = S.ents.world.every(e => e.kind !== 'prop' || !e.solid || e.type === 'boat' || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0)) || ['obelisk', 'crypt', 'tower_ruin', 'watchtower_ruin', 'palisade_prop', 'rock_node', 'ore_node', 'dead_tree', 'fallen_tree', 'rubble', 'broken_pillar', 'gravestone'].includes(e.type));   // Natur/Trümmer/Streugut dürfen im Fels/See liegen
       return m.w === 768 && m.h === 768 && towns && props;
     })());
     ok('Karawanenroute: kein Abschnitt durch Haus, Wasser oder Mauer (Karawanen fahren ohne Kollision)', SIM.ROUTE.every(([x, y], i) => {
