@@ -256,6 +256,7 @@ const NPC_SPOTS = {
   vharnholm:[489,441],                                      // Totenreich: Sael am Markt von Vharnholm
   northsmith:[139,57],                                      // Nordfurt: Brann vor der Schmiede
   sonnwacht:[452,256],                                      // Sonnwacht: Ilva vor der Ordenskapelle
+  grenzwacht:[332,349],                                     // Grenzöde: Oda am Wachfeuer
 };
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
@@ -272,7 +273,7 @@ function spawnNpcDef(def) {
     c.home = home; c.anchor = { x: pos.x, y: pos.y };
     if (def.undead) { c.pal.skin = '#b9b3a2'; c.pal.glow = def.key === 'vhal' ? '#b07ae0' : '#4e8f7a'; }
     c.hooded = !!def.undead || def.faction === 'undead' || ['morvath', 'rook', 'kelan'].includes(def.key);
-    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', morvath:'staff' }[def.key];
+    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', oda:'spear', morvath:'staff' }[def.key];
     if (w) c.equip.weapon = mkItem(w);
     if (def.key === 'borin') { c.equip.offhand = mkItem('kite_shield'); c.pal.shield = '#4a3f30'; c.pal.shieldBoss = '#8a8172'; }
     if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass');
@@ -292,6 +293,7 @@ const GUARD_POSTS = {                                   // Tore und Einfallstra�
   ashford:   { faction: 'merch', posts: [[380, 85], [379, 98], [373, 92], [358, 92]] },
   sonnwacht: { faction: 'order', posts: [[447, 250], [454, 264], [457, 264], [455, 277]] },
   vharnholm: { faction: 'undead', posts: [[469, 442], [505, 442], [487, 425], [487, 461]] },
+  grenzwacht:{ faction: 'valen', posts: [[330, 342], [331, 356], [326, 347]] },   // Nordtor, Südtor (zum Aschenpfad), Turm
 };
 const GUARD_KIT = {
   valen: { prof: 'Torwache', cloth: '#33415c', weapon: 'spear', chest: 'chain_hauberk', head: 'iron_helm' },
@@ -494,6 +496,7 @@ const SPAWN_AREAS = [
   { map:'world', x:474, y:372, r:5, types:['bandit', 'bandit', 'bandit_archer'], cap:4 },   // Grabräuber-Lager im Knochenwald
   { map:'world', x:414, y:452, r:6, types:['bandit', 'bandit'], cap:3 },                    // Grabräuber am Südrand der Nekropole
   { map:'world', x:318, y:438, r:14, types:['skeleton'], cap:6 },                           // Aschensee
+  { map:'world', x:340, y:402, r:9, types:['skeleton', 'skeleton', 'wolf'], cap:8 },        // Session 6: Hundertfeld
 ];
 
 for (const a of SPAWN_AREAS) if (a.map === 'world') {          // Entwurf → Weltmaßstab: Gebiete wachsen mit, Dichte sinkt leicht (mehr Ruhe)
@@ -587,7 +590,7 @@ export function newGame(cfg) {
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
-    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
+    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true, border1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p));
@@ -731,6 +734,14 @@ export function continueGame() {
   if (S.settlement) S.settlement.buildings = S.ents[S.settlement.map || 'world'].filter(e => e.kind === 'building');
   S.relations ||= {}; S.flags ||= {};
   S.party = S.party.filter(id => byId(id));
+  if (!S.flags.border1) {                      // Session 6: Grenzöde — Grenzwacht, Hundertfeld, Straße; was dort stand, räumt die Szene
+    const [ax, ay] = worldPt(322, 342), [bx, by] = worldPt(339, 357), [rx] = worldPt(330, 250), [, ry0] = worldPt(330, 250), [, ry1] = worldPt(330, 361);
+    const clear = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return (x >= ax && x <= bx && y >= ay && y <= by) || (x >= rx && x <= rx + 3 && y >= ry0 && y <= ry1); };
+    const have = new Set(S.ents.world.map(e => e.gk).filter(Boolean));
+    S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && !e.borderScene && clear(e)));
+    for (const p of fresh) if (p.borderScene && !have.has(p.gk)) S.ents.world.push(p);
+    indexSolids('world'); spawnGuardPosts(); S.flags.border1 = true;
+  }
   if (!S.flags.deep1) {                        // Session 6: Tiefhall betretbar — Karte, Hort drinnen, Hrodvar; der Eingang wird Portal
     S.ents.deep = FRESH.deep.slice(); indexSolids('deep');
     S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && e.type === 'chest' && e.label === 'Tiefhall-Hort' && !e.opened));   // der Hort lag draußen; ungeöffnet zieht er hinein
@@ -747,7 +758,7 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva'].includes(def.key)) spawnNpcDef(def);
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -2367,7 +2378,7 @@ const TOWN_GOSSIP = {
   eren: ['„Seit die Grube verloren ist, backt Eren kleinere Brote. Aber wir backen noch.“', '„Die Scheunen sind halb leer. Der Winter wird lang.“'],
   northcity: ['„Brann schmiedet den besten Stahl im Norden. Sie sagt, unter dem Frostkamm gab es mal besseren.“', '„Nordfurt hat Mauern. Das beruhigt die Leute — bis sie fragen, warum.“', '„Die Garnison zahlt pünktlich. Das ist mehr, als man vom König sagen kann.“'],
   saltport: ['„Das Salz geht nach Norden, das Silber kommt zurück. Meistens.“', '„Die Boote fahren nicht mehr weit raus. Draußen treibt Asche auf dem Wasser.“'],
-  kreuzweg: ['„Hier kreuzen sich die Straßen — und die Klingen. Söldner sind gut fürs Geschäft, bis sie es nicht mehr sind.“', '„Wer den Markt am Kreuzweg hält, hält das Mittelland.“'],
+  kreuzweg: ['„Valen hat einen Posten an den Rand der Öde gestellt, die Grenzwacht. Man schickt dorthin, wen man loswerden will.“', '„Hier kreuzen sich die Straßen — und die Klingen. Söldner sind gut fürs Geschäft, bis sie es nicht mehr sind.“', '„Wer den Markt am Kreuzweg hält, hält das Mittelland.“'],
   ashford: ['„Die Karawanen halten hier, weil dahinter nur noch Asche kommt.“', '„Die Palisade ist neu. Die Angst dahinter ist alt.“'],
   sonnwacht: ['„Die Pilger kommen wegen des Schreins. Sie bleiben wegen der Mauern.“', '„Der Orden zählt die Toten. Und manchmal zählen die Toten zurück.“'],
   vharnholm: ['„Am Aschensee steht ein Brunnen. Wer zu uns gehört, trinkt dort Namen.“', '„Im Knochenwald graben Lebende nach unserem Grabgut. Sael zahlt für ihr Schweigen.“',
@@ -3839,6 +3850,14 @@ export function selftest() {
     const t = D.rooms.find(r => r.tag === 'throne'), boss = S.ents.deep.find(e => e.mtype === 'hrodvar'), hort = S.ents.deep.find(e => e.label === 'Tiefhall-Hort');
     const inR = (r, e) => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; };
     return D.rooms.every(reach) && !!hort && (!boss || inR(t, boss) || boss.aggroId) && !S.ents.world.some(e => e.label === 'Tiefhall-Hort' && !e.opened);
+  })());
+  if (S.ents.world.some(e => e.borderScene)) ok('Grenzöde: Grenzwacht mit Palisade und zwei Toren auf der Straße, Wachen und Oda im Lager, Späher-Tasche auf freiem Boden', (() => {
+    const [ax, ay] = worldPt(323, 343), [bx, by] = worldPt(337, 355), inC = e => e.x / TS >= ax && e.x / TS <= bx + 2 && e.y / TS >= ay && e.y / TS <= by + 2;
+    const pal = S.ents.world.filter(e => e.type === 'palisade_prop' && e.borderScene), [gx] = worldPt(330, 343);
+    const gates = [ay, by].every(y => [gx, gx + 1].every(x => tileAt('world', x, y) === T.ROAD && !occupied.at('world', x, y)));
+    const oda = S.ents.world.find(e => e.key === 'oda'), guards = S.ents.world.filter(e => e.post === 'grenzwacht' && e.alive);
+    const sack = S.ents.world.find(e => e.label === 'Tasche des Spähers');
+    return pal.length > 30 && gates && !!oda && inC(oda) && guards.length === 3 && !!sack && !SOLID.has(tileAt('world', sack.x / TS | 0, sack.y / TS | 0));
   })());
   ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
     return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());

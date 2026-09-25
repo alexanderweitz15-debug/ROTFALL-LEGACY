@@ -51,6 +51,8 @@ export const LOCATIONS = [
   { key:'aschensee', name:'Aschensee',          x:318,y:438,r:12, kind:'wild',    threat:3, faction:'undead' },
   { key:'vharnholm', name:'Vharnholm',          x:487,y:443,r:10, kind:'city',    threat:1, faction:'undead' },
   { key:'grove',     name:'Alter Hain',         x:80, y:288,r:6,  kind:'shrine',  threat:1 },
+  { key:'grenzwacht',name:'Grenzwacht',         x:330,y:350,r:8,  kind:'camp',    threat:1, faction:'valen' },
+  { key:'hundertfeld',name:'Hundertfeld',       x:340,y:402,r:10, kind:'ruin',    threat:3 },
   { key:'mistisle',  name:'Nebelinsel',         x:90, y:500,r:12, kind:'wild',    threat:2 },
 ];
 
@@ -972,7 +974,7 @@ export function genWorld() {
   for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
-  pactScenes(); groveScene(); deadScenes();
+  pactScenes(); groveScene(); deadScenes(); borderScenes();
   const wild = new Set(props.slice(handMark));
   resampleWorld();                                         // Entwurf → Weltmaßstab (ohne rnd())
   phase = 'world';
@@ -1050,6 +1052,43 @@ export function groveScene() {
   for (const [dx, dy] of [[-1, 2], [2, 2], [-2, -1], [3, 1]]) P('mushrooms', cx + dx, cy + dy, { r: 4 });
   P('flowers_prop', cx, cy + 2, { r: 4 }); P('flowers_prop', cx + 1, cy - 2, { r: 4 }); P('fallen_tree', cx - 2, cy + 4, { solid: true });
   P('candles', cx + 2, cy - 1, { r: 6 });
+}
+
+// Grenzöde (Session 6): Valens letzter Posten vor dem Totenreich und das Schlachtfeld davor. Hash statt rnd().
+// Grenzwacht: Palisade 15×13 mit Tor nach Norden (Straße vom Kreuzweg) und nach Süden (Aschenpfad), Turm, Zelte, Feuer.
+// Hundertfeld: Gräberreihen einer verlorenen Schlacht, Wracks, Valens zerrissene Banner, ein toter Späher mit seiner Tasche.
+export function borderScenes() {
+  const P = (t, x, y, o = {}) => prop(t, x, y, { borderScene: true, ...o });
+  const x0 = 323, y0 = 343, x1 = 337, y1 = 355, gx = 330;
+  for (let y = 250; y <= 360; y++) for (const x of [gx, gx + 1]) { const t = tileAt('world', x, y);   // Straße Kreuzweg-Oststraße → Grenzwacht → Aschenpfad
+    if (!SOLID.has(t) || t === T.ROCK) setTile('world', x, y, t === T.ASH ? T.DIRT : T.ROAD); }
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (tileAt('world', x, y) !== T.ROAD) setTile('world', x, y, T.DIRT);
+  let k = 0; for (const p of props) { const x = p.x / TS | 0, y = p.y / TS | 0;               // Platz schaffen: Lager und Straße
+    const inCamp = x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 1 && y <= y1 + 1, onRoad = (x === gx || x === gx + 1) && y >= 250 && y <= 360;
+    if (!((inCamp || onRoad) && (p.map || 'world') === 'world')) props[k++] = p; }
+  props.length = k;
+  for (let x = x0; x <= x1; x++) for (const y of [y0, y1]) if (x !== gx && x !== gx + 1) P('palisade_prop', x, y, { solid: true, r: 10 });
+  for (let y = y0 + 1; y < y1; y++) for (const x of [x0, x1]) P('palisade_prop', x, y, { solid: true, r: 10 });
+  P('watchtower_ruin', x0 + 2, y0 + 2, { solid: true, label: 'Wachturm der Grenzwacht' });
+  P('sign', gx - 1, y0 - 1, { label: 'Grenzwacht — letzter Posten Valens. Dahinter: niemandes Land.' });
+  for (const [dx, dy] of [[4, 3], [9, 3], [11, 7]]) P('tent_prop', x0 + dx, y0 + dy, { solid: true });
+  P('campfire_static', gx, y0 + 7, { solid: true, label: 'Wachfeuer' });
+  P('weapon_rack', x0 + 2, y1 - 2, { solid: true }); P('weapon_rack', x0 + 4, y1 - 2, { solid: true });
+  P('crate_stack', x1 - 2, y1 - 2, { solid: true }); P('barrel', x1 - 3, y1 - 3, { solid: true }); P('cart', x1 - 2, y0 + 4, { solid: true });
+  P('banner_torn', gx - 2, y0 + 1); P('banner_torn', gx + 3, y0 + 1); P('banner_torn', gx - 2, y1 - 1);
+  for (const [dx, dy] of [[4, 6], [9, 9], [3, 9]]) P('tent_prop', x0 + dx, y0 + dy, { solid: true });         // Mannschaftszelte
+  P('firepit', x1 - 3, y0 + 9, { solid: true, label: 'Kochstelle' }); P('trough', x0 + 2, y0 + 5, { solid: true }); P('hay', x0 + 1, y0 + 6, { solid: true });
+  P('barrel', x1 - 2, y1 - 4, { solid: true }); P('crate', x1 - 4, y1 - 2, { loot: ['bandage', 'dried_meat'], label: 'Vorratskiste der Wacht' });
+  P('lantern', gx - 1, y0 + 1, { r: 6 }); P('lantern', gx + 2, y1 - 1, { r: 6 });
+  // Hundertfeld
+  const hx = 340, hy = 402;
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) { const x = hx - 9 + i * 3, y = hy - 3 + r * 3, h = nz(x * 7 + 1, y * 13 + 5);
+    if (SOLID.has(tileAt('world', x, y))) continue;
+    P(h < 0.75 ? 'gravestone' : 'bones', x, y, h < 0.75 ? { solid: true, r: 8 } : { r: 6 }); }
+  for (const [dx, dy, t] of [[-12, -5, 'broken_cart'], [11, 5, 'broken_cart'], [-7, 6, 'banner_torn'], [4, -6, 'banner_torn'], [12, -3, 'banner_torn'],
+    [-13, 2, 'rubble'], [8, 8, 'rubble'], [0, 8, 'bones'], [-4, -7, 'bones']]) if (!SOLID.has(tileAt('world', hx + dx, hy + dy))) P(t, hx + dx, hy + dy, t === 'broken_cart' ? { solid: true } : { r: 8 });
+  P('bones', hx + 6, hy + 7, { r: 6, label: 'Toter Späher' });
+  P('sack', hx + 7, hy + 7, { loot: ['scout_report', 'bandage'], label: 'Tasche des Spähers' });
 }
 
 // Totenreich-Erweiterung (Session 5): Knochenwald, Aschensee mit Seelenbrunnen. Hash statt rnd(), damit nichts verrutscht.
