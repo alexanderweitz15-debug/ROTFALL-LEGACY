@@ -120,3 +120,21 @@ necromancer: { name, title /* Namenszusatz */, glow /* Merkmal */, faction, excl
 ```
 Spieler-Laufzeitfelder: `titleClasses` (erworben), `titleClass` (getragen oder null), `tres` ({ essence, corruption }),
 `pactCost` ({ hpMul, stamina }), `pal.glow`. Diener: Gegner mit `servant` (Herr-id), `until`, `glow`, `transient`.
+
+## Weltmaßstab — Session 5
+```js
+WS = 1.5; wT(v) = floor((v + 0.5) * WS); dT(v) = floor(v / WS)   // Entwurfskachel ↔ Weltkachel
+worldPt(x, y) → [wx, wy]     // Entwurfspunkt; in Städten über deren Streckung (sp = a·WS + (v − a)·s)
+TOWN_PLAN[k].outskirts = ['cottage', 'house', …]   // Randhäuser nach Regeln (Anzahl = Länge), Typ bestimmt Größe (HOUSE_SIZE)
+TOWN_PLAN[k].grow.s0 = 1.5   // Maßstab, in dem grow-Koordinaten gebaut wurden (Umrechnung s/s0 um den Anker)
+props[i].planned = true      // Teil des Stadtplans, auch wenn der Typ sonst Wildnis-Streu wäre (Knochenturm, Namensstein)
+```
+
+## Skill-Knoten (`SKILL_TREE`) — Session 5
+```js
+k_legion: { branch: 'necromancer', row: 2, type: 'keystone' /* oder 'notable', sonst klein */, name, desc,
+  fx: { hp, stam, mana, dmg, armor, crit, speed, spell, cdr, heal, regen, manaRegen, dodge, invCap } /* additiv */,
+  requires: ['n_cold'] /* einer genügt, [] = Einstieg */, designIntent /* Pflicht bei keystone */ }
+SKILL_BRANCHES[b] = { name, desc, title? /* Zweig versiegelt ohne diese Titelklasse */ }
+```
+Spieler: `skillPoints`, `tree` ({ knoten: 1 }), `tfx` (Laufzeit-Summe). Titelklasse: `MAX_TITLES = 2`, `cost.attr`.

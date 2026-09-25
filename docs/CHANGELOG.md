@@ -2,6 +2,48 @@
 
 Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund (Master-Prompt §2, Punkte 1–4).
 
+## Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich
+
+Nutzerwunsch: Weltkarte größer (mehr Häuser, mehr Abstand), Diener folgen, Skill-Baum mit allgemeinen Knoten und eigenen
+Zweigen der Titelklassen, höchstens 2 Klassen je Figur, Totenreich erweitern. Fünf Commits, je Thema einer.
+
+### Weltmaßstab (world.js, game.js, sim.js, state.js)
+- **Refactoring nach §2, Punkt 1** (blockiert die geforderte Erweiterung): ~300 feste Koordinaten der Generierung stehen
+  im 512er-Maßstab. Statt sie umzuschreiben: `resampleWorld` rechnet die fertige Entwurfswelt auf 768×768 hoch, Städte
+  werden danach im Weltmaßstab gebaut (`sp`: Anker × WS, Streckung wie geplant). `phase` trennt Entwurf und Laufzeit
+  (`regionAt`, `seaLine`, `naturalAt` rechnen Weltkacheln auf den Entwurf zurück).
+- `worldPt`/`wT`/`dT`; `townPt` bleibt als Alias. SPAWN_AREAS, Ankunft an der Grube, Lila, Startgebiet, Karawanen-
+  Hinterhalt laufen über den Maßstab. `grow`-Einträge mit `s0` umgerechnet; neue `outskirts` (Randhäuser nach Regeln).
+- Spielstand v3: `rescaleSave` — Props neu (Truhenzustand über Typ+Etikett+Nähe), Figuren/Gegner/Gräber/Gegenstände/
+  Karawanen/Lager ×1,5, Bewohner neu, Wachen auf neue Posten, wer in Mauer stünde, tritt heraus.
+- Messung (headless, 300 Frames): Update Eren 1,2 → 1,7 ms, Nordfurt 0,9 → 1,3 ms (Budget 3,0); Spielstand 1,1 → 1,4 MB.
+
+### Diener (game.js)
+- travel(): Diener gehen wie Gruppenmitglieder mit durch jeden Eingang.
+
+### Skill-Baum (data.js, game.js, ui.js, style.css)
+- `SKILL_TREE`/`SKILL_BRANCHES`, `treeFx`/`node`/`nodeState`/`learnNode`; Wirkung in recalc, damageOf, armorOf, speedOf,
+  hit (Krit), hurt (Berserker, Zweiter Atem), Regeneration, Heilgegenständen, Ausweichen, Abklingzeiten, Zauber- und
+  Titelzauberschaden, Titelknoten (Dienerzahl/-dauer/-leben, Essenzgrenze, Fluch, Chaosblitz, Entfesseln, Blutpakt,
+  Ranken, Geisterwolf, Erdsegen, Hüter des Hains). Fenster „Talente“ (T, auch im Menü), Talente im Charakterbogen.
+- Stufenaufstieg vergibt 1 Talentpunkt; mehrere Stufen auf einmal werden jetzt vergeben (BUG-054).
+
+### Druide, Obergrenze (data.js, game.js, world.js, ui.js)
+- Titelklasse Druide (Wildkraft, Rankenfessel, Geisterwolf, Erdsegen, Waldgänger, Metall erstickt, Stärke −1),
+  Quest „Der Ruf des Hains“, Mira, Alter Hain im Westwald (`groveScene`). `MAX_TITLES = 2`, Titelwechsel nicht im Kampf.
+
+### Totenreich (world.js, game.js, data.js, buildings.js, render.js)
+- Zwei Aschland-Zentren; `deadScenes` (Knochenwald, Aschensee, Seelenbrunnen); Stadtplan Vharnholm (Stil blackstone/
+  bone, untote Bewohner `DEAD_TRADES`, Stille Wächter), Sael mit eigenem Warenpool (`npc.pool`, Orte ohne Markt),
+  Quest „Grabräuber in der Asche“, Seelenphiole (`use:'soul'`), Seelenbrunnen (`rite:'soulwell'`), Spawngebiete.
+- Gleiche Fraktion bekämpft sich nicht (isHostile, Bedrohungssuche) — BUG-055.
+- Tote Bäume neu gezeichnet (BUG-056). `planned`-Props im Stadtplan sind keine Wildnis-Streu.
+
+### Tests
+- Selbsttest 54 → 60: Weltmaßstab/Erreichbarkeit, Diener durch Eingänge, Skill-Baum-Daten, Skill-Baum-Wirkung, Druide +
+  Obergrenze, Totenreich (Fraktionsfrieden, Brunnen, Phiole). Gegenproben für Diener und Fraktionsregel. Grün auf 5 Seeds
+  und auf zwei alten v2-Ständen. Druiden- und Nekromanten-Kette über die Oberfläche durchgespielt.
+
 ## Session 4 — 2026-09-25 · Siedlungsdichte (§75) und Titelklassen (§32/§78)
 
 Nutzerwunsch: „Klassen, die man später freischalten kann, wie Titel mit besonderen Fähigkeiten“ — Ressourcen und

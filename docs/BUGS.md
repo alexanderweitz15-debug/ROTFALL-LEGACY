@@ -351,6 +351,34 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Alt-Vharn: Ysra am Ahnenaltar mit Namenssteinen; Nekromanten-Turm: Vhal im Schattenkreis; Große Nekropole: Gruft als
   Ritualort mit Wächter. Weitere leere Flächen bleiben (→ Phase 16). CONTENT · MEDIUM · IN ARBEIT
 
+## Session 5 — Weltmaßstab, Skill-Baum, Druide, Totenreich
+
+### BUG-052 — Weltkarte zu klein für mehr Häuser und Abstand (Nutzerbefund)
+- 512×512, Eren–Nordfurt ~18 Kacheln nach der Streckung. Lösung: Weltmaßstab 1,5 (768×768), Städte weitere 15 %,
+  Randhäuser. Spielstand v3 mit Umrechnung. WORLD LOGIC · HIGH · VERIFIZIERT (Selbsttest „Weltmaßstab“, 5 Seeds, 2 alte Stände)
+
+### BUG-053 — Diener folgten nicht durch Eingänge (offen aus Session 4)
+- Lösung: travel() nimmt Diener mit. SZENENÜBERGANG · MEDIUM · VERIFIZIERT (Selbsttest mit Gegenprobe)
+
+### BUG-054 — Viel Erfahrung auf einmal gab nur eine Stufe („169/109“ in der Leiste)
+- Ursache: `if` statt Schleife in gainXp. Lösung: while. GAMEPLAY · LOW · BEHOBEN
+
+### BUG-055 — Untote Figuren flohen vor Skeletten der eigenen Fraktion
+- Reproduzierbar: JA (Session 4, Morvath: „Nicht jetzt — siehst du nicht, was hier los ist?!“, weil ein Skelett in der
+  Nähe als Bedrohung zählte). Ursache: Bedrohung = Team „Feind“, Fraktion spielte keine Rolle.
+- Lösung: gleiche Fraktion ist nie feindlich (außer zornig/Diener), Bedrohungssuche überspringt die eigene Fraktion.
+- AI / FACTION · HIGH (blockierte die Pakt-Quest je nach Lage) · VERIFIZIERT (Selbsttest mit Gegenprobe)
+
+### BUG-056 — Tote Bäume als dünner 20-px-Strich (Wüste, Totenreich wirkten leer)
+- Lösung: drei Wuchsformen in Baumgröße, im Totenreich teils mit aufgehängten Knochen. VISUAL · MEDIUM · BEHOBEN (Bild)
+
+### BUG-057 — Spielstand wächst mit der Karte (1,1 → 1,4 MB) — gehört zu BUG-017
+- Ursache wie BUG-017: alle ~8300 Props werden gespeichert, auch unveränderte. SAVE-LOAD · MEDIUM · OFFEN (Phase 20)
+
+### BUG-051 — Leeres Totenreich — Stand
+- Session 5: Vharnholm, Knochenwald, Aschensee, Seelenbrunnen, Grabräuber. Die Ostküste nördlich des Knochenwalds und
+  die Grenzöde bleiben dünn. CONTENT · MEDIUM · IN ARBEIT
+
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.
 - Kein Skill Tree (Klassenkette + Fertigkeitswerte) → Phase 9.

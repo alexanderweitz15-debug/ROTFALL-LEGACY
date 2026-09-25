@@ -1,6 +1,6 @@
 # Phasenstatus — Rotfall: Legacy
 
-Letzte Aktualisierung: Session 4 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
+Letzte Aktualisierung: Session 5 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
 
 | # | Phase | Status | DoD erfüllt | Fehlt noch |
 |---|---|---|---|---|
@@ -13,14 +13,14 @@ Letzte Aktualisierung: Session 4 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 6 | Animation & Combat Polish | IN ARBEIT | teilweise | Session 3: Taumeln/Unterbrechen, rutschender Rückstoß, Interaktionsposen. Treffer-Klang je Material. Offen: Sitzen/Handeln-Posen; Klänge vom Nutzer gegenhören lassen |
 | 7 | Weapon Expansion | NICHT BEGONNEN | — | |
 | 8 | Rarity & Loot | NICHT BEGONNEN | — | Rarität ist nur Etikett |
-| 9 | Skill Tree | NICHT BEGONNEN | — | |
-| 10 | Classes | IN ARBEIT | teilweise | Session 4: Titelklassen-System + Nekromant/Hexenmeister (§78 DoD erfüllt bis auf „alle leeren Totenreich-Flächen“). Weitere Titelklassen nur als Entwurf |
+| 9 | Skill Tree | IN ARBEIT | teilweise | Session 5: 3 allgemeine + 3 Titelzweige, Schlüsselknoten mit Preis/Absicht. Offen: Umlernen, Balancing im Spiel |
+| 10 | Classes | IN ARBEIT | teilweise | Titelklassen Nekromant/Hexenmeister/Druide, max. 2 je Figur, Titelzweige im Skill-Baum (§78 Keystone ✓). Weitere Titelklassen nur Entwurf |
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
 | 12 | Bosses | NICHT BEGONNEN | — | |
 | 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
 | 14 | Dungeons | NICHT BEGONNEN | — | BUG-009 Tiefhall |
 | 15 | NPCs & Wildlife | IN ARBEIT | — | Bewohner mit Tagesablauf ✓; benannte NPCs, Tiere offen |
-| 16 | World Simulation | NICHT BEGONNEN | — | BUG-011 Karawane |
+| 16 | World Simulation | IN ARBEIT | — | Session 5: Totenreich erweitert (Vharnholm, Knochenwald, Aschensee). BUG-011 Karawane offen |
 | 17 | Factions & Consequences | NICHT BEGONNEN | — | Kopfgeld |
 | 18 | Audio & Atmosphere | NICHT BEGONNEN | — | Schmiede-/Tavernengeräusche an Gebäude koppeln |
 | 19 | UI Polish | IN ARBEIT | — | Touch-Steuerung ✓ (Session 3, Gerätetest offen) |
@@ -58,11 +58,11 @@ Letzte Aktualisierung: Session 4 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 ## §78 Nekromant/Hexenmeister — Definition of Done (Session 4)
 - [x] 5 Stufen (Kontakt, Prüfung, Entscheidung, Initiation, Titelklasse), kein Einzeldialog
 - [x] Pfade unterscheiden sich in Ressource, Ton, Fähigkeiten, Makel, Preis
-- [~] Totenreich: 3 Orte gefüllt (Ahnenaltar, Schattenkreis, Gruft mit Wächter); weitere leere Flächen bleiben
+- [x] Totenreich: Ahnenaltar, Schattenkreis, Gruft (S4) + Vharnholm, Knochenwald, Aschensee/Seelenbrunnen (S5)
 - [x] Ordensreaktion getestet (Gespräch verweigert, Wachen greifen an)
 - [x] Sichtbares Merkmal (glimmende Augen), nicht nur Variable
-- [ ] Skill-Tree-Keystone — es gibt noch keinen Skill Tree (Phase 9)
+- [x] Skill-Tree-Keystone (Legion bzw. Blutpakt), erst nach der Freischaltung erreichbar (Session 5)
 - [x] Unumkehrbarkeit im GDD dokumentiert
 
 ## Nächster sinnvoller Schritt
-Rückmeldung des Nutzers zu Städten und Titelklassen; Frage Kartengröße. Danach BUG-011 Karawane, BUG-009 Tiefhall, BUG-017 Spielstandgröße.
+Rückmeldung des Nutzers zur großen Karte (Reisewege). Dann BUG-017/057 Spielstandgröße, BUG-011 Karawane, BUG-009 Tiefhall.

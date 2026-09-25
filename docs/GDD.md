@@ -33,7 +33,7 @@ Entscheidung (Master-Prompt §21, Optionen A/B, keine stille Variante D):
 | Wolf, Wildschwein | nein | **B — lauert** 90 Spielminuten am Eingang; kommt der Spieler zurück, greift es sofort an. Danach misstrauisch zurück (Sichtweite ×1,5 für 5 h) |
 | Gorak (Boss) | nein | **Hält seine Halle**: verlässt die Grube nie, bricht die Jagd ab (Arena-Bindung als bewusste Designentscheidung) |
 | Wächter der Nekropole | ja | **A — folgt** (Untoter; steigt nur aus der Gruft, wenn ein Fremder die Urne holen will) |
-| Diener (Nekromant) | — | folgen ihrem Herrn nicht über Kartengrenzen; der Ruf verklingt nach 60 s ohnehin (flüchtig, nie gespeichert) |
+| Diener (Nekromant), Geisterwolf (Druide) | — | **gehen mit ihrem Herrn** durch jeden Eingang (Session 5); flüchtig, nie gespeichert |
 
 - Verfolger: nur wer den Spieler ins Visier hatte (Aggro/Verfolgung) und < 560 px entfernt war.
 - Enge Tür: höchstens 4 Folgende, weitere lauern draußen.
@@ -188,8 +188,36 @@ der Durchgangsstraße bzw. an Fluss/Kai, damit Weltstraßen anschließen und kei
 - Der alte Kern (aus der ersten Generierung) zieht beim Ausbau mit um; Straßenstücke, die dadurch ins Leere liefen, werden
   per Breitensuche an das Stadtnetz angeschlossen; jede Tür bekommt einen Trampelpfad (verlassene Häuser nicht).
 - Eine Siedlung hat eine Region (die ihres Ankers) — für Farbwelt und Klang.
-- Nicht getan: die Weltkarte selbst (512×512) ist nicht größer geworden. Zwischen Eren und Nordfurt liegen jetzt ~18 statt
-  ~24 Kacheln (Fluss, Brücke). Eine größere Karte bräuchte ein neues Spielstandformat → Rückfrage an den Nutzer.
+- Session 5: die Karte selbst ist jetzt 1,5× größer (siehe „Weltmaßstab“), die Städte sind zusätzlich um ~15 % gestreckt
+  (Eren 1,4×1,5, Nordfurt 1,7, Salzhafen 1,45, Kreuzweg 1,5, Aschfurt 1,7, Sonnwacht 1,45) und bekommen **Randhäuser**
+  nach Regeln statt Koordinaten (`outskirts`: freier Grund, ≥ 3 Kacheln zu jedem Haus, ≥ 2 zum Rand, Tür zur nächsten
+  Straße ≤ 8 Kacheln, Kandidaten in Hash-Reihenfolge — deterministisch, nicht im Raster). Eren–Nordfurt: ~37 Kacheln (vorher ~18).
+
+## Weltmaßstab (Session 5 — Nutzerwunsch: „die Weltkarte soll größer werden, damit mehr Häuser und mehr Abstand möglich sind“)
+**Entscheidung: hochrechnen statt neu zeichnen.** Die Welt wird wie bisher im Entwurfsmaßstab 512×512 erzeugt — alle
+handgesetzten Orte, Straßen, Szenen und der Grubenpfad stehen so im Code und bleiben lesbar — und dann um `WS = 1,5`
+auf 768×768 hochgerechnet (`resampleWorld`): Gelände per nächstem Nachbarn (Straßen/Flüsse/Mauern 1–2 Kacheln breit),
+Props auf die Mitte ihrer Entwurfskachel, Zäune/Palisaden lückenlos nachgezogen, Wälder mit Hash nachverdichtet
+(sonst ×2,25 dünner). Erst danach entstehen die Städte im Weltmaßstab — Häuser verzerren nie.
+- `worldPt(x, y)`: Entwurfspunkt → Weltkachel (in Städten über deren Streckung). Alle festen Koordinaten in game.js/sim.js
+  (Spawngebiete, Wachposten, Arbeitsplätze, Karawane, Start, Ankunft an der Grube) laufen darüber.
+- Spawngebiete wachsen mit (Radius ×1,5, Deckel ×1,25) → Gegnerdichte je Fläche sinkt: mehr Ruhe zwischen Begegnungen.
+- Warum 1,5 und nicht 2: Generierung, Spielstand (1,1 → 1,4 MB) und Wegfindung wachsen quadratisch; 1,5 verdoppelt die
+  Fläche und hält Update ≤ 1,7 ms. Die Grube (Innenkarte) bleibt unverändert.
+- Spielstand v3; v2 wird umgerechnet (siehe CHANGELOG), v1 bleibt inkompatibel.
+
+## Skill-Baum (Session 5)
+- 1 Talentpunkt zum Start und je Stufe (alte Stände: Stufe − 1 rückwirkend). Knoten brauchen **einen** gelernten Knoten
+  darüber (Pfade statt Pflichtketten). Daten: `SKILL_TREE`/`SKILL_BRANCHES` (data.js), Fenster „Talente“ (T).
+- **Allgemeine Zweige** Kampf / Magie / Überleben, je 7 Knoten (Leben, Schaden, Rüstung, Krit, Ausdauer, Mana, Abklingzeit,
+  Zauberschaden, Heilung, Tempo, Ausweichen, Gepäck) und je 2 Schlüsselknoten, die einander nicht ausschließen, aber
+  jeder hat einen Preis: Berserker (+25 % Schaden unter 30 % Leben / +15 % erlittener Schaden), Bollwerk (Rüstung +30 % /
+  Tempo −10 %), Glaskanone (Zauber +30 % / Leben −15 %), Gelehrter Geist (Abklingzeit −15 % / Waffenschaden −15 %),
+  Zweiter Atem (Rettung unter 25 % alle 3 min / Leben −5 %), Wildnisläufer (draußen schneller / in Siedlungen langsamer).
+- **Titelzweige** (Nekromantie, Hexerei, Hainkunde) sind sichtbar, aber versiegelt, bis die Titelklasse erworben ist —
+  man soll sehen, wofür sich der Weg lohnt. Schlüsselknoten: Legion (3 Diener / Waffenschaden −20 %), Blutpakt
+  (Titelzauber +25 % / Verderbnis sinkt nie), Hüter des Hains (Wald +15 % Schaden, +3 Rüstung / Stein, Stadt −10 %).
+- Kein Zurücksetzen der Punkte (noch). Offene Frage: Umlernen gegen Gold bei einem Lehrer?
 
 ## Titelklassen (Session 4 — Nutzerwunsch: „Klassen, die man später freischaltet, wie Titel mit besonderen Fähigkeiten“)
 **Struktur.** Zwei Schichten statt einer:
@@ -233,11 +261,34 @@ wäre. Alte Stände: Hexenmeister-Grundklasse → Magier + Titel Hexenmeister (o
 ab Ruf −25 an, wenn sie ihn sehen (Leine und Buße wie sonst, danach 3 h misstrauisch statt sofort wieder zornig).
 Bewohner der Städte grüßen anders (je Stadt eine Zeile, dazu drei allgemeine).
 
-**Geplante weitere Titelklassen (nicht umgesetzt, Vorschlag):** Druide (Ressource „Wildkraft“ nur in der Natur; Tat:
-den Waldschrein gegen die Toten halten), Kopfgeldjäger („Fährte“ je markiertem Ziel; braucht das Kopfgeldsystem aus
+**Session 5 — Druide und Obergrenze.** Höchstens **2 Titelklassen** je Figur (`MAX_TITLES`, Nutzerwunsch), getragen wird
+eine (Wechsel im Ausbildungsfenster, nicht mitten im Kampf); die Talentzweige beider gelten. Nekromant und Hexenmeister
+schließen einander weiter aus — ein Totenpakt plus der Druide ist erlaubt (Mira: „Der Wald hat schon Schlimmeres
+überwachsen.“). Der Totenpakt überdeckt das Grün des Hains in den Augen.
+
+| | Druide |
+|---|---|
+| Ressource | **Wildkraft** 0–100: wächst von selbst (+5/s), aber nur draußen auf Gras, Erde, Sumpf; Stadt, Stein, Asche, Grube: Stillstand |
+| Fähigkeiten | Rankenfessel (25: Ziel 3 s festgehalten) · Geisterwolf (40: Wolf kämpft 30 s mit) · Erdsegen (30: Gruppe heilt 8 s) |
+| Passiv | Waldgänger: draußen in der Natur 0,5 Leben/s |
+| Makel | Metall erstickt: in Ketten-/Plattenpanzer wächst Wildkraft halb so schnell |
+| Preis | Stärke −1 für immer |
+| Freischaltung | „Der Ruf des Hains“: Mira im Alten Hain (Westwald) — 4 Wölfe vertreiben, 3 Heilkraut für die Quelle, Ritual |
+
+**Geplante weitere Titelklassen (nicht umgesetzt, Vorschlag):** Kopfgeldjäger („Fährte“ je markiertem Ziel; braucht das Kopfgeldsystem aus
 Phase 17), Barde („Inspiration“ aus Treffern der Gruppe; Tat in einer Schenke), Mönch („Fokus“ aus Ausweichen im
 letzten Moment), Alchemist („Tinkturen“, an Feuerstellen gebraut), Todesritter (liegt als Grundklasse ohne Lehrer im
 Klassenbaum — Kandidat, als Titel der Stillen Schar neu gedacht zu werden). Jede braucht zuerst eine Tat in der Welt.
+
+## Totenreich (Session 5 — „erweitere das Totenreich“)
+- Größer: zwei neue Aschland-Zentren (Ostküste, Aschensee). Neue Orte: **Knochenwald** (Stufe 3, dichter toter Wald,
+  Skelette und Wölfe, Lager der Grabräuber), **Aschensee** (Stufe 3, schwarzes Wasser, **Seelenbrunnen**: einmal am Tag
+  Essenz voll bzw. Verderbnis weg), **Vharnholm, Stadt der Stillen** (Stufe 1 — der einzige ruhige Ort im Reich).
+- Vharnholm macht das Fraktionsbild wahr („eine Zivilisation, keine Monsterschar“): untote Bewohner mit eigenen Berufen,
+  Stille Wächter, Markt, Seelenobelisk. Sael (Totenschreiber) handelt nur mit Mitgliedern der Schar oder Paktgebundenen
+  und vergibt „Grabräuber in der Asche“ (5 Grabräuber, Untote +15) — ein zweiter Weg zum Ansehen neben Morvath.
+- **Regel: gleiche Fraktion bekämpft sich nicht** (außer zornig oder Diener). Vorher flohen untote Figuren (Morvath) vor
+  den Skeletten ihrer eigenen Fraktion und verweigerten deshalb das Gespräch.
 
 ## Offene Designfragen
 - Rarität/Affixe, Skill Tree, Klassen: siehe PHASE_STATUS (Phasen 8–10).

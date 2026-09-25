@@ -2,6 +2,19 @@
 
 Neueste oben.
 
+### Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich (Nutzerwunsch)
+**Vorgefunden:** Selbsttest 54/54; offen: Karte nicht vergrößert, Diener folgen nicht, kein Skill-Baum, Totenreich dünn.
+**Gemacht:** Welt 768×768 (Hochrechnung aus dem Entwurf, Spielstand v3 mit Umrechnung), Städte +15 % gestreckt mit
+Randhäusern; Diener folgen durch Eingänge; Skill-Baum (3 allgemeine Zweige + 3 Titelzweige, 6+3 Schlüsselknoten);
+Druide als dritte Titelklasse, höchstens 2 je Figur; Totenreich mit Vharnholm, Knochenwald, Aschensee, Quest. 60/60.
+**Gefundene neue Probleme:** BUG-052–057 (057 Spielstandgröße offen), BUG-055 war ein echter Blocker der Pakt-Quest.
+**Offen geblieben:** Spielstand 1,4 MB (nur geänderte Props speichern → Phase 20); kein Umlernen im Skill-Baum; Ostküste
+und Grenzöde des Totenreichs noch dünn; Kopfgeldjäger/Barde/Mönch/Alchemist nur Entwurf; Headless-Zeichenzeit ist kein
+verlässlicher Wert — im echten Browser gegenmessen.
+**Nächster Schritt:** Nutzer spielt die neue Karte an (Wege sind länger — zu lang?). Danach BUG-017/057 Spielstand,
+dann BUG-011 Karawane.
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 60/60 melden.
+
 ### Session 4 — 2026-09-25 · Siedlungsdichte + Titelklassen (Nutzerwunsch)
 **Vorgefunden:** Phasen 0–4 abgeschlossen, 5 im Test, 6/13/15/19 in Arbeit; Selbsttest 46/46. (SESSION_LOG hatte nur
 Session 1 — Sessions 2 und 3 stehen im CHANGELOG.)
