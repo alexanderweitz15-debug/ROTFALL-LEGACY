@@ -97,6 +97,15 @@ Leine 360 px, helfen auf) · **Heilerin** (kämpft nie, hilft Verwundeten auf) �
 | Speer | Reichweite 74, trifft mehrere in Linie | schmaler Bogen | Abstand halten |
 | Bogen | Distanz | schwach im Nahkampf | Kiten |
 | Stab | Magie-Skalierung (Mana) | geringer Waffenschaden | Kontrolle |
+| Rapier (S7) | schnell (380 ms), Krit ×2,2, **Riposte** ×2,2 nach Parade | schmaler Bogen (0,45), kaum Wucht | Deckung + Konter |
+| Kriegshammer (S7) | **Wucht**: ignoriert Schilde, Ziel taumelt immer, 60 % Durchschlag | sehr langsam (1,15 s), 20 Ausdauer | gegen Schildträger, Platte |
+| Hellebarde (S7) | Reichweite 82, **fegt** den Bogen, Spitze ×1,15 | Schaft (nah) nur 60 %, zweihändig | Abstand halten, Gruppen |
+| Armbrust (S7) | sofort, Bolzen 50 % Durchschlag, hoher Schaden | **1,9 s spannen** (60 % Tempo) | ein Schuss, dann Stellung |
+| Zauberstab (S7) | Einhand-Fernzauber, Intelligenz, Schild frei | 4 Mana je Funke, nur Zauberkundige | Magier mit Schild |
+
+Bezugsquellen (Session 7): Brann (Nordfurt) Schwerwaffen, Gerold (Nordfurt) Rapier/Armbrust/Langbogen/Zauberstab,
+Oda (Grenzwacht) Armbrust/Hellebarde, Sael (Vharnholm) Zauberstab. Kombos: bewusst keine (ein Hieb = eine Entscheidung,
+Tempo und Gefühl unterscheiden die Klassen); Runenwaffen kommen über Rarität (Phase 8).
 
 ## Gegner (Kurzblätter)
 | Gegner | Verhalten | Ansage | Region | interiors |

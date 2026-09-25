@@ -139,6 +139,11 @@ SKILL_BRANCHES[b] = { name, desc, title? /* Zweig versiegelt ohne diese Titelkla
 ```
 Spieler: `skillPoints`, `tree` ({ knoten: 1 }), `tfx` (Laufzeit-Summe). Titelklasse: `MAX_TITLES = 2`, `cost.attr`.
 
+## Waffe — Ergänzungen Session 7
+`wtype` rapier|hammer|polearm|crossbow|wand (+ FEEL-Eintrag Pflicht, Selbsttest). Neue Felder: `riposte` (Stich nach Parade
+×2,2, sicher kritisch), `crush` (ignoriert Schilde, Deckung ×2, Ziel taumelt), `sweep` (trifft alle im Bogen, Spitze/Schaft),
+`reload` (ms Spannzeit nach dem Schuss), `manaShot` (Mana je Schuss), `ap` gilt auch für Geschosse.
+
 ## Spielstand — Session 6
 - `ents[map]`: alle Karten aus `MAP_KEYS` (world, mine, deep). Props mit `gk` (Typ@Kachel[#n]) nur, wenn sie vom
   Grundzustand abweichen; `propsGone[map]`: Schlüssel entfernter erzeugter Props. Props ohne `gk` (gebaut, alt) voll.
