@@ -23,6 +23,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const NAV = [
   ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
   ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
+  ['quests', 'Aufträge', 'J'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
 ];
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
@@ -238,7 +239,8 @@ const propName = t => ({ tree:'Baum', bush:'Strauch', rock_node:'Felsbrocken', o
   sack:'Sack', crate_stack:'Kistenstapel', table:'Tisch', bench:'Bank', bed:'Bett', bunk:'Etagenbett', shelf:'Regal',
   hearth:'Herdfeuer', forge:'Esse', counter:'Theke', desk:'Schreibpult', workbench_int:'Werkbank', cask_rack:'Fassgestell',
   weapon_rack:'Waffenständer', altar_small:'Altar', camp_ruin:'Verlassenes Lager', fallen_tree:'Umgestürzter Baum', rubble:'Geröll',
-  mushrooms:'Pilze', standing_stone:'Menhir', tent_prop:'Zelt', cart:'Karren', stall:'Marktstand', scarecrow:'Vogelscheuche', fence:'Zaun' }[t] || 'Objekt');
+  mushrooms:'Pilze', standing_stone:'Menhir', tent_prop:'Zelt', cart:'Karren', stall:'Marktstand', scarecrow:'Vogelscheuche', fence:'Zaun',
+  hay:'Heuballen', boat:'Fischerboot', net_rack:'Netzgestell', laundry:'Wäscheleine', lantern:'Laterne', trough:'Tränke', palisade_prop:'Palisade' }[t] || 'Objekt');
 
 export function relLabel(v) {
   if (v <= -60) return 'Feind'; if (v <= -20) return 'Rivale'; if (v < 10) return 'Fremder';

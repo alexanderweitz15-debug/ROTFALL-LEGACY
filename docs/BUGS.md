@@ -110,8 +110,10 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Befund: Eren 16 NPCs, Nordfurt 1, Salzhafen/Kreuzweg/Aschfurt/Sonnwacht 0.
 - Erwartet: Bewohner, Händler, Wachen je Stadt (Master-Prompt §39, §41).
 - Kategorie: NPC / WORLD LOGIC · Priorität: HIGH
-- Lösung: Phase 13/15 — Stadtbewohner aus Gebäuden ableiten (wer wohnt/arbeitet wo).
-- Status: OFFEN (Phase 13)
+- Lösung (Session 2): Bewohner aus den Gebäuden abgeleitet (`spawnResidents`): jedes Wohn-/Arbeitshaus hat 1–2
+  Leute mit Beruf, Begrüßung und Ortsgerüchten; ~100 Bewohner in 6 Siedlungen, 25 Wachen an Toren und Plätzen.
+- Test: Selbsttest „Bewohner: jedes Wohn- und Arbeitshaus bewohnt, ihr Nachtplatz liegt im eigenen Haus“.
+- Status: VERIFIZIERT
 
 ## MEDIUM
 
@@ -139,10 +141,21 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 
 ### BUG-012 — Mobil nicht spielbar: keine Touch-Steuerung
 - Layout passt (keine horizontale Scrollbar), aber es gibt keine Touch-Eingabe (0 Treffer für touch/pointer).
-- Kategorie: MOBILE · Status: OFFEN (Phase 19)
+- Lösung (Session 3): Touch-Bedienfeld im Spielfenster (nur Touch-Geräte): Stick links (Totzone), Knöpfe Hieb (halten =
+  weiter schlagen), Rolle, E. Zielen ohne Maus: nächster Feind < 220 px, sonst Lauf-/Blickrichtung. Aufträge und
+  Einstellungen in die Menüleiste (waren nur per J/Esc erreichbar). Geprüft bei 375×812 mit Pointer-Ereignissen:
+  Laufen, Stoppen, Dauerhieb, Rolle, Auto-Ziel, Menüs. Nicht auf echtem Gerät getestet.
+- Kategorie: MOBILE · Status: BEHOBEN (Gerätetest durch Nutzer offen)
 
 ### BUG-013 — NPCs ohne echten Tagesablauf (Händler stehen rund um die Uhr am Fleck)
-- Kategorie: NPC · Status: OFFEN (Phase 15)
+- Session 2: Bewohner haben einen Ablauf — 7–18 Uhr Arbeit (Fischer am Steg, Bauer am Feld, Bäcker vor dem Laden,
+  andere auf dem Platz), 18–22 Uhr vor dem Haus oder in der Schenke, nachts im eigenen Haus. Geprüft: 12/12 Erener
+  Bewohner um 23:30 im Haus, morgens am Arbeitsplatz. Offen: benannte Händler/Figuren aus Session 1 (Phase 15).
+- Session 3: Figuren mit Namen (`NPC_DAY`): Arbeitsplatz, Feierabend, Zuhause an echte Häuser gebunden (Aldric wohnt
+  in der Schmiede, Elena im Heilerhaus, Borin in der Schenke, Havel/Mara/Jorun/Tomas/Gerold in Wohnhäusern); abends
+  Schenke; Läden (Mara, Gerold) bis 20 Uhr, danach „Der Laden ist zu“. Geprüft im Spiel: nachts 7/7 im eigenen Haus,
+  mittags am Arbeitsplatz, abends 3 in der Schenke. Kelan/Rook/Lila/Morvath bleiben bewusst an ihren Orten.
+- Kategorie: NPC · Status: VERIFIZIERT (Selbsttest „Figuren mit Namen …“)
 
 ### BUG-019 — Niedergestreckte Feinde können nicht erledigt werden
 - `resolveSwing` überspringt `downed`; `hurt` auf Gestürzte bewirkt nichts. Zusammen mit BUG-002 stand der Feind wieder auf.
@@ -196,13 +209,99 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Kategorie: SAVE-LOAD · Priorität: CRITICAL (verhindert) · Status: VERIFIZIERT
 
 ### BUG-016 — Titelbild: Burg ist eine flache Vektorsilhouette, passt nicht zum Pixelstil
-- Kategorie: VISUAL · Priorität: POLISH · Status: OFFEN (Phase 5)
+- Lösung (Session 3): ganze Szene im Sprite-Pixelraster gemalt und scharf hochskaliert; Feste mit Quadern, Zinnen,
+  Torhaus mit Fallgitter, zerbrochenem Bergfried, flackernden Fenstern, Banner; gedithertes Abendrot, Bergketten mit
+  Randlicht, Pixel-Feuer. Mobil (Hochformat) geprüft. Bilder `titel-vorher.png` / `titel-nachher*.png`.
+- Kategorie: VISUAL · Priorität: POLISH · Status: VERIFIZIERT
 
 ### BUG-017 — Spielstand ~800 KB (alle Props werden gespeichert)
 - Risiko für das localStorage-Limit (~5 MB), wenn die Welt wächst. Props sind aus dem Seed reproduzierbar.
 - Kategorie: SAVE-LOAD / PERFORMANCE · Priorität: LOW · Status: OFFEN (Phase 20)
 
 ---
+
+## Session 2 — Städteausbau
+
+### BUG-028 — Häuser hatten „keine richtigen Dächer“ (Nutzer-Rückmeldung)
+- Befund: Walm-/Traufdach von vorn wirkte wie eine flache Platte über der Fassade.
+- Lösung: Giebel nach vorn (Giebeldreieck in Wandmaterial, Windbretter, zwei Dachflächen mit Licht/Schatten, First,
+  Überstandschatten, Schornstein durchs Dach, Kreuz auf dem First). Vorher/Nachher: `screenshots/dach-*`.
+- Kategorie: GEBÄUDE / VISUAL · Priorität: HIGH · Status: VERIFIZIERT
+
+### BUG-029 — Siedlungen viel zu klein (Nutzer-Rückmeldung)
+- Befund: 2–5 Häuser je Ort; „Stadt“ Nordfurt = 2 Gebäude.
+- Lösung: Ausbauplan je Siedlung (`TOWN_PLAN`, world.js): 104 statt 23 Gebäude, Straßen, Plätze, Mauern mit Toren,
+  Felder, Hafen. Vorher/Nachher: `screenshots/dorf-*`.
+- Kategorie: WORLD LOGIC / CONTENT · Priorität: HIGH · Status: VERIFIZIERT
+
+### BUG-030 — Salzhafen: Hafenstadt ohne Hafen, Stege endeten im Sumpf
+- Lösung: Stadt bis zur Küste erweitert, Kai an der echten Küstenlinie, drei Stege ins Meer, Boote; alte Stege entfernt.
+- Kategorie: WORLD LOGIC · Priorität: HIGH · Status: VERIFIZIERT
+
+### BUG-031 — Straßen endeten an Mauern bzw. Hauswänden
+- Aschfurt: Oststraße endete an der Nordmauer (kein Tor) → Nordtor. Kreuzweg: Nordstraße lief in eine Hausrückwand →
+  Straße daneben. Sonnwacht: Mittellandstraße lief an der Mauer vorbei → Westtor.
+- Test: Selbsttest „jede Haustür ist vom Platz aus zu Fuß erreichbar“ (Flutfüllung über Kacheln + feste Objekte).
+- Kategorie: WORLD LOGIC / PATHING · Priorität: MEDIUM · Status: VERIFIZIERT
+
+### BUG-032 — Gegner-Gebiete setzten Banditen/Wölfe mitten in Kreuzweg und Aschfurt
+- Ursache: Spawn-Gebiete „um Kreuzweg“/„um Aschfurt“ lagen auf der Stadtmitte, kein Siedlungs-Ausschluss.
+- Lösung: Erst- und Nachspawns nie in einer Siedlung (+4 Kacheln Rand); Migration entfernt ruhende Gegner aus Städten.
+- Test: Selbsttest „keine ruhenden Gegner zwischen den Häusern einer Siedlung“.
+- Kategorie: SPAWNING · Priorität: HIGH · Status: VERIFIZIERT
+
+### BUG-033 — Wüstenfelsen und tote Bäume in der Festung Aschfurt (je nach Seed auch auf der Tür der Wache)
+- Ursache: Mesas/tote Bäume der Roten Wüste werden nach der Festung gewürfelt und überschreiben Boden, Mauer, Tür.
+- Lösung: Stadtausbau räumt den alten Kern: Fels → Boden, auf dem Mauerring → Mauer, in Häusern → Wand/Diele; fremde
+  Objekte auf Hausflächen entfernt. Gefunden durch Selbsttest über 8 Seeds (1 schlug fehl), danach 8/8 grün.
+- Kategorie: WORLD LOGIC · Priorität: MEDIUM · Status: VERIFIZIERT
+
+### BUG-034 — Wildnis-Streugut in Siedlungen (Lager, Geröll, Verstecke zwischen den Häusern)
+- Lösung: alles ab `placeScenes` gewürfelte Streugut wird in Siedlungsflächen entfernt; Bäume/Büsche/Felsen bleiben nur
+  auf Gras, wenn sie nichts verstellen. Test: Selbsttest „keine Wildnis-Streu … zwischen den Häusern“.
+- Kategorie: PROPS / IMMERSION · Priorität: MEDIUM · Status: VERIFIZIERT
+
+### BUG-036 — Häuser zu heil und gleichförmig für eine dystopische Welt (Nutzer-Rückmeldung)
+- Lösung: Verfallsstufen und Stilvarianten (siehe CHANGELOG Session 2). Bilder: `screenshots/nachher-ruine-*`.
+- Kategorie: GEBÄUDE / IMMERSION · Priorität: MEDIUM · Status: VERIFIZIERT
+
+### BUG-035 — Wüstenfelsen (ROCK-Kacheln) sind harte dunkle Blöcke
+- Sichtbar um Aschfurt; wirkt blockig, nicht wie Fels. Kategorie: VISUAL · Priorität: MEDIUM
+- Ursache: jede Felskachel war dieselbe 16×16-Textur mit Lichtkante oben → Raster/Schachbrett aus Einzelkacheln.
+- Lösung (Session 3): Fels als zusammenhängende Masse gemalt (`paintRock`), Findlinge, Wand, Schatten, Regionsgestein.
+  Bilder: `screenshots/fels-vorher-*` / `fels-nachher-*`. Status: VERIFIZIERT (Sicht + Lauftest, Selbsttest 41/41)
+
+### BUG-037 — Hochgebirge mit Straßenpflaster als Naturboden
+- Der Gebirgsgrund (STONE) nutzte die Pflastertextur der Stadtplätze → Wildnis sah gepflastert aus.
+- Lösung: außerhalb von Siedlungen im Gebirge Geröll-Textur. Kategorie: VISUAL / WORLD LOGIC · LOW · VERIFIZIERT
+
+### BUG-043 — Waffenwert „stagger“ ohne Wirkung (Scheinsystem); Rückstoß als 1-Frame-Sprung
+- Befund Session 3: `ITEMS.mace.stagger = 1.6` wurde nirgends gelesen; Taumeln gab es nur beim Boss. Waffen
+  unterschieden sich im Treffer nur über Hit-Stop/Wackeln.
+- Lösung: Taumeln je Waffenklasse mit Unterbrechung ab Axt, rutschender Rückstoß (siehe CHANGELOG Phase 6).
+- Kategorie: COMBAT · MEDIUM · Status: VERIFIZIERT (Selbsttest + Duell-Simulation)
+
+### BUG-044 — Interaktionen ohne Körpersprache (Figur steht starr beim Durchsuchen, Holzfällen, Beten, Aufstehen)
+- Lösung: `act()` + Posen knien/arbeiten/aufrichten. ANIMATION · LOW · VERIFIZIERT
+
+### BUG-042 — Grube sah aus wie ein gepflastertes Ziegelraster statt wie eine Mine
+- Lösung: Höhlenfels statt Ziegelstreifen, Geröllboden. Bilder `grube-nachher-*`. VISUAL · MEDIUM · VERIFIZIERT
+
+### BUG-041 — Stadtmauern sahen von oben wie gepflasterte Wege aus
+- Lösung: Front nach Süden, Zinnen, Kantenlicht (`paintWalls`). Bilder `mauer-vorher-*` / `mauer-nachher-*`.
+- Kategorie: VISUAL / WORLD LOGIC · MEDIUM · Status: VERIFIZIERT
+
+### BUG-040 — Boden: Kachel-Schachbrett im Gras, eckige Erd-/Sand-/Sumpfflecken
+- Ursache: Helligkeit und Regionstönung wurden je Kachel als Rechteck gefüllt; Bodengrenzen folgten Kachelkanten.
+- Lösung: `bakeGround` (siehe CHANGELOG Session 3). Bilder `boden-vorher-*` / `boden-nachher-*`.
+- Kategorie: VISUAL · HIGH (prägt jedes Bild der Welt) · Status: VERIFIZIERT
+
+### BUG-039 — Wasser als Kachelquadrate (Ufer eckig, einzelne Grasquadrate im Sumpf)
+- Lösung: weiches Uferfeld, Tiefe, Schaum, Schilf, Regionspaletten, Südsee. Bilder `wasser-vorher-*`/`wasser-nachher-*`.
+- Kategorie: VISUAL · MEDIUM · Status: VERIFIZIERT (Sicht, Lauftest, Selbsttest 41/41)
+
+### BUG-038 — Lose Felsbrocken waren einfarbige Vielecke (Platzhalter)
+- Lösung: 3 facettierte Varianten in Regionsgestein, Erzader, Schutthaufen bei Abbau. PROPS · LOW · VERIFIZIERT
 
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.

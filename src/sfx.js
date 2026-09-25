@@ -28,14 +28,23 @@ function tone(t, dur, type, f0, f1, peak) {
 }
 
 // weight: 0 (Dolch) … 1 (Zweihänder). vol: 0..1 (Entfernung)
-export function sfx(name, weight = 0.4, vol = 1) {
+// mat (Treffer): 'blade' schneidet (heller Zisch), 'blunt' dröhnt (tiefer Schlag + Knacken), 'pierce' sticht (kurz, trocken);
+// armored: Rüstung am Ziel → zusätzliches Scheppern. So klingen Axt, Kolben und Dolch verschieden, nicht nur tiefer/höher.
+export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
   if ((S.settings.volume ?? 0.7) <= 0 || vol <= 0.02) return;
   try {
     ctx(); const t = ac.currentTime, v = vol;
     switch (name) {
       case 'swing': noise(t, 0.09 + weight * 0.2, 'bandpass', 2600 - weight * 1400, 500 - weight * 250, 0.22 * v, 1.2); break;
-      case 'hit':   tone(t, 0.12 + weight * 0.1, 'sine', 150 - weight * 60, 45, 0.5 * v); noise(t, 0.07 + weight * 0.05, 'lowpass', 2200, 300, 0.35 * v); break;
-      case 'crit':  tone(t, 0.22, 'sine', 120, 38, 0.6 * v); noise(t, 0.14, 'lowpass', 3200, 250, 0.45 * v); noise(t + 0.02, 0.2, 'bandpass', 5200, 2500, 0.12 * v, 6); break;
+      case 'hit':   tone(t, 0.12 + weight * 0.1, 'sine', 150 - weight * 60, 45, 0.5 * v); noise(t, 0.07 + weight * 0.05, 'lowpass', 2200, 300, 0.35 * v);
+        if (mat === 'blade') noise(t, 0.05 + weight * 0.04, 'bandpass', 4200 - weight * 1200, 2600, 0.16 * v, 2.5);
+        else if (mat === 'blunt') { tone(t, 0.18, 'sine', 85, 40, 0.35 * v); noise(t + 0.01, 0.04, 'bandpass', 1200, 900, 0.22 * v, 4); }
+        else if (mat === 'pierce') noise(t, 0.035, 'highpass', 2600, 3200, 0.14 * v);
+        if (armored) { noise(t, 0.12, 'bandpass', 3000, 2200, 0.16 * v, 10); tone(t, 0.1, 'square', 640 + weight * 120, 540, 0.025 * v); }
+        break;
+      case 'crit':  tone(t, 0.22, 'sine', 120, 38, 0.6 * v); noise(t, 0.14, 'lowpass', 3200, 250, 0.45 * v); noise(t + 0.02, 0.2, 'bandpass', 5200, 2500, 0.12 * v, 6);
+        if (mat === 'blunt') tone(t, 0.25, 'sine', 70, 35, 0.4 * v); if (armored) noise(t, 0.16, 'bandpass', 3000, 2200, 0.18 * v, 10); break;
+      case 'break': tone(t, 0.14, 'triangle', 260, 90, 0.18 * v); noise(t, 0.1, 'bandpass', 900, 500, 0.25 * v, 2); break;   // Angriff unterbrochen
       case 'bone':  noise(t, 0.06, 'bandpass', 1800, 900, 0.35 * v, 3); noise(t + 0.03, 0.05, 'bandpass', 1300, 700, 0.25 * v, 3); tone(t, 0.08, 'triangle', 220, 120, 0.15 * v); break;
       case 'metal': noise(t, 0.18, 'bandpass', 3400, 2600, 0.35 * v, 12); tone(t, 0.16, 'square', 880, 760, 0.05 * v); break;
       case 'dodge': noise(t, 0.2, 'lowpass', 900, 200, 0.2 * v, 0.7); break;

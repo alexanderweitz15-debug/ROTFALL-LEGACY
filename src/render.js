@@ -1,6 +1,6 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp } from './state.js';
-import { MAPS, T, TS, tileAt, regionAt, HOUSES } from './world.js';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES } from './world.js';
 import * as HB from './buildings.js';
 import { ITEMS, MONSTERS } from './data.js';
 import { buildOf } from './body.js';
@@ -67,7 +67,9 @@ export function drawFrame(now) {
   for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++)
     for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++)
       ctx.drawImage(chunkCanvas(m, cx, cy), cx * CH * TS, cy * CH * TS, CH * TS + 0.5, CH * TS + 0.5);
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER) drawWater(tx, ty, now);
+  prefetchChunk(m, Math.floor(x0 / CH), Math.floor(y0 / CH), Math.floor(x1 / CH), Math.floor(y1 / CH));
+  const isW = (tx, ty) => tileAt(S.map, tx, ty) === T.WATER;
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
 
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = S.ents[S.map].filter(e => e.x > cam.x - 80 && e.x < cam.x + W / cam.zoom + 80 && e.y > cam.y - 100 && e.y < cam.y + H / cam.zoom + 120);
@@ -126,11 +128,34 @@ const REGION = {
 let curRegion = 'greenmark';                              // Region des Spielers (je Frame)
 const propRegion = new WeakMap();
 const regionOfProp = e => { let r = propRegion.get(e); if (!r) { r = regionAt(e.x / TS | 0, e.y / TS | 0); propRegion.set(e, r); } return r; };
-// Ausfransen weicher Böden: höherer Wert wächst über die Kante des niedrigeren (Gras > Sumpf > Sand > Asche > Erde > Acker > Straße)
-const FRAY = { [T.GRASS]: 6, [T.MARSH]: 5, [T.SAND]: 4, [T.ASH]: 3, [T.DIRT]: 2, [T.FIELD]: 1, [T.ROAD]: 0 };
 // Kacheln: 16×16-Pixeltexturen (sprites.js) werden in Chunks zu 16×16 Kacheln in Texturauflösung gebacken
 // (256×256 px, doppelt skaliert gezeichnet). LRU-begrenzt; neu gebacken, wenn sich die Karte ändert (m.ver).
 const CH = 16, CHUNK_MAX = 140, chunkCache = new Map(), chunkRef = {};
+// Chunks im Ring um das Sichtfeld vorab backen — in der Leerlaufzeit des Browsers zwischen zwei Frames, solange
+// genug Zeit bleibt. Sonst kostet das Backen (Boden pro Pixel, Fels, Wasser) beim Laufen einen spürbaren Ruckler,
+// sobald ein neuer Chunk ins Bild kommt. Ohne requestIdleCallback: kurzer Timeout, je Aufruf ein Chunk.
+let pfArgs = null, pfQueued = false;
+const idle = window.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 12 }), 30));
+function prefetchChunk(m, cx0, cy0, cx1, cy1) {
+  pfArgs = [m, S.map, cx0, cy0, cx1, cy1];
+  if (pfQueued) return;
+  pfQueued = true;
+  idle(dl => {
+    pfQueued = false;
+    while (dl.timeRemaining() > 8 && prefetchOne()) {}
+  });
+}
+function prefetchOne() {
+  const [m, map, cx0, cy0, cx1, cy1] = pfArgs || [];
+  if (!m || map !== S.map || MAPS[S.map] !== m) return false;
+  const mw = Math.ceil(m.w / CH), mh = Math.ceil(m.h / CH);
+  for (let cy = cy0 - 1; cy <= cy1 + 1; cy++) for (let cx = cx0 - 1; cx <= cx1 + 1; cx++) {
+    if (cx >= cx0 && cx <= cx1 && cy >= cy0 && cy <= cy1) continue;
+    if (cx < 0 || cy < 0 || cx >= mw || cy >= mh || chunkCache.has(S.map + ':' + cx + ',' + cy)) continue;
+    chunkCanvas(m, cx, cy); return true;
+  }
+  return false;
+}
 function chunkCanvas(m, cx, cy) {
   const ref = chunkRef[S.map];
   if (!ref || ref.tiles !== m.tiles || ref.ver !== (m.ver || 0)) {
@@ -142,44 +167,12 @@ function chunkCanvas(m, cx, cy) {
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
-  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
-    const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
-    const t = m.tiles[ty * m.w + tx], v = h2(tx, ty);
-    o.drawImage(SP.tileTexture(t, (v * 4) | 0, TILE_COL[t] || TILE_COL[T.GRASS], TILE_KIND[t] || 'grass'), i * 16, j * 16);
-  }
-  // Übergänge: Gras franst in angrenzenden Boden aus; an Wasser eine helle, unterbrochene Uferkante
-  const tAt = (tx, ty) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) ? -1 : m.tiles[ty * m.w + tx];
-  const grassCol = SP.ramp(TILE_COL[T.GRASS][0]);
-  for (let j = -1; j <= CH; j++) for (let i = -1; i <= CH; i++) {            // Randkacheln der Nachbar-Chunks mit, damit Fransen über Chunkgrenzen reichen
-    const tx = cx * CH + i, ty = cy * CH + j, t = tAt(tx, ty); if (t < 0) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const n = tAt(tx + dx, ty + dy); if (n < 0 || n === t) continue;
-      const X = i * 16, Y = j * 16;
-      if ((FRAY[t] || 0) > (FRAY[n] || 0) && FRAY[n] !== undefined) {   // der „stärkere“ Boden franst in den schwächeren aus
-        const C = t === T.GRASS ? grassCol : SP.ramp(TILE_COL[t][0]);
-        for (let k = 0; k < 16; k++) {
-          const r = h2(tx * 31 + k, ty * 17 + dx * 7 + dy * 13); if (r < 0.35) continue;
-          const d = r > 0.8 ? 2 : 1;
-          o.fillStyle = r > 0.9 ? C.hi : C.b;
-          if (dx) o.fillRect(dx > 0 ? X + 16 : X - d, Y + k, d, 1); else o.fillRect(X + k, dy > 0 ? Y + 16 : Y - d, 1, d);
-        }
-      } else if (n === T.WATER && t !== T.WATER && !SOLID_T.has(t)) { // Uferkante
-        o.fillStyle = 'rgba(190,200,190,.35)';
-        for (let k = 0; k < 16; k += 2) { if (h2(tx + k, ty * 3 + dx + dy * 5) < 0.3) continue;
-          if (dx) o.fillRect(dx > 0 ? X + 15 : X, Y + k, 1, 2); else o.fillRect(X + k, dy > 0 ? Y + 15 : Y, 2, 1); }
-      }
-    }
-  }
-  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Nahdetails und Geländefärbung
+  bakeGround(o, m, cx, cy);
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Nahdetails
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx], X = i * 16, Y = j * 16;
-    if (t === T.GRASS || t === T.DIRT) {
-      const n = vnoise(tx / 11, ty / 11) * 0.7 + vnoise(tx / 4, ty / 4) * 0.3;   // Wiesen hell, Senken dunkel
-      o.fillStyle = n > 0.58 ? `rgba(150,160,90,${(n - 0.58) * 0.35})` : `rgba(8,10,6,${Math.max(0, 0.42 - n) * 0.45})`;
-      o.fillRect(X, Y, 16, 16);
-    }
     const reg = S.map === 'world' ? REGION[regionAt(tx, ty)] : REGION.greenmark;
-    if (reg.tint && !SOLID_T.has(t) && t !== T.WATER) { o.fillStyle = reg.tint; o.fillRect(X, Y, 16, 16); }
+    if (t === T.ROCK || t === T.WATER) continue;
     const r = h2(tx * 7 + 1, ty * 13 + 5), px = X + 2 + ((h2(tx, ty * 3) * 11) | 0), py = Y + 3 + ((h2(tx * 5, ty) * 10) | 0);
     if (regionDecor(o, reg.decor, t, r, px, py)) continue;
     if (t === T.GRASS) {
@@ -190,16 +183,324 @@ function chunkCanvas(m, cx, cy) {
     } else if ((t === T.DIRT || t === T.ROAD) && r < 0.12) { o.fillStyle = '#6a6252'; o.fillRect(px, py, 2, 1); o.fillStyle = '#2a241c'; o.fillRect(px, py + 1, 2, 1); }
     else if (t === T.ASH && r < 0.05) { o.fillStyle = '#cfc6b0'; o.fillRect(px, py, 3, 1); o.fillRect(px + 1, py - 1, 1, 3); }
   }
-  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Mauerfuß: Schatten nur, wo unten kein Fels/Mauer anschließt
+  paintWater(o, m, cx, cy);
+  paintRock(o, m, cx, cy);
+  paintRock(o, m, cx, cy, T.DWALL);
+  paintWalls(o, m, cx, cy);
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Mauerfuß: Schatten nur, wo unten keine Mauer anschließt
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx];
-    if (!SOLID_T.has(t)) continue;
+    if (t === T.ROCK || t === T.DWALL || !SOLID_T.has(t)) continue;
     const below = ty + 1 < m.h ? m.tiles[(ty + 1) * m.w + tx] : t;
     if (!SOLID_T.has(below)) { o.fillStyle = 'rgba(0,0,0,.38)'; o.fillRect(i * 16, j * 16 + 14, 16, 2); o.fillStyle = 'rgba(0,0,0,.2)'; o.fillRect(i * 16, j * 16 + 16, 16, 2); }
   }
   chunkCache.set(key, cv);
   if (chunkCache.size > CHUNK_MAX) chunkCache.delete(chunkCache.keys().next().value);
   return cv;
+}
+// ---------------- Fels als Masse statt Kachelblock (BUG-035) ----------------
+// Die Felskacheln bleiben die Kollision; gemalt wird ein weiches Feld (bilineare Belegung der Kachelmitten + Rauschen),
+// das Ecken rundet, Einzelkacheln zu Findlingen macht und Kanten ausfranst. Oben die Felskuppe mit Relief (Licht von
+// links oben), Risse, nach Süden eine Felswand mit Schichtung, darunter Schlagschatten und Geröll. Farbe je Region.
+const ROCK_PAL = {             // dunkel, Schatten, Grund, Licht, Kante (+ Schnee)
+  greenmark: ['#1d1b19', '#34312c', '#4a463f', '#625d53', '#7c766a'],
+  plains:    ['#1f1c18', '#38332b', '#50493d', '#6a6150', '#857a64'],
+  forest:    ['#171a16', '#2b302a', '#3f453c', '#565d50', '#6e7564'],
+  marsh:     ['#171a16', '#2b302a', '#3f453c', '#565d50', '#6e7564'],
+  mountain:  ['#1b1d21', '#33373d', '#4b5057', '#666d76', '#848c95', '#dfe6ea', '#b9c3cb'],
+  desert:    ['#261a12', '#463023', '#624533', '#7e5f44', '#977656'],
+  badland:   ['#131110', '#24201d', '#36302c', '#4b433e', '#645a52'],
+  blight:    ['#121614', '#232a27', '#343d39', '#48534d', '#5e6b64'],
+  cave:      ['#0c0b0a', '#1a1815', '#27241f', '#36322b', '#48423a'],   // Minen-/Höhlenwände
+};
+const rgbOf = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+const ROCK_RGB = Object.fromEntries(Object.entries(ROCK_PAL).map(([k, v]) => [k, v.map(rgbOf)]));
+function groundUnder(m, tx, ty) {                    // häufigster begehbarer Nachbarboden, sonst Erde
+  const cnt = {}; let best = T.DIRT, bn = 0;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const x = tx + i, y = ty + j; if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
+    const t = m.tiles[y * m.w + x]; if (SOLID_T.has(t) || t === T.WATER) continue;
+    cnt[t] = (cnt[t] || 0) + 1; if (cnt[t] > bn) { bn = cnt[t]; best = t; }
+  }
+  return best;
+}
+// ---------------- Boden pro Pixel (statt Kachelrechtecke) ----------------
+// Jeder Pixel nimmt Bodenart, Helligkeit und Regionstönung aus den vier umliegenden Kachelmitten: an Grenzen natürlicher
+// Böden gewinnt die Art mit dem höchsten Gewicht + Rauschen (ausgefranste, runde Übergänge), Helligkeit und Tönung
+// werden bilinear verlaufen und mit geordnetem Dithering in Pixelstufen gesetzt — kein Kachel-Schachbrett mehr.
+// Menschengemachte Böden (Pflaster, Dielen, Acker, Mauern) behalten ihre harten Kanten.
+const SOFT_T = new Set([T.GRASS, T.DIRT, T.ROAD, T.MARSH, T.SAND, T.ASH]);
+const SOFT = new Uint8Array(32); for (const t of SOFT_T) SOFT[t] = 1;
+const texData = new Map();
+function texel(t, v, kind) {
+  const key = t + '|' + v + '|' + kind; let d = texData.get(key);
+  if (!d) { const c = SP.tileTexture(t, v, TILE_COL[t] || TILE_COL[T.GRASS], kind); d = c.getContext('2d').getImageData(0, 0, 16, 16).data; texData.set(key, d); }
+  return d;
+}
+const TINT_RGBA = {};                                    // 'rgba(r,g,b,a)' → [r,g,b,a]
+const tintOf = str => TINT_RGBA[str] || (TINT_RGBA[str] = str.match(/[\d.]+/g).map(Number));
+const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
+function bakeGround(o, m, cx, cy) {
+  const x0t = cx * CH, y0t = cy * CH, TW = CH + 2, SZ = CH * 16, world = S.map === 'world';
+  const typ = new Uint8Array(TW * TW), kin = [], vari = new Uint8Array(TW * TW);
+  shadeCv.width = shadeCv.height = TW;                   // 1 Pixel je Kachel: Helligkeit (weich hochskaliert)
+  const tintCv = document.createElement('canvas'); tintCv.width = tintCv.height = TW;
+  const sd = shadeCtx.createImageData(TW, TW), tctx = tintCv.getContext('2d'), td = tctx.createImageData(TW, TW);
+  for (let j = 0; j < TW; j++) for (let i = 0; i < TW; i++) {   // Kachelraster mit 1 Kachel Rand
+    const tx = Math.max(0, Math.min(m.w - 1, x0t - 1 + i)), ty = Math.max(0, Math.min(m.h - 1, y0t - 1 + j)), k = j * TW + i, raw = m.tiles[ty * m.w + tx];
+    let t = raw;
+    if (t === T.ROCK || t === T.WATER || t === T.DWALL) t = groundUnder(m, tx, ty);   // Fels/Wasser/Höhlenwand werden danach als weiche Masse gemalt
+    let kind = TILE_KIND[t] || 'grass';
+    if (t === T.DFLOOR && S.map === 'mine') kind = 'scree';   // Minenboden: Geröll, kein Pflaster
+    if (t === T.STONE && world && !townAt(tx, ty, 2) && regionAt(tx, ty) === 'mountain') kind = 'scree';   // Hochgebirge: Geröll, kein Pflaster
+    typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * 4) | 0;
+    if (t === T.GRASS || t === T.DIRT) {                  // Wiesen hell, Senken dunkel
+      const n = vnoise(tx / 11, ty / 11) * 0.7 + vnoise(tx / 4, ty / 4) * 0.3;
+      if (n > 0.58) { sd.data[k * 4] = 150; sd.data[k * 4 + 1] = 160; sd.data[k * 4 + 2] = 90; sd.data[k * 4 + 3] = (n - 0.58) * 0.35 * 255; }
+      else { sd.data[k * 4] = 8; sd.data[k * 4 + 1] = 10; sd.data[k * 4 + 2] = 6; sd.data[k * 4 + 3] = Math.max(0, 0.42 - n) * 0.45 * 255; }
+    }
+    const reg = world ? REGION[regionAt(tx, ty)] : REGION.greenmark;
+    if (reg.tint && !(SOLID_T.has(raw) && raw !== T.ROCK)) { const c = tintOf(reg.tint); td.data.set([c[0], c[1], c[2], c[3] * 255], k * 4); }
+  }
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {     // Grundtexturen
+    const k = (j + 1) * TW + i + 1;
+    o.drawImage(SP.tileTexture(typ[k], vari[k], TILE_COL[typ[k]] || TILE_COL[T.GRASS], kin[k]), i * 16, j * 16);
+  }
+  // Grenzen natürlicher Böden pro Pixel: nur Kacheln, deren 3×3-Umfeld gemischt ist
+  const noise = [], G0x = x0t * 16 - 2, G0y = y0t * 16 - 2, AWn = SZ + 4;
+  const nz = t => noise[t] || (noise[t] = ((A, B) => (X, Y) => A(X, Y) * 0.75 + B(X, Y) * 0.25)(latNoise(G0x, G0y, AWn, 5, t * 37, 0), latNoise(G0x, G0y, AWn, 3, t * 11, 40)));
+  const cand = (t, a, b, c, d, fx, fy, X, Y) => (a === t) * (1 - fx) * (1 - fy) + (b === t) * fx * (1 - fy) + (c === t) * (1 - fx) * fy + (d === t) * fx * fy + (nz(t)(X, Y) - 0.5) * 0.55;
+  let wK = 0;                                             // Quelle (Kachelindex) des letzten winAt — spart Array-Rückgaben
+  const winAt = (X, Y, own) => {                          // Bodenart eines Pixels (Weltkoordinaten in Texeln)
+    const gx = (X - 8) / 16 - x0t + 1, gy = (Y - 8) / 16 - y0t + 1, ix = Math.floor(gx), iy = Math.floor(gy), fx = gx - ix, fy = gy - iy, k = iy * TW + ix;
+    const a = typ[k], b = typ[k + 1], c = typ[k + TW], d = typ[k + TW + 1];
+    if ((a === b && a === c && a === d) || !SOFT[own]) { wK = k; return own; }
+    let best = -9, w = own, wt;
+    if (SOFT[a]) { wt = cand(a, a, b, c, d, fx, fy, X, Y); if (wt > best) { best = wt; w = a; } }
+    if (b !== a && SOFT[b]) { wt = cand(b, a, b, c, d, fx, fy, X, Y); if (wt > best) { best = wt; w = b; } }
+    if (c !== a && c !== b && SOFT[c]) { wt = cand(c, a, b, c, d, fx, fy, X, Y); if (wt > best) { best = wt; w = c; } }
+    if (d !== a && d !== b && d !== c && SOFT[d]) { wt = cand(d, a, b, c, d, fx, fy, X, Y); if (wt > best) { best = wt; w = d; } }
+    wK = w === a ? k : w === b ? k + 1 : w === c ? k + TW : k + TW + 1;
+    return w;
+  };
+  let img = null;
+  const tc = [];                                          // Texeldaten je Quellkachel
+  const wb = new Uint8Array(17 * 16), sb = new Int16Array(16 * 16);   // Sieger je Pixel der Kachel (+1 Zeile darunter)
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+    const k = (j + 1) * TW + i + 1, own = typ[k];
+    if (!SOFT[own]) continue;
+    let mixed = false;
+    for (let b = -1; b <= 1 && !mixed; b++) for (let a = -1; a <= 1; a++) if (typ[k + b * TW + a] !== own) { mixed = true; break; }
+    if (!mixed) continue;
+    const X0 = (x0t + i) * 16, Y0 = (y0t + j) * 16, below = typ[k + TW];
+    let any = false;
+    for (let y = 0; y < 17; y++) for (let x = 0; x < 16; x++) {
+      const w = winAt(X0 + x, Y0 + y, y < 16 ? own : below); wb[y * 16 + x] = w;
+      if (y < 16) { sb[y * 16 + x] = wK; if (w !== own || w === T.GRASS) any = true; }
+    }
+    if (!any) continue;
+    img ||= new ImageData(SZ, SZ);
+    const D = img.data;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const w = wb[y * 16 + x], lip = w === T.GRASS && wb[(y + 1) * 16 + x] !== T.GRASS && h2(X0 + x, Y0 + y) < 0.7;   // Grashalme an der Unterkante
+      if (w === own && !lip) continue;
+      const src = sb[y * 16 + x], T0 = tc[src] || (tc[src] = texel(typ[src], vari[src], kin[src])), ti = (y * 16 + x) * 4, o4 = ((j * 16 + y) * SZ + i * 16 + x) * 4;
+      D[o4] = T0[ti] + (lip ? 22 : 0); D[o4 + 1] = T0[ti + 1] + (lip ? 26 : 0); D[o4 + 2] = T0[ti + 2] + (lip ? 10 : 0); D[o4 + 3] = 255;
+    }
+  }
+  if (img) putLayer(o, img);
+  // Helligkeit und Regionstönung: 1 Pixel je Kachelmitte, bilinear hochskaliert — weiche Verläufe statt Kachelrechtecke
+  shadeCtx.putImageData(sd, 0, 0); tctx.putImageData(td, 0, 0);
+  o.save(); o.imageSmoothingEnabled = true;
+  o.drawImage(shadeCv, -16, -16, TW * 16, TW * 16); o.drawImage(tintCv, -16, -16, TW * 16, TW * 16);   // Pixelmitte i ↔ Kachelmitte
+  o.restore();
+}
+// Wertrauschen mit vorab gehashten Gitterpunkten für ein Quadrat [gx0, gx0+AW) — gleiches Ergebnis wie
+// vnoise(X/sc+ox, Y/scy+oy), aber ~50× weniger Hashes (Backen der Chunks bleibt billig).
+function latNoise(gx0, gy0, AW, sc, ox, oy, scy = sc) {
+  const lx0 = Math.floor(gx0 / sc + ox), ly0 = Math.floor(gy0 / scy + oy), nx = Math.ceil(AW / sc) + 3, ny = Math.ceil(AW / scy) + 3, L = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) L[j * nx + i] = h2(lx0 + i, ly0 + j);
+  return (X, Y) => {
+    const x = X / sc + ox, y = Y / scy + oy, xi = Math.floor(x), yi = Math.floor(y), u = x - xi, v = y - yi;
+    const U = u * u * (3 - 2 * u), V = v * v * (3 - 2 * v), k = (yi - ly0) * nx + xi - lx0, a = L[k], b = L[k + 1], c = L[k + nx];
+    return a + (b - a) * U + (c - a) * V + (a - b - c + L[k + nx + 1]) * U * V;
+  };
+}
+// Weiches Feld für eine Kachelart (Fels, Wasser): bilineare Belegung der Kachelmitten + Rauschen ergibt runde,
+// ausgefranste Umrisse statt Kachelkanten. Alles pro Chunk vorberechnet, damit das Backen billig bleibt.
+// Liefert null, wenn im Chunk samt Rand keine Kachel dieser Art liegt.
+function softField(m, cx, cy, kind, M, G = 2) {
+  const x0t = cx * CH, y0t = cy * CH;
+  const isK = (tx, ty) => tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && m.tiles[ty * m.w + tx] === kind;
+  let any = false;
+  for (let j = -1; j <= CH && !any; j++) for (let i = -1; i <= CH; i++) if (isK(x0t + i, y0t + j)) { any = true; break; }
+  if (!any) return null;
+  const SZ = CH * 16, AW = SZ + 2 * M, gx0 = x0t * 16 - M, gy0 = y0t * 16 - M;
+  const TW = CH + 2 * G, reg = [], occ = new Uint8Array(TW * TW);   // Kachelraster mit G Kacheln Rand
+  for (let j = 0; j < TW; j++) for (let i = 0; i < TW; i++) {
+    const tx = x0t - G + i, ty = y0t - G + j; occ[j * TW + i] = isK(tx, ty) ? 1 : 0;
+    reg[j * TW + i] = S.map === 'world' && tx >= 0 && ty >= 0 && tx < m.w && ty < m.h ? regionAt(tx, ty) : 'greenmark';
+  }
+  const oc = (tx, ty) => occ[(ty - y0t + G) * TW + (tx - x0t + G)];
+  const regAt = (X, Y) => reg[(((Y >> 4) - y0t + G) * TW) + (X >> 4) - x0t + G];
+  const lat = (sc, ox, oy, scy = sc) => latNoise(gx0, gy0, AW, sc, ox, oy, scy);
+  const nEdge = lat(6, 0, 0), nEdge2 = lat(2.5, 30, 0);
+  const mask = new Uint8Array(AW * AW);
+  for (let y = 0; y < AW; y++) {
+    const Y = gy0 + y, gy = (Y - 8) / 16, iy = Math.floor(gy), fy = gy - iy;
+    for (let x = 0; x < AW; x++) {
+      const X = gx0 + x, gx = (X - 8) / 16, ix = Math.floor(gx), fx = gx - ix;
+      const a = oc(ix, iy), b = oc(ix + 1, iy), c = oc(ix, iy + 1), d = oc(ix + 1, iy + 1), sum = a + b + c + d;
+      if (!sum) continue;
+      if (sum === 4) { mask[y * AW + x] = 1; continue; }
+      const f = a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
+      if (f < 0.22 || f > 0.78) { if (f > 0.78) mask[y * AW + x] = 1; continue; }   // Rauschen reicht nicht über ±0,25
+      if (f + (nEdge(X, Y) - 0.5) * 0.4 + (nEdge2(X, Y) - 0.5) * 0.1 > 0.5) mask[y * AW + x] = 1;
+    }
+  }
+  return { mask, M, SZ, AW, gx0, gy0, x0t, y0t, oc, regAt, lat };
+}
+const layerCv = document.createElement('canvas'); layerCv.width = layerCv.height = CH * 16;
+const layerCtx = layerCv.getContext('2d');
+const putLayer = (o, img) => { layerCtx.putImageData(img, 0, 0); o.drawImage(layerCv, 0, 0); };   // eigene Ebene statt Rücklesen des Chunks
+function paintRock(o, m, cx, cy, kind = T.ROCK) {      // auch Höhlenwände (DWALL) der Minen: gleiche Masse, Höhlenpalette
+  const F = softField(m, cx, cy, kind, 10); if (!F) return;
+  const cave = kind === T.DWALL;
+  const { mask, M, SZ, AW, gx0, gy0, lat } = F;
+  const nRel = lat(9, 0, 0), nRel2 = lat(4, 50, 0), nCrack = lat(9, 100, 0);
+  const nSnow = m === MAPS.world ? lat(16, 7, 0) : null, nSnow2 = nSnow && lat(5, 0, 9);
+  const below = new Uint8Array(AW * AW), above = new Uint8Array(AW * AW);   // Abstand zum nächsten Nicht-Fels darunter / Fels darüber
+  for (let x = 0; x < AW; x++) {
+    let d = 0; for (let y = AW - 1; y >= 0; y--) { d = mask[y * AW + x] ? Math.min(d + 1, 250) : 0; below[y * AW + x] = d; }
+    d = 250; for (let y = 0; y < AW; y++) { d = mask[y * AW + x] ? 0 : Math.min(d + 1, 250); above[y * AW + x] = d; }
+  }
+  const R = (x, y) => mask[y * AW + x] === 1;            // x/y bleiben im Rand (M ≥ Wandhöhe + 2)
+  const img = new ImageData(SZ, SZ), D = img.data;
+  const rel = new Float32Array(AW * AW).fill(NaN);        // Relief nur, wo es gebraucht wird (Fels + Diagonalnachbarn)
+  const relAt = q => { if (rel[q] !== rel[q]) { const X = gx0 + q % AW, Y = gy0 + (q / AW | 0); rel[q] = nRel(X, Y) + nRel2(X, Y) * 0.3; } return rel[q]; };
+  for (let y = M; y < M + SZ; y++) for (let x = M; x < M + SZ; x++) {
+    const X = gx0 + x, Y = gy0 + y, o4 = ((y - M) * SZ + (x - M)) * 4, q = y * AW + x;
+    const rg = cave ? 'cave' : F.regAt(X, Y), P = ROCK_RGB[rg] || ROCK_RGB.greenmark;
+    if (!mask[q]) {                                      // Boden: Schlagschatten unter/rechts der Wand, Geröll am Fuß
+      let sh = above[q] <= 4 ? above[q] : 0;
+      if (!sh && (R(x - 1, y - 1) || R(x - 2, y - 2))) sh = R(x - 1, y - 1) ? 1 : 2;
+      if (sh) D[o4 + 3] = [0, 128, 97, 66, 36][sh];   // Schatten: Schwarz mit Deckkraft
+      else if (above[q] < 9 || R(x - 3, y) || R(x + 3, y)) {
+        if (h2(X * 3, Y * 5) < 0.05) { const c = P[h2(X, Y * 7) < 0.5 ? 3 : 2]; D[o4] = c[0]; D[o4 + 1] = c[1]; D[o4 + 2] = c[2]; D[o4 + 3] = 255; }
+      }
+      continue;
+    }
+    const CL = rg === 'mountain' || cave ? 8 : 6, bl = below[q];  // Wandhöhe in Texturpixeln; bl = Pixel bis zur Unterkante
+    let c;
+    if (bl <= CL) {                                       // Südwand: senkrechte Schichtung, unten dunkler, oben Lichtkante
+      const depth = CL - bl, streak = h2(X, Y >> 3);
+      c = bl === 1 ? P[0] : depth === 0 && !R(x, y - 1) ? P[3] : depth === 0 ? P[2]
+        : streak > 0.82 ? P[0] : streak < 0.18 || (X + (h2(Y >> 3, 3) * 4 | 0)) % 5 === 0 ? P[2] : P[1];
+      if (bl === 2 && h2(X, Y) < 0.5) c = P[0];
+      if (!R(x - 1, y) && c !== P[0]) c = P[2];           // Westkante der Wand fängt Licht
+    } else {                                              // Kuppe: Relief (Licht von links oben), Kanten, Risse
+      const r = relAt(q - AW - 1) - relAt(q + AW + 1);
+      c = P[r > 0.2 ? 4 : r > 0.07 ? 3 : r < -0.1 ? 1 : 2];
+      if (!R(x, y - 1) || !R(x - 1, y)) c = P[4];         // Oberkante/Westkante: Licht
+      else if (!R(x + 1, y)) c = P[1];                    // Ostkante: Schatten
+      else if (R(x, y - 2) && Math.abs(nCrack(X, Y) - 0.5) < 0.016) c = P[0];   // Risslinie
+      if (P[5] && nSnow) { const sn = nSnow(X, Y) + (nSnow2(X, Y) - 0.5) * 0.12;   // zusammenhängende Schneefelder
+        if (sn > 0.6) c = sn < 0.625 || r < -0.1 ? P[6] : P[5]; }
+    }
+    D[o4] = c[0]; D[o4 + 1] = c[1]; D[o4 + 2] = c[2]; D[o4 + 3] = 255;
+  }
+  putLayer(o, img);
+}
+// ---------------- Mauern mit Höhe: Wehrgang oben, Quaderfront nach Süden, Zinnen an offenen Seiten ----------------
+// Mauerkacheln sahen von oben wie Pflaster aus. Freistehende Mauern (Stadtmauer, Feste) bekommen Zinnen; Hauswände
+// nur die Front (innen sichtbar, wenn das Dach ausblendet).
+function paintWalls(o, m, cx, cy) {
+  const x0t = cx * CH, y0t = cy * CH, isW = (tx, ty) => tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && m.tiles[ty * m.w + tx] === T.WALL;
+  let houses = null;
+  const inHouse = (tx, ty) => (houses ||= HOUSES.filter(b => b.map === S.map && b.x < x0t + CH + 1 && b.x + b.w > x0t - 1 && b.y < y0t + CH + 1 && b.y + b.h > y0t - 1))
+    .some(b => tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h);
+  const P = (c, x, y, w = 1, h = 1) => { o.fillStyle = c; o.fillRect(x, y, w, h); };
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+    const tx = x0t + i, ty = y0t + j; if (!isW(tx, ty)) continue;
+    const X = i * 16, Y = j * 16, N = isW(tx, ty - 1), Sd = isW(tx, ty + 1), Wd = isW(tx - 1, ty), E = isW(tx + 1, ty), house = inHouse(tx, ty);
+    if (!N) P('#6a6258', X, Y, 16, 1);                    // Kantenlicht oben/links, Schatten rechts
+    if (!Wd) P('#5e574d', X, Y, 1, 16);
+    if (!E) P('#1e1b17', X + 15, Y, 1, 16);
+    if (!Sd) {                                            // Front: 8 Texel Quader, Lichtlippe oben, dunkler Fuß
+      for (let r = 0; r < 8; r++) for (let x = 0; x < 16; x++) {
+        const joint = r === 3 || r === 7 || (x + (r < 4 ? 0 : 3) + (tx * 5 % 6)) % 6 === 0;
+        P(r === 0 ? '#5a5248' : joint ? '#221e1a' : h2(tx * 16 + x, ty * 16 + r) < 0.12 ? '#433c34' : r > 5 ? '#2c2823' : '#37312a', X + x, Y + 8 + r);
+      }
+      if (!Wd) P('#4a443b', X, Y + 8, 1, 7);
+      if (!E) P('#161310', X + 15, Y + 8, 1, 8);
+    }
+    if (house) continue;
+    const merlon = (x, y, w, h) => { P('#6e665b', x, y, w, h); P('#827a6d', x, y, w, 1); P('#1a1714', x + w, y + 1, 1, h); P('#1a1714', x, y + h, w + 1, 1); };
+    if (!N) for (let k = 1; k < 16; k += 5) merlon(X + k, Y + 1, 3, 2);       // Zinnen entlang offener Seiten
+    if (!Sd) for (let k = 1; k < 16; k += 5) merlon(X + k, Y + 5, 3, 2);
+    if (!Wd) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 1, Y + k, 2, 3);
+    if (!E) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 12, Y + k, 2, 3);
+  }
+}
+// ---------------- Wasser: weiche Ufer, Tiefe, Schaum, Schilf (statt Kachelquadrate) ----------------
+const WATER_PAL = {            // tief, mittel, flach, Licht, Schaum
+  greenmark: ['#18293a', '#1f3446', '#2a4452', '#3e5c66', '#8aa2a4'],
+  plains:    ['#18293a', '#1f3446', '#2a4452', '#3e5c66', '#8aa2a4'],
+  forest:    ['#152430', '#1b2f3a', '#253e46', '#385658', '#7e9690'],
+  marsh:     ['#19231f', '#212e28', '#2c3b30', '#3e4e3c', '#76866a'],
+  mountain:  ['#182839', '#1f3549', '#2b475c', '#44657a', '#b4c8d0'],
+  desert:    ['#1b272c', '#233439', '#2f4446', '#485c5a', '#a09e88'],
+  badland:   ['#191e20', '#212a2c', '#2b3736', '#3e4c48', '#8a8a7a'],
+  blight:    ['#121a1a', '#192523', '#22312d', '#30433b', '#6a8a7a'],
+  sea:       ['#131e2b', '#192837', '#223546', '#385064', '#9aaeb6'],   // Südsee: kalt, grau-blau, heller Schaum
+};
+const WATER_RGB = Object.fromEntries(Object.entries(WATER_PAL).map(([k, v]) => [k, v.map(rgbOf)]));
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);   // geordnetes Dithering zwischen Tiefenstufen
+function paintWater(o, m, cx, cy) {
+  const F = softField(m, cx, cy, T.WATER, 4, 4); if (!F) return;
+  const { mask, M, SZ, AW, gx0, gy0, oc, regAt, lat } = F;
+  const TD = CH + 2, dep = new Float32Array(TD * TD);   // Tiefe je Kachel: Anteil Wasser im 5×5-Umfeld
+  for (let j = 0; j < TD; j++) for (let i = 0; i < TD; i++) {
+    let c = 0; for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) c += oc(F.x0t - 1 + i + a, F.y0t - 1 + j + b);
+    dep[j * TD + i] = c / 25;
+  }
+  const depAt = (X, Y) => {
+    const gx = (X - 8) / 16 - F.x0t + 1, gy = (Y - 8) / 16 - F.y0t + 1, ix = Math.max(0, Math.min(TD - 2, Math.floor(gx))), iy = Math.max(0, Math.min(TD - 2, Math.floor(gy)));
+    const fx = Math.min(1, Math.max(0, gx - ix)), fy = Math.min(1, Math.max(0, gy - iy)), k = iy * TD + ix;
+    return dep[k] * (1 - fx) * (1 - fy) + dep[k + 1] * fx * (1 - fy) + dep[k + TD] * (1 - fx) * fy + dep[k + TD + 1] * fx * fy;
+  };
+  const nRip = lat(7, 20, 0, 1.6);                       // langgezogene Glanzstreifen
+  const W = (x, y) => mask[y * AW + x] === 1;
+  const img = new ImageData(SZ, SZ), D = img.data;
+  const set = (o4, c, a = 255) => { D[o4] = c[0]; D[o4 + 1] = c[1]; D[o4 + 2] = c[2]; D[o4 + 3] = a; };
+  for (let y = M; y < M + SZ; y++) for (let x = M; x < M + SZ; x++) {
+    const X = gx0 + x, Y = gy0 + y, o4 = ((y - M) * SZ + (x - M)) * 4, q = y * AW + x;
+    const rg = m === MAPS.world && (Y >> 4) >= seaLine(X >> 4) - 2 ? 'sea' : regAt(X, Y), P = WATER_RGB[rg] || WATER_RGB.greenmark;
+    const r1 = !W(x - 1, y) || !W(x + 1, y) || !W(x, y - 1) || !W(x, y + 1);
+    if (!mask[q]) {                                      // Ufer: nasser, dunkler Saum auf dem Boden
+      if (W(x - 1, y) || W(x + 1, y) || W(x, y - 1) || W(x, y + 1)) set(o4, [8, 10, 8], 90);
+      else if (W(x - 2, y) || W(x + 2, y) || W(x, y - 2) || W(x, y + 2)) set(o4, [8, 10, 8], 45);
+      continue;
+    }
+    if (r1) { set(o4, h2(X * 5, Y * 3) < 0.65 ? P[4] : P[3]); continue; }   // Schaumkante
+    const r2 = !W(x - 2, y) || !W(x + 2, y) || !W(x, y - 2) || !W(x, y + 2) || !W(x - 3, y) || !W(x, y - 3) || !W(x + 3, y) || !W(x, y + 3);
+    const t = r2 ? 2 : (1 - depAt(X, Y)) * 2.4, k = Math.min(2, Math.floor(t) + (t % 1 > BAYER[(Y & 3) * 4 + (X & 3)] ? 1 : 0));
+    let c = P[k];
+    if (k === 0 && nRip(X, Y) > 0.86) c = P[3];           // seltener Lichtreflex im tiefen Wasser
+    set(o4, c);
+    if (r2 && rg !== 'mountain' && rg !== 'desert' && h2(X * 7, Y * 3) < 0.035) {   // Schilf im Flachwasser
+      const hgt = 3 + (h2(X, Y) * 3 | 0);
+      for (let k2 = 0; k2 < hgt && y - M - k2 >= 0; k2++) { const oo = ((y - M - k2) * SZ + (x - M)) * 4; set(oo, k2 === hgt - 1 ? [106, 90, 48] : k2 & 1 ? [58, 74, 42] : [44, 60, 34]); }
+    }
+  }
+  if (m === MAPS.world) for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {   // Seerosen im Sumpf
+    const tx = F.x0t + i, ty = F.y0t + j; if (!oc(tx, ty) || regionAt(tx, ty) !== 'marsh' || h2(tx * 7 + 1, ty * 13 + 5) > 0.14) continue;
+    const px = i * 16 + 4 + (h2(tx, ty * 3) * 8 | 0), py = j * 16 + 5 + (h2(tx * 5, ty) * 7 | 0);
+    if (!W(px + M, py + M) || !W(px + 3 + M, py + 2 + M)) continue;
+    for (const [dx, dy, c] of [[0, 0, [58, 90, 52]], [1, 0, [74, 106, 62]], [2, 0, [58, 90, 52]], [0, 1, [44, 70, 40]], [1, 1, [58, 90, 52]], [2, 1, [44, 70, 40]], [3, 1, [44, 70, 40]], [1, -1, [196, 186, 160]]])
+      set(((py + dy) * SZ + px + dx) * 4, c);
+  }
+  putLayer(o, img);
 }
 const DECOR_FLOWERS = ['#b8a44a', '#a05a5a', '#c9c0a0', '#6a7ab0'];
 // Regionale Nahdetails in Texturpixeln. true = Kachel ist erledigt (keine Wiesendetails mehr).
@@ -328,9 +629,9 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const VARIANTS = { crate: 3, barrel: 3 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
 const PROP_PERIOD = { hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { tower_ruin: 192 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const PROP_BOX = { tower_ruin: 192, boat: 128 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
@@ -344,6 +645,8 @@ function drawPropPixel(e, now) {
   if (VARIANTS[e.type]) { variant = e.v ?? ((h2(e.x | 0, (e.y | 0) + 3) * VARIANTS[e.type]) | 0); key += 'v' + variant; }
   if (e.depleted) key += 'd';
   if (e.opened) key += 'o';
+  let reg = null;                                         // Fels trägt die Gesteinsfarbe seiner Region
+  if (e.type === 'rock_node' || e.type === 'ore_node') { reg = e.map === 'world' ? regionOfProp(e) : 'greenmark'; key += reg; }
   if (per) { ph = ((now / per * 6 + h2(e.x | 0, 7) * 6) | 0) % 6; key += '#' + ph; }
   let cv = propCache.get(key);
   if (!cv) {
@@ -353,7 +656,7 @@ function drawPropPixel(e, now) {
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(0.5, 0, 0, 0.5, 0, 0);
     ctx = o;
-    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
+    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
     SP.pixelize(o, B / 2, B / 2, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
     propCache.set(key, cv);
@@ -403,13 +706,41 @@ function drawProp(e, now) {
       ctx.beginPath(); ctx.arc(x, y - 4, 9, 0, 7); ctx.arc(x - 6, y, 7, 0, 7); ctx.arc(x + 6, y, 7, 0, 7); ctx.fill();
       if (!e.depleted) { ctx.fillStyle = '#9c5a4a'; ctx.fillRect(x - 2, y - 6, 2, 2); ctx.fillRect(x + 4, y - 2, 2, 2); }
       break;
-    case 'rock_node': case 'ore_node':
-      shadow(x, y + 4, 11, .3);
-      ctx.fillStyle = e.depleted ? '#332f2b' : '#4b4740';
-      ctx.beginPath(); ctx.moveTo(x - 12, y + 6); ctx.lineTo(x - 7, y - 9); ctx.lineTo(x + 3, y - 12); ctx.lineTo(x + 12, y + 2); ctx.lineTo(x + 8, y + 7); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x - 6, y - 7, 7, 3);
-      if (e.type === 'ore_node' && !e.depleted) { ctx.fillStyle = '#8a6f3f'; ctx.fillRect(x - 3, y - 3, 3, 3); ctx.fillRect(x + 4, y + 1, 3, 3); }
-      break;
+    case 'rock_node': case 'ore_node': {                 // Findling: Facetten (Licht von links oben), Risse, Regionsgestein
+      const [dk, sh, b, hi, top] = ROCK_PAL[e._reg] || ROCK_PAL.greenmark, reg = e._reg, v = e._var || 0;
+      const poly = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.closePath(); ctx.fill(); };
+      const line = (c, pts, w = 1) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.stroke(); };
+      if (e.depleted) {                                   // abgebaut: Schutthaufen
+        shadow(x, y + 4, 10, .25);
+        poly(sh, [-10, 6, -7, 0, -2, 2, -1, 6]); poly(b, [-3, 6, 0, -2, 6, -1, 8, 6]); poly(hi, [0, -2, 3, -3, 6, -1, 2, 1]); poly(sh, [5, 6, 8, 2, 11, 6]);
+        break;
+      }
+      shadow(x, y + 5, 13, .32);
+      if (v === 1) {                                      // hohe Platte mit kleinem Begleitstein
+        poly(sh, [8, 7, 9, 1, 14, 0, 15, 7]); poly(hi, [9, 1, 11, -1, 14, 0, 12, 2]);
+        poly(sh, [-9, 7, -10, -8, -5, -16, 2, -15, 5, -4, 4, 7]);
+        poly(b, [-9, 7, -10, -8, -5, -16, -3, -6, -4, 7]); poly(hi, [-10, -8, -5, -16, 2, -15, -2, -11]);
+        line(top, [-10, -8, -5, -16, 2, -15]); line(dk, [-3, -6, -1, 0, 1, 2, 0, 6]); line(dk, [-7, -2, -5, 1]);
+      } else if (v === 2) {                               // flacher, breiter Block
+        poly(sh, [-14, 7, -13, -2, -7, -8, 6, -8, 13, -3, 14, 7]);
+        poly(b, [-14, 7, -13, -2, -4, -1, -3, 7]); poly(hi, [-13, -2, -7, -8, 6, -8, 13, -3, 4, -2, -4, -1]);
+        line(top, [-13, -2, -7, -8, 6, -8]); line(dk, [4, -2, 5, 3, 3, 7]); line(dk, [-8, 1, -6, 4]); line(sh, [-9, -5, 1, -6]);
+      } else {                                            // kantiger Findling
+        poly(sh, [-12, 7, -10, -6, -4, -12, 5, -13, 11, -4, 12, 4, 7, 7]);
+        poly(b, [-12, 7, -10, -6, -6, -2, -5, 7]); poly(hi, [-10, -6, -4, -12, 5, -13, 2, -5, -6, -2]);
+        poly(SP.mix(sh, dk, 0.4), [2, -5, 5, -13, 11, -4]);
+        line(top, [-10, -6, -4, -12, 5, -13]); line(dk, [2, -5, 3, 1, 1, 6]); line(dk, [-8, 1, -7, 4]);
+      }
+      if (reg === 'mountain') poly('#dfe6ea', v === 2 ? [-12, -3, -7, -8, 5, -8, 9, -5, 1, -4] : v === 1 ? [-9, -9, -5, -16, 2, -15, 0, -12, -5, -11] : [-9, -7, -4, -12, 5, -13, 3, -9, -3, -8]);
+      else if (reg === 'greenmark' || reg === 'forest' || reg === 'marsh' || reg === 'plains') {   // Moos auf der Wetterseite
+        ctx.fillStyle = '#3a4a2a'; ctx.fillRect(x - 9, y - 5 - v * 2, 4, 2); ctx.fillRect(x - 7, y - 7 - v * 2, 3, 2); ctx.fillStyle = '#4c5e34'; ctx.fillRect(x - 8, y - 7 - v * 2, 1, 1);
+      }
+      if (e.type === 'ore_node') {                        // Erzader: glänzende Einschlüsse entlang eines Risses
+        line('#6a4a2a', [-6, 0, -1, -3, 5, -1], 2);
+        ctx.fillStyle = '#c08a4a'; ctx.fillRect(x - 5, y - 1, 2, 2); ctx.fillRect(x + 1, y - 3, 2, 2); ctx.fillRect(x + 4, y - 1, 2, 1);
+        ctx.fillStyle = '#e8c07a'; ctx.fillRect(x - 5, y - 1, 1, 1); ctx.fillRect(x + 1, y - 3, 1, 1);
+      }
+      break; }
     case 'crate': case 'crate_stack': {                   // Kiste: Bretter, Strebe/Eisenband/Schaden; offen = Deckel ab
       const v = e._var || 0, opened = e.opened;
       const box = (bx, by, vv) => {
@@ -446,6 +777,53 @@ function drawProp(e, now) {
       ctx.fillStyle = '#a8986f'; ctx.beginPath(); ctx.ellipse(x - 3, y - 9, 4, 4, 0, 0, 7); ctx.fill();
       ctx.fillStyle = '#6e603f'; ctx.fillRect(x - 3, y - 17, 6, 4); ctx.fillStyle = '#3e3224'; ctx.fillRect(x - 3, y - 14, 6, 1.5);
       ctx.fillStyle = 'rgba(30,24,16,.35)'; ctx.fillRect(x + 3, y - 8, 4, 8);
+      break; }
+    case 'hay': {                                         // Heuballen: zwei gebundene Ballen, Halme stehen ab
+      shadow(x, y + 4, 14, .3);
+      const bale = (bx, by, w, h) => {
+        ctx.fillStyle = '#9a7a34'; ctx.fillRect(bx - w / 2, by - h, w, h);
+        ctx.fillStyle = '#c4a14e'; ctx.fillRect(bx - w / 2, by - h, w, 3);
+        ctx.fillStyle = '#6e5424'; ctx.fillRect(bx + w / 2 - 3, by - h + 3, 3, h - 3);
+        ctx.fillStyle = '#4a3a1c'; ctx.fillRect(bx - w / 2 + 4, by - h, 1.5, h); ctx.fillRect(bx + w / 2 - 8, by - h, 1.5, h);   // Bindeschnüre
+        ctx.fillStyle = '#dcc068'; for (let i = 0; i < 5; i++) ctx.fillRect(bx - w / 2 + 2 + i * 4, by - h - 1 - (i & 1), 1.5, 2);
+      };
+      bale(x, y + 3, 26, 11); bale(x - 3, y - 8, 18, 9);
+      break; }
+    case 'boat': {                                        // Ruderboot am Steg: Rumpf, Duchten, Ruder, Wasserlinie
+      ctx.save(); ctx.translate(x, y); ctx.scale(1.5, 1.5); ctx.translate(-x, -y);   // echte Bootsgröße (~2 Kacheln)
+      ctx.fillStyle = 'rgba(8,18,28,.4)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 26, 7, 0, 0, 7); ctx.fill();
+      const hull = (s, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 25 * s, y - 4); ctx.quadraticCurveTo(x, y - 18 * s, x + 25 * s, y - 4);
+        ctx.quadraticCurveTo(x, y + 8 * s, x - 25 * s, y - 4); ctx.fill(); };
+      hull(1, '#3a2a1a'); hull(0.82, '#6a4c30'); hull(0.62, '#2a2018');
+      ctx.fillStyle = '#7a5a38'; ctx.fillRect(x - 8, y - 11, 3, 13); ctx.fillRect(x + 6, y - 10, 3, 11);   // Duchten
+      ctx.fillStyle = '#8a6a44'; ctx.save(); ctx.translate(x + 2, y - 3); ctx.rotate(-0.35); ctx.fillRect(-18, -1, 36, 2); ctx.fillRect(14, -2.5, 7, 5); ctx.restore();   // Ruder
+      ctx.fillStyle = 'rgba(200,210,215,.35)'; ctx.fillRect(x - 22, y + 3, 10, 1.5); ctx.fillRect(x + 12, y + 4, 8, 1.5);
+      ctx.restore();
+      break; }
+    case 'net_rack': {                                    // Netzgestell: zwei Pfosten, Querstange, hängendes Netz mit Schwimmern
+      shadow(x, y + 3, 14, .25);
+      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 15, y - 26, 3, 28); ctx.fillRect(x + 12, y - 26, 3, 28); ctx.fillRect(x - 16, y - 27, 32, 3);
+      ctx.strokeStyle = '#9a8a64'; ctx.lineWidth = 1;
+      ctx.beginPath(); for (let i = -12; i <= 12; i += 4) { ctx.moveTo(x + i, y - 24); ctx.lineTo(x + i + 6, y - 4); ctx.moveTo(x + i + 4, y - 24); ctx.lineTo(x + i - 2, y - 4); } ctx.stroke();
+      ctx.fillStyle = '#a84a3a'; for (let i = -12; i <= 12; i += 8) ctx.fillRect(x + i, y - 25, 3, 3);
+      break; }
+    case 'laundry': {                                     // Wäscheleine zwischen zwei Pfosten: Hemd, Tuch, Laken
+      shadow(x, y + 3, 16, .2);
+      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 18, y - 24, 3, 26); ctx.fillRect(x + 15, y - 24, 3, 26);
+      ctx.fillStyle = '#6a5a44'; ctx.fillRect(x - 16, y - 23, 32, 1.5);
+      const cloth = (cx, w, h, c, d) => { ctx.fillStyle = c; ctx.fillRect(cx, y - 22, w, h); ctx.fillStyle = d; ctx.fillRect(cx + w - 2, y - 22, 2, h); ctx.fillRect(cx, y - 22 + h - 2, w, 2); };
+      cloth(x - 13, 8, 11, '#c9bfa6', '#9a917c'); cloth(x - 3, 7, 8, '#6a4a5a', '#4a3040'); cloth(x + 6, 7, 12, '#5a6a7a', '#3e4a58');
+      break; }
+    case 'trough': {                                      // Tränke: Holztrog mit Wasser
+      shadow(x, y + 4, 14, .3);
+      ctx.fillStyle = '#4b3a25'; ctx.fillRect(x - 14, y - 9, 28, 11); ctx.fillStyle = '#5e4a30'; ctx.fillRect(x - 14, y - 9, 28, 2);
+      ctx.fillStyle = '#26384a'; ctx.fillRect(x - 11, y - 7, 22, 4); ctx.fillStyle = 'rgba(200,215,225,.4)'; ctx.fillRect(x - 8, y - 7, 6, 1);
+      ctx.fillStyle = '#2b2116'; ctx.fillRect(x - 14, y + 1, 28, 1.5);
+      break; }
+    case 'lantern': {                                     // Laterne an einem Pfahl: gibt nachts Licht (staticLights)
+      shadow(x, y + 3, 6, .25);
+      ctx.fillStyle = '#2e2a26'; ctx.fillRect(x - 1.5, y - 30, 3, 32); ctx.fillRect(x - 1.5, y - 30, 9, 2);
+      ctx.fillStyle = '#35332f'; ctx.fillRect(x + 3, y - 28, 6, 8); ctx.fillStyle = '#e2a95a'; ctx.fillRect(x + 4, y - 26, 4, 4);
       break; }
     case 'table': {                                       // Tisch mit Becher/Teller
       shadow(x, y + 4, 16, .3);
@@ -575,7 +953,18 @@ function drawProp(e, now) {
     case 'rubble':
       ctx.fillStyle = '#3c3833'; ctx.fillRect(x - 8, y - 3, 8, 5); ctx.fillRect(x + 1, y - 6, 6, 8);
       break;
-    case 'fence': case 'palisade_prop': case 'fallen_tree':
+    case 'palisade_prop': {                               // Palisade: angespitzte Stämme, geschnürt, Schattenseite rechts
+      shadow(x, y + 4, 16, .3);
+      for (let i = 0; i < 4; i++) {
+        const sx = x - 15 + i * 8, h = 30 + ((i * 7 + (x | 0)) % 5);
+        ctx.fillStyle = '#4a3a26'; ctx.fillRect(sx, y - h + 6, 7, h - 2);
+        ctx.fillStyle = '#5e4a30'; ctx.fillRect(sx, y - h + 6, 2, h - 2);
+        ctx.fillStyle = '#33271a'; ctx.fillRect(sx + 5, y - h + 6, 2, h - 2);
+        ctx.fillStyle = '#4a3a26'; ctx.beginPath(); ctx.moveTo(sx, y - h + 6); ctx.lineTo(sx + 3.5, y - h - 1); ctx.lineTo(sx + 7, y - h + 6); ctx.fill();
+      }
+      ctx.fillStyle = '#2a2016'; ctx.fillRect(x - 16, y - 18, 32, 2); ctx.fillRect(x - 16, y - 7, 32, 2);   // Querbinder
+      break; }
+    case 'fence': case 'fallen_tree':
       shadow(x, y + 3, 11, .25);
       ctx.fillStyle = '#43331f';
       if (e.type === 'fallen_tree') { ctx.fillRect(x - 16, y - 5, 32, 9); ctx.fillStyle = '#5b452a'; ctx.fillRect(x - 16, y - 5, 32, 3); }
@@ -819,14 +1208,17 @@ function swingOf(wt, sw, arc) {
 }
 function drawWeapon(c, e, now, it) {
   it = it || ITEMS[e.equip.weapon.key] || {};
-  const sw = e.swing || 0, dir = e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
+  const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
+  const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
+  const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
+  const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
   const W = SP.weaponSprite(e.equip.weapon.key, it.rarity, it.holy, wt);
   const sv = wt === 'bow' ? { a: 0, ext: 0 } : swingOf(wt, sw, arc);
   const sgn = Math.cos(dir) < 0 ? -1 : 1;                           // nach links gespiegelt: Waffe hängt unten, Hieb von oben
-  const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + Math.sin(dir) * (5 + sv.ext * 0.6);
+  const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + low + Math.sin(dir) * (5 + sv.ext * 0.6);   // kniend: Hand tiefer
   const len = (W.cv.width - W.gx) * PX;
   // Klingenspur: dieselbe Kurve, ein paar Schritte zurück ausgewertet — die Spur folgt genau der Klinge
-  if (sw > 0 && !it.ranged) {
+  if (sw > 0 && !it.ranged && !A) {
     const heavy = wt === 'great' || wt === 'axe' || wt === 'mace', thrust = wt === 'spear' || wt === 'dagger';
     const col = W.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210';
     for (let k = 1; k <= 7; k++) {
@@ -1107,7 +1499,7 @@ function staticLights() {
   if (lightCache.map === S.map && lightCache.n === n) return lightCache.list;
   const list = [];
   for (const e of arr) {
-    if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static')) list.push({ x: e.x, y: e.y, r: e.type === 'torch' ? 95 : 140 });
+    if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
     if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
     if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });
     if (e.kind === 'prop' && e.type === 'shrine') list.push({ x: e.x, y: e.y, r: 90 });
@@ -1131,7 +1523,7 @@ function drawLight(now) {
   const pl = S.player;
   const lights = [...staticLights()];
   if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: S.map === 'mine' ? 150 : 120 });
-  if (isNight()) for (const b of HOUSES) if (b.map === S.map)       // erleuchtete Fenster werfen warmes Licht auf die Straße
+  if (isNight()) for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2)   // erleuchtete Fenster werfen warmes Licht auf die Straße
     lights.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
   for (const l of lights) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
@@ -1306,64 +1698,119 @@ function drawItemVec(c, it, key, w, h) {
 const TITLE_A = SP.humanSpec({ seed: 2, pal: { skin: '#b98f66', hair: '#2b2118', cloth: '#4a3a28' }, equip: { cloak: { key: 'traveler_cloak' }, chest: { key: 'leather_jerkin' } } });
 const TITLE_B = SP.humanSpec({ seed: 1, faction: 'order', prof: 'Alter Paladin', pal: { skin: '#d6b089', cloth: '#c7bda6', helm: '#c3bba5', crest: '#9b2e26', shield: '#d9d2c0', shieldBoss: '#9b2e26' },
   equip: { chest: { key: 'plate_cuirass' }, offhand: { key: 'kite_shield' } } });
+// Titelbild (BUG-016): die ganze Szene wird in Sprite-Pixeln gemalt (1 Pixel = k Bildschirmpixel, wie die Figuren) und
+// scharf hochskaliert. Himmel/Berge und Hügel/Feste sind je Größe gecachte Ebenen; animiert sind Wolken, Fenster,
+// Banner, Feuer, Funken und Gras. Licht: Abendglut hinter der Feste (Randlicht oben/links), Feuer vorn.
+const titleCache = { key: '', back: null, mid: null };
+const TITLE_SKY = [[0, '#171a24'], [0.45, '#3a2a26'], [0.62, '#7d3a24'], [0.75, '#2a1e18'], [1, '#0c0a08']];
+function titleLayers(lw, lh) {
+  const key = lw + 'x' + lh; if (titleCache.key === key) return titleCache;
+  const mk = () => { const cv = document.createElement('canvas'); cv.width = lw; cv.height = lh; return cv; };
+  const back = mk(), mid = mk(), b = back.getContext('2d'), g = mid.getContext('2d');
+  const P = (o, col, x, y, w = 1, h = 1) => { o.fillStyle = col; o.fillRect(Math.round(x), Math.round(y), w, h); };
+  // Himmel: Verlauf in Stufen, an den Übergängen geordnet gedithert (keine glatten Web-Verläufe)
+  const skyAt = f => { let i = 0; while (i < TITLE_SKY.length - 2 && f > TITLE_SKY[i + 1][0]) i++; const [f0, c0] = TITLE_SKY[i], [f1, c1] = TITLE_SKY[i + 1]; return SP.mix(c0, c1, Math.min(1, Math.max(0, (f - f0) / (f1 - f0)))); };
+  const STEPS = 22, band = Array.from({ length: STEPS + 2 }, (_, i) => skyAt(i / STEPS));
+  for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+    const f = y / lh * STEPS, lo = Math.floor(f), fr = f - lo;
+    P(b, band[fr > BAYER[(y & 3) * 4 + (x & 3)] ? lo + 1 : lo], x, y);
+  }
+  for (let i = 0; i < 26; i++) { const x = h2(i, 5) * lw | 0, y = h2(5, i) * lh * 0.3 | 0; P(b, i % 5 ? '#6a6660' : '#b0a894', x, y); }   // Sterne im oberen Dunkel
+  const ridge = (o, base, amp, sc, col, rim) => {           // Bergkette: gezackte Silhouette mit Randlicht
+    for (let x = 0; x < lw; x++) {
+      const yy = Math.round(base - (vnoise(x / sc, 3) * 0.7 + vnoise(x / (sc / 3), 9) * 0.3) * amp);
+      P(o, col, x, yy, 1, lh - yy); if (rim) P(o, rim, x, yy);
+    }
+  };
+  ridge(b, lh * 0.62, lh * 0.2, 38, '#2c2126', '#5a2e24');
+  ridge(b, lh * 0.66, lh * 0.12, 24, '#231a1d', '#4a2620');
+  // Hügel mit der Feste
+  for (let x = 0; x < lw; x++) { const yy = Math.round(lh * 0.69 - Math.sin(x / (lw / 4.9)) * lh * 0.045 - Math.sin(x / 17) * 1.5); P(g, '#1c1514', x, yy, 1, lh - yy); P(g, '#3a2420', x, yy); }
+  const bx = Math.round(lw * (lw < 200 ? 0.66 : 0.62)), by = Math.round(lh * 0.70), stone = '#241c1b', dk = '#150f0e', rim = '#6e3a26', rim2 = '#4a2a20';
+  const block = (x0, y0, w, h, o = {}) => {                 // Mauerkörper: Quader, Fugen, Randlicht oben/links, Zinnen
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+      const row = y - y0, joint = row % 4 === 3 || (x + (row >> 2) * 3) % 7 === 0;
+      P(g, joint ? dk : h2(x, y) < 0.08 ? '#2e2322' : stone, x, y);
+    }
+    for (let x = x0; x < x0 + w; x++) P(g, rim, x, y0); for (let y = y0; y < y0 + h; y++) P(g, rim2, x0, y);
+    if (o.crenel) for (let x = x0; x < x0 + w; x += 4) { P(g, stone, x, y0 - 3, 2, 3); P(g, rim, x, y0 - 3, 2, 1); P(g, rim2, x, y0 - 2, 1, 2); }
+  };
+  block(bx - 58, by - 22, 116, 30, { crenel: true });       // Ringmauer
+  block(bx - 72, by - 36, 15, 44, { crenel: true });        // linker Turm
+  block(bx - 12, by - 32, 24, 40, { crenel: true });        // Torhaus
+  block(bx + 36, by - 58, 20, 66);                          // Bergfried
+  for (let x = bx + 36; x < bx + 56; x++) {                 // Bergfried oben zerbrochen (die Welt ist im Niedergang)
+    const drop = x < bx + 42 ? 0 : Math.round((x - bx - 42) * 1.1 + h2(x, 1) * 3);
+    g.clearRect(x, by - 58, 1, drop); P(g, rim, x, by - 58 + drop);
+  }
+  for (let x = bx + 36; x < bx + 42; x += 3) { P(g, stone, x, by - 61, 2, 3); P(g, rim, x, by - 61, 2, 1); }
+  P(g, dk, bx + 49, by - 44, 1, 4); P(g, dk, bx + 50, by - 46, 1, 3); P(g, dk, bx + 51, by - 45, 1, 1);   // Riss
+  for (let y = by - 18; y < by + 8; y++) for (let x = bx - 6; x < bx + 6; x++) {   // Tor: Bogen, Fallgitter
+    const dx = x - bx + 0.5, top = by - 12 - Math.sqrt(Math.max(0, 36 - dx * dx)) * 0.9;
+    if (y >= top) P(g, (x - bx + 6) % 3 === 0 || (y - by) % 4 === 0 ? '#2a201c' : '#070505', x, y);
+  }
+  titleCache.windows = [[bx - 66, by - 26], [bx - 64, by - 14], [bx + 42, by - 44], [bx + 44, by - 30], [bx + 50, by - 18], [bx - 30, by - 12], [bx + 22, by - 12], [bx - 4, by - 26]];
+  for (const [x, y] of titleCache.windows) { P(g, '#0a0707', x - 1, y - 1, 3, 5); }
+  titleCache.banner = [bx + 1, by - 36]; titleCache.fire = [Math.max(Math.round(lw * 0.30), 40), Math.round(lh * 0.86)];   // schmal: Rastende nicht abschneiden   // Banner auf dem Torhaus
+  // Vordergrund: dunkler Boden, zerbrochener Torpfeiler links
+  for (let x = 0; x < lw; x++) { const yy = Math.round(lh * 0.9 + Math.sin(x / 23) * 1.5); P(g, '#0e0b0a', x, yy, 1, lh - yy); }
+  for (let y = Math.round(lh * 0.78); y < lh; y++) { const w = Math.round((y - lh * 0.78) * 0.9 + 10 + h2(1, y) * 2); P(g, y % 5 === 0 ? '#050404' : '#0a0807', 0, y, w, 1); P(g, '#231a18', w, y); }
+  titleCache.key = key; titleCache.back = back; titleCache.mid = mid;
+  return titleCache;
+}
 export function drawTitleScene(canvas, t) {
   const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth, h = canvas.height = canvas.clientHeight;
-  const sky = c.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#171a24'); sky.addColorStop(.45, '#3a2a26'); sky.addColorStop(.62, '#7d3a24'); sky.addColorStop(.75, '#2a1e18'); sky.addColorStop(1, '#0c0a08');
-  c.fillStyle = sky; c.fillRect(0, 0, w, h);
-  // Wolkenbänder
-  for (let i = 0; i < 7; i++) {
-    const y = h * (.12 + i * .055), off = (t / (40 + i * 12)) % (w + 400) - 200;
-    c.fillStyle = `rgba(20,16,18,${.18 + i * .03})`;
-    c.beginPath(); c.ellipse(off, y, 220 - i * 12, 12 + i, 0, 0, 7); c.fill();
-    c.beginPath(); c.ellipse(off + 420, y + 8, 160, 10, 0, 0, 7); c.fill();
+  const k = Math.max(3, Math.round(h / 190)), lw = Math.ceil(w / k), lh = Math.ceil(h / k);
+  const L = titleLayers(lw, lh);
+  const cv = L.frame || (L.frame = document.createElement('canvas'));
+  if (cv.width !== lw || cv.height !== lh) { cv.width = lw; cv.height = lh; }
+  const o = cv.getContext('2d'), P = (col, x, y, ww = 1, hh = 1) => { o.fillStyle = col; o.fillRect(Math.round(x), Math.round(y), ww, hh); };
+  o.imageSmoothingEnabled = false;
+  o.drawImage(L.back, 0, 0);
+  for (let i = 0; i < 6; i++) {                             // Wolkenbänder: flache Pixelstreifen, ziehen langsam
+    const y = Math.round(lh * (0.12 + i * 0.055)), len = 60 - i * 4, off = ((t / (160 + i * 50)) % (lw + 160)) - 80;
+    for (let j = 0; j < 3; j++) { const x0 = off + j * (lw / 2.2) - (i * 37 % 50), l = len - j * 9;
+      P(i < 3 ? '#1c181c' : '#2a1d1c', x0, y, l, 2); P(i < 3 ? '#1c181c' : '#2a1d1c', x0 + 6, y - 1, l - 14, 1); P('#4a2a22', x0 + 4, y + 2, l - 10, 1); }
   }
-  // Hügel
-  c.fillStyle = '#231a19'; c.beginPath(); c.moveTo(0, h * .68);
-  for (let x = 0; x <= w; x += 40) c.lineTo(x, h * .68 - Math.sin(x / 260) * 34 - Math.sin(x / 70) * 6);
-  c.lineTo(w, h); c.lineTo(0, h); c.fill();
-  // Feste (Mittelgrund)
-  const bx = w * .62, by = h * .70;
-  c.fillStyle = '#191413';
-  c.fillRect(bx - 200, by - 90, 400, 120);
-  c.fillRect(bx - 250, by - 55, 60, 85); c.fillRect(bx + 190, by - 130, 70, 160);
-  c.fillStyle = '#0f0c0b';
-  for (let i = 0; i < 9; i++) c.fillRect(bx - 200 + i * 45, by - 110, 22, 22);   // Zinnen (Lücken)
-  c.fillStyle = '#221a18'; c.fillRect(bx - 40, by - 30, 80, 60);                  // Torbogen
-  c.fillStyle = '#060505'; c.beginPath(); c.moveTo(bx - 28, by + 30); c.lineTo(bx - 28, by - 6); c.quadraticCurveTo(bx, by - 34, bx + 28, by - 6); c.lineTo(bx + 28, by + 30); c.fill();
-  // Banner
-  const sway = Math.sin(t / 700) * 4;
-  c.fillStyle = '#5b2119'; c.beginPath(); c.moveTo(bx + 214, by - 120); c.lineTo(bx + 250 + sway, by - 114); c.lineTo(bx + 244 + sway, by - 60); c.lineTo(bx + 214, by - 66); c.fill();
-  // Lagerfeuer vorn
-  const fx = w * .30, fy = h * .86, f = Math.sin(t / 90) * .5 + .5;
-  c.fillStyle = '#100d0b'; c.beginPath(); c.ellipse(fx, fy + 6, 60, 16, 0, 0, 7); c.fill();
-  c.fillStyle = '#2a1f16'; c.fillRect(fx - 34, fy - 4, 68, 10); c.fillRect(fx - 8, fy - 20, 16, 26);
-  c.fillStyle = `rgba(190,80,28,${.6 + f * .25})`; c.beginPath(); c.moveTo(fx - 22, fy); c.quadraticCurveTo(fx, fy - 70 - f * 22, fx + 22, fy); c.fill();
-  c.fillStyle = `rgba(240,180,80,${.5 + f * .3})`; c.beginPath(); c.moveTo(fx - 11, fy); c.quadraticCurveTo(fx + 3, fy - 44 - f * 14, fx + 12, fy); c.fill();
-  // Funken
-  for (let i = 0; i < 40; i++) {
-    const p = (t / 26 + i * 97) % 300;
-    const px = fx + Math.sin((t / 400) + i) * (18 + p / 7), py = fy - p;
-    c.fillStyle = `rgba(230,150,60,${Math.max(0, .75 - p / 300)})`;
-    c.fillRect(px, py, 2, 2);
+  o.drawImage(L.mid, 0, 0);
+  for (const [i, [x, y]] of L.windows.entries()) {         // Fenster: einige erleuchtet, flackernd
+    if (i % 3 === 2) continue;
+    const fl = Math.sin(t / 230 + i * 1.7) > -0.6;
+    P(fl ? '#d08a3a' : '#8a4a22', x, y, 1, 2); if (fl) P('#f0c070', x, y);
   }
-  // Rastende am Feuer: dieselben Pixel-Sprites wie im Spiel (Kapuzen-Wanderer, Ordensritter)
+  const [bnx, bny] = L.banner, sway = Math.round(Math.sin(t / 700) * 1.5);   // zerrissenes Banner am Bergfried
+  P('#3a2a22', bnx - 1, bny - 14, 1, 14); P('#6e3a26', bnx - 1, bny - 14);
+  for (let y = 0; y < 12; y++) { const wv = Math.round(Math.sin(t / 500 + y / 3) * 0.8) + (y > 8 ? sway : 0), ww = y > 9 ? 3 + (y & 1) : 5;
+    P(y % 4 === 0 ? '#7a2c20' : '#5b2119', bnx + wv, bny - 13 + y, ww, 1); }
+  const [fx, fy] = L.fire, f = Math.sin(t / 90) * 0.5 + 0.5;   // Lagerfeuer
+  for (let r = 7; r >= 1; r--) { o.fillStyle = `rgba(200,100,40,${0.035 * (8 - r) * (0.8 + f * 0.3)})`; o.beginPath(); o.ellipse(fx, fy + 2, r * 4, r * 1.4, 0, 0, 7); o.fill(); }
+  P('#2a1f16', fx - 6, fy, 12, 2); P('#3a2a1c', fx - 5, fy - 1, 4, 1); P('#3a2a1c', fx + 1, fy + 1, 5, 1); P('#15100c', fx - 7, fy + 2, 14, 1);
+  const fh = 10 + Math.round(f * 3);                        // Flamme: roter Saum, oranger Körper, heller Kern
+  for (let y = 0; y < fh; y++) {
+    const q = 1 - y / fh, jit = Math.round(Math.sin(t / 55 + y * 1.3) * (1 - q) * 1.4), wo = Math.round(Math.pow(q, 0.8) * 5), wi = wo - 2, wc = wo - 4;
+    if (wo < 0) continue;
+    P(y > fh * 0.7 ? '#7a2814' : '#b8401c', fx - wo + jit, fy - 1 - y, wo * 2 + 1, 1);
+    if (wi >= 0) P('#e07828', fx - wi + jit, fy - 1 - y, wi * 2 + 1, 1);
+    if (wc >= 0) P('#f6c868', fx - wc + jit, fy - 1 - y, wc * 2 + 1, 1);
+  }
+  if (f > 0.6) P('#b8401c', fx - 2 + Math.round(Math.sin(t / 70) * 2), fy - fh - 2);   // abreißende Flammenzunge
+  for (let i = 0; i < 18; i++) {                            // Funken
+    const pp = (t / 26 + i * 97) % 90, px = fx + Math.sin(t / 400 + i) * (2 + pp / 10), py = fy - 6 - pp;
+    if (pp < 80) P(pp < 40 ? '#f0b060' : '#b8602a', px, py);
+  }
+  // Rastende am Feuer: dieselben Pixel-Sprites wie im Spiel, hier 1:1 im Szenenraster
+  o.filter = 'brightness(0.62) sepia(0.25)';
+  const A = SP.humanFrame(TITLE_A, 'E', t % 1300 < 650 ? 'i0' : 'i1'), B = SP.humanFrame(TITLE_B, 'W', 'i0');
+  o.drawImage(A, fx - 12 - A.width, fy + 4 - 23); o.drawImage(B, fx + 12, fy + 4 - 23);
+  o.filter = 'none';
+  for (let x = 0; x < lw; x += 2) {                         // Gras vorn, wiegt im Wind
+    const sw = Math.round(Math.sin(t / 900 + x / 14) * 1), hh = 4 + (h2(x, 3) * 4 | 0);
+    for (let y = 0; y < hh; y++) P(y > hh - 2 ? '#1a1410' : '#0c0a08', x + (y < hh / 2 ? sw : 0), lh - y);
+  }
   c.imageSmoothingEnabled = false;
-  const k = Math.max(3, Math.round(h / 190));
-  const put = (f, x0, y0) => { c.filter = 'brightness(0.62) sepia(0.25)'; c.drawImage(f, Math.round(x0), Math.round(y0), f.width * k, f.height * k); c.filter = 'none'; };
-  put(SP.humanFrame(TITLE_A, 'E', t % 1300 < 650 ? 'i0' : 'i1'), fx - 50 - 20 * k, fy + 12 - 23 * k);
-  put(SP.humanFrame(TITLE_B, 'W', 'i0'), fx + 50, fy + 12 - 23 * k);
-  // Vordergrund: kaputtes Tor + Gras
-  c.fillStyle = '#0a0807';
-  c.beginPath(); c.moveTo(0, h); c.lineTo(0, h * .80); c.lineTo(w * .1, h * .84); c.lineTo(w * .16, h); c.fill();
-  c.fillStyle = '#100d0b';
-  for (let x = 0; x < w; x += 9) {
-    const s = Math.sin(t / 900 + x / 60) * 4;
-    c.fillRect(x, h - 26 - (x % 3) * 5, 2, 30);
-    c.fillRect(x + 4 + s * .3, h - 18, 2, 22);
-  }
-  const shade = c.createLinearGradient(0, 0, w * .62, 0);              // Lesbarkeit links, weich auslaufend
+  c.drawImage(cv, 0, 0, lw * k, lh * k);
+  const shade = c.createLinearGradient(0, 0, w * .62, 0);              // Lesbarkeit links (UI-Schrift), weich auslaufend
   shade.addColorStop(0, 'rgba(10,8,7,.62)'); shade.addColorStop(1, 'rgba(10,8,7,0)');
   c.fillStyle = shade; c.fillRect(0, 0, w, h);
 }

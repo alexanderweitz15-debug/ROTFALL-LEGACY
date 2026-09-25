@@ -85,3 +85,15 @@ RARITY_TIERS = {
   "effect": { "dmgMulBelowHp": [0.3, 1.25], "dmgTakenMul": 1.15 },
   "designIntent": "Risiko/Belohnung für aggressive Spielweise" }
 ```
+
+## Siedlungsplan (Session 2, world.js `TOWN_PLAN`)
+```js
+eren: { area: [x0,y0,x1,y1], old: [...], square: [x,y],        // Rechtecke inklusiv; old = Kern vor dem Ausbau
+  fill: [[T.DIRT, x0,y0,x1,y1, 'ragged']], clear: [[T.DIRT, ...]], plazas: [[T.STONE, ...]], streets: [[T.ROAD, ...]],
+  walls: { rect, gates: [[x0,y0,x1,y1]] }, palisade: { rect, sides: 'NWS', gates }, oldWalls: true,
+  harbor: { x0, x1, top, piers: [x...], boats: [[x, dy]] }, fields: [[x0,y0,x1,y1]],
+  houses: [['bakery', x, y, w, h, 'N']], props: [['lantern', x, y, { label }]] }
+```
+Neue Gebäudetypen: cottage, manor (`floors: 2`), bakery (`oven`), barn (`barnDoor`, `hay`), stable (`stalls`),
+store (`crane`), fisher (`nets`). Weitere Merkmale: `noWin`, `fewWin`, `patch`, `wall` (Material erzwingen).
+Bewohner (Laufzeit): `homeId`, `homeTown`, `anchor` (Nacht, im Haus), `schedulePos` (Tag), `eve` (Abend).

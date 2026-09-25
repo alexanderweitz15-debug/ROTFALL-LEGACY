@@ -2,7 +2,7 @@
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES } from './world.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
 import * as UI from './ui.js';
@@ -16,6 +16,7 @@ let last = 0, acc = 0, running = false, hovered = null, selected = null, placing
 let combat = [];                        // lebende Kämpfer der aktuellen Karte, einmal pro Frame
 const keys = new Set();
 let mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false };
+const touch = { on: false, dx: 0, dy: 0, lx: 1, ly: 0, attack: false };   // Touch-Steuerung: Stick-Richtung, letzte Blickrichtung
 const solidIndex = { world: new Map(), mine: new Map() };
 occupied.at = (map, tx, ty) => !!solidIndex[map]?.get(tx + ',' + ty)?.length;   // Spawns nie in Bäume/Felsen setzen
 
@@ -270,22 +271,25 @@ function spawnVillagers() {
 }
 
 // Wachposten je Siedlung: an Toren/Einfallstraßen und am Platz. Wer die Wache stellt, bestimmt Ausrüstung und Farbe.
-const GUARD_POSTS = {
-  eren:      { faction: 'valen', posts: [[51, 64], [71, 64], [61, 57]] },
-  northcity: { faction: 'valen', posts: [[113, 59], [125, 59], [119, 52]] },
-  saltport:  { faction: 'valen', posts: [[139, 450], [163, 450], [150, 456]] },
-  kreuzweg:  { faction: 'merch', posts: [[241, 250], [261, 250]] },
-  ashford:   { faction: 'merch', posts: [[379, 98], [381, 97], [380, 90]] },
-  sonnwacht: { faction: 'order', posts: [[454, 264], [457, 264], [455, 252]] },
+const GUARD_POSTS = {                                   // Tore und Einfallstraßen der ausgebauten Siedlungen, dazu der Platz
+  eren:      { faction: 'valen', posts: [[35, 64], [86, 64], [61, 56], [60, 75]] },
+  northcity: { faction: 'valen', posts: [[112, 63], [146, 64], [118, 72], [128, 45], [135, 62]] },
+  saltport:  { faction: 'valen', posts: [[148, 432], [132, 450], [174, 450], [150, 473]] },
+  kreuzweg:  { faction: 'merch', posts: [[226, 250], [276, 250], [249, 236], [250, 264]] },
+  ashford:   { faction: 'merch', posts: [[380, 85], [379, 98], [373, 92], [358, 92]] },
+  sonnwacht: { faction: 'order', posts: [[447, 250], [454, 264], [457, 264], [455, 277]] },
 };
 const GUARD_KIT = {
   valen: { prof: 'Torwache', cloth: '#33415c', weapon: 'spear', chest: 'chain_hauberk', head: 'iron_helm' },
   merch: { prof: 'Söldnerwache', cloth: '#5a4630', weapon: 'spear', chest: 'leather_jerkin', head: 'leather_cap' },
   order: { prof: 'Ordenswache', cloth: '#c7bda6', weapon: 'longsword', chest: 'chain_hauberk', offhand: 'kite_shield' },
 };
+// Idempotent: vorhandene Wachen einer Siedlung beziehen die (neuen) Posten der Reihe nach, nur fehlende kommen hinzu.
 function spawnGuardPosts() {
-  for (const [town, g] of Object.entries(GUARD_POSTS)) for (const [tx, ty] of g.posts) {
+  for (const [town, g] of Object.entries(GUARD_POSTS)) g.posts.forEach(([tx, ty], i) => {
     const k = GUARD_KIT[g.faction], pos = freeSpotNear('world', tx, ty, 1);
+    const had = S.ents.world.filter(c => c.kind === 'npc' && c.guard && c.post === town && c.alive)[i];
+    if (had) { had.anchor = { x: pos.x, y: pos.y }; had.x = pos.x; had.y = pos.y; had.wander = null; return; }
     const c = makeChar({ name: pick(['Aldo', 'Berit', 'Conrad', 'Dagna', 'Egil', 'Frida', 'Gunnar', 'Hedda', 'Ivo', 'Jutta']), prof: k.prof,
       x: pos.x, y: pos.y, level: ri(4, 7), faction: g.faction, traits: ['diszipliniert'], attrs: { strength: 11, endurance: 11 },
       pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: k.cloth, crest: g.faction === 'order' ? '#9b2e26' : null } });
@@ -293,8 +297,97 @@ function spawnGuardPosts() {
     c.anchor = { x: pos.x, y: pos.y }; c.guard = true; c.post = town; c.skills.onehanded = 20; c.skills.polearms = 20;
     recalc(c); B.fullHeal(c);
     S.ents.world.push(c);
+  });
+}
+
+// Bewohner: jedes Wohn- und Arbeitshaus der Siedlungen hat Leute. Nachts drinnen (an der Tür), tagsüber bei der Arbeit
+// oder auf dem Platz, abends vor dem Haus oder in der Schenke. Leichtgewichtig: nur Ziele, die think() ohnehin ansteuert.
+const TRADES = {
+  house: ['Bauer', 'Magd', 'Weber', 'Tagelöhner', 'Handwerker', 'Böttcher'], cottage: ['Tagelöhner', 'Holzfäller', 'Witwe', 'Kesselflicker'],
+  manor: ['Kaufmann', 'Bürgerin', 'Ratsherr'], bakery: ['Bäcker'], barn: ['Bauer'], stable: ['Stallknecht'], store: ['Lagerknecht'],
+  fisher: ['Fischer', 'Netzflickerin'], tavern: ['Wirt'], smithy: ['Schmied'], healer: ['Heilerin'], chapel: ['Priester'],
+};
+const TRADE_GREET = {
+  Bauer: '„Wenn der Regen ausbleibt, hungern wir. Wenn er kommt, auch.“', Magd: '„Ich hab zu tun. Sag schnell, was du willst.“',
+  Weber: '„Gutes Tuch hält einen Winter. Schlechtes nicht mal eine Woche.“', Tagelöhner: '„Arbeit? Hast du welche? Nein? Dann geh weiter.“',
+  Handwerker: '„Alles bricht irgendwann. Davon lebe ich.“', Böttcher: '„Ein Fass, das nicht leckt, ist mehr wert als ein Schwert.“',
+  Holzfäller: '„Der Wald gibt Holz. Und manchmal nimmt er einen von uns.“', Witwe: '„Mein Mann ging zur Grube. Er kam nicht wieder.“',
+  Kesselflicker: '„Löcher im Topf, Löcher im Dach. Ich flicke alles, nur mein Glück nicht.“', Kaufmann: '„Zeit ist Silber. Deine auch.“',
+  Bürgerin: '„Die Wachen sollten mehr Leute wie dich aufhalten.“', Ratsherr: '„Ordnung. Das ist es, was dieser Stadt fehlt.“',
+  Bäcker: '„Brot geht immer. Sogar im Krieg. Gerade im Krieg.“', Stallknecht: '„Die Gäule mögen dich nicht. Ich auch nicht, noch nicht.“',
+  Lagerknecht: '„Kisten rauf, Kisten runter. Frag mich nicht, was drin ist.“', Fischer: '„Die See war gnädig heute. Sie ist es selten.“',
+  Netzflickerin: '„Jedes Loch im Netz ist ein Fisch, der davonschwimmt.“', Wirt: '„Setz dich. Wer zahlt, bleibt.“',
+  Schmied: '„Wenn du nichts zu schmieden hast, steh nicht im Licht.“', Heilerin: '„Zeig her. Nein, das ist nicht nur ein Kratzer.“',
+  Priester: '„Die Toten stehen wieder auf. Beten allein hilft da nicht mehr.“',
+};
+const FIRST = ['Adda', 'Bertold', 'Cordula', 'Dietmar', 'Edda', 'Folkmar', 'Gesa', 'Hartwig', 'Irmel', 'Jost', 'Kunna', 'Liudger', 'Mechthild',
+  'Notker', 'Oda', 'Poppo', 'Ragna', 'Sigbert', 'Thiadrun', 'Udo', 'Walburg', 'Wido', 'Ymma', 'Arnulf', 'Benno', 'Ella', 'Gero', 'Hemma'];
+function spawnResidents() {
+  for (const b of HOUSES) {
+    const P = TOWN_PLAN[b.town], trades = TRADES[b.type];
+    if (!P || !trades || b.map !== 'world') continue;
+    if (b.town === 'eren' && ['tavern', 'smithy', 'healer'].includes(b.type)) continue;    // dort arbeiten schon Figuren mit Namen
+    if (HB.wearOf(b) === 2 || S.ents.world.some(c => c.homeId === b.id)) continue;   // verlassene Häuser bleiben leer                                // schon bewohnt (Migration idempotent)
+    const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
+    const inside = { x: (dx + sx) * TS + TS / 2, y: (dy + sy) * TS + TS / 2 }, front = { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
+    const n = b.type === 'manor' || (b.type === 'house' && b.w >= 5 && (b.x + b.y) % 3 === 0) ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const prof = trades[(b.x * 7 + b.y * 3 + i) % trades.length];
+      const c = makeChar({ name: FIRST[(b.x * 13 + b.y * 5 + i * 11) % FIRST.length], prof, x: front.x, y: front.y, level: ri(1, 4),
+        traits: [pick(['gütig', 'mürrisch', 'neugierig', 'faul', 'furchtsam', 'fleißig'])], greet: TRADE_GREET[prof] });
+      c.villager = true; c.homeId = b.id; c.homeTown = b.town;
+      c.anchor = inside;                                                          // Nacht: drinnen an der Tür
+      const pier = P.harbor && P.harbor.piers[(b.x + i) % P.harbor.piers.length], field = P.fields && P.fields[(b.x + i) % P.fields.length];
+      c.schedulePos = prof === 'Fischer' && pier ? { x: (pier + 0.5) * TS, y: (P.harbor.top + 2) * TS }
+        : b.type === 'barn' && field ? { x: ((field[0] + field[2]) / 2) * TS, y: ((field[1] + field[3]) / 2) * TS }
+        : ['tavern', 'healer', 'chapel'].includes(b.type) ? inside
+        : ['bakery', 'store', 'stable', 'smithy', 'fisher'].includes(b.type) || (b.x + i) % 2 ? front
+        : { x: (P.square[0] + ((b.x + i) % 5) - 2) * TS, y: (P.square[1] + ((b.y + i) % 3) - 1) * TS };
+      const tav = HOUSES.find(h => h.town === b.town && h.type === 'tavern');         // abends: ein Teil geht in die Schenke
+      c.eve = tav && (b.x + b.y + i) % 3 === 0 ? { x: (tav.doorTile[0] + 0.5) * TS, y: (tav.doorTile[1] + (tav.door === 'S' ? 1.5 : -0.5)) * TS } : front;
+      if (prof === 'Heilerin') c.traits = ['gütig'];
+      S.ents.world.push(c);
+    }
   }
 }
+
+// Tagesablauf der Figuren mit Namen (BUG-013): Arbeit, Feierabend, Zuhause — an echte Häuser der Siedlung gebunden.
+// Ort: [Haus-id, 'front'|'in'] oder [tx, ty] oder 'field'. till = Feierabend (Stunde, sonst 18); Läden sind bis dahin offen.
+// Kelan (Schreinwache), Rook/Lila (Lager), Morvath (Friedhof) haben keinen Ort in einer Stadt — sie bleiben, wo sie sind.
+const NPC_DAY = {
+  havel:  { work: ['h52_68', 'front'], eve: ['h53_58', 'in'], night: ['h66_68', 'in'] },      // Halle → Schenke → Wohnhaus
+  elena:  { work: ['h68_59', 'front'], eve: ['h68_59', 'in'], night: ['h68_59', 'in'] },      // lebt im Heilerhaus
+  tomas:  { work: [37, 63], eve: ['h53_58', 'in'], night: ['h37_58', 'in'] },                  // Dorfrand zum Wald
+  borin:  { work: ['h53_58', 'front'], eve: ['h53_58', 'in'], night: ['h53_58', 'in'] },      // hat ein Zimmer in der Schenke
+  mara:   { work: [60, 63], till: 20, eve: ['h74_57', 'in'], night: ['h74_57', 'in'] },
+  aldric: { work: ['h62_58', 'front'], eve: ['h53_58', 'in'], night: ['h62_58', 'in'] },      // wohnt über der Werkstatt
+  jorun:  { work: 'field', eve: ['h66_76', 'front'], night: ['h66_76', 'in'] },
+  gerold: { work: ['h114_53', 'front'], till: 20, eve: ['h120_45', 'in'], night: ['h120_45', 'in'] },
+};
+function assignNpcDays() {                         // idempotent: bei Neustart und bei jedem Laden (Häuser werden neu erzeugt)
+  const used = {};                                 // Innenplätze je Haus, damit sich niemand auf eine Kachel stapelt
+  const spot = (where, npc) => {
+    if (where === 'field') { const f = (TOWN_PLAN.eren.fields || [])[0]; if (f) return { x: ((f[0] + f[2]) / 2) * TS, y: ((f[1] + f[3]) / 2) * TS }; where = [60, 70]; }
+    if (typeof where[0] === 'number') { const s = freeSpotNear('world', where[0], where[1], 1); return { x: s.x, y: s.y }; }
+    const b = HOUSES.find(h => h.id === where[0]); if (!b) return null;
+    const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
+    if (where[1] === 'front') return { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
+    const free = [];                               // freie Innenkacheln, nächste zur Tür zuerst
+    for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++)
+      if (!SOLID.has(tileAt('world', x, y)) && !solidPropAt('world', x * TS + TS / 2, y * TS + TS / 2, 4)) free.push([x, y]);
+    free.sort((a, c) => Math.hypot(a[0] - dx, a[1] - dy) - Math.hypot(c[0] - dx, c[1] - dy));
+    const k = used[b.id + npc] ?? (used[b.id + npc] = Object.keys(used).filter(u => u.startsWith(b.id)).length);
+    const t = free[k % Math.max(1, free.length)] || [dx + sx, dy + sy];
+    return { x: t[0] * TS + TS / 2, y: t[1] * TS + TS / 2, in: true };
+  };
+  for (const c of S.ents.world) {
+    const d = c.kind === 'npc' && NPC_DAY[c.key]; if (!d) continue;
+    const work = spot(d.work, c.key), eve = spot(d.eve, c.key), night = spot(d.night, c.key);
+    if (!work || !night) continue;
+    c.schedulePos = work; c.eve = eve; c.anchor = night; c.till = d.till || null;
+  }
+}
+
 
 const SPAWN_AREAS = [
   { map:'world', x:65, y:29, r:3, types:['goblin','goblin','goblin_warrior'], cap:3 },   // Grubenpfad: Plünderer im Händlerlager
@@ -326,6 +419,51 @@ const SPAWN_AREAS = [
 ];
 
 const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'valen_soldier', 'gorak']);
+// §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
+// Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
+// Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
+let styleKeep = null;
+function styleArea(on = true) {
+  const K = '__style';
+  if (!on) {
+    if (!styleKeep) return false;
+    const p = S.player; Object.assign(p, styleKeep.pos); S.map = styleKeep.map; S.ents[K].splice(S.ents[K].indexOf(p), 1); S.ents[p.map].push(p);
+    for (let i = HOUSES.length - 1; i >= 0; i--) if (HOUSES[i].map === K) HOUSES.splice(i, 1);
+    S.fx = S.fx.filter(f => !f.style); S.paused = styleKeep.paused;
+    delete MAPS[K]; delete S.ents[K]; delete solidIndex[K]; styleKeep = null; return true;
+  }
+  if (styleKeep) styleArea(false);
+  const w = 38, h = 22, tiles = new Uint8Array(w * h).fill(T.GRASS);
+  MAPS[K] = { w, h, tiles }; S.ents[K] = []; solidIndex[K] = new Map();
+  const fill = (x0, y0, x1, y1, t) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) tiles[y * w + x] = t; };
+  fill(0, 8, w - 1, 9, T.ROAD); fill(1, 10, 12, 11, T.DIRT); fill(14, 10, 19, 12, T.STONE);         // Weg, Erde, Platz
+  fill(29, 11, 35, 16, T.ROCK); fill(27, 13, 28, 14, T.ROCK); tiles[18 * w + 33] = T.ROCK;      // Felsmasse + Findling
+  fill(19, 17, 26, 21, T.WATER); fill(17, 17, 18, 21, T.MARSH); fill(27, 18, 31, 21, T.SAND);  // Ufer, Sumpf, Sand
+  fill(1, 18, 6, 21, T.FIELD); fill(7, 18, 9, 21, T.ASH);
+  const hs = [['smithy', 1, 2, 5, 4], ['tavern', 8, 1, 6, 5], ['cottage', 16, 3, 4, 3, 2], ['manor', 22, 1, 5, 5], ['barn', 29, 2, 6, 4, 1]];
+  for (const [type, x, y, bw, bh, wear] of hs) {
+    fill(x, y, x + bw - 1, y + bh - 1, T.WALL);
+    HOUSES.push({ id: 'st' + x, map: K, x, y, w: bw, h: bh, door: 'S', doorTile: [x + (bw >> 1), y + bh - 1], type, town: 'eren', wear, seed: x * 31 + 7 });
+  }
+  const P = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: K, x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 12, solid: false, ...o }; S.ents[K].push(e); return e; };
+  [0, 1, 2].forEach(v => { P('crate', 1 + v, 13, { v }); P('barrel', 5 + v, 13, { v }); P('rock_node', 29 + v * 2, 19 - 1, { v }); });
+  P('crate', 2, 14, { v: 1, opened: true }); P('crate_stack', 9, 13); P('sack', 10, 13); P('chest', 11, 13); P('cart', 13, 14);
+  P('campfire', 16, 14); P('torch', 18, 13); P('well', 21, 11); P('stall', 24, 12); P('lantern', 26, 11); P('sign', 20, 13);
+  P('ore_node', 36, 18); P('bush', 12, 16); P('flowers_prop', 13, 17); P('dead_tree', 15, 19); P('fence', 1, 16); P('fence', 2, 16);
+  [['tree', 8, 16], ['tree', 10, 16], ['tree', 36, 3], ['tree', 36, 7]].forEach(([t, x, y]) => P(t, x, y));
+  P('gravestone', 14, 16); P('bones', 12, 19); P('blood', 3, 11);
+  const npc = makeChar({ name: 'Magd', prof: 'Bäuerin', map: K, x: 15 * TS, y: 11 * TS }); npc.anchor = { x: npc.x, y: npc.y }; S.ents[K].push(npc);
+  const gd = makeChar({ name: 'Wache', prof: 'Wache', map: K, x: 18 * TS, y: 11 * TS, faction: 'valen' }); gd.guard = true; gd.anchor = { x: gd.x, y: gd.y }; S.ents[K].push(gd);
+  ['bandit', 'skeleton', 'wolf', 'goblin', 'bandit_archer', 'gorak'].forEach((mt, i) => {
+    const e = spawnEnemy(mt, K, 3 + i * 2 + (i > 3 ? 1 : 0), 10); e.x = (3 + i * 2) * TS + TS / 2; e.y = 10 * TS + 8; e.aiState = 'idle'; e.stat = true; });
+  const fx = (type, tx, ty, o = {}) => S.fx.push({ x: tx * TS, y: ty * TS, vx: 0, vy: 0, type, s: 2, a: 0, life: 110, maxLife: 200, style: true, ...o });
+  ['impact', 'crit', 'spark', 'blood', 'heal', 'fire', 'shock', 'ring', 'necro', 'ghost'].forEach((t, i) => fx(t, 3 + i * 3, 7, t === 'ghost' ? { face: 0 } : {}));
+  const p = S.player; styleKeep = { map: S.map, pos: { map: p.map, x: p.x, y: p.y }, paused: S.paused };
+  S.ents[p.map].splice(S.ents[p.map].indexOf(p), 1); p.map = K; p.x = 24 * TS; p.y = 10 * TS; S.ents[K].push(p); S.map = K;
+  S.paused = true;                                     // Schaubild: Zeit steht, Gegner greifen nicht an
+  for (const e of S.ents[K]) if (e.solid) addSolid(e);
+  return true;
+}
 function spawnEnemy(mtype, map, tx, ty, opts = {}) {
   const m = MONSTERS[mtype];
   const pos = freeSpotNear(map, tx, ty, 3);
@@ -345,8 +483,10 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
 }
 
 function initialSpawns() {
-  for (const a of SPAWN_AREAS) for (let i = 0; i < a.cap * 0.7; i++)
-    spawnEnemy(pick(a.types), a.map, a.x + ri(-a.r, a.r), a.y + ri(-a.r, a.r));
+  for (const a of SPAWN_AREAS) for (let i = 0; i < a.cap * 0.7; i++) {
+    const tx = a.x + ri(-a.r, a.r), ty = a.y + ri(-a.r, a.r);
+    if (!(a.map === 'world' && townAt(tx, ty, 4))) spawnEnemy(pick(a.types), a.map, tx, ty);   // nie mitten in einer Siedlung
+  }
   spawnEnemy('gorak', 'mine', 32, 13, { level: 10 });
   for (let i = 0; i < 3; i++) spawnEnemy('goblin_warrior', 'mine', 30 + i, 14, { level: 6 });
 }
@@ -355,12 +495,12 @@ function initialSpawns() {
 export function newGame(cfg) {
   const keep = { settings: S.settings };
   Object.assign(S, {
-    ver: SAVE_VERSION, seed: Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
+    ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
     weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
-    settlement: null, flags: { gen2: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
+    settlement: null, flags: { gen2: true, gen3: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p));
@@ -368,6 +508,8 @@ export function newGame(cfg) {
   indexSolids('world'); indexSolids('mine');
   spawnNPCs();
   spawnGuardPosts();
+  spawnResidents();
+  assignNpcDays();
   initialSpawns();
   bindSim(); SIM.initSim();
 
@@ -437,12 +579,25 @@ export function continueGame() {
     for (const p of fresh) if (inTown(p)) S.ents.world.push(p);
     S.flags.gen2 = true;
   }
+  if (!S.flags.gen3) {                         // Städteausbau (Session 2): Kacheln sind schon neu, Props der Siedlungen auch
+    const inR = (r, e) => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]; };
+    const P = Object.values(TOWN_PLAN);
+    const repl = e => e.kind === 'prop' && (e.map || 'world') === 'world' && P.some(t => inR(t.area, e) && (!e.loot || !inR(t.old, e)));
+    S.ents.world = S.ents.world.filter(e => !repl(e) && !(e.kind === 'enemy' && !e.boss && !e.aggroId && townAt(e.x / TS | 0, e.y / TS | 0)));   // Banden, die früher in der Stadt spawnten, sind fort
+    for (const p of fresh) if (repl(p)) S.ents.world.push(p);
+    indexSolids('world');
+    for (const e of S.ents.world)                // wer jetzt in einer Mauer/einem Möbel stünde, tritt heraus
+      if (e.kind !== 'prop' && (solidTile('world', e.x, e.y) || solidPropAt('world', e.x, e.y, 4))) { const s = freeSpotNear('world', e.x / TS | 0, e.y / TS | 0, 5); e.x = s.x; e.y = s.y; }
+    spawnGuardPosts(); spawnResidents();
+    S.flags.gen3 = true;
+  }
   S.player = byId(S.player.id) || S.ents.world.find(e => e.kind === 'player') || S.player;
   if (!S.ents[S.map].includes(S.player)) S.ents[S.map].push(S.player);
   if (S.settlement) S.settlement.buildings = S.ents[S.settlement.map || 'world'].filter(e => e.kind === 'building');
   S.relations ||= {}; S.flags ||= {};
   S.party = S.party.filter(id => byId(id));
   for (const m of ['world', 'mine']) for (const e of S.ents[m]) {
+    e.act = null;                                  // Zeitstempel (performance.now) sind nach dem Laden wertlos
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
     if (e.kind === 'enemy' && !e.body && HUMANOID.has(e.mtype)) { e.build = 'ausgewogen'; B.initBody(e, e.maxHp); }
   }
@@ -451,6 +606,7 @@ export function continueGame() {
   for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && def.key === 'gerold') spawnNpcDef(def);
   bindSim(); SIM.initSim();
   indexSolids('world'); indexSolids('mine');
+  assignNpcDays();                             // Tagesablauf der Figuren mit Namen (auch für alte Stände; nach dem Objekt-Index)
   if (!S.ents.world.some(e => e.post)) spawnGuardPosts();       // ältere Stände: Wachposten nachrüsten (nach dem Objekt-Index)
   log('Die Welt erinnert sich.', 'world');
   startGame();
@@ -472,7 +628,8 @@ function loop(now) {
 
 let hudTimer = 0, simTimer = 0, respawnTimer = 0, lastHour = -1, lastDay = 1, travelTimer = 0, encCooldown = 0, pursuitT = 0;
 let lastHouse = null;
-const clock = () => S.day * 1440 + S.minute;                  // Spieluhr in Spielminuten (1 s Echtzeit = 1 min), wird gespeichert
+const clock = () => S.day * 1440 + S.minute;
+const hourNow = () => S.minute / 60;                  // Spieluhr in Spielminuten (1 s Echtzeit = 1 min), wird gespeichert
 function update(dt, now) {
   const p = S.player;
   // Zeit
@@ -551,6 +708,7 @@ function update(dt, now) {
 function think(e, dt) {
   if (!e.alive) return;
   if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
+  else if (e.stagger > 0 && e !== S.player && !S.party.includes(e.id)) { e.vx = e.vy = 0; }   // taumelt: keine Entscheidung
   else if (e.kind === 'enemy') updateEnemy(e, dt);
   else if (e.kind === 'npc') updateNpc(e, dt);
   if (e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') tickCombatant(e, dt);
@@ -615,6 +773,12 @@ function camShake(amount, ms) { if (!S.settings.motion) return; shake = amount; 
 
 function tickCombatant(c, dt) {
   if (!c.alive) return;
+  if (c.kb) {                                     // Rückstoß ausrollen (abklingend), Blickrichtung bleibt
+    const k = Math.min(dt, c.kb.t) / c.kb.T * 2 * (c.kb.t / c.kb.T), f = c.facing;
+    moveEnt(c, c.kb.x * k, c.kb.y * k); c.facing = f;
+    c.kb.t -= dt; if (c.kb.t <= 0) c.kb = null;
+  }
+  if (c.stagger > 0) c.stagger -= dt;
   if (c.swing > 0 && !c.downed) {
     c.swing += dt / (c.swingDur || 500);
     if (!c.hitDone && c.swing >= 0.42) {
@@ -636,7 +800,7 @@ function tickCombatant(c, dt) {
     for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && chance(dt / 2500)) hurt(c, 2, null, 'Blutung'); }
     c.status = c.status.filter(s => s.left > 0);
   }
-  if (c.downed && B.vital(c) > 0) { c.downed = false; log(`${c.name} kommt wieder auf die Beine.`, 'party'); }   // geheilt = steht auf
+  if (c.downed && B.vital(c) > 0) { c.downed = false; act(c, 'rise', 520); log(`${c.name} kommt wieder auf die Beine.`, 'party'); }   // geheilt = steht auf
   if (c.downed) {
     c.downTimer -= dt;
     if (c.downTimer <= 0) die(c, c.lastCause || 'Wunden', c.lastKiller);
@@ -757,8 +921,9 @@ function controlPlayer(dt) {
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
     p.stepT = (p.stepT || 0) + dt; if (p.stepT > 300) { p.stepT = 0; sfx('step'); }
   } else { p.vx = p.vy = 0; }
+  if (touch.on) touchAim(p);
   p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
-  if (mouse.down || keys.has(' ')) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
+  if (mouse.down || keys.has(' ') || touch.attack) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
   // Dungeon-Fallen
   const haz = S.ents[S.map].find(e => e.hazard && dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
   if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, 'Fallgrube'); camShake(6, 160); }
@@ -766,13 +931,16 @@ function controlPlayer(dt) {
 
 // ================= Kampf =================
 // Waffengefühl: Gewicht (Klang/Sweep), Hit-Stop (ms), Kamerawackeln, Ausfallschritt beim Schlag (px).
+// w: Gewicht (Hit-Stop, Wackeln, Rückstoß), stag: Taumeln des Getroffenen. Ab stag ≥ 0.6 unterbricht ein Treffer die
+// Angriffsvorbereitung des Gegners (Axt, Kolben, Zweihänder) — leichte Waffen treffen oft, schwere brechen Angriffe.
 const FEEL = {
-  dagger: { w: 0.05, stop: 28, shake: 1.5, lunge: 6 }, sword: { w: 0.35, stop: 50, shake: 3, lunge: 6 },
-  spear:  { w: 0.3,  stop: 45, shake: 2.5, lunge: 4 }, axe:   { w: 0.6,  stop: 72, shake: 4.5, lunge: 5 },
-  mace:   { w: 0.65, stop: 78, shake: 5, lunge: 4 },   great: { w: 1,    stop: 100, shake: 7, lunge: 9 },
-  staff:  { w: 0.3,  stop: 40, shake: 2, lunge: 3 },   bow:   { w: 0.2,  stop: 30, shake: 1.5, lunge: 0 },
-  none:   { w: 0.15, stop: 35, shake: 2, lunge: 4 },
+  dagger: { w: 0.05, stop: 28, shake: 1.5, lunge: 6, stag: 0.1 }, sword: { w: 0.35, stop: 50, shake: 3, lunge: 6, stag: 0.35 },
+  spear:  { w: 0.3,  stop: 45, shake: 2.5, lunge: 4, stag: 0.4 },  axe:   { w: 0.6,  stop: 72, shake: 4.5, lunge: 5, stag: 0.7 },
+  mace:   { w: 0.65, stop: 78, shake: 5, lunge: 4, stag: 0.9 },    great: { w: 1,    stop: 100, shake: 7, lunge: 9, stag: 1 },
+  staff:  { w: 0.3,  stop: 40, shake: 2, lunge: 3, stag: 0.3 },    bow:   { w: 0.2,  stop: 30, shake: 1.5, lunge: 0, stag: 0.15 },
+  none:   { w: 0.15, stop: 35, shake: 2, lunge: 4, stag: 0.2 },
 };
+const stagOf = c => { const w = c && c.equip && c.equip.weapon, it = w && ITEMS[w.key]; return it && it.stagger ? Math.min(1.2, it.stagger * 0.6) : feelOf(c).stag; };
 const feelOf = c => { const w = c && c.equip && c.equip.weapon; return FEEL[(w && ITEMS[w.key]?.wtype) || (c && c.mtype === 'gorak' ? 'great' : 'none')]; };
 const earVol = e => clamp(1 - dist(S.player, e) / 650, 0, 1);    // Lautstärke nach Entfernung zum Spieler
 function attack(c, forceDir) {
@@ -903,10 +1071,19 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
     }
   }
   if (source && source !== target && target.kind !== 'caravan' && !target.downed && source.map === target.map) {
-    // Rückstoß: kurzer Stoß weg vom Angreifer, kollisionssicher über moveEnt; Blickrichtung bleibt
-    const a = Math.atan2(target.y - source.y, target.x - source.x), f = target.facing;
-    const kb = Math.min(12, 2 + dmg * 0.25) * (crit ? 1.6 : 1) * (target.boss ? 0.25 : 1);
-    moveEnt(target, Math.cos(a) * kb, Math.sin(a) * kb); target.facing = f;
+    // Rückstoß: kurzes Wegrutschen (~140 ms) statt Sprung, je nach Waffengewicht; kollisionssicher in tickCombatant
+    const a = Math.atan2(target.y - source.y, target.x - source.x), fl = feelOf(source);
+    const kb = Math.min(20, (2 + dmg * 0.22) * (0.6 + fl.w)) * (crit ? 1.5 : 1) * (target.boss ? 0.25 : 1);
+    target.kb = { x: Math.cos(a) * kb, y: Math.sin(a) * kb, t: 140, T: 140 };
+    // Taumeln: kurzer Kontrollverlust; schwere Treffer brechen die Angriffsvorbereitung (nicht beim Boss außer kritisch)
+    const stg = stagOf(source) * (crit ? 1.4 : 1);
+    if (stg >= 0.3 && teamOf(target) !== 'player' && (!target.boss || (crit && stg >= 1))) {   // Dolch/Bogen: kein Taumeln (sonst Dauerlähmung)   // Spieler/Gefährten taumeln nicht (Steuerung bleibt direkt)
+      target.stagger = Math.max(target.stagger || 0, 260 * stg);   // Schwert ~90 ms, Axt ~180, Kolben ~250, Zweihänder ~260 (krit. mehr)
+      if (stg >= 0.6 && (target.telegraph > 0 || target.windup || (target.swing > 0 && !target.hitDone) || target.draw > 0)) {
+        target.telegraph = 0; target.windup = false; target.swing = 0; target.hitDone = false; target.draw = 0; if (target.special && target.special.t > 0) target.special = null;
+        float(target, 'Unterbrochen', 'rgba(210,190,140,ALPHA)'); fx(target.x, target.y - 20, 'spark', 5); sfx('break', 0.5, earVol(target));
+      }
+    }
   }
   if (target.aiState === 'idle' || target.aiState === 'patrol') target.aiState = 'pursue';
   float(target, (crit ? '' : '') + Math.round(dmg), crit ? 'rgba(212,175,55,ALPHA)' : 'rgba(228,220,200,ALPHA)', crit);
@@ -917,7 +1094,10 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (lvl === 'standard' && (crit || dmg > 12)) S.ents[target.map].push({ id: uid(), kind:'decal', map: target.map, x: target.x, y: target.y + 4, r: 6 + rnd() * 6, life: 12000, maxLife: 12000, transient: true });
   if (dmg > 10 && chance(0.25) && !(target.status || []).some(s => s.key === 'bleeding'))
     (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000 });
-  sfx(bony ? 'bone' : crit ? 'crit' : 'hit', source ? feelOf(source).w : 0.3, earVol(target));
+  const swt = source && source.equip && source.equip.weapon && ITEMS[source.equip.weapon.key]?.wtype;
+  const mat = swt === 'mace' || swt === 'staff' ? 'blunt' : swt === 'spear' || swt === 'dagger' || swt === 'bow' ? 'pierce' : swt ? 'blade' : null;
+  const armored = target.kind === 'enemy' ? ['valen_soldier', 'goblin_warrior', 'gorak'].includes(target.mtype) : armorOf(target) >= 6;   // Metall am Ziel: Scheppern
+  sfx(bony ? 'bone' : crit ? 'crit' : 'hit', source ? feelOf(source).w : 0.3, earVol(target), mat, armored);
   if (result === 'disabled') limbLost(target, part);
   if (result === 'decap') {
     fx(target.x, target.y - 26, 'blood', 16); camShake(8, 200);
@@ -956,7 +1136,7 @@ function downed(c, cause, source) {
   if (c === S.player) UI.toast('Du bist am Boden. Deine Gruppe hat kurz Zeit.', 3500);
 }
 function stabilize(c, helper) {
-  c.downed = false;
+  c.downed = false; act(c, 'rise', 520);
   if (c.body) B.healPart(c, 'torso', Math.max(4, c.body.torso.max * 0.2) - c.body.torso.hp); else c.hp = Math.max(6, c.maxHp * 0.14);
   log(`${helper.name} stabilisiert ${c.name}.`, 'party');
   if (c !== helper) remember(c, 'saved_life', helper.name);
@@ -1248,7 +1428,6 @@ function bossAI(e, tgt, d, reach, sp, dt, m) {
     camShake(9, 500); shockFx(e.x, e.y); fx(e.x, e.y - 10, 'dust', 14); sfx('death', 1, earVol(e));
   }
   if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
-  if (e.stagger > 0) { e.stagger -= dt; e.vx = e.vy = 0; return; }
   const fast = e.phase === 2 ? 1.35 : 1, sp2 = sp * fast;
   e.chargeCd = (e.chargeCd || 3000) - dt; e.quakeCd = (e.quakeCd || 2000) - dt;
   const sa = e.special;
@@ -1370,10 +1549,13 @@ function updateNpc(e, dt) {
   const h = S.minute / 60;
   let target = e.anchor;
   if (e.schedulePos) target = e.schedulePos;
-  if (h >= 22 || h < 7) target = e.anchor;
+  const night = h >= 22 || h < 7;
+  if (night) target = e.anchor;
+  else if (h >= (e.till || 18) && e.eve) target = e.eve;          // Feierabend: vor dem Haus, in der Schenke oder daheim
   else if (h >= 18 && h < 22 && e.home) target = { x: e.anchor.x + 40, y: e.anchor.y + 20 };
+  const jit = target.in || (e.homeId && (night || target === e.anchor)) ? 6 : 46;  // drinnen nur ein paar Schritte, sonst gegen die Wand
   e.aiTimer -= dt;
-  if (e.aiTimer <= 0) { e.aiTimer = ri(2200, 5200); e.wander = { x: target.x + ri(-46, 46), y: target.y + ri(-40, 40) }; }
+  if (e.aiTimer <= 0) { e.aiTimer = ri(2200, 5200); e.wander = { x: target.x + ri(-jit, jit), y: target.y + ri(-jit * 0.87, jit * 0.87) }; }
   if (e.wander) {
     const d = Math.hypot(e.wander.x - e.x, e.wander.y - e.y);
     if (d > 10) seek(e, Math.atan2(e.wander.y - e.y, e.wander.x - e.x), 0.9 * dt / 16, dt, e.wander);
@@ -1403,7 +1585,7 @@ function calmDown(e, why) {
   if (!law) return log('Sie lassen von dir ab und gehen. Niemand hilft dir auf.', 'combat');
   const fine = Math.min(S.gold, 30);
   S.gold -= fine;
-  p.downed = false; B.healPart(p, 'torso', Math.max(4, p.body.torso.max * 0.2) - p.body.torso.hp);   // aufgerichtet, nicht gepflegt
+  p.downed = false; act(p, 'rise', 520); B.healPart(p, 'torso', Math.max(4, p.body.torso.max * 0.2) - p.body.torso.hp);   // aufgerichtet, nicht gepflegt
   log(`${law.name} nimmt dir ${fine} Gold als Buße ab. „Beim nächsten Mal hängst du.“`, 'faction');
   UI.toast(fine ? `Buße: ${fine} Gold` : 'Verwarnt', 3200);
 }
@@ -1424,7 +1606,7 @@ function partyAI(m, dt) {
       m.mana -= 18; m.cooldowns.holy_heal = ABILITIES.holy_heal.cd;
       const amt = 22 + m.attributes.intelligence * 1.4;
       B.heal(wounded, amt);
-      if (wounded.downed) { wounded.downed = false; }
+      if (wounded.downed) { wounded.downed = false; act(wounded, 'rise', 520); }
       fx(wounded.x, wounded.y - 14, 'heal', 14); float(wounded, '+' + Math.round(amt), 'rgba(120,170,90,ALPHA)');
       log(`${m.name} heilt ${wounded.name}.`, 'party');
     }
@@ -1528,10 +1710,19 @@ function updatePrompt() {
     t.type === 'board' ? `<b>E</b> Anschlagbrett lesen` : `<b>E</b> Durchsuchen`;
   UI.setPrompt(label);
 }
+// Körpersprache beim Handeln (§26 Interaktionen): kurz knien, arbeiten, aufrichten — rein sichtbar, blockiert nichts.
+function act(c, kind, ms, toward) {
+  const now = performance.now();
+  let dir = null;
+  if (toward) { const a = Math.atan2(toward.y - c.y, toward.x - c.x), ca = Math.cos(a), sa = Math.sin(a);
+    dir = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N'); }
+  c.act = { kind, at: now, until: now + ms, dir };
+}
 function doInteract() {
   const p = S.player, t = interactables()[0];
   if (!t) return;
   if (t.kind === 'npc') return talk(t);
+  if (!t.portal) act(p, t.type === 'tree' || t.harvest === 'stone' || t.harvest === 'iron' ? 'work' : 'kneel', t.type === 'shrine' ? 1100 : t.type === 'board' ? 0 : 420, t);
   if (t.kind === 'item') {
     if (addItem(p, t.item.key, t.item.count || 1)) {
       log(`Aufgehoben: ${ITEMS[t.item.key].name}.`, 'world');
@@ -1841,6 +2032,7 @@ function respawnTick() {
     if (count >= a.cap) continue;
     const tx = a.x + ri(-a.r, a.r), ty = a.y + ri(-a.r, a.r);
     if (a.map === S.map && Math.hypot(tx * TS - p.x, ty * TS - p.y) < 620) continue;
+    if (a.map === 'world' && townAt(tx, ty, 4)) continue;              // Banden lauern vor der Stadt, nicht zwischen den Häusern
     if (chance(0.55)) spawnEnemy(pick(a.types), a.map, tx, ty);
   }
 }
@@ -1869,6 +2061,8 @@ function talk(npc) {
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
   if (npc.shop && npc.shopClosed > now) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
     npc.provoked ? '„Für dich ist heute geschlossen. Vielleicht für immer.“' : '„Der Stand ist zu, bis sich die Lage beruhigt.“', leave) });
+  else if (npc.shop && npc.till && (hourNow() >= npc.till || hourNow() < 7)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
+    '„Der Laden ist zu. Komm morgen früh wieder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });   // Ladenzeiten
   else if (npc.shop && occupied) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Handel? Die Toten halten die Stadt. Ich verstecke, was ich habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
@@ -1892,8 +2086,18 @@ function gossip(npc) {
     `„Die Preise steigen. Krieg im Norden, sagen sie.“`,
     S.settlement ? `„Man redet über dein Lager bei ${S.settlement.name}.“` : `„Freies Land gibt es genug. Mut, es zu halten, weniger.“`,
   ];
+  const town = npc.homeTown || npc.post;                  // Bewohner und Wachen reden auch über ihren eigenen Ort
+  if (TOWN_GOSSIP[town]) lines.push(...TOWN_GOSSIP[town], ...TOWN_GOSSIP[town]);
   UI.dialogue(npc, pick(lines), [{ text: 'Und sonst?', fn: () => gossip(npc) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
+const TOWN_GOSSIP = {
+  eren: ['„Seit die Grube verloren ist, backt Eren kleinere Brote. Aber wir backen noch.“', '„Die Scheunen sind halb leer. Der Winter wird lang.“'],
+  northcity: ['„Nordfurt hat Mauern. Das beruhigt die Leute — bis sie fragen, warum.“', '„Die Garnison zahlt pünktlich. Das ist mehr, als man vom König sagen kann.“'],
+  saltport: ['„Das Salz geht nach Norden, das Silber kommt zurück. Meistens.“', '„Die Boote fahren nicht mehr weit raus. Draußen treibt Asche auf dem Wasser.“'],
+  kreuzweg: ['„Hier kreuzen sich die Straßen — und die Klingen. Söldner sind gut fürs Geschäft, bis sie es nicht mehr sind.“', '„Wer den Markt am Kreuzweg hält, hält das Mittelland.“'],
+  ashford: ['„Die Karawanen halten hier, weil dahinter nur noch Asche kommt.“', '„Die Palisade ist neu. Die Angst dahinter ist alt.“'],
+  sonnwacht: ['„Die Pilger kommen wegen des Schreins. Sie bleiben wegen der Mauern.“', '„Der Orden zählt die Toten. Und manchmal zählen die Toten zurück.“'],
+};
 
 // ================= Quests =================
 function questAvailable(k) {
@@ -2485,6 +2689,42 @@ function bindInput() {
     R.cam.base = clamp((R.cam.base || R.cam.zoom) * (e.deltaY > 0 ? 0.9 : 1.1), 0.7, 2.4);
   }, { passive: false });
   window.addEventListener('beforeunload', () => { if (running) save(); });
+  bindTouch();
+}
+// Touch: Zielen ohne Maus — nächster Feind in Reichweite, sonst in Lauf-/Blickrichtung
+function touchAim(p) {
+  const f = hostilesOf(p).filter(e => !e.downed && dist(e, p) < 220).sort((a, b) => dist(a, p) - dist(b, p))[0];
+  if (touch.dx || touch.dy) { const l = Math.hypot(touch.dx, touch.dy); touch.lx = touch.dx / l; touch.ly = touch.dy / l; }
+  if (f) { mouse.wx = f.x; mouse.wy = f.y - 12; } else { mouse.wx = p.x + touch.lx * 80; mouse.wy = p.y - 12 + touch.ly * 80; }
+}
+function bindTouch() {
+  const body = document.body, on = () => { touch.on = true; body.classList.add('touch'); };
+  if (matchMedia('(pointer: coarse)').matches) on();
+  window.addEventListener('touchstart', on, { passive: true, once: true });
+  const stick = $('t-stick'), knob = $('t-knob'); let sid = null;
+  const cap = (el, id) => { try { el.setPointerCapture(id); } catch (err) { /* ohne Capture geht es auch */ } };
+  const setStick = e => {
+    const r = stick.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R0 = r.width / 2;
+    let x = e.clientX - cx, y = e.clientY - cy; const l = Math.hypot(x, y);
+    if (l > R0) { x *= R0 / l; y *= R0 / l; }
+    knob.style.transform = `translate(${x}px,${y}px)`;
+    const dead = R0 * 0.22;                                 // kleine Totzone gegen Zittern
+    touch.dx = l < dead ? 0 : x / R0; touch.dy = l < dead ? 0 : y / R0;
+  };
+  const endStick = () => { sid = null; touch.dx = touch.dy = 0; knob.style.transform = ''; };
+  stick.addEventListener('pointerdown', e => { e.preventDefault(); on(); sid = e.pointerId; cap(stick, e.pointerId); setStick(e); });
+  stick.addEventListener('pointermove', e => { if (e.pointerId === sid) setStick(e); });
+  stick.addEventListener('pointerup', endStick); stick.addEventListener('pointercancel', endStick);
+  const hold = (id, down, up) => {
+    const b = $(id);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); on(); b.classList.add('down'); cap(b, e.pointerId); down(); });
+    const rel = () => { b.classList.remove('down'); up && up(); };
+    b.addEventListener('pointerup', rel); b.addEventListener('pointercancel', rel);
+  };
+  const ready = () => !UI.dialogueOpen() && !UI.modalOpen && !$('game').classList.contains('hidden');
+  hold('t-attack', () => { if (ready()) touch.attack = true; }, () => { touch.attack = false; });
+  hold('t-dodge', () => { if (ready()) dodge(); });
+  hold('t-use', () => { if (ready()) doInteract(); });
 }
 function moveInput() {
   let dx = 0, dy = 0;
@@ -2492,6 +2732,7 @@ function moveInput() {
   if (keys.has('s') || keys.has('arrowdown')) dy++;
   if (keys.has('a') || keys.has('arrowleft')) dx--;
   if (keys.has('d') || keys.has('arrowright')) dx++;
+  if (!dx && !dy && (touch.dx || touch.dy)) return { dx: touch.dx, dy: touch.dy };   // Stick (analog, Richtung zählt)
   return { dx, dy };
 }
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
@@ -2725,6 +2966,31 @@ export function selftest() {
     const stuck = actor(tree.x, tree.y); for (let i = 0; i < 20; i++) moveEnt(stuck, 1.2, 0);
     return inTree === 0 && dist(stuck, tree) > 15;
   }));
+  ok('Kampf: schwere Waffen unterbrechen die Ansage, leichte nicht; Rückstoß rutscht über mehrere Frames', sandbox(() => {
+    const p = stage(), probe = w => {
+      p.equip.weapon = mkItem(w); const b = spawnEnemy('bandit', '__a', 12, 9); b.x = p.x + 40; b.y = p.y; b.telegraph = 400; b.windup = true;
+      const x0 = b.x; hit(p, b, 1); const x1 = b.x; tickCombatant(b, 16); const x2 = b.x; for (let i = 0; i < 12; i++) tickCombatant(b, 16);
+      return { broke: b.telegraph <= 0 && !b.windup, slide: x1 === x0 && x2 > x0 && b.x > x2, dx: b.x - x0 };
+    };
+    const heavy = probe('greatsword'), light = probe('dagger');
+    return heavy.broke && !light.broke && heavy.slide && light.slide && heavy.dx > light.dx;
+  }));
+  ok('Animation: Interaktion zeigt Knien/Arbeit/Aufrichten, Laufen oder Schwung bricht sie sichtbar ab', (() => {
+    const c = makeChar({ name: 'Probe' }), now = performance.now();
+    act(c, 'kneel', 400); const k = SP.poseOf(c, now + 10).pose;
+    act(c, 'work', 400); const w1 = SP.poseOf(c, now + 10).pose, w2 = SP.poseOf(c, now + 110).pose;
+    act(c, 'rise', 400); const r = SP.poseOf(c, now + 10).pose;
+    c.vx = 1; const mv = SP.poseOf(c, now + 10).pose; c.vx = 0; c.swing = 0.2; const sw = SP.poseOf(c, now + 10).pose;
+    return k === 'kneel' && w1 === 'a1' && w2 === 'a2' && r === 'kneel' && mv.startsWith('w') && sw === 'a1' && SP.poseOf(c, now + 900).pose !== 'kneel';
+  })());
+  ok('Speichern: Test-/Stilkarten werden nie gespeichert (kein Spieler im Nichts)', sandbox(() => { stage(); return save() === false; }));
+  if (S.player && MAPS.world) ok('Stil-Testbereich: hin und zurück stellt Spieler, Karte und Häuser wieder her', (() => {
+    const p = S.player, before = { map: S.map, pm: p.map, x: p.x, y: p.y, houses: HOUSES.length, paused: S.paused };
+    styleArea(); const inside = S.map === '__style' && S.ents.__style.includes(p) && !S.ents[before.pm].includes(p);
+    styleArea(false);
+    return inside && S.map === before.map && p.map === before.pm && p.x === before.x && p.y === before.y && HOUSES.length === before.houses
+      && !MAPS.__style && !S.ents.__style && S.ents[p.map].includes(p) && S.paused === before.paused;
+  })());
   ok('Gebäude: jeder Typ × jede Stadt ergibt ein Sprite in Grundrissbreite (Tag und Nacht)', Object.keys(HB.BTYPES).every(t => Object.keys(HB.TOWN_STYLE).every(town => {
     const b = { id: 't', x: 3, y: 4, w: 5, h: 4, door: 'S', type: t, town, seed: 7 }, cv = HB.houseSprite(b, false), cn = HB.houseSprite(b, true);
     return cv.width === 5 * 16 + 4 && filled(cv) && filled(cn);
@@ -2734,6 +3000,38 @@ export function selftest() {
     const ox = dx - (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0), oy = dy + (b.door === 'S' ? 1 : b.door === 'N' ? -1 : 0);
     return ![[dx, dy], [ix, iy], [ox, oy]].some(([x, y]) => occupied.at(b.map, x, y) || SOLID.has(tileAt(b.map, x, y)));
   }));
+  if (HOUSES.length && MAPS.world) {
+    const walk = (x, y) => !SOLID.has(tileAt('world', x, y)) && !occupied.at('world', x, y);
+    ok('Siedlungen: jede Haustür ist vom Platz aus zu Fuß erreichbar', Object.entries(TOWN_PLAN).every(([town, P]) => {
+      const [x0, y0, x1, y1] = P.area, seen = new Set(), q = [P.square];
+      while (q.length) { const [x, y] = q.pop(), k = x + ',' + y;
+        if (seen.has(k) || x < x0 - 2 || x > x1 + 2 || y < y0 - 2 || y > y1 + 2 || !walk(x, y)) continue;
+        seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+      return HOUSES.filter(b => b.town === town).every(b => { const [dx, dy] = b.doorTile;
+        return seen.has(`${dx - (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0)},${dy + (b.door === 'S' ? 1 : b.door === 'N' ? -1 : 0)}`); });
+    }));
+    const WILD = new Set(['camp_ruin', 'rubble', 'bones', 'debris', 'broken_pillar', 'gravestone', 'firepit', 'mushrooms', 'standing_stone', 'tent_prop', 'bone_spire']);
+    ok('Siedlungen: keine Wildnis-Streu (Lager, Geröll, Verstecke) zwischen den Häusern', S.ents.world.every(e => {
+      if (e.kind !== 'prop') return true;
+      const x = e.x / TS | 0, y = e.y / TS | 0, P = TOWN_PLAN[townAt(x, y)];
+      if (!P) return true;
+      const inOld = x >= P.old[0] && x <= P.old[2] && y >= P.old[1] && y <= P.old[3];   // alte Stände: Truhen im Kern bleiben (Inhalt)
+      return e.house || (!WILD.has(e.type) && (inOld || !e.loot));   // Schutt in verlassenen Häusern gehört dazu
+    }));
+    ok('Bewohner: jedes Wohn- und Arbeitshaus bewohnt, ihr Nachtplatz liegt im eigenen Haus', HOUSES.every(b => {
+      if (!TRADES[b.type] || HB.wearOf(b) === 2 || (b.town === 'eren' && ['tavern', 'smithy', 'healer'].includes(b.type))) return true;
+      const rs = S.ents.world.filter(c => c.homeId === b.id);
+      return rs.length > 0 && rs.every(c => { const x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0;
+        return x > b.x && x < b.x + b.w - 1 && y > b.y && y < b.y + b.h - 1 && walk(x, y); });
+    }));
+    ok('Figuren mit Namen: Nachtplatz im eigenen Haus (freie Kachel), tagsüber ein Arbeitsplatz, Läden mit Ladenschluss', Object.entries(NPC_DAY).every(([k, d]) => {
+      const c = S.ents.world.find(e => e.key === k); if (!c || !c.alive) return true;
+      const b = HOUSES.find(h => h.id === d.night[0]), x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0;
+      return b && x > b.x && x < b.x + b.w - 1 && y > b.y && y < b.y + b.h - 1 && walk(x, y) && !!c.schedulePos && (!c.shop || c.till > 0);
+    }));
+    ok('Spawns: keine ruhenden Gegner zwischen den Häusern einer Siedlung', S.ents.world.every(e =>
+      e.kind !== 'enemy' || !e.alive || e.aggroId || e.encounter || e.follow || !townAt(e.x / TS | 0, e.y / TS | 0)));
+  }
   ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
     return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());
   ok('Daten: jeder Gegner definiert interiors, jede Herkunfts-Fertigkeit hat einen Namen',
@@ -2878,7 +3176,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, styleArea, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest };
 }
 boot();

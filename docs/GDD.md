@@ -120,5 +120,41 @@ Leine 360 px, helfen auf) · **Heilerin** (kämpft nie, hilft Verwundeten auf) �
 - Props folgen dem „Warum ist das hier?“-Test: Waren am Markt, Fässer vor der Taverne, Löschwasser an der Schmiede,
   Fracht an den Stegen; Wildnis-Truhen nur als Szene (toter Reisender, Wurzelversteck, kaltes Lager, Schmuggler).
 
+## Siedlungen (Session 2)
+Jede Siedlung ist ein Plan (`TOWN_PLAN` in world.js), kein Zufall. Grund: Gebäude sind Landmarken; Zufallsstreuung
+erzeugt Häuser ohne Straße und Straßen ins Nichts.
+
+| Stadt | Rolle | Herrschaft | Gebäude-Set | Landmarke | Atmosphäre |
+|---|---|---|---|---|---|
+| Eren | Dorf, Ackerbau, Rast an der Alten Straße | Valen | Taverne, Schmiede, Heilerin, Vorsteher, Bäckerei, 2 Scheunen, Häuser, Katen | Felder mit Vogelscheuchen | ärmlich, geduckt, heimelig |
+| Nordfurt | Grenzstadt, Handel am Fluss, Garnison | Valen | Kapelle, Bürgerhäuser, Lagerhaus, Taverne, Schmiede, Bäckerei, Heilerhaus, Kontor, Wache | Mauer mit 4 Toren, Markt | ordentlich, kalt, wachsam |
+| Salzhafen | Hafen: Salz, Fisch, Umschlag | Valen | Kontor, Lagerhäuser, Fischerhütten, Bürgerhäuser, Kapelle, Taverne, Wache | Kai mit drei Stegen und Booten | geschäftig, feucht, salzig |
+| Kreuzweg | Marktflecken an der Kreuzung | Händler/Söldner | Rasthaus, Söldnerhalle, Schmiede, Stall, Lagerhäuser, Bäckerei, Heilerhaus, Bürgerhaus | Marktplatz im Süden | laut, rau, käuflich |
+| Aschfurt | Grenzposten vor der Asche, Karawanenhalt | Händler | Kernburg (Kontor, Wache), Vorstadt (Taverne, Schmiede, Lager), Karawanenhof mit Stall | Palisade, Nordtor | staubig, eng, misstrauisch |
+| Sonnwacht | Ordensfeste, Pilgerort | Orden | Kapelle, Komturei, 2 Wachhäuser; Unterstadt: Hospiz, Herberge, Bäckerei, Schmiede, Scheune | Feste mit Schrein | streng, hell, fromm |
+
+- **Bewohner:** abgeleitet aus Gebäuden (1–2 je Wohn-/Arbeitshaus). Tagesablauf: 7–18 Arbeit, 18–22 vor dem Haus /
+  in der Schenke, 22–7 im Haus. Zivilisten fliehen vor Feinden (bleiben dann auch im Haus). Heilerinnen helfen Gestürzten.
+- **Figuren mit Namen** (`NPC_DAY` in game.js): eigener Ablauf, an Häuser gebunden.
+
+  | Figur | Tag (7 – Feierabend) | Abend | Nacht |
+  |---|---|---|---|
+  | Havel (Vorsteher) | vor der Halle | Schenke | Wohnhaus am Platz |
+  | Elena (Heilerin) | vor dem Heilerhaus | im Heilerhaus | im Heilerhaus |
+  | Tomas (Jäger) | Dorfrand zum Wald | Schenke | Kate im Westen |
+  | Borin (Söldner) | vor der Schenke | Schenke | Zimmer in der Schenke |
+  | Mara (Händlerin) | Marktstand bis 20 Uhr | daheim | daheim |
+  | Aldric (Schmied) | vor der Schmiede | Schenke | über der Werkstatt |
+  | Jorun (Bauer) | Feld | vor dem Haus | Haus am Feld |
+  | Gerold (Nordfurt) | vor dem Kontor bis 20 Uhr | Bürgerhaus | Bürgerhaus |
+
+  Läden haben Öffnungszeiten (7 bis Feierabend). Kelan hält Wache am Schrein, Rook/Lila im Lager, Morvath am
+  Friedhof — sie haben keinen Ort in einer Stadt und bleiben bewusst dort.
+- **Wachen:** an Toren/Einfallstraßen und am Platz (4–5 je Siedlung).
+- **Spawns:** Gegner-Gebiete setzen nie Feinde in eine Siedlung (Rand 4 Kacheln); Banden lauern davor.
+- **Verfall:** jedes Haus hat eine Verfallsstufe (gepflegt / heruntergekommen / verlassen). Verlassene Häuser sind
+  unbewohnt, dunkel, innen Schutt — die Welt ist im Niedergang, Grenzorte stärker als die Ordensfeste.
+- **Technik:** Ausbau am Ende der Generierung ohne `rnd()`, Migration `flags.gen3` für alte Spielstände.
+
 ## Offene Designfragen
 - Rarität/Affixe, Skill Tree, Klassen: siehe PHASE_STATUS (Phasen 8–10).

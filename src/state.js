@@ -90,6 +90,7 @@ export function partyMembers() { return S.party.map(byId).filter(x => x && x.ali
 // ---- Speichern ----
 const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet']);
 export function save() {
+  if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
   try {
     const out = {};
     for (const k of Object.keys(S)) if (!SKIP.has(k)) out[k] = S[k];

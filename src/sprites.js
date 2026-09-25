@@ -535,11 +535,17 @@ export function poseOf(e, now, bow) {
   }
   const dir = 'SNWE'[face] || 'S';
   if (e.dodge) return { dir, pose: 'tuck', rot: ((e.dodge.t / 65) | 0) % 4 };
+  if (e.act && now < e.act.until && now >= e.act.at && !(e.vx || e.vy) && !(sw > 0)) {   // Interaktion: knien, arbeiten, aufrichten
+    const k = (now - e.act.at) / (e.act.until - e.act.at), d = e.act.dir || dir;
+    if (e.act.kind === 'work') return { dir: d, pose: ((k * 4) | 0) & 1 ? 'a2' : 'a1' };           // Axt/Hacke: zwei Schläge
+    if (e.act.kind === 'rise') return { dir: d, pose: k < 0.5 ? 'kneel' : 'hit' };                // vom Boden hoch: Knie, dann wankend
+    return { dir: d, pose: 'kneel' };                                                             // suchen, sammeln, beten
+  }
   if (e.draw > 0) return { dir, pose: 'cast' };                         // Bogen gespannt
   if (e.telegraph > 0 && !(sw > 0)) return { dir, pose: 'a1' };          // Ansage: erhobene Waffe
   if (sw > 0) return { dir, pose: bow ? 'cast' : sw < 0.3 ? 'a1' : sw < 0.72 ? 'a2' : 'a3' };
   if (e.channel || (e.castT && now - e.castT < 450 && now >= e.castT)) return { dir, pose: 'cast' };
-  if (e.lastHurt && now - e.lastHurt < 170 && now >= e.lastHurt) return { dir, pose: 'hit' };
+  if ((e.lastHurt && now - e.lastHurt < 170 && now >= e.lastHurt) || e.stagger > 0) return { dir, pose: 'hit' };   // Treffer / Taumeln
   if (e.vx || e.vy) return { dir, pose: 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3) };
   return { dir, pose: ((now / 650 + (e.seed || 0)) | 0) & 1 ? 'i1' : 'i0' };
 }
@@ -804,6 +810,11 @@ export function tileTexture(t, v, cols, kind) {
         for (let i = 0; i < bw; i++) P(x + i, y, base.sh); for (let j = 0; j < bh; j++) P(x, y + j, base.sh);
         P(x + 1, y + 1, base.hi); if (bw > 5) P(x + 2, y + 1, base.hi);
       }
+    } else if (kind === 'scree') {                        // Geröllboden: lose Steine mit Licht oben, Schatten unten
+      for (let i = 0; i < 7; i++) { const x = (n(i, 21) * 15) | 0, y = (n(21, i) * 15) | 0; P(x, y, base.hi); P(x, y + 1, base.dk); if (i < 3) { P(x + 1, y, base.b); P(x + 1, y + 1, base.dk); } }
+      if (n(4, 4) > 0.5) { const x = 2 + ((n(5, 2) * 10) | 0), y = 2 + ((n(2, 5) * 10) | 0);
+        P(x, y, base.hi); P(x + 1, y, base.hi); P(x + 2, y, base.b); P(x, y + 1, base.b); P(x + 1, y + 1, base.b); P(x + 2, y + 1, base.sh); P(x, y + 2, base.dk); P(x + 1, y + 2, base.dk); P(x + 2, y + 2, base.dk); }
+      for (let i = 0; i < 2; i++) { let x = (n(i, 33) * 13) | 0, y = (n(33, i) * 13) | 0; for (let k = 0; k < 3; k++) { P(x, y, mix(base.b, base.dk, 0.5)); x++; y += n(k, i + 3) > 0.5 ? 1 : 0; } }
     } else if (kind === 'plank') {
       for (let y = 0; y < 16; y += 4) { for (let x = 0; x < 16; x++) P(x, y, base.dk); P(((y * 7) % 13) + 1, y + 2, base.sh); P(3 + (y % 8), y + 1, base.hi); }
     } else if (kind === 'wall' || kind === 'dwall') {

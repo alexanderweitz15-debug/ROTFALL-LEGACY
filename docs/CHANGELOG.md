@@ -2,6 +2,103 @@
 
 Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund (Master-Prompt §2, Punkte 1–4).
 
+## Session 3 — 2026-09-25 · Phase 5: Visual Style Revision, Phase 15: Tagesablauf benannter Figuren
+
+### Phase 6 — Kampfgefühl & Animation
+- Taumeln (BUG-043): das Datenfeld `stagger` (Streitkolben) war ohne Wirkung, nur der Boss konnte taumeln. Jetzt je
+  Waffenklasse (`FEEL.stag`, Kolben aus seinem Datenwert): Schwert ~90 ms, Axt ~180, Kolben/Zweihänder ~250 ms ohne
+  KI-Entscheidung; ab Axt unterbricht ein Treffer die Angriffsansage („Unterbrochen“). Dolch/Bogen lassen nicht taumeln
+  (Dolch schlägt alle 300 ms — sonst Dauerlähmung). Spieler und Gefährten taumeln nie (Steuerung bleibt direkt).
+  Kampfsimulation 6×5 Duelle gegen Banditen: Gegner 8–14 % der Zeit taumelnd, keine Dauerlähmung.
+- Rückstoß rutscht (~140 ms, abklingend) statt in einem Frame zu springen; Stärke nach Waffengewicht.
+- Interaktionen mit Körpersprache (§26): Durchsuchen/Sammeln/Grab = knien, Holz/Stein/Erz = zwei Arbeitshiebe mit der
+  Waffe, Beten = längeres Knien, Aufstehen nach dem Niederschlag = Knie → wankend. Rein sichtbar, blockiert nichts;
+  Laufen oder Angreifen bricht die Pose sofort ab. Bild `anim-nachher-interaktion.png`.
+- Treffer-Klang nach Waffenmaterial (sfx.js): Klinge (Zisch), Wucht (tiefer Schlag + Knacken), Stich (kurz, trocken),
+  Metall am Ziel (Soldat, Goblin-Krieger, Gorak, gepanzerter Spieler) scheppert zusätzlich; eigener Klang fürs
+  Unterbrechen. Vorher klangen alle Waffen gleich (nur Tonhöhe nach Gewicht). Nur synthetisch geprüft (fehlerfrei),
+  nicht angehört — bitte beim Spielen gegenhören.
+- Selbsttest 44 → 46 (Taumeln/Rückstoß, Interaktionsposen).
+
+### Mobil (BUG-012)
+- Touch-Steuerung (`bindTouch`, `touchAim`, `#touchui`): Stick, Hieb/Rolle/E im Stil der Paneele; Auto-Zielen.
+  `setPointerCapture` abgesichert (ein Fehler dort hätte die Eingabe verschluckt).
+- Menüleiste: „Aufträge“ und „Optionen“ ergänzt — ohne Tastatur waren sie unerreichbar.
+
+### Figuren mit Namen (game.js `NPC_DAY`, `assignNpcDays`)
+- Arbeitsplatz, Feierabend (`till`), Abendort und Zuhause je Figur, an echte Häuser gebunden; freie Innenkacheln je Haus
+  (niemand stapelt sich). Läuft bei Neustart und bei jedem Laden (alte Stände bekommen es automatisch).
+- `think()`: Feierabend je Figur statt fest 18 Uhr; drinnen kleine Schritte (`in`-Ziele), draußen normale Streuung.
+- Läden: nach Feierabend „Der Laden ist zu. Komm morgen früh wieder.“
+- Selbsttest: „Figuren mit Namen: Nachtplatz im eigenen Haus …“ (44/44).
+
+
+### Fels & Gelände (render.js `paintRock`, sprites.js `scree`)
+- Fels wird als Masse gemalt statt als Kachelblock (BUG-035): weiches Feld aus bilinearer Kachelbelegung + Rauschen →
+  runde Ecken, ausgefranste Kanten, Einzelkacheln werden Findlinge. Kuppe mit Relief (Licht links oben), Risse,
+  Südwand mit Schichtung, Schlagschatten, Geröll am Fuß. Gestein je Region (Sandstein Wüste, Granit + Schneefelder im
+  Gebirge, Basalt Ödland …). Kollision unverändert (Kacheln), keine Welt-/Speicheränderung.
+- Performance: Rauschgitter je Chunk vorab gehasht, Fels auf eigener Ebene statt Rücklesen des Chunks, Chunks am
+  Sichtrand werden vorab gebacken (höchstens einer pro Frame) — Laufen durchs Gebirge ohne Backruckler.
+- Losen Felsbrocken (`rock_node`/`ore_node`): 3 Formvarianten mit Facetten, Regionsgestein, Schnee/Moos, Erzader,
+  abgebaut = Schutthaufen (war ein einfarbiges Vieleck — Platzhalter nach §22).
+- Hochgebirge: Boden (STONE) außerhalb von Siedlungen als Geröll statt als Straßenpflaster.
+- Wasser mit demselben weichen Feld (`softField`, aus `paintRock` herausgelöst — kein Refactoring im Sinne §2, nur
+  gemeinsame Nutzung): runde Ufer statt Kachelquadrate, Tiefe mit Dithering, Schaumkante, nasser Ufersaum,
+  Schilf, Seerosen im Sumpf, Palette je Region und eigene Palette für die Südsee. Die alte Uferstrich-Kante entfällt;
+  Wellenlinien nur noch im offenen Wasser.
+- Boden pro Pixel (`bakeGround`): Grenzen natürlicher Böden (Gras, Erde, Weg, Sumpf, Sand, Asche) werden je Pixel
+  aus den vier Kachelmitten + Rauschen entschieden → ausgefranste, runde Übergänge statt Kachelkanten; Graskante mit
+  Halmlicht. Helligkeit (Wiese/Senke) und Regionstönung als 1-Pixel-je-Kachel-Bild weich hochskaliert — das
+  Kachel-Schachbrett im Gras ist weg. Pflaster, Dielen, Acker, Mauern bleiben hart. Die alte Fransen-Logik (`FRAY`)
+  entfällt (ersetzt, nicht umgebaut: sie arbeitete nur entlang gerader Kachelkanten).
+- Vorausbacken der Chunks am Sichtrand in der Leerlaufzeit (`requestIdleCallback`) statt im Frame.
+- Grube: Höhlenwände (DWALL) mit dem Fels-Zeichner als Höhlenfels (eigene Palette, Wand nach Süden, Schatten),
+  Minenboden als Geröll statt Pflaster — die Grube war ein Raster aus Ziegelstreifen (BUG-042).
+- Mauern mit Höhe (`paintWalls`): Quaderfront nach Süden, Kantenlicht, Zinnen an offenen Seiten freistehender
+  Mauern (Hauswände ohne Zinnen) — Stadtmauern sahen wie Pflaster aus (BUG-041).
+- Titelbild (BUG-016) als Pixel-Szene statt Vektorflächen; Himmel/Feste als gecachte Ebenen, animiert nur Wolken,
+  Fenster, Banner, Feuer, Funken, Gras.
+- §25 Stil-Testbereich: `RF.styleArea()` (nur `?dev`), Spiel pausiert dort; `save()` speichert nie auf Testkarten
+  (`__…`), damit ein Autosave dort keinen kaputten Stand erzeugt.
+
+## Session 2 — 2026-09-25 · Dächer & Städteausbau
+
+### Gebäude (buildings.js)
+- Dächer: Giebel nach vorn statt Walm-/Traufplatte (BUG-028). Kein Refactoring im Sinne §2 — Neuzeichnung des
+  Dach-Abschnitts, Schnittstellen (`houseSprite`, `houseDims`, `chimneyOf`) unverändert; neu `gableOf`.
+- Moos/Nässe als unregelmäßige Flecken statt Rechtecke.
+- 7 neue Gebäudetypen mit eigener Silhouette/Funktion: Kate (geflicktes Dach), Bürgerhaus (zwei Geschosse),
+  Bäckerei (Backofen, Brotschild), Scheune (Scheunentor mit Z-Streben, Heuluke, Heu), Stall (Stalltüren), Lagerhaus
+  (Ladeluke, Ladebalken mit Seil und Sack), Fischerhütte (Netze). Je Typ Innenausstattung (`FURNISH`).
+- Farbvariation je Haus aus der Materialfamilie (`ROOF_VAR`/`WALL_VAR`) — Nachbarn sind keine Klone (§20).
+
+### Verfall & Stilvarianten (Nutzerwunsch „dystopisch, teils zerstört“)
+- `wearOf(b)`: 0 gepflegt, 1 heruntergekommen (Risse, abgeplatzter Putz, vernageltes Fenster, fehlende Dachdeckung),
+  2 verlassen (eingebrochenes Dach mit offenen Sparren, Ruß über den Fenstern, vernagelte Tür, eingestürzter Schornstein,
+  Schutt, Ranken). Anteil je Ort (Aschfurt/Kreuzweg am stärksten, Sonnwacht kaum); Betriebe verfallen nie ganz.
+  Einzelne Ruinen bewusst gesetzt (ausgebrannte Kate in Aschfurt, Speicher am Salzhafener Kai, Kate in Kreuzweg).
+- Folgen im Spiel: verlassene Häuser ohne Bewohner, ohne Licht und Rauch; innen Schutt statt Möbel.
+- Stil je Haus: Dachneigung variiert, Dachgauben, Vordächer über Türen, Bruchsteinsockel unter Holz/Fachwerk/Putz.
+
+### Siedlungen (world.js `TOWN_PLAN`, `expandTowns`, `townAt`)
+- Alle 6 Siedlungen ausgebaut: 23 → 104 Gebäude. Eren (Dorf, Felder, Scheunen), Nordfurt (ummauerte Stadt, 4 Tore,
+  Markt), Salzhafen (bis zur Küste, Kai, Stege, Boote), Kreuzweg (vier Viertel, Marktplatz, Stall), Aschfurt (Vorstadt
+  hinter Palisaden, Karawanenhof, Nord-/Westtor), Sonnwacht (Komturei in der Feste, Unterstadt).
+- Ausbau läuft am Ende von `genWorld` ohne `rnd()` → Zufallsfolge der restlichen Welt unverändert (BUG-027 bleibt gelöst).
+- Aufräumen: Wildnis-Streugut raus, Felsen im Festungskern repariert (BUG-033/034). `locAt` kennt die Stadtflächen.
+- Neue Props: Heuballen, Fischerboot, Netzgestell, Wäscheleine, Tränke, Laterne (leuchtet nachts); Palisade als
+  angespitzte Stämme statt Zaun. Scheunen/Ställe ohne Fenster werfen nachts kein Fensterlicht.
+
+### Leben (game.js)
+- `spawnResidents`: ~100 Bewohner mit Beruf, Begrüßung, Tagesablauf (BUG-008, BUG-013 teilweise); Ortsgerüchte je Stadt.
+- Wachposten an die neuen Tore verlegt, 17 → 25 Wachen; `spawnGuardPosts` idempotent (verlegt vorhandene Wachen).
+- Gegner-Spawns nie in Siedlungen (+4 Kacheln Rand) (BUG-032).
+- Migration `flags.gen3`: alte Spielstände übernehmen neue Viertel, Figuren in Mauern treten heraus, Wachen ziehen um,
+  Bewohner ziehen ein, ruhende Gegner in Städten verschwinden. Mit einem echten Spielstand geprüft.
+- `newGame({ seed })` optional (reproduzierbare Tests).
+- Selbsttest 37 → 41: Türen erreichbar, keine Wildnis-Streu, Bewohner wohnen im eigenen Haus, keine Gegner in Städten.
+
 ## Session 1 — 2026-09-24 · Phasen 0–3
 
 ### Phase 0 — Durchspielen & Audit

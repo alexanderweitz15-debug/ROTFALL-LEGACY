@@ -1,6 +1,6 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
 import { S, rnd, ri, pick, chance, seedRng, uid } from './state.js';
-import { FURNISH } from './buildings.js';
+import { FURNISH, wearOf } from './buildings.js';
 
 export const TS = 32;                // Kachelgröße
 export const T = { GRASS:0, DIRT:1, ROAD:2, WATER:3, MARSH:4, STONE:5, PLANK:6, ROCK:7, WALL:8, SAND:9, DFLOOR:10, DWALL:11, ASH:12, FIELD:13 };
@@ -43,6 +43,7 @@ export const LOCATIONS = [
 ];
 
 export function locAt(tx, ty) {
+  const town = townAt(tx, ty); if (town) return LOCATIONS.find(l => l.key === town);   // ausgebaute Siedlung: ganzer Plan
   let best = null, bd = 1e9;
   for (const l of LOCATIONS) {
     const d = Math.hypot(l.x - tx, l.y - ty);
@@ -97,16 +98,17 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   rect(map, x + 1, y + 1, w - 2, h - 2, T.PLANK);
   const door = doorSide === 'S' ? [x + (w >> 1), y + h - 1] : doorSide === 'N' ? [x + (w >> 1), y] : doorSide === 'W' ? [x, y + (h >> 1)] : [x + w - 1, y + (h >> 1)];
   setTile(map, door[0], door[1], T.PLANK);
-  const b = { id: 'h' + x + '_' + y, map, x, y, w, h, door: doorSide, doorTile: door, type: meta.type || 'house', town: meta.town, seed: (x * 31 + y * 17) % 997 + 1 };
+  const b = { id: 'h' + x + '_' + y, map, x, y, w, h, door: doorSide, doorTile: door, type: meta.type || 'house', town: meta.town, wear: meta.wear, seed: (x * 31 + y * 17) % 997 + 1 };
   HOUSES.push(b);
   // Innenausstattung: die Kachel hinter der Tür bleibt frei; keine zwei Möbel auf einer Kachel
   const inside = [door[0] + (doorSide === 'W' ? 1 : doorSide === 'E' ? -1 : 0), door[1] + (doorSide === 'S' ? -1 : doorSide === 'N' ? 1 : 0)];
   const used = new Set([inside.join(',')]);
-  for (const [kind, ox, oy] of FURNISH[b.type] || []) {
+  const ruin = wearOf(b) === 2;                     // verlassen: Schutt, umgestürzter Rest, keine Wohnung mehr
+  for (const [kind, ox, oy] of ruin ? [['rubble', 0, 0], ['debris', -1, 0], ['barrel', -1, -1], ['debris', 1, -1]] : FURNISH[b.type] || []) {
     const tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy, k = tx + ',' + ty;
     if (tx < x + 1 || tx > x + w - 2 || ty < y + 1 || ty > y + h - 2 || used.has(k)) continue;
     used.add(k);
-    prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack'].includes(kind), r: 10 });
+    prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 10 });
   }
   return b;
 }
@@ -265,6 +267,174 @@ function gruben() {
   }
   for (let i = 0; i < 26; i++) { const y = ri(22, 52), x = pathX(y) + (chance(0.5) ? -ri(2, 6) : ri(3, 7));
     if (tileAt('world', x, y) === T.GRASS) prop(chance(0.6) ? 'bush' : 'rock_node', x, y, chance(0.6) ? { harvest: 'herb' } : { harvest: 'stone', solid: true }); }
+}
+
+// ---------------- Siedlungen: Ausbau (Session 2) ----------------
+// Jede Siedlung ist ein Plan statt Zufall: Straßen und Plätze, Mauern mit Toren, typisierte Häuser mit der Tür zur
+// Straße, Felder und Props mit Grund. Läuft am Ende von genWorld und zieht kein rnd(): die Zufallsfolge der übrigen
+// Welt bleibt unverändert (BUG-027); ältere Spielstände übernehmen den Ausbau per Migration (game.js, flags.gen3).
+// Kachelkoordinaten, Rechtecke inklusiv. old = Kern vor dem Ausbau (seine Häuser bleiben stehen), area = ganze Siedlung,
+// square = Platz (Treffpunkt der Bewohner am Tag).
+export const seaLine = x => 476 + Math.round(Math.sin(x / 20) * 4);   // Küstenlinie der Südsee (wie die Generierung)
+export const TOWN_PLAN = {
+  eren: {                                                         // Heimatdorf: Ackerbau, Rast an der Alten Straße
+    area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66],
+    streets: [[T.DIRT, 46, 55, 49, 56], [T.DIRT, 48, 57, 49, 63], [T.DIRT, 76, 61, 77, 63], [T.DIRT, 82, 61, 82, 63], [T.DIRT, 53, 72, 54, 75]],
+    houses: [['house', 43, 58, 5, 4, 'S'], ['cottage', 37, 58, 4, 4, 'S'], ['house', 44, 51, 5, 4, 'S'], ['barn', 36, 66, 6, 5, 'N'],
+      ['bakery', 44, 66, 5, 4, 'N'], ['house', 74, 57, 5, 4, 'S'], ['cottage', 80, 57, 4, 4, 'S'], ['house', 74, 66, 5, 4, 'N'],
+      ['cottage', 80, 66, 4, 4, 'N'], ['barn', 51, 76, 6, 5, 'N'], ['house', 66, 76, 5, 4, 'N']],
+    fields: [[36, 73, 46, 78], [72, 76, 83, 81]],
+    props: [['hay', 42, 68], ['hay', 57, 78], ['cart', 35, 65], ['trough', 58, 80], ['laundry', 41, 55], ['laundry', 79, 71],
+      ['lantern', 50, 62], ['lantern', 73, 63], ['flowers_prop', 47, 62], ['sack', 47, 65, { label: 'Mehlsack' }], ['barrel', 43, 65, { label: 'Regentonne' }]],
+  },
+  northcity: {                                                    // Grenzstadt der Valen: Handel am Fluss, Garnison
+    area: [111, 44, 147, 73], old: [112, 50, 125, 62], square: [137, 60],
+    fill: [[T.STONE, 112, 45, 146, 72]],
+    walls: { rect: [111, 44, 147, 73], gates: [[111, 62, 111, 64], [147, 63, 147, 65], [118, 73, 119, 73], [128, 44, 129, 44]] },
+    streets: [[T.ROAD, 112, 63, 146, 64], [T.ROAD, 128, 45, 129, 62], [T.ROAD, 118, 65, 119, 72]],
+    houses: [['chapel', 113, 45, 6, 5, 'S'], ['manor', 120, 45, 5, 5, 'S'], ['store', 131, 46, 6, 5, 'S'], ['house', 138, 46, 4, 4, 'S'],
+      ['cottage', 143, 46, 4, 4, 'S'], ['tavern', 131, 53, 6, 5, 'S'], ['smithy', 138, 53, 4, 4, 'S'], ['house', 143, 53, 4, 4, 'S'],
+      ['bakery', 113, 66, 5, 4, 'N'], ['house', 120, 66, 5, 4, 'N'], ['manor', 130, 66, 5, 5, 'N'], ['house', 136, 66, 5, 4, 'N'], ['healer', 142, 66, 5, 4, 'N']],
+    props: [['stall', 137, 59, { tag: 'market' }], ['stall', 139, 59, { tag: 'market' }], ['stall', 141, 59, { tag: 'market' }],
+      ['well', 131, 60], ['board', 144, 60, { label: 'Anschlagbrett', tag: 'board' }], ['crate', 138, 61, { label: 'Marktware' }], ['sack', 142, 61, { label: 'Getreidesack' }],
+      ['barrel', 131, 58, { label: 'Bierfass' }], ['barrel', 132, 58, { label: 'Bierfass' }], ['lantern', 113, 61], ['lantern', 145, 62], ['lantern', 117, 71],
+      ['lantern', 130, 47], ['lantern', 127, 61], ['laundry', 126, 69], ['trough', 145, 71]],
+  },
+  saltport: {                                                     // Hafenstadt: Salz, Fisch, Umschlag an Kai und Stegen
+    area: [132, 431, 174, 488], old: [138, 438, 163, 463], square: [157, 447],
+    fill: [[T.DIRT, 132, 431, 174, 471, 'ragged']],
+    clear: [[T.DIRT, 146, 463, 147, 471], [T.DIRT, 156, 463, 156, 471]],     // alte Stege endeten im Sumpf
+    streets: [[T.ROAD, 147, 431, 148, 476], [T.ROAD, 149, 436, 150, 437], [T.ROAD, 132, 450, 174, 450], [T.ROAD, 132, 463, 174, 464],
+      [T.DIRT, 140, 437, 146, 438], [T.DIRT, 149, 438, 158, 438], [T.DIRT, 135, 444, 136, 449], [T.DIRT, 166, 445, 166, 449], [T.DIRT, 172, 445, 172, 449]],
+    plazas: [[T.STONE, 152, 445, 162, 449]],
+    harbor: { x0: 132, x1: 174, top: 472, piers: [140, 153, 166], boats: [[143, 3], [156, 5], [164, 2]] },
+    houses: [['house', 133, 440, 5, 4, 'S'], ['manor', 164, 440, 5, 5, 'S'], ['house', 170, 441, 4, 4, 'S'], ['store', 137, 432, 6, 5, 'S'], ['chapel', 155, 432, 6, 5, 'S'],
+      ['house', 133, 452, 5, 4, 'N'], ['manor', 159, 452, 5, 5, 'N'], ['house', 165, 452, 5, 4, 'N'], ['cottage', 171, 452, 4, 4, 'N'],
+      ['store', 133, 457, 6, 5, 'S'], ['store', 140, 457, 6, 5, 'S'], ['fisher', 150, 458, 4, 4, 'S'], ['fisher', 155, 458, 4, 4, 'S'], ['store', 160, 458, 6, 4, 'S'], ['fisher', 167, 458, 4, 4, 'S'],
+      ['fisher', 133, 466, 4, 4, 'N'], ['store', 138, 466, 6, 5, 'N'], ['fisher', 150, 466, 4, 4, 'N'], ['store', 155, 466, 6, 5, 'N', 2], ['fisher', 162, 466, 4, 4, 'N'], ['house', 168, 466, 5, 4, 'N']],
+    props: [['stall', 153, 446, { tag: 'market' }], ['stall', 155, 446, { tag: 'market' }], ['stall', 157, 446, { tag: 'market' }],
+      ['board', 161, 448, { label: 'Anschlagbrett', tag: 'board' }], ['crate', 159, 446, { label: 'Marktware' }], ['sack', 154, 448, { label: 'Salzsack' }],
+      ['crate_stack', 144, 473, { label: 'Hafenfracht' }], ['sack', 145, 474, { label: 'Salzsack' }], ['sack', 146, 473, { label: 'Salzsack' }],
+      ['barrel', 157, 473, { label: 'Heringsfass' }], ['barrel', 158, 473, { label: 'Heringsfass' }], ['crate', 160, 474, { label: 'Hafenfracht' }], ['crate', 161, 473, { label: 'Hafenfracht', v: 2 }],
+      ['net_rack', 135, 473], ['net_rack', 170, 473], ['cart', 150, 474], ['lantern', 139, 472], ['lantern', 152, 472], ['lantern', 165, 472],
+      ['lantern', 146, 449], ['lantern', 163, 449], ['laundry', 138, 446], ['net_rack', 149, 462]],
+  },
+  kreuzweg: {                                                     // Marktflecken an der Kreuzung: Söldner, Rast, Handel
+    area: [225, 230, 277, 271], old: [240, 240, 261, 257], square: [250, 261],
+    streets: [[T.ROAD, 248, 236, 249, 249], [T.ROAD, 225, 250, 277, 250],
+      [T.DIRT, 230, 247, 230, 249], [T.DIRT, 236, 247, 236, 249], [T.DIRT, 232, 239, 239, 240], [T.DIRT, 238, 241, 239, 249],
+      [T.DIRT, 266, 248, 266, 249], [T.DIRT, 273, 248, 273, 249], [T.DIRT, 265, 239, 274, 240], [T.DIRT, 269, 241, 269, 249],
+      [T.DIRT, 228, 257, 239, 258], [T.DIRT, 238, 251, 239, 256], [T.DIRT, 248, 251, 251, 257], [T.DIRT, 261, 257, 272, 258]],
+    plazas: [[T.STONE, 240, 258, 260, 264]],
+    houses: [['house', 228, 243, 5, 4, 'S'], ['cottage', 234, 243, 4, 4, 'S'], ['bakery', 231, 235, 5, 4, 'S'],
+      ['stable', 263, 243, 6, 5, 'S'], ['store', 270, 243, 6, 5, 'S'], ['house', 263, 235, 5, 4, 'S'], ['house', 270, 235, 5, 4, 'S'],
+      ['house', 228, 252, 5, 4, 'N'], ['cottage', 234, 252, 4, 4, 'N'], ['barn', 228, 259, 6, 5, 'N'],
+      ['healer', 262, 252, 5, 4, 'N'], ['house', 268, 252, 5, 4, 'N'], ['cottage', 274, 252, 4, 4, 'N', 2], ['house', 263, 260, 5, 4, 'N'], ['store', 269, 260, 6, 5, 'N'],
+      ['manor', 243, 266, 5, 5, 'N'], ['house', 249, 266, 5, 4, 'N'], ['house', 255, 266, 5, 4, 'N']],
+    fields: [[226, 265, 236, 269]],
+    props: [['stall', 243, 260, { tag: 'market' }], ['stall', 246, 260, { tag: 'market' }], ['stall', 253, 260, { tag: 'market' }], ['stall', 256, 260, { tag: 'market' }],
+      ['well', 250, 262], ['board', 258, 263, { label: 'Anschlagbrett', tag: 'board' }], ['crate', 244, 262, { label: 'Marktware' }], ['crate', 254, 262, { label: 'Marktware', v: 1 }],
+      ['sack', 247, 262, { label: 'Getreidesack' }], ['trough', 262, 249], ['hay', 276, 245], ['cart', 276, 249], ['laundry', 233, 256],
+      ['lantern', 247, 257], ['lantern', 240, 249], ['lantern', 261, 249], ['hay', 234, 261]],
+  },
+  ashford: {                                                      // Grenzposten: Kernburg, Vorstadt hinter Palisaden, Karawanenhof
+    area: [357, 83, 395, 109], old: [372, 84, 387, 99], square: [379, 94], oldWalls: true,
+    clear: [[T.DIRT, 380, 84, 380, 84], [T.DIRT, 372, 92, 372, 93], [T.DIRT, 378, 99, 381, 99]],       // Nordtor (die Oststraße endete an der Mauer), Westtor
+    fill: [[T.DIRT, 358, 84, 371, 99, 'ragged'], [T.DIRT, 364, 101, 394, 108, 'ragged']],
+    palisade: { rect: [357, 83, 371, 100], sides: 'NWS', gates: [[357, 92, 357, 93]] },
+    streets: [[T.DIRT, 358, 92, 371, 93], [T.DIRT, 378, 100, 381, 102], [T.DIRT, 364, 101, 394, 102], [T.DIRT, 380, 80, 380, 83]],
+    houses: [['tavern', 359, 86, 6, 5, 'S'], ['smithy', 366, 87, 5, 4, 'S'], ['store', 359, 95, 6, 5, 'N'], ['house', 366, 95, 5, 4, 'N'],
+      ['stable', 368, 104, 6, 5, 'N'], ['house', 384, 104, 5, 4, 'N'], ['cottage', 390, 104, 4, 4, 'N', 2]],
+    props: [['trough', 375, 104], ['hay', 366, 106], ['cart', 381, 105], ['crate', 358, 94, { label: 'Handelsware' }], ['barrel', 358, 91, { label: 'Wasserfass' }],
+      ['anvil', 365, 91, { label: 'Amboss' }], ['lantern', 379, 97], ['lantern', 370, 91], ['lantern', 377, 101]],
+  },
+  sonnwacht: {                                                    // Ordensfeste: Kernburg mit Komturei, Unterstadt der Pilger
+    area: [435, 245, 476, 290], old: [446, 246, 465, 265], square: [455, 277], oldWalls: true,
+    clear: [[T.STONE, 446, 250, 446, 251], [T.STONE, 453, 265, 458, 265]],                       // Westtor zur Mittellandstraße
+    fill: [[T.DIRT, 436, 266, 476, 289, 'ragged']],
+    streets: [[T.ROAD, 455, 266, 456, 289], [T.ROAD, 436, 276, 476, 277], [T.DIRT, 450, 282, 454, 283]],
+    houses: [['hall', 448, 257, 6, 5, 'S'], ['barracks', 459, 257, 5, 4, 'S'],
+      ['healer', 437, 271, 6, 5, 'S'], ['house', 447, 272, 5, 4, 'S'], ['bakery', 458, 272, 5, 4, 'S'], ['store', 464, 271, 6, 5, 'S'], ['house', 471, 272, 5, 4, 'S'],
+      ['tavern', 437, 278, 6, 5, 'N'], ['house', 447, 278, 5, 4, 'N'], ['smithy', 458, 278, 5, 4, 'N'], ['house', 464, 278, 5, 4, 'N'], ['cottage', 470, 278, 4, 4, 'N'],
+      ['barn', 447, 284, 6, 5, 'N']],
+    fields: [[458, 284, 470, 288]],
+    props: [['sign', 453, 263, { label: 'Sonnwacht — Feste des Ordens' }], ['lantern', 446, 275], ['lantern', 454, 275], ['lantern', 463, 275], ['lantern', 454, 265],
+      ['hay', 453, 286], ['trough', 444, 283], ['laundry', 443, 273], ['torch', 445, 249], ['torch', 445, 252]],
+  },
+};
+export function townAt(tx, ty, m = 0) {                    // m: Rand in Kacheln (z. B. Abstand für Gegner-Spawns)
+  for (const k in TOWN_PLAN) { const [x0, y0, x1, y1] = TOWN_PLAN[k].area; if (tx >= x0 - m && tx <= x1 + m && ty >= y0 - m && ty <= y1 + m) return k; }
+  return null;
+}
+const SOLID_PROP = new Set(['hay', 'boat', 'net_rack', 'trough', 'barrel', 'well', 'anvil', 'crate_stack', 'palisade_prop', 'fence']);
+const NATURE = new Set(['tree', 'bush', 'flowers_prop', 'rock_node', 'dead_tree']);   // darf zwischen den Häusern bleiben, wenn es nichts verstellt
+const NATURAL = new Set([T.GRASS, T.MARSH, T.SAND, T.FIELD, T.ASH, T.ROCK]);
+function expandTowns(wild) {
+  for (const [town, P] of Object.entries(TOWN_PLAN)) {
+    const mark = props.length, claimed = new Set(), K = (x, y) => x + ',' + y;
+    const inR = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
+    const inHouse = (x, y) => HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
+    const paint = (x, y, t) => { if (!inHouse(x, y)) setTile('world', x, y, t); claimed.add(K(x, y)); };
+    const box = (r, fn) => { for (let y = r[1]; y <= r[3]; y++) for (let x = r[0]; x <= r[2]; x++) fn(x, y); };
+    for (const [t, ...r] of P.fill || []) box(r, (x, y) => {          // Grund: Pflaster bzw. festgetretene Erde; Ränder ausgefranst
+      const edge = x - r[0] < 1 || r[2] - x < 1 || y - r[1] < 1 || r[3] - y < 1;
+      if (tileAt('world', x, y) === T.ROAD || inHouse(x, y) || (r[4] === 'ragged' && edge && nz(x, y) > 0.5)) return;
+      setTile('world', x, y, t);
+    });
+    box(P.old, (x, y) => {                                              // später gewürfelte Felsen im alten Kern: Boden bzw. Mauer
+      if (tileAt('world', x, y) !== T.ROCK || inHouse(x, y)) return;
+      const rim = x === P.old[0] || x === P.old[2] || y === P.old[1] || y === P.old[3];
+      setTile('world', x, y, P.oldWalls && rim ? T.WALL : T.DIRT);
+    });
+    for (const [t, ...r] of P.clear || []) box(r, (x, y) => paint(x, y, t));
+    for (const b of HOUSES) if (b.town === town) box([b.x, b.y, b.x + b.w - 1, b.y + b.h - 1], (x, y) => {   // … und in seinen Häusern
+      if (tileAt('world', x, y) !== T.ROCK) return;
+      const edge = x === b.x || y === b.y || x === b.x + b.w - 1 || y === b.y + b.h - 1, door = x === b.doorTile[0] && y === b.doorTile[1];
+      setTile('world', x, y, edge && !door ? T.WALL : T.PLANK);
+    });
+    if (P.walls) { const [x0, y0, x1, y1] = P.walls.rect, gate = (x, y) => P.walls.gates.some(g => inR(g, x, y));
+      box(P.walls.rect, (x, y) => { if (x === x0 || x === x1 || y === y0 || y === y1) paint(x, y, gate(x, y) ? T.ROAD : T.WALL); }); }
+    for (const [t, ...r] of P.plazas || []) box(r, (x, y) => paint(x, y, t));
+    for (const [t, ...r] of P.streets || []) box(r, (x, y) => { if (tileAt('world', x, y) !== T.ROAD) paint(x, y, t); else claimed.add(K(x, y)); });
+    if (P.harbor) { const H = P.harbor;                                // Kai bis ans Wasser, Stege hinaus, Boote daneben
+      for (let x = H.x0; x <= H.x1; x++) for (let y = H.top; y < seaLine(x); y++) paint(x, y, T.STONE);
+      for (const px of H.piers) for (let x = px; x <= px + 1; x++) for (let y = H.top; y <= seaLine(x) + 7; y++) paint(x, y, T.PLANK);
+      for (const [bx, dy] of H.boats) prop('boat', bx, seaLine(bx) + dy, { solid: true, r: 14, label: 'Fischerboot' });
+    }
+    for (const r of P.fields || []) {                                  // Acker mit Zaun zur Straße hin und Vogelscheuche
+      box(r, (x, y) => paint(x, y, T.FIELD));
+      for (let x = r[0]; x <= r[2]; x++) { prop('fence', x, r[3] + 1, { solid: true }); claimed.add(K(x, r[3] + 1)); }
+      prop('scarecrow', (r[0] + r[2]) >> 1, (r[1] + r[3]) >> 1);
+    }
+    for (const [type, x, y, w, h, door, wear] of P.houses) {         // wear (optional): bewusst gesetzte Ruine
+      box([x - 1, y - 1, x + w, y + h], (i, j) => {                     // Hofrand: Erde statt Gras, Ecken ausgefranst
+        const corner = (i === x - 1 || i === x + w) && (j === y - 1 || j === y + h);
+        if (!(corner && nz(i, j) > 0.5) && NATURAL.has(tileAt('world', i, j)) && !inHouse(i, j)) setTile('world', i, j, T.DIRT);
+        claimed.add(K(i, j));
+      });
+      house('world', x, y, w, h, door, { type, town, wear });
+    }
+    if (P.palisade) { const [x0, y0, x1, y1] = P.palisade.rect, gate = (x, y) => P.palisade.gates.some(g => inR(g, x, y));
+      box(P.palisade.rect, (x, y) => {
+        const side = (y === y0 && P.palisade.sides.includes('N')) || (y === y1 && P.palisade.sides.includes('S')) || (x === x0 && P.palisade.sides.includes('W'));
+        if (side && !gate(x, y)) { prop('palisade_prop', x, y, { solid: true, r: 14 }); claimed.add(K(x, y)); }
+      });
+    }
+    for (const [kind, x, y, o = {}] of P.props || []) prop(kind, x, y, { solid: SOLID_PROP.has(kind), r: SOLID_PROP.has(kind) ? 10 : 12, ...o });
+    // Aufräumen: Streugut der Wildnis (Lager, Verstecke, Geröll, fremde Szenen) hat in einer Siedlung keinen Grund;
+    // Bäume, Büsche, Felsen bleiben, wo sie nichts verstellen; Gebautes (Wegschrein, Schilder) nur nicht auf Straße/Hof.
+    const near = (x, y) => { for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (claimed.has(K(x + i, y + j))) return true; return false; };
+    let w = 0;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i], tx = p.x / TS | 0, ty = p.y / TS | 0;
+      let drop = false;
+      if (i < mark && (p.map || 'world') === 'world' && inR(P.area, tx, ty))
+        drop = (inHouse(tx, ty) && !p.house) || (NATURE.has(p.type) ? tileAt('world', tx, ty) !== T.GRASS || near(tx, ty) : wild.has(p) || claimed.has(K(tx, ty)));
+      if (!drop) props[w++] = p;
+    }
+    props.length = w;
+    box(P.area, (x, y) => { if (!inR(P.old, x, y) && !claimed.has(K(x, y)) && tileAt('world', x, y) === T.FIELD) setTile('world', x, y, T.GRASS); });   // Reste fremder Äcker
+  }
 }
 
 // ---------------- Oberwelt ----------------
@@ -546,6 +716,7 @@ export function genWorld() {
   prop('banner_torn', 427, 418); prop('banner_torn', 435, 418);
   prop('chest', 431, 432, { loot:['grave_seal', 'potion', 'plate_cuirass'], label:'Grabkammer der Feste' });
 
+  const handMark = props.length;                           // ab hier: Streugut (Szenen, Haine, Verstecke, Lager, Geröll)
   placeScenes();
   regionClusters();
 
@@ -579,6 +750,8 @@ export function genWorld() {
   }
   for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
+
+  expandTowns(new Set(props.slice(handMark)));             // zuletzt und ohne rnd(): Zufallsfolge oben bleibt stabil
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
