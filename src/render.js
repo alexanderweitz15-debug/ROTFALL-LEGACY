@@ -1327,7 +1327,7 @@ function telegraphArc(e, R, half, now) {
 
 // Leichen: kurze Sterbeanimation (Treffer → Knien → Fallen), dann liegend, Blutlache wächst.
 function drawCorpse(e, now) {
-  const age = e.born ? now - e.born : 9999;
+  const age = e.born ? Math.max(0, now - e.born) : 9999;   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
   ctx.globalAlpha = clamp(e.life / 1000, 0, 1);
   const pool = Math.min(14, 5 + age / 70);
   ctx.fillStyle = 'rgba(90,18,14,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 3, pool, pool * 0.45, 0, 0, 7); ctx.fill();
