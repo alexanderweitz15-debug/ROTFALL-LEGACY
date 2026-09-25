@@ -1,5 +1,5 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
-import { S, rnd, ri, pick, chance, seedRng, uid } from './state.js';
+import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js';
 import { FURNISH, wearOf } from './buildings.js';
 
 export const TS = 32;                // Kachelgröße
@@ -983,7 +983,17 @@ export function genWorld() {
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
   const noTree = new Set([T.DIRT, T.ROAD, T.PLANK, T.FIELD, T.WATER, T.WALL, T.DWALL, T.ROCK, T.DFLOOR]);
   for (const p of props) delete p._d;                        // nur für den Umzug gebraucht, nicht speichern
-  return props.filter(p => p.type !== 'tree' || !noTree.has(tileAt('world', p.x / TS | 0, p.y / TS | 0)));
+  return baseProps('world', props.filter(p => p.type !== 'tree' || !noTree.has(tileAt('world', p.x / TS | 0, p.y / TS | 0))));
+}
+
+// Erzeugungsschlüssel gk = Typ@Kachel (+#n bei gleichem Typ auf derselben Kachel). Bewusst nicht die Reihenfolge:
+// ändert eine spätere Session die Generierung, verschiebt ein Index-Schlüssel alle alten Spielstände, Typ+Kachel nur die betroffenen.
+// Der Grundzustand (state.js) erlaubt, nur abweichende Props zu speichern (BUG-057).
+function baseProps(map, list) {
+  const n = new Map();
+  for (const p of list) { const k = `${p.type}@${p.x / TS | 0},${p.y / TS | 0}`, i = n.get(k) || 0; n.set(k, i + 1); p.gk = i ? `${k}#${i}` : k; }
+  setPropBase(map, list);
+  return list;
 }
 
 // ---------------- Hochrechnung Entwurf → Weltmaßstab (Session 5) ----------------
@@ -1107,7 +1117,7 @@ export function genMine() {
 
   MAPS.mine.rooms = rooms;
   MAPS.mine.entry = { x: entry.cx * TS, y: (entry.y + entry.h - 3) * TS };
-  return props.slice();
+  return baseProps('mine', props.slice());
 }
 
 // Feste Objekte (Bäume, Felsen, Gebäude) kennt nur game.js (Objekt-Index); es trägt hier die Prüfung ein.

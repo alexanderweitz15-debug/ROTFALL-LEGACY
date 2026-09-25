@@ -89,16 +89,49 @@ export function partyMembers() { return S.party.map(byId).filter(x => x && x.ali
 
 // ---- Speichern ----
 const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet']);
+// Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
+// Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
+// Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
+const PROP_BASE = { world: new Map(), mine: new Map() };
+const r2 = (k, v) => typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;   // Positionen/Timer: 2 Nachkommastellen genügen
+const sig = p => { const { id, ...rest } = p; return JSON.stringify(rest, r2); };
+export function setPropBase(map, list) { const B = new Map(); for (const p of list) B.set(p.gk, sig(p)); PROP_BASE[map] = B; }
+export function saveData() {
+  const out = {}; out.ents = {}; out.propsGone = {};
+  for (const k of Object.keys(S)) if (!SKIP.has(k) && k !== 'ents') out[k] = S[k];
+  for (const m of ['world', 'mine']) {
+    const B = PROP_BASE[m], list = S.ents[m].filter(e => !e.transient);
+    if (!B.size) { out.ents[m] = list; continue; }       // ohne Grundzustand (sollte nicht vorkommen): alles speichern
+    const have = new Set();
+    out.ents[m] = list.filter(e => { if (e.kind !== 'prop' || !e.gk || !B.has(e.gk) || have.has(e.gk)) return true; have.add(e.gk); return sig(e) !== B.get(e.gk); });
+    out.propsGone[m] = [...B.keys()].filter(k => !have.has(k));
+  }
+  return JSON.stringify(out, r2);
+}
+// Laden: gespeicherte Liste + erzeugte Props zusammenführen. Reihenfolge: erzeugte Props (bzw. ihre gespeicherte Fassung) zuerst, dann der Rest.
+// Ein gespeichertes Prop, dessen Schlüssel die heutige Generierung nicht mehr kennt, bleibt erhalten (Spielerzustand geht vor).
+// Hinweis für Migrationen: nach dem Zusammenführen stecken erzeugte Props schon in S.ents — nicht noch einmal aus fresh pushen.
+export function mergeProps(map, fresh, goneList) {
+  const gone = new Set(goneList), saved = new Map(), rest = [];
+  for (const e of S.ents[map]) { if (e.kind === 'prop' && e.gk && !saved.has(e.gk)) saved.set(e.gk, e); else rest.push(e); }
+  const out = [];
+  for (const p of fresh) { const s = saved.get(p.gk); if (s) { out.push(s); saved.delete(p.gk); } else if (!gone.has(p.gk)) out.push(p); }
+  S.ents[map] = [...out, ...saved.values(), ...rest];
+}
+// Alte Vollstände: ihren Props die Schlüssel der passenden erzeugten Props geben (gleicher Typ, gleiche Kachel), damit ab dem
+// nächsten Speichern nur noch Abweichungen geschrieben werden. Was nicht passt, bleibt ohne Schlüssel und wird weiter voll gespeichert.
+export function adoptPropKeys(map, fresh) {
+  const free = new Map(), list = S.ents[map], used = new Set(list.map(e => e.gk).filter(Boolean));
+  for (const p of fresh) if (!used.has(p.gk)) { const b = p.gk.split('#')[0]; (free.get(b) || free.set(b, []).get(b)).push(p.gk); }
+  for (const e of list) if (e.kind === 'prop' && !e.gk) {
+    const q = free.get(`${e.type}@${e.x / 32 | 0},${e.y / 32 | 0}`);   // 32 = TS (world.js importiert state.js, nicht umgekehrt)
+    if (q?.length) e.gk = q.shift();
+  }
+}
 export function save() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
   try {
-    const out = {};
-    for (const k of Object.keys(S)) if (!SKIP.has(k)) out[k] = S[k];
-    out.ents = {
-      world: S.ents.world.filter(e => !e.transient),
-      mine: S.ents.mine.filter(e => !e.transient),
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(out));
+    localStorage.setItem(SAVE_KEY, saveData());
     return true;
   } catch (err) {
     console.warn('Speichern fehlgeschlagen', err);

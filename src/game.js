@@ -1,6 +1,6 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES } from './data.js';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
 import * as R from './render.js';
@@ -650,9 +650,11 @@ function rescaleSave(fresh) {
 }
 export function continueGame() {
   const data = loadRaw(); if (!data) return;
+  const gone = data.propsGone; delete data.propsGone;
   applySave(data);
   seedRng(S.seed);
-  const fresh = genWorld(); genMine();         // Kacheln (+ Gebäudedaten); Props kommen aus dem Spielstand …
+  const fresh = genWorld(), freshMine = genMine();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  for (const [m, f] of [['world', fresh], ['mine', freshMine]]) if (gone?.[m]) mergeProps(m, f, gone[m]);   // … Abweichungen stehen im Spielstand
   if (S.flags?.rescale) rescaleSave(fresh);
   if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
     const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
@@ -695,6 +697,7 @@ export function continueGame() {
   S.relations ||= {}; S.flags ||= {};
   S.party = S.party.filter(id => byId(id));
   for (const m of ['world', 'mine']) for (const e of S.ents[m]) {
+    if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
     if (e.kind === 'enemy' && !e.body && HUMANOID.has(e.mtype)) { e.build = 'ausgewogen'; B.initBody(e, e.maxHp); }
@@ -721,6 +724,7 @@ export function continueGame() {
     if (c === S.player) { (c.titleClasses ||= []).includes('warlock') || c.titleClasses.push('warlock'); c.titleClass = 'warlock'; c.pal = { ...c.pal, glow: TITLE_CLASSES.warlock.glow }; }
     recalc(c); if (c === S.player) syncHotbar();
   }
+  for (const [m, f] of [['world', fresh], ['mine', freshMine]]) if (!gone?.[m]) adoptPropKeys(m, f);   // alte Vollstände: ab jetzt nur Abweichungen speichern
   bindSim(); SIM.initSim();
   indexSolids('world'); indexSolids('mine');
   assignNpcDays();                             // Tagesablauf der Figuren mit Namen (auch für alte Stände; nach dem Objekt-Index)
@@ -3585,6 +3589,20 @@ export function selftest() {
       return heads <= target * 1.1 + 1 && heads >= Math.min(target * 0.6, HOUSES.filter(b => b.town === town && TRADES[b.type]).length);
     }));
   }
+  if (S.ents.world.some(e => e.gk)) ok('Spielstand: nur abweichende Props, Rückweg stellt Truhe und gefällten Baum her (BUG-057)', (() => {
+    const keep = S.ents.world, W = keep.slice(), chest = W.find(e => e.kind === 'prop' && e.loot && e.gk && !e.opened), tree = W.find(e => e.type === 'tree' && e.gk);
+    if (!chest || !tree) return false;
+    const was = chest.opened; S.ents.world = W.filter(e => e !== tree); chest.opened = true;
+    try {
+      const d = JSON.parse(saveData()), n = d.ents.world.filter(e => e.kind === 'prop').length, all = W.filter(e => e.kind === 'prop').length;
+      const stored = d.ents.world.find(e => e.gk === chest.gk);
+      S.ents.world = d.ents.world; mergeProps('world', W.filter(e => e.kind === 'prop' && e.gk), d.propsGone.world);
+      const back = S.ents.world, bc = back.find(e => e.gk === chest.gk);
+      return n < all * 0.05 && stored?.opened && d.propsGone.world.includes(tree.gk) && !back.some(e => e.gk === tree.gk)
+        && bc?.opened && bc.id === chest.id && back.filter(e => e.kind === 'prop').length === all - 1
+        && back.filter(e => e.kind !== 'prop').length === W.filter(e => e.kind !== 'prop' && !e.transient).length;
+    } finally { chest.opened = was; S.ents.world = keep; }
+  })());
   ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
     return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());
   ok('Daten: jeder Gegner definiert interiors, jede Herkunfts-Fertigkeit hat einen Namen',
