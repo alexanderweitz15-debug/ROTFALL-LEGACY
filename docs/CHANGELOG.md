@@ -21,6 +21,15 @@ Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund
 - `genDeep`, Thron-Objekt, Säulen neu gezeichnet, Hrodvar (Boss) mit Beute, Spawngebiete, Migration deep1,
   Ankunft vor dem benutzten Eingang.
 
+### Tiefhall eingebunden (game.js, data.js, render.js) — BUG-064, BUG-065
+- Brann (Nordfurt), Quest Königseisen, Frostklinge; `reward.item`/`reward.take`; `startQuest` zählt Erledigtes.
+- Hrodvar: `frostKingAI` (Eiskreis, Durchfroren, Leibwache); Thron neu gezeichnet.
+
+### Titelklasse Mönch (data.js, game.js, sprites.js, style.css)
+- `TITLE_CLASSES.monk`, drei Fähigkeiten, Zweig Stille Hand, Ilva + Quest in Sonnwacht, `evaded()` als eine Stelle für
+  „im letzten Moment ausgewichen“ (Nahkampf, Geschosse, Eiskreis, Bodenbeben), Sprint über `p.dodge.dist/dur/dash`.
+- Nekromant/Hexenmeister schließen den Mönch aus (beidseitig, Selbsttest prüft die Symmetrie).
+
 ### Kleinkram
 - Leichen: Alter nie negativ (BUG-059).
 

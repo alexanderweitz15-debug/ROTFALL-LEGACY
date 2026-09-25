@@ -275,6 +275,19 @@ schließen einander weiter aus — ein Totenpakt plus der Druide ist erlaubt (Mi
 | Preis | Stärke −1 für immer |
 | Freischaltung | „Der Ruf des Hains“: Mira im Alten Hain (Westwald) — 4 Wölfe vertreiben, 3 Heilkraut für die Quelle, Ritual |
 
+**Session 6 — Mönch.** Vierte Titelklasse, die erste des Ordens. Gegenstück zum Nekromanten: nicht Masse, sondern
+Aufmerksamkeit. Schließt Nekromant und Hexenmeister aus (beidseitig); mit dem Druiden kombinierbar.
+
+| | Mönch |
+|---|---|
+| Ressource | **Fokus** 0–5: +1 je Ausweichrolle, die einen Hieb, ein Geschoss oder einen Flächenangriff ins Leere laufen lässt (einmal je Rolle); jeder Treffer kostet 1 |
+| Fähigkeiten | Handkante (1: 1,4-fach, Ziel taumelt 0,7 s) · Stilles Wasser (2: heilt 6 s, stillt Blutung) · Hundert Schritte (alles, ab 3: unverwundbarer Sprint 180 px, trifft jeden im Weg einmal, Schaden 0,5 + 0,25 je Fokus) |
+| Passiv | Leerer Geist: Ausweichen kostet 25 % weniger Ausdauer |
+| Makel | Gelübde der Leichtigkeit: in Ketten-/Plattenpanzer kein Fokus |
+| Preis | Gelübde der Armut: halbes Gold ans Kloster (einmalig), Rooks Bande −30 (bleibt) |
+| Freischaltung | „Die Probe der Stillen Hand“: Meisterin Ilva vor der Ordenskapelle in Sonnwacht — 10× im letzten Moment ausweichen, 4 Tote, dann das Gelübde |
+| Zweig | Stille Hand: Zweiter Atem des Klosters, Harte Hand, Tiefer Brunnen (+2 Fokus), Wind im Rücken; Schlüssel **Vollkommene Stille** (Treffer kosten keinen Fokus; mit Schild oder Zweihänder gar kein Fokus) |
+
 **Geplante weitere Titelklassen (nicht umgesetzt, Vorschlag):** Kopfgeldjäger („Fährte“ je markiertem Ziel; braucht das Kopfgeldsystem aus
 Phase 17), Barde („Inspiration“ aus Treffern der Gruppe; Tat in einer Schenke), Mönch („Fokus“ aus Ausweichen im
 letzten Moment), Alchemist („Tinkturen“, an Feuerstellen gebraut), Todesritter (liegt als Grundklasse ohne Lehrer im
@@ -304,8 +317,11 @@ Klassenbaum — Kandidat, als Titel der Stillen Schar neu gedacht zu werden). Je
 - Räume: Vorhalle (Frosttreppe) → Säulenhalle (Banner, Inschrift) → Eiskammern (Eiszapfen, Erfrorener, Versteck) /
   Ahnengruft (Grabsteinreihen, Ahnenstein) / Schmiede der Tiefe (Esse, Königsamboss, Erz, Goblins graben) →
   Thronsaal (Thron unter dem Eis, Kohlebecken, Hrodvar mit zwei Leibwächtern) → Hort.
-- Hrodvar, König unter dem Eis: untoter Zweihänder, Stufe 11 — Endgegner für Stufe ~8–10. Eigene Angriffsmuster: Phase 12.
-- Offen: Wer in der Welt weiß von der Tiefhall? (Questanbindung, z. B. Schmied in Nordfurt sucht Königseisen.)
+- Hrodvar, König unter dem Eis: untoter Zweihänder, Stufe 11 — Endgegner für Stufe ~8–10. **Eiskreis**: Ring als Ansage
+  (900 ms), dann Schaden im Umkreis und „Durchfroren“ (4 s, −40 % Tempo) — heraustreten oder durchrollen (zählt für den
+  Mönch). Unter 50 %: ruft einmal drei Tote der Leibwache, danach schneller. Gegenstück zu Gorak: Raum verweigern statt rennen.
+- Questanbindung: Brann, Meisterschmiedin in Nordfurt — „Königseisen“ (Hrodvar legen, Barren aus dem Hort) → Frostklinge.
+  Gerüchte über die Treppe ins Eis überall, in Nordfurt über Brann. Ein vorher erschlagener Hrodvar zählt.
 
 ## Offene Designfragen
 - Rarität/Affixe, Skill Tree, Klassen: siehe PHASE_STATUS (Phasen 8–10).

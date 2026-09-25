@@ -417,7 +417,11 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 
 ### BUG-064 — Hrodvar ohne eigene Angriffsmuster, Tiefhall ohne Questanbindung
 - Hrodvar ist ein starker Untoter mit Zweihänder (Stufe 11), aber ohne Spezialangriffe wie Gorak. Niemand in der Welt
-  erwähnt die Tiefhall. CONTENT · MEDIUM · OFFEN (Phase 12 Bosse)
+  erwähnt die Tiefhall. CONTENT · MEDIUM · BEHOBEN (Session 6: Eiskreis + Leibwache, Quest Königseisen, Gerüchte)
+
+### BUG-065 — Quest mit Boss-Ziel wäre nach frühem Sieg nicht mehr lösbar
+- Wer Hrodvar vor der Annahme von „Königseisen“ erschlägt, hätte das Ziel nie erfüllen können (Boss kommt nicht wieder).
+- Lösung: `startQuest` zählt schon Erledigtes (Boss-Flag, Gegenstände im Gepäck). QUEST · HIGH · BEHOBEN (vor Auslieferung)
 
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.

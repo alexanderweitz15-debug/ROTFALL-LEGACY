@@ -7,11 +7,14 @@ Neueste oben.
 **Gemacht:** Diff-Speichern der Props (1,43 → 0,53 MB, alte v2/v3-Stände getestet); Karawane als Zug mit Gespann,
 Kutscher, Beiwagen und zwei Wachen, Route aus der Straße; Tiefhall als zweiter Dungeon mit Boss Hrodvar und
 Dungeon-Register. Nebenbei: BUG-058 (Props nach Laden verändert), BUG-059 (Leichen-Radius), BUG-060 (Säulen).
-Selbsttest 64/64 auf fünf Seeds.
-**Gefundene neue Probleme:** BUG-058–064 (062 Beiwagen-Sprung, 063 Balance, 064 Boss ohne Muster offen).
-**Offen geblieben:** Hrodvar ohne Spezialangriffe; Tiefhall ohne Quest; Bewohner machen 430 KB des Spielstands aus.
-**Nächster Schritt:** laut Nutzer weiter mit neuem Inhalt (siehe Einträge darüber, falls vorhanden).
-Beim Start: `index.html?dev&test` → `RF.selftest()` muss 64/64 melden.
+Danach (Nutzer: „mach auf jeden Fall mit neuem Content weiter“): Quest Königseisen (Brann, Nordfurt) mit Hrodvars
+Eiskreis und Leibwache; vierte Titelklasse **Mönch** (Fokus aus Ausweichen im letzten Moment, Ilva in Sonnwacht).
+Selbsttest 68/68 auf vier Seeds, alte Stände (v2, v3 voll, v3 Diff) laden fehlerfrei.
+**Gefundene neue Probleme:** BUG-058–065 (062 Beiwagen-Sprung und 063 Balance offen).
+**Offen geblieben:** Bewohner machen 430 KB des Spielstands aus; Umlernen im Skill-Baum; Kopfgeldjäger/Barde/Alchemist
+nur Entwurf; Mönch und Hrodvar sind ungespielt — Werte (Fokuszahlen, Eiskreis-Schaden) brauchen einen echten Durchlauf.
+**Nächster Schritt:** Nutzer spielt Mönch-Probe und Tiefhall an. Danach: angefangene Phasen schließen (6, 9, 13).
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 68/68 melden.
 
 ### Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich (Nutzerwunsch)
 **Vorgefunden:** Selbsttest 54/54; offen: Karte nicht vergrößert, Diener folgen nicht, kein Skill-Baum, Totenreich dünn.

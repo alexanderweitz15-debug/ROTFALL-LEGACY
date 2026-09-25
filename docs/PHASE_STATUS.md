@@ -14,9 +14,9 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 7 | Weapon Expansion | NICHT BEGONNEN | — | |
 | 8 | Rarity & Loot | NICHT BEGONNEN | — | Rarität ist nur Etikett |
 | 9 | Skill Tree | IN ARBEIT | teilweise | Session 5: 3 allgemeine + 3 Titelzweige, Schlüsselknoten mit Preis/Absicht. Offen: Umlernen, Balancing im Spiel |
-| 10 | Classes | IN ARBEIT | teilweise | Titelklassen Nekromant/Hexenmeister/Druide, max. 2 je Figur, Titelzweige im Skill-Baum (§78 Keystone ✓). Weitere Titelklassen nur Entwurf |
+| 10 | Classes | IN ARBEIT | teilweise | Titelklassen Nekromant/Hexenmeister/Druide/Mönch (Session 6), max. 2 je Figur, Titelzweige im Skill-Baum (§78 Keystone ✓). Kopfgeldjäger/Barde/Alchemist nur Entwurf |
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
-| 12 | Bosses | NICHT BEGONNEN | — | |
+| 12 | Bosses | IN ARBEIT | teilweise | Gorak (Sturm, Beben), Hrodvar (Eiskreis, Leibwache, Session 6). Offen: Bosse der Oberwelt, Beute mit Eigenschaften (Phase 8) |
 | 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
 | 14 | Dungeons | IN ARBEIT | teilweise | Session 6: Tiefhall (gebaute Halle, 8 Räume, Boss), Dungeon-Register. Offen: Rätsel/Fallen jenseits Stacheln, Questanbindung, dritter Dungeon |
 | 15 | NPCs & Wildlife | IN ARBEIT | — | Bewohner mit Tagesablauf ✓; benannte NPCs, Tiere offen |
