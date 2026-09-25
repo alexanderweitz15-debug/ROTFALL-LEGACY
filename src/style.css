@@ -430,6 +430,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .bar-fill.mana{background:linear-gradient(180deg,#5a9ac0 0 2px,#336a8c 2px 7px,#23425a 7px)}
 .bar-fill.essence{background:linear-gradient(180deg,#a6e3c3 0 2px,#5f9e82 2px 7px,#355f4e 7px)}
 .bar-fill.wild{background:linear-gradient(180deg,#d2e79a 0 2px,#8aa84a 2px 7px,#4f6a2a 7px)}
+.bar-fill.focus{background:linear-gradient(180deg,#f5e7b8 0 2px,#d4b460 2px 7px,#8a7032 7px)}
 .bar-fill.corruption{background:linear-gradient(180deg,#c49ae8 0 2px,#7d4fa8 2px 7px,#4a2c66 7px)}
 .slot.title-ab{box-shadow:inset 0 0 0 1px rgba(160,140,200,.35)}
 .bar-fill.xp{background:linear-gradient(180deg,#b09a52 0 2px,#7a6a33 2px 7px,#4a3f1d 7px)}

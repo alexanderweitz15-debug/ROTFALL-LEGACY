@@ -255,6 +255,7 @@ const NPC_SPOTS = {
   grove:[82,290],                                           // Westwald: Mira im Alten Hain
   vharnholm:[489,441],                                      // Totenreich: Sael am Markt von Vharnholm
   northsmith:[139,57],                                      // Nordfurt: Brann vor der Schmiede
+  sonnwacht:[452,256],                                      // Sonnwacht: Ilva vor der Ordenskapelle
 };
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
@@ -431,6 +432,7 @@ const NPC_DAY = {
   jorun:  { work: 'field', eve: ['h66_76', 'front'], night: ['h66_76', 'in'] },
   gerold: { work: ['h114_53', 'front'], till: 20, eve: ['h120_45', 'in'], night: ['h120_45', 'in'] },
   brann:  { work: ['h138_53', 'front'], eve: ['h131_53', 'in'], night: ['h138_53', 'in'] },     // Schmiede → Schenke → über der Werkstatt
+  ilva:   { work: [453, 257], eve: ['h449_249', 'in'], night: ['h449_249', 'in'] },            // Übungsplatz vor der Kapelle → Kapelle
 };
 function assignNpcDays() {                         // idempotent: bei Neustart und bei jedem Laden (Häuser werden neu erzeugt)
   const used = {};                                 // Innenplätze je Haus, damit sich niemand auf eine Kachel stapelt
@@ -745,7 +747,7 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann'].includes(def.key)) spawnNpcDef(def);
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -1074,11 +1076,15 @@ function controlPlayer(dt) {
   p.dodgeCd = Math.max(0, (p.dodgeCd || 0) - dt);
   if (p.dodge) {                                            // Ausweichrolle: feste Dauer, unverwundbar, keine Steuerung
     const d = p.dodge, ease = k => 1 - (1 - k) * (1 - k);      // schneller Antritt, weiches Auslaufen
-    const sp = DODGE.dist * (ease(Math.min(1, (d.t + dt) / DODGE.dur)) - ease(d.t / DODGE.dur));
+    const L = d.dist || DODGE.dist, U = d.dur || DODGE.dur;   // Hundert Schritte: weiter und länger
+    const sp = L * (ease(Math.min(1, (d.t + dt) / U)) - ease(d.t / U));
     moveEnt(p, d.ax * sp, d.ay * sp);
     d.t += dt;
+    if (d.dash) for (const f of combat) if (f.alive && !f.downed && isHostile(p, f) && !d.dash.hit.includes(f.id) && dist(p, f) < 36 + (f.r || 10)) {
+      d.dash.hit.push(f.id); hit(p, f, d.dash.mult); f.stagger = Math.max(f.stagger || 0, 350);
+    }
     if (d.t % 55 < dt) S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ghost', s: 1, life: 220, maxLife: 220, face: p.facing });
-    if (d.t >= DODGE.dur) { p.dodge = null; p.invuln = false; }
+    if (d.t >= U) { p.dodge = null; p.invuln = false; }
     return;
   }
   const { dx, dy } = moveInput();
@@ -1234,6 +1240,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
     fx(target.x, target.y - 12, 'bone', 4); if (dmg <= 0) return float(target, 'Knochen', 'rgba(215,208,186,ALPHA)');
   }
+  if (source && dmg > 0 && target.titleClass === 'monk' && tres(target) > 0 && !node(target, 'k_stillness')) setTres(target, tres(target) - 1);   // getroffen: die Sammlung reißt
   dmg = Math.round(dmg * 10) / 10;
   let result = null, part = null;
   if (target.body) { part = B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit); }
@@ -1476,6 +1483,7 @@ function updateProjectiles(dt) {
       const own = byId(p.owner);
       if (!own || teamOf(own) === teamOf(e)) continue;
       if (dist(p, e) < (e.r || 10) + 5) {
+        if (e.invuln && e.dodge) { if (!p.evaded) { p.evaded = true; evaded(e); } continue; }   // Geschoss fliegt durch die Rolle
         const attacker = own || { name:'Pfeil', skills:null };
         hurtFromProjectile(attacker, e, p);
         p.life = 0; break;
@@ -1642,7 +1650,7 @@ function bossAI(e, tgt, d, reach, sp, dt, m) {
       e.vx = e.vy = 0;
       if (sa.t <= 0) {
         e.special = null; camShake(8, 300); shockFx(e.x, e.y); fx(e.x, e.y, 'dust', 16); sfx('crit', 1, earVol(e));
-        for (const t of combat) if (t.alive && !t.invuln && t !== e && isHostile(e, t) && dist(e, t) < 110) hit(e, t, 0.8);
+        for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 110) { if (t.invuln) evaded(t); else hit(e, t, 0.8); }
       }
       return;
     }
@@ -1683,7 +1691,8 @@ function frostKingAI(e, tgt, d, reach, sp, dt, m) {
     if (sa.t <= 0) {
       e.special = null; camShake(6, 250); sfx('crit', 1, earVol(e));
       S.fx.push({ x: e.x, y: e.y, vx: 0, vy: 0, type: 'shock', ice: true, s: 1, life: 520, maxLife: 520 }); fx(e.x, e.y - 6, 'frost', 18);
-      for (const t of combat) if (t.alive && !t.invuln && t !== e && isHostile(e, t) && dist(e, t) < 105) {
+      for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 105) {
+        if (t.invuln) { evaded(t); continue; }
         hit(e, t, 0.7);
         if (!(t.status ||= []).some(q => q.key === 'chilled')) t.status.push({ key: 'chilled', name: 'Durchfroren', left: 4000, desc: 'Langsamer (−40 %).' });
       }
@@ -1704,10 +1713,11 @@ function frostKingAI(e, tgt, d, reach, sp, dt, m) {
 function resolveSwingEnemy(e) {
   const m = MONSTERS[e.mtype];
   for (const t of combat) {
-    if (!t.alive || t.downed || t === e || t.invuln || !isHostile(e, t)) continue;
+    if (!t.alive || t.downed || t === e || !isHostile(e, t)) continue;
     if (dist(e, t) > m.reach + (t.r || 10)) continue;
     const ang = Math.atan2(t.y - e.y, t.x - e.x);
     if (Math.abs(normAng(ang - e.aim)) > 1.1) continue;
+    if (t.invuln) { evaded(t); continue; }                    // der Hieb hätte getroffen: im letzten Moment ausgewichen
     hit(e, t, 1);
     if (!m.boss) break;
   }
@@ -2379,6 +2389,11 @@ function pactChoices(npc, choices) {
     choices.unshift({ text: 'Die Wölfe sind fort, hier ist das Kraut. (Ruf des Hains → Druide)', fn: () => groveRitual(npc) });
   if (npc.key === 'mira' && titleFull() && !(S.player.titleClasses || []).includes('druid'))
     choices.unshift({ text: 'Kann ich dem Hain dienen?', fn: () => UI.dialogue(npc, '„Du trägst schon zwei Namen, die nicht deine eigenen sind. Ein dritter würde dich zerreißen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  const mq = S.quests.q_monk;
+  if (npc.key === 'ilva' && mq?.state === 'active' && questComplete('q_monk'))
+    choices.unshift({ text: 'Zehnmal ausgewichen, vier Tote ruhen. (Probe der Stillen Hand → Mönch)', fn: () => monkVow(npc) });
+  if (npc.key === 'ilva' && titleFull() && !(S.player.titleClasses || []).includes('monk'))
+    choices.unshift({ text: 'Kann ich die Stille Hand lernen?', fn: () => UI.dialogue(npc, '„Du trägst zwei Namen, die dich festhalten. Die Stille Hand braucht leere Hände.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   if (!q || q.state !== 'active') return;
   if (npc.key === 'ysra' && urn) choices.unshift({ text: 'Die Urne. Ich will die Toten führen. (Ahnenpakt → Nekromant)', fn: () => pactRitual('necromancer', npc) });
   if (npc.key === 'vhal') choices.unshift(urn
@@ -2416,6 +2431,20 @@ function groveRitual(npc) {
       log(`Auftrag abgeschlossen: ${QUESTS.q_grove.name}`, 'quest'); UI.closeDialogue();
       act(p, 'kneel', 2200, npc); sfx('magic');
       for (let i = 0; i < 3; i++) setTimeout(() => fx(p.x, p.y - 10, 'heal', 16), i * 400);
+      save();
+    } },
+    { text: 'Noch nicht.', fn: () => UI.closeDialogue() },
+  ]);
+}
+function monkVow(npc) {
+  const p = S.player, T = TITLE_CLASSES.monk;
+  UI.dialogue(npc, '„Leg ab, was dich schwer macht. Das Gold zuerst — das Kloster braucht es mehr als du. Dann atme. Die Hand folgt.“', [
+    { text: `Das Gelübde ablegen: ${T.name}. ${T.cost.desc}`, fn: () => {
+      if (!unlockTitle('monk', 'Probe der Stillen Hand bei Ilva in Sonnwacht')) return UI.closeDialogue();
+      Object.assign(S.quests.q_monk, { state: 'done' }); gainXp(p, QUESTS.q_monk.reward.xp);
+      log(`Auftrag abgeschlossen: ${QUESTS.q_monk.name}`, 'quest'); UI.closeDialogue();
+      act(p, 'kneel', 2200, npc); sfx('magic');
+      for (let i = 0; i < 3; i++) setTimeout(() => S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'ring', s: 2 + i, life: 600, maxLife: 600 }), i * 350);
       save();
     } },
     { text: 'Noch nicht.', fn: () => UI.closeDialogue() },
@@ -2466,6 +2495,7 @@ function questAvailable(k) {
   if (k === 'q_undead') return (S.relations.morvath ?? 0) >= 5;
   if (k === 'q_pact') return S.quests.q_undead?.state === 'done' && !pactBound() && !titleFull();
   if (k === 'q_grove') return !(S.player.titleClasses || []).includes('druid') && !titleFull();
+  if (k === 'q_monk') return !(S.player.titleClasses || []).includes('monk') && !titleFull() && !pactBound();
   if (k === 'q_rook') return (S.relations.rook ?? 0) >= 10;
   return true;
 }
@@ -2767,7 +2797,7 @@ function repairAll(npc) {
 // Ressource (tres, je Ressource gespeichert — ablegen und wieder tragen verliert nichts) und eigene Fähigkeiten.
 const TC = c => c && c.titleClass ? TITLE_CLASSES[c.titleClass] : null;
 function tres(c) { const T = TC(c); if (!T) return 0; c.tres ||= {}; return c.tres[T.resource.key] ??= T.resource.start; }
-function resMax(c) { const T = TC(c); return T ? T.resource.max + (T.resource.key === 'essence' && node(c, 'n_vessel') ? 2 : 0) : 0; }
+function resMax(c) { const T = TC(c); return T ? T.resource.max + (T.resource.key === 'essence' && node(c, 'n_vessel') ? 2 : 0) + (T.resource.key === 'focus' && node(c, 'o_well') ? 2 : 0) : 0; }
 function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key] = clamp(v, 0, resMax(c)); }
 const spellMul = c => 1 + tfx(c, 'spell');
 const cdMul = c => 1 - Math.min(0.4, tfx(c, 'cdr'));
@@ -2781,6 +2811,7 @@ function unlockTitle(key, where) {
   if (p.titleClasses.length >= MAX_TITLES) { UI.toast(`Mehr als ${MAX_TITLES} Titelklassen trägt kein Mensch.`); return false; }
   p.titleClasses.push(key);
   for (const [a, v] of Object.entries(T.cost.attr || {})) p.attributes[a] = Math.max(1, p.attributes[a] + v);
+  if (T.cost.gold) { const g = Math.floor(S.gold * T.cost.gold); S.gold -= g; if (g) log(`${g} Gold gehen an das Kloster.`, 'economy'); }
   p.pactCost = { ...(p.pactCost || {}), ...(T.cost.hpMul ? { hpMul: T.cost.hpMul } : {}), ...(T.cost.stamina ? { stamina: T.cost.stamina } : {}) };
   for (const [f, v] of Object.entries(T.rep)) S.factions[f] = (S.factions[f] || 0) + v;
   if (T.faction === 'undead' || !p.pal.glow) p.pal = { ...p.pal, glow: T.glow };   // sichtbares Merkmal (ein Pakt der Toten überdeckt das Grün des Hains)
@@ -2822,6 +2853,19 @@ function titleTick(c, dt) {
     if (c.rot >= 1) { const n = Math.floor(c.rot); c.rot -= n; hurt(c, n, null, 'Verderbnis'); }
   }
   setTres(c, v);
+}
+// Ausweichen im letzten Moment (Hieb, Geschoss oder Flächenangriff hätte getroffen): einmal je Rolle. Zählt für die Probe
+// der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
+function evaded(t) {
+  if (t !== S.player || !t.dodge || t.dodge.dash || t.dodge.evaded) return;
+  t.dodge.evaded = true; float(t, 'Ausgewichen', 'rgba(230,207,138,ALPHA)');
+  const st = S.quests.q_monk;
+  if (st?.state === 'active' && (st.progress[0] || 0) < QUESTS.q_monk.objectives[0].count) { st.progress[0] = (st.progress[0] || 0) + 1; log(`${QUESTS.q_monk.name}: ${st.progress[0]}/${QUESTS.q_monk.objectives[0].count}`, 'quest'); }
+  if (t.titleClass !== 'monk') return;
+  const metal = ['chain_hauberk', 'plate_cuirass'].includes(t.equip.chest?.key);
+  const impure = node(t, 'k_stillness') && (ITEMS[t.equip.offhand?.key]?.block || ITEMS[t.equip.weapon?.key]?.twohand);
+  if (metal || impure) return;
+  setTres(t, tres(t) + 1); fx(t.x, t.y - 16, 'frost', 4); UI.refreshHUD();
 }
 function titleOnDeath(c) {
   const p = S.player;
@@ -2875,6 +2919,22 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
     case 'earth_blessing':
       for (const a of [p, ...partyMembers()]) { (a.status ||= []).push({ key: 'regrowth', name: 'Erdsegen', good: true, left: 8000, heal: 3 * (node(p, 'd_earth') ? 1.5 : 1), desc: 'Heilt 8 s lang.' }); fx(a.x, a.y - 8, 'heal', 12); }
       return true;
+    case 'palm_strike': {
+      const f = foes.find(x => dist(p, x) < 64 + (x.r || 10));
+      if (!f) { UI.toast('Zu weit für die Handkante.'); return false; }
+      p.aim = Math.atan2(f.y - p.y, f.x - p.x); hit(p, f, 1.4 * (node(p, 'o_edge') ? 1.2 : 1));
+      f.stagger = Math.max(f.stagger || 0, 700 + (node(p, 'o_edge') ? 500 : 0)); f.swing = 0; f.telegraph = 0; f.windup = false;
+      act(p, 'strike', 240, f); camShake(3, 90); return true; }
+    case 'still_water':
+      p.status = (p.status || []).filter(q => q.key !== 'bleeding');
+      p.status.push({ key: 'regrowth', name: 'Stilles Wasser', good: true, left: 6000, heal: 4 * (node(p, 'o_breath') ? 1.5 : 1), desc: 'Heilt 6 s lang.' });
+      S.fx.push({ x: p.x, y: p.y - 6, vx: 0, vy: 0, type: 'ring', s: 1.5, life: 700, maxLife: 700 }); fx(p.x, p.y - 12, 'heal', 10); return true;
+    case 'hundred_steps': {
+      if (p.dodge || p.downed) return false;
+      const far = node(p, 'o_steps');
+      p.dodge = { t: 0, ax: Math.cos(p.aim), ay: Math.sin(p.aim), dist: 180 + (far ? 60 : 0), dur: 320,
+        dash: { hit: [], mult: (0.5 + 0.25 * v) * (far ? 1.25 : 1) } };
+      p.invuln = true; p.swing = 0; fx(p.x, p.y + 4, 'dust', 8); sfx('dodge'); return true; }
     case 'hex': {
       const f = foes.find(x => dist(p, x) < 260);
       if (!f) { UI.toast('Kein Ziel für den Fluch.'); return false; }
@@ -3270,7 +3330,7 @@ function dodge() {
   const p = S.player;
   if (p.downed || p.dodge || p.channel) return false;
   if (p.dodgeCd > 0) return false;
-  const cost = DODGE.stam * (1 - tfx(p, 'dodge'));
+  const cost = DODGE.stam * (1 - tfx(p, 'dodge')) * (p.titleClass === 'monk' ? 0.75 : 1);   // Mönch: Leerer Geist
   if (p.stamina < cost) { UI.toast('Zu erschöpft zum Ausweichen'); return false; }
   if (B.speedFactor(p) < 0.5) { UI.toast('Mit diesen Beinen rollst du nicht.'); return false; }
   const { dx, dy } = moveInput();
@@ -3607,6 +3667,28 @@ export function selftest() {
       S.ranks.undead = 0; urnRite(crypt);
       return closed && open && fight && teamOf(warden) === 'player' && hasItem(p, 'ancestor_urn', 1);
     } finally { S.quests.q_undead = keepQ.u; S.quests.q_pact = keepQ.p; if (!keepQ.u) delete S.quests.q_undead; if (!keepQ.p) delete S.quests.q_pact; }
+  }));
+  ok('Mönch: Gelübde kostet halbes Gold, schließt Totenpakte aus; Ausweichen im letzten Moment gibt 1 Fokus je Rolle (nicht in Metall), Treffer kostet 1', sandbox(() => {
+    const p = stage(), keep = S.quests.q_monk; S.gold = 100; const ord = S.factions.order;
+    try {
+      S.quests.q_monk = { state: 'active', progress: [0, 0] };
+      if (!unlockTitle('monk', 'Test') || S.gold !== 50 || S.factions.order !== ord + 20 || unlockTitle('necromancer', 'Test')) return false;
+      const b = spawnEnemy('bandit', '__a', 11, 9); b.x = p.x + 20; b.y = p.y; b.aim = Math.PI; combat = S.ents.__a.filter(e => e.alive);
+      p.dodge = { t: 0, ax: 0, ay: 1 }; p.invuln = true; resolveSwingEnemy(b); resolveSwingEnemy(b);
+      const one = tres(p) === 1 && S.quests.q_monk.progress[0] === 1;
+      p.dodge = null; p.invuln = false; hurt(p, 5, b); const lost = tres(p) === 0;
+      p.equip.chest = mkItem('chain_hauberk'); p.dodge = { t: 0, ax: 0, ay: 1 }; p.invuln = true; resolveSwingEnemy(b);
+      const metal = tres(p) === 0; p.dodge = null; p.invuln = false;
+      return one && lost && metal && !(p.titleClasses || []).includes('necromancer');
+    } finally { if (keep) S.quests.q_monk = keep; else delete S.quests.q_monk; }
+  }));
+  ok('Mönch: Hundert Schritte — unverwundbarer Sprint trifft jeden Gegner im Weg einmal, Fokus ist danach leer', sandbox(() => {
+    const p = stage(); unlockTitle('monk', 'Test'); p.titleClass = 'monk'; setTres(p, 5); p.aim = 0; p.cooldowns = {}; p.equip.weapon = mkItem('longsword');
+    const a = spawnEnemy('wolf', '__a', 11, 9), c = spawnEnemy('wolf', '__a', 11, 9); a.x = p.x + 60; a.y = p.y; c.x = p.x + 130; c.y = p.y + 6;
+    combat = S.ents.__a.filter(e => e.alive); const ha = a.hp, hc = c.hp;
+    useAbility('hundred_steps'); const inv = p.invuln;
+    for (let t = 0; t < 400; t += 16) controlPlayer(16);
+    return inv && a.hp < ha && c.hp < hc && tres(p) === 0 && !p.dodge && !p.invuln && p.x > 300 + 150;
   }));
   ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
     const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';

@@ -543,6 +543,7 @@ export function poseOf(e, now, bow) {
     const k = (now - e.act.at) / (e.act.until - e.act.at), d = e.act.dir || dir;
     if (e.act.kind === 'work') return { dir: d, pose: ((k * 4) | 0) & 1 ? 'a2' : 'a1' };           // Axt/Hacke: zwei Schläge
     if (e.act.kind === 'rise') return { dir: d, pose: k < 0.5 ? 'kneel' : 'hit' };                // vom Boden hoch: Knie, dann wankend
+    if (e.act.kind === 'strike') return { dir: d, pose: k < 0.4 ? 'a2' : 'a3' };                  // Handkante: Stoß und Nachgehen
     return { dir: d, pose: 'kneel' };                                                             // suchen, sammeln, beten
   }
   if (e.draw > 0) return { dir, pose: 'cast' };                         // Bogen gespannt

@@ -136,6 +136,9 @@ export const ABILITIES = {
   chaos_bolt:  { name:'Chaosblitz', title:'warlock', cd:2500, gain:15, desc:'Schattengeschoss; Schaden steigt mit der Verderbnis (bis ×2). +15 Verderbnis.' },
   roots:       { name:'Rankenfessel', title:'druid', cd:7000, cost:25, desc:'Ranken halten das nächste Ziel 3 s fest. Kostet 25 Wildkraft.' },
   spirit_wolf: { name:'Geisterwolf', title:'druid', cd:15000, cost:40, desc:'Ein Wolf aus Nebel kämpft 30 s an deiner Seite. Kostet 40 Wildkraft.' },
+  palm_strike: { name:'Handkante', title:'monk', cd:3500, cost:1, desc:'Ein kurzer, harter Schlag: 1,4-facher Schaden, das Ziel taumelt. Kostet 1 Fokus.' },
+  still_water: { name:'Stilles Wasser', title:'monk', cd:16000, cost:2, desc:'Atmen, sammeln: heilt 6 s lang, stillt Blutungen. Kostet 2 Fokus.' },
+  hundred_steps:{ name:'Hundert Schritte', title:'monk', cd:9000, cost:'all', min:3, desc:'Ein Sprint durch die Reihen: unverwundbar, jeder Gegner im Weg wird getroffen — stärker je Fokus. Verbraucht allen Fokus (mindestens 3).' },
   earth_blessing:{ name:'Erdsegen', title:'druid', cd:14000, cost:30, desc:'Dich und deine Gruppe heilt die Erde 8 s lang. Kostet 30 Wildkraft.' },
   unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
 };
@@ -146,7 +149,7 @@ export const ABILITIES = {
 // drei Sonderfähigkeiten, die nur diese Ressource nutzen, ein Passiv, einen ehrlichen Makel, Kosten beim Pakt,
 // Fraktionsfolgen und ein sichtbares Merkmal. Aktiv ist höchstens eine; Pakte schließen einander aus (excludes).
 export const TITLE_CLASSES = {
-  necromancer: { name:'Nekromant', title:'Totenrufer', glow:'#8fd9b0', faction:'undead', excludes:['warlock'], reversible:false,
+  necromancer: { name:'Nekromant', title:'Totenrufer', glow:'#8fd9b0', faction:'undead', excludes:['warlock', 'monk'], reversible:false,
     desc:'Ein Pakt mit den Ahnen des Totenreichs. Kontrolle statt Zerstörung: die Toten stehen für dich auf.',
     resource:{ key:'essence', name:'Seelenessenz', max:6, start:0, css:'essence',
       rule:'Jeder Tod in deiner Nähe (bis ~9 Schritt) gibt +1, auch durch deine Diener. Sie verfliegt nicht und kommt nicht durch Rast.' },
@@ -156,7 +159,7 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Ein Teil von dir bleibt bei den Toten: Leben −10 % für immer.', hpMul:0.9 },
     rep:{ undead:20, order:-30, valen:-10 },
     unlock:'„Der Pakt der Stillen Schar“: die Ahnenurne aus der Großen Nekropole zu Ysra nach Alt-Vharn bringen.' },
-  warlock: { name:'Hexenmeister', title:'Schattengebundener', glow:'#b07ae0', faction:'undead', excludes:['necromancer'], reversible:false,
+  warlock: { name:'Hexenmeister', title:'Schattengebundener', glow:'#b07ae0', faction:'undead', excludes:['necromancer', 'monk'], reversible:false,
     desc:'Ein Pakt mit dem, was im Obelisken flüstert. Flüche, Chaos, Macht auf Pump.',
     resource:{ key:'corruption', name:'Verderbnis', max:100, start:20, css:'corruption',
       rule:'Jede Titelfähigkeit lädt sie auf. Außerhalb des Kampfes sinkt sie (−4/s). Stirbt ein Verfluchter, sinkt sie um 15.' },
@@ -176,6 +179,16 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Der Hain nimmt, was er gibt: Stärke −1 für immer.', attr:{ strength:-1 } },
     rep:{ order:5 },
     unlock:'„Der Ruf des Hains“: Mira im Alten Hain des Westwalds helfen — das Rudel der Wolfsschlucht vertreiben, Heilkraut für die Quelle bringen.' },
+  monk: { name:'Mönch', title:'Hand des Ordens', glow:'#e6cf8a', faction:'order', excludes:['necromancer', 'warlock'], reversible:false,
+    desc:'Die Stille Hand von Sonnwacht: nicht getroffen werden, dann zuschlagen. Kraft aus Aufmerksamkeit, nicht aus Eisen.',
+    resource:{ key:'focus', name:'Fokus', max:5, start:0, css:'focus',
+      rule:'Jedes Ausweichen, das einen Treffer oder ein Geschoss ins Leere laufen lässt, gibt +1. Wirst du getroffen, verlierst du 1. Sonst bleibt er.' },
+    abilities:['palm_strike', 'still_water', 'hundred_steps'],
+    passive:{ name:'Leerer Geist', desc:'Ausweichen kostet 25 % weniger Ausdauer.' },
+    flaw:{ name:'Gelübde der Leichtigkeit', desc:'In Ketten- oder Plattenpanzer sammelst du keinen Fokus.' },
+    cost:{ desc:'Das Gelübde der Armut: die Hälfte deines Goldes geht an das Kloster, und Rooks Bande vergisst dich nicht.', gold:0.5 },
+    rep:{ order:20, bandit:-30 },
+    unlock:'„Die Probe der Stillen Hand“: Meisterin Ilva in Sonnwacht — zehnmal im letzten Moment ausweichen, vier Tote zur Ruhe bringen, dann das Gelübde.' },
 };
 export const MAX_TITLES = 2;                       // höchstens zwei Titelklassen je Figur (Nutzerwunsch), getragen wird eine
 
@@ -189,6 +202,7 @@ export const SKILL_BRANCHES = {
   necromancer:{ name:'Nekromantie', title:'necromancer', desc:'Nur für Nekromanten.' },
   warlock:{ name:'Hexerei', title:'warlock', desc:'Nur für Hexenmeister.' },
   druid:  { name:'Hainkunde', title:'druid', desc:'Nur für Druiden.' },
+  monk:   { name:'Stille Hand', title:'monk', desc:'Nur für Mönche.' },
 };
 export const SKILL_TREE = {
   // Kampf
@@ -247,6 +261,13 @@ export const SKILL_TREE = {
   d_earth:  { branch:'druid', row:1, type:'notable', name:'Heilende Erde', fx:{}, requires:['d_roots'], desc:'Erdsegen heilt 50 % mehr.' },
   k_grove:  { branch:'druid', row:2, type:'keystone', name:'Hüter des Hains', fx:{}, requires:['d_pack', 'd_earth'],
     desc:'Auf Gras und im Wald: Schaden +15 %, Rüstung +3. Auf Stein, Asche und in Siedlungen: Schaden −10 %.', designIntent:'Der Druide gehört nach draußen: stark im Wald, schwach in Stein und Stadt.' },
+  // Stille Hand
+  o_breath: { branch:'monk', row:0, name:'Zweiter Atem des Klosters', fx:{}, requires:[], desc:'Stilles Wasser heilt 50 % mehr.' },
+  o_edge:   { branch:'monk', row:0, name:'Harte Hand', fx:{}, requires:[], desc:'Handkante: Taumeln 0,5 s länger, Schaden +20 %.' },
+  o_well:   { branch:'monk', row:1, name:'Tiefer Brunnen', fx:{}, requires:['o_breath'], desc:'Fokus fasst 2 mehr.' },
+  o_steps:  { branch:'monk', row:1, type:'notable', name:'Wind im Rücken', fx:{}, requires:['o_edge'], desc:'Hundert Schritte trägt 60 px weiter und trifft 25 % härter.' },
+  k_stillness:{ branch:'monk', row:2, type:'keystone', name:'Vollkommene Stille', fx:{}, requires:['o_well', 'o_steps'],
+    desc:'Getroffen werden kostet keinen Fokus mehr. Dafür: mit Schild oder Zweihandwaffe gibt es gar keinen Fokus.', designIntent:'Der Mönch als Reinform: ohne Schild, ohne schwere Klinge — dafür verzeiht die Stille einen Fehler.' },
 };
 
 export const FACTIONS = {
@@ -306,6 +327,9 @@ export const NPCS = [
   { key:'brann', name:'Brann', prof:'Meisterschmiedin', faction:'valen', age:44, home:'northsmith',
     traits:['stolz','genau'], attrs:{strength:13,crafting:16}, cls:'warrior', recruit:false, smith:true,
     greet:'„Nordfurter Stahl hält. Aber es gab einmal Besseres — tief unter dem Frostkamm.“' },
+  { key:'ilva', name:'Ilva', prof:'Meisterin der Stillen Hand', faction:'order', age:57, home:'sonnwacht',
+    traits:['diszipliniert','geduldig'], attrs:{agility:15,willpower:14}, cls:'wanderer', recruit:false,
+    greet:'„Du stehst, als würdest du gleich getroffen. Das lässt sich ändern.“' },
   { key:'sael', name:'Sael', prof:'Totenschreiber', faction:'undead', age:0, home:'vharnholm', undead:true,
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
     pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','dagger','traveler_cloak'],
@@ -360,6 +384,9 @@ export const QUESTS = {
   q_kingsiron: { name:'Königseisen', giver:'brann', desc:'Unter dem Frostkamm liegt die Tiefhall. Die alten Bergleute schmolzen dort Eisen nur für ihren König — und der König soll sie nie verlassen haben. Bring mir einen Barren aus seinem Hort, und ich schmiede dir eine Klinge, wie Nordfurt keine zweite hat.',
     objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
     reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
+  q_monk: { name:'Die Probe der Stillen Hand', giver:'ilva', desc:'Der Orden hat Ritter genug, die Hiebe einstecken. Die Stille Hand steckt keine ein. Weich zehnmal im letzten Moment aus — so knapp, dass der Hieb dich hätte treffen müssen. Und bring vier Tote zur Ruhe, die nicht ruhen. Dann reden wir über das Gelübde.',
+    objectives:[{type:'dodge',target:'any',count:10,text:'Im letzten Moment ausweichen'}, {type:'kill',target:'skeleton',count:4,text:'Tote zur Ruhe bringen'}],
+    reward:{xp:180}, turnin:'ilva', pact:true },
   q_grove: { name:'Der Ruf des Hains', giver:'mira', desc:'Das Rudel der Wolfsschlucht treibt sich im Hain herum, seit die Quelle krank ist. Vertreib vier Wölfe und bring mir drei Heilkraut für die Quelle. Dann sehen wir, ob der Wald dich will.',
     objectives:[{type:'kill',target:'wolf',count:4,text:'Wölfe vertreiben'}, {type:'item',target:'herb',count:3,text:'Heilkraut für die Quelle'}],
     reward:{xp:150}, turnin:'mira', pact:true },
