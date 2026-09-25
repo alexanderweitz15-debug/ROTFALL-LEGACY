@@ -553,7 +553,8 @@ function classUI(body) {
   // Titelklassen: neben der Grundklasse getragen; freigeschaltet nur durch Taten in der Welt
   const known = p.titleClasses || [];
   body.insertAdjacentHTML('beforeend', `<div class="ledger" style="margin-top:16px">Titelklassen trägst du zusätzlich zur Klasse — wie einen Titel.
-    Sie werden in der Welt erworben, nie gewählt${known.length ? '' : '. Du hast noch keine'}.</div>
+    Sie werden in der Welt erworben, nie gewählt. Höchstens zwei je Figur, getragen wird eine; ihre Talentzweige gelten beide
+    (${known.length}/2)${known.length ? '' : ' — du hast noch keine'}.</div>
     <div class="inv-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
     ${known.map(k => `<button class="build-item" data-t="${k}" style="border-color:${TITLE_CLASSES[k].glow}">${TITLE_CLASSES[k].name}
       <small>${k === p.titleClass ? 'getragen · ablegen' : 'tragen'}</small><br><span class="ledger">${TITLE_CLASSES[k].desc}</span></button>`).join('')}</div>`);

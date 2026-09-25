@@ -47,6 +47,7 @@ export const LOCATIONS = [
   { key:'altvharn',  name:'Alt-Vharn',          x:362,y:380,r:16, kind:'ruin',    threat:4, faction:'undead' },
   { key:'necropolis',name:'Große Nekropole',    x:404,y:437,r:14, kind:'ruin',    threat:4, faction:'undead' },
   { key:'blackkeep', name:'Die Schwarze Feste', x:431,y:430,r:18, kind:'city',    threat:5, faction:'undead' },
+  { key:'grove',     name:'Alter Hain',         x:80, y:288,r:6,  kind:'shrine',  threat:1 },
   { key:'mistisle',  name:'Nebelinsel',         x:90, y:500,r:12, kind:'wild',    threat:2 },
 ];
 
@@ -954,7 +955,7 @@ export function genWorld() {
   for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
-  pactScenes();
+  pactScenes(); groveScene();
   const wild = new Set(props.slice(handMark));
   resampleWorld();                                         // Entwurf → Weltmaßstab (ohne rnd())
   phase = 'world';
@@ -1011,6 +1012,17 @@ export function pactScenes() {
   // Schattenkreis am Nekromanten-Turm: Vhal flüstert aus dem Obelisken
   for (const [dx, dy] of [[-3, 1], [3, 1], [-2, 4], [2, 4], [0, 5]]) P('standing_stone', 392 + dx, 348 + dy, { solid: true, r: 8, label: 'Schattenstein' });
   P('candles', 391, 352, { r: 6 }); P('candles', 393, 352, { r: 6 }); P('blood', 393, 354, { r: 4 });
+}
+
+// Der Alte Hain im Westwald (Session 5): Lichtung mit Quelle, Steinkreis, Pilzen — Miras Ort, Freischaltung des Druiden.
+export function groveScene() {
+  const P = (t, x, y, o = {}) => prop(t, x, y, { groveScene: true, ...o }), cx = 80, cy = 288;
+  clearing(cx, cy, 5);
+  setTile('world', cx, cy, T.WATER); setTile('world', cx + 1, cy, T.WATER);                    // die kranke Quelle
+  for (const [dx, dy] of [[-4, -1], [-3, -3], [0, -4], [3, -3], [4, -1], [-3, 3], [3, 3]]) P('standing_stone', cx + dx, cy + dy, { solid: true, r: 8, label: 'Hainstein' });
+  for (const [dx, dy] of [[-1, 2], [2, 2], [-2, -1], [3, 1]]) P('mushrooms', cx + dx, cy + dy, { r: 4 });
+  P('flowers_prop', cx, cy + 2, { r: 4 }); P('flowers_prop', cx + 1, cy - 2, { r: 4 }); P('fallen_tree', cx - 2, cy + 4, { solid: true });
+  P('candles', cx + 2, cy - 1, { r: 6 });
 }
 
 // ---------------- Grube (Dungeon) ----------------

@@ -127,6 +127,9 @@ export const ABILITIES = {
   soul_harvest:{ name:'Seelenernte', title:'necromancer', cd:20000, cost:'all', desc:'Verbraucht alle Essenz: heilt dich und deine Diener, entzieht Feinden ringsum Leben.' },
   hex:         { name:'Fluch', title:'warlock', cd:6000, gain:20, desc:'Das nächste Ziel nimmt 12 s lang 25 % mehr Schaden und wird langsamer. +20 Verderbnis.' },
   chaos_bolt:  { name:'Chaosblitz', title:'warlock', cd:2500, gain:15, desc:'Schattengeschoss; Schaden steigt mit der Verderbnis (bis ×2). +15 Verderbnis.' },
+  roots:       { name:'Rankenfessel', title:'druid', cd:7000, cost:25, desc:'Ranken halten das nächste Ziel 3 s fest. Kostet 25 Wildkraft.' },
+  spirit_wolf: { name:'Geisterwolf', title:'druid', cd:15000, cost:40, desc:'Ein Wolf aus Nebel kämpft 30 s an deiner Seite. Kostet 40 Wildkraft.' },
+  earth_blessing:{ name:'Erdsegen', title:'druid', cd:14000, cost:30, desc:'Dich und deine Gruppe heilt die Erde 8 s lang. Kostet 30 Wildkraft.' },
   unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
 };
 
@@ -156,7 +159,18 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Der Schatten nimmt Atem: Ausdauer −10 für immer.', stamina:-10 },
     rep:{ undead:15, order:-30, valen:-10 },
     unlock:'„Der Pakt der Stillen Schar“: die Ahnenurne statt zu Ysra zu Vhal, dem Flüsternden, am Nekromanten-Turm bringen.' },
+  druid: { name:'Druide', title:'Hainhüter', glow:'#b7d86a', faction:null, excludes:[], reversible:false,
+    desc:'Der Wald hat dich angenommen. Kraft aus Wurzel, Rudel und Erde — solange du draußen bist.',
+    resource:{ key:'wild', name:'Wildkraft', max:100, start:40, css:'wild',
+      rule:'Wächst von selbst (+5/s), aber nur draußen auf Gras, Erde und Sumpf. In Siedlungen, auf Stein und Asche, unter Tage steht sie still.' },
+    abilities:['roots', 'spirit_wolf', 'earth_blessing'],
+    passive:{ name:'Waldgänger', desc:'Draußen in der Natur heilen deine Wunden langsam von selbst (0,5 Leben/s).' },
+    flaw:{ name:'Metall erstickt', desc:'In Ketten- oder Plattenpanzer wächst die Wildkraft nur halb so schnell.' },
+    cost:{ desc:'Der Hain nimmt, was er gibt: Stärke −1 für immer.', attr:{ strength:-1 } },
+    rep:{ order:5 },
+    unlock:'„Der Ruf des Hains“: Mira im Alten Hain des Westwalds helfen — das Rudel der Wolfsschlucht vertreiben, Heilkraut für die Quelle bringen.' },
 };
+export const MAX_TITLES = 2;                       // höchstens zwei Titelklassen je Figur (Nutzerwunsch), getragen wird eine
 
 // ---- Skill-Baum (Session 5): 1 Punkt je Stufe. Allgemeine Zweige für alle, dazu ein Zweig je Titelklasse, der erst mit ihr
 // erscheint. requires = einer der genannten Knoten reicht (Pfad), [] = Einstieg. Effekte addieren sich (fx), besondere Regeln
@@ -279,6 +293,9 @@ export const NPCS = [
   { key:'vhal', name:'Vhal', prof:'Der Flüsternde', faction:'undead', age:0, home:'necrotower',
     traits:['gierig','kalt'], attrs:{intelligence:16,willpower:12}, cls:'mage', recruit:false, undead:true,
     greet:'„Ysra will die Toten ordnen. Ich will, dass sie tanzen. Was willst du?“' },
+  { key:'mira', name:'Mira', prof:'Hüterin des Hains', faction:null, age:66, home:'grove',
+    traits:['geduldig','gütig'], attrs:{willpower:14,perception:13}, cls:'wanderer', recruit:false,
+    greet:'„Tritt leise. Hier wachsen Dinge, die älter sind als dein Königreich.“' },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },
@@ -323,6 +340,9 @@ export const QUESTS = {
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
     reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  q_grove: { name:'Der Ruf des Hains', giver:'mira', desc:'Das Rudel der Wolfsschlucht treibt sich im Hain herum, seit die Quelle krank ist. Vertreib vier Wölfe und bring mir drei Heilkraut für die Quelle. Dann sehen wir, ob der Wald dich will.',
+    objectives:[{type:'kill',target:'wolf',count:4,text:'Wölfe vertreiben'}, {type:'item',target:'herb',count:3,text:'Heilkraut für die Quelle'}],
+    reward:{xp:150}, turnin:'mira', pact:true },
   q_pact: { name:'Der Pakt der Stillen Schar', giver:'ysra', desc:'In der Großen Nekropole ruht die Ahnenurne, bewacht von dem, der sie nie losließ. Wer zur Schar gehört, dem öffnet er. Alle anderen müssen an ihm vorbei. Bring die Urne — zu mir, wenn du die Toten führen willst.',
     objectives:[{type:'item',target:'ancestor_urn',count:1,text:'Ahnenurne aus der Großen Nekropole holen'}],
     reward:{xp:200}, turnin:'ysra', pact:true },
