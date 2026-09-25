@@ -12,7 +12,7 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 5 | Visual Style Revision (restliche Welt) | TESTEN | JA, im Kern | Session 3: Testbereich §25, Fels, Wasser, Boden, Mauern, Grube, Titel. Offen: Leere Flächen (Totenreich) sind Inhalt → Phase 16 |
 | 6 | Animation & Combat Polish | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Deckung/Parade, Rollen-Landung, Sitzen, Handeln. Nutzer: Kampfgefühl und Klänge gegenhören. Bewusst nicht: Sprint (Shift ist Deckung), Türen als Objekte |
 | 7 | Weapon Expansion | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: 19 Waffen, 13 Klassen; Rapier, Kriegshammer, Hellebarde, Armbrust, Zauberstab mit eigener Mechanik. Bewusst nicht: Kombos |
-| 8 | Rarity & Loot | NICHT BEGONNEN | — | Rarität ist nur Etikett |
+| 8 | Rarity & Loot | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Rarität je Exemplar, 12 Affixe, 3 legendäre Effekte, 2 Unikate, Tabelle im GDD |
 | 9 | Skill Tree | IN ARBEIT | teilweise | Session 5: 3 allgemeine + 3 Titelzweige, Schlüsselknoten mit Preis/Absicht. Offen: Umlernen, Balancing im Spiel |
 | 10 | Classes | IN ARBEIT | teilweise | Titelklassen Nekromant/Hexenmeister/Druide/Mönch (Session 6), max. 2 je Figur, Titelzweige im Skill-Baum (§78 Keystone ✓). Kopfgeldjäger/Barde/Alchemist nur Entwurf |
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
@@ -27,6 +27,13 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 20 | Performance | TEILWEISE | — | Spielstand 0,53 MB (BUG-017/057 ✓). Offen: Wald-Zeichnen 2,8 ms (Budget 2,0), im echten Browser messen |
 | 21 | Second Complete Playthrough | NICHT BEGONNEN | — | |
 | 22 | Final Quality Pass | NICHT BEGONNEN | — | |
+
+## Phase 8 — Definition of Done (§30, §48) — Session 7
+- [x] Rarität ist nicht nur Farbe: Affixe, Werte, Sondereffekte, Wert, Bild (Klinge, Runen, Bodenglanz, Zelle)
+- [x] Drop-Chancen abgestuft und als Tabelle im GDD (gemessen), Mythisch nur als Unikat; Loot bleibt kontrolliert (Tabellen je Gegner)
+- [x] Ursachen behoben: Aufheben verlor das Exemplar, Verkaufen traf das falsche Exemplar
+- [x] REGRESSION 73/73 · [x] DOKUMENTATION
+- [ ] Nutzer: fühlen sich Funde besonders an? (Werte sind Startwerte)
 
 ## Phase 7 — Definition of Done (§29) — Session 7
 - [x] Bestehende 14 Waffen erhalten; 5 Klassen dazu, jede mit eigener Regel (nicht nur Werte), eigenem Gefühl und Bild

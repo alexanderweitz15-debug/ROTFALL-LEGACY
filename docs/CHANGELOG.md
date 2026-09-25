@@ -4,6 +4,13 @@ Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund
 
 ## Session 7 — 2026-09-25 · Phasen abschließen (Nutzer: „schließ die restlichen Phasen ab“)
 
+### Phase 8 — Rarität & Beute (data.js, game.js, ui.js, render.js, sprites.js, style.css)
+- `rollRarity`, `AFFIXES`, `LEGENDS`, `RARITY_DROP/VALUE/AFFIXES`, `afx()`, `hasLeg()`, `giveItem()`; Unikate Nachtfrost, Hackmesser.
+
+### Phase 7 — Waffen (data.js, game.js, sprites.js, render.js)
+- Rapier, Kriegshammer, Hellebarde, Armbrust, Zauberstab (Felder riposte/crush/sweep/reload/manaShot), FEEL, Designs, Geschosse.
+- Läden: Brann (Schmiede, eigener Pool, `market:false`), Gerold/Oda/Sael-Pools; Handelsdaten beim Laden nachziehen.
+
 ### Phase 6 — Animation & Combat Polish (game.js, sprites.js, render.js, world.js, index.html, style.css)
 - Deckung/Parade (`updateGuard`, `guarded`, Feld `cover`), Touch-Knopf „Deckung“; Rollen-Landung (`landT`, i-Frames −40 ms).
 - Posen guard/sit/trade; Sitzplätze an Bank/Tisch (`assignNpcDays`), Handelsgeste; Waffe abgelegt beim Sitzen.

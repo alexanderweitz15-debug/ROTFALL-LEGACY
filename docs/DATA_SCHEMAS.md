@@ -144,6 +144,10 @@ Spieler: `skillPoints`, `tree` ({ knoten: 1 }), `tfx` (Laufzeit-Summe). Titelkla
 ×2,2, sicher kritisch), `crush` (ignoriert Schilde, Deckung ×2, Ziel taumelt), `sweep` (trifft alle im Bogen, Spitze/Schaft),
 `reload` (ms Spannzeit nach dem Schuss), `manaShot` (Mana je Schuss), `ap` gilt auch für Geschosse.
 
+## Gegenstands-Exemplar — Session 7
+`{ key, count, cond, rar?, afx?: { affix: wert }, leg? }` — `rar` nur, wenn besser als `ITEMS[key].rarity`; Unikate
+(`unique:true`) tragen `rarity`/`leg` im Typ und würfeln nie. Aufheben/Truhe behalten das Exemplar (`giveItem`).
+
 ## Spielstand — Session 6
 - `ents[map]`: alle Karten aus `MAP_KEYS` (world, mine, deep). Props mit `gk` (Typ@Kachel[#n]) nur, wenn sie vom
   Grundzustand abweichen; `propsGone[map]`: Schlüssel entfernter erzeugter Props. Props ohne `gk` (gebaut, alt) voll.

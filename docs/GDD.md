@@ -107,6 +107,25 @@ Bezugsquellen (Session 7): Brann (Nordfurt) Schwerwaffen, Gerold (Nordfurt) Rapi
 Oda (Grenzwacht) Armbrust/Hellebarde, Sael (Vharnholm) Zauberstab. Kombos: bewusst keine (ein Hieb = eine Entscheidung,
 Tempo und Gefühl unterscheiden die Klassen); Runenwaffen kommen über Rarität (Phase 8).
 
+## Rarität & Beute (Session 7, Phase 8)
+Jedes Ausrüstungs-Exemplar hat seine Rarität (nie unter der Grundrarität des Typs). Gewürfelt wird beim **Fund**
+(Gegnerbeute, Truhen); Läden verkaufen Grundware — Glück findet man draußen, nicht am Stand.
+
+| Stufe | Chance (Gefahr 0) | Gefahr 1 | Gefahr 3 | Affixe | Wert |
+|---|---|---|---|---|---|
+| Gewöhnlich | 62 % | 59 % | 51 % | — | ×1 |
+| Ungewöhnlich | 24 % | 22 % | 19 % | 1 klein | ×1,35 |
+| Selten | 10 % | 13,5 % | 21 % | 2 klein | ×1,9 |
+| Episch | 3,5 % | 5 % | 8 % | 3, davon 1 spielverändernd | ×3 |
+| Legendär | 0,5 % | 0,7 % | 0,8 % | Sondereffekt + 2 klein | ×5 |
+| Mythisch | nie zufällig | — | — | eigenes Unikat mit Mechanik | ×8 |
+
+Gefahr = Gefahrenstufe des Gegners − 1 (+1 für Bosse); Truhen zählen als Gefahr 1 (gemessen: 10 000 Würfe).
+Kleine Affixe: Schärfe, Leichtigkeit, Auge, Durchschlag, Atem (Waffe); Härte, Lebenskraft, Leichtfuß, Zähigkeit (Rüstung).
+Spielverändernd: Blutzoll (Heilung aus Schaden), Zerfetzen (Blutung), Dornen (Rückschaden). Legendäre Effekte: Blutdurst,
+Nachhall, Ahnenwall. Unikate: **Nachtfrost** (mythisch, Hrodvar, Durchfrieren), **Goraks Hackmesser** (legendär, Blutdurst).
+Geschosse tragen weder Blutzoll noch Zerfetzen (sie laufen nicht über den Nahkampftreffer) — deshalb nie auf Fernwaffen.
+
 ## Gegner (Kurzblätter)
 | Gegner | Verhalten | Ansage | Region | interiors |
 |---|---|---|---|---|
