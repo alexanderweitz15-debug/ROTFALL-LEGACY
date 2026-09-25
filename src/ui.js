@@ -1,6 +1,6 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
-import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES } from './data.js';
+import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt } from './world.js';
 import { townState, townPrice } from './sim.js';
@@ -23,7 +23,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const NAV = [
   ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
   ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
-  ['quests', 'Aufträge', 'J'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
+  ['skills', 'Talente', 'T'], ['quests', 'Aufträge', 'J'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
 ];
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
@@ -338,7 +338,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   if (R) R[1](body, arg);
 }
@@ -515,6 +515,7 @@ function charUI(body, who) {
       <h3>Fähigkeiten</h3>
       <p class="traits">${(p.abilities || []).map(a => ABILITIES[a].name).join(' · ') || 'Noch keine. Lehrer findet man in der Welt.'}</p>
       ${titleBlock(p, isPlayer)}
+      ${isPlayer ? `<h3>Talente</h3><p class="traits">${Object.keys(p.tree || {}).map(k => SKILL_TREE[k]?.name).filter(Boolean).join(' · ') || 'Noch keine.'}${p.skillPoints ? ` · <b style="color:var(--gold)">${p.skillPoints} frei (T)</b>` : ''}</p>` : ''}
       <h3>Fertigkeiten</h3>
       <dl class="ledger-list">${skills.map(([k, n]) => `<div><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
     </section>
@@ -557,6 +558,30 @@ function classUI(body) {
     ${known.map(k => `<button class="build-item" data-t="${k}" style="border-color:${TITLE_CLASSES[k].glow}">${TITLE_CLASSES[k].name}
       <small>${k === p.titleClass ? 'getragen · ablegen' : 'tragen'}</small><br><span class="ledger">${TITLE_CLASSES[k].desc}</span></button>`).join('')}</div>`);
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { A.setTitleClass(b.dataset.t === p.titleClass ? null : b.dataset.t); closeModal(); });
+}
+
+// ---- Skill-Baum ----
+// Spalten je Zweig, Zeilen = Tiefe. Titelzweige stehen darunter; solange die Titelklasse fehlt, versiegelt (sichtbar, damit man
+// weiß, wofür sich der Weg lohnt). Tooltip zeigt Wirkung und — bei Schlüsselknoten — die Absicht.
+function skillUI(body) {
+  const p = S.player, pts = p.skillPoints || 0;
+  const col = b => {
+    const N = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === b), rows = Math.max(...N.map(([, n]) => n.row)) + 1, B_ = SKILL_BRANCHES[b];
+    const sealed = B_.title && !(p.titleClasses || []).includes(B_.title);
+    return `<div class="tree-branch${sealed ? ' sealed' : ''}"><h3>${B_.name}</h3><p class="ledger">${sealed ? `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.` : B_.desc}</p>
+      ${Array.from({ length: rows }, (_, r) => `<div class="tree-row">${N.filter(([, n]) => n.row === r).map(([k, n]) => {
+        const st = A.nodeState(p, k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
+        const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
+        return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" title="${tip.replace(/"/g, '&quot;')}">${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : 'gesperrt'}</small></button>`;
+      }).join('')}</div>`).join('')}</div>`;
+  };
+  const base = ['combat', 'magic', 'survival'], titles = Object.keys(SKILL_BRANCHES).filter(b => !base.includes(b));
+  body.innerHTML = `<div class="ledger">Talentpunkte frei: <b style="color:var(--gold)">${pts}</b> · einer je Stufe. Ein Knoten braucht einen gelernten
+    Knoten darüber (einer genügt). Schlüsselknoten verändern die Spielweise und haben einen Preis.</div>
+    <div class="tree-wrap">${base.map(col).join('')}</div>
+    <div class="ledger" style="margin-top:12px">Zweige der Titelklassen</div>
+    <div class="tree-wrap">${titles.map(col).join('')}</div>`;
+  body.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { A.learnNode(b.dataset.k); refreshModal(); });
 }
 
 // ---- Gruppe ----

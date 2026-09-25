@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year } from './state.js';
-import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES } from './data.js';
+import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
@@ -54,13 +54,21 @@ export function makeChar(o = {}) {
   return c;
 }
 
+// ---- Skill-Baum: Summe der Knoteneffekte (nur wer Knoten hat) und besondere Regeln je Schlüsselknoten ----
+const node = (c, k) => !!(c && c.tree && c.tree[k]);
+function treeFx(c) { const f = {}; for (const k of Object.keys(c.tree || {})) for (const [a, v] of Object.entries(SKILL_TREE[k]?.fx || {})) f[a] = (f[a] || 0) + v; return f; }
+const tfx = (c, k) => (c && c.tfx && c.tfx[k]) || 0;
+const inNature = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0) && [T.GRASS, T.MARSH, T.DIRT].includes(tileAt('world', c.x / TS | 0, c.y / TS | 0));
+const outside = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0);
 export function recalc(c) {
   const a = c.attributes;
-  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1);   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
+  c.tfx = c.tree ? treeFx(c) : null;
+  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1) * (1 + tfx(c, 'hp'));   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
   if (c.body) B.rescale(c, base); else B.initBody(c, base);
-  c.maxStamina = 60 + a.endurance * 3 + a.agility * 2 + B.buildOf(c).stamina + (c.pactCost?.stamina || 0);
+  c.maxStamina = 60 + a.endurance * 3 + a.agility * 2 + B.buildOf(c).stamina + (c.pactCost?.stamina || 0) + tfx(c, 'stam');
   const magic = ['mage', 'cleric', 'paladin'].includes(c.currentClass);   // Titelklassen haben ihre eigene Ressource, kein Mana
-  c.maxMana = magic ? 30 + a.intelligence * 4 + a.willpower * 2 : 0;
+  c.maxMana = magic ? 30 + a.intelligence * 4 + a.willpower * 2 + tfx(c, 'mana') : 0;
+  if (c.kind === 'player') c.invCap = 24 + tfx(c, 'invCap');
   c.partyCap = 3 + Math.floor((c.skills.leadership || 0) / 10) + (S.settlement ? 1 : 0);
 }
 export function armorOf(c) {
@@ -68,6 +76,7 @@ export function armorOf(c) {
   let v = 0;
   for (const k of Object.keys(c.equip)) { const it = c.equip[k]; if (it && ITEMS[it.key].armor) v += ITEMS[it.key].armor * (0.4 + 0.6 * (it.cond ?? 1)); }
   const bless = (c.status || []).find(s => s.key === 'blessing');
+  v = (v + tfx(c, 'armor') + (node(c, 'k_grove') && inNature(c) ? 3 : 0)) * (node(c, 'k_bulwark') ? 1.3 : 1);
   return Math.round(v + (bless ? 5 : 0));
 }
 export function damageOf(c) {
@@ -75,7 +84,11 @@ export function damageOf(c) {
   const base = (it ? it.dmg * (0.55 + 0.45 * (w.cond ?? 1)) : 3) * (B.isDisabled(c, 'rarm') ? 0.3 : 1);
   const skill = it ? (c.skills[it.skill] || 0) : (c.skills.unarmed || 0);
   const attr = it && it.ranged ? c.attributes.agility : c.attributes.strength;
-  return base + attr * 0.35 + skill * 0.22;
+  let m = 1 + tfx(c, 'dmg');
+  if (node(c, 'k_berserk') && c.hp < c.maxHp * 0.3) m += 0.25;                       // Berserker: nah am Tod gefährlicher
+  if (node(c, 'k_grove')) m += inNature(c) ? 0.15 : -0.10;                            // Hüter des Hains
+  if (node(c, 'k_legion') && c.titleClass === 'necromancer') m -= 0.20;               // Legion: Feldherr, kein Fechter
+  return (base + attr * 0.35 + skill * 0.22) * Math.max(0.2, m);
 }
 function speedOf(c) {
   let s = 2.25 + c.attributes.agility * 0.045;
@@ -83,6 +96,7 @@ function speedOf(c) {
   const ch = c.equip.chest && ITEMS[c.equip.chest.key].slow || 0;
   s *= (1 - off - ch);
   if (c.stamina <= 0) s *= 0.55;
+  s *= (1 + tfx(c, 'speed')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c);
 }
 
@@ -160,14 +174,14 @@ function applyHealItem(c, key, target, part) {
   if (it.use === 'bandage' || key === 'herb') {
     part ||= B.worstPart(target) || 'torso';
     const P = target.body[part];
-    const amt = (key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4;
+    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal'));
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
   } else {
-    B.heal(target, it.heal + med * 0.3);
+    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')));
     float(target, '+' + it.heal, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} gibt ${target === c ? 'sich' : target.name} ${it.name}.`, 'party');
   }
@@ -540,7 +554,7 @@ export function newGame(cfg) {
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
     origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   p.attributes = Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
-  p.invCap = 24; p.attrPoints = 0; p.hotbar = [];
+  p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {};   // ein Talentpunkt zum Start, danach einer je Stufe
   S.gold = o.gold;
   o.gear.forEach(k => { const it = mkItem(k); if (ITEMS[k].slot === 'weapon' && !p.equip.weapon) p.equip.weapon = it;
     else if (ITEMS[k].slot === 'chest' && !p.equip.chest) p.equip.chest = it;
@@ -666,6 +680,7 @@ export function continueGame() {
   }
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
+  if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.pact1) {                        // Session 4: Orte des Paktes im Totenreich; die Gruft der Nekropole wird zum Ritualort
     for (const p of fresh) if (p.pactScene) S.ents.world.push(p);
@@ -868,8 +883,8 @@ function tickCombatant(c, dt) {
   if (c.telegraph > 0) c.telegraph -= dt;
   for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - dt);
   const resting = !c.vx && !c.vy;
-  c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5));
-  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2);
+  c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0)));
+  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')));
   if (c === S.player && c.titleClass) titleTick(c, dt);
   // Statuszeiten
   if (c.status && c.status.length) {
@@ -1103,7 +1118,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * (attacker.disarmed ? 0.4 : 1) : damageOf(attacker)) * mult;
   if (attacker.titleClass === 'necromancer') dmg *= 0.85;             // Makel: Die Toten zehren
   // Kritisch
-  const critChance = 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01);
+  const critChance = 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit');
   const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < 1;
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
@@ -1134,6 +1149,7 @@ function hit(attacker, target, mult, kind = 'physical') {
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (!target.alive || target.invuln) return;
   if (source && target.hexed > performance.now()) dmg *= 1.25;        // Fluch des Hexenmeisters
+  if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
   if (ward && dmg > 0) {                                              // Knochenschild fängt ab, bis er bricht
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
@@ -1143,6 +1159,10 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   let result = null, part = null;
   if (target.body) { part = B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit); }
   else target.hp -= dmg;
+  if (node(target, 'k_second') && target.alive && !target.downed && target.hp < target.maxHp * 0.25 && clock() > (target.secondWind || 0)) {
+    target.secondWind = clock() + 180; B.heal(target, target.maxHp * 0.3); target.stamina = target.maxStamina;   // Zweiter Atem (3 Spielstunden = 3 min)
+    fx(target.x, target.y - 14, 'heal', 14); float(target, 'Zweiter Atem', 'rgba(150,200,120,ALPHA)', true);
+  }
   if (target === S.player && S.player.channel && source) { S.player.channel = null; UI.toast('Unterbrochen!'); }   // Blutung allein unterbricht nicht
   target.lastCause = cause; target.lastKiller = source ? source.id : null;
   if (source) target.aggroId = source.id;
@@ -1332,11 +1352,11 @@ function gainXp(c, n) {
   if (!c || !c.alive) return;
   c.xp += n;
   for (const m of partyMembers()) { m.xp += n * 0.6; if (m.xp >= m.xpNext) levelUp(m); }
-  if (c.xp >= c.xpNext) levelUp(c);
+  while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
 function levelUp(c) {
   c.xp -= c.xpNext; c.level++; c.xpNext = Math.round(c.xpNext * 1.35);
-  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; UI.toast(`Stufe ${c.level}`); log(`Du erreichst Stufe ${c.level}.`, 'party'); }
+  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Talentpunkt`); log(`Du erreichst Stufe ${c.level}. Ein Talentpunkt ist frei (T).`, 'party'); }
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
   recalc(c); B.fullHeal(c);
 }
@@ -2565,7 +2585,10 @@ function repairAll(npc) {
 // Ressource (tres, je Ressource gespeichert — ablegen und wieder tragen verliert nichts) und eigene Fähigkeiten.
 const TC = c => c && c.titleClass ? TITLE_CLASSES[c.titleClass] : null;
 function tres(c) { const T = TC(c); if (!T) return 0; c.tres ||= {}; return c.tres[T.resource.key] ??= T.resource.start; }
-function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key] = clamp(v, 0, T.resource.max); }
+function resMax(c) { const T = TC(c); return T ? T.resource.max + (T.resource.key === 'essence' && node(c, 'n_vessel') ? 2 : 0) : 0; }
+function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key] = clamp(v, 0, resMax(c)); }
+const spellMul = c => 1 + tfx(c, 'spell');
+const cdMul = c => 1 - Math.min(0.4, tfx(c, 'cdr'));
 const titleAbilities = c => TC(c)?.abilities || [];
 const pactBound = (c = S.player) => (c?.titleClasses || []).some(k => TITLE_CLASSES[k].faction === 'undead');
 function unlockTitle(key, where) {
@@ -2599,8 +2622,8 @@ function titleTick(c, dt) {
   if (c.titleClass !== 'warlock') return;
   const now = performance.now(), fighting = now - (c.lastCast || -1e9) < 4000 || combat.some(e => e.alive && isHostile(c, e) && dist(c, e) < 300);
   let v = tres(c);
-  if (!fighting) v -= dt / 1000 * 4;
-  if (v > 70 && c.alive && !c.downed) {                      // Makel: sie frisst dich
+  if (!fighting && !node(c, 'k_bloodpact')) v -= dt / 1000 * 4;   // Blutpakt: kein Durchatmen
+  if (v > (node(c, 'w_deep') ? 85 : 70) && c.alive && !c.downed) {   // Makel: sie frisst dich
     c.rot = (c.rot || 0) + dt / 1000 * 1.5;
     if (c.rot >= 1) { const n = Math.floor(c.rot); c.rot -= n; hurt(c, n, null, 'Verderbnis'); }
   }
@@ -2609,7 +2632,7 @@ function titleTick(c, dt) {
 function titleOnDeath(c) {
   const p = S.player;
   if (!p || !p.alive || c === p || c.map !== p.map || c.kind === 'caravan') return;
-  if (p.titleClass === 'necromancer' && !c.servant && dist(p, c) < 280 && tres(p) < TITLE_CLASSES.necromancer.resource.max) {
+  if (p.titleClass === 'necromancer' && !c.servant && dist(p, c) < 280 && tres(p) < resMax(p)) {
     setTres(p, tres(p) + 1); fx(c.x, c.y - 16, 'necro', 6); float(p, '+1 Essenz', 'rgba(143,217,176,ALPHA)');
   }
   if (p.titleClass === 'warlock' && c.hexed > performance.now()) setTres(p, tres(p) - 15);
@@ -2620,14 +2643,18 @@ function crumble(e) {                                        // Diener zerfällt
 }
 function titleAbility(p, key, ab) {                          // true = gewirkt; false = abgebrochen (keine Kosten, keine Abklingzeit)
   const T = TITLE_CLASSES[ab.title], foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b)), v = tres(p);
+  const pact = spellMul(p) * (node(p, 'k_bloodpact') ? 1.25 : 1);   // Titelzauber-Schaden: Magie-Zweig und Blutpakt
   switch (key) {
     case 'raise_dead': {
-      if (S.ents[p.map].filter(e => e.servant === p.id && e.alive).length >= 2) { UI.toast('Mehr als zwei Diener hält der Pakt nicht.'); return false; }
+      const cap = node(p, 'k_legion') ? 3 : 2;
+      if (S.ents[p.map].filter(e => e.servant === p.id && e.alive).length >= cap) { UI.toast(`Mehr als ${cap === 3 ? 'drei' : 'zwei'} Diener hält der Pakt nicht.`); return false; }
       const body = S.ents[p.map].filter(e => e.kind === 'corpse' && !e.raised && dist(p, e) < 220).sort((a, b) => dist(p, a) - dist(p, b))[0];
       if (!body) { UI.toast('Keine Leiche in der Nähe.'); return false; }
       S.ents[p.map].splice(S.ents[p.map].indexOf(body), 1);
       const d = spawnEnemy('skeleton', p.map, body.x / TS | 0, body.y / TS | 0, { level: Math.max(2, p.level) });
-      Object.assign(d, { name: 'Gerufener Toter', x: body.x, y: body.y, anchor: { x: body.x, y: body.y }, servant: p.id, transient: true, until: performance.now() + 60000, glow: T.glow });
+      Object.assign(d, { name: 'Gerufener Toter', x: body.x, y: body.y, anchor: { x: body.x, y: body.y }, servant: p.id, transient: true,
+        until: performance.now() + 60000 + (node(p, 'n_bind') ? 20000 : 0), glow: T.glow });
+      if (node(p, 'n_cold')) { d.maxHp = d.hp = Math.round(d.maxHp * 1.25); if (d.body) B.rescale(d, d.maxHp); }
       fx(body.x, body.y - 10, 'necro', 16); fx(body.x, body.y, 'bone', 8); sfx('bone', 0.6);
       log('Die Leiche steht auf. Sie dient dir — eine Minute lang.', 'combat');
       return true; }
@@ -2635,26 +2662,45 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
       (p.status ||= []).push({ key: 'bone_ward', name: 'Knochenschild', good: true, left: 10000, absorb: 25, desc: 'Fängt die nächsten 25 Schaden ab.' });
       fx(p.x, p.y - 14, 'bone', 10); return true;
     case 'soul_harvest': {
-      const own = [p, ...S.ents[p.map].filter(e => e.servant === p.id && e.alive)];
-      for (const a of own) { if (a.body) B.heal(a, 12 * v); else a.hp = Math.min(a.maxHp, a.hp + 12 * v); fx(a.x, a.y - 14, 'necro', 8); }
-      for (const f of foes) if (dist(p, f) < 150) { hurt(f, 6 * v, p, 'Seelenernte'); fx(f.x, f.y - 12, 'necro', 8); }
-      float(p, '+' + Math.round(12 * v), 'rgba(143,217,176,ALPHA)'); return true; }
+      const own = [p, ...S.ents[p.map].filter(e => e.servant === p.id && e.alive)], k = node(p, 'n_reap') ? 1.5 : 1;
+      for (const a of own) { if (a.body) B.heal(a, 12 * v * k); else a.hp = Math.min(a.maxHp, a.hp + 12 * v * k); fx(a.x, a.y - 14, 'necro', 8); }
+      for (const f of foes) if (dist(p, f) < 150) { hurt(f, 6 * v * k * spellMul(p), p, 'Seelenernte'); fx(f.x, f.y - 12, 'necro', 8); }
+      float(p, '+' + Math.round(12 * v * k), 'rgba(143,217,176,ALPHA)'); return true; }
     case 'hex': {
       const f = foes.find(x => dist(p, x) < 260);
       if (!f) { UI.toast('Kein Ziel für den Fluch.'); return false; }
-      f.hexed = performance.now() + 12000;
+      f.hexed = performance.now() + 12000 + (node(p, 'w_eye') ? 6000 : 0);
       S.fx.push({ x: f.x, y: f.y - 20, vx: 0, vy: 0, type: 'ring', s: 2, life: 700, maxLife: 700 }); fx(f.x, f.y - 14, 'shadow', 10);
       return true; }
     case 'chaos_bolt':
       S.projectiles.push({ id: uid(), kind: 'shadow', map: p.map, x: p.x + Math.cos(p.aim) * 14, y: p.y - 12 + Math.sin(p.aim) * 8,
-        vx: Math.cos(p.aim) * 6, vy: Math.sin(p.aim) * 6, owner: p.id, dmg: (18 + p.attributes.intelligence * 1.4) * (1 + v / 100), life: 1500, team: 'player', splash: 0 });
+        vx: Math.cos(p.aim) * 6, vy: Math.sin(p.aim) * 6, owner: p.id, dmg: (18 + p.attributes.intelligence * 1.4) * (1 + v / 100) * pact * (node(p, 'w_core') ? 1.2 : 1), life: 1500, team: 'player', splash: 0 });
       return true;
     case 'unleash':
-      for (const f of foes) if (dist(p, f) < 110) hurt(f, v * 0.6, p, 'Entfesseln');
+      for (const f of foes) if (dist(p, f) < 110 + (node(p, 'w_rift') ? 40 : 0)) hurt(f, v * 0.6 * pact, p, 'Entfesseln');
       for (let i = 0; i < 3; i++) S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'ring', s: 3 + i * 2, life: 500 + i * 120, maxLife: 500 + i * 120 });
       fx(p.x, p.y - 12, 'shadow', 24); camShake(6, 200); return true;
   }
   return false;
+}
+
+// ================= Skill-Baum =================
+// Zustand je Knoten: 'learned', 'open' (lernbar), 'locked' (Voraussetzung fehlt), 'sealed' (Zweig einer nicht erworbenen Titelklasse).
+function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return !B_.title || (c.titleClasses || []).includes(B_.title); }
+function nodeState(c, k) {
+  const N = SKILL_TREE[k]; if (!N) return 'locked';
+  if (node(c, k)) return 'learned';
+  if (!branchOpen(c, N.branch)) return 'sealed';
+  return !N.requires.length || N.requires.some(r => node(c, r)) ? 'open' : 'locked';
+}
+function learnNode(k) {
+  const p = S.player, N = SKILL_TREE[k], st = nodeState(p, k);
+  if (st !== 'open') return UI.toast(st === 'learned' ? 'Schon gelernt.' : st === 'sealed' ? 'Dieser Zweig gehört einer Titelklasse, die du nicht hast.' : 'Erst einen Knoten davor lernen.');
+  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt mit jeder Stufe.');
+  (p.tree ||= {})[k] = 1; p.skillPoints--;
+  const r = p.hp / (p.maxHp || 1); recalc(p); if (N.fx.hp) { for (const part of B.PARTS) p.body[part].hp = Math.min(p.body[part].max, p.body[part].max * r); B.syncHp(p); }
+  log(`Talent gelernt: ${N.name}${N.type === 'keystone' ? ' (Schlüsselknoten)' : ''}.`, 'party');
+  UI.refreshHUD(); save();
 }
 
 // ================= Fähigkeiten =================
@@ -2666,14 +2712,14 @@ function useAbility(key) {
     const R = TITLE_CLASSES[ab.title].resource, v = tres(p);
     if (ab.cost === 'all' ? v < (ab.min || 1) : ab.cost && v < ab.cost) return UI.toast(`Zu wenig ${R.name}${ab.min ? ` (mindestens ${ab.min})` : ''}`);
     if (!titleAbility(p, key, ab)) return;
-    p.cooldowns[key] = ab.cd; p.castT = p.lastCast = performance.now(); sfx('magic');
+    p.cooldowns[key] = ab.cd * cdMul(p); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (ab.cost === 'all') setTres(p, 0); else if (ab.cost) setTres(p, v - ab.cost);
     if (ab.gain) corrupt(p, ab.gain);
     return UI.refreshHUD();
   }
   if (ab.mana && p.mana < ab.mana) return UI.toast('Zu wenig Mana');
   if (ab.stam && p.stamina < ab.stam) return UI.toast('Zu erschöpft');
-  p.cooldowns[key] = ab.cd;
+  p.cooldowns[key] = ab.cd * cdMul(p);
   if (ab.mana) p.mana -= ab.mana;
   if (ab.stam) p.stamina -= ab.stam;
   if (ab.mana) { p.castT = performance.now(); sfx('magic'); }   // Zauber-Pose (render: 'cast')
@@ -2692,12 +2738,12 @@ function useAbility(key) {
       const kind = key === 'fireball' ? 'fire' : 'shadow';
       S.projectiles.push({ id: uid(), kind, map: p.map, x: p.x + Math.cos(p.aim) * 14, y: p.y - 12 + Math.sin(p.aim) * 8,
         vx: Math.cos(p.aim) * 5.4, vy: Math.sin(p.aim) * 5.4, owner: p.id,
-        dmg: 14 + p.attributes.intelligence * 1.3, life: 1600, team:'player', splash: key === 'fireball' ? 46 : 0 });
+        dmg: (14 + p.attributes.intelligence * 1.3) * spellMul(p), life: 1600, team:'player', splash: key === 'fireball' ? 46 : 0 });
       break; }
     case 'life_drain': {
       const f = foes[0];
       if (!f || dist(p, f) > 180) { UI.toast('Kein Ziel in Reichweite'); p.cooldowns[key] = 0; return; }
-      const d = 12 + p.attributes.intelligence * 1.1;
+      const d = (12 + p.attributes.intelligence * 1.1) * spellMul(p);
       hurt(f, d, p, 'Lebensentzug');
       B.heal(p, d * 0.6);
       fx(f.x, f.y - 12, 'necro', 12); fx(p.x, p.y - 14, 'necro', 6);
@@ -2931,6 +2977,7 @@ function bindInput() {
     if (k === 'k') UI.openModal('chronicle');
     if (k === 'm') UI.openModal('map');
     if (k === 'j') UI.openModal('quests');
+    if (k === 't') UI.openModal('skills');
     if (k === 'q') dodge();
     if (k >= '1' && k <= '8') useSlot(+k - 1);
     if (k === ' ') e.preventDefault();
@@ -3014,12 +3061,13 @@ function dodge() {
   const p = S.player;
   if (p.downed || p.dodge || p.channel) return false;
   if (p.dodgeCd > 0) return false;
-  if (p.stamina < DODGE.stam) { UI.toast('Zu erschöpft zum Ausweichen'); return false; }
+  const cost = DODGE.stam * (1 - tfx(p, 'dodge'));
+  if (p.stamina < cost) { UI.toast('Zu erschöpft zum Ausweichen'); return false; }
   if (B.speedFactor(p) < 0.5) { UI.toast('Mit diesen Beinen rollst du nicht.'); return false; }
   const { dx, dy } = moveInput();
   const l = Math.hypot(dx, dy);
   const ax = l ? dx / l : -Math.cos(p.aim), ay = l ? dy / l : -Math.sin(p.aim);
-  p.stamina -= DODGE.stam; p.dodgeCd = DODGE.cd + DODGE.dur;
+  p.stamina -= cost; p.dodgeCd = DODGE.cd + DODGE.dur;
   p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0;
   fx(p.x, p.y + 4, 'dust', 6); sfx('dodge');
   return true;
@@ -3281,6 +3329,25 @@ export function selftest() {
     setTres(p, 95); corrupt(p, 10); const burst = tres(p) === 60;
     return cursed && plus && decay && burn && burst && p.maxMana === 0;
   }));
+  ok('Skill-Baum: Daten stimmig (Voraussetzungen im selben Zweig, jeder Zweig hat einen Einstieg, jeder Schlüsselknoten hat Absicht und Preis)',
+    Object.entries(SKILL_TREE).every(([k, n]) => SKILL_BRANCHES[n.branch] && n.requires.every(r => SKILL_TREE[r]?.branch === n.branch && SKILL_TREE[r].row < n.row)
+      && (n.type !== 'keystone' || (n.designIntent && /Dafür|−|nicht/.test(n.desc))))
+    && Object.keys(SKILL_BRANCHES).every(b => Object.values(SKILL_TREE).some(n => n.branch === b && !n.requires.length)));
+  ok('Skill-Baum: Punkte, Voraussetzung, Titelzweig versiegelt bis zur Titelklasse; Wirkung (Leben, Bollwerk, Berserker, Legion)', sandbox(() => {
+    const p = stage(); p.tree = {}; p.skillPoints = 0; recalc(p);
+    const hp0 = p.maxHp; learnNode('c_tough'); const noPts = !node(p, 'c_tough');
+    p.skillPoints = 20; learnNode('c_skin'); const needReq = !node(p, 'c_skin');
+    learnNode('c_tough'); const hpUp = p.maxHp > hp0 * 1.05;
+    learnNode('c_skin'); learnNode('c_wall'); const a0 = armorOf(p); learnNode('k_bulwark'); const bulwark = armorOf(p) > a0;
+    learnNode('n_bind'); const sealed = !node(p, 'n_bind');
+    unlockTitle('necromancer', 'Test'); learnNode('n_bind'); learnNode('n_cold'); learnNode('k_legion');
+    const w = spawnEnemy('wolf', '__a', 11, 9), h0 = w.hp, sum = () => Object.values(p.body).reduce((n, q) => n + q.hp, 0);
+    p.tree.k_berserk = 1; recalc(p); B.fullHeal(p); let t0 = sum(); hurt(p, 10, w, 'Test'); const taken = t0 - sum();
+    delete p.tree.k_berserk; recalc(p); B.fullHeal(p); t0 = sum(); hurt(p, 10, w, 'Test'); const plain = t0 - sum();
+    for (let i = 0; i < 3; i++) { S.ents.__a.push({ id: uid(), kind: 'corpse', map: '__a', x: p.x + 20 + i * 8, y: p.y, transient: true }); setTres(p, 6); p.cooldowns = {}; useAbility('raise_dead'); }
+    const three = S.ents.__a.filter(e => e.servant === p.id).length === 3;
+    return noPts && needReq && hpUp && bulwark && sealed && node(p, 'k_legion') && three && taken > plain && h0 === w.hp;
+  }));
   ok('Diener folgen ihrem Herrn durch einen Eingang (Kartenwechsel), fremde Untote nicht', sandbox(() => {
     const p = stage(); if (!unlockTitle('necromancer', 'Test')) return false;
     const sv = spawnEnemy('skeleton', '__a', 10, 9); Object.assign(sv, { servant: p.id, transient: true, until: performance.now() + 60000 });
@@ -3504,7 +3571,7 @@ function boot() {
     takeFromStash: i => { const s = S.stash[i]; if (!s) return; if (addItem(S.player, s.key, s.count || 1)) S.stash.splice(i, 1); },
     toHotbar: key => { const p = S.player; if (p.hotbar.length < 8) p.hotbar.push({ type:'item', key }); else p.hotbar[7] = { type:'item', key }; UI.renderHotbar(); },
     useSlot, spendAttr: k => { const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    setClass, setTitleClass, tres, armorOf, damageOf, population, canAfford,
+    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     shopStock, price, buy, sell, craftBandage, bandageFrom: k => BANDAGE_FROM[k] || 0,

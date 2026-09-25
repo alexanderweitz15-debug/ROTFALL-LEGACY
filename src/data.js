@@ -158,6 +158,76 @@ export const TITLE_CLASSES = {
     unlock:'„Der Pakt der Stillen Schar“: die Ahnenurne statt zu Ysra zu Vhal, dem Flüsternden, am Nekromanten-Turm bringen.' },
 };
 
+// ---- Skill-Baum (Session 5): 1 Punkt je Stufe. Allgemeine Zweige für alle, dazu ein Zweig je Titelklasse, der erst mit ihr
+// erscheint. requires = einer der genannten Knoten reicht (Pfad), [] = Einstieg. Effekte addieren sich (fx), besondere Regeln
+// hängen am Knoten-Schlüssel (keystone). Jeder Schlüsselknoten hat einen Preis und ein designIntent — ohne Absicht kein Knoten.
+export const SKILL_BRANCHES = {
+  combat:  { name:'Kampf', desc:'Wer vorne steht.' },
+  magic:   { name:'Magie', desc:'Wer von weitem entscheidet.' },
+  survival:{ name:'Überleben', desc:'Wer am Ende noch steht.' },
+  necromancer:{ name:'Nekromantie', title:'necromancer', desc:'Nur für Nekromanten.' },
+  warlock:{ name:'Hexerei', title:'warlock', desc:'Nur für Hexenmeister.' },
+  druid:  { name:'Hainkunde', title:'druid', desc:'Nur für Druiden.' },
+};
+export const SKILL_TREE = {
+  // Kampf
+  c_tough:  { branch:'combat', row:0, name:'Zähigkeit', fx:{ hp:0.08 }, requires:[], desc:'Leben +8 %.' },
+  c_strike: { branch:'combat', row:0, name:'Kraftschlag', fx:{ dmg:0.06 }, requires:[], desc:'Waffenschaden +6 %.' },
+  c_skin:   { branch:'combat', row:1, name:'Eiserne Haut', fx:{ armor:2 }, requires:['c_tough'], desc:'Rüstung +2.' },
+  c_edge:   { branch:'combat', row:1, name:'Klingenmeister', fx:{ crit:0.04 }, requires:['c_strike'], desc:'Kritische Treffer +4 %.' },
+  c_breath: { branch:'combat', row:1, name:'Kampfatem', fx:{ stam:15 }, requires:['c_tough', 'c_strike'], desc:'Ausdauer +15.' },
+  c_wall:   { branch:'combat', row:2, type:'notable', name:'Schildwall', fx:{ armor:4, hp:0.05 }, requires:['c_skin'], desc:'Rüstung +4, Leben +5 %.' },
+  c_butcher:{ branch:'combat', row:2, type:'notable', name:'Schlächter', fx:{ dmg:0.10, crit:0.03 }, requires:['c_edge'], desc:'Waffenschaden +10 %, Krit +3 %.' },
+  k_berserk:{ branch:'combat', row:3, type:'keystone', name:'Berserker', fx:{}, requires:['c_butcher'],
+    desc:'Unter 30 % Leben: Schaden +25 %. Dafür nimmst du immer 15 % mehr Schaden.', designIntent:'Risiko als Waffe: wer nah am Tod kämpft, wird gefährlicher — Gegenpol zum Bollwerk.' },
+  k_bulwark:{ branch:'combat', row:3, type:'keystone', name:'Bollwerk', fx:{}, requires:['c_wall'],
+    desc:'Rüstung +30 %. Dafür 10 % langsamer.', designIntent:'Stehen statt tanzen: Treffer einstecken, dafür schlechter fliehen und ausweichen.' },
+  // Magie
+  m_vein:   { branch:'magic', row:0, name:'Arkane Ader', fx:{ mana:15 }, requires:[], desc:'Mana +15 (wer Mana hat).' },
+  m_quick:  { branch:'magic', row:0, name:'Gedankenschnelle', fx:{ cdr:0.05 }, requires:[], desc:'Abklingzeiten −5 %.' },
+  m_power:  { branch:'magic', row:1, name:'Zauberkraft', fx:{ spell:0.08 }, requires:['m_vein'], desc:'Zauberschaden +8 %.' },
+  m_focus:  { branch:'magic', row:1, name:'Sammlung', fx:{ manaRegen:0.5 }, requires:['m_vein'], desc:'Mana kehrt 50 % schneller zurück.' },
+  m_flow:   { branch:'magic', row:2, type:'notable', name:'Fluss', fx:{ cdr:0.08 }, requires:['m_quick', 'm_focus'], desc:'Abklingzeiten −8 %.' },
+  m_soul:   { branch:'magic', row:2, type:'notable', name:'Feuerseele', fx:{ spell:0.12 }, requires:['m_power'], desc:'Zauberschaden +12 %.' },
+  k_glass:  { branch:'magic', row:3, type:'keystone', name:'Glaskanone', fx:{ spell:0.30, hp:-0.15 }, requires:['m_soul'],
+    desc:'Zauberschaden +30 %. Leben −15 %.', designIntent:'Zauber entscheiden den Kampf, bevor er dich erreicht — oder du stirbst schneller.' },
+  k_scholar:{ branch:'magic', row:3, type:'keystone', name:'Gelehrter Geist', fx:{ cdr:0.15, dmg:-0.15 }, requires:['m_flow'],
+    desc:'Abklingzeiten −15 %. Waffenschaden −15 %.', designIntent:'Fähigkeiten statt Klinge: öfter zaubern, schwächer zuschlagen.' },
+  // Überleben
+  s_life:   { branch:'survival', row:0, name:'Lebenskraft', fx:{ hp:0.06 }, requires:[], desc:'Leben +6 %.' },
+  s_light:  { branch:'survival', row:0, name:'Leichtfüßig', fx:{ speed:0.04 }, requires:[], desc:'Tempo +4 %.' },
+  s_medic:  { branch:'survival', row:1, name:'Feldscher', fx:{ heal:0.20 }, requires:['s_life'], desc:'Heilung durch Kräuter, Verbände, Tränke +20 %.' },
+  s_endure: { branch:'survival', row:1, name:'Ausdauernd', fx:{ regen:0.25 }, requires:['s_light'], desc:'Ausdauer kehrt 25 % schneller zurück.' },
+  s_pack:   { branch:'survival', row:1, name:'Packesel', fx:{ invCap:6 }, requires:['s_light'], desc:'6 Plätze mehr im Gepäck.' },
+  s_dodge:  { branch:'survival', row:2, type:'notable', name:'Ausweichkünstler', fx:{ dodge:0.30, speed:0.03 }, requires:['s_endure'], desc:'Ausweichen kostet 30 % weniger Ausdauer, Tempo +3 %.' },
+  s_wound:  { branch:'survival', row:2, type:'notable', name:'Wundheiler', fx:{ heal:0.25, hp:0.05 }, requires:['s_medic'], desc:'Heilung +25 %, Leben +5 %.' },
+  k_second: { branch:'survival', row:3, type:'keystone', name:'Zweiter Atem', fx:{ hp:-0.05 }, requires:['s_wound'],
+    desc:'Fällst du unter 25 % Leben, kommen 30 % zurück und die Ausdauer füllt sich — höchstens alle 3 Minuten. Leben −5 %.', designIntent:'Ein Fehler wird verziehen, zwei nicht: rettet den Kampf, nicht den Leichtsinn.' },
+  k_wild:   { branch:'survival', row:3, type:'keystone', name:'Wildnisläufer', fx:{}, requires:['s_dodge'],
+    desc:'Außerhalb von Siedlungen: Tempo +10 %, Ausdauer kehrt 50 % schneller zurück. In Siedlungen Tempo −5 %.', designIntent:'Für Reisende und Jäger: die Welt ist groß — wer draußen lebt, wird dort stärker.' },
+  // Nekromantie (erst mit der Titelklasse)
+  n_bind:   { branch:'necromancer', row:0, name:'Knochenbinder', fx:{}, requires:[], desc:'Diener bleiben 20 s länger.' },
+  n_vessel: { branch:'necromancer', row:0, name:'Seelengefäß', fx:{}, requires:[], desc:'Seelenessenz fasst 2 mehr.' },
+  n_cold:   { branch:'necromancer', row:1, name:'Grabkälte', fx:{}, requires:['n_bind'], desc:'Diener haben 25 % mehr Leben.' },
+  n_reap:   { branch:'necromancer', row:1, type:'notable', name:'Ernte der Toten', fx:{}, requires:['n_vessel'], desc:'Seelenernte wirkt 50 % stärker.' },
+  k_legion: { branch:'necromancer', row:2, type:'keystone', name:'Legion', fx:{}, requires:['n_cold'],
+    desc:'Bis zu 3 Diener gleichzeitig. Dein eigener Waffenschaden −20 %.', designIntent:'Kontrolle statt Einzelkampf: der Nekromant wird zum Feldherrn, nicht zum Fechter.' },
+  // Hexerei
+  w_deep:   { branch:'warlock', row:0, name:'Tiefer Schatten', fx:{}, requires:[], desc:'Verderbnis frisst erst ab 85 statt 70.' },
+  w_eye:    { branch:'warlock', row:0, name:'Böser Blick', fx:{}, requires:[], desc:'Fluch hält 6 s länger.' },
+  w_core:   { branch:'warlock', row:1, name:'Chaoskern', fx:{}, requires:['w_eye'], desc:'Chaosblitz +20 % Schaden.' },
+  w_rift:   { branch:'warlock', row:1, type:'notable', name:'Weiter Riss', fx:{}, requires:['w_deep'], desc:'Entfesseln trifft 40 px weiter.' },
+  k_bloodpact:{ branch:'warlock', row:2, type:'keystone', name:'Blutpakt', fx:{}, requires:['w_core'],
+    desc:'Titelzauber +25 % Schaden. Die Verderbnis sinkt außerhalb des Kampfes nicht mehr.', designIntent:'Kein Durchatmen: mehr Macht, aber der Schatten bleibt — jeder Kampf beginnt schon angefressen.' },
+  // Hainkunde
+  d_roots:  { branch:'druid', row:0, name:'Tiefe Wurzeln', fx:{}, requires:[], desc:'Rankenfessel hält 1 s länger.' },
+  d_spring: { branch:'druid', row:0, name:'Quellgrund', fx:{}, requires:[], desc:'Wildkraft wächst 30 % schneller.' },
+  d_pack:   { branch:'druid', row:1, name:'Rudelband', fx:{}, requires:['d_spring'], desc:'Der Geisterwolf bleibt 15 s länger.' },
+  d_earth:  { branch:'druid', row:1, type:'notable', name:'Heilende Erde', fx:{}, requires:['d_roots'], desc:'Erdsegen heilt 50 % mehr.' },
+  k_grove:  { branch:'druid', row:2, type:'keystone', name:'Hüter des Hains', fx:{}, requires:['d_pack', 'd_earth'],
+    desc:'Auf Gras und im Wald: Schaden +15 %, Rüstung +3. Auf Stein, Asche und in Siedlungen: Schaden −10 %.', designIntent:'Der Druide gehört nach draußen: stark im Wald, schwach in Stein und Stadt.' },
+};
+
 export const FACTIONS = {
   valen: { name:'Königreich Valen', colors:['#2f4260','#b9c3d2'], desc:'Ordnung, Steuern, Garnisonen. Was davon übrig ist.',
            ranks:['Rekrut','Soldat','Veteran','Ritter','Offizier'] },

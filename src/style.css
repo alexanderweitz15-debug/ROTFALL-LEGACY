@@ -461,3 +461,20 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .tip.on{display:block}
 .tip::before,.tip::after{content:"";position:absolute;top:3px;width:3px;height:3px;background:#8a7448}
 .tip::before{left:3px} .tip::after{right:3px}
+
+/* Skill-Baum */
+.tree-wrap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.tree-branch{background:#14110c;border:1px solid #2f271d;padding:8px}
+.tree-branch h3{margin:0 0 2px;font-size:13px;color:var(--bone)}
+.tree-branch.sealed{opacity:.55}
+.tree-row{display:flex;gap:6px;margin-top:8px;justify-content:center;flex-wrap:wrap}
+.tree-node{flex:1 1 0;min-width:0;background:#191510;border:1px solid #3b3227;color:var(--dim);padding:6px 4px;font-size:11px;line-height:1.2;cursor:pointer;text-align:center}
+.tree-node small{display:block;font-size:9px;letter-spacing:.06em;text-transform:uppercase;margin-top:2px;color:#6f6552}
+.tree-node.notable{border-color:#6b5a3a}
+.tree-node.keystone{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(189,148,51,.25)}
+.tree-node.open{color:var(--bone);background:#221c13}
+.tree-node.open small{color:var(--gold)}
+.tree-node.learned{color:#e8dcc0;background:#2e2517;border-color:var(--gold)}
+.tree-node.learned small{color:#c9a95a}
+.tree-node.locked,.tree-node.sealed{cursor:default}
+@media (max-width:700px){.tree-wrap{grid-template-columns:1fr}}
