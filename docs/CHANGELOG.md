@@ -2,6 +2,13 @@
 
 Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund (Master-Prompt §2, Punkte 1–4).
 
+## Session 7 — 2026-09-25 · Phasen abschließen (Nutzer: „schließ die restlichen Phasen ab“)
+
+### Phase 6 — Animation & Combat Polish (game.js, sprites.js, render.js, world.js, index.html, style.css)
+- Deckung/Parade (`updateGuard`, `guarded`, Feld `cover`), Touch-Knopf „Deckung“; Rollen-Landung (`landT`, i-Frames −40 ms).
+- Posen guard/sit/trade; Sitzplätze an Bank/Tisch (`assignNpcDays`), Handelsgeste; Waffe abgelegt beim Sitzen.
+- Möbel-Ausweichplatz in `house()` (BUG-066), Schenken-Halbkreis (BUG-067), Review-Befunde (BUG-068).
+
 ## Session 6 — 2026-09-25 · Spielstand, Karawane, Tiefhall
 
 ### Spielstand (state.js, world.js, game.js) — BUG-017, BUG-057, BUG-058

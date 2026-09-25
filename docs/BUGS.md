@@ -424,6 +424,20 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 - Wer Hrodvar vor der Annahme von „Königseisen“ erschlägt, hätte das Ziel nie erfüllen können (Boss kommt nicht wieder).
 - Lösung: `startQuest` zählt schon Erledigtes (Boss-Flag, Gegenstände im Gepäck). QUEST · HIGH · BEHOBEN (vor Auslieferung)
 
+## Session 7 — Phasen abschließen
+
+### BUG-066 — Kleine Schenken ohne Bänke
+- Ursache: Bei 6×5-Schenken lagen beide Bank-Plätze auf der Kachel hinter der Tür (bleibt frei) → ersatzlos weggefallen.
+- Lösung: Möbel rücken auf die nächste freie Innenkachel. WORLD/VISUAL · MEDIUM · BEHOBEN
+
+### BUG-067 — Abends ein Klumpen Bewohner vor der Schenkentür
+- Alle Schenkengänger hatten denselben Zielpunkt. Lösung: Halbkreis je Bewohner. IMMERSION · LOW · BEHOBEN
+
+### BUG-068 — (vor Auslieferung) Deckungszustand kollidierte mit dem Wachen-Flag `guard`
+- Gefunden per code-review: Stadtwachen hätten dauerhaft geblockt, keine Ausdauer erholt und bei Bruch ihren Status
+  verloren; Block rechnete vor der Rüstung; Rolle beendete die Deckung nicht; gebrochene Deckung ließ noch Zufallsblock zu.
+- Lösung: eigenes Feld `cover`, Rüstung vor dem Block, Rolle setzt zurück, Bruch = voller Treffer. Regressionstest. BEHOBEN
+
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.
 - Kein Skill Tree (Klassenkette + Fertigkeitswerte) → Phase 9.

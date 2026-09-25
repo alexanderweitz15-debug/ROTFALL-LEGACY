@@ -10,7 +10,7 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 3 | Szenenübergänge, Pathfinding, Spawns | ABGESCHLOSSEN | JA | — (Tiefhall betretbar seit Session 6) |
 | 4 | Gebäude & Props | ABGESCHLOSSEN | JA, mit Grenzen | Nordseiten/Nord-Türen nur angedeutet; Wildnis-Szenen nur in neuen Spielständen |
 | 5 | Visual Style Revision (restliche Welt) | TESTEN | JA, im Kern | Session 3: Testbereich §25, Fels, Wasser, Boden, Mauern, Grube, Titel. Offen: Leere Flächen (Totenreich) sind Inhalt → Phase 16 |
-| 6 | Animation & Combat Polish | IN ARBEIT | teilweise | Session 3: Taumeln/Unterbrechen, rutschender Rückstoß, Interaktionsposen. Treffer-Klang je Material. Offen: Sitzen/Handeln-Posen; Klänge vom Nutzer gegenhören lassen |
+| 6 | Animation & Combat Polish | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Deckung/Parade, Rollen-Landung, Sitzen, Handeln. Nutzer: Kampfgefühl und Klänge gegenhören. Bewusst nicht: Sprint (Shift ist Deckung), Türen als Objekte |
 | 7 | Weapon Expansion | NICHT BEGONNEN | — | |
 | 8 | Rarity & Loot | NICHT BEGONNEN | — | Rarität ist nur Etikett |
 | 9 | Skill Tree | IN ARBEIT | teilweise | Session 5: 3 allgemeine + 3 Titelzweige, Schlüsselknoten mit Preis/Absicht. Offen: Umlernen, Balancing im Spiel |
@@ -27,6 +27,16 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 20 | Performance | TEILWEISE | — | Spielstand 0,53 MB (BUG-017/057 ✓). Offen: Wald-Zeichnen 2,8 ms (Budget 2,0), im echten Browser messen |
 | 21 | Second Complete Playthrough | NICHT BEGONNEN | — | |
 | 22 | Final Quality Pass | NICHT BEGONNEN | — | |
+
+## Phase 6 — Definition of Done (§26–28, §36, §64) — Session 7
+- [x] TECHNIK: Selbsttests Parade/Block/Deckungsbruch, Rollen-Landung; keine Konsolenfehler im Browserlauf
+- [x] GAMEPLAY: Deckung ist echte Entscheidung (Tempo, keine Erholung, Bruch bei leerer Ausdauer), Parade belohnt Timing
+- [x] WORLD LOGIC: Figuren sitzen abends in der Schenke (Ursache fehlender Bänke behoben), Händler zeigen Ware
+- [x] VISUAL/ANIMATION: Posen Deckung (Klinge schräg, Schild vor), Sitzen (Waffe abgelegt), Handeln, Landung in den Knien
+- [x] AUDIO: Metallklang bei Deckung/Block/Parade (vorhandene Klänge) — Gegenhören durch den Nutzer offen
+- [x] EDGE CASES: Rolle beendet Deckung; Stadtwachen (guard-Flag) blocken nicht (Regressionstest); Geschosse nicht parierbar
+- [x] REGRESSION 71/71 · [x] DOKUMENTATION
+- [ ] Nicht umgesetzt (bewusst): Sprint, Türen öffnen (Türen sind Lücken, keine Objekte), Aufladeangriff
 
 ## Phase 4 — Definition of Done (Gebäude §20 / Props §22)
 - [x] Funktion von außen erkennbar (Schild mit Symbol, Esse, Banner, Kräuter, Rosette/Kreuz, Wappen, Säcke)

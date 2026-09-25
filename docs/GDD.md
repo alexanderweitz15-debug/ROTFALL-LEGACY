@@ -73,6 +73,14 @@ Leine 360 px, helfen auf) · **Heilerin** (kämpft nie, hilft Verwundeten auf) �
 | Tier wird angegriffen | — | ✓ hilft | — | — | — | ○ flieht / Rudel wehrt sich (P15) |
 | Spieler ist paktgebunden (Titelklasse der Untoten) | ✓ Ordenswache greift an (Ruf ≤ −25) · Valen: nur Ruf | ✓ Orden verweigert das Gespräch | — | ✓ grüßt anders (Angst, Misstrauen) | ✓ Untote der Schar: Verbündete, wenn beigetreten | — |
 
+## Deckung & Parade (Session 7)
+- Umschalt halten (Touch: „Deckung“): Tempo ×0,45, keine Ausdauer-Erholung, kein Hieb. Hiebe von vorn (±70°):
+  erste 180 ms **Parade** (eine je Deckung; Angreifer taumelt 0,9 s, Bosse 0,45 s; kein Schaden), danach **Block**:
+  Schild 15 %, Waffe 45 % des Schadens nach Rüstung, Ausdauerkosten = Schaden × 0,8 (Schild) / 1,2 (Waffe).
+  Reicht die Ausdauer nicht: Deckung bricht, der Hieb trifft voll, 0,5 s Taumeln, 0,9 s keine neue Deckung.
+- Geschosse und Flächenangriffe lassen sich blocken, nicht parieren. Die Rolle beendet die Deckung.
+- Designabsicht: Schild und Timing belohnen, ohne die Rolle zu ersetzen — Rolle = Raum, Deckung = Stand.
+
 ## Kampf
 - Waffengefühl-Tabelle `FEEL` (game.js): Gewicht, Hit-Stop, Kamerawackeln, Ausfallschritt je Waffentyp.
 - Treffer: Körperteile (body.js), Krit (Wahrnehmung, Dolch von hinten), Block (Schild), Rüstung/Durchschlag.
