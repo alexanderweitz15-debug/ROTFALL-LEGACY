@@ -142,7 +142,7 @@ function renderLog() {
 function townHeads(key) {
   let n = 0;
   for (const c of S.ents.world) if (c.kind === 'npc' && c.alive && !S.party.includes(c.id)
-    && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;
+    && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && !c.escort && !c.escortLost && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;   // Karawanenwachen sind Reisende
   return n;
 }
 export function renderContext(target) {

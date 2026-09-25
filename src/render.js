@@ -5,6 +5,7 @@ import * as HB from './buildings.js';
 import { ITEMS, MONSTERS } from './data.js';
 import { buildOf } from './body.js';
 import * as SP from './sprites.js';
+import { trailPt, WAGON_GAP } from './sim.js';
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -611,16 +612,63 @@ function drawHouse(b, now) {
   }
 }
 
+// Karawane (BUG-011): Leitwagen mit Plane, Kutscher und Ochsengespann; Beiwagen (offene Ladefläche, ein Maultier) folgt der Spur.
 function drawCaravan(e, now) {
-  const x = e.x, y = e.y, f = e.facing === 2 ? -1 : 1, bob = (e.vx || e.vy) ? Math.sin(now / 120) * 1 : 0;
-  shadow(x, y + 6, 26, .35);
-  ctx.fillStyle = '#5a4630'; ctx.beginPath(); ctx.ellipse(x + f * 26, y - 6 + bob, 10, 7, 0, 0, 7); ctx.fill();   // Ochse
-  ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x + f * 33 - 3, y - 12 + bob, 6, 5);
-  ctx.fillStyle = '#4b3a25'; ctx.fillRect(x - 20, y - 14, 36, 14);                                               // Wagen
-  ctx.fillStyle = '#c9bfa6'; ctx.beginPath(); ctx.moveTo(x - 20, y - 14); ctx.quadraticCurveTo(x - 2, y - 36, x + 16, y - 14); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x - 6, y - 30, 2, 16);
-  ctx.fillStyle = '#2b2116'; ctx.beginPath(); ctx.arc(x - 12, y + 2, 6, 0, 7); ctx.arc(x + 9, y + 2, 6, 0, 7); ctx.fill();
-  if (e.hp < e.maxHp) { ctx.fillStyle = '#100d0a'; ctx.fillRect(x - 18, y - 44, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(x - 18, y - 44, 36 * Math.max(0, e.hp / e.maxHp), 4); }
+  const moving = !!(e.vx || e.vy), f = e.facing === 2 ? -1 : 1;
+  const q = trailPt(e, WAGON_GAP), fb = Math.abs(Math.cos(q.a)) > 0.3 ? (Math.cos(q.a) < 0 ? -1 : 1) : f;
+  if (q.y <= e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);   // weiter hinten im Bild zuerst
+  drawWagon(e.x, e.y, f, now, moving, true, e);
+  if (q.y > e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);
+  if (e.hp < e.maxHp) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, e.hp / e.maxHp), 4); }
+}
+function drawDraft(x, y, f, now, moving, big, ph) {       // Ochse (big) oder Maultier, Seitenansicht
+  const sw = moving ? Math.sin(now / 150 + ph) * 3 : 0, L = big ? 7 : 6, bw = big ? 11 : 8, bh = big ? 6.5 : 5;
+  ctx.fillStyle = big ? '#3b2d1f' : '#4a4038';
+  for (const [dx, s] of [[-bw + 3, sw], [-bw + 6, -sw], [bw - 5, -sw], [bw - 2, sw]]) ctx.fillRect(x + f * dx + s - 1, y - L, 2.4, L);   // Beine
+  ctx.fillStyle = big ? '#5a4630' : '#6b5f52'; ctx.beginPath(); ctx.ellipse(x, y - L - bh + 2, bw, bh, 0, 0, 7); ctx.fill();          // Rumpf
+  ctx.fillStyle = big ? '#6b543a' : '#7c7064'; ctx.beginPath(); ctx.ellipse(x - f * 2, y - L - bh, bw * 0.7, bh * 0.45, 0, 0, 7); ctx.fill();   // Rückenlicht
+  const hx = x + f * (bw + 3), hy = y - L - bh - (moving ? Math.abs(sw) * 0.3 : 0);
+  ctx.fillStyle = big ? '#4b3a26' : '#5c5147'; ctx.fillRect(hx - (f > 0 ? 1 : 5), hy - 2, 6, 5);                                        // Kopf
+  if (big) { ctx.fillStyle = '#d8ccb0'; ctx.fillRect(hx + f * 1 - 1, hy - 5, 1.5, 3); ctx.fillRect(hx + f * 4 - 1, hy - 5, 1.5, 3); }       // Hörner
+  else { ctx.fillStyle = '#5c5147'; ctx.fillRect(hx + f * 1 - 1, hy - 6, 1.5, 4); ctx.fillRect(hx + f * 3 - 1, hy - 6, 1.5, 4); }       // lange Ohren
+  ctx.fillStyle = '#2b2116'; ctx.fillRect(x + f * (bw - 1) - 1, y - L - bh * 2 + 1, 2.5, bh * 1.6);                                     // Joch/Kummet
+}
+const WAGON_K = 1.5;                                        // Maßstab des Zugs: Wagen und Tiere im Verhältnis zu den Figuren
+function drawWagon(x, y, f, now, moving, lead, e) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(WAGON_K, WAGON_K);
+  const rot = moving ? x / (7 * WAGON_K) : 0; x = 0; y = 0;
+  shadow(x + f * (lead ? 18 : 12), y + 6, lead ? 40 : 30, .3);
+  const sw = moving ? Math.sin(now / 150) : 0;
+  // Zugtiere vor dem Wagen: zwei Ochsen hintereinander versetzt, der Beiwagen hat ein Maultier
+  if (lead) { drawDraft(x + f * 50, y - 1, f, now, moving, true, 1.6); drawDraft(x + f * 32, y + 2, f, now, moving, true, 0); }
+  else drawDraft(x + f * 30, y + 1, f, now, moving, false, 0.8);
+  ctx.strokeStyle = '#2b2116'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x + f * 16, y - 8); ctx.lineTo(x + f * (lead ? 42 : 26), y - 12); ctx.stroke();   // Deichsel
+  const bob = moving ? Math.abs(sw) * 0.8 : 0, W0 = lead ? 20 : 16, W1 = lead ? 16 : 13;
+  ctx.fillStyle = '#4b3a25'; ctx.fillRect(x - W0, y - 15 - bob, W0 + W1, 12);                                   // Ladefläche
+  ctx.fillStyle = '#3a2c1c'; for (let i = -W0 + 7; i < W1; i += 7) ctx.fillRect(x + i, y - 15 - bob, 1, 12);  // Bretterfugen
+  ctx.fillStyle = '#5e4a31'; ctx.fillRect(x - W0, y - 15 - bob, W0 + W1, 2);
+  if (lead) {                                                                                                     // Plane über Spriegeln
+    ctx.fillStyle = '#c9bfa6'; ctx.beginPath(); ctx.moveTo(x - W0, y - 15 - bob); ctx.quadraticCurveTo(x - 2, y - 40 - bob, x + W1, y - 15 - bob); ctx.fill();
+    ctx.fillStyle = 'rgba(60,40,20,.22)'; for (const k of [-10, 0, 9]) ctx.fillRect(x + k, y - 33 - bob + Math.abs(k) * 0.5, 2, 18 - Math.abs(k) * 0.5);
+    const dx = x + f * (W1 - 2);                                                                                 // Kutscher auf dem Bock
+    ctx.fillStyle = '#6a4b2c'; ctx.fillRect(dx - 3, y - 26 - bob, 7, 10);
+    ctx.fillStyle = '#c9a582'; ctx.beginPath(); ctx.arc(dx + 0.5, y - 29 - bob, 3.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3d2f1f'; ctx.fillRect(dx - 4, y - 33 - bob, 9, 2); ctx.fillRect(dx - 2, y - 35 - bob, 5, 2);   // Hut
+    ctx.strokeStyle = 'rgba(30,20,10,.7)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(dx + f * 3, y - 21 - bob); ctx.lineTo(x + f * 44, y - 16); ctx.stroke();   // Zügel
+  } else {                                                                                                        // offene Ladung: Kisten, Säcke
+    const n = Object.values(e.cargo || {}).reduce((a, b) => a + b, 0);
+    if (n > 0) { ctx.fillStyle = '#7a5a35'; ctx.fillRect(x - 12, y - 24 - bob, 10, 9); ctx.fillStyle = '#5e4427'; ctx.fillRect(x - 12, y - 20 - bob, 10, 1); }
+    if (n > 8) { ctx.fillStyle = '#b8a67e'; ctx.beginPath(); ctx.ellipse(x + 4, y - 19 - bob, 6, 4.5, 0, 0, 7); ctx.fill(); }
+    if (n > 16) { ctx.fillStyle = '#6f5130'; ctx.fillRect(x - 6, y - 31 - bob, 8, 7); }
+  }
+  for (const wx of [x - W0 + 7, x + W1 - 6]) {                                                                   // Räder mit Speichen
+    const R = lead ? 6.5 : 5.5, a = rot;
+    ctx.fillStyle = '#2b2116'; ctx.beginPath(); ctx.arc(wx, y + 1, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6b5438'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let k = 0; k < 3; k++) { const t = a + k * Math.PI / 3; ctx.moveTo(wx - Math.cos(t) * R * 0.8, y + 1 - Math.sin(t) * R * 0.8); ctx.lineTo(wx + Math.cos(t) * R * 0.8, y + 1 + Math.sin(t) * R * 0.8); }
+    ctx.stroke(); ctx.fillStyle = '#8a7150'; ctx.fillRect(wx - 1, y, 2, 2);
+  }
+  ctx.restore();
 }
 function drawDecal(e) {
   ctx.fillStyle = `rgba(90,18,14,${clamp(e.life / e.maxLife, 0, 1) * 0.55})`;

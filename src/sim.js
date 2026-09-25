@@ -1,7 +1,7 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js';
 import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js';
-import { LOCATIONS, TS, worldPt, wT } from './world.js';
+import { LOCATIONS, TS, T, SOLID, HOUSES, tileAt, worldPt, wT } from './world.js';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -9,6 +9,7 @@ const NEIGH = {};
 for (const [a, b] of WAR_EDGES) { (NEIGH[a] ||= []).push(b); (NEIGH[b] ||= []).push(a); }
 
 export function initSim() {
+  buildRoute();
   S.towns ||= structuredClone(TOWNS);
   if (!S.war || !S.war.nodes) S.war = {
     nodes: structuredClone(WAR_NODES),
@@ -64,14 +65,89 @@ function economyDay() {
 }
 
 // ---------------- Karawanen ----------------
-export const ROUTE = [[62, 65], [100, 65], [106, 63], [112, 63], [119, 64], [129, 64], [129, 61]].map(([x, y]) => worldPt(x, y));   // Entwurf → gestreckte Städte; Ziel auf der Nordfurter Torstraße (Karawanen fahren ohne Kollision)
+// Route Eren → Nordfurt: günstigster Weg über die Straße (Dijkstra, Straße/Brücke billig, Wiese teuer, Häuser/Wasser/feste
+// Objekte gesperrt, Kanten neben Hindernissen teurer — der Zug ist breit). Früher feste Wegpunkte im Entwurfsmaßstab: nach der
+// Streckung (Session 5) fuhr die Karawane drei Kacheln neben der Straße über die Wiese. Aus der Karte gebaut bleibt sie auf der
+// Straße, auch wenn eine spätere Session die Straße verlegt. Wegpunkte in Kacheln (+0,5 = Kachelmitte), Karawanen fahren ohne Kollision.
+export let ROUTE = [];
+const ROUTE_ENDS = [[62, 65], [129, 61]];                   // Eren (Marktweg) → Nordfurter Torstraße, Entwurfskoordinaten
+export function buildRoute() {
+  const [[ax, ay], [bx, by]] = ROUTE_ENDS.map(([x, y]) => worldPt(x, y));
+  const x0 = Math.min(ax, bx) - 24, y0 = Math.min(ay, by) - 24, w = Math.abs(bx - ax) + 49, h = Math.abs(by - ay) + 49;
+  const blk = new Uint8Array(w * h), I = (x, y) => (y - y0) * w + (x - x0), inB = (x, y) => x >= x0 && y >= y0 && x < x0 + w && y < y0 + h;
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (SOLID.has(tileAt('world', x, y))) blk[I(x, y)] = 1;
+  for (const b of HOUSES) if (b.map === 'world') for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inB(x, y)) blk[I(x, y)] = 1;
+  for (const e of S.ents.world) if (e.kind === 'prop' && e.solid) { const x = e.x / TS | 0, y = e.y / TS | 0; if (inB(x, y)) blk[I(x, y)] = 1; }
+  const cost = (x, y) => { const t = tileAt('world', x, y); let c = t === T.ROAD || t === T.PLANK ? 1 : t === T.DIRT ? 3 : 8;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inB(x + dx, y + dy) && blk[I(x + dx, y + dy)]) { c += 4; break; }
+    return c; };
+  const dist = new Float64Array(w * h).fill(Infinity), prev = new Int32Array(w * h).fill(-1), heap = [];
+  const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k;
+    if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  const start = I(ax, ay), goal = I(bx, by); dist[start] = 0; push(0, start);
+  while (heap.length) {
+    const [d, i] = pop(); if (d > dist[i]) continue; if (i === goal) break;
+    const x = i % w + x0, y = (i / w | 0) + y0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const nx = x + dx, ny = y + dy; if (!inB(nx, ny) || blk[I(nx, ny)]) continue;
+      if (dx && dy && (blk[I(x + dx, y)] || blk[I(x, y + dy)])) continue;          // keine Ecke schneiden
+      const n = I(nx, ny), nd = d + cost(nx, ny) * (dx && dy ? 1.414 : 1);
+      if (nd < dist[n]) { dist[n] = nd; prev[n] = i; push(nd, n); }
+    }
+  }
+  const pts = [];
+  if (prev[goal] < 0) ROUTE = [[ax, ay], [bx, by]];                                  // kein Weg (sollte nicht vorkommen): gerade Linie
+  else { for (let i = goal; i >= 0; i = prev[i]) pts.push([i % w + x0, (i / w | 0) + y0]); pts.reverse();
+    ROUTE = pts.filter((q, k) => k === 0 || k === pts.length - 1 || q[0] - pts[k - 1][0] !== pts[k + 1][0] - q[0] || q[1] - pts[k - 1][1] !== pts[k + 1][1] - q[1])   // nur Knicke
+      .map(([x, y]) => [x + 0.5, y + 0.5]); }
+  for (const c of S.ents.world) if (c.kind === 'caravan') {                           // Karawanen alter Stände: nächsten Wegpunkt in Fahrtrichtung
+    const ord = c.dir > 0 ? ROUTE : ROUTE.slice().reverse();
+    let best = 1, bd = Infinity;                                                      // nächster Abschnitt; Ziel ist sein Ende
+    for (let k = 1; k < ord.length; k++) { const [ax, ay] = ord[k - 1].map(v => v * TS), [bx, by] = ord[k].map(v => v * TS), L = Math.hypot(bx - ax, by - ay) || 1;
+      const u = clamp(((c.x - ax) * (bx - ax) + (c.y - ay) * (by - ay)) / (L * L), 0, 1), d = Math.hypot(ax + (bx - ax) * u - c.x, ay + (by - ay) * u - c.y);
+      if (d < bd) { bd = d; best = k; } }
+    c.wp = best;
+  }
+}
+// Eine Karawane ist ein Zug (BUG-011): Leitwagen (die Entität: Lebenspunkte, Ladung, Ziel der Räuber) mit Ochsengespann und
+// Kutscher, ein Beiwagen, der der Spur des Leitwagens folgt (nur Bild), und zwei Söldnerwachen — echte Figuren (game.js), die
+// neben und hinter dem Zug gehen, Räuber stellen und bei der Ankunft ersetzt werden, wenn sie gefallen sind.
 function spawnCaravan() {
   const [tx, ty] = ROUTE[0];
   const c = { id: uid(), kind:'caravan', map:'world', name:'Händlerkarawane', faction:'merch', x: tx * TS, y: ty * TS,
-    hp: 140, maxHp: 140, r: 16, alive: true, dir: 1, wp: 1, cargo: {}, attacked: false, ambushChecked: false, facing: 3 };
+    hp: 140, maxHp: 140, r: 16, alive: true, dir: 1, wp: 1, cargo: {}, attacked: false, ambushChecked: false, facing: 3, trail: [] };
   load(c, 'eren');
   S.ents.world.push(c);
+  H.hireEscorts?.(c);
 }
+const TRAIL_STEP = 12, TRAIL_MAX = 24;                     // Spurpunkte alle 12 px, 24 Punkte ≈ 290 px Zuglänge
+// Punkt `back` px hinter dem Leitwagen entlang seiner Spur, mit Fahrtrichtung a. Ohne Spur (Abfahrt, alter Stand): geradlinig
+// entgegen der Richtung zum nächsten Wegpunkt.
+export function trailPt(c, back) {
+  const T = c.trail || [];
+  let x = c.x, y = c.y, left = back;
+  for (let i = T.length - 1; i >= 0; i--) {
+    const [px, py] = T[i], d = Math.hypot(px - x, py - y);
+    if (d >= left && d > 0) { const k = left / d; return { x: x + (px - x) * k, y: y + (py - y) * k, a: Math.atan2(y - py, x - px) }; }
+    left -= d; x = px; y = py;
+  }
+  const [gx, gy] = ROUTE[c.dir > 0 ? c.wp : ROUTE.length - 1 - c.wp], a0 = T.length > 1 ? Math.atan2(T[T.length - 1][1] - T[0][1], T[T.length - 1][0] - T[0][0])
+    : Math.atan2(gy * TS - c.y, gx * TS - c.x);
+  return { x: x - Math.cos(a0) * left, y: y - Math.sin(a0) * left, a: a0 };
+}
+export const WAGON_GAP = 104;                              // Beiwagen: Abstand Mitte–Mitte hinter dem Leitwagen (Zug im Maßstab 1,5)
+// Platz der Wachen: 0 = seitlich am Leitwagen (Straßenrand), 1 = hinter dem Beiwagen
+export function escortSlot(c, slot) {
+  if (slot === 0) {                                       // Seitenplatz; in Mauer/Haus/Wasser: andere Seite, sonst dicht hinter dem Leitwagen
+    const q = trailPt(c, 8), free = (x, y) => { const tx = x / TS | 0, ty = y / TS | 0;
+      return !SOLID.has(tileAt('world', tx, ty)) && !HOUSES.some(b => b.map === 'world' && tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h); };
+    for (const k of [34, -34]) { const x = c.x - Math.sin(q.a) * k, y = c.y + Math.cos(q.a) * k; if (free(x, y)) return { x, y }; }
+    return trailPt(c, WAGON_GAP * 0.5);
+  }
+  return trailPt(c, WAGON_GAP + 64);
+}
+const clockMin = () => S.day * 1440 + S.minute;
 function load(c, from) {
   const t = S.towns[from];
   c.cargo = {};
@@ -81,21 +157,32 @@ function load(c, from) {
 export function caravanFrame(c, dt, player, nearFoes) {
   if (!c.alive) return;
   if (nearFoes) c.attacked = true;                               // unter Angriff: rollt langsam weiter
+  if (c.restUntil > clockMin()) { c.vx = c.vy = 0; return; }     // Ankunft: abladen, neu beladen, dann zurück
+  if (c.restUntil) { c.restUntil = 0; c.trail = []; }             // Abfahrt: der Zug wendet (neue Spur)
   const idx = c.dir > 0 ? c.wp : ROUTE.length - 1 - c.wp;
   const [tx, ty] = ROUTE[idx];
   const gx = tx * TS, gy = ty * TS, d = Math.hypot(gx - c.x, gy - c.y);
   const sp = (nearFoes ? 0.35 : 0.9) * dt / 16;
-  if (d > sp) { c.vx = (gx - c.x) / d * sp; c.vy = (gy - c.y) / d * sp; c.x += c.vx; c.y += c.vy; c.facing = c.vx > 0 ? 3 : 2; }
+  if (d > sp) {
+    c.vx = (gx - c.x) / d * sp; c.vy = (gy - c.y) / d * sp; c.x += c.vx; c.y += c.vy;
+    if (Math.abs(c.vx) > 0.05) c.facing = c.vx > 0 ? 3 : 2;       // senkrechte Stücke: Seitenansicht bleibt
+    const T = (c.trail ||= []), l = T[T.length - 1];
+    if (!l || Math.hypot(c.x - l[0], c.y - l[1]) >= TRAIL_STEP) { T.push([Math.round(c.x), Math.round(c.y)]); if (T.length > TRAIL_MAX) T.shift(); }
+  }
   else if (c.wp < ROUTE.length - 1) c.wp++;
   else arrive(c, player);
   // Hinterhalt auf halber Strecke
   if (!c.ambushChecked && Math.abs(c.x / TS - wT(101)) < 3) {            // zwischen Eren (bis x 93) und der Nordfurter Brücke
     c.ambushChecked = true;
     if (chance(0.35)) {
+      const guards = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.escort === c.id);
       if (Math.hypot(player.x - c.x, player.y - c.y) < 700 && player.map === 'world') {
-        for (let i = 0; i < 3; i++) H.spawnEnemy('bandit', 'world', (c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6));
+        for (let i = 0; i < 3 + guards.length; i++) H.spawnEnemy('bandit', 'world', (c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6));   // ein bewachter Zug lockt mehr Räuber
         log('Banditen fallen über die Karawane her!', 'combat');
         H.toast('KARAWANE ÜBERFALLEN');
+      } else if (guards.length && chance(0.3 + 0.15 * guards.length)) {    // außer Sicht: Wachen schlagen zurück, nicht ohne Preis
+        if (chance(0.3)) { const g = pick(guards); g.alive = false; S.ents.world.splice(S.ents.world.indexOf(g), 1); }
+        log('Räuber überfielen eine Karawane auf der Alten Straße — die Wachen schlugen sie zurück.', 'economy');
       } else {
         for (const g of Object.keys(c.cargo)) c.cargo[g] = Math.floor(c.cargo[g] / 2);
         log('Eine Karawane wurde auf der Alten Straße ausgeraubt.', 'economy');
@@ -114,8 +201,10 @@ function arrive(c, player) {
     log('Die Händler danken für den Geleitschutz: 30 Gold.', 'economy');
     H.toast('Geleitschutz belohnt');
   }
-  c.dir = -c.dir; c.wp = 1; c.attacked = false; c.ambushChecked = false;
+  c.dir = -c.dir; c.wp = 1; c.attacked = false; c.ambushChecked = false; c.vx = c.vy = 0;
+  c.restUntil = clockMin() + 40;                                // 40 Spielminuten am Tor
   load(c, to);
+  H.hireEscorts?.(c);                                           // gefallene Wachen werden in der Stadt ersetzt
 }
 export function caravanDied(c) {
   log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy');

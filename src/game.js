@@ -302,15 +302,33 @@ function spawnGuardPosts() {
     const k = GUARD_KIT[g.faction], pos = freeSpotNear('world', ...worldPt(tx, ty), 1);
     const had = S.ents.world.filter(c => c.kind === 'npc' && c.guard && c.post === town && c.alive)[i];
     if (had) { had.anchor = { x: pos.x, y: pos.y }; had.x = pos.x; had.y = pos.y; had.wander = null; return; }
-    const c = makeChar({ name: pick(['Aldo', 'Berit', 'Conrad', 'Dagna', 'Egil', 'Frida', 'Gunnar', 'Hedda', 'Ivo', 'Jutta']), prof: k.prof,
-      x: pos.x, y: pos.y, level: ri(4, 7), faction: g.faction, traits: ['diszipliniert'], attrs: { strength: 11, endurance: 11 },
-      pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: k.cloth, crest: g.faction === 'order' ? '#9b2e26' : null } });
-    for (const sl of ['weapon', 'chest', 'head', 'offhand']) if (k[sl]) c.equip[sl] = mkItem(k[sl]);
-    c.anchor = { x: pos.x, y: pos.y }; c.guard = true; c.post = town; c.skills.onehanded = 20; c.skills.polearms = 20;
-    if (k.undead) { c.undead = true; c.hooded = true; c.pal.skin = '#b9b3a2'; c.pal.glow = '#4e8f7a'; }
-    recalc(c); B.fullHeal(c);
+    const c = guardChar(g.faction, pos); c.guard = true; c.post = town;
     S.ents.world.push(c);
   });
+}
+// Bewaffnete Figur nach GUARD_KIT (Stadtwache, Karawanenwache). Posten/Aufgabe setzt der Aufrufer.
+function guardChar(faction, pos, prof, level = ri(4, 7)) {
+  const k = GUARD_KIT[faction];
+  const c = makeChar({ name: pick(['Aldo', 'Berit', 'Conrad', 'Dagna', 'Egil', 'Frida', 'Gunnar', 'Hedda', 'Ivo', 'Jutta']), prof: prof || k.prof,
+    x: pos.x, y: pos.y, level, faction, traits: ['diszipliniert'], attrs: { strength: 11, endurance: 11 },
+    pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: k.cloth, crest: faction === 'order' ? '#9b2e26' : null } });
+  for (const sl of ['weapon', 'chest', 'head', 'offhand']) if (k[sl]) c.equip[sl] = mkItem(k[sl]);
+  c.anchor = { x: pos.x, y: pos.y }; c.skills.onehanded = 20; c.skills.polearms = 20;
+  if (k.undead) { c.undead = true; c.hooded = true; c.pal.skin = '#b9b3a2'; c.pal.glow = '#4e8f7a'; }
+  recalc(c); B.fullHeal(c);
+  return c;
+}
+// Karawanenwachen (BUG-011): je Platz eine; wer fehlt (gefallen, alter Spielstand), wird angeheuert.
+const ESCORT_SLOTS = 2;
+const escortsOf = car => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.escort === car.id);
+function hireEscorts(car) {
+  const have = escortsOf(car);
+  for (let slot = 0; slot < ESCORT_SLOTS; slot++) if (!have.some(e => e.slot === slot)) {
+    const q = SIM.escortSlot(car, slot), pos = freeSpotNear('world', q.x / TS | 0, q.y / TS | 0, 3);
+    const c = guardChar('merch', pos, 'Karawanenwache', ri(2, 4)); c.escort = car.id; c.slot = slot; c.brave = true;
+    S.ents.world.push(c);
+  }
+  car.crew = 1;
 }
 
 // Bewohner: jedes Wohn- und Arbeitshaus der Siedlungen hat Leute. Nachts drinnen (an der Tür), tagsüber bei der Arbeit
@@ -595,6 +613,7 @@ export function newGame(cfg) {
 
 function bindSim() {
   SIM.H.spawnEnemy = spawnEnemy;
+  SIM.H.hireEscorts = hireEscorts;
   SIM.H.toast = t => UI.toast(t, 3600);
   SIM.H.title = t => {
     const p = S.player; p.titles ||= [];
@@ -771,6 +790,11 @@ function update(dt, now) {
   for (const c of S.ents.world) if (c.kind === 'caravan' && c.alive) {
     const near = performance.now() - (c.lastHurt || -1e9) < 4000;          // hält nur, solange sie angegriffen wird
     SIM.caravanFrame(c, dt, p, near);
+    if (!c.crew) hireEscorts(c);                                           // alter Spielstand: Zug ohne Wachen
+    // Wachen außer Sicht (updateNpc denkt erst ab 900 px): sie gehen auf ihrem Platz mit, statt am Wegrand stehen zu bleiben
+    if (p.map !== 'world' || dist(c, p) > 1000) for (const e of escortsOf(c)) if (!e.downed && (p.map !== 'world' || dist(e, p) > 900)) {
+      const q = SIM.escortSlot(c, e.slot); e.x = q.x; e.y = q.y; e.anchor = { x: q.x, y: q.y }; e.vx = e.vy = 0; e.wander = null; e.threatId = null;
+    }
   }
   if (p.alive) controlPlayer(dt);
   for (const e of [...S.ents[S.map]]) think(e, dt);
@@ -1134,7 +1158,7 @@ function teamOf(c) {
     return 'foe';
   }
   if (c.kind === 'caravan') return 'player';
-  if (c.kind === 'npc') return c.angry ? 'foe' : c.guard && !valenHostile() ? 'player' : 'neutral';
+  if (c.kind === 'npc') return c.angry ? 'foe' : (c.guard && !valenHostile()) || c.escort ? 'player' : 'neutral';   // Karawanenwachen stehen wie der Wagen
   return 'neutral';
 }
 function isHostile(a, b) {
@@ -1293,6 +1317,7 @@ function die(c, cause = 'Wunden', source) {
   const arr = S.ents[c.map];
   if (c.kind === 'caravan') {
     SIM.caravanDied(c);
+    for (const e of escortsOf(c)) { e.escort = null; e.escortLost = true; e.anchor = { x: e.x, y: e.y }; }   // Wachen ohne Zug: bleiben, bis niemand hinsieht
     for (const [g, n] of Object.entries(c.cargo || {})) if (n > 0) dropItemAt(c.map, c.x + ri(-14, 14), c.y + ri(-10, 10), mkItem(g, Math.ceil(n / 2)));
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
     return;
@@ -1663,12 +1688,15 @@ function updateNpc(e, dt) {
   const held = e.threatId ? byId(e.threatId) : null;
   const called = e.alarm && e.alarm.until > now ? byId(e.alarm.id) : null;
   const f = foe(held) && dist(e, held) < 340 ? held : foe(called) && dist(e, called) < 700 ? called :
-    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && !(e.faction && x.faction === e.faction) && dist(e, x) < (e.guard ? 300 : 220));   // eigene Fraktion ist keine Bedrohung
+    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && !(e.faction && x.faction === e.faction) && dist(e, x) < (e.guard || e.escort ? 300 : 220));   // eigene Fraktion ist keine Bedrohung
   e.threatId = f ? f.id : null;
-  const home = e.anchor || e, leashed = DEFENDERS.has(e.key) && !e.guard && Math.hypot(e.x - home.x, e.y - home.y) > 360;
+  const car = e.escort ? byId(e.escort) : null;
+  if (e.escort && (!car || !car.alive)) { e.escort = null; e.escortLost = true; e.anchor = { x: e.x, y: e.y }; }
+  const home = e.anchor || e, leashed = (DEFENDERS.has(e.key) && !e.guard && Math.hypot(e.x - home.x, e.y - home.y) > 360)
+    || (car && car.alive && dist(e, car) > 420);                   // Karawanenwache: nicht weiter als 420 px vom Zug
   if (f && !leashed) {
     if (e.shop) e.shopClosed = Math.max(e.shopClosed || 0, now + 10);   // Kampf in der Nähe: Stand zu, bis Ruhe ist
-    if (e.guard || e.hostile || e.angry || DEFENDERS.has(e.key)) {   // Wachen und kampferprobte Bewohner stellen sich
+    if (e.guard || e.escort || e.hostile || e.angry || DEFENDERS.has(e.key)) {   // Wachen und kampferprobte Bewohner stellen sich
       if (e.guard && !(e.calledAt > now - 5)) { e.calledAt = now; raiseAlarm(e, f); }
       e.aim = Math.atan2(f.y - e.y, f.x - e.x);
       const d = dist(e, f), reach = ITEMS[e.equip.weapon?.key]?.ranged ? 200 : 34;   // Schützen halten Abstand
@@ -1697,6 +1725,13 @@ function updateNpc(e, dt) {
   } else e.calledHelp = false;
   // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
   if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
+  if (car && car.alive) {                              // Karawanenwache: geht auf ihrem Platz am Zug mit
+    const q = SIM.escortSlot(car, e.slot), d = Math.hypot(q.x - e.x, q.y - e.y);
+    e.anchor = { x: q.x, y: q.y };
+    if (d > 10) seek(e, Math.atan2(q.y - e.y, q.x - e.x), Math.min(1.8, (car.vx || car.vy ? 0.9 : 0.6) + d / 45) * dt / 16, dt, q);   // Zugtempo + Aufholen
+    else { e.vx = e.vy = 0; if (car.vx || car.vy) e.aim = Math.atan2(car.vy, car.vx); }
+    return;
+  }
   // Tagesablauf
   const h = S.minute / 60;
   let target = e.anchor;
@@ -2179,7 +2214,7 @@ function respawnTick() {
     const e = W[i];
     if (e.kind === 'enemy' && e.armyId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400)) { W.splice(i, 1); continue; }
     // Reise-Begegnungen räumen sich auf, sobald der Spieler weit weg ist
-    if (e.encounter && !e.follow && !e.lurk && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
+    if ((e.encounter || e.escortLost) && !e.follow && !e.lurk && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
   }
   for (const a of SPAWN_AREAS) {
     const count = S.ents[a.map].filter(e => e.kind === 'enemy' && !e.boss &&
@@ -3573,10 +3608,26 @@ export function selftest() {
     })());
     ok('Karawanenroute: kein Abschnitt durch Haus, Wasser oder Mauer (Karawanen fahren ohne Kollision)', SIM.ROUTE.every(([x, y], i) => {
       if (!i) return true; const [a, b] = SIM.ROUTE[i - 1], n = Math.max(Math.abs(x - a), Math.abs(y - b), 1);
-      for (let k = 0; k <= n; k++) { const tx = Math.round(a + (x - a) * k / n), ty = Math.round(b + (y - b) * k / n);
+      for (let k = 0; k <= n; k++) { const tx = Math.floor(a + (x - a) * k / n), ty = Math.floor(b + (y - b) * k / n);   // Wegpunkte in Kachelmitte
         if (SOLID.has(tileAt('world', tx, ty)) || HOUSES.some(h => tx >= h.x && tx < h.x + h.w && ty >= h.y && ty < h.y + h.h)) return false; }
       return true;
     }));
+    ok('Karawanenroute folgt der Straße (≥ 90 % der Kacheln Straße oder Brücke)', (() => { let r = 0, n = 0;
+      for (let i = 1; i < SIM.ROUTE.length; i++) { const [a, b] = SIM.ROUTE[i - 1], [x, y] = SIM.ROUTE[i], m = Math.max(Math.abs(x - a), Math.abs(y - b), 1);
+        for (let k = 0; k < m; k++) { const t = tileAt('world', Math.floor(a + (x - a) * k / m), Math.floor(b + (y - b) * k / m)); n++; if (t === T.ROAD || t === T.PLANK) r++; } }
+      return n > 60 && r / n >= 0.9; })());
+    const car = S.ents.world.find(e => e.kind === 'caravan' && e.alive);
+    if (car) ok('Karawane (BUG-011): zwei Wachen gehen mit dem Zug, stehen zur Karawane, Räuber sind ihre Feinde', (() => {
+      const p = S.player, keep = { x: p.x, y: p.y, map: p.map }, bandit = { kind: 'enemy', faction: 'bandit', mtype: 'bandit', alive: true };
+      p.x = car.x - 60; p.y = car.y + 110; seedRng(11);
+      try {
+        let far = 0, n = 0;                                    // Stichprobe alle 240 ms: höchstens 15 % der Proben > 90 px vom Platz (Ecken, Kampf)
+        for (let t = 0; t < 12000; t += 16) { update(16, performance.now());
+          if (t % 240 === 0) for (const e of escortsOf(car)) { const q = SIM.escortSlot(car, e.slot); n++; if (Math.hypot(q.x - e.x, q.y - e.y) > 90 && !e.threatId) far++; } }
+        const es = escortsOf(car);
+        return es.length === 2 && new Set(es.map(e => e.slot)).size === 2 && far <= n * 0.15 && es.every(e => teamOf(e) === 'player' && isHostile(bandit, e) && e.map === 'world');
+      } finally { Object.assign(p, keep); }
+    })());
     ok('Siedlungen (§75): Nachbarhäuser ≥ 2 Kacheln auseinander, bebaut < 35 % der Fläche', Object.entries(TOWN_PLAN).every(([town, P]) => {
       const hs = HOUSES.filter(b => b.town === town), [x0, y0, x1, y1] = P.area;
       const apart = hs.every((a, i) => hs.every((b, j) => j <= i || Math.max(b.x - a.x - a.w, a.x - b.x - b.w, b.y - a.y - a.h, a.y - b.y - b.h) >= 2));
@@ -3585,7 +3636,7 @@ export function selftest() {
     ok('Einwohner folgen der Fläche (perHead), nicht der Häuserzahl; Anzeige zählt echte Köpfe', Object.entries(TOWN_PLAN).every(([town, P]) => {
       const [x0, y0, x1, y1] = P.area, target = (x1 - x0 + 1) * (y1 - y0 + 1) / P.perHead;
       const heads = S.ents.world.filter(c => c.kind === 'npc' && c.alive && (c.homeTown === town || c.post === town
-        || (!c.villager && !c.guard && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === town))).length;
+        || (!c.villager && !c.guard && !c.escort && !c.escortLost && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === town))).length;
       return heads <= target * 1.1 + 1 && heads >= Math.min(target * 0.6, HOUSES.filter(b => b.town === town && TRADES[b.type]).length);
     }));
   }
