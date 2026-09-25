@@ -16,7 +16,7 @@ let last = 0, acc = 0, running = false, hovered = null, selected = null, placing
 let combat = [];                        // lebende Kämpfer der aktuellen Karte, einmal pro Frame
 const keys = new Set();
 let mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false };
-const touch = { on: false, dx: 0, dy: 0, lx: 1, ly: 0, attack: false };   // Touch-Steuerung: Stick-Richtung, letzte Blickrichtung
+const touch = { on: false, dx: 0, dy: 0, lx: 1, ly: 0, attack: false, guard: false };   // Touch-Steuerung: Stick-Richtung, letzte Blickrichtung
 const solidIndex = { world: new Map(), mine: new Map() };
 occupied.at = (map, tx, ty) => !!solidIndex[map]?.get(tx + ',' + ty)?.length;   // Spawns nie in Bäume/Felsen setzen
 
@@ -414,7 +414,8 @@ function spawnResidents() {
         : ['bakery', 'store', 'stable', 'smithy', 'fisher'].includes(b.type) && i === 0 ? front
         : r < 0.35 ? sq() : r < 0.65 ? visit : front;
       const tav = HOUSES.find(h => h.town === b.town && h.type === 'tavern');         // abends: ein Teil geht in die Schenke
-      c.eve = tav && (hx + hy + i) % 3 === 0 ? { x: (tav.doorTile[0] + 0.5) * TS, y: (tav.doorTile[1] + (tav.door === 'S' ? 1.5 : -0.5)) * TS } : front;
+      const k = (hx * 7 + hy * 13 + i * 5) % 7 - 3, far = 1.5 + ((hx + i) % 3);         // vor der Schenke: in einem Halbkreis verteilt statt als Klumpen an der Tür
+      c.eve = tav && (hx + hy + i) % 3 === 0 ? { x: (tav.doorTile[0] + 0.5 + k * 1.1) * TS, y: (tav.doorTile[1] + (tav.door === 'S' ? far : -far + 1)) * TS } : front;
       if (prof === 'Heilerin') c.traits = ['gütig'];
       S.ents.world.push(c);
     }
@@ -444,6 +445,12 @@ function assignNpcDays() {                         // idempotent: bei Neustart u
     const b = HOUSES.find(h => h.id === where[0]); if (!b) return null;
     const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
     if (where[1] === 'front') return { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
+    if (where[2] === 'sit') {                                  // Sitzplatz: an einer freien Bank des Hauses (Schenke am Abend)
+      const bench = S.ents.world.find(e => e.type === 'bench' && e.house === b.id && !used['seat' + e.id]);
+      if (bench) { used['seat' + bench.id] = npc; return { x: bench.x, y: bench.y - 16, in: true, sit: true }; }
+      const table = S.ents.world.find(e => e.type === 'table' && e.house === b.id && !used['seat' + e.id]);   // keine Bank frei: an den Tisch
+      if (table) { used['seat' + table.id] = npc; return { x: table.x, y: table.y + 18, in: true, sit: true }; }
+    }
     const free = [];                               // freie Innenkacheln, nächste zur Tür zuerst
     for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++)
       if (!SOLID.has(tileAt('world', x, y)) && !solidPropAt('world', x * TS + TS / 2, y * TS + TS / 2, 4)) free.push([x, y]);
@@ -454,7 +461,8 @@ function assignNpcDays() {                         // idempotent: bei Neustart u
   };
   for (const c of S.ents.world) {
     const d = c.kind === 'npc' && NPC_DAY[c.key]; if (!d) continue;
-    const work = spot(d.work, c.key), eve = spot(d.eve, c.key), night = spot(d.night, c.key);
+    const eveHouse = Array.isArray(d.eve) && HOUSES.find(h => h.id === d.eve[0]);
+    const work = spot(d.work, c.key), eve = spot(eveHouse?.type === 'tavern' && d.eve[1] === 'in' ? [...d.eve, 'sit'] : d.eve, c.key), night = spot(d.night, c.key);
     if (!work || !night) continue;
     c.schedulePos = work; c.eve = eve; c.anchor = night; c.till = d.till || null;
   }
@@ -973,7 +981,7 @@ function tickCombatant(c, dt) {
   if (c.telegraph > 0) c.telegraph -= dt;
   for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - dt);
   const resting = !c.vx && !c.vy;
-  c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0)));
+  if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0)));
   if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')));
   if (c === S.player && c.titleClass) titleTick(c, dt);
   // Statuszeiten
@@ -1095,21 +1103,29 @@ function controlPlayer(dt) {
       d.dash.hit.push(f.id); hit(p, f, d.dash.mult); f.stagger = Math.max(f.stagger || 0, 350);
     }
     if (d.t % 55 < dt) S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ghost', s: 1, life: 220, maxLife: 220, face: p.facing });
-    if (d.t >= U) { p.dodge = null; p.invuln = false; }
+    if (!d.dash && d.t >= U - 40) p.invuln = false;                   // die letzten 40 ms (Landung) sind verwundbar — i-Frames sind die Rolle, nicht das Aufstehen
+    if (d.t >= U) { p.dodge = null; p.invuln = false; if (!d.dash) { p.landT = performance.now() + 110; fx(p.x, p.y + 4, 'dust', 4); } }
+    return;
+  }
+  if (p.landT > performance.now()) {                                // Landung: kurz in den Knien, halbes Tempo, kein Hieb
+    const { dx, dy } = moveInput(), l = Math.hypot(dx, dy);
+    if (l) moveEnt(p, dx / l * speedOf(p) * dt / 32, dy / l * speedOf(p) * dt / 32);
+    p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
     return;
   }
   const { dx, dy } = moveInput();
   tickChannel(p, dt, dx || dy);
   if (p.channel) { p.vx = p.vy = 0; p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x); return; }
+  updateGuard(p, keys.has('shift') || touch.guard);
   if (dx || dy) {
-    const l = Math.hypot(dx, dy), sp = speedOf(p) * dt / 16;
+    const l = Math.hypot(dx, dy), sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : 1);   // in Deckung: kleine Schritte
     moveEnt(p, dx / l * sp, dy / l * sp);
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
     p.stepT = (p.stepT || 0) + dt; if (p.stepT > 300) { p.stepT = 0; sfx('step'); }
   } else { p.vx = p.vy = 0; }
   if (touch.on) touchAim(p);
   p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
-  if (mouse.down || keys.has(' ') || touch.attack) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
+  if (!p.cover && (mouse.down || keys.has(' ') || touch.attack)) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
   // Dungeon-Fallen
   const haz = S.ents[S.map].find(e => e.hazard && dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
   if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, 'Fallgrube'); camShake(6, 160); }
@@ -1224,7 +1240,10 @@ function hit(attacker, target, mult, kind = 'physical') {
   const ap = it ? (it.ap || 0) : 0;
   const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.6 : armorOf(target)) * (1 - ap);
   const off = target.equip && target.equip.offhand;
-  if (off && chance(ITEMS[off.key].block * 0.7) && !target.downed) {
+  // Aktive Deckung / Parade (nur der Spieler; eigenes Feld cover — guard ist das Flag der Stadtwachen). Rüstung wirkt vor dem Block.
+  const cov = target.cover ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55)) : false;
+  if (cov === true) return;
+  if (off && !target.cover && cov !== 'broken' && chance(ITEMS[off.key].block * 0.7) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
     fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
@@ -1510,6 +1529,7 @@ function hurtFromProjectile(attacker, target, p) {
   dmg = Math.max(1, dmg - armor * 0.5);
   if (p.kind === 'fire') { fx(p.x, p.y, 'fire', 12); sfx('fire', 0.5, earVol(target)); }
   if (p.kind === 'shadow') fx(p.x, p.y, 'shadow', 10);
+  if (target.cover && guarded({ x: p.x - p.vx * 20, y: p.y - p.vy * 20, name: attacker.name, mtype: attacker.mtype }, target, dmg)) return;   // Geschoss aus der Blickrichtung: blocken, nicht parieren
   hurt(target, dmg, attacker, attacker.name, crit, p.kind === 'fire' ? 'fire' : 'physical');
   if (attacker.skills) attacker.skills.archery = Math.min(100, (attacker.skills.archery || 0) + 0.15);
 }
@@ -1740,6 +1760,7 @@ function updateNpc(e, dt) {
   if (S.party.includes(e.id)) return partyAI(e, dt);
   const p = S.player;
   if (dist(e, p) > 900) { e.vx = e.vy = 0; return; }
+  const wasSitting = e.sitting; e.sitting = false;
   if (e.fleeing && !e.angry) {                         // provozierter Zivilist/Händler flieht vor dem Spieler
     const d = dist(e, p);
     if (d > 360 || !p.alive) { e.fleeing = false; e.vx = e.vy = 0; return; }
@@ -1822,6 +1843,15 @@ function updateNpc(e, dt) {
   if (night) target = e.anchor;
   else if (h >= (e.till || 18) && e.eve) target = e.eve;          // Feierabend: vor dem Haus, in der Schenke oder daheim
   else if (h >= 18 && h < 22 && e.home) target = { x: e.anchor.x + 40, y: e.anchor.y + 20 };
+  if (target.sit) {                                             // Sitzplatz: hinsetzen statt herumstehen (setzt sich nach Ankunft)
+    const d = Math.hypot(target.x - e.x, target.y - e.y);
+    if (d > 8) { seek(e, Math.atan2(target.y - e.y, target.x - e.x), 0.9 * dt / 16, dt, target); return; }
+    e.vx = e.vy = 0; e.sitting = true; e.sitDir = 'S'; if (!wasSitting) { e.x = target.x; e.y = target.y; }
+    return;
+  }
+  if (e.shop && !night && dist(e, p) < 90 && !(e.vx || e.vy) && !(e.tradeT > performance.now())) {   // Händler zeigt die Ware, wenn man nah kommt
+    e.tradeT = performance.now() + 2600; act(e, 'trade', 1100, p);
+  }
   const jit = target.in || (e.homeId && (night || target === e.anchor)) ? 6 : 46;  // drinnen nur ein paar Schritte, sonst gegen die Wand
   e.aiTimer -= dt;
   if (e.aiTimer <= 0) { e.aiTimer = ri(2200, 5200); e.wander = { x: target.x + ri(-jit, jit), y: target.y + ri(-jit * 0.87, jit * 0.87) }; }
@@ -2943,6 +2973,7 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
     case 'hundred_steps': {
       if (p.dodge || p.downed) return false;
       const far = node(p, 'o_steps');
+      p.cover = null;
       p.dodge = { t: 0, ax: Math.cos(p.aim), ay: Math.sin(p.aim), dist: 180 + (far ? 60 : 0), dur: 320,
         dash: { hit: [], mult: (0.5 + 0.25 * v) * (far ? 1.25 : 1) } };
       p.invuln = true; p.swing = 0; fx(p.x, p.y + 4, 'dust', 8); sfx('dodge'); return true; }
@@ -3323,6 +3354,7 @@ function bindTouch() {
   const ready = () => !UI.dialogueOpen() && !UI.modalOpen && !$('game').classList.contains('hidden');
   hold('t-attack', () => { if (ready()) touch.attack = true; }, () => { touch.attack = false; });
   hold('t-dodge', () => { if (ready()) dodge(); });
+  hold('t-guard', () => { if (ready()) touch.guard = true; }, () => { touch.guard = false; });
   hold('t-use', () => { if (ready()) doInteract(); });
 }
 function moveInput() {
@@ -3333,6 +3365,43 @@ function moveInput() {
   if (keys.has('d') || keys.has('arrowright')) dx++;
   if (!dx && !dy && (touch.dx || touch.dy)) return { dx: touch.dx, dy: touch.dy };   // Stick (analog, Richtung zählt)
   return { dx, dy };
+}
+// Deckung (Umschalt halten, Touch „Deckung“): kleine Schritte, keine Ausdauer-Erholung, kein Angriff. Hiebe von vorn
+// (±70°): in den ersten 180 ms Parade — der Angreifer taumelt (Bosse kürzer), kein Schaden. Danach Block: mit Schild 15 %
+// Schaden, mit der Waffe 45 %, dafür Ausdauer; reicht sie nicht, bricht die Deckung (Taumeln, 0,9 s keine Deckung).
+// Flächenangriffe und Geschosse lassen sich blocken, aber nicht parieren.
+const GUARD = { parry: 180, arc: 1.22, shield: 0.15, weapon: 0.45 };
+function updateGuard(p, want) {
+  const now = performance.now(), can = want && !p.dodge && !p.downed && !(p.swing > 0) && !(p.guardBroken > now) && p.stamina > 1;
+  if (can && !p.cover) { p.cover = { since: now }; sfx('metal', 0.15); }
+  else if (!can && p.cover) p.cover = null;
+}
+function guarded(attacker, target, dmg) {
+  const now = performance.now(), g = target.cover;
+  const facing = Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < GUARD.arc;
+  if (!facing || target.downed) return false;
+  const melee = attacker.swing > 0 && dist(attacker, target) < 120;
+  if (melee && now - g.since < GUARD.parry) {                       // Parade: Klinge an Klinge, der Angreifer ist offen
+    const boss = attacker.boss || MONSTERS[attacker.mtype]?.boss;
+    Object.assign(attacker, { swing: 0, hitDone: true, telegraph: 0, windup: false, special: null });
+    attacker.stagger = Math.max(attacker.stagger || 0, boss ? 450 : 900); attacker.atkCd = Math.max(attacker.atkCd || 0, 700);
+    fx(target.x + Math.cos(target.aim) * 14, target.y - 14 + Math.sin(target.aim) * 8, 'spark', 14); float(target, 'Parade!', 'rgba(240,220,150,ALPHA)');
+    sfx('metal', 1, 1); hitStop = Math.max(hitStop, 120); camShake(4, 120); target.stamina = Math.max(0, target.stamina - 3);
+    g.since = -1e9;                                                  // eine Parade je Deckung, danach nur noch Block
+    return true;
+  }
+  const shield = ITEMS[target.equip?.offhand?.key]?.block, cost = dmg * (shield ? 0.8 : 1.2);
+  if (target.stamina < cost) {                                       // Deckung bricht
+    target.cover = null; target.guardBroken = now + 900; target.stagger = Math.max(target.stagger || 0, 500); target.stamina = 0;
+    float(target, 'Deckung gebrochen', 'rgba(210,90,70,ALPHA)'); sfx('metal', 0.8, 1); camShake(5, 160);
+    return 'broken';                                                  // der Hieb trifft voll (auch kein Zufallsblock des Schilds)
+  }
+  target.stamina -= cost;
+  hurt(target, dmg * (shield ? GUARD.shield : GUARD.weapon), attacker, attacker.name || MONSTERS[attacker.mtype]?.name);
+  fx(target.x + Math.cos(target.aim) * 12, target.y - 12 + Math.sin(target.aim) * 7, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
+  if (target.equip?.offhand && shield) target.equip.offhand.cond = Math.max(0.05, (target.equip.offhand.cond ?? 1) - 0.004);
+  sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50);
+  return true;
 }
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
 // i-Frames = Dauer der Rolle. Abklingzeit + Ausdauer verhindern Dauerrollen.
@@ -3348,7 +3417,7 @@ function dodge() {
   const l = Math.hypot(dx, dy);
   const ax = l ? dx / l : -Math.cos(p.aim), ay = l ? dy / l : -Math.sin(p.aim);
   p.stamina -= cost; p.dodgeCd = DODGE.cd + DODGE.dur;
-  p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0;
+  p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0; p.cover = null;   // Rolle beendet die Deckung
   fx(p.x, p.y + 4, 'dust', 6); sfx('dodge');
   return true;
 }
@@ -3700,6 +3769,25 @@ export function selftest() {
     useAbility('hundred_steps'); const inv = p.invuln;
     for (let t = 0; t < 400; t += 16) controlPlayer(16);
     return inv && a.hp < ha && c.hp < hc && tres(p) === 0 && !p.dodge && !p.invuln && p.x > 300 + 150;
+  }));
+  ok('Deckung: Parade in den ersten 180 ms lässt den Angreifer taumeln (kein Schaden), danach Block mit Schild 15 %, leere Ausdauer bricht die Deckung', sandbox(() => {
+    const p = stage(); p.equip.offhand = mkItem('wooden_shield'); p.aim = 0; const b = spawnEnemy('bandit', '__a', 11, 9); b.x = p.x + 30; b.y = p.y; b.aim = Math.PI;
+    combat = S.ents.__a.filter(e => e.alive); const vit = () => B.PARTS.reduce((n, k) => n + p.body[k].hp, 0);   // alle Körperteile (Treffer gehen auf ein zufälliges)
+    updateGuard(p, true); b.swing = 0.45; const h0 = vit(); hit(b, p, 1);
+    const parry = vit() === h0 && b.stagger >= 800 && b.swing === 0;
+    b.swing = 0.45; b.stagger = 0; const s0 = p.stamina, h1 = vit(); hit(b, p, 1); const dmgBlock = h1 - vit();
+    const block = dmgBlock > 0 && p.stamina < s0 && !b.stagger;
+    p.cover = null; seedRng(5); const h2 = vit(); p.equip.offhand = null; hit(b, p, 1); const dmgFull = h2 - vit();
+    p.equip.offhand = mkItem('wooden_shield'); updateGuard(p, true); p.cover.since = -1e9; p.stamina = 0.5; b.swing = 0.45; hit(b, p, 1);
+    const broke = !p.cover && p.guardBroken > performance.now() && p.stagger > 0;
+    const w = actor(p.x - 40, p.y, { faction: 'valen' }); w.guard = true; w.post = 'eren'; const wh = w.hp; seedRng(9); hit(b, w, 1);   // Regression: Stadtwache (guard-Flag) blockt nicht aktiv
+    const townGuard = w.guard === true && w.hp < wh && !w.cover;
+    return parry && block && dmgBlock < dmgFull * 0.4 && broke && townGuard;
+  }));
+  ok('Rolle: i-Frames enden 40 ms vor der Landung, danach kurz in den Knien (halbes Tempo, kein Hieb)', sandbox(() => {
+    const p = stage(); p.stamina = 100; p.dodgeCd = 0; keys.clear(); p.aim = 0; dodge();
+    let vulnerableEarly = false; for (let t = 0; t < DODGE.dur; t += 16) { controlPlayer(16); if (p.dodge && !p.invuln && p.dodge.t < DODGE.dur - 56) vulnerableEarly = true; }
+    return !vulnerableEarly && !p.dodge && !p.invuln && p.landT > performance.now();
   }));
   ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
     const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';

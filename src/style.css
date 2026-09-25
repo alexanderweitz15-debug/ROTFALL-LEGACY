@@ -342,6 +342,7 @@ body.touch #game-canvas{touch-action:none}
 .t-attack{right:18px;bottom:22px;width:76px;height:76px;font-size:13px;border-color:var(--rust)}
 .t-dodge{right:104px;bottom:14px;width:56px;height:56px;font-size:11px}
 .t-use{right:40px;bottom:112px;width:52px;height:52px;font-size:15px;color:var(--gold)}
+.t-guard{right:112px;bottom:82px;width:54px;height:54px;font-size:9px}
 
 /* ---- Auswahl, Fokus: Browserflächen im Stil ---- */
 ::selection{background:rgba(164,64,44,.55);color:#f0e6cd}

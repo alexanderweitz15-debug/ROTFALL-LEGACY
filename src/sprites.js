@@ -181,6 +181,9 @@ const POSES = {
   a1: { u: 0, leg: 0, act: 'a1' }, a2: { u: 1, leg: 1, act: 'a2' }, a3: { u: 0, leg: 1, act: 'a3' },
   hit: { u: 0, leg: 0, act: 'hit', hx: 1 }, cast: { u: 0, leg: 0, act: 'cast' },
   kneel: { u: 3, leg: 0, act: 'kneel' },
+  guard: { u: 1, leg: 1, act: 'guard' },                              // Deckung: tief, Schrittstellung, Arme vor dem Körper
+  sit: { u: 4, leg: 0, act: 'sit' },                                  // Sitzen (Bank, Schenke): Oberschenkel waagrecht
+  trade: { u: 0, leg: 0, act: 'trade' },                              // Handeln: Ware vorzeigen, Hand offen
 };
 
 // ---------------- Menschen / Goblins / Skelette ----------------
@@ -189,6 +192,11 @@ function handOf(L) { return L.glove || L.skin; }
 
 function legsFront(g, L, P) {
   const kneel = P.act === 'kneel', rl = P.leg > 0 ? 1 : 0, rr = P.leg < 0 ? 1 : 0;
+  if (P.act === 'sit') {                                              // von vorn: Knie vorn, Unterschenkel hängen
+    const Pn = L.sp === 'skeleton' ? L.skin : L.pants, Bo = L.sp === 'skeleton' ? L.skin : (L.boots || L.skin);
+    g.r(6, 19, 3, 2, Pn.b); g.r(11, 19, 3, 2, Pn.b); g.p(8, 19, Pn.sh); g.p(13, 19, Pn.sh);
+    g.r(6, 21, 3, 1, Bo.b); g.r(11, 21, 3, 1, Bo.b); return;
+  }
   const top = kneel ? 19 : 17;
   if (L.sp === 'skeleton') {
     const B = L.skin;
@@ -204,6 +212,10 @@ function legsFront(g, L, P) {
   g.r(11, 20 - rr, 4, 2, Bo.sh); g.r(11, 20 - rr, 4, 1, Bo.b); g.p(14, 21 - rr, Bo.dk);
 }
 function legsSide(g, L, P) {
+  if (P.act === 'sit') {                                              // seitlich: Oberschenkel nach vorn, Unterschenkel senkrecht
+    const Pn = L.sp === 'skeleton' ? L.skin : L.pants, Bo = L.sp === 'skeleton' ? L.skin : (L.boots || L.skin);
+    g.r(4, 19, 6, 2, Pn.b); g.r(4, 20, 6, 1, Pn.sh); g.r(4, 21, 2, 1, Pn.sh); g.r(3, 22, 3, 1, Bo.b); return;
+  }
   const kneel = P.act === 'kneel', top = kneel ? 19 : 17;
   // Schrittstellung: near = zugewandtes Bein, far = abgewandtes (dunkler)
   const nearX = P.leg > 0 ? 6 : P.leg < 0 ? 11 : 8, farX = P.leg > 0 ? 11 : P.leg < 0 ? 6 : 10;
@@ -391,6 +403,11 @@ function armsFront(g, L, P, back) {
   else if (act === 'cast') { armUp(4, 8); armUp(14, 8); if (L.glow) { g.p(4, 5 + u, L.glow); g.p(15, 5 + u, L.glow); } }
   else if (act === 'hit') { armUp(2, 9); armUp(16, 9); }
   else if (act === 'kneel') { arm(3, 1, true); arm(15, 1, false); }
+  else if (act === 'guard') {                                        // beide Unterarme quer vor der Brust
+    const y = 11 + u; g.r(wx, 10 + u, 2, 2, S.b); g.r(back ? 12 : 5, y, 4, 2, S.b); g.r(back ? 12 : 5, y + 1, 4, 1, S.sh); g.r(back ? 11 : 8, y - 1, 2, 2, Hd.b);
+    g.r(ox, 10 + u, 2, 2, S.b); g.r(back ? 5 : 11, y + 1, 4, 2, S.b); g.r(back ? 5 : 11, y + 2, 4, 1, S.sh); }
+  else if (act === 'sit') { arm(3, 1, true); arm(15, 1, false); g.r(5, 16 + u, 2, 1, Hd.b); g.r(13, 16 + u, 2, 1, Hd.b); }   // Hände auf den Knien
+  else if (act === 'trade') { arm(3, 0, true); const x0 = back ? 12 : 12; g.r(15, 10 + u, 2, 2, S.b); g.r(x0, 12 + u, 4, 2, S.b); g.r(x0 - 1, 11 + u, 2, 2, Hd.b); }   // Hand offen nach vorn
   else { arm(3, P.arm > 0 ? 1 : 0, true); arm(15, P.arm < 0 ? 1 : 0, false); }
   // Kapuzen-Schulterkragen über den Armansätzen
   if (L.hooded) { const H = L.hood, v = u + (P.hdy || 0);
@@ -404,7 +421,7 @@ function paintFront(L, pose, back) {
   if (L.robe) { /* Beine unter der Robe */ } else legsFront(g, L, P);
   torsoFront(g, L, P, back);
   if (back) { armsFront(g, L, P, true); headFront(g, L, P, true); if (L.shield) shieldAt(g, L, 1, 11 + P.u, false); }
-  else { armsFront(g, L, P, false); headFront(g, L, P, false); if (L.shield) shieldAt(g, L, 14, 11 + P.u, false); }
+  else { armsFront(g, L, P, false); headFront(g, L, P, false); if (L.shield) shieldAt(g, L, P.act === 'guard' ? 8 : 14, P.act === 'guard' ? 10 + P.u : 11 + P.u, false); }
   if (L.quiver && !back) { g.p(15, 8 + P.u, '#c9bfa6'); g.p(16, 7 + P.u, '#c9bfa6'); }
   return g;
 }
@@ -441,12 +458,15 @@ function paintSide(L, pose) {
   else if (act === 'a3') { g.r(8, 12 + u, 2, 3, S.b); g.r(6, 14 + u, 3, 2, S.b); g.p(8, 15 + u, S.sh); g.r(5, 15 + u, 2, 2, Hd.b); }
   else if (act === 'cast') { g.r(6, 10 + u, 4, 2, S.b); g.r(6, 11 + u, 4, 1, S.sh); g.r(4, 9 + u, 2, 2, Hd.b); if (L.glow) g.p(3, 8 + u, L.glow); }
   else if (act === 'hit') { g.r(11, 7 + u, 2, 4, S.b); g.p(12, 7 + u, S.sh); g.r(11, 5 + u, 2, 2, Hd.b); }
+  else if (act === 'guard') { g.r(8, 10 + u, 2, 2, S.b); g.r(5, 10 + u, 4, 2, S.b); g.r(5, 11 + u, 4, 1, S.sh); g.r(4, 8 + u, 2, 2, Hd.b); }   // Arm hoch vor dem Gesicht
+  else if (act === 'sit') { g.r(8, 10 + u, 2, 4, S.b); g.r(6, 14 + u, 3, 1, S.b); g.r(5, 14 + u, 2, 1, Hd.b); }                                 // Hand auf dem Knie
+  else if (act === 'trade') { g.r(8, 11 + u, 2, 2, S.b); g.r(4, 12 + u, 5, 2, S.b); g.r(4, 13 + u, 5, 1, S.sh); g.r(2, 11 + u, 2, 2, Hd.b); }   // Hand nach vorn
   else { const ax = 9 + (P.arm > 0 ? 1 : P.arm < 0 ? -1 : 0) + (act === 'kneel' ? -1 : 0);
     g.r(ax, 10 + u, 2, 5, S.b); g.r(ax + 1, 10 + u, 1, 5, S.sh); g.p(ax, 10 + u, S.hi); g.r(ax, 15 + u, 2, 2, Hd.b); g.p(ax + 1, 16 + u, Hd.sh); }
   if (L.armor === 'plate') { g.r(8, 9 + u, 4, 2, A.b); g.r(8, 9 + u, 3, 1, A.hi); g.r(8, 11 + u, 4, 1, A.sh); }
   // Kopf
   headSide(g, L, { u: u + (P.hdy || 0), hx });
-  if (L.shield) shieldAt(g, L, 3, 11 + u, true);
+  if (L.shield) shieldAt(g, L, act === 'guard' ? 1 : 3, act === 'guard' ? 8 + u : 11 + u, true);   // Deckung: Schild hoch und vor
   return g;
 }
 function headSide(g, L, P) {
@@ -539,11 +559,14 @@ export function poseOf(e, now, bow) {
   }
   const dir = 'SNWE'[face] || 'S';
   if (e.dodge) return { dir, pose: 'tuck', rot: ((e.dodge.t / 65) | 0) % 4 };
+  if (e.landT > now) return { dir, pose: 'kneel' };                    // Landung nach der Rolle: kurz in die Knie
+  if (e.cover) return { dir, pose: 'guard' };                          // Deckung des Spielers (nicht e.guard: das ist die Stadtwache)
   if (e.act && now < e.act.until && now >= e.act.at && !(e.vx || e.vy) && !(sw > 0)) {   // Interaktion: knien, arbeiten, aufrichten
     const k = (now - e.act.at) / (e.act.until - e.act.at), d = e.act.dir || dir;
     if (e.act.kind === 'work') return { dir: d, pose: ((k * 4) | 0) & 1 ? 'a2' : 'a1' };           // Axt/Hacke: zwei Schläge
     if (e.act.kind === 'rise') return { dir: d, pose: k < 0.5 ? 'kneel' : 'hit' };                // vom Boden hoch: Knie, dann wankend
     if (e.act.kind === 'strike') return { dir: d, pose: k < 0.4 ? 'a2' : 'a3' };                  // Handkante: Stoß und Nachgehen
+    if (e.act.kind === 'trade') return { dir: d, pose: 'trade' };
     return { dir: d, pose: 'kneel' };                                                             // suchen, sammeln, beten
   }
   if (e.draw > 0) return { dir, pose: 'cast' };                         // Bogen gespannt
@@ -552,6 +575,7 @@ export function poseOf(e, now, bow) {
   if (e.channel || (e.castT && now - e.castT < 450 && now >= e.castT)) return { dir, pose: 'cast' };
   if ((e.lastHurt && now - e.lastHurt < 170 && now >= e.lastHurt) || e.stagger > 0) return { dir, pose: 'hit' };   // Treffer / Taumeln
   if (e.vx || e.vy) return { dir, pose: 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3) };
+  if (e.sitting) return { dir: e.sitDir || dir, pose: 'sit' };           // sitzt auf Bank/Stuhl (Schenke, Feierabend)
   return { dir, pose: ((now / 650 + (e.seed || 0)) | 0) & 1 ? 'i1' : 'i0' };
 }
 

@@ -1256,7 +1256,8 @@ export function drawHumanoid(e, now, override) {
   }
   const f = SP.humanFrame(spec, pz.dir, pz.pose);
   const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
-  if (w && behind) drawWeapon(c, e, now, wit);
+  const armed = w && !e.sitting;                                   // wer sitzt, hat die Waffe abgelegt
+  if (armed && behind) drawWeapon(c, e, now, wit);
   const [sx, sy] = buildOf(e).scale;
   c.save(); c.translate(x, y + 6); c.scale(sx, sy);
   c.drawImage(f, -10 * PX, -23 * PX, f.width * PX, f.height * PX);
@@ -1271,7 +1272,7 @@ export function drawHumanoid(e, now, override) {
     c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0));
     c.beginPath(); c.arc(x, y - 29, 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   }
-  if (w && !behind) drawWeapon(c, e, now, wit);
+  if (armed && !behind) drawWeapon(c, e, now, wit);
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 44, 4, 0, 7); c.stroke(); }
 }
 
@@ -1300,9 +1301,9 @@ function drawWeapon(c, e, now, it) {
   const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
   const W = SP.weaponSprite(e.equip.weapon.key, it.rarity, it.holy, wt);
-  const sv = wt === 'bow' ? { a: 0, ext: 0 } : swingOf(wt, sw, arc);
+  const sv = wt === 'bow' ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
   const sgn = Math.cos(dir) < 0 ? -1 : 1;                           // nach links gespiegelt: Waffe hängt unten, Hieb von oben
-  const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + low + Math.sin(dir) * (5 + sv.ext * 0.6);   // kniend: Hand tiefer
+  const a = dir + sv.a * sgn, hx = e.x + Math.cos(dir) * (8 + sv.ext), hy = e.y - 12 + low - (e.cover ? 4 : 0) + Math.sin(dir) * (5 + sv.ext * 0.6);   // kniend: Hand tiefer
   const len = (W.cv.width - W.gx) * PX;
   // Klingenspur: dieselbe Kurve, ein paar Schritte zurück ausgewertet — die Spur folgt genau der Klinge
   if (sw > 0 && !it.ranged && !A) {

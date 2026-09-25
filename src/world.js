@@ -121,9 +121,13 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   const used = new Set([inside.join(',')]);
   const ruin = wearOf(b) === 2;                     // verlassen: Schutt, umgestürzter Rest, keine Wohnung mehr
   for (const [kind, ox, oy] of ruin ? [['rubble', 0, 0], ['debris', -1, 0], ['barrel', -1, -1], ['debris', 1, -1]] : FURNISH[b.type] || []) {
-    const tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy, k = tx + ',' + ty;
-    if (tx < x + 1 || tx > x + w - 2 || ty < y + 1 || ty > y + h - 2 || used.has(k)) continue;
-    used.add(k);
+    let tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy;
+    const free = (i, j) => i >= x + 1 && i <= x + w - 2 && j >= y + 1 && j <= y + h - 2 && !used.has(i + ',' + j);
+    if (!free(tx, ty)) {                            // Platz belegt (z. B. Kachel hinter der Tür): nächste freie Innenkachel —
+      const alt = [[tx - 1, ty], [tx + 1, ty], [tx, ty - 1], [tx - 1, ty - 1], [tx + 1, ty - 1]].find(([i, j]) => free(i, j));   // sonst fehlten kleinen Schenken die Bänke
+      if (!alt) continue; [tx, ty] = alt;
+    }
+    used.add(tx + ',' + ty);
     prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 10 });
   }
   return b;
