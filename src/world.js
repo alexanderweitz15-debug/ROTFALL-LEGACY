@@ -47,6 +47,9 @@ export const LOCATIONS = [
   { key:'altvharn',  name:'Alt-Vharn',          x:362,y:380,r:16, kind:'ruin',    threat:4, faction:'undead' },
   { key:'necropolis',name:'Große Nekropole',    x:404,y:437,r:14, kind:'ruin',    threat:4, faction:'undead' },
   { key:'blackkeep', name:'Die Schwarze Feste', x:431,y:430,r:18, kind:'city',    threat:5, faction:'undead' },
+  { key:'knochenwald',name:'Knochenwald',       x:470,y:366,r:18, kind:'wild',    threat:3, faction:'undead' },
+  { key:'aschensee', name:'Aschensee',          x:318,y:438,r:12, kind:'wild',    threat:3, faction:'undead' },
+  { key:'vharnholm', name:'Vharnholm',          x:487,y:443,r:10, kind:'city',    threat:1, faction:'undead' },
   { key:'grove',     name:'Alter Hain',         x:80, y:288,r:6,  kind:'shrine',  threat:1 },
   { key:'mistisle',  name:'Nebelinsel',         x:90, y:500,r:12, kind:'wild',    threat:2 },
 ];
@@ -142,6 +145,8 @@ const centers = [
   { x:360, y:460, b:'blight'   },
   { x:470, y:440, b:'blight'   },
   { x:120, y:180, b:'plains'   },  // südliche Ebenen
+  { x:492, y:372, b:'blight'   },  // Session 5: Totenreich erweitert — Knochenwald bis an die Ostküste
+  { x:318, y:440, b:'blight'   },  //            … und westwärts bis zum Aschensee
 ];
 const protectedNW = (x, y) => x < 140 && y < 150;      // Greenmark bleibt handgebaut
 // Region einer Kachel (gleiche Formel wie die Generierung): 'greenmark' im handgebauten Nordwesten, sonst das Biom.
@@ -390,6 +395,19 @@ export const TOWN_PLAN = {
     fields: [[458, 284, 470, 288]],
     props: [['sign', 453, 263, { label: 'Sonnwacht — Feste des Ordens' }], ['lantern', 446, 275], ['lantern', 454, 275], ['lantern', 463, 275], ['lantern', 454, 265],
       ['hay', 453, 286], ['trough', 444, 283], ['laundry', 443, 273], ['torch', 445, 249], ['torch', 445, 252]],
+  },
+  vharnholm: {                                                    // Stadt der Stillen (Session 5): Untote leben hier, handeln, schreiben Namen auf
+    area: [468, 424, 506, 462], old: [482, 438, 492, 446], square: [487, 444], spread: { s: 1.3, a: [487, 442] }, perHead: 80,
+    outskirts: ['cottage', 'house'],
+    streets: [[T.ROAD, 468, 442, 506, 442], [T.ROAD, 487, 424, 487, 462], [T.DIRT, 476, 450, 500, 450], [T.DIRT, 480, 436, 480, 441], [T.DIRT, 497, 436, 497, 441]],
+    plazas: [[T.STONE, 482, 438, 492, 446]],
+    houses: [['hall', 470, 435, 6, 5, 'S'], ['house', 477, 436, 5, 4, 'S'], ['store', 494, 435, 6, 5, 'S'], ['cottage', 501, 436, 4, 4, 'S'],
+      ['smithy', 470, 443, 5, 4, 'N'], ['house', 476, 443, 5, 4, 'N'], ['store', 494, 443, 6, 5, 'N'], ['house', 501, 443, 5, 4, 'N'],
+      ['cottage', 481, 451, 4, 4, 'N'], ['house', 491, 451, 5, 4, 'N']],
+    props: [['obelisk', 484, 440, { solid: true, label: 'Seelenobelisk von Vharnholm' }], ['stall', 490, 439, { tag: 'market' }], ['sack', 491, 439, { label: 'Knochenmehl' }],
+      ['bone_spire', 468, 441, { solid: true, planned: true }], ['bone_spire', 468, 443, { solid: true, planned: true }], ['bone_spire', 506, 441, { solid: true, planned: true }], ['bone_spire', 506, 443, { solid: true, planned: true }],
+      ['torch', 486, 437], ['torch', 486, 447], ['candles', 485, 441], ['gravestone', 483, 446, { label: 'Namensstein', planned: true }], ['gravestone', 489, 446, { label: 'Namensstein', planned: true }],
+      ['sign', 487, 425, { label: 'Vharnholm — Stadt der Stillen' }], ['crate', 493, 441, { label: 'Grabgut, zurückgebracht' }]],
   },
 };
 // ---------------- Streckung (Session 4, Nutzerwunsch: Städte zu klein und zu voll) ----------------
@@ -955,7 +973,7 @@ export function genWorld() {
   for (let i = 0; i < 260; i++) { const x = ri(20, 500), y = ri(20, 500); if (inWild(x, y)) prop('rock_node', x, y, { harvest:'stone', solid:true }); }
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
-  pactScenes(); groveScene();
+  pactScenes(); groveScene(); deadScenes();
   const wild = new Set(props.slice(handMark));
   resampleWorld();                                         // Entwurf → Weltmaßstab (ohne rnd())
   phase = 'world';
@@ -1023,6 +1041,28 @@ export function groveScene() {
   for (const [dx, dy] of [[-1, 2], [2, 2], [-2, -1], [3, 1]]) P('mushrooms', cx + dx, cy + dy, { r: 4 });
   P('flowers_prop', cx, cy + 2, { r: 4 }); P('flowers_prop', cx + 1, cy - 2, { r: 4 }); P('fallen_tree', cx - 2, cy + 4, { solid: true });
   P('candles', cx + 2, cy - 1, { r: 6 });
+}
+
+// Totenreich-Erweiterung (Session 5): Knochenwald, Aschensee mit Seelenbrunnen. Hash statt rnd(), damit nichts verrutscht.
+export function deadScenes() {
+  const P = (t, x, y, o = {}) => prop(t, x, y, { deadScene: true, ...o });
+  for (let y = 348; y <= 384; y++) for (let x = 452; x <= 490; x++) {                     // Knochenwald: tote Bäume, Knochentürme
+    const d = Math.hypot(x - 470, y - 366), h = nz(x * 5 + 3, y * 11 + 1);
+    if (d > 18 || [T.WATER, T.ROCK, T.DWALL, T.ROAD].includes(tileAt('world', x, y))) continue;
+    const dense = d < 11 ? 0.26 : 0.16;                                                   // zur Mitte hin dichter
+    if (h < dense) P('dead_tree', x, y, { solid: true }); else if (h < dense + 0.03) P('bone_spire', x, y, { solid: true }); else if (h < dense + 0.06) P('bones', x, y, { r: 6 });
+  }
+  P('camp_ruin', 472, 368, { label: 'Lager der Grabräuber' }); P('crate', 473, 369, { loot: ['bone', 'grave_seal'], label: 'Geraubtes Grabgut' });
+  for (let y = 428; y <= 448; y++) for (let x = 306; x <= 330; x++) {                     // Aschensee: schwarzes Wasser, Rand aus Asche
+    const d = Math.hypot((x - 318) * 0.9, y - 438) + (nz(x, y) - 0.5) * 2.2;
+    if (d < 7.5) setTile('world', x, y, T.WATER); else if (d < 9 && tileAt('world', x, y) !== T.ROAD) setTile('world', x, y, T.ASH);
+  }
+  let k = 0; for (const p of props) { const x = p.x / TS | 0, y = p.y / TS | 0;         // was im neuen See stünde, versinkt
+    if (!(x >= 306 && x <= 330 && y >= 428 && y <= 448 && tileAt('world', x, y) === T.WATER && (p.map || 'world') === 'world')) props[k++] = p; }
+  props.length = k;
+  P('well', 318, 447, { solid: true, rite: 'soulwell', label: 'Seelenbrunnen' }); P('candles', 317, 448, { r: 6 }); P('candles', 319, 448, { r: 6 });
+  for (const [x, y] of [[309, 432], [327, 431], [308, 444], [328, 446]]) P('dead_tree', x, y, { solid: true });
+  P('bones', 322, 449, { r: 6 }); P('obelisk', 318, 451, { solid: true, label: 'Brunnenwächter-Stein' });
 }
 
 // ---------------- Grube (Dungeon) ----------------

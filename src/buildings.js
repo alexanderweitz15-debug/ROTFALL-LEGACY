@@ -20,12 +20,13 @@ export const TOWN_STYLE = {
   kreuzweg:  { roof: 'shingle', wall: 'wood' },       // Söldnerstadt: Holz
   ashford:   { roof: 'slate',   wall: 'stone' },      // befestigter Posten: Schiefer
   sonnwacht: { roof: 'slate',   wall: 'palestone' },  // Orden: heller Stein
+  vharnholm: { roof: 'bone',    wall: 'blackstone' }, // Stadt der Stillen: aschgraue Schindeln, schwarzer Basalt
 };
 // Materialtöne; Nachbarn unterscheiden sich: je Haus ein gedämpfter Ton aus der Familie (neu gedeckt, verwittert, anderer Kalk)
 const ROOF_VAR = { thatch: ['#7a6238', '#71603a', '#826842', '#6a5834'], shingle: ['#5b4a3c', '#534537', '#645244', '#4d443a'],
-  slate: ['#4a525c', '#444b54', '#525860', '#4b4d57'], tile: ['#7c4432', '#88523a', '#6c3d30', '#7a4b37', '#8c5c42'] };
+  slate: ['#4a525c', '#444b54', '#525860', '#4b4d57'], bone: ['#5a564c', '#4f4c44', '#625d51', '#48453e'], tile: ['#7c4432', '#88523a', '#6c3d30', '#7a4b37', '#8c5c42'] };
 const WALL_VAR = { timber: ['#b1a283', '#a8997b', '#b9ac90'], wood: ['#5d4632', '#534030', '#654d37'], stone: ['#6c665c', '#645f58', '#736b5f'],
-  plaster: ['#a89a7e', '#b4a88d', '#a39177', '#aba390', '#b39a85'], palestone: ['#9b968a', '#a39d91', '#938e83'] };
+  plaster: ['#a89a7e', '#b4a88d', '#a39177', '#aba390', '#b39a85'], palestone: ['#9b968a', '#a39d91', '#938e83'], blackstone: ['#3f3d39', '#383633', '#46423c'] };
 const varOf = (tab, kind, b, salt) => { const a = tab[kind]; return a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0]; };
 const BEAM = '#3e2e20', DOORW = '#4a3322', IRON = '#35332f';
 const SHUTTER = ['#4a5a3a', '#5a3a2a', '#3a4a5a', '#5a5030'];
@@ -63,7 +64,7 @@ const ICON = {
 // Zustand je Haus (dystopische Welt): 0 bewohnt/gepflegt, 1 heruntergekommen, 2 verlassen/zerstört (kein Licht, keine
 // Bewohner). Je Ort unterschiedlich stark: die Grenzorte verfallen, die Ordensfeste hält ihre Häuser instand.
 // Betriebe (Taverne, Schmiede …) werden nie ganz aufgegeben — sonst fehlt der Ort, der sie braucht.
-const WEAR_BIAS = { eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12 };
+const WEAR_BIAS = { eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
 const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store']);
 export function wearOf(b) {
   if (b.wear != null) return b.wear;
@@ -108,8 +109,8 @@ export function houseSprite(b, lit) {
   const Wr = ramp(mix(varOf(WALL_VAR, wallKind, b, 93), '#806a50', (n(3, 3) - 0.5) * 0.18)), Br = ramp(BEAM);
   function wallAt(x, y) {
     const r = n(x, y), yy = y - yF + 300;
-    if (wallKind === 'stone' || wallKind === 'palestone') {
-      const bw = wallKind === 'stone' ? 5 : 7, row = (yy / 3) | 0, xo = (x - fx0 + (row & 1) * 3) % bw;
+    if (wallKind === 'stone' || wallKind === 'palestone' || wallKind === 'blackstone') {
+      const bw = wallKind === 'palestone' ? 7 : 5, row = (yy / 3) | 0, xo = (x - fx0 + (row & 1) * 3) % bw;
       return yy % 3 === 2 || xo === 0 ? Wr.sh : xo === 1 && yy % 3 === 0 ? Wr.hi : r > 0.9 ? mix(Wr.b, Wr.sh, 0.4) : Wr.b;
     }
     if (wallKind === 'wood') { const xo = (x - fx0) % 3; return r > 0.95 ? Wr.sh : xo === 0 ? Wr.dk : xo === 1 ? Wr.hi : Wr.b; }
@@ -121,7 +122,7 @@ export function houseSprite(b, lit) {
     for (let x = fx0; x <= fx1; x += 13) for (let y = yF; y < yB - 2; y++) { g.p(x, y, Br.b); g.p(x + 1, y, Br.sh); }
     for (let x = fx0 + 2; x + 11 <= fx1; x += 13) if (n(x, 1) > 0.45) for (let k = 0; k < 8; k++) { g.p(x + k, yF + 2 + k, Br.sh); g.p(x + k + 1, yF + 2 + k, Br.b); }
   }
-  if (sty.plinth && wallKind !== 'stone' && wallKind !== 'palestone')    // Bruchsteinsockel unter Holz/Fachwerk/Putz
+  if (sty.plinth && wallKind !== 'stone' && wallKind !== 'palestone' && wallKind !== 'blackstone')    // Bruchsteinsockel unter Holz/Fachwerk/Putz
     for (let y = yB - 9; y < yB - 2; y++) for (let x = fx0; x <= fx1; x++) { const row = (y - yB + 9) >> 1, xo = (x - fx0 + (row & 1) * 3) % 6;
       g.p(x, y, y === yB - 9 ? '#3a352e' : (y - yB + 9) % 2 === 1 || xo === 0 ? '#4e4a42' : n(x, y + 7) > 0.8 ? '#7a756a' : '#66615a'); }
   for (let x = fx0; x <= fx1; x++) { g.p(x, yB - 2, '#4a463f'); g.p(x, yB - 1, '#34312c'); if (n(x, 9) > 0.7) g.p(x, yB - 3, mix(Wr.b, '#3a3a2a', 0.5)); }   // Sockel, Spritzschmutz

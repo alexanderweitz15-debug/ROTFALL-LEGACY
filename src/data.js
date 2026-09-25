@@ -65,6 +65,7 @@ export const ITEMS = {
                   rarity:'epic', value:340, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden.' },
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
+  soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
   ancestor_urn: { name:'Ahnenurne', slot:'material', stack:1, rarity:'epic', value:0, lore:'Asche von tausend Namen. Wer sie trägt, hört sie flüstern.' },
 };
 
@@ -296,6 +297,10 @@ export const NPCS = [
   { key:'mira', name:'Mira', prof:'Hüterin des Hains', faction:null, age:66, home:'grove',
     traits:['geduldig','gütig'], attrs:{willpower:14,perception:13}, cls:'wanderer', recruit:false,
     greet:'„Tritt leise. Hier wachsen Dinge, die älter sind als dein Königreich.“' },
+  { key:'sael', name:'Sael', prof:'Totenschreiber', faction:'undead', age:0, home:'vharnholm', undead:true,
+    traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
+    pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','dagger','traveler_cloak'],
+    greet:'„Vharnholm schreibt jeden Namen auf, der durch das Tor kommt. Deinen auch.“' },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },
@@ -340,6 +345,9 @@ export const QUESTS = {
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
     reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  q_graverobbers: { name:'Grabräuber in der Asche', giver:'sael', desc:'Lebende graben in der Nekropole und am Knochenwald nach Grabgut. Sie nehmen die Namen mit. Bring fünf von ihnen zum Schweigen — dann schreibt Vharnholm deinen Namen in die gute Spalte.',
+    objectives:[{type:'kill',target:'bandit',count:5,text:'Grabräuber töten'}],
+    reward:{gold:90,xp:140,rep:{undead:15,valen:-5}}, turnin:'sael' },
   q_grove: { name:'Der Ruf des Hains', giver:'mira', desc:'Das Rudel der Wolfsschlucht treibt sich im Hain herum, seit die Quelle krank ist. Vertreib vier Wölfe und bring mir drei Heilkraut für die Quelle. Dann sehen wir, ob der Wald dich will.',
     objectives:[{type:'kill',target:'wolf',count:4,text:'Wölfe vertreiben'}, {type:'item',target:'herb',count:3,text:'Heilkraut für die Quelle'}],
     reward:{xp:150}, turnin:'mira', pact:true },

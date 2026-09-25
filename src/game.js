@@ -150,6 +150,12 @@ function unequip(c, slotKey) {
 const CHANNEL_MS = { bandage: 2500, heal: 1600 };
 function useConsumable(c, idx, target = c, part = null) {
   const slot = c.inv[idx], it = ITEMS[slot.key];
+  if (it.use === 'soul') {                                   // Seelenphiole: Essenz für Totenrufer, Linderung für Hexer, sonst ein Schluck Kälte
+    removeItem(c, slot.key, 1);
+    if (c.titleClass === 'necromancer') setTres(c, tres(c) + 2); else if (c.titleClass === 'warlock') setTres(c, tres(c) - 30); else B.heal(c, 8);
+    log(`${c.name} trinkt eine Seelenphiole.`, 'party'); fx(c.x, c.y - 14, 'necro', 8);
+    return UI.refreshHUD();
+  }
   if (it.use === 'food') {                                   // Essen gibt Kraft, heilt aber keine Wunden
     c.stamina = Math.min(c.maxStamina, c.stamina + 30 + (it.food || 1) * 10);
     removeItem(c, slot.key, 1);
@@ -246,6 +252,7 @@ const NPC_SPOTS = {
   shrine:[76,52], banditcamp:[66,116], graveyard:[34,96], mayor:[54,69], northcity:[119,60],
   altvharn:[359,385], necrotower:[392,350],                 // Totenreich: Ysra am Ahnenaltar, Vhal im Schattenkreis
   grove:[82,290],                                           // Westwald: Mira im Alten Hain
+  vharnholm:[489,441],                                      // Totenreich: Sael am Markt von Vharnholm
 };
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
@@ -281,11 +288,13 @@ const GUARD_POSTS = {                                   // Tore und Einfallstra�
   kreuzweg:  { faction: 'merch', posts: [[226, 250], [276, 250], [249, 236], [250, 264]] },
   ashford:   { faction: 'merch', posts: [[380, 85], [379, 98], [373, 92], [358, 92]] },
   sonnwacht: { faction: 'order', posts: [[447, 250], [454, 264], [457, 264], [455, 277]] },
+  vharnholm: { faction: 'undead', posts: [[469, 442], [505, 442], [487, 425], [487, 461]] },
 };
 const GUARD_KIT = {
   valen: { prof: 'Torwache', cloth: '#33415c', weapon: 'spear', chest: 'chain_hauberk', head: 'iron_helm' },
   merch: { prof: 'Söldnerwache', cloth: '#5a4630', weapon: 'spear', chest: 'leather_jerkin', head: 'leather_cap' },
   order: { prof: 'Ordenswache', cloth: '#c7bda6', weapon: 'longsword', chest: 'chain_hauberk', offhand: 'kite_shield' },
+  undead: { prof: 'Stiller Wächter', cloth: '#232a28', weapon: 'longsword', chest: 'chain_hauberk', undead: true },
 };
 // Idempotent: vorhandene Wachen einer Siedlung beziehen die (neuen) Posten der Reihe nach, nur fehlende kommen hinzu.
 function spawnGuardPosts() {
@@ -298,6 +307,7 @@ function spawnGuardPosts() {
       pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: k.cloth, crest: g.faction === 'order' ? '#9b2e26' : null } });
     for (const sl of ['weapon', 'chest', 'head', 'offhand']) if (k[sl]) c.equip[sl] = mkItem(k[sl]);
     c.anchor = { x: pos.x, y: pos.y }; c.guard = true; c.post = town; c.skills.onehanded = 20; c.skills.polearms = 20;
+    if (k.undead) { c.undead = true; c.hooded = true; c.pal.skin = '#b9b3a2'; c.pal.glow = '#4e8f7a'; }
     recalc(c); B.fullHeal(c);
     S.ents.world.push(c);
   });
@@ -310,7 +320,11 @@ const TRADES = {
   manor: ['Kaufmann', 'Bürgerin', 'Ratsherr'], bakery: ['Bäcker'], barn: ['Bauer'], stable: ['Stallknecht'], store: ['Lagerknecht'],
   fisher: ['Fischer', 'Netzflickerin'], tavern: ['Wirt'], smithy: ['Schmied'], healer: ['Heilerin'], chapel: ['Priester'],
 };
+const DEAD_TRADES = ['Knochenleser', 'Ahnenwächter', 'Aschegräber', 'Stumme Magd', 'Namensritzer'];   // Vharnholm: jeder Haustyp
 const TRADE_GREET = {
+  Knochenleser: '„Jeder Knochen erzählt, wie er gebrochen ist. Deine erzählen noch nichts.“', Ahnenwächter: '„Wir warten. Darin sind wir gut.“',
+  Aschegräber: '„Die Asche gibt Namen zurück, wenn man lange genug gräbt.“', 'Stumme Magd': '„…“ (Sie nickt dir zu und fegt weiter.)',
+  Namensritzer: '„Ein Name in Stein hält länger als einer im Mund.“',
   Bauer: '„Wenn der Regen ausbleibt, hungern wir. Wenn er kommt, auch.“', Magd: '„Ich hab zu tun. Sag schnell, was du willst.“',
   Weber: '„Gutes Tuch hält einen Winter. Schlechtes nicht mal eine Woche.“', Tagelöhner: '„Arbeit? Hast du welche? Nein? Dann geh weiter.“',
   Handwerker: '„Alles bricht irgendwann. Davon lebe ich.“', Böttcher: '„Ein Fass, das nicht leckt, ist mehr wert als ein Schwert.“',
@@ -344,11 +358,11 @@ export function residentPlan() {
   }
   return out;
 }
-const TOWN_OF_SPOT = { village: 'eren', tavern: 'eren', market: 'eren', smithy: 'eren', healer: 'eren', farm: 'eren', mayor: 'eren', northcity: 'northcity' };
+const TOWN_OF_SPOT = { village: 'eren', tavern: 'eren', market: 'eren', smithy: 'eren', healer: 'eren', farm: 'eren', mayor: 'eren', northcity: 'northcity', vharnholm: 'vharnholm' };
 function spawnResidents() {
   const plan = residentPlan(), hsh = (a, b, c) => { let n = (a * 374761393 + b * 668265263 + c * 2246822519) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
   for (const b of HOUSES) {
-    const P = TOWN_PLAN[b.town], trades = TRADES[b.type], n = plan[b.id] || 0;
+    const P = TOWN_PLAN[b.town], trades = TRADES[b.type] && (b.town === 'vharnholm' ? DEAD_TRADES : TRADES[b.type]), n = plan[b.id] || 0;
     if (!P || !trades || b.map !== 'world' || !n) continue;
     if (S.ents.world.some(c => c.homeId === b.id)) continue;                          // schon bewohnt (Migration idempotent)
     const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
@@ -360,6 +374,7 @@ function spawnResidents() {
       const c = makeChar({ name: FIRST[(hx * 13 + hy * 5 + i * 11) % FIRST.length], prof, x: front.x, y: front.y, level: ri(1, 4),
         traits: [pick(['gütig', 'mürrisch', 'neugierig', 'faul', 'furchtsam', 'fleißig'])], greet: TRADE_GREET[prof] });
       c.villager = true; c.homeId = b.id; c.homeTown = b.town;
+      if (b.town === 'vharnholm') { c.undead = true; c.faction = 'undead'; c.hooded = true; c.pal = { ...c.pal, skin: '#b9b3a2', glow: '#4e8f7a', cloth: pick(['#232a28', '#2a2622', '#1f2624']) }; }
       const [lat, dep] = [[0, 0], [1, 0], [-1, 0], [0, 1]][i % 4];                   // Nacht: drinnen, nebeneinander (quer zur Tür, dann tiefer)
       c.anchor = { x: inside.x + (lat * Math.abs(sy) + dep * sx) * TS, y: inside.y + (lat * Math.abs(sx) + dep * sy) * TS };
       if (SOLID.has(tileAt('world', c.anchor.x / TS | 0, c.anchor.y / TS | 0)) || solidPropAt('world', c.anchor.x, c.anchor.y, 4)) c.anchor = inside;
@@ -448,6 +463,11 @@ const SPAWN_AREAS = [
   { map:'world', x:404, y:437, r:16, types:['skeleton','skeleton'], cap:12 },              // Nekropole
   { map:'world', x:431, y:430, r:20, types:['skeleton','skeleton','goblin_warrior'], cap:18 }, // Schwarze Feste
   { map:'world', x:392, y:348, r:14, types:['skeleton'], cap:8 },                          // Nekromanten-Turm
+  // Session 5: erweitertes Totenreich
+  { map:'world', x:470, y:366, r:16, types:['skeleton', 'skeleton', 'wolf'], cap:10 },      // Knochenwald: Tote und hungrige Wölfe
+  { map:'world', x:474, y:372, r:5, types:['bandit', 'bandit', 'bandit_archer'], cap:4 },   // Grabräuber-Lager im Knochenwald
+  { map:'world', x:414, y:452, r:6, types:['bandit', 'bandit'], cap:3 },                    // Grabräuber am Südrand der Nekropole
+  { map:'world', x:318, y:438, r:14, types:['skeleton'], cap:6 },                           // Aschensee
 ];
 
 for (const a of SPAWN_AREAS) if (a.map === 'world') {          // Entwurf → Weltmaßstab: Gebiete wachsen mit, Dichte sinkt leicht (mehr Ruhe)
@@ -535,7 +555,7 @@ export function newGame(cfg) {
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
-    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
+    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p));
@@ -625,7 +645,7 @@ function rescaleSave(fresh) {
   for (const e of S.ents.world)
     if (e.kind !== 'prop' && (solidTile('world', e.x, e.y) || solidPropAt('world', e.x, e.y, 4))) { const s = freeSpotNear('world', e.x / TS | 0, e.y / TS | 0, 6); e.x = s.x; e.y = s.y; }
   spawnGuardPosts(); spawnResidents();
-  Object.assign(S.flags, { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, rescale: false });
+  Object.assign(S.flags, { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, rescale: false });
   log('Die Welt ist weiter geworden. (Spielstand auf die größere Karte umgerechnet.)', 'world');
 }
 export function continueGame() {
@@ -682,8 +702,14 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira'].includes(def.key)) spawnNpcDef(def);
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
+  if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
+    const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
+    S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && inV(e)) && !(e.kind === 'enemy' && !e.aggroId && townAt(e.x / TS | 0, e.y / TS | 0, 4) === 'vharnholm'));
+    for (const p of fresh) if (p.deadScene || (p.kind === 'prop' && inV(p))) S.ents.world.push(p);
+    indexSolids('world'); spawnGuardPosts(); spawnResidents(); S.flags.dead1 = true;
+  }
   if (!S.flags.pact1) {                        // Session 4: Orte des Paktes im Totenreich; die Gruft der Nekropole wird zum Ritualort
     for (const p of fresh) if (p.pactScene) S.ents.world.push(p);
     for (const e of S.ents.world) if (e.kind === 'prop' && e.type === 'crypt' && e.label === 'Große Nekropole') e.rite = 'urn';
@@ -1108,6 +1134,7 @@ function teamOf(c) {
   return 'neutral';
 }
 function isHostile(a, b) {
+  if (a.faction && a.faction === b.faction && a.kind !== 'player' && b.kind !== 'player' && !a.angry && !b.angry && !a.servant && !b.servant) return false;   // Gleiche Fraktion: kein Kampf (Stille Wächter vs. Skelette)
   const ta = teamOf(a), tb = teamOf(b);
   return ta !== tb && ta !== 'neutral' && tb !== 'neutral';
 }
@@ -1632,7 +1659,7 @@ function updateNpc(e, dt) {
   const held = e.threatId ? byId(e.threatId) : null;
   const called = e.alarm && e.alarm.until > now ? byId(e.alarm.id) : null;
   const f = foe(held) && dist(e, held) < 340 ? held : foe(called) && dist(e, called) < 700 ? called :
-    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && dist(e, x) < (e.guard ? 300 : 220));
+    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && !(e.faction && x.faction === e.faction) && dist(e, x) < (e.guard ? 300 : 220));   // eigene Fraktion ist keine Bedrohung
   e.threatId = f ? f.id : null;
   const home = e.anchor || e, leashed = DEFENDERS.has(e.key) && !e.guard && Math.hypot(e.x - home.x, e.y - home.y) > 360;
   if (f && !leashed) {
@@ -1864,6 +1891,7 @@ function doInteract() {
   if (t.portal) return travel(t.portal);
   if (t.claim) return claimPlace(t);
   if (t.rite === 'urn') return urnRite(t);
+  if (t.rite === 'soulwell') return soulWell(t);
   if (t.type === 'tree') {
     if (t.chopCd && performance.now() < t.chopCd) return;
     t.chopCd = performance.now() + 400;
@@ -2190,6 +2218,8 @@ function talk(npc) {
     npc.provoked ? '„Für dich ist heute geschlossen. Vielleicht für immer.“' : '„Der Stand ist zu, bis sich die Lage beruhigt.“', leave) });
   else if (npc.shop && npc.till && (hourNow() >= npc.till || hourNow() < 7)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
     '„Der Laden ist zu. Komm morgen früh wieder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });   // Ladenzeiten
+  else if (npc.shop && npc.town === 'vharnholm' && !deadWelcome()) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
+    '„Vharnholm handelt mit denen, die zu uns gehören. Du gehörst noch zu den Lauten.“ (Mitglied der Stillen Schar oder paktgebunden)', leave) });
   else if (npc.shop && occupied) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Handel? Die Toten halten die Stadt. Ich verstecke, was ich habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
@@ -2225,6 +2255,8 @@ const TOWN_GOSSIP = {
   kreuzweg: ['„Hier kreuzen sich die Straßen — und die Klingen. Söldner sind gut fürs Geschäft, bis sie es nicht mehr sind.“', '„Wer den Markt am Kreuzweg hält, hält das Mittelland.“'],
   ashford: ['„Die Karawanen halten hier, weil dahinter nur noch Asche kommt.“', '„Die Palisade ist neu. Die Angst dahinter ist alt.“'],
   sonnwacht: ['„Die Pilger kommen wegen des Schreins. Sie bleiben wegen der Mauern.“', '„Der Orden zählt die Toten. Und manchmal zählen die Toten zurück.“'],
+  vharnholm: ['„Am Aschensee steht ein Brunnen. Wer zu uns gehört, trinkt dort Namen.“', '„Im Knochenwald graben Lebende nach unserem Grabgut. Sael zahlt für ihr Schweigen.“',
+    '„Wir sind keine Schar. Wir sind eine Stadt. Das vergessen die Lebenden immer.“'],
 };
 
 // ================= Der Pakt der Stillen Schar (Titelklassen Nekromant / Hexenmeister) =================
@@ -2299,6 +2331,17 @@ function urnRite(t) {
   const e = spawnEnemy('crypt_warden', p.map, t.x / TS | 0, (t.y / TS | 0) + 2, { level: 10 });   // Kampf: er hat die Urne nie losgelassen
   e.aggroId = p.id; e.aiState = 'pursue';
   log('Aus der Gruft steigt ihr Wächter. Er hat die Urne nie losgelassen.', 'combat'); UI.toast('WÄCHTER DER NEKROPOLE', 3000);
+}
+const deadWelcome = () => S.ranks.undead >= 0 || pactBound();
+// Seelenbrunnen am Aschensee: einmal am Tag. Totenrufer füllen ihre Essenz, Hexer lassen die Verderbnis hinein, alle anderen hören nur.
+function soulWell(t) {
+  const p = S.player;
+  if (S.flags.wellDay === S.day) return UI.toast('Der Brunnen schweigt. Morgen wieder.', 2600);
+  act(p, 'kneel', 1400, t);
+  if (p.titleClass === 'necromancer') { setTres(p, resMax(p)); fx(p.x, p.y - 14, 'necro', 16); log('Aus dem Brunnen steigen Namen. Deine Essenz ist voll.', 'world'); }
+  else if (p.titleClass === 'warlock') { setTres(p, 0); fx(p.x, p.y - 14, 'shadow', 16); log('Der Brunnen trinkt deine Verderbnis. Kurz ist es still in dir.', 'world'); }
+  else return log('Tief unten flüstern Namen. Keiner davon ist deiner.', 'world');
+  S.flags.wellDay = S.day; UI.refreshHUD();
 }
 const PACT_GREET = ['„Deine Augen … was ist mit deinen Augen?“', '„Geh weiter. Du riechst nach Gruft.“', '„Man sagt, du hättest mit den Toten gehandelt. Stimmt das?“'];
 const PACT_TOWN = {
@@ -2541,7 +2584,7 @@ function partyCommand(cmd) {
 
 // ================= Handel =================
 function price(key, isBuy, npc) {
-  if (ITEMS[key].good && npc) {
+  if (ITEMS[key].good && npc && S.towns[npc.town || 'eren']) {
     const p = SIM.townPrice(npc.town || 'eren', key, isBuy), t = (S.player.skills.trading || 0) / 100;
     return Math.max(1, Math.round(isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)));
   }
@@ -2552,13 +2595,15 @@ function price(key, isBuy, npc) {
 function shopStock(npc) {
   if (!npc._stockDay || npc._stockDay !== S.day) {
     npc._stockDay = S.day;
-    const pool = ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
+    const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
       'wooden_shield', 'leather_jerkin', 'leather_cap', 'chain_hauberk', 'pickaxe', 'traveler_cloak'];
     npc._stock = [];
     for (let i = 0; i < 7; i++) { const k = pick(pool); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
   }
-  const town = S.towns[npc.town || 'eren'];
-  SIM.notePrices(npc.town || 'eren');
+  const tk = S.towns[npc.town || 'eren'] ? npc.town || 'eren' : null;      // Orte ohne Markt (Vharnholm) handeln nur mit Waren
+  if (!tk) return npc._stock;
+  const town = S.towns[tk];
+  SIM.notePrices(tk);
   const goods = ['grain', 'salt', 'cloth', 'pelt'].filter(g => town.stock[g] >= 1).map(g => ({ key: g, count: Math.floor(town.stock[g]) }));
   return [...goods, ...npc._stock];
 }
@@ -3416,6 +3461,17 @@ export function selftest() {
     return Math.abs(free - 15) < 0.01 && Math.abs(metal - 12.5) < 0.01 && town === 10 && held && !!wolf && teamOf(wolf) === 'player'
       && two && !three && p.titleClasses.length === 2 && p.attributes.strength === str - 1;
   }));
+  ok('Totenreich: gleiche Fraktion kämpft nicht (Stiller Wächter vs. Skelett), Wächter wehren Grabräuber ab; Seelenbrunnen und Phiole wirken je Titel', sandbox(() => {
+    const p = stage(), g = actor(360, 300, { faction: 'undead' }); g.guard = true; g.undead = true;
+    const sk = spawnEnemy('skeleton', '__a', 13, 9), bd = spawnEnemy('bandit', '__a', 14, 9);
+    const peace = !isHostile(g, sk) && !isHostile(sk, g), fight = isHostile(g, bd) && isHostile(sk, p);
+    const sv = spawnEnemy('skeleton', '__a', 15, 9); sv.servant = p.id; const servantFights = isHostile(sv, sk);
+    unlockTitle('necromancer', 'Test'); setTres(p, 0); const keepDay = S.flags.wellDay; S.flags.wellDay = -1; soulWell({ x: p.x, y: p.y }); const full = tres(p) === resMax(p);
+    soulWell({ x: p.x, y: p.y }); setTres(p, 0); p.inv = []; addItem(p, 'soul_vial', 1); useConsumable(p, 0); const vial = tres(p) === 2;
+    S.flags.wellDay = keepDay;
+    const regions = ['knochenwald', 'aschensee', 'vharnholm'].every(k => { const L = LOCATIONS.find(l => l.key === k); return L && regionAt(L.x, L.y) === 'blight'; });
+    return peace && fight && servantFights && full && vial && regions;
+  }));
   ok('Diener folgen ihrem Herrn durch einen Eingang (Kartenwechsel), fremde Untote nicht', sandbox(() => {
     const p = stage(); if (!unlockTitle('necromancer', 'Test')) return false;
     const sv = spawnEnemy('skeleton', '__a', 10, 9); Object.assign(sv, { servant: p.id, transient: true, until: performance.now() + 60000 });
@@ -3487,7 +3543,7 @@ export function selftest() {
       const x = e.x / TS | 0, y = e.y / TS | 0, P = TOWN_PLAN[townAt(x, y)];
       if (!P) return true;
       const inOld = x >= P.old[0] && x <= P.old[2] && y >= P.old[1] && y <= P.old[3];   // alte Stände: Truhen im Kern bleiben (Inhalt)
-      return e.house || (!WILD.has(e.type) && (inOld || !e.loot));   // Schutt in verlassenen Häusern gehört dazu
+      return e.house || e.planned || (!WILD.has(e.type) && (inOld || !e.loot));   // Schutt in verlassenen Häusern gehört dazu; planned = Teil des Stadtplans
     }));
     ok('Bewohner: jedes Wohn- und Arbeitshaus bewohnt, ihr Nachtplatz liegt im eigenen Haus', HOUSES.every(b => {
       if (!TRADES[b.type] || HB.wearOf(b) === 2 || (b.town === 'eren' && ['tavern', 'smithy', 'healer'].includes(b.type))) return true;

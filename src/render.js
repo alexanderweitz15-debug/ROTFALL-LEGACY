@@ -1010,12 +1010,25 @@ function drawProp(e, now) {
       ctx.fillStyle = '#7d7466';
       for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + i * 5 - 2, y + 3); ctx.lineTo(x + i * 5, y - 8); ctx.lineTo(x + i * 5 + 2, y + 3); ctx.fill(); }
       break;
-    case 'dead_tree': {                                   // kahler Baum: Wüste und Blight
-      shadow(x, y + 5, 10, .3);
-      ctx.strokeStyle = '#3a2e20'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x, y - 20);
-      ctx.moveTo(x, y - 8); ctx.lineTo(x - 9, y - 18); ctx.moveTo(x, y - 12); ctx.lineTo(x + 8, y - 22);
-      ctx.moveTo(x, y - 4); ctx.lineTo(x + 6, y - 10); ctx.stroke(); ctx.lineCap = 'butt';
+    case 'dead_tree': {                                   // kahler Baum: Wüste und Blight — drei Wuchsformen in Baumgröße (Session 5)
+      const v = e._v ?? h2(x | 0, (y | 0) + 7), k = v < 0.34 ? 0 : v < 0.67 ? 1 : 2, tall = 0.85 + h2((x | 0) + 3, y | 0) * 0.4;
+      shadow(x, y + 5, 12, .32);
+      const limb = (w, c, pts) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1] * tall);
+        for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1] * tall); ctx.stroke(); };
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const D = '#2e241a', M = '#43362a', L = '#5a4a38';
+      if (k === 0) {                                      // Galgenbaum: gerader Stamm, ein weiter Ast zur Seite
+        limb(6, D, [0, 5, -1, -22, 1, -38]); limb(3, D, [0, -24, 12, -30, 18, -28]); limb(2, D, [-1, -16, -10, -24, -14, -34]); limb(2, D, [1, -34, 6, -44]);
+        limb(2, L, [-2, 2, -3, -20]); limb(1, M, [18, -28, 19, -22]);
+      } else if (k === 1) {                               // Gabelbaum: zwei Stämme, verdreht
+        limb(6, D, [0, 5, 0, -14]); limb(4, D, [0, -14, -8, -30, -10, -42]); limb(4, D, [0, -14, 7, -28, 12, -38]);
+        limb(2, D, [-8, -30, -16, -34]); limb(2, D, [7, -28, 14, -26]); limb(2, D, [12, -38, 16, -44]); limb(2, L, [-2, 2, -2, -12]);
+      } else {                                            // Krüppel: gebeugt, abgebrochene Krone
+        limb(7, D, [0, 5, 3, -12, 8, -24]); limb(3, D, [3, -12, -8, -18, -13, -16]); limb(3, D, [8, -24, 4, -32]); limb(2, D, [8, -24, 14, -27]);
+        limb(2, L, [-2, 3, 1, -10]); ctx.fillStyle = M; ctx.fillRect(x + 6, y - 26 * tall, 5, 3);
+      }
+      ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+      if (regionOfProp(e) === 'blight' && v > 0.8) { ctx.fillStyle = '#cfc8b4'; ctx.fillRect(x + 9, y - 30 * tall, 2, 5); ctx.fillRect(x + 8, y - 25 * tall, 4, 2); }   // im Totenreich: aufgehängte Knochen
       break; }
     case 'bone_spire': {                                  // Knochenturm der Untoten
       shadow(x, y + 4, 10, .35);
