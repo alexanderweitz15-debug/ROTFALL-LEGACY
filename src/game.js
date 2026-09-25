@@ -102,6 +102,7 @@ function speedOf(c) {
   if (c.stamina <= 0) s *= 0.55;
   if (c.status && c.status.some(t => t.key === 'chilled')) s *= 0.6;   // Hrodvars Eiskreis
   if (stat(c, 'frenzy')) s *= 1.15;
+  if (stat(c, 'grabbed')) s *= 0.5;                                   // Griff des Wiedergängers
   s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c);
 }
@@ -549,13 +550,25 @@ const SPAWN_AREAS = [
   { map:'world', x:474, y:372, r:5, types:['bandit', 'bandit', 'bandit_archer'], cap:4 },   // Grabräuber-Lager im Knochenwald
   { map:'world', x:414, y:452, r:6, types:['bandit', 'bandit'], cap:3 },                    // Grabräuber am Südrand der Nekropole
   { map:'world', x:318, y:438, r:14, types:['skeleton'], cap:6 },                           // Aschensee
-  { map:'world', x:340, y:402, r:9, types:['skeleton', 'skeleton', 'wolf'], cap:8 },        // Session 6: Hundertfeld
+  { map:'world', x:340, y:402, r:9, types:['skeleton', 'ghoul', 'ghoul', 'wolf'], cap:8 },  // Session 6: Hundertfeld (Wiedergänger seit Phase 11)
+  // Phase 11: neue Wesen, je dort, wo sie hingehören
+  { map:'world', x:356, y:372, r:12, types:['cultist', 'skeleton', 'ghoul'], cap:7 },         // Alt-Vharn: Kult der Asche
+  { map:'world', x:318, y:420, r:8, types:['cultist', 'ghoul'], cap:5 },                      // Nordufer des Aschensees
+  { map:'world', x:470, y:366, r:10, types:['wraith', 'wraith'], cap:4 },                     // Knochenwald: Geister zwischen den Stämmen
+  { map:'world', x:48, y:280, r:16, types:['bear'], cap:2 },                                  // Westwald: Bärenrevier
+  { map:'world', x:300, y:40, r:18, types:['bear', 'wolf'], cap:3 },                          // Frostkamm
+  { map:'world', x:210, y:210, r:18, types:['wild_dog', 'wild_dog', 'wild_dog'], cap:6 },     // Mittelland: verwilderte Hunde
+  { map:'world', x:430, y:180, r:20, types:['wild_dog', 'wild_dog'], cap:5 },                 // Rote Wüste
+  { map:'world', x:74, y:300, r:30, types:['deer', 'deer', 'deer'], cap:6 },                  // Westwald: Rotwild
+  { map:'world', x:96, y:40, r:18, types:['deer', 'deer'], cap:4 },                           // Eren-Wald
+  { map:'world', x:120, y:190, r:24, types:['deer', 'deer'], cap:4 },                         // südliche Ebenen
+  { map:'deep', x:10, y:36, r:5, types:['wraith'], cap:2 },                                   // Tiefhall: Eiskammern
 ];
 
 for (const a of SPAWN_AREAS) if (a.map === 'world') {          // Entwurf → Weltmaßstab: Gebiete wachsen mit, Dichte sinkt leicht (mehr Ruhe)
   [a.x, a.y] = worldPt(a.x, a.y); a.r = Math.round(a.r * WS); if (a.r >= 12) a.cap = Math.round(a.cap * 1.25);
 }
-const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'crypt_warden', 'hrodvar', 'valen_soldier', 'gorak']);
+const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'crypt_warden', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -609,7 +622,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     level: opts.level || Math.max(1, ri(1, 3) + (m.threat || 1) * 2),
     hp: m.hp, maxHp: m.hp, r: m.r, armor: m.threat, alive:true, seed: rnd() * 100,
     swing:0, atkCd:0, telegraph:0, aiState:'idle', aiTimer:0, anchor:{ x: pos.x, y: pos.y },
-    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', skeleton:'rusty_sword', crypt_warden:'longsword', hrodvar:'greatsword', valen_soldier:'spear' }[mtype] || null,
+    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', skeleton:'rusty_sword', crypt_warden:'longsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff' }[mtype] || null,
     shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : null,
     faction: m.faction, boss: !!m.boss, ...opts,
   };
@@ -887,6 +900,17 @@ function update(dt, now) {
   }
   if (p.alive) controlPlayer(dt);
   for (const e of [...S.ents[S.map]]) think(e, dt);
+  if (S.rising && S.rising.length) {                              // Wiedergänger: Zucken als Ansage, nach 6 Spielminuten steht er auf
+    const now = clock();
+    for (let i = S.rising.length - 1; i >= 0; i--) { const r = S.rising[i];
+      if (r.map === S.map && chance(dt / 400)) fx(r.x + ri(-6, 6), r.y - 4, 'necro', 2);
+      if (now < r.at) continue;
+      S.rising.splice(i, 1);
+      const arr = S.ents[r.map], ci = arr.findIndex(e => e.kind === 'corpse' && e.mtype === 'ghoul' && Math.hypot(e.x - r.x, e.y - r.y) < 20); if (ci >= 0) arr.splice(ci, 1);
+      const g = spawnEnemy('ghoul', r.map, r.x / TS | 0, r.y / TS | 0, { level: r.level, risen: true }); g.x = r.x; g.y = r.y;
+      if (r.map === S.map && dist(g, S.player) < 600) log('Der Wiedergänger steht wieder auf.', 'combat');
+    }
+  }
   pursuitT = (pursuitT || 0) + dt;
   if (pursuitT > 250) { pursuitT = 0; arrivingPursuers(); }
   updateProjectiles(dt);
@@ -1265,6 +1289,7 @@ function teamOf(c) {
   if (c === S.player || S.party.includes(c.id)) return 'player';
   if (c.servant) return 'player';                              // Diener des Nekromanten
   if (c.kind === 'enemy') {
+    if (MONSTERS[c.mtype]?.prey) return 'prey';                  // Wild: kein Gegner, aber jagdbar (Spieler, Wölfe)
     if (c.faction === 'undead') return S.ranks.undead >= 0 ? 'player' : 'foe';
     if (c.faction === 'valen') return valenHostile() ? 'foe' : 'player';
     return 'foe';
@@ -1318,6 +1343,9 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (afx(attacker, 'rend') && target.alive && chance(afx(attacker, 'rend')) && !(target.status || []).some(s => s.key === 'bleeding')) (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000 });
   if (it && it.frost && target.alive && !(target.status || []).some(q => q.key === 'chilled')) (target.status ||= []).push({ key: 'chilled', name: 'Durchfroren', left: 2500, desc: 'Langsamer (−40 %).' });
   if (hasLeg(attacker, 'echo') && target.alive && !attacker._echo && chance(0.2)) { attacker._echo = true; hurt(target, dmg * 0.5, attacker, attacker.name); attacker._echo = false; fx(target.x, target.y - 14, 'spark', 5); }
+  if (attacker.mtype === 'ghoul' && target.alive && target.kind !== 'caravan') addStatus(target, { key: 'grabbed', name: 'Gepackt', left: 1500, desc: 'Langsamer (−50 %).' });
+  if (attacker.mtype === 'wraith' && target.stamina != null) { target.stamina = Math.max(0, target.stamina - 15); fx(target.x, target.y - 14, 'frost', 5); }
+  if (target.mtype === 'wraith' && target.alive) target.phased = performance.now() + 900;
   if (crush && target.alive && !target.downed) { target.stagger = Math.max(target.stagger || 0, MONSTERS[target.mtype]?.boss ? 300 : 650); target.swing = 0; target.telegraph = 0; target.windup = false; }   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
@@ -1332,6 +1360,9 @@ function hit(attacker, target, mult, kind = 'physical') {
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (!target.alive || target.invuln) return;
+  if (target.mtype === 'wraith' && target.phased > performance.now() && kind === 'physical') { float(target, 'körperlos', 'rgba(200,220,240,ALPHA)'); return; }   // Geist: nach Treffer kurz ungreifbar
+  if (target.mtype === 'bear' && source) target.provoked = true;
+  target.lastKind = kind;
   if (source && target.hexed > performance.now()) dmg *= 1.25;        // Fluch des Hexenmeisters
   if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
   if (stat(target, 'frenzy')) dmg *= 1.2;                              // Preis der Raserei
@@ -1442,6 +1473,8 @@ function die(c, cause = 'Wunden', source) {
   const wasFoe = teamOf(c) === 'foe';                          // vor dem Aufräumen: war es ein Feind oder ein Unschuldiger?
   titleOnDeath(c);
   if (source && source.alive && source !== c && hasLeg(source, 'thirst') && wasFoe) { const h = source.maxHp * 0.08; if (source.body) B.heal(source, h); else source.hp = Math.min(source.maxHp, source.hp + h); float(source, '+' + Math.round(h), 'rgba(150,40,30,ALPHA)'); }   // Blutdurst
+  if (c.mtype === 'ghoul' && !c.risen && !['fire', 'holy'].includes(c.lastKind))   // Wiedergänger: steht einmal wieder auf — außer Feuer/Heiliges
+    (S.rising ||= []).push({ at: clock() + 6, map: c.map, x: c.x, y: c.y, level: c.level });
   if (c.mtype === 'crypt_warden') S.flags.wardenSlain = true;
   if (c.mtype === 'hrodvar') S.flags.hrodvarSlain = true;
   c.alive = false; c.downed = false;
@@ -1633,10 +1666,12 @@ function updateEnemy(e, dt) {
   const far = dist(e, p) > 1100;
   if (far) { e.vx = e.vy = 0; return; }                       // Stufe C: außerhalb der Sicht keine Simulation
   const m = MONSTERS[e.mtype];
+  if (m.prey) return preyAI(e, dt, m);                          // Wild: flieht vor allem, was sich nähert, sonst äsen
   const targets = combat.filter(t => !t.downed && t !== e && isHostile(e, t) && (t.kind !== 'caravan' || e.faction === 'bandit'));   // nur Banditen rauben Wagen
   const ag = e.aggroId ? byId(e.aggroId) : null;
   const sight = m.sight * (e.wary > clock() ? 1.5 : 1);           // nach abgebrochener Jagd: wachsamer
   let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
+  if (e.mtype === 'bear' && tgt && !e.provoked && dist(e, tgt) > 110 && tgt !== ag) tgt = null;   // Revier: nur wer zu nahe kommt
   const sp = m.speed * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1) * ((e.status || []).some(q => q.key === 'chilled') ? 0.6 : 1);   // Ranken halten, Frost bremst
   if (e.hp < e.maxHp * 0.2 && !e.boss && !e.fleeing && !e.servant && chance(0.004)) { e.fleeing = true; log(`${m.name} flieht.`, 'combat'); }
   if (e.fleeing && tgt) {
@@ -1667,6 +1702,12 @@ function updateEnemy(e, dt) {
     if (e.telegraph > 0) { e.vx = e.vy = 0; if (e.telegraph <= dt) { e.leap = { t: 190, ax: Math.cos(e.aim), ay: Math.sin(e.aim) }; sfx('dodge', 0, earVol(e)); } return; }
     if (d < 130 && d > reach && e.leapCd <= 0) { e.telegraph = 280; e.leapCd = 2800; e.vx = e.vy = 0; return; }
   }
+  if (e.mtype === 'bear' && bearAI(e, tgt, d, reach, sp, dt, m)) return;
+  if (e.mtype === 'wild_dog' && d > reach * 1.6) {            // Rudel: von der Seite, nicht alle frontal
+    const side = ((e.seed | 0) % 2 ? 1 : -1) * 0.9 * Math.min(1, (d - reach) / 120);
+    seek(e, e.aim + side, sp, dt, tgt); return;
+  }
+  if (e.mtype === 'cultist') cultistHeal(e, m);
   if (e.retreat > 0) {                                        // Goblin: nach dem Hieb zurückspringen (Hit & Run)
     e.retreat -= dt; moveEnt(e, -Math.cos(e.aim) * sp, -Math.sin(e.aim) * sp); return;
   }
@@ -1691,6 +1732,38 @@ function updateEnemy(e, dt) {
   }
 }
 
+// Hirsch: äst, hebt den Kopf, flieht vor Spieler, Figuren und Raubtieren (Wölfe jagen ihn — teamOf 'prey').
+function preyAI(e, dt, m) {
+  const threat = S.ents[e.map].find(o => o !== e && o.alive && (o.kind === 'player' || o.kind === 'npc' || (o.kind === 'enemy' && !MONSTERS[o.mtype]?.prey)) && dist(e, o) < (e.lastHurt ? 320 : m.sight));
+  const sp = m.speed * dt / 16 * speedMul(e.map, e.x, e.y);
+  if (threat) { e.aim = Math.atan2(e.y - threat.y, e.x - threat.x); seek(e, e.aim, sp, dt); return; }
+  e.aiTimer -= dt;
+  if (e.aiTimer <= 0) { e.aiTimer = ri(2500, 6000); e.wander = chance(0.5) ? null : { x: e.anchor.x + ri(-120, 120), y: e.anchor.y + ri(-120, 120) }; }
+  if (e.wander && Math.hypot(e.wander.x - e.x, e.wander.y - e.y) > 8) seek(e, Math.atan2(e.wander.y - e.y, e.wander.x - e.x), sp * 0.3, dt, e.wander); else e.vx = e.vy = 0;
+}
+// Bär: bleibt im Revier; wer ihn verletzt, den stellt er — aus mittlerer Distanz mit Ansage (aufrichten) und Sturmlauf.
+function bearAI(e, tgt, d, reach, sp, dt, m) {
+  if (e.charge) {
+    e.charge.t -= dt; moveEnt(e, e.charge.ax * sp * 3, e.charge.ay * sp * 3);
+    if (!e.charge.hit && dist(e, tgt) < reach) { e.charge.hit = true; hit(e, tgt, 1.3); camShake(6, 180); }
+    if (e.charge.t <= 0) { e.charge = null; e.atkCd = 900; }
+    return true;
+  }
+  e.chargeCd = (e.chargeCd || 0) - dt;
+  if (e.telegraph > 0 && e.chargeWind) { e.vx = e.vy = 0; if (e.telegraph <= dt) { e.chargeWind = false; e.charge = { t: 380, ax: Math.cos(e.aim), ay: Math.sin(e.aim) }; sfx('death', 0.6, earVol(e)); } return true; }
+  if (e.provoked && d > 90 && d < 260 && e.chargeCd <= 0) { e.telegraph = 520; e.chargeWind = true; e.chargeCd = 6000; e.vx = e.vy = 0; return true; }
+  return false;
+}
+// Kultist: heilt verwundete Untote in der Nähe (sichtbar, unterbrechbar durch Taumeln), sonst Schütze mit Schattenblitz.
+function cultistHeal(e, m) {
+  e.healCd = (e.healCd || 2000) - 16;
+  if (e.healCd > 0 || e.stagger > 0) return;
+  const ally = S.ents[e.map].find(o => o !== e && o.alive && o.kind === 'enemy' && o.faction === 'undead' && o.hp < o.maxHp * 0.6 && dist(e, o) < 220);
+  if (!ally) return;
+  e.healCd = 6500; e.castT = performance.now();
+  const h = ally.maxHp * 0.2; if (ally.body) B.heal(ally, h); else ally.hp = Math.min(ally.maxHp, ally.hp + h);
+  fx(ally.x, ally.y - 14, 'necro', 12); float(ally, '+' + Math.round(h), 'rgba(143,217,176,ALPHA)');
+}
 // Bogenschütze: Wunschabstand ~190 px. Spannt sichtbar (Ansage), schießt, wechselt dann seitlich die Stellung.
 // Kommt man zu nahe, springt er zurück (mit Abklingzeit, damit man ihn stellen kann).
 function archerAI(e, tgt, d, sp, dt, m) {
@@ -1700,8 +1773,10 @@ function archerAI(e, tgt, d, sp, dt, m) {
     e.vx = e.vy = 0; e.draw -= dt;
     if (e.draw <= 0) {
       e.atkCd = m.atk; e.repos = 500 + rnd() * 600; e.circle = chance(0.5) ? 1 : -1;
-      S.projectiles.push({ id: uid(), kind:'arrow', map: e.map, x: e.x + cs * 12, y: e.y - 10 + sn * 8,
-        vx: cs * 7, vy: sn * 7, owner: e.id, dmg: m.dmg * (1 + e.level * 0.05), life: 1600, team:'foe' });
+      const mag = m.missile === 'shadow';                     // Kultist: Schattenblitz (langsamer, man kann ausweichen)
+      S.projectiles.push({ id: uid(), kind: m.missile || 'arrow', map: e.map, x: e.x + cs * 12, y: e.y - 10 + sn * 8,
+        vx: cs * (mag ? 4.6 : 7), vy: sn * (mag ? 4.6 : 7), owner: e.id, dmg: m.dmg * (1 + e.level * 0.05), life: 1600, team:'foe' });
+      if (mag) { e.castT = performance.now(); fx(e.x + cs * 12, e.y - 14, 'shadow', 6); }
       sfx('bow', 0.2, earVol(e));
     }
     return;
@@ -3677,12 +3752,13 @@ export function selftest() {
   const filled = cv => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; };
   ok('Sprites: Figuren aller NPCs, alle Posen', NPCS.every(n => {
     const sp = SP.humanSpec({ ...n, seed: 1, pal: { skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28' }, equip: {} });
-    return ['S', 'N', 'W', 'E'].every(d => ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'a1', 'a2', 'hit', 'cast', 'kneel'].every(ps => {
+    return ['S', 'N', 'W', 'E'].every(d => ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'a1', 'a2', 'hit', 'cast', 'kneel', 'guard', 'sit', 'trade'].every(ps => {
       const f = SP.humanFrame(sp, d, ps); return f.width === 20 && f.height === 25 && (ps !== 'i0' || filled(f)); }));
   }));
   ok('Sprites: alle Gegnertypen', Object.entries(MONSTERS).every(([k, m]) => {
     const e = { mtype: k, seed: 1 };
-    const f = k === 'wolf' || k === 'boar' ? SP.beastFrame(k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
+    const beast = ['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(k);
+    const f = beast ? SP.beastFrame(k === 'wild_dog' ? 'wolf' : k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
     return filled(f);
   }));
   ok('Sprites: Waffen & Kacheln', Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => filled(SP.weaponSprite(k, i.rarity, i.holy, i.wtype).cv))

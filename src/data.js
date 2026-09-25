@@ -122,6 +122,12 @@ export const LOOT = {
   skeleton:  [['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
   crypt_warden:[['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
+  cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1]],
+  ghoul:     [['bone',0.6],['dried_meat',0.15]],
+  wraith:    [['soul_vial',0.4],['grave_seal',0.08]],
+  bear:      [['pelt',1],['pelt',0.5],['dried_meat',1],['bone',0.4]],
+  wild_dog:  [['pelt',0.3],['bone',0.3]],
+  deer:      [['dried_meat',1],['pelt',0.6]],
   hrodvar:   [['nachtfrost',1],['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
 };
 
@@ -138,9 +144,26 @@ export const MONSTERS = {
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
   hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
+  // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
+  cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true,
+               pal:{skin:'#b8a890',cloth:'#2a1f2e',metal:'#5a4a66',glow:'#b07ae0'} },    // hält Abstand, heilt verwundete Untote
+  ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true,
+               pal:{skin:'#8c9478',cloth:'#2c2a24',metal:'#4a4a42',glow:'#9fb070'} },   // langsam, Griff bremst, steht einmal wieder auf (außer Feuer/Heiliges)
+  wraith:    { name:'Geist', hp:38, dmg:9, speed:1.7, reach:30, atk:900, xp:32, sight:260, r:11, threat:3, faction:'undead', interiors:true,
+               pal:{skin:'#c9d4dc',cloth:'#aab4c0',metal:'#8090a0',glow:'#cfe6ff'} },   // schnell, nach Treffer kurz körperlos, raubt Ausdauer
+  bear:      { name:'Bär', hp:150, dmg:18, speed:1.15, reach:38, atk:1400, telegraph:480, xp:45, sight:140, r:18, threat:3, faction:'beast', interiors:false,
+               pal:{body:'#4a3526',dark:'#2c1f16',eye:'#1a120c'} },                   // Revier: greift an, wer zu nahe kommt; verletzt stürmt er
+  wild_dog:  { name:'Wilder Hund', hp:24, dmg:6, speed:1.65, reach:24, atk:800, xp:9, sight:230, r:10, threat:1, faction:'beast', interiors:false,
+               pal:{body:'#8a7456',dark:'#55462f',eye:'#d0a040'} },                   // Rudel flankiert
+  deer:      { name:'Hirsch', hp:30, dmg:0, speed:1.9, reach:0, atk:9999, xp:6, sight:200, r:12, threat:0, faction:'beast', interiors:false, prey:true,
+               pal:{body:'#8a6040',dark:'#5a3e28',eye:'#1a120c'} },                   // Wildtier, kein Gegner: flieht, Wölfe jagen ihn
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };
+// §72: Skalierung ist die Ausnahme. Jeder Gegner trägt sie ausdrücklich; nur Einträge in SCALING (GDD-Liste) dürfen mitwachsen.
+export const SCALING = {};                           // z. B. bounty_hunter: { tierCap, perTier:{ hp, dmg } } — Phase 17
+for (const [k, m] of Object.entries(MONSTERS)) m.scaling = SCALING[k] ? { enabled: true, ...SCALING[k] } : { enabled: false };
+
 
 // Klassenbaum: parent = Voraussetzung
 export const CLASSES = {

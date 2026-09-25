@@ -143,6 +143,12 @@ export function monsterSpec(e, m) {
     s.hood = t === 'bandit' ? '#2e241a' : '#2f3a24'; s.cloak = t === 'bandit' ? '#261e16' : '#26301d';
     s.scarf = t === 'bandit' ? '#7a2a20' : ''; s.armor = 'leather'; s.armorCol = '#4a3525';
     if (t === 'bandit_archer') s.quiver = 1;
+  } else if (t === 'cultist') {                                         // Kultist: Robe, tiefe Kapuze, violettes Glimmen
+    s.hooded = 1; s.hood = '#241a28'; s.robe = '#2a1f2e'; s.cloak = '#1c1420'; s.face = 'skin'; s.glow = p.glow; s.mark = 'chevron'; s.markCol = '#5a4a66';
+  } else if (t === 'ghoul' || t === 'wraith') {                         // Wiedergänger: Leichenhaut, Fetzen; Geist: bleich, Kapuze, Schleier
+    s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = '';
+    if (t === 'ghoul') { s.hooded = 0; s.cloth = '#2c2a24'; s.pants = '#2c2a24'; s.armor = 'leather'; s.armorCol = '#3a342a'; }
+    else { s.hooded = 1; s.hood = '#aab4c0'; s.cloak = '#8a96a4'; s.cloth = '#aab4c0'; s.pants = '#aab4c0'; }
   } else if (t === 'skeleton' || t === 'crypt_warden' || t === 'hrodvar') {
     s.sp = 'skeleton'; s.skin = p.skin || '#cfc8b4'; s.hooded = 1; s.hood = '#20252a'; s.cloak = '#191c20'; s.cloth = '#22252a';
     s.face = 'skull'; s.glow = e.glow || p.glow || '#4e8f7a'; s.boots = ''; s.pants = '#22252a';   // e.glow: Diener eines Nekromanten
@@ -733,13 +739,34 @@ function paintBeast(type, pal, frame, act) {
   const belly = ramp(mix(pal.body || '#5b5145', '#c8b89a', boar ? 0.12 : 0.32));
   const sw = [1, 0, -1, 0][frame & 3], lunge = act === 'a2' ? -2 : act === 'a1' ? 1 : 0, low = act === 'a1' ? 1 : 0;
   // Beine: Oberschenkel 2 px, Unterschenkel 1 px, Pfote/Huf 2 px; ferne Beine dunkel
-  const legTop = boar ? 11 : 10, legBot = boar ? 15 : 16;
-  const legs = boar ? [[8, 0], [10, 1], [17, 0], [19, 1]] : [[7, 0], [9, 1], [17, 0], [19, 1]];
+  const bear = type === 'bear', deer = type === 'deer';
+  const legTop = boar ? 11 : bear ? 12 : deer ? 10 : 10, legBot = boar ? 15 : bear ? 15 : deer ? 17 : 16;
+  const legs = boar ? [[8, 0], [10, 1], [17, 0], [19, 1]] : bear ? [[6, 0], [8, 1], [17, 0], [19, 1]] : deer ? [[8, 0], [9, 1], [17, 0], [18, 1]] : [[7, 0], [9, 1], [17, 0], [19, 1]];
   for (const [lx, near] of legs) {
     const s = (near ? sw : -sw), C = near ? F : D;
     g.r(lx, legTop, 2, 2, C.sh);
     for (let y = legTop + 2; y < legBot; y++) g.p(lx + (y > legTop + 2 ? s : 0) + (near ? 0 : 1), y, near ? C.sh : C.dk);
     g.r(lx + s - (boar ? 0 : 1) + (near ? 0 : 1), legBot, 2, 1, near ? D.b : D.dk);
+  }
+  if (type === 'bear') {                                 // Bär: massiger Buckel, runde Ohren, kurze Schnauze
+    for (let x = 4; x <= 22; x++) {
+      const top = x >= 8 && x <= 14 ? 2 : x <= 18 ? 3 : 4, bot = 12;
+      for (let y = top; y <= bot; y++) g.p(x, y, y === top ? F.hi : y >= bot - 1 ? F.sh : x >= 20 ? F.sh : F.b);
+    }
+    for (let x = 9; x <= 14; x += 2) g.p(x, 3, F.hi);
+    const hx = lunge, hy = low + (act === 'a1' ? -2 : 0);                        // Ansage: aufrichten
+    g.r(hx, 4 + hy, 6, 6, F.b); g.r(hx + 1, 4 + hy, 4, 1, F.hi); g.p(hx + 1, 3 + hy, D.b); g.p(hx + 4, 3 + hy, D.b);   // Kopf, Ohren
+    g.r(hx - 1, 7 + hy, 3, 2, belly.b); g.p(hx - 1, 7 + hy, DEEP); g.p(hx + 2, 5 + hy, eye);
+    if (act === 'a2') { g.r(hx - 1, 9 + hy, 3, 1, DEEP); g.p(hx, 9 + hy, '#e0d6bc'); }
+    g.p(23, 6, D.b); return g;
+  }
+  if (type === 'deer') {                                  // Hirsch: schlanker Rumpf, hohe Beine, Geweih, heller Spiegel
+    for (let x = 7; x <= 19; x++) { const top = 5, bot = x <= 9 ? 9 : 10; for (let y = top; y <= bot; y++) g.p(x, y, y === top ? F.hi : y === bot ? belly.b : F.b); }
+    g.r(19, 6, 2, 3, '#e8dcc4');                                                     // Spiegel
+    const hx = lunge, hy = low;
+    g.r(4 + hx, 2 + hy, 3, 5, F.b); g.r(2 + hx, 1 + hy, 4, 3, F.b); g.p(1 + hx, 2 + hy, DEEP); g.p(3 + hx, 2 + hy, eye);   // Hals, Kopf
+    for (const [x, y] of [[3, -1], [4, -2], [5, -3], [2, -2], [6, -1], [5, -1]]) g.p(x + hx, y + hy, '#c9b28a');            // Geweih
+    return g;
   }
   if (boar) {
     for (let x = 5; x <= 21; x++) {

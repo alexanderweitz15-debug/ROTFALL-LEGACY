@@ -1353,15 +1353,18 @@ function drawCreature(e, now) {
     for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * 105) - 2, Math.round(e.y + Math.sin(a) * 66) - 2, 4, 4); }
     ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 105, 66, 0, 0, 7); ctx.fill();
   }
-  if (e.mtype === 'wolf' || e.mtype === 'boar') {
-    const moving = e.vx || e.vy, sw = e.swing || 0;
+  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
+    const moving = e.vx || e.vy, sw = e.swing || 0, K = e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1;   // Bär groß, Hund klein
+    if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
-    const f = SP.beastFrame(e.mtype, p, sideDir(e), pose, fr);
-    shadow(e.x, e.y + 3, e.r + 4, .35);
+    const f = SP.beastFrame(e.mtype === 'wild_dog' ? 'wolf' : e.mtype, p, sideDir(e), pose, fr);   // Hund: Wolfsgestalt, eigene Farben
+    shadow(e.x, e.y + 3, (e.r + 4) / K, .35);
     ctx.drawImage(f, e.x - 15 * PX, e.y + 5 - 17 * PX, f.width * PX, f.height * PX);
     const fw = flashAlpha(e, now);
     if (fw > 0) { ctx.globalAlpha = fw; ctx.drawImage(SP.flashOf(f), e.x - 15 * PX, e.y + 5 - 17 * PX, f.width * PX, f.height * PX); ctx.globalAlpha = 1; }
+    if (K !== 1) ctx.restore();
+    if (e.mtype === 'bear' && e.telegraph > 0) dottedLine(e.x, e.y - 8, e.aim ?? 0, 200, now);   // Ansage des Sturmlaufs
     return;
   }
   if (e.mtype === 'gorak') {
@@ -1390,8 +1393,9 @@ function drawCreature(e, now) {
   const scale = e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1;
   const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(scale, scale); ctx.translate(-e.x, -e.y);
+  if (e.mtype === 'wraith') ctx.globalAlpha = e.phased > performance.now() ? 0.28 : 0.62 + 0.1 * Math.sin(now / 200);   // Geist: halb da, körperlos fast weg
   drawHumanoid(proxy, now);
-  ctx.restore();
+  ctx.globalAlpha = 1; ctx.restore();
   if (e.telegraph > 0) telegraphArc(e, m.reach + 10, 0.9, now);   // Ansage: gepunkteter Pixelbogen in Schlagrichtung
   if (e.draw > 0) dottedLine(e.x, e.y - 14, e.aim ?? 0, 70 + (520 - e.draw) / 3, now);
 }
@@ -1416,8 +1420,8 @@ function drawCorpse(e, now) {
   if (!m) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
-  } else if (e.mtype === 'wolf' || e.mtype === 'boar') {
-    const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
+  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
+    const f = SP.beastFrame(e.mtype === 'wild_dog' ? 'wolf' : e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
     ctx.drawImage(f, e.x - 15 * PX, e.y + 5 - (age < 160 ? 17 : 12) * PX, f.width * PX, f.height * PX);
   } else if (e.mtype === 'gorak') {
     const f = SP.bruteFrame(m.pal || {}, 'E', '', 0), k = Math.min(1, age / 500);
