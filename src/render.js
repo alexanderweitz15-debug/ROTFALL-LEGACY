@@ -677,7 +677,7 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
 const PROP_PERIOD = { hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
 const PROP_BOX = { tower_ruin: 192, boat: 128 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
@@ -692,6 +692,7 @@ function drawPropPixel(e, now) {
   let variant = 0;
   if (VARIANTS[e.type]) { variant = e.v ?? ((h2(e.x | 0, (e.y | 0) + 3) * VARIANTS[e.type]) | 0); key += 'v' + variant; }
   if (e.depleted) key += 'd';
+  if (e.intact) key += 'I';
   if (e.opened) key += 'o';
   let reg = null;                                         // Fels trägt die Gesteinsfarbe seiner Region
   if (e.type === 'rock_node' || e.type === 'ore_node') { reg = e.map === 'world' ? regionOfProp(e) : 'greenmark'; key += reg; }
@@ -992,7 +993,19 @@ function drawProp(e, now) {
       ctx.strokeStyle = 'rgba(230,214,160,.35)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, y - 20, 9 + Math.sin(now / 600) * 1.5, 0, 7); ctx.stroke();
       break;
-    case 'crypt': case 'marsh_ruin': case 'broken_pillar':
+    case 'broken_pillar': {                               // Säule: Sockel, kannelierter Schaft; ganz (intact) mit Kapitell, sonst Bruchkante
+      const H = e.intact ? 46 : 16 + (e._var || 0) * 6;
+      shadow(x, y + 4, 12, .35);
+      ctx.fillStyle = '#4a4741'; ctx.fillRect(x - 11, y - 4, 22, 7);                           // Sockel
+      ctx.fillStyle = '#5c5850'; ctx.fillRect(x - 11, y - 4, 22, 2);
+      ctx.fillStyle = '#6a665d'; ctx.fillRect(x - 7, y - H, 14, H - 3);                        // Schaft
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; for (const k of [-4, 0, 4]) ctx.fillRect(x + k - 0.5, y - H + 2, 1, H - 6);   // Kanneluren
+      ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x - 7, y - H, 3, H - 3);
+      if (e.intact) { ctx.fillStyle = '#5c5850'; ctx.fillRect(x - 10, y - H - 5, 20, 6); ctx.fillStyle = '#6f6b62'; ctx.fillRect(x - 10, y - H - 5, 20, 2); }
+      else { ctx.fillStyle = '#2a2824'; ctx.beginPath(); ctx.moveTo(x - 7, y - H); ctx.lineTo(x - 3, y - H - 4); ctx.lineTo(x + 1, y - H + 1); ctx.lineTo(x + 4, y - H - 3); ctx.lineTo(x + 7, y - H); ctx.lineTo(x + 7, y - H + 2); ctx.lineTo(x - 7, y - H + 2); ctx.fill();
+        ctx.fillStyle = '#5c5850'; ctx.fillRect(x + 9, y, 5, 3); ctx.fillRect(x - 14, y + 1, 4, 2); }   // Bruchstücke am Fuß
+      break; }
+    case 'crypt': case 'marsh_ruin':
       shadow(x, y + 4, 14, .35);
       ctx.fillStyle = '#3f3b35'; ctx.fillRect(x - 14, y - 22, 28, 26);
       ctx.fillStyle = '#16140f'; ctx.fillRect(x - 5, y - 12, 10, 16);
