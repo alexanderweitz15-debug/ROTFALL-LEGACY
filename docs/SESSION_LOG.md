@@ -9,12 +9,13 @@ Kutscher, Beiwagen und zwei Wachen, Route aus der Straße; Tiefhall als zweiter 
 Dungeon-Register. Nebenbei: BUG-058 (Props nach Laden verändert), BUG-059 (Leichen-Radius), BUG-060 (Säulen).
 Danach (Nutzer: „mach auf jeden Fall mit neuem Content weiter“): Quest Königseisen (Brann, Nordfurt) mit Hrodvars
 Eiskreis und Leibwache; vierte Titelklasse **Mönch** (Fokus aus Ausweichen im letzten Moment, Ilva in Sonnwacht).
-Selbsttest 68/68 auf vier Seeds, alte Stände (v2, v3 voll, v3 Diff) laden fehlerfrei.
+Zuletzt die Grenzöde (Grenzwacht, Hundertfeld, Straße, Quest bei Oda).
+Selbsttest 69/69 auf drei Seeds, alte Stände (v2, v3 voll, v3 Diff) laden fehlerfrei.
 **Gefundene neue Probleme:** BUG-058–065 (062 Beiwagen-Sprung und 063 Balance offen).
 **Offen geblieben:** Bewohner machen 430 KB des Spielstands aus; Umlernen im Skill-Baum; Kopfgeldjäger/Barde/Alchemist
 nur Entwurf; Mönch und Hrodvar sind ungespielt — Werte (Fokuszahlen, Eiskreis-Schaden) brauchen einen echten Durchlauf.
 **Nächster Schritt:** Nutzer spielt Mönch-Probe und Tiefhall an. Danach: angefangene Phasen schließen (6, 9, 13).
-Beim Start: `index.html?dev&test` → `RF.selftest()` muss 68/68 melden.
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 69/69 melden.
 
 ### Session 5 — 2026-09-25 · Größere Welt, Skill-Baum, Druide, Totenreich (Nutzerwunsch)
 **Vorgefunden:** Selbsttest 54/54; offen: Karte nicht vergrößert, Diener folgen nicht, kein Skill-Baum, Totenreich dünn.

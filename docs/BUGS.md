@@ -384,8 +384,9 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
   Rest: ~300 Figuren à 1,4 KB (430 KB) — Bewohner sind nicht aus dem Seed reproduzierbar (Zustand), bewusst gespeichert.
 
 ### BUG-051 — Leeres Totenreich — Stand
-- Session 5: Vharnholm, Knochenwald, Aschensee, Seelenbrunnen, Grabräuber. Die Ostküste nördlich des Knochenwalds und
-  die Grenzöde bleiben dünn. CONTENT · MEDIUM · IN ARBEIT
+- Session 5: Vharnholm, Knochenwald, Aschensee, Seelenbrunnen, Grabräuber. Session 6: Grenzöde mit Grenzwacht,
+  Hundertfeld, bewachter Straße und Quest. Offen: Ostrand nördlich des Knochenwalds (kein Meer im Osten — Landschaft,
+  nicht Küste). CONTENT · MEDIUM · TEILWEISE
 
 ## Session 6 — Spielstand, Karawane, Tiefhall
 

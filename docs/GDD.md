@@ -303,6 +303,14 @@ Klassenbaum — Kandidat, als Titel der Stillen Schar neu gedacht zu werden). Je
 - **Regel: gleiche Fraktion bekämpft sich nicht** (außer zornig oder Diener). Vorher flohen untote Figuren (Morvath) vor
   den Skeletten ihrer eigenen Fraktion und verweigerten deshalb das Gespräch.
 
+## Grenzöde (Session 6 — Rest von „erweitere das Totenreich“)
+- Die Öde zwischen Mittelland und Totenreich war leer. Jetzt: **Grenzwacht**, Valens letzter Posten (Palisade, zwei Tore,
+  Turm, Zelte, Wachfeuer; drei Wachen, Hauptfrau Oda mit kleinem Laden) an einer neuen Straße, die von der
+  Mittellandstraße nach Süden führt und in den Aschenpfad übergeht — der erste Weg ins Totenreich, der bewacht ist.
+- **Hundertfeld** südlich davon: Gräberreihen einer verlorenen Schlacht, Wracks, Valens Banner; Skelette und Wölfe.
+- Quest „Die Zahl der Toten“ (Oda): Tasche des vermissten Spähers holen, fünf Tote — Späherbericht: „Sie warten auf eine Zahl.“
+  (Aufhänger für den Krieg: das Heer der Toten sammelt sich — Phase 16/17.)
+
 ## Karawanen (Session 6)
 - Ein Zug, nicht ein Objekt: Leitwagen (Lebenspunkte, Ladung, Ziel der Räuber) mit Kutscher und zwei Ochsen, Beiwagen mit
   Maultier auf der Spur des Leitwagens, zwei angeheuerte Wachen (Söldner Stufe 2–4, keine Stadtwache).

@@ -30,6 +30,10 @@ Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund
   „im letzten Moment ausgewichen“ (Nahkampf, Geschosse, Eiskreis, Bodenbeben), Sprint über `p.dodge.dist/dur/dash`.
 - Nekromant/Hexenmeister schließen den Mönch aus (beidseitig, Selbsttest prüft die Symmetrie).
 
+### Grenzöde (world.js, game.js, data.js) — BUG-051
+- `borderScenes` (Hash, kein rnd), Orte Grenzwacht/Hundertfeld, Oda + Warenpool, Wachposten, Quest `q_frontier`,
+  Spawngebiet, Migration border1, Selbsttest.
+
 ### Kleinkram
 - Leichen: Alter nie negativ (BUG-059).
 
