@@ -2,7 +2,7 @@
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
 import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
 import * as UI from './ui.js';
@@ -467,6 +467,9 @@ const SPAWN_AREAS = [
   { map:'mine', x:45, y:38, r:10, types:['goblin','goblin','goblin_warrior'], cap:10 },
   { map:'mine', x:31, y:26, r:9, types:['goblin_warrior','goblin'], cap:7 },
   { map:'mine', x:20, y:36, r:7, types:['goblin'], cap:4 },
+  { map:'deep', x:36, y:37, r:10, types:['skeleton', 'skeleton', 'goblin_warrior'], cap:7 },   // Tiefhall: Säulenhalle
+  { map:'deep', x:62, y:35, r:6, types:['skeleton'], cap:6 },                                 // Ahnengruft
+  { map:'deep', x:12, y:17, r:6, types:['goblin_warrior', 'goblin'], cap:5 },                 // Schmiede: Goblins graben nach Königseisen
   // --- Großregionen (512×512) ---
   { map:'world', x:60, y:300, r:44, types:['wolf','wolf','boar','goblin'], cap:16 },       // Westwald
   { map:'world', x:44, y:300, r:14, types:['wolf','wolf','bandit'], cap:9 },               // Wolfsschlucht
@@ -491,7 +494,7 @@ const SPAWN_AREAS = [
 for (const a of SPAWN_AREAS) if (a.map === 'world') {          // Entwurf → Weltmaßstab: Gebiete wachsen mit, Dichte sinkt leicht (mehr Ruhe)
   [a.x, a.y] = worldPt(a.x, a.y); a.r = Math.round(a.r * WS); if (a.r >= 12) a.cap = Math.round(a.cap * 1.25);
 }
-const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'crypt_warden', 'valen_soldier', 'gorak']);
+const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'skeleton', 'crypt_warden', 'hrodvar', 'valen_soldier', 'gorak']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -545,7 +548,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     level: opts.level || Math.max(1, ri(1, 3) + (m.threat || 1) * 2),
     hp: m.hp, maxHp: m.hp, r: m.r, armor: m.threat, alive:true, seed: rnd() * 100,
     swing:0, atkCd:0, telegraph:0, aiState:'idle', aiTimer:0, anchor:{ x: pos.x, y: pos.y },
-    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', skeleton:'rusty_sword', crypt_warden:'longsword', valen_soldier:'spear' }[mtype] || null,
+    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', skeleton:'rusty_sword', crypt_warden:'longsword', hrodvar:'greatsword', valen_soldier:'spear' }[mtype] || null,
     shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : null,
     faction: m.faction, boss: !!m.boss, ...opts,
   };
@@ -562,6 +565,12 @@ function initialSpawns() {
   }
   spawnEnemy('gorak', 'mine', 32, 13, { level: 10 });
   for (let i = 0; i < 3; i++) spawnEnemy('goblin_warrior', 'mine', 30 + i, 14, { level: 6 });
+  deepBoss();
+}
+function deepBoss() {                                         // Tiefhall: Hrodvar vor seinem Thron, zwei Tote der Leibwache
+  const t = MAPS.deep.rooms.find(r => r.tag === 'throne');
+  spawnEnemy('hrodvar', 'deep', t.cx, t.y + 5, { level: 11 });
+  for (const dx of [-3, 3]) spawnEnemy('skeleton', 'deep', t.cx + dx, t.y + 6, { level: 7 });
 }
 
 // ================= Neues Spiel =================
@@ -569,16 +578,17 @@ export function newGame(cfg) {
   const keep = { settings: S.settings };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: 0, merch: 0, bandit: 0 }, ranks: { valen: -1, order: -1, undead: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
-    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
+    settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p));
   genMine().forEach(p => S.ents.mine.push(p));
-  indexSolids('world'); indexSolids('mine');
+  genDeep().forEach(p => S.ents.deep.push(p));
+  for (const m of MAP_KEYS) indexSolids(m);
   spawnNPCs();
   spawnGuardPosts();
   spawnResidents();
@@ -672,8 +682,9 @@ export function continueGame() {
   const gone = data.propsGone; delete data.propsGone;
   applySave(data);
   seedRng(S.seed);
-  const fresh = genWorld(), freshMine = genMine();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
-  for (const [m, f] of [['world', fresh], ['mine', freshMine]]) if (gone?.[m]) mergeProps(m, f, gone[m]);   // … Abweichungen stehen im Spielstand
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep() };   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  for (const m of MAP_KEYS) S.ents[m] ||= [];
+  for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);   // … Abweichungen stehen im Spielstand
   if (S.flags?.rescale) rescaleSave(fresh);
   if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
     const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
@@ -715,7 +726,14 @@ export function continueGame() {
   if (S.settlement) S.settlement.buildings = S.ents[S.settlement.map || 'world'].filter(e => e.kind === 'building');
   S.relations ||= {}; S.flags ||= {};
   S.party = S.party.filter(id => byId(id));
-  for (const m of ['world', 'mine']) for (const e of S.ents[m]) {
+  if (!S.flags.deep1) {                        // Session 6: Tiefhall betretbar — Karte, Hort drinnen, Hrodvar; der Eingang wird Portal
+    S.ents.deep = FRESH.deep.slice(); indexSolids('deep');
+    S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && e.type === 'chest' && e.label === 'Tiefhall-Hort' && !e.opened));   // der Hort lag draußen; ungeöffnet zieht er hinein
+    for (const e of S.ents.world) if (e.kind === 'prop' && e.type === 'mine_entrance' && e.label === 'Tiefhall') e.portal = 'deep';
+    for (const a of SPAWN_AREAS) if (a.map === 'deep') for (let i = 0; i < a.cap * 0.7; i++) spawnEnemy(pick(a.types), 'deep', a.x + ri(-a.r, a.r), a.y + ri(-a.r, a.r));
+    deepBoss(); S.flags.deep1 = true;
+  }
+  for (const m of MAP_KEYS) for (const e of S.ents[m]) {
     if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
@@ -743,9 +761,9 @@ export function continueGame() {
     if (c === S.player) { (c.titleClasses ||= []).includes('warlock') || c.titleClasses.push('warlock'); c.titleClass = 'warlock'; c.pal = { ...c.pal, glow: TITLE_CLASSES.warlock.glow }; }
     recalc(c); if (c === S.player) syncHotbar();
   }
-  for (const [m, f] of [['world', fresh], ['mine', freshMine]]) if (!gone?.[m]) adoptPropKeys(m, f);   // alte Vollstände: ab jetzt nur Abweichungen speichern
+  for (const m of MAP_KEYS) if (!gone?.[m]) adoptPropKeys(m, FRESH[m]);   // alte Vollstände: ab jetzt nur Abweichungen speichern
   bindSim(); SIM.initSim();
-  indexSolids('world'); indexSolids('mine');
+  for (const m of MAP_KEYS) indexSolids(m);
   assignNpcDays();                             // Tagesablauf der Figuren mit Namen (auch für alte Stände; nach dem Objekt-Index)
   if (!S.ents.world.some(e => e.post)) spawnGuardPosts();       // ältere Stände: Wachposten nachrüsten (nach dem Objekt-Index)
   log('Die Welt erinnert sich.', 'world');
@@ -832,14 +850,14 @@ function update(dt, now) {
     hudTimer = 0; UI.refreshHUD(); UI.renderContext(selected || hovered); updatePrompt();
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6) (S.flags.seen ||= {})[l.key] = true;
-    if (S.map === 'mine') (S.flags.seen ||= {}).mine = true;
+    if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
     if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type].label} · ${LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
   }
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
-    ambienceTick(S.map === 'mine' ? 'blight' : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'));
+    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'));
   }
   respawnTimer += dt;
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
@@ -1976,7 +1994,11 @@ function doInteract() {
 }
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
-const ARRIVAL = { mine: () => MAPS.mine.entry, world: () => { const [x, y] = worldPt(62, 21); return { x: x * TS + TS / 2, y: y * TS + TS / 2 }; } };   // vor dem Grubeneingang
+// Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry,
+  world: from => { const door = S.ents.world.find(e => e.kind === 'prop' && e.portal === from);
+    if (door) return freeSpotNear('world', door.x / TS | 0, (door.y / TS | 0) + 3, 1);
+    const [x, y] = worldPt(62, 21); return { x: x * TS + TS / 2, y: y * TS + TS / 2 }; } };
 function travel(to) {
   const p = S.player, from = S.map;
   leavePursuit(from, to);
@@ -1984,12 +2006,12 @@ function travel(to) {
   const members = [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   S.map = to; p.map = to;
-  const spot = ARRIVAL[to]();
+  const spot = ARRIVAL[to](from);
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
   for (const m of members) { m.map = to; m.x = p.x + ri(-24, 24); m.y = p.y + ri(-24, 24); if (m.servant) { m.anchor = { x: m.x, y: m.y }; m.aggroId = null; } S.ents[to].push(m); }
-  log(to === 'mine' ? 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' : 'Du kehrst an die Oberfläche zurück.', 'world');
-  UI.toast(to === 'mine' ? 'Verlassene Grube' : 'Greenmark-Grenzland');
+  log(DUNGEONS[to] ? DUNGEONS[to].enter : 'Du kehrst an die Oberfläche zurück.', 'world');
+  UI.toast(DUNGEONS[to] ? DUNGEONS[to].name : 'Greenmark-Grenzland');
   arrivePursuit(to);
   save();
 }
@@ -2118,7 +2140,7 @@ function hourTick(h) {
     if (S.settlement.buildings.some(b => b.type === 'well' && b.built >= 1)) S.settlement.morale = Math.min(100, S.settlement.morale + 0.2);
   }
   // Nachwachsen
-  for (const map of ['world', 'mine']) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
+  for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
   if (h === 3 && chance(0.4) && S.settlement) raidSettlement();
   // Gruppengeschehen
   if (chance(0.25)) partyInteraction();
@@ -2921,7 +2943,7 @@ function useSlot(i) {
 // ================= Tod & Erbe =================
 function playerDeath(cause, source) {
   const p = S.player;
-  const loc = S.map === 'mine' ? 'Verlassene Grube' : (locAt(p.x / TS | 0, p.y / TS | 0)?.name || 'Greenmark-Grenzland');
+  const loc = DUNGEONS[S.map] ? DUNGEONS[S.map].name : (locAt(p.x / TS | 0, p.y / TS | 0)?.name || 'Greenmark-Grenzland');
   const rec = { name: p.name, age: p.age, days: S.day - (p.bornDay || 1), kills: p.kills || 0, battles: S.battles,
     settlements: S.settlement ? 1 : 0, family: S.party.length ? partyMembers().map(m => m.name).join(', ') : '—',
     cause, location: loc, year: year(), titles: (p.titles || []).join(', ') };
@@ -2992,14 +3014,14 @@ function adoptSuccessor(c) {
   recalc(c); B.fullHeal(c); c.mana = c.maxMana;
   // Neubeginn fern vom Tod: der Erbe trifft im Heimatdorf ein (nicht am Grab neben dem Mörder), die Gruppe mit ihm.
   const home = freeSpotNear('world', ...worldPt(60, 66), 4), group = [c, ...partyMembers().filter(m => m !== c)];
-  for (const m of group) { for (const k of ['world', 'mine']) { const a = S.ents[k], i = a.indexOf(m); if (i >= 0) a.splice(i, 1); }
+  for (const m of group) { for (const k of MAP_KEYS) { const a = S.ents[k], i = a.indexOf(m); if (i >= 0) a.splice(i, 1); }
     m.map = 'world'; m.x = home.x + (m === c ? 0 : ri(-30, 30)); m.y = home.y + (m === c ? 0 : ri(-30, 30)); S.ents.world.push(m); }
   S.map = 'world';
   c.invuln = true; setTimeout(() => { if (S.player === c && !c.dodge) c.invuln = false; }, 3000);   // kurze Schonfrist
   S.player = c;
   syncHotbar();
   chronicle(`${c.name} übernimmt Haus ${S.legacy.house}`, 'legacy',
-    `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : 'der Erde von Greenmark'}.`);
+    `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : old.map === 'deep' ? 'der Tiefhall' : 'der Erde von Greenmark'}.`);
   log(`${c.name} führt Haus ${S.legacy.house} weiter. Generation ${S.legacy.gen}.`, 'death');
   S.paused = false;
   UI.toast(`GENERATION ${S.legacy.gen} — ${c.name}`, 5000);
@@ -3250,6 +3272,7 @@ function toggleDebug() {
     'Paladin freischalten': () => unlockClass('paladin'),
     'Ruf +25 (alle)': () => { for (const f of Object.keys(S.factions)) S.factions[f] += 25; checkRankUp(); },
     'Zur Grube': () => travel('mine'),
+    'Zur Tiefhall': () => travel('deep'),
     'Spieler töten': () => { S.player.body.torso.hp = 0; B.syncHp(S.player); downed(S.player, 'Debug'); S.player.downTimer = 1; },
     'Linken Arm brechen': () => { const r = B.damagePart(S.player, 'larm', 999); if (r === 'disabled' || r === 'down') limbLost(S.player, 'larm'); },
     '+3 Verbände': () => addItem(S.player, 'bandage', 3),
@@ -3653,6 +3676,16 @@ export function selftest() {
         && bc?.opened && bc.id === chest.id && back.filter(e => e.kind === 'prop').length === all - 1
         && back.filter(e => e.kind !== 'prop').length === W.filter(e => e.kind !== 'prop' && !e.transient).length;
     } finally { chest.opened = was; S.ents.world = keep; }
+  })());
+  ok('Tiefhall (BUG-009): Eingang ist Portal, jeder Raum vom Treppenfuß aus begehbar (Möbel/Säulen sperren keinen Gang), Hort drinnen, Hrodvar im Thronsaal', (() => {
+    const D = MAPS.deep, door = S.ents.world.find(e => e.kind === 'prop' && e.portal === 'deep'), ex = S.ents.deep.find(e => e.portal === 'world');
+    if (!D || !door || !ex) return false;
+    const free = (x, y) => !SOLID.has(tileAt('deep', x, y)) && !occupied.at('deep', x, y), seen = new Set(), q = [[D.entry.x / TS | 0, D.entry.y / TS | 0]];
+    while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || !free(x, y)) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+    const reach = r => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (seen.has(x + ',' + y)) return true; return false; };
+    const t = D.rooms.find(r => r.tag === 'throne'), boss = S.ents.deep.find(e => e.mtype === 'hrodvar'), hort = S.ents.deep.find(e => e.label === 'Tiefhall-Hort');
+    const inR = (r, e) => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; };
+    return D.rooms.every(reach) && !!hort && (!boss || inR(t, boss) || boss.aggroId) && !S.ents.world.some(e => e.label === 'Tiefhall-Hort' && !e.opened);
   })());
   ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
     return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());

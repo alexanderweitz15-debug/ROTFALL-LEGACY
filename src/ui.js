@@ -2,7 +2,7 @@
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
 import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt } from './world.js';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js';
 import { townState, townPrice } from './sim.js';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js';
 import { sfx, ambience } from './sfx.js';
@@ -154,8 +154,8 @@ export function renderContext(target) {
     const threat = here ? here.threat : 1;
     const tName = ['Sicher', 'Gering', 'Mittel', 'Hoch', 'Tödlich'][threat] || 'Mittel';
     const tCls = threat <= 1 ? 'threat-low' : threat === 2 ? 'threat-med' : 'threat-high';
-    let h = `<div class="ctx-head">${S.map === 'mine' ? 'Verlassene Grube' : (here ? here.name : 'Greenmark-Grenzland')}</div>
-      <div class="ctx-sub">${S.map === 'mine' ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
+    let h = `<div class="ctx-head">${DUNGEONS[S.map] ? DUNGEONS[S.map].name : (here ? here.name : 'Greenmark-Grenzland')}</div>
+      <div class="ctx-sub">${DUNGEONS[S.map] ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
       <div class="ctx-line"><span>Gefahr</span><b class="${tCls}">${tName}</b></div>
       <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel'}[S.weather]}</b></div>
       <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>

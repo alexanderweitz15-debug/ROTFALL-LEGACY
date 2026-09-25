@@ -79,6 +79,7 @@ export const LOOT = {
   skeleton:  [['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
   crypt_warden:[['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
+  hrodvar:   [['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
 };
 
 // interiors: folgt dem Spieler durch Eingänge (Grube, Dungeons). Tiere nicht — sie lauern draußen (GDD §Übergänge).
@@ -92,6 +93,8 @@ export const MONSTERS = {
   skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
   crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true,
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
+  hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
+               pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };

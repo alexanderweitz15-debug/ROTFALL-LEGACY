@@ -867,8 +867,7 @@ export function genWorld() {
   // ---- Frostkamm & Tiefhall: nördliches Hochgebirge ----
   for (let i = 0; i < 140; i++) blob('world', ri(180, 380), ri(6, 60), ri(3, 8), T.ROCK, 0.72);
   rect('world', 244, 32, 12, 10, T.DFLOOR);
-  prop('mine_entrance', 250, 36, { solid:false, label:'Tiefhall', tag:'delve' });
-  prop('chest', 250, 34, { loot:['plate_cuirass', 'iron', 'iron'], label:'Tiefhall-Hort' });
+  prop('mine_entrance', 250, 36, { solid:false, portal:'deep', label:'Tiefhall', tag:'delve' });   // der Hort liegt jetzt drinnen (genDeep)
   for (let i = 0; i < 24; i++) prop('ore_node', ri(200, 360), ri(8, 56), { harvest:'iron', solid:true });
   prop('banner_torn', 330, 24); prop('camp_ruin', 300, 50, { label:'Erfrorenes Lager' });
 
@@ -1073,6 +1072,80 @@ export function deadScenes() {
   P('well', 318, 447, { solid: true, rite: 'soulwell', label: 'Seelenbrunnen' }); P('candles', 317, 448, { r: 6 }); P('candles', 319, 448, { r: 6 });
   for (const [x, y] of [[309, 432], [327, 431], [308, 444], [328, 446]]) P('dead_tree', x, y, { solid: true });
   P('bones', 322, 449, { r: 6 }); P('obelisk', 318, 451, { solid: true, label: 'Brunnenwächter-Stein' });
+}
+
+// ---------------- Dungeons ----------------
+// Register der Unterwelt-Karten: Name, Bodenbild, Ankunftstext. Alles, was früher „S.map === 'mine'“ prüfte, fragt hier
+// (Refactoring §2, Punkt 1: ein zweiter Dungeon war mit der festen Verdrahtung nicht möglich — BUG-009).
+export const DUNGEONS = {
+  mine: { name: 'Verlassene Grube', floor: 'scree', amb: 'blight', enter: 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' },
+  deep: { name: 'Tiefhall', floor: 'dfloor', amb: 'frozen', enter: 'Du steigst die Frosttreppe hinab. Reif sitzt in den Fugen alter Steinmetzarbeit — hier hat jemand gebaut, der für die Ewigkeit baute.' },
+};
+export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
+
+// Tiefhall (Frostkamm): Königshalle der alten Bergleute, unter dem Eis versiegelt. Anders als die Grube gebaut, nicht gegraben:
+// gerade Hallen, Säulen, Gruft der Ahnen, Schmiede der Tiefe, Thronsaal mit Hrodvar, dahinter der Hort. Eigener Seed-Zweig.
+export function genDeep() {
+  props.length = 0;
+  seedRng(S.seed * 11 + 5);
+  const w = 72, h = 62, tiles = new Uint8Array(w * h).fill(T.DWALL);
+  MAPS.deep = { w, h, tiles };
+  const rooms = [], M = 'deep', o = { map: M };
+  const room = (x, y, rw, rh, tag) => { rect(M, x, y, rw, rh, T.DFLOOR); const r = { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1), tag }; rooms.push(r); return r; };
+  const corr = (a, b, wide = 2) => {                          // gerade gebaute Gänge: erst waagrecht, dann senkrecht
+    let x = a.cx, y = a.cy;
+    while (x !== b.cx) { for (let k = 0; k < wide; k++) setTile(M, x, y + k, T.DFLOOR); x += x < b.cx ? 1 : -1; }
+    while (y !== b.cy) { for (let k = 0; k < wide; k++) setTile(M, x + k, y, T.DFLOOR); y += y < b.cy ? 1 : -1; }
+  };
+  const entry  = room(30, 51, 12, 8, 'entry');
+  const hall   = room(22, 30, 28, 15, 'hall');
+  const ice    = room(4, 31, 12, 10, 'ice');
+  const crypt  = room(56, 28, 12, 15, 'crypt');
+  const forge  = room(5, 12, 15, 11, 'forge');
+  const throne = room(24, 4, 24, 13, 'throne');
+  const hoard  = room(54, 6, 10, 8, 'hoard');
+  const secret = room(4, 46, 8, 6, 'secret');
+  corr(entry, hall, 4); corr(hall, ice, 3); corr(hall, crypt, 3); corr(ice, forge); corr(forge, throne); corr(hall, throne, 4); corr(throne, hoard); corr(ice, secret);
+
+  prop('mine_exit', entry.cx, entry.y + entry.h - 1, { ...o, portal: 'world', label: 'Aufstieg zum Frostkamm' });
+  for (const [x, y] of [[entry.x + 1, entry.y + 1], [entry.x + entry.w - 2, entry.y + 1]]) prop('torch', x, y, o);
+  prop('broken_pillar', entry.x + 2, entry.y + 4, { ...o, solid: true }); prop('broken_pillar', entry.x + entry.w - 3, entry.y + 4, { ...o, solid: true });
+  // Säulenhalle: zwei Säulenreihen, zerrissene Banner an der Nordwand, Kerzen an den Säulenfüßen
+  for (let i = 0; i < 5; i++) for (const y of [hall.y + 3, hall.y + hall.h - 4]) {
+    const x = hall.x + 3 + i * 5; prop('broken_pillar', x, y, { ...o, solid: true, r: 11, intact: !(i === 1 && y > hall.cy) && i !== 4 });   // zwei sind gebrochen
+    if (chance(0.4)) prop('candles', x + 1, y + 1, { ...o, r: 6 });
+  }
+  for (let i = 0; i < 4; i++) prop('banner_torn', hall.x + 5 + i * 6, hall.y, o);
+  for (let i = 0; i < 6; i++) prop(pick(['rubble', 'bones', 'debris']), ri(hall.x + 1, hall.x + hall.w - 2), ri(hall.y + 5, hall.y + hall.h - 6), { ...o, r: 8 });
+  prop('sign', hall.cx, hall.y + hall.h - 2, { ...o, label: 'Gemeißelt: „Wer hier gräbt, gräbt für den König. Wer hier stiehlt, bleibt.“' });
+  // Eiskammern: eingestürzt, Eiszapfen fallen (Gefahr), Erfrorene
+  for (let i = 0; i < 7; i++) prop('rubble', ri(ice.x, ice.x + ice.w - 1), ri(ice.y, ice.y + ice.h - 1), { ...o, r: 9 });
+  for (let i = 0; i < 4; i++) prop('spikes', ri(ice.x + 1, ice.x + ice.w - 2), ri(ice.y + 1, ice.y + ice.h - 2), { ...o, hazard: 12, label: 'Eiszapfen' });
+  prop('bones', ice.cx, ice.cy, { ...o, r: 6, label: 'Erfrorener Bergmann' });
+  prop('crate', ice.x + 1, ice.y + ice.h - 2, { ...o, loot: ['bandage', 'dried_meat'], label: 'Proviantkiste' });
+  // Ahnengruft: Grabsteine in Reihen, Altar, Kerzen
+  for (let y = crypt.y + 2; y < crypt.y + crypt.h - 2; y += 3) for (let x = crypt.x + 2; x < crypt.x + crypt.w - 1; x += 3) prop('gravestone', x, y, { ...o, solid: true, r: 8 });
+  prop('standing_stone', crypt.cx, crypt.y + 1, { ...o, solid: true, label: 'Ahnenstein der Bergleute' });   // kein Altar (Ordenstuch), kein Obelisk (nekromantisch)
+  for (const dx of [-2, 2]) prop('candles', crypt.cx + dx, crypt.y + 1, { ...o, r: 6 });
+  // Schmiede der Tiefe: Esse, Amboss, Waffengestell, Erz in den Wänden
+  prop('forge', forge.x + 3, forge.y + 2, { ...o, solid: true, label: 'Esse der Tiefe' });
+  prop('anvil', forge.x + 6, forge.y + 3, { ...o, solid: true, label: 'Königsamboss' });
+  prop('weapon_rack', forge.x + forge.w - 3, forge.y + 1, { ...o, solid: true });
+  for (let i = 0; i < 5; i++) prop('ore_node', ri(forge.x, forge.x + forge.w - 1), ri(forge.y + 5, forge.y + forge.h - 1), { ...o, harvest: 'iron', solid: true });
+  prop('chest', forge.x + forge.w - 2, forge.y + forge.h - 2, { ...o, loot: ['pickaxe', 'iron', 'iron'], label: 'Werkzeugtruhe' });
+  // Thronsaal: Thron am Nordende, Kohlebecken, Banner; Hrodvar wartet davor (game.js)
+  prop('throne', throne.cx, throne.y + 1, { ...o, solid: true, r: 16, label: 'Thron unter dem Eis' });
+  for (const dx of [-5, 5]) { prop('campfire_static', throne.cx + dx, throne.y + 3, { ...o, solid: true, label: 'Kohlebecken' }); prop('banner_torn', throne.cx + dx, throne.y, o); }
+  for (let i = 0; i < 4; i++) prop('broken_pillar', throne.x + 2 + i * 6, throne.y + throne.h - 3, { ...o, solid: true, r: 11, intact: true });
+  // Hort und Versteck
+  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['plate_cuirass', 'iron', 'iron', 'potion'], label: 'Tiefhall-Hort' });
+  for (let i = 0; i < 3; i++) prop(pick(['crate_stack', 'barrel', 'sack']), ri(hoard.x, hoard.x + hoard.w - 1), ri(hoard.y, hoard.y + hoard.h - 1), { ...o, solid: true });
+  prop('chest', secret.cx, secret.cy, { ...o, loot: ['kite_shield', 'potion'], label: 'Vergessene Nische' });
+  for (const r of rooms) for (let i = 0; i < 2; i++) prop('torch', ri(r.x, r.x + r.w - 1), r.y, o);   // Fackeln an den Nordwänden
+
+  MAPS.deep.rooms = rooms;
+  MAPS.deep.entry = { x: entry.cx * TS + TS / 2, y: (entry.y + entry.h - 3) * TS };
+  return baseProps('deep', props.slice());
 }
 
 // ---------------- Grube (Dungeon) ----------------

@@ -8,7 +8,7 @@ export const S = {
   day: 1, minute: 8 * 60, season: 'Später Frühling',
   weather: 'clear', weatherLeft: 40,
   map: 'world',
-  ents: { world: [], mine: [] },
+  ents: { world: [], mine: [], deep: [] },
   player: null,
   party: [],
   gold: 20,
@@ -92,16 +92,17 @@ const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quie
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
-const PROP_BASE = { world: new Map(), mine: new Map() };
+const PROP_BASE = {};                                        // je Karte: gk → Signatur
 const r2 = (k, v) => typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;   // Positionen/Timer: 2 Nachkommastellen genügen
 const sig = p => { const { id, ...rest } = p; return JSON.stringify(rest, r2); };
 export function setPropBase(map, list) { const B = new Map(); for (const p of list) B.set(p.gk, sig(p)); PROP_BASE[map] = B; }
 export function saveData() {
   const out = {}; out.ents = {}; out.propsGone = {};
   for (const k of Object.keys(S)) if (!SKIP.has(k) && k !== 'ents') out[k] = S[k];
-  for (const m of ['world', 'mine']) {
+  for (const m of Object.keys(S.ents)) {
+    if (m.startsWith('__')) continue;                  // Test-/Stilkarten
     const B = PROP_BASE[m], list = S.ents[m].filter(e => !e.transient);
-    if (!B.size) { out.ents[m] = list; continue; }       // ohne Grundzustand (sollte nicht vorkommen): alles speichern
+    if (!B || !B.size) { out.ents[m] = list; continue; }       // ohne Grundzustand (sollte nicht vorkommen): alles speichern
     const have = new Set();
     out.ents[m] = list.filter(e => { if (e.kind !== 'prop' || !e.gk || !B.has(e.gk) || have.has(e.gk)) return true; have.add(e.gk); return sig(e) !== B.get(e.gk); });
     out.propsGone[m] = [...B.keys()].filter(k => !have.has(k));

@@ -1,6 +1,6 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp } from './state.js';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES } from './world.js';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js';
 import * as HB from './buildings.js';
 import { ITEMS, MONSTERS } from './data.js';
 import { buildOf } from './body.js';
@@ -252,7 +252,7 @@ function bakeGround(o, m, cx, cy) {
     let t = raw;
     if (t === T.ROCK || t === T.WATER || t === T.DWALL) t = groundUnder(m, tx, ty);   // Fels/Wasser/Höhlenwand werden danach als weiche Masse gemalt
     let kind = TILE_KIND[t] || 'grass';
-    if (t === T.DFLOOR && S.map === 'mine') kind = 'scree';   // Minenboden: Geröll, kein Pflaster
+    if (t === T.DFLOOR && DUNGEONS[S.map]?.floor === 'scree') kind = 'scree';   // Minenboden: Geröll, kein Pflaster (Tiefhall: gebaute Halle, Pflaster)
     if (t === T.STONE && world && !townAt(tx, ty, 2) && regionAt(tx, ty) === 'mountain') kind = 'scree';   // Hochgebirge: Geröll, kein Pflaster
     typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * 4) | 0;
     if (t === T.GRASS || t === T.DIRT) {                  // Wiesen hell, Senken dunkel
@@ -933,6 +933,17 @@ function drawProp(e, now) {
       ctx.fillStyle = '#a8adb4'; ctx.fillRect(x - 1, y - 26, 3, 20); ctx.fillStyle = '#5a4430'; ctx.fillRect(x - 3, y - 8, 7, 2);
       ctx.fillStyle = '#5a4430'; ctx.fillRect(x + 7, y - 24, 2, 22); ctx.fillStyle = '#8a8f98'; ctx.fillRect(x + 8, y - 24, 6, 7);
       break; }
+    case 'throne': {                                      // Thron unter dem Eis (Tiefhall): Blockstein, hohe Lehne, Reif, blasser Eisschein
+      shadow(x, y + 5, 20, .4);
+      ctx.fillStyle = '#3e4449'; ctx.fillRect(x - 18, y - 4, 36, 8);                                         // Stufe
+      ctx.fillStyle = '#566068'; ctx.fillRect(x - 14, y - 42, 28, 30);                                       // Lehne
+      ctx.fillStyle = '#6b767e'; ctx.fillRect(x - 14, y - 42, 28, 3); ctx.fillRect(x - 10, y - 48, 20, 7);  // Krone der Lehne
+      ctx.fillStyle = '#4a5359'; ctx.fillRect(x - 17, y - 22, 6, 18); ctx.fillRect(x + 11, y - 22, 6, 18); // Armlehnen
+      ctx.fillStyle = '#5e6a72'; ctx.fillRect(x - 11, y - 14, 22, 10);                                       // Sitz
+      ctx.fillStyle = '#2f353a'; ctx.fillRect(x - 1, y - 38, 2, 20); ctx.fillRect(x - 6, y - 32, 12, 2);    // eingemeißelter Hammer
+      ctx.fillStyle = 'rgba(200,230,245,.55)'; ctx.fillRect(x - 14, y - 42, 9, 2); ctx.fillRect(x + 6, y - 30, 8, 2); ctx.fillRect(x - 17, y - 22, 6, 2);   // Reif
+      ctx.fillStyle = 'rgba(150,210,245,.18)'; ctx.beginPath(); ctx.ellipse(x, y - 24, 22, 28, 0, 0, 7); ctx.fill();
+      break; }
     case 'altar_small': {                                 // Altar mit Tuch des Ordens
       shadow(x, y + 4, 14, .3);
       ctx.fillStyle = '#8f8a7e'; ctx.fillRect(x - 13, y - 14, 26, 16); ctx.fillStyle = '#a7a194'; ctx.fillRect(x - 13, y - 16, 26, 3);
@@ -1556,7 +1567,7 @@ function drawFx(now) {
 // ---------------- Licht & Wetter ----------------
 export function ambient() {
   const h = S.minute / 60;
-  if (S.map === 'mine') return 0.82;
+  if (DUNGEONS[S.map]) return 0.82;
   let a = 0;
   if (h < 5) a = 0.72; else if (h < 7) a = 0.72 - (h - 5) / 2 * 0.62;
   else if (h < 17) a = 0.08; else if (h < 20) a = 0.08 + (h - 17) / 3 * 0.5;
@@ -1589,14 +1600,14 @@ function drawLight(now) {
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.clearRect(0, 0, dark.width, dark.height);          // sonst summiert sich die Dunkelheit jeden Frame
   dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const night = S.map === 'mine' ? '6,8,10' : (S.minute / 60 > 18 || S.minute / 60 < 6) ? '10,14,28' : '20,18,14';
+  const night = S.map === 'deep' ? '8,12,18' : DUNGEONS[S.map] ? '6,8,10' : (S.minute / 60 > 18 || S.minute / 60 < 6) ? '10,14,28' : '20,18,14';
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = `rgba(${night},${a})`;
   dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
   const pl = S.player;
   const lights = [...staticLights()];
-  if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: S.map === 'mine' ? 150 : 120 });
+  if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: DUNGEONS[S.map] ? 150 : 120 });
   if (isNight()) for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2)   // erleuchtete Fenster werfen warmes Licht auf die Straße
     lights.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
   for (const l of lights) {
@@ -1625,7 +1636,7 @@ function drawLight(now) {
 
 const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() }));
 function drawWeather(now) {
-  if (S.map === 'mine') return;
+  if (DUNGEONS[S.map]) return;
   if (S.weather === 'rain') {
     ctx.strokeStyle = 'rgba(170,190,210,.25)'; ctx.lineWidth = 1;
     ctx.beginPath();
