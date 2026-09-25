@@ -98,7 +98,9 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   rect(map, x + 1, y + 1, w - 2, h - 2, T.PLANK);
   const door = doorSide === 'S' ? [x + (w >> 1), y + h - 1] : doorSide === 'N' ? [x + (w >> 1), y] : doorSide === 'W' ? [x, y + (h >> 1)] : [x + w - 1, y + (h >> 1)];
   setTile(map, door[0], door[1], T.PLANK);
-  const b = { id: 'h' + x + '_' + y, map, x, y, w, h, door: doorSide, doorTile: door, type: meta.type || 'house', town: meta.town, wear: meta.wear, seed: (x * 31 + y * 17) % 997 + 1 };
+  // id und seed aus dem Entwurf (Streckung): Bezüge (NPC_DAY) und Aussehen bleiben, auch wenn das Haus umzieht
+  const b = { id: meta.id || 'h' + x + '_' + y, map, x, y, w, h, door: doorSide, doorTile: door, type: meta.type || 'house', town: meta.town, wear: meta.wear,
+              seed: meta.seed || (x * 31 + y * 17) % 997 + 1, hx: meta.hx ?? x, hy: meta.hy ?? y };
   HOUSES.push(b);
   // Innenausstattung: die Kachel hinter der Tür bleibt frei; keine zwei Möbel auf einer Kachel
   const inside = [door[0] + (doorSide === 'W' ? 1 : doorSide === 'E' ? -1 : 0), door[1] + (doorSide === 'S' ? -1 : doorSide === 'N' ? 1 : 0)];
@@ -147,7 +149,11 @@ function biomeAt(x, y) {
   for (const c of centers) { const d = (c.x - jx) ** 2 + (c.y - jy) ** 2; if (d < bd) { bd = d; best = c; } }
   return best.b;
 }
-export const regionAt = (tx, ty) => protectedNW(tx, ty) ? 'greenmark' : biomeAt(tx, ty);
+const rawRegion = (tx, ty) => protectedNW(tx, ty) ? 'greenmark' : biomeAt(tx, ty);
+// Eine Siedlung hat eine Region (die ihres Ankers): Nordfurts gestreckte Osthälfte läge sonst im Gebirge (Geröll, Schnee
+// zwischen den Häusern). Erst nach der Generierung — sie selbst sieht die rohe Region, damit ihre Zufallsfolge gleich bleibt.
+let townsBuilt = false;
+export const regionAt = (tx, ty) => { if (townsBuilt) { const k = townAt(tx, ty); if (k) return rawRegion(...TOWN_PLAN[k].spread.a); } return rawRegion(tx, ty); };
 
 // ---------------- Szenen: kleine, komponierte Orte, die eine Geschichte erzählen ----------------
 // Keine Zufallsstreuung: jede Szene ist ein festes Arrangement. Gras darunter wird zur Lichtung,
@@ -274,22 +280,24 @@ function gruben() {
 // Straße, Felder und Props mit Grund. Läuft am Ende von genWorld und zieht kein rnd(): die Zufallsfolge der übrigen
 // Welt bleibt unverändert (BUG-027); ältere Spielstände übernehmen den Ausbau per Migration (game.js, flags.gen3).
 // Kachelkoordinaten, Rechtecke inklusiv. old = Kern vor dem Ausbau (seine Häuser bleiben stehen), area = ganze Siedlung,
-// square = Platz (Treffpunkt der Bewohner am Tag).
+// square = Platz (Treffpunkt der Bewohner am Tag). perHead = Kacheln Siedlungsfläche je Kopf (Bewohner + Wachen + Figuren
+// mit Namen): die Einwohnerzahl folgt der Fläche, nicht der Häuserzahl (Stadt dichter als Dorf, Grenzposten am dünnsten).
 export const seaLine = x => 476 + Math.round(Math.sin(x / 20) * 4);   // Küstenlinie der Südsee (wie die Generierung)
 export const TOWN_PLAN = {
   eren: {                                                         // Heimatdorf: Ackerbau, Rast an der Alten Straße
-    area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66],
-    streets: [[T.DIRT, 46, 55, 49, 56], [T.DIRT, 48, 57, 49, 63], [T.DIRT, 76, 61, 77, 63], [T.DIRT, 82, 61, 82, 63], [T.DIRT, 53, 72, 54, 75]],
+    area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66], spread: { s: [1.2, 1.35], a: [58, 64] }, perHead: 95,   // West: Alte Feste, Nord: Grubenpfad
+    streets: [[T.ROAD, 50, 64, 71, 64], [T.DIRT, 46, 55, 49, 56], [T.DIRT, 48, 57, 49, 63], [T.DIRT, 76, 61, 77, 63], [T.DIRT, 82, 61, 82, 63], [T.DIRT, 53, 72, 54, 75]],
     houses: [['house', 43, 58, 5, 4, 'S'], ['cottage', 37, 58, 4, 4, 'S'], ['house', 44, 51, 5, 4, 'S'], ['barn', 36, 66, 6, 5, 'N'],
       ['bakery', 44, 66, 5, 4, 'N'], ['house', 74, 57, 5, 4, 'S'], ['cottage', 80, 57, 4, 4, 'S'], ['house', 74, 66, 5, 4, 'N'],
       ['cottage', 80, 66, 4, 4, 'N'], ['barn', 51, 76, 6, 5, 'N'], ['house', 66, 76, 5, 4, 'N']],
-    fields: [[36, 73, 46, 78], [72, 76, 83, 81]],
+    fields: [[36, 73, 46, 78], [72, 76, 83, 81], [58, 68, 63, 71]],
     props: [['hay', 42, 68], ['hay', 57, 78], ['cart', 35, 65], ['trough', 58, 80], ['laundry', 41, 55], ['laundry', 79, 71],
       ['lantern', 50, 62], ['lantern', 73, 63], ['flowers_prop', 47, 62], ['sack', 47, 65, { label: 'Mehlsack' }], ['barrel', 43, 65, { label: 'Regentonne' }]],
   },
   northcity: {                                                    // Grenzstadt der Valen: Handel am Fluss, Garnison
-    area: [111, 44, 147, 73], old: [112, 50, 125, 62], square: [137, 60],
-    fill: [[T.STONE, 112, 45, 146, 72]],
+    area: [111, 44, 147, 73], old: [112, 50, 125, 62], square: [137, 60], spread: { s: 1.5, a: [111, 64] }, perHead: 55,
+    fill: [[T.GRASS, 111, 44, 147, 73]],                                        // Grund innerhalb der Mauer (die Osthälfte liegt schon im Gebirgsgeröll)
+    plazas: [[T.STONE, 133, 58, 146, 62]],                                      // Markt; sonst kein Flächenpflaster mehr (Höfe, Gärten)
     walls: { rect: [111, 44, 147, 73], gates: [[111, 62, 111, 64], [147, 63, 147, 65], [118, 73, 119, 73], [128, 44, 129, 44]] },
     streets: [[T.ROAD, 112, 63, 146, 64], [T.ROAD, 128, 45, 129, 62], [T.ROAD, 118, 65, 119, 72]],
     houses: [['chapel', 113, 45, 6, 5, 'S'], ['manor', 120, 45, 5, 5, 'S'], ['store', 131, 46, 6, 5, 'S'], ['house', 138, 46, 4, 4, 'S'],
@@ -299,9 +307,15 @@ export const TOWN_PLAN = {
       ['well', 131, 60], ['board', 144, 60, { label: 'Anschlagbrett', tag: 'board' }], ['crate', 138, 61, { label: 'Marktware' }], ['sack', 142, 61, { label: 'Getreidesack' }],
       ['barrel', 131, 58, { label: 'Bierfass' }], ['barrel', 132, 58, { label: 'Bierfass' }], ['lantern', 113, 61], ['lantern', 145, 62], ['lantern', 117, 71],
       ['lantern', 130, 47], ['lantern', 127, 61], ['laundry', 126, 69], ['trough', 145, 71]],
+    // grow: erst durch die Streckung möglich, darum in Weltkoordinaten. Reihe zur Hauptstraße, Garnisonsstall an der
+    // Südmauer, Hinterhäuser; Gemüsebeete in den Höfen.
+    grow: { houses: [['house', 115, 57, 5, 4, 'S'], ['cottage', 123, 57, 4, 4, 'S'], ['house', 130, 57, 5, 4, 'S'],
+        ['house', 115, 73, 5, 4, 'N'], ['stable', 132, 73, 6, 5, 'N'], ['cottage', 148, 73, 4, 4, 'N'], ['house', 157, 73, 5, 4, 'N']],
+      gardens: [[123, 45, 127, 47], [147, 45, 151, 47], [133, 45, 136, 47], [125, 74, 129, 76]],
+      props: [['sack', 128, 48, { label: 'Kartoffelsack' }], ['laundry', 121, 56], ['hay', 139, 76], ['trough', 131, 77]] },
   },
   saltport: {                                                     // Hafenstadt: Salz, Fisch, Umschlag an Kai und Stegen
-    area: [132, 431, 174, 488], old: [138, 438, 163, 463], square: [157, 447],
+    area: [132, 431, 174, 488], old: [138, 438, 163, 463], square: [157, 447], spread: { s: 1.3, a: [148, 472] }, perHead: 70,
     fill: [[T.DIRT, 132, 431, 174, 471, 'ragged']],
     clear: [[T.DIRT, 146, 463, 147, 471], [T.DIRT, 156, 463, 156, 471]],     // alte Stege endeten im Sumpf
     streets: [[T.ROAD, 147, 431, 148, 476], [T.ROAD, 149, 436, 150, 437], [T.ROAD, 132, 450, 174, 450], [T.ROAD, 132, 463, 174, 464],
@@ -320,7 +334,7 @@ export const TOWN_PLAN = {
       ['lantern', 146, 449], ['lantern', 163, 449], ['laundry', 138, 446], ['net_rack', 149, 462]],
   },
   kreuzweg: {                                                     // Marktflecken an der Kreuzung: Söldner, Rast, Handel
-    area: [225, 230, 277, 271], old: [240, 240, 261, 257], square: [250, 261],
+    area: [225, 230, 277, 271], old: [240, 240, 261, 257], square: [250, 261], spread: { s: 1.35, a: [249, 250] }, perHead: 90,
     streets: [[T.ROAD, 248, 236, 249, 249], [T.ROAD, 225, 250, 277, 250],
       [T.DIRT, 230, 247, 230, 249], [T.DIRT, 236, 247, 236, 249], [T.DIRT, 232, 239, 239, 240], [T.DIRT, 238, 241, 239, 249],
       [T.DIRT, 266, 248, 266, 249], [T.DIRT, 273, 248, 273, 249], [T.DIRT, 265, 239, 274, 240], [T.DIRT, 269, 241, 269, 249],
@@ -338,7 +352,8 @@ export const TOWN_PLAN = {
       ['lantern', 247, 257], ['lantern', 240, 249], ['lantern', 261, 249], ['hay', 234, 261]],
   },
   ashford: {                                                      // Grenzposten: Kernburg, Vorstadt hinter Palisaden, Karawanenhof
-    area: [357, 83, 395, 109], old: [372, 84, 387, 99], square: [379, 94], oldWalls: true,
+    area: [357, 83, 395, 109], old: [372, 84, 387, 99], square: [379, 94], oldWalls: true, spread: { s: 1.5, a: [380, 92] }, perHead: 100,
+    oldFloor: T.DIRT, coreWalls: [372, 84, 387, 99],
     clear: [[T.DIRT, 380, 84, 380, 84], [T.DIRT, 372, 92, 372, 93], [T.DIRT, 378, 99, 381, 99]],       // Nordtor (die Oststraße endete an der Mauer), Westtor
     fill: [[T.DIRT, 358, 84, 371, 99, 'ragged'], [T.DIRT, 364, 101, 394, 108, 'ragged']],
     palisade: { rect: [357, 83, 371, 100], sides: 'NWS', gates: [[357, 92, 357, 93]] },
@@ -347,9 +362,13 @@ export const TOWN_PLAN = {
       ['stable', 368, 104, 6, 5, 'N'], ['house', 384, 104, 5, 4, 'N'], ['cottage', 390, 104, 4, 4, 'N', 2]],
     props: [['trough', 375, 104], ['hay', 366, 106], ['cart', 381, 105], ['crate', 358, 94, { label: 'Handelsware' }], ['barrel', 358, 91, { label: 'Wasserfass' }],
       ['anvil', 365, 91, { label: 'Amboss' }], ['lantern', 379, 97], ['lantern', 370, 91], ['lantern', 377, 101]],
+    grow: { houses: [['house', 371, 96, 5, 4, 'N'], ['store', 384, 96, 6, 5, 'N'], ['house', 375, 110, 5, 4, 'N']],
+      gardens: [[350, 82, 354, 84]],
+      props: [['crate', 390, 95, { label: 'Handelsware' }], ['barrel', 389, 95, { label: 'Wasserfass' }]] },
   },
   sonnwacht: {                                                    // Ordensfeste: Kernburg mit Komturei, Unterstadt der Pilger
-    area: [435, 245, 476, 290], old: [446, 246, 465, 265], square: [455, 277], oldWalls: true,
+    area: [435, 245, 476, 290], old: [446, 246, 465, 265], square: [455, 277], oldWalls: true, spread: { s: 1.3, a: [455, 250] }, perHead: 85,   // y 250: Westtor auf der Mittellandstraße
+    oldFloor: T.STONE, coreWalls: [446, 246, 465, 265],
     clear: [[T.STONE, 446, 250, 446, 251], [T.STONE, 453, 265, 458, 265]],                       // Westtor zur Mittellandstraße
     fill: [[T.DIRT, 436, 266, 476, 289, 'ragged']],
     streets: [[T.ROAD, 455, 266, 456, 289], [T.ROAD, 436, 276, 476, 277], [T.DIRT, 450, 282, 454, 283]],
@@ -362,6 +381,53 @@ export const TOWN_PLAN = {
       ['hay', 453, 286], ['trough', 444, 283], ['laundry', 443, 273], ['torch', 445, 249], ['torch', 445, 252]],
   },
 };
+// ---------------- Streckung (Session 4, Nutzerwunsch: Städte zu klein und zu voll) ----------------
+// Die Pläne oben bleiben in Entwurfskoordinaten (so wurden sie gestaltet und so lesen sie sich). spread = { s, a }:
+// alle Abstände wachsen um den Faktor s um den Anker a, Häuser behalten ihre Größe. Folge: Gassen werden Wege,
+// zwischen den Häusern entsteht Hof, Garten, Grün — die Anordnung (Straße, Platz, Tor) bleibt die gestaltete.
+// Der Anker liegt auf der Durchgangsstraße bzw. am Kai/Fluss, damit Straßen außerhalb anschließen und die
+// Stadt nicht über Fluss/Küste wächst. Häuser werden an der Türseite verankert: die Tür bleibt an ihrer Straße.
+const spS = (P, ax) => Array.isArray(P.spread.s) ? P.spread.s[ax] : P.spread.s;   // s: Faktor oder [sx, sy]
+const sp = (P, v, ax) => P.spread.a[ax] + (v - P.spread.a[ax]) * spS(P, ax);
+const spR = (P, v, ax) => Math.round(sp(P, v, ax));
+const spRect = (P, [x0, y0, x1, y1, ...rest]) => [spR(P, x0, 0), spR(P, y0, 1), spR(P, x1 + 1, 0) - 1, spR(P, y1 + 1, 1) - 1, ...rest];
+export function spreadHouse(P, x, y, w, h, door) {
+  const nx = door === 'W' ? spR(P, x, 0) : door === 'E' ? spR(P, x + w, 0) - w : Math.round(sp(P, x + w / 2, 0) - w / 2);
+  const ny = door === 'N' ? spR(P, y, 1) : door === 'S' ? spR(P, y + h, 1) - h : Math.round(sp(P, y + h / 2, 1) - h / 2);
+  return [nx, ny];
+}
+// Entwurfspunkt → Weltkachel. Außerhalb jeder Siedlung unverändert. Für alle festen Stadtkoordinaten in game.js/sim.js
+// (Wachposten, Arbeitsplätze, Karawanenroute, Startpunkt).
+export function townPt(x, y) {
+  for (const P of Object.values(TOWN_PLAN)) { const [x0, y0, x1, y1] = P.design.area;
+    if (x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2) return [spR(P, x, 0), spR(P, y, 1)]; }
+  return [x, y];
+}
+for (const [key, P] of Object.entries(TOWN_PLAN)) {
+  P.design = { area: P.area.slice(), old: P.old.slice(), clear: (P.clear || []).map(r => r.slice()), houses: P.houses };
+  const R4 = ([t, ...r]) => [t, ...spRect(P, r)];
+  P.area = spRect(P, P.area); P.old = spRect(P, P.old); P.square = [spR(P, P.square[0], 0), spR(P, P.square[1], 1)];
+  for (const k of ['fill', 'clear', 'plazas', 'streets']) if (P[k]) P[k] = P[k].map(R4);
+  for (const r of P.streets) if (r[0] === T.ROAD) {                     // Hauptstraßen mindestens 3 breit — breiter als jede Gasse (§75)
+    const ax = r[3] - r[1] >= r[4] - r[2] ? 2 : 1, w = r[ax + 2] - r[ax] + 1;       // quer zur Laufrichtung
+    if (Math.max(r[3] - r[1], r[4] - r[2]) >= 10 && w < 3) { r[ax] -= (3 - w) >> 1; r[ax + 2] += (3 - w + 1) >> 1; }
+  }
+  if (P.fields) P.fields = P.fields.map(r => spRect(P, r));
+  if (P.coreWalls) P.coreWalls = spRect(P, P.coreWalls);
+  for (const k of ['walls', 'palisade']) if (P[k]) P[k] = { ...P[k], rect: spRect(P, P[k].rect), gates: P[k].gates.map(g => spRect(P, g)) };
+  if (P.harbor) { const H = P.harbor;
+    P.harbor = { x0: spR(P, H.x0, 0), x1: spR(P, H.x1 + 1, 0) - 1, top: spR(P, H.top, 1), piers: H.piers.map(x => spR(P, x, 0)), boats: H.boats.map(([x, d]) => [spR(P, x, 0), d]) }; }
+  P.houses = P.houses.map(([type, x, y, w, h, door, wear]) => [type, ...spreadHouse(P, x, y, w, h, door), w, h, door, wear, 'h' + x + '_' + y, x, y]);
+  P.props = (P.props || []).map(([kind, x, y, o]) => { const [nx, ny] = attachedPt(P, x, y); return [kind, nx, ny, o]; });
+  const L = LOCATIONS.find(l => l.key === key);
+  if (L) { [L.x, L.y] = [spR(P, L.x, 0), spR(P, L.y, 1)]; L.r = Math.round(L.r * Math.max(spS(P, 0), spS(P, 1))); }
+}
+// Props neben einem Haus (Schild an der Tür, Fässer vor der Schenke) ziehen mit dem Haus um; freie Props strecken.
+function attachedPt(P, x, y, extra = []) {
+  for (const [, hx, hy, w, h, door] of [...P.design.houses, ...extra])
+    if (x >= hx - 2 && x <= hx + w + 1 && y >= hy - 2 && y <= hy + h + 1) { const [nx, ny] = spreadHouse(P, hx, hy, w, h, door); return [x - hx + nx, y - hy + ny]; }
+  return [spR(P, x, 0), spR(P, y, 1)];
+}
 export function townAt(tx, ty, m = 0) {                    // m: Rand in Kacheln (z. B. Abstand für Gegner-Spawns)
   for (const k in TOWN_PLAN) { const [x0, y0, x1, y1] = TOWN_PLAN[k].area; if (tx >= x0 - m && tx <= x1 + m && ty >= y0 - m && ty <= y1 + m) return k; }
   return null;
@@ -369,35 +435,63 @@ export function townAt(tx, ty, m = 0) {                    // m: Rand in Kacheln
 const SOLID_PROP = new Set(['hay', 'boat', 'net_rack', 'trough', 'barrel', 'well', 'anvil', 'crate_stack', 'palisade_prop', 'fence']);
 const NATURE = new Set(['tree', 'bush', 'flowers_prop', 'rock_node', 'dead_tree']);   // darf zwischen den Häusern bleiben, wenn es nichts verstellt
 const NATURAL = new Set([T.GRASS, T.MARSH, T.SAND, T.FIELD, T.ASH, T.ROCK]);
+const naturalAt = (x, y) => protectedNW(x, y) ? T.GRASS : BIOME[biomeAt(x, y)];
+const PAVED = new Set([T.ROAD, T.STONE, T.PLANK]);
+const SCATTER = new Set(['camp_ruin', 'rubble', 'bones', 'debris', 'broken_pillar', 'gravestone', 'firepit', 'tent_prop', 'blood', 'broken_cart', 'bone_spire']);
+const TRAMPLE = new Set([T.GRASS, T.MARSH, T.SAND, T.ASH]);            // hier darf ein Trampelpfad entstehen
 function expandTowns(wild) {
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
-    const mark = props.length, claimed = new Set(), K = (x, y) => x + ',' + y;
+    const claimed = new Set(), street = new Set(), K = (x, y) => x + ',' + y;
     const inR = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
-    const inHouse = (x, y) => HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
+    const own = () => HOUSES.filter(b => b.map === 'world' && b.x <= P.area[2] + 2 && b.x + b.w >= P.area[0] - 2 && b.y <= P.area[3] + 2 && b.y + b.h >= P.area[1] - 2);
+    let near_h = own();
+    const inHouse = (x, y) => near_h.some(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
     const paint = (x, y, t) => { if (!inHouse(x, y)) setTile('world', x, y, t); claimed.add(K(x, y)); };
+    const pave = (x, y, t) => { paint(x, y, t); street.add(K(x, y)); };
     const box = (r, fn) => { for (let y = r[1]; y <= r[3]; y++) for (let x = r[0]; x <= r[2]; x++) fn(x, y); };
+
+    // 0) Umzug des alten Kerns (Streckung): Kernhäuser aus genWorld samt Möbeln abtragen, ihren Boden der Natur
+    //    zurückgeben; Kern-Props ziehen mit ihrem Haus um (Schild an der Tür bleibt an der Tür).
+    const core = [];
+    for (let i = HOUSES.length - 1; i >= 0; i--) { const b = HOUSES[i];
+      if (b.town === town && b.map === 'world') { core.push([b.type, b.x, b.y, b.w, b.h, b.door, b.wear]); HOUSES.splice(i, 1); } }
+    const coreIds = new Set(core.map(([, x, y]) => 'h' + x + '_' + y));
+    const moved = new Set();
+    let k0 = 0;
+    for (const p of props) {
+      if (coreIds.has(p.house)) continue;                               // Möbel entstehen im neuen Haus neu
+      const tx = p.x / TS | 0, ty = p.y / TS | 0;
+      if ((p.map || 'world') === 'world' && inR(P.design.old, tx, ty) && !NATURE.has(p.type) && !wild.has(p)) {
+        if (p.type === 'fence' || p.type === 'scarecrow') continue;      // Kernfeld: Zaun und Scheuche setzt der Plan neu
+        const [nx, ny] = attachedPt(P, tx, ty, core); p.x = nx * TS + TS / 2; p.y = ny * TS + TS / 2; moved.add(p);
+      }
+      props[k0++] = p;
+    }
+    props.length = k0;
+    near_h = own();
+    for (const r of [P.design.old, ...P.design.clear.map(c => c.slice(1))]) box(r, (x, y) => { if (tileAt('world', x, y) !== T.WATER) setTile('world', x, y, naturalAt(x, y)); });
+    const houses = [...core.map(([type, x, y, w, h, door, wear]) => [type, ...spreadHouse(P, x, y, w, h, door), w, h, door, wear, 'h' + x + '_' + y, x, y]), ...P.houses,
+      ...(P.grow?.houses || []).map(([type, x, y, w, h, door, wear]) => [type, x, y, w, h, door, wear, 'g' + x + '_' + y, x, y])];
+    const mark = props.length;
+
     for (const [t, ...r] of P.fill || []) box(r, (x, y) => {          // Grund: Pflaster bzw. festgetretene Erde; Ränder ausgefranst
       const edge = x - r[0] < 1 || r[2] - x < 1 || y - r[1] < 1 || r[3] - y < 1;
       if (tileAt('world', x, y) === T.ROAD || inHouse(x, y) || (r[4] === 'ragged' && edge && nz(x, y) > 0.5)) return;
       setTile('world', x, y, t);
     });
-    box(P.old, (x, y) => {                                              // später gewürfelte Felsen im alten Kern: Boden bzw. Mauer
-      if (tileAt('world', x, y) !== T.ROCK || inHouse(x, y)) return;
-      const rim = x === P.old[0] || x === P.old[2] || y === P.old[1] || y === P.old[3];
-      setTile('world', x, y, P.oldWalls && rim ? T.WALL : T.DIRT);
+    box(P.old, (x, y) => {                                              // Boden des (gestreckten) Kerns; Felsen dort sind Reste
+      const t = tileAt('world', x, y);
+      if (P.oldFloor != null ? t !== T.WATER && t !== T.ROAD : t === T.ROCK) setTile('world', x, y, P.oldFloor ?? T.DIRT);
     });
-    for (const [t, ...r] of P.clear || []) box(r, (x, y) => paint(x, y, t));
-    for (const b of HOUSES) if (b.town === town) box([b.x, b.y, b.x + b.w - 1, b.y + b.h - 1], (x, y) => {   // … und in seinen Häusern
-      if (tileAt('world', x, y) !== T.ROCK) return;
-      const edge = x === b.x || y === b.y || x === b.x + b.w - 1 || y === b.y + b.h - 1, door = x === b.doorTile[0] && y === b.doorTile[1];
-      setTile('world', x, y, edge && !door ? T.WALL : T.PLANK);
-    });
+    if (P.coreWalls) { const [x0, y0, x1, y1] = P.coreWalls;             // Kernburg: Ringmauer (Tore öffnet clear)
+      box(P.coreWalls, (x, y) => { if (x === x0 || x === x1 || y === y0 || y === y1) paint(x, y, T.WALL); }); }
+    for (const [t, ...r] of P.clear || []) box(r, (x, y) => pave(x, y, t));
     if (P.walls) { const [x0, y0, x1, y1] = P.walls.rect, gate = (x, y) => P.walls.gates.some(g => inR(g, x, y));
-      box(P.walls.rect, (x, y) => { if (x === x0 || x === x1 || y === y0 || y === y1) paint(x, y, gate(x, y) ? T.ROAD : T.WALL); }); }
-    for (const [t, ...r] of P.plazas || []) box(r, (x, y) => paint(x, y, t));
-    for (const [t, ...r] of P.streets || []) box(r, (x, y) => { if (tileAt('world', x, y) !== T.ROAD) paint(x, y, t); else claimed.add(K(x, y)); });
+      box(P.walls.rect, (x, y) => { if (x === x0 || x === x1 || y === y0 || y === y1) (gate(x, y) ? pave : paint)(x, y, gate(x, y) ? T.ROAD : T.WALL); }); }
+    for (const [t, ...r] of P.plazas || []) box(r, (x, y) => pave(x, y, t));
+    for (const [t, ...r] of P.streets || []) box(r, (x, y) => { if (tileAt('world', x, y) !== T.ROAD) pave(x, y, t); else { claimed.add(K(x, y)); street.add(K(x, y)); } });
     if (P.harbor) { const H = P.harbor;                                // Kai bis ans Wasser, Stege hinaus, Boote daneben
-      for (let x = H.x0; x <= H.x1; x++) for (let y = H.top; y < seaLine(x); y++) paint(x, y, T.STONE);
+      for (let x = H.x0; x <= H.x1; x++) for (let y = H.top; y < seaLine(x); y++) pave(x, y, T.STONE);
       for (const px of H.piers) for (let x = px; x <= px + 1; x++) for (let y = H.top; y <= seaLine(x) + 7; y++) paint(x, y, T.PLANK);
       for (const [bx, dy] of H.boats) prop('boat', bx, seaLine(bx) + dy, { solid: true, r: 14, label: 'Fischerboot' });
     }
@@ -406,13 +500,15 @@ function expandTowns(wild) {
       for (let x = r[0]; x <= r[2]; x++) { prop('fence', x, r[3] + 1, { solid: true }); claimed.add(K(x, r[3] + 1)); }
       prop('scarecrow', (r[0] + r[2]) >> 1, (r[1] + r[3]) >> 1);
     }
-    for (const [type, x, y, w, h, door, wear] of P.houses) {         // wear (optional): bewusst gesetzte Ruine
+    for (const r of P.grow?.gardens || []) box(r, (x, y) => { if (!street.has(K(x, y))) paint(x, y, T.FIELD); });   // Gemüsebeete im Hof
+    for (const [type, x, y, w, h, door, wear, id, hx, hy] of houses) {  // wear (optional): bewusst gesetzte Ruine
       box([x - 1, y - 1, x + w, y + h], (i, j) => {                     // Hofrand: Erde statt Gras, Ecken ausgefranst
         const corner = (i === x - 1 || i === x + w) && (j === y - 1 || j === y + h);
         if (!(corner && nz(i, j) > 0.5) && NATURAL.has(tileAt('world', i, j)) && !inHouse(i, j)) setTile('world', i, j, T.DIRT);
         claimed.add(K(i, j));
       });
-      house('world', x, y, w, h, door, { type, town, wear });
+      house('world', x, y, w, h, door, { type, town, wear, id, hx, hy });
+      near_h = own();
     }
     if (P.palisade) { const [x0, y0, x1, y1] = P.palisade.rect, gate = (x, y) => P.palisade.gates.some(g => inR(g, x, y));
       box(P.palisade.rect, (x, y) => {
@@ -420,7 +516,62 @@ function expandTowns(wild) {
         if (side && !gate(x, y)) { prop('palisade_prop', x, y, { solid: true, r: 14 }); claimed.add(K(x, y)); }
       });
     }
-    for (const [kind, x, y, o = {}] of P.props || []) prop(kind, x, y, { solid: SOLID_PROP.has(kind), r: SOLID_PROP.has(kind) ? 10 : 12, ...o });
+    for (const [kind, x, y, o = {}] of [...P.props || [], ...P.grow?.props || []]) prop(kind, x, y, { solid: SOLID_PROP.has(kind), r: SOLID_PROP.has(kind) ? 10 : 12, ...o });
+
+    // Türachsen (Tür, davor, dahinter) bleiben frei: umgezogene oder gestreckte Props, die dort landen, rücken zur Seite
+    const doorAxis = new Set();
+    for (const b of near_h) { const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
+      for (const [x, y] of [[dx, dy], [dx + sx, dy + sy], [dx - sx, dy - sy]]) doorAxis.add(K(x, y)); }
+    const solidAt = new Set();
+    for (const p of props) if (p.solid && (p.map || 'world') === 'world' && !NATURE.has(p.type)) solidAt.add(K(p.x / TS | 0, p.y / TS | 0));
+    const bad = (x, y) => doorAxis.has(K(x, y)) || inHouse(x, y) || SOLID.has(tileAt('world', x, y)) || tileAt('world', x, y) === T.ROAD;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i]; if ((p.map || 'world') !== 'world' || p.house || NATURE.has(p.type) || p.type === 'boat' || p.type === 'palisade_prop' || p.type === 'fence') continue;
+      const tx = p.x / TS | 0, ty = p.y / TS | 0;
+      if (!inR(P.area, tx, ty) || !(i >= mark || moved.has(p)) || !bad(tx, ty)) continue;
+      if (!doorAxis.has(K(tx, ty)) && !inHouse(tx, ty) && tileAt('world', tx, ty) === T.ROAD && i >= mark) continue;   // Planprops auf der Straße sind gewollt (Stände)
+      for (let r = 1, done = false; r <= 3 && !done; r++) for (let j = -r; j <= r && !done; j++) for (let q = -r; q <= r && !done; q++) {
+        const x = tx + q, y = ty + j;
+        if (bad(x, y) || solidAt.has(K(x, y)) || street.has(K(x, y))) continue;
+        if (p.solid) { solidAt.delete(K(tx, ty)); solidAt.add(K(x, y)); }
+        p.x = x * TS + TS / 2; p.y = y * TS + TS / 2; done = true;
+      }
+    }
+
+    // Anschluss: Straßenstücke der Welt, die jetzt ins Leere laufen (der Kern ist umgezogen), führen zur nächsten
+    // Stadtstraße; jede Haustür bekommt einen Trampelpfad zum Pflaster. Breitensuche, nie durch Haus, Mauer, Möbel.
+    const [ax0, ay0, ax1, ay1] = P.area, M = 4;
+    const walk = (x, y) => x >= ax0 - M && x <= ax1 + M && y >= ay0 - M && y <= ay1 + M && !SOLID.has(tileAt('world', x, y)) && !inHouse(x, y) && !solidAt.has(K(x, y)) && tileAt('world', x, y) !== T.FIELD;
+    const net = new Set(), q0 = [...street].map(s => s.split(',').map(Number));
+    while (q0.length) { const [x, y] = q0.pop(), k = K(x, y);             // Straßennetz der Stadt: alles Pflaster, das an ihren Straßen hängt
+      if (net.has(k) || !walk(x, y) || !(PAVED.has(tileAt('world', x, y)) || street.has(k))) continue;
+      net.add(k); q0.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+    const route = (from, maxLen) => {                                  // kürzester Weg zum Netz, als Kachelliste
+      const prev = new Map([[K(...from), null]]), q = [from];
+      for (let h = 0; h < q.length; h++) { const [x, y] = q[h], k = K(x, y);
+        if (net.has(k)) { const path = []; for (let c = k; c; c = prev.get(c)) path.push(c.split(',').map(Number)); return path.length <= maxLen ? path : null; }
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) { const nk = K(nx, ny);
+          if (!prev.has(nk) && walk(nx, ny)) { prev.set(nk, k); q.push([nx, ny]); } } }
+      return null;
+    };
+    const seen = new Set();
+    for (let y = ay0 - 1; y <= ay1 + 1; y++) for (let x = ax0 - 1; x <= ax1 + 1; x++) {
+      if (tileAt('world', x, y) !== T.ROAD || net.has(K(x, y)) || seen.has(K(x, y))) continue;
+      const comp = [], q = [[x, y]];                                     // zusammenhängendes, abgehängtes Straßenstück
+      while (q.length) { const [cx, cy] = q.pop(), k = K(cx, cy);
+        if (seen.has(k) || tileAt('world', cx, cy) !== T.ROAD || net.has(k)) continue;
+        seen.add(k); comp.push([cx, cy]); q.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]); }
+      if (comp.length < 4) { for (const [cx, cy] of comp) if (!street.has(K(cx, cy))) setTile('world', cx, cy, naturalAt(cx, cy)); continue; }   // Stummel
+      const ends = comp.filter(([cx, cy]) => inR(P.area, cx, cy)).sort((a, b) => Math.hypot(a[0] - P.square[0], a[1] - P.square[1]) - Math.hypot(b[0] - P.square[0], b[1] - P.square[1]));
+      const path = route(ends[0] || comp[0], 80);
+      if (path) for (const [px, py] of path) { if (!PAVED.has(tileAt('world', px, py))) setTile('world', px, py, T.ROAD); claimed.add(K(px, py)); net.add(K(px, py)); }
+    }
+    for (const b of near_h) { if (b.town !== town || wearOf(b) === 2) continue;   // Trampelpfade (verlassene Häuser: zugewachsen)
+      const [dx, dy] = b.doorTile, sx = b.door === 'W' ? -1 : b.door === 'E' ? 1 : 0, sy = b.door === 'S' ? 1 : b.door === 'N' ? -1 : 0;
+      const path = route([dx + sx, dy + sy], 16); if (!path) continue;
+      for (const [px, py] of path) { if (TRAMPLE.has(tileAt('world', px, py))) setTile('world', px, py, T.DIRT); claimed.add(K(px, py)); }
+    }
+
     // Aufräumen: Streugut der Wildnis (Lager, Verstecke, Geröll, fremde Szenen) hat in einer Siedlung keinen Grund;
     // Bäume, Büsche, Felsen bleiben, wo sie nichts verstellen; Gebautes (Wegschrein, Schilder) nur nicht auf Straße/Hof.
     const near = (x, y) => { for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (claimed.has(K(x + i, y + j))) return true; return false; };
@@ -428,8 +579,9 @@ function expandTowns(wild) {
     for (let i = 0; i < props.length; i++) {
       const p = props[i], tx = p.x / TS | 0, ty = p.y / TS | 0;
       let drop = false;
-      if (i < mark && (p.map || 'world') === 'world' && inR(P.area, tx, ty))
-        drop = (inHouse(tx, ty) && !p.house) || (NATURE.has(p.type) ? tileAt('world', tx, ty) !== T.GRASS || near(tx, ty) : wild.has(p) || claimed.has(K(tx, ty)));
+      if (i < mark && !moved.has(p) && (p.map || 'world') === 'world' && inR(P.area, tx, ty))
+        drop = (inHouse(tx, ty) && !p.house) || (NATURE.has(p.type) ? tileAt('world', tx, ty) !== T.GRASS || near(tx, ty)
+          : wild.has(p) || claimed.has(K(tx, ty)) || (SCATTER.has(p.type) && !p.house));   // Straßenszenen, die die Streckung jetzt einschließt
       if (!drop) props[w++] = p;
     }
     props.length = w;
@@ -439,7 +591,7 @@ function expandTowns(wild) {
 
 // ---------------- Oberwelt ----------------
 export function genWorld() {
-  props.length = 0; HOUSES.length = 0;
+  props.length = 0; HOUSES.length = 0; townsBuilt = false;
   seedRng(S.seed);
   const w = 512, h = 512, tiles = new Uint8Array(w * h).fill(T.GRASS);
   MAPS.world = { w, h, tiles };
@@ -700,7 +852,7 @@ export function genWorld() {
   // Nekropole: großes Gräberfeld
   rect('world', 396, 430, 20, 16, T.ASH);
   for (let i = 0; i < 30; i++) prop('gravestone', ri(397, 415), ri(431, 445));
-  prop('crypt', 404, 437, { solid:true, label:'Große Nekropole' });
+  prop('crypt', 404, 437, { solid:true, label:'Große Nekropole', rite:'urn' });   // Gruft der Ahnenurne (Pakt der Stillen Schar)
   prop('obelisk', 400, 433, { solid:true });
 
   // Die Schwarze Feste: Thron der Stillen Schar
@@ -752,11 +904,27 @@ export function genWorld() {
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
   expandTowns(new Set(props.slice(handMark)));             // zuletzt und ohne rnd(): Zufallsfolge oben bleibt stabil
+  pactScenes();
+  townsBuilt = true;
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
   const noTree = new Set([T.DIRT, T.ROAD, T.PLANK, T.FIELD, T.WATER, T.WALL, T.DWALL, T.ROCK, T.DFLOOR]);
   return props.filter(p => p.type !== 'tree' || !noTree.has(tileAt('world', p.x / TS | 0, p.y / TS | 0)));
+}
+
+// ---------------- Totenreich: Orte des Paktes (Session 4) ----------------
+// Die leeren Flächen um Alt-Vharn und den Nekromanten-Turm bekommen, was die Questkette dort braucht: Ysras Ahnenaltar
+// mit Namenssteinen, Vhals Schattenkreis. Ohne rnd() und nach allem anderen; pactScene markiert sie für die Migration.
+export function pactScenes() {
+  const P = (t, x, y, o = {}) => prop(t, x, y, { pactScene: true, ...o });
+  // Ahnenaltar vor der Gruft von Alt-Vharn: Ysra hält hier die Namen der Toten
+  P('obelisk', 357, 384, { solid: true, r: 10, label: 'Ahnenaltar' }); P('candles', 356, 385, { r: 6 }); P('candles', 358, 385, { r: 6 });
+  for (let i = 0; i < 5; i++) P('gravestone', 362 + i, 387, { label: 'Namensstein' });
+  P('bones', 355, 383, { r: 6 }); P('torch', 354, 384); P('torch', 368, 384);
+  // Schattenkreis am Nekromanten-Turm: Vhal flüstert aus dem Obelisken
+  for (const [dx, dy] of [[-3, 1], [3, 1], [-2, 4], [2, 4], [0, 5]]) P('standing_stone', 392 + dx, 348 + dy, { solid: true, r: 8, label: 'Schattenstein' });
+  P('candles', 391, 352, { r: 6 }); P('candles', 393, 352, { r: 6 }); P('blood', 393, 354, { r: 4 });
 }
 
 // ---------------- Grube (Dungeon) ----------------

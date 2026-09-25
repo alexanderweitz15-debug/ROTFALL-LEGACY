@@ -143,9 +143,11 @@ export function monsterSpec(e, m) {
     s.hood = t === 'bandit' ? '#2e241a' : '#2f3a24'; s.cloak = t === 'bandit' ? '#261e16' : '#26301d';
     s.scarf = t === 'bandit' ? '#7a2a20' : ''; s.armor = 'leather'; s.armorCol = '#4a3525';
     if (t === 'bandit_archer') s.quiver = 1;
-  } else if (t === 'skeleton') {
-    s.sp = 'skeleton'; s.skin = '#cfc8b4'; s.hooded = 1; s.hood = '#20252a'; s.cloak = '#191c20'; s.cloth = '#22252a';
-    s.face = 'skull'; s.glow = p.glow || '#4e8f7a'; s.boots = ''; s.pants = '#22252a';
+  } else if (t === 'skeleton' || t === 'crypt_warden') {
+    s.sp = 'skeleton'; s.skin = p.skin || '#cfc8b4'; s.hooded = 1; s.hood = '#20252a'; s.cloak = '#191c20'; s.cloth = '#22252a';
+    s.face = 'skull'; s.glow = e.glow || p.glow || '#4e8f7a'; s.boots = ''; s.pants = '#22252a';   // e.glow: Diener eines Nekromanten
+    if (t === 'crypt_warden') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#4a4f55'; s.armor = 'plate'; s.armorCol = '#3d4247'; s.tabard = '#1c1f24';
+      s.mark = 'chevron'; s.markCol = '#7fd0b8'; s.shield = 'heater'; s.shieldCol = '#262a2e'; }
   } else if (t === 'valen_soldier') {
     s.armor = 'chain'; s.armorCol = '#8a8f98'; s.helm = 'great'; s.helmCol = '#9aa3b0'; s.crest = '#39599c';
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';

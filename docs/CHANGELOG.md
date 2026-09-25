@@ -2,6 +2,53 @@
 
 Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund (Master-Prompt §2, Punkte 1–4).
 
+## Session 4 — 2026-09-25 · Siedlungsdichte (§75) und Titelklassen (§32/§78)
+
+Nutzerwunsch: „Klassen, die man später freischalten kann, wie Titel mit besonderen Fähigkeiten“ — Ressourcen und
+Fähigkeiten dieser Titelklassen neu strukturieren; Menschen und Häuser deutlich weiter auseinander, Einwohner je nach Größe.
+
+### Siedlungen (world.js, game.js, sim.js, ui.js)
+- Streckung je Stadt (`spread`, `spreadHouse`, `townPt`): Entwurfskoordinaten bleiben, Abstände wachsen um 1,2–1,5,
+  Häuser an der Türseite verankert. Fläche aller Siedlungen 10 651 → 19 322 Kacheln; Mindestabstand 0–1 → 2 Kacheln.
+- **Refactoring nach §2, Punkt 1** (blockiert die geforderte Erweiterung): Der alte Stadtkern war in `genWorld` fest
+  verdrahtet und ließ sich nicht verschieben, ohne die Zufallsfolge (und damit alte Welten) zu ändern. Er bleibt dort
+  (Zufallsfolge stabil) und zieht in `expandTowns` um: Häuser/Möbel ab, Boden zurück zur Natur, Kern-Props wandern mit
+  ihrem Haus (`attachedPt`), Häuser neu an gestreckter Stelle (id und Aussehen aus dem Entwurf: `meta.id`, `hx/hy`).
+- Anschluss: abgehängte Straßenstücke per Breitensuche ans Stadtnetz; Trampelpfad von jeder Tür; Props auf Türachsen
+  rücken zur Seite; Hauptstraßen mindestens 3 Kacheln breit.
+- Nordfurt: Flächenpflaster entfernt (Markt gepflastert, Höfe, Gemüsebeete), +7 Häuser (`grow`, Weltkoordinaten);
+  Aschfurt +3 Häuser. Siedlungen übernehmen die Region ihres Ankers (Nordfurt lag halb im Gebirgsbiom).
+- Einwohner nach Fläche (`perHead`, `residentPlan`, `HOUSE_CAP`); Tagesziele verteilt (Platz, Nachbarn, eigenes Haus)
+  statt 5×3 Kacheln; Anzeige „Einwohner“ zählt echte Köpfe, jetzt in allen Städten (`townHeads`).
+- Entfernt: `spawnVillagers` (9 hauslose Zusatzdörfler in Eren, stammten aus der Zeit vor den Bewohnern — trieben die
+  Dichte hoch, ohne Zuhause).
+- Feste Koordinaten (Wachposten, Arbeitsplätze, Karawanenroute, Startpunkt, Erbe-Ankunft) laufen durch `townPt`;
+  Karawanen-Hinterhalt von x 92 (jetzt im Dorf) nach x 101; Route auf Brücke und Torstraße (der alte Endpunkt läge in
+  einem neuen Nordfurter Haus — Karawanen fahren ohne Kollision).
+- Migration `flags.gen4`: Stadt-Props und Bewohner neu, Truhen behalten ihren Inhalt (über Typ + Etikett), Wachen
+  beziehen die neuen Posten, wer in einer Mauer stünde, tritt heraus. Getestet mit einem Stand des alten Codes.
+- Performance (headless, 300 Frames): Update Nordfurt 0,7 → 0,9 ms, Eren 1,2 → 1,2 ms; Zeichnen unverändert.
+
+### Titelklassen (data.js, game.js, ui.js, sprites.js, world.js, style.css)
+- `TITLE_CLASSES` (Nekromant, Hexenmeister): eigene Ressource mit Regel, 3 Fähigkeiten, Passiv, Makel, Paktpreis,
+  Ruf, Merkmal, Ausschluss. Titelfähigkeiten in `ABILITIES` mit `title`/`cost`/`gain` statt Mana/Ausdauer.
+- Spiel: `unlockTitle`, `setTitleClass`, `tres/setTres`, `corrupt`, `titleTick`, `titleOnDeath`, `titleAbility`;
+  Diener (`servant`, Team Spieler, folgen, zerfallen nach 60 s, flüchtig), Fluch (`hexed`: +25 % Schaden, −30 %
+  Tempo), Knochenschild (Status mit `absorb`), Makel im Treffer- und Heilcode, Paktkosten in `recalc`.
+- Questkette „Der Pakt der Stillen Schar“: Morvath → Ysra (Alt-Vharn) → Ahnenurne aus der Nekropole (Wächter oder,
+  als Mitglied der Schar, freier Zugang) → Ysra (Nekromant) oder Vhal (Hexenmeister) → Ritual. Neue Figuren Ysra, Vhal;
+  neuer Gegner „Wächter der Nekropole“ (Sprite: Plattenpanzer, Großhelm, Grünlicht); Ortsszenen `pactScenes`.
+- Folgen: Orden verweigert Gespräche, Ordenswachen greifen ab Ruf −25 an, Stadtbewohner grüßen anders.
+- Hexenmeister aus dem Klassenbaum entfernt (war Lehrklasse bei Morvath). Migration alter Stände: → Magier + Titel.
+- Oberfläche: Ressourcenleiste im HUD (Essenz grün, Verderbnis violett), Titelfähigkeiten farbig in der Leiste,
+  Titelblock im Charakterbogen (Ressource, Passiv, Makel, Preis), Titel tragen/ablegen im Ausbildungsfenster.
+
+### Tests
+- Selbsttest 46 → 54: Siedlungsabstand/-bebauung, Einwohner nach Fläche, Karawanenroute frei, Titelklassen-Daten, Nekromant, Hexenmeister,
+  Pakt-Kette (Kampf/Überzeugung), Ordensreaktion. Gegenprobe: je ein Mechanismus ausgebaut → der zugehörige Test fällt.
+- Zufallsabhängiger Kampftest deterministisch gemacht (BUG-049). Grün auf 8 Seeds und auf einem migrierten alten Stand.
+- Durchgespielt über die Oberfläche (E, Dialogknöpfe, Tasten 1–3): beide Pfade bis zur Titelklasse.
+
 ## Session 3 — 2026-09-25 · Phase 5: Visual Style Revision, Phase 15: Tagesablauf benannter Figuren
 
 ### Phase 6 — Kampfgefühl & Animation

@@ -26,7 +26,7 @@ const ROOF_VAR = { thatch: ['#7a6238', '#71603a', '#826842', '#6a5834'], shingle
   slate: ['#4a525c', '#444b54', '#525860', '#4b4d57'], tile: ['#7c4432', '#88523a', '#6c3d30', '#7a4b37', '#8c5c42'] };
 const WALL_VAR = { timber: ['#b1a283', '#a8997b', '#b9ac90'], wood: ['#5d4632', '#534030', '#654d37'], stone: ['#6c665c', '#645f58', '#736b5f'],
   plaster: ['#a89a7e', '#b4a88d', '#a39177', '#aba390', '#b39a85'], palestone: ['#9b968a', '#a39d91', '#938e83'] };
-const varOf = (tab, kind, b, salt) => { const a = tab[kind]; return a[(hh(b.x, b.y, salt) * a.length) | 0]; };
+const varOf = (tab, kind, b, salt) => { const a = tab[kind]; return a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0]; };
 const BEAM = '#3e2e20', DOORW = '#4a3322', IRON = '#35332f';
 const SHUTTER = ['#4a5a3a', '#5a3a2a', '#3a4a5a', '#5a5030'];
 
@@ -67,12 +67,12 @@ const WEAR_BIAS = { eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48,
 const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store']);
 export function wearOf(b) {
   if (b.wear != null) return b.wear;
-  const bias = WEAR_BIAS[b.town] ?? 0.3, r = hh(b.x, b.y, 55);
+  const bias = WEAR_BIAS[b.town] ?? 0.3, r = hh(b.hx ?? b.x, b.hy ?? b.y, 55);
   return !KEEP.has(b.type) && r < bias * 0.45 ? 2 : r < bias ? 1 : 0;
 }
 // Stilvarianten je Haus (Würfel aus der Lage, stabil): Dachneigung, Gaube, Vordach, Steinsockel
-const styleOf = b => ({ pitch: 0.34 + hh(b.x, b.y, 61) * 0.17, dormer: b.w >= 5 && hh(b.x, b.y, 62) < 0.4,
-  awning: hh(b.x, b.y, 63) < 0.35, plinth: hh(b.x, b.y, 64) < 0.45 });
+const styleOf = b => ({ pitch: 0.34 + hh(b.hx ?? b.x, b.hy ?? b.y, 61) * 0.17, dormer: b.w >= 5 && hh(b.hx ?? b.x, b.hy ?? b.y, 62) < 0.4,
+  awning: hh(b.hx ?? b.x, b.hy ?? b.y, 63) < 0.35, plinth: hh(b.hx ?? b.x, b.hy ?? b.y, 64) < 0.45 });
 
 // Wandhöhe FH: höher als eine Figur (25 Texel inkl. Kopf ≈ Tür 16). Firsthöhe RISE wächst mit der Tiefe.
 export function houseDims(b) { const T = BTYPES[b.type] || {}, RISE = 10 + b.h * 2, FH = T.floors === 2 ? 36 : b.big || T.big ? 24 : 21; return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
@@ -86,7 +86,7 @@ export function gableOf(b) {
 // Schornstein-Mündung in Texeln (für Rauch im Renderer) oder null. Gleiche Würfel wie beim Zeichnen.
 export function chimneyOf(b) {
   const T = BTYPES[b.type] || BTYPES.house, { RISE, FH, W } = houseDims(b);
-  const on = T.forge || (T.chimney && (T.chimney >= 1 || hh(b.x, b.y, 7 + 'chimney'.length) < T.chimney));
+  const on = T.forge || (T.chimney && (T.chimney >= 1 || hh(b.hx ?? b.x, b.hy ?? b.y, 7 + 'chimney'.length) < T.chimney));
   if (!on || wearOf(b) === 2) return null;                           // verlassen: Schornstein eingestürzt, kein Rauch
   const G = gableOf(b), side = hh(4, 4, b.seed || 1) > 0.5 ? 1 : -1;
   return { x: Math.round(G.cx + side * G.halfW * 0.5) + 1, y: Math.max(2, G.apexY - 14) - 2, soot: !!T.forge };
@@ -102,7 +102,7 @@ export function houseSprite(b, lit) {
   const n = (x, y) => hh(x, y, s);
   const yF = RISE + b.h * 16 - FH, yB = RISE + b.h * 16;           // Fassade oben / Grundlinie
   const fx0 = OV, fx1 = OV + b.w * 16 - 1;                           // Fassade links/rechts
-  const has = k => T[k] && (T[k] >= 1 || hh(b.x, b.y, 7 + k.length) < T[k]);
+  const has = k => T[k] && (T[k] >= 1 || hh(b.hx ?? b.x, b.hy ?? b.y, 7 + k.length) < T[k]);
 
   // ---- Fassade ----
   const Wr = ramp(mix(varOf(WALL_VAR, wallKind, b, 93), '#806a50', (n(3, 3) - 0.5) * 0.18)), Br = ramp(BEAM);

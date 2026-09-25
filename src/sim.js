@@ -1,7 +1,7 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js';
 import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js';
-import { LOCATIONS, TS } from './world.js';
+import { LOCATIONS, TS, townPt } from './world.js';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -64,7 +64,7 @@ function economyDay() {
 }
 
 // ---------------- Karawanen ----------------
-const ROUTE = [[62, 65], [100, 65], [119, 64], [119, 60]];
+export const ROUTE = [[62, 65], [100, 65], [106, 63], [112, 63], [119, 64], [129, 64], [129, 61]].map(([x, y]) => townPt(x, y));   // Entwurf → gestreckte Städte; Ziel auf der Nordfurter Torstraße (Karawanen fahren ohne Kollision)
 function spawnCaravan() {
   const [tx, ty] = ROUTE[0];
   const c = { id: uid(), kind:'caravan', map:'world', name:'Händlerkarawane', faction:'merch', x: tx * TS, y: ty * TS,
@@ -89,7 +89,7 @@ export function caravanFrame(c, dt, player, nearFoes) {
   else if (c.wp < ROUTE.length - 1) c.wp++;
   else arrive(c, player);
   // Hinterhalt auf halber Strecke
-  if (!c.ambushChecked && Math.abs(c.x / TS - 92) < 2) {
+  if (!c.ambushChecked && Math.abs(c.x / TS - 101) < 2) {            // zwischen Eren (bis x 93) und der Nordfurter Brücke
     c.ambushChecked = true;
     if (chance(0.35)) {
       if (Math.hypot(player.x - c.x, player.y - c.y) < 700 && player.map === 'world') {

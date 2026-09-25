@@ -428,6 +428,9 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .bar-fill.hp{background:linear-gradient(180deg,#d0553f 0 2px,#a3342a 2px 7px,#6d1c15 7px)}
 .bar-fill.sta{background:linear-gradient(180deg,#c4ae52 0 2px,#8e7c33 2px 7px,#5d5220 7px)}
 .bar-fill.mana{background:linear-gradient(180deg,#5a9ac0 0 2px,#336a8c 2px 7px,#23425a 7px)}
+.bar-fill.essence{background:linear-gradient(180deg,#a6e3c3 0 2px,#5f9e82 2px 7px,#355f4e 7px)}
+.bar-fill.corruption{background:linear-gradient(180deg,#c49ae8 0 2px,#7d4fa8 2px 7px,#4a2c66 7px)}
+.slot.title-ab{box-shadow:inset 0 0 0 1px rgba(160,140,200,.35)}
 .bar-fill.xp{background:linear-gradient(180deg,#b09a52 0 2px,#7a6a33 2px 7px,#4a3f1d 7px)}
 .bar-track::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(0,0,0,.45) 9px 10px)}

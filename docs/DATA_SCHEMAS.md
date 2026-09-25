@@ -97,3 +97,26 @@ eren: { area: [x0,y0,x1,y1], old: [...], square: [x,y],        // Rechtecke inkl
 Neue Gebäudetypen: cottage, manor (`floors: 2`), bakery (`oven`), barn (`barnDoor`, `hay`), stable (`stalls`),
 store (`crane`), fisher (`nets`). Weitere Merkmale: `noWin`, `fewWin`, `patch`, `wall` (Material erzwingen).
 Bewohner (Laufzeit): `homeId`, `homeTown`, `anchor` (Nacht, im Haus), `schedulePos` (Tag), `eve` (Abend).
+
+## Siedlungsplan (`TOWN_PLAN`) — Ergänzungen Session 4
+```js
+eren: { area, old, square,                       // Entwurfskoordinaten; werden beim Laden des Moduls gestreckt
+  spread: { s: [1.2, 1.35] /* oder Zahl */, a: [58, 64] /* Anker */ },
+  perHead: 95,                                   // Kacheln Siedlungsfläche je Kopf (Bewohner + Wachen + Figuren mit Namen)
+  oldFloor?: T.DIRT, coreWalls?: [x0, y0, x1, y1], // Kernburg: Boden und Ringmauer des alten Kerns
+  grow?: { houses: [[type, x, y, w, h, door]], gardens: [[x0, y0, x1, y1]], props: [[kind, x, y, opts]] },   // WELTkoordinaten
+  design: { area, old, clear, houses }           // (Laufzeit) Entwurf, für townPt und den Umzug des Kerns
+}
+townPt(x, y)  → [wx, wy]   // Entwurfspunkt → Weltkachel (Wachposten, NPC-Orte, Karawane, Start)
+```
+
+## Titelklasse (`TITLE_CLASSES`) — Session 4
+```js
+necromancer: { name, title /* Namenszusatz */, glow /* Merkmal */, faction, excludes: ['warlock'], reversible: false, desc,
+  resource: { key: 'essence', name, max: 6, start: 0, css, rule /* woher sie kommt, Pflicht */ },
+  abilities: ['raise_dead', 'bone_ward', 'soul_harvest'],   // ABILITIES[k].title === 'necromancer'
+  passive: { name, desc }, flaw: { name, desc }, cost: { desc, hpMul?, stamina? }, rep: { undead: 20, order: -30 }, unlock }
+// ABILITIES: { name, title, cd, cost: n | 'all', min?, gain? }   — nie mana/stam
+```
+Spieler-Laufzeitfelder: `titleClasses` (erworben), `titleClass` (getragen oder null), `tres` ({ essence, corruption }),
+`pactCost` ({ hpMul, stamina }), `pal.glow`. Diener: Gegner mit `servant` (Herr-id), `until`, `glow`, `transient`.

@@ -303,6 +303,54 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
 ### BUG-038 — Lose Felsbrocken waren einfarbige Vielecke (Platzhalter)
 - Lösung: 3 facettierte Varianten in Regionsgestein, Erzader, Schutthaufen bei Abbau. PROPS · LOW · VERIFIZIERT
 
+## Session 4 — Siedlungsdichte & Titelklassen
+
+### BUG-045 — Städte zu klein und zu voll (Nutzerbefund, Screenshot)
+- Reproduzierbar: JA · Schritte: Nordfurt betreten, Gesamtansicht (Bild `stadt-vorher-northcity.png`).
+- Erwartet (§75): Wege zwischen den Häusern, Höfe/Grün, Hauptstraße breiter als Gassen, Einwohner passend zur Fläche.
+- Tatsächlich: Nordfurt 37×30 Kacheln, 15 Häuser Wand an Wand (0–1 Kachel Abstand), alles gepflastert; Eren-Kern,
+  Kreuzweg, Sonnwacht-Unterstadt ebenso 1 Kachel; Aschfurt 1053 Kacheln.
+- Kategorie: WORLD LOGIC / GEBÄUDE · Priorität: HIGH (Nutzer: „wichtiger machen“)
+- Ursache: Pläne mit 1-Kachel-Raster entworfen; der alte Kern (genWorld) war fest verdrahtet und nicht verschiebbar,
+  ohne die Zufallsfolge der Welt (alte Spielstände) zu verändern.
+- Lösung: Streckung je Stadt (`spread` in TOWN_PLAN, Faktor 1,2–1,5 um einen Anker auf Durchgangsstraße/Kai/Fluss),
+  Häuser behalten Größe und bleiben an ihrer Türseite verankert; der alte Kern zieht in `expandTowns` um (Häuser + Props,
+  Boden zurück zur Natur), Straßenstücke werden an das Stadtnetz angeschlossen, jede Tür bekommt einen Trampelpfad,
+  Hauptstraßen ≥ 3 Kacheln. Nordfurt: kein Flächenpflaster mehr (Markt gepflastert, Höfe, Gemüsebeete), 7 Ergänzungs-
+  häuser; Aschfurt: 3. Fläche aller Siedlungen: 10 651 → 19 322 Kacheln. Migration `flags.gen4` für alte Stände.
+- Test: Selbsttest „Siedlungen (§75): Nachbarhäuser ≥ 2 Kacheln, bebaut < 35 %“ + Türen erreichbar, 8 Seeds.
+- Status: VERIFIZIERT (Bilder `stadt-nachher-*`)
+
+### BUG-046 — Einwohneranzeige log: Nordfurt „90“, zu sehen waren 22
+- Ursache: Anzeige zeigte die abstrakte Marktgröße (`TOWNS.pop`), nicht die Menschen. Bewohner hingen an der Häuserzahl
+  (1–2 je Haus), nicht an der Fläche. Andere Städte zeigten gar keine Zahl.
+- Lösung: `perHead` je Stadt (Kacheln je Kopf: Nordfurt 55, Salzhafen 70, Sonnwacht 85, Kreuzweg 90, Eren 95, Aschfurt
+  100); `residentPlan` verteilt Fläche/perHead − Wachen − Figuren mit Namen auf die Häuser (jedes mind. 1, Obergrenze je
+  Haustyp). Anzeige = gezählte Köpfe, für alle Städte. Marktgröße bleibt intern (Produktion).
+- Test: Selbsttest „Einwohner folgen der Fläche“. · UI / WORLD LOGIC · MEDIUM · VERIFIZIERT
+
+### BUG-047 — Tagsüber standen alle Müßigen auf 5×3 Kacheln am Platz
+- Folge: mit mehr Einwohnern ein Gedränge, genau das „zu voll“. Lösung: Tagesziel verteilt — Platz (ganze Fläche),
+  Nachbarn besuchen (vor deren Tür), vor dem eigenen Haus; Nachtplätze nebeneinander statt übereinander.
+- NPC / IMMERSION · MEDIUM · BEHOBEN (Sichtprüfung)
+
+### BUG-048 — Nordfurts Osthälfte im Gebirgsbiom (Geröll und Schnee zwischen den Häusern)
+- Vorher vom Flächenpflaster verdeckt. Lösung: Siedlungen übernehmen die Region ihres Ankers (erst nach der Generierung).
+- VISUAL · LOW · VERIFIZIERT
+
+### BUG-049 — Kampftest hing am Zufall (Krit-Wurf) und am Seed des Spielstands
+- Selbsttest „schwere Waffen unterbrechen…“ fiel bei Seed 424242 durch, sobald sich die Zufallsfolge verschob.
+  Lösung: Zufall im Test fest (`seedRng(7)`). ARCHITECTURE/TEST · LOW · VERIFIZIERT (8 Seeds)
+
+### BUG-050 — Hexenmeister als gewöhnliche Lehrklasse (Nutzer: soll später freischaltbar sein, wie ein Titel)
+- Vorher: Morvath lehrte „Hexenmeister“ nach einer Holquest als Grundklasse (ersetzte die Klasse, Mana, 2 Fähigkeiten).
+- Lösung: Titelklassen-System (GDD). Alte Stände: Hexenmeister-Grundklasse → Magier + Titelklasse Hexenmeister.
+- DESIGN / CONTENT · HIGH · VERIFIZIERT (Durchspielen beider Pfade über die Oberfläche)
+
+### BUG-051 — Leeres Totenreich (offen seit Session 1) — teilweise
+- Alt-Vharn: Ysra am Ahnenaltar mit Namenssteinen; Nekromanten-Turm: Vhal im Schattenkreis; Große Nekropole: Gruft als
+  Ritualort mit Wächter. Weitere leere Flächen bleiben (→ Phase 16). CONTENT · MEDIUM · IN ARBEIT
+
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.
 - Kein Skill Tree (Klassenkette + Fertigkeitswerte) → Phase 9.

@@ -1,6 +1,6 @@
 # Phasenstatus — Rotfall: Legacy
 
-Letzte Aktualisierung: Session 3 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
+Letzte Aktualisierung: Session 4 (2026-09-25). Nächster Einstieg: SESSION_LOG.md → offene HIGH-Einträge in BUGS.md.
 
 | # | Phase | Status | DoD erfüllt | Fehlt noch |
 |---|---|---|---|---|
@@ -14,10 +14,10 @@ Letzte Aktualisierung: Session 3 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 7 | Weapon Expansion | NICHT BEGONNEN | — | |
 | 8 | Rarity & Loot | NICHT BEGONNEN | — | Rarität ist nur Etikett |
 | 9 | Skill Tree | NICHT BEGONNEN | — | |
-| 10 | Classes | NICHT BEGONNEN | — | |
+| 10 | Classes | IN ARBEIT | teilweise | Session 4: Titelklassen-System + Nekromant/Hexenmeister (§78 DoD erfüllt bis auf „alle leeren Totenreich-Flächen“). Weitere Titelklassen nur als Entwurf |
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
 | 12 | Bosses | NICHT BEGONNEN | — | |
-| 13 | Cities | IN ARBEIT | teilweise | Ausbau + Bewohner fertig (Session 2); Landmarken, Händler je Stadt, Quests fehlen |
+| 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
 | 14 | Dungeons | NICHT BEGONNEN | — | BUG-009 Tiefhall |
 | 15 | NPCs & Wildlife | IN ARBEIT | — | Bewohner mit Tagesablauf ✓; benannte NPCs, Tiere offen |
 | 16 | World Simulation | NICHT BEGONNEN | — | BUG-011 Karawane |
@@ -46,5 +46,23 @@ Letzte Aktualisierung: Session 3 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 - [x] Performance: Backen in Leerlaufzeit, Lauftest 2000 Frames Median 1,8 ms (verdecktes Fenster, gedrosselt)
 - [ ] Regionen mit großen leeren Flächen (Totenreich) — kein Stil-, sondern Inhaltsproblem → Phase 16/§38
 
+## §75 Siedlungsdichte — Definition of Done (Session 4)
+- [x] Mindestabstand zwischen Gebäuden (≥ 2 Kacheln, Selbsttest); Ausnahmen: keine
+- [x] Hauptwege ≥ 3 Kacheln, Gassen 1–2
+- [x] Bebaute Fläche 11–18 % (Richtwert < 50 %)
+- [x] Einwohner nach Fläche (perHead), Tagesziele verteilt
+- [x] Peripherie: Felder, Höfe, Gärten; Übergang zur Wildnis ohne harten Schnitt (Trampelpfade, Hofränder)
+- [x] Vorher/Nachher-Bilder `stadt-vorher-*` / `stadt-nachher-*`
+- [ ] Stresstest „viele NPCs gleichzeitig unterwegs“ nur als Messung (Update 0,9 ms), nicht als Gedränge-Sichtprüfung
+
+## §78 Nekromant/Hexenmeister — Definition of Done (Session 4)
+- [x] 5 Stufen (Kontakt, Prüfung, Entscheidung, Initiation, Titelklasse), kein Einzeldialog
+- [x] Pfade unterscheiden sich in Ressource, Ton, Fähigkeiten, Makel, Preis
+- [~] Totenreich: 3 Orte gefüllt (Ahnenaltar, Schattenkreis, Gruft mit Wächter); weitere leere Flächen bleiben
+- [x] Ordensreaktion getestet (Gespräch verweigert, Wachen greifen an)
+- [x] Sichtbares Merkmal (glimmende Augen), nicht nur Variable
+- [ ] Skill-Tree-Keystone — es gibt noch keinen Skill Tree (Phase 9)
+- [x] Unumkehrbarkeit im GDD dokumentiert
+
 ## Nächster sinnvoller Schritt
-BUG-011 Karawane (Wagen, Tiere, Wachen), dann BUG-009 Tiefhall, dann BUG-017 Spielstandgröße. Details: SESSION_LOG Session 3.
+Rückmeldung des Nutzers zu Städten und Titelklassen; Frage Kartengröße. Danach BUG-011 Karawane, BUG-009 Tiefhall, BUG-017 Spielstandgröße.

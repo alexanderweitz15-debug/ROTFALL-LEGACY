@@ -65,6 +65,7 @@ export const ITEMS = {
                   rarity:'epic', value:340, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden.' },
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
+  ancestor_urn: { name:'Ahnenurne', slot:'material', stack:1, rarity:'epic', value:0, lore:'Asche von tausend Namen. Wer sie trägt, hört sie flüstern.' },
 };
 
 export const LOOT = {
@@ -76,6 +77,7 @@ export const LOOT = {
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   skeleton:  [['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
+  crypt_warden:[['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
 };
 
 // interiors: folgt dem Spieler durch Eingänge (Grube, Dungeons). Tiere nicht — sie lauern draußen (GDD §Übergänge).
@@ -87,6 +89,8 @@ export const MONSTERS = {
   bandit:    { name:'Bandit', hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2, faction:'bandit', interiors:true, pal:{skin:'#b2926f',cloth:'#4a3226',metal:'#7d7364'} },
   bandit_archer:{ name:'Banditenschütze', hp:36, dmg:9, speed:1.35, reach:300, atk:1500, ranged:true, xp:24, sight:320, r:11, threat:2, faction:'bandit', interiors:true, pal:{skin:'#b2926f',cloth:'#3f4a2e',metal:'#7d7364'} },
   skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true,
+               pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };
@@ -102,7 +106,6 @@ export const CLASSES = {
   knight:    { name:'Ritter', tier:2, parent:'warrior', abilities:['power_strike','blessing'], desc:'Ein Eid mit Rüstung.' },
   paladin:   { name:'Paladin', tier:3, parent:'knight', abilities:['holy_strike','blessing','holy_heal'], faction:'order',
                desc:'Ein Schwert macht dich nicht zum Ritter. Was du beschützt, tut es.' },
-  warlock:   { name:'Hexenmeister', tier:2, parent:'mage', abilities:['shadow_bolt','life_drain'], desc:'Verbotene Wege, verlässliche Kosten.' },
   ranger:    { name:'Waldläufer', tier:2, parent:'archer', abilities:['aimed_shot','mark_target'], desc:'Der Wald ist eine Karte, die nur du liest.' },
   deathknight:{name:'Todesritter', tier:3, parent:'warrior', abilities:['life_drain','power_strike'], faction:'undead', desc:'Treue über den Tod hinaus.' },
 };
@@ -118,6 +121,41 @@ export const ABILITIES = {
   holy_strike: { name:'Heiliger Schlag', cd:7000, mana:14, icon:'holy', desc:'Schwerer Schaden gegen Untote und Verfluchte.' },
   blessing:    { name:'Segen', cd:20000, mana:16, icon:'bless', desc:'Rüstung der Gruppe steigt für 20 Sekunden.' },
   mark_target: { name:'Ziel markieren', cd:12000, stam:10, icon:'mark', desc:'Markiertes Ziel nimmt 25% mehr Schaden.' },
+  // ---- Titelfähigkeiten: kosten die Ressource ihrer Titelklasse (cost) oder laden sie auf (gain), nie Mana/Ausdauer ----
+  raise_dead:  { name:'Totenruf', title:'necromancer', cd:4000, cost:2, desc:'Eine Leiche in der Nähe steht als Diener auf (60 s, höchstens 2). Kostet 2 Seelenessenz.' },
+  bone_ward:   { name:'Knochenschild', title:'necromancer', cd:12000, cost:1, desc:'Knochen fangen die nächsten 25 Schaden ab (10 s). Kostet 1 Seelenessenz.' },
+  soul_harvest:{ name:'Seelenernte', title:'necromancer', cd:20000, cost:'all', desc:'Verbraucht alle Essenz: heilt dich und deine Diener, entzieht Feinden ringsum Leben.' },
+  hex:         { name:'Fluch', title:'warlock', cd:6000, gain:20, desc:'Das nächste Ziel nimmt 12 s lang 25 % mehr Schaden und wird langsamer. +20 Verderbnis.' },
+  chaos_bolt:  { name:'Chaosblitz', title:'warlock', cd:2500, gain:15, desc:'Schattengeschoss; Schaden steigt mit der Verderbnis (bis ×2). +15 Verderbnis.' },
+  unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
+};
+
+// ---- Titelklassen (Session 4, Nutzerwunsch): später freigeschaltet, getragen wie ein Titel, neben der Grundklasse ----
+// Die Grundklasse (Klassenbaum oben) bleibt die Kampfbasis mit Mana/Ausdauer. Eine Titelklasse kommt dazu — nie im Menü,
+// immer durch eine Tat in der Welt — und bringt: eine eigene Ressource mit eigener Regel (keine Ruhe-Regeneration),
+// drei Sonderfähigkeiten, die nur diese Ressource nutzen, ein Passiv, einen ehrlichen Makel, Kosten beim Pakt,
+// Fraktionsfolgen und ein sichtbares Merkmal. Aktiv ist höchstens eine; Pakte schließen einander aus (excludes).
+export const TITLE_CLASSES = {
+  necromancer: { name:'Nekromant', title:'Totenrufer', glow:'#8fd9b0', faction:'undead', excludes:['warlock'], reversible:false,
+    desc:'Ein Pakt mit den Ahnen des Totenreichs. Kontrolle statt Zerstörung: die Toten stehen für dich auf.',
+    resource:{ key:'essence', name:'Seelenessenz', max:6, start:0, css:'essence',
+      rule:'Jeder Tod in deiner Nähe (bis ~9 Schritt) gibt +1, auch durch deine Diener. Sie verfliegt nicht und kommt nicht durch Rast.' },
+    abilities:['raise_dead', 'bone_ward', 'soul_harvest'],
+    passive:{ name:'Totenwache', desc:'Deine Diener kämpfen für dich; was sie töten, nährt deine Essenz.' },
+    flaw:{ name:'Die Toten zehren', desc:'Eigener Waffenschaden −15 %. Heiliges Heilen wirkt auf dich nur halb.' },
+    cost:{ desc:'Ein Teil von dir bleibt bei den Toten: Leben −10 % für immer.', hpMul:0.9 },
+    rep:{ undead:20, order:-30, valen:-10 },
+    unlock:'„Der Pakt der Stillen Schar“: die Ahnenurne aus der Großen Nekropole zu Ysra nach Alt-Vharn bringen.' },
+  warlock: { name:'Hexenmeister', title:'Schattengebundener', glow:'#b07ae0', faction:'undead', excludes:['necromancer'], reversible:false,
+    desc:'Ein Pakt mit dem, was im Obelisken flüstert. Flüche, Chaos, Macht auf Pump.',
+    resource:{ key:'corruption', name:'Verderbnis', max:100, start:20, css:'corruption',
+      rule:'Jede Titelfähigkeit lädt sie auf. Außerhalb des Kampfes sinkt sie (−4/s). Stirbt ein Verfluchter, sinkt sie um 15.' },
+    abilities:['hex', 'chaos_bolt', 'unleash'],
+    passive:{ name:'Macht aus Fäulnis', desc:'Titelzauber kosten kein Mana; ihr Schaden steigt mit der Verderbnis bis aufs Doppelte.' },
+    flaw:{ name:'Sie frisst dich', desc:'Über 70 Verderbnis verlierst du Leben (1,5/s). Bei 100 bricht sie aus: 15 Schaden, zurück auf 60.' },
+    cost:{ desc:'Der Schatten nimmt Atem: Ausdauer −10 für immer.', stamina:-10 },
+    rep:{ undead:15, order:-30, valen:-10 },
+    unlock:'„Der Pakt der Stillen Schar“: die Ahnenurne statt zu Ysra zu Vhal, dem Flüsternden, am Nekromanten-Turm bringen.' },
 };
 
 export const FACTIONS = {
@@ -163,8 +201,14 @@ export const NPCS = [
     traits:['grausam','ehrgeizig'], attrs:{strength:13,agility:12}, cls:'rogue', recruit:true, recruitRel:60, hostile:true,
     greet:'„Du bist weit von der Straße abgekommen.“', teaches:'rogue' },
   { key:'morvath', name:'Morvath', prof:'Grabgebundener', faction:'undead', age:0, home:'graveyard',
-    traits:['geduldig','kalt'], attrs:{intelligence:14,willpower:14}, cls:'warlock', recruit:false, undead:true,
-    greet:'„Die Lebenden sind laut. Du bist leiser als die meisten.“', teaches:'warlock' },
+    traits:['geduldig','kalt'], attrs:{intelligence:14,willpower:14}, cls:'mage', recruit:false, undead:true,
+    greet:'„Die Lebenden sind laut. Du bist leiser als die meisten.“' },
+  { key:'ysra', name:'Ysra', prof:'Stimme der Gruft', faction:'undead', age:0, home:'altvharn',
+    traits:['geduldig','streng'], attrs:{intelligence:15,willpower:16}, cls:'mage', recruit:false, undead:true,
+    greet:'„Alt-Vharn war eine Stadt. Die Ahnen wohnen noch hier. Sprich leise.“' },
+  { key:'vhal', name:'Vhal', prof:'Der Flüsternde', faction:'undead', age:0, home:'necrotower',
+    traits:['gierig','kalt'], attrs:{intelligence:16,willpower:12}, cls:'mage', recruit:false, undead:true,
+    greet:'„Ysra will die Toten ordnen. Ich will, dass sie tanzen. Was willst du?“' },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },
@@ -208,7 +252,10 @@ export const QUESTS = {
     reward:{xp:200,rep:{order:20},unlock:'paladin'}, turnin:'kelan' },
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
-    reward:{xp:120,rep:{undead:25,order:-15},unlock:'warlock'}, turnin:'morvath' },
+    reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  q_pact: { name:'Der Pakt der Stillen Schar', giver:'ysra', desc:'In der Großen Nekropole ruht die Ahnenurne, bewacht von dem, der sie nie losließ. Wer zur Schar gehört, dem öffnet er. Alle anderen müssen an ihm vorbei. Bring die Urne — zu mir, wenn du die Toten führen willst.',
+    objectives:[{type:'item',target:'ancestor_urn',count:1,text:'Ahnenurne aus der Großen Nekropole holen'}],
+    reward:{xp:200}, turnin:'ysra', pact:true },
   q_rook: { name:'Rooks Angebot', giver:'rook', desc:'Rook will die Straße nach Norden unsicher machen. Er braucht Klingen.',
     objectives:[{type:'kill',target:'bandit_rival',count:2,text:'Rooks Rivalen töten'}],
     reward:{gold:120,rep:{bandit:25,valen:-20},xp:90}, turnin:'rook' },

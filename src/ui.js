@@ -1,8 +1,8 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
-import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES } from './data.js';
+import { ITEMS, RARITY, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES } from './data.js';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS } from './world.js';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt } from './world.js';
 import { townState, townPrice } from './sim.js';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js';
 import { sfx, ambience } from './sfx.js';
@@ -71,12 +71,14 @@ function bar(label, val, max, cls, extra = '') {
 export function refreshHUD() {
   const p = S.player; if (!p) return;
   $('pc-name').textContent = p.name;
-  $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}`;
+  const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
+  $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}`;
   const fr = topRank(p);
   $('pc-rank').textContent = fr || 'Ohne Banner';
   drawPortraitTo($('pc-portrait'), p);
   let html = bar('Leben', p.hp, p.maxHp, 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
+  if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp');
   $('pc-bars').innerHTML = html;
   $('pc-status').innerHTML = statusIcons(p);
@@ -135,6 +137,14 @@ function renderLog() {
 }
 
 // ---------------- Kontextpanel ----------------
+// Einwohner = wer tatsächlich dort lebt (Bewohner, Wachen, Figuren mit Namen) — nicht mehr die abstrakte Marktgröße,
+// die in Nordfurt 90 zeigte, während 22 Menschen zu sehen waren.
+function townHeads(key) {
+  let n = 0;
+  for (const c of S.ents.world) if (c.kind === 'npc' && c.alive && !S.party.includes(c.id)
+    && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;
+  return n;
+}
 export function renderContext(target) {
   const box = $('context'); if (!box) return;
   const p = S.player;
@@ -155,10 +165,11 @@ export function renderContext(target) {
       h += `<div class="ctx-block"><div class="ctx-sub">Stadt</div>
         <div class="ctx-line"><span>Lage</span><b>${townState(here.key)}</b></div>
         <div class="ctx-line"><span>Herrschaft</span><b>${owner ? FACTIONS[owner].name : 'frei'}</b></div>
-        <div class="ctx-line"><span>Einwohner</span><b>${Math.round(t.pop)}</b></div>` +
+        <div class="ctx-line"><span>Einwohner</span><b>${townHeads(here.key)}</b></div>` +
         ['grain', 'salt', 'cloth', 'pelt'].map(g => `<div class="ctx-line"><span>${ITEMS[g].name}</span><b>${townPrice(here.key, g, true)} Gold · ${Math.floor(t.stock[g])}</b></div>`).join('') + '</div>';
     } else if (S.war && S.map === 'world' && here && S.war.nodes[here.key]?.owner) {
       h += `<div class="ctx-line"><span>Herrschaft</span><b>${FACTIONS[S.war.nodes[here.key].owner].name}</b></div>`;
+      if (TOWN_PLAN[here.key]) h += `<div class="ctx-line"><span>Einwohner</span><b>${townHeads(here.key)}</b></div>`;
     }
     if (S.map === 'world') {
       h += `<div class="ctx-block"><div class="ctx-sub">In der Nähe</div>` +
@@ -270,7 +281,8 @@ export function renderHotbar() {
         d.title = ITEMS[s.key]?.name || '';
       } else {
         const ab = ABILITIES[s.key];
-        d.insertAdjacentHTML('beforeend', `<span style="font-size:10px;text-align:center;line-height:1.1;color:#cbbf8a;padding:0 2px">${ab.name}</span>`);
+        d.insertAdjacentHTML('beforeend', `<span style="font-size:10px;text-align:center;line-height:1.1;color:${ab.title ? TITLE_CLASSES[ab.title].glow : '#cbbf8a'};padding:0 2px">${ab.name}</span>`);
+        if (ab.title) d.classList.add('title-ab');
         d.title = ab.desc;
         const cd = (p.cooldowns?.[s.key] || 0);
         if (cd > 0) { const c = el('div', 'cd'); c.style.height = `${clamp(cd / ab.cd * 100, 0, 100)}%`; c.style.top = 'auto'; c.style.bottom = '0'; d.appendChild(c); }
@@ -502,6 +514,7 @@ function charUI(body, who) {
       ${isPlayer && p.knownClasses?.length > 1 ? '<button class="txtbtn" id="ch-switch">Klasse wechseln</button>' : ''}
       <h3>Fähigkeiten</h3>
       <p class="traits">${(p.abilities || []).map(a => ABILITIES[a].name).join(' · ') || 'Noch keine. Lehrer findet man in der Welt.'}</p>
+      ${titleBlock(p, isPlayer)}
       <h3>Fertigkeiten</h3>
       <dl class="ledger-list">${skills.map(([k, n]) => `<div><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
     </section>
@@ -511,6 +524,21 @@ function charUI(body, who) {
   body.querySelectorAll('[data-part]').forEach(el => el.addEventListener('click', () => doBandage(el.dataset.part)));
   if ($('ap-box')) [...$('ap-box').querySelectorAll('button')].forEach(b => b.onclick = () => { A.spendAttr(b.dataset.a); refreshModal(); });
   if ($('ch-switch')) $('ch-switch').onclick = () => openModal('classes');
+  if ($('ch-title')) $('ch-title').onclick = () => openModal('classes');
+}
+// Titelklasse im Charakterbogen: was sie gibt, was sie nimmt, woher die Ressource kommt
+function titleBlock(p, isPlayer) {
+  const T = p.titleClass && TITLE_CLASSES[p.titleClass];
+  if (!T) return p.titleClasses?.length && isPlayer ? '<h3>Titelklasse</h3><p class="traits">Abgelegt. Der Pakt bleibt.</p><button class="txtbtn" id="ch-title">Titel tragen</button>' : '';
+  return `<h3>Titelklasse · ${T.name}</h3>
+    <p class="traits" style="color:${T.glow}">„${T.title}“ — ${T.resource.name} ${Math.floor(A.tres(p))}/${T.resource.max}</p>
+    <dl class="ledger-list">
+      <div><dt>Ressource</dt><dd>${T.resource.rule}</dd></div>
+      <div><dt>Fähigkeiten</dt><dd>${T.abilities.map(a => ABILITIES[a].name).join(' · ')}</dd></div>
+      <div><dt>${T.passive.name}</dt><dd>${T.passive.desc}</dd></div>
+      <div><dt>Makel: ${T.flaw.name}</dt><dd>${T.flaw.desc}</dd></div>
+      <div><dt>Preis des Paktes</dt><dd>${T.cost.desc}</dd></div>
+    </dl>${isPlayer ? '<button class="txtbtn" id="ch-title">Titel wechseln/ablegen</button>' : ''}`;
 }
 function classChain(c) { const out = []; let k = c; while (k) { out.unshift(k); k = CLASSES[k].parent; } return out; }
 
@@ -521,6 +549,14 @@ function classUI(body) {
     ${(p.knownClasses || []).map(c => `<button class="build-item" data-c="${c}">${CLASSES[c].name}
       <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${CLASSES[c].desc || ''}</span></button>`).join('')}</div>`;
   [...body.querySelectorAll('[data-c]')].forEach(b => b.onclick = () => { A.setClass(b.dataset.c); closeModal(); });
+  // Titelklassen: neben der Grundklasse getragen; freigeschaltet nur durch Taten in der Welt
+  const known = p.titleClasses || [];
+  body.insertAdjacentHTML('beforeend', `<div class="ledger" style="margin-top:16px">Titelklassen trägst du zusätzlich zur Klasse — wie einen Titel.
+    Sie werden in der Welt erworben, nie gewählt${known.length ? '' : '. Du hast noch keine'}.</div>
+    <div class="inv-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+    ${known.map(k => `<button class="build-item" data-t="${k}" style="border-color:${TITLE_CLASSES[k].glow}">${TITLE_CLASSES[k].name}
+      <small>${k === p.titleClass ? 'getragen · ablegen' : 'tragen'}</small><br><span class="ledger">${TITLE_CLASSES[k].desc}</span></button>`).join('')}</div>`);
+  [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { A.setTitleClass(b.dataset.t === p.titleClass ? null : b.dataset.t); closeModal(); });
 }
 
 // ---- Gruppe ----

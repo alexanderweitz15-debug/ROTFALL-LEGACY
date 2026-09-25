@@ -2,6 +2,20 @@
 
 Neueste oben.
 
+### Session 4 — 2026-09-25 · Siedlungsdichte + Titelklassen (Nutzerwunsch)
+**Vorgefunden:** Phasen 0–4 abgeschlossen, 5 im Test, 6/13/15/19 in Arbeit; Selbsttest 46/46. (SESSION_LOG hatte nur
+Session 1 — Sessions 2 und 3 stehen im CHANGELOG.)
+**Gemacht:** Städte gestreckt (Abstand ≥ 2, Fläche ×1,8), Nordfurt/Aschfurt ergänzt, Einwohner nach Fläche, echte
+Einwohneranzeige, Migration gen4. Titelklassen-System mit Nekromant und Hexenmeister, Questkette im Totenreich mit zwei
+neuen Figuren, einem Wächter und drei Ortsszenen; Hexenmeister aus dem Klassenbaum gelöst. Selbsttest 54/54.
+**Gefundene neue Probleme:** BUG-045–051 (alle behoben außer 051 teilweise).
+**Offen geblieben:** weitere Titelklassen (nur Entwurf im GDD); Weltkarte selbst nicht vergrößert (Eren–Nordfurt ~18
+Kacheln); Marktgröße (Wirtschaft) und sichtbare Einwohner laufen noch getrennt (Hunger/Flucht ändert nur die Zahl im
+Markt); Diener folgen nicht durch Eingänge; Salzhafen/Sonnwacht bleiben unter ihrem Einwohnerziel (zu wenige Häuser).
+**Nächster Schritt:** Nutzer: Bilder `stadt-nachher-*` gegen die eigene Vorstellung prüfen; soll die Karte selbst größer
+werden (neues Spielstandformat)? Danach BUG-011 Karawane.
+Beim Start: `index.html?dev&test` → `RF.selftest()` muss 54/54 melden.
+
 ### Session 1 — 2026-09-24 · Master-Prompt: Phasen 0–4
 **Gemacht:**
 - docs/ angelegt (BUGS, GDD, CHANGELOG, SESSION_LOG, PHASE_STATUS, STYLE_GUIDE, DATA_SCHEMAS).
