@@ -269,10 +269,10 @@ export function renderHotbar() {
   if (sig === hbSig && hb.childElementCount) return;
   hbSig = sig;
   hb.innerHTML = '';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const s = slots[i];
     const d = el('div', 'slot' + (s ? '' : ' empty'));
-    d.innerHTML = `<b>${i + 1}</b>`;
+    d.innerHTML = `<b>${(i + 1) % 10}</b>`;
     if (s) {
       if (s.type === 'item') {
         const cv = el('canvas'); cv.width = cv.height = 48; d.appendChild(cv);
@@ -551,7 +551,7 @@ function classUI(body) {
   body.innerHTML = `<div class="ledger">Klassen werden in der Welt gelernt, nicht im Menü gewählt. Was du beherrschst, kannst du hier führen.</div>
     <div class="inv-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
     ${(p.knownClasses || []).map(c => `<button class="build-item" data-c="${c}">${CLASSES[c].name}
-      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${CLASSES[c].desc || ''}</span></button>`).join('')}</div>`;
+      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${CLASSES[c].desc || ''}${CLASSES[c].weak ? ` <i>Schwäche: ${CLASSES[c].weak}</i>` : ''}</span></button>`).join('')}</div>`;
   [...body.querySelectorAll('[data-c]')].forEach(b => b.onclick = () => { A.setClass(b.dataset.c); closeModal(); });
   // Titelklassen: neben der Grundklasse getragen; freigeschaltet nur durch Taten in der Welt
   const known = p.titleClasses || [];
@@ -575,7 +575,7 @@ function skillUI(body) {
     return `<div class="tree-branch${sealed ? ' sealed' : ''}"><h3>${B_.name}</h3><p class="ledger">${sealed ? `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.` : B_.desc}</p>
       ${Array.from({ length: rows }, (_, r) => `<div class="tree-row">${N.filter(([, n]) => n.row === r).map(([k, n]) => {
         const st = A.nodeState(p, k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
-        const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
+        const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : n.type === 'active' ? ' — aktive Fähigkeit' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
         return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" title="${tip.replace(/"/g, '&quot;')}">${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : 'gesperrt'}</small></button>`;
       }).join('')}</div>`).join('')}</div>`;
   };

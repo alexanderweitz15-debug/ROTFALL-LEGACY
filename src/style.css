@@ -477,6 +477,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .tree-node small{display:block;font-size:9px;letter-spacing:.06em;text-transform:uppercase;margin-top:2px;color:#6f6552}
 .tree-node.notable{border-color:#6b5a3a}
 .tree-node.keystone{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(189,148,51,.25)}
+.tree-node.active{border-style:dashed;border-color:#6f8bb8}.tree-node.active.learned{border-style:solid}
 .tree-node.open{color:var(--bone);background:#221c13}
 .tree-node.open small{color:var(--gold)}
 .tree-node.learned{color:#e8dcc0;background:#2e2517;border-color:var(--gold)}

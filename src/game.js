@@ -89,6 +89,9 @@ export function damageOf(c) {
   if (node(c, 'k_berserk') && c.hp < c.maxHp * 0.3) m += 0.25;                       // Berserker: nah am Tod gefährlicher
   if (node(c, 'k_grove')) m += inNature(c) ? 0.15 : -0.10;                            // Hüter des Hains
   if (node(c, 'k_legion') && c.titleClass === 'necromancer') m -= 0.20;               // Legion: Feldherr, kein Fechter
+  if (c.currentClass === 'bard') m -= 0.15;                                            // Barde: kämpft durch andere
+  if (stat(c, 'frenzy')) m += 0.35;                                                    // Raserei
+  if (stat(c, 'song')) m += 0.15;                                                      // Kriegslied
   return (base + attr * 0.35 + skill * 0.22) * Math.max(0.2, m);
 }
 function speedOf(c) {
@@ -98,6 +101,7 @@ function speedOf(c) {
   s *= (1 - off - ch);
   if (c.stamina <= 0) s *= 0.55;
   if (c.status && c.status.some(t => t.key === 'chilled')) s *= 0.6;   // Hrodvars Eiskreis
+  if (stat(c, 'frenzy')) s *= 1.15;
   s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c);
 }
@@ -155,11 +159,13 @@ function addItem(c, key, count = 1) {
   c.inv.push(mkItem(key, count));
   return true;
 }
-function removeItem(c, key, count = 1) {
-  const i = c.inv.findIndex(x => x.key === key);
-  if (i < 0) return false;
-  const s = c.inv[i];
-  if ((s.count || 1) > count) s.count -= count; else c.inv.splice(i, 1);
+function removeItem(c, key, count = 1) {                   // über alle Stapel hinweg (vorher nur der erste — 1+9 Kraut kostete nur 1)
+  if (!hasItem(c, key, 1)) return false;
+  for (let i = c.inv.length - 1; i >= 0 && count > 0; i--) {
+    const s = c.inv[i]; if (s.key !== key) continue;
+    const n = Math.min(count, s.count || 1); count -= n;
+    if ((s.count || 1) > n) s.count -= n; else c.inv.splice(i, 1);
+  }
   return true;
 }
 function hasItem(c, key, count = 1) {
@@ -293,6 +299,7 @@ const NPC_SPOTS = {
   northsmith:[139,57],                                      // Nordfurt: Brann vor der Schmiede
   sonnwacht:[452,256],                                      // Sonnwacht: Ilva vor der Ordenskapelle
   grenzwacht:[332,349],                                     // Grenzöde: Oda am Wachfeuer
+  kreuzweg_tav:[244,246], saltport_lab:[139,436],           // Lioba in der Kreuzweg-Schenke, Quirin im Salzhafener Lagerhaus
 };
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
@@ -472,6 +479,8 @@ const NPC_DAY = {
   gerold: { work: ['h114_53', 'front'], till: 20, eve: ['h120_45', 'in'], night: ['h120_45', 'in'] },
   brann:  { work: ['h138_53', 'front'], till: 18, eve: ['h131_53', 'in'], night: ['h138_53', 'in'] },     // Schmiede → Schenke → über der Werkstatt
   ilva:   { work: [453, 257], eve: ['h449_249', 'in'], night: ['h449_249', 'in'] },            // Übungsplatz vor der Kapelle → Kapelle
+  lioba:  { work: ['h242_242', 'front'], eve: ['h242_242', 'in'], night: ['h242_242', 'in'] },     // spielt vor der Schenke, abends drinnen
+  quirin: { work: ['h137_432', 'front'], till: 19, eve: ['h137_432', 'in'], night: ['h137_432', 'in'] },   // Lagerhaus am Hafen = Labor
 };
 function assignNpcDays() {                         // idempotent: bei Neustart und bei jedem Laden (Häuser werden neu erzeugt)
   const used = {};                                 // Innenplätze je Haus, damit sich niemand auf eine Kachel stapelt
@@ -803,8 +812,8 @@ export function continueGame() {
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
-    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith']) if (def[k] !== undefined) e[k] = def[k]; }
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda'].includes(def.key)) spawnNpcDef(def);
+    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches']) if (def[k] !== undefined) e[k] = def[k]; }
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key)) spawnNpcDef(def);
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -1019,13 +1028,14 @@ function tickCombatant(c, dt) {
   if (c.telegraph > 0) c.telegraph -= dt;
   for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - dt);
   const resting = !c.vx && !c.vy;
-  if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0)));
+  if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0) + (stat(c, 'song') ? 0.5 : 0)));
   if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')));
   if (c === S.player && c.titleClass) titleTick(c, dt);
   // Statuszeiten
   if (c.status && c.status.length) {
     for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && chance(dt / 2500)) hurt(c, 2, null, 'Blutung');
-      if (s.key === 'regrowth') B.heal(c, s.heal * dt / 1000); }
+      if (s.key === 'regrowth') B.heal(c, s.heal * dt / 1000);
+      if (s.key === 'poisoned') { s.acc = (s.acc || 0) + dt / 1000 * 4; if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Gift'); } } }
     c.status = c.status.filter(s => s.left > 0);
   }
   if (c.downed && B.vital(c) > 0) { c.downed = false; act(c, 'rise', 520); log(`${c.name} kommt wieder auf die Beine.`, 'party'); }   // geheilt = steht auf
@@ -1277,6 +1287,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && attacker.equip.weapon, it = w ? ITEMS[w.key] : null;
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * (attacker.disarmed ? 0.4 : 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
+  if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
   if (attacker.titleClass === 'necromancer') dmg *= 0.85;             // Makel: Die Toten zehren
   // Kritisch
@@ -1301,6 +1312,8 @@ function hit(attacker, target, mult, kind = 'physical') {
   }
   dmg = Math.max(1, dmg - armor * 0.55);
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
+  if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
+    target.status = (target.status || []).filter(q => q.key !== 'poisoned'); target.status.push({ key: 'poisoned', name: 'Vergiftet', left: 5000 }); fx(target.x, target.y - 12, 'necro', 4); }
   const lee = afx(attacker, 'leech'); if (lee && attacker.alive) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
   if (afx(attacker, 'rend') && target.alive && chance(afx(attacker, 'rend')) && !(target.status || []).some(s => s.key === 'bleeding')) (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000 });
   if (it && it.frost && target.alive && !(target.status || []).some(q => q.key === 'chilled')) (target.status ||= []).push({ key: 'chilled', name: 'Durchfroren', left: 2500, desc: 'Langsamer (−40 %).' });
@@ -1321,6 +1334,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (!target.alive || target.invuln) return;
   if (source && target.hexed > performance.now()) dmg *= 1.25;        // Fluch des Hexenmeisters
   if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
+  if (stat(target, 'frenzy')) dmg *= 1.2;                              // Preis der Raserei
+  if (source && source.cowed > performance.now()) dmg *= 0.8;          // eingeschüchtert (Kampfschrei)
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
@@ -1564,10 +1579,19 @@ function updateFx(dt) {
     if (e.kind === 'decal' || e.kind === 'corpse') { e.life -= dt; if (e.life <= 0) arr.splice(i, 1); }
   }
 }
+// Flächenschaden beim Einschlag (Feuerball, Feuerflasche): alle Feinde des Werfers im Umkreis außer dem direkt Getroffenen.
+function splashAt(p, skip) {
+  const own = byId(p.owner); if (!own || !p.splash) return;
+  fx(p.x, p.y, 'fire', 16); S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'shock', s: 1, life: 360, maxLife: 360 }); sfx('fire', 0.6, earVol(p));
+  for (const e of S.ents[p.map]) if (e !== skip && e.alive && COMBAT_KINDS.has(e.kind) && e !== own && isHostile(own, e) && Math.hypot(e.x - p.x, e.y - p.y) < p.splash + (e.r || 10))
+    hurt(e, p.dmg * 0.6, own, own.name, false, 'fire');
+  p.splash = 0;
+}
 function updateProjectiles(dt) {
   for (const p of S.projectiles) {
     p.x += p.vx * dt / 16; p.y += p.vy * dt / 16; p.life -= dt;
-    if (solidTile(p.map, p.x, p.y) || solidPropAt(p.map, p.x, p.y, 3)) { fx(p.x, p.y, 'spark', 3); p.life = 0; continue; }
+    if (p.burst && p.life <= 0) { splashAt(p); continue; }            // Wurf: zerschellt am Zielpunkt
+    if (solidTile(p.map, p.x, p.y) || solidPropAt(p.map, p.x, p.y, 3)) { fx(p.x, p.y, 'spark', 3); if (p.splash) splashAt(p); p.life = 0; continue; }
     for (const e of S.ents[p.map]) {
       if (!(e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') || !e.alive || e.downed || e.id === p.owner) continue;   // Pfeile fliegen über Liegende
       const own = byId(p.owner);
@@ -1576,6 +1600,7 @@ function updateProjectiles(dt) {
         if (e.invuln && e.dodge) { if (!p.evaded) { p.evaded = true; evaded(e); } continue; }   // Geschoss fliegt durch die Rolle
         const attacker = own || { name:'Pfeil', skills:null };
         hurtFromProjectile(attacker, e, p);
+        if (p.splash) splashAt(p, e);
         p.life = 0; break;
       }
     }
@@ -1809,6 +1834,7 @@ function resolveSwingEnemy(e) {
     const ang = Math.atan2(t.y - e.y, t.x - e.x);
     if (Math.abs(normAng(ang - e.aim)) > 1.1) continue;
     if (t.invuln) { evaded(t); continue; }                    // der Hieb hätte getroffen: im letzten Moment ausgewichen
+    if (e.confused > performance.now() && chance(0.5)) { float(e, 'daneben', 'rgba(200,190,160,ALPHA)'); continue; }   // Missklang
     hit(e, t, 1);
     if (!m.boss) break;
   }
@@ -2426,7 +2452,9 @@ function talk(npc) {
   pactChoices(npc, choices);
   if (npc.key === 'jorun' && S.quests.q_lila?.state === 'active' && S.flags.lilaFound)
     choices.push({ text: 'Über deine Tochter …', fn: () => lilaOutcome(npc) });
-  if (npc.teaches) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[npc.teaches].name})`, fn: () => teach(npc) });
+  const tcls = teachable(npc);
+  if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
+  if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
   if (npc.faction && S.ranks[npc.faction] === -1 && ['valen', 'order', 'undead'].includes(npc.faction))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
@@ -2734,8 +2762,31 @@ function setClass(cls) {
   recalc(p); syncHotbar(); UI.refreshHUD();
   log(`Du führst dich nun als ${CLASSES[cls].name}.`, 'party');
 }
-function teach(npc) {
-  const p = S.player, cls = npc.teaches, rel = S.relations[npc.key] ?? 0;
+// Lehrer unterrichten eine Folge (z. B. Schütze → Waldläufer): angeboten wird die erste noch unbekannte Klasse, deren
+// Vorgänger man kann. Ohne passende Vorstufe bietet der Lehrer den Einstieg der Folge an (die Vorstufe ist dann Pflicht).
+function teachable(npc) {
+  const list = [].concat(npc.teaches || []), p = S.player; if (!list.length) return null;
+  return list.find(c => !p.knownClasses.includes(c) && (!CLASSES[c].parent || p.knownClasses.includes(CLASSES[c].parent) || CLASSES[c].parent === 'wanderer'))
+    || list.find(c => !p.knownClasses.includes(c)) || list[list.length - 1];
+}
+const respecCost = () => 30 + 10 * (S.player.level || 1);
+function respec(npc) {
+  const p = S.player, n = Object.keys(p.tree || {}).length, cost = respecCost();
+  UI.dialogue(npc, `„Alles, was du dir angewöhnt hast, legen wir ab. Das dauert und kostet. ${n} Talente, ${cost} Gold.“`, [
+    { text: `Talente vergessen (${cost} Gold)`, fn: () => {
+      if (S.gold < cost) { UI.closeDialogue(); return UI.toast('Zu wenig Gold'); }
+      S.gold -= cost; p.skillPoints = (p.skillPoints || 0) + n; p.tree = {};
+      const r = p.hp / (p.maxHp || 1); recalc(p); for (const k of B.PARTS) p.body[k].hp = Math.min(p.body[k].max, p.body[k].max * r); B.syncHp(p);
+      syncHotbar(); log(`Talente vergessen: ${n} Punkte sind wieder frei.`, 'party'); UI.closeDialogue(); save();
+    } },
+    { text: 'Lieber nicht.', fn: () => UI.closeDialogue() },
+  ]);
+}
+function teach(npc, cls = teachable(npc)) {
+  const p = S.player, rel = S.relations[npc.key] ?? 0;
+  const parent = CLASSES[cls].parent;
+  if (parent && parent !== 'wanderer' && !p.knownClasses.includes(parent))
+    return UI.dialogue(npc, `„Erst ${CLASSES[parent].name}. Dann reden wir über ${CLASSES[cls].name}.“`, [{ text: 'Verstanden.', fn: () => UI.closeDialogue() }]);
   const need = { paladin: 'q_paladin3' }[cls];             // Hexenmeister ist keine Lehrklasse mehr, sondern eine Titelklasse (Pakt)
   if (need && S.quests[need]?.state !== 'done') {
     return UI.dialogue(npc, '„Erst die Prüfungen. Wachsamkeit, das Siegel, der Schrein. Dann reden wir.“',
@@ -2904,6 +2955,7 @@ function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key]
 const spellMul = c => 1 + tfx(c, 'spell');
 const cdMul = c => 1 - Math.min(0.4, tfx(c, 'cdr'));
 const titleAbilities = c => TC(c)?.abilities || [];
+const treeAbilities = c => Object.keys(c.tree || {}).map(k => SKILL_TREE[k]?.grants).filter(Boolean);   // aktive Talentknoten
 const titleFull = (c = S.player) => (c?.titleClasses || []).length >= MAX_TITLES;
 const pactBound = (c = S.player) => (c?.titleClasses || []).some(k => TITLE_CLASSES[k].faction === 'undead');
 function unlockTitle(key, where) {
@@ -3071,6 +3123,7 @@ function learnNode(k) {
   if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt mit jeder Stufe.');
   (p.tree ||= {})[k] = 1; p.skillPoints--;
   const r = p.hp / (p.maxHp || 1); recalc(p); if (N.fx.hp) { for (const part of B.PARTS) p.body[part].hp = Math.min(p.body[part].max, p.body[part].max * r); B.syncHp(p); }
+  if (N.grants) { syncHotbar(); log(`Neue Fähigkeit: ${ABILITIES[N.grants].name} (Leiste).`, 'party'); }   // aktiver Knoten
   log(`Talent gelernt: ${N.name}${N.type === 'keystone' ? ' (Schlüsselknoten)' : ''}.`, 'party');
   UI.refreshHUD(); save();
 }
@@ -3078,7 +3131,7 @@ function learnNode(k) {
 // ================= Fähigkeiten =================
 function useAbility(key) {
   const p = S.player, ab = ABILITIES[key];
-  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key))) return;
+  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key))) return;
   if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
   if (ab.title) {                                            // Titelfähigkeit: nur die eigene Ressource zählt
     const R = TITLE_CLASSES[ab.title].resource, v = tres(p);
@@ -3089,9 +3142,13 @@ function useAbility(key) {
     if (ab.gain) corrupt(p, ab.gain);
     return UI.refreshHUD();
   }
-  if (ab.mana && p.mana < ab.mana) return UI.toast('Zu wenig Mana');
+  if (ab.mana && p.mana < ab.mana) return UI.toast(p.maxMana ? 'Zu wenig Mana' : 'Das braucht Mana — nur Zauberkundige haben welches.');
   if (ab.stam && p.stamina < ab.stam) return UI.toast('Zu erschöpft');
+  if (ab.herb && !hasItem(p, 'herb', ab.herb)) return UI.toast(`Zu wenig Heilkraut (${ab.herb} nötig)`);   // Alchemist: Kraut ist die Ressource
+  if (key === 'shadowstep' && ['chain_hauberk', 'plate_cuirass'].includes(p.equip.chest?.key)) return UI.toast('In Eisen wirft niemand einen Schatten.');
+  if (!classAbility(p, key)) return;                                  // neue Klassen/Talente (Session 7); false = kein Ziel, nichts verbraucht
   p.cooldowns[key] = ab.cd * cdMul(p);
+  if (ab.herb) removeItem(p, 'herb', ab.herb);
   if (ab.mana) p.mana -= ab.mana;
   if (ab.stam) p.stamina -= ab.stam;
   if (ab.mana) { p.castT = performance.now(); sfx('magic'); }   // Zauber-Pose (render: 'cast')
@@ -3142,8 +3199,9 @@ function useAbility(key) {
 }
 function syncHotbar() {
   const p = S.player;
-  p.hotbar = [...p.abilities, ...titleAbilities(p)].slice(0, 7).map(k => ({ type:'ability', key: k }));
-  for (const k of ['bandage', 'potion', 'herb', 'bread']) if (p.hotbar.length < 8) p.hotbar.push({ type:'item', key: k });
+  const HB = 10;                                             // Tasten 1–9, 0: Klasse (≤3) + Titel (3) + aktive Talente (≤3) passen immer
+  p.hotbar = [...new Set([...p.abilities, ...titleAbilities(p), ...treeAbilities(p)])].slice(0, HB - 1).map(k => ({ type:'ability', key: k }));
+  for (const k of ['bandage', 'potion', 'herb', 'bread']) if (p.hotbar.length < HB) p.hotbar.push({ type:'item', key: k });
   UI.renderHotbar();
 }
 function useSlot(i) {
@@ -3351,7 +3409,8 @@ function bindInput() {
     if (k === 'j') UI.openModal('quests');
     if (k === 't') UI.openModal('skills');
     if (k === 'q') dodge();
-    if (k >= '1' && k <= '8') useSlot(+k - 1);
+    if (k >= '1' && k <= '9') useSlot(+k - 1);
+    if (k === '0') useSlot(9);
     if (k === ' ') e.preventDefault();
   });
   window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
@@ -3464,6 +3523,46 @@ function guarded(attacker, target, dmg) {
   if (target.equip?.offhand && shield) target.equip.offhand.cond = Math.max(0.05, (target.equip.offhand.cond ?? 1) - 0.004);
   sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50);
   return true;
+}
+const stat = (c, k) => !!(c.status && c.status.some(s => s.key === k));
+function addStatus(c, o) { c.status = (c.status || []).filter(s => s.key !== o.key); c.status.push(o); }
+// Fähigkeiten der Klassen aus Session 7 und der aktiven Talentknoten. true = gewirkt; false = abgebrochen (keine Kosten).
+function classAbility(p, key) {
+  const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b)), now = performance.now();
+  switch (key) {
+    case 'frenzy': addStatus(p, { key: 'frenzy', name: 'Raserei', good: true, left: 8000, desc: 'Schaden +35 %, Tempo +15 %, eingesteckter Schaden +20 %.' });
+      fx(p.x, p.y - 14, 'blood', 10); camShake(4, 160); sfx('death', 0.4); return true;
+    case 'shadowstep': {
+      const f = foes.find(x => dist(p, x) < 220); if (!f) { UI.toast('Kein Ziel im Schatten.'); return false; }
+      const a = Math.atan2(f.y - p.y, f.x - p.x), bx = f.x + Math.cos(a) * 26, by = f.y + Math.sin(a) * 26;
+      if (solidTile(p.map, bx, by) || solidPropAt(p.map, bx, by, 8)) { UI.toast('Dahinter ist kein Platz.'); return false; }
+      fx(p.x, p.y - 12, 'shadow', 10); p.x = bx; p.y = by; p.aim = a + Math.PI; p.shadowNext = now + 2500; fx(p.x, p.y - 12, 'shadow', 10); sfx('dodge'); return true; }
+    case 'war_song':
+      for (const a of [p, ...partyMembers()]) { addStatus(a, { key: 'song', name: 'Kriegslied', good: true, left: 12000, desc: 'Schaden +15 %, Ausdauer schneller.' }); S.fx.push({ x: a.x, y: a.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.5, life: 600, maxLife: 600 }); }
+      log(`${p.name} stimmt ein Lied an. Die Gruppe fasst Mut.`, 'party'); sfx('magic', 0.4); return true;
+    case 'discord': {
+      const near = foes.filter(f => dist(p, f) < 140); if (!near.length) { UI.toast('Niemand, der zuhört.'); return false; }
+      for (const f of near) { f.confused = now + 3000; f.stagger = Math.max(f.stagger || 0, 400); fx(f.x, f.y - 20, 'spark', 5); }
+      S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'ring', s: 3, life: 500, maxLife: 500 }); return true; }
+    case 'fire_flask': {
+      const tx = mouse.wx ?? p.x + Math.cos(p.aim) * 150, ty = mouse.wy ?? p.y, a = Math.atan2(ty - p.y, tx - p.x), d = Math.min(260, Math.hypot(tx - p.x, ty - p.y));
+      S.projectiles.push({ id: uid(), kind: 'fire', map: p.map, x: p.x + Math.cos(a) * 14, y: p.y - 12 + Math.sin(a) * 8, vx: Math.cos(a) * 5, vy: Math.sin(a) * 5,
+        owner: p.id, dmg: 18 + p.attributes.intelligence * 0.8, life: Math.max(200, d / 5 * 16), team: 'player', splash: 60, burst: true });
+      return true; }
+    case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
+    case 'brew': if (!addItem(p, 'potion')) return false; log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'war_cry': {
+      const near = foes.filter(f => dist(p, f) < 120); if (!near.length) { UI.toast('Niemand zum Anschreien.'); return false; }
+      for (const f of near) { f.stagger = Math.max(f.stagger || 0, 350); f.cowed = now + 6000; }
+      camShake(5, 180); S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'shock', s: 1, life: 400, maxLife: 400 }); sfx('death', 0.5); return true; }
+    case 'blink': {
+      let d = 0; const ax = Math.cos(p.aim), ay = Math.sin(p.aim);
+      for (let k = 8; k <= 110; k += 8) { if (solidTile(p.map, p.x + ax * k, p.y + ay * k) || solidPropAt(p.map, p.x + ax * k, p.y + ay * k, 8)) break; d = k; }
+      if (d < 16) { UI.toast('Kein Platz zum Springen.'); return false; }
+      fx(p.x, p.y - 12, 'frost', 8); p.x += ax * d; p.y += ay * d; fx(p.x, p.y - 12, 'frost', 8); p.castT = now; sfx('magic', 0.4); return true; }
+    case 'first_aid': p.status = (p.status || []).filter(s => s.key !== 'bleeding'); B.heal(p, p.maxHp * 0.15); fx(p.x, p.y - 12, 'heal', 8); return true;
+  }
+  return true;                                                         // ältere Fähigkeiten: Logik folgt im switch unten
 }
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
 // i-Frames = Dauer der Rolle. Abklingzeit + Ausdauer verhindern Dauerrollen.
@@ -3884,6 +3983,34 @@ export function selftest() {
     const inst = { key: 'longsword', cond: 0.8, rar: 'rare', afx: { keen: 0.05, swift: 0.1 } }; p.inv = []; giveItem(p, inst); const kept = p.inv[0] === inst;
     return ok1 && dist && unique && d1 > d0 * 1.05 && a1 >= a0 + 3 && healed && thorn && kept;
   }));
+  ok('Klassen (Phase 10): jede lernbare Klasse hat einen Lehrer, jede neue eine Schwäche; Berserker-Raserei, Barde −15 %, Alchemist braucht Kraut, Assassine nicht in Platte', sandbox(() => {
+    const teachers = new Set(NPCS.flatMap(n => [].concat(n.teaches || [])));
+    const everyTaught = Object.keys(CLASSES).filter(k => k !== 'wanderer' && k !== 'deathknight').every(k => teachers.has(k));
+    const weak = ['berserker', 'assassin', 'bard', 'alchemist'].every(k => CLASSES[k].weak && CLASSES[k].abilities.every(a => ABILITIES[a]));
+    const p = stage(); p.equip.weapon = mkItem('longsword'); p.equip.weapon.cond = 1; p.knownClasses = ['wanderer', 'warrior', 'berserker', 'bard', 'alchemist', 'rogue', 'assassin'];
+    p.currentClass = 'warrior'; const d0 = damageOf(p); setClass('bard'); const dBard = damageOf(p);
+    setClass('berserker'); p.cooldowns = {}; p.stamina = 100; useAbility('frenzy'); const dRage = damageOf(p), hurtMore = (() => { const h = p.hp; hurt(p, 10, null, 'Test'); return h - p.hp; })();
+    setClass('alchemist'); p.cooldowns = {}; p.inv = []; useAbility('brew'); const noHerb = !hasItem(p, 'potion', 1); addItem(p, 'herb', 3); useAbility('brew'); const brewed = hasItem(p, 'potion', 1) && !hasItem(p, 'herb', 1);
+    setClass('assassin'); p.cooldowns = {}; p.equip.chest = mkItem('plate_cuirass'); const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 80; w.y = p.y; combat = S.ents.__a;
+    const x0 = p.x; useAbility('shadowstep'); const blocked = p.x === x0; p.equip.chest = null; p.cooldowns = {}; p.stamina = 100; useAbility('shadowstep'); const stepped = p.x !== x0 && p.shadowNext > performance.now();
+    p.inv = []; addItem(p, 'herb', 1); p.inv.push({ key: 'herb', count: 9 }); p.cooldowns = {}; setClass('alchemist'); useAbility('brew');   // Regression: Kosten über alle Stapel
+    const paidAll = p.inv.filter(x => x.key === 'herb').reduce((n, x) => n + (x.count || 1), 0) === 7;
+    return paidAll && everyTaught && weak && dBard < d0 * 0.9 && dRage > d0 * 1.25 && hurtMore >= 11 && noHerb && brewed && blocked && stepped;
+  }));
+  ok('Skill-Baum (Phase 9): aktiver Knoten gibt eine Fähigkeit auf die Leiste; Umlernen gibt alle Punkte zurück', sandbox(() => {
+    const p = stage(); p.tree = {}; p.skillPoints = 3; S.gold = 500; p.abilities = []; p.hotbar = [];
+    learnNode('c_tough'); learnNode('c_breath'); learnNode('c_cry');
+    const onBar = p.hotbar.some(h => h.key === 'war_cry') && treeAbilities(p).includes('war_cry');
+    const npc = actor(320, 300); npc.teaches = ['warrior']; npc.key = 'borin'; respec(npc);
+    document.querySelector('#dlg-choices button')?.click(); UI.closeDialogue();
+    return onBar && p.skillPoints === 3 && !Object.keys(p.tree).length && !p.hotbar.some(h => h.key === 'war_cry');
+  }));
+  ok('Feuerball/Feuerflasche: Flächenschaden beim Einschlag trifft auch Umstehende', sandbox(() => {
+    const p = stage(); combat = S.ents.__a; const a = spawnEnemy('wolf', '__a', 11, 9), b = spawnEnemy('wolf', '__a', 11, 9);
+    a.x = p.x + 60; a.y = p.y - 12; b.x = p.x + 80; b.y = p.y + 8; const hb = b.hp;
+    S.projectiles.push({ id: uid(), kind: 'fire', map: '__a', x: a.x - 4, y: a.y, vx: 1, vy: 0, owner: p.id, dmg: 20, life: 500, team: 'player', splash: 60 });
+    updateProjectiles(16); return b.hp < hb && !S.projectiles.length;
+  }));
   ok('Hrodvar: Eiskreis mit Ansage trifft und macht langsam; unter 50 % ruft er einmal drei Tote', sandbox(() => {
     const p = stage(), h = spawnEnemy('hrodvar', '__a', 11, 9, { level: 11 }); h.x = 360; h.y = 300; h.aggroId = p.id; h.aiState = 'pursue';
     combat = S.ents.__a.filter(e => e.alive); const v0 = speedOf(p), hp0 = B.vital(p);
@@ -4150,7 +4277,7 @@ function boot() {
     dropItem: i => { const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
     toStash: i => { const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
     takeFromStash: i => { const s = S.stash[i]; if (!s) return; if (addItem(S.player, s.key, s.count || 1)) S.stash.splice(i, 1); },
-    toHotbar: key => { const p = S.player; if (p.hotbar.length < 8) p.hotbar.push({ type:'item', key }); else p.hotbar[7] = { type:'item', key }; UI.renderHotbar(); },
+    toHotbar: key => { const p = S.player; if (p.hotbar.length < 10) p.hotbar.push({ type:'item', key }); else p.hotbar[9] = { type:'item', key }; UI.renderHotbar(); },
     useSlot, spendAttr: k => { const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford,
     startPlacing, foundCamp: () => foundCamp(),
