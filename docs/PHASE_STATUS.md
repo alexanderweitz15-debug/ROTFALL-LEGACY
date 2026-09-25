@@ -13,8 +13,8 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 6 | Animation & Combat Polish | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Deckung/Parade, Rollen-Landung, Sitzen, Handeln. Nutzer: Kampfgefühl und Klänge gegenhören. Bewusst nicht: Sprint (Shift ist Deckung), Türen als Objekte |
 | 7 | Weapon Expansion | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: 19 Waffen, 13 Klassen; Rapier, Kriegshammer, Hellebarde, Armbrust, Zauberstab mit eigener Mechanik. Bewusst nicht: Kombos |
 | 8 | Rarity & Loot | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: Rarität je Exemplar, 12 Affixe, 3 legendäre Effekte, 2 Unikate, Tabelle im GDD |
-| 9 | Skill Tree | IN ARBEIT | teilweise | Session 5: 3 allgemeine + 3 Titelzweige, Schlüsselknoten mit Preis/Absicht. Offen: Umlernen, Balancing im Spiel |
-| 10 | Classes | IN ARBEIT | teilweise | Titelklassen Nekromant/Hexenmeister/Druide/Mönch (Session 6), max. 2 je Figur, Titelzweige im Skill-Baum (§78 Keystone ✓). Kopfgeldjäger/Barde/Alchemist nur Entwurf |
+| 9 | Skill Tree | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | Session 7: aktive Knoten (3), Umlernen beim Lehrer, 4 Titelzweige. Balancing nur im Spiel prüfbar |
+| 10 | Classes | ABGESCHLOSSEN (Nutzerprüfung offen) | JA, technisch | 14 Grundklassen (+Berserker, Assassine, Barde, Alchemist), 4 Titelklassen; jede lernbar, jede mit Schwäche. Kopfgeldjäger → Phase 17 |
 | 11 | Enemy Expansion | NICHT BEGONNEN | — | |
 | 12 | Bosses | IN ARBEIT | teilweise | Gorak (Sturm, Beben), Hrodvar (Eiskreis, Leibwache, Session 6). Offen: Bosse der Oberwelt, Beute mit Eigenschaften (Phase 8) |
 | 13 | Cities | IN ARBEIT | teilweise | Session 4: Siedlungsdichte §75 erfüllt (Abstand, Fläche, Einwohner nach Größe). Landmarken, Händler je Stadt, Quests fehlen |
@@ -27,6 +27,14 @@ Letzte Aktualisierung: Session 6 (2026-09-25). Nächster Einstieg: SESSION_LOG.m
 | 20 | Performance | TEILWEISE | — | Spielstand 0,53 MB (BUG-017/057 ✓). Offen: Wald-Zeichnen 2,8 ms (Budget 2,0), im echten Browser messen |
 | 21 | Second Complete Playthrough | NICHT BEGONNEN | — | |
 | 22 | Final Quality Pass | NICHT BEGONNEN | — | |
+
+## Phase 9/10 — Definition of Done (§31–32) — Session 7
+- [x] Knotenformen: passiv, aktiv (Fähigkeit), Schlüssel mit designIntent; Umlernen gegen Gold
+- [x] Jede Klasse hat Lehrer (Ursache: drei Klassen waren unerlernbar), jede neue Klasse eine mechanische Schwäche
+- [x] Nekromant/Hexenmeister weiter nur über §78 (Titel), nicht in der Startliste
+- [x] EDGE CASES: Kraut über mehrere Stapel, volle Leiste, Schattenschritt in Platte/ohne Platz, Zauber ohne Mana
+- [x] REGRESSION 76/76 · [x] DOKUMENTATION
+- [ ] Nicht umgesetzt: Kopfgeldjäger (braucht Kopfgeldsystem → Phase 17); Balancing der Werte nur im Spiel
 
 ## Phase 8 — Definition of Done (§30, §48) — Session 7
 - [x] Rarität ist nicht nur Farbe: Affixe, Werte, Sondereffekte, Wert, Bild (Klinge, Runen, Bodenglanz, Zelle)

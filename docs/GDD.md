@@ -242,6 +242,16 @@ Props auf die Mitte ihrer Entwurfskachel, Zäune/Palisaden lückenlos nachgezoge
   Fläche und hält Update ≤ 1,7 ms. Die Grube (Innenkarte) bleibt unverändert.
 - Spielstand v3; v2 wird umgerechnet (siehe CHANGELOG), v1 bleibt inkompatibel.
 
+## Klassen — Ergänzung Session 7 (Vorlage §32)
+| Klasse | Kernfantasie | Ressource | Signatur | Stärke | Schwäche | Lehrer |
+|---|---|---|---|---|---|---|
+| Berserker (Krieger →) | Wut als Rüstung | Ausdauer | Wuchtschlag, Raserei (8 s: +35 % Schaden, +15 % Tempo) | Ausbrüche | +20 % eingesteckt in Raserei | Oda (Grenzwacht) |
+| Assassine (Schurke →) | nicht da, dann dort | Ausdauer | Meuchelstich, Schattenschritt (hinter das Ziel, nächster Hieb ×2,5) | erster Schlag | nicht in Kette/Platte | Rook |
+| Barde | ein Lied trägt weiter | Ausdauer | Kriegslied (Gruppe +15 % Schaden, Ausdauer), Missklang (Gegner taumeln, 50 % daneben) | Gruppe, Kontrolle | −15 % eigener Waffenschaden | Lioba (Kreuzweg) |
+| Alchemist | Kraut, Feuer, Geduld | Heilkraut | Feuerflasche (Fläche am Wurfziel), Giftöl (Treffer vergiften), Trank brauen | Fläche, Nachschub | ohne Kraut keine Fähigkeit | Quirin (Salzhafen) |
+Lehrer aller Klassen: Borin Krieger · Tomas Schütze→Waldläufer · Rook Schurke→Assassine · Elena Kleriker · Morvath Magier ·
+Kelan Ritter→Paladin · Oda Berserker. Todesritter bleibt Rang der Untoten-Fraktion (kein Lehrer, bewusst).
+
 ## Skill-Baum (Session 5)
 - 1 Talentpunkt zum Start und je Stufe (alte Stände: Stufe − 1 rückwirkend). Knoten brauchen **einen** gelernten Knoten
   darüber (Pfade statt Pflichtketten). Daten: `SKILL_TREE`/`SKILL_BRANCHES` (data.js), Fenster „Talente“ (T).

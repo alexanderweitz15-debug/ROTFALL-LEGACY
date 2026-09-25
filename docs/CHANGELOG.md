@@ -4,6 +4,11 @@ Neueste oben. Je Eintrag: was, warum, welche Bugs. Refactorings nennen den Grund
 
 ## Session 7 — 2026-09-25 · Phasen abschließen (Nutzer: „schließ die restlichen Phasen ab“)
 
+### Phase 9/10 — Skill-Baum & Klassen (data.js, game.js, ui.js, style.css)
+- Klassen berserker/assassin/bard/alchemist (+`weak`), Fähigkeiten in `classAbility`, Status frenzy/song/poison_coat/poisoned,
+  `cowed`/`confused`; Lehrer-Folgen `teachable`, Umlernen `respec`; aktive Knoten (`grants`, `treeAbilities`); `splashAt`;
+  `removeItem` über Stapel; Leiste 10 Plätze. Neue Figuren Lioba, Quirin.
+
 ### Phase 8 — Rarität & Beute (data.js, game.js, ui.js, render.js, sprites.js, style.css)
 - `rollRarity`, `AFFIXES`, `LEGENDS`, `RARITY_DROP/VALUE/AFFIXES`, `afx()`, `hasLeg()`, `giveItem()`; Unikate Nachtfrost, Hackmesser.
 

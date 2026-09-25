@@ -438,6 +438,16 @@ dazu Code-Lesen der KI-, Übergangs- und Weltgenerierungspfade.
   verloren; Block rechnete vor der Rüstung; Rolle beendete die Deckung nicht; gebrochene Deckung ließ noch Zufallsblock zu.
 - Lösung: eigenes Feld `cover`, Rüstung vor dem Block, Rolle setzt zurück, Bruch = voller Treffer. Regressionstest. BEHOBEN
 
+### BUG-069 — Magier, Waldläufer, Ritter ohne Lehrer (unerlernbar)
+- Seit der Hexenmeister Titelklasse wurde, lehrte Morvath nichts mehr; Waldläufer/Ritter hatten nie einen Lehrer.
+- Lösung: Lehrer unterrichten Folgen; Selbsttest „jede lernbare Klasse hat einen Lehrer“. CLASSES · HIGH · BEHOBEN
+
+### BUG-070 — Feuerball ohne Flächenschaden (splash nie ausgewertet)
+- Die Beschreibung versprach Flächenschaden, das Feld wurde nirgends gelesen. Lösung: `splashAt`. COMBAT · MEDIUM · BEHOBEN
+
+### BUG-071 — (vor Auslieferung) removeItem nur aus dem ersten Stapel, Leiste zu kurz für aktive Talente
+- Gefunden per code-review. Lösung: Entnahme über alle Stapel; Leiste 10 Plätze. BEHOBEN
+
 ## Design-Lücken (kein Fehler im engeren Sinn, aber Master-Prompt-Anforderung)
 - Rarität ist nur Etikett/Farbe (5 Stufen, kein Mythic, keine Affixe) → Phase 8.
 - Kein Skill Tree (Klassenkette + Fertigkeitswerte) → Phase 9.
