@@ -1,6 +1,6 @@
 // Globaler Spielzustand + Hilfsfunktionen. Ein mutierbares Objekt, absichtlich ohne Store-Framework.
 export const SAVE_KEY = 'rotfall.legacy.save';
-export const SAVE_VERSION = 3;   // 2: erweitertes Grenzland (512×512); 3: Weltmaßstab ×1,5 (768×768), v2 wird beim Laden umgerechnet
+export const SAVE_VERSION = 4;   // 4 (S12): Neuordnung West/Mitte/Ost — ältere Stände werden gesichert, nicht geladen   // 2: erweitertes Grenzland (512×512); 3: Weltmaßstab ×1,5 (768×768), v2 wird beim Laden umgerechnet
 
 export const S = {
   ver: SAVE_VERSION,
@@ -88,7 +88,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet']);
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar']);
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
@@ -153,6 +153,7 @@ function migrate(data) {
   // v1 → v2: Die Welt wurde von 128×128 auf 512×512 vergrößert. Alte Positionen und Kriegsknoten
   // passen nicht mehr zur neuen Geometrie, darum wird ein inkompatibler Stand verworfen statt halb geladen.
   if ((data.ver || 1) < 2) { wipeSave(); return null; }
+  if (data.ver < 4) { try { localStorage.setItem(SAVE_KEY + '.v' + data.ver + '.backup', localStorage.getItem(SAVE_KEY)); } catch (e) {} wipeSave(); return null; }   // S12: Welt neu geordnet — nur neues Spiel
   // v2 → v3: dieselbe Welt (gleicher Seed), nur größer. Positionen rechnet continueGame nach der Weltgenerierung um.
   if (data.ver === 2) (data.flags ||= {}).rescale = true;
   data.ver = SAVE_VERSION; return data;

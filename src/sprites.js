@@ -16,7 +16,33 @@ import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoul
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
-const meta = (f, px, ox, oy) => { f.px = px; f.ox = ox; f.oy = oy; return f; };
+// Stil D (Session 10): feine Frames werden auf ein gröberes Raster gebracht (COARSE Welt je Pixel) — näher an der pixeligen
+// Welt. Nächster-Nachbar-Abtastung, danach wird die Kontur wieder geschlossen (ausgelassene Randpixel).
+export const COARSE = 1.5;
+// S12 (Nutzer: „feiner und größer“): Figuren, Tiere und Waffen bleiben im feinen Raster (1 Pixel = 1 Einheit) und werden als
+// Ganzes um FIGK vergrößert gezeichnet — 1,5-mal mehr Pixel je Figur, 1,2-mal größer. Props und Boden bleiben im groben Raster.
+export const FIGK = 1.2;
+// BUG-093: ohne CPU-Kopie (cv._px) lief das über drawImage + getImageData — GPU-Rücklesen, 1,5–16 ms je Bild, mitten im Frame.
+export function coarse(cv, k = COARSE) {
+  const w = Math.round(cv.width / k), h = Math.round(cv.height / k), s = document.createElement('canvas'); s.width = w; s.height = h;
+  const c = s.getContext('2d');
+  let im;
+  if (cv._px) {                                                      // Nächster Nachbar auf der CPU-Kopie (wie drawImage ohne Glättung)
+    im = new ImageData(w, h); const src = cv._px, W0 = cv.width, H0 = cv.height;
+    for (let y = 0; y < h; y++) { const sy = Math.min(H0 - 1, Math.floor((y + 0.5) * k));
+      for (let x = 0; x < w; x++) { const sx = Math.min(W0 - 1, Math.floor((x + 0.5) * k)), si = (sy * W0 + sx) * 4, di = (y * w + x) * 4;
+        im.data[di] = src[si]; im.data[di + 1] = src[si + 1]; im.data[di + 2] = src[si + 2]; im.data[di + 3] = src[si + 3]; } }
+  } else { c.imageSmoothingEnabled = false; c.drawImage(cv, 0, 0, w, h); im = c.getImageData(0, 0, w, h); }
+  const d = im.data, a = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) a[i] = d[i * 4 + 3] > 0 ? (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] > 75 ? 2 : 1) : 0;   // 2 = Farbe, 1 = Kontur
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (a[i]) continue;
+    if ((x > 0 && a[i - 1] === 2) || (x < w - 1 && a[i + 1] === 2) || (y > 0 && a[i - w] === 2) || (y < h - 1 && a[i + w] === 2)) {
+      d[i * 4] = 12; d[i * 4 + 1] = 10; d[i * 4 + 2] = 8; d[i * 4 + 3] = 255; } }
+  c.putImageData(im, 0, 0); return s;
+}
+const meta = (f, px, ox, oy) => {
+  f.px = px; f.ox = ox; f.oy = oy; return f;   // S12: kein Vergröbern mehr (FIGK)
+};
 export function blit(c, f, dx, dy) { const px = f.px || PX; c.drawImage(f, dx - (f.ox ?? 10) * px, dy - (f.oy ?? 23) * px, f.width * px, f.height * px); }
 const OUT = '#0c0a08';
 const DEEP = '#0d0b0a';
@@ -61,8 +87,19 @@ export function toCanvas(g, outline = true) {
     const i = y * g.w + x;
     if (!g.a[i] && (g.at(x - 1, y) || g.at(x + 1, y) || g.at(x, y - 1) || g.at(x, y + 1))) a[i] = OUT;
   }
-  for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) { const col = a[y * g.w + x]; if (col) { c.fillStyle = col; c.fillRect(x, y, 1, 1); } }
+  const im = new ImageData(g.w, g.h), D = im.data;                   // BUG-093: ein putImageData statt Tausender fillRect; CPU-Kopie für coarse()
+  for (let i = 0; i < a.length; i++) { const col = a[i]; if (!col) continue; const q = rgbaOf(col); D[i * 4] = q[0]; D[i * 4 + 1] = q[1]; D[i * 4 + 2] = q[2]; D[i * 4 + 3] = q[3]; }
+  c.putImageData(im, 0, 0); cv._px = D;
   return cv;
+}
+const rgbaCache = new Map();
+let probe = null;
+function rgbaOf(col) {                                               // Farbstring → [r,g,b,a], einmal je Farbe
+  let q = rgbaCache.get(col); if (q) return q;
+  if (col[0] === '#' && (col.length === 7 || col.length === 4)) q = [...rgb(col), 255];
+  else { probe ||= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    probe.clearRect(0, 0, 1, 1); probe.fillStyle = col; probe.fillRect(0, 0, 1, 1); q = [...probe.getImageData(0, 0, 1, 1).data]; }
+  rgbaCache.set(col, q); return q;
 }
 
 // Weiße Silhouette für den Trefferblitz (einmal je Frame).
@@ -76,14 +113,90 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove'];
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole'];
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '' };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '' };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
+// Bürger je Beruf (Session 10). 'cloth' = eigene Kleidfarbe. hem: Saumhöhe (35 Wams, 39 Kittel, 44 Rock/Mantel).
+const CIVIC = {
+  Bauer: { hem: 39, pouch: 1 },
+  Magd: { robe: 'cloth', apron: 1, apronCol: '#8a8270' },
+  'Bürgerin': { robe: 'cloth', helm: 'scarf', helmCol: '#5a5048', scarf: '#4a3a30' },
+  'Tagelöhner': { hem: 35, strap: 1 },
+  Weber: { hem: 44, scarf: '#6a4a3a' },
+  'Böttcher': { apron: 1, glove: '#3a2c20', hem: 35 },
+  'Bäcker': { apron: 1, apronCol: '#b8ae98', helm: 'cap', helmCol: '#a8a090', hem: 35 },
+  Witwe: { robe: '#1c191c', helm: 'scarf', helmCol: '#141216' },
+  Graf: { hem: 44, tabard: '#2a2a50', mark: 'quarter', markCol: '#c8a050', cape: '#5a1a2a', beard: 1 }, 'Gräfin': { robe: '#4a1a2a', cape: '#2a2a50', helm: 'scarf', helmCol: '#c8a050' },
+  Edelmann: { hem: 44, tabard: '#1f3a3a', mark: 'quarter', markCol: '#b89a50', cape: '#2a2030' }, Edelfrau: { robe: '#2a3a4a', cape: '#5a3a2a', helm: 'scarf', helmCol: '#b89a50' },
+  Kaufherr: { hem: 44, cape: '#3a2a1a', helm: 'wide', helmCol: '#2a2018', pouch: 1, strap: 1 }, Feinmechaniker: { apron: 1, apronCol: '#4a4038', glove: '#3a2c20', pouch: 1, hem: 35 },
+  Kybernetiker: { robe: '#c8c0b0', apron: 1, apronCol: '#6a2020', glove: '#3a3a3a' }, Medica: { robe: '#b8b0a0', stole: '#6a2420' }, Prothesenhändlerin: { robe: 'cloth', apron: 1, apronCol: '#5a4a3a', pouch: 1 },
+  Gelehrter: { robe: '#2a2a3a', hooded: 1, hood: '#2a2a3a', stole: '#b89a50' }, Prothesenmacherin: { apron: 1, apronCol: '#5a3a2a', glove: '#8a7040', strap: 1 },
+  Priester: { robe: '#3a3026', hooded: 1, hood: '#2e2620', stole: '#6a2420', hs: 2 },   // Referenz 3: Kutte, Kapuze, rote Stola
+  Kaufmann: { hem: 44, scarf: '#6a5a44', pouch: 1, helm: 'wide', helmCol: '#2a2420', cape: '#4a2a3a' },
+  Ratsherr: { hem: 44, tabard: '#44202a', mark: 'quarter', markCol: '#a88a48', cape: '#2a1418', beard: 1 },   // Adel: gevierter Wappenrock, Umhang
+  Lagerknecht: { hem: 35, strap: 1, pouch: 1 },
+  Kesselflicker: { helm: 'wide', helmCol: '#3a2e22', strap: 1, pouch: 1 },
+  Wirt: { apron: 1, apronCol: '#8a8270', hem: 35, beard: 1 },
+  Handwerker: { apron: 1, hem: 35 },
+  Stallknecht: { hem: 35, helm: 'cap', helmCol: '#4a3a2a' },
+  Fischer: { hooded: 1, hood: '#34443a', cloak: '#28342c', hem: 44 },
+  Netzflickerin: { robe: 'cloth', helm: 'scarf', helmCol: '#6a6250', apron: 1, apronCol: '#5a5040' },
+  Spielfrau: { hooded: 1, hood: '#5a2230', cloak: '#3a1820', robe: 'cloth' },
+  Alchemist: { robe: '#26302e', pouch: 1, strap: 1 },
+  'Händlerin': { robe: 'cloth' },
+};
+// S12 Automaten des Hochreichs: Messingpanzer, Maskengesicht, bernsteinfarbene Augen
+const ROBOT_LOOK = { skin: '#8a8272', hair: '#8a8272', hs: 2, beard: 0, face: 'mask', glow: '#8a5420', armor: 'plate', armorCol: '#7a6038', pauld: '#8a7040', helm: 'great', helmCol: '#8a7a58',
+  crest: '', hooded: 0, cloak: '', robe: '', cape: '', glove: '#5a5248', boots: '#3a3630', pants: '#4a4640', tabard: '#2a2a30', mark: 'chevron', markCol: '#c8a050', wraps: 0, pouch: 0, strap: 0 };
+// S12: Rüstungsbild je Teil (Material, Farbe, Schulterstücke, Schärpe, Helm). Neue Rüstung = eine Zeile hier.
+const ARMOR_LOOK = {
+  eisenwache: { armor: 'chain', armorCol: '#2a2a2e', sash: '#5a1a1c' },
+  rotgardist: { armor: 'plate', armorCol: '#26272b', pauld: '#4a1418' },
+  aufsehermantel: { armor: 'leather', armorCol: '#1e1a18', glove: '#4a1418', scarf: '#4a4640', hem: 44 },
+  tiefenschuerfer: { armor: 'leather', armorCol: '#4a3e30', pauld: '#5a5650', glove: '#3a2c20' },
+  kettenkoloss: { armor: 'chain', armorCol: '#3e3c38', strap: 1, glove: '#2a2622' },
+  plattenmantel: { armor: 'plate', armorCol: '#4a4640', hem: 44, pauld: '#3a3834' },
+  pluendererharnisch: { armor: 'leather', armorCol: '#4a3a2a', pauld: '#6a665e', strap: 1, pouch: 1 },
+  grenzlaeufer: { armor: 'leather', armorCol: '#3e3a2c', strap: 1, pouch: 1 },
+  legionaersplatte: { armor: 'plate', armorCol: '#5a4636' },
+  eisenfuerst: { armor: 'plate', armorCol: '#1e1f22', pauld: '#4a1418', sash: '#3a1114' },
+  letzte_wache: { armor: 'plate', armorCol: '#5e5044', tabard: '#2a3448', mark: 'chevron', markCol: '#8a8a80' },
+  rotgardistenhelm: { helm: 'great', helmCol: '#1e1f22', crest: '#5a1a1c' },
+  bergmannshelm: { helm: 'cap', helmCol: '#5a5650' },
+  eisenfuersthelm: { helm: 'great', helmCol: '#18181a', crest: '#3a1114' },
+};
+// S12: Leute der Kette sehen nicht geklont aus — Schulterstück, Schärpe, Maske, Umhang je nach Person (seed)
+function varyChain(s, seed) {
+  const h = (seed * 131) | 0;
+  if (!s.pauld && h % 3 === 0) s.pauld = h % 2 ? '#26272b' : '#4a1418';
+  if (!s.sash && h % 4 === 1) s.sash = '#5a1a1c';
+  if (!s.hooded && s.helm !== 'great' && h % 5 === 2) { s.face = 'mask'; }
+  if (!s.cloak && h % 6 === 3) s.cloak = '#1a0c0e';
+}
+// Referenz 3 (Session 12): Zustand sichtbar — Abnutzung 0 neu … 3 zerschlissen, Blut 0/1/2 nach Leben. Diskrete Stufen halten den Frame-Cache klein.
+export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
+const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
+const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };
+const PACK_PROF = new Set(['Reisender', 'Flüchtling', 'Händler', 'Kontorhändler', 'Hausierer']);
+function condition(s, e, eq) {
+  const cs = Object.values(eq || {}).filter(i => i && i.cond != null).map(i => i.cond), avg = cs.length ? cs.reduce((a, b) => a + b, 0) / cs.length : 1;
+  s.wear = Math.max(s.wear || 0, avg > 0.8 ? 0 : avg > 0.5 ? 1 : avg > 0.25 ? 2 : 3, WEAR_PROF[e.prof] || 0, e.captive ? 3 : 0);
+  s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
+  if (PACK_PROF.has(e.prof)) s.pack = 1;
+  if (HAT_PROF[e.prof] && !s.helm && (((e.seed || 0) | 0) % 2)) { s.helm = HAT_PROF[e.prof]; s.helmCol = '#3a3026'; s.hooded = 0; }
+  // Referenz 3: Schichten statt Einheitskittel — Schulterumhang in gedämpften Farben, Beinwickel, Handschuhe, Taschen (je Person fest)
+  const r = (((e.seed || 0) * 7919) | 0) >>> 0;
+  if (!s.hooded && !s.robe && !s.cloak && !s.cape && r % 3 === 0) s.cape = CAPE_COLS[(r >> 3) % CAPE_COLS.length];
+  if (!s.robe && !s.armor && r % 2 === 0) s.wraps = 1;
+  if (s.armor && !s.glove) s.glove = s.armor === 'leather' ? '#3a2c20' : '#4a4640';
+  if (!s.robe && (r >> 5) % 2 === 0) s.pouch = 1;
+}
+const CAPE_COLS = ['#5a1a1c', '#6a2a1e', '#2a3448', '#4a3a28', '#3a4428', '#3a3634', '#5a4a3a', '#4a2a3a'];
 // Personen (Spieler, NPCs): aus Palette, Ausrüstung, Beruf.
 export function humanSpec(e) {
   const p = e.pal || {}, eq = e.equip || {}, s = baseSpec();
@@ -91,14 +204,25 @@ export function humanSpec(e) {
   s.skin = p.skin || s.skin; s.hair = p.hair || s.hair; s.cloth = p.cloth || s.cloth; s.glow = p.glow || '';
   s.hs = p.hs != null ? p.hs : e.kind === 'player' ? 0 : (((e.seed || 0) * 7) | 0) % 4;   // Frisur: 0 kurz, 1 lang, 2 kahl, 3 Zopf
   const chest = eq.chest && eq.chest.key, head = eq.head && eq.head.key, off = eq.offhand && eq.offhand.key;
-  if (chest === 'leather_jerkin') { s.armor = 'leather'; s.armorCol = '#5a4030'; }
-  else if (chest === 'chain_hauberk') { s.armor = 'chain'; s.armorCol = '#7c7b76'; }
-  else if (chest === 'plate_cuirass') { s.armor = 'plate'; s.armorCol = p.armor || '#a39d8e'; }
+  const AL = ARMOR_LOOK[chest]; if (AL) Object.assign(s, AL);
+  const HL = ARMOR_LOOK[head]; if (HL) Object.assign(s, HL);
+  if (AL) {}
+  else if (chest === 'leather_jerkin') { s.armor = 'leather'; s.armorCol = '#5a4030'; }
+  else if (chest === 'gambeson') { s.armor = 'leather'; s.armorCol = '#8a7a5c'; }
+  else if (chest === 'pit_leather') { s.armor = 'leather'; s.armorCol = '#4a5230'; }
+  else if (chest === 'brigandine') { s.armor = 'chain'; s.armorCol = '#5a3e32'; }
+  else if (chest === 'scale_mail') { s.armor = 'chain'; s.armorCol = '#8a7e62'; }
+  else if (chest === 'chain_hauberk') { s.armor = 'chain'; s.armorCol = '#64635e'; }
+  else if (chest === 'plate_cuirass') { s.armor = 'plate'; s.armorCol = p.armor || '#5e5a52'; }
   else if (p.armor) { s.armor = 'chain'; s.armorCol = p.armor; }
-  if (head === 'leather_cap') { s.helm = 'cap'; s.helmCol = '#5a4030'; }
-  else if (head === 'iron_helm') { s.helm = 'nasal'; s.helmCol = '#8b8a85'; }
+  if (HL) {}
+  else if (head === 'leather_cap') { s.helm = 'cap'; s.helmCol = '#5a4030'; }
+  else if (head === 'iron_helm') { s.helm = 'nasal'; s.helmCol = '#5a5852'; }
+  else if (head === 'kettle_hat') { s.helm = 'kettle'; s.helmCol = '#6a6862'; }
+  else if (head === 'great_helm') { s.helm = 'great'; s.helmCol = '#5a5852'; }
   if (p.helm) { s.helm = 'great'; s.helmCol = p.helm; }
-  s.crest = p.crest || '';
+  s.crest = p.crest || s.crest || '';
+  if (e.faction === 'chain' && !e.captive) varyChain(s, e.seed || 0);
   if (eq.cloak || e.hooded || p.hood) {
     s.hooded = 1; s.cloak = p.cloak || (eq.cloak && eq.cloak.key === 'order_seal' ? '#d9d2c0' : darkOf(s.cloth));
     s.hood = p.hood || s.cloak;
@@ -114,15 +238,15 @@ export function humanSpec(e) {
   if (e.undead) { s.face = 'skull'; s.glow = s.glow || '#4e8f7a'; }
   // Berufe und Figuren
   if (prof === 'Dorfvorsteher') { s.robe = s.cloth; s.scarf = '#6b5a45'; s.beard = 1; s.hs = 2; }
-  else if (prof === 'Heilerin') { s.robe = '#c7bda6'; s.cloth = '#c7bda6'; s.hooded = 1; s.hood = '#7a2a22'; s.cloak = ''; s.face = 'human'; s.belt = '#7a2a22'; }
+  else if (prof === 'Heilerin') { s.robe = '#a89c84'; s.cloth = '#a89c84'; s.hooded = 1; s.hood = '#6a2420'; s.cloak = ''; s.face = 'human'; s.belt = '#6a2420'; s.stole = '#6a2420'; }
   else if (prof === 'Schmied') { s.apron = 1; s.hs = 2; s.beard = 1; s.glove = '#3a2c20'; }
-  else if (prof === 'Bauer') { s.helm = s.helm || 'hat'; s.helmCol = s.helmCol || '#8a7a4a'; s.beard = s.hs & 1; }
+  else if (prof === 'Bauer') { s.helm = s.helm || ((e.seed | 0) % 2 ? 'wide' : 'hat'); s.helmCol = s.helmCol || ((e.seed | 0) % 3 ? '#8a7a4a' : '#5a4a36'); s.beard = s.hs & 1; }
   else if (prof === 'Holzfäller') { s.beard = 1; s.strap = 1; }
   else if (prof === 'Magd' || prof === 'Jorans Tochter' || prof === 'Kind des Dorfes') { s.helm = s.helm || 'scarf'; s.helmCol = s.helmCol || '#8a7d62'; s.hs = 1; }
   else if (prof === 'Händlerin' || prof === 'Kontorhändler' || prof === 'Händler') { s.pouch = 1; s.strap = 1; s.scarf = '#8c6a2e';
     if (prof !== 'Händlerin') { s.helm = s.helm || 'hat'; s.helmCol = s.helmCol || '#3a2c20'; s.beard = 1; } }
-  else if (prof === 'Wache') { s.helm = 'nasal'; s.helmCol = '#8b8a85'; s.armor = 'chain'; s.armorCol = '#7c7b76'; s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }
-  else if (prof === 'Torwache') { s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }                   // Valen: Blau, Silberwinkel
+  else if (prof === 'Wache') { s.helm = ['nasal', 'kettle', 'bascinet'][(e.seed | 0) % 3]; s.helmCol = '#5a5852'; s.armor = 'chain'; s.armorCol = '#64635e'; s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }
+  else if (prof === 'Torwache') { if (!s.helm || s.helm === 'nasal') s.helm = ['nasal', 'kettle', 'bascinet'][(e.seed | 0) % 3]; s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; }                   // Valen: Blau, Silberwinkel
   else if (prof === 'Ordenswache') { s.tabard = '#d9d2c0'; s.mark = 'cross'; s.markCol = '#9b2e26'; s.helm = 'great'; s.helmCol = '#b9b19c'; }   // Orden: Elfenbein & Rot
   else if (prof === 'Söldnerwache') { s.scarf = '#7a5a2a'; s.strap = 1; s.pouch = 1; s.beard = s.hs & 1; }             // gekauft, nicht vereidigt
   else if (prof === 'Ehemaliger Söldner') { s.beard = 1; s.strap = 1; s.pouch = 1; }
@@ -131,7 +255,12 @@ export function humanSpec(e) {
   else if (prof === 'Grabgebundener') { s.robe = '#232a28'; s.hooded = 1; s.hood = '#1b2120'; s.cloak = '#161b1a'; s.face = 'mask'; s.glow = '#5fb39a'; }
   else if (prof === 'Alter Paladin') { s.tabard = '#d9d2c0'; s.mark = s.mark || 'cross'; s.markCol = '#9b2e26'; s.beard = 1; }
   else if (prof === 'Reisender' || prof === 'Flüchtling') { s.hooded = s.hooded || ((e.seed | 0) % 2); s.cloak = s.cloak || darkOf(s.cloth); s.hood = s.hood || s.cloak; s.strap = 1; s.pouch = 1; }
+  // Stände an der Silhouette (Referenz 2): Kleid/Robe, langer Rock, Schürze, Kapuze — nicht nur Farbe
+  const K = CIVIC[prof]; if (K) { for (const k in K) if (s[k] == null || s[k] === '' || s[k] === 0 || k === 'robe' || k === 'hem') s[k] = K[k] === 'cloth' ? s.cloth : K[k]; }
+  if (!K && !s.robe && /(in|frau)$/.test(prof) && !s.armor) { s.robe = s.cloth; s.helm = s.helm || 'scarf'; s.helmCol = s.helmCol || darkOf(s.cloth); }
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
+  condition(s, e, eq);
+  if (e.robot) Object.assign(s, ROBOT_LOOK);
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
   return s;
@@ -144,22 +273,37 @@ export function monsterSpec(e, m) {
   if (t === 'goblin' || t === 'goblin_warrior') {
     s.sp = 'goblin'; s.pants = '#3a2e1e'; s.boots = ''; s.hs = 2;
     if (t === 'goblin_warrior') { s.helm = 'cap'; s.helmCol = '#6b6156'; s.armor = 'leather'; s.armorCol = '#4a3a28'; s.shield = 'round'; s.shieldCol = '#3d2f20'; s.mark = 'boss'; s.markCol = '#6b6156'; }
-  } else if (t === 'bandit' || t === 'bandit_archer') {
+  } else if (t === 'automat') {
+    Object.assign(s, ROBOT_LOOK, { tabard: '', armorCol: '#5a4a34', helmCol: '#6a5a44' });   // verwildert: stumpfes Messing
+  } else if (t === 'rotgardist') {                                    // S12 Rotgardist: schwarze Platte, rote Schultern, Vollhelm mit rotem Kamm
+    Object.assign(s, ARMOR_LOOK.rotgardist, ARMOR_LOOK.rotgardistenhelm, { cloak: (e.seed | 0) % 3 ? '#2a0e10' : '' }); varyChain(s, e.seed || 0); s.helm = 'great';
+  } else if (t === 'kettenschuetze') {                                // S12 Kettenschütze: Eisenwache mit Köcher, Bergmannshelm
+    Object.assign(s, ARMOR_LOOK.eisenwache, ARMOR_LOOK.bergmannshelm); s.quiver = 1; varyChain(s, e.seed || 0);
+  } else if (t === 'chain_brute' || t === 'chain_master') {             // Eiserne Kette: schwarze Kleidung, Brigantine/Schuppen, Topfhelm, Kette quer über der Brust
+    s.hooded = 0; s.armor = 'chain'; s.armorCol = t === 'chain_master' ? '#6a6250' : '#4a3e34'; s.helm = 'great'; s.helmCol = t === 'chain_master' ? '#8a8278' : '#5a5652';
+    s.crest = t === 'chain_master' ? '#6a1e18' : ''; s.tabard = '#141210'; s.mark = 'chevron'; s.markCol = '#5a1a1c'; s.cloak = t === 'chain_master' ? '#2a0e10' : ''; s.strap = 1;
+    if (t === 'chain_master') { s.armor = 'plate'; s.armorCol = '#1e1f22'; s.pauld = '#4a1418'; s.helmCol = '#18181a'; s.crest = '#3a1114'; } else varyChain(s, e.seed || 0);
+  } else if (t === 'bandit' || t === 'bandit_archer' || t === 'bandit_spear' || t === 'bounty_hunter') {
     s.hooded = 1; s.face = 'cloth'; s.strap = 1; s.pouch = 1;
     s.hood = t === 'bandit' ? '#2e241a' : '#2f3a24'; s.cloak = t === 'bandit' ? '#261e16' : '#26301d';
     s.scarf = t === 'bandit' ? '#7a2a20' : ''; s.armor = 'leather'; s.armorCol = '#4a3525';
     if (t === 'bandit_archer') s.quiver = 1;
+    if (t === 'bounty_hunter') { s.hood = '#1e1c1a'; s.cloak = '#2a2622'; s.scarf = ''; s.strap = 1; s.quiver = 0;   // Kopfgeldjäger: schwarz; ab Stufe 3 (§72) Kettenhemd und Helm — sichtbar stärker
+      if ((e.tier || 0) >= 3) { s.armor = 'chain'; s.armorCol = '#6a6a66'; s.hooded = 0; s.helm = 'nasal'; s.helmCol = '#7a7874'; } }
+    if (t === 'bandit_spear') { s.hooded = 0; s.helm = 'cap'; s.helmCol = '#5a4e40'; s.hood = '#4a3a26'; s.cloak = '#3e3222'; s.scarf = '#b8a070'; }   // Speerträger: Kappe statt Kapuze, helles Halstuch
   } else if (t === 'cultist') {                                         // Kultist: Robe, tiefe Kapuze, violettes Glimmen
     s.hooded = 1; s.hood = '#241a28'; s.robe = '#2a1f2e'; s.cloak = '#1c1420'; s.face = 'skin'; s.glow = p.glow; s.mark = 'chevron'; s.markCol = '#5a4a66';
   } else if (t === 'ghoul' || t === 'wraith') {                         // Wiedergänger: Leichenhaut, Fetzen; Geist: bleich, Kapuze, Schleier
     s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = '';
     if (t === 'ghoul') { s.hooded = 0; s.cloth = '#2c2a24'; s.pants = '#2c2a24'; s.armor = 'leather'; s.armorCol = '#3a342a'; }
     else { s.hooded = 1; s.hood = '#aab4c0'; s.cloak = '#8a96a4'; s.cloth = '#aab4c0'; s.pants = '#aab4c0'; }
-  } else if (t === 'skeleton' || t === 'crypt_warden' || t === 'hrodvar') {
+  } else if (t === 'skeleton' || t === 'crypt_warden' || t === 'hrodvar' || t === 'death_captain') {
     s.sp = 'skeleton'; s.skin = p.skin || '#cfc8b4'; s.hooded = 1; s.hood = '#20252a'; s.cloak = '#191c20'; s.cloth = '#22252a';
     s.face = 'skull'; s.glow = e.glow || p.glow || '#4e8f7a'; s.boots = ''; s.pants = '#22252a';   // e.glow: Diener eines Nekromanten
     if (t === 'crypt_warden') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#4a4f55'; s.armor = 'plate'; s.armorCol = '#3d4247'; s.tabard = '#1c1f24';
       s.mark = 'chevron'; s.markCol = '#7fd0b8'; s.shield = 'heater'; s.shieldCol = '#262a2e'; }
+    if (t === 'death_captain') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#50463f'; s.crest = '#7a2a22'; s.armor = 'plate'; s.armorCol = '#403834'; s.tabard = '#2a1416';
+      s.mark = 'chevron'; s.markCol = '#c05a3a'; s.cloak = '#1c1012'; }   // Hauptmann: rostige Platte, roter Kamm, glühende Augen
     if (t === 'hrodvar') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#8fb3c7'; s.crest = '#c8e6f5'; s.armor = 'plate'; s.armorCol = '#5d7383'; s.tabard = '#1d2a36';
       s.mark = 'chevron'; s.markCol = '#9fd8ff'; s.cloak = '#16202a'; }   // Frostkönig: bereifte Platte, Kammhelm, kein Schild (Zweihänder)
   } else if (t === 'valen_soldier') {
@@ -167,6 +311,11 @@ export function monsterSpec(e, m) {
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
   }
   if (e.shield && !s.shield) { s.shield = 'round'; s.shieldCol = '#4a3f30'; s.mark = 'boss'; s.markCol = '#8a8172'; }
+  const sd = ((e.seed || 0) | 0) % 2;                                   // Referenz 3: Räuber und Tote tragen, was sie haben
+  s.wear = { goblin: 2, goblin_warrior: 2, bandit: 1 + sd, bandit_archer: 1 + sd, bandit_spear: 1 + sd, bounty_hunter: 1, ghoul: 3, skeleton: 2, crypt_warden: 2, death_captain: 2, cultist: 1, chain_brute: 1, kettenschuetze: 1, valen_soldier: 1 }[t] || 0;
+  s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
+  if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
+  if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
   return s;
 }
 
@@ -176,13 +325,14 @@ const lookCache = new Map();
 function resolve(s, k) {
   let L = lookCache.get(k); if (L) return L;
   const pants = s.pants || '#2f2519';
+  const dk = (h, k = 0.3) => h && mix(h, '#0f0d12', k);             // Referenz 2: Kleidung dunkel, Akzente bleiben
   L = { ...s,
-    skin: ramp(s.skin), hair: ramp(s.hair), cloth: ramp(s.cloth), pants: ramp(pants), boots: s.boots ? ramp(s.boots) : null,
-    belt: ramp(s.belt), leather: ramp('#5a4030'), hood: s.hooded ? ramp(s.hood || darkOf(s.cloth)) : null, cloak: s.cloak ? ramp(s.cloak) : null,
-    armorR: s.armor ? ramp(s.armorCol) : null, helmR: s.helm ? ramp(s.helmCol || '#8b8a85') : null, crest: s.crest ? ramp(s.crest) : null,
-    robe: s.robe ? ramp(s.robe) : null, tabard: s.tabard ? ramp(s.tabard) : null, markR: s.markCol ? ramp(s.markCol) : null,
+    skin: ramp(s.skin), hair: ramp(dk(s.hair, 0.15)), cloth: ramp(dk(s.cloth)), pants: ramp(dk(pants)), boots: s.boots ? ramp(s.boots) : null,
+    belt: ramp(s.belt), leather: ramp('#5a4030'), apronR: s.apronCol ? ramp(s.apronCol) : null, hood: s.hooded ? ramp(dk(s.hood || darkOf(s.cloth))) : null, cloak: s.cloak ? ramp(dk(s.cloak)) : null,
+    armorR: s.armor ? ramp(dk(s.armorCol, 0.2)) : null, pauldR: s.pauld ? ramp(s.pauld) : null, capeR: s.cape ? ramp(dk(s.cape, 0.1)) : null, stoleR: s.stole ? ramp(s.stole) : null, sashR: s.sash ? ramp(s.sash) : null, helmR: s.helm ? ramp(dk(s.helmCol || '#5a5852', 0.2)) : null, crest: s.crest ? ramp(s.crest) : null,
+    robe: s.robe ? ramp(dk(s.robe, 0.22)) : null, tabard: s.tabard ? ramp(dk(s.tabard, 0.15)) : null, markR: s.markCol ? ramp(s.markCol) : null,
     scarf: s.scarf ? ramp(s.scarf) : null, shieldR: s.shield ? ramp(s.shieldCol) : null, glove: s.glove ? ramp(s.glove) : null,
-    bone: ramp('#cfc6b0'), metal: ramp('#8b8a85'), gold: ramp('#b8963e'), wood: ramp('#5b452a'),
+    bone: ramp('#cfc6b0'), metal: ramp('#5a5852'), gold: ramp('#b8963e'), wood: ramp('#5b452a'),
   };
   lookCache.set(k, L); return L;
 }
@@ -549,12 +699,32 @@ function paintTuck2(L) {
 }
 
 // ---------------- Frame-Cache ----------------
-const frameCache = new Map();
+const frameCache = new Map(), cacheStat = { miss: 0, clears: 0 };
+export const frameCacheInfo = () => ({ size: frameCache.size, ...cacheStat });
 function cacheGet(k, make) {
   let f = frameCache.get(k); if (f) return f;
-  if (frameCache.size > 4000) frameCache.clear();
+  if (frameCache.size > 4000) { frameCache.clear(); warmed.clear(); cacheStat.clears++; }
+  cacheStat.miss++;
   f = make(); frameCache.set(k, f); return f;
 }
+// BUG-093: ein neues Bild (Figur × Richtung × Pose) kostet beim ersten Zeichnen ~10 ms (Malen + Vergröbern) — mitten im Frame
+// ein Ruckler. Sichtbare Figuren melden sich hier; Stand- und Laufposen aller vier Richtungen werden in Browser-Pausen vorgebacken.
+const warmQ = [], warmed = new Set();
+let warmOn = false;
+const idleCb = window.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8 }), 40));
+export function warm(spec, noArm = null) {
+  const k = specKey(spec) + '|' + (noArm || '');
+  if (warmed.has(k)) return;
+  warmed.add(k);
+  for (const d of 'SNWE') for (const p of ['i0', 'w0', 'w1', 'w2', 'w3', 'i1']) warmQ.push([spec, d, p, noArm]);
+  if (!warmOn) { warmOn = true; idleCb(warmRun); }
+}
+function warmRun(dl) {
+  warmOn = false;
+  while (warmQ.length && dl.timeRemaining() > 4) { const [sp, d, p, n] = warmQ.shift(); humanFrame(sp, d, p, n); }
+  if (warmQ.length) { warmOn = true; idleCb(warmRun); }
+}
+export const warmPending = () => warmQ.length;
 // dir: 'S' | 'N' | 'W' | 'E'. pose: i0 i1 w0..w3 a1 a2 hit cast kneel tuck down dead
 export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waffenarm weglassen (zeichnet der Renderer zur Waffe)
   const sk = specKey(spec);
@@ -583,7 +753,9 @@ export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waff
 export function poseOf(e, now, bow) {
   let face = e.facing || 0;
   const sw = e.swing || 0;
-  if ((sw > 0 || e.channel) && e.aim != null) {
+  // Körper folgt der Zielrichtung (Master-Prompt §27): Spieler immer, andere im Kampf — sonst kreiste nur die Waffe um eine
+  // Figur, die in Laufrichtung schaute. Rückwärtslaufen = Blick zum Ziel, Beine laufen (wie Zielen im Gehen).
+  if ((sw > 0 || e.channel || e.kind === 'player' || e.aggroId || e.threatId) && e.aim != null) {
     const ca = Math.cos(e.aim), sa = Math.sin(e.aim);
     face = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 3 : 2) : (sa > 0 ? 0 : 1);
   }
@@ -757,6 +929,7 @@ export function weaponSprite(key, rarity, holy, wtype) {
   if (runes && info.blade) { const [x0, x1, y] = info.blade, rc = holy ? '#f2e6b0' : rarity === 'mythic' ? '#e8f8ff' : rarity === 'legendary' ? '#ffd27a' : '#e0a060';
     for (let x = x0 + 2; x < x1 - 1; x += 3) { g.p(x, y, rc); if (info.px === 1) g.p(x + 1, y, rc); } }
   w = { cv: toCanvas(g), px: PX, ...info, runes };
+  // S12: Waffen im feinen Raster (vergrößert zeichnet drawHumanoid)
   WPN.set(k, w); return w;
 }
 
@@ -948,10 +1121,14 @@ export function tileTexture(t, v, cols, kind) {
     c.fillStyle = base.b; c.fillRect(0, 0, 16, 16);
     const seed = t * 97 + v * 13;
     const n = (x, y) => h2(x + seed * 31, y + seed * 17);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = n(x, y); if (r > 0.84) P(x, y, mix(base.b, alt.b, 0.6)); else if (r < 0.1) P(x, y, mix(base.b, base.sh, 0.6)); else if (r < 0.13) P(x, y, mix(base.b, base.hi, 0.35)); }
-    if (kind === 'grass') {
-      for (let i = 0; i < 7; i++) { const x = (n(i, 99) * 15) | 0, y = 2 + ((n(99, i) * 12) | 0); P(x, y, base.hi); P(x, y + 1, base.b); P(x + 1, y + 1, base.sh); }
-      if (n(5, 5) > 0.8) { P((n(7, 1) * 14) | 0, (n(1, 7) * 14) | 0, '#8a7a44'); }
+    // Session 10 (Referenz 2): ruhige Flächen — Flecken in 2×2-Clustern (versetzt) statt Einzelpixel-Rauschen
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = n((x + ((y >> 1) & 1)) >> 1, y >> 1), q = n(x, y);
+      if (r > 0.86 && q > 0.2) P(x, y, mix(base.b, alt.b, 0.5)); else if (r < 0.1 && q > 0.25) P(x, y, mix(base.b, base.sh, 0.45)); else if (q < 0.02) P(x, y, mix(base.b, base.hi, 0.3)); }
+    if (kind === 'grass') {                                // Referenz 4: Büschel (dunkler Fuß, helle Spitzen), selten Blüte oder Kiesel
+      for (let i = 0; i < 4; i++) { const x = 1 + ((n(i, 99) * 13) | 0), y = 3 + ((n(99, i) * 11) | 0);   // ruhig: flache Büschel, keine Spitzen
+        P(x, y + 1, base.sh); P(x + 1, y + 1, base.sh); P(x + 2, y + 1, mix(base.b, base.sh, 0.5)); P(x + 1, y, mix(base.b, base.hi, 0.6)); P(x, y, i % 2 ? mix(base.b, base.hi, 0.4) : base.b); }
+      if (n(5, 5) > 0.82) { const x = (n(7, 1) * 14) | 0, y = (n(1, 7) * 14) | 0; P(x, y, ['#b8a050', '#a04a38', '#c8c0a0'][v % 3]); P(x + 1, y + 1, base.dk); }
+      else if (n(5, 6) > 0.8) { const x = (n(8, 1) * 14) | 0, y = (n(1, 8) * 14) | 0; P(x, y, '#8a8070'); P(x + 1, y, '#6a6258'); P(x, y + 1, '#3a342c'); }
     } else if (kind === 'road' || kind === 'stone' || kind === 'dfloor') {
       const bw = kind === 'road' ? 5 : 8, bh = kind === 'road' ? 4 : 8;
       for (let y = 0; y < 16; y += bh) for (let x = -((y / bh) % 2) * (bw >> 1); x < 16; x += bw) {
@@ -963,8 +1140,10 @@ export function tileTexture(t, v, cols, kind) {
       if (n(4, 4) > 0.5) { const x = 2 + ((n(5, 2) * 10) | 0), y = 2 + ((n(2, 5) * 10) | 0);
         P(x, y, base.hi); P(x + 1, y, base.hi); P(x + 2, y, base.b); P(x, y + 1, base.b); P(x + 1, y + 1, base.b); P(x + 2, y + 1, base.sh); P(x, y + 2, base.dk); P(x + 1, y + 2, base.dk); P(x + 2, y + 2, base.dk); }
       for (let i = 0; i < 2; i++) { let x = (n(i, 33) * 13) | 0, y = (n(33, i) * 13) | 0; for (let k = 0; k < 3; k++) { P(x, y, mix(base.b, base.dk, 0.5)); x++; y += n(k, i + 3) > 0.5 ? 1 : 0; } }
-    } else if (kind === 'plank') {
-      for (let y = 0; y < 16; y += 4) { for (let x = 0; x < 16; x++) P(x, y, base.dk); P(((y * 7) % 13) + 1, y + 2, base.sh); P(3 + (y % 8), y + 1, base.hi); }
+    } else if (kind === 'plank') {                         // Dielen: Fugen, Maserung, Nagelköpfe, Stoß versetzt
+      for (let y = 0; y < 16; y += 4) { for (let x = 0; x < 16; x++) { P(x, y, base.dk); if (n(x, y + 3) > 0.7) P(x, y + 2, mix(base.b, base.sh, 0.5)); }
+        P(3 + (y % 8), y + 1, base.hi); P(4 + (y % 8), y + 1, base.hi); const jx = ((y * 7) % 13) + 1; P(jx, y + 1, base.dk); P(jx, y + 2, base.dk); P(jx, y + 3, base.dk);
+        P(jx + 1, y + 2, '#2a2420'); P(jx - 1, y + 2, '#2a2420'); }
     } else if (kind === 'wall' || kind === 'dwall') {
       for (let y = 0; y < 16; y += 4) for (let x = -((y / 4) % 2) * 3; x < 16; x += 6) {
         for (let i = 0; i < 6; i++) P(x + i, y + 3, base.dk); P(x + 5, y, base.dk); P(x + 5, y + 1, base.dk); P(x + 5, y + 2, base.dk);
@@ -974,8 +1153,9 @@ export function tileTexture(t, v, cols, kind) {
     } else if (kind === 'rock') {
       for (let i = 0; i < 3; i++) { let x = (n(i, 3) * 14) | 0, y = (n(3, i) * 12) | 0; for (let k = 0; k < 5; k++) { P(x, y, base.dk); x += n(k, i) > 0.5 ? 1 : 0; y++; } }
       for (let x = 0; x < 16; x++) P(x, 0, base.hi);
-    } else if (kind === 'field') {
-      for (let y = 1; y < 16; y += 4) for (let x = 0; x < 16; x++) { P(x, y, base.dk); if ((x + y) % 3 === 0) P(x, y - 1, '#6d6a36'); }
+    } else if (kind === 'field') {                         // Acker: Furchen mit Licht an der Kante, Keimlinge in Reihen
+      for (let y = 1; y < 16; y += 4) for (let x = 0; x < 16; x++) { P(x, y, base.dk); P(x, y + 1, mix(base.b, base.dk, 0.3)); P(x, y - 1, mix(base.b, base.hi, 0.35));
+        if ((x + y) % 3 === 0 && n(x, y) > 0.3) { P(x, y - 1, '#5a6a2c'); P(x, y - 2, '#7a8a3a'); } }
     } else if (kind === 'water') {
       for (let i = 0; i < 4; i++) { const x = (n(i, 9) * 12) | 0, y = (n(9, i) * 15) | 0; P(x, y, base.hi); P(x + 1, y, base.hi); P(x + 2, y, base.b); }
     } else if (kind === 'marsh') {
@@ -984,8 +1164,28 @@ export function tileTexture(t, v, cols, kind) {
     } else if (kind === 'ash') {
       if (n(8, 8) > 0.7) { const x = 3 + ((n(1, 2) * 9) | 0), y = 3 + ((n(2, 1) * 9) | 0); P(x, y, '#b8b09a'); P(x + 1, y, '#b8b09a'); P(x + 2, y + 1, '#8e8776'); }
       if (n(6, 3) > 0.85) P((n(3, 6) * 15) | 0, (n(6, 6) * 15) | 0, '#7a3a22');
-    } else if (kind === 'sand' || kind === 'dirt') {
-      for (let i = 0; i < 4; i++) { const x = (n(i, 7) * 15) | 0, y = (n(7, i) * 15) | 0; P(x, y, base.hi); P(x + 1, y + 1, base.dk); }
+    } else if (kind === 'sand' || kind === 'dirt') {       // Kiesel mit Licht und Schatten, Erdklumpen, bei Erde vereinzelt Halme
+      for (let i = 0; i < 5; i++) { const x = (n(i, 7) * 14) | 0, y = (n(7, i) * 14) | 0, big = i < 2;
+        P(x, y, mix(base.hi, '#c8b890', 0.2)); P(x + 1, y + 1, base.dk); if (big) { P(x + 1, y, base.hi); P(x, y + 1, base.b); P(x + 2, y + 1, base.dk); P(x + 1, y + 2, base.dk); } }
+      for (let i = 0; i < 2; i++) { let x = (n(i, 17) * 13) | 0, y = (n(17, i) * 13) | 0; for (let k = 0; k < 3; k++) { P(x, y, mix(base.b, base.dk, 0.55)); x++; y += n(k, i + 5) > 0.6 ? 1 : 0; } }
+      if (kind === 'dirt' && n(3, 3) > 0.6) { const x = (n(4, 9) * 14) | 0, y = 2 + ((n(9, 4) * 12) | 0); P(x, y, '#4a5a2c'); P(x, y + 1, '#34401f'); P(x + 1, y - 1, '#6a7a38'); }
+    }
+    // S12 (Nutzer: „Boden detaillierter“): zweite Detailebene — feine Körnung, dazu je Boden eigene Kleinigkeiten, ruhig gehalten
+    if (kind === 'grass' || kind === 'dirt' || kind === 'sand' || kind === 'ash' || kind === 'marsh' || kind === 'scree')
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const g = n(x * 3 + 7, y * 5 + 11); if (g > 0.93) P(x, y, mix(base.b, base.hi, 0.22)); else if (g < 0.06) P(x, y, mix(base.b, base.dk, 0.28)); }
+    if (kind === 'grass') {                                   // Halme (dunkler Fuß → heller Kopf) und Klee
+      for (let i = 0; i < 3; i++) { const x = 1 + ((n(i + 20, 40) * 14) | 0), y = 4 + ((n(40, i + 20) * 10) | 0); P(x, y + 1, base.dk); P(x, y, base.sh); P(x, y - 1, mix(base.b, base.hi, 0.5)); }
+      if (n(9, 9) > 0.55) { const x = (n(10, 3) * 14) | 0, y = (n(3, 10) * 14) | 0; P(x, y, mix(base.hi, '#9ab060', 0.3)); P(x + 1, y, mix(base.hi, '#9ab060', 0.2)); P(x, y + 1, mix(base.b, base.sh, 0.4)); }
+    } else if (kind === 'dirt') {                             // Risse und Wurzeln
+      if (n(12, 4) > 0.45) { let x = (n(13, 5) * 12) | 0, y = (n(5, 13) * 12) | 0; for (let k = 0; k < 4; k++) { P(x, y, mix(base.dk, '#120e0a', 0.3)); x += 1; y += n(k, 14) > 0.5 ? 1 : 0; } }
+      if (n(14, 6) > 0.7) { let x = (n(15, 7) * 12) | 0, y = (n(7, 15) * 12) | 0; for (let k = 0; k < 3; k++) { P(x, y, '#4a3622'); x += n(k, 16) > 0.5 ? 1 : -1; y += 1; } }
+    } else if (kind === 'sand') {                             // Windrippel: helle Kante, Schatten darunter
+      for (let y = 2 + (v % 3); y < 16; y += 5) for (let x = 0; x < 16; x++) { const yy = y + Math.round(Math.sin((x + v * 3) / 2.5)); P(x, yy, mix(base.b, base.hi, 0.35)); P(x, yy + 1, mix(base.b, base.sh, 0.3)); }
+    } else if (kind === 'ash') {                              // Schlacke, Asche, seltene Glut
+      for (let i = 0; i < 4; i++) { const x = (n(i, 50) * 15) | 0, y = (n(50, i) * 15) | 0; P(x, y, i % 2 ? '#6a6660' : '#2a2624'); }
+      if (n(17, 17) > 0.9) P((n(18, 2) * 15) | 0, (n(2, 18) * 15) | 0, '#b0502a');
+    } else if (kind === 'marsh') {                            // Pfützen mit Himmelsglanz
+      if (n(19, 3) > 0.4) { const x = 2 + ((n(20, 4) * 10) | 0), y = 3 + ((n(4, 20) * 10) | 0); for (let i = 0; i < 4; i++) P(x + i, y, i === 1 ? '#6a7a80' : '#2a3a3a'); P(x + 1, y + 1, '#1e2a28'); P(x + 2, y + 1, '#1e2a28'); }
     }
     return cv;
   });

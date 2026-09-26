@@ -14,20 +14,31 @@ const hh = (x, y, s = 0) => { let n = (x * 374761393 + y * 668265263 + s * 22468
 
 // Stadt → Bauweise. Arm/einfach/wohlhabend spiegelt sich im Material.
 export const TOWN_STYLE = {
-  eren:      { roof: 'thatch',  wall: 'timber' },     // Dorf: Stroh, Fachwerk
-  northcity: { roof: 'shingle', wall: 'stone' },      // Grenzstadt: Schindeln, Bruchstein
-  saltport:  { roof: 'tile',    wall: 'plaster' },    // Hafen: Ziegel, Putz
-  kreuzweg:  { roof: 'shingle', wall: 'wood' },       // Söldnerstadt: Holz
-  ashford:   { roof: 'slate',   wall: 'stone' },      // befestigter Posten: Schiefer
-  sonnwacht: { roof: 'slate',   wall: 'palestone' },  // Orden: heller Stein
+  eren:      { roof: 'thatch',  wall: 'timber', alt: 'shingle' },     // Dorf: Stroh, Fachwerk
+  northcity: { roof: 'shingle', wall: 'stone', alt: 'tile' },      // Grenzstadt: Schindeln, Bruchstein
+  saltport:  { roof: 'tile',    wall: 'plaster', alt: 'slate' },    // Hafen: Ziegel, Putz
+  kreuzweg:  { roof: 'shingle', wall: 'wood', alt: 'thatch' },       // Söldnerstadt: Holz
+  ashford:   { roof: 'slate',   wall: 'stone', alt: 'shingle' },      // befestigter Posten: Schiefer
+  sonnwacht: { roof: 'slate',   wall: 'palestone', alt: 'tile' },  // Orden: heller Stein
   vharnholm: { roof: 'bone',    wall: 'blackstone' }, // Stadt der Stillen: aschgraue Schindeln, schwarzer Basalt
+  karak: { roof: 'tile', wall: 'plaster', alt: 'shingle' },
+  // Hochreich Aurelion (S12): heller Stein, Schiefer und Ziegel — sichtbar reicher als der Norden
+  aurelheim: { roof: 'slate', wall: 'palestone', alt: 'tile' }, kupferhafen: { roof: 'tile', wall: 'plaster', alt: 'slate' }, gelenkhall: { roof: 'tile', wall: 'stone', alt: 'slate' },
+  tickmar: { roof: 'slate', wall: 'blackstone', alt: 'tile' }, sanktserin: { roof: 'slate', wall: 'palestone' }, aurelheim_land: { roof: 'slate', wall: 'palestone', alt: 'tile' },           // S12 Karak-Atar: Lehmputz, Ziegel
+  kettenfeste: { roof: 'slate', wall: 'blackstone' }, // Eiserne Kette (Session 11): Schiefer, schwarzer Stein
+  // Dörfer (Session 12): Bauweise nach Herrschaft — Valen Stroh/Fachwerk, Orden Schiefer/heller Stein, Händler Holz, Tributdörfer ärmlich
+  haselbrueck: { roof: 'thatch', wall: 'timber', alt: 'shingle' }, muehlbach: { roof: 'thatch', wall: 'timber', alt: 'tile' }, weidenau: { roof: 'thatch', wall: 'wood', alt: 'shingle' },
+  rastfurt: { roof: 'shingle', wall: 'wood', alt: 'tile' }, lichtenrain: { roof: 'slate', wall: 'palestone', alt: 'tile' },
+  grauwasser: { roof: 'thatch', wall: 'wood' }, hohlstein: { roof: 'shingle', wall: 'stone' }, eisenried: { roof: 'thatch', wall: 'wood' },
 };
 // Materialtöne; Nachbarn unterscheiden sich: je Haus ein gedämpfter Ton aus der Familie (neu gedeckt, verwittert, anderer Kalk)
-const ROOF_VAR = { thatch: ['#7a6238', '#71603a', '#826842', '#6a5834'], shingle: ['#5b4a3c', '#534537', '#645244', '#4d443a'],
-  slate: ['#4a525c', '#444b54', '#525860', '#4b4d57'], bone: ['#5a564c', '#4f4c44', '#625d51', '#48453e'], tile: ['#7c4432', '#88523a', '#6c3d30', '#7a4b37', '#8c5c42'] };
+// Referenz 4 (Session 12): kräftigere Dachfarben — goldenes Stroh, rotbraune Schindeln, blauer Schiefer, tiefrote Ziegel
+const ROOF_VAR = { thatch: ['#8a6a34', '#7e6232', '#94703a', '#6e5a30'], shingle: ['#6a4436', '#5e4a3a', '#744a38', '#54483a'],
+  slate: ['#3e4a5e', '#465264', '#38445a', '#4a5068'], bone: ['#5a564c', '#4f4c44', '#625d51', '#48453e'], tile: ['#8a3a2a', '#963f2e', '#7a3428', '#8e4a34', '#823e2c'] };
 const WALL_VAR = { timber: ['#b1a283', '#a8997b', '#b9ac90'], wood: ['#5d4632', '#534030', '#654d37'], stone: ['#6c665c', '#645f58', '#736b5f'],
   plaster: ['#a89a7e', '#b4a88d', '#a39177', '#aba390', '#b39a85'], palestone: ['#9b968a', '#a39d91', '#938e83'], blackstone: ['#3f3d39', '#383633', '#46423c'] };
-const varOf = (tab, kind, b, salt) => { const a = tab[kind]; return a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0]; };
+const DIM = { timber: 0.42, plaster: 0.38, palestone: 0.22, stone: 0.15, wood: 0.12 };                       // Session 10: dunkler, gealtert
+const varOf = (tab, kind, b, salt) => { const a = tab[kind], c = a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0]; return tab === WALL_VAR && DIM[kind] ? mix(c, '#2a221a', DIM[kind]) : c; };
 const BEAM = '#3e2e20', DOORW = '#4a3322', IRON = '#35332f';
 const SHUTTER = ['#4a5a3a', '#5a3a2a', '#3a4a5a', '#5a5030'];
 
@@ -64,7 +75,7 @@ const ICON = {
 // Zustand je Haus (dystopische Welt): 0 bewohnt/gepflegt, 1 heruntergekommen, 2 verlassen/zerstört (kein Licht, keine
 // Bewohner). Je Ort unterschiedlich stark: die Grenzorte verfallen, die Ordensfeste hält ihre Häuser instand.
 // Betriebe (Taverne, Schmiede …) werden nie ganz aufgegeben — sonst fehlt der Ort, der sie braucht.
-const WEAR_BIAS = { eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
+const WEAR_BIAS = { aurelheim: 0.02, kupferhafen: 0.06, gelenkhall: 0.08, tickmar: 0.1, sanktserin: 0.04, aurelheim_land: 0.05, grauwasser: 0.6, hohlstein: 0.6, eisenried: 0.6, eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
 const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store']);
 export function wearOf(b) {
   if (b.wear != null) return b.wear;
@@ -76,7 +87,8 @@ const styleOf = b => ({ pitch: 0.34 + hh(b.hx ?? b.x, b.hy ?? b.y, 61) * 0.17, d
   awning: hh(b.hx ?? b.x, b.hy ?? b.y, 63) < 0.35, plinth: hh(b.hx ?? b.x, b.hy ?? b.y, 64) < 0.45 });
 
 // Wandhöhe FH: höher als eine Figur (25 Texel inkl. Kopf ≈ Tür 16). Firsthöhe RISE wächst mit der Tiefe.
-export function houseDims(b) { const T = BTYPES[b.type] || {}, RISE = 10 + b.h * 2, FH = T.floors === 2 ? 36 : b.big || T.big ? 24 : 21; return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
+// Session 10: Fassade höher (Tür ≈ Figurenhöhe, Figuren sind seit v2 größer); das Dach behält mindestens 24 Texel.
+export function houseDims(b) { const T = BTYPES[b.type] || {}, RISE = 10 + b.h * 2, FH = Math.min(T.floors === 2 ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
 // Giebel nach vorn: über der Vorderwand ein Giebeldreieck (Höhe GH), dahinter zwei Dachflächen, die nach hinten laufen.
 export function gableOf(b) {
   const { OV, RISE, FH, W } = houseDims(b), yF = RISE + b.h * 16 - FH, halfW = (b.w * 16) / 2;
@@ -97,7 +109,7 @@ export function houseSprite(b, lit) {
   const T = BTYPES[b.type] || BTYPES.house, st = TOWN_STYLE[b.town] || TOWN_STYLE.eren;
   const wear = wearOf(b), sty = styleOf(b);
   if (wear === 2) lit = false;                                      // verlassen: nachts dunkel
-  const roofKind = b.roof || st.roof, wallKind = b.wall || T.wall || st.wall;
+  const roofKind = b.roof || (st.alt && hh(b.hx ?? b.x, b.hy ?? b.y, 71) < 0.3 ? st.alt : st.roof), wallKind = b.wall || T.wall || st.wall;   // Referenz 4: gemischte Dächer im Ort
   const { OV, RISE, FH, W, H } = houseDims(b), s = b.seed || 1;
   const g = new G(W, H);
   const n = (x, y) => hh(x, y, s);
@@ -132,7 +144,7 @@ export function houseSprite(b, lit) {
   const floors2 = T.floors === 2;
   if (floors2) for (let x = fx0; x <= fx1; x++) { g.p(x, yB - 20, wallKind === 'timber' ? Br.b : mix(Wr.sh, '#120e0c', 0.3)); g.p(x, yB - 19, mix(Wr.b, '#120e0c', 0.25)); }   // Geschossgesims
   const midT = b.w >> 1, big = has('bigDoor');
-  const dw = T.barnDoor ? 20 : big ? 12 : 8, dh = floors2 ? 15 : FH - 6, dx = fx0 + midT * 16 + ((16 - dw) >> 1), dy = yB - 2 - dh;
+  const dw = T.barnDoor ? 20 : big ? 14 : 10, dh = floors2 ? 26 : FH - 6, dx = fx0 + midT * 16 + ((16 - dw) >> 1), dy = yB - 2 - dh;
   const door = (x0, y0, w, hgt) => {
     const D = ramp(DOORW);
     g.r(x0 - 1, y0 - 1, w + 2, hgt + 1, Br.dk);
@@ -148,10 +160,10 @@ export function houseSprite(b, lit) {
   else if (b.door === 'E') door(fx1 - 4, dy + 2, 4, dh - 2);
   const shut = SHUTTER[(n(5, 5) * SHUTTER.length) | 0];
   const win = (x0, y0) => {
-    g.r(x0 - 1, y0 - 1, 8, 8, Br.dk); g.r(x0 - 1, y0 + 6, 8, 1, '#8a8274');            // Rahmen, Fensterbank
-    for (let y = y0; y < y0 + 6; y++) for (let x = x0; x < x0 + 6; x++)
-      g.p(x, y, lit ? (x === x0 + 2 || y === y0 + 2 ? '#8a5020' : (x + y) % 3 ? '#e2a95a' : '#f2cf8a') : (x === x0 + 2 || y === y0 + 2 ? Br.dk : x === x0 + 1 && y === y0 + 1 ? '#6a7480' : y > y0 + 3 ? '#15181c' : '#1d2126'));
-    if (wallKind === 'timber' || wallKind === 'wood') { const Sr = ramp(shut); g.r(x0 - 3, y0, 2, 6, Sr.b); g.p(x0 - 3, y0, Sr.hi); g.p(x0 - 3, y0 + 3, Sr.dk); g.r(x0 + 7, y0, 2, 6, Sr.sh); g.p(x0 + 7, y0 + 3, Sr.dk); }
+    g.r(x0 - 1, y0 - 1, 8, 10, Br.dk); g.r(x0 - 1, y0 + 8, 8, 1, '#6a6458');            // Rahmen, Fensterbank (6×8 Glas)
+    for (let y = y0; y < y0 + 8; y++) for (let x = x0; x < x0 + 6; x++)
+      g.p(x, y, lit ? (x === x0 + 2 || y === y0 + 3 ? '#8a5020' : (x + y) % 3 ? '#e2a95a' : '#f2cf8a') : (x === x0 + 2 || y === y0 + 3 ? Br.dk : x === x0 + 1 && y === y0 + 1 ? '#5a6470' : y > y0 + 4 ? '#101316' : '#181c21'));
+    if (wallKind === 'timber' || wallKind === 'wood') { const Sr = ramp(shut); g.r(x0 - 3, y0, 2, 8, Sr.b); g.p(x0 - 3, y0, Sr.hi); g.p(x0 - 3, y0 + 4, Sr.dk); g.r(x0 + 7, y0, 2, 8, Sr.sh); g.p(x0 + 7, y0 + 4, Sr.dk); }
     return [x0, y0];
   };
   const stallDoor = (x0) => {                                      // Stalltür: oben offen (dunkel), unten Bretter
@@ -163,9 +175,9 @@ export function houseSprite(b, lit) {
   };
   const wins = [];
   const slots = Math.max(1, Math.floor((b.w * 16 - 8) / 16));
-  for (const wy of floors2 ? [yF + 5, yB - 16] : [yF + 5]) for (let i = 0; i < slots + 1; i++) {
+  for (const wy of floors2 ? [yF + 7, yB - 20] : [yF + 8]) for (let i = 0; i < slots + 1; i++) {
     const cx = fx0 + 5 + Math.round(i * (b.w * 16 - 16) / Math.max(1, slots));
-    if (b.door === 'S' && cx + 8 > dx - 3 && cx < dx + dw + 3 && wy + 7 > dy - 2) continue;
+    if (b.door === 'S' && cx + 8 > dx - 3 && cx < dx + dw + 3 && wy + 9 > dy - 2) continue;
     if ((T.forge || T.oven) && i === 0 && wy > yB - 20) continue;
     if ((b.door === 'W' && cx < fx0 + 8) || (b.door === 'E' && cx > fx1 - 12)) continue;
     if (T.stalls) { stallDoor(cx - 1); continue; }
@@ -183,7 +195,7 @@ export function houseSprite(b, lit) {
   const patches = T.patch ? [0, 1].map(i => ({ x: Math.round(cx + (i ? 1 : -1) * halfW * (0.3 + hh(i, 3, s) * 0.45)) - 3, y: 3 + Math.round(hh(i, 4, s) * Math.max(1, apexY - 6)) })) : [];
   for (let y = 0; y < yF; y++) for (let x = 0; x < W; x++) {
     if (inGable(x, y)) {                                                   // Giebelfeld in Wandmaterial
-      if (y < yF) g.p(x, y, wallAt(x, y));
+      if (y < yF) g.p(x, y, mix(wallAt(x, y), '#1a1510', 0.12 + 0.1 * (1 - (y - apexY) / GH)));   // Giebelfeld liegt im Schatten des Dachs
       continue;
     }
     const k = Math.abs(x - cx), west = x < cx, depth = 1 - y / (yF + 2);
@@ -252,7 +264,7 @@ export function houseSprite(b, lit) {
     if (!inGable(gx, y) || (hatch && y >= hatch[0] && y <= hatch[1])) continue; if (Math.abs(y - gy) > 3) g.p(gx, y, Br.b);
     if (y === yF - Math.round(GH * 0.3)) for (let x = 0; x < W; x++) if (inGable(x, y) && inGable(x, y - 1)) g.p(x, y, Br.b);
   }
-  for (let x = fx0; x <= fx1; x++) g.p(x, yF, mix(g.at(x, yF) || Wr.b, '#120e0c', 0.5));   // Rähm/Schatten unter dem Giebel
+  for (let x = fx0; x <= fx1; x++) for (let d = 0; d < 4; d++) g.p(x, yF + d, mix(g.at(x, yF + d) || Wr.b, '#0e0b09', [0.55, 0.4, 0.26, 0.14][d]));   // Traufschatten (Verlauf)
   if (b.door === 'N') { const nx = Math.round(cx) - 4; g.r(nx - 1, 1, 10, 3, Br.dk); g.r(nx, 2, 8, 1, DOORW); }
 
   // ---- Funktion von außen ----
@@ -331,6 +343,8 @@ export function houseSprite(b, lit) {
     for (let j = 0; j < 4; j++) for (let i = 0; i < 6 - (j === 0 ? 2 : 0); i++) g.p(wx + i + (j === 0 ? 1 : 0), wy + j, (i + j) % 2 ? '#7a5a38' : '#5a4028'); }
   if (T.sacks) for (let i = 0; i < 3; i++) { const sx = fx1 - 18 + i * 5, sy = yB - 7; const Sk = ramp('#9a8a66');   // Säcke an der Wand
     g.r(sx, sy + 1, 4, 5, Sk.b); g.r(sx + 1, sy, 2, 1, Sk.sh); g.p(sx, sy + 1, Sk.hi); g.r(sx + 3, sy + 2, 1, 4, Sk.sh); }
+  for (let y = yB - 12; y < yB - 2; y++) for (let x = fx0; x <= fx1; x++) { const c = g.at(x, y), t = (y - yB + 12) / 10;   // Spritzwasser, Feuchte
+    if (c && n(x, y + 200) < t * 0.55) g.p(x, y, mix(c, '#1b1812', 0.3)); }
   if (wear) weather(g, { b, wear, n, W, yF, yB, fx0, fx1, cx, halfW, apexY, GH, inGable, R, Wr, Br, wins, dx, dy, dw, dh, wallKind, roofKind, door: b.door });
   return toCanvas(g);
 }
@@ -361,8 +375,8 @@ function weather(g, o) {
   wins.forEach(([x0, y0], i) => {
     if (wear === 1 && i !== ((n(9, 9) * wins.length) | 0)) return;
     if (wear === 2 && n(i, 60) < 0.4) {                             // eingeschlagen: schwarz mit Scherbenrand
-      g.r(x0, y0, 6, 6, '#0b0a09'); g.p(x0, y0, '#6a7480'); g.p(x0 + 5, y0 + 1, '#6a7480'); g.p(x0 + 1, y0 + 5, '#5a646e');
-    } else plank(x0 - 1, y0, 8, 6);
+      g.r(x0, y0, 6, 8, '#0b0a09'); g.p(x0, y0, '#6a7480'); g.p(x0 + 5, y0 + 1, '#6a7480'); g.p(x0 + 1, y0 + 7, '#5a646e');
+    } else plank(x0 - 1, y0, 8, 8);
     if (wear === 2) for (let y = y0 - 6; y < y0; y++) for (let x = x0 - 1; x < x0 + 7; x++)   // Rußfahne über dem Fenster
       if (g.at(x, y) && n(x, y + 70) < 0.75 - (y0 - y) * 0.1) g.p(x, y, mix(g.at(x, y), '#15110d', 0.55));
   });

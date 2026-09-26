@@ -24,7 +24,7 @@ function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   W = cv.parentElement.clientWidth; H = cv.parentElement.clientHeight;
   cv.width = Math.max(2, W * dpr); cv.height = Math.max(2, H * dpr);
-  dark.width = cv.width; dark.height = cv.height;
+  dark.width = Math.ceil(cv.width / 2); dark.height = Math.ceil(cv.height / 2);   // Licht ist weich: halbe Auflösung, ¼ der Pixel (Phase 20)
   ctx.imageSmoothingEnabled = false;
 }
 export const view = () => ({ W, H });
@@ -33,23 +33,37 @@ export function screenToWorld(sx, sy) { return { x: sx / cam.zoom + cam.x, y: sy
 function h2(x, y) { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; }
 
 const TILE_COL = {
-  [T.GRASS]: ['#3c4a2c', '#43522f', '#364325'],
-  [T.DIRT]:  ['#4a3d2c', '#534531', '#413527'],
+  [T.GRASS]: ['#3e4c2a', '#46542d', '#384524'],   // Referenz 4: wärmer, oliv, mehr Tiefe
+  [T.DIRT]:  ['#50402c', '#5a4730', '#463826'],
   [T.ROAD]:  ['#5a4d3a', '#645640', '#524634'],
   [T.WATER]: ['#22384a', '#284058', '#1d3040'],
   [T.MARSH]: ['#333a26', '#3b422c', '#2b3120'],
   [T.STONE]: ['#4a4741', '#534f48', '#413e39'],
-  [T.PLANK]: ['#4e3d2a', '#573f2c', '#453525'],
+  [T.PLANK]: ['#56402a', '#5e452c', '#4b3824'],
   [T.ROCK]:  ['#3a3733', '#44403a', '#312e2b'],
   [T.WALL]:  ['#3f3a33', '#48423a', '#36322c'],
   [T.SAND]:  ['#5c5540', '#665e47', '#544d3a'],
   [T.DFLOOR]:['#2e2a25', '#35302a', '#28241f'],
   [T.DWALL]: ['#1b1815', '#201d19', '#171411'],
   [T.ASH]:   ['#37332e', '#3e3934', '#2f2b27'],
-  [T.FIELD]: ['#55492c', '#5e5131', '#4b4026'],
+  [T.FIELD]: ['#4f3e28', '#58452b', '#473824'],
 };
 
 // ---------------- Hauptbild ----------------
+// Sichtliste (S12): alle Props je Bild zu filtern kostete bei ~14 000 Props ~0,4 ms. Props bewegen sich nicht: Raster (256 px)
+// je Karte, neu gebaut, wenn sich die Objektzahl ändert (spätestens alle 1,5 s); Bewegliches (Figuren, Gegner, Beute) als kurze Liste.
+const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0 }, GC = 256;
+function visibleEnts(arr, xa, ya, xb, yb) {
+  const now = performance.now();
+  if (VIS.arr !== arr || VIS.n !== arr.length || now - VIS.t > 1500) {
+    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = [];
+    for (const e of arr) { if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e); }
+  }
+  const out = [], inView = e => e.x > xa && e.x < xb && e.y > ya && e.y < yb;
+  for (let gy = Math.floor(ya / GC); gy <= Math.floor(yb / GC); gy++) for (let gx = Math.floor(xa / GC); gx <= Math.floor(xb / GC); gx++) { const c = VIS.grid.get(gx * 4096 + gy); if (c) for (const e of c) if (inView(e)) out.push(e); }
+  for (const e of VIS.dyn) if (inView(e)) out.push(e);
+  return out;
+}
 export function drawFrame(now) {
   if (!ctx) return;
   const m = MAPS[S.map]; if (!m) return;
@@ -73,11 +87,15 @@ export function drawFrame(now) {
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
 
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
-  const list = S.ents[S.map].filter(e => e.x > cam.x - 80 && e.x < cam.x + W / cam.zoom + 80 && e.y > cam.y - 100 && e.y < cam.y + H / cam.zoom + 120);
+  const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
+  for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
+    const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 150, a - 0.7, a + 0.7); ctx.closePath(); ctx.fill(); }
   for (const e of list) drawEntity(e, now);
+  shown = list;
   for (const p of S.projectiles) drawProjectile(p);
   drawFx(now);
   const ch = S.player && S.player.channel;
@@ -91,7 +109,30 @@ export function drawFrame(now) {
   drawLight(now);
   drawWeather(now);
   drawFloats();
+  drawBubbles(performance.now());
   drawBossBar();
+}
+// Sprechblasen der Bewohner (Talk-Pairs): über Licht und Wetter, damit sie lesbar bleiben; dunkles Feld mit Pergamentkante
+let shown = [];
+function drawBubbles(now) {
+  const z = cam.zoom, placed = []; ctx.font = `${Math.round(10 * z * 0.75 + 4)}px Cinzel, serif`; ctx.textAlign = 'center';
+  const P = S.player, talking = shown.filter(e => { const t = e.talk; return t && now >= t.at && now <= t.at + 2500 && now <= t.until; })
+    .sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 4);   // höchstens 4 Blasen, die nächsten zum Spieler
+  for (const e of talking) {
+    const t = e.talk;
+    const tx = e.x / TS | 0, ty = e.y / TS | 0;                        // unter einem Dach: nur hörbar, wenn man selbst im Haus ist
+    if (HOUSES.some(b => b.map === S.map && tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !playerInside(b))) continue;
+    const a = Math.min(1, (now - t.at) / 150, (t.at + 2500 - now) / 250);
+    const sx = Math.round((e.x - cam.x) * z), w = Math.ceil(ctx.measureText(t.say).width) + 10, h = Math.round(10 * z * 0.75 + 12);
+    let sy = Math.round((e.y - 72 - cam.y) * z);                          // überlappt eine schon gezeichnete Blase: darüber ausweichen
+    for (let k = 0; k < 6 && placed.some(r => Math.abs(r[0] - sx) < (r[2] + w) / 2 + 2 && Math.abs(r[1] - sy) < h + 2); k++) sy -= h + 3;
+    placed.push([sx, sy, w]);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#c8b89a'; ctx.fillRect(sx - w / 2 - 1, sy - h - 1, w + 2, h + 2); ctx.fillRect(sx - 3, sy + 1, 6, 2); ctx.fillRect(sx - 1, sy + 3, 2, 2);   // Kante + Zipfel
+    ctx.fillStyle = '#1a1612'; ctx.fillRect(sx - w / 2, sy - h, w, h); ctx.fillRect(sx - 2, sy, 4, 2);
+    ctx.fillStyle = '#eadcc0'; ctx.fillText(t.say, sx, sy - h / 2 + 4);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
 }
 function drawBossBar() {
   const p = S.player; if (!p) return;
@@ -104,8 +145,8 @@ function drawBossBar() {
   ctx.fillStyle = '#c0503a'; ctx.fillRect(x, y, Math.round(w * k), 2);
   ctx.fillStyle = '#e7dcc2'; ctx.fillRect(x + w / 2 - 1, y - 3, 2, 16);               // Phasenwechsel bei 50 %
   ctx.font = '600 13px Cinzel, serif'; ctx.textAlign = 'center';
-  ctx.fillStyle = '#0c0a08'; ctx.fillText((MONSTERS[b.mtype] || {}).name || 'Boss', W / 2 + 1, y - 7);
-  ctx.fillStyle = b.phase === 2 ? '#e0806a' : '#e7dcc2'; ctx.fillText((MONSTERS[b.mtype] || {}).name || 'Boss', W / 2, y - 8);
+  ctx.fillStyle = '#0c0a08'; ctx.fillText(b.title || (MONSTERS[b.mtype] || {}).name || 'Boss', W / 2 + 1, y - 7);
+  ctx.fillStyle = b.phase >= 2 ? '#e0806a' : '#e7dcc2'; ctx.fillText(b.title || (MONSTERS[b.mtype] || {}).name || 'Boss', W / 2, y - 8);
   ctx.textAlign = 'left';
 }
 
@@ -124,6 +165,9 @@ const REGION = {
   mountain:  { tint: 'rgba(190,200,215,.10)',  trees: ['snowpine'],              decor: 'snow',  mote: '#e8eef2', fall: 1 },
   desert:    { tint: 'rgba(180,90,40,.10)',    trees: ['dead'],                  decor: 'desert', dust: '#c89a6a' },
   badland:   { tint: 'rgba(90,40,30,.16)',     trees: ['dead'],                  decor: 'ember', mote: '#d06a2a', rise: 1 },
+  aurel:     { tint: 'rgba(120,130,60,.05)',   trees: ['oak', 'birch', 'oak'],   decor: 'meadow' },   // S12 Hochreich Aurelion: gepflegtes Land
+  eisen:     { tint: 'rgba(30,24,22,.18)',     trees: ['pine', 'dead', 'pine'],  decor: 'snow',  dark: 0.05, mote: '#7a746a', fall: 1 },   // S12 Eisenmark (Westen): Asche fällt
+  deadland:  { tint: 'rgba(90,12,14,.24)',     trees: ['dead'],                  decor: 'blight', dark: 0.16, fog: 'rgba(80,16,16,.10)', mote: '#8a2a22', fall: 1 },   // S12 Totenland (Osten)
   blight:    { tint: 'rgba(16,26,24,.26)',     trees: ['dead'],                  decor: 'blight', dark: 0.15, fog: 'rgba(50,80,70,.14)', mote: '#7a7a72', fall: 1 },
 };
 let curRegion = 'greenmark';                              // Region des Spielers (je Frame)
@@ -445,15 +489,16 @@ function paintWalls(o, m, cx, cy) {
 }
 // ---------------- Wasser: weiche Ufer, Tiefe, Schaum, Schilf (statt Kachelquadrate) ----------------
 const WATER_PAL = {            // tief, mittel, flach, Licht, Schaum
-  greenmark: ['#18293a', '#1f3446', '#2a4452', '#3e5c66', '#8aa2a4'],
-  plains:    ['#18293a', '#1f3446', '#2a4452', '#3e5c66', '#8aa2a4'],
-  forest:    ['#152430', '#1b2f3a', '#253e46', '#385658', '#7e9690'],
+  greenmark: ['#132a44', '#1a3852', '#264e66', '#44748a', '#a4c0c8'],   // Referenz 4: tiefer, blauer, heller Schaum
+  plains:    ['#132a44', '#1a3852', '#264e66', '#44748a', '#a4c0c8'],
+  forest:    ['#122838', '#183444', '#224858', '#3a6670', '#90aca8'],
   marsh:     ['#19231f', '#212e28', '#2c3b30', '#3e4e3c', '#76866a'],
   mountain:  ['#182839', '#1f3549', '#2b475c', '#44657a', '#b4c8d0'],
   desert:    ['#1b272c', '#233439', '#2f4446', '#485c5a', '#a09e88'],
   badland:   ['#191e20', '#212a2c', '#2b3736', '#3e4c48', '#8a8a7a'],
   blight:    ['#121a1a', '#192523', '#22312d', '#30433b', '#6a8a7a'],
-  sea:       ['#131e2b', '#192837', '#223546', '#385064', '#9aaeb6'],   // Südsee: kalt, grau-blau, heller Schaum
+  deadland:  ['#1a0808', '#240b0c', '#2e1012', '#4a1a1c', '#8a4a44'],   // S12 Totenland: dunkle Blutseen
+  sea:       ['#0f2036', '#152c46', '#1f3e5a', '#385e7a', '#a2bac6'],   // Südsee: kalt, grau-blau, heller Schaum
 };
 const WATER_RGB = Object.fromEntries(Object.entries(WATER_PAL).map(([k, v]) => [k, v.map(rgbOf)]));
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);   // geordnetes Dithering zwischen Tiefenstufen
@@ -564,6 +609,22 @@ function flashAlpha(e, now) {
   return dt >= 0 && dt < FLASH_MS ? (1 - dt / FLASH_MS) * 0.6 : 0;
 }
 
+// Eisenmark (Session 11): Kette vom Treiber zum Gefangenen — Glieder mit Durchhang; Goblin-NPCs klein wie Goblin-Gegner.
+// Der Treiber wird hier zwischengespeichert, nicht am Objekt (ein Verweis im Objekt ginge in den Spielstand).
+const chainLead = new Map();
+function drawChain(e) {
+  let L = chainLead.get(e.id);
+  if (!L || !L.alive) { const k = e.chainIdx || 1;                    // Glied an Glied: Treiber → 1 → 2 → 3
+    L = k > 1 ? S.ents[e.map].find(x => x.chainedTo === e.chainedTo && x.chainIdx === k - 1) : S.ents[e.map].find(x => x.id === e.chainedTo);
+    if (!L) return; chainLead.set(e.id, L); }
+  const x0 = L.x + 6, y0 = L.y - 14, x1 = e.x, y1 = e.y - 16, n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / 4));
+  for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t + Math.sin(t * Math.PI) * 5;
+    ctx.fillStyle = '#1a1816'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4); ctx.fillStyle = i % 2 ? '#8a857e' : '#b8b2a8'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); }   // Glied mit Kontur, auch auf dunklem Boden lesbar
+}
+function drawGoblinNpc(e, now) {
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.82, 0.82); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
+  if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
+}
 function drawEntity(e, now) {
   switch (e.kind) {
     case 'prop': return drawPropPixel(e, now);
@@ -572,7 +633,8 @@ function drawEntity(e, now) {
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
     case 'enemy': return drawCreature(e, now);
-    case 'npc': case 'player': return drawHumanoid(e, now);
+    case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
+    case 'player': return drawHumanoid(e, now);
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'house': return drawHouse(e.b, now);
@@ -591,7 +653,7 @@ export function playerInside(b, p = S.player) {
 }
 const isNight = () => { const h = S.minute / 60; return h >= 19 || h < 6; };
 function drawHouse(b, now) {
-  const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd');
+  const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b);   // Verfall (auch Kriegsschäden) im Schlüssel
   let cv = houseCache.get(key);
   if (!cv) { if (houseCache.size > 120) houseCache.clear(); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
   const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
@@ -677,13 +739,15 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
-const PROP_PERIOD = { hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { tower_ruin: 192, boat: 128 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const PROP_PERIOD = { chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const PROP_BOX = { tower_ruin: 192, boat: 128, factory: 224, big_gear: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
-const PROP_RES = 1;                                       // Pixel je Welt-Einheit (vorher 0,5 = grobes 2er-Raster)
+const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
+const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
+export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
 function drawPropPixel(e, now) {
   const per = PROP_PERIOD[e.type];
   let key = e.type, v = 0, ph = 0;
@@ -695,6 +759,7 @@ function drawPropPixel(e, now) {
   if (e.depleted) key += 'd';
   if (e.intact) key += 'I';
   if (e.opened) key += 'o';
+  const shut = stallShut(e); if (shut) key += 'z';   // §41: Markt sichtbar zu (Plane), nicht nur eine Zahl
   let reg = null;                                         // Fels trägt die Gesteinsfarbe seiner Region
   if (e.type === 'rock_node' || e.type === 'ore_node') { reg = e.map === 'world' ? regionOfProp(e) : 'greenmark'; key += reg; }
   if (per) { ph = ((now / per * 6 + h2(e.x | 0, 7) * 6) | 0) % 6; key += '#' + ph; }
@@ -702,19 +767,32 @@ function drawPropPixel(e, now) {
   if (!cv) {
     if (propCache.size > 600) propCache.clear();
     const B = PROP_BOX[e.type] || 96;
-    cv = document.createElement('canvas'); cv.width = cv.height = B * PROP_RES;   // G5: feines Raster (1 Welt je Pixel) wie Figuren
+    cv = document.createElement('canvas'); cv.width = cv.height = Math.round(B * PROP_RES);   // G5: feines Raster (1 Welt je Pixel) wie Figuren
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0);
     ctx = o;
-    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
+    try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg, _shut: shut }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
-    SP.pixelize(o, B * PROP_RES, B * PROP_RES, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
+    SP.pixelize(o, cv.width, cv.height, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
     propCache.set(key, cv);
   }
   const B = cv.width / PROP_RES;
   ctx.drawImage(cv, e.x - B / 2, e.y - B * 0.73, B, B);
 }
 
+// Referenz 4: Krone aus Blattballen — Schatten unten rechts, Grundton, Licht oben links, Glanzpunkte; fest aus dem Hash
+const LEAF = { summer: ['#141c10', '#26361a', '#3a5024', '#5e7432'], dark: ['#10170f', '#1e2c1a', '#2c4026', '#46603a'],
+  autumn: ['#24140c', '#5a2c12', '#8a4a1a', '#b8782c'], birch: ['#182212', '#2e4020', '#4a6028', '#6e8a38'] };
+function crown(cx, cy, R, pal, seed, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) { const a = h2(seed, i) * 6.283, r = Math.sqrt(h2(i, seed)) * R;
+    pts.push([cx + Math.cos(a) * r * 1.05, cy + Math.sin(a) * r * 0.75, R * 0.42 * (0.7 + h2(i + 9, seed) * 0.5)]); }
+  const layer = (col, f) => { ctx.fillStyle = col; ctx.beginPath(); for (const p of pts) { const q = f(p); if (q) { ctx.moveTo(q[0] + q[2], q[1]); ctx.arc(q[0], q[1], q[2], 0, 7); } } ctx.fill(); };
+  layer(pal[0], ([x, y, r]) => [x + 2, y + 3, r]);
+  layer(pal[1], p => p);
+  layer(pal[2], ([x, y, r]) => y < cy + R * 0.35 ? [x - r * 0.22, y - r * 0.3, r * 0.72] : null);
+  layer(pal[3], ([x, y, r]) => x < cx + R * 0.2 && y < cy ? [x - r * 0.42, y - r * 0.48, r * 0.34] : null);
+}
 function drawProp(e, now) {
   const x = e.x, y = e.y;
   switch (e.type) {
@@ -736,24 +814,24 @@ function drawProp(e, now) {
         for (let i = 0; i < 4; i++) { const w = 16 - i * 3, yy = y - 6 - i * 10;
           ctx.fillStyle = i & 1 ? '#233327' : '#2a3b2c'; ctx.beginPath(); ctx.moveTo(x - w, yy); ctx.lineTo(x, yy - 16); ctx.lineTo(x + w, yy); ctx.fill();
           ctx.fillStyle = '#1a261d'; ctx.beginPath(); ctx.moveTo(x + 2, yy - 12); ctx.lineTo(x + w, yy); ctx.lineTo(x + 2, yy); ctx.fill();
+          ctx.fillStyle = '#3e5638'; ctx.beginPath(); ctx.moveTo(x - w, yy); ctx.lineTo(x - 1, yy - 15); ctx.lineTo(x - w + 5, yy); ctx.fill();   // Referenz 4: Licht an der linken Flanke
+          ctx.fillStyle = '#10180f'; for (let k = -w + 2; k < w; k += 4) ctx.fillRect(x + k, yy - 1, 2, 2);                                          // gezackter Astsaum
           if (sp === 'snowpine') { ctx.fillStyle = '#dfe6ea'; ctx.beginPath(); ctx.moveTo(x - w * 0.7, yy - 4); ctx.lineTo(x, yy - 16); ctx.lineTo(x + w * 0.3, yy - 10); ctx.lineTo(x - w * 0.2, yy - 6); ctx.fill(); } }
-      } else if (sp === 'birch') {                        // Birke: heller Stamm mit Kerben, lichte Krone
-        ctx.fillStyle = '#9a927e'; ctx.fillRect(x - 2.5, y - 30, 5, 36);
-        ctx.fillStyle = '#2b2620'; for (let i = 0; i < 5; i++) ctx.fillRect(x - 2.5 + (i & 1) * 2, y - 26 + i * 6, 3, 1.5);
-        ctx.fillStyle = '#3e4a2a'; ctx.beginPath(); ctx.arc(x - 6, y - 32, 8, 0, 7); ctx.arc(x + 6, y - 36, 8, 0, 7); ctx.arc(x, y - 42, 7, 0, 7); ctx.fill();
-        ctx.fillStyle = '#4c5a32'; ctx.beginPath(); ctx.arc(x - 7, y - 36, 4, 0, 7); ctx.arc(x - 1, y - 45, 3, 0, 7); ctx.fill();
-      } else {                                            // Eiche: breite, schwere Krone mit Licht oben links
-        ctx.fillStyle = '#382a1d'; ctx.fillRect(x - 3, y - 14, 6, 20); ctx.fillRect(x - 7, y + 2, 14, 3);
-        ctx.fillStyle = '#28331d'; ctx.beginPath(); ctx.arc(x, y - 27, 15, 0, 7); ctx.arc(x - 11, y - 19, 11, 0, 7); ctx.arc(x + 11, y - 19, 11, 0, 7); ctx.fill();
-        ctx.fillStyle = '#34432a'; ctx.beginPath(); ctx.arc(x - 4, y - 31, 9, 0, 7); ctx.arc(x - 13, y - 21, 6, 0, 7); ctx.fill();
-        ctx.fillStyle = '#1c2416'; ctx.beginPath(); ctx.arc(x + 7, y - 16, 8, 0, 7); ctx.fill();
+      } else if (sp === 'birch') {                        // Birke: heller Stamm mit Kerben, lichte Krone aus Blattballen
+        ctx.fillStyle = '#9a927e'; ctx.fillRect(x - 2.5, y - 34, 5, 40); ctx.fillStyle = '#b8b09a'; ctx.fillRect(x - 2.5, y - 34, 1.5, 40);
+        ctx.fillStyle = '#2b2620'; for (let i = 0; i < 6; i++) ctx.fillRect(x - 2.5 + (i & 1) * 2, y - 30 + i * 6, 3, 1.5);
+        crown(x, y - 42, 13, LEAF.birch, 31 + v * 97, 11);
+      } else {                                            // Eiche (Referenz 4): Wurzeln, Astgabel, schwere Krone aus Blattballen
+        ctx.fillStyle = '#2e2218'; ctx.beginPath(); ctx.moveTo(x - 9, y + 5); ctx.lineTo(x - 3, y - 2); ctx.lineTo(x - 3, y - 24); ctx.lineTo(x + 3, y - 24); ctx.lineTo(x + 3, y - 2); ctx.lineTo(x + 10, y + 5); ctx.fill();
+        ctx.fillStyle = '#4a3826'; ctx.fillRect(x - 3, y - 22, 2, 24);
+        ctx.strokeStyle = '#2e2218'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.lineTo(x - 11, y - 30); ctx.moveTo(x + 1, y - 20); ctx.lineTo(x + 12, y - 32); ctx.stroke();
+        crown(x, y - 36, 21, v > 0.8 ? LEAF.autumn : v > 0.45 ? LEAF.dark : LEAF.summer, 7 + v * 131, 16);
       }
       if (e.hp < 3) { ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3); }
       break; }
     case 'bush':
       shadow(x, y + 3, 9, .25);
-      ctx.fillStyle = e.depleted ? '#333d26' : '#38492a';
-      ctx.beginPath(); ctx.arc(x, y - 4, 9, 0, 7); ctx.arc(x - 6, y, 7, 0, 7); ctx.arc(x + 6, y, 7, 0, 7); ctx.fill();
+      crown(x, y - 3, 9, e.depleted ? LEAF.dark : LEAF.summer, 5 + (x | 0), 7);
       if (!e.depleted) { ctx.fillStyle = '#9c5a4a'; ctx.fillRect(x - 2, y - 6, 2, 2); ctx.fillRect(x + 4, y - 2, 2, 2); }
       break;
     case 'rock_node': case 'ore_node': {                 // Findling: Facetten (Licht von links oben), Risse, Regionsgestein
@@ -966,6 +1044,20 @@ function drawProp(e, now) {
       ctx.strokeStyle = '#2c2116'; ctx.strokeRect(x - 12.5, y - 26.5, 25, 15);
       ctx.fillStyle = 'rgba(30,24,16,.7)'; for (let i = 0; i < 3; i++) ctx.fillRect(x - 8, y - 23 + i * 4, 16 - i * 3, 1.5);
       break;
+    case 'cage': {                                        // Eiserne Kette (S11): Gitterkäfig auf Holzboden, Kette am Dach
+      shadow(x, y + 4, 15, .35);
+      ctx.fillStyle = '#3b2e22'; ctx.fillRect(x - 14, y - 2, 28, 5);
+      ctx.fillStyle = '#2a2826'; ctx.fillRect(x - 14, y - 28, 28, 3);
+      ctx.fillStyle = '#4a4744'; for (let i = 0; i < 6; i++) ctx.fillRect(x - 13 + i * 5, y - 26, 2, 25);
+      ctx.fillStyle = '#6a6560'; for (let i = 0; i < 6; i++) ctx.fillRect(x - 13 + i * 5, y - 26, 1, 25);
+      ctx.fillStyle = '#5a5652'; ctx.fillRect(x - 1, y - 34, 2, 6); ctx.fillRect(x - 3, y - 36, 6, 2);
+      break; }
+    case 'chain_post': {                                  // Pfahl mit Eisenring und herabhängender Kette
+      shadow(x, y + 3, 6, .3);
+      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 3, y - 26, 6, 29); ctx.fillStyle = '#4e3c28'; ctx.fillRect(x - 3, y - 26, 2, 29);
+      ctx.fillStyle = '#5a5652'; ctx.fillRect(x - 5, y - 20, 10, 3);
+      ctx.fillStyle = '#6e6a64'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 3 + (i % 2), y - 17 + i * 3, 2, 2);
+      break; }
     case 'anvil':
       shadow(x, y + 3, 11, .35);
       ctx.fillStyle = '#2f2c28'; ctx.fillRect(x - 9, y - 4, 18, 7);
@@ -974,6 +1066,13 @@ function drawProp(e, now) {
     case 'stall':
       shadow(x, y + 5, 15, .3);
       ctx.fillStyle = '#4b3a25'; ctx.fillRect(x - 14, y - 6, 28, 9);
+      if (e._shut) {                                      // geschlossen: Plane über der Theke, Markise eingerollt, keine Ware
+        ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 15, y - 16, 3, 14); ctx.fillRect(x + 12, y - 16, 3, 14);
+        ctx.fillStyle = '#6a2f24'; ctx.fillRect(x - 17, y - 18, 34, 3);
+        ctx.fillStyle = '#5c5343'; ctx.beginPath(); ctx.moveTo(x - 15, y - 7); ctx.lineTo(x - 12, y - 13); ctx.lineTo(x + 12, y - 13); ctx.lineTo(x + 15, y - 7); ctx.lineTo(x + 15, y + 2); ctx.lineTo(x - 15, y + 2); ctx.fill();
+        ctx.fillStyle = '#4a4336'; ctx.fillRect(x - 15, y - 3, 30, 1.5); ctx.fillRect(x - 6, y - 13, 1.5, 15); ctx.fillRect(x + 5, y - 13, 1.5, 15);
+        break;
+      }
       ctx.fillStyle = '#7d3b2c'; ctx.fillRect(x - 17, y - 22, 34, 9);
       ctx.fillStyle = '#93503b'; for (let i = 0; i < 4; i++) ctx.fillRect(x - 17 + i * 9, y - 22, 4, 9);
       ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 15, y - 14, 3, 12); ctx.fillRect(x + 12, y - 14, 3, 12);
@@ -994,11 +1093,69 @@ function drawProp(e, now) {
       ctx.fillStyle = `rgba(230,150,60,${.7 + f * .3})`;
       ctx.beginPath(); ctx.arc(x, y - 19 - f * 2, 4.5, 0, 7); ctx.fill();
       break; }
-    case 'gravestone':
-      shadow(x, y + 2, 8, .3);
-      ctx.fillStyle = '#4a4741'; ctx.beginPath(); ctx.moveTo(x - 7, y + 2); ctx.lineTo(x - 7, y - 12); ctx.quadraticCurveTo(x, y - 20, x + 7, y - 12); ctx.lineTo(x + 7, y + 2); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x - 4, y - 10, 8, 1.5); ctx.fillRect(x - 4, y - 6, 8, 1.5);
-      break;
+    case 'gravestone': graveShape(x, y, e._var || 0, 0.8); break;
+    case 'portcullis': {                                  // S12 Fallgitter im Tor der Eisenfeste: eiserne Stäbe, Querriegel
+      ctx.fillStyle = '#1a1816'; ctx.fillRect(x - 16, y - 30, 32, 34);
+      ctx.fillStyle = '#4a4640'; for (let i = -14; i <= 14; i += 5) ctx.fillRect(x + i, y - 30, 2.5, 34);
+      for (const yy of [-24, -12, 0]) ctx.fillRect(x - 16, y + yy, 32, 2.5);
+      ctx.fillStyle = '#6a665e'; for (let i = -14; i <= 14; i += 5) ctx.fillRect(x + i, y - 30, 1, 34); break; }
+    case 'chimney': {                                     // S12 E: Ziegelschornstein mit Rauch
+      shadow(x, y + 3, 7, .3);
+      ctx.fillStyle = '#4a2e24'; ctx.fillRect(x - 5, y - 44, 10, 46); ctx.fillStyle = '#6a4232'; ctx.fillRect(x - 5, y - 44, 3, 46);
+      ctx.fillStyle = '#2a1a14'; for (let k = 0; k < 8; k++) ctx.fillRect(x - 5 + (k % 2) * 5, y - 40 + k * 5, 5, 1);
+      ctx.fillStyle = '#3a2a22'; ctx.fillRect(x - 6, y - 47, 12, 4);
+      for (let k = 0; k < 3; k++) { const t = ((now / 1130) + k / 3) % 1; ctx.fillStyle = `rgba(90,86,80,${0.45 * (1 - t)})`; ctx.beginPath(); ctx.arc(x + t * 8, y - 50 - t * 22, 3 + t * 5, 0, 7); ctx.fill(); }
+      break; }
+    case 'big_gear': {                                    // S12 E: großes Messingrad am Tor, dreht langsam
+      shadow(x, y + 4, 12, .3); const a0 = (now / 3000) * 1.05;
+      ctx.fillStyle = '#3a3026'; ctx.fillRect(x - 2, y - 14, 4, 18);
+      ctx.fillStyle = '#8a6a34'; ctx.beginPath(); ctx.arc(x, y - 22, 13, 0, 7); ctx.fill();
+      for (let k = 0; k < 10; k++) { const a = a0 + k * 0.628; ctx.fillRect(x + Math.cos(a) * 14 - 2, y - 22 + Math.sin(a) * 14 - 2, 4, 4); }
+      ctx.fillStyle = '#b08a44'; ctx.beginPath(); ctx.arc(x - 3, y - 25, 6, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a2018'; ctx.beginPath(); ctx.arc(x, y - 22, 4, 0, 7); ctx.fill();
+      for (let k = 0; k < 4; k++) { const a = a0 + k * 1.57; ctx.fillRect(x + Math.cos(a) * 8 - 1, y - 22 + Math.sin(a) * 8 - 1, 2, 2); } break; }
+    case 'factory': {                                     // S12 E: Fabrikhalle von Tickmar — Sägezahndach, Schornsteine, glühende Fenster
+      shadow(x, y + 6, 70, .45);
+      ctx.fillStyle = '#3a2e28'; ctx.fillRect(x - 64, y - 60, 128, 64); ctx.fillStyle = '#4e3c32'; ctx.fillRect(x - 64, y - 60, 30, 64);
+      ctx.fillStyle = '#26201c'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x - 64 + k * 32, y - 60); ctx.lineTo(x - 64 + k * 32 + 32, y - 60); ctx.lineTo(x - 64 + k * 32 + 32, y - 80); ctx.fill(); }
+      ctx.fillStyle = '#6a7478'; for (let k = 0; k < 4; k++) ctx.fillRect(x - 62 + k * 32 + 20, y - 78, 10, 16);
+      for (let k = 0; k < 5; k++) { ctx.fillStyle = '#1a1412'; ctx.fillRect(x - 56 + k * 24, y - 44, 12, 16); ctx.fillStyle = `rgba(232,150,60,${0.55 + 0.25 * Math.sin(now / 180 + k)})`; ctx.fillRect(x - 55 + k * 24, y - 43, 10, 14); }
+      ctx.fillStyle = '#1a1412'; ctx.fillRect(x - 10, y - 22, 20, 26); ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x - 10, y - 22, 20, 3);
+      for (const cx2 of [x - 46, x + 40]) { ctx.fillStyle = '#4a2e24'; ctx.fillRect(cx2, y - 108, 10, 48); ctx.fillStyle = '#6a4232'; ctx.fillRect(cx2, y - 108, 3, 48);
+        for (let k = 0; k < 3; k++) { const t = ((now / 1130) + k / 3) % 1; ctx.fillStyle = `rgba(70,66,62,${0.5 * (1 - t)})`; ctx.beginPath(); ctx.arc(cx2 + 5 + t * 12, y - 112 - t * 26, 5 + t * 8, 0, 7); ctx.fill(); } }
+      ctx.fillStyle = '#8a6a34'; ctx.beginPath(); ctx.arc(x + 20, y - 50, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#2a2018'; ctx.beginPath(); ctx.arc(x + 20, y - 50, 3, 0, 7); ctx.fill(); break; }
+    case 'machine': {                                     // S12 E: Dampfhammer
+      shadow(x, y + 3, 10, .35); ctx.fillStyle = '#3a3634'; ctx.fillRect(x - 8, y - 6, 16, 9); ctx.fillStyle = '#5a5450'; ctx.fillRect(x - 6, y - 26, 3, 20); ctx.fillRect(x + 3, y - 26, 3, 20);
+      const hy = y - 22 + Math.abs(Math.sin(now / 300)) * 12; ctx.fillStyle = '#7a6a50'; ctx.fillRect(x - 5, hy, 10, 6); ctx.fillStyle = '#8a6a34'; ctx.fillRect(x - 7, y - 28, 14, 3); break; }
+    case 'workstation': case 'workbench': {               // S12 E: Werkbank mit Schraubstock und Teilen
+      shadow(x, y + 3, 11, .3); ctx.fillStyle = '#4a3624'; ctx.fillRect(x - 11, y - 12, 22, 4); ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x - 10, y - 8, 3, 10); ctx.fillRect(x + 7, y - 8, 3, 10);
+      ctx.fillStyle = '#6a6460'; ctx.fillRect(x - 8, y - 17, 6, 5); ctx.fillStyle = '#8a6a34'; ctx.beginPath(); ctx.arc(x + 4, y - 15, 3, 0, 7); ctx.fill();
+      if (e.type === 'workbench') { ctx.fillStyle = '#9a8a6a'; ctx.fillRect(x - 1, y - 16, 7, 2); ctx.fillRect(x + 5, y - 18, 2, 5); } break; }
+    case 'keychest': {                                    // S12 E: Schlüsselkasten des Vogts
+      shadow(x, y + 3, 7, .3); ctx.fillStyle = '#3a2c20'; ctx.fillRect(x - 6, y - 12, 12, 13); ctx.fillStyle = '#6a5a3a'; ctx.fillRect(x - 6, y - 12, 12, 2);
+      ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 1, y - 8, 2, 3); break; }
+    case 'gearpile': {                                    // S12 Zahnräder, Federn, Wellen — Werkstatt des Hochreichs
+      shadow(x, y + 3, 10, .3);
+      for (const [dx, dy, r, col] of [[-4, -2, 6, '#8a7040'], [4, -4, 5, '#6a6258'], [0, -8, 4, '#a08850']]) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, 7); ctx.fill();
+        ctx.fillStyle = '#2a2420'; ctx.beginPath(); ctx.arc(x + dx, y + dy, r * 0.35, 0, 7); ctx.fill(); ctx.fillStyle = col; for (let k = 0; k < 8; k++) { const a = k * 0.785; ctx.fillRect(x + dx + Math.cos(a) * r - 1, y + dy + Math.sin(a) * r - 1, 2.5, 2.5); } }
+      ctx.strokeStyle = '#c8b890'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 10; k++) ctx.lineTo(x + 6 + (k % 2) * 3, y - 2 - k); ctx.stroke(); break; }
+    case 'automat_frame': {                               // ruhender Automat: Messingrumpf, Maskenkopf, Kolbengelenke
+      shadow(x, y + 4, 9, .35);
+      ctx.fillStyle = '#4a4640'; ctx.fillRect(x - 5, y - 4, 3, 8); ctx.fillRect(x + 2, y - 4, 3, 8);                          // Beine
+      ctx.fillStyle = '#7a6038'; ctx.fillRect(x - 7, y - 20, 14, 16); ctx.fillStyle = '#9a7c48'; ctx.fillRect(x - 7, y - 20, 4, 16);   // Rumpf, Licht links
+      ctx.fillStyle = '#5a4a34'; ctx.fillRect(x - 10, y - 18, 3, 12); ctx.fillRect(x + 7, y - 18, 3, 12);                      // Arme
+      ctx.fillStyle = '#8a7a58'; ctx.fillRect(x - 4, y - 28, 8, 8); ctx.fillStyle = '#1a1614'; ctx.fillRect(x - 3, y - 25, 6, 1.5);   // Kopf, Sehschlitz
+      ctx.fillStyle = e.label && e.label.includes('Zerstört') ? '#3a2a1a' : '#e8a040'; ctx.fillRect(x - 2, y - 25, 1.5, 1.5); ctx.fillRect(x + 1, y - 25, 1.5, 1.5);
+      ctx.fillStyle = '#2a2420'; ctx.fillRect(x - 1, y - 16, 2, 8); break; }
+    case 'statue': {                                      // Standbild auf Sockel: Adelsherr mit Mantel
+      shadow(x, y + 4, 11, .35);
+      ctx.fillStyle = '#6a665e'; ctx.fillRect(x - 8, y - 4, 16, 8); ctx.fillStyle = '#8a857a'; ctx.fillRect(x - 8, y - 4, 16, 2);
+      ctx.fillStyle = '#9a958a'; ctx.beginPath(); ctx.moveTo(x - 5, y - 4); ctx.lineTo(x - 3, y - 26); ctx.lineTo(x + 3, y - 26); ctx.lineTo(x + 6, y - 4); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y - 29, 3.5, 0, 7); ctx.fill(); ctx.fillStyle = '#6a665e'; ctx.fillRect(x + 1, y - 24, 4, 20); ctx.fillStyle = '#7a8a6a'; ctx.fillRect(x - 3, y - 20, 2, 3); break; }
+    case 'hedge': {                                       // geschnittene Hecke im Adelsgarten
+      shadow(x, y + 3, 10, .3);
+      ctx.fillStyle = '#1e3018'; ctx.fillRect(x - 10, y - 12, 20, 14); ctx.fillStyle = '#2e4a22'; ctx.fillRect(x - 10, y - 12, 20, 5); ctx.fillStyle = '#3e5e2c'; ctx.fillRect(x - 10, y - 12, 7, 3);
+      ctx.fillStyle = '#9a4a5a'; ctx.fillRect(x - 4, y - 9, 2, 2); ctx.fillRect(x + 5, y - 6, 2, 2); break; }
     case 'shrine':
       shadow(x, y + 4, 14, .3);
       ctx.fillStyle = '#54504a'; ctx.fillRect(x - 12, y - 6, 24, 9);
@@ -1063,8 +1220,13 @@ function drawProp(e, now) {
       break;
     case 'banner_torn': {
       const s = Math.sin(now / 800 + x) * 2;
-      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 2, y - 30, 3, 32);
-      ctx.fillStyle = '#5b2a20'; ctx.beginPath(); ctx.moveTo(x, y - 29); ctx.lineTo(x + 14 + s, y - 27); ctx.lineTo(x + 11 + s, y - 12); ctx.lineTo(x, y - 14); ctx.fill();
+      ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 2, y - 40, 3, 42); ctx.fillStyle = '#4a4640'; ctx.fillRect(x - 3, y - 43, 5, 3);   // Referenz 4: Stange mit Eisenknauf
+      ctx.fillStyle = '#2a1a14'; ctx.fillRect(x - 1, y - 38, 18, 2);                                                                        // Querstange
+      ctx.fillStyle = '#5a1618'; ctx.beginPath(); ctx.moveTo(x + 1, y - 37); ctx.lineTo(x + 16 + s * 0.5, y - 37); ctx.lineTo(x + 16 + s, y - 14);
+      ctx.lineTo(x + 13 + s, y - 17); ctx.lineTo(x + 10 + s, y - 12); ctx.lineTo(x + 7 + s, y - 16); ctx.lineTo(x + 4 + s * 0.5, y - 13); ctx.lineTo(x + 1, y - 16); ctx.fill();   // zerrissener Saum
+      ctx.fillStyle = '#7a2224'; ctx.fillRect(x + 1, y - 37, 3, 21);                                                                         // Licht links
+      ctx.fillStyle = '#3a0e10'; ctx.fillRect(x + 12 + s * 0.5, y - 36, 3, 20);                                                              // Faltenschatten
+      ctx.fillStyle = '#a0843a'; ctx.beginPath(); ctx.moveTo(x + 5 + s * 0.3, y - 31); ctx.lineTo(x + 8.5 + s * 0.4, y - 26); ctx.lineTo(x + 12 + s * 0.5, y - 31); ctx.lineTo(x + 12 + s * 0.5, y - 28); ctx.lineTo(x + 8.5 + s * 0.4, y - 23); ctx.lineTo(x + 5 + s * 0.3, y - 28); ctx.fill();   // Wappen (Winkel)
       break; }
     case 'claim_stone':
       shadow(x, y + 3, 10, .3);
@@ -1235,7 +1397,17 @@ function drawProp(e, now) {
 // Figuren: Pixel-Sprites aus sprites.js (Raster, Kontur, Rampen, Posen). Pivot = Fußmitte (x, y+6).
 const LIMB_PX = { S: { rarm: [3, 14], larm: [15, 14], rleg: [6, 19], lleg: [12, 19] }, N: { rarm: [15, 14], larm: [3, 14], rleg: [12, 19], lleg: [6, 19] },
                   W: { rarm: [9, 13], larm: [9, 13], rleg: [8, 19], lleg: [10, 19] }, E: { rarm: [9, 13], larm: [9, 13], rleg: [10, 19], lleg: [8, 19] } };
+// S12: ganze Figur (Körper, Arme, Waffe) um den Fußpunkt vergrößert — Hand, Griff und Klinge bleiben beieinander
 export function drawHumanoid(e, now, override) {
+  const c = override || ctx, k = SP.FIGK * (e.big || 1); c.save(); c.translate(e.x, e.y + 6); c.scale(k, k); c.translate(-e.x, -e.y - 6);
+  try { drawHumanoidAt(e, now, override);
+    if (e.big && !e.downed) {                                            // S12 E: Uhrwerk in der Brust des Kampfautomaten
+      const gx = e.x, gy = e.y - 22, a0 = now / 400; c.fillStyle = '#1a1612'; c.beginPath(); c.arc(gx, gy, 5, 0, 7); c.fill();
+      c.fillStyle = '#b08a44'; c.beginPath(); c.arc(gx, gy, 3.5, 0, 7); c.fill(); for (let q = 0; q < 6; q++) { const a = a0 + q * 1.047; c.fillRect(gx + Math.cos(a) * 4 - 0.8, gy + Math.sin(a) * 4 - 0.8, 1.6, 1.6); }
+      c.fillStyle = '#2a2018'; c.beginPath(); c.arc(gx, gy, 1.2, 0, 7); c.fill(); }
+  } finally { c.restore(); }
+}
+function drawHumanoidAt(e, now, override) {
   const c = override || ctx;
   c.imageSmoothingEnabled = false;
   const x = e.x, y = e.y;
@@ -1257,9 +1429,12 @@ export function drawHumanoid(e, now, override) {
   }
   const armed = w && !e.sitting;                                   // wer sitzt, hat die Waffe abgelegt
   const wp = armed ? weaponPose(e, now, wit, pz) : null, melee = wp && !wp.ranged;
-  const f = SP.humanFrame(spec, pz.dir, pz.pose, melee ? wp.armSide : null);   // Nahkampf: Waffenarm zeichnet drawArm zur Hand
+  const two = melee && wit.twohand, noArm = melee ? (two ? 'both' : wp.armSide) : null;   // S12: Zweihänder mit beiden Händen
+  const f = SP.humanFrame(spec, pz.dir, pz.pose, noArm);   // Nahkampf: Waffenarm(e) zeichnet drawArm zur Hand
+  SP.warm(spec, noArm);
+  const arms = () => { if (!melee) return; drawArm(c, e, spec, wp, f); if (two) drawArm(c, e, spec, offGrip(e, wp, pz), f); };   // Hand über den Griff                         // BUG-093: übrige Richtungen/Posen in Leerlaufzeit vorbacken
   const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
-  if (armed && behind) { if (melee) drawArm(c, e, spec, wp, f); drawWeapon(c, e, now, wit, wp); }
+  if (armed && behind) { drawWeapon(c, e, now, wit, wp); arms(); }
   const [sx, sy] = buildOf(e).scale;
   c.save(); c.translate(x, y + 6); c.scale(sx, sy);
   SP.blit(c, f, 0, 0);
@@ -1272,29 +1447,47 @@ export function drawHumanoid(e, now, override) {
   c.restore();
   if (spec.glow && pz.dir !== 'N') {                                // Glimmen der Untoten-Augen
     c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0));
-    c.beginPath(); c.arc(x, y - (f.px === 1 ? 40 : 29), 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';   // Augenhöhe je Raster
+    c.beginPath(); c.arc(x, y - (f.px < 2 ? 40 : 29), 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';   // Augenhöhe je Raster
   }
-  if (armed && !behind) { if (melee) drawArm(c, e, spec, wp, f); drawWeapon(c, e, now, wit, wp); }
-  if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - (f.px === 1 ? 58 : 44), 4, 0, 7); c.stroke(); }
+  if (armed && !behind) { drawWeapon(c, e, now, wit, wp); arms(); }
+  if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - (f.px < 2 ? 58 : 44), 4, 0, 7); c.stroke(); }
 }
 
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
 const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
-function swingOf(wt, sw, arc) {
+// S12 (Nutzer: „neue Animations-Sets je Waffe, immer etwas Variation“): v 0 Vorhand, 1 Rückhand, 2 Überkopfhieb (schwere Waffen,
+// Schwerter) bzw. Stoß tief/hoch (Stoßwaffen); j = kleine Abweichung je Hieb. Treffer bleiben unabhängig davon (resolveSwing).
+export function swingOf(wt, sw, arc, v = 0, j = 0) {
   if (sw <= 0) return { a: 0.6, ext: 0 };
+  const wob = j * Math.sin(Math.min(1, sw) * Math.PI);
   if (wt === 'spear' || wt === 'dagger' || wt === 'rapier') {       // Stoß: zurückziehen, vorschnellen, einholen
-    const back = wt === 'spear' ? -9 : wt === 'rapier' ? -6 : -4, fwd = wt === 'spear' ? 22 : wt === 'rapier' ? 17 : 11;
-    if (sw < 0.3) return { a: 0.15 * (1 - sw / 0.3), ext: back * eo(sw / 0.3) };
-    if (sw < 0.45) return { a: 0, ext: back + (fwd - back) * ei((sw - 0.3) / 0.15) };
-    return { a: 0, ext: fwd * (1 - eo((sw - 0.45) / 0.55)) };
+    const back = wt === 'spear' ? -9 : wt === 'rapier' ? -6 : -4, fwd = (wt === 'spear' ? 22 : wt === 'rapier' ? 17 : 11) * (v === 2 ? 1.15 : 1), off = [0, 0.24, -0.24][v] + wob;
+    if (sw < 0.3) return { a: 0.15 * (1 - sw / 0.3) + off, ext: back * eo(sw / 0.3) };
+    if (sw < 0.45) return { a: off, ext: back + (fwd - back) * ei((sw - 0.3) / 0.15) };
+    return { a: off, ext: fwd * (1 - eo((sw - 0.45) / 0.55)) };
   }
   const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm';
   const w0 = wt === 'hammer' ? 0.44 : heavy ? 0.36 : 0.28, half = arc / 2;           // Hammer: langes Ausholen
-  const start = -half - (heavy ? 0.75 : 0.4), end = half + (heavy ? 0.5 : 0.28);
-  if (sw < w0) return { a: 0.6 + (start - 0.6) * eo(sw / w0), ext: heavy ? -3 * sw / w0 : 0 };       // ausholen
-  if (sw < 0.5) return { a: start + (end - start) * ei((sw - w0) / (0.5 - w0)), ext: 2 };            // Schlag
-  return { a: end + (0.6 - end) * eo((sw - 0.5) / 0.5), ext: 2 * (1 - (sw - 0.5) * 2) };             // Nachschwung
+  if (v === 2 && (heavy || wt === 'sword')) {                        // Überkopfhieb: hoch über den Kopf, steil nach vorn herunter
+    const up = -Math.PI * (heavy ? 0.85 : 0.7), down = 0.25 + wob;
+    if (sw < w0) return { a: 0.6 + (up - 0.6) * eo(sw / w0), ext: -4 * sw / w0 };
+    if (sw < 0.5) return { a: up + (down - up) * ei((sw - w0) / (0.5 - w0)), ext: 4 };
+    return { a: down + (0.6 - down) * eo((sw - 0.5) / 0.5), ext: 4 * (1 - (sw - 0.5) * 2) };
+  }
+  const start = -half - (heavy ? 0.75 : 0.4), end = half + (heavy ? 0.5 : 0.28), k = v === 1 ? -1 : 1;   // Rückhand: gespiegelter Bogen
+  if (sw < w0) return { a: k * (0.6 + (start - 0.6) * eo(sw / w0)) + wob, ext: heavy ? -3 * sw / w0 : 0 };       // ausholen
+  if (sw < 0.5) return { a: k * (start + (end - start) * ei((sw - w0) / (0.5 - w0))) + wob, ext: 2 };            // Schlag
+  return { a: k * (end + (0.6 - end) * eo((sw - 0.5) / 0.5)) + wob, ext: 2 * (1 - (sw - 0.5) * 2) };             // Nachschwung
+}
+// Hiebvariante je Schlag: beim Beginn eines Schwungs gewählt (Kombo mit Zufall), je Figur gemerkt (Gegner zeichnen über Kopien → id)
+const SWING_V = new Map();
+function swingVar(e, sw) {
+  if (SWING_V.size > 3000) SWING_V.clear();                          // ponytail: grobe Aufräumung, reicht bei ein paar hundert Kämpfern
+  let st = SWING_V.get(e.id); if (!st) SWING_V.set(e.id, st = { v: 0, j: 0, live: false });
+  if (sw > 0 && !st.live) { st.live = true; st.v = (st.v + 1 + (Math.random() < 0.35 ? 1 : 0)) % 3; st.j = (Math.random() - 0.5) * 0.35; }
+  if (!(sw > 0)) st.live = false;
+  return st;
 }
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
@@ -1308,31 +1501,44 @@ function weaponPose(e, now, it, pz) {
   const thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
   const side = pz.dir === 'W' || pz.dir === 'E', armSide = side ? 'near' : (Math.cos(dir) < 0 ? 'L' : 'R');
   const [sox, soy] = SP.shoulderOf(pz.dir, pz.pose, armSide === 'L' ? 'L' : 'R'), shx = e.x + sox, shy = e.y + 6 + soy;
+  const upright = wt === 'spear' || wt === 'polearm', onShoulder = wt === 'great' || wt === 'hammer';   // S12: Stangenwaffen aufrecht, Zweihänder auf der Schulter
   const hand = (swv, sv) => {                                         // Hand für einen Schwungzustand
     if (ranged) return [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5];
     const active = swv > 0 || e.cover || (A && A.kind === 'work');
-    if (!active) return [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
+    if (!active) return upright ? [shx + Math.cos(dir) * 6, shy + 11 + low] : onShoulder ? [shx + Math.cos(dir) * 3, shy + 9 + low]
+      : [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
     if (thrust) { const r = 11 + sv.ext * 0.8; return [shx + Math.cos(dir) * r, shy + 6 + low + Math.sin(dir) * r * 0.8]; }
     const ha = dir + sv.a * sgn * 0.55, r = 13 + sv.ext * 0.5;       // Hand läuft mit der Klinge um die Schulter
     return [shx + Math.cos(ha) * r, shy + 5 + low - (e.cover ? 4 : 0) + Math.sin(ha) * r * 0.75];
   };
-  const sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc);   // Deckung: Klinge schräg hoch vor dem Körper
+  const vv = swingVar(e, sw), sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc, vv.v, vv.j);   // Deckung: Klinge schräg hoch vor dem Körper
   const [hx, hy] = hand(sw, sv);
-  return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a: dir + sv.a * sgn, hx, hy, shx, shy, armSide, hand };
+  // In Ruhe getragen, nicht gezielt: Klinge gesenkt zur Blickseite (sonst zeigte sie wie ein Zeiger zur Maus und kreiste um die Figur)
+  const rest = !ranged && !(sw > 0) && !e.cover && !(A && A.kind === 'work');
+  const a = rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
+  return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv };
+}
+// Zweite Hand am Schaft (Zweihänder): von der anderen Schulter zu einem Punkt 9 Welt-Einheiten weiter oben auf der Waffenachse —
+// dreht mit Schwung und Blickrichtung mit, weil sie an der Waffe hängt, nicht am Körper.
+function offGrip(e, wp, pz) {
+  const [ox, oy] = SP.shoulderOf(pz.dir, pz.pose, wp.armSide === 'L' ? 'R' : 'L'), k = 9;
+  return { shx: e.x + ox, shy: e.y + 6 + oy, hx: wp.hx + Math.cos(wp.a) * k, hy: wp.hy + Math.sin(wp.a) * k };
 }
 // Arm von der Schulter zur Hand (feines Raster): Kontur, Ärmel mit Licht oben links, Hand/Handschuh
 function drawArm(c, e, spec, wp, f) {
   // Farben einmal je Figurenbild (Frame ist nach Spec gecacht)
-  const L = f._look || (f._look = SP.lookOf(spec)), sl = L.armor === 'plate' || L.armor === 'chain' ? L.armorR : L.robe || L.cloth, hd = L.glove || L.skin;
+  const L = f._look || (f._look = SP.lookOf(spec)), mech = e.body && (e.body.rarm?.mech || e.body.larm?.mech);   // S12: Prothese sichtbar als Messingarm
+  const sl = mech ? L.gold : L.armor === 'plate' || L.armor === 'chain' ? L.armorR : L.robe || L.cloth, hd = mech ? L.metal : L.glove || L.skin;
   const x0 = wp.shx, y0 = wp.shy, x1 = wp.hx, y1 = wp.hy, n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
   const mx = (x0 + x1) / 2 + (x1 > x0 ? -1.5 : 1.5), my = (y0 + y1) / 2 + 2.5;   // Ellbogen leicht nach außen/unten
   const pt = t => t < 0.5 ? [x0 + (mx - x0) * t * 2, y0 + (my - y0) * t * 2] : [mx + (x1 - mx) * (t - 0.5) * 2, my + (y1 - my) * (t - 0.5) * 2];
-  const stamp = (col, r, w) => { c.fillStyle = col; for (let i = 0; i <= n; i++) { const [px, py] = pt(i / n); c.fillRect(Math.round(px - r), Math.round(py - r), w, w); } };
-  stamp('#0c0a08', 3, 7); stamp(sl.sh, 2, 5); stamp(sl.b, 2, 3);
-  c.fillStyle = sl.hi; for (let i = 1; i < n * 0.45; i++) { const [px, py] = pt(i / n); c.fillRect(Math.round(px - 2), Math.round(py - 2), 1, 1); }
-  c.fillStyle = '#0c0a08'; c.fillRect(Math.round(x1) - 3, Math.round(y1) - 3, 7, 7);
-  c.fillStyle = hd.b; c.fillRect(Math.round(x1) - 2, Math.round(y1) - 2, 5, 5); c.fillStyle = hd.hi; c.fillRect(Math.round(x1) - 2, Math.round(y1) - 2, 2, 1);
-  c.fillStyle = hd.sh; c.fillRect(Math.round(x1), Math.round(y1) + 1, 3, 2);
+  const Q = f.px || 1, R = (x, y, w, h) => c.fillRect(Math.round(x / Q) * Q, Math.round(y / Q) * Q, w * Q, h * Q);   // Stil D: Armraster = Figurenraster
+  const stamp = (col, r, w) => { c.fillStyle = col; for (let i = 0; i <= n; i++) { const [px, py] = pt(i / n); R(px - r * Q, py - r * Q, w, w); } };
+  stamp('#0c0a08', 2, 5); stamp(sl.sh, 1, 3); stamp(sl.b, 1, 2);
+  c.fillStyle = sl.hi; for (let i = 1; i < n * 0.45; i += Q) { const [px, py] = pt(i / n); R(px - Q, py - Q, 1, 1); }
+  c.fillStyle = '#0c0a08'; R(x1 - 2 * Q, y1 - 2 * Q, 5, 5);
+  c.fillStyle = hd.b; R(x1 - Q, y1 - Q, 3, 3); c.fillStyle = hd.hi; R(x1 - Q, y1 - Q, 2, 1);
+  c.fillStyle = hd.sh; R(x1, y1 + Q, 2, 1);
 }
 function drawWeapon(c, e, now, it, wp) {
   it = it || ITEMS[e.equip.weapon.key] || {};
@@ -1346,7 +1552,7 @@ function drawWeapon(c, e, now, it, wp) {
     const col = W.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210';
     for (let k = 1; k <= 7; k++) {
       const past = sw - k * 0.022; if (past <= 0) break;
-      const pv = swingOf(wt, past, arc), t = 1 - k / 8;
+      const pv = swingOf(wt, past, arc, wp.vv.v, wp.vv.j), t = 1 - k / 8;
       if (Math.abs(pv.a - sv.a) < 0.02 && Math.abs(pv.ext - sv.ext) < 0.5) continue;   // keine Bewegung, keine Spur
       const ph = wp.hand(past, pv), pa = wp.thrust ? dir : dir + pv.a * sgn, r = len * 0.9;
       const bx = ph[0] + Math.cos(pa) * r, by = ph[1] + Math.sin(pa) * r;
@@ -1373,7 +1579,7 @@ function drawWeapon(c, e, now, it, wp) {
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
 const monsterSpecs = new WeakMap();
-function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s) { s = SP.monsterSpec(e, m); monsterSpecs.set(e, s); } return s; }
+function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e)) { s = SP.monsterSpec(e, m); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben
 function sideDir(e) {
   if (e.swing > 0 && e.aim != null) return Math.cos(e.aim) < 0 ? 'W' : 'E';
   if (e.facing === 2) e._side = 'W'; else if (e.facing === 3) e._side = 'E';
@@ -1383,12 +1589,12 @@ function drawCreature(e, now) {
   const m = MONSTERS[e.mtype] || {};
   const p = m.pal || {};
   if (e.special && e.special.kind === 'frost' && e.special.t > 0) {       // Hrodvars Eiskreis: Ansage-Ring, zieht sich zusammen
-    const k = 1 - e.special.t / 900; ctx.fillStyle = `rgba(160,215,245,${0.35 + 0.4 * k})`;
-    for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * 105) - 2, Math.round(e.y + Math.sin(a) * 66) - 2, 4, 4); }
-    ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 105, 66, 0, 0, 7); ctx.fill();
+    const k = 1 - e.special.t / 900, R = e.special.big ? 140 : 105, Ry = R * 0.63; ctx.fillStyle = `rgba(160,215,245,${0.35 + 0.4 * k})`;   // Phase 3: großer Kreis — Ansage = Trefferfläche
+    for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * R) - 2, Math.round(e.y + Math.sin(a) * Ry) - 2, 4, 4); }
+    ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, R, Ry, 0, 0, 7); ctx.fill();
   }
   if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
-    const moving = e.vx || e.vy, sw = e.swing || 0, K = e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1;   // Bär groß, Hund klein
+    const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
     if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
@@ -1424,7 +1630,7 @@ function drawCreature(e, now) {
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
-  const scale = e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1;
+  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
   const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(scale, scale); ctx.translate(-e.x, -e.y);
   if (e.mtype === 'wraith') ctx.globalAlpha = e.phased > performance.now() ? 0.28 : 0.62 + 0.1 * Math.sin(now / 200);   // Geist: halb da, körperlos fast weg
@@ -1456,12 +1662,12 @@ function drawCorpse(e, now) {
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
   } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
     const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
-    SP.blit(ctx, f, e.x, e.y + 5);
+    ctx.save(); ctx.translate(e.x, e.y + 5); ctx.scale(SP.FIGK, SP.FIGK); SP.blit(ctx, f, 0, 0); ctx.restore();
   } else if (e.mtype === 'gorak') {
     const f = SP.bruteFrame(m.pal || {}, 'E', '', 0), k = Math.min(1, age / 500);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.rotate(k * Math.PI / 2); SP.blit(ctx, f, 0, 2); ctx.restore();
   } else {
-    const spec = SP.monsterSpec(e, m), sc = e.mtype === 'goblin' ? 0.82 : 1;
+    const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.scale(sc, sc);
     if (age < 320) SP.blit(ctx, SP.humanFrame(spec, 'S', age < 130 ? 'hit' : 'kneel'), 0, 0);
     else SP.blit(ctx, SP.humanFrame(spec, 'W', 'dead'), 0, 0);
@@ -1470,12 +1676,24 @@ function drawCorpse(e, now) {
   ctx.globalAlpha = 1;
 }
 
-function drawGrave(e) { drawBaked('grave', e, 96, drawGraveVec); }
+function drawGrave(e) { const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec); }
+// Referenz 4 (Friedhof): Rundstein, Kreuz, Stele, schiefer Stein — Kante im Licht, Riss, Moos am Fuß
+function graveShape(x, y, v, k = 1) {
+  shadow(x, y + 2, 9 * k, .35);
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k); if (v === 3) ctx.rotate(-0.12);
+  const S = '#4e4a44', L = '#6a655c', D = '#2e2b27';
+  ctx.fillStyle = S; ctx.beginPath();
+  if (v === 1) { ctx.rect(-2, -24, 5, 27); ctx.rect(-8, -18, 17, 5); }                                         // Kreuz
+  else if (v === 2) { ctx.moveTo(-6, 3); ctx.lineTo(-6, -22); ctx.lineTo(0, -28); ctx.lineTo(6, -22); ctx.lineTo(6, 3); }   // Stele
+  else { ctx.moveTo(-9, 3); ctx.lineTo(-9, -14); ctx.quadraticCurveTo(0, -25, 9, -14); ctx.lineTo(9, 3); }     // Rundstein
+  ctx.fill();
+  ctx.fillStyle = L; if (v === 1) ctx.fillRect(-2, -24, 2, 27); else ctx.fillRect(v === 2 ? -6 : -9, -14, 2, 17);   // Licht links
+  ctx.fillStyle = D; if (v !== 1) { ctx.fillRect(-4, -10, 8, 1.5); ctx.fillRect(-4, -6, 8, 1.5); ctx.fillRect(2, -16, 1, 5); ctx.fillRect(3, -12, 1, 4); }   // Inschrift, Riss
+  ctx.fillStyle = '#3a4a2a'; ctx.fillRect(-8, 0, 6, 3); ctx.fillRect(3, 1, 4, 2);                                // Moos
+  ctx.restore();
+}
 function drawGraveVec(e) {
-  shadow(e.x, e.y + 2, 10, .35);
-  ctx.fillStyle = '#524d46'; ctx.beginPath(); ctx.moveTo(e.x - 9, e.y + 3); ctx.lineTo(e.x - 9, e.y - 16); ctx.quadraticCurveTo(e.x, e.y - 26, e.x + 9, e.y - 16); ctx.lineTo(e.x + 9, e.y + 3); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(e.x - 5, e.y - 14, 10, 1.6); ctx.fillRect(e.x - 5, e.y - 10, 10, 1.6);
-  ctx.fillStyle = 'rgba(189,148,51,.35)'; ctx.fillRect(e.x - 3, e.y - 20, 6, 1.6);
+  graveShape(e.x, e.y, e._gv || 0);
 }
 
 // Beute am Boden: dasselbe Pixel-Icon wie im Inventar, mit Seltenheits-Schimmer.
@@ -1570,6 +1788,10 @@ function drawProjectile(p) {
   else if (p.kind === 'bolt') {                                      // Armbrustbolzen: kurz, dick, Eisenspitze
     ctx.fillStyle = OUT_COL; ctx.fillRect(-7, -2, 16, 4); ctx.fillStyle = '#8a7658'; ctx.fillRect(-5, -1, 10, 2);
     ctx.fillStyle = '#6d6154'; ctx.fillRect(5, -2, 4, 4); ctx.fillStyle = '#c9bfa6'; ctx.fillRect(-7, -2, 2, 4); }
+  else if (p.kind === 'frost') {                                     // Hrodvars Eislanze: lange, blasse Spitze mit Frostschweif
+    ctx.fillStyle = 'rgba(150,200,240,.45)'; ctx.fillRect(-18, -2, 10, 4);
+    ctx.fillStyle = OUT_COL; ctx.fillRect(-9, -3, 22, 6); ctx.fillStyle = '#9fd8ff'; ctx.fillRect(-8, -2, 18, 4);
+    ctx.fillStyle = '#e8f6ff'; ctx.fillRect(4, -1, 8, 2); ctx.fillRect(12, -1, 3, 2); }
   else if (p.kind === 'spark') {                                     // Funke des Zauberstabs
     ctx.fillStyle = 'rgba(120,170,230,.5)'; ctx.fillRect(-10, -2, 8, 4);
     ctx.fillStyle = '#8fb7e8'; ctx.fillRect(-3, -4, 8, 8); ctx.fillStyle = '#e8f4ff'; ctx.fillRect(-1, -2, 4, 4); }
@@ -1626,7 +1848,7 @@ export function ambient() {
   if (h < 5) a = 0.72; else if (h < 7) a = 0.72 - (h - 5) / 2 * 0.62;
   else if (h < 17) a = 0.08; else if (h < 20) a = 0.08 + (h - 17) / 3 * 0.5;
   else a = 0.58 + (h - 20) / 4 * 0.18;
-  if (S.weather === 'rain') a += 0.12; if (S.weather === 'fog') a += 0.06; if (S.weather === 'cloudy') a += 0.05;
+  a += { rain: 0.12, fog: 0.06, cloudy: 0.05, bloodrain: 0.14, sandstorm: 0.08, snow: 0.03 }[S.weather] || 0;
   a += (REGION[curRegion] && REGION[curRegion].dark) || 0;          // Wald und Totenreich sind dunkler
   return clamp(a, 0, 0.86);
 }
@@ -1634,8 +1856,10 @@ export function ambient() {
 // Neu gesammelt, wenn sich die Objektzahl der Karte ändert (Bau, Abriss, Laden) oder die Karte wechselt.
 let lightCache = { map: null, n: -1, list: [] };
 function staticLights() {
-  const arr = S.ents[S.map], n = arr.length * 64 + (S.settlement ? S.settlement.buildings.reduce((k, b) => k + (b.built >= 1), 0) : 0);   // + fertige Bauten
-  if (lightCache.map === S.map && lightCache.n === n) return lightCache.list;
+  const arr = S.ents[S.map], n = S.settlement ? S.settlement.buildings.reduce((k, b) => k + (b.built >= 1), 0) : 0, now = performance.now();   // fertige Bauten
+  // Phase 20: früher Schlüssel = Objektzahl — jede verschwundene Blutspur ließ alle ~9000 Objekte neu prüfen (~0,5 ms).
+  // Jetzt: Kartenwechsel, neuer Bau, sonst höchstens alle 3 s (neue Fackeln, z. B. Fest, leuchten spätestens dann).
+  if (lightCache.map === S.map && lightCache.n === n && now - (lightCache.t || 0) < 3000) return lightCache.list;
   const list = [];
   for (const e of arr) {
     if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
@@ -1645,15 +1869,21 @@ function staticLights() {
     if (e.kind === 'prop' && e.type === 'candles') list.push({ x: e.x, y: e.y - 8, r: 60 });
     if (e.kind === 'prop' && (e.type === 'hearth' || e.type === 'forge')) list.push({ x: e.x, y: e.y - 8, r: 80 });
   }
-  lightCache = { map: S.map, n, list };
+  lightCache = { map: S.map, n, list, t: now };
   return list;
 }
+// Licht als vorgemalte Stempel (Radialverlauf einmal gebacken, danach nur drawImage) — vorher zwei createRadialGradient
+// je Lampe und Bild, ~0,7–1,0 ms in beleuchteten Städten (Phase 20).
+const stamp = stops => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  for (const [o, col] of stops) gr.addColorStop(o, col); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return c; };
+let HOLE = null, WARM = null;
 function drawLight(now) {
+  HOLE ||= stamp([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,.72)'], [1, 'rgba(0,0,0,0)']]); WARM ||= stamp([[0, 'rgba(210,140,60,.10)'], [1, 'rgba(0,0,0,0)']]);
   const a = ambient();
   if (a < 0.06) return;
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.clearRect(0, 0, dark.width, dark.height);          // sonst summiert sich die Dunkelheit jeden Frame
-  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  dctx.setTransform(dpr / 2, 0, 0, dpr / 2, 0, 0);
   const night = S.map === 'deep' ? '8,12,18' : DUNGEONS[S.map] ? '6,8,10' : (S.minute / 60 > 18 || S.minute / 60 < 6) ? '10,14,28' : '20,18,14';
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = `rgba(${night},${a})`;
@@ -1668,22 +1898,20 @@ function drawLight(now) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260) continue;
     const r = l.r * cam.zoom * (0.94 + 0.06 * Math.sin(now / 160 + l.x));
-    const g = dctx.createRadialGradient(sx, sy, 0, sx, sy, r);
-    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,.72)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    dctx.fillStyle = g; dctx.beginPath(); dctx.arc(sx, sy, r, 0, 7); dctx.fill();
+    dctx.drawImage(HOLE, sx - r, sy - r, r * 2, r * 2);
   }
+ 
   dctx.globalCompositeOperation = 'source-over';
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(dark, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(dark, 0, 0, dark.width * 2, dark.height * 2); ctx.imageSmoothingEnabled = false;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   // warmer Lichtstich
   ctx.globalCompositeOperation = 'lighter';
   for (const l of lights) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -200 || sy < -200 || sx > W + 200 || sy > H + 200) continue;
-    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, l.r * cam.zoom * 0.8);
-    g.addColorStop(0, 'rgba(210,140,60,.10)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, l.r * cam.zoom * 0.8, 0, 7); ctx.fill();
+    const r = l.r * cam.zoom * 0.8;
+    ctx.drawImage(WARM, sx - r, sy - r, r * 2, r * 2);
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -1708,6 +1936,19 @@ function drawWeather(now) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     }
   } else if (S.weather === 'cloudy') { ctx.fillStyle = 'rgba(40,42,45,.12)'; ctx.fillRect(0, 0, W, H); }
+  else if (S.weather === 'bloodrain') {                   // Referenz 4: Blutregen — dunkelrote Schlieren, roter Himmel
+    ctx.strokeStyle = 'rgba(175,32,30,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (const d of rainDrops) { const x = ((d.x + now / 11000) % 1) * W, y = ((d.y + now / (1100 / d.s)) % 1) * H; ctx.moveTo(x, y); ctx.lineTo(x - 2, y + 9 * d.s); }
+    ctx.stroke(); ctx.fillStyle = 'rgba(80,6,8,.3)'; ctx.fillRect(0, 0, W, H);
+  } else if (S.weather === 'sandstorm') {                 // Sandsturm: waagrechte Schwaden, ockerne Sicht
+    ctx.fillStyle = 'rgba(150,110,60,.26)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(210,170,110,.5)';
+    for (const d of rainDrops) { const x = ((d.x + now / (700 / d.s)) % 1) * W, y = ((d.y + Math.sin(now / 900 + d.x * 9) * 0.01) % 1) * H; ctx.fillRect(Math.round(x), Math.round(y), 8 + 10 * d.s, 1 + (d.s > 1.2)); }
+  } else if (S.weather === 'snow') {                      // Schnee: große, langsame Flocken
+    ctx.fillStyle = 'rgba(230,236,240,.75)';
+    for (const d of rainDrops) { const x = ((d.x + now / 20000 + Math.sin(now / 1500 + d.y * 20) * 0.01) % 1) * W, y = ((d.y + now / (6000 / d.s)) % 1) * H; const sz = d.s > 1.2 ? 3 : 2; ctx.fillRect(Math.round(x), Math.round(y), sz, sz); }
+    ctx.fillStyle = 'rgba(200,210,225,.08)'; ctx.fillRect(0, 0, W, H);
+  }
   const R = REGION[curRegion];
   if (S.map === 'world' && R) {
     if (R.fog) { ctx.fillStyle = R.fog; ctx.fillRect(0, 0, W, H); }
@@ -1751,8 +1992,8 @@ export function drawPortraitTo(canvas, ch) {
   g.addColorStop(0, 'rgba(90,76,56,.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = g; c.fillRect(0, 0, w, h);
   if (ch) {
-    const f = SP.humanFrame(ch.spec || SP.humanSpec(ch), 'S', 'i0'), fine = f.px === 1;   // Porträt: Kopf und Schultern
-    const sx = fine ? 7 : 2, sy = fine ? 1 : 0, cw = fine ? 26 : 16, chh = fine ? 26 : 15, k = Math.max(1, Math.floor(Math.min(w / cw, h / chh)));
+    const f = SP.humanFrame(ch.spec || SP.humanSpec(ch), 'S', 'i0'), fine = f.px < 2, q = fine ? 1 / f.px : 1;   // Porträt: Kopf und Schultern (Ausschnitt in 1-Welt-Pixeln, je Raster skaliert)
+    const sx = Math.round((fine ? 7 : 2) * q), sy = fine ? 1 : 0, cw = Math.round((fine ? 26 : 16) * q), chh = Math.round((fine ? 26 : 15) * q), k = Math.max(1, Math.floor(Math.min(w / cw, h / chh)));
     c.drawImage(f, sx, sy, cw, chh, Math.round((w - cw * k) / 2), h - chh * k, cw * k, chh * k);
   }
   c.strokeStyle = 'rgba(0,0,0,.5)'; c.strokeRect(0.5, 0.5, w - 1, h - 1);
@@ -1804,6 +2045,8 @@ function drawItemVec(c, it, key, w, h) {
     else if (it.wtype === 'axe') { c.fillStyle = wood; c.fillRect(-2, -16, 4, 32); c.fillStyle = metal; c.beginPath(); c.moveTo(2, -14); c.lineTo(15, -8); c.lineTo(15, 2); c.lineTo(2, 0); c.fill(); }
     else if (it.wtype === 'spear') { c.fillStyle = wood; c.fillRect(-1.5, -14, 3, 32); c.fillStyle = metal; c.beginPath(); c.moveTo(-4, -14); c.lineTo(0, -22); c.lineTo(4, -14); c.fill(); }
     else if (it.wtype === 'mace') { c.fillStyle = wood; c.fillRect(-2, -8, 4, 26); c.fillStyle = metal; c.beginPath(); c.arc(0, -12, 7, 0, 7); c.fill(); }
+    else if (it.wtype === 'whip') { c.fillStyle = '#3a2a1c'; c.fillRect(-2, 8, 4, 12); c.fillStyle = metal;   // Kettenpeitsche: Griff, Kettenglieder im Bogen
+      for (let k = 0; k < 7; k++) c.fillRect(Math.round(Math.sin(k * 0.8) * 6) - 1.5, 6 - k * 4, 3, 3); }
     else { c.fillStyle = metal; c.fillRect(-2.5, -18, 5, 28); c.beginPath(); c.moveTo(-2.5, -18); c.lineTo(0, -23); c.lineTo(2.5, -18); c.fill();
            c.fillStyle = '#6d6154'; c.fillRect(-7, 9, 14, 3); c.fillStyle = '#2f2519'; c.fillRect(-2, 12, 4, 8); }
   } else if (it.slot === 'offhand') {

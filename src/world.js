@@ -59,14 +59,14 @@ export const LOCATIONS = [
 export function locAt(tx, ty) {
   const town = townAt(tx, ty); if (town) return LOCATIONS.find(l => l.key === town);   // ausgebaute Siedlung: ganzer Plan
   let best = null, bd = 1e9;
-  for (const l of LOCATIONS) {
+  for (const l of LOCATIONS) { if (l.fin && !SHIFT) continue;
     const d = Math.hypot(l.x - tx, l.y - ty);
     if (d < l.r && d < bd) { bd = d; best = l; }
   }
   return best;
 }
 export function nearestLocations(tx, ty, n = 4) {
-  return LOCATIONS.map(l => ({ l, d: Math.hypot(l.x - tx, l.y - ty) }))
+  return LOCATIONS.filter(l => SHIFT || !l.fin).map(l => ({ l, d: Math.hypot(l.x - tx, l.y - ty) }))
     .sort((a, b) => a.d - b.d).slice(0, n);
 }
 
@@ -130,6 +130,13 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
     used.add(tx + ',' + ty);
     prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 10 });
   }
+  // Große Schenke (Session 10, gewachsene Häuser): weitere Tische mit Bank in der hinteren Reihe, Türachse ± 1 bleibt frei
+  if (!ruin && b.type === 'tavern' && w >= 8 && h >= 6) for (let i = x + 2; i <= x + w - 3; i += 3) {
+    const j = doorSide === 'N' ? y + h - 3 : y + 2 + (h >= 7 ? 2 : 1);
+    if (Math.abs(i - door[0]) <= 1 || used.has(i + ',' + j) || used.has(i + ',' + (j + 1))) continue;
+    used.add(i + ',' + j); used.add(i + ',' + (j + 1));
+    prop('table', i, j, { map, gen: 2, house: b.id, solid: true, r: 10 }); prop('bench', i, j + 1, { map, gen: 2, house: b.id, solid: true, r: 10 });
+  }
   return b;
 }
 
@@ -174,7 +181,12 @@ const rawRegion = (tx, ty) => protectedNW(tx, ty) ? 'greenmark' : biomeAt(tx, ty
 // zwischen den Häusern). Erst nach der Generierung — sie selbst sieht die rohe Region, damit ihre Zufallsfolge gleich bleibt.
 // Laufzeit (phase 'world'): Weltkacheln → Entwurfsregion. Während der Entwurfsgenerierung die rohe Entwurfsregion.
 export const regionAt = (tx, ty) => { if (phase === 'design') return rawRegion(tx, ty);
-  const k = townAt(tx, ty); return k ? rawRegion(...TOWN_PLAN[k].spread.a) : rawRegion(dT(tx), dT(ty)); };
+  if (SHIFT && ty >= 700 && (ty >= 768 || spornAt(tx, ty) > 0)) return spornAt(tx, ty) > 0 ? (tx < 480 + (vnE(tx, ty + 300, 30) - 0.5) * 60 ? 'desert' : 'aurel') : tx > 1330 ? 'deadland' : 'aurel';   // S12: Wüstenzipfel, Hochreich, Inseln
+  if (SHIFT && tx < SHIFT) { if (westMtnAt(tx, ty)) return 'mountain'; if (tx >= FORT[0] && tx <= FORT[2] && ty >= FORT[1] && ty <= FORT[3]) return 'eisen';
+    const [sx, sy] = westSrc(tx, ty); return rawRegion(dT(sx - SHIFT), dT(sy)); }           // S12: Westen — Land setzt sich fort
+  if (tx >= SHIFT + 768) { if (tx - SHIFT - 768 > deadBorder(ty)) return 'deadland'; const [sx, sy] = eastSrc(tx - SHIFT, ty); return rawRegion(dT(sx), dT(sy)); }   // S12: Osten
+  const k = townAt(tx, ty); return k && !TOWN_PLAN[k].village ? rawRegion(...TOWN_PLAN[k].spread.a) : rawRegion(dT(tx - SHIFT), dT(ty)); };
+const westMtn = x => 118 + (vnE(x, 3, 24) - 0.5) * 50;                                 // Südrand des Westgebirges
 
 // ---------------- Szenen: kleine, komponierte Orte, die eine Geschichte erzählen ----------------
 // Keine Zufallsstreuung: jede Szene ist ein festes Arrangement. Gras darunter wird zur Lichtung,
@@ -304,7 +316,7 @@ function gruben() {
 // square = Platz (Treffpunkt der Bewohner am Tag). perHead = Kacheln Siedlungsfläche je Kopf (Bewohner + Wachen + Figuren
 // mit Namen): die Einwohnerzahl folgt der Fläche, nicht der Häuserzahl (Stadt dichter als Dorf, Grenzposten am dünnsten).
 const seaLineD = x => 476 + Math.round(Math.sin(x / 20) * 4);          // Küstenlinie der Südsee im Entwurf (wie die Generierung)
-export const seaLine = x => Math.ceil(seaLineD(dT(x)) * WS);            // … in Weltkacheln (erste Wasserzeile)
+export const seaLine = x => Math.ceil(seaLineD(dT(x - SHIFT)) * WS);   // S12: Welt-x nach der Westverschiebung            // … in Weltkacheln (erste Wasserzeile)
 export const TOWN_PLAN = {
   eren: {                                                         // Heimatdorf: Ackerbau, Rast an der Alten Straße
     area: [34, 50, 87, 83], old: [50, 56, 71, 73], square: [62, 66], spread: { s: [1.4, 1.5], a: [58, 64] }, perHead: 95, outskirts: ['cottage', 'house', 'barn', 'house', 'cottage'],   // West: Alte Feste, Nord: Grubenpfad
@@ -434,9 +446,9 @@ export function spreadHouse(P, x, y, w, h, door) {
 // Entwurfspunkt → Weltkachel: in einer Siedlung über deren Streckung, sonst über den Weltmaßstab. Für alle festen
 // Koordinaten in game.js/sim.js (Wachposten, Arbeitsplätze, Spawngebiete, Karawanenroute, Startpunkt, Ankunft).
 export function worldPt(x, y) {
-  for (const P of Object.values(TOWN_PLAN)) { const [x0, y0, x1, y1] = P.design.area;
-    if (x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2) return [spR(P, x, 0), spR(P, y, 1)]; }
-  return [wT(x), wT(y)];
+  for (const P of Object.values(TOWN_PLAN)) { if (P.village) continue; const [x0, y0, x1, y1] = P.design.area;
+    if (x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2) return [spR(P, x, 0) + OX, spR(P, y, 1)]; }
+  return [wT(x) + OX, wT(y)];   // S12: alles rückt um OX nach Osten
 }
 export const townPt = worldPt;
 // grow-Einträge wurden in Weltkoordinaten einer früheren Fassung gebaut (Maßstab 1, Streckung s0). Umrechnung: gleiche
@@ -471,6 +483,59 @@ for (const [key, P] of Object.entries(TOWN_PLAN)) {
   if (L) { [L.x, L.y] = [spR(P, L.x, 0), spR(P, L.y, 1)]; L.r = Math.round(L.r * Math.max(spS(P, 0), spS(P, 1))); L.town = true; }
 }
 for (const L of LOCATIONS) if (!L.town) { L.x = wT(L.x); L.y = wT(L.y); L.r = Math.round(L.r * WS); }   // übrige Orte: Weltmaßstab
+// Session 11 — die Eisenmark (Nutzerwunsch: größere Welt, Endgame-Fraktion der Sklavenhalter). Ostlich angehängt, schon im
+// Weltmaßstab (keine Umrechnung): bestehende Koordinaten und Spielstände bleiben gültig.
+export const EAST = 256, EAST2 = 256, SOUTH = 448;   // S12: SOUTH — der Wüstensporn und die Südinseln                                     // S12: zweite Erweiterung — das Grauland hinter der Mark
+// Session 12 — Neuordnung (Nutzer: „West Kette, Mitte Menschen, Ost Untote“). Die Karte wächst um OX nach Westen: dort liegen
+// Westgebirge, Eisenfeste, Steinbruch, Grubenhort (Goblins) und die Tributdörfer. Die alte Osterweiterung wird zum Totenland.
+// fin: schon Weltkoordinaten nach der Verschiebung; alle anderen Orte rücken beim Erzeugen um OX nach rechts (shiftCoords).
+export const OX = 256;
+let SHIFT = 0;                                                            // 0 während der Erzeugung, danach OX
+LOCATIONS.push(
+  { key:'westgebirge', name:'Das Westgebirge', x:128, y:56, r:80, kind:'wild', threat:3, fin:true },
+  { key:'eisenmark',   name:'Die Eisenmark',  x:130, y:232, r:96, kind:'wild', threat:3, faction:'chain', fin:true },
+  { key:'kettenfeste', name:'Die Eisenfeste', x:158, y:172, r:34, kind:'city', threat:4, faction:'chain', fin:true },
+  { key:'steinbruch',  name:'Der Steinbruch', x:78,  y:318, r:24, kind:'camp', threat:3, faction:'chain', fin:true },
+  { key:'grubenhort',  name:'Grubenhort',     x:185, y:430, r:20, kind:'camp', threat:2, faction:'goblin', fin:true },
+  { key:'kettenpass',  name:'Kettentor',      x:226, y:172, r:10, kind:'road', threat:3, fin:true },
+  // Totenland: in Koordinaten der Erzeugung (rückt mit)
+  { key:'totenland',   name:'Das Totenland',  x:1024, y:400, r:250, kind:'wild', threat:4, faction:'undead' },
+  { key:'knochenpass', name:'Knochentor',     x:778, y:384, r:10, kind:'road', threat:3, faction:'undead' },
+  { key:'totenruinen', name:'Totenruinen',    x:900, y:180, r:22, kind:'ruin', threat:4, faction:'undead' },
+  { key:'schaedelwald', name:'Schädelwald',   x:1050, y:300, r:26, kind:'wild', threat:4, faction:'undead' },
+  { key:'graeberfeld', name:'Gräberfeld',     x:930, y:480, r:20, kind:'ruin', threat:3, faction:'undead' },
+  { key:'seelenhuegel', name:'Seelenhügel',   x:1130, y:470, r:18, kind:'ruin', threat:4, faction:'undead' },
+  { key:'grabwacht',   name:'Grabwacht',      x:1150, y:620, r:18, kind:'ruin', threat:4, faction:'undead' });
+// Wüstensporn (Session 12, Referenzkarte „Valoris“): Halbinsel im Südwesten — Wüste, Dünen, Felsödland, Ruinen, Banditen.
+LOCATIONS.push(
+  { key:'wuestensporn', name:'Der Wüstensporn', x:470, y:880, r:220, kind:'wild', threat:3, fin:true },
+  { key:'karak_atar',   name:'Karak-Atar',      x:430, y:900, r:26, kind:'city', threat:3, faction:'bandit', fin:true },
+  { key:'duenenwacht',  name:'Dünenwacht',      x:330, y:800, r:14, kind:'camp', threat:3, faction:'bandit', fin:true },
+  { key:'sandruinen',   name:'Sandruinen',      x:250, y:860, r:16, kind:'ruin', threat:3, fin:true },
+  { key:'aurelion',     name:'Das Hochreich Aurelion', x:860, y:1010, r:300, kind:'wild', threat:1, faction:'aurel', fin:true },
+  { key:'nekrosinsel',  name:'Nekrosinsel',     x:1390, y:800, r:30, kind:'ruin', threat:5, faction:'undead', fin:true });
+// Dörfer (Session 12): Weltkoordinaten nach der Verschiebung. Eigener Bauplan (buildVillages), volle Siedlungen im Spiel.
+// lord: wessen Einfluss — Valen, Orden, Händler; tribute: zahlt Abgaben an die Eiserne Kette (Westen).
+export const VILLAGES = [
+  { key: 'haselbrueck', name: 'Haselbrück', x: 360, y: 258, lord: 'valen', link: [434, 258] },
+  { key: 'muehlbach',   name: 'Mühlbach',   x: 518, y: 226, lord: 'valen', link: [434, 226] },
+  { key: 'weidenau',    name: 'Weidenau',   x: 366, y: 372, lord: 'valen', link: [434, 372] },
+  { key: 'rastfurt',    name: 'Rastfurt',   x: 768, y: 334, lord: 'merch', link: [768, 376] },
+  { key: 'lichtenrain', name: 'Lichtenrain', x: 860, y: 446, lord: 'order', link: [860, 386] },
+  { key: 'grauwasser',  name: 'Grauwasser', x: 70,  y: 470, lord: 'chain', tribute: true, link: [214, 470] },
+  { key: 'hohlstein',   name: 'Hohlstein',  x: 122, y: 560, lord: 'chain', tribute: true, link: [214, 560] },
+  { key: 'eisenried',   name: 'Eisenried',  x: 70,  y: 630, lord: 'chain', tribute: true, link: [214, 630] },
+];
+for (const V of VILLAGES) LOCATIONS.push({ key: V.key, name: V.name, x: V.x, y: V.y, r: 16, kind: 'village', threat: 0, faction: V.lord, town: true, tribute: !!V.tribute, fin: true });
+// Alte Eisenmark-Koordinaten (Session 11, Osten) → neuer Westen: Feste gespiegelt (Tor nach Osten), Steinbruch, Grubenhort, Pass.
+export function EM(x, y) {
+  if (x >= 890 && x <= 970 && y >= 355 && y <= 410) return [1090 - x, y - 212];
+  if (x >= 855 && x <= 905 && y >= 195 && y <= 240) return [x - 802, y + 100];
+  if (x >= 880 && x <= 930 && y >= 580 && y <= 615) return [x - 720, y - 170];
+  if (x >= 770 && x <= 800 && y >= 370 && y <= 395) return [218, 172];                       // Wache am Kettentor (innen)
+  return [x, y];
+}
+export const EISEN_CONVOY = { start: [150, 318], pts: [[95, 318], [214, 318], [214, 172], [192, 172]] };   // Steinbruch → Straße → Tor der Feste
 // Props neben einem Haus (Schild an der Tür, Fässer vor der Schenke) ziehen mit dem Haus um; freie Props strecken.
 function attachedPt(P, x, y, extra = []) {
   for (const [, hx, hy, w, h, door] of [...P.design.houses, ...extra])
@@ -491,6 +556,7 @@ const SCATTER = new Set(['camp_ruin', 'rubble', 'bones', 'debris', 'broken_pilla
 const TRAMPLE = new Set([T.GRASS, T.MARSH, T.SAND, T.ASH]);            // hier darf ein Trampelpfad entstehen
 function expandTowns(wild) {
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
+    if (P.village) continue;                                          // Dörfer baut buildVillages
     const claimed = new Set(), street = new Set(), K = (x, y) => x + ',' + y;
     const inR = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
     const own = () => HOUSES.filter(b => b.map === 'world' && b.x <= P.area[2] + 2 && b.x + b.w >= P.area[0] - 2 && b.y <= P.area[3] + 2 && b.y + b.h >= P.area[1] - 2);
@@ -521,7 +587,7 @@ function expandTowns(wild) {
     near_h = own();
     for (const r of [P.design.old, ...P.design.clear.map(c => c.slice(1))]) box(wRect(r), (x, y) => { if (tileAt('world', x, y) !== T.WATER) setTile('world', x, y, naturalAt(x, y)); });
     const houses = [...core.map(([type, x, y, w, h, door, wear]) => [type, ...spreadHouse(P, x, y, w, h, door), w, h, door, wear, 'h' + x + '_' + y, x, y]), ...P.houses,
-      ...(P.grow?.houses || [])];
+      ...(P.grow?.houses || [])].map(a => a.slice());                  // Kopien: das Wachsen unten darf TOWN_PLAN nicht verändern
     const mark = props.length;
 
     for (const [t, ...r] of P.fill || []) box(r, (x, y) => {          // Grund: Pflaster bzw. festgetretene Erde; Ränder ausgefranst
@@ -551,6 +617,22 @@ function expandTowns(wild) {
       prop('scarecrow', (r[0] + r[2]) >> 1, (r[1] + r[3]) >> 1);
     }
     for (const r of P.grow?.gardens || []) box(r, (x, y) => { if (!street.has(K(x, y))) paint(x, y, T.FIELD); });   // Gemüsebeete im Hof
+    // Session 10 (Nutzer: „Schenke/Versammlungsorte größer, manche Häuser sehr klein“): vor dem Bauen nach hinten und zu
+    // den Seiten wachsen, die Tür bleibt auf ihrer Kachel (Schilder, Schlafplätze, NPC_DAY-Bezüge stimmen weiter).
+    // Nur auf freiem Grund: keine Straße/Platz, kein Acker/Wasser/Fels/Mauer, ≥ 2 Kacheln zu jedem anderen geplanten Haus.
+    const GROW = { tavern: [[4, 2], [2, 2], [2, 1]], chapel: [[2, 2], [2, 1]], hall: [[2, 2], [2, 1]], merc: [[2, 2], [2, 1]] };
+    const grown = (x, y, w, h, door, dw, dh) => door === 'S' ? [x - dw / 2, y - dh, w + dw, h + dh] : door === 'N' ? [x - dw / 2, y, w + dw, h + dh]
+      : door === 'W' ? [x, y - dh / 2, w + dw, h + dh] : [x - dw, y - dh / 2, w + dw, h + dh];   // Tür-Kachel bleibt gleich
+    const BAD = new Set([T.WATER, T.ROCK, T.WALL, T.FIELD, T.DWALL]);
+    const fits = (me, [x, y, w, h]) => {
+      for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (street.has(K(i, j)) || BAD.has(tileAt('world', i, j))) return false;
+      return houses.every(o => o === me || Math.max(o[1] - x - w, x - o[1] - o[3], o[2] - y - h, y - o[2] - o[4]) >= 2);
+    };
+    for (const hs of houses) {
+      const [type, x, y, w, h, door] = hs, steps = GROW[type] || (w * h <= 16 ? [[2, 1]] : []);
+      for (const [dw, dh] of steps) { const d = door === 'W' || door === 'E' ? [dw, dh % 2 ? dh + 1 : dh] : [dw, dh];   // Seitentür: Höhe gerade wachsen (Tür mittig)
+        const r = grown(x, y, w, h, door, d[0], d[1]); if (fits(hs, r)) { [hs[1], hs[2], hs[3], hs[4]] = r; break; } }
+    }
     for (const [type, x, y, w, h, door, wear, id, hx, hy] of houses) {  // wear (optional): bewusst gesetzte Ruine
       box([x - 1, y - 1, x + w, y + h], (i, j) => {                     // Hofrand: Erde statt Gras, Ecken ausgefranst
         const corner = (i === x - 1 || i === x + w) && (j === y - 1 || j === y + h);
@@ -667,6 +749,9 @@ function expandTowns(wild) {
 
 // ---------------- Oberwelt ----------------
 export function genWorld() {
+  if (SHIFT) { shiftCoords(-SHIFT); SHIFT = 0; }                         // S12: zur Erzeugung in die Entwurfslage zurück
+  for (const k of Object.keys(TOWN_PLAN)) if (TOWN_PLAN[k].village) delete TOWN_PLAN[k];
+  for (let i = LOCATIONS.length - 1; i >= 0; i--) if (LOCATIONS[i].poi) LOCATIONS.splice(i, 1);   // Streuorte entstehen je Welt neu
   props.length = 0; HOUSES.length = 0; phase = 'design';
   seedRng(S.seed);
   const w = 512, h = 512, tiles = new Uint8Array(w * h).fill(T.GRASS);
@@ -979,10 +1064,27 @@ export function genWorld() {
   for (let i = 0; i < 200; i++) { const x = ri(20, 300), y = ri(120, 460); if (tileAt('world', x, y) === T.GRASS) prop('bush', x, y, { harvest:'herb' }); }
 
   pactScenes(); groveScene(); deadScenes(); borderScenes();
-  const wild = new Set(props.slice(handMark));
+  const wild = new Set(props.slice(handMark));               // vor den Zugängen: Entfernen verschiebt sonst den Index
+  // Zugänge (BUG-079, per Wegsuche gefunden): Wolfsschlucht war rundum Fels, die Nebelinsel ohne Übergang. Ohne rnd();
+  // feste Props auf den Wegkacheln werden entfernt, sonst sperrt ein Erzbrocken den neuen Pass.
+  const cut = [];
+  for (let k = 0; k < 8; k++) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) cut.push([48 + k + dx, 298 - k + dy, T.DIRT]);   // Schluchtpass nach NO
+  for (let y = 470; y <= 486; y++) for (const x of [90, 91]) if (SOLID.has(tileAt('world', x, y))) cut.push([x, y, T.PLANK]);   // Nebelsteg
+  for (const [x, y, t] of cut) setTile('world', x, y, t);
+  prop('sign', 92, 470, { label: 'Nebelsteg — zur Nebelinsel' });
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if (q.solid && cut.some(([x, y]) => Math.floor(q.x / 32) === x && Math.floor(q.y / 32) === y)) props.splice(i, 1); }
   resampleWorld();                                         // Entwurf → Weltmaßstab (ohne rnd())
   phase = 'world';
   expandTowns(wild);                                       // zuletzt und ohne rnd(): Zufallsfolge oben bleibt stabil
+  extendEast();                                            // Session 11: Eisenmark, ohne rnd() (Hash-Rauschen)
+  extendFarEast();                                         // Session 12: Totenland (Osten)
+  shiftWest();                                             // Session 12: Karte wächst nach Westen, alles rückt um OX
+  buildWest();                                             // Session 12: Westgebirge, Eisenfeste, Steinbruch, Grubenhort
+  extendSouth();                                           // Session 12: Wüstensporn, Südinseln, Nekrosinsel
+  coastline(); lakes(); totenbruecke();                    // Session 12: zerklüftete Küste, Buchten, Binnenseen, Brücke zur Nekrosinsel
+  buildVillages();                                         // Session 12: Dörfer in allen Einflussgebieten
+  scatterPOIs();                                           // Session 12: Dichte — überall kleine Orte mit Geschichte
+  tidyTowns(); clearDoors(); ensureReach();                              // Session 12: gilt für jeden Seed (neue Spiele haben neue Welten)
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
@@ -999,6 +1101,473 @@ function baseProps(map, list) {
   for (const p of list) { const k = `${p.type}@${p.x / TS | 0},${p.y / TS | 0}`, i = n.get(k) || 0; n.set(k, i + 1); p.gk = i ? `${k}#${i}` : k; }
   setPropBase(map, list);
   return list;
+}
+
+// ---------------- Die Eisenmark (Session 11) ----------------
+// Karte wächst nach Osten (768 → 1024). Gelände aus Hash-Rauschen (kein rnd(): die Welt davor bleibt Kachel für Kachel gleich).
+// Ein Felskamm trennt die Mark vom Grenzland, der Kettenpass öffnet ihn; die Straße führt von Sonnwacht zur Kettenfeste.
+const vnE = (x, y, s) => { const X = Math.floor(x / s), Y = Math.floor(y / s), fx = x / s - X, fy = y / s - Y, sm = t => t * t * (3 - 2 * t);
+  const a = nz(X, Y), b = nz(X + 1, Y), c = nz(X, Y + 1), d = nz(X + 1, Y + 1), u = sm(fx), v = sm(fy);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+// Weg aus 2×2-Kacheln (Straße, Erdweg); Mauern bleiben stehen
+function lay(x0, y0, x1, y1, tile = T.ROAD) { const n = Math.max(1, Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (tileAt('world', x + dx, y + dy) !== T.WALL) setTile('world', x + dx, y + dy, tile); } }
+// Session 12 (Nutzer: „links und rechts nicht so abgetrennt“): Land jenseits der alten Kartenränder setzt das Land davor fort —
+// verzerrt gespiegelt an der Naht, nur natürliche Böden (keine Straßen, Häuser, Äcker). Im Osten geht es nach einer
+// unregelmäßigen Grenze in das Totenland über (Asche, Erde, dunkle Seen); keine geraden Grate mehr. Kein rnd().
+const NATURAL_T = new Set([T.GRASS, T.DIRT, T.MARSH, T.SAND, T.ASH, T.ROCK, T.STONE, T.WATER]);
+export const deadBorder = y => 36 + vnE(7, y, 37) * 80;                             // Spalten hinter der alten Ostkante
+const eastSrc = (x, y) => [Math.max(516, Math.min(760, 1535 - x + Math.round((vnE(x, y + 50, 31) - 0.5) * 34))), Math.max(0, Math.min(767, y + Math.round((vnE(x + 70, y, 29) - 0.5) * 34)))];
+function extendEast() {
+  const O = MAPS.world, W = O.w + EAST + EAST2, H = O.h, t = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) t.set(O.tiles.subarray(y * O.w, y * O.w + O.w), y * W);
+  const X0 = O.w;
+  for (let y = 0; y < H; y++) for (let x = X0; x < W; x++) {
+    const [sx, sy] = eastSrc(x, y), src = O.tiles[sy * O.w + sx], n = vnE(x, y, 22), dead = x - X0 > deadBorder(y);
+    let tl = NATURAL_T.has(src) ? src : T.GRASS;
+    if (y < 2 || y >= H - 2 || x >= W - 3) tl = T.ROCK;
+    else if (y >= seaLine(Math.min(x, 767))) tl = T.WATER;
+    else if (dead) tl = vnE(x + 500, y, 9) > 0.87 ? T.ROCK : vnE(x + 900, y, 40) < 0.1 ? T.WATER : n < 0.45 ? T.ASH : n < 0.8 ? T.DIRT : T.STONE;   // eigenes Gelände: Asche, schwarze Seen
+    t[y * W + x] = tl;
+  }
+  MAPS.world = { w: W, h: H, tiles: t, design: O.design };
+  lay(712, 384, 1000, 384);                                                         // Sonnwacht → Knochentor → ins Totenland
+  for (const [x, y] of [[776, 381], [776, 389]]) prop('bone_spire', x, y, { solid: true, r: 8, label: 'Knochentor' });
+  prop('sign', 781, 386, { label: 'Knochentor — Das Totenland. Hier endet das Land der Lebenden.' });
+}
+function extendFarEast() { totenland(); }                                          // Karte ist schon breit genug (extendEast)
+// Orte des Totenlands: Ruinen, Schädelwald, Gräberfeld, Seelenhügel, Grabwacht — dazwischen tote Bäume, Knochen, Grabsteine
+function totenland() {
+  const free = (x, y) => { const t = tileAt('world', x, y); return t !== T.WATER && t !== T.ROCK && t !== T.WALL && t !== T.ROAD; };
+  const P = (t, x, y, o = {}) => { if (free(x, y)) prop(t, x, y, o); };
+  const deadAt = (x, y) => x - 768 > deadBorder(y);
+  lay(1000, 384, 1050, 300, T.DIRT); lay(1000, 384, 930, 480, T.DIRT); lay(1000, 384, 1130, 470, T.DIRT); lay(1130, 470, 1150, 620, T.DIRT); lay(1000, 384, 900, 190, T.DIRT);
+  for (let i = 0; i < 1400; i++) { const x = 782 + Math.floor(nz(i, 91) * 492), y = 6 + Math.floor(nz(91, i) * 700), k = nz(i, 17);
+    if (!free(x, y)) continue;
+    if (!deadAt(x, y)) { if (k < 0.12 && tileAt('world', x, y) === T.GRASS) prop('tree', x, y, { solid: true, r: 12, hp: 3 }); continue; }   // Übergangsland: noch lebendig
+    if (k < 0.42) P('dead_tree', x, y, { solid: true, r: 10 }); else if (k < 0.6) P('bones', x, y, { r: 6 }); else if (k < 0.7) P('gravestone', x, y, { solid: true, r: 7 });
+    else if (k < 0.74) P('bone_spire', x, y, { solid: true, r: 8 }); else if (k < 0.8) P('blood', x, y); }
+  // Totenruinen: Säulenring, Gruft, abgebrochener Turm
+  rect('world', 884, 166, 32, 28, T.STONE);
+  for (let k = 0; k < 10; k++) { const a = k * 0.63; P('broken_pillar', Math.round(900 + Math.cos(a) * 13), Math.round(180 + Math.sin(a) * 11), { solid: true, r: 10 }); }
+  P('crypt', 900, 176, { solid: true, r: 16, label: 'Gruft der Totenruinen' }); P('tower_ruin', 912, 170, { solid: true, r: 18 }); P('rubble', 890, 186); P('rubble', 906, 188);
+  // Schädelwald: dichter toter Wald, Knochenspitzen
+  for (let i = 0; i < 90; i++) { const a = nz(i, 5) * 6.28, r = Math.sqrt(nz(5, i)) * 24; P(i % 7 ? 'dead_tree' : 'bone_spire', Math.round(1050 + Math.cos(a) * r), Math.round(300 + Math.sin(a) * r), { solid: true, r: 10 }); }
+  // Gräberfeld: Reihen von Gräbern, Gruft, Kerzen
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 9; i++) P('gravestone', 918 + i * 3, 472 + j * 3, { solid: true, r: 7 });
+  P('crypt', 944, 478, { solid: true, r: 16, label: 'Gruft des Gräberfelds' }); P('candles', 930, 486); P('candles', 936, 470);
+  // Seelenhügel: Obelisk im Kerzenkreis
+  P('obelisk', 1130, 470, { solid: true, r: 12 }); for (let k = 0; k < 8; k++) P('candles', Math.round(1130 + Math.cos(k * 0.785) * 5), Math.round(470 + Math.sin(k * 0.785) * 4));
+  for (const [dx, dy] of [[-9, -6], [9, -5], [-8, 7], [10, 6]]) P('bone_spire', 1130 + dx, 470 + dy, { solid: true, r: 8 });
+  // Grabwacht: verfallener Wachturm, Palisade, Gräber der Wächter
+  P('watchtower_ruin', 1150, 616, { solid: true, r: 16 }); for (let i = -6; i <= 6; i++) P('palisade_prop', 1150 + i, 626, { solid: true });
+  for (let i = 0; i < 6; i++) P('gravestone', 1142 + i * 3, 610, { solid: true, r: 7 }); P('banner_torn', 1156, 612, { label: 'Zerfetztes Banner der Grabwacht' });
+}
+// Kontinent (Session 12, Referenzkarte): an West-, Nord- und Ostrand frisst das Meer eine zerklüftete Küste ins Land, Buchten
+// und Landzungen aus zwei Rauschlagen. Orte bleiben an Land (Schutzkreis), Straßen enden nicht im Wasser (sie liegen innen).
+// Wüstensporn: Land entlang eines Rückgrats vom Südwestland nach Südosten, Breite und Küste aus Rauschen; > 0 = Land
+const SPINE = [[200, 690], [250, 790], [400, 880], [620, 950], [860, 1010], [1060, 1040], [1180, 1090]];   // S12: Wüstenzipfel im Westen, dann das Hochreich
+function spornAt(x, y) {
+  let best = 1e9, tt = 0;
+  for (let i = 0; i + 1 < SPINE.length; i++) { const [ax, ay] = SPINE[i], [bx, by] = SPINE[i + 1], dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy))), d = Math.hypot(x - ax - dx * t, y - ay - dy * t);
+    if (d < best) { best = d; tt = (i + t) / (SPINE.length - 1); } }
+  const r = 55 + Math.sin(tt * Math.PI) * 160 + (vnE(x + 6000, y, 40) - 0.5) * 80 + (vnE(x + 7000, y, 11) - 0.5) * 18;
+  return r - best;
+}
+function extendSouth() {
+  const O = MAPS.world, W = O.w, H = O.h + SOUTH, t = new Uint8Array(W * H).fill(T.WATER);
+  t.set(O.tiles, 0); MAPS.world = { w: W, h: H, tiles: t, design: O.design };
+  for (let y = O.h - 4; y < O.h; y++) for (let x = 0; x < W; x++) if (t[y * W + x] === T.ROCK) t[y * W + x] = T.WATER;   // alter Randfels unten → Meer
+  for (let y = 640; y < H - 3; y++) for (let x = 2; x < 1330; x++) {
+    const v = spornAt(x, y); if (v <= 0) continue;
+    const k = y * W + x; if (y < 700 && t[k] !== T.WATER) continue;                   // Festland bleibt, nur Meer wird zu Sporn
+    const n = vnE(x + 800, y, 18), r = vnE(x + 900, y, 8);
+    const west = x < 480 + (vnE(x, y + 300, 30) - 0.5) * 60;                       // Wüstenzipfel mit ausgefranster Grenze
+    t[k] = west ? (v < 3 ? T.SAND : r > 0.9 ? T.ROCK : n < 0.05 && v > 45 ? T.WATER : n < 0.72 ? T.SAND : n < 0.86 ? T.DIRT : T.STONE)   // Dünen, Felsödland, seltene Oasen
+      : v < 2 ? T.SAND : r > 0.93 ? T.ROCK : n < 0.035 && v > 50 ? T.WATER : n < 0.07 && v > 50 ? T.MARSH : n < 0.74 ? T.GRASS : n < 0.92 ? T.DIRT : T.STONE;   // Aurelion: fruchtbares, gepflegtes Land
+  }
+  for (let i = 0; i < 26; i++) {                                                      // Südinseln und Riffe
+    const cx = 60 + Math.floor(nz(i, 81) * 1400), cy = 790 + Math.floor(nz(81, i) * 210), rr = 6 + Math.floor(nz(i, 82) * 22);
+    if (spornAt(cx, cy) > -20) continue;
+    for (let y = cy - rr - 6; y <= cy + rr + 6; y++) for (let x = cx - rr - 6; x <= cx + rr + 6; x++) {
+      if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) continue;
+      const d = Math.hypot(x - cx, (y - cy) * 1.3) - rr - (vnE(x + 20 * i, y, 6) - 0.5) * 10; if (d > 0) continue;
+      t[y * W + x] = cx > 1100 ? (vnE(x, y, 5) > 0.5 ? T.ASH : T.DIRT) : d > -3 ? T.SAND : vnE(x, y, 7) > 0.55 ? T.GRASS : T.STONE; }
+  }
+  for (let y = 755; y <= 845; y++) for (let x = 1335; x <= 1445; x++) {               // Nekrosinsel, über die Totenbrücke erreichbar
+    const d = Math.hypot(x - 1390, (y - 800) * 1.2) - 44 - (vnE(x, y + 40, 9) - 0.5) * 16; if (d < 0) t[y * W + x] = vnE(x, y, 6) > 0.6 ? T.STONE : T.ASH; }
+  // Karak-Atar: Mauerstadt der Sandfürsten — Mauer mit Toren, Sandsteinhäuser, Markt, Brunnen
+  const K = [404, 880, 456, 922];
+  for (let y = K[1]; y <= K[3]; y++) for (let x = K[0]; x <= K[2]; x++) {
+    const edge = x === K[0] || x === K[2] || y === K[1] || y === K[3], gate = (y >= 899 && y <= 902 && (x === K[0] || x === K[2])) || (x >= 429 && x <= 431 && (y === K[1] || y === K[3]));
+    t[y * W + x] = edge && !gate ? T.WALL : T.SAND; }
+  rect('world', 405, 899, 51, 4, T.STONE); rect('world', 429, 881, 3, 41, T.STONE); rect('world', 424, 895, 13, 11, T.STONE);
+  for (const [x, y, dr] of [[408, 884, 'S'], [416, 884, 'S'], [436, 884, 'S'], [444, 884, 'S'], [408, 910, 'N'], [416, 910, 'N'], [436, 910, 'N'], [444, 910, 'N']])
+    house('world', x, y, 6, 5, dr, { type: ['house', 'store', 'tavern', 'house'][(x + y) % 4], town: 'karak' });
+  for (const [tp, x, y, o] of [['stall', 426, 897, {}], ['stall', 433, 897, {}], ['well', 430, 903, { solid: true }], ['banner_torn', 403, 897, { label: 'Zeichen der Sandfürsten' }], ['banner_torn', 403, 904, { label: 'Zeichen der Sandfürsten' }],
+    ['torch', 428, 880], ['torch', 432, 880], ['barrel', 425, 904], ['crate', 436, 904], ['campfire_static', 430, 915, { solid: true, r: 10 }]]) prop(tp, x, y, o);
+  lay(250, 700, 250, 790, T.DIRT); lay(250, 790, 404, 900, T.DIRT);                   // Karawanenweg durch den Sporn
+  for (let i = 0; i < 1400; i++) { const x = 480 + Math.floor(nz(i, 71) * 840), y = 760 + Math.floor(nz(71, i) * 440);   // Aurelion: Haine und Alleen
+    if (t[y * W + x] === T.GRASS && spornAt(x, y) > 8 && vnE(x + 1200, y, 26) > 0.56) prop('tree', x, y, { solid: true, r: 12, hp: 3 }); }
+  for (const C of AUREL_CITIES) buildAurelCity(C);
+  const G = k => AUREL_CITIES.find(c => c.key === k), gate = (c, s) => s === 'W' ? [c.x - c.hw, c.y] : s === 'E' ? [c.x + c.hw, c.y] : s === 'N' ? [c.x, c.y - c.hh] : [c.x, c.y + c.hh];
+  for (const [a, sa, b, sb] of [['aurelheim', 'N', 'kupferhafen', 'S'], ['aurelheim', 'E', 'gelenkhall', 'W'], ['gelenkhall', 'E', 'tickmar', 'W'], ['aurelheim', 'S', 'sanktserin', 'N']]) {
+    const [x0, y0] = gate(G(a), sa), [x1, y1] = gate(G(b), sb); lay(x0, y0, x1, y1); }
+  lay(456, 900, 666, 980);                                                            // Karak-Atar → Aurelheim (Westtor)
+  prop('sign', 252, 704, { label: 'Wüstensporn — Karak-Atar, Stadt der Sandfürsten' });
+  // Dünenwacht, Sandruinen, Nekrosinsel
+  for (const [x, y] of [[322, 792], [338, 792], [322, 808], [338, 808]]) prop('watchtower_ruin', x, y, { solid: true, r: 14 });
+  for (let i = -6; i <= 6; i++) { prop('palisade_prop', 330 + i, 790, { solid: true }); prop('palisade_prop', 330 + i, 810, { solid: true }); }
+  prop('tent_prop', 328, 800, { solid: true, label: 'Zelt der Wüstenräuber' }); prop('campfire_static', 333, 801, { solid: true, r: 10 });
+  for (let k = 0; k < 12; k++) prop(k % 3 ? 'broken_pillar' : 'rubble', Math.round(250 + Math.cos(k * 0.52) * 11), Math.round(860 + Math.sin(k * 0.52) * 8), { solid: k % 3 !== 0, r: 10 });
+  prop('tower_ruin', 1390, 796, { solid: true, r: 18, label: 'Turm der Nekrosinsel' }); for (let k = 0; k < 8; k++) prop('bone_spire', Math.round(1390 + Math.cos(k * 0.8) * 22), Math.round(800 + Math.sin(k * 0.8) * 16), { solid: true, r: 8 });
+  prop('sign', 1392, 700, { label: 'Totenbrücke — zur Nekrosinsel' });
+}
+// Totenbrücke: vom Inselrand nach Norden, bis Land kommt (nach der Küstenbildung, sonst frisst das Meer sie)
+function totenbruecke() {
+  const m = MAPS.world, W = m.w, t = m.tiles; let y = 800;
+  while (y > 560 && t[y * W + 1390] !== T.WATER) y--;                                  // Nordrand der Insel
+  for (; y > 560 && t[y * W + 1390] === T.WATER; y--) for (const x of [1389, 1390]) t[y * W + x] = T.PLANK;
+}
+// Das Hochreich Aurelion (Session 12, Nutzer): die reichste Nation der Welt — Adel, Handelsherren, Automaten, Prothesen.
+// Ummauerte Städte mit Pflasterkreuz, Platz, Häuserreihen zur Straße, Laternen, Statuen, Werkstätten mit Zahnrädern und
+// ruhenden Automaten. Volle Siedlungen im Spiel (TOWN_PLAN, lord 'aurel'): Bewohner (Adel, Feinmechaniker, Kybernetiker).
+export const AUREL_CITIES = [
+  { key: 'aurelheim',   name: 'Aurelheim',   x: 700,  y: 980,  hw: 34, hh: 24, capital: true, types: ['manor', 'manor', 'house', 'store', 'manor', 'tavern', 'healer', 'house', 'chapel', 'manor', 'smithy', 'house'] },
+  { key: 'kupferhafen', name: 'Kupferhafen', x: 600,  y: 800,  hw: 22, hh: 16, types: ['store', 'house', 'tavern', 'store', 'house', 'smithy', 'fisher'] },
+  { key: 'gelenkhall',  name: 'Gelenkhall',  x: 930,  y: 1030, hw: 22, hh: 16, types: ['smithy', 'store', 'healer', 'smithy', 'house', 'manor', 'smithy'] },
+  { key: 'tickmar',     name: 'Tickmar',     x: 1120, y: 1070, hw: 22, hh: 16, types: ['store', 'smithy', 'store', 'house', 'smithy', 'barn'] },
+  { key: 'sanktserin',  name: 'Sankt Serin', x: 820,  y: 1110, hw: 22, hh: 16, types: ['chapel', 'manor', 'house', 'healer', 'manor', 'house'] },
+];
+for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
+const HSIZE = { manor: [6, 5], house: [5, 4], store: [6, 5], tavern: [6, 5], healer: [5, 4], chapel: [6, 5], smithy: [5, 4], barn: [6, 5], fisher: [4, 4] };
+function buildAurelCity(C) {
+  const m = MAPS.world, W = m.w, t = m.tiles, { x: cx, y: cy, hw, hh } = C, x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 - 3 && qx <= x1 + 3 && qy >= y0 - 3 && qy <= y1 + 3) props.splice(i, 1); }
+  const gate = (x, y) => (Math.abs(y - cy) <= 1 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 1 && (y === y0 || y === y1));
+  for (let y = y0 - 3; y <= y1 + 3; y++) for (let x = x0 - 3; x <= x1 + 3; x++) {
+    const edge = x === x0 || x === x1 || y === y0 || y === y1, inside = x > x0 && x < x1 && y > y0 && y < y1;
+    t[y * W + x] = edge ? (gate(x, y) ? T.STONE : T.WALL) : inside ? T.GRASS : (t[y * W + x] === T.WATER ? T.DIRT : t[y * W + x]);
+  }
+  for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) t[(y + j) * W + x + i] = T.WALL;   // Ecktürme
+  const street = (ax, ay, bx, by) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) t[y * W + x] = T.STONE; };
+  street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1); street(cx - 5, cy - 4, cx + 5, cy + 4);   // Pflasterkreuz und Platz
+  const rows = C.capital ? [cy, cy - 13, cy + 13] : [cy];
+  if (C.capital) for (const ry of [cy - 13, cy + 13]) street(x0 + 1, ry - 1, x1 - 1, ry + 1);
+  const hs = [], at = (x, y) => t[y * W + x]; let ti = 0;
+  const fits = (hx, hy, w, h) => hx > x0 + 1 && hx + w < x1 - 1 && hy > y0 + 1 && hy + h < y1 - 1
+    && hs.every(([a, b, c, d]) => hx + w + 2 <= a || a + c + 2 <= hx || hy + h + 2 <= b || b + d + 2 <= hy)
+    && [...Array(w * h).keys()].every(k => at(hx + (k % w), hy + ((k / w) | 0)) === T.GRASS);
+  const put = (hx, hy, w, h, door, type) => { if (!fits(hx, hy, w, h)) return false; house('world', hx, hy, w, h, door, { type, town: C.key }); hs.push([hx, hy, w, h]); return true; };
+  for (const ry of rows) for (let hx = x0 + 3; hx < x1 - 6; hx += 8) {
+    let type = C.types[ti % C.types.length], [w, h] = HSIZE[type] || [5, 4]; if (put(hx, ry - 2 - h, w, h, 'S', type)) ti++;
+    type = C.types[ti % C.types.length]; [w, h] = HSIZE[type] || [5, 4]; if (put(hx, ry + 2, w, h, 'N', type)) ti++;
+  }
+  for (let hy = y0 + 3; hy < y1 - 5; hy += 7) {
+    let type = C.types[ti % C.types.length], [w, h] = HSIZE[type] || [5, 4]; if (put(cx - 2 - w, hy, w, h, 'E', type)) ti++;
+    type = C.types[ti % C.types.length]; [w, h] = HSIZE[type] || [5, 4]; if (put(cx + 2, hy, w, h, 'W', type)) ti++;
+  }
+  const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, o); };
+  P('well', cx + 3, cy + 3, { solid: true }); P('statue', cx - 4, cy - 3, { solid: true, r: 10, label: 'Standbild eines Stadtgründers' }); P('statue', cx + 4, cy - 3, { solid: true, r: 10, label: 'Standbild eines Stadtgründers' });
+  for (let x = x0 + 4; x < x1 - 2; x += 7) { P('lantern', x, cy - 2); P('lantern', x + 3, cy + 2); }
+  for (let y = y0 + 4; y < y1 - 2; y += 7) { P('lantern', cx - 2, y); P('lantern', cx + 2, y + 3); }
+  for (const [x, y] of [[x0 - 1, cy - 3], [x0 - 1, cy + 3], [x1 + 1, cy - 3], [x1 + 1, cy + 3]]) P('banner_torn', x, y, { label: 'Banner des Hochreichs Aurelion' });
+  for (const b of HOUSES.filter(b => b.town === C.key && (b.type === 'smithy' || b.type === 'store'))) {   // Werkstätten: Zahnräder, ruhende Automaten, Kisten
+    const fx = b.door === 'S' ? b.x - 1 : b.door === 'N' ? b.x - 1 : b.door === 'E' ? b.x + 1 : b.x + 1, fy = b.door === 'S' ? b.y + 1 : b.door === 'N' ? b.y + b.h - 2 : b.y - 1;
+    P('gearpile', b.x - 1, b.y + 1, { solid: true, r: 8, label: 'Zahnräder und Federn' }); P('automat_frame', b.x + b.w, b.y + 1, { solid: true, r: 9, label: 'Ruhender Automat' }); P('crate', fx, fy);
+  }
+  for (const [x, y] of [[cx - 8, cy - 6], [cx + 8, cy - 6], [cx - 8, cy + 6], [cx + 8, cy + 6]]) P('hedge', x, y, { solid: true, r: 8 });
+  // S12 E: Stadtbild — Schornsteine an Werkstätten, Zahnräder an den Toren; zwei unbewachte Breschen in der Mauer (Reinschleichen)
+  for (const b of HOUSES.filter(b => b.town === C.key && ['smithy', 'store', 'manor'].includes(b.type))) P('chimney', b.x + b.w, b.y + b.h - 1, { solid: true, r: 7, label: 'Schornstein' });
+  for (const [x, y] of [[x0 - 2, cy - 5], [x0 - 2, cy + 5], [x1 + 2, cy - 5], [x1 + 2, cy + 5]]) P('big_gear', x, y, { solid: true, r: 10, label: 'Torrad des Hochreichs' });
+  for (const [bx, by] of [[cx + Math.round(hw * 0.6), y0], [cx - Math.round(hw * 0.6), y1]]) { t[by * W + bx] = T.DIRT; P('rubble', bx, by + (by === y0 ? -1 : 1), { label: 'Bresche in der Mauer — unbewacht' }); }
+  if (C.key === 'tickmar') {                                                            // Fabrikviertel vor dem Osttor
+    const fx = x1 + 14;
+    for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x1 + 3 && qx <= x1 + 26 && qy >= cy - 10 && qy <= cy + 12) props.splice(i, 1); }
+    for (let y = cy - 9; y <= cy + 11; y++) for (let x = x1 + 3; x <= x1 + 25; x++) if (t[y * W + x] !== T.WALL) t[y * W + x] = T.STONE;
+    prop('factory', fx, cy - 2, { solid: true, r: 40, label: 'Die Fabrik von Tickmar' });
+    for (const [dx, dy] of [[-8, 7], [-3, 8], [3, 8], [8, 7]]) prop('machine', fx + dx, cy + dy, { solid: true, r: 9, label: 'Dampfhammer' });
+    prop('workstation', fx - 6, cy + 10, { bond: 'aurel', label: 'Werkbank der Schuldknechte' }); prop('keychest', fx + 7, cy + 10, { bond: 'aurel', label: 'Schlüsselkasten des Vogts' });
+  }
+  if (C.key === 'gelenkhall') prop('workbench', cx + 5, cy - 2, { solid: true, r: 9, label: 'Werkbank der Prothesenmacherin', mechBench: true });
+  TOWN_PLAN[C.key] = { village: true, lord: 'aurel', area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy], perHead: C.capital ? 55 : 65, fields: [],
+    plazas: [[T.STONE, cx - 5, cy - 4, cx + 5, cy + 4]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+}
+// Binnenseen: ruhige Senken im offenen Land, fern von Orten und Straßen (Wege gräbt ensureReach nach)
+function lakes() {
+  const m = MAPS.world, W = m.w, t = m.tiles, far = (x, y, d) => LOCATIONS.every(l => Math.hypot(l.x - x, l.y - y) > l.r + d);
+  for (let i = 0; i < 40; i++) { const cx = 20 + Math.floor(nz(i, 61) * (W - 40)), cy = 20 + Math.floor(nz(61, i) * (m.h - 300)), rr = 5 + Math.floor(nz(i, 62) * 12);
+    const tl = t[cy * W + cx]; if (!(tl === T.GRASS || tl === T.DIRT || tl === T.ASH || tl === T.MARSH) || !far(cx, cy, rr + 14) || townAt(cx, cy, rr + 8) || (cx < 240 && cy < 360)) continue;
+    for (let y = cy - rr - 4; y <= cy + rr + 4; y++) for (let x = cx - rr - 4; x <= cx + rr + 4; x++) { const k = y * W + x, v = t[k];
+      if (v === T.ROAD || v === T.WALL || v === T.PLANK || v === T.FIELD) continue;
+      const d = Math.hypot(x - cx, (y - cy) * 1.25) - rr - (vnE(x + 90 * i, y, 5) - 0.5) * 6; if (d < 0) t[k] = T.WATER; else if (d < 2 && v === T.GRASS) t[k] = T.MARSH; }
+  }
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if ((q.map || 'world') === 'world' && t[(q.y / TS | 0) * W + (q.x / TS | 0)] === T.WATER && q.type !== 'boat') props.splice(i, 1); }
+}
+// Dichte (Nutzer: „fast jede Stelle der Karte soll Landschaft, Orte, Wege oder Bauten zeigen“): je 52×52-Zelle vielleicht ein
+// kleiner Ort nach Gegend — Gehöft, Wachturm, Lager, Banditenlager, Mine, Friedhof, Tempel, Ruine, Steinkreis, Außenposten,
+// Wrack an der Küste. Jeder bekommt einen Namen (Silben je Gegend) und steht als Ort in LOCATIONS (poi) — kein rnd().
+const POI_SYL = {
+  men: [['Linden', 'Dorn', 'Hasel', 'Eichen', 'Grün', 'Weiden', 'Moos', 'Kreuz', 'Mühl', 'Adler', 'Sonnen', 'Birken', 'Fuchs', 'Rabens'], ['hof', 'feld', 'au', 'wacht', 'bruch', 'furt', 'hain', 'grund', 'tal', 'eck', 'stein']],
+  eisen: [['Stahl', 'Eisen', 'Klingen', 'Schlacken', 'Ruß', 'Erz', 'Tiefen', 'Kohlen', 'Grau', 'Hammer', 'Frost'], ['grat', 'schlucht', 'fels', 'schacht', 'stollen', 'halde', 'hütte', 'wacht']],
+  desert: [['Sand', 'Dünen', 'Glut', 'Staub', 'Salz', 'Sonnen', 'Durst', 'Geier'], ['ruinen', 'wacht', 'grab', 'brunnen', 'lager', 'spitze', 'senke', 'fels']],
+  aurel: [['Gold', 'Kupfer', 'Messing', 'Silber', 'Rosen', 'Lilien', 'Zahnrad', 'Feder', 'Glocken', 'Hohen', 'Löwen'], ['stein', 'hof', 'wacht', 'werk', 'hall', 'garten', 'burg', 'tor', 'au']],
+  dead: [['Blut', 'Schädel', 'Knochen', 'Asche', 'Grab', 'Toten', 'Moder', 'Schatten', 'Nacht', 'Aas', 'Seelen'], ['höhe', 'feld', 'moor', 'wacht', 'ruinen', 'hain', 'grube', 'stein', 'tor', 'kreuz']],
+};
+const POI_KIND = {
+  men: ['farm', 'farm', 'farm', 'tower', 'camp', 'bandits', 'grave', 'temple', 'ruin', 'stones', 'outpost'],
+  eisen: ['mine', 'mine', 'mine', 'camp', 'tower', 'ruin', 'outpost', 'grave'],
+  desert: ['ruin', 'ruin', 'bandits', 'camp', 'stones', 'grave', 'tower'],
+  dead: ['grave', 'grave', 'ruin', 'ruin', 'temple', 'stones', 'tower'],
+  aurel: ['estate', 'estate', 'farm', 'farm', 'workshop', 'tower', 'techruin'],
+};
+const POI_NOUN = { estate: 'Adelssitz', workshop: 'Werkstatt', techruin: 'Maschinenruine', farm: 'Gehöft', tower: 'Wachturm', camp: 'Lager', bandits: 'Banditenlager', mine: 'Stollen', grave: 'Gräber', temple: 'Tempel', ruin: 'Ruine', stones: 'Steinkreis', outpost: 'Posten', wreck: 'Wrack' };
+function scatterPOIs() {
+  const m = MAPS.world, W = m.w, H = m.h, t = m.tiles, C = 52, taken = [], reach = new Uint8Array(W * H), [sx, sy] = TOWN_PLAN.eren.square;   // nur erreichbares Land (keine Stege zu Inselchen)
+  { const q = [sy * W + sx]; reach[q[0]] = 1; while (q.length) { const k = q.pop(), x = k % W; for (const n of [k - 1, k + 1, k - W, k + W]) if (n >= 0 && n < W * H && !reach[n] && Math.abs((n % W) - x) <= 1 && !SOLID.has(t[n])) { reach[n] = 1; q.push(n); } } }
+  const land = (x, y) => { const v = t[y * W + x]; return v === T.GRASS || v === T.DIRT || v === T.SAND || v === T.ASH || v === T.STONE || v === T.MARSH; };
+  for (let cy = 0; cy < H; cy += C) for (let cx = 0; cx < W; cx += C) {
+    const h = nz(cx + 11, cy + 13); if (h > 0.62) continue;
+    const x = cx + 6 + Math.floor(nz(cx, cy + 5) * (C - 12)), y = cy + 6 + Math.floor(nz(cy, cx + 5) * (C - 12));
+    if (x < 8 || y < 8 || x >= W - 8 || y >= H - 8) continue;
+    const rg = regionAt(x, y), fam = rg === 'aurel' ? 'aurel' : rg === 'deadland' || rg === 'blight' ? 'dead' : rg === 'desert' || rg === 'badland' ? 'desert' : rg === 'eisen' || rg === 'mountain' ? 'eisen' : 'men';
+    let coast = false;
+    for (const [dx, dy] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) if (t[(y + dy) * W + x + dx] === T.WATER && (y + dy) > 700 || (t[(y + dy) * W + x + dx] === T.WATER && (x < 60 || x > W - 60 || y < 60))) coast = true;
+    let ok = true; for (let j = -4; j <= 4 && ok; j++) for (let i = -4; i <= 4; i++) if (!land(x + i, y + j)) { ok = false; break; }
+    if ((!ok && !coast) || !reach[y * W + x]) continue;
+    if (townAt(x, y, 10) || LOCATIONS.some(l => Math.hypot(l.x - x, l.y - y) < l.r + 12) || taken.some(([a, b]) => Math.hypot(a - x, b - y) < 30)) continue;
+    if (x >= FORT[0] - 4 && x <= FORT[2] + 4 && y >= FORT[1] - 4 && y <= FORT[3] + 4) continue;
+    const kinds = POI_KIND[fam], kind = coast && nz(x, y + 9) < 0.7 ? 'wreck' : kinds[Math.floor(nz(x + 3, y) * kinds.length)];
+    if (kind === 'wreck') { let wx = null; for (const [dx, dy] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) if (t[(y + dy) * W + x + dx] === T.WATER) { wx = [x + Math.sign(dx) * 7, y + Math.sign(dy) * 7]; break; } if (!wx) continue;
+      prop('boat', wx[0], wx[1], { solid: true, r: 14, label: 'Schiffswrack' }); prop('debris', x, y); prop('barrel', x + 1, y + 1); prop('crate', x - 1, y); }
+    else {
+      for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if ((q.map || 'world') === 'world' && Math.abs(q.x / TS - x) < 6 && Math.abs(q.y / TS - y) < 6) props.splice(i, 1); }   // Lichtung
+      buildPOI(kind, x, y, fam);
+    }
+    const S = POI_SYL[fam], name = S[0][Math.floor(nz(x, y + 1) * S[0].length)] + S[1][Math.floor(nz(y, x + 1) * S[1].length)];
+    const threat = fam === 'dead' ? 4 : kind === 'techruin' ? 3 : fam === 'men' || fam === 'aurel' ? (kind === 'bandits' ? 2 : 1) : 2;
+    const spawn = kind === 'bandits' ? (fam === 'desert' ? ['bandit', 'bandit_archer', 'bandit_spear'] : ['bandit', 'bandit', 'bandit_archer']) : kind === 'grave' && fam === 'dead' ? ['skeleton', 'ghoul', 'wraith']
+      : kind === 'techruin' ? ['automat'] : kind === 'mine' && fam === 'eisen' ? ['goblin', 'goblin_warrior'] : kind === 'ruin' && fam !== 'men' ? ['skeleton', 'wild_dog'] : null;
+    LOCATIONS.push({ key: `poi_${x}_${y}`, name: kind === 'wreck' ? `Wrack bei ${name}` : `${name} (${POI_NOUN[kind]})`, x, y, r: 8, kind: { farm: 'farm', tower: 'tower', camp: 'camp', bandits: 'camp', mine: 'mine', grave: 'ruin', temple: 'shrine', ruin: 'ruin', stones: 'shrine', outpost: 'tower', wreck: 'wreck', estate: 'farm', workshop: 'mine', techruin: 'ruin' }[kind],
+      poi: kind, threat, fin: true, spawn, faction: kind === 'bandits' ? 'bandit' : fam === 'dead' ? 'undead' : undefined });
+    taken.push([x, y]);
+  }
+}
+function buildPOI(kind, x, y, fam) {
+  const P = (tp, dx, dy, o = {}) => prop(tp, x + dx, y + dy, o);
+  const clear = r => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const k = (y + j) * MAPS.world.w + x + i, v = MAPS.world.tiles[k]; if (v === T.ROCK || v === T.MARSH) MAPS.world.tiles[k] = T.DIRT; } };
+  switch (kind) {
+    case 'farm': clear(4); house('world', x - 2, y - 3, 5, 4, 'S', { type: 'cottage' }); rect('world', x - 4, y + 2, 8, 3, T.FIELD); P('scarecrow', 0, 3); P('hay', 4, -1); P('fence', -5, 2, { solid: true }); P('fence', 4, 2, { solid: true }); P('barrel', 3, 0); break;
+    case 'tower': P('watchtower_ruin', 0, 0, { solid: true, r: 14 }); P('rubble', 2, 2); P('torch', -2, 2); if (fam !== 'dead') P('banner_torn', 2, -1, { label: 'Zerrissenes Banner' }); break;
+    case 'camp': P('tent_prop', -2, 0, { solid: true }); P('tent_prop', 2, -1, { solid: true }); P('campfire_static', 0, 2, { solid: true, r: 10 }); P('barrel', 3, 2); P('crate', -3, 2); break;
+    case 'bandits': for (let i = -4; i <= 4; i++) { P('palisade_prop', i, -4, { solid: true }); if (Math.abs(i) > 1) P('palisade_prop', i, 4, { solid: true }); }
+      P('tent_prop', -2, -1, { solid: true, label: 'Räuberzelt' }); P('tent_prop', 2, -1, { solid: true, label: 'Räuberzelt' }); P('campfire_static', 0, 1, { solid: true, r: 10 }); P('crate', 3, 2, { loot: [] }); P('blood', -2, 2); break;
+    case 'mine': clear(3); for (const [dx, dy] of [[-3, -2], [-1, -3], [2, -3], [3, -1]]) P('ore_node', dx, dy, { harvest: 'iron', solid: true }); P('broken_cart', 1, 1, { solid: true }); P('tent_prop', -3, 2, { solid: true, label: 'Hütte der Bergleute' }); P('crate', 3, 2); P('torch', 0, -1); break;
+    case 'grave': for (let j = -1; j <= 1; j++) for (let i = -2; i <= 2; i++) P('gravestone', i * 2, j * 2, { solid: true, r: 7 }); P('candles', 0, 3); if (fam === 'dead') P('crypt', 0, -5, { solid: true, r: 16, label: 'Gruft' }); break;
+    case 'temple': P(fam === 'dead' ? 'obelisk' : 'wayshrine', 0, 0, { solid: true, r: 10 }); for (let k = 0; k < 6; k++) P('broken_pillar', Math.round(Math.cos(k * 1.05) * 4), Math.round(Math.sin(k * 1.05) * 3), { solid: true, r: 9 }); P('candles', 1, 2); break;
+    case 'ruin': for (let k = 0; k < 5; k++) P(k % 2 ? 'broken_pillar' : 'rubble', Math.round(Math.cos(k * 1.3) * 4), Math.round(Math.sin(k * 1.3) * 3), { solid: k % 2 === 1, r: 10 }); P('camp_ruin', 0, 0); if (fam === 'dead') P('bone_spire', 3, -3, { solid: true, r: 8 }); break;
+    case 'stones': for (let k = 0; k < 7; k++) P('standing_stone', Math.round(Math.cos(k * 0.9) * 4), Math.round(Math.sin(k * 0.9) * 3), { solid: true, r: 8 }); break;
+    case 'estate': clear(6); house('world', x - 3, y - 3, 6, 5, 'S', { type: 'manor', town: 'aurelheim_land' }); for (let i = -6; i <= 6; i += 2) { P('hedge', i, -5, { solid: true, r: 8 }); P('hedge', i, 5, { solid: true, r: 8 }); }
+      P('statue', -5, 3, { solid: true, r: 10, label: 'Standbild eines Ahnherrn' }); P('lantern', 3, 3); P('automat_frame', 5, 2, { solid: true, r: 9, label: 'Wachautomat (ruht)' }); P('well', -2, 3, { solid: true }); break;
+    case 'workshop': clear(4); house('world', x - 2, y - 3, 5, 4, 'S', { type: 'smithy', town: 'aurelheim_land' }); P('gearpile', 3, 0, { solid: true, r: 8, label: 'Zahnräder und Federn' }); P('automat_frame', -4, 1, { solid: true, r: 9, label: 'Halbfertiger Automat' }); P('cart', 1, 3, { solid: true }); P('crate', -2, 2); break;
+    case 'techruin': for (let k = 0; k < 6; k++) P(k % 2 ? 'broken_pillar' : 'gearpile', Math.round(Math.cos(k * 1.05) * 4), Math.round(Math.sin(k * 1.05) * 3), { solid: true, r: 9, label: k % 2 ? undefined : 'Verrostetes Getriebe' }); P('automat_frame', 0, 0, { solid: true, r: 9, label: 'Zerstörter Automat' }); P('rubble', 2, 2); break;
+    case 'outpost': for (let i = -3; i <= 3; i++) P('palisade_prop', i, -3, { solid: true }); P('watchtower_ruin', 3, -1, { solid: true, r: 14 }); P('tent_prop', -2, 0, { solid: true }); P('campfire_static', 0, 2, { solid: true, r: 10 }); P('banner_torn', -3, -2, { label: 'Wimpel eines Außenpostens' }); break;
+  }
+}
+function coastline() {
+  const m = MAPS.world, W = m.w, H = m.h, t = m.tiles;
+  const guard = LOCATIONS.map(l => [l.x, l.y, l.r + 8]);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dS = y < 740 && spornAt(x, y) < -12 ? seaLine(x) - y : 999, dW = x, dE = W - 1 - x, dN = y, d = Math.min(dW, dE, dN * 1.4, dS * 1.3);
+    if (d > 140) continue;
+    const c = 12 + vnE(x + 3000, y, 70) ** 2 * 120 + vnE(x + 4000, y, 23) * 34 + vnE(x + 5000, y, 7) * 10;   // tiefe Buchten, Landzungen, feine Zacken
+    if (d >= c || t[y * W + x] === T.WATER) continue;
+    if (x >= FORT[0] - 6 && x <= FORT[2] + 6 && y >= FORT[1] - 6 && y <= FORT[3] + 6) continue;   // Festungsring bleibt an Land
+    if (guard.some(([gx, gy, r]) => (gx - x) * (gx - x) + (gy - y) * (gy - y) < r * r)) continue;
+    t[y * W + x] = T.WATER;
+  }
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if ((q.map || 'world') === 'world' && t[(q.y / TS | 0) * W + (q.x / TS | 0)] === T.WATER && q.type !== 'boat') props.splice(i, 1); }
+}
+// Türachsen frei (Tür, Kachel davor, Kachel dahinter) und keine festen Props auf Fels/Wasser — je nach Seed kam beides vor.
+const ON_ROCK_OK = new Set(['obelisk', 'crypt', 'tower_ruin', 'watchtower_ruin', 'palisade_prop', 'rock_node', 'ore_node', 'boat']);
+function clearDoors() {
+  const m = MAPS.world, W = m.w, block = new Map();
+  for (const b of HOUSES) { if (b.map !== 'world') continue; const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
+    for (const [x, y] of [[dx, dy], [dx + sx, dy + sy], [dx - sx, dy - sy]]) block.set(y * W + x, b.id);
+    const ox = dx - sx, oy = dy - sy, k = oy * W + ox; if (SOLID.has(m.tiles[k])) m.tiles[k] = T.DIRT; }
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if ((q.map || 'world') !== 'world') continue; const k = (q.y / TS | 0) * W + (q.x / TS | 0);
+    if ((block.has(k) && q.house !== block.get(k)) || (q.solid && !ON_ROCK_OK.has(q.type) && SOLID.has(m.tiles[k]))) props.splice(i, 1); }
+}
+// Streu (Geröll, Knochen, Gräber) gehört nicht zwischen Häuser — je nach Seed landet sie dort; in Vharnholm sind Gräber gewollt
+function tidyTowns() {
+  for (let i = props.length - 1; i >= 0; i--) { const p = props[i]; if ((p.map || 'world') !== 'world' || p.house || p.planned || !SCATTER.has(p.type)) continue;
+    const k = townAt(p.x / TS | 0, p.y / TS | 0); if (!k) continue;
+    if (k === 'vharnholm' && p.type === 'gravestone') p.planned = true; else props.splice(i, 1); }
+}
+// Jeder Ort muss zu Fuß von Eren erreichbar sein (BUG-079 für alle Seeds): Wegsuche über die Kacheln; ein abgeschnittener Ort
+// bekommt einen Erdweg zur nächsten erreichbaren Kachel (Hohlweg durch Fels), feste Props auf dem Weg werden entfernt.
+function ensureReach() {
+  const m = MAPS.world, W = m.w, H = m.h, seen = new Uint8Array(W * H), [sx, sy] = TOWN_PLAN.eren.square;
+  const flood = k0 => { const q = [k0]; seen[k0] = 1; while (q.length) { const k = q.pop(), x = k % W;
+    for (const n of [k - 1, k + 1, k - W, k + W]) if (n >= 0 && n < W * H && !seen[n] && Math.abs((n % W) - x) <= 1 && !SOLID.has(m.tiles[n])) { seen[n] = 1; q.push(n); } } };
+  flood(sy * W + sx);
+  for (const L of LOCATIONS) {
+    const r = Math.max(3, Math.round(L.r / 2)); let ok = false;
+    for (let dy = -r; dy <= r && !ok; dy++) for (let dx = -r; dx <= r; dx++) if (seen[(L.y + dy) * W + L.x + dx]) { ok = true; break; }
+    if (ok) continue;
+    let best = null;
+    for (let d = 1; d < 160 && !best; d++) for (let i = -d; i <= d && !best; i++) for (const [x, y] of [[L.x + i, L.y - d], [L.x + i, L.y + d], [L.x - d, L.y + i], [L.x + d, L.y + i]])
+      if (x > 1 && y > 1 && x < W - 2 && y < H - 2 && seen[y * W + x]) { best = [x, y]; break; }
+    if (!best) continue;
+    const n = Math.max(Math.abs(best[0] - L.x), Math.abs(best[1] - L.y)), cut = new Set();
+    for (let i = 0; i <= n; i++) { const x = Math.round(L.x + (best[0] - L.x) * i / n), y = Math.round(L.y + (best[1] - L.y) * i / n);
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const k = (y + dy) * W + x + dx; if (SOLID.has(m.tiles[k])) m.tiles[k] = m.tiles[k] === T.WATER ? T.PLANK : T.DIRT; cut.add(k); } }   // über Wasser: Steg
+    for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if (q.solid && (q.map || 'world') === 'world' && cut.has((q.y / TS | 0) * W + (q.x / TS | 0))) props.splice(i, 1); }
+    flood((best[1]) * W + best[0]);   // neu Erreichtes mitzählen
+    for (const k of cut) if (!seen[k]) flood(k);
+  }
+}
+// Karte wächst nach Westen: OX Spalten vorn, alles Erzeugte rückt um OX (Kacheln, Props, Häuser, Orte, Stadtpläne)
+function shiftWest() {
+  const O = MAPS.world, W = O.w + OX, H = O.h, t = new Uint8Array(W * H).fill(T.ROCK);
+  for (let y = 0; y < H; y++) t.set(O.tiles.subarray(y * O.w, y * O.w + O.w), y * W + OX);
+  MAPS.world = { w: W, h: H, tiles: t, design: O.design };
+  for (const p of props) if ((p.map || 'world') === 'world') p.x += OX * TS;
+  for (const b of HOUSES) if (b.map === 'world') { b.x += OX; b.doorTile = [b.doorTile[0] + OX, b.doorTile[1]]; }
+  shiftCoords(OX); SHIFT = OX;
+}
+function shiftCoords(d) {
+  for (const L of LOCATIONS) if (!L.fin) L.x += d;
+  const sh = r => { r[0] += d; r[2] += d; };
+  for (const P of Object.values(TOWN_PLAN)) { if (P.village) continue;
+    sh(P.area); sh(P.old); P.square[0] += d;
+    for (const k of ['fill', 'clear', 'plazas', 'streets']) for (const r of P[k] || []) { r[1] += d; r[3] += d; }
+    for (const r of P.fields || []) sh(r);
+    if (P.coreWalls) sh(P.coreWalls);
+    for (const k of ['walls', 'palisade']) if (P[k]) { sh(P[k].rect); for (const g of P[k].gates) sh(g); }
+    if (P.harbor) { const Hb = P.harbor; Hb.x0 += d; Hb.x1 += d; Hb.piers = Hb.piers.map(x => x + d); Hb.boats = Hb.boats.map(([x, y]) => [x + d, y]); }
+    for (const h of [...P.houses, ...(P.grow?.houses || [])]) h[1] += d;
+    for (const p of [...(P.props || []), ...(P.grow?.props || [])]) p[1] += d;
+    for (const r of P.grow?.gardens || []) sh(r);
+  }
+}
+// Der Westen (Session 12, Nutzer: „Eisenfeste nur ein großes Festungsgebiet“): das Land setzt sich an der Naht fort (verzerrter
+// Spiegel, Wälder, Wiesen, Moor), im Nordwesten steigt das Westgebirge an. Darin liegt das Festungsgebiet der Eisernen Kette:
+// ein Mauerring mit Türmen und zwei Toren um Zitadelle, Steinbruch, Sklavenpferche, Kasernen und Äcker. Der Grubenhort der
+// Goblins liegt draußen in den Wäldern, die Tributdörfer im Süden.
+export const FORT = [36, 118, 222, 344];                                             // Mauerring (Kacheln, inklusive)
+const westSrc = (x, y) => [Math.max(OX + 4, Math.min(OX + 250, 2 * OX - 1 - x + Math.round((vnE(x, y + 90, 31) - 0.5) * 34))), Math.max(0, Math.min(767, y + Math.round((vnE(x + 170, y, 29) - 0.5) * 34)))];
+const westMtnAt = (x, y) => y < westMtn(x) - Math.max(0, x - 150) * 1.4;              // Gebirge flacht zur Naht hin ab
+function buildWest() {
+  const m = MAPS.world, W = m.w, H = m.h, t = m.tiles;
+  const [f0, f1, f2, f3] = FORT, inF = (x, y) => x >= f0 && x <= f2 && y >= f1 && y <= f3;
+  for (let y = 0; y < H; y++) for (let x = 0; x < OX; x++) {
+    const [sx, sy] = westSrc(x, y), src = t[sy * W + sx], n = vnE(x + 2000, y, 22);
+    let tl = NATURAL_T.has(src) ? src : T.GRASS;
+    if (x < 2 || y < 2 || y >= H - 2) tl = T.ROCK;
+    else if (y >= seaLine(x)) tl = T.WATER;
+    else if (westMtnAt(x, y)) tl = vnE(x + 40, y, 7) > 0.4 ? T.ROCK : T.STONE;
+    else if (inF(x, y)) tl = n < 0.62 ? T.GRASS : T.DIRT;                                  // im Ring: Wiese, Trampelpfade (keine grauen Flecken)
+    t[y * W + x] = tl;
+  }
+  for (let y = 0; y < H; y += 3) for (let x = 2; x < OX; x += 3) {                   // Wälder wie im Land davor
+    const jx = x + Math.floor(nz(x, y) * 3), jy = y + Math.floor(nz(y, x) * 3); if (jy >= H) continue;
+    const tl = t[jy * W + jx], rg = rawRegion(...westSrc(jx, jy).map((v, i) => dT(i ? v : v - OX)));
+    if (tl !== T.GRASS || inF(jx, jy) || westMtnAt(jx, jy + 3)) continue;
+    if (nz(jx + 7, jy) < (rg === 'forest' ? 0.55 : rg === 'marsh' ? 0.12 : 0.1)) prop('tree', jx, jy, { solid: true, r: 12, hp: 3 });
+  }
+  // Mauerring: 2 Kacheln stark, Türme (5×5) an Ecken und alle 30 Kacheln, Osttor (zum Menschenland) und Südtor (Dörfer, Goblinwälder)
+  const gate = (x, y) => (x >= f2 - 1 && y >= 169 && y <= 175) || (y >= f3 - 1 && x >= 211 && x <= 217);
+  for (let y = f1; y <= f3; y++) for (let x = f0; x <= f2; x++) if ((x <= f0 + 1 || x >= f2 - 1 || y <= f1 + 1 || y >= f3 - 1) && !gate(x, y)) t[y * W + x] = T.WALL;
+  const tower = (cx, cy) => { for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (!gate(cx + i, cy + j)) t[(cy + j) * W + cx + i] = T.WALL; prop('torch', cx, cy + 3); };
+  for (let x = f0; x <= f2; x += 31) { tower(x + 1, f1 + 1); tower(x + 1, f3 - 1); }
+  for (let y = f1; y <= f3; y += 30) { tower(f0 + 1, y + 1); tower(f2 - 1, y + 1); }
+  tower(f2 - 1, f3 - 1); tower(f2 - 1, 165); tower(f2 - 1, 179); tower(207, f3 - 1); tower(221, f3 - 1);
+  for (const [x, y] of [[f2 + 1, 167], [f2 + 1, 177], [209, f3 + 1], [219, f3 + 1]]) prop('banner_torn', x, y, { label: 'Banner der Eisernen Kette' });
+  lay(186, 172, 440, 172); lay(214, 172, 214, 318); lay(95, 318, 214, 318); lay(214, 318, 214, 630, T.DIRT); lay(214, 430, 200, 430, T.DIRT);   // Tor → Menschenland; Steinbruch; Süden
+  // Zitadelle: die Kettenfeste der Session 11, gespiegelt (Tor nach Osten)
+  const R = (x, y, w, h, tile) => rect('world', 1091 - x - w, y - 212, w, h, tile);
+  const Hs = (x, y, w, h, door, o) => house('world', 1091 - x - w, y - 212, w, h, door, o);
+  const Pp = (tp, x, y, o = {}) => prop(tp, 1090 - x, y - 212, o);
+  R(900, 362, 64, 44, T.WALL); R(902, 364, 60, 40, T.DIRT); R(902, 382, 32, 6, T.STONE); R(918, 364, 4, 40, T.STONE); R(900, 382, 2, 6, T.ROAD);
+  R(934, 376, 24, 16, T.WALL); R(935, 377, 22, 14, T.DFLOOR); R(934, 382, 1, 4, T.DFLOOR);
+  Pp('throne', 954, 384, { solid: true, r: 12, label: 'Thron des Kettenmeisters' }); for (const y of [379, 389]) Pp('banner_torn', 955, y, { label: 'Banner der Eisernen Kette' });
+  Hs(906, 366, 7, 5, 'S', { type: 'barracks', town: 'kettenfeste' }); Hs(906, 397, 7, 5, 'N', { type: 'barracks', town: 'kettenfeste' });
+  Hs(916, 366, 6, 5, 'S', { type: 'store', town: 'kettenfeste' }); Hs(916, 397, 6, 5, 'N', { type: 'smithy', town: 'kettenfeste' });
+  for (const [x, y] of [[903, 380], [903, 389], [930, 380], [930, 389], [936, 380], [936, 387], [955, 380], [955, 387]]) Pp('torch', x, y);
+  for (const [x, y] of [[926, 370], [926, 398], [944, 395]]) Pp('cage', x, y, { solid: true, r: 13, label: 'Käfig' });
+  for (const [x, y] of [[922, 384], [912, 379], [912, 390]]) Pp('chain_post', x, y, { solid: true, r: 6, label: 'Kettenpfahl' });
+  Pp('banner_torn', 899, 380, { label: 'Banner der Eisernen Kette' }); Pp('banner_torn', 899, 389, { label: 'Banner der Eisernen Kette' });
+  for (const [tp, x, y, o] of [
+    ['cart', 906, 376, { solid: true, label: 'Sklavenkarren' }], ['crate', 923, 367], ['crate', 924, 367, { v: 1 }], ['crate', 923, 368, { v: 2 }], ['barrel', 925, 368], ['sack', 926, 367],
+    ['barrel', 914, 372], ['barrel', 915, 372], ['cask_rack', 929, 366, { solid: true }],
+    ['anvil', 924, 402, { solid: true }], ['barrel', 926, 403], ['crate', 912, 402],
+    ['campfire_static', 928, 390, { solid: true, r: 10 }], ['bench', 926, 392], ['bench', 930, 392], ['table', 928, 393, { solid: true }],
+    ['tent_prop', 908, 392, { solid: true, label: 'Wachzelt' }], ['tent_prop', 908, 373, { solid: true, label: 'Wachzelt' }],
+    ['cage', 930, 370, { solid: true, r: 13, label: 'Käfig' }], ['cage', 930, 399, { solid: true, r: 13, label: 'Käfig' }], ['cage', 950, 371, { solid: true, r: 13, label: 'Käfig' }],
+    ['chain_post', 946, 373, { solid: true, r: 6, label: 'Kettenpfahl' }], ['chain_post', 948, 398, { solid: true, r: 6, label: 'Kettenpfahl' }],
+    ['well', 912, 384, { solid: true }], ['torch', 920, 372], ['torch', 920, 396], ['torch', 945, 377], ['torch', 945, 391],
+    ['banner_torn', 944, 383, { label: 'Banner der Eisernen Kette' }], ['sack', 946, 402], ['sack', 947, 402], ['crate', 960, 366], ['crate', 960, 401]]) Pp(tp, x, y, o || {});
+  // Festungsstadt im Ring: gepflasterte Hauptstraßen, Häuserreihen (Kasernen, Lager, Schmiede, Ställe) in schwarzem Stein
+  lay(40, 225, 220, 225, T.STONE); lay(40, 282, 212, 282, T.STONE); lay(100, 122, 100, 340, T.STONE); lay(150, 196, 150, 225, T.STONE);
+  const ROW = [['barracks', 42], ['store', 53], ['house', 63], ['barracks', 107], ['smithy', 117], ['stable', 126], ['store', 158], ['barracks', 168], ['house', 180], ['barracks', 191]];
+  for (const [i, [type, x]] of ROW.entries()) { const w = type === 'stable' || type === 'store' ? 6 : type === 'barracks' ? 7 : 5;
+    house('world', x, 219, w, 5, 'S', { type, town: 'kettenfeste' }); if (i % 3 !== 1) house('world', x, 229, w, 5, 'N', { type: i % 2 ? 'house' : 'barracks', town: 'kettenfeste' }); }
+  for (const x of [48, 70, 112, 164, 186]) { prop('torch', x, 223); prop('torch', x + 2, 228); }
+  for (const [x, y] of [[104, 227], [150, 283], [60, 283]]) prop('well', x, y, { solid: true });
+  // Im Ring: Steinbruch, Sklavenpferche mit Arbeitsfeldern, Kasernenreihe, Zeltlager
+  rect('world', 60, 300, 38, 26, T.STONE);
+  for (let i = 0; i < 26; i++) { const x = 62 + Math.floor(nz(i, 7) * 34), y = 302 + Math.floor(nz(i, 11) * 22); prop('rock_node', x, y, { harvest: 'stone', solid: true }); }
+  for (const [x, y] of [[68, 328], [88, 328]]) prop('cage', x, y, { solid: true, r: 13, label: 'Käfig' });
+  prop('tent_prop', 82, 332, { solid: true, label: 'Aufseherzelt' }); prop('torch', 76, 332); prop('torch', 84, 332);
+  for (const [x0, y0] of [[52, 150], [52, 200], [84, 200]]) { rect('world', x0, y0, 26, 12, T.FIELD); prop('scarecrow', x0 + 13, y0 + 6); }   // Arbeitsfelder der Gefangenen
+  for (const [x, y] of [[56, 240], [70, 240], [84, 240]]) { house('world', x, y, 8, 5, 'S', { type: 'barracks', town: 'kettenfeste' }); prop('chain_post', x + 4, y + 7, { solid: true, r: 6, label: 'Kettenpfahl' }); }   // Sklavenbaracken
+  for (const [x, y] of [[110, 262], [122, 262], [134, 262], [146, 262]]) prop('tent_prop', x, y, { solid: true, label: 'Soldatenzelt' });
+  prop('campfire_static', 128, 270, { solid: true, r: 10 }); for (const [x, y] of [[124, 272], [132, 272]]) prop('bench', x, y);
+  for (const [x, y] of [[160, 240], [170, 240], [180, 240]]) prop('cage', x, y, { solid: true, r: 13, label: 'Sklavenpferch' });
+  // Grubenhort: Lichtung in den Goblin-Wäldern (draußen, südlich des Rings)
+  for (let i = 0; i < 260; i++) { const x = 140 + Math.floor(nz(i, 23) * 95), y = 370 + Math.floor(nz(23, i) * 120);
+    const tl = t[y * W + x]; if ((tl === T.GRASS || tl === T.DIRT) && vnE(x + 300, y, 12) > 0.42 && !(x > 166 && x < 204 && y > 416 && y < 446) && Math.abs(x - 214) > 2) prop('tree', x, y, { solid: true, r: 12, hp: 3 }); }
+  rect('world', 170, 420, 30, 22, T.DIRT);
+  for (const [x, y] of [[174, 424], [192, 424], [174, 436], [194, 436]]) prop('tent_prop', x, y, { solid: true, label: 'Goblinhütte' });
+  prop('campfire_static', 184, 430, { solid: true, r: 10 });
+  prop('sign', 226, 170, { label: 'Kettentor — Die Eisenfeste. Wer hier Ketten hört, kehre um.' });
+}
+// Dorf: Platz mit Brunnen, Dorfstraße Ost–West, vier bis sechs Häuser mit der Tür zur Straße (eine Kate: dort lebt der Jäger),
+// Acker mit Zaun und Scheuche, Weg zur nächsten Straße (link). Tributdörfer: Kettenpfahl am Platz, Abgabenkiste, weniger Vorrat.
+const V_HOUSES = [['house', -12, -7, 5, 4, 'S'], ['cottage', -5, -7, 4, 4, 'S'], ['house', 3, -7, 5, 4, 'S'], ['barn', 10, -8, 6, 5, 'S'],
+  ['cottage', -11, 3, 4, 4, 'N'], ['house', 4, 3, 5, 4, 'N']];
+function buildVillages() {
+  for (const V of VILLAGES) {
+    const { x: cx, y: cy } = V, area = [cx - 14, cy - 10, cx + 16, cy + 10];
+    const inA = (x, y) => x >= area[0] && x <= area[2] && y >= area[1] && y <= area[3];
+    for (let i = props.length - 1; i >= 0; i--) { const q = props[i]; if ((q.map || 'world') === 'world' && inA(q.x / TS | 0, q.y / TS | 0)) props.splice(i, 1); }
+    for (let y = area[1]; y <= area[3]; y++) for (let x = area[0]; x <= area[2]; x++) {       // Grund: Wiese, Hofränder, keine Felsen/Wasser
+      const t = tileAt('world', x, y); if (t === T.ROCK || t === T.WATER || t === T.WALL || t === T.MARSH || t === T.ASH || t === T.SAND || t === T.STONE) setTile('world', x, y, V.tribute ? T.DIRT : T.GRASS); }
+    // Weg zur Straße (2 breit), danach Dorfstraße und Platz — der Weg darf durch Fels und Wasser (Furt, Hohlweg)
+    const [lx, ly] = V.link, n = Math.max(Math.abs(lx - cx), Math.abs(ly - cy));
+    for (let i = 0; i <= n; i++) { const x = Math.round(cx + (lx - cx) * i / n), y = Math.round(cy + (ly - cy) * i / n);
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const t = tileAt('world', x + dx, y + dy); if (t !== T.ROAD && t !== T.WALL && t !== T.PLANK) setTile('world', x + dx, y + dy, T.DIRT); } }
+    for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0;
+      if ((q.map || 'world') === 'world' && q.solid && tileAt('world', qx, qy) === T.DIRT && Math.abs((lx - cx) * (qy - cy) - (ly - cy) * (qx - cx)) / Math.max(1, n) < 2.5) props.splice(i, 1); }
+    rect('world', area[0], cy - 1, area[2] - area[0] + 1, 3, T.DIRT);
+    rect('world', cx - 3, cy - 3, 7, 7, T.DIRT); rect('world', cx - 1, cy - 1, 3, 3, T.STONE);
+    for (const [type, ox, oy, w, h, door] of V_HOUSES) house('world', cx + ox, cy + oy, w, h, door, { type, town: V.key });
+    const f = [cx - 13, cy + 8, cx - 5, cy + 10];                                                   // Acker im Süden
+    for (let y = f[1]; y <= f[3]; y++) for (let x = f[0]; x <= f[2]; x++) setTile('world', x, y, T.FIELD);
+    prop('scarecrow', cx - 9, cy + 9);
+    prop('well', cx, cy - 2, { solid: true, r: 10 });
+    for (const [t, dx, dy, o] of [['hay', 12, -2], ['laundry', -8, -2], ['barrel', 2, -3, { label: 'Regentonne' }], ['lantern', -3, 1], ['lantern', 4, 1],
+      ['cart', 13, 2, { solid: true }], ['sack', 11, -2, { label: 'Kornsack' }], ['trough', 15, -2, { solid: true }]]) prop(t, cx + dx, cy + dy, o || {});
+    if (V.tribute) { prop('chain_post', cx + 2, cy + 2, { solid: true, r: 6, label: 'Kettenpfahl — hier wird der Tribut gewogen' });
+      prop('crate', cx - 2, cy + 2, { label: 'Abgabenkiste der Eisernen Kette' }); prop('banner_torn', cx + 3, cy - 3, { label: 'Banner der Eisernen Kette' }); }
+    else prop('banner_torn', cx + 3, cy - 3, { label: { valen: 'Banner Valens', order: 'Banner des Ordens', merch: 'Zeichen der Freien Händler' }[V.lord] });
+    prop('sign', lx + (lx > cx ? -1 : 1), ly + (ly > cy ? -1 : 1), { label: `${V.name}${V.tribute ? ' — zinst der Eisernen Kette' : ''}` });
+    TOWN_PLAN[V.key] = { village: true, lord: V.lord, tribute: !!V.tribute, area, old: area, square: [cx, cy], perHead: 70, fields: [f],
+      spread: { s: 1, a: [dT(cx), dT(cy)] }, design: { area: [-99, -99, -99, -99] } };
+  }
 }
 
 // ---------------- Hochrechnung Entwurf → Weltmaßstab (Session 5) ----------------
@@ -1238,10 +1807,28 @@ export function genMine() {
 
 // Feste Objekte (Bäume, Felsen, Gebäude) kennt nur game.js (Objekt-Index); es trägt hier die Prüfung ein.
 export const occupied = { at: null };                // (map, tx, ty) → true, wenn ein festes Objekt auf der Kachel steht
-export function freeSpotNear(map, tx, ty, radius = 6) {
-  for (let i = 0; i < 200; i++) {
-    const x = tx + ri(-radius, radius), y = ty + ri(-radius, radius);
-    if (!SOLID.has(tileAt(map, x, y)) && !(occupied.at && occupied.at(map, x, y))) return { x: x * TS + TS / 2, y: y * TS + TS / 2 };
+const walkable = (map, x, y) => !SOLID.has(tileAt(map, x, y)) && !(occupied.at && occupied.at(map, x, y));
+// Offen heißt: von der Kachel aus sind mindestens `need` Kacheln zu Fuß erreichbar (Flutfüllung, 4 Nachbarn). Verhindert
+// Figuren, die in einem Felskessel, zwischen Bäumen oder hinter Zäunen eingesperrt entstehen (S12).
+export function openSpot(map, x, y, need = 120) {
+  if (!walkable(map, x, y)) return false;
+  const seen = new Set([x + ',' + y]), q = [[x, y]];
+  for (let i = 0; i < q.length; i++) {
+    if (seen.size >= need) return true;
+    const [cx, cy] = q[i];
+    for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
+      const k = nx + ',' + ny; if (seen.has(k) || !walkable(map, nx, ny)) continue;
+      seen.add(k); q.push([nx, ny]);
+    }
   }
+  return seen.size >= need;
+}
+export function freeSpotNear(map, tx, ty, radius = 6) {
+  const need = MAPS[map] && MAPS[map].w * MAPS[map].h < 20000 ? 30 : 120;       // kleine Karten (Höhlen, Innenräume): kleinere Mindestfläche
+  for (let r = radius; r <= radius + 12; r += 4)                                  // kein offener Platz: Suchkreis wachsen lassen
+    for (let i = 0; i < 200; i++) {
+      const x = tx + ri(-r, r), y = ty + ri(-r, r);
+      if (walkable(map, x, y) && (!occupied.at || openSpot(map, x, y, need))) return { x: x * TS + TS / 2, y: y * TS + TS / 2 };
+    }
   return { x: tx * TS, y: ty * TS };
 }

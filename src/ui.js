@@ -15,6 +15,9 @@ const WEATHER_ICON = {
   cloudy: ico('<path d="M4.5 12h7.5a2.8 2.8 0 0 0 .3-5.6A3.8 3.8 0 0 0 5 6.8 2.6 2.6 0 0 0 4.5 12z"/>'),
   rain: ico('<path d="M4.5 9h7.5a2.6 2.6 0 0 0 .3-5.2A3.6 3.6 0 0 0 5 4.2 2.4 2.4 0 0 0 4.5 9z"/><path d="M5.5 11l-.8 2.5M8.5 11l-.8 2.5M11.5 11l-.8 2.5"/>'),
   fog: ico('<path d="M2 5.5h12M3.5 8.5h9M2 11.5h12"/>'),
+  bloodrain: ico('<path d="M4.5 9h7.5a2.6 2.6 0 0 0 .3-5.2A3.6 3.6 0 0 0 5 4.2 2.4 2.4 0 0 0 4.5 9z"/><path d="M5.5 11v2.5M8.5 11v2.5M11.5 11v2.5" stroke="#a03030"/>'),
+  sandstorm: ico('<path d="M2 5h9M4 8h10M2 11h8"/>'),
+  snow: ico('<path d="M8 2v12M2.8 5l10.4 6M2.8 11l10.4-6"/>'),
 };                        // Aktionen aus game.js
 export function bind(actions) { A = actions; }
 const $ = id => document.getElementById(id);
@@ -157,7 +160,7 @@ export function renderContext(target) {
     let h = `<div class="ctx-head">${DUNGEONS[S.map] ? DUNGEONS[S.map].name : (here ? here.name : 'Greenmark-Grenzland')}</div>
       <div class="ctx-sub">${DUNGEONS[S.map] ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
       <div class="ctx-line"><span>Gefahr</span><b class="${tCls}">${tName}</b></div>
-      <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel'}[S.weather]}</b></div>
+      <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel',bloodrain:'Blutregen',sandstorm:'Sandsturm',snow:'Schnee'}[S.weather]}</b></div>
       <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>
       <div class="ctx-line"><span>Jahr</span><b>${year()}</b></div>`;
     if (here && S.towns && S.towns[here.key]) {
@@ -196,7 +199,7 @@ export function renderContext(target) {
   }
   if (target.kind === 'enemy') {
     const m = MONSTERS[target.mtype];
-    box.innerHTML = `<div class="ctx-head">${m.name}</div><div class="ctx-sub">${m.boss ? 'Anführer' : 'Feind'}</div>
+    box.innerHTML = `<div class="ctx-head">${target.title || (target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
       <div class="ctx-line"><span>Stufe</span><b>${target.level}</b></div>
       ${bar('Leben', target.hp, target.maxHp, 'hp')}
       <div class="ctx-line"><span>Gefahr</span><b class="${m.threat >= 3 ? 'threat-high' : m.threat === 2 ? 'threat-med' : 'threat-low'}">${['','Gering','Mittel','Hoch','Tödlich'][m.threat]}</b></div>
@@ -299,7 +302,7 @@ export function dialogue(npc, text, choices) {
   const box = $('dialogue');
   box.classList.remove('hidden');
   $('dlg-name').textContent = npc.name;
-  $('dlg-text').textContent = text;
+  $('dlg-text').textContent = text; $('dlg-text').style.whiteSpace = 'pre-line';   // Anschlagbrett: mehrere Zeilen
   drawPortraitTo($('dlg-portrait'), npc);
   const cc = $('dlg-choices'); cc.innerHTML = '';
   choices.forEach(c => {
@@ -313,6 +316,7 @@ export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
 let toastTimer = 0;
 export function toast(text, ms = 2200) {
+  if (S._quiet) return;                                   // Selbsttest-Sandbox: keine Einblendungen
   const t = $('toast'); t.textContent = text; t.classList.remove('hidden');
   t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), ms);
@@ -677,7 +681,8 @@ function facUI(body) {
       <div style="margin-top:10px">${Object.keys(FACTIONS).map(k => `<div class="fac-row ${k === selFac ? 'sel' : ''}" data-f="${k}">
         <span>${FACTIONS[k].name}</span><b>${S.factions[k] > 0 ? '+' : ''}${Math.round(S.factions[k])}</b></div>`).join('')}</div></div>
     <div><h3>${f.name}</h3><div class="ledger">${f.desc}</div>
-      <div class="statline"><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)}</b></div>
+      <div class="statline"><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
+      <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
       <div class="classtree">${f.ranks.map((r, i) => `<span class="${i === rank ? 'on' : ''}">${r}</span>${i < f.ranks.length - 1 ? '<em>│</em>' : ''}`).join('')}</div>
@@ -732,10 +737,13 @@ export function chronUI(body) {
 
 // ---- Karte ----
 function mapUI(body) {
-  body.innerHTML = `<canvas id="wm" style="width:100%;height:calc(100% - 40px);border:1px solid #2b2419;background:#0b0a08"></canvas>
-    <div class="ledger" style="margin-top:8px">Entdeckte Orte erscheinen dauerhaft. Grau = Gerücht, unentdeckt.</div>`;
+  const z = S.settings.mapZoom ?? 3;
+  body.innerHTML = `<canvas id="wm" style="width:100%;height:calc(100% - 44px);border:1px solid #2b2419;background:#0b0a08"></canvas>
+    <div class="ctx-actions" style="margin-top:8px"><button data-z="3" class="${z === 3 ? 'on' : ''}" aria-pressed="${z === 3}">Umgebung</button><button data-z="1" class="${z === 1 ? 'on' : ''}" aria-pressed="${z === 1}">Welt</button>
+    <span class="ledger" style="margin-left:10px">Entdeckte Orte erscheinen dauerhaft. Dunkel = unentdeckt.</span></div>`;
   const cv = $('wm'); cv.width = cv.clientWidth; cv.height = cv.clientHeight;
-  A.drawWorldmap(cv);
+  A.drawWorldmap(cv, z);
+  [...body.querySelectorAll('[data-z]')].forEach(b => b.onclick = () => { S.settings.mapZoom = +b.dataset.z; mapUI(body); });
 }
 
 // ---- Handel ----

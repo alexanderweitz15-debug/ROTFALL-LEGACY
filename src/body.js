@@ -71,6 +71,7 @@ export function damagePart(c, part, dmg, crit) {
     P.hp = Math.max(P.hp, -P.max);
     c.body.torso.hp -= spill;
     if (wasUp) result = 'disabled';
+    if (P.hp <= -P.max + 1e-6 && !P.lost) { P.lost = true; P.mech = 0; result = 'severed'; }   // S12: zerschmettert — das Glied ist verloren (Prothese)
   } else if (part !== 'torso' && part !== 'head' && P.hp === 0 && wasUp) result = 'disabled';
   if (c.body.torso.hp <= 0 && result !== 'decap') result = 'down';
   syncHp(c);
@@ -79,6 +80,7 @@ export function damagePart(c, part, dmg, crit) {
 
 export function healPart(c, part, amount) {
   const P = c.body[part], was = P.hp;
+  if (P.lost) return { restored: false, gained: 0 };
   P.hp = Math.min(P.max, P.hp + amount);
   syncHp(c);
   return { restored: was <= 0 && P.hp > 0, gained: P.hp - was };
@@ -93,16 +95,22 @@ export function heal(c, amount) {
   }
   syncHp(c);
 }
-export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) c.body[p].hp = c.body[p].max; syncHp(c); }
+export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost) c.body[p].hp = c.body[p].max; syncHp(c); }
+// S12: Prothese an ein verlorenes Glied — tier 1 Schrott, 2 Aurelion, 3 Meisterstück
+export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = tier; P.hp = P.max; syncHp(c); }
+// S12 E: Meisterglied +10 % (Arm) / +6 % (Bein); Aufrüstung +5 % je Stufe; unter 30 % Zustand wirkt die Prothese nicht
+export const mechBonus = (c, kind) => { if (!c.body) return 0; let b = 0;
+  for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; b = Math.max(b, (P.mech >= 3 ? (kind === 'arm' ? 0.1 : 0.06) : 0) + (P.mechUp || 0) * 0.05); }
+  return b; };
 export function worstPart(c) {
   let best = null, br = 1;
-  for (const p of PARTS) { const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
+  for (const p of PARTS) { if (c.body[p].lost) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
   return best;
 }
 export function speedFactor(c) {
   if (!c.body) return 1;
   const lame = (c.body.lleg.hp <= 0) + (c.body.rleg.hp <= 0);
-  return (lame === 2 ? 0.2 : lame === 1 ? 0.55 : 1) * buildOf(c).speed;
+  return (lame === 2 ? 0.2 : lame === 1 ? 0.55 : 1) * buildOf(c).speed * (1 + mechBonus(c, 'leg'));
 }
 export function partState(P) {
   const r = P.hp / P.max;

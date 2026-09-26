@@ -9,12 +9,19 @@
 // erst die Grundlage gegen die Referenz prüfen (Nutzervorgabe), dann übertragen.
 import { ramp, mix, toCanvas } from './sprites.js';
 
-export const FW = 40, FH = 60, FPX = 1, FOX = 20, FOY = 57;   // Rastergröße, Welt je Pixel, Pivot (Fußmitte)
+export const FW = 40, FH = 66, FPX = 1, FOX = 20, FOY = 57;   // Rastergröße, Welt je Pixel, Pivot (Fußmitte)
 // Proportion (Nutzer: „noch etwas weird“): Formen werden im Entwurfsmaß (Füße bei y 53) gezeichnet und beim Rastern
 // verzerrt — Figur 7 % schmaler, alles unterhalb des Rocksaums (y ≥ 39) 4 px tiefer → längere Beine, Verhältnis
 // Schulterbreite : Höhe ≈ 0,48 wie in der Referenz.
-const LEG = 4, NARROW = 0.93;
-const warpX = x => 20 + (x - 20) * NARROW, warpY = y => y >= 39 ? y + LEG : y > 36 ? y + (y - 36) * LEG / 3 : y;
+// Stilparameter (Session 9, Nutzer: „Figuren sehen weird aus → 5 Stile zeigen“): Breite, Beinlänge, Kopf-/Kapuzengröße
+// (um den Hals skaliert), Rumpfbreite. Standard = bisheriger Stand.
+export const FIG = { narrow: 0.98, leg: 5, head: 0.9, torso: 1.06 };   // S12 (Nutzer: „schwerer, glaubwürdiger“): breiterer Rumpf, kräftigere Schultern; Kopf bleibt klein
+const warpP = (x, y) => {
+  let X = x, Y = y;
+  if (y < 17.5) { X = 20 + (x - 20) * FIG.head; Y = 17.5 - (17.5 - y) * FIG.head; } else if (y < 38) X = 20 + (x - 20) * FIG.torso;
+  return [20 + (X - 20) * FIG.narrow, Y >= 39 ? Y + FIG.leg : Y > 36 ? Y + (Y - 36) * FIG.leg / 3 : Y];
+};
+const warpX = x => 20 + (x - 20) * FIG.narrow;
 const OUT = '#0b0907';
 
 // ---- Raster mit Teil-IDs (Tiefe = Zeichenreihenfolge) ----
@@ -31,7 +38,7 @@ class Canvas2 {
     }
   }
   poly(pid, pts) {                                            // Scanline-Füllung (Pixelmitte im Vieleck), keine Kantenglättung
-    if (this.warp) pts = pts.map(([x, y]) => [warpX(x), warpY(y)]);
+    if (this.warp) pts = pts.map(([x, y]) => warpP(x, y));
     let y0 = this.H, y1 = 0; for (const [, y] of pts) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(this.H - 1, Math.ceil(y1)); y++) {
       const yc = y + 0.5, xs = [];
@@ -42,7 +49,7 @@ class Canvas2 {
         if (x >= 0 && x < this.W) this.id[y * this.W + x] = pid;
     }
   }
-  ell(pid, cx, cy, rx, ry) { if (this.warp) { cx = warpX(cx); cy = warpY(cy); rx *= NARROW; } for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++)
+  ell(pid, cx, cy, rx, ry) { if (this.warp) { const k = (cy < 17.5 ? FIG.head : cy < 38 ? FIG.torso : 1); [cx, cy] = warpP(cx, cy); rx *= FIG.narrow * k; ry *= cy < 17.5 ? FIG.head : 1; } for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++)
     if (x >= 0 && y >= 0 && x < this.W && y < this.H && ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) this.id[y * this.W + x] = pid; }
   at(x, y) { return x < 0 || y < 0 || x >= this.W || y >= this.H ? -1 : this.id[y * this.W + x]; }
   // Volumen: je Teil und Zeile Spanne bestimmen → Licht links/oben, Formschatten rechts; Schlagschatten unter/rechts
@@ -78,7 +85,10 @@ class Canvas2 {
       this.col[y * this.W + x] = c;
     }
   }
-  set(x, y, c) { if (this.warp) { x = Math.round(warpX(x + 0.5) - 0.5); y = warpY(y); } if (x >= 0 && y >= 0 && x < this.W && y < this.H && c) { this.col[y * this.W + x] = c; if (this.id[y * this.W + x] < 0) this.id[y * this.W + x] = 999; } }
+  setOn(pid, x, y, c) {                                       // nur auf Pixel eines Teils (Gesichtsschatten bleibt im Kopf)
+    if (!c) return; let X = x, Y = y; if (this.warp) { const [wx, wy] = warpP(x + 0.5, y + 0.5); X = Math.round(wx - 0.5); Y = Math.round(wy - 0.5); }
+    if (X >= 0 && Y >= 0 && X < this.W && Y < this.H && this.id[Y * this.W + X] === pid) this.col[Y * this.W + X] = c; }
+  set(x, y, c) { if (this.warp) { const [wx, wy] = warpP(x + 0.5, y + 0.5); x = Math.round(wx - 0.5); y = Math.round(wy - 0.5); } if (x >= 0 && y >= 0 && x < this.W && y < this.H && c) { this.col[y * this.W + x] = c; if (this.id[y * this.W + x] < 0) this.id[y * this.W + x] = 999; } }
   toG() {                                                     // → Pixel-Array mit Außenkontur (Innenkanten trennt die Schattierung)
     const g = { w: this.W, h: this.H, a: this.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= this.W || y >= this.H ? null : this.col[y * this.W + x] };
     return g;
@@ -86,6 +96,7 @@ class Canvas2 {
 }
 const h = (a, b) => { let n = (a * 374761393 + b * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 // zerfetzter Saum: Punkte entlang y von xa nach xb, Zacken 1–4 px nach unten, fest aus dem Hash (kein Flackern)
+const h2 = h;                                                    // Hash-Alias (in paintWeapon2 ist h die Höhe)
 function hem(xa, xb, y, seed, depth = 4) {
   const pts = [], n = Math.max(2, Math.round(Math.abs(xb - xa) / 2.2));
   for (let i = 0; i <= n; i++) { const x = xa + (xb - xa) * i / n; pts.push([x, y + (i % 2 ? Math.round(1 + h(i, seed) * depth) : Math.round(h(seed, i) * 1.2))]); }
@@ -403,11 +414,12 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
   const R = side ? sideRig(pose) : frontRig(pose), b = R.b + R.u, hx = R.hx, gob = L.sp === 'goblin';   // Goblin: gebückt, Kopf tief
   const bone = L.sp === 'skeleton', sleeve = L.armor === 'plate' || L.armor === 'chain' ? L.armorR : L.robe || L.cloth;
   const hand = L.glove || L.skin, pants = bone ? L.skin : L.pants, boots = bone ? L.skin : (L.boots || L.skin);
-  const coatR = L.robe || L.cloth, hm = L.robe ? 48 : L.cloak || L.hooded ? 39 : 35;   // Robe bis zu den Knöcheln, Mantel, Wams
-  const helmet = L.helm === 'great', hood = L.hooded && !helmet;
+  const coatR = L.robe || L.cloth, hm = L.robe ? 48 : L.hem || (L.cloak || L.hooded ? 39 : 35);   // Robe bis zu den Knöcheln, Mantel, Wams
+  const helmet = L.helm === 'great' || L.helm === 'bascinet', hood = L.hooded && !helmet && L.helm !== 'wide';
   const P = {};
   // --- Tiefenreihenfolge: was zuerst angelegt wird, liegt hinten ---
   if (L.cloak && !back) P.cloak = C.partR('cloak', L.cloak);
+  if (L.pack && side) { P.pack = C.partR('pack', L.leather); P.roll = C.partR('roll', ramp('#5e5040')); }
   if (L.quiver && !back) P.quiver = C.partR('quiver', L.leather);
   if (side) { P.farArm = C.partR('farArm', dim(sleeve, 0.3)); P.farHand = C.partR('farHand', dim(hand, 0.3)); }
   P.legF = C.partR('legF', dim(pants, 0.18)); P.bootF = C.partR('bootF', dim(boots, 0.12));
@@ -415,14 +427,18 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
   P.coat = C.partR('coat', coatR);
   if (L.armor === 'leather') P.jerkin = C.partR('jerkin', L.armorR);
   if (L.armor === 'plate') P.plate = C.partR('plate', L.armorR);
-  if (L.apron && !back) P.apron = C.partR('apron', L.leather);
+  if (L.apron && !back) P.apron = C.partR('apron', L.apronR || L.leather);
   if (L.tabard) P.tabard = C.partR('tabard', L.tabard);
+  if (L.stoleR && !back) P.stole = C.partR('stole', L.stoleR);
   P.belt = C.partR('belt', L.belt);
   if (back && L.cloak) P.cloak = C.partR('cloak', L.cloak);
+  if (L.pack && back) { P.pack = C.partR('pack', L.leather); P.roll = C.partR('roll', ramp('#5e5040')); }
   if (back && L.quiver) P.quiver = C.partR('quiver', L.leather);
   if (!side) { P.armW = C.partR('armW', sleeve); P.handW = C.partR('handW', hand); P.armO = C.partR('armO', dim(sleeve, 0.1)); P.handO = C.partR('handO', dim(hand, 0.08)); }
-  if (L.armor === 'plate') { P.pauldL = C.partR('pauldL', L.armorR); P.pauldR = C.partR('pauldR', dim(L.armorR, 0.12)); }
+  if (L.armor === 'plate' || L.pauldR) { const Pr = L.pauldR || L.armorR; P.pauldL = C.partR('pauldL', Pr); P.pauldR = C.partR('pauldR', dim(Pr, 0.12)); }
+  if (L.sashR && !back) P.sash = C.partR('sash', L.sashR);
   if (hood) P.mantle = C.partR('mantle', L.hood);
+  else if (L.capeR && !helmet) P.mantle = C.partR('mantle', L.capeR);   // Referenz 3: Schulterumhang
   else if (L.scarf && L.face !== 'cloth') P.collar = C.partR('collar', L.scarf);
   if (hood) { P.hood = C.partR('hood', L.hood); P.face = C.partR('face', { hi: DARKF, b: DARKF, sh: DARKF, dk: DARKF }); }
   else { P.head = C.partR('head', L.skin); if (L.hs !== 2 && !helmet) P.hair = C.partR('hair', L.hair); if (L.beard && !back && !helmet) P.beard = C.partR('beard', L.hair);
@@ -448,12 +464,15 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
     if (P.plate !== undefined) C.poly(P.plate, [[14, top + 1], [26, top + 1], [26, 24 + b], [24, waist], [16, waist], [14, 24 + b]]);
     if (P.apron !== undefined) C.poly(P.apron, [[15, 22 + b], [25, 22 + b], [26, 40], [14, 40]]);
     if (P.tabard !== undefined) C.poly(P.tabard, [[17, 20 + b], [23, 20 + b], [24, 38], ...hem(24, 16, 41, 17, 3).slice(1, -1), [16, 38]]);
+    if (P.stole !== undefined) { C.poly(P.stole, [[16.5, 16 + b], [18.5, 17 + b], [18.5, 40], [16.5, 41]]); C.poly(P.stole, [[21.5, 17 + b], [23.5, 16 + b], [23.5, 41], [21.5, 40]]); }   // Referenz 3: Stola
     C.poly(P.belt, [[13, waist - 1], [27, waist - 1], [27, waist + 2], [13, waist + 2]]);
     if (L.strap && P.plate === undefined && P.tabard === undefined) C.poly(P.belt, back ? [[26, 18 + b], [24, 17 + b], [14, 28 + b], [16, 28 + b]] : [[14, 18 + b], [16, 17 + b], [26, 28 + b], [24, 28 + b]]);
+    if (P.sash !== undefined) C.poly(P.sash, [[24, 17 + b], [27, 18 + b], [17, 31 + b], [14, 30 + b]]);   // S12 Schärpe quer über die Brust
     if (P.cloak !== undefined && back) C.poly(P.cloak, cloakPts);
+    if (P.pack !== undefined) { C.poly(P.pack, [[14, 19 + b], [26, 19 + b], [27, 33 + b], [13, 33 + b]]); C.ell(P.roll, 20, 18 + b, 7.5, 2.2); }   // Referenz 3: Rucksack mit Deckenrolle
     if (P.quiver !== undefined) C.poly(P.quiver, back ? [[23, 14 + b], [27, 13 + b], [30, 30 + b], [26, 31 + b]] : [[25, 11 + b], [28, 10 + b], [29, 16 + b], [26, 17 + b]]);
     const [wA, oA] = back ? [R.oa.map(([x, y]) => [40 - x, y]), R.wa.map(([x, y]) => [40 - x, y])] : [R.wa, R.oa];
-    const skip = arm => noArm && (arm[0][0] < 20 ? 'L' : 'R') === noArm;
+    const skip = arm => noArm === 'both' || (noArm && (arm[0][0] < 20 ? 'L' : 'R') === noArm);   // both: Zweihänder — beide Arme zeichnet der Renderer
     if (!skip(wA)) { C.limb(P.armW, shift(wA, b), aw, aw2); C.ell(P.handW, wA[2][0], wA[2][1] + b + 1, bone ? 1.8 : 2.7, bone ? 1.8 : 2.9); }
     if (!skip(oA)) { C.limb(P.armO, shift(oA, b), aw, aw2); C.ell(P.handO, oA[2][0], oA[2][1] + b + 1, bone ? 1.8 : 2.7, bone ? 1.8 : 2.9); }
     if (P.pauldL !== undefined) { C.poly(P.pauldL, [[14, 16 + b], [9, 16 + b], [6, 19 + b], [6, 22 + b], [9, 23 + b], [13, 21 + b]]);
@@ -472,7 +491,7 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
       C.poly(P.head, [[18.5 + hx, 15 + b], [21.5 + hx, 15 + b], [21.5, 18 + b], [18.5, 18 + b]]);   // Hals
       if (P.hair !== undefined) {
         if (back) C.ell(P.hair, 20 + hx, 10.5 + b, 4.9, 5.4);
-        else C.poly(P.hair, [[15.4 + hx, 11 + b], [15.6 + hx, 7.5 + b], [17.5 + hx, 5.4 + b], [22.5 + hx, 5.4 + b], [24.4 + hx, 7.5 + b], [24.6 + hx, 11 + b], [23.5 + hx, 8.5 + b], [16.5 + hx, 8.5 + b]]);
+        else C.poly(P.hair, [[15.3 + hx, 13 + b], [15.5 + hx, 7.5 + b], [17.5 + hx, 5.2 + b], [22.5 + hx, 5.2 + b], [24.5 + hx, 7.5 + b], [24.7 + hx, 13 + b], [23.6 + hx, 9.6 + b], [20 + hx, 9 + b], [16.4 + hx, 9.6 + b]]);
         if (L.hs === 1) { C.poly(P.hair, [[15 + hx, 9 + b], [16.5 + hx, 9 + b], [16.5 + hx, 18 + b], [15 + hx, 17 + b]]); C.poly(P.hair, [[23.5 + hx, 9 + b], [25 + hx, 9 + b], [25 + hx, 17 + b], [23.5 + hx, 18 + b]]); }
         if (L.hs === 3 && back) C.poly(P.hair, [[19.5, 14 + b], [20.5, 14 + b], [21, 21 + b], [19, 21 + b]]);
       }
@@ -480,6 +499,9 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
       if (P.helm !== undefined) {
         const t = L.helm;
         if (t === 'great') C.poly(P.helm, [[15 + hx, 6 + b], [25 + hx, 6 + b], [25.5 + hx, 16 + b], [14.5 + hx, 16 + b]]);
+        else if (t === 'bascinet') C.poly(P.helm, [[14.8 + hx, 16 + b], [15 + hx, 8 + b], [17 + hx, 4.5 + b], [20 + hx, 1.5 + b], [23 + hx, 4.5 + b], [25 + hx, 8 + b], [25.2 + hx, 16 + b]]);   // Beckenhaube, spitz
+        else if (t === 'kettle') { C.poly(P.helm, [[15.3 + hx, 10 + b], [15.6 + hx, 6.5 + b], [18 + hx, 4.5 + b], [22 + hx, 4.5 + b], [24.4 + hx, 6.5 + b], [24.7 + hx, 10 + b]]); C.poly(P.helm, [[11.5 + hx, 9.5 + b], [28.5 + hx, 9.5 + b], [27 + hx, 11.5 + b], [13 + hx, 11.5 + b]]); }   // Eisenhut mit Krempe
+        else if (t === 'wide') { C.poly(P.helm, [[16.5 + hx, 2.5 + b], [23.5 + hx, 2.5 + b], [24.5 + hx, 7.5 + b], [15.5 + hx, 7.5 + b]]); C.poly(P.helm, [[8.5 + hx, 8 + b], [31.5 + hx, 8 + b], [30 + hx, 10 + b], [10 + hx, 10 + b]]); }   // breiter Hut
         else if (t === 'hat') { C.poly(P.helm, [[17 + hx, 3 + b], [23 + hx, 3 + b], [24 + hx, 7.5 + b], [16 + hx, 7.5 + b]]); C.poly(P.helm, [[11 + hx, 7 + b], [29 + hx, 7 + b], [28 + hx, 9 + b], [12 + hx, 9 + b]]); }
         else if (t === 'scarf') C.poly(P.helm, [[15.3 + hx, 11 + b], [15.6 + hx, 7 + b], [18 + hx, 5 + b], [22 + hx, 5 + b], [24.4 + hx, 7 + b], [24.7 + hx, 11 + b], [25 + hx, 18 + b], [23.8 + hx, 17 + b], [23.8 + hx, 10 + b], [16.2 + hx, 10 + b], [16.2 + hx, 17 + b], [15 + hx, 18 + b]]);
         else { const g3 = gob ? 3 : 0; C.poly(P.helm, [[15.3 + hx - g3 / 3, 10.5 + b + g3], [15.6 + hx - g3 / 3, 7 + b + g3], [18 + hx, 5 + b + g3], [22 + hx, 5 + b + g3], [24.4 + hx + g3 / 3, 7 + b + g3], [24.7 + hx + g3 / 3, 10.5 + b + g3]]); }   // Kappe / Nasalhelm
@@ -493,7 +515,8 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
     if (P.cloak !== undefined) { const sw = { w0: 2, w2: -2 }[pose] || 0;
       C.poly(P.cloak, [[22, 16 + b], [28, 17 + b], [31 + sw, 29], [34 + sw, 41], ...hem(34 + sw, 16, 41, 7, 5).slice(1, -1), [16, 39], [18, 25 + b]]); }
     if (P.quiver !== undefined) C.poly(P.quiver, [[25, 14 + b], [28, 13 + b], [31, 29 + b], [28, 30 + b]]);
-    C.limb(P.farArm, shift(R.fa, b), bone ? 2.4 : 4.6, bone ? 2 : 3.8); C.ell(P.farHand, R.fa[2][0], R.fa[2][1] + b + 1, 2.4, 2.5);
+    if (P.pack !== undefined) { C.poly(P.pack, [[24, 18 + b], [31, 19 + b], [31, 32 + b], [24, 32 + b]]); C.ell(P.roll, 28, 17 + b, 3.5, 2.2); }
+    if (noArm !== 'both') { C.limb(P.farArm, shift(R.fa, b), bone ? 2.4 : 4.6, bone ? 2 : 3.8); C.ell(P.farHand, R.fa[2][0], R.fa[2][1] + b + 1, 2.4, 2.5); }
     C.limb(P.legF, R.fl, legW, legW2); C.limb(P.legN, R.nl, legW, legW2);
     const boot = (pid, [fx, fy]) => { if (bone) { C.ell(pid, fx - 1, fy + 1, 3, 1.4); return; } C.poly(pid, [[fx - 3, fy - 5], [fx + 4, fy - 5], [fx + 4, fy + 2], [fx - 8, fy + 2], [fx - 7, fy - 1], [fx - 3, fy - 2]]); };
     boot(P.bootF, R.fl[2]); boot(P.bootN, R.nl[2]);
@@ -504,8 +527,10 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
     if (P.plate !== undefined) C.poly(P.plate, [[14, top + 1], [25, top + 1], [26, 25 + b], [24, waist], [15, waist], [13, 24 + b]]);
     if (P.apron !== undefined) C.poly(P.apron, [[12, 22 + b], [15, 22 + b], [15, 41], [11, 41]]);
     if (P.tabard !== undefined) C.poly(P.tabard, [[13, 20 + b], [17, 20 + b], [17, 39], [12, 40]]);
+    if (P.stole !== undefined) C.poly(P.stole, [[15, 16 + b], [17, 17 + b], [16.5, 40], [14.5, 40]]);
     C.poly(P.belt, [[14, waist - 1], [26, waist - 1], [26, waist + 2], [14, waist + 2]]);
     if (L.strap && P.plate === undefined && P.tabard === undefined) C.poly(P.belt, [[17, 18 + b], [20, 18 + b], [26, 27 + b], [23, 28 + b]]);
+    if (P.sash !== undefined) C.poly(P.sash, [[18, 17 + b], [21, 17 + b], [24, 30 + b], [21, 31 + b]]);
     if (P.pauldL !== undefined) C.poly(P.pauldL, [[17, 16 + b], [24, 16 + b], [25, 21 + b], [17, 22 + b]]);
     if (P.mantle !== undefined) C.poly(P.mantle, [[16, 14 + b], [25, 14 + b], [29, 18 + b], [29, 21 + b], ...hem(29, 13, 21 + b, 4, 2).slice(1, -1), [13, 21 + b], [14, 17 + b]]);
     if (P.collar !== undefined) C.poly(P.collar, [[16, 15 + b], [25, 15 + b], [26, 18 + b], [15, 18 + b]]);
@@ -524,6 +549,9 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
       if (P.helm !== undefined) {
         const t = L.helm;
         if (t === 'great') C.poly(P.helm, [[15 + hx, 6 + b], [24 + hx, 6 + b], [24.5 + hx, 16 + b], [14.5 + hx, 16 + b]]);
+        else if (t === 'bascinet') C.poly(P.helm, [[14 + hx, 16 + b], [14.5 + hx, 8 + b], [17 + hx, 4.5 + b], [19.5 + hx, 1.5 + b], [22 + hx, 5 + b], [24 + hx, 8 + b], [24.5 + hx, 16 + b]]);
+        else if (t === 'kettle') { C.poly(P.helm, [[14.5 + hx, 10 + b], [15.5 + hx, 6.5 + b], [18 + hx, 4.5 + b], [21.5 + hx, 5 + b], [23.2 + hx, 7.5 + b], [23.4 + hx, 10 + b]]); C.poly(P.helm, [[11 + hx, 9.5 + b], [27 + hx, 9.5 + b], [26 + hx, 11.5 + b], [12 + hx, 11.5 + b]]); }
+        else if (t === 'wide') { C.poly(P.helm, [[17 + hx, 2.5 + b], [23 + hx, 2.5 + b], [23.5 + hx, 7.5 + b], [16.5 + hx, 7.5 + b]]); C.poly(P.helm, [[9.5 + hx, 8 + b], [29.5 + hx, 8 + b], [28 + hx, 10 + b], [11 + hx, 10 + b]]); }
         else if (t === 'hat') { C.poly(P.helm, [[17 + hx, 3 + b], [23 + hx, 3 + b], [23.5 + hx, 7.5 + b], [16.5 + hx, 7.5 + b]]); C.poly(P.helm, [[12 + hx, 7 + b], [27 + hx, 7 + b], [26 + hx, 9 + b], [13 + hx, 9 + b]]); }
         else if (t === 'scarf') C.poly(P.helm, [[16 + hx, 9 + b], [17.5 + hx, 5 + b], [22.5 + hx, 5 + b], [24.5 + hx, 8 + b], [25 + hx, 18 + b], [21 + hx, 17 + b], [21 + hx, 10 + b], [16 + hx, 10 + b]]);
         else { const g3 = gob ? 3 : 0; C.poly(P.helm, [[14.5 + hx, 10 + b + g3], [15.5 + hx, 6.5 + b + g3], [18 + hx, 5 + b + g3], [21.5 + hx, 5.5 + b + g3], [23.2 + hx, 8 + b + g3], [23.4 + hx, 11 + b + g3]]); }
@@ -531,13 +559,67 @@ export function paintHuman(L, dir, pose, noArm = null) {   // noArm: 'L'/'R' (Bi
       if (P.crest !== undefined) C.poly(P.crest, [[18 + hx, 2 + b], [23 + hx, 2 + b], [27 + hx, 9 + b], [24 + hx, 8 + b], [22 + hx, 6 + b], [18 + hx, 6 + b]]);
     }
     if (P.mouthcloth !== undefined) C.poly(P.mouthcloth, [[14, 13 + b], [19, 13 + b], [20, 17 + b], [15, 18 + b], [13.5, 16 + b]]);
-    if (noArm !== 'near') { C.limb(P.arm, shift(R.na, b), aw, aw2); C.ell(P.hand, R.na[2][0], R.na[2][1] + b + 1, bone ? 1.8 : 2.8, bone ? 1.8 : 2.9); }
+    if (noArm !== 'near' && noArm !== 'both') { C.limb(P.arm, shift(R.na, b), aw, aw2); C.ell(P.hand, R.na[2][0], R.na[2][1] + b + 1, bone ? 1.8 : 2.8, bone ? 1.8 : 2.9); }
     if (P.shield !== undefined) { const [sx, sy] = pose === 'guard' ? [12, 20 + b] : [14, 27 + b];
       if (L.shield === 'round') C.ell(P.shield, sx, sy, 3, 5.4); else C.poly(P.shield, [[sx - 2, sy - 6], [sx + 2, sy - 6], [sx + 2, sy + 2], [sx, sy + 6], [sx - 2, sy + 2]]); }
   }
   C.shade();
   humanDetails(C, L, P, side, back, b, hood);
+  weather(C, L, P, side, back, b);
   return { w: FW, h: FH, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= FW || y >= FH ? null : C.col[y * FW + x] };
+}
+
+// Referenz 3: Stoff hat Schmutz und Falten, Metall Rost und Kerben; Abnutzung (L.wear 0–3) reißt Säume, setzt Flicken;
+// Blut (L.blood 0–2) spritzt auf Rumpf und Beine. Alles fest aus dem Hash (kein Flackern), nur auf vorhandene Pixel.
+function weather(C, L, P, side, back, b) {
+  const W = C.W, wear = L.wear | 0, bl = L.blood | 0, sd = (L.wseed | 0) * 97 + 13;
+  const def = a => a.filter(v => v !== undefined);
+  const cloth = new Set(def([P.cloak, P.coat, P.mantle, P.hood, P.legF, P.legN, P.tabard, P.jerkin, P.apron, P.pack]));
+  const metal = new Set(def([P.plate, P.pauldL, P.pauldR, L.helm && !['hat', 'scarf', 'wide'].includes(L.helm) ? P.helm : undefined]));
+  if (L.armor === 'chain') { cloth.delete(P.coat); metal.add(P.coat); }
+  const torso = [];
+  for (let y = 0; y < C.H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, id = C.id[i], col = C.col[i]; if (id < 0 || !col) continue;
+    const n = h(x + sd, y * 7 + sd), n2 = h((x >> 1) + sd, (y >> 1) * 3 + sd);
+    if (cloth.has(id)) {
+      if (n2 < 0.1 + wear * 0.05) C.col[i] = mix(col, '#0a0808', 0.2 + wear * 0.04);        // Schmutz, Falten
+      else if (n2 > 0.96 - wear * 0.02) C.col[i] = mix(col, '#8a7a5c', 0.14);              // ausgeblichen
+    } else if (metal.has(id)) {
+      if (n < 0.04 + wear * 0.05) C.col[i] = mix(col, '#6a3a1e', 0.5);                      // Rost
+      else if (n > 0.975) C.col[i] = mix(col, '#0a0808', 0.4);                              // Kerbe
+    }
+    if (id === P.coat || id === P.plate || id === P.jerkin || id === P.tabard || id === P.legN || id === P.legF) torso.push(i);
+  }
+  if (wear >= 2) {                                                   // zerrissener Saum: Löcher von unten in Umhang und Rock
+    for (const pid of def([P.cloak, P.coat, P.tabard])) for (let x = 0; x < W; x++) {
+      let y = C.H - 1; while (y >= 0 && C.id[y * W + x] !== pid) y--; if (y < 0 || h(x * 3 + sd, pid) > (wear - 1) * 0.28) continue;
+      const cut = 1 + ((h(x, sd + pid) * (wear + 1)) | 0);
+      for (let k = 0; k < cut; k++) { const i = (y - k) * W + x; if (C.id[i] !== pid) break; C.col[i] = null; C.id[i] = -1; }
+    }
+    if (torso.length) for (let p = 0; p < wear - 1; p++) {            // Flicken
+      const i0 = torso[(h(p + 5, sd) * torso.length) | 0], x0 = i0 % W, y0 = (i0 / W) | 0;
+      for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 2; dx++) { const i = (y0 + dy) * W + x0 + dx; if (C.col[i] && C.id[i] === C.id[i0]) C.col[i] = mix(C.col[i], dy === 0 ? '#7a6a4c' : '#5a4a34', 0.4); }
+    }
+  }
+  // S12 Detail (Referenz: Gurte, Nieten, Falten): Faltenwurf im Umhang/Rock, Nieten auf Platte, helle Stiefelstulpe
+  const boots = new Set(def([P.bootN, P.bootF])), foldP = new Set(def([P.cloak, P.coat, P.robe, P.tabard])), plateP = new Set(def([P.plate, P.pauldL, P.pauldR]));
+  const topOf = new Map();
+  for (let y = 0; y < C.H; y++) for (let x = 0; x < W; x++) { const i = y * W + x, id = C.id[i], col = C.col[i]; if (id < 0 || !col) continue;
+    if (foldP.has(id) && x % 4 === (sd & 3) && y > 30 && C.id[i - W] === id && C.id[i + W] === id) C.col[i] = mix(col, '#0a0808', 0.2);
+    if (plateP.has(id) && (x * 7 + y * 3) % 13 === 0 && C.id[i - 1] === id && C.id[i + 1] === id) C.col[i] = mix(col, '#e6dcc8', 0.45);
+    if (boots.has(id)) { const k = id * 100 + x; if (!topOf.has(k)) { topOf.set(k, y); C.col[i] = mix(col, '#8a7a5e', 0.4); } } }
+  if (bl && torso.length) for (let s = 0; s < bl * 3; s++) {          // Blutspritzer mit kurzem Lauf nach unten
+    const i0 = torso[(h(s * 11 + 3, sd + 7) * torso.length) | 0], x0 = i0 % W, y0 = (i0 / W) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const i = (y0 + dy) * W + x0 + dx;
+      if (C.col[i] && C.id[i] >= 0 && (dx === 0 && dy === 0 || h(x0 + dx + s, y0 + dy) < 0.55)) C.col[i] = h(dx + 9, dy + s) < 0.5 ? '#5a1010' : '#3a0a0a'; }
+    for (let k = 1; k <= 1 + ((h(s, sd) * 3) | 0); k++) { const i = (y0 + 1 + k) * W + x0; if (C.col[i] && C.id[i] >= 0) C.col[i] = '#3a0a0a'; }
+  }
+  if (L.wraps) for (const pid of def([P.legN, P.legF])) for (let x = 0; x < W; x++) {   // Beinwickel: helle Bänder über dem Stiefel
+    let yb = C.H - 1; while (yb >= 0 && C.id[yb * W + x] !== P.bootN && C.id[yb * W + x] !== P.bootF) yb--;
+    let y = yb; while (y >= 0 && C.id[y * W + x] !== pid) y--; if (y < 0 || yb < 0) continue;
+    for (let k = 0; k < 6; k++) { const i = (y - k) * W + x; if (C.id[i] !== pid) break; if ((y - k + x) % 3 !== 0) C.col[i] = mix(C.col[i], '#8a7a5e', k % 3 === 1 ? 0.45 : 0.3); }
+  }
+  if (L.pack && !side && !back) for (const x of [16, 24]) for (let y = 17 + b; y <= 27 + b; y++) { const i = y * W + Math.round(warpX(x)); if (C.col[i] && C.id[i] >= 0) C.col[i] = y % 3 ? L.leather.sh : L.leather.b; }   // Tragriemen vorn
 }
 
 // Handgesetzte Details nach der Schattierung (Gesicht, Schnallen, Nähte, Wappen, Kettenglieder)
@@ -555,15 +637,18 @@ function humanDetails(C, L, P, side, back, b, hood) {
         for (const [x, y] of eyes) C.set(x, y + b, '#1b1411'); }
     } else if (P.head !== undefined) {
       const eyes = side ? [[16, 11]] : [[18, 11], [22, 11]];
-      if (L.helm === 'great') { const M = L.helmR; for (let x = side ? 14 : 16; x <= (side ? 19 : 24); x++) C.set(x, 10 + b, DARKF); if (!side) { C.set(20, 11 + b, DARKF); C.set(20, 12 + b, DARKF); }
+      if (L.helm === 'great' || L.helm === 'bascinet') { const M = L.helmR; for (let x = side ? 14 : 16; x <= (side ? 19 : 24); x++) C.set(x, 10 + b, DARKF); if (!side) { C.set(20, 11 + b, DARKF); C.set(20, 12 + b, DARKF); }
         if (G1) for (const [x, y] of eyes) C.set(x, y - 1 + b, G1); }
       else if (L.sp === 'goblin') { const ge = side ? [[15, 12]] : [[18, 12], [22, 12]];
         for (const [x, y] of ge) { C.set(x, y + b, '#e0c24a'); C.set(x + (side ? 1 : 0), y - 1 + b, S.dk); }
         for (let x = side ? 13 : 18; x <= (side ? 15 : 22); x++) C.set(x, 16 + b, x % 2 ? L.bone.b : DARKF); }
       else if (bone) { for (const [x, y] of eyes) { C.set(x, y + b, DARKF); C.set(x + (side ? -1 : 1), y + b, DARKF); if (G1) C.set(x, y + b, G1); }
         C.set(side ? 15 : 20, 13 + b, DARKF); for (let x = side ? 15 : 18; x <= (side ? 18 : 22); x++) C.set(x, 15 + b, x % 2 ? S.sh : DARKF); }
-      else { for (const [x, y] of eyes) { C.set(x, y + b, '#1b1411'); C.set(x, y - 1 + b, S.sh); }
-        C.set(side ? 15 : 20, 13 + b, S.sh); if (!L.beard) for (let x = side ? 15 : 19; x <= (side ? 16 : 21); x++) C.set(x, 15 + b, S.dk);
+      else {                                                  // Gesicht (Referenz 2): Schattenhälfte, Brauenschatten, 2 px Augen, keine Mundlinie
+        const h = P.head;
+        for (let y = 9; y <= 18; y++) for (let x = side ? 13 : 15; x <= (side ? 20 : 25); x++)
+          C.setOn(h, x, y + b, y === 10 ? S.sh : y >= 15 ? (y >= 16 ? S.dk : S.sh) : (side ? x >= 17 : x >= 21) ? S.sh : null);
+        for (const [x, y] of eyes) { C.setOn(h, x, y + b, DARKF); C.setOn(h, side ? x + 1 : x < 20 ? x - 1 : x + 1, y + b, DARKF); }
         if (L.helm === 'nasal' && !side) for (let y = 9; y <= 13; y++) C.set(20, y + b, L.helmR.b); }
     }
   }
@@ -576,7 +661,11 @@ function humanDetails(C, L, P, side, back, b, hood) {
     const M = L.armorR, cur = C.col[y * FW + x], dark = cur === (L.robe || L.cloth).sh || cur === (L.robe || L.cloth).dk || cur === M.sh || cur === M.dk;
     C.col[y * FW + x] = y % 2 ? M.dk : ((x + (y >> 1)) % 2 ? (dark ? M.sh : mix(M.b, M.sh, 0.4)) : mix(M.dk, M.sh, 0.5));
   }
-  if (P.tabard !== undefined && L.markR && !back) { const M = L.markR, cx = side ? 15 : 20;
+  if (P.tabard !== undefined && L.markR && L.mark === 'quarter') {                       // Referenz 3: gevierter Wappenrock (Adel)
+    let x0 = 99, x1 = 0, y0 = 99, y1 = 0; for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) if (C.id[y * FW + x] === P.tabard) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const mx = (x0 + x1 + 1) / 2, my = y0 + (y1 - y0) * 0.45;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * FW + x; if (C.id[i] === P.tabard && C.col[i] && ((x < mx) !== (y < my))) C.col[i] = mix(C.col[i], L.markR.b, 0.7); }
+  } else if (P.tabard !== undefined && L.markR && !back) { const M = L.markR, cx = side ? 15 : 20;
     if (L.mark === 'chevron') { C.set(cx - 2, 26 + b, M.b); C.set(cx - 1, 25 + b, M.hi); C.set(cx, 24 + b, M.hi); C.set(cx + 1, 25 + b, M.b); C.set(cx + 2, 26 + b, M.sh); }
     else { for (let y = 22; y <= 27; y++) C.set(cx, y + b, M.b); for (let x = cx - 2; x <= cx + 2; x++) C.set(x, 24 + b, M.b); C.set(cx, 22 + b, M.hi); } }
   if (P.shield !== undefined && L.markR) { let sx = 0, sy = 0, n = 0;
@@ -608,17 +697,32 @@ const WDES = {
     C.poly(M.ir, [[31, 4], [33, 4], [33, 14], [31, 14]]);                                                                            // Parierhaken
     C.poly(M.st, [[33, 4.8], [64, 5.4], [71, 9], [64, 12.6], [33, 13.2]]);
     return { gx: 13, gy: 9, blade: [35, 62, 8], after: (set, S) => { for (let x = 35; x <= 58; x++) { set(x, 8, S.sh); set(x, 9, S.dk); } } }; }],
-  axe: [42, 26, (C, M) => {
-    C.poly(M.wd, [[1, 11.5], [34, 11.5], [34, 14.5], [1, 14.5]]); C.poly(M.wr, [[2, 11.2], [9, 11.2], [9, 14.8], [2, 14.8]]);
-    C.poly(M.ir, [[28, 8.5], [33, 8.5], [33, 17.5], [28, 17.5]]);
-    C.poly(M.st, [[33, 9], [37, 3], [40, 1], [41, 8], [40.5, 19], [38, 24], [35, 22], [33, 17]]);
-    return { gx: 6, gy: 13, blade: null, after: (set, S) => { for (let y = 2; y <= 22; y++) set(y < 12 ? 40 : 39 + (y > 18 ? -1 : 0), y, S.hi); set(30, 10, '#1b1411'); set(30, 16, '#1b1411'); } }; }],
-  greataxe: [58, 34, (C, M) => {
-    C.poly(M.wd, [[1, 15.5], [52, 15.5], [52, 18.5], [1, 18.5]]); C.poly(M.wr, [[2, 15.2], [11, 15.2], [11, 18.8], [2, 18.8]]);
-    C.poly(M.st, [[42, 17], [39, 6], [43, 1], [50, 3], [52, 12], [52, 22], [50, 31], [43, 33], [39, 28]]);                          // Doppelblatt
-    C.poly(M.ir, [[43, 12], [49, 12], [49, 22], [43, 22]]); C.poly(M.ir, [[52, 16], [57, 17], [52, 18]]);
-    return { gx: 8, gy: 17, blade: null, after: (set, S) => { for (const [y0, y1, x] of [[2, 11, 40], [23, 32, 40]]) for (let y = y0; y <= y1; y++) { set(x, y, S.hi); set(x + 1, y, S.b); }
-      for (let y = 4; y <= 30; y++) if (y < 12 || y > 22) set(47, y, S.dk); set(46, 17, '#1b1411'); set(44, 14, S.hi); set(44, 20, S.hi); } }; }],
+  axe: [40, 22, (C, M) => {                                          // S12: schlanker Schaft, Bartklinge mit heller Schneide
+    C.poly(M.wd, [[1, 9.6], [33, 9.6], [33, 12.2], [1, 12.2]]); C.poly(M.wr, [[2, 9.3], [9, 9.3], [9, 12.5], [2, 12.5]]);
+    C.poly(M.ir, [[28, 7.5], [32.5, 7.5], [32.5, 14.5], [28, 14.5]]);
+    C.poly(M.st, [[32, 8.5], [35, 3.5], [38, 2], [39.5, 6.5], [39, 14], [37.5, 19.5], [34.5, 18], [32, 13.5]]);
+    return { gx: 6, gy: 11, blade: null, after: (set) => { set(30, 9, '#1b1411'); set(30, 13, '#1b1411'); } }; }],
+  greataxe: [58, 26, (C, M) => {                                     // S12: Doppelblatt als Halbmonde, nicht als Platte
+    C.poly(M.wd, [[1, 11.8], [52, 11.8], [52, 14.4], [1, 14.4]]); C.poly(M.wr, [[2, 11.5], [11, 11.5], [11, 14.7], [2, 14.7]]);
+    C.poly(M.ir, [[41, 9.5], [46, 9.5], [46, 16.5], [41, 16.5]]);
+    C.poly(M.st, [[46, 10.5], [49, 4], [53, 1.5], [56, 3.5], [54.5, 9], [54.5, 17], [56, 22.5], [53, 24.5], [49, 22], [46, 15.5]]);
+    C.poly(M.st, [[41, 10.5], [38, 6.5], [35.5, 8.5], [35.5, 17.5], [38, 19.5], [41, 15.5]]);
+    return { gx: 8, gy: 13, blade: null, after: (set) => { for (let y = 3; y <= 23; y++) set(y < 12 ? 55 : 54, y, '#d8d2c4'); set(43, 13, '#1b1411'); } }; }],
+  chain_whip: [64, 20, (C, M) => {                                    // Kettenpeitsche: Griff, lange Eisenkette, Haken am Ende
+    C.poly(M.wr, [[1, 8.6], [12, 8.6], [12, 11.4], [1, 11.4]]); C.ell(M.ir, 13, 10, 1.8, 2.2);
+    for (let k = 0; k < 15; k++) C.ell(M.ir, 16 + k * 3, 10 + Math.sin(k * 0.9) * 2.2, 1.4, 1);
+    C.poly(M.st, [[59, 8], [63, 10], [60, 14], [58, 12]]);
+    return { gx: 6, gy: 10, blade: null, after: (set, S) => { for (let k = 0; k < 15; k += 2) set(16 + k * 3, 9 + Math.round(Math.sin(k * 0.9) * 2.2), S.hi); } }; }],
+  goblin_hook: [30, 14, (C, M) => {                                   // Hakenmesser: Wickelgriff, gebogene Klinge mit Haken
+    C.poly(M.wr, [[1, 6], [9, 6], [9, 8.6], [1, 8.6]]); C.poly(M.ir, [[9, 4.5], [11, 4.5], [11, 10], [9, 10]]);
+    C.poly(M.st, [[11, 5.5], [21, 4.5], [27, 2], [28, 5], [24, 6], [26, 9], [21, 8.4], [11, 8.2]]);
+    return { gx: 5, gy: 7, blade: [12, 25, 6], after: (set, S) => { for (let x = 12; x <= 21; x++) set(x, 6, S.hi); } }; }],
+  flail: [46, 24, (C, M) => {                                         // Streitflegel: Griff, kurzer Schaft, Kette, Dornenkugel
+    C.poly(M.wr, [[1, 12.4], [11, 12.4], [11, 15.6], [1, 15.6]]); C.poly(M.wd, [[11, 12.6], [19, 12.6], [19, 15.4], [11, 15.4]]); C.ell(M.ir, 19.5, 14, 1.8, 2.2);
+    for (let k = 0; k < 4; k++) C.ell(M.ir, 22 + k * 3, 13 - k * 1.3, 1.4, 1.1);                                  // Kettenglieder, leicht schwingend
+    C.ell(M.st, 38, 8.5, 5.5, 5.5);
+    for (const pts of [[[36, 3.5], [40, 3.5], [38, 0]], [[36, 13.5], [40, 13.5], [38, 17]], [[43, 6.5], [43, 10.5], [46, 8.5]], [[33, 6.5], [33, 10.5], [31, 8.5]]]) C.poly(M.ir, pts);
+    return { gx: 6, gy: 14, blade: null, after: (set, S) => { set(36, 6, S.hi); set(37, 5, S.hi); for (let y = 5; y <= 12; y += 2) set(39, y, S.dk); } }; }],
   mace: [36, 22, (C, M) => {
     C.poly(M.wr, [[1, 9.4], [12, 9.4], [12, 12.6], [1, 12.6]]); C.poly(M.wd, [[12, 9.6], [24, 9.6], [24, 12.4], [12, 12.4]]);
     C.ell(M.st, 28, 11, 6, 6);
@@ -648,12 +752,11 @@ const WDES = {
     C.limb(M.ir, [[11, 2], [9, 4], [8, 8], [9, 12], [11, 14]], 1.4, 1.4); C.limb(M.ir, [[11, 3], [14, 5], [15, 8], [14, 11], [11, 13]], 1.4, 1.4);   // Korbbügel
     C.poly(M.ir, [[11, 6], [14, 6], [14, 10], [11, 10]]); C.poly(M.st, [[14, 7], [55, 7.6], [59, 8], [55, 8.4], [14, 9]]);
     return { gx: 7, gy: 8, blade: [16, 54, 8] }; }],
-  warhammer: [58, 26, (C, M) => {
-    C.poly(M.wd, [[1, 11.5], [48, 11.5], [48, 14.5], [1, 14.5]]); C.poly(M.wr, [[2, 11.2], [11, 11.2], [11, 14.8], [2, 14.8]]);
-    C.poly(M.st, [[42, 4], [51, 4], [51, 22], [42, 22]]); C.poly(M.st, [[51, 8], [55, 8], [55, 18], [51, 18]]);                       // Kopf, Schlagfläche
-    C.poly(M.ir, [[42, 12], [34, 13], [42, 14]]);                                                                                    // Rückseitendorn
-    return { gx: 7, gy: 13, blade: null, after: (set, S) => { for (let y = 5; y <= 21; y++) { set(46, y, S.dk); set(42, y, S.hi); } for (let x = 42; x <= 50; x++) { set(x, 4, S.hi); set(x, 22, S.dk); }
-      for (const [x, y] of [[44, 7], [48, 7], [44, 19], [48, 19]]) { set(x, y, '#d8d0c0'); set(x + 1, y + 1, '#1b1411'); } for (let y = 9; y <= 17; y += 2) set(53, y, S.sh); } }; }],
+  warhammer: [52, 20, (C, M) => {
+    C.poly(M.wd, [[1, 8.8], [42, 8.8], [42, 11.2], [1, 11.2]]); C.poly(M.wr, [[2, 8.5], [10, 8.5], [10, 11.5], [2, 11.5]]);
+    C.poly(M.st, [[37, 4], [45, 4], [45, 16], [37, 16]]); C.poly(M.st, [[45, 6.5], [49, 6.5], [49, 13.5], [45, 13.5]]);
+    C.poly(M.ir, [[37, 9], [30, 10], [37, 11]]);
+    return { gx: 6, gy: 10, blade: null, after: (set) => { for (const [x, y] of [[39, 5], [43, 5], [39, 15], [43, 15]]) set(x, y, '#d8d0c0'); for (let y = 7; y <= 13; y++) set(48, y, '#c8c2b8'); } }; }],
   halberd: [80, 24, (C, M) => {
     C.poly(M.wd, [[1, 10.6], [66, 10.6], [66, 13.4], [1, 13.4]]);
     C.poly(M.st, [[58, 11], [59, 2], [64, 1], [67, 5], [67, 11]]);                                                                   // Beilblatt
@@ -669,29 +772,117 @@ const WDES = {
     C.poly(M.wd, [[1, 5], [22, 5], [22, 7.4], [1, 7.4]]); C.poly(M.ir, [[20, 3.5], [23, 3.5], [23, 8.5], [20, 8.5]]);
     const Cr = C.partR('crystal', ramp('#6f8fd0')); C.poly(Cr, [[23, 6], [26, 2], [30, 4], [31, 6], [30, 8], [26, 10]]);
     return { gx: 6, gy: 6, blade: null, orb: [27, 5], after: (set) => { set(26, 4, '#e8f4ff'); } }; }],
-  gorak_cleaver: [54, 28, (C, M) => {
-    C.poly(M.wr, [[1, 12.5], [14, 12.5], [14, 16.5], [1, 16.5]]);
-    const D = C.partR('dark', ramp('#7d766a'), true); C.poly(D, [[14, 3], [50, 2], [53, 6], [52, 24], [14, 25]]);
-    return { gx: 6, gy: 14, blade: [16, 50, 13], after: (set) => { for (const [x, y] of [[20, 8], [21, 8], [20, 9], [21, 9]]) set(x, y, null);
-      for (const [x, y] of [[25, 18], [31, 7], [38, 20], [44, 11], [29, 22]]) set(x, y, x % 2 ? '#7a4a2a' : '#5a3a22'); for (let x = 16; x < 50; x += 4) set(x, 25, null); } }; }],
+  gorak_cleaver: [50, 20, (C, M) => {
+    C.poly(M.wr, [[1, 8.5], [13, 8.5], [13, 11.8], [1, 11.8]]);
+    const D = C.partR('dark', ramp('#6a645a'), true); C.poly(D, [[13, 3.5], [42, 3], [48, 6], [47, 16.5], [13, 16.5]]);
+    return { gx: 6, gy: 10, blade: [15, 45, 10], after: (set) => { for (let x = 14; x < 47; x++) set(x, 16, '#c8c2b8'); for (const [x, y] of [[19, 7], [20, 7]]) set(x, y, null);
+      for (const [x, y] of [[24, 12], [30, 6], [37, 13], [42, 8], [28, 14]]) set(x, y, x % 2 ? '#6a3a22' : '#4a2a18'); } }; }],
   shortbow: [16, 40, (C, M) => {
     C.limb(M.wd, [[5, 1], [9, 8], [11, 20], [9, 32], [5, 39]], 2.8, 2.8); C.poly(M.wr, [[9, 17], [13, 17], [13, 23], [9, 23]]);
     return { gx: 11, gy: 20, blade: null, after: (set) => { for (let y = 2; y <= 38; y++) set(4, y, '#c9bfa6'); } }; }],
+  // --- S12: Arsenal der Mark (Nieten, Flickwerk, Rot nur als Akzent) ---
+  schrott_hellebarde: [80, 26, (C, M) => {
+    C.poly(M.wd, [[1, 11.6], [64, 11.6], [64, 14.4], [1, 14.4]]); C.poly(M.wr, [[30, 11.2], [36, 11.2], [36, 14.8], [30, 14.8]]);   // Flickwicklung
+    C.poly(M.ir, [[56, 10], [60, 10], [60, 16], [56, 16]]); C.poly(M.st, [[60, 12], [64, 3], [68, 2], [67, 12]]);                    // verbogenes Blatt
+    C.poly(M.ir, [[60, 14], [63, 14], [62, 22], [60, 20]]); C.poly(M.st, [[64, 11], [79, 13], [64, 15]]);
+    return { gx: 22, gy: 13, blade: [65, 77, 13], after: (set, S) => { for (const [x, y] of [[57, 11], [59, 15], [65, 6]]) set(x, y, '#d8d0c0'); for (let y = 4; y <= 11; y++) set(66, y, S.hi); set(67, 8, null); } }; }],
+  rabenbeil: [40, 26, (C, M) => {
+    C.poly(M.wd, [[1, 11.5], [30, 11.5], [30, 14.5], [1, 14.5]]); C.poly(M.wr, [[2, 11.2], [9, 11.2], [9, 14.8], [2, 14.8]]);
+    C.poly(M.ir, [[26, 9], [31, 9], [31, 17], [26, 17]]);
+    C.poly(M.st, [[31, 10], [35, 4], [39, 5], [37, 9], [36, 15], [38, 22], [34, 20], [31, 16]]);                                   // Schnabel nach hinten gebogen
+    C.poly(M.ir, [[26, 11], [21, 8], [22, 12]]);
+    return { gx: 6, gy: 13, blade: null, after: (set, S) => { for (let y = 5; y <= 20; y++) set(y < 10 ? 38 : 37, y, S.hi); set(28, 13, '#1b1411'); } }; }],
+  dornensaebel: [52, 16, (C, M) => {
+    C.ell(M.ir, 3, 8, 2.4, 2.4); C.poly(M.wr, [[5, 6.6], [13, 6.6], [13, 9.4], [5, 9.4]]); C.poly(M.ir, [[13, 3], [15, 3], [15, 13], [13, 13]]);
+    C.poly(M.st, [[15, 6], [34, 5.5], [46, 7], [51, 10], [44, 10], [34, 9.6], [15, 10]]);                                           // gebogen
+    for (const x of [22, 28, 34, 40]) C.poly(M.st, [[x, 5.8], [x + 3, 3], [x + 2.5, 5.8]]);                                       // Widerhaken
+    return { gx: 9, gy: 8, blade: [16, 46, 8], after: (set, S) => { for (let x = 16; x <= 44; x++) set(x, 9, S.sh); } }; }],
+  grabraeuber: [40, 16, (C, M) => {
+    C.ell(M.ir, 2.5, 8, 2.3, 2.3); C.poly(M.wr, [[4, 6.6], [11, 6.6], [11, 9.4], [4, 9.4]]); C.poly(M.ir, [[11, 3], [13, 3], [13, 13], [11, 13]]);
+    C.poly(M.st, [[13, 4], [30, 3.5], [38, 7], [33, 12], [13, 12]]);                                                                // breit, asymmetrisch
+    return { gx: 7, gy: 8, blade: [14, 33, 8], after: (set, S) => { for (const x of [18, 24, 29]) set(x, 3 + (x % 2), null); for (const x of [16, 21, 27]) set(x, 12, null); set(22, 7, '#7a4a2a'); set(26, 9, '#8c5a30'); } }; }],
+  kriegspicke: [40, 30, (C, M) => {
+    C.poly(M.wd, [[1, 13.5], [33, 13.5], [33, 16.5], [1, 16.5]]); C.poly(M.wr, [[2, 13.2], [8, 13.2], [8, 16.8], [2, 16.8]]);
+    C.poly(M.ir, [[29, 11.5], [35, 11.5], [35, 18.5], [29, 18.5]]); C.ell(M.ir, 27, 15, 1.2, 3.4);                                  // Metallring
+    C.poly(M.st, [[33, 12], [36, 2], [38, 1], [36, 12]]); C.poly(M.st, [[33, 18], [36, 18], [39, 29], [37, 28]]);                  // zwei lange Spitzen
+    return { gx: 6, gy: 15, blade: null, after: (set, S) => { for (let y = 3; y <= 11; y++) set(36, y, S.hi); } }; }],
+  sensenlanze: [90, 30, (C, M) => {
+    C.poly(M.wd, [[1, 15.6], [74, 15.6], [74, 18.4], [1, 18.4]]); C.poly(M.ir, [[72, 14], [77, 14], [77, 20], [72, 20]]);
+    C.poly(M.st, [[77, 15], [89, 17], [77, 19]]);                                                                                   // Spitze
+    C.poly(M.st, [[70, 14], [72, 14], [64, 6], [52, 1], [58, 5], [66, 12]]);                                                       // Sensenblatt quer
+    return { gx: 24, gy: 17, blade: [78, 88, 17], after: (set, S) => { for (let x = 55; x <= 68; x++) set(x, Math.round(2 + (x - 55) * 0.8), S.hi); } }; }],
+  knochenspalter: [54, 20, (C, M) => {                               // S12: Hackbeil, Griff mit Knochenwicklung
+    C.poly(M.wr, [[1, 8.5], [17, 8.5], [17, 11.5], [1, 11.5]]); const Bo = C.partR('bone', ramp('#cfc6b0')); for (const x of [5, 11]) C.ell(Bo, x, 10, 1.4, 2);
+    const D = C.partR('dark', ramp('#48443e'), true); C.poly(D, [[17, 4], [45, 3], [52, 6.5], [51, 16], [17, 16]]);
+    return { gx: 9, gy: 10, blade: [19, 49, 10], after: (set) => { for (let x = 18; x <= 50; x++) set(x, 16, '#c8c2b8'); set(22, 6, '#d8d0c0'); set(24, 7, '#1b1411'); } }; }],
+  henkersaxt: [60, 26, (C, M) => {                                   // S12: Richtbeil — langer Bart, eine Schneide
+    C.poly(M.wd, [[1, 11.8], [53, 11.8], [53, 14.4], [1, 14.4]]); C.poly(M.wr, [[2, 11.5], [12, 11.5], [12, 14.7], [2, 14.7]]);
+    C.poly(M.ir, [[45, 9.5], [50, 9.5], [50, 16.5], [45, 16.5]]);
+    C.poly(M.st, [[50, 10.5], [51, 4], [55, 2], [58.5, 4.5], [57.5, 12], [58.5, 21], [55.5, 25], [51.5, 20], [50, 15.5]]);
+    return { gx: 8, gy: 13, blade: null, after: (set) => { for (let y = 4; y <= 23; y++) set(y < 13 ? 58 : 58, y, '#d8d2c4'); set(47, 13, '#1b1411'); set(53, 8, '#1b1411'); } }; }],
+  mauerbrecher: [58, 22, (C, M) => {                                 // S12: kleinerer Kopf, Eisenbänder, Kette am Griff
+    C.poly(M.wd, [[1, 9.8], [46, 9.8], [46, 12.2], [1, 12.2]]); C.poly(M.wr, [[2, 9.5], [11, 9.5], [11, 12.5], [2, 12.5]]);
+    for (let k = 0; k < 4; k++) C.ell(M.ir, 14 + k * 3, 14 + Math.sin(k) * 1.2, 1.1, 0.9);
+    C.poly(M.st, [[42, 4], [51, 4], [51, 18], [42, 18]]); C.poly(M.st, [[51, 7], [56, 7], [56, 15], [51, 15]]);
+    C.poly(M.ir, [[42, 10], [35, 11], [42, 12]]); C.poly(M.ir, [[41.5, 6], [51.5, 6], [51.5, 7.5], [41.5, 7.5]]); C.poly(M.ir, [[41.5, 14.5], [51.5, 14.5], [51.5, 16], [41.5, 16]]);
+    return { gx: 7, gy: 11, blade: null, after: (set) => { for (const [x, y] of [[44, 5], [49, 5], [44, 17], [49, 17]]) set(x, y, '#d8d0c0'); for (let y = 8; y <= 14; y++) set(55, y, '#c8c2b8'); } }; }],
+  seelenhaken: [74, 24, (C, M) => {
+    const D = C.partR('dark', ramp('#23282a'), true); C.poly(D, [[1, 10.8], [60, 10.8], [60, 13.2], [1, 13.2]]);
+    C.poly(M.st, [[58, 10], [66, 4], [72, 6], [70, 13], [65, 20], [64, 14], [67, 9], [62, 12]]);                                   // Haken
+    const G = C.partR('rune', ramp('#4e8f7a')); C.ell(G, 30, 12, 1.4, 1.4);
+    return { gx: 18, gy: 12, blade: null, after: (set) => { set(30, 12, '#9fe0c8'); set(69, 7, '#7fd0b8'); } }; }],
+  totenglocke: [52, 24, (C, M) => {                                  // S12: kleinere Glocke, Rune
+    C.poly(M.wd, [[1, 10.8], [39, 10.8], [39, 13.2], [1, 13.2]]); C.poly(M.wr, [[2, 10.5], [10, 10.5], [10, 13.5], [2, 13.5]]);
+    C.poly(M.ir, [[37, 9], [40, 9], [40, 15], [37, 15]]);
+    C.poly(M.st, [[40, 7.5], [42.5, 3.5], [46.5, 3.5], [49, 7.5], [49, 16.5], [46.5, 20.5], [42.5, 20.5], [40, 16.5]]);
+    return { gx: 6, gy: 12, blade: null, after: (set) => { for (let y = 8; y <= 16; y++) set(44, y, '#141210'); set(47, 9, '#4e8f7a'); set(47, 15, '#4e8f7a'); } }; }],
+  rotklaue: [56, 16, (C, M) => {
+    C.ell(M.ir, 3, 8, 2.8, 2.8); C.poly(M.wr, [[5, 6.4], [15, 6.4], [15, 9.6], [5, 9.6]]);
+    const Rd = C.partR('red', ramp('#6a1e20')); C.poly(Rd, [[15, 1], [18, 2], [18, 14], [15, 15], [16, 8]]);                       // rote Parierstange
+    const D = C.partR('dark', ramp('#2e2e32'), true); C.poly(D, [[18, 5.4], [48, 5.6], [55, 8], [48, 10.4], [18, 10.6]]);
+    return { gx: 10, gy: 8, blade: [20, 50, 8], after: (set) => { for (let x = 20; x <= 46; x++) set(x, 5, '#8a8a90'); } }; }],
+  schwarzzahn: [74, 20, (C, M) => {
+    C.ell(M.ir, 3.5, 10, 3.2, 3.2); C.poly(M.wr, [[6, 8.2], [21, 8.2], [21, 11.8], [6, 11.8]]); C.poly(M.ir, [[21, 1], [24, 2], [24, 18], [21, 19], [22.5, 10]]);
+    const D = C.partR('dark', ramp('#222226'), true); C.poly(D, [[24, 4], [64, 4.5], [73, 10], [64, 15.5], [24, 16]]);             // sehr breit
+    return { gx: 13, gy: 10, blade: [26, 66, 10], after: (set) => { for (let x = 26; x <= 60; x++) set(x, 10, '#5a1a1c'); for (let x = 26; x <= 62; x++) set(x, 4, '#8a8a90'); } }; }],
+  kettenbrecher: [52, 30, (C, M) => {
+    C.poly(M.wr, [[1, 13.4], [11, 13.4], [11, 16.6], [1, 16.6]]); C.poly(M.wd, [[11, 13.6], [19, 13.6], [19, 16.4], [11, 16.4]]); C.ell(M.ir, 19.5, 15, 1.8, 2.2);
+    for (const [dy, len] of [[-9, 26], [0, 30], [9, 26]]) { for (let k = 0; k < 4; k++) C.ell(M.ir, 22 + k * 3, 15 + dy * k / 5, 1.2, 0.9); C.ell(M.st, 20 + len, 15 + dy, 3.4, 3.4); }   // drei Eisenkörper
+    return { gx: 6, gy: 15, blade: null, after: (set, S) => { for (const [x, y] of [[45, 5], [49, 14], [45, 23]]) set(x, y, S.hi); } }; }],
+  eisenfalke: [48, 32, (C, M) => {
+    const D = C.partR('dark', ramp('#26262a'), true); C.poly(D, [[1, 14], [42, 14], [42, 18], [8, 18], [4, 22], [1, 21]]);
+    C.limb(M.st, [[36, 1], [39, 8], [40, 16], [39, 24], [36, 31]], 3, 3); C.poly(M.ir, [[16, 18], [18, 18], [18, 24], [16, 23]]);
+    C.ell(M.ir, 10, 16, 2.6, 2.6);                                                                                                  // Winde
+    return { gx: 9, gy: 16, blade: null, after: (set) => { for (let y = 2; y <= 30; y++) set(Math.round(30 + Math.abs(y - 16) * 0.38), y, '#c9bfa6'); set(41, 16, '#8a8a88'); } }; }],
+  roter_henker: [64, 28, (C, M) => {                                 // S12: Vargs Axt — schwarzer Halbmond, rote Kerbe, Stoffstreifen
+    const Dk = C.partR('dark', ramp('#2a2a2e'), true);
+    C.poly(Dk, [[1, 12.8], [56, 12.8], [56, 15.4], [1, 15.4]]); C.poly(M.wr, [[2, 12.5], [12, 12.5], [12, 15.7], [2, 15.7]]);
+    const Rd = C.partR('red', ramp('#6a1e20')); C.poly(Rd, [[14, 15.4], [16, 15.4], [15.5, 22], [14, 20.5]]); C.poly(Rd, [[19, 15.4], [20.5, 15.4], [21, 20], [19.5, 19]]);
+    C.poly(M.ir, [[47, 10.5], [53, 10.5], [53, 17.5], [47, 17.5]]); C.poly(M.ir, [[47, 13], [41, 11.5], [41, 13.5]]);     // Tülle, Rückendorn
+    C.poly(Dk, [[53, 11.5], [54, 4], [58, 1.5], [62.5, 4.5], [61, 13.5], [62.5, 22.5], [58, 26.5], [54, 23], [53, 17]]);
+    return { gx: 8, gy: 14, blade: null, after: (set) => { for (let y = 3; y <= 25; y++) set(61 + (y > 5 && y < 22 ? 0 : 0), y, '#c8c2b8'); for (let y = 6; y <= 21; y += 2) set(57, y, '#7a2224'); set(50, 14, '#1b1411'); } }; }],
   longbow: [18, 56, (C, M) => {
     C.limb(M.wd, [[5, 1], [10, 12], [12, 28], [10, 44], [5, 55]], 3, 3); C.poly(M.wr, [[10, 24], [14, 24], [14, 32], [10, 32]]);
     return { gx: 12, gy: 28, blade: null, after: (set) => { for (let y = 2; y <= 54; y++) set(4, y, '#c9bfa6'); } }; }],
 };
-const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff',
+const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
   rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow' };
 export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron) {
   const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w, h, fn] = WDES[d];
   const C = new Canvas2(w, h);
-  St = { hi: St.hi, b: mix(St.b, '#1e1c1a', 0.32), sh: mix(St.sh, '#141210', 0.4), dk: mix(St.dk, '#0c0b0a', 0.3) };   // dunkles Eisen, helle Kanten (Referenz)
+  St = { hi: mix(St.hi, St.b, 0.35), b: mix(St.b, '#1e1c1a', 0.46), sh: mix(St.sh, '#141210', 0.52), dk: mix(St.dk, '#0c0b0a', 0.4) };   // S12: dunkle Fläche, Licht nur an der Kante (Referenz 3)
   const M = { St, wd: C.partR('wood', Wood, true), wr: C.partR('wrap', Wrap, true), ir: C.partR('iron', Iron, true), st: C.partR('steel', St, true) };
   const info = fn(C, M);
   C.shade();
+  const metal = new Set([M.st, M.ir, ...C.parts.map((p, i) => p.name === 'dark' ? i : -1).filter(i => i >= 0)]);   // S12 Kantenpass: Schneide oben hell, Unterkante dunkel
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (!metal.has(C.id[i]) || !C.col[i]) continue;
+    const up = y > 0 ? C.id[i - w] : -1, dn = y < h - 1 ? C.id[i + w] : -1;
+    if (up < 0) C.col[i] = mix(C.col[i], '#e2ddd2', 0.5); else if (dn < 0) C.col[i] = mix(C.col[i], '#0c0b0a', 0.45); }
   if (info.after) info.after((x, y, c) => { if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.wr && (x % 3 === 0)) C.col[y * w + x] = Wrap.dk;   // Wicklung
+  let ks = 0; for (const ch of key) ks = (ks * 31 + ch.charCodeAt(0)) | 0;                            // Referenz 3: benutzter Stahl — Rost, Scharten
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) { const i = y * w + x; if ((C.id[i] === M.st || C.id[i] === M.ir) && C.col[i]) { const n = h2(x + ks, y * 5 + ks);
+    if (n < 0.03) C.col[i] = mix(C.col[i], '#6a3a1e', 0.35); else if (n > 0.98) C.col[i] = mix(C.col[i], '#0c0b0a', 0.4); } }
   return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb };
 }
 

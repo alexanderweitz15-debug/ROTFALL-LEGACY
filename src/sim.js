@@ -1,7 +1,7 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js';
 import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js';
-import { LOCATIONS, TS, T, SOLID, HOUSES, tileAt, worldPt, wT } from './world.js';
+import { LOCATIONS, TS, T, SOLID, HOUSES, tileAt, worldPt, wT, OX } from './world.js';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -172,7 +172,7 @@ export function caravanFrame(c, dt, player, nearFoes) {
   else if (c.wp < ROUTE.length - 1) c.wp++;
   else arrive(c, player);
   // Hinterhalt auf halber Strecke
-  if (!c.ambushChecked && Math.abs(c.x / TS - wT(101)) < 3) {            // zwischen Eren (bis x 93) und der Nordfurter Brücke
+  if (!c.ambushChecked && Math.abs(c.x / TS - wT(101) - OX) < 3) {            // zwischen Eren (bis x 93) und der Nordfurter Brücke
     c.ambushChecked = true;
     if (chance(0.35)) {
       const guards = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.escort === c.id);
@@ -182,10 +182,10 @@ export function caravanFrame(c, dt, player, nearFoes) {
         H.toast('KARAWANE ÜBERFALLEN');
       } else if (guards.length && chance(0.3 + 0.15 * guards.length)) {    // außer Sicht: Wachen schlagen zurück, nicht ohne Preis
         if (chance(0.3)) { const g = pick(guards); g.alive = false; S.ents.world.splice(S.ents.world.indexOf(g), 1); }
-        log('Räuber überfielen eine Karawane auf der Alten Straße — die Wachen schlugen sie zurück.', 'economy');
+        log('Räuber überfielen eine Karawane auf der Alten Straße — die Wachen schlugen sie zurück.', 'economy'); chronicle('Die Karawanenwachen schlugen Räuber auf der Alten Straße zurück', 'news');
       } else {
         for (const g of Object.keys(c.cargo)) c.cargo[g] = Math.floor(c.cargo[g] / 2);
-        log('Eine Karawane wurde auf der Alten Straße ausgeraubt.', 'economy');
+        log('Eine Karawane wurde auf der Alten Straße ausgeraubt.', 'economy'); chronicle('Eine Karawane wurde auf der Alten Straße ausgeraubt', 'news');
       }
     }
   }
@@ -195,7 +195,7 @@ function arrive(c, player) {
   const t = S.towns[to];
   for (const [g, n] of Object.entries(c.cargo)) t.stock[g] += n;
   const sum = Object.values(c.cargo).reduce((a, b) => a + b, 0);
-  if (sum) log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy');
+  if (sum) { log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy'); chronicle(`Die Karawane ist heil in ${t.name} angekommen`, 'news'); }
   if (c.attacked && Math.hypot(player.x - c.x, player.y - c.y) < 400) {
     S.gold += 30; S.factions.merch += 4;
     log('Die Händler danken für den Geleitschutz: 30 Gold.', 'economy');
@@ -207,7 +207,7 @@ function arrive(c, player) {
   H.hireEscorts?.(c);                                           // gefallene Wachen werden in der Stadt ersetzt
 }
 export function caravanDied(c) {
-  log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy');
+  log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy'); chronicle('Die Karawane nach Nordfurt ist nie angekommen', 'news');
   S.factions.merch -= 2;
   S.caravanBack = S.day + 2;
 }
@@ -236,6 +236,15 @@ export function warTick() {                                  // alle 6 Spielstun
     if (a.faction === 'undead') next = path(a.at, n => W.nodes[n].owner !== 'undead');
     else next = path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));
     if (!next || (a.faction === 'valen' && a.strength < 25)) next = null;   // zu schwach: halten
+    // §74 Vorwarnung: bevor ein Untotenheer auf eine Siedlung zieht, melden Späher es — das Heer sammelt sich einen Zug (6 Std.)
+    const L = next && LOC[next];
+    if (next && a.faction === 'undead' && L && (L.kind === 'city' || L.kind === 'village') && a.warned !== next) {
+      a.warned = next;
+      chronicle(`Späher: Die Toten ziehen auf ${L.name}`, 'news', `${a.name}, Stärke ${Math.round(a.strength)}.`);
+      log(`Späher melden: ${a.name} zieht auf ${L.name}. Noch ein halber Tag.`, 'faction');
+      if (nearPlayer(next, 30)) H.toast(`WARNUNG: DIE TOTEN ZIEHEN AUF ${L.name.toUpperCase()}`);
+      continue;
+    }
     if (next) { a.prev = a.at; a.at = next; }
   }
   for (const node of Object.keys(W.nodes)) resolveNode(node);
@@ -282,7 +291,7 @@ function capture(node, faction) {
   const n = S.war.nodes[node];
   if (n.owner === faction) return;
   const was = n.owner;
-  n.owner = faction; n.garrison = faction === 'undead' ? 10 : 8;
+  n.owner = faction; n.garrison = faction === 'undead' ? 10 : 8; n.wave = 0; n.waves = 0;   // neu besetzt: Befreiung beginnt wieder bei Welle 1
   const L = LOC[node];
   log(`${L.name} fällt an ${FACTIONS[faction].name}.`, 'faction');
   if (S.towns[node]) {
@@ -295,10 +304,14 @@ function capture(node, faction) {
       log(`Flüchtlinge aus ${L.name} ziehen nach ${LOC[refuge].name}.`, 'world');
       H.toast(`${L.name.toUpperCase()} IST GEFALLEN`);
       if (S.player.map === 'world') for (let i = 0; i < 3; i++) H.spawnRefugee(L.x, L.y, refuge);
-    } else if (was === 'undead') {
-      chronicle(`${L.name} befreit`, 'battle', `${FACTIONS[faction].name} nimmt ${L.name} zurück.`);
-      H.toast(`${L.name.toUpperCase()} BEFREIT`);
     }
+  }
+  if (faction === 'undead') H.raidDamage?.(node);                 // §74 Nachwirkung: Kriegsschäden an Häusern
+  if (was === 'undead' && faction !== 'undead') {                  // Befreiung — für jeden Ort, nicht nur für Orte mit Markt
+    chronicle(`${L.name} befreit`, 'battle', `${FACTIONS[faction].name} nimmt ${L.name} zurück.`);
+    H.toast(`${L.name.toUpperCase()} BEFREIT`);
+    if (nearPlayer(node, 30)) { const [ox, oy] = waveOrigin(node, 3); for (let i = 0; i < 4; i++) H.spawnRefugee(ox, oy, node);   // §81: sichtbar — Geflohene kehren heim
+      if (S.towns[node]) S.towns[node].pop += 6; log(`Die Geflohenen kehren nach ${L.name} zurück.`, 'world'); }
   }
 }
 function cleanupArmies() {
@@ -328,17 +341,47 @@ export function warDay() {
 function materialize(node, att, def) {
   const L = LOC[node];
   const b = { node, sides: [att.id, def.id], started: S.day * 1440 + S.minute };
+  // §74 Anmarsch statt Spawn im Ort: Angreifer erscheinen ~20 Kacheln vor dem Ort, auf der Seite, von der sie kommen,
+  // und ziehen zum Ort (Anker = Ort); Verteidiger stehen im Ort.
+  const from = LOC[att.prev] && att.prev !== node ? LOC[att.prev] : { x: L.x - 1, y: L.y }, fd = Math.hypot(from.x - L.x, from.y - L.y) || 1;
+  const sx = L.x + (from.x - L.x) / fd * Math.min(20, fd), sy = L.y + (from.y - L.y) / fd * Math.min(20, fd), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
   for (const side of [att, def]) {
-    const n = clamp(Math.round(side.strength / 8), 2, 7);
+    const n = clamp(Math.round(side.strength / 8), 2, 7), at = side === att;
     for (let i = 0; i < n; i++) {
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', L.x + ri(-5, 5) + (side === att ? -4 : 4), L.y + ri(-4, 4),
-        { armyId: side.id, worth: side.strength / n, level: 4 });
+      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3)),
+        { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }
   S.war.battles.push(b);
   log(`Schlacht bei ${L.name}! ${att.name} gegen ${def.name}.`, 'combat');
   H.toast(`SCHLACHT BEI ${L.name.toUpperCase()}`);
 }
+// Sammelpunkt einer Welle: ~14 Kacheln vor dem Ort, zu Fuß erreichbar (BFS vom Ortskern), je Welle eine andere Seite
+function waveOrigin(node, k) {
+  const L = LOC[node], cx = Math.round(L.x), cy = Math.round(L.y), seen = new Set([cx + ',' + cy]), q = [[cx, cy]], ring = [];
+  for (let i = 0; i < q.length && q.length < 5000; i++) { const [x, y] = q[i], d = Math.hypot(x - cx, y - cy);
+    if (d >= 13 && d <= 15) ring.push([x, y]);
+    if (d > 15) continue;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) { const key = nx + ',' + ny;
+      if (!seen.has(key) && !SOLID.has(tileAt('world', nx, ny))) { seen.add(key); q.push([nx, ny]); } } }
+  if (!ring.length) return [cx, cy];
+  const a = k * 2.1;
+  return ring.reduce((b, p) => (Math.cos(Math.atan2(p[1] - cy, p[0] - cx) - a) > Math.cos(Math.atan2(b[1] - cy, b[0] - cx) - a) ? p : b));
+}
+function spawnWave(node, n, id) {
+  const L = LOC[node], [ox, oy] = waveOrigin(node, n.wave), last = n.wave >= n.waves, keep = node === 'blackkeep';
+  const types = ['skeleton', 'skeleton', 'skeleton'];
+  for (let i = 1; i < n.wave; i++) types.push(i % 2 ? 'ghoul' : 'wraith');
+  if (keep) types.push('skeleton', 'skeleton');
+  if (last) types.push('death_captain');
+  const worth = n.garrison / types.length / Math.max(1, n.waves - n.wave + 1), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
+  for (const t of types) H.spawnEnemy(t, 'world', ox + ri(-2, 2), oy + ri(-2, 2),
+    { armyId: id, worth, level: t === 'death_captain' ? (keep ? 9 : 6) : 4 + n.wave, anchor: { ...home }, marching: true, boss: t === 'death_captain' || undefined });
+  log(last ? `Welle ${n.wave}/${n.waves}: der Hauptmann der Toten führt sie selbst.` : `Welle ${n.wave}/${n.waves} marschiert auf ${L.name}.`, 'combat');
+  H.toast(last ? 'DER HAUPTMANN DER TOTEN' : `WELLE ${n.wave}/${n.waves}`);
+}
+export const spawnWaveForTest = (node, n, id) => spawnWave(node, n, id);
+export const materializeForTest = (node, att, def) => materialize(node, att, def);   // Selbsttest
 export function unitDied(e) {
   const a = findArmy(e.armyId); if (a) setStrength(a, a.strength - (e.worth || 5));
 }
@@ -363,25 +406,33 @@ export function battleCheck() {                              // alle paar Sekund
       afterBattle(b.node, win, lose);
     }
   }
-  // Besatzung lebt als Einheiten, wenn der Spieler nah ist (befreibar)
+  // §81 Befreiungskampf: ein besetzter Ort fällt nicht durch einen Textwechsel. Die Besatzung kommt in Wellen (sie marschiert
+  // von außen ein), zwischen den Wellen eine Atempause mit Ansage, die letzte Welle führt der Hauptmann der Toten.
+  // Der Fortschritt (n.wave) bleibt am Ort: wer flieht und wiederkommt, fängt nicht von vorn an.
   for (const [node, n] of Object.entries(W.nodes)) {
     if (n.owner !== 'undead' || n.garrison <= 0 || !nearPlayer(node, 22) || W.battles.some(b => b.node === node)) continue;
-    const id = 'g:' + node;
-    if (S.ents.world.some(e => e.kind === 'enemy' && e.armyId === id)) continue;
-    const L = LOC[node], cnt = clamp(Math.round(n.garrison / 4), 2, 5);
-    for (let i = 0; i < cnt; i++) H.spawnEnemy('skeleton', 'world', L.x + ri(-5, 5), L.y + ri(-5, 5), { armyId: id, worth: n.garrison / cnt, level: 4 });
-    W.battles.push({ node, sides: [id, 'player'], started: S.day * 1440 + S.minute, garrisonFight: true });
+    n.waves ||= node === 'blackkeep' ? 4 : clamp(Math.round(n.garrison / 10), 2, 3); n.wave ||= 0;
+    W.battles.push({ node, sides: ['g:' + node, 'player'], started: S.day * 1440 + S.minute, garrisonFight: true, next: 0 });
+    log(`Die Toten halten ${LOC[node].name}. Wer die Stadt will, muss ${n.waves - n.wave} Wellen brechen.`, 'combat');
+    H.toast(`BEFREIUNG VON ${LOC[node].name.toUpperCase()} — WELLE ${n.wave + 1}/${n.waves}`);
   }
   for (const b of [...W.battles].filter(b => b.garrisonFight)) {
-    const left = S.ents.world.some(e => e.kind === 'enemy' && e.alive && e.armyId === b.sides[0]);
-    if (left && nearPlayer(b.node, 30)) continue;
-    // Spieler gegangen: Einheiten verschwinden, ihre Stärke bleibt in der Besatzung
-    if (left) for (let i = S.ents.world.length - 1; i >= 0; i--) { const e = S.ents.world[i]; if (e.kind === 'enemy' && e.armyId === b.sides[0]) S.ents.world.splice(i, 1); }
-    W.battles.splice(W.battles.indexOf(b), 1);
+    const id = b.sides[0], n = W.nodes[b.node], left = S.ents.world.some(e => e.kind === 'enemy' && e.alive && e.armyId === id);
+    if (!nearPlayer(b.node, 30)) {                                  // Spieler gegangen: Einheiten verschwinden, Stärke und Welle bleiben
+      for (let i = S.ents.world.length - 1; i >= 0; i--) { const e = S.ents.world[i]; if (e.kind === 'enemy' && e.armyId === id) S.ents.world.splice(i, 1); }
+      if (b.spawned) n.wave = Math.max(0, n.wave - 1);               // halb geschlagene Welle kommt wieder
+      W.battles.splice(W.battles.indexOf(b), 1); continue;
+    }
+    if (left) continue;
+    if (b.spawned) { b.spawned = false; if (n.wave >= n.waves) { n.garrison = 0; W.battles.splice(W.battles.indexOf(b), 1); continue; } }
+    if (!b.next) { b.next = clockMin() + (n.wave ? 8 : 1);
+      if (n.wave) { log(`Welle ${n.wave}/${n.waves} gebrochen. Die nächste sammelt sich …`, 'combat'); H.toast(`WELLE ${n.wave + 1}/${n.waves} SAMMELT SICH`); } continue; }
+    if (clockMin() < b.next) continue;
+    b.next = 0; n.wave++; b.spawned = true; spawnWave(b.node, n, id);
   }
   // Besetzter Ort ohne Besatzung und ohne Untotenheer: Valen (bzw. das Volk) nimmt ihn zurück
   for (const [node, n] of Object.entries(W.nodes)) {
-    if (n.owner !== 'undead' || n.garrison > 0.5 || node === 'graveyard') continue;
+    if (n.owner !== 'undead' || n.garrison > 0.5 || node === 'graveyard' || (n.waves && n.wave < n.waves)) continue;   // §81: kein Sieg ohne letzte Welle
     if (W.armies.some(a => a.faction === 'undead' && a.at === node) || W.battles.some(b => b.node === node)) continue;
     capture(node, 'valen');
     if (nearPlayer(node, 22) && S.ranks.undead < 0) H.title(`Befreier von ${LOC[node].name}`);
