@@ -120,7 +120,9 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   const inside = [door[0] + (doorSide === 'W' ? 1 : doorSide === 'E' ? -1 : 0), door[1] + (doorSide === 'S' ? -1 : doorSide === 'N' ? 1 : 0)];
   const used = new Set([inside.join(',')]);
   const ruin = wearOf(b) === 2;                     // verlassen: Schutt, umgestürzter Rest, keine Wohnung mehr
+  const cap = Math.max(1, Math.floor((w - 2) * (h - 2) / 2) - 1);   // Phase 1: höchstens halb voll — Bewohner brauchen Laufwege (Magd in Nordstadt saß auf dem Tisch fest)
   for (const [kind, ox, oy] of ruin ? [['rubble', 0, 0], ['debris', -1, 0], ['barrel', -1, -1], ['debris', 1, -1]] : FURNISH[b.type] || []) {
+    if (used.size - 1 >= cap) break;
     let tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy;
     const free = (i, j) => i >= x + 1 && i <= x + w - 2 && j >= y + 1 && j <= y + h - 2 && !used.has(i + ',' + j);
     if (!free(tx, ty)) {                            // Platz belegt (z. B. Kachel hinter der Tür): nächste freie Innenkachel —
@@ -129,6 +131,17 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
     }
     used.add(tx + ',' + ty);
     prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 10 });
+  }
+  // Säle der Monumentalbauten (Phase 5): Möbel in Reihen mit Gängen, Türachse frei, Obergrenze wie oben
+  const HALL = { palace: ['column', 'column', 'bench'], markethall: ['stall', 'stall', 'counter'], bank: ['counter', 'chest', 'desk'], academy: ['desk', 'shelf', 'desk'], library: ['shelf', 'shelf', 'desk'],
+    court: ['bench', 'bench', 'desk'], hospital: ['bed', 'bed', 'shelf'], bathhouse: ['trough', 'barrel', 'trough'], observatory: ['desk', 'shelf', 'workbench'], magitech: ['workbench', 'gearpile', 'machine'],
+    factoryhall: ['machine', 'machine', 'gearpile'], legion: ['bunk', 'bunk', 'weapon_rack'] }[b.type];
+  if (HALL && !ruin) { const HC = Math.floor((w - 2) * (h - 2) / 2); let k = 0;
+    for (let j = y + 2; j <= y + h - 3; j += 3) for (let i = x + 2; i <= x + w - 3; i += 3) {
+      if (Math.abs(i - door[0]) <= 1 || used.has(i + ',' + j) || used.size - 1 >= HC) continue;
+      used.add(i + ',' + j); prop(HALL[k++ % HALL.length], i, j, { map, gen: 2, house: b.id, solid: true, r: 9 }); }
+    if (b.type === 'palace' || b.type === 'court') prop('throne', x + (w >> 1), y + 1, { map, gen: 2, house: b.id, solid: true, r: 12, label: b.type === 'palace' ? 'Thron im Regierungspalais' : 'Richterstuhl' });
+    if (b.type === 'palace') for (const i of [x + 2, x + w - 3]) prop('banner_torn', i, y + 1, { map, gen: 2, house: b.id, label: 'Banner des Hochreichs' });
   }
   // Große Schenke (Session 10, gewachsene Häuser): weitere Tische mit Bank in der hinteren Reihe, Türachse ± 1 bleibt frei
   if (!ruin && b.type === 'tavern' && w >= 8 && h >= 6) for (let i = x + 2; i <= x + w - 3; i += 3) {
@@ -1215,7 +1228,7 @@ function extendSouth() {
   const G = k => AUREL_CITIES.find(c => c.key === k), gate = (c, s) => s === 'W' ? [c.x - c.hw, c.y] : s === 'E' ? [c.x + c.hw, c.y] : s === 'N' ? [c.x, c.y - c.hh] : [c.x, c.y + c.hh];
   for (const [a, sa, b, sb] of [['aurelheim', 'N', 'kupferhafen', 'S'], ['aurelheim', 'E', 'gelenkhall', 'W'], ['gelenkhall', 'E', 'tickmar', 'W'], ['aurelheim', 'S', 'sanktserin', 'N']]) {
     const [x0, y0] = gate(G(a), sa), [x1, y1] = gate(G(b), sb); lay(x0, y0, x1, y1); }
-  lay(456, 900, 666, 980);                                                            // Karak-Atar → Aurelheim (Westtor)
+  lay(456, 900, 560, 980); lay(560, 980, 603, 980);                                   // Karak-Atar → Aurelheim (Westtor der Metropole, gerade hinein)
   prop('sign', 252, 704, { label: 'Wüstensporn — Karak-Atar, Stadt der Sandfürsten' });
   // Dünenwacht, Sandruinen, Nekrosinsel
   for (const [x, y] of [[322, 792], [338, 792], [322, 808], [338, 808]]) prop('watchtower_ruin', x, y, { solid: true, r: 14 });
@@ -1235,7 +1248,7 @@ function totenbruecke() {
 // Ummauerte Städte mit Pflasterkreuz, Platz, Häuserreihen zur Straße, Laternen, Statuen, Werkstätten mit Zahnrädern und
 // ruhenden Automaten. Volle Siedlungen im Spiel (TOWN_PLAN, lord 'aurel'): Bewohner (Adel, Feinmechaniker, Kybernetiker).
 export const AUREL_CITIES = [
-  { key: 'aurelheim',   name: 'Aurelheim',   x: 700,  y: 980,  hw: 34, hh: 24, capital: true, types: ['manor', 'manor', 'house', 'store', 'manor', 'tavern', 'healer', 'house', 'chapel', 'manor', 'smithy', 'house'] },
+  { key: 'aurelheim',   name: 'Aurelheim',   x: 700,  y: 980,  hw: 95, hh: 68, capital: true, metro: true, types: ['manor', 'manor', 'house', 'store', 'manor', 'tavern', 'healer', 'house', 'chapel', 'manor', 'smithy', 'house'] },   // MP2 Phase 5: Metropole, ~8× so groß
   { key: 'kupferhafen', name: 'Kupferhafen', x: 600,  y: 800,  hw: 22, hh: 16, types: ['store', 'house', 'tavern', 'store', 'house', 'smithy', 'fisher'] },
   { key: 'gelenkhall',  name: 'Gelenkhall',  x: 930,  y: 1030, hw: 22, hh: 16, types: ['smithy', 'store', 'healer', 'smithy', 'house', 'manor', 'smithy'] },
   { key: 'tickmar',     name: 'Tickmar',     x: 1120, y: 1070, hw: 22, hh: 16, types: ['store', 'smithy', 'store', 'house', 'smithy', 'barn'] },
@@ -1244,6 +1257,7 @@ export const AUREL_CITIES = [
 for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
 const HSIZE = { manor: [6, 5], house: [5, 4], store: [6, 5], tavern: [6, 5], healer: [5, 4], chapel: [6, 5], smithy: [5, 4], barn: [6, 5], fisher: [4, 4] };
 function buildAurelCity(C) {
+  if (C.metro) return buildMetropolis(C);
   const m = MAPS.world, W = m.w, t = m.tiles, { x: cx, y: cy, hw, hh } = C, x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
   for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 - 3 && qx <= x1 + 3 && qy >= y0 - 3 && qy <= y1 + 3) props.splice(i, 1); }
   const gate = (x, y) => (Math.abs(y - cy) <= 1 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 1 && (y === y0 || y === y1));
@@ -1287,13 +1301,100 @@ function buildAurelCity(C) {
     const fx = x1 + 14;
     for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x1 + 3 && qx <= x1 + 26 && qy >= cy - 10 && qy <= cy + 12) props.splice(i, 1); }
     for (let y = cy - 9; y <= cy + 11; y++) for (let x = x1 + 3; x <= x1 + 25; x++) if (t[y * W + x] !== T.WALL) t[y * W + x] = T.STONE;
-    prop('factory', fx, cy - 2, { solid: true, r: 40, label: 'Die Fabrik von Tickmar' });
+    house('world', fx - 9, cy - 9, 18, 9, 'S', { type: 'factoryhall', town: 'tickmar' });                   // begehbar (Nutzer)
     for (const [dx, dy] of [[-8, 7], [-3, 8], [3, 8], [8, 7]]) prop('machine', fx + dx, cy + dy, { solid: true, r: 9, label: 'Dampfhammer' });
     prop('workstation', fx - 6, cy + 10, { bond: 'aurel', label: 'Werkbank der Schuldknechte' }); prop('keychest', fx + 7, cy + 10, { bond: 'aurel', label: 'Schlüsselkasten des Vogts' });
   }
   if (C.key === 'gelenkhall') prop('workbench', cx + 5, cy - 2, { solid: true, r: 9, label: 'Werkbank der Prothesenmacherin', mechBench: true });
   TOWN_PLAN[C.key] = { village: true, lord: 'aurel', area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy], perHead: C.capital ? 55 : 65, fields: [],
     plazas: [[T.STONE, cx - 5, cy - 4, cx + 5, cy + 4]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+}
+// ================= Aurelheim, die Metropole (MP2 §33–§49, Phase 5) =================
+// Rund 190×136 Kacheln: Mauerring mit vier mechanischen Toren, zwei Prachtachsen, Regierungsplatz mit Palast, Uhr und
+// Brunnen, Aquädukt und Kanal, dreizehn Bezirke mit eigenem Gesicht. Heller Stein, Säulen, Kuppeln, Gold, Glas.
+export const METRO = {};
+function buildMetropolis(C) {
+  const m = MAPS.world, W = m.w, t = m.tiles, { x: cx, y: cy, hw, hh } = C, x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 - 30 && qx <= x1 + 30 && qy >= y0 - 34 && qy <= y1 + 26) props.splice(i, 1); }
+  const at = (x, y) => t[y * W + x], set = (x, y, v) => { if (x > 0 && y > 0 && x < W - 1 && y < m.h - 1) t[y * W + x] = v; };
+  const fill = (ax, ay, bx, by, v) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) set(x, y, v); };
+  fill(x0 - 30, y0 - 34, x1 + 30, y1 + 26, T.GRASS);                                   // Umland ebnen (Wasser, Fels, Wald weg)
+  fill(x0, y0, x1, y1, T.GRASS);
+  const gate = (x, y) => (Math.abs(y - cy) <= 2 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 2 && (y === y0 || y === y1));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if ((x === x0 || x === x1 || y === y0 || y === y1) && !gate(x, y)) set(x, y, T.WALL);
+  for (let y = y0; y <= y1; y++) for (const x of [x0 + 1, x1 - 1]) if (!gate(x0, y)) set(x, y, T.WALL);
+  for (let x = x0; x <= x1; x++) for (const y of [y0 + 1, y1 - 1]) if (!gate(x, y0)) set(x, y, T.WALL);
+  for (let k = 0; k <= 6; k++) for (const [tx, ty] of [[x0 + Math.round(k * hw * 2 / 6), y0], [x0 + Math.round(k * hw * 2 / 6), y1], [x0, y0 + Math.round(k * hh * 2 / 6)], [x1, y0 + Math.round(k * hh * 2 / 6)]])
+    if (!(Math.abs(tx - cx) <= 4 && (ty === y0 || ty === y1)) && !(Math.abs(ty - cy) <= 4 && (tx === x0 || tx === x1))) fill(tx - 1, ty - 1, tx + 1, ty + 1, T.WALL);   // Wehrtürme
+  // Prachtachsen (5 breit) mit Bordstein und Laternen, Ringstraße innen
+  fill(x0 + 2, cy - 2, x1 - 2, cy + 2, T.STONE); fill(cx - 2, y0 + 2, cx + 2, y1 - 2, T.STONE);
+  fill(x0 + 3, y0 + 3, x1 - 3, y0 + 4, T.STONE); fill(x0 + 3, y1 - 4, x1 - 3, y1 - 3, T.STONE); fill(x0 + 3, y0 + 3, x0 + 4, y1 - 3, T.STONE); fill(x1 - 4, y0 + 3, x1 - 3, y1 - 3, T.STONE);
+  for (let x = x0 + 6; x < x1 - 4; x += 6) { if (Math.abs(x - cx) > 4) { prop('lantern', x, cy - 3); prop('lantern', x + 3, cy + 3); } }
+  for (let y = y0 + 6; y < y1 - 4; y += 6) { if (Math.abs(y - cy) > 4) { prop('lantern', cx - 3, y); prop('lantern', cx + 3, y + 3); } }
+  // Mechanische Tore mit Kontrollpunkt und Torrädern
+  for (const [gx, gy, dir] of [[x0, cy, 'W'], [x1, cy, 'E'], [cx, y0, 'N'], [cx, y1, 'S']]) {
+    const ox = dir === 'W' ? -2 : dir === 'E' ? 2 : 0, oy = dir === 'N' ? -2 : dir === 'S' ? 2 : 0, sx = dir === 'W' || dir === 'E' ? 0 : 1, sy = sx ? 0 : 1;
+    for (const s of [-4, 4]) prop('big_gear', gx + ox + s * sx, gy + oy + s * sy, { solid: true, r: 10, label: 'Torwerk des Hochreichs' });
+    prop('telecircle', gx + ox * 3, gy + oy * 3, { label: 'Kontrollpunkt — Siegelprüfung' });
+  }
+  // Regierungsplatz: Palast, astronomische Uhr, Brunnen, Standbild, Säulengänge
+  fill(cx - 18, cy - 14, cx + 18, cy + 12, T.STONE);
+  house('world', cx - 11, cy - 21, 22, 12, 'S', { type: 'palace', town: C.key });                      // begehbar (Nutzer), Tür zum Platz
+  prop('fountain', cx, cy + 6, { solid: true, r: 18, label: 'Großer Brunnen der Wasser des Reiches' });
+  prop('astroclock', cx + 15, cy - 6, { solid: true, r: 12, label: 'Astronomische Uhr' }); prop('statue', cx - 15, cy - 6, { solid: true, r: 10, label: 'Standbild der Ewigen Kaiserin' });
+  for (let x = cx - 16; x <= cx + 16; x += 4) prop('column', x, cy + 11, { solid: true, r: 6, label: 'Arkade' });
+  METRO.square = [cx - 8, cy + 4];                                                   // frei auf dem Platz (nicht im Brunnen)
+  // Aquädukt von Norden bis zur Zisterne, Kanal im Süden mit Brücken
+  const aqx = cx + 44;
+  for (let y = y0 - 30; y <= y0 + 22; y += 2) prop('aqueduct', aqx, y, { solid: y < y0 - 1 || y > y0 + 1, r: 8, label: 'Aquädukt' });
+  prop('fountain', aqx, y0 + 25, { solid: true, r: 14, label: 'Zisterne des Nordviertels' });
+  const kany = cy + 36;
+  fill(x0 + 5, kany, x1 - 5, kany + 1, T.WATER);
+  for (let x = x0 + 5; x <= x1 - 5; x++) if (Math.abs(x - cx) <= 2 || (x - x0) % 22 === 0) { set(x, kany, T.PLANK); set(x, kany + 1, T.PLANK); }
+  // Häuserblöcke: Querstraßen alle 11 Kacheln, Häuser an beiden Seiten, je Bezirk eigene Typen
+  const hs = [];
+  const fits = (hx, hy, w, h) => hx > x0 + 5 && hx + w < x1 - 5 && hy > y0 + 5 && hy + h < y1 - 5 && hs.every(([a, b, c, d]) => hx + w + 2 <= a || a + c + 2 <= hx || hy + h + 2 <= b || b + d + 2 <= hy)
+    && [...Array(w * h).keys()].every(k => at(hx + (k % w), hy + ((k / w) | 0)) === T.GRASS);
+  const put = (hx, hy, w, h, door, type) => { if (!fits(hx, hy, w, h)) return false; house('world', hx, hy, w, h, door, { type, town: C.key }); hs.push([hx, hy, w, h]); return true; };
+  const SZ = { manor: [7, 6], house: [5, 4], store: [6, 5], tavern: [8, 6], healer: [5, 4], chapel: [7, 6], smithy: [6, 5], barn: [7, 5], cottage: [4, 4], barracks: [8, 5], stable: [7, 5], hall: [8, 6] };
+  const block = (bx0, by0, bx1, by1, types, road = T.STONE) => {
+    for (let ry = by0 + 6; ry < by1 - 3; ry += 11) {
+      fill(bx0, ry - 1, bx1, ry + 1, road);
+      let ti = 0;
+      for (let hx = bx0 + 1; hx < bx1 - 4; hx += 1) {
+        const ty = types[ti % types.length], [w, h] = SZ[ty] || [5, 4];
+        if (put(hx, ry - 2 - h, w, h, 'S', ty)) { ti++; hx += w + 1; continue; }
+      }
+      ti = 1;
+      for (let hx = bx0 + 2; hx < bx1 - 4; hx += 1) {
+        const ty = types[ti % types.length], [w, h] = SZ[ty] || [5, 4];
+        if (put(hx, ry + 2, w, h, 'N', ty)) { ti++; hx += w + 1; }
+      }
+    }
+  };
+  const D = METRO.districts = [];
+  const district = (name, bx0, by0, bx1, by1, types, road, deco) => { D.push({ name, x0: bx0, y0: by0, x1: bx1, y1: by1 }); const n0 = props.length; if (deco) deco(bx0, by0, bx1, by1);
+    for (const q of props.slice(n0)) if ((q.r || 0) >= 14) { const px = q.x / TS | 0, py = q.y / TS | 0, k = Math.ceil(q.r / TS) + 2; fill(px - k, py - k * 2, px + k, py + 2, T.STONE); }   // Prachtbau: Grund pflastern, keine Häuser darauf
+    if (types) block(bx0, by0, bx1, by1, types, road); prop('sign', bx0 + 2, by0 + 1, { label: `${name} — Aurelheim` }); };
+  const L = cx - 20, R = cx + 20, U = cy - 16, B = cy + 14;
+  district('Regierungsviertel', cx - 18, y0 + 6, cx + 18, cy - 23, ['hall', 'manor', 'store'], T.STONE, (a, b) => { house('world', a + 1, b + 2, 12, 8, 'S', { type: 'court', town: C.key }); house('world', a + 22, b + 2, 12, 8, 'S', { type: 'library', town: C.key }); });
+  district('Adelsviertel', x0 + 6, y0 + 6, L, U - 12, ['manor', 'manor', 'chapel'], T.STONE, (a, b, c, d) => { for (let x = a + 4; x < c - 2; x += 9) { prop('hedge', x, d - 1, { solid: true, r: 8 }); prop('statue', x + 4, d - 1, { solid: true, r: 10, label: 'Ahnenstandbild eines Hauses' }); } });
+  district('Transportbezirk', x0 + 6, U - 10, L, U + 6, null, null, (a, b, c, d) => { fill(a, b, c, d, T.DIRT); for (let x = a + 3; x < c - 3; x += 8) { prop('cart', x, b + 4, { solid: true, r: 14, label: 'Frachtwagen' }); prop('hay', x + 3, b + 9, { solid: true }); prop('trough', x + 5, b + 12, { solid: true }); } house('world', a + 2, d - 6, 8, 5, 'N', { type: 'stable', town: C.key }); });
+  district('Akademieviertel', R, y0 + 6, R + 36, U, ['store', 'hall', 'house'], T.STONE, (a, b) => { house('world', a + 1, b + 2, 16, 10, 'S', { type: 'academy', town: C.key }); house('world', a + 20, b + 2, 10, 10, 'S', { type: 'observatory', town: C.key }); });
+  district('Magitech-Viertel', R + 38, y0 + 6, x1 - 6, U, ['smithy', 'store'], T.STONE, (a, b, c) => { house('world', a + 1, b + 8, 14, 8, 'S', { type: 'magitech', town: C.key }); for (let x = a + 18; x < c - 3; x += 12) prop('magitower', x, b + 5, { solid: true, r: 10, label: 'Magitech-Turm' }); });
+  district('Handelsviertel', x0 + 6, cy + 4, L, cy + 30, ['store', 'store', 'tavern', 'house'], T.STONE, (a, b) => { house('world', a + 1, b + 2, 22, 11, 'S', { type: 'markethall', town: C.key }); house('world', a + 26, b + 2, 12, 9, 'S', { type: 'bank', town: C.key }); for (let x = a + 6; x < a + 40; x += 5) prop('stall', x, b + 18, { solid: true, label: 'Marktstand' }); });
+  district('Bürgerstadt', x0 + 6, kany + 3, cx - 24, y1 - 6, ['house', 'house', 'store', 'healer', 'house'], T.STONE, (a, b) => { house('world', a + 1, b + 2, 14, 8, 'S', { type: 'hospital', town: C.key }); house('world', a + 18, b + 2, 11, 8, 'S', { type: 'bathhouse', town: C.key }); });
+  district('Armenviertel', cx - 22, kany + 3, cx - 4, y1 - 6, ['cottage', 'cottage', 'house'], T.DIRT, (a, b, c, d) => { for (let i = 0; i < 6; i++) prop(i % 2 ? 'sack' : 'barrel', a + 2 + i * 3, d - 2, { label: 'Lumpenbündel' }); });
+  district('Gildenviertel', R, cy + 4, R + 38, cy + 30, ['smithy', 'store', 'healer', 'smithy'], T.STONE, (a, b) => { for (let x = a + 4; x < a + 34; x += 10) prop('gearpile', x, b + 2, { solid: true, r: 8 }); });
+  district('Industrieviertel', R + 40, cy + 4, x1 - 6, cy + 30, ['barn', 'smithy', 'barn'], T.STONE, (a, b, c) => { house('world', a + 1, b + 2, 20, 10, 'S', { type: 'factoryhall', town: C.key }); for (let x = a + 4; x < c - 4; x += 14) { prop('crane', x, b + 17, { solid: true, r: 10, label: 'Lastkran' }); prop('chimney', x + 6, b + 19, { solid: true, r: 7 }); } });
+  district('Militärbezirk', cx + 4, kany + 3, x1 - 6, y1 - 6, ['barracks', 'barracks', 'stable'], T.STONE, (a, b) => { house('world', a + 30, b + 2, 16, 8, 'S', { type: 'legion', town: C.key }); fill(a + 2, b + 2, a + 26, b + 12, T.DIRT); prop('weapon_rack', a + 4, b + 3, { solid: true, label: 'Waffenlager der Sonnenlegion' }); prop('banner_torn', a + 14, b + 2, { label: 'Banner der Sonnenlegion' }); for (let x = a + 6; x < a + 26; x += 5) prop('hay', x, b + 9, { solid: true, label: 'Strohziel der Sonnenlegion' }); });
+  // Außenstadt und landwirtschaftliche Vorstadt (vor den Mauern)
+  for (const [fx, fy] of [[x0 - 26, cy - 40], [x0 - 26, cy + 10], [x1 + 4, cy - 40], [x1 + 4, cy + 10], [cx - 60, y1 + 4], [cx + 30, y1 + 4]]) { fill(fx, fy, fx + 20, fy + 12, T.FIELD); prop('scarecrow', fx + 10, fy + 6); }
+  for (const [hx, hy] of [[x0 - 18, cy - 22], [x1 + 10, cy - 22], [x0 - 18, cy + 28], [x1 + 10, cy + 28]]) { house('world', hx, hy, 6, 5, 'S', { type: 'barn', town: 'aurel_vorstadt' }); prop('big_gear', hx + 8, hy + 2, { solid: true, r: 10, label: 'Windmühlenrad' }); }
+  D.push({ name: 'Außenstadt', x0: x0 - 30, y0: y0 - 34, x1: x1 + 30, y1: y1 + 26, outside: true }, { name: 'Landwirtschaftliche Vorstadt', x0: x0 - 30, y0: y1, x1: x1 + 30, y1: y1 + 26, outside: true });
+  const nHouses = HOUSES.filter(b => b.town === C.key).length;
+  TOWN_PLAN[C.key] = { village: false, lord: 'aurel', metro: true, area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx - 8, cy + 4], perHead: Math.max(40, Math.round((hw * 2 + 1) * (hh * 2 + 1) / Math.max(1, nHouses * 2.2))), fields: [],
+    plazas: [[T.STONE, cx - 18, cy - 14, cx + 18, cy + 12]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
 }
 // Binnenseen: ruhige Senken im offenen Land, fern von Orten und Straßen (Wege gräbt ensureReach nach)
 function lakes() {
@@ -1534,6 +1635,44 @@ function buildWest() {
   for (const [x, y] of [[174, 424], [192, 424], [174, 436], [194, 436]]) prop('tent_prop', x, y, { solid: true, label: 'Goblinhütte' });
   prop('campfire_static', 184, 430, { solid: true, r: 10 });
   prop('sign', 226, 170, { label: 'Kettentor — Die Eisenfeste. Wer hier Ketten hört, kehre um.' });
+  eisenDistricts();
+}
+// Phase 4 (MP2 §53/§54): Die Eisenfeste wird eine Region — im Ring Schmiedeviertel, Mine mit Erzadern, Ställe und Lager am
+// Kettentor, Arbeiterquartiere; vor der Mauer das Vorwerk mit Höfen und Feldern im Osten und ein Holzfällerlager im Süden.
+// Die Plätze (EISEN_SITES) nutzt game.js für Arbeiter, Aufseher und Wachen.
+export const EISEN_SITES = { smithy: [182, 300], mine: [46, 272], stables: [200, 192], vorwerk: [252, 212], lumber: [236, 352], quarters: [48, 318] };
+function eisenDistricts() {
+  const m = MAPS.world, W = m.w, t = m.tiles, clear = (x0, y0, x1, y1, tile) => {
+    for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 && qx <= x1 && qy >= y0 && qy <= y1) props.splice(i, 1); }
+    if (tile != null) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const v = t[y * W + x]; if (v !== T.WALL && v !== T.WATER && v !== T.ROAD) t[y * W + x] = tile; } };
+  // Schmiedeviertel (im Ring, Südosten)
+  clear(164, 290, 208, 330, T.STONE);
+  for (const [x, y] of [[166, 292], [178, 292], [190, 292]]) { house('world', x, y, 6, 5, 'S', { type: 'smithy', town: 'kettenfeste' }); prop('forge', x + 3, y + 7, { solid: true, label: 'Esse der Kette' }); prop('anvil', x + 5, y + 7, { solid: true, label: 'Amboss' }); prop('chimney', x + 6, y + 4, { solid: true, r: 7, label: 'Schornstein' }); }
+  for (const [x, y] of [[168, 312], [184, 312], [200, 312]]) { prop('weapon_rack', x, y, { solid: true, label: 'Kettenwaffen' }); prop('crate_stack', x + 3, y + 1, { solid: true, label: 'Erzbarren' }); }
+  lay(164, 305, 208, 305, T.STONE); prop('sign', 164, 304, { label: 'Schmiedeviertel der Kette' });
+  // Mine (Westmauer): Stollen, Erzadern, Loren, Abraum
+  clear(38, 262, 58, 290, T.DIRT);
+  prop('mine_entrance', 40, 268, { solid: true, label: 'Kettenmine — Stollen' });
+  for (let i = 0; i < 14; i++) prop('ore_node', 42 + Math.floor(nz(i, 41) * 14), 264 + Math.floor(nz(41, i) * 24), { harvest: 'iron', solid: true });
+  for (const [x, y] of [[48, 276], [53, 284]]) prop('broken_cart', x, y, { solid: true, label: 'Erzlore' });
+  prop('sign', 56, 270, { label: 'Kettenmine — Eisen für die Feste' });
+  // Arbeiterquartiere neben dem Steinbruch
+  for (const [x, y] of [[38, 300], [38, 312]]) house('world', x, y, 8, 5, 'E', { type: 'barracks', town: 'kettenfeste' });
+  prop('chain_post', 50, 318, { solid: true, r: 6, label: 'Kettenpfahl' }); prop('trough', 52, 306, { solid: true, label: 'Wassertrog' });
+  // Ställe und Lagerhäuser am Kettentor
+  clear(188, 180, 214, 212, T.DIRT);
+  house('world', 190, 182, 7, 5, 'S', { type: 'stable', town: 'kettenfeste' }); house('world', 203, 182, 7, 5, 'S', { type: 'store', town: 'kettenfeste' });
+  house('world', 190, 198, 7, 5, 'N', { type: 'store', town: 'kettenfeste' }); house('world', 203, 198, 7, 5, 'N', { type: 'barn', town: 'kettenfeste' });
+  for (const [x, y] of [[199, 190], [201, 194]]) prop('hay', x, y, { solid: true }); prop('trough', 197, 191, { solid: true }); prop('cart', 208, 192, { solid: true, r: 14, label: 'Lastkarren' });
+  // Vorwerk vor dem Kettentor: Höfe, Felder, Zäune
+  clear(230, 196, 280, 236, T.GRASS);
+  for (const [x0, y0] of [[232, 198], [258, 198], [232, 220]]) { rect('world', x0, y0, 20, 10, T.FIELD); prop('scarecrow', x0 + 10, y0 + 5); }
+  house('world', 260, 222, 6, 5, 'N', { type: 'house', town: 'kettenfeste' }); house('world', 268, 222, 7, 5, 'N', { type: 'barn', town: 'kettenfeste' });
+  for (let x = 230; x <= 278; x += 4) prop('fence', x, 196, { solid: true }); prop('sign', 229, 210, { label: 'Vorwerk der Eisenfeste' });
+  // Holzfällerlager vor dem Südtor
+  clear(226, 344, 250, 362, T.DIRT);
+  for (const [x, y] of [[230, 348], [238, 350], [244, 356]]) prop('fallen_tree', x, y, { solid: true, label: 'Gefällter Stamm' });
+  for (const [x, y] of [[232, 356], [240, 358]]) prop('crate_stack', x, y, { solid: true, label: 'Holzstapel' }); prop('tent_prop', 247, 346, { solid: true, label: 'Holzfällerzelt' }); prop('campfire_static', 236, 346, { solid: true, r: 10 });
 }
 // Dorf: Platz mit Brunnen, Dorfstraße Ost–West, vier bis sechs Häuser mit der Tür zur Straße (eine Kate: dort lebt der Jäger),
 // Acker mit Zaun und Scheuche, Weg zur nächsten Straße (link). Tributdörfer: Kettenpfahl am Platz, Abgabenkiste, weniger Vorrat.
@@ -1692,8 +1831,59 @@ export function deadScenes() {
 export const DUNGEONS = {
   mine: { name: 'Verlassene Grube', floor: 'scree', amb: 'blight', enter: 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' },
   deep: { name: 'Tiefhall', floor: 'dfloor', amb: 'frozen', enter: 'Du steigst die Frosttreppe hinab. Reif sitzt in den Fugen alter Steinmetzarbeit — hier hat jemand gebaut, der für die Ewigkeit baute.' },
+  kerker: { name: 'Kerker', floor: 'dfloor', amb: 'blight', enter: 'Die Tür fällt ins Schloss. Stroh, Eisen, der Geruch von zu vielen Leuten auf zu wenig Raum.' },   // Phase 2 §26
+  sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
+
+// Kerker (Phase 2, Master-Prompt 2 §26): ein Gang, oben und unten je vier Zellen hinter Gittern, Wachstube im Westen mit dem
+// Ausgang. Wer verhaftet wird, sitzt hier seine Zeit ab (10–20 Minuten), isst, redet mit Mitgefangenen — oder bricht aus.
+export function genKerker() {
+  props.length = 0;
+  seedRng(S.seed * 17 + 9);
+  const w = 38, h = 22, tiles = new Uint8Array(w * h).fill(T.DWALL), M = 'kerker', o = { map: M };
+  MAPS.kerker = { w, h, tiles };
+  rect(M, 2, 10, 34, 2, T.DFLOOR); rect(M, 2, 7, 6, 8, T.DFLOOR);                      // Gang, Wachstube
+  const cells = [];
+  for (let i = 0; i < 4; i++) for (const top of [true, false]) {
+    const x = 10 + i * 7, y = top ? 3 : 13; rect(M, x, y, 5, 6, T.DFLOOR);
+    const dy = top ? 9 : 12; setTile(M, x + 2, dy, T.DFLOOR);                            // Zellentür zum Gang
+    const c = { id: cells.length, x, y, door: [x + 2, dy], spot: { x: (x + 2) * TS + TS / 2, y: (top ? y + 2 : y + 3) * TS + TS / 2 } }; cells.push(c);
+    prop('portcullis', x + 2, dy, { ...o, solid: true, r: 14, cellDoor: c.id, label: 'Zellentür' });
+    prop('sack', x + 1, top ? y + 1 : y + 4, { ...o, label: 'Strohlager' }); prop('barrel', x + 4, top ? y + 1 : y + 4, { ...o, solid: true, r: 7, label: 'Eimer' });
+  }
+  prop('mine_exit', 2, 10, { ...o, portal: 'world', label: 'Ausgang des Kerkers' });
+  prop('table', 5, 8, { ...o, solid: true, r: 10, label: 'Tisch der Wärter' }); prop('weapon_rack', 3, 7, { ...o, solid: true, label: 'Verwahrte Waffen' });
+  for (const x of [9, 16, 23, 30, 35]) prop('torch', x, 10, o);
+  MAPS.kerker.cells = cells; MAPS.kerker.entry = cells[0].spot; MAPS.kerker.exit = { x: 3 * TS + TS / 2, y: 10 * TS + TS / 2 };
+  return baseProps('kerker', props.slice());
+}
+// Die schwebende Insel über Aurelheim (S12 E, Master-Prompt 2 §50): Marmorplateau im Himmel, Gärten, Palast, der Hof des
+// Magischen Gerichts mit vier Thronen (Ewige Kaiserin, Rat der Häuser, Uhrwerk-Orakel, Magierkönig). Zugang: teurer
+// Teleport vom Platz in Aurelheim oder als Angeklagter. Eigener Seed-Zweig, keine Zufälle aus der Weltgenerierung.
+export function genSky() {
+  props.length = 0;
+  seedRng(S.seed * 13 + 3);
+  const w = 64, h = 48, tiles = new Uint8Array(w * h).fill(T.WATER), M = 'sky', o = { map: M };
+  MAPS.sky = { w, h, tiles };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const d = Math.hypot((x - 32) / 26, (y - 24) / 19) + (nz(x * 3, y * 5) - 0.5) * 0.08;
+    if (d < 1) tiles[y * w + x] = d < 0.62 ? T.DFLOOR : T.GRASS;
+  }
+  rect(M, 30, 8, 5, 34, T.DFLOOR); rect(M, 12, 22, 40, 5, T.DFLOOR);                  // Kreuz der Hauptwege
+  for (let x = 20; x <= 44; x++) { setTile(M, x, 7, T.DWALL); } for (let y = 7; y <= 14; y++) { setTile(M, 20, y, T.DWALL); setTile(M, 44, y, T.DWALL); }   // Rückwand des Gerichtshofs
+  prop('mine_exit', 32, 40, { ...o, portal: 'world', label: 'Teleportkreis — hinab nach Aurelheim' });
+  const seats = [[24, 10, 'Thron der Ewigen Kaiserin'], [28, 9, 'Bank des Rates der Häuser'], [36, 9, 'Sockel des Uhrwerk-Orakels'], [40, 10, 'Stuhl des Magierkönigs']];
+  for (const [x, y, label] of seats) prop('throne', x, y, { ...o, solid: true, r: 12, label });
+  for (const x of [22, 42]) { prop('big_gear', x, 13, { ...o, solid: true, r: 10, label: 'Rad der Rechtsprechung' }); prop('banner_torn', x, 8, { ...o, label: 'Banner des Hochreichs' }); }
+  for (const [x, y] of [[26, 19], [38, 19], [26, 30], [38, 30]]) prop('statue', x, y, { ...o, solid: true, r: 10, label: 'Standbild eines Kaisers der ersten Zeit' });
+  for (let y = 16; y <= 36; y += 4) { prop('lantern', 29, y, o); prop('lantern', 35, y, o); }
+  for (let i = 0; i < 26; i++) { const x = 8 + ((i * 17) % 48), y = 14 + ((i * 11) % 22); if (tiles[y * w + x] === T.GRASS) prop(i % 3 ? 'hedge' : 'tree', x, y, { ...o, solid: true, r: 9 }); }
+  prop('well', 32, 24, { ...o, solid: true, label: 'Sternbrunnen' }); prop('chimney', 46, 12, { ...o, solid: true, r: 7, label: 'Kessel des Palastes' });
+  MAPS.sky.entry = { x: 32 * TS + TS / 2, y: 37 * TS };
+  MAPS.sky.court = { x: 32 * TS + TS / 2, y: 15 * TS };
+  return baseProps('sky', props.slice());
+}
 
 // Tiefhall (Frostkamm): Königshalle der alten Bergleute, unter dem Eis versiegelt. Anders als die Grube gebaut, nicht gegraben:
 // gerade Hallen, Säulen, Gruft der Ahnen, Schmiede der Tiefe, Thronsaal mit Hrodvar, dahinter der Hort. Eigener Seed-Zweig.

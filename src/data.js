@@ -154,6 +154,8 @@ export const ITEMS = {
   aurelbein:   { name:'Aurelionisches Bein', slot:'consumable', use:'prosthesis', part:'leg', tier:2, stack:1, rarity:'rare', value:850, desc:'Kniegelenk mit Dämpfer, Sohle aus Gummi und Stahl. Voll belastbar.' },
   meisterarm:  { name:'Meisterarm von Gelenkhall', slot:'consumable', use:'prosthesis', part:'arm', tier:3, stack:1, rarity:'epic', value:2400, desc:'Feinwerk der Kybernetiker. Stärker als Fleisch: Hiebe mit diesem Arm treffen härter (+10 %).' },
   meisterbein: { name:'Meisterbein von Gelenkhall', slot:'consumable', use:'prosthesis', part:'leg', tier:3, stack:1, rarity:'epic', value:2200, desc:'Feinwerk der Kybernetiker. Schneller als Fleisch (+6 % Tempo).' },
+  dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
+  auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
   tributgut: { name:'Tributgut', slot:'material', stack:40, rarity:'common', value:10, lore:'Korn, Salz, Werkzeug — was ein Dorf der Kette abgeben musste.' },
   automatenkern: { name:'Automatenkern', slot:'material', stack:20, rarity:'uncommon', value:60, lore:'Ein Messingherz voller Zahnräder. Tickt noch, wenn man es ans Ohr hält.' },
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
@@ -469,8 +471,8 @@ export const FACTIONS = {
   merch: { name:'Freie Händler', colors:['#3c3324','#bd9433'], desc:'Wo Krieg ist, ist Nachfrage.' , ranks:['Kunde','Partner','Teilhaber']},
   bandit:{ name:'Rooks Bande', colors:['#2a231a','#8c3b2a'], desc:'Kein Banner, keine Steuern, kurze Leben.', ranks:['Handlanger','Klinge','Hauptmann'] },
   // Session 11 — Endgame: die Sklavenhalter der Eisenmark und die Goblins, die sie in Ketten halten
-  aurel: { name:'Das Hochreich Aurelion', colors:['#2a2a30','#c8a050'], desc:'Adelshäuser, Handelsherren, Automaten und Messingglieder. Reich genug, um sich jede Ordnung zu kaufen — auch die der anderen.', ranks:['Bittsteller','Geduldeter','Bürger','Patrizier'] },
-  chain: { name:'Die Eiserne Kette', colors:['#111214','#5a1a1c'], desc:'Sie nennen es Ordnung. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.', ranks:['Treiber','Kettenknecht','Grenzreiter','Aufseher'] },   // S12: Spielerränge; Kettenmeister ist Varg allein
+  aurel: { name:'Das Hochreich Aurelion', colors:['#2a2a30','#c8a050'], desc:'Adelshäuser, Handelsherren, Automaten und Messingglieder. Reich genug, um sich jede Ordnung zu kaufen — auch die der anderen.', ranks:['Fremder','Registrierter Besucher','Bürger','Anerkannter Bürger','Handelsbürger','Gildenmitglied','Hoher Beamter','Mitglied des Hohen Rates'] },   // MP2 §81
+  chain: { name:'Die Eiserne Kette', colors:['#111214','#5a1a1c'], desc:'Sie nennen es Ordnung. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.', ranks:['Treiber','Kettenknecht','Grenzreiter','Aufseher','Dunkler Hochpaladin'] },   // S12: Spielerränge; Kettenmeister ist Varg allein
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };
 
@@ -621,6 +623,10 @@ export const QUESTS = {
     objectives:[{type:'custom',count:1,text:'30 Holz und 15 Stein zu Grisk bringen'}], reward:{rep:{goblin:20},xp:100} },
   q_intrige: { name:'Heikle Angelegenheit', giver:null, desc:'Ein Adelshaus von Aurelion hat dir einen Auftrag gegen ein anderes Haus gegeben. Niemand soll davon wissen.',
     objectives:[{type:'custom',count:1,text:'Den Auftrag erledigen und dem Haus berichten'}] },
+  q_gilde: { name:'Das rote Tuch', giver:null, desc:'Mo, eine Diebin im Kerker von Salzhafen, sagt: Draußen am Hafen wartet ein Mann mit einem roten Tuch. Sag ihm, Mo schickt dich.',
+    objectives:[{type:'custom',count:1,text:'Den Mann mit dem roten Tuch am Hafen von Salzhafen finden'}], reward:{gold:60,xp:80} },
+  q_rask: { name:'Rasks Versteck', giver:null, desc:'Kapitän Rask sitzt im Kerker von Salzhafen und kommt nicht mehr raus. Seine Beute liegt noch in einer Kiste an der Küste südlich der Stadt.',
+    objectives:[{type:'custom',count:1,text:'Rasks Kiste an der Küste finden und öffnen'}], reward:{xp:100} },
   q_pelts: { name:'Felle für den Hafen', giver:'quirin', desc:'Die Seeleute frieren, und ich brauche Fett für meine Salben. Drei Wolfsfelle. Gegerbt oder nicht, Hauptsache ganz.',
     objectives:[{type:'item',target:'pelt',count:3,text:'Wolfsfelle bringen'}],
     reward:{gold:60,xp:70,item:'potion',take:'pelt',takeCount:3}, turnin:'quirin' },

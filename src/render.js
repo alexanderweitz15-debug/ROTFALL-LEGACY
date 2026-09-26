@@ -696,7 +696,23 @@ function drawDraft(x, y, f, now, moving, big, ph) {       // Ochse (big) oder Ma
   ctx.fillStyle = '#2b2116'; ctx.fillRect(x + f * (bw - 1) - 1, y - L - bh * 2 + 1, 2.5, bh * 1.6);                                     // Joch/Kummet
 }
 const WAGON_K = 1.5;                                        // Maßstab des Zugs: Wagen und Tiere im Verhältnis zu den Figuren
+// MP2 §24: Der Zug wurde als glatte Vektorform gemalt und fiel neben der Pixelwelt heraus. Jetzt wird er wie die Props in ein
+// feines Raster gemalt und pixelisiert (Kontur, Stufen), je Richtung, Ladung und einer von 6 Laufphasen gecacht.
+const wagonCache = new Map();
 function drawWagon(x, y, f, now, moving, lead, e) {
+  const ph = moving ? Math.floor(((now / 150) % 6.2832) / 6.2832 * 6) : 0, load = lead ? 0 : Math.min(2, Math.floor(Object.values(e.cargo || {}).reduce((a, b) => a + b, 0) / 8.5) + (Object.values(e.cargo || {}).some(v => v > 0) ? 1 : 0));
+  const key = `${lead ? 1 : 0}${f}${moving ? 1 : 0}${ph}${load}`, BW = 220, BH = 110, AX = 110, AY = 86;
+  let cv = wagonCache.get(key);
+  if (!cv) {
+    cv = document.createElement('canvas'); cv.width = Math.round(BW * PROP_RES); cv.height = Math.round(BH * PROP_RES);
+    const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx; o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0); ctx = o;
+    const fake = { cargo: load === 0 ? {} : load === 1 ? { a: 1 } : { a: 20 } };
+    try { paintWagon(AX, AY, f, ph / 6 * 6.2832 * 150, moving, lead, fake); } finally { ctx = saved; }
+    o.setTransform(1, 0, 0, 1, 0, 0); SP.pixelize(o, cv.width, cv.height, false, false); wagonCache.set(key, cv);
+  }
+  ctx.drawImage(cv, x - AX, y - AY, BW, BH);
+}
+function paintWagon(x, y, f, now, moving, lead, e) {
   ctx.save(); ctx.translate(x, y); ctx.scale(WAGON_K, WAGON_K);
   const rot = moving ? x / (7 * WAGON_K) : 0; x = 0; y = 0;
   shadow(x + f * (lead ? 18 : 12), y + 6, lead ? 40 : 30, .3);
@@ -706,11 +722,13 @@ function drawWagon(x, y, f, now, moving, lead, e) {
   else drawDraft(x + f * 30, y + 1, f, now, moving, false, 0.8);
   ctx.strokeStyle = '#2b2116'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x + f * 16, y - 8); ctx.lineTo(x + f * (lead ? 42 : 26), y - 12); ctx.stroke();   // Deichsel
   const bob = moving ? Math.abs(sw) * 0.8 : 0, W0 = lead ? 20 : 16, W1 = lead ? 16 : 13;
-  ctx.fillStyle = '#4b3a25'; ctx.fillRect(x - W0, y - 15 - bob, W0 + W1, 12);                                   // Ladefläche
+  ctx.fillStyle = '#3e3020'; ctx.fillRect(x - W0, y - 15 - bob, W0 + W1, 12);                                   // Ladefläche (dunkles, altes Holz)
   ctx.fillStyle = '#3a2c1c'; for (let i = -W0 + 7; i < W1; i += 7) ctx.fillRect(x + i, y - 15 - bob, 1, 12);  // Bretterfugen
   ctx.fillStyle = '#5e4a31'; ctx.fillRect(x - W0, y - 15 - bob, W0 + W1, 2);
   if (lead) {                                                                                                     // Plane über Spriegeln
-    ctx.fillStyle = '#c9bfa6'; ctx.beginPath(); ctx.moveTo(x - W0, y - 15 - bob); ctx.quadraticCurveTo(x - 2, y - 40 - bob, x + W1, y - 15 - bob); ctx.fill();
+    ctx.fillStyle = '#8a7f68'; ctx.beginPath(); ctx.moveTo(x - W0, y - 15 - bob); ctx.quadraticCurveTo(x - 2, y - 40 - bob, x + W1, y - 15 - bob); ctx.fill();   // verwittertes Leinen
+    ctx.fillStyle = '#9c917a'; ctx.beginPath(); ctx.moveTo(x - W0 + 3, y - 17 - bob); ctx.quadraticCurveTo(x - 6, y - 36 - bob, x + 2, y - 19 - bob); ctx.fill();   // Licht oben links
+    ctx.fillStyle = 'rgba(40,30,20,.35)'; ctx.fillRect(x - W0 + 2, y - 19 - bob, W0 + W1 - 4, 3);   // Schmutzrand
     ctx.fillStyle = 'rgba(60,40,20,.22)'; for (const k of [-10, 0, 9]) ctx.fillRect(x + k, y - 33 - bob + Math.abs(k) * 0.5, 2, 18 - Math.abs(k) * 0.5);
     const dx = x + f * (W1 - 2);                                                                                 // Kutscher auf dem Bock
     ctx.fillStyle = '#6a4b2c'; ctx.fillRect(dx - 3, y - 26 - bob, 7, 10);
@@ -740,8 +758,8 @@ function drawDecal(e) {
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
 const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
-const PROP_PERIOD = { chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { tower_ruin: 192, boat: 128, factory: 224, big_gear: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const PROP_PERIOD = { magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const PROP_BOX = { tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
@@ -1099,6 +1117,72 @@ function drawProp(e, now) {
       ctx.fillStyle = '#4a4640'; for (let i = -14; i <= 14; i += 5) ctx.fillRect(x + i, y - 30, 2.5, 34);
       for (const yy of [-24, -12, 0]) ctx.fillRect(x - 16, y + yy, 32, 2.5);
       ctx.fillStyle = '#6a665e'; for (let i = -14; i <= 14; i += 5) ctx.fillRect(x + i, y - 30, 1, 34); break; }
+    // ---- Aurelheim (MP2 §35–§52): heller Stein, Säulen, Kuppeln, Gold, Glas ----
+    case 'palace': {                                      // Regierungspalais: Freitreppe, Säulenfront, Kuppel, Banner
+      const st = '#d8cfb8', sh = '#9a9280', dk = '#6a6458', gd = '#c8a050';
+      shadow(x, y + 8, 110, .45);
+      ctx.fillStyle = sh; ctx.fillRect(x - 100, y - 8, 200, 14); ctx.fillStyle = st; for (let k = 0; k < 4; k++) ctx.fillRect(x - 60 + k * 4, y - 8 + k * 3, 120 - k * 8, 3);   // Freitreppe
+      ctx.fillStyle = st; ctx.fillRect(x - 96, y - 88, 192, 80); ctx.fillStyle = '#e8e0cc'; ctx.fillRect(x - 96, y - 88, 60, 80);
+      ctx.fillStyle = dk; ctx.fillRect(x - 96, y - 92, 192, 6); ctx.fillStyle = gd; ctx.fillRect(x - 96, y - 94, 192, 2);
+      for (let k = 0; k < 11; k++) { const cx2 = x - 80 + k * 16; ctx.fillStyle = '#f0e8d4'; ctx.fillRect(cx2 - 3, y - 84, 6, 74); ctx.fillStyle = sh; ctx.fillRect(cx2 + 2, y - 84, 1.5, 74); }
+      for (let k = 0; k < 5; k++) { ctx.fillStyle = '#2a3440'; ctx.fillRect(x - 70 + k * 32, y - 60, 12, 22); ctx.fillStyle = 'rgba(140,190,220,.55)'; ctx.fillRect(x - 69 + k * 32, y - 59, 10, 8); }
+      ctx.fillStyle = '#6a8098'; ctx.beginPath(); ctx.arc(x, y - 96, 40, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8aa0b8'; ctx.beginPath(); ctx.arc(x - 12, y - 104, 18, Math.PI, 0); ctx.fill();   // Kuppel
+      ctx.fillStyle = gd; ctx.fillRect(x - 2, y - 150, 4, 16); ctx.beginPath(); ctx.arc(x, y - 152, 5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a2016'; ctx.fillRect(x - 14, y - 40, 28, 32); ctx.fillStyle = gd; ctx.fillRect(x - 14, y - 42, 28, 3);
+      for (const bx of [x - 88, x + 84]) { ctx.fillStyle = '#5a4a2a'; ctx.fillRect(bx, y - 130, 2, 44); ctx.fillStyle = '#c8a050'; ctx.fillRect(bx + 2, y - 128, 12, 18); ctx.fillStyle = '#8a2a22'; ctx.fillRect(bx + 2, y - 122, 12, 4); }
+      break; }
+    case 'markethall': {                                  // Große Markthalle: lange Halle, Bogenfenster, Glasdach
+      shadow(x, y + 6, 100, .4); ctx.fillStyle = '#cfc6b0'; ctx.fillRect(x - 96, y - 60, 192, 66); ctx.fillStyle = '#e0d8c4'; ctx.fillRect(x - 96, y - 60, 50, 66);
+      ctx.fillStyle = '#4a5058'; ctx.beginPath(); ctx.moveTo(x - 100, y - 60); ctx.lineTo(x, y - 96); ctx.lineTo(x + 100, y - 60); ctx.fill();
+      ctx.fillStyle = 'rgba(150,200,230,.5)'; for (let k = 0; k < 9; k++) ctx.fillRect(x - 84 + k * 20, y - 78 + Math.abs(k - 4) * 3.5, 12, 10);
+      for (let k = 0; k < 8; k++) { const ax = x - 84 + k * 24; ctx.fillStyle = '#2a2016'; ctx.fillRect(ax, y - 36, 14, 42); ctx.beginPath(); ctx.arc(ax + 7, y - 36, 7, Math.PI, 0); ctx.fill(); ctx.fillStyle = `rgba(232,170,80,${0.35 + 0.1 * (k % 3)})`; ctx.fillRect(ax + 2, y - 30, 10, 12); }
+      ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 96, y - 62, 192, 2); break; }
+    case 'observatory': {                                 // Observatorium: Rundbau, Kuppel mit Spalt, Fernrohr
+      shadow(x, y + 6, 60, .4); ctx.fillStyle = '#d4cbb4'; ctx.fillRect(x - 50, y - 50, 100, 56); ctx.fillStyle = '#e6dec8'; ctx.fillRect(x - 50, y - 50, 30, 56);
+      ctx.fillStyle = '#5a6a7a'; ctx.beginPath(); ctx.arc(x, y - 50, 48, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#7a8a9a'; ctx.beginPath(); ctx.arc(x - 14, y - 60, 22, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#141820'; ctx.fillRect(x + 6, y - 96, 8, 46); ctx.save(); ctx.translate(x + 10, y - 80); ctx.rotate(-0.7); ctx.fillStyle = '#b08a44'; ctx.fillRect(-3, -30, 6, 34); ctx.restore();
+      ctx.fillStyle = '#2a2016'; ctx.fillRect(x - 8, y - 24, 16, 30); break; }
+    case 'bank': {                                        // Zentralbank: Tempelfront, Giebel mit Münze, schwere Tür
+      shadow(x, y + 6, 60, .4); ctx.fillStyle = '#d8cfb8'; ctx.fillRect(x - 56, y - 52, 112, 58);
+      ctx.fillStyle = '#c4bba4'; ctx.beginPath(); ctx.moveTo(x - 62, y - 52); ctx.lineTo(x, y - 80); ctx.lineTo(x + 62, y - 52); ctx.fill();
+      ctx.fillStyle = '#c8a050'; ctx.beginPath(); ctx.arc(x, y - 62, 7, 0, 7); ctx.fill(); ctx.fillStyle = '#8a6a30'; ctx.fillRect(x - 1, y - 66, 2, 8);
+      for (let k = 0; k < 6; k++) { ctx.fillStyle = '#f0e8d4'; ctx.fillRect(x - 48 + k * 19, y - 50, 6, 52); }
+      ctx.fillStyle = '#3a3026'; ctx.fillRect(x - 10, y - 30, 20, 36); ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 1, y - 16, 2, 4); break; }
+    case 'astroclock': {                                  // Astronomische Uhr: Turm, Zifferblatt mit Tierkreis, Zeiger drehen
+      shadow(x, y + 4, 22, .4); ctx.fillStyle = '#d4cbb4'; ctx.fillRect(x - 16, y - 100, 32, 104); ctx.fillStyle = '#e6dec8'; ctx.fillRect(x - 16, y - 100, 10, 104);
+      ctx.fillStyle = '#4a5058'; ctx.beginPath(); ctx.moveTo(x - 20, y - 100); ctx.lineTo(x, y - 128); ctx.lineTo(x + 20, y - 100); ctx.fill();
+      ctx.fillStyle = '#1a2440'; ctx.beginPath(); ctx.arc(x, y - 70, 13, 0, 7); ctx.fill(); ctx.strokeStyle = '#c8a050'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#e8d8a0'; for (let k = 0; k < 12; k++) { const a = k * 0.5236; ctx.fillRect(x + Math.cos(a) * 10 - 0.8, y - 70 + Math.sin(a) * 10 - 0.8, 1.6, 1.6); }
+      const a1 = now / 6000 * 6.283; ctx.strokeStyle = '#e8d8a0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y - 70); ctx.lineTo(x + Math.cos(a1) * 9, y - 70 + Math.sin(a1) * 9); ctx.stroke();
+      ctx.fillStyle = '#c8a050'; ctx.beginPath(); ctx.arc(x, y - 44, 6, 0, 7); ctx.fill(); break; }
+    case 'magitower': {                                   // Magitech-Turm: schlanker Turm, Messingringe, pulsierender Kristall
+      shadow(x, y + 4, 16, .4); ctx.fillStyle = '#c4bba4'; ctx.fillRect(x - 9, y - 90, 18, 94); ctx.fillStyle = '#d8cfb8'; ctx.fillRect(x - 9, y - 90, 6, 94);
+      ctx.fillStyle = '#b08a44'; for (const yy of [-30, -55, -80]) ctx.fillRect(x - 12, y + yy, 24, 3);
+      const pl = 0.5 + 0.5 * Math.sin(now / 1500 * 6.283); ctx.fillStyle = `rgba(120,200,255,${0.25 * pl})`; ctx.beginPath(); ctx.arc(x, y - 104, 16, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgba(150,220,255,${0.7 + 0.3 * pl})`; ctx.beginPath(); ctx.moveTo(x, y - 116); ctx.lineTo(x + 7, y - 104); ctx.lineTo(x, y - 92); ctx.lineTo(x - 7, y - 104); ctx.fill(); break; }
+    case 'crane': {                                       // Lastkran: Holzgerüst, Ausleger, Seil, Last
+      shadow(x, y + 4, 18, .35); ctx.fillStyle = '#5a4630'; ctx.fillRect(x - 10, y - 4, 20, 6); ctx.fillRect(x - 2, y - 90, 5, 88);
+      ctx.fillRect(x - 2, y - 90, 54, 4); ctx.strokeStyle = '#3a2c1c'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 1, y - 60); ctx.lineTo(x + 40, y - 88); ctx.moveTo(x + 44, y - 86); ctx.lineTo(x + 44, y - 40); ctx.stroke();
+      ctx.fillStyle = '#6a6460'; ctx.fillRect(x + 38, y - 40, 12, 10); ctx.fillStyle = '#8a6a34'; ctx.beginPath(); ctx.arc(x, y - 30, 7, 0, 7); ctx.fill(); break; }
+    case 'fountain': {                                    // Brunnen: Becken, Säule, Wasserschleier
+      const r = e.r > 16 ? 26 : 18; shadow(x, y + 4, r + 6, .35);
+      ctx.fillStyle = '#c4bba4'; ctx.beginPath(); ctx.ellipse(x, y - 4, r, r * 0.45, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#4a7a9a'; ctx.beginPath(); ctx.ellipse(x, y - 5, r - 4, r * 0.45 - 3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#d8cfb8'; ctx.fillRect(x - 3, y - 30, 6, 26); ctx.beginPath(); ctx.ellipse(x, y - 30, 9, 3, 0, 0, 7); ctx.fill();
+      const f = now / 900 * 6.283; ctx.fillStyle = 'rgba(180,220,240,.55)'; for (let k = 0; k < 6; k++) { const a = k * 1.047 + f * 0.1; ctx.fillRect(x + Math.cos(a) * 7, y - 30 + Math.abs(Math.sin(f + k)) * 18, 1.5, 3); }
+      ctx.fillStyle = 'rgba(210,235,250,.35)'; ctx.fillRect(x - 1, y - 40, 2, 10); break; }
+    case 'column': {                                      // Säule der Arkaden
+      shadow(x, y + 3, 6, .3); ctx.fillStyle = '#e8e0cc'; ctx.fillRect(x - 4, y - 44, 8, 46); ctx.fillStyle = '#b8b09c'; ctx.fillRect(x + 2, y - 44, 2, 46);
+      ctx.fillStyle = '#d4cbb4'; ctx.fillRect(x - 6, y - 48, 12, 4); ctx.fillRect(x - 6, y, 12, 3); break; }
+    case 'aqueduct': {                                    // Aquäduktbogen: zwei Pfeiler, Bogen, Rinne mit Wasser
+      shadow(x, y + 3, 16, .3); ctx.fillStyle = '#c4bba4'; ctx.fillRect(x - 16, y - 52, 32, 10); ctx.fillRect(x - 16, y - 44, 7, 46); ctx.fillRect(x + 9, y - 44, 7, 46);
+      ctx.fillStyle = '#9a9280'; ctx.beginPath(); ctx.arc(x, y - 30, 9, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#2a261e'; ctx.beginPath(); ctx.arc(x, y - 28, 8, Math.PI, 0); ctx.fill(); ctx.fillRect(x - 8, y - 28, 16, 30);
+      ctx.fillStyle = '#5a8aa8'; ctx.fillRect(x - 16, y - 54, 32, 3); break; }
+    case 'telecircle': {                                  // S12 E: Teleportkreis zur Himmelsinsel — Messingring, Glyphen, Licht
+      const t = now / 1000; ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y, 20, 9, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#b08a44'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y, 18, 8, 0, 0, 7); ctx.stroke();
+      ctx.strokeStyle = `rgba(150,200,255,${0.45 + 0.25 * Math.sin(t * 3)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, 13, 5.5, 0, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#e8d8a0'; for (let k = 0; k < 8; k++) { const a = t * 0.6 + k * 0.785; ctx.fillRect(x + Math.cos(a) * 18 - 1, y + Math.sin(a) * 8 - 1, 2, 2); }
+      ctx.fillStyle = `rgba(160,210,255,${0.18 + 0.1 * Math.sin(t * 2)})`; ctx.fillRect(x - 10, y - 40, 20, 40); break; }
     case 'chimney': {                                     // S12 E: Ziegelschornstein mit Rauch
       shadow(x, y + 3, 7, .3);
       ctx.fillStyle = '#4a2e24'; ctx.fillRect(x - 5, y - 44, 10, 46); ctx.fillStyle = '#6a4232'; ctx.fillRect(x - 5, y - 44, 3, 46);
@@ -1401,6 +1485,9 @@ const LIMB_PX = { S: { rarm: [3, 14], larm: [15, 14], rleg: [6, 19], lleg: [12, 
 export function drawHumanoid(e, now, override) {
   const c = override || ctx, k = SP.FIGK * (e.big || 1); c.save(); c.translate(e.x, e.y + 6); c.scale(k, k); c.translate(-e.x, -e.y - 6);
   try { drawHumanoidAt(e, now, override);
+    if (e.bondGuard && !e.downed) {                                      // MP2 §25: Wächter — glühende rote Augen, pulsierend
+      const pl = 0.6 + 0.4 * Math.sin(now / 260); c.fillStyle = `rgba(255,50,30,${pl})`; c.fillRect(e.x - 2.5, e.y - 33, 1.6, 1.2); c.fillRect(e.x + 1, e.y - 33, 1.6, 1.2);
+      c.fillStyle = `rgba(255,60,30,${0.15 * pl})`; c.beginPath(); c.arc(e.x, e.y - 32.5, 5, 0, 7); c.fill(); }
     if (e.big && !e.downed) {                                            // S12 E: Uhrwerk in der Brust des Kampfautomaten
       const gx = e.x, gy = e.y - 22, a0 = now / 400; c.fillStyle = '#1a1612'; c.beginPath(); c.arc(gx, gy, 5, 0, 7); c.fill();
       c.fillStyle = '#b08a44'; c.beginPath(); c.arc(gx, gy, 3.5, 0, 7); c.fill(); for (let q = 0; q < 6; q++) { const a = a0 + q * 1.047; c.fillRect(gx + Math.cos(a) * 4 - 0.8, gy + Math.sin(a) * 4 - 0.8, 1.6, 1.6); }
@@ -1501,9 +1588,10 @@ function weaponPose(e, now, it, pz) {
   const thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
   const side = pz.dir === 'W' || pz.dir === 'E', armSide = side ? 'near' : (Math.cos(dir) < 0 ? 'L' : 'R');
   const [sox, soy] = SP.shoulderOf(pz.dir, pz.pose, armSide === 'L' ? 'L' : 'R'), shx = e.x + sox, shy = e.y + 6 + soy;
+  const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
   const upright = wt === 'spear' || wt === 'polearm', onShoulder = wt === 'great' || wt === 'hammer';   // S12: Stangenwaffen aufrecht, Zweihänder auf der Schulter
   const hand = (swv, sv) => {                                         // Hand für einen Schwungzustand
-    if (ranged) return [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5];
+    if (ranged) return aimingR ? [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5] : [shx + Math.cos(dir) * 4, shy + 14 + low];   // Phase 1: in Ruhe hängt die Fernwaffe an der Seite
     const active = swv > 0 || e.cover || (A && A.kind === 'work');
     if (!active) return upright ? [shx + Math.cos(dir) * 6, shy + 11 + low] : onShoulder ? [shx + Math.cos(dir) * 3, shy + 9 + low]
       : [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
@@ -1515,7 +1603,11 @@ function weaponPose(e, now, it, pz) {
   const [hx, hy] = hand(sw, sv);
   // In Ruhe getragen, nicht gezielt: Klinge gesenkt zur Blickseite (sonst zeigte sie wie ein Zeiger zur Maus und kreiste um die Figur)
   const rest = !ranged && !(sw > 0) && !e.cover && !(A && A.kind === 'work');
-  const a = rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
+  // Bogen (Phase 1): wird senkrecht gehalten — in der Draufsicht bleiben die Wurfarme senkrecht, nur leicht zur Zielseite geneigt
+  // (vorher drehte er ganz mit dem Ziel und lag beim Blick nach unten waagrecht wie eine Armbrust vor dem Bauch).
+  const bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
+  const a = wt === 'bow' ? bowA : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
+    : rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
   return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv };
 }
 // Zweite Hand am Schaft (Zweihänder): von der anderen Schulter zu einem Punkt 9 Welt-Einheiten weiter oben auf der Waffenachse —
@@ -1561,7 +1653,7 @@ function drawWeapon(c, e, now, it, wp) {
     }
   }
   c.save(); c.translate(Math.round(hx), Math.round(hy));
-  c.rotate(ranged ? dir : a);
+  c.rotate(ranged && wt === 'wand' ? dir : a);                          // Phase 1: Bogen/Armbrust nach ihrer Haltung (Bogen senkrecht)
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);          // nach Blickrichtung, nie mitten im Schwung (Bogen ist symmetrisch)
   c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
   if (W.orb) {                                                      // Kristall des Stabs flackert (Magie sichtbar, kein Glühschleier)
@@ -1843,7 +1935,7 @@ function drawFx(now) {
 // ---------------- Licht & Wetter ----------------
 export function ambient() {
   const h = S.minute / 60;
-  if (DUNGEONS[S.map]) return 0.82;
+  if (DUNGEONS[S.map] && !DUNGEONS[S.map].open) return 0.82;   // Himmelsinsel: Tageslicht
   let a = 0;
   if (h < 5) a = 0.72; else if (h < 7) a = 0.72 - (h - 5) / 2 * 0.62;
   else if (h < 17) a = 0.08; else if (h < 20) a = 0.08 + (h - 17) / 3 * 0.5;
@@ -1884,7 +1976,7 @@ function drawLight(now) {
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.clearRect(0, 0, dark.width, dark.height);          // sonst summiert sich die Dunkelheit jeden Frame
   dctx.setTransform(dpr / 2, 0, 0, dpr / 2, 0, 0);
-  const night = S.map === 'deep' ? '8,12,18' : DUNGEONS[S.map] ? '6,8,10' : (S.minute / 60 > 18 || S.minute / 60 < 6) ? '10,14,28' : '20,18,14';
+  const night = S.map === 'deep' ? '8,12,18' : DUNGEONS[S.map] && !DUNGEONS[S.map].open ? '6,8,10' : (S.minute / 60 > 18 || S.minute / 60 < 6) ? '10,14,28' : '20,18,14';
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = `rgba(${night},${a})`;
   dctx.fillRect(0, 0, W, H);
@@ -2140,9 +2232,12 @@ function titleLayers(lw, lh) {
   titleCache.key = key; titleCache.back = back; titleCache.mid = mid;
   return titleCache;
 }
+let TITLE_HERO = null;
+export function setTitleHero(ch) { TITLE_HERO = ch ? { kind: 'player', pal: ch.pal, seed: ch.seed || 1, build: ch.build, equip: ch.equip || {}, body: ch.body, prof: ch.prof, spec: null } : null; }
 export function drawTitleScene(canvas, t) {
   const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth, h = canvas.height = canvas.clientHeight;
+  if (!w || !h) return;                                      // Phase 1: verstecktes Canvas (Größe 0) — sonst wirft drawImage
   const k = Math.max(3, Math.round(h / 190)), lw = Math.ceil(w / k), lh = Math.ceil(h / k);
   const L = titleLayers(lw, lh);
   const cv = L.frame || (L.frame = document.createElement('canvas'));
@@ -2183,9 +2278,12 @@ export function drawTitleScene(canvas, t) {
   }
   // Rastende am Feuer: dieselben Pixel-Sprites wie im Spiel, hier 1:1 im Szenenraster
   o.filter = 'brightness(0.62) sepia(0.25)';
-  const A = SP.humanFrame(TITLE_A, 'E', t % 1300 < 650 ? 'i0' : 'i1'), B = SP.humanFrame(TITLE_B, 'W', 'i0');
-  const sa = (A.px || 2) / 2, sb = (B.px || 2) / 2;                  // Szenenraster = alter Sprite-Pixel; feine Frames halb so groß
-  o.drawImage(A, fx - 12 - A.width * sa, fy + 4 - A.oy * sa, A.width * sa, A.height * sa); o.drawImage(B, fx + 12, fy + 4 - B.oy * sb, B.width * sb, B.height * sb);
+  const B = SP.humanFrame(TITLE_B, 'W', 'i0'), sb = (B.px || 2) / 2;   // Szenenraster = alter Sprite-Pixel; feine Frames halb so groß
+  o.drawImage(B, fx + 12, fy + 4 - B.oy * sb, B.width * sb, B.height * sb);
+  if (TITLE_HERO) {                                                    // Phase 1: der eigene Charakter, 3/4 von vorn, mit Ausrüstung und Waffe wie im Spiel
+    o.save(); o.translate(fx - 22, fy + 4); o.scale(0.5, 0.5);
+    try { drawHumanoid({ ...TITLE_HERO, x: 0, y: 0, facing: 0, aim: Math.PI / 2 - 0.35, swing: 0, downed: false, act: null, vx: 0, vy: 0 }, t, o); } finally { o.restore(); }
+  } else { const A = SP.humanFrame(TITLE_A, 'S', t % 1300 < 650 ? 'i0' : 'i1'), sa = (A.px || 2) / 2; o.drawImage(A, fx - 22 - A.width * sa / 2, fy + 4 - A.oy * sa, A.width * sa, A.height * sa); }
   o.filter = 'none';
   for (let x = 0; x < lw; x += 2) {                         // Gras vorn, wiegt im Wind
     const sw = Math.round(Math.sin(t / 900 + x / 14) * 1), hh = 4 + (h2(x, 3) * 4 | 0);

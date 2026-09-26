@@ -25,7 +25,7 @@ export function revealAround(tx, ty, r = 18) {                  // r in Kacheln 
   }
   if (changed) { let s = ''; for (let i = 0; i < fog.length; i++) s += String.fromCharCode(fog[i]); S.fog = btoa(s); }
 }
-export function explored(tx, ty) { return fogReady() && !!fogAt(Math.floor(tx / FC), Math.floor(ty / FC)); }
+export function explored(tx, ty) { return !!S.dbg?.reveal || (fogReady() && !!fogAt(Math.floor(tx / FC), Math.floor(ty / FC))); }   // Debug: ganze Welt
 export function resetFog() { fog = null; S.fog = ''; }
 
 // ---------------- Grundbild ----------------
@@ -100,6 +100,21 @@ function label(c, text, x, y, size, col, italic = false) {
 
 // ---------------- Karte zeichnen ----------------
 const FACCOL = { aurel: '#e8c878', chain: '#e0a040', goblin: '#b8a050', undead: '#e04a3a', valen: '#e8d070', order: '#f0e6c8', merch: '#e8c060', bandit: '#b86a40' };
+// Debug-Karte (MP2 §71): alle Lebenden und Ziele — Gegner rot, Bosse groß, wichtige NPCs gold, Verteidigungsmeister blau,
+// Karawanen weiß, Auftragsziele gelb, Heere (Feldzug) schwarz-rot, Spieler grün. Unabhängig vom Nebel.
+function debugMarks(c, SX, SY, sc, w, h) {
+  const dot = (x, y, r, col) => { const X = SX(x), Y = SY(y); if (X < -5 || Y < -5 || X > w + 5 || Y > h + 5) return; c.fillStyle = col; c.beginPath(); c.arc(X, Y, r, 0, 7); c.fill(); };
+  for (const e of S.ents.world) {
+    if (!e.alive && e.kind !== 'caravan') continue; const x = e.x / TS, y = e.y / TS;
+    if (e.kind === 'enemy') dot(x, y, e.boss ? 4 : 1.4, e.boss ? '#ff3020' : 'rgba(230,60,40,.8)');
+    else if (e.kind === 'caravan') dot(x, y, 3, '#f0f0e0');
+    else if (e.kind === 'npc' && e.vm) dot(x, y, 2.5, '#60a0ff');
+    else if (e.kind === 'npc' && e.camp) dot(x, y, 2, '#8a1a1a');
+    else if (e.kind === 'npc' && (e.key && !e.villager && !e.guard)) dot(x, y, 2, '#f0c040');
+  }
+  for (const C of S.contracts || []) if (C.state === 'active') dot(C.x, C.y, 3.5, '#ffe040');
+  dot(S.player.x / TS, S.player.y / TS, 4, '#40ff60');
+}
 export function drawAtlas(cv, zoom, extra) {
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, m = MAPS.world, p = S.player;
   const B = buildBase(); fogReady();
@@ -150,11 +165,12 @@ export function drawAtlas(cv, zoom, extra) {
     else if (l.kind === 'wreck') { c.strokeStyle = '#6a4a2a'; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 1, s * 0.45, 0.2, Math.PI - 0.2); c.stroke(); c.fillStyle = '#6a4a2a'; c.fillRect(x - 0.5, y - s * 0.7, 1.5, s * 0.6); }
     else if (l.kind === 'shrine') { c.fillStyle = l.faction === 'undead' ? '#5a2a2a' : '#8a8478'; c.fillRect(x - 1.5, y - s * 0.7, 3, s * 0.7); c.fillRect(x - 3, y - s * 0.5, 6, 1.5); }
   }
-  // Nebel: weiche Kante (kleine Maske, geglättet hochskaliert)
-  const fcv = document.createElement('canvas'); fcv.width = fogW; fcv.height = fogH;
+  // Nebel: weiche Kante (kleine Maske, geglättet hochskaliert) — im Debug „ganze Welt“ aus, dafür alle Lebenden als Punkte
+  if (S.dbg?.reveal) debugMarks(c, SX, SY, sc, w, h);
+  else { const fcv = document.createElement('canvas'); fcv.width = fogW; fcv.height = fogH;
   const fc = fcv.getContext('2d'), fd = fc.createImageData(fogW, fogH);
   for (let i = 0; i < fogW * fogH; i++) { const on = (fog[i >> 3] >> (i & 7)) & 1; fd.data[i * 4] = 10; fd.data[i * 4 + 1] = 9; fd.data[i * 4 + 2] = 8; fd.data[i * 4 + 3] = on ? 0 : 246; }
-  fc.putImageData(fd, 0, 0); c.imageSmoothingEnabled = true; c.drawImage(fcv, ox - FC * sc / 2, oy - FC * sc / 2, fogW * FC * sc + FC * sc, fogH * FC * sc + FC * sc);
+  fc.putImageData(fd, 0, 0); c.imageSmoothingEnabled = true; c.drawImage(fcv, ox - FC * sc / 2, oy - FC * sc / 2, fogW * FC * sc + FC * sc, fogH * FC * sc + FC * sc); }
   // Namen (nur Erkundetes), große Landesnamen
   const place = extra.place;
   for (const [text, tx, ty, col] of [['DIE EISENMARK', 120, 250, 'rgba(224,160,64,.8)'], ['KÖNIGREICH VALEN', OX + 330, 330, 'rgba(232,208,112,.8)'], ['DAS TOTENLAND', OX + 1024, 330, 'rgba(224,74,58,.8)'], ['GRENZLAND DER TOTEN', OX + 620, 560, 'rgba(192,112,96,.75)'], ['HOCHREICH AURELION', 860, 940, 'rgba(236,214,150,.85)']])

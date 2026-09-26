@@ -60,6 +60,19 @@ export const BTYPES = {
   stable:   { label: 'Stall',          stalls: 1, noWin: 1, hay: 1, wall: 'wood' },
   store:    { label: 'Lagerhaus',      bigDoor: 1, crane: 1, sacks: 1, fewWin: 1 },
   fisher:   { label: 'Fischerhütte',   nets: 1, wall: 'wood', woodpile: 0.3 },
+  // Monumentalbauten (Phase 5, Nutzer: „mehr Gebäude betretbar“): eigene Fassade (monumentSprite), begehbar wie Häuser
+  palace:      { label: 'Regierungspalais',            mono: 1, columns: 1, dome: 1, towers: 1, emblem: 'sun' },
+  markethall:  { label: 'Große Markthalle',            mono: 1, glass: 1, arches: 1, emblem: 'scales' },
+  bank:        { label: 'Zentralbank und Börse',       mono: 1, columns: 1, emblem: 'coin' },
+  academy:     { label: 'Akademie von Aurelion',       mono: 1, columns: 1, towers: 1, emblem: 'book' },
+  observatory: { label: 'Aurelionisches Observatorium', mono: 1, dome: 1, emblem: 'star' },
+  library:     { label: 'Große Bibliothek',            mono: 1, arches: 1, emblem: 'book' },
+  court:       { label: 'Hoher Gerichtshof',           mono: 1, columns: 1, emblem: 'scales' },
+  hospital:    { label: 'Hospital der Kaiserin',       mono: 1, arches: 1, emblem: 'cross' },
+  bathhouse:   { label: 'Badehaus',                    mono: 1, dome: 1, arches: 1, emblem: 'wave' },
+  magitech:    { label: 'Magitech-Werkstatt',          mono: 1, glass: 1, emblem: 'gear', glow: 1 },
+  factoryhall: { label: 'Werkhalle',                   mono: 1, glass: 1, saw: 1, emblem: 'gear', dark: 1 },
+  legion:      { label: 'Kaserne der Sonnenlegion',    mono: 1, towers: 1, emblem: 'sun' },
 };
 
 // 5×4-Symbole für Schilder ('#' = Farbe, '+' = Licht)
@@ -76,7 +89,7 @@ const ICON = {
 // Bewohner). Je Ort unterschiedlich stark: die Grenzorte verfallen, die Ordensfeste hält ihre Häuser instand.
 // Betriebe (Taverne, Schmiede …) werden nie ganz aufgegeben — sonst fehlt der Ort, der sie braucht.
 const WEAR_BIAS = { aurelheim: 0.02, kupferhafen: 0.06, gelenkhall: 0.08, tickmar: 0.1, sanktserin: 0.04, aurelheim_land: 0.05, grauwasser: 0.6, hohlstein: 0.6, eisenried: 0.6, eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
-const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store']);
+const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store', 'palace', 'markethall', 'bank', 'academy', 'observatory', 'library', 'court', 'hospital', 'bathhouse', 'magitech', 'factoryhall', 'legion']);
 export function wearOf(b) {
   if (b.wear != null) return b.wear;
   const bias = WEAR_BIAS[b.town] ?? 0.3, r = hh(b.hx ?? b.x, b.hy ?? b.y, 55);
@@ -88,7 +101,8 @@ const styleOf = b => ({ pitch: 0.34 + hh(b.hx ?? b.x, b.hy ?? b.y, 61) * 0.17, d
 
 // Wandhöhe FH: höher als eine Figur (25 Texel inkl. Kopf ≈ Tür 16). Firsthöhe RISE wächst mit der Tiefe.
 // Session 10: Fassade höher (Tür ≈ Figurenhöhe, Figuren sind seit v2 größer); das Dach behält mindestens 24 Texel.
-export function houseDims(b) { const T = BTYPES[b.type] || {}, RISE = 10 + b.h * 2, FH = Math.min(T.floors === 2 ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
+export function houseDims(b) { const T = BTYPES[b.type] || {}; if (T.mono) { const RISE = 12 + b.h * 2 + (T.dome ? 30 : T.towers ? 16 : 0), FH = Math.min(52, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 }; }
+  const RISE = 10 + b.h * 2, FH = Math.min(T.floors === 2 ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
 // Giebel nach vorn: über der Vorderwand ein Giebeldreieck (Höhe GH), dahinter zwei Dachflächen, die nach hinten laufen.
 export function gableOf(b) {
   const { OV, RISE, FH, W } = houseDims(b), yF = RISE + b.h * 16 - FH, halfW = (b.w * 16) / 2;
@@ -98,6 +112,7 @@ export function gableOf(b) {
 
 // Schornstein-Mündung in Texeln (für Rauch im Renderer) oder null. Gleiche Würfel wie beim Zeichnen.
 export function chimneyOf(b) {
+  if (BTYPES[b.type]?.mono && !BTYPES[b.type].dark) return null;   // Prachtbauten rauchen nicht (Werkhalle schon)
   const T = BTYPES[b.type] || BTYPES.house, { RISE, FH, W } = houseDims(b);
   const on = T.forge || (T.chimney && (T.chimney >= 1 || hh(b.hx ?? b.x, b.hy ?? b.y, 7 + 'chimney'.length) < T.chimney));
   if (!on || wearOf(b) === 2) return null;                           // verlassen: Schornstein eingestürzt, kein Rauch
@@ -105,7 +120,61 @@ export function chimneyOf(b) {
   return { x: Math.round(G.cx + side * G.halfW * 0.5) + 1, y: Math.max(2, G.apexY - 14) - 2, soot: !!T.forge };
 }
 
+// Monumentalfassade (MP2 §52): heller Quaderstein, Säulen oder Bögen, hohe Bogenfenster, Goldgesims, Freitreppe, Wappen;
+// darüber ein flaches Dach mit Balustrade, dazu Kuppel, Glasdach, Sägezahn oder Ecktürme je nach Bau. Gleiche Maße-Logik
+// wie Häuser (houseDims), damit Renderer, Dach-Ausblenden beim Betreten und Kollision unverändert bleiben.
+const EMBLEM = { sun: ['.#.#.', '#+++#', '.+#+.', '#+++#', '.#.#.'], scales: ['#.#.#', '#####', '..#..', '.###.'], coin: ['.###.', '#+#+#', '##+##', '#+#+#', '.###.'],
+  book: ['##.##', '#+#+#', '#+#+#', '#####'], star: ['..#..', '.###.', '#####', '.#.#.'], cross: ['.###.', '#####', '.###.', '.###.'], wave: ['#..#.', '.##.#', '#..#.'], gear: ['.#.#.', '#####', '##.##', '#####', '.#.#.'] };
+function monumentSprite(b, lit) {
+  const T = BTYPES[b.type], { OV, RISE, FH, W, H } = houseDims(b), s = b.seed || 1, n = (x, y) => hh(x, y, s), g = new G(W, H);
+  const yF = RISE + b.h * 16 - FH, yB = RISE + b.h * 16, fx0 = OV, fx1 = OV + b.w * 16 - 1, cx = OV + ((b.w * 16) >> 1);
+  const St = ramp(T.dark ? '#6a655c' : '#b8b0a0'), Gd = ramp('#b08a44'), Ld = ramp(T.dark ? '#3a3e44' : '#5a6878');
+  // ---- Dach über dem Grundriss: flach, Bleibahnen, Balustrade an der Traufe ----
+  const roofTop = RISE, roofBot = yF;
+  for (let y = roofTop; y < roofBot; y++) for (let x = fx0; x <= fx1; x++) {
+    const r = n(x, y), seam = (x - fx0) % 10 === 0;
+    let c = seam ? Ld.sh : r > 0.93 ? Ld.hi : Ld.b;
+    if (T.glass && (x - fx0) % 20 > 3 && (x - fx0) % 20 < 17 && (y - roofTop) % 12 > 2 && (y - roofTop) % 12 < 10) c = lit ? '#d8a860' : (y - roofTop) % 12 < 5 ? '#9ac0d4' : '#6a90a8';   // Glasfelder
+    if (T.saw && (x - fx0) % 24 < 6) c = Ld.dk;                                                                    // Sägezahndach
+    if (x === fx0 || x === fx1) c = Ld.dk;
+    g.p(x, y, c);
+  }
+  for (let x = fx0; x <= fx1; x++) { g.p(x, roofTop, St.hi); g.p(x, roofTop + 1, St.b); }                         // Attika hinten
+  for (let x = fx0; x <= fx1; x++) for (let y = roofBot - 6; y < roofBot; y++) g.p(x, y, y === roofBot - 6 ? St.hi : (x - fx0) % 4 === 0 && y < roofBot - 1 ? St.sh : St.b);   // Balustrade
+  if (T.towers) for (const tx of [fx0, fx1 - 13]) { for (let y = roofTop - 14; y < roofBot; y++) for (let x = tx; x < tx + 14; x++) g.p(x, y, x === tx || y === roofTop - 14 ? St.hi : x === tx + 13 ? St.sh : St.b);
+    for (let y = roofTop - 20; y < roofTop - 14; y++) for (let x = tx + 2; x < tx + 12; x++) if (Math.abs(x - tx - 7) <= (y - roofTop + 20)) g.p(x, y, Ld.b);   // Turmdach
+    g.r(tx + 5, roofTop - 6, 4, 6, lit ? '#e2a95a' : '#2a3440'); }
+  if (T.dome) { const dr = Math.min(Math.round((fx1 - fx0) * 0.28), 36), dcy = roofTop + Math.round((roofBot - roofTop) * 0.45);
+    for (let y = dcy - dr; y <= dcy; y++) for (let x = cx - dr; x <= cx + dr; x++) { const d = Math.hypot(x - cx, (y - dcy) * 1.1); if (d > dr) continue;
+      g.p(x, y, x < cx - dr * 0.35 && y < dcy - dr * 0.4 ? mix(Ld.hi, '#8ab0c8', 0.4) : (x - cx) % 6 === 0 ? Ld.sh : d > dr - 1.5 ? Ld.dk : Ld.b); }
+    g.r(cx - dr, dcy, dr * 2 + 1, 3, St.b); g.r(cx - 1, dcy - dr - 8, 3, 8, Gd.b); g.p(cx, dcy - dr - 9, Gd.hi); }
+  // ---- Fassade ----
+  for (let y = yF; y < yB; y++) for (let x = fx0; x <= fx1; x++) { const row = ((y - yF) / 4) | 0, xo = (x - fx0 + (row & 1) * 4) % 9;
+    g.p(x, y, (y - yF) % 4 === 3 || xo === 0 ? St.sh : xo === 1 && (y - yF) % 4 === 0 ? St.hi : n(x, y) > 0.94 ? mix(St.b, St.sh, 0.5) : St.b); }
+  for (let x = fx0; x <= fx1; x++) { g.p(x, yF, Gd.b); g.p(x, yF + 1, Gd.sh); g.p(x, yF + 2, St.dk); g.p(x, yB - 2, St.sh); g.p(x, yB - 1, St.dk); }   // Goldgesims, Sockel
+  const dw = Math.min(22, 10 + b.w), dh = Math.min(FH - 10, 30), dx = cx - (dw >> 1), dy = yB - 3 - dh;
+  const pier = x => { for (let y = yF + 3; y < yB - 3; y++) { g.p(x, y, St.hi); g.p(x + 1, y, mix(St.hi, St.b, 0.4)); g.p(x + 2, y, St.b); g.p(x + 3, y, St.sh); } g.r(x - 1, yF + 3, 6, 2, St.hi); g.r(x - 1, yB - 5, 6, 2, St.sh); };
+  const archWin = (x0, y0, w, h2) => { for (let y = y0; y < y0 + h2; y++) for (let x = x0; x < x0 + w; x++) { const top = y < y0 + (w >> 1) && Math.hypot(x - x0 - (w - 1) / 2, y - y0 - (w >> 1)) > w / 2; if (top) continue;
+      g.p(x, y, lit ? ((x + y) % 4 ? '#e2a95a' : '#f2cf8a') : x === x0 + (w >> 1) || y === y0 + (h2 >> 1) ? '#1e2630' : y < y0 + 4 ? '#6a8aa0' : '#2a3440'); }
+    g.r(x0 - 1, y0 + h2, w + 2, 1, St.hi); };
+  const step = T.columns ? 12 : 16, winH = Math.min(FH - 16, 22);
+  for (let x = fx0 + 6; x < fx1 - 8; x += step) {
+    const nearDoor = x + 8 > dx - 2 && x < dx + dw + 2;
+    if (T.columns) pier(x);
+    if (!nearDoor && (T.arches || !T.columns || (x - fx0) % 24 === 6)) archWin(x + (T.columns ? 5 : 0), yF + 8, 6, winH);
+  }
+  // Portal: Freitreppe, Doppeltür, Bogen, Wappen
+  for (let k = 0; k < 3; k++) g.r(dx - 6 + k * 2, yB - 3 + k - 2, dw + 12 - k * 4, 1, k ? St.hi : St.sh);
+  for (let y = dy; y < yB - 3; y++) for (let x = dx; x < dx + dw; x++) { const top = y < dy + (dw >> 1) && Math.hypot(x - dx - (dw - 1) / 2, y - dy - (dw >> 1)) > dw / 2; if (top) continue;
+    g.p(x, y, x === dx + (dw >> 1) ? '#1a1410' : (x - dx) % 3 === 0 ? '#3a2a1c' : '#4e3a26'); }
+  g.r(dx - 2, dy - 2, dw + 4, 2, Gd.b);
+  const E = EMBLEM[T.emblem]; if (E) { const ex = cx - 2, ey = yF + 4; E.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.') g.p(ex + i, ey + j, ch === '+' ? Gd.hi : Gd.b); })); }
+  if (T.glow) for (let x = fx0 + 3; x < fx1 - 3; x += 20) { g.r(x, yF + 5, 3, 3, '#9ad8ff'); g.p(x + 1, yF + 4, '#e0f4ff'); }        // Magitech: blaue Leuchtsteine
+  if (b.door !== 'S') for (let y = dy; y < yB - 3; y++) for (let x = dx - 6; x < dx + dw + 6; x++) g.p(x, y, St.b);                        // Seiteneingang: Front geschlossen
+  return toCanvas(g);
+}
 export function houseSprite(b, lit) {
+  if (BTYPES[b.type]?.mono) return monumentSprite(b, lit);
   const T = BTYPES[b.type] || BTYPES.house, st = TOWN_STYLE[b.town] || TOWN_STYLE.eren;
   const wear = wearOf(b), sty = styleOf(b);
   if (wear === 2) lit = false;                                      // verlassen: nachts dunkel
@@ -420,7 +489,7 @@ function weather(g, o) {
 // Innenausstattung je Funktion: Möbel, die zur Nutzung passen (Welt-Props, von world.js platziert).
 // Koordinaten relativ zur Innenfläche (x+1..x+w-2, y+1..y+h-2). Die Türachse bleibt frei.
 export const FURNISH = {
-  tavern:   [['hearth', 0, 0], ['table', 2, 1], ['bench', 2, 2], ['table', -2, 1], ['bench', -2, 2], ['counter', -1, 0], ['cask_rack', -1, -1]],
+  tavern:   [['hearth', 0, 0], ['table', 2, 1], ['bench', 2, 2], ['table', -2, 1], ['bench', -2, 2], ['counter', -1, 0], ['cask_rack', -1, -1], ['bed', 0, -1], ['bed', 1, -1], ['shelf', -3, 0], ['barrel', -2, -1]],   // MP2 §76: Schlafraum, Lager
   smithy:   [['forge', 0, 0], ['workbench_int', 2, 0], ['weapon_rack', -1, 0], ['barrel', -1, 1]],
   healer:   [['bed', 0, 1], ['bed', 0, 2], ['shelf', 2, 0], ['table', -1, 0]],
   hall:     [['desk', 1, 1], ['shelf', 0, 0], ['shelf', -1, 0], ['bench', -1, 2]],
