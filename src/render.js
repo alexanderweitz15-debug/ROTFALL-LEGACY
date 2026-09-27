@@ -19,7 +19,7 @@ export function initCanvas(canvas) {
   resize();
   new ResizeObserver(resize).observe(cv.parentElement);
 }
-function resize() {
+export function resize() {
   if (!cv) return;
   dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   W = cv.parentElement.clientWidth; H = cv.parentElement.clientHeight;
@@ -1547,7 +1547,8 @@ function drawHumanoidAt(e, now, override) {
     SP.blit(c, f, x, y + 6 - br);
     return;
   }
-  const w = e.equip && e.equip.weapon, wit = w ? ITEMS[w.key] || {} : null;
+  const tool = e.act && e.act.tool && now >= e.act.at && now < e.act.until ? { key: e.act.tool } : null;   // S13: bei der Arbeit das Werkzeug statt der Waffe
+  const w = tool || (e.equip && e.equip.weapon), wit = w ? ITEMS[w.key] || {} : null;
   const pz = SP.poseOf(e, now, wit && ['bow', 'crossbow', 'wand'].includes(wit.wtype));   // Fernwaffen: Zielhaltung statt Schwung
   if (pz.pose === 'tuck') {                                         // Ausweichrolle: Kugel in 90°-Schritten gedreht
     const f = SP.humanFrame(spec, 'S', 'tuck'), sgn = e.dodge && e.dodge.ax < 0 ? -1 : 1;
@@ -1567,7 +1568,7 @@ function drawHumanoidAt(e, now, override) {
   SP.warm(spec, noArm);
   const arms = () => { if (!melee) return; drawArm(c, e, spec, wp, f); if (two) drawArm(c, e, spec, offGrip(e, wp, pz), f); };   // Hand über den Griff                         // BUG-093: übrige Richtungen/Posen in Leerlaufzeit vorbacken
   const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
-  if (armed && behind) { drawWeapon(c, e, now, wit, wp); arms(); }
+  if (armed && behind) { drawWeapon(c, e, now, wit, wp, w); arms(); }
   const [sx, sy] = buildOf(e).scale;
   c.save(); c.translate(x, y + 6); c.scale(sx, sy);
   SP.blit(c, f, 0, 0);
@@ -1582,7 +1583,8 @@ function drawHumanoidAt(e, now, override) {
     c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0));
     c.beginPath(); c.arc(x, y - (f.px < 2 ? 40 : 29), 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';   // Augenhöhe je Raster
   }
-  if (armed && !behind) { drawWeapon(c, e, now, wit, wp); arms(); }
+  if (armed && !behind) { drawWeapon(c, e, now, wit, wp, w); arms(); }
+  if (e.carry && pz.dir !== 'N') { const ic = groundIcon(e.carry), bob = (e.vx || e.vy) ? ((now / 180 | 0) & 1) : 0; c.drawImage(ic, Math.round(x - 8 + (pz.dir === 'E' ? 5 : pz.dir === 'W' ? -5 : 0)), Math.round(y - 22 - bob), 16, 16); }   // S13: getragene Ware vor der Brust
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - (f.px < 2 ? 58 : 44), 4, 0, 7); c.stroke(); }
 }
 
@@ -1628,7 +1630,7 @@ const RANGED_W = new Set(['bow', 'crossbow', 'wand']);
 function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
-  const sw = A && A.kind === 'work' ? 0.05 + ((ak * 2) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe
+  const sw = A && A.kind === 'work' ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe (S13: Werkzeug bestimmt das Tempo)
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
   const ranged = RANGED_W.has(wt), sgn = Math.cos(dir) < 0 ? -1 : 1;   // nach links gespiegelt: Waffe hängt unten, Hieb von oben
   const thrust = wt === 'spear' || wt === 'dagger' || wt === 'rapier';
@@ -1678,11 +1680,11 @@ function drawArm(c, e, spec, wp, f) {
   c.fillStyle = hd.b; R(x1 - Q, y1 - Q, 3, 3); c.fillStyle = hd.hi; R(x1 - Q, y1 - Q, 2, 1);
   c.fillStyle = hd.sh; R(x1, y1 + Q, 2, 1);
 }
-function drawWeapon(c, e, now, it, wp) {
-  it = it || ITEMS[e.equip.weapon.key] || {};
+function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar in der Hand (S13: auch ein Werkzeug)
+  it = it || ITEMS[wi.key] || {};
   wp = wp || weaponPose(e, now, it, SP.poseOf(e, now, RANGED_W.has(it.wtype)));
   const { A, sw, dir, wt, arc, ranged, sgn, sv, a, hx, hy } = wp;
-  const W = SP.weaponSprite(e.equip.weapon.key, e.equip.weapon.rar || it.rarity, it.holy, wt);   // Rarität des Exemplars
+  const W = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt);   // Rarität des Exemplars
   const WP = W.px || PX, len = (W.cv.width - W.gx) * WP;
   // Klingenspur: dieselbe Kurve ein paar Schritte zurück — Hand und Klinge der Vergangenheit, die Spur folgt der Klinge
   if (sw > 0 && !it.ranged && !A) {

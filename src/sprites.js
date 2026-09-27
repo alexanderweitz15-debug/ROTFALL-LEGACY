@@ -106,11 +106,11 @@ function rgbaOf(col) {                                               // Farbstri
 // ---------------- Stil F (Nutzer S13, Referenz 5: docs/reference/ref5-hauptstil-sprites.png) ----------------
 // Neuer Hauptstil: die Sprites aus dem Blatt des Nutzers, 1:1 ausgeschnitten (assets/ref5_atlas.png, Tabelle ref5_atlas.js).
 // Der bisherige, im Code gemalte Stil („D“) bleibt in den Optionen wählbar. ART steht in S.settings.art; setArt leert die Caches.
-export let ART = 'F';
+export let ART = 'D';
 const artHooks = [];
 export const onArtChange = fn => artHooks.push(fn);
 export function setArt(v) {
-  v = v === 'D' ? 'D' : 'F'; if (v === ART) return; ART = v;
+  v = v === 'F' ? 'F' : 'D'; if (v === ART) return; ART = v;
   frameCache.clear(); lookCache.clear(); WPN.clear(); warmed.clear();
   for (const f of artHooks) f();
 }

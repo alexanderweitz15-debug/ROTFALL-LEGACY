@@ -86,6 +86,17 @@ Leine 360 px, helfen auf) · **Heilerin** (kämpft nie, hilft Verwundeten auf) �
 - Treffer: Körperteile (body.js), Krit (Wahrnehmung, Dolch von hinten), Block (Schild), Rüstung/Durchschlag.
 - Messwerte Session 1 (Selbst-Simulation gegen Untoten, 1 Ziel): Langschwert ~0,5 s, Beil ~0,6 s, Streitkolben ~0,7 s,
   Speer ~1,0 s, Dolch ~0,9 s, Zweihänder ~1,5 s, Große Axt ~1,7 s, Kurzbogen ~2,7 s bis zum Tod — plausibel gestaffelt.
+- **Anti-Kiting (Session 10, BUG-076, §34).** Warum: der Spieler (2,25–2,7) war fast doppelt so schnell wie Nahkämpfer
+  (1,1–1,55) und konnte rückwärts gehend endlos zuschlagen. Bausteine:
+  - Spieler: während des eigenen Hiebs 55 % Tempo („wer schlägt, steht“); Rückwärtsgehen (Bewegung gegen die
+    Zielrichtung, Gegner < 280 px) 70 %.
+  - Alle Nahkämpfer inkl. Gorak/Hrodvar, nur gegen Spieler und Gefährten: „Nicht-mehr-nachgeben“ — nach ~2 s vergeblicher Verfolgung ×1,45 Tempo,
+    angesagt durch rotes „!“ und Staubwolke (fair telegraphiert, kein Sofort-Treffer), klingt ab, sobald sie in Reichweite sind.
+  - Zusätzlich je Typ: Wolf Sprung mit Ducken, Wilder Hund Flanke, Goblin Hit & Run, Bandit eigene Taktik, Bär Revier-Ansturm.
+  - Fernkämpfer ausgenommen (halten Abstand von selbst).
+- **Gegner-Ausdauer (Session 11, §28):** Maximum = 1,2 × Spieler-Maximum (beim ersten Kontakt). Hieb −26, Sprung −30,
+  Erholung +14/s, Elite (Gefahr ≥ 3) und Boss +20/s. Bei 0: „erschöpft“, 1,1 s wanken (Boss 0,7 s), danach 25 Punkte.
+  Warum: Öffnungen im Dauerkampf belohnen aktives Kämpfen; da nur Angriffe kosten, gewinnt reines Abwarten nichts.
 
 ## Waffenklassen (Leitplanken)
 | Klasse | Stärke | Schwäche | Spielstil |
@@ -126,17 +137,43 @@ Spielverändernd: Blutzoll (Heilung aus Schaden), Zerfetzen (Blutung), Dornen (R
 Nachhall, Ahnenwall. Unikate: **Nachtfrost** (mythisch, Hrodvar, Durchfrieren), **Goraks Hackmesser** (legendär, Blutdurst).
 Geschosse tragen weder Blutzoll noch Zerfetzen (sie laufen nicht über den Nahkampftreffer) — deshalb nie auf Fernwaffen.
 
-## Gegner (Kurzblätter)
-| Gegner | Verhalten | Ansage | Region | interiors |
-|---|---|---|---|---|
-| Wolf | duckt sich, springt an | Ducken 280 ms | Wald, Schlucht, Frostkamm | nein |
-| Wildschwein | stürmt | — | Wald | nein |
-| Goblin | tänzelt seitlich, Hieb, springt zurück | — | Lager, Grube, Ruinen | ja |
-| Goblin-Krieger | wie Goblin, schwerer, Schild | — | Grube, Wüste | ja |
-| Bandit | Duellant: umkreist, weicht Ausholen aus | — | Straßen, Lager | ja |
-| Banditenschütze | hält 190 px, spannt sichtbar, springt zurück | Bogen spannen 520 ms | Straßen, Wüste | ja |
-| Untoter Krieger | langsam, kündigt Hiebe an | 380 ms | Friedhof, Totenreich | ja |
-| Gorak (Boss) | Phase 1 Hieb; ab 50 %: Brüllen, Sturmangriff, Bodenbeben | 800 ms / Linie / Ring | Grube | nein (Arena) |
+## Gegner (Datenblätter, §33 — Stand Session 11)
+Alle Gegner sind **statisch** (§72: feste Stärke der Region, `scaling` aus). Level-skalierende Sondergegner gibt es noch
+nicht — Kandidaten: Kopfgeldjäger (Phase 17). Gegner-Ausdauer (§28) und „Nicht-mehr-nachgeben“ (§34) gelten für alle
+Nahkämpfer; die Spalte Anti-Kiting nennt den zusätzlichen, arteigenen Baustein.
+
+| Gegner | LP / Tempo | Verhalten | Ansage | Anti-Kiting (eigen) | Schwäche | Region | Ruf | Innen |
+|---|---|---|---|---|---|---|---|---|
+| Wolf | 30 / 1,55 | duckt sich, springt an; Rudel | Ducken 280 ms | Sprung (Lücke schließen) | wenig LP | Wald, Schlucht, Frostkamm | Knurren | nein |
+| Wilder Hund | 24 / 1,65 | Rudel flankiert von der Seite | — | Flanke, hohes Tempo | sehr wenig LP | Ödland, Straßenränder | Knurren | nein |
+| Wildschwein | 46 / 1,35 | stürmt | — | Sturm | dreht schwer | Wald | Knurren | nein |
+| Bär | 150 / 1,15 | Revier: greift nur Eindringlinge an | 480 ms | Revier-Ansturm | langsam, Ansage lang | tiefer Wald, Berge | Knurren | nein |
+| Goblin | 28 / 1,35 | tänzelt seitlich, Hieb, springt zurück | — | Hit & Run | wenig LP | Lager, Grube, Ruinen | Ruf | ja |
+| Goblin-Krieger | 54 / 1,25 | wie Goblin, schwerer, Schild | — | Schildvorstoß | träge | Grube, Wüste | Ruf | ja |
+| Bandit | 48 / 1,4 | Duellant: umkreist, weicht Ausholen aus | — | Umkreisen, Ausweichen | Ausdauer im Dauerkampf | Straßen, Lager | Ruf | ja |
+| Speerträger (S11) | 50 / 1,3 | hält Speerlänge (66), sticht mit Ansage, stößt zu Nahe zurück | 320 ms | Reichweite, Stoß | seitlich/Schild/Rolle, dann nah dran | Straßen, Banditenlager, Wüste | Ruf | ja |
+| Banditenschütze | 36 / 1,35 | hält 190 px, spannt sichtbar, springt zurück | Spannen 520 ms | Fernkampf | Nahkampf | Straßen, Wüste | Ruf | ja |
+| Untoter Krieger | 44 / 1,15 | langsam, kündigt Hiebe an | 380 ms | Nachsetzen (§34) | Heiliges, Wucht | Friedhof, Totenreich | Klappern | ja |
+| Wiedergänger | 70 / 0,85 | Griff bremst, steht einmal wieder auf | 420 ms | Griff (−50 % Tempo) | Feuer verhindert Aufstehen | Moor, Totenreich | Stöhnen | ja |
+| Geist | 38 / 1,7 | schnell, nach Treffer kurz körperlos | — | Tempo | Heiliges trifft immer | Totenreich | Kreischen | ja |
+| Kultist der Asche | 34 / 1,2 | hält Abstand, Schattenblitz, heilt Untote | 1700 ms Zauber | Fernkampf | Nahkampf, wenig LP | Totenreich, Ruinen | Stöhnen | ja |
+| Wächter der Nekropole | 150 / 1,1 | Elite, Schild, schwere Hiebe | 520 ms | Nachsetzen | Ansage lang | Große Nekropole | Klappern | ja |
+| Hauptmann der Toten | 170 / 1,1 | führt die letzte Befreiungswelle (§81) | 500 ms | Nachsetzen, Zweihänder | Ausdauer | besetzte Orte | Klappern | ja |
+| Gorak (Boss) | — | Phase 1 Hieb; ab 50 %: Brüllen, Sturm, Beben | 800 ms / Linie / Ring | Sturmangriff | prallt an Wänden ab | Grube | Knurren | nein (Arena) |
+| Hrodvar (Boss) | 280 / 1,0 | Eiskreis, ruft unter 50 % drei Tote | 650 ms | Eiskreis bremst | Feuer | Tiefhall | Klappern | nein (Thronsaal) |
+| Knochenritter (P6) | 120 / 0,95 | Schildwall: frontal −70 % | 480 ms | Schild | Flanke, Wucht | Totenland, Gruft | Klappern | ja |
+| Knochenschütze (P6) | 36 / 1,1 | hält Abstand, spannt sichtbar | 520 ms | Fernkampf | Nahkampf | Totenland, Gruft | Klappern | ja |
+| Nekromant (P6) | 52 / 1,0 | ruft bis zu drei Knochendiener | 7 s Ruf | Beschwörung | stirbt er, zerfallen sie | Totenland, Gruft | Stöhnen | ja |
+| Seuchenleiche (P6) | 80 / 0,7 | Masse, Biss vergiftet | 360 ms | zäh | langsam | Totenland | Stöhnen | ja |
+| Aschdämon (P6) | 170 / 1,05 | Glutaura, feuerfest | 460 ms | Flächenschaden | Heiliges, Abstand | Totenland, Gruft | Knurren | ja |
+| Schattenwesen (P6) | 40 / 1,5 | springt hinter das Ziel, aus der Ferne unsichtbar | — | Meuchler | wenig LP | Totenland, Gruft | Kreischen | ja |
+| Knochenhund (P6) | 34 / 1,8 | Hetzer, flankiert | — | Tempo | wenig LP | Totenland | Knurren | nein |
+| Aasschwinge (P6) | 22 / 2,0 | fliegt über alles, beißt und steigt auf | — | Flug | wenig LP | Totenland | Kreischen | nein |
+| Leichenkoloss (P6) | 340 / 0,6 | Belagerung: Stampfen im Ring, Wagen ×3 | 900 ms | Fläche | langsam | Totenland, Raids | Stöhnen | nein |
+| Todesritter (P6) | 230 / 1,1 | Elite, Lebensraub | 500 ms | Ausdauer | Heiliges | Gruft, Vorhof | Klappern | ja |
+| König Garmadon (Boss P6) | 620 / 1,05 | spricht; Blutwelle, „Erhebt euch“ (60 %), Omegas Blut (30 %) | 560 ms | Druck, Lebensraub | Ansagen lesen | Gruft, Thronsaal | Ruf | nein (versiegelt) |
+| Omega (Endgott P7) | 600 / 0,9 | spricht (wenn ruhig erwacht); Sternenfall, ab 66 % Strahl + Blutboten, ab 33 % Nova | 700 ms / 1,1 s Kreise | Fläche, Größe 2,6× | Ansagen lesen, Verbündete | Krater des Gefallenen Sterns | Ruf | nein |
+| Hirsch | 30 / 1,9 | flieht, greift nie an (Jagdwild) | — | — | — | Wald, Wiesen | — | nein |
 
 ## Spawns
 - Feste Spawn-Gebiete mit Deckel (`SPAWN_AREAS`), Nachschub nur außerhalb der Sicht (> 620 px).
@@ -376,6 +413,252 @@ Klassenbaum — Kandidat, als Titel der Stillen Schar neu gedacht zu werden). Je
   Mönch). Unter 50 %: ruft einmal drei Tote der Leibwache, danach schneller. Gegenstück zu Gorak: Raum verweigern statt rennen.
 - Questanbindung: Brann, Meisterschmiedin in Nordfurt — „Königseisen“ (Hrodvar legen, Barren aus dem Hort) → Frostklinge.
   Gerüchte über die Treppe ins Eis überall, in Nordfurt über Brann. Ein vorher erschlagener Hrodvar zählt.
+
+## Lebendige Städte — Entwurf Session 9 (Master-Prompt „World Alive“, Priorität 2–3)
+**Ist-Stand (Code):** Bewohner haben drei Fixpunkte (Arbeit/Abend/Nacht) und schlendern zufällig ±46 px darum; Wachen
+stehen fest am Posten; Figuren mit Namen haben dieselben drei Punkte (`NPC_DAY`). Kein Mittag, keine Wege, keine
+Begegnungen, keine Beziehungen unter NPCs. Wirkung: „Figuren stehen herum“, Klumpen auf Plätzen.
+
+**Entwurf (baut auf `schedulePos`/`eve`/`anchor`, `act()`-Posen und `seek()` auf — kein Ersatzsystem):**
+1. **Tagesplan je Rolle als Daten** (`ROUTINES[rolle]` = Liste `[ab Stunde, Ort-Art, Tätigkeit]`), aus dem je Figur
+   beim Erzeugen feste Orte werden (`e.day`). Ort-Arten: `home` (innen), `front`, `work` (Arbeitsort des Hauses: Feld,
+   Steg, Amboss, Stand), `store` (Lagerhaus der Stadt), `market` (freier Platz auf dem Markt, reserviert), `tavern`
+   (Sitzplatz), `friend` (Tür eines Bekannten), `well`. Beispiel Bauer: 6 front → 6:30 Feld (knien/hacken) → 9 Stall →
+   12 essen (sitzen vor dem Haus) → 13 Feld → 17 Markt → 19 Schenke/zu Hause → 22 schlafen.
+   Schmied: 7 Amboss (Arbeitshiebe, Funken) · Material aus dem Lager holen · 12 Pause · 13 Amboss · 18 Schenke.
+   Händler: Stand · Lager · Nachbarhändler · 12 essen · Stand · 20 Unterkunft.
+2. **Wachen im Schichtdienst:** zwei Schichten (6–14, 14–22, Nacht halbe Besetzung); aktive Wachen wechseln zwischen
+   Posten, Mauer, Platz, Kontrollgang (Rundweg zwischen den Posten); freie Schicht schläft/isst in der Kaserne/Schenke.
+   Nie alle am selben Ort.
+3. **Kein Gedränge:** jeder Aufenthaltsort ist ein reservierter Platz (Kachel), Markt/Platz haben begrenzte Plätze;
+   leichte Abstoßung (≥ 1 Kachel) zwischen stehenden Figuren; Ziel-Streuung klein, dafür echte Ortswechsel.
+4. **Sichtbare Tätigkeit** über vorhandene Posen: arbeiten (Hiebe), knien (Feld, Wasser holen), sitzen, handeln;
+   neu nur „reden“ (zwei Figuren drehen sich zueinander, selten eine Textblase).
+5. **Beziehungen unter NPCs** (Priorität 3): `S.bonds` = Liste `{a, b, type, value, cause}` mit Ursache als Text
+   (z. B. `{a:'aldric', b:'borin', type:'respect', value:40, cause:'Borin zog Aldric beim Überfall aus dem Feuer.'}`);
+   Typen like/dislike/respect/fear/envy/love/hate/avoid/miss/blame. Beziehungen steuern: wer wen besucht (`friend`),
+   wem man ausweicht, worüber man redet (Textblase/Gerücht), Trauer bei Tod (`NPC_DEATH`).
+6. **Textblasen & Gerüchte** (Priorität 3): selten (höchstens 1–2 sichtbar), aus Weltereignissen (`S.news` —
+   Karawane, Überfall, Boss, Tod, Befreiung) und Beziehungen; Gerüchte je NPC mit Wahrheitsgrad (korrekt / verzerrt /
+   unbekannt).
+
+Tests (geplant): NPC_SCHEDULE_TEST, NPC_CROWD_TEST (max. Figuren je 3×3 Kacheln), NPC_RELATIONSHIP_TEST, NPC_DIALOG_TEST.
+Wartet auf das Durchlauf-Audit (Session 9), um Prioritäten zu bestätigen.
+
+### Umgesetzt Session 10 (BUG-082/083) — Tagesplan der Bewohner, Stufe 1
+`planDays()` / `dayTarget()` / `villagerDay()` in game.js. Orte je Bewohner aus Haus + Index (`spotsOf`), bei jedem
+Laden neu berechnet (kein Spielstandfeld, keine Migration). Jede Person hat einen eigenen Zeitversatz (0–45 min).
+| Zeit | Block | Tätigkeit |
+|---|---|---|
+| 22:00–06:30 | Nacht | drinnen (Schlafplatz) |
+| 06:30–07:30 | Morgen | vor dem eigenen Haus |
+| 07:30–11:30 | Arbeit | Arbeitsort; draußen Arbeitsanimation (`act 'work'`) alle 3–8 s |
+| 11:30–13:00 | Mittag | Platz oder (jeder 2. mit Schenkenplatz) Schenke drinnen; Gespräche |
+| 13:00–16:30 | Nachmittag | mit festem Beruf: Arbeit; sonst je Tag wechselnd Arbeit / Nachbarhaus / Platz |
+| 16:30–18:00 | Markt | Platz (Beruf: weiter am Arbeitsort) |
+| 18:00–20:30 | Abend | Schenke **drinnen** (nur so viele wie freie Innenkacheln) oder vor dem eigenen Haus |
+| ab 20:30 | Heimweg | drinnen (wer in Schenke/Heilerhaus/Kapelle wohnt, bleibt drinnen) |
+**Gespräche (Talk-Pairs, Stufe 1):** an sozialen Orten sucht ein ankommender Bewohner einen stehenden Nachbarn (≤ 64 px),
+beide drehen sich zueinander, zwei Sprechblasen im Wechsel (je 2,5 s). Unter einem Dach nur sichtbar, wenn der Spieler
+im selben Haus ist. Textpool `TALK` (12 Wechsel) — Gerüchte aus Weltereignissen (BUG-078, §79) folgen als Stufe 2.
+**Außer Sicht (> 900 px):** keine Wegsuche; je Blockwechsel einmal an den Zielort gesetzt, im Kreis um das Ziel (eigene
+Richtung je Person, belegte Stellen ausgelassen) — Update in Eren 3,03 → 1,2 ms.
+**Unterbrechung:** Kampf/Flucht/Hilfe laufen vor dem Tagesplan; danach gilt wieder der Block der aktuellen Uhrzeit
+(kein Reset auf den Tagesbeginn).
+**Offen (DoD §41):** Jäger ziehen noch nicht in die Wildnis; Läden öffnen/schließen nicht sichtbar (Schild/Laden);
+Wachen ohne Schichtdienst; Beziehungen (mag/meidet) und Gerüchte aus Weltereignissen fehlen; Schenke abends voll.
+
+### Tagesrhythmus Stufe 2 (Session 11, §41)
+| Rolle | Plan |
+|---|---|
+| Jäger (1 je Stadt) | 7–13:30 Jagdgrund (baumreichste Richtung, 40 Kacheln vor dem Ort, erreichbar), 13:30–15 Markt: Felle +2 in den Stadtvorrat, danach normaler Plan |
+| Marktstände | 7–18 Uhr offen (Markise, Ware), sonst Plane — sichtbar, nicht nur Zahl; Festbude folgt dem Fest |
+| Wache | tags alle am Posten; 22–6 Uhr schläft jede zweite im Wachhaus (Kaserne, sonst Halle, sonst Schenke) — halbe Nachtbesatzung |
+Warum so: je Rolle ein sichtbarer Unterschied mit wenig Code. Wirtschaftliche Wirkung klein (Felle), damit nichts kippt.
+
+### Raids (Session 11, §74)
+Phasen: Vorwarnung (Späher-Meldung, Heer wartet 6 Std.) → Anmarsch (in Spielernähe sichtbar, s. u.) → Kampf → Ergebnis →
+Nachwirkung (3 Wohnhäuser eine Verfallstufe schlechter, Flüchtlinge, Einwohner −40 %) → Befreiung (§81 Wellen) → Wiederaufbau
+(ein Haus je Tag). Spieler: verteidigen (Schlacht vor Ort), ignorieren (abstrakte Schlacht), befreien. Offen: sich dem Raid
+anschließen (Fraktionslogik), Raids durch Banditen auf Außenposten.
+
+### Krieg: Anmarsch (Session 11, §74)
+Schlacht in Spielernähe: Angreifer erscheinen ~20 Kacheln vor dem Ort auf der Seite ihres letzten Knotens und marschieren
+(80 % Tempo) ein; Verteidiger stehen im Ort. Vorher erschienen beide Seiten mitten zwischen den Häusern.
+
+### Befreiungskampf (Session 11, §81)
+Besetzter Ort in Spielernähe → Kampf in Wellen statt Textwechsel. Wellen: 2–3 (nach Besatzungsstärke), Schwarze Feste 4.
+Jede Welle marschiert von einem zu Fuß erreichbaren Sammelpunkt 13–15 Kacheln vor dem Ort ein (je Welle andere Seite).
+Aufbau: 3 Skelette, ab Welle 2 dazu Wiedergänger/Geist abwechselnd, letzte Welle + „Hauptmann der Toten“ (170 LP,
+Ansage 500 ms, Stufe 6 / Feste 9). Pause 8 Spielminuten mit Ansage. Fortschritt bleibt am Ort (Flucht kostet höchstens die
+laufende Welle). Befreiung nur nach der letzten Welle. Folgen: Chronik, Titel, 4 Heimkehrer laufen sichtbar in den Ort,
+Einwohner +6. Offen: Arena der Schwarzen Feste (BUG-100), Verhalten der Bewohner unter Besatzung (BUG-099).
+
+### NPC-Beziehungen (Session 11, §79)
+Fest aus der id-Reihenfolge je Stadt: Freund (jeder), Rivale (jeder Vierte, Abneigung gegenseitig, nie Hausgenosse).
+Rivalen: kein Gespräch miteinander, ausweichen unter 70 px (außer drinnen), Lästern in Hörweite (160 px) mit Namen.
+Freunde: jedes zweite Gespräch aus eigenen, wärmeren Zeilen. Gerüchte (Chronik) wie bisher. Spätere Stufe: Beziehung
+ändert sich durch Spielerhandlungen.
+
+### Regionaler Boss: Graumähne (Session 11, §73)
+| Feld | Inhalt |
+|---|---|
+| Region / Gefahr | Wolfsschlucht, Stufe 1–2 (lokaler Boss) |
+| Kampf | Wolf-Sprung mit Ansage, 170 LP; Phase 2 (< 50 %): Heulen, zwei Wölfe greifen ein |
+| Machtverschiebung | Rudel zerfällt: Westwald/Schlucht −30 % Gegnerdeckel |
+| Machtvakuum | 60 % der Wolf-Spawns im Westen werden verwilderte Hunde — nicht automatisch Frieden |
+| Wirtschaft | Eren +8 Felle |
+| Ruf / NPC | Valen +3; Gerücht „Graumähne wurde erschlagen“ (Chronik) |
+Offen: Beute mit eigener Identität (Fell-Umhang), Jäger-Kommentar.
+
+### Regionaler Boss: Karrak, der Sandfürst (Session 11, §73)
+| Feld | Inhalt |
+|---|---|
+| Region / Gefahr | Rote Wüste, Stufe 3 (mittlerer Anführer) |
+| Kampf | Bandit-Duellant (umkreist, weicht Ausholen aus), Stufe 12, größer; Phase 2: pfeift zwei Schützen herbei |
+| Machtverschiebung | Wüstenbanden zerfallen: Gegnerdeckel −30 % |
+| Machtvakuum | 60 % der Banditen-Spawns werden Goblin-Krieger |
+| Ruf | Händler +8, Banditen −25 |
+Weitere Kandidaten (Stufe 4): Kultführer in Alt-Vharn, Schwarze Feste (BUG-100).
+
+### Balancing-Update §82 — Teil 1 (Session 11)
+Methode: `RF.duel(gegner, {level, weapon, chest, mode:'stand'|'kite', seed})` (nur `?dev`) — Standard-Held gegen einen
+Gegner auf leerer Karte, Mittel über mehrere Seeds. Der Bot weicht nie aus: für Bosse nur obere Schranke.
+
+| Messung (Mittel) | vorher | nachher |
+|---|---|---|
+| Stufe 3, Langschwert, Leder — Bandit stehend | 3,1 s / 10 % | 4,0 s / 19 % |
+| … Wolf stehend | 2,5 s / 8 % | 3,2 s / 19 % |
+| … Skelett stehend | 4,4 s / 10 % | 4,7 s / 19 % |
+| … Bandit rückwärts | (0 % ab Stufe 8) | 16 s / 25 % — nicht mehr billiger als Stehen |
+| Stufe 8, Zweihänder, Kette — Bandit/Skelett rückwärts | 0 % | 2–4 % (Stufe 8 in Gefahr-1-Gebiet: gewollt leicht, §71) |
+
+Hebel in dieser Reihenfolge (Verhalten vor Zahlen):
+1. Standfestigkeit: nach einem Taumeln 1,2 s kein neues, Rückstoß 30 % — Zweihänder-Dauerlähmen war die Lücke hinter dem Cheese.
+2. Ausfallschritt: knapp (≤ 30 px) zurückgewichen wird trotzdem getroffen; Ausholen bleibt sichtbar.
+3. Nachsetzen mit Mindesttempo 2,0 (rückwärts gehender Spieler 1,9) — außer Wiedergänger.
+4. Zahlen: `BAL = { hp: 1.7, dmg: 1.4 }` für alle Gegner — das ist „Schwer (Standard)“.
+Teil 2 (S11): Bosse mit Antwort auf Abstand (Gorak-Sturm ab Phase 1, Hrodvars Eislanze) und dritter Phase (< 25 %);
+neuer Gegnertyp Speerträger; neue Waffe Streitflegel (Schwung: +15 %/Stufe, ab Stufe 2 rundum — Druck statt Abwarten).
+Offen: Gefahrenstufen 3/4 gegen „spürbar gefährlicher“ prüfen (§71); Schwierigkeitsstufen Sehr schwer / Schwer / Angsthase
+(Nutzerwunsch, nach den übrigen Phasen).
+
+### Gefahrenregionen (Session 11, §71)
+| Stufe | Wirkung auf Gegner, die dort entstehen |
+|---|---|
+| 0–2 | unverändert |
+| 3 Tödlich | +2 Stufen, 25 % Veteranen |
+| 4 Verboten | +4 Stufen, 50 % Veteranen |
+Veteran: +30 % Leben, größere Silhouette (Vorwarnung), Beute-Bonus +1. Dungeons zählen als Stufe 3. Vorwarnungen: Warnung beim
+ersten Betreten (BUG-081), düstere Region-Tönung, Veteranen sichtbar größer. Offen: Flucht-Test je Stufe-4-Region.
+
+### Verbrechen & Kopfgeld (Session 11, §44/§72)
+Tat → Zeugen (< 240 px) → Kopfgeld bei der Fraktion des Opfers (Angriff 25, Mord 75) → Wache stellt bei Sichtkontakt
+(zahlen / ein Tag Kerker + 10 % Gold / Widerstand +25) → ohne Klärung: Kopfgeldjäger ab 150 Gold (draußen, alle 2 Tage).
+Kopfgeld verfällt 5 Gold je Tag. Kopfgeldjäger sind die bislang einzigen skalierenden Gegner (§72): Stufe folgt der
+Spielerstufe in 3er-Schritten, Deckel 6 (Stufe 14), sichtbare Aufrüstung. Ohne Zeugen kein Kopfgeld.
+
+### Ruf-Stufen (Session 11, §43)
+| Stufe | ab Ansehen | Preis beim Fraktionshändler | Folge |
+|---|---|---|---|
+| Vertraut | 70 | −15 % | herzliche Begrüßung |
+| Verbündet | 40 | −10 % | herzliche Begrüßung |
+| Freundlich | 15 | −5 % | — |
+| Neutral | −5 | normal | — |
+| Misstrauisch | −30 | +12 % | kühle Begrüßung |
+| Feindlich | −60 | +30 % | kalte Begrüßung |
+| Verhasst | darunter | kein Handel | Wachen der Fraktion greifen an |
+
+## Endgame: Die Eisenmark (Session 11)
+**Pitch:** Im Osten, hinter dem Kettenpass, hält die Eiserne Kette ein ganzes Volk in Ketten. Wer ihren Kettenmeister
+stürzt, verwandelt die Goblins von der häufigsten Bedrohung der Welt in Nachbarn, Händler und Verbündete.
+
+| Element | Umsetzung |
+|---|---|
+| Region | Osten, 256 Kacheln breit (Welt 1024×768), Hash-Gelände (Asche, Erde, Stein, Felsnasen), Felskamm mit einem Pass |
+| Kettenfeste | Gefahr 4; Mauer 64×44, Hof (Lager, Wagen, Schmiede, Wachfeuer, Käfige, Kettenpfähle), Kernburg mit Varg |
+| Steinbruch | Gefahr 3; Goblins und Gefangene arbeiten, zwei Aufseher |
+| Kettenzug | Treiber pendelt Steinbruch ↔ Feste, drei Goblins an der Kette (versetzt, Kette Glied an Glied) |
+| Grubenhort | vor der Befreiung: Versteck feindseliger freier Goblins; danach: Goblin-Dorf (Grisk, Nibbel) |
+| Endkampf | Varg (Kettenpeitsche: Reichweite 70, fesselt), 2 Kettenknechte; unter 50 % Verstärkung |
+| Folgen | Befreiung, Goblins friedlich (sprechen, handeln), keine Goblin-Spawns auf der Oberwelt, Ruf Goblins +40, Kette −100 |
+
+**Fraktionen (7):** Valen, Orden, Untote, Freie Händler, Rooks Bande, Eiserne Kette, Grubenstämme.
+
+**Darstellung der Gefangenen:** Goblins und Menschen jeder Herkunft, erkennbar an Lumpen, Eisenkragen und Kette —
+die Unterdrückung wird über Kleidung und Ketten erzählt, nicht über Hautfarbe.
+
+**Offen:** Aufträge im Grubenhort (Grisk), Gespräch mit Gefangenen vor der Befreiung (Hinweise auf Varg), Händler der
+Kette, Musik/Klang der Eisenmark, Veteranen-Dichte in der Mark prüfen, Kettenknechte in der Kernburg nach Befreiung.
+
+## Arsenal und Eisenfeste-Ausbau (Session 12)
+Leitlinie: Waffen sehen gebaut und benutzt aus (Nieten, Flickwerk, Kerben, asymmetrisch). Rot erscheint nur als Akzent der Kette (Schärpe, Schulter, Kamm, Klingenkerbe).
+
+- **Eigenschaften, die vom Ziel abhängen** (`weaponMult`): `execute: [Schwelle, Faktor]` und `raw` (gegen Rüstung unter 4).
+- **Weitere Waffenfelder:** `chill` (verlangsamt mit eigenem Namen), `toll` (schüchtert im Umkreis ein), `ally` bei Rüstung (Bonus neben Verbündeten).
+- **Rüstungsbild aus Komponenten** (`ARMOR_LOOK`). Leute der Kette variieren nach Seed.
+- **Bewusst nicht übernommen:**
+  - Sklaven „arbeiten schneller“ beim Aufseher (würde Sklaverei positiv belohnen).
+  - Skorpionschwanz und Käferpanzer (passen nicht zum Stil).
+  - Repetierarmbrust und Harpune (brauchen Magazin- und Zugmechanik; später möglich).
+
+**Geplant (aus der Vorlage, passt):**
+- Die Kettenfeste wird zur lebenden Militärstadt:
+  - Tagesablauf: morgens Arbeitszug, abends Rückkehr, nachts geschlossene Tore.
+  - Mehr Bewohner im Budget.
+  - Kriegsraum mit Offizieren.
+- Tribut: Dörfer beklagen sich über Abgaben, eine Tributkarawane zieht zur Feste (überfallen, schützen oder plündern).
+- Feldzüge der Kette gegen die Untoten über die Kriegssimulation: Musterung, Marsch, Rückkehr mit Verwundeten. Der Spieler kann mitziehen oder sabotieren.
+
+## Dörfer und Einfluss (Session 12)
+- Die Welt ist 1280×768 groß. Im Osten liegt das **Grauland**: offenes Land, dessen Dörfer der Eisernen Kette Tribut zahlen.
+- Acht Dörfer mit je sechs Häusern:
+
+| Herrschaft | Dörfer |
+|---|---|
+| Valen | Haselbrück, Mühlbach, Weidenau |
+| Orden | Lichtenrain |
+| Freie Händler | Rastfurt |
+| Tribut an die Kette | Grauwasser, Hohlstein, Eisenried |
+
+- Dörfer sind volle Siedlungen (`TOWN_PLAN`, `village: true`). Sie haben aber keine Wachen, keine Läden und keinen Kriegsknoten.
+- **Anknüpfung für den Eisenfeste-Block:** Tributkarawanen aus Grauwasser, Hohlstein und Eisenried. Die Klagen der Dorfbewohner sind der Einstieg ins Tributsystem.
+
+## Weltordnung (Session 12)
+Die Welt ist 1536×768 groß. Es gibt keine geraden Grenzen: Die Länder gehen ineinander über.
+
+| Richtung | Land |
+|---|---|
+| Westen | Land der Eisernen Kette: Westgebirge; Eisenfeste als ummauertes Festungsgebiet mit Zitadelle, Steinbruch, Baracken und Feldern; Goblin-Wälder mit dem Grubenhort; Tributdörfer |
+| Mitte | Menschenland: Valen, Orden, Händler |
+| Süden | Grenzland der Toten (Alt-Vharn, Nekropole, Schwarze Feste) |
+| Osten | Totenland: rote Asche, Ruinen, Grabfelder |
+
+**Varg** empfängt in seiner Halle. Man kann mit ihm reden, ihn herausfordern oder aus dem Hinterhalt angreifen. Freikauf oder Dienst bei der Kette sind als spätere Ideen offen.
+
+**Karte (M):** gemalt, mit Kriegsnebel. Nur Erkundetes wird beschriftet.
+
+## Das Hochreich Aurelion (Session 12)
+Der Norden und die Mitte sind wild, rau und arm. Der Süden ist das Hochreich Aurelion: reich, adlig, geordnet und technisch weit voraus, aber seine Technik ist alt, abgenutzt und praktisch.
+
+- **Städte:**
+
+  | Stadt | Rolle |
+  |---|---|
+  | Aurelheim | Hauptstadt |
+  | Kupferhafen | Handel |
+  | Gelenkhall | Prothesen, Kybernetik |
+  | Tickmar | Automatenfabrik |
+  | Sankt Serin | Akademie, Labore |
+
+- **Automaten** sind Wachen, Arbeiter und Diener; in Ruinen gibt es verwilderte Kriegsautomaten.
+- **Prothesen:** Glieder können verloren gehen, das Hochreich verkauft den Ersatz. Das ist der Grund, in den Süden zu reisen.
+- **Offen:**
+  - Adelshäuser als Fraktionen mit Intrigen.
+  - Aufträge in Aurelheim.
+  - Handel des Hochreichs mit der Kette (Tribut in Automaten?).
+  - Automaten-Arbeiter mit Tagesablauf (heute sind es Wachen).
+  - Prothesen-Werkbank und Reparatur.
 
 ## Offene Designfragen
 - Rarität/Affixe, Skill Tree, Klassen: siehe PHASE_STATUS (Phasen 8–10).

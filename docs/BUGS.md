@@ -469,3 +469,144 @@ Maßnahmen: Kämpferliste je Frame auf den Umkreis des Spielers begrenzt; Lichtq
 - Performance: Update 1,4 ms, Zeichnen 1,7 ms pro Frame (Budget 3,0 / 2,0).
 - Mobil 375 px: keine horizontale Scrollbar, HUD lesbar.
 - Selbsttest 22/22.
+
+---
+
+## Session 8 — Phase 11 (Gegner)
+
+### BUG-072 — Wilder Hund war ein grauer Wolf (Copy-Paste-Gegner, §66) + Cache-Fehler bei Tier-Sprites
+- Ursache: `beastFrame` cachte nur nach Typ; der Hund wurde als 'wolf' angefragt und erbte den gecachten grauen Wolf.
+- Lösung: eigene Gestalt (schmal, hochbeinig, Rippen, Schlappohr, Sichelrute, Flecken), Palette im Cache-Schlüssel.
+  Selbsttest „Wilder Hund hat eine eigene Gestalt“. VISUAL · MEDIUM · BEHOBEN
+
+### BUG-073 — Selbsttest-Sandbox isoliert Geschosse/Auferstehungen nicht → Tests kippen je nach Reihenfolge
+- Befund: Karawanen-Test und Feuerball-Test schlugen zeitweise fehl. Feuerball verlangt `S.projectiles` leer; ein
+  Kultist in einem vorherigen Test (oder ein echtes Geschoss aus der Welt) hinterließ Schattenblitze.
+- Lösung (verifiziert Session 9: 82/82 zweimal hintereinander): `sandbox` sichert und leert
+  `S.projectiles` und `S.rising` und stellt sie danach wieder her.
+- Offen: Karawanen-Test („zwei Wachen gehen mit dem Zug …“) war einmal rot, dann grün — Ursache nicht untersucht.
+- Kategorie: TESTING · HIGH (unzuverlässige Tests) · Status: BEHOBEN (Karawanen-Test weiter beobachten)
+
+### BUG-074 — Kultist heilte bildratenabhängig (Abklingzeit zählte fest 16 ms je Aufruf)
+- Lösung: echte Frame-Zeit `dt`. AI · LOW · BEHOBEN
+
+### BUG-075 — Test-Spielstand: Spielfigur war tot (aus Kampfsimulationen), Tests im Spiel verhielten sich daher „falsch“
+- Kein Spielfehler, Hinweis für Tests: vor Welt-Tests `S.player.alive` prüfen. Status: HINWEIS
+
+---
+
+## Session 9 — Durchlauf-Audit (Agent, Bericht: `AUDIT_PLAYTHROUGH_S9.md`)
+Übernommen als offene Einträge; Details, Messwerte und Screenshots stehen im Bericht.
+- BUG-076 Kampf trivial durch Rückwärtslaufen (Spieler 1,7–2,2× schneller als Gegner, Gehen kostet keine Ausdauer) · COMBAT · HIGH · BEHOBEN S10 (Ursache: Spieler 2,25–2,7 px/Bild, Gegner 1,1–1,55, Rückwärtsgehen und Hauen ohne Abzug. Jetzt: eigener Hieb bremst auf 55 %, Rückwärtsgehen mit Gegner < 280 px auf 70 %; jeder Nahkämpfer inkl. Boss setzt nach ~2 s vergeblicher Verfolgung mit ×1,45 nach, angesagt durch „!“ und Staub — §34 „Nicht-mehr-nachgeben“. Wolf behält seinen Sprung. Test „Anti-Kiting“ mit Bandit, Goblin, Skelett)
+- BUG-077 Kelan kämpft endlos gegen Wölfe ohne Schaden, Dialog gesperrt, hilft Gestürzten nicht (`teamOf`/`updateNpc`) · NPC AI · HIGH · BEHOBEN S10 (Kämpfer wie Kelan zählen wie Wachen zur Spielerseite; Test „Kelan verletzt Wolf wirklich“)
+- BUG-078 Gerüchte statisch, Weltereignisse (Überfall, Moorland fällt) werden nie erwähnt (`gossip()`) · WORLD CONSEQUENCES · HIGH · BEHOBEN S10 (`recentNews()` aus der Chronik: Kämpfe, Tode, Verbrechen, Karawanen ≤5 Tage; Bewohner reden in Sprechblasen darüber, `gossip()` erzählt das Neueste zuerst; Test „Gerüchte“)
+- BUG-079 Wolfsschlucht rundum von Fels eingeschlossen; Nebelinsel ohne Fähre (per Wegsuche) · MAP ACCESS · HIGH · BEHOBEN S10 (Schluchtpass NO, Nebelsteg; Test „jeder Ort zu Fuß von Eren erreichbar“)
+- BUG-080 E wählt immer das Nächste in 62 px — Brann nicht ansprechbar, Figuren von Kräutern/Mägden verdeckt · UI · HIGH · BEHOBEN S10 (Auswahl nach Maus/Zielrichtung, Figuren mit Namen bevorzugt; Test)
+- BUG-081 Stufe-1-Figur verblutet 10 Kacheln vor Eren an einem Wolf, keine Warnung/Hilfe · BALANCE · MEDIUM · BEHOBEN S10 (Hilfe: BUG-077 — Kelan trifft jetzt wirklich. Warnung §71: erster Schritt in ein Gebiet mit Gefahr ≥ 2 oder bei Stufe ≤ 2 schreibt eine Warnung nach Gefahrenstufe ins Protokoll, bei Überforderung auch als Einblendung; beim ersten Bluten Hinweis auf Verband bzw. fehlenden Verband. Test „Warnung“)
+- BUG-082 Dorfleben statisch: 08–11 Uhr kein Bewohner > 5 Kacheln, niemand sitzt/isst/arbeitet, Wachen ohne Rundgang; fern des Spielers pixelgleich übereinander · NPC SCHEDULES · HIGH · BEHOBEN S10 (Tagesplan mit Blöcken, Arbeitsanimation, Gespräche, Versetzen außer Sicht; Eren 08–10 Uhr: 15/27 statt 2/27 unterwegs; Test „Tagesplan“) — Stufe 1, Jäger/Läden/Wachen-Schichten offen
+- BUG-083 Abendpulk: 11–12 Leute vor der Tavernentür Nordfurt, Wirte draußen · CITY · MEDIUM · BEHOBEN S10 (Abend in der Schenke drinnen nach freien Plätzen, Wirte drinnen; Nordfurt 19 Uhr vor der Tür 14 → 4, drinnen 1 → 4)
+- BUG-084 Zielen beim Laufen veraltet (nur bei Mausbewegung neu berechnet); Körper dreht nicht mit · COMBAT/ANIMATION · MEDIUM · BEHOBEN S10 (Mauspunkt jeden Frame neu; Körper schaut zur Zielrichtung, Waffe in Ruhe gesenkt getragen)
+- BUG-085 Karte: ~10 Symbole überlappen um Eren, Legende fehlt; Auftragsorte („Hürde“, „Waldrand“) nicht auf der Karte · QUEST/UI · MEDIUM · BEHOBEN S10 (Ansicht „Umgebung“ ×3 um den Spieler als Standard + „Welt“; Beschriftung ohne Überlappung mit Vorrang Aufträge > Städte > Rest, Symbole/Fahnen/Spieler freigehalten; Legende im Kartenbild; aktive Aufträge als rote Raute mit Namen, `QUEST_WHERE` bzw. Aufenthaltsort der gesuchten Person; Screenshot `karte-umgebung.png`; Test „Karte“)
+- BUG-086 „Neue Geschichte“ überschreibt Spielstand ohne Rückfrage · SAVE · MEDIUM · BEHOBEN S10 (Rückfrage, wenn ein Spielstand existiert)
+- BUG-087 Namen: 5× „Jost (Magd)“, Männernamen als Magd; Lila „Jorans Tochter“ statt Jorun · IMMERSION · LOW · BEHOBEN S10 (Ursache: 14 Namen je Liste + Hash-Kollision → bis 9× „Notker“ in Salzhafen. Jetzt 45/47 Namen, `nameFix()` vergibt je Stadt jeden Namen einmal, dann mit Beinamen; Namen benannter Figuren gesperrt; läuft beim Spawn und Laden. 263 Bewohner, 0 Dopplungen; Test „Namen“)
+- BUG-088 Gegner stapeln sich am Flussufer, gefahrlos mit Bogen abschießbar · AI · MEDIUM · BEHOBEN S10 (Ursache: A* sucht nur ±14 Kacheln; ohne Brücke darin kein Weg, Gegner rutscht am Ufer. Jetzt: ~3 s ohne Weg → „?“, Abzug zum Posten, 9 s kein neuer Anlauf auf dasselbe Ziel, wachsamer; Bosse halten ihre Arena. Test „Wegfindung (BUG-088)“)
+- BUG-089 Log nach dem Laden „Tag 2 bricht an“ um 20:04; Startmeldung „Im Norden liegt Eren“ passt nicht · UI · LOW · BEHOBEN S10 (Ursache: `lastDay` startete fest bei 1 → jedes Laden lief als Tageswechsel, inkl. **doppeltem Tagesverbrauch**; jetzt `syncClock()` in startGame. Startmeldung aus der echten Richtung. Test „Laden“)
+- BUG-091 Sprechblasen aus Häusern schwebten über dem geschlossenen Dach · IMMERSION · LOW · BEHOBEN S10 (nur sichtbar, wenn der Spieler im selben Haus ist)
+- BUG-092 Schenke abends sehr voll (bis ~10 Figuren auf 4×3 Kacheln) · CITY · LOW · BEHOBEN S10 (größere Schenken + Sitzplätze nur im Schachbrettmuster: nie Schulter an Schulter, höchstens halb belegt; Kreuzweg 17 → 11 Gäste; Screenshot `schenke-kreuzweg-abend.png`)
+- BUG-093 Zeichenzeit während eines vollen Stadtfests 2,10 ms (Budget 2,0) · PERFORMANCE · MEDIUM · TEILWEISE BEHOBEN S10 (Ursache war nicht das Fest: jedes neue Figurenbild kostete 3–17 ms, weil `toCanvas` pro Pixel `fillRect` rief und `coarse()` über `getImageData` von der GPU zurücklas → 12–18 % der Bilder > 5 ms. Jetzt CPU-Pipeline (ein `putImageData`, Vergröbern auf der CPU-Kopie): 16,5 → 0,7 ms je Bild (Median); dazu Vorbacken aller Richtungen/Laufposen sichtbarer Figuren in Leerlaufzeit. Eren-Kern 17 Uhr: 0–1 von 150 Bildern > 5 ms statt 17–27. Danach Licht (Phase 20): Median Stadtkern 1,9–2,1 ms im versteckten Tab; Rest ist das Einblenden der Dunkel-Ebene — im sichtbaren Browser nachmessen)
+- BUG-094 Festaufbauten auf der Alten Straße blockierten Karawane; Ausweichplätze stellten eine Haustür zu · WORLD LOGIC · HIGH · BEHOBEN S10 (nur Platz/Erde/Wiese/Sand, Türvorplätze ±1 und Platzmitte reserviert; Tests „Stadtfest“ offRoad + Tür-Erreichbarkeit während des Fests grün)
+- BUG-095 Selbsttest „Karawane (BUG-011)“ flackerte: läuft auf der echten Welt; passierte der Zug im Test den Hinterhaltspunkt, spawnten Räuber und töteten eine Wache · TEST · LOW · BEHOBEN S10 (Zufallsüberfall und feindliche Tiere im Umkreis für die Dauer der Probe geparkt; Formation und Aufholen isoliert geprüft)
+- BUG-096 Karawanenwachen blieben für immer zurück, wenn der Spieler beim Zug stand und sie > 900 px weg waren (weder Denk- noch Nachführbereich) · AI · MEDIUM · BEHOBEN S10 (außer Denkweite holen sie zu Fuß auf, 1,8 px/Bild; Test „Karawane (BUG-096)“)
+- BUG-097 Selbsttests hingen am Zustand der echten Welt (Kopftreffer tötete Probe-Gegner trotz Heilung; Valen-Besatzung nach Schlacht galt als „ruhender Gegner“) · TEST · LOW · BEHOBEN S10 (Probe-Gegner mit unzerstörbaren Körperteilen; nur spielerfeindliche Gegner zählen; Warnausgaben nennen die Verursacher)
+- BUG-098 Gerüchte zitierten Chronik-Schlagzeilen wörtlich („Man sagt: Schlacht bei Alte Straße.“) · IMMERSION · LOW · BEHOBEN S10 (`newsLine()` macht Sätze, Ortsnamen im Dativ: „Bei der Alten Straße wurde gekämpft“; Test)
+- BUG-099 Besetzter Ort: Bewohner gehen ihrem normalen Tag nach, als wären keine Untoten da (Markt, Schwatz) · IMMERSION · MEDIUM · BEHOBEN S11 (unter Besatzung bleiben alle Bewohner im Haus — Block „v“ im Tagesplan; nach Befreiung sofort wieder Alltag; Test „Besatzung“. Tagesplan-Proben laufen mit `peace()` im Friedensstand)
+- BUG-100 Schwarze Feste praktisch nicht befreibar: dort steht das Untotenheer (34) dauerhaft, Befreiung verlangt „kein Untotenheer am Ort“ · CONTENT · MEDIUM · OFFEN (Endgame-Set-Piece §81: eigene Arena/Thronsaal, Heer muss vorher im Feld geschlagen werden — Nutzerentscheid)
+- BUG-101 Aschfurt hat keinen Auftrag (keine benannte Figur dort) — Brett verweist nur auf andere Orte · CONTENT · LOW · OFFEN
+- BUG-090 Bürgernamen passten nicht zum Beruf (Magd Folkmar, Netzflickerin Arnulf) · Daten · LOW · BEHOBEN S10 (Namenslisten nach Geschlecht, Korrektur beim Laden)
+
+
+## BUG-102 (behoben, Session 12)
+Test „Tagesrhythmus (§41) Jäger“ schlug fehl, sobald das Fell-Lager einen gebrochenen Wert hatte (6,3 + 2 − 6,3 ≠ 2). Ursache: Gleitkomma mit `===` verglichen. Fix: Toleranz 1e-6. Der Test deckt es selbst ab.
+
+## BUG-103 (behoben, Session 12)
+Das Anschlagbrett eines Dorfes stand auf dem Platzmittelpunkt (`freeSpotNear` lieferte die Platzmitte) und sperrte die Wege zu allen Türen. Fix: Das Brett wird im Ring um (Platz +3, +2) gesetzt, nie auf die Platzmitte und nie vor eine Tür. Abgedeckt durch den Test „jede Haustür ist vom Platz aus erreichbar“.
+
+## BUG-104 (behoben, Session 12)
+Je nach Seed war die Tiefhall ohne Zugang (Stufen der Hochrechnung trennten den Pfad diagonal). Fix: `ensureReach()` prüft nach jeder Erzeugung per Wegsuche, ob jeder Ort erreichbar ist, und gräbt sonst einen Erdweg. Abgedeckt durch den Test „Erreichbarkeit (BUG-079)“.
+
+## BUG-105 (behoben, Session 12)
+Der Test „Einwohner folgen der Fläche“ schlug fehl, sobald ein Tributzug im Dorf stand oder das Dorf Hungertote hatte. Ursache: Offizier, Wachen und Träger haben ihren Anker im Dorf und zählten als Einwohner. Wer verhungert, fehlte dagegen in der Untergrenze. Fix: Tributzug ausgenommen, Hungertote (`S.tribute[k].lost`) werden angerechnet.
+
+## BUG-106 (behoben, Session 12)
+Gegner und Menschen standen im Kampf ineinander, blieben an Kanten hängen und entstanden manchmal eingesperrt (Felskessel, zwischen Bäumen). Ursache: Es gab keine Abstandsregel zwischen Figuren. `seek` hatte keinen Ausweg, wenn alle Seitenschritte scheiterten. `freeSpotNear` prüfte nur die eine Kachel. Fix: `separate()`, `unstick()` und `openSpot()` (siehe CHANGELOG). Test „Abstand (S12)“.
+
+## BUG-107 (behoben, Session 12)
+Nach dem Selbsttest ging der Todesbildschirm „Probe ist gefallen“ auf. Ursache: `playerDeath` lief auch für die Test-Figur in der Sandbox. Dabei wurde ein Vorfahr ins Erbe geschrieben und gespeichert. Fix: Proben (`S._quiet`, Karten `__*`) sterben nicht ins Erbe. Der betroffene Spielstand ist bereinigt. Test „BUG-107“.
+
+## BUG-108 (GROSSTEILS BEHOBEN, Session 12) · PERFORMANCE · HIGH
+Das Update kostet 5–8 ms (Budget 3 ms), in der Wildnis mit 3 Kämpfern 5,7 ms. Gemessen im versteckten Browserfenster. Props allein kosten 2,2 ms, Dorfbewohner allein 1,5 ms, Wachen 0,3 ms, Gegner 0,4 ms. Zusammen ist es mehr als die Summe, also läuft vermutlich irgendwo eine Suche über alle Entitäten je Figur und Bild. Ursache noch nicht gefunden. Nächster Schritt: Profiler oder einzelne Hooks in `updateNpc` messen. Auf Nutzerwunsch zurückgestellt.
+
+## BUG-109 (behoben, Session 12)
+Bewohner hingen in Häusern fest oder drückten gegen Türen und Geräte. Ursachen:
+1. `seek` wertete Entlangschrammen an der Wand als Bewegung, deshalb startete die Wegsuche nie.
+2. Kleine Häuser waren übermöbliert.
+3. Ein verstelltes Ziel galt nie als erreicht.
+
+Fix siehe CHANGELOG Phase 1. Tests „Phase 1 Türen“ und „Phase 1 Häuser“.
+
+## BUG-110 (behoben, Session 12)
+Der Bogen lag in der Frontansicht waagrecht, weil `drawWeapon` Fernwaffen mit der Zielrichtung drehte. Außerdem gab es XP ohne eigenen Schaden, Pfeile tunnelten bei niedriger Bildrate, und Schützen schossen ohne Sichtlinie. Fix siehe CHANGELOG Phase 1.
+
+## BUG-111 (OFFEN, Session 12) · TEST · LOW
+Der Test „Karawane (BUG-096)“ wackelt: Die Wache landet je nach Position und Fahrt des Zugs 108–138 px vom Platz, die Toleranz ist 120. Er ist zeitabhängig. Die Wache holt den Zug tatsächlich ein (Live-Trace). Nächster Schritt: den Zug für den Test anhalten oder die Toleranz an die Zuggeschwindigkeit koppeln. Auf Nutzerwunsch zurückgestellt.
+Nachtrag: Mit der Metropole stieg das Update auf 17–23 ms. Behoben durch den Cache der Handelnden, gedrosselte Fernplatzierung, Kampfuhren nur in der Nähe, Mittelbereich-Simulation und die Fx-Liste; Details im CHANGELOG. Stand gemessen im versteckten Fenster: 3,7–6 ms Update, 2,0–2,4 ms Zeichnen. Offen: Städte mit vielen Bewohnern liegen noch über 3 ms. Im sichtbaren Fenster muss neu gemessen werden.
+
+## BUG-112 (behoben, Session 13) · TEST · LOW
+Der Test „Reaktion: kämpfende Wache ruft Wachen im Umkreis herbei“ wackelt: Er fiel einmal durch und lief im nächsten Lauf durch, ohne Codeänderung dazwischen. Die Ursache ist noch nicht untersucht.
+
+## BUG-113 (ZU PRÜFEN, Session 12) · NPC · MEDIUM
+Im Log sterben mehrfach Wachen „an Blutung“ (Dagna, Borin, Conrad, Aldric). Vermutung: Nach Kämpfen verbindet niemand blutende NPCs, bis Blutung sie tötet. Prüfen, ob Heiler oder Wachen sich gegenseitig verbinden sollten.
+
+
+## BUG-114 (behoben, Session 13) · WELT · HIGH
+Die Rückkehr aus Grube, Tiefhall, Himmelsinsel oder Gruft an die Oberfläche warf `door is not defined`. Ursache: `const door = …` stand in `ARRIVAL.world` hinter dem Zeilenkommentar zum Kerker (Session 12). Fix: eigene Zeile. Test „BUG-114–117“.
+
+## BUG-115 (behoben, Session 13) · KAMPF · HIGH
+Jeder Tod des Spielers konnte zu 70 % in Ketten enden, auch durch Wölfe oder Untote. Die Wächterzeile in `captureInstead` (nur Kettenleute, nur vor der Befreiung) stand im Kommentar. Fix: eigene Zeile. Test „BUG-114–117“.
+
+## BUG-116 (behoben, Session 13) · QUEST · MEDIUM
+Die Weihe der Kette gab weder Kettenbrecher noch Eisenfürst: `addItem` stand im Kommentar. Fix und Test wie oben.
+
+## BUG-117 (behoben, Session 13) · FRAKTION · MEDIUM
+Die Befreiung der Goblins setzte den Ruf bei der Kette nicht auf −100: Die Zuweisung stand im Kommentar. Fix und Test wie oben. Vorsorge: ein Scanner (Sitzungs-Skript) sucht Code hinter `//`; `edhelp.py` blockt solche Ersetzungen.
+
+Nachtrag BUG-112 (Session 13): Die Ursache ist die Detailstufen-Logik in `think`. Eine Figur weiter als 520 px vom Spieler denkt nur jedes dritte Bild; der Zähler startet je nach Figuren-ID. Der Test gab der Wache nur ein einziges Bild, also hing das Ergebnis von der zufälligen ID ab. Fix: Die Tests geben drei Bilder (auch „Rudel hilft, Händler schließt“). Das Spiel selbst war richtig.
+
+## BUG-118 (behoben, Session 13) · SPIELSTAND · HIGH
+Nach dem Selbsttest startete die Garmadon-Kamerafahrt im echten Spiel. Der Test „Garmadons Tod“ löste sie verzögert aus, und die Prüfung auf Proben lief erst im Timer, als die Probe schon vorbei war. Der Held wurde dabei versetzt. Fix: `cineLater` prüft beim Auslösen. Test „BUG-118“. Der Spielstand wurde von Hand bereinigt (Position, zwei falsche Chronik-Einträge, das Orakel-Bruchstück).
+
+## BUG-119 (behoben, Session 13) · NPC · MEDIUM
+Während einer Kamerafahrt hielt ein Inquisitor den unsichtbaren Helden an. Auch Wachen (Festnahme) und Automaten (Aufenthaltsschein) hätten es getan. Fix: Sie ignorieren `cineGhost`. Test „BUG-119“.
+
+## BUG-124 bis BUG-131 (behoben, Session 13, Audit) · verschiedene
+Aus dem Audit-Durchlauf (`docs/AUDIT_S13.md`), jeweils mit Test:
+- **BUG-124 (HIGH):** Lager und Grab gaben ein neues Exemplar zurück (Seltenheit, Affixe, Zustand verloren). Ursache: `addItem(key)` statt `giveItem(Exemplar)`.
+- **BUG-125 (HIGH):** Schlafen filterte `bleed`/`poison`, die Zustände heißen `bleeding`/`poisoned` — die Blutung lief nach dem Aufwachen weiter.
+- **BUG-126 (MEDIUM):** Begleiter richteten sofort und nur zufällig (< 50 px) auf; `protect` fehlte; Entlassene blieben im Dungeon.
+- **BUG-127 (MEDIUM):** Arbeitsplätze ausgewürfelt (Platz, fremde Haustür) — Bewohner hämmerten irgendwo.
+- **BUG-128 (MEDIUM):** Gegner erschienen im Bild (Hinterhalt 26–32 Kacheln, Nachschub ab 620 px, Kopfgeldjäger 16 Kacheln, Räuber am Zug).
+- **BUG-129 (MEDIUM):** Siedlungsgebäude ohne Wirkung, Siedler nur als Zahl.
+- **BUG-130 (MEDIUM):** Die Test-Sandbox setzte `S._quiet` auf `false` statt auf den vorigen Wert.
+- **BUG-131 (HIGH, von heute):** `townDanger` stürzte bei Figuren ohne Heimatort ab (Gespräch mit Flüchtlingen).
+
+## BUG-123 (behoben, Session 13) · TEST · HIGH
+Der Selbsttest gab dem echten Helden XP und Gold. Die Sandbox stellte nur die Referenz auf den Helden wieder her, nicht seine Werte. Zwei Proben („Dienst bei der Kette“, „Phase 2 Aufträge“) gaben zusammen 90 XP je Lauf, die Karawanen-Proben durch Geleitschutz 30 Gold. Mit dem automatischen Speichern landete das im Spielstand (Stufe 12 → 13). Fix: Die Sandbox sichert XP, Stufe, Punkte, Körper, Inventar und Ausrüstung und stellt sie wieder her; die Karawanen-Proben sichern das Gold. Der Spielstand wurde auf die Sicherung vor den Proben zurückgesetzt. Test: „BUG-123: Der Selbsttest ändert den echten Helden, sein Gold und die Märkte nicht“ (vergleicht vor und nach dem ganzen Selbsttest).
+
+## BUG-122 (behoben, Session 13) · TEST · LOW
+„Beziehungen (§79)“ schlug beim zweiten Selbsttest-Lauf fehl. Die Wachstums-Probe rief `spawnResidents` auf, das die Beziehungen aller Bewohner neu plant — auch mit den Test-Bewohnern, die danach wieder verschwanden. Fix: Die Probe stellt `VILLAGERS` und die Beziehungen wieder her. Außerdem setzt die Beziehungs-Probe Laufweg und Tätigkeit der zwei Figuren vorher zurück.
+
+## BUG-121 (behoben, Session 13) · TEST · LOW
+„Omega-Glaube“ hing vom Zufallszustand ab: `makeChar` würfelt `seed` selbst und ignoriert den übergebenen Wert. Fix: Die Probe setzt `seed` danach. Dazu zählte „Einwohner folgen der Fläche“ durchreitende Grenzreiter mit (je nach Tageszeit); Reiter sind jetzt ausgenommen.
+
+## BUG-120 (behoben, Session 13) · WELT · MEDIUM
+Der Scheiterhaufen der Ketzerjagd konnte genau auf dem Dorfplatz stehen und sperrte ihn. Dadurch waren alle Türen des Dorfs „unerreichbar“ (Test „jede Haustür erreichbar“ schlug fehl). Fix: Er ist nicht mehr fest, steht versetzt, und alte Stände werden beim Laden korrigiert.

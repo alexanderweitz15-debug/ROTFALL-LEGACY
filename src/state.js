@@ -24,7 +24,7 @@ export const S = {
   legacy: { house: 'Ragnar', gen: 1, ancestors: [] },
   settlement: null,
   flags: {},
-  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7, art: 'F' },
+  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7, art: 'D' },   // Nutzer S13: Stil F vorerst aus (in den Optionen wählbar)
   kills: 0, battles: 0,
   log: [],
   // transient (nicht gespeichert)
@@ -72,18 +72,22 @@ export function chronicle(text, kind = 'event', detail = '') {
 export function ents(map = S.map) { return S.ents[map]; }
 // id → Entity. Index statt linearer Suche über ~3500 Entities (wird pro Frame vielfach gerufen: Aggro, Gruppe, Bedrohung).
 // Alle 250 ms neu aufgebaut und sofort bei neuem Weltstand; ein Treffer wird geprüft (gleiche Karte, noch dort), ein Fehlgriff sucht linear nach.
-let idIndex = new Map(), idStamp = 0, idEnts = null, idWorld = null;
+let idIndex = new Map(), idStamp = 0, idEnts = null, idWorld = null, idMiss = new Set();
 export function byId(id) {
   if (id == null) return null;
   const now = performance.now();
   if (idEnts !== S.ents || idWorld !== S.ents.world || now - idStamp > 250) {
-    idIndex = new Map(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world;
+    idIndex = new Map(); idMiss = new Set(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world;
     for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) idIndex.set(e.id, e);
   }
+  // AUDIT P-03: vorher prüfte jeder Treffer auf eine Tote per includes() über ~17 000 Einträge, und jeder Fehlgriff (Beziehung zu
+  // einer Weggezogenen, Ziel eines Toten) suchte jedes Mal linear. Jetzt: Treffer gilt bis zum nächsten Neubau (≤ 250 ms), Fehlgriffe
+  // werden bis dahin gemerkt.
   const hit = idIndex.get(id);
-  if (hit && S.ents[hit.map] && (hit.alive !== false || S.ents[hit.map].includes(hit))) return hit;
+  if (hit && S.ents[hit.map]) return hit;
+  if (idMiss.has(id)) return null;
   for (const m of Object.keys(S.ents)) { const e = S.ents[m].find(x => x.id === id); if (e) { idIndex.set(id, e); return e; } }
-  return null;
+  idMiss.add(id); return null;
 }
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 

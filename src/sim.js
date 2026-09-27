@@ -1,7 +1,7 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js';
 import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js';
-import { LOCATIONS, TS, T, SOLID, HOUSES, tileAt, worldPt, wT, OX } from './world.js';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js';
 import * as ECO from './economy.js';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
@@ -55,44 +55,73 @@ function economyDay() {
 // Straße, auch wenn eine spätere Session die Straße verlegt. Wegpunkte in Kacheln (+0,5 = Kachelmitte), Karawanen fahren ohne Kollision.
 export let ROUTE = [];
 const ROUTE_ENDS = [[62, 65], [129, 61]];                   // Eren (Marktweg) → Nordfurter Torstraße, Entwurfskoordinaten
-// S13: allgemeiner Straßenweg zwischen zwei Kacheln (A*, gleiche Kosten wie die Karawane), für Reisende. Ergebnis im Speicher
-// zwischengelagert, nicht im Spielstand. null = kein Weg. Wegpunkte nur an Knicken, in Kacheln (+0,5).
+// S13: allgemeiner Straßenweg zwischen zwei Kacheln (A*), für Karawane und Reisende. Kosten wie früher: Straße/Brücke 1, Erde 3,
+// sonst 8, +4 neben Hindernissen (der Zug ist breit); Häuser, Wasser, feste Objekte gesperrt. Das Kostenraster entsteht einmal je
+// Welt (buildRoute leert es), die Suchfelder werden wiederverwendet (Stempel statt neuer Arrays) — sonst ruckelte jede neue Route.
+// Ergebnis im Speicher zwischengelagert, nicht im Spielstand. null = kein Weg. Wegpunkte nur an Knicken, in Kacheln (+0,5).
 const roadCache = new Map();
-export function roadPath(ax, ay, bx, by, pad = 24) {
-  const key = ax + ',' + ay + '>' + bx + ',' + by; if (roadCache.has(key)) return roadCache.get(key);
-  const x0 = Math.max(0, Math.min(ax, bx) - pad), y0 = Math.max(0, Math.min(ay, by) - pad), w = Math.abs(bx - ax) + 2 * pad + 1, h = Math.abs(by - ay) + 2 * pad + 1;
-  const blk = new Uint8Array(w * h), I = (x, y) => (y - y0) * w + (x - x0), inB = (x, y) => x >= x0 && y >= y0 && x < x0 + w && y < y0 + h;
-  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (SOLID.has(tileAt('world', x, y))) blk[I(x, y)] = 1;
-  for (const b of HOUSES) if (b.map === 'world' && b.x + b.w >= x0 && b.y + b.h >= y0 && b.x < x0 + w && b.y < y0 + h)
-    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inB(x, y)) blk[I(x, y)] = 1;
-  for (const e of S.ents.world) if (e.kind === 'prop' && e.solid) { const x = e.x / TS | 0, y = e.y / TS | 0; if (inB(x, y)) blk[I(x, y)] = 1; }
-  if (inB(ax, ay)) blk[I(ax, ay)] = 0; if (inB(bx, by)) blk[I(bx, by)] = 0;
-  const cost = (x, y) => { const t = tileAt('world', x, y); let c = t === T.ROAD || t === T.PLANK ? 1 : t === T.DIRT ? 3 : 8;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inB(x + dx, y + dy) && blk[I(x + dx, y + dy)]) { c += 4; break; }
-    return c; };
-  const hh = (x, y) => { const dx = Math.abs(x - bx), dy = Math.abs(y - by); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };   // zulässig: jede Kachel kostet ≥ 1
-  const dist = new Float64Array(w * h).fill(Infinity), prev = new Int32Array(w * h).fill(-1), heap = [];
-  const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+let RG = null;
+function roadGrid() {
+  const M = MAPS.world, w = M.w, h = M.h, blk = new Uint8Array(w * h), cost = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (SOLID.has(tileAt('world', x, y))) blk[y * w + x] = 1;
+  for (const b of HOUSES) if (b.map === 'world') for (let y = Math.max(0, b.y); y < Math.min(h, b.y + b.h); y++) for (let x = Math.max(0, b.x); x < Math.min(w, b.x + b.w); x++) blk[y * w + x] = 1;
+  for (const e of S.ents.world) if (e.kind === 'prop' && e.solid) { const x = e.x / TS | 0, y = e.y / TS | 0; if (x >= 0 && y >= 0 && x < w && y < h) blk[y * w + x] = 1; }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (blk[i]) continue; const t = tileAt('world', x, y); let c = t === T.ROAD || t === T.PLANK ? 1 : t === T.DIRT ? 3 : 8;
+    if ((x > 0 && blk[i - 1]) || (x < w - 1 && blk[i + 1]) || (y > 0 && blk[i - w]) || (y < h - 1 && blk[i + w])) c += 4;
+    cost[i] = c;
+  }
+  return { w, h, blk, cost, dist: new Float64Array(w * h), prev: new Int32Array(w * h), seen: new Uint32Array(w * h), gen: 0 };
+}
+// wgt > 1: gewichtetes A* (schneller, Weg höchstens wgt-mal so teuer). Die Suche ist ein Generator: roadPath rechnet sofort
+// (Laden, Tests), roadAsync stellt sie in eine Warteschlange, die pumpRoads je Bild mit festem Zeitbudget abarbeitet (keine Ruckler).
+const rkey = (ax, ay, bx, by, wgt) => ax + ',' + ay + '>' + bx + ',' + by + '*' + wgt;
+export function roadPath(ax, ay, bx, by, wgt = 1) {
+  const key = rkey(ax, ay, bx, by, wgt); if (roadCache.has(key)) return roadCache.get(key);
+  if (roadQueue[0]) roadQueue[0].it = null;                                           // teilt sich die Suchfelder: angefangene Suche neu starten
+  const it = roadSearch(ax, ay, bx, by, wgt, key); let r; do r = it.next(); while (!r.done); return r.value;
+}
+const roadQueue = [];
+export function roadAsync(ax, ay, bx, by, wgt = 1) {
+  const key = rkey(ax, ay, bx, by, wgt); if (roadCache.has(key)) return roadCache.get(key);
+  if (!roadQueue.some(j => j.key === key)) roadQueue.push({ key, args: [ax, ay, bx, by, wgt, key], it: null });
+  return undefined;                                                                   // noch in Arbeit
+}
+export function pumpRoads(ms = 1.5) {
+  const t0 = performance.now();
+  while (roadQueue.length && performance.now() - t0 < ms) { const J = roadQueue[0]; J.it ||= roadSearch(...J.args); if (J.it.next().done) roadQueue.shift(); }
+}
+function* roadSearch(ax, ay, bx, by, wgt, key) {
+  const G = (RG ||= roadGrid()), { w, h, blk, cost, dist, prev, seen } = G, gen = ++G.gen;
+  const ok = (x, y) => x >= 0 && y >= 0 && x < w && y < h, start = ay * w + ax, goal = by * w + bx;
+  if (!ok(ax, ay) || !ok(bx, by)) { roadCache.set(key, null); return null; }
+  const free = i => !blk[i] || i === start || i === goal;
+  const hh = (x, y) => { const dx = Math.abs(x - bx), dy = Math.abs(y - by); return (Math.max(dx, dy) + 0.414 * Math.min(dx, dy)) * wgt; };   // wgt 1 zulässig: jede Kachel kostet ≥ 1
+  const heap = [];
+  const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k;
     if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
-  const start = I(ax, ay), goal = I(bx, by); dist[start] = 0; push(hh(ax, ay), start);
-  while (heap.length) {
-    const [f, i] = pop(); if (i === goal) break;
-    const x = i % w + x0, y = (i / w | 0) + y0; if (f - hh(x, y) > dist[i] + 1e-9) continue;
+  seen[start] = gen; dist[start] = 0; prev[start] = -1; push(hh(ax, ay), start);
+  let found = false, steps = 0;
+  while (heap.length && steps++ < 600000) {
+    if ((steps & 511) === 0) yield;
+    const [f, i] = pop(); if (i === goal) { found = true; break; }
+    const x = i % w, y = i / w | 0; if (f - hh(x, y) > dist[i] + 1e-9) continue;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      const nx = x + dx, ny = y + dy; if (!inB(nx, ny) || blk[I(nx, ny)]) continue;
-      if (dx && dy && (blk[I(x + dx, y)] || blk[I(x, y + dy)])) continue;          // keine Ecke schneiden
-      const n = I(nx, ny), nd = dist[i] + cost(nx, ny) * (dx && dy ? 1.414 : 1);
-      if (nd < dist[n]) { dist[n] = nd; prev[n] = i; push(nd + hh(nx, ny), n); }
+      const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const n = ny * w + nx; if (!free(n)) continue;
+      if (dx && dy && (blk[y * w + nx] || blk[ny * w + x])) continue;                  // keine Ecke schneiden
+      const nd = dist[i] + (cost[n] || 8) * (dx && dy ? 1.414 : 1);
+      if (seen[n] !== gen || nd < dist[n]) { seen[n] = gen; dist[n] = nd; prev[n] = i; push(nd + hh(nx, ny), n); }
     }
   }
   let out = null;
-  if (prev[goal] >= 0) { const pts = []; for (let i = goal; i >= 0; i = prev[i]) pts.push([i % w + x0, (i / w | 0) + y0]); pts.reverse();
+  if (found) { const pts = []; for (let i = goal; i >= 0; i = prev[i]) pts.push([i % w, i / w | 0]); pts.reverse();
     out = pts.filter((q, k) => k === 0 || k === pts.length - 1 || q[0] - pts[k - 1][0] !== pts[k + 1][0] - q[0] || q[1] - pts[k - 1][1] !== pts[k + 1][1] - q[1])   // nur Knicke
       .map(([x, y]) => [x + 0.5, y + 0.5]); }
   roadCache.set(key, out); return out;
 }
 export function buildRoute() {
+  roadCache.clear(); RG = null; roadQueue.length = 0;                                                       // neue Welt: alte Wege gelten nicht mehr
   const [[ax, ay], [bx, by]] = ROUTE_ENDS.map(([x, y]) => worldPt(x, y));
   ROUTE = roadPath(ax, ay, bx, by) || [[ax, ay], [bx, by]];                            // kein Weg (sollte nicht vorkommen): gerade Linie
   for (const c of S.ents.world) if (c.kind === 'caravan') {                           // Karawanen alter Stände: nächsten Wegpunkt in Fahrtrichtung
@@ -171,7 +200,7 @@ export function caravanFrame(c, dt, player, nearFoes) {
     if (chance(0.35)) {
       const guards = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.escort === c.id);
       if (Math.hypot(player.x - c.x, player.y - c.y) < 700 && player.map === 'world') {
-        for (let i = 0; i < 3 + guards.length; i++) H.spawnEnemy('bandit', 'world', (c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6));   // ein bewachter Zug lockt mehr Räuber
+        for (let i = 0; i < 3 + guards.length; i++) H.spawnEnemy('bandit', 'world', ...(H.pushOut ? H.pushOut('world', (c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6)) : [(c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6)]));   // ein bewachter Zug lockt mehr Räuber; AUDIT: von außerhalb des Bildes
         log('Banditen fallen über die Karawane her!', 'combat');
         H.toast('KARAWANE ÜBERFALLEN');
       } else if (guards.length && chance(0.3 + 0.15 * guards.length)) {    // außer Sicht: Wachen schlagen zurück, nicht ohne Preis
@@ -343,7 +372,9 @@ function materialize(node, att, def) {
   for (const side of [att, def]) {
     const n = clamp(Math.round(side.strength / 8), 2, 7), at = side === att;
     for (let i = 0; i < n; i++) {
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3)),
+      let [qx, qy] = [Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3))];
+      if (H.inView?.('world', qx * TS, qy * TS)) { if (at) [qx, qy] = H.pushOut('world', qx, qy); else { const hs = HOUSES.filter(h => h.town === node && h.map === 'world'); const h = hs[(i * 7) % Math.max(1, hs.length)]; if (h) [qx, qy] = h.doorTile; } }   // AUDIT: Angreifer von außerhalb, Verteidiger aus den Häusern
+      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', qx, qy,
         { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }
@@ -381,7 +412,7 @@ function spawnWave(node, n, id) {
   const types = undeadMix(3 + (n.wave - 1) + (keep ? 2 : 0), keep ? 'military' : 'town').map(u => u.type);   // Phase 6: gemischte Heere
   if (last) types.push('death_captain');
   const worth = n.garrison / types.length / Math.max(1, n.waves - n.wave + 1), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
-  for (const t of types) H.spawnEnemy(t, 'world', ox + ri(-2, 2), oy + ri(-2, 2),
+  for (const t of types) H.spawnEnemy(t, 'world', ...(H.pushOut ? H.pushOut('world', ox + ri(-2, 2), oy + ri(-2, 2)) : [ox + ri(-2, 2), oy + ri(-2, 2)]),   // AUDIT: Welle kommt von außerhalb des Bildes
     { armyId: id, worth, level: t === 'death_captain' ? (keep ? 9 : 6) : 4 + n.wave, anchor: { ...home }, marching: true, boss: t === 'death_captain' || undefined });
   log(last ? `Welle ${n.wave}/${n.waves}: der Hauptmann der Toten führt sie selbst.` : `Welle ${n.wave}/${n.waves} marschiert auf ${L.name}.`, 'combat');
   H.toast(last ? 'DER HAUPTMANN DER TOTEN' : `WELLE ${n.wave}/${n.waves}`);

@@ -20,7 +20,8 @@ const keys = new Set();
 let mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false };
 const touch = { on: false, dx: 0, dy: 0, lx: 1, ly: 0, attack: false, guard: false };   // Touch-Steuerung: Stick-Richtung, letzte Blickrichtung
 const solidIndex = { world: new Map(), mine: new Map() };
-occupied.at = (map, tx, ty) => !!solidIndex[map]?.get(tx + ',' + ty)?.length;   // Spawns nie in Bäume/Felsen setzen
+const SK = (tx, ty) => ty * 8192 + tx;                      // AUDIT P-03: Zahlenschlüssel statt "x,y"-Text (9 Texte je Bewegungsprüfung kosteten ~28 % der Spiellogik)
+occupied.at = (map, tx, ty) => !!solidIndex[map]?.get(SK(tx, ty))?.length;   // Spawns nie in Bäume/Felsen setzen
 
 // ================= Charaktere =================
 const SKIN = ['#d6b089', '#b98f66', '#8d6644', '#f0d2ae', '#6d4a30'];
@@ -159,7 +160,8 @@ function addItem(c, key, count = 1) {
   if (it.res) { S.res[it.res] += count; return true; }
   if (it.stack) {
     const s = c.inv.find(x => x.key === key && (x.count || 1) < it.stack);
-    if (s) { s.count = (s.count || 1) + count; return true; }
+    if (s) { const room = it.stack - (s.count || 1); if (count <= room) { s.count = (s.count || 1) + count; return true; }   // AUDIT H-06: nie über die Stapelgrenze
+      s.count = it.stack; return addItem(c, key, count - room); }
   }
   if (c.inv.length >= c.invCap) { if (c === S.player) UI.toast('Tasche voll'); return false; }
   c.inv.push(mkItem(key, count));
@@ -257,10 +259,16 @@ function tickChannel(p, dt, moving) {
   const target = byId(ch.targetId) || p;
   if (moving || mouse.down || !target.alive || dist(p, target) > 70) { p.channel = null; UI.toast('Abgebrochen.'); return; }
   ch.t += dt;
-  if (ch.t >= ch.dur) { p.channel = null; applyHealItem(p, ch.key, target, ch.part); }
+  if (ch.revive) { target.tended = performance.now() + 250; if (!(p.act && p.act.until > performance.now())) act(p, 'kneel', 700, target); }
+  if (ch.healer && !(target.act && target.act.until > performance.now())) act(target, 'kneel', 700, p);   // die Heilerin kniet beim Helden
+  if (ch.t >= ch.dur) { p.channel = null;
+    if (ch.healer) { const g = woundedGroup(); S.gold -= Math.min(S.gold, ch.cost); for (const c of g) { B.fullHeal(c); c.status = (c.status || []).filter(s => !SLEEP_CURES.has(s.key)); }
+      log(`${target.name} versorgt ${g.length > 1 ? 'dich und deine Gruppe' : 'deine Wunden'} (${ch.cost} Gold).`, 'party'); fx(p.x, p.y - 14, 'heal', 12); addRel(target.key, 2); UI.refreshHUD(); return; }
+    if (ch.revive) { if (target.downed) stabilize(target, p); } else applyHealItem(p, ch.key, target, ch.part); }
 }
 // Verbände herstellen: aus Stoff, nicht aus dem Nichts
 const BANDAGE_FROM = { cloth: 3, cloth_shirt: 2 };
+function takeFromStash(i) { const s = S.stash[i]; if (!s) return; if (giveItem(S.player, s)) S.stash.splice(i, 1); }   // AUDIT H-04: das Exemplar selbst (Rarität, Affixe, Zustand), nicht ein neues
 function craftBandage(idx) {
   const p = S.player, slot = p.inv[idx]; if (!slot || !BANDAGE_FROM[slot.key]) return;
   const n = BANDAGE_FROM[slot.key], name = ITEMS[slot.key].name;
@@ -273,19 +281,19 @@ function indexSolids(map) {
   const idx = new Map();
   for (const e of S.ents[map]) {
     if (!e.solid) continue;
-    const k = ((e.x / TS) | 0) + ',' + ((e.y / TS) | 0);
+    const k = SK((e.x / TS) | 0, (e.y / TS) | 0);
     (idx.get(k) || idx.set(k, []).get(k)).push(e);
   }
   solidIndex[map] = idx;
 }
 function addSolid(e) {
-  const k = ((e.x / TS) | 0) + ',' + ((e.y / TS) | 0);
+  const k = SK((e.x / TS) | 0, (e.y / TS) | 0);
   const idx = solidIndex[e.map || S.map];
   (idx.get(k) || idx.set(k, []).get(k)).push(e);
 }
 function removeSolid(e) {
   const idx = solidIndex[e.map || S.map];
-  const k = ((e.x / TS) | 0) + ',' + ((e.y / TS) | 0);
+  const k = SK((e.x / TS) | 0, (e.y / TS) | 0);
   const arr = idx.get(k); if (!arr) return;
   const i = arr.indexOf(e); if (i >= 0) arr.splice(i, 1);
 }
@@ -293,12 +301,12 @@ function solidPropAt(map, x, y, r) {
   const tx = (x / TS) | 0, ty = (y / TS) | 0, idx = solidIndex[map];
   if (!idx || !idx.size) return null;                         // Karte ohne Objekt-Index (z. B. Selbsttest-Sandbox)
   for (let j = ty - 1; j <= ty + 1; j++) for (let i = tx - 1; i <= tx + 1; i++) {
-    const arr = idx.get(i + ',' + j); if (!arr || !arr.length) continue;
+    const arr = idx.get(SK(i, j)); if (!arr || !arr.length) continue;
     for (const p of arr) {
       if (p.kind === 'building') {
         const hw = p.def.w * TS / 2, hh = p.def.h * TS / 2;
         if (Math.abs(x - p.x) < hw + r * 0.6 && Math.abs(y - p.y) < hh + r * 0.6) return p;
-      } else if (Math.hypot(x - p.x, y - p.y) < (p.r || 12) * 0.75 + r * 0.6) return p;
+      } else { const q = (p.r || 12) * 0.75 + r * 0.6, dx = x - p.x, dy = y - p.y; if (dx * dx + dy * dy < q * q) return p; }
     }
   }
   return null;
@@ -506,7 +514,8 @@ function spotsOf(b, i, prof) {
   // Früher standen alle Müßigen auf 5×3 Kacheln am Platz: bei mehr Einwohnern ein Gedränge — daher die ganze Platzfläche
   const r = hsh(hx, hy, i), nb = town[Math.floor(hsh(hy, hx, i + 7) * town.length)];
   const dist0 = P.metro && (METRO.districts || []).find(d => !d.outside && hx >= d.x0 && hx <= d.x1 && hy >= d.y0 && hy <= d.y1);   // Phase 5: Metropole — Treffpunkt im eigenen Bezirk
-  const sq = dist0 ? { x: (dist0.x0 + (dist0.x1 - dist0.x0) * (0.3 + hsh(hx, i, 3) * 0.4)) * TS, y: (dist0.y0 + (dist0.y1 - dist0.y0) * (0.3 + hsh(hy, i, 5) * 0.4)) * TS }
+  const sq = dist0 && hsh(hx, hy, i + 11) >= 0.45 ? {   // AUDIT V-03: knapp die Hälfte der Metropole trifft sich auf dem Hauptplatz, nicht im Bezirk
+     x: (dist0.x0 + (dist0.x1 - dist0.x0) * (0.3 + hsh(hx, i, 3) * 0.4)) * TS, y: (dist0.y0 + (dist0.y1 - dist0.y0) * (0.3 + hsh(hy, i, 5) * 0.4)) * TS }
     : plaza ? { x: (plaza[1] + hsh(hx, i, 3) * (plaza[3] - plaza[1] + 1)) * TS, y: (plaza[2] + hsh(hy, i, 5) * (plaza[4] - plaza[2] + 1)) * TS }
     : { x: (P.square[0] + (hsh(hx, i, 3) - 0.5) * 10) * TS, y: (P.square[1] + (hsh(hy, i, 5) - 0.5) * 6) * TS };
   const visit = nb ? { x: (nb.doorTile[0] + (nb.door === 'E' ? 2 : nb.door === 'W' ? -2 : 0.5 + (i % 2 ? 1 : -1))) * TS, y: (nb.doorTile[1] + (nb.door === 'S' ? 1.5 : nb.door === 'N' ? -1.5 : 0.5)) * TS } : front;
@@ -592,13 +601,143 @@ function festMeal(p, t) {                                            // Festtafe
 // (nicht alle brechen gleichzeitig auf), der Nachmittag wechselt von Tag zu Tag. Abends in der Schenke nur so viele, wie
 // drinnen freie Plätze sind — der Rest bleibt vor dem eigenen Haus. Bei jedem Laden neu berechnet (kein Spielstandfeld).
 const VILLAGERS = [];
+// AUDIT A-01 (Nutzer: „Schmiede sitzen in ihrer Schmiede und arbeiten dort, sind zum Kaufen ansprechbar; Händler stehen hinter
+// ihrem Marktstand“): Arbeitsplatz je Beruf statt ausgewürfelt. Vorher arbeiteten zwei Drittel der Bewohner irgendwo auf dem Platz
+// oder vor einer fremden Tür. Der Platz liegt neben dem passenden Möbel, mit Blick darauf; wer drinnen arbeitet, ist drinnen.
+// house: Haustyp(en) der Arbeitsstätte ('home' = das eigene Haus), props: Möbel in Reihenfolge, act: Bewegung (null = steht und bedient).
+const JOB_AT = {
+  Schmied: { house: ['smithy'], props: ['forge', 'workbench_int', 'anvil'], shop: 'smith' },
+  'Bäcker': { house: ['bakery'], props: ['hearth', 'table'] },
+  Wirt: { house: ['tavern'], props: ['counter', 'cask_rack'], act: null }, Schankmagd: { house: ['tavern'], props: ['table', 'counter'] }, Koch: { house: ['tavern'], props: ['hearth'] },
+  Lagerknecht: { house: ['store', 'kontor'], props: ['crate_stack', 'sack', 'barrel'] }, 'Tagelöhner': { house: ['store', 'barn'], props: ['crate_stack', 'sack', 'hay'] },
+  Stallknecht: { house: ['stable'], props: ['hay', 'barrel'] }, Heilerin: { house: ['healer'], props: ['bed', 'table'] },
+  Weber: { house: 'home', props: ['table'] }, Handwerker: { house: 'home', props: ['table', 'shelf'] }, 'Böttcher': { house: 'home', props: ['barrel', 'table'] },
+  Magd: { house: 'home', props: ['hearth', 'table'] }, Kesselflicker: { house: 'home', props: ['hearth', 'table'] },
+  Bauer: { field: true, house: ['barn'], props: ['hay', 'sack'] }, 'Holzfäller': { trees: true },
+  Feinmechaniker: { house: ['magitech', 'factoryhall', 'smithy'], props: ['workbench', 'machine', 'gearpile', 'workbench_int'] }, Kybernetiker: { house: ['magitech', 'factoryhall', 'healer'], props: ['machine', 'workbench', 'table'] },
+  Kaufmann: { stall: true }, Kaufherr: { stall: true }, 'Händlerin': { stall: true }, 'Tuchhändlerin': { stall: true }, 'Gewürzhändler': { stall: true },
+};
+const STALL_SELL = { 'Bäcker': ['bread', 'bread', 'dried_meat'], Weber: ['traveler_cloak', 'leather_cap', 'bandage'], 'Böttcher': ['wood', 'bread'], Bauer: ['bread', 'dried_meat', 'herb'], Magd: ['herb', 'bread', 'bandage'], Handwerker: ['wood', 'stone', 'bandage'] };
+const SMITH_POOL = ['rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk'];
+const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion'];
+function spotBy(prop, b) {                                        // freier Stehplatz neben dem Möbel, drinnen zuerst Richtung Tür
+  for (const [ox, oy] of [[0, 22], [0, -22], [22, 0], [-22, 0], [16, 18], [-16, 18]]) {
+    const x = prop.x + ox, y = prop.y + oy, tx = x / TS | 0, ty = y / TS | 0;
+    if (b && (tx <= b.x || ty <= b.y || tx >= b.x + b.w - 1 || ty >= b.y + b.h - 1)) continue;   // nicht in der Wand
+    if (!SOLID.has(tileAt('world', tx, ty)) && !solidPropAt('world', x, y, 5)) return { x, y };
+  }
+  return null;
+}
+function jobFor(c, home, i, use) {
+  const J = JOB_AT[c.prof]; if (!J || c.plan?.hunt) return null;
+  const P = TOWN_PLAN[c.homeTown]; if (!P) return null;
+  const mk = (pos, prop, inHouse, act) => ({ x: pos.x, y: pos.y, in: inHouse ? 1 : 0, f: { x: prop.x, y: prop.y }, act: act === undefined ? (J.act === undefined ? 'work' : J.act) : act });
+  if (J.stall) {                                                  // hinter dem Stand (Kunden kommen von vorn/unten)
+    const st = S.ents.world.filter(e => e.kind === 'prop' && e.type === 'stall' && townAt(e.x / TS | 0, e.y / TS | 0, 0) === c.homeTown && !use.has(e.id)
+      && !S.ents.world.some(o => o.kind === 'npc' && o.shop && !o.villager && Math.hypot(o.x - e.x, o.y - e.y) < 50)).sort((a, b) => a.id < b.id ? -1 : 1)[0];
+    if (!st) return null; use.add(st.id);
+    return { x: st.x, y: st.y - 20, in: 0, f: { x: st.x, y: st.y + 40 }, act: null, stall: st.id };
+  }
+  if (J.trees) {                                                  // nächster Baum außerhalb der Stadt
+    const [sx, sy] = P.square, t = S.ents.world.filter(e => e.kind === 'prop' && e.type === 'tree' && !use.has(e.id) && !townAt(e.x / TS | 0, e.y / TS | 0, 1)
+      && Math.hypot(e.x / TS - sx, e.y / TS - sy) < 70).sort((a, b) => Math.hypot(a.x / TS - sx, a.y / TS - sy) - Math.hypot(b.x / TS - sx, b.y / TS - sy))[0];
+    if (!t) return null; use.add(t.id); const pos = spotBy(t, null); return pos && mk(pos, t, false);
+  }
+  if (J.field && P.fields?.length) {                              // über das ganze Feld verteilt, nicht alle in der Mitte
+    const n = c.plan?.n || 0, f = P.fields[(i + n) % P.fields.length], x = (f[0] + 0.5 + (f[2] - f[0]) * hsh(n, i, 21)) * TS, y = (f[1] + 0.5 + (f[3] - f[1]) * hsh(i, n, 23)) * TS;
+    return { x, y, in: 0, f: { x: x + 24, y }, act: 'work', row: f }; }
+  const houses = J.house === 'home' ? [home] : HOUSES.filter(h => h.town === c.homeTown && h.map === 'world' && J.house.includes(h.type) && HB.wearOf(h) < 2)
+    .sort((a, b) => (a === home ? -1 : b === home ? 1 : Math.hypot(a.x - home.x, a.y - home.y) - Math.hypot(b.x - home.x, b.y - home.y)));
+  for (const h of houses) for (const type of J.props) {
+    const pr = S.ents.world.filter(e => e.kind === 'prop' && e.house === h.id && e.type === type && !use.has(e.id)).sort((a, b) => a.id < b.id ? -1 : 1);
+    for (const p of pr) { const pos = spotBy(p, h); if (pos) { use.add(p.id); return mk(pos, p, true); } }
+  }
+  if (J.house === 'home') {                                       // Hausgenossen mit gleichem Beruf: anderes Möbel im Haus, sonst vor der eigenen Tür
+    const pr = S.ents.world.filter(e => e.kind === 'prop' && e.house === home.id && !use.has(e.id) && !['bed', 'rubble', 'debris'].includes(e.type)).sort((a, b) => a.id < b.id ? -1 : 1);
+    for (const p of pr) { const pos = spotBy(p, home); if (pos) { use.add(p.id); return mk(pos, p, true); } }
+    const [dx, dy] = home.doorTile, sx = home.door === 'W' ? 1 : home.door === 'E' ? -1 : 0, sy = home.door === 'S' ? -1 : home.door === 'N' ? 1 : 0, fr = { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
+    return { x: fr.x + (i % 2 ? 14 : -14), y: fr.y, in: 0, f: { x: fr.x + (i % 2 ? 14 : -14), y: fr.y + 20 }, act: 'work' };
+  }
+  return null;
+}
+// Arbeitskreislauf (S13, Nutzer: „Arbeiter holen Material und liefern Ware ab; jeder Beruf eigene Bewegung“): Material holen (knien,
+// dann tragen) → an der Werkbank mit dem Werkzeug des Berufs arbeiten (reps Durchgänge, Tempo rate) → Ware zur Abgabe tragen → von vorn.
+// in/out = was getragen wird (Bild), src/drop = Orte ('store' Lager/Kisten, 'barn' Scheune, 'stall' Marktstand, 'rack' Waffenständer
+// derselben Schmiede). ponytail: rein sichtbar — Menge und Preise rechnet economy.js; die Wege koppeln wir nicht an Bestände.
+const CYCLE = {
+  'Holzfäller': { tool: 'axe', reps: 4, rate: 2, out: 'timber', drop: ['store'] },
+  Bauer: { tool: 'tool_hoe', reps: 4, rate: 2, out: 'grain', drop: ['barn', 'store'] },
+  Schmied: { in: 'ingot', src: ['store'], tool: 'tool_hammer', reps: 5, rate: 3, out: 'tools', drop: ['rack', 'store'] },
+  'Bäcker': { in: 'grain', src: ['store', 'barn'], tool: 'tool_spoon', reps: 3, rate: 3, out: 'bread', drop: ['stall', 'store'] },
+  Weber: { reps: 4, rate: 3, out: 'cloth', drop: ['store', 'stall'] },
+  Handwerker: { in: 'timber', src: ['store'], tool: 'tool_saw', reps: 4, rate: 4, out: 'woodware', drop: ['store', 'stall'] },
+  'Böttcher': { in: 'timber', src: ['store'], tool: 'tool_hammer', reps: 4, rate: 2, out: 'woodware', drop: ['store'] },
+  Lagerknecht: { in: 'woodware', src: ['store'], reps: 0, drop: ['stall', 'store'] },
+  'Tagelöhner': { in: 'grain', src: ['barn', 'store'], reps: 0, drop: ['store', 'stall'] },
+  Fischer: { tool: 'tool_rod', reps: 3, rate: 1, out: 'meat', drop: ['stall', 'store'] },
+  Stallknecht: { tool: 'tool_fork', reps: 99, rate: 2 }, Koch: { tool: 'tool_spoon', reps: 99, rate: 3 }, Magd: { tool: 'tool_spoon', reps: 99, rate: 3 },
+  Kesselflicker: { tool: 'tool_hammer', reps: 99, rate: 3 }, Feinmechaniker: { tool: 'tool_hammer', reps: 99, rate: 4 }, Stallmeister: { tool: 'tool_fork', reps: 99, rate: 2 },
+};
+let CYC_PROPS = null;                                             // je Stadt die Orte, einmal aus der Welt gelesen
+function cycProps() {
+  if (CYC_PROPS && CYC_PROPS.w === S.ents.world.length) return CYC_PROPS;
+  const H = new Map(HOUSES.map(h => [h.id, h])), T = {};
+  for (const p of S.ents.world) {
+    if (p.kind !== 'prop') continue;
+    const town = p.house ? H.get(p.house)?.town : townAt(p.x / TS | 0, p.y / TS | 0, 0); if (!town) continue;
+    const L = (T[town] ||= { store: [], barn: [], stall: [], rack: [] }), ht = p.house && H.get(p.house)?.type;
+    if (p.type === 'stall') L.stall.push(p);
+    else if (p.type === 'weapon_rack') L.rack.push(p);
+    else if (ht === 'barn' && (p.type === 'hay' || p.type === 'sack')) L.barn.push(p);
+    else if (['crate_stack', 'sack', 'crate', 'barrel'].includes(p.type) && (!ht || ht === 'store' || ht === 'kontor')) L.store.push(p);
+  }
+  return (CYC_PROPS = { w: S.ents.world.length, T });
+}
+function cycSpot(e, kinds) {
+  const L = cycProps().T[e.homeTown]; if (!L) return null; const J = e.plan.work;
+  for (const k of kinds) {
+    let cand = L[k] || []; if (k === 'rack') cand = cand.filter(p => Math.hypot(p.x - J.x, p.y - J.y) < 200);
+    if (!cand.length) continue;
+    const p = cand.reduce((a, b) => (Math.hypot(b.x - J.x, b.y - J.y) < Math.hypot(a.x - J.x, a.y - J.y) ? b : a));
+    for (const [ox, oy] of k === 'stall' ? [[28, 8], [-28, 8]] : [[0, 22], [0, -22], [22, 0], [-22, 0]]) {
+      const x = p.x + ox, y = p.y + oy; if (!SOLID.has(tileAt('world', x / TS | 0, y / TS | 0)) && !solidPropAt('world', x, y, 5)) return { x, y, f: { x: p.x, y: p.y } };
+    }
+  }
+  return null;
+}
+function workCycle(e, dt) {                                       // true = der Kreislauf steuert die Figur
+  const C = CYCLE[e.prof], J = e.plan.work, now = performance.now();
+  const cy = (e.plan.cyc ||= { src: C.src ? cycSpot(e, C.src) : null, drop: C.drop ? cycSpot(e, C.drop) : null });
+  const W = (e.wk ||= { ph: C.in && cy.src ? 'fetch' : 'work', n: 0, picked: false });
+  if (W.ph === 'fetch' && !cy.src) W.ph = 'work';
+  if (W.ph === 'deliver' && !cy.drop) { W.ph = C.in && cy.src ? 'fetch' : 'work'; e.carry = null; }
+  const goal = W.ph === 'fetch' ? cy.src : W.ph === 'deliver' ? cy.drop : J;
+  if (e.act && e.act.until > now) { e.vx = e.vy = 0; return true; } // Bewegung läuft zu Ende
+  const d = Math.hypot(goal.x - e.x, goal.y - e.y);
+  if (d > 10) { seek(e, Math.atan2(goal.y - e.y, goal.x - e.x), 0.9 * dt / 16, dt, goal); return true; }
+  e.vx = e.vy = 0;
+  if (W.ph !== 'work') {                                          // aufnehmen bzw. abstellen: kurz knien
+    if (!W.picked) { act(e, 'kneel', 800, goal.f); W.picked = true; return true; }
+    W.picked = false;
+    if (W.ph === 'fetch') { e.carry = C.in; W.ph = 'work'; W.n = 0; } else { e.carry = null; W.ph = C.in && cy.src ? 'fetch' : 'work'; W.n = 0; }
+    return true;
+  }
+  if (C.reps === 0 || W.n >= C.reps) { W.n = 0; if (cy.drop && (C.out || C.in)) { e.carry = C.out || C.in; W.ph = 'deliver'; } return true; }
+  e.carry = null;                                                 // Material liegt auf der Werkbank
+  if (J.row && W.mv) { W.mv = false; const [x0, , x1] = J.row, nx = J.x + TS * (W.dir ||= 1); if (nx < (x0 + 0.5) * TS || nx > (x1 + 0.5) * TS) W.dir = -W.dir; else { J.x = nx; J.f = { x: nx + 24 * W.dir, y: J.y }; return true; } }   // Bauer: nach jedem Hieb eine Furche weiter
+  act(e, 'work', 1500, J.f); if (C.tool) e.act.tool = C.tool; e.act.rate = C.rate || 2; W.n++; W.mv = true;
+  const k = WORK_FX[e.prof]; if (k && J.f) fx(J.f.x, J.f.y - 6, k, k === 'spark' ? 4 : 2);
+  return true;
+}
 function planDays() {
-  VILLAGERS.length = 0;
+  VILLAGERS.length = 0; const jobUse = new Set();
   const byHome = new Map(), seats = new Map();
   for (const c of S.ents.world) if (c.villager && c.homeId) { if (!byHome.has(c.homeId)) byHome.set(c.homeId, []); byHome.get(c.homeId).push(c); }
   const seatsOf = tav => {                                            // freie Innenkacheln der Schenke (ohne Möbel, nicht die Türachse)
     if (seats.has(tav.id)) return seats.get(tav.id);
-    const L = []; for (let y = tav.y + 1; y < tav.y + tav.h - 1; y++) for (let x = tav.x + 1; x < tav.x + tav.w - 1; x++) {
+    const L = [];                                                   // AUDIT V-01: zuerst die Bänke (sitzen, zwei je Bank), dann freie Kacheln
+    for (const bn of S.ents.world.filter(e => e.kind === 'prop' && e.type === 'bench' && e.house === tav.id)) for (const dx of [-10, 10]) L.push({ x: bn.x + dx, y: bn.y - 16, in: 1, sit: 1 });
+    for (let y = tav.y + 1; y < tav.y + tav.h - 1; y++) for (let x = tav.x + 1; x < tav.x + tav.w - 1; x++) {
       const px = x * TS + TS / 2, py = y * TS + TS / 2;
       if ((x + y) % 2 === 0 && !SOLID.has(tileAt('world', x, y)) && !solidPropAt('world', px, py, 6) && x !== tav.doorTile[0]) L.push({ x: px, y: py, in: 1 }); }   // BUG-092: Schachbrett — nie Schulter an Schulter, höchstens halb voll
     seats.set(tav.id, L); return L;
@@ -609,7 +748,8 @@ function planDays() {
     const tav = HOUSES.find(h => h.town === b.town && h.type === 'tavern' && h.map === 'world');
     rs.forEach((c, i) => {
       const s = spotsOf(b, i, c.prof), host = ['tavern', 'healer', 'chapel'].includes(b.type);   // wer in Schenke/Heilerhaus/Kapelle wohnt, ist abends drinnen (nicht vor der eigenen Schenkentür)
-      const free = tav && !host && (s.hx + s.hy + i) % 3 === 0 ? seatsOf(tav) : null, seat = free && free.length ? free.splice((s.hx * 7 + s.hy * 3 + i * 13) % free.length, 1)[0] : null;   // über den Raum verteilt, nicht Reihe für Reihe von oben
+      const free = tav && !host && (s.hx + s.hy + i) % 2 === 0 ? seatsOf(tav) : null,   // AUDIT V-01: jeder Zweite abends in der Schenke (vorher jeder Dritte)
+        seat = free && free.length ? free.splice(free.some(q => q.sit) ? free.findIndex(q => q.sit) : (s.hx * 7 + s.hy * 3 + i * 13) % free.length, 1)[0] : null;   // über den Raum verteilt, nicht Reihe für Reihe von oben
       const n = Math.floor(hsh(s.hx, s.hy, i + 31) * 1000);
       // Nachtplatz aus dem aktuellen Haus (nicht gespeichert übernehmen): Häuser können wachsen, Randhäuser umziehen
       const [lat, dep] = [[0, 0], [1, 0], [-1, 0], [0, 1]][i % 4];               // drinnen nebeneinander (quer zur Tür, dann tiefer)
@@ -618,11 +758,29 @@ function planDays() {
       c.plan = { front: s.front, work: s.work, job: !!s.job, plaza: s.sq, visit: s.visit, tav: seat, eve: host ? { ...s.inside, in: 1 } : seat || s.front,
         o: (n % 75) / 100, n, dx: (n % 9) - 4, dy: ((n / 9 | 0) % 7) - 3 };
       c.schedulePos = s.work;
+      const J = jobFor(c, b, i, jobUse);                                 // AUDIT A-01: fester Arbeitsplatz je Beruf
+      if (J) { c.plan.work = J; c.plan.job = true; c.schedulePos = J;
+        if (JOB_AT[c.prof].shop === 'smith') Object.assign(c, { shop: true, smith: true, pool: SMITH_POOL.filter(k => ITEMS[k]), market: false, till: 18 });   // verkauft und bessert aus, wo er arbeitet
+        if (J.stall) Object.assign(c, { shop: true, pool: STALL_POOL.filter(k => ITEMS[k]), till: 18 }); }
       VILLAGERS.push(c);
     });
   }
-  // §79 Beziehungen: je Bewohner ein Freund und ein Rivale in derselben Stadt (fest, aus der Reihenfolge der ids) —
-  // Rivalen reden nicht miteinander und gehen sich aus dem Weg, über den Rivalen wird gelästert, Freunde reden wärmer.
+  // Freie Marktstände: Bäcker, Weber, Böttcher, Bauern verkaufen dort ihre eigene Ware (Nutzer: Händler hinter dem Stand, kein leerer Markt)
+  for (const town of Object.keys(TOWN_PLAN)) {
+    const free = S.ents.world.filter(e => e.kind === 'prop' && e.type === 'stall' && !jobUse.has(e.id) && townAt(e.x / TS | 0, e.y / TS | 0, 0) === town
+      && !S.ents.world.some(o => o.kind === 'npc' && o.shop && !o.villager && Math.hypot(o.x - e.x, o.y - e.y) < 50)).sort((a, b) => a.id < b.id ? -1 : 1);
+    const cand = VILLAGERS.filter(c => c.homeTown === town && STALL_SELL[c.prof] && !c.plan.work?.stall).sort((a, b) => a.plan.n - b.plan.n);
+    free.forEach((st, k) => { const c = cand[k]; if (!c) return; jobUse.add(st.id);
+      c.plan.work = { x: st.x, y: st.y - 20, in: 0, f: { x: st.x, y: st.y + 40 }, act: null, stall: st.id }; c.plan.job = true; c.schedulePos = c.plan.work;
+      Object.assign(c, { shop: true, pool: STALL_SELL[c.prof].filter(i => ITEMS[i]), till: 18 }); });
+  }
+  planRelations();
+  assignHunters();
+}
+// §79 Beziehungen: je Bewohner ein Freund und ein Rivale in derselben Stadt (fest, aus der Reihenfolge der ids) —
+// Rivalen reden nicht miteinander und gehen sich aus dem Weg, über den Rivalen wird gelästert, Freunde reden wärmer.
+// S13: eigene Funktion — nach einem Wegzug neu geplant, damit niemand einen Weggezogenen zum Freund hat.
+function planRelations() {
   const byTown = {};
   for (const c of VILLAGERS) (byTown[c.homeTown] ||= []).push(c);
   for (const list of Object.values(byTown)) {
@@ -634,7 +792,6 @@ function planDays() {
     });
     for (const c of list) if (c.rel.rival) { const o = list.find(x => x.id === c.rel.rival); o.rel.foe = c.id; }   // Abneigung ist gegenseitig
   }
-  assignHunters();
 }
 // §41 Stufe 2: je Stadt ein Jäger (bestehende Stände: ein Tagelöhner oder Holzfäller wird es) — Jagdgebiet = nächste Wildnis.
 // S12: eigene Funktion, beim Laden erneut (gespeicherte Jagdplätze konnten in einer Stadt liegen)
@@ -683,17 +840,18 @@ function dayTargetRaw(e) {
   const P = e.plan, h = S.minute / 60 - P.o, alt = ((S.day | 0) + P.n) % 3;
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
   if (S.war?.nodes[e.homeTown]?.owner === 'undead') return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus
+  if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
   if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996, r = 80 + (P.n % 6) * 22;   // Fest: im Kreis ums Feuer
     return { x: c.x + Math.cos(a) * r, y: c.y - 2 * TS + Math.sin(a) * r * 0.7, k: 'f', social: 1 }; }   // Mitte = Feuer (2 Kacheln nördlich des Platzes)
   if (P.hunt && h >= 7 && h < 13.5) return { x: P.hunt.x, y: P.hunt.y, k: 'j', work: 1 };            // Jäger: draußen im Jagdgebiet
   if (P.hunt && h >= 13.5 && h < 15) return { x: P.plaza.x, y: P.plaza.y, k: 'jd', deliver: 1 };     // … und mit Beute zum Markt
   if (h < 7.5) return { x: P.front.x, y: P.front.y, k: 'm' };
   if (h < 11.5) return { x: P.work.x, y: P.work.y, k: 'w', work: 1 };
-  if (h < 13) { const t = P.tav && P.n % 2 ? P.tav : P.plaza; return { x: t.x, y: t.y, k: 'l', social: 1, in: t.in }; }
+  if (h < 13) { const t = P.tav && P.n % 2 ? P.tav : P.plaza; return { x: t.x, y: t.y, k: 'l', social: 1, in: t.in, sit: t.sit }; }
   if (h < 16.5) { if (P.job || alt === 0) return { x: P.work.x, y: P.work.y, k: 'a', work: 1 };
     const t = alt === 1 ? P.visit : P.plaza; return { x: t.x, y: t.y, k: 'a' + alt, social: 1 }; }
   if (h < 18) { const t = P.job ? P.work : P.plaza; return { x: t.x, y: t.y, k: 'k', work: P.job ? 1 : 0, social: P.job ? 0 : 1 }; }
-  if (h < 20.5 || P.eve.in) return { x: P.eve.x, y: P.eve.y, k: 'e', social: 1, in: P.eve.in };
+  if (h < 20.5 || P.eve.in) return { x: P.eve.x, y: P.eve.y, k: 'e', social: 1, in: P.eve.in, sit: P.eve.sit };
   return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
 }
 // Kurze Gespräche zwischen Bewohnern am Treffpunkt (Talk-Pairs): beide stehen, drehen sich zueinander, Sprechblasen im Wechsel
@@ -737,14 +895,21 @@ function villagerDay(e, t, dt) {
   if (foe && foe.alive && foe.map === e.map && !t.in && Math.hypot(foe.x - e.x, foe.y - e.y) < 70) {   // §79: dem Rivalen aus dem Weg gehen
     const a = Math.atan2(e.y - foe.y, e.x - foe.x); e.talk = null; seek(e, a, 0.9 * dt / 16, dt); return;
   }
+  if (!t.work) { e.carry = null; e.wk = null; }                    // S13: außerhalb der Arbeit trägt niemand Ware herum
+  else if (e.plan.job && !e.plan.work.stall && CYCLE[e.prof] && t.x === e.plan.work.x && t.y === e.plan.work.y && workCycle(e, dt)) return;   // S13: Arbeitskreislauf
   const d = Math.hypot(t.x - e.x, t.y - e.y);
   if (t.deliver && d <= 40) deliverGame(e);
+  if (d <= 40) { if (t.k === 'l' || t.k === 'e') eatMeal(e); else if (t.k === 'a2') marketBuy(e, true); }   // S13: Mahlzeit, Markteinkauf
   e.nearT = d < 60 ? (e.nearT || 0) + dt : 0;                                          // Phase 1: Ziel verstellt (Gerät, Nachbar) → nah genug ist da
-  if (d > 30 && e.nearT < 1000) { e.wander = null; seek(e, Math.atan2(t.y - e.y, t.x - e.x), (d > 300 ? 1.1 : 0.9) * dt / 16, dt, t); return; }
+  if (t.sit && d <= 8) { e.vx = e.vy = 0; e.wander = null; e.sitting = true; e.sitDir = 'S'; e.x = t.x; e.y = t.y;   // AUDIT V-01: auf der Bank sitzen, essen, reden
+    e.aiTimer -= dt; if (e.aiTimer <= 0) { e.aiTimer = ri(3200, 7600); if (hsh(e.plan.n, performance.now() / 1000 | 0, 3) < 0.55) startTalk(e); } return; }
+  if (d > (t.sit ? 8 : 30) && e.nearT < 1000) { e.wander = null; seek(e, Math.atan2(t.y - e.y, t.x - e.x), (d > 300 ? 1.1 : 0.9) * dt / 16, dt, t); return; }
   e.aiTimer -= dt;
   if (e.aiTimer <= 0) {                                               // angekommen: arbeiten, reden oder ein paar Schritte
     e.aiTimer = ri(3200, 7600);
-    if (t.work && !t.in) { e.vx = e.vy = 0; e.wander = null; act(e, 'work', 1500); return; }
+    if (t.work) { e.vx = e.vy = 0; e.wander = null; const J = e.plan.job && t.x === e.plan.work.x && t.y === e.plan.work.y ? e.plan.work : null;   // AUDIT A-01: am eigenen Arbeitsplatz, zum Möbel gewandt
+      if (J && J.act === null) { if (J.f) e.facing = J.f.y > e.y ? 0 : 1; return; }   // Händler/Wirt: steht und bedient
+      if (!t.in || J) act(e, 'work', 1500, J?.f); return; }
     if (t.social && hsh(e.plan.n, now / 1000 | 0, 3) < 0.55 && startTalk(e)) return;
     const j = t.in ? 8 : 26; e.wander = { x: t.x + ri(-j, j), y: t.y + ri(-j * 0.8, j * 0.8) };
   }
@@ -757,10 +922,190 @@ function placeAway(e) {
   const t = dayTarget(e); if (e.blk === t.k) return;
   e.blk = t.k; e.talk = null; e.wander = null;
   if (t.deliver) deliverGame(e);
+  if (t.k === 'l' || t.k === 'e') eatMeal(e); else if (t.k === 'a2') marketBuy(e, false);
   const a0 = e.plan.n * 2.39996, r = t.in ? 7 : 12 + (e.plan.n % 5) * 4;   // je Person eigene Richtung (goldener Winkel): Hausgenossen stehen nie aufeinander
   for (const rr of [r, r * 0.55, 7]) for (let k = 0; k < 6; k++) { const x = t.x + Math.cos(a0 + k * 1.05) * rr, y = t.y + Math.sin(a0 + k * 1.05) * rr * 0.8;
     if (!solidTile('world', x, y) && !solidPropAt('world', x, y, 4) && !VILLAGERS.some(o => o !== e && Math.abs(o.x - x) < 7 && Math.abs(o.y - y) < 7)) { e.x = x; e.y = y; return; } }   // frei = kein Hindernis, niemand steht dort
   e.x = t.x + ((e.plan.n % 5) - 2) * 4; e.y = t.y + (((e.plan.n / 5 | 0) % 3) - 1) * 4;   // enge Stelle: kleiner fester Versatz je Person
+}
+
+// ================= NPC-Leben (S13, Nutzer: Grundmechaniken) =================
+// Essen: Mittag (Block l) und Abend (Block e) sind Mahlzeiten. Satt wird, wer in einer Stadt mit Nahrung lebt (economy.js:
+// `hunger`). Wer lange nichts gegessen hat, arbeitet halb (economy.js zählt ihn halb) und sagt es.
+// Einkauf: Wer nachmittags auf dem Markt ist (Block a2), kauft einmal am Tag eine Ware. Der Vorrat sinkt sofort; economy.js zieht
+// das Gekaufte vom Tagesverbrauch der Stadt ab, damit nichts doppelt zählt.
+const HUNGRY_MIN = 20 * 60;
+const hungry = e => e.ate != null && clock() - e.ate > HUNGRY_MIN;
+function eatMeal(e) {
+  const t = S.towns?.[e.homeTown];
+  if (t && !t.hunger) e.ate = clock(); else if (e.ate == null) e.ate = clock() - HUNGRY_MIN / 2;   // die Mahlzeit fällt aus
+}
+const SHOP_GOODS = ['grain', 'meat', 'salt', 'cloth', 'woodware'];
+function marketBuy(e, near) {
+  if (e.shopDay === (S.day | 0)) return; e.shopDay = S.day | 0;
+  const t = S.towns?.[e.homeTown]; if (!t) return;
+  const g = SHOP_GOODS[(e.plan.n + (S.day | 0)) % SHOP_GOODS.length]; if ((t.stock[g] || 0) < 1) return;
+  t.stock[g] -= 1; (t.bought ||= {})[g] = (t.bought[g] || 0) + 1;
+  if (near) act(e, 'trade', 1100, S.ents.world.find(o => o.shop && o.alive && Math.abs(o.x - e.x) < 160 && Math.abs(o.y - e.y) < 160) || null);
+}
+// Sicherheit: Steht ein Überfall bevor (Vorwarnung) oder ein Totenheer vor der Stadt, bleiben die Leute außerhalb der Arbeit daheim.
+function townDanger(k) {
+  if (!k) return false;                                          // ohne Heimatort (Flüchtlinge, Reisende) keine Stadtgefahr
+  if (S.deadRaid && S.deadRaid.v === k && clock() > S.deadRaid.at - 240) return true;
+  return !!S.towns?.[k] && !!S.war?.nodes && SIM.townState(k) === 'Bedroht';
+}
+
+// Reisende (Nutzer: „mehr Leute, die einfach normal durchs Land reisen“): Wanderer, Hausierer, Pilger, Boten, Spielleute und
+// Arbeitssuchende ziehen über die Straßen (SIM.roadPath) von Ort zu Ort, rasten in der Schenke, schlafen nachts am Wegrand.
+// Fern vom Spieler rücken sie nur auf ihrer Route vor (roadTick, ohne Wegsuche). Flüchtig: nicht im Spielstand.
+const TRAVEL_MAX = 14;
+const TRAV_KINDS = [
+  { k: 'wanderer', prof: 'Wanderer', w: 3, greet: ['„Nur auf der Durchreise. Wie alle.“', '„Der Weg ist das Einzige, was mir gehört.“', '„Gibt es in % eine Schenke, die nicht panscht?“'] },
+  { k: 'peddler', prof: 'Hausierer', w: 2, shop: true, pool: ['bread', 'bandage', 'herb', 'dried_meat', 'potion'], greet: ['„Nadeln, Verbände, Brot — alles, was der Weg frisst.“', '„Schau ruhig. Anschauen kostet nichts.“'] },
+  { k: 'pilgrim', prof: 'Pilger', w: 1, n: 2, greet: ['„Zum Altar Omegas. Der Stern wartet.“', '„Bete mit uns, Fremder. Oder geh.“'] },
+  { k: 'messenger', prof: 'Bote', w: 1, speed: 1.5, greet: ['„Keine Zeit! Die Nachricht muss nach %.“', '„Briefe. Frag nicht, was drinsteht.“'] },
+  { k: 'minstrel', prof: 'Spielmann', w: 1, musician: true, greet: ['„Ein Lied für ein Kupfer? Zwei, wenn es traurig sein soll.“', '„In % zahlen sie gut für Lieder. Hoffe ich.“'] },
+  { k: 'seeker', prof: 'Arbeitssuchender', w: 2, n: 1, greet: ['„Man sagt, in % gibt es Arbeit. Man sagt viel.“', '„Ich kann pflügen, hacken, tragen. Irgendwer braucht das.“'] },
+];
+const travelTowns = () => Object.keys(TOWN_PLAN).filter(k => k !== 'vharnholm' && S.war?.nodes?.[k]?.owner !== 'undead' && !S.razed?.[k]);
+const sqOf = k => TOWN_PLAN[k].square;
+const townGap = (a, b) => Math.hypot(sqOf(a)[0] - sqOf(b)[0], sqOf(a)[1] - sqOf(b)[1]);
+const destPt = to => typeof to === 'string' ? sqOf(to) : to;
+const destName = to => typeof to === 'string' ? ECO.townName(to) : 'dem Altar Omegas';
+function travelRoute(fromPt, to) { const [ax, ay] = fromPt, [bx, by] = destPt(to); return SIM.roadAsync(ax | 0, ay | 0, bx | 0, by | 0, 1.5); }   // undefined = Weg wird noch gesucht
+function nextTown(from) {
+  const T = travelTowns().filter(k => k !== from && townGap(from, k) > 40 && townGap(from, k) < 420).sort((a, b) => townGap(from, a) - townGap(from, b));
+  return T.length ? T[ri(0, Math.min(3, T.length - 1))] : null;
+}
+function pickTravKind() { const tot = TRAV_KINDS.reduce((n, K) => n + K.w, 0); let r = rnd() * tot; for (const K of TRAV_KINDS) if ((r -= K.w) < 0) return K; return TRAV_KINDS[0]; }
+function spawnTraveler(K = pickTravKind(), from = null, to = null) {
+  const T = travelTowns(); if (T.length < 2) return null;
+  if (K.k === 'pilgrim') {                                         // Pilger: aus den Westdörfern zum Altar Omegas
+    const alt = S.ents.world.find(e => e.omegaAltar); if (!alt || S.flags.chainsBroken) return null;
+    from ||= pick(['grauwasser', 'hohlstein', 'eisenried'].filter(k => T.includes(k))); to ||= [alt.x / TS | 0, (alt.y / TS | 0) + 2];
+  } else { from ||= pick(T); to ||= nextTown(from); }
+  if (!from || !to || !TOWN_PLAN[from]) return null;
+  const route = travelRoute(sqOf(from), to);
+  if (route === undefined) { if (!TRAV_PEND.some(q => q.from === from && q.to === to)) TRAV_PEND.push({ K, from, to }); return 'wait'; }   // Weg wird gesucht: zur nächsten Stunde
+  if (!route || route.length < 2) return null;
+  const [sx, sy] = sqOf(from); let lead = null;
+  if (inView('world', sx * TS, sy * TS, 200)) return null;           // AUDIT: nicht vor den Augen des Spielers aus dem Nichts
+  for (let i = 0; i < (K.n || 1); i++) {
+    const s = freeSpotNear('world', sx + ri(-2, 2), sy + ri(-2, 2), 2), fem = chance(0.4);
+    const c = makeChar({ name: pick(fem ? FIRST_F : FIRST_M), prof: K.prof, x: s.x, y: s.y, level: ri(1, 4) });
+    Object.assign(c, { transient: true, visitor: true, anchor: { x: s.x, y: s.y }, greet: pick(K.greet).replace('%', destName(to)) });
+    if (!lead) { c.traveler = { kind: K.k, from, to, route, wp: 1, legs: K.k === 'pilgrim' ? 1 : ri(1, 3), speed: K.speed || 1, rest: 0 }; lead = c; }
+    else c.travLead = lead.id;
+    if (K.shop) Object.assign(c, { shop: true, pool: K.pool, market: false });
+    if (K.musician) c.musician = true;
+    S.ents.world.push(c);
+  }
+  return lead;
+}
+function frontOf(b) {
+  const [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
+  return { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
+}
+function arriveTown(e) {
+  const T = e.traveler;
+  if (typeof T.to !== 'string') { T.rest = clock() + ri(120, 240); T.spot = { x: e.x, y: e.y }; T.legs = 0; return; }   // Pilger: am Altar beten, dann heim
+  if ((T.kind === 'seeker' || T.kind === 'emigrant') && settleIn(e, T.to)) return;
+  const tav = HOUSES.find(h => h.town === T.to && h.type === 'tavern' && h.map === 'world');
+  const [qx, qy] = sqOf(T.to); T.spot = tav ? frontOf(tav) : { x: (qx + 0.5) * TS, y: (qy + 0.5) * TS };
+  T.rest = clock() + ri(120, 360);
+}
+function nextLeg(e) {
+  const T = e.traveler; T.rest = 0; T.spot = null;
+  if (--T.legs <= 0 || typeof T.to !== 'string') { e.gone = true; return; }   // am Ziel: geht in ein Haus (verschwindet)
+  const to = T.pendTo || nextTown(T.to), route = to && travelRoute(sqOf(T.to), to); T.pendTo = to;
+  if (route === undefined) { T.legs++; T.rest = clock() + 20; T.spot = { x: e.x, y: e.y }; return; }   // Weg wird noch gesucht: kurz warten
+  if (!route) { e.gone = true; return; }
+  Object.assign(T, { from: T.to, to, route, wp: 1, pendTo: null });
+}
+function travelerStep(e, dt, far) {
+  if (e.travLead) {                                                // Begleiter gehen hinter dem Anführer
+    const L = byId(e.travLead); if (!L || !L.alive || L.gone || !L.traveler) { e.gone = true; return true; }
+    const q = { x: L.x - 16, y: L.y + 12 }, d = Math.hypot(q.x - e.x, q.y - e.y);
+    if (far || d > 400) { e.x = q.x; e.y = q.y; e.vx = e.vy = 0; }
+    else if (d > 10) seek(e, Math.atan2(q.y - e.y, q.x - e.x), Math.min(1.5, 0.8 + d / 60) * dt / 16, dt, q); else { e.vx = e.vy = 0; e.facing = L.facing; }
+    e.sitting = L.sitting; e.sitDir = 'S'; return true;
+  }
+  const T = e.traveler; if (!T) return false;
+  if (T.rest) {
+    if (clock() < T.rest) { if (!far) { const d = Math.hypot(T.spot.x - e.x, T.spot.y - e.y); if (d > 36) seek(e, Math.atan2(T.spot.y - e.y, T.spot.x - e.x), 0.8 * dt / 16, dt, T.spot); else e.vx = e.vy = 0; } return true; }
+    nextLeg(e); return true;
+  }
+  const h = S.minute / 60;
+  if (h < 6 || h >= 21.5) { e.vx = e.vy = 0; e.sitting = true; e.sitDir = 'S'; return true; }   // Nachtlager am Wegrand
+  e.sitting = false;
+  const [wx, wy] = T.route[T.wp], gx = wx * TS, gy = wy * TS, d = Math.hypot(gx - e.x, gy - e.y), v = 0.9 * T.speed;
+  if (d < 20) { if (++T.wp >= T.route.length) arriveTown(e); return true; }
+  if (far) { const st = Math.min(d, v * dt / 16); e.x += (gx - e.x) / d * st; e.y += (gy - e.y) / d * st; e.vx = e.vy = 0; }
+  else seek(e, Math.atan2(gy - e.y, gx - e.x), v * dt / 16, dt, { x: gx, y: gy });
+  return true;
+}
+// Jedes Bild: Reisende fern vom Spieler (oder wenn er unter der Erde ist) rücken auf ihrer Route vor; Abgereiste verschwinden.
+let TRAV = [], TRAV_W = null;
+function roadTick(dt) {
+  SIM.pumpRoads(0.8);                                                  // Wegsuche der Reisenden: höchstens ~1 ms je Bild, nur wenn etwas ansteht
+  if (TRAV_W !== S.ents.world) { TRAV_W = S.ents.world; TRAV = S.ents.world.filter(e => e.traveler || e.travLead); }
+  const p = S.player, onW = S.map === 'world'; let gone = false;
+  for (const e of TRAV) {
+    if (e.gone) { gone = true; continue; }
+    if (!e.alive || e.downed || !(e.traveler || e.travLead)) continue;
+    if (!onW || Math.abs(e.x - p.x) > 900 || Math.abs(e.y - p.y) > 900) travelerStep(e, dt, true);
+  }
+  if (gone) S.ents.world = S.ents.world.filter(e => !e.gone);
+}
+let TRAV_PEND = [];
+function travelHour() {
+  const h = S.minute / 60; if (h < 6 || h >= 19) return;                         // aufgebrochen wird am Tag
+  TRAV_PEND = TRAV_PEND.filter(q => spawnTraveler(q.K, q.from, q.to) === 'wait');
+  const n = S.ents.world.reduce((k, e) => k + (e.traveler && !e.gone ? 1 : 0), 0);
+  for (let i = 0; i < (n < TRAVEL_MAX / 2 ? 3 : 1) && n + i < TRAVEL_MAX; i++) if (chance(0.7)) spawnTraveler();
+}
+function travelTalk(npc) {
+  const T = npc.traveler || byId(npc.travLead)?.traveler; if (!T) return null;
+  const why = { wanderer: 'Einfach weiter.', peddler: 'Wo Leute sind, wird gekauft.', pilgrim: 'Der Stern ruft.', messenger: 'Man zahlt mich fürs Laufen, nicht fürs Reden.',
+    minstrel: 'Wo gefeiert wird, bin ich richtig.', seeker: 'Ich suche Arbeit. Und ein Dach.', emigrant: 'Wir fangen neu an. Irgendwo.' }[T.kind] || '';
+  return `„Nach ${destName(T.to)}${typeof T.from === 'string' ? `, von ${ECO.townName(T.from)} her` : ''}. ${why}“`;
+}
+
+// Wegzug, Zuzug, Geburten (einmal am Tag): Hungert eine Stadt oder steht ein Totenheer davor, packen nach drei Tagen die ersten
+// und ziehen als Auswanderer los — der Stadt fehlen dann echte Arbeiter. Arbeitssuchende und Auswanderer lassen sich in einem
+// leeren Haus nieder, wenn es am Ziel eins gibt (dann eigene Tagesplanung). Friedliche, satte Städte bekommen Kinder (Einwohnerzahl).
+function migrationDay() {
+  for (const k of Object.keys(TOWN_PLAN)) {
+    const t = S.towns?.[k]; if (!t || k === 'vharnholm' || S.war?.nodes?.[k]?.owner === 'undead') continue;
+    const bad = t.hunger || townDanger(k);
+    t.badDays = bad ? (t.badDays || 0) + 1 : 0;
+    if (t.badDays >= 3 && chance(0.35)) emigrate(k, t.hunger ? 'hunger' : 'fear');
+    else if (!bad && chance(0.04)) { t.pop = (t.pop || 0) + 1; if (chance(0.3)) log(`In ${t.name} wurde ein Kind geboren.`, 'world'); }
+  }
+}
+const NAMED_NPC = new Set(NPCS.map(n => n.key));   // Figuren mit Geschichte ziehen nie weg
+function emigrate(k, why, dest = null) {
+  const c = VILLAGERS.filter(v => v.homeTown === k && v.alive && !v.downed && !v.shop && !NAMED_NPC.has(v.key) && !S.party.includes(v.id)).sort((a, b) => a.plan.n - b.plan.n)[0];
+  const to = dest || pick(travelTowns().filter(x => x !== k && !S.towns?.[x]?.hunger && !townDanger(x) && townGap(k, x) < 500));
+  const route = c && to && travelRoute(sqOf(k), to); if (!route) return null;   // los geht es am Stadtplatz (drinnen ist jede Kachel gesperrt)
+  VILLAGERS.splice(VILLAGERS.indexOf(c), 1);
+  Object.assign(c, { villager: false, plan: null, homeId: null, homeTown: null, transient: true, visitor: true, rel: null, talk: null, wander: null,
+    traveler: { kind: 'emigrant', from: k, to, route, wp: 1, legs: 1, speed: 0.9, rest: 0 },
+    greet: why === 'hunger' ? `„In ${ECO.townName(k)} gibt es kein Brot mehr. Wir gehen, solange wir noch gehen können.“` : '„Die Toten stehen vor der Stadt. Ich warte nicht, bis sie hereinkommen.“' });
+  planRelations();
+  log(`${c.name} verlässt ${ECO.townName(k)} (${why === 'hunger' ? 'Hunger' : 'Angst'}) und zieht nach ${ECO.townName(to)}.`, 'world');
+  return c;
+}
+function settleIn(e, k) {
+  const t = S.towns?.[k]; if (!t || t.hunger || townDanger(k) || TOWN_PLAN[k]?.lord === 'aurel') return false;   // Aurelion nimmt nur mit Papieren auf
+  const b = HOUSES.find(h => h.town === k && h.map === 'world' && ['house', 'cottage'].includes(h.type) && HB.wearOf(h) < 2 && !S.ents.world.some(o => o.homeId === h.id && o.alive));
+  if (!b) return false;
+  if (e.traveler.kind === 'seeker') { e.prof = pick(TRADES[b.type]); e.greet = TRADE_GREET[e.prof] || e.greet; }
+  Object.assign(e, { villager: true, homeId: b.id, homeTown: k, transient: false, visitor: false });
+  delete e.traveler; TRAV_W = null;
+  planDays();
+  log(`${e.name} lässt sich in ${ECO.townName(k)} nieder.`, 'world');
+  return true;
 }
 
 // Tagesablauf der Figuren mit Namen (BUG-013): Arbeit, Feierabend, Zuhause — an echte Häuser der Siedlung gebunden.
@@ -1087,6 +1432,7 @@ export function newGame(cfg) {
 
 function bindSim() {
   SIM.H.spawnEnemy = spawnEnemy;
+  SIM.H.pushOut = pushOut; SIM.H.inView = inView;                     // AUDIT: Heere und Räuber erscheinen außerhalb des Bildes
   SIM.H.hireEscorts = hireEscorts;
   SIM.H.toast = t => UI.toast(t, 3600);
   SIM.H.title = t => {
@@ -1147,7 +1493,8 @@ export function continueGame() {
   const data = loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
   applySave(data);
-  SP.setArt(S.settings?.art || 'F');   // Nutzer S13: gewählter Grafikstil
+  if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
+  SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
   const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega() }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
@@ -1311,7 +1658,7 @@ function update(dt, now) {
   const hour = Math.floor(S.minute / 60);
   if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
   if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
-  festTick();
+  festTick(); roadTick(dt);
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
   // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
@@ -1445,7 +1792,8 @@ function think(e, dt) {
   if (e.kind === 'enemy' && !(e.status && e.status.length) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen (updateEnemy tat fern ohnehin nichts)
   if (e.kind === 'npc' && !e.angry && !e.fleeing && !e.escort && !e.threatId && !(e.swing > 0) && S.party.indexOf(e.id) < 0) {   // außer Sicht: jedes 3. Bild, dreifacher Schritt
     const P0 = S.player, far = Math.abs(e.x - P0.x) > 520 || Math.abs(e.y - P0.y) > 420;
-    if (far) { e._lc = ((e._lc ?? (e.id.charCodeAt(e.id.length - 1) || 0)) + 1) % 3; if (e._lc) return; dt *= 3; }   // Zähler je Figur (gestaffelt), unabhängig vom Bildzähler
+    if (far) { const k = Math.abs(e.x - P0.x) > 1700 || Math.abs(e.y - P0.y) > 1700 ? 8 : 3;   // AUDIT P-03: weit draußen jedes 8. Bild
+      e._lc = ((e._lc ?? (e.id.charCodeAt(e.id.length - 1) || 0)) + 1) % k; if (e._lc) return; dt *= k; }   // Zähler je Figur (gestaffelt), unabhängig vom Bildzähler
   }
   if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
   else if (e.stagger > 0 && e !== S.player && !S.party.includes(e.id)) { e.vx = e.vy = 0; }   // taumelt: keine Entscheidung
@@ -1478,6 +1826,20 @@ function regionThreat(tx, ty) {
   for (const l of LOCATIONS) { const d = Math.hypot(l.x - tx, l.y - ty); if (d < bd) { bd = d; bt = l.threat; } }
   return Math.max(1, bt - 1);
 }
+// AUDIT (Nutzer: „Hinterhalte spawnen einfach — man soll nicht sehen, wie sie spawnen“): Liegt ein Punkt im Kamerabild? Das Bild
+// ist mindestens Full HD angenommen (größere Bildschirme, Herauszoomen) plus Rand. pushOut schiebt einen Spawnpunkt vom Helden weg nach
+// außen, bis er sicher außerhalb liegt — für alles, was „aus dem Nichts“ käme (Hinterhalte, Nachschub, Kopfgeldjäger, Heere).
+function inView(map, x, y, m = 96) {
+  if (map !== S.map) return false; const p = S.player, V = R.view(), z = R.cam.zoom || 1;
+  const hw = Math.max(V.W || 0, 1920) / (2 * z) + m, hh = Math.max(V.H || 0, 1080) / (2 * z) + m;
+  return Math.abs(x - p.x) < hw && Math.abs(y - p.y) < hh;
+}
+function pushOut(map, tx, ty) {                                   // in Kacheln
+  const p = S.player; if (!inView(map, tx * TS, ty * TS)) return [tx, ty];
+  let a = Math.atan2(ty * TS - p.y, tx * TS - p.x); if (!isFinite(a) || (tx * TS === p.x && ty * TS === p.y)) a = rnd() * Math.PI * 2;
+  for (let r = 4; r < 120; r += 2) { const x = tx + Math.round(Math.cos(a) * r), y = ty + Math.round(Math.sin(a) * r); if (!inView(map, x * TS, y * TS)) return [x, y]; }
+  return [tx, ty];
+}
 function travelTick() {
   const p = S.player;
   if (S.map !== 'world' || !p.alive || p.downed) return;
@@ -1501,18 +1863,19 @@ function travelTick() {
     const types = AMBUSH_BY_TILE[tileAt('world', tx, ty)] || ['wolf', 'goblin', 'bandit'], fam = pick(AMBUSH_FAM.filter(f => f.some(m => types.includes(m)) && !(S.flags.goblinsFreed && f[0] === 'goblin'))) || AMBUSH_FAM[0];
     const n = ri(fam[0] === 'wolf' ? 2 : 1, 2 + Math.floor(threat / 2)), ahead = ri(26, 32), a = Math.atan2(p.vy, p.vx) + (rnd() - 0.5) * 0.6;
     const ax = tx + Math.round(Math.cos(a) * ahead), ay = ty + Math.round(Math.sin(a) * ahead), cover = coverNear(ax, ay, 6), gid = uid();
-    const bx = cover ? cover[0] + Math.round(Math.cos(a) * 2) : ax, by = cover ? cover[1] + Math.round(Math.sin(a) * 2) : ay;   // hinter der Deckung, vom Spieler aus gesehen
+    let bx = cover ? cover[0] + Math.round(Math.cos(a) * 2) : ax, by = cover ? cover[1] + Math.round(Math.sin(a) * 2) : ay;   // hinter der Deckung, vom Spieler aus gesehen
+    if (inView('world', bx * TS, by * TS)) { [bx, by] = pushOut('world', bx, by); const c2 = coverNear(bx, by, 5); if (c2 && !inView('world', c2[0] * TS, c2[1] * TS)) [bx, by] = c2; }   // AUDIT: nie sichtbar erscheinen
     for (let i = 0; i < n; i++) { const e = spawnEnemy(pick(fam), 'world', bx + ri(-2, 2), by + ri(-2, 2)); if (!e) continue;
       Object.assign(e, { encounter: true, ambush: fam[0] !== 'wolf' ? gid : null, pack: fam[0] === 'wolf' ? gid : null, aiState: 'idle' }); e.aggroId = null; }
   } else if (roll < 0.82) {                                                 // fahrender Händler
-    const pos = freeSpotNear('world', tx + ox, ty + oy, 3);
+    const pos = freeSpotNear('world', ...pushOut('world', tx + ox, ty + oy), 3);
     const c = makeChar({ name: 'Fahrender Händler', prof: 'Händler', x: pos.x, y: pos.y, level: ri(3, 6),
       traits: ['klug', 'praktisch'], greet: '„Weit weg von jeder Stadt — genau da braucht man einen Händler.“' });
     c.shop = true; c.brave = true; c.encounter = true; c.anchor = { x: pos.x, y: pos.y };
     c.equip.weapon = mkItem('dagger'); S.ents.world.push(c);
     log('Ein fahrender Händler kreuzt deinen Weg.', 'world'); UI.toast('Fahrender Händler', 2400);
   } else {                                                                  // Reisender (Gerücht)
-    const pos = freeSpotNear('world', tx + ox, ty + oy, 3);
+    const pos = freeSpotNear('world', ...pushOut('world', tx + ox, ty + oy), 3);
     const c = makeChar({ name: pick(['Reisender', 'Pilgerin', 'Bote', 'Wanderin']), prof: 'Reisender', x: pos.x, y: pos.y, level: ri(1, 4),
       traits: [pick(['furchtsam', 'neugierig', 'müde'])], greet: '„Die Straßen sind nicht mehr sicher. Aber wann waren sie das je.“' });
     c.brave = false; c.encounter = true; c.anchor = { x: pos.x, y: pos.y };
@@ -1577,15 +1940,9 @@ function tickCombatant(c, dt) {
   if (c.downed && c.brawlKO) {                             // S12: nach der Prügelei aufstehen statt verbluten
     if (performance.now() > c.brawlKO) { c.brawlKO = 0; c.downed = false; if (c.body) B.healPart(c, 'torso', c.body.torso.max * 0.3 - c.body.torso.hp); act(c, 'rise', 520); }
   } else if (c.downed) {
-    c.downTimer -= dt;
+    if (!(c.tended > performance.now())) c.downTimer -= dt;   // AUDIT B-01: wer versorgt wird, blutet nicht weiter aus
     if (c.downTimer <= 0) { if (c === S.player && captureInstead(c)) return; die(c, c.lastCause || 'Wunden', c.lastKiller); }   // S12 E: Kette schleppt in den Steinbruch
-    else if (c !== S.player) {                                // nur wer nicht verfeindet ist, hilft auf
-      const helper = [S.player, ...partyMembers()].find(h => h !== c && h.alive && !h.downed && !c.angry && !isHostile(h, c) && dist(h, c) < 40);
-      if (helper) stabilize(c, helper);
-    } else {
-      const helper = partyMembers().find(h => h.alive && !h.downed && dist(h, c) < 50);
-      if (helper) stabilize(c, helper);
-    }
+    // Aufrichten dauert jetzt (Nutzer): Begleiter knien REVIVE_MS lang (partyCare), der Held mit E (startRevive) — nicht mehr im Vorbeigehen
   }
 }
 
@@ -1657,7 +2014,7 @@ function findPath(map, x0, y0, x1, y1) {
   const idx = solidIndex[map];
   const blocked = (i, j) => { const tx = i + minX, ty = j + minY;
     if (i < 0 || j < 0 || i >= W || j >= H || SOLID.has(tileAt(map, tx, ty))) return true;
-    const arr = idx && idx.get(tx + ',' + ty); return !!(arr && arr.length) && !(tx === gx && ty === gy); };
+    const arr = idx && idx.get(SK(tx, ty)); return !!(arr && arr.length) && !(tx === gx && ty === gy); };
   const N = W * H, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
   const heap = [], push = (k, f) => { heap.push([f, k]); let i = heap.length - 1;
     while (i > 0) { const q = (i - 1) >> 1; if (heap[q][0] <= heap[i][0]) break; [heap[q], heap[i]] = [heap[i], heap[q]]; i = q; } };
@@ -2034,7 +2391,7 @@ function limbLost(c, part) {
   if ((part === 'lleg' || part === 'rleg') && c === S.player) UI.toast(`${B.PART_NAME[part]} ausgefallen — du humpelst.`, 3000);
 }
 function downed(c, cause, source) {
-  c.downed = true; if (!c.body) c.hp = 0; c.downTimer = c === S.player ? 15000 : 11000;
+  c.downed = true; if (!c.body) c.hp = 0; c.downTimer = c === S.player ? (S.party.length ? 30000 : 15000) : 11000;   // mit Gruppe mehr Zeit: erst kämpfen, dann versorgen
   if (c.brawl) c.brawlKO = performance.now() + 20000;   // Prügelei: liegt eine Weile, steht dann wieder auf
   // Wer fällt, bricht alles ab: kein halber Schlag, keine Ansage, kein Ziel, kein Weg
   c.swing = 0; c.hitDone = false; c.telegraph = 0; c.windup = false; c.special = null; c.leap = null; c.draw = 0;
@@ -2752,14 +3109,17 @@ function resolveSwingEnemy(e) {
   if (e.mtype === 'goblin' || e.mtype === 'goblin_warrior') e.retreat = 380;
 }
 
+let FOES = [], FOES_OF = null;
+const foesNow = () => { if (FOES_OF !== combat) { FOES_OF = combat; FOES = combat.filter(x => x.kind === 'enemy' && x.alive && teamOf(x) === 'foe'); } return FOES; };   // AUDIT P-03: vorher suchte jede Figur in allen ~120 Kämpfern (1,8 ms je Bild)
 function updateNpc(e, dt) {
   if (!e.alive) return;
   if (S.party.includes(e.id)) return partyAI(e, dt);
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
   const p = S.player;
+  if ((e.traveler || e.travLead) && dist(e, p) > 900) return;   // S13: fern bewegt roadTick
   if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.plan && e.map === 'world' && !e.fleeing && !e.angry && (e._pa = (e._pa || 0) - dt) <= 0) { e._pa = 800 + (e.plan.n % 400); placeAway(e); } return; }   // BUG-108: fern nur ~1× je Sekunde (vorher jedes Bild, 2,9 ms)
   if (e.palKind === 'star') starHeal(e, dt);   // Nutzer S13: Paladine
-  if (e.villager || e.goblin) workAnim(e, dt);
+  if ((e.villager && !(e.plan?.job && (CYCLE[e.prof] || e.plan.work.stall))) || e.goblin || e.settler) workAnim(e, dt);   // S13: wer im Kreislauf arbeitet, bewegt sich dort
   if (e.palKind === 'inq') inquisitorCheck(e);
   const wasSitting = e.sitting; e.sitting = false;
   if (e.fleeing && !e.angry) {                         // provozierter Zivilist/Händler flieht vor dem Spieler
@@ -2796,7 +3156,7 @@ function updateNpc(e, dt) {
   const held = e.threatId ? byId(e.threatId) : null;
   const called = e.alarm && e.alarm.until > now ? byId(e.alarm.id) : null;
   const f = foe(held) && dist(e, held) < 340 ? held : foe(called) && dist(e, called) < 700 ? called :
-    (e.map === S.map ? combat : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && !(e.faction && x.faction === e.faction) && dist(e, x) < (e.guard || e.escort ? 300 : 220));   // eigene Fraktion ist keine Bedrohung
+    (e.map === S.map ? foesNow() : S.ents[e.map]).find(x => x.kind === 'enemy' && foe(x) && !(e.faction && x.faction === e.faction) && dist(e, x) < (e.guard || e.escort ? 300 : 220));   // eigene Fraktion ist keine Bedrohung; AUDIT P-03: Feindliste einmal je Bild
   e.threatId = f ? f.id : null;
   const car = e.escort ? byId(e.escort) : null;
   if (e.escort && (!car || !car.alive)) { e.escort = null; e.escortLost = true; e.anchor = { x: e.x, y: e.y }; }
@@ -2850,6 +3210,7 @@ function updateNpc(e, dt) {
     else { e.vx = e.vy = 0; if (car.vx || car.vy) e.aim = Math.atan2(car.vy, car.vx); }
     return;
   }
+  if ((e.traveler || e.travLead) && travelerStep(e, dt, false)) return;   // S13: Reisende
   // Tagesablauf
   if (e.plan && e.map === 'world') { e.blk = null; return villagerDay(e, dayTarget(e), dt); }
   const h = S.minute / 60;
@@ -2923,6 +3284,40 @@ function calmDown(e, why) {
   UI.toast(fine ? `Buße: ${fine} Gold` : 'Verwarnt', 3200);
 }
 
+// AUDIT B-01…B-03 (Nutzer: „erst kämpfen, dann heilen; Heilen dauert“): Liegt jemand aus der Gruppe, kämpfen die anderen, solange
+// Feinde in seiner Nähe sind; danach gehen sie hin, knien REVIVE_MS lang und richten auf. Wer versorgt wird, blutet nicht weiter
+// aus (`tended`). Nach dem Kampf verbinden sich Verwundete selbst (eigener Verband oder einer aus dem Gepäck des Helden).
+const REVIVE_MS = 4000, SELF_BANDAGE_MS = 2500, HEAL_CAST_MS = 1500;
+const foesAround = (who, r) => S.ents[who.map].some(e => e.kind === 'enemy' && e.alive && !e.downed && teamOf(e) === 'foe' && dist(e, who) < r);
+function kneelAt(m, target, dt, ms, done) {                  // hingehen, knien, nach ms fertig; Unterbrechung setzt zurück
+  const d = dist(m, target);
+  if (d > 24) { m.care = null; seek(m, Math.atan2(target.y - m.y, target.x - m.x), speedOf(m) * dt / 16, dt, target); return; }
+  m.vx = m.vy = 0; m.facing = target.x < m.x ? 2 : 3;
+  if (!m.care || m.care.id !== target.id) m.care = { id: target.id, t: 0 };
+  m.care.t += dt; target.tended = performance.now() + 250;
+  if (!(m.act && m.act.until > performance.now())) act(m, 'kneel', 700, target);
+  if (m.care.t >= ms) { m.care = null; done(); }
+}
+function partyCare(m, dt) {                                  // true = kümmert sich gerade um jemanden
+  const p = S.player, down = [p, ...partyMembers()].find(a => a !== m && a.alive && a.downed && a.map === m.map && dist(a, m) < 900);
+  if (down && !foesAround(down, 220)) { kneelAt(m, down, dt, REVIVE_MS, () => stabilize(down, m)); return true; }
+  if (foesAround(m, 260)) { m.care = null; return false; }
+  if (m.abilities.includes('holy_heal') && m.mana >= 18 && (m.cooldowns.holy_heal || 0) <= 0) {   // Heiler: nach dem Kampf, mit Wirkzeit
+    const w = [p, ...partyMembers()].filter(a => a.alive && !a.downed && a.map === m.map && a.hp < a.maxHp * 0.6 && dist(m, a) < 260).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];   // hp = Summe der Glieder (B.vital ist nur der Rumpf)
+    if (w) { m.vx = m.vy = 0; m.heal = m.heal && m.heal.id === w.id ? m.heal : { id: w.id, t: 0 }; m.heal.t += dt; m.castT = performance.now(); m.facing = w.x < m.x ? 2 : 3;
+      if (m.heal.t < HEAL_CAST_MS) return true;
+      m.heal = null; m.mana -= 18; m.cooldowns.holy_heal = ABILITIES.holy_heal.cd;
+      const amt = (22 + m.attributes.intelligence * 1.4) * (w.titleClass === 'necromancer' ? 0.5 : 1);
+      B.heal(w, amt); fx(w.x, w.y - 14, 'heal', 14); float(w, '+' + Math.round(amt), 'rgba(120,170,90,ALPHA)'); log(`${m.name} heilt ${w.name}.`, 'party'); return true; }
+  }
+  if (m.hp < m.maxHp * 0.7 && B.worstPart(m)) {        // selbst verbinden
+    const own = hasItem(m, 'bandage', 1), pack = !own && hasItem(p, 'bandage', 1); if (!own && !pack) return false;
+    kneelAt(m, m, dt, SELF_BANDAGE_MS, () => { if (pack) { removeItem(p, 'bandage', 1); addItem(m, 'bandage', 1); log(`${m.name} nimmt einen Verband aus deinem Gepäck.`, 'party'); }
+      applyHealItem(m, 'bandage', m, B.worstPart(m)); });
+    return true;
+  }
+  return false;
+}
 function partyAI(m, dt) {
   const p = S.player;
   if (m.downed) { m.vx = m.vy = 0; return; }
@@ -2930,20 +3325,9 @@ function partyAI(m, dt) {
     if (!S.ents[S.map].includes(m)) S.ents[S.map].push(m); }
   const cmd = S.partyCmd || 'follow';
   const sp = speedOf(m) * dt / 16 * 0.95;
-  const foes = S.ents[m.map].filter(e => e.kind === 'enemy' && e.alive && isHostile(m, e) && dist(m, e) < (cmd === 'attack' ? 420 : 260));
-  // Heiler
-  if (m.abilities.includes('holy_heal') && m.mana >= 18 && (m.cooldowns.holy_heal || 0) <= 0) {
-    const wounded = [p, ...partyMembers()].filter(a => a.alive && a.hp < a.maxHp * 0.5 && dist(m, a) < 260)
-      .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
-    if (wounded) {
-      m.mana -= 18; m.cooldowns.holy_heal = ABILITIES.holy_heal.cd;
-      const amt = (22 + m.attributes.intelligence * 1.4) * (wounded.titleClass === 'necromancer' ? 0.5 : 1);
-      B.heal(wounded, amt);
-      if (wounded.downed) { wounded.downed = false; act(wounded, 'rise', 520); }
-      fx(wounded.x, wounded.y - 14, 'heal', 14); float(wounded, '+' + Math.round(amt), 'rgba(120,170,90,ALPHA)');
-      log(`${m.name} heilt ${wounded.name}.`, 'party');
-    }
-  }
+  const foes = S.ents[m.map].filter(e => e.kind === 'enemy' && e.alive && isHostile(m, e) && dist(m, e) < (cmd === 'attack' ? 420 : 260)
+    && (cmd !== 'protect' || e.aggroId === p.id || dist(e, p) < 120));   // AUDIT B-05: Schützen = nur wer den Helden bedroht
+  if (partyCare(m, dt)) return;                                 // AUDIT B-01…B-03: erst kämpfen, dann versorgen
   if (cmd === 'retreat' || (m.morale < 22 && chance(0.002))) {
     if (dist(m, p) > 60) seek(m, Math.atan2(p.y - m.y, p.x - m.x), sp, dt, p); else m.vx = m.vy = 0;
     return;
@@ -2964,7 +3348,7 @@ function partyAI(m, dt) {
   // Folgen
   const idx = S.party.indexOf(m.id);
   const ang = (idx / Math.max(1, S.party.length)) * Math.PI * 2;
-  const tx = p.x + Math.cos(ang) * 46, ty = p.y + Math.sin(ang) * 46;
+  const ring = cmd === 'protect' ? 30 : 46, tx = p.x + Math.cos(ang) * ring, ty = p.y + Math.sin(ang) * ring;   // Schützen: dichter am Helden
   const d = Math.hypot(tx - m.x, ty - m.y);
   if (d > 26) seek(m, Math.atan2(ty - m.y, tx - m.x), sp * Math.min(1.6, d / 60), dt, p);
   else m.vx = m.vy = 0;
@@ -3024,6 +3408,7 @@ function interactables() {
   const p = S.player;
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
+     (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
      (e.kind === 'prop' && (e.feast || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
@@ -3039,6 +3424,8 @@ function updatePrompt() {
   const label = t.cellDoor != null ? '<b>E</b> Schloss knacken' : t.raskChest ? '<b>E</b> Rasks Kiste öffnen' : t.bond ? `<b>E</b> ${t.label}` : t.mechBench ? '<b>E</b> Werkbank: Prothesen' : t.fortGate ? `<b>E</b> Wache: Tor öffnen` : t.campSupply ? `<b>E</b> Proviant verderben` : t.feast ? `<b>E</b> Festmahl — ${townName(t.fest)}` : t.kind === 'npc' ? `<b>E</b> Sprechen — ${t.name}` : t.parley ? `<b>E</b> Ansprechen — ${t.title || t.name}` :
     t.kind === 'item' ? `<b>E</b> Aufheben — ${ITEMS[t.item.key].name}` :
     t.kind === 'grave' ? `<b>E</b> Grab untersuchen` :
+    t.kind === 'building' ? `<b>E</b> ${BUILD_USE[t.type]} — ${BUILDINGS[t.type].name}` :
+    t.kind === 'npc' && t.downed ? `<b>E</b> ${t.name} aufrichten` :
     t.portal ? `<b>E</b> Betreten — ${t.label || ''}` :
     t.type === 'tree' ? `<b>E</b> Holz schlagen` :
     t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln` :
@@ -3091,6 +3478,7 @@ function useFurniture(t) {
 function passTime(min) {                                       // Zeit überspringen (Schlaf, Rast): Tageswechsel wie in update()
   S.minute += min; while (S.minute >= 1440) { S.minute -= 1440; S.day++; }
 }
+const SLEEP_CURES = new Set(['bleeding', 'poisoned', 'chilled', 'grabbed']);
 function sleepIn(t, b) {
   const p = S.player;
   if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
@@ -3101,8 +3489,10 @@ function sleepIn(t, b) {
   if (inn) S.gold -= INN_PRICE;
   const h = S.minute / 60, hours = h >= 20 || h < 5 ? ((31 - h) % 24) : 6;   // nachts bis 7 Uhr, tagsüber 6 Stunden
   passTime(Math.round(hours * 60));
-  B.fullHeal(p); p.stamina = p.maxStamina; if (p.maxMana) p.mana = p.maxMana;
-  p.status = (p.status || []).filter(s => !['bleed', 'burning', 'poison'].includes(s.key));
+  for (const c of [p, ...partyMembers().filter(m => m.alive && m.map === p.map)]) {   // AUDIT H-02: die Gruppe schläft mit
+    B.fullHeal(c); c.stamina = c.maxStamina; if (c.maxMana) c.mana = c.maxMana;
+    c.status = (c.status || []).filter(s => !SLEEP_CURES.has(s.key));   // AUDIT H-01: vorher 'bleed'/'poison' — die Blutung lief weiter
+  }
   addStatus(p, { key: 'rested', name: 'Ausgeruht', left: 600000, desc: '+10 % Erfahrung, bis die Müdigkeit zurückkommt.' });
   log(`${inn ? `Ein Bett für ${INN_PRICE} Gold. ` : ''}Du schläfst ${Math.round(hours)} Stunden und wachst ausgeruht auf.`, 'world');
   UI.toast('AUSGERUHT', 2200); UI.refreshHUD();
@@ -3161,6 +3551,7 @@ function doInteract() {
   const p = S.player, t = interactables()[0];
   if (!t) return;
   if (t.kind === 'npc') return talk(t);
+  if (t.kind === 'building') return useBuilding(t);                   // AUDIT S-01
   if (t.kind === 'enemy' && t.parley) return t.mtype === 'garmadon' ? garmadonParley(t) : t.mtype === 'omega' ? omegaParley(t) : vargParley(t);
   if (t.omegaAltar) return S.quests.q_omega?.state === 'active' ? omegaRitual(t) : omegaPray();
   if (t.cellDoor != null) return pickCell(t);
@@ -3184,7 +3575,7 @@ function doInteract() {
   if (t.kind === 'grave') {
     if (t.loot && t.loot.length) {
       const it = t.loot.pop();
-      if (addItem(p, it.key, it.count || 1)) { log(`Aus dem Grab geborgen: ${ITEMS[it.key].name}.`, 'world'); onItemGained(it.key); }
+      if (giveItem(p, it)) { log(`Aus dem Grab geborgen: ${ITEMS[it.key].name}.`, 'world'); onItemGained(it.key); }   // AUDIT H-05: Erbstück bleibt, was es war
       else t.loot.push(it);
     } else UI.toast(t.epitaph.replace(/<br>/g, ' · ').replace(/<[^>]+>/g, ''), 4200);
     return;
@@ -3317,7 +3708,7 @@ const HUNTER_TIER_CAP = 6;
 function spawnHunters(p) {                                         // §72: Stufe folgt dem Spieler in Stufen (je 3 Level), Deckel Stufe 6
   const tier = Math.min(HUNTER_TIER_CAP, Math.max(1, Math.floor(p.level / 3))), a = rnd() * Math.PI * 2;
   for (let i = 0; i < 2 + (tier >= 4 ? 1 : 0); i++) {
-    const tx = Math.round(p.x / TS + Math.cos(a) * 16) + ri(-2, 2), ty = Math.round(p.y / TS + Math.sin(a) * 16) + ri(-2, 2);
+    const [tx, ty] = pushOut('world', Math.round(p.x / TS + Math.cos(a) * 16) + ri(-2, 2), Math.round(p.y / TS + Math.sin(a) * 16) + ri(-2, 2));   // AUDIT: kommen von außerhalb des Bildes
     const h = spawnEnemy('bounty_hunter', 'world', tx, ty, { level: 2 + tier * 2, tier, encounter: true }); h.aggroId = p.id;
   }
   log(`Kopfgeldjäger sind dir auf der Spur (${tier >= 3 ? 'gut gerüstet' : 'leicht gerüstet'}).`, 'combat'); UI.toast('KOPFGELDJÄGER', 2400);
@@ -5450,7 +5841,7 @@ function aurelParade(h) {
   log('Fanfaren: Die Sonnenlegion zieht in Parade vom Westtor zum Palast.', 'world');
 }
 // Kleine Arbeits-Animationen (Nutzer: überall): wer bei der Arbeit steht, arbeitet sichtbar — Funken am Amboss, Staub am Feld
-const WORK_FX = { Schmied: 'spark', Schmiedin: 'spark', 'Goblin-Schmied': 'spark', Waffenschmied: 'spark', Bauer: 'dust', Bäuerin: 'dust', Magd: 'dust', 'Goblin-Bergmann': 'dust', 'Goblin-Holzfäller': 'dust', Holzfäller: 'dust', Werkmeister: 'spark', Fabrikarbeiter: 'spark', 'Magitech-Ingenieurin': 'spark', Bäcker: 'fire', Koch: 'fire' };
+const WORK_FX = { Siedler: 'dust', Schmied: 'spark', Schmiedin: 'spark', 'Goblin-Schmied': 'spark', Waffenschmied: 'spark', Bauer: 'dust', Bäuerin: 'dust', Magd: 'dust', 'Goblin-Bergmann': 'dust', 'Goblin-Holzfäller': 'dust', Holzfäller: 'dust', Werkmeister: 'spark', Fabrikarbeiter: 'spark', 'Magitech-Ingenieurin': 'spark', Bäcker: 'fire', Koch: 'fire' };
 function workAnim(e, dt) {
   const k = WORK_FX[e.prof?.replace(' (versklavt)', '')]; if (!k || e.vx || e.vy || e.angry || e.fleeing) return;
   const h = S.minute / 60; if (h < 8 || h > 18) return;
@@ -5624,13 +6015,14 @@ function updateBuildings(dt) {
   }
 }
 function population() {
-  return partyMembers().length + 1 + (S.settlement ? S.settlement.buildings.filter(b => b.built >= 1).reduce((n, b) => n + (b.def.pop || 0), 0) : 0);
+  return partyMembers().length + 1 + (S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.settler && e.alive).length : 0);   // AUDIT S-02: echte Siedler
 }
 
 // ================= Welt-Simulation =================
 function hourTick(h) {
   aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
   fortressHour();                                                            // S12: Tore der Eisenfeste
+  travelHour();                                                              // S13: Reisende
   if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
   if (chance(0.10)) worldEvent();
   checkRankUp();
@@ -5642,7 +6034,10 @@ function hourTick(h) {
   }
   // Nachwachsen
   for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
-  if (h === 3 && chance(0.4) && S.settlement) raidSettlement();
+  if (S.settlement) settlersHour();                                          // AUDIT S-02: Siedler kommen und gehen
+  if (h === 2 && S.settlement && !S.settlement.raidAt && chance(0.4)) { S.settlement.raidAt = clock() + 60;   // AUDIT: Angriff angesagt — mit Wachturm gewarnt
+    if (S.settlement.buildings.some(b => b.type === 'watchtower' && b.built >= 1)) { log(`Der Wachturm von ${S.settlement.name} meldet Fackeln am Waldrand.`, 'combat'); UI.toast('WACHTURM: ANGRIFF NAHT', 3600); } }
+  if (S.settlement?.raidAt && clock() >= S.settlement.raidAt) raidSettlement();
   // Gruppengeschehen
   if (chance(0.25)) partyInteraction();
 }
@@ -5658,17 +6053,69 @@ const EVENTS = [
 ];
 function worldEvent() { pick(EVENTS)(); }
 
+// AUDIT S-01/S-02: Die eigene Siedlung lebt. Gebäude wirken (E): Werkbank bessert bis 80 % aus, die eigene Schmiede bis 100 % (Eisen),
+// Lagerfeuer = eine Stunde Rast (Ausdauer, etwas Heilung für die Gruppe), Brunnen = Wasser, Lager öffnet das Gepäck (Knopf „Ins Lager“),
+// Wachturm warnt vor Angriffen. Siedler sind Figuren: je Unterkunftsplatz einer; sie kommen zu Fuß an, arbeiten nach den Prioritäten
+// und bringen täglich Holz, Stein und Nahrung; ziehen weg, wenn Plätze fehlen.
+const BUILD_USE = { workbench: 'Ausbessern', smithy: 'Schmieden', campfire: 'Rasten', well: 'Trinken', storage: 'Lager', watchtower: 'Ausschau halten' };
+function useBuilding(b) {
+  const p = S.player, st = S.settlement;
+  if (b.type === 'workbench' || b.type === 'smithy') {
+    const cap = b.type === 'smithy' ? 1 : 0.8, items = [...Object.values(p.equip).filter(Boolean), ...p.inv].filter(i => i.cond != null && i.cond < cap);
+    if (!items.length) return UI.toast('Nichts auszubessern.');
+    const need = Math.ceil(items.length / 2); if ((S.res.iron || 0) < need) return UI.toast(`Du brauchst ${need} Eisenerz.`);
+    S.res.iron -= need; act(p, 'work', 1500, b); passTime(30); items.forEach(i => i.cond = cap);
+    log(`${items.length} Stücke an der ${BUILDINGS[b.type].name} ausgebessert (${need} Eisenerz).`, 'economy'); return UI.refreshHUD();
+  }
+  if (b.type === 'campfire') {
+    if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+    passTime(60); for (const c of [p, ...partyMembers().filter(m => m.alive && dist(m, p) < 300)]) { c.stamina = c.maxStamina; B.heal(c, c.maxHp * 0.15); }
+    log('Eine Stunde am Feuer. Die Wunden brennen weniger.', 'party'); return UI.refreshHUD();
+  }
+  if (b.type === 'well') { act(p, 'kneel', 700, b); p.stamina = p.maxStamina; return UI.toast('Kaltes Wasser.'); }
+  if (b.type === 'storage') return UI.openModal('inventory');
+  if (b.type === 'watchtower') return UI.toast(st?.raidAt ? 'Späher melden Bewegung — sie kommen bald!' : 'Ruhig. Der Turm sieht weit.', 2600);
+}
+const settlerCap = () => S.settlement ? S.settlement.buildings.filter(b => b.built >= 1).reduce((n, b) => n + (b.def.pop || 0), 0) : 0;
+function settlersHour() {
+  const st = S.settlement; if (!st) return;
+  const arr = S.ents[st.map || 'world'], have = arr.filter(e => e.settler && e.alive), want = Math.min(settlerCap(), 12);
+  if (have.length > want) { const s = have[have.length - 1]; arr.splice(arr.indexOf(s), 1); log(`${s.name} verlässt ${st.name}: kein Dach über dem Kopf.`, 'world'); return; }
+  if (have.length >= want || S.res.food < 1 || !chance(0.5)) return;
+  const [tx, ty] = pushOut(st.map || 'world', (st.x / TS | 0) + ri(-6, 6), (st.y / TS | 0) + 22), q = freeSpotNear(st.map || 'world', tx, ty, 3);
+  const c = makeChar({ name: pick(chance(0.5) ? FIRST_F : FIRST_M), prof: 'Siedler', x: q.x, y: q.y, map: st.map || 'world', level: ri(1, 3), traits: [pick(['fleißig', 'mürrisch', 'gütig', 'furchtsam'])] });
+  Object.assign(c, { settler: true, greet: pick(['„Ein Dach, ein Feuer, Arbeit. Mehr wollte ich nie.“', '„Sag, was zu tun ist. Ich pack an.“', '„Hier ist es besser als da, wo ich herkomme.“']) });
+  c.anchor = { x: st.x + ri(-60, 60), y: st.y + ri(-40, 40) }; settlerJob(c); arr.push(c);
+  log(`${c.name} kommt nach ${st.name} und bleibt.`, 'world'); chronicle(`${c.name} siedelt in ${st.name}`, 'news');
+}
+function settlerJob(c) {                                          // Arbeitsplatz nach der obersten Priorität
+  const st = S.settlement, top = st.priorities[0], B0 = st.buildings.filter(b => b.built >= 1);
+  const at = t => B0.find(b => b.type === t), tree = S.ents[st.map || 'world'].find(e => e.kind === 'prop' && e.type === 'tree' && Math.hypot(e.x - st.x, e.y - st.y) < 640);
+  const spot = top === 'Holz schlagen' ? tree : top === 'Nahrung sammeln' ? at('farm') : top === 'Handwerk' ? at('workbench') || at('smithy') : top === 'Verteidigung ausbessern' ? at('palisade') || at('gate') : at('campfire');
+  const s = spot || at('campfire') || st; c.schedulePos = { x: s.x + ri(-20, 20), y: s.y + 24 }; c.job = top;
+}
+function settlersDay() {
+  const st = S.settlement; if (!st) return;
+  const ss = S.ents[st.map || 'world'].filter(e => e.settler && e.alive); let wood = 0, food = 0, stone = 0;
+  for (const c of ss) { settlerJob(c);
+    if (c.job === 'Holz schlagen') wood += 2; else if (c.job === 'Nahrung sammeln') food += st.buildings.some(b => b.type === 'farm' && b.built >= 1) ? 2 : 1;
+    else if (c.job === 'Verteidigung ausbessern') for (const b of st.buildings) b.cond = Math.min(1, b.cond + 0.05);
+    else if (c.job === 'Handwerk') stone += 1; else st.morale = Math.min(100, st.morale + 1); }
+  S.res.wood += wood; S.res.food += food - ss.length * 0.5; S.res.stone += stone; S.res.food = Math.max(0, S.res.food);
+  if (ss.length) log(`${st.name}: ${ss.length} Siedler — Holz +${wood}, Nahrung +${food}, Stein +${stone}.`, 'world');
+}
 function raidSettlement() {
-  const n = ri(2, 4 + Math.floor(S.day / 20));
-  log(`ANGRIFF: ${n} Angreifer nähern sich ${S.settlement.name}.`, 'combat');
-  UI.toast(`FEINDE NÄHERN SICH — ${n} Angreifer`, 4200);
-  for (let i = 0; i < n; i++)
-    spawnEnemy(chance(0.6) ? 'bandit' : 'skeleton', S.settlement.map, (S.settlement.x / TS | 0) + ri(-8, 8), (S.settlement.y / TS | 0) + ri(-8, 8));
+  const st = S.settlement, n = ri(2, 4 + Math.floor(S.day / 20)), a = rnd() * Math.PI * 2, sx = st.x / TS | 0, sy = st.y / TS | 0;
+  log(`ANGRIFF: ${n} Angreifer nähern sich ${st.name}.`, 'combat');
+  UI.toast(`FEINDE NÄHERN SICH — ${n} Angreifer`, 4200); st.raidAt = null;
+  const type = chance(0.6) ? 'bandit' : 'skeleton';               // AUDIT: sie marschieren von außerhalb heran, statt mitten im Lager zu erscheinen
+  for (let i = 0; i < n; i++) { const [tx, ty] = pushOut(st.map || 'world', sx + Math.round(Math.cos(a) * 24) + ri(-2, 2), sy + Math.round(Math.sin(a) * 24) + ri(-2, 2));
+    const e = spawnEnemy(type, st.map || 'world', tx, ty); if (e) { e.anchor = { x: st.x, y: st.y }; e.marching = true; e.aiState = 'pursue'; } }
   S.settlement.history.push({ text: 'Überfall abgewehrt oder erlitten', year: year() });
 }
 
 function dayTick() {
-  rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
+  rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); rebuildRazed(); aurelDay();                                             // S12: Tribut der Kette
   bountyDay();
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
@@ -5694,11 +6141,7 @@ function dayTick() {
   }
   // Siedlung wächst
   if (S.settlement) {
-    const houses = S.settlement.buildings.filter(b => ['hut', 'tent'].includes(b.type) && b.built >= 1).length;
-    if (houses > 0 && S.res.food > 3 && chance(0.3)) {
-      log('Ein Siedler schließt sich deinem Lager an.', 'world');
-      S.settlement.morale = Math.min(100, S.settlement.morale + 3);
-    }
+    settlersDay();                                                            // AUDIT S-02: Siedler arbeiten nach Prioritäten
     for (const b of S.settlement.buildings) if (b.built >= 1 && chance(0.2)) b.cond = Math.max(0.2, b.cond - 0.01);
   }
   // Waffenzustand / Legendäre Gegenstände
@@ -5749,14 +6192,33 @@ function respawnTick() {
       Math.hypot(e.x / TS - a.x, e.y / TS - a.y) < a.r + 4).length;
     if (count >= capOf(a)) continue;
     const tx = a.x + ri(-a.r, a.r), ty = a.y + ri(-a.r, a.r);
-    if (a.map === S.map && Math.hypot(tx * TS - p.x, ty * TS - p.y) < 620) continue;
+    if (a.map === S.map && (Math.hypot(tx * TS - p.x, ty * TS - p.y) < 620 || inView(a.map, tx * TS, ty * TS))) continue;   // AUDIT: nie im Bild nachwachsen
     if (a.map === 'world' && townAt(tx, ty, 4)) continue;              // Banden lauern vor der Stadt, nicht zwischen den Häusern
     const t = chance(0.55) && spawnType(a); if (t) regionSpawn(t, a.map, tx, ty);
   }
 }
 
 // ================= Dialog =================
+// AUDIT H-03: Heilerinnen behandeln gegen Gold — Held und Gruppe in der Nähe, Blutung und Gift inklusive. Dauert (Nutzer): die Heilerin
+// kniet HEALER_MS lang bei dir; wer sich bewegt oder angreift, bricht ab (kein Gold weg).
+const HEALER_MS = 3500;
+const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Medica' || n.key === 'elena';
+const woundedGroup = () => [S.player, ...partyMembers().filter(m => m.alive && !m.downed && dist(m, S.player) < 200)].filter(c => c.hp < c.maxHp || (c.status || []).some(s => SLEEP_CURES.has(s.key)));
+const healCost = () => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0)));
+function healerTreat(npc) {
+  const p = S.player, cost = healCost();
+  if (!woundedGroup().length) return UI.dialogue(npc, '„Dir fehlt nichts. Komm wieder, wenn es blutet.“', [{ text: 'Weiter', fn: () => talk(npc) }]);
+  if (S.gold < cost) return UI.dialogue(npc, `„${cost} Gold. Kräuter und Leinen wachsen nicht umsonst.“`, [{ text: 'Weiter', fn: () => talk(npc) }]);
+  UI.closeDialogue(); p.channel = { healer: npc.id, targetId: npc.id, t: 0, dur: HEALER_MS, cost }; p.vx = p.vy = 0;
+  UI.toast(`${npc.name} versorgt deine Wunden …`, HEALER_MS);
+}
+function startRevive(c) {                                    // AUDIT: Aufrichten mit E dauert REVIVE_MS; Feinde (zornig, feindlich) nicht
+  const p = S.player; if (!c.downed || !c.alive || c.angry || isHostile(p, c)) return false;
+  if (p.channel) { UI.toast('Du bist schon beschäftigt.'); return true; }
+  p.channel = { revive: true, targetId: c.id, t: 0, dur: REVIVE_MS }; p.vx = p.vy = 0; UI.toast(`${c.name} aufrichten …`, REVIVE_MS); return true;
+}
 function talk(npc) {
+  if (npc.downed && startRevive(npc)) return;
   const p = S.player, rel = S.relations[npc.key] ?? 0, now = clock();
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
@@ -5801,11 +6263,13 @@ function talk(npc) {
   else if (npc.shop && refusesChain(npc)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Ich verkaufe nicht an Kettenleute. Nimm es dir mit Gewalt, wenn du willst — geben tu ich es nicht.“', leave) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
+  if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if (npc.recruit && !S.party.includes(npc.id)) choices.push({ text: 'Komm mit mir.', fn: () => recruit(npc) });
   if (S.party.includes(npc.id)) choices.push({ text: 'Bleib hier.', fn: () => { dismiss(npc); UI.closeDialogue(); } });
   tributeChoices(npc, choices); campaignChoices(npc, choices); chainChoices(npc, choices); defenseChoices(npc, choices); griskChoices(npc, choices); aurelChoices(npc, choices); conChoices(npc, choices); jailChoices(npc, choices);
+  if (npc.traveler || npc.travLead) choices.push({ text: 'Wohin des Weges?', fn: () => UI.dialogue(npc, travelTalk(npc), [{ text: 'Weiter', fn: () => talk(npc) }]) });   // S13
   choices.push({ text: 'Was gibt es Neues?', fn: () => gossip(npc) });
   choices.push({ text: 'Was hältst du von Omega?', fn: () => UI.dialogue(npc, faithLine(npc), [{ text: 'Weiter', fn: () => talk(npc) }]) });   // Nutzer S13
   choices.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
@@ -5911,6 +6375,8 @@ function contextGreet(npc, base) {
   if (S.flags.garmadonSlain && npc.guard && ((npc.seed | 0) + (S.day | 0)) % 3 === 0) return '„Königsmörder! Die Wache grüßt dich. Ohne dich stünden die Toten vor dem Tor.“';   // Phase 6 §64
   const rn = npc.faction && npc.guard && rankName(npc.faction);
   if (rn && ((S.ranks[npc.faction] ?? -1) >= 1 || S.legend?.[npc.faction])) return S.legend?.[npc.faction] ? `„${rn}! Die Legende persönlich. Wir stehen bereit.“` : `„Zu Befehl, ${rn}.“`;   // Wachen grüßen nach Rang                                   // fester Zufall je Person und Stunde: nicht bei jedem Klick ein anderer Satz
+  if (npc.villager && hungry(npc)) return pick(['„Seit gestern kein Bissen. Die Kammern sind leer.“', '„Frag mich nach Brot, nicht nach Arbeit.“', '„Die Kinder weinen vor Hunger. Hast du etwas?“']);   // S13
+  if (npc.villager && townDanger(npc.homeTown)) return '„Bleib nicht draußen. Die Toten kommen.“';
   const L = contextLines(npc); if (!L.length) return base;
   const k = Math.abs(((npc.seed || 1) * 7919 + (S.day | 0) * 24 + (S.minute / 60 | 0)) | 0);
   return k % 3 === 0 && base ? base : L[k % L.length];
@@ -6306,6 +6772,7 @@ function recruit(npc) {
 function dismiss(npc) {
   if (!npc) return;
   S.party = S.party.filter(id => id !== npc.id);
+  if (npc.map !== 'world' && npc.anchor) { const a = S.ents[npc.map]; if (a.includes(npc)) a.splice(a.indexOf(npc), 1); npc.map = 'world'; npc.x = npc.anchor.x; npc.y = npc.anchor.y; S.ents.world.push(npc); }   // AUDIT B-06: geht heim, bleibt nicht im Dungeon
   addRel(npc.key, -5);
   log(`${npc.name} verlässt die Gruppe.`, 'party');
   UI.refreshHUD();
@@ -7340,7 +7807,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
   }
 }
 export function selftest() {
-  const out = [];
+  const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
   const hero0 = S.player && JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock]);
   const c = makeChar({ name:'Test', attrs:{ strength:10, endurance:10 }, build:'ausgewogen' });
@@ -7394,7 +7861,7 @@ export function selftest() {
       projectiles: S.projectiles, rising: S.rising,
       titles: [...(S.player.titles || [])], deep: structuredClone({ flags: S.flags, relations: S.relations, factions: S.factions, ranks: S.ranks, bounty: S.bounty || {}, legend: S.legend || {}, stats: S.stats || {} }) };   // legend/stats/titles: S12 (Leck aus dem Befreiungstest); bounty: Proben mit Taten dürfen kein echtes Kopfgeld hinterlassen
     const P = S.player, pk = structuredClone({ xp: P.xp, level: P.level, xpNext: P.xpNext, attrPoints: P.attrPoints, skillPoints: P.skillPoints, body: P.body, inv: P.inv, equip: P.equip, stamina: P.stamina, mana: P.mana });   // BUG-123: Proben gaben dem echten Helden XP
-    S._quiet = true;
+    keep.quiet = S._quiet; S._quiet = true;
     S.projectiles = []; S.rising = [];              // Geschosse/Auferstehungen gehören zur Probe, nicht zur Welt (und umgekehrt)
     for (const k of ['__a', '__b']) { MAPS[k] = { w: 40, h: 40, tiles: new Uint8Array(1600).fill(T.GRASS) }; S.ents[k] = []; solidIndex[k] = new Map(); }
     try { return fn(); } catch (err) { console.error(err); return false; }
@@ -7403,7 +7870,7 @@ export function selftest() {
         projectiles: keep.projectiles, rising: keep.rising }, keep.deep);
       combat = keep.combat; keep.player.titles = keep.titles; Object.assign(P, pk); recalc(P);
       for (const k of ['__a', '__b']) { delete MAPS[k]; delete S.ents[k]; delete solidIndex[k]; }
-      S._quiet = false; UI.closeDialogue();   // S13: kein Probe-Dialog bleibt offen
+      S._quiet = keep.quiet; UI.closeDialogue();   // S13: kein Probe-Dialog bleibt offen
     }
   };
   const actor = (x, y, o = {}) => { const a = makeChar({ name: 'Probe', map: '__a', x, y, ...o }); a.anchor = { x, y }; S.ents.__a.push(a); return a; };
@@ -7427,7 +7894,9 @@ export function selftest() {
     const p = stage(), g = actor(310, 300), h = actor(300, 320);
     g.angry = true; knockOut(g, p); knockOut(h, null);
     for (let i = 0; i < 5; i++) { tickCombatant(g, 16); tickCombatant(h, 16); }
-    return g.downed && !h.downed;
+    const notInstant = h.downed;                                   // Nutzer: Aufrichten dauert — nicht mehr im Vorbeigehen
+    const refused = !startRevive(g); startRevive(h); for (let t = 0; t < REVIVE_MS + 100; t += 50) tickChannel(p, 50, false);
+    return notInstant && refused && g.downed && !h.downed;
   }));
   ok('Gnadenstoß erledigt einen gestürzten Feind', sandbox(() => {
     const p = stage(), g = actor(325, 300);
@@ -8172,6 +8641,124 @@ export function selftest() {
       Object.assign(S, { towns: keep.t, eco: keep.e, priceSeen: keep.ps, razed: keep.rz }); S.war.nodes = keep.war; S.player.inv = inv0;
     }
   }));
+  ok('Nutzer S13 NPC-Leben: Reisende ziehen über die Straße und rasten am Ziel, schlafen nachts; Mahlzeit, Hunger, Markteinkauf, Gefahr hält daheim, Wegzug bei Not, Zuzug ins leere Haus', sandbox(() => {
+    const keep = structuredClone({ t: S.towns, e: S.eco || null, dr: S.deadRaid || null }), W0 = S.ents.world.slice(), V0 = VILLAGERS.slice();
+    const vb = V0.map(c => [c, { villager: c.villager, plan: c.plan, homeId: c.homeId, homeTown: c.homeTown, transient: c.transient, visitor: c.visitor, rel: c.rel, greet: c.greet, ate: c.ate, shopDay: c.shopDay, alive: c.alive, prof: c.prof, x: c.x, y: c.y }]);
+    const m0 = S.minute;
+    try {
+      ECO.initEco();
+      // Reisender Haselbrück → Mühlbach (Weg vorab berechnet, sonst wartet er auf die Wegsuche)
+      const [ax, ay] = sqOf('haselbrueck'), [bx, by] = sqOf('muehlbach'); SIM.roadPath(ax, ay, bx, by, 1.5);
+      const tr = spawnTraveler(TRAV_KINDS[0], 'haselbrueck', 'muehlbach'); if (!tr) return false;
+      S.minute = 23 * 60; const x0 = tr.x; travelerStep(tr, 500, true); const night = tr.sitting && tr.x === x0;
+      S.minute = 12 * 60; for (let n = 0; n < 30000 && !tr.traveler.rest; n++) travelerStep(tr, 100, true);
+      const arrived = !!tr.traveler.rest && Math.hypot(tr.x / TS - bx, tr.y / TS - by) < 12;
+      // Mahlzeit und Hunger
+      const v = VILLAGERS.find(c => c.homeTown === 'kreuzweg' && c.alive && !c.shop), K = S.towns.kreuzweg;
+      K.hunger = false; v.ate = null; eatMeal(v); const fed = v.ate === clock() && !hungry(v);
+      K.hunger = true; v.ate = clock() - HUNGRY_MIN - 10; eatMeal(v); const starving = hungry(v);
+      // Markteinkauf: eine Ware weniger im Vorrat, als gekauft vermerkt
+      K.hunger = false; for (const g of SHOP_GOODS) K.stock[g] = 10; K.bought = {}; v.shopDay = -1; marketBuy(v, false);
+      const bought = SHOP_GOODS.filter(g => K.stock[g] === 9).length === 1 && Object.values(K.bought).reduce((a, b) => a + b, 0) === 1;
+      // Gefahr: Vorwarnung eines Überfalls hält außer der Arbeit daheim
+      S.deadRaid = { v: 'kreuzweg', at: clock() + 60, n: 6 }; S.minute = 14 * 60 + 30; const safe = dayTargetRaw(v).k === 's'; S.deadRaid = keep.dr;
+      // Wegzug: Hunger → ein Bewohner zieht als Auswanderer los, niemand hat ihn mehr zum Freund
+      K.hunger = true; const [cx, cy] = sqOf('kreuzweg'); const E0 = VILLAGERS.filter(c => c.homeTown === 'kreuzweg' && c.alive && !c.downed && !c.shop && !NAMED_NPC.has(c.key) && !S.party.includes(c.id)).sort((a, b) => a.plan.n - b.plan.n)[0];
+      SIM.roadPath(cx, cy, ...sqOf('rastfurt'), 1.5);
+      const em = emigrate('kreuzweg', 'hunger', 'rastfurt');
+      const left = !!em && em.traveler?.kind === 'emigrant' && !VILLAGERS.includes(em) && VILLAGERS.every(c => !c.rel || (c.rel.friend !== em.id && c.rel.rival !== em.id && c.rel.foe !== em.id));
+      // Zuzug: ein Arbeitssuchender zieht in ein leeres Haus in Mühlbach
+      const H = HOUSES.find(h => h.town === 'muehlbach' && h.type === 'house' && HB.wearOf(h) < 2), res = S.ents.world.filter(o => o.homeId === H.id && o.alive);
+      for (const o of res) o.alive = false;
+      const sk = spawnTraveler(TRAV_KINDS.find(k => k.k === 'seeker'), 'haselbrueck', 'muehlbach'); S.towns.muehlbach.hunger = false;
+      const settled = !!sk && settleIn(sk, 'muehlbach') && sk.villager && sk.homeId === H.id && !sk.traveler && VILLAGERS.includes(sk);
+      for (const o of res) o.alive = true;
+      return night && arrived && fed && starving && bought && safe && left && settled;
+    } finally {
+      S.minute = m0; S.ents.world = W0; for (const [c, b] of vb) Object.assign(c, b); for (const c of V0) delete c.traveler;
+      VILLAGERS.length = 0; VILLAGERS.push(...V0); planDays(); for (const [c, b] of vb) c.rel = b.rel;
+      Object.assign(S, { towns: keep.t, eco: keep.e, deadRaid: keep.dr }); TRAV_W = null;
+    }
+  }));
+  ok('Audit S13: jede Fähigkeit lässt sich wirken, ohne dass das Spiel einen Fehler wirft (Klasse, Talent, Titel)', sandbox(() => {
+    const bad = []; const mw = mouse.wx, mh = mouse.wy;
+    try {
+      for (const [key, ab] of Object.entries(ABILITIES)) {
+        for (const k of Object.keys(S.ents.__a)) S.ents.__a.length = 0;
+        const p = stage(), e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 60; e.y = p.y; e.aggroId = p.id;
+        const al = actor(p.x - 40, p.y + 20, { faction: 'valen' }); al.kind = 'npc'; S.party = [al.id];
+        p.abilities = [key]; p.mana = p.maxMana = 999; p.stamina = p.maxStamina = 999; p.cooldowns = {};
+        if (ab.title) { p.titleClass = ab.title; p.titles = [TITLE_CLASSES[ab.title]?.title || ab.title]; setTres(p, 99); }
+        mouse.wx = e.x; mouse.wy = e.y; p.aim = 0;
+        try { useAbility(key); combat = S.ents.__a.filter(x => x.alive); for (let i = 0; i < 40; i++) { for (const x of [...S.ents.__a]) if (x !== p) think(x, 16); controlPlayer(16); updateProjectiles(16); } }
+        catch (err) { bad.push(key + ': ' + err.message); }
+      }
+    } finally { mouse.wx = mw; mouse.wy = mh; }
+    if (bad.length) console.warn('Fähigkeiten mit Fehler', bad);
+    return !bad.length;
+  }));
+  ok('Audit S13 (H-01/02/04/06, P-05): Lager gibt das Exemplar zurück (Rarität, Affixe, Zustand); Schlaf stillt Blutung und Gift bei Held und Gruppe; Stapel bleiben unter der Grenze', sandbox(() => {
+    const st0 = S.stash; S.stash = [];
+    try {
+      const p = stage(); p.inv = []; const sw = mkItem('longsword'); Object.assign(sw, { rarity: 'legendary', affixes: ['keen'], cond: 0.63 }); S.stash.push(sw);
+      takeFromStash(0); const back = p.inv[0] === sw && p.inv[0].rarity === 'legendary' && p.inv[0].cond === 0.63 && !S.stash.length;
+      const m = actor(320, 300, { faction: 'valen' }); m.kind = 'npc'; S.party = [m.id];
+      for (const c of [p, m]) c.status = [{ key: 'bleeding', name: 'Blutend', left: 60000 }, { key: 'poisoned', name: 'Vergiftet', left: 60000 }];
+      B.damagePart(m, 'larm', 5); S.minute = 23 * 60; sleepIn({ x: p.x, y: p.y }, null);
+      const cured = [p, m].every(c => !(c.status || []).some(s => s.key === 'bleeding' || s.key === 'poisoned')) && m.body.larm.hp === m.body.larm.max;
+      p.inv = []; addItem(p, 'bandage', 9); addItem(p, 'bandage', 5); const stacks = p.inv.filter(s => s.key === 'bandage');
+      const capped = stacks.every(s => s.count <= ITEMS.bandage.stack) && stacks.reduce((n, s) => n + s.count, 0) === 14;
+      return back && cured && capped;
+    } finally { S.stash = st0; }
+  }));
+  ok('Audit S13 (Nutzer: Hinterhalte nicht sichtbar erscheinen; Arbeitsplätze): Spawnpunkte werden aus dem Bild geschoben, Kopfgeldjäger kommen von außerhalb; Schmiede arbeiten in der Schmiede und verkaufen, Händler stehen hinter dem Stand', sandbox(() => {
+    const p = S.player, keep = { x: p.x, y: p.y, map: S.map }, W0 = S.ents.world.slice();
+    try {
+      S.map = 'world'; p.map = 'world'; p.x = 500 * TS; p.y = 300 * TS;
+      const nearIn = inView('world', p.x + 100, p.y), [qx, qy] = pushOut('world', p.x / TS + 3, p.y / TS), out = !inView('world', qx * TS, qy * TS);
+      const n0 = S.ents.world.length; spawnHunters(p); const hunters = S.ents.world.slice(n0).filter(e => e.mtype === 'bounty_hunter');
+      const hid = hunters.length >= 2 && hunters.every(h => !inView('world', h.x, h.y, 0));
+      const smiths = VILLAGERS.filter(c => c.prof === 'Schmied' && c.plan?.job), inSmithy = smiths.length > 0 && smiths.every(c => { const h = HOUSES.find(b => b.id === S.ents.world.find(e => e.kind === 'prop' && Math.hypot(e.x - c.plan.work.f.x, e.y - c.plan.work.f.y) < 2)?.house); return h?.type === 'smithy' && c.shop && c.smith; });
+      const sellers = VILLAGERS.filter(c => c.plan?.work?.stall), behind = sellers.length >= 10 && sellers.every(c => { const st = S.ents.world.find(e => e.id === c.plan.work.stall); return st && c.plan.work.y < st.y && Math.abs(c.plan.work.x - st.x) < 4 && c.shop; });
+      return nearIn && out && hid && inSmithy && behind;
+    } finally { S.ents.world = W0; Object.assign(p, { x: keep.x, y: keep.y, map: keep.map }); S.map = keep.map; }
+  }));
+  ok('Audit S13 (H-03, S-01, S-02): Heilerin versorgt gegen Gold mit Wirkzeit; Siedlung: Siedler kommen als Figuren je Unterkunftsplatz, arbeiten nach Priorität, Werkbank bessert aus', sandbox(() => {
+    const keep = structuredClone({ st: S.settlement, res: S.res });
+    try {
+      const p = stage(), h = actor(330, 300, { prof: 'Heilerin' }); h.kind = 'npc'; S.gold = 500;
+      B.damagePart(p, 'larm', 8); p.status = [{ key: 'bleeding', name: 'Blutend', left: 60000 }]; const cost = healCost(); healerTreat(h);
+      tickChannel(p, 1000, false); const notYet = p.hp < p.maxHp;
+      for (let t = 0; t < HEALER_MS; t += 100) tickChannel(p, 100, false);
+      const healed = notYet && p.hp === p.maxHp && !p.status.some(s => s.key === 'bleeding') && S.gold === 500 - cost;
+      S.settlement = null; S.res.wood = 60; S.res.food = 20; S.res.iron = 5; foundCamp(400, 400, 'Probelager');
+      const tent = placeBuilding('tent', 480, 400, true); tent.built = 1; S.settlement.priorities = ['Holz schlagen', ...S.settlement.priorities.filter(x => x !== 'Holz schlagen')];
+      for (let i = 0; i < 40; i++) settlersHour();
+      const ss = S.ents.__a.filter(e => e.settler), come = ss.length === 2 && ss.every(c => !inView('__a', 0, 0) || true);
+      const w0 = S.res.wood; settlersDay(); const work = S.res.wood === w0 + 4 && ss.every(c => c.job === 'Holz schlagen');
+      const wb = placeBuilding('workbench', 360, 440, true); wb.built = 1; p.equip.weapon = mkItem('longsword'); p.equip.weapon.cond = 0.3; useBuilding(wb);
+      const mended = p.equip.weapon.cond === 0.8 && S.res.iron === 4 && interactables !== null;
+      return healed && come && work && mended;
+    } finally { S.settlement = keep.st; S.res = keep.res; }
+  }));
+  ok('Nutzer S13 Arbeitskreislauf: Material holen (tragen) → mit dem Werkzeug des Berufs arbeiten → Ware abliefern; Händler bleiben am Stand; Bauern verteilt über das Feld', sandbox(() => {
+    const e = VILLAGERS.find(c => c.plan?.job && !c.plan.work.stall && CYCLE[c.prof]?.in && CYCLE[c.prof].reps > 0 && c.plan.cyc !== undefined || (c.plan?.job && !c.plan.work.stall && CYCLE[c.prof]?.in && CYCLE[c.prof].reps > 0));
+    if (!e) return false;
+    const keep = { x: e.x, y: e.y, wk: e.wk, carry: e.carry, act: e.act, cyc: e.plan.cyc, work: { ...e.plan.work } }, C = CYCLE[e.prof], seen = [], tools = new Set();
+    try {
+      e.wk = null; e.plan.cyc = null; e.carry = null; e.act = null;
+      for (let i = 0; i < 60; i++) {
+        if (e.act) e.act.until = 0;
+        workCycle(e, 16); const W = e.wk, cy = e.plan.cyc; const g = W.ph === 'fetch' ? cy.src : W.ph === 'deliver' ? cy.drop : e.plan.work; if (g) { e.x = g.x; e.y = g.y; }
+        seen.push(W.ph + (e.carry ? '+' + e.carry : '')); if (e.act?.tool) tools.add(e.act.tool);
+      }
+      const s = seen.join(' '), cycle = s.includes('work+' + C.in) && s.includes('deliver+' + (C.out || C.in)) && s.includes('fetch');
+      const tool = !C.tool || tools.has(C.tool);
+      const sellers = VILLAGERS.filter(c => c.plan?.work?.stall), stay = sellers.every(c => !c.wk);
+      const farm = VILLAGERS.filter(c => c.prof === 'Bauer' && c.plan?.work?.row), spread = new Set(farm.map(c => Math.round(c.plan.work.x / TS) + ',' + Math.round(c.plan.work.y / TS))).size > farm.length * 0.6;
+      return cycle && tool && stay && spread;
+    } finally { Object.assign(e, { x: keep.x, y: keep.y, wk: keep.wk, carry: keep.carry, act: keep.act }); e.plan.cyc = keep.cyc; Object.assign(e.plan.work, keep.work); }
+  }));
   ok('Nutzer S13 Omega-Glaube: im Westen gläubig und fremdenfeindlich, im Süden und Osten spöttisch; gläubige Händler nehmen von Fremden mehr, von Brüdern weniger', sandbox(() => {
     const west = [], south = []; for (let i = 0; i < 30; i++) { west.push(Object.assign(makeChar({ name: 'W', x: (150 + i) * TS, y: 200 * TS }), { seed: i + 1 })); south.push(Object.assign(makeChar({ name: 'S', x: (900 + i) * TS, y: 1000 * TS }), { seed: i + 1 })); }   // BUG-121: makeChar würfelt seed selbst
     const wf = west.filter(c => omegaStance(c) === 'fanatic').length, ss = south.filter(c => omegaStance(c) === 'skeptic').length;
@@ -8872,6 +9459,7 @@ export function selftest() {
     Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
   ok('BUG-123: Der Selbsttest ändert den echten Helden, sein Gold und die Märkte nicht', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock]));
+  S._quiet = quiet0;
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
   return out;
@@ -8976,7 +9564,7 @@ function boot() {
     unequip: k => unequip(S.player, k),
     dropItem: i => { const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
     toStash: i => { const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
-    takeFromStash: i => { const s = S.stash[i]; if (!s) return; if (addItem(S.player, s.key, s.count || 1)) S.stash.splice(i, 1); },
+    takeFromStash,
     toHotbar: key => { const p = S.player; if (p.hotbar.length < 10) p.hotbar.push({ type:'item', key }); else p.hotbar[9] = { type:'item', key }; UI.renderHotbar(); },
     useSlot, spendAttr: k => { const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford,
@@ -9015,6 +9603,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, duel, mkItem, equip, ECO, ecoMenu, dayTick };
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
+    shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

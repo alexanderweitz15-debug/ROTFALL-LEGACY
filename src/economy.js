@@ -75,7 +75,7 @@ export function census() {
     if (NOBLE.test(e.prof || '')) c.noble++;
     if (SOLDIER.test(e.prof || '')) c.soldier++;
     const tr = tradeOf(e, k);
-    if (tr && works(e)) c.work[tr] = (c.work[tr] || 0) + 1;
+    if (tr && works(e)) c.work[tr] = (c.work[tr] || 0) + (e.ate != null && S.day * 1440 + S.minute - e.ate > 1200 ? 0.5 : 1);   // hungrig: halbe Arbeit
   }
   return C;
 }
@@ -168,9 +168,10 @@ export function ecoDay() {
     if (!C[town] || occupied(town)) continue;
     const cap = capOf(town);
     for (const g of GOODS) {
-      t.stock[g] = Math.max(0, (t.stock[g] || 0) - (t.use[g] || 0));
+      t.stock[g] = Math.max(0, (t.stock[g] || 0) - Math.max(0, (t.use[g] || 0) - (t.bought?.[g] || 0)));   // Markteinkäufe sind schon abgezogen
       t.stock[g] = Math.min(t.stock[g], cap);
     }
+    t.bought = {};
     if (t.hunger && t.pop > 5) { t.pop -= 1; if (chance(0.3)) log(`${t.name} hungert. Menschen wandern ab.`, 'economy'); }
   }
   if (income) { S.gold += Math.max(0, income); S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute.`, 'economy'); }

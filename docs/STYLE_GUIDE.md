@@ -6,6 +6,16 @@ Verbindliche visuelle DNA. Nicht den Stil ersetzen — den Stil perfektionieren.
 Grimdark, Kapuzenfiguren, gedämpfte Erdtöne, Darkest-Dungeon-Anmutung: schwere Silhouetten, wenig Sättigung,
 Akzentfarben sparsam (altes Rot, Elfenbein, Grabgrün). Keine Neon-Effekte, kein Glow-Teppich, keine Web-UI-Optik.
 
+## Figuren v2 (Session 9 — ersetzt die 20×25-Regeln für Figuren, sobald eingebaut)
+- Referenzbild ist verbindlich: grimdarke Kapuzenfiguren, schwerer Körper, breite Schultern, kleiner Kopf unter der
+  Kapuze, lange kräftige Beine, große Hände, Schichten (Kapuze → Capelet → Mantel/Wams → Gurte/Gürtel → Wickel →
+  Handschuhe → Stiefel), zerfetzte Säume. NICHT: Chibi, großer Kopf auf kleinem Körper, Graveyard-Keeper-Look,
+  „mehr Pixel“ statt anderer Formensprache.
+- Raster 40×60 bei 1 Welt-Einheit je Pixel (Boss 60×76); Verhältnis Schulterbreite : Höhe ≈ 0,48; Kopf/Kapuze ≈ 1/5.
+- Formen statt Einzelpixel (`figure.js`): Teile als Vielecke, je Teil Volumen (Licht oben links, Formschatten rechts),
+  Schlagschatten und selektive Innenkontur zwischen vorderem und hinterem Teil, danach handgesetzte Details.
+- Unterschiede zwischen Figuren über Silhouette (Mantel/Wams-Länge, Umhang, Schulterstücke, Masken), nicht nur Farbe.
+
 ## Pixel-Regeln
 - **Pixeldichte**: Weltpixel `PX = 2` (ein Sprite-Pixel = 2×2 Bildschirmpixel bei Zoom 1). Kamera-Grundzoom 1,3.
 - **Figurenraster**: Menschen 20×25 (Drehpunkt 10,23), Tiere 28×18, Brocken (Gorak) 34×38.

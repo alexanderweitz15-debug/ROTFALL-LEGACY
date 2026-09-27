@@ -697,6 +697,30 @@ const WDES = {
     C.poly(M.ir, [[31, 4], [33, 4], [33, 14], [31, 14]]);                                                                            // Parierhaken
     C.poly(M.st, [[33, 4.8], [64, 5.4], [71, 9], [64, 12.6], [33, 13.2]]);
     return { gx: 13, gy: 9, blade: [35, 62, 8], after: (set, S) => { for (let x = 35; x <= 58; x++) { set(x, 8, S.sh); set(x, 9, S.dk); } } }; }],
+  // Werkzeuge der Arbeiter (S13, Nutzer: „jeder Beruf eigene Bewegung“) — nur in der Hand bei der Arbeit, nicht zu kaufen
+  tool_hammer: [30, 16, (C, M) => {                                  // Schmiedehammer: kurzer Stiel, schwerer Kopf
+    C.poly(M.wd, [[1, 7], [22, 7], [22, 9.4], [1, 9.4]]); C.poly(M.wr, [[2, 6.7], [7, 6.7], [7, 9.7], [2, 9.7]]);
+    C.poly(M.ir, [[20, 2], [27, 2], [28, 3], [28, 13], [27, 14], [20, 14]]);
+    return { gx: 4, gy: 8, blade: null, after: (set) => { for (let y = 3; y <= 13; y++) set(27, y, '#8e877c'); } }; }],
+  tool_hoe: [42, 18, (C, M) => {                                     // Hacke: langer Stiel, Blatt quer nach unten
+    C.poly(M.wd, [[1, 7.2], [37, 7.2], [37, 9.4], [1, 9.4]]);
+    C.poly(M.ir, [[35, 6], [39, 6], [39, 10], [35, 10]]); C.poly(M.st, [[37, 10], [41, 10], [41, 17], [37, 16]]);
+    return { gx: 8, gy: 8, blade: null }; }],
+  tool_saw: [36, 14, (C, M) => {                                     // Säge: Holzgriff, gezahntes Blatt
+    C.poly(M.wd, [[1, 3], [9, 3], [9, 11], [1, 11]]); C.poly(M.wr, [[3, 5], [7, 5], [7, 9], [3, 9]]);
+    C.poly(M.st, [[9, 4], [34, 5.5], [34, 9.5], [9, 11]]);
+    return { gx: 5, gy: 7, blade: null, after: (set) => { for (let x = 10; x <= 33; x += 2) set(x, 10, '#3a3630'); } }; }],
+  tool_spoon: [26, 10, (C, M) => {                                   // Kochlöffel
+    C.poly(M.wd, [[1, 4.2], [18, 4.2], [18, 6], [1, 6]]); C.ell(M.wd, 21.5, 5, 3.6, 3);
+    return { gx: 5, gy: 5, blade: null, after: (set) => { set(21, 4, '#2a1d14'); set(22, 5, '#2a1d14'); } }; }],
+  tool_rod: [62, 10, (C, M) => {                                     // Angel: lange, dünne Rute mit Schnur
+    C.limb(M.wd, [[1, 5], [30, 4.6], [60, 3.4]], 2.2, 1); C.poly(M.wr, [[2, 4], [8, 4], [8, 6.4], [2, 6.4]]);
+    return { gx: 5, gy: 5, blade: null, after: (set) => { for (let y = 4; y <= 9; y++) set(60, y, '#cfc8b6'); } }; }],
+  tool_fork: [48, 16, (C, M) => {                                    // Heugabel: Stiel, drei Zinken
+    C.poly(M.wd, [[1, 7], [36, 7], [36, 9.2], [1, 9.2]]);
+    C.poly(M.ir, [[35, 2], [37.5, 2], [37.5, 14], [35, 14]]);
+    for (const y of [2.4, 7.2, 12]) C.poly(M.st, [[37, y], [47, y + 0.3], [47, y + 1.6], [37, y + 1.9]]);
+    return { gx: 8, gy: 8, blade: null }; }],
   axe: [40, 22, (C, M) => {                                          // S12: schlanker Schaft, Bartklinge mit heller Schneide
     C.poly(M.wd, [[1, 9.6], [33, 9.6], [33, 12.2], [1, 12.2]]); C.poly(M.wr, [[2, 9.3], [9, 9.3], [9, 12.5], [2, 12.5]]);
     C.poly(M.ir, [[28, 7.5], [32.5, 7.5], [32.5, 14.5], [28, 14.5]]);

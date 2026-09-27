@@ -168,6 +168,13 @@ export const ITEMS = {
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   potion:     { name:'Trank der Genesung', slot:'consumable', use:'heal', heal:40, stack:5, rarity:'uncommon', value:55 },
+  // S13: Werkzeuge der Arbeiter (nur Bild und Bewegung bei der Arbeit; nicht im Handel, keine Beute)
+  tool_hammer: { name:'Schmiedehammer', slot:'tool', wtype:'hammer', arc:1.4, value:0, rarity:'common' },
+  tool_hoe:    { name:'Hacke', slot:'tool', wtype:'axe', arc:1.6, value:0, rarity:'common' },
+  tool_saw:    { name:'Säge', slot:'tool', wtype:'dagger', arc:1, value:0, rarity:'common' },
+  tool_spoon:  { name:'Kochlöffel', slot:'tool', wtype:'dagger', arc:1, value:0, rarity:'common' },
+  tool_rod:    { name:'Angel', slot:'tool', wtype:'spear', arc:1, value:0, rarity:'common' },
+  tool_fork:   { name:'Heugabel', slot:'tool', wtype:'spear', arc:1.2, value:0, rarity:'common' },
   bandage:    { name:'Verband', slot:'consumable', use:'bandage', stack:10, rarity:'common', value:9, lore:'Heilt ein Körperteil und stillt Blutungen. Anlegen dauert.' },
 
   wood:  { name:'Bauholz', slot:'material', res:'wood', stack:99, rarity:'common', value:2 },
