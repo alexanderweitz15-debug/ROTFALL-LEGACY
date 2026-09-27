@@ -8,7 +8,7 @@ export const S = {
   day: 1, minute: 8 * 60, season: 'Später Frühling',
   weather: 'clear', weatherLeft: 40,
   map: 'world',
-  ents: { world: [], mine: [], deep: [], sky: [], kerker: [] },
+  ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [] },
   player: null,
   party: [],
   gold: 20,
@@ -24,7 +24,7 @@ export const S = {
   legacy: { house: 'Ragnar', gen: 1, ancestors: [] },
   settlement: null,
   flags: {},
-  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7 },
+  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7, art: 'F' },
   kills: 0, battles: 0,
   log: [],
   // transient (nicht gespeichert)
@@ -88,7 +88,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg']);
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine']);
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
@@ -131,7 +131,7 @@ export function adoptPropKeys(map, fresh) {
 }
 export function save() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
-  if (S._quiet) return false;                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
+  if (S._quiet || S.cine) return false;                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
   try {
     localStorage.setItem(SAVE_KEY, saveData());
     return true;

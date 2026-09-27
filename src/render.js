@@ -105,6 +105,7 @@ export function drawFrame(now) {
     ctx.fillStyle = '#b8a370'; ctx.fillRect(t.x - 15, t.y - 45, 30 * k, 3);
   }
 
+  drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   ctx.restore();
   drawLight(now);
   drawWeather(now);
@@ -634,7 +635,7 @@ function drawEntity(e, now) {
     case 'grave': return drawGrave(e);
     case 'enemy': return drawCreature(e, now);
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
-    case 'player': return drawHumanoid(e, now);
+    case 'player': return e.cineGhost ? null : drawHumanoid(e, now);   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'house': return drawHouse(e.b, now);
@@ -652,7 +653,12 @@ export function playerInside(b, p = S.player) {
   return (tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1) || (tx === b.doorTile[0] && ty === b.doorTile[1]);
 }
 const isNight = () => { const h = S.minute / 60; return h >= 19 || h < 6; };
+const HOUSE_ATLAS = false;   // Nutzer S13: Blatt-Gebäude wirken aufgeblasen zu verpixelt; an, sobald große Gebäudebilder kommen
 function drawHouse(b, now) {
+  if (HOUSE_ATLAS && SP.atlasOn()) { const src = SP.atlasSprite(SP.houseAtlas(b)); if (src) {   // Gebäude aus dem Blatt — aus: im Blatt zu klein, aufgeblasen zu grob (Nutzer S13)
+    const target = playerInside(b) ? 0.14 : 1, a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15; roofAlpha.set(b, a);
+    const dw = b.w * TS + 12, dh = dw * src.height / src.width, x0 = b.x * TS - 6, y0 = (b.y + b.h) * TS + 6 - dh;
+    ctx.globalAlpha = a * (HB.wearOf(b) === 2 ? 0.75 : 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(src, x0, y0, dw, dh); ctx.globalAlpha = 1; return; } }
   const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b);   // Verfall (auch Kriegsschäden) im Schlüssel
   let cv = houseCache.get(key);
   if (!cv) { if (houseCache.size > 120) houseCache.clear(); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
@@ -758,15 +764,20 @@ function drawDecal(e) {
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
 const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
-const PROP_PERIOD = { magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const PROP_PERIOD = { machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const PROP_BOX = { star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+// Session 13 (Nutzer): Möbel und Stände in Menschengröße — gezeichnet wie bisher, um den Fußpunkt vergrößert
+const PROP_SCALE = { bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
+SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear(); bakeCache.clear(); iconCache.clear(); });   // Stil gewechselt: alles neu backen
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
 export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
 function drawPropPixel(e, now) {
+  const PA = SP.PROP_ATLAS[e.type] && SP.atlasOn() && SP.atlasSprite(SP.PROP_ATLAS[e.type]);   // Stil F: Objekt aus dem Blatt, in seiner eigenen Größe
+  if (PA) { const k = SP.APX * SP.FIGK; ctx.drawImage(PA, Math.round(e.x - PA.width * k / 2), Math.round(e.y + 8 - PA.height * k), PA.width * k, PA.height * k); return; }
   const per = PROP_PERIOD[e.type];
   let key = e.type, v = 0, ph = 0;
   let sp = null;
@@ -789,6 +800,7 @@ function drawPropPixel(e, now) {
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0);
     ctx = o;
+    const sc = PROP_SCALE[e.type]; if (sc) { o.translate(B / 2, B * 0.73); o.scale(sc, sc); o.translate(-B / 2, -B * 0.73); }
     try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg, _shut: shut }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
     SP.pixelize(o, cv.width, cv.height, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
@@ -798,6 +810,13 @@ function drawPropPixel(e, now) {
   ctx.drawImage(cv, e.x - B / 2, e.y - B * 0.73, B, B);
 }
 
+// Nutzer (S13): Sprites exportieren — ein Prop als Bild über denselben Bake-Pfad wie im Spiel
+export function propSprite(type, o = {}) {
+  const B = PROP_BOX[type] || 96, c = document.createElement('canvas'); c.width = c.height = B;
+  const saved = ctx; ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  try { drawPropPixel({ kind: 'prop', type, map: 'world', x: B / 2, y: B * 0.73, r: 12, ...o }, 0); } finally { ctx = saved; }
+  return c;
+}
 // Referenz 4: Krone aus Blattballen — Schatten unten rechts, Grundton, Licht oben links, Glanzpunkte; fest aus dem Hash
 const LEAF = { summer: ['#141c10', '#26361a', '#3a5024', '#5e7432'], dark: ['#10170f', '#1e2c1a', '#2c4026', '#46603a'],
   autumn: ['#24140c', '#5a2c12', '#8a4a1a', '#b8782c'], birch: ['#182212', '#2e4020', '#4a6028', '#6e8a38'] };
@@ -959,6 +978,28 @@ function drawProp(e, now) {
       ctx.fillStyle = '#6a5a44'; ctx.fillRect(x - 16, y - 23, 32, 1.5);
       const cloth = (cx, w, h, c, d) => { ctx.fillStyle = c; ctx.fillRect(cx, y - 22, w, h); ctx.fillStyle = d; ctx.fillRect(cx + w - 2, y - 22, 2, h); ctx.fillRect(cx, y - 22 + h - 2, w, 2); };
       cloth(x - 13, 8, 11, '#c9bfa6', '#9a917c'); cloth(x - 3, 7, 8, '#6a4a5a', '#4a3040'); cloth(x + 6, 7, 12, '#5a6a7a', '#3e4a58');
+      break; }
+    case 'omega_altar': {                                 // Phase 7: Altar Omegas — schwarzer Block, goldener Stern, rote Glut
+      const f = 0.6 + 0.4 * Math.sin(now / 400);
+      shadow(x, y + 5, 20, .4);
+      ctx.fillStyle = '#16121a'; ctx.fillRect(x - 18, y - 16, 36, 20); ctx.fillStyle = '#2a2230'; ctx.fillRect(x - 18, y - 18, 36, 4);
+      ctx.fillStyle = '#3a0a0c'; ctx.fillRect(x - 12, y - 14, 24, 14);
+      ctx.fillStyle = '#c8a040'; ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283 - 1.571, r = i % 2 ? 3 : 7; ctx.lineTo(x + Math.cos(a) * r, y - 7 + Math.sin(a) * r); } ctx.fill();
+      ctx.fillStyle = `rgba(230,60,40,${0.25 * f})`; ctx.beginPath(); ctx.ellipse(x, y - 7, 16, 10, 0, 0, 7); ctx.fill();
+      for (const dx of [-15, 15]) { ctx.fillStyle = '#c9bfa6'; ctx.fillRect(x + dx - 1, y - 24, 2, 6); ctx.fillStyle = `rgba(255,190,90,${f})`; ctx.fillRect(x + dx - 1, y - 27, 2, 3); }
+      break; }
+    case 'omega_rift': {                                  // Phase 7: Riss zu Omega — senkrechter Spalt aus Licht und Blut
+      const f = 0.5 + 0.5 * Math.sin(now / 250);
+      ctx.fillStyle = `rgba(200,30,30,${0.18 + 0.1 * f})`; ctx.beginPath(); ctx.ellipse(x, y - 20, 16, 30, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a0406'; ctx.beginPath(); ctx.moveTo(x, y - 50); ctx.lineTo(x + 7, y - 22); ctx.lineTo(x, y + 4); ctx.lineTo(x - 6, y - 24); ctx.fill();
+      ctx.fillStyle = `rgba(255,210,120,${0.6 + 0.4 * f})`; ctx.beginPath(); ctx.moveTo(x, y - 44); ctx.lineTo(x + 3, y - 22); ctx.lineTo(x, y - 2); ctx.lineTo(x - 2, y - 24); ctx.fill();
+      break; }
+    case 'star_shard': {                                  // Phase 7: Herz des Gefallenen Sterns — gezackter Kristall, rot-gold
+      shadow(x, y + 6, 30, .45);
+      const shard = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.fill(); };
+      shard([-26, 4, -18, -30, -8, -10, 0, -62, 10, -14, 20, -38, 28, 4], '#5a1012');
+      shard([-18, -30, -8, -10, 0, -62, -4, -8], '#9a2a1c'); shard([0, -62, 10, -14, 4, -6], '#c8a040'); shard([20, -38, 28, 4, 14, 0], '#7a1a14');
+      ctx.fillStyle = `rgba(255,210,120,${0.4 + 0.3 * Math.sin(now / 300)})`; ctx.fillRect(x - 1, y - 58, 2, 40);
       break; }
     case 'trough': {                                      // Tränke: Holztrog mit Wasser
       shadow(x, y + 4, 14, .3);
@@ -1518,6 +1559,11 @@ function drawHumanoidAt(e, now, override) {
   const wp = armed ? weaponPose(e, now, wit, pz) : null, melee = wp && !wp.ranged;
   const two = melee && wit.twohand, noArm = melee ? (two ? 'both' : wp.armSide) : null;   // S12: Zweihänder mit beiden Händen
   const f = SP.humanFrame(spec, pz.dir, pz.pose, noArm);   // Nahkampf: Waffenarm(e) zeichnet drawArm zur Hand
+  if (f.atlas) {                                                    // Stil F (Referenz 5): Bild aus dem Blatt — Waffe ist schon darin
+    SP.blit(c, f, x, y + 6); const fa = flashAlpha(e, now); if (fa > 0) { c.globalAlpha = fa; const fl = SP.flashOf(f); Object.assign(fl, { px: f.px, ox: f.ox, oy: f.oy }); SP.blit(c, fl, x, y + 6); c.globalAlpha = 1; }
+    if (spec.glow && pz.dir !== 'N') { c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0)); c.beginPath(); c.arc(x, y - 48, 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+    if (melee && e.swing > 0) { const a = e.aim ?? 0; c.strokeStyle = `rgba(230,220,200,${0.5 * (1 - Math.abs(e.swing - 0.5) * 2)})`; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 22, 30, a - 0.9, a + 0.9); c.stroke(); }   // Schwung als Bogen
+    return; }
   SP.warm(spec, noArm);
   const arms = () => { if (!melee) return; drawArm(c, e, spec, wp, f); if (two) drawArm(c, e, spec, offGrip(e, wp, pz), f); };   // Hand über den Griff                         // BUG-093: übrige Richtungen/Posen in Leerlaufzeit vorbacken
   const behind = w && (pz.dir === 'N' || Math.sin(e.aim ?? 0) < -0.45);
@@ -1677,6 +1723,74 @@ function sideDir(e) {
   if (e.facing === 2) e._side = 'W'; else if (e.facing === 3) e._side = 'E';
   return e._side || 'W';
 }
+// Aasschwinge (Phase 6): fliegt — Schatten am Boden, Körper 18 px darüber, die Schwingen schlagen
+function drawWing(e, now, p) {
+  const s0 = e.seed || 0, f = Math.sin(now / 70 + s0), hgt = 18 + Math.sin(now / 300 + s0) * 3, x = Math.round(e.x), y = Math.round(e.y - hgt), dir = sideDir(e) === 'E' ? 1 : -1, lift = Math.round(f * 7);
+  shadow(e.x, e.y + 3, 9, .3);
+  ctx.fillStyle = p.dark || '#141012';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + s * 3, y); ctx.lineTo(x + s * 15, y - lift - 4); ctx.lineTo(x + s * 12, y - lift + 3); ctx.lineTo(x + s * 8, y - lift + 1); ctx.lineTo(x + s * 4, y + 4); ctx.fill(); }
+  ctx.fillStyle = p.body || '#2a2426'; ctx.fillRect(x - 3, y - 3, 6, 8); ctx.fillRect(dir > 0 ? x + 2 : x - 6, y - 6, 4, 4);
+  ctx.fillStyle = p.eye || '#e05a3a'; ctx.fillRect(dir > 0 ? x + 4 : x - 5, y - 5, 1.5, 1.5);
+  const fw = flashAlpha(e, now); if (fw > 0) { ctx.globalAlpha = fw; ctx.fillStyle = '#fff'; ctx.fillRect(x - 3, y - 3, 6, 8); ctx.globalAlpha = 1; }
+}
+// Nutzer (S13): Rollen-Symbol der Untoten über dem Kopf (in der Nähe des Spielers) — 5×5-Pixelzeichen in der Farbe der Rolle
+const ROLE_GLYPH = { Nahkampf: ['#c8c0a8', '00100,00100,00100,01110,00100'], Schildwall: ['#b8c4cc', '11111,11111,11111,01110,00100'], Fernkampf: ['#a8d0a0', '00111,00011,00101,01000,10000'],
+  Beschwörer: ['#8fe0b0', '01110,10101,11111,01110,01010'], Heiler: ['#b07ae0', '00100,00100,11111,00100,00100'], Masse: ['#b0c070', '00100,01110,11111,11111,01110'],
+  Brecher: ['#ff7a2a', '00100,01100,01110,11111,01110'], Meuchler: ['#9a7ae0', '00001,00010,10100,01000,10100'], Hetzer: ['#d8d0b8', '10101,00000,01110,11111,01110'],
+  Flieger: ['#e05a3a', '10001,11011,01110,00100,00000'], Belagerung: ['#c05a3a', '11111,11111,00100,00100,00100'], Elite: ['#6fd8ff', '10101,11111,11111,11111,00000'] };
+function roleBadge(e, m, top) {
+  const G = ROLE_GLYPH[m.role], P = S.player; if (!G || !P || Math.hypot(e.x - P.x, e.y - P.y) > 360) return;
+  const rows = G[1].split(','), x0 = Math.round(e.x - 5), y0 = Math.round(top - 12);
+  ctx.fillStyle = 'rgba(10,8,8,.7)'; ctx.fillRect(x0 - 2, y0 - 2, 14, 14);
+  ctx.fillStyle = G[0]; rows.forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] === '1') ctx.fillRect(x0 + i * 2, y0 + j * 2, 2, 2); });
+}
+// Nekromant: zwei kleine Schädel kreisen um ihn
+function orbitSkulls(e, now) {
+  for (let k = 0; k < 2; k++) { const a = now / 600 + k * Math.PI, x = Math.round(e.x + Math.cos(a) * 16), y = Math.round(e.y - 30 + Math.sin(a) * 6);
+    ctx.fillStyle = '#d8d0ba'; ctx.fillRect(x - 2, y - 2, 5, 4); ctx.fillRect(x - 1, y + 2, 3, 1); ctx.fillStyle = '#8fe0b0'; ctx.fillRect(x - 1, y - 1, 1, 1); ctx.fillRect(x + 1, y - 1, 1, 1); }
+}
+// Garmadon: Krone aus schwarzem Eisen mit roten Steinen, über dem Helm
+function crownOf(e, top) {
+  const x = Math.round(e.x), y = Math.round(top + 2);
+  ctx.fillStyle = '#2a2220'; ctx.fillRect(x - 9, y, 18, 4); for (const dx of [-9, -3, 3, 8]) ctx.fillRect(x + dx, y - 5, 2, 5);
+  ctx.fillStyle = '#b8942e'; ctx.fillRect(x - 9, y, 18, 1); ctx.fillStyle = '#e03a2a'; for (const dx of [-6, 0, 5]) ctx.fillRect(x + dx, y + 1, 2, 2);
+}
+// Omega (Nutzer S13): ein gigantisches Auge — schwebt, Lid und Adern, die Iris folgt dem Spieler, Heiligenschein und Strahlen,
+// blinzelt; Ophanim sind kleine Rad-Augen derselben Art. R = Radius in Welt-Einheiten.
+function drawEye(e, now, R) {
+  const P = S.player, s0 = e.seed || 0, hov = R * 0.9 + Math.sin(now / 600 + s0) * 4, cx = e.x, cy = e.y - hov;
+  shadow(e.x, e.y + 2, R * 0.8, .45);
+  const rot = now / 3000 + s0;
+  ctx.strokeStyle = `rgba(255,214,130,${0.5 + 0.2 * Math.sin(now / 400)})`; ctx.lineWidth = Math.max(1, R / 20);
+  for (const k of [1.35, 1.6]) { ctx.beginPath(); ctx.ellipse(cx, cy, R * k, R * k * 0.38, Math.sin(rot) * 0.3, 0, 7); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,220,150,.35)';
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283 + rot * 0.5, r0 = R * 1.05, r1 = R * (1.45 + 0.15 * Math.sin(now / 300 + i));
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a - 0.05) * r0, cy + Math.sin(a - 0.05) * r0 * 0.7); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1 * 0.7); ctx.lineTo(cx + Math.cos(a + 0.05) * r0, cy + Math.sin(a + 0.05) * r0 * 0.7); ctx.fill(); }
+  ctx.fillStyle = '#4a1414'; ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.12, R * 0.78, 0, 0, 7); ctx.fill();          // Lid, Fleisch
+  ctx.fillStyle = '#6a2020'; ctx.beginPath(); ctx.ellipse(cx, cy - R * 0.05, R * 1.05, R * 0.7, 0, 0, 7); ctx.fill();
+  const blink = ((now + s0 * 997) % 5200) < 160, open = e.special ? 1.1 : blink ? 0.08 : 1;
+  ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, R * 0.98, R * 0.6 * open, 0, 0, 7); ctx.clip();
+  ctx.fillStyle = '#efe4c8'; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);                                             // Lederhaut
+  ctx.strokeStyle = 'rgba(170,30,30,.7)'; ctx.lineWidth = Math.max(1, R / 40);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283 + s0; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R * 0.6); ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * R * 0.7, cy + Math.sin(a + 0.3) * R * 0.45, cx + Math.cos(a) * R * 0.42, cy + Math.sin(a) * R * 0.3); ctx.stroke(); }
+  const la = P ? Math.atan2(P.y - cy, P.x - cx) : 0, ld = P ? Math.min(R * 0.36, Math.hypot(P.x - cx, P.y - cy) / 6) : 0, ix = cx + Math.cos(la) * ld, iy = cy + Math.sin(la) * ld * 0.6;
+  ctx.fillStyle = '#8a1a14'; ctx.beginPath(); ctx.arc(ix, iy, R * 0.36, 0, 7); ctx.fill();                            // Iris
+  ctx.fillStyle = '#c8502a'; ctx.beginPath(); ctx.arc(ix, iy, R * 0.28, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(ix, iy, R * 0.16, 0, 7); ctx.fill();
+  ctx.fillStyle = '#0a0404'; const pw = e.special ? R * 0.14 : R * 0.06; ctx.fillRect(ix - pw / 2, iy - R * 0.2, pw, R * 0.4);   // Schlitzpupille, weit im Angriff
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(ix - R * 0.16, iy - R * 0.18, R * 0.08, R * 0.08);
+  ctx.restore();
+  if (e.mtype === 'omega') { ctx.fillStyle = 'rgba(150,10,10,.8)'; for (const dx of [-0.5, 0.35]) { const t = ((now / 900 + dx * 3) % 1); ctx.fillRect(cx + R * dx, cy + R * 0.55 + t * R * 0.9, Math.max(2, R / 25), Math.max(4, R / 10)); } }   // Bluttränen
+  const fw = flashAlpha(e, now); if (fw > 0) { ctx.globalAlpha = fw * 0.7; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.62, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+}
+// Engel (Nutzer S13): zwei Flügel hinter der Figur, weiß-golden, schlagen langsam
+function drawWings(e, now, scale) {
+  const f = Math.sin(now / 260 + (e.seed || 0)) * 0.25, y0 = e.y - 38 * scale;
+  for (const s of [-1, 1]) { ctx.save(); ctx.translate(e.x + s * 5 * scale, y0); ctx.rotate(s * (0.35 + f)); ctx.scale(s * scale, scale);
+    ctx.fillStyle = '#d8ccb0'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(22, -18, 34, -6); ctx.quadraticCurveTo(28, 6, 30, 16); ctx.quadraticCurveTo(18, 10, 0, 14); ctx.fill();
+    ctx.fillStyle = '#f4ecd8'; for (let k = 0; k < 4; k++) ctx.fillRect(8 + k * 6, -6 + k * 3, 5, 12 - k);
+    ctx.fillStyle = '#c8a040'; ctx.fillRect(0, -1, 26, 2); ctx.restore(); }
+}
 function drawCreature(e, now) {
   const m = MONSTERS[e.mtype] || {};
   const p = m.pal || {};
@@ -1685,8 +1799,17 @@ function drawCreature(e, now) {
     for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * R) - 2, Math.round(e.y + Math.sin(a) * Ry) - 2, 4, 4); }
     ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, R, Ry, 0, 0, 7); ctx.fill();
   }
-  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
-    const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
+  if (e.special?.kind === 'beam' && e.special.t > 0) dottedLine(e.x, e.y - 20, e.special.a, 420, now);   // Phase 7: Omegas Strahl
+  if (e.special && ['stomp', 'bloodrain', 'meteor', 'nova'].includes(e.special.kind) && e.special.t > 0) {   // Phase 6: Stampfen des Kolosses, Omegas Blut (Garmadon)
+    const st = e.special.kind === 'stomp', k = 1 - e.special.t / (e.special.T || (st ? 900 : 1000)), R = e.special.R || (st ? 95 : 48), col = `rgba(200,40,30,${0.35 + 0.45 * k})`;
+    for (const s of e.special.spots || [{ x: e.x, y: e.y }]) {
+      ctx.fillStyle = col; for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2; ctx.fillRect(Math.round(s.x + Math.cos(a) * R) - 2, Math.round(s.y + Math.sin(a) * R * 0.63) - 2, 4, 4); }
+      ctx.fillStyle = `rgba(160,20,20,${0.08 + 0.15 * k})`; ctx.beginPath(); ctx.ellipse(s.x, s.y, R, R * 0.63, 0, 0, 7); ctx.fill(); }
+  }
+  if (e.mtype === 'carrion_wing') return drawWing(e, now, p);
+  if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
+  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(e.mtype)) {
+    const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
     if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
@@ -1722,12 +1845,26 @@ function drawCreature(e, now) {
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
-  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
+  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
   const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
-  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(scale, scale); ctx.translate(-e.x, -e.y);
+  if (e.mtype === 'zombie') { ctx.fillStyle = 'rgba(140,170,70,.13)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, 26, 14, 0, 0, 7); ctx.fill(); }   // Seuchendunst
+  if (e.shadowServ) { ctx.fillStyle = 'rgba(120,80,190,.18)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, 18, 8, 0, 0, 7); ctx.fill(); }   // Schattenskelett des Hexenmeisters
+  const lean = e.mtype === 'zombie' ? (sideDir(e) === 'E' ? 0.16 : -0.16) : 0, sx = e.mtype === 'flesh_golem' ? 1.22 : 1, sy = e.mtype === 'zombie' ? 0.9 : 1, lift = e.mtype === 'shade' ? 5 + Math.sin(now / 260) * 3 : 0;   // Silhouetten: gebückt, massig, schwebend
+  ctx.save(); ctx.translate(e.x, e.y - lift); ctx.rotate(lean); ctx.scale(scale * sx, scale * sy); ctx.translate(-e.x, -e.y);
   if (e.mtype === 'wraith') ctx.globalAlpha = e.phased > performance.now() ? 0.28 : 0.62 + 0.1 * Math.sin(now / 200);   // Geist: halb da, körperlos fast weg
+  if (e.mtype === 'shade') ctx.globalAlpha = S.player && Math.hypot(e.x - S.player.x, e.y - S.player.y) > 150 ? 0.2 : 0.85;   // Phase 6: aus der Ferne kaum zu sehen
+  if (e.mtype === 'omega') { ctx.fillStyle = `rgba(200,30,30,${0.1 + 0.05 * Math.sin(now / 200)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 90 / scale, 50 / scale, 0, 0, 7); ctx.fill(); }   // Phase 7: rote Aura
+  if (e.mtype === 'ash_demon') { ctx.fillStyle = `rgba(255,110,40,${0.1 + 0.05 * Math.sin(now / 160)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 56 / scale, 35 / scale, 0, 0, 7); ctx.fill(); }   // Glutaura
+  if (e.shadowServ) ctx.globalAlpha = 0.72;
+  if (m.angel) drawWings(e, now, 1);
   drawHumanoid(proxy, now);
   ctx.globalAlpha = 1; ctx.restore();
+  if (e.mtype === 'shade') { ctx.fillStyle = 'rgba(14,12,20,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 12, 7, 0, 0, 7); ctx.fill(); }   // kein Fuß berührt den Boden
+  if (e.mtype === 'necromancer') orbitSkulls(e, now);
+  const top = e.y - 46 * scale * sy - lift;
+  if (e.mtype === 'garmadon') crownOf(e, top);
+  if (e.mtype === 'omega') { const f = 0.5 + 0.5 * Math.sin(now / 300); ctx.strokeStyle = `rgba(255,210,120,${0.55 + 0.35 * f})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(e.x, top + 4, 22, 7, 0, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }   // Phase 7: Heiligenschein
+  if (m.faction === 'undead' && !e.servant) roleBadge(e, m, top - (e.mtype === 'garmadon' ? 10 : 0));
   if (e.telegraph > 0) telegraphArc(e, m.reach + 10, 0.9, now);   // Ansage: gepunkteter Pixelbogen in Schlagrichtung
   if (e.draw > 0) dottedLine(e.x, e.y - 14, e.aim ?? 0, 70 + (520 - e.draw) / 3, now);
 }
@@ -1752,14 +1889,18 @@ function drawCorpse(e, now) {
   if (!m) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
-  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(e.mtype)) {
+  } else if (m.eye) {                                         // Nutzer S13: das Auge schließt sich und sinkt
+    ctx.fillStyle = '#4a1414'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 6, 70 * m.eye, 12 * m.eye + 4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a0a0a'; ctx.fillRect(e.x - 60 * m.eye, e.y - 7, 120 * m.eye, 2);
+  } else if (e.mtype === 'carrion_wing') {                     // Phase 6: gefallene Schwinge
+    ctx.fillStyle = '#141012'; ctx.fillRect(e.x - 11, e.y - 1, 22, 3); ctx.fillStyle = '#2a2426'; ctx.fillRect(e.x - 3, e.y - 3, 6, 5);
+  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(e.mtype)) {
     const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
     ctx.save(); ctx.translate(e.x, e.y + 5); ctx.scale(SP.FIGK, SP.FIGK); SP.blit(ctx, f, 0, 0); ctx.restore();
   } else if (e.mtype === 'gorak') {
     const f = SP.bruteFrame(m.pal || {}, 'E', '', 0), k = Math.min(1, age / 500);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.rotate(k * Math.PI / 2); SP.blit(ctx, f, 0, 2); ctx.restore();
   } else {
-    const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1);
+    const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m.scale || 1);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.scale(sc, sc);
     if (age < 320) SP.blit(ctx, SP.humanFrame(spec, 'S', age < 130 ? 'hit' : 'kneel'), 0, 0);
     else SP.blit(ctx, SP.humanFrame(spec, 'W', 'dead'), 0, 0);
@@ -1807,6 +1948,7 @@ function drawGroundItem(e, now) {
     ctx.fillStyle = `rgba(${col},${.16 + .08 * Math.sin(now / 300)})`;
     ctx.beginPath(); ctx.arc(e.x, e.y - 7 + f, 12, 0, 7); ctx.fill();
   }
+  const A = SP.itemAtlas(e.item.key, it); if (A) { const s = 26 / Math.max(A.width, A.height); ctx.drawImage(A, e.x - A.width * s / 2, e.y - 4 + f - A.height * s, A.width * s, A.height * s); return; }   // Stil F
   ctx.drawImage(groundIcon(e.item.key), e.x - 12, e.y - 20 + f, 24, 24);
 }
 
@@ -1880,6 +2022,8 @@ function drawProjectile(p) {
   else if (p.kind === 'bolt') {                                      // Armbrustbolzen: kurz, dick, Eisenspitze
     ctx.fillStyle = OUT_COL; ctx.fillRect(-7, -2, 16, 4); ctx.fillStyle = '#8a7658'; ctx.fillRect(-5, -1, 10, 2);
     ctx.fillStyle = '#6d6154'; ctx.fillRect(5, -2, 4, 4); ctx.fillStyle = '#c9bfa6'; ctx.fillRect(-7, -2, 2, 4); }
+  else if (p.kind === 'light') {                                     // Nutzer S13: Lichtpfeil der Engel
+    ctx.fillStyle = 'rgba(255,220,140,.45)'; ctx.fillRect(-18, -2, 12, 4); ctx.fillStyle = '#fff0b0'; ctx.fillRect(-8, -2, 18, 4); ctx.fillStyle = '#ffffff'; ctx.fillRect(4, -1, 8, 2); }
   else if (p.kind === 'frost') {                                     // Hrodvars Eislanze: lange, blasse Spitze mit Frostschweif
     ctx.fillStyle = 'rgba(150,200,240,.45)'; ctx.fillRect(-18, -2, 10, 4);
     ctx.fillStyle = OUT_COL; ctx.fillRect(-9, -3, 22, 6); ctx.fillStyle = '#9fd8ff'; ctx.fillRect(-8, -2, 18, 4);
@@ -2009,6 +2153,26 @@ function drawLight(now) {
 }
 
 const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() }));
+// Nutzer S13: kleine Animationen am Himmel — Luftschiffe über dem Hochreich (mit Schatten), Vogelschwärme am Tag im Freien
+function drawSkyLife(now) {
+  if (S.map !== 'world' || !S.player) return;
+  const P = S.player, day = S.minute > 360 && S.minute < 1170;
+  if (curRegion === 'aurel') for (let i = 0; i < 2; i++) {
+    const x = P.x + ((now / 55 + i * 1300) % 2600) - 1300, y = P.y - 260 + i * 190, s = i ? 0.8 : 1;
+    ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x + 40, y + 260, 60 * s, 14 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.ellipse(x, y, 58 * s, 22 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 58 * s, y - 2, 116 * s, 4 * s); ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(x - 10 * s, y - 6 * s, 40 * s, 10 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 16 * s, y + 24 * s, 32 * s, 9 * s); ctx.fillStyle = '#5a4630'; ctx.fillRect(x - 12 * s, y + 18 * s, 2, 7 * s); ctx.fillRect(x + 10 * s, y + 18 * s, 2, 7 * s);
+    ctx.fillStyle = '#e8c070'; for (let k = -12; k <= 10; k += 6) ctx.fillRect(x + k * s, y + 27 * s, 2, 2);
+    const pr = (now / 60) % 6.283; ctx.fillStyle = '#4a4440'; ctx.fillRect(x + 58 * s, y - 1 + Math.sin(pr) * 8 * s, 3, 3);
+  }
+  if (day && !['aurel', 'deadland', 'blight'].includes(curRegion) && !DUNGEONS[S.map]) {
+    const cyc = (now / 26000) % 1, bx = P.x - 700 + cyc * 1400, by = P.y - 240 + Math.sin(now / 5000) * 60;
+    ctx.strokeStyle = 'rgba(30,26,22,.7)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 6; i++) { const x = bx - (i % 3) * 16 - (i > 2 ? 8 : 0), y = by + (i % 3) * 7 * (i > 2 ? -1 : 1), f = Math.sin(now / 120 + i) * 3;
+      ctx.beginPath(); ctx.moveTo(x - 5, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 5, y - f); ctx.stroke(); }
+  }
+}
 function drawWeather(now) {
   if (DUNGEONS[S.map]) return;
   if (S.weather === 'rain') {
@@ -2110,6 +2274,7 @@ export function drawItemIconTo(canvas, key, raw) {
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
   c.clearRect(0, 0, w, h); if (!it) return;
   if (raw) return drawItemVec(c, it, key, w, h);
+  const A = SP.itemAtlas(key, it); if (A) { const s = Math.min((w - 4) / A.width, (h - 4) / A.height), dw = A.width * s, dh = A.height * s; c.imageSmoothingEnabled = false; c.drawImage(A, (w - dw) / 2, (h - dh) / 2, dw, dh); return; }   // Stil F: Symbol aus dem Blatt
   const ck = key + '|' + w + 'x' + h;
   let px = iconCache.get(ck);
   if (!px) {

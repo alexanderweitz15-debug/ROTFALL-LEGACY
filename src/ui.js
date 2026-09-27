@@ -4,6 +4,8 @@ import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACT
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js';
 import { townState, townPrice } from './sim.js';
+import { GOODS } from './data.js';
+import { target as ecoTarget } from './economy.js';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js';
 import { sfx, ambience } from './sfx.js';
 
@@ -169,7 +171,8 @@ export function renderContext(target) {
         <div class="ctx-line"><span>Lage</span><b>${townState(here.key)}</b></div>
         <div class="ctx-line"><span>Herrschaft</span><b>${owner ? FACTIONS[owner].name : 'frei'}</b></div>
         <div class="ctx-line"><span>Einwohner</span><b>${townHeads(here.key)}</b></div>` +
-        ['grain', 'salt', 'cloth', 'pelt'].map(g => `<div class="ctx-line"><span>${ITEMS[g].name}</span><b>${townPrice(here.key, g, true)} Gold · ${Math.floor(t.stock[g])}</b></div>`).join('') + '</div>';
+        ['grain', ...GOODS.filter(g => g !== 'grain' && (t.use[g] || 0) > 0.1 && t.stock[g] < ecoTarget(t, g) * 0.5).slice(0, 3)].map(g =>
+          `<div class="ctx-line"><span>${ITEMS[g].name}</span><b>${townPrice(here.key, g, true)} Gold · ${Math.floor(t.stock[g])}</b></div>`).join('') + '</div>';   // S13: Getreide und die knappsten Waren
     } else if (S.war && S.map === 'world' && here && S.war.nodes[here.key]?.owner) {
       h += `<div class="ctx-line"><span>Herrschaft</span><b>${FACTIONS[S.war.nodes[here.key].owner].name}</b></div>`;
       if (TOWN_PLAN[here.key]) h += `<div class="ctx-line"><span>Einwohner</span><b>${townHeads(here.key)}</b></div>`;
@@ -763,9 +766,9 @@ function tradeUI(body, npc) {
     row.onclick = () => { isBuy ? A.buy(npc, slot.key) : A.sell(i, npc); refreshModal(npc); };
     box.appendChild(row);
   });
-  const other = npc.town === 'northcity' ? 'eren' : 'northcity', seen = S.priceSeen?.[other];
-  if (seen) $('buy').appendChild(el('div', 'ledger', `Zuletzt in ${S.towns[other].name} (Tag ${seen.day}): ` +
-    Object.entries(seen.p).map(([g, v]) => `${ITEMS[g].name} ${v}`).join(' · ')));
+  const here = npc.homeTown || npc.town, last = Object.entries(S.priceSeen || {}).filter(([k]) => k !== here && S.towns?.[k]).sort((a, b) => b[1].day - a[1].day)[0];
+  if (last && stock.some(s => ITEMS[s.key].good)) $('buy').appendChild(el('div', 'ledger', `Zuletzt in ${S.towns[last[0]].name} (Tag ${last[1].day}): ` +
+    Object.entries(last[1].p).filter(([g]) => stock.some(s => s.key === g)).map(([g, v]) => `${ITEMS[g].name} ${v}`).join(' · ')));
   mk(stock, $('buy'), true);
   mk(p.inv.filter(s => s), $('sell'), false);
 }
@@ -785,6 +788,8 @@ function settingsUI(body) {
     <div><h3>Darstellung</h3>
       <div class="ctx-actions">${['low:Kaum Blut', 'reduced:Reduziert', 'standard:Voll'].map(s => { const [k, n] = s.split(':');
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
+      <h3 style="margin-top:14px">Grafikstil</h3>
+      <div class="ctx-actions"><button data-art="F" class="${(S.settings.art || 'F') === 'F' ? 'on' : ''}">Neu (Referenz 5)</button><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button></div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>
@@ -802,6 +807,7 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
+  [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = () => { A.saveNow(); toast('Gespeichert'); };
   $('quit').onclick = () => { A.saveNow(); location.reload(); };

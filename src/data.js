@@ -144,6 +144,8 @@ export const ITEMS = {
   eisenfuerst:   { name:'Eisenfürst', slot:'chest', armor:18, weight:7, slow:0.12, rarity:'epic', value:800, desc:'Schwarze Platten, rote Linien, schwerer Umhang. Die Rüstung der Kettenmeister.' },
   letzte_wache:  { name:'Die letzte Wache', slot:'chest', armor:16, weight:4, slow:0.05, rarity:'legendary', unique:true, leg:'bastion', value:700,
     lore:'Die Rüstung eines Soldaten, der nie von seinem Posten zurückkam. Verrostet — und hält noch immer.' },
+  garmadon_krone:{ name:'Krone des Toten Königs', slot:'head', armor:8, weight:1, rarity:'legendary', value:900, desc:'Schwarzes Eisen, rot glimmend. Kalt, auch in warmer Hand.' },
+  garmadons_reue:{ name:'Garmadons Reue', slot:'weapon', wtype:'great', dmg:30, reach:58, arc:2.5, speed:1000, stam:19, bleed:0.25, rarity:'legendary', value:1200, skill:'twohanded', twohand:true, desc:'Die Klinge des Toten Königs. Auf der Fehlschärfe: ein Name, ausgekratzt.' },
   rotgardistenhelm:{ name:'Rotgardistenhelm', slot:'head', armor:9, weight:2, rarity:'rare', value:240, desc:'Schwarzer Vollhelm mit rotem Kamm.' },
   bergmannshelm: { name:'Bergmannshelm', slot:'head', armor:4, rarity:'common', value:60, desc:'Eisenkappe mit Nackenleder. Aus den Gruben der Mark.' },
   eisenfuersthelm:{ name:'Hörnerhelm', slot:'head', armor:10, weight:2, rarity:'epic', value:400, desc:'Geschlossen, schmaler Sehschlitz, zwei kurze Eisenhörner.' },
@@ -156,6 +158,10 @@ export const ITEMS = {
   meisterbein: { name:'Meisterbein von Gelenkhall', slot:'consumable', use:'prosthesis', part:'leg', tier:3, stack:1, rarity:'epic', value:2200, desc:'Feinwerk der Kybernetiker. Schneller als Fleisch (+6 % Tempo).' },
   dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
   auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
+  vargs_kette: { name:'Vargs Kette', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Das erste Glied, das Varg je geschmiedet hat. Kalt, schwer — und es summt, wenn man an Omega denkt.' },
+  vargs_tagebuch: { name:'Vargs Tagebuch', slot:'material', stack:1, rarity:'rare', value:0, lore:'Enge Schrift, Blutflecken. Die letzte Seite beschreibt ein Ritual: Krone, Kette, Splitter, zehn Seelen, ein Freund, das eigene Blut.' },
+  himmelssplitter: { name:'Splitter vom Himmel', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Ein Stück des Sterns, den Aurelion über seine Insel hob. Warm wie Haut.' },
+  sternenklinge: { name:'Sternenklinge', slot:'weapon', wtype:'sword', dmg:26, reach:50, arc:1.7, speed:600, stam:10, holy:true, rarity:'mythic', value:2000, skill:'onehanded', desc:'Aus dem geschmiedet, was von Omegas Herz blieb.' },
   tributgut: { name:'Tributgut', slot:'material', stack:40, rarity:'common', value:10, lore:'Korn, Salz, Werkzeug — was ein Dorf der Kette abgeben musste.' },
   automatenkern: { name:'Automatenkern', slot:'material', stack:20, rarity:'uncommon', value:60, lore:'Ein Messingherz voller Zahnräder. Tickt noch, wenn man es ans Ohr hält.' },
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
@@ -172,6 +178,16 @@ export const ITEMS = {
   grain: { name:'Weizensack', slot:'material', good:true, stack:20, rarity:'common', value:6 },
   salt:  { name:'Salzsack', slot:'material', good:true, stack:20, rarity:'common', value:8 },
   cloth: { name:'Tuchballen', slot:'material', good:true, stack:20, rarity:'common', value:12 },
+  // S13 Wirtschaft: Handelswaren der Produktionsketten (economy.js)
+  meat:      { name:'Pökelfleisch', slot:'material', good:true, stack:20, rarity:'common', value:9 },
+  timber:    { name:'Stammholz', slot:'material', good:true, stack:20, rarity:'common', value:4 },
+  woodware:  { name:'Holzwaren', slot:'material', good:true, stack:20, rarity:'common', value:10 },
+  stoneware: { name:'Behauene Steine', slot:'material', good:true, stack:20, rarity:'common', value:8 },
+  ore:       { name:'Erzfuhre', slot:'material', good:true, stack:20, rarity:'common', value:8 },
+  ingot:     { name:'Eisenbarren', slot:'material', good:true, stack:20, rarity:'common', value:18 },
+  tools:     { name:'Werkzeugkiste', slot:'material', good:true, stack:20, rarity:'common', value:24 },
+  arms:      { name:'Waffenkiste', slot:'material', good:true, stack:20, rarity:'uncommon', value:45 },
+  magitech:  { name:'Magitech-Teile', slot:'material', good:true, stack:20, rarity:'uncommon', value:60 },
 
   nachtfrost:   { name:'Nachtfrost', slot:'weapon', wtype:'great', dmg:27, reach:58, arc:2.4, speed:1000, stam:18, rarity:'mythic', unique:true, value:900, skill:'twohanded', twohand:true, frost:true,
                   lore:'Hrodvars Klinge. Wo sie trifft, gefriert der Atem: Getroffene werden langsam. Es gibt nur eine.' },
@@ -209,6 +225,9 @@ export const LOOT = {
   bear:      [['pelt',1],['pelt',0.5],['dried_meat',1],['bone',0.4]],
   wild_dog:  [['pelt',0.3],['bone',0.3]],
   deer:      [['dried_meat',1],['pelt',0.6]],
+  bone_knight:[['kite_shield',0.15],['bone',0.8]], bone_archer:[['shortbow',0.2],['bone',0.7]], necromancer:[['soul_vial',0.6],['staff',0.1]], zombie:[['bone',0.5]],
+  ash_demon:[['soul_vial',0.35]], shade:[['soul_vial',0.3]], bone_hound:[['bone',0.8]], carrion_wing:[['bone',0.3]], flesh_golem:[['bone',1],['soul_vial',0.5]],
+  death_knight:[['soul_vial',0.4],['plate_cuirass',0.2]], garmadon:[['potion',1],['soul_vial',1]], omega:[['sternenklinge',1],['potion',1]],   // Phase 6/7: Seelen für das Ritual
   hrodvar:   [['nachtfrost',1],['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
 };
 
@@ -234,20 +253,52 @@ export const MONSTERS = {
                pal:{skin:'#8a8272',cloth:'#3a3530',metal:'#8a7040'}, scaling:{enabled:false} },
   chain_master:{ name:'Varg, Kettenmeister', hp:260, dmg:18, speed:1.25, reach:70, atk:1300, telegraph:520, xp:320, sight:300, r:14, boss:true, threat:4, faction:'chain', interiors:true,   // S11 Endgame
                pal:{skin:'#a88a6a',cloth:'#141210',metal:'#8a8278'} },
-  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
-  crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true,
+  skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, role:'Nahkampf', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
-  death_captain:{ name:'Hauptmann der Toten', hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true,   // §81: führt die letzte Befreiungswelle
+  death_captain:{ name:'Hauptmann der Toten', hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true, role:'Elite',   // §81: führt die letzte Befreiungswelle
                pal:{skin:'#d8d0ba',cloth:'#2a1416',metal:'#50463f',glow:'#c05a3a'} },
   hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
   // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
-  cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true,
+  cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true, role:'Heiler',
                pal:{skin:'#b8a890',cloth:'#2a1f2e',metal:'#5a4a66',glow:'#b07ae0'} },    // hält Abstand, heilt verwundete Untote
-  ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true,
+  ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true, role:'Masse',
                pal:{skin:'#8c9478',cloth:'#2c2a24',metal:'#4a4a42',glow:'#9fb070'} },   // langsam, Griff bremst, steht einmal wieder auf (außer Feuer/Heiliges)
-  wraith:    { name:'Geist', hp:38, dmg:9, speed:1.7, reach:30, atk:900, xp:32, sight:260, r:11, threat:3, faction:'undead', interiors:true,
+  wraith:    { name:'Geist', hp:38, dmg:9, speed:1.7, reach:30, atk:900, xp:32, sight:260, r:11, threat:3, faction:'undead', interiors:true, role:'Meuchler',
                pal:{skin:'#c9d4dc',cloth:'#aab4c0',metal:'#8090a0',glow:'#cfe6ff'} },   // schnell, nach Treffer kurz körperlos, raubt Ausdauer
+  // ---- Phase 6 (MP2 §61): Untotenreich — jede Art mit eigener Rolle (role), Werte im GDD-Datenblatt ----
+  bone_knight: { name:'Knochenritter', hp:120, dmg:14, speed:0.95, reach:38, atk:1300, telegraph:480, xp:70, sight:250, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
+               pal:{skin:'#d8d0ba',cloth:'#1a1d22',metal:'#5a6068',glow:'#7fd0b8'} },   // Schild vorn: Frontalhiebe prallen ab, von der Seite verwundbar
+  bone_archer: { name:'Knochenschütze', hp:36, dmg:9, speed:1.1, reach:280, atk:1700, ranged:true, missile:'arrow', xp:34, sight:320, r:11, threat:2, faction:'undead', interiors:true, role:'Fernkampf',
+               pal:{skin:'#cfc8b4',cloth:'#22262a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  necromancer: { name:'Nekromant', hp:52, dmg:11, speed:1.0, reach:240, atk:1900, ranged:true, missile:'shadow', xp:60, sight:300, r:11, threat:3, faction:'undead', interiors:true, role:'Beschwörer',
+               pal:{skin:'#a89c88',cloth:'#141018',metal:'#3a2e44',glow:'#8fe0b0'} },   // ruft Knochendiener (höchstens drei); stirbt er, zerfallen sie
+  zombie:     { name:'Seuchenleiche', hp:80, dmg:9, speed:0.7, reach:28, atk:1400, telegraph:360, xp:22, sight:180, r:12, threat:1, faction:'undead', interiors:true, role:'Masse',
+               pal:{skin:'#7e8a64',cloth:'#3a3024',metal:'#4a4a42',glow:'#b0c070'} },   // langsam, zäh, der Biss vergiftet
+  ash_demon:  { name:'Aschdämon', hp:170, dmg:17, speed:1.05, reach:40, atk:1300, telegraph:460, xp:120, sight:260, r:15, threat:4, faction:'undead', interiors:true, role:'Brecher', scale:1.25,
+               pal:{skin:'#3a2420',cloth:'#1a0e0c',metal:'#5a2a1c',glow:'#ff7a2a'} },   // Glutaura, feuerfest
+  shade:      { name:'Schattenwesen', hp:40, dmg:15, speed:1.5, reach:30, atk:1100, xp:48, sight:280, r:10, threat:3, faction:'undead', interiors:true, role:'Meuchler',
+               pal:{skin:'#1a1822',cloth:'#0e0c14',metal:'#2a2436',glow:'#9a7ae0'} },   // springt hinter das Ziel, aus der Ferne kaum zu sehen
+  bone_hound: { name:'Knochenhund', hp:34, dmg:8, speed:1.8, reach:24, atk:800, xp:16, sight:260, r:10, threat:2, faction:'undead', interiors:false, role:'Hetzer',
+               pal:{body:'#bdb49a',dark:'#5a5446',eye:'#6fe0b0'} },
+  carrion_wing:{ name:'Aasschwinge', hp:22, dmg:6, speed:2.0, reach:26, atk:1000, xp:14, sight:300, r:9, threat:2, faction:'undead', interiors:false, role:'Flieger', fly:true,
+               pal:{body:'#2a2426',dark:'#141012',eye:'#e05a3a'} },   // fliegt über Wasser und Mauern, stößt herab und steigt wieder auf
+  flesh_golem:{ name:'Leichenkoloss', hp:340, dmg:24, speed:0.6, reach:50, atk:2200, telegraph:900, xp:180, sight:220, r:18, threat:4, faction:'undead', interiors:false, role:'Belagerung', scale:1.6, siege:true,
+               pal:{skin:'#8a7a6a',cloth:'#2a2018',metal:'#4a3a30',glow:'#c05a3a'} },   // Stampfen trifft alle im Umkreis; zerschlägt Wagen
+  death_knight:{ name:'Todesritter', hp:230, dmg:20, speed:1.1, reach:44, atk:1300, telegraph:500, xp:160, sight:290, r:13, threat:4, faction:'undead', interiors:true, role:'Elite', scale:1.12,
+               pal:{skin:'#d8d0ba',cloth:'#12141a',metal:'#2a2e36',glow:'#6fd8ff'} },   // jeder Treffer nährt ihn (Lebensraub)
+  garmadon:   { name:'König Garmadon', hp:620, dmg:24, speed:1.05, reach:52, atk:1400, telegraph:560, xp:900, sight:320, r:20, boss:true, threat:5, faction:'undead', interiors:true, role:'Endgegner', scale:1.9,
+               pal:{skin:'#e0d8c4',cloth:'#1a0a0c',metal:'#3a2a24',glow:'#e03a2a'} },   // MP2 §63: spricht, lässt nicht gehen; drei Phasen
+  omega:      { name:'Omega, der Gefallene', hp:600, dmg:30, speed:0.9, reach:70, atk:1500, telegraph:700, xp:3000, sight:420, r:40, boss:true, threat:6, faction:'omega', interiors:false, role:'Gott', fly:true, eye:1,
+               pal:{skin:'#f0e2c0',cloth:'#5a1010',metal:'#c8a040',glow:'#ffd27a'} },   // Phase 7: Endkampf — Sternenfall, Strahl, Nova
+  // ---- Nutzer (S13): Omegas Engel — Omega ruft sie im Kampf; alle fliegen ----
+  angel_blade: { name:'Klingenengel', hp:90, dmg:16, speed:1.5, reach:40, atk:1100, telegraph:380, xp:90, sight:360, r:12, threat:4, faction:'omega', interiors:true, role:'Elite', fly:true, angel:1,
+               pal:{skin:'#f4e8d0',cloth:'#e8dcc0',metal:'#d8b050',glow:'#fff0b0'} },   // Nahkampf: Flügel, goldene Platte, Schwert
+  angel_archer:{ name:'Lichtschütze', hp:60, dmg:12, speed:1.3, reach:300, atk:1600, ranged:true, missile:'light', xp:80, sight:380, r:11, threat:3, faction:'omega', interiors:true, role:'Fernkampf', fly:true, angel:1,
+               pal:{skin:'#f0e4cc',cloth:'#d8ccb0',metal:'#c8a040',glow:'#ffe6a0'} },   // schießt Lichtpfeile aus der Luft
+  angel_ophan: { name:'Ophan', hp:70, dmg:6, speed:1.1, reach:220, atk:2200, ranged:true, missile:'light', xp:70, sight:360, r:12, threat:3, faction:'omega', interiors:false, role:'Heiler', fly:true, eye:0.28,
+               pal:{skin:'#f0e2c0',cloth:'#c8a040',metal:'#c8a040',glow:'#ffd27a'} },   // kleines Rad-Auge: heilt Omega und die Engel
   bear:      { name:'Bär', hp:150, dmg:18, speed:1.15, reach:38, atk:1400, telegraph:480, xp:45, sight:140, r:18, threat:3, faction:'beast', interiors:false,
                pal:{body:'#4a3526',dark:'#2c1f16',eye:'#1a120c'} },                   // Revier: greift an, wer zu nahe kommt; verletzt stürmt er
   wild_dog:  { name:'Wilder Hund', hp:24, dmg:6, speed:1.65, reach:24, atk:800, xp:9, sight:230, r:10, threat:1, faction:'beast', interiors:false,
@@ -328,6 +379,8 @@ export const ABILITIES = {
   still_water: { name:'Stilles Wasser', title:'monk', cd:16000, cost:2, desc:'Atmen, sammeln: heilt 6 s lang, stillt Blutungen. Kostet 2 Fokus.' },
   hundred_steps:{ name:'Hundert Schritte', title:'monk', cd:9000, cost:'all', min:3, desc:'Ein Sprint durch die Reihen: unverwundbar, jeder Gegner im Weg wird getroffen — stärker je Fokus. Verbraucht allen Fokus (mindestens 3).' },
   earth_blessing:{ name:'Erdsegen', title:'druid', cd:14000, cost:30, desc:'Dich und deine Gruppe heilt die Erde 8 s lang. Kostet 30 Wildkraft.' },
+  shadow_raise:{ name:'Schattenruf', title:'warlock', cd:8000, gain:25, desc:'Ein Schattenskelett steigt ohne Leiche aus dem Boden (40 s, höchstens 2). +25 Verderbnis.' },
+  pact_knight: { name:'Paktritter', title:'warlock', cd:30000, desc:'Ein Knochenritter mit Schild dient dir 45 s (höchstens einer). Kostet 20 % deines Lebens.' },
   unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
 };
 
@@ -351,7 +404,7 @@ export const TITLE_CLASSES = {
     desc:'Ein Pakt mit dem, was im Obelisken flüstert. Flüche, Chaos, Macht auf Pump.',
     resource:{ key:'corruption', name:'Verderbnis', max:100, start:20, css:'corruption',
       rule:'Jede Titelfähigkeit lädt sie auf. Außerhalb des Kampfes sinkt sie (−4/s). Stirbt ein Verfluchter, sinkt sie um 15.' },
-    abilities:['hex', 'chaos_bolt', 'unleash'],
+    abilities:['hex', 'chaos_bolt', 'unleash', 'shadow_raise', 'pact_knight'],   // Nutzer (S13): Hexenmeister beschwört auch
     passive:{ name:'Macht aus Fäulnis', desc:'Titelzauber kosten kein Mana; ihr Schaden steigt mit der Verderbnis bis aufs Doppelte.' },
     flaw:{ name:'Sie frisst dich', desc:'Über 70 Verderbnis verlierst du Leben (1,5/s). Bei 100 bricht sie aus: 15 Schaden, zurück auf 60.' },
     cost:{ desc:'Der Schatten nimmt Atem: Ausdauer −10 für immer.', stamina:-10 },
@@ -625,6 +678,12 @@ export const QUESTS = {
     objectives:[{type:'custom',count:1,text:'Den Auftrag erledigen und dem Haus berichten'}] },
   q_gilde: { name:'Das rote Tuch', giver:null, desc:'Mo, eine Diebin im Kerker von Salzhafen, sagt: Draußen am Hafen wartet ein Mann mit einem roten Tuch. Sag ihm, Mo schickt dich.',
     objectives:[{type:'custom',count:1,text:'Den Mann mit dem roten Tuch am Hafen von Salzhafen finden'}], reward:{gold:60,xp:80} },
+  q_ratssitz: { name:'Eine Stimme im Rat', giver:null, desc:'Ein Adelshaus schlägt dich für den Hohen Rat von Aurelion vor. Drei Häuser müssen für dich sprechen (Gunst ≥ 30), dann will Ratssprecher Corvan auf der Himmelsfeste fünfhundert Gold Einlage.',
+    objectives:[{type:'custom',count:1,text:'Drei Häuser als Fürsprecher gewinnen'},{type:'custom',count:1,text:'Die Einlage bei Corvan zahlen (Himmelsfeste)'}], reward:{xp:600} },
+  q_rotfall: { name:'Die Spur des Rotfalls', giver:null, desc:'Omega fiel, sein Blut regnete, Garmadon stand auf, Varg erschlug ihn — so viel ahnt man. Die ganze Wahrheit liegt verstreut: bei Toten und Lebenden, in Büchern, Liedern und Karten.',
+    objectives:[{type:'custom',count:9,text:'Bruchstücke der Wahrheit über den Rotfall finden'}], reward:{xp:400} },
+  q_omega: { name:'Der Ruf nach Omega', giver:null, desc:'Das Ritual verlangt am Altar der Eisenfeste: Garmadons Krone, Vargs Kette, einen Splitter vom Himmel, zehn Seelen, einen Gefährten — und für immer ein Fünftel deines Blutes. Wenn er zornig erwacht, brennt die Welt.',
+    objectives:[{type:'custom',count:1,text:'Das Ritual am Altar Omegas vollziehen'}], reward:{xp:1000} },
   q_rask: { name:'Rasks Versteck', giver:null, desc:'Kapitän Rask sitzt im Kerker von Salzhafen und kommt nicht mehr raus. Seine Beute liegt noch in einer Kiste an der Küste südlich der Stadt.',
     objectives:[{type:'custom',count:1,text:'Rasks Kiste an der Küste finden und öffnen'}], reward:{xp:100} },
   q_pelts: { name:'Felle für den Hafen', giver:'quirin', desc:'Die Seeleute frieren, und ich brauche Fett für meine Salben. Drei Wolfsfelle. Gegerbt oder nicht, Hauptsache ganz.',
@@ -659,7 +718,7 @@ export const REP_TIERS = [
   { min: -60, name: 'Feindlich', price: 1.3, greet: '„Leute wie dich bedienen wir nur ungern.“' },
   { min: -Infinity, name: 'Verhasst', price: null, greet: '„Verschwinde, bevor ich die Wache rufe.“' },
 ];
-export const GOODS = ['grain', 'salt', 'cloth', 'pelt'];
+export const GOODS = ['grain', 'meat', 'salt', 'cloth', 'pelt', 'timber', 'woodware', 'stoneware', 'ore', 'ingot', 'tools', 'arms', 'magitech'];   // S13 Wirtschaft: economy.js
 export const TOWNS = {
   eren:      { name:'Eren', pop:40, stock:{ grain:40, salt:6, cloth:5, pelt:8 }, prod:{ grain:7, pelt:2 }, use:{ grain:3, salt:2, cloth:1 } },
   northcity: { name:'Nordfurt', pop:90, stock:{ grain:12, salt:30, cloth:25, pelt:3 }, prod:{ salt:5, cloth:4 }, use:{ grain:8, pelt:2, salt:1 } },

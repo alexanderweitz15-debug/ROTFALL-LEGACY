@@ -130,7 +130,7 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
       if (!alt) continue; [tx, ty] = alt;
     }
     used.add(tx + ',' + ty);
-    prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 10 });
+    prop(kind, tx, ty, { map, gen: 2, house: b.id, solid: !['candles', 'sack', 'debris'].includes(kind), r: 13 });   // Session 13: größere Möbel, größerer Körper
   }
   // Säle der Monumentalbauten (Phase 5): Möbel in Reihen mit Gängen, Türachse frei, Obergrenze wie oben
   const HALL = { palace: ['column', 'column', 'bench'], markethall: ['stall', 'stall', 'counter'], bank: ['counter', 'chest', 'desk'], academy: ['desk', 'shelf', 'desk'], library: ['shelf', 'shelf', 'desk'],
@@ -139,7 +139,7 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   if (HALL && !ruin) { const HC = Math.floor((w - 2) * (h - 2) / 2); let k = 0;
     for (let j = y + 2; j <= y + h - 3; j += 3) for (let i = x + 2; i <= x + w - 3; i += 3) {
       if (Math.abs(i - door[0]) <= 1 || used.has(i + ',' + j) || used.size - 1 >= HC) continue;
-      used.add(i + ',' + j); prop(HALL[k++ % HALL.length], i, j, { map, gen: 2, house: b.id, solid: true, r: 9 }); }
+      used.add(i + ',' + j); prop(HALL[k++ % HALL.length], i, j, { map, gen: 2, house: b.id, solid: true, r: 12 }); }
     if (b.type === 'palace' || b.type === 'court') prop('throne', x + (w >> 1), y + 1, { map, gen: 2, house: b.id, solid: true, r: 12, label: b.type === 'palace' ? 'Thron im Regierungspalais' : 'Richterstuhl' });
     if (b.type === 'palace') for (const i of [x + 2, x + w - 3]) prop('banner_torn', i, y + 1, { map, gen: 2, house: b.id, label: 'Banner des Hochreichs' });
   }
@@ -554,6 +554,48 @@ function attachedPt(P, x, y, extra = []) {
   for (const [, hx, hy, w, h, door] of [...P.design.houses, ...extra])
     if (x >= hx - 2 && x <= hx + w + 1 && y >= hy - 2 && y <= hy + h + 1) { const [nx, ny] = spreadHouse(P, hx, hy, w, h, door); return [x - hx + nx, y - hy + ny]; }
   return [spR(P, x, 0), spR(P, y, 1)];
+}
+// Phase 8 (Nutzer: Städte wachsen von selbst und durch Investition): ein neues Haus am Rand einer Stadt. Gesucht wird eine freie
+// Fläche (Wiese, Erde, Sand; 2 Kacheln Abstand zu anderen Häusern, keine Mauer, kein Wasser im Rand), deren Tür zum Platz zeigt
+// und zu Fuß erreichbar ist. Ohne Zufall: gleiche Welt, gleiche Stelle. Das Stadtgebiet wächst mit (Dichte-Regel §75 bleibt).
+const GROW_SIZE = { house: [5, 4], cottage: [4, 4], smithy: [6, 5], bakery: [5, 4], store: [6, 5], tavern: [8, 6] };
+const BUILDABLE = new Set([T.GRASS, T.DIRT, T.SAND, T.ASH]);
+export function findGrowSpot(town, type = 'house') {
+  const P = TOWN_PLAN[town]; if (!P) return null;
+  const [w, h] = GROW_SIZE[type] || GROW_SIZE.house, [x0, y0, x1, y1] = P.area, [sx, sy] = P.square, R = 10, cand = [];
+  const near = (x, y) => HOUSES.some(b => b.map === 'world' && x - 2 < b.x + b.w && x + w + 2 > b.x && y - 2 < b.y + b.h && y + h + 2 > b.y);
+  for (let y = y0 - R; y <= y1 + R - h; y++) for (let x = x0 - R; x <= x1 + R - w; x++) cand.push([x, y, Math.hypot(x + w / 2 - sx, y + h / 2 - sy)]);
+  cand.sort((a, b) => a[2] - b[2]);
+  for (const [x, y] of cand) {
+    let ok = true;
+    for (let j = y - 2; j < y + h + 2 && ok; j++) for (let i = x - 2; i < x + w + 2 && ok; i++) {
+      const t = tileAt('world', i, j), inside = i >= x && i < x + w && j >= y && j < y + h;
+      if (inside ? !BUILDABLE.has(t) : (t === T.WALL || t === T.WATER || t === T.PLANK || t === T.ROCK)) ok = false;
+    }
+    if (!ok || near(x, y)) continue;
+    const dx = sx - (x + w / 2), dy = sy - (y + h / 2), door = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'E' : 'W') : (dy > 0 ? 'S' : 'N');
+    const fx = door === 'E' ? x + w : door === 'W' ? x - 1 : x + (w >> 1), fy = door === 'S' ? y + h : door === 'N' ? y - 1 : y + (h >> 1);
+    if (!reachable(fx, fy, sx, sy, x, y, w, h)) continue;
+    return { town, type, x, y, w, h, door };
+  }
+  return null;
+}
+function reachable(fx, fy, sx, sy, hx, hy, w, h) {                 // BFS von der Tür zum Platz, das geplante Haus zählt als Mauer
+  const seen = new Set([fx + ',' + fy]), q = [[fx, fy]];
+  for (let k = 0; k < q.length && k < 6000; k++) { const [x, y] = q[k]; if (Math.abs(x - sx) <= 2 && Math.abs(y - sy) <= 2) return true;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) { const key = nx + ',' + ny;
+      if (seen.has(key) || SOLID.has(tileAt('world', nx, ny)) || (nx >= hx && nx < hx + w && ny >= hy && ny < hy + h)) continue; seen.add(key); q.push([nx, ny]); } }
+  return false;
+}
+export function buildGrown(spec) {                                   // baut ein gefundenes (oder gespeichertes) Haus; gibt Haus, Möbel, alte Kacheln
+  const P = TOWN_PLAN[spec.town]; if (!P) return null;
+  const id = 'g' + spec.town + '_' + spec.x + '_' + spec.y; if (HOUSES.some(b => b.id === id)) return null;
+  const before = []; for (let j = spec.y; j < spec.y + spec.h; j++) for (let i = spec.x; i < spec.x + spec.w; i++) before.push(tileAt('world', i, j));
+  const area0 = P.area.slice(), n0 = props.length;
+  const b = house('world', spec.x, spec.y, spec.w, spec.h, spec.door, { type: spec.type, town: spec.town, id, grown: true });
+  const furn = props.splice(n0);
+  P.area = [Math.min(P.area[0], spec.x - 2), Math.min(P.area[1], spec.y - 2), Math.max(P.area[2], spec.x + spec.w + 1), Math.max(P.area[3], spec.y + spec.h + 1)];
+  return { b, props: furn, undo: () => { let k = 0; for (let j = spec.y; j < spec.y + spec.h; j++) for (let i = spec.x; i < spec.x + spec.w; i++) setTile('world', i, j, before[k++]); HOUSES.splice(HOUSES.indexOf(b), 1); P.area = area0; } };
 }
 export function townAt(tx, ty, m = 0) {                    // m: Rand in Kacheln (z. B. Abstand für Gegner-Spawns)
   for (const k in TOWN_PLAN) { const [x0, y0, x1, y1] = TOWN_PLAN[k].area; if (tx >= x0 - m && tx <= x1 + m && ty >= y0 - m && ty <= y1 + m) return k; }
@@ -1174,6 +1216,11 @@ function totenland() {
   P('obelisk', 1130, 470, { solid: true, r: 12 }); for (let k = 0; k < 8; k++) P('candles', Math.round(1130 + Math.cos(k * 0.785) * 5), Math.round(470 + Math.sin(k * 0.785) * 4));
   for (const [dx, dy] of [[-9, -6], [9, -5], [-8, 7], [10, 6]]) P('bone_spire', 1130 + dx, 470 + dy, { solid: true, r: 8 });
   // Grabwacht: verfallener Wachturm, Palisade, Gräber der Wächter
+  // Phase 6 (MP2 §63): Pforte zur Gruft des Toten Königs — Steinplatz, Knochenspitzen im Kreis, Treppe hinab
+  rect('world', 1188, 392, 13, 11, T.STONE); lay(1130, 470, 1194, 402, T.DIRT);
+  for (let k = 0; k < 12; k++) { const a = k * 0.524; prop('bone_spire', Math.round(1194 + Math.cos(a) * 7), Math.round(397 + Math.sin(a) * 5), { solid: true, r: 8 }); }
+  prop('mine_entrance', 1194, 396, { solid: true, r: 14, portal: 'garmadon', label: 'Gruft des Toten Königs' });
+  prop('sign', 1194, 401, { label: 'In den Stein gekratzt: „Hier ruht kein König. Hier wartet einer.“' }); prop('banner_torn', 1190, 395, { label: 'Banner Garmadons' }); prop('banner_torn', 1198, 395, { label: 'Banner Garmadons' });
   P('watchtower_ruin', 1150, 616, { solid: true, r: 16 }); for (let i = -6; i <= 6; i++) P('palisade_prop', 1150 + i, 626, { solid: true });
   for (let i = 0; i < 6; i++) P('gravestone', 1142 + i * 3, 610, { solid: true, r: 7 }); P('banner_torn', 1156, 612, { label: 'Zerfetztes Banner der Grabwacht' });
 }
@@ -1301,7 +1348,7 @@ function buildAurelCity(C) {
     const fx = x1 + 14;
     for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x1 + 3 && qx <= x1 + 26 && qy >= cy - 10 && qy <= cy + 12) props.splice(i, 1); }
     for (let y = cy - 9; y <= cy + 11; y++) for (let x = x1 + 3; x <= x1 + 25; x++) if (t[y * W + x] !== T.WALL) t[y * W + x] = T.STONE;
-    house('world', fx - 9, cy - 9, 18, 9, 'S', { type: 'factoryhall', town: 'tickmar' });                   // begehbar (Nutzer)
+    house('world', fx - 9, cy - 9, 18, 9, 'S', { type: 'factoryhall', town: 'tickmar_werk' });              // begehbar (Nutzer); vor der Mauer, eigener Ort
     for (const [dx, dy] of [[-8, 7], [-3, 8], [3, 8], [8, 7]]) prop('machine', fx + dx, cy + dy, { solid: true, r: 9, label: 'Dampfhammer' });
     prop('workstation', fx - 6, cy + 10, { bond: 'aurel', label: 'Werkbank der Schuldknechte' }); prop('keychest', fx + 7, cy + 10, { bond: 'aurel', label: 'Schlüsselkasten des Vogts' });
   }
@@ -1353,7 +1400,7 @@ function buildMetropolis(C) {
   for (let x = x0 + 5; x <= x1 - 5; x++) if (Math.abs(x - cx) <= 2 || (x - x0) % 22 === 0) { set(x, kany, T.PLANK); set(x, kany + 1, T.PLANK); }
   // Häuserblöcke: Querstraßen alle 11 Kacheln, Häuser an beiden Seiten, je Bezirk eigene Typen
   const hs = [];
-  const fits = (hx, hy, w, h) => hx > x0 + 5 && hx + w < x1 - 5 && hy > y0 + 5 && hy + h < y1 - 5 && hs.every(([a, b, c, d]) => hx + w + 2 <= a || a + c + 2 <= hx || hy + h + 2 <= b || b + d + 2 <= hy)
+  const fits = (hx, hy, w, h) => hx > x0 + 5 && hx + w < x1 - 5 && hy > y0 + 5 && hy + h < y1 - 5 && HOUSES.every(q => q.town !== C.key || hx + w + 2 <= q.x || q.x + q.w + 2 <= hx || hy + h + 2 <= q.y || q.y + q.h + 2 <= hy)   // auch Abstand zu den Prachtbauten
     && [...Array(w * h).keys()].every(k => at(hx + (k % w), hy + ((k / w) | 0)) === T.GRASS);
   const put = (hx, hy, w, h, door, type) => { if (!fits(hx, hy, w, h)) return false; house('world', hx, hy, w, h, door, { type, town: C.key }); hs.push([hx, hy, w, h]); return true; };
   const SZ = { manor: [7, 6], house: [5, 4], store: [6, 5], tavern: [8, 6], healer: [5, 4], chapel: [7, 6], smithy: [6, 5], barn: [7, 5], cottage: [4, 4], barracks: [8, 5], stable: [7, 5], hall: [8, 6] };
@@ -1832,6 +1879,8 @@ export const DUNGEONS = {
   mine: { name: 'Verlassene Grube', floor: 'scree', amb: 'blight', enter: 'Du steigst in die Verlassene Grube hinab. Es riecht nach kaltem Eisen.' },
   deep: { name: 'Tiefhall', floor: 'dfloor', amb: 'frozen', enter: 'Du steigst die Frosttreppe hinab. Reif sitzt in den Fugen alter Steinmetzarbeit — hier hat jemand gebaut, der für die Ewigkeit baute.' },
   kerker: { name: 'Kerker', floor: 'dfloor', amb: 'blight', enter: 'Die Tür fällt ins Schloss. Stroh, Eisen, der Geruch von zu vielen Leuten auf zu wenig Raum.' },   // Phase 2 §26
+  omega: { name: 'Krater des Gefallenen Sterns', floor: 'scree', amb: 'blight', open: true, enter: 'Du trittst durch den Riss. Der Himmel ist rot, der Boden warm. In der Mitte des Kraters atmet etwas, das größer ist als ein Haus.' },   // Phase 7
+  garmadon: { name: 'Gruft des Toten Königs', floor: 'dfloor', amb: 'blight', enter: 'Stufen aus Knochen führen hinab. Die Luft ist warm und riecht nach altem Blut. Irgendwo unten schlägt etwas wie ein Herz.' },   // Phase 6 MP2 §63
   sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
@@ -1876,6 +1925,7 @@ export function genSky() {
   const seats = [[24, 10, 'Thron der Ewigen Kaiserin'], [28, 9, 'Bank des Rates der Häuser'], [36, 9, 'Sockel des Uhrwerk-Orakels'], [40, 10, 'Stuhl des Magierkönigs']];
   for (const [x, y, label] of seats) prop('throne', x, y, { ...o, solid: true, r: 12, label });
   for (const x of [22, 42]) { prop('big_gear', x, 13, { ...o, solid: true, r: 10, label: 'Rad der Rechtsprechung' }); prop('banner_torn', x, 8, { ...o, label: 'Banner des Hochreichs' }); }
+  prop('chest', 32, 9, { ...o, loot: ['himmelssplitter'], label: 'Schrein des Himmelssplitters' });   // Phase 7: Artefakt für Omegas Ruf
   for (const [x, y] of [[26, 19], [38, 19], [26, 30], [38, 30]]) prop('statue', x, y, { ...o, solid: true, r: 10, label: 'Standbild eines Kaisers der ersten Zeit' });
   for (let y = 16; y <= 36; y += 4) { prop('lantern', 29, y, o); prop('lantern', 35, y, o); }
   for (let i = 0; i < 26; i++) { const x = 8 + ((i * 17) % 48), y = 14 + ((i * 11) % 22); if (tiles[y * w + x] === T.GRASS) prop(i % 3 ? 'hedge' : 'tree', x, y, { ...o, solid: true, r: 9 }); }
@@ -1883,6 +1933,66 @@ export function genSky() {
   MAPS.sky.entry = { x: 32 * TS + TS / 2, y: 37 * TS };
   MAPS.sky.court = { x: 32 * TS + TS / 2, y: 15 * TS };
   return baseProps('sky', props.slice());
+}
+// Gruft des Toten Königs (Phase 6, MP2 §63): drei Ebenen nach Norden hinab — das Beinhaus (Knochen, Fallen), die Blutkatakomben
+// (Nekromanten, Blutbecken, Stachelfallen) und der Thronsaal Garmadons mit Leibwache und Hort. Eigener Seed-Zweig.
+export function genGarmadon() {
+  props.length = 0;
+  seedRng(S.seed * 19 + 7);
+  const w = 90, h = 96, tiles = new Uint8Array(w * h).fill(T.DWALL), M = 'garmadon', o = { map: M }, rooms = [];
+  MAPS.garmadon = { w, h, tiles };
+  const room = (x, y, rw, rh, tag, lvl) => { rect(M, x, y, rw, rh, T.DFLOOR); const r = { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1), tag, lvl }; rooms.push(r); return r; };
+  const corr = (a, b, wide = 3) => { let x = a.cx, y = a.cy;
+    while (x !== b.cx) { for (let k = 0; k < wide; k++) setTile(M, x, y + k, T.DFLOOR); x += x < b.cx ? 1 : -1; }
+    while (y !== b.cy) { for (let k = 0; k < wide; k++) setTile(M, x + k, y, T.DFLOOR); y += y < b.cy ? 1 : -1; } };
+  // Ebene 1: Beinhaus
+  const entry = room(38, 84, 14, 9, 'entry', 1), ossuary = room(12, 64, 26, 14, 'ossuary', 1), pits = room(54, 64, 24, 14, 'pits', 1);
+  // Ebene 2: Blutkatakomben
+  const stair1 = room(40, 52, 10, 6, 'stair1', 2), lab = room(8, 34, 22, 14, 'lab', 2), pool = room(36, 34, 18, 12, 'pool', 2), cata = room(60, 32, 22, 16, 'cata', 2);
+  // Ebene 3: Thronsaal
+  const stair2 = room(40, 24, 10, 5, 'stair2', 3), throne = room(22, 3, 46, 18, 'throne', 3), hoard = room(72, 6, 12, 10, 'hoard', 3);
+  corr(entry, ossuary); corr(entry, pits); corr(ossuary, stair1); corr(pits, stair1); corr(stair1, lab); corr(stair1, pool); corr(stair1, cata);
+  corr(pool, stair2); corr(stair2, throne, 4); corr(throne, hoard);
+  prop('mine_exit', entry.cx, entry.y + entry.h - 1, { ...o, portal: 'world', label: 'Aufstieg ins Totenland' });
+  for (const r of rooms) for (let i = 0; i < 2; i++) prop('torch', ri(r.x + 1, r.x + r.w - 2), r.y, o);
+  const sign = (r, label) => prop('sign', r.cx, r.y + r.h - 2, { ...o, label });
+  sign(stair1, 'Zweite Ebene — Die Blutkatakomben. Wer hier blutet, nährt den König.'); sign(stair2, 'Dritte Ebene — Der Thronsaal. Knie, oder steh zum letzten Mal.');
+  // Beinhaus: Knochenwände, Schädelstapel, Gruben mit Stacheln
+  for (let i = 0; i < 16; i++) prop(i % 3 ? 'bones' : 'bone_spire', ri(ossuary.x + 1, ossuary.x + ossuary.w - 2), ri(ossuary.y + 1, ossuary.y + ossuary.h - 2), { ...o, solid: i % 3 === 0, r: 8 });
+  for (let i = 0; i < 8; i++) prop('spikes', ri(pits.x + 2, pits.x + pits.w - 3), ri(pits.y + 2, pits.y + pits.h - 3), { ...o, hazard: 16, label: 'Knochengrube' });
+  for (let i = 0; i < 4; i++) prop('gravestone', pits.x + 3 + i * 5, pits.y + 1, { ...o, solid: true, r: 8 });
+  prop('crate', ossuary.x + 1, ossuary.y + ossuary.h - 2, { ...o, loot: ['bandage', 'bandage', 'potion'], label: 'Vorrat eines Grabräubers' });
+  // Blutkatakomben: Labor der Nekromanten, Blutbecken (Fallen), Grabnischen
+  for (const [dx, dy] of [[3, 3], [8, 3], [13, 3], [3, 9], [13, 9]]) prop(dx === 8 ? 'altar_small' : 'candles', lab.x + dx, lab.y + dy, { ...o, solid: dx === 8, r: 8 });
+  prop('shelf', lab.x + 18, lab.y + 1, { ...o, solid: true, r: 10 }); prop('desk', lab.x + 18, lab.y + 4, { ...o, solid: true, r: 10 });
+  prop('chest', lab.x + lab.w - 2, lab.y + lab.h - 2, { ...o, loot: ['soul_vial', 'potion', 'bandage'], label: 'Truhe der Nekromanten' });
+  for (let i = 0; i < 10; i++) prop('blood', ri(pool.x + 2, pool.x + pool.w - 3), ri(pool.y + 2, pool.y + pool.h - 3), o);
+  for (let i = 0; i < 6; i++) prop('spikes', ri(pool.x + 2, pool.x + pool.w - 3), ri(pool.y + 2, pool.y + pool.h - 3), { ...o, hazard: 18, label: 'Blutdorn' });
+  for (let y = cata.y + 2; y < cata.y + cata.h - 1; y += 3) for (let x = cata.x + 2; x < cata.x + cata.w - 1; x += 4) prop('gravestone', x, y, { ...o, solid: true, r: 8 });
+  // Thronsaal: Säulenreihen, Kohlebecken, Banner, Thron; dahinter der Hort
+  for (let i = 0; i < 7; i++) for (const y of [throne.y + 4, throne.y + throne.h - 4]) prop('broken_pillar', throne.x + 4 + i * 6, y, { ...o, solid: true, r: 11, intact: true });
+  prop('throne', throne.cx, throne.y + 1, { ...o, solid: true, r: 16, label: 'Knochenthron Garmadons' });
+  for (const dx of [-6, 6]) { prop('campfire_static', throne.cx + dx, throne.y + 3, { ...o, solid: true, label: 'Blutfeuer' }); prop('banner_torn', throne.cx + dx, throne.y, { ...o, label: 'Banner Garmadons' }); }
+  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['garmadon_krone', 'garmadons_reue', 'potion', 'potion'], label: 'Hort des Toten Königs', garmHoard: true });
+  for (let i = 0; i < 4; i++) prop(pick(['crate_stack', 'barrel', 'sack']), ri(hoard.x, hoard.x + hoard.w - 1), ri(hoard.y + 6, hoard.y + hoard.h - 1), { ...o, solid: true });
+  MAPS.garmadon.rooms = rooms;
+  MAPS.garmadon.entry = { x: entry.cx * TS + TS / 2, y: (entry.y + entry.h - 3) * TS };
+  return baseProps('garmadon', props.slice());
+}
+// Krater des Gefallenen Sterns (Phase 7): Arena des Endkampfs — Asche, Blutlachen, ein Ring aus Obelisken, im Norden der Splitter
+export function genOmega() {
+  props.length = 0;
+  seedRng(S.seed * 23 + 11);
+  const w = 64, h = 56, tiles = new Uint8Array(w * h).fill(T.ROCK), M = 'omega', o = { map: M };
+  MAPS.omega = { w, h, tiles };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const d = Math.hypot((x - 32) / 26, (y - 28) / 22) + (nz(x * 5, y * 3) - 0.5) * 0.1; if (d < 1) tiles[y * w + x] = d < 0.28 ? T.STONE : T.ASH; }
+  prop('star_shard', 32, 9, { ...o, solid: true, r: 22, label: 'Herz des Gefallenen Sterns' });
+  for (let k = 0; k < 12; k++) { const a = k * 0.524; prop('obelisk', Math.round(32 + Math.cos(a) * 21), Math.round(28 + Math.sin(a) * 17), { ...o, solid: true, r: 12 }); }
+  for (let i = 0; i < 18; i++) prop('blood', 14 + ((i * 17) % 36), 14 + ((i * 11) % 28), o);
+  for (let k = 0; k < 8; k++) prop('candles', Math.round(32 + Math.cos(k * 0.785) * 6), Math.round(28 + Math.sin(k * 0.785) * 5), o);
+  prop('mine_exit', 32, 47, { ...o, portal: 'world', label: 'Riss zurück in die Welt' });
+  MAPS.omega.entry = { x: 32 * TS + TS / 2, y: 44 * TS };
+  return baseProps('omega', props.slice());
 }
 
 // Tiefhall (Frostkamm): Königshalle der alten Bergleute, unter dem Eis versiegelt. Anders als die Grube gebaut, nicht gegraben:

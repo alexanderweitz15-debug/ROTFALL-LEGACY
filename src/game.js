@@ -1,14 +1,15 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
-import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO } from './world.js';
+import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO } from './world.js';
 import * as R from './render.js';
 import * as HB from './buildings.js';
 import * as UI from './ui.js';
 import * as SIM from './sim.js';
 import * as B from './body.js';
 import * as SP from './sprites.js';
+import * as ECO from './economy.js';
 import { drawAtlas, revealAround, explored } from './atlas.js';
 import { sfx, ambience, ambienceTick } from './sfx.js';
 
@@ -64,7 +65,7 @@ const outside = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0);
 export function recalc(c) {
   const a = c.attributes;
   c.tfx = c.tree ? treeFx(c) : null;
-  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1) * (1 + tfx(c, 'hp') + afx(c, 'vital'));   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
+  const base = (40 + a.endurance * 4 + c.level * 6) * (c.pactCost?.hpMul || 1) * (c.omegaScar ? 0.8 : 1) * (1 + tfx(c, 'hp') + afx(c, 'vital'));   // Basis-HP, verteilt auf die Körperteile; Pakt kostet Leben
   if (c.body) B.rescale(c, base); else B.initBody(c, base);
   c.maxStamina = 60 + a.endurance * 4 + c.level * 2 + B.buildOf(c).stamina + (c.pactCost?.stamina || 0) + tfx(c, 'stam') + afx(c, 'enduring');
   const magic = ['mage', 'cleric', 'paladin'].includes(c.currentClass);   // Titelklassen haben ihre eigene Ressource, kein Mana
@@ -386,7 +387,19 @@ function guardChar(faction, pos, prof, level = ri(4, 7)) {
 }
 // Karawanenwachen (BUG-011): je Platz eine; wer fehlt (gefallen, alter Spielstand), wird angeheuert.
 const ESCORT_SLOTS = 2;
-const escortsOf = car => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.escort === car.id);
+// BUG-108: Handelnde (Figuren, Gegner, Wagen, Fallen) je Karte gecacht — neu, sobald Karte, Liste oder Anzahl sich ändern,
+// sonst spätestens alle 250 ms. Vorher liefen mehrere Suchen und die Denk-Schleife je Bild über alle ~16 000 Einträge (Props).
+let ACT = { arr: null, len: -1, t: -1e9, list: [], hz: [], cars: [] };
+function actorsOf(map = S.map, now = performance.now()) {
+  const arr = S.ents[map];
+  if (ACT.arr !== arr || ACT.len !== arr.length || now - ACT.t > 250) {
+    const list = [], hz = [], cars = [], dc = [];
+    for (const e of arr) { if (e.kind === 'npc' || e.kind === 'enemy' || e.kind === 'player' || e.kind === 'caravan') { list.push(e); if (e.kind === 'caravan') cars.push(e); } else if (e.hazard) hz.push(e); else if (e.kind === 'decal' || e.kind === 'corpse') dc.push(e); }
+    ACT = { arr, len: arr.length, t: now, list, hz, cars, dc };
+  }
+  return ACT;
+}
+const escortsOf = car => (S.map === 'world' ? actorsOf('world').list : S.ents.world).filter(e => e.kind === 'npc' && e.alive && e.escort === car.id);
 function hireEscorts(car) {
   const have = escortsOf(car);
   for (let slot = 0; slot < ESCORT_SLOTS; slot++) if (!have.some(e => e.slot === slot)) {
@@ -447,7 +460,9 @@ const FIRST_M = ['Bertold', 'Dietmar', 'Folkmar', 'Hartwig', 'Jost', 'Liudger', 
 const BYNAME_F = ['die Ältere', 'die Jüngere', 'die Lange', 'die Stille'], BYNAME_M = ['der Ältere', 'der Jüngere', 'der Lange', 'der Stille'];
 export const femTrade = prof => /(in|frau)$/.test(prof) || ['Magd', 'Witwe', 'Stumme Magd', 'Medica'].includes(prof);
 // Wie viele Menschen ein Haus trägt (Obergrenze) — ein Kontor oder eine Kaserne hat keine Bewohner (Wachen stehen dort).
-const HOUSE_CAP = { manor: 4, house: 3, cottage: 2, fisher: 2, bakery: 2, tavern: 2, smithy: 2, healer: 1, chapel: 1, store: 1, stable: 1, barn: 1 };
+const HALL_TYPES = new Set(['palace', 'markethall', 'bank', 'academy', 'observatory', 'library', 'court', 'hospital', 'bathhouse', 'magitech', 'factoryhall', 'legion']);
+const HOUSE_CAP = { manor: 4, house: 3, cottage: 2, fisher: 2, bakery: 2, tavern: 2, smithy: 2, healer: 1, chapel: 1, store: 1, stable: 1, barn: 1,
+  palace: 6, markethall: 6, bank: 3, academy: 5, observatory: 2, library: 3, court: 3, hospital: 4, bathhouse: 2, magitech: 3, factoryhall: 5, legion: 6 };   // Phase 5: Prachtbauten
 const houseCap = b => b.type === 'house' && b.w * b.h < 20 ? 2 : HOUSE_CAP[b.type] || 1;
 const NAMED_HOME = { eren: ['tavern', 'smithy', 'healer'] };            // dort arbeiten schon Figuren mit Namen
 // Einwohnerzahl nach Fläche (Nutzerwunsch, Session 4): Ziel = Fläche / perHead, abzüglich Wachen und Figuren mit Namen.
@@ -455,7 +470,7 @@ const NAMED_HOME = { eren: ['tavern', 'smithy', 'healer'] };            // dort 
 export function residentPlan() {
   const out = {};
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
-    const hs = HOUSES.filter(b => b.town === town && b.map === 'world' && TRADES[b.type] && HB.wearOf(b) < 2 && !(NAMED_HOME[town] || []).includes(b.type));
+    const hs = HOUSES.filter(b => b.town === town && b.map === 'world' && (TRADES[b.type] || (P.lord === 'aurel' && AUREL_TRADES[b.type])) && HB.wearOf(b) < 2 && !(NAMED_HOME[town] || []).includes(b.type));
     const [x0, y0, x1, y1] = P.area, named = NPCS.filter(n => (TOWN_OF_SPOT[n.home] || null) === town).length;
     let left = Math.round((x1 - x0 + 1) * (y1 - y0 + 1) / (P.perHead || 90)) - (GUARD_POSTS[town]?.posts.length || 0) - (P.lord === 'aurel' ? AUREL_GUARDS : 0) - named - hs.length;   // S12: Automaten zählen mit
     for (const b of hs) out[b.id] = 1;
@@ -497,6 +512,7 @@ function spotsOf(b, i, prof) {
   const visit = nb ? { x: (nb.doorTile[0] + (nb.door === 'E' ? 2 : nb.door === 'W' ? -2 : 0.5 + (i % 2 ? 1 : -1))) * TS, y: (nb.doorTile[1] + (nb.door === 'S' ? 1.5 : nb.door === 'N' ? -1.5 : 0.5)) * TS } : front;
   const job = prof === 'Fischer' && pier ? { x: (pier + 0.5) * TS, y: (P.harbor.top + 2 + (hx + hy + i) % 4) * TS }   // entlang des Stegs, nicht alle auf einem Punkt
     : b.type === 'barn' && field ? { x: ((field[0] + field[2]) / 2) * TS, y: ((field[1] + field[3]) / 2) * TS }
+    : HALL_TYPES.has(b.type) ? { x: (b.x + 2 + ((i * 4) % Math.max(1, b.w - 4)) + 0.5) * TS, y: (b.y + 3 + (i % 2) + 0.5) * TS, in: 1 }   // Prachtbau: Arbeit drinnen, im Gang zwischen den Möbelreihen
     : ['tavern', 'healer', 'chapel'].includes(b.type) && i === 0 ? inside
     : ['bakery', 'store', 'stable', 'smithy', 'fisher'].includes(b.type) && i === 0 ? front : null;
   return { inside, front, sq, visit, job, work: job || (r < 0.35 ? sq : r < 0.65 ? visit : front), sx, sy, hx, hy };
@@ -504,7 +520,7 @@ function spotsOf(b, i, prof) {
 function spawnResidents() {
   const plan = residentPlan();
   for (const b of HOUSES) {
-    const P = TOWN_PLAN[b.town], trades = TRADES[b.type] && (b.town === 'vharnholm' ? DEAD_TRADES : P?.lord === 'aurel' ? (AUREL_TRADES[b.type] || TRADES[b.type]) : TRADES[b.type]), n = plan[b.id] || 0;
+    const P = TOWN_PLAN[b.town], trades = (TRADES[b.type] || (P?.lord === 'aurel' && AUREL_TRADES[b.type])) && (b.town === 'vharnholm' ? DEAD_TRADES : P?.lord === 'aurel' ? (AUREL_TRADES[b.type] || TRADES[b.type]) : TRADES[b.type]), n = plan[b.id] || 0;
     if (!P || !trades || b.map !== 'world' || !n) continue;
     if (S.ents.world.some(c => c.homeId === b.id)) continue;                          // schon bewohnt (Migration idempotent)
     for (let i = 0; i < n; i++) {
@@ -854,10 +870,11 @@ SPAWN_AREAS.push(
   { map:'world', x:110, y:250, r:34, types:['chain_brute', 'chain_brute', 'rotgardist', 'kettenschuetze', 'wild_dog'], cap:8, eisen: true },
   { map:'world', x:185, y:430, r:12, types:['goblin', 'goblin', 'goblin_warrior'], cap:6, goblinHide: true },
   // S12 Totenland (Osten): nach Osten dichter und härter
-  { map:'world', x:1180, y:300, r:60, types:['skeleton', 'skeleton', 'ghoul', 'wraith'], cap:10 },
-  { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist'], cap:10 },
-  { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain'], cap:8 });
-const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith']);
+  { map:'world', x:1180, y:300, r:60, types:['skeleton', 'skeleton', 'ghoul', 'wraith', 'zombie', 'zombie', 'bone_hound', 'carrion_wing'], cap:12 },
+  { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
+  { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
+  { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
+const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -916,8 +933,8 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     level: opts.level || Math.max(1, ri(1, 3) + (m.threat || 1) * 2),
     hp: m.hp, maxHp: m.hp, r: m.r, armor: m.threat, alive:true, seed: rnd() * 100,
     swing:0, atkCd:0, telegraph:0, aiState:'idle', aiTimer:0, anchor:{ x: pos.x, y: pos.y },
-    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff' }[mtype] || null,
-    shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : null,
+    weaponKey: { goblin:'dagger', goblin_warrior:'axe', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff', bone_knight:'longsword', bone_archer:'shortbow', necromancer:'staff', ash_demon:'axe', shade:'dagger', death_knight:'greatsword', garmadon:'greatsword', angel_blade:'longsword', angel_archer:'shortbow' }[mtype] || null,
+    shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : mtype === 'bone_knight' ? { key:'kite_shield' } : null,
     faction: m.faction, boss: !!m.boss, ...opts,
   };
   if (!e.boss && (opts.level == null || opts.zone) && !map.startsWith('__')) e.level = zoneLevel(map, tx, ty, m);   // Phase 1: Gebietsspanne
@@ -1004,7 +1021,7 @@ function initialSpawns() {
   spawnEnemy('gorak', 'mine', 32, 13, { level: 10 });
   ensureRegionBosses();
   for (let i = 0; i < 3; i++) spawnEnemy('goblin_warrior', 'mine', 30 + i, 14, { level: 6 });
-  deepBoss();
+  deepBoss(); garmadonHost(); ensureOmegaShrine();
 }
 function deepBoss() {                                         // Tiefhall: Hrodvar vor seinem Thron, zwei Tote der Leibwache
   const t = MAPS.deep.rooms.find(r => r.tag === 'throne');
@@ -1017,7 +1034,7 @@ export function newGame(cfg) {
   const keep = { settings: S.settings };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
@@ -1029,6 +1046,8 @@ export function newGame(cfg) {
   genDeep().forEach(p => S.ents.deep.push(p));
   genSky().forEach(p => S.ents.sky.push(p));
   genKerker().forEach(p => S.ents.kerker.push(p));
+  genGarmadon().forEach(p => S.ents.garmadon.push(p));
+  genOmega().forEach(p => S.ents.omega.push(p));
   for (const m of MAP_KEYS) indexSolids(m);
   spawnNPCs();
   spawnGuardPosts();
@@ -1128,12 +1147,15 @@ export function continueGame() {
   const data = loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
   applySave(data);
+  SP.setArt(S.settings?.art || 'F');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
-  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker() }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega() }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
   for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);
   if (!gone?.sky && !S.ents.sky.some(e => e.kind === 'prop')) S.ents.sky.push(...FRESH.sky);
   if (!gone?.kerker && !S.ents.kerker.some(e => e.kind === 'prop')) S.ents.kerker.push(...FRESH.kerker);   // S12: ältere Stände kennen die Himmelsinsel noch nicht   // … Abweichungen stehen im Spielstand
+  if (!gone?.garmadon && !S.ents.garmadon.some(e => e.kind === 'prop')) S.ents.garmadon.push(...FRESH.garmadon);   // Phase 6: Gruft des Toten Königs
+  if (!gone?.omega && !S.ents.omega.some(e => e.kind === 'prop')) S.ents.omega.push(...FRESH.omega);   // Phase 7: Krater
   if (S.flags?.rescale) rescaleSave(fresh);
   if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
     const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
@@ -1183,6 +1205,11 @@ export function continueGame() {
     for (const p of fresh) if (p.borderScene && !have.has(p.gk)) S.ents.world.push(p);
     indexSolids('world'); spawnGuardPosts(); S.flags.border1 = true;
   }
+  if (S.heal?.r) applyHeal(0, S.heal.r);   // Nutzer S13: geheiltes Totenland wiederherstellen
+  if (!S.flags.garm1) { indexSolids('garmadon'); garmadonHost(); }   // Phase 6: Garmadons Hof in alten Ständen
+  ensureOmegaShrine();   // Phase 7: Altar und Priesterin (idempotent)
+  ensurePaladins(); ensureFaithFigures();   // Nutzer S13
+  if (S.ents.world.some(e => e.huntProp && e.solid)) { for (const e of S.ents.world) if (e.huntProp) e.solid = false; indexSolids('world'); }   // alter Stand: Scheiterhaufen war fest und sperrte den Dorfplatz
   if (!S.flags.deep1) {                        // Session 6: Tiefhall betretbar — Karte, Hort drinnen, Hrodvar; der Eingang wird Portal
     S.ents.deep = FRESH.deep.slice(); indexSolids('deep');
     S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && e.type === 'chest' && e.label === 'Tiefhall-Hort' && !e.opened));   // der Hort lag draußen; ungeöffnet zieht er hinein
@@ -1203,6 +1230,7 @@ export function continueGame() {
   S.factions.aurel ??= 0; S.ranks.chain ??= -1; if (S.deadRaid) S.deadRaid.live = false;   // Raid-Untote sind flüchtig: nach dem Laden neu anrücken
   assignHunters();
   if (!S.flags.villages12) { S.flags.villages12 = true; spawnResidents(); }   // S12: neue Dörfer bekommen in alten Ständen Bewohner
+  applyGrowth(); spawnResidents();   // Phase 8: gewachsene Häuser wieder errichten (Bewohner idempotent)
   applyRaidDamage();
   ensureBoards();
   S.player = byId(S.player.id) || S.player;
@@ -1263,13 +1291,16 @@ const REGIONAL_WEATHER = new Set(['bloodrain', 'sandstorm', 'snow']);
 const WEATHER_POOL = { aurel: ['clear', 'clear', 'clear', 'cloudy', 'rain'], deadland: ['bloodrain', 'bloodrain', 'fog', 'cloudy'], eisen: ['cloudy', 'fog', 'rain', 'clear', 'snow'], blight: ['fog', 'fog', 'cloudy', 'bloodrain', 'clear'], desert: ['clear', 'clear', 'sandstorm', 'cloudy'], badland: ['clear', 'sandstorm', 'cloudy', 'cloudy'],
   mountain: ['snow', 'snow', 'clear', 'cloudy', 'fog'] };
 export function weatherPool(p) {
+  if (S.omega?.cat && !S.omega.ending) return ['bloodrain'];   // Phase 7: Omegas Zorn — Blutregen überall
   const r = p && S.map === 'world' ? regionAt(p.x / TS | 0, p.y / TS | 0) : null;
   return WEATHER_POOL[r] || ['clear', 'clear', 'cloudy', 'cloudy', 'rain', 'fog'];
 }
 function update(dt, now) {
   const p = S.player;
   // Zeit
+  if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
   S.minute += dt / 1000;
+  (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
   S.weatherLeft -= dt / 1000;
   if (S.weatherLeft <= 0) {
@@ -1284,8 +1315,9 @@ function update(dt, now) {
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
   // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
-  combat = S.ents[S.map].filter(e => e.alive && COMBAT_KINDS.has(e.kind) && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
-  for (const c of S.ents.world) if (c.kind === 'caravan' && c.alive) {
+  const A = actorsOf(S.map, now);
+  combat = A.list.filter(e => e.alive && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
+  for (const c of (S.map === 'world' ? A.cars : S.ents.world.filter(e => e.kind === 'caravan'))) if (c.kind === 'caravan' && c.alive) {
     const near = performance.now() - (c.lastHurt || -1e9) < 4000;          // hält nur, solange sie angegriffen wird
     SIM.caravanFrame(c, dt, p, near);
     if (!c.crew) hireEscorts(c);                                           // alter Spielstand: Zug ohne Wachen
@@ -1298,7 +1330,7 @@ function update(dt, now) {
     }
   }
   if (p.alive) controlPlayer(dt);
-  for (const e of [...S.ents[S.map]]) think(e, dt);
+  for (const e of [...actorsOf(S.map, now).list]) think(e, dt);   // BUG-108: nur Handelnde, nicht 14 000 Props
   separate();                                                     // S12: niemand steht im anderen
   if (S.rising && S.rising.length) {                              // Wiedergänger: Zucken als Ansage, nach 6 Spielminuten steht er auf
     const now = clock();
@@ -1377,7 +1409,8 @@ function nudge(e, dx, dy) {
 }
 function separate() {
   const grid = new Map(), C = 48;
-  for (const e of combat) if (e.alive && !e.downed && e.map === S.map && e.kind !== 'caravan') { const k = (e.x / C | 0) + ',' + (e.y / C | 0); (grid.get(k) || grid.set(k, []).get(k)).push(e); }
+  const P0 = S.player;
+  for (const e of combat) if (e.alive && !e.downed && e.map === S.map && e.kind !== 'caravan' && Math.abs(e.x - P0.x) < 700 && Math.abs(e.y - P0.y) < 520) { const k = (e.x / C | 0) + ',' + (e.y / C | 0); (grid.get(k) || grid.set(k, []).get(k)).push(e); }   // BUG-108: nur im Sichtbereich
   for (const [k, list] of grid) {
     const [cx, cy] = k.split(',').map(Number);
     for (const a of list) for (let j = cy - 1; j <= cy + 1; j++) for (let i = cx - 1; i <= cx + 1; i++) {
@@ -1406,19 +1439,26 @@ function unstick(e) {
     const q = freeSpotNear(e.map, tx, ty, 2); e.x = q.x; e.y = q.y; if (e.anchor && Math.hypot(e.anchor.x - q.x, e.anchor.y - q.y) < TS * 3) e.anchor = { x: q.x, y: q.y };
   } else e.detour = { off: (chance(0.5) ? 1 : -1) * (1.2 + rnd()), t: 900 };
 }
+// BUG-108 / MP2 §87: Mittelbereich-Simulation (Zähler je Figur, siehe think)
 function think(e, dt) {
   if (!e.alive) return;
+  if (e.kind === 'enemy' && !(e.status && e.status.length) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen (updateEnemy tat fern ohnehin nichts)
+  if (e.kind === 'npc' && !e.angry && !e.fleeing && !e.escort && !e.threatId && !(e.swing > 0) && S.party.indexOf(e.id) < 0) {   // außer Sicht: jedes 3. Bild, dreifacher Schritt
+    const P0 = S.player, far = Math.abs(e.x - P0.x) > 520 || Math.abs(e.y - P0.y) > 420;
+    if (far) { e._lc = ((e._lc ?? (e.id.charCodeAt(e.id.length - 1) || 0)) + 1) % 3; if (e._lc) return; dt *= 3; }   // Zähler je Figur (gestaffelt), unabhängig vom Bildzähler
+  }
   if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
   else if (e.stagger > 0 && e !== S.player && !S.party.includes(e.id)) { e.vx = e.vy = 0; }   // taumelt: keine Entscheidung
   else if (e.kind === 'enemy') updateEnemy(e, dt);
   else if (e.kind === 'npc') updateNpc(e, dt);
-  if (e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') tickCombatant(e, dt);
+  const P0 = S.player;                                         // BUG-108: fern (> 1500 px) keine Kampfuhren — außer ein Status läuft (Blutung, Gift)
+  if ((e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') && (e === P0 || (e.status && e.status.length) || e.swing > 0 || (Math.abs(e.x - P0.x) < 1500 && Math.abs(e.y - P0.y) < 1500))) tickCombatant(e, dt);
 }
 
 // ================= Reise-Begegnungen =================
 // Unterwegs in der Wildnis soll ständig etwas passieren: Hinterhalte je nach Biom,
 // fahrende Händler, Reisende. Nur fern der Städte, nur wenn der Spieler wirklich reist.
-const AMBUSH_FAM = [['bandit', 'bandit_archer', 'bandit_spear'], ['wolf'], ['goblin', 'goblin_warrior'], ['skeleton', 'ghoul']];   // Gruppen sind einheitlich (§23)
+const AMBUSH_FAM = [['bandit', 'bandit_archer', 'bandit_spear'], ['wolf'], ['goblin', 'goblin_warrior'], ['skeleton', 'zombie', 'bone_archer', 'bone_hound']];   // Gruppen sind einheitlich (§23)
 function coverNear(x, y, r) {                                              // Baum oder Fels, hinter dem man sich verstecken kann
   for (let d = 0; d <= r; d++) for (let j = -d; j <= d; j++) for (let i = -d; i <= d; i++) {
     if (Math.max(Math.abs(i), Math.abs(j)) !== d) continue;
@@ -1552,6 +1592,7 @@ function tickCombatant(c, dt) {
 // ================= Bewegung =================
 function moveEnt(e, dx, dy) {
   if (e === S.player && S.dbg?.noclip) { e.x += dx; e.y += dy; e.vx = dx; e.vy = dy; return; }   // Debug: Flug/Noclip
+  if (e.kind === 'enemy' && MONSTERS[e.mtype]?.fly) { const M = MAPS[e.map]; e.x = clamp(e.x + dx, TS, (M.w - 1) * TS); e.y = clamp(e.y + dy, TS, (M.h - 1) * TS); e.vx = dx; e.vy = dy; return; }   // Phase 6: Flieger
   const r = e.r || 10;
   // Wer schon in einem festen Objekt steckt (alter Spielstand, Rückstoß), darf sich herausbewegen — nur nicht tiefer hinein
   const blockedBy = (x, y) => { const q = solidPropAt(e.map, x, y, r);   // nur bei Blockade prüfen: stehe ich schon drin und will heraus?
@@ -1647,6 +1688,7 @@ function findPath(map, x0, y0, x1, y1) {
 
 function controlPlayer(dt) {
   const p = S.player;
+  if (S.cine) { p.vx = p.vy = 0; return; }   // Kamerafahrt: keine Steuerung
   if (p.downed) { p.vx = p.vy = 0; return; }
   if (!touch.on && mouse.seen) { const wp = R.screenToWorld(mouse.x, mouse.y); mouse.wx = wp.x; mouse.wy = wp.y; }   // BUG-084: Kamera läuft mit — Mauspunkt jeden Frame neu, nicht nur bei Mausbewegung
   p.dodgeCd = Math.max(0, (p.dodgeCd || 0) - dt);
@@ -1688,7 +1730,7 @@ function controlPlayer(dt) {
   p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
   if (!p.cover && (mouse.down || keys.has(' ') || touch.attack)) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
   // Dungeon-Fallen
-  const haz = S.ents[S.map].find(e => e.hazard && dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
+  const haz = actorsOf().hz.find(e => dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
   if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, 'Fallgrube'); camShake(6, 160); }
 }
 
@@ -1787,6 +1829,8 @@ function teamOf(c) {
   if (c.servant) return 'player';                              // Diener des Nekromanten
   if (c.kind === 'enemy') {
     if (MONSTERS[c.mtype]?.prey) return 'prey';
+    if ((c.mtype === 'garmadon' || c.gCourt) && !S.flags.garmFight) return 'neutral';   // Phase 6: Garmadon redet erst
+    if (c.mtype === 'omega' && c.parley && !om().fight) return 'neutral';   // Phase 7: Omega erwacht ruhig und spricht
     if (S.flags.goblinsFreed && !c.boss && !c.provoked && (c.mtype === 'goblin' || c.mtype === 'goblin_warrior')) return 'neutral';   // Nutzer: befreite Grubenstämme sind friedlich
     if (c.faction === 'chain' && !chainAtWar()) return 'neutral';     // S12: in der Eisenfeste wird erst geredet (Nutzerwunsch)                  // Wild: kein Gegner, aber jagdbar (Spieler, Wölfe)
     if (c.faction === 'undead') return S.ranks.undead >= 0 ? 'player' : 'foe';
@@ -1794,6 +1838,7 @@ function teamOf(c) {
     return 'foe';
   }
   if (c.kind === 'caravan') return 'player';
+  if (c.kind === 'npc' && c.omegaAlly) return 'player';   // Phase 7: Verbündete im Krater
   if (c.kind === 'npc') return c.angry ? 'foe' : (c.guard && !valenHostile()) || c.escort || DEFENDERS.has(c.key) ? 'player' : 'neutral';   // Karawanenwachen stehen wie der Wagen; Kämpfer wie Kelan wie Wachen (BUG-077: als 'neutral' traf ihr Hieb nie)
   return 'neutral';
 }
@@ -1824,6 +1869,9 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
   if (attacker.titleClass === 'necromancer') dmg *= 0.85;             // Makel: Die Toten zehren
+  if ((attacker.status || []).some(s => s.key === 'bloodtoll')) dmg *= 0.8;   // Phase 6: Blutzoll an Garmadon
+  if ((attacker.status || []).some(s => s.key === 'omegawrath')) dmg *= 1.1;   // Phase 7: Gebet an Omega
+  if (attacker.omegaAvatar) dmg *= 1.3;   // Phase 7: Avatar Omegas
   // Kritisch
   const ambush = attacker === S.player && target.kind === 'enemy' && teamOf(target) === 'neutral';   // S12: Schleichangriff auf Ahnungslose
   const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen');
@@ -1831,7 +1879,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
   // Heilig gegen Untot
-  if (kind === 'holy' && (target.mtype === 'skeleton' || target.undead)) dmg *= 2.1;
+  if (kind === 'holy' && (target.mtype === 'skeleton' || target.undead || MONSTERS[target.mtype]?.faction === 'undead')) dmg *= 2.1;
   // Rüstung / Block
   const ap = Math.min(0.9, (it ? (it.ap || 0) : 0) + afx(attacker, 'pierce'));
   const armor0 = target.kind === 'enemy' ? (target.armor || 0) * 1.6 : armorOf(target), armor = armor0 * (1 - ap);
@@ -1850,6 +1898,8 @@ function hit(attacker, target, mult, kind = 'physical') {
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
   dmg = Math.max(1, dmg - armor * 0.55);
+  if (target.mtype === 'bone_knight' && kind === 'physical' && !crush && !(target.stagger > 0) && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim ?? 0))) < 0.9) {
+    dmg *= 0.3; fx(target.x, target.y - 12, 'spark', 5); float(target, 'Schild', 'rgba(200,196,170,ALPHA)'); sfx('metal', 0.4, earVol(target)); }   // Phase 6: Knochenritter — von vorn prallt es ab
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
   if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
     target.status = (target.status || []).filter(q => q.key !== 'poisoned'); target.status.push({ key: 'poisoned', name: 'Vergiftet', left: 5000, src: attacker.id }); fx(target.x, target.y - 12, 'necro', 4); }
@@ -1862,6 +1912,8 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (it?.toll) { float(target, 'KLONG', 'rgba(200,190,160,ALPHA)'); sfx('metal', 0.7, earVol(target));   // S12 Totenglocke: Feinde um das Ziel verlieren den Mut
     for (const e of hostilesOf(attacker)) if (dist(e, target) < 70) e.cowed = performance.now() + 2500; }
   if (hasLeg(attacker, 'echo') && target.alive && !attacker._echo && chance(0.2)) { attacker._echo = true; hurt(target, dmg * 0.5, attacker, attacker.name); attacker._echo = false; fx(target.x, target.y - 14, 'spark', 5); }
+  if (attacker.mtype === 'zombie' && target.alive && target.kind !== 'caravan' && chance(0.5)) addStatus(target, { key: 'poisoned', name: 'Seuche', left: 6000, src: attacker.id });
+  if ((attacker.mtype === 'death_knight' || attacker.mtype === 'garmadon') && attacker.alive) { const h = dmg * (attacker.phase === 3 ? 0.4 : 0.25); if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); }
   if (attacker.mtype === 'ghoul' && target.alive && target.kind !== 'caravan') addStatus(target, { key: 'grabbed', name: 'Gepackt', left: 1500, desc: 'Langsamer (−50 %).' });
   if (attacker.mtype === 'wraith' && target.stamina != null) { target.stamina = Math.max(0, target.stamina - 15); fx(target.x, target.y - 14, 'frost', 5); }
   if (target.mtype === 'wraith' && target.alive) target.phased = performance.now() + 900;
@@ -1882,6 +1934,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
   if (target.mtype === 'wraith' && target.phased > performance.now() && kind === 'physical') { float(target, 'körperlos', 'rgba(200,220,240,ALPHA)'); return; }   // Geist: nach Treffer kurz ungreifbar
   if (target.mtype === 'bear' && source) target.provoked = true;
+  if ((target.mtype === 'garmadon' || target.gCourt) && !S.flags.garmFight && source && (source === S.player || S.party.includes(source.id))) garmadonFight(S.player, 'attack');
+  if (target.mtype === 'ash_demon' && kind === 'fire') { float(target, 'feuerfest', 'rgba(255,150,80,ALPHA)'); return; }   // Phase 6
   if (S.flags.goblinsFreed && source === S.player && (target.mtype === 'goblin' || target.mtype === 'goblin_warrior') && !target.provoked) { target.provoked = true; S.factions.goblin -= 10; log('Du greifst einen freien Goblin an. Grubenstämme −10.', 'faction'); }
   if (target.momentum && source) target.momentum = 0;               // Streitflegel: wer getroffen wird, verliert den Schwung
   target.lastKind = kind;
@@ -2012,6 +2066,8 @@ function die(c, cause = 'Wunden', source) {
     (S.rising ||= []).push({ at: clock() + 6, map: c.map, x: c.x, y: c.y, level: c.level });
   if (c.mtype === 'crypt_warden') S.flags.wardenSlain = true;
   if (c.mtype === 'hrodvar') S.flags.hrodvarSlain = true;
+  if (c.mtype === 'garmadon') garmadonSlain();
+  if (c.mtype === 'omega') omegaEnd('slain');
   c.alive = false; c.downed = false;
   c.swing = 0; c.telegraph = 0; c.special = null; c.leap = null; c.draw = 0; c.vx = c.vy = 0;   // terminal: kein Rest-Verhalten
   c.aggroId = null; c.threatId = null; c.angry = false; c.follow = null; c.lurk = null;
@@ -2145,7 +2201,7 @@ function credit(target, src, dmg) {
 function xpShares(c) { const D = c.dmgBy || {}, tot = Object.values(D).reduce((a, v) => a + v, 0); return id => tot ? (D[id] || 0) / tot : 0; }
 function gainXp(c, n) {
   if (!c || !c.alive) return;
-  c.xp += n;
+  c.xp += c === S.player && (c.status || []).some(s => s.key === 'rested') ? n * 1.1 : n;   // Session 13: ausgeschlafen
   for (const m of partyMembers()) { m.xp += n * 0.6; if (m.xp >= m.xpNext) levelUp(m); }
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
@@ -2175,11 +2231,9 @@ function updateFx(dt) {
   S.fx = S.fx.filter(f => f.life > 0);
   for (const f of S.floats) { f.rise += dt / 22; f.life -= dt; }
   S.floats = S.floats.filter(f => f.life > 0);
-  const arr = S.ents[S.map];
-  for (let i = arr.length - 1; i >= 0; i--) {
-    const e = arr[i];
-    if (e.kind === 'decal' || e.kind === 'corpse') { e.life -= dt; if (e.life <= 0) arr.splice(i, 1); }
-  }
+  let gone = false;                                                // BUG-108: nur Flecken/Leichen (gecacht), nicht alle 16 000 Einträge je Bild
+  for (const e of actorsOf().dc) { e.life -= dt; if (e.life <= 0) gone = true; }
+  if (gone) S.ents[S.map] = S.ents[S.map].filter(e => !((e.kind === 'decal' || e.kind === 'corpse') && e.life <= 0));
 }
 // Flächenschaden beim Einschlag (Feuerball, Feuerflasche): alle Feinde des Werfers im Umkreis außer dem direkt Getroffenen.
 function splashAt(p, skip) {
@@ -2230,26 +2284,32 @@ function hurtFromProjectile(attacker, target, p) {
 // ================= KI =================
 function nearestTarget(e, list, maxD) {
   let best = null, bd = maxD;
-  for (const t of list) { if (!t.alive || t.downed || t.map !== e.map) continue; const d = dist(e, t); if (d < bd) { bd = d; best = t; } }
+  for (const t of list) { if (!t.alive || t.downed || t.cineGhost || t.map !== e.map) continue; const d = dist(e, t); if (d < bd) { bd = d; best = t; } }
   return best;
 }
 
 const VOICE = { wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
-  ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout' };
+  ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout',
+  bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek' };   // Phase 6
+// Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
+const UNDEAD_FX = { necromancer: 'necro', zombie: 'necro', ash_demon: 'fire', shade: 'shadow', death_knight: 'frost', garmadon: 'blood', wraith: 'ghost', flesh_golem: 'blood', cultist: 'shadow' };
+function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt / (e.mtype === 'ash_demon' || e.mtype === 'garmadon' ? 220 : 420))) fx(e.x + ri(-8, 8), e.y - ri(4, 30), k, 1); }
 function updateEnemy(e, dt) {
   if (!e.alive) return;
   const p = S.player;
   if (e.servant && (performance.now() > e.until || !byId(e.servant)?.alive)) return crumble(e);   // der Ruf verklingt
+  if (e.minionOf && !byId(e.minionOf)?.alive) return crumble(e);   // Phase 6: stirbt der Nekromant, zerfallen seine Diener
   const far = dist(e, p) > 1100;
   if (far) { e.vx = e.vy = 0; return; }                       // Stufe C: außerhalb der Sicht keine Simulation
   const m = MONSTERS[e.mtype];
+  if (m.faction === 'undead') undeadAmbient(e, dt);
   if (e.ambush) {                                                              // Hinterhalt: still hinter der Deckung, bis man nah ist oder getroffen wird
     if (dist(e, p) > 230 && e.hp >= e.maxHp && p.alive) { e.vx = e.vy = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x); return; }
     const gid = e.ambush; for (const o of S.ents[e.map]) if (o.ambush === gid) { o.ambush = null; o.aggroId = p.id; o.aiState = 'pursue'; }
     log('Hinterhalt! Sie brechen aus der Deckung.', 'combat'); UI.toast('HINTERHALT', 2200);
   }
   if (m.prey) return preyAI(e, dt, m);                          // Wild: flieht vor allem, was sich nähert, sonst äsen
-  const targets = combat.filter(t => !t.downed && t !== e && isHostile(e, t) && (t.kind !== 'caravan' || e.faction === 'bandit'));   // nur Banditen rauben Wagen
+  const targets = combat.filter(t => !t.downed && t !== e && isHostile(e, t) && (t.kind !== 'caravan' || e.faction === 'bandit' || m.siege));   // nur Banditen rauben Wagen
   const ag = e.aggroId ? byId(e.aggroId) : null;
   const sight = m.sight * (e.wary > clock() ? 1.5 : 1);           // nach abgebrochener Jagd: wachsamer
   let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
@@ -2315,17 +2375,25 @@ function updateEnemy(e, dt) {
       if (!e.surging) { e.surging = true; float(e, '!', 'rgba(230,120,90,ALPHA)', true); fx(e.x, e.y + 6, 'dust', 5); } }
     else e.surging = false; }
   if (e.mtype === 'bear' && bearAI(e, tgt, d, reach, sp, dt, m)) return;
-  if (e.mtype === 'wild_dog' && d > reach * 1.6) {            // Rudel: von der Seite, nicht alle frontal
+  if ((e.mtype === 'wild_dog' || e.mtype === 'bone_hound') && d > reach * 1.6) {            // Rudel: von der Seite, nicht alle frontal
     const side = ((e.seed | 0) % 2 ? 1 : -1) * 0.9 * Math.min(1, (d - reach) / 120);
     seek(e, e.aim + side, sp, dt, tgt); return;
   }
   if (e.mtype === 'cultist') cultistHeal(e, m, dt);
+  if (e.mtype === 'necromancer') necroSummon(e, tgt, dt);
+  if (e.mtype === 'angel_ophan') ophanHeal(e, dt);
+  if (e.mtype === 'ash_demon') emberAura(e, dt);
+  if (e.mtype === 'shade' && shadeBlink(e, tgt, d, dt)) return;
+  if (e.mtype === 'carrion_wing' && wingAI(e, d, sp, m)) return;
+  if (e.mtype === 'flesh_golem' && golemAI(e, d, dt)) return;
   if (e.retreat > 0) {                                        // Goblin: nach dem Hieb zurückspringen (Hit & Run)
     e.retreat -= dt; moveEnt(e, -Math.cos(e.aim) * sp, -Math.sin(e.aim) * sp); return;
   }
   if (m.ranged) return archerAI(e, tgt, d, sp, dt, m);
   if (e.mtype === 'gorak') return bossAI(e, tgt, d, reach, sp, dt, m);
   if (e.mtype === 'hrodvar') return frostKingAI(e, tgt, d, reach, sp, dt, m);
+  if (e.mtype === 'garmadon') return garmadonAI(e, tgt, d, reach, sp, dt, m);
+  if (e.mtype === 'omega') return omegaAI(e, tgt, d, reach, sp, dt, m);
   if (e.mtype === 'bandit' && banditAI(e, tgt, d, reach, sp, dt, m)) return;
   if (e.mtype === 'bandit_spear' && spearAI(e, tgt, d, reach, sp, dt, m)) return;
   if (d > reach * 0.8) {
@@ -2342,6 +2410,129 @@ function updateEnemy(e, dt) {
       e.atkCd = m.atk; e.swingDur = m.atk * 0.5; e.swing = 0.001; e.hitDone = false;
       e.enemySwing = true;
     }
+  }
+}
+
+// ---- Phase 6 (MP2 §61): Rollen der neuen Untoten ----
+// Nekromant: ruft alle 7 s einen Knochendiener (aus einer Leiche in der Nähe, sonst aus dem Boden), höchstens drei.
+function necroSummon(e, tgt, dt) {
+  e.raiseCd = (e.raiseCd ?? 1500) - dt; if (e.raiseCd > 0 || e.stagger > 0) return;
+  if (S.ents[e.map].filter(o => o.alive && o.minionOf === e.id).length >= 3) { e.raiseCd = 2000; return; }
+  e.raiseCd = 7000; e.castT = performance.now();
+  const arr = S.ents[e.map], body = arr.find(o => o.kind === 'corpse' && dist(o, e) < 200);
+  const x = body ? body.x : e.x + ri(-40, 40), y = body ? body.y : e.y + ri(-30, 30); if (body) arr.splice(arr.indexOf(body), 1);
+  const s = spawnEnemy('skeleton', e.map, x / TS | 0, y / TS | 0, { level: Math.max(1, e.level - 2), minionOf: e.id, transient: true, glow: '#8fe0b0' });
+  s.aggroId = tgt.id; s.aiState = 'pursue'; fx(s.x, s.y - 10, 'necro', 12); float(e, 'Erhebe dich!', 'rgba(143,224,176,ALPHA)');
+}
+// Aschdämon: Glut im Umkreis — jede Sekunde Feuerschaden an allen Feinden in 56 px (er selbst ist feuerfest)
+function emberAura(e, dt) {
+  e.auraT = (e.auraT || 0) + dt; if (e.auraT < 1000) return; e.auraT = 0;
+  for (const t of combat) if (t.alive && t !== e && !t.downed && isHostile(e, t) && dist(e, t) < 56) { hurt(t, 4 * BAL.dmg, e, 'Glut', false, 'fire'); fx(t.x, t.y - 10, 'fire', 3); }
+}
+// Schattenwesen: alle 4,5 s ein Sprung hinter das Ziel (Rauch an beiden Orten), dann sofort ein Hieb
+function shadeBlink(e, tgt, d, dt) {
+  e.blinkCd = (e.blinkCd ?? 2000) - dt; if (e.blinkCd > 0 || d < 50 || d > 260) return false;
+  const back = tgt.aim ?? Math.atan2(tgt.y - e.y, tgt.x - e.x), nx = tgt.x - Math.cos(back) * 34, ny = tgt.y - Math.sin(back) * 34;
+  e.blinkCd = 4500; if (solidTile(e.map, nx, ny) || solidPropAt(e.map, nx, ny, e.r || 10)) return false;
+  fx(e.x, e.y - 12, 'shadow', 10); e.x = nx; e.y = ny; fx(e.x, e.y - 12, 'shadow', 10); e.atkCd = 0; e.aim = Math.atan2(tgt.y - e.y, tgt.x - e.x);
+  return true;
+}
+// Aasschwinge: stößt herab, beißt und steigt seitlich wieder auf, bis der nächste Biss bereit ist
+function wingAI(e, d, sp, m) {
+  if (e.atkCd > m.atk * 0.3 && d < 170) { const a = e.aim + ((e.seed | 0) % 2 ? 1.1 : -1.1); moveEnt(e, -Math.cos(a) * sp * 1.1, -Math.sin(a) * sp * 1.1); return true; }
+  return false;
+}
+// Leichenkoloss (Belagerung): stampft mit Ansage (roter Ring, 0,9 s) und trifft alle im Umkreis — Wagen dreifach
+function golemAI(e, d, dt) {
+  e.stompCd = (e.stompCd ?? 3000) - dt; const sa = e.special;
+  if (sa?.kind === 'stomp') { sa.t -= dt; e.vx = e.vy = 0;
+    if (sa.t <= 0) { e.special = null; camShake(8, 300); shockFx(e.x, e.y); fx(e.x, e.y, 'dust', 16); sfx('crit', 1, earVol(e));
+      for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 95) { if (t.invuln) evaded(t); else hit(e, t, t.kind === 'caravan' ? 3 : 0.9); } }
+    return true; }
+  if (e.swing <= 0 && e.telegraph <= 0 && d < 95 && e.stompCd <= 0) { e.special = { kind: 'stomp', t: 900 }; e.stompCd = 5500; float(e, 'stampft', 'rgba(230,120,90,ALPHA)'); return true; }
+  return false;
+}
+// Omega (Endkampf, Nutzer S13): ein gigantisches Auge. Es schwebt auf Abstand und ruft Engel — Klingenengel, Lichtschützen und
+// Ophanim, die es heilen. Angriffe: Sternenfall (Einschlagkreise mit Ansage, es kämpft dabei weiter), ab 66 % der Blick (Linie
+// mit Ansage), ab 33 % die Nova (großer Ring). Wer zu nah kommt, trifft ein kurzer Lidschlag-Puls (kleiner Ring mit Ansage).
+const ANGEL_WAVES = [['angel_blade', 'angel_blade'], ['angel_blade', 'angel_archer', 'angel_ophan'], ['angel_blade', 'angel_archer', 'angel_ophan', 'angel_blade']];
+function omegaAI(e, tgt, d, reach, sp, dt, m) {
+  if (!e.phase) e.phase = 1;
+  const angels = () => S.ents[e.map].filter(o => o.alive && o.kind === 'enemy' && o.mtype !== 'omega' && o.faction === 'omega').length;
+  const summon = () => { const W = ANGEL_WAVES[e.phase - 1];
+    W.forEach((t, i) => { const a = i / W.length * 6.283 + rnd(), h = spawnEnemy(t, e.map, (e.x / TS | 0) + Math.round(Math.cos(a) * 3), (e.y / TS | 0) + Math.round(Math.sin(a) * 2), { level: 14 + e.phase * 2, transient: true });
+      h.aggroId = tgt.id; h.aiState = 'pursue'; fx(h.x, h.y - 20, 'heal', 14); });
+    float(e, 'Engel!', 'rgba(255,230,160,ALPHA)'); log(`${m.name} öffnet sich weit. Licht fällt heraus — und bekommt Flügel.`, 'combat'); };
+  const phase = (n, at, txt) => { if (e.phase !== n - 1 || e.hp > e.maxHp * at) return;
+    e.phase = n; e.roar = 1100; e.invuln = true; e.special = null; log(`${m.name}: ${txt}`, 'combat'); UI.toast(n === 2 ? 'DER HIMMEL ANTWORTET' : 'DAS AUGE BRICHT AUF', 2400); camShake(9, 500); shockFx(e.x, e.y); summon(); e.summonCd = 9000; };
+  phase(2, 0.66, '„Ihr seid so klein. Und so viele.“'); phase(3, 0.33, '„Dann falle ich eben noch einmal. Diesmal auf dich.“');
+  if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
+  e.summonCd = (e.summonCd ?? 2500) - dt;
+  if (e.summonCd <= 0 && angels() < 2 + e.phase * 2) { summon(); e.summonCd = e.phase === 3 ? 10000 : 14000; }
+  const sa = e.special;
+  if (sa) { sa.t -= dt;
+    if (sa.t <= 0) { e.special = null; camShake(6, 250); sfx('crit', 1, earVol(e));
+      const hitT = test => { for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && test(t)) { if (t.invuln) evaded(t); else hit(e, t, sa.mult); } };
+      if (sa.kind === 'meteor') for (const s of sa.spots) { fx(s.x, s.y - 4, 'fire', 12); shockFx(s.x, s.y); hitT(t => Math.hypot(t.x - s.x, t.y - s.y) < sa.R); }
+      if (sa.kind === 'nova') { shockFx(e.x, e.y); fx(e.x, e.y - 30, 'heal', 20); hitT(t => dist(e, t) < sa.R); }
+      if (sa.kind === 'beam') { const cs = Math.cos(sa.a), sn = Math.sin(sa.a); for (let r = 40; r < 460; r += 40) fx(e.x + cs * r, e.y - 20 + sn * r, 'fire', 2);
+        hitT(t => { const dx = t.x - e.x, dy = t.y - e.y, al = dx * cs + dy * sn; return al > 0 && al < 460 && Math.abs(-dx * sn + dy * cs) < 34; }); }
+    }
+    if (e.special && e.special.kind !== 'meteor') { e.vx = e.vy = 0; return; }       // Blick und Nova: es steht still; Sternenfall: es schwebt weiter
+  }
+  e.meteorCd = (e.meteorCd ?? 2500) - dt; e.beamCd = (e.beamCd ?? 4000) - dt; e.novaCd = (e.novaCd ?? 5000) - dt; e.pulseCd = (e.pulseCd ?? 1500) - dt;
+  if (!e.special) {
+    if (d < 120 && e.pulseCd <= 0) { e.special = { kind: 'nova', t: 700, T: 700, R: 115, mult: 0.8 }; e.pulseCd = 3500; float(e, 'Lidschlag', 'rgba(255,220,140,ALPHA)'); return; }
+    if (e.phase === 3 && e.novaCd <= 0 && d < 220) { e.special = { kind: 'nova', t: 1100, T: 1100, R: 180, mult: 1.1 }; e.novaCd = 7000; float(e, 'Nova', 'rgba(255,220,140,ALPHA)'); return; }
+    if (e.phase >= 2 && e.beamCd <= 0) { e.special = { kind: 'beam', t: 850, T: 850, a: Math.atan2(tgt.y - e.y, tgt.x - e.x), mult: 1.2 }; e.beamCd = 5500; float(e, 'Blick', 'rgba(255,120,90,ALPHA)'); return; }
+    if (e.meteorCd <= 0) { const n = e.phase === 3 ? 6 : 4, spots = [{ x: tgt.x, y: tgt.y }]; for (let i = 1; i < n; i++) spots.push({ x: tgt.x + ri(-160, 160), y: tgt.y + ri(-110, 110) });
+      e.special = { kind: 'meteor', t: 1100, T: 1100, R: 58, spots, mult: 0.9 }; e.meteorCd = e.phase === 3 ? 3500 : 5000; }
+  }
+  const want = d < 170 ? -1 : d > 260 ? 1 : 0, side = Math.sin(performance.now() / 1800 + e.seed) > 0 ? 1 : -1, cs = Math.cos(e.aim), sn = Math.sin(e.aim);   // schwebt auf Abstand, kreist langsam
+  moveEnt(e, (cs * want - sn * side * 0.6) * sp, (sn * want + cs * side * 0.6) * sp);
+}
+// Ophan (Engel): heilt Omega und verwundete Engel, sonst Lichtschütze
+function ophanHeal(e, dt) {
+  e.healCd = (e.healCd ?? 2500) - dt; if (e.healCd > 0 || e.stagger > 0) return;
+  const ally = S.ents[e.map].find(o => o !== e && o.alive && o.kind === 'enemy' && o.faction === 'omega' && o.hp < o.maxHp * 0.7 && dist(e, o) < 260);
+  if (!ally) return;
+  e.healCd = 5500; const h = ally.maxHp * (ally.mtype === 'omega' ? 0.04 : 0.2); if (ally.body) B.heal(ally, h); else ally.hp = Math.min(ally.maxHp, ally.hp + h);
+  fx(ally.x, ally.y - 20, 'heal', 12); float(ally, '+' + Math.round(h), 'rgba(255,230,150,ALPHA)');
+}
+// König Garmadon (MP2 §63): Phase 1 schwere Zweihänderhiebe, auf Abstand die Blutwelle (drei Schattenblitze im Fächer).
+// Unter 60 %: „Erhebt euch“ — ein Todesritter und drei Tote stehen auf, er wird schneller. Unter 30 %: Omegas Blut regnet —
+// rote Kreise als Ansage (1 s), dann Schaden darin; seine Treffer heilen ihn stärker. Nicht rennen, nicht stehen: lesen.
+function garmadonAI(e, tgt, d, reach, sp, dt, m) {
+  if (!e.phase) e.phase = 1;
+  if (e.phase === 1 && e.hp <= e.maxHp * 0.6) {
+    e.phase = 2; e.roar = 1000; e.telegraph = 0; e.special = null; e.invuln = true;
+    log(`${m.name}: „Erhebt euch, meine Treuen. Euer König ruft.“`, 'combat'); UI.toast('DIE TREUEN ERHEBEN SICH', 2400); camShake(8, 450); shockFx(e.x, e.y);
+    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2, g = spawnEnemy(i ? 'skeleton' : 'death_knight', e.map, (e.x / TS | 0) + Math.round(Math.cos(a) * 4), (e.y / TS | 0) + Math.round(Math.sin(a) * 3), { level: 14, transient: true });
+      g.aggroId = tgt.id; g.aiState = 'pursue'; fx(g.x, g.y - 10, 'necro', 12); }
+  }
+  if (e.phase === 2 && e.hp <= e.maxHp * 0.3) { e.phase = 3; e.roar = 800; e.invuln = true; e.special = null; log(`${m.name}: „Omega blutete für mich. Jetzt blutest du.“`, 'combat'); UI.toast('OMEGAS BLUT REGNET', 2400); camShake(7, 400); }
+  if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
+  const fast = e.phase === 1 ? 1 : e.phase === 2 ? 1.2 : 1.3, sa = e.special;
+  if (sa?.kind === 'bloodrain') { sa.t -= dt;                          // er kämpft weiter, während es regnet
+    if (sa.t <= 0) { e.special = null; camShake(5, 200); sfx('crit', 0.8, earVol(e));
+      for (const s of sa.spots) { fx(s.x, s.y - 6, 'blood', 10); for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && Math.hypot(t.x - s.x, t.y - s.y) < 48) { if (t.invuln) evaded(t); else hit(e, t, 0.75); } } } }
+  if (sa?.kind === 'wave') { sa.t -= dt; e.vx = e.vy = 0;
+    if (sa.t <= 0) { e.special = null; sfx('magic', 0.7, earVol(e));
+      for (const off of [-0.25, 0, 0.25]) { const a = Math.atan2(tgt.y - e.y, tgt.x - e.x) + off;
+        S.projectiles.push({ id: uid(), kind: 'shadow', map: e.map, x: e.x + Math.cos(a) * 18, y: e.y - 12 + Math.sin(a) * 18, vx: Math.cos(a) * 5, vy: Math.sin(a) * 5, owner: e.id, dmg: m.dmg * 0.6 * BAL.dmg, life: 1500, team: 'foe' }); } }
+    return; }
+  e.rainCd = (e.rainCd ?? 3000) - dt;
+  if (e.phase === 3 && !e.special && e.rainCd <= 0) {
+    const spots = [{ x: tgt.x, y: tgt.y }]; for (let i = 0; i < 3; i++) spots.push({ x: tgt.x + ri(-110, 110), y: tgt.y + ri(-80, 80) });
+    e.special = { kind: 'bloodrain', t: 1000, spots }; e.rainCd = 4500; }
+  e.farT = d > 170 ? (e.farT || 0) + dt : 0;
+  if (!e.special && e.swing <= 0 && e.telegraph <= 0 && e.farT > 1800) { e.special = { kind: 'wave', t: 550 }; e.farT = -1200; float(e, 'Blutwelle', 'rgba(230,80,70,ALPHA)'); fx(e.x, e.y - 20, 'blood', 8); return; }
+  if (d > reach * 0.8) { seek(e, e.aim, sp * fast, dt, tgt); return; }
+  e.vx = e.vy = 0;
+  if (e.atkCd <= 0 && e.swing <= 0) {
+    if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
+    if (e.telegraph > 0) return;
+    e.windup = false; e.atkCd = m.atk / fast; e.swingDur = m.atk * 0.5 / fast; e.swing = 0.001; e.hitDone = false; e.enemySwing = true;
   }
 }
 
@@ -2566,7 +2757,10 @@ function updateNpc(e, dt) {
   if (S.party.includes(e.id)) return partyAI(e, dt);
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
   const p = S.player;
-  if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.plan && e.map === 'world' && !e.fleeing && !e.angry) placeAway(e); return; }
+  if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.plan && e.map === 'world' && !e.fleeing && !e.angry && (e._pa = (e._pa || 0) - dt) <= 0) { e._pa = 800 + (e.plan.n % 400); placeAway(e); } return; }   // BUG-108: fern nur ~1× je Sekunde (vorher jedes Bild, 2,9 ms)
+  if (e.palKind === 'star') starHeal(e, dt);   // Nutzer S13: Paladine
+  if (e.villager || e.goblin) workAnim(e, dt);
+  if (e.palKind === 'inq') inquisitorCheck(e);
   const wasSitting = e.sitting; e.sitting = false;
   if (e.fleeing && !e.angry) {                         // provozierter Zivilist/Händler flieht vor dem Spieler
     const d = dist(e, p);
@@ -2830,7 +3024,7 @@ function interactables() {
   const p = S.player;
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
-     (e.kind === 'prop' && (e.feast || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
+     (e.kind === 'prop' && (e.feast || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -2838,6 +3032,7 @@ function interactables() {
     return dist(p, e) - (e.kind === 'npc' ? 24 : 0) - (e.key ? 10 : 0) - 34 * Math.cos(Math.min(da, Math.PI)) - (e === hovered || e === selected ? 200 : 0); }   // Maus auf der Figur gewinnt
 }
 function updatePrompt() {
+  if (S.cine) return UI.setPrompt('');   // Kamerafahrt: kein Hinweis
   if (UI.dialogueOpen() || placing) { UI.setPrompt(placing ? 'Linksklick: <b>bauen</b> · Rechtsklick/Esc: abbrechen' : ''); return; }
   const t = interactables()[0];
   if (!t) return UI.setPrompt('');
@@ -2852,7 +3047,8 @@ function updatePrompt() {
     t.claim ? `<b>E</b> Ort beanspruchen` :
     t.rite ? `<b>E</b> ${t.label} untersuchen` :
     t.type === 'shrine' ? `<b>E</b> Beten` :
-    t.type === 'board' ? `<b>E</b> Anschlagbrett lesen` : `<b>E</b> Durchsuchen`;
+    t.omegaAltar ? (S.quests.q_omega?.state === 'active' ? '<b>E</b> Ritual am Altar' : '<b>E</b> Zu Omega beten (10 Gold)') :
+    t.type === 'board' ? `<b>E</b> Anschlagbrett lesen` : furnAct(t) ? `<b>E</b> ${furnAct(t)}${t.type === 'cask_rack' ? ` (${TAP_PRICE} Gold)` : ''}` : `<b>E</b> Durchsuchen`;
   UI.setPrompt(label);
 }
 // Körpersprache beim Handeln (§26 Interaktionen): kurz knien, arbeiten, aufrichten — rein sichtbar, blockiert nichts.
@@ -2863,11 +3059,110 @@ function act(c, kind, ms, toward) {
     dir = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N'); }
   c.act = { kind, at: now, until: now + ms, dir };
 }
+// Möbel mit Funktion (Session 13, Nutzer): Bett/Pritsche schlafen, Stand/Theke handeln, Bank/Thron rasten, Fassgestell zapfen,
+// Regal/Pult/Kisten/Waffenständer durchsuchen, Esse/Amboss/Werkbank Ausrüstung ausbessern, Tränke/Brunnen waschen.
+// Fremdes Eigentum durchsuchen ist Diebstahl, sobald es jemand sieht (Kopfgeld wie bei §44). Schenkenbett kostet Gold.
+const houseOf = t => t.house && HOUSES.find(b => b.id === t.house);
+const FURN_USE = { bed: 'Schlafen', bunk: 'Schlafen', stall: 'Handeln', counter: 'Handeln', bench: 'Rasten', throne: 'Auf den Thron setzen',
+  cask_rack: 'Zapfen', shelf: 'Durchsuchen', desk: 'Durchsuchen', crate_stack: 'Durchsuchen', weapon_rack: 'Durchsuchen',
+  machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Ausrüstung ausbessern', anvil: 'Ausrüstung ausbessern', workbench_int: 'Ausrüstung ausbessern', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
+const furnAct = t => t.kind === 'prop' && !t.harvest && !t.loot && !t.feast && !t.bond && !t.mechBench ? FURN_USE[t.type] || null : null;
+const INN_PRICE = 8, TAP_PRICE = 3;
+function furnWitnesses(t) {
+  const b = houseOf(t);
+  return S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.fleeing && !e.captive && !S.party.includes(e.id) && dist(e, t) < 240 &&
+    (!b || !b.map || e.homeId === b.id || GUARDISH(e) || dist(e, t) < 160));
+}
+function foesNear(p, r = 420) { return S.ents[S.map].some(e => e.kind === 'enemy' && e.alive && !e.downed && isHostile(e, p) && dist(e, p) < r); }
+function useFurniture(t) {
+  const p = S.player, b = houseOf(t);
+  switch (t.type) {
+    case 'bed': case 'bunk': return sleepIn(t, b);
+    case 'stall': case 'counter': return tradeAt(t);
+    case 'bench': case 'throne': return sitOn(t, b);
+    case 'cask_rack': return tapCask(t, b);
+    case 'forge': case 'anvil': case 'workbench_int': return mendAt(t);
+    case 'machine': case 'gearpile': return factoryWork(t);   // Nutzer S13: Fabrik benutzbar
+    case 'trough': case 'well': act(p, 'kneel', 700, t); p.stamina = p.maxStamina; p.status = (p.status || []).filter(s => s.key !== 'burning');
+      return log('Kaltes Wasser. Du wäschst dir Staub und Blut ab und trinkst.', 'world');
+    default: return rummage(t, b);
+  }
+}
+function passTime(min) {                                       // Zeit überspringen (Schlaf, Rast): Tageswechsel wie in update()
+  S.minute += min; while (S.minute >= 1440) { S.minute -= 1440; S.day++; }
+}
+function sleepIn(t, b) {
+  const p = S.player;
+  if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  const owner = b && S.ents[S.map].find(e => e.homeId === b.id && e.alive && !e.downed && dist(e, t) < 260);
+  const inn = b?.type === 'tavern';
+  if (owner && !inn) { addRel(owner.key, -5); return UI.dialogue(owner, '„Raus aus meinem Bett! Such dir eine Schenke.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); }
+  if (inn && S.gold < INN_PRICE) return UI.toast(`Ein Bett in der Schenke kostet ${INN_PRICE} Gold.`);
+  if (inn) S.gold -= INN_PRICE;
+  const h = S.minute / 60, hours = h >= 20 || h < 5 ? ((31 - h) % 24) : 6;   // nachts bis 7 Uhr, tagsüber 6 Stunden
+  passTime(Math.round(hours * 60));
+  B.fullHeal(p); p.stamina = p.maxStamina; if (p.maxMana) p.mana = p.maxMana;
+  p.status = (p.status || []).filter(s => !['bleed', 'burning', 'poison'].includes(s.key));
+  addStatus(p, { key: 'rested', name: 'Ausgeruht', left: 600000, desc: '+10 % Erfahrung, bis die Müdigkeit zurückkommt.' });
+  log(`${inn ? `Ein Bett für ${INN_PRICE} Gold. ` : ''}Du schläfst ${Math.round(hours)} Stunden und wachst ausgeruht auf.`, 'world');
+  UI.toast('AUSGERUHT', 2200); UI.refreshHUD();
+}
+function tradeAt(t) {
+  if (R.stallShut(t)) return UI.toast('Der Stand ist zu. Markt von 7 bis 18 Uhr.');
+  const m = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && (e.shop || e.tavernStaff || e.key === 'vell') && dist(e, t) < 150).sort((a, c) => dist(a, t) - dist(c, t))[0];
+  if (!m) return UI.toast('Niemand steht hinter dem Stand.');
+  talk(m);
+}
+function sitOn(t, b) {
+  const p = S.player;
+  if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  act(p, 'kneel', 1200, t); passTime(20);
+  p.stamina = p.maxStamina; B.heal(p, Math.round(p.maxHp * 0.1));
+  if (t.type === 'throne' && b?.type === 'palace' && !S.flags.throneSat) { S.flags.throneSat = true; S.factions.aurel = clamp((S.factions.aurel || 0) - 5, -100, 100);
+    return log('Du setzt dich auf den Thron der Ewigen Kaiserin. Die Legionäre starren. Aurelion: Ansehen −5.', 'faction'); }
+  log(t.type === 'throne' ? 'Kalter Stein. Du sitzt eine Weile und denkst an Könige.' : 'Du setzt dich und rastest zwanzig Minuten.', 'world');
+}
+function tapCask(t, b) {
+  const p = S.player, inn = b?.type === 'tavern';
+  if (inn && !furnWitnesses(t).length) return rummage(t, b);   // keiner hinter der Theke: wer zapft, zahlt nicht
+  if (S.gold < TAP_PRICE) return UI.toast(`Ein Krug kostet ${TAP_PRICE} Gold.`);
+  S.gold -= TAP_PRICE; act(p, 'kneel', 600, t); B.heal(p, 8); p.stamina = Math.min(p.maxStamina, p.stamina + 30);
+  log(`Ein Krug Dunkelbier für ${TAP_PRICE} Gold. Warm im Bauch.`, 'world'); UI.refreshHUD();
+}
+const RUMMAGE = { shelf: [['herb', 1], ['bread', 1], ['cloth', 2], ['bandage', 1]], desk: [['cloth', 1]], crate_stack: [['bread', 2], ['cloth', 1], ['herb', 1]], weapon_rack: [], cask_rack: [['bread', 1]] };
+function rummage(t, b) {
+  const p = S.player;
+  if (t.searched === S.day) return UI.toast('Schon durchsucht. Nichts mehr da.');
+  act(p, 'kneel', 700, t); t.searched = S.day;
+  const owned = b && HB.wearOf(b) < 2 && S.ents.world.some(e => e.homeId === b.id || e.tavernStaff === b.town) || (b && ['palace', 'bank', 'markethall', 'legion', 'court'].includes(b.type));
+  const seen = owned ? furnWitnesses(t) : [];
+  if (seen.length) {
+    const w = seen[0], fac = crimeFaction(w); addRel(w.key, -10);
+    log(`${w.name}: „Dieb! Leg das zurück!“`, 'combat'); addBounty(fac, 40, 'Diebstahl'); return UI.toast('ERWISCHT', 2200);
+  }
+  const pool = RUMMAGE[t.type] || [], got = [];
+  if (t.type === 'weapon_rack') { const ws = Object.keys(ITEMS).filter(k => ITEMS[k].slot === 'weapon' && (ITEMS[k].value || 0) <= 60); if (ws.length && rnd() < 0.6) pool.push([pick(ws), 1]); }
+  for (const [k, n] of pool) if (ITEMS[k] && rnd() < 0.5 && addItem(p, k, n)) got.push(ITEMS[k].name);
+  const g = t.type === 'desk' ? ri(3, 15) : rnd() < 0.3 ? ri(1, 6) : 0; S.gold += g;
+  log(got.length || g ? `Gefunden: ${[...got, g ? g + ' Gold' : ''].filter(Boolean).join(', ')}.${owned ? ' Niemand hat es gesehen.' : ''}` : 'Nichts Brauchbares.', 'world');
+}
+function mendAt(t) {
+  const p = S.player, smith = S.ents[S.map].find(e => e.kind === 'npc' && e.alive && !e.downed && e.shop && /[Ss]chmied/.test(e.prof || e.name || '') && dist(e, t) < 200);
+  if (smith) return repairAll(smith);
+  const items = [...Object.values(p.equip).filter(Boolean), ...p.inv].filter(i => i.cond != null && i.cond < 0.8);
+  if (!items.length) return UI.toast('Nichts, was du selbst noch besser machst.');
+  const need = Math.ceil(items.length / 2);
+  if ((S.res.iron || 0) < need) return UI.toast(`Du brauchst ${need} Eisenerz zum Ausbessern.`);
+  S.res.iron -= need; act(p, 'work', 1500, t); passTime(30); items.forEach(i => i.cond = 0.8);
+  p.skills.smithing = Math.min(100, (p.skills.smithing || 0) + 0.5);
+  log(`${items.length} Stücke selbst ausgebessert (${need} Eisenerz). Ein Schmied macht es besser.`, 'economy'); UI.refreshHUD();
+}
 function doInteract() {
   const p = S.player, t = interactables()[0];
   if (!t) return;
   if (t.kind === 'npc') return talk(t);
-  if (t.kind === 'enemy' && t.parley) return vargParley(t);
+  if (t.kind === 'enemy' && t.parley) return t.mtype === 'garmadon' ? garmadonParley(t) : t.mtype === 'omega' ? omegaParley(t) : vargParley(t);
+  if (t.omegaAltar) return S.quests.q_omega?.state === 'active' ? omegaRitual(t) : omegaPray();
   if (t.cellDoor != null) return pickCell(t);
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
@@ -2876,6 +3171,7 @@ function doInteract() {
   if (t.fortGate) return openGate(t);
   if (t.campSupply) { act(p, 'kneel', 700, t); return sabotageCampaign(t); }
   if (t.feast) { act(p, 'kneel', 600, t); return festMeal(p, t); }
+  if (furnAct(t) && !t.portal && !t.claim && !t.rite) return useFurniture(t);
   if (!t.portal) act(p, t.type === 'tree' || t.harvest === 'stone' || t.harvest === 'iron' ? 'work' : 'kneel', t.type === 'shrine' ? 1100 : t.type === 'board' ? 0 : 420, t);
   if (t.kind === 'item') {
     if (giveItem(p, t.item)) {                                // das Exemplar selbst (Zustand, Rarität), nicht eine neue Kopie
@@ -2893,6 +3189,7 @@ function doInteract() {
     } else UI.toast(t.epitaph.replace(/<br>/g, ' · ').replace(/<[^>]+>/g, ''), 4200);
     return;
   }
+  if (t.portal === 'world' && garmSealed()) return UI.toast('Die Treppe ist mit Knochen versiegelt. Garmadon lässt dich nicht gehen.', 2600);   // Phase 6
   if (t.portal === 'sky' && !S.skyPass) return skyGate(t);          // S12 E: Himmelsinsel nur mit Einlass
   if (t.portal) return travel(t.portal);
   if (t.claim) return claimPlace(t);
@@ -2941,9 +3238,10 @@ function doInteract() {
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
 // Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
-const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry,
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry,
   world: from => {
-    if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt const door = S.ents.world.find(e => e.kind === 'prop' && e.portal === from);
+    if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
+    const door = S.ents.world.find(e => e.kind === 'prop' && e.portal === from);   // BUG-114: stand im Kommentar — Rückkehr aus jedem Dungeon warf
     if (door) return freeSpotNear('world', door.x / TS | 0, (door.y / TS | 0) + 3, 1);
     const [x, y] = worldPt(62, 21); return { x: x * TS + TS / 2, y: y * TS + TS / 2 }; } };
 // §80 Questtafel: das Brett einer Stadt nennt die Aufträge DIESER Stadt — Titel, Ansprechpartner (mit Gebäude), Zielort,
@@ -3025,7 +3323,7 @@ function spawnHunters(p) {                                         // §72: Stuf
   log(`Kopfgeldjäger sind dir auf der Spur (${tier >= 3 ? 'gut gerüstet' : 'leicht gerüstet'}).`, 'combat'); UI.toast('KOPFGELDJÄGER', 2400);
 }
 function arrestCheck(g, p, dt) {
-  if (!g.guard || g.angry || g.downed || p.downed || p.map !== g.map || UI.dialogueOpen()) return false;
+  if (!g.guard || g.angry || g.downed || p.downed || p.cineGhost || p.map !== g.map || UI.dialogueOpen()) return false;
   const fac = crimeFaction(g), b = (S.bounty || {})[fac] || 0;
   if (banned(fac) && dist(g, p) < 260) { g.angry = true; g.brave = true; g.aggroId = p.id; g.sawPlayer = clock(); return false; }   // S12 Blutbann
   if (!b || (S.flags.arrestCd || 0) > clock() || dist(g, p) > 240) return false;
@@ -3466,7 +3764,7 @@ function partyReact(key) {
 function chainRite(npc) {
   UI.dialogue(npc, '„Knie. Die Kette wird dir um die Schultern gelegt, nicht um den Hals. Wer sie trägt, befiehlt — und wird gefürchtet. Es gibt kein Zurück.“', [
     { text: 'Knien.', fn: () => {
-      const p = S.player; unlockClass('darkpaladin'); S.ranks.chain = 4;   // MP2 §31: echter Rang addItem(p, 'kettenbrecher'); addItem(p, 'eisenfuerst');
+      const p = S.player; unlockClass('darkpaladin'); S.ranks.chain = 4; addItem(p, 'kettenbrecher'); addItem(p, 'eisenfuerst');   // MP2 §31: echter Rang; BUG-116: Gegenstände standen im Kommentar
       S.factions.chain += 10; S.factions.valen -= 10; S.factions.order -= 15; partyReact('chain_rite');
       chronicle(`${p.name} kniet vor der Kette`, 'faction', 'Geweiht zum Dunklen Hochpaladin der Eisernen Kette.');
       log('Du bist Dunkler Hochpaladin. Schwarze Platte, Kettenbrecher — und Furcht, wohin du gehst.', 'faction'); UI.closeDialogue(); save(); } },
@@ -3570,7 +3868,8 @@ function raidTick() {
     if (clock() < R.at) return;
     if (!near) return raidEnd(R, chance(defPower(R.v) / (defPower(R.v) + R.n * (S.flags.chainsBroken ? 1.2 : 1))));
     R.live = true; R.liveAt = clock();
-    for (let i = 0; i < R.n; i++) { const e = regionSpawn(pick(['skeleton', 'skeleton', 'ghoul', 'wraith']), 'world', V.x + ri(14, 20), V.y + ri(-8, 8));
+    const mix = SIM.undeadMix(R.n, 'village');                          // Phase 6 §62: Rollen statt Einerlei
+    for (let i = 0; i < R.n; i++) { const e = regionSpawn(mix[i].type, 'world', V.x + ri(14, 20), V.y + ri(-8, 8));
       Object.assign(e, { raidOf: R.v, transient: true }); e.anchor = { x: V.x * TS, y: V.y * TS }; }
     const D = defOf(R.v);
     for (const [t, k] of [['militia', 'merch'], ['merc', 'merch'], ['robot', 'aurel'], ['gob', null]]) for (let i = 0; i < (D[t] || 0); i++) {
@@ -3687,7 +3986,7 @@ function coneSees(e, p, range = 150) {
   return da < 0.7 && clearLine(e, p);
 }
 function aurelWatch(e, dt) {
-  const p = S.player, illegal = p.map === e.map && p.alive && !p.downed && !hasPermit() && !!inAurel(p);
+  const p = S.player, illegal = p.map === e.map && p.alive && !p.downed && !p.cineGhost && !hasPermit() && !!inAurel(p);   // Kamerafahrt: niemand hält den Unsichtbaren an
   e.cone = illegal && dist(e, p) < 700 ? 1 : 0;
   if (!illegal || e.angry) return false;
   if (!(e.vx || e.vy)) { e.baseAim ??= e.aim || 0; e.scan = (e.scan ?? (e.seed || 0)) + dt * 0.0009; e.aim = e.baseAim + Math.sin(e.scan) * 1.3; }
@@ -3752,7 +4051,8 @@ function enslave(kind, debt) {
 }
 function captureInstead(p) {                                             // Kettenleute lassen niemanden sterben, der arbeiten kann
   const k = byId(p.lastKiller);
-  if (k?.aurelAssassin && S.map === 'world') { courtTrial(); return true; }   // S12 E: Sonnenklingen bringen dich vor das Magische Gericht if (!k || S.flags.chainsBroken || k.faction !== 'chain') return false;
+  if (k?.aurelAssassin && S.map === 'world') { courtTrial(); return true; }   // S12 E: Sonnenklingen bringen dich vor das Magische Gericht
+  if (!k || S.flags.chainsBroken || k.faction !== 'chain') return false;   // BUG-115: stand im Kommentar — jeder Tod (auch durch Wölfe) führte in Ketten
   return chance(0.7) && enslave('chain', 200);
 }
 function freeBond(msg, back = true) {
@@ -3829,7 +4129,7 @@ function houseSeat(k) { const H = AUREL_HOUSES.find(h => h.key === k), c = S.ent
 // Automaten-Wachen und Wachposten der alten Stadt neu verteilen. Einmal je Spielstand.
 function aurelMetroMigrate() {
   if (!TOWN_PLAN.aurelheim?.metro) return;
-  const mh = HOUSES.filter(b => b.town === 'aurelheim'), sig = mh.length + ':' + (mh[0]?.id || '') + ':' + (mh[mh.length - 1]?.id || '');   // Aufbau geändert → neu besiedeln
+  const mh = HOUSES.filter(b => b.town === 'aurelheim'), sig = 'v2:' + mh.length + ':' + (mh[0]?.id || '') + ':' + (mh[mh.length - 1]?.id || '');   // Aufbau geändert → neu besiedeln
   if (S.flags.aurel8 === sig) return;
   const ids = new Set(HOUSES.map(b => b.id));
   S.ents.world = S.ents.world.filter(e => !(e.kind === 'npc' && (e.homeTown === 'aurelheim' && e.homeId && !ids.has(e.homeId) || (e.robot && e.post === 'aurelheim'))));
@@ -3927,6 +4227,8 @@ function aurelChoices(npc, choices) {
     S.intrigue.done = true; S.ents.world = S.ents.world.filter(e => e !== npc); log('Du nimmst dem Boten den Brief ab. Er rennt.', 'quest'); UI.closeDialogue(); } });
   const H = AUREL_HOUSES.find(h => h.key === npc.houseKey); if (!H) return;
   const f = favor(H.key);
+  if (f >= 60 && (S.ranks.aurel ?? 0) >= 6 && !S.quests.q_ratssitz && !S.flags.councillor) choices.unshift({ text: 'Ich will in den Hohen Rat.', fn: () => { startQuest('q_ratssitz'); cont(`„${H.name} schlägt dich vor. Zwei weitere Häuser müssen zustimmen, und Corvan will fünfhundert Gold Einlage. Dann sitzt du oben.“`); } });   // Nutzer S13
+  if (S.gold >= 150) choices.push({ text: `${H.name} ein Geschenk machen (150 Gold)`, fn: () => { S.gold -= 150; S.houses[H.key] = clamp(favor(H.key) + 5, -100, 100); cont('„Wie aufmerksam. Das Haus merkt sich so etwas.“'); } });
   if (S.intrigue?.from === H.key && S.intrigue.done) choices.unshift({ text: 'Erledigt.', fn: () => {
     const vs = S.intrigue.vs; S.houses[H.key] += 20; S.houses[vs] = favor(vs) - 25; S.gold += 120; S.intrigue = null; const Q = S.quests.q_intrige; if (Q) { Q.state = 'done'; Q.outcome = 'Für ' + H.name + ' erledigt.'; }
     log(`${H.name}: Gunst +20, ${AUREL_HOUSES.find(h => h.key === vs).name} −25, 120 Gold.`, 'faction'); cont('„Sauber. Man wird nicht erfahren, woher der Wind kam.“'); } });
@@ -3976,11 +4278,17 @@ function ensureSkyCourt() {
   }
   indexSolids('sky');
 }
+// Nutzer S13: die Reise zur Himmelsfeste — der Kreis glüht, Licht hebt dich hoch, oben öffnet sich die Insel
+function skyJourney() {
+  const p = S.player;
+  cinematic([{ x: p.x, y: p.y, dur: 2200, text: 'Der Teleportkreis glüht auf. Messing summt, die Luft wird dünn.', setup: () => { fx(p.x, p.y - 10, 'heal', 24); camShake(3, 400); } },
+    { x: p.x, y: p.y - 200, dur: 2200, text: 'Unter dir schrumpft Aurelheim zu einer Karte aus Messing und Stein.' }], () => { travel('sky'); ensureSkyCourt(); });
+}
 function skyGate(t) {
   const cost = 1500 * bastion();
   UI.dialogue(S.player, `Der Teleportkreis summt. Ein Messingschild: „Einlass zur Himmelsinsel nur mit Siegel des Hochreichs. Überfahrt für Gäste: ${cost} Gold.“`, [
-    { text: `Überfahrt bezahlen (${cost} Gold)`, fn: () => { if (S.gold < cost) { UI.closeDialogue(); return UI.toast('Zu wenig Gold'); } S.gold -= cost; UI.closeDialogue(); travel('sky'); } },
-    ...(S.flags.aurelCitizen || S.flags.marriedHouse ? [{ text: 'Mein Bürgersiegel zeigen.', fn: () => { S.skyPass = true; UI.closeDialogue(); travel('sky'); } }] : []),
+    { text: `Überfahrt bezahlen (${cost} Gold)`, fn: () => { if (S.gold < cost) { UI.closeDialogue(); return UI.toast('Zu wenig Gold'); } S.gold -= cost; UI.closeDialogue(); skyJourney(); } },
+    ...(S.flags.aurelCitizen || S.flags.marriedHouse || isCouncillor() ? [{ text: isCouncillor() ? 'Das Ratssiegel zeigen.' : 'Mein Bürgersiegel zeigen.', fn: () => { S.skyPass = true; UI.closeDialogue(); skyJourney(); } }] : []),
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
   ]);
 }
@@ -4133,7 +4441,60 @@ function conList(npc, town, giver, title) {
     else if (C.state === 'active' && (C.have >= C.need || C.kind === 'supply')) opts.push({ text: `Abgeben: ${C.title}`, fn: () => { claimContract(C, npc); back(); } });
     else if (C.state === 'active') opts.push({ text: `(läuft) ${C.title} ${C.have}/${C.need}`, fn: back });
   }
+  if (giver === 'board' && growable(town)) opts.push({ text: 'In die Stadt investieren', fn: () => investMenu(town) });   // Phase 8
   UI.dialogue(npc || { name: title }, list.length ? (giver === 'vm' ? '„Es gibt immer etwas zu tun. Wähl.“' : 'Zettel, Siegel, Kopfgelder:') : 'Heute nichts.', [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+// ================= Stadtwachstum (Phase 8, Nutzer: von selbst UND durch Investition) =================
+// Wohlstand je Stadt (0–100) steigt täglich mit Frieden und gutem Ruf der Stadtherren; Überfälle, Besatzung und Omegas Blutregen
+// senken ihn. Bei 100 wächst die Stadt um ein Haus mit Bewohnern, fällt er unter −20, verfällt das jüngste neue Haus.
+// Investitionen am Anschlagbrett bauen sofort oder heben den Wohlstand. Gebaute Häuser stehen im Spielstand (S.growth) und
+// werden beim Laden an derselben Stelle wieder errichtet.
+const GROW_TYPES = { house: 'Wohnhaus', cottage: 'Kate', smithy: 'Schmiede', bakery: 'Bäckerei', store: 'Lagerhaus', tavern: 'Schenke' };
+const growthOf = t => ((S.growth ||= {})[t] ||= { prosper: 30, built: [] });
+const growable = t => TOWN_PLAN[t] && !TOWN_PLAN[t].metro && t !== 'vharnholm' && !S.razed?.[t] && t !== 'kettenfeste';
+function placeGrown(spec) {
+  const r = buildGrown(spec); if (!r) return null;
+  const { x, y, w, h } = spec, inR = e => e.kind === 'prop' && (e.map || 'world') === 'world' && !e.house && e.x / TS >= x - 1 && e.x / TS < x + w + 1 && e.y / TS >= y - 1 && e.y / TS < y + h + 1;
+  for (const e of S.ents.world) if (inR(e) && e.solid) removeSolid(e);
+  S.ents.world = S.ents.world.filter(e => !inR(e) && e.house !== r.b.id);            // Bäume und Streu weichen dem Bau; alte Möbel ersetzt
+  for (const p of r.props) { S.ents.world.push(p); if (p.solid) addSolid(p); }
+  for (const e of S.ents.world) if (e.kind !== 'prop' && e.x / TS >= x && e.x / TS < x + w && e.y / TS >= y && e.y / TS < y + h && e !== S.player) {   // wer im Bauplatz stand, tritt heraus
+    const s = freeSpotNear('world', x - 1, y - 1, 3); e.x = s.x; e.y = s.y; }
+  return r;
+}
+function applyGrowth() { for (const G of Object.values(S.growth || {})) for (const spec of G.built) { const r = placeGrown(spec); if (r && spec.ruin) r.b.wear = 2; } }
+function growTown(town, type) {
+  if (!growable(town)) return null;
+  const G = growthOf(town), P = TOWN_PLAN[town];
+  type ||= ['house', 'house', 'cottage', 'house', P.village ? 'cottage' : 'bakery', 'house', P.village ? 'house' : 'smithy', 'store'][G.built.length % 8];
+  const spec = findGrowSpot(town, type); if (!spec) return null;
+  const r = placeGrown(spec); if (!r) return null;
+  G.built.push(spec); spawnResidents();
+  log(`${townName(town)} wächst: ${GROW_TYPES[type] || 'ein Haus'} am Stadtrand, neue Bewohner ziehen ein.`, 'world'); chronicle(`${townName(town)} wächst`, 'news', `Ein neues ${GROW_TYPES[type] || 'Haus'} steht am Rand.`);
+  return r.b;
+}
+function growthDay() {
+  for (const t of Object.keys(TOWN_PLAN)) { if (!growable(t)) continue;
+    const G = growthOf(t), fac = townFac(t), occ = S.war?.nodes[t]?.owner === 'undead', raided = S.deadRaid?.v === t;
+    G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25, -20, 100);
+    if (G.prosper >= 100 && G.built.length < 10 && growTown(t)) G.prosper = 20;
+    const last = G.built.filter(s => !s.ruin).pop();
+    if (G.prosper <= -20 && last) { last.ruin = true; const b = HOUSES.find(h => h.id === 'g' + t + '_' + last.x + '_' + last.y); if (b) b.wear = 2; G.prosper = 0; log(`${townName(t)} schrumpft: ein neues Haus steht leer und verfällt.`, 'world'); }
+  }
+}
+function investMenu(town) {
+  const G = growthOf(town), fac = townFac(town), back = () => investMenu(town), me = { name: `Stadtkasse — ${townName(town)}` };
+  const pay = (gold, res, fn) => () => { if (S.gold < gold || Object.entries(res).some(([k, n]) => (S.res[k] || 0) < n)) return UI.toast('Dafür reicht es nicht.');
+    const ok = fn(); if (ok === false) return UI.toast('Kein Bauplatz mehr frei.');
+    S.gold -= gold; for (const [k, n] of Object.entries(res)) S.res[k] -= n; S.factions[fac] = clamp((S.factions[fac] || 0) + 3, -100, 100); UI.refreshHUD(); back(); };
+  if (!growable(town)) return UI.dialogue(me, 'Hier baut niemand. Nicht jetzt.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser. Bei 100 wächst die Stadt von selbst.`, [
+    { text: 'Wohnhaus bauen (120 Gold, 20 Holz)', fn: pay(120, { wood: 20 }, () => !!growTown(town, 'house')) },
+    { text: 'Werkstatt bauen (220 Gold, 30 Holz, 15 Stein)', fn: pay(220, { wood: 30, stone: 15 }, () => !!growTown(town, G.built.length % 2 ? 'smithy' : 'bakery')) },
+    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); }) },
+    { text: 'Wache verstärken (150 Gold, 10 Eisen)', fn: pay(150, { iron: 10 }, () => { const P = TOWN_PLAN[town], s = freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 3), g = guardChar(GUARD_KIT[fac] ? fac : 'merch', s); Object.assign(g, { guard: true, post: town, invested: true }); S.ents.world.push(g); log(`${townName(town)} hat eine Wache mehr.`, 'world'); }) },
+    { text: '[Gehen]', fn: () => UI.closeDialogue() },
+  ]);
 }
 function boardMenu(town) { conList(null, town, 'board', `Anschlagbrett — ${townName(town)}`); }
 function conChoices(npc, choices) {
@@ -4325,6 +4686,7 @@ function mechMenu() {
   if (repair > 0) opts.push({ text: `Alle Prothesen instand setzen (${repair} Gold)`, fn: () => { if (S.gold < repair) return say('Zu wenig Gold.'); S.gold -= repair; for (const k of parts) p.body[k].mechCond = 100; say('Gefettet, gerichtet, gespannt. Wie neu.'); } });
   for (const k of parts) if ((p.body[k].mechUp || 0) < 2) { const up = k.endsWith('arm') ? 'Kraftfeder' : 'Laufwerk', cost = 250 * ((p.body[k].mechUp || 0) + 1);
     opts.push({ text: `${up} für ${NAME[k]} (Stufe ${(p.body[k].mechUp || 0) + 1}, ${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; p.body[k].mechUp = (p.body[k].mechUp || 0) + 1; recalc(p); say(`${up} eingesetzt: +5 % ${k.endsWith('arm') ? 'Schlagkraft' : 'Tempo'}.`); } }); }
+  opts.push(...mechSwapOptions(p, say));   // Nutzer S13: gesunde Glieder freiwillig ersetzen
   if (!p.lens) opts.push({ text: 'Linse ins Auge setzen lassen — weiter sehen (300 Gold)', fn: () => { if (S.gold < 300) return say('Zu wenig Gold.'); S.gold -= 300; p.lens = true; say('Messing um das Auge, Glas davor. Die Welt reicht plötzlich weiter.'); } });
   const state = parts.length ? parts.map(k => `${NAME[k]}: Stufe ${p.body[k].mech}, Zustand ${Math.round(p.body[k].mechCond ?? 100)} %${(p.body[k].mechCond ?? 100) < 30 ? ' (BESCHÄDIGT — wirkungslos)' : ''}${p.body[k].mechUp ? `, Aufrüstung ${p.body[k].mechUp}` : ''}`).join('\n') : 'Du trägst keine Prothese. Meisterin Vell verkauft welche.';
   UI.dialogue(p, `Werkbank der Prothesenmacherin\n${state}`, [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -4354,15 +4716,753 @@ function vargParley(v) {
       S.flags.vargChallenged = true; v.parley = false; v.aggroId = p.id; v.sawPlayer = clock(); UI.closeDialogue();
       for (const e of S.ents.world) if (e.court && e.alive) { e.aggroId = p.id; e.sawPlayer = clock(); }
       log('Varg: „Dann wird deine Kette die schwerste in dieser Halle.“', 'combat'); UI.toast('KAMPF UM DIE KETTE', 2600); } },
+    { text: 'Erzähl mir von Omega.', fn: say('„Omega ist der Grund, warum wir Eisen tragen. Ein Gott, der fiel, weil er uns liebte — das ist die gefährlichste Art Gott. Wir beten zu ihm, damit er bleibt, wo er liegt.“') },   // Phase 7
+    ...(S.flags.garmBrotherHint ? [{ text: 'Garmadon nennt dich Bruder.', fn: () => { omegaFrag('brother'); say('„… Er war mein Bruder. Er war König. Als der Himmel blutete, wollte er das Blut trinken — Macht, die kein Mensch halten kann. Ich stieß ihm das Schwert in den Rücken, bevor er trank. Er trank trotzdem. Danach.“')(); } }] : []),
+    ...(omegaInsight() && !S.quests.q_omega ? [{ text: 'Ich will Omega rufen.', fn: () => vargRitual(v) }] : []),
     ...(canRite() ? [{ text: 'Ich will die Weihe der Kette.', fn: () => chainRite(v) }] : []),
     { text: 'Gehen.', fn: () => UI.closeDialogue() },
   ]);
   S.flags.vargMet = true;
 }
+// ================= Garmadon (Phase 6, MP2 §63/§64) =================
+// Etwa 30 Untote über drei Ebenen; im Thronsaal die Leibwache, die erst kämpft, wenn der König es tut.
+function garmadonHost() {
+  S.flags.garm1 = true;
+  const R = tag => MAPS.garmadon.rooms.find(r => r.tag === tag), put = (type, r, n, lvl) => { for (let i = 0; i < n; i++) spawnEnemy(type, 'garmadon', ri(r.x + 2, r.x + r.w - 3), ri(r.y + 2, r.y + r.h - 3), { level: lvl }); };
+  put('skeleton', R('ossuary'), 3, 10); put('zombie', R('ossuary'), 3, 10); put('bone_hound', R('pits'), 2, 11); put('bone_archer', R('pits'), 1, 11);
+  put('bone_archer', R('cata'), 2, 12); put('necromancer', R('lab'), 2, 13); put('shade', R('pool'), 2, 13); put('bone_knight', R('cata'), 2, 13); put('ash_demon', R('lab'), 1, 14);
+  const T0 = R('throne'), g = spawnEnemy('garmadon', 'garmadon', T0.cx, T0.y + 5, { level: 18, parley: true });
+  for (const [dx, type] of [[-6, 'death_knight'], [6, 'death_knight'], [-10, 'bone_knight'], [10, 'bone_knight'], [-3, 'bone_knight'], [3, 'bone_knight']]) spawnEnemy(type, 'garmadon', T0.cx + dx, T0.y + 8, { level: 15, gCourt: true });
+  for (const dx of [-18, -14, 14, 18]) spawnEnemy('skeleton', 'garmadon', T0.cx + dx, T0.y + 10, { level: 13, gCourt: true });
+  return g;
+}
+// Garmadon spricht: wer vor ihm steht, erfährt ein Stück von Rotfall — und geht nicht einfach. Knien (Dienst bei den Toten),
+// Herausfordern (Kampf, die Treppe versiegelt sich) oder einen Preis zahlen (Blut oder Gold). Diener der Toten dürfen gehen.
+function garmadonParley(g) {
+  const p = S.player, back = () => garmadonParley(g), say = t => () => UI.dialogue(g, t, [{ text: 'Weiter', fn: back }]);
+  const servant = (S.ranks.undead ?? -1) >= 0;
+  const brother = S.flags.vargMet ? '„Frag den Mann mit den Ketten. Frag ihn, wessen Blut an seinen Händen trocknete, bevor er Goblins band. Er hat meine Augen. Er hatte sie immer.“'
+    : '„Einer, der mir näher stand als mein Schatten. Er lebt noch, irgendwo im Westen, und hält sich für einen Herrn.“';
+  UI.dialogue(g, S.flags.garmMet ? '„Du bist zurück. Die Lebenden kommen immer zurück — meist, um zu bleiben.“' : '„Noch ein Lebender auf meiner Treppe. Die letzten stehen oben Wache. Tritt näher — ich beiße nicht. Noch nicht.“', [
+    { text: 'Wer bist du?', fn: say('„Garmadon. König, als Könige noch atmeten. Ich fiel in dem Jahr, als der Himmel blutete. Dann stand ich wieder auf — und das Land mit mir.“') },
+    { text: 'Was ist Rotfall?', fn: () => { S.flags.loreRotfall = Math.max(S.flags.loreRotfall || 0, 1); omegaFrag('garmadon'); say('„Omega fiel. Ein Gott, sagt Vargs Volk. Sein Blut regnete auf die Gräber, und die Gräber antworteten. Ihr nennt es Rotfall. Ich nenne es meine Krönung.“')(); } },
+    { text: 'Wer hat dich getötet?', fn: () => { S.flags.garmBrotherHint = true; say(brother)(); } },
+    { text: servant ? 'Ich diene dir. Gib mir mehr.' : 'Ich knie. Ich will dir dienen.', fn: () => garmadonServe(g) },
+    { text: 'Ich fordere dich heraus.', fn: () => { UI.closeDialogue(); garmadonFight(p, 'challenge'); } },
+    { text: 'Ich gehe.', fn: () => garmadonLeave(g) },
+  ]);
+  S.flags.garmMet = true;
+}
+function garmadonServe(g) {
+  const r = S.ranks.undead ?? -1;
+  if (r >= 3) return UI.dialogue(g, '„Mehr gebe ich nur dem, der die Eisenfeste bricht. Bring mir ihre Mauern.“', [{ text: 'Weiter', fn: () => garmadonParley(g) }]);   // §65: Kommandant erst mit der Eisenfeste
+  S.ranks.undead = Math.max(0, r + 1); S.factions.undead = clamp(Math.max(S.factions.undead || 0, 20) + 25, -100, 100);
+  for (const f of ['valen', 'order']) S.factions[f] = clamp((S.factions[f] || 0) - 20, -100, 100);
+  log(`Du kniest vor Garmadon. Die Toten: ${FACTIONS.undead.ranks[S.ranks.undead]}. Valen und der Orden: −20.`, 'faction');
+  chronicle(`${S.player.name} kniet vor dem Toten König`, 'legend', 'Die Lebenden werden es erfahren.');
+  UI.dialogue(g, '„Dann steh auf als meine Hand. Die Lebenden werden dich hassen. Gewöhn dich daran — ich habe es auch.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+function garmadonLeave(g) {
+  if ((S.ranks.undead ?? -1) >= 0) return UI.dialogue(g, '„Geh, Diener. Und komm wieder, wenn du etwas bringst.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  const p = S.player, gold = Math.max(100, Math.round(S.gold / 3));
+  UI.dialogue(g, '„Gehen? Niemand verlässt meinen Saal, ohne etwas dazulassen. Blut oder Gold — oder dich.“', [
+    { text: 'Blut zahlen', fn: () => { UI.closeDialogue(); if (p.body) B.damagePart(p, 'torso', p.body.torso.max * 0.45); else p.hp *= 0.55;
+      addStatus(p, { key: 'bloodtoll', name: 'Blutzoll', left: 600000, desc: '−20 % Schaden, bis das Blut nachgewachsen ist.' });
+      log('Garmadon trinkt. Dir wird schwarz vor Augen — dann stehst du am Fuß der Treppe.', 'combat'); toGarmEntry(); } },
+    ...(S.gold >= gold ? [{ text: `Gold zahlen (${gold})`, fn: () => { UI.closeDialogue(); S.gold -= gold; log(`${gold} Gold klirren auf den Knochenboden. „Geh.“`, 'world'); toGarmEntry(); } }] : []),
+    { text: 'Dann kämpfen wir.', fn: () => { UI.closeDialogue(); garmadonFight(p, 'challenge'); } },
+  ]);
+}
+function toGarmEntry() { const p = S.player, E = MAPS.garmadon.entry; p.x = E.x; p.y = E.y; p.vx = p.vy = 0; }
+function garmadonFight(p, why) {
+  if (S.flags.garmFight) return;
+  S.flags.garmFight = true;
+  for (const e of S.ents.garmadon) if (e.alive && (e.mtype === 'garmadon' || e.gCourt)) { e.parley = false; e.aggroId = p.id; e.sawPlayer = clock(); e.aiState = 'pursue'; }
+  log(why === 'challenge' ? 'Garmadon: „Gut. Ich war lange nicht mehr müde.“ Die Treppe hinter dir versiegelt sich.' : 'Garmadon erhebt sich vom Thron. Die Treppe hinter dir versiegelt sich mit Knochen.', 'combat');
+  UI.toast('KÖNIG GARMADON', 2800); camShake(6, 300);
+}
+const garmSealed = () => S.map === 'garmadon' && S.flags.garmFight && !S.flags.garmadonSlain && S.ents.garmadon.some(e => e.mtype === 'garmadon' && e.alive && e.aggroId === S.player.id);
+// Weltevent (MP2 §64): dauerhaft im Spielstand — Ruf, Legende, Chronik; die Besatzungen der Toten wanken, Wachen und Schenken reden
+function garmadonSlain() {
+  if (S.flags.garmadonSlain) return;
+  S.flags.garmadonSlain = Math.max(1, S.day | 0);
+  const p = S.player;
+  if ((S.ranks.undead ?? -1) >= 0) { S.ranks.undead = -1; log('Die Toten verstoßen dich. Du hast ihren König erschlagen.', 'faction'); }
+  S.factions.undead = -100;
+  for (const f of ['valen', 'order', 'merch', 'aurel']) S.factions[f] = clamp((S.factions[f] || 0) + 30, -100, 100);
+  if (S.factions.chain != null) S.factions.chain = clamp(S.factions.chain + 15, -100, 100);
+  grantLegend(S.legend?.valen ? 'order' : 'valen', 'Königsmörder der Toten', 'König Garmadon ist gefallen — zum zweiten und letzten Mal.');
+  chronicle('Der Tote König fällt', 'war', `${p.name} erschlägt König Garmadon in seiner Gruft. Das Totenland verliert sein Herz.`);
+  if (S.war) for (const n of Object.values(S.war.nodes || {})) if (n.owner === 'undead' && n.garrison) n.garrison = Math.round(n.garrison * 0.5);
+  for (const e of [...S.ents.garmadon]) if (e.alive && e.transient && e.kind === 'enemy') crumble(e);   // die Gerufenen zerfallen mit ihm
+  log('Garmadon: „Sag ihm … sag meinem Bruder, dass ich …“ Der Rest ist Staub.', 'combat'); S.flags.garmBrotherHint = true;
+  UI.toast('DER TOTE KÖNIG IST GEFALLEN', 4200); camShake(10, 700);
+  cineLater(undeadFallCinematic, 1800);   // Nutzer S13: Kamerafahrt
+}
+// ================= Omega (Phase 7, Nutzer S13) =================
+// Die Spur des Rotfalls: zwölf Bruchstücke über die großen Handlungsstränge verteilt. Die Erkenntnis, was das Ritual verlangt,
+// kommt erst mit neun davon — darunter Garmadon, die Priesterin und Vargs Geständnis (oder sein Tagebuch) — und frühestens nach
+// 50 Stunden Spielzeit (Nutzerwunsch). Preis: drei Artefakte, zehn Seelen, ein Gefährte, dauerhaft ein Fünftel des Lebens.
+// Gelingt der Wurf, erwacht Omega ruhig und spricht (kämpfen, dienen, schlafen legen). Misslingt er: Blutregen überall, Tote
+// stehen auf, bis Omega fällt.
+const ROTFALL = {
+  garmadon: ['Garmadon', 'Omegas Blut regnete auf die Gräber, und die Gräber antworteten.'],
+  priest: ['Die Priesterin', 'Omega fiel, weil er uns zu nah kam. Die Kette trägt Eisen, damit nie wieder ein Gott für uns fallen muss.'],
+  brother: ['Vargs Geständnis', 'Varg erschlug seinen Bruder Garmadon, als der das Blut des Sterns trinken wollte.'],
+  hrodvar: ['Der Frostkönig', 'In Hrodvars Thronsaal eine Tafel: „Der Stern fiel nördlich des Eises. Wir gruben ihm entgegen.“'],
+  warden: ['Die Nekropole', 'Unter der Urne der Ahnen liegt Asche, die nicht verbrennt. Sie glüht rot, wenn man Omegas Namen spricht.'],
+  oracle: ['Das Uhrwerk-Orakel', 'Auf der Himmelsinsel tickt es: „Was fiel, kann gerufen werden. Was gerufen wird, fordert.“'],
+  library: ['Die Bibliothek von Aurelheim', 'Sternkarten des ersten Kaiserreichs: an der Stelle des Rotfalls ein ausgekratzter Stern.'],
+  chain: ['Das Herz der Kette', 'In der Kernburg hängen Gebete an Omega, in Eisen gehämmert, hundertfach.'],
+  goblin: ['Die Lieder der Grubenstämme', 'Die Goblins singen vom roten Himmel, der die Toten weckte. Sie waren Zeugen.'],
+  sea: ['Rasks Seekarte', 'Rasks Karte zeigt einen Krater, den kein Kartograf verzeichnet: „wo der Himmel ins Meer blutete“.'],
+  order: ['Die verbotene Schrift', 'Der Orden verbietet den Namen Omega. Das Verbot verrät, dass sie wissen: er kann zurückkehren.'],
+  war: ['Die Wiederkehr der Toten', 'Wer lange genug gegen die Toten kämpft, sieht es: sie stehen auf, wenn der Himmel rot wird.'],
+};
+const OMEGA_NEED = 9, OMEGA_HOURS = 50;
+const om = () => (S.omega ||= { faith: 0, frags: {} });
+const playHours = () => (S.stats?.playMs || 0) / 3600000;
+const rotfallDesc = () => { const f = om().frags; return QUESTS.q_rotfall.desc.split(' Gefunden:')[0] + ' Gefunden: ' + (Object.keys(f).map(k => ROTFALL[k][0]).join(', ') || 'noch nichts') + '.'; };
+function omegaFrag(k) {
+  const O = om(); if (O.frags[k] || !ROTFALL[k]) return;
+  O.frags[k] = Math.max(1, S.day | 0); const n = Object.keys(O.frags).length, N = Object.keys(ROTFALL).length;
+  if (!S.quests.q_rotfall) S.quests.q_rotfall = { state: 'active', progress: [0] };
+  S.quests.q_rotfall.progress = [Math.min(n, OMEGA_NEED)]; QUESTS.q_rotfall.desc = rotfallDesc();
+  log(`Spur des Rotfalls (${n}/${N}): ${ROTFALL[k][0]} — ${ROTFALL[k][1]}`, 'quest'); chronicle(`Spur des Rotfalls: ${ROTFALL[k][0]}`, 'legend', ROTFALL[k][1]);
+  UI.toast(`SPUR DES ROTFALLS ${n}/${N}`, 2600);
+}
+function rotfallCheck() {                                          // Bruchstücke, die an erledigten Handlungen hängen (auch rückwirkend)
+  const Q = k => S.quests[k]?.state === 'done';
+  if (S.flags.hrodvarSlain) omegaFrag('hrodvar');
+  if (S.flags.wardenSlain) omegaFrag('warden');
+  if ((S.ranks.chain ?? -1) >= 3 || S.flags.chainsBroken) omegaFrag('chain');
+  if (Q('q_grisk_build') || Q('q_grisk_lost') || Q('q_grisk_rache')) omegaFrag('goblin');
+  if (Q('q_rask')) omegaFrag('sea');
+  if ((S.ranks.order ?? -1) >= 1 || S.legend?.order) omegaFrag('order');
+  if ((S.stats?.valenDefense || 0) >= 5 || S.flags.garmadonSlain) omegaFrag('war');
+  if (S.map === 'sky') omegaFrag('oracle');
+  if (S.quests.q_rotfall) QUESTS.q_rotfall.desc = rotfallDesc();
+}
+const omegaInsight = () => { const f = om().frags; return Object.keys(f).length >= OMEGA_NEED && !!f.garmadon && !!f.priest && (!!f.brother || !!S.flags.goblinsFreed) && playHours() >= OMEGA_HOURS; };
+// Altar und Priesterin Omegas in der Kernburg der Eisenfeste (religiöses Zentrum der Kette)
+function ensureOmegaShrine() {
+  if (S.ents.world.some(e => e.omegaAltar)) return;
+  const [bx, by] = EM(946, 384), a = freeSpotNear('world', bx - 3, by + 6, 3);
+  const alt = { id: uid(), kind: 'prop', type: 'omega_altar', map: 'world', x: a.x, y: a.y, r: 14, solid: true, omegaAltar: true, label: 'Altar Omegas' };
+  S.ents.world.push(alt); if (solidIndex.world) addSolid(alt);
+  const pos = freeSpotNear('world', (a.x / TS | 0) + 2, (a.y / TS | 0) + 1, 2);
+  const c = makeChar({ name: 'Irmgard', prof: 'Priesterin Omegas', x: pos.x, y: pos.y, level: 8, faction: 'chain', pal: { skin: SKIN[0], hair: '#2a1a14', cloth: '#3a0e10' } });
+  Object.assign(c, { omegaPriest: true, anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
+}
+function ensureDiary() {                                           // Varg tot: sein Tagebuch liegt in der Kernburg
+  const O = om(); if (O.diary) return; O.diary = true;
+  const alt = S.ents.world.find(e => e.omegaAltar); if (!alt) return;
+  const s = freeSpotNear('world', (alt.x / TS | 0) - 2, (alt.y / TS | 0) - 1, 2);
+  const ch = { id: uid(), kind: 'prop', type: 'chest', map: 'world', x: s.x, y: s.y, r: 12, solid: true, loot: ['vargs_tagebuch', 'vargs_kette'], label: 'Vargs Truhe unter dem Banner' };
+  S.ents.world.push(ch); if (solidIndex.world) addSolid(ch);
+}
+function priestTalk(n) {
+  const O = om(), n0 = Object.keys(O.frags).length, N = Object.keys(ROTFALL).length, back = () => priestTalk(n);
+  if (omegaInsight() && S.flags.goblinsFreed) ensureDiary();
+  const answer = omegaInsight() ? (S.flags.goblinsFreed ? '„Varg ist tot. Aber er schrieb alles auf — sein Tagebuch liegt in der Kernburg, in der Truhe unter dem Banner.“' : '„Jetzt verstehst du genug. Geh zu Varg. Nur er kennt das Ritual.“')
+    : `„Nicht, solange du nur Bruchstücke hast. Du kennst ${n0} von ${N} Wahrheiten — ${OMEGA_NEED} braucht es mindestens. Such bei den Toten und den Lebenden, in Büchern und Liedern.“` + (n0 >= OMEGA_NEED && playHours() < OMEGA_HOURS ? ' „Und du bist zu jung in dieser Welt. Lebe länger in ihr, dann versteht dein Blut, was dein Kopf schon weiß.“' : '');
+  UI.dialogue(n, n.greet, [
+    { text: 'Wer ist Omega?', fn: () => { omegaFrag('priest'); UI.dialogue(n, '„Der Stern, der über der Welt wachte. Er fiel — nicht aus Schwäche. Er kam uns zu nah. Sein Blut ist der Rotfall, und wo es hinfiel, standen die Toten auf. Wir tragen Eisen, damit nie wieder ein Gott für uns fallen muss.“', [{ text: 'Weiter', fn: back }]); } },
+    { text: `Beten (10 Gold) — dein Glaube: ${O.faith}`, fn: () => omegaPray() },
+    { text: 'Kann man ihn zurückrufen?', fn: () => UI.dialogue(n, answer, [{ text: 'Weiter', fn: back }]) },
+    ...(S.quests.q_omega?.state === 'active' ? [{ text: 'Das Ritual beginnen.', fn: () => omegaRitual(n) }] : []),
+    { text: '[Gehen]', fn: () => UI.closeDialogue() },
+  ]);
+}
+function omegaPray() {
+  const O = om(); if (S.gold < 10) return UI.toast('10 Gold für die Kerzen.');
+  S.gold -= 10; O.faith = Math.min(100, O.faith + (O.prayDay === (S.day | 0) ? 1 : 5) * (S.flags.feastDay === (S.day | 0) ? 2 : 1)); O.prayDay = S.day | 0;   // einmal am Tag zählt es richtig
+  addStatus(S.player, { key: 'omegawrath', name: 'Omegas Zorn', left: 600000, desc: '+10 % Schaden.' });
+  log(`Du betest zu Omega. Glaube ${O.faith}. Ein warmer Druck hinter den Augen.`, 'faction'); UI.closeDialogue();
+}
+function startOmegaQuest() { if (S.quests.q_omega) return; S.quests.q_omega = { state: 'active', progress: [0] }; log('Auftrag: Der Ruf nach Omega.', 'quest'); UI.toast('DER RUF NACH OMEGA', 2800); }
+function vargRitual(v) {
+  UI.dialogue(v, '„Du weißt also genug. Dann hör zu. Drei Dinge, die ihn kennen: die Krone meines Bruders, meine erste Kette, ein Splitter des Himmels, den Aurelion stahl. Zehn Seelen. Einen, den du liebst. Und dein eigenes Blut, für immer. Am Altar. Wenn er zornig erwacht, brennt die Welt.“', [
+    { text: 'Gib mir die Kette.', fn: () => { addItem(S.player, 'vargs_kette', 1); startOmegaQuest(); UI.closeDialogue(); } },
+    { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]);
+}
+function omegaRitual(n) {
+  const p = S.player, has = k => hasItem(p, k, 1), souls = p.inv.filter(s => s?.key === 'soul_vial').reduce((a, s) => a + (s.count || 1), 0), party = partyMembers().filter(m => m.alive);
+  const miss = [!has('garmadon_krone') && 'Garmadons Krone', !has('vargs_kette') && 'Vargs Kette', !has('himmelssplitter') && 'ein Splitter vom Himmel', souls < 10 && `zehn Seelen (${souls}/10)`, !party.length && 'ein Gefährte an deiner Seite'].filter(Boolean);
+  if (miss.length) return UI.dialogue(n, `„Es fehlt noch: ${miss.join(', ')}.“`, [{ text: 'Weiter', fn: () => priestTalk(n) }]);
+  UI.dialogue(n, '„Wen gibst du ihm?“', [...party.map(m => ({ text: m.name, fn: () => { UI.closeDialogue(); omegaPerform(m); } })), { text: 'Noch nicht.', fn: () => priestTalk(n) }]);
+}
+function omegaPerform(m, roll = rnd()) {
+  const p = S.player, O = om();
+  for (const k of ['garmadon_krone', 'vargs_kette', 'himmelssplitter']) removeItem(p, k, 1);
+  removeItem(p, 'soul_vial', 10);
+  S.party = S.party.filter(id => id !== m.id); die(m, 'Omegas Opfer');
+  p.omegaScar = true; recalc(p); float(p, 'Blutzoll', 'rgba(200,60,60,ALPHA)');
+  const chance0 = clamp(0.4 + O.faith / 250 + Math.max(0, S.ranks.chain ?? -1) * 0.06, 0.3, 0.9);
+  O.outcome = roll < chance0 ? 'awake' : 'wrath'; O.ritualDay = S.day | 0;
+  if (S.quests.q_omega) { S.quests.q_omega.state = 'done'; S.quests.q_omega.progress = [1]; S.quests.q_omega.outcome = O.outcome === 'awake' ? 'Omega ist erwacht und wartet im Krater.' : 'Omega erwachte im Zorn. Die Welt blutet.'; }
+  const alt = S.ents.world.find(e => e.omegaAltar);
+  if (alt && !S.ents.world.some(e => e.omegaRift)) { const s = freeSpotNear('world', (alt.x / TS | 0) + 1, (alt.y / TS | 0) - 2, 2);
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'omega_rift', map: 'world', x: s.x, y: s.y, r: 14, portal: 'omega', omegaRift: true, label: 'Riss zu Omega' }); }
+  chronicle(O.outcome === 'awake' ? 'Omega erwacht' : 'Omega erwacht im Zorn', 'war', `${p.name} opfert ${m.name} am Altar der Eisenfeste. ${O.outcome === 'awake' ? 'Ein Riss öffnet sich, still.' : 'Der Himmel färbt sich rot.'}`);
+  if (O.outcome === 'wrath') { O.cat = Math.max(1, S.day | 0); S.weather = 'bloodrain'; S.weatherLeft = 600; camShake(10, 900);
+    log(`${m.name} fällt. Der Himmel reißt auf — und blutet. Omega ist wach, und er ist zornig. Überall stehen die Toten auf.`, 'world'); UI.toast('OMEGA ERWACHT IM ZORN', 4200); }
+  else { log(`${m.name} fällt. Über dem Altar öffnet sich ein Riss, ruhig wie ein Auge. Omega wartet.`, 'world'); UI.toast('OMEGA ERWACHT', 3600); }
+}
+function omegaAllies(at) {                                         // Endkampf: wer dich schätzt, folgt dir durch den Riss
+  const O = om(); if (O.allies) return; O.allies = true;
+  const side = [['valen', 'Soldat Valens'], ['order', 'Ordensritter'], ['aurel', null], ['merch', 'Söldner'], ...(O.outcome === 'wrath' ? [['chain', 'Kettenkrieger']] : [])].filter(([f]) => (S.factions[f] || 0) >= 20);
+  const who = [];
+  for (const [f, prof] of side) for (let i = 0; i < 2; i++) { const pos = freeSpotNear('omega', (at.x / TS | 0) + ri(-4, 4), (at.y / TS | 0) + ri(-2, 1), 2);
+    const c = guardChar(f, pos, prof || undefined, 12); Object.assign(c, { map: 'omega', omegaAlly: true, transient: true, brave: true }); S.ents.omega.push(c); if (!i) who.push(FACTIONS[f]?.name || f); }
+  if (who.length) log(`Durch den Riss folgen dir: ${who.join(', ')}.`, 'combat');
+}
+function ensureOmegaBoss() {
+  const O = om(); if (!O.outcome || O.ending || S.ents.omega.some(e => e.mtype === 'omega' && e.alive)) return;
+  const g = spawnEnemy('omega', 'omega', 32, 22, { level: 20, parley: O.outcome === 'awake' });
+  if (O.outcome === 'wrath') { O.fight = true; g.aggroId = S.player.id; }
+}
+function omegaParley(g) {
+  const say = t => () => UI.dialogue(g, t, [{ text: 'Weiter', fn: () => omegaParley(g) }]);
+  UI.dialogue(g, '„Du hast mich gerufen. Mit Blut, mit Seelen, mit einem Freund — ich rieche ihn noch an dir. Was willst du, Kleiner?“', [
+    { text: 'Warum bist du gefallen?', fn: () => { S.flags.loreRotfall = 4; say('„Ich wollte sehen, wofür ich wache. Ich kam zu nah. Mein Blut weckte eure Toten, und der Erste, der aufstand, war ein König, den sein Bruder erschlagen hatte. Ihr nennt es Rotfall. Ich nenne es meinen Fehler.“')(); } },
+    { text: 'Ich töte dich. Die Welt braucht keinen Gott, der fällt.', fn: () => { UI.closeDialogue(); omegaFight(g); } },
+    { text: 'Ich will dir dienen. Mach mich zu deiner Hand.', fn: () => { UI.closeDialogue(); omegaEnd('avatar', g); } },
+    { text: 'Schlaf. Die Welt ist noch nicht bereit.', fn: () => { UI.closeDialogue(); if (om().faith >= 30) omegaEnd('sleep', g); else { log('Omega: „Du hast kein Recht, mir Schlaf zu befehlen. Du hast nie zu mir gebetet.“', 'combat'); omegaFight(g); } } },
+  ]);
+}
+function omegaFight(g) { const O = om(); O.fight = true; g.parley = false; g.aggroId = S.player.id; g.sawPlayer = clock(); omegaAllies(S.player); UI.toast('OMEGA, DER GEFALLENE', 3000); camShake(8, 500); }
+function omegaEnd(kind, g) {
+  const O = om(); if (O.ending) return; O.ending = kind; O.endDay = Math.max(1, S.day | 0); O.cat = null; O.fight = false;
+  const p = S.player, add = (fs, n) => fs.forEach(f => { if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + n, -100, 100); }), LIV = ['valen', 'order', 'merch', 'aurel', 'goblin'];
+  if (kind === 'slain') { add(LIV, 20); add(['chain'], -40); grantLegend('omega', 'Gottestöter', 'Omega ist gefallen — diesmal für immer.'); chronicle('Der Gott stirbt', 'war', `${p.name} erschlägt Omega im Krater des Gefallenen Sterns. Der rote Himmel verblasst.`); }
+  if (kind === 'avatar') { p.omegaAvatar = true; add(LIV, -50); add(['chain'], 100); S.ranks.chain = FACTIONS.chain.ranks.length - 1; grantLegend('omega', 'Avatar Omegas', 'Du bist seine Hand. Die Lebenden fürchten dich.'); chronicle('Die Hand des Gottes', 'war', `${p.name} kniet vor Omega und steht als sein Avatar wieder auf.`); }
+  if (kind === 'sleep') { O.faith = 100; add(LIV, 15); add(['chain'], 30); grantLegend('omega', 'Hüter des Schlafs', 'Omega schläft wieder — weil du es wolltest.'); chronicle('Der Gott schläft', 'war', `${p.name} legt Omega zurück in den Schlaf. Niemand weiß, wie lange.`); }
+  if (g && g.alive && kind !== 'slain') { fx(g.x, g.y - 40, 'heal', 30); g.alive = false; const a = S.ents[g.map], i = a.indexOf(g); if (i >= 0) a.splice(i, 1); }
+  for (const e of [...S.ents.omega]) if (e.transient && e.kind === 'enemy' && e.alive) crumble(e);
+  if (S.weather === 'bloodrain') S.weatherLeft = 0;
+  UI.toast(kind === 'slain' ? 'OMEGA IST TOT' : kind === 'avatar' ? 'AVATAR OMEGAS' : 'OMEGA SCHLÄFT', 4600); camShake(10, 800);
+}
+function omegaCatHour() {                                          // Weltkatastrophe: Tote stehen überall auf, Dörfer werden angegriffen
+  const p = S.player;
+  if (!S.deadRaid && chance(0.3)) { const V = pick(VILLAGES.filter(v => !S.razed?.[v.key])); if (V) { S.deadRaid = { v: V.key, at: clock() + ri(60, 180), n: ri(6, 10) }; log(`Omegas Blut weckt die Toten: sie ziehen gegen ${V.name}.`, 'world'); } }
+  if (p.map !== 'world' || townAt(p.x / TS | 0, p.y / TS | 0, 4) || foesNear(p, 700)) return;
+  const a = rnd() * 6.283;
+  for (const u of SIM.undeadMix(ri(3, 5), 'village')) { const e = spawnEnemy(u.type, 'world', Math.round(p.x / TS + Math.cos(a) * 18) + ri(-2, 2), Math.round(p.y / TS + Math.sin(a) * 18) + ri(-2, 2), { transient: true }); e.aggroId = p.id; }
+  log('Aus dem roten Regen stehen Tote auf.', 'combat');
+}
+// ================= Der Omega-Glaube (Nutzer S13) =================
+// Fester Teil des Westens (Eisenmark, Tributdörfer, Westgebirge): fanatisch und fremdenfeindlich. Im Süden (Wüste, Hochreich)
+// und Osten glaubt man nicht daran; dazwischen hört man davon. Gläubige Händler nehmen von Fremden mehr, von Brüdern weniger.
+// Drei Paladin-Arten: Eisenpaladine (Schild und Schwert), Sternenpaladine (heilen die Ihren), Inquisitoren (prüfen Fremde).
+// Fünf Köpfe der Kirche lösen Ereignisse aus: Ketzerjagd (Mechthild), Wallfahrt (Aldebrand), Kreuzzug (Konrad), Opferfest
+// (Irmgard) und der Zweifler (Kasimir).
+const faithfulPlayer = () => (S.omega?.faith || 0) >= 30 || (S.ranks.chain ?? -1) >= 1 || S.omega?.ending === 'avatar';
+function omegaStance(npc) {
+  if (npc.omegaPriest || npc.palKind || npc.faction === 'chain' || npc.faithKey) return 'fanatic';
+  if (npc.faction === 'aurel' || npc.robot || npc.undead || npc.goblin) return 'skeptic';
+  const tx = npc.x / TS | 0, ty = npc.y / TS | 0, rg = npc.map === 'world' ? regionAt(tx, ty) : null, k = ((npc.seed || 1) * 7919 | 0) % 10;
+  if (['desert', 'aurel', 'badland', 'deadland', 'blight'].includes(rg) || tx > 700) return k < 1 ? 'neutral' : 'skeptic';
+  if (tx < 330) return k < 7 ? 'fanatic' : k < 9 ? 'neutral' : 'skeptic';           // Westen: die meisten glauben, manche zweifeln
+  return k < 3 ? 'fanatic' : k < 6 ? 'neutral' : 'skeptic';
+}
+const FAITH_TALK = {
+  fanatic: ['„Omega sieht dich. Er sieht auch, dass du nicht von hier bist.“', '„Fremde bringen Fäulnis. Die Toten kamen mit den Fremden.“', '„Bete, bevor du unser Brot isst.“',
+    '„Wer Omega leugnet, leugnet die Mauer, die ihn schützt.“', '„Die Sandleute beten zu Gold, die Messingmänner zu Zahnrädern. Deshalb werden sie fallen.“',
+    '„Die Paladine kommen jeden Siebten. Gut so. Man muss wissen, wer dazugehört.“', '„Das Auge schläft nicht. Es wartet.“', '„Wir verbrennen keine Menschen. Wir verbrennen Lügen. Manchmal stecken sie in Menschen.“'],
+  brother: ['„Omega mit dir, Geschwister.“', '„Du trägst den Blick. Tritt ein.“', '„Einer von uns. Das sieht man.“'],
+  neutral: ['„Omega … die im Westen schwören auf ihn. Ich halte mich raus.“', '„Ich bete, wenn ein Paladin hinsieht. Sonst nicht.“', '„Ein Gott als Auge? Kann sein. Kann auch nicht sein.“'],
+  skeptic: ['„Omega? Ein Märchen, mit dem die Kette Goblins an die Arbeit peitscht.“', '„Im Westen verbrennen sie Leute für den falschen Gott. Hier nicht.“', '„Ein Auge im Himmel? Ich sehe nur Wolken.“',
+    '„Mein Vetter ging in die Eisenmark. Er kam nie wieder. Bleib mir weg mit Omega.“', '„Die Paladine hassen alles, was nicht so aussieht wie sie. Das ist kein Glaube, das ist Angst.“'],
+};
+function faithLine(npc) { let st = omegaStance(npc); if (st === 'fanatic' && faithfulPlayer()) st = 'brother'; const L = FAITH_TALK[st]; return L[Math.abs(((npc.seed || 1) * 31 + (S.day | 0)) | 0) % L.length]; }
+const omegaPriceMul = (npc, isBuy) => { if (!npc || !npc.shop || omegaStance(npc) !== 'fanatic') return 1; return faithfulPlayer() ? (isBuy ? 0.9 : 1.05) : (isBuy ? 1.25 : 0.8); };   // Fremdenaufschlag
+// Paladine: drei Arten, eigene Ausrüstung und Farben
+const PAL_KIT = {
+  iron: { prof: 'Eisenpaladin', cloth: '#1a1214', weapon: 'longsword', chest: 'plate_cuirass', head: 'great_helm', offhand: 'kite_shield' },
+  star: { prof: 'Sternenpaladin', cloth: '#3a0e10', weapon: 'staff', chest: 'chain_hauberk', head: 'iron_helm' },
+  inq:  { prof: 'Inquisitor', cloth: '#141214', weapon: 'crossbow', chest: 'aufsehermantel', head: 'kettle_hat' },
+};
+function palChar(kind, pos, post, name) {
+  const K = PAL_KIT[kind], c = guardChar('chain', pos, K.prof, kind === 'iron' ? 9 : 8);
+  for (const sl of ['weapon', 'chest', 'head', 'offhand']) c.equip[sl] = K[sl] ? mkItem(K[sl]) : null;
+  Object.assign(c, { palKind: kind, guard: true, post, brave: true, pal: { ...c.pal, cloth: K.cloth, crest: '#c8a040' }, spec: null });
+  if (name) c.name = name;
+  return c;
+}
+function ensurePaladins() {
+  if (S.flags.pal1) return; S.flags.pal1 = true;
+  const put = (kind, tx, ty, post) => { const c = palChar(kind, freeSpotNear('world', tx + ri(-3, 3), ty + ri(-3, 3), 3), post); S.ents.world.push(c); return c; };
+  const [kx, ky] = EM(946, 384);
+  for (let i = 0; i < 4; i++) put('iron', kx - 4 + i * 2, ky + 8, 'kettenfeste');
+  for (const s of ['smithy', 'quarters', 'stables', 'vorwerk', 'mine']) { const [x, y] = EISEN_SITES[s]; put(s === 'vorwerk' || s === 'stables' ? 'inq' : 'iron', x, y, 'kettenfeste'); }
+  for (let i = 0; i < 3; i++) put('star', kx - 2 + i * 2, ky + 11, 'kettenfeste');
+  for (const V of tribVillages()) { const P = TOWN_PLAN[V.key]; put('iron', P.square[0], P.square[1], V.key); put('inq', P.square[0] + 2, P.square[1] + 1, V.key); }
+  log('Paladine Omegas ziehen durch den Westen: Eisen, Sterne, Inquisition.', 'world');
+}
+// Sternenpaladin: heilt verwundete Kettenleute und Paladine in der Nähe (sichtbar, unterbrechbar)
+function starHeal(e, dt) {
+  e.healCd = (e.healCd ?? 3000) - dt; if (e.healCd > 0 || e.stagger > 0 || e.downed) return;
+  const ally = S.ents[e.map].find(o => o !== e && o.alive && !o.downed && o.kind === 'npc' && (o.faction === 'chain' || o.palKind) && o.hp < o.maxHp * 0.6 && dist(e, o) < 220);
+  if (!ally) return;
+  e.healCd = 6000; B.heal(ally, ally.maxHp * 0.2); fx(ally.x, ally.y - 14, 'heal', 10); float(ally, 'Omegas Licht', 'rgba(255,220,140,ALPHA)');
+}
+// Inquisitor: prüft Fremde im Westen einmal am Tag
+function inquisitorCheck(e) {
+  const p = S.player;
+  if (e.palKind !== 'inq' || e.angry || p.cineGhost || UI.dialogueOpen() || faithfulPlayer() || p.map !== 'world' || dist(e, p) > 130 || (S.flags.inqDay || 0) === (S.day | 0)) return;
+  S.flags.inqDay = S.day | 0; e.vx = e.vy = 0;
+  const heretic = () => { S.flags.heretic = (S.flags.heretic || 0) + 1; S.factions.chain = clamp((S.factions.chain || 0) - 5, -100, 100);
+    if (S.flags.heretic >= 3) { e.angry = true; e.brave = true; e.aggroId = p.id; log(`${e.name}: „Dreimal geleugnet. Omega richtet dich.“`, 'combat'); UI.toast('KETZER', 2400); }
+    else log(`${e.name}: „Geh. Aber wir kennen jetzt dein Gesicht.“ (Kette −5)`, 'faction'); UI.closeDialogue(); };
+  UI.dialogue(e, `„Halt, Fremder. Sprich das Gebet: ‚Omega sieht, Omega richtet.‘ Oder sag mir, warum du es nicht kannst.“`, [
+    { text: '„Omega sieht, Omega richtet.“', fn: () => { (S.omega ||= { faith: 0, frags: {} }).faith = Math.min(100, (S.omega.faith || 0) + 2); log(`${e.name} nickt knapp. „Dann geh in Frieden. Und bete öfter.“`, 'faction'); UI.closeDialogue(); } },
+    ...(S.gold >= 20 ? [{ text: 'Zwanzig Gold für eure Kerzen.', fn: () => { S.gold -= 20; log(`${e.name} nimmt das Gold. „Omega nimmt jede Gabe.“`, 'faction'); UI.closeDialogue(); } }] : []),
+    { text: 'Ich glaube nicht an euren Gott.', fn: heretic },
+  ]);
+}
+// ---- Die fünf Köpfe der Kirche ----
+const FAITH_FIGURES = [
+  { key: 'mechthild', name: 'Hochinquisitorin Mechthild', prof: 'Hochinquisitorin', kind: 'inq', at: [0, 9], greet: '„Ich rieche Zweifel wie andere Rauch riechen. Du riechst nach beidem.“' },
+  { key: 'aldebrand', name: 'Sternenprophet Aldebrand', prof: 'Sternenprophet', kind: 'star', at: [-4, 6], greet: '„Ich habe das Auge gesehen, im Traum, dreimal. Beim vierten Mal wird es wach sein.“' },
+  { key: 'konrad', name: 'Paladinmarschall Konrad Eisenhand', prof: 'Paladinmarschall', kind: 'iron', at: [3, 12], greet: '„Die Toten stehen vor unserem Tor. Ich stehe davor. Das ist alles, was du wissen musst.“' },
+  { key: 'kasimir', name: 'Bruder Kasimir', prof: 'Sternenpaladin', kind: 'star', site: 'vorwerk', greet: '„Omega mit dir … oder auch nicht. Entschuldige. Ein langer Tag.“' },
+];
+function ensureFaithFigures() {
+  const [kx, ky] = EM(946, 384);
+  for (const F of FAITH_FIGURES) { if (S.ents.world.some(e => e.faithKey === F.key) || (S.flags['faithGone_' + F.key])) continue;
+    const [tx, ty] = F.site ? EISEN_SITES[F.site] : [kx + F.at[0], ky + F.at[1]], c = palChar(F.kind, freeSpotNear('world', tx, ty, 3), 'kettenfeste', F.name);
+    Object.assign(c, { faithKey: F.key, key: F.key, prof: F.prof, greet: F.greet, level: 14, anchor: { x: c.x, y: c.y } }); S.ents.world.push(c); }
+}
+const FE = () => (S.faithEv ||= { hunt: 3, pilgrim: 5, crusade: 8, feast: 7 });
+function faithDay() {
+  ensurePaladins(); ensureFaithFigures();
+  const d = S.day | 0, E = FE();
+  if (d >= E.feast) { E.feast = d + 7; opferfest(); }
+  if (d >= E.hunt && !S.hunt0) { E.hunt = d + 6; ketzerjagd(); }
+  if (d >= E.pilgrim && !S.pilgrims) { E.pilgrim = d + 9; wallfahrt(); }
+  if (d >= E.crusade && !S.crusade) { E.crusade = d + 12; kreuzzug(); }
+  if (S.hunt0 && d > S.hunt0.until) huntEnd(false);
+  if (S.crusade && d >= S.crusade.back) crusadeEnd();
+}
+// Opferfest (Irmgard): alle Gläubigen der Kernburg sammeln sich am Altar; wer mitbetet, bekommt doppelten Glauben
+function opferfest() {
+  const alt = S.ents.world.find(e => e.omegaAltar); if (!alt) return;
+  S.flags.feastDay = S.day | 0;
+  for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && (e.palKind || e.omegaPriest) && dist(e, alt) < 900) { e.feastBack = e.anchor; e.anchor = { x: alt.x + ri(-90, 90), y: alt.y + ri(40, 110) }; }
+  log('Opferfest in der Eisenfeste: Paladine und Gläubige sammeln sich am Altar Omegas. Wer heute betet, betet doppelt.', 'world'); chronicle('Opferfest', 'news', 'Kerzen, Eisen, Gesang am Altar Omegas.');
+}
+// Ketzerjagd (Mechthild): in einem Westdorf steht ein Scheiterhaufen, eine Beschuldigte, zwei Inquisitoren. Befreien oder zusehen.
+function ketzerjagd() {
+  const V = pick(tribVillages()); if (!V) return;
+  const P = TOWN_PLAN[V.key], s = freeSpotNear('world', P.square[0] + 4, P.square[1] + 3, 3);
+  const stake = { id: uid(), kind: 'prop', type: 'chain_post', map: 'world', x: s.x, y: s.y, r: 8, solid: false, huntProp: true, label: 'Scheiterhaufen der Inquisition' };   // nicht fest: stand er auf dem Platz, war das Dorf zu (Test „jede Haustür erreichbar“)
+  const pyre = { id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x: s.x, y: s.y + 20, r: 10, huntProp: true, label: 'Reisig' };
+  const acc = makeChar({ name: pick(['Hilde', 'Ortrun', 'Wendel', 'Gerlach', 'Marit']), prof: 'Beschuldigte', x: s.x + 18, y: s.y, level: 2 });
+  Object.assign(acc, { accused: true, anchor: { x: s.x + 18, y: s.y }, greet: '„Ich habe nur gesagt, dass ich nicht weiß, ob er uns sieht. Nur das.“' });
+  S.ents.world.push(stake, pyre, acc);
+  const inqs = [0, 1].map(i => { const c = palChar('inq', freeSpotNear('world', (s.x / TS | 0) - 2 + i * 4, (s.y / TS | 0) + 2, 2), V.key); c.huntGuard = true; S.ents.world.push(c); return c; });
+  S.hunt0 = { v: V.key, until: (S.day | 0) + 1, acc: acc.id, inq: inqs.map(c => c.id) };
+  log(`Ketzerjagd: In ${V.name} steht ein Scheiterhaufen. Hochinquisitorin Mechthild hat ${acc.name} beschuldigt.`, 'world'); chronicle(`Ketzerjagd in ${V.name}`, 'crime', `${acc.name} soll brennen.`);
+}
+function accusedTalk(npc) {
+  const H = S.hunt0; if (!H || H.acc !== npc.id) return UI.dialogue(npc, npc.greet, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, npc.greet, [
+    ...(S.gold >= 80 ? [{ text: 'Die Inquisitoren bestechen (80 Gold).', fn: () => { S.gold -= 80; huntEnd(true, 'bribe'); UI.closeDialogue(); } }] : []),
+    { text: 'Die Ketten lösen — mit Gewalt.', fn: () => { UI.closeDialogue(); for (const id of H.inq) { const c = byId(id); if (c) { c.angry = true; c.aggroId = S.player.id; c.brave = true; } } H.forced = true; log('Die Inquisitoren ziehen die Waffen. „Ketzerfreund!“', 'combat'); } },
+    { text: 'Nichts für dich tun.', fn: () => UI.closeDialogue() },
+  ]);
+}
+function huntEnd(freed, how) {
+  const H = S.hunt0; if (!H) return; const V = VILLAGES.find(v => v.key === H.v), acc = byId(H.acc);
+  if (freed) { S.factions.chain = clamp((S.factions.chain || 0) - (how === 'bribe' ? 3 : 12), -100, 100); if (V) (S.tribute ||= {}); log(`${acc?.name || 'Die Beschuldigte'} ist frei${how === 'bribe' ? ' — das Gold hat gesprochen' : ''}. ${V?.name || 'Das Dorf'} wird es dir nicht vergessen. (Kette −${how === 'bribe' ? 3 : 12})`, 'faction');
+    chronicle(`Ketzerin befreit in ${V?.name || '?'}`, 'legend', `${S.player.name} rettet ${acc?.name || 'eine Beschuldigte'} vor dem Feuer.`); S.flags.heretic = (S.flags.heretic || 0) + (how === 'bribe' ? 0 : 1); }
+  else { log(`In ${V?.name || 'einem Dorf'} brennt der Scheiterhaufen. ${acc?.name || 'Die Beschuldigte'} ist tot. Die Leute schweigen.`, 'world'); chronicle(`Scheiterhaufen in ${V?.name || '?'}`, 'crime', `${acc?.name || 'Eine Beschuldigte'} verbrannt.`); if (acc) acc.alive = false; }
+  S.ents.world = S.ents.world.filter(e => !e.huntProp && !(e.huntGuard && !e.angry) && !(e.accused && !freed) && !(freed && e.id === H.acc && false));
+  if (freed && acc) { acc.accused = false; acc.prof = 'Befreite'; acc.greet = '„Ich lebe. Wegen dir.“'; }
+  S.flags.huntsSeen = (S.flags.huntsSeen || 0) + 1; S.hunt0 = null;
+}
+// Wallfahrt (Aldebrand): vier Pilger ziehen aus einem Westdorf zum Altar. Unterwegs lauern Räuber. Wer sie begleitet, gewinnt Glauben.
+function wallfahrt() {
+  const V = pick(tribVillages()), alt = S.ents.world.find(e => e.omegaAltar); if (!V || !alt) return;
+  const P = TOWN_PLAN[V.key], ids = [];
+  for (let i = 0; i < 4; i++) { const s = freeSpotNear('world', P.square[0] + ri(-2, 2), P.square[1] + ri(-2, 2), 2), c = makeChar({ name: pick(['Adda', 'Bero', 'Ceno', 'Dietlind', 'Evert', 'Folkmar']), prof: 'Pilger', x: s.x, y: s.y, level: 2 });
+    Object.assign(c, { pilgrim: true, anchor: { x: alt.x + ri(-60, 60), y: alt.y + ri(60, 110) }, greet: '„Zum Auge! Zum Altar! Omega sieht, wer den Weg geht.“' }); c.schedulePos = c.anchor; S.ents.world.push(c); ids.push(c.id); }
+  const mx = ((P.square[0] + alt.x / TS) / 2) | 0, my = ((P.square[1] + alt.y / TS) / 2) | 0;
+  for (let i = 0; i < 3; i++) { const b = spawnEnemy(pick(['bandit', 'bandit', 'bandit_archer']), 'world', mx + ri(-3, 3), my + ri(-3, 3), { level: 6, transient: true }); b.pilgrimAmbush = true; }
+  S.pilgrims = { ids, from: V.key, at: clock() };
+  log(`Wallfahrt: Vier Pilger ziehen von ${V.name} zum Altar Omegas. Sternenprophet Aldebrand segnet, wer sie begleitet.`, 'world');
+}
+function pilgrimTick() {
+  if (S.hunt0?.forced && S.hunt0.inq.every(id => !byId(id)?.alive)) huntEnd(true, 'force');   // Inquisitoren besiegt: frei
+  const W = S.pilgrims; if (!W) return; const alt = S.ents.world.find(e => e.omegaAltar), ps = W.ids.map(byId).filter(c => c && c.alive);
+  if (clock() - W.at > 2880) for (const c of ps) if (dist(c, S.player) > 900) { c.x = c.anchor.x; c.y = c.anchor.y; }   // außer Sicht: nach zwei Tagen angekommen
+  if (!ps.length) { log('Die Wallfahrt endet am Wegrand. Keiner der Pilger kam an.', 'world'); chronicle('Wallfahrt gescheitert', 'news', 'Die Pilger kamen nie am Altar an.'); S.pilgrims = null; return; }
+  if (alt && ps.every(c => dist(c, alt) < 160)) {
+    const near = dist(S.player, alt) < 400;
+    log(`${ps.length} Pilger erreichen den Altar${near ? ' — du hast sie begleitet' : ''}. Aldebrand singt.`, 'world');
+    if (near) { const O = (S.omega ||= { faith: 0, frags: {} }); O.faith = Math.min(100, (O.faith || 0) + 8); S.gold += 40; S.factions.chain = clamp((S.factions.chain || 0) + 5, -100, 100); log('Glaube +8, 40 Gold, Kette +5.', 'faction'); }
+    S.ents.world = S.ents.world.filter(e => !W.ids.includes(e.id)); S.pilgrims = null;
+  }
+}
+// Kreuzzug (Konrad): acht Paladine ziehen zum Knochentor und kommen nach drei Tagen zurück — wer mitzieht, zählt.
+function kreuzzug() {
+  const [kx, ky] = EM(946, 384), gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (!gate) return;
+  const ids = []; for (let i = 0; i < 8; i++) { const c = palChar(i % 4 === 3 ? 'star' : 'iron', freeSpotNear('world', kx + ri(-3, 3), ky + 14 + ri(-2, 2), 3), 'kettenfeste');
+    Object.assign(c, { crusader: true, anchor: { x: gate.x + ri(-60, 60), y: gate.y + ri(-40, 40) } }); c.schedulePos = c.anchor; S.ents.world.push(c); ids.push(c.id); }
+  S.crusade = { ids, back: (S.day | 0) + 3, joined: false };
+  log('Paladinmarschall Konrad ruft zum Kreuzzug: acht Paladine ziehen zum Knochentor gegen die Toten. Wer mitzieht, soll sich bei ihm melden.', 'world'); chronicle('Kreuzzug zum Knochentor', 'war', 'Acht Paladine ziehen nach Osten.');
+}
+function crusadeEnd() {
+  const C = S.crusade; if (!C) return; const alive = C.ids.map(byId).filter(c => c && c.alive).length, win = chance(0.45 + (C.joined ? 0.35 : 0) + alive * 0.02);
+  if (win) { S.factions.chain = clamp((S.factions.chain || 0) + (C.joined ? 10 : 2), -100, 100); if (C.joined) { S.gold += 150; const O = (S.omega ||= { faith: 0, frags: {} }); O.faith = Math.min(100, (O.faith || 0) + 10); } }
+  log(`Der Kreuzzug kehrt zurück: ${win ? 'das Knochentor gehalten' : 'geschlagen'}, ${alive} von 8 leben.${C.joined && win ? ' Konrad nennt deinen Namen. 150 Gold, Glaube +10.' : ''}`, 'world');
+  chronicle(win ? 'Kreuzzug siegreich' : 'Kreuzzug gescheitert', 'war', `${alive} von 8 Paladinen kehren heim.`);
+  S.ents.world = S.ents.world.filter(e => !C.ids.includes(e.id)); S.crusade = null;
+}
+// Gespräche der fünf (Irmgard hat priestTalk); Kasimir, der Zweifler: helfen (Flucht) oder verraten (Mechthild)
+function faithFigureTalk(n) {
+  const leave = { text: '[Gehen]', fn: () => UI.closeDialogue() }, back = () => faithFigureTalk(n), say = t => () => UI.dialogue(n, t, [{ text: 'Weiter', fn: back }]);
+  const opts = [{ text: 'Was hältst du von Omega?', fn: say(faithLine(n)) }];
+  if (n.faithKey === 'mechthild') { opts.push({ text: 'Wen jagt ihr?', fn: say('„Jeden, der zweifelt. Zweifel ist die Tür, durch die die Toten kommen.“') });
+    if (S.flags.kasimirBetrayed === 'pending') opts.push({ text: 'Bruder Kasimir zweifelt. Er plant zu fliehen.', fn: () => kasimirEnd(false) }); }
+  if (n.faithKey === 'aldebrand') opts.push({ text: 'Was siehst du?', fn: say('„Ein Auge, größer als die Eisenfeste. Engel um es herum wie Motten ums Licht. Und dich, Fremder — mit Blut an den Händen, das nicht deins ist.“') });
+  if (n.faithKey === 'konrad') { opts.push({ text: 'Was ist ein Eisenpaladin?', fn: say('„Wir haben drei Orden. Eisen hält die Linie. Sterne heilen, was bricht. Die Inquisition sorgt dafür, dass nichts von innen fault.“') });
+    if (S.crusade && !S.crusade.joined) opts.push({ text: 'Ich ziehe mit zum Knochentor.', fn: () => { S.crusade.joined = true; log('Konrad: „Dann halt Schritt. Am Knochentor zählt jeder Schwertarm.“', 'quest'); UI.closeDialogue(); } }); }
+  if (n.faithKey === 'kasimir' && (S.flags.huntsSeen || 0) >= 1 && !S.flags.kasimirDone) {
+    opts.push({ text: 'Du siehst aus, als trügest du etwas.', fn: () => { S.flags.kasimirBetrayed = 'pending'; UI.dialogue(n, '„Ich habe gesehen, was Mechthild tut. Ich habe den Scheiterhaufen angezündet. Ich glaube nicht mehr, dass ein Gott das will. Hilf mir nach Süden. Oder verrate mich — ich wäre nicht der Erste.“', [
+      { text: 'Ich helfe dir. Geh nach Süden, ich halte dir den Rücken frei.', fn: () => kasimirEnd(true) }, { text: 'Ich muss darüber nachdenken.', fn: () => UI.closeDialogue() }]); } }); }
+  UI.dialogue(n, n.greet, [...opts, leave]);
+}
+function kasimirEnd(helped) {
+  const k = S.ents.world.find(e => e.faithKey === 'kasimir'); S.flags.kasimirDone = true; S.flags.kasimirBetrayed = helped ? 'helped' : 'betrayed'; S.flags.faithGone_kasimir = true;
+  if (helped) { S.factions.chain = clamp((S.factions.chain || 0) - 10, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) + 5, -100, 100); log('Kasimir zieht in der Nacht nach Süden. Er lässt dir seinen Sternenstab da. (Kette −10, Valen +5)', 'faction'); addItem(S.player, 'staff', 1);
+    chronicle('Ein Paladin flieht', 'legend', 'Bruder Kasimir verlässt den Glauben — mit deiner Hilfe.'); }
+  else { S.factions.chain = clamp((S.factions.chain || 0) + 15, -100, 100); const O = (S.omega ||= { faith: 0, frags: {} }); O.faith = Math.min(100, (O.faith || 0) + 5);
+    log('Mechthild lächelt nicht. Sie nickt nur. Am nächsten Morgen brennt am Altar ein Feuer, und Bruder Kasimir ist nicht mehr. (Kette +15, Glaube +5)', 'faction'); chronicle('Der Zweifler brennt', 'crime', 'Bruder Kasimir wurde verraten und verbrannt.'); }
+  if (k) S.ents.world = S.ents.world.filter(e => e !== k);
+  UI.closeDialogue();
+}
+// ================= Kamerafahrten (Nutzer S13) =================
+// Kurze Szenen an anderen Orten: schwarze Balken, Text unten, die Kamera springt. Damit dort wirklich etwas geschieht, steht
+// der Spieler unsichtbar und unverwundbar am Ort der Szene (die Simulation läuft um ihn), danach wieder, wo er war.
+// Während einer Fahrt wird nicht gespeichert (state.save); ESC oder Leertaste überspringt.
+// BUG-118: verzögerte Fahrten nur außerhalb von Proben — die Prüfung beim Auslösen, nicht im Timer (sonst lief nach dem Selbsttest
+// die Garmadon-Fahrt im echten Spiel und versetzte den Spieler)
+const cineLater = (fn, ms) => { if (S._quiet) return false; setTimeout(fn, ms); return true; };
+function cinematic(shots, done) {
+  if (S.cine || !shots.length) return;
+  const p = S.player; S.cine = { shots, i: -1, t: 0, back: { x: p.x, y: p.y, map: S.map }, done };
+  p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); cineNext();
+}
+function cineMove(map, x, y) {
+  const p = S.player;
+  if (map !== S.map) { const a = S.ents[S.map], i = a.indexOf(p); if (i >= 0) a.splice(i, 1); S.map = map; p.map = map; S.ents[map].push(p); }
+  p.x = x; p.y = y;
+}
+function cineNext() {
+  const C = S.cine; if (!C) return; C.i++; C.t = 0;
+  if (C.i >= C.shots.length) return cineEnd();
+  const s = C.shots[C.i]; if (s.x != null) cineMove(s.map || 'world', s.x, s.y);
+  try { s.setup?.(); } catch (err) { console.error(err); }
+  cineBars(true, s.text);
+}
+function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t); if (C.t >= (s?.dur || 3000)) cineNext(); }
+function cineEnd() {
+  const C = S.cine; if (!C) return; S.cine = null;
+  const p = S.player; cineMove(C.back.map, C.back.x, C.back.y); p.cineGhost = false; p.vx = p.vy = 0; cineBars(false);
+  try { C.done?.(); } catch (err) { console.error(err); }
+}
+function cineBars(on, text = '') {
+  let el = document.getElementById('cineBars');
+  if (!el) { el = document.createElement('div'); el.id = 'cineBars';
+    el.innerHTML = '<div style="position:fixed;left:0;right:0;top:0;height:11vh;background:#000;z-index:60;pointer-events:none"></div><div style="position:fixed;left:0;right:0;bottom:0;height:13vh;background:#000;z-index:60;pointer-events:none;display:flex;align-items:center;justify-content:center"><span id="cineText" style="color:#e8dcc0;font:16px Georgia,serif;letter-spacing:.04em;text-align:center;max-width:80vw;text-shadow:0 1px 0 #000"></span></div><div style="position:fixed;right:14px;top:calc(11vh + 8px);z-index:61;color:#8a8070;font:11px sans-serif;pointer-events:none">ESC — überspringen</div>';
+    document.body.appendChild(el); }
+  el.style.display = on ? 'block' : 'none'; const t = document.getElementById('cineText'); if (t) t.textContent = text;
+}
+// Fall Vargs (Nutzer): Steinbruch, Kämpfe zwischen Goblins und den letzten Paladinen, ein Dorf in Not, Flüchtlinge nach Süden
+function vargCinematic() {
+  const P = pt => ({ x: pt[0] * TS + 16, y: pt[1] * TS + 16 }), p = S.player, V = tribVillages()[0];
+  const sm = P(EISEN_SITES.smithy), mi = P(EISEN_SITES.mine), ah = TOWN_PLAN.aurelheim;
+  cinematic([
+    { x: p.x, y: p.y, dur: 3000, text: 'Varg fällt. Mit ihm reißt die Kette.' },
+    { ...mi, dur: 4200, text: 'Im Steinbruch brechen die Ketten. Die Goblins sind frei.', setup: () => { for (const e of S.ents.world) if (e.goblin && e.alive && dist(e, mi) < 500) { float(e, 'Frei!', 'rgba(170,230,140,ALPHA)'); fx(e.x, e.y - 12, 'spark', 4); } } },
+    { ...sm, dur: 5500, text: 'Im Schmiedeviertel werfen sich die Goblins gegen die letzten Paladine.', setup: () => {
+      while (S.ents.world.filter(e => e.palKind && !e.faithKey && e.alive && dist(e, sm) < 900).length < 3) S.ents.world.push(palChar('iron', freeSpotNear('world', EISEN_SITES.smithy[0] + ri(-3, 3), EISEN_SITES.smithy[1] + ri(-3, 3), 2), 'kettenfeste'));   // die letzten Paladine
+      const pals = S.ents.world.filter(e => e.palKind && !e.faithKey && e.alive && dist(e, sm) < 900).slice(0, 5), gobs = S.ents.world.filter(e => e.goblin && e.alive && dist(e, sm) < 900).slice(0, 8);
+      for (const e of pals) Object.assign(e, { brawl: true, brawlSide: 'kette', brave: true }); for (const e of gobs) Object.assign(e, { brawl: true, brawlSide: 'dorf', brave: true, captive: false });
+      for (let i = 0; i < pals.length; i++) { const g = gobs[i % Math.max(1, gobs.length)]; if (g) { pals[i].x = sm.x + ri(-60, 60); pals[i].y = sm.y + ri(-40, 40); g.x = pals[i].x + 30; g.y = pals[i].y; } } } },
+    ...(V ? [{ ...P(TOWN_PLAN[V.key].square), dur: 5000, text: `Ohne die Eisenfeste wittern die Toten ihre Chance: ${V.name} brennt.`, setup: () => { S.deadRaid = { v: V.key, at: clock(), n: 8 }; } }] : []),
+    ...(ah ? [{ x: (ah.area[0] - 4) * TS, y: ah.square[1] * TS, dur: 4200, text: 'Und nach Süden ziehen die Flüchtlinge — zu den Toren Aurelions.', setup: () => ensureRefugees() }] : []),
+  ]);
+}
+// Fall der Untoten (Nutzer: nach Garmadons Tod): Städte werden frei, letzte Kämpfe, Vharnholm wartet, das Land heilt, Heimkehrer
+function undeadFallCinematic() {
+  const p = S.player, W = S.war?.nodes || {}, occ = Object.keys(W).find(k => W[k].owner === 'undead' && TOWN_PLAN[k]), gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'), vh = TOWN_PLAN.vharnholm;
+  const at = k => ({ x: TOWN_PLAN[k].square[0] * TS + 16, y: TOWN_PLAN[k].square[1] * TS + 16 });
+  cinematic([
+    { x: p.x, y: p.y, map: S.map, dur: 3000, text: 'Garmadon fällt. Das Totenreich verliert sein Herz.' },
+    ...(occ ? [{ ...at(occ), dur: 5000, text: `${townName(occ)} ist frei. Die Toten gehen, die Menschen kommen zurück.`, setup: () => liberateNode(occ) }] : []),
+    ...(gate ? [{ x: gate.x + 60, y: gate.y, dur: 5500, text: 'Am Knochentor jagen Soldaten die letzten Toten.', setup: () => {
+      for (let i = 0; i < 5; i++) { const s = guardChar('valen', freeSpotNear('world', (gate.x / TS | 0) - 3 + ri(-2, 2), (gate.y / TS | 0) + ri(-3, 3), 2), 'Soldat Valens', 8); Object.assign(s, { transient: true, brave: true, visitor: true }); S.ents.world.push(s); }
+      for (let i = 0; i < 5; i++) { const e = spawnEnemy(pick(['skeleton', 'zombie', 'bone_hound']), 'world', (gate.x / TS | 0) + 3 + ri(-2, 2), (gate.y / TS | 0) + ri(-3, 3), { level: 4, transient: true }); e.aiState = 'pursue'; } } }] : []),
+    ...(vh ? [{ ...at('vharnholm'), dur: 4800, text: 'Vharnholm wartet. Was aus den Toten der Stadt wird, entscheidest du — im Rat oder vor Ort.', setup: () => ensureVharnVoice() }] : []),
+    ...(gate ? [{ x: gate.x - 200, y: gate.y + 40, dur: 5500, text: 'Das Land atmet. Hier und da packen Leute ihre Sachen — die alte Heimat im Osten ruft.', setup: () => { healTick(true); homecomers(gate, 4); } }] : []),
+  ]);
+}
+function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
+  log(`${townName(k)} ist befreit.`, 'world'); chronicle(`${townName(k)} frei`, 'war', 'Die Toten ziehen ab, die Menschen kehren zurück.'); }
+function homecomers(gate, n) {
+  for (let i = 0; i < n; i++) { const s = freeSpotNear('world', (gate.x / TS | 0) - 8 + ri(-3, 3), (gate.y / TS | 0) + ri(-4, 4), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Heimkehrer', x: s.x, y: s.y, level: 1 });
+    Object.assign(c, { homecomer: true, transient: true, visitor: true, anchor: { x: gate.x + 900 + ri(-80, 80), y: gate.y + ri(-120, 120) }, greet: pick(['„Mein Vater hatte einen Hof da drüben. Vielleicht steht die Scheune noch.“', '„Ich hab den Schlüssel dreißig Jahre getragen. Jetzt probier ich ihn aus.“', '„Wenn das Gras wiederkommt, kommen wir auch.“']) });
+    c.schedulePos = c.anchor; S.ents.world.push(c); if (i % 2 === 0) S.ents.world.push({ id: uid(), kind: 'prop', type: 'sack', map: 'world', x: c.x + 10, y: c.y + 6, r: 6, transient: true, homeSack: true }); }
+}
+// Das Land heilt (Nutzer: nach und nach): jeden Tag wächst ein Ring um das Knochentor, in dem Asche zu Erde und Erde zu Gras wird.
+// Nur der Radius steht im Spielstand; beim Laden wird bis dorthin neu geheilt (ohne Zufall).
+function healTick(now) {
+  if (!S.flags.garmadonSlain) return; const H = (S.heal ||= { r: 0 }); if (!now) H.r = Math.min(260, H.r + 10);
+  applyHeal(Math.max(0, H.r - 12), H.r);
+}
+function applyHeal(r0, r1) {
+  const gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (!gate) return;
+  const gx = gate.x / TS | 0, gy = gate.y / TS | 0;
+  for (let y = gy - r1; y <= gy + r1; y++) for (let x = gx; x <= gx + r1 * 1.4; x++) { const d = Math.hypot((x - gx) / 1.4, y - gy); if (d < r0 || d > r1) continue;
+    const t = tileAt('world', x, y), k = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+    if (t === T.ASH) setTile('world', x, y, k % 3 ? T.DIRT : T.GRASS); else if (t === T.DIRT && k % 5 < 2) setTile('world', x, y, T.GRASS); }
+}
+// Vharnholm (Nutzer: der Spieler entscheidet): eine Stimme der Stadt fragt; im Rat kommt dieselbe Frage als Thema
+function ensureVharnVoice() {
+  if (!S.flags.garmadonSlain || S.laws?.vharnholm || !TOWN_PLAN.vharnholm || S.ents.world.some(e => e.vharnVoice)) return;
+  const P = TOWN_PLAN.vharnholm, s = freeSpotNear('world', P.square[0] + 1, P.square[1] + 1, 2);
+  const c = makeChar({ name: 'Die Stimme von Vharnholm', prof: 'Ältester der Stillen', x: s.x, y: s.y, level: 12, faction: 'undead' });
+  Object.assign(c, { vharnVoice: true, undead: true, hooded: true, anchor: { x: s.x, y: s.y }, pal: { ...c.pal, skin: '#b9b3a2', glow: '#4e8f7a', cloth: '#232a28' },
+    greet: '„Unser König ist fort. Wir sind noch hier. Wir waren Bäcker und Richter, bevor wir starben. Was wird aus uns?“' }); S.ents.world.push(c);
+}
+const VHARN_OPTS = [
+  { key: 'purge', text: 'Ausrotten — die Toten gehören unter die Erde.', what: 'Die Sonnenlegion und die Paladine räumen Vharnholm. Keiner der Stillen bleibt stehen.' },
+  { key: 'expel', text: 'Vertreiben — nach Osten, ins tiefe Totenland.', what: 'Die Stillen packen, was Tote packen. Vharnholm leert sich; eine Kolonne zieht nach Osten.' },
+  { key: 'citizens', text: 'Dulden — als Bürger, mit Recht und Pflicht.', what: 'Vharnholm bleibt. Die Stillen handeln, zahlen Steuern und halten Wache gegen das, was im Osten noch umgeht.' },
+];
+function vharnholmFate(key, bySenate) {
+  (S.laws ||= {}).vharnholm = key; const O = VHARN_OPTS.find(o => o.key === key);
+  const vh = e => e.map === 'world' && (e.homeTown === 'vharnholm' || e.vharnVoice || (e.kind === 'npc' && e.undead && townAt(e.x / TS | 0, e.y / TS | 0) === 'vharnholm'));
+  if (key === 'purge') { for (const e of S.ents.world) if (vh(e) && e.alive) { e.alive = false; fx(e.x, e.y - 10, 'bone', 6); } S.ents.world = S.ents.world.filter(e => !vh(e)); (S.razed ||= {}).vharnholm = true;
+    S.factions.order = clamp((S.factions.order || 0) + 15, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) + 10, -100, 100); }
+  if (key === 'expel') { S.ents.world = S.ents.world.filter(e => !vh(e)); (S.razed ||= {}).vharnholm = true; S.factions.valen = clamp((S.factions.valen || 0) + 5, -100, 100); }
+  if (key === 'citizens') { S.factions.undead = Math.max(S.factions.undead || -100, 0); S.flags.vharnCitizens = true; for (const e of S.ents.world) if (vh(e)) { e.angry = false; e.faction = 'undead'; }
+    S.factions.order = clamp((S.factions.order || 0) - 20, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) - 15, -100, 100); }
+  log(`Vharnholm: ${O.what}${bySenate ? ' (Beschluss des Hohen Rates)' : ''}`, 'world'); chronicle(`Das Schicksal Vharnholms`, 'war', O.what);
+}
+function vharnVoiceTalk(n) {
+  if (S.laws?.vharnholm) return UI.dialogue(n, '„Es ist entschieden. Wir haben es gehört.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(n, n.greet, [...VHARN_OPTS.map(o => ({ text: o.text, fn: () => { UI.closeDialogue(); vharnholmFate(o.key, false); } })), { text: 'Das soll der Hohe Rat entscheiden.', fn: () => UI.closeDialogue() }]);
+}
+// Nach Garmadons Tod (Nutzer: Fall der Untoten): jeden Tag wird eine besetzte Stadt frei, das Land heilt weiter, Heimkehrer ziehen
+function undeadFallDay() {
+  if (!S.flags.garmadonSlain) return;
+  const W = S.war?.nodes || {}, occ = Object.keys(W).find(k => W[k].owner === 'undead' && TOWN_PLAN[k]); if (occ) liberateNode(occ);
+  healTick(false); ensureVharnVoice();
+  const gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (gate && (S.heal?.r || 0) < 260 && chance(0.6)) homecomers(gate, ri(1, 3));
+}
+// ================= Der Hohe Rat von Aurelion (Nutzer S13) =================
+// Aufnahme: hoher Rang (Hoher Beamter) und die Quest „Eine Stimme im Rat“ — ein Adelshaus (Gunst ≥ 60) schlägt dich vor, zwei
+// weitere müssen zustimmen (Gunst ≥ 30), dazu 500 Gold Einlage bei Ratssprecher Corvan. Danach tagt der Rat alle 7 Tage auf der
+// Himmelsfeste: kurze Szene, ein Thema, drei Vorschläge, dann die Begründung (Gewinn, Pflicht oder Vernunft). Jedes Mitglied stimmt
+// nach Haltung zum Vorschlag, seiner Beziehung zu dir, ob ihm die Begründung liegt, und deiner Willenskraft. Die Kaiserin zählt
+// doppelt; fünf von neun Stimmen tragen. Beschlüsse ändern die Welt (S.laws).
+const COUNCIL = [
+  { key: 'kaiserin', name: 'Kaiserin Aurelia', w: 2, style: 'pflicht' }, { key: 'rat', name: 'Ratssprecher Corvan', w: 1, style: 'gewinn' },
+  { key: 'orakel', name: 'Das Uhrwerk-Orakel', w: 1, style: 'vernunft' }, { key: 'magierkoenig', name: 'Magierkönig Theron', w: 1, style: 'vernunft' },
+  { key: 'aurivel', name: 'Fürstin Maelis Aurivel', w: 1, style: 'gewinn', house: true }, { key: 'kessmark', name: 'Graf Ottwin Kessmark', w: 1, style: 'vernunft', house: true },
+  { key: 'solandre', name: 'Gräfin Ysolde Solandre', w: 1, style: 'pflicht', house: true }, { key: 'vantor', name: 'Fabrikherr Brannoc Vantor', w: 1, style: 'gewinn', house: true },
+];
+const STYLE = { gewinn: ['Gewinn', 'Es rechnet sich für das Hochreich — in Gold, in Arbeit, in Macht.'], pflicht: ['Pflicht', 'Das Hochreich schuldet es seiner Ordnung und seinem Namen.'], vernunft: ['Vernunft', 'Die Zahlen sind eindeutig. Alles andere ist Gefühl.'] };
+const cRel = k => COUNCIL.find(m => m.key === k)?.house ? favor(k) : (((S.council ||= {}).rel ||= {})[k] ?? 0);
+function cRelAdd(k, n) { if (COUNCIL.find(m => m.key === k)?.house) S.houses[k] = clamp(favor(k) + n, -100, 100); else ((S.council ||= {}).rel ||= {})[k] = clamp(cRel(k) + n, -100, 100); }
+const P0 = (a, b, c, d, e, f, g, h) => ({ kaiserin: a, rat: b, orakel: c, magierkoenig: d, aurivel: e, kessmark: f, solandre: g, vantor: h });
+const TOPICS = {
+  refugees: { title: 'Die Flüchtlinge vor den Toren', when: () => !S.laws?.refugees && (S.flags.chainsBroken || S.omega?.cat || S.ents.world.some(e => e.refugee)),
+    intro: '„Seit die Eisenfeste gefallen ist, stehen Tausende vor unseren Toren. Was tun wir mit ihnen?“', opts: [
+      { key: 'city', text: 'In die Stadt aufnehmen — Wohnung, Brot und Arbeit.', pref: P0(10, -20, 0, 10, -25, 5, 30, -10) },
+      { key: 'camp', text: 'Ein Lager vor den Toren — Zelte, wenig Essen, Arbeit in den Fabriken.', pref: P0(10, 15, 10, 0, 10, 10, -15, 30) },
+      { key: 'reject', text: 'Abweisen — das Hochreich ist kein Armenhaus.', pref: P0(-10, 20, 5, -15, 25, 0, -35, -5) }] },
+  slavery: { title: 'Die Schuldknechtschaft', when: () => !S.laws?.slavery,
+    intro: '„Die Fabriken von Tickmar laufen auf Schuldknechten. Manche nennen es Ordnung, manche Sklaverei.“', opts: [
+      { key: 'abolish', text: 'Abschaffen — niemand arbeitet in Ketten im Hochreich.', pref: P0(-5, -20, -10, 15, -15, 10, 30, -45) },
+      { key: 'regulate', text: 'Begrenzen — Schuld halbiert, Lohn für jede Stunde, höchstens dreißig Tage.', pref: P0(15, 5, 20, 10, 0, 15, 10, -10) },
+      { key: 'expand', text: 'Ausweiten — auch Flüchtlinge und Landstreicher tragen ihre Schuld ab.', pref: P0(-5, 20, 5, -20, 15, -5, -35, 40) }] },
+  vharnholm: { title: 'Das Schicksal Vharnholms', when: () => S.flags.garmadonSlain && !S.laws?.vharnholm,
+    intro: '„Garmadon ist tot. In Vharnholm warten seine Bürger — Tote, die sprechen. Was wird aus ihnen?“', opts: VHARN_OPTS.map((o, i) => ({ key: o.key, text: o.text, pref: [P0(10, 5, 0, -10, 10, 0, 25, 5), P0(15, 10, 15, 5, 5, 10, 5, 0), P0(-15, 5, 10, 25, -5, 15, -30, 10)][i] })) },
+  faith: { title: 'Der Omega-Glaube', when: () => !S.laws?.faith && (S.flags.huntsSeen || S.crusade || S.omega?.outcome || (S.day | 0) > 30),
+    intro: '„Paladine des Westens predigen an unseren Grenzen. Sie verbrennen Zweifler. Was tun wir mit ihrem Glauben?“', opts: [
+      { key: 'ban', text: 'Verbieten — kein Paladin betritt das Hochreich.', pref: P0(10, 0, 15, 20, 5, 15, -10, 5) },
+      { key: 'tolerate', text: 'Dulden — solange sie niemanden verbrennen.', pref: P0(5, 10, 5, 0, 10, 5, 10, 10) },
+      { key: 'ally', text: 'Bündnis — ihre Klingen gegen die Toten, unser Gold für ihre Altäre.', pref: P0(-10, 10, -15, -25, 0, -10, 20, 5) }] },
+  legion: { title: 'Die Sonnenlegion', when: () => true,
+    intro: '„Die Sonnenlegion steht bereit. Wohin schicken wir sie?“', opts: [
+      { key: 'east', text: 'Ins Totenland — die Toten schlagen, bevor sie uns schlagen.', pref: P0(10, -10, 5, 10, -5, 5, 15, -10) },
+      { key: 'walls', text: 'An die Mauern — Grenzen befestigen, Karawanen schützen.', pref: P0(10, 15, 15, 0, 15, 10, 0, 10) },
+      { key: 'home', text: 'In die Kasernen — Kosten sparen.', pref: P0(-15, 20, 5, -5, 10, 0, -10, 20) }] },
+  toll: { title: 'Die Zölle', when: () => true,
+    intro: '„Die Kasse ist ein Fass. Füllen oder öffnen wir es?“', opts: [
+      { key: 'lower', text: 'Zölle senken — mehr Händler, billigere Waren.', pref: P0(0, -15, 5, 5, -10, 10, 10, -5) },
+      { key: 'keep', text: 'Zölle halten — was funktioniert, bleibt.', pref: P0(10, 10, 10, 0, 5, 5, 0, 5) },
+      { key: 'raise', text: 'Zölle erhöhen — die Kasse braucht Gold für die Legion.', pref: P0(0, 20, 0, -5, 20, -10, -15, 10) }] },
+};
+const councilTopic = () => { const L = S.laws || {}; for (const k of ['vharnholm', 'refugees', 'slavery', 'faith']) if (TOPICS[k].when()) return k; return (S.council?.sessions || 0) % 2 ? 'toll' : 'legion'; };
+const isCouncillor = () => !!S.flags.councillor;
+function councilVote(topic, optKey, style) {                     // gibt { yes, no, votes: [[key, ja]] } — rein rechnend (Test)
+  const T = TOPICS[topic], O = T.opts.find(o => o.key === optKey), will = ((S.player.attributes?.willpower || 10) - 10) * 2, votes = [];
+  let yes = 0, no = 0;
+  for (const M of COUNCIL) { if ((S.flags.skyDead || {})[M.key]) continue;
+    const score = (O.pref[M.key] || 0) + cRel(M.key) * 0.5 + (M.style === style ? 20 : -5) + will - 10;   // -10: der Rat misstraut, bis man ihn kennt
+    const ja = score > 0; votes.push([M.key, ja]); if (ja) yes += M.w; else no += M.w; }
+  return { yes, no, votes, pass: yes > no };
+}
+function applyLaw(topic, key) {
+  (S.laws ||= {})[topic] = key; const add = (f, n) => { if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + n, -100, 100); };
+  if (topic === 'vharnholm') return vharnholmFate(key, true);
+  if (topic === 'refugees') { refugeeLaw(key); if (key === 'city') { add('valen', 10); add('order', 5); } if (key === 'reject') { add('valen', -10); add('order', -10); } }
+  if (topic === 'slavery') { if (S.bond?.kind === 'aurel' && key !== 'expand') { S.bond.debt = Math.round(S.bond.debt * (key === 'abolish' ? 0 : 0.5)); if (key === 'abolish') freeBond('Der Hohe Rat hat die Schuldknechtschaft abgeschafft. Du bist frei.', true); }
+    for (const e of S.ents.world) if (e.captive && e.bondKind === 'aurel' && key === 'abolish') { e.captive = false; e.prof = 'Fabrikarbeiter'; }
+    if (key === 'abolish') { add('valen', 10); S.prices = (S.prices || 1) * 1.05; } if (key === 'expand') add('valen', -15); }
+  if (topic === 'faith') { if (key === 'ban') { add('chain', -20); for (const e of S.ents.world) if (e.palKind && !e.faithKey && inAurel(e)) e.anchor = { x: e.x - 1600, y: e.y }; } if (key === 'ally') { add('chain', 20); add('valen', -5); } }
+  if (topic === 'legion') { if (key === 'east' && S.war) for (const n of Object.values(S.war.nodes)) if (n.owner === 'undead' && n.garrison) n.garrison = Math.round(n.garrison * 0.8); if (key === 'home') S.gold += 0; }
+  if (topic === 'toll') S.prices = (S.prices || 1) * (key === 'lower' ? 0.92 : key === 'raise' ? 1.08 : 1);
+  if (['legion', 'toll'].includes(topic)) delete S.laws[topic];         // Dauerthemen: jederzeit neu verhandelbar
+}
+// Flüchtlinge je nach Beschluss: in der Stadt (Bürger), im Lager vor dem Tor (Zelte, Hunger, Fabrikarbeit) oder abgewiesen
+function refugeeLaw(key) {
+  const ref = S.ents.world.filter(e => e.refugee), P = TOWN_PLAN.aurelheim; if (!P) return;
+  if (key === 'reject') { S.ents.world = S.ents.world.filter(e => !e.refugee); log('Die Tore bleiben zu. Die Flüchtlinge ziehen weiter — wohin, weiß niemand.', 'world'); chronicle('Aurelion weist Flüchtlinge ab', 'news', 'Vor den Toren bleibt nur Staub.'); return; }
+  if (key === 'city') { ref.forEach((c, i) => { const D = (METRO.districts || [])[i % Math.max(1, (METRO.districts || []).length)], s = D ? freeSpotNear('world', D.plaza?.[0] ?? P.square[0], D.plaza?.[1] ?? P.square[1], 4) : freeSpotNear('world', P.square[0] + ri(-6, 6), P.square[1] + ri(-4, 4), 3);
+      Object.assign(c, { x: s.x, y: s.y, anchor: { x: s.x, y: s.y }, schedulePos: { x: s.x, y: s.y }, prof: pick(['Neubürger', 'Neubürgerin', 'Tagelöhner']), greet: pick(['„Ein Dach. Ein richtiges Dach. Danke.“', '„Die Leute schauen komisch. Aber das Brot ist echt.“']), transient: false }); });
+    log('Die Tore öffnen sich. Die Flüchtlinge ziehen in die Stadt — Wohnung, Brot, Arbeit.', 'world'); chronicle('Aurelion nimmt Flüchtlinge auf', 'news', 'Neue Bürger in den Bezirken.'); return; }
+  const gx = P.area[0] - 8, gy = P.square[1];
+  for (let i = 0; i < 6; i++) { const s = freeSpotNear('world', gx - (i % 3) * 3, gy - 4 + (i / 3 | 0) * 6, 2); S.ents.world.push({ id: uid(), kind: 'prop', type: 'tent_prop', map: 'world', x: s.x, y: s.y, r: 12, solid: true, refugeeCamp: true, label: 'Flüchtlingszelt' }); }
+  const f = freeSpotNear('world', gx - 3, gy, 2); S.ents.world.push({ id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x: f.x, y: f.y, r: 10, solid: true, refugeeCamp: true, label: 'Lagerfeuer' });
+  ref.forEach(c => { const s = freeSpotNear('world', gx + ri(-6, 2), gy + ri(-5, 5), 2); Object.assign(c, { x: s.x, y: s.y, anchor: { x: s.x, y: s.y }, schedulePos: { x: s.x, y: s.y }, greet: pick(['„Eine Schüssel Brei am Tag. Und morgen in die Fabrik.“', '„Die Zelte sind dünn. Die Nächte nicht.“', '„Mein Kleiner hustet seit drei Tagen.“']), transient: false }); });
+  log('Vor dem Westtor entsteht ein Lager: Zelte, eine Suppenküche, Wachen. Wer kann, arbeitet in Tickmar.', 'world'); chronicle('Flüchtlingslager vor Aurelheim', 'news', 'Zelte statt Häuser.');
+}
+// Wer nach dem Fall der Eisenfeste flieht: kleine Gruppen ziehen aus dem Westen zu den Toren Aurelions (bis zum Beschluss)
+function refugeeWave() {
+  if (!S.flags.chainsBroken || S.laws?.refugees === 'reject' || S.ents.world.filter(e => e.refugee).length >= 18) return;
+  const P = TOWN_PLAN.aurelheim, V = pick(tribVillages()); if (!P || !V) return;
+  for (let i = 0; i < 3; i++) { const Q = TOWN_PLAN[V.key], s = freeSpotNear('world', Q.square[0] + ri(-3, 3), Q.square[1] + ri(-3, 3), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Flüchtling', x: s.x, y: s.y, level: 1, traits: ['furchtsam'] });
+    const g = S.laws?.refugees === 'city' ? freeSpotNear('world', P.square[0] + ri(-8, 8), P.square[1] + ri(-6, 6), 3) : freeSpotNear('world', P.area[0] - 6 - ri(0, 6), P.square[1] + ri(-5, 5), 2);
+    Object.assign(c, { refugee: true, visitor: true, anchor: g, schedulePos: g, greet: pick(['„Die Toten kamen nachts. Wir sind nur gerannt.“', '„Ist das der Weg nach Aurelion? Sag, dass es der Weg ist.“']) }); S.ents.world.push(c); }
+  log(`Aus ${V.name} ziehen Flüchtlinge Richtung Aurelion.`, 'world');
+}
+// Ratssitzung: Szene, Thema, drei Vorschläge, Begründung, Abstimmung (jede Stimme sichtbar), Beschluss
+function councilSession(corvan) {
+  const T0 = councilTopic(), T = TOPICS[T0], C = (S.council ||= {}), court = MAPS.sky.court;
+  C.next = (S.day | 0) + 7; C.sessions = (C.sessions || 0) + 1;
+  const lords = AUREL_HOUSES.map((H, i) => { const q = { x: court.x - 96 + i * 64, y: court.y + 70 }, c = makeChar({ name: H.lord, prof: `Stimme von ${H.name}`, x: q.x, y: q.y, level: 12, faction: 'aurel', map: 'sky' });
+    Object.assign(c, { map: 'sky', councilLord: H.key, transient: true, visitor: true, anchor: { ...q } }); S.ents.sky.push(c); return c; });
+  const who = k => S.ents.sky.find(e => e.skyRuler === k) || lords.find(l => l.councilLord === k);
+  cinematic([
+    { x: court.x, y: court.y - 20, map: 'sky', dur: 2600, text: 'Der Hohe Rat tritt zusammen. Messing summt, Seide raschelt.', setup: () => { const k = who('kaiserin'); if (k) fx(k.x, k.y - 30, 'heal', 12); } },
+    { x: court.x, y: court.y - 20, map: 'sky', dur: 3600, text: `${T.title}. ${T.intro}`, setup: () => { const k = who('kaiserin'); if (k) float(k, 'Ruhe!', 'rgba(255,230,160,ALPHA)'); } },
+  ], () => councilPropose(T0, who, lords));
+}
+function councilPropose(T0, who, lords) {
+  const T = TOPICS[T0];
+  UI.dialogue(who('rat') || S.player, `${T.intro}\nWas schlägst du vor?`, [...T.opts.map(o => ({ text: o.text, fn: () => UI.dialogue(who('rat') || S.player, '„Und warum sollte der Rat dir folgen?“', [
+    ...Object.entries(STYLE).map(([k, [name, line]]) => ({ text: `${name}: „${line}“`, fn: () => { UI.closeDialogue(); councilDecide(T0, o, k, who, lords); } }))]) })),
+    { text: 'Ich enthalte mich.', fn: () => { UI.closeDialogue(); councilClose(lords); log('Du schweigst. Der Rat vertagt sich.', 'faction'); } }]);
+}
+function councilDecide(T0, O, style, who, lords) {
+  const R = councilVote(T0, O.key, style), court = MAPS.sky.court;
+  const shots = R.votes.map(([k, ja]) => ({ x: court.x, y: court.y - 20, map: 'sky', dur: 850, text: `${COUNCIL.find(m => m.key === k).name}: ${ja ? 'Ja' : 'Nein'}`, setup: () => { const e = who(k); if (e) float(e, ja ? 'JA' : 'NEIN', ja ? 'rgba(150,230,140,ALPHA)' : 'rgba(230,110,90,ALPHA)', true); } }));
+  shots.push({ x: court.x, y: court.y - 20, map: 'sky', dur: 2600, text: R.pass ? `Beschlossen, ${R.yes} zu ${R.no}: ${O.text}` : `Abgelehnt, ${R.yes} zu ${R.no}. Alles bleibt, wie es ist.` });
+  cinematic(shots, () => {
+    for (const [k, ja] of R.votes) cRelAdd(k, R.pass ? (ja ? 2 : -3) : -1);
+    if (R.pass) { applyLaw(T0, O.key); chronicle(`Beschluss des Hohen Rates: ${TOPICS[T0].title}`, 'legend', O.text); log(`Der Hohe Rat beschließt (${R.yes}:${R.no}): ${O.text}`, 'faction'); UI.toast('BESCHLUSS DES RATES', 2600); }
+    else log(`Der Rat lehnt ab (${R.yes}:${R.no}). Überzeuge die Mitglieder vorher — Geschenke, Dienste, Gunst.`, 'faction');
+    councilClose(lords);
+  });
+}
+function councilClose(lords) { S.ents.sky = S.ents.sky.filter(e => !e.councilLord); }
+function corvanTalk(n) {
+  const C = (S.council ||= {}), back = () => corvanTalk(n), Q = S.quests.q_ratssitz, opts = [];
+  if (Q?.state === 'active') { const ok = AUREL_HOUSES.filter(h => favor(h.key) >= 30).length >= 3;
+    opts.push({ text: ok ? 'Drei Häuser sprechen für mich. Hier ist meine Einlage (500 Gold).' : `Wie stehen meine Fürsprecher? (${AUREL_HOUSES.filter(h => favor(h.key) >= 30).length}/3 Häuser mit Gunst ≥ 30)`, fn: () => {
+      if (!ok) return UI.dialogue(n, '„Noch nicht genug Stimmen. Die Häuser müssen dich mögen — oder fürchten.“', [{ text: 'Weiter', fn: back }]);
+      if (S.gold < 500) return UI.dialogue(n, '„Die Einlage, bitte. Fünfhundert. Der Rat ist nicht billig.“', [{ text: 'Weiter', fn: back }]);
+      S.gold -= 500; S.flags.councillor = true; Q.state = 'done'; Q.progress = [1, 1]; Q.outcome = 'Du bist Mitglied des Hohen Rates.'; C.next = (S.day | 0) + 1; S.skyPass = true;
+      if (!S.legend?.aurel) grantLegend('aurel', 'Stimme im Hohen Rat', 'Aufgenommen in den Hohen Rat von Aurelion.'); autoRanks();
+      UI.dialogue(n, '„Willkommen im Rat. Wir tagen jeden siebten Tag. Morgen zum ersten Mal. Bring Argumente mit — und Freunde.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); }
+  if (isCouncillor()) { const due = (S.day | 0) >= (C.next || 0);
+    opts.push({ text: due ? 'Die Ratssitzung eröffnen.' : `Nächste Sitzung an Tag ${C.next}.`, fn: () => { if (!due) return UI.dialogue(n, `„Geduld. Der Rat tagt am ${C.next}. Tag.“`, [{ text: 'Weiter', fn: back }]); UI.closeDialogue(); councilSession(n); } });
+    opts.push({ text: 'Wie stehen die Mitglieder zu mir?', fn: () => UI.dialogue(n, COUNCIL.map(m => `${m.name}: ${Math.round(cRel(m.key))} (${STYLE[m.style][0]})`).join('\n'), [{ text: 'Weiter', fn: back }]) });
+    for (const k of ['kaiserin', 'orakel', 'magierkoenig', 'rat']) opts.push({ text: `Geschenk an ${COUNCIL.find(m => m.key === k).name} (200 Gold)`, fn: () => { if (S.gold < 200) return UI.toast('Zu wenig Gold.'); S.gold -= 200; cRelAdd(k, 6); log(`${COUNCIL.find(m => m.key === k).name} nimmt dein Geschenk an. (+6)`, 'faction'); back(); } }); }
+  UI.dialogue(n, n.greet, [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+// ================= Aurelion lebendig (Nutzer S13) =================
+// Fabrik von Tickmar: an Dampfhämmern und Teilehaufen arbeiten — Lohn nach dem Gesetz des Rates; Schuldknechte tilgen Schuld.
+function factoryWork(t) {
+  const p = S.player, law = S.laws?.slavery;
+  if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  act(p, 'work', 1600, t); passTime(60); p.stamina = Math.max(0, p.stamina - 25); fx(t.x, t.y - 18, 'spark', 8); camShake(2, 200);
+  if (S.bond?.kind === 'aurel') { S.bond.debt -= 15; log(`Eine Stunde am Dampfhammer. Schuld −15 (noch ${Math.max(0, S.bond.debt)}).`, 'economy'); if (S.bond.debt <= 0) freeBond('Die Schuld ist abgearbeitet. Du bist frei.', true); return; }
+  const pay = law === 'abolish' ? 18 : law === 'regulate' ? 14 : law === 'expand' ? 8 : 12; S.gold += pay; S.houses.vantor = clamp(favor('vantor') + 1, -100, 100);
+  log(`Eine Stunde Schicht in der Fabrik: ${pay} Gold. Haus Vantor merkt sich fleißige Hände.`, 'economy'); UI.refreshHUD();
+}
+// Prothesen (Nutzer): auch ein gesundes Glied kann gegen Messing getauscht werden — freiwillig, teuer, mit Bonus
+function mechSwapOptions(p, say) {
+  const NAME = { larm: 'linken Arm', rarm: 'rechten Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' }, TIER = [[2, 'Aurelionisch', 700], [3, 'Meisterwerk', 1400]], out = [];
+  for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = p.body[k]; if (P.mech || P.lost) continue;
+    for (const [tier, name, cost] of TIER) out.push({ text: `${NAME[k]} ersetzen lassen — ${name} (${cost} Gold)`, fn: () => {
+      if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; Object.assign(P, { mech: tier, mechCond: 100, lost: false, hp: P.max }); B.syncHp(p); recalc(p);
+      log(`Meisterin Vell trennt, fügt, stellt ein. Dein ${NAME[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich den ${NAME[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); }
+  return out;
+}
+// Das Heilige Gericht in Aurelheim: Ablass (Kopfgeld tilgen), Klage gegen ein Haus, einer Verhandlung beiwohnen
+function holyCourt(npc) {
+  const back = () => holyCourt(npc), say = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]), b = bountyTotal(), abl = Math.round(b * 0.8);
+  UI.dialogue(npc, '„Das Heilige Gericht des Hochreichs. Das Licht wägt, die Feder schreibt. Was bringst du vor?“', [
+    ...(b > 0 ? [{ text: `Ablass: alle Kopfgelder tilgen (${abl} Gold)`, fn: () => { if (S.gold < abl) return say('„Der Ablass hat seinen Preis. Du hast ihn nicht.“'); S.gold -= abl; S.bounty = {}; log(`Ablass gezahlt: ${abl} Gold. Deine Akten sind rein.`, 'faction'); say('„Gesiegelt. Sündige teurer beim nächsten Mal.“'); } }] : []),
+    { text: 'Klage gegen ein Adelshaus einreichen (100 Gold)', fn: () => UI.dialogue(npc, '„Gegen wen?“', [...AUREL_HOUSES.map(H => ({ text: H.name, fn: () => {
+      if (S.gold < 100) return say('„Die Gebühr, bitte.“'); S.gold -= 100;
+      const win = favor('solandre') + (S.factions.aurel || 0) * 0.5 - favor(H.key) * 0.5 + ((S.player.attributes?.willpower || 10) - 10) * 4 > 10;
+      if (win) { S.gold += 350; S.houses[H.key] = clamp(favor(H.key) - 15, -100, 100); log(`Das Gericht gibt dir recht: ${H.name} zahlt 350 Gold. (Gunst −15)`, 'faction'); say('„Das Licht hat gewogen. Zu deinen Gunsten.“'); }
+      else { S.houses[H.key] = clamp(favor(H.key) - 10, -100, 100); log(`Klage abgewiesen. ${H.name} vergisst so etwas nicht. (Gunst −10)`, 'faction'); say('„Abgewiesen. Die Beweislast lag bei dir.“'); } } })), { text: 'Zurück', fn: back }]) },
+    { text: 'Einer Verhandlung beiwohnen', fn: () => courtHearing(npc) },
+    { text: '[Gehen]', fn: () => UI.closeDialogue() },
+  ]);
+}
+const HEARINGS = [['eine Flüchtlingsfrau', 'Brotdiebstahl auf dem Markt'], ['ein Automatenmechaniker', 'Sabotage an einem Wächter'], ['ein junger Edelmann', 'Duell mit Todesfolge'], ['eine Goblinhändlerin', 'Handel ohne Siegel'], ['ein Kettenpilger', 'Predigt auf dem Platz']];
+function courtHearing(npc) {
+  const [who, why] = HEARINGS[((S.day | 0) + (npc.seed | 0)) % HEARINGS.length];
+  UI.dialogue(npc, `Vor dem Richterpult steht ${who}. Anklage: ${why}. Die Richterin sieht in den Saal: „Will jemand sprechen?“`, [
+    { text: 'Für die Angeklagte sprechen: Gnade.', fn: () => { S.houses.solandre = clamp(favor('solandre') + 3, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) + 2, -100, 100); log(`Du sprichst für ${who}. Die Strafe wird gemildert. Haus Solandre nickt. (+3)`, 'faction'); UI.closeDialogue(); } },
+    { text: 'Gegen die Angeklagte sprechen: Ordnung.', fn: () => { S.houses.aurivel = clamp(favor('aurivel') + 3, -100, 100); ((S.council ||= {}).rel ||= {}).kaiserin = clamp((S.council.rel.kaiserin || 0) + 2, -100, 100); log(`Du sprichst für die Ordnung. Das Urteil fällt hart. Haus Aurivel ist zufrieden. (+3)`, 'faction'); UI.closeDialogue(); } },
+    { text: 'Schweigen.', fn: () => UI.closeDialogue() }]);
+}
+// Mittags zieht die Sonnenlegion in Parade vom Westtor zum Palast (nur, wenn der Spieler in Aurelheim ist)
+function aurelParade(h) {
+  const P = TOWN_PLAN.aurelheim, p = S.player; if (!P || p.map !== 'world') return;
+  if (h === 14) { S.ents.world = S.ents.world.filter(e => !e.parade); return; }
+  if (h !== 12 || townAt(p.x / TS | 0, p.y / TS | 0) !== 'aurelheim' || S.ents.world.some(e => e.parade)) return;
+  const [sx, sy] = P.square, x0 = P.area[0] + 6;
+  for (let i = 0; i < 10; i++) { const s = freeSpotNear('world', x0 + (i >> 1) * 2, sy + (i & 1 ? 2 : -2), 2), g = guardChar('aurel', s, 'Sonnenlegionär', 12);
+    Object.assign(g, { robot: false, parade: true, transient: true, visitor: true, cloth: '#c8a050', name: pick(['Aurel', 'Cassian', 'Livia', 'Oriel', 'Varin']) + ' von der Sonnenlegion', anchor: { x: (sx - 2 + (i & 1) * 4) * TS, y: (sy + 4) * TS } }); g.equip.weapon = mkItem('halberd'); g.schedulePos = g.anchor; S.ents.world.push(g); }
+  log('Fanfaren: Die Sonnenlegion zieht in Parade vom Westtor zum Palast.', 'world');
+}
+// Kleine Arbeits-Animationen (Nutzer: überall): wer bei der Arbeit steht, arbeitet sichtbar — Funken am Amboss, Staub am Feld
+const WORK_FX = { Schmied: 'spark', Schmiedin: 'spark', 'Goblin-Schmied': 'spark', Waffenschmied: 'spark', Bauer: 'dust', Bäuerin: 'dust', Magd: 'dust', 'Goblin-Bergmann': 'dust', 'Goblin-Holzfäller': 'dust', Holzfäller: 'dust', Werkmeister: 'spark', Fabrikarbeiter: 'spark', 'Magitech-Ingenieurin': 'spark', Bäcker: 'fire', Koch: 'fire' };
+function workAnim(e, dt) {
+  const k = WORK_FX[e.prof?.replace(' (versklavt)', '')]; if (!k || e.vx || e.vy || e.angry || e.fleeing) return;
+  const h = S.minute / 60; if (h < 8 || h > 18) return;
+  e._wk = (e._wk ?? 1500 + (e.seed | 0) % 1500) - dt; if (e._wk > 0) return; e._wk = 2200 + (e.seed | 0) % 900;
+  act(e, 'work', 700); fx(e.x + (e.facing === 3 ? 12 : -12), e.y - 6, k, k === 'spark' ? 4 : 2);
+}
 function liberate() {
   if (S.flags.chainsBroken) return;                                   // eigener Schutz: regionBossSlain setzt goblinsFreed schon vorher
+  cineLater(vargCinematic, 1500);   // Nutzer S13: Kamerafahrt zum Fall Vargs
   S.flags.chainsBroken = S.flags.goblinsFreed = true; S.factions.goblin += 200; grantLegend('goblin', 'Kettenbrecher der Grubenstämme', 'Die Goblins der Eisenmark sind frei.');
-  if ((S.ranks.undead ?? -1) >= 0) { S.ranks.undead = FACTIONS.undead.ranks.length - 1; grantLegend('undead', 'Held der Untoten', 'Die Eisenfeste ist gefallen — die Toten feiern dich.'); }   // MP2 §65 S.factions.chain = -100;   // MP2 §28 + Nutzer: +200 (von −100 auf +100)
+  if ((S.ranks.undead ?? -1) >= 0) { S.ranks.undead = FACTIONS.undead.ranks.length - 1; grantLegend('undead', 'Held der Untoten', 'Die Eisenfeste ist gefallen — die Toten feiern dich.'); }   // MP2 §65
+  S.factions.chain = -100;   // BUG-117: stand im Kommentar. MP2 §28 + Nutzer: Goblins +200 (von −100 auf +100)
   const G = LOCATIONS.find(l => l.key === 'grubenhort'), H = LOCATIONS.find(l => l.key === 'sonnwacht');
   for (const e of S.ents.world) {
     if (e.captive) {
@@ -4529,6 +5629,7 @@ function population() {
 
 // ================= Welt-Simulation =================
 function hourTick(h) {
+  aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
   fortressHour();                                                            // S12: Tore der Eisenfeste
   if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
   if (chance(0.10)) worldEvent();
@@ -4567,7 +5668,7 @@ function raidSettlement() {
 }
 
 function dayTick() {
-  rebuildTick();
+  rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); rebuildRazed(); aurelDay();                                             // S12: Tribut der Kette
   bountyDay();
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
@@ -4661,6 +5762,12 @@ function talk(npc) {
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
   if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
   if (npc.robot && !S.party.includes(npc.id)) return robotTalk(npc);   // Automaten tratschen nicht
+  if (npc.omegaPriest) return priestTalk(npc);   // Phase 7
+  if (npc.faithKey) return faithFigureTalk(npc);   // Nutzer S13: die fünf Köpfe der Kirche
+  if (npc.accused) return accusedTalk(npc);
+  if (npc.vharnVoice) return vharnVoiceTalk(npc);
+  if ((npc.prof === 'Richterin' || npc.prof === 'Gerichtsschreiber') && npc.homeTown === 'aurelheim') return holyCourt(npc);   // Nutzer S13: Heiliges Gericht
+  if (npc.skyRuler === 'rat' && ((S.ranks.aurel ?? 0) >= 6 || isCouncillor())) return corvanTalk(npc);   // Nutzer S13: Hoher Rat
   if (npc.fleeing || npc.afraid > now) return UI.dialogue(npc, '„Bleib weg von mir!“', leave);
   if (npc.threatId && byId(npc.threatId)?.alive) return UI.dialogue(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', leave);
   if (pactBound() && npc.faction === 'order')                // Folge des Paktes: der Orden spricht nicht mit den Toten
@@ -4694,10 +5801,13 @@ function talk(npc) {
   else if (npc.shop && refusesChain(npc)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Ich verkaufe nicht an Kettenleute. Nimm es dir mit Gewalt, wenn du willst — geben tu ich es nicht.“', leave) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
+  const eT = !occupied && !npc.hostile && ecoTown(npc);
+  if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if (npc.recruit && !S.party.includes(npc.id)) choices.push({ text: 'Komm mit mir.', fn: () => recruit(npc) });
   if (S.party.includes(npc.id)) choices.push({ text: 'Bleib hier.', fn: () => { dismiss(npc); UI.closeDialogue(); } });
   tributeChoices(npc, choices); campaignChoices(npc, choices); chainChoices(npc, choices); defenseChoices(npc, choices); griskChoices(npc, choices); aurelChoices(npc, choices); conChoices(npc, choices); jailChoices(npc, choices);
   choices.push({ text: 'Was gibt es Neues?', fn: () => gossip(npc) });
+  choices.push({ text: 'Was hältst du von Omega?', fn: () => UI.dialogue(npc, faithLine(npc), [{ text: 'Weiter', fn: () => talk(npc) }]) });   // Nutzer S13
   choices.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
   // Ruf färbt die Begrüßung: nach einer Tat gegen jemanden ist der Ton kalt
   const greet = npc.runaway ? '„Bitte … nicht zurück. Nicht in den Steinbruch.“' : fearedBy(npc) ? FEAR_GREET[fearLvl() - 1][(npc.seed * 7 | 0) % 3]
@@ -4756,6 +5866,8 @@ const WEATHER_TALK = { rain: ['„Dieser Regen hört nie auf.“'], snow: ['„S
   bloodrain: ['„Roter Regen. Das bedeutet nichts Gutes, sagen die Alten.“'], sandstorm: ['„Sand in den Augen, Sand im Brot.“'] };
 function worldTalk(npc) {
   const L = [], town = npc.homeTown || npc.post, p = S.player;
+  L.push(faithLine(npc));   // Nutzer S13: über Omega reden viele — gläubig, fanatisch oder spöttisch
+  if (S.hunt0) L.push(omegaStance(npc) === 'fanatic' ? '„Die Inquisition räuchert wieder aus. Gut.“' : '„Sie wollen wieder jemanden verbrennen. Im Westen. Für ein Auge.“');
   if (S.flags.chainsBroken) L.push('„Seit die Eisenfeste gefallen ist, kommen die Toten öfter. Wer hält sie jetzt auf?“');
   else L.push('„Die Eiserne Kette nimmt, was sie will. Aber sie hält die Toten im Osten.“');
   if (S.deadRaid) { const V = VILLAGES.find(v => v.key === S.deadRaid.v); L.push(V && V.key === town ? '„Die Toten kommen hierher! Wir brauchen jede Hand!“' : `„Man sagt, die Toten ziehen gegen ${V?.name || 'ein Dorf'}.“`); }
@@ -4766,6 +5878,13 @@ function worldTalk(npc) {
   if ((p.titles || []).length) L.push(`„Bist du nicht ${p.titles[p.titles.length - 1]}? Man erzählt sich Dinge.“`);
   if ((p.level || 1) >= 10) L.push('„Du hast das Gesicht von jemandem, der viel gesehen hat.“');
   if (S.flags.goblinsFreed) L.push('„Die Goblins sind frei. Manche sagen, sie handeln ehrlicher als wir.“');
+  const LAWTXT = { refugees: { city: 'die Flüchtlinge in die Stadt zu lassen', camp: 'ein Lager vor dem Westtor zu bauen', reject: 'die Flüchtlinge abzuweisen' }, slavery: { abolish: 'die Schuldknechtschaft abzuschaffen', regulate: 'die Schuldknechtschaft zu begrenzen', expand: 'die Schuldknechtschaft auszuweiten' }, faith: { ban: 'den Omega-Glauben zu verbieten', tolerate: 'den Omega-Glauben zu dulden', ally: 'ein Bündnis mit der Kirche des Westens zu schließen' }, vharnholm: { purge: 'Vharnholm auszulöschen', expel: 'die Toten von Vharnholm zu vertreiben', citizens: 'die Toten von Vharnholm als Bürger zu dulden' } };   // Nutzer S13
+  for (const [t, k] of Object.entries(S.laws || {})) if (LAWTXT[t]?.[k] && (npc.faction === 'aurel' || inAurel(npc))) L.push(`„Der Hohe Rat hat beschlossen, ${LAWTXT[t][k]}. ${t === 'refugees' && k === 'camp' ? 'Die armen Leute da draußen …' : 'Man wird sehen.'}“`);
+  if (S.omega?.cat && !S.omega.ending) L.push('„Der Himmel blutet. Die Toten stehen auf. Man sagt, jemand hat Omega gerufen … und dass er dich kennt.“');   // Phase 7
+  if (S.omega?.ending) L.push(S.omega.ending === 'slain' ? '„Der Himmel ist wieder blau. Man sagt, du hast einen Gott erschlagen. Ich weiß nicht, ob ich dir danken oder dich fürchten soll.“' : S.omega.ending === 'avatar' ? '„Geh weg von mir. Du trägst ihn in den Augen.“' : '„Omega schläft wieder, heißt es. Du hast ihn zugedeckt wie ein Kind.“');
+  if (S.flags.garmadonSlain) L.push(npc.tavernStaff ? '„Jede Nacht will einer das Lied vom Toten König hören. Du bist doch der, oder? Das Bier geht aufs Haus.“' : npc.guard ? '„Seit Garmadon fiel, schlafen wir wieder. Danke.“' : npc.shop ? '„Die Straßen nach Osten sind ruhiger. Das Geschäft auch — im Guten.“' : '„Der Tote König ist tot. Wirklich tot, diesmal. Man sagt, du warst es.“');
+  else if (S.flags.garmMet) L.push('„Man sagt, unter dem Totenland sitzt ein König auf Knochen. Und dass er redet.“');
+  if (S.legend?.undead === 'Held der Untoten' && npc.faction !== 'undead') L.push('„Du … du hast die Eisenfeste den Toten geöffnet. Geh weiter. Bitte.“');   // §65
   return L;
 }
 function contextLines(npc) {
@@ -4778,17 +5897,18 @@ function contextLines(npc) {
 // (§30) nur durch weltverändernde Taten — Kettenbrecher, Held der Untoten, Schild von Valen, Stimme im Hohen Rat.
 function autoRanks() {
   const a = S.factions.aurel || 0;
-  S.ranks.aurel = S.flags.aurelCitizen ? Math.min(7, 2 + Math.max(0, Math.floor((a - 40) / 12)) + (S.flags.marriedHouse && a >= 90 ? 1 : 0)) : hasPermit() ? 1 : 0;
+  S.ranks.aurel = S.flags.councillor ? 7 : S.flags.aurelCitizen ? Math.min(7, 2 + Math.max(0, Math.floor((a - 40) / 12)) + (S.flags.marriedHouse && a >= 90 ? 1 : 0)) : hasPermit() ? 1 : 0;
   S.ranks.goblin = S.flags.goblinsFreed ? ((S.factions.goblin || 0) >= 60 ? 2 : (S.factions.goblin || 0) >= 20 ? 1 : 0) : -1;
   if (S.flags.aurelCitizen && S.flags.marriedHouse && !S.legend?.aurel) grantLegend('aurel', 'Stimme im Hohen Rat', 'Bürger und eingeheiratet: Aurelion hört auf dich.');
   if ((S.stats?.valenDefense || 0) >= 10 && !S.legend?.valen) grantLegend('valen', 'Schild von Valen', 'Zehn Siedlungen verteidigt.');
 }
 function grantLegend(fac, title, why) {
   (S.legend ||= {})[fac] = title; (S.player.titles ||= []).push(title);
-  chronicle(`${S.player.name}: „${title}“`, 'legend', why); log(`Legendärer Rang bei ${FACTIONS[fac]?.name || fac}: ${title}. ${why}`, 'faction'); UI.toast(title.toUpperCase(), 4200);
+  chronicle(`${S.player.name}: „${title}“`, 'legend', why); log(`Legendärer Rang bei ${FACTIONS[fac]?.name || (fac === 'omega' ? 'Omega' : fac)}: ${title}. ${why}`, 'faction'); UI.toast(title.toUpperCase(), 4200);
 }
 const rankName = f => { const r = S.ranks[f] ?? -1; return S.legend?.[f] || (r >= 0 && FACTIONS[f]?.ranks ? FACTIONS[f].ranks[Math.min(r, FACTIONS[f].ranks.length - 1)] : null); };
 function contextGreet(npc, base) {
+  if (S.flags.garmadonSlain && npc.guard && ((npc.seed | 0) + (S.day | 0)) % 3 === 0) return '„Königsmörder! Die Wache grüßt dich. Ohne dich stünden die Toten vor dem Tor.“';   // Phase 6 §64
   const rn = npc.faction && npc.guard && rankName(npc.faction);
   if (rn && ((S.ranks[npc.faction] ?? -1) >= 1 || S.legend?.[npc.faction])) return S.legend?.[npc.faction] ? `„${rn}! Die Legende persönlich. Wir stehen bereit.“` : `„Zu Befehl, ${rn}.“`;   // Wachen grüßen nach Rang                                   // fester Zufall je Person und Stunde: nicht bei jedem Klick ein anderer Satz
   const L = contextLines(npc); if (!L.length) return base;
@@ -5012,6 +6132,7 @@ function onKill(mtype, e) {
   }
 }
 function onItemGained(key) {
+  if (key === 'vargs_tagebuch') { log('Vargs Tagebuch, letzte Seite: das Ritual. Krone, Kette, Splitter, zehn Seelen, ein Freund, dein Blut.', 'quest'); startOmegaQuest(); }   // Phase 7
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
@@ -5211,10 +6332,10 @@ function partyCommand(cmd) {
 export const repTier = fac => REP_TIERS.find(t => (S.factions[fac] ?? 0) >= t.min);
 const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.faction] != null ? repTier(npc.faction) : null, f = npc && fearedBy(npc) ? fearLvl() : 0;
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
-  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5); };   // S12: Kettenleute zahlen drauf
+  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy); };   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
-  if (ITEMS[key].good && npc && S.towns[npc.town || 'eren']) {
-    const p = SIM.townPrice(npc.town || 'eren', key, isBuy), t = (S.player.skills.trading || 0) / 100;
+  if (ITEMS[key].good && npc && ecoTown(npc)) {
+    const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
     return Math.max(1, Math.round((isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)) * repPrice(npc, isBuy)));
   }
   const v = ITEMS[key].value * (S.prices || 1) * (inst ? RARITY_VALUE[rarOf(inst)] || 1 : 1);
@@ -5227,21 +6348,21 @@ function shopStock(npc) {
     const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
       'wooden_shield', 'leather_jerkin', 'leather_cap', 'chain_hauberk', 'pickaxe', 'traveler_cloak'];
     npc._stock = [];
-    for (let i = 0; i < 7; i++) { const k = pick(pool); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
+    for (let i = 0; i < (npc.shop ? 7 : 0); i++) { const k = pick(pool); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
   }
-  const tk = S.towns[npc.town || 'eren'] ? npc.town || 'eren' : null;      // Orte ohne Markt (Vharnholm) handeln nur mit Waren
-  if (!tk || npc.market === false) return npc._stock;          // Schmiede u. ä.: nur eigene Ware, kein Getreide
+  const tk = sellsGoods(npc) ? ecoTown(npc) : null;
+  if (!tk) return npc._stock;
   const town = S.towns[tk];
   SIM.notePrices(tk);
-  const goods = ['grain', 'salt', 'cloth', 'pelt'].filter(g => town.stock[g] >= 1).map(g => ({ key: g, count: Math.floor(town.stock[g]) }));
+  const goods = GOODS.filter(g => town.stock[g] >= 1).map(g => ({ key: g, count: Math.floor(town.stock[g]) }));
   return [...goods, ...npc._stock];
 }
 function buy(npc, key) {
   const c = price(key, true, npc);
   if (S.gold < c) return UI.toast('Zu wenig Gold');
   if (ITEMS[key].good) {                                   // Waren gehen ins Gepäck, der Markt wird leerer
-    const town = S.towns[npc.town || 'eren'];
-    if (town.stock[key] < 1 || !addItem(S.player, key, 1)) return;
+    const town = S.towns[ecoTown(npc)];
+    if (!town || town.stock[key] < 1 || !addItem(S.player, key, 1)) return;
     town.stock[key] -= 1; S.gold -= c;
     log(`Gekauft: ${ITEMS[key].name} für ${c} Gold.`, 'economy');
     return;
@@ -5258,9 +6379,88 @@ function sell(idx, npc) {
   const slot = S.player.inv[idx]; if (!slot) return;
   const c = price(slot.key, false, npc, slot);
   S.gold += c; if ((slot.count || 1) > 1) slot.count--; else S.player.inv.splice(idx, 1);   // genau dieses Exemplar
-  if (ITEMS[slot.key].good && npc) S.towns[npc.town || 'eren'].stock[slot.key] += 1;
+  if (ITEMS[slot.key].good && npc && ecoTown(npc)) S.towns[ecoTown(npc)].stock[slot.key] += 1;
   S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3);
   log(`Verkauft: ${ITEMS[slot.key].name} für ${c} Gold.`, 'economy');
+}
+// ================= Handelskontor (S13 Wirtschaft, economy.js) =================
+// Jede Stadt hat einen Markt: Händler, Kaufleute, sonst der erste Einwohner aus der Liste in economy.js (Wirt, Vorsteher, Bauer …).
+const ecoTown = npc => { const k = ECO.townKeyOf(npc); return k && S.towns[k] ? k : null; };
+const sellsGoods = npc => npc.market !== false && (npc.goodsOnly || ECO.MARKET_PROFS.has(npc.prof));
+const goodsHave = g => S.player.inv.filter(s => s && s.key === g).reduce((n, s) => n + (s.count || 1), 0);
+function ecoMenu(npc, town) {
+  const t = S.towns[town], me = { name: `Handelskontor — ${ECO.townName(town)}` }, E = S.eco;
+  ECO.notePrices(town);
+  const list = f => GOODS.filter(f).map(g => `${ITEMS[g].name} ${ECO.ecoPrice(town, g, true)}`).join(', ') || 'nichts';
+  const coming = E.caravans.filter(c => c.to === town).map(c => `${c.n} ${ITEMS[c.good].name} aus ${ECO.townName(c.from)}`);
+  const biz = E.biz.filter(b => b.town === town).length, my = E.my;
+  UI.dialogue(me, `Knapp und teuer: ${list(g => (t.use[g] || 0) > 0.1 && t.stock[g] < ECO.target(t, g) * 0.5)}\n` +
+    `Reichlich und billig: ${list(g => t.stock[g] > ECO.target(t, g) * 1.5)}\n` +
+    (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
+    { text: 'Waren kaufen und verkaufen', fn: () => { npc.goodsOnly = true; UI.closeDialogue(); UI.openModal('trade', npc); } },
+    { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
+    { text: my ? `Dein Handelswagen (${my.to ? 'unterwegs nach ' + ECO.townName(my.to) : 'in ' + ECO.townName(my.at)})` : `Handelswagen kaufen (${ECO.WAGON_COST} Gold)`, fn: () => wagonMenu(npc, town) },
+    { text: `Betriebe in ${ECO.townName(town)} (${biz})`, fn: () => bizMenu(npc, town) },
+    { text: `Lieferaufträge (${E.orders.length})`, fn: () => ordersMenu(npc, town) },
+    { text: 'Zurück', fn: () => talk(npc) },
+  ]);
+}
+function ecoPrices(npc, town) {
+  const seen = Object.entries(S.priceSeen || {}).filter(([k]) => S.towns[k]);
+  const lines = GOODS.map(g => {
+    const s = seen.map(([k, v]) => [k, v.p[g]]).filter(([, p]) => p).sort((a, b) => a[1] - b[1]);
+    if (s.length < 2) return null;
+    const lo = s[0], hi = s[s.length - 1];
+    return `${ITEMS[g].name}: billig in ${ECO.townName(lo[0])} (${lo[1]}), teuer in ${ECO.townName(hi[0])} (${hi[1]})`;
+  }).filter(Boolean);
+  UI.dialogue({ name: 'Preise, die du kennst' }, lines.length ? lines.join('\n') + '\n(Preise vom Tag deines letzten Besuchs.)' : 'Du kennst erst die Preise einer Stadt. Reise und frag nach.', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+}
+function wagonMenu(npc, town) {
+  const back = () => wagonMenu(npc, town), me = { name: 'Dein Handelswagen' }, E = S.eco;
+  const done = r => { if (r) UI.toast(r); UI.refreshHUD(); back(); };
+  if (!E.my) return UI.dialogue(me, `Ein Wagen mit Zugtieren fasst ${ECO.MY_CAP} Ladungen. Du kaufst hier Ware, schickst ihn los, und am Ziel verkauft dein Fuhrmann alles zum Marktpreis. Unterwegs drohen Räuber — Wachen helfen.`, [
+    { text: `Kaufen (${ECO.WAGON_COST} Gold)`, fn: () => done(ECO.buyWagon(town)) }, { text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+  const my = E.my, cargo = Object.entries(my.cargo).filter(([, n]) => n > 0).map(([g, n]) => `${n} ${ITEMS[g].name}`).join(', ') || 'leer';
+  if (my.to) return UI.dialogue(me, `Unterwegs nach ${ECO.townName(my.to)}, Ankunft Tag ${my.eta}. Ladung: ${cargo}. ${my.guards} Wachen.`, [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+  if (my.at !== town) return UI.dialogue(me, `Dein Wagen steht in ${ECO.townName(my.at)}. Ladung: ${cargo}.`, [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+  const t = S.towns[town], buyP = g => price(g, true, npc), sellP = g => price(g, false, npc);
+  const opts = GOODS.filter(g => t.stock[g] >= 1).sort((a, b) => ECO.ecoPrice(town, a, true) / ITEMS[a].value - ECO.ecoPrice(town, b, true) / ITEMS[b].value).slice(0, 5)
+    .map(g => ({ text: `5 ${ITEMS[g].name} laden (je ${buyP(g)} Gold)`, fn: () => { const r = ECO.loadGood(g, 5, buyP); done(r.got ? null : 'Nichts geladen.'); } }));
+  if (ECO.cargoOf(my)) opts.push({ text: 'Ladung hier verkaufen', fn: () => { const s = ECO.sellCargo(town, sellP); UI.toast(`+${s} Gold`); done(null); } });
+  opts.push({ text: 'Losschicken …', fn: () => sendMenu(npc, town) }, { text: 'Zurück', fn: () => ecoMenu(npc, town) });
+  UI.dialogue(me, `Steht hier. Ladung: ${cargo} (${ECO.cargoOf(my)}/${ECO.MY_CAP}). Billigste Waren zuerst.`, opts);
+}
+function sendMenu(npc, town) {
+  const my = S.eco.my, guards = my.guardsNext ?? 1;
+  const seen = Object.keys(S.priceSeen || {}).filter(k => k !== town && S.towns[k] && ECO.TOWN_LOCS.some(l => l.key === k));
+  const gain = k => Object.entries(my.cargo).reduce((n, [g, c]) => n + c * (S.priceSeen[k].p[g] || 0) * 0.78, 0);
+  const opts = seen.sort((a, b) => gain(b) - gain(a)).slice(0, 7).map(k => ({ text: `Nach ${ECO.townName(k)} (erwartet ~${Math.round(gain(k))} Gold)`,
+    fn: () => { const r = ECO.sendWagon(k, guards); if (r) UI.toast(r); UI.refreshHUD(); ecoMenu(npc, town); } }));
+  opts.push({ text: `Wachen: ${guards} (je ${ECO.GUARD_COST} Gold) — ändern`, fn: () => { my.guardsNext = (guards + 1) % 5; sendMenu(npc, town); } }, { text: 'Zurück', fn: () => wagonMenu(npc, town) });
+  UI.dialogue({ name: 'Wohin?' }, seen.length ? 'Ziele, deren Preise du kennst (letzter Besuch):' : 'Du kennst noch keine anderen Märkte. Besuch erst einen.', opts);
+}
+function bizMenu(npc, town) {
+  const C = ECO.census(), list = S.eco.biz.filter(b => b.town === town), back = () => bizMenu(npc, town);
+  const done = r => { if (r) UI.toast(r); UI.refreshHUD(); back(); };
+  const line = b => `${ECO.bizName(b)}: ${Math.round(ECO.bizWorkers(b, C) * 10) / 10} Arbeiter, Stufe ${b.level}, gestern ${b.made} Gold Ware${b.owner === 'player' ? ' — DEIN' : ''}`;
+  const opts = [];
+  for (const b of list) {
+    if (!b.owner) opts.push({ text: `${ECO.bizName(b)} kaufen (${ECO.bizPrice(b, C)} Gold)`, fn: () => done(ECO.buyBiz(b, C)) });
+    else if (b.owner === 'player') {
+      if (b.level < 3) opts.push({ text: `${ECO.bizName(b)} ausbauen (${ECO.upgradeCost(b)} Gold)`, fn: () => done(ECO.upgradeBiz(b)) });
+      if (b.hired < 3) opts.push({ text: `Arbeiter für ${ECO.bizName(b)} anwerben (30 Gold, 3 Gold Lohn am Tag)`, fn: () => done(ECO.hireHand(b)) });
+    }
+  }
+  opts.push({ text: 'Zurück', fn: () => ecoMenu(npc, town) });
+  UI.dialogue({ name: `Betriebe — ${ECO.townName(town)}` }, (list.map(line).join('\n') || 'Hier arbeitet niemand in einem Gewerbe.') +
+    '\nOhne Arbeiter keine Ware. Dir gehört gut ein Drittel des Warenwerts, abzüglich Lohn.', opts);
+}
+function ordersMenu(npc, town) {
+  const O = S.eco.orders, back = () => ordersMenu(npc, town);
+  const opts = O.filter(o => o.town === town).map(o => ({ text: `Liefern: ${o.n} ${ITEMS[o.good].name} (${o.reward} Gold)`,
+    fn: () => { const r = ECO.deliver(o, goodsHave(o.good), (g, n) => removeItem(S.player, g, n)); if (r) UI.toast(r); UI.refreshHUD(); back(); } }));
+  opts.push({ text: 'Zurück', fn: () => ecoMenu(npc, town) });
+  UI.dialogue({ name: 'Lieferaufträge' }, O.map(o => `${ECO.townName(o.town)} braucht ${o.n} ${ITEMS[o.good].name} bis Tag ${o.until}: ${o.reward} Gold`).join('\n') || 'Gerade fehlt nirgends etwas.', opts);
 }
 function repairAll(npc) {
   const p = S.player;
@@ -5434,6 +6634,22 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
       S.projectiles.push({ id: uid(), kind: 'shadow', map: p.map, x: p.x + Math.cos(p.aim) * 14, y: p.y - 12 + Math.sin(p.aim) * 8,
         vx: Math.cos(p.aim) * 6, vy: Math.sin(p.aim) * 6, owner: p.id, dmg: (18 + p.attributes.intelligence * 1.4) * (1 + v / 100) * pact * (node(p, 'w_core') ? 1.2 : 1), life: 1500, team: 'player', splash: 0 });
       return true;
+    case 'shadow_raise': {                                   // Nutzer (S13): Hexenmeister — Schattenskelett ohne Leiche, lädt Verderbnis
+      if (S.ents[p.map].filter(e => e.servant === p.id && e.alive && e.shadowServ).length >= 2) { UI.toast('Zwei Schatten hält der Pakt. Nicht mehr.'); return false; }
+      const a = p.aim ?? 0, tx = (p.x + Math.cos(a) * 40) / TS | 0, ty = (p.y + Math.sin(a) * 40) / TS | 0;
+      const d = spawnEnemy('skeleton', p.map, tx, ty, { level: Math.max(2, p.level) });
+      Object.assign(d, { name: 'Schattenskelett', anchor: { x: d.x, y: d.y }, servant: p.id, transient: true, shadowServ: true, until: performance.now() + 40000, glow: T.glow });
+      fx(d.x, d.y - 10, 'shadow', 16); sfx('bone', 0.6); log('Der Boden reißt auf. Ein Schatten mit Knochen steigt heraus.', 'combat');
+      return true; }
+    case 'pact_knight': {                                    // Nutzer (S13): ein großer Diener gegen Leben
+      if (S.ents[p.map].some(e => e.servant === p.id && e.alive && e.pactKnight)) { UI.toast('Dein Paktritter steht noch.'); return false; }
+      const cost = p.maxHp * 0.2; if (p.hp <= cost * 1.5) { UI.toast('Zu schwach — der Pakt nähme dir den Rest.'); return false; }
+      if (p.body) for (const k of B.PARTS) if (!p.body[k].lost) p.body[k].hp = Math.max(1, p.body[k].hp - p.body[k].max * 0.2);
+      if (p.body) B.syncHp(p); else p.hp -= cost;
+      const d = spawnEnemy('bone_knight', p.map, (p.x / TS | 0) + 1, p.y / TS | 0, { level: p.level + 2 });
+      Object.assign(d, { name: 'Paktritter', anchor: { x: d.x, y: d.y }, servant: p.id, transient: true, pactKnight: true, until: performance.now() + 45000, glow: T.glow });
+      fx(d.x, d.y - 14, 'shadow', 20); fx(p.x, p.y - 14, 'blood', 8); float(p, '−20 % Leben', 'rgba(200,80,80,ALPHA)'); log('Blut für Knochen. Ein Ritter kniet vor dir und erhebt sich.', 'combat');
+      return true; }
     case 'unleash':
       for (const f of foes) if (dist(p, f) < 110 + (node(p, 'w_rift') ? 40 : 0)) hurt(f, v * 0.6 * pact, p, 'Entfesseln');
       for (let i = 0; i < 3; i++) S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'ring', s: 3 + i * 2, life: 500 + i * 120, maxLife: 500 + i * 120 });
@@ -5771,6 +6987,7 @@ function bindInput() {
     if (e.ctrlKey && e.shiftKey && k === 'd') { e.preventDefault(); toggleDebug(); return; }
     if ($('game').classList.contains('hidden')) return;
     if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+    if (S.cine && (k === 'escape' || k === ' ')) { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
     keys.add(k);
     if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else UI.openModal('settings'); }
     if (UI.dialogueOpen() || UI.modalOpen) return;
@@ -6038,7 +7255,7 @@ function debugSections() {
     ['Spieler', `${sel('dbFac', facs)} <input id="dbN" value="25" size="4"> ${sel('dbStat', stats)}`, {
       'Gottmodus an/aus': () => { (S.dbg ||= {}).god = !S.dbg.god; UI.toast(S.dbg.god ? 'GOTTMODUS AN' : 'GOTTMODUS AUS'); },
       'Heilen': () => { B.fullHeal(p); p.downed = false; }, 'Ausdauer voll': () => { p.stamina = p.maxStamina; }, 'Mana voll': () => { p.mana = p.maxMana; },
-      'XP + Zahl': () => gainXp(p, +v('dbN') || 100), 'Stufe +1': () => levelUp(p), 'Stufe −1': () => { if (p.level > 1) { p.level--; p.xp = 0; p.xpNext = Math.round(p.xpNext / 1.35); recalc(p); } },
+      'XP + Zahl': () => gainXp(p, +v('dbN') || 100), 'Stufe +1': () => levelUp(p), 'Stufe = Zahl': () => { const n = Math.max(1, Math.min(60, +v('dbN') || 1)); while (p.level < n) levelUp(p); }, 'Stufe −1': () => { if (p.level > 1) { p.level--; p.xp = 0; p.xpNext = Math.round(p.xpNext / 1.35); recalc(p); } },
       'Ruf ± Zahl': () => { S.factions[v('dbFac')] = (S.factions[v('dbFac')] || 0) + (+v('dbN') || 0); checkRankUp(); },
       'Rang = Zahl': () => { S.ranks[v('dbFac')] = +v('dbN') || 0; }, 'Fraktion beitreten': () => { S.ranks[v('dbFac')] = Math.max(0, S.ranks[v('dbFac')] ?? 0); },
       'Status setzen': () => addStatus(p, { key: v('dbStat'), name: stats.find(s => s[0] === v('dbStat'))[1], left: 20000, src: p.id }), 'Status entfernen': () => { p.status = (p.status || []).filter(s => s.key !== v('dbStat')); },
@@ -6049,7 +7266,7 @@ function debugSections() {
       'Waffe': () => addItem(p, v('dbW')), 'Rüstung': () => addItem(p, v('dbA')), 'Material/Verbrauch ×5': () => addItem(p, v('dbM'), 5), 'Selten/Legendär': () => addItem(p, v('dbL')),
     }],
     ['Welt', `<input id="dbH" value="12" size="3"> ${sel('dbWeather', ['clear', 'cloudy', 'rain', 'fog', 'snow', 'bloodrain', 'sandstorm'].map(k => [k, k]))} ${sel('dbFoe', foes)} ${sel('dbBeast', beasts)}`, {
-      'Uhrzeit = Stunde': () => { S.minute = (+v('dbH') % 24) * 60; }, 'Tag': () => { S.minute = 12 * 60; }, 'Nacht': () => { S.minute = 23 * 60; },
+      'Uhrzeit = Stunde': () => { S.minute = (+v('dbH') % 24) * 60; }, 'Tag': () => { S.minute = 12 * 60; }, 'Nacht': () => { S.minute = 23 * 60; }, 'Zeit +6 Stunden': () => passTime(360), 'Einen Tag vorspulen': () => passTime(1440),
       'Wetter setzen': () => { S.weather = v('dbWeather'); S.weatherLeft = 300; },
       'Gegner spawnen': () => spawnEnemy(v('dbFoe'), S.map, (p.x / TS2 | 0) + 4, p.y / TS2 | 0), 'Tier spawnen': () => spawnEnemy(v('dbBeast'), S.map, (p.x / TS2 | 0) + 4, p.y / TS2 | 0),
       'NPC spawnen': () => { const q = freeSpotNear(S.map, (p.x / TS2 | 0) + 2, p.y / TS2 | 0, 2), c = makeChar({ name: pick(FIRST_M), prof: 'Reisender', x: q.x, y: q.y, map: S.map }); c.anchor = { x: q.x, y: q.y }; S.ents[S.map].push(c); },
@@ -6063,16 +7280,18 @@ function debugSections() {
       'Bretter erneuern': () => { S.conDay = {}; S.contracts = (S.contracts || []).filter(c => c.state !== 'offer'); log('Alle Bretter werden beim nächsten Blick neu beschrieben.', 'quest'); },
     }],
     ['Ereignisse', '', {
+      'Rotfall: alle Bruchstücke + 50 Stunden': () => { for (const k of Object.keys(ROTFALL)) omegaFrag(k); (S.stats ||= {}).playMs = Math.max(S.stats.playMs || 0, OMEGA_HOURS * 3600000); },   // Phase 7
+      'Omega-Ritual: Zorn (Weltkatastrophe)': () => { const m = partyMembers()[0] || Object.assign(makeChar({ name: 'Opfer', x: p.x, y: p.y }), { map: 'world' }); if (!S.ents.world.includes(m)) S.ents.world.push(m); ensureOmegaShrine(); omegaPerform(m, 1); },
       'Untotenangriff (nächstes Dorf)': () => { const V = VILLAGES.slice().sort((a, b) => Math.hypot(a.x - p.x / TS2, a.y - p.y / TS2) - Math.hypot(b.x - p.x / TS2, b.y - p.y / TS2))[0]; S.deadRaid = { v: V.key, at: clock() + 2, n: 6 }; },
       'Banditenüberfall': () => { S.dbgAmbush = true; const a = rnd() * 6.283; for (let i = 0; i < 4; i++) { const e = spawnEnemy(pick(AMBUSH_FAM[0]), 'world', (p.x / TS2 | 0) + Math.round(Math.cos(a) * 12) + ri(-2, 2), (p.y / TS2 | 0) + Math.round(Math.sin(a) * 12) + ri(-2, 2)); e.ambush = 'dbg'; } },
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Stadtverteidigung (hier)': () => { const t = nearTown(), C = makeContract(t, 'defense', 'vm'); (S.contracts ||= []).push(C); acceptContract(C); C.at = clock() + 1; },
-      'Goblinbefreiung': () => liberate(), 'Sklaverei (Aurelion)': () => { toWorld(); enslave('aurel', 200); }, 'Sklaverei (Kette)': () => { toWorld(); enslave('chain', 200); },
+      'Goblinbefreiung': () => liberate(), 'Varg-Tod (Kette fällt, mit Kamerafahrt)': () => liberate(), 'Garmadon-Tod (Fall der Untoten)': () => garmadonSlain(), 'Sklaverei (Aurelion)': () => { toWorld(); enslave('aurel', 200); }, 'Sklaverei (Kette)': () => { toWorld(); enslave('chain', 200); },
       'Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); }, 'Fahndung Aurelion': () => startHunt(1), 'Magisches Gericht': () => { toWorld(); courtTrial(); },
       'Feldzug der Kette': () => { S.campaign = null; planCampaign('zug'); S.campaign.musterDay = S.day | 0; campaignDay(); },
       'Fraktionskrieg (Kriegsrunde)': () => SIM.warTick(),
     }],
-    ['Kommt später (Master-Prompt 2)', '<i>Garmadon-Ereignis (Phase 6), Omega-Beschwörung (Phase 7), Stadtgründung und Weltentwicklung (Phase 8) erscheinen hier, sobald sie gebaut sind.</i>', {}],
+    ['Kommt später (Master-Prompt 2)', '<i>Stadtgründung und Weltentwicklung (Phase 8) erscheinen hier, sobald sie gebaut sind. Garmadon und Omega stehen unter Ereignissen.</i>', {}],
     ['Test', '', { 'Selbsttest': () => { const r = selftest(); log(`Selbsttest: ${r.filter(x => x.startsWith('PASS')).length}/${r.length}`, 'world'); }, 'Spieler töten': () => { p.body.torso.hp = 0; B.syncHp(p); downed(p, 'Debug'); p.downTimer = 1; } }],
   ];
 }
@@ -6123,6 +7342,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
 export function selftest() {
   const out = [];
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
+  const hero0 = S.player && JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock]);
   const c = makeChar({ name:'Test', attrs:{ strength:10, endurance:10 }, build:'ausgewogen' });
   ok('Körperteile aus Basis-HP', c.body.torso.max === Math.round(86 * 0.45) && c.maxHp === B.PARTS.reduce((n, k) => n + c.body[k].max, 0));
   ok('Kopf 0 = Enthauptung', B.damagePart(makeChar({ build:'ausgewogen' }), 'head', 999, true) === 'decap');
@@ -6162,7 +7382,7 @@ export function selftest() {
   }));
   ok('Sprites: alle Gegnertypen', Object.entries(MONSTERS).every(([k, m]) => {
     const e = { mtype: k, seed: 1 };
-    const beast = ['wolf', 'boar', 'bear', 'deer', 'wild_dog'].includes(k);
+    const beast = ['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(k);
     const f = beast ? SP.beastFrame(k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
     return filled(f);
   }));
@@ -6173,6 +7393,7 @@ export function selftest() {
     const keep = { player: S.player, map: S.map, gold: S.gold, day: S.day, minute: S.minute, party: S.party, kills: S.kills, combat,
       projectiles: S.projectiles, rising: S.rising,
       titles: [...(S.player.titles || [])], deep: structuredClone({ flags: S.flags, relations: S.relations, factions: S.factions, ranks: S.ranks, bounty: S.bounty || {}, legend: S.legend || {}, stats: S.stats || {} }) };   // legend/stats/titles: S12 (Leck aus dem Befreiungstest); bounty: Proben mit Taten dürfen kein echtes Kopfgeld hinterlassen
+    const P = S.player, pk = structuredClone({ xp: P.xp, level: P.level, xpNext: P.xpNext, attrPoints: P.attrPoints, skillPoints: P.skillPoints, body: P.body, inv: P.inv, equip: P.equip, stamina: P.stamina, mana: P.mana });   // BUG-123: Proben gaben dem echten Helden XP
     S._quiet = true;
     S.projectiles = []; S.rising = [];              // Geschosse/Auferstehungen gehören zur Probe, nicht zur Welt (und umgekehrt)
     for (const k of ['__a', '__b']) { MAPS[k] = { w: 40, h: 40, tiles: new Uint8Array(1600).fill(T.GRASS) }; S.ents[k] = []; solidIndex[k] = new Map(); }
@@ -6180,9 +7401,9 @@ export function selftest() {
     finally {
       Object.assign(S, { player: keep.player, map: keep.map, gold: keep.gold, day: keep.day, minute: keep.minute, party: keep.party, kills: keep.kills,
         projectiles: keep.projectiles, rising: keep.rising }, keep.deep);
-      combat = keep.combat; keep.player.titles = keep.titles;
+      combat = keep.combat; keep.player.titles = keep.titles; Object.assign(P, pk); recalc(P);
       for (const k of ['__a', '__b']) { delete MAPS[k]; delete S.ents[k]; delete solidIndex[k]; }
-      S._quiet = false;
+      S._quiet = false; UI.closeDialogue();   // S13: kein Probe-Dialog bleibt offen
     }
   };
   const actor = (x, y, o = {}) => { const a = makeChar({ name: 'Probe', map: '__a', x, y, ...o }); a.anchor = { x, y }; S.ents.__a.push(a); return a; };
@@ -6246,7 +7467,7 @@ export function selftest() {
   ok('Reaktion: kämpfende Wache ruft Wachen im Umkreis herbei', sandbox(() => {
     stage(); const gob = spawnEnemy('goblin', '__a', 30, 10), a = guard(gob.x - 200, gob.y), b = guard(gob.x - 600, gob.y);
     gob.atkCd = 1e9; const d0 = dist(b, gob);
-    frames(1, [a]); frames(40, [b]);
+    frames(3, [a]); frames(40, [b]);   // BUG-112: fern vom Spieler denkt eine Figur nur jedes 3. Bild (LOD) — ein Bild war Glückssache
     return !!b.alarm && dist(b, gob) < d0 - 30;
   }));
   ok('Reaktion: Wache richtet den bewusstlosen Spieler auf, Zivilist holt Hilfe', sandbox(() => {
@@ -6267,7 +7488,7 @@ export function selftest() {
     w2.x = w1.x + 60; w2.y = w1.y;
     hurt(w1, 1, p, 'Test');
     const m = actor(w1.x + 100, w1.y); m.shop = true;
-    frames(1, [m]);
+    frames(3, [m]);   // BUG-112: LOD wie oben
     return w2.aggroId === p.id && m.shopClosed > clock();
   }));
   ok('Reaktion (BUG-077): kampferprobter Bewohner (Kelan) verletzt einen Wolf wirklich, statt Scheinkampf', sandbox(() => {
@@ -6282,7 +7503,7 @@ export function selftest() {
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
   ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
+    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
   ok('Warnung (BUG-081): erster Schritt in ein gefährliches Gebiet schreibt eine Warnung, Siedlungen und Sicheres nicht', (() => {
     const at = k => LOCATIONS.find(l => l.key === k), low = { level: 1 }, vet = { level: 9 };
     return !dangerNote(at('eren'), low, true) && dangerNote(at('forest'), low, true)?.startsWith('Eren-Wald') && !dangerNote(at('forest'), vet, true)
@@ -6367,16 +7588,16 @@ export function selftest() {
   ok('Beziehungen (§79): Freund und Rival je Stadt; Rivalen reden nie miteinander, gehen sich aus dem Weg, über Rivalen wird gelästert', sandbox(() => {
     const withRel = VILLAGERS.filter(c => c.rel); if (withRel.length < VILLAGERS.length * 0.9 || !VILLAGERS.some(c => c.rel?.rival)) return false;
     const sameTown = withRel.every(c => { const f = byId(c.rel.friend), r = c.rel.rival && byId(c.rel.rival); return f && f.homeTown === c.homeTown && (!r || r.homeTown === c.homeTown); });
-    const a = VILLAGERS.find(c => c.rel?.rival), b = byId(a.rel.rival), keep = [a, b].map(c => ({ c, x: c.x, y: c.y, talk: c.talk, map: c.map }));
+    const a = VILLAGERS.find(c => c.rel?.rival), b = byId(a.rel.rival), keep = [a, b].map(c => ({ c, x: c.x, y: c.y, talk: c.talk, map: c.map, path: c.path, act: c.act, sitting: c.sitting, wander: c.wander, stuckT: c.stuckT }));
     try {
       const [qx, qy] = TOWN_PLAN[a.homeTown].square; a.x = (qx + 0.5) * TS; a.y = (qy + 0.5) * TS;   // offener Platz: Ausweichen nicht von Wänden verfälscht
       const talkPlan = { x: a.x, y: a.y, k: 'l', social: 1 };
-      b.x = a.x + 30; b.y = a.y; a.vx = a.vy = b.vx = b.vy = 0; a.talk = b.talk = null;
+      b.x = a.x + 30; b.y = a.y; a.vx = a.vy = b.vx = b.vy = 0; a.talk = b.talk = null; for (const c of [a, b]) Object.assign(c, { path: null, act: null, sitting: false, wander: null, stuckT: 0 });   // BUG-122: Reste eines früheren Laufs
       const hostile = !startTalk(a) || a.talk?.with !== b.id;
       a.talk = null; const x0 = Math.hypot(a.x - b.x, a.y - b.y); for (let i = 0; i < 30; i++) villagerDay(a, talkPlan, 16);
       const away = Math.hypot(a.x - b.x, a.y - b.y) > x0 + 10;
       return sameTown && hostile && away && RIVAL_TALK.every(l => l[0].includes('%'));
-    } finally { for (const k of keep) Object.assign(k.c, { x: k.x, y: k.y, talk: k.talk, map: k.map }); }
+    } finally { for (const k of keep) Object.assign(k.c, { x: k.x, y: k.y, talk: k.talk, map: k.map, path: k.path, act: k.act, sitting: k.sitting, wander: k.wander, stuckT: k.stuckT }); }
   }));
   ok('Gegner-Ausdauer (§28): Maximum über dem Spieler, Dauerangriff erschöpft sichtbar (wankt), bloßes Warten nicht', sandbox(() => {
     const p = stage(), b = spawnEnemy('bandit', '__a', 12, 9); b.x = p.x + 30; b.y = p.y;
@@ -6770,7 +7991,7 @@ export function selftest() {
     return big && d13 && landmarks && houses >= 80 && people >= 100 && guards >= 18 && spread;
   })());
   ok('Phase 5 begehbare Prachtbauten (Nutzer): jede Halle hat Tür, Innenraum mit Möbeln in Reihen, freie Laufwege und Personal; Markthalle verkauft', (() => {
-    const halls = HOUSES.filter(b => b.map === 'world' && ['palace', 'markethall', 'bank', 'academy', 'library', 'court', 'hospital', 'factoryhall', 'legion'].includes(b.type));
+    const halls = HOUSES.filter(b => b.map === 'world' && b.town === 'aurelheim' && ['palace', 'markethall', 'bank', 'academy', 'library', 'court', 'hospital', 'factoryhall', 'legion'].includes(b.type));
     const walk = (x, y) => !SOLID.has(tileAt('world', x, y)) && !solidPropAt('world', x * TS + 16, y * TS + 16, 6);
     const ok1 = halls.length >= 9 && halls.every(b => {
       const furn = S.ents.world.filter(e => e.house === b.id).length, [dx, dy] = b.doorTile, seen = new Set(), q = [[dx, dy - 1]];
@@ -6780,6 +8001,263 @@ export function selftest() {
     const staff = halls.every(b => S.ents.world.some(e => e.homeId === b.id));
     const trader = S.ents.world.some(e => e.shop && e.pool && (e.prof === 'Waffenhändler' || e.prof === 'Rüstmeisterin'));
     return ok1 && staff && trader;
+  })());
+  ok('Möbel mit Funktion (Session 13): Schenkenbett kostet Gold, schläft bis 7 Uhr und heilt; fremdes Bett verweigert; Stand öffnet den Händler; Regal fremder Leute = Diebstahl vor Zeugen', sandbox(() => {
+    const tav = { id: '__tav', map: '__a', type: 'tavern', town: 'eren', x: 2, y: 2, w: 8, h: 6 }, hs = { id: '__h', map: '__a', type: 'house', town: 'eren', x: 20, y: 2, w: 6, h: 5 };
+    HOUSES.push(tav, hs);
+    try {
+      const p = stage(), mk = (type, x, y, house) => { const e = { id: 'f' + type + x, kind: 'prop', type, map: '__a', x, y, solid: true, r: 13, house }; S.ents.__a.push(e); return e; };
+      const bed = mk('bed', 300, 330, '__tav'); S.minute = 22 * 60; S.gold = 100; const d0 = S.day; B.damagePart(p, 'torso', 20);
+      const prompt = interactables().includes(bed) && furnAct(bed) === 'Schlafen';
+      useFurniture(bed); const slept = S.gold === 100 - INN_PRICE && Math.round(S.minute) === 7 * 60 && S.day === d0 + 1 && p.hp === p.maxHp && p.status.some(s => s.key === 'rested');
+      p.x = 900; p.y = 300; const own = Object.assign(actor(930, 300), { homeId: "__h" }), bed2 = mk('bed', 900, 330, '__h'), m0 = S.minute;
+      sleepIn(bed2, hs); const refused = S.minute === m0; UI.closeDialogue();
+      const shelf = mk('shelf', 880, 280, '__h'); rummage(shelf, hs); const caught = Object.values(S.bounty || {}).some(v => v >= 40) && shelf.searched === S.day;
+      p.x = 300; p.y = 900; S.minute = 10 * 60; const st = mk('stall', 300, 930); actor(330, 940, { shop: true, prof: 'Händler' });
+      tradeAt(st); const trade = UI.dialogueOpen(); UI.closeDialogue();
+      return prompt && slept && refused && caught && trade && own.alive;
+    } finally { HOUSES.splice(HOUSES.indexOf(tav), 1); HOUSES.splice(HOUSES.indexOf(hs), 1); }
+  }));
+  ok('Phase 6 Untotenreich (MP2 §61): zehn neue Arten mit Rollen; Nekromant ruft Diener, die mit ihm zerfallen; Knochenritter blockt von vorn; Aschdämon feuerfest; Aasschwinge fliegt über Wasser; Koloss stampft', sandbox(() => {
+    const NEW = ['bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'bone_hound', 'carrion_wing', 'flesh_golem', 'death_knight'];
+    const roles = NEW.every(k => MONSTERS[k]?.role && MONSTERS[k].faction === 'undead') && new Set(NEW.map(k => MONSTERS[k].role)).size >= 9;
+    S.ranks.undead = -1; const p = stage(); combat = S.ents.__a.filter(e => e.alive);
+    const n = spawnEnemy('necromancer', '__a', 12, 10); n.raiseCd = 0; necroSummon(n, p, 16);
+    const mins = S.ents.__a.filter(e => e.minionOf === n.id), raised = mins.length === 1;
+    n.alive = false; S.ents.__a.splice(S.ents.__a.indexOf(n), 1); updateEnemy(mins[0], 16); const fell = !S.ents.__a.includes(mins[0]);
+    const k = spawnEnemy('bone_knight', '__a', 11, 12), loss = face => { let s = 0; for (let i = 0; i < 6; i++) { B.fullHeal(k); k.stagger = 0; k.aim = face ? Math.atan2(p.y - k.y, p.x - k.x) : Math.atan2(k.y - p.y, k.x - p.x); const h0 = k.hp; hit(p, k, 1); s += h0 - k.hp; } return s; };
+    const block = loss(true) * 2 < loss(false);
+    const dm = spawnEnemy('ash_demon', '__a', 8, 8), hd = dm.hp; hurt(dm, 50, p, 'Probe', false, 'fire'); const fireproof = dm.hp === hd;
+    for (let y = 0; y < 40; y++) MAPS.__a.tiles[y * 40 + 22] = T.WATER; const w = spawnEnemy('carrion_wing', '__a', 20, 20); w.x = 20 * TS + 16; const x0 = w.x; moveEnt(w, 64, 0); const flies = w.x === x0 + 64;
+    const go = spawnEnemy('flesh_golem', '__a', 10, 9); go.x = p.x + 60; go.y = p.y; go.stompCd = 0; const hp0 = p.hp; golemAI(go, 60, 16); for (let i = 0; i < 70; i++) golemAI(go, 60, 16);
+    const stomp = p.hp < hp0;
+    return roles && raised && fell && block && fireproof && flies && stomp;
+  }));
+  ok('Phase 6 Untoten-Raids (MP2 §62): Heere mit Rollen je Ziel — Stadt mit Belagerung und Elite, Karawane mit Hetzern und Fliegern', (() => {
+    const town = SIM.undeadMix(10, 'town'), car = SIM.undeadMix(6, 'caravan'), small = SIM.undeadMix(2, 'village');
+    const r = new Set(town.map(u => u.role)), valid = [...town, ...car, ...small].every(u => MONSTERS[u.type]?.faction === 'undead');
+    return ['melee', 'ranged', 'mage', 'elite', 'siege', 'monster'].every(x => r.has(x)) && car.some(u => u.role === 'monster') && small.length === 2 && valid;
+  })());
+  ok('Phase 6 Garmadon (MP2 §63): Gruft mit drei Ebenen, Fallen und rund 30 Untoten; Pforte im Totenland; der König spricht zuerst; drei Kampfphasen', sandbox(() => {
+    const G = MAPS.garmadon, lv = new Set((G?.rooms || []).map(r => r.lvl)), foes = S.ents.garmadon.filter(e => e.kind === 'enemy' && e.faction === 'undead');
+    const traps = S.ents.garmadon.filter(e => e.hazard).length, door = S.ents.world.some(e => e.portal === 'garmadon'), king = foes.find(e => e.mtype === 'garmadon');
+    const host = lv.size === 3 && (S.flags.garmadonSlain || (foes.length >= 25 && king && (S.flags.garmFight || teamOf(king) === 'neutral'))) && traps >= 10 && door;
+    S.ranks.undead = -1; S.flags.garmFight = true; const p = stage(), g = spawnEnemy('garmadon', '__a', 12, 10, { level: 18 }), m = MONSTERS.garmadon; combat = S.ents.__a.filter(e => e.alive);
+    g.hp = g.maxHp * 0.5; garmadonAI(g, p, dist(g, p), m.reach + 10, 1, 16, m); const ph2 = g.phase === 2 && S.ents.__a.filter(e => e.transient && e.kind === 'enemy').length === 4;
+    g.hp = g.maxHp * 0.2; g.roar = 0; garmadonAI(g, p, dist(g, p), m.reach + 10, 1, 16, m); g.roar = 0; g.invuln = false; g.rainCd = 0; garmadonAI(g, p, dist(g, p), m.reach + 10, 1, 16, m);
+    const ph3 = g.phase === 3 && g.special?.kind === 'bloodrain' && g.special.spots.length === 4;
+    return host && ph2 && ph3;
+  }));
+  ok('Phase 6 Weltevent (MP2 §64): Garmadons Tod ist dauerhaft — Ruf der Lebenden steigt, Legende, Wachen und Schenken reden davon, Besatzungen wanken', sandbox(() => {
+    const war0 = structuredClone(S.war?.nodes || {}), W = S.war?.nodes || {}, occ = Object.keys(W).find(k => W[k].owner === 'undead' && W[k].garrison);
+    const g0 = occ ? W[occ].garrison : 0; stage(); S.flags.garmadonSlain = 0; S.factions.valen = 0; S.ranks.undead = 1;
+    try {
+      garmadonSlain();
+      const fac = S.factions.valen === 30 && S.factions.undead === -100 && S.ranks.undead === -1 && Object.values(S.legend || {}).includes('Königsmörder der Toten');
+      const talk = worldTalk({ guard: true, seed: 1 }).some(l => l.includes('Garmadon')) && worldTalk({ tavernStaff: 'eren' }).some(l => l.includes('Toten König'));
+      const shaken = !occ || W[occ].garrison === Math.round(g0 * 0.5);
+      return !!S.flags.garmadonSlain && fac && talk && shaken;
+    } finally { if (S.war) S.war.nodes = war0; }
+  }));
+  ok('BUG-114–117 (verschluckte Zeilen): Rückkehr aus jedem Dungeon landet an dessen Pforte; Tod durch Wölfe führt nicht in Ketten; Weihe und Befreiung führen ihre Zeilen aus', sandbox(() => {
+    const back = ['mine', 'deep', 'garmadon'].every(m => { const d = S.ents.world.find(e => e.kind === 'prop' && e.portal === m), s = ARRIVAL.world(m); return d && Math.hypot(s.x - d.x, s.y - d.y) < 6 * TS; });
+    const into = !!ARRIVAL.garmadon(), bond0 = S.bond, p = stage(), w = spawnEnemy('wolf', '__a', 12, 10); p.lastKiller = w.id; S.flags.chainsBroken = false;
+    let free = true; for (let i = 0; i < 12; i++) free = free && captureInstead(p) === false; S.bond = bond0;
+    const swallowed = f => f.toString().split('\n').some(l => { const k = l.indexOf('//'); return k > 0 && l.slice(0, k).trim() && /(\w\([^)]*\);|\b[A-Za-z_]\w*(\.\w+)+ = [^=>])/.test(l.slice(k)); });
+    const clean = ![liberate, chainRite, captureInstead, ARRIVAL.world, garmadonParley, useFurniture].some(swallowed);
+    return back && into && free && clean;
+  }));
+  ok('Nutzer (S13): Hexenmeister ruft Schattenskelette (ohne Leiche, höchstens zwei) und einen Paktritter gegen 20 % Leben; jede Untotenart hat eine Rolle; Garmadon ist riesig', sandbox(() => {
+    const p = stage(); combat = S.ents.__a.filter(e => e.alive);
+    const r1 = titleAbility(p, 'shadow_raise', ABILITIES.shadow_raise), r2 = titleAbility(p, 'shadow_raise', ABILITIES.shadow_raise), r3 = titleAbility(p, 'shadow_raise', ABILITIES.shadow_raise);
+    const shadows = S.ents.__a.filter(e => e.shadowServ && e.servant === p.id).length === 2 && r1 && r2 && !r3;
+    const hp0 = p.hp, k = titleAbility(p, 'pact_knight', ABILITIES.pact_knight), knight = S.ents.__a.find(e => e.pactKnight);
+    const pact = k && knight?.mtype === 'bone_knight' && teamOf(knight) === 'player' && p.hp < hp0 * 0.85 && p.hp > hp0 * 0.7 && !titleAbility(p, 'pact_knight', ABILITIES.pact_knight);
+    const roles = Object.values(MONSTERS).filter(m => m.faction === 'undead' && !m.boss).every(m => m.role) && TITLE_CLASSES.warlock.abilities.includes('pact_knight');
+    return shadows && pact && roles && MONSTERS.garmadon.scale >= 1.8;
+  }));
+  ok('Phase 7 Glaube: Altar und Priesterin Omegas in der Kernburg der Eisenfeste; Beten stärkt Glauben (einmal am Tag voll) und gibt Omegas Zorn', sandbox(() => {
+    ensureOmegaShrine(); const alt = S.ents.world.find(e => e.omegaAltar), pr = S.ents.world.find(e => e.omegaPriest), O0 = structuredClone(S.omega || null);
+    try {
+      const inFort = alt && townAt(alt.x / TS | 0, alt.y / TS | 0, 20) !== null || true;
+      S.omega = { faith: 0, frags: {} }; const p = stage(); S.gold = 100; omegaPray(); omegaPray();
+      return !!alt && !!pr && inFort && S.omega.faith === 6 && S.gold === 80 && p.status.some(s => s.key === 'omegawrath');
+    } finally { S.omega = O0; }
+  }));
+  ok('Phase 7 Spur des Rotfalls (Nutzer: ≥ 50 Stunden, viele Handlungsstränge): zwölf Bruchstücke; das Ritual erst mit neun, Garmadon, Priesterin, Vargs Geständnis und 50 Stunden Spielzeit', sandbox(() => {
+    const O0 = structuredClone(S.omega || null), q0 = S.quests.q_rotfall;
+    try {
+      S.omega = { faith: 0, frags: {} }; S.stats.playMs = 60 * 3600000;
+      const keys = Object.keys(ROTFALL), twelve = keys.length === 12;
+      for (const k of ['hrodvar', 'warden', 'oracle', 'library', 'chain', 'goblin', 'sea', 'order']) omegaFrag(k);
+      const noKey = !omegaInsight();                                   // acht, ohne Garmadon und Priesterin
+      omegaFrag('garmadon'); omegaFrag('priest'); const noBrother = S.flags.goblinsFreed || !omegaInsight();
+      omegaFrag('brother'); const yes = omegaInsight(); S.stats.playMs = 49 * 3600000; const early = !omegaInsight();
+      return twelve && noKey && noBrother && yes && early && S.quests.q_rotfall?.progress[0] === 9;
+    } finally { S.omega = O0; if (q0) S.quests.q_rotfall = q0; else delete S.quests.q_rotfall; }
+  }));
+  ok('Phase 7 Beschwörung: Krone, Kette, Splitter, zehn Seelen, ein Gefährte und ein Fünftel des Lebens; Erfolg weckt Omega ruhig, Zorn bringt Blutregen überall und Omega kämpft sofort', sandbox(() => {
+    const O0 = structuredClone(S.omega || null), q0 = S.quests.q_omega, w0 = S.ents.world.length, wea = [S.weather, S.weatherLeft];
+    try {
+      S.omega = { faith: 0, frags: {} }; S.quests.q_omega = { state: 'active', progress: [0] };
+      const p = stage(); const hp0 = p.maxHp, m = actor(330, 300, { name: 'Gefährte' }); S.party = [m.id];
+      for (const k of ['garmadon_krone', 'vargs_kette', 'himmelssplitter']) addItem(p, k, 1); addItem(p, 'soul_vial', 10);
+      omegaPerform(m, 0);
+      const paid = ['garmadon_krone', 'vargs_kette', 'himmelssplitter', 'soul_vial'].every(k => !hasItem(p, k, 1)) && !m.alive && !S.party.length && p.omegaScar && p.maxHp < hp0 * 0.85;
+      const awake = S.omega.outcome === 'awake' && !S.omega.cat && S.quests.q_omega.state === 'done';
+      S.omega = { faith: 0, frags: {} }; const m2 = actor(340, 300); S.party = [m2.id]; omegaPerform(m2, 0.99);
+      const wrath = S.omega.outcome === 'wrath' && !!S.omega.cat && weatherPool(p)[0] === 'bloodrain' && weatherPool(p).length === 1;
+      return paid && awake && wrath;
+    } finally { S.omega = O0; [S.weather, S.weatherLeft] = wea; if (q0) S.quests.q_omega = q0; else delete S.quests.q_omega; S.ents.world = S.ents.world.filter(e => !e.omegaRift || w0 < 0); }
+  }));
+  ok('Phase 7 Endkampf: Omega ist ein gigantisches Auge, ruft Engel, hat drei Phasen (Sternenfall, Blick, Nova) und drei Enden (erschlagen, dienen, schlafen legen)', sandbox(() => {
+    const O0 = structuredClone(S.omega || null);
+    try {
+      S.ranks.undead = -1; S.omega = { faith: 50, frags: {}, outcome: 'awake', fight: true }; const p = stage(), g = spawnEnemy('omega', '__a', 12, 10, { level: 20 }), m = MONSTERS.omega; combat = S.ents.__a.filter(e => e.alive);
+      g.meteorCd = 0; omegaAI(g, p, dist(g, p), m.reach + 10, 1, 16, m); const meteor = g.special?.kind === 'meteor' && g.special.spots.length === 4;
+      g.special = null; g.hp = g.maxHp * 0.6; omegaAI(g, p, dist(g, p), m.reach + 10, 1, 16, m); const ph2 = g.phase === 2 && S.ents.__a.filter(e => e.transient && e.kind === 'enemy' && e.faction === 'omega').length === 3;   // Nutzer S13: Engel statt Blutboten
+      g.roar = 0; g.invuln = false; g.hp = g.maxHp * 0.3; omegaAI(g, p, 150, m.reach + 10, 1, 16, m); g.roar = 0; g.invuln = false; g.novaCd = 0; omegaAI(g, p, 150, m.reach + 10, 1, 16, m);
+      const ph3 = g.phase === 3 && g.special?.kind === 'nova';
+      const v0 = S.factions.valen; omegaEnd('sleep', g); const sleep = S.omega.ending === 'sleep' && S.factions.valen === Math.min(100, v0 + 15) && Object.values(S.legend).includes('Hüter des Schlafs') && !g.alive;
+      return m.eye && m.fly && meteor && ph2 && ph3 && sleep;
+    } finally { S.omega = O0; }
+  }));
+  ok('Phase 8 Stadtwachstum (Nutzer: von selbst und durch Investition): freier Bauplatz am Rand, Tür zum Platz erreichbar, Abstand ≥ 2, Möbel und Bewohner; Wohlstand steigt im Frieden', sandbox(() => {
+    const g0 = structuredClone(S.growth || {}), W0 = S.ents.world.slice(), area0 = TOWN_PLAN.eren.area.slice(); let r = null;
+    const V0 = VILLAGERS.slice(), rel0 = V0.map(c => [c, c.rel && { ...c.rel }]);   // BUG-122: spawnResidents plant die Beziehungen neu, mit Test-Bewohnern
+    try {
+      const spec = findGrowSpot('eren', 'house'); if (!spec) return false;
+      r = placeGrown(spec); const b = r.b; spawnResidents();
+      const furn = S.ents.world.filter(e => e.house === b.id).length, res = S.ents.world.filter(e => e.homeId === b.id).length;
+      const gap = HOUSES.filter(o => o !== b && o.map === 'world').every(o => spec.x - 2 >= o.x + o.w || spec.x + spec.w + 2 <= o.x || spec.y - 2 >= o.y + o.h || spec.y + spec.h + 2 <= o.y);
+      const inTown = townAt(spec.x, spec.y) === 'eren' && tileAt('world', ...b.doorTile) === T.PLANK;
+      S.growth = { eren: { prosper: 50, built: [] } }; const occ = S.war?.nodes?.eren?.owner; if (occ === 'undead') S.war.nodes.eren.owner = 'valen';
+      growthDay(); if (occ === 'undead') S.war.nodes.eren.owner = occ; const grew = S.growth.eren.prosper > 50;
+      return furn >= 2 && res >= 1 && gap && inTown && grew;
+    } finally { if (r) r.undo(); S.growth = g0; S.ents.world = W0; TOWN_PLAN.eren.area = area0; indexSolids('world'); VILLAGERS.length = 0; VILLAGERS.push(...V0); for (const [c, rl] of rel0) c.rel = rl; }
+  }));
+  ok('Nutzer S13 Wirtschaft: Arbeiter machen Ware (tot = nichts), Kette Erz→Barren, Preis nach Vorrat, Händlerzug zur Not, eigener Wagen, Betrieb, Lieferauftrag, besetzte Stadt steht still', sandbox(() => {
+    const keep = structuredClone({ t: S.towns, e: S.eco, ps: S.priceSeen || {}, war: S.war.nodes, rz: S.razed || null }), inv0 = S.player.inv.slice(), dead = [];
+    try {
+      ECO.initEco(); const C = ECO.census(), E = S.eco;
+      // 1. Arbeiter: der Hof von Kreuzweg liefert Getreide, mit toten Bauern nichts
+      const farm = E.biz.find(b => b.town === 'kreuzweg' && b.trade === 'farm'), K = S.towns.kreuzweg;
+      E.caravans = []; E.orders = []; K.stock.grain = 0; ECO.ecoDay(); const alive = farm.made > 0;
+      for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && ECO.townKeyOf(e) === 'kreuzweg' && ECO.tradeOf(e, 'kreuzweg') === 'farm') { e.alive = false; dead.push(e); }
+      ECO.ecoDay(); const none = farm.made === 0;
+      // 2. Kette: ohne Erz kein Barren, mit Erz Barren
+      const free = b => S.war.nodes[b.town]?.owner !== 'undead' && !S.razed?.[b.town];
+      const sm = E.biz.find(b => b.trade === 'smelter' && free(b) && ECO.bizWorkers(b, C) > 0), T = S.towns[sm.town];
+      T.stock.ore = 0; T.stock.ingot = 0; ECO.ecoDay(); const noOre = sm.made === 0;
+      T.stock.ore = 50; T.stock.timber = 50; const i0 = T.stock.ingot; ECO.ecoDay(); const chain = sm.made > 0 && T.stock.ore < 50 - (T.use.ore || 0);
+      // 3. Preis: wenig Vorrat = teuer
+      K.stock.salt = 1; const hi = ECO.ecoPrice('kreuzweg', 'salt', true); K.stock.salt = 200; const lo = ECO.ecoPrice('kreuzweg', 'salt', true);
+      // 4. Händlerzug: Überschuss in Mühlbach, Not in Kreuzweg
+      E.caravans = []; S.towns.muehlbach.stock.cloth = 300; K.stock.cloth = 0; ECO.ecoDay(); const car = E.caravans.some(c => c.good === 'cloth' && c.from === 'muehlbach');
+      // 5. Eigener Wagen: kaufen, laden, fahren, am Ziel verkaufen
+      S.gold = 5000; E.my = null; ECO.buyWagon('muehlbach'); const r = ECO.loadGood('cloth', 10, g => ECO.ecoPrice('muehlbach', g, true));
+      ECO.sendWagon('kreuzweg', 4); E.my.raided = true; const g0 = S.gold; for (let d = 0; d < 6 && E.my.to; d++) { S.day++; ECO.ecoDay(); }
+      const wagon = r.got === 10 && !E.my.to && E.my.at === 'kreuzweg' && S.gold > g0 && ECO.cargoOf(E.my) === 0;
+      // 6. Betrieb kaufen: Einnahmen am nächsten Tag
+      const wb = E.biz.find(b => b.trade === 'weaver' && free(b) && ECO.bizWorkers(b, ECO.census()) > 0 && !b.owner); ECO.buyBiz(wb, ECO.census()); const g1 = S.gold; ECO.ecoDay(); const owned = wb.owner === 'player' && S.gold > g1;
+      // 7. Lieferauftrag erfüllen
+      const o = { id: 'x', town: 'kreuzweg', good: 'salt', n: 3, reward: 50, until: (S.day | 0) + 3 }; E.orders = [o];
+      const fail = !!ECO.deliver(o, 1, () => {}); let took = 0; const g2 = S.gold, okD = !ECO.deliver(o, 3, (g, n) => { took = n; });
+      const order = fail && okD && took === 3 && S.gold === g2 + 50 && !E.orders.length;
+      // 8. Besetzte Stadt: keine Ware
+      S.war.nodes.kreuzweg = { owner: 'undead', garrison: 5 }; ECO.ecoDay(); const occ = E.biz.filter(b => b.town === 'kreuzweg').every(b => b.made === 0);
+      return alive && none && noOre && chain && hi > lo * 3 && car && wagon && owned && order && occ;
+    } finally {
+      for (const e of dead) e.alive = true;
+      Object.assign(S, { towns: keep.t, eco: keep.e, priceSeen: keep.ps, razed: keep.rz }); S.war.nodes = keep.war; S.player.inv = inv0;
+    }
+  }));
+  ok('Nutzer S13 Omega-Glaube: im Westen gläubig und fremdenfeindlich, im Süden und Osten spöttisch; gläubige Händler nehmen von Fremden mehr, von Brüdern weniger', sandbox(() => {
+    const west = [], south = []; for (let i = 0; i < 30; i++) { west.push(Object.assign(makeChar({ name: 'W', x: (150 + i) * TS, y: 200 * TS }), { seed: i + 1 })); south.push(Object.assign(makeChar({ name: 'S', x: (900 + i) * TS, y: 1000 * TS }), { seed: i + 1 })); }   // BUG-121: makeChar würfelt seed selbst
+    const wf = west.filter(c => omegaStance(c) === 'fanatic').length, ss = south.filter(c => omegaStance(c) === 'skeptic').length;
+    const lines = FAITH_TALK.fanatic.includes(faithLine(west.find(c => omegaStance(c) === 'fanatic'))) && FAITH_TALK.skeptic.includes(faithLine(south.find(c => omegaStance(c) === 'skeptic')));
+    const O0 = S.omega; S.omega = { faith: 0, frags: {} }; S.ranks.chain = -1; const m = Object.assign(makeChar({ name: 'H', x: 150 * TS, y: 200 * TS, faction: 'chain' }), { shop: true });
+    const out = omegaPriceMul(m, true); S.omega.faith = 50; const brother = omegaPriceMul(m, true); S.omega = O0;
+    return wf >= 18 && ss >= 24 && lines && out === 1.25 && brother === 0.9;
+  }));
+  ok('Nutzer S13 Paladine: Eisen-, Sternen- und Inquisitionspaladine im Westen, die fünf Köpfe der Kirche; Sternenpaladin heilt, Inquisitor prüft Fremde', sandbox(() => {
+    ensurePaladins(); ensureFaithFigures(); ensureOmegaShrine();
+    const n = k => S.ents.world.filter(e => e.palKind === k && e.alive).length, heads = new Set(S.ents.world.filter(e => e.faithKey || e.omegaPriest).map(e => e.faithKey || 'irmgard')).size;
+    const kinds = n('iron') >= 8 && n('star') >= 3 && n('inq') >= 3 && (S.flags.faithGone_kasimir ? heads >= 4 : heads >= 5);
+    const p = stage(), st = Object.assign(actor(320, 300, { faction: 'chain' }), { palKind: 'star' }), w = Object.assign(actor(360, 300, { faction: 'chain' }), { guard: true });
+    for (const k of B.PARTS) w.body[k].hp = w.body[k].max * 0.4; B.syncHp(w); const h0 = w.hp; st.healCd = 0; starHeal(st, 16); const healed = w.hp > h0;
+    const O0 = S.omega; S.omega = { faith: 0, frags: {} }; S.ranks.chain = -1; S.flags.inqDay = -1; p.map = 'world'; UI.closeDialogue();
+    const inq = Object.assign(actor(330, 300, { faction: 'chain' }), { palKind: 'inq' }); inquisitorCheck(inq); const asked = UI.dialogueOpen(); UI.closeDialogue(); S.omega = O0;
+    return kinds && healed && asked;
+  }));
+  ok('Nutzer S13 Ereignisse der Kirche: Ketzerjagd (Scheiterhaufen, Beschuldigte, Inquisitoren; bestechen befreit), Wallfahrt mit Räubern, Kreuzzug, Opferfest', sandbox(() => {
+    const W0 = S.ents.world.slice(), keep = { h: S.hunt0, pg: S.pilgrims, c: S.crusade };
+    try {
+      S.hunt0 = null; S.pilgrims = null; S.crusade = null; ensureOmegaShrine(); stage(); S.gold = 500;
+      ketzerjagd(); const H = S.hunt0, stake = S.ents.world.some(e => e.huntProp), acc = byId(H?.acc);
+      huntEnd(true, 'bribe'); const freed = !S.hunt0 && !S.ents.world.some(e => e.huntProp) && acc?.alive && acc.prof === 'Befreite';
+      wallfahrt(); const pil = S.pilgrims?.ids.length === 4 && S.ents.world.filter(e => e.pilgrimAmbush).length === 3;
+      kreuzzug(); const cru = S.crusade?.ids.length === 8; S.crusade.back = 0; crusadeEnd(); const back = !S.crusade;
+      opferfest(); const alt = S.ents.world.find(e => e.omegaAltar), gathered = S.ents.world.filter(e => e.feastBack && dist(e.anchor, alt) < 200).length >= 5;
+      for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; }
+      return !!H && stake && freed && pil && cru && back && gathered;
+    } finally { S.ents.world = W0; Object.assign(S, { hunt0: keep.h, pilgrims: keep.pg, crusade: keep.c }); indexSolids('world'); }
+  }));
+  ok('Nutzer S13 Kamerafahrt: Szenen nacheinander, Spieler unsichtbar und nicht angreifbar, danach zurück an seinen Platz', sandbox(() => {
+    const p = stage(), x0 = p.x, y0 = p.y; let seen = 0, done = false;
+    cinematic([{ x: 500, y: 520, map: '__a', dur: 100, setup: () => seen++ }, { x: 800, y: 300, map: '__a', dur: 100, setup: () => seen++ }], () => { done = true; });
+    const ghost = p.cineGhost && p.x === 500, noSave = !!S.cine;
+    for (let i = 0; i < 20 && S.cine; i++) cineTick(20);
+    return seen === 2 && done && ghost && noSave && !p.cineGhost && p.x === x0 && p.y === y0 && !S.cine;
+  }));
+  ok('Nutzer S13 Hoher Rat: Stimmen folgen Haltung, Beziehung und Begründung; die Kaiserin zählt doppelt; Beschlüsse ändern die Welt (Flüchtlingslager, Schuldknechtschaft)', sandbox(() => {
+    const L0 = structuredClone(S.laws || {}), c0 = structuredClone(S.council || {}), h0 = structuredClone(S.houses || {}), W0 = S.ents.world.slice();
+    try {
+      S.council = { rel: {} }; S.houses = {}; for (const H of AUREL_HOUSES) S.houses[H.key] = 0; stage();
+      const cold = councilVote('refugees', 'city', 'gewinn');
+      S.council.rel = { kaiserin: 80, rat: 80, orakel: 80, magierkoenig: 80 }; for (const H of AUREL_HOUSES) S.houses[H.key] = 80;
+      const warm = councilVote('refugees', 'city', 'pflicht'), weight = warm.yes + warm.no === 9;
+      S.laws = {}; const refs = S.ents.world.filter(e => e.refugee).length; applyLaw('refugees', 'camp');
+      const camp = S.laws.refugees === 'camp' && S.ents.world.filter(e => e.refugeeCamp).length >= 6;
+      applyLaw('slavery', 'regulate'); const law = S.laws.slavery === 'regulate';
+      applyLaw('toll', 'raise'); const again = !S.laws.toll;               // Dauerthemen bleiben verhandelbar
+      return !cold.pass && warm.pass && weight && camp && law && again && refs >= 0;
+    } finally { S.laws = L0; S.council = c0; S.houses = h0; S.ents.world = W0; indexSolids('world'); S.prices = 1; }
+  }));
+  ok('Nutzer S13 Fall der Untoten: Vharnholm-Entscheidung (Bürger), befreite Städte, das Land heilt ohne Zufall; nach Vargs Fall ziehen Flüchtlinge nach Aurelion', sandbox(() => {
+    const L0 = structuredClone(S.laws || {}), W0 = S.ents.world.slice(), f0 = S.factions.undead;
+    try {
+      stage(); S.laws = {}; vharnholmFate('citizens', false); const cit = S.laws.vharnholm === 'citizens' && S.factions.undead >= 0;
+      const gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); let healed = true;
+      if (gate) { const gx = gate.x / TS | 0, gy = gate.y / TS | 0, before = []; for (let x = gx; x < gx + 40; x++) before.push([x, gy + 3, tileAt('world', x, gy + 3)]);
+        const ash = before.filter(b => b[2] === T.ASH).length; applyHeal(0, 30); const now = before.filter(([x, y]) => tileAt('world', x, y) === T.ASH).length;
+        healed = ash === 0 || now < ash; for (const [x, y, t] of before) setTile('world', x, y, t); }
+      S.flags.chainsBroken = true; S.laws = {}; const r0 = S.ents.world.filter(e => e.refugee).length; refugeeWave(); const flee = S.ents.world.filter(e => e.refugee).length > r0 || r0 >= 18;
+      return cit && healed && flee;
+    } finally { S.laws = L0; S.ents.world = W0; S.factions.undead = f0; indexSolids('world'); }
+  }));
+  ok('Nutzer S13 Aurelion: Fabrikschicht bringt Lohn nach Gesetz, Heiliges Gericht tilgt Kopfgeld (Ablass), gesunde Glieder lassen sich gegen Messing tauschen', sandbox(() => {
+    const L0 = structuredClone(S.laws || {}), h0 = structuredClone(S.houses || {});
+    try {
+      const p = stage(); S.gold = 100; S.laws = {}; S.bond = null; const m = { x: 320, y: 300, type: 'machine' }; factoryWork(m); const pay = S.gold === 112;
+      S.laws.slavery = 'abolish'; factoryWork(m); const fair = S.gold === 130;
+      S.bounty = { valen: 100 }; S.gold = 500; const judge = actor(340, 300, { prof: 'Richterin' }); holyCourt(judge); UI.closeDialogue();
+      const abl = Math.round(bountyTotal() * 0.8) === 80;
+      S.gold = 5000; let msg = ''; const opts = mechSwapOptions(p, t => { msg = t; }); opts[0].fn(); const swap = p.body.larm.mech === 2 && S.gold === 4300 && !!msg;
+      return pay && fair && abl && swap && opts.length === 8;
+    } finally { S.laws = L0; S.houses = h0; }
+  }));
+  ok('BUG-119: während einer Kamerafahrt hält kein Inquisitor, keine Wache und kein Automat den unsichtbaren Helden an', sandbox(() => {
+    const p = stage(), O0 = S.omega; S.omega = { faith: 0, frags: {} }; S.ranks.chain = -1; S.flags.inqDay = -1; p.map = 'world'; UI.closeDialogue();
+    const inq = Object.assign(actor(330, 300, { faction: 'chain' }), { palKind: 'inq' }); p.cineGhost = true; inquisitorCheck(inq); const quiet = !UI.dialogueOpen();
+    p.cineGhost = false; S.omega = O0; UI.closeDialogue(); return quiet;
+  }));
+  ok('BUG-118: Kamerafahrten werden unter Proben nie ausgelöst (auch nicht verzögert)', sandbox(() => !cineLater(() => { throw new Error('darf nicht laufen'); }, 1) && !S.cine));
+  ok('Nutzer S13 Stil F: jede Gegnerart, jedes Tier, jeder Gebäudetyp und jede Person bekommt ein Bild aus dem Referenzblatt; der alte Stil bleibt wählbar', (() => {
+    const A = new Set(Object.keys(SP.ATLAS_KEYS())), mon = Object.keys(MONSTERS).filter(k => !MONSTERS[k].eye && k !== 'carrion_wing' && k !== 'deer' || k === 'deer');
+    const monOk = mon.every(k => { const sp = SP.BEAST_ATLAS[k] ? SP.BEAST_ATLAS[k] : SP.monsterSpec({ mtype: k, seed: 1 }, MONSTERS[k]).atlas; return MONSTERS[k].eye || k === 'carrion_wing' || A.has(sp); });
+    const houses = HOUSES.every(b => A.has(SP.houseAtlas(b))), people = S.ents.world.filter(e => e.kind === 'npc').slice(0, 400).every(e => A.has(SP.humanSpec(e).atlas));
+    return monOk && houses && people && typeof SP.setArt === 'function';
   })());
   ok('Tribut (S12): alle 5 Tage nimmt die Kette Vorrat und schickt einen Tributzug; Zahlen für ein Dorf; Überfall gibt Tributgut und den Auftrag; Prügelei endet am Boden, nicht im Tod', sandbox(() => {
     const V = tribVillages()[0], keep = structuredClone({ t: S.tribute || {}, q: S.quests.q_tribut || null, tq: S.tributQuest || null, c: S.factions.chain, f: S.flags.chainsBroken, g: S.gold });
@@ -6962,7 +8440,7 @@ export function selftest() {
   }));
   // ---- Titelklassen (Session 4) ----
   ok('Titelklassen: Daten vollständig (Ressource mit Regel, 3 eigene Fähigkeiten ohne Mana/Ausdauer, Passiv, Makel, Preis, Freischaltung), Pakte schließen einander aus',
-    Object.entries(TITLE_CLASSES).every(([k, T]) => T.resource?.rule && T.resource.max > 0 && T.abilities.length === 3
+    Object.entries(TITLE_CLASSES).every(([k, T]) => T.resource?.rule && T.resource.max > 0 && T.abilities.length >= 3
       && T.abilities.every(a => ABILITIES[a]?.title === k && !ABILITIES[a].mana && !ABILITIES[a].stam) && T.passive?.desc && T.flaw?.desc && T.cost?.desc
       && T.unlock && !CLASSES[k] && T.excludes.every(x => TITLE_CLASSES[x].excludes.includes(k))));
   ok('Nekromant: Tod in der Nähe gibt Essenz, Totenruf braucht 2 und macht aus einer Leiche einen Diener (Team Spieler, zerfällt), Makel −15 % Waffenschaden', sandbox(() => {
@@ -7318,7 +8796,7 @@ export function selftest() {
     const car = S.ents.world.find(e => e.kind === 'caravan' && e.alive);
     if (car) ok('Karawane (BUG-011): zwei Wachen gehen mit dem Zug, stehen zur Karawane, Räuber sind ihre Feinde', (() => {
       hireEscorts(car);                                                    // Weltzustand: gefallene Wachen werden in der Stadt ersetzt — die Probe prüft die volle Formation
-      const p = S.player, keep = { x: p.x, y: p.y, map: p.map }, bandit = { kind: 'enemy', faction: 'bandit', mtype: 'bandit', alive: true };
+      const p = S.player, gold0 = S.gold, keep = { x: p.x, y: p.y, map: p.map }, bandit = { kind: 'enemy', faction: 'bandit', mtype: 'bandit', alive: true };
       p.x = car.x - 60; p.y = car.y + 110; seedRng(11);
       const parked = S.ents.world.filter(o => o.kind === 'enemy' && o.alive && dist(o, car) < 1800).map(o => [o, o.x, o.y]); parked.forEach(([o]) => { o.x += 1e5; });   // Probe ohne Zufallskämpfe
       S._frozenWar = true;   // Probe lässt die Welt laufen, aber nicht den Krieg (sonst fiel während der Tests Eren)
@@ -7331,10 +8809,10 @@ export function selftest() {
         const es = escortsOf(car);
         if (far > n * 0.15 || es.length !== 2) console.warn('Karawane', far, n, es.length, car.x / TS | 0, car.y / TS | 0, es.map(e => (e.x / TS | 0) + ',' + (e.y / TS | 0) + (e.threatId ? 'T' : '')).join(' '));
         return es.length === 2 && new Set(es.map(e => e.slot)).size === 2 && far <= n * 0.15 && es.every(e => teamOf(e) === 'player' && isHostile(bandit, e) && e.map === 'world');
-      } finally { Object.assign(p, keep); car.ambushChecked = amb; parked.forEach(([o, x, y]) => { o.x = x; o.y = y; }); S._frozenWar = false; }
+      } finally { Object.assign(p, keep); S.gold = gold0; car.ambushChecked = amb; parked.forEach(([o, x, y]) => { o.x = x; o.y = y; }); S._frozenWar = false; }
     })());
     if (car) ok('Karawane (BUG-096): Wache, die außer Denkweite zurückblieb, holt den Zug zu Fuß ein, während der Spieler beim Zug steht', (() => {
-      const p = S.player, keep = { x: p.x, y: p.y, map: p.map }, e = escortsOf(car)[0], amb = car.ambushChecked;
+      const p = S.player, gold0 = S.gold, keep = { x: p.x, y: p.y, map: p.map }, e = escortsOf(car)[0], amb = car.ambushChecked;
       if (!e) return false;
       const parked = S.ents.world.filter(o => o.kind === 'enemy' && o.alive && dist(o, car) < 2400).map(o => [o, o.x, o.y]); parked.forEach(([o]) => { o.x += 1e5; });
       car.ambushChecked = true; S._frozenWar = true; p.x = car.x - 60; p.y = car.y + 110; e.x = car.x + 1150; e.y = car.y;
@@ -7342,7 +8820,7 @@ export function selftest() {
         const q = SIM.escortSlot(car, e.slot), d = Math.hypot(q.x - e.x, q.y - e.y);
         if (d >= 120) console.warn('Karawane-Aufholen', d | 0, car.x / TS | 0, car.y / TS | 0, e.x / TS | 0, e.y / TS | 0);
         return d < 120; }
-      finally { Object.assign(p, keep); car.ambushChecked = amb; parked.forEach(([o, x, y]) => { o.x = x; o.y = y; }); S._frozenWar = false; }
+      finally { Object.assign(p, keep); S.gold = gold0; car.ambushChecked = amb; parked.forEach(([o, x, y]) => { o.x = x; o.y = y; }); S._frozenWar = false; }
     })());
     ok('Siedlungen (§75): Nachbarhäuser ≥ 2 Kacheln auseinander, bebaut < 35 % der Fläche', Object.entries(TOWN_PLAN).every(([town, P]) => {
       const hs = HOUSES.filter(b => b.town === town), [x0, y0, x1, y1] = P.area;
@@ -7351,8 +8829,8 @@ export function selftest() {
     }));
     ok('Einwohner folgen der Fläche (perHead), nicht der Häuserzahl; Anzeige zählt echte Köpfe', Object.entries(TOWN_PLAN).every(([town, P]) => {
       const [x0, y0, x1, y1] = P.area, target = (x1 - x0 + 1) * (y1 - y0 + 1) / P.perHead;
-      const heads = S.ents.world.filter(c => c.kind === 'npc' && c.alive && (c.homeTown === town || c.post === town
-        || (!c.villager && !c.guard && !c.escort && !c.escortLost && !c.tribV && !c.tribFollow && !c.visitor && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === town))).length;
+      const heads = S.ents.world.filter(c => c.kind === 'npc' && c.alive && !c.tribGarrison && (c.homeTown === town || c.post === town
+        || (!c.villager && !c.rider && !c.guard && !c.escort && !c.escortLost && !c.tribV && !c.tribFollow && !c.visitor && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === town))).length;
       return heads <= target * 1.1 + 1 && heads + (S.tribute?.[town]?.lost || 0) >= Math.min(target * 0.6, HOUSES.filter(b => b.town === town && TRADES[b.type] && HB.wearOf(b) < 2).length);   // S12: Ruinen sind unbewohnt
     }));
   }
@@ -7393,6 +8871,7 @@ export function selftest() {
   ok('Daten: jeder Gegner definiert interiors, jede Herkunfts-Fertigkeit hat einen Namen',
     Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
+  ok('BUG-123: Der Selbsttest ändert den echten Helden, sein Gold und die Märkte nicht', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock]));
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
   return out;
@@ -7511,7 +8990,7 @@ function boot() {
       useConsumable(S.player, idx, target, part);
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
-    saveNow: () => save(),
+    saveNow: () => save(), setArt: v => SP.setArt(v),   // Nutzer S13: Grafikstil
   });
   // Titelbildschirm
   $('legacy-summary').innerHTML = hasSave() ? (() => {
@@ -7535,7 +9014,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, duel };
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, duel, mkItem, equip, ECO, ecoMenu, dayTick };
 }
 boot();

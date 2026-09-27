@@ -2,6 +2,7 @@
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js';
 import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js';
 import { LOCATIONS, TS, T, SOLID, HOUSES, tileAt, worldPt, wT, OX } from './world.js';
+import * as ECO from './economy.js';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -18,6 +19,7 @@ export function initSim() {
     battles: [],
   };
   S.priceSeen ||= {};
+  ECO.initEco();
   if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) spawnCaravan();
 }
 function newArmy(faction, at, strength) {
@@ -31,31 +33,13 @@ export function townState(key) {
   if (node && node.owner === 'undead') return 'Besetzt';
   if (S.war.armies.some(a => a.faction === 'undead' && (a.at === key || (NEIGH[key] || []).includes(a.at)))) return 'Bedroht';
   if (t.stock.grain < 5) return 'Hunger';
-  return GOODS.reduce((n, g) => n + t.stock[g], 0) > 90 ? 'Wohlhabend' : 'Ruhig';
+  if (t.hunger) return 'Hunger';
+  return GOODS.filter(g => t.stock[g] >= ECO.target(t, g)).length >= 8 ? 'Wohlhabend' : 'Ruhig';
 }
-export function townPrice(key, good, buy) {
-  const t = S.towns[key];
-  const need = (t.use[good] || 0) * 5 + 10;
-  const f = clamp(need / (t.stock[good] + 1), 0.45, 2.6);
-  const p = ITEMS[good].value * f;
-  return Math.max(1, Math.round(buy ? p * 1.12 : p * 0.88));
-}
-export function notePrices(key) {
-  S.priceSeen[key] = { day: S.day, p: Object.fromEntries(GOODS.map(g => [g, townPrice(key, g, true)])) };
-}
+// S13: Preise, Produktion und Verbrauch aller Städte liegen in economy.js
+export const townPrice = ECO.ecoPrice, notePrices = ECO.notePrices;
 function economyDay() {
-  for (const [key, t] of Object.entries(S.towns)) {
-    const occupied = S.war.nodes[key]?.owner === 'undead';
-    for (const g of GOODS) {
-      t.stock[g] += occupied ? 0 : (t.prod[g] || 0) * (t.pop / TOWNS[key].pop);
-      t.stock[g] -= (t.use[g] || 0) * (t.pop / TOWNS[key].pop);
-      if (t.stock[g] < 0) {
-        t.stock[g] = 0;
-        if (g === 'grain') { t.pop = Math.max(5, t.pop - 2); log(`${t.name} hungert. Menschen wandern ab.`, 'economy'); }
-      }
-      t.stock[g] = Math.min(t.stock[g], 200);
-    }
-  }
+  ECO.ecoDay();
   // Heeresversorgung: Valen isst Nordfurts Weizen
   for (const a of S.war.armies.filter(a => a.faction === 'valen')) {
     const need = a.strength / 12, nc = S.towns.northcity;
@@ -71,36 +55,46 @@ function economyDay() {
 // Straße, auch wenn eine spätere Session die Straße verlegt. Wegpunkte in Kacheln (+0,5 = Kachelmitte), Karawanen fahren ohne Kollision.
 export let ROUTE = [];
 const ROUTE_ENDS = [[62, 65], [129, 61]];                   // Eren (Marktweg) → Nordfurter Torstraße, Entwurfskoordinaten
-export function buildRoute() {
-  const [[ax, ay], [bx, by]] = ROUTE_ENDS.map(([x, y]) => worldPt(x, y));
-  const x0 = Math.min(ax, bx) - 24, y0 = Math.min(ay, by) - 24, w = Math.abs(bx - ax) + 49, h = Math.abs(by - ay) + 49;
+// S13: allgemeiner Straßenweg zwischen zwei Kacheln (A*, gleiche Kosten wie die Karawane), für Reisende. Ergebnis im Speicher
+// zwischengelagert, nicht im Spielstand. null = kein Weg. Wegpunkte nur an Knicken, in Kacheln (+0,5).
+const roadCache = new Map();
+export function roadPath(ax, ay, bx, by, pad = 24) {
+  const key = ax + ',' + ay + '>' + bx + ',' + by; if (roadCache.has(key)) return roadCache.get(key);
+  const x0 = Math.max(0, Math.min(ax, bx) - pad), y0 = Math.max(0, Math.min(ay, by) - pad), w = Math.abs(bx - ax) + 2 * pad + 1, h = Math.abs(by - ay) + 2 * pad + 1;
   const blk = new Uint8Array(w * h), I = (x, y) => (y - y0) * w + (x - x0), inB = (x, y) => x >= x0 && y >= y0 && x < x0 + w && y < y0 + h;
   for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (SOLID.has(tileAt('world', x, y))) blk[I(x, y)] = 1;
-  for (const b of HOUSES) if (b.map === 'world') for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inB(x, y)) blk[I(x, y)] = 1;
+  for (const b of HOUSES) if (b.map === 'world' && b.x + b.w >= x0 && b.y + b.h >= y0 && b.x < x0 + w && b.y < y0 + h)
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inB(x, y)) blk[I(x, y)] = 1;
   for (const e of S.ents.world) if (e.kind === 'prop' && e.solid) { const x = e.x / TS | 0, y = e.y / TS | 0; if (inB(x, y)) blk[I(x, y)] = 1; }
+  if (inB(ax, ay)) blk[I(ax, ay)] = 0; if (inB(bx, by)) blk[I(bx, by)] = 0;
   const cost = (x, y) => { const t = tileAt('world', x, y); let c = t === T.ROAD || t === T.PLANK ? 1 : t === T.DIRT ? 3 : 8;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inB(x + dx, y + dy) && blk[I(x + dx, y + dy)]) { c += 4; break; }
     return c; };
+  const hh = (x, y) => { const dx = Math.abs(x - bx), dy = Math.abs(y - by); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };   // zulässig: jede Kachel kostet ≥ 1
   const dist = new Float64Array(w * h).fill(Infinity), prev = new Int32Array(w * h).fill(-1), heap = [];
   const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k;
     if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
-  const start = I(ax, ay), goal = I(bx, by); dist[start] = 0; push(0, start);
+  const start = I(ax, ay), goal = I(bx, by); dist[start] = 0; push(hh(ax, ay), start);
   while (heap.length) {
-    const [d, i] = pop(); if (d > dist[i]) continue; if (i === goal) break;
-    const x = i % w + x0, y = (i / w | 0) + y0;
+    const [f, i] = pop(); if (i === goal) break;
+    const x = i % w + x0, y = (i / w | 0) + y0; if (f - hh(x, y) > dist[i] + 1e-9) continue;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const nx = x + dx, ny = y + dy; if (!inB(nx, ny) || blk[I(nx, ny)]) continue;
       if (dx && dy && (blk[I(x + dx, y)] || blk[I(x, y + dy)])) continue;          // keine Ecke schneiden
-      const n = I(nx, ny), nd = d + cost(nx, ny) * (dx && dy ? 1.414 : 1);
-      if (nd < dist[n]) { dist[n] = nd; prev[n] = i; push(nd, n); }
+      const n = I(nx, ny), nd = dist[i] + cost(nx, ny) * (dx && dy ? 1.414 : 1);
+      if (nd < dist[n]) { dist[n] = nd; prev[n] = i; push(nd + hh(nx, ny), n); }
     }
   }
-  const pts = [];
-  if (prev[goal] < 0) ROUTE = [[ax, ay], [bx, by]];                                  // kein Weg (sollte nicht vorkommen): gerade Linie
-  else { for (let i = goal; i >= 0; i = prev[i]) pts.push([i % w + x0, (i / w | 0) + y0]); pts.reverse();
-    ROUTE = pts.filter((q, k) => k === 0 || k === pts.length - 1 || q[0] - pts[k - 1][0] !== pts[k + 1][0] - q[0] || q[1] - pts[k - 1][1] !== pts[k + 1][1] - q[1])   // nur Knicke
+  let out = null;
+  if (prev[goal] >= 0) { const pts = []; for (let i = goal; i >= 0; i = prev[i]) pts.push([i % w + x0, (i / w | 0) + y0]); pts.reverse();
+    out = pts.filter((q, k) => k === 0 || k === pts.length - 1 || q[0] - pts[k - 1][0] !== pts[k + 1][0] - q[0] || q[1] - pts[k - 1][1] !== pts[k + 1][1] - q[1])   // nur Knicke
       .map(([x, y]) => [x + 0.5, y + 0.5]); }
+  roadCache.set(key, out); return out;
+}
+export function buildRoute() {
+  const [[ax, ay], [bx, by]] = ROUTE_ENDS.map(([x, y]) => worldPt(x, y));
+  ROUTE = roadPath(ax, ay, bx, by) || [[ax, ay], [bx, by]];                            // kein Weg (sollte nicht vorkommen): gerade Linie
   for (const c of S.ents.world) if (c.kind === 'caravan') {                           // Karawanen alter Stände: nächsten Wegpunkt in Fahrtrichtung
     const ord = c.dir > 0 ? ROUTE : ROUTE.slice().reverse();
     let best = 1, bd = Infinity;                                                      // nächster Abschnitt; Ziel ist sein Ende
@@ -369,11 +363,22 @@ function waveOrigin(node, k) {
   const a = k * 2.1;
   return ring.reduce((b, p) => (Math.cos(Math.atan2(p[1] - cy, p[0] - cx) - a) > Math.cos(Math.atan2(b[1] - cy, b[0] - cx) - a) ? p : b));
 }
+// Phase 6 (MP2 §62): Untoten-Heere mit Rollen — Nahkampf, Fernkampf, Magier, Elite, Belagerung, Monster. Das Ziel bestimmt die
+// Mischung: Städte bekommen Belagerung, Karawanen Hetzer und Flieger, Militär Elite und Schützen. Ab so vielen Einheiten wie
+// Rollen ist jede Rolle mindestens einmal dabei.
+export const UNDEAD_ROLES = { melee: ['skeleton', 'skeleton', 'zombie', 'ghoul'], ranged: ['bone_archer'], mage: ['necromancer', 'cultist'], elite: ['bone_knight', 'death_knight'],
+  siege: ['flesh_golem'], monster: ['bone_hound', 'carrion_wing', 'ash_demon', 'shade', 'wraith'] };
+const UNDEAD_MIX = { town: { melee: 5, ranged: 2, mage: 1, elite: 1, siege: 1, monster: 1 }, village: { melee: 5, ranged: 1, mage: 1, monster: 2 },
+  caravan: { melee: 2, ranged: 1, monster: 3 }, military: { melee: 3, ranged: 2, mage: 1, elite: 2, monster: 1 }, production: { melee: 3, mage: 1, siege: 1, monster: 2 } };
+export function undeadMix(n, target = 'village') {
+  const w = UNDEAD_MIX[target] || UNDEAD_MIX.village, keys = Object.keys(w), pool = keys.flatMap(r => Array(w[r]).fill(r));
+  const roles = n >= keys.length ? [...keys] : ['melee'];
+  while (roles.length < n) roles.push(pick(pool));
+  return roles.slice(0, n).map(role => ({ role, type: pick(UNDEAD_ROLES[role]) }));
+}
 function spawnWave(node, n, id) {
   const L = LOC[node], [ox, oy] = waveOrigin(node, n.wave), last = n.wave >= n.waves, keep = node === 'blackkeep';
-  const types = ['skeleton', 'skeleton', 'skeleton'];
-  for (let i = 1; i < n.wave; i++) types.push(i % 2 ? 'ghoul' : 'wraith');
-  if (keep) types.push('skeleton', 'skeleton');
+  const types = undeadMix(3 + (n.wave - 1) + (keep ? 2 : 0), keep ? 'military' : 'town').map(u => u.type);   // Phase 6: gemischte Heere
   if (last) types.push('death_captain');
   const worth = n.garrison / types.length / Math.max(1, n.waves - n.wave + 1), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
   for (const t of types) H.spawnEnemy(t, 'world', ox + ri(-2, 2), oy + ri(-2, 2),

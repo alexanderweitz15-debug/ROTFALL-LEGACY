@@ -12,6 +12,7 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
+import { ATLAS } from './ref5_atlas.js';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
@@ -102,6 +103,96 @@ function rgbaOf(col) {                                               // Farbstri
   rgbaCache.set(col, q); return q;
 }
 
+// ---------------- Stil F (Nutzer S13, Referenz 5: docs/reference/ref5-hauptstil-sprites.png) ----------------
+// Neuer Hauptstil: die Sprites aus dem Blatt des Nutzers, 1:1 ausgeschnitten (assets/ref5_atlas.png, Tabelle ref5_atlas.js).
+// Der bisherige, im Code gemalte Stil („D“) bleibt in den Optionen wählbar. ART steht in S.settings.art; setArt leert die Caches.
+export let ART = 'F';
+const artHooks = [];
+export const onArtChange = fn => artHooks.push(fn);
+export function setArt(v) {
+  v = v === 'D' ? 'D' : 'F'; if (v === ART) return; ART = v;
+  frameCache.clear(); lookCache.clear(); WPN.clear(); warmed.clear();
+  for (const f of artHooks) f();
+}
+export function refineCanvas(cv) { return cv; }   // Nachbearbeitung verworfen (Nutzer: Blatt 1:1 übernehmen)
+// ---- Atlas (Referenz 5) ----
+const atlasImg = new Image(); let atlasReady = false;
+atlasImg.onload = () => { atlasReady = true; frameCache.clear(); warmed.clear(); for (const f of artHooks) f(); };
+atlasImg.src = new URL('./assets/ref5_atlas.png', import.meta.url).href;
+export const atlasOn = () => ART === 'F' && atlasReady;
+export const APX = 0.95;                                            // Welt-Einheiten je Atlas-Pixel (Figur ~70 px → ~66 Einheiten, dann FIGK)
+const atlasCache = new Map();
+export function atlasSprite(key) {
+  let c = atlasCache.get(key); if (c) return c; const r = ATLAS[key]; if (!r || !atlasReady) return null;
+  c = document.createElement('canvas'); c.width = r[2]; c.height = r[3]; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(atlasImg, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+  const d = g.getImageData(0, 0, r[2], Math.max(1, Math.round(r[3] * 0.45))).data; let sx = 0, n = 0;   // Blickrichtung (Tiere): wo liegt der Kopf?
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { sx += (i / 4) % r[2]; n++; }
+  c._left = n ? sx / n < r[2] / 2 : true; atlasCache.set(key, c); return c;
+}
+// Posen aus einem Einzelbild: Laufen wippt, Angriff neigt sich in Blickrichtung, Treffer zurück, Knien/Sitzen gestaucht,
+// Liegen um 90° gedreht. Menschen schauen im Blatt nach vorn; nach Osten wird gespiegelt. Tiere nach ihrer Kopfseite.
+const APOSE = { w0: [0, -2, 0.035], w2: [0, -2, -0.035], a1: [0, 0, -0.14], a2: [3, 0, 0.2], a3: [1, 0, 0.09], hit: [-2, 0, -0.12], cast: [0, -1, 0], guard: [0, 1, 0.05] };
+export function atlasPose(key, dir, pose, beast = false) {
+  const src = atlasSprite(key); if (!src) return null;
+  return cacheGet('A|' + key + '|' + dir + '|' + pose + '|' + (beast ? 1 : 0), () => {
+    const W = src.width, H = src.height, flip = beast ? (dir === 'E') === src._left : dir === 'E', sgn = dir === 'W' ? -1 : 1;
+    if (pose === 'down' || pose === 'dead') {
+      const c = document.createElement('canvas'); c.width = H; c.height = W; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+      g.translate(flip ? 0 : H, flip ? W : 0); g.rotate(flip ? -Math.PI / 2 : Math.PI / 2); g.drawImage(src, 0, 0);
+      const f = meta(c, APX, H / 2, W); f.atlas = true; return f; }
+    const [dx, dy, ang] = APOSE[pose] || [0, 0, 0], sy = pose === 'kneel' || pose === 'sit' ? 0.8 : pose === 'tuck' ? 0.55 : 1;
+    const M = Math.ceil(Math.max(W, H) * 0.3), c = document.createElement('canvas'); c.width = W + 2 * M; c.height = H + 2 * M;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.translate(M + W / 2 + dx * sgn, M + H + dy); g.rotate(ang * sgn); g.scale(flip ? -1 : 1, sy); g.drawImage(src, -W / 2, -H);
+    const f = meta(c, APX, M + W / 2, M + H); f.atlas = true; return f;
+  });
+}
+// Zuordnung Spielfigur → Sprite aus dem Blatt (Beruf, Fraktion, Gegnerart); Bürger ohne eigenes Bild wechseln je Person
+const PROF_ATLAS = { Wache: 'waechter', Torwache: 'waechter', Stadtwache: 'waechter', 'Söldnerwache': 'soeldner', 'Söldner': 'soeldner', 'Ehemaliger Söldner': 'veteran', Ordenswache: 'paladin', 'Alter Paladin': 'paladin',
+  Eisenpaladin: 'ritter', Sternenpaladin: 'kleriker', Inquisitor: 'armbrustschuetze', Hochinquisitorin: 'assassine', Sternenprophet: 'schamane', Paladinmarschall: 'veteran', 'Priesterin Omegas': 'schamane',
+  Bauer: 'bauer', 'Bäuerin': 'bauer', Magd: 'bauer', Knecht: 'bauer', Schmied: 'handwerker', Schmiedin: 'handwerker', Handwerker: 'handwerker', Koch: 'handwerker', Werkmeister: 'techniker', Fabrikarbeiter: 'techniker',
+  Feinmechaniker: 'techniker', 'Magitech-Ingenieurin': 'techniker', Prothesenmacherin: 'techniker', 'Prothesenhändlerin': 'techniker', 'Händler': 'haendler', 'Händlerin': 'haendler', 'Kontorhändler': 'haendler', Kaufherr: 'haendler',
+  Hausierer: 'nomade', Reisender: 'nomade', Pilger: 'nomade', Heimkehrer: 'nomade', 'Flüchtling': 'sklave', Bettler: 'sklave', Beschuldigte: 'sklave', Befreite: 'sklave', 'Jäger': 'jaeger', 'Jägerbursche': 'jaeger',
+  'Holzfäller': 'waldlaeufer', Fischer: 'hutmann', Heilerin: 'sanitaeter', Heiler: 'sanitaeter', Medica: 'sanitaeter', Pfleger: 'sanitaeter', Magister: 'magier', Gelehrter: 'magier', Archivar: 'magier', Sternkundiger: 'magier',
+  Wirt: 'hutmann', Schankmagd: 'rotkappe', Spielmann: 'rotkappe', Edelmann: 'haendler', Edelfrau: 'haendler', Graf: 'ritter', 'Gräfin': 'haendler', 'Sonnenlegionär': 'infanterist', 'Offizier der Sonnenlegion': 'veteran',
+  Kettenwache: 'krieger', Kettenkrieger: 'krieger', Aufseher: 'berserker', Streifenwache: 'krieger', Grenzreiter: 'kavallerist', Kundschafter: 'kundschafter', 'Soldat Valens': 'infanterist', Miliz: 'infanterist',
+  Verteidigungsmeister: 'veteran', Richterin: 'magier', Gerichtsschreiber: 'magier', Dorfvorsteher: 'hutmann', Paladinmarschall2: 'veteran' };
+const CIV_ATLAS = ['mensch', 'bauer', 'hutmann', 'handwerker', 'rotkappe', 'dunkelmann', 'nomade', 'soeldner'];
+function humanAtlas(e) {
+  if (e.kind === 'player') return 'mensch';
+  if (e.goblin) return e.prof && /Krieger|Aufseher/.test(e.prof) ? 'ork' : 'goblin';
+  if (e.undead) return 'untoter';
+  if (e.robot) return 'scharfschuetze';
+  if (e.captive) return 'sklave';
+  const p = (e.prof || '').replace(' (versklavt)', '');
+  if (PROF_ATLAS[p]) return PROF_ATLAS[p];
+  if (e.guard) return e.faction === 'chain' ? 'krieger' : e.faction === 'order' ? 'paladin' : e.faction === 'aurel' ? 'infanterist' : 'waechter';
+  return CIV_ATLAS[((((e.seed || 0) * 7919) | 0) >>> 0) % CIV_ATLAS.length];
+}
+const MON_ATLAS = { goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
+  kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
+  cultist: 'schamane', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
+  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese' };
+export const ATLAS_KEYS = () => ATLAS;
+// Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
+const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
+  crossbow: 'w_armbrust', shortbow: 'w_bogen', staff: 'w_stab', wand: 'w_zauberstab', totenglocke: 'w_totenglocke', rotklaue: 'w_rotklaue', schwarzzahn: 'w_schwarzzahn', kettenbrecher: 'w_kettenbrecher',
+  eisenfalke: 'w_eisenfalke', roter_henker: 'w_roter_henker', garmadons_reue: 'w_garmadons_reue', nachfrost: 'w_nachfrost', gorak_cleaver: 'w_goraks_hackmesser', mauerbrecher: 'w_mauerbrecher',
+  schrott_hellebarde: 'w_schotthellebarde', henkersaxt: 'w_kriegsaxt', kite_shield: 'w_schild', wooden_shield: 'w_schild', buckler: 'w_schild', chain_whip: 'w_kettenbrecher' };
+const WTYPE_ATLAS = { sword: 'w_langschwert', rapier: 'w_kurzschwert', dagger: 'w_dolch', axe: 'w_beil', great: 'w_zweihaender', mace: 'w_streitkolben', hammer: 'w_kriegsaxt', spear: 'w_speer',
+  polearm: 'w_hellebarde', bow: 'w_bogen', crossbow: 'w_armbrust', staff: 'w_stab', wand: 'w_zauberstab', whip: 'w_streitflegel' };
+export function itemAtlas(key, it) { if (!atlasOn()) return null; const k = ITEM_ATLAS[key] || (it?.slot === 'weapon' && WTYPE_ATLAS[it.wtype]) || (it?.slot === 'offhand' ? 'w_schild' : null); return k ? atlasSprite(k) : null; }
+// Objekte in Objektgröße aus dem Blatt (nicht aufgeblasen): Brunnen, Schrein, Pumpe, Falle, Belagerungsgerät
+export const PROP_ATLAS = { well: 'b_brunnen', shrine: 'b_heiligtum', wayshrine: 'b_heiligtum', spikes: 'u_falle', catapult: 'u_katapult', ballista: 'u_ballista', ram: 'u_rammbock' };
+export const BEAST_ATLAS = { wolf: 'wolf', wild_dog: 'wilder_hund', bear: 'baer', boar: 'wildschwein', deer: 'hirsch', bone_hound: 'leichhund' };
+// Gebäude (Typ → Bild aus dem Blatt)
+export function houseAtlas(b) {
+  const T = { cottage: 'b_holzhuette', tavern: 'b_taverne', smithy: 'b_schmiede', barracks: 'b_kaserne', legion: 'b_kaserne', merc: 'b_kaserne', chapel: 'b_kirche', manor: 'b_steinhaus', healer: 'b_steinhaus',
+    barn: 'b_getreidespeicher', stable: 'b_bauernhof', store: 'b_handelsposten', kontor: 'b_handelshaus', hall: 'b_handelshaus', bank: 'b_handelshaus', bakery: 'b_werkstatt', fisher: 'b_fischerhuette',
+    palace: 'b_festung', court: 'b_festung', markethall: 'b_marktplatz', academy: 'b_kirche', library: 'b_steinhaus', observatory: 'b_burgturm', hospital: 'b_steinhaus', bathhouse: 'b_steinhaus',
+    magitech: 'b_werkstatt', factoryhall: 'b_saegewerk' };
+  return T[b.type] || ((b.seed || 0) % 2 ? 'b_holzhuette' : 'b_steinhaus');
+}
 // Weiße Silhouette für den Trefferblitz (einmal je Frame).
 const flashCache = new WeakMap();
 export function flashOf(cv) {
@@ -263,6 +354,7 @@ export function humanSpec(e) {
   if (e.robot) Object.assign(s, ROBOT_LOOK);
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
+  s.atlas = humanAtlas(e);   // Stil F
   return s;
 }
 
@@ -297,7 +389,21 @@ export function monsterSpec(e, m) {
     s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = '';
     if (t === 'ghoul') { s.hooded = 0; s.cloth = '#2c2a24'; s.pants = '#2c2a24'; s.armor = 'leather'; s.armorCol = '#3a342a'; }
     else { s.hooded = 1; s.hood = '#aab4c0'; s.cloak = '#8a96a4'; s.cloth = '#aab4c0'; s.pants = '#aab4c0'; }
-  } else if (t === 'skeleton' || t === 'crypt_warden' || t === 'hrodvar' || t === 'death_captain') {
+  } else if (t === 'angel_blade' || t === 'angel_archer') {            // Nutzer S13: Engel — helle Haut, goldene Platte, weißer Mantel, Lichtglanz
+    s.skin = p.skin; s.face = 'skin'; s.glow = p.glow; s.hooded = 0; s.helm = t === 'angel_blade' ? 'great' : 'cap'; s.helmCol = '#d8b050'; s.crest = '#fff0b0'; s.armor = t === 'angel_blade' ? 'plate' : 'chain'; s.armorCol = '#d8c080'; s.tabard = '#f4ecd8'; s.cloak = '#e8dcc0'; s.mark = 'chevron'; s.markCol = '#c8a040'; if (t === 'angel_archer') s.quiver = 1;
+  } else if (t === 'omega') {                                          // Phase 7 Omega: goldene Platte, Blutmantel, Sternenkamm, leuchtend
+    s.skin = p.skin; s.face = 'skin'; s.glow = p.glow; s.hooded = 0; s.helm = 'great'; s.helmCol = '#c8a040'; s.crest = '#ffd27a'; s.armor = 'plate'; s.armorCol = '#8a6a3a'; s.pauld = '#5a1010'; s.tabard = '#5a1010'; s.cloak = '#3a0808'; s.mark = 'chevron'; s.markCol = '#ffd27a';
+  } else if (t === 'necromancer') {                                     // Phase 6 Nekromant: Knochengesicht unter schwarzer Kapuze, grünes Glimmen
+    s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = ''; s.hooded = 1; s.hood = '#141018'; s.robe = '#1a1420'; s.cloak = '#0e0a12'; s.mark = 'chevron'; s.markCol = '#8fe0b0';
+  } else if (t === 'zombie') {                                          // Seuchenleiche: grünliche Haut, zerrissene Kleider, keine Stiefel
+    s.hooded = 0; s.cloth = '#3a3024'; s.pants = '#2e281e'; s.boots = ''; s.glow = p.glow; s.hs = 3; s.armor = 'leather'; s.armorCol = '#2e2a20';
+  } else if (t === 'shade') {                                           // Schattenwesen: schwarz in schwarz, violette Augen
+    s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = ''; s.hooded = 1; s.hood = '#0e0c14'; s.cloak = '#0a0810'; s.cloth = '#0e0c14'; s.pants = '#0e0c14';
+  } else if (t === 'ash_demon') {                                       // Aschdämon: verkohlte Platte, Flammenkamm, glühende Augen
+    s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.hooded = 0; s.helm = 'great'; s.helmCol = '#2a1410'; s.crest = '#ff7a2a'; s.armor = 'plate'; s.armorCol = '#2a1410'; s.cloak = '#1a0e0c'; s.tabard = '#1a0e0c'; s.mark = 'chevron'; s.markCol = '#ff7a2a'; s.boots = '';
+  } else if (t === 'flesh_golem') {                                     // Leichenkoloss: vernähtes Fleisch, Lederriemen, Ketten
+    s.hooded = 0; s.skin = p.skin; s.cloth = '#2a2018'; s.pants = '#2a2018'; s.armor = 'leather'; s.armorCol = '#4a3a30'; s.strap = 1; s.glow = p.glow; s.hs = 3; s.boots = ''; s.mark = 'chevron'; s.markCol = '#6a2a1c';
+  } else if (t === 'skeleton' || t === 'crypt_warden' || t === 'hrodvar' || t === 'death_captain' || t === 'bone_knight' || t === 'bone_archer' || t === 'death_knight' || t === 'garmadon') {
     s.sp = 'skeleton'; s.skin = p.skin || '#cfc8b4'; s.hooded = 1; s.hood = '#20252a'; s.cloak = '#191c20'; s.cloth = '#22252a';
     s.face = 'skull'; s.glow = e.glow || p.glow || '#4e8f7a'; s.boots = ''; s.pants = '#22252a';   // e.glow: Diener eines Nekromanten
     if (t === 'crypt_warden') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#4a4f55'; s.armor = 'plate'; s.armorCol = '#3d4247'; s.tabard = '#1c1f24';
@@ -306,6 +412,10 @@ export function monsterSpec(e, m) {
       s.mark = 'chevron'; s.markCol = '#c05a3a'; s.cloak = '#1c1012'; }   // Hauptmann: rostige Platte, roter Kamm, glühende Augen
     if (t === 'hrodvar') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#8fb3c7'; s.crest = '#c8e6f5'; s.armor = 'plate'; s.armorCol = '#5d7383'; s.tabard = '#1d2a36';
       s.mark = 'chevron'; s.markCol = '#9fd8ff'; s.cloak = '#16202a'; }   // Frostkönig: bereifte Platte, Kammhelm, kein Schild (Zweihänder)
+    if (t === 'bone_knight') { s.hooded = 0; s.helm = 'nasal'; s.helmCol = '#5a6068'; s.armor = 'chain'; s.armorCol = '#4a5058'; s.tabard = '#1a1d22'; s.mark = 'chevron'; s.markCol = '#7fd0b8'; s.shield = 'heater'; s.shieldCol = '#2a2e34'; }   // Phase 6
+    if (t === 'bone_archer') s.quiver = 1;
+    if (t === 'death_knight') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#2a2e36'; s.crest = '#6fd8ff'; s.armor = 'plate'; s.armorCol = '#262a32'; s.tabard = '#12141a'; s.mark = 'chevron'; s.markCol = '#6fd8ff'; s.cloak = '#0c0e12'; }
+    if (t === 'garmadon') { s.hooded = 0; s.helm = 'great'; s.helmCol = '#3a2a24'; s.crest = '#e03a2a'; s.armor = 'plate'; s.armorCol = '#2a1a18'; s.pauld = '#5a1418'; s.tabard = '#1a0a0c'; s.mark = 'chevron'; s.markCol = '#e03a2a'; s.cloak = '#2a0a0c'; }   // der Tote König: rostrote Platte, Blutkamm, Königsmantel
   } else if (t === 'valen_soldier') {
     s.armor = 'chain'; s.armorCol = '#8a8f98'; s.helm = 'great'; s.helmCol = '#9aa3b0'; s.crest = '#39599c';
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
@@ -316,6 +426,7 @@ export function monsterSpec(e, m) {
   s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
   if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
+  s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
   return s;
 }
 
@@ -727,6 +838,7 @@ function warmRun(dl) {
 export const warmPending = () => warmQ.length;
 // dir: 'S' | 'N' | 'W' | 'E'. pose: i0 i1 w0..w3 a1 a2 hit cast kneel tuck down dead
 export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waffenarm weglassen (zeichnet der Renderer zur Waffe)
+  if (spec.atlas && atlasOn()) { const f = atlasPose(spec.atlas, dir, pose); if (f) return f; }   // Stil F: Bild aus dem Blatt
   const sk = specKey(spec);
   return cacheGet(sk + dir + pose + (noArm || ''), () => {
     const L = resolve(spec, sk);
@@ -1023,6 +1135,7 @@ function paintBeast(type, pal, frame, act) {
   return g;
 }
 export function beastFrame(type, pal, dir, pose, frame) {
+  if (BEAST_ATLAS[type] && atlasOn()) { const f = atlasPose(BEAST_ATLAS[type], dir, pose || (frame & 1 ? 'w0' : 'i0'), true); if (f) return f; }   // Stil F
   return cacheGet('beast|' + type + '|' + (pal.body || '') + dir + pose + frame, () => {
     if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster
       const o = paintBeast2(type, pal, frame, pose === 'dead' ? '' : pose), g0 = new G(o.w, o.h); g0.a = o.a;
@@ -1075,6 +1188,7 @@ function paintBrute(pal, frame, act) {
   return g;
 }
 export function bruteFrame(pal, dir, pose, frame) {
+  if (atlasOn()) { const f = atlasPose('riese', dir, pose || (frame & 1 ? 'w0' : 'i0')); if (f) return f; }   // Stil F: Gorak
   return cacheGet('brute|' + dir + pose + frame, () => {
     if (!OLD_FIGURES) {                                               // G4: Gorak als Goblin-Hüne im feinen Raster (Hackmesser zeichnet der Renderer)
       const look = { goblin: 1, noClub: 1, skin: pal.skin || '#556b34', hood: '#2a2019', cloak: mix(pal.cloth || '#33261a', '#000', 0.25), cloth: pal.cloth || '#33261a',
