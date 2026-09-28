@@ -280,8 +280,15 @@ export function paintFigureBack(look = WANDERER, pose = 'i0') {
 export const BW = 60, BH = 76, BOX = 30, BOY = 73;
 export const BRUTE = { hood: '#1d1c22', cloak: '#1b1a20', skin: '#9c745a', mask: '#b8ad94', eye: '#d0452c', leather: '#3e2e22', strap: '#5a4230',
   metal: '#7a7468', pants: '#2a2420', boots: '#1c1712', wrap: '#6e604c', cloth: '#3a2c24' };
-export function paintBrute(look = BRUTE, pose = 'i0', frame = 0) {   // look.goblin: Goblin-Kopf statt Kapuze/Maske; look.noClub: Waffe zeichnet der Renderer
-  const C = new Canvas2(BW, BH), b = pose === 'i1' || (pose === 'walk' && frame & 1) ? 1 : 0, gob = !!look.goblin, up = pose === 'a1';
+// S14 Stil R: dieselben Formen im gröberen Zielraster (alle Koordinaten ×sc), statt ein fertiges Bild zu verkleinern
+function scaleCanvas(C, sc) {
+  const P = C.poly.bind(C), E = C.ell.bind(C), Lm = C.limb.bind(C), St = C.set.bind(C), So = C.setOn.bind(C), f = v => Math.floor(v * sc);
+  C.poly = (p, pts) => P(p, pts.map(([x, y]) => [x * sc, y * sc])); C.ell = (p, x, y, rx, ry) => E(p, x * sc, y * sc, Math.max(0.7, rx * sc), Math.max(0.7, ry * sc));
+  C.limb = (p, pts, a, b) => Lm(p, pts.map(([x, y]) => [x * sc, y * sc]), Math.max(1.2, a * sc), Math.max(1.2, b * sc));
+  C.set = (x, y, c) => St(f(x), f(y), c); C.setOn = (p, x, y, c) => So(p, f(x), f(y), c); C.idAt = (x, y) => C.at(f(x), f(y)); return C;
+}
+export function paintBrute(look = BRUTE, pose = 'i0', frame = 0, sc = 1) {   // look.goblin: Goblin-Kopf statt Kapuze/Maske; look.noClub: Waffe zeichnet der Renderer
+  const C = sc === 1 ? new Canvas2(BW, BH) : scaleCanvas(new Canvas2(Math.ceil(BW * sc), Math.ceil(BH * sc)), sc), b = pose === 'i1' || (pose === 'walk' && frame & 1) ? 1 : 0, gob = !!look.goblin, up = pose === 'a1';
   const lL = pose === 'walk' && frame === 0 ? 3 : 0, lR = pose === 'walk' && frame === 2 ? 3 : 0;   // Schritt: Fuß hebt sich
   const P = {
     cloak: C.part('cloak', look.cloak), legL: C.part('legL', look.pants), legR: C.part('legR', mix(look.pants, '#000', 0.15)),
@@ -351,9 +358,9 @@ export function paintBrute(look = BRUTE, pose = 'i0', frame = 0) {   // look.gob
   for (const [x0, x1, l] of [[18, 27, lL], [33, 42, lR]]) for (let y = 58; y <= 64; y += 3) for (let x = x0; x <= x1; x++) C.set(x, y - l, y === 58 ? W.hi : W.b);
   // Keule: Holz mit Eisenbändern und Nägeln
   const K = ramp('#5a4a38');
-  if (!look.noClub) { for (const y of [42, 46]) for (let x = 50; x <= 59; x++) if (C.id[(y + b) * BW + x] === P.club) C.set(x, y + b, Me.sh);   // Eisenbänder
+  if (!look.noClub) { for (const y of [42, 46]) for (let x = 50; x <= 59; x++) if ((C.idAt ? C.idAt(x, y + b) : C.id[(y + b) * BW + x]) === P.club) C.set(x, y + b, Me.sh);   // Eisenbänder
     for (const [x, y] of [[53, 30], [56, 33], [57, 38], [54, 36], [52, 32]]) { C.set(x, y + b, Me.hi); C.set(x + 1, y + 1 + b, '#0b0908'); } C.set(49, 30 + b, K.hi); C.set(50, 29 + b, K.hi); }   // Nägel im Keulenkopf
-  return { w: BW, h: BH, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= BW || y >= BH ? null : C.col[y * BW + x] };   // Raster wie paintHuman
+  const w = C.W, h = C.H; return { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] };   // Raster wie paintHuman
 }
 
 // =====================================================================================================================
@@ -644,6 +651,8 @@ function humanDetails(C, L, P, side, back, b, hood) {
         for (let x = side ? 13 : 18; x <= (side ? 15 : 22); x++) C.set(x, 16 + b, x % 2 ? L.bone.b : DARKF); }
       else if (bone) { for (const [x, y] of eyes) { C.set(x, y + b, DARKF); C.set(x + (side ? -1 : 1), y + b, DARKF); if (G1) C.set(x, y + b, G1); }
         C.set(side ? 15 : 20, 13 + b, DARKF); for (let x = side ? 15 : 18; x <= (side ? 18 : 22); x++) C.set(x, 15 + b, x % 2 ? S.sh : DARKF); }
+      else if (L.face === 'eyes') { const h = P.head, E = G1 || '#ffe8a0';                 // S14 Engel: drei Augen, kein Mund
+        for (const [x, y] of side ? [[16, 9], [16, 11], [16, 13]] : [[20, 8], [18, 11], [22, 11]]) { C.setOn(h, x, y + b, '#0a0806'); C.setOn(h, x + 1, y + b, E); C.setOn(h, x + 1, y + 1 + b, '#c8a040'); } }
       else {                                                  // Gesicht (Referenz 2): Schattenhälfte, Brauenschatten, 2 px Augen, keine Mundlinie
         const h = P.head;
         for (let y = 9; y <= 18; y++) for (let x = side ? 13 : 15; x <= (side ? 20 : 25); x++)
@@ -911,19 +920,31 @@ const WDES = {
 };
 const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
   rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
-export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron) {
-  const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w, h, fn] = WDES[d];
+export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '') {   // sc < 1: S14 Stil R — dieselbe Form im gröberen Zielraster gemalt
+  const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w0, h0, fn] = WDES[d], w = Math.ceil(w0 * sc), h = Math.ceil(h0 * sc);
   const C = new Canvas2(w, h);
+  if (sc !== 1) { const P = C.poly.bind(C), E = C.ell.bind(C), Lm = C.limb.bind(C); C.poly = (p, pts) => P(p, pts.map(([x, y]) => [x * sc, y * sc]));
+    C.ell = (p, x, y, rx, ry) => E(p, x * sc, y * sc, Math.max(0.7, rx * sc), Math.max(0.7, ry * sc)); C.limb = (p, pts, a, b) => Lm(p, pts.map(([x, y]) => [x * sc, y * sc]), Math.max(1.2, a * sc), Math.max(1.2, b * sc)); }
   St = { hi: mix(St.hi, St.b, 0.35), b: mix(St.b, '#1e1c1a', 0.46), sh: mix(St.sh, '#141210', 0.52), dk: mix(St.dk, '#0c0b0a', 0.4) };   // S12: dunkle Fläche, Licht nur an der Kante (Referenz 3)
   const M = { St, wd: C.partR('wood', Wood, true), wr: C.partR('wrap', Wrap, true), ir: C.partR('iron', Iron, true), st: C.partR('steel', St, true) };
   const info = fn(C, M);
+  if (sc !== 1) { info.gx *= sc; info.gy *= sc; if (info.blade) info.blade = info.blade.map(v => Math.round(v * sc)); if (info.orb) info.orb = info.orb.map(v => v * sc); }
   C.shade();
   const metal = new Set([M.st, M.ir, ...C.parts.map((p, i) => p.name === 'dark' ? i : -1).filter(i => i >= 0)]);   // S12 Kantenpass: Schneide oben hell, Unterkante dunkel
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (!metal.has(C.id[i]) || !C.col[i]) continue;
     const up = y > 0 ? C.id[i - w] : -1, dn = y < h - 1 ? C.id[i + w] : -1;
     if (up < 0) C.col[i] = mix(C.col[i], '#e2ddd2', 0.5); else if (dn < 0) C.col[i] = mix(C.col[i], '#0c0b0a', 0.45); }
-  if (info.after) info.after((x, y, c) => { if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
+  if (info.after) info.after((x, y, c) => { x = Math.floor(x * sc); y = Math.floor(y * sc); if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.wr && (x % 3 === 0)) C.col[y * w + x] = Wrap.dk;   // Wicklung
+  if (sc !== 1) {                                                   // S14 Stil R (Nutzer: „Waffen hübscher“): Hohlkehle und Schliff, Messing/Gold und Stein nach Rarität, Wickel schräg
+    const hi = ['epic', 'legendary', 'mythic'].includes(rar), mid = rar === 'rare' || rar === 'uncommon', Br = hi ? ramp('#c8a048') : mid ? ramp('#9a7c4c') : null;
+    const lum = c => { const n = parseInt(c.slice(1), 16); return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255); };
+    if (Br) for (let i = 0; i < w * h; i++) if (C.id[i] === M.ir && C.col[i] && C.col[i][0] === '#') { const l = lum(C.col[i]); C.col[i] = l > 330 ? Br.hi : l > 200 ? Br.b : l > 110 ? Br.sh : Br.dk; }
+    for (let i = 0; i < w * h; i++) if (C.id[i] === M.wr && C.col[i]) { const x = i % w, y = (i / w) | 0; C.col[i] = (x + y) % 3 === 0 ? Wrap.dk : (x + y) % 3 === 1 ? Wrap.b : Wrap.hi; }
+    if (info.blade) { const [b0, b1, by] = info.blade; for (let x = b0 + 1; x <= b1 - 2; x++) { const i = by * w + x; if (C.id[i] === M.st) { C.col[i] = St.sh; if (C.id[i - w] === M.st) C.col[i - w] = mix(St.hi, '#f0ece0', 0.25); } } }
+    if (rar && rar !== 'common' && rar !== 'uncommon') { let px = -1; for (let x = 0; x < w && px < 0; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.ir) { px = y * w + x; break; }   // Knaufstein
+      if (px >= 0) C.col[px] = { rare: '#4a8ad8', epic: '#a050d0', legendary: '#e8a030', mythic: '#8fe8ff' }[rar] || '#4a8ad8'; }
+  }
   let ks = 0; for (const ch of key) ks = (ks * 31 + ch.charCodeAt(0)) | 0;                            // Referenz 3: benutzter Stahl — Rost, Scharten
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) { const i = y * w + x; if ((C.id[i] === M.st || C.id[i] === M.ir) && C.col[i]) { const n = h2(x + ks, y * 5 + ks);
     if (n < 0.03) C.col[i] = mix(C.col[i], '#6a3a1e', 0.35); else if (n > 0.98) C.col[i] = mix(C.col[i], '#0c0b0a', 0.4); } }

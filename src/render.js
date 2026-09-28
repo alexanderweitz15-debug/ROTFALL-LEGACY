@@ -139,12 +139,12 @@ function drawTrack(now) {
 let shown = [];
 function drawBubbles(now) {
   const z = cam.zoom, placed = []; ctx.font = `${Math.round(10 * z * 0.75 + 4)}px Cinzel, serif`; ctx.textAlign = 'center';
-  const P = S.player, talking = shown.filter(e => { const t = e.talk; return t && now >= t.at && now <= t.at + 2500 && now <= t.until; })
+  const hidden = e => { const tx = e.x / TS | 0, ty = e.y / TS | 0;   // unter einem Dach: nur hörbar, wenn man selbst im Haus ist (S14: zählt nicht gegen die 4 Plätze)
+    return HOUSES.some(b => b.map === S.map && tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !playerInside(b)); };
+  const P = S.player, talking = shown.filter(e => { const t = e.talk; return t && now >= t.at && now <= t.at + 2500 && now <= t.until && !hidden(e); })
     .sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 4);   // höchstens 4 Blasen, die nächsten zum Spieler
   for (const e of talking) {
     const t = e.talk;
-    const tx = e.x / TS | 0, ty = e.y / TS | 0;                        // unter einem Dach: nur hörbar, wenn man selbst im Haus ist
-    if (HOUSES.some(b => b.map === S.map && tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !playerInside(b))) continue;
     const a = Math.min(1, (now - t.at) / 150, (t.at + 2500 - now) / 250);
     const sx = Math.round((e.x - cam.x) * z), w = Math.ceil(ctx.measureText(t.say).width) + 10, h = Math.round(10 * z * 0.75 + 12);
     let sy = Math.round((e.y - 72 - cam.y) * z);                          // überlappt eine schon gezeichnete Blase: darüber ausweichen
@@ -801,7 +801,7 @@ const PROP_SCALE = { bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, c
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
-SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear(); bakeCache.clear(); iconCache.clear(); });   // Stil gewechselt: alles neu backen
+SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear(); bakeCache.clear(); iconCache.clear(); groundIcons.clear(); chunkCache.clear(); });   // Stil gewechselt: alles neu backen
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
 export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
@@ -1586,6 +1586,7 @@ function drawHumanoidAt(e, now, override) {
     SP.blit(c, f, 0, 0); c.restore();
     return;
   }
+  if (SP.drawnOn()) return drawHumanoidR(e, now, c, spec, pz, w, wit);   // S14 Stil R: Arme im Bild, Waffe an der Hand
   const armed = w && !e.sitting;                                   // wer sitzt, hat die Waffe abgelegt
   const wp = armed ? weaponPose(e, now, wit, pz) : null, melee = wp && !wp.ranged;
   const two = melee && wit.twohand, noArm = melee ? (two ? 'both' : wp.armSide) : null;   // S12: Zweihänder mit beiden Händen
@@ -1618,33 +1619,60 @@ function drawHumanoidAt(e, now, override) {
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - (f.px < 2 ? 58 : 44), 4, 0, 7); c.stroke(); }
 }
 
+// S14 Stil R: Waffenzustand → Bild mit Armen (sprites.humanFrameR); die Waffe sitzt an der Hand, die im Bild steht.
+// Schwung in Zehntelschritten (Ausholen → Schlag → Nachschwung als echte Einzelbilder), Ziel in Achteln.
+function drawHumanoidR(e, now, c, spec, pz, w, wit) {
+  const x = e.x, y = e.y, moving = e.vx || e.vy, walkP = 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3);
+  let W = null, dir = e.aim ?? 0;
+  if (w && !e.sitting) {
+    const wt = wit.wtype || 'sword', ranged = RANGED_W.has(wt);
+    const A = e.act && now >= e.act.at && now < e.act.until && !moving && !(e.swing > 0) ? e.act : null;
+    const ak = A ? (now - A.at) / (A.until - A.at) : 0, work = A && A.kind === 'work', low = A && !work ? (A.kind === 'rise' ? Math.round(7 * (1 - ak)) : 7) : 0;
+    const sw = work ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;
+    if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
+    const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
+    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 ? 'swing' : 'rest', vv = swingVar(e, sw);
+    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? Math.round(sw * 10) / 10 : 0, v: mode === 'swing' ? vv.v : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low };
+  }
+  let pose = pz.pose;
+  if (/^a[123]$/.test(pose) || (pose === 'cast' && W && W.mode === 'aim')) pose = moving && W && W.mode !== 'work' ? walkP : 'i0';
+  if (e.kb && e.kb.t > 0) pose = 'kb';
+  if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
+  const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
+  const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
+  const weapon = () => { if (!W || !f.hand) return; drawWeaponR(c, e, now, wit, w, W, x + (f.hand[0] - f.ox) * f.px * bsx, y + 6 + (f.hand[1] - f.oy) * f.px * bsy, dir); };
+  if (behind) weapon();
+  c.save(); c.translate(x, y + 6); c.scale(bsx, bsy); SP.blit(c, f, 0, 0);
+  const bd = e.body;                                                // verlorene Gliedmaßen: blutige Stelle am Gelenk
+  if (bd && f.limbs) for (const k of ['rarm', 'larm', 'rleg', 'lleg']) if (bd[k] && bd[k].hp <= 0 && f.limbs[k]) { const [gx, gy] = f.limbs[k]; c.fillStyle = '#6b1a12'; c.fillRect((gx - f.ox - 1) * f.px, (gy - f.oy - 1) * f.px, 2 * f.px, 2 * f.px); }
+  const fa = flashAlpha(e, now);
+  if (fa > 0) { c.globalAlpha = fa; const fl = SP.flashOf(f); Object.assign(fl, { px: f.px, ox: f.ox, oy: f.oy }); SP.blit(c, fl, 0, 0); c.globalAlpha = 1; }
+  c.restore();
+  if (spec.glow && pz.dir !== 'N') { c.globalCompositeOperation = 'lighter'; c.fillStyle = spec.glow; c.globalAlpha = 0.16 + 0.06 * Math.sin(now / 300 + (e.seed || 0));
+    c.beginPath(); c.arc(x, y + 6 + (f.eyeY - f.oy) * f.px, 6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  if (!behind) weapon();
+  if (e.carry && pz.dir !== 'N') { const ic = groundIcon(e.carry), bob = moving ? ((now / 180 | 0) & 1) : 0; c.drawImage(ic, Math.round(x - 8 + (pz.dir === 'E' ? 5 : pz.dir === 'W' ? -5 : 0)), Math.round(y - 24 - bob), 16, 16); }
+  if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 58, 4, 0, 7); c.stroke(); }
+}
+function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
+  const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
+  if (W.mode === 'swing' && !RANGED_W.has(wt)) {                  // Klingenspur: frühere Winkel derselben Kurve um die Hand
+    const col = Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210', sw = e.swing || W.q;
+    for (let k = 1; k <= 6; k++) { const past = sw - k * 0.03; if (past <= 0) break; const pa = SP.weaponAngle({ ...W, q: past }, dir), t = 1 - k / 7;
+      const bx = hx + Math.cos(pa) * len * 0.9, by = hy + Math.sin(pa) * len * 0.9, s2 = Math.round(2 * t + 1);
+      c.fillStyle = `rgba(${col},${0.6 * t})`; c.fillRect(Math.round(bx - s2), Math.round(by - s2), s2 * 2, s2 * 2); }
+  }
+  c.save(); c.translate(Math.round(hx), Math.round(hy)); c.rotate(a);
+  if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);
+  c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
+  if (Wsp.orb) { const f = ((now / 90 + (e.seed || 0)) | 0) % 5; c.fillStyle = f === 0 ? '#e8f4ff' : f < 3 ? '#8fb7e8' : '#5f8fd0'; c.fillRect((Wsp.orb[0] - Wsp.gx) * WP, (Wsp.orb[1] - Wsp.gy - 2) * WP, 2, 2); }
+  if (Wsp.runes && ((now / 140 + (e.seed || 0)) | 0) % 6 === 0) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  c.restore();
+}
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
-const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
-// S12 (Nutzer: „neue Animations-Sets je Waffe, immer etwas Variation“): v 0 Vorhand, 1 Rückhand, 2 Überkopfhieb (schwere Waffen,
-// Schwerter) bzw. Stoß tief/hoch (Stoßwaffen); j = kleine Abweichung je Hieb. Treffer bleiben unabhängig davon (resolveSwing).
-export function swingOf(wt, sw, arc, v = 0, j = 0) {
-  if (sw <= 0) return { a: 0.6, ext: 0 };
-  const wob = j * Math.sin(Math.min(1, sw) * Math.PI);
-  if (wt === 'spear' || wt === 'dagger' || wt === 'rapier') {       // Stoß: zurückziehen, vorschnellen, einholen
-    const back = wt === 'spear' ? -9 : wt === 'rapier' ? -6 : -4, fwd = (wt === 'spear' ? 22 : wt === 'rapier' ? 17 : 11) * (v === 2 ? 1.15 : 1), off = [0, 0.24, -0.24][v] + wob;
-    if (sw < 0.3) return { a: 0.15 * (1 - sw / 0.3) + off, ext: back * eo(sw / 0.3) };
-    if (sw < 0.45) return { a: off, ext: back + (fwd - back) * ei((sw - 0.3) / 0.15) };
-    return { a: off, ext: fwd * (1 - eo((sw - 0.45) / 0.55)) };
-  }
-  const heavy = wt === 'great' || wt === 'axe' || wt === 'mace' || wt === 'hammer' || wt === 'polearm';
-  const w0 = wt === 'hammer' ? 0.44 : heavy ? 0.36 : 0.28, half = arc / 2;           // Hammer: langes Ausholen
-  if (v === 2 && (heavy || wt === 'sword')) {                        // Überkopfhieb: hoch über den Kopf, steil nach vorn herunter
-    const up = -Math.PI * (heavy ? 0.85 : 0.7), down = 0.25 + wob;
-    if (sw < w0) return { a: 0.6 + (up - 0.6) * eo(sw / w0), ext: -4 * sw / w0 };
-    if (sw < 0.5) return { a: up + (down - up) * ei((sw - w0) / (0.5 - w0)), ext: 4 };
-    return { a: down + (0.6 - down) * eo((sw - 0.5) / 0.5), ext: 4 * (1 - (sw - 0.5) * 2) };
-  }
-  const start = -half - (heavy ? 0.75 : 0.4), end = half + (heavy ? 0.5 : 0.28), k = v === 1 ? -1 : 1;   // Rückhand: gespiegelter Bogen
-  if (sw < w0) return { a: k * (0.6 + (start - 0.6) * eo(sw / w0)) + wob, ext: heavy ? -3 * sw / w0 : 0 };       // ausholen
-  if (sw < 0.5) return { a: k * (start + (end - start) * ei((sw - w0) / (0.5 - w0))) + wob, ext: 2 };            // Schlag
-  return { a: k * (end + (0.6 - end) * eo((sw - 0.5) / 0.5)) + wob, ext: 2 * (1 - (sw - 0.5) * 2) };             // Nachschwung
-}
+// S14: swingOf wohnt in fig5.js (eine Quelle für Stil D und R, kein Import-Zyklus)
+export const swingOf = SP.swingOf;
 // Hiebvariante je Schlag: beim Beginn eines Schwungs gewählt (Kombo mit Zufall), je Figur gemerkt (Gegner zeichnen über Kopien → id)
 const SWING_V = new Map();
 function swingVar(e, sw) {
@@ -1817,11 +1845,20 @@ function drawEye(e, now, R) {
 }
 // Engel (Nutzer S13): zwei Flügel hinter der Figur, weiß-golden, schlagen langsam
 function drawWings(e, now, scale) {
-  const f = Math.sin(now / 260 + (e.seed || 0)) * 0.25, y0 = e.y - 38 * scale;
+  scale *= 1.35; const f = Math.sin(now / 260 + (e.seed || 0)) * 0.25, y0 = e.y - 37 * scale;   // S14: größer, an den Schultern
+  // S14 (Nutzer: „Engel gruseliger“): zweites, tieferes Flügelpaar; zerrupfte Federn mit dunklen Spalten; Augen auf den Schwingen, die blinzeln
+  for (const s of [-1, 1]) { ctx.save(); ctx.translate(e.x + s * 6 * scale, y0 + 14 * scale); ctx.rotate(s * (0.9 - f * 0.6)); ctx.scale(s * scale * 0.85, scale * 0.85);
+    ctx.fillStyle = '#a89c84'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, -10, 30, 2); ctx.lineTo(24, 8); ctx.lineTo(27, 14); ctx.lineTo(18, 12); ctx.lineTo(16, 18); ctx.quadraticCurveTo(8, 12, 0, 10); ctx.fill();
+    ctx.fillStyle = '#2a2018'; for (let k = 0; k < 3; k++) ctx.fillRect(10 + k * 6, 2 + k * 2, 1, 8);
+    ctx.restore(); }
   for (const s of [-1, 1]) { ctx.save(); ctx.translate(e.x + s * 5 * scale, y0); ctx.rotate(s * (0.35 + f)); ctx.scale(s * scale, scale);
     ctx.fillStyle = '#d8ccb0'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(22, -18, 34, -6); ctx.quadraticCurveTo(28, 6, 30, 16); ctx.quadraticCurveTo(18, 10, 0, 14); ctx.fill();
     ctx.fillStyle = '#f4ecd8'; for (let k = 0; k < 4; k++) ctx.fillRect(8 + k * 6, -6 + k * 3, 5, 12 - k);
-    ctx.fillStyle = '#c8a040'; ctx.fillRect(0, -1, 26, 2); ctx.restore(); }
+    ctx.fillStyle = '#c8a040'; ctx.fillRect(0, -1, 26, 2);
+    ctx.fillStyle = '#1a1410'; for (const [x, y] of [[14, -8], [24, -5], [20, 6]]) ctx.fillRect(x, y, 1, 7);                       // Spalten zwischen den Federn
+    const blink = ((now / 180 + (e.seed || 0) * 7 + s) | 0) % 23 === 0;
+    for (const [x, y] of [[12, 0], [22, -2], [26, 8]]) { ctx.fillStyle = '#f2ead6'; ctx.fillRect(x - 2, y - 1, 5, blink ? 1 : 3); if (!blink) { ctx.fillStyle = '#0a0806'; ctx.fillRect(x, y, 1, 1); ctx.fillStyle = '#c8a040'; ctx.fillRect(x - 2, y + 2, 5, 1); } }
+    ctx.restore(); }
 }
 function drawCreature(e, now) {
   const m = MONSTERS[e.mtype] || {};
@@ -1881,7 +1918,7 @@ function drawCreature(e, now) {
   const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
   if (e.mtype === 'zombie') { ctx.fillStyle = 'rgba(140,170,70,.13)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, 26, 14, 0, 0, 7); ctx.fill(); }   // Seuchendunst
   if (e.shadowServ) { ctx.fillStyle = 'rgba(120,80,190,.18)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, 18, 8, 0, 0, 7); ctx.fill(); }   // Schattenskelett des Hexenmeisters
-  const lean = e.mtype === 'zombie' ? (sideDir(e) === 'E' ? 0.16 : -0.16) : 0, sx = e.mtype === 'flesh_golem' ? 1.22 : 1, sy = e.mtype === 'zombie' ? 0.9 : 1, lift = e.mtype === 'shade' ? 5 + Math.sin(now / 260) * 3 : 0;   // Silhouetten: gebückt, massig, schwebend
+  const lean = e.mtype === 'zombie' ? (sideDir(e) === 'E' ? 0.16 : -0.16) : 0, sx = e.mtype === 'flesh_golem' ? 1.22 : m.angel ? 1.16 : 1, sy = e.mtype === 'zombie' ? 0.9 : 1, lift = e.mtype === 'shade' ? 5 + Math.sin(now / 260) * 3 : 0;   // Silhouetten: gebückt, massig, schwebend
   ctx.save(); ctx.translate(e.x, e.y - lift); ctx.rotate(lean); ctx.scale(scale * sx, scale * sy); ctx.translate(-e.x, -e.y);
   if (e.mtype === 'wraith') ctx.globalAlpha = e.phased > performance.now() ? 0.28 : 0.62 + 0.1 * Math.sin(now / 200);   // Geist: halb da, körperlos fast weg
   if (e.mtype === 'shade') ctx.globalAlpha = S.player && Math.hypot(e.x - S.player.x, e.y - S.player.y) > 150 ? 0.2 : 0.85;   // Phase 6: aus der Ferne kaum zu sehen
@@ -1966,12 +2003,13 @@ function drawGraveVec(e) {
 // Beute am Boden: dasselbe Pixel-Icon wie im Inventar, mit Seltenheits-Schimmer.
 const groundIcons = new Map();
 function groundIcon(key) {
-  let cv = groundIcons.get(key); if (cv) return cv;
+  let cv = groundIcons.get(key + SP.drawnOn()); if (cv) return cv;
+  if (SP.drawnOn()) { cv = document.createElement('canvas'); cv.width = cv.height = 24; if (iconR(cv.getContext('2d'), ITEMS[key] || {}, key, 24, 24)) { groundIcons.set(key + true, cv); return cv; } }   // S14 Stil R: 24 px, keine Nachpixelung
   cv = document.createElement('canvas'); cv.width = cv.height = 16;
   const tmp = document.createElement('canvas'); tmp.width = tmp.height = 48;
   drawItemIconTo(tmp, key, true);
   const o = cv.getContext('2d', { willReadFrequently: true }); o.imageSmoothingEnabled = true; o.drawImage(tmp, 0, 0, 16, 16);
-  SP.pixelize(o, 16, 16); groundIcons.set(key, cv); return cv;
+  SP.pixelize(o, 16, 16); groundIcons.set(key + false, cv); return cv;
 }
 function drawGroundItem(e, now) {
   const f = Math.round(Math.sin(now / 400 + e.seed) * 1.5) * 2;
@@ -2309,10 +2347,27 @@ export function drawFigureTo(canvas, ch) {
 
 // Item-Icons: Vektor-Vorzeichnung, dann auf ein grobes Raster pixelisiert (Kontur + Randlicht) wie die Figuren.
 const iconCache = new Map();
+// S14 Stil R (Nutzer: „den Stil auf alles“): Waffen-Symbol = das Waffen-Sprite schräg; Rüstung = die Probefigur mit genau diesem Teil,
+// auf Rumpf, Kopf oder Schild zugeschnitten — das Symbol zeigt, wie es am Körper aussieht. Pixel bleiben scharf (ganzzahlig vergrößert).
+const MANNEQUIN = { kind: 'player', pal: { skin: '#b89878', hair: '#2b2118', cloth: '#3a3026' }, seed: 1 };   // seed 1: kein Zufallsumhang
+function iconR(c, it, key, w, h) {
+  let src = null;
+  if (it.slot === 'weapon') { const W = SP.weaponSprite(key, it.rarity, it.holy, it.wtype), L = Math.hypot(W.cv.width, W.cv.height), n = Math.ceil(L * 0.72) + 2;
+    src = document.createElement('canvas'); src.width = src.height = n; const t = src.getContext('2d'); t.imageSmoothingEnabled = false;
+    t.translate(n / 2, n / 2); t.rotate(it.wtype === 'bow' ? -0.35 : -Math.PI / 4); t.drawImage(W.cv, -W.cv.width / 2, -W.cv.height / 2); }
+  else if (['chest', 'head', 'offhand', 'cloak'].includes(it.slot)) {
+    const f = SP.humanFrameR(SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }), it.slot === 'offhand' ? 'W' : 'S', it.slot === 'offhand' ? 'guard' : 'i0');
+    const [x0, y0, x1, y1] = it.slot === 'head' ? [9, 0, 23, 15] : it.slot === 'offhand' ? [5, 12, 19, 30] : it.slot === 'cloak' ? [5, 3, 27, 46] : [6, 11, 26, 38];
+    src = document.createElement('canvas'); src.width = x1 - x0; src.height = y1 - y0; src.getContext('2d').drawImage(f, -x0, -y0); }
+  if (!src) return false;
+  const k0 = Math.min((w - 2) / src.width, (h - 2) / src.height), k = k0 >= 2 ? Math.floor(k0) : k0, dw = Math.round(src.width * k), dh = Math.round(src.height * k);   // ab 2× ganzzahlig
+  c.imageSmoothingEnabled = false; c.drawImage(src, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh); return true;
+}
 export function drawItemIconTo(canvas, key, raw) {
   const it = ITEMS[key]; const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
   c.clearRect(0, 0, w, h); if (!it) return;
+  if (SP.drawnOn() && iconR(c, it, key, w, h)) return;               // S14 Stil R: Symbol aus dem echten Sprite
   if (raw) return drawItemVec(c, it, key, w, h);
   const A = SP.itemAtlas(key, it); if (A) { const s = Math.min((w - 4) / A.width, (h - 4) / A.height), dw = A.width * s, dh = A.height * s; c.imageSmoothingEnabled = false; c.drawImage(A, (w - dw) / 2, (h - dh) / 2, dw, dh); return; }   // Stil F: Symbol aus dem Blatt
   const ck = key + '|' + w + 'x' + h;

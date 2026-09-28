@@ -417,7 +417,6 @@ function spawnWave(node, n, id) {
   log(last ? `Welle ${n.wave}/${n.waves}: der Hauptmann der Toten führt sie selbst.` : `Welle ${n.wave}/${n.waves} marschiert auf ${L.name}.`, 'combat');
   H.toast(last ? 'DER HAUPTMANN DER TOTEN' : `WELLE ${n.wave}/${n.waves}`);
 }
-export const spawnWaveForTest = (node, n, id) => spawnWave(node, n, id);
 export const materializeForTest = (node, att, def) => materialize(node, att, def);   // Selbsttest
 export function unitDied(e) {
   const a = findArmy(e.armyId); if (a) setStrength(a, a.strength - (e.worth || 5));
@@ -484,4 +483,3 @@ export function warSummary() {
   return `${t}<br><br>${armies}`;
 }
 export const warGraph = () => ({ nodes: S.war.nodes, edges: WAR_EDGES, loc: LOC, armies: S.war.armies });
-export const townAtLoc = key => S.towns && S.towns[key] ? key : null;

@@ -8,7 +8,7 @@
 //   Licht     oben links: Nordhang heller, Südhang Grundton, zur Traufe dunkler; Traufkante tiefdunkel.
 //   Material  Dach: Stroh / Holzschindel / Schiefer / Ziegel. Wand: Fachwerk / Holz / Stein / Putz / heller Stein.
 //   Funktion  von außen lesbar: Schild mit Symbol, Esse mit Glut, Banner, Kräuterbündel, Rosette, Wappen.
-import { G, toCanvas, ramp, mix } from './sprites.js';
+import { G, toCanvas, ramp, mix, drawnOn } from './sprites.js';
 
 const hh = (x, y, s = 0) => { let n = (x * 374761393 + y * 668265263 + s * 2246822519) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 
@@ -38,7 +38,11 @@ const ROOF_VAR = { thatch: ['#8a6a34', '#7e6232', '#94703a', '#6e5a30'], shingle
 const WALL_VAR = { timber: ['#b1a283', '#a8997b', '#b9ac90'], wood: ['#5d4632', '#534030', '#654d37'], stone: ['#6c665c', '#645f58', '#736b5f'],
   plaster: ['#a89a7e', '#b4a88d', '#a39177', '#aba390', '#b39a85'], palestone: ['#9b968a', '#a39d91', '#938e83'], blackstone: ['#3f3d39', '#383633', '#46423c'] };
 const DIM = { timber: 0.42, plaster: 0.38, palestone: 0.22, stone: 0.15, wood: 0.12 };                       // Session 10: dunkler, gealtert
-const varOf = (tab, kind, b, salt) => { const a = tab[kind], c = a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0]; return tab === WALL_VAR && DIM[kind] ? mix(c, '#2a221a', DIM[kind]) : c; };
+// S14 Stil R (Referenz 5): kräftigere Dächer (goldenes Stroh, rotbraune Schindeln, blauer Schiefer, rote Ziegel), Wände weniger abgedunkelt
+const ROOF_VAR_R = { thatch: ['#b08a3e', '#a07a34', '#bc9444', '#9a7434'], shingle: ['#7a4a34', '#6e4230', '#84523a', '#704636'], slate: ['#3a4c6a', '#445878', '#34465e', '#40506c'],
+  bone: ['#5e5a50', '#54504a', '#686256', '#4c4842'], tile: ['#a8402a', '#b44a30', '#963a26', '#a44632', '#9c3e2c'] };
+const varOf = (tab, kind, b, salt) => { const R = drawnOn(), a = (R && tab === ROOF_VAR ? ROOF_VAR_R : tab)[kind], c = a[(hh(b.hx ?? b.x, b.hy ?? b.y, salt) * a.length) | 0];
+  return tab === WALL_VAR && DIM[kind] ? mix(c, '#2a221a', DIM[kind] * (R ? 0.55 : 1)) : c; };
 const BEAM = '#3e2e20', DOORW = '#4a3322', IRON = '#35332f';
 const SHUTTER = ['#4a5a3a', '#5a3a2a', '#3a4a5a', '#5a5030'];
 
@@ -179,7 +183,7 @@ export function houseSprite(b, lit) {
   const wear = wearOf(b), sty = styleOf(b);
   if (wear === 2) lit = false;                                      // verlassen: nachts dunkel
   const roofKind = b.roof || (st.alt && hh(b.hx ?? b.x, b.hy ?? b.y, 71) < 0.3 ? st.alt : st.roof), wallKind = b.wall || T.wall || st.wall;   // Referenz 4: gemischte Dächer im Ort
-  const { OV, RISE, FH, W, H } = houseDims(b), s = b.seed || 1;
+  const { OV, RISE, FH, W, H } = houseDims(b), s = b.seed || 1, RR = drawnOn();
   const g = new G(W, H);
   const n = (x, y) => hh(x, y, s);
   const yF = RISE + b.h * 16 - FH, yB = RISE + b.h * 16;           // Fassade oben / Grundlinie
@@ -232,6 +236,7 @@ export function houseSprite(b, lit) {
     g.r(x0 - 1, y0 - 1, 8, 10, Br.dk); g.r(x0 - 1, y0 + 8, 8, 1, '#6a6458');            // Rahmen, Fensterbank (6×8 Glas)
     for (let y = y0; y < y0 + 8; y++) for (let x = x0; x < x0 + 6; x++)
       g.p(x, y, lit ? (x === x0 + 2 || y === y0 + 3 ? '#8a5020' : (x + y) % 3 ? '#e2a95a' : '#f2cf8a') : (x === x0 + 2 || y === y0 + 3 ? Br.dk : x === x0 + 1 && y === y0 + 1 ? '#5a6470' : y > y0 + 4 ? '#101316' : '#181c21'));
+    if (RR) { g.r(x0 - 1, y0 + 8, 8, 1, '#8a8274'); g.r(x0 - 1, y0 + 9, 8, 1, '#3a3630'); if (lit) for (let y = y0 + 10; y < Math.min(yB - 3, y0 + 14); y++) for (let x = x0; x < x0 + 6; x++) { const c = g.at(x, y); if (c) g.p(x, y, mix(c, '#e2a95a', 0.18 - (y - y0 - 10) * 0.04)); } }   // S14 Stil R: Bank, Lichtschein
     if (wallKind === 'timber' || wallKind === 'wood') { const Sr = ramp(shut); g.r(x0 - 3, y0, 2, 8, Sr.b); g.p(x0 - 3, y0, Sr.hi); g.p(x0 - 3, y0 + 4, Sr.dk); g.r(x0 + 7, y0, 2, 8, Sr.sh); g.p(x0 + 7, y0 + 4, Sr.dk); }
     return [x0, y0];
   };
@@ -272,7 +277,16 @@ export function houseSprite(b, lit) {
     let c = west ? mix(R.hi, R.b, 0.15) : mix(R.sh, R.dk, 0.25);          // Westfläche im Licht, Ostfläche deutlich im Schatten
     c = mix(c, R.dk, depth * 0.18);                                        // hintere Dachhälfte etwas dunkler (Tiefe)
     const lane = Math.floor(k / cw), pos = k - lane * cw, r = n(x, y);
-    if (roofKind === 'thatch') {
+    if (RR) {                                                              // S14 Stil R: Lagen quer, Stoßfugen versetzt, Licht an der Oberkante jeder Lage
+      const rh = roofKind === 'thatch' ? 3 : roofKind === 'tile' ? 4 : 3, row = Math.floor(y / rh), ry = y - row * rh, jw = roofKind === 'slate' ? 5 : roofKind === 'tile' ? 4 : 6;
+      const jx = (x + (row & 1) * (jw >> 1) + ((hh(row, 3, s) * 3) | 0)) % jw, tone = hh(Math.floor((x + (row & 1) * (jw >> 1)) / jw), row, s);
+      if (ry === rh - 1) c = mix(c, R.dk, roofKind === 'thatch' ? 0.45 : 0.65);                      // Schattenkante unter der Lage
+      else if (ry === 0) c = mix(c, R.hi, 0.3);
+      if (roofKind !== 'thatch' && jx === 0 && ry < rh - 1) c = mix(c, R.dk, 0.5);                  // Stoßfuge
+      else if (roofKind === 'thatch' && (x + row) % 2 === 0 && ry === 1) c = mix(c, R.dk, 0.18);    // Halme
+      if (tone > 0.84) c = mix(c, R.hi, 0.18); else if (tone < 0.12) c = mix(c, R.dk, 0.22);
+      if (roofKind === 'tile' && ry === 1 && jx === 1) c = mix(c, R.hi, 0.35);                     // Wölbung der Ziegel
+    } else if (roofKind === 'thatch') {
       if (pos >= cw - 1) c = mix(c, R.dk, 0.5);                            // Lagenkante
       else if (pos === 0) c = mix(c, R.hi, 0.2);
       if ((y + lane * 3) % 4 === 0) c = mix(c, R.dk, 0.22);                // Halmbündel

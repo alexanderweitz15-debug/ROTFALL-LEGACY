@@ -12,9 +12,12 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { ATLAS } from './ref5_atlas.js';
+import { ITEMS } from './data.js';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
+import { paintR, paintTuckR, paintBeastR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY } from './fig5.js';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
 // Stil D (Session 10): feine Frames werden auf ein gröberes Raster gebracht (COARSE Welt je Pixel) — näher an der pixeligen
@@ -109,12 +112,12 @@ function rgbaOf(col) {                                               // Farbstri
 export let ART = 'D';
 const artHooks = [];
 export const onArtChange = fn => artHooks.push(fn);
+export const drawnOn = () => ART === 'R';                          // S14: Stil R (Nutzer: erst nur optional wählbar)
 export function setArt(v) {
-  v = v === 'F' ? 'F' : 'D'; if (v === ART) return; ART = v;
+  v = v === 'F' || v === 'R' ? v : 'D'; if (v === ART) return; ART = v;
   frameCache.clear(); lookCache.clear(); WPN.clear(); warmed.clear();
   for (const f of artHooks) f();
 }
-export function refineCanvas(cv) { return cv; }   // Nachbearbeitung verworfen (Nutzer: Blatt 1:1 übernehmen)
 // ---- Atlas (Referenz 5) ----
 const atlasImg = new Image(); let atlasReady = false;
 atlasImg.onload = () => { atlasReady = true; frameCache.clear(); warmed.clear(); for (const f of artHooks) f(); };
@@ -204,11 +207,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole'];
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw'];
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '' };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0 };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -380,10 +383,37 @@ export function humanSpec(e) {
   if (e.robot) Object.assign(s, ROBOT_LOOK);
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
+  regionFarmer(s, e, prof, key);
+  s.hv = heavyOf(w);
   s.atlas = humanAtlas(e);   // Stil F
+  s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
 
+// S14 (Nutzer: „wer große Waffen trägt, soll auch so aussehen“): Zweihänder, Hämmer, große Äxte, Stangenwaffen → breiter, muskulöser
+const HEAVY_W = new Set(['great', 'hammer', 'polearm', 'axe', 'mace']);
+const heavyOf = k => { const it = k && ITEMS[k]; return it && it.twohand && HEAVY_W.has(it.wtype) ? 1 : 0; };
+// S14 (Nutzer: „die westlichen Bauern, die an Omega glauben, sollen anders aussehen als die im Osten“). Grenzen wie omegaStance
+// (game.js): Westen x < 330 Kacheln, Osten x > 700. Mitte bleibt wie bisher (Strohhut, Kittel).
+// Westen: aschgraue Kittel, Haube oder schwarzer Hut, Stern Omegas auf der Brust, roter Strick als Gürtel, vom Tribut verschlissen.
+// Osten: verblichenes Grün-Grau, Strohumhang mit Kapuze oder Filzkappe, Beinwickel, oft barfuß, Knochenamulett gegen die Toten.
+const FARMERS = new Set(['Bauer', 'Bäuerin', 'Magd', 'Tagelöhner', 'Hirte', 'Knecht']);
+function regionFarmer(s, e, prof, key) {
+  if (!FARMERS.has(prof) || NAMED_LOOK[key]) return;
+  const tx = ((e.anchor?.x ?? e.x) || 0) / 32, v = Math.abs(((e.seed || 0) * 977) | 0) % 3, fem = prof === 'Magd' || prof === 'Bäuerin';
+  if (tx < 330) {
+    Object.assign(s, { cloth: ['#3a3734', '#2e2c2a', '#44403a'][v], pants: '#24221f', belt: '#5a1a1c', star: 1, wear: Math.max(s.wear || 0, 1), cape: '', scarf: '' });
+    if (fem) Object.assign(s, { robe: s.cloth, helm: 'scarf', helmCol: '#1c1a1a', apron: 1, apronCol: '#5a5650' });
+    else if (v === 0) Object.assign(s, { helm: 'scarf', helmCol: '#4a4640', hs: 2 });                       // Haube
+    else if (v === 1) Object.assign(s, { helm: 'hat', helmCol: '#161514', beard: 1 });                      // schwarzer Glaubenshut
+    else Object.assign(s, { helm: '', hs: 2, beard: 0, hem: 44, stole: '#4a1418' });                     // geschoren, roter Streifen
+  } else if (tx > 700) {
+    Object.assign(s, { cloth: ['#4a4c3a', '#3e4234', '#55503e'][v], pants: '#34342a', charm: 1, wraps: 1, belt: '#4a3a28' });
+    if (v !== 1) Object.assign(s, { hooded: 1, hood: '#6a5c3c', cape: '#8a7a48', straw: 1, helm: '', boots: v === 2 ? '' : s.boots });   // Strohumhang
+    else Object.assign(s, { helm: 'cap', helmCol: '#4a3a2a', boots: '', hs: 1, beard: fem ? 0 : 1 });                                  // Filzkappe, barfuß
+    if (fem) Object.assign(s, { robe: s.cloth, apron: 1, apronCol: '#6a6250' });
+  }
+}
 // Humanoide Gegner (Goblins, Banditen, Untote, Soldaten).
 export function monsterSpec(e, m) {
   const p = (m && m.pal) || {}, s = baseSpec(), t = e.mtype;
@@ -416,7 +446,7 @@ export function monsterSpec(e, m) {
     if (t === 'ghoul') { s.hooded = 0; s.cloth = '#2c2a24'; s.pants = '#2c2a24'; s.armor = 'leather'; s.armorCol = '#3a342a'; }
     else { s.hooded = 1; s.hood = '#aab4c0'; s.cloak = '#8a96a4'; s.cloth = '#aab4c0'; s.pants = '#aab4c0'; }
   } else if (t === 'angel_blade' || t === 'angel_archer') {            // Nutzer S13: Engel — helle Haut, goldene Platte, weißer Mantel, Lichtglanz
-    s.skin = p.skin; s.face = 'skin'; s.glow = p.glow; s.hooded = 0; s.helm = t === 'angel_blade' ? 'great' : 'cap'; s.helmCol = '#d8b050'; s.crest = '#fff0b0'; s.armor = t === 'angel_blade' ? 'plate' : 'chain'; s.armorCol = '#d8c080'; s.tabard = '#f4ecd8'; s.cloak = '#e8dcc0'; s.mark = 'chevron'; s.markCol = '#c8a040'; if (t === 'angel_archer') s.quiver = 1;
+    s.skin = '#e8e0cc'; s.face = 'eyes'; s.glow = p.glow; s.hooded = 0; s.helm = ''; s.hs = 2; s.beard = 0; s.crest = ''; s.bd = 'bullig'; s.armor = t === 'angel_blade' ? 'plate' : 'chain'; s.armorCol = '#d8c080'; s.tabard = '#f4ecd8'; s.cloak = '#e8dcc0'; s.mark = 'chevron'; s.markCol = '#c8a040'; if (t === 'angel_archer') s.quiver = 1;
   } else if (t === 'omega') {                                          // Phase 7 Omega: goldene Platte, Blutmantel, Sternenkamm, leuchtend
     s.skin = p.skin; s.face = 'skin'; s.glow = p.glow; s.hooded = 0; s.helm = 'great'; s.helmCol = '#c8a040'; s.crest = '#ffd27a'; s.armor = 'plate'; s.armorCol = '#8a6a3a'; s.pauld = '#5a1010'; s.tabard = '#5a1010'; s.cloak = '#3a0808'; s.mark = 'chevron'; s.markCol = '#ffd27a';
   } else if (t === 'necromancer') {                                     // Phase 6 Nekromant: Knochengesicht unter schwarzer Kapuze, grünes Glimmen
@@ -452,17 +482,26 @@ export function monsterSpec(e, m) {
   s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
   if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
+  s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
+  s.bd = m?.angel ? 'bullig' : e.build || ''; s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
 
 const specKey = s => { let k = ''; for (const f of SPEC_KEYS) k += s[f] + '|'; return k; };
 export const lookOf = s => resolve(s, specKey(s));             // aufgelöste Spec (Rampen) für figure.js
 const lookCache = new Map();
-function resolve(s, k) {
+function resolve(s, k, soft = 1) {                                  // soft < 1: Stil R dunkelt weniger ab (Referenz 5: mehr Farbe, mehr Kontrast)
   let L = lookCache.get(k); if (L) return L;
   const pants = s.pants || '#2f2519';
-  const dk = (h, k = 0.3) => h && mix(h, '#0f0d12', k);             // Referenz 2: Kleidung dunkel, Akzente bleiben
+  const dk = (h, k = 0.3) => h && mix(h, '#0f0d12', k * soft);
+  if (soft < 1 && s.vs) {                                           // S14 Stil R: gleiche Rüstung, andere Person — Farbe streut je Variante
+    const v = s.vs, tint = ['#3a2a1a', '#1c2632', '#2c3420', '#32222e', '#44403a', '#4a3020', '#26262a', '#3a3424'][v], metal = ['#6a5a40', '#22262c', '#5a3a2a', '#4a4a4a', '#7a6a50', '#2a2a30', '#5a4a3a', '#3a3a40'][v];
+    const hair = ['#2b2118', '#5a3a1e', '#8a6a3a', '#1a1612', '#6a5a4a', '#a8421e', '#3a2a1e', '#c8b8a0'][v];
+    s = { ...s, cloth: mix(s.cloth, tint, 0.32), pants: mix(s.pants || '#2f2519', tint, 0.35), cape: s.cape && mix(s.cape, tint, 0.22), hood: s.hood && mix(s.hood, tint, 0.2),
+      cloak: s.cloak && mix(s.cloak, tint, 0.2), armorCol: s.armorCol && mix(s.armorCol, metal, 0.28), boots: s.boots && mix(s.boots, tint, 0.3), belt: mix(s.belt, tint, 0.3),
+      hair: s.hs === 2 ? s.hair : mix(s.hair, hair, 0.45), helmCol: s.helmCol && mix(s.helmCol, metal, 0.2) };
+  }             // Referenz 2: Kleidung dunkel, Akzente bleiben
   L = { ...s,
     skin: ramp(s.skin), hair: ramp(dk(s.hair, 0.15)), cloth: ramp(dk(s.cloth)), pants: ramp(dk(pants)), boots: s.boots ? ramp(s.boots) : null,
     belt: ramp(s.belt), leather: ramp('#5a4030'), apronR: s.apronCol ? ramp(s.apronCol) : null, hood: s.hooded ? ramp(dk(s.hood || darkOf(s.cloth))) : null, cloak: s.cloak ? ramp(dk(s.cloak)) : null,
@@ -850,7 +889,7 @@ const warmQ = [], warmed = new Set();
 let warmOn = false;
 const idleCb = window.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8 }), 40));
 export function warm(spec, noArm = null) {
-  const k = specKey(spec) + '|' + (noArm || '');
+  const k = specKey(spec) + '|' + (noArm || '') + ART;
   if (warmed.has(k)) return;
   warmed.add(k);
   for (const d of 'SNWE') for (const p of ['i0', 'w0', 'w1', 'w2', 'w3', 'i1']) warmQ.push([spec, d, p, noArm]);
@@ -864,6 +903,7 @@ function warmRun(dl) {
 export const warmPending = () => warmQ.length;
 // dir: 'S' | 'N' | 'W' | 'E'. pose: i0 i1 w0..w3 a1 a2 hit cast kneel tuck down dead
 export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waffenarm weglassen (zeichnet der Renderer zur Waffe)
+  if (ART === 'R') return humanFrameR(spec, dir, pose);
   if (spec.atlas && atlasOn()) { const f = atlasPose(spec.atlas, dir, pose); if (f) return f; }   // Stil F: Bild aus dem Blatt
   const sk = specKey(spec);
   return cacheGet(sk + dir + pose + (noArm || ''), () => {
@@ -887,6 +927,21 @@ export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waff
   });
 }
 
+// S14 Stil R: ein Bild je Spec × Richtung × Pose × Waffenzustand (Arme gehören zum Bild, die Hand steht im Frame: f.hand/f.off).
+// W = { mode, wt, q, v, oct, two, low } aus render.js; Osten = gespiegelter Westen (Zielwinkel gespiegelt).
+const asG = o => { const g = new G(o.w, o.h); g.a = o.a; return g; };
+export function humanFrameR(spec, dir, pose, W = null) {
+  const sk = specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0}` : '';
+  return cacheGet('R|' + sk + dir + pose + '|' + wk, () => {
+    const L = resolve(spec, 'R' + sk, 0.35);
+    if (pose === 'tuck') return meta(toCanvas(asG(paintTuckR(L)), false), RPX, 10, 10);
+    if (pose === 'down' || pose === 'dead') { const o = paintR(pose === 'dead' ? { ...L, glow: '' } : L, 'W', 'i0'); return meta(toCanvas(asG(o.g).rotCW(), false), RPX, 25, 26); }
+    const E = dir === 'E', o = paintR(L, E ? 'W' : dir, pose, W && E ? { ...W, oct: (12 - W.oct) % 8 } : W), g = asG(o.g);
+    const f = meta(toCanvas(E ? g.flipX() : g, false), RPX, ROX, ROY), fx = p => p && (E ? [RW - p[0], p[1]] : p);
+    f.hand = fx(o.hand); f.off = fx(o.off); f.eyeY = o.eyeY; f.limbs = {}; for (const k in o.limbs) f.limbs[k] = fx(o.limbs[k]);
+    return f;
+  });
+}
 // Pose aus dem Spielzustand
 export function poseOf(e, now, bow) {
   let face = e.facing || 0;
@@ -1044,13 +1099,14 @@ const BY_TYPE = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'ma
   rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand' };
 
 export function weaponSprite(key, rarity, holy, wtype) {
-  const k = key + '|' + rarity + '|' + (holy ? 1 : 0);
+  const k = key + '|' + rarity + '|' + (holy ? 1 : 0) + ART;
   let w = WPN.get(k); if (w) return w;
   const St = steelOf(rarity);
   let g, info;
   if (!OLD_WEAPONS) {                                               // G3: feines Raster (1 Welt je Pixel)
-    const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON());
-    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, px: 1 };
+    const sc = ART === 'R' ? 1 / RPX : 1;                           // S14 Stil R: Waffen im 1,5er-Raster wie die Figuren
+    const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON(), sc, rarity);
+    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, px: 1 / sc };
   } else if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
     const L = key === 'longbow' ? 12 : 8, wood = WOOD(), grip = WRAP();
     g = new G(9, L * 2 + 3); info = { gx: 2, gy: L + 1, blade: null };
@@ -1162,7 +1218,9 @@ function paintBeast(type, pal, frame, act) {
 }
 export function beastFrame(type, pal, dir, pose, frame) {
   if (BEAST_ATLAS[type] && atlasOn()) { const f = atlasPose(BEAST_ATLAS[type], dir, pose || (frame & 1 ? 'w0' : 'i0'), true); if (f) return f; }   // Stil F
-  return cacheGet('beast|' + type + '|' + (pal.body || '') + dir + pose + frame, () => {
+  return cacheGet('beast|' + ART + type + '|' + (pal.body || '') + dir + pose + frame, () => {
+    if (ART === 'R') { const g0 = asG(paintBeastR(type, pal, frame, pose === 'dead' ? '' : pose, ramp)), g1 = pose === 'dead' ? g0.flipY() : g0;   // S14 Stil R
+      return meta(toCanvas(dir === 'E' ? g1.flipX() : g1, false), RPX, BROX, pose === 'dead' ? g0.h - 12 : BROY); }
     if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster
       const o = paintBeast2(type, pal, frame, pose === 'dead' ? '' : pose), g0 = new G(o.w, o.h); g0.a = o.a;
       const g1 = pose === 'dead' ? g0.flipY() : g0;
@@ -1215,12 +1273,12 @@ function paintBrute(pal, frame, act) {
 }
 export function bruteFrame(pal, dir, pose, frame) {
   if (atlasOn()) { const f = atlasPose('riese', dir, pose || (frame & 1 ? 'w0' : 'i0')); if (f) return f; }   // Stil F: Gorak
-  return cacheGet('brute|' + dir + pose + frame, () => {
+  return cacheGet('brute|' + ART + dir + pose + frame, () => {
     if (!OLD_FIGURES) {                                               // G4: Gorak als Goblin-Hüne im feinen Raster (Hackmesser zeichnet der Renderer)
       const look = { goblin: 1, noClub: 1, skin: pal.skin || '#556b34', hood: '#2a2019', cloak: mix(pal.cloth || '#33261a', '#000', 0.25), cloth: pal.cloth || '#33261a',
         leather: '#3e2e22', strap: '#5a4230', metal: pal.metal || '#9a8e78', pants: '#2a2420', boots: '#1c1712', wrap: '#6e604c', eye: '#e0c24a' };
-      const o = paintBrute2(look, pose === 'a1' || pose === 'a2' ? pose : frame ? 'walk' : 'i0', frame), g = new G(o.w, o.h); g.a = o.a;
-      return meta(toCanvas(dir === 'W' ? g.flipX() : g), 1, BOX, BOY);
+      const sc = ART === 'R' ? 1 / RPX : 1, o = paintBrute2(look, pose === 'a1' || pose === 'a2' ? pose : frame ? 'walk' : 'i0', frame, sc), g = new G(o.w, o.h); g.a = o.a;   // S14 Stil R: Zielraster
+      return meta(toCanvas(dir === 'W' ? g.flipX() : g), 1 / sc, BOX * sc, BOY * sc);
     }
     const g = paintBrute(pal, frame, pose); return meta(toCanvas(dir === 'W' ? g.flipX() : g), PX, 17, 35); });
 }
@@ -1237,15 +1295,21 @@ export function pixelize(c, w, h, organic = 0, flat = false) {
     else if (a > 24 && d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] < 90) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 0; d[i * 4 + 3] = 96; }   // Schatten
     else d[i * 4 + 3] = 0;
   }
-  const S = (x, y) => x >= 0 && y >= 0 && x < w && y < h && solid[y * w + x];
+  const S = (x, y) => x >= 0 && y >= 0 && x < w && y < h && solid[y * w + x], RS = ART === 'R';
+  if (RS) for (let i = 0; i < w * h; i++) if (solid[i]) { const o = i * 4, l = d[o] * 0.3 + d[o + 1] * 0.59 + d[o + 2] * 0.11;   // S14 Stil R (Referenz 5): satter, mehr Kontrast, Farbstufen
+    for (let k = 0; k < 3; k++) { const v = (l + (d[o + k] - l) * 1.3 - 100) * 1.14 + 100; d[o + k] = clamp8(Math.round(v / 12) * 12 + 3); } }   // S14 Stil R: Farbstufen statt weicher Verläufe
+  const src = RS ? d.slice() : null;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x, o = i * 4;
     if (solid[i]) {
       let f = 1;
-      if (!S(x, y - 1) || !S(x - 1, y)) f = 1.2; else if (!S(x, y + 1) || !S(x + 1, y)) f = 0.72;
+      if (!S(x, y - 1) || !S(x - 1, y)) f = RS ? 1.3 : 1.2; else if (!S(x, y + 1) || !S(x + 1, y)) f = RS ? 0.62 : 0.72;
       if (organic) { const n = h2(x, y); f *= n > 0.82 ? 1.14 : n < 0.2 ? 0.84 : 1; }
       if (f !== 1) { d[o] = clamp8(d[o] * f + (f > 1 ? 6 : 0)); d[o + 1] = clamp8(d[o + 1] * f + (f > 1 ? 5 : 0)); d[o + 2] = clamp8(d[o + 2] * f); }
-    } else if (!flat && (S(x - 1, y) || S(x + 1, y) || S(x, y - 1) || S(x, y + 1))) { d[o] = 12; d[o + 1] = 10; d[o + 2] = 8; d[o + 3] = 255; }
+    } else if (!flat && (S(x - 1, y) || S(x + 1, y) || S(x, y - 1) || S(x, y + 1))) {
+      if (RS) { let j = -1, l = 1e9; for (const q of [i - 1, i + 1, i - w, i + w]) if (q >= 0 && q < w * h && solid[q] && Math.abs((q % w) - x) <= 1) { const s = src[q * 4] + src[q * 4 + 1] + src[q * 4 + 2]; if (s < l) { l = s; j = q; } }   // Kontur im dunkelsten Nachbarton
+        d[o] = Math.round(src[j * 4] * 0.28 + 4); d[o + 1] = Math.round(src[j * 4 + 1] * 0.26 + 3); d[o + 2] = Math.round(src[j * 4 + 2] * 0.26 + 3); d[o + 3] = 255; }
+      else { d[o] = 12; d[o + 1] = 10; d[o + 2] = 8; d[o + 3] = 255; } }
   }
   c.putImageData(img, 0, 0);
 }
@@ -1293,6 +1357,12 @@ export function tileTexture(t, v, cols, kind) {
     } else if (kind === 'rock') {
       for (let i = 0; i < 3; i++) { let x = (n(i, 3) * 14) | 0, y = (n(3, i) * 12) | 0; for (let k = 0; k < 5; k++) { P(x, y, base.dk); x += n(k, i) > 0.5 ? 1 : 0; y++; } }
       for (let x = 0; x < 16; x++) P(x, 0, base.hi);
+    } else if (kind === 'field' && ART === 'R') {          // S14 Stil R: Getreide in Reihen — Halme mit dunklem Fuß, goldene Ähren, dazwischen Furche
+      const crop = 'korn';                                   // ein Feld, eine Frucht (kein Flickenteppich je Kachel)
+      for (let y = 0; y < 16; y += 4) { for (let x = 0; x < 16; x++) { P(x, y + 3, base.dk); P(x, y + 2, mix(base.b, base.dk, 0.35)); }
+        if (crop === 'korn') for (let x = 0; x < 16; x++) { const t = n(x, y) > 0.42 + (v % 3) * 0.06; if (!t) continue;
+          P(x, y + 2, '#4a5226'); P(x, y + 1, '#8a8a3a'); P(x, y, n(x + 3, y) > 0.5 ? '#d8b85a' : '#c09a44'); if (n(x, y + 9) > 0.6) P(x, y - 1 < 0 ? 0 : y - 1, '#e8cc70'); }
+        else for (let x = 1 + ((y >> 2) & 1) * 2; x < 15; x += 4) { P(x, y, '#5a8a3a'); P(x + 1, y, '#78a84a'); P(x, y + 1, '#3e6a2a'); P(x + 1, y + 1, '#4e7a32'); P(x + 2, y + 1, '#2e4a20'); P(x - 1, y + 1, '#3e6a2a'); } }
     } else if (kind === 'field') {                         // Acker: Furchen mit Licht an der Kante, Keimlinge in Reihen
       for (let y = 1; y < 16; y += 4) for (let x = 0; x < 16; x++) { P(x, y, base.dk); P(x, y + 1, mix(base.b, base.dk, 0.3)); P(x, y - 1, mix(base.b, base.hi, 0.35));
         if ((x + y) % 3 === 0 && n(x, y) > 0.3) { P(x, y - 1, '#5a6a2c'); P(x, y - 2, '#7a8a3a'); } }

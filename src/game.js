@@ -643,8 +643,8 @@ function spawnResidents() {
 // Bewohner stehen im Kreis ums Feuer und reden übers Fest; an der Festtafel gibt es einmal je Fest ein Festmahl.
 const FEST_DAYS = 6, FEST_BUILT = new Set();
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
-const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
-const festNow = town => !!town && festDay(town) && S.minute >= 15 * 60 && S.minute < 23 * 60;
+const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
+const festNow = town => !!town && festDay(town) && S.deadRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
 const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x + 0.5) * TS, y: (y + 0.5) * TS }; };
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
@@ -1382,6 +1382,42 @@ function styleArea(on = true) {
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
 export const BAL = { hp: 1.7, dmg: 1.4 };
+// S14 (Teil B, nur ?dev): Sammelbild der Figuren im Stil R — je Figur Ansichten, Gehen, Posen, Hieb in Zehnteln, mit Waffe an
+// der Hand. rows: [[Bezeichnung, Spec, Waffenschlüssel]]; gespeichert über den Bildschirmfoto-Empfänger (docs/screenshots).
+async function figSheet(name, rows, o = {}) {
+  const art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+  try {
+    const s = o.scale || 3, U = s / 1.25, lines = [], cell = (spec, dir, pose, W, wk) => ({ f: SP.humanFrameR(spec, dir, pose, W), W, wk, dir });
+    for (const [label, spec, wk] of rows) {
+      const it = ITEMS[wk] || ITEMS.longsword, wt = it.wtype, two = !!it.twohand, base = { wt, arc: it.arc || 1.4, v: 0, two, low: 0 };
+      const rest = oct => ({ ...base, mode: RANGED_R.has(wt) ? 'aimRest' : 'rest', q: 0, oct });
+      if (o.parts?.includes('views') !== false) lines.push([label, [...'SNWE'].map(d => cell(spec, d, 'i0', null)).concat([...'SNWE'].map((d, i) => cell(spec, d, 'i0', rest([2, 6, 4, 0][i]), wk)), [cell(spec, 'S', 'i1', null)])]);
+      if (!o.parts || o.parts.includes('walk')) lines.push([label + ' gehen', ['S', 'W', 'N'].flatMap(d => ['w0', 'w1', 'w2', 'w3'].map(p => cell(spec, d, p, null)))]);
+      if (!o.parts || o.parts.includes('poses')) lines.push([label + ' Posen', ['hit', 'kb', 'guard', 'cast', 'kneel', 'search', 'sit', 'trade', 'i0+carry', 'die1'].map(p => cell(spec, 'W', p, null))
+        .concat(['hit', 'guard', 'kneel', 'sit', 'trade'].map(p => cell(spec, 'S', p, null)), [cell(spec, 'S', 'tuck', null), cell(spec, 'W', 'down', null)])]);
+      if (!o.parts || o.parts.includes('atk')) { const q = [0, .1, .2, .3, .4, .5, .6, .7, .8, .9], mode = RANGED_R.has(wt) ? 'aim' : 'swing';
+        lines.push([label + ' Hieb', q.map(k => cell(spec, 'W', 'i0', { ...base, mode, q: k, oct: 4 }, wk)).concat(q.map(k => cell(spec, 'S', 'i0', { ...base, mode, q: k, oct: 2 }, wk)))]); }
+    }
+    const pad = 4; let y = 8; const lay = [];
+    for (const [label, cs] of lines) { let x = 150, mh = 0; const at = []; for (const c of cs) { at.push([c, x]); x += c.f.width * s + pad; mh = Math.max(mh, c.f.height * s); } lay.push([label, at, y, mh]); y += mh + 8; }
+    const cv = document.createElement('canvas'); cv.width = o.w || 2000; cv.height = y + 8; const c = cv.getContext('2d');
+    c.fillStyle = o.bg || '#4f5c40'; c.fillRect(0, 0, cv.width, cv.height); c.imageSmoothingEnabled = false; c.font = '13px sans-serif';
+    for (const [label, at, yy, mh] of lay) { c.fillStyle = '#fff'; c.fillText(label, 6, yy + mh / 2);
+      for (const [{ f, W, wk, dir }, x] of at) {
+        const drawW = () => { if (!W || !f.hand) return; const it = ITEMS[wk], Wsp = SP.weaponSprite(wk, it.rarity, it.holy, it.wtype), oc = dir === 'E' ? (12 - W.oct) % 8 : W.oct, da = oc * Math.PI / 4, a = SP.weaponAngle(W, da), k = (Wsp.px || 2) * U;
+          c.save(); c.translate(x + f.hand[0] * s, yy + f.hand[1] * s); c.rotate(a); if (it.wtype !== 'bow' && Math.cos(da) < 0) c.scale(1, -1); c.drawImage(Wsp.cv, -Wsp.gx * k, -Wsp.gy * k, Wsp.cv.width * k, Wsp.cv.height * k); c.restore(); };
+        const behind = W && (dir === 'N' || Math.sin(W.oct * Math.PI / 4) < -0.45);
+        if (behind) drawW(); c.drawImage(f, x, yy, f.width * s, f.height * s); if (!behind) drawW(); } }
+    return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: cv.toDataURL('image/png') })).status;
+  } finally { SP.setArt(art0); }
+}
+const RANGED_R = new Set(['bow', 'crossbow', 'wand', 'throw', 'sling']);
+// Proben-Figuren für das Sammelbild: Spec aus Figuren der Welt bzw. aus der Gegnertabelle
+function sheetSpec(k) {
+  if (k === 'player') return SP.humanSpec(S.player);
+  if (MONSTERS[k]) return SP.monsterSpec({ mtype: k, seed: 3, alive: true, hp: 10, maxHp: 10 }, MONSTERS[k]);
+  const e = S.ents.world.find(n => n.kind === 'npc' && n.alive && (n.key === k || n.prof === k)); return e ? SP.humanSpec(e) : null;
+}
 function spawnEnemy(mtype, map, tx, ty, opts = {}) {
   const m = MONSTERS[mtype];
   const pos = freeSpotNear(map, tx, ty, 3);
@@ -1432,7 +1468,7 @@ const REGION_BOSSES = [
     effect: () => { if (S.towns.eren) S.towns.eren.stock.pelt += 8; S.factions.valen += 3; },
     text: 'Ohne Graumähne zerfällt das Rudel der Schlucht. Die Jäger in Eren atmen auf — und in den Westwald ziehen verwilderte Hunde.' },
   { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 240, r: 13, title: 'Karrak, der Sandfürst',
-    call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'),   // Weltmaßstab (Rote Wüste ≈ 660/232) from: 'bandit', to: 'goblin_warrior',
+    call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
     effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; },
     text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf — doch in die leeren Lager ziehen Goblin-Krieger.' },
   // Endgame (Session 11): Varg in der Kernburg der Kettenfeste. Tod = Befreiung der Goblins; Reste der Kette werden zu Räubern.
@@ -2450,7 +2486,7 @@ function controlPlayer(dt) {
     let sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : p.reloadUntil > performance.now() ? 0.6 : 1);   // Deckung: kleine Schritte; Armbrust spannen: langsam
     // BUG-076 (§34): wer zuschlägt, steht; wer im Kampf rückwärts geht, geht langsam — Rückwärtslaufen-und-Hauen ist kein Freifahrtschein
     if (p.swing > 0) sp *= 0.55;
-    if ((dx * Math.cos(p.aim) + dy * Math.sin(p.aim)) / l < -0.35 && combat.some(f => f.kind === 'enemy' && f.alive && !f.downed && dist(p, f) < 280 && isHostile(f, p))) sp *= 0.7;
+    if ((dx * Math.cos(p.aim) + dy * Math.sin(p.aim)) / l < -0.35 && combat.some(f => f.kind === 'enemy' && f.alive && !f.downed && dist(p, f) < 280 && isHostile(f, p))) sp *= backMul(p);
     moveEnt(p, dx / l * sp, dy / l * sp);
     p.stamina = Math.max(0, p.stamina - dt / 1000 * 1.2);
     p.stepT = (p.stepT || 0) + dt; if (p.stepT > 300) { p.stepT = 0; sfx('step'); }
@@ -2594,6 +2630,10 @@ function weaponMult(it, t, armor0) {
   if (it?.raw && armor0 < 4) m *= 1 + it.raw;
   return m;
 }
+// Mechanik-Check S14: Flächenangriffe (Ringe, Einschläge, Strahl) laufen über areaHit — Deckung, Schild und Nahkampfabwehr
+// greifen dort nicht (Rolle = Raum, Deckung = Stand). Geschosse bleiben blockbar.
+let AREA = false;
+const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && attacker.equip.weapon, it = w ? ITEMS[w.key] : null;
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
@@ -2623,14 +2663,14 @@ function hit(attacker, target, mult, kind = 'physical') {
   const off = target.equip && target.equip.offhand;
   // Aktive Deckung / Parade (nur der Spieler; eigenes Feld cover — guard ist das Flag der Stadtwachen). Rüstung wirkt vor dem Block.
   const crush = it && it.crush;                                      // Kriegshammer: kein Schild hält ihn, Deckung kostet doppelt
-  const cov = target.cover ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
+  const cov = target.cover && !AREA ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
   if (cov === true) return;
-  if (off && !crush && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
+  if (off && !crush && !AREA && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
     fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
-  if (target.skills && !target.downed && !target.cover && kind === 'physical') {       // S13 (Nutzer, Kenshi): Nahkampfabwehr
+  if (target.skills && !target.downed && !target.cover && !AREA && kind === 'physical') {       // S13 (Nutzer, Kenshi): Nahkampfabwehr
     const df = target.skills.defense || 0, front = Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim ?? 0))) < 1.2;
     if (front && chance(Math.min(0.3, df * 0.003))) { dmg *= 0.35; float(target, 'Abgewehrt', 'rgba(200,196,170,ALPHA)'); fx(target.x, target.y - 12, 'spark', 4); target.skills.defense = Math.min(100, df + 0.3);
       if (df >= 40 && attacker.alive) hurt(attacker, (target.equip?.weapon ? damageOf(target) : 3) * (0.2 + df * 0.003), target, target.name);   // Parade mit Gegenhieb
@@ -3204,7 +3244,7 @@ function golemAI(e, d, dt) {
   e.stompCd = (e.stompCd ?? 3000) - dt; const sa = e.special;
   if (sa?.kind === 'stomp') { sa.t -= dt; e.vx = e.vy = 0;
     if (sa.t <= 0) { e.special = null; camShake(8, 300); shockFx(e.x, e.y); fx(e.x, e.y, 'dust', 16); sfx('crit', 1, earVol(e));
-      for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 95) { if (t.invuln) evaded(t); else hit(e, t, t.kind === 'caravan' ? 3 : 0.9); } }
+      for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 95) { if (t.invuln) evaded(t); else areaHit(e, t, t.kind === 'caravan' ? 3 : 0.9); } }
     return true; }
   if (e.swing <= 0 && e.telegraph <= 0 && d < 95 && e.stompCd <= 0) { e.special = { kind: 'stomp', t: 900 }; e.stompCd = 5500; float(e, 'stampft', 'rgba(230,120,90,ALPHA)'); return true; }
   return false;
@@ -3229,7 +3269,7 @@ function omegaAI(e, tgt, d, reach, sp, dt, m) {
   const sa = e.special;
   if (sa) { sa.t -= dt;
     if (sa.t <= 0) { e.special = null; camShake(6, 250); sfx('crit', 1, earVol(e));
-      const hitT = test => { for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && test(t)) { if (t.invuln) evaded(t); else hit(e, t, sa.mult); } };
+      const hitT = test => { for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && test(t)) { if (t.invuln) evaded(t); else areaHit(e, t, sa.mult); } };
       if (sa.kind === 'meteor') for (const s of sa.spots) { fx(s.x, s.y - 4, 'fire', 12); shockFx(s.x, s.y); hitT(t => Math.hypot(t.x - s.x, t.y - s.y) < sa.R); }
       if (sa.kind === 'nova') { shockFx(e.x, e.y); fx(e.x, e.y - 30, 'heal', 20); hitT(t => dist(e, t) < sa.R); }
       if (sa.kind === 'beam') { const cs = Math.cos(sa.a), sn = Math.sin(sa.a); for (let r = 40; r < 460; r += 40) fx(e.x + cs * r, e.y - 20 + sn * r, 'fire', 2);
@@ -3272,7 +3312,7 @@ function garmadonAI(e, tgt, d, reach, sp, dt, m) {
   const fast = e.phase === 1 ? 1 : e.phase === 2 ? 1.2 : 1.3, sa = e.special;
   if (sa?.kind === 'bloodrain') { sa.t -= dt;                          // er kämpft weiter, während es regnet
     if (sa.t <= 0) { e.special = null; camShake(5, 200); sfx('crit', 0.8, earVol(e));
-      for (const s of sa.spots) { fx(s.x, s.y - 6, 'blood', 10); for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && Math.hypot(t.x - s.x, t.y - s.y) < 48) { if (t.invuln) evaded(t); else hit(e, t, 0.75); } } } }
+      for (const s of sa.spots) { fx(s.x, s.y - 6, 'blood', 10); for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && Math.hypot(t.x - s.x, t.y - s.y) < 48) { if (t.invuln) evaded(t); else areaHit(e, t, 0.75); } } } }
   if (sa?.kind === 'wave') { sa.t -= dt; e.vx = e.vy = 0;
     if (sa.t <= 0) { e.special = null; sfx('magic', 0.7, earVol(e));
       for (const off of [-0.25, 0, 0.25]) { const a = Math.atan2(tgt.y - e.y, tgt.x - e.x) + off;
@@ -3416,7 +3456,7 @@ function bossAI(e, tgt, d, reach, sp, dt, m) {
       e.vx = e.vy = 0;
       if (sa.t <= 0) {
         e.special = null; camShake(8, 300); shockFx(e.x, e.y); fx(e.x, e.y, 'dust', 16); sfx('crit', 1, earVol(e));
-        for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 110) { if (t.invuln) evaded(t); else hit(e, t, 0.8); }
+        for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < 110) { if (t.invuln) evaded(t); else areaHit(e, t, 0.8); }
       }
       return;
     }
@@ -3463,7 +3503,7 @@ function frostKingAI(e, tgt, d, reach, sp, dt, m) {
       S.fx.push({ x: e.x, y: e.y, vx: 0, vy: 0, type: 'shock', ice: true, s: 1, life: 520, maxLife: 520 }); fx(e.x, e.y - 6, 'frost', 18);
       for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && dist(e, t) < (sa.big ? 140 : 105)) {
         if (t.invuln) { evaded(t); continue; }
-        hit(e, t, 0.7);
+        areaHit(e, t, 0.7);
         if (!(t.status ||= []).some(q => q.key === 'chilled')) t.status.push({ key: 'chilled', name: 'Durchfroren', left: 4000, desc: 'Langsamer (−40 %).' });
       }
     }
@@ -4719,7 +4759,7 @@ function raze(k) {
 function rebuildRazed() {                                                           // Angsthase: Rückkehrer nach 10 Tagen
   for (const [k, z] of Object.entries(S.razed || {})) if (z.rebuild != null && S.day >= z.rebuild) {
     const V = VILLAGES.find(v => v.key === k); z.rebuild = null; delete S.razed[k];
-    for (const d of Object.values(S.flags.raidDamage || {})) d.perm = false;
+    for (const [id, d] of Object.entries(S.flags.raidDamage || {})) if (HOUSES.find(h => h.id === id)?.town === k) d.perm = false;   // S14: nur das eigene Dorf
     for (let i = 0; i < 4; i++) { const pos = freeSpotNear('world', V.x + ri(-5, 5), V.y + ri(-5, 5), 3);
       const c = makeChar({ name: pick(FIRST_M), prof: pick(['Bauer', 'Magd', 'Holzfäller', 'Rückkehrer']), x: pos.x, y: pos.y, level: 1, faction: null, traits: ['furchtsam'] });
       Object.assign(c, { homeTown: k, anchor: { x: pos.x, y: pos.y } }); S.ents.world.push(c); }
@@ -5372,7 +5412,13 @@ function investMenu(town) {
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
   ]);
 }
-function boardMenu(town) { conList(null, town, 'board', `Anschlagbrett — ${townName(town)}`); }
+const boardShut = town => { const lord = townFac(town);
+  if (S.war?.nodes?.[town]?.owner === 'undead' || S.razed?.[town]) return 'Die Zettel sind abgerissen. Unter den Toten schreibt niemand Aushänge.';
+  if (repTier(lord)?.price === null || (lord === 'order' && pactBound())) return 'Jemand hat deinen Namen auf einen Zettel geschrieben und durchgestrichen. Für dich hängt hier nichts.';
+  return null; };
+function boardMenu(town) { const shut = boardShut(town);   // S14 Mechanik-Check: das Brett folgt Besatzung und Ruf wie die Geber selbst
+  if (shut) return UI.dialogue({ name: `Anschlagbrett — ${townName(town)}` }, shut, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  conList(null, town, 'board', `Anschlagbrett — ${townName(town)}`); }
 function conChoices(npc, choices) {
   const here = npc.vm || npc.homeTown || npc.town;                         // S13: Paket bei jedem Bewohner der Zielstadt abgeben
   for (const C of activeCons()) if (C.kind === 'deliver' && C.target === here && C.have < C.need && hasItem(S.player, 'auftragspaket'))
@@ -6608,7 +6654,7 @@ function leavePursuit(from, to) {
     if (e.kind !== 'enemy' || !e.alive || !isHostile(e, p)) continue;
     const m = MONSTERS[e.mtype], d = dist(e, p);
     if (d > 560 || !(e.aggroId === p.id || (e.aiState === 'pursue' && d < m.sight))) continue;
-    if (m.boss) { e.aggroId = null; e.aiState = 'idle'; continue; }
+    if (m.boss || e.boss) { e.aggroId = null; e.aiState = 'idle'; continue; }   // S14: auch Regionalbosse (Karrak, Graumähne) halten ihr Revier
     if (m.interiors && n < 4) { n++; e.follow = { to, at: now + d / (m.speed * 62.5) + 1.5 }; }   // enge Tür: höchstens vier
     else e.lurk = { until: now + 90 };
   }
@@ -7671,8 +7717,12 @@ function teach(npc, cls = teachable(npc)) {
     { text: 'Später.', fn: () => UI.closeDialogue() },
   ]);
 }
+// Mechanik-Check S14: Erzfeinde schließen einander aus — kein Rang bei beiden Seiten zugleich (bestehende Ränge bleiben).
+const JOIN_FOES = { order: ['undead'], valen: ['undead', 'bandit'], undead: ['order', 'valen', 'chain'], chain: ['undead', 'goblin'] };
+const joinFoe = f => JOIN_FOES[f]?.find(o => (S.ranks[o] ?? -1) >= 0) || (f === 'undead' && (S.player.titleClasses || []).includes('monk') ? 'order' : null);
 function joinFaction(npc) {
-  const f = npc.faction, rep = S.factions[f];
+  const f = npc.faction, rep = S.factions[f], foe = joinFoe(f);
+  if (foe) return UI.dialogue(npc, `„Du trägst schon die Farben von ${FACTIONS[foe].name}. Wer beiden dient, dient keinem.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   const needed = f === 'undead' ? 15 : 10;
   if (rep < needed)
     return UI.dialogue(npc, `„${FACTIONS[f].name} nimmt keine Unbekannten. Zeig, wofür du stehst.“ (Ansehen ${Math.round(rep)}/${needed})`,
@@ -8568,11 +8618,11 @@ function moveInput() {
 // (±70°): in den ersten 180 ms Parade — der Angreifer taumelt (Bosse kürzer), kein Schaden. Danach Block: mit Schild 15 %
 // Schaden, mit der Waffe 45 %, dafür Ausdauer; reicht sie nicht, bricht die Deckung (Taumeln, 0,9 s keine Deckung).
 // Flächenangriffe und Geschosse lassen sich blocken, aber nicht parieren.
-const GUARD = { parry: 180, arc: 1.22, shield: 0.15, weapon: 0.45 };
+const GUARD = { parry: 180, arc: 1.22, shield: 0.15, weapon: 0.45, rearm: 400 };   // rearm: Mechanik-Check S14 — wer die Deckung schneller neu hebt, bekommt keine neue Parade
 function updateGuard(p, want) {
   const now = performance.now(), can = want && !p.dodge && !p.downed && !(p.swing > 0) && !(p.guardBroken > now) && p.stamina > 1;
-  if (can && !p.cover) { p.cover = { since: now }; sfx('metal', 0.15); }
-  else if (!can && p.cover) p.cover = null;
+  if (can && !p.cover) { p.cover = { since: p.coverOff > now - GUARD.rearm ? -1e9 : now }; sfx('metal', 0.15); }
+  else if (!can && p.cover) { p.cover = null; p.coverOff = now; }
 }
 function guarded(attacker, target, dmg) {
   const now = performance.now(), g = target.cover;
@@ -8667,6 +8717,9 @@ function classAbility(p, key) {
   return true;                                                         // ältere Fähigkeiten: Logik folgt im switch unten
 }
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
+// Rückwärts im Kampf (BUG-076): zu Fuß 70 %. Mechanik-Check S14: ein Pferd galoppiert nicht rückwärts — beritten 40 %, sonst
+// hebelt Rückwärtsreiten mit Bogen das Nachsetzen (Mindesttempo 2,0) wieder aus.
+const backMul = p => p.mounted ? 0.4 : 0.7;
 // i-Frames = Dauer der Rolle. Abklingzeit + Ausdauer verhindern Dauerrollen.
 const DODGE = { dur: 240, dist: 92, cd: 850, stam: 20 };
 function dodge() {
@@ -8861,6 +8914,30 @@ export function selftest() {
   ok('Lootlisten gültig', Object.values(LOOT).flat().every(([k]) => !!ITEMS[k]));
   // Sprite-System: jede Figur/Pose/Richtung liefert ein nicht-leeres Raster in der festgelegten Größe
   const filled = cv => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; };
+  ok('Stil R (S14): jede Figur, jedes Tier, Gorak und jede Waffe malen sich im Zielraster; Hieb, Deckung und Zielen setzen die Hand; Stil wechselt ohne Rest zurück', (() => {
+    const art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+    try {
+      const good = f => f && f.width > 0 && f.height > 0 && Math.abs(f.px - 1.25) < 1e-9;
+      const specs = NPCS.map(n => SP.humanSpec(n)).concat(Object.keys(MONSTERS).filter(k => !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'gorak', 'carrion_wing', 'omega', 'angel_ophan'].includes(k)).map(k => SP.monsterSpec({ mtype: k, seed: 1, alive: true, hp: 1, maxHp: 1 }, MONSTERS[k])));
+      const poses = ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'hit', 'kb', 'guard', 'cast', 'kneel', 'search', 'sit', 'trade', 'i0+carry', 'die1', 'tuck', 'down', 'dead'];
+      const figs = specs.filter((_, i) => i % 3 === 0).every(s => ['S', 'W'].every(d => poses.every(p => good(SP.humanFrameR(s, d, p)))) && ['N', 'E'].every(d => good(SP.humanFrameR(s, d, 'w1'))));
+      const hands = ['longsword', 'greatsword', 'spear', 'shortbow', 'crossbow'].every(k => { const it = ITEMS[k], two = !!it.twohand, ranged = RANGED_R.has(it.wtype);
+        return [0.1, 0.45, 0.8].every(q => [...'SNWE'].every(d => { const f = SP.humanFrameR(specs[0], d, 'i0', { mode: ranged ? 'aim' : 'swing', wt: it.wtype, arc: it.arc || 1.4, q, v: 1, oct: { S: 2, N: 6, W: 4, E: 0 }[d], two, low: 0 });
+          return good(f) && f.hand && f.hand.every(Number.isFinite) && (!two || f.off); })); })
+        && !!SP.humanFrameR(specs[0], 'W', 'guard', { mode: 'cover', wt: 'sword', arc: 1.4, q: 0, v: 0, oct: 4, two: false, low: 0 }).hand;
+      const beasts = ['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].every(t => ['', 'a1', 'a2', 'dead'].every(p => good(SP.beastFrame(t, MONSTERS[t].pal, 'W', p, 1))));
+      const brute = ['', 'a1', 'a2'].every(p => good(SP.bruteFrame(MONSTERS.gorak.pal, 'E', p, 0)));
+      const arms = Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => { const w = SP.weaponSprite(k, i.rarity, i.holy, i.wtype); return w.cv.width > 0 && Math.abs(w.px - 1.25) < 1e-9; });
+      SP.setArt('D'); const back = SP.humanFrame(specs[0], 'S', 'i0').px === 1 && SP.weaponSprite('longsword', 'common', false, 'sword').px === 1;
+      const mk = (prof, x, o = {}) => SP.humanSpec({ kind: 'npc', prof, pal: {}, seed: 2, x: x * TS, anchor: { x: x * TS, y: 0 }, equip: {}, ...o });
+      const wide = s => { const f = SP.humanFrameR(s, 'S', 'i0'), d = f.getContext('2d').getImageData(0, 17, f.width, 1).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; };
+      const region = mk('Bauer', 200).star === 1 && mk('Bauer', 800).charm === 1 && !mk('Bauer', 500).star && !mk('Bauer', 500).charm;   // Westen Omega-Stern, Osten Amulett
+      const heavy = mk('Söldnerwache', 500, { equip: { weapon: { key: 'greatsword' } } }), light = mk('Söldnerwache', 500, { equip: { weapon: { key: 'dagger' } } });
+      const strong = heavy.hv === 1 && light.hv === 0 && wide(heavy) > wide(light);                                                    // schwere Waffe: breiter
+      SP.setArt('R'); const icon = (() => { const cv = document.createElement('canvas'); Object.defineProperty(cv, 'clientWidth', { value: 48 }); Object.defineProperty(cv, 'clientHeight', { value: 48 }); R.drawItemIconTo(cv, 'chain_hauberk'); const d = cv.getContext('2d').getImageData(0, 0, 48, 48).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n > 300; })();
+      return figs && hands && beasts && brute && arms && back && region && strong && icon;
+    } finally { SP.setArt(art0); }
+  })());
   ok('Sprites: Figuren aller NPCs, alle Posen', NPCS.every(n => {
     const sp = SP.humanSpec({ ...n, seed: 1, pal: { skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28' }, equip: {} });
     return ['S', 'N', 'W', 'E'].every(d => ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'a1', 'a2', 'hit', 'cast', 'kneel', 'guard', 'sit', 'trade'].every(ps => {
@@ -10722,6 +10799,54 @@ export function selftest() {
   })());
   ok('Erbe bringt eigene Habe mit (Schütze → Bogen)', (() => { const k = makeChar({ cls: 'archer' }); kinKit(k);
     return !!ITEMS[k.equip.weapon.key].ranged && !!k.equip.chest && hasItem(k, 'bread', 2); })());
+  ok('Mechanik-Check S14: ohne Ausdauer keine Deckung, leere Ausdauer bricht sie, Takt-Tippen öffnet keine neue Parade, Stampfen ist nicht blockbar', sandbox(() => {
+    const p = stage(); p.equip.offhand = mkItem('wooden_shield'); p.aim = 0; const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 30; w.y = p.y; w.aim = Math.PI;
+    combat = S.ents.__a.filter(e => e.alive); const vit = () => B.PARTS.reduce((n, k) => n + p.body[k].hp, 0);
+    p.stamina = 0.5; updateGuard(p, true); const noCover = !p.cover;
+    p.stamina = 5; updateGuard(p, true); p.cover.since = -1e9; p.stamina = 0.01; w.swing = 0.45; seedRng(3); const h0 = vit(); hit(w, p, 1);
+    const broke = !p.cover && vit() < h0 && p.guardBroken > performance.now();
+    p.guardBroken = 0; p.stamina = p.maxStamina; updateGuard(p, true); updateGuard(p, false); updateGuard(p, true);   // runter und sofort wieder hoch
+    w.swing = 0.45; w.stagger = 0; seedRng(4); hit(w, p, 1); const noParry = !(w.stagger >= 800) && p.stamina < p.maxStamina;
+    p.cover = null; p.coverOff = performance.now() - 1000; updateGuard(p, true); w.swing = 0.45; w.stagger = 0; const h2 = vit(); hit(w, p, 1);
+    const parryAgain = vit() === h2 && w.stagger >= 800;
+    const g = spawnEnemy('flesh_golem', '__a', 11, 9); g.x = p.x + 40; g.y = p.y; combat = S.ents.__a.filter(e => e.alive);
+    p.cover = null; p.coverOff = -1e9; p.stamina = p.maxStamina; updateGuard(p, true); p.cover.since = -1e9; const s0 = p.stamina, h3 = vit();
+    g.special = { kind: 'stomp', t: 0 }; golemAI(g, 40, 16); const ring = vit() < h3 && p.stamina === s0 && !!p.cover;
+    return noCover && broke && noParry && parryAgain && ring;
+  }));
+  ok('Mechanik-Check S14: Regionalbosse folgen nicht durch Türen, Karraks Machtvakuum wirkt (BUG-139), Wiederaufbau betrifft nur das eigene Dorf', sandbox(() => {
+    const p = stage(), a = spawnEnemy('bandit', '__a', 11, 9), b = spawnEnemy('bandit', '__a', 12, 9);
+    for (const e of [a, b]) { e.aggroId = p.id; e.aiState = 'pursue'; } b.boss = true; leavePursuit('__a', '__b');
+    const arena = !!a.follow && !b.follow && !b.lurk && b.aiState === 'idle';
+    const K = REGION_BOSSES.find(x => x.id === 'sandlord'), area = SPAWN_AREAS.find(x => K.area(x)); S.flags.sandlordSlain = true; S.flags.goblinsFreed = false; seedRng(11);
+    let ban = 0; for (let i = 0; i < 60; i++) if (spawnType(area) === 'bandit') ban++;
+    const vacuum = K.from === 'bandit' && K.to === 'goblin_warrior' && !!area && ban < 12;
+    const keep = { z: S.razed, d: S.flags.raidDamage, ents: S.ents.world.slice(), day: S.day };
+    try {
+      const V = VILLAGES.find(v => HOUSES.some(h => h.town === v.key)), U = VILLAGES.find(v => v !== V && HOUSES.some(h => h.town === v.key));
+      const ha = HOUSES.find(h => h.town === V.key), hb = HOUSES.find(h => h.town === U.key);
+      S.flags.raidDamage = { [ha.id]: { base: 0, wear: 2, perm: true }, [hb.id]: { base: 0, wear: 2, perm: true } }; S.razed = { [V.key]: { day: 0, rebuild: 0 } };
+      rebuildRazed(); return arena && vacuum && S.flags.raidDamage[ha.id].perm === false && S.flags.raidDamage[hb.id].perm === true;
+    } finally { S.razed = keep.z; S.flags.raidDamage = keep.d; S.ents.world = keep.ents; S.day = keep.day; }
+  }));
+  ok('Mechanik-Check S14: kein Fest in besetzten oder zerstörten Orten und keins bei gemeldetem Überfall; das Brett bleibt dort leer; Erzfeinde schließen den Beitritt aus; der Pakt bleibt mit abgelegtem Titel', sandbox(() => {
+    const keep = { z: S.razed, r: S.deadRaid, own: S.war?.nodes?.eren?.owner, day: S.day, min: S.minute };
+    try {
+      S.razed = {}; S.deadRaid = null; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen';
+      const V = VILLAGES[0].key; let d = S.day | 0; while (!festDay(V, d)) d++; S.day = d; S.minute = 16 * 60;
+      const base = festNow(V); S.deadRaid = { v: V, at: clock() + 200, n: 5 }; const raid = !festNow(V); S.deadRaid = null;
+      S.razed = { [V]: { day: 0, rebuild: null } }; const razed = !festDay(V, d) && !!boardShut(V); S.razed = {};
+      let occ = true; if (S.war?.nodes?.eren) { let e = S.day | 0; while (!festDay('eren', e)) e++; S.war.nodes.eren.owner = 'undead'; occ = !festDay('eren', e) && !!boardShut('eren'); S.war.nodes.eren.owner = 'valen'; }
+      const p = stage(); S.ranks.order = 0; S.ranks.undead = -1; const foe1 = joinFoe('undead') === 'order'; S.ranks.order = -1; const free = joinFoe('undead') === null;
+      unlockTitle('monk', 'Test'); const monk = joinFoe('undead') === 'order';
+      const q = stage(); unlockTitle('necromancer', 'Test'); q.titleClass = null; const pact = pactBound(q) && boardShut('sonnwacht') !== null;
+      return base && raid && razed && occ && foe1 && free && monk && pact;
+    } finally { S.razed = keep.z; S.deadRaid = keep.r; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = keep.own; S.day = keep.day; S.minute = keep.min; }
+  }));
+  ok('Mechanik-Check S14: Rückwärtsreiten ist langsamer als das Nachsetzen der Gegner (kein Kiten vom Pferd)', sandbox(() => {
+    const p = stage(), m0 = S.mount; try { return Object.keys(MOUNTS).every(k => { S.mount = { kind: k, name: 'Test', oiled: S.day | 0 }; p.mounted = { kind: k };
+      return speedOf(p) * backMul(p) < 2.0 && backMul({}) === 0.7; }); } finally { p.mounted = null; S.mount = m0; }
+  }));
   ok('Daten: jeder Gegner definiert interiors, jede Herkunfts-Fertigkeit hat einen Namen',
     Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
@@ -10874,6 +10999,7 @@ function boot() {
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
+    figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

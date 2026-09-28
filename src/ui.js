@@ -898,7 +898,7 @@ function settingsUI(body) {
       <div class="ctx-actions">${['low:Kaum Blut', 'reduced:Reduziert', 'standard:Voll'].map(s => { const [k, n] = s.split(':');
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Grafikstil</h3>
-      <div class="ctx-actions"><button data-art="F" class="${S.settings.art === 'F' ? 'on' : ''}">Neu (Referenz 5)</button><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button></div>
+      <div class="ctx-actions"><button data-art="F" class="${S.settings.art === 'F' ? 'on' : ''}">Neu (Referenz 5)</button><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Gezeichnet (Test)</button></div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>
@@ -955,4 +955,3 @@ export function showSuccessors(cands, pick) {
   });
 }
 
-export function setNavActive() { [...$('nav').children].forEach(b => b.classList.remove('active')); }
