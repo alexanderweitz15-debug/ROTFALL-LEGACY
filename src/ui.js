@@ -1,13 +1,13 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js';
-import { townState, townPrice } from './sim.js';
-import { GOODS } from './data.js';
-import { target as ecoTarget } from './economy.js';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js';
-import { sfx, ambience } from './sfx.js';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js?v=14';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=14';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=14';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js?v=14';
+import { townState, townPrice } from './sim.js?v=14';
+import { GOODS } from './data.js?v=14';
+import { target as ecoTarget } from './economy.js?v=14';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=14';
+import { sfx, ambience } from './sfx.js?v=14';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -898,7 +898,7 @@ function settingsUI(body) {
       <div class="ctx-actions">${['low:Kaum Blut', 'reduced:Reduziert', 'standard:Voll'].map(s => { const [k, n] = s.split(':');
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Grafikstil</h3>
-      <div class="ctx-actions"><button data-art="F" class="${S.settings.art === 'F' ? 'on' : ''}">Neu (Referenz 5)</button><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Gezeichnet (Test)</button></div>
+      <div class="ctx-actions"><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Neu (gezeichnet)</button><button data-art="F" class="${S.settings.art === 'F' ? 'on' : ''}">Referenzblatt</button></div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>

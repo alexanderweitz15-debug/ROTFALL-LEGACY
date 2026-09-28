@@ -2,9 +2,9 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, clamp, uid } from './state.js';
-import { ITEMS, GOODS, TOWNS } from './data.js';
-import { LOCATIONS, HOUSES, TS } from './world.js';
+import { S, log, chronicle, chance, ri, clamp, uid } from './state.js?v=14';
+import { ITEMS, GOODS, TOWNS } from './data.js?v=14';
+import { LOCATIONS, HOUSES, TS } from './world.js?v=14';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];

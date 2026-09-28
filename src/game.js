@@ -1,17 +1,17 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js';
-import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO } from './world.js';
-import * as R from './render.js';
-import * as HB from './buildings.js';
-import * as UI from './ui.js';
-import * as SIM from './sim.js';
-import * as B from './body.js';
-import * as SP from './sprites.js';
-import * as ECO from './economy.js';
-import { drawAtlas, revealAround, explored } from './atlas.js';
-import { sfx, ambience, ambienceTick } from './sfx.js';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, mergeProps, adoptPropKeys, saveData } from './state.js?v=14';
+import { ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=14';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO } from './world.js?v=14';
+import * as R from './render.js?v=14';
+import * as HB from './buildings.js?v=14';
+import * as UI from './ui.js?v=14';
+import * as SIM from './sim.js?v=14';
+import * as B from './body.js?v=14';
+import * as SP from './sprites.js?v=14';
+import * as ECO from './economy.js?v=14';
+import { drawAtlas, revealAround, explored } from './atlas.js?v=14';
+import { sfx, ambience, ambienceTick } from './sfx.js?v=14';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;

@@ -8,7 +8,7 @@
 // Metall getrennt schattiert; Details nur in Clustern (kein Einzelpixel-Rauschen).
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
-import { mix } from './sprites.js';
+import { mix } from './sprites.js?v=14';
 
 export const RW = 32, RH = 50, ROX = 16, ROY = 47, RPX = 1.25;
 const K = 1 / RPX;
