@@ -65,7 +65,10 @@ export function damagePart(c, part, dmg, crit) {
   const wasUp = P.hp > 0;
   P.hp -= dmg;
   let result = 'hit';
-  if (part === 'head' && P.hp <= 0) result = 'decap';
+  if (part === 'head' && P.hp <= 0) {                   // S13 (Nutzer: Enthauptung viel seltener): nur kritisch UND mit großem Überschuss;
+    if (crit && P.hp <= -P.max * 0.5) result = 'decap';   // sonst bewusstlos am Boden (Kopf 0, Rumpf 0 — aufrichten oder verbluten)
+    else { P.hp = 0; c.body.torso.hp = Math.min(c.body.torso.hp, 0); result = 'down'; }
+  }
   else if (part !== 'torso' && part !== 'head' && P.hp < 0) {
     const spill = Math.min(-P.hp, dmg) * 0.5;           // Überschuss geht halb in den Rumpf
     P.hp = Math.max(P.hp, -P.max);

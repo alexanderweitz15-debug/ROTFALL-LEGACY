@@ -184,7 +184,7 @@ const WTYPE_ATLAS = { sword: 'w_langschwert', rapier: 'w_kurzschwert', dagger: '
 export function itemAtlas(key, it) { if (!atlasOn()) return null; const k = ITEM_ATLAS[key] || (it?.slot === 'weapon' && WTYPE_ATLAS[it.wtype]) || (it?.slot === 'offhand' ? 'w_schild' : null); return k ? atlasSprite(k) : null; }
 // Objekte in Objektgröße aus dem Blatt (nicht aufgeblasen): Brunnen, Schrein, Pumpe, Falle, Belagerungsgerät
 export const PROP_ATLAS = { well: 'b_brunnen', shrine: 'b_heiligtum', wayshrine: 'b_heiligtum', spikes: 'u_falle', catapult: 'u_katapult', ballista: 'u_ballista', ram: 'u_rammbock' };
-export const BEAST_ATLAS = { wolf: 'wolf', wild_dog: 'wilder_hund', bear: 'baer', boar: 'wildschwein', deer: 'hirsch', bone_hound: 'leichhund' };
+export const BEAST_ATLAS = { wolf: 'wolf', wild_dog: 'wilder_hund', bear: 'baer', boar: 'wildschwein', deer: 'hirsch', bone_hound: 'leichhund', horse: 'hirsch', cow: 'wildschwein', sheep: 'wildschwein' };   // S13: Stil F hat keine eigenen Bilder für Nutz- und Reittiere (nächstes passendes)
 // Gebäude (Typ → Bild aus dem Blatt)
 export function houseAtlas(b) {
   const T = { cottage: 'b_holzhuette', tavern: 'b_taverne', smithy: 'b_schmiede', barracks: 'b_kaserne', legion: 'b_kaserne', merc: 'b_kaserne', chapel: 'b_kirche', manor: 'b_steinhaus', healer: 'b_steinhaus',
@@ -255,6 +255,9 @@ const ARMOR_LOOK = {
   pluendererharnisch: { armor: 'leather', armorCol: '#4a3a2a', pauld: '#6a665e', strap: 1, pouch: 1 },
   grenzlaeufer: { armor: 'leather', armorCol: '#3e3a2c', strap: 1, pouch: 1 },
   legionaersplatte: { armor: 'plate', armorCol: '#5a4636' },
+  kronharnisch: { armor: 'plate', armorCol: '#3a4a66', tabard: '#2f4260', mark: 'chevron', markCol: '#b9c3d2' }, kronhelm: { helm: 'nasal', helmCol: '#5a5852', crest: '#3a5a9a' },   // S13: Fraktionssets
+  ordensharnisch: { armor: 'chain', armorCol: '#8a8880', tabard: '#d9d2c0', mark: 'cross', markCol: '#9b2e26' }, ordenshelm: { helm: 'great', helmCol: '#b9b19c' },
+  sonnenharnisch: { armor: 'plate', armorCol: '#a8843a', pauld: '#c8a050', sash: '#e0c070' }, sonnenhelm: { helm: 'great', helmCol: '#c8a050', crest: '#e0c070' },
   eisenfuerst: { armor: 'plate', armorCol: '#1e1f22', pauld: '#4a1418', sash: '#3a1114' },
   letzte_wache: { armor: 'plate', armorCol: '#5e5044', tabard: '#2a3448', mark: 'chevron', markCol: '#8a8a80' },
   rotgardistenhelm: { helm: 'great', helmCol: '#1e1f22', crest: '#5a1a1c' },
@@ -289,6 +292,28 @@ function condition(s, e, eq) {
 }
 const CAPE_COLS = ['#5a1a1c', '#6a2a1e', '#2a3448', '#4a3a28', '#3a4428', '#3a3634', '#5a4a3a', '#4a2a3a'];
 // Personen (Spieler, NPCs): aus Palette, Ausrüstung, Beruf.
+// S13 (Nutzer: „wichtige Figuren sehen anders aus — Statur, Haare, Bart, Kleidung“). Feste Merkmale je benannter Figur, über Beruf und
+// Ausrüstung gelegt: so erkennt man Havel, Borin oder Brann auf den ersten Blick wieder.
+const NAMED_LOOK = {
+  havel: { hair: '#c8c2b4', hs: 2, beard: 1, cloth: '#4a3a52', scarf: '#8a6a3a', stole: '#6b5a45' },
+  elena: { hair: '#6a2a1a', hs: 3, stole: '#6a2420' },
+  tomas: { hair: '#c89a4a', hs: 0, beard: 0, hood: '#4a5a2c', cloak: '#35421f' },
+  borin: { hair: '#3a2a1e', hs: 2, beard: 1, cloth: '#3a3026', scarf: '#6a2a1e', cape: '#2a221a' },
+  mara: { hair: '#1e1612', hs: 3, cloth: '#7a5a2a', scarf: '#b08a3a', sash: '#6a3a1a' },
+  gerold: { hair: '#8a8478', hs: 2, beard: 1, cloth: '#2f3a4a', sash: '#b08a3a' },
+  aldric: { hair: '#2a1e16', hs: 2, beard: 1, cloth: '#3a2a20' },
+  jorun: { hair: '#8a6a3a', hs: 0, beard: 1, cloth: '#5a4a30' },
+  kelan: { hair: '#d8d2c6', hs: 1, beard: 1, cape: '#9b2e26' },
+  rook: { hair: '#1a1410', hs: 1, beard: 1, scarf: '#7a2a20', cape: '#3a1a14' },
+  mira: { hair: '#e0dccf', hs: 1, cloth: '#3e4a2a', robe: '#3e4a2a', stole: '#7a8a4a', hooded: 0 },
+  brann: { hair: '#a8421e', hs: 3, cloth: '#3a2e26', apron: 1, glove: '#2a1e16' },
+  ilva: { hair: '#1a1612', hs: 3, cloth: '#d9d2c0', robe: '#d9d2c0', sash: '#9b2e26' },
+  oda: { hair: '#c89a4a', hs: 3, cape: '#2f4260', sash: '#b9c3d2' },
+  lioba: { hair: '#d08a3a', hs: 1, cloth: '#6a2a4a', scarf: '#c8a050', cape: '#3a1a3a' },
+  quirin: { hair: '#5a5a52', hs: 2, beard: 1, cloth: '#3a4a3a', robe: '#3a4a3a', pouch: 1, strap: 1 },
+  sael: { hair: '#2a2622', hs: 1, cloth: '#232a28', robe: '#232a28', stole: '#5fb39a' },
+  lila: { hair: '#c89a4a', hs: 3, helm: '', cloth: '#8a7a5a' },
+};
 export function humanSpec(e) {
   const p = e.pal || {}, eq = e.equip || {}, s = baseSpec();
   const prof = e.prof || '', key = e.key || '';
@@ -350,6 +375,7 @@ export function humanSpec(e) {
   const K = CIVIC[prof]; if (K) { for (const k in K) if (s[k] == null || s[k] === '' || s[k] === 0 || k === 'robe' || k === 'hem') s[k] = K[k] === 'cloth' ? s.cloth : K[k]; }
   if (!K && !s.robe && /(in|frau)$/.test(prof) && !s.armor) { s.robe = s.cloth; s.helm = s.helm || 'scarf'; s.helmCol = s.helmCol || darkOf(s.cloth); }
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
+  const NL = NAMED_LOOK[key]; if (NL) Object.assign(s, NL);
   condition(s, e, eq);
   if (e.robot) Object.assign(s, ROBOT_LOOK);
   if (s.tabard && !s.mark) s.mark = 'cross';

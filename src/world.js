@@ -1881,9 +1881,11 @@ export const DUNGEONS = {
   kerker: { name: 'Kerker', floor: 'dfloor', amb: 'blight', enter: 'Die Tür fällt ins Schloss. Stroh, Eisen, der Geruch von zu vielen Leuten auf zu wenig Raum.' },   // Phase 2 §26
   omega: { name: 'Krater des Gefallenen Sterns', floor: 'scree', amb: 'blight', open: true, enter: 'Du trittst durch den Riss. Der Himmel ist rot, der Boden warm. In der Mitte des Kraters atmet etwas, das größer ist als ein Haus.' },   // Phase 7
   garmadon: { name: 'Gruft des Toten Königs', floor: 'dfloor', amb: 'blight', enter: 'Stufen aus Knochen führen hinab. Die Luft ist warm und riecht nach altem Blut. Irgendwo unten schlägt etwas wie ein Herz.' },   // Phase 6 MP2 §63
+  vault: { name: 'Gewölbe', floor: 'dfloor', amb: 'blight', enter: '' },   // S13: zufällige Gewölbe (game.js buildVault)
   sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
+MAPS.vault = { w: 8, h: 8, tiles: new Uint8Array(64).fill(T.DWALL), entry: { x: 4 * TS, y: 4 * TS } };   // Platzhalter bis zur ersten Ebene
 
 // Kerker (Phase 2, Master-Prompt 2 §26): ein Gang, oben und unten je vier Zellen hinter Gittern, Wachstube im Westen mit dem
 // Ausgang. Wer verhaftet wird, sitzt hier seine Zeit ab (10–20 Minuten), isst, redet mit Mitgefangenen — oder bricht aus.

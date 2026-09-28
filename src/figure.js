@@ -721,6 +721,26 @@ const WDES = {
     C.poly(M.ir, [[35, 2], [37.5, 2], [37.5, 14], [35, 14]]);
     for (const y of [2.4, 7.2, 12]) C.poly(M.st, [[37, y], [47, y + 0.3], [47, y + 1.6], [37, y + 1.9]]);
     return { gx: 8, gy: 8, blade: null }; }],
+  // S13: neue Waffenarten (Nutzer)
+  kriegssense: [70, 24, (C, M) => { C.poly(M.wd, [[0, 10.5], [60, 10.5], [60, 13], [0, 13]]); C.poly(M.ir, [[57, 9], [61, 9], [61, 14], [57, 14]]);
+    C.poly(M.st, [[59, 12], [66, 11], [69, 14], [66, 19], [56, 22], [44, 23], [52, 19], [60, 16]]); return { gx: 20, gy: 12, blade: [46, 64, 18] }; }],
+  sturmsense: [72, 24, (C, M) => { C.poly(M.wd, [[0, 10.5], [62, 10.5], [62, 13], [0, 13]]); for (const x of [8, 20, 34]) C.poly(M.wr, [[x, 10], [x + 3, 10], [x + 3, 13.5], [x, 13.5]]);
+    C.poly(M.ir, [[59, 8.5], [63, 8.5], [63, 14.5], [59, 14.5]]); C.poly(M.st, [[61, 12], [68, 10.5], [71, 14], [68, 20], [57, 23], [42, 23.5], [52, 19], [61, 16]]); return { gx: 22, gy: 12, blade: [44, 66, 19] }; }],
+  kriegssichel: [40, 20, (C, M) => { C.poly(M.wr, [[0, 9], [14, 9], [14, 12], [0, 12]]); C.ell(M.ir, 1.5, 10.5, 1.6, 1.6);
+    C.poly(M.st, [[14, 8.5], [22, 4.5], [31, 3.5], [38, 7], [39, 11], [34, 8], [25, 8], [19, 11.5], [14, 12]]); return { gx: 6, gy: 10, blade: [18, 34, 7] }; }],
+  doppelklinge: [64, 12, (C, M) => { C.poly(M.wr, [[26, 4.8], [38, 4.8], [38, 7.2], [26, 7.2]]); C.poly(M.ir, [[24, 3.5], [26, 3.5], [26, 8.5], [24, 8.5]]); C.poly(M.ir, [[38, 3.5], [40, 3.5], [40, 8.5], [38, 8.5]]);
+    C.poly(M.st, [[0, 6], [6, 4.4], [24, 4.8], [24, 7.2], [6, 7.6]]); C.poly(M.st, [[40, 4.8], [58, 4.4], [64, 6], [58, 7.6], [40, 7.2]]); return { gx: 32, gy: 6, blade: [42, 58, 6] }; }],
+  schlagkralle: [24, 12, (C, M) => { C.poly(M.wr, [[0, 3.5], [8, 3.5], [8, 8.5], [0, 8.5]]); C.poly(M.ir, [[7, 2], [10, 2], [10, 10], [7, 10]]);
+    for (const y of [3, 6, 9]) C.poly(M.st, [[10, y - 0.8], [21, y - 0.5], [24, y], [21, y + 0.6], [10, y + 0.8]]); return { gx: 4, gy: 6, blade: [11, 20, 6] }; }],
+  wurfmesser: [22, 8, (C, M) => { C.poly(M.wr, [[0, 3], [8, 3], [8, 5], [0, 5]]); C.poly(M.st, [[8, 2.4], [18, 3], [22, 4], [18, 5], [8, 5.6]]); return { gx: 4, gy: 4, blade: [9, 18, 4] }; }],
+  wurfbeil: [26, 16, (C, M) => { C.poly(M.wd, [[0, 7], [18, 7], [18, 9], [0, 9]]); C.poly(M.st, [[15, 2], [21, 2.5], [25, 8], [21, 13.5], [15, 14], [18, 8]]); return { gx: 5, gy: 8, blade: null }; }],
+  schleuder: [26, 10, (C, M) => { C.poly(M.wr, [[0, 4], [18, 4.4], [18, 5.6], [0, 6]]); C.ell(M.wd, 21, 5, 3.2, 3); return { gx: 3, gy: 5, blade: null }; }],
+  messingpistole: [30, 12, (C, M) => { C.poly(M.wd, [[0, 7], [6, 5], [9, 6], [6, 11], [1, 11]]); C.poly(M.ir, [[7, 3.5], [29, 4], [29, 6.2], [7, 6.6]]); C.ell(M.st, 10, 7.5, 1.6, 1.6);
+    return { gx: 5, gy: 7, blade: null, orb: [12, 6] }; }],
+  donnerbuechse: [54, 14, (C, M) => { C.poly(M.wd, [[0, 6], [14, 5], [19, 8], [19, 12], [3, 12]]); C.poly(M.ir, [[16, 4], [52, 4.5], [53, 6.8], [16, 7.2]]);
+    for (const x of [24, 34, 44]) C.poly(M.st, [[x, 3.2], [x + 2, 3.2], [x + 2, 8], [x, 8]]); C.ell(M.st, 21, 8.5, 2, 2); return { gx: 16, gy: 8, blade: null, orb: [22, 7] }; }],
+  donnerwort: [56, 14, (C, M) => { C.poly(M.wd, [[0, 6], [14, 5], [19, 8], [19, 12], [3, 12]]); C.poly(M.st, [[16, 3.6], [54, 4.2], [55, 7], [16, 7.6]]);
+    for (const x of [22, 30, 38, 46]) C.poly(M.ir, [[x, 3], [x + 2, 3], [x + 2, 8.4], [x, 8.4]]); C.ell(M.st, 21, 8.5, 2.2, 2.2); return { gx: 16, gy: 8, blade: [17, 52, 5], orb: [22, 7] }; }],
   axe: [40, 22, (C, M) => {                                          // S12: schlanker Schaft, Bartklinge mit heller Schneide
     C.poly(M.wd, [[1, 9.6], [33, 9.6], [33, 12.2], [1, 12.2]]); C.poly(M.wr, [[2, 9.3], [9, 9.3], [9, 12.5], [2, 12.5]]);
     C.poly(M.ir, [[28, 7.5], [32.5, 7.5], [32.5, 14.5], [28, 14.5]]);
@@ -890,7 +910,7 @@ const WDES = {
     return { gx: 12, gy: 28, blade: null, after: (set) => { for (let y = 2; y <= 54; y++) set(4, y, '#c9bfa6'); } }; }],
 };
 const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
-  rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow' };
+  rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
 export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron) {
   const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w, h, fn] = WDES[d];
   const C = new Canvas2(w, h);
@@ -922,6 +942,10 @@ const BEAST = {
   wild_dog: { body: [31, 22, 11.5, 5.2], fx: 23, hx: 39, leg: 15, lw: 2.8, head: [15, 16, 4, 3.4], snout: 8, neck: 1, tail: 'sickle', ear: 'flop', ribs: 1, spots: 1 },
   boar:     { body: [31, 22, 14, 8.2], fx: 21, hx: 41, leg: 10, lw: 4.2, head: [13, 22, 6, 5], snout: 4, neck: 0, tail: 'curl', ear: 'small', crest: 1, tusk: 1 },
   bear:     { body: [31, 19, 15, 9.5], fx: 21, hx: 41, leg: 13, lw: 5.6, head: [12, 19, 5.6, 4.8], snout: 5, neck: 0, tail: 'stub', ear: 'round', hump: 1 },
+  // S13 (Nutzer, Tiere): Reittiere und Nutztiere
+  horse:    { body: [32, 16, 13, 6], fx: 23, hx: 41, leg: 20, lw: 3, head: [13, 8, 3.6, 3.4], snout: 7, neck: 2, tail: 'bushy', ear: 'point', mane: 1 },
+  cow:      { body: [31, 19, 15, 8], fx: 21, hx: 41, leg: 13, lw: 4, head: [12, 17, 4.6, 4], snout: 4, neck: 0, tail: 'short', ear: 'small', spots: 1 },
+  sheep:    { body: [31, 22, 12, 7.5], fx: 23, hx: 39, leg: 9, lw: 2.6, head: [15, 19, 3.6, 3.2], snout: 3, neck: 0, tail: 'stub', ear: 'flop', mane: 1 },
   deer:     { body: [32, 18, 11, 5.4], fx: 25, hx: 39, leg: 19, lw: 2.4, head: [14, 11, 3.6, 3], snout: 8, neck: 2, tail: 'short', ear: 'long', antler: 1, rump: 1 },
 };
 export function paintBeast2(type, pal, frame, act) {

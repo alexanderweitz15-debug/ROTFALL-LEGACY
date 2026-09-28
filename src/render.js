@@ -112,6 +112,28 @@ export function drawFrame(now) {
   drawFloats();
   drawBubbles(performance.now());
   drawBossBar();
+  drawTrack(now);
+}
+// S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
+let track = null;
+export function setTrack(t) { track = t; }
+function drawTrack(now) {
+  if (!track || !S.player || S.map !== 'world' || track.x == null) return;
+  const tx = (track.x + 0.5) * TS, ty = (track.y + 0.5) * TS, sx = (tx - cam.x) * cam.zoom, sy = (ty - cam.y) * cam.zoom, w = W, h = H, m = 28;
+  const d = Math.hypot(tx - S.player.x, ty - S.player.y), label = d > 999 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
+  ctx.save(); ctx.font = `11px serif`; ctx.textAlign = 'center';
+  if (sx > m && sx < w - m && sy > m && sy < h - m) {                // im Bild: pulsierende Raute über dem Ziel
+    const b = Math.sin(now / 300) * 3; ctx.fillStyle = '#e0b75a'; ctx.beginPath(); ctx.moveTo(sx, sy - 40 + b); ctx.lineTo(sx + 6, sy - 32 + b); ctx.lineTo(sx, sy - 24 + b); ctx.lineTo(sx - 6, sy - 32 + b); ctx.fill();
+  } else {                                                          // außerhalb: Pfeil am Rand
+    const a = Math.atan2(sy - h / 2, sx - w / 2), k = Math.min((w / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (h / 2 - m) / Math.abs(Math.sin(a) || 1e-6)), px = w / 2 + Math.cos(a) * k, py = h / 2 + Math.sin(a) * k;
+    ctx.translate(px, py); ctx.rotate(a); ctx.fillStyle = '#e0b75a'; ctx.strokeStyle = '#1a140c'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-7, -8); ctx.lineTo(-3, 0); ctx.lineTo(-7, 8); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.rotate(-a); ctx.translate(-Math.cos(a) * 22, -Math.sin(a) * 22);
+  }
+  ctx.fillStyle = '#e8dcb8'; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3; const lx = 0, ly = 4;
+  if (sx > m && sx < w - m && sy > m && sy < h - m) { ctx.strokeText(`${track.name} · ${label}`, sx, sy - 46); ctx.fillText(`${track.name} · ${label}`, sx, sy - 46); }
+  else { ctx.strokeText(label, lx, ly); ctx.fillText(label, lx, ly); }
+  ctx.restore();
 }
 // Sprechblasen der Bewohner (Talk-Pairs): über Licht und Wetter, damit sie lesbar bleiben; dunkles Feld mit Pergamentkante
 let shown = [];
@@ -626,6 +648,14 @@ function drawGoblinNpc(e, now) {
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.82, 0.82); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
   if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
 }
+// S13 (Nutzer: Reittiere, Kampf vom Pferd): das Reittier unter dem Helden, der Reiter 14 px höher
+const MOUNT_PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+function drawRider(e, now) {
+  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, f = SP.beastFrame('horse', MOUNT_PAL[e.mounted.kind] || MOUNT_PAL.horse, Math.cos(e.aim ?? 0) < 0 ? 'W' : 'E', '', fr);
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); shadow(e.x, e.y + 3, 14, .35); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore();
+  if (e.mounted.kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
+  ctx.save(); ctx.translate(0, -14); drawHumanoid(e, now); ctx.restore();
+}
 function drawEntity(e, now) {
   switch (e.kind) {
     case 'prop': return drawPropPixel(e, now);
@@ -635,7 +665,7 @@ function drawEntity(e, now) {
     case 'grave': return drawGrave(e);
     case 'enemy': return drawCreature(e, now);
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
-    case 'player': return e.cineGhost ? null : drawHumanoid(e, now);   // Kamerafahrt: unsichtbar
+    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); return drawHumanoid(e, now);   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'house': return drawHouse(e.b, now);
@@ -1626,7 +1656,7 @@ function swingVar(e, sw) {
 }
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
-const RANGED_W = new Set(['bow', 'crossbow', 'wand']);
+const RANGED_W = new Set(['bow', 'crossbow', 'wand', 'throw', 'sling']);
 function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
@@ -1701,7 +1731,7 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
     }
   }
   c.save(); c.translate(Math.round(hx), Math.round(hy));
-  c.rotate(ranged && wt === 'wand' ? dir : a);                          // Phase 1: Bogen/Armbrust nach ihrer Haltung (Bogen senkrecht)
+  c.rotate(ranged && (wt === 'wand' || wt === 'throw' || wt === 'sling') ? dir : a);                          // Phase 1: Bogen/Armbrust nach ihrer Haltung (Bogen senkrecht)
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);          // nach Blickrichtung, nie mitten im Schwung (Bogen ist symmetrisch)
   c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
   if (W.orb) {                                                      // Kristall des Stabs flackert (Magie sichtbar, kein Glühschleier)
@@ -1810,8 +1840,8 @@ function drawCreature(e, now) {
   }
   if (e.mtype === 'carrion_wing') return drawWing(e, now, p);
   if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
-  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(e.mtype)) {
-    const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
+  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
+    const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : e.mtype === 'horse' ? 1.35 : e.mtype === 'cow' ? 1.3 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
     if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
@@ -1847,7 +1877,7 @@ function drawCreature(e, now) {
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
-  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
+  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1) * ({ veteran: 1.06, armored: 1.08, leader: 1.1, starved: 0.94 }[e.variant] || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
   const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
   if (e.mtype === 'zombie') { ctx.fillStyle = 'rgba(140,170,70,.13)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, 26, 14, 0, 0, 7); ctx.fill(); }   // Seuchendunst
   if (e.shadowServ) { ctx.fillStyle = 'rgba(120,80,190,.18)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, 18, 8, 0, 0, 7); ctx.fill(); }   // Schattenskelett des Hexenmeisters
@@ -1859,6 +1889,8 @@ function drawCreature(e, now) {
   if (e.mtype === 'ash_demon') { ctx.fillStyle = `rgba(255,110,40,${0.1 + 0.05 * Math.sin(now / 160)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 56 / scale, 35 / scale, 0, 0, 7); ctx.fill(); }   // Glutaura
   if (e.shadowServ) ctx.globalAlpha = 0.72;
   if (m.angel) drawWings(e, now, 1);
+  if (e.variant === 'frenzied') { ctx.fillStyle = `rgba(190,40,30,${0.12 + 0.06 * Math.sin(now / 140)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 20, 10, 0, 0, 7); ctx.fill(); }   // S13: Raserei
+  if (e.variant === 'leader') { ctx.fillStyle = '#3a2a1a'; ctx.fillRect(e.x + 9, e.y - 54, 2, 44); ctx.fillStyle = '#8a2a1e'; ctx.fillRect(e.x + 11, e.y - 54, 11, 7); ctx.fillRect(e.x + 11, e.y - 47, 7, 3); }   // S13: Feldzeichen des Anführers
   drawHumanoid(proxy, now);
   ctx.globalAlpha = 1; ctx.restore();
   if (e.mtype === 'shade') { ctx.fillStyle = 'rgba(14,12,20,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 12, 7, 0, 0, 7); ctx.fill(); }   // kein Fuß berührt den Boden
@@ -1895,7 +1927,7 @@ function drawCorpse(e, now) {
     ctx.fillStyle = '#4a1414'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 6, 70 * m.eye, 12 * m.eye + 4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a0a0a'; ctx.fillRect(e.x - 60 * m.eye, e.y - 7, 120 * m.eye, 2);
   } else if (e.mtype === 'carrion_wing') {                     // Phase 6: gefallene Schwinge
     ctx.fillStyle = '#141012'; ctx.fillRect(e.x - 11, e.y - 1, 22, 3); ctx.fillStyle = '#2a2426'; ctx.fillRect(e.x - 3, e.y - 3, 6, 5);
-  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(e.mtype)) {
+  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
     const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
     ctx.save(); ctx.translate(e.x, e.y + 5); ctx.scale(SP.FIGK, SP.FIGK); SP.blit(ctx, f, 0, 0); ctx.restore();
   } else if (e.mtype === 'gorak') {
@@ -2021,6 +2053,12 @@ function drawProjectile(p) {
     ctx.fillStyle = '#c2582a'; ctx.fillRect(-6, -6, 12, 12); ctx.fillRect(-8, -4, 16, 8);
     ctx.fillStyle = '#f0b050'; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#ffe6a8'; ctx.fillRect(0, -2, 4, 4);
   }
+  else if (p.kind === 'bullet') {                                    // S13: Magitech-Kugel mit Glutspur
+    ctx.fillStyle = 'rgba(255,190,90,.35)'; ctx.fillRect(-22, -1, 18, 2); ctx.fillStyle = '#c89a4a'; ctx.fillRect(-4, -2, 7, 4); ctx.fillStyle = '#fff0c0'; ctx.fillRect(1, -1, 2, 2); }
+  else if (p.kind === 'stone') { ctx.fillStyle = OUT_COL; ctx.fillRect(-3, -3, 6, 6); ctx.fillStyle = '#8a8478'; ctx.fillRect(-2, -2, 4, 4); }   // Schleuderstein
+  else if (p.kind === 'knife' || p.kind === 'taxe') {                  // Wurfwaffen drehen sich im Flug
+    ctx.rotate(performance.now() / 45); ctx.fillStyle = OUT_COL; ctx.fillRect(-8, -2, 16, 4); ctx.fillStyle = '#5a4030'; ctx.fillRect(-7, -1, 6, 2);
+    ctx.fillStyle = '#b8b2a4'; if (p.kind === 'taxe') ctx.fillRect(2, -5, 5, 10); else ctx.fillRect(-1, -1, 8, 2); }
   else if (p.kind === 'bolt') {                                      // Armbrustbolzen: kurz, dick, Eisenspitze
     ctx.fillStyle = OUT_COL; ctx.fillRect(-7, -2, 16, 4); ctx.fillStyle = '#8a7658'; ctx.fillRect(-5, -1, 10, 2);
     ctx.fillStyle = '#6d6154'; ctx.fillRect(5, -2, 4, 4); ctx.fillStyle = '#c9bfa6'; ctx.fillRect(-7, -2, 2, 4); }

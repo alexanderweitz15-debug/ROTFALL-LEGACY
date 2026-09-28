@@ -28,7 +28,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const NAV = [
   ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
   ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
-  ['skills', 'Talente', 'T'], ['quests', 'Aufträge', 'J'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
+  ['skills', 'Talente', 'T'], ['quests', 'Aufträge', 'J'], ['effects', 'Effekte', 'X'], ['codex', 'Kodex', 'H'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
 ];
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
@@ -87,6 +87,9 @@ export function refreshHUD() {
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp');
   $('pc-bars').innerHTML = html;
   $('pc-status').innerHTML = statusIcons(p);
+  if (!$('pc-status').dataset.fx) { $('pc-status').dataset.fx = 1; $('pc-status').addEventListener('mouseover', fxTip); $('pc-status').addEventListener('mouseleave', () => $('fx-tip')?.classList.add('hidden'));
+    $('pc-status').addEventListener('click', e => { if (e.target.closest('[data-fx]')) openModal('effects'); });
+    if (!$('fx-tip')) { const d = document.createElement('div'); d.id = 'fx-tip'; d.className = 'hidden'; document.body.appendChild(d); } }
   const worst = PARTS.filter(k => partState(p.body[k]) !== 'heil').map(k => `${PART_NAME[k]} <em>${STATE_WORD[partState(p.body[k])]}</em>`);
   $('pc-body').innerHTML = bodyChart(p) + `<div class="pc-wounds">${worst.join('<br>') || 'Keine Wunden'}</div>`;
   // Gruppe
@@ -124,12 +127,75 @@ function topRank(p) {
   return best;
 }
 
+// S13 (Nutzer: Hinweise auf aktive Effekte): Symbolleiste unter den Balken, Maus drüber = Name und Wirkung; alles im Fenster „Effekte“ (X)
+let fxList = [];
 function statusIcons(p) {
-  const out = [];
-  for (const s of p.status || []) out.push(`<span class="st-icon ${s.good ? 'good' : 'bad'}" title="${s.desc || ''}">${s.name}</span>`);
-  if (p.stamina < p.maxStamina * 0.2) out.push('<span class="st-icon bad">Erschöpft</span>');
-  if (S.res.food <= 0) out.push('<span class="st-icon bad">Hungrig</span>');
-  return out.join('');
+  fxList = A.effects ? A.effects() : [];
+  const hud = fxList.map((f, i) => [f, i]).filter(([f]) => f.hud);
+  return hud.map(([f, i]) => `<span class="fx-ic k-${f.kind}" data-fx="${i}">${f.icon}</span>`).join('') + (fxList.length ? `<span class="fx-ic k-more" data-fx="all" title="Alle Effekte (X)">…</span>` : '');
+}
+function fxTip(ev) {
+  const t = ev.target.closest?.('[data-fx]'), tip = $('fx-tip'); if (!tip) return;
+  if (!t || t.dataset.fx === 'all') { tip.classList.add('hidden'); return; }
+  const f = fxList[+t.dataset.fx]; if (!f) return;
+  tip.innerHTML = `<b class="k-${f.kind}">${f.icon} ${f.name}</b><small>${f.g}</small>${f.lines.map(l => `<div>${l}</div>`).join('')}`;
+  tip.classList.remove('hidden'); const r = t.getBoundingClientRect(); tip.style.left = Math.min(innerWidth - 300, r.left) + 'px'; tip.style.top = (r.bottom + 6) + 'px';
+}
+function effectsUI(body) {
+  const L = A.effects ? A.effects() : [], groups = {};
+  for (const f of L) (groups[f.g] ||= []).push(f);
+  body.innerHTML = Object.keys(groups).length ? `<div class="fx-grid">${Object.entries(groups).map(([g, fs]) => `<div class="fx-group"><h3>${g}</h3>${fs.map(f =>
+    `<div class="fx-row"><span class="fx-ic k-${f.kind}">${f.icon}</span><div><b>${f.name}</b>${f.lines.map(l => `<div class="ledger">${l}</div>`).join('')}</div></div>`).join('')}</div>`).join('')}</div>`
+    : '<div class="ledger">Keine besonderen Effekte. Du bist ein unbeschriebenes Blatt.</div>';
+}
+
+// S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/GUIDE.md selbst (eine Quelle für Spieler und Doku; ohne ?dev
+// ohne den Debug-Abschnitt), dazu alle Rangfolgen, alle Zustände mit Erklärung und die Gegner, die man schon getroffen hat. Suche filtert.
+let guideMd = null, codexTab = 'guide';
+const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const inl = t => esc(t).replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/`(.+?)`/g, '<code>$1</code>');
+export function mdToHtml(md) {
+  const out = []; let list = false, table = false;
+  const close = () => { if (list) out.push('</ul>'); if (table) out.push('</table>'); list = table = false; };
+  for (const raw of md.split('\n')) {
+    const l = raw.trimEnd(), t = l.trim();
+    if (/^\|[\s|:-]+\|$/.test(t)) continue;                                  // Tabellen-Trennzeile
+    if (t.startsWith('|')) { if (!table) { close(); out.push('<table class="rank-tab">'); table = true; } out.push('<tr>' + t.slice(1, -1).split('|').map(c => `<td>${inl(c.trim())}</td>`).join('') + '</tr>'); continue; }
+    const li = /^(\s*)(?:[-*]|\d+\.)\s+(.*)$/.exec(l);
+    if (li) { if (!list) { close(); out.push('<ul>'); list = true; } out.push(`<li style="margin-left:${li[1].length * 7}px">${inl(li[2])}</li>`); continue; }
+    close();
+    const h = /^(#{1,3})\s+(.*)$/.exec(t);
+    if (h) out.push(`<h${h[1].length + 1}>${inl(h[2])}</h${h[1].length + 1}>`);
+    else if (t === '---') out.push('<hr>');
+    else if (t) out.push(`<p>${inl(t)}</p>`);
+  }
+  close(); return out.join('');
+}
+function guideSections(md) {                                               // nach „## “ geteilt; Debug-Abschnitt nur mit ?dev
+  const parts = md.split(/\n(?=## )/), dev = /[?&]dev/.test(location.search);
+  return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
+}
+function codexUI(body) {
+  const tabs = [['guide', 'Handbuch'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
+  body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"></div><div id="codex-body" class="codex"></div>`;
+  const q = $('codex-q'), cb = $('codex-body');
+  const render = () => {
+    const needle = q.value.trim().toLowerCase(), hit = t => !needle || t.toLowerCase().includes(needle);
+    if (codexTab === 'guide') {
+      if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
+      const secs = guideSections(guideMd).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';
+    } else if (codexTab === 'ranks') {
+      cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
+    } else if (codexTab === 'states') {
+      const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
+    } else {
+      const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
+      cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row"><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
+        : '<div class="ledger">Hier stehen die Gegner, die du schon erschlagen hast.</div>';
+    }
+  };
+  body.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { codexTab = b.dataset.t; codexUI(body); });
+  q.oninput = render; render();
 }
 
 // ---------------- Log ----------------
@@ -162,6 +228,7 @@ export function renderContext(target) {
     let h = `<div class="ctx-head">${DUNGEONS[S.map] ? DUNGEONS[S.map].name : (here ? here.name : 'Greenmark-Grenzland')}</div>
       <div class="ctx-sub">${DUNGEONS[S.map] ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
       <div class="ctx-line"><span>Gefahr</span><b class="${tCls}">${tName}</b></div>
+      ${A.zoneRange ? (z => `<div class="ctx-line"><span>Gegnerstufen</span><b class="${z[0] > p.level + 2 ? 'threat-high' : z[1] < p.level - 3 ? 'threat-low' : 'threat-med'}">${z[0]}–${z[1]}</b></div>`)(A.zoneRange(S.map, tx, ty)) : ''}
       <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel',bloodrain:'Blutregen',sandstorm:'Sandsturm',snow:'Schnee'}[S.weather]}</b></div>
       <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>
       <div class="ctx-line"><span>Jahr</span><b>${year()}</b></div>`;
@@ -186,7 +253,9 @@ export function renderContext(target) {
     if (q.length) {
       h += `<div class="ctx-block"><div class="ctx-sub">Aufträge</div>` + q.map(([k, v]) => {
         const Q = QUESTS[k];
-        return `<div class="ctx-line"><span>${Q.name}</span><b>${Q.objectives.map((o, i) => `${v.progress[i] || 0}/${o.count || 1}`).join(' ')}</b></div>`;
+        const I = A.questInfo ? A.questInfo(k) : {};   // S13: Ziel, Entfernung, Frist/Angriff
+        return `<div class="ctx-line${I.tracked ? ' tracked' : ''}"><span>${I.tracked ? '◆ ' : ''}${Q.name}</span><b>${Q.objectives.map((o, i) => `${v.progress[i] || 0}/${o.count || 1}`).join(' ')}</b></div>`
+          + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
     box.innerHTML = h;
@@ -202,7 +271,7 @@ export function renderContext(target) {
   }
   if (target.kind === 'enemy') {
     const m = MONSTERS[target.mtype];
-    box.innerHTML = `<div class="ctx-head">${target.title || (target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
+    box.innerHTML = `<div class="ctx-head">${target.title || (target.vname ? target.vname + ' ' : target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
       <div class="ctx-line"><span>Stufe</span><b>${target.level}</b></div>
       ${bar('Leben', target.hp, target.maxHp, 'hp')}
       <div class="ctx-line"><span>Gefahr</span><b class="${m.threat >= 3 ? 'threat-high' : m.threat === 2 ? 'threat-med' : 'threat-low'}">${['','Gering','Mittel','Hoch','Tödlich'][m.threat]}</b></div>
@@ -220,6 +289,7 @@ export function renderContext(target) {
       <div class="ctx-line"><span>Beziehung</span><b>${rel > 0 ? '+' : ''}${Math.round(rel)} · ${relLabel(rel)}</b></div>
       <div class="relbar"><i class="${rel >= 0 ? 'pos' : 'neg'}" style="width:${Math.abs(rel) / 2}%"></i></div>
       ${target.traits ? `<div class="ctx-block">${target.traits.map(t => `<span class="trait">${t}</span>`).join('')}</div>` : ''}
+      ${(o => o.length ? `<div class="ctx-block q-sub">Bietet: ${o.join(' · ')}</div>` : '')(A.offers ? A.offers(target) : [])}
       <div class="ctx-actions">
         <button id="ctx-talk">Sprechen</button>
         ${target.shop ? '<button id="ctx-trade">Handeln</button>' : ''}
@@ -294,16 +364,19 @@ export function renderHotbar() {
         if (cd > 0) { const c = el('div', 'cd'); c.style.height = `${clamp(cd / ab.cd * 100, 0, 100)}%`; c.style.top = 'auto'; c.style.bottom = '0'; d.appendChild(c); }
       }
       d.onclick = () => A.useSlot(i);
+      d.oncontextmenu = ev => { ev.preventDefault(); S.player.hotbar[i] = null; hbSig = ''; renderHotbar(); toast('Platz geleert. Gegenstände über das Inventar wieder auf die Leiste legen.', 1800); };   // S13 (Nutzer): aus der Leiste entfernen
+      d.title = (d.title ? d.title + ' — ' : '') + 'Rechtsklick: entfernen';
     }
     hb.appendChild(d);
   }
 }
-function countItem(key) { const s = S.player.inv.find(x => x.key === key); return s ? (s.count || 1) : 0; }
+function countItem(key) { return S.player.inv.filter(x => x && x.key === key).reduce((n, x) => n + (x.count || 1), 0); }   // alle Stapel
 
 // ---------------- Dialog ----------------
+export let dlgWith = null;
 export function dialogue(npc, text, choices) {
   const box = $('dialogue');
-  box.classList.remove('hidden');
+  box.classList.remove('hidden'); dlgWith = npc;   // S13: wer weggeht, beendet das Gespräch (game.js updatePrompt)
   $('dlg-name').textContent = npc.name;
   $('dlg-text').textContent = text; $('dlg-text').style.whiteSpace = 'pre-line';   // Anschlagbrett: mehrere Zeilen
   drawPortraitTo($('dlg-portrait'), npc);
@@ -318,6 +391,12 @@ export function closeDialogue() { $('dialogue').classList.add('hidden'); }
 export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
 let toastTimer = 0;
+// S13: Schlafen — das Bild blendet ab, Text, Mond, dann langsam wieder auf (rein sichtbar; die Zeit ist schon vergangen)
+export function sleepFade(text) {
+  let d = $('sleep-fade'); if (!d) { d = document.createElement('div'); d.id = 'sleep-fade'; document.getElementById('viewport')?.appendChild(d); }
+  d.innerHTML = `<div>☾</div><p>${text}</p><small>Zzz …</small>`; d.className = 'on';
+  clearTimeout(d._t); d._t = setTimeout(() => { d.className = 'off'; }, 2400);
+}
 export function toast(text, ms = 2200) {
   if (S._quiet) return;                                   // Selbsttest-Sandbox: keine Einblendungen
   const t = $('toast'); t.textContent = text; t.classList.remove('hidden');
@@ -345,7 +424,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   if (R) R[1](body, arg);
 }
@@ -405,13 +484,26 @@ function invUI(body) {
   });
   if (selIdx >= 0 && p.inv[selIdx]) showDetail(p.inv[selIdx], selIdx);
 }
-function showDetail(slot, i) {
-  const it = ITEMS[slot.key], p = S.player, d = $('det');
-  const cur = it.slot && p.equip[it.slot];
+// S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
+// Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
+const USE_TXT = { bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
+  soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).' };
+function itemPurpose(it) {
+  if (it.good) return 'Handelsware: jede Stadt zahlt einen anderen Preis — billig kaufen, wo es viel gibt, teuer verkaufen, wo es fehlt.';
+  if (it.res) return 'Baustoff: kommt in deinen Vorrat (Lager, Siedlung, Ausbessern).';
+  if (it.slot === 'consumable') return USE_TXT[it.use] || 'Verbrauchsgut.';
+  if (it.slot === 'weapon') return `${{ sword: 'Schwert', axe: 'Axt', great: 'Zweihänder', mace: 'Streitkolben', hammer: 'Hammer', spear: 'Speer', polearm: 'Stangenwaffe', dagger: 'Dolch', rapier: 'Rapier', bow: 'Bogen', crossbow: 'Armbrust', staff: 'Stab', wand: 'Zauberstab', whip: 'Peitsche' }[it.wtype] || 'Waffe'}${it.twohand ? ' (zweihändig)' : ''}: ${it.ranged ? 'Fernkampf — braucht freie Sicht.' : it.twohand ? 'schwer und langsam, trifft hart und unterbricht Angriffe.' : 'Nahkampf.'}`;
+  if (it.slot === 'offhand') return 'Schild: blockt Treffer von vorn, wenn du in Deckung gehst.';
+  if (it.armor) return 'Rüstung: mindert jeden Treffer um den Rüstungswert.';
+  if (it.slot === 'material') return 'Material: für Aufträge, Handwerk oder zum Verkauf.';
+  return '';
+}
+export function itemInfoHTML(slot, cmpWith = true) {
+  const it = ITEMS[slot.key], p = S.player, cur = cmpWith && it.slot && p.equip[it.slot];
   const cmp = (a, b) => a === b ? '' : a > b ? `<span class="better">+${+(a - b).toFixed(1)}</span>` : `<span class="worse">${+(a - b).toFixed(1)}</span>`;
   const rar = slot.rar || it.rarity || 'common', leg = slot.leg || it.leg;
-  let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3>
-    <div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
+  let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
+  const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
   for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;
   if (leg && LEGENDS[leg]) h += `<div class="legend-fx">«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
   if (it.lore || slot.lore) h += `<div class="lore">${slot.lore || it.lore}</div>`;
@@ -419,13 +511,19 @@ function showDetail(slot, i) {
   if (it.dmg) h += `<div class="stat"><span>Schaden</span><b>${it.dmg} ${cur && ITEMS[cur.key].dmg ? cmp(it.dmg, ITEMS[cur.key].dmg) : ''}</b></div>`;
   if (it.speed) h += `<div class="stat"><span>Angriffszeit</span><b>${(it.speed / 1000).toFixed(2)} s</b></div>`;
   if (it.reach) h += `<div class="stat"><span>Reichweite</span><b>${it.reach}</b></div>`;
+  if (it.stam) h += `<div class="stat"><span>Ausdauer je Hieb</span><b>${it.stam}</b></div>`;
   if (it.ap) h += `<div class="stat"><span>Panzerbrechend</span><b>${Math.round(it.ap * 100)}%</b></div>`;
   if (it.crit) h += `<div class="stat"><span>Kritischer Faktor</span><b>×${it.crit}</b></div>`;
   if (it.armor) h += `<div class="stat"><span>Rüstung</span><b>${it.armor} ${cur ? cmp(it.armor, ITEMS[cur.key].armor || 0) : ''}</b></div>`;
   if (it.block) h += `<div class="stat"><span>Block</span><b>${Math.round(it.block * 100)}%</b></div>`;
   if (it.heal) h += `<div class="stat"><span>Heilung</span><b>${it.heal}</b></div>`;
   if (slot.cond != null) h += `<div class="stat"><span>Zustand</span><b>${Math.round(slot.cond * 100)}%</b></div>`;
-  h += `<div class="stat"><span>Wert</span><b>${Math.round(it.value * (RARITY_VALUE[rar] || 1))} Gold</b></div>`;
+  h += `<div class="stat"><span>Grundwert</span><b>${Math.round(it.value * (RARITY_VALUE[rar] || 1))} Gold</b></div>`;
+  return h;
+}
+function showDetail(slot, i) {
+  const it = ITEMS[slot.key], p = S.player, d = $('det');
+  let h = itemInfoHTML(slot);                                       // S13: gemeinsame Beschreibung (Inventar und Handel)
   h += `<div class="ctx-actions">
       ${it.slot === 'consumable' ? `<button id="d-use">${it.use === 'bandage' ? 'Anlegen' : 'Benutzen'}</button>` : it.slot !== 'material' ? '<button id="d-use">Anlegen</button>' : ''}
       ${it.slot === 'consumable' || it.slot === 'weapon' ? '<button id="d-hot">Auf Leiste legen</button>' : ''}
@@ -688,7 +786,7 @@ function facUI(body) {
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
-      <div class="classtree">${f.ranks.map((r, i) => `<span class="${i === rank ? 'on' : ''}">${r}</span>${i < f.ranks.length - 1 ? '<em>│</em>' : ''}`).join('')}</div>
+      ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
       <h3 style="margin-top:14px">Krieg</h3>
       <canvas class="warmap" id="warmap" width="260" height="180"></canvas>
       <div class="ledger">${A.warStatus()}</div>
@@ -722,7 +820,11 @@ let selEv = -1;
 export function chronUI(body) {
   const evs = S.chronicle;
   const years = [...new Set(evs.map(e => e.year))].sort((a, b) => a - b);
-  body.innerHTML = `<div class="chron"><div class="timeline">${years.map(y =>
+  const st = S.stats || {}, ms = st.playMs || 0, P = S.player, done = Object.values(S.quests).filter(q => q.state === 'done').length;   // S13 (Nutzer): Spielstand-Info
+  const info = [['Spielzeit', `${Math.floor(ms / 3.6e6)} Std ${Math.floor(ms / 6e4) % 60} Min`], ['Generation', `${S.legacy.gen} (Haus ${S.legacy.house})`], ['Vorfahren', S.legacy.ancestors.length],
+    ['Tag / Jahr', `${S.day | 0} / ${year()}`], ['Getötet', S.kills || 0], ['Schlachten', S.battles || 0], ['Aufträge erfüllt', done], ['Held', `${P.name}, Stufe ${P.level}`],
+    ['Legenden', Object.values(S.legend || {}).join(', ') || '—']].map(([k, v]) => `<div class="statline"><span>${k}</span><b>${v}</b></div>`).join('');
+  body.innerHTML = `<div class="panel" style="padding:10px 14px;margin-bottom:12px"><h3>Spielstand</h3><div class="save-info">${info}</div></div><div class="chron"><div class="timeline">${years.map(y =>
     `<div class="tl-year">JAHR ${y}</div>` + evs.map((e, i) => [e, i]).filter(([e]) => e.year === y)
       .map(([e, i]) => `<div class="tl-ev ${e.kind} ${i === selEv ? 'sel' : ''}" data-i="${i}"><span class="dot"></span><span>${e.text}</span></div>`).join('')
   ).join('') || '<div class="ledger">Die Chronik ist leer. Noch.</div>'}</div>
@@ -753,9 +855,10 @@ function mapUI(body) {
 function tradeUI(body, npc) {
   const p = S.player;
   const stock = A.shopStock(npc);
-  body.innerHTML = `<div class="inv-layout" style="grid-template-columns:1fr 1fr">
+  body.innerHTML = `<div class="inv-layout" style="grid-template-columns:1fr 1fr 1fr">
     <div><h3>${npc.name} bietet</h3><div id="buy"></div></div>
-    <div><h3>Du bietest (Gold: ${S.gold})</h3><div id="sell"></div></div></div>`;
+    <div><h3>Du bietest (Gold: ${S.gold})</h3><div id="sell"></div></div>
+    <div><h3>Info</h3><div id="trade-info" class="ledger">Fahr mit der Maus über eine Ware: hier steht, was sie ist und was sie tut.</div></div></div>`;   // S13 (Nutzer): Info beim Kauf
   const mk = (list, box, isBuy) => list.forEach((slot, i) => {
     const it = ITEMS[slot.key];
     const price = A.price(slot.key, isBuy, npc);
@@ -763,6 +866,7 @@ function tradeUI(body, npc) {
     const cv = el('canvas'); cv.width = cv.height = 34; row.appendChild(cv);
     row.appendChild(el('div', '', `<div class="s-name">${it.name}${slot.count > 1 ? ' ×' + slot.count : ''}</div><div class="s-key">${price} Gold</div>`));
     setTimeout(() => drawItemIconTo(cv, slot.key), 0);
+    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div><div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
     row.onclick = () => { isBuy ? A.buy(npc, slot.key) : A.sell(i, npc); refreshModal(npc); };
     box.appendChild(row);
   });
@@ -774,13 +878,18 @@ function tradeUI(body, npc) {
 }
 
 function questUI(body) {
-  body.innerHTML = Object.entries(S.quests).map(([k, v]) => {
-    const Q = QUESTS[k];
-    return `<div class="panel" style="padding:12px;margin-bottom:8px"><h3>${Q.name} <span style="float:right;color:#8d836e">${
+  const order = { active: 0, done: 1, failed: 2 };                 // S13: offene zuerst; Verfolgen, Abbrechen, Ziel und Frist sichtbar
+  const list = Object.entries(S.quests).filter(([k]) => QUESTS[k]).sort((a, b) => order[a[1].state] - order[b[1].state]);
+  body.innerHTML = list.map(([k, v]) => {
+    const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
+    return `<div class="panel" style="padding:12px;margin-bottom:8px${v.state !== 'active' ? ';opacity:.6' : ''}"><h3>${I.tracked ? '◆ ' : ''}${Q.name} <span style="float:right;color:#8d836e">${
       { active:'offen', done:'abgeschlossen', failed:'gescheitert' }[v.state]}</span></h3>
       <div class="ledger">${Q.desc}<br>${Q.objectives.map((o, i) => `· ${o.text} ${v.progress[i] || 0}/${o.count || 1}`).join('<br>')}
-      ${v.outcome ? `<br><i>${v.outcome}</i>` : ''}</div></div>`;
+      ${I.where ? `<br>Ziel: ${I.where}` : ''}${I.timer ? `<br>${I.timer}` : ''}${v.outcome ? `<br><i>${v.outcome}</i>` : ''}</div>
+      ${v.state === 'active' ? `<div class="ctx-actions" style="margin-top:6px"><button data-track="${k}">${I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${I.cancel ? `<button data-cancel="${k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
   }).join('') || '<div class="ledger">Keine Aufträge. Frag im Dorf nach.</div>';
+  body.querySelectorAll('[data-track]').forEach(b => b.onclick = () => { A.trackQuest(b.dataset.track); questUI(body); });
+  body.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { if (b.dataset.sure) { A.cancelQuest(b.dataset.cancel); questUI(body); } else { b.dataset.sure = 1; b.textContent = 'Wirklich abbrechen?'; } });
 }
 
 function settingsUI(body) {
@@ -800,7 +909,7 @@ function settingsUI(body) {
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
       WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>1–8 — Fähigkeiten<br>
-      I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
+      I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button></div>
     </div></div>`;

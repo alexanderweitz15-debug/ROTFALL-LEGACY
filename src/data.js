@@ -13,7 +13,7 @@ export const ORIGINS = {
 };
 
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-  medicine:'Medizin', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
+  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
 
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
 // ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
@@ -62,6 +62,18 @@ export const ITEMS = {
   mace:         { name:'Streitkolben', slot:'weapon', wtype:'mace', dmg:13, reach:36, arc:1.3, speed:740, stam:11, ap:0.4, stagger:1.6, rarity:'uncommon', value:110, skill:'onehanded' },
   spear:        { name:'Speer', slot:'weapon', wtype:'spear', dmg:10, reach:74, arc:0.5, speed:640, stam:8, rarity:'common', value:48, skill:'polearms' },
   dagger:       { name:'Dolch', slot:'weapon', wtype:'dagger', dmg:5, reach:26, arc:1.1, speed:300, stam:4, crit:2.6, rarity:'common', value:22, skill:'onehanded' },
+  // S13 (Nutzer: „neue Waffenarten: Sense, Kriegssichel, Wurfwaffen, Schleuder, Doppelklinge, Faustwaffen, mehr Unikate, Magitech-Feuerwaffen“)
+  kriegssense:  { name:'Kriegssense', slot:'weapon', wtype:'polearm', dmg:20, reach:60, arc:2.4, speed:980, stam:17, sweep:true, rarity:'uncommon', value:150, skill:'polearms', twohand:true, lore:'Ein Bauerngerät, gerade geschmiedet. Mäht Reihen, nicht nur Korn.' },
+  kriegssichel: { name:'Kriegssichel', slot:'weapon', wtype:'axe', dmg:12, reach:40, arc:1.6, speed:600, stam:9, ap:0.15, rarity:'uncommon', value:80, skill:'onehanded', lore:'Der Haken zieht Schilde beiseite.' },
+  doppelklinge: { name:'Doppelklinge', slot:'weapon', wtype:'polearm', dmg:17, reach:52, arc:3.2, speed:760, stam:14, sweep:true, rarity:'rare', value:240, skill:'polearms', twohand:true, lore:'Zwei Klingen an einem Schaft. Wer sie führt, steht nie mit dem Rücken zur Wand.' },
+  schlagkralle: { name:'Schlagkralle', slot:'weapon', wtype:'dagger', dmg:8, reach:30, arc:1.2, speed:330, stam:5, rarity:'common', value:40, skill:'unarmed', lore:'Drei Klingen über den Knöcheln. Schnell, nah, hässlich.' },
+  wurfmesser:   { name:'Wurfmesser', slot:'weapon', wtype:'throw', dmg:8, reach:300, speed:520, stam:5, rarity:'common', value:45, skill:'archery', ranged:true, proj:'knife', lore:'Ein Gürtel voll davon. Man sammelt sie hinterher wieder ein — meistens.' },
+  wurfbeil:     { name:'Wurfbeil', slot:'weapon', wtype:'throw', dmg:14, reach:260, speed:900, stam:8, ap:0.2, rarity:'uncommon', value:90, skill:'archery', ranged:true, proj:'taxe', lore:'Kopflastig, dreht sich zweimal und trifft mit der Schneide.' },
+  schleuder:    { name:'Schleuder', slot:'weapon', wtype:'sling', dmg:7, reach:340, speed:700, stam:5, rarity:'common', value:15, skill:'archery', ranged:true, proj:'stone', lore:'Ein Lederriemen und ein Kiesel. Hirten treffen damit Wölfe zwischen die Augen.' },
+  messingpistole:{ name:'Messingpistole', slot:'weapon', wtype:'crossbow', dmg:24, reach:320, speed:320, reload:2200, stam:4, ap:0.6, rarity:'rare', value:380, skill:'archery', ranged:true, proj:'bullet', magitech:true, lore:'Magitech aus Gelenkhall. Ein Kristall zündet, ein Messingbolzen fliegt.' },
+  donnerbuechse:{ name:'Donnerbüchse', slot:'weapon', wtype:'crossbow', dmg:40, reach:480, speed:380, reload:3200, stam:6, ap:0.8, rarity:'epic', value:650, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, lore:'Die Waffe der Sonnenlegion. Laut genug, dass Pferde scheuen.' },
+  sturmsense:   { name:'Sturmsense', slot:'weapon', wtype:'polearm', dmg:27, reach:62, arc:2.6, speed:960, stam:17, sweep:true, rarity:'legendary', unique:true, value:700, skill:'polearms', twohand:true, lore:'Die Sense der Bäuerin, die bei Hundertfeld drei Reiter aus dem Sattel mähte.' },
+  donnerwort:   { name:'Donnerwort', slot:'weapon', wtype:'crossbow', dmg:52, reach:500, speed:380, reload:3000, stam:6, ap:0.9, rarity:'legendary', unique:true, value:900, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, lore:'Ein Prototyp aus Tickmar, gestohlen, bevor der Rat ihn verbieten konnte.' },
   shortbow:     { name:'Kurzbogen', slot:'weapon', wtype:'bow', dmg:9, reach:360, speed:820, stam:8, rarity:'common', value:55, skill:'archery', ranged:true },
   longbow:      { name:'Langbogen', slot:'weapon', wtype:'bow', dmg:15, reach:460, speed:1080, stam:11, rarity:'rare', value:190, skill:'archery', ranged:true, twohand:true },
   rapier:       { name:'Rapier', slot:'weapon', wtype:'rapier', dmg:9, reach:54, arc:0.45, speed:380, stam:6, crit:2.2, riposte:true, rarity:'uncommon', value:150, skill:'onehanded',
@@ -89,6 +101,13 @@ export const ITEMS = {
   brigandine:   { name:'Brigantine', slot:'chest', armor:11, weight:3, slow:0.04, rarity:'uncommon', value:260 },
   scale_mail:   { name:'Schuppenpanzer', slot:'chest', armor:13, weight:5, slow:0.08, rarity:'rare', value:380 },
   pit_leather:  { name:'Grubenlederweste', slot:'chest', armor:8, rarity:'rare', value:210, desc:'Goblinarbeit: gegerbtes Grubenleder, leicht und zäh — hemmt nicht.' },
+  // S13 (Nutzer: „Fraktionssets“): Rüstungen der Mächte; vollständig getragen gibt es einen Set-Bonus (ARMOR_SETS)
+  kronharnisch: { name:'Kronharnisch', slot:'chest', armor:12, weight:4, slow:0.06, rarity:'rare', value:360, lore:'Blau lackierte Platte mit dem Winkel der Krone. Die Wache Valens trägt ihn zu Paraden — und in den Krieg.' },
+  kronhelm:     { name:'Kronhelm', slot:'head', armor:7, weight:2, rarity:'rare', value:190, lore:'Offener Helm mit blauem Federbusch.' },
+  ordensharnisch:{ name:'Harnisch des Weißen Ordens', slot:'chest', armor:13, weight:5, slow:0.08, rarity:'rare', value:420, lore:'Elfenbeinweißer Wappenrock über Kettenhemd, das rote Kreuz auf der Brust.' },
+  ordenshelm:   { name:'Ordenshelm', slot:'head', armor:8, weight:2, rarity:'rare', value:220, lore:'Topfhelm mit Kreuzschlitz. Wer ihn trägt, sieht die Toten zuerst.' },
+  sonnenharnisch:{ name:'Sonnenharnisch', slot:'chest', armor:15, weight:5, slow:0.08, rarity:'epic', value:620, lore:'Gold gefasste Platte der Sonnenlegion Aurelions. Messingfedern tragen einen Teil des Gewichts.' },
+  sonnenhelm:   { name:'Sonnenhelm', slot:'head', armor:9, weight:2, rarity:'epic', value:320, lore:'Glatter Helm mit Strahlenkamm.' },
   plate_cuirass:{ name:'Plattenharnisch', slot:'chest', armor:15, weight:6, slow:0.12, rarity:'rare', value:460 },
   leather_cap:  { name:'Lederkappe', slot:'head', armor:2, rarity:'common', value:20 },
   kettle_hat:   { name:'Eisenhut', slot:'head', armor:4, rarity:'uncommon', value:70 },
@@ -208,18 +227,26 @@ export const ITEMS = {
   ancestor_urn: { name:'Ahnenurne', slot:'material', stack:1, rarity:'epic', value:0, lore:'Asche von tausend Namen. Wer sie trägt, hört sie flüstern.' },
 };
 
+// S13 (Nutzer: „Fraktionssets“): Set-Boni, wenn alle Teile getragen werden (game.js setOf)
+export const ARMOR_SETS = {
+  rotgarde:   { name: 'Rotgarde', pieces: ['rotgardist', 'rotgardistenhelm'], bonus: { dmg: 0.1 }, desc: '+10 % Schaden' },
+  eisenfuerst:{ name: 'Eisenfürst', pieces: ['eisenfuerst', 'eisenfuersthelm'], bonus: { armor: 4, stam: 15 }, desc: '+4 Rüstung, +15 Ausdauer' },
+  krone:      { name: 'Kronwache Valens', pieces: ['kronharnisch', 'kronhelm'], bonus: { armor: 3, dmg: 0.05 }, desc: '+3 Rüstung, +5 % Schaden' },
+  orden:      { name: 'Weißer Orden', pieces: ['ordensharnisch', 'ordenshelm'], bonus: { armor: 2, holy: 0.2 }, desc: '+2 Rüstung, +20 % Schaden gegen Untote' },
+  sonne:      { name: 'Sonnenlegion', pieces: ['sonnenharnisch', 'sonnenhelm'], bonus: { armor: 3, stam: 10 }, desc: '+3 Rüstung, +10 Ausdauer' },
+};
 export const LOOT = {
   wolf:      [['pelt',0.7],['dried_meat',0.4],['bone',0.3]],
   boar:      [['dried_meat',0.8],['pelt',0.3]],
   goblin:    [['bone',0.4],['rusty_sword',0.12],['bread',0.3],['iron',0.2],['bandage',0.15]],
-  goblin_warrior:[['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
-  bandit:    [['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35]],
+  goblin_warrior:[['schleuder',0.12],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
+  bandit:    [['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35]],
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   bounty_hunter:[['dornensaebel',0.15],['grenzlaeufer',0.1],['bandage',0.6],['potion',0.3],['chain_hauberk',0.12],['crossbow',0.08]],
   chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5]],
   rotgardist:[['rotgardist',0.2],['rotgardistenhelm',0.25],['rotklaue',0.12],['schwarzzahn',0.04],['mauerbrecher',0.03],['potion',0.4]],
   kettenschuetze:[['crossbow',0.2],['eisenwache',0.15],['eisenfalke',0.05],['bergmannshelm',0.2],['bandage',0.4]],
-  automat:[['automatenkern',0.8],['schrottarm',0.06],['schrottbein',0.06],['iron',0.6]],
+  automat:[['messingpistole',0.03],['automatenkern',0.8],['schrottarm',0.06],['schrottbein',0.06],['iron',0.6]],
   chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['potion',1]],
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
   skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
@@ -232,6 +259,8 @@ export const LOOT = {
   bear:      [['pelt',1],['pelt',0.5],['dried_meat',1],['bone',0.4]],
   wild_dog:  [['pelt',0.3],['bone',0.3]],
   deer:      [['dried_meat',1],['pelt',0.6]],
+  cow:       [['meat',1],['meat',1],['pelt',0.5]],
+  sheep:     [['meat',1],['cloth',0.8]],
   bone_knight:[['kite_shield',0.15],['bone',0.8]], bone_archer:[['shortbow',0.2],['bone',0.7]], necromancer:[['soul_vial',0.6],['staff',0.1]], zombie:[['bone',0.5]],
   ash_demon:[['soul_vial',0.35]], shade:[['soul_vial',0.3]], bone_hound:[['bone',0.8]], carrion_wing:[['bone',0.3]], flesh_golem:[['bone',1],['soul_vial',0.5]],
   death_knight:[['soul_vial',0.4],['plate_cuirass',0.2]], garmadon:[['potion',1],['soul_vial',1]], omega:[['sternenklinge',1],['potion',1]],   // Phase 6/7: Seelen für das Ritual
@@ -310,6 +339,10 @@ export const MONSTERS = {
                pal:{body:'#4a3526',dark:'#2c1f16',eye:'#1a120c'} },                   // Revier: greift an, wer zu nahe kommt; verletzt stürmt er
   wild_dog:  { name:'Wilder Hund', hp:24, dmg:6, speed:1.65, reach:24, atk:800, xp:9, sight:230, r:10, threat:1, faction:'beast', interiors:false,
                pal:{body:'#8a7456',dark:'#55462f',eye:'#d0a040'} },                   // Rudel flankiert
+  // S13: Nutztiere (fliehen wie Wild, gehören aber einem Hof) und Reittiere (nur gemalt unter dem Reiter)
+  cow:       { name:'Kuh', hp:60, dmg:0, speed:0.9, reach:0, atk:9999, xp:3, sight:120, r:15, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#8a6a4a',dark:'#3a2a1e',eye:'#1a120c'} },
+  sheep:     { name:'Schaf', hp:26, dmg:0, speed:1.1, reach:0, atk:9999, xp:2, sight:140, r:11, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#d8d0bc',dark:'#4a4238',eye:'#1a120c'} },
+  horse:     { name:'Pferd', hp:80, dmg:0, speed:1.8, reach:0, atk:9999, xp:0, sight:160, r:15, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#6a4a30',dark:'#2a1e14',eye:'#1a120c'} },
   deer:      { name:'Hirsch', hp:30, dmg:0, speed:1.9, reach:0, atk:9999, xp:6, sight:200, r:12, threat:0, faction:'beast', interiors:false, prey:true,
                pal:{body:'#8a6040',dark:'#5a3e28',eye:'#1a120c'} },                   // Wildtier, kein Gegner: flieht, Wölfe jagen ihn
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
@@ -582,7 +615,7 @@ export const NPCS = [
     greet:'„Tritt leise. Hier wachsen Dinge, die älter sind als dein Königreich.“' },
   { key:'brann', name:'Brann', prof:'Meisterschmiedin', faction:'valen', age:44, home:'northsmith',
     traits:['stolz','genau'], attrs:{strength:13,crafting:16}, cls:'warrior', recruit:false, smith:true, shop:true, town:'northcity', market:false,
-    pool:['longsword','greatsword','mace','flail','warhammer','halberd','axe','greataxe','spear','chain_hauberk','iron_helm','kite_shield','buckler','gambeson','brigandine','kettle_hat','iron_boots','rabenbeil','dornensaebel','sensenlanze','kriegspicke','kettenkoloss','bergmannshelm'],
+    pool:['longsword','greatsword','mace','flail','warhammer','halberd','axe','greataxe','spear','chain_hauberk','iron_helm','kite_shield','buckler','gambeson','brigandine','kettle_hat','iron_boots','rabenbeil','dornensaebel','sensenlanze','kronharnisch','kronhelm','kriegspicke','kettenkoloss','bergmannshelm'],
     greet:'„Nordfurter Stahl hält. Aber es gab einmal Besseres — tief unter dem Frostkamm.“' },
   { key:'ilva', name:'Ilva', prof:'Meisterin der Stillen Hand', faction:'order', age:57, home:'sonnwacht',
     traits:['diszipliniert','geduldig'], attrs:{agility:15,willpower:14}, cls:'wanderer', recruit:false,
