@@ -24,17 +24,20 @@ export const RARITY_VALUE = { common:1, uncommon:1.35, rare:1.9, epic:3, legenda
 export const RARITY_AFFIXES = { common:0, uncommon:1, rare:2, epic:3, legendary:2, mythic:0 };   // episch: davon 1 spielverändernd
 // Affixe: kleine Werte (minor) und spielverändernde (major). v = [min, max]; Anzeige über fmt.
 export const AFFIXES = {
-  sharp:   { slots:['weapon'], name:'Schärfe',      v:[0.06, 0.14], fmt:v => `Schaden +${Math.round(v * 100)} %` },
+  sharp:   { slots:['weapon', 'talisman'], name:'Schärfe',      v:[0.06, 0.14], fmt:v => `Schaden +${Math.round(v * 100)} %` },
   swift:   { slots:['weapon'], name:'Leichtigkeit', v:[0.05, 0.12], fmt:v => `Schlagtempo +${Math.round(v * 100)} %` },
-  keen:    { slots:['weapon'], name:'Auge',         v:[0.03, 0.07], fmt:v => `Kritische Treffer +${Math.round(v * 100)} %` },
+  keen:    { slots:['weapon', 'talisman', 'hands'], name:'Auge',         v:[0.03, 0.07], fmt:v => `Kritische Treffer +${Math.round(v * 100)} %` },
   pierce:  { slots:['weapon'], name:'Durchschlag',  v:[0.10, 0.25], fmt:v => `Panzerbrechend +${Math.round(v * 100)} %` },
   vigor:   { slots:['weapon'], name:'Atem',         v:[0.10, 0.25], fmt:v => `Ausdauer je Hieb −${Math.round(v * 100)} %` },
-  sturdy:  { slots:['chest', 'head', 'offhand', 'feet', 'cloak'], name:'Härte', v:[1, 3], int:true, fmt:v => `Rüstung +${v}` },
-  vital:   { slots:['chest', 'head', 'cloak'], name:'Lebenskraft', v:[0.03, 0.07], fmt:v => `Leben +${Math.round(v * 100)} %` },
-  fleet:   { slots:['feet', 'cloak', 'chest'], name:'Leichtfuß', v:[0.02, 0.05], fmt:v => `Tempo +${Math.round(v * 100)} %` },
-  enduring:{ slots:['chest', 'head', 'feet', 'cloak'], name:'Zähigkeit', v:[8, 16], int:true, fmt:v => `Ausdauer +${v}` },
+  sturdy:  { slots:['chest', 'head', 'offhand', 'feet', 'cloak', 'hands', 'legs', 'talisman'], name:'Härte', v:[1, 3], int:true, fmt:v => `Rüstung +${v}` },
+  vital:   { slots:['chest', 'head', 'cloak', 'legs', 'talisman'], name:'Lebenskraft', v:[0.03, 0.07], fmt:v => `Leben +${Math.round(v * 100)} %` },
+  fleet:   { slots:['feet', 'cloak', 'chest', 'legs', 'talisman'], name:'Leichtfuß', v:[0.02, 0.05], fmt:v => `Tempo +${Math.round(v * 100)} %` },
+  enduring:{ slots:['chest', 'head', 'feet', 'cloak', 'legs', 'talisman'], name:'Zähigkeit', v:[8, 16], int:true, fmt:v => `Ausdauer +${v}` },
   leech:   { slots:['weapon'], name:'Blutzoll', major:true, v:[0.04, 0.08], fmt:v => `${Math.round(v * 100)} % des Schadens heilen dich` },
   rend:    { slots:['weapon'], name:'Zerfetzen', major:true, v:[0.20, 0.35], fmt:v => `+${Math.round(v * 100)} % Chance auf Blutung` },
+  spellp:  { slots:['talisman', 'hands'], name:'Arkane Kraft', v:[0.05, 0.12], fmt:v => `Zauberschaden +${Math.round(v * 100)} %` },   // S15 P2
+  slayer:  { slots:['talisman', 'weapon'], name:'Totenbann', v:[0.10, 0.20], fmt:v => `Schaden gegen Untote +${Math.round(v * 100)} %` },
+  marks:   { slots:['talisman', 'hands'], name:'Schützenauge', v:[0.06, 0.14], fmt:v => `Fernkampfschaden +${Math.round(v * 100)} %` },
   thorns:  { slots:['chest', 'offhand'], name:'Dornen', major:true, v:[0.15, 0.25], fmt:v => `${Math.round(v * 100)} % des Nahkampfschadens zurück` },
 };
 // Legendär: ein fester Sondereffekt je Exemplar (zufällig aus der Liste des Slots) + 2 Affixe.
@@ -112,6 +115,23 @@ export const ITEMS = {
   leather_cap:  { name:'Lederkappe', slot:'head', armor:2, rarity:'common', value:20 },
   kettle_hat:   { name:'Eisenhut', slot:'head', armor:4, rarity:'uncommon', value:70 },
   great_helm:   { name:'Topfhelm', slot:'head', armor:8, weight:2, rarity:'rare', value:210 },
+  // S14 (Nutzer): Endgame-Sets je Fraktion — breite Schulterplatten, Kragen, Umhänge, Runen; hohe Tiere tragen sie, Bosse lassen sie fallen
+  thronharnisch:  { name:'Thronharnisch', slot:'chest', armor:22, weight:6, slow:0.08, rarity:'legendary', value:2600, desc:'Blaue Magitech-Platte mit Goldkanten. Ein Kern in der Brust nimmt Stöße auf, leuchtende Adern laufen über die Schultern.' },
+  thronhelm:      { name:'Thronhelm', slot:'head', armor:12, weight:2, rarity:'legendary', value:1200, desc:'Mechanischer Helm des Hohen Rates: Goldflossen, blaues Sehband, man hört das Uhrwerk.' },
+  blutkette:      { name:'Blutkette', slot:'chest', armor:24, weight:8, slow:0.13, rarity:'legendary', value:2400, desc:'Schwarze Dornenplatte, Pelzkragen, Ketten über der Brust. Wer sie trägt, hat schon viele in Ketten gelegt.' },
+  blutkettenhelm: { name:'Gehörnter Kettenhelm', slot:'head', armor:12, weight:3, rarity:'legendary', value:1100, desc:'Geschlossen, zwei Eisenhörner, im Sehschlitz glimmt es rot.' },
+  sternwacht:     { name:'Sternwacht', slot:'chest', armor:21, weight:6, slow:0.1, rarity:'legendary', value:2300, desc:'Rüstung der Paladinmarschälle Omegas: goldene Schultern, blutroter Umhang, der Stern auf der Brust glüht.' },
+  sternwachthelm: { name:'Sternkrone', slot:'head', armor:11, weight:2, rarity:'legendary', value:1000, desc:'Topfhelm mit goldener Zackenkrone. Durch den Schlitz leuchtet Omegas Licht.' },
+  totenkrone:     { name:'Totenkrone', slot:'chest', armor:22, weight:7, slow:0.1, rarity:'legendary', value:2400, desc:'Knochenplatte mit Dornen, grüne Runen, ein Umhang aus Grabtuch. Gegossen, wo Garmadon starb.' },
+  schaedelhelm:   { name:'Schädelhelm', slot:'head', armor:12, weight:2, rarity:'legendary', value:1100, desc:'Ein Totenkopf als Helm, eine Krone aus Knochenzacken. In den Höhlen brennt grünes Licht.' },
+  grubenkoenig:   { name:'Rüstung des Grubenkönigs', slot:'chest', armor:19, weight:5, slow:0.06, rarity:'legendary', value:1900, desc:'Zusammengeschweißt aus Kettenrüstung, Loren und Wolfspelz. Eine riesige Schulter, eine kleine — so ist sie gewachsen.' },
+  schrotthelm:    { name:'Schrotthörner', slot:'head', armor:10, weight:2, rarity:'legendary', value:800, desc:'Ein Grubenhelm mit angenieteten Hörnern.' },
+  generalspanzer: { name:'Generalspanzer', slot:'chest', armor:21, weight:6, slow:0.09, rarity:'legendary', value:2100, desc:'Rooks Panzer: schwere Platte, blutroter Umhang, Pelz am Hals. Brutal und zweckmäßig.' },
+  generalshelm:   { name:'Visierhelm des Generals', slot:'head', armor:11, weight:2, rarity:'legendary', value:950, desc:'Schallern mit Visier. Hinter dem Spalt ist es dunkel — und dann rot.' },
+  hochritter:     { name:'Harnisch des Hochritters', slot:'chest', armor:21, weight:6, slow:0.1, rarity:'legendary', value:2200, desc:'Blau gelackte Platte mit silbernen Schultern und dem Winkel der Krone. Nur Hauptleute Valens tragen sie.' },
+  federhelm:      { name:'Federhelm', slot:'head', armor:11, weight:2, rarity:'legendary', value:950, desc:'Hoher Helm mit blauem Federbusch.' },
+  meisterharnisch:{ name:'Harnisch des Ordensmeisters', slot:'chest', armor:21, weight:6, slow:0.1, rarity:'legendary', value:2200, desc:'Elfenbeinfarbene Platte, weißer Umhang, das rote Kreuz. Die Toten meiden ihn.' },
+  meisterhelm:    { name:'Meisterkrone', slot:'head', armor:11, weight:2, rarity:'legendary', value:950, desc:'Topfhelm mit silberner Zackenkrone und rotem Kamm.' },
   iron_helm:    { name:'Eisenhelm', slot:'head', armor:5, weight:1, rarity:'uncommon', value:95 },
   iron_boots:   { name:'Eisenschuhe', slot:'feet', armor:3, weight:1, rarity:'uncommon', value:60 },
   leather_boots:{ name:'Lederstiefel', slot:'feet', armor:1, rarity:'common', value:16 },
@@ -150,6 +170,69 @@ export const ITEMS = {
     lore:'Stahlrahmen, Winde, schwarzer Schaft. Ein Bolzen, ein Loch — durch jede Platte.' },
   roter_henker:  { name:'Der Rote Henker', slot:'weapon', wtype:'great', dmg:32, reach:56, arc:2.0, speed:1250, stam:24, ap:0.3, execute:[0.5, 1.4], rarity:'legendary', unique:true, value:950, skill:'twohanded', twohand:true,
     lore:'Vargs Axt. Rote Stoffstreifen hängen am Griff, einer für jeden, der nicht mehr arbeiten konnte.' },
+  // S14 Seevolk (Nutzer: Inselreich, zerstrittene Clans, Piratenkönig Weißbart — eigene Figur, eigene Waffe)
+  entermesser:   { name:'Entermesser', slot:'weapon', wtype:'sword', dmg:11, reach:40, arc:1.8, speed:500, stam:8, rarity:'uncommon', value:75, skill:'onehanded', lore:'Kurz, breit, gebogen. Zwischen Tauen und Masten ist ein Langschwert zu lang.' },
+  harpune:       { name:'Walharpune', slot:'weapon', wtype:'spear', dmg:13, reach:78, arc:0.4, speed:700, stam:9, ap:0.25, rarity:'uncommon', value:90, skill:'polearms', lore:'Widerhaken aus Walbein. Was sie trifft, kommt schwer wieder los.' },
+  sturmanker:    { name:'Der Sturmanker', slot:'weapon', wtype:'hammer', dmg:34, reach:58, arc:2.2, speed:1300, stam:24, ap:0.45, stagger:2.2, crush:true, rarity:'legendary', unique:true, value:1100, skill:'twohanded', twohand:true,
+    lore:'Weißbarts Anker, an einer Kette um den Unterarm. Er hat damit ein Zollschiff Valens versenkt — von innen.' },
+  // S15 Klassen-Rüstung (Nutzer: „nur über eine eigene Questline, wie in WoW“): je Titelklasse drei Teile vom Meister.
+  // Ab zwei Teilen, getragen mit dem passenden Titel: stärkere Fähigkeiten und eine neue (game.js CLASS_GEAR). Nicht verkäuflich.
+  totenrufer_kapuze: { name:'Kapuze des Totenrufers', slot:'head', armor:4, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Grabtuch, dreimal gefaltet. Darunter hört man die Toten atmen.' },
+  gewand_stille_schar: { name:'Gewand der Stillen Schar', slot:'chest', armor:7, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Bis zum Boden, schwarz wie nasse Erde. Eine Schulter aus Ahnenknochen.' },
+  grabsteinkragen: { name:'Kragen aus Grabstein', slot:'cloak', armor:3, rarity:'legendary', value:0, classSet:'necromancer', bound:true, lore:'Ysra schnitt ihn aus dem Stein über ihrem eigenen Grab.' },
+  hoernerkrone: { name:'Hörnerkrone des Paktes', slot:'head', armor:4, rarity:'epic', value:0, classSet:'warlock', bound:true, lore:'Die Hörner wuchsen erst, als der Obelisk deinen Namen kannte.' },
+  robe_fluesternder: { name:'Robe des Flüsternden', slot:'chest', armor:6, rarity:'epic', value:0, classSet:'warlock', bound:true, lore:'Violette Runen, die sich bewegen, wenn niemand hinsieht.' },
+  schattenmantel: { name:'Mantel aus Schattenfaden', slot:'cloak', armor:3, rarity:'legendary', value:0, classSet:'warlock', bound:true, lore:'Gewebt aus dem, was der Obelisk nicht verschlucken wollte.' },
+  hainfell: { name:'Hainfell', slot:'chest', armor:6, rarity:'epic', value:0, classSet:'druid', bound:true, lore:'Das Fell des alten Leitwolfs. Er gab es freiwillig — sagt Mira.' },
+  fellmantel_hain: { name:'Fellmantel des Hains', slot:'cloak', armor:4, rarity:'epic', value:0, classSet:'druid', bound:true, lore:'Lang, schwer, riecht nach Regen und Harz.' },
+  geweih_hirsch: { name:'Geweih des Weißen Hirschs', slot:'head', armor:3, rarity:'legendary', value:0, classSet:'druid', bound:true, lore:'Abgeworfen, nicht erbeutet. Der Hain vergibt kein Geweih, das mit Blut kam.' },
+  gebetsband: { name:'Gebetsband der Stillen Hand', slot:'head', armor:2, rarity:'epic', value:0, classSet:'monk', bound:true, lore:'Ein Leinenband mit neun Knoten. Einer für jede Stille, die du gefunden hast.' },
+  robe_stille_hand: { name:'Robe der Stillen Hand', slot:'chest', armor:5, rarity:'epic', value:0, classSet:'monk', bound:true, lore:'Ärmellos, gegürtet, geflickt von Generationen. Nichts daran hält einen Hieb auf — sie lässt ihn vorbei.' },
+  wickel_stille_hand: { name:'Wickel der Stillen Hand', slot:'feet', armor:2, rarity:'legendary', value:0, classSet:'monk', bound:true, lore:'Ilvas eigene. Sie sagt, sie braucht sie nicht mehr.' },
+  // S15 P2: neue Plätze Hände, Beine, Talisman. Talismane tragen feste Werte (fixed = Affixe, die immer gelten); seltene mit Nebenwirkung.
+  // S15 P2 Elixiere: immer nur eines wirkt (ein neues ersetzt das alte), gemeinsame Abklingzeit 30 s (game.js ELIXIR)
+  elixier_staerke:  { name:'Elixier der Stärke', slot:'consumable', use:'elixir', stack:5, rarity:'uncommon', value:60, efx:{ dmg:0.15 }, dur:180, lore:'Bitter, dann warm. Die Klinge wird leichter.' },
+  elixier_ausdauer: { name:'Elixier der Ausdauer', slot:'consumable', use:'elixir', stack:5, rarity:'uncommon', value:50, efx:{ vigor:0.3 }, dur:180, lore:'Schmeckt nach Rinde. Hiebe kosten weniger Atem.' },
+  elixier_eile:     { name:'Elixier der Eile', slot:'consumable', use:'elixir', stack:5, rarity:'uncommon', value:55, efx:{ speed:0.12 }, dur:120, lore:'Die Beine wollen laufen, ob du willst oder nicht.' },
+  elixier_stein:    { name:'Steinhaut', slot:'consumable', use:'elixir', stack:5, rarity:'rare', value:80, efx:{ armor:6 }, dur:150, lore:'Grau im Glas, grau auf der Haut. Klingen rutschen ab.' },
+  elixier_wut:      { name:'Trank der Wut', slot:'consumable', use:'elixir', stack:5, rarity:'rare', value:85, efx:{ dmg:0.1, speed:0.05, armor:-2 }, dur:90, lore:'Rot und laut. Du triffst härter — und vergisst die Deckung.' },
+  elixier_arkan:    { name:'Arkaner Trank', slot:'consumable', use:'elixir', stack:5, rarity:'rare', value:90, efx:{ spell:0.2 }, dur:150, lore:'Er leuchtet im Dunkeln. Zauber auch.' },
+  elixier_auge:     { name:'Scharfes Auge', slot:'consumable', use:'elixir', stack:5, rarity:'uncommon', value:60, efx:{ marks:0.2, keen:0.05 }, dur:150, lore:'Tropfen für die Augen. Brennt, dann siehst du jedes Blatt.' },
+  elixier_wacht:    { name:'Wachtrank', slot:'consumable', use:'elixir', stack:5, rarity:'uncommon', value:55, efx:{ slayer:0.2 }, dur:180, lore:'Grabsalz und Weihwasser. Die Toten mögen den Geruch nicht.' },
+  elixier_regen:    { name:'Trank der Erneuerung', slot:'consumable', use:'elixir', stack:5, rarity:'rare', value:95, efx:{ regen:1.5 }, dur:60, lore:'Wunden schließen sich, langsam, aber sie schließen sich.' },
+  elixier_lehre:    { name:'Trank der Lehre', slot:'consumable', use:'elixir', stack:3, rarity:'rare', value:120, efx:{ xp:0.1 }, dur:600, lore:'Der Kopf wird klar. Was du tust, bleibt hängen.' },
+  // S15 P2: Hände und Beine der vier großen Sets (3 und 4 Teile geben weitere Boni, ARMOR_SETS extra/t3/t4)
+  thron_handschuhe:   { name:'Handschuhe des Throns', slot:'hands', armor:4, rarity:'epic', value:420, lore:'Blau lackiert, goldene Knöchel. Ein Kristall in jeder Handfläche.' },
+  thron_beinschienen: { name:'Beinschienen des Throns', slot:'legs', armor:5, weight:2, rarity:'epic', value:480, lore:'Jede Platte trägt das Siegel eines Adelshauses.' },
+  blut_handschuhe:    { name:'Blutkettenhandschuhe', slot:'hands', armor:5, rarity:'epic', value:420, lore:'Dornen auf den Knöcheln. Sie greifen, sie lassen nicht los.' },
+  blut_beinschienen:  { name:'Blutkettenbeinschienen', slot:'legs', armor:5, weight:2, rarity:'epic', value:480, lore:'Rot unter dem Schwarz. Man sagt, es sei nicht Farbe.' },
+  toten_handschuhe:   { name:'Knochenhandschuhe der Krone', slot:'hands', armor:4, rarity:'epic', value:420, lore:'Fingerknochen über Eisen. Kalt, auch in der Sonne.' },
+  toten_beinschienen: { name:'Beinschienen der Totenkrone', slot:'legs', armor:5, weight:2, rarity:'epic', value:480, lore:'Rippen als Lamellen. Wer sie trägt, geht leiser.' },
+  hochritter_handschuhe:  { name:'Hochritterhandschuhe', slot:'hands', armor:4, rarity:'epic', value:400, lore:'Blanker Stahl, blaue Stulpen. Für den Schwur, nicht für die Arbeit.' },
+  hochritter_beinschienen:{ name:'Hochritterbeinschienen', slot:'legs', armor:5, weight:2, rarity:'epic', value:460, lore:'Kniebuckel mit Valens Wappen.' },
+  lederhandschuhe: { name:'Lederhandschuhe', slot:'hands', armor:1, rarity:'common', value:18, lore:'Rissig an den Knöcheln, weich innen.' },
+  kettenhandschuhe:{ name:'Kettenhandschuhe', slot:'hands', armor:2, rarity:'uncommon', value:60, lore:'Ringe über Leder. Klirrt beim Greifen.' },
+  panzerhandschuhe:{ name:'Panzerhandschuhe', slot:'hands', armor:4, weight:1, rarity:'rare', value:160, lore:'Geschobene Platten bis über das Handgelenk. Faust wie ein Hammer.' },
+  lederbeinlinge:  { name:'Lederbeinlinge', slot:'legs', armor:2, rarity:'common', value:24, lore:'Gewachstes Leder, an den Knien geflickt.' },
+  kettenbeinlinge: { name:'Kettenbeinlinge', slot:'legs', armor:3, weight:1, rarity:'uncommon', value:80, lore:'Ringgeflecht bis zu den Stiefeln.' },
+  beinschienen:    { name:'Beinschienen mit Kniebuckeln', slot:'legs', armor:5, weight:2, slow:0.02, rarity:'rare', value:190, lore:'Oberschenkelplatte, Kniebuckel, Röhre. Laut auf Stein.' },
+  talisman_ausdauer:  { name:'Talisman der Ausdauer', slot:'talisman', rarity:'uncommon', value:90, fixed:{ enduring:12 }, lore:'Ein Hufnagel an einer Schnur. Wer ihn trägt, läuft weiter.' },
+  talisman_leichtfuss:{ name:'Talisman der Beweglichkeit', slot:'talisman', rarity:'uncommon', value:90, fixed:{ fleet:0.05 }, lore:'Eine Hasenpfote. Der Hase hatte weniger Glück.' },
+  talisman_krieger:   { name:'Talisman des Kriegers', slot:'talisman', rarity:'rare', value:160, fixed:{ sharp:0.08 }, lore:'Ein Splitter einer Klinge, die nie brach.' },
+  talisman_waechter:  { name:'Talisman des Wächters', slot:'talisman', rarity:'rare', value:160, fixed:{ sturdy:3 }, lore:'Ein eiserner Ring aus einem Stadttor.' },
+  talisman_jaeger:    { name:'Talisman des Jägers', slot:'talisman', rarity:'rare', value:160, fixed:{ marks:0.1 }, lore:'Eine Wolfsklaue mit Kerben für jeden Treffer.' },
+  talisman_toten:     { name:'Talisman der Toten', slot:'talisman', rarity:'rare', value:180, fixed:{ slayer:0.18 }, lore:'Grabsalz in einer Knochenkapsel. Die Toten riechen es.' },
+  talisman_magie:     { name:'Talisman der Magie', slot:'talisman', rarity:'rare', value:180, fixed:{ spellp:0.1 }, lore:'Ein Kristallsplitter aus Aurelheim, noch warm.' },
+  talisman_leben:     { name:'Talisman des Lebens', slot:'talisman', rarity:'rare', value:170, fixed:{ vital:0.06 }, lore:'Ein getrocknetes Heilkraut in Harz gegossen.' },
+  splitter_rotfall:   { name:'Splitter des Rotfalls', slot:'talisman', rarity:'epic', value:320, fixed:{ spellp:0.18, vital:-0.08 }, lore:'Rot, warm, und er flüstert. Nebenwirkung: er zehrt am Leben.' },
+  blutstein:          { name:'Blutstein', slot:'talisman', rarity:'epic', value:320, fixed:{ sharp:0.14, enduring:-10 }, lore:'Er pulsiert im Takt deines Herzens — und ein wenig schneller. Nebenwirkung: weniger Ausdauer.' },
+  eulenauge:          { name:'Eulenauge', slot:'talisman', rarity:'epic', value:300, fixed:{ keen:0.08, fleet:-0.04 }, lore:'Ein gläsernes Auge, das in die Dunkelheit sieht. Nebenwirkung: schwer an der Brust.' },
+  totenmuenze:        { name:'Münze des Fährmanns', slot:'talisman', rarity:'legendary', value:500, fixed:{ slayer:0.3, vital:-0.05 }, lore:'Die Toten wollen sie zurück. Nebenwirkung: sie wollen dich gleich mit.' },
+  seemantel:     { name:'Seemantel', slot:'chest', armor:5, rarity:'uncommon', value:90, desc:'Geteertes Leder, salzsteif. Hält Gischt ab, keine Klingen — fast.' },
+  dreispitz:     { name:'Kapitänshut', slot:'head', armor:2, rarity:'uncommon', value:70, desc:'Breite Krempe, Möwenfeder. Wer ihn trägt, gibt Befehle.' },
+  wassereimer:   { name:'Wassereimer', slot:'material', value:0, desc:'Voll bis zum Rand. Läuft über, wenn man rennt.' },   // S14 Löschkette
+  salzsiegel:    { name:'Salzsiegel des Bundes', slot:'material', value:40, desc:'Wachs, Salz, das Zeichen des Salzbunds. Öffnet Kontore — und manchen Mund.' },
+  seekarte:      { name:'Weißbarts Seekarte', slot:'material', value:0, desc:'Riffe, Strömungen, ein Kreuz vor der Nebelbank. Quer darüber in Rot: „Nicht verkaufen.“' },
   // Rüstungen der Mark (Aussehen: sprites.js ARMOR_LOOK)
   eisenwache:    { name:'Eisenwache', slot:'chest', armor:10, weight:2, rarity:'uncommon', value:220, desc:'Schwarzer Brustpanzer über Kettenhemd, rote Schärpe. Die Uniform der Kette.' },
   rotgardist:    { name:'Rotgardistenpanzer', slot:'chest', armor:13, weight:4, slow:0.06, ally:3, rarity:'rare', value:420, desc:'Schwarze Platte, rote Schulterstücke. Standhalten: +3 Rüstung, wenn ein Verbündeter nah ist.' },
@@ -234,25 +317,40 @@ export const ARMOR_SETS = {
   krone:      { name: 'Kronwache Valens', pieces: ['kronharnisch', 'kronhelm'], bonus: { armor: 3, dmg: 0.05 }, desc: '+3 Rüstung, +5 % Schaden' },
   orden:      { name: 'Weißer Orden', pieces: ['ordensharnisch', 'ordenshelm'], bonus: { armor: 2, holy: 0.2 }, desc: '+2 Rüstung, +20 % Schaden gegen Untote' },
   sonne:      { name: 'Sonnenlegion', pieces: ['sonnenharnisch', 'sonnenhelm'], bonus: { armor: 3, stam: 10 }, desc: '+3 Rüstung, +10 Ausdauer' },
+  thron:      { name: 'Thron des Hochreichs', pieces: ['thronharnisch', 'thronhelm'], bonus: { armor: 5, stam: 25, dmg: 0.08 }, desc: '+5 Rüstung, +25 Ausdauer, +8 % Schaden',
+    extra: ['thron_handschuhe', 'thron_beinschienen'], t3: { armor: 3 }, t4: { block: 0.15, hp: 0.08 }, tdesc: '3 Teile: +3 Rüstung · 4 Teile: +15 % Blocken, +8 % Leben' },
+  blut:       { name: 'Blutkette', pieces: ['blutkette', 'blutkettenhelm'], bonus: { armor: 6, dmg: 0.1 }, desc: '+6 Rüstung, +10 % Schaden',
+    extra: ['blut_handschuhe', 'blut_beinschienen'], t3: { dmg: 0.05 }, t4: { leech: 0.03 }, tdesc: '3 Teile: +5 % Schaden · 4 Teile: Treffer heilen 3 %' },
+  stern:      { name: 'Sternwacht', pieces: ['sternwacht', 'sternwachthelm'], bonus: { armor: 4, dmg: 0.1, stam: 10 }, desc: '+4 Rüstung, +10 % Schaden, +10 Ausdauer' },
+  toten:      { name: 'Totenkrone', pieces: ['totenkrone', 'schaedelhelm'], bonus: { armor: 5, dmg: 0.12 }, desc: '+5 Rüstung, +12 % Schaden',
+    extra: ['toten_handschuhe', 'toten_beinschienen'], t3: { armor: 2, stam: 10 }, t4: { leech: 0.02, hp: 0.06 }, tdesc: '3 Teile: +2 Rüstung, +10 Ausdauer · 4 Teile: Treffer heilen 2 %, +6 % Leben' },
+  gruben:     { name: 'Grubenkönig', pieces: ['grubenkoenig', 'schrotthelm'], bonus: { armor: 4, stam: 30 }, desc: '+4 Rüstung, +30 Ausdauer' },
+  general:    { name: 'Rooks General', pieces: ['generalspanzer', 'generalshelm'], bonus: { armor: 4, dmg: 0.12 }, desc: '+4 Rüstung, +12 % Schaden' },
+  hochritter: { name: 'Hochritter Valens', pieces: ['hochritter', 'federhelm'], bonus: { armor: 6, stam: 15 }, desc: '+6 Rüstung, +15 Ausdauer',
+    extra: ['hochritter_handschuhe', 'hochritter_beinschienen'], t3: { armor: 3 }, t4: { block: 0.2 }, tdesc: '3 Teile: +3 Rüstung · 4 Teile: +20 % Blocken' },
+  meister:    { name: 'Ordensmeister', pieces: ['meisterharnisch', 'meisterhelm'], bonus: { armor: 4, holy: 0.35 }, desc: '+4 Rüstung, +35 % Schaden gegen Untote' },
 };
 export const LOOT = {
   wolf:      [['pelt',0.7],['dried_meat',0.4],['bone',0.3]],
   boar:      [['dried_meat',0.8],['pelt',0.3]],
   goblin:    [['bone',0.4],['rusty_sword',0.12],['bread',0.3],['iron',0.2],['bandage',0.15]],
   goblin_warrior:[['schleuder',0.12],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
-  bandit:    [['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35]],
+  bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35]],
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   bounty_hunter:[['dornensaebel',0.15],['grenzlaeufer',0.1],['bandage',0.6],['potion',0.3],['chain_hauberk',0.12],['crossbow',0.08]],
   chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5]],
   rotgardist:[['rotgardist',0.2],['rotgardistenhelm',0.25],['rotklaue',0.12],['schwarzzahn',0.04],['mauerbrecher',0.03],['potion',0.4]],
   kettenschuetze:[['crossbow',0.2],['eisenwache',0.15],['eisenfalke',0.05],['bergmannshelm',0.2],['bandage',0.4]],
   automat:[['messingpistole',0.03],['automatenkern',0.8],['schrottarm',0.06],['schrottbein',0.06],['iron',0.6]],
-  chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['potion',1]],
+  sea_raider:[['entermesser',0.18],['seemantel',0.08],['dried_meat',0.3],['potion',0.15]], sea_harpooner:[['harpune',0.15],['dreispitz',0.05],['potion',0.15]],
+  whitebeard:[['sturmanker',1],['seekarte',1],['dreispitz',1],['potion',1],['potion',1]],
+  chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['blutkette',0.5],['blutkettenhelm',0.5],['potion',1]],
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
   skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
+  dodon:     [['potion',1],['potion',1],['talisman_waechter',0.5]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
-  crypt_warden:[['knochenspalter',0.3],['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
-  death_captain:[['totenglocke',0.3],['legionaersplatte',0.3],['bone',1],['chain_hauberk',0.5],['iron_helm',0.4],['potion',0.8],['flail',0.3]],
+  crypt_warden:[['kettenbeinlinge',0.15],['talisman_waechter',0.08],['knochenspalter',0.3],['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
+  death_captain:[['elixier_stein',0.15],['elixier_wacht',0.2],['panzerhandschuhe',0.15],['beinschienen',0.12],['talisman_toten',0.1],['totenmuenze',0.02],['totenglocke',0.3],['legionaersplatte',0.3],['bone',1],['chain_hauberk',0.5],['iron_helm',0.4],['potion',0.8],['flail',0.3]],
   cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1]],
   ghoul:     [['bone',0.6],['dried_meat',0.15]],
   wraith:    [['seelenhaken',0.05],['soul_vial',0.4],['grave_seal',0.08]],
@@ -263,11 +361,22 @@ export const LOOT = {
   sheep:     [['meat',1],['cloth',0.8]],
   bone_knight:[['kite_shield',0.15],['bone',0.8]], bone_archer:[['shortbow',0.2],['bone',0.7]], necromancer:[['soul_vial',0.6],['staff',0.1]], zombie:[['bone',0.5]],
   ash_demon:[['soul_vial',0.35]], shade:[['soul_vial',0.3]], bone_hound:[['bone',0.8]], carrion_wing:[['bone',0.3]], flesh_golem:[['bone',1],['soul_vial',0.5]],
-  death_knight:[['soul_vial',0.4],['plate_cuirass',0.2]], garmadon:[['potion',1],['soul_vial',1]], omega:[['sternenklinge',1],['potion',1]],   // Phase 6/7: Seelen für das Ritual
+  death_knight:[['soul_vial',0.4],['plate_cuirass',0.2],['schaedelhelm',0.08]], garmadon:[['potion',1],['soul_vial',1],['totenkrone',1],['schaedelhelm',1]], omega:[['sternenklinge',1],['potion',1]],   // Phase 6/7: Seelen für das Ritual
   hrodvar:   [['nachtfrost',1],['plate_cuirass',0.5],['iron_helm',0.6],['iron',1],['potion',1]],
 };
 
 // interiors: folgt dem Spieler durch Eingänge (Grube, Dungeons). Tiere nicht — sie lauern draußen (GDD §Übergänge).
+// S15 P2 (Nutzer: „Boss ~90 % relevanter Waffen-Drop, nicht immer dieselbe Waffe“): Beute-Pools der Bosse.
+// Je Tod: 90 % eine Waffe aus weapons, 60 % ein Teil aus armor, 25 % ein Stück aus unique (sonst nichts davon).
+// Waffen und Rüstung aus LOOT[boss] zählen bei Bossen nicht mehr einzeln, alles andere (Tränke, Schlüssel, Karten) schon.
+export const BOSS_LOOT = {
+  whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel'], unique:['sturmanker'] },
+  chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen'], unique:['roter_henker'] },
+  gorak:        { weapons:['gorak_cleaver', 'mauerbrecher'], armor:['grubenkoenig', 'schrotthelm'], unique:['gorak_cleaver'] },
+  hrodvar:      { weapons:['nachtfrost', 'knochenspalter'], armor:['plate_cuirass', 'iron_helm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], unique:['nachtfrost'] },
+  garmadon:     { weapons:['garmadons_reue', 'knochenspalter', 'totenglocke'], armor:['totenkrone', 'schaedelhelm', 'toten_handschuhe', 'toten_beinschienen'], unique:['garmadons_reue'] },
+  omega:        { weapons:['sternenklinge'], armor:[], unique:['sternenklinge'] },
+};
 export const MONSTERS = {
   wolf:      { name:'Wolf', hp:30, dmg:7, speed:1.55, reach:26, atk:900, xp:12, sight:220, r:11, threat:1, faction:'beast', interiors:false, pal:{body:'#5b5145',dark:'#3a332b',eye:'#c8a545'} },
   boar:      { name:'Wildschwein', hp:46, dmg:11, speed:1.35, reach:26, atk:1200, xp:16, sight:170, r:13, threat:1, faction:'beast', interiors:false, pal:{body:'#4b3f34',dark:'#2f271f',eye:'#b8503a'} },
@@ -279,12 +388,19 @@ export const MONSTERS = {
                pal:{skin:'#b2926f',cloth:'#5a4a32',metal:'#8a8070'} },
   bounty_hunter:{ name:'Kopfgeldjäger', hp:58, dmg:12, speed:1.45, reach:36, atk:950, xp:40, sight:320, r:11, threat:2, faction:'bandit', interiors:true,   // §44/§72: jagt Gesuchte, wächst mit (gedeckelt)
                pal:{skin:'#a88a6a',cloth:'#2a2622',metal:'#6a6258'} },
-  chain_brute:{ name:'Kettenknecht', hp:95, dmg:15, speed:1.2, reach:40, atk:1150, telegraph:420, xp:60, sight:260, r:13, threat:3, faction:'chain', interiors:true,   // S11: Leibwache der Kette
+  chain_brute:{ name:'Kettenknecht', heavy:{ kind:'slam', every:3, wind:800, mul:2.2, r:70 }, hp:95, dmg:15, speed:1.2, reach:40, atk:1150, telegraph:420, xp:60, sight:260, r:13, threat:3, faction:'chain', interiors:true,   // S11: Leibwache der Kette
                pal:{skin:'#9a8068',cloth:'#1c1a18',metal:'#5a5652'} },
-  rotgardist:{ name:'Rotgardist', hp:120, dmg:17, speed:1.25, reach:46, atk:1100, telegraph:400, xp:80, sight:280, r:12, threat:3, faction:'chain', interiors:true,   // S12: Elite der Kette
+  rotgardist:{ name:'Rotgardist', heavy:{ kind:'thrust', every:3, wind:700, mul:2.0, r:130 }, hp:120, dmg:17, speed:1.25, reach:46, atk:1100, telegraph:400, xp:80, sight:280, r:12, threat:3, faction:'chain', interiors:true,   // S12: Elite der Kette
                pal:{skin:'#a88a6a',cloth:'#141214',metal:'#26272b'}, scaling:{enabled:false} },
   kettenschuetze:{ name:'Kettenschütze', hp:50, dmg:16, speed:1.3, reach:320, atk:2200, ranged:true, xp:45, sight:340, r:11, threat:3, faction:'chain', interiors:true,   // S12: Armbrust der Kette
                pal:{skin:'#9a8068',cloth:'#1c1a18',metal:'#4a4640'}, scaling:{enabled:false} },
+  // S14 Seevolk: Plünderer der Sturmklinge (Enterhaken schließt Abstand), Harpunierer auf Distanz, Weißbart der Piratenkönig
+  sea_raider:{ name:'Plünderer der Sturmklinge', heavy:{ kind:'thrust', every:4, wind:650, mul:1.7, r:110 }, hp:62, dmg:12, speed:1.45, reach:38, atk:900, telegraph:300, xp:34, sight:280, r:11, threat:2, faction:'pirate', interiors:true,
+               pal:{skin:'#a8805e',cloth:'#2c3a44',metal:'#7a7466'} },
+  sea_harpooner:{ name:'Harpunier', hp:48, dmg:14, speed:1.3, reach:290, atk:1900, ranged:true, xp:32, sight:330, r:11, threat:2, faction:'pirate', interiors:true,
+               pal:{skin:'#a8805e',cloth:'#3a3a2c',metal:'#8a8270'} },
+  whitebeard:{ name:'Weißbart, König der Sturmklinge', hp:560, dmg:26, speed:1.1, reach:64, atk:1450, telegraph:560, xp:700, sight:320, r:18, boss:true, threat:4, faction:'pirate', interiors:true, scale:1.45,
+               pal:{skin:'#b08a66',cloth:'#1e2a36',metal:'#8a8a86'} },
   automat:{ name:'Kriegsautomat', hp:140, dmg:16, speed:1.05, reach:44, atk:1200, telegraph:450, xp:70, sight:260, r:13, threat:3, faction:'aurel', interiors:true,   // S12: verwilderte Maschine
                pal:{skin:'#8a8272',cloth:'#3a3530',metal:'#8a7040'}, scaling:{enabled:false} },
   chain_master:{ name:'Varg, Kettenmeister', hp:260, dmg:18, speed:1.25, reach:70, atk:1300, telegraph:520, xp:320, sight:300, r:14, boss:true, threat:4, faction:'chain', interiors:true,   // S11 Endgame
@@ -292,23 +408,23 @@ export const MONSTERS = {
   skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, role:'Nahkampf', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
   crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
-  death_captain:{ name:'Hauptmann der Toten', hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true, role:'Elite',   // §81: führt die letzte Befreiungswelle
+  death_captain:{ name:'Hauptmann der Toten', heavy:{ kind:'slam', every:3, wind:750, mul:1.9, r:75 }, hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true, role:'Elite',   // §81: führt die letzte Befreiungswelle
                pal:{skin:'#d8d0ba',cloth:'#2a1416',metal:'#50463f',glow:'#c05a3a'} },
   hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
   // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
-  cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true, role:'Heiler',
+  cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true, role:'Heiler', spells:['sp_firebolt', 'sp_spark'],
                pal:{skin:'#b8a890',cloth:'#2a1f2e',metal:'#5a4a66',glow:'#b07ae0'} },    // hält Abstand, heilt verwundete Untote
   ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true, role:'Masse',
                pal:{skin:'#8c9478',cloth:'#2c2a24',metal:'#4a4a42',glow:'#9fb070'} },   // langsam, Griff bremst, steht einmal wieder auf (außer Feuer/Heiliges)
   wraith:    { name:'Geist', hp:38, dmg:9, speed:1.7, reach:30, atk:900, xp:32, sight:260, r:11, threat:3, faction:'undead', interiors:true, role:'Meuchler',
                pal:{skin:'#c9d4dc',cloth:'#aab4c0',metal:'#8090a0',glow:'#cfe6ff'} },   // schnell, nach Treffer kurz körperlos, raubt Ausdauer
   // ---- Phase 6 (MP2 §61): Untotenreich — jede Art mit eigener Rolle (role), Werte im GDD-Datenblatt ----
-  bone_knight: { name:'Knochenritter', hp:120, dmg:14, speed:0.95, reach:38, atk:1300, telegraph:480, xp:70, sight:250, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
+  bone_knight: { name:'Knochenritter', heavy:{ kind:'sweep', every:3, wind:750, mul:1.8, r:80 }, hp:120, dmg:14, speed:0.95, reach:38, atk:1300, telegraph:480, xp:70, sight:250, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
                pal:{skin:'#d8d0ba',cloth:'#1a1d22',metal:'#5a6068',glow:'#7fd0b8'} },   // Schild vorn: Frontalhiebe prallen ab, von der Seite verwundbar
   bone_archer: { name:'Knochenschütze', hp:36, dmg:9, speed:1.1, reach:280, atk:1700, ranged:true, missile:'arrow', xp:34, sight:320, r:11, threat:2, faction:'undead', interiors:true, role:'Fernkampf',
                pal:{skin:'#cfc8b4',cloth:'#22262a',metal:'#3f4b46',glow:'#4e8f7a'} },
-  necromancer: { name:'Nekromant', hp:52, dmg:11, speed:1.0, reach:240, atk:1900, ranged:true, missile:'shadow', xp:60, sight:300, r:11, threat:3, faction:'undead', interiors:true, role:'Beschwörer',
+  necromancer: { name:'Nekromant', hp:52, dmg:11, speed:1.0, reach:240, atk:1900, ranged:true, missile:'shadow', xp:60, sight:300, r:11, threat:3, faction:'undead', interiors:true, role:'Beschwörer', spells:['sp_froststrike', 'sp_shield'],
                pal:{skin:'#a89c88',cloth:'#141018',metal:'#3a2e44',glow:'#8fe0b0'} },   // ruft Knochendiener (höchstens drei); stirbt er, zerfallen sie
   zombie:     { name:'Seuchenleiche', hp:80, dmg:9, speed:0.7, reach:28, atk:1400, telegraph:360, xp:22, sight:180, r:12, threat:1, faction:'undead', interiors:true, role:'Masse',
                pal:{skin:'#7e8a64',cloth:'#3a3024',metal:'#4a4a42',glow:'#b0c070'} },   // langsam, zäh, der Biss vergiftet
@@ -322,7 +438,7 @@ export const MONSTERS = {
                pal:{body:'#2a2426',dark:'#141012',eye:'#e05a3a'} },   // fliegt über Wasser und Mauern, stößt herab und steigt wieder auf
   flesh_golem:{ name:'Leichenkoloss', hp:340, dmg:24, speed:0.6, reach:50, atk:2200, telegraph:900, xp:180, sight:220, r:18, threat:4, faction:'undead', interiors:false, role:'Belagerung', scale:1.6, siege:true,
                pal:{skin:'#8a7a6a',cloth:'#2a2018',metal:'#4a3a30',glow:'#c05a3a'} },   // Stampfen trifft alle im Umkreis; zerschlägt Wagen
-  death_knight:{ name:'Todesritter', hp:230, dmg:20, speed:1.1, reach:44, atk:1300, telegraph:500, xp:160, sight:290, r:13, threat:4, faction:'undead', interiors:true, role:'Elite', scale:1.12,
+  death_knight:{ name:'Todesritter', heavy:{ kind:'sweep', every:3, wind:800, mul:2.0, r:90 }, hp:230, dmg:20, speed:1.1, reach:44, atk:1300, telegraph:500, xp:160, sight:290, r:13, threat:4, faction:'undead', interiors:true, role:'Elite', scale:1.12,
                pal:{skin:'#d8d0ba',cloth:'#12141a',metal:'#2a2e36',glow:'#6fd8ff'} },   // jeder Treffer nährt ihn (Lebensraub)
   garmadon:   { name:'König Garmadon', hp:620, dmg:24, speed:1.05, reach:52, atk:1400, telegraph:560, xp:900, sight:320, r:20, boss:true, threat:5, faction:'undead', interiors:true, role:'Endgegner', scale:1.9,
                pal:{skin:'#e0d8c4',cloth:'#1a0a0c',metal:'#3a2a24',glow:'#e03a2a'} },   // MP2 §63: spricht, lässt nicht gehen; drei Phasen
@@ -346,6 +462,8 @@ export const MONSTERS = {
   deer:      { name:'Hirsch', hp:30, dmg:0, speed:1.9, reach:0, atk:9999, xp:6, sight:200, r:12, threat:0, faction:'beast', interiors:false, prey:true,
                pal:{body:'#8a6040',dark:'#5a3e28',eye:'#1a120c'} },                   // Wildtier, kein Gegner: flieht, Wölfe jagen ihn
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
+  dodon:     { name:'Dodon, Hüter von Morrgrund', heavy:{ kind:'slam', every:2, wind:900, mul:2.4, r:95 }, hp:760, dmg:27, speed:0.95, reach:62, atk:1700, telegraph:760, xp:600, sight:320, r:22, boss:true, threat:5, faction:'goblin', interiors:false, scale:2.1,   // S15: der Riese der Grubenstämme
+    pal:{skin:'#56703a',cloth:'#3a2c1c',metal:'#8a8272'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };
 // §72: Skalierung ist die Ausnahme. Jeder Gegner trägt sie ausdrücklich; nur Einträge in SCALING (GDD-Liste) dürfen mitwachsen.
@@ -365,7 +483,7 @@ export const CLASSES = {
   paladin:   { name:'Paladin', tier:3, parent:'knight', abilities:['holy_strike','blessing','holy_heal'], faction:'order',
                desc:'Ein Schwert macht dich nicht zum Ritter. Was du beschützt, tut es.' },
   ranger:    { name:'Waldläufer', tier:2, parent:'archer', abilities:['aimed_shot','mark_target'], desc:'Der Wald ist eine Karte, die nur du liest.' },
-  deathknight:{name:'Todesritter', tier:3, parent:'warrior', abilities:['life_drain','power_strike'], faction:'undead', desc:'Treue über den Tod hinaus.' },
+  deathknight:{name:'Todesritter', tier:3, parent:'warrior', abilities:['life_drain','power_strike','grave_strike'], faction:'undead', desc:'Treue über den Tod hinaus.' },
   // Session 7 (Phase 10) — je Klasse eine ehrliche Schwäche (weak), nicht nur andere Werte
   berserker: { name:'Berserker', tier:2, parent:'warrior', abilities:['power_strike','frenzy'], desc:'Wut als Rüstung — bis sie reißt.',
                weak:'In der Raserei nimmst du 20 % mehr Schaden.' },
@@ -421,6 +539,42 @@ export const ABILITIES = {
   earth_blessing:{ name:'Erdsegen', title:'druid', cd:14000, cost:30, desc:'Dich und deine Gruppe heilt die Erde 8 s lang. Kostet 30 Wildkraft.' },
   shadow_raise:{ name:'Schattenruf', title:'warlock', cd:8000, gain:25, desc:'Ein Schattenskelett steigt ohne Leiche aus dem Boden (40 s, höchstens 2). +25 Verderbnis.' },
   pact_knight: { name:'Paktritter', title:'warlock', cd:30000, desc:'Ein Knochenritter mit Schild dient dir 45 s (höchstens einer). Kostet 20 % deines Lebens.' },
+  corpse_blast:{ name:'Leichenbersten', title:'necromancer', cd:9000, cost:1, desc:'Eine Leiche oder dein schwächster Diener birst: Knochensplitter treffen alles im Umkreis (90 px). Kostet 1 Seelenessenz.' },
+  soul_bind:   { name:'Seelenfessel', title:'necromancer', cd:25000, cost:3, desc:'Bindet die Seele des nächsten Feindes 15 s lang. Stirbt er in der Zeit, steht er als dein Diener wieder auf — in seiner eigenen Gestalt (45 s, keine Bosse). Kostet 3 Essenz.' },
+  plague_hex:  { name:'Seuchenfluch', title:'warlock', cd:10000, gain:20, desc:'Wie Fluch, doch stirbt der Verfluchte, springt die Seuche auf die zwei nächsten Feinde. +20 Verderbnis.' },
+  void_gate:   { name:'Obeliskentor', title:'warlock', cd:40000, min:50, cost:'all', desc:'Ab 50 Verderbnis: ein Riss öffnet sich am Zielort und zieht 6 s lang Feinde heran, jede Sekunde Schattenschaden. Verbraucht alle Verderbnis.' },
+  thorns:      { name:'Dornenhaut', title:'druid', cd:16000, cost:25, desc:'10 s: wer dich im Nahkampf trifft, bekommt 40 % des Schadens zurück. Kostet 25 Wildkraft.' },
+  wolf_form:   { name:'Wolfsgestalt', title:'druid', cd:45000, cost:60, desc:'20 s wirst du zum Wolf des Hains: +35 % Tempo, Biss statt Waffe, +3 Rüstung. Keine Gegenstände. Kostet 60 Wildkraft.' },
+  counter_stance:{ name:'Gegenstrom', title:'monk', cd:8000, cost:1, desc:'3 s Haltung: der nächste Nahkampftreffer gegen dich prallt ab und wird doppelt erwidert (+1 Fokus). Kostet 1 Fokus.' },
+  silent_hand: { name:'Stille Hand', title:'monk', cd:30000, cost:'all', min:3, desc:'Ab 3 Fokus: eine Welle der Stille (130 px). Feinde erstarren 1,5 s und nehmen Schaden je Fokus. Verbraucht allen Fokus.' },
+  grave_strike:{ name:'Grabhieb', cd:9000, stam:20, desc:'Ein Hieb mit Schattenwucht (×1,8). 30 % des Schadens heilen dich.' },
+  grave_host:  { name:'Heerruf', title:'necromancer', cd:60000, cost:4, desc:'Klassen-Rüstung (2 Teile): bis zu drei Leichen stehen auf einmal auf (30 s, zusätzlich zu deinen Dienern). Kostet 4 Essenz.' },
+  dark_pact:   { name:'Dunkler Pakt', title:'warlock', cd:30000, desc:'Klassen-Rüstung (2 Teile): 20 % deines Lebens für +40 Verderbnis und 8 s lang +40 % Titelzauberschaden.' },
+  pack_call:   { name:'Rudelruf', title:'druid', cd:40000, cost:50, desc:'Klassen-Rüstung (2 Teile): zwei Geisterwölfe kämpfen 20 s an deiner Seite. Kostet 50 Wildkraft.' },
+  flurry:      { name:'Wirbel', title:'monk', cd:6000, cost:1, desc:'Klassen-Rüstung (2 Teile): drei schnelle Schläge auf das nächste Ziel (je ×0,8), das Ziel taumelt. Kostet 1 Fokus.' },
+  // ---- S15 P4 Magie-Kern: Zauber der sechs Schulen (Feuer, Frost, Blitz, Arkan, Heilung, Schutz) ----
+  // spell: Form (bolt Geschoss, line Strahl, nova Ring, area Fläche am Ziel, chain Kette, self, group, blink, dispel), Element,
+  // dmg [Basis, je Intelligenz], Zustand, Heilung/Schild. cast = Sammelzeit in ms (ein Treffer bricht ab). tier 1–3, teach = wer lehrt.
+  sp_spark:     { name:'Funke', school:'fire', tier:1, mana:6, cd:1400, cast:250, spell:{ shape:'bolt', el:'fire', dmg:[7, 0.8], speed:7, range:300 }, teach:'Wandermagier in Kreuzweg, Morvath', desc:'Ein Funke aus der Fingerspitze. Schnell, schwach, zündet selten.' },
+  sp_firebolt:  { name:'Feuerpfeil', school:'fire', tier:1, mana:10, cd:2500, cast:350, spell:{ shape:'bolt', el:'fire', dmg:[10, 1.1], speed:6, range:320, status:{ key:'burning', chance:0.35, left:3000 } }, teach:'Wandermagier in Kreuzweg, Morvath', desc:'Ein Pfeil aus Feuer. Setzt manchmal in Brand.' },
+  sp_flamejet:  { name:'Flammenstoß', school:'fire', tier:2, mana:16, cd:5000, cast:450, spell:{ shape:'line', el:'fire', dmg:[14, 1.2], range:150, status:{ key:'burning', chance:0.7, left:3500 } }, teach:'Morvath, Akademie Aurelheim', desc:'Ein Strahl aus Flammen vor dir. Alles darin brennt oft.' },
+  sp_firering:  { name:'Flammenkreis', school:'fire', tier:3, mana:28, cd:12000, cast:700, spell:{ shape:'nova', el:'fire', dmg:[20, 1.5], r:120, status:{ key:'burning', chance:1, left:4000 } }, teach:'Akademie Aurelheim (Magister)', desc:'Ein Ring aus Feuer bricht um dich aus.' },
+  sp_froststrike:{ name:'Froststoß', school:'frost', tier:1, mana:9, cd:2200, cast:300, spell:{ shape:'bolt', el:'frost', dmg:[8, 0.9], speed:6, range:300, status:{ key:'frost', chance:1 } }, teach:'Akademie Aurelheim', desc:'Kälte, die langsam macht. Drei Stufen Frost lassen erstarren.' },
+  sp_icespear:  { name:'Eisspeer', school:'frost', tier:2, mana:16, cd:4500, cast:500, spell:{ shape:'bolt', el:'frost', dmg:[16, 1.3], speed:8, range:380, pierce:true, status:{ key:'frost', chance:1 } }, teach:'Akademie Aurelheim', desc:'Ein Speer aus Eis, der durch mehrere Feinde fährt.' },
+  sp_freeze:    { name:'Einfrieren', school:'frost', tier:3, mana:26, cd:14000, cast:700, spell:{ shape:'area', el:'frost', dmg:[10, 0.8], r:80, range:260, status:{ key:'frost', chance:1, stacks:3 } }, teach:'Akademie Aurelheim (Magister)', desc:'Am Zielort gefriert alles zu Eis.' },
+  sp_shock:     { name:'Schock', school:'shock', tier:1, mana:8, cd:2400, cast:200, spell:{ shape:'bolt', el:'shock', dmg:[7, 0.8], speed:9, range:220, status:{ key:'shocked', chance:1 } }, teach:'Akademie Aurelheim, Magitech-Ingenieurin', desc:'Ein Knall aus der Hand. Das Ziel zuckt kurz.' },
+  sp_lightning: { name:'Blitz', school:'shock', tier:2, mana:16, cd:4500, cast:400, spell:{ shape:'line', el:'shock', dmg:[16, 1.3], range:260, status:{ key:'shocked', chance:0.5 } }, teach:'Akademie Aurelheim', desc:'Ein gerader Blitz, so weit das Auge reicht.' },
+  sp_chain:     { name:'Kettenblitz', school:'shock', tier:3, mana:24, cd:9000, cast:500, spell:{ shape:'chain', el:'shock', dmg:[14, 1.2], range:260, jumps:3, status:{ key:'shocked', chance:0.4 } }, teach:'Akademie Aurelheim (Magister)', desc:'Springt von Feind zu Feind — nur, wenn er sie sehen kann.' },
+  sp_missile:   { name:'Energiegeschoss', school:'arcane', tier:1, mana:7, cd:1600, cast:250, spell:{ shape:'bolt', el:'arcane', dmg:[9, 1.0], speed:8, range:340 }, teach:'Wandermagier in Kreuzweg, Akademie Aurelheim', desc:'Reine Kraft, trifft sicher.' },
+  sp_ward:      { name:'Magieschild', school:'arcane', tier:2, mana:18, cd:15000, cast:300, spell:{ shape:'self', absorb:[20, 1.5], left:12000 }, teach:'Akademie Aurelheim', desc:'Ein Schild aus Licht fängt Schaden ab.' },
+  sp_teleport:  { name:'Kurzteleport', school:'arcane', tier:3, mana:20, cd:8000, cast:150, spell:{ shape:'blink', range:180 }, teach:'Akademie Aurelheim (Magister)', desc:'Du bist woanders. Nie in einer Mauer.' },
+  sp_dispel:    { name:'Magieunterbrechung', school:'arcane', tier:2, mana:14, cd:10000, cast:200, spell:{ shape:'dispel', r:170 }, teach:'Akademie Aurelheim', desc:'Bricht Zauber und schwere Angriffe ab, nimmt Feinden ihre Stärkungen.' },
+  sp_minorheal: { name:'Kleine Heilung', school:'heal', tier:1, mana:10, cd:4000, cast:500, spell:{ shape:'self', heal:[14, 1.0] }, teach:'Elena in Eren, Ordenspriesterin', desc:'Wunden schließen sich ein Stück.' },
+  sp_staunch:   { name:'Blutung stillen', school:'heal', tier:2, mana:12, cd:6000, cast:400, spell:{ shape:'self', staunch:true, heal:[6, 0.5] }, teach:'Elena in Eren, Ordenspriesterin', desc:'Stillt Blutungen und festigt das schwächste Glied.' },
+  sp_regen:     { name:'Regeneration', school:'heal', tier:2, mana:18, cd:16000, cast:500, spell:{ shape:'group', regen:3, left:10000, r:150 }, teach:'Ordenspriesterin, Druidin', desc:'Du und deine Gruppe heilt zehn Sekunden lang.' },
+  sp_heal:      { name:'Starke Heilung', school:'heal', tier:3, mana:26, cd:9000, cast:900, spell:{ shape:'self', heal:[36, 2.0] }, teach:'Ordenspriesterin (Rang 2)', desc:'Eine lange Formel. Wer sie beendet, steht wieder.' },
+  sp_shield:    { name:'Schild', school:'ward', tier:1, mana:9, cd:9000, cast:250, spell:{ shape:'self', absorb:[10, 0.8], left:8000 }, teach:'Ordenspriesterin, Wandermagier in Kreuzweg', desc:'Eine Haut aus Licht. Hält ein paar Hiebe.' },
+  sp_circle:    { name:'Schutzkreis', school:'ward', tier:3, mana:24, cd:18000, cast:600, spell:{ shape:'group', absorb:[14, 1.0], left:10000, r:150 }, teach:'Ordenspriesterin (Rang 2)', desc:'Ein Kreis schützt dich und deine Gruppe.' },
   unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
 };
 
@@ -435,6 +589,9 @@ export const TITLE_CLASSES = {
     resource:{ key:'essence', name:'Seelenessenz', max:6, start:0, css:'essence',
       rule:'Jeder Tod in deiner Nähe (bis ~9 Schritt) gibt +1, auch durch deine Diener. Sie verfliegt nicht und kommt nicht durch Rast.' },
     abilities:['raise_dead', 'bone_ward', 'soul_harvest'],
+    grades:[['raise_dead', 'bone_ward'], ['soul_harvest', 'corpse_blast'], ['soul_bind']], mentor:'ysra',   // S15: Titelgrade I–III
+    deed:'Tote, die fallen, während du den Titel trägst (auch durch deine Diener)',
+    gradeNames:['Totenrufer', 'Knochenfürst', 'Herr der Stillen Schar'],
     passive:{ name:'Totenwache', desc:'Deine Diener kämpfen für dich; was sie töten, nährt deine Essenz.' },
     flaw:{ name:'Die Toten zehren', desc:'Eigener Waffenschaden −15 %. Heiliges Heilen wirkt auf dich nur halb.' },
     cost:{ desc:'Ein Teil von dir bleibt bei den Toten: Leben −10 % für immer.', hpMul:0.9 },
@@ -445,6 +602,9 @@ export const TITLE_CLASSES = {
     resource:{ key:'corruption', name:'Verderbnis', max:100, start:20, css:'corruption',
       rule:'Jede Titelfähigkeit lädt sie auf. Außerhalb des Kampfes sinkt sie (−4/s). Stirbt ein Verfluchter, sinkt sie um 15.' },
     abilities:['hex', 'chaos_bolt', 'unleash', 'shadow_raise', 'pact_knight'],   // Nutzer (S13): Hexenmeister beschwört auch
+    grades:[['hex', 'chaos_bolt'], ['shadow_raise', 'unleash', 'plague_hex'], ['pact_knight', 'void_gate']], mentor:'vhal',
+    deed:'Titelzauber gewirkt und Verfluchte gefallen',
+    gradeNames:['Schattengebundener', 'Seuchenwirker', 'Stimme des Obelisken'],
     passive:{ name:'Macht aus Fäulnis', desc:'Titelzauber kosten kein Mana; ihr Schaden steigt mit der Verderbnis bis aufs Doppelte.' },
     flaw:{ name:'Sie frisst dich', desc:'Über 70 Verderbnis verlierst du Leben (1,5/s). Bei 100 bricht sie aus: 15 Schaden, zurück auf 60.' },
     cost:{ desc:'Der Schatten nimmt Atem: Ausdauer −10 für immer.', stamina:-10 },
@@ -455,6 +615,9 @@ export const TITLE_CLASSES = {
     resource:{ key:'wild', name:'Wildkraft', max:100, start:40, css:'wild',
       rule:'Wächst von selbst (+5/s), aber nur draußen auf Gras, Erde und Sumpf. In Siedlungen, auf Stein und Asche, unter Tage steht sie still.' },
     abilities:['roots', 'spirit_wolf', 'earth_blessing'],
+    grades:[['roots', 'earth_blessing'], ['spirit_wolf', 'thorns'], ['wolf_form']], mentor:'mira',
+    deed:'Titelzauber gewirkt und Feinde draußen in der Wildnis besiegt',
+    gradeNames:['Hainhüter', 'Dornenwächter', 'Wolf des Hains'],
     passive:{ name:'Waldgänger', desc:'Draußen in der Natur heilen deine Wunden langsam von selbst (0,5 Leben/s).' },
     flaw:{ name:'Metall erstickt', desc:'In Ketten- oder Plattenpanzer wächst die Wildkraft nur halb so schnell.' },
     cost:{ desc:'Der Hain nimmt, was er gibt: Stärke −1 für immer.', attr:{ strength:-1 } },
@@ -465,6 +628,9 @@ export const TITLE_CLASSES = {
     resource:{ key:'focus', name:'Fokus', max:5, start:0, css:'focus',
       rule:'Jedes Ausweichen, das einen Treffer oder ein Geschoss ins Leere laufen lässt, gibt +1. Wirst du getroffen, verlierst du 1. Sonst bleibt er.' },
     abilities:['palm_strike', 'still_water', 'hundred_steps'],
+    grades:[['palm_strike', 'still_water'], ['hundred_steps', 'counter_stance'], ['silent_hand']], mentor:'ilva',
+    deed:'Titelzauber gewirkt und Fokus gesammelt',
+    gradeNames:['Hand des Ordens', 'Strömender', 'Stille selbst'],
     passive:{ name:'Leerer Geist', desc:'Ausweichen kostet 25 % weniger Ausdauer.' },
     flaw:{ name:'Gelübde der Leichtigkeit', desc:'In Ketten- oder Plattenpanzer sammelst du keinen Fokus.' },
     cost:{ desc:'Das Gelübde der Armut: die Hälfte deines Goldes geht an das Kloster, und Rooks Bande vergisst dich nicht.', gold:0.5 },
@@ -531,6 +697,9 @@ export const SKILL_TREE = {
   n_reap:   { branch:'necromancer', row:1, type:'notable', name:'Ernte der Toten', fx:{}, requires:['n_vessel'], desc:'Seelenernte wirkt 50 % stärker.' },
   k_legion: { branch:'necromancer', row:2, type:'keystone', name:'Legion', fx:{}, requires:['n_cold'],
     desc:'Bis zu 3 Diener gleichzeitig. Dein eigener Waffenschaden −20 %.', designIntent:'Kontrolle statt Einzelkampf: der Nekromant wird zum Feldherrn, nicht zum Fechter.' },
+  n_blast:  { branch:'necromancer', row:1, name:'Splitterknochen', fx:{}, requires:['n_vessel'], desc:'Leichenbersten: +30 % Radius und Schaden.' },
+  k_lone:   { branch:'necromancer', row:2, type:'keystone', name:'Einsamer Rufer', fx:{}, requires:['n_reap'], excl:'k_legion',
+    desc:'Dafür nur ein Diener, doch der hat doppeltes Leben und +50 % Schaden. Der Makel „Die Toten zehren“ entfällt. Schließt Legion aus.', designIntent:'Ein Gefährte aus Knochen statt einer Schar: der Nekromant kämpft wieder selbst mit.' },
   // Hexerei
   w_deep:   { branch:'warlock', row:0, name:'Tiefer Schatten', fx:{}, requires:[], desc:'Verderbnis frisst erst ab 85 statt 70.' },
   w_eye:    { branch:'warlock', row:0, name:'Böser Blick', fx:{}, requires:[], desc:'Fluch hält 6 s länger.' },
@@ -538,6 +707,9 @@ export const SKILL_TREE = {
   w_rift:   { branch:'warlock', row:1, type:'notable', name:'Weiter Riss', fx:{}, requires:['w_deep'], desc:'Entfesseln trifft 40 px weiter.' },
   k_bloodpact:{ branch:'warlock', row:2, type:'keystone', name:'Blutpakt', fx:{}, requires:['w_core'],
     desc:'Titelzauber +25 % Schaden. Die Verderbnis sinkt außerhalb des Kampfes nicht mehr.', designIntent:'Kein Durchatmen: mehr Macht, aber der Schatten bleibt — jeder Kampf beginnt schon angefressen.' },
+  w_plague: { branch:'warlock', row:1, name:'Pestwind', fx:{}, requires:['w_eye'], desc:'Seuchenfluch springt auf drei statt zwei Feinde.' },
+  k_void:   { branch:'warlock', row:2, type:'keystone', name:'Leeres Herz', fx:{}, requires:['w_rift'], excl:'k_bloodpact',
+    desc:'Bricht die Verderbnis aus, kostet es kein Leben: 6 s Entfesselte Gestalt (+40 % Schaden). Dafür steigt sie 20 % schneller. Schließt Blutpakt aus.', designIntent:'Den Ausbruch wollen statt fürchten: der Hexenmeister reitet den Schatten.' },
   // Hainkunde
   d_roots:  { branch:'druid', row:0, name:'Tiefe Wurzeln', fx:{}, requires:[], desc:'Rankenfessel hält 1 s länger.' },
   d_spring: { branch:'druid', row:0, name:'Quellgrund', fx:{}, requires:[], desc:'Wildkraft wächst 30 % schneller.' },
@@ -545,6 +717,9 @@ export const SKILL_TREE = {
   d_earth:  { branch:'druid', row:1, type:'notable', name:'Heilende Erde', fx:{}, requires:['d_roots'], desc:'Erdsegen heilt 50 % mehr.' },
   k_grove:  { branch:'druid', row:2, type:'keystone', name:'Hüter des Hains', fx:{}, requires:['d_pack', 'd_earth'],
     desc:'Auf Gras und im Wald: Schaden +15 %, Rüstung +3. Auf Stein, Asche und in Siedlungen: Schaden −10 %.', designIntent:'Der Druide gehört nach draußen: stark im Wald, schwach in Stein und Stadt.' },
+  d_thorns: { branch:'druid', row:1, name:'Schlehenhaut', fx:{}, requires:['d_roots'], desc:'Dornenhaut wirft 60 % statt 40 % zurück.' },
+  k_beast:  { branch:'druid', row:2, type:'keystone', name:'Tier im Herzen', fx:{}, requires:['d_thorns'], excl:'k_grove',
+    desc:'Wolfsgestalt hält 40 s und kostet nur 30 Wildkraft. In Menschengestalt: Titelzauber −15 %. Schließt Hüter des Hains aus.', designIntent:'Mehr Wolf als Mensch: der Druide wird zum Jäger.' },
   // Stille Hand
   o_breath: { branch:'monk', row:0, name:'Zweiter Atem des Klosters', fx:{}, requires:[], desc:'Stilles Wasser heilt 50 % mehr.' },
   o_edge:   { branch:'monk', row:0, name:'Harte Hand', fx:{}, requires:[], desc:'Handkante: Taumeln 0,5 s länger, Schaden +20 %.' },
@@ -552,6 +727,9 @@ export const SKILL_TREE = {
   o_steps:  { branch:'monk', row:1, type:'notable', name:'Wind im Rücken', fx:{}, requires:['o_edge'], desc:'Hundert Schritte trägt 60 px weiter und trifft 25 % härter.' },
   k_stillness:{ branch:'monk', row:2, type:'keystone', name:'Vollkommene Stille', fx:{}, requires:['o_well', 'o_steps'],
     desc:'Getroffen werden kostet keinen Fokus mehr. Dafür: mit Schild oder Zweihandwaffe gibt es gar keinen Fokus.', designIntent:'Der Mönch als Reinform: ohne Schild, ohne schwere Klinge — dafür verzeiht die Stille einen Fehler.' },
+  o_counter:{ branch:'monk', row:1, name:'Tiefer Strom', fx:{}, requires:['o_edge'], desc:'Gegenstrom hält 2 s länger.' },
+  k_storm:  { branch:'monk', row:2, type:'keystone', name:'Sturmhand', fx:{}, requires:['o_counter'], excl:'k_stillness',
+    desc:'Jeder dritte Treffer gibt +1 Fokus. Dafür gibt Ausweichen keinen Fokus mehr. Schließt Vollkommene Stille aus.', designIntent:'Angriff statt Leere: der Mönch holt sich den Fokus aus dem Schlagen.' },
 };
 
 export const FACTIONS = {
@@ -566,6 +744,7 @@ export const FACTIONS = {
   // Session 11 — Endgame: die Sklavenhalter der Eisenmark und die Goblins, die sie in Ketten halten
   aurel: { name:'Das Hochreich Aurelion', colors:['#2a2a30','#c8a050'], desc:'Adelshäuser, Handelsherren, Automaten und Messingglieder. Reich genug, um sich jede Ordnung zu kaufen — auch die der anderen.', ranks:['Fremder','Registrierter Besucher','Bürger','Anerkannter Bürger','Handelsbürger','Gildenmitglied','Hoher Beamter','Mitglied des Hohen Rates'] },   // MP2 §81
   chain: { name:'Die Eiserne Kette', colors:['#111214','#5a1a1c'], desc:'Sie nennen es Ordnung. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.', ranks:['Treiber','Kettenknecht','Grenzreiter','Aufseher','Dunkler Hochpaladin'] },   // S12: Spielerränge; Kettenmeister ist Varg allein
+  sea:   { name:'Das Seevolk', colors:['#1e2a36','#c8b890'], desc:'Salzbund und Sturmklinge: Händler und Plünderer derselben Inseln, die sich mehr hassen als jeden Fremden. Wer auf dem Wasser lebt, schuldet dem Land nichts.', ranks:['Landratte','Deckhand','Maat','Steuermann','Kapitän'] },   // S14
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };
 
@@ -648,6 +827,7 @@ export const BUILDINGS = {
   workbench: { name:'Werkbank', cat:'Produktion', cost:{wood:12,stone:4}, time:12, w:2, h:1, desc:'Einfaches Handwerk und Reparatur.', pop:0 },
   smithy:    { name:'Schmiede', cat:'Produktion', cost:{wood:20,stone:15,iron:10}, time:30, w:3, h:2, desc:'Waffen aus Eisen, Reparatur ohne Meister.', pop:0 },
   farm:      { name:'Ackerfläche', cat:'Versorgung', cost:{wood:10}, time:16, w:3, h:3, desc:'Erzeugt täglich Nahrung.', pop:0 },
+  pasture:   { name:'Weide mit Stall', cat:'Versorgung', cost:{wood:16,stone:4}, time:18, w:3, h:3, desc:'Platz für sechs Kühe oder Schafe (Tierhändler). Täglich Fleisch, Wolle, Felle — Wölfe haben auch Hunger.', pop:0 },
   well:      { name:'Brunnen', cat:'Versorgung', cost:{stone:18}, time:18, w:1, h:1, desc:'Moral der Siedlung steigt.', pop:0 },
   palisade:  { name:'Palisade', cat:'Verteidigung', cost:{wood:6}, time:5, w:1, h:1, desc:'Ein Abschnitt Wehrzaun. Blockiert Bewegung.', pop:0 },
   gate:      { name:'Tor', cat:'Verteidigung', cost:{wood:12,iron:4}, time:12, w:2, h:1, desc:'Durchlass in der Palisade.', pop:0 },
@@ -655,6 +835,25 @@ export const BUILDINGS = {
 };
 
 export const QUESTS = {
+  // S14 Seevolk: zwei Clans werben um dich; wer eine Seite wählt, verliert die andere. Geber nach Beruf auf der Insel (game.js)
+  q_salz1: { name:'Freibeuter vor Netzbucht', giver:null, giverProf:'Handelsherrin des Salzbunds', giverMap:'isle', sea:true,
+    desc:'Ysolde Kielmark: „Schwarzsegel — Abtrünnige, die weder dem Bund noch der Klinge folgen — lagern am Weststrand und schneiden den Netzleuten die Boote los. Vier von ihnen, und der Bund merkt sich deinen Namen.“',
+    objectives:[{type:'kill',target:'blacksail',count:4,text:'Schwarzsegel am Weststrand besiegen'}], reward:{gold:120,xp:160,rep:{sea:8}}, turnin:null },
+  q_salz2: { name:'Salz für den Bund', giver:null, giverProf:'Handelsherrin des Salzbunds', giverMap:'isle', sea:true,
+    desc:'„Die Sturmklinge hat unser Lager ausgeräumt. Vier Salzsäcke vom Festland, und du trägst unser Siegel. Dann gehörst du zum Bund — und die Klinge weiß das.“',
+    objectives:[{type:'item',target:'salt',count:4,text:'Salzsäcke bringen'}], reward:{gold:160,xp:180,rep:{sea:10},take:'salt',takeCount:4,item:'salzsiegel'}, turnin:null },
+  q_salz3: { name:'Frieden oder Anker', giver:null, giverProf:'Handelsherrin des Salzbunds', giverMap:'isle', sea:true,
+    desc:'„Solange Weißbart atmet, fährt kein Salzschiff sicher. Bring ihn zum Unterschreiben — oder zum Schweigen. Wie, ist mir gleich.“',
+    objectives:[{type:'kill',target:'whitebeard',count:1,text:'Weißbart besiegen — oder zum Frieden bewegen'}], reward:{gold:400,xp:600,rep:{sea:20}}, turnin:null },
+  q_klinge1: { name:'Die Grube', giver:null, giverProf:'Erste Maat der Sturmklinge', giverMap:'isle', sea:true,
+    desc:'Hella Kielbrecher: „Drei aus der Mannschaft warten in der Grube. Steh am Ende, und wir reden weiter. Lieg am Ende, und wir reden über dich.“',
+    objectives:[{type:'kill',target:'pitfighter',count:3,text:'Grubenkämpfer besiegen'}], reward:{gold:80,xp:160,rep:{sea:8}}, turnin:null },
+  q_klinge2: { name:'Beute für die Sturmklinge', giver:null, giverProf:'Erste Maat der Sturmklinge', giverMap:'isle', sea:true,
+    desc:'„Der Salzbund wiegt, wir nehmen. Drei Tuchballen — gekauft, gestohlen, egal. Dann trägst du den weißen Anker.“',
+    objectives:[{type:'item',target:'cloth',count:3,text:'Tuchballen bringen'}], reward:{gold:140,xp:180,rep:{sea:10},take:'cloth',takeCount:3,item:'entermesser'}, turnin:null },
+  q_wb_nebel: { name:'Die Schwarzsegel-Kapitänin', giver:null, sea:true,
+    desc:'Weißbart: „Morra Schwarzsegel hat einmal mit mir gesegelt. Jetzt verkauft sie meine Leute an Aurelion. Im Norden an den Möwenfelsen liegt ihr Lager. Bring mir ihren Kompass.“',
+    objectives:[{type:'kill',target:'blackcap',count:1,text:'Morra Schwarzsegel besiegen'}], reward:{gold:350,xp:550,rep:{sea:20},item:'dreispitz'}, turnin:null },
   q_wolves: { name:'Wölfe an der Hürde', giver:'havel', desc:'Havel zahlt für drei tote Wölfe am Waldrand.',
     objectives:[{type:'kill',target:'wolf',count:3,text:'Wölfe töten'}],
     reward:{gold:60,rep:{valen:5},xp:40}, turnin:'havel' },
@@ -685,6 +884,38 @@ export const QUESTS = {
   q_kingsiron: { name:'Königseisen', giver:'brann', desc:'Unter dem Frostkamm liegt die Tiefhall. Die alten Bergleute schmolzen dort Eisen nur für ihren König — und der König soll sie nie verlassen haben. Bring mir einen Barren aus seinem Hort, und ich schmiede dir eine Klinge, wie Nordfurt keine zweite hat.',
     objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
     reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
+  // S15 Klassen-Questlines: je Titelklasse drei Aufträge beim Meister (ab Grad II, der dritte ab Grad III). Belohnung: ein Teil der Klassen-Rüstung.
+  c_nec1: { name:'Die Knochen der Vergessenen', giver:'ysra', classQ:['necromancer', 1, 2], desc:'„Wer die Schar führt, muss erst die tragen, die niemand trägt. Leg sechs Wandelnde zur Ruhe und bring mir drei Knochen, die niemand vermisst.“',
+    objectives:[{type:'kill',target:'skeleton',count:6,text:'Wandelnde Tote zur Ruhe legen'}, {type:'item',target:'bone',count:3,text:'Knochen bringen'}], reward:{xp:220,item:'totenrufer_kapuze',take:'bone',takeCount:3}, turnin:'ysra' },
+  c_nec2: { name:'Das Gewand der Stillen Schar', giver:'ysra', classQ:['necromancer', 2, 2], desc:'„Der Wächter der Nekropole trägt ein Gewand, das ihm nicht gehört. Nimm es ihm. Und bring zwei Seelen in Phiolen — das Gewand hat Hunger.“',
+    objectives:[{type:'kill',target:'crypt_warden',count:1,text:'Den Wächter der Nekropole bezwingen'}, {type:'item',target:'soul_vial',count:2,text:'Zwei Seelenphiolen bringen'}], reward:{xp:320,item:'gewand_stille_schar',take:'soul_vial',takeCount:2}, turnin:'ysra' },
+  c_nec3: { name:'Der Kragen aus Grabstein', giver:'ysra', classQ:['necromancer', 3, 3], desc:'„Ein Hauptmann der Toten trägt ein Grabsiegel. Bring es mir, und ich schneide dir einen Kragen aus meinem eigenen Grab.“',
+    objectives:[{type:'kill',target:'death_captain',count:1,text:'Einen Hauptmann der Toten erschlagen'}, {type:'item',target:'grave_seal',count:1,text:'Ein Grabsiegel bringen'}], reward:{xp:450,item:'grabsteinkragen',take:'grave_seal'}, turnin:'ysra' },
+  c_war1: { name:'Die Krone, die wächst', giver:'vhal', classQ:['warlock', 1, 2], desc:'„Die Kultisten der Asche beten zum Falschen. Nimm vier von ihnen den Atem, und bring mir zwei Seelen. Dann setze ich dir auf, was dir zusteht.“',
+    objectives:[{type:'kill',target:'cultist',count:4,text:'Kultisten der Asche töten'}, {type:'item',target:'soul_vial',count:2,text:'Zwei Seelenphiolen bringen'}], reward:{xp:220,item:'hoernerkrone',take:'soul_vial',takeCount:2}, turnin:'vhal' },
+  c_war2: { name:'Fäden aus dem Flüstern', giver:'vhal', classQ:['warlock', 2, 2], desc:'„Geister sind Fäden, die niemand aufgewickelt hat. Zerreiß fünf. Aus dem, was bleibt, webe ich deine Robe.“',
+    objectives:[{type:'kill',target:'wraith',count:5,text:'Geister zerreißen'}], reward:{xp:320,item:'robe_fluesternder'}, turnin:'vhal' },
+  c_war3: { name:'Was der Obelisk nicht wollte', giver:'vhal', classQ:['warlock', 3, 3], desc:'„Ein Aschdämon trägt Schatten, die selbst der Obelisk ausspuckte. Hol sie dir.“',
+    objectives:[{type:'kill',target:'ash_demon',count:1,text:'Einen Aschdämon vernichten'}], reward:{xp:450,item:'schattenmantel'}, turnin:'vhal' },
+  c_dru1: { name:'Das Fell des Leitwolfs', giver:'mira', classQ:['druid', 1, 2], desc:'„Das Rudel ist zu groß geworden, der Wald zu klein. Nimm fünf, bring mir ihre Felle. Der alte Leitwolf hat mir seines schon gegeben — es gehört jetzt dir.“',
+    objectives:[{type:'kill',target:'wolf',count:5,text:'Wölfe erlegen'}, {type:'item',target:'pelt',count:5,text:'Fünf Felle bringen'}], reward:{xp:220,item:'hainfell',take:'pelt',takeCount:5}, turnin:'mira' },
+  c_dru2: { name:'Der lange Winter', giver:'mira', classQ:['druid', 2, 2], desc:'„Zwei Bären plündern die Vorräte der Tiere. Treib sie aus dem Hain — für immer. Und bring Heilkraut für die Quelle.“',
+    objectives:[{type:'kill',target:'bear',count:2,text:'Zwei Bären erlegen'}, {type:'item',target:'herb',count:4,text:'Vier Heilkraut bringen'}], reward:{xp:320,item:'fellmantel_hain',take:'herb',takeCount:4}, turnin:'mira' },
+  c_dru3: { name:'Der Weiße Hirsch', giver:'mira', classQ:['druid', 3, 3], desc:'„Knochenhunde jagen den Weißen Hirsch. Vertreib drei, und er wird dir sein Geweih lassen. Er wirft es ab, er gibt es nicht her.“',
+    objectives:[{type:'kill',target:'bone_hound',count:3,text:'Knochenhunde vertreiben'}], reward:{xp:450,item:'geweih_hirsch'}, turnin:'mira' },
+  c_mon1: { name:'Neun Knoten', giver:'ilva', classQ:['monk', 1, 2], desc:'„Weich zwanzigmal aus, wenn es knapp ist. Jedes Mal, wenn du es schaffst, knüpfst du einen Knoten in dein Band.“',
+    objectives:[{type:'dodge',target:'any',count:20,text:'Im letzten Moment ausweichen'}], reward:{xp:220,item:'gebetsband'}, turnin:'ilva' },
+  c_mon2: { name:'Die Robe der Generationen', giver:'ilva', classQ:['monk', 2, 2], desc:'„Sechs Räuber lauern an der Straße nach Sonnwacht. Nimm ihnen den Mut, nicht das Leben, wenn du kannst — und weich ihnen aus, fünfzehnmal.“',
+    objectives:[{type:'kill',target:'bandit',count:6,text:'Räuber an der Straße besiegen'}, {type:'dodge',target:'any',count:15,text:'Im letzten Moment ausweichen'}], reward:{xp:320,item:'robe_stille_hand'}, turnin:'ilva' },
+  c_mon3: { name:'Ilvas Wickel', giver:'ilva', classQ:['monk', 3, 3], desc:'„Ein Hauptmann der Toten führt sie in die Dörfer. Steh ihm gegenüber. Dreißigmal soll seine Klinge ins Leere gehen, dann bring ihn zur Ruhe.“',
+    objectives:[{type:'dodge',target:'any',count:30,text:'Im letzten Moment ausweichen'}, {type:'kill',target:'death_captain',count:1,text:'Den Hauptmann der Toten zur Ruhe bringen'}], reward:{xp:450,item:'wickel_stille_hand'}, turnin:'ilva' },
+  // S15 Dodon und Morrgrund: drei Aufträge, dann der gemeinsame Sturm auf die Eisenfeste (game.js goblinStorm)
+  g_dod1: { name:'Brot für Morrgrund', giver:'dodon', dod:1, desc:'„Die Kleinen hungern. Die Kette nimmt die Felder, die Wölfe nehmen den Rest. Bring Brot. Und die Kettenmänner, die unser Moor riechen — mach, dass sie nichts mehr riechen.“',
+    objectives:[{type:'item',target:'bread',count:6,text:'Sechs Brote bringen'}, {type:'kill',target:'chain_brute',count:3,text:'Kettenknechte erschlagen'}], reward:{xp:220,rep:{goblin:15},take:'bread',takeCount:6}, turnin:'dodon' },
+  g_dod2: { name:'Eisen für die Grubenstämme', giver:'dodon', dod:2, desc:'„Wir haben Steine und Zähne. Die Kette hat Eisen. Bring Eisen, damit unsere Schmiede Klingen macht — und bring zwei Rotgardisten zum Schweigen. Die Kleinen sollen sehen, dass sie bluten.“',
+    objectives:[{type:'item',target:'iron',count:8,text:'Acht Eisen bringen'}, {type:'kill',target:'rotgardist',count:2,text:'Rotgardisten besiegen'}], reward:{xp:320,rep:{goblin:20},take:'iron',takeCount:8,item:'talisman_krieger'}, turnin:'dodon' },
+  g_dod3: { name:'Der letzte Sturm', giver:'dodon', dod:3, desc:'„Der Rat sagt: Sturm ist Tod. Ich sage: Kette ist Tod, nur langsamer. Zeig dem Rat, dass die Kette fällt. Vier Kettenschützen am Kettentor — dann glauben sie dir. Dann glauben sie mir.“',
+    objectives:[{type:'kill',target:'kettenschuetze',count:4,text:'Kettenschützen am Kettentor besiegen'}], reward:{xp:400,rep:{goblin:25}}, turnin:'dodon' },
   q_monk: { name:'Die Probe der Stillen Hand', giver:'ilva', desc:'Der Orden hat Ritter genug, die Hiebe einstecken. Die Stille Hand steckt keine ein. Weich zehnmal im letzten Moment aus — so knapp, dass der Hieb dich hätte treffen müssen. Und bring vier Tote zur Ruhe, die nicht ruhen. Dann reden wir über das Gelübde.',
     objectives:[{type:'dodge',target:'any',count:10,text:'Im letzten Moment ausweichen'}, {type:'kill',target:'skeleton',count:4,text:'Tote zur Ruhe bringen'}],
     reward:{xp:180}, turnin:'ilva', pact:true },
@@ -737,6 +968,74 @@ export const QUESTS = {
     reward:{gold:120,rep:{bandit:25,valen:-20},xp:90}, turnin:'rook' },
 };
 
+// S15 Wissen im Gespräch (Nutzer: „je nachdem, was man weiß, soll man NPCs fragen können“). Ein Thema ist bekannt, wenn es zum
+// Grundwissen gehört (start), in der eigenen Chronik vorkommt (chron, regulärer Ausdruck) oder ein NPC davon erzählt hat (teach).
+// Antworten je Stimme: n:<Schlüssel>, x:sea (Seevolk), f:<Fraktion>, p:<Beruf|Beruf>, sonst default. Ohne passende Stimme keine Frage.
+export const LORE = {
+  garmadon: { name:'Garmadon', ask:'Was weißt du über Garmadon?', start:true, chron:'Garmadon',
+    lines:{ 'f:undead':'„Der König. Er hat uns zurückgeholt, als die Lebenden uns vergaßen. Wer ihn sehen will, geht nach Vharnholm — und kniet.“',
+      'f:order':'„Ein Toter, der König spielt. Der Orden hat ihn schon einmal begraben. Und die Stille Hand in Sonnwacht übt jeden Tag dafür, dass wir es wieder tun.“',
+      'f:chain':'„Der Bruder des Meisters. Der Meister spricht den Namen nicht aus. Du solltest es auch nicht.“',
+      'f:valen':'„Seine Heere stehen an der Grenze. Jede Woche stehen weniger Dörfer auf unseren Karten.“',
+      default:'„Der König der Toten. Man sagt, er redet, bevor er tötet. Ich will nicht herausfinden, ob es stimmt.“' },
+    teach:{ 'f:undead':'vharnholm', 'f:order':'stille_hand', 'f:chain':'varg' } },
+  varg: { name:'Varg', ask:'Wer ist Varg?', start:true, chron:'Varg|Kette fällt|Eiserne Kette',
+    lines:{ 'f:chain':'„Der Meister. Er hat Ordnung in die Berge gebracht. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.“',
+      'f:goblin':'„Varg hat uns die Ketten angelegt. Eines Tages legen wir sie ihm an.“',
+      'f:undead':'„Er hat seinen Bruder erschlagen. Unser König vergisst das nicht. Niemals.“',
+      default:'„Der Herr der Eisernen Kette. Im Westen, hinter dem Kettentor. Sie sagen, er habe seinen eigenen Bruder getötet — und der sei nicht liegen geblieben.“' },
+    teach:{ 'f:undead':'garmadon', default:'goblins' } },
+  aurelion: { name:'Aurelion', ask:'Was ist mit dem Hochreich?', start:true, chron:'Aurel|Hoher Rat|Himmelsinsel',
+    lines:{ 'f:aurel':'„Das Hochreich. Du brauchst einen Aufenthaltsschein vom Passamt, Fremder. Sonst holen dich die Automaten.“',
+      'p:Händler|Kaufmann|Kaufherr|Handelsherrin':'„Reich. Und sie zahlen jeden Preis für Nahrung. Wer Weizen nach Süden bringt, findet dort Freunde.“',
+      default:'„Im Süden. Alles glänzt, alles tickt. Ohne Schein kommst du nicht weit — und mit Schein nicht billig.“' },
+    teach:{ default:'magitech' } },
+  magitech: { name:'Magitech', ask:'Was ist Magitech?', chron:'Magitech|Tickmar|Automat',
+    lines:{ 'f:aurel':'„Kristall und Uhrwerk. Unsere Väter haben es gebaut. Wir halten es nur noch am Laufen.“',
+      'p:Feinmechaniker|Kybernetiker|Prothesenhändlerin|Prothesenmacherin':'„Gelenkhall baut Glieder, die besser greifen als deine. Wenn du eins verlierst — frag dort.“',
+      default:'„Aurelions Zauberwerk. Wenn eine Fabrik in Tickmar hustet, wird überall alles teurer.“' } },
+  rotfall: { name:'Der Rotfall', ask:'Was hat es mit dem Rotfall auf sich?', chron:'Rotfall|Omega|Bruchstück',
+    lines:{ 'f:chain':'„Der Stern fiel, und Omega öffnete das Auge. Die Ungläubigen nennen es ein Unglück. Wir nennen es Gnade.“',
+      'p:Gelehrter|Gelehrte|Totenschreiber|Schreiber':'„Zwölf Bruchstücke, so steht es in der Bibliothek von Aurelheim. Wer neun findet, kann das Ritual versuchen. Wer es versucht, sollte vorher sein Testament machen.“',
+      default:'„Das rote Band am Himmel? Ein Stern fiel, vor langer Zeit. Im Krater liegt etwas, das zurückschaut.“' } },
+  goblins: { name:'Die Grubenstämme', ask:'Was weißt du über die Goblins?', chron:'Goblin|Grubenst|Grisk',
+    lines:{ 'f:chain':'„Arbeiter. Sie graben, wir führen. So ist die Ordnung.“',
+      'f:goblin':'„Wir waren Händler und Sänger, bevor die Kette kam. Wenn du uns helfen willst, frag nach Grisk.“',
+      default:'„Die Grubenstämme im Westen. Die Kette hält sie in Ketten. Manche sagen, sie seien Tiere. Ich habe einen singen hören.“' },
+    teach:{ default:'morrgrund', 'f:goblin':'morrgrund' } },
+  seevolk: { name:'Das Seevolk', ask:'Erzähl mir vom Seevolk.', chron:'Seevolk|Tangkron|Salzbund|Sturmklinge|Gischt',
+    lines:{ 'x:sea':'„Der Salzbund handelt, die Sturmklinge plündert. Beide nennen sich Seevolk. Beide lügen, wenn sie das sagen.“',
+      default:'„Von den Gischtinseln? In Salzhafen und Kupferhafen legen ihre Schiffe an. Für sechzig Gold nehmen sie dich mit — meistens lebend.“' },
+    teach:{ 'x:sea':'weissbart', default:'weissbart' } },
+  weissbart: { name:'Weißbart', ask:'Wer ist Weißbart?', chron:'Weißbart',
+    lines:{ 'x:sea':'„Der König der Sturmklinge. Er redet zuerst. Wer ihn trotzdem angreift, lernt seinen Anker kennen.“',
+      default:'„Ein Pirat mit weißem Bart und einem Anker an der Kette. Mehr will ich nicht wissen.“' } },
+  nekropole: { name:'Die Große Nekropole', ask:'Was ist die Große Nekropole?', chron:'Nekropole',
+    lines:{ 'f:undead':'„Die Stadt der Ahnen. Wer zur Schar gehört, dem öffnet der Wächter. Die anderen müssen an ihm vorbei.“',
+      'f:order':'„Ein Grab, so groß wie eine Stadt, im Osten. Grabräuber gehen hinein. Wenige kommen heraus.“',
+      default:'„Die Große Nekropole im Osten. Da ruhen die Ahnen der Toten. Ein Wächter lässt keinen durch, heißt es.“' },
+    teach:{ 'f:undead':'pakt' } },
+  vharnholm: { name:'Vharnholm', ask:'Was ist Vharnholm?', chron:'Vharnholm',
+    lines:{ 'f:undead':'„Unsere Stadt. Stiller als eure. Und sauberer.“',
+      default:'„Die Hauptstadt der Toten. Dort sitzt Garmadon. Kein Lebender geht freiwillig hin.“' },
+    teach:{ 'f:undead':'nekropole' } },
+  pakt: { name:'Der Pakt der Stillen Schar', ask:'Kann ein Lebender einen Pakt mit den Toten schließen?', chron:'Pakt|Stille Schar|Nekromant|Hexenmeister',
+    lines:{ 'f:undead':'„Die Stille Schar nimmt Lebende auf, wenn sie etwas mitbringen. Morvath auf dem Alten Friedhof prüft zuerst. Danach Ysra in Alt-Vharn — oder Vhal am Turm, wenn du Flüche willst statt Diener.“',
+      'f:order':'„Ein Pakt mit den Toten? Wer das tut, ist für den Orden gestorben. Denk nicht einmal daran.“',
+      default:'„Manche Lebende gehen zu den Toten und kommen anders zurück. Mit grünem Licht in den Augen. Auf dem Alten Friedhof soll einer sitzen, der sie aussucht.“' } },
+  hain: { name:'Der Alte Hain', ask:'Was weißt du über den Alten Hain?', start:true, chron:'Hain|Mira|Druide',
+    lines:{ 'p:Jägerbursche|Holzfäller|Bauer|Magd|Jäger':'„Im Westwald gibt es einen Hain, in dem die Wölfe nicht beißen. Eine Alte wohnt dort, Mira. Sie redet mit ihnen — und manchmal bittet sie Fremde um Hilfe.“',
+      'f:order':'„Heiden, aber anständige. Der Orden lässt den Hain in Ruhe.“',
+      default:'„Der Alte Hain? Tief im Westwald. Geh nicht hin, wenn du den Wald nicht respektierst.“' } },
+  morrgrund: { name:'Morrgrund', ask:'Gibt es noch freie Goblins?', chron:'Morrgrund|Dodon',
+    lines:{ 'f:goblin':'„Morrgrund. Im Moor, weit im Süden, unter Hohlstein. Dodon beschützt es. Wenn du hingehst, geh langsam — und mit leeren Händen.“',
+      'f:chain':'„Ein paar Ratten im Südmoor, heißt es. Der Meister lässt sie. Noch.“',
+      default:'„Man sagt, weit im Süden, im Moor unter Hohlstein, leben Goblins, die nie eine Kette getragen haben. Und etwas Großes wacht über sie.“' } },
+  stille_hand: { name:'Die Stille Hand', ask:'Wer ist die Stille Hand?', chron:'Stille Hand|Ilva|Mönch',
+    lines:{ 'f:order':'„Meisterin Ilva in Sonnwacht bildet sie aus. Kämpfer ohne Rüstung. Sie weichen aus, bis du müde bist — und dann liegst du.“',
+      'f:bandit':'„Die Mönche aus Sonnwacht? Rook hat einen Preis auf jeden ausgesetzt, der ihr Gelübde spricht.“',
+      default:'„Die Mönche aus Sonnwacht? Man trifft sie nicht, sagt man. Man verfehlt sie.“' } },
+};
 export const MEMORY_TEXT = {
   joined_chain:'hat sich der Eisernen Kette angeschlossen', chain_rite:'hat vor Varg gekniet',
   saved_life:'hat mir das Leben gerettet', gave_weapon:'hat mir meine erste Waffe gegeben',

@@ -1,11 +1,12 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp } from './state.js?v=14';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=14';
-import * as HB from './buildings.js?v=14';
-import { ITEMS, MONSTERS } from './data.js?v=14';
-import { buildOf } from './body.js?v=14';
-import * as SP from './sprites.js?v=14';
-import { trailPt, WAGON_GAP } from './sim.js?v=14';
+import { S, clamp, seasonOf } from './state.js?v=15';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=15';
+import * as HB from './buildings.js?v=15';
+import { ITEMS, MONSTERS } from './data.js?v=15';
+import { buildOf, crawling } from './body.js?v=15';
+import * as SP from './sprites.js?v=15';
+import { trailPt, WAGON_GAP } from './sim.js?v=15';
+import { ICON_R } from './iconsR.js?v=15';
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -106,6 +107,7 @@ export function drawFrame(now) {
   }
 
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
+  drawFires(now);     // S14: Brand in der Stadt
   ctx.restore();
   drawLight(now);
   drawWeather(now);
@@ -656,6 +658,15 @@ function drawRider(e, now) {
   if (e.mounted.kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
   ctx.save(); ctx.translate(0, -14); drawHumanoid(e, now); ctx.restore();
 }
+// S15 Druide, Grad III: der Spieler als großer Hainwolf. Fell der Wölfe, dunkler und mit dem Grün des Hains an den Augen.
+const WOLF_FORM_PAL = { body: '#4a4638', dark: '#2a2a20', eye: '#b7d86a' };
+function drawWolfForm(e, now) {
+  const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * 1.35, pose = sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
+  const fr = moving ? ((now / 70) | 0) & 3 : 1, f = SP.beastFrame('wolf', { ...(MONSTERS.wolf.pal || {}), ...WOLF_FORM_PAL }, Math.cos(e.aim ?? 0) < 0 ? 'W' : 'E', pose, fr);
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y);
+  shadow(e.x, e.y + 3, (e.r + 4) / K, .35); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore();
+  if (((now / 180) | 0) % 3 === 0) { ctx.fillStyle = 'rgba(183,216,106,0.5)'; ctx.fillRect(Math.round(e.x + Math.sin(now / 300) * 10), Math.round(e.y - 16 - (now / 30) % 12), 2, 2); }
+}
 function drawEntity(e, now) {
   switch (e.kind) {
     case 'prop': return drawPropPixel(e, now);
@@ -665,7 +676,7 @@ function drawEntity(e, now) {
     case 'grave': return drawGrave(e);
     case 'enemy': return drawCreature(e, now);
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
-    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); return drawHumanoid(e, now);   // Kamerafahrt: unsichtbar
+    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'house': return drawHouse(e.b, now);
@@ -720,6 +731,11 @@ function drawCaravan(e, now) {
   if (e.hp < e.maxHp) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, e.hp / e.maxHp), 4); }
 }
 function drawDraft(x, y, f, now, moving, big, ph) {       // Ochse (big) oder Maultier, Seitenansicht
+  if (SP.drawnOn()) {                                        // S14 Stil R: gezeichnete Zugtiere (Ochse, Maultier) mit Laufbild
+    const fr = moving ? ((now / 150 + ph * 2) | 0) & 3 : 0, B = SP.beastFrame(big ? 'ox' : 'mule', big ? { body: '#6a5236', dark: '#3a2c1e' } : { body: '#6b6056', dark: '#3e3630' }, f > 0 ? 'E' : 'W', '', fr);
+    const k = SP.FIGK / WAGON_K * (big ? 1.3 : 1.1); ctx.save(); ctx.translate(x, y); ctx.scale(k, k); SP.blit(ctx, B, 0, 0); ctx.restore();
+    ctx.fillStyle = '#2b2116'; ctx.fillRect(x + f * (big ? 9 : 7) - 1, y - (big ? 20 : 17), 2.5, 9); return;   // Joch/Kummet
+  }
   const sw = moving ? Math.sin(now / 150 + ph) * 3 : 0, L = big ? 7 : 6, bw = big ? 11 : 8, bh = big ? 6.5 : 5;
   ctx.fillStyle = big ? '#3b2d1f' : '#4a4038';
   for (const [dx, s] of [[-bw + 3, sw], [-bw + 6, -sw], [bw - 5, -sw], [bw - 2, sw]]) ctx.fillRect(x + f * dx + s - 1, y - L, 2.4, L);   // Beine
@@ -1572,10 +1588,19 @@ function drawHumanoidAt(e, now, override) {
   const spec = e.spec || SP.humanSpec(e);
   c.fillStyle = `rgba(0,0,0,${e.downed ? .2 : .38})`;
   c.beginPath(); c.ellipse(x, y + 5, 10, 4, 0, 0, 7); c.fill();
+  if (e.casting && !e.downed) {                                          // S15 P4: Rune in der Schulfarbe, solange der Zauber sammelt
+    const r0 = 14, a0 = now / 450; c.globalAlpha = 0.75; c.strokeStyle = c.fillStyle = e.casting.col || '#b88af0'; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(x, y + 5, r0, r0 * 0.45, 0, 0, 7); c.stroke();
+    for (let q = 0; q < 6; q++) { const a = a0 + q * 1.047; c.fillRect(Math.round(x + Math.cos(a) * r0 - 1), Math.round(y + 5 + Math.sin(a) * r0 * 0.45), 2, 1); }
+    c.globalAlpha = 1; }
   if (e.downed) {                                                   // am Boden: liegende Figur, leicht atmend
     const f = SP.humanFrame(spec, 'W', 'down'), br = ((now / 700) | 0) & 1;
     SP.blit(c, f, x, y + 6 - br);
     return;
+  }
+  if (crawling(e)) {                                               // S14: beide Beine ausgefallen — kriecht bäuchlings, zieht sich mit den Armen vor
+    const f = SP.humanFrame(spec, 'W', 'down'), k = (e.vx || e.vy) ? ((now / 260) | 0) & 1 : 0, fl = (e.vx ?? 0) > 0 || (e.aim != null && Math.cos(e.aim) > 0);
+    c.save(); c.translate(x, y + 6 - k); if (fl) c.scale(-1, 1); SP.blit(c, f, 0, 0); c.restore(); return;
   }
   const tool = e.act && e.act.tool && now >= e.act.at && now < e.act.until ? { key: e.act.tool } : null;   // S13: bei der Arbeit das Werkzeug statt der Waffe
   const w = tool || (e.equip && e.equip.weapon), wit = w ? ITEMS[w.key] || {} : null;
@@ -1632,11 +1657,13 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
     const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 ? 'swing' : 'rest', vv = swingVar(e, sw);
-    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? Math.round(sw * 10) / 10 : 0, v: mode === 'swing' ? vv.v : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low };
+    const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
+    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? Math.round(sw * 10) / 10 : 0, v: mode === 'swing' ? vv.v : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low, pull };
   }
   let pose = pz.pose;
   if (/^a[123]$/.test(pose) || (pose === 'cast' && W && W.mode === 'aim')) pose = moving && W && W.mode !== 'work' ? walkP : 'i0';
-  if (e.kb && e.kb.t > 0) pose = 'kb';
+  if (e.kb && e.kb.t > 0 && !e.cover) pose = 'kb';
+  else if (e.stagger > 300 && pose === 'hit') pose = ((now / 140) | 0) & 1 ? 'kb' : 'hit';   // S14: langes Taumeln wankt vor und zurück
   if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
   const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
   const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
@@ -1655,13 +1682,23 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 58, 4, 0, 7); c.stroke(); }
 }
 function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
-  const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
+  const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
   if (W.mode === 'swing' && !RANGED_W.has(wt)) {                  // Klingenspur: frühere Winkel derselben Kurve um die Hand
     const col = Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210', sw = e.swing || W.q;
     for (let k = 1; k <= 6; k++) { const past = sw - k * 0.03; if (past <= 0) break; const pa = SP.weaponAngle({ ...W, q: past }, dir), t = 1 - k / 7;
       const bx = hx + Math.cos(pa) * len * 0.9, by = hy + Math.sin(pa) * len * 0.9, s2 = Math.round(2 * t + 1);
       c.fillStyle = `rgba(${col},${0.6 * t})`; c.fillRect(Math.round(bx - s2), Math.round(by - s2), s2 * 2, s2 * 2); }
   }
+  if (wt === 'bow' && W.mode === 'aim') {                         // S15: Sehne und Pfeil — die Sehne läuft von beiden Bogenenden zur Zughand
+    const ax = Math.cos(dir), ay = Math.sin(dir), pl = W.pull || 0, st = Wsp.str || [4, 2, Wsp.cv.height - 2];
+    const ca = Math.cos(a), sa = Math.sin(a), on = (sx0, sy0) => { const lx = (sx0 - Wsp.gx) * WP, ly = (sy0 - Wsp.gy) * WP; return [hx + lx * ca - ly * sa, hy + lx * sa + ly * ca]; };   // Bildpunkt des Bogens → Welt
+    const [t1x, t1y] = on(st[0], st[1]), [t2x, t2y] = on(st[0], st[2]);   // Bogenspitzen, dort hängt die Sehne
+    const mx = (t1x + t2x) / 2, my = (t1y + t2y) / 2, sx = mx - ax * pl * 13, sy = my - ay * pl * 13;   // Nockpunkt: Sehnenmitte, beim Spannen zur Brust
+    c.strokeStyle = 'rgba(232,224,200,0.9)'; c.lineWidth = 1; c.beginPath(); c.moveTo(Math.round(t1x), Math.round(t1y)); c.lineTo(Math.round(sx), Math.round(sy)); c.lineTo(Math.round(t2x), Math.round(t2y)); c.stroke();
+    const fresh = e.lastShot && now - e.lastShot < 180;              // eben losgelassen: kein Pfeil, die Sehne zittert
+    if (!fresh) { const tx = hx + ax * 6, ty = hy + ay * 6;
+      c.strokeStyle = '#b8a47e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(Math.round(sx), Math.round(sy)); c.lineTo(Math.round(tx), Math.round(ty)); c.stroke();
+      c.fillStyle = '#d8d0c0'; c.fillRect(Math.round(tx - 1), Math.round(ty - 1), 2, 2); c.fillStyle = '#8a2a20'; c.fillRect(Math.round(sx - 1), Math.round(sy - 1), 2, 2); } }
   c.save(); c.translate(Math.round(hx), Math.round(hy)); c.rotate(a);
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);
   c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
@@ -1777,7 +1814,7 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
 const monsterSpecs = new WeakMap();
-function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e)) { s = SP.monsterSpec(e, m); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben
+function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || s.ms !== SP.msOf(e)) { s = SP.monsterSpec(e, m); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben
 function sideDir(e) {
   if (e.swing > 0 && e.aim != null) return Math.cos(e.aim) < 0 ? 'W' : 'E';
   if (e.facing === 2) e._side = 'W'; else if (e.facing === 3) e._side = 'E';
@@ -1973,7 +2010,11 @@ function drawCorpse(e, now) {
   } else {
     const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m.scale || 1);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.scale(sc, sc);
-    if (age < 320) SP.blit(ctx, SP.humanFrame(spec, 'S', age < 130 ? 'hit' : 'kneel'), 0, 0);
+    // S14 Todesablauf (Nutzer: mehr Kampfanimationen): Treffer, in die Knie, zur Seite kippen, liegen
+    const kn = SP.drawnOn() ? 'die1' : 'kneel';
+    if (age < 120) SP.blit(ctx, SP.humanFrame(spec, 'S', 'hit'), 0, 0);
+    else if (age < 300) SP.blit(ctx, SP.humanFrame(spec, 'W', kn), 0, 0);
+    else if (age < 440) { ctx.rotate((age - 300) / 140 * Math.PI / 2); SP.blit(ctx, SP.humanFrame(spec, 'W', kn), 0, 0); }
     else SP.blit(ctx, SP.humanFrame(spec, 'W', 'dead'), 0, 0);
     ctx.restore();
   }
@@ -2063,6 +2104,12 @@ function drawBuildingVec(e, now) {
     } else if (e.type === 'farm') {
       ctx.fillStyle = '#4b3f26'; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = '#5f7a3a'; for (let j = 0; j < b.h * 2; j++) for (let i = 0; i < b.w * 2; i++) ctx.fillRect(x + 6 + i * 14, y + 6 + j * 14, 5, 5);
+    } else if (e.type === 'pasture') {                             // S14: Weide mit Zaun und Unterstand in der Ecke
+      ctx.fillStyle = '#4e6a32'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#5c7a3a'; for (let i = 0; i < 14; i++) ctx.fillRect(x + 4 + (i * 37) % (w - 8), y + 6 + (i * 23) % (h - 10), 3, 2);
+      ctx.fillStyle = '#5b452a'; ctx.fillRect(x, y, w, 2); ctx.fillRect(x, y + h - 2, w, 2); ctx.fillRect(x, y, 2, h); ctx.fillRect(x + w - 2, y, 2, h);
+      ctx.fillStyle = '#43331f'; for (let i = 0; i <= 4; i++) { ctx.fillRect(x + i * (w - 3) / 4, y - 3, 3, 6); ctx.fillRect(x + i * (w - 3) / 4, y + h - 4, 3, 6); }
+      ctx.fillStyle = '#3e3020'; ctx.fillRect(x + w - 30, y + 4, 26, 18); ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.moveTo(x + w - 33, y + 8); ctx.lineTo(x + w - 17, y - 4); ctx.lineTo(x + w - 1, y + 8); ctx.fill();
+      ctx.fillStyle = '#c8b070'; ctx.fillRect(x + w - 26, y + 14, 8, 6);   // Heu im Unterstand
     } else if (e.type === 'well') { drawProp({ ...e, type:'well' }, now); }
     else if (e.type === 'workbench' || e.type === 'storage') {
       ctx.fillStyle = '#4b3a25'; ctx.fillRect(x, y + 6, w, h - 8);
@@ -2251,8 +2298,26 @@ function drawSkyLife(now) {
       ctx.beginPath(); ctx.moveTo(x - 5, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 5, y - f); ctx.stroke(); }
   }
 }
+// S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
+function drawFires(now) {
+  for (const F of S.fires || []) {
+    const b = HOUSES.find(h => h.id === F.house); if (!b || b.map !== S.map) continue;
+    const k = Math.min(1, F.heat / 100), x0 = b.x * TS, w = b.w * TS, top = b.y * TS - 6, n = 3 + Math.round(k * 6);
+    ctx.fillStyle = `rgba(255,120,40,${0.10 + k * 0.14})`; ctx.fillRect(x0 - 10, top - 10, w + 20, b.h * TS + 20);   // Glutschein
+    for (let i = 0; i < n; i++) {                                    // Flammenzungen: drei Farbringe, flackernd
+      const fx0 = x0 + 8 + ((i * 37 + b.seed) % Math.max(10, w - 16)), fl = 14 + k * 30 + Math.sin(now / 90 + i * 1.7) * 6, fw = 8 + k * 6;
+      for (const [c, s] of [['#b8401c', 1], ['#e07828', 0.7], ['#f6c868', 0.38]]) { ctx.fillStyle = c; const hh = fl * s, ww = fw * s;
+        ctx.beginPath(); ctx.moveTo(fx0 - ww, top + 8); ctx.lineTo(fx0 + Math.sin(now / 120 + i) * 3, top + 8 - hh); ctx.lineTo(fx0 + ww, top + 8); ctx.fill(); }
+    }
+    for (let i = 0; i < 6; i++) {                                    // Rauchsäule, treibt nach Osten
+      const t = ((now / 2400 + i / 6) % 1), sx = x0 + w / 2 + t * 40 + Math.sin(now / 700 + i) * 6, sy = top - 10 - t * (90 + k * 80), r = 8 + t * 18;
+      ctx.fillStyle = `rgba(40,36,34,${(1 - t) * (0.25 + k * 0.35)})`; ctx.fillRect(sx - r, sy - r * 0.7, r * 2, r * 1.4);
+    }
+  }
+}
 function drawWeather(now) {
   if (DUNGEONS[S.map]) return;
+  if (seasonOf() === 3 && S.weather !== 'snow') { ctx.fillStyle = 'rgba(205,215,235,.07)'; ctx.fillRect(0, 0, W, H); }   // S14: Winter — kaltes Licht
   if (S.weather === 'rain') {
     ctx.strokeStyle = 'rgba(170,190,210,.25)'; ctx.lineWidth = 1;
     ctx.beginPath();
@@ -2352,13 +2417,21 @@ const iconCache = new Map();
 const MANNEQUIN = { kind: 'player', pal: { skin: '#b89878', hair: '#2b2118', cloth: '#3a3026' }, seed: 1 };   // seed 1: kein Zufallsumhang
 function iconR(c, it, key, w, h) {
   let src = null;
-  if (it.slot === 'weapon') { const W = SP.weaponSprite(key, it.rarity, it.holy, it.wtype), L = Math.hypot(W.cv.width, W.cv.height), n = Math.ceil(L * 0.72) + 2;
+  const IR = ICON_R[key];
+  if (IR) { const [pal, rows] = IR; src = document.createElement('canvas'); src.width = src.height = 16; const t = src.getContext('2d');   // gezeichnetes 16×16-Symbol
+    rows.forEach((r, y) => { for (let x = 0; x < 16; x++) { const ch = r[x] || '.'; if (ch === '.') continue; t.fillStyle = ch === 'o' ? '#1c1512' : pal[ch] || '#ff00ff'; t.fillRect(x, y, 1, 1); } }); }
+  else if (it.slot === 'weapon') { const W = SP.weaponSprite(key, it.rarity, it.holy, it.wtype), L = Math.hypot(W.cv.width, W.cv.height), n = Math.ceil(L * 0.72) + 2;
     src = document.createElement('canvas'); src.width = src.height = n; const t = src.getContext('2d'); t.imageSmoothingEnabled = false;
     t.translate(n / 2, n / 2); t.rotate(it.wtype === 'bow' ? -0.35 : -Math.PI / 4); t.drawImage(W.cv, -W.cv.width / 2, -W.cv.height / 2); }
   else if (['chest', 'head', 'offhand', 'cloak'].includes(it.slot)) {
     const f = SP.humanFrameR(SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }), it.slot === 'offhand' ? 'W' : 'S', it.slot === 'offhand' ? 'guard' : 'i0');
-    const [x0, y0, x1, y1] = it.slot === 'head' ? [9, 0, 23, 15] : it.slot === 'offhand' ? [5, 12, 19, 30] : it.slot === 'cloak' ? [5, 3, 27, 46] : [6, 11, 26, 38];
-    src = document.createElement('canvas'); src.width = x1 - x0; src.height = y1 - y0; src.getContext('2d').drawImage(f, -x0, -y0); }
+    const [y0, y1] = it.slot === 'head' ? [0, 12] : it.slot === 'offhand' ? [12, 30] : it.slot === 'cloak' ? [3, 46] : [11, 38];
+    const band = document.createElement('canvas'); band.width = f.width; band.height = y1 - y0; const bc = band.getContext('2d', { willReadFrequently: true }); bc.drawImage(f, 0, -y0);
+    const d = bc.getImageData(0, 0, band.width, band.height).data; let x0 = band.width, x1 = 0;   // S14: Zuschnitt nach Inhalt (Rahmen 40, breite Rüstung)
+    for (let i = 3; i < d.length; i += 4) if (d[i]) { const x = (i >> 2) % band.width; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    if (x1 < x0) return false;
+    if (it.slot === 'offhand') { const dx = (f.width - 32) / 2; x0 = 5 + dx; x1 = 19 + dx; }   // Schild: nur die Nebenhand, nicht der Körper
+    src = document.createElement('canvas'); src.width = x1 - x0 + 1; src.height = band.height; src.getContext('2d').drawImage(band, -x0, 0); }
   if (!src) return false;
   const k0 = Math.min((w - 2) / src.width, (h - 2) / src.height), k = k0 >= 2 ? Math.floor(k0) : k0, dw = Math.round(src.width * k), dh = Math.round(src.height * k);   // ab 2× ganzzahlig
   c.imageSmoothingEnabled = false; c.drawImage(src, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh); return true;
@@ -2536,21 +2609,22 @@ export function drawTitleScene(canvas, t) {
     const pp = (t / 26 + i * 97) % 90, px = fx + Math.sin(t / 400 + i) * (2 + pp / 10), py = fy - 6 - pp;
     if (pp < 80) P(pp < 40 ? '#f0b060' : '#b8602a', px, py);
   }
-  // Rastende am Feuer: dieselben Pixel-Sprites wie im Spiel, hier 1:1 im Szenenraster
-  o.filter = 'brightness(0.62) sepia(0.25)';
-  const B = SP.humanFrame(TITLE_B, 'W', 'i0'), sb = (B.px || 2) / 2;   // Szenenraster = alter Sprite-Pixel; feine Frames halb so groß
-  o.drawImage(B, fx + 12, fy + 4 - B.oy * sb, B.width * sb, B.height * sb);
-  if (TITLE_HERO) {                                                    // Phase 1: der eigene Charakter, 3/4 von vorn, mit Ausrüstung und Waffe wie im Spiel
-    o.save(); o.translate(fx - 22, fy + 4); o.scale(0.5, 0.5);
-    try { drawHumanoid({ ...TITLE_HERO, x: 0, y: 0, facing: 0, aim: Math.PI / 2 - 0.35, swing: 0, downed: false, act: null, vx: 0, vy: 0 }, t, o); } finally { o.restore(); }
-  } else { const A = SP.humanFrame(TITLE_A, 'S', t % 1300 < 650 ? 'i0' : 'i1'), sa = (A.px || 2) / 2; o.drawImage(A, fx - 22 - A.width * sa / 2, fy + 4 - A.oy * sa, A.width * sa, A.height * sa); }
-  o.filter = 'none';
   for (let x = 0; x < lw; x += 2) {                         // Gras vorn, wiegt im Wind
     const sw = Math.round(Math.sin(t / 900 + x / 14) * 1), hh = 4 + (h2(x, 3) * 4 | 0);
     for (let y = 0; y < hh; y++) P(y > hh - 2 ? '#1a1410' : '#0c0a08', x + (y < hh / 2 ? sw : 0), lh - y);
   }
   c.imageSmoothingEnabled = false;
   c.drawImage(cv, 0, 0, lw * k, lh * k);
+  // Rastende am Feuer (S14, Nutzer: sahen schlecht aus): direkt aufs Bild in ganzzahligen Pixeln, nicht ins grobe Szenenraster
+  // (dort wurden feine Frames auf 0,6 Rasterpunkte gestaucht und verschmierten)
+  const B = SP.humanFrame(TITLE_B, 'W', 'i0'), bp = B.px || 2, sp = Math.max(3, Math.round(k * bp * 0.75)), gx = fx * k, gy = (fy + 4) * k;
+  c.filter = 'brightness(0.9) sepia(0.15)';
+  c.drawImage(B, Math.round(gx + 12 * k), Math.round(gy - B.oy * sp), B.width * sp, B.height * sp);
+  if (TITLE_HERO) {                                                    // Phase 1: der eigene Charakter, 3/4 von vorn, mit Ausrüstung und Waffe wie im Spiel
+    c.save(); c.translate(Math.round(gx - 22 * k), Math.round(gy)); const hs = sp / (bp * SP.FIGK); c.scale(hs, hs);
+    try { drawHumanoid({ ...TITLE_HERO, x: 0, y: 0, facing: 0, aim: Math.PI / 2 - 0.35, swing: 0, downed: false, act: null, vx: 0, vy: 0 }, t, c); } finally { c.restore(); }
+  } else { const A = SP.humanFrame(TITLE_A, 'S', t % 1300 < 650 ? 'i0' : 'i1'); c.drawImage(A, Math.round(gx - 22 * k - A.width * sp / 2), Math.round(gy - A.oy * sp), A.width * sp, A.height * sp); }
+  c.filter = 'none';
   const shade = c.createLinearGradient(0, 0, w * .62, 0);              // Lesbarkeit links (UI-Schrift), weich auslaufend
   shade.addColorStop(0, 'rgba(10,8,7,.62)'); shade.addColorStop(1, 'rgba(10,8,7,0)');
   c.fillStyle = shade; c.fillRect(0, 0, w, h);

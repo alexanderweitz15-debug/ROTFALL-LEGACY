@@ -2,9 +2,9 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, clamp, uid } from './state.js?v=14';
-import { ITEMS, GOODS, TOWNS } from './data.js?v=14';
-import { LOCATIONS, HOUSES, TS } from './world.js?v=14';
+import { S, log, chronicle, chance, ri, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=15';
+import { ITEMS, GOODS, TOWNS } from './data.js?v=15';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN } from './world.js?v=15';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];
@@ -135,6 +135,28 @@ export function notePrices(town) {
   (S.priceSeen ||= {})[town] = { day: S.day | 0, p: Object.fromEntries(GOODS.map(g => [g, ecoPrice(town, g, true)])) };
 }
 
+// ---------------- Nutztiere (S14, Master-Prompt §4.2) ----------------
+// Jede Stadt mit Feldern hält eine Herde (Zahl im Stand; am Hof stehen davon einige als Figuren). Kühe geben Fleisch, Schafe Wolle
+// (Tuch), beide etwas Fell. Nachwuchs, solange Platz ist und niemand hungert; Wölfe und Räuber im Umland reißen Tiere (die Meldung
+// geht an game.js, das eine sichtbare Kuh am Hof sterben lässt); wer hungert, schlachtet notfalls.
+export const HERD_OUT = { cow: { meat: 0.25, pelt: 0.04 }, sheep: { cloth: 0.15, pelt: 0.06, meat: 0.05 } };
+export const herdCap = town => (TOWN_PLAN[town]?.fields?.length || 0) * 6;
+const predatorsNear = town => { const l = LOC[town]; if (!l) return 0; let n = 0;
+  for (const e of S.ents.world) if (e.kind === 'enemy' && e.alive && (e.mtype === 'wolf' || e.mtype === 'wild_dog' || /^bandit/.test(e.mtype)) && Math.hypot(e.x / TS - l.x, e.y / TS - l.y) < (l.r || 10) + 45) n++;
+  return n; };
+export function herdOf(town) {
+  const t = S.towns?.[town]; if (!t || !herdCap(town)) return null;
+  return (t.herd ||= { cow: 2 + (town.length % 3), sheep: 3 + (town.charCodeAt(0) % 3) });   // Anfangsherde aus dem Namen (kein Zufall)
+}
+export function herdDay(town, t) {
+  const H = herdOf(town); if (!H) return;
+  for (const [a, out] of Object.entries(HERD_OUT)) for (const [g, n] of Object.entries(out)) { const q = n * H[a]; t.stock[g] = (t.stock[g] || 0) + q; t.prod[g] = (t.prod[g] || 0) + q; }
+  const tot = H.cow + H.sheep, pred = predatorsNear(town), sn = seasonOf();
+  if (tot >= 2 && tot < herdCap(town) && !t.hunger && sn !== 3 && chance(sn === 0 ? 0.4 : 0.2)) H[chance(0.45) ? 'cow' : 'sheep']++;   // Frühling: Kälber und Lämmer; Winter: keine
+  if (tot && chance(Math.min(0.6, pred * 0.08 * (sn === 3 ? 1.8 : 1)))) { const a = H.sheep && (chance(0.6) || !H.cow) ? 'sheep' : 'cow'; H[a]--; (S.herdLoss ||= []).push({ town, a, why: pred ? 'wolf' : 'thief' }); }
+  if (t.hunger && tot > 2 && chance(0.3)) { const a = H.cow ? 'cow' : 'sheep'; H[a]--; t.stock.meat = (t.stock.meat || 0) + (a === 'cow' ? 3 : 1); }   // Notschlachtung
+}
+
 // ---------------- Tageslauf ----------------
 export function ecoDay() {
   if (!S.eco) initEco();
@@ -148,12 +170,13 @@ export function ecoDay() {
     if (occupied(town) || razed(town)) continue;
     // Umland: Aurelion bezieht Nahrung per Luftschiff aus dem Süden (außerhalb der Karte)
     if (isAurel(town)) { for (const g of FOOD) t.stock[g] += t.use[g] * 0.9; t.stock.ingot += 0.4 * ((C[town].work.mech || 0) + (C[town].work.magitech || 0)); }   // dazu Barren für die Werkstätten
+    herdDay(town, t);
   }
   // Produktion mit Vorprodukten
   for (const b of S.eco.biz) {
     const t = S.towns[b.town], T = TRADES[b.trade];
-    if (!t || occupied(b.town) || razed(b.town)) { b.made = 0; continue; }
-    const e = bizWorkers(b, C) * (1 + 0.5 * (b.level - 1)) * (t.hunger ? 0.5 : 1);
+    if (!t || occupied(b.town) || razed(b.town) || (S.halt?.[b.town + ':' + b.trade] || 0) > S.day) { b.made = 0; continue; }   // S14: Unfall legt still
+    const e = bizWorkers(b, C) * (1 + 0.5 * (b.level - 1)) * (t.hunger ? 0.5 : 1) * (b.trade === 'farm' ? SEASON_FARM[seasonOf()] : 1);   // S14: Ernte nach Jahreszeit
     if (e <= 0) { b.made = 0; continue; }
     let frac = 1;
     for (const [g, n] of Object.entries(T.in || {})) frac = Math.min(frac, (t.stock[g] || 0) / (n * e));

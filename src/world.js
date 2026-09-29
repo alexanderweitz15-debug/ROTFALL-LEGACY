@@ -1,6 +1,6 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
-import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=14';
-import { FURNISH, wearOf } from './buildings.js?v=14';
+import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=15';
+import { FURNISH, wearOf } from './buildings.js?v=15';
 
 export const TS = 32;                // Kachelgröße
 export const T = { GRASS:0, DIRT:1, ROAD:2, WATER:3, MARSH:4, STONE:5, PLANK:6, ROCK:7, WALL:8, SAND:9, DFLOOR:10, DWALL:11, ASH:12, FIELD:13 };
@@ -95,6 +95,21 @@ function prop(kind, tx, ty, extra = {}) {
   props.push(p); return p;
 }
 
+// S15 (Nutzer): Morrgrund — das letzte freie Dorf der Grubenstämme, weit im Süden der Westlande, im Moor versteckt.
+// Palisade aus angespitzten Stämmen, Hütten um ein Feuer, ein Totem mit Kettengliedern, die sie sich abgeschlagen haben.
+// Feste Koordinaten, kein rnd(): die Weltfolge bleibt gleich. Wächst, wenn die Eisenfeste fällt (game.js morrGrow).
+export const MORR = { x: 276, y: 622, x0: 262, y0: 610, x1: 291, y1: 635 };
+function buildMorrgrund() {
+  const { x0, y0, x1, y1, x, y } = MORR;
+  for (let i = props.length - 1; i >= 0; i--) { const p = props[i], tx = p.x / TS | 0, ty = p.y / TS | 0; if (p.map === 'world' && tx >= x0 - 1 && tx <= x1 + 1 && ty >= y0 - 1 && ty <= y1 + 1) props.splice(i, 1); }
+  rect('world', x0, y0, x1 - x0 + 1, y1 - y0 + 1, T.DIRT);
+  for (let tx = x0; tx <= x1; tx += 2) for (const ty of [y0, y1]) if (Math.abs(tx - x) > 2 || ty === y0) prop('palisade_prop', tx, ty, { solid: true, r: 14 });   // Tor im Süden
+  for (let ty = y0 + 2; ty < y1; ty += 2) for (const tx of [x0, x1]) prop('palisade_prop', tx, ty, { solid: true, r: 14 });
+  for (const [hx, hy] of [[x - 9, y - 7], [x - 1, y - 8], [x + 8, y - 7], [x - 10, y + 1], [x + 9, y + 1], [x - 6, y + 8], [x + 6, y + 8]]) prop('tent_prop', hx, hy, { solid: true, label: 'Goblinhütte', morr: 1 });
+  prop('campfire_static', x, y, { solid: true, r: 10 }); prop('sign', x + 1, y1 + 1, { label: 'Morrgrund. (Darunter, in krummer Schrift: „Keine Ketten. Nie wieder.“)' });
+  prop('banner_torn', x - 3, y - 3, { label: 'Totem der Grubenstämme — zerbrochene Kettenglieder an einem Pfahl' }); prop('bones', x + 3, y - 3, { r: 6 });
+  for (const [bx, by] of [[x - 4, y + 3], [x + 4, y + 3]]) prop('barrel', bx, by, { solid: true, r: 8 });
+}
 function rect(map, x, y, w, h, t) {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) setTile(map, i, j, t);
 }
@@ -510,6 +525,7 @@ LOCATIONS.push(
   { key:'kettenfeste', name:'Die Eisenfeste', x:158, y:172, r:34, kind:'city', threat:4, faction:'chain', fin:true },
   { key:'steinbruch',  name:'Der Steinbruch', x:78,  y:318, r:24, kind:'camp', threat:3, faction:'chain', fin:true },
   { key:'grubenhort',  name:'Grubenhort',     x:185, y:430, r:20, kind:'camp', threat:2, faction:'goblin', fin:true },
+  { key:'morrgrund',   name:'Morrgrund',      x:276, y:622, r:18, kind:'camp', threat:2, faction:'goblin', fin:true },   // S15: das letzte Dorf der Grubenstämme, Dodons Dorf
   { key:'kettenpass',  name:'Kettentor',      x:226, y:172, r:10, kind:'road', threat:3, fin:true },
   // Totenland: in Koordinaten der Erzeugung (rückt mit)
   { key:'totenland',   name:'Das Totenland',  x:1024, y:400, r:250, kind:'wild', threat:4, faction:'undead' },
@@ -803,8 +819,13 @@ function expandTowns(wild) {
 }
 
 // ---------------- Oberwelt ----------------
+let PLAN0 = null;                                                        // BUG-141: Stadtplan vor dem ersten Erzeugen (Laden verändert ihn)
 export function genWorld() {
   if (SHIFT) { shiftCoords(-SHIFT); SHIFT = 0; }                         // S12: zur Erzeugung in die Entwurfslage zurück
+  if (!PLAN0) PLAN0 = structuredClone(TOWN_PLAN);                        // zweites Laden in derselben Sitzung: vom unveränderten Plan ausgehen
+  else { const P1 = structuredClone(PLAN0);                             // Inhalt zurücksetzen, Objekte behalten (andere Module halten Verweise)
+    for (const k of Object.keys(TOWN_PLAN)) if (!P1[k]) delete TOWN_PLAN[k];
+    for (const [k, v] of Object.entries(P1)) { const t = TOWN_PLAN[k]; if (!t) { TOWN_PLAN[k] = v; continue; } for (const f of Object.keys(t)) delete t[f]; Object.assign(t, v); } }
   for (const k of Object.keys(TOWN_PLAN)) if (TOWN_PLAN[k].village) delete TOWN_PLAN[k];
   for (let i = LOCATIONS.length - 1; i >= 0; i--) if (LOCATIONS[i].poi) LOCATIONS.splice(i, 1);   // Streuorte entstehen je Welt neu
   props.length = 0; HOUSES.length = 0; phase = 'design';
@@ -1140,6 +1161,7 @@ export function genWorld() {
   buildVillages();                                         // Session 12: Dörfer in allen Einflussgebieten
   scatterPOIs();                                           // Session 12: Dichte — überall kleine Orte mit Geschichte
   tidyTowns(); clearDoors(); ensureReach();                              // Session 12: gilt für jeden Seed (neue Spiele haben neue Welten)
+  buildMorrgrund();                                        // S15: das letzte Goblin-Dorf, weit im Süden der Westlande
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
@@ -1152,7 +1174,15 @@ export function genWorld() {
 // ändert eine spätere Session die Generierung, verschiebt ein Index-Schlüssel alle alten Spielstände, Typ+Kachel nur die betroffenen.
 // Der Grundzustand (state.js) erlaubt, nur abweichende Props zu speichern (BUG-057).
 function baseProps(map, list) {
-  const n = new Map();
+  const n = new Map(), M = MAPS[map];
+  // Audit A-04 (§7 Erreichbarkeit): Rohstoffe auf Fels/Wasser/Mauer wandern auf die nächste begehbare Kachel (Spirale, ohne Zufall)
+  if (M) for (const p of list) if (p.harvest && SOLID.has(tileAt(map, p.x / TS | 0, p.y / TS | 0))) {
+    const tx = p.x / TS | 0, ty = p.y / TS | 0; let to = null;
+    for (let r = 1; r <= 6 && !to; r++) for (let dy = -r; dy <= r && !to; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || SOLID.has(tileAt(map, tx + dx, ty + dy))) continue; to = [tx + dx, ty + dy]; break; }
+    if (to) { p.x = to[0] * TS + TS / 2; p.y = to[1] * TS + TS / 2; } else p.gone = true;
+  }
+  for (let i = list.length - 1; i >= 0; i--) if (list[i].gone) list.splice(i, 1);
   for (const p of list) { const k = `${p.type}@${p.x / TS | 0},${p.y / TS | 0}`, i = n.get(k) || 0; n.set(k, i + 1); p.gk = i ? `${k}#${i}` : k; }
   setPropBase(map, list);
   return list;
@@ -1596,7 +1626,7 @@ function shiftCoords(d) {
     if (P.coreWalls) sh(P.coreWalls);
     for (const k of ['walls', 'palisade']) if (P[k]) { sh(P[k].rect); for (const g of P[k].gates) sh(g); }
     if (P.harbor) { const Hb = P.harbor; Hb.x0 += d; Hb.x1 += d; Hb.piers = Hb.piers.map(x => x + d); Hb.boats = Hb.boats.map(([x, y]) => [x + d, y]); }
-    for (const h of [...P.houses, ...(P.grow?.houses || [])]) h[1] += d;
+    for (const h of [...(P.houses || []), ...(P.grow?.houses || [])]) h[1] += d;   // BUG-141: Aurelheim (Metropole) hat keine Hausliste — zweites Laden stürzte ab
     for (const p of [...(P.props || []), ...(P.grow?.props || [])]) p[1] += d;
     for (const r of P.grow?.gardens || []) sh(r);
   }
@@ -1625,6 +1655,13 @@ function buildWest() {
     const tl = t[jy * W + jx], rg = rawRegion(...westSrc(jx, jy).map((v, i) => dT(i ? v : v - OX)));
     if (tl !== T.GRASS || inF(jx, jy) || westMtnAt(jx, jy + 3)) continue;
     if (nz(jx + 7, jy) < (rg === 'forest' ? 0.55 : rg === 'marsh' ? 0.12 : 0.1)) prop('tree', jx, jy, { solid: true, r: 12, hp: 3 });
+  }
+  // S14 (Nutzer: „im ganzen Steingebiet kann man keinen Stein abbauen“): Westgebirge und sein Fuß bekamen nie Steinknoten — Hash statt Zufall
+  for (let y = 4; y < H - 4; y += 4) for (let x = 4; x < OX; x += 4) {
+    const jx = x + Math.floor(nz(x, y + 5) * 4), jy = y + Math.floor(nz(y + 5, x) * 4), tl = t[jy * W + jx]; if (inF(jx, jy)) continue;
+    const foot = !westMtnAt(jx, jy) && westMtnAt(jx, jy - 14);
+    if ((tl === T.STONE && nz(jx + 11, jy) < 0.22) || (foot && (tl === T.GRASS || tl === T.DIRT) && nz(jx + 13, jy) < 0.12)) prop('rock_node', jx, jy, { harvest: 'stone', solid: true });
+    else if (tl === T.STONE && nz(jx + 17, jy) < 0.03) prop('ore_node', jx, jy, { harvest: 'iron', solid: true });
   }
   // Mauerring: 2 Kacheln stark, Türme (5×5) an Ecken und alle 30 Kacheln, Osttor (zum Menschenland) und Südtor (Dörfer, Goblinwälder)
   const gate = (x, y) => (x >= f2 - 1 && y >= 169 && y <= 175) || (y >= f3 - 1 && x >= 211 && x <= 217);
@@ -1883,6 +1920,8 @@ export const DUNGEONS = {
   garmadon: { name: 'Gruft des Toten Königs', floor: 'dfloor', amb: 'blight', enter: 'Stufen aus Knochen führen hinab. Die Luft ist warm und riecht nach altem Blut. Irgendwo unten schlägt etwas wie ein Herz.' },   // Phase 6 MP2 §63
   vault: { name: 'Gewölbe', floor: 'dfloor', amb: 'blight', enter: '' },   // S13: zufällige Gewölbe (game.js buildVault)
   sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
+  isle: { name: 'Tangkron, Gischtinseln', floor: 'grass', amb: 'coast', open: true, enter: 'Salz in der Luft, Möwen, Teer. Tangkron riecht nach Fisch und Streit. Auf dem Hügel liegt ein Schiff kieloben — dort wohnt Weißbart.' },   // S14 Seevolk
+  deck: { name: 'Auf See', floor: 'plank', amb: 'coast', open: true, enter: 'Die Taue knarren, das Land wird schmal. Vor euch nur Grau und Wasser.' },
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
 MAPS.vault = { w: 8, h: 8, tiles: new Uint8Array(64).fill(T.DWALL), entry: { x: 4 * TS, y: 4 * TS } };   // Platzhalter bis zur ersten Ebene
@@ -1935,6 +1974,78 @@ export function genSky() {
   MAPS.sky.entry = { x: 32 * TS + TS / 2, y: 37 * TS };
   MAPS.sky.court = { x: 32 * TS + TS / 2, y: 15 * TS };
   return baseProps('sky', props.slice());
+}
+// S14 Seevolk (Nutzer): die Gischtinseln. Hauptstadt Tangkron an der Ostküste — Hafen mit Stegen, das Viertel des Salzbunds
+// (Händler: Kontor, Lager, Markt, Schenke „Zur Salzwitwe“), das Viertel der Sturmklinge (Plünderer: Langhaus, Kampfgrube,
+// Beutestapel) und dazwischen Weißbarts Halle im Rumpf der gestrandeten „Salzwitwe“. Im Südwesten das Fischerdorf Netzbucht
+// (Netzleute, neutral). Eigener Seed-Zweig, keine Zufälle der Weltgenerierung.
+export function genIsle() {
+  props.length = 0;
+  seedRng(S.seed * 29 + 5);
+  const w = 112, h = 84, tiles = new Uint8Array(w * h).fill(T.WATER), M = 'isle', o = { map: M };
+  MAPS.isle = { w, h, tiles };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const d = Math.hypot((x - 54) / 44, (y - 42) / 33) + (vnE(x * 2, y * 2, 9) - 0.5) * 0.22;
+    if (d < 1) tiles[y * w + x] = d > 0.9 ? T.SAND : vnE(x + 40, y, 6) > 0.72 ? T.DIRT : T.GRASS;
+  }
+  for (let y = 10; y < 20; y++) for (let x = 44; x < 58; x++) if (tiles[y * w + x] !== T.WATER && vnE(x, y + 70, 4) > 0.5) tiles[y * w + x] = T.ROCK;   // Klippen im Norden
+  const H = (x, y, hw, hh, door, type, name) => { const b = house(M, x, y, hw, hh, door, { type, town: 'tangkron' }); if (name) b.name = name; return b; };
+  // Hafen: Kai (Planken) und drei Stege nach Osten, Boote dazwischen
+  rect(M, 86, 30, 4, 26, T.PLANK);
+  for (const y of [33, 42, 51]) rect(M, 90, y, 12, 2, T.PLANK);
+  for (const [x, y] of [[96, 36], [99, 46], [95, 54]]) prop('boat', x, y, { ...o, solid: true, r: 14, label: 'Langboot' });
+  prop('boat', 103, 38, { ...o, solid: true, r: 16, label: 'Die Möwe — Fährschiff des Salzbunds' });
+  for (const [x, y] of [[88, 31], [87, 36], [88, 48], [87, 54]]) prop(x % 2 ? 'crate_stack' : 'barrel', x, y, { ...o, solid: true });
+  prop('net_rack', 89, 44, { ...o, solid: true });
+  // Straßen: Hafen → Markt → Halle; Querstraße Nord (Sturmklinge) – Süd (Salzbund)
+  rect(M, 60, 41, 26, 3, T.ROAD); rect(M, 70, 24, 3, 32, T.ROAD); rect(M, 44, 42, 16, 2, T.DIRT); rect(M, 28, 43, 16, 2, T.DIRT);
+  // Salzbund (Süden): Kontor, zwei Lager, Schenke, Markt mit Ständen
+  H(74, 47, 9, 6, 'N', 'kontor', 'Kontor des Salzbunds'); H(62, 48, 7, 5, 'N', 'store', 'Salzlager'); H(62, 55, 7, 5, 'N', 'store', 'Tuchlager');
+  H(75, 55, 9, 7, 'N', 'tavern', 'Schenke „Zur Salzwitwe“');
+  for (const [x, y] of [[64, 45], [67, 45], [76, 45], [79, 45]]) prop('stall', x, y, { ...o, solid: true, r: 12, label: 'Marktstand des Salzbunds' });
+  prop('sign', 73, 45, { ...o, label: 'Salzbund — gewogen, gezählt, verzollt. Wer betrügt, wird kielgeholt.' });
+  // Sturmklinge (Norden): Langhaus, Kampfgrube, Beute
+  H(74, 26, 11, 6, 'S', 'barracks', 'Langhaus der Sturmklinge'); H(60, 30, 6, 5, 'S', 'house'); H(60, 23, 6, 5, 'S', 'cottage');
+  rect(M, 76, 34, 7, 5, T.SAND); for (const [x, y] of [[76, 34], [82, 34], [76, 38], [82, 38]]) prop('torch', x, y, o);
+  prop('sign', 79, 39, { ...o, label: 'Die Grube. Wer fällt, zahlt die Runde. Wer liegen bleibt, zahlt nichts mehr.' });
+  for (const [x, y] of [[73, 33], [84, 32]]) prop('weapon_rack', x, y, { ...o, solid: true, label: 'Beute der Sturmklinge' });
+  for (const [x, y] of [[86, 26], [87, 27]]) prop('crate_stack', x, y, { ...o, solid: true, label: 'Geraubte Fracht mit Valens Siegel' });
+  prop('banner_torn', 72, 25, { ...o, label: 'Banner der Sturmklinge: weißer Anker auf Schwarz' });
+  // Weißbarts Halle: der Rumpf der Salzwitwe, kieloben auf den Strand gezogen
+  const hall = H(46, 32, 14, 9, 'E', 'hall', 'Rumpf der Salzwitwe — Weißbarts Halle');
+  prop('bench', 47, 36, { ...o, solid: true, r: 12, label: 'Stuhl aus Kiel und Walbein', seaThrone: true });
+  prop('broken_pillar', 53, 31, { ...o, solid: true, r: 10, intact: true, label: 'Mast der Salzwitwe' });
+  for (const [x, y] of [[57, 33], [57, 39]]) prop('banner_torn', x, y, { ...o, label: 'Weißer Anker auf Schwarz' });
+  // Wohnhäuser zwischen den Vierteln
+  for (const [x, y, d] of [[52, 24, 'S'], [64, 62, 'N'], [55, 49, 'N'], [48, 49, 'N'], [82, 60, 'N']]) H(x, y, 5, 4, d, x % 3 ? 'house' : 'cottage');
+  prop('well', 67, 42, { ...o, solid: true, label: 'Zisterne' });
+  // Netzbucht (Südwesten): Fischer, Boote, Netze
+  for (const [x, y] of [[22, 55], [29, 57], [18, 49], [26, 49]]) H(x, y, 5, 4, 'S', 'fisher');
+  for (const [x, y] of [[20, 63], [30, 64]]) prop('boat', x, y, { ...o, solid: true, r: 14, label: 'Fischerboot' });
+  for (const [x, y] of [[24, 61], [27, 61], [33, 60]]) prop('net_rack', x, y, { ...o, solid: true });
+  prop('campfire_static', 25, 58, { ...o, solid: true, r: 10 });
+  // Wildnis: Kiefern, Klippen, Kräuter, Steine; Möwenfelsen im Norden
+  for (let i = 0; i < 90; i++) { const x = 12 + Math.floor(nz(i, 31) * 80), y = 12 + Math.floor(nz(31, i) * 60), t = tiles[y * w + x];
+    if (t === T.GRASS && !(x > 42 && x < 90 && y > 20 && y < 66) && !(x > 14 && x < 36 && y > 45 && y < 66)) prop(i % 5 ? 'tree' : 'bush', x, y, i % 5 ? { ...o, solid: true, r: 12, hp: 3 } : { ...o, harvest: 'herb' }); }
+  for (let i = 0; i < 16; i++) { const x = 14 + Math.floor(nz(i, 37) * 76), y = 12 + Math.floor(nz(37, i) * 58); if (tiles[y * w + x] === T.GRASS || tiles[y * w + x] === T.SAND) prop('rock_node', x, y, { ...o, harvest: 'stone', solid: true }); }
+  for (let i = 0; i < 6; i++) prop('bones', 46 + i * 2, 21 + (i % 2), { ...o, label: 'Möwenknochen' });
+  MAPS.isle.entry = { x: 98 * TS + TS / 2, y: 42 * TS + TS / 2 };
+  MAPS.isle.hall = { x: (hall.x + 3) * TS, y: (hall.y + 4) * TS + TS / 2 };
+  MAPS.isle.pit = { x: 79 * TS + TS / 2, y: 36 * TS + TS / 2 };
+  return baseProps('isle', props.slice());
+}
+// Deck für die Überfahrt (S14): ein Handelsschiff des Salzbunds auf offener See. Hier toben Sturm und Enterkampf.
+export function genDeck() {
+  props.length = 0;
+  const w = 64, h = 40, tiles = new Uint8Array(w * h).fill(T.WATER), M = 'deck', o = { map: M }, X = 19, Y = 17;   // offene See ringsum
+  MAPS.deck = { w, h, tiles };
+  rect(M, X + 1, Y, 24, 7, T.PLANK); rect(M, X - 1, Y + 1, 2, 5, T.PLANK); rect(M, X + 25, Y + 1, 3, 5, T.PLANK); setTile(M, X + 28, Y + 3, T.PLANK);   // Rumpf mit Heck und Bug
+  for (let x = X; x <= X + 27; x += 2) { prop('fence', x, Y - 1, { ...o, solid: true, r: 8, label: 'Reling' }); prop('fence', x, Y + 7, { ...o, solid: true, r: 8, label: 'Reling' }); }
+  prop('broken_pillar', X + 8, Y + 3, { ...o, solid: true, r: 10, intact: true, label: 'Großmast' }); prop('broken_pillar', X + 19, Y + 3, { ...o, solid: true, r: 10, intact: true, label: 'Fockmast' });
+  for (const [dx, dy] of [[3, 5], [12, 1], [23, 5], [25, 2]]) prop(dx % 2 ? 'barrel' : 'crate_stack', X + dx, Y + dy, { ...o, solid: true });
+  prop('net_rack', X + 15, Y + 5, { ...o, solid: true, label: 'Tauwerk' });
+  MAPS.deck.entry = { x: (X + 14) * TS, y: (Y + 3) * TS }; MAPS.deck.box = [X + 1, Y, X + 25, Y + 6];
+  return baseProps('deck', props.slice());
 }
 // Gruft des Toten Königs (Phase 6, MP2 §63): drei Ebenen nach Norden hinab — das Beinhaus (Knochen, Fallen), die Blutkatakomben
 // (Nekromanten, Blutbecken, Stachelfallen) und der Thronsaal Garmadons mit Leibwache und Hort. Eigener Seed-Zweig.

@@ -7,7 +7,7 @@
 // alten 20×25-Rasters). Jedes Teil wird mit eigenem Volumen schattiert (Licht oben links, Formschatten rechts), wirft
 // Schlagschatten auf Teile dahinter; danach Kontur und handgesetzte Details. Noch nicht im Spiel verdrahtet —
 // erst die Grundlage gegen die Referenz prüfen (Nutzervorgabe), dann übertragen.
-import { ramp, mix, toCanvas } from './sprites.js?v=14';
+import { ramp, mix, toCanvas } from './sprites.js?v=15';
 
 export const FW = 40, FH = 66, FPX = 1, FOX = 20, FOY = 57;   // Rastergröße, Welt je Pixel, Pivot (Fußmitte)
 // Proportion (Nutzer: „noch etwas weird“): Formen werden im Entwurfsmaß (Füße bei y 53) gezeichnet und beim Rastern
@@ -730,6 +730,15 @@ const WDES = {
     C.poly(M.ir, [[35, 2], [37.5, 2], [37.5, 14], [35, 14]]);
     for (const y of [2.4, 7.2, 12]) C.poly(M.st, [[37, y], [47, y + 0.3], [47, y + 1.6], [37, y + 1.9]]);
     return { gx: 8, gy: 8, blade: null }; }],
+  // S14 Seevolk: Entermesser (Korbgriff, breite gebogene Klinge), Walharpune (Widerhaken), Weißbarts Sturmanker (Kettenring, Stock, Arme)
+  entermesser: [42, 16, (C, M) => { C.poly(M.wr, [[0, 7], [9, 7], [9, 9.6], [0, 9.6]]); C.ell(M.ir, 10.5, 8.3, 2.6, 5); C.poly(M.ir, [[2, 4], [10, 3.4], [10, 5], [3, 5.4]]);
+    C.poly(M.st, [[12, 6.4], [26, 5.6], [35, 4.6], [41, 7.2], [38, 10.8], [27, 10.4], [12, 10]]); return { gx: 5, gy: 8, blade: [13, 36, 8] }; }],
+  harpune: [74, 14, (C, M) => { C.poly(M.wd, [[0, 6], [58, 6], [58, 8.2], [0, 8.2]]); C.poly(M.wr, [[10, 5.6], [17, 5.6], [17, 8.6], [10, 8.6]]); C.poly(M.ir, [[57, 5], [61, 5], [61, 9.2], [57, 9.2]]);
+    C.poly(M.st, [[61, 5.2], [70, 5.8], [74, 7.1], [70, 8.4], [61, 9]]); C.poly(M.st, [[63, 5.4], [67, 2.6], [66, 5.6]]); C.poly(M.st, [[63, 8.8], [67, 11.6], [66, 8.6]]); return { gx: 20, gy: 7, blade: null }; }],
+  sturmanker: [62, 30, (C, M) => { for (let k = 0; k < 3; k++) C.ell(M.ir, 2 + k * 2.6, 15, 1.5, 1.2);
+    C.poly(M.wr, [[7, 13.4], [15, 13.4], [15, 16.6], [7, 16.6]]); C.poly(M.ir, [[15, 13.8], [49, 13.6], [49, 16.4], [15, 16.2]]); C.poly(M.ir, [[18, 5], [21, 5], [21, 25], [18, 25]]);   // Stiel, Schaft, Querstock
+    C.ell(M.ir, 50.5, 15, 3.6, 3.6); C.poly(M.st, [[50, 13], [54, 9], [55, 4], [51, 0.5], [45, 2.5], [48.5, 5], [49.5, 9], [47, 12]]); C.poly(M.st, [[50, 17], [54, 21], [55, 26], [51, 29.5], [45, 27.5], [48.5, 25], [49.5, 21], [47, 18]]);
+    return { gx: 11, gy: 15, blade: null }; }],
   // S13: neue Waffenarten (Nutzer)
   kriegssense: [70, 24, (C, M) => { C.poly(M.wd, [[0, 10.5], [60, 10.5], [60, 13], [0, 13]]); C.poly(M.ir, [[57, 9], [61, 9], [61, 14], [57, 14]]);
     C.poly(M.st, [[59, 12], [66, 11], [69, 14], [66, 19], [56, 22], [44, 23], [52, 19], [60, 16]]); return { gx: 20, gy: 12, blade: [46, 64, 18] }; }],
@@ -832,7 +841,7 @@ const WDES = {
       for (const [x, y] of [[24, 12], [30, 6], [37, 13], [42, 8], [28, 14]]) set(x, y, x % 2 ? '#6a3a22' : '#4a2a18'); } }; }],
   shortbow: [16, 40, (C, M) => {
     C.limb(M.wd, [[5, 1], [9, 8], [11, 20], [9, 32], [5, 39]], 2.8, 2.8); C.poly(M.wr, [[9, 17], [13, 17], [13, 23], [9, 23]]);
-    return { gx: 11, gy: 20, blade: null, after: (set) => { for (let y = 2; y <= 38; y++) set(4, y, '#c9bfa6'); } }; }],
+    return { gx: 11, gy: 20, blade: null, str: [4, 2, 38], after: (set) => { for (let y = 2; y <= 38; y++) set(4, y, '#c9bfa6'); } }; }],
   // --- S12: Arsenal der Mark (Nieten, Flickwerk, Rot nur als Akzent) ---
   schrott_hellebarde: [80, 26, (C, M) => {
     C.poly(M.wd, [[1, 11.6], [64, 11.6], [64, 14.4], [1, 14.4]]); C.poly(M.wr, [[30, 11.2], [36, 11.2], [36, 14.8], [30, 14.8]]);   // Flickwicklung
@@ -916,15 +925,15 @@ const WDES = {
     return { gx: 8, gy: 14, blade: null, after: (set) => { for (let y = 3; y <= 25; y++) set(61 + (y > 5 && y < 22 ? 0 : 0), y, '#c8c2b8'); for (let y = 6; y <= 21; y += 2) set(57, y, '#7a2224'); set(50, 14, '#1b1411'); } }; }],
   longbow: [18, 56, (C, M) => {
     C.limb(M.wd, [[5, 1], [10, 12], [12, 28], [10, 44], [5, 55]], 3, 3); C.poly(M.wr, [[10, 24], [14, 24], [14, 32], [10, 32]]);
-    return { gx: 12, gy: 28, blade: null, after: (set) => { for (let y = 2; y <= 54; y++) set(4, y, '#c9bfa6'); } }; }],
+    return { gx: 12, gy: 28, blade: null, str: [4, 2, 54], after: (set) => { for (let y = 2; y <= 54; y++) set(4, y, '#c9bfa6'); } }; }],
 };
 const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
   rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
-export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '') {   // sc < 1: S14 Stil R — dieselbe Form im gröberen Zielraster gemalt
+export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '', bare = false) {   // bare: Bogen ohne Sehne (die Sehne zeichnet render.js beim Spannen)   // sc < 1: S14 Stil R — dieselbe Form im gröberen Zielraster gemalt
   const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w0, h0, fn] = WDES[d], w = Math.ceil(w0 * sc), h = Math.ceil(h0 * sc);
   const C = new Canvas2(w, h);
   if (sc !== 1) { const P = C.poly.bind(C), E = C.ell.bind(C), Lm = C.limb.bind(C); C.poly = (p, pts) => P(p, pts.map(([x, y]) => [x * sc, y * sc]));
-    C.ell = (p, x, y, rx, ry) => E(p, x * sc, y * sc, Math.max(0.7, rx * sc), Math.max(0.7, ry * sc)); C.limb = (p, pts, a, b) => Lm(p, pts.map(([x, y]) => [x * sc, y * sc]), Math.max(1.2, a * sc), Math.max(1.2, b * sc)); }
+    C.ell = (p, x, y, rx, ry) => E(p, x * sc, y * sc, Math.max(0.7, rx * sc), Math.max(0.7, ry * sc)); C.limb = (p, pts, a, b = a) => Lm(p, pts, Math.max(1.2 / sc, a), Math.max(1.2 / sc, b)); }   // S15: Lm ruft das skalierende poly/ell selbst — vorher doppelt skaliert (Bogen ohne unteren Arm)
   St = { hi: mix(St.hi, St.b, 0.35), b: mix(St.b, '#1e1c1a', 0.46), sh: mix(St.sh, '#141210', 0.52), dk: mix(St.dk, '#0c0b0a', 0.4) };   // S12: dunkle Fläche, Licht nur an der Kante (Referenz 3)
   const M = { St, wd: C.partR('wood', Wood, true), wr: C.partR('wrap', Wrap, true), ir: C.partR('iron', Iron, true), st: C.partR('steel', St, true) };
   const info = fn(C, M);
@@ -934,7 +943,8 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '')
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (!metal.has(C.id[i]) || !C.col[i]) continue;
     const up = y > 0 ? C.id[i - w] : -1, dn = y < h - 1 ? C.id[i + w] : -1;
     if (up < 0) C.col[i] = mix(C.col[i], '#e2ddd2', 0.5); else if (dn < 0) C.col[i] = mix(C.col[i], '#0c0b0a', 0.45); }
-  if (info.after) info.after((x, y, c) => { x = Math.floor(x * sc); y = Math.floor(y * sc); if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
+  if (info.str) info.str = info.str.map(v => v * sc);
+  if (info.after && !(bare && info.str)) info.after((x, y, c) => { x = Math.floor(x * sc); y = Math.floor(y * sc); if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.wr && (x % 3 === 0)) C.col[y * w + x] = Wrap.dk;   // Wicklung
   if (sc !== 1) {                                                   // S14 Stil R (Nutzer: „Waffen hübscher“): Hohlkehle und Schliff, Messing/Gold und Stein nach Rarität, Wickel schräg
     const hi = ['epic', 'legendary', 'mythic'].includes(rar), mid = rar === 'rare' || rar === 'uncommon', Br = hi ? ramp('#c8a048') : mid ? ramp('#9a7c4c') : null;
@@ -947,8 +957,9 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '')
   }
   let ks = 0; for (const ch of key) ks = (ks * 31 + ch.charCodeAt(0)) | 0;                            // Referenz 3: benutzter Stahl — Rost, Scharten
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) { const i = y * w + x; if ((C.id[i] === M.st || C.id[i] === M.ir) && C.col[i]) { const n = h2(x + ks, y * 5 + ks);
+    if (sc !== 1) continue;   // S15 Stil R: keine Einzelpixel-Scharten (Rauschen)
     if (n < 0.03) C.col[i] = mix(C.col[i], '#6a3a1e', 0.35); else if (n > 0.98) C.col[i] = mix(C.col[i], '#0c0b0a', 0.4); } }
-  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb };
+  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb, str: info.str };
 }
 
 // =====================================================================================================================

@@ -1,13 +1,15 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist } from './state.js?v=14';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=14';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=14';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS } from './world.js?v=14';
-import { townState, townPrice } from './sim.js?v=14';
-import { GOODS } from './data.js?v=14';
-import { target as ecoTarget } from './economy.js?v=14';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=14';
-import { sfx, ambience } from './sfx.js?v=14';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY } from './state.js?v=15';
+import * as CS from './cloudsave.js?v=15';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=15';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=15';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=15';
+import { wearOf } from './buildings.js?v=15';
+import { townState, townPrice } from './sim.js?v=15';
+import { GOODS } from './data.js?v=15';
+import { target as ecoTarget } from './economy.js?v=15';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=15';
+import { sfx, ambience } from './sfx.js?v=15';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -28,7 +30,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const NAV = [
   ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
   ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
-  ['skills', 'Talente', 'T'], ['quests', 'Aufträge', 'J'], ['effects', 'Effekte', 'X'], ['codex', 'Kodex', 'H'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
+  ['skills', 'Talente', 'T'], ['spells', 'Zauber', 'Z'], ['quests', 'Aufträge', 'J'], ['effects', 'Effekte', 'X'], ['codex', 'Kodex', 'H'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
 ];
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
@@ -198,6 +200,25 @@ function codexUI(body) {
   q.oninput = render; render();
 }
 
+// ---------------- Zauberbuch (S15 P4) ----------------
+// Reiter je Schule. Bekannte Zauber: Rang, Kosten, Wirkung, Übung bis zum nächsten Rang, „Auf Leiste“. Unbekannte: wo man sie lernt.
+let spellTab = 'fire';
+function spellUI(body) {
+  const p = S.player, SC = A.schools || {}, keys = A.spellKeys || [];
+  body.innerHTML = `<div class="codex-top">${Object.entries(SC).map(([k, s]) => `<button class="txtbtn${k === spellTab ? ' active' : ''}" data-s="${k}" style="color:${s.col}">${s.name} ${keys.filter(q => ABILITIES[q].school === k && p.spells?.[q]).length}/${keys.filter(q => ABILITIES[q].school === k).length}</button>`).join('')}</div>
+    <div class="ledger">Mana ${Math.round(p.mana || 0)}/${p.maxMana || 0}${p.maxMana ? '' : ' — ohne gelernten Zauber hast du kein Mana.'} · Ein Treffer in der Sammelzeit bricht den Zauber ab (halbes Mana zurück). Rang II nach 25, Rang III nach 100 Einsätzen.</div><div id="spell-list" class="codex"></div>`;
+  $('spell-list').innerHTML = keys.filter(k => ABILITIES[k].school === spellTab).map(k => {
+    const ab = ABILITIES[k], r = p.spells?.[k] || 0, n = p.spellUse?.[k] || 0, need = r === 1 ? 25 : r === 2 ? 100 : 0;
+    const cost = `Stufe ${ab.tier} · ${ab.mana} Mana · ${(ab.cd / 1000).toFixed(1)} s Abklingzeit · ${ab.cast ? (ab.cast / 1000).toFixed(2) + ' s Sammeln' : 'sofort'}`;
+    return r ? `<div class="fx-row spell-row"><div><b style="color:${SC[spellTab].col}">${ab.name}</b> · Rang ${['', 'I', 'II', 'III'][r]}<div class="ledger">${ab.desc}<br>${cost}</div>
+        ${need ? `<div class="bar" style="height:4px;background:#2a2418;margin:4px 0"><div style="height:100%;width:${Math.min(100, n / need * 100)}%;background:${SC[spellTab].col}"></div></div><div class="ledger">Übung ${n}/${need}</div>` : '<div class="ledger">Gemeistert.</div>'}</div>
+        <button class="txtbtn" data-bar="${k}">${p.hotbar?.some(s => s?.key === k) ? 'Auf der Leiste' : 'Auf Leiste legen'}</button></div>`
+      : `<div class="fx-row spell-row" style="opacity:.55"><div><b>${ab.name}</b> · unbekannt<div class="ledger">${ab.desc}<br>${cost}<br>Lehrer: ${ab.teach || 'unbekannt'}</div></div></div>`;
+  }).join('');
+  body.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { spellTab = b.dataset.s; spellUI(body); });
+  body.querySelectorAll('[data-bar]').forEach(b => b.onclick = () => { A.spellToBar(b.dataset.bar); spellUI(body); });
+}
+
 // ---------------- Log ----------------
 function renderLog() {
   const box = $('log'); if (!box) return;
@@ -216,6 +237,20 @@ function townHeads(key) {
     && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && !c.escort && !c.escortLost && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;   // Karawanenwachen sind Reisende
   return n;
 }
+// S14: Haus, in dem oder direkt vor dessen Tür der Held steht — Name und Zweck je Typ
+const HOUSE_INFO = { house: ['Wohnhaus', 'Hier leben Bewohner des Ortes.'], cottage: ['Kate', 'Kleines Wohnhaus, oft ein Hof am Rand.'], hall: ['Halle des Vorstehers', 'Versammlungen, Aufträge der Verteidigung.'],
+  healer: ['Heilerhaus', 'Wunden versorgen, Tränke kaufen.'], smithy: ['Schmiede', 'Waffen, Rüstung, Reparatur. Tagsüber hämmert es.'], tavern: ['Schenke', 'Essen, Betten, Söldner, Gerüchte.'],
+  barn: ['Scheune', 'Heu, Getreide, Vieh im Winter.'], bakery: ['Bäckerei', 'Brot für den Ort — frühmorgens duftet es.'], barracks: ['Kaserne', 'Wachen schlafen hier; die Nachtschicht hat frei.'],
+  kontor: ['Kontor', 'Großhandel, Handelswagen, Betriebe kaufen.'], chapel: ['Kapelle', 'Gebet, Segen, Bestattungen.'], manor: ['Herrenhaus', 'Sitz einer vornehmen Familie.'],
+  store: ['Lagerhaus', 'Vorräte des Ortes; mehr Lager heißt mehr Platz für Waren.'], stable: ['Stall', 'Pferde, Zugtiere, Fleisch und Felle.'], fisher: ['Fischerhütte', 'Netze, Boote, Fisch für den Markt.'],
+  merc: ['Söldnerhaus', 'Klingen zum Mieten.'], palace: ['Palast', 'Sitz des Hohen Rates.'], court: ['Gericht', 'Das Heilige Gericht Aurelions.'], library: ['Bibliothek', 'Schriften, Karten, das Wissen des Hochreichs.'],
+  academy: ['Akademie', 'Magitech und Gelehrsamkeit.'], observatory: ['Observatorium', 'Sterne, Himmelsrisse, der Rotfall.'], magitech: ['Magitech-Werkstatt', 'Prothesen, Kerne, Messingwaffen.'],
+  markethall: ['Markthalle', 'Händler unter einem Dach.'], bank: ['Bank', 'Gold, Schuldscheine, Schuldknechtschaft.'], hospital: ['Hospital', 'Pflege für Arme und Soldaten.'], bathhouse: ['Badehaus', 'Dampf, Klatsch, Politik.'],
+  factoryhall: ['Fabrikhalle', 'Werkbänke, Schuldknechte, Automaten.'], legion: ['Legionskaserne', 'Die Sonnenlegion Aurelions.'] };
+function houseHere(tx, ty) {
+  for (const b of HOUSES) if ((b.map || 'world') === S.map && tx >= b.x - 1 && tx <= b.x + b.w && ty >= b.y - 1 && ty <= b.y + b.h + 1) return b;
+  return null;
+}
 export function renderContext(target) {
   const box = $('context'); if (!box) return;
   const p = S.player;
@@ -231,6 +266,7 @@ export function renderContext(target) {
       ${A.zoneRange ? (z => `<div class="ctx-line"><span>Gegnerstufen</span><b class="${z[0] > p.level + 2 ? 'threat-high' : z[1] < p.level - 3 ? 'threat-low' : 'threat-med'}">${z[0]}–${z[1]}</b></div>`)(A.zoneRange(S.map, tx, ty)) : ''}
       <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel',bloodrain:'Blutregen',sandstorm:'Sandsturm',snow:'Schnee'}[S.weather]}</b></div>
       <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>
+      <div class="ctx-line"><span>Jahreszeit</span><b>${SEASONS[seasonOf()]}</b></div>
       <div class="ctx-line"><span>Jahr</span><b>${year()}</b></div>`;
     if (here && S.towns && S.towns[here.key]) {
       const t = S.towns[here.key], owner = S.war.nodes[here.key]?.owner;
@@ -243,6 +279,13 @@ export function renderContext(target) {
     } else if (S.war && S.map === 'world' && here && S.war.nodes[here.key]?.owner) {
       h += `<div class="ctx-line"><span>Herrschaft</span><b>${FACTIONS[S.war.nodes[here.key].owner].name}</b></div>`;
       if (TOWN_PLAN[here.key]) h += `<div class="ctx-line"><span>Einwohner</span><b>${townHeads(here.key)}</b></div>`;
+    }
+    const hb = houseHere(tx, ty);                                        // S14 (Nutzer, §20/§47): Gebäude-Infos im Infofeld
+    if (hb) {
+      const [nm, what] = HOUSE_INFO[hb.type] || ['Gebäude', ''], who = S.ents[hb.map || 'world'].filter(e => e.kind === 'npc' && e.alive && e.homeId === hb.id);
+      h += `<div class="ctx-block"><div class="ctx-sub">Gebäude</div><div class="ctx-line"><span>${nm}</span><b>${['gepflegt', 'abgenutzt', 'verlassen'][wearOf(hb)] || ''}</b></div>`
+        + (what ? `<div class="ctx-line q-sub"><span>${what}</span></div>` : '')
+        + (who.length ? `<div class="ctx-line"><span>Hier wohnen</span><b>${who.slice(0, 3).map(e => e.name).join(', ')}${who.length > 3 ? ` +${who.length - 3}` : ''}</b></div>` : '') + '</div>';
     }
     if (S.map === 'world') {
       h += `<div class="ctx-block"><div class="ctx-sub">In der Nähe</div>` +
@@ -359,6 +402,7 @@ export function renderHotbar() {
         const ab = ABILITIES[s.key];
         d.insertAdjacentHTML('beforeend', `<span style="font-size:10px;text-align:center;line-height:1.1;color:${ab.title ? TITLE_CLASSES[ab.title].glow : '#cbbf8a'};padding:0 2px">${ab.name}</span>`);
         if (ab.title) d.classList.add('title-ab');
+        if (ab.spell) d.firstElementChild.nextElementSibling.style.color = A.schools?.[ab.school]?.col || '#b88af0';   // S15 P4: Zauber in Schulfarbe
         d.title = ab.desc;
         const cd = (p.cooldowns?.[s.key] || 0);
         if (cd > 0) { const c = el('div', 'cd'); c.style.height = `${clamp(cd / ab.cd * 100, 0, 100)}%`; c.style.top = 'auto'; c.style.bottom = '0'; d.appendChild(c); }
@@ -424,7 +468,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   if (R) R[1](body, arg);
 }
@@ -474,7 +518,7 @@ function invUI(body) {
     }
   }
   const eq = $('eq');
-  [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['feet', 'Füße'], ['cloak', 'Umhang']].forEach(([k, label]) => {
+  [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['hands', 'Hände'], ['legs', 'Beine'], ['feet', 'Füße'], ['cloak', 'Umhang'], ['talisman', 'Talisman']].forEach(([k, label]) => {
     const item = p.equip[k];
     const d = el('div', 'eq-slot');
     const cv = el('canvas'); cv.width = cv.height = 34; d.appendChild(cv);
@@ -573,7 +617,7 @@ function woundNotes(c, click) {
   return PARTS.map(p => {
     const P = c.body[p], st = partState(P), pct = Math.max(0, P.hp / P.max * 100);
     return `<button class="wound w-${st}" data-part="${p}" ${click ? '' : 'tabindex="-1"'}>
-      <span class="w-name">${PART_NAME[p]}</span><span class="w-val">${Math.max(0, Math.round(P.hp))}<small>/${P.max}</small></span>
+      <span class="w-name">${PART_NAME[p]}</span><span class="w-val">${P.lost ? 'ab' : Math.round(P.hp)}<small>/${P.max}</small></span>
       <span class="w-bar"><i style="width:${pct}%"></i></span><span class="w-state">${STATE_WORD[st]}</span></button>`;
   }).join('');
 }
@@ -586,7 +630,7 @@ function charUI(body, who) {
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
-  const EQ = [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['feet', 'Füße'], ['cloak', 'Umhang']];
+  const EQ = [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['hands', 'Hände'], ['legs', 'Beine'], ['feet', 'Füße'], ['cloak', 'Umhang'], ['talisman', 'Talisman']];
   body.innerHTML = `<div class="tafel">
     <header class="tafel-head">
       <h2>${p.name}</h2>
@@ -681,7 +725,7 @@ function skillUI(body) {
       ${Array.from({ length: rows }, (_, r) => `<div class="tree-row">${N.filter(([, n]) => n.row === r).map(([k, n]) => {
         const st = A.nodeState(p, k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
         const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : n.type === 'active' ? ' — aktive Fähigkeit' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
-        return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" title="${tip.replace(/"/g, '&quot;')}">${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : 'gesperrt'}</small></button>`;
+        return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" title="${tip.replace(/"/g, '&quot;')}">${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : st === 'barred' ? 'ausgeschlossen' : 'gesperrt'}</small></button>`;
       }).join('')}</div>`).join('')}</div>`;
   };
   const base = ['combat', 'magic', 'survival'], titles = Object.keys(SKILL_BRANCHES).filter(b => !base.includes(b));
@@ -912,6 +956,17 @@ function settingsUI(body) {
       I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button></div>
+      <h3 style="margin-top:14px">Auf anderem Gerät weiterspielen</h3>
+      <div class="ledger">Der Spielstand wird hier im Browser mit deinem Passwort verschlüsselt (AES-256). Leg die Datei in einen
+        Cloud-Ordner (OneDrive, Google Drive, Dropbox) und lade sie auf dem anderen Gerät mit demselben Passwort. Ohne Passwort
+        kann niemand die Datei lesen — auch du nicht, wenn du es vergisst.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        <input id="cs-pw" type="password" autocomplete="new-password" placeholder="Passwort (mind. ${CS.MIN_PW} Zeichen)" class="cs-in" style="height:28px;box-sizing:border-box;background:#15120e;color:#e8dcc4;border:1px solid #5a4a34;padding:4px 8px;font:inherit">
+        <input id="cs-pw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen (nur für Export)" class="cs-in" style="height:28px;box-sizing:border-box;background:#15120e;color:#e8dcc4;border:1px solid #5a4a34;padding:4px 8px;font:inherit">
+      </div>
+      <div class="ctx-actions" style="margin-top:6px"><button id="cs-exp">Verschlüsselt exportieren</button><button id="cs-imp">Datei laden …</button>
+        <input id="cs-file" type="file" accept=".rfsave" hidden></div>
+      <div class="ledger" id="cs-msg"></div>
     </div></div>`;
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
@@ -920,6 +975,42 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = () => { A.saveNow(); toast('Gespeichert'); };
   $('quit').onclick = () => { A.saveNow(); location.reload(); };
+  cloudButtons();
+}
+// S15 Paket S: verschlüsselter Export und Import (cloudsave.js). Import behält den bisherigen Stand als Sicherung.
+function cloudButtons() {
+  const msg = t => { $('cs-msg').textContent = t; };
+  $('cs-exp').onclick = async () => {
+    const pw = $('cs-pw').value;
+    if (pw.length < CS.MIN_PW) return msg(`Das Passwort braucht mindestens ${CS.MIN_PW} Zeichen.`);
+    if (pw !== $('cs-pw2').value) return msg('Die beiden Passwörter sind nicht gleich.');
+    if (S.player && !S._quiet) A.saveNow();
+    const raw = localStorage.getItem(SAVE_KEY); if (!raw) return msg('Es gibt noch keinen Spielstand.');
+    msg('Verschlüssle …');
+    try {
+      const bytes = await CS.encryptSave(raw, pw), I = CS.saveInfo(raw) || { house: 'Haus', day: 0 };
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      a.download = `rotfall-${I.house}-tag${I.day}-${new Date().toISOString().slice(0, 10)}.rfsave`.replace(/[^\w.\-äöüÄÖÜß]/g, '_');
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      $('cs-pw').value = $('cs-pw2').value = ''; msg(`Exportiert: Haus ${I.house}, Tag ${I.day}. Leg die Datei in deinen Cloud-Ordner.`);
+    } catch (e) { msg(e.message); }
+  };
+  $('cs-imp').onclick = () => { if ($('cs-pw').value.length < CS.MIN_PW) return msg('Erst das Passwort eingeben, mit dem die Datei exportiert wurde.'); $('cs-file').click(); };
+  $('cs-file').onchange = async () => {
+    const f = $('cs-file').files[0]; $('cs-file').value = ''; if (!f) return;
+    msg('Entschlüssle …');
+    try {
+      const inner = await CS.decryptSave(new Uint8Array(await f.arrayBuffer()), $('cs-pw').value), I = CS.saveInfo(inner.save);
+      const when = new Date(inner.at).toLocaleString('de-DE');
+      if (!confirm(`Spielstand laden?\n\nHaus ${I.house}, Generation ${I.gen}, ${I.name}, Tag ${I.day}\nexportiert am ${when}\n\nDein bisheriger Stand bleibt als Sicherung erhalten.`)) return msg('Abgebrochen.');
+      const old = localStorage.getItem(SAVE_KEY);
+      try { if (old) localStorage.setItem(SAVE_KEY + '.vor-import', old); }
+      catch { return msg('Kein Platz für die Sicherung des bisherigen Stands. Exportiere ihn zuerst, dann lösche alte Stände.'); }
+      localStorage.setItem(SAVE_KEY, inner.save);
+      S._quiet = true;                                                  // beim Neuladen nicht den alten Stand darüber speichern
+      $('cs-pw').value = ''; msg('Geladen. Das Spiel startet neu …'); setTimeout(() => location.reload(), 600);
+    } catch (e) { msg(e.message); }
+  };
 }
 
 // ---------------- Tod & Erbe ----------------

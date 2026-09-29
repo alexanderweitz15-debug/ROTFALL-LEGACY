@@ -24,7 +24,7 @@ export const S = {
   legacy: { house: 'Ragnar', gen: 1, ancestors: [] },
   settlement: null,
   flags: {},
-  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7, art: 'D' },   // Nutzer S13: Stil F vorerst aus (in den Optionen wählbar)
+  settings: { violence: 'standard', motion: true, textScale: 1, volume: 0.7, art: 'R' },   // Nutzer S15: Stil R ist Standard; D und F bleiben in den Optionen wählbar
   kills: 0, battles: 0,
   log: [],
   // transient (nicht gespeichert)
@@ -52,6 +52,10 @@ export function timeStr() {
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 export function year() { return 17 + Math.floor((S.day - 1) / 60); }
+// S14 (Nutzer: Jahreszeiten mit Wirkung): je 7 Tage Frühling, Sommer, Herbst, Winter. Wirkung: Wetter, Ernte, Herden, Wolfswinter.
+export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
+export const seasonOf = (d = S.day) => Math.floor(Math.max(0, (d | 0) - 1) / 7) % 4;   // 0 Frühling … 3 Winter
+export const SEASON_FARM = [0.9, 1.1, 1.4, 0.4];                                         // Getreide je Jahreszeit (Herbst: Ernte)
 
 const logListeners = [];
 export function onLog(fn) { logListeners.push(fn); }
