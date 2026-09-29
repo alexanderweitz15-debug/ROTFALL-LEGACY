@@ -1452,7 +1452,7 @@ SPAWN_AREAS.push(
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
-const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
+const HUMANOID = new Set(['acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -2107,6 +2107,7 @@ function update(dt, now) {
   if (S.player?.casting) castTick(S.player);   // S15 P4
   mountTick(dt);                               // S15: gerufenes Pferd läuft heran
   if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
+  if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -2858,7 +2859,8 @@ function castSpell(c, key, a = c.aim ?? 0) {
       for (let k = 0; k <= 6; k++) fx(from.x + (cand.x - from.x) * k / 6, from.y - 12 + (cand.y - from.y) * k / 6, 'spark', 1); from = cand; last = cand; }
     if (!last && c === S.player) UI.toast('Kein sichtbares Ziel für den Blitz.'); }
   else if (S0.shape === 'self' || S0.shape === 'group') {
-    const who = S0.shape === 'group' ? [c, ...S.ents[c.map].filter(o => o !== c && o.alive && !isHostile(c, o) && (o.kind === 'npc' || o.kind === 'player' || o.servant) && dist(o, c) < (S0.r || 150) && (c !== S.player || S.party.includes(o.id)))] : [c];
+    const pat = c === S.player && S.trial?.kind === 'heal' && byId(S.trial.patient);   // S15 P5: Heilprüfung — Heilzauber treffen die Patientin
+    const who = pat && dist(pat, c) < 90 && S0.shape === 'self' && (S0.heal || S0.staunch) ? [pat] : S0.shape === 'group' ? [c, ...S.ents[c.map].filter(o => o !== c && o.alive && !isHostile(c, o) && (o.kind === 'npc' || o.kind === 'player' || o.servant) && dist(o, c) < (S0.r || 150) && (c !== S.player || S.party.includes(o.id)))] : [c];
     for (const o of who) {
       if (S0.heal) { if (o.body) B.heal(o, pw); else o.hp = Math.min(o.maxHp, o.hp + pw); float(o, '+' + Math.round(pw), 'rgba(160,224,160,ALPHA)'); }
       if (S0.staunch) { o.status = (o.status || []).filter(q => q.key !== 'bleeding'); if (o.body) { const w = B.worstPart(o); if (w) B.healPart?.(o, w, pw * 2); } }
@@ -2898,6 +2900,7 @@ function groundTick() {
 }
 const WILD_BEASTS = new Set(['wolf', 'bear', 'boar']);
 function isHostile(a, b) {
+  if (a.trial || b.trial) return (a === S.player || b === S.player) && (a.trial || b.trial) !== 'heal';   // S15 P5: Prüflinge nur gegen dich
   if (a.kind === 'enemy' && b.kind === 'enemy' && (WILD_BEASTS.has(a.mtype) !== WILD_BEASTS.has(b.mtype)) && !a.servant && !b.servant && !a.pet && !b.pet && !a.spirit && !b.spirit && !a.goblinStorm && !b.goblinStorm
     && !MONSTERS[a.mtype]?.prey && !MONSTERS[b.mtype]?.prey && (MONSTERS[a.mtype]?.faction === 'bandit' || MONSTERS[b.mtype]?.faction === 'bandit')) return true;   // S15 P3 (Nutzer): Raubtiere und Banditen arbeiten nicht zusammen
   if (a.amok || b.amok) return a !== b && !(a.amok && b.amok) && !b.prey && teamOf(a.amok ? b : a) !== 'prey';   // S14 Magitech-Unfall: Amok-Automaten gegen alle
@@ -3013,6 +3016,8 @@ function hit(attacker, target, mult, kind = 'physical') {
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (target === S.player && target.body) for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = target.body[k]; if (P.mech) P.mechCond = Math.max(0, (P.mechCond ?? 100) - 1.2); }   // S12 E: Prothesen nutzen sich ab (ohne Zufall: Proben bleiben gleich)
   if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
+  if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
+  if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
     float(target, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); fx(target.x, target.y + 2, 'dust', 5); setTres(target, tres(target) + 1); titleDeed(target); return; }
@@ -3034,6 +3039,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
+  if (target === S.player && S.trial?.kind === 'shield' && source?.trial === 'shield' && ward) S.trial.n++;   // S15 P5: Schildprüfung
   if (ward && dmg > 0) {                                              // Knochenschild fängt ab, bis er bricht
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
     fx(target.x, target.y - 12, 'bone', 4); if (dmg <= 0) return float(target, 'Knochen', 'rgba(215,208,186,ALPHA)');
@@ -3407,7 +3413,7 @@ function nearestTarget(e, list, maxD) {
   return best;
 }
 
-const VOICE = { dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
+const VOICE = { acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
   bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek' };   // Phase 6
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
@@ -8141,6 +8147,7 @@ function talk(npc) {
   const gw = gradeTalk(npc); if (gw) choices.push(gw);                // S15 Titelgrade
   if ((npc.key === 'sael' || npc.key === 'ysra') && (S.ranks.undead ?? -1) >= 3 && !S.player.knownClasses.includes('deathknight')) choices.push({ text: 'Die Todesweihe. (Klasse Todesritter)', fn: () => deathRite(npc) });
   if (npc.spellsTaught?.length) choices.push({ text: 'Kannst du mir Magie beibringen?', fn: () => spellMenu(npc) });   // S15 P5
+  if (npc.spellRule === 'academy') choices.push({ text: 'Ich will eine Prüfung ablegen.', fn: () => trialMenu(npc) });
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
   if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
@@ -8677,6 +8684,56 @@ function spellMenu(npc) {
       return { text: have ? `✓ ${A0.name} (kannst du)` : `${A0.name} — Stufe ${A0.tier}, ${spellPrice(npc, k)} Gold${lack.length ? ' (fehlt etwas)' : ''}`,
         fn: () => have ? back() : lack.length ? UI.dialogue(npc, `„${A0.name}? Dafür fehlt dir noch: ${lack.join(', ')}.“`, [{ text: 'Zurück', fn: back }])
           : UI.dialogue(npc, `„${A0.desc}“ Das kostet ${spellPrice(npc, k)} Gold.`, [{ text: 'Lehr es mich.', fn: () => { learnFrom(npc, k); back(); } }, { text: 'Zurück', fn: back }]) }; }),
+    { text: 'Zurück', fn: () => talk(npc) }]);
+}
+// S15 P5 Akademie-Prüfungen (Magister Corvinus, vor der Akademie in Aurelheim). Keine Prüfung tötet jemanden:
+//   aim    — 5 Puppen in 30 s mit Zaubern treffen (Waffen zählen nicht)
+//   shield — 10 Übungsgeschosse kommen in 25 s; 8 davon muss ein Schildzauber abfangen
+//   heal   — einen Studenten mit verletztem Bein in 60 s stabilisieren (jedes Glied über der Hälfte)
+//   duel   — gegen einen Studenten: wer zuerst unter 20 % Leben fällt, verliert; dann endet der Kampf sofort
+// Rang: 1 bestanden = Hörer, 2–3 = Adept (Stufe III), 4 = Magister.
+const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
+const acadRankOf = n => n >= 4 ? 3 : n >= 2 ? 2 : n >= 1 ? 1 : 0;
+function acadSpot() { const h = HOUSES.find(b => b.type === 'academy' && b.map === 'world'); return h ? { x: h.doorTile[0] * TS + TS / 2, y: (h.doorTile[1] + 6) * TS } : { x: S.player.x, y: S.player.y }; }
+function startTrial(kind, at = acadSpot()) {
+  endTrial(null);
+  const T = S.trial = { kind, until: clock() + { aim: 30, shield: 25, heal: 60, duel: 90 }[kind], n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2 }, m = S.player.map;
+  const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy; e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
+  if (kind === 'aim') for (let i = 0; i < 5; i++) put('acad_dummy', -120 + i * 60, -60 - (i % 2) * 40);
+  if (kind === 'shield') { const e = put('acad_dummy', 0, -160); if (e) { e.invuln = true; T.shooter = e.id; } }
+  if (kind === 'duel') { const e = put('acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; } }
+  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
+    c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
+  UI.toast(`PRÜFUNG: ${TRIALS[kind].toUpperCase()}`, 2600);
+  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: 'Die Studentin hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.', duel: 'Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.' }[kind], 'quest');
+}
+function endTrial(won) {
+  const T = S.trial; if (!T) return; S.trial = null;
+  for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => !T.ids.includes(e.id));
+  if (won == null) return;
+  if (!won) { UI.toast(`${TRIALS[T.kind].toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${TRIALS[T.kind]} nicht bestanden. Corvinus lässt dich es noch einmal versuchen.`, 'quest'); return; }
+  const done = (S.acad ||= {}), first = !done[T.kind]; done[T.kind] = true;
+  const r0 = S.acadRank || 0; S.acadRank = acadRankOf(Object.keys(done).length);
+  UI.toast(`${TRIALS[T.kind].toUpperCase()}: BESTANDEN`, 2600); log(`${TRIALS[T.kind]} bestanden.`, 'quest');
+  if (first) { S.factions.aurel = clamp((S.factions.aurel || 0) + 3, -100, 100); gainXp(S.player, 60); }
+  if (S.acadRank > r0) { UI.toast(`AKADEMIE: ${ACAD_RANKS[S.acadRank].toUpperCase()}`, 3200); chronicle(`${S.player.name} wird ${ACAD_RANKS[S.acadRank]} der Akademie`, 'news'); if (S.acadRank >= 2) log('Als Adept darfst du die dritte Stufe lernen.', 'quest'); }
+}
+function trialTick() {
+  const T = S.trial, p = S.player; if (!T) return;
+  if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false);
+  if (T.kind === 'aim' && T.n >= 5) return endTrial(true);
+  if (T.kind === 'shield') {
+    if (T.shot < 10 && clock() >= T.next) { T.next = clock() + 2.2; T.shot = (T.shot || 0) + 1; const a = Math.atan2(p.y - (T.y - 160), p.x - T.x);
+      S.projectiles.push({ id: uid(), kind: 'spark', map: p.map, x: T.x, y: T.y - 150, vx: Math.cos(a) * 4.5, vy: Math.sin(a) * 4.5, owner: T.shooter, dmg: 3, life: 2600, team: 'foe' }); }
+    if (T.shot >= 10 && clock() >= T.next) return endTrial(T.n >= 8);
+  }
+  if (T.kind === 'heal') { const c = byId(T.patient); if (c && c.body && ['lleg', 'rleg', 'larm', 'rarm', 'torso', 'head'].every(k => c.body[k].lost || c.body[k].hp >= c.body[k].max * 0.5)) return endTrial(true); }
+  if (clock() > T.until) return endTrial(false);
+}
+function trialMenu(npc) {
+  const done = S.acad || {}, back = () => trialMenu(npc);
+  UI.dialogue(npc, `„Vier Prüfungen. Keine davon tötet dich, alle können dich blamieren.“ Dein Rang: ${ACAD_RANKS[S.acadRank || 0]}. Die Prüfungen finden vor der Akademie statt.`, [
+    ...Object.entries(TRIALS).map(([k, n]) => ({ text: `${done[k] ? '✓ ' : ''}${n}`, fn: () => { UI.closeDialogue(); startTrial(k); } })),
     { text: 'Zurück', fn: () => talk(npc) }]);
 }
 // Kodex „Magie“: wer lehrt was (lebende Lehrer mit Ort)
@@ -12284,6 +12341,18 @@ export function selftest() {
     if (p.body) { B.fullHeal(p); p.body.torso.hp -= 30; B.syncHp(p); } else p.hp -= 30; const h0 = p.hp; hit(p, g, 1); const healed = p.hp > h0;
     return closed && open && treeAbilities(p).includes('death_grip') && frosted && pulled && healed;
   }));
+  ok('Akademie-Prüfungen (S15 P5): Puppen nur durch Zauber, Schild zählt, Heilung besteht, Duell endet vor dem Tod; Rang Adept nach zwei', sandbox(() => {
+    const p = stage(), a0 = S.acad, r0 = S.acadRank, f0 = S.factions.aurel; S.acad = {}; S.acadRank = 0;
+    try { const at = { x: p.x, y: p.y };
+      startTrial('aim', at); const dummies = S.ents.__a.filter(e => e.trial === 'aim'); hurt(dummies[0], 5, p, 'Schwert'); const noSword = S.trial.n === 0;
+      for (const d of dummies) hurt(d, 5, p, 'Zauber', false, 'magic'); trialTick(); const aim = !!S.acad.aim && !S.trial;
+      startTrial('heal', at); learnSpell(p, 'sp_heal', true); for (let i = 0; i < 4; i++) castSpell(p, 'sp_heal'); trialTick(); const heal = !!S.acad.heal && !S.trial;
+      const adept = S.acadRank === 2;
+      startTrial('duel', at); const st = S.ents.__a.find(e => e.duelist); if (p.body) B.fullHeal(p); hurt(p, p.maxHp * 0.95, st, 'Duell'); const lost = !S.trial && !S.acad.duel && p.hp > 0;
+      startTrial('duel', at); const st2 = S.ents.__a.find(e => e.duelist); hurt(st2, st2.maxHp * 0.95, p, 'Duell'); const won = !!S.acad.duel && st2.hp > 0;
+      return noSword && aim && heal && adept && lost && won && !S.ents.__a.some(e => e.trial);
+    } finally { S.trial = null; S.acad = a0; S.acadRank = r0; S.factions.aurel = f0; }
+  }));
   ok('Zauberlehrer (S15 P5): sagen, was fehlt (Gold, Intelligenz, Beziehung, Schein); lehren sonst; Akademie Stufe III nur mit Rang', sandbox(() => {
     const p = stage(), g0 = S.gold, rel0 = S.relations.serafine, perm0 = S.permit, acad0 = S.acadRank;
     try { const sera = { key: 'serafine', name: 'Serafine', faction: 'merch', spellsTaught: ['sp_firebolt'] }, prof = { key: 'corvinus', name: 'Corvinus', faction: 'aurel', spellRule: 'academy', spellsTaught: ['sp_firewall', 'sp_icespear'] };
@@ -12519,7 +12588,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
-    castSpell, learnSpell, spellMenu,                                           // S15 P4: Zauber im Dev-Modus prüfen
+    castSpell, learnSpell, spellMenu, startTrial, acadSpot,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

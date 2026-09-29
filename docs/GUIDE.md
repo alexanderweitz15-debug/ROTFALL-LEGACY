@@ -125,6 +125,13 @@ Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
   | Magister Corvinus | Akademie Aurelheim | Arkan, Feuer II–III, Frost, Blitz, Schutzkreis | Aufenthaltsschein; Stufe III nur als Bürger oder Akademie-Adept |
 
   Unbekannte Zauber zeigen im Zauberbuch, wer sie lehrt. Der Kodex (H) hat dazu den Reiter „Magie“.
+- **Akademie-Prüfungen** bei Magister Corvinus („Ich will eine Prüfung ablegen.“), vor der Akademie in Aurelheim. Niemand stirbt dabei.
+  - **Zielübung:** fünf Puppen in 30 Sekunden mit Zaubern treffen. Waffen zählen nicht.
+  - **Schildprüfung:** zehn Übungsgeschosse kommen; acht muss ein Schildzauber (Schild, Magieschild) abfangen.
+  - **Heilprüfung:** eine Studentin mit zertrümmertem Bein in 60 Sekunden stabilisieren (Heilzauber, Verband, Kräuter).
+  - **Duell:** gegen einen Studenten. Wer zuerst unter ein Fünftel seines Lebens fällt, verliert.
+
+  Eine bestandene Prüfung macht dich zum **Hörer**, zwei zum **Adepten** (du darfst Stufe III lernen), alle vier zum **Magister**.
 - **Sammelzeit:** Viele Zauber brauchen einen Moment. Unter dir leuchtet eine Rune in der Farbe der Schule. Wirst du in dieser
   Zeit getroffen, bricht der Zauber ab, und du bekommst halbes Mana zurück.
 - **Wände:** Die Eiswand (Frost III) stellt fünf Eisblöcke quer vor dich, durch die nichts kommt. Die Feuerwand (Feuer III) brennt

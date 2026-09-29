@@ -413,6 +413,10 @@ export const MONSTERS = {
   hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
   // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
+  // S15 P5: Akademie-Prüfungen (Aurelheim). Puppen stehen still, Studenten zaubern; beide sterben nie (Prüfung endet vorher).
+  acad_dummy:  { name:'Übungspuppe', interiors:false, hp:1, dmg:0, speed:0, reach:0, atk:99999, xp:0, sight:0, r:11, threat:0, pal:{skin:'#c8a868',cloth:'#8a6a3a',metal:'#5a4a30'} },
+  acad_student:{ name:'Student der Akademie', interiors:false, hp:60, dmg:6, speed:1.2, reach:240, atk:1600, ranged:true, missile:'shadow', xp:0, sight:320, r:11, threat:1, spells:['sp_spark', 'sp_froststrike'],
+                 pal:{skin:'#d8b89a',cloth:'#2c3a6a',metal:'#8a7a50',glow:'#9fd0ff'} },
   cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true, role:'Heiler', spells:['sp_firebolt', 'sp_spark'],
                pal:{skin:'#b8a890',cloth:'#2a1f2e',metal:'#5a4a66',glow:'#b07ae0'} },    // hält Abstand, heilt verwundete Untote
   ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true, role:'Masse',

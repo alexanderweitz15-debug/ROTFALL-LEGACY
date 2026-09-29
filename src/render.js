@@ -670,6 +670,14 @@ function drawHorse(e, now, kind, rider) {
   if (rider && !ns) ride();
   if (dir === 'S') blit(SP.beastFrame('horse', pal, 'S', 'head', fr));   // von vorn: der Kopf verdeckt den Reiter
 }
+function drawDummy(e) {                                               // Pfahl, Querholz, Strohsack mit Zielscheibe
+  const x = Math.round(e.x), y = Math.round(e.y);
+  shadow(x, y + 3, 9, .35);
+  ctx.fillStyle = '#4a3624'; ctx.fillRect(x - 1, y - 30, 3, 32); ctx.fillRect(x - 11, y - 24, 23, 3);
+  ctx.fillStyle = '#b89a58'; ctx.fillRect(x - 7, y - 34, 15, 20); ctx.fillStyle = '#8a7040'; ctx.fillRect(x - 7, y - 16, 15, 2); ctx.fillRect(x - 7, y - 34, 2, 20);
+  ctx.fillStyle = '#d8c080'; ctx.fillRect(x - 3, y - 41, 7, 7);
+  ctx.fillStyle = '#e8e0d0'; ctx.fillRect(x - 4, y - 29, 9, 9); ctx.fillStyle = '#a83a2a'; ctx.fillRect(x - 3, y - 28, 7, 7); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(x - 2, y - 27, 5, 5); ctx.fillStyle = '#a83a2a'; ctx.fillRect(x - 1, y - 26, 3, 3);
+}
 function drawSpellWall(e, now) {
   const left = e.until - now, fade = Math.min(1, left / 600, (now - e.born) / 200), x = Math.round(e.x), y = Math.round(e.y);
   ctx.save(); ctx.globalAlpha = Math.max(0, fade);
@@ -703,7 +711,7 @@ function drawEntity(e, now) {
     case 'item': return drawGroundItem(e, now);
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
-    case 'enemy': return drawCreature(e, now);
+    case 'enemy': return e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now);   // S15 P5: Übungspuppe der Akademie
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);

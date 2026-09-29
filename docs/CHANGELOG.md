@@ -17,7 +17,8 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - P3 Kampfgefühl: schwere Angriffe mit roter Bodenmarkierung und Erholungsfenster; Wölfe gegen Banditen; Bogen mit Pfeil auf der Sehne.
 - Bogen spannt sichtbar (Sehne an den echten Bogenspitzen). P4 Magie: 20 Zauber in 6 Schulen, Sammelzeit mit Rune, Zustände, Übungsränge,
   Zauberbuch (Z), Zauber auf der Leiste, zaubernde Kultisten und Nekromanten, Debug „Magie“. Neu: `MECHANIKEN.md` (alle Mechaniken).
-- P4 fertig (Feuerwand, Eiswand, Brandfläche, Eisboden). P5 Teil 1: fünf Zauberlehrer mit Bedingungen, Kodex-Reiter „Magie“.
+- P4 fertig (Feuerwand, Eiswand, Brandfläche, Eisboden). P5: fünf Zauberlehrer mit Bedingungen, Kodex-Reiter „Magie“,
+  vier Akademie-Prüfungen mit Rängen (Hörer, Adept, Magister).
 - 9 Stadt-Lehrer, Lehrer auf Karte und im Kodex, Nachfolger für tote wichtige NPCs, Todesritter-Talentzweig, Auftragsziele kommen nach
   (Bug: nur 3 Grabräuber für 5; Untoten-Diener konnten Kultisten-Aufträge nicht erfüllen).
 - Pferd pfeifen (R), Aufsitzen mit E, Pferd von vorn/hinten, Reitsitz; Ruf fürs Heilen von Dorfleuten und Verteidigen; Bug: Auftrag ließ sich mehrfach abgeben.
