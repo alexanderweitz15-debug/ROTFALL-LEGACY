@@ -10161,6 +10161,12 @@ function debugSections() {
       'Zauberer-Gegner (Kultist)': () => spawnEnemy('cultist', S.map, (p.x / TS2 | 0) + 6, p.y / TS2 | 0), 'Zauberer-Gegner (Nekromant)': () => spawnEnemy('necromancer', S.map, (p.x / TS2 | 0) + 6, p.y / TS2 | 0),
       'Alle Zauber vergessen': () => { p.spells = {}; p.spellUse = {}; recalc(p); syncHotbar(); },
     }],
+    ['Turm des Nachtglases', `${sel('dbTower', TOWER_LEVELS.map((n, i) => [String(i + 1), `Ebene ${i + 1}: ${n}`]))}`, {   // S15 P6
+      'Zum Turm (Tor)': () => { toWorld(); p.x = NACHT.x * TS + TS / 2; p.y = (NACHT.y + 3) * TS; },
+      'In die Ebene': () => { const i = +v('dbTower'), r = i === 9 ? MAPS.tower.lib9 : MAPS.tower.levels[i]; travel('tower'); p.x = r.cx * TS + TS / 2; p.y = (r.cy + 2) * TS; },
+      'Vertrauen +25': () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 25); UI.toast('Ilvars Vertrauen ' + S.ilvar.trust); },
+      'Vertrauen −25': () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 25); UI.toast('Ilvars Vertrauen ' + S.ilvar.trust); },
+    }],
     // S14 (Nutzer: Debug-Menü prüfen und erweitern)
     ['Grafik', `${sel('dbSet', Object.keys(ARMOR_SETS).map(k => [k, ARMOR_SETS[k].name]))}`, {
       'Stil: Klassisch': () => { S.settings.art = 'D'; SP.setArt('D'); }, 'Stil: Neu (gezeichnet)': () => { S.settings.art = 'R'; SP.setArt('R'); }, 'Stil: Referenzblatt': () => { S.settings.art = 'F'; SP.setArt('F'); },
