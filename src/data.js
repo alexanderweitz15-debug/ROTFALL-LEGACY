@@ -955,6 +955,8 @@ export const QUESTS = {
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
     reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  q_anomaly: { name:'Riss im Gewebe', giver:null, desc:'Eine magische Anomalie: Mana fließt doppelt, Zauber verrutschen. Wer sie mit einem Schutzzauber schließt, bekommt Lohn von Aurelion und dem Orden.',   // S15 P7
+    objectives:[{type:'anomaly',count:1,text:'Im Zentrum einen Schutzzauber wirken (Schild, Magieschild, Schutzkreis, Schutzsegen)'}], reward:{gold:120,xp:150,rep:{aurel:4,order:4}} },
   q_graverobbers: { name:'Grabräuber in der Asche', giver:'sael', desc:'Lebende graben in der Nekropole und am Knochenwald nach Grabgut. Sie nehmen die Namen mit. Bring fünf von ihnen zum Schweigen — dann schreibt Vharnholm deinen Namen in die gute Spalte.',
     objectives:[{type:'kill',target:'bandit',count:5,text:'Grabräuber töten'}],
     reward:{gold:90,xp:140,rep:{undead:15,valen:-5}}, turnin:'sael' },

@@ -188,6 +188,13 @@ das Geständnis und du musst das Tagebuch suchen.
 
 Beide Ereignisse lassen sich im Debug-Menü unter „Ereignisse“ auslösen.
 
+## Magische Anomalie (S15)
+
+An einem Ley-Punkt (Totenruinen, Schädelwald, Gräberfeld, Seelenhügel, Westgebirge oder Wüstensporn) reißt das Gewebe. Im
+Umkreis fließt Mana doppelt, und Feuer-, Frost- und Blitzzauber verrutschen manchmal in ein anderes Element. Der Auftrag
+„Riss im Gewebe“ zeigt den Ort. Wirk im Zentrum einen Schutzzauber (Schild, Magieschild, Schutzkreis, Schutzsegen): Die
+Anomalie schließt sich, es gibt 120 Gold und Ruf bei Aurelion und dem Orden. Nach vier Tagen schließt sie sich von selbst.
+
 ## Der Magiekern (S15)
 
 Ein zufälliges Weltereignis: Goblins in **Grubenhort** finden einen Aurelioner Magiekern. **Snikk** hat ihn. Kauf ihn für 150 Gold

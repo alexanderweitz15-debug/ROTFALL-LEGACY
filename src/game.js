@@ -2494,7 +2494,7 @@ function tickCombatant(c, dt) {
   for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - dt);
   const resting = !c.vx && !c.vy;
   if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + (c.attributes?.endurance || 10) * 0.02 - 0.2 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0) + (stat(c, 'song') ? 0.5 : 0)));
-  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')));
+  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')) * (inAnomaly(c) ? 2 : 1));   // S15 P7: Anomalie
   if (c === S.player && c.titleClass) titleTick(c, dt);
   // Statuszeiten
   if (c.status && c.status.length) {
@@ -2844,7 +2844,8 @@ function spellHit(c, t, dmg, S0) {
   applySpellStatus(t, S0.status, c);
 }
 function castSpell(c, key, a = c.aim ?? 0) {
-  const ab = ABILITIES[key], S0 = ab.spell, pw = spellPower(c, key), col = SCHOOL[ab.school]?.fx || 'spark';
+  if (anomalyClose(c, key)) return;                                  // S15 P7: Schutzzauber im Zentrum schließt die Anomalie
+  const ab = ABILITIES[key], S0 = anomalySlip(c, ab.spell), pw = spellPower(c, key), col = SCHOOL[ab.school]?.fx || 'spark';
   if (S0.shape === 'bolt') S.projectiles.push({ id: uid(), kind: S0.el === 'fire' ? 'fire' : S0.el === 'frost' ? 'frost' : S0.el === 'shock' ? 'spark' : 'shadow', map: c.map, x: c.x + Math.cos(a) * 14, y: c.y - 12 + Math.sin(a) * 8,
     vx: Math.cos(a) * (S0.speed || 7), vy: Math.sin(a) * (S0.speed || 7), owner: c.id, dmg: pw, life: (S0.range || 300) / (S0.speed || 7) * 16, team: teamOf(c), spellSt: S0.status, pierce: S0.pierce ? 3 : 0, spell: true, drain: S0.drain || 0, holy: !!S0.holy });
   else if (S0.shape === 'line') { const ts = spellTargetsLine(c, a, S0.range); for (const t of ts) spellHit(c, t, pw, S0);
@@ -7830,6 +7831,27 @@ function evMagicCore() {
     greet: '„Glänzt! Summt! Snikk hat gefunden, Snikk behält — außer, du zahlst.“' }); c.spec = SP.monsterSpec({ mtype: 'goblin', seed: 3 }, MONSTERS.goblin); S.ents.world.push(c);
   log('Gerücht: Goblins aus Grubenhort haben im Schutt einen Aurelioner Magiekern gefunden. Viele wollen ihn haben.', 'world'); chronicle('Ein Magiekern taucht in Grubenhort auf', 'news'); return true;
 }
+// S15 P7 Magische Anomalie: an einem Ley-Punkt (per Hash aus Seed und Tag gewählt, nicht mit rnd()) reißt das Gewebe. Im Umkreis von
+// 20 Kacheln fließt Mana doppelt, und Feuer-, Frost- und Blitzzauber verrutschen zu 10 % in ein anderes Element. Ein Schutzzauber im
+// Zentrum (3 Kacheln) schließt sie; das Anschlagbrett sucht jemanden dafür (Auftrag q_anomaly). Nach 4 Tagen schließt sie sich selbst.
+const LEY = ['totenruinen', 'schaedelwald', 'graeberfeld', 'seelenhuegel', 'westgebirge', 'wuestensporn'];
+function evAnomaly() {
+  if (S.anomaly) return false; const ok = LEY.map(k => LOCATIONS.find(l => l.key === k)).filter(Boolean); if (!ok.length) return false;
+  const L = ok[Math.abs(((S.seed | 0) * 31 + (S.day | 0) * 7) | 0) % ok.length];
+  const a = (((S.seed | 0) + (S.day | 0)) % 8) * 0.785, r = Math.min(10, (L.r || 20) * 0.4), x = Math.round(L.x + Math.cos(a) * r), y = Math.round(L.y + Math.sin(a) * r);
+  S.anomaly = { x, y, until: (S.day | 0) + 4, where: L.name }; S.quests.q_anomaly = { state: 'active', progress: [0] };
+  log(`Magische Anomalie bei ${L.name}: Mana fließt dort doppelt, Zauber verrutschen. Das Brett sucht jemanden, der sie schließt.`, 'world'); chronicle(`Das Gewebe reißt bei ${L.name}`, 'news'); return true;
+}
+const anomalySlip = (c, S0) => { if (!inAnomaly(c) || !['fire', 'frost', 'shock'].includes(S0.el) || !chance(0.1)) return S0; const el = pick(['fire', 'frost', 'shock'].filter(e => e !== S0.el)); float(c, 'die Formel verrutscht', 'rgba(184,138,240,ALPHA)'); return { ...S0, el, status: el === 'fire' ? { key: 'burning', chance: 0.5, left: 3000 } : el === 'frost' ? { key: 'frost', chance: 1 } : { key: 'shocked', chance: 1 } }; };
+const inAnomaly = c => S.anomaly && c.map === 'world' && Math.hypot(c.x / TS - S.anomaly.x, c.y / TS - S.anomaly.y) < 20;
+function anomalyClose(c, key) {
+  if (!S.anomaly || c !== S.player || !ABILITIES[key]?.spell?.absorb || Math.hypot(c.x / TS - S.anomaly.x, c.y / TS - S.anomaly.y) > 3) return false;
+  const st = S.quests.q_anomaly; S.anomaly = null; S.flags.anomalyClosed = (S.flags.anomalyClosed || 0) + 1;
+  fx(c.x, c.y - 12, 'heal', 30); S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 3, life: 800, maxLife: 800 });
+  if (st?.state === 'active') { st.progress = [1]; const R = QUESTS.q_anomaly.reward; st.state = 'done'; S.gold += R.gold; gainXp(c, R.xp); for (const [f, v] of Object.entries(R.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); }
+  log('Der Riss schließt sich. Das Gewebe ist wieder still (120 Gold, Aurelion und Orden +4).', 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
+}
+function anomalyDay() { if (S.anomaly && (S.day | 0) >= S.anomaly.until) { log(`Die Anomalie bei ${S.anomaly.where} schließt sich von selbst.`, 'world'); S.anomaly = null; if (S.quests.q_anomaly?.state === 'active') S.quests.q_anomaly.state = 'failed'; } }
 function snikkTalk(npc) {
   if (S.flags.coreEv !== 'found') return UI.dialogue(npc, '„Weg ist weg. Snikk hat jetzt Gold. Gold summt nicht, aber Gold ist gut.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   UI.dialogue(npc, npc.greet, [
@@ -7860,7 +7882,7 @@ function coreSmash() {                                                // aus dem
 function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].metro && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm'); const k = pick(T); return k && startFire(k) ? k : null; }   // S14
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
-  evMagicCore,
+  evMagicCore, evAnomaly,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
   () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
@@ -8041,7 +8063,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  seasonDay(); successorDay();
+  seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); rebuildRazed(); aurelDay(); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay();
@@ -9859,6 +9881,7 @@ const QUEST_WHERE = { q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
+  if (k === 'q_anomaly') return S.anomaly ? { x: S.anomaly.x, y: S.anomaly.y } : null;   // S15 P7
   if (k === 'q_grisk_rache') return S.chainRest ? { x: S.chainRest[0], y: S.chainRest[1] } : null;
   if (k.startsWith('c_')) { const C = (S.contracts || []).find(c => 'c_' + c.id === k); if (!C) return null; const [gx, gy] = conSq(C.town);   // S13: Eskorte/Paket zeigen aufs Ziel, nicht auf den Startort
     if (C.have >= C.need || C.kind === 'supply') return { x: gx, y: gy };
@@ -10230,6 +10253,7 @@ function debugSections() {
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
+      'Magische Anomalie': () => { S.anomaly = null; evAnomaly(); UI.toast('Anomalie bei ' + (S.anomaly?.where || '—')); },   // S15 P7
       'Magiekern (Artefakt-Konflikt)': () => { delete S.flags.coreEv; S.ents.world = S.ents.world.filter(e => !e.coreHolder); evMagicCore(); UI.toast('Snikk in Grubenhort hat den Kern.'); },   // S15 P7
       'Brand (hier)': () => { if (!startFire(nearTown())) UI.toast('Hier brennt nichts, was brennen könnte.'); },
       'Stadtverteidigung (hier)': () => { const t = nearTown(), C = makeContract(t, 'defense', 'vm'); (S.contracts ||= []).push(C); acceptContract(C); C.at = clock() + 1; },
@@ -10512,7 +10536,7 @@ export function selftest() {
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
   ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
+    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
   ok('Erreichbarkeit (Audit A-04): kein Rohstoff, kein Kraut steht auf Fels, Wasser oder Mauer', MAP_KEYS.every(m => (S.ents[m] || []).every(e => !(e.kind === 'prop' && e.harvest) || !SOLID.has(tileAt(m, e.x / TS | 0, e.y / TS | 0)))));
   ok('Warnung (BUG-081): erster Schritt in ein gefährliches Gebiet schreibt eine Warnung, Siedlungen und Sicheres nicht', (() => {
     const at = k => LOCATIONS.find(l => l.key === k), low = { level: 1 }, vet = { level: 9 };
@@ -12554,6 +12578,14 @@ export function selftest() {
       S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
+  }));
+  ok('Magische Anomalie (S15 P7): Ort per Hash, Mana doppelt, Schutzzauber im Zentrum schließt sie und zahlt', sandbox(() => {
+    const p = stage(), A0 = S.anomaly, q0 = S.quests.q_anomaly; S.anomaly = null;
+    try { const ev = evAnomaly(), A1 = { ...S.anomaly }; S.anomaly = null; evAnomaly(); const same = S.anomaly.x === A1.x && S.anomaly.y === A1.y;
+      p.map = 'world'; p.x = S.anomaly.x * TS; p.y = S.anomaly.y * TS; p.maxMana = 100; p.mana = 0; recalc(p); p.maxMana = 100; p.mana = 0;
+      const inside = inAnomaly(p); const g0 = S.gold; learnSpell(p, 'sp_shield', true); castSpell(p, 'sp_shield'); const closed = !S.anomaly && S.gold === g0 + 120 && S.quests.q_anomaly.state === 'done';
+      return ev && same && inside && closed;
+    } finally { S.anomaly = A0; S.quests.q_anomaly = q0; if (!q0) delete S.quests.q_anomaly; }
   }));
   ok('Artefakt-Konflikt (S15 P7): Snikk hat den Kern; jede Wahl (Akademie, Tote, Kirche, Ilvar, zerschlagen) ändert etwas', sandbox(() => {
     const p = stage(), fl = S.flags.coreEv, f0 = { ...S.factions }, I0 = S.ilvar, O0 = S.omega, W0 = S.ents.world.length; delete S.flags.coreEv; S.gold = 500;
