@@ -331,10 +331,12 @@ function buyHorse(npc, id) {
 }
 // Pferdehof bei Wendel: Koppel aus Zäunen, drei Pferde darin (Zierde, nicht reitbar)
 function ensurePaddock() {
+  S.ents.world = S.ents.world.filter(e => !e.paddockFence || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0)));   // kein Zaun in Scheunenwand oder Fels (dort schließt die Wand die Koppel)
   const w = S.ents.world.find(e => e.key === 'wendel'); if (!w || S.ents.world.some(e => e.decor && e.paddock)) return;
   const cx = (w.x / TS | 0) + 4, cy = (w.y / TS | 0) - 1;
   if (!S.ents.world.some(e => e.paddockFence)) { for (let i = -4; i <= 4; i++) for (const dy of [-3, 3]) S.ents.world.push({ id: uid(), kind: 'prop', type: 'fence', map: 'world', x: (cx + i) * TS + 16, y: (cy + dy) * TS + 16, r: 10, solid: true, paddockFence: true, label: 'Koppel des Pferdehofs' });
-    for (let j = -2; j <= 2; j++) S.ents.world.push({ id: uid(), kind: 'prop', type: 'fence', map: 'world', x: (cx + 4) * TS + 16, y: (cy + j) * TS + 16, r: 10, solid: true, paddockFence: true }); if (solidIndex.world) indexSolids('world'); }
+    for (let j = -2; j <= 2; j++) S.ents.world.push({ id: uid(), kind: 'prop', type: 'fence', map: 'world', x: (cx + 4) * TS + 16, y: (cy + j) * TS + 16, r: 10, solid: true, paddockFence: true });
+    S.ents.world = S.ents.world.filter(e => !e.paddockFence || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0))); if (solidIndex.world) indexSolids('world'); }
   for (let i = 0; i < 3; i++) S.ents.world.push({ id: uid(), kind: 'mount', map: 'world', x: (cx - 2 + i * 2) * TS, y: (cy - 1 + (i % 2) * 2) * TS, vx: 0, vy: 0, r: 12, alive: true, transient: true, decor: true, paddock: true, mkind: 'horse', aim: i ? Math.PI : 0, hDir: i ? 'W' : 'E', name: 'Pferd auf der Koppel' });
 }
 // Todesritter (Nutzer): sein Pferd wird zum Totenross; wer keins hat, bekommt einmal eins
@@ -3432,7 +3434,7 @@ function levelUp(c) {
   if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen
     log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Attribut- und Talentpunkt.`, 'party'); }
   if (c.map === S.map) { fx(c.x, c.y - 10, 'heal', 18); float(c, `Stufe ${c.level}`, 'rgba(240,210,120,ALPHA)', true); if (c === S.player) sfx('heal', 0.6); }   // S13: Aufstieg sichtbar
-  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Talentpunkt`); log(`Du erreichst Stufe ${c.level}. Ein Talentpunkt ist frei (T).`, 'party'); }
+  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Statpunkt (C) · +1 Talentpunkt (T)`, 3200); log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C) und ein Talentpunkt (Talente, T).`, 'party'); }   // S15 (Nutzer): Statpunkte sichtbar
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
   recalc(c); B.fullHeal(c);
 }
@@ -5802,7 +5804,13 @@ function evHaunt() {
   log(`${townName(k)}: Nachts steigen Geister aus dem Brunnen. Am Anschlagbrett hängt ein Aushang.`, 'world'); chronicle(`Spuk am Brunnen von ${townName(k)}`, 'news', 'Die Leute meiden den Brunnen. Am Brett wird jemand gesucht, der den Ort säubert.');
   return k;
 }
-function questOf(C) { return { name: C.title, giver: null, desc: `${C.desc} (Auftraggeber: ${C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : 'Bewohner'} in ${townName(C.town)})`,
+// S15 (Nutzer): Aufträge von Bewohnern nennen den Namen des Auftraggebers, und der Rückweg zeigt auf ihn selbst, wo er gerade ist
+// (nicht auf den Stadtplatz). Auf „Sehr schwer“ steht kein Name und es gibt keinen Wegpunkt: man muss sich merken, wer es war.
+const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev';
+const conHard = C => resGiver(C) && S.difficulty === 'sehr_schwer';
+const giverEnt = C => resGiver(C) ? S.ents.world.find(e => e.key === C.giver && e.alive !== false) : null;
+function questOf(C) { const who = C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : conHard(C) ? 'ein Bewohner — merk dir, wer' : `${C.giverName || giverEnt(C)?.name || 'ein Bewohner'}`;
+  return { name: C.title, giver: null, desc: `${C.desc} (Auftraggeber: ${who} in ${townName(C.town)})`,
   objectives: [{ type: 'custom', count: C.need, text: CON[C.kind].text(C.need) }], dyn: true }; }
 function registerContracts() {
   for (const C of S.contracts || []) if (C.state !== 'offer') { QUESTS['c_' + C.id] = questOf(C); const st = S.quests['c_' + C.id]; if (st) st.progress = [C.have]; }
@@ -5923,21 +5931,29 @@ function growthDay() {
   for (const t of Object.keys(TOWN_PLAN)) { if (!growable(t)) continue;
     const G = growthOf(t), fac = townFac(t), occ = S.war?.nodes[t]?.owner === 'undead', raided = S.deadRaid?.v === t;
     G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25, -20, 100);
-    if (G.prosper >= 100 && G.built.length < 10 && growTown(t)) G.prosper = 20;
+    if (G.prosper >= 100) growNow(t);
     const last = G.built.filter(s => !s.ruin).pop();
     if (G.prosper <= -20 && last) { last.ruin = true; const b = HOUSES.find(h => h.id === 'g' + t + '_' + last.x + '_' + last.y); if (b) b.wear = 2; G.prosper = 0; log(`${townName(t)} schrumpft: ein neues Haus steht leer und verfällt.`, 'world'); }
   }
 }
+// S15 (Nutzer: „bei 100 steht nicht, was passiert“): Wohlstand 100 baut ein Haus. Geht das nicht (zehn neue Häuser oder kein Platz),
+// bleibt der Wohlstand stehen und das Stadtkassen-Menü sagt warum.
+function growNow(t) { const G = growthOf(t);
+  if (G.built.length >= 10) return (G.full = 'max', false);
+  if (!growTown(t)) return (G.full = 'space', false);
+  G.full = null; G.prosper = 20; return true; }
 function investMenu(town) {
   const G = growthOf(town), fac = townFac(town), back = () => investMenu(town), me = { name: `Stadtkasse — ${townName(town)}` };
   const pay = (gold, res, fn) => () => { if (S.gold < gold || Object.entries(res).some(([k, n]) => (S.res[k] || 0) < n)) return UI.toast('Dafür reicht es nicht.');
     const ok = fn(); if (ok === false) return UI.toast('Kein Bauplatz mehr frei.');
     S.gold -= gold; for (const [k, n] of Object.entries(res)) S.res[k] -= n; S.factions[fac] = clamp((S.factions[fac] || 0) + 3, -100, 100); UI.refreshHUD(); back(); };
   if (!growable(town)) return UI.dialogue(me, 'Hier baut niemand. Nicht jetzt.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-  UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser. Bei 100 wächst die Stadt von selbst.`, [
+  const state = G.full === 'max' ? 'Die Stadt ist ausgebaut: zehn neue Häuser, mehr trägt der Ort nicht.' : G.full === 'space' ? 'Wohlstand voll, aber am Stadtrand ist kein Bauplatz mehr frei.'
+    : 'Bei 100 baut die Stadt ein neues Haus, neue Bewohner ziehen ein, und der Wohlstand fängt wieder bei 20 an.';
+  UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser.\n${state}\nDer Wohlstand steigt jeden Tag im Frieden; Überfälle und Besatzung senken ihn.`, [
     { text: 'Wohnhaus bauen (120 Gold, 20 Holz)', fn: pay(120, { wood: 20 }, () => !!growTown(town, 'house')) },
     { text: 'Werkstatt bauen (220 Gold, 30 Holz, 15 Stein)', fn: pay(220, { wood: 30, stone: 15 }, () => !!growTown(town, G.built.length % 2 ? 'smithy' : 'bakery')) },
-    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); }) },
+    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: G.prosper >= 100 ? () => UI.toast('Der Wohlstand ist schon voll.') : pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); if (G.prosper >= 100 && !growNow(town)) log(`${townName(town)}: Wohlstand voll, aber ${G.full === 'max' ? 'die Stadt ist ausgebaut' : 'kein Bauplatz frei'}.`, 'economy'); }) },
     { text: 'Wache verstärken (150 Gold, 10 Eisen)', fn: pay(150, { iron: 10 }, () => { const P = TOWN_PLAN[town], s = freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 3), g = guardChar(GUARD_KIT[fac] ? fac : 'merch', s); Object.assign(g, { guard: true, post: town, invested: true }); S.ents.world.push(g); log(`${townName(town)} hat eine Wache mehr.`, 'world'); }) },
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
   ]);
@@ -5967,7 +5983,7 @@ function conChoices(npc, choices) {
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
   if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => { claimContract(C, npc); if (C.state === 'claimed') UI.dialogue(npc, '„Gute Arbeit. Hier, dein Lohn.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); return; }
   choices.unshift({ text: 'Hast du Arbeit für mich?', fn: () => {
-    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); }
+    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); } C.giverName = npc.name;
     UI.dialogue(npc, `„${C.desc}“\nLohn: ${C.reward.gold} Gold${CON_DAYS[C.kind] ? ` · Frist ${CON_DAYS[C.kind]} Tage` : ''}.`, [{ text: 'Ich mach das.', fn: () => { if (acceptContract(C) !== false) UI.closeDialogue(); } }, { text: 'Später.', fn: () => UI.closeDialogue() }]); } });
 }
 // S13 (Nutzer: „neue Quest-Variationen, Ketten, Konsequenzen“). Wendungen werden beim Anlegen gewürfelt und nicht verraten:
@@ -6828,7 +6844,7 @@ function vargParley(v) {
     ...(S.flags.garmBrotherHint ? [{ text: 'Garmadon nennt dich Bruder.', fn: () => { omegaFrag('brother'); say('„… Er war mein Bruder. Er war König. Als der Himmel blutete, wollte er das Blut trinken — Macht, die kein Mensch halten kann. Ich stieß ihm das Schwert in den Rücken, bevor er trank. Er trank trotzdem. Danach.“')(); } }] : []),
     ...(omegaInsight() && !S.quests.q_omega ? [{ text: 'Ich will Omega rufen.', fn: () => vargRitual(v) }] : []),
     ...(canRite() ? [{ text: 'Ich will die Weihe der Kette.', fn: () => chainRite(v) }] : []),
-    ...((S.flags.garmMet || S.flags.garmFight) && !S.flags.garmadonSlain && !S.flags.legionAsked ? [{ text: 'Garmadon muss fallen. Leih mir eine Legion.', fn: () => { S.flags.legionAsked = true;   // S13 (Nutzer)
+    ...((S.flags.garmVisited || S.flags.garmFight) && (S.flags.garmMet || S.flags.garmFight) && !S.flags.garmadonSlain && !S.flags.legionAsked ? [{ text: 'Garmadon muss fallen. Leih mir eine Legion.', fn: () => { S.flags.legionAsked = true;   // S13 (Nutzer)
       const ok = (S.factions.chain || 0) >= 20 || (S.ranks.chain ?? -1) >= 1; if (ok) S.flags.legionPromised = true;
       UI.dialogue(v, ok ? '„Die Kette blutet nicht für die Pläne anderer. Geh allein, wenn du sterben willst.“\n(Varg wendet sich ab. Hinter ihm tauschen zwei Offiziere einen langen Blick.)'
         : '„Du? Du trägst nicht einmal unser Eisen. Geh.“', [{ text: 'Weiter', fn: back }]); } }] : []),
@@ -6863,6 +6879,7 @@ function garmadonParley(g) {
     { text: 'Ich fordere dich heraus.', fn: () => { UI.closeDialogue(); garmadonFight(p, 'challenge'); } },
     { text: 'Ich gehe.', fn: () => garmadonLeave(g) },
   ]);
+  if (!S.flags.garmMet) log('Garmadon hasst seinen Bruder Varg. Vielleicht leiht dir Varg in der Eisenfeste Männer gegen ihn.', 'quest');   // S15: Hinweis
   S.flags.garmMet = true;
 }
 function garmadonServe(g) {
@@ -7684,6 +7701,7 @@ function travel(to) {
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   if (to !== 'world' && p.mounted && S.map === 'world') leaveHorse(p);   // S15: das Pferd wartet vor der Tür
   S.map = to; p.map = to; if (to !== 'world') p.mounted = null;   // S13: Reittier bleibt draußen
+  if (to === 'garmadon') S.flags.garmVisited = true;   // S15 (Nutzer): Varg hilft erst, wenn man selbst in der Gruft war
   const spot = ARRIVAL[to](from);
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
@@ -10060,8 +10078,8 @@ const QUEST_WHERE = { q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
   if (k === 'q_anomaly') return S.anomaly ? { x: S.anomaly.x, y: S.anomaly.y } : null;   // S15 P7
   if (k === 'q_grisk_rache') return S.chainRest ? { x: S.chainRest[0], y: S.chainRest[1] } : null;
-  if (k.startsWith('c_')) { const C = (S.contracts || []).find(c => 'c_' + c.id === k); if (!C) return null; const [gx, gy] = conSq(C.town);   // S13: Eskorte/Paket zeigen aufs Ziel, nicht auf den Startort
-    if (C.have >= C.need || C.kind === 'supply') return { x: gx, y: gy };
+  if (k.startsWith('c_')) { const C = (S.contracts || []).find(c => 'c_' + c.id === k); if (!C || conHard(C)) return null; const [gx, gy] = conSq(C.town);   // S13: Eskorte/Paket zeigen aufs Ziel, nicht auf den Startort
+    if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') { const g = giverEnt(C); return g ? { x: g.x / TS, y: g.y / TS } : { x: gx, y: gy }; }   // S15: zurück zum Bewohner selbst
     if (C.kind === 'escort') { const t = S.ents.world.find(e => e.contract === C.id && e.alive); return t && dist(t, S.player) > 300 ? { x: t.x / TS, y: t.y / TS } : { x: C.tx, y: C.ty }; }
     if (C.kind === 'deliver') return { x: C.tx, y: C.ty };
     return { x: C.x, y: C.y }; }
@@ -12785,6 +12803,24 @@ export function selftest() {
     if (a.body) { a.body.torso.hp = -2; B.syncHp(a); } downed(a, 'Test'); a.status = [{ key: 'bleeding', name: 'Blutend', left: 30000 }]; a.downTimer = 3000;
     for (let i = 0; i < 60 && a.downed; i++) tickCombatant(a, 100);
     return a.alive && !(a.status || []).some(s => s.key === 'bleeding');
+  }));
+  ok('Bewohner-Aufträge (S15): Name des Auftraggebers steht im Auftrag, Rückweg zeigt auf ihn, wo er gerade ist; Sehr schwer: kein Name, kein Wegpunkt', sandbox(() => {
+    const d0 = S.difficulty, W0 = S.ents.world, C0 = S.contracts; S.ents.world = W0.slice();
+    try { S.difficulty = 'schwer'; const v = { id: uid(), kind: 'npc', key: '__tv', name: 'Testbert', alive: true, map: 'world', x: 100 * TS, y: 120 * TS }; S.ents.world.push(v);
+      const C = makeContract('eren', 'herbs', '__tv'); C.giverName = 'Testbert'; C.state = 'active'; S.contracts = [C];
+      const named = questOf(C).desc.includes('Testbert'), p1 = questPoint('c_' + C.id); v.x = 140 * TS; const p2 = questPoint('c_' + C.id);
+      const follows = p1.x === 100 && p2.x === 140;
+      S.difficulty = 'sehr_schwer'; const hard = !questPoint('c_' + C.id) && !questOf(C).desc.includes('Testbert');
+      const B = makeContract('eren', 'herbs', 'board'); B.state = 'active'; S.contracts.push(B); const boardStill = !!questPoint('c_' + B.id);
+      return named && follows && hard && boardStill;
+    } finally { S.difficulty = d0; S.ents.world = W0; S.contracts = C0; }
+  }));
+  ok('Wohlstand 100 (S15): Handel fördern bis 100 baut sofort; ist die Stadt voll, bleibt es stehen und das Menü sagt warum', sandbox(() => {
+    const G0 = structuredClone(S.growth || {});
+    try { const t = Object.keys(TOWN_PLAN).find(k => growable(k)), G = growthOf(t); G.built = Array.from({ length: 10 }, () => ({ x: -99, y: -99, w: 1, h: 1 })); G.prosper = 100;
+      const full = !growNow(t) && G.full === 'max' && G.prosper === 100;
+      return full;
+    } finally { S.growth = G0; }
   }));
   ok('Reittier-Werte (S15 P17): jedes Pferd eigene Werte, Erschöpfung bremst, mutige kommen im Kampf, Verstoßen löscht es', sandbox(() => {
     const p = stage(), m0 = S.mount;

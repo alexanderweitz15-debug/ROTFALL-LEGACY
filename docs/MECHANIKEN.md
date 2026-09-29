@@ -178,3 +178,10 @@ Stand: Session 15 (2026-09-29).
 - **Debug-Menü** (Strg + Umschalt + D): Teleport, Zeit, Stufe, alle großen Ereignisse, Kampf und Körper, Kerker,
   Kamerafahrten, **Magie** (alle Zauber lernen, Rang setzen, Mana voll, Abklingzeiten zurück, Zauberer-Gegner rufen).
 - **Selbsttest** (237 Proben) und **Ladeprobe** laufen abgeschirmt und ändern den echten Spielstand nicht.
+
+## Runde: Bewohner-Aufträge, Statpunkte, Wohlstand (S15)
+
+- **Aufträge von Bewohnern** nennen jetzt den Namen des Auftraggebers. Ist der Auftrag erledigt, zeigt der Wegpunkt auf den Bewohner selbst, dort wo er gerade steht, nicht mehr auf den Stadtplatz. Auf „Sehr schwer“ gibt es für diese Aufträge weder Namen noch Wegpunkt: Man muss sich merken, wer es war.
+- **Statpunkte:** Jede Stufe gibt einen Statpunkt (alle fünf Stufen einen zusätzlich). Die Stufenmeldung nennt ihn, die Kopfzeile zeigt freie Stat- und Talentpunkte, und im Charakterfenster (C) erklärt jeder Knopf beim Überfahren, was der Wert bewirkt.
+- **Wohlstand 100:** Die Stadt baut sofort ein neues Haus, wenn der Wohlstand durch „Handel fördern“ 100 erreicht, sonst über Nacht. Danach fängt er bei 20 wieder an. Ist die Stadt ausgebaut (zehn neue Häuser) oder kein Bauplatz frei, sagt die Stadtkasse das.
+- **Varg und die Legion:** Um Varg um Männer gegen Garmadon zu bitten, muss man selbst in Garmadons Gruft gewesen sein und ihn getroffen haben. Nach dem ersten Gespräch mit Garmadon gibt das Spiel einen Hinweis darauf.

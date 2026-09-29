@@ -79,7 +79,7 @@ export function refreshHUD() {
   const p = S.player; if (!p) return;
   $('pc-name').textContent = p.name;
   const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
-  $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}`;
+  $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`;   // S15 (Nutzer): freie Punkte sichtbar
   const fr = topRank(p);
   $('pc-rank').textContent = fr || 'Ohne Banner';
   drawPortraitTo($('pc-portrait'), p);
@@ -664,6 +664,8 @@ function woundNotes(c, click) {
 function charUI(body, who) {
   const p = who || S.player, isPlayer = p === S.player;
   const ATTRS = { strength:'Stärke', agility:'Beweglichkeit', endurance:'Ausdauer', intelligence:'Intelligenz', perception:'Wahrnehmung', willpower:'Willenskraft' };
+  const ATTR_TIP = { strength: 'Nahkampfschaden', agility: 'Fernkampfschaden, Lauftempo, Ausweichen', endurance: 'Leben, Ausdauer, Erholung', intelligence: 'Mana und Zauberschaden; manche Zauber verlangen einen Mindestwert',
+    perception: 'Chance auf kritische Treffer', willpower: 'Mana, Überzeugen im Rat und in Gesprächen' };   // S15 (Nutzer): erklären, was ein Punkt bringt
   const SKILLS = SKILL_NAMES;
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
@@ -680,7 +682,7 @@ function charUI(body, who) {
       <h3>Befund</h3>
       <dl class="ledger-list">${Object.entries(ATTRS).map(([k, n]) => `<div><dt>${n}</dt><dd>${p.attributes[k]}</dd></div>`).join('')}</dl>
       ${isPlayer && p.attrPoints > 0 ? `<div class="ap-box" id="ap-box"><p>${p.attrPoints} freie${p.attrPoints > 1 ? '' : 'r'} Punkt${p.attrPoints > 1 ? 'e' : ''}</p>
-        ${Object.entries(ATTRS).map(([k, n]) => `<button data-a="${k}">${n} +1</button>`).join('')}</div>` : ''}
+        ${Object.entries(ATTRS).map(([k, n]) => `<button data-a="${k}" title="${ATTR_TIP[k]}">${n} +1</button>`).join('')}<p class="ledger">Einen Punkt je Stufe, einen extra alle fünf Stufen. Maus über den Knopf zeigt, was der Wert bewirkt.</p></div>` : ''}
       <h3>Werte</h3>
       <dl class="ledger-list">
         <div><dt>Rüstung</dt><dd>${A.armorOf(p)}</dd></div>
