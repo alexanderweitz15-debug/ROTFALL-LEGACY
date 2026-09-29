@@ -582,6 +582,7 @@ function showDetail(slot, i) {
       ${it.slot === 'consumable' ? `<button id="d-use">${it.use === 'bandage' ? 'Anlegen' : 'Benutzen'}</button>` : it.slot !== 'material' ? '<button id="d-use">Anlegen</button>' : ''}
       ${it.slot === 'consumable' || it.slot === 'weapon' ? '<button id="d-hot">Auf Leiste legen</button>' : ''}
       ${A.bandageFrom(slot.key) ? `<button id="d-craft">${A.bandageFrom(slot.key)} Verbände schneiden</button>` : ''}
+      ${slot.key === 'magiekern' ? '<button id="d-smash">Zerschlagen</button>' : ''}
       <button id="d-drop">Ablegen</button>
       ${S.settlement && S.settlement.buildings.some(b => b.type === 'storage' && b.built >= 1) ? '<button id="d-stash">Ins Lager</button>' : ''}
     </div>`;
@@ -591,6 +592,7 @@ function showDetail(slot, i) {
   if ($('d-hot')) $('d-hot').onclick = () => { A.toHotbar(slot.key); toast('Auf Leiste gelegt'); };
   if ($('d-craft')) $('d-craft').onclick = () => { A.craftBandage(i); refresh(); };
   if ($('d-drop')) $('d-drop').onclick = () => { A.dropItem(i); refresh(); };
+  if ($('d-smash')) $('d-smash').onclick = () => { A.coreSmash?.(); refresh(); };   // S15 P7: Magiekern zerschlagen
   if ($('d-stash')) $('d-stash').onclick = () => { A.toStash(i); refresh(); };
 }
 const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', chest:'Rumpf', feet:'Füße', cloak:'Umhang', consumable:'Verbrauch', material:'Material' }[s] || s);

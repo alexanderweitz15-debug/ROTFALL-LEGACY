@@ -224,6 +224,7 @@ export const ITEMS = {
   talisman_toten:     { name:'Talisman der Toten', slot:'talisman', rarity:'rare', value:180, fixed:{ slayer:0.18 }, lore:'Grabsalz in einer Knochenkapsel. Die Toten riechen es.' },
   talisman_magie:     { name:'Talisman der Magie', slot:'talisman', rarity:'rare', value:180, fixed:{ spellp:0.1 }, lore:'Ein Kristallsplitter aus Aurelheim, noch warm.' },
   talisman_leben:     { name:'Talisman des Lebens', slot:'talisman', rarity:'rare', value:170, fixed:{ vital:0.06 }, lore:'Ein getrocknetes Heilkraut in Harz gegossen.' },
+  magiekern:          { name:'Aurelioner Magiekern', slot:'talisman', rarity:'epic', value:400, fixed:{ spellp:0.15 }, lore:'Ein Kristall in Messing gefasst, er summt. Aurelion, die Toten und die Kirche wollen ihn.' },   // S15 P7: Artefakt-Konflikt
   splitter_rotfall:   { name:'Splitter des Rotfalls', slot:'talisman', rarity:'epic', value:320, fixed:{ spellp:0.18, vital:-0.08 }, lore:'Rot, warm, und er flüstert. Nebenwirkung: er zehrt am Leben.' },
   blutstein:          { name:'Blutstein', slot:'talisman', rarity:'epic', value:320, fixed:{ sharp:0.14, enduring:-10 }, lore:'Er pulsiert im Takt deines Herzens — und ein wenig schneller. Nebenwirkung: weniger Ausdauer.' },
   eulenauge:          { name:'Eulenauge', slot:'talisman', rarity:'epic', value:300, fixed:{ keen:0.08, fleet:-0.04 }, lore:'Ein gläsernes Auge, das in die Dunkelheit sieht. Nebenwirkung: schwer an der Brust.' },

@@ -6169,6 +6169,7 @@ function ilvarTalk(npc) {
     if (!hasItem(p, 'soul_vial', 3)) return UI.dialogue(npc, '„Drei. Nicht zwei, nicht zweieinhalb. Seelen zählt man genau.“', [{ text: 'Zurück', fn: back }]);
     removeItem(p, 'soul_vial', 3); I.vials++; gain(12, 'Seelenphiolen'); S.gold += 40; UI.dialogue(npc, '„Gut. Sie werden nicht leiden. Nicht mehr als vorher.“ (+40 Gold)', [{ text: 'Weiter', fn: back }]); } });
   if (!npc.spellsTaught.includes('sp_raise')) npc.spellsTaught.push('sp_raise', 'sp_soulburst');   // ältere Stände
+  const cc = coreChoice(npc); if (cc) ch.unshift(cc);
   ch.push({ text: 'Lehre mich.', fn: () => spellMenu(npc) });
   if (I.trust >= 75 && !S.flags.towerSeal) ch.push({ text: 'Die verbotene Bibliothek …', fn: () => { openTowerSeal(); UI.dialogue(npc, '„Nimm, was du lesen kannst. Was du nicht lesen kannst, lass liegen. Es liest sonst dich.“ (Die Knochenkette fällt.)', [{ text: 'Weiter', fn: back }]); } });
   if (I.trust >= 100 && !S.player.spells?.sp_nachtglas) ch.push({ text: 'Ich bin bereit für die Endprüfung.', fn: () => UI.dialogue(npc, '„In der Beschwörungskammer. Fünfundvierzig Sekunden. Halte stand, während ich die Geister loslasse. Ich fange dich auf, wenn du fällst — aber dann war es das für heute.“', [
@@ -6917,6 +6918,7 @@ function priestTalk(n) {
     { text: 'Wer ist Omega?', fn: () => { omegaFrag('priest'); UI.dialogue(n, '„Der Stern, der über der Welt wachte. Er fiel — nicht aus Schwäche. Er kam uns zu nah. Sein Blut ist der Rotfall, und wo es hinfiel, standen die Toten auf. Wir tragen Eisen, damit nie wieder ein Gott für uns fallen muss.“', [{ text: 'Weiter', fn: back }]); } },
     { text: `Beten (10 Gold) — dein Glaube: ${O.faith}`, fn: () => omegaPray() },
     ...(n.spellsTaught ? [{ text: 'Lehre mich Omegas Worte. (Glaubensmagie)', fn: () => spellMenu(n) }] : []),   // S15 P7
+    ...(coreChoice(n) ? [coreChoice(n)] : []),
     { text: 'Kann man ihn zurückrufen?', fn: () => UI.dialogue(n, answer, [{ text: 'Weiter', fn: back }]) },
     ...(S.quests.q_omega?.state === 'active' ? [{ text: 'Das Ritual beginnen.', fn: () => omegaRitual(n) }] : []),
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
@@ -7818,9 +7820,47 @@ function evPilgrimRaid() {                                               // Räu
 }
 function evHauntEv() { return evHaunt(); }
 function evMagitech() { return magitechAccident('tickmar'); }   // S14
+// S15 P7 Artefakt-Konflikt: Goblins in Grubenhort finden einen Aurelioner Magiekern (Snikk hat ihn). Kaufen oder nehmen; dann melden
+// sich Aurelion, die Toten und die Omega-Kirche. Mit dem Kern im Gepäck bieten Corvinus, Sael, Irmgard und Ilvar je etwas an; man kann
+// ihn auch zerschlagen oder behalten (Talisman). Jede Wahl ändert Ruf, eine Handelsroute oder den Glauben und kommt in die Chronik.
+function evMagicCore() {
+  if (S.flags.coreEv) return false; const G = LOCATIONS.find(l => l.key === 'grubenhort'); if (!G) return false;
+  S.flags.coreEv = 'found'; const pos = freeSpotNear('world', G.x + 3, G.y + 2, 3);
+  const c = makeChar({ name: 'Snikk', prof: 'Goblin-Sammler', x: pos.x, y: pos.y, level: 3, faction: 'goblin' }); Object.assign(c, { goblin: true, key: 'snikk', coreHolder: true, anchor: { x: pos.x, y: pos.y },
+    greet: '„Glänzt! Summt! Snikk hat gefunden, Snikk behält — außer, du zahlst.“' }); c.spec = SP.monsterSpec({ mtype: 'goblin', seed: 3 }, MONSTERS.goblin); S.ents.world.push(c);
+  log('Gerücht: Goblins aus Grubenhort haben im Schutt einen Aurelioner Magiekern gefunden. Viele wollen ihn haben.', 'world'); chronicle('Ein Magiekern taucht in Grubenhort auf', 'news'); return true;
+}
+function snikkTalk(npc) {
+  if (S.flags.coreEv !== 'found') return UI.dialogue(npc, '„Weg ist weg. Snikk hat jetzt Gold. Gold summt nicht, aber Gold ist gut.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, npc.greet, [
+    { text: 'Ich kaufe ihn dir ab. (150 Gold)', fn: () => { if (S.gold < 150) return UI.toast('Dafür reicht dein Gold nicht.'); S.gold -= 150; coreTaken(npc, 'gekauft'); } },
+    { text: 'Gib ihn her.', fn: () => { S.factions.goblin = clamp((S.factions.goblin || 0) - 10, -100, 100); coreTaken(npc, 'genommen'); } },
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+function coreTaken(npc, how) {
+  S.flags.coreEv = 'held'; addItem(S.player, 'magiekern'); UI.closeDialogue(); UI.refreshHUD();
+  log(`Du hast den Magiekern ${how}. Kurz darauf finden dich Boten: Aurelion will ihn zurück (Magister Corvinus), die Toten wollen ihn untersuchen (Sael in Vharnholm), die Kirche will ihn weihen (Irmgard). Auch Ilvar Nachtglas wäre neugierig.`, 'quest');
+  chronicle(`${S.player.name} nimmt den Magiekern an sich`, 'news');
+}
+const CORE_DEALS = {   // wer den Kern nimmt: Gespräch, Folgen
+  corvinus: ['Den Magiekern der Akademie zurückgeben.', () => { S.factions.aurel = clamp((S.factions.aurel || 0) + 15, -100, 100); S.gold += 250; S.flags.coreRoute = 'aurel'; return 'Aurelion zahlt 250 Gold und senkt die Zölle für dich. Magitech wird in Aurelion billiger.'; }],
+  sael:     ['Den Magiekern den Toten überlassen.', () => { S.factions.undead = clamp((S.factions.undead || 0) + 15, -100, 100); S.factions.order = clamp((S.factions.order || 0) - 10, -100, 100); addItem(S.player, 'soul_vial', 3); return 'Vharnholm schreibt deinen Namen in die gute Spalte (Untote +15, Orden −10) und gibt dir drei Seelenphiolen.'; }],
+  irmgard:  ['Den Magiekern Omega weihen lassen.', () => { S.factions.chain = clamp((S.factions.chain || 0) + 15, -100, 100); (S.omega ||= {}).faith = (S.omega.faith || 0) + 15; return 'Irmgard legt den Kern auf den Altar. Glaube +15, Kette +15.'; }],
+  ilvar:    ['Den Magiekern von Ilvar untersuchen lassen.', () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 20); return 'Ilvar zerlegt ihn mit spitzen Fingern. „Aurelion hat den Rotfall gemessen. Sie wissen mehr, als sie sagen.“ Vertrauen +20.'; }],
+};
+function coreChoice(npc) {
+  const D = CORE_DEALS[npc.key]; if (!D || S.flags.coreEv !== 'held' || !hasItem(S.player, 'magiekern')) return null;
+  return { text: D[0], fn: () => { removeItem(S.player, 'magiekern', 1); S.flags.coreEv = npc.key; const r = D[1](); log(r, 'quest'); chronicle(`Der Magiekern geht an ${npc.name}`, 'news'); UI.dialogue(npc, r, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } };
+}
+function coreSmash() {                                                // aus dem Inventar: zerschlagen
+  if (!removeItem(S.player, 'magiekern', 1)) return; S.flags.coreEv = 'smashed';
+  S.factions.order = clamp((S.factions.order || 0) + 5, -100, 100); for (const f of ['aurel', 'undead', 'chain']) S.factions[f] = clamp((S.factions[f] || 0) - 5, -100, 100);
+  fx(S.player.x, S.player.y - 12, 'spark', 20); camShake(4, 200); log('Du zerschlägst den Magiekern. Niemand bekommt ihn (Orden +5, Aurelion, Tote und Kette −5).', 'quest'); chronicle(`${S.player.name} zerschlägt den Magiekern`, 'news');
+}
 function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].metro && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm'); const k = pick(T); return k && startFire(k) ? k : null; }   // S14
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
+  evMagicCore,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
   () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
@@ -8206,6 +8246,7 @@ function npcOffers(n) {
   return o;
 }
 function talk(npc) {
+  if (npc.coreHolder) return snikkTalk(npc);                          // S15 P7 Artefakt-Konflikt
   if (npc.key === 'ilvar') return ilvarTalk(npc);                     // S15 P6
   if (npc.map === 'tower' && npc.name === 'Tuvi') return tuviTalk(npc);
   if (npc.downed && startRevive(npc)) return;
@@ -8244,6 +8285,7 @@ function talk(npc) {
   const gw = gradeTalk(npc); if (gw) choices.push(gw);                // S15 Titelgrade
   if ((npc.key === 'sael' || npc.key === 'ysra') && (S.ranks.undead ?? -1) >= 3 && !S.player.knownClasses.includes('deathknight')) choices.push({ text: 'Die Todesweihe. (Klasse Todesritter)', fn: () => deathRite(npc) });
   if (npc.spellsTaught?.length) choices.push({ text: 'Kannst du mir Magie beibringen?', fn: () => spellMenu(npc) });   // S15 P5
+  const cc = coreChoice(npc); if (cc) choices.unshift(cc);             // S15 P7: Magiekern
   if (npc.spellRule === 'academy') choices.push({ text: 'Ich will eine Prüfung ablegen.', fn: () => trialMenu(npc) });
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
@@ -10188,6 +10230,7 @@ function debugSections() {
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
+      'Magiekern (Artefakt-Konflikt)': () => { delete S.flags.coreEv; S.ents.world = S.ents.world.filter(e => !e.coreHolder); evMagicCore(); UI.toast('Snikk in Grubenhort hat den Kern.'); },   // S15 P7
       'Brand (hier)': () => { if (!startFire(nearTown())) UI.toast('Hier brennt nichts, was brennen könnte.'); },
       'Stadtverteidigung (hier)': () => { const t = nearTown(), C = makeContract(t, 'defense', 'vm'); (S.contracts ||= []).push(C); acceptContract(C); C.at = clock() + 1; },
       'Goblinbefreiung': () => liberate(), 'Varg-Tod (Kette fällt, mit Kamerafahrt)': () => liberate(), 'Garmadon-Tod (Fall der Untoten)': () => garmadonSlain(), 'Sklaverei (Aurelion)': () => { toWorld(); enslave('aurel', 200); }, 'Sklaverei (Kette)': () => { toWorld(); enslave('chain', 200); },
@@ -12512,6 +12555,15 @@ export function selftest() {
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
+  ok('Artefakt-Konflikt (S15 P7): Snikk hat den Kern; jede Wahl (Akademie, Tote, Kirche, Ilvar, zerschlagen) ändert etwas', sandbox(() => {
+    const p = stage(), fl = S.flags.coreEv, f0 = { ...S.factions }, I0 = S.ilvar, O0 = S.omega, W0 = S.ents.world.length; delete S.flags.coreEv; S.gold = 500;
+    try { const ev = evMagicCore(), sn = S.ents.world.find(e => e.coreHolder); coreTaken(sn, 'test'); const held = hasItem(p, 'magiekern') && S.flags.coreEv === 'held';
+      const res = {}; for (const k of ['corvinus', 'sael', 'irmgard', 'ilvar']) { S.flags.coreEv = 'held'; if (!hasItem(p, 'magiekern')) addItem(p, 'magiekern'); const before = JSON.stringify([S.factions, S.ilvar?.trust, S.omega?.faith, S.gold]);
+        coreChoice({ key: k, name: k }).fn(); res[k] = JSON.stringify([S.factions, S.ilvar?.trust, S.omega?.faith, S.gold]) !== before && !hasItem(p, 'magiekern'); }
+      S.flags.coreEv = 'held'; addItem(p, 'magiekern'); const o0 = S.factions.order; coreSmash(); const smashed = S.factions.order > o0 && !hasItem(p, 'magiekern');
+      UI.closeDialogue(); return ev && held && Object.values(res).every(Boolean) && smashed;
+    } finally { S.flags.coreEv = fl; if (!fl) delete S.flags.coreEv; Object.assign(S.factions, f0); S.ilvar = I0; S.omega = O0; S.ents.world = S.ents.world.slice(0, W0); }
+  }));
   ok('Glaubensmagie (S15 P7): Irmgard lehrt nach Kettenrang oder Glauben; Heilig trifft Untote doppelt; Rang macht stärker', sandbox(() => {
     const p = stage(), rk0 = S.ranks.chain, O0 = S.omega; S.omega = { ...(O0 || {}), faith: 0 };
     try { const ir = { key: 'irmgard', name: 'Irmgard', faction: 'chain', spellRule: 'faith', spellsTaught: FAITH_SPELLS }; S.ranks.chain = -1; p.attributes.intelligence = 14; S.gold = 999;
@@ -12757,7 +12809,7 @@ function boot() {
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
-    magicView: MAGIC_VIEW,                                             // S15 P7
+    magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });

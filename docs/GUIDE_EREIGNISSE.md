@@ -188,6 +188,22 @@ das Geständnis und du musst das Tagebuch suchen.
 
 Beide Ereignisse lassen sich im Debug-Menü unter „Ereignisse“ auslösen.
 
+## Der Magiekern (S15)
+
+Ein zufälliges Weltereignis: Goblins in **Grubenhort** finden einen Aurelioner Magiekern. **Snikk** hat ihn. Kauf ihn für 150 Gold
+oder nimm ihn (Grubenstämme −10). Danach melden sich Boten. Wer ihn bekommt, entscheidest du:
+
+| Wem | Wo | Folge |
+|---|---|---|
+| Magister Corvinus | Akademie Aurelheim | Aurelion +15, 250 Gold, Magitech wird für dich billiger |
+| Sael | Vharnholm | Untote +15, Orden −10, drei Seelenphiolen |
+| Irmgard | Altar der Eisenfeste | Kette +15, Glaube +15 |
+| Ilvar Nachtglas | Turm des Nachtglases | Vertrauen +20 und ein Hinweis zum Rotfall |
+| niemandem: zerschlagen | Inventar, „Zerschlagen“ | Orden +5, Aurelion, Tote und Kette −5 |
+| niemandem: behalten | als Talisman tragen | Zauberschaden +15 % |
+
+Im Debug-Menü („Ereignisse“) lässt er sich sofort auslösen.
+
 ## Der Turm des Nachtglases (S15)
 
 **Ort:** östlich der Schwarzen Feste, tief im Totenland. Der Turm ist das höchste Bauwerk der Welt: dunkler Stein, grüne Fenster,
