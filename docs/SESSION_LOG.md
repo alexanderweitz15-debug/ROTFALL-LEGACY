@@ -7,6 +7,11 @@ Neueste oben. Letzte zwei Sessions voll, ältere je eine Zeile (volle Texte: `ar
 - Später in S15: P1–P3 und Morrgrund/Dodon (siehe CHANGELOG), Bogen spannt sichtbar (Figuren-Glieder wurden doppelt skaliert,
   behoben), P4 Magie-Kern und Zauberbuch (Z), Gegner-Zauberer, Debug „Magie“. Selbsttest 237/237.
 - Nutzer (29.09.): Am Ende jeder Runde `docs/MECHANIKEN.md` ergänzen — dort steht jede Mechanik in ein, zwei Zeilen.
+- Danach (Opus): Pferd pfeifen/Werte, Stadt-Lehrer, Nachfolger, Todesritter (Talente + Eidwacht), Auftragsziel-Nachschub,
+  P4 (Wände), P5 (Zauberlehrer, Akademie-Prüfungen), P6 (Turm des Nachtglases, Ilvar), P7 (verbotene Magie, Glaube, Magiekern,
+  Anomalie), P8 (Ruhm, Rangwege), P9, P11, P12, P17, P19. Selbsttest 262/262. Automatischer Push nach `claude-arbeit` (Hook).
+- Offen mit Fragen an den Nutzer: P10/P21 Aurelion und Wasservolk, P14 Siedlungsbau, P15 Weltereignisse, P16 Varons Schloss,
+  P18 Fall Aurelions, P20 Untoten-Überfälle, P22 Gruppe, §G Morrgrund. Ohne Fragen: P13 Gesamtdurchlauf.
 - Nächster Schritt: P4-Rest (Form `wall`, Welt-Spuren), dann P5 (Lehrer, Akademie, Prüfungen, Kodex-Reiter).
 - S14-Reste davor: Magitech-Unfall (Amok-Automaten, Fabrikstillstand) und Spuk am Brunnen („Ort säubern“). Damit sind alle 4
   Ereignisse der Nutzerliste fertig.
