@@ -1449,6 +1449,7 @@ SPAWN_AREAS.push(
   { map:'world', x:185, y:430, r:12, types:['goblin', 'goblin', 'goblin_warrior'], cap:6, goblinHide: true },
   // S12 Totenland (Osten): nach Osten dichter und härter
   { map:'world', x:1180, y:300, r:60, types:['skeleton', 'skeleton', 'ghoul', 'wraith', 'zombie', 'zombie', 'bone_hound', 'carrion_wing'], cap:12 },
+  { map:'world', x:930, y:640, r:16, types:['bone_knight', 'wraith', 'necromancer', 'skeleton'], cap:7 },   // S15 P6: Wachen am Weg zum Turm des Nachtglases
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
@@ -3163,6 +3164,7 @@ function stabilize(c, helper) {
 
 function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
+  if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
   if (c.runaway && S.quests.q_runaway?.state === 'active') runawayEnd('Der Entlaufene ist tot.', 3);   // S12 A3
@@ -4231,7 +4233,7 @@ function interactables() {
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
-     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
+     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -4395,6 +4397,7 @@ function doInteract() {
     if (p.carry !== 'wassereimer') return UI.toast('Hol Wasser — am Brunnen gibt es Eimer.');
     act(p, 'work', 500, t); douse(F, 14, p); p.carry = null; return UI.toast(`Zisch! Die Flammen weichen (Hitze ${Math.round(F.heat)}).`); }
   if (t.type === 'well' && (S.fires || []).some(f => f.well && Math.hypot(f.well.x - t.x, f.well.y - 20 - t.y) < 40) && p.carry !== 'wassereimer') { act(p, 'kneel', 500, t); p.carry = 'wassereimer'; return UI.toast('Eimer voll. Zum brennenden Haus!'); }
+  if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
   if (t.bond) return t.type === 'keychest' ? stealKey(t) : bondMenu(t);
@@ -6130,6 +6133,7 @@ function morrFolk(n, from = 0) {
 // S15 P6 Turm des Nachtglases: Pförtner, lesende Geister, drei untote Schüler, Ilvar in der Turmspitze. Vertrauen S.ilvar.trust 0–100:
 // Fragen, die richtige Antwort über Omega und Seelenphiolen bringen es. Die Lehre richtet sich danach (SPELL_RULES.ilvar).
 function ensureTower() {
+  if (S.flags.soulsFreed) for (const e of S.ents.tower || []) if (e.soulJar) e.label = 'Zerbrochene Gläser. Das Licht ist fort.';
   if (S.flags.towerPop || !MAPS.tower?.levels || !S.ents.tower) return; S.flags.towerPop = true;
   const L = MAPS.tower.levels, put = (o, r, dx, dy) => { const c = makeChar({ faction: 'undead', undead: true, level: 8, ...o, x: (r.cx + dx) * TS + TS / 2, y: (r.cy + dy) * TS, map: 'tower' });
     c.anchor = { x: c.x, y: c.y }; c.hooded = true; c.pal.skin = '#b9b3a2'; c.pal.glow = '#8fd9b0'; c.pal.cloth = '#1c2220'; c.equip.weapon = o.weapon ? mkItem(o.weapon) : null; S.ents.tower.push(c); return c; };
@@ -6166,6 +6170,32 @@ function ilvarTalk(npc) {
     { text: 'Beginnen.', fn: () => { UI.closeDialogue(); const r5 = MAPS.tower.levels[5]; startTrial('ilvar', { x: r5.cx * TS + TS / 2, y: r5.cy * TS }); } }, { text: 'Noch nicht.', fn: back }]) });
   ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
   UI.dialogue(npc, `„${I.trust < 25 ? 'Du bist noch ein Fremder in meinem Turm.' : I.trust < 50 ? 'Du hörst zu. Das ist selten.' : I.trust < 75 ? 'Ich beginne, dir Dinge zu zeigen, die ich sonst niemandem zeige.' : 'Du bist beinahe ein Schüler.'}“ (Vertrauen ${I.trust})`, ch);
+}
+// Tuvi will fliehen (Nebenquest): helfen (Ilvar −15, Orden +5) oder verraten (Ilvar +10). Seelenkammer: befreien (Orden +10,
+// Untote −10, Ilvar −30) oder lassen. Stirbt Ilvar, stürzen die oberen Ebenen ein und die Schüler ziehen feindlich ins Totenland.
+function tuviTalk(npc) {
+  if (S.flags.tuvi) return UI.dialogue(npc, S.flags.tuvi === 'told' ? '„Du hast es ihm gesagt. Er hat nur gelächelt. Das ist schlimmer als Strafe.“' : '…', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, '„Ich war Buchbinder in Vharnholm. Dann bin ich gestorben, und jetzt binde ich Bücher für ihn. Für immer. Hilfst du mir hinaus? Der Pförtner schaut weg, wenn ihn jemand ablenkt.“', [
+    { text: 'Ich lenke den Pförtner ab. Lauf.', fn: () => { S.flags.tuvi = 'fled'; S.ents.tower = S.ents.tower.filter(e => e !== npc); (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 15);
+      S.factions.order = clamp((S.factions.order || 0) + 5, -100, 100); log('Tuvi ist fort. Ilvar wird es merken (Vertrauen −15, Orden +5).', 'quest'); chronicle('Ein toter Buchbinder flieht aus dem Turm des Nachtglases', 'news'); UI.closeDialogue(); } },
+    { text: 'Ich sage es Ilvar.', fn: () => { S.flags.tuvi = 'told'; (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 10); log('Du verrätst Tuvi (Ilvars Vertrauen +10).', 'quest'); UI.dialogue(npc, '„… Natürlich.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } },
+    { text: 'Nicht meine Sache.', fn: () => UI.closeDialogue() }]);
+}
+function soulJarChoice() {
+  UI.dialogue({ name: 'Seelenkammer' }, 'Dutzende Gläser. In jedem kreist ein grünes Licht und drückt gegen das Glas, wenn du näher kommst.', [
+    { text: 'Die Gläser zerschlagen. Die Seelen befreien.', fn: () => { S.flags.soulsFreed = true; S.factions.order = clamp((S.factions.order || 0) + 10, -100, 100); S.factions.undead = clamp((S.factions.undead || 0) - 10, -100, 100);
+      (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 30); for (const e of S.ents.tower) if (e.soulJar) e.label = 'Zerbrochene Gläser. Das Licht ist fort.';
+      fx(S.player.x, S.player.y - 20, 'heal', 30); log('Die Seelen steigen auf und verlöschen (Orden +10, Untote −10, Ilvars Vertrauen −30).', 'quest'); chronicle(`${S.player.name} befreit die Seelen im Turm des Nachtglases`, 'news'); UI.closeDialogue(); } },
+    { text: 'Nichts anrühren.', fn: () => UI.closeDialogue() }]);
+}
+function ilvarSlain(source) {
+  S.flags.ilvarDead = true; const L = MAPS.tower?.levels; if (!L) return;
+  for (let x = 30; x <= 34; x++) { const y = L[6].y + L[6].h; S.ents.tower.push({ id: uid(), kind: 'prop', type: 'broken_pillar', map: 'tower', x: x * TS + 16, y: y * TS + 16, r: 14, solid: true, label: 'Eingestürzte Treppe' }); }
+  indexSolids('tower');
+  for (const e of S.ents.tower.filter(e => e.kind === 'npc' && /Schüler/.test(e.prof || '') && e.alive)) { e.alive = false; const a = rnd() * 6.283, s = spawnEnemy('necromancer', 'world', NACHT.x + Math.round(Math.cos(a) * 30), NACHT.y + Math.round(Math.sin(a) * 30)); if (s) s.name = e.name; }
+  S.ents.tower = S.ents.tower.filter(e => !(e.kind === 'npc' && /Schüler/.test(e.prof || '')));
+  camShake(10, 800); log('Mit Ilvar stirbt, was den Turm zusammenhielt. Die oberen Ebenen stürzen ein. Seine Schüler fliehen ins Totenland.', 'world');
+  chronicle('Ilvar Nachtglas ist tot. Sein Turm bricht ein.', 'legend'); if (source === S.player) SIM.H.title('Turmbrecher');
 }
 function openTowerSeal() {
   S.flags.towerSeal = true;
@@ -8169,6 +8199,7 @@ function npcOffers(n) {
 }
 function talk(npc) {
   if (npc.key === 'ilvar') return ilvarTalk(npc);                     // S15 P6
+  if (npc.map === 'tower' && npc.name === 'Tuvi') return tuviTalk(npc);
   if (npc.downed && startRevive(npc)) return;
   const p = S.player, rel = S.relations[npc.key] ?? 0, now = clock();
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
@@ -12433,6 +12464,16 @@ export function selftest() {
       S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
+  }));
+  ok('Turm-Folgen (S15 P6): Tuvi flieht (Vertrauen sinkt), Seelen befreien kostet Vertrauen, Ilvars Tod versperrt die oberen Ebenen', sandbox(() => {
+    const p = stage(), I0 = S.ilvar, T0 = S.ents.tower, fl = { tuvi: S.flags.tuvi, souls: S.flags.soulsFreed, dead: S.flags.ilvarDead }, W0 = S.ents.world.length, f0 = { ...S.factions };
+    S.ilvar = { trust: 60, asked: {}, vials: 0 }; S.ents.tower = T0.slice(); delete S.flags.tuvi; delete S.flags.soulsFreed;
+    try { const tuvi = S.ents.tower.find(e => e.name === 'Tuvi'); tuviTalk(tuvi); document.querySelector('#dlg-choices button')?.click(); const fled = S.flags.tuvi === 'fled' && S.ilvar.trust === 45 && !S.ents.tower.includes(tuvi);
+      soulJarChoice(); document.querySelector('#dlg-choices button')?.click(); const freed = S.flags.soulsFreed && S.ilvar.trust === 15;
+      const saved = solidIndex.tower; ilvarSlain(null); const L = MAPS.tower.levels, blocked = !!solidPropAt('tower', 32 * TS + 16, (L[6].y + L[6].h) * TS + 16, 6);
+      solidIndex.tower = saved; return fled && freed && blocked && S.flags.ilvarDead;
+    } finally { UI.closeDialogue(); S.ilvar = I0; S.ents.tower = T0; S.flags.tuvi = fl.tuvi; S.flags.soulsFreed = fl.souls; S.flags.ilvarDead = fl.dead; if (!fl.tuvi) delete S.flags.tuvi; if (!fl.souls) delete S.flags.soulsFreed; if (!fl.dead) delete S.flags.ilvarDead;
+      S.ents.world = S.ents.world.slice(0, W0); Object.assign(S.factions, f0); for (const e of T0) { if (e.kind === 'npc') e.alive = true; if (e.soulJar) e.label = 'Gläser voller grünem Licht. In jedem bewegt sich etwas.'; } indexSolids('tower'); }
   }));
   ok('Nachtglas (S15 P6): Vertrauen 50/75 öffnet Lehre und Siegel, Endprüfung gibt den legendären Zauber, der Feinde verlangsamt', sandbox(() => {
     const p = stage(), I0 = S.ilvar, f0 = S.flags.towerSeal, seals0 = S.ents.tower.filter(e => e.towerSeal); S.ilvar = { trust: 60, asked: {}, vials: 0 };

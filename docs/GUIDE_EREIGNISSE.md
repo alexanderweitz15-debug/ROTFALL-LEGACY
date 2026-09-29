@@ -210,6 +210,12 @@ Lieferungen von je drei Seelenphiolen.
 | 75 | Seelenbersten; die Knochenkette vor der verbotenen Bibliothek fällt |
 | 100 | **Endprüfung** in der Beschwörungskammer: 45 Sekunden gegen Wellen von Geistern. Wer fällt, wird aufgefangen. Bestanden: der legendäre Zauber **Nachtglas** (Feinde um dich 6 s wie durch Glas) und der Titel „Schüler des Nachtglases“ |
 
+**Entscheidungen im Turm:**
+- **Tuvi** (Lehrsäle) will fliehen. Lenkst du den Pförtner ab, ist sie frei (Orden +5, Ilvars Vertrauen −15). Verrätst du sie, steigt das Vertrauen um 10.
+- **Seelenkammer** (Ebene 8): Zerschlägst du die Gläser, steigen die Seelen auf (Orden +10, Untote −10, Ilvars Vertrauen −30).
+- **Ilvars Tod:** Die Treppe über Ebene 5 stürzt ein, die Schüler fliehen als Nekromanten ins Totenland. Wer ihn tötet, heißt „Turmbrecher“.
+- Auf dem Weg zum Turm wachen Knochenritter, Geister und Nekromanten.
+
 ## Morrgrund und Dodon: der letzte Sturm der Grubenstämme (S15)
 
 **Ort:** Morrgrund, das letzte freie Dorf der Goblins, liegt weit im Süden der Westlande, im Moor unter Hohlstein. Man findet
