@@ -80,8 +80,8 @@ Jede Tat verändert deinen Ruf bei den Fraktionen. Der Ruf bestimmt Preise, Begr
 | Königreich Valen | Rekrut → Soldat → Veteran → Ritter → Offizier | Gespräch mit Soldaten und Offizieren |
 | Der Orden | Novize → Akolyth → Wächter → Ritter → Paladin → Meister | Gespräch mit dem Orden |
 | Die Untoten | Diener → Adept → Grabgebundener → Todesritter → Kommandant | bei Garmadon knien oder über die Stille Schar |
-| Freie Händler | Kunde → Partner → Teilhaber | Handel, Geleitschutz |
-| Rooks Bande | Handlanger → Klinge → Hauptmann | über Rook |
+| Freie Händler | Kunde → Partner → Teilhaber | Beitritt bei jedem Händler (Ansehen 10), Rangprüfungen bei Gerold in Nordfurt |
+| Rooks Bande | Handlanger → Klinge → Hauptmann | Beitritt bei Rook (Ansehen 10; nicht mit Valen oder dem Orden), Rangprüfungen bei Rook |
 | Hochreich Aurelion | Fremder → Registrierter Besucher → Bürger → Anerkannter Bürger → Handelsbürger → Gildenmitglied → Hoher Beamter → Mitglied des Hohen Rates | Aufenthaltsschein, dann Bürgerrecht (Abschnitt 11) |
 | Die Eiserne Kette | Treiber → Kettenknecht → Grenzreiter → Aufseher → Dunkler Hochpaladin | ab Ansehen 10 bei jeder Kettenwache |
 | Die Grubenstämme | Fremder → Freund → Grubenbruder | nach der Befreiung, Aufträge von Grisk |

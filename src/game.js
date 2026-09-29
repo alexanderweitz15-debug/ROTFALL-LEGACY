@@ -8314,7 +8314,7 @@ function talk(npc) {
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
   if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
-  if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
+  if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead', 'merch', 'bandit'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
   if (npc.shop && npc.shopClosed > now) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
@@ -8968,7 +8968,7 @@ function teach(npc, cls = teachable(npc)) {
   ]);
 }
 // Mechanik-Check S14: Erzfeinde schließen einander aus — kein Rang bei beiden Seiten zugleich (bestehende Ränge bleiben).
-const JOIN_FOES = { order: ['undead'], valen: ['undead', 'bandit'], undead: ['order', 'valen', 'chain'], chain: ['undead', 'goblin'] };
+const JOIN_FOES = { order: ['undead', 'bandit'], valen: ['undead', 'bandit'], undead: ['order', 'valen', 'chain'], chain: ['undead', 'goblin'], bandit: ['valen', 'order'] };   // S15 P8: Bande
 const joinFoe = f => JOIN_FOES[f]?.find(o => (S.ranks[o] ?? -1) >= 0) || (f === 'undead' && (S.player.titleClasses || []).includes('monk') ? 'order' : null);
 function joinFaction(npc) {
   const f = npc.faction, rep = S.factions[f], foe = joinFoe(f);
@@ -9002,7 +9002,7 @@ function rankGuide(f) {
     if (f === 'aurel') return ['Anfang', 'Aufenthaltsschein am Passamt (3 oder 7 Tage) oder Dienst bei einem Haus', 'Bürgerrecht: Ansehen 40, 1000 Gold, ein Adelshaus als Fürsprecher',
       'Bürger und Ansehen 52', 'Bürger und Ansehen 64', 'Bürger und Ansehen 76', 'Bürger und Ansehen 88', 'Hoher Beamter und die Quest „Eine Stimme im Rat“'][i];
     if (f === 'goblin') return ['Die Grubenstämme befreien (Varg stürzen)', 'Befreit und Ansehen 20', 'Befreit und Ansehen 60'][i];
-    if (f === 'merch' || f === 'bandit') return 'noch kein Aufstiegsweg (geplant)';
+    if (f === 'sea') return ['Ankunft auf den Gischtinseln', 'Den zweiten Auftrag eines Clans erfüllen (Salzbund oder Sturmklinge)', 'noch kein eigener Weg (Ausbau des Seevolks, Plan P21)', 'Salzbund: dritter Auftrag · Sturmklinge: Weißbarts Auftrag gegen Morra', 'noch kein eigener Weg (Ausbau des Seevolks, Plan P21)'][i];   // S15 P8: aus dem Code, nichts erfunden
     if (i === 0) return `Beitritt bei einem Mitglied, Ansehen ${f === 'undead' ? 15 : 10}`;
     if (f === 'chain' && i === 4) return 'Aufseher und die Weihe der Kette bei Varg';
     const L = RANK_LINES[f]; return `Ansehen ${i * 25}, dann die Rangprüfung (zwei Aufträge) bei ${L?.giver ? NPCS.find(n => n.key === L.giver)?.name : 'einer Kettenwache der Festung'}`;
@@ -9014,6 +9014,13 @@ function rankGuide(f) {
 // S14 (Nutzer): Rang-Questlines — Ruf erreicht → Questline beim Anführer frei → beide Aufträge erledigt = nächster Rang.
 // Je Rang zwei Aufträge (a: Bewährung, b: Tat). giver = NPC-Schlüssel, giverProf = Beruf (Kette: jede Kettenwache der Festung).
 const RANK_LINES = {
+  // S15 P8: Aufstiegswege für die Freien Händler (Gerold, Nordfurt) und Rooks Bande (Rook)
+  merch: { giver: 'gerold', lines: [
+    [['Geleitschutz', 'Gerold: „Ein Partner schützt die Straßen, auf denen seine Waren fahren. Vier Wegelagerer weniger.“', 'bandit', 4], ['Salz für Nordfurt', '„Und ein Partner liefert. Fünf Säcke Salz.“', 'item:salt', 5]],
+    [['Die Schützen am Pass', '„Die Bande schießt auf meine Wagen. Drei Schützen, und du bist Teilhaber.“', 'bandit_archer', 3], ['Werkzeug für den Norden', '„Drei Werkzeugkisten. Ein Teilhaber weiß, was knapp ist.“', 'item:tools', 3]] ] },
+  bandit: { giver: 'rook', lines: [
+    [['Blaue Röcke', 'Rook: „Valens Soldaten auf unserer Straße. Zwei weniger, und du bist eine Klinge.“', 'valen_soldier', 2], ['Beute', '„Und bring was mit. Drei Heiltränke — die Jungs bluten gern.“', 'item:potion', 3]],
+    [['Jäger auf der Jagd', '„Kopfgeldjäger wollen meinen Kopf. Nimm ihnen ihre, zwei reichen.“', 'bounty_hunter', 2], ['Der Wolf von der Furt', '„Ein Hauptmann hat keine Angst. Zeig es mir: ein Bär, allein.“', 'bear', 1]] ] },
   valen: { giver: 'oda', lines: [
     [['Straßen säubern', 'Oda: „Wer bei der Grenzwacht dient, hält zuerst die Straßen frei.“', 'bandit', 4], ['Schützen im Wald', '„Die Bande schießt aus dem Unterholz auf Karren. Hol sie da raus.“', 'bandit_archer', 2]],
     [['Wölfe an der Grenze', '„Die Weiden an der Grenze verlieren jede Woche Vieh. Veteranen lösen das.“', 'wolf', 5], ['Speere der Bande', '„Rooks Speerträger halten die Furt. Brich sie.“', 'bandit_spear', 3]],
@@ -9050,7 +9057,7 @@ function promote(f, r) {
 }
 function checkRankUp() {
   autoRanks();
-  for (const f of ['valen', 'order', 'undead', 'chain']) {
+  for (const f of ['valen', 'order', 'undead', 'chain', 'merch', 'bandit']) {   // S15 P8: Händler und Bande
     if (S.ranks[f] < 0 || S.ranks[f] == null || (f === 'chain' && S.ranks.chain >= 3)) continue;   // Hochpaladin nur durch die Weihe
     const r = S.ranks[f] + 1; if (r >= FACTIONS[f].ranks.length || !rankReady(f, r) || (S.rankNote ||= {})[f] === r) continue;
     S.rankNote[f] = r; const L = RANK_LINES[f], who = L.giver ? NPCS.find(n => n.key === L.giver)?.name : 'Eine Kettenwache der Festung';   // S14: Aufstieg nur über die Questline
@@ -12601,6 +12608,11 @@ export function selftest() {
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
+  ok('Rangwege (S15 P8): Händler und Bande haben Beitritt und zwei Rangprüfungen; der Kodex nennt für jede Fraktion den nächsten Schritt', (() => {
+    const lines = ['merch', 'bandit'].every(f => RANK_LINES[f]?.lines.length === FACTIONS[f].ranks.length - 1 && QUESTS[`r_${f}_1a`] && QUESTS[`r_${f}_2b`]);
+    const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
+    return lines && guide;
+  })());
   ok('Ruhm (S15 P8): Boss-Sieg hebt den Ruhm der Region über „Bekannt“, Begrüßung ändert sich, Berühmte zahlen weniger', sandbox(() => {
     const p = stage(), F0 = S.fame; S.fame = {};
     try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Geschichten') || l.includes('gehört'));

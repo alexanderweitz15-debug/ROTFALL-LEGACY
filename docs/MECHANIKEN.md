@@ -124,6 +124,8 @@ Stand: Session 15 (2026-09-29).
 - **Ruf-Stufen** bestimmen Preise (−15 % bis +30 %), Begrüßung und ob Wachen angreifen.
 - **Ruhm je Region (S15):** Bosse, Titel, Aufträge und gelöschte Brände machen dich bekannt; Stufen bis „Legendär“. Die Leute
   erkennen dich, Händler geben Nachlass, Kopfgeldjäger kommen früher.
+- **Rangwege für alle (S15):** Auch Freie Händler (Gerold) und Rooks Bande (Rook) haben Beitritt und Rangprüfungen. Der Kodex
+  (Reiter „Ränge“) nennt für jede Fraktion, was der nächste Rang verlangt.
 - **Ränge über Rangprüfungen:** Ruf allein befördert nicht; zwei Aufträge beim Anführer.
 - **Die Mächte handeln jeden Morgen:** Streifen, Aushänge, Preise, Aushebungen, als Nachricht und Gerücht.
 - **Hoher Rat von Aurelion:** alle 7 Tage eine Sitzung; überzeugen mit Gewinn, Pflicht oder Vernunft.
