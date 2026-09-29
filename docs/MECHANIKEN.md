@@ -50,6 +50,8 @@ Stand: Session 15 (2026-09-29).
   Der Kodex (H) zeigt im Reiter „Magie“ alle Schulen, Lehrer und wie die Mächte über Magie denken.
 - **Akademie-Prüfungen (S15):** Zielübung, Schildprüfung, Heilprüfung, Duell. Keine tötet; das Duell endet, wenn einer unter 20 %
   fällt. Ränge Hörer, Adept (schaltet Stufe III frei), Magister.
+- **Glaubensmagie (S15):** Omegas Priesterin Irmgard lehrt die Schule Glaube. Heilige Zauber treffen Untote doppelt, Kettenrang
+  und Glaube machen sie stärker. Inquisition zieht Verborgene ans Licht.
 - **Verbotene Magie (S15):** Totenmagie vor Zeugen einer Macht, die sie verbietet, ist ein Verbrechen (Kopfgeld). Ab drei
   Taten jagen Magierjäger mit Bann (Zauber bricht ab, Mana halbiert, 5 s Stille). Jede Macht hat ihre Haltung zu jeder Schule.
 - **Zauberbuch (Taste Z):** Reiter je Schule, Rang, Kosten, Übungsbalken, „Auf Leiste legen“. Unbekannte Zauber zeigen,

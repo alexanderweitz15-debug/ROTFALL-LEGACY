@@ -2788,7 +2788,7 @@ const chainAtWar = () => S.flags.vargChallenged || (S.flags.chainAlarm || 0) > (
 // der Übung (25 und 100 Einsätze). Wirken: Mana und Abklingzeit gleich, dann Sammelzeit (cast); ein Treffer bricht ab (halbes Mana
 // zurück). castSpell wirkt für Spieler und Gegner gleich (NPC-Zauberer: MONSTERS.spells).
 const SCHOOL = { fire: { name: 'Feuer', col: '#e0703a', fx: 'fire' }, frost: { name: 'Frost', col: '#8fd0f0', fx: 'frost' }, shock: { name: 'Blitz', col: '#f0e070', fx: 'spark' },
-  arcane: { name: 'Arkan', col: '#b88af0', fx: 'spark' }, shadow: { name: 'Schatten', col: '#8fd9b0', fx: 'shadow' }, heal: { name: 'Heilung', col: '#9fe0a0', fx: 'heal' }, ward: { name: 'Schutz', col: '#e8d8a0', fx: 'heal' } };
+  arcane: { name: 'Arkan', col: '#b88af0', fx: 'spark' }, shadow: { name: 'Schatten', col: '#8fd9b0', fx: 'shadow' }, faith: { name: 'Glaube', col: '#e0a060', fx: 'heal' }, heal: { name: 'Heilung', col: '#9fe0a0', fx: 'heal' }, ward: { name: 'Schutz', col: '#e8d8a0', fx: 'heal' } };
 const SPELL_KEYS = Object.keys(ABILITIES).filter(k => ABILITIES[k].spell);
 function learnSpell(c, key, quiet) {
   if (!ABILITIES[key]?.spell) return false; (c.spells ||= {}); if (c.spells[key]) return false;
@@ -2803,7 +2803,8 @@ function spellToBar(key, onlyFree) {                                  // Zauberb
   UI.renderHotbar(); return true;
 }
 function spellPower(c, key) { const S0 = ABILITIES[key].spell, r = spellRank(c, key) || 1, v = S0.dmg || S0.heal || S0.absorb || [0, 0];
-  return (v[0] + (c.attributes?.intelligence || 8) * v[1]) * spellMul(c) * [1, 1, 1.25, 1.5][r] * (c.kind === 'enemy' ? 1 + (c.level || 1) * 0.04 : 1); }
+  return (v[0] + (c.attributes?.intelligence || 8) * v[1]) * spellMul(c) * [1, 1, 1.25, 1.5][r] * (c.kind === 'enemy' ? 1 + (c.level || 1) * 0.04 : 1) * (ABILITIES[key].school === 'faith' ? faithMul(c) : 1); }
+const faithMul = c => c === S.player ? 1 + 0.1 * Math.max(0, S.ranks.chain ?? -1) + Math.min(60, S.omega?.faith || 0) / 200 : 1;   // S15 P7: je höher Rang und Glaube, desto stärker
 function startCast(c, key) {
   const ab = ABILITIES[key]; c.casting = { key, until: clock() + (ab.cast || 0) / 1000, mana: ab.mana || 0, aim: c.aim, col: SCHOOL[ab.school]?.col };
   c.castT = performance.now(); fx(c.x, c.y + 2, SCHOOL[ab.school]?.fx || 'spark', 6);
@@ -2837,13 +2838,15 @@ function applySpellStatus(t, st, src) {
 const c0Casting = t => !!t.casting;
 function spellHit(c, t, dmg, S0) {
   if (t.invuln && t.dodge) { evaded(t); return; }
+  if (S0.holy && (t.undead || MONSTERS[t.mtype]?.faction === 'undead')) dmg *= 2;   // S15 P7: heilig
+  if (S0.reveal) { t.hidden = false; t.stealth = false; t.revealed = performance.now() + 8000; }
   hurt(t, dmg, c, c.name || MONSTERS[c.mtype]?.name, false, S0.el === 'fire' ? 'fire' : S0.el === 'frost' ? 'frost' : 'magic');
   applySpellStatus(t, S0.status, c);
 }
 function castSpell(c, key, a = c.aim ?? 0) {
   const ab = ABILITIES[key], S0 = ab.spell, pw = spellPower(c, key), col = SCHOOL[ab.school]?.fx || 'spark';
   if (S0.shape === 'bolt') S.projectiles.push({ id: uid(), kind: S0.el === 'fire' ? 'fire' : S0.el === 'frost' ? 'frost' : S0.el === 'shock' ? 'spark' : 'shadow', map: c.map, x: c.x + Math.cos(a) * 14, y: c.y - 12 + Math.sin(a) * 8,
-    vx: Math.cos(a) * (S0.speed || 7), vy: Math.sin(a) * (S0.speed || 7), owner: c.id, dmg: pw, life: (S0.range || 300) / (S0.speed || 7) * 16, team: teamOf(c), spellSt: S0.status, pierce: S0.pierce ? 3 : 0, spell: true, drain: S0.drain || 0 });
+    vx: Math.cos(a) * (S0.speed || 7), vy: Math.sin(a) * (S0.speed || 7), owner: c.id, dmg: pw, life: (S0.range || 300) / (S0.speed || 7) * 16, team: teamOf(c), spellSt: S0.status, pierce: S0.pierce ? 3 : 0, spell: true, drain: S0.drain || 0, holy: !!S0.holy });
   else if (S0.shape === 'line') { const ts = spellTargetsLine(c, a, S0.range); for (const t of ts) spellHit(c, t, pw, S0);
     for (let d = 16; d < S0.range; d += 14) { const x = c.x + Math.cos(a) * d, y = c.y - 10 + Math.sin(a) * d; if (solidTile(c.map, x, y)) break; fx(x, y, col, 1); } }
   else if (S0.shape === 'nova' || S0.shape === 'area') {
@@ -3398,6 +3401,7 @@ function projHit(p) {
     if (!own || teamOf(own) === teamOf(e)) continue;
     if (Math.abs(p.x - e.x) < 30 && Math.abs(p.y - e.y) < 30 && dist(p, e) < (e.r || 10) + 5) {
       if (e.invuln && e.dodge) { if (!p.evaded) { p.evaded = true; evaded(e); } continue; }   // Geschoss fliegt durch die Rolle
+      if (p.holy && (e.undead || MONSTERS[e.mtype]?.faction === 'undead')) p.mult = 2;   // S15 P7: Heilige Flamme
       hurtFromProjectile(own, e, p);
       if (p.spellSt) applySpellStatus(e, p.spellSt, own);   // S15 P4
       if (p.drain && own.alive) { const h = p.dmg * p.drain; if (own.body) B.heal(own, h); else own.hp = Math.min(own.maxHp, own.hp + h); fx(own.x, own.y - 14, 'necro', 6); }   // S15 P6 Seelenzug
@@ -6886,14 +6890,16 @@ function rotfallCheck() {                                          // Bruchstüc
 }
 const omegaInsight = () => { const f = om().frags; return Object.keys(f).length >= OMEGA_NEED && !!f.garmadon && !!f.priest && (!!f.brother || !!S.flags.goblinsFreed) && playHours() >= OMEGA_HOURS; };
 // Altar und Priesterin Omegas in der Kernburg der Eisenfeste (religiöses Zentrum der Kette)
+const FAITH_SPELLS = ['sp_holyflame', 'sp_blessing', 'sp_ray', 'sp_inquisition'];
 function ensureOmegaShrine() {
+  for (const e of S.ents.world) if (e.omegaPriest) Object.assign(e, { spellsTaught: FAITH_SPELLS, spellRule: 'faith', key: e.key || 'irmgard' });   // S15 P7: Irmgard lehrt Glaubensmagie
   if (S.ents.world.some(e => e.omegaAltar)) return;
   const [bx, by] = EM(946, 384), a = freeSpotNear('world', bx - 3, by + 6, 3);
   const alt = { id: uid(), kind: 'prop', type: 'omega_altar', map: 'world', x: a.x, y: a.y, r: 14, solid: true, omegaAltar: true, label: 'Altar Omegas' };
   S.ents.world.push(alt); if (solidIndex.world) addSolid(alt);
   const pos = freeSpotNear('world', (a.x / TS | 0) + 2, (a.y / TS | 0) + 1, 2);
   const c = makeChar({ name: 'Irmgard', prof: 'Priesterin Omegas', x: pos.x, y: pos.y, level: 8, faction: 'chain', pal: { skin: SKIN[0], hair: '#2a1a14', cloth: '#3a0e10' } });
-  Object.assign(c, { omegaPriest: true, anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
+  Object.assign(c, { omegaPriest: true, key: 'irmgard', spellsTaught: FAITH_SPELLS, spellRule: 'faith', anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
 }
 function ensureDiary() {                                           // Varg tot: sein Tagebuch liegt in der Kernburg
   const O = om(); if (O.diary) return; O.diary = true;
@@ -6910,6 +6916,7 @@ function priestTalk(n) {
   UI.dialogue(n, n.greet, [
     { text: 'Wer ist Omega?', fn: () => { omegaFrag('priest'); UI.dialogue(n, '„Der Stern, der über der Welt wachte. Er fiel — nicht aus Schwäche. Er kam uns zu nah. Sein Blut ist der Rotfall, und wo es hinfiel, standen die Toten auf. Wir tragen Eisen, damit nie wieder ein Gott für uns fallen muss.“', [{ text: 'Weiter', fn: back }]); } },
     { text: `Beten (10 Gold) — dein Glaube: ${O.faith}`, fn: () => omegaPray() },
+    ...(n.spellsTaught ? [{ text: 'Lehre mich Omegas Worte. (Glaubensmagie)', fn: () => spellMenu(n) }] : []),   // S15 P7
     { text: 'Kann man ihn zurückrufen?', fn: () => UI.dialogue(n, answer, [{ text: 'Weiter', fn: back }]) },
     ...(S.quests.q_omega?.state === 'active' ? [{ text: 'Das Ritual beginnen.', fn: () => omegaRitual(n) }] : []),
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
@@ -8754,6 +8761,7 @@ const ILVAR_NEED = { sp_shadowbolt: 0, sp_drain: 25, sp_raise: 50, sp_soulburst:
 const SPELL_RULES = {
   order: (p, t) => (S.ranks.order ?? -1) < (t >= 3 ? 2 : t >= 2 ? 1 : 0) ? `Rang ${FACTIONS.order.ranks[t >= 3 ? 2 : 1]} im Orden` : null,
   ilvar: (p, t, key) => { const tr = S.ilvar?.trust || 0, need = ILVAR_NEED[key] ?? (t >= 3 ? 50 : t >= 2 ? 25 : 0); return need > 100 ? 'Ilvars Endprüfung' : tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
+  faith: (p, t) => { const rk = S.ranks.chain ?? -1, fa = S.omega?.faith || 0, ok = t >= 3 ? rk >= 2 || fa >= 60 : t >= 2 ? rk >= 1 || fa >= 40 : rk >= 0 || fa >= 20; return ok ? null : t >= 3 ? 'Kettenrang 2 oder Glaube 60' : t >= 2 ? 'Kettenrang 1 oder Glaube 40' : 'Kettenrang oder Glaube 20 (am Altar beten)'; },   // S15 P7
   academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
 };
 function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0, love = MAGIC_VIEW[npc.faction]?.love.includes(ABILITIES[key].school); return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1) * (love ? 0.85 : 1)); }
@@ -8791,7 +8799,7 @@ function spellLack(npc, key) {                                      // was fehlt
   const p = S.player, t = ABILITIES[key].tier, out = [], price = spellPrice(npc, key);
   if (S.gold < price) out.push(`${price - S.gold} Gold`);
   if ((p.attributes.intelligence || 8) < SPELL_INT[t]) out.push(`Intelligenz ${SPELL_INT[t]}`);
-  if (npc.spellRule !== 'academy' && npc.spellRule !== 'ilvar' && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
+  if (!['academy', 'ilvar', 'faith'].includes(npc.spellRule) && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
   const r = SPELL_RULES[npc.spellRule]?.(p, t, key); if (r) out.push(r);
   return out;
 }
@@ -12504,6 +12512,16 @@ export function selftest() {
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
+  ok('Glaubensmagie (S15 P7): Irmgard lehrt nach Kettenrang oder Glauben; Heilig trifft Untote doppelt; Rang macht stärker', sandbox(() => {
+    const p = stage(), rk0 = S.ranks.chain, O0 = S.omega; S.omega = { ...(O0 || {}), faith: 0 };
+    try { const ir = { key: 'irmgard', name: 'Irmgard', faction: 'chain', spellRule: 'faith', spellsTaught: FAITH_SPELLS }; S.ranks.chain = -1; p.attributes.intelligence = 14; S.gold = 999;
+      const no = spellLack(ir, 'sp_holyflame').some(x => x.includes('Glaube')); S.ranks.chain = 1; const t2 = !spellLack(ir, 'sp_ray').length && spellLack(ir, 'sp_inquisition').length > 0;
+      learnSpell(p, 'sp_ray', true); const pw1 = spellPower(p, 'sp_ray'); S.ranks.chain = 3; const pw3 = spellPower(p, 'sp_ray');
+      const sk = spawnEnemy('skeleton', '__a', 11, 9), ba = spawnEnemy('bandit', '__a', 12, 9), S0 = ABILITIES.sp_ray.spell; let l1 = 0, l2 = 0;
+      for (let i = 0; i < 8; i++) for (const [t, add] of [[sk, v => l1 += v], [ba, v => l2 += v]]) { t.armor = 0; t.alive = true; if (t.body) B.fullHeal(t); else t.hp = t.maxHp; const h = t.hp; spellHit(p, t, 12, S0); add(h - t.hp); }
+      return no && t2 && pw3 > pw1 && l1 > l2 * 1.4;
+    } finally { S.ranks.chain = rk0; S.omega = O0; }
+  }));
   ok('Verbotene Magie (S15 P7): Schattenzauber vor einer Wache gibt Kopfgeld, ohne Zeugen nicht; Magierjäger bannen den Zauber', sandbox(() => {
     const p = stage(), b0 = S.bounty, n0 = S.flags.forbiddenN; S.bounty = {}; S.flags.forbiddenN = 0;
     try { S.ents.__a = S.ents.__a.filter(e => e.kind !== 'npc'); const alone = magicSeen(p, 'sp_shadowbolt') === 0 && !Object.keys(S.bounty).length;
@@ -12768,7 +12786,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
-    castSpell, learnSpell, spellMenu, startTrial, acadSpot,                                           // S15 P4: Zauber im Dev-Modus prüfen
+    castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

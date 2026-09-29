@@ -123,6 +123,10 @@ Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
   | Morvath | Alter Friedhof | Funke, Feuerpfeil, Flammenstoß | die Toten müssen dich dulden |
   | Mutter Aldis, Ordenspriesterin | Sonnwacht | Heilung und Schutz | Orden-Rang 1, für Stufe III Rang 2 |
   | Magister Corvinus | Akademie Aurelheim | Arkan, Feuer II–III, Frost, Blitz, Schutzkreis | Aufenthaltsschein; Stufe III nur als Bürger oder Akademie-Adept |
+  | Irmgard, Priesterin Omegas | Altar in der Eisenfeste | Glaube: Heilige Flamme, Schutzsegen, Lichtstrahl, Inquisition | Kettenrang oder Glaube (20 / 40 / 60) |
+  | Ilvar Nachtglas | Turm des Nachtglases | Schatten, Skelett erheben, Seelenbersten | sein Vertrauen (siehe Ereignis-Guide) |
+
+  **Glaubensmagie** trifft Untote doppelt und wird mit jedem Kettenrang und mehr Glauben stärker.
 
   Unbekannte Zauber zeigen im Zauberbuch, wer sie lehrt. Der Kodex (H) hat dazu den Reiter „Magie“.
 - **Akademie-Prüfungen** bei Magister Corvinus („Ich will eine Prüfung ablegen.“), vor der Akademie in Aurelheim. Niemand stirbt dabei.
