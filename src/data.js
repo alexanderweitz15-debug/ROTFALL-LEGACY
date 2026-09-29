@@ -897,6 +897,9 @@ export const NPCS = [
   { key:'ulfar', name:'Ulfar der Narbige', prof:'Grubenkämpfer', faction:'merch', age:44, atTown:'rastfurt', off:[4, -3], weapon:'greataxe',
     traits:['grausam','ehrgeizig'], attrs:{strength:15,endurance:14}, cls:'berserker', recruit:false,
     greet:'„Schmerz ist ein Lehrer. Ich bin nur sein Gehilfe.“', teaches:['berserker'] },
+  { key:'wendel', name:'Hadubrand', prof:'Pferdezüchter', faction:'valen', age:51, atTown:'muehlbach', off:[9, -3], weapon:'staff', horseBreeder:true,   // S15: Pferdehof (Nutzer: „richtigen Bauern mit Menü, wo man die Pferde sieht“)
+    traits:['geduldig','stolz'], attrs:{endurance:12}, cls:'wanderer', recruit:false,
+    greet:'„Jedes Pferd hier hat einen Namen und einen Kopf. Such dir eins aus, das zu deinem passt.“' },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },

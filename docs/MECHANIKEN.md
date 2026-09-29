@@ -161,6 +161,10 @@ Stand: Session 15 (2026-09-29).
 - **Begegnungen unterwegs:** Verwundete, Wegelagerer, Deserteure — nicht jeder Hilferuf ist echt.
 
 ## 11. Reisen
+- **Stall und Pferdehof (S15):** Tierhändler und der Züchter Hadubrand (Mühlbach, Koppel) zeigen ihre Pferde als Karten mit Werten
+  und Preis; das Angebot wechselt wöchentlich, ein eigenes Pferd wird zu 40 % angerechnet. Todesritter bekommen ein Totenross.
+- **Kodex füllt sich (S15):** Lehrer, Ränge und Zustände erscheinen erst, wenn man sie kennt; Kapitel zu Verbrechen, großen
+  Ereignissen, Aurelion und dem Seevolk öffnen sich im Spiel. Der Code NACHTGLAS schaltet alles frei.
 - **Reittier-Werte (S15):** Jedes Pferd hat eigenes Tempo, Ausdauer (sinkt beim Reiten, erschöpft = langsamer) und Mut
   (ab 70 kommt es auch im Kampf). Das Gruppenfenster (G) zeigt die Werte; dort kann man das Tier verstoßen.
 - **Pferd pfeifen (S15):** R pfeift. Das Pferd kommt von außerhalb des Bildes angelaufen und bleibt bei dir stehen. E sitzt auf,

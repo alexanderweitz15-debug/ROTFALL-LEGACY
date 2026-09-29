@@ -23,10 +23,10 @@ Es gibt keinen festen Pfad. Du kannst Händler werden, Söldner, Paladin der Ket
 | Strg + Angriff | Neutrale angreifen (mit Folgen für deinen Ruf) |
 | E | sprechen, benutzen, betreten |
 | Q | ausweichen |
-| R | nach dem Pferd pfeifen; im Sattel: absitzen (Werte des Pferdes und „Verstoßen“ im Gruppenfenster G) |
+| R | nach dem Pferd pfeifen; im Sattel: absitzen (Werte des Pferdes und „Verstoßen“ im Gruppenfenster G). Pferde kaufen im **Stall**: bei den Tierhändlern (Kreuzweg, Nordfurt, Kupferhafen) und auf dem **Pferdehof** von Hadubrand in Mühlbach; ein eigenes Pferd wird eingetauscht. Todesritter reiten ein **Totenross** |
 | 1–8 | Fähigkeiten |
 | I · C · G · B · F · K · M · J · T | Inventar · Charakter · Gruppe · Lager · Fraktion · Chronik · Karte · Aufträge · Talente |
-| X · N · H · Z | aktive Effekte · Minikarte · Kodex (dieses Handbuch im Spiel) · Zauberbuch |
+| X · N · H · Z | aktive Effekte · Minikarte · Kodex (dieses Handbuch im Spiel; füllt sich beim Spielen, Code **NACHTGLAS** schaltet alles frei) · Zauberbuch |
 | Mausrad | zoomen |
 | Esc | schließen |
 | Strg + Umschalt + D | Debug-Menü |

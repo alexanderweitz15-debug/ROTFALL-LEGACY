@@ -177,15 +177,24 @@ function guideSections(md) {                                               // na
   const parts = md.split(/\n(?=## )/), dev = /[?&]dev/.test(location.search);
   return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
 }
+// S15 (Nutzer): Kapitel des Handbuchs öffnen sich im Spiel; der Code im Kodex schaltet alles frei
+function guideLock(sec) {
+  if (S.flags?.codexAll) return null; const h = sec.split('\n')[0];
+  if (/^## 8\./.test(h) && !S.flags.crimeSeen) return 'öffnet sich mit deinem ersten Kopfgeld.';
+  if (/^## 10\./.test(h) && !(S.chronicle || []).some(c => ['war', 'legend', 'battle'].includes(c.kind))) return 'öffnet sich, wenn Großes in der Welt geschieht.';
+  if (/^## 11\. Aurelion/.test(h) && !S.flags.visitAurel) return 'öffnet sich in Aurelion.';
+  if (/^## 11b\./.test(h) && !S.ents?.isle?.some?.(e => e.visited) && !S.flags.seaSeen) return 'öffnet sich auf den Gischtinseln.';
+  return null;
+}
 function codexUI(body) {
   const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
-  body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"></div><div id="codex-body" class="codex"></div>`;
+  body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"><input id="codex-code" placeholder="Code" style="width:90px"><button class="txtbtn" id="codex-go">Einlösen</button></div><div id="codex-body" class="codex"></div>`;
   const q = $('codex-q'), cb = $('codex-body');
   const render = () => {
     const needle = q.value.trim().toLowerCase(), hit = t => !needle || t.toLowerCase().includes(needle);
     if (codexTab === 'guide') {
       if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
-      const secs = guideSections(guideMd).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';
+      const secs = guideSections(guideMd).map(s => { const lk = guideLock(s); return lk ? `${s.split('\n')[0]}\n\n*Noch unbekannt — ${lk}*\n` : s; }).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';   // S15: Kapitel öffnen sich im Spiel
     } else if (codexTab === 'magic') {                                     // S15 P5: Schulen, Zauber, Lehrer, Haltung der Mächte
       const SC = A.schools || {}, keys = A.spellKeys || [], p = S.player;
       const VIEW = Object.entries(A.magicView || {}).map(([f, v]) => [FACTIONS[f]?.name || f, v.say + (v.hate.length ? ` Verboten: ${v.hate.map(s => SC[s]?.name || (s === 'faith' ? 'Glaube' : s)).join(', ')} — wer das vor ihren Leuten wirkt, bekommt Kopfgeld.` : '')]);   // S15 P7: aus data.js MAGIC_VIEW
@@ -193,13 +202,13 @@ function codexUI(body) {
         `<h3 style="color:${S0.col}">${S0.name}</h3><table class="rank-tab">${keys.filter(k => ABILITIES[k].school === s).map(k => `<tr><td>${p.spells?.[k] ? '✓ ' : ''}${ABILITIES[k].name} <span class="ledger">(Stufe ${ABILITIES[k].tier})</span></td><td>${A.spellTeachers?.(k)?.join('<br>') || '<i>Niemand, den du kennst, lehrt das.</i>'}</td></tr>`).join('')}</table>`).join('')
         + `<h3>Wie die Mächte über Magie denken</h3>${VIEW.filter(([n, t]) => hit(n + t)).map(([n, t]) => `<div class="fx-row"><div><b>${n}:</b> ${t}</div></div>`).join('')}`;
     } else if (codexTab === 'teachers') {                                  // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“)
-      const L = A.teacherList?.() || [], rows = Object.entries(CLASSES).filter(([k]) => L.some(t => t.cls.includes(k))).filter(([k, C]) => hit(C.name + L.filter(t => t.cls.includes(k)).map(t => t.name + t.where).join(' ')));
-      cb.innerHTML = `<div class="ledger">Ein Lehrer bildet dich erst aus, wenn er dich mag (Beziehung 20, bei Rook 40). Eine Folgeklasse braucht die Klasse davor. Auf der Karte (M) sind Lehrer gelb umrandet.</div>
+      const L0 = A.teacherList?.() || [], L = L0.filter(t => A.codexKnown('met', t.key)), rows = Object.entries(CLASSES).filter(([k]) => L.some(t => t.cls.includes(k))).filter(([k, C]) => hit(C.name + L.filter(t => t.cls.includes(k)).map(t => t.name + t.where).join(' ')));
+      cb.innerHTML = `<div class="ledger">Ein Lehrer bildet dich erst aus, wenn er dich mag (Beziehung 20, bei Rook 40). Eine Folgeklasse braucht die Klasse davor. Auf der Karte (M) sind Lehrer gelb umrandet. Hier stehen nur Lehrer, mit denen du schon gesprochen hast${L0.length > L.length ? ` — ${L0.length - L.length} kennst du noch nicht` : ''}.</div>
         <table class="rank-tab">${rows.map(([k, C]) => `<tr><td>${C.name}${C.parent && C.parent !== 'wanderer' ? ` <span class="ledger">(braucht ${CLASSES[C.parent]?.name})</span>` : ''}</td><td>${L.filter(t => t.cls.includes(k)).map(t => `${t.name} — ${t.where}`).join('<br>')}</td></tr>`).join('')}</table>`;
     } else if (codexTab === 'ranks') {
-      cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
+      cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0) && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
     } else if (codexTab === 'states') {
-      const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
+      const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
     } else {
       const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
       cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row"><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
@@ -207,7 +216,24 @@ function codexUI(body) {
     }
   };
   body.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { codexTab = b.dataset.t; codexUI(body); });
+  $('codex-go').onclick = () => { if (A.codexCode($('codex-code').value)) { toast('KODEX VOLLSTÄNDIG FREIGESCHALTET', 2600); codexUI(body); } else toast('Unbekannter Code', 1500); };   // S15
   q.oninput = render; render();
+}
+
+// ---------------- Stall (S15) ----------------
+// Pferde als Karten: Bild, Werte als Balken, Preis; mit eigenem Pferd wird eingetauscht (40 % Anrechnung).
+function stableUI(body, npc) {
+  const offers = A.stableOffers(npc), cur = S.mount && A.mountStats(), credit = cur ? Math.round(A.horseValue(cur) * 0.4) : 0;
+  const bar = (v, max, col) => `<div style="height:5px;background:#2a2418;margin:2px 0 6px"><div style="height:100%;width:${Math.min(100, v / max * 100)}%;background:${col}"></div></div>`;
+  body.innerHTML = `<div class="ledger">${npc.name}: ${offers.length ? 'Das hier steht diese Woche im Stall.' : 'Diese Woche ist alles verkauft. Komm nächste Woche wieder.'} Dein Gold: ${S.gold}.${cur ? ` Dein ${cur.name} wird mit ${credit} Gold angerechnet.` : ''}</div>
+    <div class="sheet" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));margin-top:10px">${offers.map(H => `<div class="panel" style="padding:10px">
+      <canvas data-h="${H.id}" width="150" height="100" style="width:150px;height:100px;image-rendering:pixelated;display:block;margin:0 auto"></canvas>
+      <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
+      <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
+  const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=15').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+    const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
+  body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
 // ---------------- Zauberbuch (S15 P4) ----------------
@@ -478,7 +504,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   if (R) R[1](body, arg);
 }
