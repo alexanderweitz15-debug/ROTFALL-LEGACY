@@ -128,6 +128,9 @@ Stand: Session 15 (2026-09-29).
 - **Überfälle, Brände, Stadtverteidigung, Tributzüge, Feldzüge, Ketzerjagd, Wallfahrt, Kreuzzug.**
 - **Magitech-Unfall (S14):** Automaten laufen Amok, die Fabrik steht still.
 - **Spuk am Brunnen (S14):** nachts erscheint ein Geist, der Ort muss gesäubert werden.
+- **Turm des Nachtglases (S15):** das höchste Bauwerk der Welt, östlich der Schwarzen Feste. Zehn Ebenen, Krypta, verbotene
+  Bibliothek hinter einer Knochenkette. Ilvar Nachtglas lehrt nach Vertrauen (Gespräche, eine kluge Antwort über Omega,
+  Seelenphiolen). Neue Schule **Schatten**: Schattenpfeil, Seelenzug (heilt den Wirker).
 - **Morrgrund und Dodon (S15):** das letzte Goblin-Dorf weit im Süden. Beim ersten Sehen rennen die Goblins und rufen „Dodon!“.
   Freund, Vorbeiziehender oder Feind. Als Freund überzeugst du sie zum letzten Sturm auf die Eisenfeste: Sobald du Varg
   angreifst, stürmen Dodon und die Goblins herein. Stirbst du im Sturm, stirbt das Dorf. Nach Vargs Fall wächst Morrgrund.

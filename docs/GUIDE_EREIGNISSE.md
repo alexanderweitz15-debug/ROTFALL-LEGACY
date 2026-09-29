@@ -188,6 +188,20 @@ das Geständnis und du musst das Tagebuch suchen.
 
 Beide Ereignisse lassen sich im Debug-Menü unter „Ereignisse“ auslösen.
 
+## Der Turm des Nachtglases (S15)
+
+**Ort:** östlich der Schwarzen Feste, tief im Totenland. Der Turm ist das höchste Bauwerk der Welt: dunkler Stein, grüne Fenster,
+Seelenfunken über der Krone. Ein Ring aus Grabsteinen umgibt ihn, das Tor liegt im Süden.
+
+**Innen:** zehn Ebenen, verbunden durch die Wendeltreppe: Eingangshalle mit dem Pförtner, Bibliothek mit lesenden Geistern,
+Lehrsäle mit drei untoten Schülern (Maelis, Oskar der Blasse, Tuvi), Alchemielabor, Beschwörungskammer, Ritualraum,
+Observatorium mit Blick auf den Krater, Seelenkammer, Ilvars Studierzimmer ganz oben. Neben der Seelenkammer liegt die
+**verbotene Bibliothek**, eine Kette aus Knochen versperrt den Gang. Unter dem Turm: die Krypta mit Seelenfallen.
+
+**Ilvar Nachtglas**, einst Hofmagier von Vharnholm, heute ein Lich. Er will den Rotfall verstehen, nicht anbeten. Sein
+**Vertrauen** (0–100) wächst durch Gespräche (je Thema einmal), die richtige Antwort auf „Was ist Omega?“ („Ein Wesen“) und
+Lieferungen von je drei Seelenphiolen. Er lehrt Schattenpfeil ab 0, Seelenzug (heilt dich) ab Vertrauen 25.
+
 ## Morrgrund und Dodon: der letzte Sturm der Grubenstämme (S15)
 
 **Ort:** Morrgrund, das letzte freie Dorf der Goblins, liegt weit im Süden der Westlande, im Moor unter Hohlstein. Man findet

@@ -99,6 +99,22 @@ function prop(kind, tx, ty, extra = {}) {
 // Palisade aus angespitzten Stämmen, Hütten um ein Feuer, ein Totem mit Kettengliedern, die sie sich abgeschlagen haben.
 // Feste Koordinaten, kein rnd(): die Weltfolge bleibt gleich. Wächst, wenn die Eisenfeste fällt (game.js morrGrow).
 export const MORR = { x: 276, y: 622, x0: 262, y0: 610, x1: 291, y1: 635 };
+// S15 P6: der Turm des Nachtglases (Ilvar). Steinplatz, Ring aus Grabsteinen, Knochenspitzen am Weg, der Turm selbst ist ein hohes
+// Bild (render.js drawMageTower) über einem festen Sockel aus Fels. Das Tor davor führt in die Karte 'tower'.
+export const NACHT = { x: 953, y: 630 };
+function buildNachtglas() {
+  const { x, y } = NACHT;
+  for (let i = props.length - 1; i >= 0; i--) { const p = props[i], tx = p.x / TS | 0, ty = p.y / TS | 0; if (p.map === 'world' && Math.abs(tx - x) <= 11 && Math.abs(ty - y) <= 11) props.splice(i, 1); }
+  rect('world', x - 10, y - 9, 21, 20, T.STONE);
+  rect('world', x - 5, y - 4, 11, 4, T.ROCK);                             // Sockel: fest
+  for (let k = 0; k < 16; k++) { const a = k * 0.3927; if (Math.abs(Math.sin(a) - 1) < 0.3) continue;   // Grabsteinring, im Süden offen
+    prop('gravestone', Math.round(x + Math.cos(a) * 9), Math.round(y + Math.sin(a) * 8), { solid: true, r: 7 }); }
+  for (const dy of [4, 7, 10]) for (const dx of [-2, 2]) prop('bone_spire', x + dx, y + dy, { solid: true, r: 8 });
+  prop('mage_tower', x, y - 1, { r: 10, label: 'Turm des Nachtglases' });
+  prop('tower_gate', x, y + 1, { solid: true, r: 12, portal: 'tower', label: 'Tor des Turms' });
+  prop('sign', x + 4, y + 3, { label: 'In grünem Licht: „Wer lernen will, trete ein. Wer stehlen will, auch — einmal.“' });
+  for (const dx of [-5, 5]) prop('candles', x + dx, y + 2, { r: 6 });
+}
 function buildMorrgrund() {
   const { x0, y0, x1, y1, x, y } = MORR;
   for (let i = props.length - 1; i >= 0; i--) { const p = props[i], tx = p.x / TS | 0, ty = p.y / TS | 0; if (p.map === 'world' && tx >= x0 - 1 && tx <= x1 + 1 && ty >= y0 - 1 && ty <= y1 + 1) props.splice(i, 1); }
@@ -525,7 +541,8 @@ LOCATIONS.push(
   { key:'kettenfeste', name:'Die Eisenfeste', x:158, y:172, r:34, kind:'city', threat:4, faction:'chain', fin:true },
   { key:'steinbruch',  name:'Der Steinbruch', x:78,  y:318, r:24, kind:'camp', threat:3, faction:'chain', fin:true },
   { key:'grubenhort',  name:'Grubenhort',     x:185, y:430, r:20, kind:'camp', threat:2, faction:'goblin', fin:true },
-  { key:'morrgrund',   name:'Morrgrund',      x:276, y:622, r:18, kind:'camp', threat:2, faction:'goblin', fin:true },   // S15: das letzte Dorf der Grubenstämme, Dodons Dorf
+  { key:'morrgrund',   name:'Morrgrund',      x:276, y:622, r:18, kind:'camp', threat:2, faction:'goblin', fin:true },
+  { key:'nachtglas',   name:'Turm des Nachtglases', x:953, y:630, r:14, kind:'ruin', threat:5, faction:'undead', fin:true },   // S15 P6: Magierturm, östlich der Schwarzen Feste   // S15: das letzte Dorf der Grubenstämme, Dodons Dorf
   { key:'kettenpass',  name:'Kettentor',      x:226, y:172, r:10, kind:'road', threat:3, fin:true },
   // Totenland: in Koordinaten der Erzeugung (rückt mit)
   { key:'totenland',   name:'Das Totenland',  x:1024, y:400, r:250, kind:'wild', threat:4, faction:'undead' },
@@ -1162,6 +1179,7 @@ export function genWorld() {
   scatterPOIs();                                           // Session 12: Dichte — überall kleine Orte mit Geschichte
   tidyTowns(); clearDoors(); ensureReach();                              // Session 12: gilt für jeden Seed (neue Spiele haben neue Welten)
   buildMorrgrund();                                        // S15: das letzte Goblin-Dorf, weit im Süden der Westlande
+  buildNachtglas();                                        // S15 P6: der Magierturm Ilvars
 
   // Lichtungen entstehen nach dem Wald: Bäume nur auf Gras stehen lassen
   // Bäume nicht auf Wegen, Lichtungen, Feldern oder in Mauern (Wüste, Asche, Sumpf, Gebirge dürfen tragen)
@@ -1921,6 +1939,7 @@ export const DUNGEONS = {
   vault: { name: 'Gewölbe', floor: 'dfloor', amb: 'blight', enter: '' },   // S13: zufällige Gewölbe (game.js buildVault)
   sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
   isle: { name: 'Tangkron, Gischtinseln', floor: 'grass', amb: 'coast', open: true, enter: 'Salz in der Luft, Möwen, Teer. Tangkron riecht nach Fisch und Streit. Auf dem Hügel liegt ein Schiff kieloben — dort wohnt Weißbart.' },   // S14 Seevolk
+  tower: { name: 'Turm des Nachtglases', floor: 'dfloor', amb: 'blight', enter: 'Das Tor schließt sich lautlos. Grünes Licht wandert die Wände hinauf. Irgendwo über dir blättert jemand in einem Buch.' },   // S15 P6
   deck: { name: 'Auf See', floor: 'plank', amb: 'coast', open: true, enter: 'Die Taue knarren, das Land wird schmal. Vor euch nur Grau und Wasser.' },
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
@@ -2091,6 +2110,43 @@ export function genGarmadon() {
   MAPS.garmadon.rooms = rooms;
   MAPS.garmadon.entry = { x: entry.cx * TS + TS / 2, y: (entry.y + entry.h - 3) * TS };
   return baseProps('garmadon', props.slice());
+}
+// S15 P6: Turm des Nachtglases, innen. Zehn Ebenen übereinander (unten Eingang, oben Ilvars Studierzimmer), verbunden durch die
+// Wendeltreppe (Gang in der Mitte), dazu die verbotene Bibliothek neben Ebene 8 (versiegelt, towerSeal) und die Krypta unter dem Turm.
+export const TOWER_LEVELS = ['Eingangshalle', 'Bibliothek', 'Lehrsäle', 'Alchemielabor', 'Beschwörungskammer', 'Ritualraum', 'Observatorium', 'Seelenkammer', 'Verbotene Bibliothek', 'Ilvars Studierzimmer'];
+export function genTower() {
+  props.length = 0;
+  seedRng(S.seed * 29 + 13);
+  const w = 64, h = 160, tiles = new Uint8Array(w * h).fill(T.DWALL), M = 'tower', o = { map: M }, rooms = [];
+  MAPS.tower = { w, h, tiles };
+  const room = (x, y, rw, rh, lvl) => { rect(M, x, y, rw, rh, T.DFLOOR); const r = { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1), lvl }; rooms.push(r); return r; };
+  const col = [];                                                        // Ebenen 1–8 und 10 in der Säule; 9 daneben
+  for (let i = 1; i <= 10; i++) col[i] = i === 9 ? null : room(20, 146 - (i - (i > 9 ? 2 : 1)) * 15, 24, 11, i);
+  for (let i = 1; i < 10; i++) { const a = col[i], b = col[i + 1] || col[i + 2]; if (!a || !b || a === b) continue; rect(M, 31, b.y + b.h, 3, a.y - b.y - b.h, T.DFLOOR); }
+  const lib9 = room(48, col[8].y + 1, 13, 9, 9); rect(M, 44, col[8].cy, 4, 2, T.DFLOOR);
+  const crypt = room(2, 136, 14, 20, 0); rect(M, 16, 150, 4, 2, T.DFLOOR);
+  const sign = (r, n) => prop('sign', r.x + 2, r.y + r.h - 2, { ...o, label: n });
+  for (let i = 1; i <= 10; i++) { const r = i === 9 ? lib9 : col[i]; sign(r, `Ebene ${i} — ${TOWER_LEVELS[i - 1]}`); for (const dx of [2, r.w - 3]) prop('candles', r.x + dx, r.y + 1, { ...o, r: 6 }); }
+  sign(crypt, 'Unter dem Turm — Krypta. Nicht alles hier ist tot. Nicht alles hier ist eingesperrt.');
+  const L = col;
+  prop('mine_exit', L[1].cx, L[1].y + L[1].h - 1, { ...o, portal: 'world', label: 'Tor hinaus ins Totenland' });
+  for (const dx of [-8, 8]) prop('bone_spire', L[1].cx + dx, L[1].cy, { ...o, solid: true, r: 8 });
+  for (let i = 0; i < 6; i++) prop('shelf', L[2].x + 2 + i * 4, L[2].y + 1, { ...o, solid: true, r: 10, label: 'Regal: Schriften über Seelen, Sterne und Gräber' });
+  for (const dx of [6, 16]) prop('desk', L[2].x + dx, L[2].cy + 2, { ...o, solid: true, r: 10 });
+  for (let i = 0; i < 4; i++) prop('desk', L[3].x + 4 + i * 5, L[3].cy, { ...o, solid: true, r: 10 });
+  prop('campfire_static', L[4].cx, L[4].cy, { ...o, solid: true, r: 10, label: 'Kessel voll grüner Brühe' }); for (const dx of [-8, 8]) prop('barrel', L[4].cx + dx, L[4].y + 2, { ...o, solid: true, r: 8 }); prop('crate_stack', L[4].x + L[4].w - 3, L[4].cy, { ...o, solid: true });
+  for (let k = 0; k < 10; k++) prop('candles', Math.round(L[5].cx + Math.cos(k * 0.628) * 5), Math.round(L[5].cy + Math.sin(k * 0.628) * 3), { ...o, r: 6 }); prop('blood', L[5].cx, L[5].cy, o);
+  prop('altar_small', L[6].cx, L[6].y + 3, { ...o, solid: true, r: 10, label: 'Altar der verbotenen Rituale (erkaltet)' }); for (const dx of [-4, 4]) prop('banner_torn', L[6].cx + dx, L[6].y + 1, { ...o, label: 'Banner mit einem Auge, halb geschlossen' });
+  prop('obelisk', L[7].cx, L[7].y + 3, { ...o, solid: true, r: 12, label: 'Sternrohr: Es zeigt nach Westen, auf den Krater des Gefallenen Sterns.' }); prop('desk', L[7].cx + 6, L[7].cy, { ...o, solid: true, r: 10, label: 'Sternkarte mit einem roten Riss mitten hindurch' });
+  for (let i = 0; i < 5; i++) prop('crate_stack', L[8].x + 3 + i * 4, L[8].y + 2, { ...o, solid: true, label: 'Gläser voller grünem Licht. In jedem bewegt sich etwas.' });
+  for (let i = 0; i < 3; i++) prop('bone_spire', 44 + (i === 1 ? 1 : 0), L[8].cy - 1 + i, { ...o, solid: true, r: 9, towerSeal: true, label: 'Eine Kette aus Knochen versperrt den Gang' });
+  for (let i = 0; i < 3; i++) prop('shelf', lib9.x + 2 + i * 4, lib9.y + 1, { ...o, solid: true, r: 10, label: 'Verbotene Schriften' }); prop('chest', lib9.cx, lib9.cy + 2, { ...o, loot: ['soul_vial', 'soul_vial', 'potion'], label: 'Ilvars verschlossene Truhe' });
+  prop('desk', L[10].cx, L[10].y + 3, { ...o, solid: true, r: 10, label: 'Ilvars Pult: Aufzeichnungen über den Rotfall' }); prop('shelf', L[10].x + 2, L[10].y + 1, { ...o, solid: true, r: 10 }); prop('shelf', L[10].x + L[10].w - 3, L[10].y + 1, { ...o, solid: true, r: 10 });
+  for (let y = crypt.y + 2; y < crypt.y + crypt.h - 3; y += 3) for (const x of [crypt.x + 3, crypt.x + crypt.w - 4]) prop('gravestone', x, y, { ...o, solid: true, r: 8 });
+  for (let i = 0; i < 4; i++) prop('spikes', crypt.x + 5 + (i % 2) * 3, crypt.y + 4 + i * 4, { ...o, hazard: 14, label: 'Seelenfalle' });
+  MAPS.tower.rooms = rooms; MAPS.tower.levels = L; MAPS.tower.lib9 = lib9; MAPS.tower.crypt = crypt;
+  MAPS.tower.entry = { x: L[1].cx * TS + TS / 2, y: (L[1].y + L[1].h - 3) * TS };
+  return baseProps('tower', props.slice());
 }
 // Krater des Gefallenen Sterns (Phase 7): Arena des Endkampfs — Asche, Blutlachen, ein Ring aus Obelisken, im Norden der Splitter
 export function genOmega() {

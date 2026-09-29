@@ -91,6 +91,8 @@ export function drawFrame(now) {
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
+  if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
+    const MT = TOWER_AT.e; if (MT && !list.includes(MT) && MT.x > cam.x - 220 && MT.x < cam.x + W / cam.zoom + 220 && MT.y > cam.y && MT.y < cam.y + H / cam.zoom + 900) list.push(MT); }
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
   for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
     const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
@@ -860,7 +862,42 @@ SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear()
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
 export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
+// S15 P6: Turm des Nachtglases — ein Wahrzeichen: schmaler, sehr hoher Schaft aus dunklem Stein über breitem Sockel, Strebepfeiler,
+// Galerie, Dornenkrone mit Seelenfeuer. Das Bild wird einmal gemalt (Pixelraster 2 × 2), darüber leben die Fenster und die Funken.
+let TOWER_CV = null, TOWER_AT = { arr: null, e: null };
+const TOWER_WIN = [];
+function towerCanvas() {
+  if (TOWER_CV) return TOWER_CV;
+  const W = 120, H = 290, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const o = cv.getContext('2d'), R = (x, y, w, h, c) => { o.fillStyle = c; o.fillRect(x, y, w, h); };
+  const cx = W / 2, stone = ['#1c1a1f', '#26232b', '#322e38', '#403a47'];
+  for (let y = 250; y < 290; y++) { const hw = 50 - (y - 250) * 0.15; R(cx - hw, y, hw * 2, 1, y % 6 === 0 ? stone[0] : stone[1]); }   // Sockel mit Stufen
+  for (let i = 0; i < 4; i++) R(cx - 18 + i * 2, 278 - i * 4, 36 - i * 4, 4, stone[2 + (i & 1)]);
+  R(cx - 7, 262, 14, 26, '#0b0a0c'); R(cx - 5, 258, 10, 4, '#0b0a0c'); R(cx - 1, 256, 2, 2, '#8fd9b0');                 // Torbogen
+  for (let y = 40; y < 252; y++) { const t = (y - 40) / 212, hw = 18 + t * 12;                                        // Schaft, nach unten breiter
+    R(cx - hw, y, hw * 2, 1, stone[1]); R(cx - hw, y, 4, 1, stone[3]); R(cx + hw - 5, y, 5, 1, stone[0]);
+    if (y % 9 === 0) R(cx - hw, y, hw * 2, 1, stone[0]); }                                                            // Steinlagen
+  for (const s of [-1, 1]) for (let y = 120; y < 252; y++) { const t = (y - 40) / 212, hw = 18 + t * 12, bw = 4 + (y - 120) * 0.06; R(s < 0 ? cx - hw - bw : cx + hw, y, bw, 1, s < 0 ? stone[2] : stone[0]); }   // Strebepfeiler
+  R(cx - 30, 118, 60, 5, stone[3]); R(cx - 30, 123, 60, 2, stone[0]); for (let x = cx - 28; x < cx + 28; x += 5) R(x, 112, 2, 6, stone[2]);   // Galerie
+  for (let y = 26; y < 42; y++) { const hw = 22 - (y - 26) * 0.2; R(cx - hw, y, hw * 2, 1, stone[2]); }                // Kronenring
+  for (let k = -4; k <= 4; k++) { const x = cx + k * 5, hgt = 12 + (k % 2 === 0 ? 8 : 0) - Math.abs(k); for (let i = 0; i < hgt; i++) R(x - Math.max(0, 1.5 - i * 0.12), 26 - i, Math.max(1, 3 - i * 0.2), 1, stone[3]); }   // Dornen
+  TOWER_WIN.length = 0;
+  for (const [y, n] of [[60, 2], [88, 3], [140, 2], [170, 3], [200, 2], [228, 3]]) for (let i = 0; i < n; i++) { const x = cx - (n - 1) * 5 + i * 10; TOWER_WIN.push([x, y]); R(x - 2, y - 1, 4, 9, '#0b0a0c'); }
+  return (TOWER_CV = cv);
+}
+function drawMageTower(e, now) {
+  const K = 3, cv = towerCanvas(), x0 = Math.round(e.x - cv.width * K / 2), y0 = Math.round(e.y + 60 - cv.height * K);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 54, 165, 32, 0, 0, 7); ctx.fill();
+  ctx.drawImage(cv, x0, y0, cv.width * K, cv.height * K);
+  for (const [wx, wy] of TOWER_WIN) { const p = 0.55 + 0.45 * Math.sin(now / 700 + wx * 0.3 + wy * 0.1); ctx.fillStyle = `rgba(143,217,176,${p})`; ctx.fillRect(x0 + (wx - 1) * K, y0 + wy * K, 2 * K, 7 * K); }
+  const fy = y0 + 18 * K, fl = 0.6 + 0.4 * Math.sin(now / 160);                                                      // Seelenfeuer in der Krone
+  ctx.fillStyle = `rgba(143,217,176,${0.25 * fl})`; ctx.beginPath(); ctx.arc(e.x, fy, 26, 0, 7); ctx.fill(); ctx.fillStyle = `rgba(200,255,225,${0.8 * fl})`; ctx.fillRect(e.x - 4, fy - 8, 8, 12);
+  for (let i = 0; i < 10; i++) { const t = ((now / 3200 + i * 0.1) % 1), sx = e.x + Math.sin(i * 2.3 + now / 900) * (20 + i * 3), sy = fy - t * 180;   // Seelenfunken steigen auf
+    ctx.fillStyle = `rgba(160,240,200,${(1 - t) * 0.8})`; ctx.fillRect(Math.round(sx), Math.round(sy), 3, 3); }
+  ctx.restore();
+}
 function drawPropPixel(e, now) {
+  if (e.type === 'mage_tower') return drawMageTower(e, now);             // S15 P6
+  if (e.type === 'tower_gate') return;                                   // das Tor ist Teil des Turmbilds
   const PA = SP.PROP_ATLAS[e.type] && SP.atlasOn() && SP.atlasSprite(SP.PROP_ATLAS[e.type]);   // Stil F: Objekt aus dem Blatt, in seiner eigenen Größe
   if (PA) { const k = SP.APX * SP.FIGK; ctx.drawImage(PA, Math.round(e.x - PA.width * k / 2), Math.round(e.y + 8 - PA.height * k), PA.width * k, PA.height * k); return; }
   const per = PROP_PERIOD[e.type];
