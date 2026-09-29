@@ -139,3 +139,4 @@ Volle Texte mit Schritten, Lösung und Test: `BUGS_bis_S13.md`. Regressionstests
   Türen · Brett trotz Besatzung/Ruf · Sprechblasen-Plätze unter Dächern
 - BUG-137-Rest (S14): Ladeprobe `RF.loadProbe()` / Debug „Laden prüfen“ — serialisieren, wie „Fortsetzen“ laden, Held/Karten/Städte/Bewohner/Herden vergleichen.
 - BUG-141 (S14): Zweites Laden in derselben Sitzung stürzte ab (Aurelheim ohne Hausliste; `genWorld` ging vom veränderten Stadtplan aus) — Plan beim ersten Erzeugen gemerkt und in place zurückgesetzt.
+- BUG-113 (S15): Blutende Bewohner am Boden werden nach dem Kampf verbunden, wenn jemand bei ihnen ist (Borin, Aldric starben daran). Probe im Selbsttest.

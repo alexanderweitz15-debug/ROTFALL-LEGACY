@@ -17,6 +17,8 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - P3 Kampfgefühl: schwere Angriffe mit roter Bodenmarkierung und Erholungsfenster; Wölfe gegen Banditen; Bogen mit Pfeil auf der Sehne.
 - Bogen spannt sichtbar (Sehne an den echten Bogenspitzen). P4 Magie: 20 Zauber in 6 Schulen, Sammelzeit mit Rune, Zustände, Übungsränge,
   Zauberbuch (Z), Zauber auf der Leiste, zaubernde Kultisten und Nekromanten, Debug „Magie“. Neu: `MECHANIKEN.md` (alle Mechaniken).
+- P13 Gesamtdurchlauf (neues Spiel bis Erbe, 13 Orte, Sammelbild `durchlauf_regionen.png`): keine Fehler; BUG-113 behoben
+  (NPCs verbluten nicht mehr nach Kämpfen), BUG-142/143 neu.
 - P17: Reittiere mit eigenen Werten (Tempo, Ausdauer, Mut), Anzeige im Gruppenfenster, Verstoßen.
 - P19: Todesritter-Questreihe „Eidwacht“ bei Sael (drei Aufträge, Rüstung mit eigenem Aussehen, Todesmahr, Frostaura).
 - P11: Wiederbesiedlung befreiter Orte in fünf Stufen (Heimkehrer, Zelte, Häuser, Dorf, Siedlung), in der Chronik.

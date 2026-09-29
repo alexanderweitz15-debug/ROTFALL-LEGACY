@@ -2546,6 +2546,9 @@ function tickCombatant(c, dt) {
     if (performance.now() > c.brawlKO) { c.brawlKO = 0; c.downed = false; if (c.body) B.healPart(c, 'torso', c.body.torso.max * 0.3 - c.body.torso.hp); act(c, 'rise', 520); }
   } else if (c.downed) {
     if (!(c.tended > performance.now())) c.downTimer -= dt;   // AUDIT B-01: wer versorgt wird, blutet nicht weiter aus
+    if (c.kind === 'npc' && c.downTimer < 4000 && !S.party.includes(c.id) && (c.status || []).some(s => s.key === 'bleeding') && !S.ents[c.map].some(e => e.alive && !e.downed && COMBAT_KINDS.has(e.kind) && isHostile(e, c) && dist(e, c) < 400)
+      && (c.guard || S.ents[c.map].some(o => o !== c && o.kind === 'npc' && o.alive && !o.downed && dist(o, c) < 300))) {   // BUG-113: nach dem Kampf verbindet man sich gegenseitig
+      c.status = c.status.filter(s => s.key !== 'bleeding'); float(c, 'wird verbunden', 'rgba(160,224,160,ALPHA)'); }
     if (c.downTimer <= 0) {
       const T = c.body?.torso, bleeding = (c.status || []).some(s => s.key === 'bleeding');   // S13 (Nutzer, Kenshi): Zähigkeit — nicht kritisch = kommt zu sich
       if (c.kind !== 'enemy' && T && T.hp > -T.max * 0.5 && !bleeding) { c.downed = false; B.healPart(c, 'torso', Math.max(2, T.max * 0.1) - T.hp); if (c.body.head.hp <= 0) B.healPart(c, 'head', c.body.head.max * 0.2);
@@ -12719,6 +12722,12 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('BUG-113: Ein blutender Bewohner am Boden wird nach dem Kampf verbunden und stirbt nicht', sandbox(() => {
+    const p = stage(), a = actor(p.x + 200, p.y, { kind: 'npc', name: 'Wache' }), b = actor(p.x + 230, p.y, { kind: 'npc', name: 'Helfer' }); a.guard = true;
+    if (a.body) { a.body.torso.hp = -2; B.syncHp(a); } downed(a, 'Test'); a.status = [{ key: 'bleeding', name: 'Blutend', left: 30000 }]; a.downTimer = 3000;
+    for (let i = 0; i < 60 && a.downed; i++) tickCombatant(a, 100);
+    return a.alive && !(a.status || []).some(s => s.key === 'bleeding');
+  }));
   ok('Reittier-Werte (S15 P17): jedes Pferd eigene Werte, Erschöpfung bremst, mutige kommen im Kampf, Verstoßen löscht es', sandbox(() => {
     const p = stage(), m0 = S.mount;
     try { S.mount = mountStats({ kind: 'horse', name: 'Test', oiled: 0 }); const H = S.mount, ok1 = H.tempo >= 0.9 && H.tempo <= 1.2 && H.staminaMax >= 80 && H.mut >= 0;

@@ -2,7 +2,7 @@
 
 Nur offene Einträge, nach Priorität. Behobene: je eine Zeile in `archive/BUGS_behoben.md`, volle Texte bis S13 in
 `archive/BUGS_bis_S13.md`. Neuer Eintrag: ID · Titel · Schritte · Erwartet/Tatsächlich · Ursache · Lösung · Test · Status.
-Nächste freie ID: **BUG-142**.
+Nächste freie ID: **BUG-144**.
 
 ## HIGH
 
@@ -15,8 +15,16 @@ Nächste freie ID: **BUG-142**.
 - Nächster Schritt: im sichtbaren Fenster je System messen; ferne Bewohner (> 520 px) ganz abstrakt; räumliches Raster.
 - Stand: Nutzer wollte in S13 „nicht weiter suchen“. Zeichenteil wird in S14 mit den neuen Figuren (Cache) gemessen.
 - S15-Messung (P0, 29.09.): Eren Logik 5,8 ms/Bild, Zeichnen 2,5–3,5 ms warm mit Stil R (erste Bilder bis 12 ms, bis der Figuren-Cache voll ist).
+- S15 P13 (Durchlauf, neues Spiel): warm Eren 3,0 ms Bild / 2,7 ms Logik, Aurelheim 2,6 / 1,6, Totenland 1,1 / 1,4. Spielstand eines
+  neuen Spiels 1,87 MB (Budget überschritten, siehe BUG-142).
 
 ## MEDIUM
+
+### BUG-142 — Kalter Aufbau beim ersten Betreten eines Ortes
+- S15 P13: Nach einem Teleport oder dem ersten Betreten brauchen die ersten fünf Bilder im Schnitt 25–53 ms (Eren 53, Weidenau
+  25, Totenland 20), danach 1–3 ms. Ursache: Boden-Chunks und Figurenbilder werden erst beim Zeichnen gebacken.
+- Vorschlag: beim Kartenwechsel die Chunks im Umkreis vorbacken (`prefetchChunk` gibt es) und Figuren der Nähe vorwärmen.
+
 
 ### BUG-093 — Zeichnen im vollen Stadtfest über 2,0 ms
 - S10: Figurenbilder ×24 schneller (CPU-Pipeline, Vorbacken). Rest: Median Stadtkern 1,9–2,1 ms, Fest 2,1 ms.
@@ -26,11 +34,12 @@ Nächste freie ID: **BUG-142**.
 - Dort steht das Untotenheer (34) dauerhaft; Befreiung verlangt „kein Heer am Ort“.
 - Lösungsvorschlag (Designfrage 1 in `design/mechanik-check.md`): eigene Arena, Heer vorher im Feld schlagen.
 
-### BUG-113 — Wachen sterben an Blutung (zu prüfen)
-- Log: Dagna, Borin, Conrad, Aldric „an Blutung“. Vermutung: Nach Kämpfen verbindet niemand blutende NPCs.
-- Prüfen: Heiler/Wachen verbinden einander nach dem Kampf.
-
 ## LOW
+
+### BUG-143 — Totenland bei der Schwarzen Feste leer und sehr dunkel
+- S15 P13: Im Sammelbild wirkt die Umgebung der Schwarzen Feste fast schwarz und ohne Objekte; dort steht auch ein Goblin
+  („Grak! Menschling!“), weil das Spawn-Gebiet Goblin-Krieger im Totenland mischt. Dichte und Mischung prüfen.
+
 
 ### BUG-062 — Beiwagen springt beim Wenden auf die andere Seite
 - Nach der Rast beginnt die Spur neu; der Beiwagen steht schlagartig hinter dem Leitwagen (am Tor). Lösung: Wendekreis.

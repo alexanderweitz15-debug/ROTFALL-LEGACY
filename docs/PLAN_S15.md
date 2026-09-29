@@ -132,7 +132,7 @@ ist Ausbau.
 | P10 | Aurelion sichtbar überlegen, Aurelion-Ränge, Aurelion-Ereignisse | OFFEN |
 | P11 | Osten nach Garmadon: Wiederbesiedlung in 5 Stufen (`S.resettle`, `resettleDay`, Häuser über `growTown`, Chronik mit Hausnamen). Die befreiten Orte sind Städte mit Markt; neue Märkte waren nicht nötig | FERTIG (Opus) |
 | P12 | Schwierigkeitsgrade: Wahl beim Start (`DIFF`, `applyDifficulty`), Gegner-Leben/-Schaden über `BAL`, Ansagezeit, Beute, Kopfgeld-Verfall; Glieder und Dorf-Wiederaufbau gab es schon | FERTIG (Opus) |
-| P13 | Gesamtdurchlauf und visuelle Prüfung | OFFEN |
+| P13 | Gesamtdurchlauf (29.09.): neues Spiel → Kampf, Stufe, Auftrag, Beitritt, Rangprüfung, Magie, Kerker, Sklaverei, 13 Orte mit Sammelbild, Weltereignis, Laden, Tod, Erbe — ohne Fehler. Funde: BUG-113 behoben, BUG-142 (kalter Aufbau), BUG-143 (Totenland leer) | FERTIG (Opus) |
 
 ---
 
