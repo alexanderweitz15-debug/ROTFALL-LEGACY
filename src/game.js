@@ -1,17 +1,17 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=15';
-import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=15';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=15';
-import * as R from './render.js?v=15';
-import * as HB from './buildings.js?v=15';
-import * as UI from './ui.js?v=15';
-import * as SIM from './sim.js?v=15';
-import * as B from './body.js?v=15';
-import * as SP from './sprites.js?v=15';
-import * as ECO from './economy.js?v=15';
-import { drawAtlas, revealAround, explored } from './atlas.js?v=15';
-import { sfx, ambience, ambienceTick } from './sfx.js?v=15';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=16';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=16';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=16';
+import * as R from './render.js?v=16';
+import * as HB from './buildings.js?v=16';
+import * as UI from './ui.js?v=16';
+import * as SIM from './sim.js?v=16';
+import * as B from './body.js?v=16';
+import * as SP from './sprites.js?v=16';
+import * as ECO from './economy.js?v=16';
+import { drawAtlas, revealAround, explored } from './atlas.js?v=16';
+import { sfx, ambience, ambienceTick } from './sfx.js?v=16';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -209,12 +209,12 @@ function equip(c, idx) {
   if (prev) c.inv.push(prev);
   if (it.twohand && c.equip.offhand) { c.inv.push(c.equip.offhand); c.equip.offhand = null; }
   log(`${c.name} legt ${it.name} an.`, 'party');
-  recalc(c); UI.refreshHUD();
+  recalc(c); if (c === S.player) syncHotbar(); UI.refreshHUD();   // S15 Fehlersuche: Fähigkeiten aus Klassenrüstung sofort
 }
 function unequip(c, slotKey) {
   const it = c.equip[slotKey]; if (!it) return;
   if (c.inv.length >= c.invCap) return UI.toast('Tasche voll');
-  c.inv.push(it); c.equip[slotKey] = null; recalc(c); UI.refreshHUD();
+  c.inv.push(it); c.equip[slotKey] = null; recalc(c); if (c === S.player) syncHotbar(); UI.refreshHUD();
 }
 const CHANNEL_MS = { bandage: 2500, heal: 1600 };
 // S13 (Nutzer, Tiere: „Zähmen: füttern und Geduld — passendes Futter, ruhig nähern, mehrere Versuche; Fehler reizen wilde Tiere — und Kauf
@@ -327,7 +327,7 @@ function buyHorse(npc, id) {
   S.gold -= cost; ((S.stableSold ||= {})[npc.key || npc.beastTrader] ||= []).push(H.id);
   const old = S.mount?.name; S.player.mounted = null; S.ents.world = S.ents.world.filter(e => !(e.kind === 'mount' && !e.decor));
   const { id: _i, price: _p, ...mount } = H; S.mount = mountStats({ ...mount, stamina: null });
-  log(`${H.name} gehört jetzt dir${old ? ` (${old} bleibt im Stall, ${credit} Gold angerechnet)` : ''}.`, 'party'); UI.refreshHUD(); dkSteed(); return true;
+  log(`${H.name} gehört jetzt dir${old ? ` (${old} bleibt im Stall, ${credit} Gold angerechnet)` : ''}.`, 'party'); UI.refreshHUD(); if (S.player.currentClass === 'deathknight') { const k = { tempo: S.mount.tempo, staminaMax: S.mount.staminaMax }; dkSteed(); Object.assign(S.mount, k, { stamina: null }); } return true;   // S15 Fehlersuche: gekaufte Werte bleiben
 }
 // Pferdehof bei Wendel: Koppel aus Zäunen, drei Pferde darin (Zierde, nicht reitbar)
 function ensurePaddock() {
@@ -353,7 +353,7 @@ function dkSteed() {
 function releaseMount() {
   if (!S.mount) return; const n = S.mount.name, p = S.player; p.mounted = null;
   const h = horseEnt(p.map); if (h) { h.come = false; h.anchor = null; h.until = performance.now() + 4000; h.leaving = true; }
-  S.ents[p.map] = S.ents[p.map].filter(e => e.kind !== 'mount'); S.mount = null;
+  S.ents[p.map] = S.ents[p.map].filter(e => e.kind !== 'mount' || e.decor); S.mount = null;
   log(`Du lässt ${n} laufen. Es sieht sich nicht um.`, 'party'); chronicle(`${p.name} verstößt ${n}`, 'news');
 }
 function mountUp(h) {
@@ -1933,6 +1933,7 @@ export function continueGame() {
   for (const m of MAP_KEYS) for (const e of S.ents[m]) {
     if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
+    for (const k of ['silenced', 'voidRage', 'darkPact', 'timeSlow', 'soulBound', 'exposed', 'cowed', 'shockImm']) if (e[k]) e[k] = 0;   // S15 Fehlersuche: Bann, Pakt, Verlangsamung usw. überdauerten das Laden
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
     if (e.kind === 'enemy' && !e.body && HUMANOID.has(e.mtype)) { e.build = 'ausgewogen'; B.initBody(e, e.maxHp); }
   }
@@ -5550,7 +5551,7 @@ function intrigueTick() {
 const HEIRS = [['die ältere Tochter', 'Pflicht', '„Das Haus braucht Beständigkeit, nicht Abenteuer.“'], ['der jüngere Sohn', 'Gewinn', '„Die Fabriken sind die Zukunft. Mein Vater hat das nie verstanden.“'],
   ['die Nichte', 'Vernunft', '„Wir rechnen. Wer rechnet, streitet nicht um Stühle.“'], ['der Bastard', 'Gewinn', '„Ich habe mehr gearbeitet als beide zusammen. Das weiß jeder.“']];
 function evSuccession() {
-  if (S.succession && !S.succession.done) return false;
+  if (S.succession && !S.succession.done && (S.day | 0) <= S.succession.until) return false;   // S15 Fehlersuche: ignorierter Streit blockierte alle weiteren
   const H = AUREL_HOUSES[Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 11) | 0) % AUREL_HOUSES.length], i = (S.day | 0) % HEIRS.length, j = (i + 1 + ((S.day | 0) % 2)) % HEIRS.length;
   S.succession = { house: H.key, a: [pick(FIRST_F), ...HEIRS[i]], b: [pick(FIRST_M), ...HEIRS[j]], until: (S.day | 0) + 6 };
   log(`${H.name} streitet um den Sitz: ${S.succession.a[0]} (${HEIRS[i][0]}) gegen ${S.succession.b[0]} (${HEIRS[j][0]}). Beide suchen Fürsprache beim Hausherrn.`, 'faction');
@@ -6289,7 +6290,7 @@ function ilvarTalk(npc) {
     { text: 'Ein Gott.', fn: () => { I.omega = 'god'; gain(-5, 'falsche Antwort'); UI.dialogue(npc, '„Ein Gott. Natürlich. Das sagen alle, die niemals hingesehen haben.“', [{ text: 'Weiter', fn: back }]); } },
     { text: 'Ein Wesen. Etwas, das man verstehen kann.', fn: () => { I.omega = 'being'; gain(10, 'kluge Antwort'); UI.dialogue(npc, '„… Ja. Endlich einer, der hinsieht, statt zu knien.“', [{ text: 'Weiter', fn: back }]); } },
     { text: 'Ich weiß es nicht.', fn: () => { I.omega = 'unsure'; gain(3, 'ehrliche Antwort'); UI.dialogue(npc, '„Ehrlich. Das ist mehr, als Varg je gesagt hat.“', [{ text: 'Weiter', fn: back }]); } }]) });
-  if (I.vials < 3) ch.push({ text: `Ich bringe dir drei Seelenphiolen. (${I.vials}/3 Lieferungen)`, fn: () => {
+  if (I.vials < 6) ch.push({ text: `Ich bringe dir drei Seelenphiolen. (${I.vials}/6 Lieferungen)`,   /* S15 Fehlersuche: vorher 3, 100 Vertrauen kaum erreichbar */ fn: () => {
     if (!hasItem(p, 'soul_vial', 3)) return UI.dialogue(npc, '„Drei. Nicht zwei, nicht zweieinhalb. Seelen zählt man genau.“', [{ text: 'Zurück', fn: back }]);
     removeItem(p, 'soul_vial', 3); I.vials++; gain(12, 'Seelenphiolen'); S.gold += 40; UI.dialogue(npc, '„Gut. Sie werden nicht leiden. Nicht mehr als vorher.“ (+40 Gold)', [{ text: 'Weiter', fn: back }]); } });
   if (!npc.spellsTaught.includes('sp_raise')) npc.spellsTaught.push('sp_raise', 'sp_soulburst');   // ältere Stände
@@ -7386,7 +7387,7 @@ function undeadFallCinematic() {
     ...(gate ? [{ x: gate.x - 200, y: gate.y + 40, dur: 5500, text: 'Das Land atmet. Hier und da packen Leute ihre Sachen — die alte Heimat im Osten ruft.', setup: () => { healTick(true); homecomers(gate, 4); } }] : []),
   ]);
 }
-function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; if (S.flags.garmadonSlain && TOWN_PLAN[k]) (S.resettle ||= {})[k] ||= { day: S.day | 0, stage: 0 };   // S15 P11 n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
+function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; if (S.flags.garmadonSlain && TOWN_PLAN[k]) (S.resettle ||= {})[k] ||= { day: S.day | 0, stage: 0 };   /* S15 P11 */ n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
   log(`${townName(k)} ist befreit.`, 'world'); chronicle(`${townName(k)} frei`, 'war', 'Die Toten ziehen ab, die Menschen kehren zurück.'); }
 // S15 P11: Nach Garmadons Fall füllt sich jeder befreite Ort in Stufen: Tag 1 Flüchtlinge, Tag 5 Zeltlager, Tag 15 erste Häuser,
 // Tag 30 Dorf, Tag 60 größere Siedlung. Häuser über growTown (wie das Stadtwachstum), jede Stufe steht in der Chronik — mit dem
@@ -7993,15 +7994,15 @@ function anomalyClose(c, key) {
   const st = S.quests.q_anomaly; S.anomaly = null; S.flags.anomalyClosed = (S.flags.anomalyClosed || 0) + 1;
   fx(c.x, c.y - 12, 'heal', 30); S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 3, life: 800, maxLife: 800 });
   if (st?.state === 'active') { st.progress = [1]; const R = QUESTS.q_anomaly.reward; st.state = 'done'; S.gold += R.gold; gainXp(c, R.xp); for (const [f, v] of Object.entries(R.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); }
-  log('Der Riss schließt sich. Das Gewebe ist wieder still (120 Gold, Aurelion und Orden +4).', 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
+  log(`Der Riss schließt sich. Das Gewebe ist wieder still${st?.state === 'done' ? ' (120 Gold, Aurelion und Orden +4)' : ''}.`, 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
 }
 function anomalyDay() { if (S.anomaly && (S.day | 0) >= S.anomaly.until) { log(`Die Anomalie bei ${S.anomaly.where} schließt sich von selbst.`, 'world'); S.anomaly = null; if (S.quests.q_anomaly?.state === 'active') S.quests.q_anomaly.state = 'failed'; } }
 // S15 P9 Meteorsplitter: nachts ein Leuchten am Himmel, am Morgen liegt ein Splitter in einem Krater (Ort per Hash). Wer ihn aufhebt,
 // kann ihn Irmgard (heilig sprechen), Magister Corvinus (Messwert) oder Ilvar (Neugier) geben — oder als Reagenz behalten und verkaufen.
 function evMeteor() {
-  if (S.meteor) return false; const cand = LOCATIONS.filter(l => l.kind === 'wild' && l.r < 120); if (!cand.length) return false;
+  if (S.meteor && (S.day | 0) < (S.meteor.day ?? 0) + 20) return false; const cand   /* S15 Fehlersuche: frühestens 20 Tage nach dem letzten */ = LOCATIONS.filter(l => l.kind === 'wild' && l.r < 120); if (!cand.length) return false;
   const L = cand[Math.abs(((S.seed | 0) * 13 + (S.day | 0) * 17) | 0) % cand.length], tx = L.x + (((S.day | 0) * 5) % 11) - 5, ty = L.y + (((S.day | 0) * 3) % 9) - 4, pos = freeSpotNear('world', tx, ty, 6);
-  S.meteor = { x: pos.x / TS | 0, y: pos.y / TS | 0, where: L.name };
+  S.meteor = { x: pos.x / TS | 0, y: pos.y / TS | 0, where: L.name, day: S.day | 0 };
   for (let k = 0; k < 6; k++) S.ents.world.push({ id: uid(), kind: 'prop', type: k % 2 ? 'ember' : 'rubble', map: 'world', x: pos.x + Math.cos(k * 1.05) * 40, y: pos.y + Math.sin(k * 1.05) * 30, r: 8, transient: true, meteorBits: true });
   dropItemAt('world', pos.x, pos.y, mkItem('meteorsplitter'));
   log(`In der Nacht zog ein Leuchten über den Himmel. Bei ${L.name} ist etwas eingeschlagen.`, 'world'); chronicle(`Ein Stern fällt bei ${L.name}`, 'news'); return true;
@@ -9112,7 +9113,7 @@ function trialMenu(npc) {
     { text: 'Zurück', fn: () => talk(npc) }]);
 }
 // Kodex „Magie“: wer lehrt was (lebende Lehrer mit Ort)
-const spellTeachers = key => [...S.ents.world, ...(S.ents.tower || [])].filter(e => e.kind === 'npc' && e.alive && e.spellsTaught?.includes(key) && (S.flags.codexAll || S.codex?.met?.[e.key]))   // S15 Kodex: nur bekannte Lehrer.map(e => `${e.name} (${LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—'})`);
+const spellTeachers = key => [...S.ents.world, ...(S.ents.tower || [])].filter(e => e.kind === 'npc' && e.alive && e.spellsTaught?.includes(key) && (S.flags.codexAll || S.codex?.met?.[e.key]))   /* S15 Kodex: nur bekannte Lehrer */ .map(e => `${e.name} (${LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—'})`);
 function teach(npc, cls = teachable(npc)) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
   const parent = CLASSES[cls].parent;
@@ -9325,7 +9326,7 @@ function addFame(n, r = fameRegion(), why = '') {
 }
 const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.faction] != null ? repTier(npc.faction) : null, f = npc && fearedBy(npc) ? fearLvl() : 0;
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
-  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1); };   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
+  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1) * (isBuy && npc?.faction === 'aurel' && S.flags.coreRoute === 'aurel' ? 0.9 : 1); };   /* S15 Fehlersuche: Corvinus-Handel senkt Aurelions Preise um 10 % */   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
   if (ITEMS[key].good && npc && ecoTown(npc)) {
     const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
