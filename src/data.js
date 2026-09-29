@@ -964,6 +964,11 @@ export const QUESTS = {
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
     reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  // S15 P20: Überfälle der Toten (game.js startMyRaid / orderArmy). Fortschritt und Wegpunkt setzt game.js.
+  q_undraid: { name:'Überfall der Toten', giver:null, desc:'Die Horde wartet vor dem Dorf, das du bei Sael gewählt hast. Geh hin, dann greift sie an. Die Dorfwache und die Miliz müssen fallen; die Bewohner verschont die Horde, bis du über sie entscheidest. Wer sich weit entfernt, bricht den Überfall ab.',
+    objectives:[{type:'custom',count:1,text:'Das Dorf einnehmen'}], reward:{} },
+  q_undarmy: { name:'Ein Heer der Toten', giver:null, desc:'Ein Heer der Toten zieht auf deinen Befehl gegen eine Stadt der Lebenden. Es marschiert über die Kriegskarte (M) von Ort zu Ort. Bist du in der Nähe, wenn es ankommt, kämpfst du mit. Fällt die Stadt, entscheidest du über ihre Bewohner.',
+    objectives:[{type:'custom',count:1,text:'Die Stadt fällt'}], reward:{} },
   q_anomaly: { name:'Riss im Gewebe', giver:null, desc:'Eine magische Anomalie: Mana fließt doppelt, Zauber verrutschen. Wer sie mit einem Schutzzauber schließt, bekommt Lohn von Aurelion und dem Orden.',   // S15 P7
     objectives:[{type:'anomaly',count:1,text:'Im Zentrum einen Schutzzauber wirken (Schild, Magieschild, Schutzkreis, Schutzsegen)'}], reward:{gold:120,xp:150,rep:{aurel:4,order:4}} },
   q_graverobbers: { name:'Grabräuber in der Asche', giver:'sael', desc:'Lebende graben in der Nekropole und am Knochenwald nach Grabgut. Sie nehmen die Namen mit. Bring fünf von ihnen zum Schweigen — dann schreibt Vharnholm deinen Namen in die gute Spalte.',

@@ -2,6 +2,11 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 17 — 2026-09-29 (S15)
+- Überfälle der Toten (P20): bei Sael eine Horde gegen ein Dorf führen, ab Rang 2 ein Heer gegen eine Stadt schicken; danach über die Bewohner entscheiden.
+- Festnahme: in Ketten oder im Kerker keine zweite Festnahme, Schuldknechtschaft löscht das Kopfgeld, Entlassung in Aurelion vor das Tor.
+- Ausbruch: Der Wärter redet erst (zurückgehen, bestechen, kämpfen). NPCs am Boden heilen sich nicht selbst.
+
 ## Version 16 — 2026-09-29 (S15, zweite Hälfte)
 - Versionsnummer auf dem Startbildschirm und oben links (v16). Die Seite lädt alle Dateien neu (Cache-Schlüssel v=16).
 - Pferd: R pfeift, E sitzt auf; Werte je Pferd, Stall-Fenster bei Tierhändlern, Pferdehof Hadubrand in Mühlbach, Totenross für Todesritter.
