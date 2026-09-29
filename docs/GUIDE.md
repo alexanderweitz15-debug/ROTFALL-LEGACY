@@ -24,7 +24,10 @@ Es gibt keinen festen Pfad. Du kannst Händler werden, Söldner, Paladin der Ket
 | E | sprechen, benutzen, betreten |
 | Q | ausweichen |
 | R | nach dem Pferd pfeifen; im Sattel: absitzen (Werte des Pferdes und „Verstoßen“ im Gruppenfenster G). Pferde kaufen im **Stall**: bei den Tierhändlern (Kreuzweg, Nordfurt, Kupferhafen) und auf dem **Pferdehof** von Hadubrand in Mühlbach; ein eigenes Pferd wird eingetauscht. Todesritter reiten ein **Totenross** |
-| 1–8 | Fähigkeiten |
+| Umschalt (halten) | Deckung: blocken; im ersten Augenblick eines Hiebs **parieren** (der Angreifer taumelt) |
+| 1–9, 0 | Fähigkeiten und Zauber |
+| Rechtsklick auf eine Figur | auswählen (Infos rechts, z. B. Reparieren beim Schmied) |
+| Esc oder Leertaste | Kamerafahrt überspringen |
 | I · C · G · B · F · K · M · J · T | Inventar · Charakter · Gruppe · Lager · Fraktion · Chronik · Karte · Aufträge · Talente |
 | X · N · H · Z | aktive Effekte · Minikarte · Kodex (dieses Handbuch im Spiel; füllt sich beim Spielen, Code **NACHTGLAS** schaltet alles frei) · Zauberbuch |
 | Mausrad | zoomen |
@@ -45,6 +48,10 @@ Es gibt keinen festen Pfad. Du kannst Händler werden, Söldner, Paladin der Ket
 3. Such dir einen Lehrer für eine Klasse (Abschnitt 6).
 4. Nimm einen Gefährten mit. Allein am Boden verblutest du.
 5. Verlass die sicheren Gebiete erst, wenn du die Gefahrenstufe eines Gebiets kennst (Seitenleiste rechts).
+
+**Reisen:** Es gibt keine Schnellreise. Du läufst oder reitest. Für Gold fahren **Kutscher** vom Platz jeder größeren Stadt zu
+den nächsten Städten (unterwegs droht ein Überfall), und der **Fährmann** setzt zwischen **Salzhafen** und **Kupferhafen** über.
+Ins Hochreich **Aurelion** fährt dich ein Kutscher nur mit **Aufenthaltsschein** (Passamt, siehe Abschnitt 11).
 
 ---
 
@@ -121,6 +128,18 @@ kommen schon ab 100 Gold Kopfgeld. Dein Ruhm steht im Charakterfenster (C).
 - **Gefahrenstufen:** In tödlichen und verbotenen Gebieten sind Gegner stärker und öfter Veteranen (sichtbar größer).
 - **Erfahrung gibt es nur für eigenen Schaden.** Machst du 30 % des Schadens, bekommst du 30 % der Erfahrung. Gefährten lernen mit 60 %.
 - **Eine Stufe** bringt Leben, Ausdauer, Mana, Schaden und Rüstung sowie einen Talentpunkt.
+- **Abnutzung:** Waffen und Rüstung verlieren mit der Zeit an Zustand (im Inventar sichtbar). Eine abgenutzte Waffe macht bis zu
+  **45 % weniger Schaden**. Ein Schmied bessert alles aus („Kannst du das ausbessern?“). Selbst geht es an Esse, Amboss oder
+  Werkbank mit **Eisenerz**, aber nur bis 80 %.
+- **Fertigkeiten** (Charakterfenster C) steigen durch Tun, nicht durch Punkte. Maus über eine Fertigkeit zeigt, was sie bringt:
+  - **Waffen** (Einhändig, Zweihändig, Stangenwaffen, Bogen): steigen mit jedem Treffer — mehr Schaden, schnellere Hiebe.
+  - **Verteidigung:** steigt, wenn du getroffen wirst — wehrt manchmal Hiebe von vorn ab.
+  - **Zähigkeit:** steigt mit jedem eingesteckten Treffer — du liegst kürzer bewusstlos.
+  - **Medizin:** steigt beim Verbinden — Verbände und Kräuter heilen mehr.
+  - **Überleben:** steigt beim Holzfällen und Zähmen — Zähmen gelingt öfter.
+  - **Handel:** steigt mit jedem Kauf und Verkauf — bessere Preise.
+  - **Führung:** je 10 Punkte ein Gefährte mehr (steigt bisher nicht durch Übung).
+  - Jagd, Handwerk, Schmieden und Schleichen haben **noch keine Wirkung**.
 
 ### Magie
 Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
@@ -171,8 +190,9 @@ Du beginnst als **Wanderer**. Jede weitere Klasse lernst du in der Welt, nie im 
 Klassen, die du schon kannst (Charakterfenster C).
 
 ### Grundklassen und ihre Folgeklassen (bei Lehrern)
-Ein Lehrer bildet dich erst aus, wenn er dich mag: **Beziehung mindestens 20** (bei Rook 40). Die bekommst du durch
-Gespräche, Aufträge und Geschenke. Eine Folgeklasse braucht die Klasse davor.
+Ein Lehrer bildet dich erst aus, wenn er dich mag: **Beziehung mindestens 20** (bei Rook 40). Beziehung bekommst du durch
+seine **Aufträge** (+8), **Berufsaufträge**, die du bei ihm abrechnest (+5) und **Dienste**, die du bei ihm bezahlst, etwa
+Reparaturen oder Zauber kaufen (+3). Geschenke gibt es nicht. Eine Folgeklasse braucht die Klasse davor.
 
 | Klasse | Braucht | Lehrer | Wo |
 |---|---|---|---|
@@ -203,7 +223,8 @@ Gespräche, Aufträge und Geschenke. Eine Folgeklasse braucht die Klasse davor.
 | Ulfar der Narbige, Grubenkämpfer | Rastfurt | Berserker |
 
 **Paladin** gibt es erst nach Kelans drei Prüfungen: Wachsamkeit (Untote töten), das Siegel (aus der Grube holen), der
-Schrein (halten, bis die Toten aufhören zu kommen).
+Schrein (halten, bis die Toten aufhören zu kommen). Kelan gibt die Prüfungen erst ab **Beziehung 10**: tritt dem Orden bei und
+erledige seine Aufgaben für Akolythen. Ebenso verrät **Rook** seinen Plan („Rooks Angebot“) erst ab Beziehung 10.
 
 ### Klassen einer Fraktion (durch Rang)
 | Klasse | Weg |
@@ -229,6 +250,7 @@ einen Makel und einen **dauerhaften Preis**. Nekromant und Hexenmeister schließ
 
 | Titel | Freischaltung | Preis |
 |---|---|---|
+| **Vorbedingung (Nekromant, Hexenmeister)** | Zuerst Morvaths Auftrag „Das Grabsiegel“ erfüllen. Morvath gibt ihn erst, wenn er dir traut (**Beziehung 5**). Danach öffnet Ysra den Pakt. Nicht für Ordensleute und Mönche. | — |
 | **Nekromant** | Quest „Der Pakt der Stillen Schar“: Ysra in Alt-Vharn schickt dich nach der Ahnenurne in der Großen Nekropole. Bring sie **zu Ysra**. | Leben −10 % für immer |
 | **Hexenmeister** | Dieselbe Quest, aber bring die Urne **zu Vhal, dem Flüsternden**, am Nekromanten-Turm. | Ausdauer −10 für immer |
 | **Druide** | Quest „Der Ruf des Hains“: Mira im Alten Hain des Westwalds. Das Rudel der Wolfsschlucht vertreiben, Heilkraut für die Quelle bringen. | Stärke −1 für immer |
@@ -331,7 +353,9 @@ Titelklassen. Ein Talentpunkt je Stufe, alle 5 Stufen einer mehr. Umlernen koste
 
 ## 7. Gruppe, Beziehungen und Bewohner
 
-- Bis zu **drei Gefährten**. Sie haben Moral: Hunger und zu viele Tote senken sie, unter 12 laufen sie davon. Geplant ist ein **Tier** als vierter Begleiter.
+- Bis zu **drei Gefährten**, mit eigenem Lager (B) **vier**. Sie haben Moral: Hunger und zu viele Tote senken sie, unter 12 laufen sie davon.
+- **Eigenes Lager (B):** Alle Siedler arbeiten an der obersten Aufgabe der Arbeitsprioritäten. Siedler kommen nur, wenn es Hütten
+  (ein Dach) und Nahrung gibt, und jeder isst täglich. Nachts kommen manchmal Angreifer; ein **Wachturm** warnt eine Stunde vorher.
 - Die Bewohner haben Tagesabläufe: Arbeit am richtigen Ort, Schenke am Abend, nachts zu Hause. Sie haben Freunde und Rivalen und reden über dich.
 - Tote bleiben tot. Ein leeres Haus wird später neu bezogen.
 - Stirbt ein Lehrer, Händler, Schmied oder Meister, kommt nach drei Tagen ein Nachfolger mit derselben Aufgabe. Die Beziehung zu ihm musst du neu aufbauen.
@@ -352,6 +376,8 @@ Titelklassen. Ein Talentpunkt je Stufe, alle 5 Stufen einer mehr. Umlernen koste
 ## 8. Verbrechen, Gefängnis und Schuldknechtschaft
 
 - **Taten mit Zeugen** bringen ein Kopfgeld bei der Fraktion des Opfers (Angriff 25, Mord 75). Ohne Zeugen kein Kopfgeld. Das Kopfgeld sinkt um 5 Gold am Tag.
+- **Fremde Möbel durchsuchen** (Regal, Pult, Kisten, Waffenständer) ist Diebstahl, sobald es jemand sieht (40 Gold Kopfgeld). Der
+  Hinweis „(fremdes Eigentum)“ bei **E** zeigt, dass das Haus jemandem gehört.
 - **Eine Wache stellt dich:** zahlen, mitkommen (Kerker) oder Widerstand. Ab 150 Gold Kopfgeld kommen Kopfgeldjäger.
 - **Im Kerker:** Kaution, Schloss knacken oder absitzen.
 - **Schuldknechtschaft** (Aurelion, Kette): halbes Tempo, keine Waffe, ein Wächter folgt dir. Hinaus kommst du durch Arbeit, Freikauf, gestohlene Schlüssel, Flucht, Hilfe von Freunden oder einen Ratsbeschluss.
@@ -380,6 +406,8 @@ Ohne Palisade oder Wachturm holen Wölfe und Diebe öfter ein Tier.
 - **Eigener Handelswagen** (250 Gold, 60 Ladungen): Ware laden, Wachen anheuern, losschicken. Am Ziel verkauft der Fuhrmann alles. Ab drei Wachen wehrt er Überfälle oft ab.
 - **Betriebe kaufen:** Dir gehört gut ein Drittel des täglichen Warenwerts, minus Lohn. Du kannst sie ausbauen (bis Stufe 3) und Arbeiter anwerben.
 - **Lieferaufträge:** Städte mit Mangel zahlen das 1,6-Fache des Warenwerts, wenn du innerhalb von 7 Tagen lieferst.
+- **In eine Stadt investieren:** am **Anschlagbrett** der Stadt („In die Stadt investieren“). Mit Gold, Holz und Stein baust du
+  Wohnhäuser und Werkstätten; neue Bewohner ziehen ein, und die Stadtherren mögen dich mehr.
 
 **Tipp:** Das Totenland und die Eisenmark brauchen Waffen, Aurelion braucht Nahrung, die Dörfer der Mitte haben Weizen übrig.
 
@@ -478,6 +506,8 @@ Jedes davon verändert die Welt dauerhaft und wird mit einer Kamerafahrt gezeigt
 
 - **Nie allein in tödliche Gebiete.** Gefährten richten dich auf.
 - **Verbände vor jedem Ausflug.** Blutungen töten langsam, aber sicher.
+- **Lass deine Waffe ausbessern.** Eine abgenutzte Klinge verliert bis zu 45 % Schaden — schau im Inventar auf „Zustand“.
+- **Prothesen nutzen sich ab.** Unter 30 % wirken sie nicht mehr (Effekte, X). Die Werkbank in Gelenkhall setzt sie instand.
 - **Ausweichen kostet Ausdauer.** Greif an, wenn der Gegner wankt.
 - **Ruf ist Geld.** Freundliche Händler geben Nachlass, verhasste verkaufen nichts.
 - **Handel lohnt über weite Wege:** Je weiter zwei Märkte auseinander liegen, desto größer oft der Preisunterschied, aber desto höher das Risiko.

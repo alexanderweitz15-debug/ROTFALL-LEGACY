@@ -502,3 +502,19 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .codex{max-width:860px;line-height:1.5;color:#c9bda2;font-size:13px}.codex h2{color:#e0b75a;font-size:18px;margin:18px 0 6px}.codex h3{color:#d8ccb0;font-size:15px;margin:14px 0 4px}
 .codex h4{color:#d8ccb0;margin:10px 0 4px}.codex ul{margin:4px 0 8px 16px;padding:0}.codex li{margin:2px 0}.codex p{margin:6px 0}.codex hr{border:0;border-top:1px solid #2a241c;margin:14px 0}
 .codex code{background:#15120e;padding:0 4px}
+
+/* S15 (Nutzer, Laptop): Die Menüleiste lief rechts aus dem Bild. Sie darf schrumpfen und notfalls seitlich scrollen;
+   auf schmaleren Bildschirmen werden Abstände kleiner, unter 1400 px fallen die Tastenkürzel weg. */
+#nav{min-width:0;overflow-x:auto;scrollbar-width:none}
+#nav::-webkit-scrollbar{display:none}
+#nav button{white-space:nowrap;flex:0 0 auto}
+@media (max-width:1800px){
+  #topbar{gap:10px;padding:0 10px}
+  .brand{font-size:16px;letter-spacing:.14em}
+  #nav button{padding:7px 7px;font-size:11px;letter-spacing:.06em}
+  .worldclock{gap:8px}
+}
+@media (max-width:1400px){
+  #nav button i{display:none}
+  #nav button{padding:7px 5px;letter-spacing:.03em}
+}

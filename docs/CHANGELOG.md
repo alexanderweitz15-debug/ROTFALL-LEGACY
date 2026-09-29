@@ -2,6 +2,12 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 19 — 2026-09-29 (S15)
+- Acht große Weltereignisse (P15): Seuche, Heuschrecken, Turnier, Adelsball, Luftschiffabsturz, Schatzwagen, Hexenprozess, Streik.
+- Cutscenes: Abblende, Schwenks, Überspringen ohne verlorene Folgen; bei Vargs Fall siegen die Goblins. Menüleiste für Laptops.
+- Kenshi-K.-o.: Aufstehen erst ab 25 % Rumpf, Heilen dauert; Wachen, die dich niederschlugen, helfen nicht auf. Rund 45 weitere Fehler (Magie, Reisen, Dungeons, Hinweise).
+- Doku: docs/IST_ZUSTAND.md beschreibt jedes Feature für eine Lückenanalyse.
+
 ## Version 18 — 2026-09-29 (S15, große Fehlersuche)
 - Acht Fehlersucher über alle Systeme; rund 55 Fehler behoben (Liste in BUGS.md, Abschnitt „Fehlersuche Version 18“).
 - Unter anderem: unendlich Gold durch Kaufen/Verkaufen, zerstörte Dörfer füllten sich beim Laden neu, abgebrochene Aufträge für immer gesperrt,

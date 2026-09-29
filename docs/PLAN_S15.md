@@ -111,7 +111,7 @@ ist Ausbau.
 | W | Wissen im Gespräch: 13 Themen (`LORE`), Antwort je Fraktion/Beruf/Seevolk, Wissen aus Grundwissen, Chronik und Erzähltem (Kette von Hinweisen bis zu den Titelklassen). Ausbauen: mehr Themen je neuem Inhalt | FERTIG (Fable) |
 | P14 | Eigener Siedlungsbau als Städtebau-Simulation (Nutzer 29.09., nur notiert, Details unten §P14) | OFFEN |
 | G | Morrgrund und Dodon (Nutzer 29.09.): letztes Goblin-Dorf weit im Süden der Westlande, Entdeckung mit „Dodon!“, drei Wege (Freund, vorbei, Feind), Questline g_dod1–3, Pakt des Sturms, Sturm auf Varg, Untergang bei Tod, Wachstum nach Fall der Eisenfeste | FERTIG (Fable), Fragen offen (unten §G) |
-| P15 | Mehr Weltereignisse (Nutzer 29.09., „später, mit Fragen“) — Ideen sammeln, dann Nutzer fragen | OFFEN (später) |
+| P15 | Mehr Weltereignisse (Nutzer 29.09., „später, mit Fragen“) — Ideen sammeln, dann Nutzer fragen | FERTIG (Version 19) |
 | P16 | Schloss im Norden: dunkles Dark-Fantasy-Schloss von **König Varon** (Königreich Valen) (Nutzer 29.09., „erst später“) | OFFEN (später) |
 | P17 | Reittiere als Gefährten: eigene Werte je Tier (`mountStats`: Tempo, Ausdauer mit Erschöpfung, Mut — Mutige kommen im Kampf), Anzeige und „Verstoßen“ im Gruppenfenster, Pfeifen/Aufsitzen/Richtungen | FERTIG (Opus) |
 | P18 | **Der Fall Aurelions** (Nutzer 29.09., „Fragen nachher“): Wer den ganzen Hohen Rat tötet, löst ein neues Weltereignis aus. Offen: Was folgt (Bürgerkrieg, Machtvakuum, Automaten ohne Herren, Flucht der Adelshäuser)? Wer übernimmt? Was wird aus Kaiserin, Legion, Schuldknechten, Himmelsfeste? | OFFEN (Fragen an den Nutzer) |
