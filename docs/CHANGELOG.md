@@ -17,6 +17,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - P3 Kampfgefühl: schwere Angriffe mit roter Bodenmarkierung und Erholungsfenster; Wölfe gegen Banditen; Bogen mit Pfeil auf der Sehne.
 - Bogen spannt sichtbar (Sehne an den echten Bogenspitzen). P4 Magie: 20 Zauber in 6 Schulen, Sammelzeit mit Rune, Zustände, Übungsränge,
   Zauberbuch (Z), Zauber auf der Leiste, zaubernde Kultisten und Nekromanten, Debug „Magie“. Neu: `MECHANIKEN.md` (alle Mechaniken).
+- P8 Teil 1: Ruhm je Region mit Stufen, Begrüßungen, Nachlass und früheren Kopfgeldjägern; Anzeige im Charakterfenster.
 - P7 Teil 4: Magische Anomalie an Ley-Punkten (Mana doppelt, Zauber verrutschen, Schutzzauber schließt sie).
 - P7 Teil 3: Artefakt-Konflikt um den Aurelioner Magiekern (Snikk, vier Abnehmer, zerschlagen, behalten).
 - P7 Teil 2: Glaubensmagie (Irmgard, vier Zauber, heilig doppelt gegen Untote, stärker mit Kettenrang und Glauben).

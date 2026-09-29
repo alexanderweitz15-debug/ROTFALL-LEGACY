@@ -90,6 +90,11 @@ Jede Tat verändert deinen Ruf bei den Fraktionen. Der Ruf bestimmt Preise, Begr
 nächsten Rang (25 je Stufe), meldet das Spiel eine **Rangprüfung**: zwei Aufträge beim Anführer — Oda (Valen), Kelan (Orden),
 Morvath (Tote) oder eine Kettenwache in der Eisenfeste. Erst wenn beide erledigt und abgegeben sind, steigst du auf.
 
+**Ruhm** zählt je Region (Menschenland, Westlande, Hochreich, Totenland, Gischtinseln): Bosse +15 in ihrer Region und +5 überall,
+Legenden-Titel +10 überall, jeder abgeschlossene Auftrag +2, ein gelöschter Brand +3. Stufen: Unbekannt, Bekannt (15), Regional
+bekannt (35), Berühmt (60), Legendär (85). Die Leute erkennen dich, ab „Berühmt“ geben Händler 5 % Nachlass — und Kopfgeldjäger
+kommen schon ab 100 Gold Kopfgeld. Dein Ruhm steht im Charakterfenster (C).
+
 **Legenden** sind keine Ruftitel, sondern Taten, von denen die ganze Welt spricht: Kettenbrecher der Grubenstämme, Königsmörder der Toten, Gottestöter, Avatar Omegas, Hüter des Schlafs, Stimme im Hohen Rat, Schild von Valen und weitere.
 
 ---

@@ -1732,7 +1732,7 @@ function bindSim() {
   SIM.H.title = t => {
     const p = S.player; p.titles ||= [];
     if (p.titles.includes(t)) return;
-    p.titles.push(t); chronicle(`${p.name}: „${t}“`, 'legend', 'Ein Name, den andere vergeben.');
+    p.titles.push(t); chronicle(`${p.name}: „${t}“`, 'legend', 'Ein Name, den andere vergeben.'); for (const r of Object.keys(FAME_REG)) addFame(10, r, t);   // S15 P8
     UI.toast(t.toUpperCase(), 4200); log(`Man nennt dich nun ${t}.`, 'faction');
   };
   SIM.H.raidDamage = raidDamage;
@@ -3230,6 +3230,7 @@ function die(c, cause = 'Wunden', source) {
     const pw = S.player.equip.weapon;
     if (pw && dist(S.player, c) < 260) pw.kills = (pw.kills || 0) + 1;
     if (c.boss) {
+      const fr = fameRegion(c); for (const r of Object.keys(FAME_REG)) addFame(r === fr ? 15 : 5, r, `${c.title || m.name} ist tot`);   // S15 P8
       const nm = c.map === 'world' ? locAt(c.x / TS | 0, c.y / TS | 0)?.name : DUNGEONS[c.map]?.name, where = nm ? locDat(nm) : 'der Wildnis';   // vorher stand immer „Grube“
       chronicle(`${c.title || m.name} erschlagen`, 'battle', `Gefallen bei ${where}, Jahr ${year()}.`);
       UI.toast(`${c.title || m.name} ist besiegt`, 3200);
@@ -4553,7 +4554,7 @@ function addBounty(fac, g, why) {
 function bountyDay() {
   for (const f of Object.keys(S.bounty || {})) { S.bounty[f] = Math.max(0, S.bounty[f] - Math.max(5, Math.round(S.bounty[f] * 0.05))); if (!S.bounty[f]) delete S.bounty[f]; }
   const p = S.player;
-  if (bountyTotal() >= 150 && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 6) && !((S.flags.hunterDay || 0) > S.day)) {
+  if (bountyTotal() >= (Math.max(...Object.values(S.fame || {}), 0) >= 60 ? 100 : 150) && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 6) && !((S.flags.hunterDay || 0) > S.day)) {
     S.flags.hunterDay = S.day + 2; spawnHunters(p);
   }
 }
@@ -6434,6 +6435,7 @@ function fireTick(dt) {
   }
 }
 function endFire(F, saved) {
+  if (saved && dist(S.player, F.well || S.player) < 1400) addFame(3, fameRegion(), 'der Brand ist gelöscht');   // S15 P8
   S.fires.splice(S.fires.indexOf(F), 1);
   S.ents.world = S.ents.world.filter(e => e.fireSpot !== F.id);
   for (const v of VILLAGERS) if (v.fireJob?.fire === F.id) { v.fireJob = null; v.carry = null; }
@@ -8421,6 +8423,10 @@ function contextLines(npc) {
   const h = S.minute / 60, L = [...(PROF_TALK[npc.prof] || [])];
   L.push(...(h < 8 ? TIME_TALK.morn : h >= 22 || h < 5 ? TIME_TALK.night : h >= 18 ? TIME_TALK.eve : []));
   L.push(...(WEATHER_TALK[S.weather] || []), ...worldTalk(npc));
+  const fv = fameOf(fameRegion(npc));                                  // S15 P8: Ruhm
+  if (fv >= 85) L.push(`„${S.player.name}! Man singt Lieder über dich. Schlechte, aber immerhin.“`, '„Darf ich … nein. Vergiss es. Es ist mir eine Ehre.“');
+  else if (fv >= 60) L.push(`„Du bist ${S.player.name}, oder? Ich hab von dir gehört.“`, '„Die Kinder spielen dich nach. Meistens den Teil mit dem Schwert.“');
+  else if (fv >= 35) L.push('„Dein Gesicht kenne ich. Aus Geschichten, glaube ich.“');
   return L;
 }
 // Ränge ohne Beitritt (MP2 §29/§81): Aurelion aus Schein, Bürgerrecht und Ruf; Grubenstämme nach der Befreiung. Legendäre Ränge
@@ -8687,6 +8693,7 @@ function turnIn(npc, k) {
   if (k === 'g_dod3') { turnInStorm(npc); return; }   // S15: der Pakt des Sturms
   if (k === 'q_salz2') chooseSeaSide('trader'); if (k === 'q_klinge2') chooseSeaSide('raider'); if (k === 'q_salz3') promote('sea', 3);   // S14 Seevolk
   if (npc.key) addRel(npc.key, 8);
+  addFame(2);                                                          // S15 P8
   log(`Auftrag abgeschlossen: ${Q.name}`, 'quest');
   chronicle(`${Q.name} abgeschlossen`, 'quest');
   UI.dialogue(npc, '„Das war mehr, als ich erwartet habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -9130,9 +9137,23 @@ function partyCommand(cmd) {
 
 // ================= Handel =================
 export const repTier = fac => REP_TIERS.find(t => (S.factions[fac] ?? 0) >= t.min);
+// S15 P8 Ruhm je Region (0–100): Bosse +15 dort und +5 überall, Legenden-Titel +10 überall, abgeschlossene Aufträge +2, gelöschter
+// Brand +3. Stufen: Unbekannt, Bekannt (15), Regional bekannt (35), Berühmt (60), Legendär (85). Wirkung: Begrüßung, 5 % Nachlass ab
+// „Berühmt“, Kopfgeldjäger kommen schon ab 100 Gold Kopfgeld, wenn man irgendwo berühmt ist. Anzeige im Charakterfenster.
+const FAME_REG = { mitte: 'Menschenland', west: 'Westlande', sued: 'Hochreich', ost: 'Totenland', see: 'Gischtinseln' }, FAME_TIERS = [[85, 'Legendär'], [60, 'Berühmt'], [35, 'Regional bekannt'], [15, 'Bekannt'], [0, 'Unbekannt']];
+function fameRegion(e = S.player) {
+  if (e.map === 'isle' || e.map === 'deck') return 'see'; if (e.map !== 'world') return 'mitte';
+  const tx = e.x / TS, ty = e.y / TS; return tx < OX ? 'west' : tx > 770 ? 'ost' : ty > 780 ? 'sued' : 'mitte';
+}
+const fameOf = (r = fameRegion()) => (S.fame ||= {})[r] || 0;
+const fameTier = v => FAME_TIERS.find(([n]) => v >= n)[1];
+function addFame(n, r = fameRegion(), why = '') {
+  S.fame ||= {}; const before = fameTier(fameOf(r)); S.fame[r] = clamp((S.fame[r] || 0) + n, 0, 100); const now = fameTier(S.fame[r]);
+  if (now !== before && n > 0) { UI.toast(`RUHM: ${now.toUpperCase()} (${FAME_REG[r]})`, 3000); log(`Im ${FAME_REG[r]} bist du jetzt ${now.toLowerCase()}${why ? ` — ${why}` : ''}.`, 'faction'); }
+}
 const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.faction] != null ? repTier(npc.faction) : null, f = npc && fearedBy(npc) ? fearLvl() : 0;
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
-  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy); };   // S12: Kettenleute zahlen drauf
+  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1); };   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
   if (ITEMS[key].good && npc && ecoTown(npc)) {
     const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
@@ -10346,6 +10367,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
   }
 }
 export function selftest() {
+  const fame0 = structuredClone(S.fame || null), anom0 = S.anomaly || null;   // S15: Ruhm und Anomalie bleiben vom Test unberührt
   const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   S._quiet = true;                     // S13: der ganze Test ist still (keine Kamerafahrten, Chronik, Speicherstände aus Proben)
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
@@ -12579,6 +12601,15 @@ export function selftest() {
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
+  ok('Ruhm (S15 P8): Boss-Sieg hebt den Ruhm der Region über „Bekannt“, Begrüßung ändert sich, Berühmte zahlen weniger', sandbox(() => {
+    const p = stage(), F0 = S.fame; S.fame = {};
+    try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Geschichten') || l.includes('gehört'));
+      const b = spawnEnemy('bandit', '__a', 11, 9); b.boss = true; b.x = p.x + 40; b.y = p.y; die(b, 'Test', p);
+      const known = fameOf('mitte') >= 15 && fameTier(fameOf('mitte')) !== 'Unbekannt'; S.fame.mitte = 40; const l1 = contextLines(npc).some(l => l.includes('Geschichten'));
+      const shop = { faction: null, x: p.x, y: p.y, map: '__a' }, pr0 = repPrice(shop, true); S.fame.mitte = 70; const cheaper = repPrice(shop, true) < pr0;
+      return !l0 && known && l1 && cheaper;
+    } finally { S.fame = F0; }
+  }));
   ok('Magische Anomalie (S15 P7): Ort per Hash, Mana doppelt, Schutzzauber im Zentrum schließt sie und zahlt', sandbox(() => {
     const p = stage(), A0 = S.anomaly, q0 = S.quests.q_anomaly; S.anomaly = null;
     try { const ev = evAnomaly(), A1 = { ...S.anomaly }; S.anomaly = null; evAnomaly(); const same = S.anomaly.x === A1.x && S.anomaly.y === A1.y;
@@ -12718,6 +12749,7 @@ export function selftest() {
     Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
+  S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   S._quiet = quiet0;
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
@@ -12842,6 +12874,7 @@ function boot() {
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
+    fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),   // S15 P8
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
