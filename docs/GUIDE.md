@@ -23,7 +23,7 @@ Es gibt keinen festen Pfad. Du kannst Händler werden, Söldner, Paladin der Ket
 | Strg + Angriff | Neutrale angreifen (mit Folgen für deinen Ruf) |
 | E | sprechen, benutzen, betreten |
 | Q | ausweichen |
-| R | nach dem Pferd pfeifen; im Sattel: absitzen |
+| R | nach dem Pferd pfeifen; im Sattel: absitzen (Werte des Pferdes und „Verstoßen“ im Gruppenfenster G) |
 | 1–8 | Fähigkeiten |
 | I · C · G · B · F · K · M · J · T | Inventar · Charakter · Gruppe · Lager · Fraktion · Chronik · Karte · Aufträge · Talente |
 | X · N · H · Z | aktive Effekte · Minikarte · Kodex (dieses Handbuch im Spiel) · Zauberbuch |

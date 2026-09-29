@@ -161,6 +161,8 @@ Stand: Session 15 (2026-09-29).
 - **Begegnungen unterwegs:** Verwundete, Wegelagerer, Deserteure — nicht jeder Hilferuf ist echt.
 
 ## 11. Reisen
+- **Reittier-Werte (S15):** Jedes Pferd hat eigenes Tempo, Ausdauer (sinkt beim Reiten, erschöpft = langsamer) und Mut
+  (ab 70 kommt es auch im Kampf). Das Gruppenfenster (G) zeigt die Werte; dort kann man das Tier verstoßen.
 - **Pferd pfeifen (S15):** R pfeift. Das Pferd kommt von außerhalb des Bildes angelaufen und bleibt bei dir stehen. E sitzt auf,
   R im Sattel sitzt ab (es wartet dann dort). Im Kampf kommt es nicht; vor Häusern und Höhlen wartet es draußen. Beim Kauf erklärt
   der Tierhändler alles. Das Pferd schaut in alle vier Richtungen, der Reiter sitzt im Sattel. Rückwärts reiten ist langsam.

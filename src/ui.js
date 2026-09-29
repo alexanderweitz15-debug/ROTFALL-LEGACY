@@ -754,7 +754,7 @@ function skillUI(body) {
 function partyUI(body) {
   const mem = partyMembers();
   body.innerHTML = `<div class="ledger">Befehle gelten für die ganze Gruppe. Moral entscheidet, ob sie befolgt werden.</div>
-    ${S.mount ? `<div class="ledger" style="margin-top:6px">Reittier: <b>${S.mount.name}</b> — ${S.player.mounted ? 'du reitest. R zum Absitzen.' : 'es ist immer bei dir. Draußen R zum Aufsitzen (nicht in Häusern und Höhlen).'}</div>` : ''}
+    ${S.mount ? (() => { const H = A.mountInfo?.() || { name: S.mount.name }; return `<div class="panel" style="padding:10px;margin-top:8px"><b>${H.name}</b> <span class="ledger">(${H.kind || 'Reittier'})</span><div class="ledger">Tempo ${H.tempo}% · Ausdauer ${H.stamina}/${H.staminaMax} · Mut ${H.mut}${H.mut >= 70 ? ' (kommt auch im Kampf)' : ' (scheut den Kampf)'}<br>${S.player.mounted ? 'Du reitest. R zum Absitzen.' : 'R pfeift es heran, E sitzt auf. In Häusern und Höhlen wartet es draußen.'}</div><div class="ctx-actions" style="margin-top:6px"><button id="mount-release">Verstoßen</button></div></div>`; })() : ''}
     <div class="ctx-actions" style="flex-direction:row;flex-wrap:wrap;margin:10px 0">
       ${['follow:Folgen', 'attack:Angreifen', 'hold:Stellung halten', 'retreat:Zurückziehen', 'protect:Anführer schützen'].map(c => {
         const [k, n] = c.split(':'); return `<button data-cmd="${k}" class="${S.partyCmd === k ? 'on' : ''}" aria-pressed="${S.partyCmd === k}" style="flex:0 0 auto">${n}</button>`; }).join('')}
@@ -773,6 +773,7 @@ function partyUI(body) {
       <div class="ctx-actions"><button data-bandage="${m.id}">Verbinden</button><button data-sheet="${m.id}">Körpertafel</button><button data-gear="${m.id}">Ausrüstung geben</button><button data-dismiss="${m.id}">Entlassen</button></div>
     </div>`).join('') || '<div class="ledger">Du reist allein. Sprich mit Leuten. Hilf ihnen. Dann frage.</div>'}</div>`;
   [...body.querySelectorAll('[data-cmd]')].forEach(b => b.onclick = () => { A.partyCommand(b.dataset.cmd); refreshModal(); });
+  const rb = $('mount-release'); if (rb) rb.onclick = () => { if (rb.dataset.sure) { A.releaseMount(); refreshModal(); } else { rb.dataset.sure = 1; rb.textContent = 'Wirklich verstoßen? Es kommt nicht zurück.'; } };   // S15 P17
   [...body.querySelectorAll('[data-dismiss]')].forEach(b => b.onclick = () => { A.dismiss(byId(b.dataset.dismiss)); refreshModal(); });
   [...body.querySelectorAll('[data-bandage]')].forEach(b => b.onclick = () => { A.bandage(byId(b.dataset.bandage)); closeModal(); });
   [...body.querySelectorAll('[data-sheet]')].forEach(b => b.onclick = () => { modalOpen = null; openModal('character', byId(b.dataset.sheet)); });

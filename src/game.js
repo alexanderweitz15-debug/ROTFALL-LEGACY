@@ -251,9 +251,15 @@ const BEAST_WARES = [['wild_dog', 'Hund', 60], ['wolf', 'Wolfshund', 180], ['boa
 // Das Reittier gehört dem Helden (S.mount); aufsitzen/absitzen mit R, nur draußen. Reitend: schneller, kämpft weiter; wer zu Boden geht,
 // fällt vom Pferd. Das Messingross braucht alle 5 Tage einen Automatenkern, sonst lahmt es. Kauf beim Tierhändler.
 const MOUNTS = { horse: { name: 'Pferd', spd: 1.55, price: 250 }, mech_horse: { name: 'Messingross', spd: 1.75, price: 900 }, dead_horse: { name: 'Totenross', spd: 1.65, price: 400 } };
+// S15 P17 (Nutzer): Jedes Reittier hat eigene Werte — Tempo (×0,9–1,15), Ausdauer (80–140, sinkt beim Reiten, erschöpft = 70 % Tempo),
+// Mut (0–100: ab 70 kommt es auch mitten im Kampf). Anzeige und „Verstoßen“ im Gruppenfenster (G).
+function mountStats(M = S.mount) {
+  if (!M || M.tempo) return M; const k = M.kind === 'mech_horse' ? 1.05 : M.kind === 'dead_horse' ? 1.02 : 1;
+  return Object.assign(M, { tempo: Math.round((0.9 + rnd() * 0.25) * k * 100) / 100, staminaMax: M.kind === 'dead_horse' ? 160 : ri(80, 140), mut: M.kind === 'dead_horse' ? 100 : M.kind === 'mech_horse' ? 90 : ri(20, 90), stamina: null });
+}
 function mountSpeed(c) {
-  if (!c.mounted) return 1; const M = MOUNTS[c.mounted.kind] || MOUNTS.horse;
-  return M.spd * (c.mounted.kind === 'mech_horse' && (S.mount?.oiled || 0) + 5 < (S.day | 0) ? 0.6 : 1);
+  if (!c.mounted) return 1; const M = MOUNTS[c.mounted.kind] || MOUNTS.horse, H = mountStats();
+  return M.spd * (H?.tempo || 1) * (H && H.stamina != null && H.stamina <= 0 ? 0.7 : 1) * (c.mounted.kind === 'mech_horse' && (S.mount?.oiled || 0) + 5 < (S.day | 0) ? 0.6 : 1);
 }
 // S15 (Nutzer): R pfeift. Das Pferd kommt von außerhalb des Bildes angelaufen und bleibt bei dir stehen; E sitzt auf, R sitzt ab
 // (dann bleibt es stehen). Im Kampf kommt es nicht. Das Pferd in der Welt ist eine flüchtige Figur (kind 'mount'), gespeichert
@@ -279,15 +285,17 @@ function toggleMount() {
   if (S.map !== 'world') return UI.toast('Hier drinnen hört dich dein Pferd nicht. Es wartet draußen.');
   if (p.downed) return;
   float(p, 'pfeift', 'rgba(230,220,180,ALPHA)'); sfx('whistle', 0.4, 1);
-  if (inFight(p)) return UI.toast(`${S.mount.name} scheut den Kampf und kommt nicht.`, 2400);
+  if (inFight(p) && (mountStats()?.mut || 0) < 70) return UI.toast(`${S.mount.name} scheut den Kampf und kommt nicht.`, 2400);   // S15 P17: Mutige kommen
   let h = horseEnt(); if (!h || dist(h, p) > 900) h = spawnHorse(p);
   if (!h) return UI.toast('Dein Pferd findet keinen Weg zu dir.');
   h.come = true; h.stuckT = 0;
 }
 function mountTick(dt) {
-  const p = S.player, h = horseEnt(S.map); if (!h) return;
+  const p = S.player, H = S.mount && mountStats(); if (H) { H.stamina ??= H.staminaMax; const riding = p.mounted && (p.vx || p.vy);
+    H.stamina = clamp(H.stamina + dt / 1000 * (riding ? -1.2 : 2.5), 0, H.staminaMax); if (riding && H.stamina <= 0 && !H.tiredSaid) { H.tiredSaid = true; UI.toast(`${H.name} ist erschöpft.`, 2000); } if (H.stamina > 20) H.tiredSaid = false; }   // S15 P17
+  const h = horseEnt(S.map); if (!h) return;
   if (!h.come || p.mounted) { h.vx = h.vy = 0; h.come = h.come && !p.mounted; return; }
-  if (inFight(p)) { h.come = false; h.vx = h.vy = 0; float(h, 'scheut', 'rgba(220,200,160,ALPHA)'); return; }
+  if (inFight(p) && (mountStats()?.mut || 0) < 70) { h.come = false; h.vx = h.vy = 0; float(h, 'scheut', 'rgba(220,200,160,ALPHA)'); return; }
   const d = dist(h, p);
   if (d < 44) { h.come = false; h.vx = h.vy = 0; float(h, 'schnaubt', 'rgba(220,200,160,ALPHA)'); if (d < 900) UI.toast(`${h.name} ist da — E zum Aufsitzen.`, 1800); return; }
   const a = Math.atan2(p.y - h.y, p.x - h.x), sp = (d > 220 ? 4.4 : 2.4) * dt / 16, x0 = h.x, y0 = h.y;
@@ -296,6 +304,12 @@ function mountTick(dt) {
     if ((h.stuckT = (h.stuckT || 0) + dt) > 1200) { h.stuckT = 0; const k = Math.max(60, d - 180), x = p.x - Math.cos(a) * k, y = p.y - Math.sin(a) * k;
       if (!solidTile(h.map, x, y) && !solidPropAt(h.map, x, y, 12)) { h.x = x; h.y = y; } else { h.x = p.x - Math.cos(a) * 40; h.y = p.y - Math.sin(a) * 40; } } }
   else h.stuckT = 0;
+}
+function releaseMount() {
+  if (!S.mount) return; const n = S.mount.name, p = S.player; p.mounted = null;
+  const h = horseEnt(p.map); if (h) { h.come = false; h.anchor = null; h.until = performance.now() + 4000; h.leaving = true; }
+  S.ents[p.map] = S.ents[p.map].filter(e => e.kind !== 'mount'); S.mount = null;
+  log(`Du lässt ${n} laufen. Es sieht sich nicht um.`, 'party'); chronicle(`${p.name} verstößt ${n}`, 'news');
 }
 function mountUp(h) {
   const p = S.player; if (!S.mount || p.downed) return;
@@ -310,7 +324,7 @@ function mountIntro(npc) {                                            // S15 (Nu
 }
 function buyMount(kind) {
   const M = MOUNTS[kind]; if (S.gold < M.price) return UI.toast('Dafür reicht dein Gold nicht.');
-  S.gold -= M.price; S.mount = { kind, name: `${M.name} ${pick(['Sturm', 'Asche', 'Messing', 'Nacht', 'Wind', 'Funke'])}`, oiled: S.day | 0 };
+  S.gold -= M.price; S.mount = mountStats({ kind, name: `${M.name} ${pick(['Sturm', 'Asche', 'Messing', 'Nacht', 'Wind', 'Funke'])}`, oiled: S.day | 0 });
   log(`${S.mount.name} gehört jetzt dir. R pfeift es heran, E sitzt auf.`, 'party'); UI.toast(`REITTIER: ${S.mount.name.toUpperCase()}`, 2400); UI.refreshHUD();
 }
 function oilMount() {
@@ -10263,7 +10277,7 @@ function classAbility(p, key) {
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
 // Rückwärts im Kampf (BUG-076): zu Fuß 70 %. Mechanik-Check S14: ein Pferd galoppiert nicht rückwärts — beritten 40 %, sonst
 // hebelt Rückwärtsreiten mit Bogen das Nachsetzen (Mindesttempo 2,0) wieder aus.
-const backMul = p => p.mounted ? 0.4 : 0.7;
+const backMul = p => p.mounted ? 0.4 / (S.mount?.tempo || 1) : 0.7;   // S15 P17: schnelle Pferde reiten rückwärts nicht schneller (kein Kiten)
 // i-Frames = Dauer der Rolle. Abklingzeit + Ausdauer verhindern Dauerrollen.
 const DODGE = { dur: 240, dist: 92, cd: 850, stam: 20 };
 function dodge() {
@@ -12705,6 +12719,17 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Reittier-Werte (S15 P17): jedes Pferd eigene Werte, Erschöpfung bremst, mutige kommen im Kampf, Verstoßen löscht es', sandbox(() => {
+    const p = stage(), m0 = S.mount;
+    try { S.mount = mountStats({ kind: 'horse', name: 'Test', oiled: 0 }); const H = S.mount, ok1 = H.tempo >= 0.9 && H.tempo <= 1.2 && H.staminaMax >= 80 && H.mut >= 0;
+      p.mounted = { kind: 'horse' }; H.stamina = H.staminaMax; const fresh = mountSpeed(p); H.stamina = 0; const tired = mountSpeed(p) < fresh;
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 60; e.y = p.y; p.mounted = null; p.map = '__a';
+      H.mut = 90; const h1 = spawnHorse(p, 200); h1.come = true; mountTick(16); const brave = h1.come;
+      H.mut = 10; h1.come = true; mountTick(16); const shy = !h1.come;
+      releaseMount(); const gone = !S.mount && !horseEnt(p.map);
+      return ok1 && tired && brave && shy && gone;
+    } finally { S.mount = m0; p.mounted = null; }
+  }));
   ok('Todesritter-Questreihe (S15 P19): drei Aufträge bei Sael der Reihe nach; zwei Teile geben Todesmahr, drei die Frostaura', sandbox(() => {
     const p = stage(), q0 = ['dk_1', 'dk_2', 'dk_3'].map(k => S.quests[k]); ['dk_1', 'dk_2', 'dk_3'].forEach(k => delete S.quests[k]);
     try { p.knownClasses = ['wanderer', 'warrior']; const locked = !questAvailable('dk_1'); p.knownClasses.push('deathknight'); p.currentClass = 'deathknight';
@@ -12849,7 +12874,7 @@ export function selftest() {
     claimContract(C); claimContract(C); claimContract(C); return S.gold === g0 + 50 && C.state === 'claimed';
   }));
   ok('Pferd pfeifen (S15): kommt von außerhalb, läuft heran, E sitzt auf; im Kampf kommt es nicht; absitzen lässt es stehen', sandbox(() => {
-    const p = stage(), m0 = S.mount; S.mount = { kind: 'horse', name: 'Test', oiled: 0 };
+    const p = stage(), m0 = S.mount; S.mount = { kind: 'horse', name: 'Test', oiled: 0, tempo: 1, staminaMax: 100, mut: 10 };
     try { const h = spawnHorse(p, 300); const far = h && dist(h, p) > 250; h.come = true;
       for (let i = 0; i < 400 && h.come; i++) mountTick(16); const came = !h.come && dist(h, p) < 60;
       mountUp(h); const up = !!p.mounted && !horseEnt(p.map);
@@ -13030,6 +13055,7 @@ function boot() {
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
     fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
+    mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
