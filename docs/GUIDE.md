@@ -113,8 +113,18 @@ Morvath (Tote) oder eine Kettenwache in der Eisenfeste. Erst wenn beide erledigt
 Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
 - **Zauberbuch (Z):** ein Reiter je Schule (Feuer, Frost, Blitz, Arkan, Heilung, Schutz). Dort stehen Rang, Kosten, Wirkung und
   die Übung bis zum nächsten Rang. „Auf Leiste legen“ legt den Zauber auf die Schnellleiste (Tasten 1–0).
-- **Unbekannte Zauber** zeigen, wer sie lehrt. Die Lehrer in der Welt kommen mit dem nächsten Ausbau (Wandermagier in
-  Kreuzweg, Akademie in Aurelheim). Bis dahin lernt man Zauber über das Debug-Menü (Abschnitt „Magie“).
+- **Zauber lernen:** Frag einen Zauberlehrer „Kannst du mir Magie beibringen?“. Er nennt Preis und Stufe und sagt, was dir fehlt.
+  Bedingungen: Gold (Stufe I 30, II 80, III 180; guter Ruf senkt den Preis), Intelligenz (8 / 11 / 14) und Beziehung 10 zum Lehrer.
+
+  | Lehrer | Wo | Lehrt | Zusätzlich |
+  |---|---|---|---|
+  | Serafine, Wandermagierin | Kreuzweg | Funke, Feuerpfeil, Energiegeschoss, Schild | — |
+  | Elena, Heilerin | Eren | Kleine Heilung | — |
+  | Morvath | Alter Friedhof | Funke, Feuerpfeil, Flammenstoß | die Toten müssen dich dulden |
+  | Mutter Aldis, Ordenspriesterin | Sonnwacht | Heilung und Schutz | Orden-Rang 1, für Stufe III Rang 2 |
+  | Magister Corvinus | Akademie Aurelheim | Arkan, Feuer II–III, Frost, Blitz, Schutzkreis | Aufenthaltsschein; Stufe III nur als Bürger oder Akademie-Adept |
+
+  Unbekannte Zauber zeigen im Zauberbuch, wer sie lehrt. Der Kodex (H) hat dazu den Reiter „Magie“.
 - **Sammelzeit:** Viele Zauber brauchen einen Moment. Unter dir leuchtet eine Rune in der Farbe der Schule. Wirst du in dieser
   Zeit getroffen, bricht der Zauber ab, und du bekommst halbes Mana zurück.
 - **Wände:** Die Eiswand (Frost III) stellt fünf Eisblöcke quer vor dich, durch die nichts kommt. Die Feuerwand (Feuer III) brennt

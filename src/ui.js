@@ -178,7 +178,7 @@ function guideSections(md) {                                               // na
   return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
 }
 function codexUI(body) {
-  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
+  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
   body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"></div><div id="codex-body" class="codex"></div>`;
   const q = $('codex-q'), cb = $('codex-body');
   const render = () => {
@@ -186,6 +186,13 @@ function codexUI(body) {
     if (codexTab === 'guide') {
       if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
       const secs = guideSections(guideMd).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';
+    } else if (codexTab === 'magic') {                                     // S15 P5: Schulen, Zauber, Lehrer, Haltung der Mächte
+      const SC = A.schools || {}, keys = A.spellKeys || [], p = S.player;
+      const VIEW = [['Der Orden', 'Heilung und Schutz sind Werk des Lichts. Totenmagie ist verboten und wird verfolgt.'], ['Hochreich Aurelion', 'Magie ist Wissenschaft: an der Akademie gelehrt, mit Schein und Gebühr.'],
+        ['Die Untoten', 'Totenmagie ist ihr Recht und ihre Religion. Wer Seelen stiehlt, stiehlt von ihnen.'], ['Die Eiserne Kette', 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.'], ['Königreich Valen', 'Misstraut allen Zauberern und duldet sie, solange sie nützen.']];
+      cb.innerHTML = Object.entries(SC).filter(([s, S0]) => hit(S0.name + keys.filter(k => ABILITIES[k].school === s).map(k => ABILITIES[k].name).join(' '))).map(([s, S0]) =>
+        `<h3 style="color:${S0.col}">${S0.name}</h3><table class="rank-tab">${keys.filter(k => ABILITIES[k].school === s).map(k => `<tr><td>${p.spells?.[k] ? '✓ ' : ''}${ABILITIES[k].name} <span class="ledger">(Stufe ${ABILITIES[k].tier})</span></td><td>${A.spellTeachers?.(k)?.join('<br>') || '<i>Niemand, den du kennst, lehrt das.</i>'}</td></tr>`).join('')}</table>`).join('')
+        + `<h3>Wie die Mächte über Magie denken</h3>${VIEW.filter(([n, t]) => hit(n + t)).map(([n, t]) => `<div class="fx-row"><div><b>${n}:</b> ${t}</div></div>`).join('')}`;
     } else if (codexTab === 'teachers') {                                  // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“)
       const L = A.teacherList?.() || [], rows = Object.entries(CLASSES).filter(([k]) => L.some(t => t.cls.includes(k))).filter(([k, C]) => hit(C.name + L.filter(t => t.cls.includes(k)).map(t => t.name + t.where).join(' ')));
       cb.innerHTML = `<div class="ledger">Ein Lehrer bildet dich erst aus, wenn er dich mag (Beziehung 20, bei Rook 40). Eine Folgeklasse braucht die Klasse davor. Auf der Karte (M) sind Lehrer gelb umrandet.</div>
@@ -217,7 +224,7 @@ function spellUI(body) {
     return r ? `<div class="fx-row spell-row"><div><b style="color:${SC[spellTab].col}">${ab.name}</b> · Rang ${['', 'I', 'II', 'III'][r]}<div class="ledger">${ab.desc}<br>${cost}</div>
         ${need ? `<div class="bar" style="height:4px;background:#2a2418;margin:4px 0"><div style="height:100%;width:${Math.min(100, n / need * 100)}%;background:${SC[spellTab].col}"></div></div><div class="ledger">Übung ${n}/${need}</div>` : '<div class="ledger">Gemeistert.</div>'}</div>
         <button class="txtbtn" data-bar="${k}">${p.hotbar?.some(s => s?.key === k) ? 'Auf der Leiste' : 'Auf Leiste legen'}</button></div>`
-      : `<div class="fx-row spell-row" style="opacity:.55"><div><b>${ab.name}</b> · unbekannt<div class="ledger">${ab.desc}<br>${cost}<br>Lehrer: ${ab.teach || 'unbekannt'}</div></div></div>`;
+      : `<div class="fx-row spell-row" style="opacity:.55"><div><b>${ab.name}</b> · unbekannt<div class="ledger">${ab.desc}<br>${cost}<br>Lehrer: ${A.spellTeachers?.(k)?.join(', ') || ab.teach || 'unbekannt'}</div></div></div>`;
   }).join('');
   body.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { spellTab = b.dataset.s; spellUI(body); });
   body.querySelectorAll('[data-bar]').forEach(b => b.onclick = () => { A.spellToBar(b.dataset.bar); spellUI(body); });

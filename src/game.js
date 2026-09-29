@@ -47,7 +47,7 @@ export function makeChar(o = {}) {
     seed: rnd() * 100, swing: 0, atkCd: 0, telegraph: 0, aiState: 'idle', aiTimer: 0,
     pal: o.pal || { skin: pick(SKIN), hair: pick(HAIR), cloth: pick(CLOTH) },
     home: o.home || null, schedule: o.schedule || null, origin: o.origin || null,
-    recruit: o.recruit || false, recruitRel: o.recruitRel || 25, teaches: o.teaches || null,
+    recruit: o.recruit || false, recruitRel: o.recruitRel || 25, teaches: o.teaches || null, spellsTaught: o.spellsTaught || null, spellRule: o.spellRule || null,
     shop: o.shop || false, town: o.town || null, smith: o.smith || false, undead: o.undead || false, kin: o.kin || null,
     greet: o.greet || '"..."', hostile: o.hostile || false,
     build: o.build || pick(Object.keys(B.BUILDS)),
@@ -535,7 +535,8 @@ function spawnNPCs() {
 function spawnNpcDef(def) {
   const spots = NPC_SPOTS;
   {
-    const home = def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
+    const hs = def.atHouse && HOUSES.find(h => h.type === def.atHouse && h.map === 'world');   // S15 P5: vor einem Gebäude (Akademie)
+    const home = hs ? [hs.doorTile[0], hs.doorTile[1] + 2] : def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
       : worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
     const pos = freeSpotNear('world', home[0] + ri(-2, 2), home[1] + ri(-2, 2), 4);
     const c = makeChar({ ...def, x: pos.x, y: pos.y, level: def.key === 'kelan' ? 12 : def.key === 'rook' ? 8 : ri(3, 7),
@@ -1882,8 +1883,8 @@ export function continueGame() {
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
-    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches']) if (def[k] !== undefined) e[k] = def[k]; }
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && (def.atTown || ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key))) spawnNpcDef(def);   // S15: Stadt-Lehrer auch in alten Ständen
+    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches', 'spellsTaught', 'spellRule']) if (def[k] !== undefined) e[k] = def[k]; }
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && (def.atTown || def.atHouse || ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key))) spawnNpcDef(def);   // S15: Stadt-Lehrer auch in alten Ständen
   successorDay(true);                                                 // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“): fehlende wichtige NPCs ersetzen
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
@@ -7856,7 +7857,7 @@ function seasonDay() {
 // Stirbt ein Lehrer, Händler, Schmied, Meister oder der Vorsteher, kommt nach drei Tagen ein Nachfolger an dieselbe Stelle. Er übernimmt
 // Rolle und Schlüssel (Aufträge und Questreihen laufen weiter), aber nicht die Beziehung. Verwandte kommen nicht wieder, und nach
 // Garmadons Fall keine Lehrer der Toten mehr.
-const KEY_ROLE = d => !d.kin && !!(d.teaches || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key));
+const KEY_ROLE = d => !d.kin && !!(d.teaches || d.spellsTaught || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key));
 function successorDay(onLoad = false) {                            // onLoad: wer ganz fehlt (alter Stand, Tod unbekannt), kommt sofort nach
   const day = S.day | 0, all = Object.values(S.ents).flat(); S.succ ||= {};
   for (const def of NPCS) {
@@ -8139,6 +8140,7 @@ function talk(npc) {
     choices.push({ text: 'Über deine Tochter …', fn: () => lilaOutcome(npc) });
   const gw = gradeTalk(npc); if (gw) choices.push(gw);                // S15 Titelgrade
   if ((npc.key === 'sael' || npc.key === 'ysra') && (S.ranks.undead ?? -1) >= 3 && !S.player.knownClasses.includes('deathknight')) choices.push({ text: 'Die Todesweihe. (Klasse Todesritter)', fn: () => deathRite(npc) });
+  if (npc.spellsTaught?.length) choices.push({ text: 'Kannst du mir Magie beibringen?', fn: () => spellMenu(npc) });   // S15 P5
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
   if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
@@ -8646,6 +8648,39 @@ function respec(npc) {
     { text: 'Lieber nicht.', fn: () => UI.closeDialogue() },
   ]);
 }
+// ================= S15 P5 Magie lernen =================
+// Zauberlehrer (NPCS.spellsTaught). Bedingungen: Gold (nach Stufe, Ruf senkt den Preis), Intelligenz (8 / 11 / 14), Beziehung 10 zum
+// Lehrer, dazu je Lehrer eine Regel (Orden: Rang 1, für Stufe III Rang 2; Akademie: Aufenthaltsschein, Stufe III nur Bürger oder
+// Akademie-Rang Adept). Der Lehrer sagt, was fehlt.
+const SPELL_PRICE = [0, 30, 80, 180], SPELL_INT = [0, 8, 11, 14];
+const SPELL_RULES = {
+  order: (p, t) => (S.ranks.order ?? -1) < (t >= 3 ? 2 : t >= 2 ? 1 : 0) ? `Rang ${FACTIONS.order.ranks[t >= 3 ? 2 : 1]} im Orden` : null,
+  academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
+};
+function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0; return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1)); }
+function spellLack(npc, key) {                                      // was fehlt, als Liste; leer = darf lernen
+  const p = S.player, t = ABILITIES[key].tier, out = [], price = spellPrice(npc, key);
+  if (S.gold < price) out.push(`${price - S.gold} Gold`);
+  if ((p.attributes.intelligence || 8) < SPELL_INT[t]) out.push(`Intelligenz ${SPELL_INT[t]}`);
+  if (npc.spellRule !== 'academy' && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
+  const r = SPELL_RULES[npc.spellRule]?.(p, t); if (r) out.push(r);
+  return out;
+}
+function learnFrom(npc, key) {
+  const lack = spellLack(npc, key); if (lack.length) return false;
+  S.gold -= spellPrice(npc, key); learnSpell(S.player, key); addRel(npc.key, 3); UI.refreshHUD(); return true;
+}
+function spellMenu(npc) {
+  const p = S.player, back = () => spellMenu(npc), list = npc.spellsTaught.filter(k => ABILITIES[k]);
+  UI.dialogue(npc, `„Welche Formel? Ein Zauber sitzt erst, wenn du ihn oft wirkst.“ (Gold: ${S.gold}, Intelligenz: ${p.attributes.intelligence})`, [
+    ...list.map(k => { const A0 = ABILITIES[k], lack = spellLack(npc, k), have = p.spells?.[k];
+      return { text: have ? `✓ ${A0.name} (kannst du)` : `${A0.name} — Stufe ${A0.tier}, ${spellPrice(npc, k)} Gold${lack.length ? ' (fehlt etwas)' : ''}`,
+        fn: () => have ? back() : lack.length ? UI.dialogue(npc, `„${A0.name}? Dafür fehlt dir noch: ${lack.join(', ')}.“`, [{ text: 'Zurück', fn: back }])
+          : UI.dialogue(npc, `„${A0.desc}“ Das kostet ${spellPrice(npc, k)} Gold.`, [{ text: 'Lehr es mich.', fn: () => { learnFrom(npc, k); back(); } }, { text: 'Zurück', fn: back }]) }; }),
+    { text: 'Zurück', fn: () => talk(npc) }]);
+}
+// Kodex „Magie“: wer lehrt was (lebende Lehrer mit Ort)
+const spellTeachers = key => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.spellsTaught?.includes(key)).map(e => `${e.name} (${LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—'})`);
 function teach(npc, cls = teachable(npc)) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
   const parent = CLASSES[cls].parent;
@@ -12231,7 +12266,7 @@ export function selftest() {
   ok('Lehrer in den Städten (S15): jede Grundklasse hat mindestens zwei Lehrer, alle Stadt-Lehrer stehen in der Welt', sandbox(() => {
     const n = c => NPCS.filter(d => [].concat(d.teaches || []).includes(c)).length;
     return ['warrior', 'archer', 'rogue', 'cleric', 'mage', 'bard', 'alchemist', 'berserker'].every(c => n(c) >= 2)
-      && NPCS.filter(d => d.atTown).every(d => TOWN_PLAN[d.atTown] && S.ents.world.some(e => e.key === d.key && e.teaches));
+      && NPCS.filter(d => d.atTown && d.teaches).every(d => TOWN_PLAN[d.atTown] && S.ents.world.some(e => e.key === d.key && e.teaches));
   }));
   ok('Nachfolger (S15): stirbt ein Lehrer, kommt nach drei Tagen ein neuer mit derselben Rolle; nie doppelt', sandbox(() => {
     const W0 = S.ents.world, succ0 = S.succ, rel0 = S.relations.hauke; S.ents.world = W0.slice(); S.succ = {};
@@ -12248,6 +12283,18 @@ export function selftest() {
     const g = spawnEnemy('bandit', '__a', 11, 9); g.x = p.x + 180; g.y = p.y; p.aim = 0; p.cooldowns = {}; p.stamina = 100; e.x = p.x - 200; useAbility('death_grip'); const pulled = dist(p, g) < 60;
     if (p.body) { B.fullHeal(p); p.body.torso.hp -= 30; B.syncHp(p); } else p.hp -= 30; const h0 = p.hp; hit(p, g, 1); const healed = p.hp > h0;
     return closed && open && treeAbilities(p).includes('death_grip') && frosted && pulled && healed;
+  }));
+  ok('Zauberlehrer (S15 P5): sagen, was fehlt (Gold, Intelligenz, Beziehung, Schein); lehren sonst; Akademie Stufe III nur mit Rang', sandbox(() => {
+    const p = stage(), g0 = S.gold, rel0 = S.relations.serafine, perm0 = S.permit, acad0 = S.acadRank;
+    try { const sera = { key: 'serafine', name: 'Serafine', faction: 'merch', spellsTaught: ['sp_firebolt'] }, prof = { key: 'corvinus', name: 'Corvinus', faction: 'aurel', spellRule: 'academy', spellsTaught: ['sp_firewall', 'sp_icespear'] };
+      p.spells = {}; p.attributes.intelligence = 8; S.gold = 5; S.relations.serafine = 0;
+      const l1 = spellLack(sera, 'sp_firebolt'), poor = l1.some(x => x.includes('Gold')) && l1.some(x => x.includes('Beziehung'));
+      S.gold = 500; S.relations.serafine = 20; const learned = learnFrom(sera, 'sp_firebolt') && p.spells.sp_firebolt === 1 && S.gold < 500;
+      S.permit = -1; const noPermit = spellLack(prof, 'sp_icespear').some(x => x.includes('Aufenthaltsschein'));
+      S.permit = (S.day | 0) + 3; p.attributes.intelligence = 14; S.acadRank = 0; const t3 = spellLack(prof, 'sp_firewall').some(x => x.includes('Adept')), t2ok = !spellLack(prof, 'sp_icespear').length;
+      S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
+      return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
+    } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
   ok('Zauber-Wände (S15 P4): Eiswand hält eine Figur auf, Feuerwand brennt, beide vergehen; Frostfläche bleibt als Eisboden', sandbox(() => {
     const p = stage(); indexSolids('__a'); p.aim = 0; learnSpell(p, 'sp_icewall', true); castSpell(p, 'sp_icewall', 0);
@@ -12443,6 +12490,7 @@ function boot() {
       useConsumable(S.player, idx, target, part);
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
+    spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
@@ -12471,7 +12519,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
-    castSpell, learnSpell,                                           // S15 P4: Zauber im Dev-Modus prüfen
+    castSpell, learnSpell, spellMenu,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();
