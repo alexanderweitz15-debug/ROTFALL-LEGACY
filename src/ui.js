@@ -1,15 +1,15 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=16';
-import * as CS from './cloudsave.js?v=16';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=16';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=16';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=16';
-import { wearOf } from './buildings.js?v=16';
-import { townState, townPrice } from './sim.js?v=16';
-import { GOODS } from './data.js?v=16';
-import { target as ecoTarget } from './economy.js?v=16';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=16';
-import { sfx, ambience } from './sfx.js?v=16';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=17';
+import * as CS from './cloudsave.js?v=17';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=17';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=17';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=17';
+import { wearOf } from './buildings.js?v=17';
+import { townState, townPrice } from './sim.js?v=17';
+import { GOODS } from './data.js?v=17';
+import { target as ecoTarget } from './economy.js?v=17';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=17';
+import { sfx, ambience } from './sfx.js?v=17';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -231,7 +231,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=16').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=17').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }

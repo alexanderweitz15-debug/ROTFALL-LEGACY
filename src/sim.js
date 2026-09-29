@@ -1,8 +1,8 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
-import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=16';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=16';
-import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=16';
-import * as ECO from './economy.js?v=16';
+import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=17';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=17';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=17';
+import * as ECO from './economy.js?v=17';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -257,7 +257,7 @@ export function warTick() {                                  // alle 6 Spielstun
   if (W.battles.some(b => !b.garrisonFight)) return;         // laufende Feldschlacht vor Ort erst auswerten
   for (const a of W.armies) {
     let next = null;
-    if (a.faction === 'undead') next = path(a.at, n => W.nodes[n].owner !== 'undead');
+    if (a.faction === 'undead') next = a.order && W.nodes[a.order] ? (a.at === a.order ? null : path(a.at, n => n === a.order)) : path(a.at, n => W.nodes[n].owner !== 'undead');   // S15 P20: Befehl des Spielers
     else next = path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));
     if (!next || (a.faction === 'valen' && a.strength < 25)) next = null;   // zu schwach: halten
     // §74 Vorwarnung: bevor ein Untotenheer auf eine Siedlung zieht, melden Späher es — das Heer sammelt sich einen Zug (6 Std.)
@@ -316,6 +316,7 @@ function capture(node, faction) {
   if (n.owner === faction) return;
   const was = n.owner;
   n.owner = faction; n.garrison = faction === 'undead' ? 10 : 8; n.wave = 0; n.waves = 0;   // neu besetzt: Befreiung beginnt wieder bei Welle 1
+  if (faction === 'undead') for (const a of S.war.armies) if (a.order === node) { a.order = null; H.heldTaken?.(node); }   // S15 P20: Befehl erfüllt
   const L = LOC[node];
   log(`${L.name} fällt an ${FACTIONS[faction].name}.`, 'faction');
   if (S.towns[node]) {

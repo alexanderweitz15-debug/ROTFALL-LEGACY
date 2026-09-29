@@ -185,3 +185,15 @@ Stand: Session 15 (2026-09-29).
 - **Statpunkte:** Jede Stufe gibt einen Statpunkt (alle fünf Stufen einen zusätzlich). Die Stufenmeldung nennt ihn, die Kopfzeile zeigt freie Stat- und Talentpunkte, und im Charakterfenster (C) erklärt jeder Knopf beim Überfahren, was der Wert bewirkt.
 - **Wohlstand 100:** Die Stadt baut sofort ein neues Haus, wenn der Wohlstand durch „Handel fördern“ 100 erreicht, sonst über Nacht. Danach fängt er bei 20 wieder an. Ist die Stadt ausgebaut (zehn neue Häuser) oder kein Bauplatz frei, sagt die Stadtkasse das.
 - **Varg und die Legion:** Um Varg um Männer gegen Garmadon zu bitten, muss man selbst in Garmadons Gruft gewesen sein und ihn getroffen haben. Nach dem ersten Gespräch mit Garmadon gibt das Spiel einen Hinweis darauf.
+
+## Runde: Überfälle der Toten, Festnahme, Kerker, Am Boden (S15, Version 17)
+
+- **Überfälle der Toten (P20):** Wer den Toten beigetreten ist, bekommt den Hinweis, dass Sael in Vharnholm Überfälle plant.
+  - Bei Sael wählt man eines der vier nächsten Dörfer. Die Horde wartet vor dem Dorf (Wegpunkt), bis man kommt, und greift dann die Dorfwache und eine Miliz an. Die Bewohner verschont sie.
+  - Fallen alle Verteidiger, gehört das Dorf den Toten: Besatzung aus Skeletten, 80 Gold Beute, die Herren des Dorfs −15, die Toten +8.
+  - Wer sich weiter als 90 Felder entfernt, bricht den Überfall ab. Ein neuer Überfall geht am nächsten Tag.
+  - Ab Rang 2 schickt man bei Sael das stärkste Heer der Toten gegen eine Stadt. Es zieht über die Kriegskarte; ist man in der Nähe, kämpft man mit.
+  - Fällt ein Ort, entscheidet man über die Bewohner: **Erheben** (sie sterben und stehen als Besatzung auf), **Versklaven** (sie bleiben als Knechte, jeden Tag Tribut) oder **Vertreiben** (sie ziehen in die nächste Stadt der Lebenden). Man kann das Urteil auch später bei Sael fällen.
+- **Festnahme:** Wer in Ketten oder im Kerker sitzt, wird nicht noch einmal festgenommen. Die Schuldknechtschaft ersetzt das Kopfgeld. Wer in Aurelion aus dem Kerker kommt und keinen Schein hat, wird vor das Tor geführt.
+- **Ausbruch aus dem Kerker:** Sieht ein Wärter den Ausbruch, redet er erst: zurück in die Zelle (zwei Stunden mehr), bestechen (die Hälfte der Kaution, er sieht eine Stunde weg) oder kämpfen (beide Wärter greifen an).
+- **Am Boden:** NPCs, auch Gefährten, heilen sich am Boden nicht selbst. Sie stehen nur auf, wenn jemand sie heilt oder aufrichtet: der Held (E, Verband, Zauber), ein Gefährte oder ein Bewohner in der Nähe, sobald kein Feind mehr da ist. Nur der Held selbst kommt von allein zu sich.
