@@ -5468,6 +5468,24 @@ function intrigueTick() {
   const c = makeChar({ name: I.name, prof: I.kind === 'brief' ? `Bote von ${AUREL_HOUSES.find(h => h.key === I.vs).name}` : `Verwalter von ${AUREL_HOUSES.find(h => h.key === I.vs).name}`, x: I.x, y: I.y, level: 6, faction: 'aurel' });
   Object.assign(c, { intrigueTarget: true, visitor: true, transient: true, anchor: { x: I.x, y: I.y }, schedulePos: { x: I.x, y: I.y }, cloth: '#2a2a3a' }); S.ents.world.push(c);
 }
+// S15 P9 Erbfolgestreit: In einem Adelshaus Aurelions (per Hash gewählt) streiten zwei Erben um den Sitz. Beide suchen Fürsprache;
+// wen du stützt, der sitzt danach im Hohen Rat und schuldet dir etwas (Gunst des Hauses +15, damit eine Stimme im Rat).
+const HEIRS = [['die ältere Tochter', 'Pflicht', '„Das Haus braucht Beständigkeit, nicht Abenteuer.“'], ['der jüngere Sohn', 'Gewinn', '„Die Fabriken sind die Zukunft. Mein Vater hat das nie verstanden.“'],
+  ['die Nichte', 'Vernunft', '„Wir rechnen. Wer rechnet, streitet nicht um Stühle.“'], ['der Bastard', 'Gewinn', '„Ich habe mehr gearbeitet als beide zusammen. Das weiß jeder.“']];
+function evSuccession() {
+  if (S.succession && !S.succession.done) return false;
+  const H = AUREL_HOUSES[Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 11) | 0) % AUREL_HOUSES.length], i = (S.day | 0) % HEIRS.length, j = (i + 1 + ((S.day | 0) % 2)) % HEIRS.length;
+  S.succession = { house: H.key, a: [pick(FIRST_F), ...HEIRS[i]], b: [pick(FIRST_M), ...HEIRS[j]], until: (S.day | 0) + 6 };
+  log(`${H.name} streitet um den Sitz: ${S.succession.a[0]} (${HEIRS[i][0]}) gegen ${S.succession.b[0]} (${HEIRS[j][0]}). Beide suchen Fürsprache beim Hausherrn.`, 'faction');
+  chronicle(`Erbstreit im ${H.name}`, 'news'); return true;
+}
+function successionTalk(npc, H) {
+  const Sx = S.succession, back = () => UI.closeDialogue();
+  const side = (h, other) => ({ text: `Ich spreche für ${h[0]} (${h[1]}).`, fn: () => { Sx.done = h[0]; cRelAdd(H.key, 15); for (const m of COUNCIL) if (m.key !== H.key && m.style === h[2].toLowerCase()) cRelAdd(m.key, 3);
+    npc.name = `${h[0]} ${H.name.replace('Haus ', '')}`; log(`${h[0]} übernimmt ${H.name}. Das Haus schuldet dir etwas (Gunst +15; Ratsmitglieder, denen ${h[2]} liegt, +3).`, 'faction');
+    chronicle(`${h[0]} übernimmt ${H.name}`, 'faction', `${S.player.name} sprach für ${h[1]}; ${other[0]} ging leer aus.`); UI.dialogue(npc, `${h[3]} — „Ich vergesse nicht, wer für mich sprach.“`, [{ text: 'Weiter', fn: back }]); } });
+  UI.dialogue(npc, `Zwei Erben, ein Stuhl im Hohen Rat. ${Sx.a[0]}: ${Sx.a[3]} ${Sx.b[0]}: ${Sx.b[3]}`, [side(Sx.a, Sx.b), side(Sx.b, Sx.a), { text: 'Das ist nicht meine Sache.', fn: back }]);
+}
 function aurelChoices(npc, choices) {
   bondChoices(npc, choices);
   const p = S.player, back = () => talk(npc), cont = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
@@ -5489,6 +5507,7 @@ function aurelChoices(npc, choices) {
   if (npc.intrigueTarget && S.intrigue?.kind === 'brief' && !S.intrigue.done) choices.unshift({ text: 'Den Brief. Sofort.', fn: () => {
     S.intrigue.done = true; S.ents.world = S.ents.world.filter(e => e !== npc); log('Du nimmst dem Boten den Brief ab. Er rennt.', 'quest'); UI.closeDialogue(); } });
   const H = AUREL_HOUSES.find(h => h.key === npc.houseKey); if (!H) return;
+  if (S.succession?.house === H.key && !S.succession.done && (S.day | 0) <= S.succession.until) choices.unshift({ text: 'Der Erbstreit …', fn: () => successionTalk(npc, H) });   // S15 P9
   const f = favor(H.key);
   if (f >= 60 && (S.ranks.aurel ?? 0) >= 6 && !S.quests.q_ratssitz && !S.flags.councillor) choices.unshift({ text: 'Ich will in den Hohen Rat.', fn: () => { startQuest('q_ratssitz'); cont(`„${H.name} schlägt dich vor. Zwei weitere Häuser müssen zustimmen, und Corvan will fünfhundert Gold Einlage. Dann sitzt du oben.“`); } });   // Nutzer S13
   if (S.gold >= 150) choices.push({ text: `${H.name} ein Geschenk machen (150 Gold)`, fn: () => { S.gold -= 150; S.houses[H.key] = clamp(favor(H.key) + 5, -100, 100); cont('„Wie aufmerksam. Das Haus merkt sich so etwas.“'); } });
@@ -7915,7 +7934,7 @@ function coreSmash() {                                                // aus dem
 function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].metro && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm'); const k = pick(T); return k && startFire(k) ? k : null; }   // S14
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
-  evMagicCore, evAnomaly, evMeteor,
+  evMagicCore, evAnomaly, evMeteor, evSuccession,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
   () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
@@ -10313,6 +10332,7 @@ function debugSections() {
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
+      'Erbfolgestreit (Aurelion)': () => { if (S.succession) S.succession.done = S.succession.done || 'alt'; evSuccession(); UI.toast('Erbstreit im Haus ' + S.succession.house); },   // S15 P9
       'Meteorsplitter': () => { S.meteor = null; evMeteor(); UI.toast('Einschlag bei ' + (S.meteor?.where || '—')); },   // S15 P9
       'Flüchtiger Sklave (hier)': () => spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'runaway'),
       'Magische Anomalie': () => { S.anomaly = null; evAnomaly(); UI.toast('Anomalie bei ' + (S.anomaly?.where || '—')); },   // S15 P7
@@ -12647,6 +12667,14 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Erbfolgestreit (S15 P9): zwei Erben, deine Fürsprache hebt die Gunst des Hauses und damit seine Stimme im Rat', sandbox(() => {
+    const p = stage(), S0 = S.succession, h0 = structuredClone(S.houses || {}), c0 = structuredClone(S.council || {});
+    try { delete S.succession; const ev = evSuccession(), Sx = S.succession, H = AUREL_HOUSES.find(h => h.key === Sx.house), f0 = favor(H.key);
+      const lord = { name: 'Hausherr', houseKey: H.key }; successionTalk(lord, H); document.querySelector('#dlg-choices button')?.click();
+      const done = Sx.done === Sx.a[0] && favor(H.key) === Math.min(100, f0 + 15) && lord.name.startsWith(Sx.a[0]);
+      UI.closeDialogue(); return ev && done && Sx.a[0] && Sx.b[0];
+    } finally { UI.closeDialogue(); S.succession = S0; if (!S0) delete S.succession; S.houses = h0; S.council = c0; }
+  }));
   ok('Weg und Himmel (S15 P9): Entflohener (verstecken/ausliefern/begleiten), Meteorsplitter mit Krater und drei Abnehmern', sandbox(() => {
     const p = stage(), f0 = { ...S.factions }, M0 = S.meteor, O0 = S.omega, I0 = S.ilvar, W0 = S.ents.world.length; S.gold = 100;
     try { const pick1 = t => { const b = [...document.querySelectorAll('#dlg-choices button')].find(x => x.textContent.includes(t)); b?.click(); return !!b; };

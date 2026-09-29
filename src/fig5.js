@@ -858,7 +858,7 @@ const BEASTR = {
   boar:     { body: [31, 22, 14, 8.2], fx: 21, hx: 41, leg: 10, lw: 4.2, head: [13, 22, 6, 5], snout: 4, neck: 0, tail: 'curl', ear: 'small', crest: 1, tusk: 1 },
   bear:     { body: [31, 19, 15, 9.5], fx: 21, hx: 41, leg: 13, lw: 5.6, head: [12, 19, 5.6, 4.8], snout: 5, neck: 0, tail: 'stub', ear: 'round', hump: 1 },
   horse:    { body: [33, 17, 12.5, 6.2], fx: 24, hx: 42, leg: 19, lw: 3.2, head: [12, 6, 3.4, 3.2], snout: 5, neck: 2, tail: 'long', ear: 'point', mane: 1, hoof: 1 },
-  cow:      { body: [31, 19, 15, 7.5], fx: 21, hx: 41, leg: 12, lw: 4.2, head: [13, 18, 4.4, 4.2], snout: 7, neck: 0, tail: 'tuft', ear: 'side', boxy: 1, udder: 1, horns: 1, patches: 1, hoof: 1 },
+  cow:      { body: [31, 19, 16.5, 8.8], fx: 20, hx: 42, leg: 11, lw: 5, head: [12, 19, 5.2, 4.8], snout: 6, neck: 0, tail: 'tuft', ear: 'side', boxy: 1, udder: 1, horns: 1, patches: 1, hoof: 1, dewlap: 1 },   // S15 P9 (Nutzer): massiger als das Pferd
   ox:       { body: [31, 19, 15.5, 8], fx: 21, hx: 41, leg: 12, lw: 4.6, head: [13, 18, 4.6, 4.4], snout: 7, neck: 0, tail: 'tuft', ear: 'side', boxy: 1, horns: 1, hump: 1, hoof: 1 },   // S14 Zugtiere
   mule:     { body: [32, 18, 11.5, 6], fx: 24, hx: 41, leg: 16, lw: 3, head: [13, 8, 3.4, 3.2], snout: 5, neck: 2, tail: 'long', ear: 'long', hoof: 1 },
   sheep:    { body: [31, 21, 12, 8], fx: 23, hx: 39, leg: 10, lw: 2.4, head: [16, 18, 3.4, 3.6], snout: 12, neck: 0, tail: 'stub', ear: 'side', wool: 1, darkLeg: 1, hoof: 1 },
@@ -925,7 +925,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   C.ell(P.body, cx, cy, brx, bry);
   if (T.boxy) C.poly(P.body, [[cx - brx + 2, cy - bry + 0.5], [cx + brx - 1, cy - bry + 1.5], [cx + brx, cy + bry - 1], [cx - brx + 1, cy + bry - 0.5]]);   // Kuh: gerader Rücken, kantige Hüfte
   if (T.wool) for (let i = 0; i < 9; i++) { const a = Math.PI * (0.95 + i * 0.13); C.ell(P.body, cx + Math.cos(a) * brx * 0.92, cy + Math.sin(a) * bry * 0.85, 3.2, 3); }   // Schaf: Wollbausch
-  if (T.udder) C.ell(P.udder, cx + 5, cy + bry + 0.5, 3.2, 2.4);
+  if (T.udder) { C.ell(P.udder, cx + 5, cy + bry + 0.5, 4, 3); for (const dx of [-1.5, 1.5]) C.ell(P.udder, cx + 5 + dx, cy + bry + 3, 0.9, 1.3); }   // S15 P9: volles Euter mit Zitzen
   if (T.hump) C.ell(P.body, cx - 5, cy - bry * 0.55, brx * 0.55, bry * 0.6);
   C.ell(P.belly, cx - 2, cy + bry * 0.55, brx * 0.7, bry * 0.4);
   leg(P.legFN, T.fx, s * 4, s > 0 ? 2 : 0, false); leg(P.legHN, T.hx, -s * 4, s < 0 ? 2 : 0, true);
@@ -937,7 +937,8 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   C.poly(P.head, [[hx - hrx * 0.5, hy - hry * 0.5], [sn, hy + (type === 'boar' ? 1 : 0)], [sn, hy + hry * 0.7], [hx - hrx * 0.3, hy + hry * 0.8]]);
   if (act === 'a2' && type !== 'deer') C.poly(P.head, [[sn + 1, hy + hry * 0.7], [hx - 2, hy + hry], [sn + 2, hy + hry + 2.5]]);
   if (T.hoof || type === 'boar') C.ell(P.muzzle, sn + 1.5, hy + hry * 0.3, type === 'horse' ? 2.4 : 2.8, hry * 0.62);          // helles Maul / Rüsselscheibe
-  if (T.horns) { C.limb(P.horn, [[hx + 1, hy - hry + 1], [hx - 1, hy - hry - 2], [hx - 3, hy - hry - 2.5]], 1.6, 1.2); C.limb(P.horn, [[hx + 3, hy - hry + 1], [hx + 4, hy - hry - 2], [hx + 6, hy - hry - 2.5]], 1.4, 1.1); }
+  if (T.horns) { C.limb(P.horn, [[hx + 1, hy - hry + 1], [hx - 2, hy - hry - 2.5], [hx - 4, hy - hry - 2]], 2.2, 1.3); C.limb(P.horn, [[hx + 3, hy - hry + 1], [hx + 5, hy - hry - 2.5], [hx + 7, hy - hry - 2]], 2, 1.2); }   // S15 P9: kräftigere Hörner
+  if (T.dewlap) C.ell(P.head, hx + 2, hy + hry + 1.5, 2.6, 2.2);   // Wamme unter dem Kinn
   if (T.ear === 'point') C.poly(P.ear, [[hx - 1, hy - hry + 1], [hx + 1, hy - hry - 4], [hx + 3, hy - hry + 1]]);
   else if (T.ear === 'flop') C.poly(P.ear, [[hx + 1, hy - hry + 1], [hx + 4, hy - hry], [hx + 5, hy + 1], [hx + 3, hy + 2]]);
   else if (T.ear === 'long') C.poly(P.ear, [[hx + 1, hy - hry + 1], [hx + 6, hy - hry - 2], [hx + 3, hy - hry + 2]]);

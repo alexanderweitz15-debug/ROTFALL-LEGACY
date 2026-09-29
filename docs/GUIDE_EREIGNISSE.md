@@ -188,6 +188,17 @@ das Geständnis und du musst das Tagebuch suchen.
 
 Beide Ereignisse lassen sich im Debug-Menü unter „Ereignisse“ auslösen.
 
+## Kleine Weltereignisse (S15)
+
+- **Flüchtiger Grubenarbeiter** (Westen, solange die Kette steht): Jemand mit Kettenspuren bittet um Hilfe. Verstecken
+  (Grubenstämme +8, Kette −8), ausliefern (30 Gold, Kette +10, Grubenstämme −12, die Gruppe mag das nicht) oder mit ihm kämpfen:
+  zwei Kettenreiter und ein Hund kommen (Grubenstämme +15, Kette −15).
+- **Meteorsplitter:** Nachts zieht ein Leuchten über den Himmel, am Morgen liegt bei einem Wildgebiet ein Splitter im Krater.
+  Irmgard weiht ihn (Glaube +10, Kette +5, 80 Gold), Magister Corvinus kauft ihn (200 Gold, Aurelion +5), Ilvar will ihn
+  sehen (120 Gold, Vertrauen +15).
+- **Erbfolgestreit:** In einem Adelshaus Aurelions streiten zwei Erben um den Sitz. Sprich beim Hausherrn für eine Seite:
+  Die Gunst des Hauses steigt um 15, damit auch seine Stimme im Hohen Rat; Ratsmitglieder mit derselben Haltung +3.
+
 ## Magische Anomalie (S15)
 
 An einem Ley-Punkt (Totenruinen, Schädelwald, Gräberfeld, Seelenhügel, Westgebirge oder Wüstensporn) reißt das Gewebe. Im
