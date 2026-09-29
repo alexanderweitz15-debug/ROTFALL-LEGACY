@@ -2119,6 +2119,7 @@ function update(dt, now) {
   if (S.player?.casting) castTick(S.player);   // S15 P4
   mountTick(dt);                               // S15: gerufenes Pferd läuft heran
   if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
+  dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
@@ -8719,6 +8720,7 @@ function questAvailable(k) {
   if (k === 'q_monk') return !(S.player.titleClasses || []).includes('monk') && !titleFull() && !pactBound();
   if (k === 'q_rook') return (S.relations.rook ?? 0) >= 10;
   if (QUESTS[k]?.dod) { const n = QUESTS[k].dod; return !!S.flags.morrFriend && !S.flags.morrDead && (n === 1 || S.quests['g_dod' + (n - 1)]?.state === 'done') && (n < 3 || !S.flags.chainsBroken); }   // S15 Dodon
+  if (QUESTS[k]?.dkQ) { const n = QUESTS[k].dkQ; return S.player.knownClasses.includes('deathknight') && (n === 1 || S.quests['dk_' + (n - 1)]?.state === 'done'); }   // S15 P19
   if (QUESTS[k]?.classQ) { const [t, step, g] = QUESTS[k].classQ, p = S.player;   // S15 Klassen-Questline beim Meister
     return (p.titleClasses || []).includes(t) && gradeOf(p, t) >= g && (step === 1 || S.quests[Object.keys(QUESTS).find(q => QUESTS[q].classQ?.[0] === t && QUESTS[q].classQ[1] === step - 1)]?.state === 'done'); }
   if (QUESTS[k]?.sea) { const Q = S.quests, side = S.seaSide, done = q => Q[q]?.state === 'done';   // S14 Seevolk
@@ -9402,6 +9404,8 @@ const titleAbilities = c => { const T = TC(c); if (!T) return []; const a = T.gr
 // S15 Klassen-Rüstung (Nutzer: „nur über eine Questline, wie in WoW; getragen verstärkt sie die Fähigkeiten und gibt weitere“).
 // Zählt die getragenen Teile der Rüstung des aktiven Titels. Ab 2 Teilen: Titelzauber +25 % und eine neue Fähigkeit, ab 3 mehr.
 const GEAR_ABILITY = { necromancer: 'grave_host', warlock: 'dark_pact', druid: 'pack_call', monk: 'flurry' };
+function dkAuraTick(p, dt) { if (dkGear(p) >= 3 && (S._dkAura = (S._dkAura || 0) + dt) > 3000) { S._dkAura = 0; for (const t of hostilesOf(p)) if (dist(p, t) < 90) applySpellStatus(t, { key: 'frost', chance: 1 }, p); } }
+const dkGear = c => c?.currentClass === 'deathknight' ? gearOf(c, 'deathknight') : 0;   // S15 P19: Rüstung der Eidwacht
 function gearOf(c, key = c?.titleClass) { return key && c?.equip ? Object.values(c.equip).filter(it => it && ITEMS[it.key]?.classSet === key).length : 0; }
 const classQDone = (c, key) => Object.entries(QUESTS).some(([k, Q]) => Q.classQ?.[0] === key && S.quests[k]?.state === 'done');
 // S15 Titelgrade (Nutzer: Klassen wie Nekromant aufarbeiten): Wer den Titel trägt, sammelt Taten (Titelzauber, Tote in der Nähe).
@@ -9711,7 +9715,7 @@ function learnNode(k) {
 // ================= Fähigkeiten =================
 function useAbility(key) {
   const p = S.player, ab = ABILITIES[key];
-  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]))) return;
+  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]) || (key === 'death_coil' && dkGear(p) >= 2))) return;
   if (p.silenced > performance.now() && (ab.spell || ab.title)) return UI.toast('Gebannt — für einen Moment keine Magie.');   // S15 P7: Bann der Magierjäger
   if (ab.spell) {                                            // S15 P4: Zauber
     if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
@@ -9744,7 +9748,7 @@ function useAbility(key) {
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b));
   switch (key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
-    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
+    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1) * (dkGear(p) >= 2 ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
     case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'heal', 10); break;
     case 'backstab': p.abilityMult = 3; p.atkCd = 0; attack(p); break;
     case 'aimed_shot': {
@@ -9791,7 +9795,7 @@ function syncHotbar() {
   const p = S.player;
   const HB = 10;                                             // Tasten 1–9, 0: Klasse (≤3) + Titel (3) + aktive Talente (≤3) passen immer
   const sp = (p.hotbar || []).filter(s => s?.type === 'ability' && ABILITIES[s.key]?.spell && p.spells?.[s.key]).map(s => s.key);   // S15 P4: Zauber auf der Leiste bleiben
-  p.hotbar = [...new Set([...p.abilities, ...titleAbilities(p), ...treeAbilities(p)])].slice(0, HB - 1).map(k => ({ type:'ability', key: k }));
+  p.hotbar = [...new Set([...p.abilities, ...titleAbilities(p), ...treeAbilities(p), ...(dkGear(p) >= 2 ? ['death_coil'] : [])])].slice(0, HB - 1).map(k => ({ type:'ability', key: k }));
   for (const k of sp) if (p.hotbar.length < HB && !p.hotbar.some(s => s.key === k)) p.hotbar.push({ type:'ability', key: k });
   for (const k of ['bandage', 'potion', 'herb', 'bread']) if (p.hotbar.length < HB) p.hotbar.push({ type:'item', key: k });
   UI.renderHotbar();
@@ -10207,6 +10211,11 @@ function classAbility(p, key) {
       return true; }
     case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
     case 'brew': if (!addItem(p, 'potion')) return false; log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'death_coil': {                                            // S15 P19: Todesmahr
+      const f = foes.filter(o => dist(p, o) < 240 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.6 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
+      if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
+      const d = (14 + (p.attributes.strength || 8) + (p.attributes.willpower || 8)) * (dkGear(p) >= 3 ? 1.25 : 1); hurt(f, d, p, 'Todesmahr', false, 'magic'); B.heal(p, d / 3);
+      for (let k = 0; k <= 6; k++) fx(p.x + (f.x - p.x) * k / 6, p.y - 12 + (f.y - p.y) * k / 6, 'frost', 1); float(p, '+' + Math.round(d / 3), 'rgba(111,216,255,ALPHA)'); sfx('magic', 0.5); return true; }
     case 'death_grip': {                                            // S15 Todesritter: den Feind heranziehen
       const f = foes.filter(o => dist(p, o) < 220 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.7 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
       if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
@@ -10648,7 +10657,7 @@ export function selftest() {
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
   ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
+    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
   ok('Erreichbarkeit (Audit A-04): kein Rohstoff, kein Kraut steht auf Fels, Wasser oder Mauer', MAP_KEYS.every(m => (S.ents[m] || []).every(e => !(e.kind === 'prop' && e.harvest) || !SOLID.has(tileAt(m, e.x / TS | 0, e.y / TS | 0)))));
   ok('Warnung (BUG-081): erster Schritt in ein gefährliches Gebiet schreibt eine Warnung, Siedlungen und Sicheres nicht', (() => {
     const at = k => LOCATIONS.find(l => l.key === k), low = { level: 1 }, vet = { level: 9 };
@@ -12696,6 +12705,16 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Todesritter-Questreihe (S15 P19): drei Aufträge bei Sael der Reihe nach; zwei Teile geben Todesmahr, drei die Frostaura', sandbox(() => {
+    const p = stage(), q0 = ['dk_1', 'dk_2', 'dk_3'].map(k => S.quests[k]); ['dk_1', 'dk_2', 'dk_3'].forEach(k => delete S.quests[k]);
+    try { p.knownClasses = ['wanderer', 'warrior']; const locked = !questAvailable('dk_1'); p.knownClasses.push('deathknight'); p.currentClass = 'deathknight';
+      const first = questAvailable('dk_1') && !questAvailable('dk_2'); S.quests.dk_1 = { state: 'done', progress: [3, 3] }; const second = questAvailable('dk_2');
+      p.equip.head = mkItem('todesritter_helm'); p.equip.chest = mkItem('todesritter_harnisch'); recalc(p); syncHotbar(); const coil = p.hotbar.some(h => h.key === 'death_coil');
+      p.equip.cloak = mkItem('todesritter_mantel'); recalc(p); const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 40; e.y = p.y; S._dkAura = 3100; dkAuraTick(p, 16);
+      const aura = e.status?.some(s => s.key === 'frost');
+      return locked && first && second && coil && dkGear(p) === 3 && aura && ['dk_1', 'dk_2', 'dk_3'].every(k => ITEMS[QUESTS[k].reward.item]?.classSet === 'deathknight');
+    } finally { ['dk_1', 'dk_2', 'dk_3'].forEach((k, i) => { if (q0[i]) S.quests[k] = q0[i]; else delete S.quests[k]; }); }
+  }));
   ok('Wiederbesiedlung (S15 P11): 60 Tage nach der Befreiung hat ein Ort alle fünf Stufen durchlaufen und ist gewachsen', sandbox(() => {
     const R0 = S.resettle, d0 = S.day, W0 = S.ents.world.slice(), G0 = structuredClone(S.growth || {}), gs = S.flags.garmadonSlain;
     try { const k = Object.keys(TOWN_PLAN).find(t => growable(t) && !TOWN_PLAN[t].metro); S.resettle = { [k]: { day: d0 | 0, stage: 0 } };

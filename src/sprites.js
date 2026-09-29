@@ -261,6 +261,9 @@ const ARMOR_LOOK = {
   kronharnisch: { armor: 'plate', armorCol: '#3a4a66', tabard: '#2f4260', mark: 'chevron', markCol: '#b9c3d2' }, kronhelm: { helm: 'nasal', helmCol: '#5a5852', crest: '#3a5a9a' },   // S13: Fraktionssets
   totenrufer_kapuze: { hooded: 1, hood: '#141a18', helm: '' }, gewand_stille_schar: { robe: '#161c18', stole: '#1a2420', charm: 1, rn: '#8fd9b0', pauld: '#b8b09a', asy: 1, pb: 1, sil: 'collar' },   // S15 Klassen-Rüstung
   grabsteinkragen: { cloak: '#101512', sil: 'collar motes', mc: '#8fd9b0' },
+  todesritter_helm: { helm: 'great', helmCol: '#22262e', crest: '#6fd8ff', ge: '#6fd8ff' },   // S15 P19: Eidwacht (Todesritter)
+  todesritter_harnisch: { armor: 'plate', armorCol: '#20242c', pauld: '#3a4250', pb: 2, spk: 1, rn: '#6fd8ff', kn: 1, glove: '#2a2e36', tabard: '#12141a' },
+  todesritter_mantel: { cloak: '#10161e', capeL: 1, sil: 'flames', mc: '#6fd8ff' },
   hoernerkrone: { hooded: 1, hood: '#1e1624', helm: '', sil: 'horns' }, robe_fluesternder: { robe: '#221a2a', sash: '#4a2a5e', rn: '#b07ae0', core: '#c890ff' }, schattenmantel: { cloak: '#140f18', sil: 'motes', mc: '#c890ff' },
   hainfell: { fur: '#5a4a30', wraps: 1, armor: 'leather', armorCol: '#4a3a26' }, fellmantel_hain: { cloak: '#3e3222', capeL: 1 }, geweih_hirsch: { helm: '', sil: 'antlers' },
   gebetsband: { helm: '', hs: 2, charm: 1 }, robe_stille_hand: { sash: '#e6cf8a', stole: '#d9d2c0', bare: 1, stance: 1, wraps: 1 }, wickel_stille_hand: { wraps: 1, sil: 'motes', mc: '#e6cf8a' },

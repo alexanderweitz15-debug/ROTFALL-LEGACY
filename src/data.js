@@ -177,6 +177,10 @@ export const ITEMS = {
     lore:'Weißbarts Anker, an einer Kette um den Unterarm. Er hat damit ein Zollschiff Valens versenkt — von innen.' },
   // S15 Klassen-Rüstung (Nutzer: „nur über eine eigene Questline, wie in WoW“): je Titelklasse drei Teile vom Meister.
   // Ab zwei Teilen, getragen mit dem passenden Titel: stärkere Fähigkeiten und eine neue (game.js CLASS_GEAR). Nicht verkäuflich.
+  // S15 P19: Rüstung des Todesritters (Questreihe bei Sael in Vharnholm), gebunden. Wirkung nur als aktive Klasse Todesritter (game.js dkGear).
+  todesritter_helm:     { name:'Helm der Eidwacht', slot:'head', armor:6, rarity:'epic', value:0, classSet:'deathknight', bound:true, lore:'Schwarzer Stahl mit Reif am Visier. Wer ihn trägt, hört Garmadons Eid in der Kälte.' },
+  todesritter_harnisch: { name:'Harnisch der Eidwacht', slot:'chest', armor:10, rarity:'epic', value:0, classSet:'deathknight', bound:true, lore:'Die Platten sind kalt, auch im Sommer. Unter dem Brustbein glimmt ein blaues Licht.' },
+  todesritter_mantel:   { name:'Frostmantel der Eidwacht', slot:'cloak', armor:4, rarity:'legendary', value:0, classSet:'deathknight', bound:true, lore:'Genäht aus dem Banner eines Ritters, der seinen Eid brach. Er friert, wer dir zu nahe kommt.' },
   totenrufer_kapuze: { name:'Kapuze des Totenrufers', slot:'head', armor:4, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Grabtuch, dreimal gefaltet. Darunter hört man die Toten atmen.' },
   gewand_stille_schar: { name:'Gewand der Stillen Schar', slot:'chest', armor:7, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Bis zum Boden, schwarz wie nasse Erde. Eine Schulter aus Ahnenknochen.' },
   grabsteinkragen: { name:'Kragen aus Grabstein', slot:'cloak', armor:3, rarity:'legendary', value:0, classSet:'necromancer', bound:true, lore:'Ysra schnitt ihn aus dem Stein über ihrem eigenen Grab.' },
@@ -553,6 +557,7 @@ export const ABILITIES = {
   wolf_form:   { name:'Wolfsgestalt', title:'druid', cd:45000, cost:60, desc:'20 s wirst du zum Wolf des Hains: +35 % Tempo, Biss statt Waffe, +3 Rüstung. Keine Gegenstände. Kostet 60 Wildkraft.' },
   counter_stance:{ name:'Gegenstrom', title:'monk', cd:8000, cost:1, desc:'3 s Haltung: der nächste Nahkampftreffer gegen dich prallt ab und wird doppelt erwidert (+1 Fokus). Kostet 1 Fokus.' },
   silent_hand: { name:'Stille Hand', title:'monk', cd:30000, cost:'all', min:3, desc:'Ab 3 Fokus: eine Welle der Stille (130 px). Feinde erstarren 1,5 s und nehmen Schaden je Fokus. Verbraucht allen Fokus.' },
+  death_coil:  { name:'Todesmahr', cd:9000, stam:18, desc:'Ein Stoß kalter Macht auf den Feind vor dir (bis 240 px). Ein Drittel des Schadens heilt dich. Nur mit der Rüstung der Eidwacht (2 Teile).' },   // S15 P19
   death_grip:  { name:'Todesgriff', cd:12000, stam:15, tree:true, desc:'Zieht den Feind vor dir (bis 220 px) heran und lässt ihn taumeln. Große Gegner taumeln nur.' },   // S15 Todesritter-Talent
   grave_strike:{ name:'Grabhieb', cd:9000, stam:20, desc:'Ein Hieb mit Schattenwucht (×1,8). 30 % des Schadens heilen dich.' },
   grave_host:  { name:'Heerruf', title:'necromancer', cd:60000, cost:4, desc:'Klassen-Rüstung (2 Teile): bis zu drei Leichen stehen auf einmal auf (30 s, zusätzlich zu deinen Dienern). Kostet 4 Essenz.' },
@@ -965,6 +970,13 @@ export const QUESTS = {
     objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
     reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
   // S15 Klassen-Questlines: je Titelklasse drei Aufträge beim Meister (ab Grad II, der dritte ab Grad III). Belohnung: ein Teil der Klassen-Rüstung.
+  // S15 P19: Questreihe des Todesritters bei Sael (dkQ = Schritt). Voraussetzung: Klasse Todesritter gelernt.
+  dk_1: { name:'Der erste Schwur', giver:'sael', dkQ:1, desc:'„Ein Todesritter schwört nicht einmal, sondern dreimal. Der erste Schwur gilt den Jägern, die uns für Gold jagen. Drei von ihnen, und drei Knochen als Zeugnis.“',
+    objectives:[{type:'kill',target:'bounty_hunter',count:3,text:'Kopfgeldjäger töten'}, {type:'item',target:'bone',count:3,text:'Knochen bringen'}], reward:{xp:260,item:'todesritter_helm',take:'bone',takeCount:3}, turnin:'sael' },
+  dk_2: { name:'Die kalte Klinge', giver:'sael', dkQ:2, desc:'„Der zweite Schwur gilt denen, die uns in Messing gießen wollen. Zwei Kriegsautomaten Aurelions — und zwei Seelen für den Harnisch.“',
+    objectives:[{type:'kill',target:'automat',count:2,text:'Kriegsautomaten zerstören'}, {type:'item',target:'soul_vial',count:2,text:'Zwei Seelenphiolen bringen'}], reward:{xp:360,item:'todesritter_harnisch',take:'soul_vial',takeCount:2}, turnin:'sael' },
+  dk_3: { name:'Der gebrochene Eid', giver:'sael', dkQ:3, desc:'„Der dritte Schwur ist der schwerste: Ein Todesritter brach seinen Eid und zieht durchs Totenland. Richte ihn. Aus seinem Banner nähe ich deinen Mantel.“',
+    objectives:[{type:'kill',target:'death_knight',count:1,text:'Den eidbrüchigen Todesritter richten'}], reward:{xp:500,item:'todesritter_mantel'}, turnin:'sael' },
   c_nec1: { name:'Die Knochen der Vergessenen', giver:'ysra', classQ:['necromancer', 1, 2], desc:'„Wer die Schar führt, muss erst die tragen, die niemand trägt. Leg sechs Wandelnde zur Ruhe und bring mir drei Knochen, die niemand vermisst.“',
     objectives:[{type:'kill',target:'skeleton',count:6,text:'Wandelnde Tote zur Ruhe legen'}, {type:'item',target:'bone',count:3,text:'Knochen bringen'}], reward:{xp:220,item:'totenrufer_kapuze',take:'bone',takeCount:3}, turnin:'ysra' },
   c_nec2: { name:'Das Gewand der Stillen Schar', giver:'ysra', classQ:['necromancer', 2, 2], desc:'„Der Wächter der Nekropole trägt ein Gewand, das ihm nicht gehört. Nimm es ihm. Und bring zwei Seelen in Phiolen — das Gewand hat Hunger.“',

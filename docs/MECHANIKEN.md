@@ -81,6 +81,7 @@ Stand: Session 15 (2026-09-29).
   Ab 2 Teilen stärker und eine neue Fähigkeit (Heerruf, Dunkler Pakt, Rudelruf, Wirbel). Die Mönchsrobe lässt dich 20–30 %
   aller Treffer von selbst ausweichen.
 - **Kein Zurück (S15):** Wer die Questreihe begonnen hat und den Titel ablegt, verliert die Klasse für immer.
+- **Die Eidwacht (S15):** Questreihe des Todesritters bei Sael, drei Rüstungsteile; ab 2 Teilen Todesmahr, mit 3 eine Frostaura.
 - **Todesritter-Talente (S15):** eigener Zweig, sobald man die Klasse kann: Frostklinge (Grabhieb legt Frost), Blutdurst,
   Runenklinge, Totenpanzer, **Todesgriff** (zieht einen Feind heran) und die Schlüsselknoten Frostgeboren oder Blutfürst.
 - **Lehrer finden (S15):** Auf der Karte (M) sind Lehrer gelb umrandet; der Kodex (H) hat den Reiter „Lehrer“ mit allen Klassen.

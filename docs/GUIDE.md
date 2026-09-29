@@ -211,6 +211,18 @@ Schrein (halten, bis die Toten aufhören zu kommen).
 | **Dunkler Hochpaladin** | Bei der Eisernen Kette bis zum Rang **Aufseher** (3) aufsteigen. Varg oder ein Dunkler Paladin legt dir die Kette um. Geht nicht mehr, wenn die Kette gefallen ist. |
 | **Todesritter** | Bei den Untoten bis zum Rang **Todesritter** (3) aufsteigen und Krieger gelernt haben. Dann weiht dich **Sael** in Vharnholm oder **Ysra** in Alt-Vharn („Die Todesweihe“). |
 
+**Die Eidwacht (Questreihe des Todesritters):** Wer Todesritter ist, bekommt bei **Sael in Vharnholm** drei Aufträge, einen
+nach dem anderen. Jeder gibt ein gebundenes Teil der Rüstung der Eidwacht:
+
+| Auftrag | Ziel | Belohnung |
+|---|---|---|
+| Der erste Schwur | 3 Kopfgeldjäger töten, 3 Knochen bringen | Helm der Eidwacht |
+| Die kalte Klinge | 2 Kriegsautomaten zerstören, 2 Seelenphiolen bringen | Harnisch der Eidwacht |
+| Der gebrochene Eid | den eidbrüchigen Todesritter richten | Frostmantel der Eidwacht |
+
+Als aktiver Todesritter: ab **2 Teilen** Grabhieb +25 % und die neue Fähigkeit **Todesmahr** (Schaden, ein Drittel heilt dich);
+mit **allen 3** legt eine Frostaura alle drei Sekunden Frost auf Feinde in deiner Nähe, Todesmahr +25 %.
+
 ### Titelklassen (durch eine Tat)
 Titelklassen sind Pakte und Gelübde. Du trägst höchstens **zwei**, aktiv ist immer eine. Jede hat eine eigene Kraftquelle,
 einen Makel und einen **dauerhaften Preis**. Nekromant und Hexenmeister schließen einander und den Mönch aus.
