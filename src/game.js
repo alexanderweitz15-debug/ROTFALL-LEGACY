@@ -2272,7 +2272,7 @@ function think(e, dt) {
   }
   if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
   else if (e.stagger > 0 && e !== S.player && !S.party.includes(e.id)) { e.vx = e.vy = 0; }   // taumelt: keine Entscheidung
-  else if (e.kind === 'enemy') updateEnemy(e, dt);
+  else if (e.kind === 'enemy') updateEnemy(e, e.timeSlow > performance.now() ? dt * 0.3 : dt);   // S15 P6: Nachtglas verlangsamt
   else if (e.kind === 'npc') updateNpc(e, dt);
   const P0 = S.player;                                         // BUG-108: fern (> 1500 px) keine Kampfuhren — außer ein Status läuft (Blutung, Gift)
   if ((e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') && (e === P0 || (e.status && e.status.length) || e.swing > 0 || (Math.abs(e.x - P0.x) < 1500 && Math.abs(e.y - P0.y) < 1500))) tickCombatant(e, dt);
@@ -2868,6 +2868,16 @@ function castSpell(c, key, a = c.aim ?? 0) {
       if (S0.absorb) addStatus(o, { key: 'bone_ward', name: ab.name, good: true, left: S0.left || 10000, absorb: Math.round(pw), desc: `Fängt ${Math.round(pw)} Schaden ab.` });
       if (S0.regen) addStatus(o, { key: 'regrowth', name: ab.name, good: true, left: S0.left || 10000, heal: S0.regen * [1, 1, 1.25, 1.5][spellRank(c, key) || 1], desc: 'Heilt langsam.' });
       fx(o.x, o.y - 12, col, 10); } }
+  else if (S0.shape === 'raise') {                                  // S15 P6: Skelett erheben (einer, schwächer als beim Nekromanten)
+    const body = S.ents[c.map].filter(e => e.kind === 'corpse' && !e.raised && dist(c, e) < 220).sort((a1, b1) => dist(c, a1) - dist(c, b1))[0];
+    if (!body) { if (c === S.player) { UI.toast('Keine Leiche in der Nähe.'); c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + (ab.mana || 0)); c.cooldowns[key] = 0; } return; }
+    for (const o of S.ents[c.map]) if (o.servant === c.id && o.spellRaised) o.until = 0;
+    S.ents[c.map].splice(S.ents[c.map].indexOf(body), 1);
+    const d = spawnEnemy('skeleton', c.map, body.x / TS | 0, body.y / TS | 0, { level: Math.max(2, (c.level || 3) - 2) });
+    if (d) { Object.assign(d, { name: 'Erhobener Toter', x: body.x, y: body.y, anchor: { x: body.x, y: body.y }, servant: c.id, spellRaised: true, transient: true, until: performance.now() + (S0.left || 45000), dmgMul: 0.8 }); fx(body.x, body.y - 10, 'necro', 14); } }
+  else if (S0.shape === 'timeslow') {                               // S15 P6: Nachtglas — Feinde in der Nähe 6 s zu 30 % Tempo
+    for (const t of S.ents[c.map]) if (t.alive && t !== c && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(c, t) < S0.r) { t.timeSlow = performance.now() + (S0.left || 6000); float(t, 'wie Glas', 'rgba(143,217,176,ALPHA)'); }
+    S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 4, life: 900, maxLife: 900 }); fx(c.x, c.y - 12, 'necro', 24); if (dist(c, S.player) < 500) camShake(3, 300); }
   else if (S0.shape === 'wall') {                                   // S15 P4: fünf Stücke quer zur Blickrichtung, 70 px vor dem Wirker
     const px = -Math.sin(a), py = Math.cos(a), bx = c.x + Math.cos(a) * 70, by = c.y + Math.sin(a) * 70;
     for (let k = -2; k <= 2; k++) spellGround(c, bx + px * k * 20, by + py * k * 20, S0.el, S0.left || 6000, pw, S0.solid, S0.status); }
@@ -6128,7 +6138,7 @@ function ensureTower() {
   put({ name: 'Maelis', prof: 'Schülerin des Turms', greet: '„Ilvar ist geduldig. Er hat ja auch alle Zeit der Welt. Wir nicht.“' }, L[3], -6, 2);
   put({ name: 'Oskar der Blasse', prof: 'Schüler des Turms', greet: '„Er sagt, Omega sei kein Gott. Ich hoffe, er hat recht. Ich habe nämlich zu ihm gebetet.“' }, L[3], 0, 2);
   put({ name: 'Tuvi', prof: 'Schüler des Turms', greet: '„Wenn du wieder rausgehst … nimmst du eine Nachricht mit? Nein. Vergiss es. Er hört alles.“' }, L[3], 6, 2);
-  put({ key: 'ilvar', name: 'Ilvar Nachtglas', prof: 'Herr des Turms', level: 30, weapon: 'staff', spellRule: 'ilvar', spellsTaught: ['sp_spark', 'sp_missile', 'sp_shadowbolt', 'sp_drain', 'sp_ward', 'sp_dispel'],
+  put({ key: 'ilvar', name: 'Ilvar Nachtglas', prof: 'Herr des Turms', level: 30, weapon: 'staff', spellRule: 'ilvar', spellsTaught: ['sp_spark', 'sp_missile', 'sp_shadowbolt', 'sp_drain', 'sp_ward', 'sp_dispel', 'sp_raise', 'sp_soulburst'],
     greet: '„Ein Lebender. Wie erfrischend. Setz dich — oder bleib stehen, das ist dir überlassen. Das Stehen ist das Einzige, was ihr länger könnt als wir.“' }, L[10], 0, 0);
 }
 const ILVAR_TOPICS = {
@@ -6149,9 +6159,18 @@ function ilvarTalk(npc) {
   if (I.vials < 3) ch.push({ text: `Ich bringe dir drei Seelenphiolen. (${I.vials}/3 Lieferungen)`, fn: () => {
     if (!hasItem(p, 'soul_vial', 3)) return UI.dialogue(npc, '„Drei. Nicht zwei, nicht zweieinhalb. Seelen zählt man genau.“', [{ text: 'Zurück', fn: back }]);
     removeItem(p, 'soul_vial', 3); I.vials++; gain(12, 'Seelenphiolen'); S.gold += 40; UI.dialogue(npc, '„Gut. Sie werden nicht leiden. Nicht mehr als vorher.“ (+40 Gold)', [{ text: 'Weiter', fn: back }]); } });
+  if (!npc.spellsTaught.includes('sp_raise')) npc.spellsTaught.push('sp_raise', 'sp_soulburst');   // ältere Stände
   ch.push({ text: 'Lehre mich.', fn: () => spellMenu(npc) });
+  if (I.trust >= 75 && !S.flags.towerSeal) ch.push({ text: 'Die verbotene Bibliothek …', fn: () => { openTowerSeal(); UI.dialogue(npc, '„Nimm, was du lesen kannst. Was du nicht lesen kannst, lass liegen. Es liest sonst dich.“ (Die Knochenkette fällt.)', [{ text: 'Weiter', fn: back }]); } });
+  if (I.trust >= 100 && !S.player.spells?.sp_nachtglas) ch.push({ text: 'Ich bin bereit für die Endprüfung.', fn: () => UI.dialogue(npc, '„In der Beschwörungskammer. Fünfundvierzig Sekunden. Halte stand, während ich die Geister loslasse. Ich fange dich auf, wenn du fällst — aber dann war es das für heute.“', [
+    { text: 'Beginnen.', fn: () => { UI.closeDialogue(); const r5 = MAPS.tower.levels[5]; startTrial('ilvar', { x: r5.cx * TS + TS / 2, y: r5.cy * TS }); } }, { text: 'Noch nicht.', fn: back }]) });
   ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
   UI.dialogue(npc, `„${I.trust < 25 ? 'Du bist noch ein Fremder in meinem Turm.' : I.trust < 50 ? 'Du hörst zu. Das ist selten.' : I.trust < 75 ? 'Ich beginne, dir Dinge zu zeigen, die ich sonst niemandem zeige.' : 'Du bist beinahe ein Schüler.'}“ (Vertrauen ${I.trust})`, ch);
+}
+function openTowerSeal() {
+  S.flags.towerSeal = true;
+  for (const e of S.ents.tower.filter(x => x.towerSeal)) { S.ents.tower.splice(S.ents.tower.indexOf(e), 1); if (solidIndex.tower) removeSolid(e); }
+  fx(44 * TS, (MAPS.tower.levels[8].cy) * TS, 'bone', 12); log('Die Knochenkette vor der verbotenen Bibliothek fällt.', 'world');
 }
 function ensureMorrgrund() {
   if (S.flags.morrBuilt || S.flags.morrDead) return;
@@ -8699,9 +8718,10 @@ function respec(npc) {
 // Lehrer, dazu je Lehrer eine Regel (Orden: Rang 1, für Stufe III Rang 2; Akademie: Aufenthaltsschein, Stufe III nur Bürger oder
 // Akademie-Rang Adept). Der Lehrer sagt, was fehlt.
 const SPELL_PRICE = [0, 30, 80, 180], SPELL_INT = [0, 8, 11, 14];
+const ILVAR_NEED = { sp_shadowbolt: 0, sp_drain: 25, sp_raise: 50, sp_soulburst: 75, sp_nachtglas: 999 };
 const SPELL_RULES = {
   order: (p, t) => (S.ranks.order ?? -1) < (t >= 3 ? 2 : t >= 2 ? 1 : 0) ? `Rang ${FACTIONS.order.ranks[t >= 3 ? 2 : 1]} im Orden` : null,
-  ilvar: (p, t) => { const tr = S.ilvar?.trust || 0, need = t >= 3 ? 50 : t >= 2 ? 25 : 0; return tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
+  ilvar: (p, t, key) => { const tr = S.ilvar?.trust || 0, need = ILVAR_NEED[key] ?? (t >= 3 ? 50 : t >= 2 ? 25 : 0); return need > 100 ? 'Ilvars Endprüfung' : tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
   academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
 };
 function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0; return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1)); }
@@ -8710,7 +8730,7 @@ function spellLack(npc, key) {                                      // was fehlt
   if (S.gold < price) out.push(`${price - S.gold} Gold`);
   if ((p.attributes.intelligence || 8) < SPELL_INT[t]) out.push(`Intelligenz ${SPELL_INT[t]}`);
   if (npc.spellRule !== 'academy' && npc.spellRule !== 'ilvar' && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
-  const r = SPELL_RULES[npc.spellRule]?.(p, t); if (r) out.push(r);
+  const r = SPELL_RULES[npc.spellRule]?.(p, t, key); if (r) out.push(r);
   return out;
 }
 function learnFrom(npc, key) {
@@ -8732,7 +8752,7 @@ function spellMenu(npc) {
 //   heal   — einen Studenten mit verletztem Bein in 60 s stabilisieren (jedes Glied über der Hälfte)
 //   duel   — gegen einen Studenten: wer zuerst unter 20 % Leben fällt, verliert; dann endet der Kampf sofort
 // Rang: 1 bestanden = Hörer, 2–3 = Adept (Stufe III), 4 = Magister.
-const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
+const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, TRIAL_EXTRA = { ilvar: 'Endprüfung des Nachtglases' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
 const acadRankOf = n => n >= 4 ? 3 : n >= 2 ? 2 : n >= 1 ? 1 : 0;
 function acadSpot() { const h = HOUSES.find(b => b.type === 'academy' && b.map === 'world'); return h ? { x: h.doorTile[0] * TS + TS / 2, y: (h.doorTile[1] + 6) * TS } : { x: S.player.x, y: S.player.y }; }
 function startTrial(kind, at = acadSpot()) {
@@ -8741,16 +8761,20 @@ function startTrial(kind, at = acadSpot()) {
   const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy; e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
   if (kind === 'aim') for (let i = 0; i < 5; i++) put('acad_dummy', -120 + i * 60, -60 - (i % 2) * 40);
   if (kind === 'shield') { const e = put('acad_dummy', 0, -160); if (e) { e.invuln = true; T.shooter = e.id; } }
+  if (kind === 'ilvar') { T.until = clock() + 45; T.next = clock() + 1; }   // S15 P6: Wellen von Geistern, siehe trialTick
   if (kind === 'duel') { const e = put('acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; } }
   if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
     c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
-  UI.toast(`PRÜFUNG: ${TRIALS[kind].toUpperCase()}`, 2600);
-  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: 'Die Studentin hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.', duel: 'Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.' }[kind], 'quest');
+  UI.toast(`PRÜFUNG: ${(TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
+  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: 'Die Studentin hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.', duel: 'Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.', ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.' }[kind], 'quest');
 }
 function endTrial(won) {
   const T = S.trial; if (!T) return; S.trial = null;
   for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => !T.ids.includes(e.id));
   if (won == null) return;
+  if (T.kind === 'ilvar') { const p = S.player;                       // S15 P6: Endprüfung des Nachtglases
+    if (!won) { if (p.downed) { p.downed = false; p.downTimer = 0; B.heal(p, p.maxHp * 0.3); } UI.toast('ILVAR FÄNGT DICH AUF', 2600); log('„Nicht heute.“ Ilvar hebt die Hand, und die Geister verblassen.', 'quest'); return; }
+    learnSpell(p, 'sp_nachtglas'); SIM.H.title('Schüler des Nachtglases'); gainXp(p, 300); chronicle(`${p.name} besteht Ilvars Endprüfung`, 'legend'); return; }
   if (!won) { UI.toast(`${TRIALS[T.kind].toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${TRIALS[T.kind]} nicht bestanden. Corvinus lässt dich es noch einmal versuchen.`, 'quest'); return; }
   const done = (S.acad ||= {}), first = !done[T.kind]; done[T.kind] = true;
   const r0 = S.acadRank || 0; S.acadRank = acadRankOf(Object.keys(done).length);
@@ -8762,6 +8786,11 @@ function trialTick() {
   const T = S.trial, p = S.player; if (!T) return;
   if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false);
   if (T.kind === 'aim' && T.n >= 5) return endTrial(true);
+  if (T.kind === 'ilvar') {
+    if (clock() >= T.until) return endTrial(true);
+    if (clock() >= T.next) { T.next = clock() + 9; for (let i = 0; i < 2 + (T.wave = (T.wave || 0) + 1) % 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('wraith', p.map, (T.x + Math.cos(a) * 200) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(6, p.level) });
+      if (e) { e.trial = 'ilvar'; e.questFoe = 'ilvar'; e.transient = true; e.aggroId = p.id; T.ids.push(e.id); } } }
+    return; }
   if (T.kind === 'shield') {
     if (T.shot < 10 && clock() >= T.next) { T.next = clock() + 2.2; T.shot = (T.shot || 0) + 1; const a = Math.atan2(p.y - (T.y - 160), p.x - T.x);
       S.projectiles.push({ id: uid(), kind: 'spark', map: p.map, x: T.x, y: T.y - 150, vx: Math.cos(a) * 4.5, vy: Math.sin(a) * 4.5, owner: T.shooter, dmg: 3, life: 2600, team: 'foe' }); }
@@ -12404,6 +12433,15 @@ export function selftest() {
       S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
+  }));
+  ok('Nachtglas (S15 P6): Vertrauen 50/75 öffnet Lehre und Siegel, Endprüfung gibt den legendären Zauber, der Feinde verlangsamt', sandbox(() => {
+    const p = stage(), I0 = S.ilvar, f0 = S.flags.towerSeal, seals0 = S.ents.tower.filter(e => e.towerSeal); S.ilvar = { trust: 60, asked: {}, vials: 0 };
+    try { const il = { key: 'ilvar', name: 'Ilvar', spellRule: 'ilvar' }; p.attributes.intelligence = 16; S.gold = 999;
+      const raiseOk = !spellLack(il, 'sp_raise').length, burstNo = spellLack(il, 'sp_soulburst').some(x => x.includes('75')), glassNo = spellLack(il, 'sp_nachtglas').some(x => x.includes('Endprüfung'));
+      startTrial('ilvar', { x: p.x, y: p.y }); S.trial.until = clock() - 1; trialTick(); const got = !!p.spells?.sp_nachtglas;
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 100; e.y = p.y; castSpell(p, 'sp_nachtglas'); const slowed = e.timeSlow > performance.now();
+      return raiseOk && burstNo && glassNo && got && slowed;
+    } finally { S.ilvar = I0; S.trial = null; }
   }));
   ok('Magierturm (S15 P6): Wahrzeichen und Tor in der Welt, zehn Ebenen begehbar (Weg vom Eingang bis Ilvar), Ilvar lehrt nach Vertrauen', sandbox(() => {
     const M = MAPS.tower, gate = S.ents.world.find(e => e.portal === 'tower'), tower = S.ents.world.find(e => e.type === 'mage_tower');

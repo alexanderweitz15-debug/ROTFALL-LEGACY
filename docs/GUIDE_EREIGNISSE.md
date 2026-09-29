@@ -200,7 +200,15 @@ Observatorium mit Blick auf den Krater, Seelenkammer, Ilvars Studierzimmer ganz 
 
 **Ilvar Nachtglas**, einst Hofmagier von Vharnholm, heute ein Lich. Er will den Rotfall verstehen, nicht anbeten. Sein
 **Vertrauen** (0–100) wächst durch Gespräche (je Thema einmal), die richtige Antwort auf „Was ist Omega?“ („Ein Wesen“) und
-Lieferungen von je drei Seelenphiolen. Er lehrt Schattenpfeil ab 0, Seelenzug (heilt dich) ab Vertrauen 25.
+Lieferungen von je drei Seelenphiolen.
+
+| Vertrauen | Was Ilvar gibt |
+|---|---|
+| 0 | Schattenpfeil, einfache Zauber gegen Gold |
+| 25 | Seelenzug (heilt dich um die Hälfte des Schadens) |
+| 50 | Skelett erheben (ein Diener, 45 s, auch ohne Nekromanten-Titel) |
+| 75 | Seelenbersten; die Knochenkette vor der verbotenen Bibliothek fällt |
+| 100 | **Endprüfung** in der Beschwörungskammer: 45 Sekunden gegen Wellen von Geistern. Wer fällt, wird aufgefangen. Bestanden: der legendäre Zauber **Nachtglas** (Feinde um dich 6 s wie durch Glas) und der Titel „Schüler des Nachtglases“ |
 
 ## Morrgrund und Dodon: der letzte Sturm der Grubenstämme (S15)
 
