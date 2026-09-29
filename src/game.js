@@ -2105,6 +2105,7 @@ function update(dt, now) {
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
   if (S.player?.casting) castTick(S.player);   // S15 P4
   mountTick(dt);                               // S15: gerufenes Pferd läuft heran
+  if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -2845,7 +2846,9 @@ function castSpell(c, key, a = c.aim ?? 0) {
     let cx = c.x, cy = c.y;
     if (S0.shape === 'area') { let d = S0.range; for (let k = 16; k <= S0.range; k += 12) if (solidTile(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k)) { d = k - 12; break; } cx = c.x + Math.cos(a) * d; cy = c.y + Math.sin(a) * d; }
     for (const t of S.ents[c.map]) if (t.alive && t !== c && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && Math.hypot(t.x - cx, t.y - cy) < S0.r + (t.r || 10)) spellHit(c, t, pw, S0);
-    S.fx.push({ x: cx, y: cy, vx: 0, vy: 0, type: 'shock', s: S0.r / 70, life: 500, maxLife: 500 }); fx(cx, cy - 6, col, 20); if (dist(c, S.player) < 500) camShake(4, 200); }
+    S.fx.push({ x: cx, y: cy, vx: 0, vy: 0, type: 'shock', s: S0.r / 70, life: 500, maxLife: 500 }); fx(cx, cy - 6, col, 20); if (dist(c, S.player) < 500) camShake(4, 200);
+    if (S0.el === 'fire' || S0.el === 'frost') for (let k = 0; k < 4; k++) { const ang = rnd() * 6.283, rr = rnd() * S0.r * 0.7;   // Welt-Spuren: Brandfläche 8 s, Eisboden 10 s
+      spellGround(c, cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, S0.el, S0.el === 'fire' ? 8000 : 10000, pw * 0.25, false, S0.el === 'fire' ? { key: 'burning', chance: 0.3, left: 2000 } : { key: 'frost', chance: 0.5 }, true); } }
   else if (S0.shape === 'chain') {
     let from = c, hitSet = new Set(), last = null;
     for (let j = 0; j <= (S0.jumps || 3); j++) { const cand = S.ents[c.map].filter(t => t.alive && t !== c && !hitSet.has(t) && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(from, t) < (j ? 130 : S0.range) && clearLine(from, t)
@@ -2861,6 +2864,9 @@ function castSpell(c, key, a = c.aim ?? 0) {
       if (S0.absorb) addStatus(o, { key: 'bone_ward', name: ab.name, good: true, left: S0.left || 10000, absorb: Math.round(pw), desc: `Fängt ${Math.round(pw)} Schaden ab.` });
       if (S0.regen) addStatus(o, { key: 'regrowth', name: ab.name, good: true, left: S0.left || 10000, heal: S0.regen * [1, 1, 1.25, 1.5][spellRank(c, key) || 1], desc: 'Heilt langsam.' });
       fx(o.x, o.y - 12, col, 10); } }
+  else if (S0.shape === 'wall') {                                   // S15 P4: fünf Stücke quer zur Blickrichtung, 70 px vor dem Wirker
+    const px = -Math.sin(a), py = Math.cos(a), bx = c.x + Math.cos(a) * 70, by = c.y + Math.sin(a) * 70;
+    for (let k = -2; k <= 2; k++) spellGround(c, bx + px * k * 20, by + py * k * 20, S0.el, S0.left || 6000, pw, S0.solid, S0.status); }
   else if (S0.shape === 'blink') { let d = 0; for (let k = 8; k <= S0.range; k += 8) { if (solidTile(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k) || solidPropAt(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k, 6)) break; d = k; }
     fx(c.x, c.y - 10, 'spark', 12); c.x += Math.cos(a) * d; c.y += Math.sin(a) * d; fx(c.x, c.y - 10, 'spark', 12); }
   else if (S0.shape === 'dispel') { for (const t of S.ents[c.map]) if (t.alive && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(c, t) < S0.r) {
@@ -2869,6 +2875,25 @@ function castSpell(c, key, a = c.aim ?? 0) {
   sfx(S0.el === 'fire' ? 'fire' : 'magic', 0.6, earVol(c)); c.castT = performance.now();
   if (c === S.player) { (c.spellUse ||= {})[key] = (c.spellUse[key] || 0) + 1; const n = c.spellUse[key], r = spellRank(c, key);   // Übung
     if ((r === 1 && n >= 25) || (r === 2 && n >= 100)) { c.spells[key] = r + 1; UI.toast(`${ab.name}: RANG ${['', 'I', 'II', 'III'][r + 1]}`, 2600); log(`${ab.name} sitzt jetzt tiefer: Rang ${r + 1}.`, 'party'); } }
+}
+// S15 P4: Zauber auf dem Boden (Feuerwand, Eiswand, Brandfläche, Eisboden). Flüchtig (nicht gespeichert). Die Eiswand ist fest:
+// sie steht im Objekt-Index, also bleiben Figuren und Wegsuche an ihr hängen. Feuer schadet Feinden des Wirkers zweimal je Sekunde.
+const GROUND = [];
+function spellGround(c, x, y, el, left, dmg, solid, status, patch = false) {
+  if (solidTile(c.map, x, y)) return null;
+  const g = { id: uid(), kind: 'spellwall', map: c.map, x, y, r: solid ? 11 : 10, el, until: performance.now() + left, owner: c.id, dmg, status, solid: !!solid, patch, transient: true, born: performance.now() };
+  S.ents[c.map].push(g); if (solid && solidIndex[c.map]) addSolid(g); GROUND.push(g); return g;
+}
+function groundTick() {
+  const now = performance.now();
+  for (let i = GROUND.length - 1; i >= 0; i--) {
+    const g = GROUND[i], arr = S.ents[g.map];
+    if (now > g.until || !arr) { GROUND.splice(i, 1); if (arr) { const j = arr.indexOf(g); if (j >= 0) arr.splice(j, 1); } if (g.solid && solidIndex[g.map]) removeSolid(g); continue; }
+    if (g.el !== 'fire' && !g.patch || now - (g.tick || 0) < 500) continue;
+    g.tick = now; const src = byId(g.owner) || { id: g.owner, kind: 'enemy', name: 'Zauber' };
+    for (const t of arr) if (t.alive && !t.downed && COMBAT_KINDS.has(t.kind) && t.id !== g.owner && Math.hypot(t.x - g.x, t.y - g.y) < 16 + (t.r || 10) && (src.kind ? isHostile(src, t) : true)) {
+      if (g.el === 'fire') hurt(t, g.dmg, src, 'Feuer', false, 'fire'); applySpellStatus(t, g.status, src); }
+  }
 }
 const WILD_BEASTS = new Set(['wolf', 'bear', 'boar']);
 function isHostile(a, b) {
@@ -12224,6 +12249,14 @@ export function selftest() {
     if (p.body) { B.fullHeal(p); p.body.torso.hp -= 30; B.syncHp(p); } else p.hp -= 30; const h0 = p.hp; hit(p, g, 1); const healed = p.hp > h0;
     return closed && open && treeAbilities(p).includes('death_grip') && frosted && pulled && healed;
   }));
+  ok('Zauber-Wände (S15 P4): Eiswand hält eine Figur auf, Feuerwand brennt, beide vergehen; Frostfläche bleibt als Eisboden', sandbox(() => {
+    const p = stage(); indexSolids('__a'); p.aim = 0; learnSpell(p, 'sp_icewall', true); castSpell(p, 'sp_icewall', 0);
+    const walls = GROUND.filter(g => g.owner === p.id && g.solid), e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 40; e.y = p.y;
+    for (let i = 0; i < 20; i++) moveEnt(e, 3, 0); const blocked = e.x < p.x + 70 - 10;
+    learnSpell(p, 'sp_firewall', true); const b = spawnEnemy('bandit', '__a', 11, 9); b.x = p.x - 70; b.y = p.y; castSpell(p, 'sp_firewall', Math.PI); const hp0 = b.hp; groundTick(); const burnt = b.hp < hp0;
+    for (const g of GROUND) g.until = 0; groundTick(); const gone = !GROUND.length && !S.ents.__a.some(x => x.kind === 'spellwall') && !solidPropAt('__a', p.x + 70, p.y, 4);
+    delete solidIndex.__a; return walls.length >= 3 && blocked && burnt && gone;
+  }));
   ok('Auftragsziele (S15, Nutzer-Bug Grabräuber): fehlende Ziele kommen außer Sicht nach und sind Feind, auch Untote für Diener der Toten', sandbox(() => {
     const p = stage(), q0 = S.quests.c_war1, g0 = S.quests.q_graverobbers, r0 = S.ranks.undead, m0 = S.map, W = S.ents.world.length;
     try { S.map = p.map = 'world'; const l = LOCATIONS.find(l => l.key === 'necropolis'); p.x = (l.x + 60) * TS; p.y = l.y * TS; S.ranks.undead = 1;
@@ -12438,6 +12471,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
+    castSpell, learnSpell,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

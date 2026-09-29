@@ -670,6 +670,22 @@ function drawHorse(e, now, kind, rider) {
   if (rider && !ns) ride();
   if (dir === 'S') blit(SP.beastFrame('horse', pal, 'S', 'head', fr));   // von vorn: der Kopf verdeckt den Reiter
 }
+function drawSpellWall(e, now) {
+  const left = e.until - now, fade = Math.min(1, left / 600, (now - e.born) / 200), x = Math.round(e.x), y = Math.round(e.y);
+  ctx.save(); ctx.globalAlpha = Math.max(0, fade);
+  if (e.el === 'frost' && e.solid) {                                   // Eisblock: kantig, hell, mit Lichtkante
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x - 11, y + 2, 22, 4);
+    ctx.fillStyle = '#5f8fb0'; ctx.fillRect(x - 10, y - 22, 20, 24); ctx.fillStyle = '#9fd0ec'; ctx.fillRect(x - 8, y - 24, 16, 22);
+    ctx.fillStyle = '#d8f0ff'; ctx.fillRect(x - 6, y - 22, 3, 16); ctx.fillRect(x - 8, y - 24, 16, 2); ctx.fillStyle = '#3f6a88'; ctx.fillRect(x + 6, y - 20, 2, 20);
+  } else if (e.el === 'frost') {                                      // Eisboden
+    ctx.fillStyle = 'rgba(170,215,240,.35)'; ctx.beginPath(); ctx.ellipse(x, y, 16, 7, 0, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(230,248,255,.5)'; ctx.fillRect(x - 6, y - 1, 5, 1); ctx.fillRect(x + 3, y + 2, 4, 1);
+  } else {                                                             // Flammen: drei Zungen, flackernd; Brandfläche niedriger
+    const h = e.patch ? 8 : 20; ctx.fillStyle = e.patch ? 'rgba(60,30,20,.35)' : 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y, 12, 5, 0, 0, 7); ctx.fill();
+    for (let k = 0; k < 3; k++) { const f = Math.sin(now / 90 + k * 2.1 + e.x) * 0.5 + 0.5, hh = h * (0.6 + f * 0.4), fx0 = x - 8 + k * 6;
+      ctx.fillStyle = '#c0401a'; ctx.fillRect(fx0, y - hh, 5, hh); ctx.fillStyle = '#f08a2a'; ctx.fillRect(fx0 + 1, y - hh * 0.8, 3, hh * 0.8); ctx.fillStyle = '#ffd870'; ctx.fillRect(fx0 + 2, y - hh * 0.45, 1, hh * 0.45); }
+  }
+  ctx.restore();
+}
 function drawRider(e, now) { drawHorse(e, now, e.mounted.kind, true); }
 // S15 Druide, Grad III: der Spieler als großer Hainwolf. Fell der Wölfe, dunkler und mit dem Grün des Hains an den Augen.
 const WOLF_FORM_PAL = { body: '#4a4638', dark: '#2a2a20', eye: '#b7d86a' };
@@ -693,6 +709,7 @@ function drawEntity(e, now) {
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd
+    case 'spellwall': return drawSpellWall(e, now);                    // S15 P4: Feuerwand, Eiswand, Brandfläche, Eisboden
     case 'house': return drawHouse(e.b, now);
   }
 }

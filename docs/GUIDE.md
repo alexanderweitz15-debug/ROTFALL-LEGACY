@@ -117,6 +117,8 @@ Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
   Kreuzweg, Akademie in Aurelheim). Bis dahin lernt man Zauber über das Debug-Menü (Abschnitt „Magie“).
 - **Sammelzeit:** Viele Zauber brauchen einen Moment. Unter dir leuchtet eine Rune in der Farbe der Schule. Wirst du in dieser
   Zeit getroffen, bricht der Zauber ab, und du bekommst halbes Mana zurück.
+- **Wände:** Die Eiswand (Frost III) stellt fünf Eisblöcke quer vor dich, durch die nichts kommt. Die Feuerwand (Feuer III) brennt
+  sechs Sekunden. Feuer- und Frostflächen hinterlassen kurz Brandflächen oder Eisboden.
 - **Rang:** Nach 25 Einsätzen steigt ein Zauber auf Rang II, nach 100 auf Rang III. Jeder Rang macht ihn stärker.
 - **Zustände:** Feuer lässt brennen. Frost stapelt bis zu drei Stufen und friert dann ein. Schock betäubt kurz, danach ist das Ziel
   drei Sekunden immun.

@@ -35,7 +35,9 @@ Stand: Session 15 (2026-09-29).
 
 ## 3. Magie (S15, P4)
 - **Magie ist ein Weltsystem, keine Klasse.** Jeder kann Zauber lernen; wer einen kennt, hat Mana.
-- **20 Zauber in 6 Schulen:** Feuer, Frost, Blitz, Arkan, Heilung, Schutz — je Stufe I bis III.
+- **Wände und Spuren (S15):** Die **Eiswand** blockiert den Weg, bis sie taut (8 s). Die **Feuerwand** verbrennt, wer hindurchgeht.
+  Flammenkreis und Einfrieren hinterlassen kurz Brandflächen (8 s) oder Eisboden (10 s, macht langsam).
+- **22 Zauber in 6 Schulen:** Feuer, Frost, Blitz, Arkan, Heilung, Schutz — je Stufe I bis III.
 - **Formen:** Geschoss, Strahl, Ring um dich, Fläche am Zielpunkt, Kette (springt nur mit Sichtlinie), auf dich, auf die Gruppe,
   Kurzteleport (nie in eine Wand), Magieunterbrechung.
 - **Sammelzeit:** Viele Zauber brauchen einen Moment. Unter dem Wirker leuchtet eine **Rune in der Schulfarbe**, die Hand hebt
