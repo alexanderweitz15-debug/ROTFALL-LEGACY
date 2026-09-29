@@ -1,55 +1,52 @@
 # Style Guide — Rotfall: Legacy
 
-Verbindliche visuelle DNA. Nicht den Stil ersetzen — den Stil perfektionieren.
+Alte Fassung: `archive/STYLE_GUIDE_bis_S13.md`. Referenzen: `docs/reference/` (3 Klassen/Abnutzung, 4 Gelände, 5 Hauptstil).
 
-## Referenz
-Grimdark, Kapuzenfiguren, gedämpfte Erdtöne, Darkest-Dungeon-Anmutung: schwere Silhouetten, wenig Sättigung,
-Akzentfarben sparsam (altes Rot, Elfenbein, Grabgrün). Keine Neon-Effekte, kein Glow-Teppich, keine Web-UI-Optik.
+## Stile (Optionen → Grafikstil)
+| Stil | Stand | Quelle |
+|---|---|---|
+| D „Klassisch“ | **Standard** | `figure.js` (Figuren 40×66 fein, ×1,2), Props/Boden 1,5 Welt je Pixel |
+| R „Gezeichnet (Test)“ | optional (S14) | `fig5.js`: Referenz 5 im Code nachgezeichnet, Figuren, Tiere, Waffen, Gorak im Zielraster |
+| F „Neu (Referenz 5)“ | optional, aus | Atlas aus dem Referenzblatt (`assets/ref5_atlas.png`) |
+Stilwechsel leert die Bild-Caches (`setArt`); gespeichert wird nur `S.settings.art`.
 
-## Figuren v2 (Session 9 — ersetzt die 20×25-Regeln für Figuren, sobald eingebaut)
-- Referenzbild ist verbindlich: grimdarke Kapuzenfiguren, schwerer Körper, breite Schultern, kleiner Kopf unter der
-  Kapuze, lange kräftige Beine, große Hände, Schichten (Kapuze → Capelet → Mantel/Wams → Gurte/Gürtel → Wickel →
-  Handschuhe → Stiefel), zerfetzte Säume. NICHT: Chibi, großer Kopf auf kleinem Körper, Graveyard-Keeper-Look,
-  „mehr Pixel“ statt anderer Formensprache.
-- Raster 40×60 bei 1 Welt-Einheit je Pixel (Boss 60×76); Verhältnis Schulterbreite : Höhe ≈ 0,48; Kopf/Kapuze ≈ 1/5.
-- Formen statt Einzelpixel (`figure.js`): Teile als Vielecke, je Teil Volumen (Licht oben links, Formschatten rechts),
-  Schlagschatten und selektive Innenkontur zwischen vorderem und hinterem Teil, danach handgesetzte Details.
-- Unterschiede zwischen Figuren über Silhouette (Mantel/Wams-Länge, Umhang, Schulterstücke, Masken), nicht nur Farbe.
+## Grundregeln (alle Stile)
+- Grimdark: gedämpfte Erdtöne, Akzente sparsam (altes Rot, Elfenbein, Grabgrün, Messing). Keine Neon-Effekte, kein Glühteppich.
+- Licht oben links; 4-Stufen-Rampe je Material (`ramp`: hi, b, sh, dk; Licht wärmer, Schatten kühler, leicht entsättigt).
+- Silhouette zuerst: Beruf und Rang an Umriss erkennbar (Hut, Kapuze, Robe, Helm, Schild, Mantellänge), nicht nur an Farbe.
+- Kein Einzelpixel-Rauschen; Details in Clustern von 2–4 Pixeln. Keine Weichzeichner, keine Verläufe als Materialersatz.
+- Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur `drawImage`.
 
-## Pixel-Regeln
-- **Pixeldichte**: Weltpixel `PX = 2` (ein Sprite-Pixel = 2×2 Bildschirmpixel bei Zoom 1). Kamera-Grundzoom 1,3.
-- **Figurenraster**: Menschen 20×25 (Drehpunkt 10,23), Tiere 28×18, Brocken (Gorak) 34×38.
-- **Kontur**: 1 px dunkle Außenkontur um jede Figur/jedes Objekt (`toCanvas` in sprites.js), nie schwarz, sondern
-  der dunkelste Rampenton.
-- **Farbrampen** (`ramp()`): 4 Stufen je Material — Licht (hi), Basis (b), Schatten (sh), Tiefe (dk), mit
-  Farbtonverschiebung: Licht wärmer, Schatten kühler. `mute()` dämpft Sättigung für die Welt.
-- **Lichtwinkel**: oben links. Highlights oben/links, Schatten unten/rechts, Bodenschatten als weiche Ellipse unten.
-- **Keine Einfarbflächen**: jede Fläche mindestens zwei Rampentöne plus Materialzeichnung (Maserung, Fugen, Nieten).
-- **Cluster**: keine Einzelpixel-Rauschen auf Flächen; Detail in Clustern von 2–4 Pixeln.
+## Stil R — Figuren (S14)
+- Raster: 32×50 Frame, 1 Pixel = 1,25 Frame-Einheiten, Renderer ×1,2 → **1,5 Welt je Pixel** wie Props. Figur 43 px hoch, Pivot (16, 47).
+- Proportion: Kopf 8 px (≈ 1/5,5), Schultern 12 px, schlanke Arme dicht am Rumpf, Beine 4 px, Mantellänge nach `hem` (Wams, Kittel, Mantel, Robe).
+- Gesicht im Schatten: Brauenschatten, rechte Hälfte dunkel, zwei Augenpixel; unter Kapuze dunkle Öffnung mit Augenglanz (Glimmen der Untoten und Titel in `glow`).
+- Material: Stoff (weich, Falten als senkrechte Schattenzüge vom Saum), Leder (Glanzkante, Naht), Metall (harte Bänder, Grat, Nieten), Haut/Knochen.
+- Kontur: außen im dunkelsten Ton des angrenzenden Materials; innen selektiv (rechts/unten dunkel, links weich).
+- Arme gehören zum Bild; die Waffe sitzt an der gebackenen Hand (`f.hand`, zweite Hand `f.off`), Schwung in Zehnteln, Ziel in Achteln.
+- Animation: Atmen (2), Gehen (4, Rock und Umhang schwingen eine Phase verzögert), Hieb je Waffenklasse (Ausholen → Schlag → Nachschwung, Rumpf lehnt mit, Schritt), Treffer, Rückstoß, Deckung, Zaubern/Zielen, Knien, Durchsuchen, Sitzen, Handeln, Tragen, Sterben, Rolle, Liegen.
+- Varianz (Runde 2): Körperbau aus `BUILDS` als Maß (Schultern, Taille, Höhe, Armdicke), Bauch und breite Schultern aus der Variante `vs` (0–7);
+  je Variante Rüstungsmuster (Leder beschlagen/geschnürt/gesteppt, Platte Grat/Geschübe/Gravur, Kette/Schuppen), Schulterstücke rund/geschichtet/Dornen,
+  Armschienen, Halsberge, Borte mit Knöpfen, Farbstreuung; benannte Figuren und der Held bleiben fest (`vs = 0`).
+- Schwere Waffen (Zweihänder, Hammer, große Axt, Stangenwaffe; `hv`): +1 Schulter, dickere Arme und Beine, freie Unterarme.
+- Bauern nach Region (`regionFarmer`, Grenzen wie `omegaStance`): Westen x < 330 Omega-Tracht mit Stern; Osten x > 700 Stroh, Filz, barfuß, Knochenamulett; Mitte Strohhut.
+- Symbole in R: Waffe = Sprite schräg; Rüstung = Probefigur mit dem Teil, zugeschnitten.
+- Waffen in R: Hohlkehle und Schliff, Parier/Knauf in Messing (ungewöhnlich/selten) oder Gold (episch+), Knaufstein nach Rarität, Wickel schräg.
+- Häuser in R: Dachfarben `ROOF_VAR_R`, Deckung in Lagen parallel zur Traufe mit versetzten Stoßfugen, Wände weniger abgedunkelt, Fensterbank + Lichtschein.
+- Felder in R: Getreide in Reihen (dunkler Fuß, goldene Ähre), eine Frucht je Feld. Props in R: satter, Farbstufen, Kontur im dunkelsten Nachbarton.
+- Tiere 48×32, Pivot (24, 30); Waffen und Gorak mit denselben Formen im Zielraster (Faktor 0,8).
 
-## Materialien (Kurzrezepte)
-- Holz: warmbraun, Maserung als 1-px-Linien in `sh`, Kanten `hi`, Bänder/Nägel in Metall-Rampe.
-- Stein: kühles Grau, Fugen `dk`, Kanten `hi`, gelegentlich Moos (`#4a5a32`) in Nischen.
-- Metall: blaugrau, harter `hi`-Glanzpunkt, Rost (`#7a4a2a`) an Kanten bei „alt“.
-- Stoff: gedämpfte Farbe aus `CLOTH`, Falten als `sh`-Streifen.
-- Dach: Stroh (ocker, Halmstriche), Schindel (graubraun, Reihen), Schiefer (blaugrau, Reihen) — nach Region/Wohlstand.
+## Stil D — Figuren
+- Formen (Vielecke) auf 40×66 bei 1 Welt je Pixel, als Ganzes ×1,2 (`FIGK`); Arm und Waffe zeichnet der Renderer je Frame zur Hand.
 
-## Gebäude (`src/buildings.js`)
-- 1 Texel = 2 Welt-Einheiten (wie Figuren), 16 Texel je Kachel. Wand 21 Texel (Taverne 24) — höher als eine Figur.
-- Dach über dem ganzen Grundriss bis zur Traufe; First bei 30 % der Dachhöhe; Walmdach (Stroh, Ziegel) oder
-  Satteldach mit Giebelbrettern (Schindel, Schiefer). Licht NW: Nordhang/Westwalm hell, Südhang → Traufe dunkel, Ostwalm Schatten.
-- Materiallagen: Stroh 4-Texel-Lagen mit Halmrichtung; Ziegel 4er-Lagen mit gerundeten Mönchen; Schindel/Schiefer versetzt.
-- Pflichtdetails: Traufschatten auf der Wand, Sockel, Fenster mit Rahmen und Bank, Tür mit Beschlägen und Stufe.
-- Funktion lesbar an einem Merkmal je Typ (Schild, Esse, Banner, Kräuter, Rosette, Wappen, Säcke).
-
-## Regionen (Farbwelt, `REGION` in render.js)
-greenmark/plains (Grün-Oliv), forest (Tannengrün, dunkler), marsh (Moosbraun, Nebel), mountain (Steingrau, kalt),
-desert/badland (Ocker, Rost), blight (Asche, Grabgrün, Knochen).
+## Gebäude, Boden, Props
+- Gebäude (`buildings.js`): Dach über dem Grundriss, Walm- oder Satteldach, Traufschatten, Sockel, Fenster mit Rahmen, Tür mit Beschlag; Funktion an einem Merkmal je Typ (Schild, Esse, Banner, Kräuter, Rosette, Wappen, Säcke).
+- Stroh in 4-Texel-Lagen, Ziegel in 4er-Lagen, Schindel/Schiefer versetzt; Holz mit Maserung, Stein mit Fugen und Moos, Metall mit Rost an Kanten.
+- Regionen (`REGION` in render.js): Grünland/Ebene grün-oliv, Wald tannengrün, Sumpf moosbraun, Gebirge kalt grau, Wüste ocker/rost, Totenland Asche/Grabgrün/Knochen.
+- Neue große Grafik nur über `PROMPTS_GRAFIK.md`.
 
 ## UI
-Pixelbalken, Holz-/Stein-Paneele, Serifenschrift (Cinzel/Spectral-Anmutung), Tooltips im Pixelrahmen.
-Kritische HUD-Werte (Leben/Ausdauer) mit ausreichendem Kontrast zum Paneel.
+Pixelbalken, Holz-/Stein-Paneele, Serifenschrift (Cinzel), Tooltips im Pixelrahmen; kritische Werte mit Kontrast zum Paneel.
 
 ## Verboten
-Weichzeichner, Verlaufsflächen als Materialersatz, Neon, generische Web-Komponenten, Bild-Assets fremder Stile
-(LPC u. ä. wurden geprüft und verworfen), bezahlte Generatoren (vom Nutzer abgelehnt).
+Bezahlte Generatoren, SpriteCook, Pixel-Plugin, Aseprite, fremde Asset-Stile (LPC geprüft und verworfen), Nachbearbeitungsfilter über Sprites.

@@ -55,6 +55,7 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
       case 'fire':  noise(t, 0.35, 'lowpass', 1800, 200, 0.35 * v, 0.8); break;
       case 'heal':  tone(t, 0.25, 'sine', 660, 660, 0.1 * v); tone(t + 0.1, 0.35, 'sine', 990, 990, 0.08 * v); break;
       case 'ui':    tone(t, 0.035, 'square', 1400, 900, 0.03 * v); break;
+      case 'whistle': tone(t, 0.16, 'sine', 1500, 2300, 0.09 * v); tone(t + 0.22, 0.32, 'sine', 1700, 2700, 0.09 * v); break;   // S15: nach dem Pferd pfeifen
       // Rufe beim Entdecken (Phase 11: Geräusche je Art)
       case 'growl':  noise(t, 0.5, 'lowpass', 420, 180, 0.28 * v, 1.5); tone(t, 0.45, 'sawtooth', 95, 70, 0.05 * v); break;
       case 'rattle': for (let i = 0; i < 4; i++) noise(t + i * 0.06, 0.04, 'bandpass', 1600 + i * 200, 900, 0.22 * v, 3); break;

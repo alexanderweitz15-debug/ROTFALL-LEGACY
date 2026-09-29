@@ -1,8 +1,8 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=15';
-import { BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=15';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=15';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=15';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=15';
 import * as R from './render.js?v=15';
 import * as HB from './buildings.js?v=15';
 import * as UI from './ui.js?v=15';
@@ -47,7 +47,7 @@ export function makeChar(o = {}) {
     seed: rnd() * 100, swing: 0, atkCd: 0, telegraph: 0, aiState: 'idle', aiTimer: 0,
     pal: o.pal || { skin: pick(SKIN), hair: pick(HAIR), cloth: pick(CLOTH) },
     home: o.home || null, schedule: o.schedule || null, origin: o.origin || null,
-    recruit: o.recruit || false, recruitRel: o.recruitRel || 25, teaches: o.teaches || null,
+    recruit: o.recruit || false, recruitRel: o.recruitRel || 25, teaches: o.teaches || null, spellsTaught: o.spellsTaught || null, spellRule: o.spellRule || null, horseBreeder: o.horseBreeder || false,
     shop: o.shop || false, town: o.town || null, smith: o.smith || false, undead: o.undead || false, kin: o.kin || null,
     greet: o.greet || '"..."', hostile: o.hostile || false,
     build: o.build || pick(Object.keys(B.BUILDS)),
@@ -59,6 +59,7 @@ export function makeChar(o = {}) {
 
 // ---- Skill-Baum: Summe der Knoteneffekte (nur wer Knoten hat) und besondere Regeln je Schlüsselknoten ----
 const node = (c, k) => !!(c && c.tree && c.tree[k]);
+const dkNode = (c, k) => node(c, k) && c.currentClass === 'deathknight';   // S15: Todesritter-Schlüsselknoten nur als aktive Klasse
 function treeFx(c) { const f = {}; for (const k of Object.keys(c.tree || {})) for (const [a, v] of Object.entries(SKILL_TREE[k]?.fx || {})) f[a] = (f[a] || 0) + v; return f; }
 const tfx = (c, k) => (c && c.tfx && c.tfx[k]) || 0;
 const inNature = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0) && [T.GRASS, T.MARSH, T.DIRT].includes(tileAt('world', c.x / TS | 0, c.y / TS | 0));
@@ -250,21 +251,126 @@ const BEAST_WARES = [['wild_dog', 'Hund', 60], ['wolf', 'Wolfshund', 180], ['boa
 // Das Reittier gehört dem Helden (S.mount); aufsitzen/absitzen mit R, nur draußen. Reitend: schneller, kämpft weiter; wer zu Boden geht,
 // fällt vom Pferd. Das Messingross braucht alle 5 Tage einen Automatenkern, sonst lahmt es. Kauf beim Tierhändler.
 const MOUNTS = { horse: { name: 'Pferd', spd: 1.55, price: 250 }, mech_horse: { name: 'Messingross', spd: 1.75, price: 900 }, dead_horse: { name: 'Totenross', spd: 1.65, price: 400 } };
-function mountSpeed(c) {
-  if (!c.mounted) return 1; const M = MOUNTS[c.mounted.kind] || MOUNTS.horse;
-  return M.spd * (c.mounted.kind === 'mech_horse' && (S.mount?.oiled || 0) + 5 < (S.day | 0) ? 0.6 : 1);
+// S15 P17 (Nutzer): Jedes Reittier hat eigene Werte — Tempo (×0,9–1,15), Ausdauer (80–140, sinkt beim Reiten, erschöpft = 70 % Tempo),
+// Mut (0–100: ab 70 kommt es auch mitten im Kampf). Anzeige und „Verstoßen“ im Gruppenfenster (G).
+function mountStats(M = S.mount) {
+  if (!M || M.tempo) return M; const k = M.kind === 'mech_horse' ? 1.05 : M.kind === 'dead_horse' ? 1.02 : 1;
+  return Object.assign(M, { tempo: Math.round((0.9 + rnd() * 0.25) * k * 100) / 100, staminaMax: M.kind === 'dead_horse' ? 160 : ri(80, 140), mut: M.kind === 'dead_horse' ? 100 : M.kind === 'mech_horse' ? 90 : ri(20, 90), stamina: null });
 }
+function mountSpeed(c) {
+  if (!c.mounted) return 1; const M = MOUNTS[c.mounted.kind] || MOUNTS.horse, H = mountStats();
+  return M.spd * (H?.tempo || 1) * (H && H.stamina != null && H.stamina <= 0 ? 0.7 : 1) * (c.mounted.kind === 'mech_horse' && (S.mount?.oiled || 0) + 5 < (S.day | 0) ? 0.6 : 1);
+}
+// S15 (Nutzer): R pfeift. Das Pferd kommt von außerhalb des Bildes angelaufen und bleibt bei dir stehen; E sitzt auf, R sitzt ab
+// (dann bleibt es stehen). Im Kampf kommt es nicht. Das Pferd in der Welt ist eine flüchtige Figur (kind 'mount'), gespeichert
+// wird nur S.mount; nach dem Laden pfeift man es wieder heran.
+const horseEnt = (map = 'world') => S.ents[map]?.find(e => e.kind === 'mount' && !e.decor);
+const inFight = (p = S.player) => S.ents[p.map].some(e => e.kind === 'enemy' && e.alive && !e.downed && !e.pet && dist(e, p) < 420 && teamOf(e) !== 'neutral' && isHostile(e, p));
+const insideHouse = p => HOUSES.some(b => b.map === p.map && p.x / TS > b.x && p.x / TS < b.x + b.w && p.y / TS > b.y && p.y / TS < b.y + b.h);
+function spawnHorse(p, R = 600, at = null) {
+  const old = horseEnt(p.map); if (old) S.ents[p.map].splice(S.ents[p.map].indexOf(old), 1);
+  const free = (x, y) => !solidTile(p.map, x, y) && !solidPropAt(p.map, x, y, 12);
+  for (let i = 0; i < 24; i++) {
+    const a = rnd() * 6.283, x = at ? at.x + (i ? Math.cos(a) * 24 : 22) : p.x + Math.cos(a) * R, y = at ? at.y + (i ? Math.sin(a) * 24 : 0) : p.y + Math.sin(a) * R;
+    if (!free(x, y)) continue;
+    const h = { id: uid(), kind: 'mount', map: p.map, x, y, vx: 0, vy: 0, r: 12, alive: true, transient: true, mkind: S.mount.kind, name: S.mount.name, aim: 0 };
+    S.ents[p.map].push(h); return h;
+  }
+  return null;
+}
+function leaveHorse(p) { if (S.mount && p.map === 'world') spawnHorse(p, 0, p); }   // absitzen oder stürzen: das Pferd bleibt, wo du warst
 function toggleMount() {
   const p = S.player; if (!S.mount) return UI.toast('Du hast kein Reittier. (Tierhändler: Kreuzweg, Nordfurt, Kupferhafen)');
-  if (p.mounted) { p.mounted = null; log(`Du sitzt ab.`, 'world'); return; }
-  if (S.map !== 'world' || townAt(p.x / TS | 0, p.y / TS | 0) && HOUSES.some(b => b.map === 'world' && p.x / TS > b.x && p.x / TS < b.x + b.w && p.y / TS > b.y && p.y / TS < b.y + b.h)) return UI.toast('Hier drinnen nicht.');
+  if (p.mounted) { p.mounted = null; leaveHorse(p); log(`Du sitzt ab. ${S.mount.name} bleibt stehen (R pfeift es heran, E sitzt auf).`, 'world'); return; }
+  if (S.map !== 'world') return UI.toast('Hier drinnen hört dich dein Pferd nicht. Es wartet draußen.');
   if (p.downed) return;
+  float(p, 'pfeift', 'rgba(230,220,180,ALPHA)'); sfx('whistle', 0.4, 1);
+  if (inFight(p) && (mountStats()?.mut || 0) < 70) return UI.toast(`${S.mount.name} scheut den Kampf und kommt nicht.`, 2400);   // S15 P17: Mutige kommen
+  let h = horseEnt(); if (!h || dist(h, p) > 900) h = spawnHorse(p);
+  if (!h) return UI.toast('Dein Pferd findet keinen Weg zu dir.');
+  h.come = true; h.stuckT = 0;
+}
+function mountTick(dt) {
+  const p = S.player, H = S.mount && mountStats(); if (H) { H.stamina ??= H.staminaMax; const riding = p.mounted && (p.vx || p.vy);
+    H.stamina = clamp(H.stamina + dt / 1000 * (riding ? -1.2 : 2.5), 0, H.staminaMax); if (riding && H.stamina <= 0 && !H.tiredSaid) { H.tiredSaid = true; UI.toast(`${H.name} ist erschöpft.`, 2000); } if (H.stamina > 20) H.tiredSaid = false; }   // S15 P17
+  const h = horseEnt(S.map); if (!h) return;
+  if (!h.come || p.mounted) { h.vx = h.vy = 0; h.come = h.come && !p.mounted; return; }
+  if (inFight(p) && (mountStats()?.mut || 0) < 70) { h.come = false; h.vx = h.vy = 0; float(h, 'scheut', 'rgba(220,200,160,ALPHA)'); return; }
+  const d = dist(h, p);
+  if (d < 44) { h.come = false; h.vx = h.vy = 0; float(h, 'schnaubt', 'rgba(220,200,160,ALPHA)'); if (d < 900) UI.toast(`${h.name} ist da — E zum Aufsitzen.`, 1800); return; }
+  const a = Math.atan2(p.y - h.y, p.x - h.x), sp = (d > 220 ? 4.4 : 2.4) * dt / 16, x0 = h.x, y0 = h.y;
+  moveEnt(h, Math.cos(a) * sp, Math.sin(a) * sp); h.vx = h.x - x0; h.vy = h.y - y0; h.aim = a;
+  if (Math.hypot(h.vx, h.vy) < sp * 0.3) {                          // hängt an einem Zaun oder Haus: ein Stück näher heran
+    if ((h.stuckT = (h.stuckT || 0) + dt) > 1200) { h.stuckT = 0; const k = Math.max(60, d - 180), x = p.x - Math.cos(a) * k, y = p.y - Math.sin(a) * k;
+      if (!solidTile(h.map, x, y) && !solidPropAt(h.map, x, y, 12)) { h.x = x; h.y = y; } else { h.x = p.x - Math.cos(a) * 40; h.y = p.y - Math.sin(a) * 40; } } }
+  else h.stuckT = 0;
+}
+// S15 Stall (Nutzer): Tierhändler und der Pferdezüchter Wendel zeigen ihre Pferde in einem Fenster mit Werten und Preis. Das Angebot
+// ist je Händler und Woche fest (aus einem Hash, nicht rnd). Wer schon ein Pferd hat, tauscht es ein (40 % seines Werts).
+const hashR = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
+const STABLE_NAMES = ['Sturm', 'Asche', 'Nacht', 'Wind', 'Funke', 'Hagel', 'Distel', 'Rauch', 'Kiesel', 'Schatten', 'Moor', 'Glut'];
+function horseValue(H) { return Math.round((MOUNTS[H.kind]?.price || 250) * (0.6 + (H.tempo - 0.9) * 2.2 + (H.staminaMax - 80) / 160 + H.mut / 250)); }
+function stableOffers(npc) {
+  const week = (S.day / 7) | 0, sold = (S.stableSold ||= {})[npc.key || npc.beastTrader] || [], breeder = !!npc.horseBreeder, seed = [...(npc.key || npc.beastTrader || 'x')].reduce((a, c) => a + c.charCodeAt(0), 0) + week * 97;
+  const kinds = ['horse', ...(npc.beastTrader === 'kupferhafen' ? ['mech_horse'] : []), ...((S.ranks.undead ?? -1) >= 0 || pactBound() ? ['dead_horse'] : [])];
+  const out = [];
+  for (let i = 0; i < (breeder ? 5 : 3); i++) { const r = k => hashR(seed + i * 31 + k), kind = breeder ? 'horse' : kinds[Math.floor(r(1) * kinds.length)];
+    const H = { id: `${week}-${i}`, kind, name: `${MOUNTS[kind].name} ${STABLE_NAMES[(Math.floor(hashR(seed) * STABLE_NAMES.length) + i * 5) % STABLE_NAMES.length]}`, tempo: Math.round((0.9 + r(3) * (breeder ? 0.3 : 0.22)) * 100) / 100,
+      staminaMax: Math.round(80 + r(4) * (breeder ? 70 : 60)), mut: kind === 'dead_horse' ? 100 : kind === 'mech_horse' ? 90 : Math.round(15 + r(5) * 85), oiled: S.day | 0 };
+    H.price = horseValue(H); if (!sold.includes(H.id)) out.push(H); }
+  return out;
+}
+function buyHorse(npc, id) {
+  const H = stableOffers(npc).find(h => h.id === id); if (!H) return false;
+  const credit = S.mount ? Math.round(horseValue(mountStats()) * 0.4) : 0, cost = Math.max(0, H.price - credit);
+  if (S.gold < cost) { UI.toast('Dafür reicht dein Gold nicht.'); return false; }
+  S.gold -= cost; ((S.stableSold ||= {})[npc.key || npc.beastTrader] ||= []).push(H.id);
+  const old = S.mount?.name; S.player.mounted = null; S.ents.world = S.ents.world.filter(e => !(e.kind === 'mount' && !e.decor));
+  const { id: _i, price: _p, ...mount } = H; S.mount = mountStats({ ...mount, stamina: null });
+  log(`${H.name} gehört jetzt dir${old ? ` (${old} bleibt im Stall, ${credit} Gold angerechnet)` : ''}.`, 'party'); UI.refreshHUD(); dkSteed(); return true;
+}
+// Pferdehof bei Wendel: Koppel aus Zäunen, drei Pferde darin (Zierde, nicht reitbar)
+function ensurePaddock() {
+  S.ents.world = S.ents.world.filter(e => !e.paddockFence || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0)));   // kein Zaun in Scheunenwand oder Fels (dort schließt die Wand die Koppel)
+  const w = S.ents.world.find(e => e.key === 'wendel'); if (!w || S.ents.world.some(e => e.decor && e.paddock)) return;
+  const cx = (w.x / TS | 0) + 4, cy = (w.y / TS | 0) - 1;
+  if (!S.ents.world.some(e => e.paddockFence)) { for (let i = -4; i <= 4; i++) for (const dy of [-3, 3]) S.ents.world.push({ id: uid(), kind: 'prop', type: 'fence', map: 'world', x: (cx + i) * TS + 16, y: (cy + dy) * TS + 16, r: 10, solid: true, paddockFence: true, label: 'Koppel des Pferdehofs' });
+    for (let j = -2; j <= 2; j++) S.ents.world.push({ id: uid(), kind: 'prop', type: 'fence', map: 'world', x: (cx + 4) * TS + 16, y: (cy + j) * TS + 16, r: 10, solid: true, paddockFence: true });
+    S.ents.world = S.ents.world.filter(e => !e.paddockFence || !SOLID.has(tileAt('world', e.x / TS | 0, e.y / TS | 0))); if (solidIndex.world) indexSolids('world'); }
+  for (let i = 0; i < 3; i++) S.ents.world.push({ id: uid(), kind: 'mount', map: 'world', x: (cx - 2 + i * 2) * TS, y: (cy - 1 + (i % 2) * 2) * TS, vx: 0, vy: 0, r: 12, alive: true, transient: true, decor: true, paddock: true, mkind: 'horse', aim: i ? Math.PI : 0, hDir: i ? 'W' : 'E', name: 'Pferd auf der Koppel' });
+}
+// Todesritter (Nutzer): sein Pferd wird zum Totenross; wer keins hat, bekommt einmal eins
+const A_codexCode = c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; };
+function dkSteed() {
+  const p = S.player; if (p?.currentClass !== 'deathknight') return;
+  if (S.mount?.kind === 'dead_horse') return;
+  if (!S.mount && S.flags.dkSteed) return;
+  const old = S.mount?.name; S.flags.dkSteed = true; p.mounted = null; S.ents.world = S.ents.world.filter(e => !(e.kind === 'mount' && !e.decor));
+  S.mount = mountStats({ kind: 'dead_horse', name: `Totenross ${old ? old.split(' ').pop() : pick(STABLE_NAMES)}`, oiled: S.day | 0 });
+  log(old ? `${old} stirbt nicht mit dir — es kehrt als Totenross zurück. Seine Augen glühen grün.` : 'Aus der Asche steigt ein Totenross und wartet auf dich. Pfeif (R), und es kommt.', 'party');
+  UI.toast('TOTENROSS', 2600);
+}
+function releaseMount() {
+  if (!S.mount) return; const n = S.mount.name, p = S.player; p.mounted = null;
+  const h = horseEnt(p.map); if (h) { h.come = false; h.anchor = null; h.until = performance.now() + 4000; h.leaving = true; }
+  S.ents[p.map] = S.ents[p.map].filter(e => e.kind !== 'mount'); S.mount = null;
+  log(`Du lässt ${n} laufen. Es sieht sich nicht um.`, 'party'); chronicle(`${p.name} verstößt ${n}`, 'news');
+}
+function mountUp(h) {
+  const p = S.player; if (!S.mount || p.downed) return;
+  if (insideHouse(p)) return UI.toast('Hier drinnen nicht.');
+  S.ents[h.map].splice(S.ents[h.map].indexOf(h), 1);
   p.mounted = { kind: S.mount.kind }; sfx('step', 0.5); log(`Du sitzt auf ${S.mount.name}.${S.mount.kind === 'mech_horse' && (S.mount.oiled || 0) + 5 < (S.day | 0) ? ' Es knirscht — es braucht einen Automatenkern.' : ''}`, 'world');
+}
+function mountIntro(npc) {                                            // S15 (Nutzer): beim Kauf erklären, wie es geht
+  const n = S.mount.name;
+  UI.dialogue(npc, `„${n} gehört jetzt dir. So geht's:\n\n• R: pfeifen. ${n} kommt angelaufen, auch von weit her.\n• E: aufsitzen, wenn es bei dir steht.\n• R im Sattel: absitzen. Es bleibt dann stehen und wartet.\n• Im Kampf kommt es nicht, Pferde scheuen Klingen.\n• In Häuser, Höhlen und Gewölbe kommt es nicht mit, es wartet draußen.${S.mount.kind === 'mech_horse' ? '\n• Alle fünf Tage braucht es einen Automatenkern, sonst lahmt es.' : ''}\n• Im Gruppenfenster (G) siehst du, wie es ihm geht.“`,
+    [{ text: 'Verstanden.', fn: () => UI.closeDialogue() }]);
 }
 function buyMount(kind) {
   const M = MOUNTS[kind]; if (S.gold < M.price) return UI.toast('Dafür reicht dein Gold nicht.');
-  S.gold -= M.price; S.mount = { kind, name: `${M.name} ${pick(['Sturm', 'Asche', 'Messing', 'Nacht', 'Wind', 'Funke'])}`, oiled: S.day | 0 };
-  log(`${S.mount.name} gehört jetzt dir. Aufsitzen mit R.`, 'party'); UI.toast(`REITTIER: ${S.mount.name.toUpperCase()}`, 2400); UI.refreshHUD();
+  S.gold -= M.price; S.mount = mountStats({ kind, name: `${M.name} ${pick(['Sturm', 'Asche', 'Messing', 'Nacht', 'Wind', 'Funke'])}`, oiled: S.day | 0 });
+  log(`${S.mount.name} gehört jetzt dir. R pfeift es heran, E sitzt auf.`, 'party'); UI.toast(`REITTIER: ${S.mount.name.toUpperCase()}`, 2400); UI.refreshHUD();
 }
 function oilMount() {
   if (S.mount?.kind !== 'mech_horse') return false; if (!hasItem(S.player, 'automatenkern')) { UI.toast('Dafür brauchst du einen Automatenkern.'); return false; }
@@ -328,8 +434,7 @@ function beastMenu(npc) {
     [...(petOf() ? [] : BEAST_WARES.map(([m, n, g]) => ({ text: `${n} — ${g} Gold`, fn: () => {
       if (S.gold < g) return UI.toast('Dafür reicht dein Gold nicht.');
       S.gold -= g; const p = S.player, e = spawnEnemy(m, p.map, (p.x / TS | 0) + 1, (p.y / TS | 0) + 1, { level: Math.max(2, p.level - 2), noVariant: true }); makePet(e); UI.closeDialogue(); UI.refreshHUD(); } }))),
-    ...(!S.mount ? Object.entries(MOUNTS).filter(([k]) => k === 'horse' || (k === 'mech_horse' && npc.beastTrader === 'kupferhafen') || (k === 'dead_horse' && ((S.ranks.undead ?? -1) >= 0 || pactBound())))
-      .map(([k, M]) => ({ text: `Reittier: ${M.name} — ${M.price} Gold`, fn: () => { buyMount(k); UI.closeDialogue(); } })) : []),
+    { text: S.mount ? 'Reittiere ansehen (eintauschen)' : 'Reittiere ansehen', fn: () => { UI.closeDialogue(); UI.openModal('stable', npc); } },   // S15: Stall-Fenster
     ...(S.mount?.kind === 'mech_horse' ? [{ text: `${S.mount.name} warten (1 Automatenkern)`, fn: () => { oilMount(); back(); } }] : []),
     ...(farmCap() ? [{ text: 'Kuh für deinen Hof — 70 Gold', fn: () => { buyFarmAnimal('cow'); back(); } }, { text: 'Schaf für deinen Hof — 40 Gold', fn: () => { buyFarmAnimal('sheep'); back(); } }] : []),   // S14: eigener Hof
     ...(petOf() ? [{ text: `${petOf().petName} freilassen`, fn: () => { const e = petOf(); e.servant = null; e.pet = false; e.transient = true; e.anchor = { x: e.x + 600, y: e.y }; S.pet = null; log(`${e.petName} trottet davon.`, 'party'); back(); } }] : []),
@@ -390,14 +495,14 @@ function applyHealItem(c, key, target, part) {
   if (it.use === 'bandage' || key === 'herb') {
     part ||= B.worstPart(target) || 'torso';
     const P = target.body[part];
-    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal'));
+    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1);
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
   } else {
-    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')));
+    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1));   // S15 Blutfürst
     float(target, '+' + it.heal, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} gibt ${target === c ? 'sich' : target.name} ${it.name}.`, 'party');
   }
@@ -415,7 +520,15 @@ function tickChannel(p, dt, moving) {
   if (ch.t >= ch.dur) { p.channel = null;
     if (ch.healer) { const g = woundedGroup(); S.gold -= Math.min(S.gold, ch.cost); for (const c of g) { B.fullHeal(c); c.status = (c.status || []).filter(s => !SLEEP_CURES.has(s.key)); }
       log(`${target.name} versorgt ${g.length > 1 ? 'dich und deine Gruppe' : 'deine Wunden'} (${ch.cost} Gold).`, 'party'); fx(p.x, p.y - 14, 'heal', 12); addRel(target.key, 2); UI.refreshHUD(); return; }
-    if (ch.revive) { if (target.downed) stabilize(target, p); } else applyHealItem(p, ch.key, target, ch.part); }
+    if (ch.revive) { if (target.downed) stabilize(target, p); } else applyHealItem(p, ch.key, target, ch.part);
+    helpedVillager(target, p); }
+}
+// S15 (Nutzer: „Heilen von Leuten aus Dörfern soll Ruf bringen“): Wer einen Bewohner verbindet oder aufrichtet, gewinnt Ansehen bei der
+// Macht des Ortes und die Zuneigung der Person. Einmal je Person und Tag, damit es kein Verband-Kreislauf wird.
+function helpedVillager(t, p) {
+  if (p !== S.player || t === p || t.kind !== 'npc' || !t.homeTown || S.party.includes(t.id) || t.helpedDay === (S.day | 0)) return;
+  t.helpedDay = S.day | 0; const f = townFac(t.homeTown); S.factions[f] = clamp((S.factions[f] || 0) + 3, -100, 100); if (t.key) addRel(t.key, 10);
+  float(t, 'dankbar', 'rgba(160,224,160,ALPHA)'); log(`${t.name} vergisst dir das nicht. ${FACTIONS[f]?.name || f} +3.`, 'faction');
 }
 // Verbände herstellen: aus Stoff, nicht aus dem Nichts
 const BANDAGE_FROM = { cloth: 3, cloth_shirt: 2 };
@@ -480,7 +593,9 @@ function spawnNPCs() {
 function spawnNpcDef(def) {
   const spots = NPC_SPOTS;
   {
-    const home = worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
+    const hs = def.atHouse && HOUSES.find(h => h.type === def.atHouse && h.map === 'world');   // S15 P5: vor einem Gebäude (Akademie)
+    const home = hs ? [hs.doorTile[0], hs.doorTile[1] + 2] : def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
+      : worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
     const pos = freeSpotNear('world', home[0] + ri(-2, 2), home[1] + ri(-2, 2), 4);
     const c = makeChar({ ...def, x: pos.x, y: pos.y, level: def.key === 'kelan' ? 12 : def.key === 'rook' ? 8 : ri(3, 7),
       pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: def.faction === 'order' ? '#c7bda6' : def.faction === 'valen' ? '#33415c' :
@@ -489,7 +604,7 @@ function spawnNpcDef(def) {
     c.home = home; c.anchor = { x: pos.x, y: pos.y };
     if (def.undead) { c.pal.skin = '#b9b3a2'; c.pal.glow = def.key === 'vhal' ? '#b07ae0' : '#4e8f7a'; }
     c.hooded = !!def.undead || def.faction === 'undead' || ['morvath', 'rook', 'kelan'].includes(def.key);
-    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', oda:'spear', morvath:'staff' }[def.key];
+    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', oda:'spear', morvath:'staff' }[def.key] || def.weapon;
     if (w) c.equip.weapon = mkItem(w);
     if (def.key === 'borin') { c.equip.offhand = mkItem('kite_shield'); c.pal.shield = '#4a3f30'; c.pal.shieldBoss = '#8a8172'; }
     if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass');
@@ -1392,10 +1507,11 @@ SPAWN_AREAS.push(
   { map:'world', x:185, y:430, r:12, types:['goblin', 'goblin', 'goblin_warrior'], cap:6, goblinHide: true },
   // S12 Totenland (Osten): nach Osten dichter und härter
   { map:'world', x:1180, y:300, r:60, types:['skeleton', 'skeleton', 'ghoul', 'wraith', 'zombie', 'zombie', 'bone_hound', 'carrion_wing'], cap:12 },
+  { map:'world', x:930, y:640, r:16, types:['bone_knight', 'wraith', 'necromancer', 'skeleton'], cap:7 },   // S15 P6: Wachen am Weg zum Turm des Nachtglases
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
-const HUMANOID = new Set(['goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
+const HUMANOID = new Set(['acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -1446,6 +1562,15 @@ function styleArea(on = true) {
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
 export const BAL = { hp: 1.7, dmg: 1.4 };
+// S15 P12 Schwierigkeitsgrade (PLAN_OFFEN Block B). Schwer ist der Standard. Wirkt auf Leben und Schaden der Gegner (über BAL),
+// die Ansagezeit schwerer Angriffe, Beutechancen und wie schnell Kopfgeld verfällt; die Gliedergrenze steht in body.js cutOf.
+export const DIFF = {
+  angsthase:   { name: 'Angsthase', hp: 0.75, dmg: 0.7, tele: 1.3, loot: 1.25, decay: 2, desc: 'Gegner schwächer, Ansagen länger, mehr Beute. Glieder gehen nie verloren, zerstörte Dörfer bauen sich wieder auf.' },
+  schwer:      { name: 'Schwer', hp: 1, dmg: 1, tele: 1, loot: 1, decay: 1, desc: 'So ist Rotfall gedacht. Glieder gehen ab −200 verloren, zerstörte Dörfer bleiben zerstört.' },
+  sehr_schwer: { name: 'Sehr schwer', hp: 1.25, dmg: 1.3, tele: 0.9, loot: 0.85, decay: 0.6, desc: 'Gegner zäher und härter, weniger Beute, Kopfgeld vergeht langsam. Glieder gehen schon ab −100 verloren.' },
+};
+const diffOf = () => DIFF[S.difficulty] || DIFF.schwer;
+function applyDifficulty() { const D = diffOf(); BAL.hp = 1.7 * D.hp; BAL.dmg = 1.4 * D.dmg; }
 // S14 (Teil B, nur ?dev): Sammelbild der Figuren im Stil R — je Figur Ansichten, Gehen, Posen, Hieb in Zehnteln, mit Waffe an
 // der Hand. rows: [[Bezeichnung, Spec, Waffenschlüssel]]; gespeichert über den Bildschirmfoto-Empfänger (docs/screenshots).
 async function figSheet(name, rows, o = {}) {
@@ -1610,15 +1735,15 @@ function deepBoss() {                                         // Tiefhall: Hrodv
 
 // ================= Neues Spiel =================
 export function newGame(cfg) {
-  const keep = { settings: S.settings };
+  const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], isle: [], deck: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
     settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true, border1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
-    settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
+    settings: keep.settings, difficulty: keep.difficulty, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p)); poiSpawns();
   genMine().forEach(p => S.ents.mine.push(p));
@@ -1628,6 +1753,8 @@ export function newGame(cfg) {
   genGarmadon().forEach(p => S.ents.garmadon.push(p));
   genOmega().forEach(p => S.ents.omega.push(p));
   genIsle().forEach(p => S.ents.isle.push(p)); genDeck().forEach(p => S.ents.deck.push(p));   // S14 Seevolk
+  genTower().forEach(p => S.ents.tower.push(p));                                                // S15 P6: Turm des Nachtglases
+  applyDifficulty();                                                 // S15 P12: vor den ersten Gegnern
   for (const m of MAP_KEYS) indexSolids(m);
   spawnNPCs();
   spawnGuardPosts();
@@ -1673,7 +1800,7 @@ function bindSim() {
   SIM.H.title = t => {
     const p = S.player; p.titles ||= [];
     if (p.titles.includes(t)) return;
-    p.titles.push(t); chronicle(`${p.name}: „${t}“`, 'legend', 'Ein Name, den andere vergeben.');
+    p.titles.push(t); chronicle(`${p.name}: „${t}“`, 'legend', 'Ein Name, den andere vergeben.'); for (const r of Object.keys(FAME_REG)) addFame(10, r, t);   // S15 P8
     UI.toast(t.toUpperCase(), 4200); log(`Man nennt dich nun ${t}.`, 'faction');
   };
   SIM.H.raidDamage = raidDamage;
@@ -1727,21 +1854,21 @@ function rescaleSave(fresh) {
 export function continueGame() {
   const data = loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
-  applySave(data);
+  applySave(data); applyDifficulty();                                  // S15 P12
   { const p = S.player; if (p?.titleClasses?.length && !p.tgrade) { p.tgrade = {};   // S15: alte Stände behalten jede Fähigkeit, die sie vor den Titelgraden hatten
     for (const k of p.titleClasses) { const T = TITLE_CLASSES[k]; p.tgrade[k] = Math.max(1, ...T.abilities.map(a => T.grades.findIndex(g => g.includes(a)) + 1)); } } }
   if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
   if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
   SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
-  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), vault: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
   for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);
   if (!gone?.sky && !S.ents.sky.some(e => e.kind === 'prop')) S.ents.sky.push(...FRESH.sky);
   if (!gone?.kerker && !S.ents.kerker.some(e => e.kind === 'prop')) S.ents.kerker.push(...FRESH.kerker);   // S12: ältere Stände kennen die Himmelsinsel noch nicht   // … Abweichungen stehen im Spielstand
   if (!gone?.garmadon && !S.ents.garmadon.some(e => e.kind === 'prop')) S.ents.garmadon.push(...FRESH.garmadon);   // Phase 6: Gruft des Toten Königs
   if (!gone?.omega && !S.ents.omega.some(e => e.kind === 'prop')) S.ents.omega.push(...FRESH.omega);   // Phase 7: Krater
-  for (const m of ['isle', 'deck']) if (!gone?.[m] && !S.ents[m].some(e => e.kind === 'prop')) S.ents[m].push(...FRESH[m]);   // S14: Seevolk in alten Ständen
+  for (const m of ['isle', 'deck', 'tower']) if (!gone?.[m] && !S.ents[m].some(e => e.kind === 'prop')) S.ents[m].push(...FRESH[m]);   // S14: Seevolk in alten Ständen; S15 P6: Turm
   if (S.flags?.rescale) rescaleSave(fresh);
   if (!(S.flags ||= {}).gen2) {                // … außer in Siedlungen: dort gilt die neue Ausstattung (Möbel, Warenstapel statt Zufallskisten)
     const R = [[50, 56, 72, 74], [112, 50, 126, 63], [138, 438, 164, 464], [240, 240, 262, 258], [372, 84, 388, 100], [446, 246, 466, 266]];
@@ -1826,8 +1953,10 @@ export function continueGame() {
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
-    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches']) if (def[k] !== undefined) e[k] = def[k]; }
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key)) spawnNpcDef(def);
+    if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches', 'spellsTaught', 'spellRule']) if (def[k] !== undefined) e[k] = def[k]; }
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && (def.atTown || def.atHouse || ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key))) spawnNpcDef(def);   // S15: Stadt-Lehrer auch in alten Ständen
+  successorDay(true);                                                 // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“): fehlende wichtige NPCs ersetzen
+  ensurePaddock();                                                    // S15: Koppel am Pferdehof (Hadubrand erscheint in alten Ständen erst hier)
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -2047,6 +2176,11 @@ function update(dt, now) {
   if (S.fires?.length) fireTick(dt);   // S14: Brand in der Stadt
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
   if (S.player?.casting) castTick(S.player);   // S15 P4
+  mountTick(dt);                               // S15: gerufenes Pferd läuft heran
+  if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
+  dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
+  if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
+  if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -2209,7 +2343,7 @@ function think(e, dt) {
   }
   if (e.downed) { e.vx = e.vy = 0; }                          // am Boden: keine KI, keine Bewegung
   else if (e.stagger > 0 && e !== S.player && !S.party.includes(e.id)) { e.vx = e.vy = 0; }   // taumelt: keine Entscheidung
-  else if (e.kind === 'enemy') updateEnemy(e, dt);
+  else if (e.kind === 'enemy') updateEnemy(e, e.timeSlow > performance.now() ? dt * 0.3 : dt);   // S15 P6: Nachtglas verlangsamt
   else if (e.kind === 'npc') updateNpc(e, dt);
   const P0 = S.player;                                         // BUG-108: fern (> 1500 px) keine Kampfuhren — außer ein Status läuft (Blutung, Gift)
   if ((e.kind === 'enemy' || e.kind === 'npc' || e.kind === 'player') && (e === P0 || (e.status && e.status.length) || e.swing > 0 || (Math.abs(e.x - P0.x) < 1500 && Math.abs(e.y - P0.y) < 1500))) tickCombatant(e, dt);
@@ -2261,9 +2395,10 @@ const ENC_KINDS = {
   hungry: { name: 'Hungernde Mutter', prof: 'Flüchtling', greet: '„Die Kinder haben seit zwei Tagen nichts gegessen. Hast du etwas übrig?“', log: 'Eine Flüchtlingsfamilie rastet am Weg.' },
   deserter: { name: 'Deserteur', prof: 'Deserteur', greet: '„Ich will keinen Ärger. Ich will nur nach Hause. Du hast mich nicht gesehen, ja?“', log: 'Ein Mann in zerrissenem Valen-Rock hält Abstand.' },
   avenger: { name: 'Rächer', prof: 'Rächer', greet: '', log: 'Jemand folgt dir schon eine Weile.' },   // Kette aus Kopfgeldaufträgen (S.avenge)
+  runaway: { name: 'Entflohener Grubenarbeiter', prof: 'Entflohener', greet: '„Bitte! Sie jagen mich — Kettenreiter mit einem Hund. Versteck mich, oder bring mich weg!“', log: 'Jemand mit Kettenspuren an den Knöcheln hinkt von der Straße weg.' },   // S15 P9
   bait: { name: 'Weinende Frau', prof: 'Wanderin', greet: '„Hilfe! Mein Mann — dort hinten im Gebüsch! Bitte, schnell!“', log: 'Jemand ruft verzweifelt um Hilfe.' },
 };
-function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger'))) {
+function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger' && (k !== 'runaway' || (tx < OX + 80 && !S.flags.chainsBroken))))) {   // S15 P9: Entflohene nur im Westen, solange die Kette steht
   const K = ENC_KINDS[kind], [bx, by] = pushOut('world', tx, ty), gid = uid(), out = [];
   for (let i = 0; i < (K.n || 1); i++) {
     const pos = freeSpotNear('world', bx + ri(-1, 1) * i, by + ri(-1, 1) * i, 3), fem = kind === 'hungry' || kind === 'bait';
@@ -2289,6 +2424,17 @@ function encTalk(npc) {
   const fin = (t, walk = true) => { encDone(npc, walk); UI.dialogue(npc, t, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); };   // Ausgang sofort festhalten
   const food = p.inv.find(i => ITEMS[i.key]?.use === 'food'), bandage = p.inv.find(i => i.key === 'bandage' || i.key === 'herb');
   const C = [];
+  if (npc.enc === 'runaway') {                                        // S15 P9: verstecken, ausliefern, begleiten
+    const hunters = () => { const out = []; for (const mt of ['chain_brute', 'chain_brute', 'wild_dog']) { const [tx, ty] = pushOut('world', (npc.x / TS | 0) + ri(-6, 6), (npc.y / TS | 0) + 10);
+      const e = spawnEnemy(mt, 'world', tx, ty, { level: Math.max(3, p.level) }); if (e) { e.questFoe = 'runaway'; e.transient = true; e.aggroId = p.id; if (mt === 'chain_brute') e.name = 'Kettenreiter'; out.push(e); } } return out; };
+    C.push({ text: 'Versteck dich dort im Gebüsch. Ich lenke sie ab.', fn: () => { S.factions.goblin = clamp((S.factions.goblin || 0) + 8, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) - 8, -100, 100);
+      chronicle('Ein Entflohener entkommt der Kette', 'news', `${p.name} hat ihn nicht verraten.`); fin('„Danke … Ich vergesse dein Gesicht nicht.“ (Grubenstämme +8, Kette −8)'); } });
+    C.push({ text: '[Ausliefern] Die Kette sucht dich. Sie bekommt dich.', fn: () => { S.factions.chain = clamp((S.factions.chain || 0) + 10, -100, 100); S.factions.goblin = clamp((S.factions.goblin || 0) - 12, -100, 100); S.gold += 30;
+      for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 8; S.ents.world = S.ents.world.filter(e => e.encGid !== npc.encGid);
+      chronicle('Ein Entflohener wird der Kette ausgeliefert', 'crime', `${p.name} bekam dafür dreißig Gold.`); UI.dialogue(npc, '„… Nein. Nein!“ Kettenreiter führen ihn weg. (+30 Gold, Kette +10, Grubenstämme −12)', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } });
+    C.push({ text: 'Bleib hinter mir. Wir kämpfen.', fn: () => { hunters(); S.factions.goblin = clamp((S.factions.goblin || 0) + 15, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) - 15, -100, 100); S.flags.chainAlarm = Math.max(S.flags.chainAlarm || 0, (S.day | 0) + 1);
+      chronicle('Kettenreiter stellen einen Entflohenen — und seinen Beschützer', 'battle'); fin('Hufe und Gebell. Die Kettenreiter sind da. (Grubenstämme +15, Kette −15)', false); } });
+  }
   if (npc.enc === 'wounded') {
     if (bandage) C.push({ text: `[${ITEMS[bandage.key].name} geben] Halt still.`, fn: () => { removeItem(p, bandage.key, 1); B.fullHeal(npc);
       const g = ri(8, 25); S.gold += g; addRel(npc.key, 30); S.factions.order = clamp((S.factions.order || 0) + 2, -100, 100);
@@ -2430,10 +2576,11 @@ function tickCombatant(c, dt) {
   for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - dt);
   const resting = !c.vx && !c.vy;
   if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (1 + (c.attributes?.endurance || 10) * 0.02 - 0.2 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0) + (stat(c, 'song') ? 0.5 : 0)));
-  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')));
+  if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')) * (inAnomaly(c) ? 2 : 1));   // S15 P7: Anomalie
   if (c === S.player && c.titleClass) titleTick(c, dt);
   // Statuszeiten
   if (c.status && c.status.length) {
+    if (c === S.player) for (const s of c.status) ((S.codex ||= {}).states ||= {})[s.key] = 1;   // S15 Kodex: erlebte Zustände
     for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }
       if (s.key === 'regrowth') B.heal(c, s.heal * dt / 1000);
       if (s.key === 'burning') { s.acc = (s.acc || 0) + dt / 1000 * (S.weather === 'rain' ? 1.5 : 3); if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Feuer', false, 'fire'); credit(c, byId(s.src), n); } }   // S15 P4
@@ -2445,6 +2592,9 @@ function tickCombatant(c, dt) {
     if (performance.now() > c.brawlKO) { c.brawlKO = 0; c.downed = false; if (c.body) B.healPart(c, 'torso', c.body.torso.max * 0.3 - c.body.torso.hp); act(c, 'rise', 520); }
   } else if (c.downed) {
     if (!(c.tended > performance.now())) c.downTimer -= dt;   // AUDIT B-01: wer versorgt wird, blutet nicht weiter aus
+    if (c.kind === 'npc' && c.downTimer < 4000 && !S.party.includes(c.id) && (c.status || []).some(s => s.key === 'bleeding') && !S.ents[c.map].some(e => e.alive && !e.downed && COMBAT_KINDS.has(e.kind) && isHostile(e, c) && dist(e, c) < 400)
+      && (c.guard || S.ents[c.map].some(o => o !== c && o.kind === 'npc' && o.alive && !o.downed && dist(o, c) < 300))) {   // BUG-113: nach dem Kampf verbindet man sich gegenseitig
+      c.status = c.status.filter(s => s.key !== 'bleeding'); float(c, 'wird verbunden', 'rgba(160,224,160,ALPHA)'); }
     if (c.downTimer <= 0) {
       const T = c.body?.torso, bleeding = (c.status || []).some(s => s.key === 'bleeding');   // S13 (Nutzer, Kenshi): Zähigkeit — nicht kritisch = kommt zu sich
       if (c.kind !== 'enemy' && T && T.hp > -T.max * 0.5 && !bleeding) { c.downed = false; B.healPart(c, 'torso', Math.max(2, T.max * 0.1) - T.hp); if (c.body.head.hp <= 0) B.healPart(c, 'head', c.body.head.max * 0.2);
@@ -2700,6 +2850,7 @@ function teamOf(c) {
   if (c.servant) return 'player';                              // Diener des Nekromanten
   if (c.kind === 'enemy') {
     if (c.surrendered) return 'neutral';                               // S13: ergeben
+    if (c.questFoe) return 'foe';                                      // S15: Auftragsziel aus dem Nachschub ist immer Feind
     if (MONSTERS[c.mtype]?.prey) return 'prey';
     if ((c.mtype === 'garmadon' || c.gCourt) && !S.flags.garmFight) return 'neutral';   // Phase 6: Garmadon redet erst
     if (c.mtype === 'omega' && c.parley && !om().fight) return 'neutral';   // Phase 7: Omega erwacht ruhig und spricht
@@ -2723,7 +2874,7 @@ const chainAtWar = () => S.flags.vargChallenged || (S.flags.chainAlarm || 0) > (
 // der Übung (25 und 100 Einsätze). Wirken: Mana und Abklingzeit gleich, dann Sammelzeit (cast); ein Treffer bricht ab (halbes Mana
 // zurück). castSpell wirkt für Spieler und Gegner gleich (NPC-Zauberer: MONSTERS.spells).
 const SCHOOL = { fire: { name: 'Feuer', col: '#e0703a', fx: 'fire' }, frost: { name: 'Frost', col: '#8fd0f0', fx: 'frost' }, shock: { name: 'Blitz', col: '#f0e070', fx: 'spark' },
-  arcane: { name: 'Arkan', col: '#b88af0', fx: 'spark' }, heal: { name: 'Heilung', col: '#9fe0a0', fx: 'heal' }, ward: { name: 'Schutz', col: '#e8d8a0', fx: 'heal' } };
+  arcane: { name: 'Arkan', col: '#b88af0', fx: 'spark' }, shadow: { name: 'Schatten', col: '#8fd9b0', fx: 'shadow' }, faith: { name: 'Glaube', col: '#e0a060', fx: 'heal' }, heal: { name: 'Heilung', col: '#9fe0a0', fx: 'heal' }, ward: { name: 'Schutz', col: '#e8d8a0', fx: 'heal' } };
 const SPELL_KEYS = Object.keys(ABILITIES).filter(k => ABILITIES[k].spell);
 function learnSpell(c, key, quiet) {
   if (!ABILITIES[key]?.spell) return false; (c.spells ||= {}); if (c.spells[key]) return false;
@@ -2738,7 +2889,8 @@ function spellToBar(key, onlyFree) {                                  // Zauberb
   UI.renderHotbar(); return true;
 }
 function spellPower(c, key) { const S0 = ABILITIES[key].spell, r = spellRank(c, key) || 1, v = S0.dmg || S0.heal || S0.absorb || [0, 0];
-  return (v[0] + (c.attributes?.intelligence || 8) * v[1]) * spellMul(c) * [1, 1, 1.25, 1.5][r] * (c.kind === 'enemy' ? 1 + (c.level || 1) * 0.04 : 1); }
+  return (v[0] + (c.attributes?.intelligence || 8) * v[1]) * spellMul(c) * [1, 1, 1.25, 1.5][r] * (c.kind === 'enemy' ? 1 + (c.level || 1) * 0.04 : 1) * (ABILITIES[key].school === 'faith' ? faithMul(c) : 1); }
+const faithMul = c => c === S.player ? 1 + 0.1 * Math.max(0, S.ranks.chain ?? -1) + Math.min(60, S.omega?.faith || 0) / 200 : 1;   // S15 P7: je höher Rang und Glaube, desto stärker
 function startCast(c, key) {
   const ab = ABILITIES[key]; c.casting = { key, until: clock() + (ab.cast || 0) / 1000, mana: ab.mana || 0, aim: c.aim, col: SCHOOL[ab.school]?.col };
   c.castT = performance.now(); fx(c.x, c.y + 2, SCHOOL[ab.school]?.fx || 'spark', 6);
@@ -2772,20 +2924,25 @@ function applySpellStatus(t, st, src) {
 const c0Casting = t => !!t.casting;
 function spellHit(c, t, dmg, S0) {
   if (t.invuln && t.dodge) { evaded(t); return; }
+  if (S0.holy && (t.undead || MONSTERS[t.mtype]?.faction === 'undead')) dmg *= 2;   // S15 P7: heilig
+  if (S0.reveal) { t.hidden = false; t.stealth = false; t.revealed = performance.now() + 8000; }
   hurt(t, dmg, c, c.name || MONSTERS[c.mtype]?.name, false, S0.el === 'fire' ? 'fire' : S0.el === 'frost' ? 'frost' : 'magic');
   applySpellStatus(t, S0.status, c);
 }
 function castSpell(c, key, a = c.aim ?? 0) {
-  const ab = ABILITIES[key], S0 = ab.spell, pw = spellPower(c, key), col = SCHOOL[ab.school]?.fx || 'spark';
+  if (anomalyClose(c, key)) return;                                  // S15 P7: Schutzzauber im Zentrum schließt die Anomalie
+  const ab = ABILITIES[key], S0 = anomalySlip(c, ab.spell), pw = spellPower(c, key), col = SCHOOL[ab.school]?.fx || 'spark';
   if (S0.shape === 'bolt') S.projectiles.push({ id: uid(), kind: S0.el === 'fire' ? 'fire' : S0.el === 'frost' ? 'frost' : S0.el === 'shock' ? 'spark' : 'shadow', map: c.map, x: c.x + Math.cos(a) * 14, y: c.y - 12 + Math.sin(a) * 8,
-    vx: Math.cos(a) * (S0.speed || 7), vy: Math.sin(a) * (S0.speed || 7), owner: c.id, dmg: pw, life: (S0.range || 300) / (S0.speed || 7) * 16, team: teamOf(c), spellSt: S0.status, pierce: S0.pierce ? 3 : 0, spell: true });
+    vx: Math.cos(a) * (S0.speed || 7), vy: Math.sin(a) * (S0.speed || 7), owner: c.id, dmg: pw, life: (S0.range || 300) / (S0.speed || 7) * 16, team: teamOf(c), spellSt: S0.status, pierce: S0.pierce ? 3 : 0, spell: true, drain: S0.drain || 0, holy: !!S0.holy });
   else if (S0.shape === 'line') { const ts = spellTargetsLine(c, a, S0.range); for (const t of ts) spellHit(c, t, pw, S0);
     for (let d = 16; d < S0.range; d += 14) { const x = c.x + Math.cos(a) * d, y = c.y - 10 + Math.sin(a) * d; if (solidTile(c.map, x, y)) break; fx(x, y, col, 1); } }
   else if (S0.shape === 'nova' || S0.shape === 'area') {
     let cx = c.x, cy = c.y;
     if (S0.shape === 'area') { let d = S0.range; for (let k = 16; k <= S0.range; k += 12) if (solidTile(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k)) { d = k - 12; break; } cx = c.x + Math.cos(a) * d; cy = c.y + Math.sin(a) * d; }
     for (const t of S.ents[c.map]) if (t.alive && t !== c && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && Math.hypot(t.x - cx, t.y - cy) < S0.r + (t.r || 10)) spellHit(c, t, pw, S0);
-    S.fx.push({ x: cx, y: cy, vx: 0, vy: 0, type: 'shock', s: S0.r / 70, life: 500, maxLife: 500 }); fx(cx, cy - 6, col, 20); if (dist(c, S.player) < 500) camShake(4, 200); }
+    S.fx.push({ x: cx, y: cy, vx: 0, vy: 0, type: 'shock', s: S0.r / 70, life: 500, maxLife: 500 }); fx(cx, cy - 6, col, 20); if (dist(c, S.player) < 500) camShake(4, 200);
+    if (S0.el === 'fire' || S0.el === 'frost') for (let k = 0; k < 4; k++) { const ang = rnd() * 6.283, rr = rnd() * S0.r * 0.7;   // Welt-Spuren: Brandfläche 8 s, Eisboden 10 s
+      spellGround(c, cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, S0.el, S0.el === 'fire' ? 8000 : 10000, pw * 0.25, false, S0.el === 'fire' ? { key: 'burning', chance: 0.3, left: 2000 } : { key: 'frost', chance: 0.5 }, true); } }
   else if (S0.shape === 'chain') {
     let from = c, hitSet = new Set(), last = null;
     for (let j = 0; j <= (S0.jumps || 3); j++) { const cand = S.ents[c.map].filter(t => t.alive && t !== c && !hitSet.has(t) && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(from, t) < (j ? 130 : S0.range) && clearLine(from, t)
@@ -2794,13 +2951,27 @@ function castSpell(c, key, a = c.aim ?? 0) {
       for (let k = 0; k <= 6; k++) fx(from.x + (cand.x - from.x) * k / 6, from.y - 12 + (cand.y - from.y) * k / 6, 'spark', 1); from = cand; last = cand; }
     if (!last && c === S.player) UI.toast('Kein sichtbares Ziel für den Blitz.'); }
   else if (S0.shape === 'self' || S0.shape === 'group') {
-    const who = S0.shape === 'group' ? [c, ...S.ents[c.map].filter(o => o !== c && o.alive && !isHostile(c, o) && (o.kind === 'npc' || o.kind === 'player' || o.servant) && dist(o, c) < (S0.r || 150) && (c !== S.player || S.party.includes(o.id)))] : [c];
+    const pat = c === S.player && S.trial?.kind === 'heal' && byId(S.trial.patient);   // S15 P5: Heilprüfung — Heilzauber treffen die Patientin
+    const who = pat && dist(pat, c) < 90 && S0.shape === 'self' && (S0.heal || S0.staunch) ? [pat] : S0.shape === 'group' ? [c, ...S.ents[c.map].filter(o => o !== c && o.alive && !isHostile(c, o) && (o.kind === 'npc' || o.kind === 'player' || o.servant) && dist(o, c) < (S0.r || 150) && (c !== S.player || S.party.includes(o.id)))] : [c];
     for (const o of who) {
       if (S0.heal) { if (o.body) B.heal(o, pw); else o.hp = Math.min(o.maxHp, o.hp + pw); float(o, '+' + Math.round(pw), 'rgba(160,224,160,ALPHA)'); }
       if (S0.staunch) { o.status = (o.status || []).filter(q => q.key !== 'bleeding'); if (o.body) { const w = B.worstPart(o); if (w) B.healPart?.(o, w, pw * 2); } }
       if (S0.absorb) addStatus(o, { key: 'bone_ward', name: ab.name, good: true, left: S0.left || 10000, absorb: Math.round(pw), desc: `Fängt ${Math.round(pw)} Schaden ab.` });
       if (S0.regen) addStatus(o, { key: 'regrowth', name: ab.name, good: true, left: S0.left || 10000, heal: S0.regen * [1, 1, 1.25, 1.5][spellRank(c, key) || 1], desc: 'Heilt langsam.' });
       fx(o.x, o.y - 12, col, 10); } }
+  else if (S0.shape === 'raise') {                                  // S15 P6: Skelett erheben (einer, schwächer als beim Nekromanten)
+    const body = S.ents[c.map].filter(e => e.kind === 'corpse' && !e.raised && dist(c, e) < 220).sort((a1, b1) => dist(c, a1) - dist(c, b1))[0];
+    if (!body) { if (c === S.player) { UI.toast('Keine Leiche in der Nähe.'); c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + (ab.mana || 0)); c.cooldowns[key] = 0; } return; }
+    for (const o of S.ents[c.map]) if (o.servant === c.id && o.spellRaised) o.until = 0;
+    S.ents[c.map].splice(S.ents[c.map].indexOf(body), 1);
+    const d = spawnEnemy('skeleton', c.map, body.x / TS | 0, body.y / TS | 0, { level: Math.max(2, (c.level || 3) - 2) });
+    if (d) { Object.assign(d, { name: 'Erhobener Toter', x: body.x, y: body.y, anchor: { x: body.x, y: body.y }, servant: c.id, spellRaised: true, transient: true, until: performance.now() + (S0.left || 45000), dmgMul: 0.8 }); fx(body.x, body.y - 10, 'necro', 14); } }
+  else if (S0.shape === 'timeslow') {                               // S15 P6: Nachtglas — Feinde in der Nähe 6 s zu 30 % Tempo
+    for (const t of S.ents[c.map]) if (t.alive && t !== c && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(c, t) < S0.r) { t.timeSlow = performance.now() + (S0.left || 6000); float(t, 'wie Glas', 'rgba(143,217,176,ALPHA)'); }
+    S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 4, life: 900, maxLife: 900 }); fx(c.x, c.y - 12, 'necro', 24); if (dist(c, S.player) < 500) camShake(3, 300); }
+  else if (S0.shape === 'wall') {                                   // S15 P4: fünf Stücke quer zur Blickrichtung, 70 px vor dem Wirker
+    const px = -Math.sin(a), py = Math.cos(a), bx = c.x + Math.cos(a) * 70, by = c.y + Math.sin(a) * 70;
+    for (let k = -2; k <= 2; k++) spellGround(c, bx + px * k * 20, by + py * k * 20, S0.el, S0.left || 6000, pw, S0.solid, S0.status); }
   else if (S0.shape === 'blink') { let d = 0; for (let k = 8; k <= S0.range; k += 8) { if (solidTile(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k) || solidPropAt(c.map, c.x + Math.cos(a) * k, c.y + Math.sin(a) * k, 6)) break; d = k; }
     fx(c.x, c.y - 10, 'spark', 12); c.x += Math.cos(a) * d; c.y += Math.sin(a) * d; fx(c.x, c.y - 10, 'spark', 12); }
   else if (S0.shape === 'dispel') { for (const t of S.ents[c.map]) if (t.alive && COMBAT_KINDS.has(t.kind) && isHostile(c, t) && dist(c, t) < S0.r) {
@@ -2810,8 +2981,28 @@ function castSpell(c, key, a = c.aim ?? 0) {
   if (c === S.player) { (c.spellUse ||= {})[key] = (c.spellUse[key] || 0) + 1; const n = c.spellUse[key], r = spellRank(c, key);   // Übung
     if ((r === 1 && n >= 25) || (r === 2 && n >= 100)) { c.spells[key] = r + 1; UI.toast(`${ab.name}: RANG ${['', 'I', 'II', 'III'][r + 1]}`, 2600); log(`${ab.name} sitzt jetzt tiefer: Rang ${r + 1}.`, 'party'); } }
 }
+// S15 P4: Zauber auf dem Boden (Feuerwand, Eiswand, Brandfläche, Eisboden). Flüchtig (nicht gespeichert). Die Eiswand ist fest:
+// sie steht im Objekt-Index, also bleiben Figuren und Wegsuche an ihr hängen. Feuer schadet Feinden des Wirkers zweimal je Sekunde.
+const GROUND = [];
+function spellGround(c, x, y, el, left, dmg, solid, status, patch = false) {
+  if (solidTile(c.map, x, y)) return null;
+  const g = { id: uid(), kind: 'spellwall', map: c.map, x, y, r: solid ? 11 : 10, el, until: performance.now() + left, owner: c.id, dmg, status, solid: !!solid, patch, transient: true, born: performance.now() };
+  S.ents[c.map].push(g); if (solid && solidIndex[c.map]) addSolid(g); GROUND.push(g); return g;
+}
+function groundTick() {
+  const now = performance.now();
+  for (let i = GROUND.length - 1; i >= 0; i--) {
+    const g = GROUND[i], arr = S.ents[g.map];
+    if (now > g.until || !arr) { GROUND.splice(i, 1); if (arr) { const j = arr.indexOf(g); if (j >= 0) arr.splice(j, 1); } if (g.solid && solidIndex[g.map]) removeSolid(g); continue; }
+    if (g.el !== 'fire' && !g.patch || now - (g.tick || 0) < 500) continue;
+    g.tick = now; const src = byId(g.owner) || { id: g.owner, kind: 'enemy', name: 'Zauber' };
+    for (const t of arr) if (t.alive && !t.downed && COMBAT_KINDS.has(t.kind) && t.id !== g.owner && Math.hypot(t.x - g.x, t.y - g.y) < 16 + (t.r || 10) && (src.kind ? isHostile(src, t) : true)) {
+      if (g.el === 'fire') hurt(t, g.dmg, src, 'Feuer', false, 'fire'); applySpellStatus(t, g.status, src); }
+  }
+}
 const WILD_BEASTS = new Set(['wolf', 'bear', 'boar']);
 function isHostile(a, b) {
+  if (a.trial || b.trial) return (a === S.player || b === S.player) && (a.trial || b.trial) !== 'heal';   // S15 P5: Prüflinge nur gegen dich
   if (a.kind === 'enemy' && b.kind === 'enemy' && (WILD_BEASTS.has(a.mtype) !== WILD_BEASTS.has(b.mtype)) && !a.servant && !b.servant && !a.pet && !b.pet && !a.spirit && !b.spirit && !a.goblinStorm && !b.goblinStorm
     && !MONSTERS[a.mtype]?.prey && !MONSTERS[b.mtype]?.prey && (MONSTERS[a.mtype]?.faction === 'bandit' || MONSTERS[b.mtype]?.faction === 'bandit')) return true;   // S15 P3 (Nutzer): Raubtiere und Banditen arbeiten nicht zusammen
   if (a.amok || b.amok) return a !== b && !(a.amok && b.amok) && !b.prey && teamOf(a.amok ? b : a) !== 'prey';   // S14 Magitech-Unfall: Amok-Automaten gegen alle
@@ -2890,6 +3081,10 @@ function hit(attacker, target, mult, kind = 'physical') {
     dmg *= 0.3; fx(target.x, target.y - 12, 'spark', 5); float(target, 'Schild', 'rgba(200,196,170,ALPHA)'); sfx('metal', 0.4, earVol(target)); }   // Phase 6: Knochenritter — von vorn prallt es ab
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
   if (kind === 'physical' && !AREA && attacker.alive && stat(target, 'thorns') && dist(attacker, target) < 100) hurt(attacker, dmg * (node(target, 'd_thorns') || gearOf(target) >= 3 ? 0.6 : 0.4), target, 'Dornenhaut');   // S15 Druide
+  if (attacker.graveFrost) { attacker.graveFrost = false; applySpellStatus(target, { key: 'frost', stacks: 1 }, attacker); }   // S15 Frostklinge
+  if (kind === 'physical' && !AREA && attacker.alive && attacker.currentClass === 'deathknight') {   // S15 Todesritter-Schlüsselknoten
+    if (dkNode(attacker, 'k_frostborn') && (attacker.fbN = (attacker.fbN || 0) + 1) % 3 === 0) applySpellStatus(target, { key: 'frost', stacks: 1 }, attacker);
+    if (dkNode(attacker, 'k_bloodlord')) { const h = dmg * 0.08; if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); } }
   if (attacker.drainHit && attacker.alive) { const h = dmg * attacker.drainHit; attacker.drainHit = 0; if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); fx(attacker.x, attacker.y - 14, 'necro', 6); }   // S15 Grabhieb
   if (attacker === S.player && node(attacker, 'k_storm') && attacker.titleClass === 'monk' && (attacker.stormN = (attacker.stormN || 0) + 1) % 3 === 0) setTres(attacker, tres(attacker) + 1);   // S15 Sturmhand
   if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
@@ -2923,6 +3118,9 @@ function hit(attacker, target, mult, kind = 'physical') {
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (target === S.player && target.body) for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = target.body[k]; if (P.mech) P.mechCond = Math.max(0, (P.mechCond ?? 100) - 1.2); }   // S12 E: Prothesen nutzen sich ab (ohne Zufall: Proben bleiben gleich)
   if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
+  if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
+  if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
+  if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
     float(target, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); fx(target.x, target.y + 2, 'dust', 5); setTres(target, tres(target) + 1); titleDeed(target); return; }
   if (target.mtype === 'wraith' && target.phased > performance.now() && kind === 'physical') { float(target, 'körperlos', 'rgba(200,220,240,ALPHA)'); return; }   // Geist: nach Treffer kurz ungreifbar
@@ -2943,6 +3141,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
+  if (target === S.player && S.trial?.kind === 'shield' && source?.trial === 'shield' && ward) S.trial.n++;   // S15 P5: Schildprüfung
   if (ward && dmg > 0) {                                              // Knochenschild fängt ab, bis er bricht
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
     fx(target.x, target.y - 12, 'bone', 4); if (dmg <= 0) return float(target, 'Knochen', 'rgba(215,208,186,ALPHA)');
@@ -3034,7 +3233,7 @@ function limbLost(c, part, severed = false) {
   if ((part === 'lleg' || part === 'rleg') && c === S.player) UI.toast(`${B.PART_NAME[part]} ausgefallen — du humpelst.`, 3000);
 }
 function downed(c, cause, source) {
-  if (c.mounted) { c.mounted = null; if (c === S.player) log('Du stürzt vom Pferd!', 'combat'); }   // S13: vom Reittier gestürzt
+  if (c.mounted) { c.mounted = null; if (c === S.player) { leaveHorse(c); log('Du stürzt vom Pferd!', 'combat'); } }   // S13: vom Reittier gestürzt
   c.downed = true; if (!c.body) c.hp = 0; c.downTimer = (c === S.player ? (S.party.length ? 30000 : 15000) : 11000) * (1 - Math.min(0.5, (c.skills?.toughness || 0) * 0.005));   // mit Gruppe mehr Zeit; Zähigkeit verkürzt die Ohnmacht
   if (c.brawl) c.brawlKO = performance.now() + 20000;   // Prügelei: liegt eine Weile, steht dann wieder auf
   // Wer fällt, bricht alles ab: kein halber Schlag, keine Ansage, kein Ziel, kein Weg
@@ -3055,6 +3254,7 @@ function stabilize(c, helper) {
 
 function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
+  if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
   if (c.runaway && S.quests.q_runaway?.state === 'active') runawayEnd('Der Entlaufene ist tot.', 3);   // S12 A3
@@ -3116,6 +3316,7 @@ function die(c, cause = 'Wunden', source) {
     const pw = S.player.equip.weapon;
     if (pw && dist(S.player, c) < 260) pw.kills = (pw.kills || 0) + 1;
     if (c.boss) {
+      const fr = fameRegion(c); for (const r of Object.keys(FAME_REG)) addFame(r === fr ? 15 : 5, r, `${c.title || m.name} ist tot`);   // S15 P8
       const nm = c.map === 'world' ? locAt(c.x / TS | 0, c.y / TS | 0)?.name : DUNGEONS[c.map]?.name, where = nm ? locDat(nm) : 'der Wildnis';   // vorher stand immer „Grube“
       chronicle(`${c.title || m.name} erschlagen`, 'battle', `Gefallen bei ${where}, Jahr ${year()}.`);
       UI.toast(`${c.title || m.name} ist besiegt`, 3200);
@@ -3204,7 +3405,7 @@ function dropLoot(e) {
   const bonus = Math.max(0, (MONSTERS[e.mtype]?.threat || 1) - 1) + (e.boss ? 1 : 0) + (e.elite ? 1 : 0);   // gefährlicher Gegner (Veteran §71), bessere Chancen
   const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }));
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
-    if (gear && BP) continue; if (chance(gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p)) drop(key); }
+    if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p) * diffOf().loot)) drop(key); }   // S15 P12
   if (BP) { if (BP.weapons.length && chance(0.9)) drop(pick(BP.weapons)); if (BP.armor.length && chance(0.6)) drop(pick(BP.armor));
     if (BP.unique.length && chance(0.25)) drop(pick(BP.unique)); }
   if (chance(0.5)) { const g = ri(1, 6) + e.level; S.gold += g; float(e, `+${g} Gold`, 'rgba(189,148,51,ALPHA)'); }
@@ -3233,7 +3434,7 @@ function levelUp(c) {
   if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen
     log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Attribut- und Talentpunkt.`, 'party'); }
   if (c.map === S.map) { fx(c.x, c.y - 10, 'heal', 18); float(c, `Stufe ${c.level}`, 'rgba(240,210,120,ALPHA)', true); if (c === S.player) sfx('heal', 0.6); }   // S13: Aufstieg sichtbar
-  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Talentpunkt`); log(`Du erreichst Stufe ${c.level}. Ein Talentpunkt ist frei (T).`, 'party'); }
+  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Statpunkt (C) · +1 Talentpunkt (T)`, 3200); log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C) und ein Talentpunkt (Talente, T).`, 'party'); }   // S15 (Nutzer): Statpunkte sichtbar
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
   recalc(c); B.fullHeal(c);
 }
@@ -3288,8 +3489,10 @@ function projHit(p) {
     if (!own || teamOf(own) === teamOf(e)) continue;
     if (Math.abs(p.x - e.x) < 30 && Math.abs(p.y - e.y) < 30 && dist(p, e) < (e.r || 10) + 5) {
       if (e.invuln && e.dodge) { if (!p.evaded) { p.evaded = true; evaded(e); } continue; }   // Geschoss fliegt durch die Rolle
+      if (p.holy && (e.undead || MONSTERS[e.mtype]?.faction === 'undead')) p.mult = 2;   // S15 P7: Heilige Flamme
       hurtFromProjectile(own, e, p);
       if (p.spellSt) applySpellStatus(e, p.spellSt, own);   // S15 P4
+      if (p.drain && own.alive) { const h = p.dmg * p.drain; if (own.body) B.heal(own, h); else own.hp = Math.min(own.maxHp, own.hp + h); fx(own.x, own.y - 14, 'necro', 6); }   // S15 P6 Seelenzug
       if (p.splash) splashAt(p, e);
       if (p.pierce > 0) { p.pierce--; (p.hitIds ||= []).push(e.id); continue; }   // Eisspeer fährt durch
       p.hitDone = true; p.life = 0; return false;
@@ -3316,7 +3519,7 @@ function nearestTarget(e, list, maxD) {
   return best;
 }
 
-const VOICE = { dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
+const VOICE = { acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
   bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek' };   // Phase 6
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
@@ -3325,6 +3528,7 @@ function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt
 function updateEnemy(e, dt) {
   if (!e.alive) return;
   const p = S.player;
+  if (e.mageHunter) mageHunterTick(e, dt);                           // S15 P7
   if (e.servant && !e.pet && (performance.now() > e.until || !byId(e.servant)?.alive)) return crumble(e);   // der Ruf verklingt
   if (e.minionOf && !byId(e.minionOf)?.alive) return crumble(e);   // Phase 6: stirbt der Nekromant, zerfallen seine Diener
   const far = dist(e, p) > 1100;
@@ -3776,9 +3980,10 @@ function frostKingAI(e, tgt, d, reach, sp, dt, m) {
 function startHeavy(e, tgt, m) {
   const H = m.heavy, a = Math.atan2(tgt.y - e.y, tgt.x - e.x); e.aim = a; e.vx = e.vy = 0;
   const c = H.kind === 'slam' ? { x: e.x + Math.cos(a) * H.r * 0.55, y: e.y + Math.sin(a) * H.r * 0.55 } : { x: e.x, y: e.y };
-  e.heavy = { kind: H.kind, t: H.wind, T: H.wind, a, c };
-  e.telegraph = H.wind; e.windup = true;
-  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: H.wind, a } : { kind: 'stomp', t: H.wind, T: H.wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c] };
+  const wind = H.wind * diffOf().tele;                                 // S15 P12: Angsthase sieht es länger kommen
+  e.heavy = { kind: H.kind, t: wind, T: wind, a, c };
+  e.telegraph = wind; e.windup = true;
+  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: wind, a } : { kind: 'stomp', t: wind, T: wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c] };
   float(e, H.kind === 'sweep' ? 'holt weit aus' : H.kind === 'thrust' ? 'zielt' : 'hebt die Waffe', 'rgba(230,120,90,ALPHA)'); sfx('swing', 0.2, earVol(e));
 }
 function heavyTick(e, dt, m) {
@@ -4120,9 +4325,9 @@ function provoke(target, attacker) {
 function interactables() {
   const p = S.player;
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
-    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
+    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
-     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
+     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -4135,7 +4340,7 @@ function updatePrompt() {
   if (UI.dialogueOpen() || placing) { UI.setPrompt(placing ? 'Linksklick: <b>bauen</b> · Rechtsklick/Esc: abbrechen' : ''); return; }
   const t = interactables()[0];
   if (!t) return UI.setPrompt('');
-  const label = t.cellDoor != null ? '<b>E</b> Schloss knacken' : t.raskChest ? '<b>E</b> Rasks Kiste öffnen' : t.bond ? `<b>E</b> ${t.label}` : t.mechBench ? '<b>E</b> Werkbank: Prothesen' : t.fortGate ? `<b>E</b> Wache: Tor öffnen` : t.campSupply ? `<b>E</b> Proviant verderben` : t.feast ? `<b>E</b> Festmahl — ${townName(t.fest)}` : t.kind === 'npc' ? `<b>E</b> Sprechen — ${t.name}` : t.parley ? `<b>E</b> Ansprechen — ${t.title || t.name}` :
+  const label = t.kind === 'mount' ? `<b>E</b> Aufsitzen — ${t.name}` : t.cellDoor != null ? '<b>E</b> Schloss knacken' : t.raskChest ? '<b>E</b> Rasks Kiste öffnen' : t.bond ? `<b>E</b> ${t.label}` : t.mechBench ? '<b>E</b> Werkbank: Prothesen' : t.fortGate ? `<b>E</b> Wache: Tor öffnen` : t.campSupply ? `<b>E</b> Proviant verderben` : t.feast ? `<b>E</b> Festmahl — ${townName(t.fest)}` : t.kind === 'npc' ? `<b>E</b> Sprechen — ${t.name}` : t.parley ? `<b>E</b> Ansprechen — ${t.title || t.name}` :
     t.kind === 'item' ? `<b>E</b> Aufheben — ${ITEMS[t.item.key].name}` :
     t.kind === 'grave' ? `<b>E</b> Grab untersuchen` :
     t.kind === 'building' ? `<b>E</b> ${BUILD_USE[t.type]} — ${BUILDINGS[t.type].name}` :
@@ -4276,6 +4481,7 @@ function mendAt(t) {
 function doInteract() {
   const p = S.player, t = interactables()[0];
   if (!t) return;
+  if (t.kind === 'mount') return mountUp(t);                         // S15: aufsitzen
   if (t.kind === 'npc') return talk(t);
   if (t.kind === 'building') return useBuilding(t);                   // AUDIT S-01
   if (t.kind === 'enemy' && t.parley) return t.mtype === 'dodon' ? dodonParley(t) : t.mtype === 'garmadon' ? garmadonParley(t) : t.mtype === 'omega' ? omegaParley(t) : t.mtype === 'whitebeard' ? whitebeardParley(t) : vargParley(t);
@@ -4285,6 +4491,7 @@ function doInteract() {
     if (p.carry !== 'wassereimer') return UI.toast('Hol Wasser — am Brunnen gibt es Eimer.');
     act(p, 'work', 500, t); douse(F, 14, p); p.carry = null; return UI.toast(`Zisch! Die Flammen weichen (Hitze ${Math.round(F.heat)}).`); }
   if (t.type === 'well' && (S.fires || []).some(f => f.well && Math.hypot(f.well.x - t.x, f.well.y - 20 - t.y) < 40) && p.carry !== 'wassereimer') { act(p, 'kneel', 500, t); p.carry = 'wassereimer'; return UI.toast('Eimer voll. Zum brennenden Haus!'); }
+  if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
   if (t.bond) return t.type === 'keychest' ? stealKey(t) : bondMenu(t);
@@ -4362,7 +4569,7 @@ function doInteract() {
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
 // Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
-const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => MAPS.isle.entry, deck: () => MAPS.deck.entry,
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
   world: from => {
     if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
     if (from === 'isle' || from === 'deck') return portSpot(S.seaPort || 'saltport');   // S14: Seereise endet im Hafen
@@ -4427,14 +4634,15 @@ function rebuildTick() {                                              // je Tag:
 const crimeFaction = c => (c.faction && S.factions[c.faction] != null ? c.faction : 'valen');
 const bountyTotal = () => Object.values(S.bounty || {}).reduce((n, v) => n + v, 0);
 function addBounty(fac, g, why) {
+  S.flags.crimeSeen = true;                                          // S15 Kodex: Kapitel Verbrechen
   S.bounty ||= {}; S.bounty[fac] = (S.bounty[fac] || 0) + g;
   log(`${why}: Kopfgeld bei ${FACTIONS[fac]?.name || fac} steigt auf ${S.bounty[fac]} Gold.`, 'faction');
   UI.toast(`KOPFGELD ${S.bounty[fac]} GOLD`, 2600);
 }
 function bountyDay() {
-  for (const f of Object.keys(S.bounty || {})) { S.bounty[f] = Math.max(0, S.bounty[f] - Math.max(5, Math.round(S.bounty[f] * 0.05))); if (!S.bounty[f]) delete S.bounty[f]; }
+  for (const f of Object.keys(S.bounty || {})) { S.bounty[f] = Math.max(0, S.bounty[f] - Math.round(Math.max(5, Math.round(S.bounty[f] * 0.05)) * diffOf().decay)); if (!S.bounty[f]) delete S.bounty[f]; }   // S15 P12
   const p = S.player;
-  if (bountyTotal() >= 150 && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 6) && !((S.flags.hunterDay || 0) > S.day)) {
+  if (bountyTotal() >= (Math.max(...Object.values(S.fame || {}), 0) >= 60 ? 100 : 150) && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 6) && !((S.flags.hunterDay || 0) > S.day)) {
     S.flags.hunterDay = S.day + 2; spawnHunters(p);
   }
 }
@@ -5018,6 +5226,11 @@ function raidTick() {
 function raidEnd(R, won) {
   const V = VILLAGES.find(v => v.key === R.v);
   S.ents.world = S.ents.world.filter(e => e.raidOf !== R.v && e.raidDef !== R.v); S.deadRaid = null;
+  if (won && R.live && R.pk) {                                        // S15 (Nutzer): wer das Dorf verteidigt, gewinnt Ruf
+    const f = townFac(R.v), g = Math.min(15, 3 + R.pk * 2); S.factions[f] = clamp((S.factions[f] || 0) + g, -100, 100);
+    for (const c of villagersOf(R.v)) if (c.key) addRel(c.key, 6);
+    log(`${V.name} dankt dir: ${R.pk} Tote hast du zurückgeschlagen. ${FACTIONS[f]?.name || f} +${g}.`, 'faction'); UI.toast(`${V.name.toUpperCase()} DANKT DIR (+${g})`, 2800);
+    chronicle(`${S.player.name} verteidigt ${V.name} gegen die Toten`, 'battle'); return; }
   if (won) { log(`${V.name} hält stand. Die Toten ziehen ab.`, 'world'); chronicle(`${V.name} wehrt die Toten ab`, 'battle'); return; }
   raidDamage(R.v);
   const vs = villagersOf(R.v); for (let i = 0; i < Math.min(vs.length, ri(1, 3)); i++) { const c = vs[i]; c.alive = false; S.ents.world.splice(S.ents.world.indexOf(c), 1); }
@@ -5112,6 +5325,7 @@ function coneSees(e, p, range = 150) {
   return da < 0.7 && clearLine(e, p);
 }
 function aurelWatch(e, dt) {
+  if (!S.flags.visitAurel && inAurel(S.player)) S.flags.visitAurel = true;   // S15 Kodex: Kapitel Aurelion
   const p = S.player, illegal = p.map === e.map && p.alive && !p.downed && !p.cineGhost && !hasPermit() && !!inAurel(p);   // Kamerafahrt: niemand hält den Unsichtbaren an
   e.cone = illegal && dist(e, p) < 700 ? 1 : 0;
   if (!illegal || e.angry) return false;
@@ -5331,6 +5545,24 @@ function intrigueTick() {
   const c = makeChar({ name: I.name, prof: I.kind === 'brief' ? `Bote von ${AUREL_HOUSES.find(h => h.key === I.vs).name}` : `Verwalter von ${AUREL_HOUSES.find(h => h.key === I.vs).name}`, x: I.x, y: I.y, level: 6, faction: 'aurel' });
   Object.assign(c, { intrigueTarget: true, visitor: true, transient: true, anchor: { x: I.x, y: I.y }, schedulePos: { x: I.x, y: I.y }, cloth: '#2a2a3a' }); S.ents.world.push(c);
 }
+// S15 P9 Erbfolgestreit: In einem Adelshaus Aurelions (per Hash gewählt) streiten zwei Erben um den Sitz. Beide suchen Fürsprache;
+// wen du stützt, der sitzt danach im Hohen Rat und schuldet dir etwas (Gunst des Hauses +15, damit eine Stimme im Rat).
+const HEIRS = [['die ältere Tochter', 'Pflicht', '„Das Haus braucht Beständigkeit, nicht Abenteuer.“'], ['der jüngere Sohn', 'Gewinn', '„Die Fabriken sind die Zukunft. Mein Vater hat das nie verstanden.“'],
+  ['die Nichte', 'Vernunft', '„Wir rechnen. Wer rechnet, streitet nicht um Stühle.“'], ['der Bastard', 'Gewinn', '„Ich habe mehr gearbeitet als beide zusammen. Das weiß jeder.“']];
+function evSuccession() {
+  if (S.succession && !S.succession.done) return false;
+  const H = AUREL_HOUSES[Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 11) | 0) % AUREL_HOUSES.length], i = (S.day | 0) % HEIRS.length, j = (i + 1 + ((S.day | 0) % 2)) % HEIRS.length;
+  S.succession = { house: H.key, a: [pick(FIRST_F), ...HEIRS[i]], b: [pick(FIRST_M), ...HEIRS[j]], until: (S.day | 0) + 6 };
+  log(`${H.name} streitet um den Sitz: ${S.succession.a[0]} (${HEIRS[i][0]}) gegen ${S.succession.b[0]} (${HEIRS[j][0]}). Beide suchen Fürsprache beim Hausherrn.`, 'faction');
+  chronicle(`Erbstreit im ${H.name}`, 'news'); return true;
+}
+function successionTalk(npc, H) {
+  const Sx = S.succession, back = () => UI.closeDialogue();
+  const side = (h, other) => ({ text: `Ich spreche für ${h[0]} (${h[1]}).`, fn: () => { Sx.done = h[0]; cRelAdd(H.key, 15); for (const m of COUNCIL) if (m.key !== H.key && m.style === h[2].toLowerCase()) cRelAdd(m.key, 3);
+    npc.name = `${h[0]} ${H.name.replace('Haus ', '')}`; log(`${h[0]} übernimmt ${H.name}. Das Haus schuldet dir etwas (Gunst +15; Ratsmitglieder, denen ${h[2]} liegt, +3).`, 'faction');
+    chronicle(`${h[0]} übernimmt ${H.name}`, 'faction', `${S.player.name} sprach für ${h[1]}; ${other[0]} ging leer aus.`); UI.dialogue(npc, `${h[3]} — „Ich vergesse nicht, wer für mich sprach.“`, [{ text: 'Weiter', fn: back }]); } });
+  UI.dialogue(npc, `Zwei Erben, ein Stuhl im Hohen Rat. ${Sx.a[0]}: ${Sx.a[3]} ${Sx.b[0]}: ${Sx.b[3]}`, [side(Sx.a, Sx.b), side(Sx.b, Sx.a), { text: 'Das ist nicht meine Sache.', fn: back }]);
+}
 function aurelChoices(npc, choices) {
   bondChoices(npc, choices);
   const p = S.player, back = () => talk(npc), cont = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
@@ -5352,6 +5584,7 @@ function aurelChoices(npc, choices) {
   if (npc.intrigueTarget && S.intrigue?.kind === 'brief' && !S.intrigue.done) choices.unshift({ text: 'Den Brief. Sofort.', fn: () => {
     S.intrigue.done = true; S.ents.world = S.ents.world.filter(e => e !== npc); log('Du nimmst dem Boten den Brief ab. Er rennt.', 'quest'); UI.closeDialogue(); } });
   const H = AUREL_HOUSES.find(h => h.key === npc.houseKey); if (!H) return;
+  if (S.succession?.house === H.key && !S.succession.done && (S.day | 0) <= S.succession.until) choices.unshift({ text: 'Der Erbstreit …', fn: () => successionTalk(npc, H) });   // S15 P9
   const f = favor(H.key);
   if (f >= 60 && (S.ranks.aurel ?? 0) >= 6 && !S.quests.q_ratssitz && !S.flags.councillor) choices.unshift({ text: 'Ich will in den Hohen Rat.', fn: () => { startQuest('q_ratssitz'); cont(`„${H.name} schlägt dich vor. Zwei weitere Häuser müssen zustimmen, und Corvan will fünfhundert Gold Einlage. Dann sitzt du oben.“`); } });   // Nutzer S13
   if (S.gold >= 150) choices.push({ text: `${H.name} ein Geschenk machen (150 Gold)`, fn: () => { S.gold -= 150; S.houses[H.key] = clamp(favor(H.key) + 5, -100, 100); cont('„Wie aufmerksam. Das Haus merkt sich so etwas.“'); } });
@@ -5571,7 +5804,13 @@ function evHaunt() {
   log(`${townName(k)}: Nachts steigen Geister aus dem Brunnen. Am Anschlagbrett hängt ein Aushang.`, 'world'); chronicle(`Spuk am Brunnen von ${townName(k)}`, 'news', 'Die Leute meiden den Brunnen. Am Brett wird jemand gesucht, der den Ort säubert.');
   return k;
 }
-function questOf(C) { return { name: C.title, giver: null, desc: `${C.desc} (Auftraggeber: ${C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : 'Bewohner'} in ${townName(C.town)})`,
+// S15 (Nutzer): Aufträge von Bewohnern nennen den Namen des Auftraggebers, und der Rückweg zeigt auf ihn selbst, wo er gerade ist
+// (nicht auf den Stadtplatz). Auf „Sehr schwer“ steht kein Name und es gibt keinen Wegpunkt: man muss sich merken, wer es war.
+const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev';
+const conHard = C => resGiver(C) && S.difficulty === 'sehr_schwer';
+const giverEnt = C => resGiver(C) ? S.ents.world.find(e => e.key === C.giver && e.alive !== false) : null;
+function questOf(C) { const who = C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : conHard(C) ? 'ein Bewohner — merk dir, wer' : `${C.giverName || giverEnt(C)?.name || 'ein Bewohner'}`;
+  return { name: C.title, giver: null, desc: `${C.desc} (Auftraggeber: ${who} in ${townName(C.town)})`,
   objectives: [{ type: 'custom', count: C.need, text: CON[C.kind].text(C.need) }], dyn: true }; }
 function registerContracts() {
   for (const C of S.contracts || []) if (C.state !== 'offer') { QUESTS['c_' + C.id] = questOf(C); const st = S.quests['c_' + C.id]; if (st) st.progress = [C.have]; }
@@ -5633,6 +5872,7 @@ function conProgress(C, n = 1) {
   if (C.have >= C.need) { S.ents.world = S.ents.world.filter(e => e.contract !== C.id || e.kind === 'enemy'); C.done = true; }
 }
 function claimContract(C, npc) {
+  if (C.state !== 'active') return false;                             // S15 (Nutzer-Bug: dieselbe Mission dreimal abgegeben): nur einmal auszahlen
   if (C.kind === 'supply') { if ((S.res.wood || 0) < C.need || (S.res.stone || 0) < C.need) return UI.dialogue(npc || S.player, `„Noch nicht genug. ${C.need} Holz und ${C.need} Stein.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     S.res.wood -= C.need; S.res.stone -= C.need; C.have = C.need; }
   if (C.kind === 'herbs') { if (!hasItem(S.player, 'herb', C.need)) return UI.dialogue(npc || S.player, `„Noch nicht genug. ${C.need} Heilkräuter, bitte.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -5691,21 +5931,29 @@ function growthDay() {
   for (const t of Object.keys(TOWN_PLAN)) { if (!growable(t)) continue;
     const G = growthOf(t), fac = townFac(t), occ = S.war?.nodes[t]?.owner === 'undead', raided = S.deadRaid?.v === t;
     G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25, -20, 100);
-    if (G.prosper >= 100 && G.built.length < 10 && growTown(t)) G.prosper = 20;
+    if (G.prosper >= 100) growNow(t);
     const last = G.built.filter(s => !s.ruin).pop();
     if (G.prosper <= -20 && last) { last.ruin = true; const b = HOUSES.find(h => h.id === 'g' + t + '_' + last.x + '_' + last.y); if (b) b.wear = 2; G.prosper = 0; log(`${townName(t)} schrumpft: ein neues Haus steht leer und verfällt.`, 'world'); }
   }
 }
+// S15 (Nutzer: „bei 100 steht nicht, was passiert“): Wohlstand 100 baut ein Haus. Geht das nicht (zehn neue Häuser oder kein Platz),
+// bleibt der Wohlstand stehen und das Stadtkassen-Menü sagt warum.
+function growNow(t) { const G = growthOf(t);
+  if (G.built.length >= 10) return (G.full = 'max', false);
+  if (!growTown(t)) return (G.full = 'space', false);
+  G.full = null; G.prosper = 20; return true; }
 function investMenu(town) {
   const G = growthOf(town), fac = townFac(town), back = () => investMenu(town), me = { name: `Stadtkasse — ${townName(town)}` };
   const pay = (gold, res, fn) => () => { if (S.gold < gold || Object.entries(res).some(([k, n]) => (S.res[k] || 0) < n)) return UI.toast('Dafür reicht es nicht.');
     const ok = fn(); if (ok === false) return UI.toast('Kein Bauplatz mehr frei.');
     S.gold -= gold; for (const [k, n] of Object.entries(res)) S.res[k] -= n; S.factions[fac] = clamp((S.factions[fac] || 0) + 3, -100, 100); UI.refreshHUD(); back(); };
   if (!growable(town)) return UI.dialogue(me, 'Hier baut niemand. Nicht jetzt.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-  UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser. Bei 100 wächst die Stadt von selbst.`, [
+  const state = G.full === 'max' ? 'Die Stadt ist ausgebaut: zehn neue Häuser, mehr trägt der Ort nicht.' : G.full === 'space' ? 'Wohlstand voll, aber am Stadtrand ist kein Bauplatz mehr frei.'
+    : 'Bei 100 baut die Stadt ein neues Haus, neue Bewohner ziehen ein, und der Wohlstand fängt wieder bei 20 an.';
+  UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser.\n${state}\nDer Wohlstand steigt jeden Tag im Frieden; Überfälle und Besatzung senken ihn.`, [
     { text: 'Wohnhaus bauen (120 Gold, 20 Holz)', fn: pay(120, { wood: 20 }, () => !!growTown(town, 'house')) },
     { text: 'Werkstatt bauen (220 Gold, 30 Holz, 15 Stein)', fn: pay(220, { wood: 30, stone: 15 }, () => !!growTown(town, G.built.length % 2 ? 'smithy' : 'bakery')) },
-    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); }) },
+    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: G.prosper >= 100 ? () => UI.toast('Der Wohlstand ist schon voll.') : pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); if (G.prosper >= 100 && !growNow(town)) log(`${townName(town)}: Wohlstand voll, aber ${G.full === 'max' ? 'die Stadt ist ausgebaut' : 'kein Bauplatz frei'}.`, 'economy'); }) },
     { text: 'Wache verstärken (150 Gold, 10 Eisen)', fn: pay(150, { iron: 10 }, () => { const P = TOWN_PLAN[town], s = freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 3), g = guardChar(GUARD_KIT[fac] ? fac : 'merch', s); Object.assign(g, { guard: true, post: town, invested: true }); S.ents.world.push(g); log(`${townName(town)} hat eine Wache mehr.`, 'world'); }) },
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
   ]);
@@ -5733,9 +5981,9 @@ function conChoices(npc, choices) {
   if (!town || !kind || !TOWN_PLAN[town] || S.party.includes(npc.id)) return;
   S.contracts ||= [];
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
-  if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => claimContract(C, npc) }); return; }
+  if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => { claimContract(C, npc); if (C.state === 'claimed') UI.dialogue(npc, '„Gute Arbeit. Hier, dein Lohn.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); return; }
   choices.unshift({ text: 'Hast du Arbeit für mich?', fn: () => {
-    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); }
+    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); } C.giverName = npc.name;
     UI.dialogue(npc, `„${C.desc}“\nLohn: ${C.reward.gold} Gold${CON_DAYS[C.kind] ? ` · Frist ${CON_DAYS[C.kind]} Tage` : ''}.`, [{ text: 'Ich mach das.', fn: () => { if (acceptContract(C) !== false) UI.closeDialogue(); } }, { text: 'Später.', fn: () => UI.closeDialogue() }]); } });
 }
 // S13 (Nutzer: „neue Quest-Variationen, Ketten, Konsequenzen“). Wendungen werden beim Anlegen gewürfelt und nicht verraten:
@@ -6011,6 +6259,79 @@ function morrFolk(n, from = 0) {
     c.spec = SP.monsterSpec({ mtype: i % 3 ? 'goblin' : 'goblin_warrior', seed: i }, MONSTERS.goblin);
     if (S.flags.morrHostile) c.angry = true; S.ents.world.push(c); }
 }
+// S15 P6 Turm des Nachtglases: Pförtner, lesende Geister, drei untote Schüler, Ilvar in der Turmspitze. Vertrauen S.ilvar.trust 0–100:
+// Fragen, die richtige Antwort über Omega und Seelenphiolen bringen es. Die Lehre richtet sich danach (SPELL_RULES.ilvar).
+function ensureTower() {
+  if (S.flags.soulsFreed) for (const e of S.ents.tower || []) if (e.soulJar) e.label = 'Zerbrochene Gläser. Das Licht ist fort.';
+  if (S.flags.towerPop || !MAPS.tower?.levels || !S.ents.tower) return; S.flags.towerPop = true;
+  const L = MAPS.tower.levels, put = (o, r, dx, dy) => { const c = makeChar({ faction: 'undead', undead: true, level: 8, ...o, x: (r.cx + dx) * TS + TS / 2, y: (r.cy + dy) * TS, map: 'tower' });
+    c.anchor = { x: c.x, y: c.y }; c.hooded = true; c.pal.skin = '#b9b3a2'; c.pal.glow = '#8fd9b0'; c.pal.cloth = '#1c2220'; c.equip.weapon = o.weapon ? mkItem(o.weapon) : null; S.ents.tower.push(c); return c; };
+  put({ name: 'Der Pförtner', prof: 'Knochenpförtner', greet: '„Wer bist du, und was willst du hier? Lernen? Stehlen? Beides wurde schon versucht.“' }, L[1], 0, -2);
+  put({ name: 'Ein lesender Geist', prof: 'Geist der Bibliothek', greet: '„Psst. Seite dreihundertzwölf. Ich lese sie seit vierzig Jahren.“' }, L[2], -5, 1);
+  put({ name: 'Maelis', prof: 'Schülerin des Turms', greet: '„Ilvar ist geduldig. Er hat ja auch alle Zeit der Welt. Wir nicht.“' }, L[3], -6, 2);
+  put({ name: 'Oskar der Blasse', prof: 'Schüler des Turms', greet: '„Er sagt, Omega sei kein Gott. Ich hoffe, er hat recht. Ich habe nämlich zu ihm gebetet.“' }, L[3], 0, 2);
+  put({ name: 'Tuvi', prof: 'Schüler des Turms', greet: '„Wenn du wieder rausgehst … nimmst du eine Nachricht mit? Nein. Vergiss es. Er hört alles.“' }, L[3], 6, 2);
+  put({ key: 'ilvar', name: 'Ilvar Nachtglas', prof: 'Herr des Turms', level: 30, weapon: 'staff', spellRule: 'ilvar', spellsTaught: ['sp_spark', 'sp_missile', 'sp_shadowbolt', 'sp_drain', 'sp_ward', 'sp_dispel', 'sp_raise', 'sp_soulburst'],
+    greet: '„Ein Lebender. Wie erfrischend. Setz dich — oder bleib stehen, das ist dir überlassen. Das Stehen ist das Einzige, was ihr länger könnt als wir.“' }, L[10], 0, 0);
+}
+const ILVAR_TOPICS = {
+  who: ['Wer bist du?', '„Hofmagier von Vharnholm, als Vharnholm noch Städte hatte. Ich sah Garmadon zurückkehren und blieb in meinem Turm. Man nennt das Feigheit. Ich nenne es Beobachtung.“', 3],
+  garmadon: ['Was hältst du von Garmadon?', () => S.flags.garmadonSlain ? '„Er ist fort. Ein Bruder, der nicht loslassen konnte — und den nun niemand mehr festhält. Ich vermisse ihn nicht. Ich vermisse die Frage, die er war.“' : '„Ein Bruder, der nicht loslassen kann. Er hält das Totenreich zusammen wie eine Faust eine Handvoll Sand.“', 3],
+  varg: ['Und Varg?', '„Ein Schmied, der Ketten für Gebete hält. Er glaubt, Omega hört ihm zu. Omega hört niemandem zu. Es schläft.“', 3],
+  aurel: ['Was denkst du über Aurelion?', '„Kinder mit Kristallen. Sie messen alles und verstehen wenig. Aber ihre Akademie hat gute Bücher. Ich hätte gern ein paar zurück.“', 3],
+  living: ['Und über die Lebenden?', '„Ihr seid laut und kurz. Aber neugierig. Das rettet euch manchmal.“', 3],
+};
+function ilvarTalk(npc) {
+  const I = (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }), back = () => ilvarTalk(npc), p = S.player;
+  const gain = (n, why) => { I.trust = clamp(I.trust + n, 0, 100); if (n) log(`Ilvars Vertrauen ${n > 0 ? '+' : ''}${n} (${why}). Jetzt ${I.trust}.`, 'party'); };
+  const ch = Object.entries(ILVAR_TOPICS).map(([k, [q, a, t]]) => ({ text: `${I.asked[k] ? '' : '• '}${q}`, fn: () => { if (!I.asked[k]) { I.asked[k] = 1; gain(t, 'Gespräch'); } UI.dialogue(npc, typeof a === 'function' ? a() : a, [{ text: 'Weiter', fn: back }]); } }));
+  if (!I.omega) ch.push({ text: '• Was ist Omega?', fn: () => UI.dialogue(npc, '„Das frage ich dich. Was glaubst du, liegt im Krater?“', [
+    { text: 'Ein Gott.', fn: () => { I.omega = 'god'; gain(-5, 'falsche Antwort'); UI.dialogue(npc, '„Ein Gott. Natürlich. Das sagen alle, die niemals hingesehen haben.“', [{ text: 'Weiter', fn: back }]); } },
+    { text: 'Ein Wesen. Etwas, das man verstehen kann.', fn: () => { I.omega = 'being'; gain(10, 'kluge Antwort'); UI.dialogue(npc, '„… Ja. Endlich einer, der hinsieht, statt zu knien.“', [{ text: 'Weiter', fn: back }]); } },
+    { text: 'Ich weiß es nicht.', fn: () => { I.omega = 'unsure'; gain(3, 'ehrliche Antwort'); UI.dialogue(npc, '„Ehrlich. Das ist mehr, als Varg je gesagt hat.“', [{ text: 'Weiter', fn: back }]); } }]) });
+  if (I.vials < 3) ch.push({ text: `Ich bringe dir drei Seelenphiolen. (${I.vials}/3 Lieferungen)`, fn: () => {
+    if (!hasItem(p, 'soul_vial', 3)) return UI.dialogue(npc, '„Drei. Nicht zwei, nicht zweieinhalb. Seelen zählt man genau.“', [{ text: 'Zurück', fn: back }]);
+    removeItem(p, 'soul_vial', 3); I.vials++; gain(12, 'Seelenphiolen'); S.gold += 40; UI.dialogue(npc, '„Gut. Sie werden nicht leiden. Nicht mehr als vorher.“ (+40 Gold)', [{ text: 'Weiter', fn: back }]); } });
+  if (!npc.spellsTaught.includes('sp_raise')) npc.spellsTaught.push('sp_raise', 'sp_soulburst');   // ältere Stände
+  const cc = coreChoice(npc); if (cc) ch.unshift(cc); const mc = meteorChoice(npc); if (mc) ch.unshift(mc);
+  ch.push({ text: 'Lehre mich.', fn: () => spellMenu(npc) });
+  if (I.trust >= 75 && !S.flags.towerSeal) ch.push({ text: 'Die verbotene Bibliothek …', fn: () => { openTowerSeal(); UI.dialogue(npc, '„Nimm, was du lesen kannst. Was du nicht lesen kannst, lass liegen. Es liest sonst dich.“ (Die Knochenkette fällt.)', [{ text: 'Weiter', fn: back }]); } });
+  if (I.trust >= 100 && !S.player.spells?.sp_nachtglas) ch.push({ text: 'Ich bin bereit für die Endprüfung.', fn: () => UI.dialogue(npc, '„In der Beschwörungskammer. Fünfundvierzig Sekunden. Halte stand, während ich die Geister loslasse. Ich fange dich auf, wenn du fällst — aber dann war es das für heute.“', [
+    { text: 'Beginnen.', fn: () => { UI.closeDialogue(); const r5 = MAPS.tower.levels[5]; startTrial('ilvar', { x: r5.cx * TS + TS / 2, y: r5.cy * TS }); } }, { text: 'Noch nicht.', fn: back }]) });
+  ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
+  UI.dialogue(npc, `„${I.trust < 25 ? 'Du bist noch ein Fremder in meinem Turm.' : I.trust < 50 ? 'Du hörst zu. Das ist selten.' : I.trust < 75 ? 'Ich beginne, dir Dinge zu zeigen, die ich sonst niemandem zeige.' : 'Du bist beinahe ein Schüler.'}“ (Vertrauen ${I.trust})`, ch);
+}
+// Tuvi will fliehen (Nebenquest): helfen (Ilvar −15, Orden +5) oder verraten (Ilvar +10). Seelenkammer: befreien (Orden +10,
+// Untote −10, Ilvar −30) oder lassen. Stirbt Ilvar, stürzen die oberen Ebenen ein und die Schüler ziehen feindlich ins Totenland.
+function tuviTalk(npc) {
+  if (S.flags.tuvi) return UI.dialogue(npc, S.flags.tuvi === 'told' ? '„Du hast es ihm gesagt. Er hat nur gelächelt. Das ist schlimmer als Strafe.“' : '…', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, '„Ich war Buchbinder in Vharnholm. Dann bin ich gestorben, und jetzt binde ich Bücher für ihn. Für immer. Hilfst du mir hinaus? Der Pförtner schaut weg, wenn ihn jemand ablenkt.“', [
+    { text: 'Ich lenke den Pförtner ab. Lauf.', fn: () => { S.flags.tuvi = 'fled'; S.ents.tower = S.ents.tower.filter(e => e !== npc); (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 15);
+      S.factions.order = clamp((S.factions.order || 0) + 5, -100, 100); log('Tuvi ist fort. Ilvar wird es merken (Vertrauen −15, Orden +5).', 'quest'); chronicle('Ein toter Buchbinder flieht aus dem Turm des Nachtglases', 'news'); UI.closeDialogue(); } },
+    { text: 'Ich sage es Ilvar.', fn: () => { S.flags.tuvi = 'told'; (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 10); log('Du verrätst Tuvi (Ilvars Vertrauen +10).', 'quest'); UI.dialogue(npc, '„… Natürlich.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } },
+    { text: 'Nicht meine Sache.', fn: () => UI.closeDialogue() }]);
+}
+function soulJarChoice() {
+  UI.dialogue({ name: 'Seelenkammer' }, 'Dutzende Gläser. In jedem kreist ein grünes Licht und drückt gegen das Glas, wenn du näher kommst.', [
+    { text: 'Die Gläser zerschlagen. Die Seelen befreien.', fn: () => { S.flags.soulsFreed = true; S.factions.order = clamp((S.factions.order || 0) + 10, -100, 100); S.factions.undead = clamp((S.factions.undead || 0) - 10, -100, 100);
+      (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 30); for (const e of S.ents.tower) if (e.soulJar) e.label = 'Zerbrochene Gläser. Das Licht ist fort.';
+      fx(S.player.x, S.player.y - 20, 'heal', 30); log('Die Seelen steigen auf und verlöschen (Orden +10, Untote −10, Ilvars Vertrauen −30).', 'quest'); chronicle(`${S.player.name} befreit die Seelen im Turm des Nachtglases`, 'news'); UI.closeDialogue(); } },
+    { text: 'Nichts anrühren.', fn: () => UI.closeDialogue() }]);
+}
+function ilvarSlain(source) {
+  S.flags.ilvarDead = true; const L = MAPS.tower?.levels; if (!L) return;
+  for (let x = 30; x <= 34; x++) { const y = L[6].y + L[6].h; S.ents.tower.push({ id: uid(), kind: 'prop', type: 'broken_pillar', map: 'tower', x: x * TS + 16, y: y * TS + 16, r: 14, solid: true, label: 'Eingestürzte Treppe' }); }
+  indexSolids('tower');
+  for (const e of S.ents.tower.filter(e => e.kind === 'npc' && /Schüler/.test(e.prof || '') && e.alive)) { e.alive = false; const a = rnd() * 6.283, s = spawnEnemy('necromancer', 'world', NACHT.x + Math.round(Math.cos(a) * 30), NACHT.y + Math.round(Math.sin(a) * 30)); if (s) s.name = e.name; }
+  S.ents.tower = S.ents.tower.filter(e => !(e.kind === 'npc' && /Schüler/.test(e.prof || '')));
+  camShake(10, 800); log('Mit Ilvar stirbt, was den Turm zusammenhielt. Die oberen Ebenen stürzen ein. Seine Schüler fliehen ins Totenland.', 'world');
+  chronicle('Ilvar Nachtglas ist tot. Sein Turm bricht ein.', 'legend'); if (source === S.player) SIM.H.title('Turmbrecher');
+}
+function openTowerSeal() {
+  S.flags.towerSeal = true;
+  for (const e of S.ents.tower.filter(x => x.towerSeal)) { S.ents.tower.splice(S.ents.tower.indexOf(e), 1); if (solidIndex.tower) removeSolid(e); }
+  fx(44 * TS, (MAPS.tower.levels[8].cy) * TS, 'bone', 12); log('Die Knochenkette vor der verbotenen Bibliothek fällt.', 'world');
+}
 function ensureMorrgrund() {
   if (S.flags.morrBuilt || S.flags.morrDead) return;
   S.flags.morrBuilt = true; morrFolk(8);
@@ -6236,6 +6557,7 @@ function fireTick(dt) {
   }
 }
 function endFire(F, saved) {
+  if (saved && dist(S.player, F.well || S.player) < 1400) addFame(3, fameRegion(), 'der Brand ist gelöscht');   // S15 P8
   S.fires.splice(S.fires.indexOf(F), 1);
   S.ents.world = S.ents.world.filter(e => e.fireSpot !== F.id);
   for (const v of VILLAGERS) if (v.fireJob?.fire === F.id) { v.fireJob = null; v.carry = null; }
@@ -6305,7 +6627,7 @@ function journey(T, how) {
   UI.refreshHUD(); return ambush;
 }
 function ensureDefenseMasters() {
-  ensureTavernStaff(); ensureMercs(); ensureCoaches(); ensureVaultSites(); ensureBeastTraders(); ensureLivestock(); ensureFarmAnimals(); ensureSeafolk(); ensureWhitebeard(); ensureMorrgrund();                                      // S13: Söldner in den Schenken
+  ensureTavernStaff(); ensureMercs(); ensureCoaches(); ensureVaultSites(); ensureBeastTraders(); ensureLivestock(); ensureFarmAnimals(); ensureSeafolk(); ensureWhitebeard(); ensureMorrgrund(); ensureTower(); ensurePaddock(); dkSteed();                                      // S13: Söldner in den Schenken
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
     if (town === 'vharnholm' || S.ents.world.some(e => e.vm === town)) continue;
     const board = S.ents.world.find(e => e.type === 'board' && boardTown(e) === town), [bx, by] = board ? [board.x / TS | 0, board.y / TS | 0] : P.square;
@@ -6522,7 +6844,7 @@ function vargParley(v) {
     ...(S.flags.garmBrotherHint ? [{ text: 'Garmadon nennt dich Bruder.', fn: () => { omegaFrag('brother'); say('„… Er war mein Bruder. Er war König. Als der Himmel blutete, wollte er das Blut trinken — Macht, die kein Mensch halten kann. Ich stieß ihm das Schwert in den Rücken, bevor er trank. Er trank trotzdem. Danach.“')(); } }] : []),
     ...(omegaInsight() && !S.quests.q_omega ? [{ text: 'Ich will Omega rufen.', fn: () => vargRitual(v) }] : []),
     ...(canRite() ? [{ text: 'Ich will die Weihe der Kette.', fn: () => chainRite(v) }] : []),
-    ...((S.flags.garmMet || S.flags.garmFight) && !S.flags.garmadonSlain && !S.flags.legionAsked ? [{ text: 'Garmadon muss fallen. Leih mir eine Legion.', fn: () => { S.flags.legionAsked = true;   // S13 (Nutzer)
+    ...((S.flags.garmVisited || S.flags.garmFight) && (S.flags.garmMet || S.flags.garmFight) && !S.flags.garmadonSlain && !S.flags.legionAsked ? [{ text: 'Garmadon muss fallen. Leih mir eine Legion.', fn: () => { S.flags.legionAsked = true;   // S13 (Nutzer)
       const ok = (S.factions.chain || 0) >= 20 || (S.ranks.chain ?? -1) >= 1; if (ok) S.flags.legionPromised = true;
       UI.dialogue(v, ok ? '„Die Kette blutet nicht für die Pläne anderer. Geh allein, wenn du sterben willst.“\n(Varg wendet sich ab. Hinter ihm tauschen zwei Offiziere einen langen Blick.)'
         : '„Du? Du trägst nicht einmal unser Eisen. Geh.“', [{ text: 'Weiter', fn: back }]); } }] : []),
@@ -6557,6 +6879,7 @@ function garmadonParley(g) {
     { text: 'Ich fordere dich heraus.', fn: () => { UI.closeDialogue(); garmadonFight(p, 'challenge'); } },
     { text: 'Ich gehe.', fn: () => garmadonLeave(g) },
   ]);
+  if (!S.flags.garmMet) log('Garmadon hasst seinen Bruder Varg. Vielleicht leiht dir Varg in der Eisenfeste Männer gegen ihn.', 'quest');   // S15: Hinweis
   S.flags.garmMet = true;
 }
 function garmadonServe(g) {
@@ -6694,14 +7017,16 @@ function rotfallCheck() {                                          // Bruchstüc
 }
 const omegaInsight = () => { const f = om().frags; return Object.keys(f).length >= OMEGA_NEED && !!f.garmadon && !!f.priest && (!!f.brother || !!S.flags.goblinsFreed) && playHours() >= OMEGA_HOURS; };
 // Altar und Priesterin Omegas in der Kernburg der Eisenfeste (religiöses Zentrum der Kette)
+const FAITH_SPELLS = ['sp_holyflame', 'sp_blessing', 'sp_ray', 'sp_inquisition'];
 function ensureOmegaShrine() {
+  for (const e of S.ents.world) if (e.omegaPriest) Object.assign(e, { spellsTaught: FAITH_SPELLS, spellRule: 'faith', key: e.key || 'irmgard' });   // S15 P7: Irmgard lehrt Glaubensmagie
   if (S.ents.world.some(e => e.omegaAltar)) return;
   const [bx, by] = EM(946, 384), a = freeSpotNear('world', bx - 3, by + 6, 3);
   const alt = { id: uid(), kind: 'prop', type: 'omega_altar', map: 'world', x: a.x, y: a.y, r: 14, solid: true, omegaAltar: true, label: 'Altar Omegas' };
   S.ents.world.push(alt); if (solidIndex.world) addSolid(alt);
   const pos = freeSpotNear('world', (a.x / TS | 0) + 2, (a.y / TS | 0) + 1, 2);
   const c = makeChar({ name: 'Irmgard', prof: 'Priesterin Omegas', x: pos.x, y: pos.y, level: 8, faction: 'chain', pal: { skin: SKIN[0], hair: '#2a1a14', cloth: '#3a0e10' } });
-  Object.assign(c, { omegaPriest: true, anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
+  Object.assign(c, { omegaPriest: true, key: 'irmgard', spellsTaught: FAITH_SPELLS, spellRule: 'faith', anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
 }
 function ensureDiary() {                                           // Varg tot: sein Tagebuch liegt in der Kernburg
   const O = om(); if (O.diary) return; O.diary = true;
@@ -6718,6 +7043,8 @@ function priestTalk(n) {
   UI.dialogue(n, n.greet, [
     { text: 'Wer ist Omega?', fn: () => { omegaFrag('priest'); UI.dialogue(n, '„Der Stern, der über der Welt wachte. Er fiel — nicht aus Schwäche. Er kam uns zu nah. Sein Blut ist der Rotfall, und wo es hinfiel, standen die Toten auf. Wir tragen Eisen, damit nie wieder ein Gott für uns fallen muss.“', [{ text: 'Weiter', fn: back }]); } },
     { text: `Beten (10 Gold) — dein Glaube: ${O.faith}`, fn: () => omegaPray() },
+    ...(n.spellsTaught ? [{ text: 'Lehre mich Omegas Worte. (Glaubensmagie)', fn: () => spellMenu(n) }] : []),   // S15 P7
+    ...(coreChoice(n) ? [coreChoice(n)] : []), ...(meteorChoice(n) ? [meteorChoice(n)] : []),
     { text: 'Kann man ihn zurückrufen?', fn: () => UI.dialogue(n, answer, [{ text: 'Weiter', fn: back }]) },
     ...(S.quests.q_omega?.state === 'active' ? [{ text: 'Das Ritual beginnen.', fn: () => omegaRitual(n) }] : []),
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
@@ -7059,8 +7386,26 @@ function undeadFallCinematic() {
     ...(gate ? [{ x: gate.x - 200, y: gate.y + 40, dur: 5500, text: 'Das Land atmet. Hier und da packen Leute ihre Sachen — die alte Heimat im Osten ruft.', setup: () => { healTick(true); homecomers(gate, 4); } }] : []),
   ]);
 }
-function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
+function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; if (S.flags.garmadonSlain && TOWN_PLAN[k]) (S.resettle ||= {})[k] ||= { day: S.day | 0, stage: 0 };   // S15 P11 n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
   log(`${townName(k)} ist befreit.`, 'world'); chronicle(`${townName(k)} frei`, 'war', 'Die Toten ziehen ab, die Menschen kehren zurück.'); }
+// S15 P11: Nach Garmadons Fall füllt sich jeder befreite Ort in Stufen: Tag 1 Flüchtlinge, Tag 5 Zeltlager, Tag 15 erste Häuser,
+// Tag 30 Dorf, Tag 60 größere Siedlung. Häuser über growTown (wie das Stadtwachstum), jede Stufe steht in der Chronik — mit dem
+// Namen des Hauses, damit ein Erbe später nachlesen kann, was der Vorgänger angestoßen hat.
+const RESETTLE = [[1, 'Flüchtlinge'], [5, 'Zeltlager'], [15, 'erste Häuser'], [30, 'Dorf'], [60, 'größere Siedlung']];
+function resettleDay(grow = growTown) {                            // grow: im Test ersetzt (Häuser verändern die Karte)
+  for (const [k, R] of Object.entries(S.resettle || {})) {
+    const days = (S.day | 0) - R.day, P = TOWN_PLAN[k]; if (!P) continue;
+    while (R.stage < RESETTLE.length && days >= RESETTLE[R.stage][0]) {
+      const st = RESETTLE[R.stage][1], [sx, sy] = P.square;
+      if (R.stage === 0) for (let i = 0; i < 3; i++) { const q = freeSpotNear('world', sx + ri(-4, 4), sy + ri(-3, 3), 3), c = makeChar({ name: pick(i % 2 ? FIRST_F : FIRST_M), prof: 'Heimkehrer', x: q.x, y: q.y, level: 1 });
+        Object.assign(c, { homeTown: k, anchor: { x: q.x, y: q.y }, greet: pick(['„Das war unser Dorf. Es wird es wieder.“', '„Die Asche ist noch warm, aber der Boden trägt.“']) }); S.ents.world.push(c); }
+      if (R.stage === 1) for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3 | 0, sy + 4, 2); S.ents.world.push({ id: uid(), kind: 'prop', type: 'tent_prop', map: 'world', x: q.x, y: q.y, r: 14, solid: true, label: 'Zelt der Heimkehrer', resettle: k }); }
+      if (R.stage >= 2) for (let i = 0; i < [0, 0, 2, 2, 3][R.stage]; i++) grow(k);
+      R.stage++; chronicle(`${townName(k)}: ${st}`, 'news', `Wiederbesiedelt nach dem Fall der Toten — Haus ${S.legacy?.house || S.player.name} war dabei.`);
+      log(`${townName(k)} lebt wieder: ${st}.`, 'world');
+    }
+  }
+}
 function homecomers(gate, n) {
   for (let i = 0; i < n; i++) { const s = freeSpotNear('world', (gate.x / TS | 0) - 8 + ri(-3, 3), (gate.y / TS | 0) + ri(-4, 4), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Heimkehrer', x: s.x, y: s.y, level: 1 });
     Object.assign(c, { homecomer: true, transient: true, visitor: true, anchor: { x: gate.x + 900 + ri(-80, 80), y: gate.y + ri(-120, 120) }, greet: pick(['„Mein Vater hatte einen Hof da drüben. Vielleicht steht die Scheune noch.“', '„Ich hab den Schlüssel dreißig Jahre getragen. Jetzt probier ich ihn aus.“', '„Wenn das Gras wiederkommt, kommen wir auch.“']) });
@@ -7110,7 +7455,7 @@ function vharnVoiceTalk(n) {
 function undeadFallDay() {
   if (!S.flags.garmadonSlain) return;
   const W = S.war?.nodes || {}, occ = Object.keys(W).find(k => W[k].owner === 'undead' && TOWN_PLAN[k]); if (occ) liberateNode(occ);
-  healTick(false); ensureVharnVoice();
+  healTick(false); ensureVharnVoice(); resettleDay();
   const gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (gate && (S.heal?.r || 0) < 260 && chance(0.6)) homecomers(gate, ri(1, 3));
 }
 // ================= Der Hohe Rat von Aurelion (Nutzer S13) =================
@@ -7354,7 +7699,9 @@ function travel(to) {
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
   const members = [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
+  if (to !== 'world' && p.mounted && S.map === 'world') leaveHorse(p);   // S15: das Pferd wartet vor der Tür
   S.map = to; p.map = to; if (to !== 'world') p.mounted = null;   // S13: Reittier bleibt draußen
+  if (to === 'garmadon') S.flags.garmVisited = true;   // S15 (Nutzer): Varg hilft erst, wenn man selbst in der Gruft war
   const spot = ARRIVAL[to](from);
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
@@ -7618,9 +7965,87 @@ function evPilgrimRaid() {                                               // Räu
 }
 function evHauntEv() { return evHaunt(); }
 function evMagitech() { return magitechAccident('tickmar'); }   // S14
+// S15 P7 Artefakt-Konflikt: Goblins in Grubenhort finden einen Aurelioner Magiekern (Snikk hat ihn). Kaufen oder nehmen; dann melden
+// sich Aurelion, die Toten und die Omega-Kirche. Mit dem Kern im Gepäck bieten Corvinus, Sael, Irmgard und Ilvar je etwas an; man kann
+// ihn auch zerschlagen oder behalten (Talisman). Jede Wahl ändert Ruf, eine Handelsroute oder den Glauben und kommt in die Chronik.
+function evMagicCore() {
+  if (S.flags.coreEv) return false; const G = LOCATIONS.find(l => l.key === 'grubenhort'); if (!G) return false;
+  S.flags.coreEv = 'found'; const pos = freeSpotNear('world', G.x + 3, G.y + 2, 3);
+  const c = makeChar({ name: 'Snikk', prof: 'Goblin-Sammler', x: pos.x, y: pos.y, level: 3, faction: 'goblin' }); Object.assign(c, { goblin: true, key: 'snikk', coreHolder: true, anchor: { x: pos.x, y: pos.y },
+    greet: '„Glänzt! Summt! Snikk hat gefunden, Snikk behält — außer, du zahlst.“' }); c.spec = SP.monsterSpec({ mtype: 'goblin', seed: 3 }, MONSTERS.goblin); S.ents.world.push(c);
+  log('Gerücht: Goblins aus Grubenhort haben im Schutt einen Aurelioner Magiekern gefunden. Viele wollen ihn haben.', 'world'); chronicle('Ein Magiekern taucht in Grubenhort auf', 'news'); return true;
+}
+// S15 P7 Magische Anomalie: an einem Ley-Punkt (per Hash aus Seed und Tag gewählt, nicht mit rnd()) reißt das Gewebe. Im Umkreis von
+// 20 Kacheln fließt Mana doppelt, und Feuer-, Frost- und Blitzzauber verrutschen zu 10 % in ein anderes Element. Ein Schutzzauber im
+// Zentrum (3 Kacheln) schließt sie; das Anschlagbrett sucht jemanden dafür (Auftrag q_anomaly). Nach 4 Tagen schließt sie sich selbst.
+const LEY = ['totenruinen', 'schaedelwald', 'graeberfeld', 'seelenhuegel', 'westgebirge', 'wuestensporn'];
+function evAnomaly() {
+  if (S.anomaly) return false; const ok = LEY.map(k => LOCATIONS.find(l => l.key === k)).filter(Boolean); if (!ok.length) return false;
+  const L = ok[Math.abs(((S.seed | 0) * 31 + (S.day | 0) * 7) | 0) % ok.length];
+  const a = (((S.seed | 0) + (S.day | 0)) % 8) * 0.785, r = Math.min(10, (L.r || 20) * 0.4), x = Math.round(L.x + Math.cos(a) * r), y = Math.round(L.y + Math.sin(a) * r);
+  S.anomaly = { x, y, until: (S.day | 0) + 4, where: L.name }; S.quests.q_anomaly = { state: 'active', progress: [0] };
+  log(`Magische Anomalie bei ${L.name}: Mana fließt dort doppelt, Zauber verrutschen. Das Brett sucht jemanden, der sie schließt.`, 'world'); chronicle(`Das Gewebe reißt bei ${L.name}`, 'news'); return true;
+}
+const anomalySlip = (c, S0) => { if (!inAnomaly(c) || !['fire', 'frost', 'shock'].includes(S0.el) || !chance(0.1)) return S0; const el = pick(['fire', 'frost', 'shock'].filter(e => e !== S0.el)); float(c, 'die Formel verrutscht', 'rgba(184,138,240,ALPHA)'); return { ...S0, el, status: el === 'fire' ? { key: 'burning', chance: 0.5, left: 3000 } : el === 'frost' ? { key: 'frost', chance: 1 } : { key: 'shocked', chance: 1 } }; };
+const inAnomaly = c => S.anomaly && c.map === 'world' && Math.hypot(c.x / TS - S.anomaly.x, c.y / TS - S.anomaly.y) < 20;
+function anomalyClose(c, key) {
+  if (!S.anomaly || c !== S.player || !ABILITIES[key]?.spell?.absorb || Math.hypot(c.x / TS - S.anomaly.x, c.y / TS - S.anomaly.y) > 3) return false;
+  const st = S.quests.q_anomaly; S.anomaly = null; S.flags.anomalyClosed = (S.flags.anomalyClosed || 0) + 1;
+  fx(c.x, c.y - 12, 'heal', 30); S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 3, life: 800, maxLife: 800 });
+  if (st?.state === 'active') { st.progress = [1]; const R = QUESTS.q_anomaly.reward; st.state = 'done'; S.gold += R.gold; gainXp(c, R.xp); for (const [f, v] of Object.entries(R.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); }
+  log('Der Riss schließt sich. Das Gewebe ist wieder still (120 Gold, Aurelion und Orden +4).', 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
+}
+function anomalyDay() { if (S.anomaly && (S.day | 0) >= S.anomaly.until) { log(`Die Anomalie bei ${S.anomaly.where} schließt sich von selbst.`, 'world'); S.anomaly = null; if (S.quests.q_anomaly?.state === 'active') S.quests.q_anomaly.state = 'failed'; } }
+// S15 P9 Meteorsplitter: nachts ein Leuchten am Himmel, am Morgen liegt ein Splitter in einem Krater (Ort per Hash). Wer ihn aufhebt,
+// kann ihn Irmgard (heilig sprechen), Magister Corvinus (Messwert) oder Ilvar (Neugier) geben — oder als Reagenz behalten und verkaufen.
+function evMeteor() {
+  if (S.meteor) return false; const cand = LOCATIONS.filter(l => l.kind === 'wild' && l.r < 120); if (!cand.length) return false;
+  const L = cand[Math.abs(((S.seed | 0) * 13 + (S.day | 0) * 17) | 0) % cand.length], tx = L.x + (((S.day | 0) * 5) % 11) - 5, ty = L.y + (((S.day | 0) * 3) % 9) - 4, pos = freeSpotNear('world', tx, ty, 6);
+  S.meteor = { x: pos.x / TS | 0, y: pos.y / TS | 0, where: L.name };
+  for (let k = 0; k < 6; k++) S.ents.world.push({ id: uid(), kind: 'prop', type: k % 2 ? 'ember' : 'rubble', map: 'world', x: pos.x + Math.cos(k * 1.05) * 40, y: pos.y + Math.sin(k * 1.05) * 30, r: 8, transient: true, meteorBits: true });
+  dropItemAt('world', pos.x, pos.y, mkItem('meteorsplitter'));
+  log(`In der Nacht zog ein Leuchten über den Himmel. Bei ${L.name} ist etwas eingeschlagen.`, 'world'); chronicle(`Ein Stern fällt bei ${L.name}`, 'news'); return true;
+}
+const METEOR_DEALS = {
+  irmgard: ['Den Meteorsplitter Omega weihen lassen.', () => { (S.omega ||= {}).faith = (S.omega.faith || 0) + 10; S.factions.chain = clamp((S.factions.chain || 0) + 5, -100, 100); S.gold += 80; return 'Irmgard spricht ihn heilig. Glaube +10, Kette +5, 80 Gold aus dem Opferstock.'; }],
+  corvinus: ['Den Meteorsplitter der Akademie verkaufen.', () => { S.gold += 200; S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100); return 'Corvinus zahlt 200 Gold und schreibt deinen Namen in ein Messprotokoll. Aurelion +5.'; }],
+  ilvar: ['Den Meteorsplitter Ilvar zeigen.', () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 15); S.gold += 120; return '„Ein Bruder des Rotfalls. Kleiner. Jünger.“ Ilvar zahlt 120 Gold. Vertrauen +15.'; }],
+};
+function meteorChoice(npc) {
+  const D = METEOR_DEALS[npc.key]; if (!D || !hasItem(S.player, 'meteorsplitter')) return null;
+  return { text: D[0], fn: () => { removeItem(S.player, 'meteorsplitter', 1); const r = D[1](); S.flags.meteorTo = npc.key; log(r, 'quest'); chronicle(`Der Meteorsplitter geht an ${npc.name}`, 'news'); UI.dialogue(npc, r, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } };
+}
+function snikkTalk(npc) {
+  if (S.flags.coreEv !== 'found') return UI.dialogue(npc, '„Weg ist weg. Snikk hat jetzt Gold. Gold summt nicht, aber Gold ist gut.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, npc.greet, [
+    { text: 'Ich kaufe ihn dir ab. (150 Gold)', fn: () => { if (S.gold < 150) return UI.toast('Dafür reicht dein Gold nicht.'); S.gold -= 150; coreTaken(npc, 'gekauft'); } },
+    { text: 'Gib ihn her.', fn: () => { S.factions.goblin = clamp((S.factions.goblin || 0) - 10, -100, 100); coreTaken(npc, 'genommen'); } },
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+function coreTaken(npc, how) {
+  S.flags.coreEv = 'held'; addItem(S.player, 'magiekern'); UI.closeDialogue(); UI.refreshHUD();
+  log(`Du hast den Magiekern ${how}. Kurz darauf finden dich Boten: Aurelion will ihn zurück (Magister Corvinus), die Toten wollen ihn untersuchen (Sael in Vharnholm), die Kirche will ihn weihen (Irmgard). Auch Ilvar Nachtglas wäre neugierig.`, 'quest');
+  chronicle(`${S.player.name} nimmt den Magiekern an sich`, 'news');
+}
+const CORE_DEALS = {   // wer den Kern nimmt: Gespräch, Folgen
+  corvinus: ['Den Magiekern der Akademie zurückgeben.', () => { S.factions.aurel = clamp((S.factions.aurel || 0) + 15, -100, 100); S.gold += 250; S.flags.coreRoute = 'aurel'; return 'Aurelion zahlt 250 Gold und senkt die Zölle für dich. Magitech wird in Aurelion billiger.'; }],
+  sael:     ['Den Magiekern den Toten überlassen.', () => { S.factions.undead = clamp((S.factions.undead || 0) + 15, -100, 100); S.factions.order = clamp((S.factions.order || 0) - 10, -100, 100); addItem(S.player, 'soul_vial', 3); return 'Vharnholm schreibt deinen Namen in die gute Spalte (Untote +15, Orden −10) und gibt dir drei Seelenphiolen.'; }],
+  irmgard:  ['Den Magiekern Omega weihen lassen.', () => { S.factions.chain = clamp((S.factions.chain || 0) + 15, -100, 100); (S.omega ||= {}).faith = (S.omega.faith || 0) + 15; return 'Irmgard legt den Kern auf den Altar. Glaube +15, Kette +15.'; }],
+  ilvar:    ['Den Magiekern von Ilvar untersuchen lassen.', () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 20); return 'Ilvar zerlegt ihn mit spitzen Fingern. „Aurelion hat den Rotfall gemessen. Sie wissen mehr, als sie sagen.“ Vertrauen +20.'; }],
+};
+function coreChoice(npc) {
+  const D = CORE_DEALS[npc.key]; if (!D || S.flags.coreEv !== 'held' || !hasItem(S.player, 'magiekern')) return null;
+  return { text: D[0], fn: () => { removeItem(S.player, 'magiekern', 1); S.flags.coreEv = npc.key; const r = D[1](); log(r, 'quest'); chronicle(`Der Magiekern geht an ${npc.name}`, 'news'); UI.dialogue(npc, r, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } };
+}
+function coreSmash() {                                                // aus dem Inventar: zerschlagen
+  if (!removeItem(S.player, 'magiekern', 1)) return; S.flags.coreEv = 'smashed';
+  S.factions.order = clamp((S.factions.order || 0) + 5, -100, 100); for (const f of ['aurel', 'undead', 'chain']) S.factions[f] = clamp((S.factions[f] || 0) - 5, -100, 100);
+  fx(S.player.x, S.player.y - 12, 'spark', 20); camShake(4, 200); log('Du zerschlägst den Magiekern. Niemand bekommt ihn (Orden +5, Aurelion, Tote und Kette −5).', 'quest'); chronicle(`${S.player.name} zerschlägt den Magiekern`, 'news');
+}
 function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].metro && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm'); const k = pick(T); return k && startFire(k) ? k : null; }   // S14
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
+  evMagicCore, evAnomaly, evMeteor, evSuccession,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
   () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
@@ -7754,8 +8179,54 @@ function seasonDay() {
   const C = makeContract(k, 'hunt', 'board'); C.title = 'Wolfswinter'; (S.contracts ||= []).push(C);
   log(`Wolfswinter: Ein Rudel streicht um die Weiden von ${townName(k)}. Am Brett hängt ein Jagdauftrag.`, 'world');
 }
+// S15 (Nutzer: „prüfen, wie viele Lehrer auf der Karte sind, notfalls welche nachspawnen — das System für jeden wichtigen NPC“):
+// Stirbt ein Lehrer, Händler, Schmied, Meister oder der Vorsteher, kommt nach drei Tagen ein Nachfolger an dieselbe Stelle. Er übernimmt
+// Rolle und Schlüssel (Aufträge und Questreihen laufen weiter), aber nicht die Beziehung. Verwandte kommen nicht wieder, und nach
+// Garmadons Fall keine Lehrer der Toten mehr.
+const KEY_ROLE = d => !d.kin && !!(d.teaches || d.spellsTaught || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key));
+function successorDay(onLoad = false) {                            // onLoad: wer ganz fehlt (alter Stand, Tod unbekannt), kommt sofort nach
+  const day = S.day | 0, all = Object.values(S.ents).flat(); S.succ ||= {};
+  for (const def of NPCS) {
+    if (!KEY_ROLE(def)) continue;
+    const e = all.find(x => x.key === def.key && x.kind === 'npc');
+    if (e?.alive) { delete S.succ[def.key]; continue; }
+    if (def.undead && S.flags.garmadonSlain) continue;
+    if (onLoad && !e && S.succ[def.key] == null) S.succ[def.key] = day;
+    if (S.succ[def.key] == null) { S.succ[def.key] = day + 3; log(`${e?.name || def.name} ist tot. Man sucht einen Nachfolger.`, 'world'); continue; }
+    if (day < S.succ[def.key]) continue;
+    for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(x => !(x.key === def.key && x.kind === 'npc'));
+    const used = new Set(Object.values(S.ents).flat().filter(x => x.kind === 'npc').map(x => x.name.split(' ')[0])), L = (femTrade(def.prof || '') || def.key === 'adela' ? FIRST_F : FIRST_M).filter(n => !used.has(n)), name = L.length ? pick(L) : `${def.name.split(' ')[0]} der Jüngere`;   // nie wie ein Bewohner
+    spawnNpcDef({ ...def, name }); delete S.succ[def.key]; delete S.relations[def.key];
+    log(`${name} übernimmt den Platz von ${def.name} (${def.prof}).`, 'world'); chronicle(`${name} folgt auf ${def.name}`, 'news');
+  }
+}
+// S15 (Nutzer: „bei den Untoten funktionieren nicht alle Missionen, es spawnen nur 3 Grabräuber statt 5“): Für jeden offenen
+// Tötungsauftrag stehen genug Ziele bereit. Gezählt wird, was lebt und dir feind ist, am Zielort (sonst im Umkreis des Helden); was
+// fehlt, kommt außer Sicht nach (30–45 Kacheln entfernt, nicht in Städten) und ist immer Feind, auch wenn die Art sonst zu deinen
+// Verbündeten gehört (Kultisten für einen Diener der Toten). Bosse und Einzelstücke kommen nie nach.
+function questTargetTick(force = false) {
+  if (S.map !== 'world' || S.cine || (S._quiet && !force)) return;
+  const p = S.player; let budget = 6;
+  for (const [k, st] of Object.entries(S.quests)) {
+    if (st.state !== 'active' || !QUESTS[k]) continue;
+    QUESTS[k].objectives.forEach((o, i) => {
+      const M = MONSTERS[o.target]; if (o.type !== 'kill' || !M || M.boss || M.unique || (M.scale || 1) > 1.6 || budget <= 0) return;
+      const need = (o.count || 1) - (st.progress[i] || 0); if (need <= 0) return;
+      const pt = questPoint(k), cx = pt ? pt.x : p.x / TS, cy = pt ? pt.y : p.y / TS, R = pt ? 50 : 70, atSite = pt && Math.hypot(cx - p.x / TS, cy - p.y / TS) < 30;
+      const have = S.ents.world.filter(e => e.kind === 'enemy' && e.alive && e.mtype === o.target && teamOf(e) === 'foe' && Math.hypot(e.x / TS - cx, e.y / TS - cy) < R).length;
+      for (let n = have; n < need && budget > 0; n++) {
+        for (let tries = 0; tries < 12; tries++) {
+          const a = rnd() * 6.283, d = pt && !atSite ? 6 + rnd() * 10 : 26 + rnd() * 16, tx = Math.round(cx + Math.cos(a) * d), ty = Math.round(cy + Math.sin(a) * d);
+          if (townAt(tx, ty) || solidTile('world', tx * TS, ty * TS) || Math.hypot(tx - p.x / TS, ty - p.y / TS) < 22) continue;
+          const e = spawnEnemy(o.target, 'world', tx, ty); if (!e) continue;
+          e.questFoe = k; e.transient = true; budget--; break;
+        }
+      }
+    });
+  }
+}
 function dayTick() {
-  seasonDay();
+  seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); rebuildRazed(); aurelDay(); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay();
@@ -7960,12 +8431,17 @@ function npcOffers(n) {
   return o;
 }
 function talk(npc) {
+  if (npc.key) ((S.codex ||= {}).met ||= {})[npc.key] = 1;             // S15 Kodex: wen man kennt
+  if (npc.coreHolder) return snikkTalk(npc);                          // S15 P7 Artefakt-Konflikt
+  if (npc.key === 'ilvar') return ilvarTalk(npc);                     // S15 P6
+  if (npc.map === 'tower' && npc.name === 'Tuvi') return tuviTalk(npc);
   if (npc.downed && startRevive(npc)) return;
   const p = S.player, rel = S.relations[npc.key] ?? 0, now = clock();
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
   if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
   if (npc.enc) return encTalk(npc);                                     // S13: Begegnung mit Entscheidung
+  if (npc.horseBreeder) return UI.dialogue(npc, npc.greet, [{ text: 'Zeig mir deine Pferde.', fn: () => { UI.closeDialogue(); UI.openModal('stable', npc); } }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);   // S15 Pferdehof
   if (npc.beastTrader) return beastMenu(npc);                            // S13: Tiere kaufen
   if (npc.seaCaptain) return seaTalk(npc);
   if (npc.seaFolk && seaTalkGate(npc)) return;                            // S14: Überfahrt zu den Gischtinseln
@@ -7995,10 +8471,14 @@ function talk(npc) {
     choices.push({ text: 'Über deine Tochter …', fn: () => lilaOutcome(npc) });
   const gw = gradeTalk(npc); if (gw) choices.push(gw);                // S15 Titelgrade
   if ((npc.key === 'sael' || npc.key === 'ysra') && (S.ranks.undead ?? -1) >= 3 && !S.player.knownClasses.includes('deathknight')) choices.push({ text: 'Die Todesweihe. (Klasse Todesritter)', fn: () => deathRite(npc) });
+  if (npc.spellsTaught?.length) choices.push({ text: 'Kannst du mir Magie beibringen?', fn: () => spellMenu(npc) });   // S15 P5
+  const cc = coreChoice(npc); if (cc) choices.unshift(cc);             // S15 P7: Magiekern
+  const mc = meteorChoice(npc); if (mc) choices.unshift(mc);           // S15 P9: Meteorsplitter
+  if (npc.spellRule === 'academy') choices.push({ text: 'Ich will eine Prüfung ablegen.', fn: () => trialMenu(npc) });
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
   if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
-  if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
+  if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead', 'merch', 'bandit'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
   if (npc.shop && npc.shopClosed > now) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc,
@@ -8107,6 +8587,10 @@ function contextLines(npc) {
   const h = S.minute / 60, L = [...(PROF_TALK[npc.prof] || [])];
   L.push(...(h < 8 ? TIME_TALK.morn : h >= 22 || h < 5 ? TIME_TALK.night : h >= 18 ? TIME_TALK.eve : []));
   L.push(...(WEATHER_TALK[S.weather] || []), ...worldTalk(npc));
+  const fv = fameOf(fameRegion(npc));                                  // S15 P8: Ruhm
+  if (fv >= 85) L.push(`„${S.player.name}! Man singt Lieder über dich. Schlechte, aber immerhin.“`, '„Darf ich … nein. Vergiss es. Es ist mir eine Ehre.“');
+  else if (fv >= 60) L.push(`„Du bist ${S.player.name}, oder? Ich hab von dir gehört.“`, '„Die Kinder spielen dich nach. Meistens den Teil mit dem Schwert.“');
+  else if (fv >= 35) L.push('„Dein Gesicht kenne ich. Aus Geschichten, glaube ich.“');
   return L;
 }
 // Ränge ohne Beitritt (MP2 §29/§81): Aurelion aus Schein, Bürgerrecht und Ruf; Grubenstämme nach der Befreiung. Legendäre Ränge
@@ -8319,6 +8803,7 @@ function questAvailable(k) {
   if (k === 'q_monk') return !(S.player.titleClasses || []).includes('monk') && !titleFull() && !pactBound();
   if (k === 'q_rook') return (S.relations.rook ?? 0) >= 10;
   if (QUESTS[k]?.dod) { const n = QUESTS[k].dod; return !!S.flags.morrFriend && !S.flags.morrDead && (n === 1 || S.quests['g_dod' + (n - 1)]?.state === 'done') && (n < 3 || !S.flags.chainsBroken); }   // S15 Dodon
+  if (QUESTS[k]?.dkQ) { const n = QUESTS[k].dkQ; return S.player.knownClasses.includes('deathknight') && (n === 1 || S.quests['dk_' + (n - 1)]?.state === 'done'); }   // S15 P19
   if (QUESTS[k]?.classQ) { const [t, step, g] = QUESTS[k].classQ, p = S.player;   // S15 Klassen-Questline beim Meister
     return (p.titleClasses || []).includes(t) && gradeOf(p, t) >= g && (step === 1 || S.quests[Object.keys(QUESTS).find(q => QUESTS[q].classQ?.[0] === t && QUESTS[q].classQ[1] === step - 1)]?.state === 'done'); }
   if (QUESTS[k]?.sea) { const Q = S.quests, side = S.seaSide, done = q => Q[q]?.state === 'done';   // S14 Seevolk
@@ -8359,6 +8844,7 @@ function questComplete(k) {
 }
 function turnIn(npc, k) {
   const Q = QUESTS[k], st = S.quests[k];
+  if (!st || st.state !== 'active') return;                          // S15: nie zweimal abgeben
   st.state = 'done';
   const r = Q.reward || {};
   if (r.gold) { S.gold += r.gold; log(`${r.gold} Gold erhalten.`, 'economy'); }
@@ -8372,6 +8858,7 @@ function turnIn(npc, k) {
   if (k === 'g_dod3') { turnInStorm(npc); return; }   // S15: der Pakt des Sturms
   if (k === 'q_salz2') chooseSeaSide('trader'); if (k === 'q_klinge2') chooseSeaSide('raider'); if (k === 'q_salz3') promote('sea', 3);   // S14 Seevolk
   if (npc.key) addRel(npc.key, 8);
+  addFame(2);                                                          // S15 P8
   log(`Auftrag abgeschlossen: ${Q.name}`, 'quest');
   chronicle(`${Q.name} abgeschlossen`, 'quest');
   UI.dialogue(npc, '„Das war mehr, als ich erwartet habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -8382,6 +8869,7 @@ function onKill(mtype, e) {
   if (e?.seaTag) mtype = e.seaTag;                                 // S14: Schwarzsegel, Grubenkämpfer
   if (e?.chainRest) mtype = 'chain_rest';                         // S12 A4: Kettenreste zählen für Grisk
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
+  if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
@@ -8469,7 +8957,7 @@ function setClass(cls) {
   if (!p.knownClasses.includes(cls)) return;
   p.currentClass = cls;
   p.abilities = [...new Set((CLASSES[cls].abilities || []))];
-  recalc(p); syncHotbar(); UI.refreshHUD();
+  recalc(p); syncHotbar(); UI.refreshHUD(); dkSteed();                     // S15: Todesritter reitet ein Totenross
   log(`Du führst dich nun als ${CLASSES[cls].name}.`, 'party');
 }
 // Lehrer unterrichten eine Folge (z. B. Schütze → Waldläufer): angeboten wird die erste noch unbekannte Klasse, deren
@@ -8500,6 +8988,131 @@ function respec(npc) {
     { text: 'Lieber nicht.', fn: () => UI.closeDialogue() },
   ]);
 }
+// ================= S15 P5 Magie lernen =================
+// Zauberlehrer (NPCS.spellsTaught). Bedingungen: Gold (nach Stufe, Ruf senkt den Preis), Intelligenz (8 / 11 / 14), Beziehung 10 zum
+// Lehrer, dazu je Lehrer eine Regel (Orden: Rang 1, für Stufe III Rang 2; Akademie: Aufenthaltsschein, Stufe III nur Bürger oder
+// Akademie-Rang Adept). Der Lehrer sagt, was fehlt.
+const SPELL_PRICE = [0, 30, 80, 180], SPELL_INT = [0, 8, 11, 14];
+const ILVAR_NEED = { sp_shadowbolt: 0, sp_drain: 25, sp_raise: 50, sp_soulburst: 75, sp_nachtglas: 999 };
+const SPELL_RULES = {
+  order: (p, t) => (S.ranks.order ?? -1) < (t >= 3 ? 2 : t >= 2 ? 1 : 0) ? `Rang ${FACTIONS.order.ranks[t >= 3 ? 2 : 1]} im Orden` : null,
+  ilvar: (p, t, key) => { const tr = S.ilvar?.trust || 0, need = ILVAR_NEED[key] ?? (t >= 3 ? 50 : t >= 2 ? 25 : 0); return need > 100 ? 'Ilvars Endprüfung' : tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
+  faith: (p, t) => { const rk = S.ranks.chain ?? -1, fa = S.omega?.faith || 0, ok = t >= 3 ? rk >= 2 || fa >= 60 : t >= 2 ? rk >= 1 || fa >= 40 : rk >= 0 || fa >= 20; return ok ? null : t >= 3 ? 'Kettenrang 2 oder Glaube 60' : t >= 2 ? 'Kettenrang 1 oder Glaube 40' : 'Kettenrang oder Glaube 20 (am Altar beten)'; },   // S15 P7
+  academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
+};
+function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0, love = MAGIC_VIEW[npc.faction]?.love.includes(ABILITIES[key].school); return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1) * (love ? 0.85 : 1)); }
+// S15 P7 Verbotene Magie: Wer vor Zeugen einer Macht zaubert, die diese Schule verbietet, bekommt Kopfgeld bei ihr (60, Orden 120).
+// Ab der dritten bezeugten Tat jagen Magierjäger: Kopfgeldjäger mit „Bann“ (Zauber bricht ab, Mana halbiert, 5 s Stille).
+const FORBIDDEN_TITLES = new Set(['necromancer', 'warlock']);
+const schoolOf = key => ABILITIES[key]?.school || (FORBIDDEN_TITLES.has(ABILITIES[key]?.title) ? 'shadow' : null);
+function magicSeen(p, key) {
+  const school = schoolOf(key); if (!school || p !== S.player) return 0;
+  const town = townAt(p.x / TS | 0, p.y / TS | 0, 4);
+  const ws = S.ents[p.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.undead && e.faction !== 'undead' && !S.party.includes(e.id) && dist(e, p) < 280);
+  const facs = new Set(ws.map(w => (w.faction && MAGIC_VIEW[w.faction]) ? w.faction : town ? townFac(town) : 'valen')); let n = 0;
+  for (const f of facs) if (MAGIC_VIEW[f]?.hate.includes(school)) { n++; addBounty(f, f === 'order' ? 120 : 60, 'Verbotene Magie'); }
+  if (!n) return 0;
+  for (const w of ws) { w.alarmed = true; if (!GUARDISH(w)) w.fleeing = true; }
+  float(p, 'Ketzer!', 'rgba(220,120,90,ALPHA)');
+  S.flags.forbiddenN = (S.flags.forbiddenN || 0) + 1;
+  if (S.flags.forbiddenN >= 3 && p.map === 'world' && !((S.flags.mageHunterDay || 0) > S.day)) { S.flags.mageHunterDay = S.day + 3; spawnMageHunters(p); }
+  return n;
+}
+function spawnMageHunters(p) {
+  const a = rnd() * Math.PI * 2;
+  for (let i = 0; i < 2; i++) { const [tx, ty] = pushOut('world', Math.round(p.x / TS + Math.cos(a) * 16) + ri(-2, 2), Math.round(p.y / TS + Math.sin(a) * 16) + ri(-2, 2));
+    const h = spawnEnemy('bounty_hunter', 'world', tx, ty, { level: Math.max(4, p.level), encounter: true }); if (!h) continue;
+    Object.assign(h, { mageHunter: true, name: 'Magierjäger', title: 'Magierjäger', aggroId: p.id, banCd: 1500 }); }
+  log('Magierjäger sind dir auf der Spur. Sie tragen Bannsiegel.', 'combat'); UI.toast('MAGIERJÄGER', 2600);
+}
+function mageHunterTick(e, dt) {                                      // Bann: aus der Nähe, mit freier Sicht, alle 9 s
+  const p = S.player; e.banCd = (e.banCd || 0) - dt;
+  if (e.banCd > 0 || dist(e, p) > 260 || !clearLine(e, p) || !(p.casting || (p.mana || 0) > 10)) return;
+  e.banCd = 9000; if (p.casting) interruptCast(p); p.mana = Math.floor((p.mana || 0) * 0.5); p.silenced = performance.now() + 5000;
+  float(p, 'Bann!', 'rgba(230,200,120,ALPHA)'); fx(p.x, p.y - 14, 'spark', 14); sfx('magic', 0.3, earVol(e)); e.castT = performance.now();
+}
+function spellLack(npc, key) {                                      // was fehlt, als Liste; leer = darf lernen
+  const p = S.player, t = ABILITIES[key].tier, out = [], price = spellPrice(npc, key);
+  if (S.gold < price) out.push(`${price - S.gold} Gold`);
+  if ((p.attributes.intelligence || 8) < SPELL_INT[t]) out.push(`Intelligenz ${SPELL_INT[t]}`);
+  if (!['academy', 'ilvar', 'faith'].includes(npc.spellRule) && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
+  const r = SPELL_RULES[npc.spellRule]?.(p, t, key); if (r) out.push(r);
+  return out;
+}
+function learnFrom(npc, key) {
+  const lack = spellLack(npc, key); if (lack.length) return false;
+  S.gold -= spellPrice(npc, key); learnSpell(S.player, key); addRel(npc.key, 3); UI.refreshHUD(); return true;
+}
+function spellMenu(npc) {
+  const p = S.player, back = () => spellMenu(npc), list = npc.spellsTaught.filter(k => ABILITIES[k]);
+  UI.dialogue(npc, `„Welche Formel? Ein Zauber sitzt erst, wenn du ihn oft wirkst.“ (Gold: ${S.gold}, Intelligenz: ${p.attributes.intelligence})`, [
+    ...list.map(k => { const A0 = ABILITIES[k], lack = spellLack(npc, k), have = p.spells?.[k];
+      return { text: have ? `✓ ${A0.name} (kannst du)` : `${A0.name} — Stufe ${A0.tier}, ${spellPrice(npc, k)} Gold${lack.length ? ' (fehlt etwas)' : ''}`,
+        fn: () => have ? back() : lack.length ? UI.dialogue(npc, `„${A0.name}? Dafür fehlt dir noch: ${lack.join(', ')}.“`, [{ text: 'Zurück', fn: back }])
+          : UI.dialogue(npc, `„${A0.desc}“ Das kostet ${spellPrice(npc, k)} Gold.`, [{ text: 'Lehr es mich.', fn: () => { learnFrom(npc, k); back(); } }, { text: 'Zurück', fn: back }]) }; }),
+    { text: 'Zurück', fn: () => talk(npc) }]);
+}
+// S15 P5 Akademie-Prüfungen (Magister Corvinus, vor der Akademie in Aurelheim). Keine Prüfung tötet jemanden:
+//   aim    — 5 Puppen in 30 s mit Zaubern treffen (Waffen zählen nicht)
+//   shield — 10 Übungsgeschosse kommen in 25 s; 8 davon muss ein Schildzauber abfangen
+//   heal   — einen Studenten mit verletztem Bein in 60 s stabilisieren (jedes Glied über der Hälfte)
+//   duel   — gegen einen Studenten: wer zuerst unter 20 % Leben fällt, verliert; dann endet der Kampf sofort
+// Rang: 1 bestanden = Hörer, 2–3 = Adept (Stufe III), 4 = Magister.
+const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, TRIAL_EXTRA = { ilvar: 'Endprüfung des Nachtglases' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
+const acadRankOf = n => n >= 4 ? 3 : n >= 2 ? 2 : n >= 1 ? 1 : 0;
+function acadSpot() { const h = HOUSES.find(b => b.type === 'academy' && b.map === 'world'); return h ? { x: h.doorTile[0] * TS + TS / 2, y: (h.doorTile[1] + 6) * TS } : { x: S.player.x, y: S.player.y }; }
+function startTrial(kind, at = acadSpot()) {
+  endTrial(null);
+  const T = S.trial = { kind, until: clock() + { aim: 30, shield: 25, heal: 60, duel: 90 }[kind], n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2 }, m = S.player.map;
+  const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy; e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
+  if (kind === 'aim') for (let i = 0; i < 5; i++) put('acad_dummy', -120 + i * 60, -60 - (i % 2) * 40);
+  if (kind === 'shield') { const e = put('acad_dummy', 0, -160); if (e) { e.invuln = true; T.shooter = e.id; } }
+  if (kind === 'ilvar') { T.until = clock() + 45; T.next = clock() + 1; }   // S15 P6: Wellen von Geistern, siehe trialTick
+  if (kind === 'duel') { const e = put('acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; } }
+  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
+    c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
+  UI.toast(`PRÜFUNG: ${(TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
+  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: 'Die Studentin hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.', duel: 'Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.', ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.' }[kind], 'quest');
+}
+function endTrial(won) {
+  const T = S.trial; if (!T) return; S.trial = null;
+  for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => !T.ids.includes(e.id));
+  if (won == null) return;
+  if (T.kind === 'ilvar') { const p = S.player;                       // S15 P6: Endprüfung des Nachtglases
+    if (!won) { if (p.downed) { p.downed = false; p.downTimer = 0; B.heal(p, p.maxHp * 0.3); } UI.toast('ILVAR FÄNGT DICH AUF', 2600); log('„Nicht heute.“ Ilvar hebt die Hand, und die Geister verblassen.', 'quest'); return; }
+    learnSpell(p, 'sp_nachtglas'); SIM.H.title('Schüler des Nachtglases'); gainXp(p, 300); chronicle(`${p.name} besteht Ilvars Endprüfung`, 'legend'); return; }
+  if (!won) { UI.toast(`${TRIALS[T.kind].toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${TRIALS[T.kind]} nicht bestanden. Corvinus lässt dich es noch einmal versuchen.`, 'quest'); return; }
+  const done = (S.acad ||= {}), first = !done[T.kind]; done[T.kind] = true;
+  const r0 = S.acadRank || 0; S.acadRank = acadRankOf(Object.keys(done).length);
+  UI.toast(`${TRIALS[T.kind].toUpperCase()}: BESTANDEN`, 2600); log(`${TRIALS[T.kind]} bestanden.`, 'quest');
+  if (first) { S.factions.aurel = clamp((S.factions.aurel || 0) + 3, -100, 100); gainXp(S.player, 60); }
+  if (S.acadRank > r0) { UI.toast(`AKADEMIE: ${ACAD_RANKS[S.acadRank].toUpperCase()}`, 3200); chronicle(`${S.player.name} wird ${ACAD_RANKS[S.acadRank]} der Akademie`, 'news'); if (S.acadRank >= 2) log('Als Adept darfst du die dritte Stufe lernen.', 'quest'); }
+}
+function trialTick() {
+  const T = S.trial, p = S.player; if (!T) return;
+  if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false);
+  if (T.kind === 'aim' && T.n >= 5) return endTrial(true);
+  if (T.kind === 'ilvar') {
+    if (clock() >= T.until) return endTrial(true);
+    if (clock() >= T.next) { T.next = clock() + 9; for (let i = 0; i < 2 + (T.wave = (T.wave || 0) + 1) % 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('wraith', p.map, (T.x + Math.cos(a) * 200) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(6, p.level) });
+      if (e) { e.trial = 'ilvar'; e.questFoe = 'ilvar'; e.transient = true; e.aggroId = p.id; T.ids.push(e.id); } } }
+    return; }
+  if (T.kind === 'shield') {
+    if (T.shot < 10 && clock() >= T.next) { T.next = clock() + 2.2; T.shot = (T.shot || 0) + 1; const a = Math.atan2(p.y - (T.y - 160), p.x - T.x);
+      S.projectiles.push({ id: uid(), kind: 'spark', map: p.map, x: T.x, y: T.y - 150, vx: Math.cos(a) * 4.5, vy: Math.sin(a) * 4.5, owner: T.shooter, dmg: 3, life: 2600, team: 'foe' }); }
+    if (T.shot >= 10 && clock() >= T.next) return endTrial(T.n >= 8);
+  }
+  if (T.kind === 'heal') { const c = byId(T.patient); if (c && c.body && ['lleg', 'rleg', 'larm', 'rarm', 'torso', 'head'].every(k => c.body[k].lost || c.body[k].hp >= c.body[k].max * 0.5)) return endTrial(true); }
+  if (clock() > T.until) return endTrial(false);
+}
+function trialMenu(npc) {
+  const done = S.acad || {}, back = () => trialMenu(npc);
+  UI.dialogue(npc, `„Vier Prüfungen. Keine davon tötet dich, alle können dich blamieren.“ Dein Rang: ${ACAD_RANKS[S.acadRank || 0]}. Die Prüfungen finden vor der Akademie statt.`, [
+    ...Object.entries(TRIALS).map(([k, n]) => ({ text: `${done[k] ? '✓ ' : ''}${n}`, fn: () => { UI.closeDialogue(); startTrial(k); } })),
+    { text: 'Zurück', fn: () => talk(npc) }]);
+}
+// Kodex „Magie“: wer lehrt was (lebende Lehrer mit Ort)
+const spellTeachers = key => [...S.ents.world, ...(S.ents.tower || [])].filter(e => e.kind === 'npc' && e.alive && e.spellsTaught?.includes(key) && (S.flags.codexAll || S.codex?.met?.[e.key]))   // S15 Kodex: nur bekannte Lehrer.map(e => `${e.name} (${LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—'})`);
 function teach(npc, cls = teachable(npc)) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
   const parent = CLASSES[cls].parent;
@@ -8520,7 +9133,7 @@ function teach(npc, cls = teachable(npc)) {
   ]);
 }
 // Mechanik-Check S14: Erzfeinde schließen einander aus — kein Rang bei beiden Seiten zugleich (bestehende Ränge bleiben).
-const JOIN_FOES = { order: ['undead'], valen: ['undead', 'bandit'], undead: ['order', 'valen', 'chain'], chain: ['undead', 'goblin'] };
+const JOIN_FOES = { order: ['undead', 'bandit'], valen: ['undead', 'bandit'], undead: ['order', 'valen', 'chain'], chain: ['undead', 'goblin'], bandit: ['valen', 'order'] };   // S15 P8: Bande
 const joinFoe = f => JOIN_FOES[f]?.find(o => (S.ranks[o] ?? -1) >= 0) || (f === 'undead' && (S.player.titleClasses || []).includes('monk') ? 'order' : null);
 function joinFaction(npc) {
   const f = npc.faction, rep = S.factions[f], foe = joinFoe(f);
@@ -8554,7 +9167,7 @@ function rankGuide(f) {
     if (f === 'aurel') return ['Anfang', 'Aufenthaltsschein am Passamt (3 oder 7 Tage) oder Dienst bei einem Haus', 'Bürgerrecht: Ansehen 40, 1000 Gold, ein Adelshaus als Fürsprecher',
       'Bürger und Ansehen 52', 'Bürger und Ansehen 64', 'Bürger und Ansehen 76', 'Bürger und Ansehen 88', 'Hoher Beamter und die Quest „Eine Stimme im Rat“'][i];
     if (f === 'goblin') return ['Die Grubenstämme befreien (Varg stürzen)', 'Befreit und Ansehen 20', 'Befreit und Ansehen 60'][i];
-    if (f === 'merch' || f === 'bandit') return 'noch kein Aufstiegsweg (geplant)';
+    if (f === 'sea') return ['Ankunft auf den Gischtinseln', 'Den zweiten Auftrag eines Clans erfüllen (Salzbund oder Sturmklinge)', 'noch kein eigener Weg (Ausbau des Seevolks, Plan P21)', 'Salzbund: dritter Auftrag · Sturmklinge: Weißbarts Auftrag gegen Morra', 'noch kein eigener Weg (Ausbau des Seevolks, Plan P21)'][i];   // S15 P8: aus dem Code, nichts erfunden
     if (i === 0) return `Beitritt bei einem Mitglied, Ansehen ${f === 'undead' ? 15 : 10}`;
     if (f === 'chain' && i === 4) return 'Aufseher und die Weihe der Kette bei Varg';
     const L = RANK_LINES[f]; return `Ansehen ${i * 25}, dann die Rangprüfung (zwei Aufträge) bei ${L?.giver ? NPCS.find(n => n.key === L.giver)?.name : 'einer Kettenwache der Festung'}`;
@@ -8566,6 +9179,13 @@ function rankGuide(f) {
 // S14 (Nutzer): Rang-Questlines — Ruf erreicht → Questline beim Anführer frei → beide Aufträge erledigt = nächster Rang.
 // Je Rang zwei Aufträge (a: Bewährung, b: Tat). giver = NPC-Schlüssel, giverProf = Beruf (Kette: jede Kettenwache der Festung).
 const RANK_LINES = {
+  // S15 P8: Aufstiegswege für die Freien Händler (Gerold, Nordfurt) und Rooks Bande (Rook)
+  merch: { giver: 'gerold', lines: [
+    [['Geleitschutz', 'Gerold: „Ein Partner schützt die Straßen, auf denen seine Waren fahren. Vier Wegelagerer weniger.“', 'bandit', 4], ['Salz für Nordfurt', '„Und ein Partner liefert. Fünf Säcke Salz.“', 'item:salt', 5]],
+    [['Die Schützen am Pass', '„Die Bande schießt auf meine Wagen. Drei Schützen, und du bist Teilhaber.“', 'bandit_archer', 3], ['Werkzeug für den Norden', '„Drei Werkzeugkisten. Ein Teilhaber weiß, was knapp ist.“', 'item:tools', 3]] ] },
+  bandit: { giver: 'rook', lines: [
+    [['Blaue Röcke', 'Rook: „Valens Soldaten auf unserer Straße. Zwei weniger, und du bist eine Klinge.“', 'valen_soldier', 2], ['Beute', '„Und bring was mit. Drei Heiltränke — die Jungs bluten gern.“', 'item:potion', 3]],
+    [['Jäger auf der Jagd', '„Kopfgeldjäger wollen meinen Kopf. Nimm ihnen ihre, zwei reichen.“', 'bounty_hunter', 2], ['Der Wolf von der Furt', '„Ein Hauptmann hat keine Angst. Zeig es mir: ein Bär, allein.“', 'bear', 1]] ] },
   valen: { giver: 'oda', lines: [
     [['Straßen säubern', 'Oda: „Wer bei der Grenzwacht dient, hält zuerst die Straßen frei.“', 'bandit', 4], ['Schützen im Wald', '„Die Bande schießt aus dem Unterholz auf Karren. Hol sie da raus.“', 'bandit_archer', 2]],
     [['Wölfe an der Grenze', '„Die Weiden an der Grenze verlieren jede Woche Vieh. Veteranen lösen das.“', 'wolf', 5], ['Speere der Bande', '„Rooks Speerträger halten die Furt. Brich sie.“', 'bandit_spear', 3]],
@@ -8602,7 +9222,7 @@ function promote(f, r) {
 }
 function checkRankUp() {
   autoRanks();
-  for (const f of ['valen', 'order', 'undead', 'chain']) {
+  for (const f of ['valen', 'order', 'undead', 'chain', 'merch', 'bandit']) {   // S15 P8: Händler und Bande
     if (S.ranks[f] < 0 || S.ranks[f] == null || (f === 'chain' && S.ranks.chain >= 3)) continue;   // Hochpaladin nur durch die Weihe
     const r = S.ranks[f] + 1; if (r >= FACTIONS[f].ranks.length || !rankReady(f, r) || (S.rankNote ||= {})[f] === r) continue;
     S.rankNote[f] = r; const L = RANK_LINES[f], who = L.giver ? NPCS.find(n => n.key === L.giver)?.name : 'Eine Kettenwache der Festung';   // S14: Aufstieg nur über die Questline
@@ -8689,9 +9309,23 @@ function partyCommand(cmd) {
 
 // ================= Handel =================
 export const repTier = fac => REP_TIERS.find(t => (S.factions[fac] ?? 0) >= t.min);
+// S15 P8 Ruhm je Region (0–100): Bosse +15 dort und +5 überall, Legenden-Titel +10 überall, abgeschlossene Aufträge +2, gelöschter
+// Brand +3. Stufen: Unbekannt, Bekannt (15), Regional bekannt (35), Berühmt (60), Legendär (85). Wirkung: Begrüßung, 5 % Nachlass ab
+// „Berühmt“, Kopfgeldjäger kommen schon ab 100 Gold Kopfgeld, wenn man irgendwo berühmt ist. Anzeige im Charakterfenster.
+const FAME_REG = { mitte: 'Menschenland', west: 'Westlande', sued: 'Hochreich', ost: 'Totenland', see: 'Gischtinseln' }, FAME_TIERS = [[85, 'Legendär'], [60, 'Berühmt'], [35, 'Regional bekannt'], [15, 'Bekannt'], [0, 'Unbekannt']];
+function fameRegion(e = S.player) {
+  if (e.map === 'isle' || e.map === 'deck') return 'see'; if (e.map !== 'world') return 'mitte';
+  const tx = e.x / TS, ty = e.y / TS; return tx < OX ? 'west' : tx > 770 ? 'ost' : ty > 780 ? 'sued' : 'mitte';
+}
+const fameOf = (r = fameRegion()) => (S.fame ||= {})[r] || 0;
+const fameTier = v => FAME_TIERS.find(([n]) => v >= n)[1];
+function addFame(n, r = fameRegion(), why = '') {
+  S.fame ||= {}; const before = fameTier(fameOf(r)); S.fame[r] = clamp((S.fame[r] || 0) + n, 0, 100); const now = fameTier(S.fame[r]);
+  if (now !== before && n > 0) { UI.toast(`RUHM: ${now.toUpperCase()} (${FAME_REG[r]})`, 3000); log(`Im ${FAME_REG[r]} bist du jetzt ${now.toLowerCase()}${why ? ` — ${why}` : ''}.`, 'faction'); }
+}
 const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.faction] != null ? repTier(npc.faction) : null, f = npc && fearedBy(npc) ? fearLvl() : 0;
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
-  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy); };   // S12: Kettenleute zahlen drauf
+  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1); };   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
   if (ITEMS[key].good && npc && ecoTown(npc)) {
     const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
@@ -8853,6 +9487,8 @@ const titleAbilities = c => { const T = TC(c); if (!T) return []; const a = T.gr
 // S15 Klassen-Rüstung (Nutzer: „nur über eine Questline, wie in WoW; getragen verstärkt sie die Fähigkeiten und gibt weitere“).
 // Zählt die getragenen Teile der Rüstung des aktiven Titels. Ab 2 Teilen: Titelzauber +25 % und eine neue Fähigkeit, ab 3 mehr.
 const GEAR_ABILITY = { necromancer: 'grave_host', warlock: 'dark_pact', druid: 'pack_call', monk: 'flurry' };
+function dkAuraTick(p, dt) { if (dkGear(p) >= 3 && (S._dkAura = (S._dkAura || 0) + dt) > 3000) { S._dkAura = 0; for (const t of hostilesOf(p)) if (dist(p, t) < 90) applySpellStatus(t, { key: 'frost', chance: 1 }, p); } }
+const dkGear = c => c?.currentClass === 'deathknight' ? gearOf(c, 'deathknight') : 0;   // S15 P19: Rüstung der Eidwacht
 function gearOf(c, key = c?.titleClass) { return key && c?.equip ? Object.values(c.equip).filter(it => it && ITEMS[it.key]?.classSet === key).length : 0; }
 const classQDone = (c, key) => Object.entries(QUESTS).some(([k, Q]) => Q.classQ?.[0] === key && S.quests[k]?.state === 'done');
 // S15 Titelgrade (Nutzer: Klassen wie Nekromant aufarbeiten): Wer den Titel trägt, sammelt Taten (Titelzauber, Tote in der Nähe).
@@ -9140,7 +9776,7 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
 
 // ================= Skill-Baum =================
 // Zustand je Knoten: 'learned', 'open' (lernbar), 'locked' (Voraussetzung fehlt), 'sealed' (Zweig einer nicht erworbenen Titelklasse).
-function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return !B_.title || (c.titleClasses || []).includes(B_.title); }
+function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return B_.cls ? (c.knownClasses || []).includes(B_.cls) : !B_.title || (c.titleClasses || []).includes(B_.title); }   // S15: Klassen-Zweig (Todesritter)
 function nodeState(c, k) {
   const N = SKILL_TREE[k]; if (!N) return 'locked';
   if (node(c, k)) return 'learned';
@@ -9162,18 +9798,20 @@ function learnNode(k) {
 // ================= Fähigkeiten =================
 function useAbility(key) {
   const p = S.player, ab = ABILITIES[key];
-  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]))) return;
+  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]) || (key === 'death_coil' && dkGear(p) >= 2))) return;
+  if (p.silenced > performance.now() && (ab.spell || ab.title)) return UI.toast('Gebannt — für einen Moment keine Magie.');   // S15 P7: Bann der Magierjäger
   if (ab.spell) {                                            // S15 P4: Zauber
     if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
     if (p.casting) return UI.toast('Du sammelst schon einen Zauber.');
     if ((p.mana || 0) < ab.mana) return UI.toast('Zu wenig Mana');
-    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); return UI.refreshHUD();
+    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); magicSeen(p, key); return UI.refreshHUD();
   }
   if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
   if (ab.title) {                                            // Titelfähigkeit: nur die eigene Ressource zählt
     const R = TITLE_CLASSES[ab.title].resource, v = tres(p);
     if (ab.cost === 'all' ? v < (ab.min || 1) : ab.cost && v < ab.cost) return UI.toast(`Zu wenig ${R.name}${ab.min ? ` (mindestens ${ab.min})` : ''}`);
     if (!titleAbility(p, key, ab)) return;
+    magicSeen(p, key);                                        // S15 P7: Totenmagie vor Zeugen
     p.cooldowns[key] = ab.cd * cdMul(p); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (ab.cost === 'all') setTres(p, 0); else if (ab.cost) setTres(p, v - ab.cost);
     if (ab.gain) corrupt(p, ab.gain);
@@ -9193,7 +9831,7 @@ function useAbility(key) {
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b));
   switch (key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
-    case 'grave_strike': p.abilityMult = 1.8; p.abilityKind = 'shadow'; p.drainHit = 0.3; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
+    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1) * (dkGear(p) >= 2 ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
     case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'heal', 10); break;
     case 'backstab': p.abilityMult = 3; p.atkCd = 0; attack(p); break;
     case 'aimed_shot': {
@@ -9213,7 +9851,7 @@ function useAbility(key) {
       if (!f || dist(p, f) > 180) { UI.toast('Kein Ziel in Reichweite'); p.cooldowns[key] = 0; return; }
       const d = (12 + p.attributes.intelligence * 1.1) * spellMul(p);
       hurt(f, d, p, 'Lebensentzug');
-      B.heal(p, d * 0.6);
+      B.heal(p, d * 0.6 * (node(p, 'dk_blood') ? 1.5 : 1));
       fx(f.x, f.y - 12, 'necro', 12); fx(p.x, p.y - 14, 'necro', 6);
       float(p, '+' + Math.round(d * 0.6), 'rgba(78,143,122,ALPHA)');
       break; }
@@ -9240,7 +9878,7 @@ function syncHotbar() {
   const p = S.player;
   const HB = 10;                                             // Tasten 1–9, 0: Klasse (≤3) + Titel (3) + aktive Talente (≤3) passen immer
   const sp = (p.hotbar || []).filter(s => s?.type === 'ability' && ABILITIES[s.key]?.spell && p.spells?.[s.key]).map(s => s.key);   // S15 P4: Zauber auf der Leiste bleiben
-  p.hotbar = [...new Set([...p.abilities, ...titleAbilities(p), ...treeAbilities(p)])].slice(0, HB - 1).map(k => ({ type:'ability', key: k }));
+  p.hotbar = [...new Set([...p.abilities, ...titleAbilities(p), ...treeAbilities(p), ...(dkGear(p) >= 2 ? ['death_coil'] : [])])].slice(0, HB - 1).map(k => ({ type:'ability', key: k }));
   for (const k of sp) if (p.hotbar.length < HB && !p.hotbar.some(s => s.key === k)) p.hotbar.push({ type:'ability', key: k });
   for (const k of ['bandage', 'potion', 'herb', 'bread']) if (p.hotbar.length < HB) p.hotbar.push({ type:'item', key: k });
   UI.renderHotbar();
@@ -9400,6 +10038,12 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   for (const k of S.ents.world.filter(e => e.kind === 'caravan')) {
     c.fillStyle = '#bd9433'; c.fillRect(ox + k.x / TS * sc - 3, oy + k.y / TS * sc - 3, 6, 6);
   }
+  for (const t of S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches)) {   // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“): Lehrer auf der Karte
+    const x = ox + t.x / TS * sc, y = oy + t.y / TS * sc, cls = [].concat(t.teaches).map(k => CLASSES[k]?.name).filter(Boolean).join(', ');
+    c.fillStyle = '#1a1510'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.strokeStyle = '#e8c070'; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6);
+    const at = place(`${t.name.split(' ')[0]}: ${cls}`, x, y, '10px Spectral, serif'); if (at) { c.fillStyle = '#e8c070'; c.font = '10px Spectral, serif'; c.textAlign = 'center'; c.fillText(`${t.name.split(' ')[0]}: ${cls}`, at[0], at[1]); }
+  }
   if (S.settlement) {
     const x = ox + S.settlement.x / TS * sc, y = oy + S.settlement.y / TS * sc;
     c.fillStyle = '#a4402c'; c.fillRect(x - 2, y - 12, 2, 12); c.fillRect(x, y - 12, 10, 7);
@@ -9409,7 +10053,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.fillStyle = '#e7dcc2'; c.beginPath(); c.arc(px, py, 4, 0, 7); c.fill();
   c.strokeStyle = 'rgba(231,220,194,.5)'; c.beginPath(); c.arc(px, py, 8, 0, 7); c.stroke();
   c.textAlign = 'left'; c.font = '10px Spectral, serif';
-  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['you', 'Du']];
+  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['teacher', 'Lehrer (Kodex H: Liste)'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['you', 'Du']];
   const lx = 8, ly = h - LEG.length * 14 - 12;
   c.fillStyle = 'rgba(11,10,8,.82)'; c.fillRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10); c.strokeStyle = '#3b3227'; c.strokeRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10);
   LEG.forEach(([k, t], i) => { const x = lx + 6, y = ly + i * 14 + 4;
@@ -9420,6 +10064,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
     else if (k === 'wild') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 4, y + 4); c.lineTo(x - 4, y + 4); c.fill(); }
     else if (k === 'quest') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 5, y); c.lineTo(x, y + 5); c.lineTo(x - 5, y); c.closePath(); c.stroke(); }
     else if (k === 'caravan') c.fillRect(x - 3, y - 3, 6, 6);
+    else if (k === 'teacher') { c.fillStyle = '#1a1510'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.strokeStyle = '#e8c070'; c.stroke(); c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6); }
     else if (k === 'valen' || k === 'undead') { c.strokeStyle = k === 'undead' ? 'rgba(78,143,122,.9)' : 'rgba(111,139,184,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 5, 0, 7); c.stroke(); }
     else if (k === 'army') { c.fillStyle = '#2b2419'; c.fillRect(x - 3, y - 6, 2, 12); c.fillStyle = '#6f8bb8'; c.fillRect(x - 1, y - 6, 8, 5); }
     else { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }
@@ -9431,9 +10076,10 @@ const QUEST_WHERE = { q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
+  if (k === 'q_anomaly') return S.anomaly ? { x: S.anomaly.x, y: S.anomaly.y } : null;   // S15 P7
   if (k === 'q_grisk_rache') return S.chainRest ? { x: S.chainRest[0], y: S.chainRest[1] } : null;
-  if (k.startsWith('c_')) { const C = (S.contracts || []).find(c => 'c_' + c.id === k); if (!C) return null; const [gx, gy] = conSq(C.town);   // S13: Eskorte/Paket zeigen aufs Ziel, nicht auf den Startort
-    if (C.have >= C.need || C.kind === 'supply') return { x: gx, y: gy };
+  if (k.startsWith('c_')) { const C = (S.contracts || []).find(c => 'c_' + c.id === k); if (!C || conHard(C)) return null; const [gx, gy] = conSq(C.town);   // S13: Eskorte/Paket zeigen aufs Ziel, nicht auf den Startort
+    if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') { const g = giverEnt(C); return g ? { x: g.x / TS, y: g.y / TS } : { x: gx, y: gy }; }   // S15: zurück zum Bewohner selbst
     if (C.kind === 'escort') { const t = S.ents.world.find(e => e.contract === C.id && e.alive); return t && dist(t, S.player) > 300 ? { x: t.x / TS, y: t.y / TS } : { x: C.tx, y: C.ty }; }
     if (C.kind === 'deliver') return { x: C.tx, y: C.ty };
     return { x: C.x, y: C.y }; }
@@ -9648,6 +10294,18 @@ function classAbility(p, key) {
       return true; }
     case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
     case 'brew': if (!addItem(p, 'potion')) return false; log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'death_coil': {                                            // S15 P19: Todesmahr
+      const f = foes.filter(o => dist(p, o) < 240 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.6 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
+      if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
+      const d = (14 + (p.attributes.strength || 8) + (p.attributes.willpower || 8)) * (dkGear(p) >= 3 ? 1.25 : 1); hurt(f, d, p, 'Todesmahr', false, 'magic'); B.heal(p, d / 3);
+      for (let k = 0; k <= 6; k++) fx(p.x + (f.x - p.x) * k / 6, p.y - 12 + (f.y - p.y) * k / 6, 'frost', 1); float(p, '+' + Math.round(d / 3), 'rgba(111,216,255,ALPHA)'); sfx('magic', 0.5); return true; }
+    case 'death_grip': {                                            // S15 Todesritter: den Feind heranziehen
+      const f = foes.filter(o => dist(p, o) < 220 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.7 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
+      if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
+      const big = MONSTERS[f.mtype]?.boss || (MONSTERS[f.mtype]?.scale || 1) > 1.4;
+      if (!big) { const a = Math.atan2(p.y - f.y, p.x - f.x); for (let k = 0; k < 40 && dist(p, f) > 34; k++) moveEnt(f, Math.cos(a) * 5, Math.sin(a) * 5); }
+      f.stagger = Math.max(f.stagger || 0, big ? 400 : 700); if (f.casting) interruptCast(f);
+      for (let k = 0; k <= 6; k++) fx(p.x + (f.x - p.x) * k / 6, p.y - 12 + (f.y - p.y) * k / 6, 'necro', 1); sfx('magic', 0.5); float(f, big ? 'widersteht' : 'gepackt', 'rgba(143,217,176,ALPHA)'); return true; }
     case 'war_cry': {
       const near = foes.filter(f => dist(p, f) < 120); if (!near.length) { UI.toast('Niemand zum Anschreien.'); return false; }
       for (const f of near) { f.stagger = Math.max(f.stagger || 0, 350); f.cowed = now + 6000; }
@@ -9688,7 +10346,7 @@ function classAbility(p, key) {
 // Ausweichen: 8 Richtungen aus WASD, ohne Richtung nach hinten (weg von der Maus).
 // Rückwärts im Kampf (BUG-076): zu Fuß 70 %. Mechanik-Check S14: ein Pferd galoppiert nicht rückwärts — beritten 40 %, sonst
 // hebelt Rückwärtsreiten mit Bogen das Nachsetzen (Mindesttempo 2,0) wieder aus.
-const backMul = p => p.mounted ? 0.4 : 0.7;
+const backMul = p => p.mounted ? 0.4 / (S.mount?.tempo || 1) : 0.7;   // S15 P17: schnelle Pferde reiten rückwärts nicht schneller (kein Kiten)
 // i-Frames = Dauer der Rolle. Abklingzeit + Ausdauer verhindern Dauerrollen.
 const DODGE = { dur: 240, dist: 92, cd: 850, stam: 20 };
 function dodge() {
@@ -9766,7 +10424,7 @@ function debugSections() {
       'Ruf ± Zahl': () => { S.factions[v('dbFac')] = (S.factions[v('dbFac')] || 0) + (+v('dbN') || 0); checkRankUp(); },
       'Rang = Zahl': () => { S.ranks[v('dbFac')] = +v('dbN') || 0; }, 'Fraktion beitreten': () => { S.ranks[v('dbFac')] = Math.max(0, S.ranks[v('dbFac')] ?? 0); },
       'Status setzen': () => addStatus(p, { key: v('dbStat'), name: stats.find(s => s[0] === v('dbStat'))[1], left: 20000, src: p.id }), 'Status entfernen': () => { p.status = (p.status || []).filter(s => s.key !== v('dbStat')); },
-      'Schwierigkeit: Angsthase / Schwer / Sehr schwer': () => { S.difficulty = ({ angsthase: 'schwer', schwer: 'sehr_schwer' })[S.difficulty || 'schwer'] || 'angsthase'; UI.toast('SCHWIERIGKEIT: ' + S.difficulty.toUpperCase()); },
+      'Schwierigkeit: Angsthase / Schwer / Sehr schwer': () => { S.difficulty = ({ angsthase: 'schwer', schwer: 'sehr_schwer' })[S.difficulty || 'schwer'] || 'angsthase'; applyDifficulty(); UI.toast('SCHWIERIGKEIT: ' + DIFF[S.difficulty].name.toUpperCase()); },
       'Gold +500': () => { S.gold += 500; }, 'Material +100': () => { S.res.wood += 100; S.res.stone += 100; S.res.iron += 50; S.res.food += 20; },
     }],
     ['Gegenstände', `${sel('dbW', items(it => it.slot === 'weapon'))} ${sel('dbA', items(it => ['head', 'chest', 'offhand', 'cloak', 'legs', 'hands', 'feet', 'ring', 'amulet'].includes(it.slot)))}
@@ -9795,6 +10453,11 @@ function debugSections() {
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
+      'Erbfolgestreit (Aurelion)': () => { if (S.succession) S.succession.done = S.succession.done || 'alt'; evSuccession(); UI.toast('Erbstreit im Haus ' + S.succession.house); },   // S15 P9
+      'Meteorsplitter': () => { S.meteor = null; evMeteor(); UI.toast('Einschlag bei ' + (S.meteor?.where || '—')); },   // S15 P9
+      'Flüchtiger Sklave (hier)': () => spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'runaway'),
+      'Magische Anomalie': () => { S.anomaly = null; evAnomaly(); UI.toast('Anomalie bei ' + (S.anomaly?.where || '—')); },   // S15 P7
+      'Magiekern (Artefakt-Konflikt)': () => { delete S.flags.coreEv; S.ents.world = S.ents.world.filter(e => !e.coreHolder); evMagicCore(); UI.toast('Snikk in Grubenhort hat den Kern.'); },   // S15 P7
       'Brand (hier)': () => { if (!startFire(nearTown())) UI.toast('Hier brennt nichts, was brennen könnte.'); },
       'Stadtverteidigung (hier)': () => { const t = nearTown(), C = makeContract(t, 'defense', 'vm'); (S.contracts ||= []).push(C); acceptContract(C); C.at = clock() + 1; },
       'Goblinbefreiung': () => liberate(), 'Varg-Tod (Kette fällt, mit Kamerafahrt)': () => liberate(), 'Garmadon-Tod (Fall der Untoten)': () => garmadonSlain(), 'Sklaverei (Aurelion)': () => { toWorld(); enslave('aurel', 200); }, 'Sklaverei (Kette)': () => { toWorld(); enslave('chain', 200); },
@@ -9808,6 +10471,12 @@ function debugSections() {
       'Mana voll': () => { recalc(p); p.mana = p.maxMana; }, 'Abklingzeiten zurück': () => { p.cooldowns = {}; },
       'Zauberer-Gegner (Kultist)': () => spawnEnemy('cultist', S.map, (p.x / TS2 | 0) + 6, p.y / TS2 | 0), 'Zauberer-Gegner (Nekromant)': () => spawnEnemy('necromancer', S.map, (p.x / TS2 | 0) + 6, p.y / TS2 | 0),
       'Alle Zauber vergessen': () => { p.spells = {}; p.spellUse = {}; recalc(p); syncHotbar(); },
+    }],
+    ['Turm des Nachtglases', `${sel('dbTower', TOWER_LEVELS.map((n, i) => [String(i + 1), `Ebene ${i + 1}: ${n}`]))}`, {   // S15 P6
+      'Zum Turm (Tor)': () => { toWorld(); p.x = NACHT.x * TS + TS / 2; p.y = (NACHT.y + 3) * TS; },
+      'In die Ebene': () => { const i = +v('dbTower'), r = i === 9 ? MAPS.tower.lib9 : MAPS.tower.levels[i]; travel('tower'); p.x = r.cx * TS + TS / 2; p.y = (r.cy + 2) * TS; },
+      'Vertrauen +25': () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 25); UI.toast('Ilvars Vertrauen ' + S.ilvar.trust); },
+      'Vertrauen −25': () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 25); UI.toast('Ilvars Vertrauen ' + S.ilvar.trust); },
     }],
     // S14 (Nutzer: Debug-Menü prüfen und erweitern)
     ['Grafik', `${sel('dbSet', Object.keys(ARMOR_SETS).map(k => [k, ARMOR_SETS[k].name]))}`, {
@@ -9880,6 +10549,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
   }
 }
 export function selftest() {
+  const fame0 = structuredClone(S.fame || null), anom0 = S.anomaly || null;   // S15: Ruhm und Anomalie bleiben vom Test unberührt
   const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   S._quiet = true;                     // S13: der ganze Test ist still (keine Kamerafahrten, Chronik, Speicherstände aus Proben)
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
@@ -10070,7 +10740,7 @@ export function selftest() {
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
   ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
+    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
   ok('Erreichbarkeit (Audit A-04): kein Rohstoff, kein Kraut steht auf Fels, Wasser oder Mauer', MAP_KEYS.every(m => (S.ents[m] || []).every(e => !(e.kind === 'prop' && e.harvest) || !SOLID.has(tileAt(m, e.x / TS | 0, e.y / TS | 0)))));
   ok('Warnung (BUG-081): erster Schritt in ein gefährliches Gebiet schreibt eine Warnung, Siedlungen und Sicheres nicht', (() => {
     const at = k => LOCATIONS.find(l => l.key === k), low = { level: 1 }, vet = { level: 9 };
@@ -12062,6 +12732,261 @@ export function selftest() {
       return placed && folk >= 8 && calm && friend && storm && fallen;
     } finally { S.ents.world = W0; S.flags = f0; S.factions = fa0; S.quests = q0; UI.closeDialogue(); }
   }));
+  ok('Ruf für Hilfe im Dorf (S15): Bewohner heilen (einmal am Tag) und Überfall abwehren bringen Ansehen', sandbox(() => {
+    const p = stage(), V = VILLAGES[0], f = townFac(V.key), f0 = S.factions[f] || 0, c = Object.assign(actor(p.x + 20, p.y, { kind: 'npc' }), { homeTown: V.key });
+    helpedVillager(c, p); helpedVillager(c, p); const healed = (S.factions[f] || 0) === Math.min(100, f0 + 3);
+    const f1 = S.factions[f], dr = S.deadRaid; raidEnd({ v: V.key, live: true, pk: 4, n: 4 }, true); S.deadRaid = dr; const defended = S.factions[f] > f1 || S.factions[f] === 100;
+    return healed && defended;
+  }));
+  ok('Lehrer in den Städten (S15): jede Grundklasse hat mindestens zwei Lehrer, alle Stadt-Lehrer stehen in der Welt', sandbox(() => {
+    const n = c => NPCS.filter(d => [].concat(d.teaches || []).includes(c)).length;
+    return ['warrior', 'archer', 'rogue', 'cleric', 'mage', 'bard', 'alchemist', 'berserker'].every(c => n(c) >= 2)
+      && NPCS.filter(d => d.atTown && d.teaches).every(d => TOWN_PLAN[d.atTown] && S.ents.world.some(e => e.key === d.key && e.teaches));
+  }));
+  ok('Nachfolger (S15): stirbt ein Lehrer, kommt nach drei Tagen ein neuer mit derselben Rolle; nie doppelt', sandbox(() => {
+    const W0 = S.ents.world, succ0 = S.succ, rel0 = S.relations.hauke; S.ents.world = W0.slice(); S.succ = {};
+    try { const d = S.day; const h = S.ents.world.find(e => e.key === 'hauke'); h.alive = false; successorDay(); const waiting = S.succ.hauke === (d | 0) + 3;
+      S.day = d + 3; successorDay(); const neu = S.ents.world.filter(e => e.key === 'hauke'); S.day = d;
+      successorDay(); const once = S.ents.world.filter(e => e.key === 'hauke').length === 1;
+      return waiting && neu.length === 1 && neu[0].alive && neu[0].teaches?.includes('warrior') && neu[0] !== h && once;
+    } finally { S.ents.world = W0; S.succ = succ0; if (rel0 != null) S.relations.hauke = rel0; const h = W0.find(e => e.key === 'hauke'); if (h) h.alive = true; }
+  }));
+  ok('Todesritter-Talente (S15): Zweig öffnet sich mit der Klasse; Frostklinge legt Frost, Todesgriff zieht heran, Blutfürst heilt beim Treffen', sandbox(() => {
+    const p = stage(); p.knownClasses = ['wanderer', 'warrior']; const closed = !branchOpen(p, 'deathknight'); p.knownClasses.push('deathknight'); p.currentClass = 'deathknight';
+    const open = branchOpen(p, 'deathknight'); p.tree = { dk_frost: 1, dk_blood: 1, dk_grip: 1, dk_plate: 1, k_bloodlord: 1 }; recalc(p);
+    const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 30; e.y = p.y; combat = S.ents.__a; p.graveFrost = true; hit(p, e, 1); const frosted = e.status?.some(s => s.key === 'frost');
+    const g = spawnEnemy('bandit', '__a', 11, 9); g.x = p.x + 180; g.y = p.y; p.aim = 0; p.cooldowns = {}; p.stamina = 100; e.x = p.x - 200; useAbility('death_grip'); const pulled = dist(p, g) < 60;
+    if (p.body) { B.fullHeal(p); p.body.torso.hp -= 30; B.syncHp(p); } else p.hp -= 30; const h0 = p.hp; hit(p, g, 1); const healed = p.hp > h0;
+    return closed && open && treeAbilities(p).includes('death_grip') && frosted && pulled && healed;
+  }));
+  ok('Akademie-Prüfungen (S15 P5): Puppen nur durch Zauber, Schild zählt, Heilung besteht, Duell endet vor dem Tod; Rang Adept nach zwei', sandbox(() => {
+    const p = stage(), a0 = S.acad, r0 = S.acadRank, f0 = S.factions.aurel; S.acad = {}; S.acadRank = 0;
+    try { const at = { x: p.x, y: p.y };
+      startTrial('aim', at); const dummies = S.ents.__a.filter(e => e.trial === 'aim'); hurt(dummies[0], 5, p, 'Schwert'); const noSword = S.trial.n === 0;
+      for (const d of dummies) hurt(d, 5, p, 'Zauber', false, 'magic'); trialTick(); const aim = !!S.acad.aim && !S.trial;
+      startTrial('heal', at); learnSpell(p, 'sp_heal', true); for (let i = 0; i < 4; i++) castSpell(p, 'sp_heal'); trialTick(); const heal = !!S.acad.heal && !S.trial;
+      const adept = S.acadRank === 2;
+      startTrial('duel', at); const st = S.ents.__a.find(e => e.duelist); if (p.body) B.fullHeal(p); hurt(p, p.maxHp * 0.95, st, 'Duell'); const lost = !S.trial && !S.acad.duel && p.hp > 0;
+      startTrial('duel', at); const st2 = S.ents.__a.find(e => e.duelist); hurt(st2, st2.maxHp * 0.95, p, 'Duell'); const won = !!S.acad.duel && st2.hp > 0;
+      return noSword && aim && heal && adept && lost && won && !S.ents.__a.some(e => e.trial);
+    } finally { S.trial = null; S.acad = a0; S.acadRank = r0; S.factions.aurel = f0; }
+  }));
+  ok('Zauberlehrer (S15 P5): sagen, was fehlt (Gold, Intelligenz, Beziehung, Schein); lehren sonst; Akademie Stufe III nur mit Rang', sandbox(() => {
+    const p = stage(), g0 = S.gold, rel0 = S.relations.serafine, perm0 = S.permit, acad0 = S.acadRank;
+    try { const sera = { key: 'serafine', name: 'Serafine', faction: 'merch', spellsTaught: ['sp_firebolt'] }, prof = { key: 'corvinus', name: 'Corvinus', faction: 'aurel', spellRule: 'academy', spellsTaught: ['sp_firewall', 'sp_icespear'] };
+      p.spells = {}; p.attributes.intelligence = 8; S.gold = 5; S.relations.serafine = 0;
+      const l1 = spellLack(sera, 'sp_firebolt'), poor = l1.some(x => x.includes('Gold')) && l1.some(x => x.includes('Beziehung'));
+      S.gold = 500; S.relations.serafine = 20; const learned = learnFrom(sera, 'sp_firebolt') && p.spells.sp_firebolt === 1 && S.gold < 500;
+      S.permit = -1; const noPermit = spellLack(prof, 'sp_icespear').some(x => x.includes('Aufenthaltsschein'));
+      S.permit = (S.day | 0) + 3; p.attributes.intelligence = 14; S.acadRank = 0; const t3 = spellLack(prof, 'sp_firewall').some(x => x.includes('Adept')), t2ok = !spellLack(prof, 'sp_icespear').length;
+      S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
+      return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
+    } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
+  }));
+  ok('Rangwege (S15 P8): Händler und Bande haben Beitritt und zwei Rangprüfungen; der Kodex nennt für jede Fraktion den nächsten Schritt', (() => {
+    const lines = ['merch', 'bandit'].every(f => RANK_LINES[f]?.lines.length === FACTIONS[f].ranks.length - 1 && QUESTS[`r_${f}_1a`] && QUESTS[`r_${f}_2b`]);
+    const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
+    return lines && guide;
+  })());
+  ok('Stall & Totenross & Kodex (S15): Angebote fest je Woche, Kaufen/Eintauschen, Todesritter bekommt ein Totenross, Code schaltet den Kodex frei', sandbox(() => {
+    const p = stage(), m0 = S.mount, ss0 = S.stableSold, g0 = S.gold, c0 = S.codex, fl = { dk: S.flags.dkSteed, all: S.flags.codexAll };
+    try { const w = { key: 'wendel', name: 'Wendel', horseBreeder: true }; const o1 = stableOffers(w), o2 = stableOffers(w); const fixed = o1.length === 5 && JSON.stringify(o1) === JSON.stringify(o2);
+      S.mount = null; S.gold = 5000; const bought = buyHorse(w, o1[0].id) && S.mount.name === o1[0].name && stableOffers(w).length === 4;
+      const n1 = S.mount.name; buyHorse(w, stableOffers(w)[0].id); const traded = S.mount.name !== n1;
+      p.knownClasses = ['wanderer', 'warrior', 'deathknight']; delete S.flags.dkSteed; p.currentClass = 'deathknight'; dkSteed(); const undeadSteed = S.mount.kind === 'dead_horse';
+      S.codex = {}; delete S.flags.codexAll; const hidden = !(S.flags.codexAll || S.codex?.met?.serafine); const code = A_codexCode('nachtglas') && S.flags.codexAll;
+      return fixed && bought && traded && undeadSteed && hidden && code;
+    } finally { S.mount = m0; S.stableSold = ss0; S.gold = g0; S.codex = c0; S.flags.dkSteed = fl.dk; S.flags.codexAll = fl.all; if (!fl.dk) delete S.flags.dkSteed; if (!fl.all) delete S.flags.codexAll; }
+  }));
+  ok('BUG-113: Ein blutender Bewohner am Boden wird nach dem Kampf verbunden und stirbt nicht', sandbox(() => {
+    const p = stage(), a = actor(p.x + 200, p.y, { kind: 'npc', name: 'Wache' }), b = actor(p.x + 230, p.y, { kind: 'npc', name: 'Helfer' }); a.guard = true;
+    if (a.body) { a.body.torso.hp = -2; B.syncHp(a); } downed(a, 'Test'); a.status = [{ key: 'bleeding', name: 'Blutend', left: 30000 }]; a.downTimer = 3000;
+    for (let i = 0; i < 60 && a.downed; i++) tickCombatant(a, 100);
+    return a.alive && !(a.status || []).some(s => s.key === 'bleeding');
+  }));
+  ok('Bewohner-Aufträge (S15): Name des Auftraggebers steht im Auftrag, Rückweg zeigt auf ihn, wo er gerade ist; Sehr schwer: kein Name, kein Wegpunkt', sandbox(() => {
+    const d0 = S.difficulty, W0 = S.ents.world, C0 = S.contracts; S.ents.world = W0.slice();
+    try { S.difficulty = 'schwer'; const v = { id: uid(), kind: 'npc', key: '__tv', name: 'Testbert', alive: true, map: 'world', x: 100 * TS, y: 120 * TS }; S.ents.world.push(v);
+      const C = makeContract('eren', 'herbs', '__tv'); C.giverName = 'Testbert'; C.state = 'active'; S.contracts = [C];
+      const named = questOf(C).desc.includes('Testbert'), p1 = questPoint('c_' + C.id); v.x = 140 * TS; const p2 = questPoint('c_' + C.id);
+      const follows = p1.x === 100 && p2.x === 140;
+      S.difficulty = 'sehr_schwer'; const hard = !questPoint('c_' + C.id) && !questOf(C).desc.includes('Testbert');
+      const B = makeContract('eren', 'herbs', 'board'); B.state = 'active'; S.contracts.push(B); const boardStill = !!questPoint('c_' + B.id);
+      return named && follows && hard && boardStill;
+    } finally { S.difficulty = d0; S.ents.world = W0; S.contracts = C0; }
+  }));
+  ok('Wohlstand 100 (S15): Handel fördern bis 100 baut sofort; ist die Stadt voll, bleibt es stehen und das Menü sagt warum', sandbox(() => {
+    const G0 = structuredClone(S.growth || {});
+    try { const t = Object.keys(TOWN_PLAN).find(k => growable(k)), G = growthOf(t); G.built = Array.from({ length: 10 }, () => ({ x: -99, y: -99, w: 1, h: 1 })); G.prosper = 100;
+      const full = !growNow(t) && G.full === 'max' && G.prosper === 100;
+      return full;
+    } finally { S.growth = G0; }
+  }));
+  ok('Reittier-Werte (S15 P17): jedes Pferd eigene Werte, Erschöpfung bremst, mutige kommen im Kampf, Verstoßen löscht es', sandbox(() => {
+    const p = stage(), m0 = S.mount;
+    try { S.mount = mountStats({ kind: 'horse', name: 'Test', oiled: 0 }); const H = S.mount, ok1 = H.tempo >= 0.9 && H.tempo <= 1.2 && H.staminaMax >= 80 && H.mut >= 0;
+      p.mounted = { kind: 'horse' }; H.stamina = H.staminaMax; const fresh = mountSpeed(p); H.stamina = 0; const tired = mountSpeed(p) < fresh;
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 60; e.y = p.y; p.mounted = null; p.map = '__a';
+      H.mut = 90; const h1 = spawnHorse(p, 200); h1.come = true; mountTick(16); const brave = h1.come;
+      H.mut = 10; h1.come = true; mountTick(16); const shy = !h1.come;
+      releaseMount(); const gone = !S.mount && !horseEnt(p.map);
+      return ok1 && tired && brave && shy && gone;
+    } finally { S.mount = m0; p.mounted = null; }
+  }));
+  ok('Todesritter-Questreihe (S15 P19): drei Aufträge bei Sael der Reihe nach; zwei Teile geben Todesmahr, drei die Frostaura', sandbox(() => {
+    const p = stage(), q0 = ['dk_1', 'dk_2', 'dk_3'].map(k => S.quests[k]); ['dk_1', 'dk_2', 'dk_3'].forEach(k => delete S.quests[k]);
+    try { p.knownClasses = ['wanderer', 'warrior']; const locked = !questAvailable('dk_1'); p.knownClasses.push('deathknight'); p.currentClass = 'deathknight';
+      const first = questAvailable('dk_1') && !questAvailable('dk_2'); S.quests.dk_1 = { state: 'done', progress: [3, 3] }; const second = questAvailable('dk_2');
+      p.equip.head = mkItem('todesritter_helm'); p.equip.chest = mkItem('todesritter_harnisch'); recalc(p); syncHotbar(); const coil = p.hotbar.some(h => h.key === 'death_coil');
+      p.equip.cloak = mkItem('todesritter_mantel'); recalc(p); const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 40; e.y = p.y; S._dkAura = 3100; dkAuraTick(p, 16);
+      const aura = e.status?.some(s => s.key === 'frost');
+      return locked && first && second && coil && dkGear(p) === 3 && aura && ['dk_1', 'dk_2', 'dk_3'].every(k => ITEMS[QUESTS[k].reward.item]?.classSet === 'deathknight');
+    } finally { ['dk_1', 'dk_2', 'dk_3'].forEach((k, i) => { if (q0[i]) S.quests[k] = q0[i]; else delete S.quests[k]; }); }
+  }));
+  ok('Wiederbesiedlung (S15 P11): 60 Tage nach der Befreiung hat ein Ort alle fünf Stufen durchlaufen und ist gewachsen', sandbox(() => {
+    const R0 = S.resettle, d0 = S.day, W0 = S.ents.world.slice(), G0 = structuredClone(S.growth || {}), gs = S.flags.garmadonSlain;
+    try { const k = Object.keys(TOWN_PLAN).find(t => growable(t) && !TOWN_PLAN[t].metro); S.resettle = { [k]: { day: d0 | 0, stage: 0 } };
+      let built = 0; const stages = []; for (const add of [1, 5, 15, 30, 60]) { S.day = (d0 | 0) + add; resettleDay(() => built++); stages.push(S.resettle[k].stage); }
+      const tents = S.ents.world.some(e => e.resettle === k), grown = built === 7;
+      return stages.join() === '1,2,3,4,5' && tents && grown;
+    } finally { S.resettle = R0; S.day = d0; S.ents.world = W0; S.growth = G0; S.flags.garmadonSlain = gs; }
+  }));
+  ok('Schwierigkeit (S15 P12): Angsthase schwächer und mit längerer Ansage, Sehr schwer härter; Kopfgeld verfällt je nach Stufe', sandbox(() => {
+    const p = stage(), d0 = S.difficulty, b0 = S.bounty;
+    try { const hpOf = d => { S.difficulty = d; applyDifficulty(); return spawnEnemy('bandit', '__a', 11, 9, { noVariant: true, level: 5 }).maxHp; };
+      const easy = hpOf('angsthase'), norm = hpOf('schwer'), hard = hpOf('sehr_schwer');
+      S.difficulty = 'angsthase'; applyDifficulty(); const e = spawnEnemy('chain_brute', '__a', 11, 9); startHeavy(e, p, MONSTERS.chain_brute); const longWind = e.telegraph > MONSTERS.chain_brute.heavy.wind;
+      const decay = d => { S.difficulty = d; S.bounty = { valen: 100 }; bountyDay(); return 100 - (S.bounty.valen || 0); };
+      return easy < norm && norm < hard && longWind && decay('angsthase') > decay('schwer') && decay('schwer') > decay('sehr_schwer');
+    } finally { S.difficulty = d0; S.bounty = b0; applyDifficulty(); }
+  }));
+  ok('Erbfolgestreit (S15 P9): zwei Erben, deine Fürsprache hebt die Gunst des Hauses und damit seine Stimme im Rat', sandbox(() => {
+    const p = stage(), S0 = S.succession, h0 = structuredClone(S.houses || {}), c0 = structuredClone(S.council || {});
+    try { delete S.succession; const ev = evSuccession(), Sx = S.succession, H = AUREL_HOUSES.find(h => h.key === Sx.house), f0 = favor(H.key);
+      const lord = { name: 'Hausherr', houseKey: H.key }; successionTalk(lord, H); document.querySelector('#dlg-choices button')?.click();
+      const done = Sx.done === Sx.a[0] && favor(H.key) === Math.min(100, f0 + 15) && lord.name.startsWith(Sx.a[0]);
+      UI.closeDialogue(); return ev && done && Sx.a[0] && Sx.b[0];
+    } finally { UI.closeDialogue(); S.succession = S0; if (!S0) delete S.succession; S.houses = h0; S.council = c0; }
+  }));
+  ok('Weg und Himmel (S15 P9): Entflohener (verstecken/ausliefern/begleiten), Meteorsplitter mit Krater und drei Abnehmern', sandbox(() => {
+    const p = stage(), f0 = { ...S.factions }, M0 = S.meteor, O0 = S.omega, I0 = S.ilvar, W0 = S.ents.world.length; S.gold = 100;
+    try { const pick1 = t => { const b = [...document.querySelectorAll('#dlg-choices button')].find(x => x.textContent.includes(t)); b?.click(); return !!b; };
+      const [r1] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r1); const hid = pick1('Versteck') && S.factions.goblin > (f0.goblin || 0);
+      const [r2] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r2); const g1 = S.gold; const sold = pick1('Ausliefern') && S.gold === g1 + 30 && !S.ents.world.includes(r2);
+      const [r3] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r3); const n0 = S.ents.world.filter(e => e.questFoe === 'runaway').length; const fought = pick1('kämpfen') && S.ents.world.filter(e => e.questFoe === 'runaway').length === n0 + 3;
+      S.meteor = null; const ev = evMeteor(), shard = S.ents.world.some(e => e.kind === 'item' && e.item.key === 'meteorsplitter');
+      addItem(p, 'meteorsplitter'); const g2 = S.gold; meteorChoice({ key: 'corvinus', name: 'Corvinus' }).fn(); const paid = S.gold === g2 + 200 && !hasItem(p, 'meteorsplitter');
+      UI.closeDialogue(); return hid && sold && fought && ev && shard && paid;
+    } finally { UI.closeDialogue(); Object.assign(S.factions, f0); S.meteor = M0; S.omega = O0; S.ilvar = I0; S.ents.world = S.ents.world.slice(0, W0); delete S.flags.meteorTo; }
+  }));
+  ok('Ruhm (S15 P8): Boss-Sieg hebt den Ruhm der Region über „Bekannt“, Begrüßung ändert sich, Berühmte zahlen weniger', sandbox(() => {
+    const p = stage(), F0 = S.fame; S.fame = {};
+    try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Geschichten') || l.includes('gehört'));
+      const b = spawnEnemy('bandit', '__a', 11, 9); b.boss = true; b.x = p.x + 40; b.y = p.y; die(b, 'Test', p);
+      const known = fameOf('mitte') >= 15 && fameTier(fameOf('mitte')) !== 'Unbekannt'; S.fame.mitte = 40; const l1 = contextLines(npc).some(l => l.includes('Geschichten'));
+      const shop = { faction: null, x: p.x, y: p.y, map: '__a' }, pr0 = repPrice(shop, true); S.fame.mitte = 70; const cheaper = repPrice(shop, true) < pr0;
+      return !l0 && known && l1 && cheaper;
+    } finally { S.fame = F0; }
+  }));
+  ok('Magische Anomalie (S15 P7): Ort per Hash, Mana doppelt, Schutzzauber im Zentrum schließt sie und zahlt', sandbox(() => {
+    const p = stage(), A0 = S.anomaly, q0 = S.quests.q_anomaly; S.anomaly = null;
+    try { const ev = evAnomaly(), A1 = { ...S.anomaly }; S.anomaly = null; evAnomaly(); const same = S.anomaly.x === A1.x && S.anomaly.y === A1.y;
+      p.map = 'world'; p.x = S.anomaly.x * TS; p.y = S.anomaly.y * TS; p.maxMana = 100; p.mana = 0; recalc(p); p.maxMana = 100; p.mana = 0;
+      const inside = inAnomaly(p); const g0 = S.gold; learnSpell(p, 'sp_shield', true); castSpell(p, 'sp_shield'); const closed = !S.anomaly && S.gold === g0 + 120 && S.quests.q_anomaly.state === 'done';
+      return ev && same && inside && closed;
+    } finally { S.anomaly = A0; S.quests.q_anomaly = q0; if (!q0) delete S.quests.q_anomaly; }
+  }));
+  ok('Artefakt-Konflikt (S15 P7): Snikk hat den Kern; jede Wahl (Akademie, Tote, Kirche, Ilvar, zerschlagen) ändert etwas', sandbox(() => {
+    const p = stage(), fl = S.flags.coreEv, f0 = { ...S.factions }, I0 = S.ilvar, O0 = S.omega, W0 = S.ents.world.length; delete S.flags.coreEv; S.gold = 500;
+    try { const ev = evMagicCore(), sn = S.ents.world.find(e => e.coreHolder); coreTaken(sn, 'test'); const held = hasItem(p, 'magiekern') && S.flags.coreEv === 'held';
+      const res = {}; for (const k of ['corvinus', 'sael', 'irmgard', 'ilvar']) { S.flags.coreEv = 'held'; if (!hasItem(p, 'magiekern')) addItem(p, 'magiekern'); const before = JSON.stringify([S.factions, S.ilvar?.trust, S.omega?.faith, S.gold]);
+        coreChoice({ key: k, name: k }).fn(); res[k] = JSON.stringify([S.factions, S.ilvar?.trust, S.omega?.faith, S.gold]) !== before && !hasItem(p, 'magiekern'); }
+      S.flags.coreEv = 'held'; addItem(p, 'magiekern'); const o0 = S.factions.order; coreSmash(); const smashed = S.factions.order > o0 && !hasItem(p, 'magiekern');
+      UI.closeDialogue(); return ev && held && Object.values(res).every(Boolean) && smashed;
+    } finally { S.flags.coreEv = fl; if (!fl) delete S.flags.coreEv; Object.assign(S.factions, f0); S.ilvar = I0; S.omega = O0; S.ents.world = S.ents.world.slice(0, W0); }
+  }));
+  ok('Glaubensmagie (S15 P7): Irmgard lehrt nach Kettenrang oder Glauben; Heilig trifft Untote doppelt; Rang macht stärker', sandbox(() => {
+    const p = stage(), rk0 = S.ranks.chain, O0 = S.omega; S.omega = { ...(O0 || {}), faith: 0 };
+    try { const ir = { key: 'irmgard', name: 'Irmgard', faction: 'chain', spellRule: 'faith', spellsTaught: FAITH_SPELLS }; S.ranks.chain = -1; p.attributes.intelligence = 14; S.gold = 999;
+      const no = spellLack(ir, 'sp_holyflame').some(x => x.includes('Glaube')); S.ranks.chain = 1; const t2 = !spellLack(ir, 'sp_ray').length && spellLack(ir, 'sp_inquisition').length > 0;
+      learnSpell(p, 'sp_ray', true); const pw1 = spellPower(p, 'sp_ray'); S.ranks.chain = 3; const pw3 = spellPower(p, 'sp_ray');
+      const sk = spawnEnemy('skeleton', '__a', 11, 9), ba = spawnEnemy('bandit', '__a', 12, 9), S0 = ABILITIES.sp_ray.spell; let l1 = 0, l2 = 0;
+      for (let i = 0; i < 8; i++) for (const [t, add] of [[sk, v => l1 += v], [ba, v => l2 += v]]) { t.armor = 0; t.alive = true; delete t.body; t.hp = t.maxHp = 500; const h = t.hp; spellHit(p, t, 12, S0); add(h - t.hp); }
+      return no && t2 && pw3 > pw1 && l1 > l2 * 1.4;
+    } finally { S.ranks.chain = rk0; S.omega = O0; }
+  }));
+  ok('Verbotene Magie (S15 P7): Schattenzauber vor einer Wache gibt Kopfgeld, ohne Zeugen nicht; Magierjäger bannen den Zauber', sandbox(() => {
+    const p = stage(), b0 = S.bounty, n0 = S.flags.forbiddenN; S.bounty = {}; S.flags.forbiddenN = 0;
+    try { S.ents.__a = S.ents.__a.filter(e => e.kind !== 'npc'); const alone = magicSeen(p, 'sp_shadowbolt') === 0 && !Object.keys(S.bounty).length;
+      const g = actor(p.x + 60, p.y, { kind: 'npc', faction: 'order', name: 'Wache' }); g.guard = true;
+      const seen = magicSeen(p, 'sp_shadowbolt') > 0 && S.bounty.order === 120, fire = magicSeen(p, 'sp_firebolt') === 0;
+      const h = spawnEnemy('bounty_hunter', '__a', 11, 9); Object.assign(h, { mageHunter: true, banCd: 0, x: p.x + 100, y: p.y }); p.maxMana = 50; p.mana = 40;
+      startCast(p, 'sp_firering'); mageHunterTick(h, 16); const banned = !p.casting && p.mana < 40 && p.silenced > performance.now();
+      return alone && seen && fire && banned;
+    } finally { S.bounty = b0; S.flags.forbiddenN = n0; }
+  }));
+  ok('Turm-Folgen (S15 P6): Tuvi flieht (Vertrauen sinkt), Seelen befreien kostet Vertrauen, Ilvars Tod versperrt die oberen Ebenen', sandbox(() => {
+    const p = stage(), I0 = S.ilvar, T0 = S.ents.tower, fl = { tuvi: S.flags.tuvi, souls: S.flags.soulsFreed, dead: S.flags.ilvarDead }, W0 = S.ents.world.length, f0 = { ...S.factions };
+    S.ilvar = { trust: 60, asked: {}, vials: 0 }; S.ents.tower = T0.slice(); delete S.flags.tuvi; delete S.flags.soulsFreed;
+    try { const tuvi = S.ents.tower.find(e => e.name === 'Tuvi'); tuviTalk(tuvi); document.querySelector('#dlg-choices button')?.click(); const fled = S.flags.tuvi === 'fled' && S.ilvar.trust === 45 && !S.ents.tower.includes(tuvi);
+      soulJarChoice(); document.querySelector('#dlg-choices button')?.click(); const freed = S.flags.soulsFreed && S.ilvar.trust === 15;
+      const saved = solidIndex.tower; ilvarSlain(null); const L = MAPS.tower.levels, blocked = !!solidPropAt('tower', 32 * TS + 16, (L[6].y + L[6].h) * TS + 16, 6);
+      solidIndex.tower = saved; return fled && freed && blocked && S.flags.ilvarDead;
+    } finally { UI.closeDialogue(); S.ilvar = I0; S.ents.tower = T0; S.flags.tuvi = fl.tuvi; S.flags.soulsFreed = fl.souls; S.flags.ilvarDead = fl.dead; if (!fl.tuvi) delete S.flags.tuvi; if (!fl.souls) delete S.flags.soulsFreed; if (!fl.dead) delete S.flags.ilvarDead;
+      S.ents.world = S.ents.world.slice(0, W0); Object.assign(S.factions, f0); for (const e of T0) { if (e.kind === 'npc') e.alive = true; if (e.soulJar) e.label = 'Gläser voller grünem Licht. In jedem bewegt sich etwas.'; } indexSolids('tower'); }
+  }));
+  ok('Nachtglas (S15 P6): Vertrauen 50/75 öffnet Lehre und Siegel, Endprüfung gibt den legendären Zauber, der Feinde verlangsamt', sandbox(() => {
+    const p = stage(), I0 = S.ilvar, f0 = S.flags.towerSeal, seals0 = S.ents.tower.filter(e => e.towerSeal); S.ilvar = { trust: 60, asked: {}, vials: 0 };
+    try { const il = { key: 'ilvar', name: 'Ilvar', spellRule: 'ilvar' }; p.attributes.intelligence = 16; S.gold = 999;
+      const raiseOk = !spellLack(il, 'sp_raise').length, burstNo = spellLack(il, 'sp_soulburst').some(x => x.includes('75')), glassNo = spellLack(il, 'sp_nachtglas').some(x => x.includes('Endprüfung'));
+      startTrial('ilvar', { x: p.x, y: p.y }); S.trial.until = clock() - 1; trialTick(); const got = !!p.spells?.sp_nachtglas;
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 100; e.y = p.y; castSpell(p, 'sp_nachtglas'); const slowed = e.timeSlow > performance.now();
+      return raiseOk && burstNo && glassNo && got && slowed;
+    } finally { S.ilvar = I0; S.trial = null; }
+  }));
+  ok('Magierturm (S15 P6): Wahrzeichen und Tor in der Welt, zehn Ebenen begehbar (Weg vom Eingang bis Ilvar), Ilvar lehrt nach Vertrauen', sandbox(() => {
+    const M = MAPS.tower, gate = S.ents.world.find(e => e.portal === 'tower'), tower = S.ents.world.find(e => e.type === 'mage_tower');
+    const walk = (a, b) => { const seen = new Set([a]), q = [a]; while (q.length) { const k = q.shift(); if (k === b) return true; const x = k % M.w, y = k / M.w | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (y + dy) * M.w + x + dx; if (x + dx < 0 || x + dx >= M.w || seen.has(n) || SOLID.has(M.tiles[n])) continue; seen.add(n); q.push(n); } } return false; };
+    const L = M.levels, idx = r => r.cy * M.w + r.cx, allUp = [2, 3, 4, 5, 6, 7, 8, 10].every(i => walk(idx(L[1]), idx(L[i]))) && walk(idx(L[1]), idx(M.crypt));
+    const signs = S.ents.tower.filter(e => e.type === 'sign' && /^Ebene \d+/.test(e.label || '')).length === 10;
+    const I0 = S.ilvar; S.ilvar = { trust: 0, asked: {}, vials: 0 };
+    try { const il = S.ents.tower.find(e => e.key === 'ilvar'), low = SPELL_RULES.ilvar(S.player, 2), S2 = (S.ilvar.trust = 30, SPELL_RULES.ilvar(S.player, 2)), hi = SPELL_RULES.ilvar(S.player, 3);
+      return !!gate && !!tower && allUp && signs && !!il && !!low && !S2 && !!hi && DUNGEONS.tower && MAP_KEYS.includes('tower');
+    } finally { S.ilvar = I0; }
+  }));
+  ok('Zauber-Wände (S15 P4): Eiswand hält eine Figur auf, Feuerwand brennt, beide vergehen; Frostfläche bleibt als Eisboden', sandbox(() => {
+    const p = stage(); indexSolids('__a'); p.aim = 0; learnSpell(p, 'sp_icewall', true); castSpell(p, 'sp_icewall', 0);
+    const walls = GROUND.filter(g => g.owner === p.id && g.solid), e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 40; e.y = p.y;
+    for (let i = 0; i < 20; i++) moveEnt(e, 3, 0); const blocked = e.x < p.x + 70 - 10;
+    learnSpell(p, 'sp_firewall', true); const b = spawnEnemy('bandit', '__a', 11, 9); b.x = p.x - 70; b.y = p.y; castSpell(p, 'sp_firewall', Math.PI); const hp0 = b.hp; groundTick(); const burnt = b.hp < hp0;
+    for (const g of GROUND) g.until = 0; groundTick(); const gone = !GROUND.length && !S.ents.__a.some(x => x.kind === 'spellwall') && !solidPropAt('__a', p.x + 70, p.y, 4);
+    delete solidIndex.__a; return walls.length >= 3 && blocked && burnt && gone;
+  }));
+  ok('Auftragsziele (S15, Nutzer-Bug Grabräuber): fehlende Ziele kommen außer Sicht nach und sind Feind, auch Untote für Diener der Toten', sandbox(() => {
+    const p = stage(), q0 = S.quests.c_war1, g0 = S.quests.q_graverobbers, r0 = S.ranks.undead, m0 = S.map, W = S.ents.world.length;
+    try { S.map = p.map = 'world'; const l = LOCATIONS.find(l => l.key === 'necropolis'); p.x = (l.x + 60) * TS; p.y = l.y * TS; S.ranks.undead = 1;
+      S.quests.q_graverobbers = { state: 'active', progress: [0] }; S.quests.c_war1 = { state: 'active', progress: [0, 0] };
+      questTargetTick(true);
+      const rob = S.ents.world.filter(e => e.questFoe === 'q_graverobbers' && e.alive), cul = S.ents.world.filter(e => e.questFoe === 'c_war1' && e.alive);
+      return rob.length >= 1 && cul.length >= 1 && cul.every(e => teamOf(e) === 'foe') && [...rob, ...cul].every(e => dist(e, p) > 20 * TS);
+    } finally { S.ents.world = S.ents.world.filter(e => !e.questFoe); S.quests.c_war1 = q0; S.quests.q_graverobbers = g0; if (!g0) delete S.quests.q_graverobbers; if (!q0) delete S.quests.c_war1; S.ranks.undead = r0; S.map = m0; }
+  }));
+  ok('Aufträge nur einmal abgeben (S15, Nutzer-Bug)', sandbox(() => {
+    stage(); const g0 = S.gold, C = { id: 'tst', kind: 'bounty', state: 'active', have: 1, need: 1, town: 'eren', title: 'Test', spared: true, reward: { gold: 50, xp: 0, rep: 0 } };
+    claimContract(C); claimContract(C); claimContract(C); return S.gold === g0 + 50 && C.state === 'claimed';
+  }));
+  ok('Pferd pfeifen (S15): kommt von außerhalb, läuft heran, E sitzt auf; im Kampf kommt es nicht; absitzen lässt es stehen', sandbox(() => {
+    const p = stage(), m0 = S.mount; S.mount = { kind: 'horse', name: 'Test', oiled: 0, tempo: 1, staminaMax: 100, mut: 10 };
+    try { const h = spawnHorse(p, 300); const far = h && dist(h, p) > 250; h.come = true;
+      for (let i = 0; i < 400 && h.come; i++) mountTick(16); const came = !h.come && dist(h, p) < 60;
+      mountUp(h); const up = !!p.mounted && !horseEnt(p.map);
+      p.mounted = null; leaveHorse(p); const stays = !horseEnt(p.map);   // leaveHorse nur in der Welt
+      spawnHorse(p, 0, p); const left = !!horseEnt(p.map);
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 100; e.y = p.y; e.aggroId = p.id; const h2 = horseEnt(p.map); h2.come = true; mountTick(16);
+      return far && came && up && stays && left && inFight(p) && !h2.come;
+    } finally { S.mount = m0; p.mounted = null; }
+  }));
   ok('Zauberbuch & Gegner-Zauberer (S15 P4): Zauber auf die Leiste, bleibt nach dem Neuordnen; Kultist wirkt auf einen Dummy', sandbox(() => {
     const p = stage(); p.spells = {}; p.hotbar = []; learnSpell(p, 'sp_firebolt', true); syncHotbar(); const onBar = p.hotbar.some(s => s.key === 'sp_firebolt');
     UI.openModal('spells'); const book = !!document.querySelector('#modal-body .spell-row'); UI.closeModal();
@@ -12102,6 +13027,7 @@ export function selftest() {
     Object.values(MONSTERS).every(m => typeof m.interiors === 'boolean') && Object.values(ORIGINS).every(o => Object.keys(o.skills).every(s => SKILL_NAMES[s])));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
+  S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   S._quiet = quiet0;
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
@@ -12149,6 +13075,10 @@ function buildCreation() {
   });
   ap.appendChild(hr);
   row('Kleidung', CLOTH, 'cloth');
+  let diff = 'schwer'; const db = $('cr-diff');                            // S15 P12: Schwierigkeit beim Start
+  if (db) { db.innerHTML = ''; const showD = () => { $('cr-diff-desc').textContent = DIFF[diff].desc; };
+    for (const [k, D] of Object.entries(DIFF)) { const b = el2('button', 'build' + (k === diff ? ' sel' : ''), D.name); b.onclick = () => { diff = k; [...db.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showD(); }; db.appendChild(b); }
+    showD(); }
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
     const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).map(s => SKILL_NAMES[s] || s).join(', ')}</small>`);
@@ -12185,7 +13115,7 @@ function buildCreation() {
     const name = ($('cr-name').value || 'Namenlos').slice(0, 18);
     const house = ($('cr-house').value || name).slice(0, 18);
     bindInput();
-    newGame({ name, house, origin, pal, build });
+    newGame({ name, house, origin, pal, build, difficulty: diff });
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); $('titlescreen').classList.remove('hidden'); };
 }
@@ -12224,6 +13154,14 @@ function boot() {
       useConsumable(S.player, idx, target, part);
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
+    spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
+    magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
+    fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),   // S15 P8
+    difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
+    mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
+    stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
+    teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
   // Titelbildschirm
@@ -12251,6 +13189,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
+    castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
 boot();

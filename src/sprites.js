@@ -16,7 +16,7 @@ import { ATLAS } from './ref5_atlas.js?v=15';
 import { ITEMS } from './data.js?v=15';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=15';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { paintR, paintTuckR, paintBeastR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=15';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=15';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -172,7 +172,7 @@ function humanAtlas(e) {
   if (e.guard) return e.faction === 'chain' ? 'krieger' : e.faction === 'order' ? 'paladin' : e.faction === 'aurel' ? 'infanterist' : 'waechter';
   return CIV_ATLAS[((((e.seed || 0) * 7919) | 0) >>> 0) % CIV_ATLAS.length];
 }
-const MON_ATLAS = { dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
+const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
   cultist: 'schamane', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
   flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese' };
@@ -261,6 +261,9 @@ const ARMOR_LOOK = {
   kronharnisch: { armor: 'plate', armorCol: '#3a4a66', tabard: '#2f4260', mark: 'chevron', markCol: '#b9c3d2' }, kronhelm: { helm: 'nasal', helmCol: '#5a5852', crest: '#3a5a9a' },   // S13: Fraktionssets
   totenrufer_kapuze: { hooded: 1, hood: '#141a18', helm: '' }, gewand_stille_schar: { robe: '#161c18', stole: '#1a2420', charm: 1, rn: '#8fd9b0', pauld: '#b8b09a', asy: 1, pb: 1, sil: 'collar' },   // S15 Klassen-Rüstung
   grabsteinkragen: { cloak: '#101512', sil: 'collar motes', mc: '#8fd9b0' },
+  todesritter_helm: { helm: 'great', helmCol: '#22262e', crest: '#6fd8ff', ge: '#6fd8ff' },   // S15 P19: Eidwacht (Todesritter)
+  todesritter_harnisch: { armor: 'plate', armorCol: '#20242c', pauld: '#3a4250', pb: 2, spk: 1, rn: '#6fd8ff', kn: 1, glove: '#2a2e36', tabard: '#12141a' },
+  todesritter_mantel: { cloak: '#10161e', capeL: 1, sil: 'flames', mc: '#6fd8ff' },
   hoernerkrone: { hooded: 1, hood: '#1e1624', helm: '', sil: 'horns' }, robe_fluesternder: { robe: '#221a2a', sash: '#4a2a5e', rn: '#b07ae0', core: '#c890ff' }, schattenmantel: { cloak: '#140f18', sil: 'motes', mc: '#c890ff' },
   hainfell: { fur: '#5a4a30', wraps: 1, armor: 'leather', armorCol: '#4a3a26' }, fellmantel_hain: { cloak: '#3e3222', capeL: 1 }, geweih_hirsch: { helm: '', sil: 'antlers' },
   gebetsband: { helm: '', hs: 2, charm: 1 }, robe_stille_hand: { sash: '#e6cf8a', stole: '#d9d2c0', bare: 1, stance: 1, wraps: 1 }, wickel_stille_hand: { wraps: 1, sil: 'motes', mc: '#e6cf8a' },
@@ -1258,6 +1261,7 @@ function paintBeast(type, pal, frame, act) {
 export function beastFrame(type, pal, dir, pose, frame) {
   if (BEAST_ATLAS[type] && atlasOn()) { const f = atlasPose(BEAST_ATLAS[type], dir, pose || (frame & 1 ? 'w0' : 'i0'), true); if (f) return f; }   // Stil F
   return cacheGet('beast|' + ART + type + '|' + (pal.body || '') + dir + pose + frame, () => {
+    if (ART === 'R' && type === 'horse' && (dir === 'N' || dir === 'S')) return meta(toCanvas(asG(paintHorseNSR(pal, frame, dir, pose, ramp)), false), RPX, BROX, BROY);   // S15: Pferd von vorn/hinten
     if (ART === 'R') { const g0 = asG(paintBeastR(type, pal, frame, pose === 'dead' ? '' : pose, ramp)), g1 = pose === 'dead' ? g0.flipY() : g0;   // S14 Stil R
       return meta(toCanvas(dir === 'E' ? g1.flipX() : g1, false), RPX, BROX, pose === 'dead' ? g0.h - 12 : BROY); }
     if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster

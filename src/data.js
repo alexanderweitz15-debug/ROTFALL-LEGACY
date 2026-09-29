@@ -177,6 +177,10 @@ export const ITEMS = {
     lore:'Weißbarts Anker, an einer Kette um den Unterarm. Er hat damit ein Zollschiff Valens versenkt — von innen.' },
   // S15 Klassen-Rüstung (Nutzer: „nur über eine eigene Questline, wie in WoW“): je Titelklasse drei Teile vom Meister.
   // Ab zwei Teilen, getragen mit dem passenden Titel: stärkere Fähigkeiten und eine neue (game.js CLASS_GEAR). Nicht verkäuflich.
+  // S15 P19: Rüstung des Todesritters (Questreihe bei Sael in Vharnholm), gebunden. Wirkung nur als aktive Klasse Todesritter (game.js dkGear).
+  todesritter_helm:     { name:'Helm der Eidwacht', slot:'head', armor:6, rarity:'epic', value:0, classSet:'deathknight', bound:true, lore:'Schwarzer Stahl mit Reif am Visier. Wer ihn trägt, hört Garmadons Eid in der Kälte.' },
+  todesritter_harnisch: { name:'Harnisch der Eidwacht', slot:'chest', armor:10, rarity:'epic', value:0, classSet:'deathknight', bound:true, lore:'Die Platten sind kalt, auch im Sommer. Unter dem Brustbein glimmt ein blaues Licht.' },
+  todesritter_mantel:   { name:'Frostmantel der Eidwacht', slot:'cloak', armor:4, rarity:'legendary', value:0, classSet:'deathknight', bound:true, lore:'Genäht aus dem Banner eines Ritters, der seinen Eid brach. Er friert, wer dir zu nahe kommt.' },
   totenrufer_kapuze: { name:'Kapuze des Totenrufers', slot:'head', armor:4, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Grabtuch, dreimal gefaltet. Darunter hört man die Toten atmen.' },
   gewand_stille_schar: { name:'Gewand der Stillen Schar', slot:'chest', armor:7, rarity:'epic', value:0, classSet:'necromancer', bound:true, lore:'Bis zum Boden, schwarz wie nasse Erde. Eine Schulter aus Ahnenknochen.' },
   grabsteinkragen: { name:'Kragen aus Grabstein', slot:'cloak', armor:3, rarity:'legendary', value:0, classSet:'necromancer', bound:true, lore:'Ysra schnitt ihn aus dem Stein über ihrem eigenen Grab.' },
@@ -224,6 +228,8 @@ export const ITEMS = {
   talisman_toten:     { name:'Talisman der Toten', slot:'talisman', rarity:'rare', value:180, fixed:{ slayer:0.18 }, lore:'Grabsalz in einer Knochenkapsel. Die Toten riechen es.' },
   talisman_magie:     { name:'Talisman der Magie', slot:'talisman', rarity:'rare', value:180, fixed:{ spellp:0.1 }, lore:'Ein Kristallsplitter aus Aurelheim, noch warm.' },
   talisman_leben:     { name:'Talisman des Lebens', slot:'talisman', rarity:'rare', value:170, fixed:{ vital:0.06 }, lore:'Ein getrocknetes Heilkraut in Harz gegossen.' },
+  meteorsplitter:     { name:'Meteorsplitter', slot:'material', rarity:'rare', value:150, lore:'Noch warm. Er summt tiefer als ein Magiekern. Die Kirche nennt so etwas heilig, die Akademie nennt es Messwert.' },   // S15 P9
+  magiekern:          { name:'Aurelioner Magiekern', slot:'talisman', rarity:'epic', value:400, fixed:{ spellp:0.15 }, lore:'Ein Kristall in Messing gefasst, er summt. Aurelion, die Toten und die Kirche wollen ihn.' },   // S15 P7: Artefakt-Konflikt
   splitter_rotfall:   { name:'Splitter des Rotfalls', slot:'talisman', rarity:'epic', value:320, fixed:{ spellp:0.18, vital:-0.08 }, lore:'Rot, warm, und er flüstert. Nebenwirkung: er zehrt am Leben.' },
   blutstein:          { name:'Blutstein', slot:'talisman', rarity:'epic', value:320, fixed:{ sharp:0.14, enduring:-10 }, lore:'Er pulsiert im Takt deines Herzens — und ein wenig schneller. Nebenwirkung: weniger Ausdauer.' },
   eulenauge:          { name:'Eulenauge', slot:'talisman', rarity:'epic', value:300, fixed:{ keen:0.08, fleet:-0.04 }, lore:'Ein gläsernes Auge, das in die Dunkelheit sieht. Nebenwirkung: schwer an der Brust.' },
@@ -413,6 +419,10 @@ export const MONSTERS = {
   hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster erst mit Phase 12
   // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
+  // S15 P5: Akademie-Prüfungen (Aurelheim). Puppen stehen still, Studenten zaubern; beide sterben nie (Prüfung endet vorher).
+  acad_dummy:  { name:'Übungspuppe', interiors:false, hp:1, dmg:0, speed:0, reach:0, atk:99999, xp:0, sight:0, r:11, threat:0, pal:{skin:'#c8a868',cloth:'#8a6a3a',metal:'#5a4a30'} },
+  acad_student:{ name:'Student der Akademie', interiors:false, hp:60, dmg:6, speed:1.2, reach:240, atk:1600, ranged:true, missile:'shadow', xp:0, sight:320, r:11, threat:1, spells:['sp_spark', 'sp_froststrike'],
+                 pal:{skin:'#d8b89a',cloth:'#2c3a6a',metal:'#8a7a50',glow:'#9fd0ff'} },
   cultist:   { name:'Kultist der Asche', hp:34, dmg:12, speed:1.2, reach:260, atk:1700, ranged:true, missile:'shadow', xp:30, sight:300, r:11, threat:2, faction:'undead', interiors:true, role:'Heiler', spells:['sp_firebolt', 'sp_spark'],
                pal:{skin:'#b8a890',cloth:'#2a1f2e',metal:'#5a4a66',glow:'#b07ae0'} },    // hält Abstand, heilt verwundete Untote
   ghoul:     { name:'Wiedergänger', hp:70, dmg:13, speed:0.85, reach:30, atk:1300, telegraph:420, xp:34, sight:200, r:12, threat:2, faction:'undead', interiors:true, role:'Masse',
@@ -547,6 +557,8 @@ export const ABILITIES = {
   wolf_form:   { name:'Wolfsgestalt', title:'druid', cd:45000, cost:60, desc:'20 s wirst du zum Wolf des Hains: +35 % Tempo, Biss statt Waffe, +3 Rüstung. Keine Gegenstände. Kostet 60 Wildkraft.' },
   counter_stance:{ name:'Gegenstrom', title:'monk', cd:8000, cost:1, desc:'3 s Haltung: der nächste Nahkampftreffer gegen dich prallt ab und wird doppelt erwidert (+1 Fokus). Kostet 1 Fokus.' },
   silent_hand: { name:'Stille Hand', title:'monk', cd:30000, cost:'all', min:3, desc:'Ab 3 Fokus: eine Welle der Stille (130 px). Feinde erstarren 1,5 s und nehmen Schaden je Fokus. Verbraucht allen Fokus.' },
+  death_coil:  { name:'Todesmahr', cd:9000, stam:18, desc:'Ein Stoß kalter Macht auf den Feind vor dir (bis 240 px). Ein Drittel des Schadens heilt dich. Nur mit der Rüstung der Eidwacht (2 Teile).' },   // S15 P19
+  death_grip:  { name:'Todesgriff', cd:12000, stam:15, tree:true, desc:'Zieht den Feind vor dir (bis 220 px) heran und lässt ihn taumeln. Große Gegner taumeln nur.' },   // S15 Todesritter-Talent
   grave_strike:{ name:'Grabhieb', cd:9000, stam:20, desc:'Ein Hieb mit Schattenwucht (×1,8). 30 % des Schadens heilen dich.' },
   grave_host:  { name:'Heerruf', title:'necromancer', cd:60000, cost:4, desc:'Klassen-Rüstung (2 Teile): bis zu drei Leichen stehen auf einmal auf (30 s, zusätzlich zu deinen Dienern). Kostet 4 Essenz.' },
   dark_pact:   { name:'Dunkler Pakt', title:'warlock', cd:30000, desc:'Klassen-Rüstung (2 Teile): 20 % deines Lebens für +40 Verderbnis und 8 s lang +40 % Titelzauberschaden.' },
@@ -559,9 +571,11 @@ export const ABILITIES = {
   sp_firebolt:  { name:'Feuerpfeil', school:'fire', tier:1, mana:10, cd:2500, cast:350, spell:{ shape:'bolt', el:'fire', dmg:[10, 1.1], speed:6, range:320, status:{ key:'burning', chance:0.35, left:3000 } }, teach:'Wandermagier in Kreuzweg, Morvath', desc:'Ein Pfeil aus Feuer. Setzt manchmal in Brand.' },
   sp_flamejet:  { name:'Flammenstoß', school:'fire', tier:2, mana:16, cd:5000, cast:450, spell:{ shape:'line', el:'fire', dmg:[14, 1.2], range:150, status:{ key:'burning', chance:0.7, left:3500 } }, teach:'Morvath, Akademie Aurelheim', desc:'Ein Strahl aus Flammen vor dir. Alles darin brennt oft.' },
   sp_firering:  { name:'Flammenkreis', school:'fire', tier:3, mana:28, cd:12000, cast:700, spell:{ shape:'nova', el:'fire', dmg:[20, 1.5], r:120, status:{ key:'burning', chance:1, left:4000 } }, teach:'Akademie Aurelheim (Magister)', desc:'Ein Ring aus Feuer bricht um dich aus.' },
+  sp_firewall:  { name:'Feuerwand', school:'fire', tier:3, mana:26, cd:15000, cast:600, spell:{ shape:'wall', el:'fire', dmg:[6, 0.5], left:6000, status:{ key:'burning', chance:0.6, left:3000 } }, teach:'Akademie Aurelheim (Magister)', desc:'Eine Wand aus Flammen quer vor dir. Wer hindurchgeht, brennt.' },   // S15 P4: Form wall
   sp_froststrike:{ name:'Froststoß', school:'frost', tier:1, mana:9, cd:2200, cast:300, spell:{ shape:'bolt', el:'frost', dmg:[8, 0.9], speed:6, range:300, status:{ key:'frost', chance:1 } }, teach:'Akademie Aurelheim', desc:'Kälte, die langsam macht. Drei Stufen Frost lassen erstarren.' },
   sp_icespear:  { name:'Eisspeer', school:'frost', tier:2, mana:16, cd:4500, cast:500, spell:{ shape:'bolt', el:'frost', dmg:[16, 1.3], speed:8, range:380, pierce:true, status:{ key:'frost', chance:1 } }, teach:'Akademie Aurelheim', desc:'Ein Speer aus Eis, der durch mehrere Feinde fährt.' },
   sp_freeze:    { name:'Einfrieren', school:'frost', tier:3, mana:26, cd:14000, cast:700, spell:{ shape:'area', el:'frost', dmg:[10, 0.8], r:80, range:260, status:{ key:'frost', chance:1, stacks:3 } }, teach:'Akademie Aurelheim (Magister)', desc:'Am Zielort gefriert alles zu Eis.' },
+  sp_icewall:   { name:'Eiswand', school:'frost', tier:3, mana:24, cd:16000, cast:600, spell:{ shape:'wall', el:'frost', solid:true, left:8000 }, teach:'Akademie Aurelheim (Magister)', desc:'Eine Wand aus Eis quer vor dir. Nichts kommt hindurch, bis sie taut.' },
   sp_shock:     { name:'Schock', school:'shock', tier:1, mana:8, cd:2400, cast:200, spell:{ shape:'bolt', el:'shock', dmg:[7, 0.8], speed:9, range:220, status:{ key:'shocked', chance:1 } }, teach:'Akademie Aurelheim, Magitech-Ingenieurin', desc:'Ein Knall aus der Hand. Das Ziel zuckt kurz.' },
   sp_lightning: { name:'Blitz', school:'shock', tier:2, mana:16, cd:4500, cast:400, spell:{ shape:'line', el:'shock', dmg:[16, 1.3], range:260, status:{ key:'shocked', chance:0.5 } }, teach:'Akademie Aurelheim', desc:'Ein gerader Blitz, so weit das Auge reicht.' },
   sp_chain:     { name:'Kettenblitz', school:'shock', tier:3, mana:24, cd:9000, cast:500, spell:{ shape:'chain', el:'shock', dmg:[14, 1.2], range:260, jumps:3, status:{ key:'shocked', chance:0.4 } }, teach:'Akademie Aurelheim (Magister)', desc:'Springt von Feind zu Feind — nur, wenn er sie sehen kann.' },
@@ -569,6 +583,16 @@ export const ABILITIES = {
   sp_ward:      { name:'Magieschild', school:'arcane', tier:2, mana:18, cd:15000, cast:300, spell:{ shape:'self', absorb:[20, 1.5], left:12000 }, teach:'Akademie Aurelheim', desc:'Ein Schild aus Licht fängt Schaden ab.' },
   sp_teleport:  { name:'Kurzteleport', school:'arcane', tier:3, mana:20, cd:8000, cast:150, spell:{ shape:'blink', range:180 }, teach:'Akademie Aurelheim (Magister)', desc:'Du bist woanders. Nie in einer Mauer.' },
   sp_dispel:    { name:'Magieunterbrechung', school:'arcane', tier:2, mana:14, cd:10000, cast:200, spell:{ shape:'dispel', r:170 }, teach:'Akademie Aurelheim', desc:'Bricht Zauber und schwere Angriffe ab, nimmt Feinden ihre Stärkungen.' },
+  sp_shadowbolt:{ name:'Schattenpfeil', school:'shadow', tier:1, mana:9, cd:2200, cast:300, spell:{ shape:'bolt', el:'shadow', dmg:[10, 1.1], speed:6, range:320 }, teach:'Ilvar Nachtglas', desc:'Ein Splitter Dunkelheit. Er trifft, was er sieht.' },   // S15 P6: Schatten
+  sp_drain:     { name:'Seelenzug', school:'shadow', tier:2, mana:16, cd:6000, cast:450, spell:{ shape:'bolt', el:'shadow', dmg:[12, 1.2], speed:5, range:280, drain:0.5 }, teach:'Ilvar Nachtglas (Vertrauen 25)', desc:'Zieht Leben aus dem Ziel. Die Hälfte davon kehrt zu dir zurück.' },
+  sp_raise:     { name:'Skelett erheben', school:'shadow', tier:3, mana:22, cd:12000, cast:800, spell:{ shape:'raise', left:45000 }, teach:'Ilvar Nachtglas (Vertrauen 50)', desc:'Eine Leiche in der Nähe steht als Diener auf (45 s, einer). Schwächer als beim Nekromanten.' },
+  sp_soulburst: { name:'Seelenbersten', school:'shadow', tier:3, mana:28, cd:14000, cast:700, spell:{ shape:'nova', el:'shadow', dmg:[22, 1.6], r:110 }, teach:'Ilvar Nachtglas (Vertrauen 75)', desc:'Gefangene Seelen brechen aus dir hervor und reißen alles in der Nähe mit.' },
+  sp_nachtglas: { name:'Nachtglas', school:'shadow', tier:3, mana:40, cd:60000, cast:900, legendary:true, spell:{ shape:'timeslow', r:320, left:6000 }, teach:'Nur durch Ilvars Endprüfung', desc:'Legendär. Um dich herum verlangsamt sich die Zeit sechs Sekunden lang: Feinde bewegen sich wie durch Glas.' },
+  // S15 P7: Glaubensmagie der Omega-Kirche (Irmgard, Eisenfeste). Heilig: doppelt gegen Untote; stärker mit Kettenrang und Glauben.
+  sp_holyflame: { name:'Heilige Flamme', school:'faith', tier:1, mana:10, cd:2600, cast:350, spell:{ shape:'bolt', el:'fire', holy:true, dmg:[10, 1.0], speed:6, range:300 }, teach:'Irmgard, Priesterin Omegas', desc:'Omegas Feuer. Es brennt Tote doppelt.' },
+  sp_blessing:  { name:'Schutzsegen', school:'faith', tier:1, mana:10, cd:9000, cast:300, spell:{ shape:'self', absorb:[12, 0.9], left:9000 }, teach:'Irmgard, Priesterin Omegas', desc:'Das Auge wacht über dich und fängt Hiebe ab.' },
+  sp_ray:       { name:'Lichtstrahl', school:'faith', tier:2, mana:16, cd:5000, cast:450, spell:{ shape:'line', el:'holy', holy:true, dmg:[15, 1.3], range:200 }, teach:'Irmgard (Kettenrang 1 oder Glaube 40)', desc:'Ein Strahl aus rotem Licht. Tote zerfallen darin.' },
+  sp_inquisition:{ name:'Inquisition', school:'faith', tier:3, mana:24, cd:14000, cast:700, spell:{ shape:'area', el:'holy', holy:true, dmg:[14, 1.0], r:90, range:240, reveal:true }, teach:'Irmgard (Kettenrang 2 oder Glaube 60)', desc:'Ein Urteil am Zielort. Es trifft Tote doppelt und zieht Verborgene ans Licht.' },
   sp_minorheal: { name:'Kleine Heilung', school:'heal', tier:1, mana:10, cd:4000, cast:500, spell:{ shape:'self', heal:[14, 1.0] }, teach:'Elena in Eren, Ordenspriesterin', desc:'Wunden schließen sich ein Stück.' },
   sp_staunch:   { name:'Blutung stillen', school:'heal', tier:2, mana:12, cd:6000, cast:400, spell:{ shape:'self', staunch:true, heal:[6, 0.5] }, teach:'Elena in Eren, Ordenspriesterin', desc:'Stillt Blutungen und festigt das schwächste Glied.' },
   sp_regen:     { name:'Regeneration', school:'heal', tier:2, mana:18, cd:16000, cast:500, spell:{ shape:'group', regen:3, left:10000, r:150 }, teach:'Ordenspriesterin, Druidin', desc:'Du und deine Gruppe heilt zehn Sekunden lang.' },
@@ -642,6 +666,17 @@ export const MAX_TITLES = 2;                       // höchstens zwei Titelklass
 // ---- Skill-Baum (Session 5): 1 Punkt je Stufe. Allgemeine Zweige für alle, dazu ein Zweig je Titelklasse, der erst mit ihr
 // erscheint. requires = einer der genannten Knoten reicht (Pfad), [] = Einstieg. Effekte addieren sich (fx), besondere Regeln
 // hängen am Knoten-Schlüssel (keystone). Jeder Schlüsselknoten hat einen Preis und ein designIntent — ohne Absicht kein Knoten.
+// S15 P7: Wie jede Macht über die Schulen denkt. love: Lehrer dieser Macht verlangen weniger; hate: Wirken vor ihren Leuten ist ein
+// Verbrechen (Kopfgeld, beim Orden doppelt). Nekromanten- und Hexenmeister-Fähigkeiten zählen als Schatten.
+export const MAGIC_VIEW = {
+  order:  { love: ['heal', 'ward'], hate: ['shadow'], say: 'Heilung und Schutz sind Werk des Lichts. Totenmagie wird verfolgt.' },
+  valen:  { love: [], hate: ['shadow'], say: 'Misstraut allen Zauberern und duldet sie, solange sie nützen. Totenmagie ist verboten.' },
+  aurel:  { love: ['arcane', 'fire', 'frost', 'shock'], hate: [], say: 'Magie ist Wissenschaft: an der Akademie gelehrt, mit Schein und Gebühr.' },
+  merch:  { love: [], hate: [], say: 'Was sich verkauft, ist erlaubt.' },
+  chain:  { love: ['faith'], hate: ['shadow', 'arcane'], say: 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.' },
+  undead: { love: ['shadow'], hate: [], say: 'Totenmagie ist ihr Recht und ihre Religion.' },
+  goblin: { love: [], hate: ['shadow'], say: 'Wer die Toten ruft, hat sie selbst nicht begraben.' },
+};
 export const SKILL_BRANCHES = {
   combat:  { name:'Kampf', desc:'Wer vorne steht.' },
   magic:   { name:'Magie', desc:'Wer von weitem entscheidet.' },
@@ -650,6 +685,7 @@ export const SKILL_BRANCHES = {
   warlock:{ name:'Hexerei', title:'warlock', desc:'Nur für Hexenmeister.' },
   druid:  { name:'Hainkunde', title:'druid', desc:'Nur für Druiden.' },
   monk:   { name:'Stille Hand', title:'monk', desc:'Nur für Mönche.' },
+  deathknight:{ name:'Todesritter', cls:'deathknight', desc:'Frost und Blut. Nur für Todesritter.' },   // S15 (Nutzer: „beim Todesritter gibt es keine Talentfähigkeiten“)
 };
 export const SKILL_TREE = {
   // Kampf
@@ -728,6 +764,16 @@ export const SKILL_TREE = {
   k_stillness:{ branch:'monk', row:2, type:'keystone', name:'Vollkommene Stille', fx:{}, requires:['o_well', 'o_steps'],
     desc:'Getroffen werden kostet keinen Fokus mehr. Dafür: mit Schild oder Zweihandwaffe gibt es gar keinen Fokus.', designIntent:'Der Mönch als Reinform: ohne Schild, ohne schwere Klinge — dafür verzeiht die Stille einen Fehler.' },
   o_counter:{ branch:'monk', row:1, name:'Tiefer Strom', fx:{}, requires:['o_edge'], desc:'Gegenstrom hält 2 s länger.' },
+  // Todesritter (öffnet sich mit der Klasse; Schlüsselknoten wirken nur, solange Todesritter die aktive Klasse ist)
+  dk_frost: { branch:'deathknight', row:0, name:'Frostklinge', fx:{}, requires:[], desc:'Grabhieb legt eine Stufe Frost auf das Ziel (drei Stufen frieren ein).' },
+  dk_blood: { branch:'deathknight', row:0, name:'Blutdurst', fx:{}, requires:[], desc:'Lebensentzug und Grabhieb heilen 50 % mehr.' },
+  dk_rune:  { branch:'deathknight', row:1, type:'notable', name:'Runenklinge', fx:{}, requires:['dk_frost'], desc:'Grabhieb +25 % Schaden.' },
+  dk_plate: { branch:'deathknight', row:1, name:'Totenpanzer', fx:{ armor:3, hp:0.05 }, requires:['dk_blood'], desc:'Rüstung +3, Leben +5 %.' },
+  dk_grip:  { branch:'deathknight', row:1, type:'active', name:'Todesgriff', grants:'death_grip', fx:{}, requires:['dk_frost', 'dk_blood'], desc:'Aktiv: Todesgriff (zieht einen Feind vor deine Klinge).' },
+  k_frostborn:{ branch:'deathknight', row:2, type:'keystone', name:'Frostgeboren', fx:{}, requires:['dk_rune'],
+    desc:'Jeder dritte Nahkampftreffer legt Frost auf. Dafür trifft dich Feuer 30 % härter.', designIntent:'Kälte als Waffe: der Todesritter verlangsamt alles, was ihn angeht — und fürchtet das Feuer.' },
+  k_bloodlord:{ branch:'deathknight', row:2, type:'keystone', name:'Blutfürst', fx:{}, requires:['dk_plate'], excl:'k_frostborn',
+    desc:'Jeder Nahkampftreffer heilt dich um 8 % des Schadens. Dafür heilen Tränke, Verbände und Kräuter dich nur halb. Schließt Frostgeboren aus.', designIntent:'Leben nimmt man sich vom Feind, nicht aus der Flasche.' },
   k_storm:  { branch:'monk', row:2, type:'keystone', name:'Sturmhand', fx:{}, requires:['o_counter'], excl:'k_stillness',
     desc:'Jeder dritte Treffer gibt +1 Fokus. Dafür gibt Ausweichen keinen Fokus mehr. Schließt Vollkommene Stille aus.', designIntent:'Angriff statt Leere: der Mönch holt sich den Fokus aus dem Schlagen.' },
 };
@@ -754,7 +800,7 @@ export const NPCS = [
     greet:'„Fremde bringen entweder Arbeit oder Ärger. Welches von beidem bist du?“' },
   { key:'elena', name:'Elena', prof:'Heilerin', faction:'order', age:27, home:'village',
     traits:['gütig','loyal','vorsichtig'], attrs:{intelligence:12,agility:8}, cls:'cleric', recruit:true, recruitRel:25,
-    greet:'„Du siehst nicht aus wie jemand, der viel Gold besitzt.“', teaches:'cleric' },
+    greet:'„Du siehst nicht aus wie jemand, der viel Gold besitzt.“', teaches:'cleric', spellsTaught:['sp_minorheal'] },
   { key:'tomas', name:'Tomas', prof:'Jägerbursche', faction:null, age:18, home:'village',
     traits:['ehrgeizig','neugierig'], attrs:{agility:12,perception:11}, cls:'archer', recruit:true, recruitRel:15,
     greet:'„Ich treffe alles unter dreißig Schritt. Fast alles.“', teaches:['archer','ranger'], kin:'son' },
@@ -782,7 +828,7 @@ export const NPCS = [
     greet:'„Du bist weit von der Straße abgekommen.“', teaches:['rogue','assassin'] },
   { key:'morvath', name:'Morvath', prof:'Grabgebundener', faction:'undead', age:0, home:'graveyard',
     traits:['geduldig','kalt'], attrs:{intelligence:14,willpower:14}, cls:'mage', recruit:false, undead:true,
-    greet:'„Die Lebenden sind laut. Du bist leiser als die meisten.“', teaches:['mage'] },
+    greet:'„Die Lebenden sind laut. Du bist leiser als die meisten.“', teaches:['mage'], spellsTaught:['sp_spark', 'sp_firebolt', 'sp_flamejet'] },
   { key:'ysra', name:'Ysra', prof:'Stimme der Gruft', faction:'undead', age:0, home:'altvharn',
     traits:['geduldig','streng'], attrs:{intelligence:15,willpower:16}, cls:'mage', recruit:false, undead:true,
     greet:'„Alt-Vharn war eine Stadt. Die Ahnen wohnen noch hier. Sprich leise.“' },
@@ -814,6 +860,46 @@ export const NPCS = [
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
     pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak'],
     greet:'„Vharnholm schreibt jeden Namen auf, der durch das Tor kommt. Deinen auch.“' },
+  // S15 (Nutzer: „mehr NPCs auf der Welt, die einen z. B. zum Krieger ausbilden“): Lehrer in den Städten außerhalb von Eren.
+  // atTown: steht am Platz dieser Stadt (Weltkoordinaten), off: Versatz in Kacheln. Gleiche Regel wie überall: erst Beziehung 20.
+  { key:'hauke', name:'Hauke Eisenfaust', prof:'Waffenmeister', faction:'valen', age:47, atTown:'northcity', off:[4, 3], weapon:'longsword',
+    traits:['diszipliniert','stolz'], attrs:{strength:14,endurance:13}, cls:'warrior', recruit:false,
+    greet:'„Die Garnison braucht Männer und Frauen, die stehen bleiben, wenn es kracht. Kannst du das?“', teaches:['warrior','knight'] },
+  { key:'kaelis', name:'Kaelis Vey', prof:'Fechtmeisterin', faction:'aurel', age:34, atTown:'aurelheim', off:[-5, 3], weapon:'rapier',
+    traits:['stolz','genau'], attrs:{agility:15,perception:12}, cls:'warrior', recruit:false,
+    greet:'„In Aurelheim ficht man mit Anstand. Draußen mit allem, was man hat. Ich lehre beides.“', teaches:['warrior','rogue'] },
+  { key:'wenzel', name:'Wenzel', prof:'Wildhüter', faction:'valen', age:52, atTown:'weidenau', off:[3, -3], weapon:'longbow',
+    traits:['geduldig','misstrauisch'], attrs:{perception:14,agility:12}, cls:'ranger', recruit:false,
+    greet:'„Wer im Wald laut ist, isst heute nichts. Setz dich, sei still.“', teaches:['archer','ranger'] },
+  { key:'adela', name:'Schwester Adela', prof:'Ordensschwester', faction:'order', age:41, atTown:'lichtenrain', off:[4, 2], weapon:'mace',
+    traits:['gütig','diszipliniert'], attrs:{willpower:14,intelligence:12}, cls:'cleric', recruit:false,
+    greet:'„Das Licht fragt nicht, wer du warst. Ich schon, aber nur ein bisschen.“', teaches:['cleric'] },
+  { key:'nix', name:'Nix', prof:'Hehlerin', faction:'merch', age:29, atTown:'saltport', off:[-4, 4], weapon:'dagger',
+    traits:['gierig','neugierig'], attrs:{agility:14,charisma:12}, cls:'rogue', recruit:false,
+    greet:'„Ich habe nichts gesehen, nichts gekauft und dich nie getroffen. Also: Was willst du?“', teaches:['rogue'] },
+  { key:'serafine', name:'Serafine', prof:'Wandermagierin', faction:'merch', age:45, atTown:'kreuzweg', off:[5, -2], weapon:'staff',
+    traits:['neugierig','klug'], attrs:{intelligence:15,willpower:13}, cls:'mage', recruit:false,
+    greet:'„Feuer ist ehrlich: Es tut, was es verspricht. Menschen seltener.“', teaches:['mage'], spellsTaught:['sp_spark', 'sp_firebolt', 'sp_missile', 'sp_shield'] },
+  // S15 P5: Zauberlehrer. spellsTaught: was sie lehren; spellRule: Zusatzbedingung (game.js SPELL_RULES)
+  { key:'aldis', name:'Mutter Aldis', prof:'Ordenspriesterin', faction:'order', age:58, atTown:'sonnwacht', off:[-4, 3], weapon:'mace',
+    traits:['gütig','streng'], attrs:{willpower:15,intelligence:13}, cls:'cleric', recruit:false, spellRule:'order',
+    greet:'„Heilen ist keine Gnade. Es ist Arbeit. Hast du Hände für Arbeit?“', spellsTaught:['sp_minorheal', 'sp_staunch', 'sp_regen', 'sp_heal', 'sp_shield', 'sp_circle'] },
+  { key:'corvinus', name:'Magister Corvinus', prof:'Professor der Akademie', faction:'aurel', age:61, atHouse:'academy', weapon:'staff',
+    traits:['stolz','genau'], attrs:{intelligence:17,willpower:13}, cls:'mage', recruit:false, spellRule:'academy',
+    greet:'„Die Akademie lehrt jeden, der zahlt und einen Schein hat. Die dritte Stufe nur denen, die bestehen.“',
+    spellsTaught:['sp_missile', 'sp_ward', 'sp_teleport', 'sp_dispel', 'sp_flamejet', 'sp_firering', 'sp_firewall', 'sp_froststrike', 'sp_icespear', 'sp_freeze', 'sp_icewall', 'sp_shock', 'sp_lightning', 'sp_chain', 'sp_circle'] },
+  { key:'jasper', name:'Jasper Goldkehle', prof:'Barde', faction:'aurel', age:26, atTown:'kupferhafen', off:[4, 3], weapon:'dagger',
+    traits:['ehrgeizig','gütig'], attrs:{charisma:15}, cls:'bard', recruit:false,
+    greet:'„Die Hafenleute zahlen für Lieder vom Meer. Ich singe lieber von Leuten wie dir.“', teaches:['bard'] },
+  { key:'orrin', name:'Orrin', prof:'Kräuterkundiger', faction:'valen', age:63, atTown:'muehlbach', off:[-3, 3], weapon:'staff',
+    traits:['geduldig','mürrisch'], attrs:{intelligence:14}, cls:'alchemist', recruit:false,
+    greet:'„Was im Mühlbacher Grund wächst, heilt. Meistens.“', teaches:['alchemist'] },
+  { key:'ulfar', name:'Ulfar der Narbige', prof:'Grubenkämpfer', faction:'merch', age:44, atTown:'rastfurt', off:[4, -3], weapon:'greataxe',
+    traits:['grausam','ehrgeizig'], attrs:{strength:15,endurance:14}, cls:'berserker', recruit:false,
+    greet:'„Schmerz ist ein Lehrer. Ich bin nur sein Gehilfe.“', teaches:['berserker'] },
+  { key:'wendel', name:'Hadubrand', prof:'Pferdezüchter', faction:'valen', age:51, atTown:'muehlbach', off:[9, -3], weapon:'staff', horseBreeder:true,   // S15: Pferdehof (Nutzer: „richtigen Bauern mit Menü, wo man die Pferde sieht“)
+    traits:['geduldig','stolz'], attrs:{endurance:12}, cls:'wanderer', recruit:false,
+    greet:'„Jedes Pferd hier hat einen Namen und einen Kopf. Such dir eins aus, das zu deinem passt.“' },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },
@@ -878,6 +964,8 @@ export const QUESTS = {
   q_undead: { name:'Das Grabsiegel', giver:'morvath', desc:'Morvath will ein Siegel aus dem Moor. Was danach kommt, sagt er nicht.',
     objectives:[{type:'item',target:'grave_seal',count:1,text:'Grabsiegel bergen'}],
     reward:{xp:120,rep:{undead:25,order:-10}}, turnin:'morvath' },
+  q_anomaly: { name:'Riss im Gewebe', giver:null, desc:'Eine magische Anomalie: Mana fließt doppelt, Zauber verrutschen. Wer sie mit einem Schutzzauber schließt, bekommt Lohn von Aurelion und dem Orden.',   // S15 P7
+    objectives:[{type:'anomaly',count:1,text:'Im Zentrum einen Schutzzauber wirken (Schild, Magieschild, Schutzkreis, Schutzsegen)'}], reward:{gold:120,xp:150,rep:{aurel:4,order:4}} },
   q_graverobbers: { name:'Grabräuber in der Asche', giver:'sael', desc:'Lebende graben in der Nekropole und am Knochenwald nach Grabgut. Sie nehmen die Namen mit. Bring fünf von ihnen zum Schweigen — dann schreibt Vharnholm deinen Namen in die gute Spalte.',
     objectives:[{type:'kill',target:'bandit',count:5,text:'Grabräuber töten'}],
     reward:{gold:90,xp:140,rep:{undead:15,valen:-5}}, turnin:'sael' },
@@ -885,6 +973,13 @@ export const QUESTS = {
     objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
     reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
   // S15 Klassen-Questlines: je Titelklasse drei Aufträge beim Meister (ab Grad II, der dritte ab Grad III). Belohnung: ein Teil der Klassen-Rüstung.
+  // S15 P19: Questreihe des Todesritters bei Sael (dkQ = Schritt). Voraussetzung: Klasse Todesritter gelernt.
+  dk_1: { name:'Der erste Schwur', giver:'sael', dkQ:1, desc:'„Ein Todesritter schwört nicht einmal, sondern dreimal. Der erste Schwur gilt den Jägern, die uns für Gold jagen. Drei von ihnen, und drei Knochen als Zeugnis.“',
+    objectives:[{type:'kill',target:'bounty_hunter',count:3,text:'Kopfgeldjäger töten'}, {type:'item',target:'bone',count:3,text:'Knochen bringen'}], reward:{xp:260,item:'todesritter_helm',take:'bone',takeCount:3}, turnin:'sael' },
+  dk_2: { name:'Die kalte Klinge', giver:'sael', dkQ:2, desc:'„Der zweite Schwur gilt denen, die uns in Messing gießen wollen. Zwei Kriegsautomaten Aurelions — und zwei Seelen für den Harnisch.“',
+    objectives:[{type:'kill',target:'automat',count:2,text:'Kriegsautomaten zerstören'}, {type:'item',target:'soul_vial',count:2,text:'Zwei Seelenphiolen bringen'}], reward:{xp:360,item:'todesritter_harnisch',take:'soul_vial',takeCount:2}, turnin:'sael' },
+  dk_3: { name:'Der gebrochene Eid', giver:'sael', dkQ:3, desc:'„Der dritte Schwur ist der schwerste: Ein Todesritter brach seinen Eid und zieht durchs Totenland. Richte ihn. Aus seinem Banner nähe ich deinen Mantel.“',
+    objectives:[{type:'kill',target:'death_knight',count:1,text:'Den eidbrüchigen Todesritter richten'}], reward:{xp:500,item:'todesritter_mantel'}, turnin:'sael' },
   c_nec1: { name:'Die Knochen der Vergessenen', giver:'ysra', classQ:['necromancer', 1, 2], desc:'„Wer die Schar führt, muss erst die tragen, die niemand trägt. Leg sechs Wandelnde zur Ruhe und bring mir drei Knochen, die niemand vermisst.“',
     objectives:[{type:'kill',target:'skeleton',count:6,text:'Wandelnde Tote zur Ruhe legen'}, {type:'item',target:'bone',count:3,text:'Knochen bringen'}], reward:{xp:220,item:'totenrufer_kapuze',take:'bone',takeCount:3}, turnin:'ysra' },
   c_nec2: { name:'Das Gewand der Stillen Schar', giver:'ysra', classQ:['necromancer', 2, 2], desc:'„Der Wächter der Nekropole trägt ein Gewand, das ihm nicht gehört. Nimm es ihm. Und bring zwei Seelen in Phiolen — das Gewand hat Hunger.“',

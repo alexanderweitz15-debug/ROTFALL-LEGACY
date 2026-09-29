@@ -91,6 +91,8 @@ export function drawFrame(now) {
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
+  if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
+    const MT = TOWER_AT.e; if (MT && !list.includes(MT) && MT.x > cam.x - 220 && MT.x < cam.x + W / cam.zoom + 220 && MT.y > cam.y && MT.y < cam.y + H / cam.zoom + 900) list.push(MT); }
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
   for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
     const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
@@ -652,12 +654,49 @@ function drawGoblinNpc(e, now) {
 }
 // S13 (Nutzer: Reittiere, Kampf vom Pferd): das Reittier unter dem Helden, der Reiter 14 px höher
 const MOUNT_PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-function drawRider(e, now) {
-  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, f = SP.beastFrame('horse', MOUNT_PAL[e.mounted.kind] || MOUNT_PAL.horse, Math.cos(e.aim ?? 0) < 0 ? 'W' : 'E', '', fr);
-  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); shadow(e.x, e.y + 3, 14, .35); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore();
-  if (e.mounted.kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
-  ctx.save(); ctx.translate(0, -14); drawHumanoid(e, now); ctx.restore();
+// S15 (Nutzer): Das Pferd schaut in die Laufrichtung (auch nach oben und unten); im Stand behält es die letzte Richtung.
+// Nur Stil R hat Vorder- und Rückansicht, die anderen Stile bleiben seitlich.
+function horseDir(e) {
+  const vx = e.vx || 0, vy = e.vy || 0, side = vx < 0 || (!vx && Math.cos(e.aim ?? 0) < 0) ? 'W' : 'E';
+  if (Math.abs(vx) + Math.abs(vy) > 0.05) e.hDir = SP.drawnOn() && Math.abs(vy) > Math.abs(vx) * 1.2 ? (vy < 0 ? 'N' : 'S') : side;
+  return e.hDir || side;
 }
+function drawHorse(e, now, kind, rider) {
+  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = MOUNT_PAL[kind] || MOUNT_PAL.horse, dir = horseDir(e);
+  const blit = f => { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore(); };
+  const ns = dir === 'N' || dir === 'S', ride = () => { ctx.save(); ctx.translate(0, ns ? -17 : -14); drawHumanoid(e, now); ctx.restore(); };
+  shadow(e.x, e.y + 3, 19, .35);
+  if (rider && ns) ride();                                              // von vorn/hinten sitzt der Reiter im Rumpf: das Pferd verdeckt die Unterschenkel
+  blit(SP.beastFrame('horse', pal, dir, '', fr));
+  if (kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
+  if (rider && !ns) ride();
+  if (dir === 'S') blit(SP.beastFrame('horse', pal, 'S', 'head', fr));   // von vorn: der Kopf verdeckt den Reiter
+}
+function drawDummy(e) {                                               // Pfahl, Querholz, Strohsack mit Zielscheibe
+  const x = Math.round(e.x), y = Math.round(e.y);
+  shadow(x, y + 3, 9, .35);
+  ctx.fillStyle = '#4a3624'; ctx.fillRect(x - 1, y - 30, 3, 32); ctx.fillRect(x - 11, y - 24, 23, 3);
+  ctx.fillStyle = '#b89a58'; ctx.fillRect(x - 7, y - 34, 15, 20); ctx.fillStyle = '#8a7040'; ctx.fillRect(x - 7, y - 16, 15, 2); ctx.fillRect(x - 7, y - 34, 2, 20);
+  ctx.fillStyle = '#d8c080'; ctx.fillRect(x - 3, y - 41, 7, 7);
+  ctx.fillStyle = '#e8e0d0'; ctx.fillRect(x - 4, y - 29, 9, 9); ctx.fillStyle = '#a83a2a'; ctx.fillRect(x - 3, y - 28, 7, 7); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(x - 2, y - 27, 5, 5); ctx.fillStyle = '#a83a2a'; ctx.fillRect(x - 1, y - 26, 3, 3);
+}
+function drawSpellWall(e, now) {
+  const left = e.until - now, fade = Math.min(1, left / 600, (now - e.born) / 200), x = Math.round(e.x), y = Math.round(e.y);
+  ctx.save(); ctx.globalAlpha = Math.max(0, fade);
+  if (e.el === 'frost' && e.solid) {                                   // Eisblock: kantig, hell, mit Lichtkante
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x - 11, y + 2, 22, 4);
+    ctx.fillStyle = '#5f8fb0'; ctx.fillRect(x - 10, y - 22, 20, 24); ctx.fillStyle = '#9fd0ec'; ctx.fillRect(x - 8, y - 24, 16, 22);
+    ctx.fillStyle = '#d8f0ff'; ctx.fillRect(x - 6, y - 22, 3, 16); ctx.fillRect(x - 8, y - 24, 16, 2); ctx.fillStyle = '#3f6a88'; ctx.fillRect(x + 6, y - 20, 2, 20);
+  } else if (e.el === 'frost') {                                      // Eisboden
+    ctx.fillStyle = 'rgba(170,215,240,.35)'; ctx.beginPath(); ctx.ellipse(x, y, 16, 7, 0, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(230,248,255,.5)'; ctx.fillRect(x - 6, y - 1, 5, 1); ctx.fillRect(x + 3, y + 2, 4, 1);
+  } else {                                                             // Flammen: drei Zungen, flackernd; Brandfläche niedriger
+    const h = e.patch ? 8 : 20; ctx.fillStyle = e.patch ? 'rgba(60,30,20,.35)' : 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y, 12, 5, 0, 0, 7); ctx.fill();
+    for (let k = 0; k < 3; k++) { const f = Math.sin(now / 90 + k * 2.1 + e.x) * 0.5 + 0.5, hh = h * (0.6 + f * 0.4), fx0 = x - 8 + k * 6;
+      ctx.fillStyle = '#c0401a'; ctx.fillRect(fx0, y - hh, 5, hh); ctx.fillStyle = '#f08a2a'; ctx.fillRect(fx0 + 1, y - hh * 0.8, 3, hh * 0.8); ctx.fillStyle = '#ffd870'; ctx.fillRect(fx0 + 2, y - hh * 0.45, 1, hh * 0.45); }
+  }
+  ctx.restore();
+}
+function drawRider(e, now) { drawHorse(e, now, e.mounted.kind, true); }
 // S15 Druide, Grad III: der Spieler als großer Hainwolf. Fell der Wölfe, dunkler und mit dem Grün des Hains an den Augen.
 const WOLF_FORM_PAL = { body: '#4a4638', dark: '#2a2a20', eye: '#b7d86a' };
 function drawWolfForm(e, now) {
@@ -674,11 +713,13 @@ function drawEntity(e, now) {
     case 'item': return drawGroundItem(e, now);
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
-    case 'enemy': return drawCreature(e, now);
+    case 'enemy': return e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now);   // S15 P5: Übungspuppe der Akademie
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
+    case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd
+    case 'spellwall': return drawSpellWall(e, now);                    // S15 P4: Feuerwand, Eiswand, Brandfläche, Eisboden
     case 'house': return drawHouse(e.b, now);
   }
 }
@@ -821,7 +862,42 @@ SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear()
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
 export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
+// S15 P6: Turm des Nachtglases — ein Wahrzeichen: schmaler, sehr hoher Schaft aus dunklem Stein über breitem Sockel, Strebepfeiler,
+// Galerie, Dornenkrone mit Seelenfeuer. Das Bild wird einmal gemalt (Pixelraster 2 × 2), darüber leben die Fenster und die Funken.
+let TOWER_CV = null, TOWER_AT = { arr: null, e: null };
+const TOWER_WIN = [];
+function towerCanvas() {
+  if (TOWER_CV) return TOWER_CV;
+  const W = 120, H = 290, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const o = cv.getContext('2d'), R = (x, y, w, h, c) => { o.fillStyle = c; o.fillRect(x, y, w, h); };
+  const cx = W / 2, stone = ['#1c1a1f', '#26232b', '#322e38', '#403a47'];
+  for (let y = 250; y < 290; y++) { const hw = 50 - (y - 250) * 0.15; R(cx - hw, y, hw * 2, 1, y % 6 === 0 ? stone[0] : stone[1]); }   // Sockel mit Stufen
+  for (let i = 0; i < 4; i++) R(cx - 18 + i * 2, 278 - i * 4, 36 - i * 4, 4, stone[2 + (i & 1)]);
+  R(cx - 7, 262, 14, 26, '#0b0a0c'); R(cx - 5, 258, 10, 4, '#0b0a0c'); R(cx - 1, 256, 2, 2, '#8fd9b0');                 // Torbogen
+  for (let y = 40; y < 252; y++) { const t = (y - 40) / 212, hw = 18 + t * 12;                                        // Schaft, nach unten breiter
+    R(cx - hw, y, hw * 2, 1, stone[1]); R(cx - hw, y, 4, 1, stone[3]); R(cx + hw - 5, y, 5, 1, stone[0]);
+    if (y % 9 === 0) R(cx - hw, y, hw * 2, 1, stone[0]); }                                                            // Steinlagen
+  for (const s of [-1, 1]) for (let y = 120; y < 252; y++) { const t = (y - 40) / 212, hw = 18 + t * 12, bw = 4 + (y - 120) * 0.06; R(s < 0 ? cx - hw - bw : cx + hw, y, bw, 1, s < 0 ? stone[2] : stone[0]); }   // Strebepfeiler
+  R(cx - 30, 118, 60, 5, stone[3]); R(cx - 30, 123, 60, 2, stone[0]); for (let x = cx - 28; x < cx + 28; x += 5) R(x, 112, 2, 6, stone[2]);   // Galerie
+  for (let y = 26; y < 42; y++) { const hw = 22 - (y - 26) * 0.2; R(cx - hw, y, hw * 2, 1, stone[2]); }                // Kronenring
+  for (let k = -4; k <= 4; k++) { const x = cx + k * 5, hgt = 12 + (k % 2 === 0 ? 8 : 0) - Math.abs(k); for (let i = 0; i < hgt; i++) R(x - Math.max(0, 1.5 - i * 0.12), 26 - i, Math.max(1, 3 - i * 0.2), 1, stone[3]); }   // Dornen
+  TOWER_WIN.length = 0;
+  for (const [y, n] of [[60, 2], [88, 3], [140, 2], [170, 3], [200, 2], [228, 3]]) for (let i = 0; i < n; i++) { const x = cx - (n - 1) * 5 + i * 10; TOWER_WIN.push([x, y]); R(x - 2, y - 1, 4, 9, '#0b0a0c'); }
+  return (TOWER_CV = cv);
+}
+function drawMageTower(e, now) {
+  const K = 3, cv = towerCanvas(), x0 = Math.round(e.x - cv.width * K / 2), y0 = Math.round(e.y + 60 - cv.height * K);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 54, 165, 32, 0, 0, 7); ctx.fill();
+  ctx.drawImage(cv, x0, y0, cv.width * K, cv.height * K);
+  for (const [wx, wy] of TOWER_WIN) { const p = 0.55 + 0.45 * Math.sin(now / 700 + wx * 0.3 + wy * 0.1); ctx.fillStyle = `rgba(143,217,176,${p})`; ctx.fillRect(x0 + (wx - 1) * K, y0 + wy * K, 2 * K, 7 * K); }
+  const fy = y0 + 18 * K, fl = 0.6 + 0.4 * Math.sin(now / 160);                                                      // Seelenfeuer in der Krone
+  ctx.fillStyle = `rgba(143,217,176,${0.25 * fl})`; ctx.beginPath(); ctx.arc(e.x, fy, 26, 0, 7); ctx.fill(); ctx.fillStyle = `rgba(200,255,225,${0.8 * fl})`; ctx.fillRect(e.x - 4, fy - 8, 8, 12);
+  for (let i = 0; i < 10; i++) { const t = ((now / 3200 + i * 0.1) % 1), sx = e.x + Math.sin(i * 2.3 + now / 900) * (20 + i * 3), sy = fy - t * 180;   // Seelenfunken steigen auf
+    ctx.fillStyle = `rgba(160,240,200,${(1 - t) * 0.8})`; ctx.fillRect(Math.round(sx), Math.round(sy), 3, 3); }
+  ctx.restore();
+}
 function drawPropPixel(e, now) {
+  if (e.type === 'mage_tower') return drawMageTower(e, now);             // S15 P6
+  if (e.type === 'tower_gate') return;                                   // das Tor ist Teil des Turmbilds
   const PA = SP.PROP_ATLAS[e.type] && SP.atlasOn() && SP.atlasSprite(SP.PROP_ATLAS[e.type]);   // Stil F: Objekt aus dem Blatt, in seiner eigenen Größe
   if (PA) { const k = SP.APX * SP.FIGK; ctx.drawImage(PA, Math.round(e.x - PA.width * k / 2), Math.round(e.y + 8 - PA.height * k), PA.width * k, PA.height * k); return; }
   const per = PROP_PERIOD[e.type];
@@ -1665,6 +1741,7 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.kb && e.kb.t > 0 && !e.cover) pose = 'kb';
   else if (e.stagger > 300 && pose === 'hit') pose = ((now / 140) | 0) & 1 ? 'kb' : 'hit';   // S14: langes Taumeln wankt vor und zurück
   if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
+  if (e.mounted) pose = (/^w[0-3]$/.test(pose) ? 'i0' : pose) + '~r';   // S15 (Nutzer: „soll drauf sitzen, nicht stehen“): Reitsitz
   const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
   const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
   const weapon = () => { if (!W || !f.hand) return; drawWeaponR(c, e, now, wit, w, W, x + (f.hand[0] - f.ox) * f.px * bsx, y + 6 + (f.hand[1] - f.oy) * f.px * bsy, dir); };
