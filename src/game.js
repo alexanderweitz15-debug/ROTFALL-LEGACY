@@ -2325,9 +2325,10 @@ const ENC_KINDS = {
   hungry: { name: 'Hungernde Mutter', prof: 'Flüchtling', greet: '„Die Kinder haben seit zwei Tagen nichts gegessen. Hast du etwas übrig?“', log: 'Eine Flüchtlingsfamilie rastet am Weg.' },
   deserter: { name: 'Deserteur', prof: 'Deserteur', greet: '„Ich will keinen Ärger. Ich will nur nach Hause. Du hast mich nicht gesehen, ja?“', log: 'Ein Mann in zerrissenem Valen-Rock hält Abstand.' },
   avenger: { name: 'Rächer', prof: 'Rächer', greet: '', log: 'Jemand folgt dir schon eine Weile.' },   // Kette aus Kopfgeldaufträgen (S.avenge)
+  runaway: { name: 'Entflohener Grubenarbeiter', prof: 'Entflohener', greet: '„Bitte! Sie jagen mich — Kettenreiter mit einem Hund. Versteck mich, oder bring mich weg!“', log: 'Jemand mit Kettenspuren an den Knöcheln hinkt von der Straße weg.' },   // S15 P9
   bait: { name: 'Weinende Frau', prof: 'Wanderin', greet: '„Hilfe! Mein Mann — dort hinten im Gebüsch! Bitte, schnell!“', log: 'Jemand ruft verzweifelt um Hilfe.' },
 };
-function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger'))) {
+function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger' && (k !== 'runaway' || (tx < OX + 80 && !S.flags.chainsBroken))))) {   // S15 P9: Entflohene nur im Westen, solange die Kette steht
   const K = ENC_KINDS[kind], [bx, by] = pushOut('world', tx, ty), gid = uid(), out = [];
   for (let i = 0; i < (K.n || 1); i++) {
     const pos = freeSpotNear('world', bx + ri(-1, 1) * i, by + ri(-1, 1) * i, 3), fem = kind === 'hungry' || kind === 'bait';
@@ -2353,6 +2354,17 @@ function encTalk(npc) {
   const fin = (t, walk = true) => { encDone(npc, walk); UI.dialogue(npc, t, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); };   // Ausgang sofort festhalten
   const food = p.inv.find(i => ITEMS[i.key]?.use === 'food'), bandage = p.inv.find(i => i.key === 'bandage' || i.key === 'herb');
   const C = [];
+  if (npc.enc === 'runaway') {                                        // S15 P9: verstecken, ausliefern, begleiten
+    const hunters = () => { const out = []; for (const mt of ['chain_brute', 'chain_brute', 'wild_dog']) { const [tx, ty] = pushOut('world', (npc.x / TS | 0) + ri(-6, 6), (npc.y / TS | 0) + 10);
+      const e = spawnEnemy(mt, 'world', tx, ty, { level: Math.max(3, p.level) }); if (e) { e.questFoe = 'runaway'; e.transient = true; e.aggroId = p.id; if (mt === 'chain_brute') e.name = 'Kettenreiter'; out.push(e); } } return out; };
+    C.push({ text: 'Versteck dich dort im Gebüsch. Ich lenke sie ab.', fn: () => { S.factions.goblin = clamp((S.factions.goblin || 0) + 8, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) - 8, -100, 100);
+      chronicle('Ein Entflohener entkommt der Kette', 'news', `${p.name} hat ihn nicht verraten.`); fin('„Danke … Ich vergesse dein Gesicht nicht.“ (Grubenstämme +8, Kette −8)'); } });
+    C.push({ text: '[Ausliefern] Die Kette sucht dich. Sie bekommt dich.', fn: () => { S.factions.chain = clamp((S.factions.chain || 0) + 10, -100, 100); S.factions.goblin = clamp((S.factions.goblin || 0) - 12, -100, 100); S.gold += 30;
+      for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 8; S.ents.world = S.ents.world.filter(e => e.encGid !== npc.encGid);
+      chronicle('Ein Entflohener wird der Kette ausgeliefert', 'crime', `${p.name} bekam dafür dreißig Gold.`); UI.dialogue(npc, '„… Nein. Nein!“ Kettenreiter führen ihn weg. (+30 Gold, Kette +10, Grubenstämme −12)', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } });
+    C.push({ text: 'Bleib hinter mir. Wir kämpfen.', fn: () => { hunters(); S.factions.goblin = clamp((S.factions.goblin || 0) + 15, -100, 100); S.factions.chain = clamp((S.factions.chain || 0) - 15, -100, 100); S.flags.chainAlarm = Math.max(S.flags.chainAlarm || 0, (S.day | 0) + 1);
+      chronicle('Kettenreiter stellen einen Entflohenen — und seinen Beschützer', 'battle'); fin('Hufe und Gebell. Die Kettenreiter sind da. (Grubenstämme +15, Kette −15)', false); } });
+  }
   if (npc.enc === 'wounded') {
     if (bandage) C.push({ text: `[${ITEMS[bandage.key].name} geben] Halt still.`, fn: () => { removeItem(p, bandage.key, 1); B.fullHeal(npc);
       const g = ri(8, 25); S.gold += g; addRel(npc.key, 30); S.factions.order = clamp((S.factions.order || 0) + 2, -100, 100);
@@ -6171,7 +6183,7 @@ function ilvarTalk(npc) {
     if (!hasItem(p, 'soul_vial', 3)) return UI.dialogue(npc, '„Drei. Nicht zwei, nicht zweieinhalb. Seelen zählt man genau.“', [{ text: 'Zurück', fn: back }]);
     removeItem(p, 'soul_vial', 3); I.vials++; gain(12, 'Seelenphiolen'); S.gold += 40; UI.dialogue(npc, '„Gut. Sie werden nicht leiden. Nicht mehr als vorher.“ (+40 Gold)', [{ text: 'Weiter', fn: back }]); } });
   if (!npc.spellsTaught.includes('sp_raise')) npc.spellsTaught.push('sp_raise', 'sp_soulburst');   // ältere Stände
-  const cc = coreChoice(npc); if (cc) ch.unshift(cc);
+  const cc = coreChoice(npc); if (cc) ch.unshift(cc); const mc = meteorChoice(npc); if (mc) ch.unshift(mc);
   ch.push({ text: 'Lehre mich.', fn: () => spellMenu(npc) });
   if (I.trust >= 75 && !S.flags.towerSeal) ch.push({ text: 'Die verbotene Bibliothek …', fn: () => { openTowerSeal(); UI.dialogue(npc, '„Nimm, was du lesen kannst. Was du nicht lesen kannst, lass liegen. Es liest sonst dich.“ (Die Knochenkette fällt.)', [{ text: 'Weiter', fn: back }]); } });
   if (I.trust >= 100 && !S.player.spells?.sp_nachtglas) ch.push({ text: 'Ich bin bereit für die Endprüfung.', fn: () => UI.dialogue(npc, '„In der Beschwörungskammer. Fünfundvierzig Sekunden. Halte stand, während ich die Geister loslasse. Ich fange dich auf, wenn du fällst — aber dann war es das für heute.“', [
@@ -6921,7 +6933,7 @@ function priestTalk(n) {
     { text: 'Wer ist Omega?', fn: () => { omegaFrag('priest'); UI.dialogue(n, '„Der Stern, der über der Welt wachte. Er fiel — nicht aus Schwäche. Er kam uns zu nah. Sein Blut ist der Rotfall, und wo es hinfiel, standen die Toten auf. Wir tragen Eisen, damit nie wieder ein Gott für uns fallen muss.“', [{ text: 'Weiter', fn: back }]); } },
     { text: `Beten (10 Gold) — dein Glaube: ${O.faith}`, fn: () => omegaPray() },
     ...(n.spellsTaught ? [{ text: 'Lehre mich Omegas Worte. (Glaubensmagie)', fn: () => spellMenu(n) }] : []),   // S15 P7
-    ...(coreChoice(n) ? [coreChoice(n)] : []),
+    ...(coreChoice(n) ? [coreChoice(n)] : []), ...(meteorChoice(n) ? [meteorChoice(n)] : []),
     { text: 'Kann man ihn zurückrufen?', fn: () => UI.dialogue(n, answer, [{ text: 'Weiter', fn: back }]) },
     ...(S.quests.q_omega?.state === 'active' ? [{ text: 'Das Ritual beginnen.', fn: () => omegaRitual(n) }] : []),
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
@@ -7854,6 +7866,25 @@ function anomalyClose(c, key) {
   log('Der Riss schließt sich. Das Gewebe ist wieder still (120 Gold, Aurelion und Orden +4).', 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
 }
 function anomalyDay() { if (S.anomaly && (S.day | 0) >= S.anomaly.until) { log(`Die Anomalie bei ${S.anomaly.where} schließt sich von selbst.`, 'world'); S.anomaly = null; if (S.quests.q_anomaly?.state === 'active') S.quests.q_anomaly.state = 'failed'; } }
+// S15 P9 Meteorsplitter: nachts ein Leuchten am Himmel, am Morgen liegt ein Splitter in einem Krater (Ort per Hash). Wer ihn aufhebt,
+// kann ihn Irmgard (heilig sprechen), Magister Corvinus (Messwert) oder Ilvar (Neugier) geben — oder als Reagenz behalten und verkaufen.
+function evMeteor() {
+  if (S.meteor) return false; const cand = LOCATIONS.filter(l => l.kind === 'wild' && l.r < 120); if (!cand.length) return false;
+  const L = cand[Math.abs(((S.seed | 0) * 13 + (S.day | 0) * 17) | 0) % cand.length], tx = L.x + (((S.day | 0) * 5) % 11) - 5, ty = L.y + (((S.day | 0) * 3) % 9) - 4, pos = freeSpotNear('world', tx, ty, 6);
+  S.meteor = { x: pos.x / TS | 0, y: pos.y / TS | 0, where: L.name };
+  for (let k = 0; k < 6; k++) S.ents.world.push({ id: uid(), kind: 'prop', type: k % 2 ? 'ember' : 'rubble', map: 'world', x: pos.x + Math.cos(k * 1.05) * 40, y: pos.y + Math.sin(k * 1.05) * 30, r: 8, transient: true, meteorBits: true });
+  dropItemAt('world', pos.x, pos.y, mkItem('meteorsplitter'));
+  log(`In der Nacht zog ein Leuchten über den Himmel. Bei ${L.name} ist etwas eingeschlagen.`, 'world'); chronicle(`Ein Stern fällt bei ${L.name}`, 'news'); return true;
+}
+const METEOR_DEALS = {
+  irmgard: ['Den Meteorsplitter Omega weihen lassen.', () => { (S.omega ||= {}).faith = (S.omega.faith || 0) + 10; S.factions.chain = clamp((S.factions.chain || 0) + 5, -100, 100); S.gold += 80; return 'Irmgard spricht ihn heilig. Glaube +10, Kette +5, 80 Gold aus dem Opferstock.'; }],
+  corvinus: ['Den Meteorsplitter der Akademie verkaufen.', () => { S.gold += 200; S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100); return 'Corvinus zahlt 200 Gold und schreibt deinen Namen in ein Messprotokoll. Aurelion +5.'; }],
+  ilvar: ['Den Meteorsplitter Ilvar zeigen.', () => { (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.min(100, S.ilvar.trust + 15); S.gold += 120; return '„Ein Bruder des Rotfalls. Kleiner. Jünger.“ Ilvar zahlt 120 Gold. Vertrauen +15.'; }],
+};
+function meteorChoice(npc) {
+  const D = METEOR_DEALS[npc.key]; if (!D || !hasItem(S.player, 'meteorsplitter')) return null;
+  return { text: D[0], fn: () => { removeItem(S.player, 'meteorsplitter', 1); const r = D[1](); S.flags.meteorTo = npc.key; log(r, 'quest'); chronicle(`Der Meteorsplitter geht an ${npc.name}`, 'news'); UI.dialogue(npc, r, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); } };
+}
 function snikkTalk(npc) {
   if (S.flags.coreEv !== 'found') return UI.dialogue(npc, '„Weg ist weg. Snikk hat jetzt Gold. Gold summt nicht, aber Gold ist gut.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   UI.dialogue(npc, npc.greet, [
@@ -7884,7 +7915,7 @@ function coreSmash() {                                                // aus dem
 function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].metro && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm'); const k = pick(T); return k && startFire(k) ? k : null; }   // S14
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
-  evMagicCore, evAnomaly,
+  evMagicCore, evAnomaly, evMeteor,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
   () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
@@ -8310,6 +8341,7 @@ function talk(npc) {
   if ((npc.key === 'sael' || npc.key === 'ysra') && (S.ranks.undead ?? -1) >= 3 && !S.player.knownClasses.includes('deathknight')) choices.push({ text: 'Die Todesweihe. (Klasse Todesritter)', fn: () => deathRite(npc) });
   if (npc.spellsTaught?.length) choices.push({ text: 'Kannst du mir Magie beibringen?', fn: () => spellMenu(npc) });   // S15 P5
   const cc = coreChoice(npc); if (cc) choices.unshift(cc);             // S15 P7: Magiekern
+  const mc = meteorChoice(npc); if (mc) choices.unshift(mc);           // S15 P9: Meteorsplitter
   if (npc.spellRule === 'academy') choices.push({ text: 'Ich will eine Prüfung ablegen.', fn: () => trialMenu(npc) });
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
@@ -10281,6 +10313,8 @@ function debugSections() {
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
+      'Meteorsplitter': () => { S.meteor = null; evMeteor(); UI.toast('Einschlag bei ' + (S.meteor?.where || '—')); },   // S15 P9
+      'Flüchtiger Sklave (hier)': () => spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'runaway'),
       'Magische Anomalie': () => { S.anomaly = null; evAnomaly(); UI.toast('Anomalie bei ' + (S.anomaly?.where || '—')); },   // S15 P7
       'Magiekern (Artefakt-Konflikt)': () => { delete S.flags.coreEv; S.ents.world = S.ents.world.filter(e => !e.coreHolder); evMagicCore(); UI.toast('Snikk in Grubenhort hat den Kern.'); },   // S15 P7
       'Brand (hier)': () => { if (!startFire(nearTown())) UI.toast('Hier brennt nichts, was brennen könnte.'); },
@@ -12613,6 +12647,17 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Weg und Himmel (S15 P9): Entflohener (verstecken/ausliefern/begleiten), Meteorsplitter mit Krater und drei Abnehmern', sandbox(() => {
+    const p = stage(), f0 = { ...S.factions }, M0 = S.meteor, O0 = S.omega, I0 = S.ilvar, W0 = S.ents.world.length; S.gold = 100;
+    try { const pick1 = t => { const b = [...document.querySelectorAll('#dlg-choices button')].find(x => x.textContent.includes(t)); b?.click(); return !!b; };
+      const [r1] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r1); const hid = pick1('Versteck') && S.factions.goblin > (f0.goblin || 0);
+      const [r2] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r2); const g1 = S.gold; const sold = pick1('Ausliefern') && S.gold === g1 + 30 && !S.ents.world.includes(r2);
+      const [r3] = spawnChoiceEncounter(40, 40, 'runaway'); encTalk(r3); const n0 = S.ents.world.filter(e => e.questFoe === 'runaway').length; const fought = pick1('kämpfen') && S.ents.world.filter(e => e.questFoe === 'runaway').length === n0 + 3;
+      S.meteor = null; const ev = evMeteor(), shard = S.ents.world.some(e => e.kind === 'item' && e.item.key === 'meteorsplitter');
+      addItem(p, 'meteorsplitter'); const g2 = S.gold; meteorChoice({ key: 'corvinus', name: 'Corvinus' }).fn(); const paid = S.gold === g2 + 200 && !hasItem(p, 'meteorsplitter');
+      UI.closeDialogue(); return hid && sold && fought && ev && shard && paid;
+    } finally { UI.closeDialogue(); Object.assign(S.factions, f0); S.meteor = M0; S.omega = O0; S.ilvar = I0; S.ents.world = S.ents.world.slice(0, W0); delete S.flags.meteorTo; }
+  }));
   ok('Ruhm (S15 P8): Boss-Sieg hebt den Ruhm der Region über „Bekannt“, Begrüßung ändert sich, Berühmte zahlen weniger', sandbox(() => {
     const p = stage(), F0 = S.fame; S.fame = {};
     try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Geschichten') || l.includes('gehört'));
@@ -12645,7 +12690,7 @@ export function selftest() {
       const no = spellLack(ir, 'sp_holyflame').some(x => x.includes('Glaube')); S.ranks.chain = 1; const t2 = !spellLack(ir, 'sp_ray').length && spellLack(ir, 'sp_inquisition').length > 0;
       learnSpell(p, 'sp_ray', true); const pw1 = spellPower(p, 'sp_ray'); S.ranks.chain = 3; const pw3 = spellPower(p, 'sp_ray');
       const sk = spawnEnemy('skeleton', '__a', 11, 9), ba = spawnEnemy('bandit', '__a', 12, 9), S0 = ABILITIES.sp_ray.spell; let l1 = 0, l2 = 0;
-      for (let i = 0; i < 8; i++) for (const [t, add] of [[sk, v => l1 += v], [ba, v => l2 += v]]) { t.armor = 0; t.alive = true; if (t.body) B.fullHeal(t); else t.hp = t.maxHp; const h = t.hp; spellHit(p, t, 12, S0); add(h - t.hp); }
+      for (let i = 0; i < 8; i++) for (const [t, add] of [[sk, v => l1 += v], [ba, v => l2 += v]]) { t.armor = 0; t.alive = true; delete t.body; t.hp = t.maxHp = 500; const h = t.hp; spellHit(p, t, 12, S0); add(h - t.hp); }
       return no && t2 && pw3 > pw1 && l1 > l2 * 1.4;
     } finally { S.ranks.chain = rk0; S.omega = O0; }
   }));
