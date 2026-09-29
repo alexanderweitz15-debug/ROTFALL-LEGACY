@@ -130,7 +130,7 @@ ist Ausbau.
 | P8 | Ruhm und Rang-Informationen. Teil 1 fertig: `S.fame` je Region, Stufen, Begrüßung, Nachlass, Kopfgeldjäger, Charakterfenster. Teil 2 fertig: Rangwege Händler (Gerold) und Bande (Rook), Kodex-Ränge für alle Fraktionen (Seevolk-Ränge 2 und 4 haben noch keinen Weg → P21). Nicht gebaut: Kinder/Bettler laufen zu dir, Auftragsinfos vor Annahme (das Auftragsfenster zeigt das meiste) | FERTIG (Opus) |
 | P9 | S14-Reste: Kuh-Form (massiger, Wamme, Hörner, Euter), flüchtige Sklaven (Begegnung `runaway`), Erbfolgestreit (`evSuccession`), Meteorsplitter (`evMeteor`); je Probe und Debug-Knopf | FERTIG (Opus) |
 | P10 | Aurelion sichtbar überlegen, Aurelion-Ränge, Aurelion-Ereignisse | OFFEN |
-| P11 | Osten nach Garmadon: Siedlungen in Stufen | OFFEN |
+| P11 | Osten nach Garmadon: Wiederbesiedlung in 5 Stufen (`S.resettle`, `resettleDay`, Häuser über `growTown`, Chronik mit Hausnamen). Die befreiten Orte sind Städte mit Markt; neue Märkte waren nicht nötig | FERTIG (Opus) |
 | P12 | Schwierigkeitsgrade: Wahl beim Start (`DIFF`, `applyDifficulty`), Gegner-Leben/-Schaden über `BAL`, Ansagezeit, Beute, Kopfgeld-Verfall; Glieder und Dorf-Wiederaufbau gab es schon | FERTIG (Opus) |
 | P13 | Gesamtdurchlauf und visuelle Prüfung | OFFEN |
 

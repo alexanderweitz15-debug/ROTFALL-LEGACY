@@ -7305,8 +7305,26 @@ function undeadFallCinematic() {
     ...(gate ? [{ x: gate.x - 200, y: gate.y + 40, dur: 5500, text: 'Das Land atmet. Hier und da packen Leute ihre Sachen — die alte Heimat im Osten ruft.', setup: () => { healTick(true); homecomers(gate, 4); } }] : []),
   ]);
 }
-function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
+function liberateNode(k) { const n = S.war?.nodes?.[k]; if (!n || n.owner !== 'undead') return; if (S.flags.garmadonSlain && TOWN_PLAN[k]) (S.resettle ||= {})[k] ||= { day: S.day | 0, stage: 0 };   // S15 P11 n.owner = TOWN_PLAN[k]?.lord || 'valen'; n.garrison = Math.max(n.garrison || 0, 20); S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && e.faction === 'undead' && townAt(e.x / TS | 0, e.y / TS | 0) === k));
   log(`${townName(k)} ist befreit.`, 'world'); chronicle(`${townName(k)} frei`, 'war', 'Die Toten ziehen ab, die Menschen kehren zurück.'); }
+// S15 P11: Nach Garmadons Fall füllt sich jeder befreite Ort in Stufen: Tag 1 Flüchtlinge, Tag 5 Zeltlager, Tag 15 erste Häuser,
+// Tag 30 Dorf, Tag 60 größere Siedlung. Häuser über growTown (wie das Stadtwachstum), jede Stufe steht in der Chronik — mit dem
+// Namen des Hauses, damit ein Erbe später nachlesen kann, was der Vorgänger angestoßen hat.
+const RESETTLE = [[1, 'Flüchtlinge'], [5, 'Zeltlager'], [15, 'erste Häuser'], [30, 'Dorf'], [60, 'größere Siedlung']];
+function resettleDay(grow = growTown) {                            // grow: im Test ersetzt (Häuser verändern die Karte)
+  for (const [k, R] of Object.entries(S.resettle || {})) {
+    const days = (S.day | 0) - R.day, P = TOWN_PLAN[k]; if (!P) continue;
+    while (R.stage < RESETTLE.length && days >= RESETTLE[R.stage][0]) {
+      const st = RESETTLE[R.stage][1], [sx, sy] = P.square;
+      if (R.stage === 0) for (let i = 0; i < 3; i++) { const q = freeSpotNear('world', sx + ri(-4, 4), sy + ri(-3, 3), 3), c = makeChar({ name: pick(i % 2 ? FIRST_F : FIRST_M), prof: 'Heimkehrer', x: q.x, y: q.y, level: 1 });
+        Object.assign(c, { homeTown: k, anchor: { x: q.x, y: q.y }, greet: pick(['„Das war unser Dorf. Es wird es wieder.“', '„Die Asche ist noch warm, aber der Boden trägt.“']) }); S.ents.world.push(c); }
+      if (R.stage === 1) for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3 | 0, sy + 4, 2); S.ents.world.push({ id: uid(), kind: 'prop', type: 'tent_prop', map: 'world', x: q.x, y: q.y, r: 14, solid: true, label: 'Zelt der Heimkehrer', resettle: k }); }
+      if (R.stage >= 2) for (let i = 0; i < [0, 0, 2, 2, 3][R.stage]; i++) grow(k);
+      R.stage++; chronicle(`${townName(k)}: ${st}`, 'news', `Wiederbesiedelt nach dem Fall der Toten — Haus ${S.legacy?.house || S.player.name} war dabei.`);
+      log(`${townName(k)} lebt wieder: ${st}.`, 'world');
+    }
+  }
+}
 function homecomers(gate, n) {
   for (let i = 0; i < n; i++) { const s = freeSpotNear('world', (gate.x / TS | 0) - 8 + ri(-3, 3), (gate.y / TS | 0) + ri(-4, 4), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Heimkehrer', x: s.x, y: s.y, level: 1 });
     Object.assign(c, { homecomer: true, transient: true, visitor: true, anchor: { x: gate.x + 900 + ri(-80, 80), y: gate.y + ri(-120, 120) }, greet: pick(['„Mein Vater hatte einen Hof da drüben. Vielleicht steht die Scheune noch.“', '„Ich hab den Schlüssel dreißig Jahre getragen. Jetzt probier ich ihn aus.“', '„Wenn das Gras wiederkommt, kommen wir auch.“']) });
@@ -7356,7 +7374,7 @@ function vharnVoiceTalk(n) {
 function undeadFallDay() {
   if (!S.flags.garmadonSlain) return;
   const W = S.war?.nodes || {}, occ = Object.keys(W).find(k => W[k].owner === 'undead' && TOWN_PLAN[k]); if (occ) liberateNode(occ);
-  healTick(false); ensureVharnVoice();
+  healTick(false); ensureVharnVoice(); resettleDay();
   const gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (gate && (S.heal?.r || 0) < 260 && chance(0.6)) homecomers(gate, ri(1, 3));
 }
 // ================= Der Hohe Rat von Aurelion (Nutzer S13) =================
@@ -12678,6 +12696,14 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Wiederbesiedlung (S15 P11): 60 Tage nach der Befreiung hat ein Ort alle fünf Stufen durchlaufen und ist gewachsen', sandbox(() => {
+    const R0 = S.resettle, d0 = S.day, W0 = S.ents.world.slice(), G0 = structuredClone(S.growth || {}), gs = S.flags.garmadonSlain;
+    try { const k = Object.keys(TOWN_PLAN).find(t => growable(t) && !TOWN_PLAN[t].metro); S.resettle = { [k]: { day: d0 | 0, stage: 0 } };
+      let built = 0; const stages = []; for (const add of [1, 5, 15, 30, 60]) { S.day = (d0 | 0) + add; resettleDay(() => built++); stages.push(S.resettle[k].stage); }
+      const tents = S.ents.world.some(e => e.resettle === k), grown = built === 7;
+      return stages.join() === '1,2,3,4,5' && tents && grown;
+    } finally { S.resettle = R0; S.day = d0; S.ents.world = W0; S.growth = G0; S.flags.garmadonSlain = gs; }
+  }));
   ok('Schwierigkeit (S15 P12): Angsthase schwächer und mit längerer Ansage, Sehr schwer härter; Kopfgeld verfällt je nach Stufe', sandbox(() => {
     const p = stage(), d0 = S.difficulty, b0 = S.bounty;
     try { const hpOf = d => { S.difficulty = d; applyDifficulty(); return spawnEnemy('bandit', '__a', 11, 9, { noVariant: true, level: 5 }).maxHp; };

@@ -137,6 +137,7 @@ Stand: Session 15 (2026-09-29).
 
 ## 10. Die Welt verändert sich
 - **Der Fall Vargs:** Goblins frei, die Kette fällt, Untote überrennen den Westen, Flüchtlinge ziehen nach Aurelion.
+- **Wiederbesiedlung (S15):** Nach Garmadons Fall wachsen befreite Orte in fünf Stufen von Heimkehrern bis zur Siedlung.
 - **Der Fall der Untoten:** Jeden Tag wird eine Stadt frei, das Totenland heilt.
 - **Omega erwacht:** Ritual nach 50 Stunden und 9 von 12 Bruchstücken; drei Enden oder Weltkatastrophe.
 - **Die Eiserne Legion:** Varg lehnt ab — und schickt sie doch, sobald du Garmadon angreifst.

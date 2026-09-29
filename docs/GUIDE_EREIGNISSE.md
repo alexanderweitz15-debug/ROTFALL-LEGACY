@@ -79,6 +79,9 @@ Ein kurzer Überblick über die großen Ereignisse der Welt. Der vollständige S
 
 ---
 
+**Wiederbesiedlung (S15):** Jeder befreite Ort füllt sich in Stufen: Tag 1 Heimkehrer, Tag 5 ein Zeltlager, Tag 15 erste Häuser,
+Tag 30 ein Dorf, Tag 60 eine größere Siedlung. Jede Stufe steht in der Chronik, mit dem Namen deines Hauses.
+
 ### Das Ende der Brüder (Varg und Garmadon tot)
 Varg erschlug einst seinen Bruder Garmadon; aus dieser Bluttat wuchsen die Eiserne Kette im Westen und das Totenreich im Osten.
 Sind **beide** tot (Reihenfolge egal: Varg zuerst oder Garmadon zuerst), geschieht einmal, wenige Sekunden nach dem zweiten Tod:
