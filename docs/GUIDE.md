@@ -31,6 +31,14 @@ Es gibt keinen festen Pfad. Du kannst Händler werden, Söldner, Paladin der Ket
 | Esc | schließen |
 | Strg + Umschalt + D | Debug-Menü |
 
+**Schwierigkeit** wählst du beim Start:
+
+| Stufe | Gegner | Ansage schwerer Angriffe | Beute | Kopfgeld verfällt | Glieder | Zerstörte Dörfer |
+|---|---|---|---|---|---|---|
+| Angsthase | 25 % weniger Leben, 30 % weniger Schaden | 30 % länger | +25 % | doppelt so schnell | gehen nie verloren | bauen sich wieder auf |
+| Schwer (Standard) | normal | normal | normal | normal | ab −200 | bleiben zerstört |
+| Sehr schwer | 25 % mehr Leben, 30 % mehr Schaden | 10 % kürzer | −15 % | langsamer | ab −100 | bleiben zerstört |
+
 **Die ersten Stunden:**
 1. Sprich in Eren mit allen. Das Anschlagbrett und die Verteidigungsmeister haben Aufträge.
 2. Kauf Verbände. Wunden an einzelnen Körperteilen heilen nur mit Verband oder Heiler.

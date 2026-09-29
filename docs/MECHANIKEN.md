@@ -18,6 +18,8 @@ Stand: Session 15 (2026-09-29).
   laden. Eine veränderte Datei oder ein falsches Passwort wird erkannt; der alte Stand bleibt als Sicherung.
 
 ## 2. Körper, Kampf und Tod
+- **Schwierigkeit (S15):** Angsthase, Schwer, Sehr schwer — beim Start gewählt. Wirkt auf Leben und Schaden der Gegner, die
+  Ansagezeit schwerer Angriffe, Beute, Kopfgeld-Verfall, Gliederverlust und ob zerstörte Dörfer zurückkommen.
 - **Körperteile mit eigenem Leben:** Kopf, Rumpf, Arme, Beine. Lahmes Bein = langsam, ausgefallener Arm = keine Waffe.
   Glieder können abgetrennt werden; Prothesen gibt es in Gelenkhall.
 - **Am Boden:** 15 s bis zum Verbluten. Freunde richten auf, Feinde geben den Gnadenstoß, die Wache nimmt eine Buße.

@@ -131,7 +131,7 @@ ist Ausbau.
 | P9 | S14-Reste: Kuh-Form (massiger, Wamme, Hörner, Euter), flüchtige Sklaven (Begegnung `runaway`), Erbfolgestreit (`evSuccession`), Meteorsplitter (`evMeteor`); je Probe und Debug-Knopf | FERTIG (Opus) |
 | P10 | Aurelion sichtbar überlegen, Aurelion-Ränge, Aurelion-Ereignisse | OFFEN |
 | P11 | Osten nach Garmadon: Siedlungen in Stufen | OFFEN |
-| P12 | Schwierigkeitsgrade (alter Plan B) | OFFEN |
+| P12 | Schwierigkeitsgrade: Wahl beim Start (`DIFF`, `applyDifficulty`), Gegner-Leben/-Schaden über `BAL`, Ansagezeit, Beute, Kopfgeld-Verfall; Glieder und Dorf-Wiederaufbau gab es schon | FERTIG (Opus) |
 | P13 | Gesamtdurchlauf und visuelle Prüfung | OFFEN |
 
 ---

@@ -1504,6 +1504,15 @@ function styleArea(on = true) {
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
 export const BAL = { hp: 1.7, dmg: 1.4 };
+// S15 P12 Schwierigkeitsgrade (PLAN_OFFEN Block B). Schwer ist der Standard. Wirkt auf Leben und Schaden der Gegner (über BAL),
+// die Ansagezeit schwerer Angriffe, Beutechancen und wie schnell Kopfgeld verfällt; die Gliedergrenze steht in body.js cutOf.
+export const DIFF = {
+  angsthase:   { name: 'Angsthase', hp: 0.75, dmg: 0.7, tele: 1.3, loot: 1.25, decay: 2, desc: 'Gegner schwächer, Ansagen länger, mehr Beute. Glieder gehen nie verloren, zerstörte Dörfer bauen sich wieder auf.' },
+  schwer:      { name: 'Schwer', hp: 1, dmg: 1, tele: 1, loot: 1, decay: 1, desc: 'So ist Rotfall gedacht. Glieder gehen ab −200 verloren, zerstörte Dörfer bleiben zerstört.' },
+  sehr_schwer: { name: 'Sehr schwer', hp: 1.25, dmg: 1.3, tele: 0.9, loot: 0.85, decay: 0.6, desc: 'Gegner zäher und härter, weniger Beute, Kopfgeld vergeht langsam. Glieder gehen schon ab −100 verloren.' },
+};
+const diffOf = () => DIFF[S.difficulty] || DIFF.schwer;
+function applyDifficulty() { const D = diffOf(); BAL.hp = 1.7 * D.hp; BAL.dmg = 1.4 * D.dmg; }
 // S14 (Teil B, nur ?dev): Sammelbild der Figuren im Stil R — je Figur Ansichten, Gehen, Posen, Hieb in Zehnteln, mit Waffe an
 // der Hand. rows: [[Bezeichnung, Spec, Waffenschlüssel]]; gespeichert über den Bildschirmfoto-Empfänger (docs/screenshots).
 async function figSheet(name, rows, o = {}) {
@@ -1668,7 +1677,7 @@ function deepBoss() {                                         // Tiefhall: Hrodv
 
 // ================= Neues Spiel =================
 export function newGame(cfg) {
-  const keep = { settings: S.settings };
+  const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
     weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
@@ -1676,7 +1685,7 @@ export function newGame(cfg) {
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
     settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true, border1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
-    settings: keep.settings, fx: [], floats: [], projectiles: [], _uid: 0,
+    settings: keep.settings, difficulty: keep.difficulty, fx: [], floats: [], projectiles: [], _uid: 0,
   });
   genWorld().forEach(p => S.ents.world.push(p)); poiSpawns();
   genMine().forEach(p => S.ents.mine.push(p));
@@ -1687,6 +1696,7 @@ export function newGame(cfg) {
   genOmega().forEach(p => S.ents.omega.push(p));
   genIsle().forEach(p => S.ents.isle.push(p)); genDeck().forEach(p => S.ents.deck.push(p));   // S14 Seevolk
   genTower().forEach(p => S.ents.tower.push(p));                                                // S15 P6: Turm des Nachtglases
+  applyDifficulty();                                                 // S15 P12: vor den ersten Gegnern
   for (const m of MAP_KEYS) indexSolids(m);
   spawnNPCs();
   spawnGuardPosts();
@@ -1786,7 +1796,7 @@ function rescaleSave(fresh) {
 export function continueGame() {
   const data = loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
-  applySave(data);
+  applySave(data); applyDifficulty();                                  // S15 P12
   { const p = S.player; if (p?.titleClasses?.length && !p.tgrade) { p.tgrade = {};   // S15: alte Stände behalten jede Fähigkeit, die sie vor den Titelgraden hatten
     for (const k of p.titleClasses) { const T = TITLE_CLASSES[k]; p.tgrade[k] = Math.max(1, ...T.abilities.map(a => T.grades.findIndex(g => g.includes(a)) + 1)); } } }
   if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
@@ -3331,7 +3341,7 @@ function dropLoot(e) {
   const bonus = Math.max(0, (MONSTERS[e.mtype]?.threat || 1) - 1) + (e.boss ? 1 : 0) + (e.elite ? 1 : 0);   // gefährlicher Gegner (Veteran §71), bessere Chancen
   const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }));
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
-    if (gear && BP) continue; if (chance(gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p)) drop(key); }
+    if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p) * diffOf().loot)) drop(key); }   // S15 P12
   if (BP) { if (BP.weapons.length && chance(0.9)) drop(pick(BP.weapons)); if (BP.armor.length && chance(0.6)) drop(pick(BP.armor));
     if (BP.unique.length && chance(0.25)) drop(pick(BP.unique)); }
   if (chance(0.5)) { const g = ri(1, 6) + e.level; S.gold += g; float(e, `+${g} Gold`, 'rgba(189,148,51,ALPHA)'); }
@@ -3906,9 +3916,10 @@ function frostKingAI(e, tgt, d, reach, sp, dt, m) {
 function startHeavy(e, tgt, m) {
   const H = m.heavy, a = Math.atan2(tgt.y - e.y, tgt.x - e.x); e.aim = a; e.vx = e.vy = 0;
   const c = H.kind === 'slam' ? { x: e.x + Math.cos(a) * H.r * 0.55, y: e.y + Math.sin(a) * H.r * 0.55 } : { x: e.x, y: e.y };
-  e.heavy = { kind: H.kind, t: H.wind, T: H.wind, a, c };
-  e.telegraph = H.wind; e.windup = true;
-  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: H.wind, a } : { kind: 'stomp', t: H.wind, T: H.wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c] };
+  const wind = H.wind * diffOf().tele;                                 // S15 P12: Angsthase sieht es länger kommen
+  e.heavy = { kind: H.kind, t: wind, T: wind, a, c };
+  e.telegraph = wind; e.windup = true;
+  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: wind, a } : { kind: 'stomp', t: wind, T: wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c] };
   float(e, H.kind === 'sweep' ? 'holt weit aus' : H.kind === 'thrust' ? 'zielt' : 'hebt die Waffe', 'rgba(230,120,90,ALPHA)'); sfx('swing', 0.2, earVol(e));
 }
 function heavyTick(e, dt, m) {
@@ -4564,7 +4575,7 @@ function addBounty(fac, g, why) {
   UI.toast(`KOPFGELD ${S.bounty[fac]} GOLD`, 2600);
 }
 function bountyDay() {
-  for (const f of Object.keys(S.bounty || {})) { S.bounty[f] = Math.max(0, S.bounty[f] - Math.max(5, Math.round(S.bounty[f] * 0.05))); if (!S.bounty[f]) delete S.bounty[f]; }
+  for (const f of Object.keys(S.bounty || {})) { S.bounty[f] = Math.max(0, S.bounty[f] - Math.round(Math.max(5, Math.round(S.bounty[f] * 0.05)) * diffOf().decay)); if (!S.bounty[f]) delete S.bounty[f]; }   // S15 P12
   const p = S.player;
   if (bountyTotal() >= (Math.max(...Object.values(S.fame || {}), 0) >= 60 ? 100 : 150) && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 6) && !((S.flags.hunterDay || 0) > S.day)) {
     S.flags.hunterDay = S.day + 2; spawnHunters(p);
@@ -10303,7 +10314,7 @@ function debugSections() {
       'Ruf ± Zahl': () => { S.factions[v('dbFac')] = (S.factions[v('dbFac')] || 0) + (+v('dbN') || 0); checkRankUp(); },
       'Rang = Zahl': () => { S.ranks[v('dbFac')] = +v('dbN') || 0; }, 'Fraktion beitreten': () => { S.ranks[v('dbFac')] = Math.max(0, S.ranks[v('dbFac')] ?? 0); },
       'Status setzen': () => addStatus(p, { key: v('dbStat'), name: stats.find(s => s[0] === v('dbStat'))[1], left: 20000, src: p.id }), 'Status entfernen': () => { p.status = (p.status || []).filter(s => s.key !== v('dbStat')); },
-      'Schwierigkeit: Angsthase / Schwer / Sehr schwer': () => { S.difficulty = ({ angsthase: 'schwer', schwer: 'sehr_schwer' })[S.difficulty || 'schwer'] || 'angsthase'; UI.toast('SCHWIERIGKEIT: ' + S.difficulty.toUpperCase()); },
+      'Schwierigkeit: Angsthase / Schwer / Sehr schwer': () => { S.difficulty = ({ angsthase: 'schwer', schwer: 'sehr_schwer' })[S.difficulty || 'schwer'] || 'angsthase'; applyDifficulty(); UI.toast('SCHWIERIGKEIT: ' + DIFF[S.difficulty].name.toUpperCase()); },
       'Gold +500': () => { S.gold += 500; }, 'Material +100': () => { S.res.wood += 100; S.res.stone += 100; S.res.iron += 50; S.res.food += 20; },
     }],
     ['Gegenstände', `${sel('dbW', items(it => it.slot === 'weapon'))} ${sel('dbA', items(it => ['head', 'chest', 'offhand', 'cloak', 'legs', 'hands', 'feet', 'ring', 'amulet'].includes(it.slot)))}
@@ -12667,6 +12678,15 @@ export function selftest() {
     const guide = Object.keys(FACTIONS).filter(f => FACTIONS[f].ranks).every(f => rankGuide(f)?.rows.every(r => r.need && !/geplant/.test(r.need)));
     return lines && guide;
   })());
+  ok('Schwierigkeit (S15 P12): Angsthase schwächer und mit längerer Ansage, Sehr schwer härter; Kopfgeld verfällt je nach Stufe', sandbox(() => {
+    const p = stage(), d0 = S.difficulty, b0 = S.bounty;
+    try { const hpOf = d => { S.difficulty = d; applyDifficulty(); return spawnEnemy('bandit', '__a', 11, 9, { noVariant: true, level: 5 }).maxHp; };
+      const easy = hpOf('angsthase'), norm = hpOf('schwer'), hard = hpOf('sehr_schwer');
+      S.difficulty = 'angsthase'; applyDifficulty(); const e = spawnEnemy('chain_brute', '__a', 11, 9); startHeavy(e, p, MONSTERS.chain_brute); const longWind = e.telegraph > MONSTERS.chain_brute.heavy.wind;
+      const decay = d => { S.difficulty = d; S.bounty = { valen: 100 }; bountyDay(); return 100 - (S.bounty.valen || 0); };
+      return easy < norm && norm < hard && longWind && decay('angsthase') > decay('schwer') && decay('schwer') > decay('sehr_schwer');
+    } finally { S.difficulty = d0; S.bounty = b0; applyDifficulty(); }
+  }));
   ok('Erbfolgestreit (S15 P9): zwei Erben, deine Fürsprache hebt die Gunst des Hauses und damit seine Stimme im Rat', sandbox(() => {
     const p = stage(), S0 = S.succession, h0 = structuredClone(S.houses || {}), c0 = structuredClone(S.council || {});
     try { delete S.succession; const ev = evSuccession(), Sx = S.succession, H = AUREL_HOUSES.find(h => h.key === Sx.house), f0 = favor(H.key);
@@ -12882,6 +12902,10 @@ function buildCreation() {
   });
   ap.appendChild(hr);
   row('Kleidung', CLOTH, 'cloth');
+  let diff = 'schwer'; const db = $('cr-diff');                            // S15 P12: Schwierigkeit beim Start
+  if (db) { db.innerHTML = ''; const showD = () => { $('cr-diff-desc').textContent = DIFF[diff].desc; };
+    for (const [k, D] of Object.entries(DIFF)) { const b = el2('button', 'build' + (k === diff ? ' sel' : ''), D.name); b.onclick = () => { diff = k; [...db.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showD(); }; db.appendChild(b); }
+    showD(); }
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
     const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).map(s => SKILL_NAMES[s] || s).join(', ')}</small>`);
@@ -12918,7 +12942,7 @@ function buildCreation() {
     const name = ($('cr-name').value || 'Namenlos').slice(0, 18);
     const house = ($('cr-house').value || name).slice(0, 18);
     bindInput();
-    newGame({ name, house, origin, pal, build });
+    newGame({ name, house, origin, pal, build, difficulty: diff });
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); $('titlescreen').classList.remove('hidden'); };
 }
@@ -12960,6 +12984,7 @@ function boot() {
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
     fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),   // S15 P8
+    difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
