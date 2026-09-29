@@ -654,6 +654,17 @@ export const MAX_TITLES = 2;                       // höchstens zwei Titelklass
 // ---- Skill-Baum (Session 5): 1 Punkt je Stufe. Allgemeine Zweige für alle, dazu ein Zweig je Titelklasse, der erst mit ihr
 // erscheint. requires = einer der genannten Knoten reicht (Pfad), [] = Einstieg. Effekte addieren sich (fx), besondere Regeln
 // hängen am Knoten-Schlüssel (keystone). Jeder Schlüsselknoten hat einen Preis und ein designIntent — ohne Absicht kein Knoten.
+// S15 P7: Wie jede Macht über die Schulen denkt. love: Lehrer dieser Macht verlangen weniger; hate: Wirken vor ihren Leuten ist ein
+// Verbrechen (Kopfgeld, beim Orden doppelt). Nekromanten- und Hexenmeister-Fähigkeiten zählen als Schatten.
+export const MAGIC_VIEW = {
+  order:  { love: ['heal', 'ward'], hate: ['shadow'], say: 'Heilung und Schutz sind Werk des Lichts. Totenmagie wird verfolgt.' },
+  valen:  { love: [], hate: ['shadow'], say: 'Misstraut allen Zauberern und duldet sie, solange sie nützen. Totenmagie ist verboten.' },
+  aurel:  { love: ['arcane', 'fire', 'frost', 'shock'], hate: [], say: 'Magie ist Wissenschaft: an der Akademie gelehrt, mit Schein und Gebühr.' },
+  merch:  { love: [], hate: [], say: 'Was sich verkauft, ist erlaubt.' },
+  chain:  { love: ['faith'], hate: ['shadow', 'arcane'], say: 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.' },
+  undead: { love: ['shadow'], hate: [], say: 'Totenmagie ist ihr Recht und ihre Religion.' },
+  goblin: { love: [], hate: ['shadow'], say: 'Wer die Toten ruft, hat sie selbst nicht begraben.' },
+};
 export const SKILL_BRANCHES = {
   combat:  { name:'Kampf', desc:'Wer vorne steht.' },
   magic:   { name:'Magie', desc:'Wer von weitem entscheidet.' },

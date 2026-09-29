@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=15';
-import { BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=15';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=15';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=15';
 import * as R from './render.js?v=15';
 import * as HB from './buildings.js?v=15';
@@ -3436,6 +3436,7 @@ function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt
 function updateEnemy(e, dt) {
   if (!e.alive) return;
   const p = S.player;
+  if (e.mageHunter) mageHunterTick(e, dt);                           // S15 P7
   if (e.servant && !e.pet && (performance.now() > e.until || !byId(e.servant)?.alive)) return crumble(e);   // der Ruf verklingt
   if (e.minionOf && !byId(e.minionOf)?.alive) return crumble(e);   // Phase 6: stirbt der Nekromant, zerfallen seine Diener
   const far = dist(e, p) > 1100;
@@ -8755,7 +8756,37 @@ const SPELL_RULES = {
   ilvar: (p, t, key) => { const tr = S.ilvar?.trust || 0, need = ILVAR_NEED[key] ?? (t >= 3 ? 50 : t >= 2 ? 25 : 0); return need > 100 ? 'Ilvars Endprüfung' : tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
   academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
 };
-function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0; return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1)); }
+function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0, love = MAGIC_VIEW[npc.faction]?.love.includes(ABILITIES[key].school); return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1) * (love ? 0.85 : 1)); }
+// S15 P7 Verbotene Magie: Wer vor Zeugen einer Macht zaubert, die diese Schule verbietet, bekommt Kopfgeld bei ihr (60, Orden 120).
+// Ab der dritten bezeugten Tat jagen Magierjäger: Kopfgeldjäger mit „Bann“ (Zauber bricht ab, Mana halbiert, 5 s Stille).
+const FORBIDDEN_TITLES = new Set(['necromancer', 'warlock']);
+const schoolOf = key => ABILITIES[key]?.school || (FORBIDDEN_TITLES.has(ABILITIES[key]?.title) ? 'shadow' : null);
+function magicSeen(p, key) {
+  const school = schoolOf(key); if (!school || p !== S.player) return 0;
+  const town = townAt(p.x / TS | 0, p.y / TS | 0, 4);
+  const ws = S.ents[p.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.undead && e.faction !== 'undead' && !S.party.includes(e.id) && dist(e, p) < 280);
+  const facs = new Set(ws.map(w => (w.faction && MAGIC_VIEW[w.faction]) ? w.faction : town ? townFac(town) : 'valen')); let n = 0;
+  for (const f of facs) if (MAGIC_VIEW[f]?.hate.includes(school)) { n++; addBounty(f, f === 'order' ? 120 : 60, 'Verbotene Magie'); }
+  if (!n) return 0;
+  for (const w of ws) { w.alarmed = true; if (!GUARDISH(w)) w.fleeing = true; }
+  float(p, 'Ketzer!', 'rgba(220,120,90,ALPHA)');
+  S.flags.forbiddenN = (S.flags.forbiddenN || 0) + 1;
+  if (S.flags.forbiddenN >= 3 && p.map === 'world' && !((S.flags.mageHunterDay || 0) > S.day)) { S.flags.mageHunterDay = S.day + 3; spawnMageHunters(p); }
+  return n;
+}
+function spawnMageHunters(p) {
+  const a = rnd() * Math.PI * 2;
+  for (let i = 0; i < 2; i++) { const [tx, ty] = pushOut('world', Math.round(p.x / TS + Math.cos(a) * 16) + ri(-2, 2), Math.round(p.y / TS + Math.sin(a) * 16) + ri(-2, 2));
+    const h = spawnEnemy('bounty_hunter', 'world', tx, ty, { level: Math.max(4, p.level), encounter: true }); if (!h) continue;
+    Object.assign(h, { mageHunter: true, name: 'Magierjäger', title: 'Magierjäger', aggroId: p.id, banCd: 1500 }); }
+  log('Magierjäger sind dir auf der Spur. Sie tragen Bannsiegel.', 'combat'); UI.toast('MAGIERJÄGER', 2600);
+}
+function mageHunterTick(e, dt) {                                      // Bann: aus der Nähe, mit freier Sicht, alle 9 s
+  const p = S.player; e.banCd = (e.banCd || 0) - dt;
+  if (e.banCd > 0 || dist(e, p) > 260 || !clearLine(e, p) || !(p.casting || (p.mana || 0) > 10)) return;
+  e.banCd = 9000; if (p.casting) interruptCast(p); p.mana = Math.floor((p.mana || 0) * 0.5); p.silenced = performance.now() + 5000;
+  float(p, 'Bann!', 'rgba(230,200,120,ALPHA)'); fx(p.x, p.y - 14, 'spark', 14); sfx('magic', 0.3, earVol(e)); e.castT = performance.now();
+}
 function spellLack(npc, key) {                                      // was fehlt, als Liste; leer = darf lernen
   const p = S.player, t = ABILITIES[key].tier, out = [], price = spellPrice(npc, key);
   if (S.gold < price) out.push(`${price - S.gold} Gold`);
@@ -9501,17 +9532,19 @@ function learnNode(k) {
 function useAbility(key) {
   const p = S.player, ab = ABILITIES[key];
   if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]))) return;
+  if (p.silenced > performance.now() && (ab.spell || ab.title)) return UI.toast('Gebannt — für einen Moment keine Magie.');   // S15 P7: Bann der Magierjäger
   if (ab.spell) {                                            // S15 P4: Zauber
     if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
     if (p.casting) return UI.toast('Du sammelst schon einen Zauber.');
     if ((p.mana || 0) < ab.mana) return UI.toast('Zu wenig Mana');
-    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); return UI.refreshHUD();
+    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); magicSeen(p, key); return UI.refreshHUD();
   }
   if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
   if (ab.title) {                                            // Titelfähigkeit: nur die eigene Ressource zählt
     const R = TITLE_CLASSES[ab.title].resource, v = tres(p);
     if (ab.cost === 'all' ? v < (ab.min || 1) : ab.cost && v < ab.cost) return UI.toast(`Zu wenig ${R.name}${ab.min ? ` (mindestens ${ab.min})` : ''}`);
     if (!titleAbility(p, key, ab)) return;
+    magicSeen(p, key);                                        // S15 P7: Totenmagie vor Zeugen
     p.cooldowns[key] = ab.cd * cdMul(p); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (ab.cost === 'all') setTres(p, 0); else if (ab.cost) setTres(p, v - ab.cost);
     if (ab.gain) corrupt(p, ab.gain);
@@ -12471,6 +12504,16 @@ export function selftest() {
       return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
+  ok('Verbotene Magie (S15 P7): Schattenzauber vor einer Wache gibt Kopfgeld, ohne Zeugen nicht; Magierjäger bannen den Zauber', sandbox(() => {
+    const p = stage(), b0 = S.bounty, n0 = S.flags.forbiddenN; S.bounty = {}; S.flags.forbiddenN = 0;
+    try { S.ents.__a = S.ents.__a.filter(e => e.kind !== 'npc'); const alone = magicSeen(p, 'sp_shadowbolt') === 0 && !Object.keys(S.bounty).length;
+      const g = actor(p.x + 60, p.y, { kind: 'npc', faction: 'order', name: 'Wache' }); g.guard = true;
+      const seen = magicSeen(p, 'sp_shadowbolt') > 0 && S.bounty.order === 120, fire = magicSeen(p, 'sp_firebolt') === 0;
+      const h = spawnEnemy('bounty_hunter', '__a', 11, 9); Object.assign(h, { mageHunter: true, banCd: 0, x: p.x + 100, y: p.y }); p.maxMana = 50; p.mana = 40;
+      startCast(p, 'sp_firering'); mageHunterTick(h, 16); const banned = !p.casting && p.mana < 40 && p.silenced > performance.now();
+      return alone && seen && fire && banned;
+    } finally { S.bounty = b0; S.flags.forbiddenN = n0; }
+  }));
   ok('Turm-Folgen (S15 P6): Tuvi flieht (Vertrauen sinkt), Seelen befreien kostet Vertrauen, Ilvars Tod versperrt die oberen Ebenen', sandbox(() => {
     const p = stage(), I0 = S.ilvar, T0 = S.ents.tower, fl = { tuvi: S.flags.tuvi, souls: S.flags.soulsFreed, dead: S.flags.ilvarDead }, W0 = S.ents.world.length, f0 = { ...S.factions };
     S.ilvar = { trust: 60, asked: {}, vials: 0 }; S.ents.tower = T0.slice(); delete S.flags.tuvi; delete S.flags.soulsFreed;
@@ -12696,6 +12739,7 @@ function boot() {
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
+    magicView: MAGIC_VIEW,                                             // S15 P7
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });

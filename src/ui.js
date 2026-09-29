@@ -188,8 +188,7 @@ function codexUI(body) {
       const secs = guideSections(guideMd).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';
     } else if (codexTab === 'magic') {                                     // S15 P5: Schulen, Zauber, Lehrer, Haltung der Mächte
       const SC = A.schools || {}, keys = A.spellKeys || [], p = S.player;
-      const VIEW = [['Der Orden', 'Heilung und Schutz sind Werk des Lichts. Totenmagie ist verboten und wird verfolgt.'], ['Hochreich Aurelion', 'Magie ist Wissenschaft: an der Akademie gelehrt, mit Schein und Gebühr.'],
-        ['Die Untoten', 'Totenmagie ist ihr Recht und ihre Religion. Wer Seelen stiehlt, stiehlt von ihnen.'], ['Die Eiserne Kette', 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.'], ['Königreich Valen', 'Misstraut allen Zauberern und duldet sie, solange sie nützen.']];
+      const VIEW = Object.entries(A.magicView || {}).map(([f, v]) => [FACTIONS[f]?.name || f, v.say + (v.hate.length ? ` Verboten: ${v.hate.map(s => SC[s]?.name || (s === 'faith' ? 'Glaube' : s)).join(', ')} — wer das vor ihren Leuten wirkt, bekommt Kopfgeld.` : '')]);   // S15 P7: aus data.js MAGIC_VIEW
       cb.innerHTML = Object.entries(SC).filter(([s, S0]) => hit(S0.name + keys.filter(k => ABILITIES[k].school === s).map(k => ABILITIES[k].name).join(' '))).map(([s, S0]) =>
         `<h3 style="color:${S0.col}">${S0.name}</h3><table class="rank-tab">${keys.filter(k => ABILITIES[k].school === s).map(k => `<tr><td>${p.spells?.[k] ? '✓ ' : ''}${ABILITIES[k].name} <span class="ledger">(Stufe ${ABILITIES[k].tier})</span></td><td>${A.spellTeachers?.(k)?.join('<br>') || '<i>Niemand, den du kennst, lehrt das.</i>'}</td></tr>`).join('')}</table>`).join('')
         + `<h3>Wie die Mächte über Magie denken</h3>${VIEW.filter(([n, t]) => hit(n + t)).map(([n, t]) => `<div class="fx-row"><div><b>${n}:</b> ${t}</div></div>`).join('')}`;

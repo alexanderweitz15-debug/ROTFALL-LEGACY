@@ -139,6 +139,10 @@ Magie ist keine Klasse. Jeder kann Zauber lernen, und wer einen kennt, hat Mana.
 - **Rang:** Nach 25 Einsätzen steigt ein Zauber auf Rang II, nach 100 auf Rang III. Jeder Rang macht ihn stärker.
 - **Zustände:** Feuer lässt brennen. Frost stapelt bis zu drei Stufen und friert dann ein. Schock betäubt kurz, danach ist das Ziel
   drei Sekunden immun.
+- **Verbotene Magie:** Schattenzauber sowie die Fähigkeiten von Nekromant und Hexenmeister sind im Menschenland verboten.
+  Wirkst du sie vor Leuten des Ordens, Valens, der Kette oder der Grubenstämme, gibt es Kopfgeld (Orden 120, sonst 60 Gold).
+  Nach der dritten bezeugten Tat jagen dich **Magierjäger**: Ihr Bann bricht deinen Zauber ab, halbiert dein Mana und lässt
+  dich fünf Sekunden lang nicht zaubern. Wer eine Schule liebt, lehrt sie 15 % billiger (Kodex „Magie“ zeigt, wer was denkt).
 - **Gegner zaubern auch.** Kultisten der Asche werfen Funken und Feuerpfeile, Nekromanten Froststöße und Schilde. Siehst du
   eine Rune unter einem Gegner, triff ihn schnell: Dann bricht sein Zauber ab.
 
