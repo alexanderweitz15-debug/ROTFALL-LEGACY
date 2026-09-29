@@ -1,8 +1,8 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
-import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=17';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=17';
-import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=17';
-import * as ECO from './economy.js?v=17';
+import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=18';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=18';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=18';
+import * as ECO from './economy.js?v=18';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -44,7 +44,7 @@ function economyDay() {
   for (const a of S.war.armies.filter(a => a.faction === 'valen')) {
     const need = a.strength / 12, nc = S.towns.northcity;
     if (nc.stock.grain >= need) nc.stock.grain -= need;
-    else { nc.stock.grain = 0; a.strength -= 4; log(`${a.name} hungert — Nordfurt fehlt Weizen.`, 'faction'); }
+    else { nc.stock.grain = 0; a.strength = Math.max(0, a.strength - 4); log(`${a.name} hungert — Nordfurt fehlt Weizen.`, 'faction'); }
   }
 }
 
@@ -359,6 +359,7 @@ export function warDay() {
     W.armies.push(newArmy('undead', base, 30)); log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
   if (!W.armies.some(a => a.faction === 'valen') && chance(0.3)) { W.armies.push(newArmy('valen', 'northcity', 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
+  cleanupArmies();   // S15: verhungerte Heere verschwinden
   economyDay();
 }
 
@@ -447,7 +448,7 @@ export function battleCheck() {                              // alle paar Sekund
   // von außen ein), zwischen den Wellen eine Atempause mit Ansage, die letzte Welle führt der Hauptmann der Toten.
   // Der Fortschritt (n.wave) bleibt am Ort: wer flieht und wiederkommt, fängt nicht von vorn an.
   for (const [node, n] of Object.entries(W.nodes)) {
-    if (n.owner !== 'undead' || n.garrison <= 0 || !nearPlayer(node, 22) || W.battles.some(b => b.node === node)) continue;
+    if (n.owner !== 'undead' || n.garrison <= 0 || !nearPlayer(node, 22) || W.battles.some(b => b.node === node) || (S.ranks?.undead ?? -1) >= 0) continue;   // S15: wer zu den Toten gehört, befreit nichts
     n.waves ||= node === 'blackkeep' ? 4 : clamp(Math.round(n.garrison / 10), 2, 3); n.wave ||= 0;
     W.battles.push({ node, sides: ['g:' + node, 'player'], started: S.day * 1440 + S.minute, garrisonFight: true, next: 0 });
     log(`Die Toten halten ${LOC[node].name}. Wer die Stadt will, muss ${n.waves - n.wave} Wellen brechen.`, 'combat');
