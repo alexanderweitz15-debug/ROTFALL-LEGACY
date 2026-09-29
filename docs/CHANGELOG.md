@@ -2,6 +2,11 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 18 — 2026-09-29 (S15, große Fehlersuche)
+- Acht Fehlersucher über alle Systeme; rund 55 Fehler behoben (Liste in BUGS.md, Abschnitt „Fehlersuche Version 18“).
+- Unter anderem: unendlich Gold durch Kaufen/Verkaufen, zerstörte Dörfer füllten sich beim Laden neu, abgebrochene Aufträge für immer gesperrt,
+  Heer-Auftrag der Toten nie fertig, Versklavung in Dungeons, Erbe erbte Ketten und Jagd, Angst der Bewohner dauerte ewig.
+
 ## Version 17 — 2026-09-29 (S15)
 - Überfälle der Toten (P20): bei Sael eine Horde gegen ein Dorf führen, ab Rang 2 ein Heer gegen eine Stadt schicken; danach über die Bewohner entscheiden.
 - Festnahme: in Ketten oder im Kerker keine zweite Festnahme, Schuldknechtschaft löscht das Kopfgeld, Entlassung in Aurelion vor das Tor.

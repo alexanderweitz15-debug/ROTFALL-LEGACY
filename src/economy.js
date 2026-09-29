@@ -2,9 +2,9 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=17';
-import { ITEMS, GOODS, TOWNS } from './data.js?v=17';
-import { LOCATIONS, HOUSES, TS, TOWN_PLAN } from './world.js?v=17';
+import { S, log, chronicle, chance, ri, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=18';
+import { ITEMS, GOODS, TOWNS } from './data.js?v=18';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN } from './world.js?v=18';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];
@@ -126,7 +126,7 @@ export function ecoPrice(town, g, buy) {
   const t = S.towns[town]; if (!t) return ITEMS[g].value;
   let f = clamp(target(t, g) / ((t.stock[g] || 0) + 1), 0.4, 3);
   if (isAurel(town)) f *= 1.15;
-  if (occupied(town)) f *= 1.5;
+  if (occupied(town) && buy) f *= 1.5;   // S15: Besatzung macht Kaufen teuer, nicht Verkaufen
   const p = ITEMS[g].value * f;
   return Math.max(1, Math.round(buy ? p * 1.12 : p * 0.88));
 }
