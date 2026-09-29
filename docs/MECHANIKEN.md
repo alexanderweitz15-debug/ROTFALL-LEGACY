@@ -197,3 +197,34 @@ Stand: Session 15 (2026-09-29).
 - **Festnahme:** Wer in Ketten oder im Kerker sitzt, wird nicht noch einmal festgenommen. Die Schuldknechtschaft ersetzt das Kopfgeld. Wer in Aurelion aus dem Kerker kommt und keinen Schein hat, wird vor das Tor geführt.
 - **Ausbruch aus dem Kerker:** Sieht ein Wärter den Ausbruch, redet er erst: zurück in die Zelle (zwei Stunden mehr), bestechen (die Hälfte der Kaution, er sieht eine Stunde weg) oder kämpfen (beide Wärter greifen an).
 - **Am Boden:** NPCs, auch Gefährten, heilen sich am Boden nicht selbst. Sie stehen nur auf, wenn jemand sie heilt oder aufrichtet: der Held (E, Verband, Zauber), ein Gefährte oder ein Bewohner in der Nähe, sobald kein Feind mehr da ist. Nur der Held selbst kommt von allein zu sich.
+
+## Runde: Hinweise für Spieler (S15)
+
+Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im Spiel:
+- **Fertigkeiten (C):** Maus über eine Fertigkeit zeigt, wie sie steigt und was sie bewirkt. Jagd, Handwerk, Schmieden und Schleichen sind als „(noch ohne Wirkung)“ markiert; Führung wirkt (je 10 Punkte ein Gefährte mehr), steigt aber nicht durch Übung.
+- **Zustand (Inventar):** Tooltip erklärt Abnutzung (Waffe bis −45 % Schaden) und Reparatur beim Schmied oder selbst mit Eisenerz bis 80 %.
+- **Fremdes Eigentum:** Der E-Hinweis zeigt „Durchsuchen (fremdes Eigentum)“, wenn das Haus lebende Besitzer hat (oder ein Amtsgebäude ist).
+- **Prothesen:** Im Effektfenster (X) steht der Zustand in Prozent; unter 30 % rot und „wirkungslos“. Beim Unterschreiten von 30 % einmal eine Warnung.
+- **Lager (B):** Unter den Arbeitsprioritäten stehen die Regeln (alle arbeiten an der obersten Aufgabe, Dach und Nahrung, nächtliche Angriffe, Wachturm warnt). Ohne Lager: Hinweis auf den vierten Gefährten. Ackerfläche beschreibt jetzt, was sie wirklich tut (12 Nahrung am Tag, Sammler bringen doppelt).
+- **Riss im Gewebe:** Die Auftragsbeschreibung nennt Mitte (Wegpunkt) und die vier Schutzzauber.
+- **Gesperrte Wege:** Ysra sagt, was vor dem Pakt fehlt (Grabsiegel, Orden, zwei Titel). Morvath, Kelan und Rook sagen, dass sie erst Vertrauen brauchen.
+- **Varg und die Legion:** Die Bitte ist erst verbraucht, wenn Varg zusagt. Bei Absage nennt das Spiel die Bedingung (Ansehen 20 bei der Kette oder ein Rang).
+- **Mönch und Tote:** Wer das Gelübde trägt, hört beim Beitritt zu den Toten den wahren Grund; die Gelübde-Kosten nennen es vorher.
+- **Weihen:** Bei Rang 3 der Kette und der Toten sagt das Spiel, wer die Weihe gibt (Varg oder Dunkler Paladin; Sael oder Ysra, Krieger nötig).
+- **Rangübersicht:** Ränge des Seevolks ohne Weg heißen „Dieser Rang ist noch nicht erreichbar.“; der Beitritt bei den Toten nennt auch das Knien vor Garmadon.
+- **Handbuch:** Reisen (keine Schnellreise, Kutscher, Fährmann, Aufenthaltsschein), Abnutzung, Fertigkeiten, Beziehung (keine Geschenke: Aufträge +8, Berufsaufträge +5, Dienste +3), Kelans und Rooks Vertrauen, Pakt-Vorbedingung, Gruppengröße, Lagerregeln, Diebstahl an Möbeln, In eine Stadt investieren.
+
+## Runde: Große Weltereignisse, Cutscenes, Menüleiste (S15, Version 19)
+
+- **Große Weltereignisse (P15):** etwa alle 3–5 Tage eines, nie zweimal dasselbe hintereinander, immer nur eines zur Zeit. Jedes wird im Log, in der Chronik und als Einblendung angekündigt und endet nach seiner Frist von selbst.
+  - **Seuche:** In einem Ort husten Kranke. Ein Heilkraut heilt einen Kranken (ansprechen). Jeden Tag stirbt vielleicht einer und es steckt sich einer an; nach drei Tagen springt die Seuche ins Nachbardorf, wenn nicht genug geheilt wurden. Dazu ein Kräuterauftrag am Brett.
+  - **Heuschrecken:** Das halbe Korn eines Orts ist weg, Brot wird teurer. Ein Bauer dort vertreibt sie mit 10 Holz Rauch (Ruf +5).
+  - **Turnier** (Nordfurt, Eren, Salzhafen): beim Herold 20 Gold Einsatz, drei Kämpfe gegen Ritter, die aufgeben statt zu sterben. Sieg: 200 Gold, Ruhm, Titel „Turniersieger“. Wer am Boden liegt, ist raus.
+  - **Adelsball** (Aurelheim): nur mit Schein oder Bürgerrecht. Drei Gespräche mit Häusern: schmeicheln (Gunst nach Willenskraft), Klatsch (ein Haus +, ein anderes −), frech (−).
+  - **Luftschiffabsturz:** Wrack in der Wildnis, Magitech-Teile im Gras, zwei bewusstlose Luftschiffer (aufrichten: Aurelion +6, 40 Gold), Plünderer.
+  - **Schatzwagen:** rastet vor einer Stadt; einige Stunden später greifen Räuber an. Wer dabei ist und die Wachen leben: 120 Gold, Handelsgilde +10. Ist niemand da, wird er ausgeraubt.
+  - **Hexenprozess:** Eine Bewohnerin wird angeklagt. Für sie sprechen (Willenskraft und Ruf beim Orden entscheiden), nachts fortbringen (Verbrechen, vielleicht Kopfgeld) oder nichts tun (sie brennt).
+  - **Streik in Tickmar:** Die Fabriken stehen. Bei Grete Rußhand: zu den Arbeitern stehen (Vantor −10), vermitteln (Willenskraft) oder den Streik brechen (Vantor +10, 100 Gold).
+- **Cutscenes:** Schnitte blenden kurz ab, der Text blendet ein, Einstellungen können langsam schwenken. Wer überspringt, verpasst keine Folgen mehr (die Welt-Änderungen der restlichen Einstellungen passieren trotzdem). Bei Vargs Fall besiegen die befreiten Goblins sichtbar die letzten, erschöpften Paladine, die sich ergeben.
+- **Menüleiste:** passt sich an kleinere Bildschirme an (Laptop): engere Abstände, unter 1400 px ohne Tastenkürzel, notfalls seitlich scrollbar.
+- **Tastenliste** in Optionen und Handbuch vollständig: Deckung/Parade (Umschalt), R, 1–9 und 0, Rechtsklick, Überspringen, T/Z/H.

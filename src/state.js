@@ -139,7 +139,8 @@ export function adoptPropKeys(map, fresh) {
 }
 export function save() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
-  if (S._quiet || S.cine) return false;                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
+  if (S._quiet || S.cine) return false;
+  if (!S.player) return false;                                   // S15 Fehlersuche: im Titelmenü gibt es noch keinen Helden — nie einen leeren Stand über den echten schreiben                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
   try {
     localStorage.setItem(SAVE_KEY, saveData());
     return true;

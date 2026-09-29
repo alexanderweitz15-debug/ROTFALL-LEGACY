@@ -1,8 +1,8 @@
 // Weltkarte (Session 12, Nutzer: „Karte wie auf dem Bild, mit Fog of War“): gemalte Landkarte statt Kachelfarben.
 // Grundbild einmal je Welt (1 Pixel je Kachel, Relief, Rauschen, Küsten), darauf Symbole im Anzeigemaßstab (Gipfel, Wälder,
 // Burgen, Dörfer, Ruinen), Herrschaftsgrenzen (Kette bernstein, Menschen gold, Totenland rot) und der Nebel des Unerkundeten.
-import { S } from './state.js?v=18';
-import { MAPS, T, TS, LOCATIONS, regionAt, OX } from './world.js?v=18';
+import { S } from './state.js?v=19';
+import { MAPS, T, TS, LOCATIONS, regionAt, OX } from './world.js?v=19';
 
 // ---------------- Nebel: 8×8-Kachel-Zellen, bitweise, im Spielstand als Base64 (S.fog) ----------------
 const FC = 8;
@@ -114,7 +114,7 @@ function debugMarks(c, SX, SY, sc, w, h) {
   for (const C of S.contracts || []) if (C.state === 'active') dot(C.x, C.y, 3.5, '#ffe040');
   dot(S.player.x / TS, S.player.y / TS, 4, '#40ff60');
 }
-export function drawAtlas(cv, zoom, extra) {
+export function drawAtlas(cv, zoom, extra = { place: () => true }) {   // S15 Fehlersuche: die Minikarte ruft ohne extra auf
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, m = MAPS.world, p = S.player;
   const B = buildBase(); fogReady();
   const sc = Math.min(w / m.w, h / m.h) * zoom;

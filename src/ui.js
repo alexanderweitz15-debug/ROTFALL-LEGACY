@@ -1,15 +1,15 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=18';
-import * as CS from './cloudsave.js?v=18';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=18';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=18';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=18';
-import { wearOf } from './buildings.js?v=18';
-import { townState, townPrice } from './sim.js?v=18';
-import { GOODS } from './data.js?v=18';
-import { target as ecoTarget } from './economy.js?v=18';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=18';
-import { sfx, ambience } from './sfx.js?v=18';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=19';
+import * as CS from './cloudsave.js?v=19';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=19';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=19';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=19';
+import { wearOf } from './buildings.js?v=19';
+import { townState, townPrice } from './sim.js?v=19';
+import { GOODS } from './data.js?v=19';
+import { target as ecoTarget } from './economy.js?v=19';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=19';
+import { sfx, ambience } from './sfx.js?v=19';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -114,7 +114,7 @@ export function refreshHUD() {
     ['Kraut', S.res.herb], ['Nahrung', S.res.food], ['Gold', S.gold]]
     .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join('');
   // Kopfzeile
-  $('clock-time').textContent = `Tag ${S.day} · ${timeStr()} · ${S.season}`;
+  $('clock-time').textContent = `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`;   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
   if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = { clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel' }[S.weather]; }
   $('clock-gold').textContent = S.gold;
   renderHotbar();
@@ -231,7 +231,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=18').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=19').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -597,7 +597,7 @@ export function itemInfoHTML(slot, cmpWith = true) {
   if (it.armor) h += `<div class="stat"><span>Rüstung</span><b>${it.armor} ${cur ? cmp(it.armor, ITEMS[cur.key].armor || 0) : ''}</b></div>`;
   if (it.block) h += `<div class="stat"><span>Block</span><b>${Math.round(it.block * 100)}%</b></div>`;
   if (it.heal) h += `<div class="stat"><span>Heilung</span><b>${it.heal}</b></div>`;
-  if (slot.cond != null) h += `<div class="stat"><span>Zustand</span><b>${Math.round(slot.cond * 100)}%</b></div>`;
+  if (slot.cond != null) h += `<div class="stat" title="${it.dmg ? 'Abgenutzte Waffen verlieren bis zu 45 % Schaden' : 'Abgenutzte Rüstung schützt bis zu 60 % weniger'}. Ein Schmied bessert alles aus (Kannst du das ausbessern?). Selbst an Esse, Amboss oder Werkbank mit Eisenerz, aber nur bis 80 %."><span>Zustand</span><b>${Math.round(slot.cond * 100)}%</b></div>`;
   h += `<div class="stat"><span>Grundwert</span><b>${Math.round(it.value * (RARITY_VALUE[rar] || 1))} Gold</b></div>`;
   return h;
 }
@@ -615,7 +615,7 @@ function showDetail(slot, i) {
   d.innerHTML = h;
   const refresh = () => { refreshModal(); };
   if ($('d-use')) $('d-use').onclick = () => { A.useOrEquip(i); refresh(); };
-  if ($('d-hot')) $('d-hot').onclick = () => { A.toHotbar(slot.key); toast('Auf Leiste gelegt'); };
+  if ($('d-hot')) $('d-hot').onclick = () => { if (A.toHotbar(slot.key) !== false) toast('Auf Leiste gelegt'); };
   if ($('d-craft')) $('d-craft').onclick = () => { A.craftBandage(i); refresh(); };
   if ($('d-drop')) $('d-drop').onclick = () => { A.dropItem(i); refresh(); };
   if ($('d-smash')) $('d-smash').onclick = () => { A.coreSmash?.(); refresh(); };   // S15 P7: Magiekern zerschlagen
@@ -667,6 +667,17 @@ function charUI(body, who) {
   const ATTR_TIP = { strength: 'Nahkampfschaden', agility: 'Fernkampfschaden, Lauftempo, Ausweichen', endurance: 'Leben, Ausdauer, Erholung', intelligence: 'Mana und Zauberschaden; manche Zauber verlangen einen Mindestwert',
     perception: 'Chance auf kritische Treffer', willpower: 'Mana, Überzeugen im Rat und in Gesprächen' };   // S15 (Nutzer): erklären, was ein Punkt bringt
   const SKILLS = SKILL_NAMES;
+  /* S15 Hinweise: jede Fertigkeit erklärt beim Überfahren, wie sie steigt und was sie bewirkt. Ohne Wirkung wird es offen gesagt. */
+  const WPN_TIP = 'Steigt mit jedem Treffer mit dieser Waffenart. Mehr Schaden und schnellere Hiebe.';
+  const SKILL_TIP = { onehanded: WPN_TIP, twohanded: WPN_TIP, polearms: WPN_TIP, archery: 'Steigt mit jedem Schuss. Mehr Schaden und schnelleres Spannen.',
+    defense: 'Steigt, wenn du getroffen wirst oder abwehrst. Chance, Hiebe von vorn abzuwehren (weniger Schaden).',
+    medicine: 'Steigt beim Verbinden und Heilen mit Verbänden und Kräutern. Jeder Verband heilt mehr.',
+    toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
+    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.',
+    trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
+    leadership: 'Je 10 Punkte ein Gefährte mehr in der Gruppe. Steigt bisher nicht durch Übung.',
+    smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. (noch ohne Wirkung)',
+    hunting: '(noch ohne Wirkung)', crafting: '(noch ohne Wirkung)', stealth: '(noch ohne Wirkung)' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
@@ -710,7 +721,7 @@ function charUI(body, who) {
       ${titleBlock(p, isPlayer)}
       ${isPlayer ? `<h3>Talente</h3><p class="traits">${Object.keys(p.tree || {}).map(k => SKILL_TREE[k]?.name).filter(Boolean).join(' · ') || 'Noch keine.'}${p.skillPoints ? ` · <b style="color:var(--gold)">${p.skillPoints} frei (T)</b>` : ''}</p>` : ''}
       <h3>Fertigkeiten</h3>
-      <dl class="ledger-list">${skills.map(([k, n]) => `<div><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
+      <dl class="ledger-list">${skills.map(([k, n]) => `<div title="${SKILL_TIP[k] || ''}"><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
     </section>
   </div>`;
   if ($('ch-figure')) drawFigureTo($('ch-figure'), p);
@@ -814,6 +825,7 @@ function settleUI(body) {
   if (!st) {
     body.innerHTML = `<div class="ledger">Du hast noch kein Lager. Suche einen freien Platz in der Welt und gründe eins.
       <div class="ctx-actions"><button id="found">Lager hier gründen (5 Holz)</button></div>
+      <p style="margin-top:10px">Mit eigenem Lager darfst du einen vierten Gefährten mitnehmen (sonst bis zu drei).</p>
       <p style="margin-top:14px;color:#6d6454">Ein Lager ist kein Menü. Es steht in der Welt, es brennt, es wächst, es kann fallen.</p></div>`;
     $('found').onclick = () => { A.foundCamp(); closeModal(); };
     return;
@@ -832,6 +844,7 @@ function settleUI(body) {
       <div id="detail" class="ledger" style="margin-top:12px">Wähle ein Gebäude links, dann platziere es in der Welt mit Linksklick.</div>
       <h3 style="margin-top:16px">Arbeitsprioritäten</h3>
       <div id="prio"></div>
+      <div class="ledger" style="margin-top:6px">Alle Siedler arbeiten an der obersten Aufgabe. Siedler kommen nur, wenn es ein Dach (Hütten) und Nahrung gibt; jeder isst täglich. Nachts kommen Angreifer — ein Wachturm warnt eine Stunde vorher.</div>
       <h3 style="margin-top:16px">Ortsgedächtnis</h3>
       <div class="ledger">${(st.history || []).map(h => `${h.text} — Jahr ${h.year}`).join('<br>') || 'Noch keine Geschichte.'}</div>
     </div>
@@ -909,7 +922,7 @@ export function chronUI(body) {
   const years = [...new Set(evs.map(e => e.year))].sort((a, b) => a - b);
   const st = S.stats || {}, ms = st.playMs || 0, P = S.player, done = Object.values(S.quests).filter(q => q.state === 'done').length;   // S13 (Nutzer): Spielstand-Info
   const info = [['Spielzeit', `${Math.floor(ms / 3.6e6)} Std ${Math.floor(ms / 6e4) % 60} Min`], ['Generation', `${S.legacy.gen} (Haus ${S.legacy.house})`], ['Vorfahren', S.legacy.ancestors.length],
-    ['Tag / Jahr', `${S.day | 0} / ${year()}`], ['Getötet', S.kills || 0], ['Schlachten', S.battles || 0], ['Aufträge erfüllt', done], ['Held', `${P.name}, Stufe ${P.level}`],
+    ['Tag / Jahr', `${S.day | 0} / ${year()}`], ['Getötet', S.kills || 0], ['Schlachten', S.battles || 0], ['Aufträge erfüllt', done], ['Held', P ? `${P.name}, Stufe ${P.level}` : '—'],
     ['Legenden', Object.values(S.legend || {}).join(', ') || '—']].map(([k, v]) => `<div class="statline"><span>${k}</span><b>${v}</b></div>`).join('');
   body.innerHTML = `<div class="panel" style="padding:10px 14px;margin-bottom:12px"><h3>Spielstand</h3><div class="save-info">${info}</div></div><div class="chron"><div class="timeline">${years.map(y =>
     `<div class="tl-year">JAHR ${y}</div>` + evs.map((e, i) => [e, i]).filter(([e]) => e.year === y)
@@ -995,8 +1008,8 @@ function settingsUI(body) {
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
-      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>1–8 — Fähigkeiten<br>
-      I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
+      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
+      I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · T — Talente · Z — Zauberbuch · H — Kodex · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button></div>
       <h3 style="margin-top:14px">Auf anderem Gerät weiterspielen</h3>
