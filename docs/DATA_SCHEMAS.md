@@ -1,163 +1,98 @@
-# Datenmodelle — Rotfall: Legacy
+# Datenmodelle — Ist-Stand
 
-Alle Spieldaten liegen in `src/data.js` (statisch) bzw. entstehen in `world.js` (Weltgenerierung).
-Neue Inhalte als Datensatz, nicht als Einzelfall im Code.
+Statische Daten in `src/data.js`, Weltgenerierung in `world.js`. Neue Inhalte als Datensatz, nicht als Einzelfall.
+Alte Ziel-Schemata: `archive/DATA_SCHEMAS_bis_S13.md`.
 
-## Waffe (`ITEMS`, slot `weapon`) — Ist-Stand
+## Waffe (`ITEMS`, slot `weapon`)
 ```js
-longsword: { name:'Langschwert', slot:'weapon', wtype:'sword', dmg:12, reach:46, arc:1.6, speed:560, stam:9,
-             rarity:'uncommon', value:90, skill:'onehanded' /* optional: ap, crit, stagger, twohand, ranged, tool, mana, holy */ }
+longsword: { name, slot:'weapon', wtype:'sword', dmg:12, reach:46, arc:1.6, speed:560, stam:9, rarity:'uncommon', value:90,
+             skill:'onehanded' /* optional: ap, crit, stagger, twohand, ranged, tool, mana, holy, riposte, crush, sweep,
+             reload, manaShot, execute:[schwelle, faktor], raw, chill, toll, unique, leg */ }
 ```
-- `wtype` wählt Gefühl (`FEEL` in game.js), Schwungkurve (`swingOf` in render.js) und Sprite (`DESIGNS` in sprites.js).
-- `reach` px, `arc` Bogen in rad, `speed` Schwungdauer ms, `stam` Ausdauerkosten, `ap` Rüstungsdurchschlag 0..1.
+- `wtype` wählt Gefühl (`FEEL`, game.js, Pflicht), Schwung (`swingOf`, render.js) und Bild (`DESIGNS`, sprites.js).
+- `reach` px, `arc` rad, `speed` ms, `stam` Ausdauer, `ap` Durchschlag 0..1 (auch Geschosse).
+- Rüstung: `slot` chest/head/offhand, `armor`, `slow`, `block` (Schild), `ally`; Aussehen über `ARMOR_LOOK`.
 
-## Gegner (`MONSTERS`) — Ist-Stand
-```js
-bandit: { name:'Bandit', hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2,
-          faction:'bandit', interiors:true, pal:{ skin, cloth, metal } /* optional: telegraph, ranged, boss */ }
-```
-- `interiors`: folgt durch Eingänge (true) oder lauert draußen (false). Pflichtfeld (Selbsttest prüft).
-- `telegraph` ms Ansage vor dem Hieb; `boss` bindet an die Arena.
-- Beute: `LOOT[mtype] = [[itemKey, chance], …]`.
+## Exemplar
+`{ key, count, cond, rar?, afx?: { affix: wert }, leg? }` — `rar` nur besser als `ITEMS[key].rarity`; Unikate würfeln nie.
+Aufheben, Lager, Grab behalten das Exemplar (`giveItem`, nie `addItem`).
 
-## NPC (`NPCS`)
+## Rarität und Affixe
 ```js
-{ key, name, prof, faction, age, home /* NPC_SPOTS-Schlüssel */, traits:[], attrs:{}, cls, recruit, recruitRel,
-  greet, shop?, town?, smith?, teaches?, hostile?, undead?, kin? }
-```
-Laufzeitfelder: `anchor` (Posten), `angry`, `sawPlayer` (Spieluhr), `wary` (Spieluhr bis), `fleeing`, `provoked`.
-
-## Übergangszustand (Laufzeit, gespeichert mit der Entität)
-```js
-e.follow = { to: 'mine', at: <Spieluhr> }   // unterwegs zur Tür, kommt ab `at` auf Karte `to` an
-e.lurk   = { until: <Spieluhr> }            // lauert am Eingang bis `until`
-e.wary   = <Spieluhr>                        // Sichtweite ×1,5 bis dahin
+RARITY_ORDER = ['common','uncommon','rare','epic','legendary','mythic']
+RARITY_DROP  = { common:0.62, uncommon:0.24, rare:0.10, epic:0.035, legendary:0.005 }   // Basis, Gefahr verschiebt
+RARITY_VALUE = { common:1, uncommon:1.35, rare:1.9, epic:3, legendary:5, mythic:8 }
+RARITY_AFFIXES = { common:0, uncommon:1, rare:2, epic:3, legendary:2, mythic:0 }
+AFFIXES.sharp = { slots:['weapon'], name:'Schärfe', v:[min, max], fmt, major? }
+ARMOR_SETS.rotgarde = { name, pieces:[itemKey…], bonus:{ dmg?, armor?, stam?, holy? }, desc }
 ```
 
-## Gebäude — Ist-Stand (Phase 4)
+## Gegner (`MONSTERS`)
+```js
+bandit: { name, hp:48, dmg:10, speed:1.4, reach:34, atk:880, xp:22, sight:250, r:11, threat:2, faction:'bandit',
+          interiors:true /* Pflicht */, pal:{ skin, cloth, metal }, scaling /* optional: telegraph, ranged, boss, prey */ }
+```
+- `interiors`: folgt durch Eingänge oder lauert. `boss`: hält die Arena (ebenso Instanzen mit `e.boss`).
+- Beute `LOOT[mtype] = [[itemKey, chance], …]`. Regionalbosse: `REGION_BOSSES` (game.js) mit `flag, mtype, loc, level, hp,
+  call, area(a), from, to, effect, text`.
+
+## NPC (`NPCS`) und Bewohner
+```js
+{ key, name, prof, faction, age, home, traits:[], attrs:{}, cls, recruit, recruitRel, greet, shop?, town?, teaches?, hostile?, undead?, kin? }
+```
+Laufzeit: `anchor`, `homeId`, `homeTown`, `plan` (Tagesplan, beim Laden neu), `angry`, `wary`, `fleeing`, `provoked`,
+`talk: { at, until, say }`, `follow: { to, at }`, `lurk: { until }`, `servant` (Herr-id), `pet`, `transient`.
+
+## Titelklasse (`TITLE_CLASSES`)
+```js
+necromancer: { name, title, glow, faction, excludes:['warlock','monk'], reversible:false, desc,
+  resource:{ key, name, max, start, css, rule }, abilities:[…], passive:{ name, desc }, flaw:{ name, desc },
+  cost:{ desc, hpMul?, stamina?, attr? }, rep:{ undead:20, order:-30 }, unlock }
+MAX_TITLES = 2
+```
+Spieler: `titleClasses` (erworben), `titleClass` (getragen), `tres`, `pactCost`, `pal.glow`.
+`ABILITIES[k] = { name, title?, cd, cost: n | 'all', min?, gain? }`.
+
+## Skill-Baum
+```js
+SKILL_TREE.k_legion = { branch, row, type:'keystone'|'notable'|undefined, name, desc,
+  fx:{ hp, stam, mana, dmg, armor, crit, speed, spell, cdr, heal, regen, manaRegen, dodge, invCap }, requires:[…], designIntent }
+SKILL_BRANCHES[b] = { name, desc, title? }        // title: versiegelt ohne diese Titelklasse
+```
+Spieler: `skillPoints`, `tree`, `tfx`.
+
+## Fraktionen und Ruf
+`FACTIONS[f] = { name, colors:[a, b], desc, ranks:[…] }` · `REP_TIERS = [{ min, name, price, greet }]` (7 Stufen) ·
+`S.factions[f]` Ansehen, `S.ranks[f]` Rang (−1 = kein Mitglied). Ausschluss beim Beitritt: `JOIN_FOES` (game.js).
+
+## Auftrag (`S.contracts`)
+`{ id, town, kind, giver /* 'board' | 'vm' | npc-key */, have, need, state:'offer'|'active'|'claimed', day, reward:{ gold, xp, rep },
+title, desc, target?, … }` — Fristen `CON_DAYS[kind]`, Deckel `CON_MAX = 5`.
+
+## Gebäude
 ```js
 // world.js: house(map, x, y, w, h, door, { type, town }) → HOUSES (bei jeder Generierung neu, nicht gespeichert)
-{ id: 'h62_58', map: 'world', x: 62, y: 58, w: 5, h: 4, door: 'S', doorTile: [64, 61], type: 'smithy', town: 'eren', seed: 941 }
-// buildings.js
-BTYPES.smithy = { label: 'Schmiede', chimney: 1, sign: 'hammer', forge: 1 }   // Merkmale: chimney (Wahrscheinlichkeit), sign,
-                                                                             // forge, herbs, banner, bigDoor, crest, rose, cross, sacks, flowers, woodpile, big
-TOWN_STYLE.eren = { roof: 'thatch', wall: 'timber' }                         // Dach: thatch|shingle|slate|tile, Wand: timber|wood|stone|plaster|palestone
-FURNISH.smithy = [['forge', 0, 0], ['workbench_int', 2, 0], …]               // [Prop, x, y] relativ zur Innenfläche; negativ = vom rechten/unteren Rand
-```
-Möbel sind Props mit `gen: 2, house: <id>`. Die Kachel hinter der Tür bleibt immer frei (Selbsttest prüft Türen).
-
-## Gebäude (erweitertes Ziel-Schema)
-```json
-{
-  "id": "eren_smithy",
-  "type": "smithy",
-  "wealthTier": "einfach",
-  "material": { "wall": "stone", "roof": "shingle" },
-  "rect": { "x": 62, "y": 58, "w": 5, "h": 4 },
-  "door": "S",
-  "exteriorFeatures": ["chimney_smoke", "anvil_porch", "tools_wall", "sign_hammer"],
-  "interior": ["forge", "anvil", "workbench", "weapon_rack"],
-  "inhabitants": ["aldric"],
-  "lightSource": "forge_glow",
-  "soundAmbient": "hammer"
-}
+{ id, map, x, y, w, h, door:'S', doorTile:[x, y], type:'smithy', town:'eren', seed, wear? }
+BTYPES.smithy = { label, chimney, sign, forge }            // buildings.js; weitere Merkmale: herbs, banner, bigDoor, crest, …
+TOWN_STYLE.eren = { roof:'thatch', wall:'timber' }
+FURNISH.smithy = [['forge', 0, 0], …]                     // Möbel = Props mit gen: 2, house: <id>; Kachel hinter der Tür frei
 ```
 
-## Prop-Szene (Ist-Stand `scene()` in world.js)
-Feste Arrangements statt Streuung: `huntcamp, mushrooms, battlefield, wreck, shrine, stones, frozen, altar, drowned,
-farm, village, tower`. Zuordnung zu Orten über `SCENES[locationKey]`.
-
-## Rarität (Ziel-Schema, Phase 8)
+## Siedlungsplan (`TOWN_PLAN`)
 ```js
-RARITY_TIERS = {
-  common:    { affixes:0, drop:0.62, color },
-  uncommon:  { affixes:1, drop:0.25 },
-  rare:      { affixes:2, drop:0.09 },
-  epic:      { affixes:3, drop:0.03, needsPlaystyleAffix:true },
-  legendary: { affixes:[1,2], drop:0.009, unique:true },
-  mythic:    { named:true, drop:0 /* nur gesetzte Fundorte/Bosse */ },
-}
+eren: { area:[x0,y0,x1,y1], old, square:[x,y], spread:{ s, a:[x,y] }, perHead:95, village?, lord?, metro?,
+  fill, clear, plazas, streets, walls:{ rect, gates }, palisade, harbor, fields, houses:[[type,x,y,w,h,door]],
+  props:[[kind,x,y,opts]], grow:{ houses, gardens, props, s0 }, outskirts:[type…], oldFloor?, coreWalls? }
+worldPt(x, y) → [wx, wy]    // Entwurfspunkt → Weltkachel (in Städten über die Streckung); WS = 1,5, OX = 256
 ```
+Wachstum: `S.growth[town] = { prosper, built:[{ type, x, y, w, h, ruin? }] }`. Verfall durch Raids: `S.flags.raidDamage[houseId] = { base, wear, perm? }`,
+zerstörte Dörfer `S.razed[k] = { day, rebuild }`.
 
-## Skill-Knoten (Ziel-Schema, Phase 9)
-```json
-{ "id": "combat_keystone_berserker", "branch": "COMBAT", "type": "keystone", "requires": ["combat_12"],
-  "effect": { "dmgMulBelowHp": [0.3, 1.25], "dmgTakenMul": 1.15 },
-  "designIntent": "Risiko/Belohnung für aggressive Spielweise" }
-```
-
-## Siedlungsplan (Session 2, world.js `TOWN_PLAN`)
-```js
-eren: { area: [x0,y0,x1,y1], old: [...], square: [x,y],        // Rechtecke inklusiv; old = Kern vor dem Ausbau
-  fill: [[T.DIRT, x0,y0,x1,y1, 'ragged']], clear: [[T.DIRT, ...]], plazas: [[T.STONE, ...]], streets: [[T.ROAD, ...]],
-  walls: { rect, gates: [[x0,y0,x1,y1]] }, palisade: { rect, sides: 'NWS', gates }, oldWalls: true,
-  harbor: { x0, x1, top, piers: [x...], boats: [[x, dy]] }, fields: [[x0,y0,x1,y1]],
-  houses: [['bakery', x, y, w, h, 'N']], props: [['lantern', x, y, { label }]] }
-```
-Neue Gebäudetypen: cottage, manor (`floors: 2`), bakery (`oven`), barn (`barnDoor`, `hay`), stable (`stalls`),
-store (`crane`), fisher (`nets`). Weitere Merkmale: `noWin`, `fewWin`, `patch`, `wall` (Material erzwingen).
-Bewohner (Laufzeit): `homeId`, `homeTown`, `anchor` (Nacht, im Haus), `schedulePos` (Tag), `eve` (Abend).
-
-## Siedlungsplan (`TOWN_PLAN`) — Ergänzungen Session 4
-```js
-eren: { area, old, square,                       // Entwurfskoordinaten; werden beim Laden des Moduls gestreckt
-  spread: { s: [1.2, 1.35] /* oder Zahl */, a: [58, 64] /* Anker */ },
-  perHead: 95,                                   // Kacheln Siedlungsfläche je Kopf (Bewohner + Wachen + Figuren mit Namen)
-  oldFloor?: T.DIRT, coreWalls?: [x0, y0, x1, y1], // Kernburg: Boden und Ringmauer des alten Kerns
-  grow?: { houses: [[type, x, y, w, h, door]], gardens: [[x0, y0, x1, y1]], props: [[kind, x, y, opts]] },   // WELTkoordinaten
-  design: { area, old, clear, houses }           // (Laufzeit) Entwurf, für townPt und den Umzug des Kerns
-}
-townPt(x, y)  → [wx, wy]   // Entwurfspunkt → Weltkachel (Wachposten, NPC-Orte, Karawane, Start)
-```
-
-## Titelklasse (`TITLE_CLASSES`) — Session 4
-```js
-necromancer: { name, title /* Namenszusatz */, glow /* Merkmal */, faction, excludes: ['warlock'], reversible: false, desc,
-  resource: { key: 'essence', name, max: 6, start: 0, css, rule /* woher sie kommt, Pflicht */ },
-  abilities: ['raise_dead', 'bone_ward', 'soul_harvest'],   // ABILITIES[k].title === 'necromancer'
-  passive: { name, desc }, flaw: { name, desc }, cost: { desc, hpMul?, stamina? }, rep: { undead: 20, order: -30 }, unlock }
-// ABILITIES: { name, title, cd, cost: n | 'all', min?, gain? }   — nie mana/stam
-```
-Spieler-Laufzeitfelder: `titleClasses` (erworben), `titleClass` (getragen oder null), `tres` ({ essence, corruption }),
-`pactCost` ({ hpMul, stamina }), `pal.glow`. Diener: Gegner mit `servant` (Herr-id), `until`, `glow`, `transient`.
-
-## Weltmaßstab — Session 5
-```js
-WS = 1.5; wT(v) = floor((v + 0.5) * WS); dT(v) = floor(v / WS)   // Entwurfskachel ↔ Weltkachel
-worldPt(x, y) → [wx, wy]     // Entwurfspunkt; in Städten über deren Streckung (sp = a·WS + (v − a)·s)
-TOWN_PLAN[k].outskirts = ['cottage', 'house', …]   // Randhäuser nach Regeln (Anzahl = Länge), Typ bestimmt Größe (HOUSE_SIZE)
-TOWN_PLAN[k].grow.s0 = 1.5   // Maßstab, in dem grow-Koordinaten gebaut wurden (Umrechnung s/s0 um den Anker)
-props[i].planned = true      // Teil des Stadtplans, auch wenn der Typ sonst Wildnis-Streu wäre (Knochenturm, Namensstein)
-```
-
-## Skill-Knoten (`SKILL_TREE`) — Session 5
-```js
-k_legion: { branch: 'necromancer', row: 2, type: 'keystone' /* oder 'notable', sonst klein */, name, desc,
-  fx: { hp, stam, mana, dmg, armor, crit, speed, spell, cdr, heal, regen, manaRegen, dodge, invCap } /* additiv */,
-  requires: ['n_cold'] /* einer genügt, [] = Einstieg */, designIntent /* Pflicht bei keystone */ }
-SKILL_BRANCHES[b] = { name, desc, title? /* Zweig versiegelt ohne diese Titelklasse */ }
-```
-Spieler: `skillPoints`, `tree` ({ knoten: 1 }), `tfx` (Laufzeit-Summe). Titelklasse: `MAX_TITLES = 2`, `cost.attr`.
-
-## Waffe — Ergänzungen Session 7
-`wtype` rapier|hammer|polearm|crossbow|wand (+ FEEL-Eintrag Pflicht, Selbsttest). Neue Felder: `riposte` (Stich nach Parade
-×2,2, sicher kritisch), `crush` (ignoriert Schilde, Deckung ×2, Ziel taumelt), `sweep` (trifft alle im Bogen, Spitze/Schaft),
-`reload` (ms Spannzeit nach dem Schuss), `manaShot` (Mana je Schuss), `ap` gilt auch für Geschosse.
-
-## Gegenstands-Exemplar — Session 7
-`{ key, count, cond, rar?, afx?: { affix: wert }, leg? }` — `rar` nur, wenn besser als `ITEMS[key].rarity`; Unikate
-(`unique:true`) tragen `rarity`/`leg` im Typ und würfeln nie. Aufheben/Truhe behalten das Exemplar (`giveItem`).
-
-## Spielstand — Session 6
-- `ents[map]`: alle Karten aus `MAP_KEYS` (world, mine, deep). Props mit `gk` (Typ@Kachel[#n]) nur, wenn sie vom
-  Grundzustand abweichen; `propsGone[map]`: Schlüssel entfernter erzeugter Props. Props ohne `gk` (gebaut, alt) voll.
-- Migrationen, die erzeugte Props einsetzen, müssen mit dem zusammengeführten Stand rechnen (erzeugte Props stecken
-  nach `mergeProps` schon in `S.ents`).
-
-## Karawane (`kind:'caravan'`) — Session 6
-`{ dir, wp, cargo, trail:[[x,y]…] (≤ 24 Punkte à 12 px), restUntil (Spielminuten), crew:1 }`; Wachen sind NPCs mit
-`escort: <caravan id>`, `slot: 0|1`; nach Verlust `escortLost:true`.
-
-## Dungeon (`DUNGEONS` in world.js) — Session 6
-`{ name, floor: 'scree'|'dfloor', amb: <Klangregion>, enter: <Ankunftstext> }`; Karte `MAPS[key]` mit `rooms[{x,y,w,h,cx,cy,tag}]`
-und `entry`. Portal: Prop mit `portal: <map>`; Ankunft an der Oberfläche vor dem Portal, das auf die verlassene Karte zeigt.
+## Welt, Karten, Spielstand
+- `DUNGEONS[key] = { name, floor, amb, enter }`, Karte `MAPS[key]` mit `rooms[{ x, y, w, h, cx, cy, tag }]`, `entry`;
+  Portal = Prop mit `portal: <map>`. Neue Karten brauchen eine Grundliste beim Laden (BUG-137).
+- Spielstand: `ents[map]` nur abweichende Props (`gk` = Typ@Kachel), `propsGone[map]`; Figuren voll. `SAVE_VERSION` 4.
+- Karawane: `{ kind:'caravan', dir, wp, cargo, trail:[[x,y]…], restUntil, crew }`; Wachen mit `escort`, `slot`.
+- Wirtschaft: `S.towns[k] = { stock:{ ware: n }, … }`, `S.eco`, `S.priceSeen`; Waren `GOODS` (13).
+- Tiere: `MOUNTS = { horse:{ name, spd, price }, … }`, `S.mount = { kind, name, oiled? }`, `p.mounted = { kind }`, `S.pet` (id).
+- Prop-Szenen: `scene()` in world.js, Zuordnung `SCENES[locationKey]`.

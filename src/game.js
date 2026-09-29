@@ -59,6 +59,7 @@ export function makeChar(o = {}) {
 
 // ---- Skill-Baum: Summe der Knoteneffekte (nur wer Knoten hat) und besondere Regeln je Schlüsselknoten ----
 const node = (c, k) => !!(c && c.tree && c.tree[k]);
+const dkNode = (c, k) => node(c, k) && c.currentClass === 'deathknight';   // S15: Todesritter-Schlüsselknoten nur als aktive Klasse
 function treeFx(c) { const f = {}; for (const k of Object.keys(c.tree || {})) for (const [a, v] of Object.entries(SKILL_TREE[k]?.fx || {})) f[a] = (f[a] || 0) + v; return f; }
 const tfx = (c, k) => (c && c.tfx && c.tfx[k]) || 0;
 const inNature = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0) && [T.GRASS, T.MARSH, T.DIRT].includes(tileAt('world', c.x / TS | 0, c.y / TS | 0));
@@ -254,17 +255,63 @@ function mountSpeed(c) {
   if (!c.mounted) return 1; const M = MOUNTS[c.mounted.kind] || MOUNTS.horse;
   return M.spd * (c.mounted.kind === 'mech_horse' && (S.mount?.oiled || 0) + 5 < (S.day | 0) ? 0.6 : 1);
 }
+// S15 (Nutzer): R pfeift. Das Pferd kommt von außerhalb des Bildes angelaufen und bleibt bei dir stehen; E sitzt auf, R sitzt ab
+// (dann bleibt es stehen). Im Kampf kommt es nicht. Das Pferd in der Welt ist eine flüchtige Figur (kind 'mount'), gespeichert
+// wird nur S.mount; nach dem Laden pfeift man es wieder heran.
+const horseEnt = (map = 'world') => S.ents[map]?.find(e => e.kind === 'mount');
+const inFight = (p = S.player) => S.ents[p.map].some(e => e.kind === 'enemy' && e.alive && !e.downed && !e.pet && dist(e, p) < 420 && teamOf(e) !== 'neutral' && isHostile(e, p));
+const insideHouse = p => HOUSES.some(b => b.map === p.map && p.x / TS > b.x && p.x / TS < b.x + b.w && p.y / TS > b.y && p.y / TS < b.y + b.h);
+function spawnHorse(p, R = 600, at = null) {
+  const old = horseEnt(p.map); if (old) S.ents[p.map].splice(S.ents[p.map].indexOf(old), 1);
+  const free = (x, y) => !solidTile(p.map, x, y) && !solidPropAt(p.map, x, y, 12);
+  for (let i = 0; i < 24; i++) {
+    const a = rnd() * 6.283, x = at ? at.x + (i ? Math.cos(a) * 24 : 22) : p.x + Math.cos(a) * R, y = at ? at.y + (i ? Math.sin(a) * 24 : 0) : p.y + Math.sin(a) * R;
+    if (!free(x, y)) continue;
+    const h = { id: uid(), kind: 'mount', map: p.map, x, y, vx: 0, vy: 0, r: 12, alive: true, transient: true, mkind: S.mount.kind, name: S.mount.name, aim: 0 };
+    S.ents[p.map].push(h); return h;
+  }
+  return null;
+}
+function leaveHorse(p) { if (S.mount && p.map === 'world') spawnHorse(p, 0, p); }   // absitzen oder stürzen: das Pferd bleibt, wo du warst
 function toggleMount() {
   const p = S.player; if (!S.mount) return UI.toast('Du hast kein Reittier. (Tierhändler: Kreuzweg, Nordfurt, Kupferhafen)');
-  if (p.mounted) { p.mounted = null; log(`Du sitzt ab.`, 'world'); return; }
-  if (S.map !== 'world' || townAt(p.x / TS | 0, p.y / TS | 0) && HOUSES.some(b => b.map === 'world' && p.x / TS > b.x && p.x / TS < b.x + b.w && p.y / TS > b.y && p.y / TS < b.y + b.h)) return UI.toast('Hier drinnen nicht.');
+  if (p.mounted) { p.mounted = null; leaveHorse(p); log(`Du sitzt ab. ${S.mount.name} bleibt stehen (R pfeift es heran, E sitzt auf).`, 'world'); return; }
+  if (S.map !== 'world') return UI.toast('Hier drinnen hört dich dein Pferd nicht. Es wartet draußen.');
   if (p.downed) return;
+  float(p, 'pfeift', 'rgba(230,220,180,ALPHA)'); sfx('whistle', 0.4, 1);
+  if (inFight(p)) return UI.toast(`${S.mount.name} scheut den Kampf und kommt nicht.`, 2400);
+  let h = horseEnt(); if (!h || dist(h, p) > 900) h = spawnHorse(p);
+  if (!h) return UI.toast('Dein Pferd findet keinen Weg zu dir.');
+  h.come = true; h.stuckT = 0;
+}
+function mountTick(dt) {
+  const p = S.player, h = horseEnt(S.map); if (!h) return;
+  if (!h.come || p.mounted) { h.vx = h.vy = 0; h.come = h.come && !p.mounted; return; }
+  if (inFight(p)) { h.come = false; h.vx = h.vy = 0; float(h, 'scheut', 'rgba(220,200,160,ALPHA)'); return; }
+  const d = dist(h, p);
+  if (d < 44) { h.come = false; h.vx = h.vy = 0; float(h, 'schnaubt', 'rgba(220,200,160,ALPHA)'); if (d < 900) UI.toast(`${h.name} ist da — E zum Aufsitzen.`, 1800); return; }
+  const a = Math.atan2(p.y - h.y, p.x - h.x), sp = (d > 220 ? 4.4 : 2.4) * dt / 16, x0 = h.x, y0 = h.y;
+  moveEnt(h, Math.cos(a) * sp, Math.sin(a) * sp); h.vx = h.x - x0; h.vy = h.y - y0; h.aim = a;
+  if (Math.hypot(h.vx, h.vy) < sp * 0.3) {                          // hängt an einem Zaun oder Haus: ein Stück näher heran
+    if ((h.stuckT = (h.stuckT || 0) + dt) > 1200) { h.stuckT = 0; const k = Math.max(60, d - 180), x = p.x - Math.cos(a) * k, y = p.y - Math.sin(a) * k;
+      if (!solidTile(h.map, x, y) && !solidPropAt(h.map, x, y, 12)) { h.x = x; h.y = y; } else { h.x = p.x - Math.cos(a) * 40; h.y = p.y - Math.sin(a) * 40; } } }
+  else h.stuckT = 0;
+}
+function mountUp(h) {
+  const p = S.player; if (!S.mount || p.downed) return;
+  if (insideHouse(p)) return UI.toast('Hier drinnen nicht.');
+  S.ents[h.map].splice(S.ents[h.map].indexOf(h), 1);
   p.mounted = { kind: S.mount.kind }; sfx('step', 0.5); log(`Du sitzt auf ${S.mount.name}.${S.mount.kind === 'mech_horse' && (S.mount.oiled || 0) + 5 < (S.day | 0) ? ' Es knirscht — es braucht einen Automatenkern.' : ''}`, 'world');
+}
+function mountIntro(npc) {                                            // S15 (Nutzer): beim Kauf erklären, wie es geht
+  const n = S.mount.name;
+  UI.dialogue(npc, `„${n} gehört jetzt dir. So geht's:\n\n• R: pfeifen. ${n} kommt angelaufen, auch von weit her.\n• E: aufsitzen, wenn es bei dir steht.\n• R im Sattel: absitzen. Es bleibt dann stehen und wartet.\n• Im Kampf kommt es nicht, Pferde scheuen Klingen.\n• In Häuser, Höhlen und Gewölbe kommt es nicht mit, es wartet draußen.${S.mount.kind === 'mech_horse' ? '\n• Alle fünf Tage braucht es einen Automatenkern, sonst lahmt es.' : ''}\n• Im Gruppenfenster (G) siehst du, wie es ihm geht.“`,
+    [{ text: 'Verstanden.', fn: () => UI.closeDialogue() }]);
 }
 function buyMount(kind) {
   const M = MOUNTS[kind]; if (S.gold < M.price) return UI.toast('Dafür reicht dein Gold nicht.');
   S.gold -= M.price; S.mount = { kind, name: `${M.name} ${pick(['Sturm', 'Asche', 'Messing', 'Nacht', 'Wind', 'Funke'])}`, oiled: S.day | 0 };
-  log(`${S.mount.name} gehört jetzt dir. Aufsitzen mit R.`, 'party'); UI.toast(`REITTIER: ${S.mount.name.toUpperCase()}`, 2400); UI.refreshHUD();
+  log(`${S.mount.name} gehört jetzt dir. R pfeift es heran, E sitzt auf.`, 'party'); UI.toast(`REITTIER: ${S.mount.name.toUpperCase()}`, 2400); UI.refreshHUD();
 }
 function oilMount() {
   if (S.mount?.kind !== 'mech_horse') return false; if (!hasItem(S.player, 'automatenkern')) { UI.toast('Dafür brauchst du einen Automatenkern.'); return false; }
@@ -329,7 +376,7 @@ function beastMenu(npc) {
       if (S.gold < g) return UI.toast('Dafür reicht dein Gold nicht.');
       S.gold -= g; const p = S.player, e = spawnEnemy(m, p.map, (p.x / TS | 0) + 1, (p.y / TS | 0) + 1, { level: Math.max(2, p.level - 2), noVariant: true }); makePet(e); UI.closeDialogue(); UI.refreshHUD(); } }))),
     ...(!S.mount ? Object.entries(MOUNTS).filter(([k]) => k === 'horse' || (k === 'mech_horse' && npc.beastTrader === 'kupferhafen') || (k === 'dead_horse' && ((S.ranks.undead ?? -1) >= 0 || pactBound())))
-      .map(([k, M]) => ({ text: `Reittier: ${M.name} — ${M.price} Gold`, fn: () => { buyMount(k); UI.closeDialogue(); } })) : []),
+      .map(([k, M]) => ({ text: `Reittier: ${M.name} — ${M.price} Gold`, fn: () => { buyMount(k); if (S.mount) mountIntro(npc); else UI.closeDialogue(); } })) : []),
     ...(S.mount?.kind === 'mech_horse' ? [{ text: `${S.mount.name} warten (1 Automatenkern)`, fn: () => { oilMount(); back(); } }] : []),
     ...(farmCap() ? [{ text: 'Kuh für deinen Hof — 70 Gold', fn: () => { buyFarmAnimal('cow'); back(); } }, { text: 'Schaf für deinen Hof — 40 Gold', fn: () => { buyFarmAnimal('sheep'); back(); } }] : []),   // S14: eigener Hof
     ...(petOf() ? [{ text: `${petOf().petName} freilassen`, fn: () => { const e = petOf(); e.servant = null; e.pet = false; e.transient = true; e.anchor = { x: e.x + 600, y: e.y }; S.pet = null; log(`${e.petName} trottet davon.`, 'party'); back(); } }] : []),
@@ -390,14 +437,14 @@ function applyHealItem(c, key, target, part) {
   if (it.use === 'bandage' || key === 'herb') {
     part ||= B.worstPart(target) || 'torso';
     const P = target.body[part];
-    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal'));
+    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1);
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
   } else {
-    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')));
+    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1));   // S15 Blutfürst
     float(target, '+' + it.heal, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} gibt ${target === c ? 'sich' : target.name} ${it.name}.`, 'party');
   }
@@ -415,7 +462,15 @@ function tickChannel(p, dt, moving) {
   if (ch.t >= ch.dur) { p.channel = null;
     if (ch.healer) { const g = woundedGroup(); S.gold -= Math.min(S.gold, ch.cost); for (const c of g) { B.fullHeal(c); c.status = (c.status || []).filter(s => !SLEEP_CURES.has(s.key)); }
       log(`${target.name} versorgt ${g.length > 1 ? 'dich und deine Gruppe' : 'deine Wunden'} (${ch.cost} Gold).`, 'party'); fx(p.x, p.y - 14, 'heal', 12); addRel(target.key, 2); UI.refreshHUD(); return; }
-    if (ch.revive) { if (target.downed) stabilize(target, p); } else applyHealItem(p, ch.key, target, ch.part); }
+    if (ch.revive) { if (target.downed) stabilize(target, p); } else applyHealItem(p, ch.key, target, ch.part);
+    helpedVillager(target, p); }
+}
+// S15 (Nutzer: „Heilen von Leuten aus Dörfern soll Ruf bringen“): Wer einen Bewohner verbindet oder aufrichtet, gewinnt Ansehen bei der
+// Macht des Ortes und die Zuneigung der Person. Einmal je Person und Tag, damit es kein Verband-Kreislauf wird.
+function helpedVillager(t, p) {
+  if (p !== S.player || t === p || t.kind !== 'npc' || !t.homeTown || S.party.includes(t.id) || t.helpedDay === (S.day | 0)) return;
+  t.helpedDay = S.day | 0; const f = townFac(t.homeTown); S.factions[f] = clamp((S.factions[f] || 0) + 3, -100, 100); if (t.key) addRel(t.key, 10);
+  float(t, 'dankbar', 'rgba(160,224,160,ALPHA)'); log(`${t.name} vergisst dir das nicht. ${FACTIONS[f]?.name || f} +3.`, 'faction');
 }
 // Verbände herstellen: aus Stoff, nicht aus dem Nichts
 const BANDAGE_FROM = { cloth: 3, cloth_shirt: 2 };
@@ -480,7 +535,8 @@ function spawnNPCs() {
 function spawnNpcDef(def) {
   const spots = NPC_SPOTS;
   {
-    const home = worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
+    const home = def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
+      : worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
     const pos = freeSpotNear('world', home[0] + ri(-2, 2), home[1] + ri(-2, 2), 4);
     const c = makeChar({ ...def, x: pos.x, y: pos.y, level: def.key === 'kelan' ? 12 : def.key === 'rook' ? 8 : ri(3, 7),
       pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: def.faction === 'order' ? '#c7bda6' : def.faction === 'valen' ? '#33415c' :
@@ -489,7 +545,7 @@ function spawnNpcDef(def) {
     c.home = home; c.anchor = { x: pos.x, y: pos.y };
     if (def.undead) { c.pal.skin = '#b9b3a2'; c.pal.glow = def.key === 'vhal' ? '#b07ae0' : '#4e8f7a'; }
     c.hooded = !!def.undead || def.faction === 'undead' || ['morvath', 'rook', 'kelan'].includes(def.key);
-    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', oda:'spear', morvath:'staff' }[def.key];
+    const w = { elena:'dagger', tomas:'shortbow', borin:'longsword', rook:'dagger', kelan:'longsword', aldric:'mace', brann:'longsword', oda:'spear', morvath:'staff' }[def.key] || def.weapon;
     if (w) c.equip.weapon = mkItem(w);
     if (def.key === 'borin') { c.equip.offhand = mkItem('kite_shield'); c.pal.shield = '#4a3f30'; c.pal.shieldBoss = '#8a8172'; }
     if (def.key === 'kelan') { c.equip.offhand = mkItem('kite_shield'); c.equip.chest = mkItem('plate_cuirass');
@@ -1827,7 +1883,8 @@ export function continueGame() {
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
     if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches']) if (def[k] !== undefined) e[k] = def[k]; }
-  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key)) spawnNpcDef(def);
+  for (const def of NPCS) if (!S.ents.world.some(e => e.key === def.key) && (def.atTown || ['gerold', 'ysra', 'vhal', 'mira', 'sael', 'brann', 'ilva', 'oda', 'lioba', 'quirin'].includes(def.key))) spawnNpcDef(def);   // S15: Stadt-Lehrer auch in alten Ständen
+  successorDay(true);                                                 // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“): fehlende wichtige NPCs ersetzen
   if (!S.flags.grove1) { for (const p of fresh) if (p.groveScene) S.ents.world.push(p); S.flags.grove1 = true; }   // Session 5: der Alte Hain
   if (!S.flags.dead1) {                         // Session 5: erweitertes Totenreich — Szenen, Vharnholm (Props, Bewohner, Wachen)
     const A = TOWN_PLAN.vharnholm.area, inV = e => { const x = e.x / TS | 0, y = e.y / TS | 0; return x >= A[0] && x <= A[2] && y >= A[1] && y <= A[3]; };
@@ -2047,6 +2104,8 @@ function update(dt, now) {
   if (S.fires?.length) fireTick(dt);   // S14: Brand in der Stadt
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
   if (S.player?.casting) castTick(S.player);   // S15 P4
+  mountTick(dt);                               // S15: gerufenes Pferd läuft heran
+  if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -2700,6 +2759,7 @@ function teamOf(c) {
   if (c.servant) return 'player';                              // Diener des Nekromanten
   if (c.kind === 'enemy') {
     if (c.surrendered) return 'neutral';                               // S13: ergeben
+    if (c.questFoe) return 'foe';                                      // S15: Auftragsziel aus dem Nachschub ist immer Feind
     if (MONSTERS[c.mtype]?.prey) return 'prey';
     if ((c.mtype === 'garmadon' || c.gCourt) && !S.flags.garmFight) return 'neutral';   // Phase 6: Garmadon redet erst
     if (c.mtype === 'omega' && c.parley && !om().fight) return 'neutral';   // Phase 7: Omega erwacht ruhig und spricht
@@ -2890,6 +2950,10 @@ function hit(attacker, target, mult, kind = 'physical') {
     dmg *= 0.3; fx(target.x, target.y - 12, 'spark', 5); float(target, 'Schild', 'rgba(200,196,170,ALPHA)'); sfx('metal', 0.4, earVol(target)); }   // Phase 6: Knochenritter — von vorn prallt es ab
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
   if (kind === 'physical' && !AREA && attacker.alive && stat(target, 'thorns') && dist(attacker, target) < 100) hurt(attacker, dmg * (node(target, 'd_thorns') || gearOf(target) >= 3 ? 0.6 : 0.4), target, 'Dornenhaut');   // S15 Druide
+  if (attacker.graveFrost) { attacker.graveFrost = false; applySpellStatus(target, { key: 'frost', stacks: 1 }, attacker); }   // S15 Frostklinge
+  if (kind === 'physical' && !AREA && attacker.alive && attacker.currentClass === 'deathknight') {   // S15 Todesritter-Schlüsselknoten
+    if (dkNode(attacker, 'k_frostborn') && (attacker.fbN = (attacker.fbN || 0) + 1) % 3 === 0) applySpellStatus(target, { key: 'frost', stacks: 1 }, attacker);
+    if (dkNode(attacker, 'k_bloodlord')) { const h = dmg * 0.08; if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); } }
   if (attacker.drainHit && attacker.alive) { const h = dmg * attacker.drainHit; attacker.drainHit = 0; if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); fx(attacker.x, attacker.y - 14, 'necro', 6); }   // S15 Grabhieb
   if (attacker === S.player && node(attacker, 'k_storm') && attacker.titleClass === 'monk' && (attacker.stormN = (attacker.stormN || 0) + 1) % 3 === 0) setTres(attacker, tres(attacker) + 1);   // S15 Sturmhand
   if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
@@ -2923,6 +2987,7 @@ function hit(attacker, target, mult, kind = 'physical') {
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (target === S.player && target.body) for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = target.body[k]; if (P.mech) P.mechCond = Math.max(0, (P.mechCond ?? 100) - 1.2); }   // S12 E: Prothesen nutzen sich ab (ohne Zufall: Proben bleiben gleich)
   if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
+  if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
     float(target, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); fx(target.x, target.y + 2, 'dust', 5); setTres(target, tres(target) + 1); titleDeed(target); return; }
   if (target.mtype === 'wraith' && target.phased > performance.now() && kind === 'physical') { float(target, 'körperlos', 'rgba(200,220,240,ALPHA)'); return; }   // Geist: nach Treffer kurz ungreifbar
@@ -3034,7 +3099,7 @@ function limbLost(c, part, severed = false) {
   if ((part === 'lleg' || part === 'rleg') && c === S.player) UI.toast(`${B.PART_NAME[part]} ausgefallen — du humpelst.`, 3000);
 }
 function downed(c, cause, source) {
-  if (c.mounted) { c.mounted = null; if (c === S.player) log('Du stürzt vom Pferd!', 'combat'); }   // S13: vom Reittier gestürzt
+  if (c.mounted) { c.mounted = null; if (c === S.player) { leaveHorse(c); log('Du stürzt vom Pferd!', 'combat'); } }   // S13: vom Reittier gestürzt
   c.downed = true; if (!c.body) c.hp = 0; c.downTimer = (c === S.player ? (S.party.length ? 30000 : 15000) : 11000) * (1 - Math.min(0.5, (c.skills?.toughness || 0) * 0.005));   // mit Gruppe mehr Zeit; Zähigkeit verkürzt die Ohnmacht
   if (c.brawl) c.brawlKO = performance.now() + 20000;   // Prügelei: liegt eine Weile, steht dann wieder auf
   // Wer fällt, bricht alles ab: kein halber Schlag, keine Ansage, kein Ziel, kein Weg
@@ -4120,7 +4185,7 @@ function provoke(target, attacker) {
 function interactables() {
   const p = S.player;
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
-    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
+    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
      (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
@@ -4135,7 +4200,7 @@ function updatePrompt() {
   if (UI.dialogueOpen() || placing) { UI.setPrompt(placing ? 'Linksklick: <b>bauen</b> · Rechtsklick/Esc: abbrechen' : ''); return; }
   const t = interactables()[0];
   if (!t) return UI.setPrompt('');
-  const label = t.cellDoor != null ? '<b>E</b> Schloss knacken' : t.raskChest ? '<b>E</b> Rasks Kiste öffnen' : t.bond ? `<b>E</b> ${t.label}` : t.mechBench ? '<b>E</b> Werkbank: Prothesen' : t.fortGate ? `<b>E</b> Wache: Tor öffnen` : t.campSupply ? `<b>E</b> Proviant verderben` : t.feast ? `<b>E</b> Festmahl — ${townName(t.fest)}` : t.kind === 'npc' ? `<b>E</b> Sprechen — ${t.name}` : t.parley ? `<b>E</b> Ansprechen — ${t.title || t.name}` :
+  const label = t.kind === 'mount' ? `<b>E</b> Aufsitzen — ${t.name}` : t.cellDoor != null ? '<b>E</b> Schloss knacken' : t.raskChest ? '<b>E</b> Rasks Kiste öffnen' : t.bond ? `<b>E</b> ${t.label}` : t.mechBench ? '<b>E</b> Werkbank: Prothesen' : t.fortGate ? `<b>E</b> Wache: Tor öffnen` : t.campSupply ? `<b>E</b> Proviant verderben` : t.feast ? `<b>E</b> Festmahl — ${townName(t.fest)}` : t.kind === 'npc' ? `<b>E</b> Sprechen — ${t.name}` : t.parley ? `<b>E</b> Ansprechen — ${t.title || t.name}` :
     t.kind === 'item' ? `<b>E</b> Aufheben — ${ITEMS[t.item.key].name}` :
     t.kind === 'grave' ? `<b>E</b> Grab untersuchen` :
     t.kind === 'building' ? `<b>E</b> ${BUILD_USE[t.type]} — ${BUILDINGS[t.type].name}` :
@@ -4276,6 +4341,7 @@ function mendAt(t) {
 function doInteract() {
   const p = S.player, t = interactables()[0];
   if (!t) return;
+  if (t.kind === 'mount') return mountUp(t);                         // S15: aufsitzen
   if (t.kind === 'npc') return talk(t);
   if (t.kind === 'building') return useBuilding(t);                   // AUDIT S-01
   if (t.kind === 'enemy' && t.parley) return t.mtype === 'dodon' ? dodonParley(t) : t.mtype === 'garmadon' ? garmadonParley(t) : t.mtype === 'omega' ? omegaParley(t) : t.mtype === 'whitebeard' ? whitebeardParley(t) : vargParley(t);
@@ -5018,6 +5084,11 @@ function raidTick() {
 function raidEnd(R, won) {
   const V = VILLAGES.find(v => v.key === R.v);
   S.ents.world = S.ents.world.filter(e => e.raidOf !== R.v && e.raidDef !== R.v); S.deadRaid = null;
+  if (won && R.live && R.pk) {                                        // S15 (Nutzer): wer das Dorf verteidigt, gewinnt Ruf
+    const f = townFac(R.v), g = Math.min(15, 3 + R.pk * 2); S.factions[f] = clamp((S.factions[f] || 0) + g, -100, 100);
+    for (const c of villagersOf(R.v)) if (c.key) addRel(c.key, 6);
+    log(`${V.name} dankt dir: ${R.pk} Tote hast du zurückgeschlagen. ${FACTIONS[f]?.name || f} +${g}.`, 'faction'); UI.toast(`${V.name.toUpperCase()} DANKT DIR (+${g})`, 2800);
+    chronicle(`${S.player.name} verteidigt ${V.name} gegen die Toten`, 'battle'); return; }
   if (won) { log(`${V.name} hält stand. Die Toten ziehen ab.`, 'world'); chronicle(`${V.name} wehrt die Toten ab`, 'battle'); return; }
   raidDamage(R.v);
   const vs = villagersOf(R.v); for (let i = 0; i < Math.min(vs.length, ri(1, 3)); i++) { const c = vs[i]; c.alive = false; S.ents.world.splice(S.ents.world.indexOf(c), 1); }
@@ -5633,6 +5704,7 @@ function conProgress(C, n = 1) {
   if (C.have >= C.need) { S.ents.world = S.ents.world.filter(e => e.contract !== C.id || e.kind === 'enemy'); C.done = true; }
 }
 function claimContract(C, npc) {
+  if (C.state !== 'active') return false;                             // S15 (Nutzer-Bug: dieselbe Mission dreimal abgegeben): nur einmal auszahlen
   if (C.kind === 'supply') { if ((S.res.wood || 0) < C.need || (S.res.stone || 0) < C.need) return UI.dialogue(npc || S.player, `„Noch nicht genug. ${C.need} Holz und ${C.need} Stein.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     S.res.wood -= C.need; S.res.stone -= C.need; C.have = C.need; }
   if (C.kind === 'herbs') { if (!hasItem(S.player, 'herb', C.need)) return UI.dialogue(npc || S.player, `„Noch nicht genug. ${C.need} Heilkräuter, bitte.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -5733,7 +5805,7 @@ function conChoices(npc, choices) {
   if (!town || !kind || !TOWN_PLAN[town] || S.party.includes(npc.id)) return;
   S.contracts ||= [];
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
-  if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => claimContract(C, npc) }); return; }
+  if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => { claimContract(C, npc); if (C.state === 'claimed') UI.dialogue(npc, '„Gute Arbeit. Hier, dein Lohn.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); return; }
   choices.unshift({ text: 'Hast du Arbeit für mich?', fn: () => {
     if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); }
     UI.dialogue(npc, `„${C.desc}“\nLohn: ${C.reward.gold} Gold${CON_DAYS[C.kind] ? ` · Frist ${CON_DAYS[C.kind]} Tage` : ''}.`, [{ text: 'Ich mach das.', fn: () => { if (acceptContract(C) !== false) UI.closeDialogue(); } }, { text: 'Später.', fn: () => UI.closeDialogue() }]); } });
@@ -7354,6 +7426,7 @@ function travel(to) {
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
   const members = [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
+  if (to !== 'world' && p.mounted && S.map === 'world') leaveHorse(p);   // S15: das Pferd wartet vor der Tür
   S.map = to; p.map = to; if (to !== 'world') p.mounted = null;   // S13: Reittier bleibt draußen
   const spot = ARRIVAL[to](from);
   p.x = spot.x; p.y = spot.y;
@@ -7754,8 +7827,54 @@ function seasonDay() {
   const C = makeContract(k, 'hunt', 'board'); C.title = 'Wolfswinter'; (S.contracts ||= []).push(C);
   log(`Wolfswinter: Ein Rudel streicht um die Weiden von ${townName(k)}. Am Brett hängt ein Jagdauftrag.`, 'world');
 }
+// S15 (Nutzer: „prüfen, wie viele Lehrer auf der Karte sind, notfalls welche nachspawnen — das System für jeden wichtigen NPC“):
+// Stirbt ein Lehrer, Händler, Schmied, Meister oder der Vorsteher, kommt nach drei Tagen ein Nachfolger an dieselbe Stelle. Er übernimmt
+// Rolle und Schlüssel (Aufträge und Questreihen laufen weiter), aber nicht die Beziehung. Verwandte kommen nicht wieder, und nach
+// Garmadons Fall keine Lehrer der Toten mehr.
+const KEY_ROLE = d => !d.kin && !!(d.teaches || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key));
+function successorDay(onLoad = false) {                            // onLoad: wer ganz fehlt (alter Stand, Tod unbekannt), kommt sofort nach
+  const day = S.day | 0, all = Object.values(S.ents).flat(); S.succ ||= {};
+  for (const def of NPCS) {
+    if (!KEY_ROLE(def)) continue;
+    const e = all.find(x => x.key === def.key && x.kind === 'npc');
+    if (e?.alive) { delete S.succ[def.key]; continue; }
+    if (def.undead && S.flags.garmadonSlain) continue;
+    if (onLoad && !e && S.succ[def.key] == null) S.succ[def.key] = day;
+    if (S.succ[def.key] == null) { S.succ[def.key] = day + 3; log(`${e?.name || def.name} ist tot. Man sucht einen Nachfolger.`, 'world'); continue; }
+    if (day < S.succ[def.key]) continue;
+    for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(x => !(x.key === def.key && x.kind === 'npc'));
+    const used = new Set(Object.values(S.ents).flat().filter(x => x.kind === 'npc').map(x => x.name.split(' ')[0])), L = (femTrade(def.prof || '') || def.key === 'adela' ? FIRST_F : FIRST_M).filter(n => !used.has(n)), name = L.length ? pick(L) : `${def.name.split(' ')[0]} der Jüngere`;   // nie wie ein Bewohner
+    spawnNpcDef({ ...def, name }); delete S.succ[def.key]; delete S.relations[def.key];
+    log(`${name} übernimmt den Platz von ${def.name} (${def.prof}).`, 'world'); chronicle(`${name} folgt auf ${def.name}`, 'news');
+  }
+}
+// S15 (Nutzer: „bei den Untoten funktionieren nicht alle Missionen, es spawnen nur 3 Grabräuber statt 5“): Für jeden offenen
+// Tötungsauftrag stehen genug Ziele bereit. Gezählt wird, was lebt und dir feind ist, am Zielort (sonst im Umkreis des Helden); was
+// fehlt, kommt außer Sicht nach (30–45 Kacheln entfernt, nicht in Städten) und ist immer Feind, auch wenn die Art sonst zu deinen
+// Verbündeten gehört (Kultisten für einen Diener der Toten). Bosse und Einzelstücke kommen nie nach.
+function questTargetTick(force = false) {
+  if (S.map !== 'world' || S.cine || (S._quiet && !force)) return;
+  const p = S.player; let budget = 6;
+  for (const [k, st] of Object.entries(S.quests)) {
+    if (st.state !== 'active' || !QUESTS[k]) continue;
+    QUESTS[k].objectives.forEach((o, i) => {
+      const M = MONSTERS[o.target]; if (o.type !== 'kill' || !M || M.boss || M.unique || (M.scale || 1) > 1.6 || budget <= 0) return;
+      const need = (o.count || 1) - (st.progress[i] || 0); if (need <= 0) return;
+      const pt = questPoint(k), cx = pt ? pt.x : p.x / TS, cy = pt ? pt.y : p.y / TS, R = pt ? 50 : 70, atSite = pt && Math.hypot(cx - p.x / TS, cy - p.y / TS) < 30;
+      const have = S.ents.world.filter(e => e.kind === 'enemy' && e.alive && e.mtype === o.target && teamOf(e) === 'foe' && Math.hypot(e.x / TS - cx, e.y / TS - cy) < R).length;
+      for (let n = have; n < need && budget > 0; n++) {
+        for (let tries = 0; tries < 12; tries++) {
+          const a = rnd() * 6.283, d = pt && !atSite ? 6 + rnd() * 10 : 26 + rnd() * 16, tx = Math.round(cx + Math.cos(a) * d), ty = Math.round(cy + Math.sin(a) * d);
+          if (townAt(tx, ty) || solidTile('world', tx * TS, ty * TS) || Math.hypot(tx - p.x / TS, ty - p.y / TS) < 22) continue;
+          const e = spawnEnemy(o.target, 'world', tx, ty); if (!e) continue;
+          e.questFoe = k; e.transient = true; budget--; break;
+        }
+      }
+    });
+  }
+}
 function dayTick() {
-  seasonDay();
+  seasonDay(); successorDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); rebuildRazed(); aurelDay(); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay();
@@ -8359,6 +8478,7 @@ function questComplete(k) {
 }
 function turnIn(npc, k) {
   const Q = QUESTS[k], st = S.quests[k];
+  if (!st || st.state !== 'active') return;                          // S15: nie zweimal abgeben
   st.state = 'done';
   const r = Q.reward || {};
   if (r.gold) { S.gold += r.gold; log(`${r.gold} Gold erhalten.`, 'economy'); }
@@ -8382,6 +8502,7 @@ function onKill(mtype, e) {
   if (e?.seaTag) mtype = e.seaTag;                                 // S14: Schwarzsegel, Grubenkämpfer
   if (e?.chainRest) mtype = 'chain_rest';                         // S12 A4: Kettenreste zählen für Grisk
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
+  if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
@@ -9140,7 +9261,7 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
 
 // ================= Skill-Baum =================
 // Zustand je Knoten: 'learned', 'open' (lernbar), 'locked' (Voraussetzung fehlt), 'sealed' (Zweig einer nicht erworbenen Titelklasse).
-function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return !B_.title || (c.titleClasses || []).includes(B_.title); }
+function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return B_.cls ? (c.knownClasses || []).includes(B_.cls) : !B_.title || (c.titleClasses || []).includes(B_.title); }   // S15: Klassen-Zweig (Todesritter)
 function nodeState(c, k) {
   const N = SKILL_TREE[k]; if (!N) return 'locked';
   if (node(c, k)) return 'learned';
@@ -9193,7 +9314,7 @@ function useAbility(key) {
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b));
   switch (key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
-    case 'grave_strike': p.abilityMult = 1.8; p.abilityKind = 'shadow'; p.drainHit = 0.3; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
+    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
     case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'heal', 10); break;
     case 'backstab': p.abilityMult = 3; p.atkCd = 0; attack(p); break;
     case 'aimed_shot': {
@@ -9213,7 +9334,7 @@ function useAbility(key) {
       if (!f || dist(p, f) > 180) { UI.toast('Kein Ziel in Reichweite'); p.cooldowns[key] = 0; return; }
       const d = (12 + p.attributes.intelligence * 1.1) * spellMul(p);
       hurt(f, d, p, 'Lebensentzug');
-      B.heal(p, d * 0.6);
+      B.heal(p, d * 0.6 * (node(p, 'dk_blood') ? 1.5 : 1));
       fx(f.x, f.y - 12, 'necro', 12); fx(p.x, p.y - 14, 'necro', 6);
       float(p, '+' + Math.round(d * 0.6), 'rgba(78,143,122,ALPHA)');
       break; }
@@ -9400,6 +9521,12 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   for (const k of S.ents.world.filter(e => e.kind === 'caravan')) {
     c.fillStyle = '#bd9433'; c.fillRect(ox + k.x / TS * sc - 3, oy + k.y / TS * sc - 3, 6, 6);
   }
+  for (const t of S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches)) {   // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“): Lehrer auf der Karte
+    const x = ox + t.x / TS * sc, y = oy + t.y / TS * sc, cls = [].concat(t.teaches).map(k => CLASSES[k]?.name).filter(Boolean).join(', ');
+    c.fillStyle = '#1a1510'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.strokeStyle = '#e8c070'; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6);
+    const at = place(`${t.name.split(' ')[0]}: ${cls}`, x, y, '10px Spectral, serif'); if (at) { c.fillStyle = '#e8c070'; c.font = '10px Spectral, serif'; c.textAlign = 'center'; c.fillText(`${t.name.split(' ')[0]}: ${cls}`, at[0], at[1]); }
+  }
   if (S.settlement) {
     const x = ox + S.settlement.x / TS * sc, y = oy + S.settlement.y / TS * sc;
     c.fillStyle = '#a4402c'; c.fillRect(x - 2, y - 12, 2, 12); c.fillRect(x, y - 12, 10, 7);
@@ -9409,7 +9536,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.fillStyle = '#e7dcc2'; c.beginPath(); c.arc(px, py, 4, 0, 7); c.fill();
   c.strokeStyle = 'rgba(231,220,194,.5)'; c.beginPath(); c.arc(px, py, 8, 0, 7); c.stroke();
   c.textAlign = 'left'; c.font = '10px Spectral, serif';
-  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['you', 'Du']];
+  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['teacher', 'Lehrer (Kodex H: Liste)'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['you', 'Du']];
   const lx = 8, ly = h - LEG.length * 14 - 12;
   c.fillStyle = 'rgba(11,10,8,.82)'; c.fillRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10); c.strokeStyle = '#3b3227'; c.strokeRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10);
   LEG.forEach(([k, t], i) => { const x = lx + 6, y = ly + i * 14 + 4;
@@ -9420,6 +9547,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
     else if (k === 'wild') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 4, y + 4); c.lineTo(x - 4, y + 4); c.fill(); }
     else if (k === 'quest') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 5, y); c.lineTo(x, y + 5); c.lineTo(x - 5, y); c.closePath(); c.stroke(); }
     else if (k === 'caravan') c.fillRect(x - 3, y - 3, 6, 6);
+    else if (k === 'teacher') { c.fillStyle = '#1a1510'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.strokeStyle = '#e8c070'; c.stroke(); c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6); }
     else if (k === 'valen' || k === 'undead') { c.strokeStyle = k === 'undead' ? 'rgba(78,143,122,.9)' : 'rgba(111,139,184,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 5, 0, 7); c.stroke(); }
     else if (k === 'army') { c.fillStyle = '#2b2419'; c.fillRect(x - 3, y - 6, 2, 12); c.fillStyle = '#6f8bb8'; c.fillRect(x - 1, y - 6, 8, 5); }
     else { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }
@@ -9648,6 +9776,13 @@ function classAbility(p, key) {
       return true; }
     case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
     case 'brew': if (!addItem(p, 'potion')) return false; log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'death_grip': {                                            // S15 Todesritter: den Feind heranziehen
+      const f = foes.filter(o => dist(p, o) < 220 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.7 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
+      if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
+      const big = MONSTERS[f.mtype]?.boss || (MONSTERS[f.mtype]?.scale || 1) > 1.4;
+      if (!big) { const a = Math.atan2(p.y - f.y, p.x - f.x); for (let k = 0; k < 40 && dist(p, f) > 34; k++) moveEnt(f, Math.cos(a) * 5, Math.sin(a) * 5); }
+      f.stagger = Math.max(f.stagger || 0, big ? 400 : 700); if (f.casting) interruptCast(f);
+      for (let k = 0; k <= 6; k++) fx(p.x + (f.x - p.x) * k / 6, p.y - 12 + (f.y - p.y) * k / 6, 'necro', 1); sfx('magic', 0.5); float(f, big ? 'widersteht' : 'gepackt', 'rgba(143,217,176,ALPHA)'); return true; }
     case 'war_cry': {
       const near = foes.filter(f => dist(p, f) < 120); if (!near.length) { UI.toast('Niemand zum Anschreien.'); return false; }
       for (const f of near) { f.stagger = Math.max(f.stagger || 0, 350); f.cowed = now + 6000; }
@@ -12062,6 +12197,57 @@ export function selftest() {
       return placed && folk >= 8 && calm && friend && storm && fallen;
     } finally { S.ents.world = W0; S.flags = f0; S.factions = fa0; S.quests = q0; UI.closeDialogue(); }
   }));
+  ok('Ruf für Hilfe im Dorf (S15): Bewohner heilen (einmal am Tag) und Überfall abwehren bringen Ansehen', sandbox(() => {
+    const p = stage(), V = VILLAGES[0], f = townFac(V.key), f0 = S.factions[f] || 0, c = Object.assign(actor(p.x + 20, p.y, { kind: 'npc' }), { homeTown: V.key });
+    helpedVillager(c, p); helpedVillager(c, p); const healed = (S.factions[f] || 0) === Math.min(100, f0 + 3);
+    const f1 = S.factions[f], dr = S.deadRaid; raidEnd({ v: V.key, live: true, pk: 4, n: 4 }, true); S.deadRaid = dr; const defended = S.factions[f] > f1 || S.factions[f] === 100;
+    return healed && defended;
+  }));
+  ok('Lehrer in den Städten (S15): jede Grundklasse hat mindestens zwei Lehrer, alle Stadt-Lehrer stehen in der Welt', sandbox(() => {
+    const n = c => NPCS.filter(d => [].concat(d.teaches || []).includes(c)).length;
+    return ['warrior', 'archer', 'rogue', 'cleric', 'mage', 'bard', 'alchemist', 'berserker'].every(c => n(c) >= 2)
+      && NPCS.filter(d => d.atTown).every(d => TOWN_PLAN[d.atTown] && S.ents.world.some(e => e.key === d.key && e.teaches));
+  }));
+  ok('Nachfolger (S15): stirbt ein Lehrer, kommt nach drei Tagen ein neuer mit derselben Rolle; nie doppelt', sandbox(() => {
+    const W0 = S.ents.world, succ0 = S.succ, rel0 = S.relations.hauke; S.ents.world = W0.slice(); S.succ = {};
+    try { const d = S.day; const h = S.ents.world.find(e => e.key === 'hauke'); h.alive = false; successorDay(); const waiting = S.succ.hauke === (d | 0) + 3;
+      S.day = d + 3; successorDay(); const neu = S.ents.world.filter(e => e.key === 'hauke'); S.day = d;
+      successorDay(); const once = S.ents.world.filter(e => e.key === 'hauke').length === 1;
+      return waiting && neu.length === 1 && neu[0].alive && neu[0].teaches?.includes('warrior') && neu[0] !== h && once;
+    } finally { S.ents.world = W0; S.succ = succ0; if (rel0 != null) S.relations.hauke = rel0; const h = W0.find(e => e.key === 'hauke'); if (h) h.alive = true; }
+  }));
+  ok('Todesritter-Talente (S15): Zweig öffnet sich mit der Klasse; Frostklinge legt Frost, Todesgriff zieht heran, Blutfürst heilt beim Treffen', sandbox(() => {
+    const p = stage(); p.knownClasses = ['wanderer', 'warrior']; const closed = !branchOpen(p, 'deathknight'); p.knownClasses.push('deathknight'); p.currentClass = 'deathknight';
+    const open = branchOpen(p, 'deathknight'); p.tree = { dk_frost: 1, dk_blood: 1, dk_grip: 1, dk_plate: 1, k_bloodlord: 1 }; recalc(p);
+    const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 30; e.y = p.y; combat = S.ents.__a; p.graveFrost = true; hit(p, e, 1); const frosted = e.status?.some(s => s.key === 'frost');
+    const g = spawnEnemy('bandit', '__a', 11, 9); g.x = p.x + 180; g.y = p.y; p.aim = 0; p.cooldowns = {}; p.stamina = 100; e.x = p.x - 200; useAbility('death_grip'); const pulled = dist(p, g) < 60;
+    if (p.body) { B.fullHeal(p); p.body.torso.hp -= 30; B.syncHp(p); } else p.hp -= 30; const h0 = p.hp; hit(p, g, 1); const healed = p.hp > h0;
+    return closed && open && treeAbilities(p).includes('death_grip') && frosted && pulled && healed;
+  }));
+  ok('Auftragsziele (S15, Nutzer-Bug Grabräuber): fehlende Ziele kommen außer Sicht nach und sind Feind, auch Untote für Diener der Toten', sandbox(() => {
+    const p = stage(), q0 = S.quests.c_war1, g0 = S.quests.q_graverobbers, r0 = S.ranks.undead, m0 = S.map, W = S.ents.world.length;
+    try { S.map = p.map = 'world'; const l = LOCATIONS.find(l => l.key === 'necropolis'); p.x = (l.x + 60) * TS; p.y = l.y * TS; S.ranks.undead = 1;
+      S.quests.q_graverobbers = { state: 'active', progress: [0] }; S.quests.c_war1 = { state: 'active', progress: [0, 0] };
+      questTargetTick(true);
+      const rob = S.ents.world.filter(e => e.questFoe === 'q_graverobbers' && e.alive), cul = S.ents.world.filter(e => e.questFoe === 'c_war1' && e.alive);
+      return rob.length >= 1 && cul.length >= 1 && cul.every(e => teamOf(e) === 'foe') && [...rob, ...cul].every(e => dist(e, p) > 20 * TS);
+    } finally { S.ents.world = S.ents.world.filter(e => !e.questFoe); S.quests.c_war1 = q0; S.quests.q_graverobbers = g0; if (!g0) delete S.quests.q_graverobbers; if (!q0) delete S.quests.c_war1; S.ranks.undead = r0; S.map = m0; }
+  }));
+  ok('Aufträge nur einmal abgeben (S15, Nutzer-Bug)', sandbox(() => {
+    stage(); const g0 = S.gold, C = { id: 'tst', kind: 'bounty', state: 'active', have: 1, need: 1, town: 'eren', title: 'Test', spared: true, reward: { gold: 50, xp: 0, rep: 0 } };
+    claimContract(C); claimContract(C); claimContract(C); return S.gold === g0 + 50 && C.state === 'claimed';
+  }));
+  ok('Pferd pfeifen (S15): kommt von außerhalb, läuft heran, E sitzt auf; im Kampf kommt es nicht; absitzen lässt es stehen', sandbox(() => {
+    const p = stage(), m0 = S.mount; S.mount = { kind: 'horse', name: 'Test', oiled: 0 };
+    try { const h = spawnHorse(p, 300); const far = h && dist(h, p) > 250; h.come = true;
+      for (let i = 0; i < 400 && h.come; i++) mountTick(16); const came = !h.come && dist(h, p) < 60;
+      mountUp(h); const up = !!p.mounted && !horseEnt(p.map);
+      p.mounted = null; leaveHorse(p); const stays = !horseEnt(p.map);   // leaveHorse nur in der Welt
+      spawnHorse(p, 0, p); const left = !!horseEnt(p.map);
+      const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 100; e.y = p.y; e.aggroId = p.id; const h2 = horseEnt(p.map); h2.come = true; mountTick(16);
+      return far && came && up && stays && left && inFight(p) && !h2.come;
+    } finally { S.mount = m0; p.mounted = null; }
+  }));
   ok('Zauberbuch & Gegner-Zauberer (S15 P4): Zauber auf die Leiste, bleibt nach dem Neuordnen; Kultist wirkt auf einen Dummy', sandbox(() => {
     const p = stage(); p.spells = {}; p.hotbar = []; learnSpell(p, 'sp_firebolt', true); syncHotbar(); const onBar = p.hotbar.some(s => s.key === 'sp_firebolt');
     UI.openModal('spells'); const book = !!document.querySelector('#modal-body .spell-row'); UI.closeModal();
@@ -12224,6 +12410,7 @@ function boot() {
       useConsumable(S.player, idx, target, part);
     },
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
+    teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
   // Titelbildschirm

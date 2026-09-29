@@ -547,6 +547,7 @@ export const ABILITIES = {
   wolf_form:   { name:'Wolfsgestalt', title:'druid', cd:45000, cost:60, desc:'20 s wirst du zum Wolf des Hains: +35 % Tempo, Biss statt Waffe, +3 Rüstung. Keine Gegenstände. Kostet 60 Wildkraft.' },
   counter_stance:{ name:'Gegenstrom', title:'monk', cd:8000, cost:1, desc:'3 s Haltung: der nächste Nahkampftreffer gegen dich prallt ab und wird doppelt erwidert (+1 Fokus). Kostet 1 Fokus.' },
   silent_hand: { name:'Stille Hand', title:'monk', cd:30000, cost:'all', min:3, desc:'Ab 3 Fokus: eine Welle der Stille (130 px). Feinde erstarren 1,5 s und nehmen Schaden je Fokus. Verbraucht allen Fokus.' },
+  death_grip:  { name:'Todesgriff', cd:12000, stam:15, tree:true, desc:'Zieht den Feind vor dir (bis 220 px) heran und lässt ihn taumeln. Große Gegner taumeln nur.' },   // S15 Todesritter-Talent
   grave_strike:{ name:'Grabhieb', cd:9000, stam:20, desc:'Ein Hieb mit Schattenwucht (×1,8). 30 % des Schadens heilen dich.' },
   grave_host:  { name:'Heerruf', title:'necromancer', cd:60000, cost:4, desc:'Klassen-Rüstung (2 Teile): bis zu drei Leichen stehen auf einmal auf (30 s, zusätzlich zu deinen Dienern). Kostet 4 Essenz.' },
   dark_pact:   { name:'Dunkler Pakt', title:'warlock', cd:30000, desc:'Klassen-Rüstung (2 Teile): 20 % deines Lebens für +40 Verderbnis und 8 s lang +40 % Titelzauberschaden.' },
@@ -650,6 +651,7 @@ export const SKILL_BRANCHES = {
   warlock:{ name:'Hexerei', title:'warlock', desc:'Nur für Hexenmeister.' },
   druid:  { name:'Hainkunde', title:'druid', desc:'Nur für Druiden.' },
   monk:   { name:'Stille Hand', title:'monk', desc:'Nur für Mönche.' },
+  deathknight:{ name:'Todesritter', cls:'deathknight', desc:'Frost und Blut. Nur für Todesritter.' },   // S15 (Nutzer: „beim Todesritter gibt es keine Talentfähigkeiten“)
 };
 export const SKILL_TREE = {
   // Kampf
@@ -728,6 +730,16 @@ export const SKILL_TREE = {
   k_stillness:{ branch:'monk', row:2, type:'keystone', name:'Vollkommene Stille', fx:{}, requires:['o_well', 'o_steps'],
     desc:'Getroffen werden kostet keinen Fokus mehr. Dafür: mit Schild oder Zweihandwaffe gibt es gar keinen Fokus.', designIntent:'Der Mönch als Reinform: ohne Schild, ohne schwere Klinge — dafür verzeiht die Stille einen Fehler.' },
   o_counter:{ branch:'monk', row:1, name:'Tiefer Strom', fx:{}, requires:['o_edge'], desc:'Gegenstrom hält 2 s länger.' },
+  // Todesritter (öffnet sich mit der Klasse; Schlüsselknoten wirken nur, solange Todesritter die aktive Klasse ist)
+  dk_frost: { branch:'deathknight', row:0, name:'Frostklinge', fx:{}, requires:[], desc:'Grabhieb legt eine Stufe Frost auf das Ziel (drei Stufen frieren ein).' },
+  dk_blood: { branch:'deathknight', row:0, name:'Blutdurst', fx:{}, requires:[], desc:'Lebensentzug und Grabhieb heilen 50 % mehr.' },
+  dk_rune:  { branch:'deathknight', row:1, type:'notable', name:'Runenklinge', fx:{}, requires:['dk_frost'], desc:'Grabhieb +25 % Schaden.' },
+  dk_plate: { branch:'deathknight', row:1, name:'Totenpanzer', fx:{ armor:3, hp:0.05 }, requires:['dk_blood'], desc:'Rüstung +3, Leben +5 %.' },
+  dk_grip:  { branch:'deathknight', row:1, type:'active', name:'Todesgriff', grants:'death_grip', fx:{}, requires:['dk_frost', 'dk_blood'], desc:'Aktiv: Todesgriff (zieht einen Feind vor deine Klinge).' },
+  k_frostborn:{ branch:'deathknight', row:2, type:'keystone', name:'Frostgeboren', fx:{}, requires:['dk_rune'],
+    desc:'Jeder dritte Nahkampftreffer legt Frost auf. Dafür trifft dich Feuer 30 % härter.', designIntent:'Kälte als Waffe: der Todesritter verlangsamt alles, was ihn angeht — und fürchtet das Feuer.' },
+  k_bloodlord:{ branch:'deathknight', row:2, type:'keystone', name:'Blutfürst', fx:{}, requires:['dk_plate'], excl:'k_frostborn',
+    desc:'Jeder Nahkampftreffer heilt dich um 8 % des Schadens. Dafür heilen Tränke, Verbände und Kräuter dich nur halb. Schließt Frostgeboren aus.', designIntent:'Leben nimmt man sich vom Feind, nicht aus der Flasche.' },
   k_storm:  { branch:'monk', row:2, type:'keystone', name:'Sturmhand', fx:{}, requires:['o_counter'], excl:'k_stillness',
     desc:'Jeder dritte Treffer gibt +1 Fokus. Dafür gibt Ausweichen keinen Fokus mehr. Schließt Vollkommene Stille aus.', designIntent:'Angriff statt Leere: der Mönch holt sich den Fokus aus dem Schlagen.' },
 };
@@ -814,6 +826,35 @@ export const NPCS = [
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
     pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak'],
     greet:'„Vharnholm schreibt jeden Namen auf, der durch das Tor kommt. Deinen auch.“' },
+  // S15 (Nutzer: „mehr NPCs auf der Welt, die einen z. B. zum Krieger ausbilden“): Lehrer in den Städten außerhalb von Eren.
+  // atTown: steht am Platz dieser Stadt (Weltkoordinaten), off: Versatz in Kacheln. Gleiche Regel wie überall: erst Beziehung 20.
+  { key:'hauke', name:'Hauke Eisenfaust', prof:'Waffenmeister', faction:'valen', age:47, atTown:'northcity', off:[4, 3], weapon:'longsword',
+    traits:['diszipliniert','stolz'], attrs:{strength:14,endurance:13}, cls:'warrior', recruit:false,
+    greet:'„Die Garnison braucht Männer und Frauen, die stehen bleiben, wenn es kracht. Kannst du das?“', teaches:['warrior','knight'] },
+  { key:'kaelis', name:'Kaelis Vey', prof:'Fechtmeisterin', faction:'aurel', age:34, atTown:'aurelheim', off:[-5, 3], weapon:'rapier',
+    traits:['stolz','genau'], attrs:{agility:15,perception:12}, cls:'warrior', recruit:false,
+    greet:'„In Aurelheim ficht man mit Anstand. Draußen mit allem, was man hat. Ich lehre beides.“', teaches:['warrior','rogue'] },
+  { key:'wenzel', name:'Wenzel', prof:'Wildhüter', faction:'valen', age:52, atTown:'weidenau', off:[3, -3], weapon:'longbow',
+    traits:['geduldig','misstrauisch'], attrs:{perception:14,agility:12}, cls:'ranger', recruit:false,
+    greet:'„Wer im Wald laut ist, isst heute nichts. Setz dich, sei still.“', teaches:['archer','ranger'] },
+  { key:'adela', name:'Schwester Adela', prof:'Ordensschwester', faction:'order', age:41, atTown:'lichtenrain', off:[4, 2], weapon:'mace',
+    traits:['gütig','diszipliniert'], attrs:{willpower:14,intelligence:12}, cls:'cleric', recruit:false,
+    greet:'„Das Licht fragt nicht, wer du warst. Ich schon, aber nur ein bisschen.“', teaches:['cleric'] },
+  { key:'nix', name:'Nix', prof:'Hehlerin', faction:'merch', age:29, atTown:'saltport', off:[-4, 4], weapon:'dagger',
+    traits:['gierig','neugierig'], attrs:{agility:14,charisma:12}, cls:'rogue', recruit:false,
+    greet:'„Ich habe nichts gesehen, nichts gekauft und dich nie getroffen. Also: Was willst du?“', teaches:['rogue'] },
+  { key:'serafine', name:'Serafine', prof:'Wandermagierin', faction:'merch', age:45, atTown:'kreuzweg', off:[5, -2], weapon:'staff',
+    traits:['neugierig','klug'], attrs:{intelligence:15,willpower:13}, cls:'mage', recruit:false,
+    greet:'„Feuer ist ehrlich: Es tut, was es verspricht. Menschen seltener.“', teaches:['mage'] },
+  { key:'jasper', name:'Jasper Goldkehle', prof:'Barde', faction:'aurel', age:26, atTown:'kupferhafen', off:[4, 3], weapon:'dagger',
+    traits:['ehrgeizig','gütig'], attrs:{charisma:15}, cls:'bard', recruit:false,
+    greet:'„Die Hafenleute zahlen für Lieder vom Meer. Ich singe lieber von Leuten wie dir.“', teaches:['bard'] },
+  { key:'orrin', name:'Orrin', prof:'Kräuterkundiger', faction:'valen', age:63, atTown:'muehlbach', off:[-3, 3], weapon:'staff',
+    traits:['geduldig','mürrisch'], attrs:{intelligence:14}, cls:'alchemist', recruit:false,
+    greet:'„Was im Mühlbacher Grund wächst, heilt. Meistens.“', teaches:['alchemist'] },
+  { key:'ulfar', name:'Ulfar der Narbige', prof:'Grubenkämpfer', faction:'merch', age:44, atTown:'rastfurt', off:[4, -3], weapon:'greataxe',
+    traits:['grausam','ehrgeizig'], attrs:{strength:15,endurance:14}, cls:'berserker', recruit:false,
+    greet:'„Schmerz ist ein Lehrer. Ich bin nur sein Gehilfe.“', teaches:['berserker'] },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },

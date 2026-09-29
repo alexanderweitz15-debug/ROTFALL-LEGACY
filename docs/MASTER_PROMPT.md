@@ -1,107 +1,112 @@
-# ROTFALL: LEGACY — Master-Prompt (gestrafft, Session 13)
+# ROTFALL: LEGACY — Master-Prompt (Session 14)
 
-Stehender Auftrag des Nutzers. Diese Fassung ersetzt die beiden langen Master-Prompts. Was dort erledigt oder überholt war, ist entfernt. Die Originale liegen unverändert in `docs/archive/` (nur zum Nachschlagen, nicht mehr bindend).
-
-**Bei Widersprüchen gilt:** die neueste Entscheidung des Nutzers (`docs/PLAN_OFFEN.md`) vor diesem Dokument, dieses Dokument vor allem anderen.
-
----
+Stehender Auftrag des Nutzers. Neueste Nutzerentscheidung (`PLAN_OFFEN.md`) geht vor, dieses Dokument vor allem anderen.
+Frühere Fassungen: `archive/` (nicht bindend).
 
 ## 1. Ziel
+- Lebendige, simulierte RPG-Welt: systemische Tiefe vor mehr Inhalt.
+- NPCs arbeiten, Gebäude haben Funktion, Städte rechnen wirtschaftlich, Quests und Ereignisse entstehen aus der Welt.
+- Fraktionen, Gegner und Gegenstände haben Identität, nicht nur Farbe. Fern vom Spieler rechnet die Welt abstrakt weiter.
 
-ROTFALL wird eine **lebendige, simulierte, sich entwickelnde RPG-Welt**. Nicht mehr Inhalt, sondern mehr systemische Tiefe:
-- NPCs haben Rollen und arbeiten; Gebäude erfüllen Funktionen; Städte funktionieren wirtschaftlich.
-- Quests entstehen aus der Welt; Ereignisse verändern die Welt dauerhaft.
-- Fraktionen, Gegner und Gegenstände haben eine eigene Identität, nicht nur eine eigene Farbe.
-- Die Welt läuft weiter, wenn der Spieler geht (fern vom Spieler abstrakt gerechnet).
+## 2. Sitzung
+- **Start:** obersten Eintrag in `SESSION_LOG.md`, HIGH in `BUGS.md`, Tabelle in `PHASE_STATUS.md` lesen — sonst nichts.
+  Dev-Server ohne Cache (Port 8770, `?dev`), „Fortsetzen“, `RF.selftest()`.
+- **Ende:** `BUGS.md`, `CHANGELOG.md` (≤ 5 Zeilen), `SESSION_LOG.md` (neuer Eintrag oben, vorletzten auf eine Zeile
+  kürzen), `PHASE_STATUS.md`, `GDD.md`; bei neuen Systemen `WELTREGELN.md`, bei neuen Inhalten `GUIDE.md`.
+  **Immer** `MECHANIKEN.md` ergänzen: jede neue Mechanik in ein, zwei Zeilen (Nutzerwunsch 29.09.).
+- Weitere Dokumente nur lesen, wenn die Aufgabe sie braucht (Karte in §9).
 
-**Leitfragen jeder Änderung:** Ist es spielbar und stabil? Ist es logisch (würde ein echter Spieler es hinterfragen)? Fühlt es sich hochwertig an?
+## 3. Grundregeln
+- Kein Rewrite ohne Grund. Bestehendes erweitern; Refactoring nur mit genanntem Grund.
+- Ursache statt Symptom: alle Aufrufer prüfen, an der gemeinsamen Stelle fixen, Regressionstest dazu. Tests nie löschen.
+- Tests und Proben ändern nie den echten Spielstand (Sandbox, `S._quiet`; Stand vorher sichern und vergleichen).
+- Reality-Check vor „fertig“: Screenshot ansehen (ein Sammelbild je Prüfung), mit der ursprünglichen Beschwerde abgleichen.
+- Keine Fake-Features: fertig ist, was im Spiel wirkt, nicht was einen Knopf hat.
+- Budget: Zeichnen ≤ 2 ms, Spiellogik ≤ 3 ms je Bild.
+- Welt-`rnd()`-Folge nicht verschieben; neue Entscheidungen per Hash.
+- Nie Code hinter `//` in derselben Zeile; nach Skript-Edits `scan.py`/`scan2.py`.
+- Vor jeder Änderung Sicherung (externes Repo `../_rf_backup.git`); kein Git im Projekt, der Nutzer pusht selbst.
+- Keine Downloads ohne Erlaubnis. Kein SpriteCook, Pixel-Plugin, Aseprite, keine bezahlten Generatoren.
+- Figuren und Namen eigene Schöpfungen (z. B. Weißbart: eigene Geschichte, Gestalt, Waffe).
+- Nutzer bei Lore und Richtungsfragen fragen (höchstens 5 Fragen, mit Empfehlung); Kleinigkeiten selbst entscheiden.
+- Chat kurz auf Deutsch (Caveman); Code, Kommentare, Doku in klarer Prosa. Subagenten nur auf Wunsch.
 
----
+## 4. Prioritäten
+- Rangfolge bei Konflikten: Stabilität → Kernspiel → Kampf → Animation → Optik → Weltlogik → KI → Wegfindung.
+- Arbeitsreihenfolge ab Session 15: **`PLAN_S15.md`**. Das Dokument enthält Pakete P0–P13, ihre Statustabelle,
+  Standards für Designfragen und Abnahmekriterien. Immer das erste offene Paket bearbeiten.
+- S14 erledigt: Hof und Nutztiere, Seevolk mit Weißbart, Weltereignisse (Brand, Spuk, Magitech-Unfall, Jahreszeiten).
+- Nordreich und Sandfürsten folgen nach `PLAN_S15.md`.
 
-## 2. Sitzungsablauf
+## 5. Phasen (kurz)
+0 Audit · 1 Bugs · 2 Weltlogik · 3 Übergänge · 4 Gebäude · 5 Stil · 6 Animation · 7 Waffen · 8 Rarität · 9 Skill-Baum ·
+10 Klassen · 11 Gegner · 12 Bosse · 13 Städte · 14 Dungeons · 15 NPCs/Tiere · 16 Weltsimulation · 17 Fraktionen ·
+18 Klang · 19 Oberfläche · 20 Leistung · 21 zweiter Durchlauf · 22 Abschluss · A Aurelion · B Nationen ·
+C Schwierigkeit · D Ereignisse. Stand und Offenes: Tabelle in `PHASE_STATUS.md`.
 
-**Start (immer):**
-1. `docs/SESSION_LOG.md`, `docs/PHASE_STATUS.md`, `docs/BUGS.md` lesen (offene HIGH-Bugs zuerst).
-2. `docs/PLAN_OFFEN.md` für die neuesten Nutzerentscheidungen.
-3. Dev-Server ohne Cache starten, Selbsttest laufen lassen (`?dev`, `RF.selftest()`).
+## 6. Skills (Thema → Skill)
+| Thema | Skill |
+|---|---|
+| jede Code-Änderung | `ponytail` (kürzester richtiger Fix) |
+| Chat | `caveman` (voll, Deutsch) |
+| Fehlersuche | `systematic-debugging` |
+| Systeme, Balancing, Quests | `game-design` |
+| Figuren, Sprites, Animation | `2d-games` |
+| Leistung | `performance-profiling` |
+| Review vor Abschluss | `ponytail-review` |
 
-**Ende (immer):** `BUGS.md`, `CHANGELOG.md`, `SESSION_LOG.md`, `GDD.md`, `PHASE_STATUS.md` nachziehen; bei neuen Systemen auch `WELTREGELN.md` (Status-Zeichen) und bei neuen Inhalten `GUIDE.md`.
+## 7. Offene Anforderungen (Kernkriterien)
+**Siedlungsdichte (§75)**
+- Abstand zwischen Häusern ≥ 5 Kacheln, in dichten Kernen ≥ 3; Hauptwege sichtbar breiter als Gassen.
+- Bebaut < 25 % der Fläche, Peripherie (Felder, Höfe, Zäune) statt harter Kante; kein Gedränge im Stresstest.
+- Stand: ≥ 2 Kacheln (Test), bebaut 11–18 %, Peripherie da. Offen: 5-Kachel-Ziel, organische Anordnung (Designfrage).
 
----
+**Tagesablauf Stufe 2 (§41)**
+- Je Rolle eigener Plan mit 3–6 Blöcken (GDD); Jäger ziehen sichtbar hinaus und liefern ab; Läden sichtbar auf/zu.
+- Talk-Pairs im Spiel sichtbar; nach Kampf/Alarm Wiederaufnahme am aktuellen Block, kein Tagesreset.
+- Stand: erfüllt. Offen: Budget bei voller Großstadt (BUG-108).
 
-## 3. Harte Regeln
+**Rückwärtslaufen-Cheese (§34)**
+- Jeder Nahkampfgegner (außer bewusst träge) bestraft Rückwärtsgehen und Zuschlagen; Konter fair angesagt.
+- Stand: erfüllt (BUG-076, Nachsetzen ≥ 2,0 px/Bild, beritten rückwärts 40 %). Jede neue Gegnerart dagegen prüfen.
 
-1. **Tests und Proben verändern nie den echten Spielstand** (Held, Gold, Welt, Märkte). Sandbox für alles; der Selbsttest prüft das am Ende selbst (BUG-123). Nur Debug-*Aktionen*, die der Nutzer bewusst auslöst, dürfen das Spiel verändern.
-2. **Bugs an der Ursache beheben**, nie am Symptom. Jeder Fix bekommt einen Regressionstest. Tests werden nie gelöscht. Wackelnde Tests sind Bugs.
-3. **Leistungsbudget:** Zeichnen ≤ 2 ms, Spiellogik ≤ 3 ms je Bild.
-4. **Reality-Check mit Screenshots** nach sichtbaren Änderungen. Kennzahlen ersetzen keine Wahrnehmung.
-5. **Bestehendes behalten.** Keine Komplett-Neuschreibungen ohne Grund; Refactoring nur mit genanntem Grund.
-6. **Keine Fake-Features:** Ein System ist erst fertig, wenn es im Spiel wirkt, nicht wenn Knopf oder Menü existieren. Keine Platzhalter, keine halben Systeme.
-7. **Downloads nur mit ausdrücklicher Erlaubnis.** Kein Git (der Nutzer pusht selbst).
-8. **Keine SpriteCook-, Pixel-Plugin- oder Aseprite-Werkzeuge.**
-9. **Der Nutzer will gefragt werden**, bei Lore, Richtungsentscheidungen und allem, was er selbst prägen möchte. Kleinigkeiten selbst sinnvoll entscheiden.
-10. **Sprache:** Chat mit dem Nutzer kurz, auf Deutsch (Caveman-Stil). Code, Kommentare und Dokumente in normaler, klarer Prosa.
-11. **Urheberrecht:** Figuren und Namen sind eigene Schöpfungen, keine Kopien (z. B. Piratenkönig „Weißbart“: eigene Geschichte, eigenes Aussehen, eigene Waffe).
+**Balancing (§82)**
+- Messwerte vorher/nachher (`RF.duel`); Gefahr 3/4 spürbar gefährlicher; Bosse mit Phase, Ansage und Antwort auf Abstand.
+- Reality-Check-Kampf nach jeder Änderung. Offen: Gefahr 3/4 gegen die Definition prüfen, Schwierigkeitsgrade.
 
----
+**Skelett-Stadt / Befreiungsorte (§81)**
+- Eigene Arena, Mehrfach-Encounter (Wellen oder mehrstufiger Boss), sichtbare Weltfolge am Ort, getesteter Höhepunkt.
+- Stand: Befreiung in Wellen mit Hauptmann und Heimkehrern. Offen: Schwarze Feste (BUG-100, Designfrage).
 
-## 4. Qualitätsregeln der Welt
+**Questtafel (§80)**
+- Jede größere Stadt hat eine erreichbare Tafel mit Titel, grobem Zielort und Ansprechpartner je Auftrag.
+- Nur passende, zugängliche Aufträge; Tafel ersetzt nicht das Gespräch mit dem Geber.
+- Stand: 21 Tafeln; S14: Tafel folgt Besatzung und Ruf. Offen: Ansprechpartner und Zielort in jedem Eintrag prüfen.
 
-- **Warum ist das hier?** Jeder Gegner, jedes Objekt, jede Figur braucht einen Grund, an genau diesem Ort zu sein. Keine unlogischen Spawns, keine Kisten ohne Zweck.
-- **Keine NPC-Puppen:** Niemand steht dumm herum oder läuft gegen Türen. Händler nur zu ihren Zeiten im Laden. NPCs ballen sich nicht.
-- **Kampf:** keine Treffer durch Wände, Fernkampf braucht Sichtlinie, keine XP für null Schaden, keine unendliche Gegner-Skalierung (Stufe nach Gebiet), Angriffe werden angesagt.
-- **Tod und Boden sind endgültig:** Tote und Liegende denken und handeln nicht mehr.
-- **Städte:** passende Größe und Bevölkerung, erkennbare Gebäude mit Innenleben, keine Kopier-Städte.
-- **Fraktionen** unterscheiden sich in Waffen, Rüstung, Architektur, Figuren, Bannern, Effekten und einer eigenen Kernmechanik.
-- **Große Ereignisse** sind dauerhafte Weltzustände mit Kamerafahrt, keine Quests.
+**NPC-Beziehungen (§79)**
+- Beziehungswerte an Talk-Pairs; Abneigung meidet sichtbar; ≥ 3 Gerücht-Auslöser; Blasen sichtbar; Gerüchte verfallen.
+- Stand: Stufe 1 erfüllt. Offen: Beziehungen ändern sich durch Taten des Spielers.
 
----
+**Erreichbarkeit (§7)**
+- Jeder Ort und jeder POI zu Fuß erreichbar (Selbsttest BFS, `ensureReach` nach jeder Erzeugung), auch neue Orte.
+- Offen: 38 Rohstoffknoten auf Felskacheln (Audit A-04).
 
-## 5. Stil
+## 8. Prüffragen je Änderung
+- Warum ist das hier, warum passiert das? Jeder Gegner, jedes Objekt braucht einen Grund an genau diesem Ort.
+- Würde ein Spieler es hinterfragen (Logik, Immersion)? Weiß er, was zu tun ist?
+- Warum passiert hier nichts? Leere Flächen und herumstehende Figuren sind Befunde.
+- Tod und Boden sind endgültig; keine Treffer durch Wände; Fernkampf braucht Sichtlinie; keine XP ohne eigenen Schaden.
+- Fühlt es sich hochwertig an? Große Ereignisse sind dauerhafte Weltzustände mit Kamerafahrt, keine Quests.
 
-- **Aktiv:** der klassische, im Code gemalte Stil. Stil F (Referenz 5, Atlas) ist auf Wunsch des Nutzers vorerst aus und bleibt in den Optionen wählbar; darüber wird später gesprochen.
-- Neue große Grafik nur über die Aufträge in `docs/PROMPTS_GRAFIK.md`.
-- Vor breiten Stiländerungen dem Nutzer Screenshots zeigen.
-
----
-
-## 6. Arbeitsweise
-
-1. Problem und Code vollständig verstehen (alle Aufrufer prüfen), dann die kleinste Änderung am richtigen Ort.
-2. Test schreiben, Selbsttest mehrmals laufen lassen, Spielstand vorher und nachher vergleichen.
-3. Screenshot prüfen.
-4. Dokumente nachziehen.
-
-Passende Skills nutzen (ponytail, caveman, systematic-debugging, game-design, 2d-games). Subagenten nur, wenn der Nutzer es verlangt.
-
----
-
-## 7. Wo was steht
-
+## 9. Wo was steht
 | Dokument | Inhalt |
 |---|---|
-| `WELTREGELN.md` | Soll und Ist aller Systeme mit Status (✅ 🟡 ⬜), offene Aufgaben in §15 |
-| `PLAN_OFFEN.md` | Entscheidungen des Nutzers und offene Punkte je Bereich |
-| `PHASE_STATUS.md` | Phasen und ihr Stand |
-| `BUGS.md` | alle Bugs mit Ursache, Fix und Test |
-| `GDD.md` | Spielregeln und Werte im Detail |
-| `GUIDE.md`, `GUIDE_EREIGNISSE.md` | Spieler-Guide und große Ereignisse |
-| `PROMPTS_GRAFIK.md` | Bildaufträge für neue Vorlagen |
-
----
-
-## 8. Reihenfolge der offenen Arbeit
-
-Stand und Einzelheiten: `PLAN_OFFEN.md` (Entscheidungen) und `AUDIT_S13.md` (offene Audit-Punkte).
-
-1. Anzeige aktiver Effekte (Symbolleiste mit Tooltip und Effekte-Fenster).
-2. Stufen überarbeiten: Held, Gegnerstufen je Gebiet, Level-Design.
-3. Gegner-Vielfalt: Varianten je Art, neue Arten, mehr Verhalten.
-4. Dungeons mit mehreren Ebenen, zufällig erzeugt, Loot nach Schwere; sehr schwere im Untotenland und in Aurelion.
-5. Mehr Dialog: Bewohner, Begleiter, wichtige Figuren, Gegner.
-6. Aussehen wichtiger Figuren, mehr benannte NPCs und Begleiter, mehr Vielfalt bei Bewohnern.
-7. Reise nach Aurelion (Einlass oder Zeltlager), Kutschen und Fähren.
-8. Mehr Waffen (Fraktionssets, neue Arten, Unikate, Magitech) und Animationen.
-9. Gleichwertige Ränge, Kernmechanik je Fraktion, restliche Kampf-KI.
-10. Tiere, dann das Seevolk (Piratenkönig Weißbart), Fraktionskriege, Nordreich, Sandfürsten.
-11. Offene Bugs und Kleinigkeiten aus `AUDIT_S13.md` und `BUGS.md`.
+| `MECHANIKEN.md` | alle Mechaniken auf einen Blick, je ein, zwei Zeilen |
+| `GDD.md` | Regeln, Werte, Entscheidungen (Tabellen) |
+| `WELTREGELN.md` | Soll/Ist aller Systeme mit Status |
+| `PLAN_OFFEN.md` | Entscheidungen des Nutzers, offene Blöcke |
+| `DATA_SCHEMAS.md` | Datensätze im Code (Ist-Stand) |
+| `STYLE_GUIDE.md` | Grafikregeln |
+| `design/` | Mechanik-Check, Sprite-Inventur |
+| `GUIDE.md`, `GUIDE_EREIGNISSE.md` | Spieler-Guide |
+| `PROMPTS_GRAFIK.md`, `WELT_EVENTS_S13.md` | Bildaufträge, Ideenliste Ereignisse |

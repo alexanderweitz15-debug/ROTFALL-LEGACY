@@ -16,7 +16,7 @@ import { ATLAS } from './ref5_atlas.js?v=15';
 import { ITEMS } from './data.js?v=15';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=15';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { paintR, paintTuckR, paintBeastR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=15';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=15';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -1258,6 +1258,7 @@ function paintBeast(type, pal, frame, act) {
 export function beastFrame(type, pal, dir, pose, frame) {
   if (BEAST_ATLAS[type] && atlasOn()) { const f = atlasPose(BEAST_ATLAS[type], dir, pose || (frame & 1 ? 'w0' : 'i0'), true); if (f) return f; }   // Stil F
   return cacheGet('beast|' + ART + type + '|' + (pal.body || '') + dir + pose + frame, () => {
+    if (ART === 'R' && type === 'horse' && (dir === 'N' || dir === 'S')) return meta(toCanvas(asG(paintHorseNSR(pal, frame, dir, pose, ramp)), false), RPX, BROX, BROY);   // S15: Pferd von vorn/hinten
     if (ART === 'R') { const g0 = asG(paintBeastR(type, pal, frame, pose === 'dead' ? '' : pose, ramp)), g1 = pose === 'dead' ? g0.flipY() : g0;   // S14 Stil R
       return meta(toCanvas(dir === 'E' ? g1.flipX() : g1, false), RPX, BROX, pose === 'dead' ? g0.h - 12 : BROY); }
     if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster

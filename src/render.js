@@ -652,12 +652,25 @@ function drawGoblinNpc(e, now) {
 }
 // S13 (Nutzer: Reittiere, Kampf vom Pferd): das Reittier unter dem Helden, der Reiter 14 px höher
 const MOUNT_PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-function drawRider(e, now) {
-  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, f = SP.beastFrame('horse', MOUNT_PAL[e.mounted.kind] || MOUNT_PAL.horse, Math.cos(e.aim ?? 0) < 0 ? 'W' : 'E', '', fr);
-  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); shadow(e.x, e.y + 3, 14, .35); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore();
-  if (e.mounted.kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
-  ctx.save(); ctx.translate(0, -14); drawHumanoid(e, now); ctx.restore();
+// S15 (Nutzer): Das Pferd schaut in die Laufrichtung (auch nach oben und unten); im Stand behält es die letzte Richtung.
+// Nur Stil R hat Vorder- und Rückansicht, die anderen Stile bleiben seitlich.
+function horseDir(e) {
+  const vx = e.vx || 0, vy = e.vy || 0, side = vx < 0 || (!vx && Math.cos(e.aim ?? 0) < 0) ? 'W' : 'E';
+  if (Math.abs(vx) + Math.abs(vy) > 0.05) e.hDir = SP.drawnOn() && Math.abs(vy) > Math.abs(vx) * 1.2 ? (vy < 0 ? 'N' : 'S') : side;
+  return e.hDir || side;
 }
+function drawHorse(e, now, kind, rider) {
+  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = MOUNT_PAL[kind] || MOUNT_PAL.horse, dir = horseDir(e);
+  const blit = f => { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore(); };
+  const ns = dir === 'N' || dir === 'S', ride = () => { ctx.save(); ctx.translate(0, ns ? -17 : -14); drawHumanoid(e, now); ctx.restore(); };
+  shadow(e.x, e.y + 3, 19, .35);
+  if (rider && ns) ride();                                              // von vorn/hinten sitzt der Reiter im Rumpf: das Pferd verdeckt die Unterschenkel
+  blit(SP.beastFrame('horse', pal, dir, '', fr));
+  if (kind === 'dead_horse') { ctx.fillStyle = 'rgba(95,179,154,.15)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 26, 10, 0, 0, 7); ctx.fill(); }
+  if (rider && !ns) ride();
+  if (dir === 'S') blit(SP.beastFrame('horse', pal, 'S', 'head', fr));   // von vorn: der Kopf verdeckt den Reiter
+}
+function drawRider(e, now) { drawHorse(e, now, e.mounted.kind, true); }
 // S15 Druide, Grad III: der Spieler als großer Hainwolf. Fell der Wölfe, dunkler und mit dem Grün des Hains an den Augen.
 const WOLF_FORM_PAL = { body: '#4a4638', dark: '#2a2a20', eye: '#b7d86a' };
 function drawWolfForm(e, now) {
@@ -679,6 +692,7 @@ function drawEntity(e, now) {
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
+    case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd
     case 'house': return drawHouse(e.b, now);
   }
 }
@@ -1665,6 +1679,7 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.kb && e.kb.t > 0 && !e.cover) pose = 'kb';
   else if (e.stagger > 300 && pose === 'hit') pose = ((now / 140) | 0) & 1 ? 'kb' : 'hit';   // S14: langes Taumeln wankt vor und zurück
   if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
+  if (e.mounted) pose = (/^w[0-3]$/.test(pose) ? 'i0' : pose) + '~r';   // S15 (Nutzer: „soll drauf sitzen, nicht stehen“): Reitsitz
   const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
   const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
   const weapon = () => { if (!W || !f.hand) return; drawWeaponR(c, e, now, wit, w, W, x + (f.hand[0] - f.ox) * f.px * bsx, y + 6 + (f.hand[1] - f.oy) * f.px * bsy, dir); };

@@ -1,0 +1,141 @@
+# Behobene Bugs — je eine Zeile (ID · Titel · Ursache)
+
+Volle Texte mit Schritten, Lösung und Test: `BUGS_bis_S13.md`. Regressionstests stehen im Selbsttest (`RF.selftest()`).
+
+- 001 · Niedergestreckter NPC verfolgt weiter · KI prüfte nur `alive`, nicht `downed`
+- 002 · Spieler richtet eigenen Feind auf · Helfer ohne Feindschaftsprüfung
+- 003 · Verfolgung endet an der Grube · nur die aktive Karte simuliert
+- 004 · Zorn ohne Ende · keine Leine, kein Abbruch
+- 005 · Erbe ohne Waffe und Inventar · Verwandte ohne Ausrüstung erzeugt
+- 006 · Gebäude als dachlose Rechtecke · Gebäude nur Kacheln
+- 007 · Kisten ohne Kontext · Zufallsstreuung statt Szene
+- 008 · Städte leer · keine Bewohner aus Gebäuden
+- 009 · Tiefhall nicht betretbar · kein eigener Dungeon
+- 010 · Keine Wegfindung · nur achsweises Gleiten
+- 011 · Karawane als Einzelobjekt · kein Zug, keine Wachen
+- 012 · Mobil ohne Touch · keine Pointer-Eingabe
+- 013 · NPCs ohne Tagesablauf · feste Ankerpunkte
+- 014 · Englische Rohschlüssel · fehlende Übersetzung
+- 015 · Rückkehr aus der Grube zufällig · Zufallsradius statt Austrittspunkt
+- 016 · Titelbild als Vektor · nicht im Pixelraster
+- 017 · Spielstand 800 KB · alle Props gespeichert
+- 019 · Gestürzte Feinde unerledigbar · Treffer auf `downed` ignoriert
+- 020 · Laden „geschlossen“ ohne Wirkung · Feld nie ausgewertet
+- 021 · Zornige führen normale Gespräche · keine Dialogsperre
+- 022 · Heilerin kämpft, Söldner flieht · Rolle nur nach Fraktion
+- 023 · Zu wenige Wachen · keine Posten je Siedlung
+- 024 · Spawns in Bäumen · freie Stelle ohne Objektprüfung
+- 025 · Wachhaustür im Wasser · Sumpf nach der Stadt generiert
+- 026 · Selbsttest änderte den Stand · Sandbox stellte Felder nicht her
+- 027 · Zufallsfolge verschoben · entfernte `rnd()`-Aufrufe
+- 028 · Keine richtigen Dächer · Walmdach wirkte flach
+- 029 · Siedlungen zu klein · 2–5 Häuser je Ort
+- 030 · Hafenstadt ohne Hafen · Stege im Sumpf
+- 031 · Straßen enden an Mauern · Pläne ohne Tore
+- 032 · Banditen in Städten · Spawngebiet auf der Stadtmitte
+- 033 · Felsen in Aschfurt · Wüste nach der Festung gewürfelt
+- 034 · Wildnis-Streu in Siedlungen · Streu nach dem Stadtbau
+- 035 · Wüstenfelsen als Blöcke · gleiche Textur je Kachel
+- 036 · Häuser zu heil · keine Verfallsstufen
+- 037 · Gebirge gepflastert · Pflaster als Naturboden
+- 038 · Felsbrocken als Vielecke · Platzhalter-Zeichnung
+- 039 · Wasser als Kachelquadrate · Ufer je Kachel
+- 040 · Gras-Schachbrett · Tönung je Kachel-Rechteck
+- 041 · Mauern wie Wege · keine Front, keine Zinnen
+- 042 · Grube wie Ziegelraster · Ziegelstreifen statt Fels
+- 043 · `stagger` ohne Wirkung · Wert nie gelesen
+- 044 · Interaktion ohne Körpersprache · keine Posen
+- 045 · Städte zu voll · 1-Kachel-Raster
+- 046 · Einwohneranzeige falsch · Marktgröße statt Köpfe
+- 047 · Müßige auf 5×3 Kacheln · ein Tagesziel für alle
+- 048 · Nordfurt im Gebirgsbiom · Region nicht vom Anker
+- 049 · Kampftest vom Zufall abhängig · Krit-Wurf ungebunden
+- 050 · Hexenmeister als Lehrklasse · Titelsystem fehlte
+- 051 · Leeres Totenreich · Inhalt fehlte (Phase 6 und S13 gefüllt)
+- 052 · Weltkarte zu klein · 512 × 512 Kacheln
+- 053 · Diener folgen nicht durch Türen · `travel` ohne Diener
+- 054 · Viel XP ergibt eine Stufe · `if` statt Schleife
+- 055 · Untote fliehen vor eigenen Skeletten · Bedrohung ohne Fraktion
+- 056 · Tote Bäume als Strich · 20-px-Platzhalter
+- 057 · Spielstand wächst mit der Karte · alle Props gespeichert
+- 058 · Props nach jedem Laden verändert · Laufzeitfelder auf Props gesetzt
+- 059 · „negative radius“ · Alter aus Frame-Zeit negativ
+- 060 · Säulen als Mini-Gruft · geteilter Zeichenfall
+- 061 · Karawane neben der Straße · Wegpunkte im Entwurfsmaßstab
+- 063 · Wachen stärker als Banditen · Stufen zu hoch (abgelöst durch §82)
+- 064 · Hrodvar ohne Muster · keine Spezialangriffe
+- 065 · Boss-Auftrag nach frühem Sieg unlösbar · Fortschritt erst ab Annahme
+- 066 · Schenken ohne Bänke · Plätze hinter der Tür verworfen
+- 067 · Klumpen vor der Schenke · gleicher Zielpunkt
+- 068 · Deckung kollidierte mit `guard` · gleiches Feld
+- 069 · Klassen ohne Lehrer · Lehrer fehlten
+- 070 · Feuerball ohne Fläche · `splash` nie gelesen
+- 071 · `removeItem` nur erster Stapel · Schleife fehlte
+- 072 · Wilder Hund = Wolf · Cache nur nach Typ
+- 073 · Sandbox isolierte keine Geschosse · Reste aus Proben (Rest: BUG-111)
+- 074 · Kultist heilt bildratenabhängig · feste 16 ms je Aufruf
+- 075 · Test-Figur tot · Hinweis für Tests
+- 076 · Rückwärtslaufen-Cheese · Spieler viel schneller als Gegner
+- 077 · Kelan kämpft ohne Schaden · falsches Team
+- 078 · Gerüchte statisch · keine Weltereignisse
+- 079 · Orte unerreichbar · Fels ringsum, keine Fähre
+- 080 · E wählt das Nächste · keine Zielrichtung
+- 081 · Tod ohne Warnung · keine Gefahrenmeldung
+- 082 · Dorfleben statisch · nur drei Fixpunkte
+- 083 · Abendpulk vor der Taverne · alle draußen
+- 084 · Zielen beim Laufen veraltet · nur bei Mausbewegung
+- 085 · Karte überladen · Symbole überlappen
+- 086 · Neue Geschichte ohne Rückfrage · keine Abfrage
+- 087 · Doppelte Namen · Hash-Kollision
+- 088 · Gegner stapeln sich am Ufer · A* zu kurz
+- 089 · „Tag 2 bricht an“ nach Laden · `lastDay` fest auf 1
+- 090 · Namen passen nicht zum Beruf · Listen ohne Geschlecht
+- 091 · Sprechblasen über Dächern · keine Innenprüfung
+- 092 · Schenke zu voll · Plätze nebeneinander
+- 094 · Fest blockiert Straße und Türen · Aufbau auf der Straße
+- 095 · Karawanen-Test flackert · echte Welt im Test
+- 096 · Karawanenwachen bleiben zurück · außerhalb aller Denkweiten
+- 097 · Tests hängen an der echten Welt · Kopftreffer, Besatzung
+- 098 · Gerüchte als Schlagzeilen · wörtliche Chronik
+- 099 · Bewohner unter Besatzung normal · kein Besatzungsblock
+- 101 · Aschfurt ohne Auftrag · keine Geber (Brett und Geber seit S13b)
+- 102 · Jäger-Test Gleitkomma · `===` bei Brüchen
+- 103 · Brett sperrt den Dorfplatz · Platzmitte als freie Stelle
+- 104 · Tiefhall ohne Zugang · Hochrechnung trennte den Pfad
+- 105 · Einwohner-Test mit Tributzug · Träger als Einwohner gezählt
+- 106 · Figuren ineinander · keine Abstandsregel
+- 107 · Todesbildschirm nach Selbsttest · Probe starb ins Erbe
+- 109 · Bewohner hängen in Häusern · Schrammen galt als Bewegung
+- 110 · Bogen waagrecht, XP ohne Schaden · Fernwaffe mit Zielrichtung gedreht
+- 112 · Wachen-Test wackelt · Detailstufe je Figuren-ID
+- 114 · `door is not defined` · Code im Kommentar
+- 115 · Jeder Tod endet in Ketten · Code im Kommentar
+- 116 · Weihe ohne Gegenstände · Code im Kommentar
+- 117 · Befreiung ohne Rufsturz der Kette · Code im Kommentar
+- 118 · Kamerafahrt nach Selbsttest · Probenprüfung erst im Timer
+- 119 · Inquisitor hält unsichtbaren Helden an · `cineGhost` ignoriert
+- 120 · Scheiterhaufen sperrt den Platz · fester Standort
+- 121 · Omega-Test vom Zufall abhängig · `makeChar` würfelt `seed`
+- 122 · Beziehungs-Test im zweiten Lauf rot · Probe plante Beziehungen neu
+- 123 · Selbsttest gab XP und Gold · Sandbox stellte Werte nicht her
+- 124 · Lager und Grab verlieren Rarität · `addItem` statt `giveItem`
+- 125 · Schlaf heilt Blutung nicht · falsche Zustandsnamen
+- 126 · Begleiter richten zufällig auf · kein gezieltes Helfen
+- 127 · Arbeitsplätze ausgewürfelt · keine festen Plätze
+- 128 · Gegner erscheinen im Bild · Spawnabstände zu klein
+- 129 · Siedlungsgebäude ohne Wirkung · nur Bau, kein Effekt
+- 130 · Sandbox setzt `_quiet` falsch · fester Rücksetzwert
+- 131 · `townDanger` stürzt ab · Figur ohne Heimatort
+- 132 · Selbsttest nicht still · `finally` setzte fest zurück
+- 133 · Handel am Stand geht nicht · Dialog ohne Handelsknopf
+- 134 · Paket nicht abgebbar · nur ein Empfänger
+- 135 · Eskorte zu langsam, Ziel unklar · kein eigener Weg
+- 136 · Kopfgeldjäger im Bild · zweite Platzsuche im Bild
+- 137 · Absturz bei „Fortsetzen“ · neue Karte ohne Grundliste (Lade-Test offen, siehe BUGS.md)
+- 138 · Ferne Auftragsziele zählen nicht · Rückkehr vor der Meldung
+- 139 · Karraks Machtvakuum wirkte nie · `from`/`to` im Kommentar (S14)
+- S14 Mechanik-Check (`../design/mechanik-check.md`): Parade im Takt · Flächenangriffe blockbar · Rückwärtsreiten ·
+  Beitritt bei Erzfeinden · Wiederaufbau aller Dörfer · Fest trotz Besatzung/Überfall · Regionalbosse folgen durch
+  Türen · Brett trotz Besatzung/Ruf · Sprechblasen-Plätze unter Dächern
+- BUG-137-Rest (S14): Ladeprobe `RF.loadProbe()` / Debug „Laden prüfen“ — serialisieren, wie „Fortsetzen“ laden, Held/Karten/Städte/Bewohner/Herden vergleichen.
+- BUG-141 (S14): Zweites Laden in derselben Sitzung stürzte ab (Aurelheim ohne Hausliste; `genWorld` ging vom veränderten Stadtplan aus) — Plan beim ersten Erzeugen gemerkt und in place zurückgesetzt.

@@ -1,5 +1,5 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY } from './state.js?v=15';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=15';
 import * as CS from './cloudsave.js?v=15';
 import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=15';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=15';
@@ -178,7 +178,7 @@ function guideSections(md) {                                               // na
   return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
 }
 function codexUI(body) {
-  const tabs = [['guide', 'Handbuch'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
+  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
   body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"></div><div id="codex-body" class="codex"></div>`;
   const q = $('codex-q'), cb = $('codex-body');
   const render = () => {
@@ -186,6 +186,10 @@ function codexUI(body) {
     if (codexTab === 'guide') {
       if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
       const secs = guideSections(guideMd).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';
+    } else if (codexTab === 'teachers') {                                  // S15 (Nutzer: „ich finde den Krieger-Lehrer nicht“)
+      const L = A.teacherList?.() || [], rows = Object.entries(CLASSES).filter(([k]) => L.some(t => t.cls.includes(k))).filter(([k, C]) => hit(C.name + L.filter(t => t.cls.includes(k)).map(t => t.name + t.where).join(' ')));
+      cb.innerHTML = `<div class="ledger">Ein Lehrer bildet dich erst aus, wenn er dich mag (Beziehung 20, bei Rook 40). Eine Folgeklasse braucht die Klasse davor. Auf der Karte (M) sind Lehrer gelb umrandet.</div>
+        <table class="rank-tab">${rows.map(([k, C]) => `<tr><td>${C.name}${C.parent && C.parent !== 'wanderer' ? ` <span class="ledger">(braucht ${CLASSES[C.parent]?.name})</span>` : ''}</td><td>${L.filter(t => t.cls.includes(k)).map(t => `${t.name} — ${t.where}`).join('<br>')}</td></tr>`).join('')}</table>`;
     } else if (codexTab === 'ranks') {
       cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
     } else if (codexTab === 'states') {
@@ -720,8 +724,8 @@ function skillUI(body) {
   const p = S.player, pts = p.skillPoints || 0;
   const col = b => {
     const N = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === b), rows = Math.max(...N.map(([, n]) => n.row)) + 1, B_ = SKILL_BRANCHES[b];
-    const sealed = B_.title && !(p.titleClasses || []).includes(B_.title);
-    return `<div class="tree-branch${sealed ? ' sealed' : ''}"><h3>${B_.name}</h3><p class="ledger">${sealed ? `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.` : B_.desc}</p>
+    const sealed = B_.cls ? !(p.knownClasses || []).includes(B_.cls) : B_.title && !(p.titleClasses || []).includes(B_.title);
+    return `<div class="tree-branch${sealed ? ' sealed' : ''}"><h3>${B_.name}</h3><p class="ledger">${sealed ? (B_.cls ? `Versiegelt — öffnet sich mit der Klasse ${CLASSES[B_.cls]?.name || B_.cls} (Todesweihe bei Sael oder Ysra).` : `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.`) : B_.desc}</p>
       ${Array.from({ length: rows }, (_, r) => `<div class="tree-row">${N.filter(([, n]) => n.row === r).map(([k, n]) => {
         const st = A.nodeState(p, k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
         const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : n.type === 'active' ? ' — aktive Fähigkeit' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
@@ -741,6 +745,7 @@ function skillUI(body) {
 function partyUI(body) {
   const mem = partyMembers();
   body.innerHTML = `<div class="ledger">Befehle gelten für die ganze Gruppe. Moral entscheidet, ob sie befolgt werden.</div>
+    ${S.mount ? `<div class="ledger" style="margin-top:6px">Reittier: <b>${S.mount.name}</b> — ${S.player.mounted ? 'du reitest. R zum Absitzen.' : 'es ist immer bei dir. Draußen R zum Aufsitzen (nicht in Häusern und Höhlen).'}</div>` : ''}
     <div class="ctx-actions" style="flex-direction:row;flex-wrap:wrap;margin:10px 0">
       ${['follow:Folgen', 'attack:Angreifen', 'hold:Stellung halten', 'retreat:Zurückziehen', 'protect:Anführer schützen'].map(c => {
         const [k, n] = c.split(':'); return `<button data-cmd="${k}" class="${S.partyCmd === k ? 'on' : ''}" aria-pressed="${S.partyCmd === k}" style="flex:0 0 auto">${n}</button>`; }).join('')}
@@ -973,26 +978,30 @@ function settingsUI(body) {
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
-  $('sv').onclick = () => { A.saveNow(); toast('Gespeichert'); };
+  $('sv').onclick = () => { const ok = A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)
   $('quit').onclick = () => { A.saveNow(); location.reload(); };
   cloudButtons();
 }
 // S15 Paket S: verschlüsselter Export und Import (cloudsave.js). Import behält den bisherigen Stand als Sicherung.
+let cloudUrl = null;
 function cloudButtons() {
   const msg = t => { $('cs-msg').textContent = t; };
   $('cs-exp').onclick = async () => {
     const pw = $('cs-pw').value;
     if (pw.length < CS.MIN_PW) return msg(`Das Passwort braucht mindestens ${CS.MIN_PW} Zeichen.`);
     if (pw !== $('cs-pw2').value) return msg('Die beiden Passwörter sind nicht gleich.');
-    if (S.player && !S._quiet) A.saveNow();
-    const raw = localStorage.getItem(SAVE_KEY); if (!raw) return msg('Es gibt noch keinen Spielstand.');
+    if (!window.isSecureContext || !crypto.subtle) return msg('Verschlüsseln geht nur über https oder localhost. Öffne das Spiel über http://localhost:… statt über eine Netzwerkadresse.');
+    let raw = null; try { raw = S.player && !S._quiet ? saveData() : localStorage.getItem(SAVE_KEY); } catch (e) { raw = localStorage.getItem(SAVE_KEY); }   // S15: frisch aus dem Spiel, nicht aus dem (vielleicht vollen) Browser-Speicher
+    if (!raw) return msg('Es gibt noch keinen Spielstand.');
     msg('Verschlüssle …');
     try {
       const bytes = await CS.encryptSave(raw, pw), I = CS.saveInfo(raw) || { house: 'Haus', day: 0 };
-      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-      a.download = `rotfall-${I.house}-tag${I.day}-${new Date().toISOString().slice(0, 10)}.rfsave`.replace(/[^\w.\-äöüÄÖÜß]/g, '_');
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      $('cs-pw').value = $('cs-pw2').value = ''; msg(`Exportiert: Haus ${I.house}, Tag ${I.day}. Leg die Datei in deinen Cloud-Ordner.`);
+      if (cloudUrl) URL.revokeObjectURL(cloudUrl);
+      cloudUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      const name = `rotfall-${I.house}-tag${I.day}-${new Date().toISOString().slice(0, 10)}.rfsave`.replace(/[^\w.\-äöüÄÖÜß]/g, '_');
+      const a = document.createElement('a'); a.href = cloudUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();   // Versuch 1: automatisch
+      $('cs-pw').value = $('cs-pw2').value = '';
+      $('cs-msg').innerHTML = `Fertig: Haus ${I.house}, Tag ${I.day}. Kam kein Download? Dann hier klicken: <a href="${cloudUrl}" download="${name}" style="color:#e8c070;text-decoration:underline">${name}</a> (${Math.round(bytes.length / 1024)} KB). Leg die Datei in deinen Cloud-Ordner.`;   // Versuch 2: echter Klick (Safari, iPhone, eingebettete Browser)
     } catch (e) { msg(e.message); }
   };
   $('cs-imp').onclick = () => { if ($('cs-pw').value.length < CS.MIN_PW) return msg('Erst das Passwort eingeben, mit dem die Datei exportiert wurde.'); $('cs-file').click(); };

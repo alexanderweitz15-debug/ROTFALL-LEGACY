@@ -7,19 +7,16 @@ Dieses Dokument beschreibt, wie ROTFALL als **lebende Welt** funktionieren soll.
 - 🟡 teilweise umgesetzt (was fehlt, steht dabei)
 - ⬜ offen oder geplant
 
-Stand: Session 13 (2026-09-27), Selbsttest 174/174.
+Stand: Session 14 (2026-09-28), Selbsttest siehe `SESSION_LOG.md`.
 
 ---
 
-## 0. Harte Regeln (gelten immer)
-
-1. **Tests und Proben verändern nie den echten Spielstand.** Selbsttests laufen in einer Sandbox (`S._quiet`), in der nicht gespeichert wird. Verzögerte Ereignisse (Kamerafahrten, Timer) werden unter Proben nicht ausgelöst (BUG-118). Debug-*Aktionen*, die der Spieler bewusst im Debug-Menü auslöst, verändern das laufende Spiel; das ist gewollt. Automatische Tests dürfen das nie.
-2. **Während einer Kamerafahrt wird nicht gespeichert**, und niemand spricht den unsichtbaren Helden an (BUG-119).
-3. **Große Ereignisse sind Weltzustände, keine Quests.** Sie werden dauerhaft gespeichert und verändern Regeln, Orte, NPCs und Gespräche (Abschnitt 10).
-4. **Jeder Fehler wird an der Ursache behoben und bekommt einen Regressionstest.** Tests werden nie gelöscht.
-5. **Leistungsbudget:** Zeichnen ≤ 2 ms, Spiellogik ≤ 3 ms je Bild (Abschnitt 13).
-6. **Stil:** Hauptstil ist Referenz 5 (`docs/reference/ref5-hauptstil-sprites.png`). Der klassische, im Code gemalte Stil bleibt in den Optionen wählbar.
-7. **Jede große Fraktion hat eine eigene visuelle Sprache** für Waffen, Rüstungen, Architektur, NPCs, Banner und Effekte (Abschnitt 4).
+## 0. Harte Regeln
+Allgemeine Regeln (Tests, Ursache, Budget, Stil): `MASTER_PROMPT.md` §3. Für die Welt gilt zusätzlich:
+1. Während einer Kamerafahrt wird nicht gespeichert, und niemand spricht den unsichtbaren Helden an (BUG-119).
+2. Große Ereignisse sind Weltzustände, keine Quests: dauerhaft gespeichert, sie ändern Regeln, Orte, NPCs, Gespräche (§10).
+3. Jede große Fraktion hat eine eigene visuelle Sprache für Waffen, Rüstungen, Architektur, NPCs, Banner und Effekte (§4).
+4. Aktiver Stil ist der klassische, im Code gemalte Stil D; Stil F (Referenz 5) bleibt in den Optionen wählbar.
 
 ---
 
@@ -78,7 +75,7 @@ Stand: Session 13 (2026-09-27), Selbsttest 174/174.
 | Dorfüberfälle | ✅ | Fern vom Spieler nach Stärke entschieden, in der Nähe echt gekämpft |
 | Stadtwachstum | ✅ | Wohlstand täglich, gebaute Häuser werden beim Laden wiedererrichtet |
 | Bevölkerung (Geburt, Zuzug, Tod) | ✅ | Tote bleiben tot. Hunger oder ein Totenheer drei Tage lang: Bewohner wandern aus (echte Arbeiter fehlen). Arbeitssuchende und Auswanderer ziehen in leere Häuser. Friedliche Städte bekommen Kinder (Einwohnerzahl) |
-| Tiere außerhalb | ⬜ | Siehe Abschnitt 12 |
+| Tiere außerhalb | ⬜ | Abschnitt 12 |
 
 ---
 
@@ -142,7 +139,7 @@ Stand: Session 13 (2026-09-27), Selbsttest 174/174.
 
 **Regel:** Jede große Fraktion hat eine eigene visuelle Sprache für Waffen, Rüstungen, Architektur, NPCs, Banner und Effekte. Umgesetzt sind Farben, Banner und Rüstungsfarben; eigene Architektur haben Aurelion (Monumentalbauten) und die Eisenfeste. Offen sind eigene Sets im Stil der Referenz 5 für jede Fraktion.
 
-**Geplante Nationen:** Seevolk (zuerst, Fragen offen), Nordreich (Eis), Sandfürsten (Ausbau der Wüste).
+**Nationen:** Seevolk ✅ S14 (Gischtinseln, Karte `isle`; Überfahrt Karte `deck`; Clans Salzbund/Sturmklinge, Weißbart); geplant: Nordreich (Eis), Sandfürsten (Ausbau der Wüste).
 
 ---
 
@@ -200,7 +197,7 @@ Stand: Session 13 (2026-09-27), Selbsttest 174/174.
 | Banditen bereiten Hinterhalte vor | ✅ | liegen vor dem Spieler in der Welt, brechen bei Nähe hervor |
 | Spieler sieht Angreifer vorher | ✅ | Hinterhalte stehen sichtbar hinter Deckung; Angriffe haben Ansagen (Bögen, Linien, Ringe) |
 | Wölfe und Banditen arbeiten nicht zusammen | 🟡 | Sie koordinieren sich nicht, bekämpfen sich aber auch nicht. Offen: Tiere und Banditen feindlich zueinander |
-| Tiere zähmen | ⬜ | Abschnitt 12 |
+| Tiere zähmen | ✅ | Abschnitt 12 |
 | Tote verfolgen nicht weiter | ✅ | Tod und Boden sind endgültig (Test „KI: Boden/Tod ist terminal“) |
 | Reaktion auf Alarm | ✅ | Wachen rufen Wachen im Umkreis, Zivilisten fliehen oder holen Hilfe |
 | Fernkämpfer positionieren sich | ✅ | halten ~190 px Abstand, wechseln seitlich die Stellung, springen zurück |
@@ -308,21 +305,16 @@ Stand: Session 13 (2026-09-27), Selbsttest 174/174.
 
 ---
 
-## 12. Tiere (eigene spätere Phase)
+## 12. Tiere
 
 | Anforderung | Status |
 |---|---|
-| Wildtiere (Wolf, Bär, Wildschwein, Hirsch, Wilder Hund) | ✅ |
-| Rudelverhalten (Wölfe helfen einander, Hunde flankieren) | ✅ |
-| Raubtiere jagen Wild | ✅ |
-| Tiere fliehen (Wild, verwundete Tiere) | ✅ |
-| Tiere reagieren auf Spieler und NPCs (Revier des Bären, Wild flieht) | ✅ |
-| Nutztiere (Pferd, Esel, Ziege, Kamel; im Blatt vorhanden) | ⬜ |
-| Zähmen, Begleittiere | ⬜ |
-| Jungtiere | ⬜ |
-| Tiere in passenden Biomen (feste Gebiete) | 🟡 |
-| Tiere außerhalb der aktiven Region simuliert (Bestände, Wanderung) | ⬜ |
-| Reittiere: Pferd, mechanisches Reittier Aurelions, untotes Ross (Nutzerentscheidung) | ⬜ |
+| Wildtiere (Wolf, Bär, Wildschwein, Hirsch, Wilder Hund), Rudel, Jagd, Flucht, Revier | ✅ |
+| Zähmen (Futter, Geduld), Tierbegleiter (ein Platz extra), Tierhändler | ✅ |
+| Reittiere: Pferd, Messingross (Automatenkern), Totenross; Kampf vom Pferd | ✅ |
+| Nutztiere (Kühe, Schafe) auf den Höfen, Viehdiebstahl | ✅ |
+| Nutztiere in den Wirtschaftszahlen, eigener Hof des Spielers | ✅ S14 (Herde je Stadt, Weide mit Stall) |
+| Jungtiere; Bestände und Wanderung außerhalb der aktiven Region | ⬜ |
 
 ---
 
@@ -398,10 +390,10 @@ Stand: Session 13 (2026-09-27), Selbsttest 174/174.
 - [x] Aurelion-Ränge vollständig
 - [ ] Fraktionsränge für alle großen Nationen mit gleichwertigen Vorteilen
 - [ ] besondere Fraktionsmechaniken für alle Fraktionen definieren
-- [ ] Tiere (Abschnitt 12)
+- [x] Tiere (Abschnitt 12; offen: Hof, Nutztiere in der Wirtschaft)
 - [x] Wirtschaft und Produktionsketten (Abschnitt 3)
 - [ ] Magitech-Waffen
-- [ ] Performance BUG-108
+- [ ] Performance BUG-108, BUG-093
 - [ ] Karawanen-Test BUG-111
 - [ ] Blutungstode der Wachen BUG-113
 - [ ] Seevolk, Nordreich, Sandfürsten

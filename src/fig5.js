@@ -301,7 +301,8 @@ function ik(s, h, L1, L2, pick) {                                   // Ellbogen:
 // ---- Maler ----
 // L: aufgelöste Spec (sprites.js resolve), dir S/N/W, pose, W: Waffenzustand (oder null). Rückgabe: Pixel + Hand-Metadaten.
 export function paintR(L, dir, pose, W = null) {
-  const view = dir === 'W' || dir === 'E' ? 'W' : dir === 'N' ? 'N' : 'S';
+  const view = dir === 'W' || dir === 'E' ? 'W' : dir === 'N' ? 'N' : 'S', ride = pose.endsWith('~r');   // ~r: im Sattel
+  if (ride) pose = pose.slice(0, -2);
   const [base, extra] = pose.split('+'), R = view === 'W' ? rigW(base) : rigS(base), ph = W ? phaseOf(W) : null;
   if (extra) { const A = view === 'W' ? rigW(extra) : rigS(extra), dy = R.by - A.by;   // Mischpose: Beine der Grundpose, Arme der Zusatzpose
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
@@ -313,6 +314,8 @@ export function paintR(L, dir, pose, W = null) {
     R.by += X0.by; R.hy += 0; if (view === 'W') { R.aN = mv(R.aN, 0); R.aF = mv(R.aF, 0); } else { R.aL = mv(R.aL, -X0.sh); R.aR = mv(R.aR, X0.sh); } }
   if (view !== 'W' && (AB >= 2 || L.stance) && (pose === 'i0' || pose === 'i1' || pose === 'guard')) { const sp = AB >= 3 ? 1.5 : 1;   // S15: Gewicht im Stand
     R.lL = R.lL.map(([x, y], i) => [x - sp * i / 2, y]); R.lR = R.lR.map(([x, y], i) => [x + sp * i / 2, y]); }
+  if (ride) { if (view === 'W') { R.lN = [[15.5, 26], [11, 29.5], [12.5, 36]]; R.lF = [[16.5, 26], [12, 30], [13.5, 36.5]]; }   // S15 Reitsitz: Knie nach vorn, Unterschenkel am Pferd
+    else { R.lL = [[13.5, 26], [10, 31], [10.5, 37]]; R.lR = [[18.5, 26], [22, 31], [21.5, 37]]; } }   // von vorn/hinten: Beine gespreizt um den Rumpf
   const plan = W ? armPlan(view, R, W) : null;
   const C = new Px(RW, RH, DX, DY); STUMPS = [];
   if (view === 'W') { if (limbSt(L, 'rleg') === 2) R.lN = stumpOf(R.lN); if (limbSt(L, 'lleg') === 2) R.lF = stumpOf(R.lF); }
@@ -861,6 +864,38 @@ const BEASTR = {
   sheep:    { body: [31, 21, 12, 8], fx: 23, hx: 39, leg: 10, lw: 2.4, head: [16, 18, 3.4, 3.6], snout: 12, neck: 0, tail: 'stub', ear: 'side', wool: 1, darkLeg: 1, hoof: 1 },
   deer:     { body: [32, 18, 11, 5.4], fx: 25, hx: 39, leg: 19, lw: 2.4, head: [14, 11, 3.6, 3], snout: 8, neck: 2, tail: 'short', ear: 'long', antler: 1, rump: 1, hoof: 1 },
 };
+// S15 (Nutzer: „wenn man nach oben läuft, guckt das Pferd nicht nach oben“): Pferd von hinten (N) und von vorn (S).
+// Von vorn verdeckt der Kopf den Reiter; darum gibt es den Kopf als eigene Ebene (only = 'head'), der Rumpf kommt ohne Kopf.
+export function paintHorseNSR(pal, frame, view, only, ramp) {
+  const Cx = new Px(BRW, BRH), k = 0.8;
+  const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
+    limb: (p, pts, w0, w1) => Cx.limb(p, pts.map(([x, y]) => [x * k, y * k]), Math.max(1.6, w0 * k), Math.max(1.4, (w1 ?? w0) * k)) };
+  const F = ramp(pal.body || '#5b5145'), D = ramp(pal.dark || '#3a332b'), eye = pal.eye || '#c8a545', s = [1, 0, -1, 0][frame & 3];
+  const P = { far: C.part(dimR(F, 0.3), 'cloth'), neck: C.part(F, 'cloth', { grp: 'b' }), head: C.part(F, 'cloth', { grp: 'h' }), body: C.part(F, 'cloth', { grp: 'b' }), near: C.part(F, 'cloth'),
+    muzzle: C.part(ramp(mix(pal.body || '#5b5145', '#d8c8b0', 0.45)), 'skin', { grp: 'h' }), mane: C.part(D, 'cloth'), ear: C.part(D, 'cloth'), tail: C.part(D, 'cloth') };
+  const cx = 30, cy = 21, ground = 37, feet = [];
+  const legs = (pid, dx, phase) => [-1, 1].forEach(side => { const lift = side * phase * s > 0 ? 2 : 0, x = cx + side * dx;
+    C.limb(pid, [[x, cy + 2], [x + side * 0.3, cy + 9 - lift], [x, ground - lift]], 3.8, 2.8); C.ell(pid, x, ground - lift, 2.1, 1.1); feet.push([x, ground - lift]); });
+  const headN = () => { C.limb(P.neck, [[cx, cy - 3], [cx, cy - 14]], 6, 4.6); C.ell(P.head, cx, cy - 16, 3.4, 3.2);
+    C.poly(P.ear, [[cx - 3.2, cy - 17], [cx - 4, cy - 21], [cx - 1.2, cy - 18]]); C.poly(P.ear, [[cx + 3.2, cy - 17], [cx + 4, cy - 21], [cx + 1.2, cy - 18]]);
+    C.limb(P.mane, [[cx, cy - 18], [cx, cy - 4]], 2.6, 2.2); };
+  const headS = () => { C.limb(P.neck, [[cx, cy], [cx, cy - 9]], 7.5, 5.8); C.ell(P.head, cx, cy - 12, 4.2, 3.8);
+    C.poly(P.head, [[cx - 3.9, cy - 12], [cx + 3.9, cy - 12], [cx + 3, cy - 3], [cx - 3, cy - 3]]); C.ell(P.muzzle, cx, cy - 3, 3.4, 2.4);
+    C.poly(P.ear, [[cx - 3.6, cy - 14], [cx - 4.6, cy - 19.5], [cx - 1.6, cy - 15]]); C.poly(P.ear, [[cx + 3.6, cy - 14], [cx + 4.6, cy - 19.5], [cx + 1.6, cy - 15]]);
+    C.poly(P.mane, [[cx - 2.2, cy - 15], [cx, cy - 17.5], [cx + 2.2, cy - 15], [cx, cy - 11]]); };
+  if (view === 'N') {                                                 // von hinten: Kopf hinten, Kruppe, Hinterbeine, Schweif
+    headN(); legs(P.far, 5.4, -1); C.ell(P.body, cx, cy, 12, 8.5); legs(P.near, 8.2, 1);
+    C.limb(P.tail, [[cx, cy - 6], [cx + s * 0.8, cy + 3], [cx + s * 1.6, cy + 12]], 5, 3.2);
+  } else if (only === 'head') headS();
+  else { legs(P.far, 5, -1); C.ell(P.body, cx, cy, 11.5, 8.5); legs(P.near, 7.8, 1); }
+  Cx.shade();
+  const set = (x, y, c) => Cx.set(x * k, y * k, c);
+  if (view === 'N') for (let y = cy - 4; y <= cy + 3; y += 1.25) set(cx, y, F.sh);                    // Kruppenfurche
+  if (view === 'S' && only === 'head') { set(cx - 3.2, cy - 12, eye); set(cx + 3.2, cy - 12, eye); set(cx - 1.4, cy - 2.4, '#0d0b0a'); set(cx + 1.4, cy - 2.4, '#0d0b0a');
+    for (let y = cy - 14; y <= cy - 5; y += 1.25) set(cx, y, '#e8e0d0'); }                                  // Augen, Nüstern, Blesse
+  for (const [fx, fy] of feet) { set(fx - 1, fy + 1, '#141010'); set(fx + 0.3, fy + 1, '#141010'); set(fx + 1.4, fy + 1, '#141010'); }   // Hufe
+  Cx.outline(); return Cx.toG();
+}
 export function paintBeastR(type, pal, frame, act, ramp) {
   const T = BEASTR[type] || BEASTR.wolf, Cx = new Px(BRW, BRH), k = 0.8;           // Entwurf 60×40 → 48×32
   const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
