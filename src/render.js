@@ -1,12 +1,12 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=15';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=15';
-import * as HB from './buildings.js?v=15';
-import { ITEMS, MONSTERS } from './data.js?v=15';
-import { buildOf, crawling } from './body.js?v=15';
-import * as SP from './sprites.js?v=15';
-import { trailPt, WAGON_GAP } from './sim.js?v=15';
-import { ICON_R } from './iconsR.js?v=15';
+import { S, clamp, seasonOf } from './state.js?v=16';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=16';
+import * as HB from './buildings.js?v=16';
+import { ITEMS, MONSTERS } from './data.js?v=16';
+import { buildOf, crawling } from './body.js?v=16';
+import * as SP from './sprites.js?v=16';
+import { trailPt, WAGON_GAP } from './sim.js?v=16';
+import { ICON_R } from './iconsR.js?v=16';
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 

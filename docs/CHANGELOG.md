@@ -2,6 +2,12 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 16 — 2026-09-29 (S15, zweite Hälfte)
+- Versionsnummer auf dem Startbildschirm und oben links (v16). Die Seite lädt alle Dateien neu (Cache-Schlüssel v=16).
+- Pferd: R pfeift, E sitzt auf; Werte je Pferd, Stall-Fenster bei Tierhändlern, Pferdehof Hadubrand in Mühlbach, Totenross für Todesritter.
+- Magie (Akademie, Nachtglas-Turm, Schattenschule, Glaubenszauber), Ruhm je Region, neue Lehrer, Eidwacht-Questreihe, Schwierigkeitsgrade.
+- Kodex schaltet sich im Spiel frei (Code NACHTGLAS); Bewohner-Aufträge mit Namen und mitlaufendem Wegpunkt; Statpunkte erklärt.
+
 ## Session 15 — 2026-09-29 · Titelklassen vertieft
 - Titelgrade I–III: Taten sammeln, der Meister weiht; jeder Grad schaltet Fähigkeiten frei und zeigt sich an der Figur.
 - Neu: Leichenbersten, Seelenfessel, Seuchenfluch, Obeliskentor, Dornenhaut, Wolfsgestalt, Gegenstrom, Stille Hand; Grabhieb.
