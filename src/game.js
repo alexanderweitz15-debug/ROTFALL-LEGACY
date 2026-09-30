@@ -1860,7 +1860,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -2044,7 +2044,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); sideCityMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
   ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
@@ -3235,7 +3235,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.titleClass === 'necromancer' && !node(attacker, 'k_lone')) dmg *= 0.85;             // Makel: Die Toten zehren
   if ((attacker.status || []).some(s => s.key === 'bloodtoll')) dmg *= 0.8;   // Phase 6: Blutzoll an Garmadon
   if (target.exposed > performance.now()) dmg *= 1.25;                   // S15 P3: offen nach einem schweren Angriff
-  if (attacker.comboFin) { dmg *= 1.3; target.stagger = Math.max(target.stagger || 0, 700); if (!attacker.comboShown) { attacker.comboShown = true; float(target, 'Wucht!', 'rgba(240,200,120,ALPHA)'); camShake(4, 140); S.fx.push({ x: target.x, y: target.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.2, life: 350, maxLife: 350 }); } }   /* §5f: dritter Schlag der Kombo */
+  if (attacker.comboFin) { dmg *= 1.3; if (!(target.poiseUntil > performance.now())) target.stagger = Math.max(target.stagger || 0, 700); if (!attacker.comboShown) { attacker.comboShown = true; float(target, 'Wucht!', 'rgba(240,200,120,ALPHA)'); camShake(4, 140); S.fx.push({ x: target.x, y: target.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.2, life: 350, maxLife: 350 }); } }   /* §5f: dritter Schlag der Kombo */
   if (setOf(attacker)?.bonus.holy && target.faction === 'undead') dmg *= 1 + setOf(attacker).bonus.holy;   // S13: Weißer Orden
   if (target.faction === 'undead' || MONSTERS[target.mtype]?.faction === 'undead') dmg *= 1 + afx(attacker, 'slayer') + elx(attacker, 'slayer');   // S15 P2: Totenbann
   if ((attacker.status || []).some(s => s.key === 'omegawrath')) dmg *= target.faction === 'undead' ? 1.35 : 1.1;   // Phase 7: Gebet an Omega; S13 (Nutzer): gegen Untote stärker
@@ -3303,7 +3303,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.mtype === 'ghoul' && target.alive && target.kind !== 'caravan') addStatus(target, { key: 'grabbed', name: 'Gepackt', left: 1500, desc: 'Langsamer (−50 %).' });
   if (attacker.mtype === 'wraith' && target.stamina != null) { target.stamina = Math.max(0, target.stamina - 15); fx(target.x, target.y - 14, 'frost', 5); }
   if (target.mtype === 'wraith' && target.alive && !(target.phased > performance.now())) target.phased = performance.now() + 900;   // Balance-Runde: ein abgeprallter Hieb verlängert die Körperlosigkeit nicht (vorher: Dauerhauen = Geist nie treffbar)
-  if (crush && target.alive && !target.downed) { target.stagger = Math.max(target.stagger || 0, MONSTERS[target.mtype]?.boss ? 300 : 650); target.swing = 0; target.telegraph = 0; target.windup = false; }   // Wucht: niemand bleibt stehen, wie er stand
+  if (crush && target.alive && !target.downed && !(target.poiseUntil > performance.now())) { const st = MONSTERS[target.mtype]?.boss ? 300 : 650; target.stagger = Math.max(target.stagger || 0, st); target.swing = 0; target.telegraph = 0; target.windup = false; if (target.kind === 'enemy') target.poiseUntil = performance.now() + st + 1200; }   /* Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit) */   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
   const fl = feelOf(attacker), mine = attacker === S.player;
@@ -16272,6 +16272,19 @@ export function selftest() {
       for (let i = 0; i < 12; i++) zoneBuild(3); const four = S.settlement.buildings.filter(b => b.zone === z.id).length === 4 && settlerCap() >= 16;
       zoneBuild(1); return none && started && one && four;
     } finally { S.settlement = st0; Object.assign(S.res, r0); }
+  }));
+  ok('Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit auch gegen Hammer und Wuchtschlag)', sandbox(() => {
+    const p = stage(); p.equip.weapon = mkItem('warhammer'); const e = spawnEnemy('death_knight', '__a', 12, 10); e.x = p.x + 30; e.y = p.y;
+    hit(p, e, 1); const first = e.stagger > 0 && e.poiseUntil > performance.now(); e.stagger = 0; hit(p, e, 1); const second = !(e.stagger > 0);
+    return first && second;
+  }));
+  ok('Audit V1: Krieg mit Nachschub — Heere gedeckelt, nach Garmadon wachsen die Toten nicht, Valen stellt nur in eigener Stadt auf', sandbox(() => {
+    const W0 = structuredClone(S.war), g0 = S.flags.garmadonSlain, T0 = structuredClone(S.towns), E0 = structuredClone(S.eco || null);
+    try { const u = S.war.armies.find(a => a.faction === 'undead') || (S.war.armies.push({ id: 'probe_u', faction: 'undead', strength: 50, at: Object.keys(S.war.nodes)[0], name: 'Probe' }), S.war.armies[S.war.armies.length - 1]);
+      u.strength = 500; SIM.clampArmies(); const capped = u.strength <= 110;
+      S.flags.garmadonSlain = 1; const s0 = u.strength; SIM.warDay(); const still = !S.war.armies.includes(u) || u.strength <= s0;
+      return capped && still;
+    } finally { S.war = W0; S.flags.garmadonSlain = g0; S.towns = T0; if (E0) S.eco = E0; }
   }));
   ok('Varonheim (Nutzer §5g.1): Hauptstadt mit mindestens 20 Häusern, Bewohnern und Garde; das Bergfried-Tor führt in den Thronsaal; vom Markt sind alle vier Stadttore und das Burgtor erreichbar', (() => {
     const P = TOWN_PLAN.varonheim; if (!P) return false; const [x0, y0, x1, y1] = P.area, [sx, sy] = P.square, M = MAPS.world;

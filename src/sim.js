@@ -348,17 +348,24 @@ function cleanupArmies() {
     return false;
   });
 }
+// Audit V1: Heeresdeckel (Schwer 110, sonst 80) — auch beim Laden, damit alte Stände mit Riesenheeren nicht weiterrollen
+export const ARMY_CAP = () => S.difficulty === 'sehr_schwer' || S.difficulty === 'schwer' ? 110 : 80;
+export function clampArmies() { for (const a of S.war?.armies || []) a.strength = Math.min(a.strength, ARMY_CAP()); }
 export function warDay() {
   const W = S.war;
-  const undNodes = Object.values(W.nodes).filter(n => n.owner === 'undead').length;
-  for (const a of W.armies) a.strength += a.faction === 'undead' ? 2 + undNodes : (S.towns.northcity.stock.grain > 10 ? 4 : 0);
-  // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt
-  if (!W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
+  const undNodes = Object.values(W.nodes).filter(n => n.owner === 'undead').length, dead = !!S.flags.garmadonSlain;
+  // Audit V1: Nachschub statt Lawine — Untote wachsen gedeckelt (nach Garmadon gar nicht mehr), Valen nach dem Korn aller eigenen Städte
+  const valenGrain = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'valen' && S.towns[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
+  for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : (valenGrain > 10 ? 3 : 0);
+  clampArmies();
+  // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt (die Toten nur, solange Garmadon lebt)
+  if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
     const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard';
     W.nodes[base].owner = 'undead';
     W.armies.push(newArmy('undead', base, 30)); log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
-  if (!W.armies.some(a => a.faction === 'valen') && chance(0.3)) { W.armies.push(newArmy('valen', 'northcity', 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
+  const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt */
+  if (muster && !W.armies.some(a => a.faction === 'valen') && chance(0.3)) { W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
   cleanupArmies();   // S15: verhungerte Heere verschwinden
   economyDay();
 }

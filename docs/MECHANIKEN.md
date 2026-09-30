@@ -629,3 +629,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Viertel:** Tempelviertel (Nordwest), Adelsviertel (Nordost), Markt mit Brunnen, Galgen und Standbild des Königs (Mitte), Armenviertel mit Hütten (Südwest), Handwerk und Garnison (Südost). Dunkler Stein und Schiefer.
 - **Leben:** Bewohner nach den Berufen Valens, Königsgarde an Toren, Burgtor und Markt. Alte Spielstände bekommen die Stadt beim Laden (Log-Meldung).
 - Probe „Varonheim (Nutzer §5g.1)“.
+
+## Runde: Audit-Korrekturen A1 und V1 (01.10.2026)
+- **Wucht mit Standfestigkeit (A1):** Wuchtwaffen (Hammer, Mauerbrecher …) und der Wuchtschlag der Kombo lassen einen Gegner taumeln — danach ist er aber 1,2 s standfest. Kein Dauerlähmen mehr; der Hammer öffnet ein Fenster, das man nutzen muss.
+- **Krieg mit Nachschub (V1):** Untotenheere wachsen täglich höchstens um 1 + ¼ je gehaltenem Ort (bis 4), nach Garmadons Fall gar nicht mehr und es stehen keine neuen auf. Valen wächst nach dem Korn aller eigenen Städte und stellt neue Heere nur in einer eigenen Stadt auf. Jedes Heer hat einen Deckel (80, auf Schwer 110), auch beim Laden alter Stände.
