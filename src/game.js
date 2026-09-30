@@ -3012,6 +3012,8 @@ function resolveSwing(c) {
     hit(c, f, multF * tip, kind);
     if (it && it.wtype !== 'spear' && !it.sweep && !(it.flail && mom >= 2)) break;      // Speer trifft in Linie, Hellebarde fegt den Bogen, Flegel mit Schwung rundum
   }
+  c.comboFin = false;   /* Fehlersuche §5f: der Wuchtschlag gilt nur für diesen einen Schwung — sonst würde er hängen bleiben und spätere,
+    unabhängige Treffer (Fähigkeiten, Wurfwaffen, Geschosse, die direkt über hit() laufen) fälschlich verstärken */
   if (it && it.flail) {
     c.momentum = hitAny ? Math.min(3, mom + 1) : 0; c.momT = now0;
     if (c === S.player && c.momentum >= 2) float(c, c.momentum >= 3 ? 'Schwung ×3' : 'Schwung ×2', 'rgba(230,200,120,ALPHA)');
