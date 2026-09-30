@@ -1,5 +1,5 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=22';
 import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=22';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=22';
@@ -2044,6 +2044,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
+  for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) if (e.sick === false) delete e.sick;   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
@@ -9809,7 +9810,7 @@ function bigTick(B) {
     if (day - B.day === 3 && B.cured < 3) { const [sx, sy] = TOWN_PLAN[B.town].square, n = bigTowns().filter(k => k !== B.town).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - sx, TOWN_PLAN[a].square[1] - sy) - Math.hypot(TOWN_PLAN[b].square[0] - sx, TOWN_PLAN[b].square[1] - sy))[0];
       if (n) { for (const c of villagersOf(n).slice(0, 2)) c.sick = true; log(`Die Seuche zieht weiter nach ${townName(n)}.`, 'world'); chronicle(`Seuche erreicht ${townName(n)}`, 'news'); } }
     if (day >= B.until) { if (plagueStays(B)) return bigEnd(`Die Seuche ist nicht eingedämmt: ${B.dead} Tote, nur ${B.cured} geheilt. Sie bleibt in den Orten, die sie befallen hat.`);   /* Folgen §5c */
-      for (const c of S.ents.world) c.sick = false; bigEnd(`Die Seuche klingt ab. ${B.dead} Tote, ${B.cured} geheilt.`); }
+      for (const c of S.ents.world) if (c.sick) delete c.sick; bigEnd(`Die Seuche klingt ab. ${B.dead} Tote, ${B.cured} geheilt.`); }
     return; }
   if (B.kind === 'witch' && day >= B.until) { const w = byId(B.who);
     if (w?.alive && w.accused) { w.accused = false; w.alive = false; S.ents.world = S.ents.world.filter(e => e !== w); S.factions.order = clamp((S.factions.order || 0) + 2, -100, 100); witchBurned(B); return bigEnd(`${B.name} ist in ${townName(B.town)} verbrannt worden. Niemand hat für sie gesprochen.`); }
@@ -13151,7 +13152,7 @@ function bindInput() {
     e.preventDefault();
     R.cam.base = clamp((R.cam.base || R.cam.zoom) * (e.deltaY > 0 ? 0.9 : 1.1), 0.7, 2.4);
   }, { passive: false });
-  window.addEventListener('beforeunload', () => { if (running) save(); });
+  window.addEventListener('beforeunload', () => { if (running) saveSync(); });   /* Audit D6: sofort, nicht erst komprimieren */
   bindTouch();
 }
 // Touch: Zielen ohne Maus — nächster Feind in Reichweite, sonst in Lauf-/Blickrichtung
@@ -13438,6 +13439,12 @@ function debugSections() {
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
     }],
     fortDebug(tp),   /* §5d.1 Eisenfeste: Festungsleben, Sklavenmarkt, Übernahme */
+    ['Spielstand (Audit D6)', '', {
+      'Größe messen und Rundlauf prüfen': async () => { const t0 = performance.now(), str = saveData(), t1 = performance.now(), z = await zipSave(str), t2 = performance.now(), back = await unzipSave(z);
+        const msg = `JSON ${(str.length / 1e6).toFixed(2)} Mio. Zeichen (${Math.round(t1 - t0)} ms) → gepackt ${(z.length / 1e3).toFixed(0)} Tsd. (${Math.round(t2 - t1)} ms), Rundlauf ${back === str ? 'gleich' : 'FEHLER'}`;
+        log(msg, 'world'); UI.toast(msg, 5000); },
+      'Jetzt komprimiert speichern': () => { S._quiet ? UI.toast('Stumm (Test): kein Speichern.') : save(); },
+    }],
     ['Klang & Effekte (Audit C3–C5)', sel('dbAmb', ['greenmark', 'forest', 'marsh', 'desert', 'blight', 'deadland', 'aurel', 'eisen', 'frozen', 'coast', 'under'].map(k => [k, k])), {
       'Umgebung vorspielen (8 s)': () => { ambience(true); const k = v('dbAmb'); for (let i = 0; i < 8; i++) setTimeout(() => ambienceTick(k === 'under' ? 'blight' : k, true, false, k === 'under'), i * 1000); UI.toast(`Umgebungsklang: ${k}`); },
       'Partikel-Stresstest (Deckel 900)': () => { for (let i = 0; i < 400; i++) fx(p.x + ri(-200, 200), p.y + ri(-150, 150), pick(['blood', 'spark', 'ghost', 'dust']), 6); UI.toast(`Partikel: ${S.fx.length}`); },
@@ -16285,6 +16292,12 @@ export function selftest() {
       zoneBuild(1); return none && started && one && four;
     } finally { S.settlement = st0; Object.assign(S.res, r0); }
   }));
+  ok('Audit D6: Spielstand-Packung verlustfrei (15 Bit je Zeichen, keine Surrogate); kein Prop trägt noch „sick“ (Seuchenende markierte früher jeden Baum)', (() => {
+    const u8 = new Uint8Array(5003); for (let i = 0; i < u8.length; i++) u8[i] = (i * 131 + (i >> 3) * 7) & 255;
+    const s = pack(u8), back = unpack(s), same = back.length === u8.length && back.every((v, i) => v === u8[i]);
+    const clean = [...s].every(ch => { const c = ch.charCodeAt(0); return c >= 32 && (c < 0xd800 || c > 0xdfff); });
+    return same && clean && s.length < u8.length * 0.6 && S.ents.world.every(e => e.kind !== 'prop' || e.sick === undefined);
+  })());
   ok('Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit auch gegen Hammer und Wuchtschlag)', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('warhammer'); const e = spawnEnemy('death_knight', '__a', 12, 10); e.x = p.x + 30; e.y = p.y;
     hit(p, e, 1); const first = e.stagger > 0 && e.poiseUntil > performance.now(); e.stagger = 0; hit(p, e, 1); const second = !(e.stagger > 0);
@@ -16581,9 +16594,9 @@ export function selftest() {
   }));
   ok('Ruhm (S15 P8): Boss-Sieg hebt den Ruhm der Region über „Bekannt“, Begrüßung ändert sich, Berühmte zahlen weniger', sandbox(() => {
     const p = stage(), F0 = S.fame; S.fame = {};
-    try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Geschichten') || l.includes('gehört'));
+    try { const npc = actor(p.x + 30, p.y, { kind: 'npc', prof: 'Bauer' }); const l0 = contextLines(npc).some(l => l.includes('Aus Geschichten') || l.includes('von dir gehört'));   /* nur die Ruhm-Sätze: Gerüchte sagen auch „gehört“ */
       const b = spawnEnemy('bandit', '__a', 11, 9); b.boss = true; b.x = p.x + 40; b.y = p.y; die(b, 'Test', p);
-      const known = fameOf('mitte') >= 15 && fameTier(fameOf('mitte')) !== 'Unbekannt'; S.fame.mitte = 40; const l1 = contextLines(npc).some(l => l.includes('Geschichten'));
+      const known = fameOf('mitte') >= 15 && fameTier(fameOf('mitte')) !== 'Unbekannt'; S.fame.mitte = 40; const l1 = contextLines(npc).some(l => l.includes('Aus Geschichten'));
       const shop = { faction: null, x: p.x, y: p.y, map: '__a' }, pr0 = repPrice(shop, true); S.fame.mitte = 70; const cheaper = repPrice(shop, true) < pr0;
       return !l0 && known && l1 && cheaper;
     } finally { S.fame = F0; }
@@ -16999,7 +17012,7 @@ function titleLoop(t) {
 // Erfolgs-Symbolen (Garmadon tot = Schädel usw., Tooltip nennt den Erfolg). Laden setzt den aktiven Platz, Löschen fragt nach.
 function slotCards(mode, onLoad) {
   const idx = slotIndex(), list = Object.values(idx).filter(x => (x.mode || 'single') === mode).sort((a, b) => (b.at || 0) - (a.at || 0));
-  for (const x of list) if (x.name == null) { try { Object.assign(x, slotMetaFrom(JSON.parse(localStorage.getItem(slotKey(x.id))))); } catch (e) { x.name = '?'; } }   /* alter Stand ohne Übersicht */
+  for (const x of list) if (x.name == null) { try { Object.assign(x, slotMetaFrom(JSON.parse(readRaw(slotKey(x.id))))); } catch (e) { x.name = '?'; } }   /* alter Stand ohne Übersicht */
   const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
   const html = list.length ? list.map(x => `<div class="slot-card${x.id === SLOT ? ' active' : ''}"><div class="sl-head"><b>${esc(x.name)}</b> <span>${esc(x.house ? 'Haus ' + x.house : '')}</span></div>
     <div class="sl-sub">Stufe ${x.level || 1} · Tag ${x.day || 1} · Generation ${x.gen || 1}${x.dead ? ' · gefallen' : ''}${x.at ? ' · ' + new Date(x.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>
@@ -17058,7 +17071,7 @@ function boot() {
     stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
-    saveNow: () => save(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
+    saveNow: () => saveSync(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
   // Titelbildschirm
   $('legacy-summary').innerHTML = hasSave() ? (() => {
@@ -17091,4 +17104,5 @@ function boot() {
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
 }
+await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

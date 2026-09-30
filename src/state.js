@@ -144,7 +144,7 @@ const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quie
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
 const PROP_BASE = {};                                        // je Karte: gk → Signatur
 const r2 = (k, v) => typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;   // Positionen/Timer: 2 Nachkommastellen genügen
-const sig = p => { const { id, ...rest } = p; return JSON.stringify(rest, r2); };
+const sig = p => { const { id, ...rest } = p; return JSON.stringify(rest); };   /* Audit D6: ohne Replacer 4× schneller (14 000 Props je Speichern); Props tragen nur ganze Zahlen, Grundzustand und Stand rechnen gleich */
 export function setPropBase(map, list) { const B = new Map(); for (const p of list) B.set(p.gk, sig(p)); PROP_BASE[map] = B; }
 export function saveData() {
   const out = {}; out.ents = {}; out.propsGone = {};
@@ -179,23 +179,70 @@ export function adoptPropKeys(map, fresh) {
     if (q?.length) e.gk = q.shift();
   }
 }
-export function save() {
+// Audit D6 (§5g.13): Spielstand komprimiert. Format „RFZ1:“ + Bytezahl + „:“ + gzip-Bytes, je 15 Bit in einem Zeichen (+32:
+// keine Steuerzeichen, keine Surrogate) — gut 5× kleiner als JSON und 2,5× dichter als Base64. Komprimieren ist asynchron
+// (CompressionStream); darum sammelt save() Aufrufe und schreibt einmal im nächsten Leerlauf. Laden bleibt synchron: boot()
+// entpackt vorher alle Plätze in UNZ (unpackAll). saveSync() schreibt sofort als JSON (Beenden, beforeunload) — der nächste
+// normale Speichervorgang komprimiert wieder. Alte JSON-Stände laden unverändert.
+const ZIP = 'RFZ1:', UNZ = new Map();
+export function pack(u8) {
+  const out = []; let acc = 0, bits = 0;
+  for (let i = 0; i < u8.length; i++) { acc = (acc << 8) | u8[i]; bits += 8;
+    if (bits >= 15) { bits -= 15; out.push(String.fromCharCode(((acc >> bits) & 0x7fff) + 32)); acc &= (1 << bits) - 1; } }
+  if (bits) out.push(String.fromCharCode(((acc << (15 - bits)) & 0x7fff) + 32));
+  return u8.length + ':' + out.join('');
+}
+export function unpack(s) {
+  const c = s.indexOf(':'), n = +s.slice(0, c), u8 = new Uint8Array(n); let acc = 0, bits = 0, k = 0;
+  for (let j = c + 1; j < s.length && k < n; j++) { acc = (acc << 15) | (s.charCodeAt(j) - 32); bits += 15;
+    while (bits >= 8 && k < n) { bits -= 8; u8[k++] = (acc >> bits) & 255; } acc &= (1 << bits) - 1; }
+  return u8;
+}
+export async function zipSave(str) { return ZIP + pack(new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())); }
+export async function unzipSave(raw) { return raw?.startsWith(ZIP) ? new Response(new Blob([unpack(raw.slice(ZIP.length))]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : raw; }
+// Roher Stand als JSON-Text (entpackt aus UNZ); null, wenn es keinen gibt oder er noch nicht entpackt ist.
+export function readRaw(key = SAVE_KEY) { const raw = localStorage.getItem(key); return raw?.startsWith(ZIP) ? UNZ.get(key) ?? null : raw; }
+export async function unpackAll() {
+  const keys = new Set([SAVE_KEY, LEGACY_KEY, ...Object.keys(slotIndex()).map(slotKey)]);
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^rotfall\./.test(k)) keys.add(k); }   /* auch Sicherungen (…vor-import, backup) */
+  for (const k of keys) { const raw = localStorage.getItem(k); if (raw?.startsWith(ZIP) && !UNZ.has(k)) try { UNZ.set(k, await unzipSave(raw)); } catch (e) { console.warn('Spielstand nicht entpackbar', k, e); } }
+}
+function guardSave() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
   if (S._quiet || S.cine) return false;
   if (!S.player) return false;                                   // S15 Fehlersuche
   if (S.coop?.role === 'guest') return false;                    // Koop K2: der Gast spielt in der Welt des Hosts und speichert nie: im Titelmenü gibt es noch keinen Helden — nie einen leeren Stand über den echten schreiben                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
+  return true;
+}
+function saveFail(err) {
+  console.warn('Speichern fehlgeschlagen', err);
+  log('Spielstand konnte nicht geschrieben werden: ' + err.message + (/quota/i.test(err.message) ? ' — der Browser-Speicher ist voll. Im Titelmenü unter „Spielstände“ einen alten Stand löschen.' : ''), 'world');
+}
+let saveTimer = 0, saveGen = 0;
+export function save() {
+  if (!guardSave()) return false;
+  if (!saveTimer) saveTimer = setTimeout(flushSave, 0);   /* viele save() im selben Moment = ein Schreibvorgang */
+  return true;
+}
+async function flushSave() {
+  saveTimer = 0; if (!guardSave()) return;
+  const key = SAVE_KEY, gen = ++saveGen;
   try {
-    const str = saveData(); localStorage.setItem(SAVE_KEY, str); touchSlot();
-    return true;
-  } catch (err) {
-    console.warn('Speichern fehlgeschlagen', err);
-    log('Spielstand konnte nicht geschrieben werden: ' + err.message + (/quota/i.test(err.message) ? ' — der Browser-Speicher ist voll. Im Titelmenü unter „Spielstände“ einen alten Stand löschen.' : ''), 'world');
-    return false;
-  }
+    const str = saveData(), z = typeof CompressionStream === 'function' ? await zipSave(str) : str;
+    if (gen !== saveGen || key !== SAVE_KEY) return;     /* inzwischen neuer gespeichert oder Platz gewechselt */
+    localStorage.setItem(key, z); if (z !== str) UNZ.set(key, str); else UNZ.delete(key); touchSlot();
+  } catch (err) { saveFail(err); }
+}
+// Sofort und synchron (Beenden, Seite schließen): JSON. Scheitert das am Platz, bleibt der letzte komprimierte Stand stehen.
+export function saveSync() {
+  if (!guardSave()) return false;
+  saveGen++; clearTimeout(saveTimer); saveTimer = 0;
+  try { const str = saveData(); localStorage.setItem(SAVE_KEY, str); UNZ.delete(SAVE_KEY); touchSlot(); return true; }
+  catch (err) { if (!/quota/i.test(err.message)) saveFail(err); return false; }
 }
 export function loadRaw() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = readRaw();
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (data.ver !== SAVE_VERSION) return migrate(data);
@@ -206,7 +253,7 @@ function migrate(data) {
   // v1 → v2: Die Welt wurde von 128×128 auf 512×512 vergrößert. Alte Positionen und Kriegsknoten
   // passen nicht mehr zur neuen Geometrie, darum wird ein inkompatibler Stand verworfen statt halb geladen.
   if ((data.ver || 1) < 2) { wipeSave(); return null; }
-  if (data.ver < 4) { try { localStorage.setItem(SAVE_KEY + '.v' + data.ver + '.backup', localStorage.getItem(SAVE_KEY)); } catch (e) {} wipeSave(); return null; }   // S12: Welt neu geordnet — nur neues Spiel
+  if (data.ver < 4) { try { localStorage.setItem(SAVE_KEY + '.v' + data.ver + '.backup', readRaw()); } catch (e) {} wipeSave(); return null; }   // S12: Welt neu geordnet — nur neues Spiel
   // v2 → v3: dieselbe Welt (gleicher Seed), nur größer. Positionen rechnet continueGame nach der Weltgenerierung um.
   if (data.ver === 2) (data.flags ||= {}).rescale = true;
   data.ver = SAVE_VERSION; return data;
@@ -216,4 +263,4 @@ export function applySave(data) {
   S.fx = []; S.floats = []; S.projectiles = []; S.paused = false;
 }
 export function hasSave() { return !!localStorage.getItem(SAVE_KEY); }
-export function wipeSave() { localStorage.removeItem(SAVE_KEY); }
+export function wipeSave() { clearTimeout(saveTimer); saveTimer = 0; saveGen++; localStorage.removeItem(SAVE_KEY); UNZ.delete(SAVE_KEY); }   /* auch ein laufendes Komprimieren verwerfen */
