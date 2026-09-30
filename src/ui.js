@@ -1,5 +1,5 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=22';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=22';
 import * as CS from './cloudsave.js?v=22';
 import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=22';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=22';
@@ -1072,7 +1072,7 @@ function cloudButtons() {
     if (pw.length < CS.MIN_PW) return msg(`Das Passwort braucht mindestens ${CS.MIN_PW} Zeichen.`);
     if (pw !== $('cs-pw2').value) return msg('Die beiden Passwörter sind nicht gleich.');
     if (!window.isSecureContext || !crypto.subtle) return msg('Verschlüsseln geht nur über https oder localhost. Öffne das Spiel über http://localhost:… statt über eine Netzwerkadresse.');
-    let raw = null; try { raw = S.player && !S._quiet ? saveData() : localStorage.getItem(SAVE_KEY); } catch (e) { raw = localStorage.getItem(SAVE_KEY); }   // S15: frisch aus dem Spiel, nicht aus dem (vielleicht vollen) Browser-Speicher
+    let raw = null; try { raw = S.player && !S._quiet ? saveData() : readRaw(); } catch (e) { raw = readRaw(); }   // S15: frisch aus dem Spiel, nicht aus dem (vielleicht vollen) Browser-Speicher
     if (!raw) return msg('Es gibt noch keinen Spielstand.');
     msg('Verschlüssle …');
     try {

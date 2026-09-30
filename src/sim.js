@@ -258,7 +258,7 @@ export function warTick() {                                  // alle 6 Spielstun
   for (const a of W.armies) {
     let next = null;
     if (a.faction === 'undead') next = a.order && W.nodes[a.order] ? (a.at === a.order ? null : path(a.at, n => n === a.order)) : path(a.at, n => W.nodes[n].owner !== 'undead');   // S15 P20: Befehl des Spielers
-    else next = path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));
+    else next = path(a.at, n => W.nodes[n].owner === 'undead' && S.towns[n]) || path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));   /* Hunter-Befund: verlorene Städte zuerst zurückholen */
     if (!next || (a.faction === 'valen' && a.strength < 25)) next = null;   // zu schwach: halten
     // §74 Vorwarnung: bevor ein Untotenheer auf eine Siedlung zieht, melden Späher es — das Heer sammelt sich einen Zug (6 Std.)
     const L = next && LOC[next];
@@ -296,7 +296,8 @@ function setStrength(a, v) {
   if (a.garrison) S.war.nodes[a.garrison].garrison = Math.max(0, v); else a.strength = Math.max(0, v);
 }
 function battleAbstract(node, a, d) {
-  const ra = a.strength * (0.75 + rnd() * 0.5), rd = d.strength * (0.85 + rnd() * 0.5);
+  const wall = d.garrison && S.towns[d.garrison] && d.faction === 'valen' ? 1.3 : 1;   /* Stadtmauern: Valens Besatzung verteidigt stärker */
+  const ra = a.strength * (0.75 + rnd() * 0.5), rd = d.strength * (0.85 + rnd() * 0.5) * wall;
   const win = ra >= rd ? a : d, lose = win === a ? d : a;
   setStrength(win, win.strength - lose.strength * (0.2 + rnd() * 0.15));
   setStrength(lose, lose.strength * (0.35 + rnd() * 0.2));
@@ -358,8 +359,12 @@ export function warDay() {
   const undNodes = Object.values(W.nodes).filter(n => n.owner === 'undead').length, dead = !!S.flags.garmadonSlain;
   // Audit V1: Nachschub statt Lawine — Untote wachsen gedeckelt (nach Garmadon gar nicht mehr), Valen nach dem Korn aller eigenen Städte
   const valenGrain = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'valen' && S.towns[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
-  for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : (valenGrain > 10 ? 3 : 0);
+  // Hunter-Befund (01.10.): ohne Gegengewicht fielen in 15 Tagen alle Knoten. Je mehr Land verloren ist, desto mehr greift Valen zu
+  // den Waffen (+0,3 je Untotenknoten, bis +3); ohne Korn wächst es langsam statt gar nicht.
+  for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : (valenGrain > 10 ? 3 : 1) + Math.min(3, 0.3 * undNodes);
   clampArmies();
+  // Besatzungen füllen sich täglich wieder auf (+2): Valen in Städten bis 20, sonst bis 10; höhere Startbesatzungen bleiben.
+  for (const [k, n] of Object.entries(W.nodes)) if (n.owner) { const cap = n.owner === 'valen' && S.towns[k] ? 20 : 10; if (n.garrison < cap) n.garrison = Math.min(cap, n.garrison + 2); }
   // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt (die Toten nur, solange Garmadon lebt)
   if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
     const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard';
@@ -367,7 +372,13 @@ export function warDay() {
     W.armies.push(newArmy('undead', base, 30)); log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
   const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt */
-  if (muster && !W.armies.some(a => a.faction === 'valen') && chance(0.3)) { W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
+  if (!W.armies.some(a => a.faction === 'valen')) {
+    if (muster && chance(0.3 + 0.04 * undNodes)) { W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
+    else if (!muster && W.nodes.northcity && chance(0.5)) {   /* keine eigene Stadt mehr: die Hauptstadt schickt Entsatz */
+      W.armies.push(newArmy('valen', 'northcity', 45)); log('Aus Varonheim zieht ein Entsatzheer gegen Nordfurt.', 'faction');
+      chronicle('Entsatz aus Varonheim', 'news', 'König Varon schickt seine Garde, um Nordfurt zurückzuholen.');
+    }
+  }
   cleanupArmies();   // S15: verhungerte Heere verschwinden
   economyDay();
 }
