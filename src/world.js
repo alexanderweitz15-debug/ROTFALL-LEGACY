@@ -1936,6 +1936,7 @@ export const DUNGEONS = {
   kerker: { name: 'Kerker', floor: 'dfloor', amb: 'blight', enter: 'Die Tür fällt ins Schloss. Stroh, Eisen, der Geruch von zu vielen Leuten auf zu wenig Raum.' },   // Phase 2 §26
   omega: { name: 'Krater des Gefallenen Sterns', floor: 'scree', amb: 'blight', open: true, enter: 'Du trittst durch den Riss. Der Himmel ist rot, der Boden warm. In der Mitte des Kraters atmet etwas, das größer ist als ein Haus.' },   // Phase 7
   garmadon: { name: 'Gruft des Toten Königs', floor: 'dfloor', amb: 'blight', enter: 'Stufen aus Knochen führen hinab. Die Luft ist warm und riecht nach altem Blut. Irgendwo unten schlägt etwas wie ein Herz.' },   // Phase 6 MP2 §63
+  zwerge: { name: 'Tiefhall — Königsstadt der Zwerge', floor: 'dfloor', amb: 'frozen', bright: true, enter: 'Unter der toten Halle brennt Licht. Hämmer, Stimmen, der Geruch von Bier und Kohle: die Zwerge leben.' },   /* Nutzer §5d.6 */
   vault: { name: 'Gewölbe', floor: 'dfloor', amb: 'blight', enter: '' },   // S13: zufällige Gewölbe (game.js buildVault)
   sky: { name: 'Himmelsinsel von Aurelion', floor: 'marble', amb: 'aurel', open: true, enter: 'Licht, Wind, Stille. Unter dir liegt Aurelion wie eine Karte aus Messing und Stein.' },   // S12 E
   isle: { name: 'Tangkron, Gischtinseln', floor: 'grass', amb: 'coast', open: true, enter: 'Salz in der Luft, Möwen, Teer. Tangkron riecht nach Fisch und Streit. Auf dem Hügel liegt ein Schiff kieloben — dort wohnt Weißbart.' },   // S14 Seevolk

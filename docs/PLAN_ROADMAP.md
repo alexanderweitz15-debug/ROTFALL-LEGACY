@@ -528,7 +528,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 3. **Eigene Siedlung (P14):** Ort frei wählbar; Mischung beim Bauen (wichtige Bauten selbst setzen, Wohnhäuser bauen Siedler in Zonen).
 4. **König Varon:** Mischung aus hartem Kriegskönig, schwachem, von Adligen gelenktem König und Paranoia (verfeindet mit Aurelion) — **neue Burgstadt im Norden** mit Thronsaal, Hof, Kerker, Adel.
 5. **Schwarze Feste (GEBAUT):** Hauptstadt der Untoten (Hof der Stillen Schar, Händler, Rang-Aufträge), Totentempel (Seelenhandel, Leichenzüge, Rituale), nach Garmadon **eroberbar** (Belagerung als Großereignis).
-6. **Tiefhall:** lebende Zwerge in einer **Bergstadt** auf einer tieferen Ebene (Händler, Schmiede mit Königseisen).
+6. **Tiefhall (GEBAUT):** lebende Zwerge in einer **Bergstadt** auf einer tieferen Ebene (Händler, Schmiede mit Königseisen).
 7. **Banden (GEBAUT):** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
 8. **Handwerk (GEBAUT):** Rezepte an Esse/Werkbank/Kessel, **Qualität nach Fertigkeit**, Spezialmaterialien (Königseisen, Magitech).
 9. **Seevolk:** **freie Seefahrt** mit eigenem Schiff, mehrere Inseln, Seehandel und Piraterie.
