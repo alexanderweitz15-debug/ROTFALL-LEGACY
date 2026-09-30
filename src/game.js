@@ -138,7 +138,7 @@ function speedOf(c) {
   if (stat(c, 'grabbed')) s *= 0.5;                                   // Griff des Wiedergängers
   if (stat(c, 'shackled')) s *= 0.5;                                  // S12 E: Fußkette (Schuldknecht, Steinbruch)
   s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
-  return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c) * (c === S.player && S.dbg?.speed ? S.dbg.speed : 1);   // Debug-Tempo
+  return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c) * limpMul(c) * (c === S.player && S.dbg?.speed ? S.dbg.speed : 1);   // Debug-Tempo
 }
 
 // ================= Items =================
@@ -2489,6 +2489,7 @@ function eliteKit(e) {
 }
 function think(e, dt) {
   if (!e.alive) return;
+  if (e.downed && e.kind === 'npc' && !e.brawlKO && chance(dt / 5000) && dist(e, S.player) < 520) float(e, pick(['Hilfe …', 'Bitte … helft mir …', 'Hierher …', 'Ich blute …']), 'rgba(220,160,140,ALPHA)');   /* §5f: Verletzte rufen */
   if (e.eliteKey) eliteTick(e, dt);
   if (e.kind === 'npc' && !e.eliteChecked) eliteKit(e);
   if (e.kind === 'enemy' && !(e.status && e.status.length) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen (updateEnemy tat fern ohnehin nichts)
@@ -2737,7 +2738,8 @@ function tickCombatant(c, dt) {
   // Statuszeiten
   if (c.status && c.status.length) {
     if (c === S.player) for (const s of c.status) ((S.codex ||= {}).states ||= {})[s.key] = 1;   // S15 Kodex: erlebte Zustände
-    for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }
+    for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && (c.vx || c.vy) && chance(dt / 450) && dist(c, S.player) < 700) fx(c.x + ri(-4, 4), c.y + 6, 'blood', 1);   /* §5f: Blutspur */
+      if (s.key === 'bleeding' && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }
       if (s.key === 'regrowth' && !(c.downed && c !== S.player)) B.heal(c, s.heal * dt / 1000);   // S15 (Nutzer): am Boden heilt sich kein NPC selbst
       if (s.key === 'burning') { s.acc = (s.acc || 0) + dt / 1000 * (S.weather === 'rain' ? 1.5 : 3); if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Feuer', false, 'fire'); credit(c, byId(s.src), n); } }   // S15 P4
       if (s.key === 'poisoned') { s.acc = (s.acc || 0) + dt / 1000 * 4; if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Gift'); credit(c, byId(s.src), n); } } }
@@ -2938,6 +2940,20 @@ const FEEL = {
 const stagOf = c => { const w = c && c.equip && c.equip.weapon, it = w && ITEMS[w.key]; return it && it.stagger ? Math.min(1.2, it.stagger * 0.6) : feelOf(c).stag; };
 const feelOf = c => { const w = c && c.equip && c.equip.weapon; return FEEL[(w && ITEMS[w.key]?.wtype) || (c && c.mtype === 'gorak' ? 'great' : 'none')]; };
 const earVol = e => clamp(1 - dist(S.player, e) / 650, 0, 1);    // Lautstärke nach Entfernung zum Spieler
+// ================= Animation und Kampfgefühl (Nutzer §5f) =================
+// Kombos: Wer im Nahkampf im Stand ohne Pause nachschlägt (spätestens 0,6 s nach dem Schwung), zählt mit; der dritte Schlag ist ein Wuchtschlag
+// (+30 % Schaden, der Gegner taumelt, Ring und Wackeln), dauert aber etwas länger. Humpeln: ist nur ein Bein ausgefallen, geht man im
+// ungleichen Takt (schnell–langsam). Blutende hinterlassen eine Spur, Verletzte am Boden rufen um Hilfe, NPCs gestikulieren im Gespräch.
+function comboStep(c, it) {
+  if (c !== S.player && !c.coopPilot) return; if (it?.ranged || c.vx || c.vy) { c.combo = 0; c.comboFin = false; return; }   /* nur im Stand: Wegrennen und Zuschlagen baut keine Kombo auf */
+  const now = performance.now(); c.combo = now < (c.comboT || 0) + 600 ? (c.combo || 0) + 1 : 1; c.comboFin = c.combo >= 3; c.comboShown = false;
+  if (c.comboFin) { c.combo = 0; if (!S.flags.comboHint) { S.flags.comboHint = 1; log('Kombo: Drei Schläge ohne Pause — der dritte ist ein Wuchtschlag (+30 % Schaden, der Gegner taumelt).', 'combat'); } }
+  c.comboT = now + (it ? it.speed : 450) * (c.comboFin ? 1.15 : 1);
+}
+function limpMul(c, now = performance.now()) {
+  if (!c.body || !(c.vx || c.vy) && c !== S.player) return 1; const l = c.body.lleg.hp <= 0, r = c.body.rleg.hp <= 0;
+  return l !== r ? 0.7 + 0.3 * Math.abs(Math.sin(now / 170)) : 1;
+}
 function attack(c, forceDir) {
   if (c.swing > 0 || c.atkCd > 0 || c.downed || !c.alive) return;
   if (dualOn(c)) c.dualTurn = !c.dualTurn; else c.dualTurn = false;   /* Zweiwaffen: abwechselnd rechts und links */
@@ -2950,6 +2966,7 @@ function attack(c, forceDir) {
   if (it && it.energy && cellUser(c) && (w.charge ?? 100) < it.energy) { if (c === S.player && !(c.cellWarn > performance.now())) { c.cellWarn = performance.now() + 1500; UI.toast('Energie leer — Energiezelle benutzen (Inventar oder Leiste)', 2600); } return; }   /* Roadmap C.10 */
   if (it && it.manaShot) { if ((c.mana || 0) < it.manaShot) { if (c === S.player && !(c.manaWarn > performance.now())) { c.manaWarn = performance.now() + 1500; UI.toast(c.maxMana ? 'Zu wenig Mana für den Zauberstab' : 'Den Zauberstab führt nur, wer Magie gelernt hat (Magier, Kleriker, Paladin).'); } return; } c.mana -= it.manaShot; }
   c.stamina -= cost;
+  comboStep(c, it);   /* Nutzer §5f: Kombos */
   c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift'))) * (1 - Math.min(0.25, (it && c.skills ? c.skills[it.skill] || 0 : 0) * 0.0025));   // S13 (Kenshi): geübte Hand schlägt schneller
   if (it && it.wtype === 'bow') c.swingDur *= 1.15;                   // S15 (Nutzer): Spannen dauert sichtbar — der Schuss fällt erst bei 75 % (swingHit)
   if (dualOn(c)) { c.swingDur *= 0.85; }   /* Zweiwaffen: schneller */
@@ -3216,6 +3233,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.titleClass === 'necromancer' && !node(attacker, 'k_lone')) dmg *= 0.85;             // Makel: Die Toten zehren
   if ((attacker.status || []).some(s => s.key === 'bloodtoll')) dmg *= 0.8;   // Phase 6: Blutzoll an Garmadon
   if (target.exposed > performance.now()) dmg *= 1.25;                   // S15 P3: offen nach einem schweren Angriff
+  if (attacker.comboFin) { dmg *= 1.3; target.stagger = Math.max(target.stagger || 0, 700); if (!attacker.comboShown) { attacker.comboShown = true; float(target, 'Wucht!', 'rgba(240,200,120,ALPHA)'); camShake(4, 140); S.fx.push({ x: target.x, y: target.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.2, life: 350, maxLife: 350 }); } }   /* §5f: dritter Schlag der Kombo */
   if (setOf(attacker)?.bonus.holy && target.faction === 'undead') dmg *= 1 + setOf(attacker).bonus.holy;   // S13: Weißer Orden
   if (target.faction === 'undead' || MONSTERS[target.mtype]?.faction === 'undead') dmg *= 1 + afx(attacker, 'slayer') + elx(attacker, 'slayer');   // S15 P2: Totenbann
   if ((attacker.status || []).some(s => s.key === 'omegawrath')) dmg *= target.faction === 'undead' ? 1.35 : 1.1;   // Phase 7: Gebet an Omega; S13 (Nutzer): gegen Untote stärker
@@ -8269,7 +8287,8 @@ function ensureCityCharacter() {
     const mk = (name, prof, i, o = {}) => { const a = i * 1.3 + 0.4, q = freeSpotNear('world', cx + Math.round(Math.cos(a) * (4 + i)), cy + Math.round(Math.sin(a) * (3 + i * 0.5)), 2); if (!q) return null;
       const c = makeChar({ name, prof, x: q.x, y: q.y, level: 4, faction: 'aurel', traits: [pick(['fleißig', 'mürrisch', 'gütig'])] });
       Object.assign(c, { cityFace: k, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y } }, o); S.ents.world.push(c); return c; };
-    const [ln, lp, role, lg] = F.lead; mk(ln, lp, 0, { cityRole: role, greet: lg });
+    const [ln, lp, role, lg] = F.lead;   /* Fehlersuche §5d.10: Laden sofort mit Waren, nicht erst beim zweiten Gespräch (cityChoices setzte shop/pool zu spät für den Knopf im selben Aufruf) */
+    mk(ln, lp, 0, { cityRole: role, greet: lg, ...(role === 'factoryShop' ? { shop: true, market: false, pool: ['ersatzteile', 'ersatzteile', 'ersatzteile', 'energiezelle', 'energiezelle', 'automatenkern', 'tools', 'ingot'] } : {}) });
     let i = 1; for (const profs of F.folk) for (const pr of profs) { mk(pick(/in$|e$/.test(pr) ? FIRST_F : FIRST_M), pr, i, { greet: pick(F.greet) }); i++; }
     if (k === 'gelenkhall') for (const c of S.ents.world.filter(e => e.cityFace === k && /Patient/.test(e.prof || '')) ) if (c.body) { c.body.larm.mech = 2; c.body.larm.mechCond = 70; }
   }
@@ -10988,6 +11007,7 @@ function talk(npc) {
   if (npc.map === 'tower' && npc.name === 'Tuvi') return tuviTalk(npc);
   if (npc.downed && startRevive(npc)) return;
   const p = S.player, rel = S.relations[npc.key] ?? 0, now = clock();
+  if (npc.kind === 'npc' && !npc.robot && !(npc.act?.until > performance.now())) gesture(npc, rel < -20 ? 'abwehren' : pick(['zeigen', 'achsel', 'zeigen']), 1200, p);   /* §5f: Gesten im Gespräch */
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
   if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
@@ -16186,6 +16206,15 @@ export function selftest() {
       const g0 = S.gold, f0 = S.factions.sea || 0; ownArrive({ to: 'isle', pirated: true }); const prize = S.gold > g0 && S.factions.sea === f0 - 12 && cargoUsed() > 0 && S.ship.at === 'isle';
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
+  }));
+  ok('Animation und Kampfgefühl (Nutzer §5f): dritter Schlag ist Wuchtschlag mit mehr Schaden, mit einem Bein humpelt man im Takt, NPCs gestikulieren im Gespräch', sandbox(() => {
+    const p = stage(); p.equip.weapon = mkItem('longsword'); p.stamina = 999; const t = actor(p.x + 30, p.y, { kind: 'npc' });
+    const it = ITEMS.longsword; comboStep(p, it); comboStep(p, it); const two = !p.comboFin; comboStep(p, it); const fin = p.comboFin;
+    const bear = spawnEnemy('bear', '__a', 12, 10); bear.x = p.x + 30; bear.y = p.y;
+    const dmgOf = f => { let sum = 0; for (let i = 0; i < 12; i++) { B.fullHeal(bear); bear.downed = false; const h = bear.hp; p.comboFin = f; p.comboShown = true; hit(p, bear, 1); sum += h - bear.hp; } return sum; }; const d1 = dmgOf(false), d2 = dmgOf(true); p.comboFin = false;
+    p.body.lleg.hp = 0; const lm = [0, 85, 170, 255].map(n => limpMul(p, n)); const limp = Math.min(...lm) < 0.8 && Math.max(...lm) > 0.95; p.body.lleg.hp = p.body.lleg.max;
+    const n = actor(p.x + 40, p.y, { kind: 'npc', name: 'Gesprächspartner' }); n.key = 'probe_talk'; talk(n); const gest = n.act?.kind === 'gesture'; UI.closeDialogue();
+    return two && fin && d2 > d1 * 1.1 && limp && gest;
   }));
   ok('Nebenstädte (Nutzer §5d.10): jede der vier Städte hat eigene Bauten, Leute und einen Dienst (Segen, Werft, Fabrikladen, Prothesenpflege)', sandbox(() => {
     const p = stage(), sh = S.ship, fd = S.flags.serinDay; S.gold = 500;
