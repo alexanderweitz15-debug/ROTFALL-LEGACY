@@ -1,14 +1,14 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=21';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=21';
-import * as HB from './buildings.js?v=21';
-import { ITEMS, MONSTERS } from './data.js?v=21';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=21';
-import * as SP from './sprites.js?v=21';
-import { trailPt, WAGON_GAP } from './sim.js?v=21';
-import { ICON_R } from './iconsR.js?v=21';
-import { airPos, airPt } from './economy.js?v=21';
-import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=21';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=22';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=22';
+import * as HB from './buildings.js?v=22';
+import { ITEMS, MONSTERS } from './data.js?v=22';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=22';
+import * as SP from './sprites.js?v=22';
+import { trailPt, WAGON_GAP } from './sim.js?v=22';
+import { ICON_R } from './iconsR.js?v=22';
+import { airPos, airPt } from './economy.js?v=22';
+import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=22';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
