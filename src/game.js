@@ -1835,7 +1835,7 @@ export function newGame(cfg) {
   const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0, frei: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
@@ -1859,7 +1859,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -1962,7 +1962,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
   SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
-  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
   for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);
   if (!gone?.sky && !S.ents.sky.some(e => e.kind === 'prop')) S.ents.sky.push(...FRESH.sky);
@@ -2043,8 +2043,9 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
+  ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
     else { const q = ARRIVAL.world('none'); S.ents.vault = []; S.map = 'world'; Object.assign(S.player, { map: 'world', x: q.x, y: q.y }); S.ents.world.push(S.player); } }
@@ -4839,6 +4840,7 @@ function shopRefusal(npc) {
   if (!npc.shop) return 'Das ist kein Händler.';
   if (npc.shopClosed > clock()) return 'Der Stand ist zu, bis sich die Lage beruhigt.';
   if (npc.till && (hourNow() >= npc.till || hourNow() < 7)) return 'Der Laden ist zu. Morgen früh wieder.';
+  if (npc.dwarf && !S.flags.dwarfFriend) return 'Die Zwerge handeln erst, wenn der König dich als Freund der Halle anerkennt.';   /* §5d.6 */
   if (npc.keepCourt && !deadWelcome()) return 'Die Schwarze Feste handelt nur mit denen, die zu den Toten gehören (Rang bei den Toten oder Pakt).';   /* Schwarze Feste */
   if (npc.town === 'vharnholm' && !deadWelcome()) return 'Vharnholm handelt nur mit denen, die zu ihnen gehören.';
   if (npc.faction && repTier(npc.faction)?.name === 'Verhasst') return 'Nicht für euch. Nicht für Gold.';
@@ -4945,7 +4947,7 @@ function doInteract(target = null) {
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
 // Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
-const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from === 'zwerge' && S.ents.deep.find(e => e.portal === 'zwerge'); return g ? freeSpotNear('deep', g.x / TS | 0, (g.y / TS | 0) + 2, 1) : MAPS.deep.entry; }, zwerge: () => buildDwarfCity(), garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
   world: from => {
     if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
     if (from === 'deck' && S.airLand) { const [ax, ay] = S.airLand; S.airLand = null; return freeSpotNear('world', ax | 0, ay | 0, 5); }   /* Roadmap P7: Luftschiff landet am Mast (oder notlandet im Land) */
@@ -8019,6 +8021,60 @@ function gobDay() {
     else if (G.lvl >= 3 && chance(0.4)) { G.pts = Math.max(GOB_LVL[G.lvl], G.pts - 5); log('Ordensritter überfallen Grubenhort: „Ungeziefer bleibt Ungeziefer.“ Die Stadt verliert Zeit beim Wiederaufbau.', 'war'); }
     else log('Der Weiße Orden predigt gegen das „Goblinnest“ im Süden.', 'world'); }
 }
+// ================= Tiefhall — Königsstadt der Zwerge (Nutzer §5d.6) =================
+// Unter der toten Halle (Karte 'deep') führt eine Treppe aus dem Thronsaal hinab in die lebende Königsstadt (Karte 'zwerge'). Sie wird
+// wie ein Gewölbe beim Betreten neu gebaut (feste Form, nichts davon gespeichert). König Durgrim erkennt dich als Freund der Halle an,
+// wenn du den Wächter der alten Hallen erschlagen hast oder 3 Eisenbarren als Gastgeschenk bringst; erst dann handeln die Zwerge.
+// Runenschmiedin Hilda verkauft Königseisen (günstiger als oben), Zwergenaxt und Runenhammer; dazu Händler, Brauerei und Mine.
+function ensureDwarfGate() {
+  if (!MAPS.deep || !S.ents.deep || S.ents.deep.some(e => e.portal === 'zwerge')) return;
+  const q = freeSpotNear('deep', 44, 7, 2); if (!q) return;
+  S.ents.deep.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'deep', x: q.x, y: q.y, r: 14, solid: false, portal: 'zwerge', transient: true, label: 'Treppe hinab — Licht und Hammerschläge' });
+}
+function buildDwarfCity() {
+  const w = 64, h = 50, tiles = new Uint8Array(w * h).fill(T.DWALL); MAPS.zwerge = { w, h, tiles, ver: ((MAPS.zwerge?.ver) || 0) + 1 };
+  const rect = (x, y, rw, rh) => { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) tiles[j * w + i] = T.DFLOOR; return { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1) }; };
+  const entry = rect(28, 41, 8, 6), hall = rect(12, 22, 40, 14), king = rect(22, 4, 20, 12), forge = rect(2, 21, 9, 14), brew = rect(53, 21, 9, 14), mine = rect(44, 38, 16, 8);
+  rect(30, 36, 4, 5); rect(30, 16, 4, 6); rect(11, 26, 2, 4); rect(51, 26, 3, 4); rect(52, 35, 3, 4);
+  const P = [], prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'zwerge', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, ...o }; P.push(e); return e; };
+  prop('mine_exit', entry.cx, entry.y + entry.h - 1, { portal: 'deep', label: 'Hinauf in die alte Tiefhall' });
+  for (const R0 of [entry, hall, king, forge, brew, mine]) { prop('torch', R0.x + 1, R0.y, {}); prop('torch', R0.x + R0.w - 2, R0.y, {}); }
+  for (let i = 0; i < 6; i++) { prop('column', hall.x + 3 + i * 7, hall.y + 2, { solid: true }); prop('column', hall.x + 3 + i * 7, hall.y + hall.h - 3, { solid: true }); }
+  for (let i = 0; i < 4; i++) prop('stall', hall.x + 8 + i * 8, hall.cy, { solid: true, r: 12 });
+  prop('fountain', hall.cx, hall.cy + 3, { solid: true, r: 14 }); prop('big_gear', hall.x + 2, hall.cy, { solid: true });
+  prop('throne', king.cx, king.y + 2, { solid: true, r: 12 }); for (let i = 0; i < 4; i++) prop('banner_torn', king.x + 3 + i * 5, king.y, {}); prop('column', king.x + 3, king.cy + 2, { solid: true }); prop('column', king.x + king.w - 4, king.cy + 2, { solid: true });
+  prop('forge', forge.cx, forge.y + 2, { solid: true, r: 14 }); prop('anvil', forge.cx, forge.cy + 1, { solid: true }); prop('weapon_rack', forge.x + 1, forge.cy + 3, { solid: true });
+  prop('cask_rack', brew.cx, brew.y + 1, { solid: true, r: 14 }); prop('barrel', brew.x + 1, brew.cy, { solid: true }); prop('barrel', brew.x + brew.w - 2, brew.cy, { solid: true });
+  for (let i = 0; i < 2; i++) { prop('table', brew.cx, brew.cy + 1 + i * 4, { solid: true, r: 14 }); prop('bench', brew.cx - 2, brew.cy + 1 + i * 4, {}); prop('bench', brew.cx + 2, brew.cy + 1 + i * 4, {}); }
+  for (let i = 0; i < 5; i++) prop('ore_node', mine.x + 2 + i * 3, mine.y + 1 + (i % 2) * 5, { solid: true, harvest: 'iron', label: 'Erzader' }); prop('crane', mine.x + mine.w - 2, mine.cy, { solid: true });
+  S.ents.zwerge = P; MAPS.zwerge.entry = { x: entry.cx * TS + TS / 2, y: (entry.y + 2) * TS };
+  const HAIR = ['#8a3a1a', '#5a3a22', '#a8a090', '#3a2a1a', '#c86a2a'], dw = (name, prof, tx, ty, o = {}) => {
+    const c = makeChar({ name, prof, x: tx * TS + TS / 2, y: ty * TS + TS / 2, map: 'zwerge', level: 10, faction: null, build: 'gedrungen', traits: [pick(['mutig', 'ehrgeizig', 'loyal', 'misstrauisch'])],
+      pal: { skin: pick(['#c89a78', '#b88a68', '#d6a888']), hair: HAIR[(tx + ty) % HAIR.length], cloth: pick(['#2a3a6a', '#4a3a2a', '#3a4a3a', '#5a2a22']) } });
+    Object.assign(c, { dwarf: true, transient: true, visitor: true, build: 'gedrungen', anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.zwerge.push(c); return c; };
+  dw('Durgrim', 'Zwergenkönig', king.cx, king.y + 4, { dwarfKing: true, level: 20, greet: '„Ein Oberirdischer. In meiner Halle. Das gab es seit dreihundert Jahren nicht. Sprich.“' });
+  dw('Hilda Eisenfaust', 'Runenschmiedin', forge.cx + 2, forge.cy + 2, { shop: true, market: false, pool: ['koenigseisen', 'koenigseisen', 'koenigseisen', 'zwergenaxt', 'runenhammer', 'iron_helm', 'chain_hauberk', 'ingot'], greet: '„Königseisen. Kalt geschmiedet, heiß gehärtet. Oben kostet es das Doppelte.“' });
+  dw('Balin Silberbart', 'Zwergenhändler', hall.x + 10, hall.cy + 1, { shop: true, market: false, pool: ['potion', 'potion', 'bandage', 'bread', 'dried_meat', 'ingot', 'tools', 'pickaxe', 'ersatzteile'], greet: '„Alles, was man unter dem Berg braucht. Und manches, was man oben vermisst.“' });
+  dw('Orm', 'Braumeister', brew.cx, brew.y + 3, { shop: true, market: false, pool: ['bread', 'dried_meat', 'potion', 'wasserschlauch'], greet: '„Pilzbier. Das einzige Bier, das im Dunkeln besser wird.“' });
+  for (const [x, y] of [[entry.x + 1, entry.y + 2], [entry.x + entry.w - 2, entry.y + 2], [king.x + 2, king.y + king.h - 2], [king.x + king.w - 3, king.y + king.h - 2]]) { const g = dw(pick(['Thrak', 'Borin', 'Gunnar', 'Dvalin', 'Kili']), 'Zwergenwache', x, y, { brave: true, greet: '„Die Halle ist sicher. Solange wir stehen.“' }); g.equip.weapon = mkItem('zwergenaxt'); recalc(g); }
+  for (let i = 0; i < 3; i++) dw(pick(['Nori', 'Ori', 'Frerin', 'Grimbald', 'Ulfa']), 'Bergmann', mine.x + 3 + i * 4, mine.cy, { greet: pick(['„Tiefer. Immer tiefer. Da unten singt das Eisen.“', '„Die Toten oben haben uns vergessen. Gut so.“']) });
+  for (let i = 0; i < 4; i++) dw(pick(['Hedda', 'Svala', 'Tordis', 'Brokk', 'Fili', 'Asta']), pick(['Steinmetz', 'Zwergenhändler', 'Bergmann']), hall.x + 5 + i * 9, hall.y + 4 + (i % 2) * 6, { greet: pick(['„Oberirdische riechen nach Regen. Seltsam.“', '„Der König sagt, die Zeit des Verbergens ist bald vorbei.“', '„Hast du den Himmel gesehen? Wie ist er?“']) });
+  indexSolids('zwerge');
+  return MAPS.zwerge.entry;
+}
+function dwarfChoices(npc, choices) {
+  if (!npc.dwarfKing) return;
+  choices.unshift({ text: 'Wer seid ihr?', fn: () => UI.dialogue(npc, '„Die letzten der Tiefhall. Als die Toten die obere Halle nahmen, sind wir tiefer gegangen und haben die Treppe vergessen lassen. Dreihundert Jahre. Wir schmieden, wir brauen, wir warten.“', [{ text: 'Weiter', fn: () => talk(npc) }]) });
+  if (S.flags.dwarfFriend) return;
+  choices.unshift({ text: 'Ich komme als Freund.', fn: () => {
+    if (S.flags.wardenSlain) { S.flags.dwarfFriend = 1; chronicle('Freund der Tiefhall', 'legend', 'König Durgrim öffnet die Königsstadt für einen Oberirdischen.'); UI.toast('FREUND DER TIEFHALL', 2800);
+      return UI.dialogue(npc, '„Du hast den Wächter der alten Hallen erschlagen. Er hielt uns dreihundert Jahre hier unten. Du bist Freund der Halle — meine Schmiede und Händler stehen dir offen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); }
+    UI.dialogue(npc, '„Freunde bringen Geschenke. Drei Eisenbarren für die Esse — oder erschlag den Wächter, der oben in der Gruft der alten Halle haust.“', [
+      { text: 'Drei Eisenbarren überreichen', fn: () => { if (!hasItem(S.player, 'ingot', 3)) return UI.dialogue(npc, '„Das sind keine drei Barren.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+        removeItem(S.player, 'ingot', 3); S.flags.dwarfFriend = 1; chronicle('Freund der Tiefhall', 'legend', 'König Durgrim nimmt ein Gastgeschenk an.'); UI.toast('FREUND DER TIEFHALL', 2800);
+        UI.dialogue(npc, '„Gutes Eisen. Du bist Freund der Halle. Hilda wird dir Königseisen verkaufen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } },
+      { text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+}
 function ensureGobCity() {
   const G = S.gobCity; if (!S.flags.goblinsFreed || !G?.lvl) return; const [cx, cy] = gobCenter();
   const have = S.ents.world.filter(e => e.gobCity).length, want = G.lvl * 7; if (have >= want) return;
@@ -9221,8 +9277,9 @@ function buildVault(site, floor) {
   MAPS.vault.ver = (MAPS.vault.ver || 0) + 1; DUNGEONS.vault.darker = mod === 'dunkel'; S.vaultMod = mod; if (mod) DUNGEONS.vault.name += ` (${mod})`;
   const P = [], prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'vault', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 12, solid: false, transient: true, ...o }; P.push(e); return e; };
   const first = rooms[0], last = rooms[rooms.length - 1], prog = (S.vaults ||= {})[site] ||= { best: 0, cleared: {}, looted: false };
+  const cleared = (prog.cleared[floor] || -99) + 7 > (S.day | 0);
   prop('mine_exit', first.cx, first.y + first.h - 1, { portal: 'world', label: `Aufstieg (${V.name} verlassen)` });
-  const locked = floor < V.floors && rooms.length > 3 && r2() < 0.5;   /* §5e.3: Hebeltür */
+  const locked = floor < V.floors && rooms.length > 3 && r2() < 0.5 && !cleared;   /* S15 Fehlersuche §5e.3: gesäuberte Ebene bleibt beim Neubau offen — kein erneutes Hebelrätsel ohne Wächter */
   if (floor < V.floors) prop('mine_entrance', last.cx, last.cy, { portal: 'vault', vaultNext: true, vaultLocked: locked, label: locked ? 'Hinab (verriegelt — irgendwo ist ein Hebel)' : `Hinab zur Ebene ${floor + 1}` });
   if (locked) { const o = rooms[1 + Math.floor(r2() * (rooms.length - 2))]; prop('lever', o.x + o.w - 2, o.y + 1, { solid: true, r: 8, lever: true, label: 'Hebel' }); }
   { const cand = rooms.slice(1, -1).filter(o => o.y + o.h + 5 < h - 1 && [...Array(5)].every((_, dy) => [-2, -1, 0, 1, 2].every(dx => tiles[(o.y + o.h + dy) * w + o.cx + dx] === T.DWALL)));   /* §5e.3: Geheimkammer hinter einer Wand */
@@ -9230,7 +9287,6 @@ function buildVault(site, floor) {
       MAPS.vault.secret = { x: o.cx, y: o.y + o.h, found: false };
       prop('chest', o.cx, o.y + o.h + 2, { solid: true, loot: vaultLoot(Math.min(5, V.tier + 1)), lootBonus: V.tier + 1, label: 'Verborgene Truhe' }); } else MAPS.vault.secret = null; }
   for (const o of rooms) { if (mod !== 'dunkel' || o === first) prop('torch', o.x + 1, o.y, {}); for (let i = 0; i < 2; i++) prop(V.deco[R(0, V.deco.length - 1)], R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { solid: i === 0, r: 9 }); }
-  const cleared = (prog.cleared[floor] || -99) + 7 > (S.day | 0);
   const endBoss = V.endless && floor % 5 === 0;   /* Endlos: alle fünf Ebenen Wächter und Truhe */
   if (endBoss && !(prog.chests ||= {})[floor]) prop('chest', last.cx - 2, last.y + 1, { solid: true, loot: vaultLoot(Math.min(5, 2 + (floor / 5 | 0))), lootBonus: Math.min(6, 2 + (floor / 5 | 0)), label: `Truhe der Ebene ${floor}`, schlundChest: floor });
   if (floor === V.floors && !prog.looted) prop('chest', last.cx, last.y + 1, { solid: true, loot: vaultLoot(V.tier), lootBonus: V.tier, vaultHoard: site, label: `Hort — ${V.name}` });
@@ -10756,7 +10812,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -13208,6 +13264,8 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
+      'Tiefhall: Freund der Halle': () => { S.flags.dwarfFriend = 1; UI.toast('Freund der Tiefhall'); },
       'Goblins: Grubenhort wächst (+20)': () => { S.flags.goblinsFreed = true; gobGrow(20, '(Debug)'); },   /* Nutzer §5e.9 */
       'Goblins: Grubenhort Stufe 4': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 70 - (S.gobCity?.pts || 0)), '(Debug)'); },
       'Gewölbe: alle geheimen Gewölbe aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].hidden) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Geheime Gewölbe auf der Karte'); },   /* Nutzer §5e.3 */
@@ -15851,6 +15909,17 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Tiefhall (Nutzer §5d.6): Treppe im Thronsaal der alten Halle, Königsstadt mit König, Schmiedin (Königseisen), Händlern und Wachen, alles erreichbar; Handel erst als Freund der Halle', sandbox(() => {
+    const p = stage(), f0 = S.flags.dwarfFriend, z0 = S.ents.zwerge, mz = MAPS.zwerge;
+    try { ensureDwarfGate(); const gate = S.ents.deep.some(e => e.portal === 'zwerge');
+      const at = buildDwarfCity(), M = MAPS.zwerge, Z = S.ents.zwerge, king = Z.find(e => e.dwarfKing), smith = Z.find(e => e.pool?.includes('koenigseisen'));
+      const free = (x, y) => x >= 0 && y >= 0 && x < M.w && y < M.h && !SOLID.has(M.tiles[y * M.w + x]), seen = new Set(), q = [[at.x / TS | 0, at.y / TS | 0]];
+      while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || !free(x, y)) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+      const reach = Z.filter(e => e.dwarf).every(e => seen.has((e.x / TS | 0) + ',' + (e.y / TS | 0)));
+      S.flags.dwarfFriend = 0; const shut = !!shopRefusal(smith); S.flags.dwarfFriend = 1; const open = !shopRefusal(smith) || /zu/.test(shopRefusal(smith));
+      return gate && !!king && !!smith && Z.filter(e => e.dwarf).length >= 12 && reach && shut && open && Z.some(e => e.portal === 'deep');
+    } finally { S.flags.dwarfFriend = f0; S.ents.zwerge = z0; MAPS.zwerge = mz; }
   }));
   ok('Goblins (Nutzer §5e.9): Grubenhort wächst täglich und durch Spenden, jede Stufe baut mehr, Grisk wirbt Goblin-Helden an, Dodon zieht nur ins eigene Dorf', sandbox(() => {
     const p = stage(), f0 = { ...S.flags }, g0 = S.gobCity, r0 = { ...S.res }, st0 = S.settlement, fg = S.factions.goblin, W0 = S.ents.world.slice();

@@ -550,3 +550,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Menschen reagieren** (ab Grubenstadt): Valens Händler und Aurelions Gelehrte kommen (Fortschritt +1), der Weiße Orden predigt dagegen und überfällt ab Tunnelstadt manchmal die Stadt (Rückschlag).
 - **Noch offen:** die Goblin-Titelklasse.
 - **Debug:** „Goblins: Grubenhort wächst (+20)“, „Goblins: Grubenhort Stufe 4“. Probe „Goblins (Nutzer §5e.9)“.
+
+## Runde: Tiefhall — Königsstadt der Zwerge (Nutzer §5d.6, Version 21)
+- **Zugang:** Im Thronsaal der alten, toten Tiefhall führt eine Treppe hinab („Licht und Hammerschläge“) in die lebende Königsstadt. Zurück geht es über die Treppe am Eingang.
+- **Die Stadt:** Markthalle mit Säulen, Ständen und Brunnen, Königshalle mit Thron, Esse der Runenschmiedin, Brauerei mit Tischen, Mine mit Erzadern (Eisen). Gut 15 Zwerge: König Durgrim, Runenschmiedin Hilda Eisenfaust, Händler Balin Silberbart, Braumeister Orm, Wachen mit Zwergenäxten, Bergleute, Steinmetze.
+- **Freund der Halle:** Die Zwerge handeln erst, wenn König Durgrim dich anerkennt: entweder hast du den Wächter der alten Hallen (Gruft) erschlagen, oder du bringst 3 Eisenbarren als Gastgeschenk.
+- **Waren:** Hilda verkauft Königseisen (für Handwerk: eine Güte höher), die Zwergenaxt (Einhand, 17 Schaden, Durchschlag) und den Runenhammer (Zweihand, 27 Schaden, Wucht). Balin führt Tränke, Vorräte, Eisenbarren, Werkzeug und Ersatzteile.
+- **Technik:** Die Stadt wird wie ein Gewölbe beim Betreten neu gebaut (immer gleich), gespeichert wird nur die Freundschaft.
+- **Debug:** „Tiefhall: in die Königsstadt“, „Tiefhall: Freund der Halle“. Probe „Tiefhall (Nutzer §5d.6)“.

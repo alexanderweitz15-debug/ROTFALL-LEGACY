@@ -943,6 +943,7 @@ function drawPropPixel(e, now) {
   if (e.depleted) key += 'd';
   if (e.intact) key += 'I';
   if (e.opened) key += 'o';
+  if (e.on) key += 'n';   /* S15 Fehlersuche §5e.3: gezogener Hebel — sonst zeigt der Bild-Cache immer die ungezogene Stellung */
   const shut = stallShut(e); if (shut) key += 'z';   // §41: Markt sichtbar zu (Plane), nicht nur eine Zahl
   let reg = null;                                         // Fels trägt die Gesteinsfarbe seiner Region
   if (e.type === 'rock_node' || e.type === 'ore_node') { reg = e.map === 'world' ? regionOfProp(e) : 'greenmark'; key += reg; }
@@ -2342,7 +2343,7 @@ function drawFx(now) {
 // ---------------- Licht & Wetter ----------------
 export function ambient() {
   const h = S.minute / 60;
-  if (DUNGEONS[S.map] && !DUNGEONS[S.map].open) return DUNGEONS[S.map].darker ? 0.94 : 0.82;   // Himmelsinsel: Tageslicht   /* §5e.3: dunkle Gewölbe-Ebene */
+  if (DUNGEONS[S.map] && !DUNGEONS[S.map].open) return DUNGEONS[S.map].darker ? 0.94 : DUNGEONS[S.map].bright ? 0.5 : 0.82;   // Himmelsinsel: Tageslicht   /* §5e.3: dunkle Gewölbe-Ebene */
   let a = 0;
   if (h < 5) a = 0.72; else if (h < 7) a = 0.72 - (h - 5) / 2 * 0.62;
   else if (h < 17) a = 0.08; else if (h < 20) a = 0.08 + (h - 17) / 3 * 0.5;

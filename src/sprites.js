@@ -225,6 +225,10 @@ const CIVIC = {
   'Böttcher': { apron: 1, glove: '#3a2c20', hem: 35 },
   'Bäcker': { apron: 1, apronCol: '#b8ae98', helm: 'cap', helmCol: '#a8a090', hem: 35 },
   Witwe: { robe: '#1c191c', helm: 'scarf', helmCol: '#141216' },
+  /* Nutzer §5d.6: Zwerge der Tiefhall — Bärte, dunkle Stoffe, Leder und Königseisen */
+  'Zwergenkönig': { beard: 1, cape: '#2a3a6a', tabard: '#1a2440', helm: 'crown', helmCol: '#c8a050', hem: 44 }, 'Runenschmiedin': { apron: 1, apronCol: '#3a2a1c', glove: '#2a2016', hem: 35 },
+  'Zwergenhändler': { beard: 1, scarf: '#6a3a2a', hem: 44 }, Braumeister: { beard: 1, apron: 1, apronCol: '#8a7a5a', hem: 35 }, 'Zwergenwache': { beard: 1, helm: 'nasal', helmCol: '#5a5a62', tabard: '#2a3a6a', hem: 40 },
+  Bergmann: { beard: 1, helm: 'cap', helmCol: '#6a5a3a', hem: 35 }, Steinmetz: { beard: 1, apron: 1, apronCol: '#7a7468', hem: 35 },
   Graf: { hem: 44, tabard: '#2a2a50', mark: 'quarter', markCol: '#c8a050', cape: '#5a1a2a', beard: 1 }, 'Gräfin': { robe: '#4a1a2a', cape: '#2a2a50', helm: 'scarf', helmCol: '#c8a050' },
   Edelmann: { hem: 44, tabard: '#1f3a3a', mark: 'quarter', markCol: '#b89a50', cape: '#2a2030' }, Edelfrau: { robe: '#2a3a4a', cape: '#5a3a2a', helm: 'scarf', helmCol: '#b89a50' },
   Kaufherr: { hem: 44, cape: '#3a2a1a', helm: 'wide', helmCol: '#2a2018', pouch: 1, strap: 1 }, Feinmechaniker: { apron: 1, apronCol: '#4a4038', glove: '#3a2c20', pouch: 1, hem: 35 },
