@@ -611,7 +611,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kupferhafen (Werftstadt):** Rümpfe auf dem Helling, Werftkräne, Tauwerk, Planken und Pech; Schiffbauer. Meister Holm bessert das eigene Schiff zum halben Preis aus (1 Gold je Prozent).
 - **Tickmar (Fabrikstadt):** Schlote, Stanze, Kohle, Schrott; Arbeiter und Heizer. Vogt Kessler verkauft Ersatzteile, Energiezellen, Automatenkerne, Werkzeug und Barren.
 - **Gelenkhall (Prothesenstadt):** Reihen ruhender Automaten, Feinwerkbank, Drehbank, Patienten mit Prothesen. Meisterin Vessa wartet alle Prothesen und das Auge für 40 Gold auf 100 %.
-- Der Grundriss der Städte bleibt gleich (alte Spielstände passen weiter); das Gesicht entsteht bei jedem Laden neu.
+- **Eigene Grundrisse (01.10.2026):** Sankt Serin: Tempel hinter dem Nordtor, zwei Hospitäler, Kreuzgang als Platz, Herbergen und Adelshäuser an der breiten Prozessionsstraße. Kupferhafen: Speicher- und Fischerreihen im Norden, im Süden Werftplatz und Hafenbecken mit drei Stegen. Tickmar: enges Straßenraster mit Arbeiterhäusern und Fabrikhof. Gelenkhall: Ringstraße mit Grünring um den Werkstattplatz, Werkstätten an den Ecken. Die Tore liegen wie vorher.
+- **Alte Spielstände:** Beim Laden werden Bewohner ohne Haus in den vier Städten entfernt und neu angesiedelt; das Log meldet den Umbau. Das Gesicht (Zelte, Kräne, Schlote …) entsteht bei jedem Laden neu.
 - **Debug:** „Nebenstädte: zu Sankt Serin“. Probe „Nebenstädte (Nutzer §5d.10)“.
 
 ## Runde: Animation und Kampfgefühl (Nutzer §5f, Version 21)

@@ -1350,6 +1350,41 @@ export const AUREL_CITIES = [
   { key: 'sanktserin',  name: 'Sankt Serin', x: 820,  y: 1110, hw: 22, hh: 16, types: ['chapel', 'manor', 'house', 'healer', 'manor', 'house'] },
 ];
 for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
+// Nutzer §5d.10 (01.10.2026): eigene Grundrisse der Nebenstädte. Tore bleiben an den vier Seiten (Straßen draußen), innen hat
+// jede Stadt ihr Gesicht. Rückgabe: Platz [x0, y0, x1, y1] für Treffpunkte. Häuser zuerst setzen (put braucht Gras), dann pflastern.
+const CITY_LAYOUT = {
+  sanktserin: ({ cx, cy, x0, y0, x1, y1, street, put, pave }) => {        // Tempelstadt: Tempelbezirk im Norden, Prozessionsstraße, Herbergen
+    street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 2, cy - 1, cx + 2, y1 - 1); street(x0 + 1, y0 + 1, x1 - 1, y0 + 1);
+    put(cx - 4, y0 + 3, 9, 6, 'S', 'chapel');                                                            // Tempel des heiligen Serin
+    put(cx - 15, y0 + 3, 7, 5, 'E', 'healer'); put(cx + 9, y0 + 3, 7, 5, 'W', 'healer');                 // zwei Hospitäler
+    put(x0 + 2, y0 + 3, 5, 4, 'S', 'house'); put(x1 - 7, y0 + 3, 5, 4, 'S', 'house');
+    for (const hy of [cy + 3, cy + 9]) { put(cx - 10, hy, 6, 4, 'E', 'house'); put(cx + 5, hy, 6, 4, 'W', 'house'); put(x0 + 2, hy, 6, 5, 'E', 'manor'); put(x1 - 8, hy, 6, 5, 'W', 'manor'); }
+    pave(cx - 9, y0 + 9, cx + 9, cy - 2); street(cx - 1, y0 + 1, cx + 1, y0 + 2);                         // Kreuzgang vor dem Tempel
+    return [cx - 9, y0 + 9, cx + 9, cy - 2]; },
+  tickmar: ({ cx, cy, x0, y0, x1, y1, street, put, pave }) => {           // Fabrikstadt: enges Raster, Arbeiterblocks, Fabrikhof
+    for (const y of [cy - 9, cy + 8]) street(x0 + 1, y, x1 - 1, y + 1); street(x0 + 1, cy - 1, x1 - 1, cy + 1);
+    for (const x of [cx - 12, cx + 11]) street(x, y0 + 1, x + 1, y1 - 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1);
+    const types = ['house', 'house', 'store', 'house', 'smithy', 'house', 'barn', 'house'];
+    let k = 0; for (const [bx0, bx1] of [[x0 + 2, cx - 13], [cx - 10, cx - 2], [cx + 2, cx + 10], [cx + 13, x1 - 2]])
+      for (const [by0, by1] of [[y0 + 2, cy - 10], [cy - 7, cy - 2], [cy + 2, cy + 7], [cy + 10, y1 - 2]])
+        for (let hx = bx0; hx + 5 <= bx1; hx += 7) { const tp = types[k++ % types.length], h = tp === 'barn' ? 5 : 4; if (by1 - by0 >= h) put(hx, by1 - h + 1, 5, h, by1 >= cy ? 'N' : 'S', tp); }
+    pave(cx + 2, cy + 2, cx + 10, cy + 7); return [cx + 2, cy + 2, cx + 10, cy + 7]; },                   // Fabrikhof
+  kupferhafen: ({ cx, cy, x0, y0, x1, y1, W, t, street, put, pave, prop }) => {   // Werftstadt: Speicherreihen im Norden, Werft und Becken im Süden
+    street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1); street(x0 + 1, cy - 9, x1 - 1, cy - 8);
+    for (let hx = x0 + 3; hx < x1 - 6; hx += 7) { if (Math.abs(hx + 3 - cx) < 4) continue; put(hx, y0 + 2, 6, 5, 'S', hx % 2 ? 'store' : 'house'); put(hx, cy - 6, 5, 4, 'N', hx % 3 ? 'fisher' : 'store'); }
+    put(x0 + 2, cy + 3, 6, 5, 'E', 'tavern'); put(x0 + 2, cy + 10, 5, 4, 'E', 'smithy');
+    for (let y = cy + 4; y <= y1 - 3; y++) for (let x = cx + 5; x <= x1 - 3; x++) t[y * W + x] = T.WATER;  // Hafenbecken
+    for (const px of [cx + 8, cx + 13, cx + 18]) for (let y = cy + 4; y <= y1 - 6; y++) t[y * W + px] = T.PLANK;   // Stege
+    pave(x0 + 9, cy + 3, cx + 3, y1 - 2); pave(cx + 4, cy + 2, x1 - 2, cy + 3);                           // Werftplatz, Kai
+    return [x0 + 9, cy + 3, cx + 3, y1 - 2]; },
+  gelenkhall: ({ cx, cy, x0, y0, x1, y1, street, put, pave }) => {        // Prothesenstadt: Ringstraße um den Werkstattplatz
+    street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1);
+    street(cx - 10, cy - 8, cx + 10, cy - 7); street(cx - 10, cy + 7, cx + 10, cy + 8); street(cx - 10, cy - 8, cx - 9, cy + 8); street(cx + 9, cy - 8, cx + 10, cy + 8);
+    for (const [x, y, d] of [[cx - 17, y0 + 2, 'S'], [cx + 12, y0 + 2, 'S'], [cx - 17, y1 - 6, 'N'], [cx + 12, y1 - 6, 'N']]) put(x, y, 5, 4, d, 'smithy');
+    for (const [x, y, d, tp] of [[x0 + 2, y0 + 2, 'S', 'manor'], [x1 - 8, y0 + 2, 'S', 'manor'], [x0 + 2, cy + 3, 'E', 'healer'], [x1 - 7, cy + 3, 'W', 'store'], [x0 + 2, y1 - 6, 'N', 'house'], [x1 - 7, y1 - 6, 'N', 'house'], [cx - 7, y0 + 2, 'S', 'house'], [cx + 3, y0 + 2, 'S', 'store'], [cx - 7, y1 - 5, 'N', 'house'], [cx + 3, y1 - 5, 'N', 'smithy']])
+      put(x, y, tp === 'manor' ? 6 : 5, tp === 'manor' ? 5 : 4, d, tp);
+    pave(cx - 5, cy - 4, cx + 5, cy + 4); return [cx - 5, cy - 4, cx + 5, cy + 4]; },   /* Werkstattplatz, dazwischen ein Grünring bis zur Ringstraße */
+};
 const HSIZE = { manor: [6, 5], house: [5, 4], store: [6, 5], tavern: [6, 5], healer: [5, 4], chapel: [6, 5], smithy: [5, 4], barn: [6, 5], fisher: [4, 4] };
 function buildAurelCity(C) {
   if (C.metro) return buildMetropolis(C);
@@ -1362,8 +1397,9 @@ function buildAurelCity(C) {
   }
   for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) t[(y + j) * W + x + i] = T.WALL;   // Ecktürme
   const street = (ax, ay, bx, by) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) t[y * W + x] = T.STONE; };
-  street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1); street(cx - 5, cy - 4, cx + 5, cy + 4);   // Pflasterkreuz und Platz
-  const rows = C.capital ? [cy, cy - 13, cy + 13] : [cy];
+  const LAY = CITY_LAYOUT[C.key];   /* Nutzer §5d.10: eigene Grundrisse der Nebenstädte */
+  if (!LAY) { street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, y0 + 1, cx + 1, y1 - 1); street(cx - 5, cy - 4, cx + 5, cy + 4); }   // Pflasterkreuz und Platz
+  const rows = LAY ? [] : C.capital ? [cy, cy - 13, cy + 13] : [cy];
   if (C.capital) for (const ry of [cy - 13, cy + 13]) street(x0 + 1, ry - 1, x1 - 1, ry + 1);
   const hs = [], at = (x, y) => t[y * W + x]; let ti = 0;
   const fits = (hx, hy, w, h) => hx > x0 + 1 && hx + w < x1 - 1 && hy > y0 + 1 && hy + h < y1 - 1
@@ -1374,11 +1410,13 @@ function buildAurelCity(C) {
     let type = C.types[ti % C.types.length], [w, h] = HSIZE[type] || [5, 4]; if (put(hx, ry - 2 - h, w, h, 'S', type)) ti++;
     type = C.types[ti % C.types.length]; [w, h] = HSIZE[type] || [5, 4]; if (put(hx, ry + 2, w, h, 'N', type)) ti++;
   }
-  for (let hy = y0 + 3; hy < y1 - 5; hy += 7) {
+  let plaza = [cx - 5, cy - 4, cx + 5, cy + 4];
+  if (LAY) plaza = LAY({ cx, cy, x0, y0, x1, y1, W, t, street, put, pave: (ax, ay, bx, by, tile = T.STONE) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) if (t[y * W + x] === T.GRASS) t[y * W + x] = tile; }, prop }) || plaza;
+  for (let hy = y0 + 3; hy < y1 - 5 && !LAY; hy += 7) {
     let type = C.types[ti % C.types.length], [w, h] = HSIZE[type] || [5, 4]; if (put(cx - 2 - w, hy, w, h, 'E', type)) ti++;
     type = C.types[ti % C.types.length]; [w, h] = HSIZE[type] || [5, 4]; if (put(cx + 2, hy, w, h, 'W', type)) ti++;
   }
-  const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, o); };
+  const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && at(x, y) !== T.WATER && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, o); };
   P('well', cx + 3, cy + 3, { solid: true }); P('statue', cx - 4, cy - 3, { solid: true, r: 10, label: 'Standbild eines Stadtgründers' }); P('statue', cx + 4, cy - 3, { solid: true, r: 10, label: 'Standbild eines Stadtgründers' });
   for (let x = x0 + 4; x < x1 - 2; x += 7) { P('lantern', x, cy - 2); P('lantern', x + 3, cy + 2); }
   for (let y = y0 + 4; y < y1 - 2; y += 7) { P('lantern', cx - 2, y); P('lantern', cx + 2, y + 3); }
@@ -1402,7 +1440,7 @@ function buildAurelCity(C) {
   }
   if (C.key === 'gelenkhall') prop('workbench', cx + 5, cy - 2, { solid: true, r: 9, label: 'Werkbank der Prothesenmacherin', mechBench: true });
   TOWN_PLAN[C.key] = { village: true, lord: 'aurel', area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy], perHead: C.capital ? 55 : 65, fields: [],
-    plazas: [[T.STONE, cx - 5, cy - 4, cx + 5, cy + 4]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+    plazas: [[T.STONE, ...plaza]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
 }
 // ================= Aurelheim, die Metropole (MP2 §33–§49, Phase 5) =================
 // Rund 190×136 Kacheln: Mauerring mit vier mechanischen Toren, zwei Prachtachsen, Regierungsplatz mit Palast, Uhr und
