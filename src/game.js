@@ -10641,9 +10641,9 @@ function tavernChoices(npc, choices) {
   choices.push({ text: 'Lust auf ein Spiel?', fn: () => UI.dialogue(npc, `„${pick(['Immer. Was soll es sein?', 'Wenn du verlierst, zahlst du die nächste Runde.', 'Ich spiele nicht um Ehre. Nur um Gold.'])}“`, [
     ...STAKES.filter(g => S.gold >= g).map(g => ({ text: `Würfeln (${g} Gold)`, fn: () => dice(npc, g) })),
     ...(S.gold >= 20 ? [{ text: 'Siebzehn und Vier (20 Gold)', fn: () => cards(npc, 20, [drawCard(), drawCard()]) }] : []),
-    { text: 'Armdrücken (10 Gold)', fn: () => armWrestle(npc, 10) },
-    { text: 'Trinkwette (15 Gold)', fn: () => drinkBet(npc, 15, 0) },
-    { text: 'Faustkampf, bis einer liegt (30 Gold)', fn: () => fistStart(npc, 30) },
+    ...(S.gold >= 10 ? [{ text: 'Armdrücken (10 Gold)', fn: () => armWrestle(npc, 10) }] : []),
+    ...(S.gold >= 15 ? [{ text: 'Trinkwette (15 Gold)', fn: () => drinkBet(npc, 15, 0) }] : []),
+    ...(S.gold >= 30 ? [{ text: 'Faustkampf, bis einer liegt (30 Gold)', fn: () => fistStart(npc, 30) }] : []),
     { text: 'Lieber nicht.', fn: () => UI.closeDialogue() }]) });
 }
 const d6 = () => ri(1, 6);
@@ -10667,12 +10667,14 @@ function cards(npc, g, hand) {
       UI.dialogue(npc, `${npc.name}: ${h.join(' + ')} = ${n}${n > 21 ? ' — überkauft' : ''}. ${win ? `Du gewinnst ${g} Gold.` : draw ? 'Gleichstand.' : `Du verlierst ${g} Gold.`}`, [...(S.gold >= g ? [{ text: 'Neues Spiel', fn: () => cards(npc, g, [drawCard(), drawCard()]) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]); } }]);
 }
 function armWrestle(npc, g) {
+  if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold, auch nicht bei "Nochmal" */
   const me = (S.player.attributes?.strength || 10) + d6() + d6(), him = (npc.attributes?.strength || 10) + d6() + d6(), win = me >= him;
   if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); } else S.gold = Math.max(0, S.gold - g);
   S.player.stamina = Math.max(0, S.player.stamina - 20);
-  UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }, { text: 'Genug.', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [...(S.gold >= g ? [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
 }
 function drinkBet(npc, g, round) {
+  if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold, auch nicht bei "Noch einen!" */
   const p = S.player, r = p.status?.find(s => s.key === 'rausch'), st = (r?.stacks || 0) + 1;
   addStatus(p, { key: 'rausch', name: `Rausch ${Math.min(3, st)}`, stacks: Math.min(3, st), left: 240000, desc: 'Die Welt schwankt: die Steuerung zieht zur Seite. Etwas mutiger (+5 % Schaden je Stufe).' });
   const meOut = chance(0.08 + round * 0.12 - (p.attributes?.endurance || 10) * 0.006), himOut = chance(0.1 + round * 0.12);
@@ -10681,6 +10683,7 @@ function drinkBet(npc, g, round) {
   UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); UI.closeDialogue(); } }]);
 }
 function fistStart(npc, g) {
+  if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold */
   const p = S.player; UI.closeDialogue();
   S.fist = { npc: npc.id, g, pw: p.equip.weapon, nw: npc.equip.weapon }; p.equip.weapon = null; npc.equip.weapon = null; recalc(p); recalc(npc);
   Object.assign(p, { brawl: true, brawlSide: 'a', brawlV: 'fist' }); Object.assign(npc, { brawl: true, brawlSide: 'b', brawlV: 'fist', angry: true, aggroId: p.id, brave: true });

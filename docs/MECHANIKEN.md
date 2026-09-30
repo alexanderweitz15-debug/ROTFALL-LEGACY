@@ -463,7 +463,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Selbsttest „Schwarze Feste (Nutzer §5d.5)“.
 
 ## Runde: Gerüchte mit Zielen (Nutzer §5e.4, Version 21)
-- Beim Plaudern („Was gibt es Neues?“) erzählt ein Bewohner manchmal (35 %, einmal pro Person und Tag) ein Gerücht: ein vergrabener Schatz, eine Bestie oder ein Deserteur irgendwo 30–60 Felder vor dem Ort. „Dem gehe ich nach“ macht daraus einen Auftrag. Der Kartenpunkt ist **nur ungefähr** (bis 6 Felder daneben) — vor Ort suchen.
+- Beim Plaudern („Was gibt es Neues?“) erzählt ein Bewohner manchmal (35 %, einmal pro Person und Tag) ein Gerücht: ein vergrabener Schatz, eine Bestie oder ein Deserteur irgendwo 30–60 Felder vor dem Ort. „Dem gehe ich nach“ macht daraus einen Auftrag. Der Kartenpunkt ist **nur ungefähr** (bis etwa 8 Felder daneben) — vor Ort suchen.
 - **Schatz:** eine vergrabene Kiste mit guter Beute. **Bestie:** ein Tier-Mini-Boss (aus den Elite-Mini-Bossen). **Deserteur:** verschonen (Ruf Valen −2), ausliefern (60 Gold, Valen +3) oder anwerben.
 - **Selten falsch (12 %):** die Kiste ist leer — und manchmal lauern Räuber.
 - Höchstens zwei offene Gerüchte. Selbsttest „Gerüchte (Nutzer §5e.4)“.
@@ -483,3 +483,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Entzündung:** Ausgefallene Glieder entzünden sich zu 25 % (abgetrennt 60 %). Jeden Tag Rumpf −4 × Tage und halbe Ausdauer; nach 6 Tagen klingt sie von selbst ab.
 - **Narben:** Jeder verheilte Bruch hinterlässt eine Narbe: +1 Rüstung je Narbe (höchstens 5), Status „Narben (n)“.
 - **Debug:** „Verletzung: linker Arm gebrochen + Entzündung“, „Verletzung: einen Tag vergehen lassen“. Probe „Verletzungen (Nutzer §5e.7)“.
+
+## Runde: Titelbild mit wechselnden Orten (Nutzer, Version 21)
+- Bei jedem Start zeigt das Titelbild zufällig einen Ort: die zerfallene Grenzfeste, Aurelion (Türme, Kuppel, Luftschiff), einen Goblinhort (Riesenpilze, Lehmhütten, Schrott, Sporen), die Eisenfeste (Schlote mit Rauch, Ketten, glühendes Tor), Karak-Atar (Kuppeln, Minarett, Palmen, Karawane, funkelnde Sterne) oder die Schwarze Feste (Spitztürme, tote Bäume, Gräber, Nebel, grünes Feuer). Unten rechts steht der Name des Ortes.
+- Konsole (mit ?dev): `RF.R.setTitleTheme('goblin')` usw. wechselt den Ort sofort.

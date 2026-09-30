@@ -2679,61 +2679,145 @@ const TITLE_B = SP.humanSpec({ seed: 1, faction: 'order', prof: 'Alter Paladin',
 // scharf hochskaliert. Himmel/Berge und Hügel/Feste sind je Größe gecachte Ebenen; animiert sind Wolken, Fenster,
 // Banner, Feuer, Funken und Gras. Licht: Abendglut hinter der Feste (Randlicht oben/links), Feuer vorn.
 const titleCache = { key: '', back: null, mid: null };
-const TITLE_SKY = [[0, '#171a24'], [0.45, '#3a2a26'], [0.62, '#7d3a24'], [0.75, '#2a1e18'], [1, '#0c0a08']];
+// Nutzer (30.09.2026): Das Titelbild zeigt bei jedem Start zufällig einen anderen Ort der Welt — die zerfallene Grenzfeste,
+// Aurelion (Türme, Kuppel, Luftschiff), einen Goblinhort (Pilze, Lehmhütten, Schrott), die Eisenfeste (Schlote, Ketten, Rauch),
+// Karak-Atar (Kuppeln, Minarett, Palmen, Karawane) oder die Schwarze Feste (Spitztürme, tote Bäume, Gräber, grünes Feuer).
+// Jedes Thema: Himmel, Bergketten, Hügel, Mauerfarben, Bauten, Fensterlicht, Feuerfarbe und eine eigene Bewegung (extra).
+const TITLE_THEMES = {
+  feste: { name: 'Die Grenzlande', sky: [[0, '#171a24'], [0.45, '#3a2a26'], [0.62, '#7d3a24'], [0.75, '#2a1e18'], [1, '#0c0a08']], stars: 26,
+    ridges: [['#2c2126', '#5a2e24'], ['#231a1d', '#4a2620']], hill: ['#1c1514', '#3a2420'], wall: ['#241c1b', '#150f0e', '#6e3a26', '#4a2a20'], win: ['#d08a3a', '#f0c070', '#8a4a22'], banner: ['#7a2c20', '#5b2119'] },
+  aurelion: { name: 'Aurelion, das Hochreich', sky: [[0, '#0a0e1e'], [0.4, '#1c2244'], [0.6, '#4a3c6e'], [0.72, '#8a5a6a'], [0.8, '#241c2c'], [1, '#0a0a10']], stars: 40,
+    ridges: [['#1e2034', '#4a4470'], ['#181a2a', '#3a3660']], hill: ['#14141e', '#34304a'], wall: ['#262838', '#12131c', '#a898d0', '#5a5480'], win: ['#7fd8f0', '#e0fbff', '#3a6a80'], banner: ['#d8c070', '#a08a40'], cloud: ['#1a1c34', '#24223e', '#4a3e6a'] },
+  goblin: { name: 'Ein Goblinhort', sky: [[0, '#0e120c'], [0.45, '#1e2a18'], [0.62, '#46522a'], [0.74, '#2a2a18'], [1, '#0a0b08']], stars: 14,
+    ridges: [['#1e2418', '#3e4a24'], ['#181c12', '#34401e']], hill: ['#15180f', '#3a4020'], wall: ['#3a2c1c', '#1a140c', '#7a6a38', '#4a3c22'], win: ['#9ae05a', '#e0ffb0', '#4a7a2a'], banner: ['#8a8a2a', '#5a5a1a'], cloud: ['#161c12', '#1e2616', '#3a4422'] },
+  eisenfeste: { name: 'Die Eisenfeste', sky: [[0, '#0e0a0a'], [0.4, '#261210'], [0.6, '#6a2210'], [0.72, '#a0401a'], [0.8, '#2a120c'], [1, '#0a0606']], stars: 6,
+    ridges: [['#241614', '#6a2a14'], ['#1c1110', '#4a1e10']], hill: ['#140c0a', '#3a1a10'], wall: ['#1c1a1c', '#0a090a', '#8a4a2a', '#4a2a1c'], win: ['#f08a2a', '#ffd080', '#8a3a10'], banner: ['#3a3a3a', '#1e1e1e'], cloud: ['#1a1010', '#2a1814', '#5a2a18'] },
+  karak: { name: 'Karak-Atar', sky: [[0, '#16142c'], [0.4, '#3a2446'], [0.58, '#a0503a'], [0.7, '#e0a060'], [0.78, '#6a4028'], [1, '#140e0a']], stars: 34,
+    ridges: [['#5a3a24', '#c08050'], ['#4a3020', '#a06a40']], hill: ['#3a2818', '#8a6038'], wall: ['#6a4a30', '#3a2818', '#e0b070', '#a07a48'], win: ['#f0c060', '#fff0b0', '#8a6020'], banner: ['#c0a040', '#8a6a20'], dunes: true, cloud: ['#2a1e30', '#3a2a3a', '#8a5040'] },
+  totenland: { name: 'Die Schwarze Feste', sky: [[0, '#060908'], [0.45, '#0e1c18'], [0.62, '#1e3a30'], [0.74, '#12201a'], [1, '#050706']], stars: 22,
+    ridges: [['#121a18', '#2a4a3a'], ['#0e1412', '#22382e']], hill: ['#0c100e', '#1e2e26'], wall: ['#161a1a', '#080a0a', '#3a6a5a', '#223a32'], win: ['#6af0b0', '#d0ffe8', '#2a6a4a'], banner: ['#1a3a2e', '#0e2018'], cloud: ['#0c1412', '#121c18', '#1e3a30'],
+    fire: ['#1c7a4a', '#3ac88a', '#b0ffd8', '60,200,130'] },
+};
+const TITLE_KEYS = Object.keys(TITLE_THEMES);
+let TITLE_T = TITLE_KEYS[Math.random() * TITLE_KEYS.length | 0];   // Zufall nur fürs Bild, nicht die Welt-RNG
+export function setTitleTheme(k) { if (TITLE_THEMES[k]) { TITLE_T = k; titleCache.key = ''; } }   /* Debug/Konsole: RF.R.setTitleTheme('goblin') */
 function titleLayers(lw, lh) {
-  const key = lw + 'x' + lh; if (titleCache.key === key) return titleCache;
+  const key = lw + 'x' + lh + TITLE_T; if (titleCache.key === key) return titleCache;
+  const TH = TITLE_THEMES[TITLE_T];
   const mk = () => { const cv = document.createElement('canvas'); cv.width = lw; cv.height = lh; return cv; };
   const back = mk(), mid = mk(), b = back.getContext('2d'), g = mid.getContext('2d');
   const P = (o, col, x, y, w = 1, h = 1) => { o.fillStyle = col; o.fillRect(Math.round(x), Math.round(y), w, h); };
   // Himmel: Verlauf in Stufen, an den Übergängen geordnet gedithert (keine glatten Web-Verläufe)
-  const skyAt = f => { let i = 0; while (i < TITLE_SKY.length - 2 && f > TITLE_SKY[i + 1][0]) i++; const [f0, c0] = TITLE_SKY[i], [f1, c1] = TITLE_SKY[i + 1]; return SP.mix(c0, c1, Math.min(1, Math.max(0, (f - f0) / (f1 - f0)))); };
+  const SKY = TH.sky, skyAt = f => { let i = 0; while (i < SKY.length - 2 && f > SKY[i + 1][0]) i++; const [f0, c0] = SKY[i], [f1, c1] = SKY[i + 1]; return SP.mix(c0, c1, Math.min(1, Math.max(0, (f - f0) / (f1 - f0)))); };
   const STEPS = 22, band = Array.from({ length: STEPS + 2 }, (_, i) => skyAt(i / STEPS));
   for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
     const f = y / lh * STEPS, lo = Math.floor(f), fr = f - lo;
     P(b, band[fr > BAYER[(y & 3) * 4 + (x & 3)] ? lo + 1 : lo], x, y);
   }
-  for (let i = 0; i < 26; i++) { const x = h2(i, 5) * lw | 0, y = h2(5, i) * lh * 0.3 | 0; P(b, i % 5 ? '#6a6660' : '#b0a894', x, y); }   // Sterne im oberen Dunkel
-  const ridge = (o, base, amp, sc, col, rim) => {           // Bergkette: gezackte Silhouette mit Randlicht
+  titleCache.stars = [];
+  for (let i = 0; i < TH.stars; i++) { const x = h2(i, 5) * lw | 0, y = h2(5, i) * lh * 0.32 | 0; P(b, i % 5 ? '#6a6660' : '#b0a894', x, y); titleCache.stars.push([x, y]); }
+  const ridge = (o, base, amp, sc, col, rim) => {           // Bergkette (oder Dünen): gezackte bzw. weiche Silhouette mit Randlicht
     for (let x = 0; x < lw; x++) {
-      const yy = Math.round(base - (vnoise(x / sc, 3) * 0.7 + vnoise(x / (sc / 3), 9) * 0.3) * amp);
+      const yy = TH.dunes ? Math.round(base - (Math.sin(x / sc * 1.3 + base) * 0.5 + 0.5) * amp * 0.8 - vnoise(x / (sc * 2), 3) * amp * 0.3)
+        : Math.round(base - (vnoise(x / sc, 3) * 0.7 + vnoise(x / (sc / 3), 9) * 0.3) * amp);
       P(o, col, x, yy, 1, lh - yy); if (rim) P(o, rim, x, yy);
     }
   };
-  ridge(b, lh * 0.62, lh * 0.2, 38, '#2c2126', '#5a2e24');
-  ridge(b, lh * 0.66, lh * 0.12, 24, '#231a1d', '#4a2620');
-  // Hügel mit der Feste
-  for (let x = 0; x < lw; x++) { const yy = Math.round(lh * 0.69 - Math.sin(x / (lw / 4.9)) * lh * 0.045 - Math.sin(x / 17) * 1.5); P(g, '#1c1514', x, yy, 1, lh - yy); P(g, '#3a2420', x, yy); }
-  const bx = Math.round(lw * (lw < 200 ? 0.66 : 0.62)), by = Math.round(lh * 0.70), stone = '#241c1b', dk = '#150f0e', rim = '#6e3a26', rim2 = '#4a2a20';
+  ridge(b, lh * 0.62, lh * 0.2, 38, ...TH.ridges[0]);
+  ridge(b, lh * 0.66, lh * 0.12, 24, ...TH.ridges[1]);
+  for (let x = 0; x < lw; x++) { const yy = Math.round(lh * 0.69 - Math.sin(x / (lw / 4.9)) * lh * 0.045 - Math.sin(x / 17) * 1.5); P(g, TH.hill[0], x, yy, 1, lh - yy); P(g, TH.hill[1], x, yy); }
+  const bx = Math.round(lw * (lw < 200 ? 0.66 : 0.62)), by = Math.round(lh * 0.70), [stone, dk, rim, rim2] = TH.wall, sc = lh / 190;
   const block = (x0, y0, w, h, o = {}) => {                 // Mauerkörper: Quader, Fugen, Randlicht oben/links, Zinnen
+    x0 = Math.round(x0); y0 = Math.round(y0); w = Math.round(w); h = Math.round(h);
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
-      const row = y - y0, joint = row % 4 === 3 || (x + (row >> 2) * 3) % 7 === 0;
-      P(g, joint ? dk : h2(x, y) < 0.08 ? '#2e2322' : stone, x, y);
+      const row = y - y0, joint = o.smooth ? (row % 6 === 5 && (x + row) % 5 === 0) : row % 4 === 3 || (x + (row >> 2) * 3) % 7 === 0;
+      P(g, joint ? dk : h2(x, y) < 0.08 ? SP.mix(stone, rim, 0.12) : stone, x, y);
     }
     for (let x = x0; x < x0 + w; x++) P(g, rim, x, y0); for (let y = y0; y < y0 + h; y++) P(g, rim2, x0, y);
     if (o.crenel) for (let x = x0; x < x0 + w; x += 4) { P(g, stone, x, y0 - 3, 2, 3); P(g, rim, x, y0 - 3, 2, 1); P(g, rim2, x, y0 - 2, 1, 2); }
   };
-  block(bx - 58, by - 22, 116, 30, { crenel: true });       // Ringmauer
-  block(bx - 72, by - 36, 15, 44, { crenel: true });        // linker Turm
-  block(bx - 12, by - 32, 24, 40, { crenel: true });        // Torhaus
-  block(bx + 36, by - 58, 20, 66);                          // Bergfried
-  for (let x = bx + 36; x < bx + 56; x++) {                 // Bergfried oben zerbrochen (die Welt ist im Niedergang)
-    const drop = x < bx + 42 ? 0 : Math.round((x - bx - 42) * 1.1 + h2(x, 1) * 3);
-    g.clearRect(x, by - 58, 1, drop); P(g, rim, x, by - 58 + drop);
+  const spire = (cx, y0, w, h, col = rim) => { for (let y = 0; y < h; y++) { const ww = Math.max(1, Math.round(w * (1 - y / h))); P(g, y === h - 1 ? col : stone, cx - ww / 2, y0 - y, ww, 1); P(g, col, cx - ww / 2, y0 - y); } };
+  const dome = (cx, y0, r, col = stone, top = rim) => { for (let dx = -r; dx <= r; dx++) { const hh = Math.round(Math.sqrt(r * r - dx * dx) * 0.9); P(g, col, cx + dx, y0 - hh, 1, hh); P(g, top, cx + dx, y0 - hh); } };
+  const W = [];                                             // Fensterplätze (werden animiert)
+  const winGrid = (x0, y0, w, h, sx, sy, p = 0.5) => { for (let y = y0 + 3; y < y0 + h - 3; y += sy) for (let x = x0 + 2; x < x0 + w - 1; x += sx) if (h2(x, y) < p) { P(g, dk, x - 1, y - 1, 3, 4); W.push([x, y]); } };
+  let banner = [bx + 1, by - 36];
+  if (TITLE_T === 'feste') {                               // die zerfallene Grenzfeste (das ursprüngliche Titelbild)
+    block(bx - 58, by - 22, 116, 30, { crenel: true }); block(bx - 72, by - 36, 15, 44, { crenel: true }); block(bx - 12, by - 32, 24, 40, { crenel: true }); block(bx + 36, by - 58, 20, 66);
+    for (let x = bx + 36; x < bx + 56; x++) { const drop = x < bx + 42 ? 0 : Math.round((x - bx - 42) * 1.1 + h2(x, 1) * 3); g.clearRect(x, by - 58, 1, drop); P(g, rim, x, by - 58 + drop); }
+    for (let x = bx + 36; x < bx + 42; x += 3) { P(g, stone, x, by - 61, 2, 3); P(g, rim, x, by - 61, 2, 1); }
+    P(g, dk, bx + 49, by - 44, 1, 4); P(g, dk, bx + 50, by - 46, 1, 3); P(g, dk, bx + 51, by - 45, 1, 1);
+    for (let y = by - 18; y < by + 8; y++) for (let x = bx - 6; x < bx + 6; x++) { const dx = x - bx + 0.5, top = by - 12 - Math.sqrt(Math.max(0, 36 - dx * dx)) * 0.9; if (y >= top) P(g, (x - bx + 6) % 3 === 0 || (y - by) % 4 === 0 ? '#2a201c' : '#070505', x, y); }
+    for (const [x, y] of [[bx - 66, by - 26], [bx - 64, by - 14], [bx + 42, by - 44], [bx + 44, by - 30], [bx + 50, by - 18], [bx - 30, by - 12], [bx + 22, by - 12], [bx - 4, by - 26]]) { P(g, '#0a0707', x - 1, y - 1, 3, 5); W.push([x, y]); }
+  } else if (TITLE_T === 'aurelion') {                     // schlanke Türme mit Spitzen, Kuppel, Brücken, viele Lichter
+    const T = [[-78, 58, 9], [-54, 86, 11], [-26, 112, 13], [8, 70, 12], [34, 98, 10], [58, 64, 12], [80, 44, 9]];
+    block(bx - 90, by - 16, 180, 24, { smooth: true }); winGrid(bx - 90, by - 16, 180, 24, 5, 5, 0.35);
+    dome(bx - 6, by - 16, 17, SP.mix(stone, rim, 0.2), '#e0d8ff');
+    for (const [dx, hh, w] of T) { const H = Math.round(hh * sc * 0.72), x0 = bx + dx - w / 2; block(x0, by - H, w, H + 8, { smooth: true }); spire(bx + dx, by - H - 1, w - 2, Math.round(w * 1.4), '#e0d8ff'); winGrid(x0, by - H, w, H, 3, 4, 0.55); }
+    for (const [a, c2, y] of [[-54, -26, 0.55], [-26, 8, 0.4], [34, 58, 0.5]]) for (let x = bx + a; x <= bx + c2; x++) P(g, rim2, x, by - Math.round(86 * sc * y));
+    banner = [bx - 26, by - Math.round(112 * sc * 0.72) - 20];
+  } else if (TITLE_T === 'goblin') {                       // Lehmkuppeln, Riesenpilze, Schrottbleche, Laternenmast
+    for (const [dx, h, cw, capC] of [[-64, 34, 22, '#5a2a3a'], [-18, 52, 30, '#6a3a24'], [40, 40, 24, '#4a2a4a'], [74, 26, 16, '#6a2a2a']]) {
+      const H = Math.round(h * sc * 1.4); for (let y = 0; y < H; y++) P(g, y % 5 === 0 ? '#5a5040' : '#6a6048', bx + dx - 2, by - y, 5, 1);
+      const cy = by - H; for (let yy = -10; yy <= 2; yy++) { const ww = Math.round(Math.sqrt(Math.max(0, 1 - (yy / 10) ** 2)) * cw / 2 * (yy > 0 ? 1.05 : 1)); P(g, capC, bx + dx - ww, cy + yy, ww * 2 + 1, 1); P(g, SP.mix(capC, '#e0c0a0', 0.4), bx + dx - ww, cy + yy); }
+      for (let i = 0; i < 5; i++) P(g, '#c8b090', bx + dx - cw / 3 + h2(dx, i) * cw * 0.66, cy - 6 + h2(i, dx) * 6, 2, 1);
+      P(g, dk, bx + dx - 1, by - Math.round(H * 0.5), 2, 3); W.push([bx + dx, by - Math.round(H * 0.5) + 1]);
+    }
+    for (const [dx, r] of [[-86, 10], [-40, 13], [12, 11], [58, 14], [92, 9]]) { dome(bx + dx, by + 6, r); P(g, dk, bx + dx - 2, by + 6 - Math.round(r * 0.5), 4, Math.round(r * 0.5)); W.push([bx + dx - 4, by + 2 - Math.round(r * 0.4)]); P(g, dk, bx + dx - 5, by + 1 - Math.round(r * 0.4), 3, 3); }
+    for (const [dx, w, h, a] of [[-30, 16, 10, 1], [26, 14, 12, -1], [76, 18, 8, 1]]) for (let y = 0; y < h; y++) { P(g, y % 3 ? '#4a4a4a' : '#6a5a4a', bx + dx + y * a * 0.4, by - 2 - y, w, 1); if (y === 2) for (let x = 0; x < w; x += 4) P(g, '#9a8a6a', bx + dx + x + y * a * 0.4, by - 4); }
+    const mx = bx + 100; for (let y = 0; y < 50 * sc; y++) P(g, '#3a2a1c', mx, by - y); W.push([mx + 2, Math.round(by - 50 * sc)]); banner = [bx - 18, Math.round(by - 52 * sc * 1.4) - 12];
+  } else if (TITLE_T === 'eisenfeste') {                   // schwarzer Eisenblock, Spitzbewehrung, Schlote, Ketten
+    block(bx - 80, by - 40, 160, 48); winGrid(bx - 80, by - 40, 160, 48, 7, 6, 0.3);
+    for (const dx of [-90, 70]) { block(bx + dx, by - 74, 20, 82); spire(bx + dx + 10, by - 75, 20, 16, '#8a4a2a'); winGrid(bx + dx, by - 74, 20, 82, 5, 7, 0.4); }
+    for (let x = bx - 80; x < bx + 80; x += 5) { P(g, '#2a2626', x, by - 44, 2, 4); P(g, '#6a4a3a', x, by - 45); }   // Eisenspitzen
+    titleCache.stacks = [];
+    for (const dx of [-40, -12, 22, 48]) { const H = 38 + (dx & 15); block(bx + dx, by - 40 - H, 7, H); titleCache.stacks.push([bx + dx + 3, by - 41 - H]); }
+    for (const [x0, x1] of [[-80, -40], [40, 70]]) for (let i = 0; i <= 12; i++) { const f = i / 12, x = bx + x0 + (x1 - x0) * f, y = by - 60 + Math.sin(f * Math.PI) * 14 + f * 30; P(g, '#4a403a', x, y, 2, 1); }
+    for (let y = by - 20; y < by + 8; y++) for (let x = bx - 9; x < bx + 9; x++) if (y > by - 20 + Math.abs(x - bx) * 0.4) P(g, (x & 1) ? '#1a0a06' : '#5a200a', x, y);   // glühendes Tor
+    banner = [bx + 80, by - 90];
+  } else if (TITLE_T === 'karak') {                        // Flachdachhäuser, Kuppeln, Minarett, Palmen
+    for (const [dx, w, h, d] of [[-92, 22, 18, 0], [-70, 26, 30, 1], [-42, 20, 22, 0], [-22, 30, 40, 1], [10, 24, 26, 0], [32, 28, 34, 1], [62, 22, 20, 0], [84, 26, 28, 1]]) {
+      const H = Math.round(h * sc * 1.2); block(bx + dx, by - H + 6, w, H, { smooth: true }); winGrid(bx + dx, by - H + 6, w, H, 5, 6, 0.4); if (d) dome(bx + dx + w / 2, by - H + 6, Math.round(w / 2.6), SP.mix(stone, '#c07040', 0.4), '#f0c080'); }
+    const mh = Math.round(100 * sc); block(bx + 58, by - mh, 8, mh + 6, { smooth: true }); P(g, rim, bx + 57, by - mh + 10, 10, 2); dome(bx + 62, by - mh, 5, stone, '#f0c080'); spire(bx + 62, by - mh - 5, 2, 5, '#f0c080'); W.push([bx + 61, by - mh + 20]);
+    for (const dx of [-104, 104, -54]) { const px = bx + dx, ph = Math.round(40 * sc); for (let y = 0; y < ph; y++) P(g, '#3a2818', px + Math.round(Math.sin(y / ph * 2) * 3), by + 6 - y, 2, 1);
+      const tx = px + Math.round(Math.sin(2) * 3), ty = by + 6 - ph; for (const a of [-2.6, -2.1, -1.2, -0.6, -1.7]) for (let r = 0; r < 12; r++) P(g, '#2a3a1c', tx + Math.cos(a) * r, ty + Math.sin(a) * r * 0.6 + r * r * 0.03); }
+    banner = [bx - 7, by - Math.round(40 * sc * 1.2) - 6];
+  } else {                                                  // Schwarze Feste: Spitztürme, tote Bäume, Grabsteine
+    block(bx - 60, by - 30, 120, 38, { crenel: true }); winGrid(bx - 60, by - 30, 120, 38, 7, 7, 0.28);
+    for (const [dx, h, w] of [[-70, 70, 14], [-30, 96, 16], [18, 120, 18], [56, 80, 14]]) { const H = Math.round(h * sc * 0.68); block(bx + dx, by - H, w, H + 8); spire(bx + dx + w / 2, by - H - 1, w + 4, Math.round(w * 1.6)); winGrid(bx + dx, by - H, w, H, 4, 8, 0.45); }
+    const tree = (x, y, len, a, d) => { if (d > 5 || len < 2) return; for (let i = 0; i < len; i++) P(g, '#0a0c0b', x + Math.cos(a) * i, y + Math.sin(a) * i); const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len; tree(ex, ey, len * 0.7, a - 0.5, d + 1); tree(ex, ey, len * 0.6, a + 0.45, d + 1); };
+    tree(bx - 100, by + 10, 16 * sc * 1.5, -Math.PI / 2, 0); tree(bx + 96, by + 12, 13 * sc * 1.5, -Math.PI / 2 + 0.1, 0);
+    for (let i = 0; i < 9; i++) { const x = bx - 110 + i * 26 + (h2(i, 7) * 8 | 0), y = by + 10 + (h2(7, i) * 4 | 0); P(g, '#2a302e', x, y - 5, 4, 6); P(g, '#4a5a52', x, y - 5, 4, 1); if (i % 3 === 0) { P(g, '#2a302e', x - 1, y - 3, 6, 1); } }
+    banner = [bx + 27, Math.round(by - 120 * sc * 0.68) - 28];
   }
-  for (let x = bx + 36; x < bx + 42; x += 3) { P(g, stone, x, by - 61, 2, 3); P(g, rim, x, by - 61, 2, 1); }
-  P(g, dk, bx + 49, by - 44, 1, 4); P(g, dk, bx + 50, by - 46, 1, 3); P(g, dk, bx + 51, by - 45, 1, 1);   // Riss
-  for (let y = by - 18; y < by + 8; y++) for (let x = bx - 6; x < bx + 6; x++) {   // Tor: Bogen, Fallgitter
-    const dx = x - bx + 0.5, top = by - 12 - Math.sqrt(Math.max(0, 36 - dx * dx)) * 0.9;
-    if (y >= top) P(g, (x - bx + 6) % 3 === 0 || (y - by) % 4 === 0 ? '#2a201c' : '#070505', x, y);
-  }
-  titleCache.windows = [[bx - 66, by - 26], [bx - 64, by - 14], [bx + 42, by - 44], [bx + 44, by - 30], [bx + 50, by - 18], [bx - 30, by - 12], [bx + 22, by - 12], [bx - 4, by - 26]];
-  for (const [x, y] of titleCache.windows) { P(g, '#0a0707', x - 1, y - 1, 3, 5); }
-  titleCache.banner = [bx + 1, by - 36]; titleCache.fire = [Math.max(Math.round(lw * 0.30), 40), Math.round(lh * 0.86)];   // schmal: Rastende nicht abschneiden   // Banner auf dem Torhaus
+  titleCache.windows = W; titleCache.banner = banner; titleCache.fire = [Math.max(Math.round(lw * 0.30), 40), Math.round(lh * 0.86)];   // schmal: Rastende nicht abschneiden
   // Vordergrund: dunkler Boden, zerbrochener Torpfeiler links
   for (let x = 0; x < lw; x++) { const yy = Math.round(lh * 0.9 + Math.sin(x / 23) * 1.5); P(g, '#0e0b0a', x, yy, 1, lh - yy); }
   for (let y = Math.round(lh * 0.78); y < lh; y++) { const w = Math.round((y - lh * 0.78) * 0.9 + 10 + h2(1, y) * 2); P(g, y % 5 === 0 ? '#050404' : '#0a0807', 0, y, w, 1); P(g, '#231a18', w, y); }
-  titleCache.key = key; titleCache.back = back; titleCache.mid = mid;
+  titleCache.key = key; titleCache.back = back; titleCache.mid = mid; titleCache.theme = TH; titleCache.tk = TITLE_T;
   return titleCache;
+}
+// Eigene Bewegung je Thema (über dem Hintergrund, vor dem Feuer)
+function titleExtra(o, P, L, lw, lh, t, back = false) {
+  const k = L.tk;
+  if (back) { if (k === 'karak') for (let c2 = 0; c2 < 4; c2++) { const x = Math.round(lw - ((t / 140 + c2 * 11) % (lw + 60))), y = Math.round(lh * 0.6), st = (t / 200 + c2) % 2 < 1;
+      P('#1a120a', x, y, 6, 2); P('#1a120a', x + 2, y - 1, 2, 1); P('#1a120a', x - 1, y - 2, 1, 3); P('#1a120a', x - 2, y - 3, 2, 1); P('#1a120a', x + (st ? 0 : 1), y + 2, 1, 2); P('#1a120a', x + (st ? 5 : 4), y + 2, 1, 2); } return; }
+  if (k === 'aurelion') {                                   // Luftschiff zieht langsam durchs Bild, Positionslicht blinkt
+    const x = ((t / 90) % (lw + 120)) - 60, y = Math.round(lh * 0.22 + Math.sin(t / 2000) * 2);
+    for (let yy = -4; yy <= 4; yy++) { const ww = Math.round(Math.sqrt(1 - (yy / 4.5) ** 2) * 16); P(yy < -2 ? '#8a7ab0' : '#3a3552', x - ww, y + yy, ww * 2, 1); }
+    P('#2a2640', x - 5, y + 5, 10, 2); P('#2a2640', x + 15, y - 3, 3, 6); if (t % 1400 < 300) P('#ff5a4a', x - 16, y);
+    P('#e0fbff', x - 3, y + 5); P('#e0fbff', x + 1, y + 5);
+  } else if (k === 'goblin') {                              // Sporen und Glühwürmchen schweben
+    for (let i = 0; i < 26; i++) { const pp = (t / 60 + i * 53) % (lh * 0.7), x = (h2(i, 2) * lw + Math.sin(t / 900 + i) * 6) | 0, y = lh * 0.9 - pp; if ((t / 300 + i) % 4 > 1) P(i % 3 ? '#8ad04a' : '#d8ff90', x, y); }
+  } else if (k === 'eisenfeste') {                          // Rauch aus den Schloten, Glut flackert
+    for (const [sx, sy] of L.stacks || []) for (let i = 0; i < 14; i++) { const pp = (t / 45 + i * 11) % 60, r = 1 + pp / 14 | 0, x = sx + Math.sin(t / 700 + i + sx) * pp / 10 + pp / 6, y = sy - pp * 0.8;
+      o.fillStyle = pp < 8 ? 'rgba(160,70,30,.8)' : `rgba(52,46,44,${(0.75 * (1 - pp / 60)).toFixed(2)})`; o.fillRect(Math.round(x - r), Math.round(y - r), r * 2 + 1, r * 2 + 1); }
+  } else if (k === 'karak') {                               // Sterne funkeln, Karawane zieht über die Düne
+    for (const [i, [x, y]] of (L.stars || []).entries()) if (Math.sin(t / 300 + i * 2.1) > 0.7) P('#fff0c0', x, y);
+  } else if (k === 'totenland') {                           // Nebelbänder und Irrlichter
+    for (let i = 0; i < 4; i++) { const y = Math.round(lh * (0.72 + i * 0.045)), off = ((t / (120 + i * 60)) % (lw + 120)) - 60;
+      for (let j = 0; j < 3; j++) { o.fillStyle = `rgba(120,200,170,${0.05 + i * 0.015})`; o.fillRect(Math.round(off + j * lw / 2.5 - i * 29), y, 50 - i * 5, 2); } }
+    for (let i = 0; i < 6; i++) { const x = (h2(i, 9) * lw + Math.sin(t / 1300 + i) * 14) | 0, y = lh * 0.74 + Math.sin(t / 700 + i * 2) * 5; if (Math.sin(t / 500 + i) > -0.3) P('#8affc8', x, y); }
+  }
 }
 let TITLE_HERO = null;
 export function setTitleHero(ch) { TITLE_HERO = ch ? { kind: 'player', pal: ch.pal, seed: ch.seed || 1, build: ch.build, equip: ch.equip || {}, body: ch.body, prof: ch.prof, spec: null } : null; }
@@ -2751,33 +2835,35 @@ export function drawTitleScene(canvas, t) {
   for (let i = 0; i < 6; i++) {                             // Wolkenbänder: flache Pixelstreifen, ziehen langsam
     const y = Math.round(lh * (0.12 + i * 0.055)), len = 60 - i * 4, off = ((t / (160 + i * 50)) % (lw + 160)) - 80;
     for (let j = 0; j < 3; j++) { const x0 = off + j * (lw / 2.2) - (i * 37 % 50), l = len - j * 9;
-      P(i < 3 ? '#1c181c' : '#2a1d1c', x0, y, l, 2); P(i < 3 ? '#1c181c' : '#2a1d1c', x0 + 6, y - 1, l - 14, 1); P('#4a2a22', x0 + 4, y + 2, l - 10, 1); }
+      const CL = L.theme.cloud || ['#1c181c', '#2a1d1c', '#4a2a22']; P(i < 3 ? CL[0] : CL[1], x0, y, l, 2); P(i < 3 ? CL[0] : CL[1], x0 + 6, y - 1, l - 14, 1); P(CL[2], x0 + 4, y + 2, l - 10, 1); }
   }
+  titleExtra(o, P, L, lw, lh, t, true);   /* hinter den Bauten (Karawane) */
   o.drawImage(L.mid, 0, 0);
   for (const [i, [x, y]] of L.windows.entries()) {         // Fenster: einige erleuchtet, flackernd
     if (i % 3 === 2) continue;
     const fl = Math.sin(t / 230 + i * 1.7) > -0.6;
-    P(fl ? '#d08a3a' : '#8a4a22', x, y, 1, 2); if (fl) P('#f0c070', x, y);
+    P(fl ? L.theme.win[0] : L.theme.win[2], x, y, 1, 2); if (fl) P(L.theme.win[1], x, y);
   }
+  titleExtra(o, P, L, lw, lh, t);   /* Nutzer: Bewegung je Ort */
   const [bnx, bny] = L.banner, sway = Math.round(Math.sin(t / 700) * 1.5);   // zerrissenes Banner am Bergfried
   P('#3a2a22', bnx - 1, bny - 14, 1, 14); P('#6e3a26', bnx - 1, bny - 14);
   for (let y = 0; y < 12; y++) { const wv = Math.round(Math.sin(t / 500 + y / 3) * 0.8) + (y > 8 ? sway : 0), ww = y > 9 ? 3 + (y & 1) : 5;
-    P(y % 4 === 0 ? '#7a2c20' : '#5b2119', bnx + wv, bny - 13 + y, ww, 1); }
-  const [fx, fy] = L.fire, f = Math.sin(t / 90) * 0.5 + 0.5;   // Lagerfeuer
-  for (let r = 7; r >= 1; r--) { o.fillStyle = `rgba(200,100,40,${0.035 * (8 - r) * (0.8 + f * 0.3)})`; o.beginPath(); o.ellipse(fx, fy + 2, r * 4, r * 1.4, 0, 0, 7); o.fill(); }
+    P(y % 4 === 0 ? L.theme.banner[0] : L.theme.banner[1], bnx + wv, bny - 13 + y, ww, 1); }
+  const [fx, fy] = L.fire, f = Math.sin(t / 90) * 0.5 + 0.5, FC = L.theme.fire || ['#b8401c', '#e07828', '#f6c868', '200,100,40'];   // Lagerfeuer (Schwarze Feste: grün)
+  for (let r = 7; r >= 1; r--) { o.fillStyle = `rgba(${FC[3]},${0.035 * (8 - r) * (0.8 + f * 0.3)})`; o.beginPath(); o.ellipse(fx, fy + 2, r * 4, r * 1.4, 0, 0, 7); o.fill(); }
   P('#2a1f16', fx - 6, fy, 12, 2); P('#3a2a1c', fx - 5, fy - 1, 4, 1); P('#3a2a1c', fx + 1, fy + 1, 5, 1); P('#15100c', fx - 7, fy + 2, 14, 1);
   const fh = 10 + Math.round(f * 3);                        // Flamme: roter Saum, oranger Körper, heller Kern
   for (let y = 0; y < fh; y++) {
     const q = 1 - y / fh, jit = Math.round(Math.sin(t / 55 + y * 1.3) * (1 - q) * 1.4), wo = Math.round(Math.pow(q, 0.8) * 5), wi = wo - 2, wc = wo - 4;
     if (wo < 0) continue;
-    P(y > fh * 0.7 ? '#7a2814' : '#b8401c', fx - wo + jit, fy - 1 - y, wo * 2 + 1, 1);
-    if (wi >= 0) P('#e07828', fx - wi + jit, fy - 1 - y, wi * 2 + 1, 1);
-    if (wc >= 0) P('#f6c868', fx - wc + jit, fy - 1 - y, wc * 2 + 1, 1);
+    P(y > fh * 0.7 ? SP.mix(FC[0], '#000000', 0.35) : FC[0], fx - wo + jit, fy - 1 - y, wo * 2 + 1, 1);
+    if (wi >= 0) P(FC[1], fx - wi + jit, fy - 1 - y, wi * 2 + 1, 1);
+    if (wc >= 0) P(FC[2], fx - wc + jit, fy - 1 - y, wc * 2 + 1, 1);
   }
-  if (f > 0.6) P('#b8401c', fx - 2 + Math.round(Math.sin(t / 70) * 2), fy - fh - 2);   // abreißende Flammenzunge
+  if (f > 0.6) P(FC[0], fx - 2 + Math.round(Math.sin(t / 70) * 2), fy - fh - 2);   // abreißende Flammenzunge
   for (let i = 0; i < 18; i++) {                            // Funken
     const pp = (t / 26 + i * 97) % 90, px = fx + Math.sin(t / 400 + i) * (2 + pp / 10), py = fy - 6 - pp;
-    if (pp < 80) P(pp < 40 ? '#f0b060' : '#b8602a', px, py);
+    if (pp < 80) P(pp < 40 ? FC[2] : FC[0], px, py);
   }
   for (let x = 0; x < lw; x += 2) {                         // Gras vorn, wiegt im Wind
     const sw = Math.round(Math.sin(t / 900 + x / 14) * 1), hh = 4 + (h2(x, 3) * 4 | 0);
@@ -2798,4 +2884,6 @@ export function drawTitleScene(canvas, t) {
   const shade = c.createLinearGradient(0, 0, w * .62, 0);              // Lesbarkeit links (UI-Schrift), weich auslaufend
   shade.addColorStop(0, 'rgba(10,8,7,.62)'); shade.addColorStop(1, 'rgba(10,8,7,0)');
   c.fillStyle = shade; c.fillRect(0, 0, w, h);
+  c.font = `italic ${Math.max(12, Math.round(k * 4))}px Spectral, Georgia, serif`; c.textAlign = 'right'; c.fillStyle = 'rgba(217,205,178,.55)';   /* Nutzer: welcher Ort gerade zu sehen ist */
+  c.fillText(L.theme.name, w - 18, h - 16); c.textAlign = 'left';
 }
