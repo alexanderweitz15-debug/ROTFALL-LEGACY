@@ -585,6 +585,27 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 21. **Wetter im Menschenland:** eigene Wetterlagen der mittleren Länder.
 22. Zwei Sonnet-Agenten sammeln weitere Ideen und unterentwickelte Features (Nutzer).
 
+**Zusatz 01.10.2026 (nach der Lückensuche, `docs/audit/SCOUTS_2026-10-01.md`) — alle vom Nutzer gewählt:**
+
+23. Taschendiebstahl an Personen (Schleichen gegen Wahrnehmung, Zeugen).
+24. Steckbriefe jagen (Kopfgeld-Brett beim Wachhauptmann, lebend = Bonus, Ablieferung am Kerker).
+25. Siedlung bringt Gold (Ertrag aus Zonen und Gebäuden).
+26. Magie-Kombos (Frost + Blitz, Feuer + Öl …).
+27. Reittiere 2.0 (berittener Kampf, Rammen, Kamel/Wolf je Region, Zaumzeug und Rüstung sichtbar).
+28. Runen und Sockel (Tiefhall, Aurelion).
+29. Eigene Handelskarawane (Route, Wächter, Überfallrisiko, Gewinn je Rundreise).
+30. Gefährten-Szenen untereinander (Streit, Freundschaft, Eifersucht).
+31. Barde ausbauen (Repertoire, Auftritte, Verdienst).
+32. Diplomatie (Gesandte, Frieden, Bündnis, Kriegsknoten befrieden).
+33. Lehen für Ritter Varons (Ertrag, Ladungen an den Hof).
+34. Alchemie-Handel und Fallen (Apotheke, Gift-Schmuggel, Ölfass, Giftgas).
+35. Orte beleben (Szenen Schrein/Hain/Lager/Ruinen, Tributdörfer, besetzte Städte mit anderen Bannern und Wachen).
+36. Aurelheims Prachtbauten nutzbar (Bibliothek, Badehaus, Gericht, Hospital, Observatorium).
+37. Komfort-UI (Kartenlegende, eigene Markierungen, Inventar sortieren/Ramsch, Chronik-Filter, UI-Klänge).
+38. Zweite Gischtinsel und kurzer Einstieg in Eren.
+
+**Entscheide:** Vampir = Titelklasse mit Blutdurst als Ressource, Schwäche im Sonnenlicht, sozialen Folgen (Zeugen melden, Orden jagt) und heilbar (Orden oder Heilquelle Sankt Serin). Der Blutfürst am Hof ist Kanzler Aldhelm. Reihenfolge: gemischt (abwechselnd groß und klein). Der große Audit läuft parallel mit drei starken Agenten, nur als Report (`docs/audit/MASTER_REPORT.md`); die NOW-Punkte setze ich danach um.
+
 ## 6. Koop (K2)
 
 Der Netzwerk-Koop ist als eigenes Paket geplant: `docs/PLAN_COOP.md`. Reihenfolge laut Nutzer: P2 läuft parallel durch einen Opus-Agenten, K2 baut die Hauptsitzung. K1 (Couch-Koop) entfällt.
