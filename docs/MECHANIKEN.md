@@ -541,3 +541,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Geheime Gewölbe:** Schmugglergrotte, Sternkammer und Wurzelhalle stehen auf keiner Karte. Jeder geplünderte Hort enthält eine verblasste Karte zum nächsten geheimen Gewölbe; dann erscheint sein Eingang.
 - **Der Schlund (Endlosgewölbe):** beim Versunkenen Tempel. Jede Ebene ist schwerer, alle fünf Ebenen warten ein Wächter und eine Truhe (jede nur einmal). Die tiefste Ebene wird gemerkt; jede fünfte neue Bestmarke kommt in die Chronik.
 - **Debug:** „Gewölbe: alle geheimen Gewölbe aufdecken“, „Gewölbe: Schlund betreten“. Probe „Gewölbe (Nutzer §5e.3)“.
+
+## Runde: Goblins nach der Befreiung (Nutzer §5e.9, Version 21)
+- **Grubenhort wächst:** Nach dem Fall der Kette wächst Grubenhort jeden Tag ein Stück, als Außenposten von Morrgrund (wenn Dodon dein Freund ist) doppelt so schnell. Stufen: Lager, Hüttendorf (10), Grubenstadt (25), Tunnelstadt (45), Goblinfeste (70). Jede Stufe bringt Pilzgärten, Lehm- und Pilzhütten, Schrottbauten, Feuergruben, Laternen, ab Stufe 3 einen Goblintunnel und neue Bewohner.
+- **Grisk:** „Wie steht es um Grubenhort?“ nennt Stufe und Rest. Spende 10 Holz und 5 Eisen: +8 Fortschritt, Ruf bei den Goblins +3.
+- **Goblin-Helden:** Ab Ruf 20 bei den Goblins wirbt Grisk für 80 Gold einen Goblin-Helden dauerhaft an (Krieger, Schütze oder Schurke). Die Trupps auf Zeit gibt es weiter.
+- **Dodon:** Als Freund fragt man „Komm nach …“: Dodon zieht nur in das eigene Dorf (ohne Dorf lehnt er ab) und wacht dort.
+- **Menschen reagieren** (ab Grubenstadt): Valens Händler und Aurelions Gelehrte kommen (Fortschritt +1), der Weiße Orden predigt dagegen und überfällt ab Tunnelstadt manchmal die Stadt (Rückschlag).
+- **Noch offen:** die Goblin-Titelklasse.
+- **Debug:** „Goblins: Grubenhort wächst (+20)“, „Goblins: Grubenhort Stufe 4“. Probe „Goblins (Nutzer §5e.9)“.

@@ -1859,7 +1859,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -2043,7 +2043,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
@@ -7435,7 +7435,7 @@ function dodonParley(d) {
       else if (st?.state === 'active' && questComplete(k)) ch.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(d, k) }); } return ch; };
   if (S.flags.morrFriend) return UI.dialogue(d, S.flags.goblinStormWon ? '„Freund. Die Kette ist Rost. Morrgrund singt wieder. Das warst du. Und wir.“'
     : S.flags.goblinStorm ? '„Wenn du vor Varg stehst und sagst, dass er stirbt — dann kommen wir. Alle. Vergiss nicht, was es kostet.“' : '„Freund. Die Kleinen haben aufgehört, sich zu verstecken, wenn du kommst. Das ist viel.“',
-    [...quests(), { text: 'Erzähl mir von Morrgrund.', fn: () => UI.dialogue(d, '„Das letzte Dorf. Die anderen hat die Kette geholt, eins nach dem anderen. Uns fand sie nicht, weil das Moor lügt. Irgendwann findet sie uns doch. Darum bin ich groß.“', [{ text: 'Weiter', fn: () => dodonParley(d) }]) },
+    [...quests(), ...dodonHomeChoices(d), { text: 'Erzähl mir von Morrgrund.', fn: () => UI.dialogue(d, '„Das letzte Dorf. Die anderen hat die Kette geholt, eins nach dem anderen. Uns fand sie nicht, weil das Moor lügt. Irgendwann findet sie uns doch. Darum bin ich groß.“', [{ text: 'Weiter', fn: () => dodonParley(d) }]) },
       { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   const chain = (S.ranks.chain ?? -1) >= 0;
   UI.dialogue(d, chain ? '„Du riechst nach Kette. Nach Eisen und nach Angst, die nicht deine ist. Sag Dodon, warum er dich nicht zerbricht.“'
@@ -7996,6 +7996,63 @@ function mechMenu(npc = null) {
   const scope = role === 'Kybernetiker' ? '\nKybernetiker warten und rüsten auf; operieren tut die Medica.' : role === 'Medica' ? '\nDie Medica ersetzt Glieder und setzt Augen ein; warten tun die Kybernetiker.' : '';   /* Roadmap P5 */
   UI.dialogue(npc || p, `${npc && npc.key !== 'vell' ? `${npc.name} (${npc.prof})` : 'Werkbank der Prothesenmacherin'}\n${state}${priceLine}${scope}`, [...opts, ...(npc ? [{ text: 'Zurück', fn: () => talk(npc) }] : []), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   return opts;   /* Roadmap P5: für Selbsttest und Debug */
+}
+// ================= Goblins nach der Befreiung (Nutzer §5e.9) =================
+// Grubenhort wächst zur Goblinstadt (Stufen 0–4): jeden Tag ein Stück (mehr als Außenposten von Morrgrund, wenn Dodon dein Freund ist),
+// schneller mit Spenden an Grisk (10 Holz, 5 Eisen). Jede Stufe bringt Pilzhütten, Schrottbauten, Tunnel und Bewohner. Bei Grisk:
+// Goblin-Helden dauerhaft anwerben (Ruf bei den Goblins 20+). Dodon zieht auf Wunsch in dein Dorf (nur dorthin). Menschen reagieren
+// je nach Macht: Valens Händler kommen, der Orden predigt dagegen und überfällt die Stadt (Rückschlag), Aurelions Gelehrte vermessen die Tunnel.
+const GOB_LVL = [0, 10, 25, 45, 70], GOB_NAME = ['Lager', 'Hüttendorf', 'Grubenstadt', 'Tunnelstadt', 'Goblinfeste'];
+const gobCenter = () => GOBLIN_VILLAGE[0].at;
+const gobLvlOf = pts => GOB_LVL.filter(t => pts >= t).length - 1;
+function gobGrow(n, why) {
+  const G = S.gobCity ||= { pts: 0, lvl: 0 }; G.pts += n; const L = gobLvlOf(G.pts);
+  if (L > G.lvl) { G.lvl = L; ensureGobCity(); log(`Grubenhort wächst: jetzt ${GOB_NAME[L]} (Stufe ${L}).${why ? ' ' + why : ''}`, 'world'); chronicle(`Grubenhort wird ${GOB_NAME[L]}`, 'news', 'Pilzhütten, Schrott und Tunnel — die Grubenstämme bauen ihre eigene Stadt.'); UI.toast(`GRUBENHORT: ${GOB_NAME[L].toUpperCase()}`, 2600); }
+}
+function gobDay() {
+  if (!S.flags.goblinsFreed) return; const G = S.gobCity ||= { pts: 0, lvl: 0 };
+  if (S.flags.morrFriend && !S.flags.gobOutpost) { S.flags.gobOutpost = 1; log('Dodon schickt Goblins aus Morrgrund: Grubenhort ist jetzt ein Außenposten des letzten freien Dorfs.', 'world'); }
+  gobGrow(S.flags.gobOutpost ? 2 : 1);
+  if (G.lvl >= 2 && chance(0.2)) { const r = pick(['valen', 'order', 'aurel']);
+    if (r === 'valen') { gobGrow(1); log('Händler aus Valens Landen ziehen nach Grubenhort. Goblineisen verkauft sich gut.', 'world'); }
+    else if (r === 'aurel') { gobGrow(1); log('Gelehrte aus Aurelion vermessen die Tunnel von Grubenhort. Sie staunen, schreiben und bezahlen.', 'world'); }
+    else if (G.lvl >= 3 && chance(0.4)) { G.pts = Math.max(GOB_LVL[G.lvl], G.pts - 5); log('Ordensritter überfallen Grubenhort: „Ungeziefer bleibt Ungeziefer.“ Die Stadt verliert Zeit beim Wiederaufbau.', 'war'); }
+    else log('Der Weiße Orden predigt gegen das „Goblinnest“ im Süden.', 'world'); }
+}
+function ensureGobCity() {
+  const G = S.gobCity; if (!S.flags.goblinsFreed || !G?.lvl) return; const [cx, cy] = gobCenter();
+  const have = S.ents.world.filter(e => e.gobCity).length, want = G.lvl * 7; if (have >= want) return;
+  S.ents.world = S.ents.world.filter(e => !e.gobCity);
+  const KIND = [['mushrooms', 'Pilzgarten'], ['tent_prop', 'Lehmhütte'], ['tent_prop', 'Pilzhütte'], ['gearpile', 'Schrotthaufen'], ['crate_stack', 'Schrottlager'], ['firepit', 'Feuergrube'], ['broken_cart', 'Schrottkarren'], ['lantern', 'Pilzlaterne']];
+  for (let lv = 1; lv <= G.lvl; lv++) for (let i = 0; i < 5; i++) { const a = lv * 1.7 + i * 1.26, r = 6 + lv * 4, q = freeSpotNear('world', cx + Math.round(Math.cos(a) * r), cy + Math.round(Math.sin(a) * r), 2); if (!q) continue;
+    const [type, label] = KIND[(lv * 5 + i) % KIND.length]; S.ents.world.push({ id: uid(), kind: 'prop', type, map: 'world', x: q.x, y: q.y, r: 12, solid: type !== 'mushrooms', transient: true, gobCity: true, label }); }
+  if (G.lvl >= 3) { const q = freeSpotNear('world', cx - 10, cy + 12, 2); if (q) S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q.x, y: q.y, r: 12, solid: false, transient: true, gobCity: true, label: 'Goblintunnel (zu eng für dich)' }); }
+  const PROF = ['Pilzbäuerin', 'Schrottschmied', 'Tunnelgräber', 'Laternenmacher', 'Wache', 'Kräutersammlerin'];
+  for (let i = 0; i < G.lvl * 2; i++) { const a = i * 2.2, q = freeSpotNear('world', cx + Math.round(Math.cos(a) * (5 + i)), cy + Math.round(Math.sin(a) * (5 + i)), 2); if (!q) continue;
+    const c = makeChar({ name: pick(GOBLIN_NAMES), prof: PROF[i % PROF.length], x: q.x, y: q.y, level: 3 + G.lvl, faction: 'goblin', traits: ['gütig'] });
+    Object.assign(c, { goblin: true, gobCity: true, transient: true, visitor: true, freed: true, anchor: { x: q.x, y: q.y }, greet: pick(['„Eigene Stadt! Eigene Tunnel! Eigene Pilze!“', '„Grisk sagt, du hast uns frei gemacht. Willst du Pilzbier?“', '„Wir bauen tiefer. Immer tiefer.“']) });
+    c.spec = SP.monsterSpec({ mtype: i % 3 ? 'goblin' : 'goblin_warrior', seed: 40 + i }, MONSTERS.goblin); S.ents.world.push(c); }
+}
+function gobChoices(npc, choices) {
+  if (npc.key !== 'grisk' || !S.flags.goblinsFreed) return; const G = S.gobCity ||= { pts: 0, lvl: 0 }, p = S.player;
+  choices.unshift({ text: `Wie steht es um Grubenhort? (${GOB_NAME[G.lvl]})`, fn: () => UI.dialogue(npc, `„${GOB_NAME[G.lvl]}. ${G.lvl < 4 ? `Noch ${GOB_LVL[G.lvl + 1] - G.pts} Tage Arbeit bis zur nächsten Stufe — mit Holz und Eisen geht es schneller.` : 'Größer wird es nicht. Tiefer schon.'}${S.flags.gobOutpost ? ' Dodon schickt Leute aus Morrgrund.' : ''}“`, [
+    { text: 'Spenden: 10 Holz, 5 Eisen', fn: () => { if ((S.res.wood || 0) < 10 || (S.res.iron || 0) < 5) return UI.dialogue(npc, '„Zehn Holz, fünf Eisen. Aus dem Lager, nicht aus Versprechen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+      S.res.wood -= 10; S.res.iron -= 5; S.factions.goblin = clamp((S.factions.goblin || 0) + 3, -100, 100); UI.closeDialogue(); log('Grisk verteilt Holz und Eisen. Grubenhort baut schneller (Ruf bei den Goblins +3).', 'world'); gobGrow(8); } },
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if ((S.factions.goblin || 0) >= 20 && S.party.length < (p.partyCap || 3)) choices.push({ text: 'Einen Goblin-Helden anwerben (80 Gold)', fn: () => {
+    if (S.gold < 80) return UI.dialogue(npc, '„Achtzig Gold. Für Waffen und ein Abschiedsfest.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= 80; const cls = pick(['warrior', 'archer', 'rogue']), q = freeSpotNear('world', (npc.x / TS | 0) + 2, npc.y / TS | 0, 2);
+    const c = makeChar({ name: pick(GOBLIN_NAMES) + ' ' + pick(['Scharfzahn', 'Tunnelkind', 'Kettenbrecher', 'Pilzfaust']), prof: 'Goblin-Held', x: q.x, y: q.y, level: Math.max(3, (p.level || 1) - 2), faction: 'goblin', cls, traits: [pick(['mutig', 'loyal', 'ehrgeizig'])] });
+    Object.assign(c, { goblin: true, freed: true, recruit: true, morale: 70, loyal: 60 }); c.spec = SP.monsterSpec({ mtype: cls === 'warrior' ? 'goblin_warrior' : 'goblin', seed: c.seed }, MONSTERS.goblin);
+    c.equip.weapon = mkItem(cls === 'archer' ? 'shortbow' : 'goblin_hook') || mkItem('dagger'); recalc(c); S.ents.world.push(c); S.party.push(c.id);
+    UI.closeDialogue(); log(`${c.name} schließt sich dir an: „Für Grubenhort. Und ein bisschen für dich.“`, 'party'); } });
+}
+function dodonHomeChoices(d) {
+  if (!S.flags.goblinsFreed || S.flags.dodonHome) return [];
+  if (!S.settlement || S.settlement.map !== 'world') return [{ text: 'Würdest du bei mir leben?', fn: () => UI.dialogue(d, '„Dodon geht nicht zu Menschen. Nur zu dir. Aber du hast kein Dorf. Bau eins, dann komm wieder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) }];
+  return [{ text: `Komm nach ${S.settlement.name}. Mein Dorf ist dein Dorf.`, fn: () => { S.flags.dodonHome = true; const q = freeSpotNear('world', (S.settlement.x / TS | 0) + 4, S.settlement.y / TS | 0, 3) || { x: S.settlement.x, y: S.settlement.y };
+    d.x = q.x; d.y = q.y; d.anchor = { x: q.x, y: q.y }; d.approach = false; chronicle('Dodon zieht um', 'news', `Der Riese von Morrgrund lebt jetzt in ${S.settlement.name}.`);
+    UI.dialogue(d, `„Dann geht Dodon. Morrgrund hat jetzt eigene Speere.“ (Dodon lebt jetzt in ${S.settlement.name} und wacht über dein Dorf.)`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }];
 }
 function ensureGoblinVillage() {
   for (const d of GOBLIN_VILLAGE) if (!S.ents.world.some(e => e.key === d.key)) {
@@ -10245,7 +10302,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay(); familyDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay(); familyDay(); gobDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10699,7 +10756,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -11438,6 +11495,7 @@ function endTrial(won) {
     learnSpell(p, 'sp_nachtglas'); SIM.H.title('Schüler des Nachtglases'); gainXp(p, 300); chronicle(`${p.name} besteht Ilvars Endprüfung`, 'legend'); return; }
   if (!won) { UI.toast(`${TRIALS[T.kind].toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${TRIALS[T.kind]} nicht bestanden. Corvinus lässt dich es noch einmal versuchen.`, 'quest'); return; }
   const done = (S.acad ||= {}), first = !done[T.kind]; done[T.kind] = true;
+  if (S.student) S.student.trialsWon = (S.student.trialsWon || 0) + 1;   /* Fehlersuche §5e.8: Semesterfortschritt zählt jeden bestandenen Versuch, nicht nur neue Prüfungsarten (sonst Softlock, wenn alle 4 Arten schon vor der Immatrikulation bestanden waren) */
   const r0 = S.acadRank || 0; S.acadRank = acadRankOf(Object.keys(done).length);
   UI.toast(`${TRIALS[T.kind].toUpperCase()}: BESTANDEN`, 2600); log(`${TRIALS[T.kind]} bestanden.`, 'quest');
   if (first) { S.factions.aurel = clamp((S.factions.aurel || 0) + 3, -100, 100); gainXp(S.player, 60); }
@@ -11473,17 +11531,17 @@ function studentChoices(npc, choices) {
   if (isMagister(npc) && !St && !S.flags.acadBanned) choices.push({ text: 'Ich will mich als Student einschreiben. (100 Gold)', fn: () => {
     if (!hasPermit()) return UI.dialogue(npc, '„Ohne Aufenthaltsschein nimmt die Akademie niemanden. Die Kanzlei am Tor stellt ihn aus.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     if (S.gold < 100) return UI.dialogue(npc, '„Hundert Gold Semestergeld. Wissen ist nicht umsonst — nur Unwissen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-    S.gold -= 100; const rv = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.prof === 'Studentin'); S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: Object.keys(S.acad || {}).length, rival: rv?.id || null, forb: 0 };
+    S.gold -= 100; const rv = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.prof === 'Studentin'); S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: 0, trialsWon: 0, rival: rv?.id || null, forb: 0 };   /* Fehlersuche §5e.8: trialsAt zählt ab der Immatrikulation, nicht ab bereits vorher bestandenen Prüfungen */
     UI.dialogue(npc, `„Willkommen, Student. Vorlesungen jeden Morgen zwischen acht und vierzehn Uhr — sprich mich oder einen anderen Magister an. Acht Vorlesungen und eine Prüfung, dann ist das Semester geschafft.“${rv ? `\n(${rv.name} mustert dich. Eine Rivalin, das spürst du sofort.)` : ''}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
   if (!St) return;
   if (isMagister(npc)) {
     if (St.day !== day && h >= 8 && h < 14) choices.unshift({ text: `Vorlesung besuchen (${LECTURES[St.total % LECTURES.length][0]})`, fn: () => lecture(npc) });
     else if (St.day !== day) choices.push({ text: '(Vorlesungen gibt es morgens, 8–14 Uhr.)', fn: () => UI.closeDialogue() });
-    const trials = Object.keys(S.acad || {}).length;
+    const trials = St.trialsWon || 0;   /* Fehlersuche §5e.8: zählt bestandene Versuche seit der Immatrikulation, nicht Object.keys(S.acad) (nur 4 Prüfungsarten — sonst Softlock) */
     if (St.lec >= 8 && trials > St.trialsAt) choices.unshift({ text: `Semester ${St.sem} abschließen`, fn: () => semesterDone(npc) });
     else if (St.lec >= 8) choices.push({ text: '(Für den Abschluss fehlt noch eine bestandene Prüfung.)', fn: () => trialMenu(npc) });
   }
-  if (npc.id === St.rival && npc.alive) choices.unshift({ text: 'Du willst dich messen? Dann los. (Duell der Akademie)', fn: () => { UI.closeDialogue(); St.rivalDuel = true; startTrial('duel'); } });
+  if (npc.id === St.rival && npc.alive) choices.unshift({ text: 'Du willst dich messen? Dann los. (Duell der Akademie)', fn: () => { UI.closeDialogue(); St.rivalDuel = true; startTrial('duel', { x: npc.x, y: npc.y }); } });   /* Fehlersuche §5e.8: Prüfungsort war immer vor der Akademie, egal wo man der Rivalin begegnet — Distanzabbruch ließ das Duell sofort verlieren */
   if (npc.prof === 'Archivar' && St.total >= 5 && !St.caught && St.forb < 3) choices.push({ text: 'Nach der verbotenen Abteilung fragen …', fn: () => forbidden(npc) });
 }
 function lecture(npc) {
@@ -11495,7 +11553,7 @@ function lecture(npc) {
   log(`Vorlesung: ${topic}. ${npc.name} redet zwei Stunden, du schreibst mit.${k !== 'intelligence' ? ` (${SKILL_NAMES[k]} +2)` : ''}${St.total % 5 === 0 ? ' Etwas fällt an seinen Platz: Intelligenz +1.' : ''} (${St.lec}/8 im Semester)`, 'quest');
 }
 function semesterDone(npc) {
-  const St = S.student, p = S.player; St.sem++; St.lec = 0; St.trialsAt = Object.keys(S.acad || {}).length; p.attrPoints = (p.attrPoints || 0) + 1; gainXp(p, 150);
+  const St = S.student, p = S.player; St.sem++; St.lec = 0; St.trialsAt = St.trialsWon || 0; p.attrPoints = (p.attrPoints || 0) + 1; gainXp(p, 150);
   if (St.sem > 3 && !St.grad) { St.grad = true; S.acadRank = Math.max(S.acadRank || 0, 2); chronicle(`${p.name} schließt die Akademie ab`, 'legend', 'Drei Semester, ein Titel: Absolvent der Akademie von Aurelion.'); UI.toast('ABSOLVENT DER AKADEMIE', 3000); }
   UI.dialogue(npc, `„Semester ${St.sem - 1} bestanden. Ein Attributpunkt für deinen Fleiß.“${St.grad ? '\n„Und damit: Absolvent. Die Akademie kennt deinen Namen.“ (Rang mindestens Adept)' : ''}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
@@ -13150,9 +13208,11 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Goblins: Grubenhort wächst (+20)': () => { S.flags.goblinsFreed = true; gobGrow(20, '(Debug)'); },   /* Nutzer §5e.9 */
+      'Goblins: Grubenhort Stufe 4': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 70 - (S.gobCity?.pts || 0)), '(Debug)'); },
       'Gewölbe: alle geheimen Gewölbe aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].hidden) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Geheime Gewölbe auf der Karte'); },   /* Nutzer §5e.3 */
       'Gewölbe: Schlund betreten': () => enterVault('schlund'),
-      'Akademie: einschreiben (ohne Schein und Gold)': () => { S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: Object.keys(S.acad || {}).length, rival: null, forb: 0 }; S.flags.acadBanned = false; UI.toast('Student'); },   /* Nutzer §5e.8 */
+      'Akademie: einschreiben (ohne Schein und Gold)': () => { S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: 0, trialsWon: 0, rival: null, forb: 0 }; S.flags.acadBanned = false; UI.toast('Student'); },   /* Nutzer §5e.8 */
       'Akademie: 8 Vorlesungen und eine Prüfung gutschreiben': () => { if (!S.student) return UI.toast('Erst einschreiben'); S.student.lec = 8; S.student.total += 8; S.student.trialsAt = -1; UI.toast('Semester abschließbar beim Magister'); },
       'Dynastie: nächsten NPC heiraten': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.key && !e.guard && !S.party.includes(e.id)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return; S.relations[n.key] = 90; S.legacy.spouse = n.id; n.spouse = n.married = true; UI.toast(`Verheiratet: ${n.name}`); },   /* Nutzer §5e.2 */
       'Dynastie: Kind geboren': () => { const k = bearChild(); UI.toast(k.name); },
@@ -15791,6 +15851,19 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Goblins (Nutzer §5e.9): Grubenhort wächst täglich und durch Spenden, jede Stufe baut mehr, Grisk wirbt Goblin-Helden an, Dodon zieht nur ins eigene Dorf', sandbox(() => {
+    const p = stage(), f0 = { ...S.flags }, g0 = S.gobCity, r0 = { ...S.res }, st0 = S.settlement, fg = S.factions.goblin, W0 = S.ents.world.slice();
+    try { S.flags.goblinsFreed = true; S.gobCity = { pts: 0, lvl: 0 }; S.flags.gobOutpost = 1; for (let i = 0; i < 5; i++) gobDay(); const daily = S.gobCity.pts >= 10 && S.gobCity.lvl >= 1;
+      const built1 = S.ents.world.filter(e => e.gobCity).length; S.res.wood = 50; S.res.iron = 50; S.factions.goblin = 30; S.gold = 200;
+      const g = actor(330, 300, { kind: 'npc' }); g.key = 'grisk'; const ch = []; gobChoices(g, ch); ch[0].fn(); const pts0 = S.gobCity.pts;
+      document.querySelectorAll('#dlg-choices button')[0].click(); const donated = S.gobCity.pts === pts0 + 8 && S.res.wood === 40;
+      gobGrow(60); const built4 = S.ents.world.filter(e => e.gobCity).length > built1 && S.gobCity.lvl === 4;
+      S.party = []; const c2 = []; gobChoices(g, c2); c2.find(c => /Goblin-Helden/.test(c.text)).fn(); UI.closeDialogue(); const hero = S.party.length === 1 && byId(S.party[0])?.goblin;
+      S.settlement = null; const d = { x: 0, y: 0 }; const none = dodonHomeChoices(d); none[0].fn(); UI.closeDialogue(); const refused = !S.flags.dodonHome;
+      S.settlement = { name: 'Probehof', x: p.x, y: p.y, map: 'world' }; dodonHomeChoices(d)[0].fn(); UI.closeDialogue(); const moved = S.flags.dodonHome && d.anchor;
+      return daily && donated && built4 && hero && refused && !!moved;
+    } finally { S.flags = f0; S.gobCity = g0; Object.assign(S.res, r0); S.settlement = st0; S.factions.goblin = fg; S.ents.world = W0; }
   }));
   ok('Gewölbe (Nutzer §5e.3): geheime Gewölbe erst nach Karte, Hort verrät das nächste, Modifikatoren und Hebel gleich je Ebene, Hebel entriegelt, Geheimwand öffnet sich, Schlund hat alle 5 Ebenen Wächter und Truhe', sandbox(() => {
     const p = stage(), f0 = { ...S.flags }, va = structuredClone(S.vaults || {}), at0 = S.vaultAt, vm = S.vaultMod, ents0 = S.ents.vault, mv = MAPS.vault, dv = { ...DUNGEONS.vault }, sites0 = S.ents.world.filter(e => e.vaultSite);
