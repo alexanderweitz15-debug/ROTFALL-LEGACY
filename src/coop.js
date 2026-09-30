@@ -35,6 +35,12 @@ export function openPanel(api) {
       <label>Dein Name <input id="coop-name" maxlength="14" value="${(localStorage.getItem('rotfall.coop.name') || 'Gast').replace(/"/g, '')}"></label>
       <div class="coop-row"><button id="coop-host" class="plaque">Spiel öffnen (Host)</button><span class="ledger">nutzt deinen Spielstand</span></div>
       <div class="coop-row"><input id="coop-code" placeholder="Code" maxlength="6" style="text-transform:uppercase"><button id="coop-join" class="plaque">Beitreten (Gast)</button></div>
+      <details class="ledger"><summary>Verbindung klappt nicht? (Schul- oder Firmennetz)</summary>
+        Manche Netze sperren direkte Verbindungen zwischen Rechnern. Dann hilft ein Relay-Server (TURN), z. B. ein kostenloses Konto bei metered.ca oder ein eigener coturn. Beide Spieler tragen dasselbe ein.
+        <label>TURN-Adresse <input id="coop-turn" placeholder="turn:beispiel.de:443" value="${(localStorage.getItem('rotfall.coop.turn') || '').replace(/"/g, '')}"></label>
+        <label>Benutzer <input id="coop-tuser" value="${(localStorage.getItem('rotfall.coop.tuser') || '').replace(/"/g, '')}"></label>
+        <label>Passwort <input id="coop-tpass" type="password" value="${(localStorage.getItem('rotfall.coop.tpass') || '').replace(/"/g, '')}"></label>
+      </details>
       <div id="coop-status" class="ledger">Bereit.</div>
       <div id="coop-guests"></div>
       <button id="coop-close" class="plaque">Schließen</button>
@@ -46,6 +52,14 @@ export function openPanel(api) {
   }
   el.classList.remove('hidden');
 }
+// Verbindungsdaten: öffentliche STUN-Server von Google, dazu optional ein eigener TURN-Server (Relay) aus dem Koop-Fenster
+function peerOpts() {
+  const url = ($('coop-turn')?.value || '').trim(), user = ($('coop-tuser')?.value || '').trim(), pass = $('coop-tpass')?.value || '';
+  localStorage.setItem('rotfall.coop.turn', url); localStorage.setItem('rotfall.coop.tuser', user); localStorage.setItem('rotfall.coop.tpass', pass);
+  const ice = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+  if (url) ice.push({ urls: url.split(/[\s,]+/).filter(Boolean), username: user, credential: pass });
+  return { debug: 0, config: { iceServers: ice } };
+}
 const myName = () => { const n = ($('coop-name')?.value || 'Gast').trim().slice(0, 14) || 'Gast'; localStorage.setItem('rotfall.coop.name', n); return n; };
 
 // ---------------------------------------------------------------- Host
@@ -54,7 +68,7 @@ async function host() {
   if (!A.isRunning() && !A.hasSave()) return status('Kein Spielstand. Erst eine Geschichte anfangen, dann Koop öffnen.');
   status('Verbinde mit dem Vermittler …');
   const Peer = await loadPeer(); const code = rnd6();
-  peer = new Peer('rotfall-' + code, { debug: 0 });
+  peer = new Peer('rotfall-' + code, peerOpts());
   await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
   S.coop = { role: 'host', code, guests: {}, bytes: 0, t0: now() };
   A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.hostDied = hostDied; A.coopHooks.afterHeir = afterHeir;
@@ -74,11 +88,36 @@ function hostLobby() {
   const S = A.S, G = Object.values(S.coop.guests), box = $('coop-guests'); if (!box) return;
   const all = G.every(g => g.ready && g.choice);
   box.innerHTML = `<h3>Warteraum</h3><div class="ledger">${S.coop.started ? 'Das Spiel läuft. Wer bereit ist, kommt sofort dazu.' : 'Wenn alle bereit sind, startest du.'}</div>` +
-    `<div class="coop-lobby"><div>★ ${esc(S.player?.name || myName())} (Host) — bereit</div>` +
-    G.map(g => `<div>${g.ready ? '✔' : '…'} ${esc(g.name)} — ${g.choice ? esc(choiceText(g.choice)) : 'wählt noch'}${g.ready ? ' — bereit' : ''}</div>`).join('') + '</div>' +
+    '<div id="coop-cards" class="coop-cards"></div>' +
     (S.coop.started ? '<button class="plaque" id="coop-back">Weiterspielen</button>' : `<button class="plaque" id="coop-start" ${all ? '' : 'disabled'}>Spiel starten${G.length ? '' : ' (allein, Gäste können später dazukommen)'}</button>`);
+  const cards = lobbyCards(); drawCards($('coop-cards'), cards); broadcast({ t: 'cards', cards });   /* alle sehen dieselben Karten */
   if ($('coop-start')) $('coop-start').onclick = startCoop;
   if ($('coop-back')) $('coop-back').onclick = () => $('coop-panel').classList.add('hidden');
+}
+// Karten im Warteraum wie bei einem Kampfspiel: Spielername oben, Figur, Charaktername, Stufe, Klasse, Bereit
+function figOf(e) { if (!e) return null; const eq = {}; for (const k of ['weapon', 'offhand', 'head', 'chest', 'cloak']) if (e.equip?.[k]) eq[k] = { key: e.equip[k].key };
+  return { name: e.name, level: e.level, cls: A.CLASSES[e.currentClass]?.name || e.prof || '', pal: e.pal, build: e.build, equip: eq }; }
+function heroFig() { const S = A.S; if (S.player) return figOf(S.player); try { const d = A.loadRaw(); return figOf(d && Object.values(d.ents || {}).flat().find(e => e?.kind === 'player')); } catch (e) { return null; } }
+function choiceFig(g) {
+  const S = A.S, c = g.choice; if (!c) return null;
+  if (c.mode === 'new') { const o = A.ORIGINS[c.cfg.origin] || {}, eq = {}; for (const k of o.gear || []) { const sl = A.ITEMS[k]?.slot; if (['weapon', 'offhand', 'head', 'chest', 'cloak'].includes(sl) && !eq[sl]) eq[sl] = { key: k }; }
+    return { name: c.cfg.name, level: c.cfg.level || Math.max(1, (heroFig()?.level || 1) - 2), cls: o.name || '', pal: c.cfg.pal, build: c.cfg.build, equip: eq }; }
+  if (c.mode === 'saved') return figOf(S.coopHeroes?.[g.name]);
+  return figOf(A.byId(c.entId));
+}
+function lobbyCards() {
+  const S = A.S;
+  return [{ who: myName(), host: true, ready: true, fig: heroFig() }, ...Object.values(S.coop.guests).map(g => ({ who: g.name, ready: g.ready || !!g.entId, fig: g.entId ? figOf(A.byId(g.entId)) : choiceFig(g) }))];
+}
+function drawCards(box, cards) {
+  if (!box) return;
+  box.innerHTML = cards.map((c, i) => `<div class="coop-card${c.ready ? ' ready' : ''}"><div class="cc-who">${esc(c.who)}${c.host ? ' ★' : ''}</div><canvas width="120" height="150" data-card="${i}"></canvas>` +
+    (c.fig ? `<div class="cc-name">${esc(c.fig.name)}</div><div class="cc-sub">Stufe ${c.fig.level || 1}${c.fig.cls ? ' · ' + esc(c.fig.cls) : ''}</div>` : '<div class="cc-name">…</div><div class="cc-sub">wählt noch</div>') +
+    `<div class="cc-state">${c.ready ? 'BEREIT' : 'nicht bereit'}</div></div>`).join('');
+  [...box.querySelectorAll('canvas[data-card]')].forEach(cv => { const c = cards[+cv.dataset.card]; if (!c.fig) return; const x = cv.getContext('2d');
+    x.save(); x.translate(60, 128); x.scale(2.4, 2.4);
+    try { A.R.drawHumanoid({ kind: 'npc', x: 0, y: 0, pal: c.fig.pal || {}, facing: 0, seed: 1, build: c.fig.build || 'ausgewogen', equip: c.fig.equip || {}, aim: Math.PI / 2 - 0.35 }, performance.now(), x); } catch (e) { /* Figur nicht zeichenbar: Karte bleibt leer */ }
+    x.restore(); });
 }
 const esc = t => String(t).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
 function choiceText(c) { return c.mode === 'heir' || c.heir ? `Erbe „${c.name || c.cfg?.name}“` : c.mode === 'new' ? `neuer Charakter „${c.cfg?.name}“ (${A.ORIGINS[c.cfg?.origin]?.name || 'Wanderer'})` : c.mode === 'saved' ? `spielt „${c.name}“ weiter` : `übernimmt ${c.name}`; }
@@ -303,9 +342,9 @@ let lastCode = '', me = null, joined = false, inSeq = 0, inAcc = 0, lastIn = '';
 async function join(code) {
   if (!/^[A-Z0-9]{6}$/.test(code)) return status('Der Code hat 6 Zeichen.');
   status('Verbinde …'); const Peer = await loadPeer();
-  peer = new Peer({ debug: 0 }); await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
+  peer = new Peer(peerOpts()); await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
   conn = peer.connect('rotfall-' + code, { reliable: true }); lastCode = code;
-  { const c0 = conn; setTimeout(() => { if (c0 === conn && !c0.open && A.S.coop?.role !== 'guest') status('Keine Antwort vom Host. Code prüfen; der Host muss sein Spiel offen haben. Nochmal „Beitreten“ drücken.'); }, 20000); }
+  { const c0 = conn; setTimeout(() => { if (c0 === conn && !c0.open && A.S.coop?.role !== 'guest') status('Keine Verbindung zum Host. Entweder stimmt der Code nicht, der Host hat sein Spiel nicht offen — oder euer Netz sperrt direkte Verbindungen (oft in Schul- und Firmennetzen). Dann einen TURN-Server eintragen (siehe oben) oder ein anderes Netz nutzen, z. B. einen Handy-Hotspot.'); }, 20000); }
   setInterval(() => send({ t: 'ping' }), 2000);   /* Lebenszeichen auch bei der Figurenwahl und im Hintergrund (keine Bildschleife), sonst trennt der Host nach 10 s */
   conn.on('open', () => { conn.send(JSON.stringify({ t: 'hello', name: myName(), ver: VER })); status('Verbunden. Warte auf den Spielstand des Hosts …'); });
   conn.on('data', onGuestData); conn.on('close', () => { status('Verbindung beendet.'); A.UI.toast('KOOP: VERBINDUNG BEENDET', 4000); A.log('Koop: Die Verbindung zum Host ist weg. Zum Weiterspielen die Seite neu laden.', 'party'); });
@@ -334,6 +373,7 @@ function onGuestData(raw) {
   if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills, currentClass: d.currentClass, knownClasses: d.knownClasses, titleClass: d.titleClass, titleClasses: d.titleClasses, tgrade: d.tgrade, tree: d.tree, skillPoints: d.skillPoints, abilities: d.abilities, spells: d.spells, titles: d.titles }); if (d.ranks) S.ranks = d.ranks;   /* eigene Ränge des Gasts */ A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
   if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
   if (d.t === 'toast') { A.UI.toast(d.text); return; }
+  if (d.t === 'cards') { lobbyCardsData = d.cards; drawCards($('coop-cards'), d.cards); return; }
   if (d.t === 'shop') { shopData = d; guestShop(); return; }
   if (d.t === 'dlg') { if (d.close) { if (!shopData && !tradeOpen) A.UI.closeDialogue(); return; } const npc = A.byId(d.npcId) || { name: d.name }; A.UI.dialogue(npc, d.text, d.opts.map((text, i) => ({ text, fn: () => send({ t: 'cmd', kind: 'dlg', i }) }))); return; }
   if (d.t === 'modal') { A.UI.openModal(d.name, me); return; }
@@ -343,11 +383,11 @@ function onGuestData(raw) {
 function keepLocal(list) { const S = A.S; return list.filter(e => e.kind === 'prop' || e === S.player || S.party.includes(e.id) || (!SENT.has(e.kind) && !e.transient)); }   /* Gast: nur was der Host nie schickt */
 // Gast: Warteraum. Eigenen Charakter erstellen (dieselbe Maske wie bei einer neuen Geschichte), gespeicherten weiterspielen
 // oder einen Gefährten übernehmen; dann „Bereit“. Der Host startet, wenn alle bereit sind (läuft das Spiel schon: sofort).
-let myChoice = null, iAmReady = false;
+let myChoice = null, iAmReady = false, lobbyCardsData = null;
 function showLobby(d) {
   const el = $('coop-panel'); el.classList.remove('hidden'); if (d) showLobby.d = d; d = showLobby.d; if (!d) return;
   const box = $('coop-guests');
-  box.innerHTML = `<h3>Warteraum bei ${esc(d.hostName)}</h3>${d.note ? `<p class="ledger">${esc(d.note)}</p>` : ''}` +
+  box.innerHTML = `<h3>Warteraum bei ${esc(d.hostName)}</h3>${d.note ? `<p class="ledger">${esc(d.note)}</p>` : ''}<div id="coop-cards" class="coop-cards"></div>` +
     `<div class="ledger">Deine Wahl: <b>${myChoice ? esc(choiceText(myChoice)) : 'noch keine'}</b></div>` +
     (d.heirs ? '<div class="ledger">Deine Erben:</div>' + d.heirs.map((h, i) => `<button class="plaque" data-heir="${i}">${esc(h.name)} — ${esc(h.origin)}, Stufe ${h.level}</button>`).join('') : d.locked ? '' : `<button class="plaque" id="coop-new">Eigenen Charakter erstellen</button>`) +
     (d.saved ? `<button class="plaque" id="coop-saved">Mit ${esc(d.saved.name)} weiterspielen (Stufe ${d.saved.level})</button>` : '') +
@@ -360,6 +400,7 @@ function showLobby(d) {
   if ($('coop-saved')) $('coop-saved').onclick = () => choose({ mode: 'saved', name: d.saved.name });
   [...box.querySelectorAll('[data-pick]')].forEach(b => b.onclick = () => choose({ mode: 'companion', entId: b.dataset.pick, name: d.party.find(p => p.id === b.dataset.pick)?.name }));
   $('coop-ready').onclick = () => { iAmReady = !iAmReady; send({ t: 'ready', on: iAmReady }); showLobby(); };
+  if (lobbyCardsData) drawCards($('coop-cards'), lobbyCardsData);
   status(iAmReady ? 'Bereit. Warte auf den Host …' : 'Verbunden.');
 }
 function applyEnts(d) {
@@ -475,3 +516,4 @@ export function fakeGuest(api, entId) {
   return { conn: c, input: inp => { const g = S.coop.guests.fake; g.inp = { seq: (g.inp?.seq || 0) + 1, ...inp }; g.at = now(); }, drop: () => dropGuest('fake'), send: d => onHostData(c, JSON.stringify(d)) };   /* send: Nachricht wie vom Gast (cmd, chat, pick) */
 }
 export const version = VER;
+export const peerState = () => ({ id: peer?.id, open: peer?.open, disconnected: peer?.disconnected, destroyed: peer?.destroyed, conn: conn?.open });   /* Fehlersuche (?dev) */
