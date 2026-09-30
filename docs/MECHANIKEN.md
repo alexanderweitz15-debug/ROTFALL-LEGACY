@@ -518,3 +518,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Am Grab (E):** Erbstücke bergen, das Epitaph lesen oder „Epilog: Was von … bleibt“. Der Epilog erzählt die großen Taten dieser Generation (jede Tat zählt nur für die Generation, in der sie geschah), wie berühmt der Held war, welche Macht ihn ehrte (Ruf ab 30) und welche ihn verflucht (Ruf ab −30), wer an seiner Seite ging und ob seine Siedlung steht.
 - **Danach die Wahl:** „Gleich weiter“ oder „Zwanzig Jahre später …“ (nur am Grab des letzten Vorfahren, einmal je Generation, nicht im Koop): 1200 Tage vergehen, Held und Gefährten altern um 20 Jahre, der Held steigt 4 Stufen auf, offene Aufträge und Banden verfallen.
 - **Debug:** „Epilog: Ahnengrab hier“. Probe „Epilog (Nutzer §5e.10)“.
+
+## Runde: Dynastie (Nutzer §5e.2, Version 21)
+- **Heirat:** Wer dich sehr mag (Beziehung 60+), erwachsen ist und einen Namen hat, bietet im Gespräch „Willst du mein Leben teilen?“. Unter Beziehung 75 kann die Antwort „noch nicht“ sein (einmal am Tag fragen). Der Ehepartner bleibt daheim; im Gespräch: „Wie geht es den Kindern?“.
+- **Kinder:** Verheiratet kommt ab und zu ein Kind zur Welt (1 % am Tag, höchstens vier eigene). Ein Spieljahr sind 60 Tage; mit 16 ist ein Kind erwachsen (Log-Meldung) und kann erben. „Zwanzig Jahre später“ lässt Kinder mitaltern.
+- **Adoption:** Beim Priester ein Waisenkind aufnehmen (50 Gold, 4–12 Jahre alt). Einen Freund fürs Leben kann man fragen: „Willst du mein Erbe sein?“ (Loyalität +10).
+- **Erbfolge:** Beim Tod stehen zuerst eigene erwachsene Kinder, dann der Ehepartner, dann Gefährten zur Wahl; entfernte Verwandte nur noch, wenn Plätze frei sind (höchstens drei).
+- **Debug:** „Dynastie: nächsten NPC heiraten“, „Dynastie: Kind geboren“, „Dynastie: Kinder altern 16 Jahre“. Probe „Dynastie (Nutzer §5e.2)“.
