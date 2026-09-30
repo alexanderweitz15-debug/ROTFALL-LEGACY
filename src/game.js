@@ -2278,7 +2278,7 @@ function update(dt, now) {
   if (hudTimer > 180) {
     hudTimer = 0; UI.refreshHUD(); UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
-    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, p.lens ? 28 : 18);                       // S12: Nebel der Karte
+    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, B.fogR(p));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
     if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); myRaidTick(); bigSecond(); lostGobTick(); aurelTick(); conTick(); jailTick(); }
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }

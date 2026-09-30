@@ -293,7 +293,7 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 
 **Sonnet-Testfall:** Nachts in der Wildnis ohne und mit Auge Stufe 3 je einen Screenshot vergleichen. Kartennebel-Radius messen. Speichern, laden, Auge vorhanden.
 
-**Status: FERTIG (Logik, Items, UI, Debug, Probe).** `body.js`: `EYE_Q`, `eyeOf`, `fogR`, `lightR`, `eyeCrit`, `attachEye`, `wearEye`, `bionicDefaults`. `game.js`: Zweig `use: 'eye'` in `useConsumable`, `eyeOptions` in `mechMenu` (ersetzt die Linse), Fernkampf-Krit in `hurtFromProjectile`, Magie-Verschleiß in `hurt()` (`EYE_ZAP`), X-Zeile in `activeEffects`, Migration in `continueGame`, Debug „Bionik“. Offen, weil in gesperrten Bereichen der Hauptsitzung: Aufruf `B.fogR(p)` statt `p.lens ? 28 : 18` im `update()`-Nebel und `lightR(pl, …)` sowie Wärmesicht in `render.js drawLight`. Bis dahin wirkt jedes eingesetzte Auge wie die alte Linse (28 Felder), weil `attachEye` `p.lens` setzt.
+**Status: FERTIG (Logik, Items, UI, Debug, Probe).** `body.js`: `EYE_Q`, `eyeOf`, `fogR`, `lightR`, `eyeCrit`, `attachEye`, `wearEye`, `bionicDefaults`. `game.js`: Zweig `use: 'eye'` in `useConsumable`, `eyeOptions` in `mechMenu` (ersetzt die Linse), Fernkampf-Krit in `hurtFromProjectile`, Magie-Verschleiß in `hurt()` (`EYE_ZAP`), X-Zeile in `activeEffects`, Migration in `continueGame`, Debug „Bionik“. Nebel (`B.fogR(p)` in `update()`) und Nachtsicht (`lightR` in `render.js drawLight`) hat die Hauptsitzung angeschlossen; die Wärmesicht (Stufe 4) zeichnet `drawLight` als glühenden Umriss um Gegner im Dunkeln.
 
 ### P3 — Roboterarm, -bein, Hand- und Fußmodule, Sichtbarkeit (P0)
 

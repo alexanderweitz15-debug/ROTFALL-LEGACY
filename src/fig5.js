@@ -359,6 +359,9 @@ const XHELM = new Set(['horned', 'crown', 'plume', 'visor', 'mech', 'skull']);
 const LIMB_I = { larm: 0, rarm: 1, lleg: 2, rleg: 3 }, limbSt = (L, p) => L.ms ? +L.ms[LIMB_I[p]] || 0 : 0;
 const stumpOf = a => [a[0], [a[0][0] + (a[1][0] - a[0][0]) * 0.75, a[0][1] + (a[1][1] - a[0][1]) * 0.75]];
 const limpOf = (a, sx) => [a[0], [a[0][0] + sx * 0.5, a[0][1] + 6], [a[0][0] + sx, a[0][1] + 12]];   // schlaff herabhängend
+/* Roadmap P3: Prothese (Status 3 in L.ms) als Messingglied — Ärmel und Hand bzw. Hosenbein in L.gold/L.metal statt Stoff und Haut */
+const mechArm = (L, part, X) => limbSt(L, part) === 3 && L.gold ? { s: L.gold, m: 'metal', h: L.metal || L.gold, hm: 'metal' } : { s: X.sleeve, m: X.sleeveMat, h: X.hand, hm: 'skin' };
+const mechLeg = (L, part, X) => limbSt(L, part) === 3 && L.gold ? [L.gold, 'metal'] : [X.pants, X.bone ? 'bone' : 'cloth'];
 const fixArm = (L, part, a, sx) => { const st = limbSt(L, part); if (st === 1) { const l = limpOf(a, sx); STUMPS.push(l[1]); return l; } return st === 2 ? stumpOf(a) : a; };   // schlaff: Blut am Ellbogen
 function arm(C, pid, hid, pts, w, hand, bone) {
   if (pid < 0) return;
@@ -400,11 +403,11 @@ function paintSN(C, L, R, back, plan, W, pose) {
   if (L.quiver && !back) { const q = C.part(L.leather, 'leather'); C.poly(q, [[20, 6 + by], [22, 5 + by], [23.5, 13 + by], [21.5, 14 + by]]); meta.quiverTop = [21, 5 + by]; }
   if (L.pack && !back) C.rect(C.part(L.wood ? dimR(L.leather, 0.1) : L.leather, 'cloth'), 11, 10 + by, 20, 12 + by);
   const ids = {};
-  for (const [k, a] of [['L', aL], ['R', aR]]) if (armBehind(a)) { ids['arm' + k] = C.part(dimR(X.sleeve, 0.2), X.sleeveMat, { grp: 'arm' + k }); ids['hand' + k] = C.part(dimR(X.hand, 0.2), 'skin'); arm(C, ids['arm' + k], ids['hand' + k], a, X.bone ? 2 : 3, X.hand, X.bone); }
+  for (const [k, a] of [['L', aL], ['R', aR]]) if (armBehind(a)) { const M3 = mechArm(L, (k === 'L') !== back ? 'rarm' : 'larm', X); ids['arm' + k] = C.part(dimR(M3.s, 0.2), M3.m, { grp: 'arm' + k }); ids['hand' + k] = C.part(dimR(M3.h, 0.2), M3.hm); arm(C, ids['arm' + k], ids['hand' + k], a, X.bone ? 2 : 3, M3.h, X.bone); }
   // 2 Beine und Stiefel
   const walkBack = R.lL[2]?.[1] < 40.5 ? 'L' : R.lR[2]?.[1] < 40.5 ? 'R' : '';
   for (const [k, l] of [['L', R.lL], ['R', R.lR]]) {
-    const dim = k === walkBack ? 0.12 : 0, pl = C.part(dimR(X.pants, dim), X.bone ? 'bone' : 'cloth', { grp: 'leg' + k });
+    const [lc, lm] = mechLeg(L, (k === 'L') !== back ? 'rleg' : 'lleg', X), dim = k === walkBack ? 0.12 : 0, pl = C.part(dimR(lc, dim), lm, { grp: 'leg' + k });
     C.limb(pl, l, X.legW, X.legW - (X.bone ? 0 : 0.5)); meta.limbs[k === 'L' ? (back ? 'rleg' : 'lleg') : (back ? 'lleg' : 'rleg')] = [l[1][0], l[1][1]];
     if (l.length === 2) { STUMPS.push(l[1]); ids['leg' + k] = pl; continue; }
     const pb = C.part(X.boots ? dimR(X.boots, dim) : dimR(L.skin, dim + 0.1), X.boots ? 'leather' : 'skin');
@@ -447,8 +450,8 @@ function paintSN(C, L, R, back, plan, W, pose) {
   if (back && L.pack) { const pk = C.part(L.leather, 'leather'); C.rect(pk, 11, top + 1, 20, top + 11); C.rect(C.part(dimR(L.cloth, 0.05), 'cloth'), 11, top - 1, 20, top); ids.pack = pk; }
   // 7 Arme
   for (const [k, a] of [['L', aL], ['R', aR]]) if (!armBehind(a)) {
-    const pa = C.part(X.sleeve, X.sleeveMat, { grp: 'arm' + k }), ph = C.part(X.hand, 'skin');
-    arm(C, pa, ph, a, X.aw, X.hand, X.bone); ids['arm' + k] = pa; ids['hand' + k] = ph; (meta.arms ||= []).push([pa, a]);
+    const M3 = mechArm(L, (k === 'L') !== back ? 'rarm' : 'larm', X), pa = C.part(M3.s, M3.m, { grp: 'arm' + k }), ph = C.part(M3.h, M3.hm);
+    arm(C, pa, ph, a, X.aw, M3.h, X.bone); ids['arm' + k] = pa; ids['hand' + k] = ph; (meta.arms ||= []).push([pa, a]);
     meta.limbs[(k === 'L') !== back ? 'rarm' : 'larm'] = [a[1][0], a[1][1]];
   }
   // 8 Schulterstücke
@@ -554,15 +557,15 @@ function paintW(C, L, R, plan, W, pose) {
   const cloakHem = L.capeL ? 46 : Math.min(46, Math.max(X.hemRow + 4, 38) + by), cs = R.cs;
   if (L.cloak) C.poly(C.part(L.cloak, 'cloth', { grp: 'cloak', folds: true }), [[16 + ln, top - 1], [19 + ln, top], [21 + ln + cs * 0.5, top + 8], [22 + cs, cloakHem], ...rag(22 + cs, 13 + cs * 0.5, cloakHem, 9, 2), [13 + cs * 0.5, cloakHem - 1], [15 + ln, top + 10]]);
   // 2 ferner Arm, fernes Bein
-  const far = 0.28, farArm = C.part(dimR(X.sleeve, far), X.sleeveMat, { grp: 'armF' }), farHand = C.part(dimR(X.hand, far), 'skin');
-  arm(C, farArm, farHand, sh(aF, ln), X.aw, X.hand, X.bone); meta.limbs.larm = aF[1];
-  const lF = C.part(dimR(X.pants, 0.22), X.bone ? 'bone' : 'cloth', { grp: 'legF' }), bF = C.part(X.boots ? dimR(X.boots, 0.2) : dimR(L.skin, 0.3), X.boots ? 'leather' : 'skin');
+  const far = 0.28, MF = mechArm(L, 'larm', X), farArm = C.part(dimR(MF.s, far), MF.m, { grp: 'armF' }), farHand = C.part(dimR(MF.h, far), MF.hm);
+  arm(C, farArm, farHand, sh(aF, ln), X.aw, MF.h, X.bone); meta.limbs.larm = aF[1];
+  const LF = mechLeg(L, 'lleg', X), lF = C.part(dimR(LF[0], 0.22), LF[1], { grp: 'legF' }), bF = C.part(X.boots ? dimR(X.boots, 0.2) : dimR(L.skin, 0.3), X.boots ? 'leather' : 'skin');
   C.limb(lF, R.lF, X.legW, X.legW - 0.5); if (R.lF.length === 3) bootW(C, bF, R.lF[2], !X.boots); else STUMPS.push(R.lF[1]); meta.limbs.lleg = R.lF[1];
   // 3 Rucksack, Köcher (auf dem Rücken)
   if (L.pack) { const pk = C.part(L.leather, 'leather'); C.rect(pk, 18 + ln, top + 1, 21 + ln, top + 11); C.rect(C.part(dimR(L.cloth, 0.05), 'cloth'), 17 + ln, top - 1, 21 + ln, top); ids.pack = pk; }
   if (L.quiver) { const q = C.part(L.leather, 'leather'); C.poly(q, [[18 + ln, 5 + by], [20 + ln, 5 + by], [21 + ln, 22 + by], [19 + ln, 22 + by]]); meta.quiverTop = [19 + ln, 5 + by]; }
   // 4 nahes Bein
-  const lN = C.part(X.pants, X.bone ? 'bone' : 'cloth', { grp: 'legN' }), bN = C.part(X.boots || dimR(L.skin, 0.1), X.boots ? 'leather' : 'skin');
+  const LN = mechLeg(L, 'rleg', X), lN = C.part(LN[0], LN[1], { grp: 'legN' }), bN = C.part(X.boots || dimR(L.skin, 0.1), X.boots ? 'leather' : 'skin');
   C.limb(lN, R.lN, X.legW, X.legW - 0.5); if (R.lN.length === 3) bootW(C, bN, R.lN[2], !X.boots); else STUMPS.push(R.lN[1]); meta.limbs.rleg = R.lN[1];
   ids.legL = lN; ids.legR = lF; ids.bootL = bN; ids.bootR = bF;
   // 5 Rock
@@ -589,8 +592,8 @@ function paintW(C, L, R, plan, W, pose) {
   if (X.ab >= 2 && (L.armor === 'plate' || L.armor === 'chain') && !L.robe) { const tp = C.part(L.armorR, 'metal', { grp: 'tasset' }), d = X.ab >= 3 ? 7 : 5;   // S15 P1: Beinplatte
     C.poly(tp, [[12 + ln, waist + 1.5], [17.5 + ln, waist + 1.5], [17 + ln, waist + d], [11 + ln, waist + d - 1]]); ids.tassets = [tp]; }
   // 7 naher Arm
-  const nArm = C.part(X.sleeve, X.sleeveMat, { grp: 'armN' }), nHand = C.part(X.hand, 'skin');
-  arm(C, nArm, nHand, sh(aN, ln), X.aw, X.hand, X.bone); ids.armL = nArm; ids.handL = nHand; meta.limbs.rarm = aN[1]; meta.arms = [[nArm, sh(aN, ln)]];
+  const MN = mechArm(L, 'rarm', X), nArm = C.part(MN.s, MN.m, { grp: 'armN' }), nHand = C.part(MN.h, MN.hm);
+  arm(C, nArm, nHand, sh(aN, ln), X.aw, MN.h, X.bone); ids.armL = nArm; ids.handL = nHand; meta.limbs.rarm = aN[1]; meta.arms = [[nArm, sh(aN, ln)]];
   if (L.pauldR || L.armor === 'plate' || L.pb) { const PB = L.asy ? 0 : L.pb | 0, pp = C.part(L.pauldR || L.armorR, 'metal');
     C.rows(pp, top - 1 - PB, (PB === 2 ? [[14, 18], [12, 19], [11, 19], [11, 19], [12, 19], [12, 18], [13, 17]] : PB === 1 ? [[14, 17], [12, 19], [12, 19], [12, 18], [13, 17]] : [[14, 17], [13, 18], [13, 18], [14, 17]]).map(([a, b]) => [a - (X.sh >> 1), b + (X.sh >> 1)]), ln); ids.pauld = [pp]; }
   if (L.furR) { const f = C.part(L.furR, 'cloth', { grp: 'fur' }); C.rows(f, top - 2, [[13, 19], [12, 20], [12, 20]], ln); ids.fur = f; }
