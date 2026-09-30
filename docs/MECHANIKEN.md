@@ -548,7 +548,6 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Goblin-Helden:** Ab Ruf 20 bei den Goblins wirbt Grisk für 80 Gold einen Goblin-Helden dauerhaft an (Krieger, Schütze oder Schurke). Die Trupps auf Zeit gibt es weiter.
 - **Dodon:** Als Freund fragt man „Komm nach …“: Dodon zieht nur in das eigene Dorf (ohne Dorf lehnt er ab) und wacht dort.
 - **Menschen reagieren** (ab Grubenstadt): Valens Händler und Aurelions Gelehrte kommen (Fortschritt +1), der Weiße Orden predigt dagegen und überfällt ab Tunnelstadt manchmal die Stadt (Rückschlag).
-- **Noch offen:** die Goblin-Titelklasse.
 - **Debug:** „Goblins: Grubenhort wächst (+20)“, „Goblins: Grubenhort Stufe 4“. Probe „Goblins (Nutzer §5e.9)“.
 
 ## Runde: Tiefhall — Königsstadt der Zwerge (Nutzer §5d.6, Version 21)
@@ -566,3 +565,13 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Seehandel:** Laderaum mit 20 Plätzen. Salz, Tuch, Korn und Pökelfleisch haben in jedem Hafen eigene Preise (z. B. Salz billig in Salzhafen, teuer auf Tangkron); verkauft wird zu 90 % des Hafenpreises.
 - **Rumpf:** Sturm, Enterer und Riffe beschädigen den Rumpf (nie unter 5 %). Reparatur beim Kapitän: 2 Gold je Prozent.
 - **Debug:** „Seefahrt: eigenes Schiff geben“. Probe „Freie Seefahrt (Nutzer §5d.9)“.
+
+## Runde: Titelklasse Grubenhäuptling (Nutzer §5e.9, Version 21)
+- **Freischalten:** bei Grisk, sobald die Stämme frei sind, Grubenhort mindestens Grubenstadt ist und der Ruf bei den Goblins 40 erreicht. Preis: Intelligenz −1 für immer; Goblins +20, Orden −10.
+- **Stammesmut (Ressource, 0–100):** wächst von selbst +2/s, dazu +2/s je Goblin in Gruppe oder Gefolge in der Nähe (bis +8). Allein und ohne Kampf schwindet er (−1/s) — das ist der Makel.
+- **Passiv Stammesbande:** Goblins in deiner Gruppe machen +10 % Schaden.
+- **Grad I:** Goblinhorde (drei Stammeskrieger für 25 s, 40 Mut), Schrottbombe (Einschlag vor dir, trifft im Umkreis, setzt oft in Brand, 25 Mut).
+- **Grad II „Trommler der Stämme“:** Kriegstrommel (du und alle Verbündeten in der Nähe +15 % Schaden für 10 s, 35 Mut), Tunnelsprung (bis 160 px weiter wieder hervorbrechen, Feinde am Ausgang taumeln, 20 Mut).
+- **Grad III „Stimme Dodons“:** Dodons Echo (Schaden und langes Taumeln für alle Feinde in 180 px, 60 Mut).
+- **Grade:** Taten = Feinde besiegen, während ein Goblin an deiner Seite kämpft; Grisk weiht (30 Taten + Stufe 8, dann 90 + Stufe 16).
+- **Debug:** „Goblins: Grubenhäuptling-Voraussetzungen“ und „Titelklasse freischalten: Grubenhäuptling“. Probe „Grubenhäuptling (Nutzer §5e.9)“.

@@ -112,6 +112,7 @@ export function damageOf(c) {
   if (c.titleClass === 'monk' && gearOf(c) >= 2 && (!it || ['polearm', 'spear', 'staff'].includes(it.wtype))) m += 0.3;   // S15 Robe der Stillen Hand: Stange und leere Hand
   if (stat(c, 'wolf_form') && gearOf(c) >= 2) m += 0.25;                              // S15 Hainfell: stärkerer Biss
   if (stat(c, 'song')) m += 0.15;                                                      // Kriegslied
+  if (c.goblin && S.party.includes(c.id) && S.player?.titleClass === 'goblinlord') m += 0.1;   /* §5e.9 Stammesbande */
   m += setOf(c)?.bonus.dmg || 0;                                                       // S13: Set-Bonus
   // Balance-Runde: der feste Anteil (Attribut, Übung, Stufe) kommt je Treffer dazu — ohne Ausgleich war der Dolch (300 ms) viermal so
   // stark wie der Zweihänder. Jetzt wächst er mit der Schwungdauer (600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2);
@@ -8149,6 +8150,9 @@ function ensureGobCity() {
 }
 function gobChoices(npc, choices) {
   if (npc.key !== 'grisk' || !S.flags.goblinsFreed) return; const G = S.gobCity ||= { pts: 0, lvl: 0 }, p = S.player;
+  if (G.lvl >= 2 && (S.factions.goblin || 0) >= 40 && !(p.titleClasses || []).includes('goblinlord')) choices.unshift({ text: 'Mach mich zu einem von euch. (Titelklasse Grubenhäuptling)', fn: () => {   /* §5e.9 */
+    if (!unlockTitle('goblinlord', 'Grubenhort')) return UI.dialogue(npc, '„Das geht nicht. Du trägst schon zu viel anderes auf den Schultern.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    UI.dialogue(npc, '„Dann bist du jetzt Häuptling der Gruben. Die Stämme folgen dir — solange du uns nicht vergisst.“ (Grisk weiht dich auch zu höheren Graden.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
   choices.unshift({ text: `Wie steht es um Grubenhort? (${GOB_NAME[G.lvl]})`, fn: () => UI.dialogue(npc, `„${GOB_NAME[G.lvl]}. ${G.lvl < 4 ? `Noch ${GOB_LVL[G.lvl + 1] - G.pts} Tage Arbeit bis zur nächsten Stufe — mit Holz und Eisen geht es schneller.` : 'Größer wird es nicht. Tiefer schon.'}${S.flags.gobOutpost ? ' Dodon schickt Leute aus Morrgrund.' : ''}“`, [
     { text: 'Spenden: 10 Holz, 5 Eisen', fn: () => { if ((S.res.wood || 0) < 10 || (S.res.iron || 0) < 5) return UI.dialogue(npc, '„Zehn Holz, fünf Eisen. Aus dem Lager, nicht aus Versprechen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
       S.res.wood -= 10; S.res.iron -= 5; S.factions.goblin = clamp((S.factions.goblin || 0) + 3, -100, 100); UI.closeDialogue(); log('Grisk verteilt Holz und Eisen. Grubenhort baut schneller (Ruf bei den Goblins +3).', 'world'); gobGrow(8); } },
@@ -12118,6 +12122,7 @@ function gradeReady(c, key) { const g = gradeOf(c, key), N = GRADE_NEED[g]; retu
 const GRADE_LORE = {
   necromancer: ['„Die Toten kennen jetzt deinen Namen. Lass sie nicht nur stehen — lass sie brechen, wenn es nötig ist.“', '„Du hältst nicht mehr nur Knochen. Du hältst Seelen. Die Stille Schar nennt dich Herr.“'],
   warlock: ['„Er flüstert lauter, seit du kamst. Gib ihm eine Seuche, und er gibt dir mehr.“', '„Du hast das Tor gesehen. Jetzt öffne es — und schließ es wieder, wenn du kannst.“'],
+  goblinlord: ['„Die Trommel gehört dir. Schlag sie, und die Stämme laufen. Und die Tunnel? Die kennst du jetzt auch.“', '„Du brüllst, und die Erde brüllt mit. So hat Dodon uns gerettet. Jetzt rettest du uns.“'],   /* §5e.9 */
   druid: ['„Der Hain hat dir Dornen wachsen lassen. Sie gehören dir. Und der Wolf läuft jetzt aus deinem Ruf.“', '„Du rennst mit dem Rudel, als wärst du darin geboren. Dann sei es auch.“'],
   monk: ['„Du weichst nicht mehr aus. Du lässt vorbei — und gibst zurück. Das ist der Strom.“', '„Nichts mehr zu lernen. Nur noch still sein. Und wer dich trifft, wird es auch.“'],
 };
@@ -12182,6 +12187,11 @@ function corrupt(p, n) {                                     // Hexenmeister: Ve
   else setTres(p, v);
 }
 function titleTick(c, dt) {
+  if (c.titleClass === 'goblinlord') {                     /* §5e.9: Stammesmut wächst mit Goblins in der Nähe, schwindet allein */
+    const gobs = [...partyMembers(), ...(S.ents[c.map] || []).filter(e => e.servant === c.id)].filter(g => g.alive && (g.goblin || /goblin/.test(g.mtype || '')) && dist(g, c) < 300).length;
+    const fighting = combat.some(e => e.alive && isHostile(c, e) && dist(c, e) < 300);
+    setTres(c, tres(c) + dt / 1000 * (gobs || fighting ? 2 + Math.min(8, gobs * 2) : -1)); return;
+  }
   if (c.titleClass === 'druid') {                          // Wildkraft wächst nur draußen; Waldgänger heilt; Metall erstickt
     if (inNature(c) && c.alive && !c.downed) {
       const metal = ['chain_hauberk', 'plate_cuirass'].includes(c.equip.chest?.key) ? 0.5 : 1;
@@ -12222,6 +12232,7 @@ function titleOnDeath(c) {
   if (p.titleClass === 'warlock' && c.hexed > performance.now()) setTres(p, tres(p) - 15);
   // S15 Titelgrade: Taten zählen. Nekromant: jeder Tote in der Nähe; Hexenmeister: Verfluchte; Druide: Feinde draußen in der Wildnis
   const foe = c.kind === 'enemy' && !c.servant && dist(p, c) < 280;
+  if (foe && p.titleClass === 'goblinlord' && [...partyMembers(), ...S.ents[p.map].filter(e => e.servant === p.id)].some(g => g.alive && (g.goblin || /goblin/.test(g.mtype || '')) && dist(g, p) < 300)) titleDeed(p);   /* §5e.9 */
   if (foe && (p.titleClass === 'necromancer' || (p.titleClass === 'warlock' && c.hexed > performance.now()) || (p.titleClass === 'druid' && p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0)))) titleDeed(p);
   if (c.plague && c.hexed > performance.now()) {                     // S15 Seuchenfluch springt weiter
     const n = (node(p, 'w_plague') ? 3 : 2) + (gearOf(p) >= 3 ? 1 : 0);
@@ -12298,6 +12309,23 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
       if (!f) { UI.toast('Keine Seele in Reichweite, die sich binden ließe.'); return false; }
       f.soulBound = performance.now() + 15000; fx(f.x, f.y - 14, 'necro', 14); S.fx.push({ x: f.x, y: f.y - 20, vx: 0, vy: 0, type: 'ring', s: 2, life: 800, maxLife: 800 });
       float(f, 'Seele gebunden', 'rgba(143,217,176,ALPHA)'); return true; }
+    case 'gob_horde': {                                      /* §5e.9 Grubenhäuptling */
+      for (let i = 0; i < 3; i++) { const d = spawnEnemy('goblin_warrior', p.map, (p.x / TS | 0) + [-1, 1, 0][i], (p.y / TS | 0) + [1, 1, -1][i], { level: Math.max(2, p.level) });
+        if (d) { Object.assign(d, { name: 'Stammeskrieger', servant: p.id, transient: true, until: performance.now() + 25000, soulServ: true, goblin: true }); fx(d.x, d.y - 8, 'dust', 10); } }
+      float(p, 'Für die Gruben!', 'rgba(154,208,90,ALPHA)', true); sfx('metal', 0.6, 1); return true; }
+    case 'scrap_bomb': {
+      const a = p.aim ?? 0, bx = p.x + Math.cos(a) * 110, by = p.y + Math.sin(a) * 110;
+      for (const f of foes) if (Math.hypot(f.x - bx, f.y - by) < 80) { hurt(f, 18 + (p.attributes.strength || 8) * 1.2 + p.level, p, 'Schrottbombe'); if (chance(0.5)) applySpellStatus(f, { key: 'burning', chance: 1 }, p); f.stagger = Math.max(f.stagger || 0, 400); }
+      fx(bx, by - 8, 'dust', 22); fx(bx, by - 8, 'blood', 4); S.fx.push({ x: bx, y: by, vx: 0, vy: 0, type: 'shock', s: 1.1, life: 450, maxLife: 450 }); camShake(5, 180); sfx('metal', 0.9, 1); return true; }
+    case 'war_drum': {
+      for (const a of [p, ...partyMembers(), ...S.ents[p.map].filter(e => e.servant === p.id && e.alive)]) if (dist(a, p) < 300) addStatus(a, { key: 'song', name: 'Kriegstrommel', good: true, left: 10000, desc: 'Schaden +15 %.' });
+      S.fx.push({ x: p.x, y: p.y - 6, vx: 0, vy: 0, type: 'ring', s: 2.2, life: 700, maxLife: 700 }); camShake(3, 300); sfx('metal', 0.4, 1); return true; }
+    case 'tunnel_dash': {
+      const a = p.aim ?? 0; let tx = p.x, ty = p.y; for (let d = 20; d <= 160; d += 10) { const x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d; if (solidTile(p.map, x, y)) break; tx = x; ty = y; }
+      fx(p.x, p.y, 'dust', 14); p.x = tx; p.y = ty; fx(tx, ty, 'dust', 16); for (const f of foes) if (dist(f, p) < 60) f.stagger = Math.max(f.stagger || 0, 900); camShake(3, 150); return true; }
+    case 'dodon_call': {
+      for (const f of foes) if (dist(p, f) < 180) { hurt(f, 20 + p.level * 1.5, p, 'Dodons Echo'); f.stagger = Math.max(f.stagger || 0, 1800); f.swing = 0; f.telegraph = 0; f.windup = false; }
+      S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'shock', s: 1.8, life: 800, maxLife: 800 }); camShake(8, 400); UI.toast('„DODON!“', 1400); return true; }
     case 'thorns':                                           // S15 Druide Grad II
       addStatus(p, { key: 'thorns', name: 'Dornenhaut', good: true, left: 10000, desc: 'Nahkampftreffer gegen dich kommen zum Teil zurück.' }); fx(p.x, p.y - 12, 'heal', 12); return true;
     case 'wolf_form': {                                      // S15 Druide Grad III
@@ -13325,6 +13353,7 @@ function debugSections() {
       'Seefahrt: eigenes Schiff geben': () => { S.ship = { name: 'Probe-Möwe', hull: 70, cargo: {}, cap: 20, at: 'saltport' }; UI.toast('Eigenes Schiff (beim Kapitän in Salzhafen/Kupferhafen)'); },   /* Nutzer §5d.9 */
       'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
       'Tiefhall: Freund der Halle': () => { S.flags.dwarfFriend = 1; UI.toast('Freund der Tiefhall'); },
+      'Goblins: Grubenhäuptling-Voraussetzungen (Stufe 2, Ruf 40)': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 25 - (S.gobCity?.pts || 0))); S.factions.goblin = Math.max(40, S.factions.goblin || 0); UI.toast('Bei Grisk freischalten'); },   /* §5e.9 */
       'Goblins: Grubenhort wächst (+20)': () => { S.flags.goblinsFreed = true; gobGrow(20, '(Debug)'); },   /* Nutzer §5e.9 */
       'Goblins: Grubenhort Stufe 4': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 70 - (S.gobCity?.pts || 0)), '(Debug)'); },
       'Gewölbe: alle geheimen Gewölbe aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].hidden) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Geheime Gewölbe auf der Karte'); },   /* Nutzer §5e.3 */
@@ -15588,7 +15617,7 @@ export function selftest() {
     p.level = 8; (p.tdeed ||= {}).necromancer = 30; const T = gradeTalk({ key: 'ysra', name: 'Ysra' }); T.fn(); UI.closeDialogue();
     const g2 = gradeOf(p) === 2 && titleAbilities(p).includes('corpse_blast') && !titleAbilities(p).includes('soul_bind');
     const Tw = TITLE_CLASSES.warlock, old = Math.max(1, ...Tw.abilities.map(k => Tw.grades.findIndex(g => g.includes(k)) + 1));
-    const data = Object.values(TITLE_CLASSES).every(T2 => T2.grades.flat().every(k => ABILITIES[k]?.title) && T2.mentor && NPCS.some(n => n.key === T2.mentor) && T2.gradeNames.length === 3);
+    const data = Object.values(TITLE_CLASSES).every(T2 => T2.grades.flat().every(k => ABILITIES[k]?.title) && T2.mentor && (NPCS.some(n => n.key === T2.mentor) || GOBLIN_VILLAGE.some(n => n.key === T2.mentor)) && T2.gradeNames.length === 3);
     return g1 && early && g2 && old === 3 && data;
   }));
   ok('Nekromant Grad II/III (S15): Leichenbersten trifft im Umkreis; Seelenfessel lässt den Toten in eigener Gestalt dienen; Einsamer Rufer schließt Legion aus', sandbox(() => {
@@ -15990,6 +16019,17 @@ export function selftest() {
       S.flags.dwarfFriend = 0; const shut = !!shopRefusal(smith); S.flags.dwarfFriend = 1; const open = !shopRefusal(smith) || /zu/.test(shopRefusal(smith));
       return gate && !!king && !!smith && Z.filter(e => e.dwarf).length >= 12 && reach && shut && open && Z.some(e => e.portal === 'deep');
     } finally { S.flags.dwarfFriend = f0; S.ents.zwerge = z0; MAPS.zwerge = mz; }
+  }));
+  ok('Grubenhäuptling (Nutzer §5e.9): Grisk verleiht den Titel ab Grubenstadt und Ruf 40, Mut wächst mit Goblins, Horde ruft drei Krieger, Trommel stärkt die Gruppe, Grad II vom Meister', sandbox(() => {
+    const p = stage(), g0 = S.gobCity, f0 = S.flags.goblinsFreed, r0 = S.factions.goblin;
+    try { S.flags.goblinsFreed = true; S.gobCity = { pts: 30, lvl: 2 }; S.factions.goblin = 45; const g = actor(330, 300, { kind: 'npc' }); g.key = 'grisk';
+      const ch = []; gobChoices(g, ch); ch.find(c => /Grubenhäuptling/.test(c.text)).fn(); UI.closeDialogue(); setTitleClass('goblinlord'); const has = p.titleClass === 'goblinlord';
+      const m0 = tres(p), gob = actor(300, 300, { kind: 'npc' }); gob.goblin = true; gob.x = p.x + 20; gob.y = p.y; S.party = [gob.id]; titleTick(p, 1000); const grow = tres(p) === m0 + 4;
+      setTres(p, 100); combat = S.ents.__a.filter(e => e.alive); titleAbility(p, 'gob_horde', ABILITIES.gob_horde); const horde = S.ents.__a.filter(e => e.servant === p.id && e.mtype === 'goblin_warrior').length === 3;
+      titleAbility(p, 'war_drum', ABILITIES.war_drum); const drum = stat(p, 'song') && stat(gob, 'song');
+      p.level = 8; (p.tdeed ||= {}).goblinlord = 30; const T = gradeTalk({ key: 'grisk', name: 'Grisk' }); T.fn(); UI.closeDialogue(); const g2 = gradeOf(p) === 2 && titleAbilities(p).includes('tunnel_dash');
+      return has && grow && horde && drum && g2;
+    } finally { S.gobCity = g0; S.flags.goblinsFreed = f0; S.factions.goblin = r0; }
   }));
   ok('Goblins (Nutzer §5e.9): Grubenhort wächst täglich und durch Spenden, jede Stufe baut mehr, Grisk wirbt Goblin-Helden an, Dodon zieht nur ins eigene Dorf', sandbox(() => {
     const p = stage(), f0 = { ...S.flags }, g0 = S.gobCity, r0 = { ...S.res }, st0 = S.settlement, fg = S.factions.goblin, W0 = S.ents.world.slice();
