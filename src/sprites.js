@@ -294,6 +294,52 @@ const ARMOR_LOOK = {
   eisenfuersthelm: { helm: 'great', helmCol: '#18181a', crest: '#3a1114' },
 };
 // S12: Leute der Kette sehen nicht geklont aus — Schulterstück, Schärpe, Maske, Umhang je nach Person (seed)
+// Nutzer (Dauerauftrag, PLAN_ROADMAP §5b): mehr Vielfalt bei Goblins und Untoten. Varianten kommen aus dem Seed der Figur,
+// damit jede nach dem Laden gleich aussieht. Nur Felder aus SPEC_KEYS (Frame-Cache); je Art wenige Stufen, damit der Cache klein bleibt.
+const pickH = (arr, h, k) => arr[Math.abs((h >> (k * 3)) | 0) % arr.length];
+function varyGoblin(s, t, seed) {
+  const h = (seed * 977) | 0;
+  s.skin = pickH(['#556b34', '#4a6a3a', '#6a7a3a', '#5a5a3e', '#3e5a44', '#6b6a44'], h, 0);   // Moosgrün, Olive, Lehmgrau, Sumpfgrün
+  s.bd = pickH(['', 'drahtig', 'gedrungen', '', 'drahtig'], h, 1);
+  s.cloth = pickH(['#3a2e1e', '#4a3a24', '#2e2a1e', '#3e3222', '#4a2e1e'], h, 2);
+  if (t === 'goblin') {
+    const look = Math.abs(h >> 9) % 6;
+    if (look === 1) Object.assign(s, { helm: 'cap', helmCol: pickH(['#5a4e40', '#6b6156', '#4a3a2a'], h, 4) });   // Blechkappe
+    else if (look === 2) Object.assign(s, { hooded: 1, hood: pickH(['#3a2e1e', '#2e3a24', '#4a3a28'], h, 4), cloak: '#2a2418' });   // Späher mit Kapuze
+    else if (look === 3) Object.assign(s, { fur: pickH(['#4a3a26', '#6a5a3a', '#3a2e22'], h, 4) });   // Fellkragen
+    else if (look === 4) Object.assign(s, { mark: 'chevron', markCol: pickH(['#8a2a20', '#c8bca0', '#6a8a3a'], h, 4), sash: '#6a2a1c' });   // Kriegsbemalung
+    else if (look === 5) Object.assign(s, { armor: 'leather', armorCol: '#4a3a28', strap: 1, pouch: 1 });   // Plünderer mit Riemen
+  } else if (t === 'goblin_warrior') {
+    const look = Math.abs(h >> 9) % 4;
+    if (look === 1) Object.assign(s, { helm: 'horned', helmCol: '#4a4038', pauld: '#c8bca0' });   // Hörnerhelm, Knochenschulter
+    else if (look === 2) Object.assign(s, { armor: 'chain', armorCol: '#5a5650', shield: '', fur: '#4a3a26' });   // erbeutetes Kettenhemd
+    else if (look === 3) Object.assign(s, { helm: 'nasal', helmCol: '#6a6258', shieldCol: '#5a2a1c', markCol: '#8a2a20' });
+  }
+}
+function varyUndead(s, t, seed) {
+  const h = (seed * 613) | 0;
+  if (s.sp === 'skeleton') s.skin = pickH(['#cfc8b4', '#d8d0b0', '#b8ae96', '#a8a498', '#c8b890', '#9a9488'], h, 0);   // Elfenbein, vergilbt, grau, erdig
+  if (!s.glow || s.glow === '#4e8f7a') s.glow = pickH(['#4e8f7a', '#4e8f7a', '#6fb04a', '#5a8ac8', '#8fe0b0', '#c05a3a'], h, 1);   // meist Grün-Türkis, selten Blau, Rot
+  s.bd = pickH(['', 'drahtig', '', 'gedrungen', 'drahtig'], h, 2);
+  const look = Math.abs(h >> 9) % 6;
+  if (t === 'skeleton') {
+    if (look === 1) Object.assign(s, { hooded: 0, helm: 'cap', helmCol: pickH(['#5a4e40', '#6a5a44', '#4a4640'], h, 4) });   // rostige Kappe
+    else if (look === 2) Object.assign(s, { hooded: 0, armor: 'chain', armorCol: '#4a4a46', tabard: pickH(['#2a1416', '#1c2230', '#2a2a1c'], h, 4) });   // Reste einer Rüstung
+    else if (look === 3) Object.assign(s, { hooded: 0, helm: '', shield: 'round', shieldCol: '#3a3228' });   // barhäuptig mit Schildrest
+    else if (look === 4) Object.assign(s, { hood: pickH(['#2a1a1a', '#1a2a24', '#2a2a30'], h, 4), cloak: '#141214' });   // andere Leichentücher
+    else if (look === 5) Object.assign(s, { hooded: 0, helm: 'nasal', helmCol: '#5a6068', pauld: '#3a3e44' });   // gefallener Soldat
+  } else if (t === 'zombie' || t === 'ghoul') {
+    s.cloth = pickH(['#3a3024', '#2e3a2a', '#3a2a2a', '#2a2a30', '#4a3a28'], h, 3);   // verschiedene Totenhemden
+    s.pants = pickH(['#2e281e', '#2a2a24', '#3a2e24'], h, 4);
+    if (look === 1) Object.assign(s, { apron: 1, apronCol: '#5a5040' });   // Handwerker
+    else if (look === 2) Object.assign(s, { hooded: 1, hood: '#2a2620' });  // Bettler mit Kapuze
+    else if (look === 3) Object.assign(s, { armor: 'chain', armorCol: '#4a463e' });   // Söldner
+    else if (look === 4) Object.assign(s, { robe: s.cloth, stole: '#4a1418' });   // Priesterrock
+  } else if (t === 'bone_archer') {
+    if (look % 2) Object.assign(s, { hooded: 0, helm: 'cap', helmCol: '#4a4640' });
+    if (look >= 3) s.cloak = pickH(['#1a1c20', '#2a1a14', '#1a2a20'], h, 4);
+  }
+}
 function varyChain(s, seed) {
   const h = (seed * 131) | 0;
   if (!s.pauld && h % 3 === 0) s.pauld = h % 2 ? '#26272b' : '#4a1418';
@@ -516,6 +562,8 @@ export function monsterSpec(e, m) {
     s.armor = 'chain'; s.armorCol = '#8a8f98'; s.helm = 'great'; s.helmCol = '#9aa3b0'; s.crest = '#39599c';
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
   }
+  if (t === 'goblin' || t === 'goblin_warrior') varyGoblin(s, t, e.seed || 0);   /* Nutzer §5b: Vielfalt */
+  else if (['skeleton', 'zombie', 'ghoul', 'bone_archer'].includes(t) && !e.boss) varyUndead(s, t, e.seed || 0);
   const EL = { chain_master: ['blutkette', 'blutkettenhelm'], garmadon: ['totenkrone', 'schaedelhelm'], death_knight: ['totenkrone'], hrodvar: ['totenkrone'], death_captain: ['generalspanzer'] }[t];   // S14: Bosse im Endgame-Set
   if (EL) for (const k of EL) Object.assign(s, ARMOR_LOOK[k], t === 'hrodvar' ? { armorCol: '#5d7383', rn: '#9fd8ff', cloak: '#16202a', pauld: '#8fb3c7' } : t === 'garmadon' ? { cloak: '#2a0a0c', rn: '#e03a2a', ge: '#e03a2a' } : {});
   if (e.shield && !s.shield) { s.shield = 'round'; s.shieldCol = '#4a3f30'; s.mark = 'boss'; s.markCol = '#8a8172'; }
@@ -565,6 +613,7 @@ const POSES = {
   guard: { u: 1, leg: 1, act: 'guard' },                              // Deckung: tief, Schrittstellung, Arme vor dem Körper
   sit: { u: 4, leg: 0, act: 'sit' },                                  // Sitzen (Bank, Schenke): Oberschenkel waagrecht
   trade: { u: 0, leg: 0, act: 'trade' },                              // Handeln: Ware vorzeigen, Hand offen
+  zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
 };
 
 // ---------------- Menschen / Goblins / Skelette ----------------
@@ -1004,6 +1053,7 @@ export function poseOf(e, now, bow) {
     if (e.act.kind === 'rise') return { dir: d, pose: k < 0.5 ? 'kneel' : 'hit' };                // vom Boden hoch: Knie, dann wankend
     if (e.act.kind === 'strike') return { dir: d, pose: k < 0.4 ? 'a2' : 'a3' };                  // Handkante: Stoß und Nachgehen
     if (e.act.kind === 'trade') return { dir: d, pose: 'trade' };
+    if (e.act.kind === 'gesture') return { dir: d, pose: e.act.pose || 'zeigen' };   /* Roadmap P8 */
     return { dir: d, pose: 'kneel' };                                                             // suchen, sammeln, beten
   }
   if (e.draw > 0) return { dir, pose: 'cast' };                         // Bogen gespannt

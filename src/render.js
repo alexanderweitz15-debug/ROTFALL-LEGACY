@@ -7,6 +7,8 @@ import { buildOf, crawling, lightR, eyeOf } from './body.js?v=21';
 import * as SP from './sprites.js?v=21';
 import { trailPt, WAGON_GAP } from './sim.js?v=21';
 import { ICON_R } from './iconsR.js?v=21';
+import { airPos, airPt } from './economy.js?v=21';
+import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=21';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -85,7 +87,8 @@ export function drawFrame(now) {
       ctx.drawImage(chunkCanvas(m, cx, cy), cx * CH * TS, cy * CH * TS, CH * TS + 0.5, CH * TS + 0.5);
   prefetchChunk(m, Math.floor(x0 / CH), Math.floor(y0 / CH), Math.floor(x1 / CH), Math.floor(y1 / CH));
   const isW = (tx, ty) => tileAt(S.map, tx, ty) === T.WATER;
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
+  if (S.map === 'deck' && S.voyage?.air) drawSkyDeck(m, x0, y0, x1, y1, now);   /* Roadmap P7: an Bord eines Luftschiffs — Himmel statt Wasser */
+  else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
 
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
@@ -621,6 +624,27 @@ function vnoise(x, y) {                                   // weiches Wertrausche
   const xi = Math.floor(x), yi = Math.floor(y), u = x - xi, v = y - yi, s = t => t * t * (3 - 2 * t);
   const a = h2(xi, yi), b = h2(xi + 1, yi), c = h2(xi, yi + 1), d = h2(xi + 1, yi + 1), U = s(u), V = s(v);
   return a + (b - a) * U + (c - a) * V + (a - b - c + d) * U * V;
+}
+// Roadmap P7: Luftschiff-Deck — Wasserkacheln werden Himmel (Tag, Nacht, Sturm), Wolken ziehen vorbei, darüber der Ballon mit Tauen
+function drawSkyDeck(m, x0, y0, x1, y1, now) {
+  const min = S.minute || 0, day = min > 360 && min < 1170, storm = S.weather === 'rain';
+  const top = storm ? [58, 66, 80] : day ? [104, 150, 204] : [18, 24, 44], low = storm ? [92, 100, 110] : day ? [176, 204, 228] : [40, 48, 76];
+  for (let ty = y0; ty <= y1; ty++) { const k = clamp(ty / (m.h - 1), 0, 1), c = top.map((v, i) => Math.round(v + (low[i] - v) * k));
+    ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+    for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER) ctx.fillRect(tx * TS, ty * TS, TS + 0.5, TS + 0.5); }
+  const W0 = m.w * TS;
+  for (let i = 0; i < 9; i++) {                                     // Wolken: ziehen am Schiff vorbei (nach hinten)
+    const sp = 40 + (i % 3) * 25, x = W0 - ((now / 1000 * sp + i * 311) % (W0 + 400)) + 200, y = ((i * 197) % (m.h * TS - 80)) + 40, r = 26 + (i % 4) * 12;
+    ctx.fillStyle = storm ? 'rgba(70,74,84,.55)' : day ? 'rgba(250,252,255,.55)' : 'rgba(120,130,160,.25)';
+    ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * 0.7, 0, 0, 7); ctx.ellipse(x + r, y - r * 0.3, r, r * 0.6, 0, 0, 7); ctx.fill(); }
+  const bx = m.box; if (!bx) return;
+  const cx = (bx[0] + bx[2] + 1) / 2 * TS, cy = (bx[1] - 5) * TS + Math.sin(now / 1100) * 3, rx = (bx[2] - bx[0] + 4) / 2 * TS, ry = 3.4 * TS;
+  ctx.strokeStyle = 'rgba(60,44,28,.9)'; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let j = 0; j <= 6; j++) { const tx = (bx[0] + 1 + j * (bx[2] - bx[0] - 2) / 6) * TS; ctx.moveTo(cx - rx * 0.8 + j * rx * 1.6 / 6, cy + ry * 0.7); ctx.lineTo(tx, bx[1] * TS + 4); }
+  ctx.stroke();
+  ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(cx - rx * 0.15, cy - ry * 0.3, rx * 0.7, ry * 0.45, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c8a050'; ctx.fillRect(cx - rx, cy - 3, rx * 2, 6);
 }
 function drawWater(tx, ty, now) {                         // Wellenlinie in 2-px-Stufen
   const s = Math.sin(now / 700 + tx * 0.6 + ty * 0.4) * 0.5 + 0.5;
@@ -1734,7 +1758,7 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (w && !e.sitting) {
     const wt = wit.wtype || 'sword', ranged = RANGED_W.has(wt);
     const A = e.act && now >= e.act.at && now < e.act.until && !moving && !(e.swing > 0) ? e.act : null;
-    const ak = A ? (now - A.at) / (A.until - A.at) : 0, work = A && A.kind === 'work', low = A && !work ? (A.kind === 'rise' ? Math.round(7 * (1 - ak)) : 7) : 0;
+    const ak = A ? (now - A.at) / (A.until - A.at) : 0, work = A && A.kind === 'work', low = A && !work && A.kind !== 'gesture' ? (A.kind === 'rise' ? Math.round(7 * (1 - ak)) : 7) : 0;
     const sw = work ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
@@ -1807,7 +1831,7 @@ function swingVar(e, sw) {
 const RANGED_W = new Set(['bow', 'crossbow', 'wand', 'throw', 'sling']);
 function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
-  const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
+  const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' && A.kind !== 'gesture' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
   const sw = A && A.kind === 'work' ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;             // Arbeitsschwung: zwei Hiebe (S13: Werkzeug bestimmt das Tempo)
   const dir = A && A.dir ? { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir] : e.aim ?? 0, wt = it.wtype || 'sword', arc = it.arc || 1.4;
   const ranged = RANGED_W.has(wt), sgn = Math.cos(dir) < 0 ? -1 : 1;   // nach links gespiegelt: Waffe hängt unten, Hieb von oben
@@ -2074,10 +2098,12 @@ function telegraphArc(e, R, half, now) {
 function drawCorpse(e, now) {
   const age = e.born ? Math.max(0, now - e.born) : 9999;   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
   ctx.globalAlpha = clamp(e.life / 1000, 0, 1);
-  const pool = Math.min(14, 5 + age / 70);
-  ctx.fillStyle = 'rgba(90,18,14,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 3, pool, pool * 0.45, 0, 0, 7); ctx.fill();
+  const D = e.dc && ANIM_DEFS.death[e.dc];                  /* Roadmap P8: Blutlache nur bei blutigen Toden */
+  if (!D || D.pool) { const pool = Math.min(14, 5 + age / 70);
+    ctx.fillStyle = 'rgba(90,18,14,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 3, pool, pool * 0.45, 0, 0, 7); ctx.fill(); }
   const m = e.mtype && MONSTERS[e.mtype];
-  if (!m) {
+  if (e.spec || (D && m && !m.eye && !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'gorak', 'carrion_wing'].includes(e.mtype))) drawDeath(e, age, e.spec || SP.monsterSpec(e, m), SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m?.scale || 1));   /* Roadmap P8: Personen und Menschenähnliche mit Todesart */
+  else if (!m) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
   } else if (m.eye) {                                         // Nutzer S13: das Auge schließt sich und sinkt
@@ -2104,7 +2130,28 @@ function drawCorpse(e, now) {
   ctx.globalAlpha = 1;
 }
 
-function drawGrave(e) { const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec); }
+// Roadmap P8: Todesablauf aus ANIM_DEFS.death[e.dc] (anim.js deathPose) — Drehung, Rutschen, Einfärben, Verblassen, Zerspringen
+function drawDeath(e, age, spec, sc) {
+  const P = deathPose(e.dc || 'fall', age), sd = e.facing === 3 ? -1 : 1;
+  ctx.save(); ctx.translate(e.x + P.slide * sd, e.y + 6 + (P.lift || 0)); ctx.scale(sc, sc);
+  if (P.shards) {                                               // Erfrieren: nur Eissplitter bleiben
+    ctx.fillStyle = 'rgba(190,228,248,.85)'; for (let i = 0; i < 9; i++) { const a = i * 2.4 + (e.seed || 0), r = 4 + (i * 7) % 13; ctx.fillRect(Math.cos(a) * r, -2 + Math.sin(a) * r * 0.4, 2 + (i % 2), 2); }
+    ctx.restore(); return; }
+  if (P.jitter) ctx.translate(((age / 40) | 0) % 2 ? 0.6 : -0.6, 0);
+  if (P.rot) ctx.rotate(P.rot);
+  if (P.squash !== 1) ctx.scale(1, P.squash);
+  if (P.flip) ctx.scale(-1, 1);
+  ctx.globalAlpha *= P.alpha;
+  const f = SP.humanFrame(spec, P.dir, P.frame === 'die1' && !SP.drawnOn() ? 'kneel' : P.frame);
+  SP.blit(ctx, P.tint ? tinted(f, P.tint) : f, 0, 0);
+  if (P.head > 0 && P.head < 1) { ctx.fillStyle = spec.pal?.skin || '#d6b089'; ctx.beginPath(); ctx.arc(10 + P.head * 14, -18 + P.head * 16, 3, 0, 7); ctx.fill(); }   /* Enthauptung: der Kopf rollt */
+  ctx.restore();
+}
+export function deathFrameProbe(e, P) {                              /* Roadmap P8 Selbsttest: dasselbe Bild wie drawDeath, ohne zu malen */
+  const m = e.mtype && MONSTERS[e.mtype], spec = e.spec || SP.monsterSpec(e, m), f = SP.humanFrame(spec, P.dir, P.frame === 'die1' && !SP.drawnOn() ? 'kneel' : P.frame);
+  return P.tint ? tinted(f, P.tint) : f;
+}
+function drawGrave(e) { if (e.hidden) return; const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec); }
 // Referenz 4 (Friedhof): Rundstein, Kreuz, Stele, schiefer Stein — Kante im Licht, Riss, Moos am Fuß
 function graveShape(x, y, v, k = 1) {
   shadow(x, y + 2, 9 * k, .35);
@@ -2373,16 +2420,20 @@ function drawSkyLife(now) {
   const P = S.player, day = S.minute > 360 && S.minute < 1170;
   /* Nutzer-Bug: die Luftschiffe hingen am Spieler und zogen mit. Jetzt fliegen sie auf festen Bahnen der Welt (alle 900 px eine Bahn,
      auf jeder Bahn ein Schiff je 2600 px, periodisch und damit ohne Sprung), gezeichnet wird nur, was in der Nähe ist. */
-  if (curRegion === 'aurel') for (let ly = Math.floor((P.y - 800) / 900); ly <= Math.floor((P.y + 800) / 900); ly++) for (let lx = Math.floor((P.x - 1800) / 2600); lx <= Math.floor((P.x + 1800) / 2600); lx++) {
+  const fleet = S.air?.fleet;
+  if (fleet?.length) for (const sh of fleet) {                         /* Roadmap P6: die echte Flotte, welt-verankert (Lage aus economy.js airPos) */
+    const q = airPos(sh); if (!q) continue;
+    const gx = q[0] * TS, gy = q[1] * TS; if (Math.abs(gx - P.x) > 1600 || Math.abs(gy - P.y) > 1300) continue;
+    const fly = sh.state === 'flug', B = fly && sh.to ? airPt(sh.to) : null, A = airPt(sh.at), dir = B ? (B[0] >= A[0] ? 1 : -1) : 1;
+    drawAirship(gx, gy - (fly ? 230 : 70) + Math.sin(now / 900 + gx) * 3, 1, dir, now, fly ? 250 : 70, sh.motor < 50);
+    if (Math.hypot(gx - P.x, gy - P.y) < 420) { ctx.save(); ctx.font = '10px serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(232,220,184,.9)'; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 3;
+      const ly = gy - (fly ? 230 : 70) - 30; ctx.strokeText(sh.name, gx, ly); ctx.fillText(sh.name, gx, ly); ctx.restore(); }
+  }
+  else if (curRegion === 'aurel') for (let ly = Math.floor((P.y - 800) / 900); ly <= Math.floor((P.y + 800) / 900); ly++) for (let lx = Math.floor((P.x - 1800) / 2600); lx <= Math.floor((P.x + 1800) / 2600); lx++) {
     const off = ((ly * 7919) % 2600 + 2600) % 2600, dir = ly & 1 ? -1 : 1, t = ((dir * now / 55 + off) % 2600 + 2600) % 2600;
     const x = lx * 2600 + t, y = ly * 900 + 120 + (off % 400), s = ly & 1 ? 0.8 : 1;
     if (Math.abs(x - P.x) > 1500) continue;
-    ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x + 40, y + 260, 60 * s, 14 * s, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.ellipse(x, y, 58 * s, 22 * s, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 58 * s, y - 2, 116 * s, 4 * s); ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(x - 10 * s, y - 6 * s, 40 * s, 10 * s, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 16 * s, y + 24 * s, 32 * s, 9 * s); ctx.fillStyle = '#5a4630'; ctx.fillRect(x - 12 * s, y + 18 * s, 2, 7 * s); ctx.fillRect(x + 10 * s, y + 18 * s, 2, 7 * s);
-    ctx.fillStyle = '#e8c070'; for (let k = -12; k <= 10; k += 6) ctx.fillRect(x + k * s, y + 27 * s, 2, 2);
-    const pr = (now / 60) % 6.283; ctx.fillStyle = '#4a4440'; ctx.fillRect(x + 58 * s, y - 1 + Math.sin(pr) * 8 * s, 3, 3);
+    drawAirship(x, y, s, 1, now, 260, false);
   }
   if (day && !['aurel', 'deadland', 'blight'].includes(curRegion) && !DUNGEONS[S.map]) {
     const cyc = (now / 26000) % 1, bx = P.x - 700 + cyc * 1400, by = P.y - 240 + Math.sin(now / 5000) * 60;
@@ -2390,6 +2441,18 @@ function drawSkyLife(now) {
     for (let i = 0; i < 6; i++) { const x = bx - (i % 3) * 16 - (i > 2 ? 8 : 0), y = by + (i % 3) * 7 * (i > 2 ? -1 : 1), f = Math.sin(now / 120 + i) * 3;
       ctx.beginPath(); ctx.moveTo(x - 5, y - f); ctx.lineTo(x, y); ctx.lineTo(x + 5, y - f); ctx.stroke(); }
   }
+}
+// Luftschiff (Nutzer S13, Roadmap P6 als Hilfsfunktion): Ballon, Gondel, Propeller; Schatten h px tiefer am Boden, Rauch bei schwachem Motor
+function drawAirship(x, y, s, dir, now, h, smoke) {
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x + 40 * dir, y + h, 60 * s, 14 * s, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(x, y); if (dir < 0) ctx.scale(-1, 1);
+  ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.ellipse(0, 0, 58 * s, 22 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c8a050'; ctx.fillRect(-58 * s, -2, 116 * s, 4 * s); ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(-10 * s, -6 * s, 40 * s, 10 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2a1a'; ctx.fillRect(-16 * s, 24 * s, 32 * s, 9 * s); ctx.fillStyle = '#5a4630'; ctx.fillRect(-12 * s, 18 * s, 2, 7 * s); ctx.fillRect(10 * s, 18 * s, 2, 7 * s);
+  ctx.fillStyle = '#e8c070'; for (let k = -12; k <= 10; k += 6) ctx.fillRect(k * s, 27 * s, 2, 2);
+  const pr = (now / (smoke ? 140 : 60)) % 6.283; ctx.fillStyle = '#4a4440'; ctx.fillRect(-61 * s, -1 + Math.sin(pr) * 8 * s, 3, 3);   /* Propeller am Heck */
+  if (smoke) for (let i = 0; i < 5; i++) { const t = (now / 1600 + i / 5) % 1, r = 4 + t * 10; ctx.fillStyle = `rgba(40,36,34,${0.45 * (1 - t)})`; ctx.fillRect(-62 * s - t * 50 - r / 2, -r / 2 - t * 14, r, r); }
+  ctx.restore();
 }
 // S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
 function drawFires(now) {

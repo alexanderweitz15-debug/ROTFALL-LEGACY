@@ -92,7 +92,7 @@ export function refreshHUD() {
   let html = bar('Leben', p.hp, p.maxHp, 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
   if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
-  html += bar('Erfahrung', p.xp, p.xpNext, 'xp');
+  html += bar('Erfahrung', p.xp, p.xpNext, 'xp', p.level >= 60 ? ' · Höchststufe' : '');   // Balance-Runde: Höchststufe 60 (game.js MAX_LEVEL)
   $('pc-bars').innerHTML = html;
   $('pc-status').innerHTML = statusIcons(p);
   if (!$('pc-status').dataset.fx) { $('pc-status').dataset.fx = 1; $('pc-status').addEventListener('mouseover', fxTip); $('pc-status').addEventListener('mouseleave', () => $('fx-tip')?.classList.add('hidden'));
@@ -596,6 +596,7 @@ export function itemInfoHTML(slot, cmpWith = true) {
   const rar = slot.rar || it.rarity || 'common', leg = slot.leg || it.leg;
   let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
+  if (it.energy) h += `<div class="ledger" style="margin:4px 0">Magitech · Energie ${slot.charge ?? 100}/100 · ${it.energy} je Schuss${it.splash ? ' · Streuung' : ''}${it.pierce ? ' · durchschlägt einen Gegner' : ''}${it.mstatus ? ` · ${it.mstatus.key === 'shocked' ? 'lähmt' : 'setzt in Brand'} (${Math.round(it.mstatus.chance * 100)} %)` : ''}. Leer schießt sie nicht — Energiezelle benutzen.</div>`;   /* Roadmap C.10 */
   if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
   if (slot.used) h += `<div class="stat" title="Gebraucht vom Schwarzmarkt: kommt beim Einsetzen mit weniger Zustand."><span>Gebraucht</span><b>${slot.used} % Zustand</b></div>`;
   for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;

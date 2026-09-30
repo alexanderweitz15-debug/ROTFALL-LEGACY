@@ -555,3 +555,13 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #coop-chat.open .cc-line.old{opacity:.85}
 #coop-chat-in{pointer-events:auto;width:100%;box-sizing:border-box;margin-top:4px;background:#0d0b08;border:1px solid #c8a050;color:#f0e6cd;padding:6px 8px;font:14px Spectral,serif}
 #coop-chat-in.hidden{display:none}
+/* Spielstände */
+#slot-panel{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#slot-panel.hidden{display:none}
+.slot-list{display:grid;gap:8px;max-height:52vh;overflow:auto;margin:6px 0}
+.slot-card{border:1px solid #4a3d24;background:linear-gradient(180deg,#221c15,#15110c);padding:8px 10px;display:grid;gap:3px}
+.slot-card.active{border-color:#c8a050}
+.sl-head b{font:16px Cinzel,serif;color:#f0e6cd}.sl-head span{color:#a79b83;font-size:12px}
+.sl-sub{font-size:12px;color:#a79b83}
+.sl-marks{font-size:20px;letter-spacing:4px;min-height:24px}.sl-marks span{cursor:help}.sl-none{font-size:12px;letter-spacing:0;color:#6a6050}
+.sl-act{display:flex;gap:6px}.sl-act .plaque{padding:4px 12px;font-size:12px}

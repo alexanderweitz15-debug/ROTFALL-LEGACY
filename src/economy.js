@@ -4,7 +4,7 @@
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
 import { S, log, chronicle, chance, ri, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=21';
 import { ITEMS, GOODS, TOWNS } from './data.js?v=21';
-import { LOCATIONS, HOUSES, TS, TOWN_PLAN } from './world.js?v=21';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=21';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];
@@ -157,6 +157,78 @@ export function herdDay(town, t) {
   if (t.hunger && tot > 2 && chance(0.3)) { const a = H.cow ? 'cow' : 'sheep'; H[a]--; t.stock.meat = (t.stock.meat || 0) + (a === 'cow' ? 3 : 1); }   // Notschlachtung
 }
 
+// ---------------- Luftschiffe (Roadmap P6/P7) ----------------
+// Aurelions Flotte fliegt abstrakt: airDay (einmal am Tag, aus game.js dayTick) schickt Schiffe zwischen festen Punkten hin und her.
+// Handelsschiffe holen Nahrung aus dem Süden (außerhalb der Karte, Punkt „sued“); Aurelions Import richtet sich nach dem Anteil
+// einsatzbereiter Handelsschiffe (airSupply). Jeder Flugtag kann eine Havarie bringen (Hülle, Steuerung); Hülle 0 = Absturz, den
+// game.js über airH.crash als Wrack in die Welt legt. Im Heimathafen Kupferhafen bessert die Werft mit Barren aus dem Lager aus,
+// ein Wrack wird nach einigen Tagen aus Barren und Bauholz neu gebaut. Werte: hull/motor/helm 0–100, up.* Ausbaustufe 0–2.
+export const AIR_HOME = 'kupferhafen';
+export const AIR_KIND = { handel: 'Handelsschiff', patrouille: 'Patrouille' };
+const AIR_ROUTE = { handel: ['kupferhafen', 'sued'], patrouille: ['kupferhafen', 'aurelheim', 'tickmar'] };
+export const airH = {};                                              // Rückrufe aus game.js: crash(ship, [x, y])
+export function airPt(k) {                                           // Ankerpunkt in Kacheln (über dem Platz, im Süden am Kartenrand)
+  if (k === 'sued') { const q = TOWN_PLAN.sanktserin?.square || [820, 1110]; return [q[0] + 60, Math.min((MAPS.world?.h || 1216) - 4, q[1] + 100)]; }
+  const P = TOWN_PLAN[k]; return P ? [P.square[0] + 6, P.square[1] - 5] : [600, 795];
+}
+export const airPtName = k => k === 'sued' ? 'den Kornländern im Süden' : townName(k);
+const newShip = (name, kind) => ({ id: uid(), name, kind, home: AIR_HOME, hull: 100, motor: 100, helm: 100, state: 'hafen', at: AIR_HOME, to: null, dep: 0, eta: 0, trips: 0, up: { hull: 0, motor: 0, cargo: 0 } });
+export function airDefaults() {                                      // idempotent: alte Stände ohne S.air bekommen die drei Schiffe einmal (S.flags.air1)
+  S.air ??= { v: 1, fleet: [], my: null }; S.air.fleet ||= []; S.flags ||= {};
+  if (!S.flags.air1) { S.flags.air1 = true; if (!S.air.fleet.length) S.air.fleet.push(newShip('Kupferwind', 'handel'), newShip('Goldmöwe', 'handel'), newShip('Wacht von Aurel', 'patrouille')); }
+  for (const s of S.air.fleet) { s.up ||= {}; for (const k of ['hull', 'motor', 'cargo']) s.up[k] ??= 0; for (const k of ['hull', 'motor', 'helm']) s[k] ??= 100; s.state ||= 'hafen'; s.home ||= AIR_HOME; s.at ||= s.home; }
+  return S.air;
+}
+export const dayF = () => (S.day | 0) + (S.minute || 0) / 1440;
+export const airReady = s => s.state !== 'wrack' && s.hull >= 25;
+export function airSupply() {                                        // 1 = alle Handelsschiffe fliegen; Laderaum-Ausbau +25 % je Stufe; nie unter 0,2 (Karren über Land)
+  const T = (S.air?.fleet || []).filter(s => s.kind === 'handel'); if (!T.length) return 1;
+  return clamp(T.filter(airReady).reduce((n, s) => n + 1 + 0.25 * (s.up?.cargo || 0), 0) / T.length, 0.2, 1.5);
+}
+export const airSpeed = s => (0.5 + (s.motor ?? 100) / 200) * (1 + 0.15 * (s.up?.motor || 0));   // Motor 100 = 1, Motor 40 = 0,7
+export const airDays = (s, a, b) => { const A = airPt(a), B = airPt(b); return Math.max(0.3, Math.hypot(A[0] - B[0], A[1] - B[1]) / 250 / airSpeed(s)); };
+export const airDur = s => Math.round(22000 / airSpeed(s));          // Roadmap P7: Dauer der Passage an Deck (ms Echtzeit)
+export function airPos(s, t = dayF()) {                              // Lage in Kacheln (fliegend: zwischen Abflug und Ziel), Wrack: null
+  if (s.state === 'wrack') return null;
+  const A = airPt(s.at); if (s.state !== 'flug' || !s.to) return A;
+  const B = airPt(s.to), k = clamp((t - s.dep) / Math.max(0.01, s.eta - s.dep), 0, 1);
+  return [A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k];
+}
+export function riskAir(s) { return clamp(0.06 + (100 - (s.motor ?? 100)) / 500 + (100 - (s.helm ?? 100)) / 600, 0.03, 0.4); }
+function nextStop(s) { const R = AIR_ROUTE[s.kind] || AIR_ROUTE.handel, i = R.indexOf(s.at); return i < 0 ? s.home || AIR_HOME : R[(i + 1) % R.length]; }
+export function airDepart(s, to, t = dayF()) { Object.assign(s, { state: 'flug', to, dep: t, eta: t + airDays(s, s.at, to) }); }
+export function airCrash(s) {                                        // Absturz: Wrack, Neubau in 5 Tagen; game.js legt das Wrack in die Welt
+  const pos = airPos(s) || airPt(s.at); Object.assign(s, { hull: 0, state: 'wrack', to: null, back: (S.day | 0) + 5 });
+  log(`Die „${s.name}“ ist abgestürzt.`, 'economy'); airH.crash?.(s, pos);
+}
+export function airDay(skipId) {                                     // skipId: Schiff mit dem Helden an Bord (P7) — sein Flug läuft an Deck
+  const A = airDefaults(), d = dayF(), home = S.towns?.[AIR_HOME];
+  for (const s of A.fleet) {
+    if (s.id === skipId) continue;
+    if (s.state === 'wrack') {
+      if ((S.day | 0) < (s.back || 0)) continue;
+      if (home && ((home.stock.ingot || 0) < 6 || (home.stock.timber || 0) < 6)) { s.back = (S.day | 0) + 1; continue; }   // Werft wartet auf Barren und Holz
+      if (home) { home.stock.ingot -= 6; home.stock.timber -= 6; }
+      Object.assign(s, { state: 'hafen', at: s.home || AIR_HOME, to: null, hull: 100, motor: 100, helm: 100 }); log(`In Kupferhafen läuft die neue „${s.name}“ vom Stapel.`, 'economy'); continue;
+    }
+    if (s.state === 'flug') {
+      s.motor = Math.max(10, s.motor - ri(1, 3));
+      if (chance(riskAir(s))) { const dmg = Math.round(ri(15, 55) * (1 - 0.2 * (s.up?.hull || 0))); s.hull = Math.max(0, s.hull - dmg); if (s.hull > 0 && chance(0.4)) s.helm = Math.max(10, s.helm - ri(10, 30));
+        if (s.hull > 0) log(`Die „${s.name}“ meldet Sturmschaden (Hülle ${Math.round(s.hull)} %).`, 'economy'); }
+      if (s.hull <= 0) { airCrash(s); continue; }
+      if (d >= s.eta) Object.assign(s, { at: s.to, to: null, state: 'hafen', trips: (s.trips || 0) + 1 });
+      continue;
+    }
+    if (s.at === (s.home || AIR_HOME) && home && (s.hull < 90 || s.motor < 90 || s.helm < 90)) {   // Werft: je Barren +10 Hülle, +8 Motor, +8 Steuerung (höchstens 3 am Tag)
+      const n = Math.min(3, Math.floor(home.stock.ingot || 0)); home.stock.ingot -= n;
+      s.hull = Math.min(100, s.hull + n * 10); s.motor = Math.min(100, s.motor + n * 8); s.helm = Math.min(100, s.helm + n * 8);
+    }
+    if (s.hull < 50) { if (s.at !== (s.home || AIR_HOME)) airDepart(s, s.home || AIR_HOME, d); continue; }   // angeschlagen: heim zur Werft, dort bleibt es am Mast
+    if (A.fleet.some(o => o !== s && o.kind === s.kind && o.state === 'flug' && o.at === s.at && d - (o.dep || 0) < 0.9)) continue;   // gleiche Art startet nicht am selben Tag vom selben Mast (versetzt fliegen)
+    airDepart(s, nextStop(s), d);
+  }
+}
+
 // ---------------- Tageslauf ----------------
 export function ecoDay() {
   if (!S.eco) initEco();
@@ -168,8 +240,8 @@ export function ecoDay() {
     const food = FOOD.reduce((n, g) => n + (t.stock[g] || 0), 0);
     t.hunger = food < 1;
     if (occupied(town) || razed(town)) continue;
-    // Umland: Aurelion bezieht Nahrung per Luftschiff aus dem Süden (außerhalb der Karte)
-    if (isAurel(town)) { for (const g of FOOD) t.stock[g] += t.use[g] * 0.9; t.stock.ingot += 0.4 * ((C[town].work.mech || 0) + (C[town].work.magitech || 0)); }   // dazu Barren für die Werkstätten
+    // Umland: Aurelion bezieht Nahrung per Luftschiff aus dem Süden (außerhalb der Karte); Roadmap P6: so viel, wie Handelsschiffe fliegen (airSupply)
+    if (isAurel(town)) { const sup = airSupply(); for (const g of FOOD) t.stock[g] += t.use[g] * 0.9 * sup; t.stock.ingot += 0.4 * ((C[town].work.mech || 0) + (C[town].work.magitech || 0)); }   // dazu Barren für die Werkstätten
     herdDay(town, t);
   }
   // Produktion mit Vorprodukten

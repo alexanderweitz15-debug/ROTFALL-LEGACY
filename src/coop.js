@@ -55,7 +55,9 @@ export function openPanel(api) {
       <h2>Koop (Netzwerk)</h2>
       <p class="ledger">Ein Spieler öffnet sein Spiel und bekommt einen Code. Der andere gibt den Code ein, erstellt im Warteraum seinen eigenen Charakter und drückt „Bereit“; dann startet der Host. Beide brauchen dieselbe Version (${VER}). Nur der Host speichert. Fragt der Browser beim Verbinden, ob das Spiel Geräte im lokalen Netzwerk finden darf: bitte erlauben, sonst klappt die direkte Verbindung im selben WLAN oft nicht. Die Frage kommt nur bei dem, der beitritt oder dessen Browser sie verlangt — das ist normal.</p>
       <label>Dein Name <input id="coop-name" maxlength="14" value="${(localStorage.getItem('rotfall.coop.name') || 'Gast').replace(/"/g, '')}"></label>
-      <div class="coop-row"><button id="coop-host" class="plaque">Spiel öffnen (Host)</button><span class="ledger">nutzt deinen Spielstand</span></div>
+      <div class="ledger"><b>Host:</b> einen Koop-Spielstand wählen (getrennt vom Einzelspieler) oder einen neuen anfangen.</div>
+      <div id="coop-slots"></div>
+      <div class="coop-row"><button id="coop-newslot" class="plaque">Neuer Koop-Spielstand</button><button id="coop-host" class="plaque" style="display:none">Spiel öffnen (Host)</button></div>
       <div class="coop-row"><input id="coop-code" placeholder="Code" maxlength="6" style="text-transform:uppercase"><button id="coop-join" class="plaque">Beitreten (Gast)</button></div>
       <details class="ledger"><summary>Verbindung klappt nicht? (Schul- oder Firmennetz)</summary>
         Manche Netze sperren direkte Verbindungen zwischen Rechnern. Dann hilft ein Relay-Server (TURN), z. B. ein kostenloses Konto bei metered.ca oder ein eigener coturn. Beide Spieler tragen dasselbe ein.
@@ -70,6 +72,10 @@ export function openPanel(api) {
     document.body.appendChild(el);
     $('coop-close').onclick = () => { el.classList.add('hidden'); };
     $('coop-host').onclick = () => host().catch(e => status('Fehler: ' + e.message));
+    const hostSlot = id => { A.setSlot(id); if (A.isRunning()) A.continueGame(); host().catch(e => status('Fehler: ' + e.message)); };   /* Koop-Stand laden (auch aus dem laufenden Spiel) und öffnen */
+    $('coop-slots').appendChild(A.slotCards('coop', hostSlot));
+    $('coop-newslot').onclick = () => { A.setSlot(A.newSlot('coop')); A.coopHooks.afterNew = () => { A.coopHooks.afterNew = null; openPanel(A); host().catch(e => status('Fehler: ' + e.message)); };
+      el.classList.add('hidden'); $('titlescreen').classList.add('hidden'); $('game').classList.add('hidden'); $('creation').classList.remove('hidden'); };
     $('coop-join').onclick = () => join($('coop-code').value.trim().toUpperCase()).catch(e => status('Fehler: ' + e.message));
   }
   el.classList.remove('hidden');
@@ -87,7 +93,8 @@ const myName = () => { const n = ($('coop-name')?.value || 'Gast').trim().slice(
 // ---------------------------------------------------------------- Host
 async function host() {
   const { S } = A;
-  if (!A.isRunning() && !A.hasSave()) return status('Kein Spielstand. Erst eine Geschichte anfangen, dann Koop öffnen.');
+  if (!A.isRunning() && !A.hasSave()) return status('Dieser Koop-Stand ist leer. „Neuer Koop-Spielstand“ drücken.');
+  if (!A.SLOT().startsWith('c')) return status('Wähle oben einen Koop-Spielstand oder fang einen neuen an — Einzelspieler-Stände bleiben getrennt.');
   status('Verbinde mit dem Vermittler …');
   const Peer = await loadPeer(); const code = rnd6();
   peer = new Peer('rotfall-' + code, peerOpts());

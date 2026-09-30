@@ -1,5 +1,45 @@
 // Globaler Spielzustand + Hilfsfunktionen. Ein mutierbares Objekt, absichtlich ohne Store-Framework.
-export const SAVE_KEY = 'rotfall.legacy.save';
+// Nutzer (30.09.2026): mehrere Spielstände, Einzelspieler und Koop getrennt. Jeder Platz hat einen eigenen Schlüssel; der alte Stand
+// bleibt als Platz „legacy“ unter seinem alten Schlüssel (keine Umkopie, der Speicher im Browser ist knapp). SAVE_KEY zeigt immer auf den
+// aktiven Platz (live gebunden: game.js und ui.js sehen den Wechsel). Übersicht (Name, Stufe, Tag, Erfolge) in rotfall.slots.
+const LEGACY_KEY = 'rotfall.legacy.save', SLOTS_KEY = 'rotfall.slots', ACTIVE_KEY = 'rotfall.slot.active';
+export const slotKey = id => id === 'legacy' ? LEGACY_KEY : 'rotfall.slot.' + id;
+export let SLOT = localStorage.getItem(ACTIVE_KEY) || 'legacy';
+export let SAVE_KEY = slotKey(SLOT);
+export function setSlot(id) { SLOT = id; SAVE_KEY = slotKey(id); localStorage.setItem(ACTIVE_KEY, id); }
+export function slotIndex() {
+  let idx = {}; try { idx = JSON.parse(localStorage.getItem(SLOTS_KEY) || '{}') || {}; } catch (e) { idx = {}; }
+  if (!idx.legacy && localStorage.getItem(LEGACY_KEY)) idx.legacy = { id: 'legacy', mode: 'single', at: 0 };   /* alter Stand: Daten füllt slotMetaFrom beim ersten Blick */
+  for (const id of Object.keys(idx)) if (!localStorage.getItem(slotKey(id))) delete idx[id];   /* Platz ohne Daten (gelöscht, voller Speicher): weg */
+  return idx;
+}
+function saveIndex(idx) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(idx)); } catch (e) { /* Übersicht ist nur Komfort */ } }
+export function newSlot(mode) { const id = (mode === 'coop' ? 'c' : 's') + Date.now().toString(36); const idx = slotIndex(); idx[id] = { id, mode, at: Date.now() }; saveIndex(idx); return id; }
+export function deleteSlot(id) { localStorage.removeItem(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
+// Kurzbeschreibung eines Stands für die Liste: Held, Haus, Stufe, Tag, Generation und Erfolge als Symbole
+export const ACHIEVE = [
+  ['garm', '💀', 'Garmadon ist tot', d => d.flags?.garmadonSlain],
+  ['omega', '☀', 'Omega bezwungen', d => d.omega?.ending === 'slain'],
+  ['omegaPact', '✦', 'Omegas Weg zu Ende gegangen', d => d.omega?.ending && d.omega.ending !== 'slain'],
+  ['chains', '⛓', 'Die Eiserne Kette ist gebrochen', d => d.flags?.chainsBroken],
+  ['goblins', '♣', 'Die Grubenstämme sind frei', d => d.flags?.goblinsFreed],
+  ['hrodvar', '❄', 'Der Frostkönig Hrodvar ist gefallen', d => d.flags?.hrodvarSlain],
+  ['whitebeard', '⚓', 'Weißbart ist besiegt', d => d.flags?.whitebeardSlain],
+  ['ilvar', '⌛', 'Ilvar Nachtglas ist tot', d => d.flags?.ilvarDead],
+  ['dodon', '🪓', 'Dodon ist tot', d => d.flags?.dodonDead],
+  ['empress', '👑', 'Die Ewige Kaiserin ist tot', d => d.flags?.skyDead?.kaiserin],
+  ['citizen', '⚙', 'Bürger von Aurelion', d => d.flags?.aurelCitizen],
+];
+export function slotMetaFrom(d) {
+  const hero = d && Object.values(d.ents || {}).flat().find(e => e && e.kind === 'player');
+  return { name: hero?.name || '—', house: d?.legacy?.house || '', level: hero?.level || 1, day: d?.day | 0, gen: d?.legacy?.gen || 1, dead: hero ? !hero.alive : false,
+    marks: ACHIEVE.filter(a => { try { return a[3](d || {}); } catch (e) { return false; } }).map(a => a[0]) };
+}
+function touchSlot() {
+  const idx = slotIndex(), cur = idx[SLOT] || { id: SLOT, mode: SLOT.startsWith('c') ? 'coop' : 'single' };
+  try { Object.assign(cur, slotMetaFrom(S), { at: Date.now() }); } catch (e) { cur.at = Date.now(); }
+  idx[SLOT] = cur; saveIndex(idx); if (cur.mode === 'single') localStorage.setItem('rotfall.slot.lastSingle', SLOT);
+}
 export const SAVE_VERSION = 4;   // 4 (S12): Neuordnung West/Mitte/Ost — ältere Stände werden gesichert, nicht geladen   // 2: erweitertes Grenzland (512×512); 3: Weltmaßstab ×1,5 (768×768), v2 wird beim Laden umgerechnet
 
 export const S = {
@@ -143,11 +183,11 @@ export function save() {
   if (!S.player) return false;                                   // S15 Fehlersuche
   if (S.coop?.role === 'guest') return false;                    // Koop K2: der Gast spielt in der Welt des Hosts und speichert nie: im Titelmenü gibt es noch keinen Helden — nie einen leeren Stand über den echten schreiben                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
   try {
-    localStorage.setItem(SAVE_KEY, saveData());
+    const str = saveData(); localStorage.setItem(SAVE_KEY, str); touchSlot();
     return true;
   } catch (err) {
     console.warn('Speichern fehlgeschlagen', err);
-    log('Spielstand konnte nicht geschrieben werden: ' + err.message, 'world');
+    log('Spielstand konnte nicht geschrieben werden: ' + err.message + (/quota/i.test(err.message) ? ' — der Browser-Speicher ist voll. Im Titelmenü unter „Spielstände“ einen alten Stand löschen.' : ''), 'world');
     return false;
   }
 }
