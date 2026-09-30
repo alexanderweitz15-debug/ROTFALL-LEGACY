@@ -235,3 +235,16 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Frische Prothese:** Eine neue Prothese kommt immer mit 100 % Zustand und ohne Aufrüstung. Vorher erbte sie den Zustand des alten Stumpfs und war manchmal von Anfang an wirkungslos.
 - **Verschleiß nur am getroffenen Glied:** Prothesen nutzen sich nur ab, wenn genau dieses Glied einen echten Treffer bekommt. Gift, Blutung, Brand und Treffer an anderen Körperteilen nutzen sie nicht mehr ab. Das gilt auch für Gefährten.
 - **Debug (Kampf und Körper):** „Prothese anlegen (Stufe 1–4)“ am gewählten Glied und „Prothesen −30 % Zustand“.
+
+## Runde: Roadmap Paket 2 — Roboterauge (Version 20)
+
+- **Roboterauge** (`c.eye = { q, cond }`, Tabelle `EYE_Q` in body.js): ein eigenes Bionik-Teil neben den Gliedern, kein neues Körperteil. Vier Stufen:
+  - Stufe 1 Schrott: Sichtweite 22 Felder (ohne Auge 18), nutzt sich doppelt so schnell ab.
+  - Stufe 2 Aurelionisch: Sichtweite 28, Fernkampf-Krit +2 %.
+  - Stufe 3 Meisterstück: Sichtweite 32, Fernkampf-Krit +4 %, Nachtsicht (Spielerlicht +40 %).
+  - Stufe 4 Prototyp: Sichtweite 36, Fernkampf-Krit +6 %, Nachtsicht +50 %, Wärmesicht.
+- **Einsetzen:** Items Schrottauge, Aurelionisches Auge, Meisterauge, Prototyp-Auge (benutzen) oder an der Werkbank in Gelenkhall (Stufe 2 für 700, Stufe 3 für 1800 Gold). Ein neues Auge ersetzt nur ein schwächeres oder ein gestörtes.
+- **Magie-Anfälligkeit:** Magie-, Schatten-, Schock- und Arkantreffer nutzen das Auge ab (beim ersten Mal ein Hinweis im Log). Unter 30 % ist es gestört und wirkt nicht; Toast „ROBOTERAUGE GESTÖRT“. Warten an der Werkbank: 2 Gold je fehlendem Prozent. Körperliche Treffer, Gift und Blutung schaden ihm nicht.
+- **Anzeige:** X-Fenster zeigt „Auge: …“ mit Stufe, Zustand und Wirkung; die Werkbank nennt das Auge im Zustandstext.
+- **Alte Stände:** Die alte Linse (`p.lens`) wird beim Laden ein Aurelionisches Auge (Stufe 2, 100 %).
+- **Debug (Bionik):** „Auge Stufe 1–4“, „Auge entfernen“, „Auge beschädigen (−30 %)“.

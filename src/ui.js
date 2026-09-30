@@ -567,7 +567,8 @@ function invUI(body) {
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
 const USE_TXT = { bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
-  soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).' };
+  soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
+  eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.' };   /* Roadmap P2 */
 function itemPurpose(it) {
   if (it.good) return 'Handelsware: jede Stadt zahlt einen anderen Preis — billig kaufen, wo es viel gibt, teuer verkaufen, wo es fehlt.';
   if (it.res) return 'Baustoff: kommt in deinen Vorrat (Lager, Siedlung, Ausbessern).';
