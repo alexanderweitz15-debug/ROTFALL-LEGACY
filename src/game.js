@@ -73,7 +73,7 @@ export function recalc(c) {
   const magic = ['mage', 'cleric', 'paladin'].includes(c.currentClass) || Object.keys(c.spells || {}).length > 0;   // S15 P4: wer zaubern gelernt hat, hat Mana   // Titelklassen haben ihre eigene Ressource, kein Mana
   c.maxMana = magic ? 30 + a.intelligence * 4 + a.willpower * 2 + c.level * 2 + tfx(c, 'mana') : 0;
   if (c.kind === 'player') c.invCap = 24 + tfx(c, 'invCap');
-  c.partyCap = 3 + Math.floor((c.skills.leadership || 0) / 10) + (S.settlement ? 1 : 0);
+  c.partyCap = 3 + Math.floor((c.skills.leadership || 0) / 10) + (S.settlement ? 1 : 0) + (S.party || []).filter(id => byId(id)?.coopHero).length;   /* Koop: Mitspieler belegen keinen Gefährtenplatz */
 }
 // S13: Set-Bonus der Fraktionsrüstungen — nur wenn alle Teile angelegt sind
 function setOf(c) { const eq = c.equip; if (!eq) return null; const has = pk => Object.values(eq).some(i => i && i.key === pk);   // S15 P2: 3 und 4 Teile
@@ -1880,7 +1880,9 @@ function rescaleSave(fresh) {
 export function continueGame(given = null) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
   const data = given || loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
-  applySave(data); applyDifficulty();                                  // S15 P12
+  applySave(data); applyDifficulty();                                  /* S15 P12 */
+  if (!given) for (const l of Object.values(S.ents)) for (const e of [...l]) if (e.coopHero) parkCoopHero(e);   /* Koop: Gastcharaktere warten, bis ihr Spieler wieder verbunden ist */
+  // S15 P12
   { const p = S.player; if (p?.titleClasses?.length && !p.tgrade) { p.tgrade = {};   // S15: alte Stände behalten jede Fähigkeit, die sie vor den Titelgraden hatten
     for (const k of p.titleClasses) { const T = TITLE_CLASSES[k]; p.tgrade[k] = Math.max(1, ...T.abilities.map(a => T.grades.findIndex(g => g.includes(a)) + 1)); } } }
   if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
@@ -2759,6 +2761,10 @@ function controlPlayer(dt) {
   const p = S.player;
   if (S.cine) { p.vx = p.vy = 0; return; }   // Kamerafahrt: keine Steuerung
   if (p.downed) { p.vx = p.vy = 0; return; }
+  if (S.jail?.caught) {   // Bug 2 (Nutzer): beim Wärter-Gespräch nicht weglaufen können
+    if (!UI.dialogueOpen()) S.jail.caughtBack?.();   // Esc hat das Gespräch geschlossen — zählt wie „zurück in die Zelle“
+    else { p.vx = p.vy = 0; return; }
+  }
   if (!touch.on && mouse.seen) { const wp = R.screenToWorld(mouse.x, mouse.y); mouse.wx = wp.x; mouse.wy = wp.y; }   // BUG-084: Kamera läuft mit — Mauspunkt jeden Frame neu, nicht nur bei Mausbewegung
   p.dodgeCd = Math.max(0, (p.dodgeCd || 0) - dt);
   if (p.dodge) {                                            // Ausweichrolle: feste Dauer, unverwundbar, keine Steuerung
@@ -3418,7 +3424,7 @@ function die(c, cause = 'Wunden', source) {
   }
   // Person
   const isParty = S.party.includes(c.id);
-  if ((source === S.player || source === S.player.id) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   // auch verblutet (lastKiller = id)
+  if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   if (c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith)) (S.mourn ||= {})[c.homeTown] = { name: c.name, until: (S.day | 0) + 2 };   // S13: der Ort trauert
   chronicle(`${c.name} gefallen`, 'death', `${cause}. Jahr ${year()}, Tag ${S.day}.`);
@@ -3525,6 +3531,7 @@ function levelUp(c) {
   if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen
     log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Attribut- und Talentpunkt.`, 'party'); }
   if (c.map === S.map) { fx(c.x, c.y - 10, 'heal', 18); float(c, `Stufe ${c.level}`, 'rgba(240,210,120,ALPHA)', true); if (c === S.player) sfx('heal', 0.6); }   // S13: Aufstieg sichtbar
+  if (c.coopHero) { c.attrPoints = (c.attrPoints || 0) + 1; log(`${c.name} erreicht Stufe ${c.level}. Ein Statpunkt ist frei (C).`, 'party'); }   /* Koop: der eigene Charakter des Gasts verteilt Punkte selbst */
   if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Statpunkt (C) · +1 Talentpunkt (T)`, 3200); log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C) und ein Talentpunkt (Talente, T).`, 'party'); }   // S15 (Nutzer): Statpunkte sichtbar
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
   recalc(c); if (!(c.downed && c !== S.player)) B.fullHeal(c);   // S15 (Nutzer): wer am Boden liegt, steht nicht durch einen Aufstieg auf
@@ -4336,8 +4343,14 @@ function partyAI(m, dt) {
   const p = S.player;
   if (m.coopPilot && m.map === S.map && coopHooks.remote?.(m, dt)) return;   /* Koop K2: ein Gast steuert diese Figur; ohne Eingabe seit 1 s folgt sie wieder der KI */
   if (m.downed) { m.vx = m.vy = 0; return; }
-  if (m.map !== S.map) { m.map = S.map; m.x = p.x + ri(-30, 30); m.y = p.y + ri(-30, 30);
-    if (!S.ents[S.map].includes(m)) S.ents[S.map].push(m); }
+  if (m.map !== S.map) {
+    if (S.jail && S.map === 'kerker') {   // Bug 1 (Nutzer): die Gruppe geht nicht mit ins Gefängnis, sie wartet draußen; erst nach Freilassung/Ausbruch wieder mitziehen
+      if (m.coopPilot) coopHooks.remote?.(m, dt); else m.vx = m.vy = 0;
+      return;
+    }
+    m.map = S.map; m.x = p.x + ri(-30, 30); m.y = p.y + ri(-30, 30);
+    if (!S.ents[S.map].includes(m)) S.ents[S.map].push(m);
+  }
   const cmd = S.partyCmd || 'follow';
   const sp = speedOf(m) * dt / 16 * 0.95;
   const foes = S.ents[m.map].filter(e => e.kind === 'enemy' && e.alive && isHostile(m, e) && dist(m, e) < (cmd === 'attack' ? 420 : 260)
@@ -4385,11 +4398,11 @@ function remember(c, key, about) {
 const GUARDISH = c => c.prof !== 'Heilerin' && (c.guard || c.hostile || c.brave || c.faction === 'valen' || c.faction === 'order' ||
   ['borin', 'kelan', 'rook', 'havel', 'aldric'].includes(c.key));   // die Heilerin kämpft nicht, sie flieht
 function provoke(target, attacker) {
-  if (attacker !== S.player || !target.alive || target.brawl) return;   // S15: in der Prügelei mitmischen ist kein Überfall
+  if ((attacker !== S.player && !attacker?.coopPilot) || !target.alive || target.brawl) return;   /* Koop: Taten des Mitspielers zählen wie eigene (Ruf, Alarm, Kopfgeld) */   // S15: in der Prügelei mitmischen ist kein Überfall
   const firstTime = !target.provoked || clock() - (target.provokedAt || 0) > 1440;   // S15: nach einem Tag zählt eine neue Tat neu
   target.provoked = true; target.provokedAt = clock(); target.lastHurt = performance.now(); target.sawPlayer = clock();
   // Rolle bestimmt die Reaktion
-  if (GUARDISH(target)) { target.angry = true; target.brave = true; target.aggroId = S.player.id; }
+  if (GUARDISH(target)) { target.angry = true; target.brave = true; target.aggroId = attacker.id; }
   else { target.fleeing = true; if (target.shop) target.shopClosed = clock() + 1440; }   // Zivilisten und Händler fliehen; Laden bis morgen zu
   if (!firstTime) return;                                                       // Ruf/Alarm nur einmal je Tat
   const critic = partyMembers().find(m => !(m.traits || []).includes('grausam'));   // die Gruppe sieht es
@@ -7070,11 +7083,14 @@ function jailTick() {
 // zurückgehen (zwei Stunden mehr), bestechen (er sieht eine Stunde weg) oder kämpfen (beide Wärter greifen an, ohne Waffe).
 function wardenCatch(w, J, cell) {
   const p = S.player, bribe = Math.max(40, Math.round(J.bail * 0.5)); w.vx = w.vy = 0; w.aim = Math.atan2(p.y - w.y, p.x - w.x);
+  J.caught = true;   // Bug 2 (Nutzer): solange der Wärter redet, steht der Spieler fest (siehe controlPlayer)
+  const back = () => { J.caught = false; UI.closeDialogue(); p.x = cell.spot.x; p.y = cell.spot.y; J.until += 120; closeCells(); log('Zurück in die Zelle — zwei Stunden mehr.', 'combat'); };
+  J.caughtBack = back;   // Esc statt Klick zählt genauso als „zurück in die Zelle“
   UI.dialogue(w, '„He! Wo willst du hin? Die Tür war zu, als ich sie das letzte Mal gesehen hab.“', [
-    { text: 'Schon gut. Ich geh zurück. (zwei Stunden mehr)', fn: () => { UI.closeDialogue(); p.x = cell.spot.x; p.y = cell.spot.y; J.until += 120; closeCells(); log('Zurück in die Zelle — zwei Stunden mehr.', 'combat'); } },
-    { text: `Bestechen (${bribe} Gold)`, fn: () => { if (S.gold < bribe) return UI.dialogue(w, '„Mit leeren Taschen besticht man niemanden. Zurück in die Zelle.“', [{ text: 'Weiter', fn: () => { UI.closeDialogue(); p.x = cell.spot.x; p.y = cell.spot.y; J.until += 120; closeCells(); } }]);
-      S.gold -= bribe; J.blind = clock() + 60; UI.dialogue(w, '„Ich hab nichts gesehen. Eine Stunde. Dann hab ich dich wieder gesehen.“', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); log(`Du steckst dem Wärter ${bribe} Gold zu. Er dreht sich weg.`, 'crime'); } },
-    { text: 'Kämpfen. (ohne Waffe)', fn: () => { UI.closeDialogue(); for (const e of S.ents.kerker) if (e.warden && e.alive) { e.angry = true; e.brave = true; e.aggroId = p.id; e.sawPlayer = clock(); } log('Du gehst auf den Wärter los. Der zweite hört den Lärm.', 'combat'); UI.toast('AUSBRUCH!', 2000); } },
+    { text: 'Schon gut. Ich geh zurück. (zwei Stunden mehr)', fn: back },
+    { text: `Bestechen (${bribe} Gold)`, fn: () => { if (S.gold < bribe) return UI.dialogue(w, '„Mit leeren Taschen besticht man niemanden. Zurück in die Zelle.“', [{ text: 'Weiter', fn: back }]);
+      S.gold -= bribe; J.blind = clock() + 60; J.caught = false; UI.dialogue(w, '„Ich hab nichts gesehen. Eine Stunde. Dann hab ich dich wieder gesehen.“', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); log(`Du steckst dem Wärter ${bribe} Gold zu. Er dreht sich weg.`, 'crime'); } },
+    { text: 'Kämpfen. (ohne Waffe)', fn: () => { J.caught = false; UI.closeDialogue(); for (const e of S.ents.kerker) if (e.warden && e.alive) { e.angry = true; e.brave = true; e.aggroId = p.id; e.sawPlayer = clock(); } log('Du gehst auf den Wärter los. Der zweite hört den Lärm.', 'combat'); UI.toast('AUSBRUCH!', 2000); } },
   ]);
 }
 function placeRask() {
@@ -8756,7 +8772,7 @@ function dayTick() {
   }
   // Desertion
   for (const m of mem) {
-    if (m.morale < 12 && chance(0.4)) {
+    if (m.morale < 12 && !m.coopHero && chance(0.4)) {   /* Koop: Mitspieler desertieren nicht */
       log(`${m.name} verlässt die Gruppe.`, 'party');
       chronicle(`${m.name} verlässt ${S.player.name}`, 'party', 'Zu wenig Lohn, zu viele Tote.');
       S.party = S.party.filter(id => id !== m.id); sendHome(m);   // S15 Fehlersuche: wie dismiss — heim, nicht im Dungeon zurückgelassen
@@ -9823,6 +9839,7 @@ function sendHome(npc) {                                            // S15 Fehle
 }
 function dismiss(npc) {
   if (!npc) return;
+  if (npc.coopHero) return UI.toast('Das ist ein Mitspieler. Er geht, wenn er die Verbindung trennt.');
   S.party = S.party.filter(id => id !== npc.id);
   if (!npc.merc) npc.retainer = true;                                   // S13 (Nutzer): bleibt Gefährte, wartet daheim
   sendHome(npc);   // AUDIT B-06: geht heim, bleibt nicht im Dungeon
@@ -13813,11 +13830,34 @@ function buildCreation() {
   $('cr-begin').onclick = () => {
     const name = ($('cr-name').value || 'Namenlos').slice(0, 18);
     const house = ($('cr-house').value || name).slice(0, 18);
+    if (creation.hook) { const h = creation.hook; creation.hook = creation.back = null; $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); return h({ name, house, origin, pal: { ...pal }, build }); }   /* Koop: der Gast erstellt seinen eigenen Charakter */
     bindInput();
     newGame({ name, house, origin, pal, build, difficulty: diff });
   };
-  $('cr-back').onclick = () => { $('creation').classList.add('hidden'); $('titlescreen').classList.remove('hidden'); };
+  $('cr-back').onclick = () => { $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); const b = creation.back; creation.hook = creation.back = null; b?.(); };
 }
+// Koop: Charaktererstellung für einen Gast öffnen. done(cfg) bekommt Name, Herkunft, Aussehen, Körperbau; back() beim Zurück.
+const creation = { hook: null, back: null };
+const GUEST_BAR = ['bandage', 'potion', 'herb', 'bread', 'dried_meat'];   /* Koop: Leiste der Gastfigur (nur Verbrauchsgüter; Fähigkeiten löst nur der Held aus) */
+function openCreation(done, back, name) { creation.hook = done; creation.back = back; if (name) $('cr-name').value = name; $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
+// Koop: der eigene Charakter eines Gasts. Gebaut wie der Held in newGame (Herkunft: Werte, Fertigkeiten, Ausrüstung, Gold als Beutel),
+// aber als Gruppenmitglied. Er fängt zwei Stufen unter dem Helden an, damit er mithalten kann. coopOwner = Name des Gasts.
+function makeGuestHero(cfg, owner) {
+  const o = ORIGINS[cfg.origin] || ORIGINS.wanderer, p0 = S.player, q = freeSpotNear(p0.map, p0.x / TS | 0, p0.y / TS | 0, 3) || { x: p0.x + 30, y: p0.y };
+  const h = makeChar({ kind: 'npc', key: 'coop_' + owner, name: String(cfg.name || owner).slice(0, 18), x: q.x, y: q.y, map: p0.map, level: Math.max(1, (p0.level || 1) - 2),
+    attrs: baseAttrs(), skills: { ...o.skills }, traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])], origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
+  h.attributes = Object.fromEntries(Object.entries(h.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
+  Object.assign(h, { prof: o.name, coopHero: true, coopOwner: owner, coopGold: o.gold, morale: 100, hotbar: GUEST_BAR.map(key => ({ type: 'item', key })), transient: false, visitor: false });
+  h.xpNext = Math.round(60 * Math.pow(1.35, Math.min(9, h.level - 1)) * Math.pow(1.2, Math.max(0, h.level - 10)));
+  o.gear.forEach(k => { const it = mkItem(k), sl = ITEMS[k].slot; if (['weapon', 'chest', 'offhand'].includes(sl) && !h.equip[sl]) h.equip[sl] = it; else addItem(h, k); });
+  addItem(h, 'bandage', 2); recalc(h); B.fullHeal(h); h.mana = h.maxMana;
+  S.ents[h.map].push(h); S.party.push(h.id); return h;
+}
+// Koop: Gastcharaktere ohne verbundenen Gast warten in S.coopHeroes (gespeichert), nicht in der Welt oder Gruppe.
+function parkCoopHero(h) { if (!h) return; for (const k of Object.keys(S.ents)) S.ents[k] = S.ents[k].filter(e => e !== h); S.party = S.party.filter(id => id !== h.id);
+  h.coopPilot = null; h.coopName = null; h.vx = h.vy = 0; h.dodge = null; (S.coopHeroes ||= {})[h.coopOwner] = h; }
+function unparkCoopHero(owner) { const h = S.coopHeroes?.[owner]; if (!h) return null; delete S.coopHeroes[owner]; const p0 = S.player, q = freeSpotNear(p0.map, p0.x / TS | 0, p0.y / TS | 0, 3) || { x: p0.x + 30, y: p0.y };
+  Object.assign(h, { map: p0.map, x: q.x, y: q.y }); if (!h.alive) return null; S.ents[h.map].push(h); S.party.push(h.id); return h; }
 function el2(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
 function titleLoop(t) {
@@ -13830,7 +13870,7 @@ function titleLoop(t) {
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, dialogue: (...a) => UI.dialogue(...a), clock };
+    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, updatePrompt, recalc, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();
@@ -13838,13 +13878,13 @@ function boot() {
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll,
     openCoop: () => import('./coop.js?v=21').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
-    useOrEquip: i => equip(S.player, i),
-    unequip: k => unequip(S.player, k),
-    dropItem: i => { const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
-    toStash: i => { const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
+    useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
+    unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
+    dropItem: i => { if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
+    toStash: i => { if (coopHooks.cmd) return UI.toast('Das Lager gehört dem Host.'); const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
-    useSlot, spendAttr: k => { const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
+    useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
