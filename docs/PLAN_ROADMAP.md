@@ -524,10 +524,10 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 ## 5d. Zehn dünne Bereiche — Nutzerentscheide (30.09.2026)
 
 1. ✅ **Erledigt (Version 21, siehe MECHANIKEN.md „Eisenfeste bevölkert“).** **Eisenfeste** bevölkern: mehr Militärleben (Appell, Drill, Kaserne, Messe, Auspeitschung), Zivilisten (Soldatenfamilien, Schmiede, Quartiermeister, Feldscher, Kasernenmarkt), Sklavenmarkt, Kettenpriester und Schreiber. **Dunkle Klassen** der Kette je nach Grundklasse: Dunkler Hochpaladin (Krieger, gibt es), **Dunkler Priester** (Kleriker/Magier), **Kettenjäger** (Schütze), **Folterknecht/Henker** (Schurke), **Kettenbarde** (Barde) — Lehrer in der Feste, Rang in der Kette nötig. **Nach Vargs Fall entscheidet der Spieler**, wer die Feste übernimmt (Goblins, Valen, Flüchtlinge).
-2. **Karak-Atar:** neutrale Handelsstadt unter Herrschaft der Sandfürsten (Basar, Wegzoll, Schmuggel aus Aurelion) **und** eigenes Wüstenvolk mit Kultur (Wasserhandel, Rituale).
+2. **Karak-Atar (GEBAUT):** neutrale Handelsstadt unter Herrschaft der Sandfürsten (Basar, Wegzoll, Schmuggel aus Aurelion) **und** eigenes Wüstenvolk mit Kultur (Wasserhandel, Rituale).
 3. **Eigene Siedlung (P14):** Ort frei wählbar; Mischung beim Bauen (wichtige Bauten selbst setzen, Wohnhäuser bauen Siedler in Zonen).
 4. **König Varon:** Mischung aus hartem Kriegskönig, schwachem, von Adligen gelenktem König und Paranoia (verfeindet mit Aurelion) — **neue Burgstadt im Norden** mit Thronsaal, Hof, Kerker, Adel.
-5. **Schwarze Feste:** Hauptstadt der Untoten (Hof der Stillen Schar, Händler, Rang-Aufträge), Totentempel (Seelenhandel, Leichenzüge, Rituale), nach Garmadon **eroberbar** (Belagerung als Großereignis).
+5. **Schwarze Feste (GEBAUT):** Hauptstadt der Untoten (Hof der Stillen Schar, Händler, Rang-Aufträge), Totentempel (Seelenhandel, Leichenzüge, Rituale), nach Garmadon **eroberbar** (Belagerung als Großereignis).
 6. **Tiefhall:** lebende Zwerge in einer **Bergstadt** auf einer tieferen Ebene (Händler, Schmiede mit Königseisen).
 7. **Banden:** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
 8. **Handwerk:** Rezepte an Esse/Werkbank/Kessel, **Qualität nach Fertigkeit**, Spezialmaterialien (Königseisen, Magitech).

@@ -448,3 +448,17 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Weidenau, das Sensendorf:** vier Leute der Sensenwehr bewachen den Platz (nur Sensen), die Sensenschmiedin Walburga verkauft alle Sensen.
 - **Legendäre je Boss:** Dodon (Morrs Keule), Karrak der Sandfürst (Klinge des Sandfürsten), Leitwolf (Leitwolfzahn), Ilvar (Nachtglasstab) ergänzt; die übrigen Bosse hatten schon eine.
 
+## Runde: Karak-Atar (Nutzer §5d.2, Version 21)
+- Die Wüstenstadt ist belebt: **Basarhändler Yusuf** (Wüstenwaren und Schmuggelgut aus Aurelion ohne Rangsperre: Schockpistole, Energiezellen, Spezialöl), **Wasserhändlerin Leyla**, **Stammesälteste Amina** (Wüstenvolk), zwei **Zöllner der Sandfürsten** an den Toren, vier **Sandreiter**, Weberin, Töpferin, Kamelhirte.
+- **Wegzoll** (15 Gold, nach Karraks Tod 8): einmal am Tag beim Zöllner zahlen. Wer verweigert, zahlt im Basar 30 % mehr und bekommt 20 % weniger, bis er zahlt.
+- **Wasserschlauch** (12 Gold): füllt die Ausdauer und schützt eine Stunde vor Hitze.
+- **Sternenritual** bei Amina (nachts, einmal pro Nacht): Sternensegen (+5 Rüstung) und eine Weile keine Hitze.
+- **Nach Karraks Tod** übernimmt sein Stellvertreter Farid, der Zoll halbiert sich.
+- Selbsttest „Karak-Atar (Nutzer §5d.2)“.
+
+## Runde: Die Schwarze Feste (Nutzer §5d.5, Version 21)
+- Solange die Toten die Feste halten, sitzt dort der **Hof der Stillen Schar**: Hofmarschall Veyl (erklärt den Aufstieg bei den Toten, zeigt die Ränge), Seelenhändlerin Ossara (Seelenphiolen, Grabsiegel), Knochenschmied Grimbart (Knochenwaffen und Totenkronen-Rüstung). Handel nur für die, die zu den Toten gehören (Rang oder Pakt) — sonst sagen sie es.
+- **Totentempel:** Mutter Asch nimmt eine Seelenphiole als Opfer: Totensegen (+5 Rüstung, 15 Min.) und Ruf bei den Toten +3.
+- **Belagerung nach Garmadons Fall:** Valen schlägt vor dem Tor ein Heerlager auf (Marschallin Ortrun und sechs Belagerer). Die Besatzung schrumpft jeden Tag um 10 % (mindestens 8). Wer ans Tor geht, bricht die Besatzung im bestehenden Befreiungskampf in Wellen, mit den Belagerern an der Seite. Fällt die Feste, verschwindet der Hof.
+- Selbsttest „Schwarze Feste (Nutzer §5d.5)“.
+
