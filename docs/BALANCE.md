@@ -25,7 +25,7 @@ setzt Welt, Ruf, Chronik und Flaggen danach zurück (der Tod des Gegners hat kei
 | Tempo-Faktor (neu) | Schwungdauer / 600 ms, **0,6 … 2** (Dolch 0,6, Langschwert 0,93, Zweihänder 1,63, Hammer 1,92); Fernwaffen 1 | damageOf |
 | Heldenleben | 40 + Ausdauer × 4 + Stufe × 6 (Balken ≈ 45 %) | recalc |
 | Höchststufe | **60**, EP ×1,35 bis 10, ×1,2 bis 20, **×1,04** danach (≈ 0,42 Mio. EP bis 60) | levelUp |
-| Talentpunkte | **1 zum Start + 1 auf jeder geraden Stufe** = 31 bei Stufe 60 (von 59 lernbaren Knoten) | levelUp |
+| Talentpunkte | **1 zum Start + 1 auf jeder dritten Stufe** = 21 bei Stufe 60 (Nutzerentscheid) (von 59 lernbaren Knoten) | levelUp |
 | Statpunkte | 1 je Stufe + 1 je 5 Stufen (71 bis Stufe 60) | levelUp |
 
 ## 2. Held nach Stufe (übliche Ausrüstung)

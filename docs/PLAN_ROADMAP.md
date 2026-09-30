@@ -517,6 +517,25 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 - **Streik in Tickmar gewonnen:** (1) Löhne hoch, Magitech/Bionik dauerhaft teurer, dafür weniger Unfälle. (2) Arbeiterrat als neue Macht im Rat von Aurelion (eigene Aufträge, Gesetze). (3) Streikwelle in anderen Fabrikstädten, wenn man nicht eingreift. (4) Das Haus Vantor rächt sich (Schläger, Intrigen gegen den Spieler).
 - **Städte in Aurelion fallen** (Krieg, Tod der Kaiserin): (1) besetzt und sichtbar zerstört, Wachen des Siegers, Händler weg, Bionik/Magitech dort nicht mehr kaufbar. (2) Flüchtlingszüge in Nachbarstädte, Preise steigen dort, neue Aufträge. (3) Befreiung als Wellenkampf wie bei Menschenstädten, danach Wiederaufbau. (4) Nach mehreren Fällen zerbricht das Hochreich in Häuser, die sich bekriegen (Fall Aurelions, C.24).
 
+- **Dorf komplett ausgelöscht** (Spieler, Monster, Krieg): alle vier Folgen — Ruine mit Verfall, später Neubesiedlung in Stufen; Banditen/Goblins nisten sich ein (Auftrag zum Ausräuchern); Spuk/Geisterdorf nachts mit Friedhof der Bewohner (Priester-Auftrag); war es der Spieler: Rache und Kopfgeld der Fraktion, Chronik, Ruf überall.
+- **Seuche nicht eingedämmt:** Bewohner sterben täglich (Stadt schrumpft), Ausbreitung über Karawanen auf Nachbarstädte, Quarantäne (Wachen sperren, kein Handel, Schmuggel-Aufträge), der Spieler kann erkranken (Status, Heilung beim Heiler, Roadmap C.15).
+- **Hexenprozess:** Hinrichtung einer Unschuldigen hat Folgen (Angst, Magier fliehen, Akademie-Ruf sinkt); Befreiung hat Folgen (Orden jagt, die Gerettete wird Gefährtin oder Lehrerin); Hexenjagd-Welle in anderen Städten, wenn der Orden zu stark ist.
+
+## 5d. Zehn dünne Bereiche — Nutzerentscheide (30.09.2026)
+
+1. **Eisenfeste** bevölkern: mehr Militärleben (Appell, Drill, Kaserne, Messe, Auspeitschung), Zivilisten (Soldatenfamilien, Schmiede, Quartiermeister, Feldscher, Kasernenmarkt), Sklavenmarkt, Kettenpriester und Schreiber. **Dunkle Klassen** der Kette je nach Grundklasse: Dunkler Hochpaladin (Krieger, gibt es), **Dunkler Priester** (Kleriker/Magier), **Kettenjäger** (Schütze), **Folterknecht/Henker** (Schurke), **Kettenbarde** (Barde) — Lehrer in der Feste, Rang in der Kette nötig. **Nach Vargs Fall entscheidet der Spieler**, wer die Feste übernimmt (Goblins, Valen, Flüchtlinge).
+2. **Karak-Atar:** neutrale Handelsstadt unter Herrschaft der Sandfürsten (Basar, Wegzoll, Schmuggel aus Aurelion) **und** eigenes Wüstenvolk mit Kultur (Wasserhandel, Rituale).
+3. **Eigene Siedlung (P14):** Ort frei wählbar; Mischung beim Bauen (wichtige Bauten selbst setzen, Wohnhäuser bauen Siedler in Zonen).
+4. **König Varon:** Mischung aus hartem Kriegskönig, schwachem, von Adligen gelenktem König und Paranoia (verfeindet mit Aurelion) — **neue Burgstadt im Norden** mit Thronsaal, Hof, Kerker, Adel.
+5. **Schwarze Feste:** Hauptstadt der Untoten (Hof der Stillen Schar, Händler, Rang-Aufträge), Totentempel (Seelenhandel, Leichenzüge, Rituale), nach Garmadon **eroberbar** (Belagerung als Großereignis).
+6. **Tiefhall:** lebende Zwerge in einer **Bergstadt** auf einer tieferen Ebene (Händler, Schmiede mit Königseisen).
+7. **Banden:** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
+8. **Handwerk:** Rezepte an Esse/Werkbank/Kessel, **Qualität nach Fertigkeit**, Spezialmaterialien (Königseisen, Magitech).
+9. **Seevolk:** **freie Seefahrt** mit eigenem Schiff, mehrere Inseln, Seehandel und Piraterie.
+10. **Aurelions Nebenstädte:** **eigene Grundrisse** und eigener Charakter je Stadt (Klinik-/Tempelstadt Sankt Serin, Werftstadt Kupferhafen, Fabrikstadt Tickmar, Gelenkhall).
+- **Talentpunkte:** jede dritte Stufe (21 bis Stufe 60).
+- **Omega fällt:** Panik im Osten, Jubel und Pilgerzüge im Westen.
+
 ## 6. Koop (K2)
 
 Der Netzwerk-Koop ist als eigenes Paket geplant: `docs/PLAN_COOP.md`. Reihenfolge laut Nutzer: P2 läuft parallel durch einen Opus-Agenten, K2 baut die Hauptsitzung. K1 (Couch-Koop) entfällt.

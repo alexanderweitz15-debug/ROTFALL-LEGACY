@@ -282,8 +282,8 @@ function askHostQuest(g, m, before, after) {
   const S = A.S, [q0, c0] = JSON.parse(before), gained = Object.keys(S.quests).filter(k => !q0[k] || (q0[k].state !== S.quests[k].state && S.quests[k].state === 'active'));
   const newC = (S.contracts || []).filter(c => c.state === 'active' && !c0.some(o => o.id === c.id && o.state === 'active'));
   const names = [...new Set([...gained.filter(k => !k.startsWith('c_')).map(k => A.QUESTS?.[k]?.name || S.quests[k]?.title || k), ...newC.map(c => c.title)])]; if (!names.length) return;
-  A.dialogue(m, `${g.name} (${m.name}) hat angenommen: ${names.join(', ')}.
-Wollt ihr das gemeinsam machen? Aufträge gelten für die ganze Gruppe.`, [
+  const detail = [...gained.filter(k => !k.startsWith('c_')).map(k => `• ${A.QUESTS?.[k]?.name || k}: ${A.QUESTS?.[k]?.desc || ''}`), ...newC.map(c => `• ${c.title}${c.town ? ` (${A.townName?.(c.town) || c.town})` : ''}: ${c.desc || ''}${c.reward?.gold ? ` Lohn ${c.reward.gold} Gold.` : ''}`)].join('\n');   /* was und wo */
+  A.dialogue(m, `${g.name} (${m.name}) hat angenommen:\n${detail}\nWollt ihr das gemeinsam machen? Aufträge gelten für die ganze Gruppe; der Wegpunkt steht auf der Karte (M).`, [
     { text: 'Ja, machen wir.', fn: () => { A.UI.closeDialogue(); sendTo(g, { t: 'toast', text: `${S.player.name} ist dabei.` }); } },
     { text: 'Nein, lass das.', fn: () => { A.UI.closeDialogue(); const [q1, c1] = JSON.parse(before); for (const k of gained) { if (q1[k]) S.quests[k] = q1[k]; else delete S.quests[k]; } for (const c of newC) { const o = c1.find(x => x.id === c.id); if (o) Object.assign(c, o); else c.state = 'offer'; }
       sendTo(g, { t: 'toast', text: `${S.player.name} will das nicht. Auftrag zurückgegeben.` }); A.log(`Auftrag zurückgegeben: ${names.join(', ')}.`, 'quest'); } }]);
@@ -535,16 +535,17 @@ function guestTick(dt) {
   const m = A.MAPS[S.map]; if (m) { R.cam.x = Math.max(0, Math.min(R.cam.x, m.w * A.TS - V.W / R.cam.zoom)); R.cam.y = Math.max(0, Math.min(R.cam.y, m.h * A.TS - V.H / R.cam.zoom)); }
   inAcc += dt; if (inAcc < 33) return; inAcc = 0;
   const wp = R.screenToWorld(A.mouse.x, A.mouse.y), mv = A.moveInput(), aim = Math.round(Math.atan2(wp.y - me.y + 12, wp.x - me.x) * 100) / 100;
-  const msg = { t: 'in', seq: inSeq, mv: [mv.dx, mv.dy], aim, atk: (A.mouse.down || A.keys.has(' ') || pending.atk) && !A.UI.modalOpen && !A.UI.dialogueOpen() ? 1 : 0, guard: A.keys.has('shift') ? 1 : 0, dodge: pending.dodge ? 1 : 0, use: pending.use ? 1 : 0, slot: pending.slot };
+  const talking = A.UI.dialogueOpen(), msg = { t: 'in', seq: inSeq, mv: talking ? [0, 0] : [mv.dx, mv.dy], aim, atk: (A.mouse.down || A.keys.has(' ') || pending.atk) && !A.UI.modalOpen && !A.UI.dialogueOpen() ? 1 : 0, guard: A.keys.has('shift') ? 1 : 0, dodge: pending.dodge ? 1 : 0, use: pending.use ? 1 : 0, slot: pending.slot };
   pending.dodge = false; pending.use = false; pending.slot = null; pending.atk = false;
   const s = JSON.stringify(msg); if (s !== lastIn || msg.seq !== lastSeq || A.keys.size || A.mouse.down || now() - lastSent > 250) { lastIn = s; lastSeq = msg.seq; lastSent = now(); send(msg); }   /* gehaltene Maustaste und Stillstand: spätestens alle 250 ms neu schicken, sonst übernimmt beim Host nach 1 s die KI */
   if (now() - hostSeen > 10000 && !lostWarned) { lostWarned = true; A.UI.toast('KOOP: HOST ANTWORTET NICHT', 5000); A.log('Koop: Seit 10 Sekunden kommt nichts vom Host. Ist sein Fenster zu? Zum Weiterspielen die Seite neu laden.', 'party'); }
   A.UI.refreshHUD(); A.updatePrompt();
+  if (S.map === 'world' && now() - (revealAt || 0) > 500) { revealAt = now(); A.revealAround(me.x / A.TS | 0, me.y / A.TS | 0, A.B.fogR(me)); }   /* Karte deckt sich beim Gast um seine Figur auf */
   mateArrows((S.ents[S.map] || []).filter(e => e !== me && e.alive && (e.kind === 'player' || e.coopPilot)));   /* E-Hinweise (Aufheben, Händler, Eingang) aus Sicht der eigenen Figur */
   const el = $('coop-hud') || (() => { const d = document.createElement('div'); d.id = 'coop-hud'; d.className = 'ledger'; d.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;color:#c9bfa6;text-align:right'; document.body.appendChild(d); return d; })();
   el.textContent = `Koop: Gast bei ${S.coop.hostName} · Code ${lastCode}${S.coop.hostBusy ? ' · Host ist im Menü oder Gespräch' : ''}${S.coop.cineText ? ' · Kamerafahrt läuft' : ''}`;
 }
-let lastSeq = -1, lastSent = 0, hostSeen = now(), lostWarned = false;
+let revealAt = 0, lastSeq = -1, lastSent = 0, hostSeen = now(), lostWarned = false;
 // Pfeil am Bildrand zu jedem Mitspieler, der gerade nicht zu sehen ist (Name und Entfernung dabei)
 const arrows = new Map();
 function mateArrows(list) {
