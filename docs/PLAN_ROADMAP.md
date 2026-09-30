@@ -421,6 +421,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 
 **Sonnet-Testfall:** In Kupferhafen die Hafenmeisterin ansprechen und fünf Tage per Debug `tick` vorspulen. Schiffe am Himmel sichtbar, bewegen sich zwischen Häfen, folgen **nicht** dem Spieler. Absturz auslösen, Wrack finden, Überlebende aufrichten.
 
+**Status: FERTIG (Logik, Anzeige, Dialog, Debug, Probe).** `economy.js`: `airDefaults` (einmalig über `S.flags.air1`: Kupferwind, Goldmöwe, Wacht von Aurel), `airDay` (aus `dayTick`, nicht aus `ecoDay` — die Wirtschaftsprobe ruft `ecoDay` mehrfach und darf keine Flotte bewegen), `airSupply` (Aurelion-Import × Anteil einsatzbereiter Handelsschiffe, Laderaum-Ausbau +25 %, nie unter 0,2), `airPos`/`airPt`, `riskAir`, `airCrash` → Rückruf `airH.crash`; Werft in Kupferhafen bessert mit Barren aus, Neubau eines Wracks nach 5 Tagen aus 6 Barren und 6 Bauholz; gleiche Schiffsart startet versetzt. `game.js`: `ensureAirport` (Mast mit `planned`, Hafenmeisterin Odila Kranz `key: 'hafenmeisterin'`, Mastwarte in Aurelheim, Gelenkhall, Tickmar, Sankt Serin; alles flüchtig, idempotent in `newGame`/`continueGame`), `airCrashed`, `BIG_START.airship.go(o)` parametrisiert (ohne `o` stürzt ein Schiff der Flotte ab), `harborTalk` (Flottenstatus, Erklärung), Gerettete beschleunigen den Neubau. `render.js`: `drawAirship` (gemeinsame Zeichnung), Flotte welt-verankert mit Namen in der Nähe, Rauch bei Motor < 50; Deko-Bahnen nur ohne Flotte. Abweichung: Hülle 0 ruft `S.big` nur, wenn kein anderes Großereignis läuft (sonst Chronik-Meldung).
+
 ### P7 — Luftschiff-Passage, Schäden mit Folgen, Reparatur, erste Upgrades (P0/P1)
 
 **Ziel:** Der Spieler kann mitfliegen. Schäden haben konkrete Folgen, und die Reparatur verbraucht Material aus der Wirtschaft.
@@ -447,6 +449,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - Speichern während `S.voyage.air`, dann laden → der Spieler steht an Deck oder sicher im Zielhafen, nie im Nichts.
 
 **Sonnet-Testfall:** E2E-Test 3 aus C.41 (kaufen bzw. mitfliegen, Upgrade, Motorschaden, Tempo, Reparatur, Sturm, Hafen, speichern/laden). Das eigene Schiff kann in dieses Paket, falls Zeit bleibt; sonst P1.
+
+**Status: FERTIG (Passage, Ereignisse, Werft, Ausbau, Debug, Probe).** `game.js`: `startVoyage` + `seaTick` als gemeinsamer Ablauf für See und Luft (`VOY_TXT` hält die Texte), `airVoyage(to, from, ev)` mit Schiff der Flotte (`S.voyage.air`, `S.voyage.ship`), Ereignisse Sturm (Wetter der Abfahrt), Luftpiraten, Motorschaden (`airMotorFail`: Handwerk-Probe, klemmende Steuerung → Notlandung auf halber Strecke), Hülle < 50 = Wetterschaden ×1,5, Dauer `ECO.airDur` nach Motor und Ausbau, Ankunft am Mast über `S.airLand` in `ARRIVAL.world`, `airRepair`/`airUpgrade` (Material aus `S.towns.kupferhafen.stock` zum `ecoPrice`, fehlt es, keine Arbeit), Gating Rang 1 (`aurelRank`), `voyageFix` beim Laden. `render.js drawSkyDeck`: Himmel, Wolken, Ballon mit Tauen. Das eigene Schiff (`S.air.my`) bleibt für später (Feld existiert, `null`).
 
 ### P8 — Animations-Fundament: Todesarten, Personen-Tod, Gesten, Kamera pro Einstellung (Teil B, Grundstein)
 
@@ -485,6 +489,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - Goblin-Befreiung (`liberate`) mit Debug auslösen und prüfen, dass sterbende Goblins sichtbar fallen.
 - Die Fahrt überspringen und prüfen, dass es keine doppelten NPCs und keine wiederbelebten Toten gibt (B.19).
 
+**Status: FERTIG (Todesarten, Personen-Tod, Gesten, Kamera je Einstellung, Debug, Probe).** Neu `src/anim.js`: `ANIM_DEFS.death` (fall, fallB, heavy, burn, frost, dissolve, crumble, sparks, decap — Dauer, Drehung, Rutschen, Farbstich, Verblassen, Zusammensacken, Zerspringen, Ereignisliste), `ANIM_DEFS.gesture`, `animEvents`, `deathPose` (rein rechnend), `tinted` mit eigenem LRU (200). `game.js`: `deathKind`/`dying` (aus `lastKind`, `lastCrit` neu in `hurt`, `decapped`, Rückstoß, Familie; `forceDc` für Debug), `dc` an jeder Gegner-Leiche, `personCorpse` (flüchtige Leiche mit `SP.humanSpec`-Schnappschuss, 2,5 s; das Grab ist so lange `hidden`, beim Laden immer sichtbar), `DYING`/`deathTick` feuert die Ereignisse, `gesture(c, g)` über `act(…, 'gesture')`, `camAim` (Kamera-Block aus `update`: bei `S.cine` Shot-`zoom` und `focus`, kein Blickvorlauf, kein Kampf-Zoom), `lastCine` für „Cutscene wiederholen“. `render.js`: `drawDeath`, `deathFrameProbe`, Blutlache nur bei blutigen Toden. `fig5.js`: Posen `zeigen`, `abwehren`, `achsel` in `rigS`/`rigW`; `sprites.js`: Stil-D-Ersatz in `POSES`, `poseOf` kennt `gesture`. Abweichung: kein eigener Kopf-Sprite bei Enthauptung (kleiner rollender Kreis); die bestehenden Fahrten nutzen `zoom`/`focus` noch nicht (B.14/B.9 im Ausblick).
+
 ---
 
 ## 5. Nach P0 (Ausblick, nicht Teil dieser acht Pakete)
@@ -495,6 +501,21 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - Goblin-Befreiung als inszenierte Szene (B.9) mit `focus`-Shots und Personen-Toden aus P8.
 - Hit-Reaction-Varianten je Material (Rüstung, Fleisch, Untot, Automat) über `ANIM_DEFS.hit` und `fx`.
 
+
+## 5b. Dauerauftrag Nutzer (30.09.2026): mehr Vielfalt bei Figuren
+
+Bei jeder passenden Gelegenheit mehr Varianten einbauen, nie nur eine Figur je Art:
+- **Untote:** Skelette, Zombies, Ghule, Knochenschützen, Nekromanten in mehreren Varianten (Körperbau, zerrissene Kleidung, fehlende Teile, Rüstungsreste, Waffen, Farben, Leuchten der Augen).
+- **Goblins:** Krieger, Schamanen, Späher, Häuptlinge, Frauen und Kinder der befreiten Stämme; unterschiedliche Größen, Hautfarben, Ohren, Kopfschmuck, Waffen, Kriegsbemalung.
+- **Allgemein:** Banditen, Wachen, Bewohner, Tiere, Automaten, Engel, Seevolk — Varianten aus dem Seed der Figur (`e.seed`), damit sie bei jedem Laden gleich aussehen.
+- Technik: Varianten als Daten (Paletten, Teile, Größenfaktor) in `sprites.js`/`fig5.js`, nicht als Einzelbilder; Selbsttest-Probe „jede Variante malt sich“.
+
+## 5c. Folgen großer Ereignisse (Nutzerentscheid 30.09.2026)
+
+Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt nach einigen Wochen Spielzeit; Schwer und Sehr schwer bleiben die Folgen für immer (nur Spieler-Taten kehren sie um).
+- **Sklavenaufstand gewonnen:** (1) Die Befreiten gründen eine freie Siedlung (Händler, Aufträge, eigene Fraktion). (2) Die Eiserne Kette schlägt zurück: Tage später Rachezüge und Kopfgeldjäger. (3) Arbeitskräfte fehlen: Steinbrüche/Minen der Kette stehen still, Eisen und Stein werden teurer. (4) Andere Städte kippen: der Aufstand greift je nach Ruf auf Nachbarorte über.
+- **Streik in Tickmar gewonnen:** (1) Löhne hoch, Magitech/Bionik dauerhaft teurer, dafür weniger Unfälle. (2) Arbeiterrat als neue Macht im Rat von Aurelion (eigene Aufträge, Gesetze). (3) Streikwelle in anderen Fabrikstädten, wenn man nicht eingreift. (4) Das Haus Vantor rächt sich (Schläger, Intrigen gegen den Spieler).
+- **Städte in Aurelion fallen** (Krieg, Tod der Kaiserin): (1) besetzt und sichtbar zerstört, Wachen des Siegers, Händler weg, Bionik/Magitech dort nicht mehr kaufbar. (2) Flüchtlingszüge in Nachbarstädte, Preise steigen dort, neue Aufträge. (3) Befreiung als Wellenkampf wie bei Menschenstädten, danach Wiederaufbau. (4) Nach mehreren Fällen zerbricht das Hochreich in Häuser, die sich bekriegen (Fall Aurelions, C.24).
 
 ## 6. Koop (K2)
 

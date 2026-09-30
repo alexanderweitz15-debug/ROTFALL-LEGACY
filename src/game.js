@@ -1,5 +1,5 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, SAVE_VERSION, log, onLog, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=21';
 import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=21';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=21';
@@ -10,6 +10,7 @@ import * as SIM from './sim.js?v=21';
 import * as B from './body.js?v=21';
 import * as SP from './sprites.js?v=21';
 import * as ECO from './economy.js?v=21';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=21';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=21';
 import { sfx, ambience, ambienceTick } from './sfx.js?v=21';
 
@@ -109,7 +110,11 @@ export function damageOf(c) {
   if (stat(c, 'wolf_form') && gearOf(c) >= 2) m += 0.25;                              // S15 Hainfell: stärkerer Biss
   if (stat(c, 'song')) m += 0.15;                                                      // Kriegslied
   m += setOf(c)?.bonus.dmg || 0;                                                       // S13: Set-Bonus
-  return (base + attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * Math.max(0.2, m);   // Phase 1: jede Stufe etwas stärker
+  // Balance-Runde: der feste Anteil (Attribut, Übung, Stufe) kommt je Treffer dazu — ohne Ausgleich war der Dolch (300 ms) viermal so
+  // stark wie der Zweihänder. Jetzt wächst er mit der Schwungdauer (600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2);
+  // Fernwaffen ×1. Dolche behalten ihren Rückenstich (Krit ×2,6 von hinten) und die geringe Ausdauer je Hieb.
+  const spd = it && !it.ranged ? Math.min(2, Math.max(0.6, it.speed / 600)) : 1;
+  return (base + (attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * spd) * Math.max(0.2, m);   // Phase 1: jede Stufe etwas stärker
 }
 function speedOf(c) {
   let s = 2.25 + c.attributes.agility * 0.045;
@@ -450,6 +455,12 @@ function ensureBeastTraders() {
 function useConsumable(c, idx, target = c, part = null) {
   const slot = c.inv[idx], it = ITEMS[slot.key];
   if (stat(c, 'wolf_form')) { if (c === S.player) UI.toast('Mit Pfoten öffnet niemand eine Flasche.'); return; }   // S15 Wolfsgestalt
+  if (it.use === 'cell') {                                   /* Roadmap C.10: angelegte Magitech-Waffe zuerst, sonst die leerste im Gepäck */
+    const w = ITEMS[c.equip.weapon?.key]?.energy && (c.equip.weapon.charge ?? 100) < 100 ? c.equip.weapon : c.inv.filter(x => ITEMS[x.key]?.energy && (x.charge ?? 100) < 100).sort((a, b) => (a.charge ?? 100) - (b.charge ?? 100))[0];
+    if (!w) { if (c === S.player) UI.toast('Keine Magitech-Waffe braucht Energie.'); return; }
+    removeItem(c, slot.key, 1); w.charge = 100; if (c === S.player) { UI.toast(`${ITEMS[w.key].name}: Energie 100/100`, 1800); sfx('magic', 0.3); } fx(c.x, c.y - 14, 'spark', 6);
+    return UI.refreshHUD();
+  }
   if (it.use === 'soul') {                                   // Seelenphiole: Essenz für Totenrufer, Linderung für Hexer, sonst ein Schluck Kälte
     removeItem(c, slot.key, 1);
     if (c.titleClass === 'necromancer') setTres(c, tres(c) + 2); else if (c.titleClass === 'warlock') setTres(c, tres(c) - 30); else B.heal(c, 8);
@@ -721,7 +732,7 @@ const AUREL_TRADES = { house: ['Edelmann', 'Edelfrau', 'Kaufherr', 'Handwerker',
   academy: ['Magister', 'Studentin', 'Gelehrter'], observatory: ['Sternkundiger'], library: ['Archivar', 'Schreiberin'], court: ['Richterin', 'Gerichtsschreiber'], hospital: ['Medica', 'Pfleger'],
   bathhouse: ['Bader'], magitech: ['Magitech-Ingenieurin', 'Kristallschleifer'], factoryhall: ['Werkmeister', 'Fabrikarbeiter'], legion: ['Sonnenlegionär', 'Offizier der Sonnenlegion'] };   // Phase 5: begehbare Prachtbauten
 const MARKET_POOL = { 'Gewürzhändler': ['herb', 'herb', 'bread', 'dried_meat', 'potion', 'elixier_staerke', 'elixier_ausdauer', 'elixier_eile', 'elixier_regen'], 'Tuchhändlerin': ['traveler_cloak', 'leather_jerkin', 'leather_cap'], Juwelier: ['potion', 'potion', 'bandage', 'talisman_ausdauer', 'talisman_leichtfuss', 'talisman_krieger', 'talisman_waechter', 'talisman_magie', 'talisman_leben', 'eulenauge', 'elixier_auge', 'elixier_lehre'],
-  Waffenhändler: ['longsword', 'spear', 'shortbow', 'halberd', 'rusty_sword', 'doppelklinge', 'wurfmesser', 'schleuder'], 'Magitech-Ingenieurin': ['messingpistole', 'donnerbuechse', 'potion'],
+  Waffenhändler: ['longsword', 'spear', 'shortbow', 'halberd', 'rusty_sword', 'doppelklinge', 'wurfmesser', 'schleuder'], 'Magitech-Ingenieurin': ['messingpistole', 'donnerbuechse', 'potion', 'schockpistole', 'magiegewehr', 'runenarmbrust', 'kristallkanone', 'praezisionsgewehr', 'energiezelle', 'energiezelle', 'energiezelle'],
   Prothesenhändlerin: ['schrottarm', 'schrottbein', 'aurelarm', 'aurelbein', 'auge_schrott', 'auge_aurel', 'spezialoel', 'ersatzteile'],   /* Roadmap P5: Stufe 1–2 */
   Kybernetiker: ['spezialoel', 'spezialoel', 'ersatzteile', 'feinwerkzeug', 'greifhand', 'federfuss', 'ankerfuss', 'klingenhand'],   /* Roadmap P5: Wartung und Module */ 'Rüstmeisterin': ['chain_hauberk', 'plate_cuirass', 'kite_shield', 'iron_helm', 'great_helm', 'sonnenharnisch', 'sonnenhelm', 'ordensharnisch', 'ordenshelm', 'thronharnisch', 'thronhelm', 'kettenhandschuhe', 'panzerhandschuhe', 'kettenbeinlinge', 'beinschienen', 'thron_handschuhe', 'thron_beinschienen', 'hochritter_handschuhe', 'hochritter_beinschienen'] };
 const TRADE_GREET = {
@@ -1588,7 +1599,14 @@ function styleArea(on = true) {
 }
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
-export const BAL = { hp: 1.7, dmg: 1.4 };
+export const BAL = { hp: 1.7, dmg: 1.4, lvl: 0.06 };   // lvl: Gegnerschaden je Stufe (Balance-Runde: 0,05 → 0,06, sonst ab Stufe 25 kaum noch Gefahr)
+// Balance-Runde (docs/BALANCE.md): Bosse (MONSTERS.boss und Regionalbosse) — mehr Leben, weniger Wucht je Treffer. Gemessen
+// (RF.simFight, Schwer, übliche Ausrüstung) endeten Bossfeiten nach 10–26 s und fast immer mit 2–3 Treffern bis zum Boden:
+// Glücksspiel statt Kampf. Ziel 60–180 s, echte Gefahr, mit Rolle und Deckung gewinnbar. Schaden gilt für alles, was der Boss
+// austeilt (Hieb, Fläche, Geschoss; hurt()).
+// Omega (bossScale:false) ist eine Heeresschlacht mit Verbündeten und bleibt bei seinen Werten.
+export const BOSS = { hp: 2, dmg: 0.6 };
+const bossScaled = e => !!e?.boss && e.kind === 'enemy' && MONSTERS[e.mtype]?.bossScale !== false;
 // S15 P12 Schwierigkeitsgrade (PLAN_OFFEN Block B). Schwer ist der Standard. Wirkt auf Leben und Schaden der Gegner (über BAL),
 // die Ansagezeit schwerer Angriffe, Beutechancen und wie schnell Kopfgeld verfällt; die Gliedergrenze steht in body.js cutOf.
 export const DIFF = {
@@ -1647,7 +1665,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     faction: m.faction, boss: !!m.boss, ...opts,
   };
   if (!e.boss && (opts.level == null || opts.zone) && !map.startsWith('__')) e.level = zoneLevel(map, tx, ty, m);   // Phase 1: Gebietsspanne
-  e.maxHp = e.hp = Math.round(m.hp * (1 + e.level * 0.04) * BAL.hp);
+  e.maxHp = e.hp = Math.round(m.hp * (1 + e.level * 0.04) * BAL.hp * (bossScaled(e) ? BOSS.hp : 1)); if (bossScaled(e)) e.bossV = 1;   // bossV: schon nach BOSS bemessen (Ladeprüfung)
   if (!e.boss && !opts.noVariant && !m.prey && !e.servant && !map.startsWith('__') && !S._quiet && Math.random() < 0.18) applyVariant(e, m);   // S13: Gegnervarianten (eigener Zufall: die Weltfolge bleibt stabil)
   if (HUMANOID.has(mtype)) { e.build = pick(Object.keys(B.BUILDS)); B.initBody(e, e.maxHp); }   // Menschenähnliche haben Trefferzonen
   S.ents[map].push(e);
@@ -1683,12 +1701,12 @@ const REGION_BOSSES = [
     call: 'wolf', callText: 'heult. Das Rudel antwortet.', area: a => a.map === 'world' && a.x < 130 + OX && a.y > 250 && a.types.includes('wolf'), from: 'wolf', to: 'wild_dog',
     effect: () => { if (S.towns.eren) S.towns.eren.stock.pelt += 8; S.factions.valen += 3; },
     text: 'Ohne Graumähne zerfällt das Rudel der Schlucht. Die Jäger in Eren atmen auf — und in den Westwald ziehen verwilderte Hunde.' },
-  { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 240, r: 13, title: 'Karrak, der Sandfürst',
+  { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 340, dmg: 1.8, r: 13,   /* Balance-Runde: vorher 240 LP, Banditenhieb — in 6 s erledigt */ title: 'Karrak, der Sandfürst',
     call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
     effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; },
     text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf — doch in die leeren Lager ziehen Goblin-Krieger.' },
   // Endgame (Session 11): Varg in der Kernburg der Kettenfeste. Tod = Befreiung der Goblins; Reste der Kette werden zu Räubern.
-  { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 260, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
+  { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 360, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
     call: 'chain_brute', callText: 'lässt die Kette klirren. Knechte stürmen aus der Halle.', area: a => !!a.eisen, from: 'chain_brute', to: 'bandit',
     guards: 2, guardType: 'rotgardist', effect: () => liberate(),
     court: [[-4, -3, 'rotgardist'], [-4, 3, 'rotgardist'], [-9, -4, 'rotgardist'], [-9, 4, 'rotgardist'], [-12, -5, 'kettenschuetze'], [-12, 5, 'kettenschuetze']],
@@ -1701,7 +1719,7 @@ function ensureRegionBosses() {
     const L = LOCATIONS.find(l => l.key === b.loc); if (!L) continue;
     const [bx, by] = b.at || [Math.round(L.x), Math.round(L.y)];
     const e = spawnEnemy(b.mtype, 'world', bx, by, { level: b.level, boss: true, rboss: b.id, title: b.title });
-    e.maxHp = e.hp = Math.round(b.hp * BAL.hp); e.r = b.r; if (e.body) B.initBody(e, e.maxHp);
+    e.maxHp = e.hp = Math.round(b.hp * BAL.hp * BOSS.hp); e.r = b.r; if (b.dmg) e.dmgMul = b.dmg; if (e.body) B.initBody(e, e.maxHp);
     if (b.court) { e.parley = true; e.facing = 2; }                  // S12: Varg hält Hof — man kann ihn ansprechen
     for (const [i, [dx, dy, gt]] of (b.court || [[-3, -3, b.guardType || b.call], [-3, 3, b.guardType || b.call]]).slice(0, b.court ? 99 : b.guards || 0).entries())
       { const g = spawnEnemy(gt, 'world', bx + dx, by + dy, { level: b.level - 4, anchor: { x: (bx + dx) * TS, y: (by + dy) * TS } }); g.court = true; g.facing = i % 2 ? 3 : 2; }   // Leibwache / Hofstaat
@@ -1719,7 +1737,7 @@ function spawnType(a) {                                             // Machtvaku
 // oft Veteranen (+30 % Leben, größer, bessere Beute). Die Welt skaliert nicht zum Spieler — der Ort bestimmt die Gefahr.
 // Gegner-Skalierung (Master-Prompt 2 §20/§21): Jedes Gebiet hat eine Levelspanne nach seiner Gefahr. Innerhalb dieser
 // Spanne passt sich der Gegner an den Spieler an (±2, zähe Arten etwas höher); darüber hinaus nie. Frühe Gebiete werden
-// später leicht, späte bleiben hart. Stärke je Stufe bleibt maßvoll (+4 % Leben, +5 % Schaden).
+// später leicht, späte bleiben hart. Stärke je Stufe bleibt maßvoll (+4 % Leben, +6 % Schaden, BAL.lvl).
 const ZONE = [[1, 8], [1, 10], [3, 15], [8, 22], [15, 35], [25, 50]];
 const REGION_TIER = { deadland: 4, eisen: 3, mountain: 3, desert: 3, blight: 3, aurel: 2 };
 function zoneTier(map, tx, ty) {
@@ -1789,7 +1807,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -1799,7 +1817,7 @@ export function newGame(cfg) {
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
     origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   p.attributes = Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
-  p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {};   // ein Talentpunkt zum Start, danach einer je Stufe
+  p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {};   // ein Talentpunkt zum Start, danach einer auf jeder zweiten Stufe (levelUp)
   S.gold = o.gold;
   o.gear.forEach(k => { const it = mkItem(k); if (ITEMS[k].slot === 'weapon' && !p.equip.weapon) p.equip.weapon = it;
     else if (ITEMS[k].slot === 'chest' && !p.equip.chest) p.equip.chest = it;
@@ -1817,6 +1835,7 @@ export function newGame(cfg) {
     const where = Math.hypot(dx, dy) < 14 ? 'Gleich vor dir liegt Eren' : `Im ${['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8]} liegt Eren`;
     log(`${where}. Dort gibt es Arbeit — und Leute, die welche brauchen.`, 'world'); }
   startGame();
+  coopHooks.afterNew?.();   /* Koop: neuer Koop-Stand — gleich den Warteraum öffnen */
 }
 
 function bindSim() {
@@ -1961,7 +1980,8 @@ export function continueGame(given = null) {                        /* Koop K2: 
     deepBoss(); S.flags.deep1 = true;
   }
   for (const m of MAP_KEYS) for (const e of S.ents[m]) {
-    if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
+    if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }
+    if (e.kind === 'grave') { delete e.hidden; continue; }   /* Roadmap P8: im Tod gespeichert — Grab sofort sichtbar */   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
     for (const k of ['silenced', 'voidRage', 'darkPact', 'timeSlow', 'soulBound', 'exposed', 'cowed', 'shockImm', 'tended', 'cmdUntil', 'pathFail', 'tradeT', 'reactAt']) if (e[k]) e[k] = 0;
     if (e.brawlKO) e.brawlKO = 1; if (e.talk?.until) e.talk = null;   // S15 Fehlersuche: performance.now-Werte gelten nach dem Laden nicht mehr   // S15 Fehlersuche: Bann, Pakt, Verlangsamung usw. überdauerten das Laden
@@ -1971,7 +1991,8 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); registerContracts(); nameFix(); fortressHour();
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
     else { const q = ARRIVAL.world('none'); S.ents.vault = []; S.map = 'world'; Object.assign(S.player, { map: 'world', x: q.x, y: q.y }); S.ents.world.push(S.player); } }
@@ -1988,6 +2009,10 @@ export function continueGame(given = null) {                        /* Koop K2: 
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
+  for (const arr of Object.values(S.ents)) for (const e of arr || []) if (bossScaled(e) && e.alive && !e.bossV) {   /* Balance-Runde: Bosse alter Stände bekommen das neue Leben (BOSS.hp), sonst wären sie mit der geringeren Wucht nur leichter */
+    const f = e.hp / (e.maxHp || 1), rb = bossOf(e); e.bossV = 1; if (rb?.dmg) e.dmgMul = rb.dmg;
+    if (e.body) { for (const k of ['head', 'torso']) { const P = e.body[k], r = P.max ? P.hp / P.max : 1; P.max = Math.round(P.max * BOSS.hp); P.hp = P.max * r; } B.syncHp(e); }
+    else { e.maxHp = Math.round((e.maxHp || 1) * BOSS.hp); e.hp = Math.round(e.maxHp * f); } }
   if (S.halt?.tickmar) { if (S.big?.kind === 'strike') S.halt['tickmar:magitech'] = Math.max(S.halt['tickmar:magitech'] || 0, S.big.until); delete S.halt.tickmar; }   /* Roadmap P4: alter Streik-Schlüssel */
   for (const c of S.ents.world) if (c.villager && (c.prof === 'Prothesenhändlerin' || c.prof === 'Kybernetiker') && !c.shop) Object.assign(c, { shop: true, pool: MARKET_POOL[c.prof], till: 20 });   /* Roadmap P5: Bionik-Händler in alten Ständen */
   { const v = S.ents.world.find(e => e.key === 'vell'); if (v?.pool && !v.pool.includes('spezialoel')) v.pool = [...v.pool, 'spezialoel', 'feinwerkzeug', 'auge_aurel', 'auge_meister']; }   /* Roadmap P5 */
@@ -2224,6 +2249,7 @@ function update(dt, now) {
   coopHooks.hostTick?.(dt);
   // Zeit
   if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
+  deathTick();                 /* Roadmap P8: Todesabläufe */
   if (S.voyage) seaTick(dt);  // S14: Überfahrt an Deck
   if (S.fires?.length) fireTick(dt);   // S14: Brand in der Stadt
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
@@ -2285,14 +2311,7 @@ function update(dt, now) {
   updateFx(dt);
   updateBuildings(dt);
   // Kamera
-  const V = R.view();
-  // Kampf-Zoom: rückt sanft ~8 % heran, solange ein Feind nahe und auf den Spieler aus ist; langsam zurück.
-  const engaged = S.settings.motion && combat.some(e => e.kind === 'enemy' && e.alive && isHostile(p, e) && dist(p, e) < 240 && (e.aggroId === p.id || e.aiState === 'pursue'));
-  R.cam.cz = (R.cam.cz || 0) + ((engaged ? 0.08 : 0) - (R.cam.cz || 0)) * Math.min(1, dt / (engaged ? 700 : 1400));
-  R.cam.zoom = (R.cam.base || 1.3) * (1 + R.cam.cz);
-  const look = S.settings.motion ? 0.14 : 0;                    // Blickvorlauf zur Maus (max. ~40 px)
-  const lx = clamp((mouse.wx - p.x) * look, -40, 40), ly = clamp((mouse.wy - p.y) * look, -30, 30);
-  const tx = p.x + lx - V.W / (2 * R.cam.zoom), ty = p.y + ly - V.H / (2 * R.cam.zoom);
+  const V = R.view(), tx0 = camAim(p, dt), tx = tx0.x - V.W / (2 * R.cam.zoom), ty = tx0.y - V.H / (2 * R.cam.zoom);
   R.cam.punch = Math.max(0, (R.cam.punch || 0) - dt * 0.00025);
   R.cam.x += (tx - R.cam.x) * Math.min(1, dt / 120);
   R.cam.y += (ty - R.cam.y) * Math.min(1, dt / 120);
@@ -2842,6 +2861,7 @@ function attack(c, forceDir) {
   const cost = (it ? it.stam : 4) * (1 - Math.min(0.6, afx(c, 'vigor') + elx(c, 'vigor')));
   if (c.stamina < cost) { if (c === S.player && chance(0.02)) UI.toast('Zu erschöpft'); return; }
   if (it && it.reload && c.reloadUntil > performance.now()) return;   // Armbrust wird gespannt
+  if (it && it.energy && cellUser(c) && (w.charge ?? 100) < it.energy) { if (c === S.player && !(c.cellWarn > performance.now())) { c.cellWarn = performance.now() + 1500; UI.toast('Energie leer — Energiezelle benutzen (Inventar oder Leiste)', 2600); } return; }   /* Roadmap C.10 */
   if (it && it.manaShot) { if ((c.mana || 0) < it.manaShot) { if (c === S.player && !(c.manaWarn > performance.now())) { c.manaWarn = performance.now() + 1500; UI.toast(c.maxMana ? 'Zu wenig Mana für den Zauberstab' : 'Den Zauberstab führt nur, wer Magie gelernt hat (Magier, Kleriker, Paladin).'); } return; } c.mana -= it.manaShot; }
   c.stamina -= cost;
   c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift'))) * (1 - Math.min(0.25, (it && c.skills ? c.skills[it.skill] || 0 : 0) * 0.0025));   // S13 (Kenshi): geübte Hand schlägt schneller
@@ -2903,7 +2923,9 @@ function shoot(c, it, mult = 1) {
   const bolt = it.wtype === 'crossbow', spark = it.wtype === 'wand', v = it.proj === 'bullet' ? 14 : it.proj === 'stone' ? 8 : bolt ? 10 : spark ? 6.2 : 7.2;   // S13: Kugel, Stein, Messer, Beil
   const dmg = spark ? (it.dmg + (c.attributes?.intelligence || 8) * 0.9) * spellMul(c) * mult : damageOf(c) * mult;
   S.projectiles.push({ id: uid(), kind: it.proj || (bolt ? 'bolt' : spark ? 'spark' : 'arrow'), map: c.map, x: c.x + Math.cos(c.aim) * 14, y: c.y - 12 + Math.sin(c.aim) * 8,
-    vx: Math.cos(c.aim) * v, vy: Math.sin(c.aim) * v, owner: c.id, dmg, ap: it.ap || 0, life: bolt ? 1100 : 1400, team: teamOf(c) });
+    vx: Math.cos(c.aim) * v, vy: Math.sin(c.aim) * v, owner: c.id, dmg, ap: it.ap || 0, life: bolt ? 1100 : 1400, team: teamOf(c), splash: it.splash || 0, pierce: it.pierce || 0, spellSt: it.mstatus });
+  if (it.energy && cellUser(c) && c.equip?.weapon) { const w = c.equip.weapon, was = w.charge ?? 100; w.charge = Math.max(0, was - it.energy);   /* Roadmap C.10: Energie je Schuss */
+    if (c === S.player && was >= 25 && w.charge < 25) UI.toast(`Energie niedrig: ${w.charge}/100`, 2000); }
   c.lastShot = performance.now();                                    // Phase 1: Zielhaltung kurz halten (render: Bogen vor dem Körper)
   if (bolt) { c.reloadUntil = performance.now() + it.reload; if (c === S.player) sfx('metal', 0.3); }   // abgedrückt: jetzt spannen
   if (it.proj === 'bullet') { fx(c.x + Math.cos(c.aim) * 22, c.y - 12 + Math.sin(c.aim) * 10, 'spark', 7); fx(c.x + Math.cos(c.aim) * 26, c.y - 12, 'dust', 4); sfx('magic', 0.5, earVol(c)); camShake(c === S.player ? 3 : 0, 90); }   // S13: Magitech-Mündungsblitz
@@ -3100,7 +3122,7 @@ const EYE_ZAP = new Set(['magic', 'shadow', 'shock', 'arcane']);   /* Roadmap P2
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null;
-  let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
+  let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * BAL.lvl) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
   if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
@@ -3114,7 +3136,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   // Kritisch
   const ambush = attacker === S.player && target.kind === 'enemy' && teamOf(target) === 'neutral';   // S12: Schleichangriff auf Ahnungslose
   const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen');
-  const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < 1;
+  const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) > Math.PI - 1;   // Balance-Runde: vorher „< 1“ = von VORN (Dolch-Krit ×2,6 gegen jeden, der einen ansieht)
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
   // Heilig gegen Untot
@@ -3172,7 +3194,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if ((attacker.mtype === 'death_knight' || attacker.mtype === 'garmadon') && attacker.alive && !attacker.downed) { const h = dmg * (attacker.phase === 3 ? 0.4 : 0.25); if (attacker.body) B.heal(attacker, h); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + h); }
   if (attacker.mtype === 'ghoul' && target.alive && target.kind !== 'caravan') addStatus(target, { key: 'grabbed', name: 'Gepackt', left: 1500, desc: 'Langsamer (−50 %).' });
   if (attacker.mtype === 'wraith' && target.stamina != null) { target.stamina = Math.max(0, target.stamina - 15); fx(target.x, target.y - 14, 'frost', 5); }
-  if (target.mtype === 'wraith' && target.alive) target.phased = performance.now() + 900;
+  if (target.mtype === 'wraith' && target.alive && !(target.phased > performance.now())) target.phased = performance.now() + 900;   // Balance-Runde: ein abgeprallter Hieb verlängert die Körperlosigkeit nicht (vorher: Dauerhauen = Geist nie treffbar)
   if (crush && target.alive && !target.downed) { target.stagger = Math.max(target.stagger || 0, MONSTERS[target.mtype]?.boss ? 300 : 650); target.swing = 0; target.telegraph = 0; target.windup = false; }   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
@@ -3201,7 +3223,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.mtype === 'chain_master' && source === S.player && S.flags.goblinStorm && !S.flags.goblinStormFired) goblinStorm(target);   // S15: wer Varg angreift, ruft die Grubenstämme
   if (target.casting && source && dmg >= 2) interruptCast(target);   // S15 P4: wer getroffen wird, verliert den Zauber
   if (target.momentum && source) target.momentum = 0;               // Streitflegel: wer getroffen wird, verliert den Schwung
-  target.lastKind = kind;
+  target.lastKind = kind; target.lastCrit = !!crit;   /* Roadmap P8: Todesart */
   if (target.contract && source) { const mine = source === S.player || S.party.includes(source.id) || source.ownerId === S.player.id;   // S14 (Nutzer): Beitrag am Auftrag messen
     target.dmgAll = (target.dmgAll || 0) + dmg; if (mine) target.dmgMine = (target.dmgMine || 0) + dmg; }
   if (source && target.hexed > performance.now()) dmg *= 1.25;        // Fluch des Hexenmeisters
@@ -3209,6 +3231,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
   if (stat(target, 'frenzy')) dmg *= 1.2;                              // Preis der Raserei
   if (source && source.cowed > performance.now()) dmg *= 0.8;          // eingeschüchtert (Kampfschrei)
+  if (source !== target && bossScaled(source)) dmg *= BOSS.dmg;         // Balance-Runde: Bosswucht (BOSS)
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
@@ -3280,6 +3303,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   sfx(bony ? 'bone' : crit ? 'crit' : 'hit', source ? feelOf(source).w : 0.3, earVol(target), mat, armored);
   if (result === 'disabled' || result === 'severed') limbLost(target, part, result === 'severed');
   if (result === 'decap') {
+    target.decapped = true;   /* Roadmap P8 */
     fx(target.x, target.y - 26, 'blood', 16); camShake(8, 200);
     float(target, 'ENTHAUPTET', 'rgba(200,60,40,ALPHA)', true);
     return die(target, `Enthauptet durch ${cause}`, source);
@@ -3348,6 +3372,7 @@ function stabilize(c, helper) {
 
 function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
+  if (c.simDummy) { c.alive = false; c.swing = 0; c.telegraph = 0; c.special = null; return; }   /* Balance-Runde: RF.simFight — ein gestellter Tod hat keine Weltfolgen */
   if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
@@ -3393,7 +3418,7 @@ function die(c, cause = 'Wunden', source) {
     if (dist(S.player, c) < 500) log(`${m.name} fällt.`, 'combat');
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
     arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: m.pal?.cloth || '#3a3229', transient: true,
-      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now(), raised: !!c.servant });   // ein Diener steht nicht zweimal auf
+      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now(), raised: !!c.servant, dc: dying(c) }); DYING.push(arr[arr.length - 1]);   // ein Diener steht nicht zweimal auf
     if (c.contract) conKill(c);                                     // BUG-138: Auftragsziele zählen auch fern vom Helden (Gefährten, Fernkampf)
     if (c.seaTag) onKill(c.mtype, c);                               // S14: markierte Auftragsziele des Seevolks ebenso
     return;
@@ -3426,7 +3451,8 @@ function die(c, cause = 'Wunden', source) {
     onKill(c.mtype, c); const rbk = bossOf(c); if (rbk) onKill(rbk.id);   // Regionalboss zählt als eigenes Ziel
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
     arr.push({ id: uid(), kind:'corpse', map: c.map, x: c.x, y: c.y, life: 20000, maxLife: 20000, pal: MONSTERS[c.mtype].pal?.cloth || '#3a3229', transient: true,
-      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now() });
+      mtype: c.mtype, facing: c.facing, seed: c.seed, born: performance.now(), dc: dying(c) });
+    DYING.push(arr[arr.length - 1]);   /* Roadmap P8: Ereignisse des Todesablaufs */
     return;
   }
   // Person
@@ -3435,7 +3461,7 @@ function die(c, cause = 'Wunden', source) {
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   if (c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith)) (S.mourn ||= {})[c.homeTown] = { name: c.name, until: (S.day | 0) + 2 };   // S13: der Ort trauert
   chronicle(`${c.name} gefallen`, 'death', `${cause}. Jahr ${year()}, Tag ${S.day}.`);
-  makeGrave(c, cause);
+  makeGrave(c, cause); personCorpse(c);   /* Roadmap P8: Personen fallen sichtbar, das Grab erscheint danach */
   for (const m of partyMembers()) if (m !== c) { remember(m, 'friend_died', c.name); m.morale -= 14; }
   if (isParty) S.party = S.party.filter(id => id !== c.id);
   const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
@@ -3483,6 +3509,41 @@ function murderOfRank(victim, fac, rank, seen) {
   if (seen && p.map === 'world') { S.flags.hunterDay = S.day + 2; spawnHunters(p); }
 }
 const banned = fac => ((S.flags.bann || {})[fac] || 0) > (S.day | 0);
+// Roadmap P8: Todesart aus der letzten Schadensart, Rückstoß, Familie und Krit (anim.js ANIM_DEFS.death). forceDc = Debug/Test.
+function deathKind(c) {
+  if (c.forceDc && ANIM_DEFS.death[c.forceDc]) return c.forceDc;
+  const k = c.lastKind || 'physical', m = MONSTERS[c.mtype];
+  if (c.decapped) return 'decap';
+  if (c.robot || c.mtype === 'automat' || c.amok) return 'sparks';
+  if (k === 'fire') return 'burn';
+  if (k === 'frost' || c.rooted > performance.now() || c.status?.some(s => s.key === 'frost')) return 'frost';
+  if (c.undead || m?.faction === 'undead') return k === 'holy' ? 'dissolve' : 'crumble';
+  if (['holy', 'magic', 'shadow', 'arcane'].includes(k)) return 'dissolve';
+  if (c.kb && c.kb.t > 0 && Math.hypot(c.kb.x, c.kb.y) >= 30) return 'heavy';
+  if (c.lastCrit) return 'fallB';
+  return 'fall';
+}
+function dying(c) { const d = deathKind(c); c.lastDc = d; return d; }
+const DYING = [];                                                     // flüchtige Leichen mit laufendem Ablauf (nie gespeichert)
+function deathTick() {                                                // feuert die fx-Ereignisse der Todesabläufe (je Bild)
+  if (!DYING.length) return; const now = performance.now();
+  for (let i = DYING.length - 1; i >= 0; i--) { const e = DYING[i], D = ANIM_DEFS.death[e.dc];
+    const unhide = () => { if (e.graveOf) { const g = S.ents[e.map]?.find(x => x.id === e.graveOf); if (g) delete g.hidden; } };
+    if (!D || e.map !== S.map) { DYING.splice(i, 1); unhide(); continue; }
+    const k = Math.min(1, (now - e.born) / D.dur);
+    for (const ev of animEvents(D, e.animK ?? -1, k)) { if (ev.fx) fx(e.x, e.y + (ev.dy || 0), ev.fx, ev.n || 6); if (ev.shake && S.settings.motion) camShake(ev.shake, 120); if (ev.sfx) sfx(ev.sfx, 0.3, earVol(e)); }
+    e.animK = k;
+    if (k >= 1) { DYING.splice(i, 1); unhide(); }
+  }
+}
+function personCorpse(c) {                                            // flüchtige Leiche einer Person: fällt nach Todesart, dann steht das Grab
+  const arr = S.ents[c.map]; if (!arr) return;
+  const g = arr[arr.length - 1]?.kind === 'grave' ? arr[arr.length - 1] : null;
+  let spec = null; try { spec = SP.humanSpec(c); } catch (err) { spec = null; }
+  if (!spec) return;
+  const e = { id: uid(), kind: 'corpse', map: c.map, x: c.x, y: c.y, life: 2500, maxLife: 2500, transient: true, raised: true, person: true, spec, facing: c.facing, seed: c.seed, born: performance.now(), dc: dying(c), graveOf: g?.id || null };
+  arr.push(e); DYING.push(e); if (g) g.hidden = true;
+}
 function makeGrave(c, cause) {
   const g = { id: uid(), kind:'grave', map: c.map, x: c.x, y: c.y, r: 10,
     label: `Grab: ${c.name}`, epitaph: `${c.name}<br>${c.prof || CLASSES[c.currentClass].name}<br>Gefallen: ${cause}<br>Jahr ${year()}`,
@@ -3533,13 +3594,24 @@ function gainXp(c, n) {
   for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
+// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder zweiten Stufe (gerade Stufen)
+// plus der Startpunkt — bei 60 also 31 Punkte für 64 Knoten (59 lernbar, fünf Schlüsselknoten schließen einander aus): viele,
+// nicht alle. Statpunkt je Stufe und der Meilenstein-Statpunkt alle 5 Stufen bleiben. Alte Stände behalten ihre Punkte.
+// Kurve: ab Stufe 20 nur noch ×1,04 je Stufe (vorher ×1,12: 3,1 Mio. EP bis 60, unerreichbar; jetzt ≈ 0,46 Mio.).
+export const MAX_LEVEL = 60, TALENT_EVERY = 2;
+const talentAt = L => L % TALENT_EVERY === 0;
 function levelUp(c) {
-  c.xp -= c.xpNext; c.level++; c.xpNext = Math.round(c.xpNext * (c.level < 10 ? 1.35 : c.level < 20 ? 1.2 : 1.12));   // S13 (Nutzer: Level): flacher nach Stufe 10, sonst Mauer
-  if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen
-    log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Attribut- und Talentpunkt.`, 'party'); }
+  if (c.level >= MAX_LEVEL) { c.xp = Math.min(c.xp, c.xpNext - 0.001); return; }   /* Höchststufe: Balken bleibt voll, die Schleife in gainXp endet */
+  c.xp -= c.xpNext; c.level++; c.xpNext = Math.round(c.xpNext * (c.level < 10 ? 1.35 : c.level < 20 ? 1.2 : 1.04));   // S13 (Nutzer: Level): flacher nach Stufe 10 und 20, sonst Mauer
+  const tal = c === S.player && talentAt(c.level), top = c.level >= MAX_LEVEL;
+  if (top) c.xp = Math.min(c.xp, c.xpNext - 0.001);
+  if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen (Statpunkt)
+    log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Statpunkt.`, 'party'); }
   if (c.map === S.map) { fx(c.x, c.y - 10, 'heal', 18); float(c, `Stufe ${c.level}`, 'rgba(240,210,120,ALPHA)', true); if (c === S.player) sfx('heal', 0.6); }   // S13: Aufstieg sichtbar
   if (c.coopHero) { c.attrPoints = (c.attrPoints || 0) + 1; log(`${c.name} erreicht Stufe ${c.level}. Ein Statpunkt ist frei (C).`, 'party'); }   /* Koop: der eigene Charakter des Gasts verteilt Punkte selbst */
-  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; c.skillPoints = (c.skillPoints || 0) + 1; UI.toast(`Stufe ${c.level} · +1 Statpunkt (C) · +1 Talentpunkt (T)`, 3200); log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C) und ein Talentpunkt (Talente, T).`, 'party'); }   // S15 (Nutzer): Statpunkte sichtbar
+  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; if (tal) c.skillPoints = (c.skillPoints || 0) + 1;   // S15 (Nutzer): Statpunkte sichtbar; Talentpunkt nur auf geraden Stufen
+    UI.toast(`Stufe ${c.level}${top ? ' · HÖCHSTSTUFE' : ''} · +1 Statpunkt (C)${tal ? ' · +1 Talentpunkt (T)' : ''}`, 3200);
+    log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C)${tal ? ' und ein Talentpunkt (Talente, T)' : ` — der nächste Talentpunkt kommt auf Stufe ${c.level + TALENT_EVERY - c.level % TALENT_EVERY}`}.${top ? ' Höchststufe erreicht: weitere Erfahrung bringt keine Stufe mehr.' : ''}`, 'party'); }
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
   recalc(c); if (!(c.downed && c !== S.player)) B.fullHeal(c);   // S15 (Nutzer): wer am Boden liegt, steht nicht durch einen Aufstieg auf
 }
@@ -3925,7 +3997,7 @@ function archerAI(e, tgt, d, sp, dt, m) {
       e.atkCd = m.atk; e.repos = 500 + rnd() * 600; e.circle = chance(0.5) ? 1 : -1;
       const mag = m.missile === 'shadow';                     // Kultist: Schattenblitz (langsamer, man kann ausweichen)
       S.projectiles.push({ id: uid(), kind: m.missile || 'arrow', map: e.map, x: e.x + cs * 12, y: e.y - 10 + sn * 8,
-        vx: cs * (mag ? 4.6 : 7), vy: sn * (mag ? 4.6 : 7), owner: e.id, dmg: m.dmg * (1 + e.level * 0.05) * BAL.dmg, life: 1600, team:'foe' });
+        vx: cs * (mag ? 4.6 : 7), vy: sn * (mag ? 4.6 : 7), owner: e.id, dmg: m.dmg * (1 + e.level * BAL.lvl) * BAL.dmg * (e.dmgMul || 1), life: 1600, team:'foe' });   /* Balance-Runde: Varianten (Rasender, Vernarbter) wirken auch bei Schützen */
       if (mag) { e.castT = performance.now(); fx(e.x + cs * 12, e.y - 14, 'shadow', 6); }
       sfx('bow', 0.2, earVol(e));
     }
@@ -4741,6 +4813,7 @@ function doInteract(target = null) {
 const ARRIVAL = { mine: () => MAPS.mine.entry, deep: () => MAPS.deep.entry, garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
   world: from => {
     if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
+    if (from === 'deck' && S.airLand) { const [ax, ay] = S.airLand; S.airLand = null; return freeSpotNear('world', ax | 0, ay | 0, 5); }   /* Roadmap P7: Luftschiff landet am Mast (oder notlandet im Land) */
     if (from === 'isle' || from === 'deck') return portSpot(S.seaPort || 'saltport');   // S14: Seereise endet im Hafen
     const door = from === 'vault' ? S.ents.world.find(e => e.vaultSite === S.vaultAt?.site) : S.ents.world.find(e => e.kind === 'prop' && e.portal === from);   // BUG-114: stand im Kommentar — Rückkehr aus jedem Dungeon warf
     if (door) return freeSpotNear('world', door.x / TS | 0, (door.y / TS | 0) + 3, 1);
@@ -6487,50 +6560,196 @@ function seaTalk(npc) {
   const opts = dests.map(k => ({ text: `${k === 'isle' ? 'Nach Tangkron (Gischtinseln)' : 'Nach ' + SEA_PORTS[k]} — ${SEA_FARE} Gold, ~6 Std`, fn: () => seaVoyage(k, from) }));
   UI.dialogue(npc, from === 'isle' ? '„Das Festland ruft? Es ruft immer zu laut.“' : '„Zu den Gischtinseln. Sturm gibt es gratis, Freibeuter manchmal auch. Wer an Deck steht, kämpft mit.“', [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
+// Roadmap P7: See- und Luftreise teilen sich Deck, Ablauf und Ereignisse (startVoyage, seaTick). V.air = Luftschiff: Himmel statt
+// Wasser (render.js), Motorschaden als eigenes Ereignis, Sturm beschädigt das Schiff, Ankunft am Mast (S.airLand). VOY_TXT hält die Texte.
+const VOY_TXT = {
+  sea: { board: 'ENTERHAKEN! FREIBEUTER', boardLog: 'Ein schwarzes Segel schiebt sich längsseits. Enterhaken fliegen, Männer mit Entermessern springen über die Reling.', foeName: null,
+    wave: 'Brecher!', waveCause: 'Sturzsee', storm: 'Brecher schlagen über die Reling. Der Kapitän brüllt: „Unter Deck oder festhalten!“', below: 'Du hockst zwischen Salzfässern im Bauch des Schiffs. Es ächzt.',
+    help: 'An Deck bleiben und mit anpacken (+Ruf beim Seevolk)', downed: 'Du kommst im Laderaum zu dir. Der Kapitän hat umgedreht — „Mit Toten an Bord segle ich nicht.“' },
+  air: { board: 'ENTERHAKEN! LUFTPIRATEN', boardLog: 'Ein schwarzes Luftschiff schiebt sich aus der Wolke längsseits. Enterhaken fliegen, Luftpiraten schwingen sich an Seilen über die Reling.', foeName: ['Luftpirat', 'Harpunier der Luftpiraten'],
+    wave: 'Böe!', waveCause: 'Sturmböe', storm: 'Eine Sturmböe reißt am Ballon. Der Kapitän brüllt: „Unter Deck oder an die Taue!“', below: 'Du hockst im Frachtraum zwischen Kisten. Die Gondel schwankt, die Spanten knarren.',
+    help: 'An Deck bleiben und die Taue halten (+Ruf bei Aurelion)', downed: 'Du kommst in einer Koje zu dir. Der Kapitän hat abgedreht — „Verletzte fliege ich zurück, nicht weiter.“' } };
+function startVoyage(V, text) {
+  S.voyage = V; S.seaPort = V.to === 'isle' ? V.from : V.to;
+  S.ents.deck = S.ents.deck.filter(e => e.kind === 'prop');
+  travel('deck');
+  log(text, 'world');
+}
 function seaVoyage(to, from) {
   const p = S.player;
   if (S.gold < SEA_FARE) return UI.toast('Dafür reicht dein Gold nicht.');
   if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
   S.gold -= SEA_FARE; UI.closeDialogue();
   const r = rnd(), ev = r < 0.35 ? 'pirates' : r < 0.65 ? 'storm' : 'calm';
-  S.voyage = { to, from, ev, t: 0, dur: 24000, phase: 0 }; S.seaPort = to === 'isle' ? from : to;
-  S.ents.deck = S.ents.deck.filter(e => e.kind === 'prop');
-  travel('deck');
-  log(ev === 'storm' ? 'Am Horizont wird der Himmel schwarz. Der Kapitän lässt die Segel reffen.' : 'Die Möwe legt ab. Wind von achtern, gute Fahrt.', 'world');
+  startVoyage({ to, from, ev, t: 0, dur: 24000, phase: 0 }, ev === 'storm' ? 'Am Horizont wird der Himmel schwarz. Der Kapitän lässt die Segel reffen.' : 'Die Möwe legt ab. Wind von achtern, gute Fahrt.');
 }
 function seaTick(dt) {
   const V = S.voyage; if (!V || S.map !== 'deck') return;
+  const X = VOY_TXT[V.air ? 'air' : 'sea'], ship = V.air ? airShip(V.ship) : null;
   const p = S.player, foes = S.ents.deck.filter(e => e.kind === 'enemy' && e.alive && !e.downed && !e.surrendered);   // S15 Fehlersuche: ein ergebener Freibeuter hält die Fahrt nicht auf
   if (p.downed) {                                                     // an Deck niedergeschlagen: aufgelesen, zurück in den Abfahrtshafen
     S.voyage = null; S.seaPort = V.from === 'isle' ? V.to : V.from; p.downed = false; B.heal(p, p.maxHp * 0.25);
-    log('Du kommst im Laderaum zu dir. Der Kapitän hat umgedreht — „Mit Toten an Bord segle ich nicht.“', 'combat');
+    log(X.downed, 'combat');
+    if (V.air) { airDock(ship, V.from); S.airLand = ECO.airPt(V.from); return travel('world'); }
     ensureSeafolk(); return travel(V.from === 'isle' ? 'isle' : 'world');
   }
   if (foes.length) return;                                            // Enterkampf: das Schiff treibt, bis alle liegen
   V.t += dt;
   if (V.ev === 'pirates' && V.phase === 0 && V.t > 5000) {
-    V.phase = 1; camShake(6, 400); sfx('metal', 0.8, 1); UI.toast('ENTERHAKEN! FREIBEUTER', 2600);
-    log('Ein schwarzes Segel schiebt sich längsseits. Enterhaken fliegen, Männer mit Entermessern springen über die Reling.', 'combat');
+    V.phase = 1; camShake(6, 400); sfx('metal', 0.8, 1); UI.toast(X.board, 2600);
+    log(X.boardLog, 'combat');
     const n = ri(3, 4) + (p.level > 12 ? 1 : 0);
     const [bx0, by0, bx1, by1] = MAPS.deck.box;
-    for (let i = 0; i < n; i++) { const e = spawnEnemy(i === n - 1 ? 'sea_harpooner' : 'sea_raider', 'deck', ri(bx0 + 2, bx1 - 2), i % 2 ? by0 + 1 : by1 - 1, { level: Math.max(4, p.level - 1) }); if (e) { e.aggroId = p.id; e.aiState = 'pursue'; e.encounter = true; e.transient = true; } }
+    for (let i = 0; i < n; i++) { const e = spawnEnemy(i === n - 1 ? 'sea_harpooner' : 'sea_raider', 'deck', ri(bx0 + 2, bx1 - 2), i % 2 ? by0 + 1 : by1 - 1, { level: Math.max(4, p.level - 1) }); if (e) { e.aggroId = p.id; e.aiState = 'pursue'; e.encounter = true; e.transient = true; if (X.foeName) e.name = X.foeName[i === n - 1 ? 1 : 0]; } }
     return;
   }
+  if (V.ev === 'motor' && V.phase === 0 && V.t > V.dur * 0.35) return airMotorFail(V, ship);
   if (V.ev === 'storm') {
     S.weather = 'rain'; S.weatherLeft = 60;
+    const weak = ship && ship.hull < 50 ? 1.5 : 1;                    // Roadmap P7: schwache Hülle = mehr Wetterschaden
     if ((V.nextWave ?? 3000) < V.t) { V.nextWave = V.t + ri(2600, 4200);
       camShake(7, 500); fx(p.x, p.y - 10, 'dust', 10); sfx('metal', 0.3, 1);
-      if (!V.below) { const a = rnd() * 6.283; p.kb = { x: Math.cos(a) * 40, y: Math.sin(a) * 40, t: 220, T: 220 }; hurt(p, ri(3, 7), null, 'Sturzsee'); float(p, 'Brecher!', 'rgba(170,200,230,ALPHA)'); }
+      if (!V.below) { const a = rnd() * 6.283; p.kb = { x: Math.cos(a) * 40, y: Math.sin(a) * 40, t: 220, T: 220 }; hurt(p, Math.round(ri(3, 7) * weak), null, X.waveCause); float(p, X.wave, 'rgba(170,200,230,ALPHA)'); }
+      if (ship) ship.hull = Math.max(5, ship.hull - Math.round(ri(2, 5) * weak * (1 - 0.2 * (ship.up?.hull || 0))));
     }
-    if (V.phase === 0) { V.phase = 1; UI.dialogue(p, 'Brecher schlagen über die Reling. Der Kapitän brüllt: „Unter Deck oder festhalten!“', [
-      { text: 'Unter Deck gehen (sicher, die Fahrt dauert länger)', fn: () => { V.below = true; V.dur += 8000; UI.closeDialogue(); log('Du hockst zwischen Salzfässern im Bauch des Schiffs. Es ächzt.', 'world'); } },
-      { text: 'An Deck bleiben und mit anpacken (+Ruf beim Seevolk)', fn: () => { V.helped = true; UI.closeDialogue(); } }]); }
+    if (V.phase === 0) { V.phase = 1; UI.dialogue(p, X.storm, [
+      { text: 'Unter Deck gehen (sicher, die Fahrt dauert länger)', fn: () => { V.below = true; V.dur += 8000; UI.closeDialogue(); log(X.below, 'world'); } },
+      { text: X.help, fn: () => { V.helped = true; UI.closeDialogue(); } }]); }
   }
   if (V.t >= V.dur) {                                                 // Ankunft
-    S.voyage = null; passTime(V.below ? 480 : 360); if (S.weather === 'rain') S.weather = 'cloudy';
+    S.voyage = null; if (S.weather === 'rain') S.weather = 'cloudy';
+    if (V.air) { passTime(Math.round(V.dur / 80) + (V.below ? 60 : 0));
+      if (V.helped || V.phase === 1 && V.ev === 'pirates') { const g = V.ev === 'pirates' ? 4 : 2; S.factions.aurel = clamp((S.factions.aurel || 0) + g, -100, 100); log(`Der Kapitän notiert deinen Namen im Bordbuch (Aurelion +${g}).`, 'faction'); }
+      if (V.emergency) { airDock(ship, V.from, true); S.airLand = V.landAt; log('Notlandung im offenen Land. Die Mannschaft bleibt beim Schiff; den Rest des Weges gehst du zu Fuß.', 'world'); UI.toast('NOTLANDUNG', 2600); }
+      else { airDock(ship, V.to); S.airLand = ECO.airPt(V.to); log(`Die Gondel setzt am Mast von ${townName(V.to)} auf.`, 'world'); }
+      return travel('world'); }
+    passTime(V.below ? 480 : 360);
     if (V.helped || V.phase === 1 && V.ev === 'pirates') { S.factions.sea = clamp((S.factions.sea || 0) + (V.ev === 'pirates' ? 6 : 3), -100, 100); log(`Der Kapitän nickt dir zu. Das Seevolk vergisst so etwas nicht (+${V.ev === 'pirates' ? 6 : 3} Ruf).`, 'faction'); }
     ensureSeafolk(); travel(V.to === 'isle' ? 'isle' : 'world');   // S15 Fehlersuche: toter Kapitän? Bei Ankunft steht ein neuer da
   }
+}
+// ================= Roadmap P6/P7: Luftschiffe — Flotte, Hafen Kupferhafen, Passage, Reparatur, Ausbau =================
+// Die Flotte rechnet economy.js (airDay, airSupply). Hier: Mast und Hafenmeisterin in Kupferhafen, Mastwarte in den übrigen Städten
+// Aurelions (alle flüchtig, idempotent bei jedem Laden), das Wrack beim Absturz (BIG_START.airship), die Passage an Deck und die
+// Werft (Reparatur und Ausbau mit Material aus dem Lager von Kupferhafen, bezahlt zum Marktpreis).
+const AIR_TOWNS = ['kupferhafen', 'aurelheim', 'gelenkhall', 'tickmar', 'sanktserin'];
+const AIR_UP = { hull: 'Hülle (weniger Sturmschaden)', motor: 'Motor (+15 % Tempo)', cargo: 'Laderaum (+25 % Nahrung für Aurelion)' };
+const airShip = id => S.air?.fleet?.find(s => s.id === id) || null;
+function airCrashed(s, pos) {                                         // economy.js airCrash → Wrack in der Welt (oder nur Meldung, wenn schon ein Großereignis läuft)
+  if (S.big) { chronicle(`Die „${s.name}“ stürzt ab`, 'news', 'Ein aurelisches Luftschiff ging verloren.'); return; }
+  S.bigLast = [...(S.bigLast || []), 'airship'].slice(-3);
+  BIG_START.airship.go({ ship: s, x: pos[0], y: pos[1] });
+}
+function airDock(s, k, limp) {                                        // Schiff nach der Passage wieder in die Flotte (oder humpelnd heim)
+  if (!s) return;
+  if (limp) { const t = ECO.dayF(); Object.assign(s, { state: 'flug', at: k, to: s.home || ECO.AIR_HOME, dep: t, eta: t + 1 }); return; }
+  Object.assign(s, { state: 'hafen', at: k, to: null, trips: (s.trips || 0) + 1 });
+}
+function ensureAirport() {
+  ECO.airDefaults(); ECO.airH.crash = airCrashed;
+  for (const k of AIR_TOWNS) {
+    if (!TOWN_PLAN[k]) continue;
+    const [mx, my] = ECO.airPt(k);
+    if (k === ECO.AIR_HOME && !S.ents.world.some(e => e.airMast)) { const q = freeSpotNear('world', mx, my, 4);
+      S.ents.world.push({ id: uid(), kind: 'prop', type: 'broken_pillar', intact: true, map: 'world', x: q.x, y: q.y, r: 10, solid: false, transient: true, planned: true, airMast: true, label: 'Ankermast der Luftschiffe' }); }
+    if (S.ents.world.some(e => e.airMaster === k && e.alive)) continue;
+    const q = freeSpotNear('world', mx - 2, my + 2, 3), home = k === ECO.AIR_HOME;
+    const c = makeChar({ name: home ? 'Odila Kranz' : pick(FIRST_M), prof: home ? 'Hafenmeisterin' : 'Mastwart', x: q.x, y: q.y, level: 4, faction: 'aurel', traits: ['praktisch'] });
+    Object.assign(c, { airMaster: k, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, greet: home ? '„Kupferhafen, Luftschiffmast. Wer fliegen will, fragt mich. Wer nur gafft, tritt vom Seil weg.“' : '„Hier legen die Luftschiffe an. Passagen gibt es für Leute mit Schein.“' });
+    if (home) { c.key = 'hafenmeisterin'; c.pal = { ...c.pal, cloth: '#5a4630' }; }
+    S.ents.world.push(c);
+  }
+}
+function airLine(s) {                                                 // eine Zeile Flottenstatus
+  const st = s.state === 'wrack' ? `Wrack — Neubau ab Tag ${s.back || '?'}` : s.state === 'flug' ? `unterwegs nach ${ECO.airPtName(s.to)}, Ankunft ~Tag ${Math.floor(s.eta)}` : `am Mast in ${ECO.airPtName(s.at)}${s.hull < 50 ? ' (nicht flugtauglich)' : ''}`;
+  const up = Object.entries(s.up || {}).filter(([, v]) => v).map(([k, v]) => `${{ hull: 'Hülle', motor: 'Motor', cargo: 'Laderaum' }[k]} ${v}`).join(', ');
+  return `„${s.name}“ (${ECO.AIR_KIND[s.kind]}): ${st}. Hülle ${Math.round(s.hull)} %, Motor ${Math.round(s.motor)} %, Steuerung ${Math.round(s.helm)} %${up ? ' · Ausbau: ' + up : ''}`;
+}
+const airFare = (a, b) => { const A = ECO.airPt(a), Bp = ECO.airPt(b); return Math.max(30, Math.round(Math.hypot(A[0] - Bp[0], A[1] - Bp[1]) * 0.12)); };
+function airBoardShip(k) { const F = (S.air?.fleet || []).filter(s => s.state === 'hafen' && ECO.airReady(s) && s.hull >= 50); return F.find(s => s.at === k) || F[0] || null; }
+function harborTalk(npc) {
+  const A = ECO.airDefaults(), k = npc.airMaster, home = k === ECO.AIR_HOME, back = () => harborTalk(npc);
+  const say = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
+  const opts = [
+    { text: 'Wie steht die Flotte?', fn: () => say(A.fleet.map(airLine).join('\n') + `\n\nNahrung für Aurelion aus dem Süden: ${Math.round(ECO.airSupply() * 100)} % (hängt an den Handelsschiffen).`) },
+    { text: 'Wie funktionieren die Luftschiffe?', fn: () => say('„Drei Schiffe gehören der Krone: zwei Handelsschiffe holen Korn und Fleisch aus dem Süden, die Patrouille fliegt Aurelheim und Tickmar an. Fällt ein Handelsschiff aus, wird das Brot in ganz Aurelion knapp. Jeder Flug zehrt an Hülle, Motor und Steuerung; unter 50 % Hülle bleibt ein Schiff am Mast. Bei null stürzt es ab — dann liegt irgendwo ein Wrack, und die Werft hier braucht Tage und Barren, um ein neues zu bauen.\n\nPassagen: ab Aufenthaltsschein (Aurelion-Rang 1), an jedem Mast. Ein schwacher Motor macht die Reise lang, eine klemmende Steuerung endet schon mal in einer Notlandung, eine morsche Hülle lässt jeden Sturm doppelt beißen. Reparatur und Ausbau zahlt, wer will — hier bei mir, mit Material aus dem Lager von Kupferhafen.“') },
+  ];
+  for (const to of AIR_TOWNS) if (to !== k && TOWN_PLAN[to]) {
+    const fare = airFare(k, to), locked = aurelRank() < 1;
+    opts.push({ text: `Passage nach ${townName(to)} — ${fare} Gold${locked ? ' (gesperrt: Aufenthaltsschein)' : ''}`, fn: () => locked ? say('„Passagen nur mit Aufenthaltsschein oder Bürgerrecht, Rang 1. Das Passamt in Aurelheim stellt Scheine aus.“') : airVoyage(to, k) });
+  }
+  if (home) opts.push({ text: 'Ein Schiff ausbessern lassen (du zahlst das Material)', fn: () => airRepairMenu(npc) }, { text: 'Ein Schiff ausbauen (Hülle, Motor, Laderaum)', fn: () => airUpgradeMenu(npc) });
+  UI.dialogue(npc, npc.greet, [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+function airVoyage(to, from, ev0) {                                   // Roadmap P7: Passage an Deck eines Schiffs der Flotte
+  const p = S.player, s = airBoardShip(from), fare = airFare(from, to);
+  if (!s) { const n = (S.air?.fleet || []).filter(x => x.state === 'flug').sort((a, b) => a.eta - b.eta)[0]; return UI.dialogue(S.player, `Kein flugtaugliches Schiff am Mast.${n ? ` Die „${n.name}“ kommt etwa an Tag ${Math.floor(n.eta)} an.` : ''}`, [{ text: 'Weiter', fn: () => UI.closeDialogue() }]); }
+  if (S.gold < fare) return UI.toast('Dafür reicht dein Gold nicht.');
+  if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  S.gold -= fare; UI.closeDialogue();
+  s.at = from; ECO.airDepart(s, to);
+  const bad = ['rain', 'fog', 'snow', 'sandstorm'].includes(S.weather), r = rnd();
+  const ev = ev0 || (r < (bad ? 0.4 : 0.15) ? 'storm' : r < 0.4 ? 'motor' : r < 0.55 ? 'pirates' : 'calm');
+  startVoyage({ to, from, ev, t: 0, dur: ECO.airDur(s), phase: 0, air: true, ship: s.id }, `Die „${s.name}“ löst die Leinen. Unter dir schrumpft ${townName(from)}${s.motor < 50 ? ' — der Motor hustet schwarzen Rauch' : ''}.`);
+}
+function airMotorFail(V, s) {                                         // Motorschaden: klemmt die Steuerung, droht die Notlandung
+  V.phase = 1; if (s) s.motor = Math.max(5, s.motor - 30);
+  camShake(5, 500); sfx('metal', 0.6, 1); UI.toast('MOTORSCHADEN', 2400); log('Ein Knall im Heck, dann Rauch. Der Propeller läuft nur noch stotternd.', 'combat');
+  if (chance(clamp((60 - (s?.helm ?? 100)) / 60, 0, 0.8))) {
+    const A = ECO.airPt(V.from), Bp = ECO.airPt(V.to); V.emergency = true; V.landAt = [(A[0] + Bp[0]) / 2 | 0, (A[1] + Bp[1]) / 2 | 0]; V.t = Math.max(V.t, V.dur - 2500);
+    return UI.dialogue(S.player, 'Die Steuerung klemmt, das Schiff sackt durch die Wolken. Der Kapitän schreit: „Festhalten! Wir gehen runter!“', [{ text: 'Festhalten', fn: () => UI.closeDialogue() }]);
+  }
+  UI.dialogue(S.player, 'Der Motor stottert. Der Maschinist flucht über dem offenen Gehäuse: „Wer eine ruhige Hand hat, hilft mir!“', [
+    { text: 'Mit anpacken (Handwerk)', fn: () => { const ok = (S.player.skills?.crafting || 0) + ri(0, 40) >= 30; V.dur += ok ? 2500 : 7000; if (ok) { V.helped = true; if (s) s.motor = Math.min(100, s.motor + 15); } UI.closeDialogue();
+      log(ok ? 'Mit deiner Hilfe läuft der Motor wieder rund. Kaum Verspätung.' : 'Ihr flickt, so gut es geht. Das Schiff kriecht weiter.', 'world'); } },
+    { text: 'Abwarten', fn: () => { V.dur += 7000; UI.closeDialogue(); log('Das Schiff kriecht mit halber Kraft weiter.', 'world'); } }]);
+}
+// Werft Kupferhafen: Material kommt aus dem Lager der Stadt (knapp = teuer, leer = keine Arbeit), bezahlt zum Marktpreis.
+function airRepairNeed(s) { return { ingot: Math.ceil((100 - s.hull) / 10), tools: Math.ceil((100 - s.motor) / 20), magitech: Math.ceil((100 - s.helm) / 25) }; }
+const airCost = need => Object.entries(need).reduce((n, [g, q]) => n + q * ECO.ecoPrice(ECO.AIR_HOME, g, true), 0);
+function airPay(need) {                                               // null = bezahlt und entnommen, sonst der Grund
+  const T = S.towns?.[ECO.AIR_HOME]; if (!T) return 'Kupferhafen hat kein Lager.';
+  const short = Object.entries(need).filter(([g, q]) => q > 0 && (T.stock[g] || 0) < q).map(([g]) => ITEMS[g]?.name || g);
+  if (short.length) return `Im Lager von Kupferhafen fehlt: ${short.join(', ')}. Liefere es dort an den Markt oder warte auf Händler.`;
+  const c = airCost(need); if (S.gold < c) return `Das kostet ${c} Gold.`;
+  S.gold -= c; for (const [g, q] of Object.entries(need)) T.stock[g] -= q;
+  return null;
+}
+function airRepair(s) {
+  if (s.state === 'flug') return 'Das Schiff ist unterwegs.';
+  if (s.state === 'wrack') return 'Ein Wrack baut die Werft selbst neu — mit Barren und Bauholz aus dem Lager.';
+  const need = airRepairNeed(s); if (!Object.values(need).some(Boolean)) return 'Das Schiff ist in bestem Zustand.';
+  const r = airPay(need); if (r) return r;
+  Object.assign(s, { hull: 100, motor: 100, helm: 100 }); S.factions.aurel = clamp((S.factions.aurel || 0) + 2, -100, 100);
+  log(`Die Werft setzt die „${s.name}“ instand. Aurelion +2.`, 'faction'); return null;
+}
+function airUpgrade(s, k) {
+  const lv = s.up?.[k] || 0; if (lv >= 2) return 'Weiter lässt sich das nicht ausbauen.'; if (s.state === 'wrack') return 'Erst muss das Schiff wieder stehen.';
+  const need = { ingot: 4 * (lv + 1), tools: 2 * (lv + 1), magitech: lv + 1 }, gold = 120 * (lv + 1);
+  if (S.gold < gold + airCost(need)) return `Das kostet ${gold + airCost(need)} Gold (Arbeit und Material).`;
+  const r = airPay(need); if (r) return r; S.gold -= gold;
+  (s.up ||= {})[k] = lv + 1; S.factions.aurel = clamp((S.factions.aurel || 0) + 3, -100, 100);
+  log(`Die „${s.name}“ bekommt ${AIR_UP[k].split(' (')[0]} Stufe ${lv + 1}. Aurelion +3.`, 'faction'); return null;
+}
+function airRepairMenu(npc) {
+  const back = () => harborTalk(npc), done = r => UI.dialogue(npc, r ? `„${r}“` : '„Erledigt. Die Mannschaft dankt es dir.“', [{ text: 'Weiter', fn: back }]);
+  UI.dialogue(npc, '„Welches Schiff? Barren für die Hülle, Werkzeug für den Motor, Magitech für die Steuerung — alles aus unserem Lager, zum Tagespreis.“',
+    [...(S.air?.fleet || []).map(s => ({ text: `„${s.name}“ — ${s.state === 'hafen' ? `${airCost(airRepairNeed(s))} Gold` : s.state === 'flug' ? 'unterwegs' : 'Wrack'} (Hülle ${Math.round(s.hull)} %, Motor ${Math.round(s.motor)} %, Steuerung ${Math.round(s.helm)} %)`, fn: () => done(airRepair(s)) })), { text: 'Zurück', fn: back }]);
+}
+function airUpgradeMenu(npc) {
+  const back = () => harborTalk(npc), done = r => UI.dialogue(npc, r ? `„${r}“` : '„Die Zimmerleute sind schon dran.“', [{ text: 'Weiter', fn: back }]);
+  const opts = []; for (const s of S.air?.fleet || []) for (const k of Object.keys(AIR_UP)) if ((s.up?.[k] || 0) < 2) opts.push({ text: `„${s.name}“: ${AIR_UP[k]} → Stufe ${(s.up?.[k] || 0) + 1}`, fn: () => done(airUpgrade(s, k)) });
+  UI.dialogue(npc, '„Ausbauten halten. Zwei Stufen je Teil, mehr trägt kein Ballon.“', [...opts.slice(0, 9), { text: 'Zurück', fn: back }]);
+}
+function airDebugDock() {                                             // Debug: ein flugtaugliches Schiff an den Mast von Kupferhafen holen
+  if (airBoardShip(ECO.AIR_HOME)) return; const x = (S.air?.fleet || []).find(s => s.state !== 'wrack') || S.air?.fleet?.[0]; if (!x) return;
+  Object.assign(x, { state: 'hafen', at: ECO.AIR_HOME, to: null, hull: Math.max(60, x.hull) });
+}
+function voyageFix() {                                                // Laden: an Deck nur mit laufender Reise; eine Reise ohne Deck gibt es nicht
+  if (S.voyage && S.map !== 'deck') S.voyage = null;
+  if (S.map !== 'deck' || S.voyage) return;
+  const p = S.player, a = S.ents.deck, i = a.indexOf(p); if (i >= 0) a.splice(i, 1);
+  const q = ARRIVAL.world('deck'); S.map = 'world'; Object.assign(p, { map: 'world', x: q.x, y: q.y }); S.ents.world.push(p);
 }
 // ---- Clans, Seitenwahl, Weißbart (S14) ----
 // Salzbund (Ysolde Kielmark, Händler) und Sturmklinge (Hella Kielbrecher, Weißbarts Plünderer) werben um den Helden. Wer die zweite
@@ -7654,8 +7873,29 @@ function kasimirEnd(helped) {
 // BUG-118: verzögerte Fahrten nur außerhalb von Proben — die Prüfung beim Auslösen, nicht im Timer (sonst lief nach dem Selbsttest
 // die Garmadon-Fahrt im echten Spiel und versetzte den Spieler)
 const cineLater = (fn, ms) => { if (S._quiet) return false; setTimeout(fn, ms); return true; };
+// Roadmap P8: Kamera je Einstellung. Ein Shot kann zoom (Faktor auf den Grundzoom) und focus (Figur-id oder {x, y}) tragen; während
+// der Fahrt gibt es keinen Blickvorlauf und keinen Kampf-Zoom. Ohne Fahrt: Kampf-Zoom und Blickvorlauf wie bisher. Liefert den Blickpunkt.
+function camAim(p, dt) {
+  const C = S.cine, shot = C && C.shots[C.i];
+  if (shot) {
+    R.cam.cz = 0; R.cam.cineZ = (R.cam.cineZ || 1) + ((shot.zoom || 1) - (R.cam.cineZ || 1)) * Math.min(1, dt / 450);
+    R.cam.zoom = (R.cam.base || 1.3) * R.cam.cineZ;
+    const f = shot.focus == null ? null : typeof shot.focus === 'object' ? shot.focus : byId(shot.focus);
+    return f && f.x != null ? { x: f.x, y: f.y - 12 } : { x: p.x, y: p.y };
+  }
+  R.cam.cineZ = 1;
+  // Kampf-Zoom: rückt sanft ~8 % heran, solange ein Feind nahe und auf den Spieler aus ist; langsam zurück.
+  const engaged = S.settings.motion && combat.some(e => e.kind === 'enemy' && e.alive && isHostile(p, e) && dist(p, e) < 240 && (e.aggroId === p.id || e.aiState === 'pursue'));
+  R.cam.cz = (R.cam.cz || 0) + ((engaged ? 0.08 : 0) - (R.cam.cz || 0)) * Math.min(1, dt / (engaged ? 700 : 1400));
+  R.cam.zoom = (R.cam.base || 1.3) * (1 + R.cam.cz);
+  const look = S.settings.motion ? 0.14 : 0;                    // Blickvorlauf zur Maus (max. ~40 px)
+  return { x: p.x + clamp((mouse.wx - p.x) * look, -40, 40), y: p.y + clamp((mouse.wy - p.y) * look, -30, 30) };
+}
+let lastCine = null;                                                  // Roadmap P8: letzte Fahrt (nur Bild, ohne Folgen) für „Cutscene wiederholen“
+function gesture(c, g, ms, toward) { const G = ANIM_DEFS.gesture[g]; if (!G || !c) return; act(c, 'gesture', ms || G.ms, toward); c.act.pose = g; }   /* Roadmap P8 */
 function cinematic(shots, done) {
   if (S.cine || !shots.length) return;
+  lastCine = shots.map(s => ({ ...s, setup: null, tick: null, done: false, showOnly: true }));
   const p = S.player; S.cine = { shots, i: -1, t: 0, back: { x: p.x, y: p.y, map: S.map }, done };
   p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); cineNext();
 }
@@ -7954,7 +8194,9 @@ function bionicLack(tier, surgery = false) { const r = aurelRank();
   if (tier >= 3 || surgery) return r >= 2 || (S.acadRank || 0) >= 2 ? null : 'Bürgerrecht in Aurelion oder Akademie-Adept';
   if (tier >= 2) return r >= 1 ? null : 'Aufenthaltsschein in Aurelion';
   return null; }
-const bionicTier = it => it && (it.use === 'prosthesis' || it.use === 'eye') ? it.tier || 1 : it?.use === 'mechmod' ? 2 : 0;
+const bionicTier = it => it && (it.use === 'prosthesis' || it.use === 'eye') ? it.tier || 1 : it?.use === 'mechmod' ? 2 : it?.mtier || 0;   /* Roadmap C.10: Magitech-Waffen nutzen dieselbe Rangsperre */
+// Roadmap C.10: Energie verbrauchen nur Spieler und ihre Gefährten (NPC-Schützen mit Magitech schießen wie bisher)
+const cellUser = c => c === S.player || S.party.includes(c.id);
 function mechSwapOptions(p, say, who = 'Meisterin Vell') {
   const NAME = { larm: 'linken Arm', rarm: 'rechten Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' }, TIER = [[2, 'Aurelionisch', 700], [3, 'Meisterwerk', 1400]], out = [];
   for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = p.body[k]; if (P.mech || P.lost) continue;
@@ -8475,15 +8717,18 @@ const BIG_START = {
     const q = freeSpotNear('world', TOWN_PLAN.aurelheim.square[0] - 2, TOWN_PLAN.aurelheim.square[1] + 1, 2), h = makeChar({ name: 'Zeremonienmeisterin Liviane', prof: 'Zeremonienmeisterin', x: q.x, y: q.y, level: 3 });
     Object.assign(h, { bigEv: S.big.id, ballHost: true, transient: true, faction: 'aurel', anchor: { x: q.x, y: q.y }, greet: '„Der Ball der Häuser. Wer eingeladen ist, tanzt. Wer nicht, schaut zu.“' }); S.ents.world.push(h);
     bigAnnounce('Adelsball in Aurelheim', 'Die Häuser Aurelions geben einen Ball. Die Zeremonienmeisterin am Platz von Aurelheim lässt ein, wer einen Aufenthaltsschein hat oder Bürger ist. Ein Wort am rechten Ohr hebt die Gunst eines Hauses, ein falsches senkt sie.'); } },
-  airship: { ok: () => true, go: () => {
-    const L = pick(LOCATIONS.filter(l => l.kind === 'wild' && l.r < 140)), q = freeSpotNear('world', L.x + ri(-6, 6), L.y + ri(-6, 6), 6), id = uid();
-    S.big = { id, kind: 'airship', until: (S.day | 0) + 4, x: q.x / TS | 0, y: q.y / TS | 0, where: L.name };
+  airship: { ok: () => true, go: (o = {}) => {   /* Roadmap P6: o = { ship, x, y } aus der Flotte (airCrashed); ohne o stürzt ein Schiff der Flotte ab */
+    if (!o.ship && S.air?.fleet?.length) { const F = S.air.fleet.filter(s => s.state !== 'wrack' && s.id !== S.voyage?.ship), s = F.find(s => s.state === 'flug') || F[0]; if (s) return ECO.airCrash(s); }
+    const near = o.x != null ? LOCATIONS.filter(l => l.kind === 'wild' || l.kind === 'village').sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0] : null;
+    const L = near || pick(LOCATIONS.filter(l => l.kind === 'wild' && l.r < 140)), q = o.x != null ? freeSpotNear('world', o.x | 0, o.y | 0, 8) : freeSpotNear('world', L.x + ri(-6, 6), L.y + ri(-6, 6), 6), id = uid();
+    S.big = { id, kind: 'airship', until: (S.day | 0) + 4, x: q.x / TS | 0, y: q.y / TS | 0, where: L.name, ship: o.ship?.id || null, shipName: o.ship?.name || null };
     for (let i = 0; i < 6; i++) { const r = freeSpotNear('world', (q.x / TS | 0) + ri(-4, 4), (q.y / TS | 0) + ri(-3, 3), 2); S.ents.world.push({ id: uid(), kind: 'prop', type: pick(['rubble', 'crate', 'broken_pillar']), map: 'world', x: r.x, y: r.y, r: 12, solid: false, bigEv: id, transient: true, label: 'Wrack eines aurelischen Luftschiffs' }); }
     for (let i = 0; i < 2; i++) dropItemAt('world', q.x + ri(-30, 30), q.y + ri(-30, 30), mkItem('magitech'));
     for (let i = 0; i < 2; i++) { const r = freeSpotNear('world', (q.x / TS | 0) + ri(-2, 2), (q.y / TS | 0) + ri(-2, 2), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Luftschiffer', x: r.x, y: r.y, level: 3, faction: 'aurel' });
       Object.assign(c, { bigEv: id, transient: true, crashSurvivor: true, anchor: { x: r.x, y: r.y } }); S.ents.world.push(c); if (c.body) { c.body.torso.hp = -2; B.syncHp(c); } c.downed = true; c.downTimer = 0; }
     for (let i = 0; i < 3; i++) { const e = spawnEnemy('bandit', 'world', (q.x / TS | 0) + 10 + ri(-3, 3), (q.y / TS | 0) + ri(-4, 4)); e.bigEv = id; e.transient = true; }
-    bigAnnounce(`Luftschiff abgestürzt bei ${L.name}`, `Ein aurelisches Luftschiff ist bei ${L.name} abgestürzt. Magitech liegt im Gras, zwei Luftschiffer liegen bewusstlos im Wrack, und Plünderer sind schon unterwegs. Wer die Überlebenden aufrichtet, hat bei Aurelion einen Stein im Brett.`); } },
+    const who = o.ship ? `Die „${o.ship.name}“, ein aurelisches ${ECO.AIR_KIND[o.ship.kind] || 'Luftschiff'},` : 'Ein aurelisches Luftschiff';
+    bigAnnounce(`Luftschiff abgestürzt bei ${L.name}`, `${who} ist bei ${L.name} abgestürzt. Magitech liegt im Gras, zwei Luftschiffer liegen bewusstlos im Wrack, und Plünderer sind schon unterwegs. Wer die Überlebenden aufrichtet, hat bei Aurelion einen Stein im Brett${o.ship ? ' — und jeder Gerettete bringt die Werft in Kupferhafen einen Tag schneller voran' : ''}.`); } },
   treasure: { ok: () => bigTowns().length >= 2, go: () => {
     const T = bigTowns(), a = pick(T), P = TOWN_PLAN[a], q = freeSpotNear('world', P.square[0] + 18, P.square[1] + ri(-6, 6), 4), id = uid();
     S.big = { id, kind: 'treasure', until: (S.day | 0) + 2, x: q.x / TS | 0, y: q.y / TS | 0, town: a, attackAt: clock() + 60 * ri(6, 10) };
@@ -8573,7 +8818,8 @@ function bigChoices(npc, choices) {
       if (ok) { S.houses.vantor = clamp(favor('vantor') + 3, -100, 100); S.gold += questGold(60); bigEnd('Du bringst Grete und Vantor an einen Tisch. Halber Rückstand, kürzere Schichten. Beide zahlen dir etwas (60 Gold).'); } else bigEnd('Die Vermittlung platzt. Am Ende geben die Hungrigen nach, ohne etwas zu bekommen.'); UI.closeDialogue(); } },
     { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += questGold(100); addRel(npc.key, -30); strikeOff(); bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
     { text: 'Später.', fn: () => UI.closeDialogue() }]) });
-  if (npc.crashSurvivor && !npc.downed && !npc.thanked) { npc.thanked = true; S.factions.aurel = clamp((S.factions.aurel || 0) + 6, -100, 100); S.gold += 40; choices.unshift({ text: 'Wie geht es dir?', fn: () => say('„Du hast mich aus dem Wrack geholt. Aurelion zahlt seine Schulden: nimm das.“ (40 Gold, Aurelion +6)') }); }
+  if (npc.crashSurvivor && !npc.downed && !npc.thanked) { npc.thanked = true; S.factions.aurel = clamp((S.factions.aurel || 0) + 6, -100, 100); S.gold += 40;
+    { const sh = B.ship && S.air?.fleet?.find(s => s.id === B.ship); if (sh?.state === 'wrack') sh.back = Math.max((S.day | 0) + 1, (sh.back || 0) - 1); }   /* Roadmap P6: Gerettete beschleunigen den Neubau */ choices.unshift({ text: 'Wie geht es dir?', fn: () => say('„Du hast mich aus dem Wrack geholt. Aurelion zahlt seine Schulden: nimm das.“ (40 Gold, Aurelion +6)') }); }
 }
 function hasBigAt(k) { return S.big?.town === k; }
 const EVENTS = [
@@ -8762,7 +9008,7 @@ function questTargetTick(force = false) {
 function dayTick() {
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
-  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
+  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay();
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
   herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
@@ -8962,7 +9208,7 @@ function enemyBark(e, m) {
 function npcOffers(n) {
   const o = [];
   if (n.shop) o.push('Handel'); if (n.smith) o.push('Ausbessern'); if (isHealer(n)) o.push(`Heilen (${healCost()} Gold)`);
-  if (n.teaches) o.push('Ausbildung'); if (n.coach) o.push('Kutschfahrten'); if (n.ferry) o.push('Überfahrt');
+  if (n.teaches) o.push('Ausbildung'); if (n.coach) o.push('Kutschfahrten'); if (n.ferry) o.push('Überfahrt'); if (n.airMaster) o.push('Luftschiff-Passagen, Flottenstatus');
   if (n.merc && !S.party.includes(n.id)) o.push(`Söldner (${n.merc.hire} Gold)`); if ((n.recruit || n.retainer) && !S.party.includes(n.id)) o.push('Kommt vielleicht mit');
   if (n.vm || n.prof === 'Tributoffizier') o.push('Aufträge der Wache'); else if (PROF_CON[n.prof] && n.homeTown) o.push(`Auftrag: ${CON[PROF_CON[n.prof]].name}`);
   if (n.musician) o.push('Musik'); if (n.enc) o.push('Will etwas von dir');
@@ -8982,6 +9228,7 @@ function talk(npc) {
   if (npc.horseBreeder) return UI.dialogue(npc, npc.greet, [{ text: 'Zeig mir deine Pferde.', fn: () => { UI.closeDialogue(); UI.openModal('stable', npc); } }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);   // S15 Pferdehof
   if (npc.beastTrader) return beastMenu(npc);                            // S13: Tiere kaufen
   if (npc.seaCaptain) return seaTalk(npc);
+  if (npc.airMaster) return harborTalk(npc);                           /* Roadmap P6/P7: Hafenmeisterin und Mastwarte */
   if (npc.seaFolk && seaTalkGate(npc)) return;                            // S14: Überfahrt zu den Gischtinseln
   if (npc.coach || npc.ferry) return coachTalk(npc);                   // S13: Kutschen und Fähren
   if (npc.robot && !S.party.includes(npc.id)) return robotTalk(npc);   // Automaten tratschen nicht
@@ -9714,7 +9961,7 @@ function joinFaction(npc) {
 // Nur was das Spiel wirklich tut (sonst: Nachlass beim Fraktionshändler und Gruß der Wachen, siehe rankGuide)
 const RANK_PERKS = { undead: ['Die Toten sind dir nicht feind; Handel in Vharnholm'],
   chain: ['Tore der Eisenfeste offen, Aufträge der Kette', null, null, 'Zugang zur Weihe bei Varg', 'Kettenbrecher und Eisenfürst; man fürchtet dich'],
-  aurel: ['Automaten prüfen dich', 'Aufenthalt erlaubt', 'Himmelsfeste mit Siegel, Handel ohne Schein', null, null, null, 'Weg in den Hohen Rat', 'Sitzungen des Rates alle 7 Tage, Gesetze'],
+  aurel: ['Automaten prüfen dich', 'Aufenthalt erlaubt, Luftschiff-Passagen an jedem Mast', 'Himmelsfeste mit Siegel, Handel ohne Schein', null, null, null, 'Weg in den Hohen Rat', 'Sitzungen des Rates alle 7 Tage, Gesetze'],
   goblin: ['Goblins sind friedlich und reden mit dir', null, null] };
 /* Roadmap P5: Bionik-Zugang je Aurelion-Rang (so rechnet bionicLack) */
 const AUREL_BIONIC = ['Zugang: Schrottglieder und Schrottauge (auch Schwarzmarkt)', 'Zugang: aurelionische Prothesen, Auge Stufe 2, Module', 'Zugang: Meisterstücke, Chirurgie an gesunden Gliedern (auch als Akademie-Adept)', null, 'Zugang: Prototypen'];
@@ -10357,7 +10604,7 @@ function nodeState(c, k) {
 function learnNode(k) {
   const p = S.player, N = SKILL_TREE[k], st = nodeState(p, k);
   if (st !== 'open') return UI.toast(st === 'learned' ? 'Schon gelernt.' : st === 'barred' ? 'Du hast den anderen Schlüsselknoten dieses Zweigs gewählt.' : st === 'sealed' ? 'Dieser Zweig gehört einer Titelklasse, die du nicht hast.' : 'Erst einen Knoten davor lernen.');
-  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt mit jeder Stufe.');
+  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt auf jeder zweiten Stufe.');
   (p.tree ||= {})[k] = 1; p.skillPoints--;
   const m0 = p.body ? Object.fromEntries(B.PARTS.map(k => [k, p.body[k].max || 1])) : null; recalc(p); if (N.fx.hp && m0) { for (const part of B.PARTS) p.body[part].hp = Math.min(p.body[part].max, p.body[part].hp * p.body[part].max / m0[part]); B.syncHp(p); }   // S15 Fehlersuche: je Körperteil skalieren
   if (N.grants) { syncHotbar(); log(`Neue Fähigkeit: ${ABILITIES[N.grants].name} (Leiste).`, 'party'); }   // aktiver Knoten
@@ -10455,7 +10702,7 @@ function syncHotbar() {
   const off = [...all.slice(HB), ...sp.filter(k => !p.hotbar.some(s => s.key === k))], sig = off.join(',');   // S15 Fehlersuche: was nicht passt, einmal melden statt still weglassen
   if (off.length && sig !== hbOffSig) log(`Leiste voll: ${off.map(k => ABILITIES[k]?.name || k).join(', ')} ${off.length > 1 ? 'haben' : 'hat'} keinen Platz auf der Leiste. Zauber legst du im Zauberbuch (Z) auf die Leiste, sobald ein Platz frei ist (Rechtsklick leert einen).`, 'party');
   hbOffSig = sig;
-  for (const k of ['bandage', 'potion', 'herb', 'bread']) if (p.hotbar.length < HB) p.hotbar.push({ type:'item', key: k });
+  for (const k of ['bandage', 'potion', 'herb', 'bread', ...(ITEMS[p.equip.weapon?.key]?.energy ? ['energiezelle'] : [])]) if (p.hotbar.length < HB) p.hotbar.push({ type:'item', key: k });   /* Roadmap C.10: Zelle auf die Leiste, wenn eine Magitech-Waffe in der Hand ist */
   UI.renderHotbar();
 }
 function useSlot(i) {
@@ -11085,6 +11332,8 @@ function debugSections() {
       'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
       ...Object.fromEntries(Object.entries(B.MECH_MOD).map(([m, M]) => [`Modul: ${M.name}`, () => { const k = ['l', 'r'].map(s => s + M.part).find(q => p.body[q].mech) || 'l' + M.part; if (!p.body[k].mech) B.attachProsthesis(p, k, 2); p.body[k].mod = m; recalc(p); UI.toast(`${M.name} an ${k}`); }])),   /* Roadmap P3: legt bei Bedarf eine Stufe-2-Prothese an */
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
+      'Magitech-Waffen geben': () => { for (const k of ['schockpistole', 'magiegewehr', 'runenarmbrust', 'kristallkanone', 'praezisionsgewehr']) giveItem(p, mkItem(k)); addItem(p, 'energiezelle', 5); UI.toast('Fünf Magitech-Waffen, fünf Zellen'); },   /* Roadmap C.10 */
+      'Waffenenergie leeren': () => { if (p.equip.weapon) p.equip.weapon.charge = 0; UI.toast('Energie 0'); },
       'Wartungsset geben': () => { addItem(p, 'feinwerkzeug', 1); addItem(p, 'spezialoel', 3); addItem(p, 'ersatzteile', 4); addItem(p, 'magitech', 2); UI.toast('Feinwerkzeug, 3 Öl, 4 Ersatzteile, 2 Magitech'); },   /* Roadmap P4 */
       'Selbst warten (ohne Werkbank)': () => selfRepair(null),
       'Magitech-Werk stilllegen (3 Tage)': () => { (S.halt ||= {})['tickmar:magitech'] = (S.day | 0) + 3; UI.toast(`Tickmar steht bis Tag ${(S.day | 0) + 3}. Wartung ×${mechRate('tickmar').toFixed(2)}`); },
@@ -11094,14 +11343,35 @@ function debugSections() {
         const c = makeChar({ name: 'Probe-' + prof, prof, x: q.x, y: q.y, level: 3, map: S.map }); Object.assign(c, { transient: true, visitor: true, homeTown: 'gelenkhall', anchor: { x: q.x, y: q.y }, ...(MARKET_POOL[prof] ? { shop: true, pool: MARKET_POOL[prof] } : {}) }); S.ents[S.map].push(c); talk(c); }])),
       'Schwarzmarkt öffnen (Rook oder Nix)': () => { const n = S.ents.world.find(e => (e.key === 'rook' || e.key === 'nix') && e.alive); if (n) blackMarket(n); else UI.toast('Weder Rook noch Nix leben.'); },
     }],
+    ['Luftschiff', `${sel('dbShip', (ECO.airDefaults().fleet).map(s => [s.id, `${s.name} (${ECO.AIR_KIND[s.kind]})`]))}`, {   /* Roadmap P6/P7 */
+      'Flotte zeigen': () => { const L = S.air.fleet.map(airLine); for (const l of L) log(l, 'world'); UI.toast(`FLOTTE: ${S.air.fleet.length} SCHIFFE · NAHRUNG ${Math.round(ECO.airSupply() * 100)} %`, 3500); },
+      'Schiff beschädigen (−40 Hülle)': () => { const sh = airShip(v('dbShip')); if (sh) { sh.hull = Math.max(0, sh.hull - 40); UI.toast(`${sh.name}: Hülle ${sh.hull} %`); } },
+      'Motorschaden (Motor 40)': () => { const sh = airShip(v('dbShip')); if (sh) { sh.motor = 40; UI.toast(`${sh.name}: Motor 40 %, Passage ${Math.round(ECO.airDur(sh) / 1000)} s`); } },
+      'Absturz jetzt': () => { const sh = airShip(v('dbShip')); if (!sh || sh.state === 'wrack') return UI.toast('Schiff ist schon ein Wrack.'); if (S.big) bigEnd(); if (sh.state !== 'flug') { sh.at = ECO.AIR_HOME; ECO.airDepart(sh, sh.kind === 'handel' ? 'sued' : 'aurelheim'); sh.dep -= 0.5; } ECO.airCrash(sh); if (S.big?.ship === sh.id) tp(S.big.x, S.big.y + 6); },
+      'Schiff reparieren': () => { const sh = airShip(v('dbShip')); if (sh) { Object.assign(sh, { hull: 100, motor: 100, helm: 100 }); if (sh.state === 'wrack') Object.assign(sh, { state: 'hafen', at: sh.home || ECO.AIR_HOME, to: null }); UI.toast(`${sh.name} instand`); } },
+      'Flottentag (airDay)': () => { ECO.airDay(S.voyage?.air ? S.voyage.ship : null); UI.toast('Flotte einen Tag weiter'); },
+      'Zur Hafenmeisterin (Kupferhafen)': () => { const n = S.ents.world.find(e => e.airMaster === ECO.AIR_HOME); if (n) tp(n.x / TS2 | 0, (n.y / TS2 | 0) + 2); },
+      'Passage nach Aurelheim': () => { toWorld(); S.gold += 200; airDebugDock(); airVoyage('aurelheim', ECO.AIR_HOME); },
+      ...Object.fromEntries([['storm', 'Sturm'], ['motor', 'Motorschaden'], ['pirates', 'Luftpiraten']].map(([k, n]) => [`Passage mit ${n} erzwingen`, () => { if (S.voyage?.air && S.map === 'deck') { Object.assign(S.voyage, { ev: k, phase: 0, t: Math.min(S.voyage.t, 4000) }); return UI.toast(n.toUpperCase() + ' ERZWUNGEN'); }
+        toWorld(); S.gold += 200; airDebugDock(); airVoyage('aurelheim', ECO.AIR_HOME, k); }])),
+    }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
       'Dietriche = 3': () => { if (S.jail) S.jail.picks = 3; else UI.toast('Nicht im Kerker'); },
       'Schloss knacken (nächste Tür)': () => { const d0 = S.ents[S.map].filter(x => x.cellDoor != null).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (d0 && S.jail) pickCell(d0); else UI.toast('Keine Zellentür / nicht im Kerker'); },
       'Freilassen': () => { if (S.jail) { S.jail.until = clock(); jailTick(); } },
     }],
+    ['Animation', `${sel('dbDc', DEATH_KINDS.map(k => [k, ANIM_DEFS.death[k].name]))} ${sel('dbGest', Object.entries(ANIM_DEFS.gesture).map(([k, g]) => [k, g.name]))}`, {   /* Roadmap P8 */
+      'Tod erzwingen (nächster Gegner)': () => { const e = S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive).sort((a, b) => dist(a, p) - dist(b, p))[0] || spawnEnemy('bandit', S.map, (p.x / TS2 | 0) + 3, p.y / TS2 | 0); if (!e) return; e.forceDc = v('dbDc'); die(e, 'Debug', p); UI.toast(ANIM_DEFS.death[v('dbDc')].name); },
+      'Tod erzwingen (Test-Person)': () => { const q = freeSpotNear(S.map, (p.x / TS2 | 0) + 3, p.y / TS2 | 0, 2), c = makeChar({ name: 'Probe-Opfer', prof: 'Reisender', x: q.x, y: q.y, map: S.map }); c.transient = true; S.ents[S.map].push(c); c.forceDc = v('dbDc'); die(c, 'Debug'); UI.toast(ANIM_DEFS.death[v('dbDc')].name + ' (Person: Leiche, dann Grab)'); },
+      'Geste abspielen (Held und nächster NPC)': () => { gesture(p, v('dbGest')); const n = S.ents[S.map].filter(x => x.kind === 'npc' && x.alive && x !== p && dist(x, p) < 400).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (n) gesture(n, v('dbGest'), 0, p); },
+      'Alle Todesarten nebeneinander': () => { DEATH_KINDS.forEach((k, i) => { const e = spawnEnemy('bandit', S.map, (p.x / TS2 | 0) - 8 + i * 2, (p.y / TS2 | 0) + 3); if (e) { e.forceDc = k; e.x = p.x - 256 + i * 64; e.y = p.y + 90; die(e, 'Debug', p); } }); UI.toast('Von links: ' + DEATH_KINDS.join(', ')); },
+    }],
     ['Kamerafahrten', '', {
       'Fall Vargs': () => vargCinematic(), 'Fall der Untoten': () => undeadFallCinematic(), 'Beenden': () => cineEnd(),
+      'Kamerafahrt-Test (Zoom/Fokus)': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0];   /* Roadmap P8 */
+        cinematic([{ x: p.x, y: p.y, map: S.map, dur: 2200, zoom: 1.6, text: 'Einstellung 1: nah am Helden (Zoom 1,6).' }, { x: p.x, y: p.y, map: S.map, dur: 2600, zoom: 1.25, focus: n?.id, text: `Einstellung 2: Fokus auf ${n ? n.name : '—'} (Zoom 1,25).` }, { x: p.x, y: p.y, map: S.map, dur: 2200, zoom: 0.8, text: 'Einstellung 3: Totale (Zoom 0,8).' }]); },
+      'Cutscene wiederholen (nur Bild)': () => { if (!lastCine) return UI.toast('Noch keine Kamerafahrt gesehen.'); cinematic(lastCine.map(s => ({ ...s, done: false }))); },
     }],
     ['Test', '', { 'Laden prüfen': () => { const r = loadProbe(); UI.toast(r.ok ? `LADEN OK (${Math.round(r.bytes / 1024)} KB)` : 'LADEN: ' + r.diff.join(' · '), 5000); log(`Ladeprobe: ${r.ok ? 'gleich' : r.diff.join('; ')}`, 'world'); }, 'Selbsttest': () => { const r = selftest(); log(`Selbsttest: ${r.filter(x => x.startsWith('PASS')).length}/${r.length}`, 'world'); }, 'Spieler töten': () => { p.body.torso.hp = 0; B.syncHp(p); downed(p, 'Debug'); p.downTimer = 1; } }],
   ];
@@ -11147,6 +11417,68 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
     return { tr: trace ? tr : undefined, swings: sw0.n, mtype, mode, weapon, level, win: !e.alive, dead: !p.alive || p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100) };
   } finally {
     Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, gold: keep.gold, kills: keep.kills, _quiet: keep.quiet, projectiles: keep.projectiles, rising: keep.rising }); combat = keep.combat;
+    delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
+  }
+}
+// Balance-Runde (nur ?dev): RF.simFight — gestellter Kampf auf leerer Karte wie duel, aber mit voller Ausrüstung (Zustand 1),
+// Stufe und Leben des Gegners (ehp = Boss-Grundleben wie REGION_BOSSES), üblicher Punkteverteilung und einem geschickten
+// Spieler: mode 'smart' rollt bei jeder Ansage (Ausholen, Sonderangriff), Fernkämpfer halten Abstand; 'stand' haut nur.
+// pots = Heiltränke (je 40 LP unter 35 % Leben). Welt, Ruf, Chronik und Flaggen werden gesichert und danach zurückgesetzt;
+// der Tod des Gegners löst keine Weltfolgen aus (simDummy in die). Ergebnis: { win, dead, sec, hpLost, rolls, potsUsed, ehpLeft }.
+export function simFight(mtype, o = {}) {
+  const { level = 5, weapon = 'longsword', gear = {}, attrs = null, skill = null, elvl = null, ehp = null, eopt = {}, mode = 'smart', seed = 1, maxT = 180000, pots = 0, flags = {} } = o;
+  const skip = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings']), snap = {}, snapJ = {};
+  for (const k of Object.keys(S)) if (!skip.has(k)) { try { snapJ[k] = JSON.stringify(S[k]); snap[k] = structuredClone(S[k]); } catch (err) { /* nicht klonbar: bleibt */ } }   // zurückgesetzt wird nur, was sich geändert hat (Verweise bleiben heil)
+  const keep = { player: S.player, map: S.map, party: S.party, combat, projectiles: S.projectiles, rising: S.rising, quiet: S._quiet };
+  const kb = new Set(keys), md = mouse.down, ms = mouse.seen, pnow = performance.now, boss0 = { ...BOSS };
+  let vt = pnow.call(performance); performance.now = () => vt;   /* virtuelle Uhr: Nachladen, Landung, Schwung laufen in Kampfzeit, nicht in Rechenzeit */
+  S.projectiles = []; S.rising = []; S.party = [];
+  MAPS.__d = { w: 60, h: 40, tiles: new Uint8Array(2400).fill(T.GRASS) }; S.ents.__d = []; solidIndex.__d = new Map(); S._quiet = true;
+  try {
+    Object.assign(S.flags, flags); seedRng(seed); S.difficulty = o.diff || 'schwer'; applyDifficulty(); if (o.boss) Object.assign(BOSS, o.boss);   // Messung immer auf „Schwer“ (Standard), sonst die Stufe des Spielstands
+    const it = weapon ? ITEMS[weapon] : null, ranged = !!it?.ranged, pts = level - 1 + Math.floor(level / 5);
+    const A = attrs || (ranged ? { agility: 10 + Math.round(pts * 0.5), endurance: 10 + Math.round(pts * 0.4), strength: 9 + Math.round(pts * 0.1) }
+      : { strength: 10 + Math.round(pts * 0.5), endurance: 10 + Math.round(pts * 0.4), agility: 9 + Math.round(pts * 0.1) });
+    const p = makeChar({ name: 'Held', map: '__d', x: 40 * TS, y: 20 * TS, level, attrs: A, build: 'ausgewogen', skills: { [it?.skill || 'unarmed']: skill ?? Math.min(100, 5 + level * 3), defense: Math.min(100, level * 1.5) } });
+    p.kind = 'player'; p.equip.weapon = it ? { key: weapon, cond: 1, charge: 100 } : null;
+    for (const [s, k] of Object.entries(gear)) p.equip[s] = k ? { key: k, cond: 1 } : null;
+    recalc(p); B.fullHeal(p); p.stamina = p.maxStamina;
+    S.player = p; S.map = '__d'; S.ents.__d.push(p);
+    const eo = { ...eopt }; if (elvl != null) eo.level = elvl;
+    const e = spawnEnemy(mtype, '__d', 34, 20, eo);
+    if (ehp) { e.maxHp = e.hp = Math.round(ehp * BAL.hp * (bossScaled(e) ? BOSS.hp : 1)); if (e.body) B.initBody(e, e.maxHp); }
+    e.simDummy = true; e.parley = false; e.aggroId = p.id; e.aiState = 'pursue';
+    const hp0 = B.vital(p), eMax = e.maxHp, ev0 = e.body ? B.vital(e) : e.hp, st = { sw: 0, hits: 0, tired: 0, far: 0, cells: 0 }; let t = 0, rolls = 0, potsUsed = 0, ann = -1e9;
+    keys.clear(); mouse.seen = false; mouse.down = true;
+    for (; t < maxT && e.alive && p.alive && !p.downed; t += 16) {
+      vt += 16; mouse.wx = e.x; mouse.wy = e.y - 12; combat = S.ents.__d.filter(x => x.alive);
+      if (p.x > 56 * TS || p.x < 4 * TS) { const sh = p.x > 56 * TS ? -30 * TS : 30 * TS; for (const x of S.ents.__d) x.x += sh; }   // Endlosband
+      if (mode === 'smart') {
+        if (e.telegraph > 0 || e.windup) ann = vt;                                            /* Ansage gesehen */
+        const sw = e.swing > 0 && !e.hitDone, tth = sw ? (swingHit(e) - e.swing) * (e.swingDur || 500) : 1e9;
+        const late = sw && tth < 200 && (vt - ann < 1500 || e.swing * (e.swingDur || 500) >= 250);   /* angesagt: kurz vor dem Treffer rollen; sonst Reaktionszeit ~250 ms */
+        const d = dist(p, e), threat = d < 220 && ((e.telegraph > 0 && e.telegraph < 180) || (e.special && e.special.t < 220) || !!e.leap || e.draw > 0 || late);
+        for (const k of ['w', 'a', 's', 'd']) keys.delete(k);                                   /* ohne Richtung rollt man rückwärts, weg vom Ziel */
+        const far = !ranged && d > (it ? it.reach : 30) + (e.r || 10) + 4, toward = () => { if (Math.abs(e.x - p.x) > 8) keys.add(e.x < p.x ? 'a' : 'd'); if (Math.abs(e.y - p.y) > 8) keys.add(e.y < p.y ? 'w' : 's'); };
+        if (far && e.draw > 0) toward();                                                        /* gegen Schützen: nach vorn rollen */
+        if (threat && !o.nododge && !p.dodge && !(p.dodgeCd > 0) && dodge()) rolls++;
+        mouse.down = !(e.phased > vt) && !e.invuln;   /* wer spielen kann, haut nicht in einen körperlosen Geist oder einen brüllenden Boss */
+        if (ranged) { if (d < 170) keys.add(e.x < p.x ? 'd' : 'a'); }
+        else if (far && (!threat || e.draw > 0)) toward();   /* Nahkämpfer gehen auf Schlagweite */
+      }
+      if (potsUsed < pots && B.vital(p) < hp0 * 0.35) { potsUsed++; B.heal(p, ITEMS.potion.heal); }
+      if (it?.energy && p.equip.weapon && (p.equip.weapon.charge ?? 100) < it.energy && st.cells < (o.cells || 0)) { p.equip.weapon.charge = 100; st.cells++; }   /* Energiezellen */
+      const sw0 = p.swing, eh0 = e.body ? B.vital(e) : e.hp;
+      controlPlayer(16); for (const x of [...S.ents.__d]) think(x, 16); updateProjectiles(16);
+      if (!(sw0 > 0) && p.swing > 0) st.sw++; if ((e.body ? B.vital(e) : e.hp) < eh0) st.hits++; if (p.stamina < 5) st.tired += 16; if (dist(p, e) > 120) st.far += 16;
+    }
+    return { mtype, level, weapon, elvl: e.level, win: !e.alive, dead: !p.alive || !!p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100), rolls, potsUsed,
+      ehp: eMax, ehpLeft: e.alive ? Math.round(Math.max(0, e.body ? B.vital(e) : e.hp) / ev0 * 100) : 0, dealt: Math.round(ev0 - Math.max(0, e.alive ? (e.body ? B.vital(e) : e.hp) : 0)), pdmg: Math.round(damageOf(p)), parmor: armorOf(p), php: Math.round(hp0), swings: st.sw, landed: st.hits, tiredS: +(st.tired / 1000).toFixed(1), farS: +(st.far / 1000).toFixed(1), cells: st.cells };
+  } finally {
+    performance.now = pnow; Object.assign(BOSS, boss0); keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms;
+    for (const [k, v] of Object.entries(snap)) { let same = false; try { same = JSON.stringify(S[k]) === snapJ[k]; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
+    applyDifficulty();
+    Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, projectiles: keep.projectiles, rising: keep.rising, _quiet: keep.quiet }); combat = keep.combat;
     delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
   }
 }
@@ -11222,6 +11554,12 @@ export function selftest() {
     const beast = ['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound'].includes(k);
     const f = beast ? SP.beastFrame(k, m.pal, 'W', '', 0) : k === 'gorak' ? SP.bruteFrame(m.pal, 'E', '', 0) : SP.humanFrame(SP.monsterSpec(e, m), 'S', 'i0');
     return filled(f);
+  }));
+  ok('Vielfalt (Nutzer §5b): Goblins und Untote sehen je nach Seed verschieden aus, jede Variante malt sich, gleicher Seed = gleiches Aussehen', ['goblin', 'goblin_warrior', 'skeleton', 'zombie', 'ghoul', 'bone_archer'].every(k => {
+    const keys = new Set(), m = MONSTERS[k];
+    for (let sd = 1; sd <= 30; sd++) { const sp = SP.monsterSpec({ mtype: k, seed: sd * 3.7 }, m); keys.add(JSON.stringify(sp)); if (sd % 6 === 0 && !filled(SP.humanFrame(sp, 'S', 'i0'))) return false; }
+    const same = JSON.stringify(SP.monsterSpec({ mtype: k, seed: 12.3 }, m)) === JSON.stringify(SP.monsterSpec({ mtype: k, seed: 12.3 }, m));
+    return keys.size >= 5 && same;
   }));
   ok('Sprites: Waffen & Kacheln', Object.entries(ITEMS).filter(([, i]) => i.slot === 'weapon').every(([k, i]) => filled(SP.weaponSprite(k, i.rarity, i.holy, i.wtype).cv))
     && Object.values(T).every(t => filled(SP.tileTexture(t, 0, ['#3c4a2c', '#43522f', '#364325'], 'grass'))));
@@ -12547,18 +12885,19 @@ export function selftest() {
     const weapons = Object.entries(ITEMS).filter(([, it]) => it.slot === 'weapon');
     const data = weapons.every(([k, it]) => FEEL[it.wtype] && SP.weaponSprite(k, it.rarity, it.holy, it.wtype).cv.width > 0);
     const p = stage(); p.aim = 0; combat = S.ents.__a;
-    const mk = (x, y = 0) => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + x; e.y = p.y + y; e.stagger = 0; return e; };
+    const mk = (x, y = 0) => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + x; e.y = p.y + y; e.stagger = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x); return e; };   // Balance-Runde: Gegner sieht den Helden an (sonst Rückenstich-Krit)
     const dealt = (w, e, mult = 1) => { p.equip.weapon = mkItem(w); const h = e.hp; seedRng(4); hit(p, e, mult); return h - e.hp; };
     const a = mk(30), plain = dealt('rapier', a); p.riposteUntil = performance.now() + 1000; const rip = dealt('rapier', mk(30));
     const sh = mk(30); sh.equip = { offhand: { key: 'kite_shield' } }; ITEMS.__wall = { slot: 'offhand', block: 1.43 }; sh.equip.offhand = { key: '__wall' };
     const blockedSword = dealt('longsword', sh), crushed = dealt('warhammer', sh); delete ITEMS.__wall; sh.equip.offhand = null; a.alive = sh.alive = false;
-    const near = mk(24, 0), far = mk(80, 6); p.equip.weapon = mkItem('halberd'); const hn = near.hp, hf = far.hp; seedRng(4); resolveSwing(p);
+    const near = mk(24, 0), far = mk(80, 6); near.aim = far.aim = 0; near.body = far.body = null; p.equip.weapon = mkItem('halberd'); const hn = near.hp, hf = far.hp; seedRng(4); resolveSwing(p);   /* ohne Trefferzonen: Kopfdeckel/Glieder verfälschen den Vergleich Spitze/Schaft nicht */
     p.equip.weapon = mkItem('crossbow'); p.stamina = 100; p.swing = 0; p.atkCd = 0; const n0 = S.projectiles.length; resolveSwing(p);
     const shot = S.projectiles.length === n0 + 1 && S.projectiles.at(-1).kind === 'bolt' && p.reloadUntil > performance.now();
     attack(p); const noReshoot = !(p.swing > 0);
     p.reloadUntil = 0; p.equip.weapon = mkItem('wand'); p.maxMana = 50; p.mana = 5; p.swing = 0; p.atkCd = 0; attack(p); const paid = p.mana === 1;
     p.swing = 0; p.atkCd = 0; attack(p); const refused = !(p.swing > 0);
     S.projectiles.length = n0;
+    if (!(data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused)) console.warn('Waffen P7', data, rip, plain, blockedSword, crushed, sh.stagger, hn - near.hp, hf - far.hp, shot, noReshoot, paid, refused);
     return data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused;
   }));
   ok('Rarität (Phase 8): Verteilung abgestuft, nie mythisch zufällig, Unikate fest; Affixe je Stufe (episch: 1 spielverändernd, legendär: Sondereffekt); Affixe wirken; Aufheben behält das Exemplar', sandbox(() => {
@@ -13010,11 +13349,33 @@ export function selftest() {
       return many && foes.length === 3 && one && next;
     } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.kills = k.k; p.kills = k.pk; S.gold = k.g; S.ents.world = W0; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
   })());
-  ok('S13 Level: Kurve wird nach Stufe 10 flacher, alle 5 Stufen ein Meilenstein (+1 Attribut, +1 Talent); Gegnerstufen des Gebiets abrufbar', sandbox(() => {
-    const p = stage(); p.level = 9; p.xpNext = 1000; p.xp = 1000; p.attrPoints = 0; p.skillPoints = 0; levelUp(p); const n10 = p.xpNext === 1200 && p.attrPoints === 2 && p.skillPoints === 2;
-    p.xp = p.xpNext; levelUp(p); const n11 = p.xpNext === 1440 && p.attrPoints === 3;
+  ok('S13 Level: Kurve wird nach Stufe 10 flacher, alle 5 Stufen ein Meilenstein (+1 Statpunkt), Talentpunkt nur auf geraden Stufen; Gegnerstufen des Gebiets abrufbar', sandbox(() => {
+    const p = stage(); p.level = 9; p.xpNext = 1000; p.xp = 1000; p.attrPoints = 0; p.skillPoints = 0; levelUp(p); const n10 = p.xpNext === 1200 && p.attrPoints === 2 && p.skillPoints === 1;
+    p.xp = p.xpNext; levelUp(p); const n11 = p.xpNext === 1440 && p.attrPoints === 3 && p.skillPoints === 1;
     const z = ZONE[clamp(zoneTier('world', 10, 10), 0, 5)];
     return n10 && n11 && z[0] <= z[1];
+  }));
+  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + 30 bis Stufe 60 (≈ 50 % der 59 lernbaren Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
+    const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
+    while (p.level < MAX_LEVEL) { sum += p.xpNext; p.xp = p.xpNext; levelUp(p); }
+    const pts = p.skillPoints, attr = p.attrPoints, learnable = Object.keys(SKILL_TREE).length - Object.values(SKILL_TREE).filter(n => n.excl).length;
+    p.xp = p.xpNext * 5; while (p.xp >= p.xpNext) levelUp(p); const capped = p.level === MAX_LEVEL && p.xp < p.xpNext && Math.ceil(p.xp) === p.xpNext;
+    const g = actor(340, 300); g.coopHero = true; g.level = MAX_LEVEL; g.xp = 0; g.xpNext = 999; g.attrPoints = 0; g.xp = 5000; while (g.xp >= g.xpNext) levelUp(g);
+    const ratio = pts / learnable;
+    if (!(pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, sum, g.level, g.attrPoints);
+    return pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
+  }));
+  ok('Balance-Runde (docs/BALANCE.md): Bosse ×2 Leben und ×0,6 Wucht (Omega ausgenommen); fester Schadensanteil wächst mit der Schwungdauer; Geist bleibt nicht dauerhaft körperlos; RF.simFight ändert die Welt nicht', sandbox(() => {
+    const p = stage(); p.level = 20; recalc(p);
+    seedRng(3); const g = spawnEnemy('gorak', '__a', 12, 10, { level: 10 }); seedRng(3); const g2 = spawnEnemy('gorak', '__a', 12, 14, { level: 10, boss: false }); g2.alive = false;
+    const om = spawnEnemy('omega', '__a', 20, 10, { level: 20 }), w0 = spawnEnemy('wolf', '__a', 14, 12, { level: 5 });
+    const hpOk = Math.abs(g.maxHp / g2.maxHp - BOSS.hp) < 0.05 && g.bossV === 1 && om.maxHp === Math.round(MONSTERS.omega.hp * 1.8 * BAL.hp) && !om.bossV;
+    const h0 = w0.hp; hurt(w0, 10, g); const bossHit = Math.abs((h0 - w0.hp) - 10 * BOSS.dmg) < 0.2; const h1 = w0.hp; hurt(w0, 10, om); const omegaHit = Math.abs((h1 - w0.hp) - 10) < 0.2;
+    const flat = k => { p.equip.weapon = { key: k, cond: 1 }; return damageOf(p) - ITEMS[k].dmg; }, fr = flat('dagger') / flat('greatsword');
+    const wr = spawnEnemy('wraith', '__a', 16, 10); p.equip.weapon = { key: 'longsword', cond: 1 }; seedRng(5); hit(p, wr, 1); const ph = wr.phased; hit(p, wr, 1); const noRefresh = wr.phased === ph;
+    const f0 = JSON.stringify(S.flags), k0 = S.kills, r = simFight('bandit', { level: 5, elvl: 3, maxT: 20000 }), clean = JSON.stringify(S.flags) === f0 && S.kills === k0 && S.player === p && typeof r.win === 'boolean';
+    if (!(hpOk && bossHit && omegaHit && fr > 0.3 && fr < 0.45 && noRefresh && clean)) console.warn('Balance-Runde', hpOk, g.maxHp, om.maxHp, bossHit, omegaHit, fr, noRefresh, clean);
+    return hpOk && bossHit && omegaHit && fr > 0.3 && fr < 0.45 && noRefresh && clean;
   }));
   ok('S13 Fraktionssets: erst alle Teile geben den Bonus (Rüstung, Schaden, Ausdauer, gegen Untote); Effekte-Fenster zeigt das Set; jedes Setteil hat Werte und Aussehen', sandbox(() => {
     const p = stage(); p.equip.chest = mkItem('kronharnisch'); p.equip.head = null; recalc(p);
@@ -13461,6 +13822,54 @@ export function selftest() {
       return lowStock && lockedSwap && hiStock && openSwap && hasOpt && kybOk && black && chart;
     } finally { S.ranks.aurel = r0; S.permit = pm; S.acadRank = ac; S.flags.aurelCitizen = fl.c; S.flags.marriedHouse = fl.m; S.aurelJob = aj; S.bond = bd; if (fl.c === undefined) delete S.flags.aurelCitizen; if (fl.m === undefined) delete S.flags.marriedHouse; }
   }));
+  ok('Roadmap P6 Luftschiffe: alter Stand ohne S.air bekommt drei Schiffe; airDay schickt sie los; Hülle 0 = Wrack mit Absturz-Ereignis; ein Handelsschiff im Wrack senkt Aurelions Nahrung', sandbox(() => {
+    const k0 = { air: S.air, f: S.flags.air1, b: S.big, bl: S.bigLast, bn: S.bigNext, w: S.ents.world, st: S.towns?.kupferhafen ? structuredClone(S.towns.kupferhafen.stock) : null, h: ECO.airH.crash, v: S.voyage };
+    try {
+      S.ents.world = k0.w.slice(); S.big = null; S.voyage = null; delete S.air; S.flags.air1 = false; ensureAirport();
+      const three = S.air.fleet.length === 3 && S.flags.air1 && S.air.fleet.filter(x => x.kind === 'handel').length === 2 && S.air.fleet.every(x => x.up.hull === 0);
+      ECO.airDefaults(); const idem = S.air.fleet.length === 3 && S.ents.world.filter(e => e.airMast).length === 1 && S.ents.world.some(e => e.key === 'hafenmeisterin');
+      const full = ECO.airSupply(); ECO.airDay(); const flying = S.air.fleet.filter(x => x.state === 'flug').length === 2 && S.air.fleet[1].state === 'hafen';   /* zweites Handelsschiff startet versetzt */
+      const t = S.air.fleet[0], mid = ECO.airPos(t, (t.dep + t.eta) / 2), A = ECO.airPt(t.at), Bp = ECO.airPt(t.to), between = mid && Math.min(A[1], Bp[1]) <= mid[1] && mid[1] <= Math.max(A[1], Bp[1]);
+      ECO.airCrash(t); const wreck = t.state === 'wrack' && S.big?.kind === 'airship' && S.big.ship === t.id && S.ents.world.some(e => e.crashSurvivor && e.bigEv === S.big.id);
+      const less = ECO.airSupply() < full && full === 1;
+      return three && idem && flying && between && wreck && less;
+    } finally { S.air = k0.air; S.flags.air1 = k0.f; if (k0.air === undefined) delete S.air; S.big = k0.b; S.bigLast = k0.bl; S.bigNext = k0.bn; S.ents.world = k0.w; S.voyage = k0.v; if (k0.st) S.towns.kupferhafen.stock = k0.st; ECO.airH.crash = k0.h; }
+  }));
+  ok('Roadmap P7 Passage: Motor 40 fliegt länger als Motor 100; Reparatur nimmt Barren aus Kupferhafens Lager; Ausbau Motor macht schneller; ohne Schein gesperrt; Laden an Deck nur mit Reise', sandbox(() => {
+    const k0 = { air: S.air, f: S.flags.air1, st: S.towns?.kupferhafen ? structuredClone(S.towns.kupferhafen.stock) : null, fac: S.factions.aurel, v: S.voyage, sp: S.seaPort, r: S.ranks.aurel, pm: S.permit, ci: S.flags.aurelCitizen, mh: S.flags.marriedHouse, aj: S.aurelJob, bd: S.bond };
+    try {
+      delete S.air; S.flags.air1 = false; ECO.airDefaults(); const sh = S.air.fleet[0];
+      const fast = ECO.airDur(sh); sh.motor = 40; const slow = ECO.airDur(sh) > fast;
+      const T = S.towns.kupferhafen; T.stock.ingot = 50; T.stock.tools = 50; T.stock.magitech = 50; sh.hull = 50; S.gold = 99999;
+      const i0 = T.stock.ingot; const rep = airRepair(sh) === null && T.stock.ingot < i0 && sh.hull === 100 && sh.motor === 100;
+      const d0 = ECO.airDur(sh); const upOk = airUpgrade(sh, 'motor') === null && sh.up.motor === 1 && ECO.airDur(sh) < d0;
+      const p = stage(); S.ranks.aurel = 0; S.permit = -1; S.flags.aurelCitizen = false; S.flags.marriedHouse = false; S.aurelJob = null; S.bond = null; const m = actor(340, 300, { name: 'Probe' }); m.airMaster = 'kupferhafen';
+      harborTalk(m); const texts = [...document.querySelectorAll('#dlg-choices button')].map(b => b.textContent).join('|'); UI.closeDialogue();
+      const locked = texts.includes('Passage nach Aurelheim') && texts.includes('gesperrt');
+      S.voyage = { air: true, to: 'aurelheim', from: 'kupferhafen', t: 0, dur: 1000 }; voyageFix(); const cleared = S.voyage === null;
+      S.voyage = { air: true, to: 'aurelheim', from: 'kupferhafen', t: 0, dur: 1000 }; const saved = JSON.parse(saveData()).voyage?.air === true;
+      return slow && rep && upOk && locked && cleared && saved;
+    } finally { S.air = k0.air; S.flags.air1 = k0.f; if (k0.air === undefined) delete S.air; if (k0.st) S.towns.kupferhafen.stock = k0.st; S.factions.aurel = k0.fac; S.voyage = k0.v; S.seaPort = k0.sp; S.ranks.aurel = k0.r; S.permit = k0.pm; S.flags.aurelCitizen = k0.ci; if (k0.ci === undefined) delete S.flags.aurelCitizen; S.flags.marriedHouse = k0.mh; if (k0.mh === undefined) delete S.flags.marriedHouse; S.aurelJob = k0.aj; S.bond = k0.bd; }
+  }));
+  ok('Roadmap P8 Animation: Feuertod = burn, Krit = fallB, Automat = sparks; Person stirbt mit flüchtiger Leiche und einem Grab; Shot-Zoom 1,5 und zurück; 50 Tode leeren den Figuren-Cache nicht', sandbox(() => {
+    const p = stage(), c0 = S.cine, z0 = { z: R.cam.zoom, b: R.cam.base, cz: R.cam.cz };
+    try {
+      const far = o => { o.x = 1150; o.y = 1150; return o; }, e = far(spawnEnemy('bandit', '__a', 12, 10)); e.lastKind = 'fire'; die(e, 'Test');   /* fern: keine Beute, kein Auftragszähler */ const burn = S.ents.__a.some(x => x.kind === 'corpse' && x.dc === 'burn');
+      const e2 = spawnEnemy('bandit', '__a', 13, 10); e2.lastKind = 'physical'; e2.lastCrit = true; const crit = deathKind(e2) === 'fallB';
+      const e3 = spawnEnemy('automat', '__a', 14, 10); const bot = deathKind(e3) === 'sparks';
+      const v = actor(340, 300, { name: 'Probe-Opfer' }); die(v, 'Test'); const cs = S.ents.__a.filter(x => x.kind === 'corpse' && x.person), gr = S.ents.__a.filter(x => x.kind === 'grave' && x.label === 'Grab: Probe-Opfer');
+      const person = cs.length === 1 && cs[0].transient && !!cs[0].spec && gr.length === 1 && gr[0].hidden === true;
+      for (const k of DEATH_KINDS) { const q = deathPose(k, 0), r = deathPose(k, 5000); if (!q || !r || !(r.k === 1)) return false; }
+      R.cam.base = 1.3; S.cine = { shots: [{ zoom: 1.5, dur: 5000 }], i: 0, t: 0 }; camAim(p, 2000); const zin = Math.abs(R.cam.zoom - 1.3 * 1.5) < 0.05;
+      S.cine = null; camAim(p, 2000); const zout = Math.abs(R.cam.zoom - 1.3 * (1 + (R.cam.cz || 0))) < 0.01 && R.cam.cineZ === 1;
+      const cl0 = SP.frameCacheInfo().clears; let n = 0;
+      for (let i = 0; i < 50; i++) { const d = spawnEnemy('bandit', '__a', 10 + (i % 10), 12 + (i / 10 | 0)); if (!d) continue; far(d); d.forceDc = DEATH_KINDS[i % DEATH_KINDS.length]; die(d, 'Test'); n++; }
+      for (const x of S.ents.__a) if (x.kind === 'corpse' && x.dc) for (const age of [0, 150, 350, 5000]) { const P = deathPose(x.dc, age); if (P.frame && !R.deathFrameProbe(x, P)) return false; }
+      const cache = SP.frameCacheInfo().clears === cl0 && tintCacheInfo().size <= 200 && n === 50;
+      DYING.length = 0;
+      return burn && crit && bot && person && zin && zout && cache;
+    } finally { S.cine = c0; R.cam.zoom = z0.z; R.cam.base = z0.b; R.cam.cz = z0.cz; }
+  }));
   ok('Bionik-Fundament (Roadmap P1): neue Prothese kommt frisch, Schrott ist schlechter als Fleisch, Verschleiß nur am getroffenen Glied und nicht durch Gift', sandbox(() => {
     const p = stage(), L = p.body.larm; L.mechCond = 10; L.mechUp = 2; B.damagePart(p, 'larm', 9999); const cut = L.lost && L.mechCond === undefined && L.mechUp === undefined;
     B.attachProsthesis(p, 'larm', 2); const fresh = L.mech === 2 && L.mechCond === 100 && L.mechUp === 0 && !L.lost;
@@ -13469,6 +13878,16 @@ export function selftest() {
     const w = B.wearProsthesis(p, 'larm'); const worn = w && w.now < 100 && B.wearProsthesis(p, 'torso') === null;   /* nur Prothesenglieder nutzen sich ab */
     for (let i = 0; i < 40 && L.mechCond === w.now; i++) { hurt(p, 1, e, e.name, false, 'physical'); B.fullHeal(p); } const hitWears = L.mechCond < w.now || p.body.rarm.mechCond === undefined;
     return cut && fresh && bad && good && even && noPoison && worn && hitWears;
+  }));
+  ok('Magitech-Waffen (Roadmap C.10): Schuss kostet Energie, leer schießt nicht, Zelle füllt auf 100, Kanone streut, Präzisionsgewehr schlägt durch, Schockpistole lähmt', sandbox(() => {
+    const p = stage(); p.equip.weapon = mkItem('magiegewehr'); p.stamina = p.maxStamina = 1e4; p.aim = 0;
+    shoot(p, ITEMS.magiegewehr); const cost = p.equip.weapon.charge === 100 - ITEMS.magiegewehr.energy;
+    p.equip.weapon.charge = 3; p.swing = 0; p.atkCd = 0; p.reloadUntil = 0; attack(p); const blocked = !(p.swing > 0);
+    addItem(p, 'energiezelle', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'energiezelle')); const full = p.equip.weapon.charge === 100 && !hasItem(p, 'energiezelle');
+    shoot(p, ITEMS.kristallkanone); const k = S.projectiles.at(-1); shoot(p, ITEMS.praezisionsgewehr); const q = S.projectiles.at(-1); shoot(p, ITEMS.schockpistole); const s = S.projectiles.at(-1);
+    const fx2 = k.splash > 0 && q.pierce === 1 && s.spellSt?.key === 'shocked';
+    const gated = bionicTier(ITEMS.kristallkanone) === 3 && bionicTier(ITEMS.schockpistole) === 0;
+    return cost && blocked && full && fx2 && gated;
   }));
   ok('Koop K2: Gastfigur wird ferngesteuert statt KI, Auftragsgold geteilt, Stand ohne Gastzuordnung, Gast speichert nie', sandbox(() => {
     const p = stage(), m = spawnEnemy('bandit', '__a', 12, 10); m.kind = 'npc'; m.team = 'player'; S.party = [m.id]; m.coopPilot = 'probe'; m.coopName = 'Probe'; m.inv = [];
@@ -13885,9 +14304,33 @@ function titleLoop(t) {
 }
 
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
+// Nutzer (30.09.2026): Spielstände. Liste je Art (Einzelspieler / Koop), jede Karte mit Held, Haus, Stufe, Tag, Generation und
+// Erfolgs-Symbolen (Garmadon tot = Schädel usw., Tooltip nennt den Erfolg). Laden setzt den aktiven Platz, Löschen fragt nach.
+function slotCards(mode, onLoad) {
+  const idx = slotIndex(), list = Object.values(idx).filter(x => (x.mode || 'single') === mode).sort((a, b) => (b.at || 0) - (a.at || 0));
+  for (const x of list) if (x.name == null) { try { Object.assign(x, slotMetaFrom(JSON.parse(localStorage.getItem(slotKey(x.id))))); } catch (e) { x.name = '?'; } }   /* alter Stand ohne Übersicht */
+  const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+  const html = list.length ? list.map(x => `<div class="slot-card${x.id === SLOT ? ' active' : ''}"><div class="sl-head"><b>${esc(x.name)}</b> <span>${esc(x.house ? 'Haus ' + x.house : '')}</span></div>
+    <div class="sl-sub">Stufe ${x.level || 1} · Tag ${x.day || 1} · Generation ${x.gen || 1}${x.dead ? ' · gefallen' : ''}${x.at ? ' · ' + new Date(x.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>
+    <div class="sl-marks">${(x.marks || []).map(k => { const a = ACHIEVE.find(q => q[0] === k); return a ? `<span title="${esc(a[2])}">${a[1]}</span>` : ''; }).join('') || '<span class="sl-none">noch keine großen Taten</span>'}</div>
+    <div class="sl-act"><button class="plaque" data-load="${x.id}">${mode === 'coop' ? 'Hosten' : 'Laden'}</button><button class="plaque ghost" data-del="${x.id}">Löschen</button></div></div>`).join('')
+    : `<p class="ledger">Noch kein ${mode === 'coop' ? 'Koop-' : ''}Spielstand.</p>`;
+  const wrap = document.createElement('div'); wrap.className = 'slot-list'; wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-load]').forEach(b => b.onclick = () => onLoad(b.dataset.load));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const x = idx[b.dataset.del]; if (!confirm(`Spielstand „${x?.name || '?'}“ endgültig löschen?`)) return; deleteSlot(b.dataset.del); wrap.replaceWith(slotCards(mode, onLoad)); });
+  return wrap;
+}
+function slotPanel(mode) {
+  let el = $('slot-panel'); if (!el) { el = document.createElement('div'); el.id = 'slot-panel'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="coop-box"><h2>Spielstände</h2><p class="ledger">Einzelspieler. Koop-Spielstände stehen getrennt im Koop-Fenster. Die Symbole zeigen, was in diesem Stand schon geschafft ist (Maus darüber).</p><div id="slot-host"></div><button class="plaque" id="slot-new">Neue Geschichte</button><button class="plaque" id="slot-close">Schließen</button></div>`;
+  el.classList.remove('hidden');
+  $('slot-host').appendChild(slotCards(mode, id => { el.classList.add('hidden'); setSlot(id); titleLoop.hero = undefined; bindInput(); continueGame(); }));
+  $('slot-close').onclick = () => el.classList.add('hidden');
+  $('slot-new').onclick = () => { el.classList.add('hidden'); document.querySelector('[data-act="new"]').click(); };
+}
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, loadRaw, CLASSES, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
+    isRunning: () => running, slotCards, setSlot, newSlot, slotIndex, SLOT: () => SLOT, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, loadRaw, CLASSES, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();
@@ -13933,13 +14376,15 @@ function boot() {
     return `AKTUELLES ERBE<br><br>Haus ${d.legacy.house}<br>Generation ${d.legacy.gen}<br><br>
       Aktueller Charakter:<br>${d.player?.name || '—'}<br><br>Tag ${d.day}`;
   })() : 'Noch keine Geschichte geschrieben.';
-  document.querySelector('[data-act="continue"]').disabled = !hasSave();
+  { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); }   /* Titel: Einzelspieler-Stand aktiv */
+  document.querySelector('[data-act="continue"]').disabled = !hasSave() || SLOT.startsWith('c');
   document.querySelectorAll('.menu-plaques .plaque').forEach(b => {
     b.onclick = () => {
       const act = b.dataset.act;
-      if (act === 'continue') { bindInput(); continueGame(); }
+      if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
+      else if (act === 'slots') { slotPanel('single'); }
       else if (act === 'coop') { import('./coop.js?v=21').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
-      else if (act === 'new') { if (loadRaw() && !confirm('Es gibt einen Spielstand. Eine neue Geschichte überschreibt ihn beim ersten Speichern. Fortfahren?')) return;   // BUG-086
+      else if (act === 'new') { setSlot(newSlot('single'));   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
       else if (act === 'settings') { UI.openModal('settings'); }
@@ -13949,8 +14394,8 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=21').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=21').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)

@@ -316,3 +316,60 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Anzeige:** Der Koop-Code steht die ganze Zeit oben rechts (Host und Gast). Ist ein Mitspieler außerhalb des Bildes, zeigt ein Pfeil am Rand zu ihm, mit Name und Entfernung.
 - **Kerker:** Nur der Held kommt in den Kerker; die Gruppe und der Mitspieler warten draußen, der Mitspieler kann dort laufen. Erwischt der Wärter den Helden, kann er nicht weglaufen; Esc zählt wie „zurück in die Zelle“.
 - **Grenzen:** Der Held reist für die ganze Gruppe (Eingänge fragt der Gast an).
+
+## Runde: Roadmap C.10 — Magitech-Waffen (Version 21)
+- **Energie:** Jede Magitech-Waffe hat eine Zelle mit 100 Energie (je Exemplar, `charge`, fehlt = voll). Jeder Schuss kostet Energie (Messingpistole 6, Donnerbüchse und Donnerwort 12, neue Waffen siehe unten). Ist zu wenig da, schießt sie nicht („Energie leer — Energiezelle benutzen“); unter 25 kommt einmal „Energie niedrig“. Nur Spieler und Gefährten verbrauchen Energie; NPC-Schützen schießen wie bisher.
+- **Energiezelle** (30 Gold, stapelbar): füllt die angelegte Magitech-Waffe auf 100, sonst die leerste im Gepäck. Liegt automatisch auf der Leiste, wenn eine Magitech-Waffe in der Hand ist.
+- **Neue Waffen** (Magitech-Ingenieurin in Aurelion, Rangsperre wie Bionik):
+  - Schockpistole — kurz, schwach, lähmt (60 %), 5 Energie, ohne Rang.
+  - Magiegewehr — weit (520), lädt schnell nach (0,9 s), 8 Energie, Schein nötig.
+  - Runenarmbrust — setzt in Brand (50 %), 6 Energie, Schein nötig.
+  - Kristallkanone — Streuung um den Einschlag (60 % Schaden im Umkreis), 25 Energie, lange Ladezeit, Bürgerrecht nötig.
+  - Präzisionsgewehr — sehr weit (680), durchschlägt einen Gegner, 15 Energie, 3,2 s Ladezeit, Bürgerrecht nötig.
+- **Anzeige:** Tooltip zeigt Energie, Kosten je Schuss und Besonderheit.
+- **Debug:** „Magitech-Waffen geben“, „Waffenenergie leeren“. Selbsttest „Magitech-Waffen (Roadmap C.10)“.
+
+
+## Runde: Roadmap P6 — Luftschiff-Flotte und Hafen Kupferhafen (Version 21)
+- **Flotte:** Aurelion hat drei Luftschiffe (`S.air.fleet`): die Handelsschiffe „Kupferwind“ und „Goldmöwe“ fliegen zwischen Kupferhafen und den Kornländern im Süden, die Patrouille „Wacht von Aurel“ fliegt Kupferhafen → Aurelheim → Tickmar. Einmal am Tag (`airDay`) starten Schiffe am Mast, fliegen je nach Entfernung und Motor ½–3 Tage und kommen an. Zwei Schiffe gleicher Art starten nicht am selben Tag.
+- **Zustand:** Jedes Schiff hat Hülle, Motor und Steuerung (0–100 %). Jeder Flugtag nutzt den Motor ab und kann eine Havarie bringen (Chance `riskAir`: höher mit schwachem Motor und schwacher Steuerung). Unter 50 % Hülle bleibt ein Schiff am Mast (oder fliegt heim zur Werft). Die Werft in Kupferhafen bessert täglich mit bis zu 3 Barren aus dem Lager der Stadt aus.
+- **Absturz:** Hülle 0 → Wrack. Liegt kein anderes Großereignis an, wird daraus das Ereignis „Luftschiffabsturz“ an der Stelle des Schiffs (Name im Aufruf, Wrackteile, Magitech, 2 bewusstlose Luftschiffer, Plünderer). Jeder aufgerichtete Luftschiffer: Aurelion +6, 40 Gold und der Neubau einen Tag früher. Ein Wrack wird nach 5 Tagen neu gebaut, wenn Kupferhafen 6 Barren und 6 Bauholz hat. Das zufällige Großereignis lässt jetzt ein Schiff der Flotte abstürzen.
+- **Versorgung:** Aurelions Nahrungszufluss aus dem Süden = Anteil einsatzbereiter Handelsschiffe (ein Wrack = halb so viel, nie unter 20 %). Ausbau Laderaum +25 % je Stufe.
+- **Am Himmel:** Die Schiffe stehen an ihrer echten Stelle über der Welt (nicht mehr beim Spieler), mit Schatten, Namen aus der Nähe, Rauch bei Motor unter 50 %. Am Mast von Kupferhafen hängt ein Schiff tief.
+- **Hafenmeisterin Odila Kranz** (Kupferhafen, am Ankermast) und **Mastwarte** in Aurelheim, Gelenkhall, Tickmar und Sankt Serin: „Wie steht die Flotte?“ (Zustand aller Schiffe und Nahrungsanteil), „Wie funktionieren die Luftschiffe?“ (Erklärung aller Regeln).
+- **Debug (Luftschiff):** Flotte zeigen, Schiff beschädigen (−40 Hülle), Motorschaden (Motor 40), Absturz jetzt (teleportiert zum Wrack), Schiff reparieren, Flottentag, Zur Hafenmeisterin. Selbsttest „Roadmap P6 Luftschiffe“.
+
+## Runde: Roadmap P7 — Luftschiff-Passage, Schäden, Werft (Version 21)
+- **Passage:** Bei Hafenmeisterin oder Mastwart „Passage nach …“ (Preis nach Entfernung, mindestens 30 Gold). Nur mit Aurelion-Rang 1 (Aufenthaltsschein, Dienst bei einem Haus, Bürgerrecht); sonst steht „gesperrt“ dran und die Wache erklärt den Weg zum Passamt. Es fliegt ein flugtaugliches Schiff der Flotte, das am Mast liegt; sonst sagt der Mast, wann das nächste ankommt.
+- **An Deck:** Wie die Seereise (gemeinsamer Ablauf), aber über den Wolken: Himmel statt Wasser, Ballon über dem Deck. Dauer 22 s bei vollem Motor; Motor 40 % ≈ 31 s, Ausbau Motor −15 % je Stufe. Danach vergeht Spielzeit (Dauer/80 Minuten), Ankunft am Mast der Zielstadt.
+- **Ereignisse:** Sturm (häufiger bei Regen, Nebel, Schnee, Sandsturm bei der Abfahrt): Böen werfen um und verletzen, unter Deck ist man sicher (länger), an den Tauen gibt es Aurelion +2; jede Böe kostet das Schiff Hülle, eine Hülle unter 50 % lässt Böen 1,5-mal so hart treffen. Luftpiraten entern (Kampf, danach Aurelion +4). Motorschaden: Motor −30; mit Handwerk anpacken (Probe) kostet kaum Zeit, abwarten viel; eine Steuerung unter 60 % kann zur **Notlandung** auf halber Strecke führen — der Rest geht zu Fuß. Wer an Deck zu Boden geht, wird zurück zum Abfahrtsmast geflogen.
+- **Werft (Hafenmeisterin):** „Ein Schiff ausbessern lassen“: Barren für die Hülle, Werkzeug für den Motor, Magitech für die Steuerung — aus dem Lager von Kupferhafen, bezahlt zum Marktpreis (knapp = teuer, fehlt es, geht es nicht). Aurelion +2. „Ein Schiff ausbauen“: Hülle (weniger Sturm- und Havarieschaden), Motor (+15 % Tempo), Laderaum (+25 % Nahrung für Aurelion), je 2 Stufen; Arbeit 120/240 Gold plus Material. Aurelion +3.
+- **Speichern an Deck:** Die Reise wird mitgespeichert und läuft nach dem Laden weiter; steht man ohne Reise an Deck, landet man sicher im Hafen (`voyageFix`).
+- **Rangführer:** Aurelion Rang 1 nennt jetzt „Luftschiff-Passagen an jedem Mast“.
+- **Debug (Luftschiff):** Passage nach Aurelheim, Passage mit Sturm/Motorschaden/Luftpiraten erzwingen (an Deck: Ereignis sofort). Selbsttest „Roadmap P7 Passage“.
+
+## Runde: Mehrere Spielstände, Vielfalt bei Goblins und Untoten (Version 21)
+- **Spielstände:** Titel → „Spielstände“ zeigt alle Einzelspieler-Stände als Karten: Held, Haus, Stufe, Tag, Generation, Zeit des letzten Speicherns und Erfolgs-Symbole (Maus darüber nennt den Erfolg): 💀 Garmadon tot, ☀ Omega bezwungen, ✦ Omegas Weg zu Ende, ⛓ Kette gebrochen, ♣ Grubenstämme frei, ❄ Hrodvar gefallen, ⚓ Weißbart besiegt, ⌛ Ilvar tot, 🪓 Dodon tot, 👑 Kaiserin tot, ⚙ Bürger von Aurelion. Laden und Löschen (mit Rückfrage) je Karte.
+- **Neue Geschichte** legt immer einen neuen Platz an und überschreibt nichts mehr. **Fortsetzen** lädt den zuletzt gespielten Einzelspieler-Stand.
+- **Koop-Stände sind getrennt:** Im Koop-Fenster wählt der Host einen Koop-Spielstand („Hosten“) oder „Neuer Koop-Spielstand“ (Charaktererstellung, danach öffnet sich sofort der Warteraum). Einzelspieler-Stände lassen sich nicht hosten.
+- **Technik:** Jeder Platz hat einen eigenen Schlüssel im Browser-Speicher (`rotfall.slot.<id>`, der alte Stand bleibt als Platz „legacy“ unter `rotfall.legacy.save`). Übersicht in `rotfall.slots`, aktiver Platz in `rotfall.slot.active`. Ist der Speicher voll, sagt die Meldung, dass man einen alten Stand löschen soll.
+- **Vielfalt (Dauerauftrag Nutzer):** Goblins (6 Hauttöne, Körperbau, Blechkappe, Späherkapuze, Fellkragen, Kriegsbemalung, Plündererriemen; Krieger mit Hörnerhelm, erbeutetem Kettenhemd oder Nasalhelm) und Untote (Knochenfarben, Augenleuchten, Rüstungsreste, Helme, Schildreste, Leichentücher; Zombies und Ghule in verschiedenen Totenhemden, Schürze, Kapuze, Kettenhemd, Priesterrock) sehen je nach Seed verschieden aus, nach dem Laden gleich. Selbsttest „Vielfalt (Nutzer §5b)“.
+
+
+## Runde: Roadmap P8 — Animations-Fundament (Version 21)
+- **Todesarten** (`src/anim.js`, `ANIM_DEFS.death`): Woran jemand stirbt, sieht man. Feuer → brennt orange, verkohlt (Funken, Rauch, kein Blut). Frost oder eingefroren → erstarrt blau in der Trefferpose und zerspringt in Eissplitter. Heiliges gegen Untote, Magie, Schatten → verblasst und löst sich in aufsteigende Funken auf. Untote sonst → sacken als Knochenhaufen zusammen. Automaten → erstarren, Funken, kippen steif wie ein Brett. Kritischer Treffer → Sturz rückwärts mit Blutstoß. Starker Rückstoß → rutscht nach hinten und schlägt auf (Staub, leichtes Wackeln). Enthauptung → Kopf rollt. Sonst → in die Knie, zur Seite (wie bisher). Blutlachen nur bei blutigen Toden.
+- **Personen sterben sichtbar:** Stirbt ein Mensch (NPC, Gefährte), fällt zuerst sein Körper nach derselben Todesart (2,5 s, nicht gespeichert); erst dann steht das Grab mit seiner Habe da. Wird genau dann gespeichert, ist das Grab beim Laden sofort sichtbar.
+- **Gesten:** Figuren können zeigen, abwehren (Hände vors Gesicht) und mit den Achseln zucken (`gesture(c, 'zeigen'|'abwehren'|'achsel')`), Grundlage für inszenierte Gespräche.
+- **Kamera je Einstellung:** Kamerafahrten können je Einstellung heranzoomen (`zoom`) und auf eine Figur oder einen Punkt blicken (`focus`); während der Fahrt kein Blickvorlauf zur Maus und kein Kampf-Zoom, danach wieder normal.
+- **Debug (Animation):** Tod erzwingen am nächsten Gegner oder an einer Test-Person (Ursache wählen), Geste abspielen, alle Todesarten nebeneinander. **Kamerafahrten:** Kamerafahrt-Test (Zoom/Fokus), Cutscene wiederholen (nur Bild, ohne Folgen). Selbsttest „Roadmap P8 Animation“.
+
+## Runde: Balance — Bosse, Waffen, Stufen (Version 21, docs/BALANCE.md)
+- **Höchststufe 60** (Held und Koop-Gastfiguren). Darüber bringt Erfahrung keine Stufe mehr, der Balken bleibt voll („Höchststufe“ in der Kopfzeile, Meldung beim Erreichen). EP-Kurve ab Stufe 20 nur noch ×1,04 je Stufe (≈ 0,42 Mio. EP bis 60 statt 3,1 Mio.).
+- **Talentpunkte** nur noch 1 zum Start und 1 auf jeder geraden Stufe (31 bei Stufe 60 von 59 lernbaren Knoten). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
+- **Bosse** haben doppeltes Leben und teilen 60 % aus (`BOSS`; gilt für Hieb, Fläche und Geschoss). Omega bleibt, wie er ist (Heeresschlacht). Bosse alter Stände werden beim Laden einmal angepasst. Sandfürst 340 Leben und ×1,8 Wucht, Varg 360 Leben, Hrodvar 220, Dodon 620 Grundleben.
+- **Fester Schadensanteil** (Attribut, Übung, Stufe) wächst mit der Schwungdauer: 600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2; Fernwaffen ×1. Vorher war der Dolch rechnerisch doppelt so stark wie der Zweihänder.
+- **Rückenstich** (Dolch, Hakenmesser, Rapier: Krit-Chance 50 %) und **Hinterhalt ×3** gelten jetzt wirklich nur von hinten (vorher durch einen Richtungsfehler von vorn).
+- **Geist:** Ein abgeprallter Hieb verlängert die Körperlosigkeit nicht mehr (vorher war ein Geist bei Dauerhauen nie zu treffen).
+- **Gegnerschaden je Stufe** +6 % statt +5 % (`BAL.lvl`), damit späte Gebiete gefährlich bleiben. Varianten (Rasender, Vernarbter …) wirken jetzt auch bei Schützen.
+- **Waffen:** Kurzbogen schneller (820 → 700 ms), Langbogen 18 Schaden / 920 ms, Wurfmesser 680 ms, Magiegewehr 1,2 s Nachladen und 10 Energie je Schuss.
+- **Debug:** `RF.simFight(typ, { level, weapon, gear, elvl, ehp, mode: 'smart'|'stand', pots, cells, n })` — gestellter Kampf, Welt bleibt unberührt. Selbsttests „Balance-Runde: Höchststufe 60“ und „Balance-Runde (docs/BALANCE.md)“.

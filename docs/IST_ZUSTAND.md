@@ -114,8 +114,8 @@ Zeilennummern gibt es bewusst nicht, weil der Code sich ändert.
 - Gruppengröße `partyCap` = 3 + Führung/10 + 1, wenn man eine Siedlung hat.
 
 **Stufen und Punkte** (`gainXp`, `levelUp`):
-- Die nötige Erfahrung wächst je Stufe um ×1,35, ab Stufe 10 um ×1,2, ab Stufe 20 um ×1,12. Viel Erfahrung auf einmal ergibt mehrere Stufen.
-- Jede Stufe gibt +1 Statpunkt (C) und +1 Talentpunkt (T). Jede 5. Stufe gibt zusätzlich je +1 („Meilenstein“).
+- Die nötige Erfahrung wächst je Stufe um ×1,35, ab Stufe 10 um ×1,2, ab Stufe 20 um ×1,04 (Balance-Runde). Höchststufe 60 (≈ 0,42 Mio. EP). Viel Erfahrung auf einmal ergibt mehrere Stufen.
+- Jede Stufe gibt +1 Statpunkt (C), jede 5. Stufe einen zusätzlich („Meilenstein“). Talentpunkte (T): 1 zum Start und 1 auf jeder geraden Stufe (31 bei Stufe 60). Siehe docs/BALANCE.md.
 - Ein Aufstieg heilt voll, außer man liegt am Boden.
 - „Ausgeruht“ gibt +10 % Erfahrung, der Trank der Lehre mehr.
 
