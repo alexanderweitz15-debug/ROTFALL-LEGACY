@@ -598,3 +598,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Goblin-Volkswaffen:** Schrottkeule (billig, taumelt) und Schrottklinge (gezackt, lässt bluten) — bei Nibbel in Grubenhort und als Beute von Goblins.
 - Alle fünf haben eine eigene Zeichnung. Zwergenaxt und Runenhammer (Tiefhall), Entermesser und Harpune (Seevolk) sowie die Kriegssichel (Wüste) sind die übrigen Volkswaffen.
 - Probe „Exoten und Volkswaffen (Nutzer §5f)“.
+
+## Runde: Vielfalt 2 — Automaten, Engel, Bewohner, Wachen (Nutzer §5f, Version 21)
+- **Automaten** (Wachen in Aurelion und verwilderte Kriegsautomaten): Messing, Stahl, Kupfer oder geschwärztes Eisen, unterschiedlich abgenutzt, fünf Leuchtfarben. Amok-Automaten bleiben rot.
+- **Engel:** vier Goldtöne der Rüstung, verschiedene Mäntel und Lichtfarben.
+- **Bewohner:** Wer 55 oder älter ist, hat graues Haar. Dazu je nach Person Hut, Kappe, Tuch oder Krempe, farbige Halstücher und geflickte Kleidung.
+- **Wachen Valens:** Die Farbe des Wappens auf dem Wappenrock hängt an der Heimatstadt — man erkennt, woher eine Wache kommt.
+- Alles hängt am Seed der Figur: dieselbe Person sieht immer gleich aus. Probe „Vielfalt 2 (Nutzer §5f)“.

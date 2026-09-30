@@ -319,6 +319,28 @@ const ARMOR_LOOK = {
 // Nutzer (Dauerauftrag, PLAN_ROADMAP §5b): mehr Vielfalt bei Goblins und Untoten. Varianten kommen aus dem Seed der Figur,
 // damit jede nach dem Laden gleich aussieht. Nur Felder aus SPEC_KEYS (Frame-Cache); je Art wenige Stufen, damit der Cache klein bleibt.
 const pickH = (arr, h, k) => arr[Math.abs((h >> (k * 3)) | 0) % arr.length];
+// Nutzer §5f: Varianten für alle. Automaten: Metall (Messing, Stahl, Kupfer, geschwärzt), Verschleiß, Leuchtfarbe. Engel: Goldtöne,
+// Mantel, Lichtfarbe. Bewohner: graues Haar im Alter, Hut/Kappe/Tuch, geflickte Kleidung. Wachen: Wappenfarbe je Stadt.
+function varyMachine(s, seed) {
+  const h = (seed * 1231) | 0, M = pickH([['#7a6038', '#8a7a58', '#8a7040'], ['#6a6a70', '#7a7a82', '#5a5a62'], ['#8a5436', '#9a6a44', '#7a4a2e'], ['#2e2c2a', '#3a3834', '#4a4238']], h, 0);
+  Object.assign(s, { armorCol: M[0], helmCol: M[1], pauld: M[2], glow: pickH(['#8a5420', '#3a9ad8', '#9ad05a', '#d8b03a', '#c85a3a'], h, 1), wear: pickH([0, 0, 1, 2], h, 2), markCol: pickH(['#c8a050', '#b9c3d2', '#8a2a2a'], h, 3) });
+}
+function varyAngel(s, seed) {
+  const h = (seed * 733) | 0;
+  Object.assign(s, { armorCol: pickH(['#d8c080', '#e0cc90', '#c8a860', '#d8d0b8'], h, 0), cloak: pickH(['#e8dcc0', '#dce4ec', '#f0e8d8', '#e0d0b0'], h, 1), tabard: pickH(['#f4ecd8', '#e8eef4', '#f8f0e0'], h, 2),
+    glow: pickH(['#ffe8a0', '#bfe0ff', '#ffd27a', '#f0f0ff'], h, 3), markCol: pickH(['#c8a040', '#8ab0d8', '#d8a860'], h, 4) });
+}
+const TOWN_MARK = ['#b9c3d2', '#d8c070', '#c8c4bc', '#9ac0d8', '#d88a5a', '#a8d0a0'];
+function varyCivil(s, e, prof) {
+  const h = (((e.seed || 0) * 409) | 0), armored = s.armor || s.robe && s.helm;
+  if ((e.age || 30) >= 55) s.hair = pickH(['#b8b4ac', '#8a8680', '#d8d4cc'], h, 0);
+  if (s.tabard && e.homeTown && e.faction === 'valen') { let t = 0; for (const ch of e.homeTown) t = (t * 31 + ch.charCodeAt(0)) | 0; s.markCol = TOWN_MARK[Math.abs(t) % TOWN_MARK.length]; }
+  if (armored || s.tabard) return;
+  const v = Math.abs(h >> 4) % 10;
+  if (!s.helm && !s.hooded && v < 2) { s.helm = pickH(['hat', 'cap', 'scarf', 'wide'], h, 2); s.helmCol = s.helmCol || pickH(['#3a2c20', '#5a4a36', '#4a3a2a', '#6a5a40'], h, 3); }
+  if (!s.scarf && v >= 2 && v < 4) s.scarf = pickH(['#7a3a2a', '#3a5a6a', '#6a6a3a', '#5a3a5a', '#8a6a2e'], h, 4);
+  if (v === 9) s.wear = Math.max(s.wear || 0, 1);
+}
 function varyGoblin(s, t, seed) {
   const h = (seed * 977) | 0;
   s.skin = pickH(['#556b34', '#4a6a3a', '#6a7a3a', '#5a5a3e', '#3e5a44', '#6b6a44'], h, 0);   // Moosgrün, Olive, Lehmgrau, Sumpfgrün
@@ -496,7 +518,8 @@ export function humanSpec(e) {
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
   const NL = NAMED_LOOK[key]; if (NL) Object.assign(s, NL);
   condition(s, e, eq);
-  if (e.robot) Object.assign(s, ROBOT_LOOK);
+  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); }   /* §5f */
+  else if (e.kind === 'npc' && !NAMED_LOOK[key] && !e.undead) varyCivil(s, e, prof);
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
   regionFarmer(s, e, prof, key);
@@ -540,6 +563,7 @@ export function monsterSpec(e, m) {
     if (t === 'goblin_warrior') { s.helm = 'cap'; s.helmCol = '#6b6156'; s.armor = 'leather'; s.armorCol = '#4a3a28'; s.shield = 'round'; s.shieldCol = '#3d2f20'; s.mark = 'boss'; s.markCol = '#6b6156'; }
   } else if (t === 'automat') {
     Object.assign(s, ROBOT_LOOK, { tabard: '', armorCol: '#5a4a34', helmCol: '#6a5a44' });   // verwildert: stumpfes Messing
+    if (!e.amok) { varyMachine(s, e.seed || 0); s.tabard = ''; s.wear = Math.max(1, s.wear); }   /* §5f: jeder Automat anders */
     if (e.amok) Object.assign(s, { glow: '#ff4020', ge: '#ff4020', armorCol: '#6a3a2a' });   // S14: Amok — rotes Glühen, versengtes Messing
   } else if (t === 'rotgardist') {                                    // S12 Rotgardist: schwarze Platte, rote Schultern, Vollhelm mit rotem Kamm
     Object.assign(s, ARMOR_LOOK.rotgardist, ARMOR_LOOK.rotgardistenhelm, { cloak: (e.seed | 0) % 3 ? '#2a0e10' : '' }); varyChain(s, e.seed || 0); s.helm = 'great';
@@ -569,6 +593,7 @@ export function monsterSpec(e, m) {
     else { s.hooded = 1; s.hood = '#aab4c0'; s.cloak = '#8a96a4'; s.cloth = '#aab4c0'; s.pants = '#aab4c0'; }
   } else if (t === 'angel_blade' || t === 'angel_archer') {            // Nutzer S13: Engel — helle Haut, goldene Platte, weißer Mantel, Lichtglanz
     s.skin = '#e8e0cc'; s.face = 'eyes'; s.glow = p.glow; s.hooded = 0; s.helm = ''; s.hs = 2; s.beard = 0; s.crest = ''; s.bd = 'bullig'; s.armor = t === 'angel_blade' ? 'plate' : 'chain'; s.armorCol = '#d8c080'; s.tabard = '#f4ecd8'; s.cloak = '#e8dcc0'; s.mark = 'chevron'; s.markCol = '#c8a040'; if (t === 'angel_archer') s.quiver = 1;
+    varyAngel(s, e.seed || 0);   /* §5f */
   } else if (t === 'omega') {                                          // Phase 7 Omega: goldene Platte, Blutmantel, Sternenkamm, leuchtend
     s.skin = p.skin; s.face = 'skin'; s.glow = p.glow; s.hooded = 0; s.helm = 'great'; s.helmCol = '#c8a040'; s.crest = '#ffd27a'; s.armor = 'plate'; s.armorCol = '#8a6a3a'; s.pauld = '#5a1010'; s.tabard = '#5a1010'; s.cloak = '#3a0808'; s.mark = 'chevron'; s.markCol = '#ffd27a';
   } else if (t === 'necromancer') {                                     // Phase 6 Nekromant: Knochengesicht unter schwarzer Kapuze, grünes Glimmen
