@@ -845,7 +845,7 @@ function spawnResidents() {
 // FEST_DAYS Tage (eigener Versatz), 15–23 Uhr auf dem Hauptplatz. Aufbau aus vorhandenen Props (Feuer, Tafeln, Bänke,
 // Fässer, Stand, Fackeln) — `transient`: wird nie gespeichert, nach dem Fest wieder abgebaut. Am Vortag angekündigt.
 // Bewohner stehen im Kreis ums Feuer und reden übers Fest; an der Festtafel gibt es einmal je Fest ein Festmahl.
-const FEST_DAYS = 6, FEST_BUILT = new Set();
+const FEST_DAYS = 6, FEST_BUILT = new Set(), FEST_POP = {};   // BUG (Nutzer: „in Aurelion versammeln sich locker 1000 Leute auf einem Fleck“): Ringzahl je Einwohnerzahl, sonst quetscht sich eine Metropole auf denselben schmalen Kreis wie ein Dorf
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
 const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
 const festNow = town => !!town && festDay(town) && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
@@ -858,7 +858,8 @@ function festTick() {
   for (const town of Object.keys(TOWN_PLAN)) {
     const on = festNow(town);
     if (on && !FEST_BUILT.has(town)) {
-      FEST_BUILT.add(town); const c = festSpot(town), cx = c.x / TS | 0, cy = c.y / TS | 0;
+      FEST_BUILT.add(town); FEST_POP[town] = VILLAGERS.filter(v => v.homeTown === town).length || 1;   // einmal je Fest: wie viele Ringe braucht diese Stadt
+      const c = festSpot(town), cx = c.x / TS | 0, cy = c.y / TS | 0;
       const ground = new Set([T.STONE, T.DIRT, T.GRASS, T.SAND]), taken = new Set();   // nicht auf Straße (Karawane, Wachen!), Acker, Wasser, Möbel
       const [sx, sy] = TOWN_PLAN[town].square; taken.add(sx + ',' + sy);                 // Platzmitte und Türvorplätze (±1) bleiben frei
       for (const b of HOUSES) if (b.town === town) { const [dx, dy] = b.doorTile, ox = dx - (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0), oy = dy + (b.door === 'S' ? 1 : b.door === 'N' ? -1 : 0);
@@ -1134,7 +1135,8 @@ function dayTargetRaw(e) {
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
   if (S.war?.nodes[e.homeTown]?.owner === 'undead') return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus
   if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
-  if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996, r = 80 + (P.n % 6) * 22;   // Fest: im Kreis ums Feuer
+  if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
+    const rings = Math.max(6, Math.ceil((FEST_POP[e.homeTown] || 24) / 14)), r = 80 + (P.n % rings) * 22;   // BUG (Nutzer: Aurelion-Klumpen): Ringe wachsen mit der Einwohnerzahl, sonst quetscht sich eine Metropole auf 6 Ringe wie ein Dorf
     return { x: c.x + Math.cos(a) * r, y: c.y - 2 * TS + Math.sin(a) * r * 0.7, k: 'f', social: 1 }; }   // Mitte = Feuer (2 Kacheln nördlich des Platzes)
   if (P.hunt && h >= 7 && h < 13.5) return { x: P.hunt.x, y: P.hunt.y, k: 'j', work: 1 };            // Jäger: draußen im Jagdgebiet
   if (P.hunt && h >= 13.5 && h < 15) return { x: P.plaza.x, y: P.plaza.y, k: 'jd', deliver: 1 };     // … und mit Beute zum Markt
@@ -2646,6 +2648,7 @@ function tickCombatant(c, dt) {
       && (c.guard || S.ents[c.map].some(o => o !== c && o.kind === 'npc' && o.alive && !o.downed && dist(o, c) < 300))) {   // BUG-113: nach dem Kampf verbindet man sich gegenseitig
       c.status = c.status.filter(s => s.key !== 'bleeding'); float(c, 'wird verbunden', 'rgba(160,224,160,ALPHA)'); }
     if (c.downTimer <= 0) {
+      if (coopHold(c)) { c.downTimer = 1500; return; }   /* Koop (Nutzer): gestorben wird erst, wenn alle Spieler am Boden sind */
       const T = c.body?.torso, bleeding = (c.status || []).some(s => s.key === 'bleeding');   // S13 (Nutzer, Kenshi): Zähigkeit — nicht kritisch = kommt zu sich
       // S15 (Nutzer): NPCs kommen nicht mehr von selbst zu sich. Nicht kritisch und nicht blutend: sie bleiben bewusstlos liegen, bis jemand
       // sie heilt oder aufrichtet (Held mit E, Gefährten, ein Bewohner in der Nähe, wenn kein Feind mehr da ist). Nur der Held selbst kommt zu sich.
@@ -2655,7 +2658,9 @@ function tickCombatant(c, dt) {
         return; }
       if (c.kind !== 'enemy' && c.kind !== 'npc' && T && T.hp > -T.max * 0.5 && !bleeding) { c.downed = false; koLift(c);   /* S15 Fehlersuche: genau bis zur Schwelle */
         act(c, 'rise', 700); float(c, 'kommt zu sich', 'rgba(220,210,180,ALPHA)'); log(`${c.name} kommt wieder zu sich.`, 'party'); if (c.skills) c.skills.toughness = Math.min(100, (c.skills.toughness || 0) + 1); return; }
-      if (c === S.player && captureInstead(c)) return; die(c, c.lastCause || 'Wunden', c.lastKiller); }   // S12 E: Kette schleppt in den Steinbruch
+      if (c === S.player && captureInstead(c)) return;
+      if (c === S.player) for (const m of partyMembers()) if (m.coopPilot && m.downed) die(m, m.lastCause || 'Wunden', m.lastKiller);   /* Koop: alle am Boden — die Mitspieler fallen mit dem Helden */
+      die(c, c.lastCause || 'Wunden', c.lastKiller); }   // S12 E: Kette schleppt in den Steinbruch
     // Aufrichten dauert jetzt (Nutzer): Begleiter knien (partyCare), der Held mit E (startRevive) und heilen dabei Stück für Stück bis 25 % Rumpf (reviveTick)
   }
 }
@@ -4615,7 +4620,7 @@ function mendAt(t, skipMech = false) {
 // Händler (Handel mit dem Beutel des Gasts), Eingänge (Reisebitte an den Host), andere Figuren (Gruß; Gespräche führt der Host).
 function doInteractFor(m) {
   const rank = e => e.kind === 'item' ? 0 : e.shop ? 1 : e.portal ? 2 : 3;
-  const near = (S.ents[m.map] || []).filter(e => e !== m && Math.hypot(e.x - m.x, e.y - m.y) < 62 && (e.kind === 'item' || (e.kind === 'npc' && e.alive && !e.downed) || (e.kind === 'prop' && e.portal)))
+  const near = (S.ents[m.map] || []).filter(e => e !== m && Math.hypot(e.x - m.x, e.y - m.y) < 62 && (e.kind === 'item' || (e.kind === 'npc' && e.alive && !e.downed) || (e.kind === 'prop' && (e.portal || e.type === 'board'))))
     .sort((a, b) => rank(a) - rank(b) || Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y));   /* erst Gegenstände, dann Händler, Eingänge, andere Figuren */
   const t = near[0]; if (!t) return null;
   if (t.kind === 'item') {
@@ -10472,6 +10477,7 @@ function playerDeath(cause, source) {
   chronicle(`${p.name} fiel bei ${loc}`, 'death', `${cause}. Was er baute, steht noch.`);
   S.paused = true;
   UI.showDeath(rec, () => { UI.hideDeath(); chooseSuccessor(); });
+  coopHooks.hostDied?.(makeSuccessorCandidates().length, p.level);   /* Koop: Mitspieler bekommen gleich viele Erben zur Wahl */
   save();
 }
 
@@ -10548,6 +10554,7 @@ function adoptSuccessor(c) {
     `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : old.map === 'deep' ? 'der Tiefhall' : 'der Erde von Greenmark'}.`);
   log(`${c.name} führt Haus ${S.legacy.house} weiter. Generation ${S.legacy.gen}.`, 'death');
   S.paused = false;
+  coopHooks.afterHeir?.();   /* Koop: Erben der Mitspieler kommen jetzt dazu */
   UI.toast(`GENERATION ${S.legacy.gen} — ${c.name}`, 5000);
   UI.refreshHUD();
   save();
@@ -13836,6 +13843,13 @@ function buildCreation() {
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); const b = creation.back; creation.hook = creation.back = null; b?.(); };
 }
+// Koop (Nutzer): Ein Spieler am Boden stirbt nicht, solange ein anderer Spieler (Held oder Mitspieler) noch steht — der kann ihn
+// aufrichten. Erst wenn alle Spieler am Boden sind, läuft der Tod wie immer (Held: Erbe wählen; Mitspieler: im Warteraum neu).
+function coopHold(c) {
+  const players = [S.player, ...partyMembers().filter(m => m.coopPilot)];
+  if (players.length < 2 || !players.includes(c)) return false;
+  return players.some(o => o !== c && o.alive && !o.downed && o.map === c.map);
+}
 // Koop: Charaktererstellung für einen Gast öffnen. done(cfg) bekommt Name, Herkunft, Aussehen, Körperbau; back() beim Zurück.
 const creation = { hook: null, back: null };
 const GUEST_BAR = ['bandage', 'potion', 'herb', 'bread', 'dried_meat'];   /* Koop: Leiste der Gastfigur (nur Verbrauchsgüter; Fähigkeiten löst nur der Held aus) */
@@ -13844,7 +13858,7 @@ function openCreation(done, back, name) { creation.hook = done; creation.back = 
 // aber als Gruppenmitglied. Er fängt zwei Stufen unter dem Helden an, damit er mithalten kann. coopOwner = Name des Gasts.
 function makeGuestHero(cfg, owner) {
   const o = ORIGINS[cfg.origin] || ORIGINS.wanderer, p0 = S.player, q = freeSpotNear(p0.map, p0.x / TS | 0, p0.y / TS | 0, 3) || { x: p0.x + 30, y: p0.y };
-  const h = makeChar({ kind: 'npc', key: 'coop_' + owner, name: String(cfg.name || owner).slice(0, 18), x: q.x, y: q.y, map: p0.map, level: Math.max(1, (p0.level || 1) - 2),
+  const h = makeChar({ kind: 'npc', key: 'coop_' + owner, name: String(cfg.name || owner).slice(0, 18), x: q.x, y: q.y, map: p0.map, level: cfg.level || Math.max(1, (p0.level || 1) - 2),
     attrs: baseAttrs(), skills: { ...o.skills }, traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])], origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   h.attributes = Object.fromEntries(Object.entries(h.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
   Object.assign(h, { prof: o.name, coopHero: true, coopOwner: owner, coopGold: o.gold, morale: 100, hotbar: GUEST_BAR.map(key => ({ type: 'item', key })), transient: false, visitor: false });
@@ -13870,7 +13884,7 @@ function titleLoop(t) {
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, updatePrompt, recalc, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
+    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();
