@@ -3501,6 +3501,7 @@ function die(c, cause = 'Wunden', source) {
     sfx(bony ? 'bone' : 'death', 0.5, earVol(c));
   }
   if (c.livestock && !c.herdCounted) { const H = c.livestock === 'player' ? S.settlement?.herd : ECO.herdOf(c.livestock); if (H?.[c.mtype] > 0) H[c.mtype]--; }   // S14: jedes tote Tier fehlt der Herde
+  if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
     if (dist(S.player, c) < 500) log(`${m.name} fällt.`, 'combat');
@@ -6950,7 +6951,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -10161,7 +10162,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay();   /* Nutzer §5e.7 */
+  woundDay(); bandDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10315,6 +10316,68 @@ function activeEffects() {
 // AUDIT H-03: Heilerinnen behandeln gegen Gold — Held und Gruppe in der Nähe, Blutung und Gift inklusive. Dauert (Nutzer): die Heilerin
 // kniet HEALER_MS lang bei dir; wer sich bewegt oder angreift, bricht ab (kein Gold weg).
 const HEALER_MS = 3500;
+// ================= Banden (Nutzer §5d.7) =================
+// Zufällige Banden entstehen im Umland der Städte (höchstens drei zugleich), schlagen ein Lager auf und beanspruchen ein Gebiet
+// (40 Felder). Wer ihr Gebiet durchquert, ohne Schutzgeld zu zahlen, gerät in Hinterhalte. Ihr Unterhändler steht vor dem Lager:
+// Schutzgeld (20 Gold + 8 je Mann) gibt 5 Tage Ruhe. Jeden Tag ohne Schutzgeld raubt die Bande Reisende aus und wächst (bis 9 Mann).
+// Fällt der Anführer, zerfällt die Bande und die nächste Stadt zahlt Kopfgeld; alte Banden zerstreiten sich irgendwann von selbst.
+const BAND_NAMES = ['Die Krähen', 'Die Rote Hand', 'Die Grauen Wölfe', 'Die Schlitzer', 'Die Galgenbrüder', 'Die Aschemäntel', 'Die Nachtfalken', 'Die Schwarzen Stiefel'];
+const bandsOf = () => (S.bands ||= []).filter(b => !b.gone);
+function bandFound(town, at = null) {
+  const T = TOWN_PLAN[town]; if (!T?.square) return null; const [sx, sy] = T.square, a = rnd() * 6.283, r = ri(30, 50);
+  const q = at ? freeSpotNear('world', at[0], at[1], 3) : freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3); if (!q) return null;
+  const used = new Set(bandsOf().map(b => b.name)), tx = q.x / TS | 0, ty = q.y / TS | 0;
+  const B0 = { id: uid(), name: pick(BAND_NAMES.filter(n => !used.has(n))) || 'Die Namenlosen', lead: `${pick(FIRST_M)} ${pick(['Krähenfuß', 'der Graue', 'Blutzahn', 'Schiefmaul', 'Einhand', 'der Fuchs'])}`,
+    town, tx, ty, born: S.day | 0, men: ri(4, 6), paid: -1, amb: -999, where: locAt(tx, ty)?.name || `dem Umland von ${townName(town)}` };
+  (S.bands ||= []).push(B0); log(`Gerücht: ${B0.name} unter ${B0.lead} haben bei ${B0.where} ein Lager aufgeschlagen und fordern Schutzgeld von allen, die vorbeiziehen.`, 'world'); return B0;
+}
+function bandGone(b, msg) { b.gone = true; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive)); if (msg) log(msg, 'world'); }
+function bandDay() {
+  const act = bandsOf(), day = S.day | 0;
+  for (const b of act) {
+    if (day - b.born > 12 && chance(0.25)) { bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
+    if (b.paid < day && chance(0.5)) { b.men = Math.min(9, b.men + 1); log(`${b.name} haben bei ${b.where} Reisende ausgeraubt. Die Bande wächst (${b.men} Mann).`, 'world'); }
+  }
+  if (act.length < 3 && chance(0.2)) { const ts = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && S.war?.nodes?.[k]?.owner !== 'undead'); if (ts.length) bandFound(pick(ts)); }
+}
+function bandSpawn(b) {
+  const x = b.tx * TS + 16, y = b.ty * TS + 16, day = S.day | 0;
+  S.ents.world.push({ id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x, y, r: 10, solid: true, transient: true, bandId: b.id });
+  const q = freeSpotNear('world', b.tx - 11, b.ty, 2), n = makeChar({ name: pick(FIRST_M), prof: `Unterhändler (${b.name})`, x: q.x, y: q.y, level: 5, faction: null, traits: ['gierig'] });
+  Object.assign(n, { bandId: b.id, bandTalk: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: `„Halt. Das ist Gebiet von ${b.name}. Wer hier durch will, zahlt.“` }); n.equip.weapon = mkItem('rusty_sword'); S.ents.world.push(n);
+  if (b.paid >= day) return;                                  /* bezahlt: die Kämpfer bleiben in den Zelten */
+  for (let i = 0; i < b.men; i++) { const lead = i === 0 && !b.leadDead, e = spawnEnemy(lead ? 'bandit' : pick(['bandit', 'bandit', 'bandit_archer', 'bandit_spear']), 'world', b.tx + ri(-4, 4), b.ty + ri(-4, 4));
+    Object.assign(e, { bandId: b.id, transient: true, anchor: { x, y } });
+    if (lead) { Object.assign(e, { bandLead: true, elite: true, name: b.lead, title: b.lead }); e.maxHp = e.hp = Math.round(e.maxHp * 1.8); if (e.body) B.initBody(e, e.maxHp); } }
+}
+function bandTick() {
+  const p = S.player; if (!p?.alive || S.map !== 'world') return; const day = S.day | 0;
+  for (const b of bandsOf()) {
+    const d = Math.hypot(p.x / TS - b.tx, p.y / TS - b.ty), here = S.ents.world.some(e => e.bandId === b.id && e.kind !== 'corpse' && e.alive !== false);
+    if (d < 45 && !here) bandSpawn(b);
+    else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive));
+    if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && chance(0.01)) {   /* Hinterhalt im Gebiet */
+      b.amb = S.minute; const a = rnd() * 6.283;
+      for (let i = 0; i < Math.min(3, b.men); i++) { const e = spawnEnemy(pick(['bandit', 'bandit_archer']), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
+        Object.assign(e, { bandId: b.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: b.tx * TS, y: b.ty * TS } }); }
+      log(`Hinterhalt! Männer von ${b.name} — du bist in ihrem Gebiet und hast nicht gezahlt.`, 'combat'); UI.toast('HINTERHALT', 1800);
+    }
+  }
+}
+function bandKill(c) {
+  const b = (S.bands || []).find(x => x.id === c.bandId); if (!b || b.gone) return; b.men = Math.max(0, b.men - 1);
+  if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10; S.gold += g; addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
+    bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600); }
+}
+function bandChoices(npc, choices) {
+  if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = 20 + b.men * 8, day = S.day | 0;
+  if (b.paid >= day) return choices.unshift({ text: 'Gilt unsere Abmachung noch?', fn: () => UI.dialogue(npc, `„Bis Tag ${b.paid + 1}. Dann reden wir wieder.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  choices.unshift({ text: `Schutzgeld zahlen (${cost} Gold, 5 Tage Ruhe)`, fn: () => {
+    if (S.gold < cost) return UI.dialogue(npc, '„Das reicht nicht. Komm wieder, wenn deine Taschen schwerer sind — oder lauf schnell.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= cost; b.paid = day + 5; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || e.kind !== 'enemy' || !e.alive);
+    UI.closeDialogue(); log(`Du zahlst ${b.name} ${cost} Gold. Fünf Tage lang lassen sie dich in Ruhe.`, 'economy'); } },
+    { text: `Sag ${b.lead}, dass ich komme.`, fn: () => { UI.closeDialogue(); log(`Der Unterhändler grinst. „Er wartet am Feuer.“ ${b.name}: ${b.men} Mann.`, 'combat'); } });
+}
 // ================= Verletzungen über Tage (Nutzer §5e.7) =================
 // Fällt beim Helden oder einem Gefährten ein Arm oder Bein aus, ist es oft gebrochen (60 %): das Glied heilt nur bis 40 %, bis der
 // Bruch nach 4 Tagen verheilt (geschient doppelt so schnell). Offene Wunden entzünden sich manchmal (25 %, abgetrennt 60 %):
@@ -10465,7 +10528,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -10651,19 +10714,21 @@ function dice(npc, g) {
   if (S.gold < g) return UI.closeDialogue(); const cheat = (npc.traits || []).includes('hinterhältig') || chance(0.12), a = d6() + d6(), b = cheat ? Math.max(d6() + d6(), 9) : d6() + d6();
   const spot = cheat && chance(0.25 + (S.player.attributes?.perception || 10) * 0.025);
   const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') S.gold += g; else if (res === 'lose') S.gold -= g;
+  log(`Würfeln gegen ${npc.name}: ${a} zu ${b}. ${res === 'win' ? `+${g} Gold.` : res === 'lose' ? `−${g} Gold.` : 'Gleichstand.'}`, 'economy');   /* Schenke: Ergebnis auch im Protokoll, falls der Dialog zu schnell weg ist */
   UI.dialogue(npc, `Du wirfst ${a}, ${npc.name} wirft ${b}. ${res === 'win' ? `Du gewinnst ${g} Gold.` : res === 'lose' ? `Du verlierst ${g} Gold.` : 'Gleichstand — nochmal.'}${spot ? '\n(Dir fällt auf: seine Würfel rollen immer auf dieselbe Seite …)' : ''}`, [
-    ...(spot && res === 'lose' ? [{ text: '„Falschspieler!“', fn: () => { S.gold += g * 2; addRel(npc.key, -15); UI.dialogue(npc, '„Schon gut, schon gut! Hier, nimm und schrei nicht so.“ (Einsatz doppelt zurück)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }] : []),
+    ...(spot && res === 'lose' ? [{ text: '„Falschspieler!“', fn: () => { S.gold += g * 2; addRel(npc.key, -15); log(`Falschspieler entlarvt: ${npc.name} zahlt den Einsatz doppelt zurück (+${g * 2} Gold).`, 'economy'); UI.dialogue(npc, '„Schon gut, schon gut! Hier, nimm und schrei nicht so.“ (Einsatz doppelt zurück)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }] : []),
     ...(S.gold >= g ? [{ text: 'Noch eine Runde', fn: () => dice(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
 }
 const drawCard = () => pick([2, 3, 4, 7, 8, 9, 10, 10, 10, 11]);
 const handSum = h => h.reduce((a, c) => a + c, 0);
 function cards(npc, g, hand) {
   const sum = handSum(hand);
-  if (sum > 21) { S.gold -= g; return UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Überkauft! Du verlierst ${g} Gold.`, [{ text: 'Genug.', fn: () => UI.closeDialogue() }]); }
+  if (sum > 21) { S.gold -= g; log(`Siebzehn und Vier gegen ${npc.name}: ${sum} — überkauft. −${g} Gold.`, 'economy'); return UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Überkauft! Du verlierst ${g} Gold.`, [{ text: 'Genug.', fn: () => UI.closeDialogue() }]); }
   UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Noch eine?`, [
     { text: 'Karte', fn: () => cards(npc, g, [...hand, drawCard()]) },
     { text: 'Ich bleibe', fn: () => { const h = [drawCard(), drawCard()]; while (handSum(h) < 16) h.push(drawCard()); const n = handSum(h), win = n > 21 || sum > n, draw = n === sum;
       if (win) S.gold += g; else if (!draw) S.gold -= g;
+      log(`Siebzehn und Vier gegen ${npc.name}: ${sum} zu ${n}${n > 21 ? ' (überkauft)' : ''}. ${win ? `+${g} Gold.` : draw ? 'Gleichstand.' : `−${g} Gold.`}`, 'economy');
       UI.dialogue(npc, `${npc.name}: ${h.join(' + ')} = ${n}${n > 21 ? ' — überkauft' : ''}. ${win ? `Du gewinnst ${g} Gold.` : draw ? 'Gleichstand.' : `Du verlierst ${g} Gold.`}`, [...(S.gold >= g ? [{ text: 'Neues Spiel', fn: () => cards(npc, g, [drawCard(), drawCard()]) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]); } }]);
 }
 function armWrestle(npc, g) {
@@ -10671,6 +10736,7 @@ function armWrestle(npc, g) {
   const me = (S.player.attributes?.strength || 10) + d6() + d6(), him = (npc.attributes?.strength || 10) + d6() + d6(), win = me >= him;
   if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); } else S.gold = Math.max(0, S.gold - g);
   S.player.stamina = Math.max(0, S.player.stamina - 20);
+  log(`Armdrücken gegen ${npc.name}: ${win ? `gewonnen (+${g} Gold)` : `verloren (−${g} Gold)`}.`, 'economy');
   UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [...(S.gold >= g ? [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
 }
 function drinkBet(npc, g, round) {
@@ -10678,9 +10744,9 @@ function drinkBet(npc, g, round) {
   const p = S.player, r = p.status?.find(s => s.key === 'rausch'), st = (r?.stacks || 0) + 1;
   addStatus(p, { key: 'rausch', name: `Rausch ${Math.min(3, st)}`, stacks: Math.min(3, st), left: 240000, desc: 'Die Welt schwankt: die Steuerung zieht zur Seite. Etwas mutiger (+5 % Schaden je Stufe).' });
   const meOut = chance(0.08 + round * 0.12 - (p.attributes?.endurance || 10) * 0.006), himOut = chance(0.1 + round * 0.12);
-  if (meOut && !himOut) { S.gold = Math.max(0, S.gold - g); return UI.dialogue(npc, `Beim ${round + 1}. Krug wird dir schwarz vor Augen. ${npc.name} lacht. (−${g} Gold)`, [{ text: '[Wankend gehen]', fn: () => UI.closeDialogue() }]); }
-  if (himOut && !meOut) { S.gold += g; addFame(1, undefined, 'Trinkwette'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
-  UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); UI.closeDialogue(); } }]);
+  if (meOut && !himOut) { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: verloren (−${g} Gold).`, 'economy'); return UI.dialogue(npc, `Beim ${round + 1}. Krug wird dir schwarz vor Augen. ${npc.name} lacht. (−${g} Gold)`, [{ text: '[Wankend gehen]', fn: () => UI.closeDialogue() }]); }
+  if (himOut && !meOut) { S.gold += g; addFame(1, undefined, 'Trinkwette'); log(`Trinkwette gegen ${npc.name}: gewonnen (+${g} Gold).`, 'economy'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
+  UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: aufgegeben (−${g} Gold).`, 'economy'); UI.closeDialogue(); } }]);
 }
 function fistStart(npc, g) {
   if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold */
@@ -12754,6 +12820,8 @@ function debugSections() {
       'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
       ...Object.fromEntries(Object.entries(B.MECH_MOD).map(([m, M]) => [`Modul: ${M.name}`, () => { const k = ['l', 'r'].map(s => s + M.part).find(q => p.body[q].mech) || 'l' + M.part; if (!p.body[k].mech) B.attachProsthesis(p, k, 2); p.body[k].mod = m; recalc(p); UI.toast(`${M.name} an ${k}`); }])),   /* Roadmap P3: legt bei Bedarf eine Stufe-2-Prothese an */
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
+      'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
+      'Banden: einen Tag vergehen lassen': () => bandDay(),
       'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
       'Verletzung: einen Tag vergehen lassen': () => woundDay(),
       'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
@@ -15352,6 +15420,17 @@ export function selftest() {
       n.garrison = 40; keepSiegeDay(); const shrink = n.garrison === 36;
       return court.length >= 4 && refused && camp && shrink;
     } finally { n.owner = o0; n.garrison = g0; S.flags.garmadonSlain = f0; S.flags.keepSiege = s0; S.ents.world = S.ents.world.filter(e => !e.keepSiege); }
+  }));
+  ok('Banden (Nutzer §5d.7): Bande entsteht mit Lager und Unterhändler, Schutzgeld schickt die Kämpfer weg, Anführer tot = Bande zerfällt mit Kopfgeld', sandbox(() => {
+    const p = stage(), b0 = S.bands, m0 = S.map, px = p.x, py = p.y, pm = p.map; S.bands = []; S.gold = 500;
+    try { S.map = 'world'; p.map = 'world'; const T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square), [sx, sy] = TOWN_PLAN[T0].square;
+      const b = bandFound(T0, [sx + 40, sy]); if (!b) return false; p.x = b.tx * TS; p.y = (b.ty + 20) * TS; bandTick();
+      const mine = () => S.ents.world.filter(e => e.bandId === b.id); const camp = mine().some(e => e.bandTalk) && mine().filter(e => e.kind === 'enemy').length === b.men;
+      const n = mine().find(e => e.bandTalk), ch = []; bandChoices(n, ch); const g0 = S.gold; ch[0].fn(); const paid = S.gold < g0 && !mine().some(e => e.kind === 'enemy' && e.alive);
+      b.paid = -1; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id); bandTick(); const L = mine().find(e => e.bandLead); const g1 = S.gold; L.hp = 0; bandKill(L);
+      const broken = b.gone && S.gold > g1 && !mine().some(e => e.bandTalk);
+      return camp && paid && !!L && broken;
+    } finally { S.ents.world = S.ents.world.filter(e => !e.bandId); S.bands = b0; S.map = m0; p.x = px; p.y = py; p.map = pm; }
   }));
   ok('Verletzungen (Nutzer §5e.7): gebrochenes Glied heilt nur bis 40 %, Heilerin schient (doppelt schnell), verheilt nach Tagen mit Narbe (+1 Rüstung), Entzündung zehrt und wird gereinigt', sandbox(() => {
     const p = stage(); S.gold = 100; const P = p.body.larm; P.hp = 0; P.broken = 4; P.splint = false; B.fullHeal(p); const capped = P.hp === Math.round(P.max * 0.4);

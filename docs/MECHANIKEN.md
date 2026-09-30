@@ -488,3 +488,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Bei jedem Start zeigt das Titelbild zufällig einen Ort: die zerfallene Grenzfeste, Aurelion (Türme, Kuppel, Luftschiff), einen Goblinhort (Riesenpilze, Lehmhütten, Schrott, Sporen), die Eisenfeste (Schlote mit Rauch, Ketten, glühendes Tor), Karak-Atar (Kuppeln, Minarett, Palmen, Karawane, funkelnde Sterne) oder die Schwarze Feste (Spitztürme, tote Bäume, Gräber, Nebel, grünes Feuer). Unten rechts steht der Name des Ortes.
 - Alle 24 Sekunden blendet das Bild weich zu einem anderen Ort über. Jeder Ort hat Mond (Eisenfeste: Blutsonne), einen passenden Begleiter am Feuer (Paladin, Automat, Goblinkrieger, Kettenmeister, Wüstenwanderer, Skelett) und eigenes Wetter: Laub und Raben, Suchscheinwerfer und Warnlichter, Sporen, Asche und Rauch, Sandwehen und Karawane, Nebel, Irrlichter und Raben. Dazu Sternschnuppen und Lichtschein an den Fenstern.
 - Konsole (mit ?dev): `RF.R.setTitleTheme('goblin')` usw. wechselt den Ort sofort.
+
+## Runde: Banden (Nutzer §5d.7, Version 21)
+- **Entstehen:** Jeden Tag kann (20 %) eine neue Bande im Umland einer Stadt auftauchen, höchstens drei zugleich. Das Log meldet es als Gerücht mit Ort und Anführer.
+- **Lager und Gebiet:** Am Lager brennt ein Feuer, die Bande (4–9 Mann, Anführer mit mehr Leben) wartet dort. Etwa 11 Felder davor steht ihr Unterhändler. Wer das Gebiet (40 Felder) ohne Schutzgeld durchquert, gerät ab und zu in einen Hinterhalt (höchstens alle drei Stunden).
+- **Schutzgeld:** Beim Unterhändler: 20 Gold + 8 je Mann, dann 5 Tage Ruhe (keine Kämpfer im Lager, keine Hinterhalte).
+- **Wachsen und Zerfallen:** Jeden Tag ohne Schutzgeld raubt die Bande Reisende aus und wächst (50 %, bis 9 Mann). Nach 12 Tagen zerstreitet sie sich zu 25 % am Tag von selbst. Gefallene Mitglieder fehlen der Bande dauerhaft.
+- **Zerschlagen:** Fällt der Anführer, zerfällt die Bande. Die nächste Stadt zahlt Kopfgeld (60 + 10 je übrigem Mann), Ruhm +2, Ruf bei der Stadt +3.
+- **Debug:** „Bande hier gründen (neben dir)“, „Banden: einen Tag vergehen lassen“. Probe „Banden (Nutzer §5d.7)“.
