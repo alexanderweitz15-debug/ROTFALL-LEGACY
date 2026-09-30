@@ -226,6 +226,8 @@ const CIVIC = {
   'Bäcker': { apron: 1, apronCol: '#b8ae98', helm: 'cap', helmCol: '#a8a090', hem: 35 },
   Witwe: { robe: '#1c191c', helm: 'scarf', helmCol: '#141216' },
   /* Nutzer §5d.6: Zwerge der Tiefhall — Bärte, dunkle Stoffe, Leder und Königseisen */
+  'König': { beard: 1, cape: '#5a1a1a', tabard: '#1a1a1a', mark: 'quarter', markCol: '#8a2a2a', helm: 'crown', helmCol: '#c8a050', hem: 44 }, Kanzler: { robe: '#2a2a3a', cape: '#1a1a24', beard: 1, hem: 44 },   /* Nutzer §5d.4: Hof König Varons */
+  Marschall: { cape: '#3a1a1a', beard: 1, hem: 40 }, Spitzelmeisterin: { hooded: 1, cape: '#1a1a1a', hem: 44 }, Kerkermeister: { apron: 1, apronCol: '#2a2420', glove: '#2a2016', hem: 35 },
   'Zwergenkönig': { beard: 1, cape: '#2a3a6a', tabard: '#1a2440', helm: 'crown', helmCol: '#c8a050', hem: 44 }, 'Runenschmiedin': { apron: 1, apronCol: '#3a2a1c', glove: '#2a2016', hem: 35 },
   'Zwergenhändler': { beard: 1, scarf: '#6a3a2a', hem: 44 }, Braumeister: { beard: 1, apron: 1, apronCol: '#8a7a5a', hem: 35 }, 'Zwergenwache': { beard: 1, helm: 'nasal', helmCol: '#5a5a62', tabard: '#2a3a6a', hem: 40 },
   Bergmann: { beard: 1, helm: 'cap', helmCol: '#6a5a3a', hem: 35 }, Steinmetz: { beard: 1, apron: 1, apronCol: '#7a7468', hem: 35 },

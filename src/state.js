@@ -29,6 +29,8 @@ export const ACHIEVE = [
   ['dodon', '🪓', 'Dodon ist tot', d => d.flags?.dodonDead],
   ['empress', '👑', 'Die Ewige Kaiserin ist tot', d => d.flags?.skyDead?.kaiserin],
   ['citizen', '⚙', 'Bürger von Aurelion', d => d.flags?.aurelCitizen],
+  ['varonKnight', '⚔', 'Ritter König Varons', d => d.flags?.varonKnight],   /* Nutzer §5d.4 */
+  ['varonDead', '☠', 'König Varon ist tot', d => d.flags?.varonDead],
 ];
 export function slotMetaFrom(d) {
   const hero = d && Object.values(d.ents || {}).flat().find(e => e && e.kind === 'player');

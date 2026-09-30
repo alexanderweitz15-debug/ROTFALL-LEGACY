@@ -1836,7 +1836,7 @@ export function newGame(cfg) {
   const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], varonburg: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0, frei: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
@@ -1860,7 +1860,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -1963,7 +1963,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
   SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
-  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [], varonburg: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
   for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);
   if (!gone?.sky && !S.ents.sky.some(e => e.kind === 'prop')) S.ents.sky.push(...FRESH.sky);
@@ -2044,8 +2044,9 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
+  if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
   ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
@@ -3505,6 +3506,7 @@ function die(c, cause = 'Wunden', source) {
   }
   if (c.livestock && !c.herdCounted) { const H = c.livestock === 'player' ? S.settlement?.herd : ECO.herdOf(c.livestock); if (H?.[c.mtype] > 0) H[c.mtype]--; }   // S14: jedes tote Tier fehlt der Herde
   if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
+  if (c.varonKing && !S.flags.varonDead) { S.flags.varonDead = S.day | 0; S.factions.valen = -100; chronicle('König Varon ist tot', 'legend', 'Der Thron im Norden ist leer. Kanzler Aldhelm regiert — bis ihn jemand daran hindert.'); UI.toast('KÖNIG VARON IST TOT', 3600); }   /* §5d.4 */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
     if (dist(S.player, c) < 500) log(`${m.name} fällt.`, 'combat');
@@ -4948,7 +4950,7 @@ function doInteract(target = null) {
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
 // Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
-const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from === 'zwerge' && S.ents.deep.find(e => e.portal === 'zwerge'); return g ? freeSpotNear('deep', g.x / TS | 0, (g.y / TS | 0) + 2, 1) : MAPS.deep.entry; }, zwerge: () => buildDwarfCity(), garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from === 'zwerge' && S.ents.deep.find(e => e.portal === 'zwerge'); return g ? freeSpotNear('deep', g.x / TS | 0, (g.y / TS | 0) + 2, 1) : MAPS.deep.entry; }, zwerge: () => buildDwarfCity(), varonburg: () => buildVaronburg(), garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
   world: from => {
     if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
     if (from === 'deck' && S.airLand) { const [ax, ay] = S.airLand; S.airLand = null; return freeSpotNear('world', ax | 0, ay | 0, 5); }   /* Roadmap P7: Luftschiff landet am Mast (oder notlandet im Land) */
@@ -6613,6 +6615,7 @@ function rulerSlain(c, source) {
 // Neun Arten, regional: Kopfgeld, Monster, Jagd, Verteidigung, Patrouille, Eskorte, Lieferung, Vermisste, Vorräte.
 // Ziele stehen wirklich in der Welt (flüchtig, werden nachgesetzt), Fortschritt zählt, Abgabe beim Geber, Lohn: Gold, XP, Ruf.
 const CON = {
+  royal:   { name: 'Königlich', text: () => 'Den Auftrag des Königs erfüllen', mil: 0 },   /* Nutzer §5d.4 */
   comp:    { name: 'Persönlich', text: () => 'Einem Gefährten beistehen', mil: 0 },   /* Nutzer §5e.1 */
   rumor:   { name: 'Gerücht', text: () => 'Dem Gerücht nachgehen (der Kartenpunkt ist nur ungefähr)', mil: 0 },   /* Nutzer §5e.4 */
   bounty:  { name: 'Kopfgeld', text: n => `Den Anführer und ${n - 1} seiner Leute töten`, mil: 1 },
@@ -6632,7 +6635,7 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   Heilerin: 'herbs', Kräuterfrau: 'herbs', Fischer: 'missing', Graf: 'trail', 'Gräfin': 'deliver', Edelmann: 'bounty', Edelfrau: 'deliver', Hofbeamter: 'trail', Richterin: 'trail',
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 const townFac = town => TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
-const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
+const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
   return r === 'deadland' ? ['skeleton', 'ghoul', 'skeleton'] : r === 'desert' ? ['bandit', 'bandit_archer'] : r === 'eisen' || r === 'mountain' ? ['wolf', 'goblin_warrior', 'bandit']
@@ -6718,7 +6721,7 @@ function evHaunt() {
 }
 // S15 (Nutzer): Aufträge von Bewohnern nennen den Namen des Auftraggebers, und der Rückweg zeigt auf ihn selbst, wo er gerade ist
 // (nicht auf den Stadtplatz). Auf „Sehr schwer“ steht kein Name und es gibt keinen Wegpunkt: man muss sich merken, wer es war.
-const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev' && C.giver !== 'comp';   /* Fehlersuche §5e.1: 'comp' ist kein NPC-Schlüssel — sonst gilt der Gefährte selbst als toter Auftraggeber und der Auftrag scheitert sofort */
+const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev' && C.giver !== 'comp' && C.giver !== 'royal';   /* Fehlersuche §5e.1: 'comp' ist kein NPC-Schlüssel — sonst gilt der Gefährte selbst als toter Auftraggeber und der Auftrag scheitert sofort */
 const conHard = C => resGiver(C) && S.difficulty === 'sehr_schwer';
 const giverEnt = C => resGiver(C) ? S.ents.world.find(e => e.key === C.giver && e.alive !== false) : null;
 function questOf(C) { const who = C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : conHard(C) ? 'ein Bewohner — merk dir, wer' : `${C.giverName || giverEnt(C)?.name || 'ein Bewohner'}`;
@@ -6972,7 +6975,8 @@ function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contrac
   if (C && C.kind === 'bounty' && e.title === C.name) C.leaderDead = true;
   if (C && C.kind === 'trail' && e.title === C.name && C.have === 3) conProgress(C);
   if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;
-  if (C && C.kind === 'comp') C.compDead = true;   /* Gefährten-Auftrag: Ziel tot, auch fern vom Helden */   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
+  if (C && C.kind === 'comp') C.compDead = true;
+  if (C && C.kind === 'royal') C.royalDead = true;   /* §5d.4 */   /* Gefährten-Auftrag: Ziel tot, auch fern vom Helden */   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
   if (C && C.kind === 'camps' && e.campIdx != null && !(C.cleared ||= [])[e.campIdx] && !S.ents.world.some(o => o !== e && o.alive && o.contract === C.id && o.campIdx === e.campIdx)) {
     C.cleared[e.campIdx] = true; conProgress(C); log(`Lager ${C.cleared.filter(Boolean).length}/${C.need} ausgehoben.`, 'quest'); } }
 // Eskorte (Nutzer: „der NPC ist zu langsam und man weiß nicht wohin“): Der Reisende geht selbst den Straßenweg zum Ziel, etwa im
@@ -6998,7 +7002,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -8133,6 +8137,100 @@ function dwarfChoices(npc, choices) {
         removeItem(S.player, 'ingot', 3); S.flags.dwarfFriend = 1; chronicle('Freund der Tiefhall', 'legend', 'König Durgrim nimmt ein Gastgeschenk an.'); UI.toast('FREUND DER TIEFHALL', 2800);
         UI.dialogue(npc, '„Gutes Eisen. Du bist Freund der Halle. Hilda wird dir Königseisen verkaufen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } },
       { text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+}
+// ================= König Varon und die Varonsburg (Nutzer §5d.4) =================
+// Nördlich von Nordfurt steht das Tor der Varonsburg (eigene Karte, wie ein Gewölbe beim Betreten gebaut, nichts davon gespeichert
+// außer Flags). Varon ist drei Dinge zugleich: harter Kriegskönig (will die Toten zurückschlagen), schwacher König (Kanzler Aldhelm
+// lenkt, wer vorgelassen wird) und paranoid (hasst Aurelion; wer dort beliebt ist, wird nicht empfangen). Audienz über Rang bei
+// Valen (1+) oder den Kanzler (100 Gold). Auftragskette: 1) einen Hauptmann der Toten erschlagen, 2) den Verräter unter den drei
+// Adligen finden (Spitzelmeisterin Ysmay gibt den Hinweis, Gespräche verraten ihn), 3) Ritterschlag (Titel, Kronhelm, Valen +15).
+// Im Kerker sitzen Gefangene aus Aurelion — der Kerkermeister lässt einen für 80 Gold laufen (Aurelion +5, Valen −5).
+const VARON_NOBLES = [['Herzog Emmerich', 'Graf'], ['Gräfin Adelheid', 'Gräfin'], ['Baron Lothar', 'Graf']];
+function ensureVaronGate() {
+  if (S.ents.world.some(e => e.portal === 'varonburg')) return; const [x, y] = worldPt(118, 38), q = freeSpotNear('world', x, y, 8); if (!q) return;
+  S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'varonburg', transient: true, label: 'Varonsburg — Tor des Königs' });
+  for (const dx of [-3, 3]) { const b = freeSpotNear('world', (q.x / TS | 0) + dx, (q.y / TS | 0) + 1, 1); if (b) S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_torn', map: 'world', x: b.x, y: b.y, r: 6, solid: false, transient: true }); }
+}
+function buildVaronburg() {
+  const w = 72, h = 62, tiles = new Uint8Array(w * h).fill(T.GRASS); MAPS.varonburg = { w, h, tiles, ver: ((MAPS.varonburg?.ver) || 0) + 1 };
+  const fill = (x, y, rw, rh, t) => { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) tiles[j * w + i] = t; };
+  const walled = (x, y, rw, rh, floor, door) => { fill(x, y, rw, rh, T.WALL); fill(x + 1, y + 1, rw - 2, rh - 2, floor); if (door) fill(door[0], door[1], door[2] || 2, 1, floor); return { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1) }; };
+  walled(3, 3, 66, 54, T.STONE, [34, 56, 4]); fill(4, 4, 64, 2, T.WALL);                             /* Ringmauer, Tor im Süden */
+  fill(34, 56, 4, 6, T.ROAD); fill(35, 26, 2, 30, T.ROAD);
+  const keep = walled(20, 5, 32, 20, T.DFLOOR, [34, 24, 4]), west = walled(5, 6, 14, 16, T.PLANK, [11, 21, 2]), east = walled(53, 6, 14, 16, T.PLANK, [59, 21, 2]);
+  const dungeon = walled(5, 34, 14, 17, T.DFLOOR, [11, 34, 2]), smithy = walled(53, 36, 13, 12, T.DIRT, [59, 36, 2]);
+  const P = [], prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'varonburg', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, ...o }; P.push(e); return e; };
+  prop('portcullis', 36, 58, { portal: 'world', r: 14, label: 'Tor — hinaus in den Norden' });
+  prop('throne', keep.cx, keep.y + 2, { solid: true, r: 12 }); for (let i = 0; i < 6; i++) prop('banner_torn', keep.x + 3 + i * 5, keep.y + 1, {});
+  for (let i = 0; i < 4; i++) { prop('column', keep.x + 4 + i * 8, keep.cy + 2, { solid: true }); prop('torch', keep.x + 2 + i * 9, keep.y + 1, {}); }
+  prop('table', keep.cx, keep.cy + 5, { solid: true, r: 14 }); for (const R0 of [west, east]) { prop('desk', R0.cx, R0.y + 2, { solid: true }); prop('shelf', R0.x + 1, R0.cy, { solid: true }); prop('torch', R0.x + 1, R0.y + 1, {}); prop('bed', R0.x + R0.w - 3, R0.y + 3, { solid: true }); }
+  for (let i = 0; i < 3; i++) prop('cage', dungeon.x + 3 + i * 4, dungeon.y + dungeon.h - 4, { solid: true, r: 12 }); prop('torch', dungeon.x + 1, dungeon.y + 1, {}); prop('chain_post', dungeon.cx, dungeon.cy - 2, { solid: true });
+  prop('forge', smithy.cx, smithy.y + 3, { solid: true, r: 14 }); prop('anvil', smithy.cx + 2, smithy.cy + 1, { solid: true }); prop('weapon_rack', smithy.x + 1, smithy.cy, { solid: true });
+  for (let i = 0; i < 3; i++) prop('stall', 26 + i * 8, 40, { solid: true, r: 12 }); prop('well', 36, 32, { solid: true, r: 12 });
+  for (let i = 0; i < 4; i++) prop('tent_prop', 24 + i * 7, 50, { solid: true, r: 12, label: 'Zelt der Königsgarde' }); for (let i = 0; i < 6; i++) prop('banner_torn', 6 + i * 11, 6, {});
+  for (const [x, y] of [[22, 30], [48, 30], [22, 46], [48, 46]]) prop('bush', x, y, { solid: true, r: 10 });
+  S.ents.varonburg = P; MAPS.varonburg.entry = { x: 36 * TS, y: 53 * TS };
+  const put = (name, prof, tx, ty, o = {}) => { const c = makeChar({ name, prof, x: tx * TS + TS / 2, y: ty * TS + TS / 2, map: 'varonburg', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
+    pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; S.ents.varonburg.push(c); return c; };
+  if (!S.flags.varonDead) { const k = put('Varon', 'König', keep.cx, keep.y + 4, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
+  put('Aldhelm', 'Kanzler', keep.cx + 3, keep.y + 5, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
+  put('Brandt', 'Marschall', keep.cx - 4, keep.y + 6, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
+  put('Ysmay', 'Spitzelmeisterin', east.cx, east.cy, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
+  VARON_NOBLES.forEach(([n, pr], i) => put(n, pr, west.x + 3 + i * 4, west.cy + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }));
+  put('Grimm', 'Kerkermeister', dungeon.cx, dungeon.y + 3, { varonJailer: true, trait: 'gierig', greet: '„Spione aus Aurelion. Sagt der König. Ich sage: Kostgänger.“' });
+  for (let i = 0; i < 3; i++) if (!(S.flags.varonFreed || []).includes(i)) put(['Lucan', 'Serin', 'Maro'][i], 'Gefangener aus Aurelion', dungeon.x + 3 + i * 4, dungeon.y + dungeon.h - 3, { varonPrisoner: i, faction: null, trait: 'furchtsam', cloth: '#6a6258', greet: '„Ich bin Händler! Kein Spion! Sag es ihnen!“' });
+  put('Hagen', 'Schmied', smithy.cx, smithy.cy, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Kronstahl. Für die, die dem König dienen — oder zahlen.“' });
+  put('Wendel', 'Händler', 34, 39, { shop: true, market: false, pool: ['potion', 'bandage', 'bread', 'dried_meat', 'wasserschlauch', 'iron'], greet: '„Proviant für die Front. Und für den Hof, natürlich zum Hofpreis.“' });
+  for (const [x, y] of [[33, 54], [39, 54], [30, 26], [42, 26], [22, 10], [49, 10], [12, 36], [60, 22]]) { const g = guardChar('valen', { x: x * TS + 16, y: y * TS + 16 }, 'Königsgarde', ri(10, 13)); Object.assign(g, { map: 'varonburg', varonCourt: true, transient: true, visitor: true, guard: true }); S.ents.varonburg.push(g); }
+  for (let i = 0; i < 3; i++) put(pick(['Mette', 'Kuno', 'Ilse', 'Bero']), pick(['Diener', 'Magd', 'Stallknecht']), 28 + i * 7, 34 + (i % 2) * 3, { faction: null, greet: pick(['„Nicht so laut. Der König hört alles.“', '„Der Kanzler bestimmt, was der König isst. Und was er denkt.“']) });
+  indexSolids('varonburg'); return MAPS.varonburg.entry;
+}
+const varonTraitor = () => (S.flags.varonTraitor ??= ri(0, 2));
+function varonChoices(npc, choices) {
+  const p = S.player, Q = S.flags.varonQ || 0, say = (t, back) => UI.dialogue(npc, t, [{ text: back ? 'Weiter' : '[Gehen]', fn: back || (() => UI.closeDialogue()) }]);
+  if (npc.varonChancellor && !S.flags.varonAudience && !S.flags.varonDead) choices.unshift({ text: 'Ich will den König sprechen. (100 Gold für den Kanzler)', fn: () => {
+    if ((S.ranks.valen ?? -1) >= 1) { S.flags.varonAudience = 1; return say('„Ein Mann mit Rang. Nun gut — der König empfängt dich. Sprich nicht zu laut, und erwähne Aurelion nicht.“'); }
+    if (S.gold < 100) return say('„Der Zugang zum König hat seinen Preis. Hundert Gold — oder ein Rang in der Armee.“');
+    S.gold -= 100; S.flags.varonAudience = 1; say('„Großzügig. Der König empfängt dich. Und vergiss nicht, wer dir die Tür geöffnet hat.“'); } });
+  if (npc.varonKing) {
+    if (!S.flags.varonAudience && (S.ranks.valen ?? -1) < 1) return choices.unshift({ text: 'Majestät …', fn: () => say('Der König sieht durch dich hindurch. Kanzler Aldhelm tritt dazwischen: „Seine Majestät empfängt keine Bittsteller. Wende dich an mich.“') });
+    if ((S.factions.aurel || 0) >= 25) return choices.unshift({ text: 'Majestät …', fn: () => { S.factions.valen = clamp((S.factions.valen || 0) - 3, -100, 100); say('„Du riechst nach Kristall und Messing. Aurelion schickt Spione in meine Halle — und du stehst hier, als wäre nichts. Geh, bevor ich es mir anders überlege.“ (Valen −3; zu beliebt in Aurelion)'); } });
+    if (Q === 0) choices.unshift({ text: 'Ich will der Krone dienen.', fn: () => { S.flags.varonQ = 1; royalStart();
+      say('„Dienen. Alle wollen dienen, bis es blutet. Beweis es. Vor Nordfurt führt ein Hauptmann der Toten seine Knochen spazieren. Bring mir die Nachricht, dass er nicht mehr läuft.“ (Auftrag im Tagebuch)'); } });
+    if (Q === 1 && S.flags.varonQ1done) choices.unshift({ text: 'Der Hauptmann der Toten ist gefallen.', fn: () => { S.flags.varonQ = 2; S.gold += 150; gainXp(p, 200);
+      say('„Gut. Endlich einer, der tut, statt zu reden. (Er senkt die Stimme.) Einer meiner Adligen verkauft mich an Aurelion. Finde ihn. Ysmay weiß mehr, als sie sagt.“ (+150 Gold)'); } });
+    if (Q === 2) choices.unshift({ text: 'Ich weiß, wer der Verräter ist.', fn: () => UI.dialogue(npc, '„Nenn ihn. Und sei dir sicher — ich richte, wen du nennst.“', [
+      ...VARON_NOBLES.map(([n], i) => ({ text: n, fn: () => { S.flags.varonQ = 3; const ok = i === varonTraitor(); const nb = S.ents.varonburg?.find(e => e.varonNoble === i); if (nb) nb.alive = false;
+        if (ok) { S.gold += 300; S.factions.valen = clamp((S.factions.valen || 0) + 10, -100, 100); chronicle(`${n} als Verräter entlarvt`, 'news', 'Der König richtet am Morgen.'); say(`„${n}. Ich wusste es. Man findet Aurelions Siegelwachs, wo man sucht.“ (+300 Gold, Valen +10)`); }
+        else { S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); S.flags.varonWrong = 1; chronicle(`${n} hingerichtet`, 'news', 'Später heißt es, der Falsche sei gestorben.'); say(`„${n} stirbt im Morgengrauen.“ (Später flüstert der Hof: der Falsche. Valen −5)`); } } })),
+      { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]) });
+    if (Q === 3 && !S.flags.varonKnight) choices.unshift({ text: 'Was verlangt Ihr noch, Majestät?', fn: () => UI.dialogue(npc, '„Knie.“', [
+      { text: 'Niederknien (Ritterschlag)', fn: () => { S.flags.varonKnight = 1; S.factions.valen = clamp((S.factions.valen || 0) + 15, -100, 100); (p.titles ||= []).includes('Ritter Varons') || p.titles.push('Ritter Varons'); addItem(p, 'kronhelm');
+        chronicle(`${p.name} wird Ritter König Varons`, 'legend', 'Ein Schwert auf der Schulter, Kälte im Blick des Königs.'); UI.toast('RITTER KÖNIG VARONS', 3200); say('„Steh auf, Ritter. Und vergiss nie: ich sehe alles.“ (Titel „Ritter Varons“, Kronhelm, Valen +15)'); } },
+      { text: 'Ich knie vor niemandem.', fn: () => { S.factions.valen = clamp((S.factions.valen || 0) - 10, -100, 100); say('„Dann geh. Und komm nicht wieder.“ (Valen −10)'); } }]) });
+    choices.push({ text: 'Was ist mit dem Kanzler?', fn: () => say('„Aldhelm? Er … hält die Fäden, damit ich das Schwert halten kann.“ Der König blickt kurz zu ihm hinüber. Aldhelm lächelt.') });
+  }
+  if (npc.varonSpy && Q === 2) choices.unshift({ text: 'Wer verrät den König?', fn: () => say('„Aurelion bezahlt in Siegelwachs, nicht in Gold. Frag die drei Adligen nach Siegelwachs — der Verräter wird es nicht mögen.“') });
+  if (npc.varonNoble != null && Q === 2) choices.unshift({ text: '„Man findet in letzter Zeit viel Siegelwachs am Hof …“', fn: () => say(npc.varonNoble === varonTraitor()
+    ? `${npc.name} lacht eine Spur zu laut. „Siegelwachs? Wer achtet denn auf so etwas?“ — und schiebt einen Brief unter das Pult.` : `${npc.name} zuckt mit den Schultern. „Die Kanzlei siegelt den ganzen Tag. Frag Aldhelm.“`) });
+  if (npc.varonJailer) { const left = [0, 1, 2].filter(i => !(S.flags.varonFreed || []).includes(i)); if (left.length) choices.push({ text: 'Lass einen Gefangenen laufen. (80 Gold)', fn: () => {
+    if (S.gold < 80) return say('„Achtzig. Ich riskiere meinen Hals, nicht meinen Geldbeutel.“'); S.gold -= 80; (S.flags.varonFreed ||= []).push(left[0]);
+    S.ents.varonburg = (S.ents.varonburg || []).filter(e => e.varonPrisoner !== left[0]); S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100);
+    say('„Er ist heute Nacht an Typhus gestorben. Traurig. Die Leiche ist schon weg.“ (Aurelion +5, Valen −5)'); } }); }
+}
+function royalStart() {                                              /* Auftrag 1: ein Hauptmann der Toten vor Nordfurt */
+  const [x, y] = worldPt(122, 64), q = freeSpotNear('world', x, y, 6), EK = pickElite(q?.x ?? 0, q?.y ?? 0, ['skeleton', 'zombie', 'bone_knight']) || Object.keys(ELITES).find(k => ['skeleton', 'bone_knight', 'zombie'].includes(ELITES[k].base));
+  if (!q || !EK) { S.flags.varonQ1done = 1; return; } const tx = q.x / TS | 0, ty = q.y / TS | 0;
+  const C = { id: uid(), town: 'northcity', kind: 'royal', giver: 'royal', giverName: 'König Varon', have: 0, need: 1, state: 'offer', day: S.day | 0, x: tx, y: ty, tx, ty, elite: EK, reward: { gold: 0, xp: 0, rep: 0 },
+    title: `König Varon: ${ELITES[EK].name}`, desc: `Der König will ${ELITES[EK].name} tot sehen, einen Hauptmann der Toten vor Nordfurt. Danach zurück in die Varonsburg.` };
+  (S.contracts ||= []).push(C); if (acceptContract(C) === false) { S.contracts = S.contracts.filter(c => c !== C); S.flags.varonQ = 0; }
+}
+function royalTick() {
+  const p = S.player; if (!p || S.map !== 'world') return;
+  for (const C of (S.contracts || []).filter(c => c.kind === 'royal' && c.state === 'active')) {
+    if (C.royalDead) { C.state = 'claimed'; C.have = 1; const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [1]; st.outcome = 'Der Hauptmann ist gefallen.'; } S.flags.varonQ1done = 1; log('Der Hauptmann der Toten liegt. Zurück zu König Varon in die Varonsburg.', 'quest'); continue; }
+    if (Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30 && !S.ents.world.some(e => e.contract === C.id && e.alive)) { const E = ELITES[C.elite], e = spawnEnemy(E.base, 'world', C.tx, C.ty); applyElite(e, C.elite); Object.assign(e, { contract: C.id, transient: true, anchor: { x: C.tx * TS, y: C.ty * TS } }); }
+  }
 }
 function ensureGobCity() {
   const G = S.gobCity; if (!S.flags.goblinsFreed || !G?.lvl) return; const [cx, cy] = gobCenter();
@@ -10874,7 +10972,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -13351,6 +13449,8 @@ function debugSections() {
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
       'Seefahrt: eigenes Schiff geben': () => { S.ship = { name: 'Probe-Möwe', hull: 70, cargo: {}, cap: 20, at: 'saltport' }; UI.toast('Eigenes Schiff (beim Kapitän in Salzhafen/Kupferhafen)'); },   /* Nutzer §5d.9 */
+      'Varon: in die Varonsburg': () => { if (S.map !== 'world') travel('world'); travel('varonburg'); },   /* Nutzer §5d.4 */
+      'Varon: Audienz und Auftrag 1 erledigt': () => { S.flags.varonAudience = 1; S.flags.varonQ = Math.max(1, S.flags.varonQ || 0); S.flags.varonQ1done = 1; UI.toast('Zum König'); },
       'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
       'Tiefhall: Freund der Halle': () => { S.flags.dwarfFriend = 1; UI.toast('Freund der Tiefhall'); },
       'Goblins: Grubenhäuptling-Voraussetzungen (Stufe 2, Ruf 40)': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 25 - (S.gobCity?.pts || 0))); S.factions.goblin = Math.max(40, S.factions.goblin || 0); UI.toast('Bei Grisk freischalten'); },   /* §5e.9 */
@@ -14121,7 +14221,7 @@ export function selftest() {
       const foes = S.ents.world.filter(e => e.contract === C.id && e.alive), placed = foes.length === C.need && !!QUESTS['c_' + C.id] && S.quests['c_' + C.id].state === 'active';
       for (const e of foes) conKill(e); const counted = C.have === C.need;
       const g0 = S.gold; claimContract(C); const paid = S.gold > g0 && C.state === 'claimed' && S.quests['c_' + C.id].state === 'done';
-      const kinds = Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp').every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
+      const kinds = Object.keys(CON).filter(k => !['rumor', 'comp', 'royal'].includes(k)).every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
       return boards && vms && placed && counted && paid && kinds;
     } finally { for (const k of Object.keys(QUESTS)) if (QUESTS[k].dyn && !keep.q[k]) delete QUESTS[k];   // keine Test-Aufträge im echten Buch
       S.contracts = keep.c; S.conDay = keep.d; S.quests = keep.q; S.gold = keep.g; S.ents.world = keep.ents; Object.assign(S.factions, keep.f); p.x = px; p.y = py; }
@@ -16008,6 +16108,22 @@ export function selftest() {
       const g0 = S.gold, f0 = S.factions.sea || 0; ownArrive({ to: 'isle', pirated: true }); const prize = S.gold > g0 && S.factions.sea === f0 - 12 && cargoUsed() > 0 && S.ship.at === 'isle';
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
+  }));
+  ok('König Varon (Nutzer §5d.4): Tor im Norden, Burg mit König, Kanzler, Adligen, Kerker und Garde, alles erreichbar; Audienz über den Kanzler, Aurelion-Freunde abgewiesen, Verräter-Suche, Ritterschlag, Gefangener freikaufen', sandbox(() => {
+    const p = stage(), f0 = structuredClone(S.flags), v0 = S.ents.varonburg, mv = MAPS.varonburg, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen;
+    try { const W0 = S.ents.world.slice(); S.ents.world = S.ents.world.filter(e => e.portal !== 'varonburg'); ensureVaronGate(); const gate = S.ents.world.some(e => e.portal === 'varonburg'); S.ents.world = W0;
+      delete S.flags.varonDead; const at = buildVaronburg(), M = MAPS.varonburg, Z = S.ents.varonburg, king = Z.find(e => e.varonKing), chan = Z.find(e => e.varonChancellor), jail = Z.find(e => e.varonJailer);
+      const free = (x, y) => x >= 0 && y >= 0 && x < M.w && y < M.h && !SOLID.has(M.tiles[y * M.w + x]), seen = new Set(), q = [[at.x / TS | 0, at.y / TS | 0]];
+      while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || !free(x, y)) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+      const reach = Z.filter(e => e.kind === 'npc').every(e => seen.has((e.x / TS | 0) + ',' + (e.y / TS | 0)));
+      S.gold = 1000; S.ranks.valen = -1; S.factions.aurel = 0; delete S.flags.varonAudience; let ch = []; varonChoices(king, ch); const blocked = /Majestät/.test(ch[0]?.text || '') && !ch.some(c => /dienen/.test(c.text));
+      ch = []; varonChoices(chan, ch); ch[0].fn(); UI.closeDialogue(); const aud = S.flags.varonAudience === 1 && S.gold === 900;
+      S.factions.aurel = 40; ch = []; varonChoices(king, ch); const para = !ch.some(c => /dienen/.test(c.text)); S.factions.aurel = 0;
+      S.flags.varonQ = 2; S.flags.varonTraitor = 1; ch = []; varonChoices(king, ch); ch.find(c => /Verräter/.test(c.text)).fn(); [...document.querySelectorAll('#dlg-choices button')].find(b => /Adelheid/.test(b.textContent)).click(); UI.closeDialogue();
+      const right = S.flags.varonQ === 3 && S.gold === 1200; ch = []; varonChoices(king, ch); ch[0].fn(); [...document.querySelectorAll('#dlg-choices button')][0].click(); UI.closeDialogue(); const knight = S.flags.varonKnight === 1 && p.titles.includes('Ritter Varons');
+      ch = []; varonChoices(jail, ch); ch.find(c => /Gefangenen/.test(c.text)).fn(); UI.closeDialogue(); const freed = (S.flags.varonFreed || []).length === 1 && !S.ents.varonburg.some(e => e.varonPrisoner === 0);
+      return gate && !!king && !!chan && !!jail && Z.filter(e => e.kind === 'npc').length >= 20 && reach && blocked && aud && para && right && knight && freed;
+    } finally { S.flags = f0; S.ents.varonburg = v0; MAPS.varonburg = mv; S.factions.aurel = a0; S.factions.valen = vl; S.ranks.valen = rk; }
   }));
   ok('Tiefhall (Nutzer §5d.6): Treppe im Thronsaal der alten Halle, Königsstadt mit König, Schmiedin (Königseisen), Händlern und Wachen, alles erreichbar; Handel erst als Freund der Halle', sandbox(() => {
     const p = stage(), f0 = S.flags.dwarfFriend, z0 = S.ents.zwerge, mz = MAPS.zwerge;
