@@ -472,7 +472,7 @@ export function battleCheck() {                              // alle paar Sekund
   for (const [node, n] of Object.entries(W.nodes)) {
     if (n.owner !== 'undead' || n.garrison > 0.5 || node === 'graveyard' || (n.waves && n.wave < n.waves)) continue;   // §81: kein Sieg ohne letzte Welle
     if (W.armies.some(a => a.faction === 'undead' && a.at === node) || W.battles.some(b => b.node === node)) continue;
-    capture(node, 'valen');
+    capture(node, LOC[node]?.faction === 'aurel' ? 'aurel' : 'valen');   /* Folgen §5c: befreite Städte Aurelions fallen ans Hochreich zurück */
     if (nearPlayer(node, 22) && S.ranks.undead < 0) H.title(`Befreier von ${LOC[node].name}`);
   }
 }

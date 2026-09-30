@@ -121,7 +121,7 @@ export function refreshHUD() {
     .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join('');
   // Kopfzeile
   $('clock-time').textContent = `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`;   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
-  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = { clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel' }[S.weather]; }
+  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
   $('clock-gold').textContent = S.gold;
   renderHotbar();
 }

@@ -536,6 +536,19 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 - **Talentpunkte:** jede dritte Stufe (21 bis Stufe 60).
 - **Omega fällt:** Panik im Osten, Jubel und Pilgerzüge im Westen.
 
+## 5e. Weitere zehn Bereiche — Nutzerentscheide (30.09.2026)
+
+1. **Gefährten 2.0:** keine Romanze, nur tiefe Freundschaft. **Loyalität** als Langzeitwert; **jeder** Gefährte kann bei niedriger Loyalität verraten. Eigene Auftragsketten je Gefährte, Lagerfeuer-Gespräche.
+2. **Dynastie:** Erben aus allem — Heirat und Kinder (wachsen in Spielzeit), Adoption von Waisen/Gefährten, dazu Zufall wie bisher.
+3. **Gewölbe:** Rätsel und Hebel (Hebeltür, Druckplatte, Geheimwand nach Wahrnehmung), 5–8 geheime handgebaute Orte nur über Hinweise, Modifikatoren (überflutet, dunkel, verflucht), Endlosgewölbe.
+4. **Gerüchte:** erzeugen echte Ziele (Schatz, Bestie, Deserteur); **selten** falsch (auch mal Hinterhalt); grober Kreis auf der Karte.
+5. **Schenke:** Würfel, Karten, Armdrücken/Trinkwette, Faustkampf ohne Tote und Rausch (schwankende Steuerung).
+6. **Wetter mit Wirkung (C.12):** gebaut (Regen, Nebel, Schnee, Sandsturm, Hitze, Blutregen; Gegner betroffen).
+7. **Verletzungen:** Brüche und Infektionen halten **Tage**, Heiler/Feldscher beschleunigt; Narben.
+8. **Akademie:** der Spieler wird **Student** (Semester, Vorlesungen, Rivalen, verbotene Abteilung als eigener Pfad).
+9. **Goblins nach der Befreiung:** Grubenhort wird **Außenposten** von Morrgrund. Belohnungen: Goblin-Titelklasse, Goblin-Gefährte, Goblin-Händler, Dodon als Gefährte — **Dodon zieht nur in das Dorf des Spielers**, wenn man eines hat. Ab dann kann man **Goblins rekrutieren** (einzelne Helden und Trupps). Goblins bauen **größere Städte südlich der Eisenfeste** (kartenabhängig): wachsen langsam von selbst, schneller mit Spielerhilfe; Stil gemischt aus Pilz-/Lehmhütten, umgebautem Kettenschrott und Tunneln/Gruben. Menschen reagieren **je nach Stadt** (Valen offen, Orden feindlich, Aurelion neugierig).
+10. **Epilog:** nur auf Wunsch am Grab; danach **Wahl des Spielers**: weiterspielen oder 20 Jahre später mit einem Erben.
+
 ## 6. Koop (K2)
 
 Der Netzwerk-Koop ist als eigenes Paket geplant: `docs/PLAN_COOP.md`. Reihenfolge laut Nutzer: P2 läuft parallel durch einen Opus-Agenten, K2 baut die Hauptsitzung. K1 (Couch-Koop) entfällt.

@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Wetter mit Wirkung (Regen, Nebel, Schnee, Sandsturm, Hitze, Blutregen), Lehrer-Bewährung, Wachen kämpfen nach Widerstand, Talentpunkt jede dritte Stufe, Plan §5c–§5e mit Nutzerentscheiden.
 - Mehrere Spielstände mit Erfolgs-Symbolen, Koop-Stände getrennt; Goblins und Untote in vielen Varianten.
 - Magitech-Waffen 2.0 (Roadmap C.10): Energie je Schuss mit Energiezellen, fünf neue Waffen (Schockpistole, Magiegewehr, Runenarmbrust, Kristallkanone, Präzisionsgewehr) mit Streuung, Durchschlag, Lähmen, Brand; Rangsperre in Aurelion.
 - Koop: Ingame-Chat (Enter), Charakterkarten, Erben in gleicher Zahl, Gast-Schlag bei gehaltener Maus und kurzen Klicks repariert, Koop aus laufendem Spiel lässt Gäste sofort rein, lokaler Testweg ?coopLocal.

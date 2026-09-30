@@ -373,3 +373,14 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Gegnerschaden je Stufe** +6 % statt +5 % (`BAL.lvl`), damit späte Gebiete gefährlich bleiben. Varianten (Rasender, Vernarbter …) wirken jetzt auch bei Schützen.
 - **Waffen:** Kurzbogen schneller (820 → 700 ms), Langbogen 18 Schaden / 920 ms, Wurfmesser 680 ms, Magiegewehr 1,2 s Nachladen und 10 Energie je Schuss.
 - **Debug:** `RF.simFight(typ, { level, weapon, gear, elvl, ehp, mode: 'smart'|'stand', pots, cells, n })` — gestellter Kampf, Welt bleibt unberührt. Selbsttests „Balance-Runde: Höchststufe 60“ und „Balance-Runde (docs/BALANCE.md)“.
+
+## Runde: Roadmap C.12 — Wetter mit Wirkung (Version 21)
+Wetter wirkt nur draußen auf der Weltkarte (nicht in Häusern, Höhlen, Dungeons). Beim Wetterwechsel steht die Wirkung im Protokoll, und der Tooltip am Wettersymbol oben nennt sie.
+- **Regen:** Feuer brennt schwächer, Fernkampf −10 %, eigene Sicht auf der Karte −15 %.
+- **Nebel:** eigene Sicht und Blick der Gegner −40 %, Hinterhalte ×1,6.
+- **Schnee:** Tempo −15 %, Ausdauer-Erholung −30 %, die Gruppe isst 50 % mehr (Winter allgemein +25 %). Nachts ohne Umhang und nicht im Haus: „Unterkühlt“ (−40 % Tempo), bis man warm wird.
+- **Sandsturm:** Tempo −10 %, Fernkampf −30 %, Sicht −40 %, Gegnerblick −30 %, Ausdauer-Erholung −40 %.
+- **Hitze** (klare Wüste, 10–17 Uhr): Ausdauer-Erholung −30 %, in schwerer Rüstung −50 %; mehr Nahrung.
+- **Blutregen:** Gegner wittern dich 25 % früher.
+- Gegner werden durch Tempo und Sicht genauso beeinflusst. Selbsttest „Wetter mit Wirkung (Roadmap C.12)“.
+
