@@ -558,6 +558,33 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 - **Nutzer-Nachtrag:** Nahschuss-Bug (Geschosse treffen nahe Gegner nicht) — behoben. Exoten zuerst: Peitsche (heranziehen, schnell und weit) und Sensen/Stangenwaffen (mehrere treffen). **Mehr Sensen** und ein **Dorf mit Sensen-Bürgerwehr** (Weidenau), dort Sensen kaufen. **Zweiwaffen** nur Schurke, Assassine, Berserker. **Schilde:** Turmschild, Buckler, Stachelschild, Magitech-Schild. **Je Boss eine eigene Legendäre.**
 - **Elite-Mini-Bosse:** mindestens 30 mit eigenem Aussehen und Beute für Kopfgeld-Aufträge (gebaut: 32).
 
+## 5g. Dünne Bereiche überarbeiten — Nutzerentscheide (01.10.2026)
+
+Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem Punkt ein Sonnet-Bug-Agent (ohne Screenshots).
+
+1. **Varons Hauptstadt:** neue große Stadt in der Oberwelt nördlich von Nordfurt, die Varonsburg steht sichtbar darin (Weltaufbau ändert sich, Migration für alte Stände).
+2. **Blutkult (Blutmagier/Vampire) als Varons Hauptfeind:** Unterwanderung (Verschwundene, Maskierte nachts, Blutzeichen, Spuren und Verdächtige), Katakomben unter der Hauptstadt mit Blutfürst, selbst beitreten (Vampir als Titelklasse mit Blutdurst), Wendung am Hof (jemand am Hof gehört heimlich zum Kult).
+3. **Ressourcen-Sprites:** Bäume, Erz, Stein, Kräuter schöner; Abbau sichtbar.
+4. **Begehbare Zelte:** Zelte als kleine Bauten mit Innenraum (Lager, Banden, Pilger, Garnison).
+5. **Boss-Intros:** Kamerafahrt/Auftritt beim ersten Sichtkontakt (Varg, Hrodvar, Garmadon, Gorak, Dodon, Blutfürst).
+6. **Schwierigkeit:** „Sehr schwer“ = mehr Überfälle, „Angsthase“ wacht beim Heiler auf.
+7. **Gefährten-Ausrüstung:** Ausrüstung mit Klassenprüfung, bessere Befehle, Tier als viertes Mitglied.
+8. **Fall Aurelions (ganzer Hoher Rat tot):** zuerst immer Bürgerkrieg der Adelshäuser; danach je nach Weltlage: ist die Eisenfeste zerstört und Varon noch im Krieg mit dem Kult → Automaten übernehmen; sonst → Varon marschiert ein. Kein Spieler-Thron.
+9. **Himmelsinsel/Rat:** Ratsmitglieder verkaufen Dinge (auch ohne Rang lohnt der teure Besuch); wer dort oben einen tötet, lässt Luftschiffe mit sehr starken Privatarmeen des Adels landen.
+10. **Aurelion-Ränge 3–6** mit echten Prüfungen.
+11. **Neue Lehrer:** Druidin, Moorhexe, Omega-Priester mit eigenen Zaubern.
+12. **Jagd und Wildnis:** Fährten, Fallen, Häuten, Wildnis-Ereignisse.
+13. **Leistung und Spielstand:** offene Performance-Bugs, kleinerer Spielstand.
+14. **Seevolk-Ränge 2 und 4** erreichbar machen.
+15. **Akademie-Innenleben:** Studenten mit Tagesablauf, Bücher für Ilvar, Anklage „verbotene Magie“.
+16. **Musik:** synthetisierte Musik je Region, Kampf, Stadt.
+17. **Schwarze Feste befreien** (BUG-100), Umgebung beleben.
+18. **Stumme Figuren** (Automaten, Kettenwachen reden), Flüchtlinge mit Heimat.
+19. **Siedlung als Stadt:** Stufen, Zuzug nach Attraktivität, Reaktionen der Fraktionen.
+20. **Kopfgeldjäger und Gegner skalieren** (SCALING).
+21. **Wetter im Menschenland:** eigene Wetterlagen der mittleren Länder.
+22. Zwei Sonnet-Agenten sammeln weitere Ideen und unterentwickelte Features (Nutzer).
+
 ## 6. Koop (K2)
 
 Der Netzwerk-Koop ist als eigenes Paket geplant: `docs/PLAN_COOP.md`. Reihenfolge laut Nutzer: P2 läuft parallel durch einen Opus-Agenten, K2 baut die Hauptsitzung. K1 (Couch-Koop) entfällt.
