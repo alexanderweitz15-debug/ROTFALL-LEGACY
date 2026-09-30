@@ -785,6 +785,30 @@ const WDES = {
     C.ell(M.st, 38, 8.5, 5.5, 5.5);
     for (const pts of [[[36, 3.5], [40, 3.5], [38, 0]], [[36, 13.5], [40, 13.5], [38, 17]], [[43, 6.5], [43, 10.5], [46, 8.5]], [[33, 6.5], [33, 10.5], [31, 8.5]]]) C.poly(M.ir, pts);
     return { gx: 6, gy: 14, blade: null, after: (set, S) => { set(36, 6, S.hi); set(37, 5, S.hi); for (let y = 5; y <= 12; y += 2) set(39, y, S.dk); } }; }],
+  morgenstern: [40, 24, (C, M) => {                                   /* Nutzer §5f: Dornenkugel auf dem Stiel */
+    C.poly(M.wr, [[1, 10.4], [12, 10.4], [12, 13.6], [1, 13.6]]); C.poly(M.wd, [[12, 10.6], [26, 10.6], [26, 13.4], [12, 13.4]]); C.poly(M.ir, [[24, 9.5], [27, 9.5], [27, 14.5], [24, 14.5]]);
+    C.ell(M.st, 32, 12, 6.5, 6.5);
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, x = 32 + Math.cos(a) * 6.5, y = 12 + Math.sin(a) * 6.5, tx = 32 + Math.cos(a) * 10, ty = 12 + Math.sin(a) * 10, px = -Math.sin(a) * 1.5, py = Math.cos(a) * 1.5;
+      C.poly(M.ir, [[x + px, y + py], [x - px, y - py], [tx, ty]]); }
+    return { gx: 6, gy: 12, blade: null, after: (set, S) => { set(30, 9, S.hi); set(31, 8, S.hi); set(34, 15, S.dk); } }; }],
+  kettenkugel: [54, 30, (C, M) => {                                   /* Nutzer §5f: lange Kette, schwere Kugel */
+    C.poly(M.wr, [[1, 8.4], [11, 8.4], [11, 11.6], [1, 11.6]]); C.poly(M.wd, [[11, 8.6], [17, 8.6], [17, 11.4], [11, 11.4]]); C.ell(M.ir, 17.5, 10, 1.8, 2.2);
+    for (let k = 0; k < 8; k++) C.ell(M.ir, 20 + k * 3, 10 + k * 1.6, 1.3, 1);
+    C.ell(M.st, 46, 22, 6, 6); for (const pts of [[[44, 16], [48, 16], [46, 12.5]], [[44, 28], [48, 28], [46, 30]], [[52, 20], [52, 24], [54, 22]], [[40, 20], [40, 24], [38, 22]]]) C.poly(M.ir, pts);
+    return { gx: 6, gy: 10, blade: null, after: (set, S) => { set(44, 19, S.hi); set(45, 18, S.hi); set(48, 25, S.dk); } }; }],
+  katar: [28, 14, (C, M) => {                                         /* Nutzer §5f: H-Griff, Stoßklinge */
+    C.poly(M.ir, [[1, 1.5], [3.5, 1.5], [3.5, 12.5], [1, 12.5]]); C.poly(M.ir, [[8, 1.5], [10.5, 1.5], [10.5, 12.5], [8, 12.5]]); C.poly(M.wr, [[3.5, 5.6], [8, 5.6], [8, 8.4], [3.5, 8.4]]);
+    C.poly(M.st, [[10.5, 3.5], [20, 4.5], [27.5, 7], [20, 9.5], [10.5, 10.5]]);
+    return { gx: 5, gy: 7, blade: [11, 24, 7], after: (set, S) => { for (let x = 11; x <= 22; x++) set(x, 7, S.sh); } }; }],
+  schrottkeule: [38, 24, (C, M) => {                                  /* Nutzer §5f: Goblin-Knüppel mit Nägeln und Blech */
+    C.poly(M.wr, [[1, 10.6], [9, 10.6], [9, 13.4], [1, 13.4]]); C.poly(M.wd, [[9, 10.2], [26, 8.5], [34, 8], [36, 12], [34, 16], [26, 15.5], [9, 13.8]]);
+    const Rs = C.partR('rust', ramp('#6a3a1e')); C.poly(Rs, [[22, 7.5], [29, 7], [29, 10], [22, 10.5]]);
+    for (const [x, y] of [[27, 7], [31, 7.5], [35, 11], [31, 16.5], [27, 16], [33, 12]]) C.poly(M.ir, [[x - 0.8, y], [x + 0.8, y], [x, y + (y < 12 ? -3 : 3)]]);
+    return { gx: 5, gy: 12, blade: null, after: (set, S) => { set(24, 9, '#8a5a2a'); set(28, 12, '#2a1a10'); } }; }],
+  schrottklinge: [42, 16, (C, M) => {                                 /* Nutzer §5f: gezackte Goblinklinge aus einer Kettenschelle */
+    const Rg = C.partR('rag', ramp('#5a4a3a')); C.poly(Rg, [[1, 6.6], [10, 6.6], [10, 9.4], [1, 9.4]]); C.poly(M.ir, [[10, 3], [12.5, 3], [12.5, 13], [10, 13]]);
+    const pts = [[12.5, 5]]; for (let x = 15; x <= 36; x += 3) pts.push([x, 5 + ((x / 3) % 2 ? -1.2 : 0.4)]); pts.push([41, 8], [36, 11], [12.5, 11]); C.poly(M.st, pts);
+    return { gx: 6, gy: 8, blade: [13, 36, 8], after: (set, S) => { for (let x = 14; x <= 34; x += 2) set(x, 8, S.sh); for (let x = 16; x <= 34; x += 6) set(x, 10, '#6a3a1e'); } }; }],
   mace: [36, 22, (C, M) => {
     C.poly(M.wr, [[1, 9.4], [12, 9.4], [12, 12.6], [1, 12.6]]); C.poly(M.wd, [[12, 9.6], [24, 9.6], [24, 12.4], [12, 12.4]]);
     C.ell(M.st, 28, 11, 6, 6);

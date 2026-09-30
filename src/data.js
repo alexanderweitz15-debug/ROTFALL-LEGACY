@@ -60,6 +60,12 @@ export const ITEMS = {
                   desc:'Waffe der Eisernen Kette: reicht weit, fesselt kurz (−40 % Tempo, 1,5 s). Wenig Schaden, viel Kontrolle.' },
   goblin_hook:  { name:'Hakenmesser', slot:'weapon', wtype:'dagger', dmg:7, reach:30, arc:1.2, speed:340, stam:5, crit:2.2, rarity:'uncommon', value:120, skill:'onehanded', bleed:0.3,
                   desc:'Goblinarbeit aus Grubeneisen. Der Haken reißt: 30 % Blutung.' },
+  /* Nutzer §5f: Exoten und Volkswaffen, eigene Zeichnung in figure.js (WDES) */
+  morgenstern:  { name:'Morgenstern', slot:'weapon', wtype:'mace', dmg:15, reach:38, arc:1.35, speed:820, stam:12, ap:0.45, stagger:1.8, rarity:'rare', value:200, skill:'onehanded', lore:'Eine Kugel voller Dornen auf einem Eichenstiel. Frühstück für Helme.' },
+  kettenkugel:  { name:'Kettenkugel', slot:'weapon', wtype:'mace', dmg:17, reach:56, arc:2.0, speed:940, stam:15, flail:true, stagger:1.6, rarity:'rare', value:240, skill:'onehanded', lore:'Eine schwere Kugel an langer Kette. Sie kommt um Schilde herum — und manchmal zurück.' },
+  katar:        { name:'Katar', slot:'weapon', wtype:'dagger', dmg:9, reach:28, arc:1.1, speed:320, stam:5, crit:2.4, ap:0.5, rarity:'uncommon', value:130, skill:'onehanded', lore:'Ein Stoßdolch aus dem Süden: der Griff quer in der Faust, die Klinge in Verlängerung des Arms. Durchschlägt Kettenhemden.' },
+  schrottkeule: { name:'Schrottkeule', slot:'weapon', wtype:'mace', dmg:11, reach:36, arc:1.4, speed:700, stam:10, stagger:1.4, rarity:'common', value:36, skill:'onehanded', lore:'Goblinarbeit: ein Knüppel, gespickt mit Nägeln und Kettenresten. Hässlich und ehrlich.' },
+  schrottklinge:{ name:'Schrottklinge', slot:'weapon', wtype:'sword', dmg:10, reach:40, arc:1.5, speed:540, stam:8, bleed:0.25, rarity:'uncommon', value:70, skill:'onehanded', lore:'Aus einer Kettenschelle geschliffen, gezackt wie ein Sägeblatt. Die Grubenstämme schwören darauf.' },
   flail:        { name:'Streitflegel', slot:'weapon', wtype:'mace', dmg:13, reach:46, arc:1.7, speed:820, stam:12, rarity:'rare', value:210, skill:'onehanded', flail:true,
                   desc:'Schwung: Treffer in rascher Folge +15 % je Stufe (bis 3); ab der dritten Stufe trifft die Kugel rundum. Wer zögert oder getroffen wird, verliert den Schwung.' },   // §82: Waffe mit eigener Taktik — Druck statt Abwarten
   mace:         { name:'Streitkolben', slot:'weapon', wtype:'mace', dmg:13, reach:36, arc:1.3, speed:740, stam:11, ap:0.4, stagger:1.6, rarity:'uncommon', value:110, skill:'onehanded' },
@@ -383,8 +389,8 @@ export const ARMOR_SETS = {
 export const LOOT = {
   wolf:      [['pelt',0.7],['dried_meat',0.4],['bone',0.3]],
   boar:      [['dried_meat',0.8],['pelt',0.3]],
-  goblin:    [['bone',0.4],['rusty_sword',0.12],['bread',0.3],['iron',0.2],['bandage',0.15]],
-  goblin_warrior:[['schleuder',0.12],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
+  goblin:    [['bone',0.4],['rusty_sword',0.12],['schrottklinge',0.05],['bread',0.3],['iron',0.2],['bandage',0.15]],
+  goblin_warrior:[['schleuder',0.12],['schrottkeule',0.1],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
   bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35]],
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   bounty_hunter:[['dornensaebel',0.15],['grenzlaeufer',0.1],['bandage',0.6],['potion',0.3],['chain_hauberk',0.12],['crossbow',0.08]],
