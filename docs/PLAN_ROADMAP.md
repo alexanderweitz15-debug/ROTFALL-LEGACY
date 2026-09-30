@@ -542,7 +542,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 2. **Dynastie:** Erben aus allem — Heirat und Kinder (wachsen in Spielzeit), Adoption von Waisen/Gefährten, dazu Zufall wie bisher.
 3. **Gewölbe:** Rätsel und Hebel (Hebeltür, Druckplatte, Geheimwand nach Wahrnehmung), 5–8 geheime handgebaute Orte nur über Hinweise, Modifikatoren (überflutet, dunkel, verflucht), Endlosgewölbe.
 4. **Gerüchte (GEBAUT):** erzeugen echte Ziele (Schatz, Bestie, Deserteur); **selten** falsch (auch mal Hinterhalt); grober Kreis auf der Karte.
-5. **Schenke:** Würfel, Karten, Armdrücken/Trinkwette, Faustkampf ohne Tote und Rausch (schwankende Steuerung).
+5. **Schenke (GEBAUT):** Würfel, Karten, Armdrücken/Trinkwette, Faustkampf ohne Tote und Rausch (schwankende Steuerung).
 6. **Wetter mit Wirkung (C.12):** gebaut (Regen, Nebel, Schnee, Sandsturm, Hitze, Blutregen; Gegner betroffen).
 7. **Verletzungen:** Brüche und Infektionen halten **Tage**, Heiler/Feldscher beschleunigt; Narben.
 8. **Akademie:** der Spieler wird **Student** (Semester, Vorlesungen, Rivalen, verbotene Abteilung als eigener Pfad).
