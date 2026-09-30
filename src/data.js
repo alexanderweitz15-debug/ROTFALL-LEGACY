@@ -1019,6 +1019,7 @@ export const BUILDINGS = {
   well:      { name:'Brunnen', cat:'Versorgung', cost:{stone:18}, time:18, w:1, h:1, desc:'Moral der Siedlung steigt.', pop:0 },
   palisade:  { name:'Palisade', cat:'Verteidigung', cost:{wood:6}, time:5, w:1, h:1, desc:'Ein Abschnitt Wehrzaun. Blockiert Bewegung.', pop:0 },
   gate:      { name:'Tor', cat:'Verteidigung', cost:{wood:12,iron:4}, time:12, w:2, h:1, desc:'Durchlass in der Palisade.', pop:0 },
+  wohnzone:  { name:'Wohnzone', cat:'Zonen', cost:{wood:4}, time:3, w:6, h:6, desc:'Markiert Bauland (6×6). Siedler bauen hier selbst bis zu vier Hütten, sobald 20 Holz und 8 Stein im Vorrat liegen — eine Hütte je Tag.', pop:0 },   /* Nutzer §5d.3 */
   watchtower:{ name:'Wachturm', cat:'Verteidigung', cost:{wood:24,stone:12}, time:26, w:2, h:2, desc:'Warnt früher vor Angriffen.', pop:0 },
 };
 

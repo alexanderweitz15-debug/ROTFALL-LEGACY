@@ -5,6 +5,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
 - Freie Seefahrt: eigenes Schiff, Kurse (Küste, Handelsroute, Wrackfeld), Seehandel mit Hafenpreisen, Piraterie, Bergung, Rumpf und Reparatur.
 - Tiefhall: lebende Königsstadt der Zwerge unter der toten Halle (König, Runenschmiedin mit Königseisen, Händler, Brauerei, Mine).
+- Siedlung: Wohnzonen — Siedler bauen dort selbst Hütten aus dem Vorrat.
 - König Varon und die Varonsburg im Norden: Hof, Kanzler, Adel, Kerker, Garde; Audienz, Auftragskette mit Verräter-Suche, Ritterschlag.
 - Titelklasse Grubenhäuptling (Stammesmut, Goblinhorde, Schrottbombe, Kriegstrommel, Tunnelsprung, Dodons Echo; Meister Grisk).
 - Goblins nach der Befreiung: Grubenhort wächst zur Goblinstadt (Spenden helfen), Außenposten von Morrgrund, Goblin-Helden anwerben, Dodon zieht ins eigene Dorf, Menschen reagieren.

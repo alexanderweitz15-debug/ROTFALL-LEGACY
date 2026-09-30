@@ -2220,6 +2220,9 @@ function drawBaked(key, e, box, fn) {
   ctx.drawImage(cv, e.x - box / 2, e.y - box * 0.73, box, box);
 }
 function drawBuilding(e, now) {
+  if (e.type === 'wohnzone') { const w = e.def.w * TS, h = e.def.h * TS, x = e.x - w / 2, y = e.y - h / 2;   /* Nutzer §5d.3: Wohnzone als abgesteckter Grund */
+    ctx.save(); if (e.ghost) ctx.globalAlpha = .5; ctx.fillStyle = 'rgba(120,160,80,.08)'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(150,190,110,.55)'; ctx.setLineDash([6, 5]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    ctx.fillStyle = '#6a5030'; for (const [cx, cy] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) ctx.fillRect(cx - 2, cy - 10, 4, 12); ctx.restore(); return; }
   if (e.ghost || !(e.built > 0) || e.type === 'campfire' || e.type === 'smithy') return drawBuildingVec(e, now);
   const b = e.def, box = Math.ceil((Math.max(b.w, b.h) * TS * 1.5 + 40) / 32) * 32;
   const stage = e.built >= 1 ? 3 : e.built > 0.4 ? 2 : 1;

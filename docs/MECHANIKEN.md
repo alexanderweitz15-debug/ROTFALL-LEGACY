@@ -585,3 +585,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Varon töten:** möglich; der Thron bleibt leer, Valen −100, Chronik und Spielstand-Symbol ☠.
 - **Spielstände:** neue Symbole ⚔ (Ritter König Varons) und ☠ (König Varon ist tot).
 - **Debug:** „Varon: in die Varonsburg“, „Varon: Audienz und Auftrag 1 erledigt“. Probe „König Varon (Nutzer §5d.4)“.
+
+## Runde: Wohnzonen der Siedlung (Nutzer §5d.3, Version 21)
+- **Mischung beim Bauen:** Wichtige Bauten (Lager, Werkbank, Schmiede, Brunnen, Palisade …) setzt du selbst wie bisher. Neu im Baumenü unter „Zonen“: die **Wohnzone** (6×6, 4 Holz) steckt Bauland ab.
+- **Siedler bauen selbst:** Sind mindestens zwei Siedler da und liegen 20 Holz und 8 Stein im Vorrat, beginnen sie jeden Tag eine Hütte in einer fertigen Wohnzone (höchstens vier je Zone). Eine Hütte steht nach einem Tag und bietet Platz für vier weitere Siedler.
+- Reicht das Material nicht, meldet das Log es einmal.
+- **Debug:** „Siedlung: Wohnzone hier + Material + 3 Siedler“, „Siedlung: Siedlertag“. Probe „Wohnzonen (Nutzer §5d.3)“.

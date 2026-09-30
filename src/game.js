@@ -10403,6 +10403,24 @@ function settlersDay() {
     else if (c.job === 'Handwerk') stone += 1; else st.morale = Math.min(100, st.morale + 1); }
   S.res.wood += wood; S.res.food += food - ss.length * 0.5; S.res.stone += stone; S.res.food = Math.max(0, S.res.food);
   if (ss.length) log(`${st.name}: ${ss.length} Siedler — Holz +${wood}, Nahrung +${food}, Stein +${stone}.`, 'world');
+  zoneBuild(ss.length);   /* Nutzer §5d.3: Siedler bauen in Wohnzonen */
+}
+// ================= Wohnzonen (Nutzer §5d.3) =================
+// Wichtige Bauten setzt der Spieler selbst; Wohnhäuser bauen die Siedler: in jeder fertigen Wohnzone (6×6) entstehen nacheinander
+// bis zu vier Hütten, sobald mindestens zwei Siedler da sind und der Vorrat eine Hütte trägt. Eine Hütte braucht einen Tag.
+function zoneBuild(n) {
+  const st = S.settlement; if (!st) return; const map = st.map || 'world', B0 = st.buildings;
+  for (const b of B0.filter(b => b.bySettlers && b.built < 1)) { b.built = Math.min(1, b.built + 0.5); if (b.built >= 1) { log(`Die Siedler haben in ${st.name} eine Hütte fertig gebaut.`, 'world'); st.history.push({ text: 'Siedler bauen eine Hütte', year: year() }); } }
+  if (n < 2 || B0.some(b => b.bySettlers && b.built < 1)) return;
+  for (const z of B0.filter(b => b.type === 'wohnzone' && b.built >= 1)) {
+    const mine = B0.filter(b => b.zone === z.id); if (mine.length >= 4) continue;
+    const def = BUILDINGS.hut; if (!canAfford(def.cost)) { if (!st.zoneWarned) { st.zoneWarned = true; log(`Die Siedler in ${st.name} wollen bauen, aber der Vorrat reicht nicht (20 Holz, 8 Stein je Hütte).`, 'world'); } return; }
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = z.x + dx * TS * 1.5, y = z.y + dy * TS * 1.5;
+      if (B0.some(o => o !== z && o.type !== 'wohnzone' && Math.hypot(o.x - x, o.y - y) < TS * 2) || solidTile(map, x, y)) continue;
+      payCost(def.cost); st.zoneWarned = false;
+      const h = { id: uid(), kind: 'building', type: 'hut', def, map, x, y, r: 1.5 * TS, built: 0.02, cond: 1, solid: true, workers: 0, zone: z.id, bySettlers: true };
+      S.ents[map].push(h); addSolid(h); B0.push(h); log(`Die Siedler beginnen in der Wohnzone eine Hütte (−20 Holz, −8 Stein).`, 'world'); return; }
+  }
 }
 function raidSettlement() {
   const st = S.settlement, n = ri(2, 4 + Math.floor(S.day / 20)), a = rnd() * Math.PI * 2, sx = st.x / TS | 0, sy = st.y / TS | 0;
@@ -13449,6 +13467,9 @@ function debugSections() {
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
       'Seefahrt: eigenes Schiff geben': () => { S.ship = { name: 'Probe-Möwe', hull: 70, cargo: {}, cap: 20, at: 'saltport' }; UI.toast('Eigenes Schiff (beim Kapitän in Salzhafen/Kupferhafen)'); },   /* Nutzer §5d.9 */
+      'Siedlung: Wohnzone hier + Material + 3 Siedler': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen'); const p = P(), z = placeBuilding('wohnzone', p.x + 120, p.y, true); z.built = 1; S.res.wood += 100; S.res.stone += 40;   /* Nutzer §5d.3 */
+        for (let i = 0; i < 3; i++) { const c = makeChar({ name: pick(FIRST_M), prof: 'Siedler', x: p.x + ri(-40, 40), y: p.y + 40, map: S.map, level: 1 }); c.settler = true; c.anchor = { x: c.x, y: c.y }; S.ents[S.map].push(c); } UI.toast('Wohnzone rechts; Siedler bauen täglich'); },
+      'Siedlung: Siedlertag': () => settlersDay(),
       'Varon: in die Varonsburg': () => { if (S.map !== 'world') travel('world'); travel('varonburg'); },   /* Nutzer §5d.4 */
       'Varon: Audienz und Auftrag 1 erledigt': () => { S.flags.varonAudience = 1; S.flags.varonQ = Math.max(1, S.flags.varonQ || 0); S.flags.varonQ1done = 1; UI.toast('Zum König'); },
       'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
@@ -16108,6 +16129,16 @@ export function selftest() {
       const g0 = S.gold, f0 = S.factions.sea || 0; ownArrive({ to: 'isle', pirated: true }); const prize = S.gold > g0 && S.factions.sea === f0 - 12 && cargoUsed() > 0 && S.ship.at === 'isle';
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
+  }));
+  ok('Wohnzonen (Nutzer §5d.3): Siedler bauen in einer fertigen Zone Hütten aus dem Vorrat, eine Hütte je Tag, höchstens vier, ohne Material nicht', sandbox(() => {
+    const p = stage(), st0 = S.settlement, r0 = { ...S.res };
+    try { S.settlement = { name: 'Probehof', x: p.x, y: p.y, map: S.map, buildings: [], morale: 60, priorities: ['Ruhe'], history: [] };
+      const z = placeBuilding('wohnzone', p.x + 200, p.y, true); z.built = 1; S.res.wood = 0; S.res.stone = 0; zoneBuild(3); const none = !S.settlement.buildings.some(b => b.zone === z.id);
+      S.res.wood = 200; S.res.stone = 100; zoneBuild(3); const started = S.settlement.buildings.filter(b => b.zone === z.id).length === 1 && S.res.wood === 180;
+      zoneBuild(3); zoneBuild(3); const one = S.settlement.buildings.filter(b => b.zone === z.id && b.built >= 1).length >= 1;
+      for (let i = 0; i < 12; i++) zoneBuild(3); const four = S.settlement.buildings.filter(b => b.zone === z.id).length === 4 && settlerCap() >= 16;
+      zoneBuild(1); return none && started && one && four;
+    } finally { S.settlement = st0; Object.assign(S.res, r0); }
   }));
   ok('König Varon (Nutzer §5d.4): Tor im Norden, Burg mit König, Kanzler, Adligen, Kerker und Garde, alles erreichbar; Audienz über den Kanzler, Aurelion-Freunde abgewiesen, Verräter-Suche, Ritterschlag, Gefangener freikaufen', sandbox(() => {
     const p = stage(), f0 = structuredClone(S.flags), v0 = S.ents.varonburg, mv = MAPS.varonburg, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen;
