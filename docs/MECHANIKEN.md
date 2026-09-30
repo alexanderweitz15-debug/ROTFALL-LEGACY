@@ -525,3 +525,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Adoption:** Beim Priester ein Waisenkind aufnehmen (50 Gold, 4–12 Jahre alt). Einen Freund fürs Leben kann man fragen: „Willst du mein Erbe sein?“ (Loyalität +10).
 - **Erbfolge:** Beim Tod stehen zuerst eigene erwachsene Kinder, dann der Ehepartner, dann Gefährten zur Wahl; entfernte Verwandte nur noch, wenn Plätze frei sind (höchstens drei).
 - **Debug:** „Dynastie: nächsten NPC heiraten“, „Dynastie: Kind geboren“, „Dynastie: Kinder altern 16 Jahre“. Probe „Dynastie (Nutzer §5e.2)“.
+
+## Runde: Akademie — Student sein (Nutzer §5e.8, Version 21)
+- **Einschreiben:** bei Corvinus oder einem Magister in Aurelheim, mit Aufenthaltsschein und 100 Gold Semestergeld.
+- **Vorlesungen:** morgens 8–14 Uhr bei einem Magister, einmal am Tag, zwei Stunden. Die Fächer wechseln: Arkane Theorie, Heilkunde (Medizin +2), Geschichte des Hochreichs (Führung +2), Alchemie (Handwerk +2), Magitech-Mechanik (Schmieden +2). Jede fünfte Vorlesung: Intelligenz +1. Jede Vorlesung gibt etwas Erfahrung.
+- **Semester:** 8 Vorlesungen und eine neu bestandene Akademie-Prüfung, dann beim Magister abschließen: +1 Attributpunkt. Nach drei Semestern ist man Absolvent (Akademie-Rang mindestens Adept, Chronik-Eintrag).
+- **Rivalin:** Beim Einschreiben sucht sich eine Studentin dich als Rivalin aus; sie fordert dich zum Duell der Akademie.
+- **Verbotene Abteilung (eigener Pfad):** ab 5 Vorlesungen beim Archivar nachfragen; nur nachts (22–4 Uhr) kann man sich einschleichen (Schleichen, Wahrnehmung, Glück). Drei Besuche geben verbotenes Wissen (Intelligenz +3, Willenskraft +3). Wer erwischt wird, fliegt von der Akademie (Aurelion −10) und kommt nicht wieder hinein.
+- **Debug:** „Akademie: einschreiben“, „Akademie: 8 Vorlesungen und eine Prüfung gutschreiben“. Probe „Akademie (Nutzer §5e.8)“.

@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Akademie: als Student einschreiben, Vorlesungen, Semester, Rivalin, verbotene Abteilung.
 - Dynastie: Heirat, Kinder wachsen in Spielzeit, Adoption beim Priester, Freund als Erbe; Kinder und Ehepartner erben zuerst.
 - Epilog am Ahnengrab (Taten, Ruhm, Ehre und Fluch), danach weiterspielen oder zwanzig Jahre später.
 - Gefährten 2.0: Loyalität, Verrat bei niedriger Loyalität, Lagerfeuer-Gespräche, persönlicher Auftrag, Freund fürs Leben.

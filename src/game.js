@@ -10658,7 +10658,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -11418,6 +11418,57 @@ function trialTick() {
   }
   if (T.kind === 'heal') { const c = byId(T.patient); if (c && c.body && ['lleg', 'rleg', 'larm', 'rarm', 'torso', 'head'].every(k => c.body[k].lost || c.body[k].hp >= c.body[k].max * 0.5)) return endTrial(true); }
   if (clock() > T.until) return endTrial(false);
+}
+// ================= Akademie: Student sein (Nutzer §5e.8) =================
+// Einschreiben bei Corvinus oder einem Magister (Aufenthaltsschein + 100 Gold Semestergeld). Vorlesungen morgens (8–14 Uhr) bei
+// einem Magister, einmal am Tag, zwei Stunden: wechselnde Fächer geben Fertigkeit, jede fünfte Vorlesung +1 Intelligenz. Ein Semester
+// = 8 Vorlesungen und eine bestandene Prüfung; drei Semester machen zum Absolventen (mindestens Adept). Ein Rivale fordert heraus
+// (Duell der Akademie). Eigener Pfad: die verbotene Abteilung — nachts (22–4 Uhr) beim Archivar einschleichen (Schleichen und
+// Wahrnehmung). Drei Besuche geben verbotenes Wissen; wer erwischt wird, fliegt (Aurelion −10) und darf nicht wieder rein.
+const LECTURES = [['Arkane Theorie', 'intelligence'], ['Heilkunde', 'medicine'], ['Geschichte des Hochreichs', 'leadership'], ['Alchemie', 'crafting'], ['Magitech-Mechanik', 'smithing']];
+const isMagister = n => n.prof === 'Magister' || n.spellRule === 'academy';
+function studentChoices(npc, choices) {
+  const p = S.player, St = S.student, day = S.day | 0, h = S.minute / 60;
+  if (isMagister(npc) && !St && !S.flags.acadBanned) choices.push({ text: 'Ich will mich als Student einschreiben. (100 Gold)', fn: () => {
+    if (!hasPermit()) return UI.dialogue(npc, '„Ohne Aufenthaltsschein nimmt die Akademie niemanden. Die Kanzlei am Tor stellt ihn aus.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    if (S.gold < 100) return UI.dialogue(npc, '„Hundert Gold Semestergeld. Wissen ist nicht umsonst — nur Unwissen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= 100; const rv = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.prof === 'Studentin'); S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: Object.keys(S.acad || {}).length, rival: rv?.id || null, forb: 0 };
+    UI.dialogue(npc, `„Willkommen, Student. Vorlesungen jeden Morgen zwischen acht und vierzehn Uhr — sprich mich oder einen anderen Magister an. Acht Vorlesungen und eine Prüfung, dann ist das Semester geschafft.“${rv ? `\n(${rv.name} mustert dich. Eine Rivalin, das spürst du sofort.)` : ''}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+  if (!St) return;
+  if (isMagister(npc)) {
+    if (St.day !== day && h >= 8 && h < 14) choices.unshift({ text: `Vorlesung besuchen (${LECTURES[St.total % LECTURES.length][0]})`, fn: () => lecture(npc) });
+    else if (St.day !== day) choices.push({ text: '(Vorlesungen gibt es morgens, 8–14 Uhr.)', fn: () => UI.closeDialogue() });
+    const trials = Object.keys(S.acad || {}).length;
+    if (St.lec >= 8 && trials > St.trialsAt) choices.unshift({ text: `Semester ${St.sem} abschließen`, fn: () => semesterDone(npc) });
+    else if (St.lec >= 8) choices.push({ text: '(Für den Abschluss fehlt noch eine bestandene Prüfung.)', fn: () => trialMenu(npc) });
+  }
+  if (npc.id === St.rival && npc.alive) choices.unshift({ text: 'Du willst dich messen? Dann los. (Duell der Akademie)', fn: () => { UI.closeDialogue(); St.rivalDuel = true; startTrial('duel'); } });
+  if (npc.prof === 'Archivar' && St.total >= 5 && !St.caught && St.forb < 3) choices.push({ text: 'Nach der verbotenen Abteilung fragen …', fn: () => forbidden(npc) });
+}
+function lecture(npc) {
+  const p = S.player, St = S.student, [topic, k] = LECTURES[St.total % LECTURES.length];
+  St.day = S.day | 0; St.lec++; St.total++; UI.closeDialogue(); act(p, 'kneel', 800); passTime(120);
+  if (k === 'intelligence') p.attributes.intelligence = (p.attributes.intelligence || 8) + (St.total % 5 === 0 ? 1 : 0); else p.skills[k] = Math.min(100, (p.skills[k] || 0) + 2);
+  if (St.total % 5 === 0 && k !== 'intelligence') p.attributes.intelligence = (p.attributes.intelligence || 8) + 1;
+  gainXp(p, 25); recalc(p);
+  log(`Vorlesung: ${topic}. ${npc.name} redet zwei Stunden, du schreibst mit.${k !== 'intelligence' ? ` (${SKILL_NAMES[k]} +2)` : ''}${St.total % 5 === 0 ? ' Etwas fällt an seinen Platz: Intelligenz +1.' : ''} (${St.lec}/8 im Semester)`, 'quest');
+}
+function semesterDone(npc) {
+  const St = S.student, p = S.player; St.sem++; St.lec = 0; St.trialsAt = Object.keys(S.acad || {}).length; p.attrPoints = (p.attrPoints || 0) + 1; gainXp(p, 150);
+  if (St.sem > 3 && !St.grad) { St.grad = true; S.acadRank = Math.max(S.acadRank || 0, 2); chronicle(`${p.name} schließt die Akademie ab`, 'legend', 'Drei Semester, ein Titel: Absolvent der Akademie von Aurelion.'); UI.toast('ABSOLVENT DER AKADEMIE', 3000); }
+  UI.dialogue(npc, `„Semester ${St.sem - 1} bestanden. Ein Attributpunkt für deinen Fleiß.“${St.grad ? '\n„Und damit: Absolvent. Die Akademie kennt deinen Namen.“ (Rang mindestens Adept)' : ''}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+const FORB_LORE = ['Ein Band über Seelenbindung, in Menschenhaut. Du liest, bis dir übel wird — und verstehst mehr als dir lieb ist.', 'Die Aufzeichnungen des ersten Magierkönigs: Aurelion wurde auf einem Friedhof gebaut. Absichtlich.', 'Eine Karte der Kraftlinien unter dem Hochreich. Eine davon endet genau unter dem Nachtglasturm.'];
+function forbidden(npc) {
+  const St = S.student, p = S.player, h = S.minute / 60;
+  if (!(h >= 22 || h < 4)) return UI.dialogue(npc, '„Verbotene Abteilung? Nie gehört.“ Er sieht dabei zur Tür im Keller. Nachts ist dort niemand.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, 'Der Archivar schläft über seinen Büchern. Die Kellertür ist nur angelehnt.', [
+    { text: 'Hineinschleichen', fn: () => { UI.closeDialogue(); const ok = (p.skills.stealth || 0) / 100 + (p.attributes.perception || 10) * 0.02 + rnd() * 0.5 > 0.55;
+      if (!ok) { St.caught = true; S.student = null; S.flags.acadBanned = true; S.factions.aurel = clamp((S.factions.aurel || 0) - 10, -100, 100); log('Eine Laterne, eine Stimme: „Stehen bleiben!“ Du fliegst von der Akademie. Aurelion −10.', 'faction'); UI.toast('VON DER AKADEMIE VERWIESEN', 3000); return; }
+      St.forb++; passTime(60); log(`Verbotene Abteilung: ${FORB_LORE[St.forb - 1]}`, 'quest');
+      if (St.forb >= 3) { p.attributes.intelligence = (p.attributes.intelligence || 8) + 3; p.attributes.willpower = (p.attributes.willpower || 8) + 3; recalc(p); S.flags.forbiddenLore = 1;
+        chronicle(`${p.name} liest in der verbotenen Abteilung`, 'legend', 'Manches Wissen wird man nicht mehr los.'); UI.toast('VERBOTENES WISSEN: INTELLIGENZ +3, WILLENSKRAFT +3', 3200); } } },
+    { text: 'Lieber nicht.', fn: () => UI.closeDialogue() }]);
 }
 function trialMenu(npc) {
   const done = S.acad || {}, back = () => trialMenu(npc);
@@ -13053,6 +13104,8 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Akademie: einschreiben (ohne Schein und Gold)': () => { S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: Object.keys(S.acad || {}).length, rival: null, forb: 0 }; S.flags.acadBanned = false; UI.toast('Student'); },   /* Nutzer §5e.8 */
+      'Akademie: 8 Vorlesungen und eine Prüfung gutschreiben': () => { if (!S.student) return UI.toast('Erst einschreiben'); S.student.lec = 8; S.student.total += 8; S.student.trialsAt = -1; UI.toast('Semester abschließbar beim Magister'); },
       'Dynastie: nächsten NPC heiraten': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.key && !e.guard && !S.party.includes(e.id)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return; S.relations[n.key] = 90; S.legacy.spouse = n.id; n.spouse = n.married = true; UI.toast(`Verheiratet: ${n.name}`); },   /* Nutzer §5e.2 */
       'Dynastie: Kind geboren': () => { const k = bearChild(); UI.toast(k.name); },
       'Dynastie: Kinder altern 16 Jahre': () => { (S.legacy.children || []).forEach(k => k.born -= 960); familyDay(); UI.toast('Kinder erwachsen'); },
@@ -15690,6 +15743,16 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Akademie (Nutzer §5e.8): Einschreiben kostet Semestergeld, Vorlesung einmal am Tag morgens, nach 8 Vorlesungen und einer Prüfung Semester fertig, nach drei Absolvent', sandbox(() => {
+    const p = stage(), st0 = S.student, a0 = S.acad, r0 = S.acadRank, f0 = S.flags.acadBanned, pm = S.permit; S.gold = 300; S.permit = (S.day | 0) + 5; S.flags.acadBanned = false;
+    try { S.student = null; const m = actor(330, 300, { kind: 'npc', prof: 'Magister' }); S.minute = 9 * 60;
+      let ch = []; studentChoices(m, ch); ch.find(c => /einschreiben/.test(c.text)).fn(); UI.closeDialogue(); const enrolled = !!S.student && S.gold === 200;
+      ch = []; studentChoices(m, ch); const lec = ch.find(c => /Vorlesung besuchen/.test(c.text)); S.minute = 9 * 60; lec?.fn(); ch = []; S.minute = 9 * 60; studentChoices(m, ch); const once = !!lec && S.student.lec === 1 && !ch.some(c => /Vorlesung besuchen/.test(c.text));
+      S.acad = { ...(S.acad || {}), probe: 1 }; S.student.lec = 8; S.student.trialsAt = 0; for (let i = 0; i < 3; i++) { S.student.lec = 8; S.student.trialsAt = -1; semesterDone(m); UI.closeDialogue(); }
+      const grad = S.student.grad && (S.acadRank || 0) >= 2 && S.student.sem === 4;
+      return enrolled && once && grad;
+    } finally { S.student = st0; S.acad = a0; S.acadRank = r0; S.flags.acadBanned = f0; S.permit = pm; }
   }));
   ok('Dynastie (Nutzer §5e.2): Heirat ab Beziehung 60, Kinder wachsen in Spielzeit, erwachsene Kinder und Ehepartner stehen zuerst zur Erbwahl, Adoption beim Priester', sandbox(() => {
     const p = stage(), lg = structuredClone(S.legacy); S.gold = 200;
