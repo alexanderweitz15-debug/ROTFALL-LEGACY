@@ -219,8 +219,9 @@ function startDodge(m, dx, dy) {
 let acc = 0, wAcc = 0, lastQuests = '', camOn = false;
 function hostTick(dt) {
   const S = A.S, G = S.coop?.guests; if (!G) return; acc += dt; wAcc += dt;
+  mateArrows(A.partyMembers().filter(m => m.coopPilot && m.map === S.map));
   for (const [id, g] of Object.entries(G)) if (now() - (g.seen || now()) > 10000) { try { g.conn.close(); } catch (e) { /* schon zu */ } dropGuest(id); }   /* 10 s ohne Lebenszeichen: Gast gilt als getrennt */
-  for (const g of Object.values(G)) { if (g.entId) { const m = A.byId(g.entId); if (m) { m.dodgeCd = Math.max(0, (m.dodgeCd || 0) - dt); m.landT ??= 0; } } }
+  for (const g of Object.values(G)) { if (g.entId) { const m = A.byId(g.entId); if (m) { m.dodgeCd = Math.max(0, (m.dodgeCd || 0) - dt); m.landT ??= 0; if (m.map !== S.map && m.alive) remoteControl(m, dt); } } }   /* Figur auf einer anderen Karte (Held im Kerker): die Welt dort rechnet nicht, aber laufen darf sie */
   if (acc < 50) return; acc = 0;
   for (const g of Object.values(G)) {
     if (!g.entId) continue; const m = A.byId(g.entId);
@@ -388,11 +389,27 @@ function guestTick(dt) {
   pending.dodge = false; pending.use = false; pending.slot = null;
   const s = JSON.stringify(msg); if (s !== lastIn || msg.seq !== lastSeq || A.keys.size || now() - lastSent > 2000) { lastIn = s; lastSeq = msg.seq; lastSent = now(); send(msg); }   /* alle 2 s ein Lebenszeichen */
   if (now() - hostSeen > 10000 && !lostWarned) { lostWarned = true; A.UI.toast('KOOP: HOST ANTWORTET NICHT', 5000); A.log('Koop: Seit 10 Sekunden kommt nichts vom Host. Ist sein Fenster zu? Zum Weiterspielen die Seite neu laden.', 'party'); }
-  A.UI.refreshHUD(); A.updatePrompt();   /* E-Hinweise (Aufheben, Händler, Eingang) aus Sicht der eigenen Figur */
+  A.UI.refreshHUD(); A.updatePrompt();
+  mateArrows((S.ents[S.map] || []).filter(e => e !== me && e.alive && (e.kind === 'player' || e.coopPilot)));   /* E-Hinweise (Aufheben, Händler, Eingang) aus Sicht der eigenen Figur */
   const el = $('coop-hud') || (() => { const d = document.createElement('div'); d.id = 'coop-hud'; d.className = 'ledger'; d.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;color:#c9bfa6;text-align:right'; document.body.appendChild(d); return d; })();
   el.textContent = `Koop: Gast bei ${S.coop.hostName}${S.coop.hostBusy ? ' · Host ist im Menü oder Gespräch' : ''}${S.coop.cineText ? ' · Kamerafahrt läuft' : ''}`;
 }
 let lastSeq = -1, lastSent = 0, hostSeen = now(), lostWarned = false;
+// Pfeil am Bildrand zu jedem Mitspieler, der gerade nicht zu sehen ist (Name und Entfernung dabei)
+const arrows = new Map();
+function mateArrows(list) {
+  const R = A.R, V = R.view(), z = R.cam.zoom || 1, seen = new Set();
+  for (const e of list) {
+    const sx = (e.x - R.cam.x) * z, sy = (e.y - 20 - R.cam.y) * z; if (sx > 0 && sx < V.W && sy > 0 && sy < V.H) continue;
+    seen.add(e.id); let el = arrows.get(e.id);
+    if (!el) { el = document.createElement('div'); el.className = 'coop-arrow'; el.style.cssText = 'position:fixed;z-index:35;pointer-events:none;font:12px Spectral,serif;color:#f0e6cd;text-shadow:0 1px 3px #000;text-align:center;transform:translate(-50%,-50%)'; document.body.appendChild(el); arrows.set(e.id, el); }
+    const cx = V.W / 2, cy = V.H / 2, a = Math.atan2(sy - cy, sx - cx), k = Math.min((V.W / 2 - 40) / Math.abs(Math.cos(a) || 1e-6), (V.H / 2 - 40) / Math.abs(Math.sin(a) || 1e-6));
+    const r = $('game-canvas')?.getBoundingClientRect() || { left: 0, top: 0 }, d = Math.round(Math.hypot(e.x - A.S.player.x, e.y - A.S.player.y) / 32);
+    el.style.left = (r.left + cx + Math.cos(a) * k) + 'px'; el.style.top = (r.top + cy + Math.sin(a) * k) + 'px';
+    el.innerHTML = `<div style="font-size:22px;color:#e8c070;transform:rotate(${a}rad)">➤</div>${esc(e.coopName || e.name)} · ${d} m`;
+  }
+  for (const [id, el] of arrows) if (!seen.has(id)) { el.remove(); arrows.delete(id); }
+}
 // Text der Kamerafahrt beim Gast (unten mittig, wie beim Host)
 function showCineText(t) {
   let el = $('coop-cine'); if (!el) { el = document.createElement('div'); el.id = 'coop-cine'; el.style.cssText = 'position:fixed;left:50%;bottom:18%;transform:translateX(-50%);max-width:70vw;z-index:40;font:18px Spectral,serif;color:#f0e6cd;text-align:center;text-shadow:0 2px 6px #000;pointer-events:none'; document.body.appendChild(el); }
