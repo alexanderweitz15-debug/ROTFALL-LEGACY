@@ -504,3 +504,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Königseisen:** beim Schmied erhältlich. „Mit Königseisen schmieden“ hebt die Güte um eine Stufe.
 - **Übung:** jede Arbeit steigert die Fertigkeit (anfangs schnell, später langsam) und kostet 45 Minuten (Kessel 20).
 - **Debug:** „Handwerk: Material geben“, „Handwerk: Schmieden 90“, „Handwerk: Esse/Werkbank/Kessel hier öffnen“. Probe „Handwerk (Nutzer §5d.8)“.
+
+## Runde: Gefährten 2.0 (Nutzer §5e.1, Version 21)
+- **Loyalität** (0–100, Start 50) steht in der Gruppenliste und im Gespräch „Wie geht es dir?“. Jeder Tag gemeinsam +1, Moral über 70 +1, Moral unter 30 −3. Ein Überfall auf Unschuldige vor ihren Augen −2 (gütige Gefährten −6).
+- **Am Feuer:** Abends und nachts (19–5 Uhr) kann man sich einmal am Tag mit jedem Gefährten ans Feuer setzen: eine Geschichte, Loyalität +5, Moral +5.
+- **Persönlicher Auftrag:** Nach drei Abenden erzählt der Gefährte von einem Feind (einem der Elite-Mini-Bosse) und wo er ist. Der Auftrag steht im Tagebuch mit Kartenpunkt. Fällt der Feind, während der Gefährte in der Gruppe ist: Loyalität +25, sonst −10. Ablehnen kostet 3 Loyalität.
+- **Freund fürs Leben:** Wer danach 70 oder mehr Loyalität hat, wird Freund fürs Leben (♥): verrät nie mehr, +2 auf sein bestes Attribut. Keine Romanze.
+- **Verrat:** Unter 30 warnt der Gefährte jeden Tag. Unter 15 kann jeder Gefährte verraten (30 % am Tag): mit bis zu 30 % deines Golds (höchstens 300) verschwinden oder die Waffe gegen dich ziehen.
+- **Debug:** „Gefährten: Loyalität −40“, „Gefährten: Loyalität +30 und 3 Feuergespräche“, „Gefährten: Loyalitätstag“. Probe „Gefährten 2.0 (Nutzer §5e.1)“.

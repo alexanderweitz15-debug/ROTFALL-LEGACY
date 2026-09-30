@@ -110,7 +110,7 @@ export function refreshHUD() {
     const cv = el('canvas'); cv.width = cv.height = 34;
     d.appendChild(cv);
     d.appendChild(el('div', '', `<div class="m-name">${m.name}</div>
-      <div class="m-sub">St. ${m.level} ${CLASSES[m.currentClass].name} · Moral ${Math.round(m.morale)}</div>
+      <div class="m-sub">St. ${m.level} ${CLASSES[m.currentClass].name} · Moral ${Math.round(m.morale)}${m.coopHero ? '' : ` · Loyalität ${Math.round(m.loyal ?? 50)}${m.friend ? ' ♥' : ''}`}</div>
       <div class="m-bar"><div style="width:${clamp(m.hp / m.maxHp * 100, 0, 100)}%"></div></div>`));
     d.onclick = () => { A.select(m); };
     list.appendChild(d);
