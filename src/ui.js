@@ -589,6 +589,8 @@ export function itemInfoHTML(slot, cmpWith = true) {
   const rar = slot.rar || it.rarity || 'common', leg = slot.leg || it.leg;
   let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
+  if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
+  if (slot.used) h += `<div class="stat" title="Gebraucht vom Schwarzmarkt: kommt beim Einsetzen mit weniger Zustand."><span>Gebraucht</span><b>${slot.used} % Zustand</b></div>`;
   for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;
   if (leg && LEGENDS[leg]) h += `<div class="legend-fx">«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
   if (it.lore || slot.lore) h += `<div class="lore">${slot.lore || it.lore}</div>`;
@@ -658,7 +660,7 @@ export function bodyChart(c, { big = false, click = false } = {}) {
 }
 /* Roadmap P5: Kurztext einer Prothese (Stufe, Zustand, Modul) oder '' */
 const mechNote = P => { if (!P?.mech) return ''; const c = Math.round(P.mechCond ?? 100);
-  return `Prothese ${MECH_Q[P.mech]?.name || ''} (Stufe ${P.mech}), Zustand ${c} %${c < 30 ? ' — wirkungslos' : c < 50 ? ' — halbe Wirkung' : ''}${P.mod && MECH_MOD[P.mod] ? `, Modul ${MECH_MOD[P.mod].name}` : ''}`; };
+  return `Prothese ${MECH_Q[P.mech]?.name || ''} (Stufe ${P.mech}), Zustand ${c} %${c < 30 ? ' — wirkungslos' : c < 50 ? ' — halbe Wirkung' : ''}${P.mechUp ? `, Aufrüstung ${P.mechUp}` : ''}${P.mod && MECH_MOD[P.mod] ? `, Modul ${MECH_MOD[P.mod].name}` : ''}`; };
 /* Roadmap P5: Bionik im Charakterbogen — jede Prothese und das Auge mit Stufe, Zustand, Modul; Hinweis auf Wartung */
 function bionicBlock(p) {
   const rows = PARTS.filter(k => p.body?.[k]?.mech).map(k => `<div class="bp-mech" title="${mechNote(p.body[k])}"><dt>${PART_NAME[k]} ⚙</dt><dd>${mechNote(p.body[k]).replace(/^Prothese /, '')}</dd></div>`);
@@ -1027,7 +1029,7 @@ function settingsUI(body) {
       WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
       I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · T — Talente · Z — Zauberbuch · H — Kodex · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
-      <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button></div>
+      <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button><button id="coopb" title="Zu zweit über das Netz: Code erzeugen oder beitreten">Koop (Netzwerk)</button></div>
       <h3 style="margin-top:14px">Auf anderem Gerät weiterspielen</h3>
       <div class="ledger">Der Spielstand wird hier im Browser mit deinem Passwort verschlüsselt (AES-256). Leg die Datei in einen
         Cloud-Ordner (OneDrive, Google Drive, Dropbox) und lade sie auf dem anderen Gerät mit demselben Passwort. Ohne Passwort
@@ -1047,6 +1049,7 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = () => { const ok = A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)
   $('quit').onclick = () => { A.saveNow(); location.reload(); };
+  $('coopb').onclick = () => { closeModal(); A.openCoop?.(); };
   cloudButtons();
 }
 // S15 Paket S: verschlüsselter Export und Import (cloudsave.js). Import behält den bisherigen Stand als Sicherung.

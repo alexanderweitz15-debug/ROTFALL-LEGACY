@@ -466,7 +466,7 @@ function useConsumable(c, idx, target = c, part = null) {
   if (it.use === 'eye') {                                    // Roadmap P2: Roboterauge einsetzen — ersetzt ein altes Auge, das alte geht verloren
     const old = c.eye?.q; if (old && old >= (it.tier || 1) && (c.eye.cond ?? 100) >= 30) return UI.toast(`${c.name} hat schon ein gleich gutes Auge (${B.EYE_Q[old].name}).`);
     const used = slot.used; if ((slot.count || 1) > 1) slot.count--; else c.inv.splice(idx, 1); const q = B.attachEye(c, it.tier || 1).q, E = B.EYE_Q[q]; if (used) c.eye.cond = used;   /* Roadmap P5: gebraucht */
-    log(`${c.name} setzt ${it.name} ein. Sichtweite ${E.fog} Felder${E.crit ? `, Fernkampf-Krit +${Math.round(E.crit * 100)} %` : ''}${E.light ? `, Nachtsicht +${Math.round(E.light * 100)} %` : ''}${E.heat ? ', Wärmesicht' : ''}. Magie stört es.`, 'party');
+    log(`${c.name} setzt ${it.name} ein. Sichtweite ${E.fog} Felder${E.crit ? `, Fernkampf-Krit +${Math.round(E.crit * 100)} %` : ''}${E.light ? `, Nachtsicht +${Math.round(E.light * 100)} %` : ''}${E.heat ? ', Wärmesicht' : ''}. Magie stört es.${used ? ` Gebraucht: nur ${used} % Zustand.` : ''}`, 'party');
     UI.toast(`${it.name.toUpperCase()} EINGESETZT`, 2400); return UI.refreshHUD();
   }
   if (it.use === 'mechmod') {                                // Roadmap P3: Hand- oder Fußmodul auf eine Prothese stecken — ein altes Modul kommt zurück in die Tasche
@@ -474,7 +474,7 @@ function useConsumable(c, idx, target = c, part = null) {
     const part = ks.find(k => !c.body[k].mod) || ks[0];
     if (!part) return UI.toast(`Keine passende Prothese: ${M.name} braucht einen Prothesen-${M.part === 'arm' ? 'arm' : 'bein'}.`);
     const P = c.body[part], old = P.mod; removeItem(c, slot.key, 1); if (old) addItem(c, old, 1); P.mod = it.mod; recalc(c);
-    log(`${c.name}: ${M.name} am ${B.PART_NAME[part]}${old ? ` (statt ${B.MECH_MOD[old]?.name})` : ''}. ${M.desc}${(P.mechCond ?? 100) < 30 ? ' Die Prothese ist beschädigt — das Modul wirkt erst nach der Instandsetzung.' : ''}`, 'party');
+    log(`${c.name}: ${M.name} am ${{ larm: 'linken Arm', rarm: 'rechten Arm', lleg: 'linken Bein', rleg: 'rechten Bein' }[part]}${old ? ` (statt ${B.MECH_MOD[old]?.name})` : ''}. ${M.desc}${(P.mechCond ?? 100) < 30 ? ' Die Prothese ist beschädigt — das Modul wirkt erst nach der Instandsetzung.' : ''}`, 'party');
     UI.toast(`${M.name.toUpperCase()} ANGESTECKT`, 2400); return UI.refreshHUD();
   }
   if (it.use === 'mechkit') {                                // Roadmap P4: Spezialöl — das am stärksten abgenutzte Bionik-Teil +25, höchstens 90 %
@@ -3211,8 +3211,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (brawlHit) { dmg *= 0.5; if (source === S.player && S.brawls?.[target.brawlV]) S.brawls[target.brawlV].helped = target.brawlSide === 'dorf' ? 'kette' : 'dorf'; }
   if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit);
     if (kind === 'physical' && source && dmg > 0 && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
-      if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); }
-      else if (w?.half && target === S.player) log('Deine Prothese knirscht: unter 50 % Zustand bringt sie nur noch den halben Vorteil. Spezialöl oder Feinwerkzeug an einer Werkbank helfen.', 'party'); } }   /* Roadmap P4 */
+      if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese (${B.PART_NAME[part]}) ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); }
+      else if (w?.half && target === S.player) log(`Deine Prothese (${B.PART_NAME[part]}) knirscht: unter 50 % Zustand bringt sie nur noch den halben Vorteil. Spezialöl oder Feinwerkzeug an einer Werkbank helfen.`, 'party'); } }   /* Roadmap P4 */
   else target.hp -= dmg;
   if (target.eye?.q && dmg > 0 && EYE_ZAP.has(kind)) { const w = B.wearEye(target, Math.min(8, 1.5 + dmg * 0.15));   /* Roadmap P2: Magie-Anfälligkeit — Schatten- und Magietreffer stören das Roboterauge */
     if (target === S.player && w) { if (w.broke) { UI.toast('ROBOTERAUGE GESTÖRT', 2200); log('Dein Roboterauge flackert unter 30 % und zeigt nur noch Rauschen. Ein Kybernetiker oder die Werkbank in Gelenkhall richtet es.', 'party'); } else if (w.was - w.now >= 1 && !S.flags.eyeZapHint) { S.flags.eyeZapHint = true; log('Magie knistert im Messing deines Auges. Zauber nutzen es ab.', 'party'); } } }
@@ -3393,7 +3393,7 @@ function die(c, cause = 'Wunden', source) {
     const pool = pilots.length ? share0(S.player.id) + pilots.reduce((a, pm) => a + share0(pm.id), 0) : 0;   /* Koop (Nutzer): Held und Gastfiguren teilen ihren Kampfanteil, jeder bekommt den ganzen */
     const share = id => pilots.length && (id === S.player.id || pilots.some(pm => pm.id === id)) ? pool : share0(id), px = Math.round(full * share(S.player.id));
     if (px > 0) gainXp(S.player, px);
-    for (const pm of partyMembers()) { const q = Math.round(full * share(pm.id)); if (q > 0) { pm.xp += q; while (pm.xp >= pm.xpNext) levelUp(pm); } }
+    for (const pm of partyMembers()) { if (pm.coopPilot && px > 0 && S.player.alive) continue; const q = Math.round(full * share(pm.id)); if (q > 0) { pm.xp += q; while (pm.xp >= pm.xpNext) levelUp(pm); } }   /* Koop: die Gastfigur hat ihren Anteil schon über gainXp (wie der Held), nicht doppelt */
     S.kills++;
     if (S.player.alive) S.player.kills = (S.player.kills || 0) + 1;
     S.battles = Math.max(1, Math.round(S.kills / 3));
@@ -4572,7 +4572,7 @@ function rummage(t, b) {
 // Obergrenze 70 %, Schmiedekunst hebt sie (bis 95 %), die Greifhand +10. Mehr schafft nur der Kybernetiker.
 const selfCap = p => Math.round(Math.min(95, 70 + (p.skills?.smithing || 0) * 0.2 + (B.hasMod(p, 'greifhand') ? 10 : 0)));
 function selfRepair(t) {
-  const p = S.player, cap = selfCap(p), todo = B.bionicParts(p).filter(x => x.cond < cap);
+  const p = S.player, cap = selfCap(p), todo = B.bionicParts(p).filter(x => x.cond < cap).sort((a, b) => a.cond - b.cond);   /* das am stärksten abgenutzte Teil zuerst */
   if (!todo.length) return UI.toast(`Nichts unter ${cap} % — mehr schafft nur ein Kybernetiker.`), false;
   if (!hasItem(p, 'feinwerkzeug')) return UI.toast('Ohne Feinwerkzeug geht das nicht. Kybernetiker und Prothesenhändler verkaufen es.', 3200), false;
   let done = 0; const used = [];
@@ -4598,17 +4598,37 @@ function mendAt(t, skipMech = false) {
   p.skills.smithing = Math.min(100, (p.skills.smithing || 0) + 0.5);
   log(`${items.length} Stücke selbst ausgebessert (${need} Eisenerz). Ein Schmied macht es besser.`, 'economy'); UI.refreshHUD();
 }
-function doInteractFor(m) {                                          /* Koop K2: Gastfigur hebt auf, was vor ihr liegt; Gespräche und Gebäude bleiben Sache des Hosts */
-  const items = (S.ents[m.map] || []).filter(e => e.kind === 'item' && Math.hypot(e.x - m.x, e.y - m.y) < 40).sort((a, b) => Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y));
-  const t = items[0]; if (!t) return;
-  if (m.inv.length >= (m.invCap || 20)) return log(`${m.name}: Gepäck voll.`, 'party');
-  m.inv.push(t.item); S.ents[m.map].splice(S.ents[m.map].indexOf(t), 1); log(`${m.coopName || m.name} nimmt ${t.item.name}.`, 'party');
+// Koop K2: E der Gastfigur. Liegt etwas vor ihr, hebt sie es auf (wer zuerst aufhebt, hat es). Sonst geht das Nächste an coop.js:
+// Händler (Handel mit dem Beutel des Gasts), Eingänge (Reisebitte an den Host), andere Figuren (Gruß; Gespräche führt der Host).
+function doInteractFor(m) {
+  const rank = e => e.kind === 'item' ? 0 : e.shop ? 1 : e.portal ? 2 : 3;
+  const near = (S.ents[m.map] || []).filter(e => e !== m && Math.hypot(e.x - m.x, e.y - m.y) < 62 && (e.kind === 'item' || (e.kind === 'npc' && e.alive && !e.downed) || (e.kind === 'prop' && e.portal)))
+    .sort((a, b) => rank(a) - rank(b) || Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y));   /* erst Gegenstände, dann Händler, Eingänge, andere Figuren */
+  const t = near[0]; if (!t) return null;
+  if (t.kind === 'item') {
+    if (!giveItem(m, t.item)) { log(`${m.name}: Tasche voll.`, 'party'); return { kind: 'full' }; }
+    S.ents[m.map].splice(S.ents[m.map].indexOf(t), 1); log(`${m.coopName || m.name} nimmt ${ITEMS[t.item.key]?.name || t.item.key}.`, 'party'); return { kind: 'took' };
+  }
+  return coopHooks.guestAct?.(m, t) || null;
 }
+// Koop K2.7: dieselben Ladensperren wie im Gespräch des Helden (talk). Liefert den Grund oder null.
+function shopRefusal(npc) {
+  if (!npc.shop) return 'Das ist kein Händler.';
+  if (npc.shopClosed > clock()) return 'Der Stand ist zu, bis sich die Lage beruhigt.';
+  if (npc.till && (hourNow() >= npc.till || hourNow() < 7)) return 'Der Laden ist zu. Morgen früh wieder.';
+  if (npc.town === 'vharnholm' && !deadWelcome()) return 'Vharnholm handelt nur mit denen, die zu ihnen gehören.';
+  if (npc.faction && repTier(npc.faction)?.name === 'Verhasst') return 'Nicht für euch. Nicht für Gold.';
+  if (npc.town && S.war.nodes[npc.town]?.owner === 'undead') return 'Die Toten halten die Stadt. Kein Handel.';
+  if (refusesChain(npc)) return 'Ich verkaufe nicht an Kettenleute.';
+  return null;
+}
+// Koop K2.6: der Gast will durch einen Eingang. Der Held geht hin und nimmt ihn (alle Sperren wie immer), die Gruppe folgt.
+function travelVia(t) { const p = S.player; p.x = t.x; p.y = t.y + 30; doInteract(t); }
 function useSlotFor(m, i) {                                          /* Koop K2: Leiste der Gastfigur, nur Verbrauchsgüter */
   const s = m.hotbar?.[i]; if (!s || s.type === 'ability') return; const idx = m.inv.findIndex(x => x.key === s.key); if (idx >= 0) useConsumable(m, idx);
 }
-function doInteract() {
-  const p = S.player, t = interactables()[0];
+function doInteract(target = null) {
+  const p = S.player, t = target || interactables()[0];   /* target: Koop K2.6 travelVia nimmt genau diesen Eingang */
   if (!t) return;
   if (t.kind === 'mount') return mountUp(t);                         // S15: aufsitzen
   if (t.kind === 'npc') return talk(t);
@@ -5837,7 +5857,7 @@ function aurelChoices(npc, choices) {
   if (f >= 60 && (S.ranks.aurel ?? 0) >= 6 && !S.quests.q_ratssitz && !S.flags.councillor) choices.unshift({ text: 'Ich will in den Hohen Rat.', fn: () => { startQuest('q_ratssitz'); cont(`„${H.name} schlägt dich vor. Zwei weitere Häuser müssen zustimmen, und Corvan will fünfhundert Gold Einlage. Dann sitzt du oben.“`); } });   // Nutzer S13
   if (S.gold >= 150) choices.push({ text: `${H.name} ein Geschenk machen (150 Gold)`, fn: () => { S.gold -= 150; S.houses[H.key] = clamp(favor(H.key) + 5, -100, 100); cont('„Wie aufmerksam. Das Haus merkt sich so etwas.“'); } });
   if (S.intrigue?.from === H.key && S.intrigue.done) choices.unshift({ text: 'Erledigt.', fn: () => {
-    const vs = S.intrigue.vs; S.houses[H.key] += 20; S.houses[vs] = favor(vs) - 25; S.gold += 120; S.intrigue = null; const Q = S.quests.q_intrige; if (Q) { Q.state = 'done'; Q.outcome = 'Für ' + H.name + ' erledigt.'; }
+    const vs = S.intrigue.vs; S.houses[H.key] += 20; S.houses[vs] = favor(vs) - 25; S.gold += questGold(120); S.intrigue = null; const Q = S.quests.q_intrige; if (Q) { Q.state = 'done'; Q.outcome = 'Für ' + H.name + ' erledigt.'; }
     log(`${H.name}: Gunst +20, ${AUREL_HOUSES.find(h => h.key === vs).name} −25, 120 Gold.`, 'faction'); cont('„Sauber. Man wird nicht erfahren, woher der Wind kam.“'); } });
   if (!(S.aurelJob && S.aurelJob.until >= (S.day | 0))) choices.unshift({ text: `In den Dienst von ${H.name} treten (7 Tage, 15 Gold je Tag)`, fn: () => {
     S.aurelJob = { house: H.key, until: (S.day | 0) + 7, pay: 15 }; log(`Im Dienst von ${H.name} bis Tag ${S.aurelJob.until}. Das gilt als Aufenthaltsrecht.`, 'faction'); cont('„Du trägst unser Siegel. Mach ihm keine Schande.“'); } });
@@ -7089,7 +7109,7 @@ function mechMenu(npc = null) {
   const opts = [];
   if (can.repair && repair > 0) opts.push({ text: `Alle Prothesen instand setzen (${repair} Gold)`, fn: () => { if (S.gold < repair) return say('Zu wenig Gold.'); S.gold -= repair; for (const k of parts) p.body[k].mechCond = 100; say('Gefettet, gerichtet, gespannt. Wie neu.'); } });
   if (can.up) for (const k of parts) if ((p.body[k].mechUp || 0) < 2) { const up = k.endsWith('arm') ? 'Kraftfeder' : 'Laufwerk', cost = 250 * ((p.body[k].mechUp || 0) + 1);
-    opts.push({ text: `${up} für ${NAME[k]} (Stufe ${(p.body[k].mechUp || 0) + 1}, ${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; p.body[k].mechUp = (p.body[k].mechUp || 0) + 1; recalc(p); say(`${up} eingesetzt: +5 % ${k.endsWith('arm') ? 'Schlagkraft' : 'Tempo'}.`); } }); }
+    opts.push({ text: `${up} für ${{ larm: 'den linken Arm', rarm: 'den rechten Arm', lleg: 'das linke Bein', rleg: 'das rechte Bein' }[k]} (Stufe ${(p.body[k].mechUp || 0) + 1}, ${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; p.body[k].mechUp = (p.body[k].mechUp || 0) + 1; recalc(p); say(`${up} eingesetzt: +5 % ${k.endsWith('arm') ? 'Schlagkraft' : 'Tempo'}.`); } }); }
   if (can.swap) opts.push(...mechSwapOptions(p, say, npc && npc.key !== 'vell' ? npc.name : 'Meisterin Vell'));   // Nutzer S13: gesunde Glieder freiwillig ersetzen
   opts.push(...eyeOptions(p, say, can, rate));   /* Roadmap P2: Roboterauge einsetzen und warten (ersetzt die alte Linse) */
   const eyeLine = p.eye?.q ? `\nAuge: ${B.EYE_Q[p.eye.q]?.name || '?'} (Stufe ${p.eye.q}), Zustand ${Math.round(p.eye.cond ?? 100)} %${(p.eye.cond ?? 100) < 30 ? ' (GESTÖRT — wirkungslos)' : ''}` : '';
@@ -7919,7 +7939,7 @@ function mechSwapOptions(p, say, who = 'Meisterin Vell') {
       out.push({ text: `${NAME[k]} ersetzen lassen — ${name} (${cost} Gold)${lack ? ` — gesperrt: ${lack}` : ''}`, fn: () => {
       if (lack) return say(`„Gesunde Glieder schneide ich nur bei Leuten mit Rang ab. Dir fehlt: ${lack}.“`);
       if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; B.attachProsthesis(p, k, tier); recalc(p);
-      log(`${who} trennt, fügt, stellt ein. Dein ${NAME[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich den ${NAME[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); } }
+      log(`${who} trennt, fügt, stellt ein. ${{ larm: 'Dein linker Arm', rarm: 'Dein rechter Arm', lleg: 'Dein linkes Bein', rleg: 'Dein rechtes Bein' }[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich ${{ larm: 'den linken Arm', rarm: 'den rechten Arm', lleg: 'das linke Bein', rleg: 'das rechte Bein' }[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); } }
   return out;
 }
 // Roadmap P2: Roboterauge beim Prothesenmacher — einsetzen (Stufe 2/3, ersetzt ein schwächeres) und warten (2 Gold je fehlendem Prozent)
@@ -7970,7 +7990,7 @@ function holyCourt(npc) {
     { text: 'Klage gegen ein Adelshaus einreichen (100 Gold)', fn: () => UI.dialogue(npc, '„Gegen wen?“', [...AUREL_HOUSES.map(H => ({ text: H.name, fn: () => {
       if (S.gold < 100) return say('„Die Gebühr, bitte.“'); S.gold -= 100;
       const win = favor('solandre') + (S.factions.aurel || 0) * 0.5 - favor(H.key) * 0.5 + ((S.player.attributes?.willpower || 10) - 10) * 4 > 10;
-      if (win) { S.gold += 350; S.houses[H.key] = clamp(favor(H.key) - 15, -100, 100); log(`Das Gericht gibt dir recht: ${H.name} zahlt 350 Gold. (Gunst −15)`, 'faction'); say('„Das Licht hat gewogen. Zu deinen Gunsten.“'); }
+      if (win) { S.gold += questGold(350); S.houses[H.key] = clamp(favor(H.key) - 15, -100, 100); log(`Das Gericht gibt dir recht: ${H.name} zahlt 350 Gold. (Gunst −15)`, 'faction'); say('„Das Licht hat gewogen. Zu deinen Gunsten.“'); }
       else { S.houses[H.key] = clamp(favor(H.key) - 10, -100, 100); log(`Klage abgewiesen. ${H.name} vergisst so etwas nicht. (Gunst −10)`, 'faction'); say('„Abgewiesen. Die Beweislast lag bei dir.“'); } } })), { text: 'Zurück', fn: back }]) },
     { text: 'Einer Verhandlung beiwohnen', fn: () => courtHearing(npc) },
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
@@ -8343,7 +8363,7 @@ function anomalyClose(c, key) {
   if (!S.anomaly || c !== S.player || !ABILITIES[key]?.spell?.absorb || Math.hypot(c.x / TS - S.anomaly.x, c.y / TS - S.anomaly.y) > 3) return false;
   const st = S.quests.q_anomaly; S.anomaly = null; S.flags.anomalyClosed = (S.flags.anomalyClosed || 0) + 1;
   fx(c.x, c.y - 12, 'heal', 30); S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 3, life: 800, maxLife: 800 });
-  if (st?.state === 'active') { st.progress = [1]; const R = QUESTS.q_anomaly.reward; st.state = 'done'; S.gold += R.gold; gainXp(c, R.xp); for (const [f, v] of Object.entries(R.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); }
+  if (st?.state === 'active') { st.progress = [1]; const R = QUESTS.q_anomaly.reward; st.state = 'done'; S.gold += questGold(R.gold); gainXp(c, R.xp); for (const [f, v] of Object.entries(R.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); }
   log(`Der Riss schließt sich. Das Gewebe ist wieder still${st?.state === 'done' ? ' (120 Gold, Aurelion und Orden +4)' : ''}.`, 'quest'); chronicle(`${c.name} schließt eine magische Anomalie`, 'news'); return true;
 }
 function anomalyDay() { if (S.anomaly && (S.day | 0) >= S.anomaly.until) { log(`Die Anomalie bei ${S.anomaly.where} schließt sich von selbst.`, 'world'); S.anomaly = null; if (S.quests.q_anomaly?.state === 'active') S.quests.q_anomaly.state = 'failed'; } }
@@ -8481,7 +8501,7 @@ function bigSecond() {                                                // jede Se
     if (near) { for (let i = 0; i < 6; i++) { const e = spawnEnemy(pick(['bandit', 'bandit', 'bandit_archer']), 'world', B.x + 14 + ri(-3, 3), B.y + ri(-5, 5)); e.bigEv = B.id; e.transient = true; e.treasureRaid = true; } log('Räuber brechen aus dem Unterholz und stürzen sich auf den Schatzwagen!', 'combat'); UI.toast('ÜBERFALL AUF DEN SCHATZWAGEN', 2600); }
     else { S.factions.bandit = clamp((S.factions.bandit || 0) + 2, -100, 100); return bigEnd('Der Schatzwagen der Gilde wurde in der Nacht ausgeraubt. Niemand war da.'); } }
   if (B.kind === 'treasure' && B.attacked && !B.done && !S.ents.world.some(e => e.treasureRaid && e.alive)) { B.done = true;
-    if (S.ents.world.some(e => e.treasureGuard && e.alive)) { S.gold += 120; S.factions.merch = clamp((S.factions.merch || 0) + 10, -100, 100); addFame(5, undefined, 'Schatzwagen'); log('Die Räuber sind geschlagen. Die Gildenwache zahlt dir 120 Gold. Handelsgilde +10.', 'faction'); }
+    if (S.ents.world.some(e => e.treasureGuard && e.alive)) { S.gold += questGold(120); S.factions.merch = clamp((S.factions.merch || 0) + 10, -100, 100); addFame(5, undefined, 'Schatzwagen'); log('Die Räuber sind geschlagen. Die Gildenwache zahlt dir 120 Gold. Handelsgilde +10.', 'faction'); }
     bigEnd(); }
   if (B.kind === 'tourney' && B.fighter) { const f = byId(B.fighter);
     if (p.downed) { if (f) { f.angry = false; f.aggroId = null; } B.fighter = null; B.round = 0; log('Du liegst im Sand. Die Menge johlt. Das Turnier ist für dich vorbei.', 'combat'); UI.toast('BESIEGT', 2200); B.lost = true; } }
@@ -8490,7 +8510,7 @@ function tourneyYield(t, dmg) {                                       // aus hur
   if (!t.tourney || t.hp - dmg > t.maxHp * 0.3) return false;
   const B = S.big; t.angry = false; t.aggroId = null; t.tourney = false; float(t, 'Ich gebe auf!', 'rgba(230,220,180,ALPHA)');
   if (B?.kind === 'tourney') { B.round++; B.fighter = null;
-    if (B.round >= 3) { S.gold += 200; addFame(15, undefined, 'Turniersieg'); SIM.H.title?.('Turniersieger'); log('Drei Gänge, drei Siege. Der Herold ruft deinen Namen: 200 Gold und der Titel „Turniersieger“.', 'quest'); chronicle(`${S.player.name} gewinnt das Turnier von ${townName(B.town)}`, 'legend'); UI.toast('TURNIERSIEGER', 3000); B.won = true; }
+    if (B.round >= 3) { S.gold += questGold(200); addFame(15, undefined, 'Turniersieg'); SIM.H.title?.('Turniersieger'); log('Drei Gänge, drei Siege. Der Herold ruft deinen Namen: 200 Gold und der Titel „Turniersieger“.', 'quest'); chronicle(`${S.player.name} gewinnt das Turnier von ${townName(B.town)}`, 'legend'); UI.toast('TURNIERSIEGER', 3000); B.won = true; }
     else log(`Gang ${B.round} gewonnen. Sprich mit dem Herold für den nächsten.`, 'quest'); }
   return true;
 }
@@ -8527,8 +8547,8 @@ function bigChoices(npc, choices) {
   if (npc.strikeLead && B.kind === 'strike') choices.unshift({ text: 'Worum geht es beim Streik?', fn: () => UI.dialogue(npc, '„Vierzehn Stunden an den Kesseln, drei Finger weniger, und der Lohn kommt einen Monat zu spät. Vantor will uns mit Automaten ersetzen. Wir wollen nur, was man uns schuldet.“', [
     { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); S.prices = (S.prices || 1) * 1.03; strikeOff(); addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); UI.closeDialogue(); } },
     { text: 'Ich vermittle. (Willenskraft)', fn: () => { const ok = (p.attributes.willpower || 8) + ri(0, 8) >= 12; strikeOff();
-      if (ok) { S.houses.vantor = clamp(favor('vantor') + 3, -100, 100); S.gold += 60; bigEnd('Du bringst Grete und Vantor an einen Tisch. Halber Rückstand, kürzere Schichten. Beide zahlen dir etwas (60 Gold).'); } else bigEnd('Die Vermittlung platzt. Am Ende geben die Hungrigen nach, ohne etwas zu bekommen.'); UI.closeDialogue(); } },
-    { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += 100; addRel(npc.key, -30); strikeOff(); bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
+      if (ok) { S.houses.vantor = clamp(favor('vantor') + 3, -100, 100); S.gold += questGold(60); bigEnd('Du bringst Grete und Vantor an einen Tisch. Halber Rückstand, kürzere Schichten. Beide zahlen dir etwas (60 Gold).'); } else bigEnd('Die Vermittlung platzt. Am Ende geben die Hungrigen nach, ohne etwas zu bekommen.'); UI.closeDialogue(); } },
+    { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += questGold(100); addRel(npc.key, -30); strikeOff(); bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
     { text: 'Später.', fn: () => UI.closeDialogue() }]) });
   if (npc.crashSurvivor && !npc.downed && !npc.thanked) { npc.thanked = true; S.factions.aurel = clamp((S.factions.aurel || 0) + 6, -100, 100); S.gold += 40; choices.unshift({ text: 'Wie geht es dir?', fn: () => say('„Du hast mich aus dem Wrack geholt. Aurelion zahlt seine Schulden: nimm das.“ (40 Gold, Aurelion +6)') }); }
 }
@@ -8826,7 +8846,7 @@ function activeEffects() {
   for (const k of B.PARTS) { const P = p.body?.[k]; if (!P) continue;
     if (P.lost) add('Körper', '✕', `${PART_DE[k]} verloren`, 'bad', [k.includes('arm') ? 'Keine Waffe oder kein Schild in dieser Hand.' : 'Stark verlangsamt.', 'Prothesen gibt es in Gelenkhall.'], true);
     else if (P.mech) { const mc = Math.round(P.mechCond ?? 100);   /* S15 Hinweise: Zustand sichtbar, unter 30 % wirkungslos */
-      add('Körper', '⚙', `${PART_DE[k]}: Prothese`, mc < 30 ? 'bad' : 'info', [`Stufe ${P.mech} (${B.MECH_Q[P.mech]?.name || '?'}). Zustand ${mc} %${mc < 30 ? ' — beschädigt, wirkungslos' : ''}.`, ...(P.mod && B.MECH_MOD[P.mod] ? [`Modul: ${B.MECH_MOD[P.mod].name} — ${B.MECH_MOD[P.mod].desc}`] : []), 'Nutzt sich bei jedem Treffer ab, unter 50 % nur halbe Wirkung. Spezialöl, Feinwerkzeug an Werkbank oder Amboss, oder ein Kybernetiker in Aurelion.'], mc < 30); }
+      add('Körper', '⚙', `${PART_DE[k]}: Prothese`, mc < 30 ? 'bad' : 'info', [`Stufe ${P.mech} (${B.MECH_Q[P.mech]?.name || '?'}). Zustand ${mc} %${mc < 30 ? ' — beschädigt, wirkungslos' : ''}.`, (() => { const kd = k.includes('arm') ? 'arm' : 'leg', v = Math.round(((B.MECH_Q[P.mech] || B.MECH_Q[2])[kd] + (P.mechUp || 0) * 0.05) * 100); return `${kd === 'arm' ? 'Hiebe' : 'Tempo'} ${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)} %${P.mechUp ? ` (mit Aufrüstung ${P.mechUp})` : ''}.`; })(), ...(P.mod && B.MECH_MOD[P.mod] ? [`Modul: ${B.MECH_MOD[P.mod].name} — ${B.MECH_MOD[P.mod].desc}`] : []), 'Nutzt sich bei jedem Treffer ab, unter 50 % nur halbe Wirkung. Spezialöl, Feinwerkzeug an Werkbank oder Amboss, oder ein Kybernetiker in Aurelion.'], mc < 30); }
     else if (P.hp <= 0) add('Körper', '✕', `${PART_DE[k]} ausgefallen`, 'bad', [k.includes('arm') ? 'Die Hand trägt nichts mehr.' : k === 'head' ? 'Lebensgefahr.' : 'Du humpelst.', 'Verband oder Heilerin.'], true); }
   if (p.eye?.q) { const ec = Math.round(p.eye.cond ?? 100), X = B.EYE_Q[p.eye.q] || B.EYE_Q[2];   /* Roadmap P2: Roboterauge */
     add('Körper', '◉', `Auge: ${X.name}`, ec < 30 ? 'bad' : 'info', [`Stufe ${p.eye.q}. Zustand ${ec} %${ec < 30 ? ' — gestört, wirkungslos' : ''}.`, `Sichtweite ${X.fog} Felder${X.crit ? `, Fernkampf-Krit +${Math.round(X.crit * 100)} %` : ''}${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}${X.heat ? ', Wärmesicht' : ''}.`, 'Magie- und Schattentreffer nutzen es ab. Warten beim Prothesenmacher.'], ec < 30); }
@@ -9357,7 +9377,7 @@ function turnIn(npc, k) {
   if (!st || st.state !== 'active') return;                          // S15: nie zweimal abgeben
   st.state = 'done';
   const r = Q.reward || {};
-  if (r.gold) { S.gold += r.gold; log(`${r.gold} Gold erhalten.`, 'economy'); }
+  if (r.gold) { S.gold += questGold(r.gold); log(`${r.gold} Gold erhalten.`, 'economy'); }
   if (r.xp) gainXp(S.player, r.xp);
   if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] += v; log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
@@ -10659,6 +10679,7 @@ function facRelation(a, b) {
 
 // ================= Eingabe =================
 function bindInput() {
+  if (bindInput.done) return; bindInput.done = true;   /* Koop K2: Koop kann auch aus dem laufenden Spiel starten — Tasten nie doppelt binden */
   const cv = $('game-canvas');
   window.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
@@ -13809,13 +13830,14 @@ function titleLoop(t) {
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS };
+    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll,
+    openCoop: () => import('./coop.js?v=21').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => equip(S.player, i),
     unequip: k => unequip(S.player, k),
     dropItem: i => { const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
