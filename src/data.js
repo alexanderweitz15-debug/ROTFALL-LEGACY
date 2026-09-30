@@ -616,6 +616,11 @@ export const ABILITIES = {
   still_water: { name:'Stilles Wasser', title:'monk', cd:16000, cost:2, desc:'Atmen, sammeln: heilt 6 s lang, stillt Blutungen. Kostet 2 Fokus.' },
   hundred_steps:{ name:'Hundert Schritte', title:'monk', cd:9000, cost:'all', min:3, desc:'Ein Sprint durch die Reihen: unverwundbar, jeder Gegner im Weg wird getroffen — stärker je Fokus. Verbraucht allen Fokus (mindestens 3).' },
   earth_blessing:{ name:'Erdsegen', title:'druid', cd:14000, cost:30, desc:'Dich und deine Gruppe heilt die Erde 8 s lang. Kostet 30 Wildkraft.' },
+  gob_horde:   { name:'Goblinhorde', title:'goblinlord', cd:18000, cost:40, desc:'Drei Goblinkrieger stürmen aus den Schatten und kämpfen 25 s für dich. Kostet 40 Mut.' },   /* Nutzer §5e.9 */
+  scrap_bomb:  { name:'Schrottbombe', title:'goblinlord', cd:8000, cost:25, desc:'Wirft einen Topf voll Schrott und Pulver: trifft alles im Umkreis des Einschlags und setzt in Brand. Kostet 25 Mut.' },
+  war_drum:    { name:'Kriegstrommel', title:'goblinlord', cd:20000, cost:35, desc:'Du und alle Verbündeten in der Nähe kämpfen 10 s mit +15 % Schaden. Kostet 35 Mut.' },
+  tunnel_dash: { name:'Tunnelsprung', title:'goblinlord', cd:10000, cost:20, desc:'Du gräbst dich ein und brichst ein Stück weiter wieder hervor; Feinde am Ausgang taumeln. Kostet 20 Mut.' },
+  dodon_call:  { name:'Dodons Echo', title:'goblinlord', cd:40000, cost:60, desc:'Du brüllst wie Dodon: alle Feinde in der Nähe nehmen Schaden und taumeln lange. Kostet 60 Mut.' },
   shadow_raise:{ name:'Schattenruf', title:'warlock', cd:8000, gain:25, desc:'Ein Schattenskelett steigt ohne Leiche aus dem Boden (40 s, höchstens 2). +25 Verderbnis.' },
   pact_knight: { name:'Paktritter', title:'warlock', cd:30000, desc:'Ein Knochenritter mit Schild dient dir 45 s (höchstens einer). Kostet 20 % deines Lebens.' },
   corpse_blast:{ name:'Leichenbersten', title:'necromancer', cd:9000, cost:1, desc:'Eine Leiche oder dein schwächster Diener birst: Knochensplitter treffen alles im Umkreis (90 px). Kostet 1 Seelenessenz.' },
@@ -729,6 +734,20 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Das Gelübde der Armut: die Hälfte deines Goldes geht an das Kloster, und Rooks Bande vergisst dich nicht. Den Toten kannst du danach nicht mehr beitreten, und kein Totenpakt steht dir offen.', gold:0.5 },
     rep:{ order:20, bandit:-30 },
     unlock:'„Die Probe der Stillen Hand“: Meisterin Ilva in Sonnwacht — zehnmal im letzten Moment ausweichen, vier Tote zur Ruhe bringen, dann das Gelübde.' },
+  /* Nutzer §5e.9: Titelklasse der befreiten Grubenstämme */
+  goblinlord: { name:'Grubenhäuptling', title:'Häuptling der Gruben', glow:'#9ad05a', faction:'goblin', excludes:[], reversible:false,
+    desc:'Die Grubenstämme folgen dir. Mut wächst mit jedem Goblin an deiner Seite — Schrott, Trommeln und Tunnel sind deine Waffen.',
+    resource:{ key:'mut', name:'Stammesmut', max:100, start:30, css:'wild',
+      rule:'Wächst von selbst (+2/s), dazu +2/s für jeden Goblin in deiner Gruppe oder deinem Gefolge in der Nähe (bis +8). Ohne Goblin und ohne Kampf schwindet er (−1/s).' },
+    abilities:['gob_horde', 'scrap_bomb', 'war_drum'],
+    grades:[['gob_horde', 'scrap_bomb'], ['war_drum', 'tunnel_dash'], ['dodon_call']], mentor:'grisk',
+    deed:'Feinde besiegen, während ein Goblin an deiner Seite kämpft',
+    gradeNames:['Häuptling der Gruben', 'Trommler der Stämme', 'Stimme Dodons'],
+    passive:{ name:'Stammesbande', desc:'Goblins in deiner Gruppe teilen deinen Mut: +10 % Schaden.' },
+    flaw:{ name:'Mut braucht Gesellschaft', desc:'Allein und ohne Kampf schwindet der Stammesmut.' },
+    cost:{ desc:'Die Tunnel formen dich: Intelligenz −1 für immer, und der Weiße Orden nennt dich Goblinfreund.', attr:{ intelligence:-1 } },
+    rep:{ goblin:20, order:-10 },
+    unlock:'„Einer von uns“: Grisk in Grubenhort — die Stämme befreien, Grubenhort zur Grubenstadt wachsen lassen und bei den Goblins 40 Ruf haben.' },
 };
 export const MAX_TITLES = 2;                       // höchstens zwei Titelklassen je Figur (Nutzerwunsch), getragen wird eine
 
