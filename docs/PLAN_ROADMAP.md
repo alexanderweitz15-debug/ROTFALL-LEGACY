@@ -532,7 +532,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 7. **Banden (GEBAUT):** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
 8. **Handwerk (GEBAUT):** Rezepte an Esse/Werkbank/Kessel, **Qualität nach Fertigkeit**, Spezialmaterialien (Königseisen, Magitech).
 9. **Seevolk (GEBAUT: eigenes Schiff, Kurse, Seehandel, Piraterie; weitere Inseln offen):** **freie Seefahrt** mit eigenem Schiff, mehrere Inseln, Seehandel und Piraterie.
-10. **Aurelions Nebenstädte:** **eigene Grundrisse** und eigener Charakter je Stadt (Klinik-/Tempelstadt Sankt Serin, Werftstadt Kupferhafen, Fabrikstadt Tickmar, Gelenkhall).
+10. **Aurelions Nebenstädte (GEBAUT als eigenes Gesicht und Dienst; neue Grundrisse offen — würden alte Spielstände verschieben):** **eigene Grundrisse** und eigener Charakter je Stadt (Klinik-/Tempelstadt Sankt Serin, Werftstadt Kupferhafen, Fabrikstadt Tickmar, Gelenkhall).
 - **Talentpunkte:** jede dritte Stufe (21 bis Stufe 60).
 - **Omega fällt:** Panik im Osten, Jubel und Pilgerzüge im Westen.
 

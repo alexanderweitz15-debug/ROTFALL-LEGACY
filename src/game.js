@@ -1860,7 +1860,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -2044,7 +2044,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
   ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
@@ -8237,6 +8237,57 @@ function royalTick() {
     if (Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30 && !S.ents.world.some(e => e.contract === C.id && e.alive)) { const E = ELITES[C.elite], e = spawnEnemy(E.base, 'world', C.tx, C.ty); applyElite(e, C.elite); Object.assign(e, { contract: C.id, transient: true, anchor: { x: C.tx * TS, y: C.ty * TS } }); }
   }
 }
+// ================= Aurelions Nebenstädte mit eigenem Gesicht (Nutzer §5d.10) =================
+// Die vier Nebenstädte teilen denselben Grundriss (Weltaufbau bleibt unverändert, alte Spielstände passen weiter). Jede bekommt
+// flüchtig ihr eigenes Gesicht und einen eigenen Dienst: Sankt Serin (Tempel- und Klinikstadt: Pilgerzelte, Krankenlager, Segen gegen
+// Spende), Kupferhafen (Werftstadt: Rümpfe auf dem Helling, Kräne, Schiffbauer repariert das eigene Schiff zum halben Preis),
+// Tickmar (Fabrikstadt: Schlote, Kohle, Schichtpfeife; der Fabrikvogt verkauft Ersatzteile und Zellen billig), Gelenkhall
+// (Prothesenstadt: Reihen ruhender Automaten, Patienten mit Prothesen; die Gliedmacherin wartet Prothesen günstiger).
+const CITY_FACE = {
+  sanktserin: { props: [['tent_prop', 'Pilgerzelt'], ['tent_prop', 'Pilgerzelt'], ['bunk', 'Krankenlager'], ['bunk', 'Krankenlager'], ['candles', 'Votivkerzen'], ['altar_small', 'Altar des heiligen Serin'], ['candles', 'Votivkerzen'], ['shrine', 'Heilquelle']],
+    folk: [['Pilgerin', 'Pilger', 'Pilger'], ['Kranke', 'Kranker']], lead: ['Mutter Aveline', 'Tempelheilerin', 'serinBless', '„Sankt Serin heilt, was zu heilen ist. Für den Rest beten wir.“'],
+    greet: ['„Ich bin drei Wochen gelaufen. Die Quelle muss helfen.“', '„Hier stirbt niemand allein. Das ist mehr, als man anderswo sagen kann.“'] },
+  kupferhafen: { props: [['boat', 'Rumpf auf dem Helling'], ['boat', 'Rumpf auf dem Helling'], ['crane', 'Werftkran'], ['crane', 'Werftkran'], ['net_rack', 'Tauwerk'], ['crate_stack', 'Planken'], ['barrel', 'Pech'], ['big_gear', 'Winde']],
+    folk: [['Schiffbauer', 'Kalfaterin', 'Zimmermann'], ['Hafenarbeiter', 'Seilerin']], lead: ['Meister Holm', 'Schiffbaumeister', 'shipwright', '„Jeder Rumpf, der hier vom Helling geht, kommt heil zurück. Fast jeder.“'],
+    greet: ['„Pech, Planken, Kupfernägel. Und Flüche. Viele Flüche.“', '„Die Luftschiffe stehlen uns die Aufträge. Das Meer bleibt.“'] },
+  tickmar: { props: [['chimney', 'Schlot'], ['chimney', 'Schlot'], ['chimney', 'Schlot'], ['gearpile', 'Schrott'], ['machine', 'Stanze'], ['crate_stack', 'Kohle'], ['broken_cart', 'Kohlenkarren'], ['big_gear', 'Schwungrad']],
+    folk: [['Fabrikarbeiterin', 'Heizer', 'Kohlenträger'], ['Vorarbeiter']], lead: ['Vogt Kessler', 'Fabrikvogt', 'factoryShop', '„Die Pfeife geht um sechs. Wer zu spät kommt, arbeitet umsonst.“'],
+    greet: ['„Sechzehn Stunden, dann schlafen, dann wieder sechzehn.“', '„Meine Lunge ist schwarz wie die Schlote. Aber die Kinder essen.“'] },
+  gelenkhall: { props: [['automat_frame', 'Ruhender Automat'], ['automat_frame', 'Ruhender Automat'], ['automat_frame', 'Gestell mit Armen'], ['workstation', 'Feinwerkbank'], ['gearpile', 'Federn und Gelenke'], ['crate_stack', 'Gussformen'], ['machine', 'Drehbank'], ['bench', 'Wartebank']],
+    folk: [['Patient', 'Patientin', 'Feinmechaniker'], ['Uhrmacherin']], lead: ['Meisterin Vessa', 'Gliedmacherin', 'mechCare', '„Ein Arm aus Messing ist ehrlicher als einer aus Fleisch. Er lügt nicht, wenn er bricht.“'],
+    greet: ['„Das neue Knie quietscht. Aber es trägt.“', '„Ich warte seit einem Monat auf meine Hand. Sie soll schöner werden als die alte.“'] },
+};
+function ensureCityCharacter() {
+  for (const [k, F] of Object.entries(CITY_FACE)) {
+    const P = TOWN_PLAN[k]; if (!P?.square || S.ents.world.some(e => e.cityFace === k)) continue; const [cx, cy] = P.square;
+    const clear = q => { const tx = q.x / TS | 0, ty = q.y / TS | 0;   /* nicht auf Häusern, Türachsen oder Schlafplätzen der Bewohner */
+      return !HOUSES.some(b => b.map === 'world' && ((tx >= b.x - 1 && tx <= b.x + b.w && ty >= b.y - 1 && ty <= b.y + b.h) || (b.doorTile && Math.abs(b.doorTile[0] - tx) <= 2 && Math.abs(b.doorTile[1] - ty) <= 2)))
+        && !S.ents.world.some(c => c.anchor && c.kind === 'npc' && Math.hypot(c.anchor.x - q.x, c.anchor.y - q.y) < 48); };
+    const spot = (i, r0) => { for (let t = 0; t < 12; t++) { const a = i * 0.785 + t * 0.53, r = r0 + t % 4, q = freeSpotNear('world', cx + Math.round(Math.cos(a) * r), cy + Math.round(Math.sin(a) * r * 0.7), 1); if (q && clear(q)) return q; } return null; };
+    F.props.forEach(([type, label], i) => { const q = spot(i, 5 + (i % 3) * 2);
+      if (q) S.ents.world.push({ id: uid(), kind: 'prop', type, map: 'world', x: q.x, y: q.y, r: 10, solid: !['candles', 'bunk', 'bench', 'shrine'].includes(type), transient: true, planned: true, cityFace: k, label }); });
+    const mk = (name, prof, i, o = {}) => { const a = i * 1.3 + 0.4, q = freeSpotNear('world', cx + Math.round(Math.cos(a) * (4 + i)), cy + Math.round(Math.sin(a) * (3 + i * 0.5)), 2); if (!q) return null;
+      const c = makeChar({ name, prof, x: q.x, y: q.y, level: 4, faction: 'aurel', traits: [pick(['fleißig', 'mürrisch', 'gütig'])] });
+      Object.assign(c, { cityFace: k, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y } }, o); S.ents.world.push(c); return c; };
+    const [ln, lp, role, lg] = F.lead; mk(ln, lp, 0, { cityRole: role, greet: lg });
+    let i = 1; for (const profs of F.folk) for (const pr of profs) { mk(pick(/in$|e$/.test(pr) ? FIRST_F : FIRST_M), pr, i, { greet: pick(F.greet) }); i++; }
+    if (k === 'gelenkhall') for (const c of S.ents.world.filter(e => e.cityFace === k && /Patient/.test(e.prof || '')) ) if (c.body) { c.body.larm.mech = 2; c.body.larm.mechCond = 70; }
+  }
+}
+function cityChoices(npc, choices) {
+  const R0 = npc.cityRole, p = S.player, day = S.day | 0, say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); if (!R0) return;
+  if (R0 === 'serinBless') choices.unshift({ text: 'Um den Segen von Sankt Serin bitten (10 Gold Spende)', fn: () => {
+    if (S.flags.serinDay === day) return say('„Einmal am Tag. Der Heilige ist nicht geizig, aber müde.“');
+    const poor = S.gold < 30; if (!poor && S.gold < 10) return say('„Zehn Gold für die Kranken.“'); if (!poor) S.gold -= 10; S.flags.serinDay = day;
+    B.heal(p, p.maxHp * 0.3); addStatus(p, { key: 'blessing', name: 'Segen von Sankt Serin', good: true, left: 600000, desc: '+5 Rüstung.' }); p.status = p.status.filter(q => q.key !== 'infektion');
+    say(poor ? '„Behalt dein letztes Gold. Der Heilige zählt nicht.“ (Geheilt, gesegnet, Entzündung gereinigt — umsonst für Arme)' : '„Geh in Frieden.“ (Geheilt, gesegnet, Entzündung gereinigt)'); } });
+  if (R0 === 'shipwright' && S.ship && S.ship.hull < 100) choices.unshift({ text: `Die „${S.ship.name}“ ausbessern lassen (${100 - S.ship.hull} Gold — halber Preis)`, fn: () => {
+    const c = 100 - S.ship.hull; if (S.gold < c) return say('„Planken kosten. Komm mit Gold wieder.“'); S.gold -= c; S.ship.hull = 100; say('„Wie neu. Besser als neu — ich hab den Kiel verstärkt.“'); } });
+  if (R0 === 'shipwright' && !S.ship) choices.unshift({ text: 'Baut Ihr auch Schiffe für mich?', fn: () => say('„Kauf eins beim Kapitän des Salzbunds am Steg. Wenn es leckt, komm zu mir — ich nehme die Hälfte von dem, was die anderen nehmen.“') });
+  if (R0 === 'factoryShop') { Object.assign(npc, { shop: true, market: false, pool: ['ersatzteile', 'ersatzteile', 'ersatzteile', 'energiezelle', 'energiezelle', 'automatenkern', 'tools', 'ingot'] }); }
+  if (R0 === 'mechCare' && typeof B.bionicParts === 'function' && B.bionicParts(p).some(x => x.cond < 100)) choices.unshift({ text: 'Meine Prothesen warten lassen (40 Gold)', fn: () => {
+    if (S.gold < 40) return say('„Vierzig. Federn wachsen nicht an Bäumen.“'); S.gold -= 40; for (const x of B.bionicParts(p)) B.setBionicCond(p, x.k, 100); recalc(p); say('„Geölt, gespannt, geschliffen. Hör, wie leise es jetzt ist.“ (alle Prothesen 100 %)'); } });
+}
 function ensureGobCity() {
   const G = S.gobCity; if (!S.flags.goblinsFreed || !G?.lvl) return; const [cx, cy] = gobCenter();
   const have = S.ents.world.filter(e => e.gobCity).length, want = G.lvl * 7; if (have >= want) return;
@@ -10995,7 +11046,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -13472,6 +13523,7 @@ function debugSections() {
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
       'Seefahrt: eigenes Schiff geben': () => { S.ship = { name: 'Probe-Möwe', hull: 70, cargo: {}, cap: 20, at: 'saltport' }; UI.toast('Eigenes Schiff (beim Kapitän in Salzhafen/Kupferhafen)'); },   /* Nutzer §5d.9 */
+      'Nebenstädte: zu Sankt Serin': () => { const P0 = TOWN_PLAN.sanktserin?.square; if (P0 && S.map === 'world') { const q = freeSpotNear('world', P0[0], P0[1] + 3, 3); Object.assign(P(), { x: q.x, y: q.y }); } },   /* Nutzer §5d.10 */
       'Siedlung: Wohnzone hier + Material + 3 Siedler': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen'); const p = P(), z = placeBuilding('wohnzone', p.x + 120, p.y, true); z.built = 1; S.res.wood += 100; S.res.stone += 40;   /* Nutzer §5d.3 */
         for (let i = 0; i < 3; i++) { const c = makeChar({ name: pick(FIRST_M), prof: 'Siedler', x: p.x + ri(-40, 40), y: p.y + 40, map: S.map, level: 1 }); c.settler = true; c.anchor = { x: c.x, y: c.y }; S.ents[S.map].push(c); } UI.toast('Wohnzone rechts; Siedler bauen täglich'); },
       'Siedlung: Siedlertag': () => settlersDay(),
@@ -16134,6 +16186,16 @@ export function selftest() {
       const g0 = S.gold, f0 = S.factions.sea || 0; ownArrive({ to: 'isle', pirated: true }); const prize = S.gold > g0 && S.factions.sea === f0 - 12 && cargoUsed() > 0 && S.ship.at === 'isle';
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
+  }));
+  ok('Nebenstädte (Nutzer §5d.10): jede der vier Städte hat eigene Bauten, Leute und einen Dienst (Segen, Werft, Fabrikladen, Prothesenpflege)', sandbox(() => {
+    const p = stage(), sh = S.ship, fd = S.flags.serinDay; S.gold = 500;
+    try { ensureCityCharacter(); const ks = Object.keys(CITY_FACE).filter(k => TOWN_PLAN[k]); const ok1 = ks.every(k => S.ents.world.filter(e => e.cityFace === k && e.kind === 'prop').length >= 6 && S.ents.world.some(e => e.cityFace === k && e.cityRole));
+      const lead = r => S.ents.world.find(e => e.cityRole === r);
+      let ch = []; S.flags.serinDay = -1; cityChoices(lead('serinBless'), ch); ch[0].fn(); UI.closeDialogue(); const bless = stat(p, 'blessing') && S.gold === 490;
+      S.ship = { name: 'Probe', hull: 60, cargo: {}, cap: 20 }; ch = []; cityChoices(lead('shipwright'), ch); ch[0].fn(); UI.closeDialogue(); const yard = S.ship.hull === 100 && S.gold === 450;
+      ch = []; const f = lead('factoryShop'); cityChoices(f, ch); const shop = f.shop && f.pool.includes('energiezelle');
+      return ks.length === 4 && ok1 && bless && yard && shop;
+    } finally { S.ship = sh; S.flags.serinDay = fd; }
   }));
   ok('Vielfalt 2 (Nutzer §5f): Automaten, Engel, Bewohner und Wachen sehen je nach Seed verschieden aus, gleicher Seed gleich, jede Variante malt sich', (() => {
     const specs = (mk, n = 12) => Array.from({ length: n }, (_, i) => mk(i * 17 + 3));

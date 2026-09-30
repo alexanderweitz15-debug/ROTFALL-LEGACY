@@ -5,6 +5,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
 - Freie Seefahrt: eigenes Schiff, Kurse (Küste, Handelsroute, Wrackfeld), Seehandel mit Hafenpreisen, Piraterie, Bergung, Rumpf und Reparatur.
 - Tiefhall: lebende Königsstadt der Zwerge unter der toten Halle (König, Runenschmiedin mit Königseisen, Händler, Brauerei, Mine).
+- Aurelions Nebenstädte mit eigenem Gesicht: Sankt Serin (Segen), Kupferhafen (Werft), Tickmar (Fabrikladen), Gelenkhall (Prothesenpflege).
 - Mehr Varianten: Automaten (Metall, Verschleiß, Leuchtfarbe), Engel (Gold, Mantel, Licht), Bewohner (Alter, Hut, Tuch, Flicken), Wachen (Wappenfarbe je Stadt).
 - Neue Waffen mit eigener Zeichnung: Morgenstern, Kettenkugel (Flegel), Katar; Goblin-Volkswaffen Schrottkeule und Schrottklinge.
 - Siedlung: Wohnzonen — Siedler bauen dort selbst Hütten aus dem Vorrat.

@@ -605,3 +605,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Bewohner:** Wer 55 oder älter ist, hat graues Haar. Dazu je nach Person Hut, Kappe, Tuch oder Krempe, farbige Halstücher und geflickte Kleidung.
 - **Wachen Valens:** Die Farbe des Wappens auf dem Wappenrock hängt an der Heimatstadt — man erkennt, woher eine Wache kommt.
 - Alles hängt am Seed der Figur: dieselbe Person sieht immer gleich aus. Probe „Vielfalt 2 (Nutzer §5f)“.
+
+## Runde: Aurelions Nebenstädte (Nutzer §5d.10, Version 21)
+- **Sankt Serin (Tempel- und Klinikstadt):** Pilgerzelte, Krankenlager, Votivkerzen, Altar und Heilquelle auf dem Platz; Pilger und Kranke. Mutter Aveline gibt einmal am Tag den **Segen von Sankt Serin** (10 Gold, wer unter 30 Gold hat, umsonst): 30 % Leben, +5 Rüstung für 10 Minuten, Entzündung gereinigt.
+- **Kupferhafen (Werftstadt):** Rümpfe auf dem Helling, Werftkräne, Tauwerk, Planken und Pech; Schiffbauer. Meister Holm bessert das eigene Schiff zum halben Preis aus (1 Gold je Prozent).
+- **Tickmar (Fabrikstadt):** Schlote, Stanze, Kohle, Schrott; Arbeiter und Heizer. Vogt Kessler verkauft Ersatzteile, Energiezellen, Automatenkerne, Werkzeug und Barren.
+- **Gelenkhall (Prothesenstadt):** Reihen ruhender Automaten, Feinwerkbank, Drehbank, Patienten mit Prothesen. Meisterin Vessa wartet alle Prothesen und das Auge für 40 Gold auf 100 %.
+- Der Grundriss der Städte bleibt gleich (alte Spielstände passen weiter); das Gesicht entsteht bei jedem Laden neu.
+- **Debug:** „Nebenstädte: zu Sankt Serin“. Probe „Nebenstädte (Nutzer §5d.10)“.
