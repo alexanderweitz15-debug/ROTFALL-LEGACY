@@ -8176,7 +8176,8 @@ function buildVaronburg() {
   put('Aldhelm', 'Kanzler', keep.cx + 3, keep.y + 5, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
   put('Brandt', 'Marschall', keep.cx - 4, keep.y + 6, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
   put('Ysmay', 'Spitzelmeisterin', east.cx, east.cy, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
-  VARON_NOBLES.forEach(([n, pr], i) => put(n, pr, west.x + 3 + i * 4, west.cy + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }));
+  VARON_NOBLES.forEach(([n, pr], i) => { if ((S.flags.varonExecuted || []).includes(i)) return;   /* Bugfix: Gerichtete bleiben nach Neubau tot */
+    put(n, pr, west.x + 3 + i * 4, west.cy + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }); });
   put('Grimm', 'Kerkermeister', dungeon.cx, dungeon.y + 3, { varonJailer: true, trait: 'gierig', greet: '„Spione aus Aurelion. Sagt der König. Ich sage: Kostgänger.“' });
   for (let i = 0; i < 3; i++) if (!(S.flags.varonFreed || []).includes(i)) put(['Lucan', 'Serin', 'Maro'][i], 'Gefangener aus Aurelion', dungeon.x + 3 + i * 4, dungeon.y + dungeon.h - 3, { varonPrisoner: i, faction: null, trait: 'furchtsam', cloth: '#6a6258', greet: '„Ich bin Händler! Kein Spion! Sag es ihnen!“' });
   put('Hagen', 'Schmied', smithy.cx, smithy.cy, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Kronstahl. Für die, die dem König dienen — oder zahlen.“' });
@@ -8201,6 +8202,7 @@ function varonChoices(npc, choices) {
       say('„Gut. Endlich einer, der tut, statt zu reden. (Er senkt die Stimme.) Einer meiner Adligen verkauft mich an Aurelion. Finde ihn. Ysmay weiß mehr, als sie sagt.“ (+150 Gold)'); } });
     if (Q === 2) choices.unshift({ text: 'Ich weiß, wer der Verräter ist.', fn: () => UI.dialogue(npc, '„Nenn ihn. Und sei dir sicher — ich richte, wen du nennst.“', [
       ...VARON_NOBLES.map(([n], i) => ({ text: n, fn: () => { S.flags.varonQ = 3; const ok = i === varonTraitor(); const nb = S.ents.varonburg?.find(e => e.varonNoble === i); if (nb) nb.alive = false;
+        (S.flags.varonExecuted ||= []).push(i);   /* Bugfix: sonst steht der Gerichtete nach Neubau (Reload/Koop) wieder auf, wie die Gefangenen ohne S.flags.varonFreed */
         if (ok) { S.gold += 300; S.factions.valen = clamp((S.factions.valen || 0) + 10, -100, 100); chronicle(`${n} als Verräter entlarvt`, 'news', 'Der König richtet am Morgen.'); say(`„${n}. Ich wusste es. Man findet Aurelions Siegelwachs, wo man sucht.“ (+300 Gold, Valen +10)`); }
         else { S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); S.flags.varonWrong = 1; chronicle(`${n} hingerichtet`, 'news', 'Später heißt es, der Falsche sei gestorben.'); say(`„${n} stirbt im Morgengrauen.“ (Später flüstert der Hof: der Falsche. Valen −5)`); } } })),
       { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]) });
@@ -16133,6 +16135,16 @@ export function selftest() {
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
   }));
+  ok('Vielfalt 2 (Nutzer §5f): Automaten, Engel, Bewohner und Wachen sehen je nach Seed verschieden aus, gleicher Seed gleich, jede Variante malt sich', (() => {
+    const specs = (mk, n = 12) => Array.from({ length: n }, (_, i) => mk(i * 17 + 3));
+    const rob = specs(i => SP.humanSpec({ kind: 'npc', robot: true, seed: i, equip: {} })), ang = specs(i => SP.monsterSpec({ kind: 'enemy', mtype: 'angel_blade', seed: i }, MONSTERS.angel_blade));
+    const civ = specs(i => SP.humanSpec({ kind: 'npc', seed: i, prof: 'Tagelöhner', age: i % 2 ? 60 : 25, equip: {} }), 20);
+    const g1 = SP.humanSpec({ kind: 'npc', seed: 1, prof: 'Wache', faction: 'valen', homeTown: 'eren', equip: {} }), g2 = SP.humanSpec({ kind: 'npc', seed: 1, prof: 'Wache', faction: 'valen', homeTown: 'haselbrueck', equip: {} });
+    const kinds = a => new Set(a.map(s => [s.armorCol, s.glow, s.cloak, s.helm, s.scarf, s.hair].join('|'))).size;
+    const same = SP.humanSpec({ kind: 'npc', robot: true, seed: 5, equip: {} }).armorCol === SP.humanSpec({ kind: 'npc', robot: true, seed: 5, equip: {} }).armorCol;
+    let draws = true; try { for (const s of [...rob.slice(0, 3), ...civ.slice(0, 3)]) SP.humanFrame(s, 'S', 'i0'); } catch (e) { draws = false; }
+    return kinds(rob) >= 4 && kinds(ang) >= 4 && kinds(civ) >= 6 && g1.markCol !== g2.markCol && same && draws;
+  })());
   ok('Exoten und Volkswaffen (Nutzer §5f): Morgenstern, Kettenkugel, Katar, Schrottkeule und Schrottklinge haben Werte und eigene Zeichnung, Händler führen sie, die Kettenkugel schwingt als Flegel', (() => {
     const K = ['morgenstern', 'kettenkugel', 'katar', 'schrottkeule', 'schrottklinge'], data = K.every(k => ITEMS[k]?.dmg > 0 && ITEMS[k].skill && ITEMS[k].lore);
     const draw = K.every(k => { try { const f = SP.weaponSprite(k, ITEMS[k].rarity, false, ITEMS[k].wtype); return f && f.cv && f.cv.width > 10; } catch (e) { return false; } });
