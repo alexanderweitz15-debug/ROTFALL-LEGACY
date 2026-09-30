@@ -591,3 +591,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Siedler bauen selbst:** Sind mindestens zwei Siedler da und liegen 20 Holz und 8 Stein im Vorrat, beginnen sie jeden Tag eine Hütte in einer fertigen Wohnzone (höchstens vier je Zone). Eine Hütte steht nach einem Tag und bietet Platz für vier weitere Siedler.
 - Reicht das Material nicht, meldet das Log es einmal.
 - **Debug:** „Siedlung: Wohnzone hier + Material + 3 Siedler“, „Siedlung: Siedlertag“. Probe „Wohnzonen (Nutzer §5d.3)“.
+
+## Runde: Exoten und Volkswaffen (Nutzer §5f, Version 21)
+- **Morgenstern** (Einhand, 15 Schaden, Durchschlag 45 %, starkes Taumeln) und **Kettenkugel** (Einhand-Flegel, 17 Schaden, lange Reichweite, weiter Bogen, schwingt wie der Streitflegel: wer schwingt, trifft mehrere) — beim Schmied.
+- **Katar** (Stoßdolch, 9 Schaden, schnell, kritisch ×2,4, Durchschlag 50 %) — im Basar von Karak-Atar.
+- **Goblin-Volkswaffen:** Schrottkeule (billig, taumelt) und Schrottklinge (gezackt, lässt bluten) — bei Nibbel in Grubenhort und als Beute von Goblins.
+- Alle fünf haben eine eigene Zeichnung. Zwergenaxt und Runenhammer (Tiefhall), Entermesser und Harpune (Seevolk) sowie die Kriegssichel (Wüste) sind die übrigen Volkswaffen.
+- Probe „Exoten und Volkswaffen (Nutzer §5f)“.

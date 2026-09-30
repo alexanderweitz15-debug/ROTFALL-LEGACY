@@ -936,7 +936,7 @@ const JOB_AT = {
   Kaufmann: { stall: true }, Kaufherr: { stall: true }, 'Händlerin': { stall: true }, 'Tuchhändlerin': { stall: true }, 'Gewürzhändler': { stall: true },
 };
 const STALL_SELL = { 'Bäcker': ['bread', 'bread', 'dried_meat'], Weber: ['traveler_cloak', 'leather_cap', 'bandage'], 'Böttcher': ['wood', 'bread'], Bauer: ['bread', 'dried_meat', 'herb'], Magd: ['herb', 'bread', 'bandage'], Handwerker: ['wood', 'stone', 'bandage'] };
-const SMITH_POOL = ['koenigseisen', 'rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
+const SMITH_POOL = ['koenigseisen', 'morgenstern', 'kettenkugel', 'rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
 const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion'];
 function spotBy(prop, b) {                                        // freier Stehplatz neben dem Möbel, drinnen zuerst Richtung Tür
   for (const [ox, oy] of [[0, 22], [0, -22], [22, 0], [-22, 0], [16, 18], [-16, 18]]) {
@@ -5542,7 +5542,7 @@ function eisenStep(e, dt) {
 }
 const GOBLIN_VILLAGE = [
   { key: 'grisk', name: 'Grisk', prof: 'Ältester der Grubenstämme', at: EM(904, 596), greet: '„Du hast die Kette gebrochen. Wir vergessen das nicht — nicht in hundert Wintern. Setz dich ans Feuer.“' },
-  { key: 'nibbel', name: 'Nibbel', prof: 'Goblinhändlerin', at: EM(910, 604), shop: true, pool: ['goblin_hook', 'goblin_hook', 'pit_leather', 'herb', 'herb', 'bandage', 'dried_meat', 'iron', 'bone'],
+  { key: 'nibbel', name: 'Nibbel', prof: 'Goblinhändlerin', at: EM(910, 604), shop: true, pool: ['goblin_hook', 'schrottklinge', 'schrottkeule', 'pit_leather', 'herb', 'herb', 'bandage', 'dried_meat', 'iron', 'bone'],
     greet: '„Handel? Handel! Grubeneisen, Grubenleder, Kräuter aus dem Stein. Du zahlst ehrlich, ich wieg ehrlich.“' },
   { key: 'gob_krak', name: 'Krak', prof: 'Goblinkrieger', at: EM(898, 590), built: true, greet: '„Grisk sagt, du bist Freund. Dann bin ich deine Klinge, wenn die Toten kommen.“' },
   { key: 'gob_sill', name: 'Sill', prof: 'Hüttenbauerin', at: EM(914, 592), built: true, greet: '„Eigene Wände. Weißt du, wie das riecht? Nach Harz und nach niemandem.“' },
@@ -7773,7 +7773,7 @@ function ensureKarak() {
   const [cx, cy] = c0, at = (dx, dy) => freeSpotNear('world', cx + dx, cy + dy, 2), desert = ['#c8a870', '#b89060', '#8a5a2a', '#e0d0a8'];
   const mk = (name, prof, dx, dy, o = {}) => { const q = at(dx, dy), c = makeChar({ name, prof, x: q.x, y: q.y, level: 6, faction: null, traits: ['ehrgeizig'], pal: { skin: pick(['#8d6644', '#b98f66', '#6d4a30']), cloth: pick(desert) } });
     Object.assign(c, { karak: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, hooded: true }, o); S.ents.world.push(c); return c; };
-  mk('Yusuf', 'Basarhändler', -3, -2, { shop: true, pool: ['kriegssichel', 'wurfbeil', 'wurfmesser', 'shortbow', 'dornensaebel', 'schockpistole', 'energiezelle', 'spezialoel', 'potion', 'bandage'], market: false, till: 21, karakBazaar: true, greet: '„Seide aus dem Süden, Klingen aus dem Norden, und was Aurelion nicht verkaufen will. Schau.“' });
+  mk('Yusuf', 'Basarhändler', -3, -2, { shop: true, pool: ['katar', 'katar', 'kriegssichel', 'wurfbeil', 'wurfmesser', 'shortbow', 'dornensaebel', 'schockpistole', 'energiezelle', 'spezialoel', 'potion', 'bandage'], market: false, till: 21, karakBazaar: true, greet: '„Seide aus dem Süden, Klingen aus dem Norden, und was Aurelion nicht verkaufen will. Schau.“' });
   mk('Leyla', 'Wasserhändlerin', 2, 2, { shop: true, pool: ['wasserschlauch', 'wasserschlauch', 'wasserschlauch', 'bread', 'dried_meat'], market: false, greet: '„Wasser ist hier mehr wert als Gold. Heute verkaufe ich es dir trotzdem für Gold.“' });
   mk('Amina', 'Stammesälteste', 0, 5, { karakElder: true, greet: '„Die Sterne haben uns durch die Wüste geführt, lange bevor die Sandfürsten kamen.“' });
   const lord = S.flags.sandlordSlain ? 'Farid' : null;
@@ -8219,7 +8219,10 @@ function varonChoices(npc, choices) {
     say('„Er ist heute Nacht an Typhus gestorben. Traurig. Die Leiche ist schon weg.“ (Aurelion +5, Valen −5)'); } }); }
 }
 function royalStart() {                                              /* Auftrag 1: ein Hauptmann der Toten vor Nordfurt */
-  const [x, y] = worldPt(122, 64), q = freeSpotNear('world', x, y, 6), EK = pickElite(q?.x ?? 0, q?.y ?? 0, ['skeleton', 'zombie', 'bone_knight']) || Object.keys(ELITES).find(k => ['skeleton', 'bone_knight', 'zombie'].includes(ELITES[k].base));
+  const UNDEAD = ['skeleton', 'zombie', 'bone_knight', 'ghoul'];      /* Bugfix: pickElite filtert nur über where(), das auch lebende Kultisten im Totenland trifft — hier zählt nur echtes Untot */
+  const [x, y] = worldPt(122, 64), q = freeSpotNear('world', x, y, 6);
+  let EK = pickElite(q?.x ?? 0, q?.y ?? 0, UNDEAD); if (EK && !UNDEAD.includes(ELITES[EK].base)) EK = null;
+  EK = EK || Object.keys(ELITES).find(k => UNDEAD.includes(ELITES[k].base));
   if (!q || !EK) { S.flags.varonQ1done = 1; return; } const tx = q.x / TS | 0, ty = q.y / TS | 0;
   const C = { id: uid(), town: 'northcity', kind: 'royal', giver: 'royal', giverName: 'König Varon', have: 0, need: 1, state: 'offer', day: S.day | 0, x: tx, y: ty, tx, ty, elite: EK, reward: { gold: 0, xp: 0, rep: 0 },
     title: `König Varon: ${ELITES[EK].name}`, desc: `Der König will ${ELITES[EK].name} tot sehen, einen Hauptmann der Toten vor Nordfurt. Danach zurück in die Varonsburg.` };
@@ -10410,13 +10413,13 @@ function settlersDay() {
 // bis zu vier Hütten, sobald mindestens zwei Siedler da sind und der Vorrat eine Hütte trägt. Eine Hütte braucht einen Tag.
 function zoneBuild(n) {
   const st = S.settlement; if (!st) return; const map = st.map || 'world', B0 = st.buildings;
-  for (const b of B0.filter(b => b.bySettlers && b.built < 1)) { b.built = Math.min(1, b.built + 0.5); if (b.built >= 1) { log(`Die Siedler haben in ${st.name} eine Hütte fertig gebaut.`, 'world'); st.history.push({ text: 'Siedler bauen eine Hütte', year: year() }); } }
+  for (const b of B0.filter(b => b.bySettlers && b.built < 1)) { b.built = Math.min(1, b.built + 1); /* Bugfix: eine Hütte je Tag (Doku/Probe), nicht zwei */ if (b.built >= 1) { log(`Die Siedler haben in ${st.name} eine Hütte fertig gebaut.`, 'world'); st.history.push({ text: 'Siedler bauen eine Hütte', year: year() }); } }
   if (n < 2 || B0.some(b => b.bySettlers && b.built < 1)) return;
   for (const z of B0.filter(b => b.type === 'wohnzone' && b.built >= 1)) {
     const mine = B0.filter(b => b.zone === z.id); if (mine.length >= 4) continue;
     const def = BUILDINGS.hut; if (!canAfford(def.cost)) { if (!st.zoneWarned) { st.zoneWarned = true; log(`Die Siedler in ${st.name} wollen bauen, aber der Vorrat reicht nicht (20 Holz, 8 Stein je Hütte).`, 'world'); } return; }
     for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = z.x + dx * TS * 1.5, y = z.y + dy * TS * 1.5;
-      if (B0.some(o => o !== z && o.type !== 'wohnzone' && Math.hypot(o.x - x, o.y - y) < TS * 2) || solidTile(map, x, y)) continue;
+      if (B0.some(o => o !== z && o.type !== 'wohnzone' && Math.hypot(o.x - x, o.y - y) < TS * 2) || solidTile(map, x, y) || solidPropAt(map, x, y, 40)) continue;   /* Bugfix: auch Bäume/Felsen meiden, nicht nur Kacheln */
       payCost(def.cost); st.zoneWarned = false;
       const h = { id: uid(), kind: 'building', type: 'hut', def, map, x, y, r: 1.5 * TS, built: 0.02, cond: 1, solid: true, workers: 0, zone: z.id, bySettlers: true };
       S.ents[map].push(h); addSolid(h); B0.push(h); log(`Die Siedler beginnen in der Wohnzone eine Hütte (−20 Holz, −8 Stein).`, 'world'); return; }
@@ -16130,6 +16133,12 @@ export function selftest() {
       S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
     } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
   }));
+  ok('Exoten und Volkswaffen (Nutzer §5f): Morgenstern, Kettenkugel, Katar, Schrottkeule und Schrottklinge haben Werte und eigene Zeichnung, Händler führen sie, die Kettenkugel schwingt als Flegel', (() => {
+    const K = ['morgenstern', 'kettenkugel', 'katar', 'schrottkeule', 'schrottklinge'], data = K.every(k => ITEMS[k]?.dmg > 0 && ITEMS[k].skill && ITEMS[k].lore);
+    const draw = K.every(k => { try { const f = SP.weaponSprite(k, ITEMS[k].rarity, false, ITEMS[k].wtype); return f && f.cv && f.cv.width > 10; } catch (e) { return false; } });
+    const sold = SMITH_POOL.includes('morgenstern') && SMITH_POOL.includes('kettenkugel') && GOBLIN_VILLAGE.some(g => g.pool?.includes('schrottklinge'));
+    return data && draw && sold && ITEMS.kettenkugel.flail;
+  })());
   ok('Wohnzonen (Nutzer §5d.3): Siedler bauen in einer fertigen Zone Hütten aus dem Vorrat, eine Hütte je Tag, höchstens vier, ohne Material nicht', sandbox(() => {
     const p = stage(), st0 = S.settlement, r0 = { ...S.res };
     try { S.settlement = { name: 'Probehof', x: p.x, y: p.y, map: S.map, buildings: [], morale: 60, priorities: ['Ruhe'], history: [] };
