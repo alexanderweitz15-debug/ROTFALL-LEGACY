@@ -81,29 +81,34 @@ function bar(label, val, max, cls, extra = '') {
 
 let hudFor = null;                                                  /* Koop K2: der Gast sieht die Werte seiner Gastfigur statt des Helden */
 export function setHudTarget(m) { hudFor = m; }
+// Audit D16: das HUD schreibt nur, was sich geändert hat (vorher alle 180 ms jedes innerHTML neu: Umbruch und Neuzeichnen in Städten).
+const HUD_LAST = new Map();
+function hudSet(id, v, html) { const k = id + (html ? '#h' : '#t'); if (HUD_LAST.get(k) === v) return; HUD_LAST.set(k, v); if (html) $(id).innerHTML = v; else $(id).textContent = v; }
 export function refreshHUD() {
   const p = hudFor || S.player; if (!p) return;
-  $('pc-name').textContent = p.name;
+  hudSet('pc-name', p.name);
   const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
-  $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`;   // S15 (Nutzer): freie Punkte sichtbar
+  hudSet('pc-class', `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`);   // S15 (Nutzer): freie Punkte sichtbar
   const fr = topRank(p);
-  $('pc-rank').textContent = fr || 'Ohne Banner';
+  hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
   let html = bar('Leben', p.hp, p.maxHp, 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
   if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp', p.level >= 60 ? ' · Höchststufe' : '');   // Balance-Runde: Höchststufe 60 (game.js MAX_LEVEL)
-  $('pc-bars').innerHTML = html;
-  $('pc-status').innerHTML = statusIcons(p);
+  hudSet('pc-bars', html, true);
+  hudSet('pc-status', statusIcons(p), true);
   if (!$('pc-status').dataset.fx) { $('pc-status').dataset.fx = 1; $('pc-status').addEventListener('mouseover', fxTip); $('pc-status').addEventListener('mouseleave', () => $('fx-tip')?.classList.add('hidden'));
     $('pc-status').addEventListener('click', e => { if (e.target.closest('[data-fx]')) openModal('effects'); });
     if (!$('fx-tip')) { const d = document.createElement('div'); d.id = 'fx-tip'; d.className = 'hidden'; document.body.appendChild(d); } }
   const worst = PARTS.filter(k => partState(p.body[k]) !== 'heil').map(k => `${PART_NAME[k]} <em>${STATE_WORD[partState(p.body[k])]}</em>`);
-  $('pc-body').innerHTML = bodyChart(p) + `<div class="pc-wounds">${worst.join('<br>') || 'Keine Wunden'}</div>`;
+  hudSet('pc-body', bodyChart(p) + `<div class="pc-wounds">${worst.join('<br>') || 'Keine Wunden'}</div>`, true);
   // Gruppe
   const mem = partyMembers();
-  $('party-title').textContent = `GRUPPE ${mem.length} / ${p.partyCap}`;
-  const list = $('party-list'); list.innerHTML = '';
+  hudSet('party-title', `GRUPPE ${mem.length} / ${p.partyCap}`);
+  const list = $('party-list'), sig = mem.map(m => [m.id, m.name, m.level, m.currentClass, m.downed ? 1 : 0, Math.round(m.morale), Math.round(m.loyal ?? 50), m.friend ? 1 : 0, Math.round(m.hp / m.maxHp * 50),
+    Object.values(m.equip || {}).map(i => i?.key || '').join('.')].join(',')).join('|');
+  if (HUD_LAST.get('party') !== sig || !list.childElementCount) { HUD_LAST.set('party', sig); list.innerHTML = '';
   if (!mem.length) list.appendChild(el('div', 'cr-desc', 'Du reist allein.'));
   for (const m of mem) {
     const d = el('div', 'member' + (m.downed ? ' downed' : ''));
@@ -115,14 +120,14 @@ export function refreshHUD() {
     d.onclick = () => { A.select(m); };
     list.appendChild(d);
     drawPortraitTo(cv, m);
-  }
-  $('res-list').innerHTML = [['Holz', S.res.wood], ['Stein', S.res.stone], ['Eisen', S.res.iron],
+  } }
+  hudSet('res-list', [['Holz', S.res.wood], ['Stein', S.res.stone], ['Eisen', S.res.iron],
     ['Kraut', S.res.herb], ['Nahrung', S.res.food], ['Gold', S.gold]]
-    .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join('');
+    .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join(''), true);
   // Kopfzeile
-  $('clock-time').textContent = `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`;   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
+  hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
   if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
-  $('clock-gold').textContent = S.gold;
+  hudSet('clock-gold', String(S.gold));
   renderHotbar();
 }
 

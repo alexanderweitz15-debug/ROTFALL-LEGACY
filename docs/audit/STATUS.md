@@ -40,7 +40,7 @@ Die Zeilen oben bleiben als Verlauf; maßgeblich für die Reihenfolge sind T01�
 | T03 §5g.1 Varonheim | TESTING | Engineer → Hunter | 01.10. | 321/321; Hunter läuft | – |
 | T04 Effekte, Zufall, Klang (D3, D5, V17b, D4) (Critical) | TESTING | Engineer → Hunter | 01.10. | Nachbild/Schleier getrennt, vrnd + Deckel 900, economy.js auf rnd(), Regionsklang 6 Regionen + unter Tage; 2 zufallsabhängige Proben robust gemacht (Kutsche, Raserei); 323/323 | T01, T02 |
 | T05 Kleine Korrekturen (V17 a/c/e, A13, Stil F, Doku-Drift) | BACKLOG | Engineer | – | – | T02 |
-| T06 §5g.13 Spielstand und Caches (D6, D7, D16) (Critical) | IN PROGRESS | Engineer | 01.10. | D6 fertig: RFZ1 gzip 15 Bit/Zeichen, 2,36 Mio. → 110 Tsd. Zeichen, Laden aus komprimiertem Platz geprüft, Seuchen-Fehler (14 000 Props) behoben, Prop-Signatur 4× schneller; offen: D7 Caches, D16 HUD; 324/324 | T04 |
+| T06 §5g.13 Spielstand und Caches (D6, D7, D16) (Critical) | TESTING | Engineer | 01.10. | D6 fertig: RFZ1 gzip 15 Bit/Zeichen, 2,36 Mio. → 110 Tsd. Zeichen, Laden aus komprimiertem Platz geprüft, Seuchen-Fehler (14 000 Props) behoben, Prop-Signatur 4× schneller; D7: Caches verwerfen älteste 10 % statt alles (frameCache, Haus, Prop, Bake); D16: HUD schreibt nur Änderungen (0,65 ms je Aufruf), Gruppenliste nur bei neuer Signatur; offen: Vorwärmen bei Reise; 324/324 | T04 |
 | T07 §5g.2 Blutkult, Katakomben, Vampir, Aldhelm | BACKLOG | Engineer | – | – | T03 |
 | T08 Gefangene, Steckbriefe, Ruf der Klinge (A5, §5g.24, A10) | BACKLOG | Engineer | – | – | T05 |
 | T09 V3 Läden am Stadtlager (+ V17d) | BACKLOG | Engineer | – | – | T04 |
