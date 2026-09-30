@@ -365,7 +365,7 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 
 ## Runde: Balance — Bosse, Waffen, Stufen (Version 21, docs/BALANCE.md)
 - **Höchststufe 60** (Held und Koop-Gastfiguren). Darüber bringt Erfahrung keine Stufe mehr, der Balken bleibt voll („Höchststufe“ in der Kopfzeile, Meldung beim Erreichen). EP-Kurve ab Stufe 20 nur noch ×1,04 je Stufe (≈ 0,42 Mio. EP bis 60 statt 3,1 Mio.).
-- **Talentpunkte** nur noch 1 zum Start und 1 auf jeder geraden Stufe (31 bei Stufe 60 von 59 lernbaren Knoten). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
+- **Talentpunkte** nur noch 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60 von 59 lernbaren Knoten; Nutzer wollte „viele, aber nicht alle“ und wählte jede dritte). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
 - **Bosse** haben doppeltes Leben und teilen 60 % aus (`BOSS`; gilt für Hieb, Fläche und Geschoss). Omega bleibt, wie er ist (Heeresschlacht). Bosse alter Stände werden beim Laden einmal angepasst. Sandfürst 340 Leben und ×1,8 Wucht, Varg 360 Leben, Hrodvar 220, Dodon 620 Grundleben.
 - **Fester Schadensanteil** (Attribut, Übung, Stufe) wächst mit der Schwungdauer: 600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2; Fernwaffen ×1. Vorher war der Dolch rechnerisch doppelt so stark wie der Zweihänder.
 - **Rückenstich** (Dolch, Hakenmesser, Rapier: Krit-Chance 50 %) und **Hinterhalt ×3** gelten jetzt wirklich nur von hinten (vorher durch einen Richtungsfehler von vorn).

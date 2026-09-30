@@ -2787,6 +2787,7 @@ function controlPlayer(dt) {
   const p = S.player;
   if (S.cine) { p.vx = p.vy = 0; return; }   // Kamerafahrt: keine Steuerung
   if (p.downed) { p.vx = p.vy = 0; return; }
+  if (UI.dialogueOpen() && !S.jail?.caught) { p.vx = p.vy = 0; p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x); return; }   /* Nutzer: solange ein Gespräch offen ist, steht man still */
   if (S.jail?.caught) {   // Bug 2 (Nutzer): beim Wärter-Gespräch nicht weglaufen können
     if (!UI.dialogueOpen()) S.jail.caughtBack?.();   // Esc hat das Gespräch geschlossen — zählt wie „zurück in die Zelle“
     else { p.vx = p.vy = 0; return; }
@@ -3594,11 +3595,11 @@ function gainXp(c, n) {
   for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
-// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder zweiten Stufe (gerade Stufen)
+// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder dritten Stufe (gerade Stufen)
 // plus der Startpunkt — bei 60 also 31 Punkte für 64 Knoten (59 lernbar, fünf Schlüsselknoten schließen einander aus): viele,
 // nicht alle. Statpunkt je Stufe und der Meilenstein-Statpunkt alle 5 Stufen bleiben. Alte Stände behalten ihre Punkte.
 // Kurve: ab Stufe 20 nur noch ×1,04 je Stufe (vorher ×1,12: 3,1 Mio. EP bis 60, unerreichbar; jetzt ≈ 0,46 Mio.).
-export const MAX_LEVEL = 60, TALENT_EVERY = 2;
+export const MAX_LEVEL = 60, TALENT_EVERY = 3;   /* Nutzer: Talentpunkt jede dritte Stufe (21 bis Stufe 60, gut ein Drittel der Talente) */
 const talentAt = L => L % TALENT_EVERY === 0;
 function levelUp(c) {
   if (c.level >= MAX_LEVEL) { c.xp = Math.min(c.xp, c.xpNext - 0.001); return; }   /* Höchststufe: Balken bleibt voll, die Schleife in gainXp endet */
@@ -4903,14 +4904,15 @@ function arrestCheck(g, p, dt) {
   if (S.bond || S.jail || g.bondGuard) return false;   // S15 (Nutzer-Bug): wer schon in Ketten oder im Kerker sitzt, wird nicht noch einmal festgenommen
   const fac = crimeFaction(g), b = (S.bounty || {})[fac] || 0;
   if (['kerker', 'sky', 'deck', 'isle', 'vault', 'tower'].includes(p.map)) return false;   // S15: keine Festnahme im Kerker, auf der Himmelsinsel, auf See, in Gewölben
+  if ((S.resist?.until || 0) > clock() && (!S.resist.fac || S.resist.fac === fac) && dist(g, p) < 320) { g.angry = true; g.brave = true; g.aggroId = p.id; g.sawPlayer = clock(); return false; }   /* Nutzer: nach Widerstand fragt keine Wache mehr „zahlen oder mitkommen“ — sie kämpfen, höchstens 10 Minuten */
   if (banned(fac) && !(g.wary > clock()) && dist(g, p) < 260) { g.angry = true; g.brave = true; g.aggroId = p.id; g.sawPlayer = clock(); return false; }   // S12 Blutbann
   if (!b || (S.flags.arrestCd || 0) > clock() || dist(g, p) > 240) return false;
   if (dist(g, p) > 44) { seek(g, Math.atan2(p.y - g.y, p.x - g.x), 1.3 * dt / 16, dt, p); return true; }
   S.flags.arrestCd = clock() + 90; g.vx = g.vy = 0;
-  const pay = () => { S.gold -= b; delete S.bounty[fac]; log(`Du zahlst ${b} Gold. Die Sache ist erledigt.`, 'faction'); UI.closeDialogue(); };
+  const pay = () => { S.gold -= b; delete S.bounty[fac]; S.resist = null; log(`Du zahlst ${b} Gold. Die Sache ist erledigt.`, 'faction'); UI.closeDialogue(); };
   const chainB = g.faction === 'chain' && !S.flags.chainsBroken;   // S15 Fehlersuche: die Kette hat keinen Kerker (Eisenfeste fehlt in TOWN_PLAN → landete in Eren) — sie legt in Ketten
   const jail = () => { UI.closeDialogue(); if (chainB && enslave('chain', b)) return; goToJail(fac, b, g.post && TOWN_PLAN[g.post] ? g.post : townAt(g.x / TS | 0, g.y / TS | 0) || 'eren'); };   // Phase 2: echter Kerker statt „ein Tag später“
-  const fight = () => { g.angry = true; g.brave = true; g.aggroId = p.id; S.bounty[fac] += 100; log('Du widersetzt dich der Festnahme. Kopfgeld +100.', 'faction'); UI.closeDialogue(); };
+  const fight = () => { g.angry = true; g.brave = true; g.aggroId = p.id; S.bounty[fac] += 100; S.resist = { fac, until: clock() + 600 }; log('Du widersetzt dich der Festnahme. Kopfgeld +100. Die Wachen verhandeln nicht mehr — zehn Minuten lang wird gekämpft, bis du fliehst oder fällst.', 'faction'); UI.closeDialogue(); };
   UI.dialogue(g, `„Halt! Auf deinen Kopf sind ${b} Gold ausgesetzt. Zahl, oder du kommst mit.“`, [
     ...(S.gold >= b ? [{ text: `Zahlen (${b} Gold)`, fn: pay }] : []), { text: chainB ? `Mitkommen (in Ketten, Schuld ${b})` : `Mitkommen (Kerker, etwa ${jailMinutes(b)} Minuten)`, fn: jail }, { text: 'Widerstand leisten', fn: fight }]);
   return true;
@@ -7166,7 +7168,7 @@ const JAIL_LINES = ['„Was hast du angestellt? Ich hab nur ein Brot genommen.�
 // S15 Fehlersuche: wer in den Kerker oder in Ketten kommt, wird nicht weiter verfolgt (sonst kamen Kopfgeldjäger mit in die Zelle)
 function dropPursuit() { const p = S.player; for (const e of S.ents[S.map] || []) if (e.aggroId === p.id) { e.aggroId = null; e.aiState = 'idle'; e.follow = null; e.angry = false; } S.ents[S.map] = (S.ents[S.map] || []).filter(e => !(e.encounter && e.kind === 'enemy')); }
 function goToJail(fac, bounty, town) {
-  const p = S.player, min = jailMinutes(bounty);
+  const p = S.player, min = jailMinutes(bounty); S.resist = null;   /* Widerstand endet mit der Zelle */
   delete (S.bounty ||= {})[fac];
   S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3 };   // S14: drei Dietriche im Stiefel
   S.jailTown = town; p.equip.weapon = null; recalc(p); dropPursuit();
@@ -9913,6 +9915,21 @@ function trialMenu(npc) {
 }
 // Kodex „Magie“: wer lehrt was (lebende Lehrer mit Ort)
 const spellTeachers = key => [...S.ents.world, ...(S.ents.tower || [])].filter(e => e.kind === 'npc' && e.alive && e.spellsTaught?.includes(key) && (S.flags.codexAll || S.codex?.met?.[e.key]))   /* S15 Kodex: nur bekannte Lehrer */ .map(e => `${e.name} (${LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—'})`);
+// Nutzer: Lehrer wollen erst Vertrauen. Sie nennen jetzt, wie man es verdient: eine Bewährung passend zur Klasse (Vorräte oder
+// Beute abliefern) oder Lehrgeld. Beides hebt die Beziehung bis über die Schwelle. Aufträge im Ort und Geschenke helfen weiterhin.
+const TRIAL_NEED = { warrior: ['iron', 5, 'Eisen für die Übungsklingen'], knight: ['iron', 8, 'Eisen für die Rüstkammer'], paladin: ['food', 6, 'Brot für die Armenspeisung am Schrein'],
+  archer: ['wood', 8, 'Holz für Bögen und Pfeile'], ranger: ['food', 5, 'Fleisch für den Winter'], rogue: ['gold', 60, 'eine kleine „Gefälligkeit“ in Gold'], assassin: ['gold', 120, 'Schweigegeld'],
+  cleric: ['herb', 5, 'Kräuter für die Kranken'], mage: ['herb', 6, 'Kräuter für die Tinkturen'], berserker: ['iron', 6, 'Eisen für neue Äxte'], bard: ['food', 4, 'eine Runde für die Schenke'], alchemist: ['herb', 8, 'Kräuter für den Kessel'] };
+function teacherTrial(npc, cls, missing) {
+  const [res, n, what] = TRIAL_NEED[cls] || ['wood', 8, 'Holz für die Werkstatt'], have = res === 'gold' ? S.gold : Math.floor(S.res[res] || 0);
+  const fee = 40 + 15 * (S.player.level || 1), trust = () => { addRel(npc.key, missing + 5); UI.closeDialogue(); log(`${npc.name} vertraut dir jetzt. Sprich noch einmal über die Ausbildung.`, 'party'); };
+  const NAME = { iron: 'Eisen', food: 'Nahrung', herb: 'Kraut', wood: 'Holz', gold: 'Gold' }[res];
+  UI.dialogue(npc, `„Ich lehre keine Fremden. Zeig mir, dass du es ernst meinst: ${what} — ${n} ${NAME}. Oder zahl Lehrgeld.“
+(Du hast ${have} ${NAME}. Vorräte siehst du links unter „Vorrat“; Aufträge und Geschenke an ${npc.name} helfen auch.)`, [
+    ...(have >= n ? [{ text: `${n} ${NAME} geben`, fn: () => { if (res === 'gold') S.gold -= n; else S.res[res] -= n; trust(); } }] : [{ text: `(Es fehlen ${n - have} ${NAME})`, fn: () => UI.closeDialogue() }]),
+    ...(S.gold >= fee ? [{ text: `Lehrgeld zahlen (${fee} Gold)`, fn: () => { S.gold -= fee; trust(); } }] : []),
+    { text: 'Ich komme wieder.', fn: () => UI.closeDialogue() }]);
+}
 function teach(npc, cls = teachable(npc)) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
   const parent = CLASSES[cls].parent;
@@ -9923,8 +9940,7 @@ function teach(npc, cls = teachable(npc)) {
     return UI.dialogue(npc, '„Erst die Prüfungen. Wachsamkeit, das Siegel, der Schrein. Dann reden wir.“',
       [{ text: 'Ich komme wieder.', fn: () => UI.closeDialogue() }]);
   }
-  if (rel < (npc.key === 'rook' ? 40 : 20))
-    return UI.dialogue(npc, '„Ich lehre keine Fremden. Hilf mir erst.“', [{ text: 'Verstanden.', fn: () => UI.closeDialogue() }]);
+  if (rel < (npc.key === 'rook' ? 40 : 20)) return teacherTrial(npc, cls, (npc.key === 'rook' ? 40 : 20) - rel);   /* Nutzer: vorher kam nur „Hilf mir erst“ ohne Weg dahin */
   if (p.knownClasses.includes(cls))
     return UI.dialogue(npc, '„Du kannst das bereits. Übe es.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   UI.dialogue(npc, `„Gut. Ich zeige dir, wie ${CLASSES[cls].name} kämpfen. Danach liegt es an dir.“`, [
@@ -10604,7 +10620,7 @@ function nodeState(c, k) {
 function learnNode(k) {
   const p = S.player, N = SKILL_TREE[k], st = nodeState(p, k);
   if (st !== 'open') return UI.toast(st === 'learned' ? 'Schon gelernt.' : st === 'barred' ? 'Du hast den anderen Schlüsselknoten dieses Zweigs gewählt.' : st === 'sealed' ? 'Dieser Zweig gehört einer Titelklasse, die du nicht hast.' : 'Erst einen Knoten davor lernen.');
-  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt auf jeder zweiten Stufe.');
+  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt auf jeder dritten Stufe.');
   (p.tree ||= {})[k] = 1; p.skillPoints--;
   const m0 = p.body ? Object.fromEntries(B.PARTS.map(k => [k, p.body[k].max || 1])) : null; recalc(p); if (N.fx.hp && m0) { for (const part of B.PARTS) p.body[part].hp = Math.min(p.body[part].max, p.body[part].hp * p.body[part].max / m0[part]); B.syncHp(p); }   // S15 Fehlersuche: je Körperteil skalieren
   if (N.grants) { syncHotbar(); log(`Neue Fähigkeit: ${ABILITIES[N.grants].name} (Leiste).`, 'party'); }   // aktiver Knoten
@@ -11282,6 +11298,16 @@ function debugSections() {
       'Banditenüberfall': () => { S.dbgAmbush = true; const a = rnd() * 6.283; for (let i = 0; i < 4; i++) { const e = spawnEnemy(pick(AMBUSH_FAM[0]), 'world', (p.x / TS2 | 0) + Math.round(Math.cos(a) * 12) + ri(-2, 2), (p.y / TS2 | 0) + Math.round(Math.sin(a) * 12) + ri(-2, 2)); e.ambush = 'dbg'; } },
       'Karawanenüberfall': () => { const c = S.ents.world.find(e => e.kind === 'caravan'); if (c) for (let i = 0; i < 4; i++) { const e = spawnEnemy('bandit', 'world', (c.x / TS2 | 0) + 6 + i, c.y / TS2 | 0); e.aggroId = c.id; } },
       'Spuk am Brunnen': () => { const k = evHaunt(); UI.toast(k ? 'Spuk in ' + townName(k) + ' — Aushang am Brett.' : 'Kein Ort für einen Spuk gefunden.'); },
+      'Wallfahrt zu Omega': () => { wallfahrt(); UI.toast('Pilger brechen auf (wenn ein Omega-Altar steht).'); },   /* Nutzer: Ereignisse im Debug starten */
+      'Ketzerjagd': () => { ketzerjagd(); UI.toast('Ketzerjagd in einem Kettendorf.'); },
+      'Kreuzzug': () => { kreuzzug(); UI.toast('Kreuzzug ausgerufen.'); },
+      'Opferfest': () => { opferfest(); UI.toast('Opferfest.'); },
+      'Flüchtlingswelle': () => { refugeeWave(); UI.toast('Flüchtlinge ziehen los.'); },
+      'Ratssitzung (Aurelion)': () => { try { councilSession(); } catch (e) { UI.toast('Ratssitzung geht nur im Rat auf der Himmelsinsel.'); } },
+      'Parade in Aurelheim (dort stehen)': () => { aurelParade(12); UI.toast(S.ents.world.some(e => e.parade) ? 'Parade.' : 'Nur mitten in Aurelheim.'); },
+      'Brand (nächste Stadt)': () => { if (!startFire(nearTown())) UI.toast('Kein Haus zum Brennen gefunden.'); },
+      'Entlaufener Sklave (Auftrag)': () => { startRunaway(); },
+      ...Object.fromEntries(Object.entries(TITLE_CLASSES).map(([k, T]) => [`Titelklasse freischalten: ${T.name}`, () => { if (!unlockTitle(k, 'Debug')) UI.toast('Geht nicht (schon da oder ausgeschlossen).'); }])),
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
       'Erbfolgestreit (Aurelion)': () => { if (S.succession) S.succession.done = S.succession.done || 'alt'; evSuccession(); UI.toast('Erbstreit im Haus ' + S.succession.house); },   // S15 P9
       'Meteorsplitter': () => { S.meteor = null; evMeteor(); UI.toast('Einschlag bei ' + (S.meteor?.where || '—')); },   // S15 P9
@@ -13349,21 +13375,22 @@ export function selftest() {
       return many && foes.length === 3 && one && next;
     } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.kills = k.k; p.kills = k.pk; S.gold = k.g; S.ents.world = W0; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
   })());
-  ok('S13 Level: Kurve wird nach Stufe 10 flacher, alle 5 Stufen ein Meilenstein (+1 Statpunkt), Talentpunkt nur auf geraden Stufen; Gegnerstufen des Gebiets abrufbar', sandbox(() => {
-    const p = stage(); p.level = 9; p.xpNext = 1000; p.xp = 1000; p.attrPoints = 0; p.skillPoints = 0; levelUp(p); const n10 = p.xpNext === 1200 && p.attrPoints === 2 && p.skillPoints === 1;
-    p.xp = p.xpNext; levelUp(p); const n11 = p.xpNext === 1440 && p.attrPoints === 3 && p.skillPoints === 1;
+  ok('S13 Level: Kurve wird nach Stufe 10 flacher, alle 5 Stufen ein Meilenstein (+1 Statpunkt), Talentpunkt nur jede TALENT_EVERY-te Stufe; Gegnerstufen des Gebiets abrufbar', sandbox(() => {
+    const p = stage(); p.level = 9; p.xpNext = 1000; p.xp = 1000; p.attrPoints = 0; p.skillPoints = 0; levelUp(p); const t10 = talentAt(10) ? 1 : 0, t11 = t10 + (talentAt(11) ? 1 : 0); const n10 = p.xpNext === 1200 && p.attrPoints === 2 && p.skillPoints === t10;
+    p.xp = p.xpNext; levelUp(p); const n11 = p.xpNext === 1440 && p.attrPoints === 3 && p.skillPoints === t11;
     const z = ZONE[clamp(zoneTier('world', 10, 10), 0, 5)];
     return n10 && n11 && z[0] <= z[1];
   }));
-  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + 30 bis Stufe 60 (≈ 50 % der 59 lernbaren Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
+  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (Nutzer: jede dritte, gut ein Drittel der Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
     while (p.level < MAX_LEVEL) { sum += p.xpNext; p.xp = p.xpNext; levelUp(p); }
     const pts = p.skillPoints, attr = p.attrPoints, learnable = Object.keys(SKILL_TREE).length - Object.values(SKILL_TREE).filter(n => n.excl).length;
     p.xp = p.xpNext * 5; while (p.xp >= p.xpNext) levelUp(p); const capped = p.level === MAX_LEVEL && p.xp < p.xpNext && Math.ceil(p.xp) === p.xpNext;
     const g = actor(340, 300); g.coopHero = true; g.level = MAX_LEVEL; g.xp = 0; g.xpNext = 999; g.attrPoints = 0; g.xp = 5000; while (g.xp >= g.xpNext) levelUp(g);
     const ratio = pts / learnable;
-    if (!(pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, sum, g.level, g.attrPoints);
-    return pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
+    const want = 1 + Array.from({ length: MAX_LEVEL - 1 }, (_, i) => i + 2).filter(talentAt).length;
+    if (!(pts === want && attr === 59 + 12 && capped && ratio >= 0.3 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, sum, g.level, g.attrPoints);
+    return pts === want && attr === 59 + 12 && capped && ratio >= 0.3 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
   }));
   ok('Balance-Runde (docs/BALANCE.md): Bosse ×2 Leben und ×0,6 Wucht (Omega ausgenommen); fester Schadensanteil wächst mit der Schwungdauer; Geist bleibt nicht dauerhaft körperlos; RF.simFight ändert die Welt nicht', sandbox(() => {
     const p = stage(); p.level = 20; recalc(p);
@@ -14330,7 +14357,7 @@ function slotPanel(mode) {
 }
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    isRunning: () => running, slotCards, setSlot, newSlot, slotIndex, SLOT: () => SLOT, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, loadRaw, CLASSES, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
+    isRunning: () => running, slotCards, setSlot, newSlot, slotIndex, SLOT: () => SLOT, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, loadRaw, CLASSES, revealAround, townName, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();

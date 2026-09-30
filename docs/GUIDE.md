@@ -130,7 +130,7 @@ kommen schon ab 100 Gold Kopfgeld. Dein Ruhm steht im Charakterfenster (C).
 - **Fernkampf** braucht freie Sicht; Pfeile prallen an Wänden ab und fliegen über Liegende hinweg.
 - **Gefahrenstufen:** In tödlichen und verbotenen Gebieten sind Gegner stärker und öfter Veteranen (sichtbar größer).
 - **Erfahrung gibt es nur für eigenen Schaden.** Machst du 30 % des Schadens, bekommst du 30 % der Erfahrung. Gefährten lernen mit 60 %.
-- **Eine Stufe** bringt Leben, Ausdauer, Mana, Schaden und Rüstung sowie einen Statpunkt; jede zweite Stufe einen Talentpunkt. Höchststufe ist 60.
+- **Eine Stufe** bringt Leben, Ausdauer, Mana, Schaden und Rüstung sowie einen Statpunkt; jede dritte Stufe einen Talentpunkt. Höchststufe ist 60.
 - **Abnutzung:** Waffen und Rüstung verlieren mit der Zeit an Zustand (im Inventar sichtbar). Eine abgenutzte Waffe macht bis zu
   **45 % weniger Schaden**. Ein Schmied bessert alles aus („Kannst du das ausbessern?“). Selbst geht es an Esse, Amboss oder
   Werkbank mit **Eisenerz**, aber nur bis 80 %.
@@ -320,7 +320,7 @@ Fähigkeit **Todesgriff** (zieht einen Feind heran) und am Ende **Frostgeboren**
 oder **Blutfürst** (Treffer heilen dich, Tränke und Verbände nur halb). Die Schlüsselknoten wirken, solange Todesritter aktiv ist.
 
 Drei allgemeine Zweige (Kampf, Magie, Überleben) mit Schlüsselknoten, die einen Preis haben, dazu die Zweige der
-Titelklassen. Ein Talentpunkt zum Start und auf jeder zweiten Stufe (31 bei Stufe 60 — gut die Hälfte aller Talente). Umlernen kostet Gold bei einem Lehrer.
+Titelklassen. Ein Talentpunkt zum Start und auf jeder dritten Stufe (21 bei Stufe 60 — gut ein Drittel aller Talente). Umlernen kostet Gold bei einem Lehrer.
 
 ---
 
