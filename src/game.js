@@ -511,6 +511,7 @@ function useConsumable(c, idx, target = c, part = null) {
     if (it.efx?.regen) addStatus(c, { key: 'regrowth', name: it.name, good: true, left: (it.dur || 60) * 1000, heal: it.efx.regen, desc: 'Heilt langsam.' });
     recalc(c); fx(c.x, c.y - 14, 'heal', 8); log(`${c.name} trinkt ${it.name}.`, 'party'); return UI.refreshHUD();
   }
+  if (it.use === 'water') { removeItem(c, slot.key, 1); c.stamina = c.maxStamina; addStatus(c, { key: 'erfrischt', name: 'Erfrischt', good: true, left: 3600000, desc: 'Keine Hitze-Nachteile.' }); if (c === S.player) log('Kühles Wasser. Eine Stunde lang macht dir die Hitze nichts.', 'party'); return UI.refreshHUD(); }   /* Karak-Atar */
   if (it.use === 'food' && c === S.player && tryTame(slot)) return UI.refreshHUD();   // S13: füttern = zähmen, wenn ein Tier nah ist
   if (it.use === 'food') {                                   // Essen gibt Kraft, heilt aber keine Wunden
     c.stamina = Math.min(c.maxStamina, c.stamina + 30 + (it.food || 1) * 10);
@@ -1856,7 +1857,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -2040,7 +2041,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
@@ -2158,6 +2159,7 @@ function wxKey() { const p = S.player; if (!p || S.map !== 'world') return null;
   return WX[S.weather] ? S.weather : null; }
 function wxOf(c) { if (!c || c.map !== 'world' || S.map !== 'world') return {}; const k = wxKey(); if (!k) return {};
   if (c === S.player && HOUSES.some(b => b.map === 'world' && R.playerInside(b, c))) return {};   /* im Haus: kein Wetter */
+  if (k === 'heat' && stat(c, 'erfrischt')) return {};   /* Wasserschlauch aus Karak-Atar */
   const w = WX[k]; if (k === 'heat' && c.equip?.chest && (ITEMS[c.equip.chest.key]?.slow || 0) > 0.05) return { ...w, stam: 0.5 };
   return w; }
 const WEATHER_POOL = { aurel: ['clear', 'clear', 'clear', 'cloudy', 'rain'], deadland: ['bloodrain', 'bloodrain', 'fog', 'cloudy'], eisen: ['cloudy', 'fog', 'rain', 'clear', 'snow'], blight: ['fog', 'fog', 'cloudy', 'bloodrain', 'clear'], desert: ['clear', 'clear', 'sandstorm', 'cloudy'], badland: ['clear', 'sandstorm', 'cloudy', 'cloudy'],
@@ -4792,6 +4794,7 @@ function shopRefusal(npc) {
   if (!npc.shop) return 'Das ist kein Händler.';
   if (npc.shopClosed > clock()) return 'Der Stand ist zu, bis sich die Lage beruhigt.';
   if (npc.till && (hourNow() >= npc.till || hourNow() < 7)) return 'Der Laden ist zu. Morgen früh wieder.';
+  if (npc.keepCourt && !deadWelcome()) return 'Die Schwarze Feste handelt nur mit denen, die zu den Toten gehören (Rang bei den Toten oder Pakt).';   /* Schwarze Feste */
   if (npc.town === 'vharnholm' && !deadWelcome()) return 'Vharnholm handelt nur mit denen, die zu ihnen gehören.';
   if (npc.faction && repTier(npc.faction)?.name === 'Verhasst') return 'Nicht für euch. Nicht für Gold.';
   if (npc.town && S.war.nodes[npc.town]?.owner === 'undead') return 'Die Toten halten die Stadt. Kein Handel.';
@@ -7641,6 +7644,77 @@ function journey(T, how) {
 }
 // Nutzer §5f: Weidenau hat eine Bürgerwehr, die nur Sensen führt — seit der Bäuerin von Hundertfeld. Die Sensenschmiedin verkauft sie.
 // Flüchtig (jedes Laden neu, wie andere ensure*); fällt oder brennt das Dorf, gibt es keine Wehr mehr.
+// ================= Karak-Atar (Nutzer §5d.2) =================
+// Neutrale Handelsstadt unter den Sandfürsten und Heimat eines Wüstenvolks. Zöllner an den Toren nehmen Wegzoll (einmal am Tag),
+// der Basar verkauft Wüstenwaren und Schmuggelgut aus Aurelion (ohne Rang, aber teuer), die Wasserhändlerin Wasser gegen die Hitze,
+// die Älteste hält nachts das Sternenritual (Segen). Wer den Zoll verweigert, zahlt im Basar mehr. Fällt Karrak, übernimmt sein
+// Stellvertreter Farid und senkt den Zoll. Flüchtig (entsteht bei jedem Laden neu).
+function karakCenter() { const hs = HOUSES.filter(b => b.town === 'karak' && b.map === 'world'); if (!hs.length) return null;
+  return [Math.round(hs.reduce((a, b) => a + b.x + b.w / 2, 0) / hs.length), Math.round(hs.reduce((a, b) => a + b.y + b.h / 2, 0) / hs.length)]; }
+function ensureKarak() {
+  const c0 = karakCenter(); if (!c0 || S.ents.world.some(e => e.karak)) return;
+  const [cx, cy] = c0, at = (dx, dy) => freeSpotNear('world', cx + dx, cy + dy, 2), desert = ['#c8a870', '#b89060', '#8a5a2a', '#e0d0a8'];
+  const mk = (name, prof, dx, dy, o = {}) => { const q = at(dx, dy), c = makeChar({ name, prof, x: q.x, y: q.y, level: 6, faction: null, traits: ['ehrgeizig'], pal: { skin: pick(['#8d6644', '#b98f66', '#6d4a30']), cloth: pick(desert) } });
+    Object.assign(c, { karak: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, hooded: true }, o); S.ents.world.push(c); return c; };
+  mk('Yusuf', 'Basarhändler', -3, -2, { shop: true, pool: ['kriegssichel', 'wurfbeil', 'wurfmesser', 'shortbow', 'dornensaebel', 'schockpistole', 'energiezelle', 'spezialoel', 'potion', 'bandage'], market: false, till: 21, karakBazaar: true, greet: '„Seide aus dem Süden, Klingen aus dem Norden, und was Aurelion nicht verkaufen will. Schau.“' });
+  mk('Leyla', 'Wasserhändlerin', 2, 2, { shop: true, pool: ['wasserschlauch', 'wasserschlauch', 'wasserschlauch', 'bread', 'dried_meat'], market: false, greet: '„Wasser ist hier mehr wert als Gold. Heute verkaufe ich es dir trotzdem für Gold.“' });
+  mk('Amina', 'Stammesälteste', 0, 5, { karakElder: true, greet: '„Die Sterne haben uns durch die Wüste geführt, lange bevor die Sandfürsten kamen.“' });
+  const lord = S.flags.sandlordSlain ? 'Farid' : null;
+  for (const [dx, dy] of [[-13, 0], [13, 0]]) mk(pick(['Tarek', 'Hamza', 'Idris', 'Sami']), 'Zöllner der Sandfürsten', dx, dy, { karakToll: true, hooded: false, greet: lord ? '„Farid hat den Zoll halbiert. Geh.“' : '„Wegzoll. Karrak will es so.“' });
+  for (let i = 0; i < 4; i++) mk(pick(['Nabil', 'Rashid', 'Zaid', 'Karim', 'Omar']), 'Sandreiter', ri(-8, 8), ri(-6, 6), { wanderR: 5, greet: '„Die Straße gehört den Sandfürsten. Solange du zahlst, gehört sie auch dir.“' });
+  for (let i = 0; i < 3; i++) mk(pick(['Salma', 'Nura', 'Hadi', 'Faris', 'Rana']), pick(['Weberin', 'Kamelhirte', 'Töpferin']), ri(-6, 6), ri(-5, 5), { greet: pick(['„Die Karawanen bringen alles. Nur keinen Regen.“', '„Nachts beten wir zu den Sternen. Komm mit, wenn du willst.“']) });
+  if (lord) mk('Farid', 'Stellvertreter der Sandfürsten', 0, -4, { greet: '„Karrak ist tot. Ich halte die Stadt zusammen — mit weniger Zoll und mehr Handel.“' });
+}
+// ================= Die Schwarze Feste (Nutzer §5d.5) =================
+// Solange die Toten sie halten: Hof der Stillen Schar (Hofmarschall mit Rang-Auskunft, Seelenhändlerin, Knochenschmied) und
+// Totentempel (Leichenpriesterin: Seelen opfern → Totensegen; Leichenzug jeden Abend). Handel nur für die, die zu den Toten gehören.
+// Nach Garmadons Fall belagert Valen die Feste: ein Heerlager vor dem Tor, die Besatzung schrumpft täglich; wer hingeht, bricht die
+// Wellen (bestehender Befreiungskampf in sim.js) mit Valens Soldaten an der Seite. Fällt die Feste, verschwindet der Hof.
+const KEEP = () => { const L = LOCATIONS.find(l => l.key === 'blackkeep'); return L ? [L.x, L.y] : null; };
+const keepHeld = () => S.war?.nodes?.blackkeep ? S.war.nodes.blackkeep.owner === 'undead' : true;
+function ensureBlackKeep() {
+  const k = KEEP(); if (!k) return; const [kx, ky] = k;
+  if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege); return; }
+  if (!S.ents.world.some(e => e.keepCourt)) {
+    const mk = (name, prof, dx, dy, o) => { const q = freeSpotNear('world', kx + dx, ky + dy, 1), c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'undead', traits: ['diszipliniert'], pal: { skin: '#b9b3a2', cloth: '#1a1420', glow: '#4e8f7a' } });
+      Object.assign(c, { keepCourt: true, undead: true, hooded: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y } }, o); S.ents.world.push(c); return c; };
+    mk('Veyl', 'Hofmarschall der Stillen Schar', 0, -2, { keepMarshal: true, greet: '„Der Thron ist leer, solange Garmadon schläft. Wir dienen trotzdem.“' });
+    mk('Ossara', 'Seelenhändlerin', -3, 1, { shop: true, pool: ['soul_vial', 'soul_vial', 'soul_vial', 'grave_seal', 'potion'], market: false, greet: '„Seelen, abgefüllt und versiegelt. Frisch, soweit das hier möglich ist.“' });
+    mk('Grimbart Knochenhand', 'Knochenschmied', 3, 1, { shop: true, pool: ['knochenspalter', 'totenglocke', 'schaedelhelm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], market: false, greet: '„Knochen hält länger als Eisen. Frag die Toten.“' });
+    mk('Mutter Asch', 'Leichenpriesterin', 0, 4, { keepPriest: true, greet: '„Jede Seele, die du bringst, wärmt den Thron.“' });
+  }
+  if (S.flags.keepSiege && !S.ents.world.some(e => e.keepSiege)) {   /* Heerlager Valens vor dem Tor */
+    for (let i = 0; i < 6; i++) { const q = freeSpotNear('world', kx - 22 + (i % 3) * 2, ky + 4 + (i >> 1), 2), g = guardChar('valen', q, 'Belagerer', ri(8, 11));
+      Object.assign(g, { keepSiege: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: '„Die Feste fällt. Diesmal wirklich.“' }); S.ents.world.push(g); }
+    const q = freeSpotNear('world', kx - 24, ky + 2, 2), m = makeChar({ name: 'Marschallin Ortrun', prof: 'Belagerungsmarschall', x: q.x, y: q.y, level: 14, faction: 'valen', traits: ['diszipliniert'] });
+    Object.assign(m, { keepSiege: true, keepMarshalV: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: '„Garmadon ist tot. Die Feste hält nur noch aus Gewohnheit.“' }); m.equip.weapon = mkItem('longsword'); S.ents.world.push(m);
+  }
+}
+function keepSiegeDay() {
+  const n = S.war?.nodes?.blackkeep; if (!n || n.owner !== 'undead' || !S.flags.garmadonSlain) return;
+  if (!S.flags.keepSiege) { S.flags.keepSiege = S.day | 0; log('Garmadon ist tot. Valen zieht vor die Schwarze Feste und schlägt ein Heerlager auf. Die Besatzung wird Tag für Tag schwächer — wer hilft, bricht die Wellen.', 'world'); UI.toast('BELAGERUNG DER SCHWARZEN FESTE', 4200); ensureBlackKeep(); return; }
+  n.garrison = Math.max(8, Math.round(n.garrison * 0.9));   /* Belagerung zehrt */
+}
+function keepChoices(npc, choices) {
+  if (npc.keepMarshal) choices.unshift({ text: 'Wie steigt man bei den Toten auf?', fn: () => UI.dialogue(npc, `„${deadWelcome() ? 'Du gehörst schon zu uns. Diene der Schar: Überfälle, Seelen, Treue.' : 'Erst der Pakt oder ein Rang bei der Stillen Schar. In Vharnholm fragt man nach dir.'}“\n${rankGuide('undead')}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if (npc.keepPriest) choices.unshift({ text: 'Eine Seele opfern (Seelenphiole)', fn: () => {
+    if (!hasItem(S.player, 'soul_vial')) return UI.dialogue(npc, '„Ohne Seele kein Segen. Die Seelenhändlerin hat welche, oder hol sie dir aus Leben, die niemand vermisst.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    removeItem(S.player, 'soul_vial', 1); addStatus(S.player, { key: 'blessing', name: 'Totensegen', good: true, left: 900000, desc: 'Die Toten sehen dich als einen der Ihren: +5 Rüstung.' }); if (S.factions.undead != null) S.factions.undead = clamp(S.factions.undead + 3, -100, 100);
+    UI.closeDialogue(); log('Die Phiole zerspringt auf dem Altar. Kälte kriecht in deine Knochen — und bleibt als Schutz. Ruf bei den Toten +3.', 'faction'); } });
+  if (npc.keepMarshalV) choices.unshift({ text: 'Wie steht die Belagerung?', fn: () => UI.dialogue(npc, `„Noch ${S.war?.nodes?.blackkeep?.garrison ?? '?'} Tote in der Feste. Jeden Tag weniger. Komm mit ans Tor, dann brechen wir sie in Wellen.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+}
+const karakToll = () => S.flags.sandlordSlain ? 8 : 15;
+function karakChoices(npc, choices) {
+  if (npc.karakToll && (S.flags.karakPaid || -1) !== (S.day | 0)) choices.unshift(
+    { text: `Wegzoll zahlen (${karakToll()} Gold)`, fn: () => { if (S.gold < karakToll()) return UI.dialogue(npc, '„Kein Gold, kein Durchgang. Aber ich bin kein Unmensch — heute lass ich dich.“', [{ text: 'Danke.', fn: () => UI.closeDialogue() }]); S.gold -= karakToll(); S.flags.karakPaid = S.day | 0; S.flags.karakRefused = false; UI.closeDialogue(); log('Du zahlst den Wegzoll. Der Basar behandelt dich heute wie einen Gast.', 'economy'); } },
+    { text: 'Zoll verweigern', fn: () => { S.flags.karakRefused = true; UI.closeDialogue(); log('Du verweigerst den Zoll. Die Sandfürsten merken sich das: im Basar zahlst du mehr, bis du zahlst.', 'faction'); } });
+  if (npc.karakElder) { const night = S.minute >= 21 * 60 || S.minute < 4 * 60;
+    choices.unshift({ text: night ? 'Am Sternenritual teilnehmen' : 'Was ist das Sternenritual?', fn: () => {
+      if (!night) return UI.dialogue(npc, '„Wenn die Sonne weg ist, sitzen wir am Feuer und lesen die Sterne. Wer mit uns liest, geht gesegnet durch die Wüste. Komm nach Einbruch der Nacht.“', [{ text: 'Ich komme wieder.', fn: () => UI.closeDialogue() }]);
+      if ((S.flags.karakRitual || -1) === (S.day | 0)) return UI.dialogue(npc, '„Eine Nacht, ein Ritual. Morgen wieder.“', [{ text: 'Gut.', fn: () => UI.closeDialogue() }]);
+      S.flags.karakRitual = S.day | 0; S.minute = Math.min(S.minute + 60, S.minute < 4 * 60 ? 4 * 60 : 1439); addStatus(S.player, { key: 'blessing', name: 'Sternensegen', good: true, left: 600000, desc: 'Die Sterne des Wüstenvolks: +5 Rüstung, keine Hitze.' }); addStatus(S.player, { key: 'erfrischt', name: 'Erfrischt', good: true, left: 600000, desc: 'Keine Hitze-Nachteile.' });
+      UI.closeDialogue(); log('Ihr lest die Sterne bis tief in die Nacht. Du fühlst dich getragen — und die Hitze macht dir morgen nichts.', 'party'); } }); }
+}
 const SCYTHES = ['grassense', 'erntesense', 'doppelsense', 'mondsense', 'kriegssense', 'sensenlanze'];
 function ensureScytheMilitia() {
   const P = TOWN_PLAN.weidenau; if (!P || S.razed?.weidenau || S.ents.world.some(e => e.scytheMilitia)) return;
@@ -9703,8 +9777,8 @@ function plagueDay() {
     if (chance(0.55)) { const v = pick(sick); v.sick = false; if (S.towns?.[k]) S.towns[k].pop = Math.max(0, S.towns[k].pop - 2); log(`${townName(k)}: ${v.name} ist am Fieber gestorben.`, 'death'); die(v, 'Seuche'); }
     if (well.length && chance(0.6)) pick(well).sick = true;
     if (!Q.quar && day - Q.day >= 2 && !S.razed?.[k]) plagueQuarantine(k, Q);
-    if (chance(Q.quar ? 0.08 : 0.4)) { const cv = (S.eco?.caravans || []).find(c => c.from === k && !P[c.to] && TOWN_PLAN[c.to]), n = cv?.to || livingTowns(k).find(t => !P[t] && TOWN_PLAN[t].lord !== 'aurel' && villagersOf(t).length >= 3);
-      if (n && !P[n]) { for (const c of villagersOf(n).slice(0, 2)) c.sick = true; P[n] = { day };
+    if (chance(Q.quar ? 0.08 : 0.4)) { const cv = (S.eco?.caravans || []).find(c => c.from === k && !P[c.to] && TOWN_PLAN[c.to]), n = cv?.to || livingTowns(k).find(t => !P[t] && !((A.immune?.[t] || 0) > day) && TOWN_PLAN[t].lord !== 'aurel' && villagersOf(t).length >= 3);
+      if (n && !P[n] && !((A.immune?.[n] || 0) > day)) { for (const c of villagersOf(n).slice(0, 2)) c.sick = true; P[n] = { day };
         afterSay(`Das Fieber erreicht ${townName(n)}`, `Mit einem Händlerzug${Q.quar ? ', an der Quarantäne vorbeigeschmuggelt,' : ''} kam das Fleckfieber aus ${townName(k)} nach ${townName(n)}.`); } }
   }
 }
@@ -9717,7 +9791,7 @@ function plagueQuarantine(k, Q) {
   afterSay(`Quarantäne über ${townName(k)}`, `Wachen sperren ${townName(k)} ab: kein Handel, die Läden sind zu, wer tagsüber vor ihren Augen hinausgeht, wird gesucht. An den Brettern der Nachbarorte suchen sie Schmuggler für Arznei.`);
 }
 function plagueGone(k, why) {
-  const A = S.after; if (!A?.plague) return; delete A.plague[k]; if (A.quar) delete A.quar[k];
+  const A = S.after; if (!A?.plague) return; delete A.plague[k]; if (A.quar) delete A.quar[k]; (A.immune ||= {})[k] = (S.day | 0) + 5;   /* gerade frei geworden: ein paar Tage gefeit (sonst steckte der Nachbarort ihn sofort wieder an) */
   for (const c of villagersOf(k)) c.sick = false;
   S.ents.world = S.ents.world.filter(e => e.quarGuard !== k);
   for (const e of S.ents.world) if (e.quarShut === k) { e.shopClosed = 0; delete e.quarShut; }
@@ -10080,6 +10154,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
+  keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
@@ -10353,7 +10428,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc));   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -11234,6 +11309,7 @@ const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.fact
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
   return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1) * (isBuy && npc?.faction === 'aurel' && S.flags.coreRoute === 'aurel' ? 0.9 : 1); };   /* S15 Fehlersuche: Corvinus-Handel senkt Aurelions Preise um 10 % */   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
+  if (npc?.karakBazaar && S.flags.karakRefused) return Math.round(price(key, isBuy, { ...npc, karakBazaar: false }, inst) * (isBuy ? 1.3 : 0.8));   /* Karak-Atar: Zoll verweigert */
   if (!isBuy) return Math.max(1, Math.min(rawPrice(key, false, npc, inst), rawPrice(key, true, npc, inst) - 1));   // S15 Fehlersuche: Kaufen und sofort Verkaufen brachte Gewinn
   return rawPrice(key, isBuy, npc, inst);
 }
@@ -15098,6 +15174,22 @@ export function selftest() {
     const legend = ['dodon', 'garmadon', 'hrodvar', 'gorak', 'chain_master', 'whitebeard', 'omega'].every(k => BOSS_LOOT[k]?.unique?.length) && ITEMS.sandfuerstenklinge && ITEMS.leitwolfzahn && ITEMS.nachtglasstab;
     return dual && alt && noDual && pulled && militia && legend;
   }));
+  ok('Schwarze Feste (Nutzer §5d.5): Hof und Totentempel stehen, Handel nur für Tote, nach Garmadon Belagerung mit Heerlager, die Besatzung schrumpft', sandbox(() => {
+    if (!KEEP() || !S.war?.nodes?.blackkeep) return true; const n = S.war.nodes.blackkeep, o0 = n.owner, g0 = n.garrison, f0 = S.flags.garmadonSlain, s0 = S.flags.keepSiege;
+    try { n.owner = 'undead'; ensureBlackKeep(); const court = S.ents.world.filter(e => e.keepCourt), shopper = court.find(e => e.shop);
+      const refused = deadWelcome() || !!shopRefusal(shopper);
+      S.flags.garmadonSlain = 1; S.flags.keepSiege = null; keepSiegeDay(); const camp = S.ents.world.some(e => e.keepMarshalV) && S.ents.world.filter(e => e.keepSiege).length >= 7;
+      n.garrison = 40; keepSiegeDay(); const shrink = n.garrison === 36;
+      return court.length >= 4 && refused && camp && shrink;
+    } finally { n.owner = o0; n.garrison = g0; S.flags.garmadonSlain = f0; S.flags.keepSiege = s0; S.ents.world = S.ents.world.filter(e => !e.keepSiege); }
+  }));
+  ok('Karak-Atar (Nutzer §5d.2): Basar, Wasserhändlerin, Älteste, Zöllner und Sandreiter stehen; Wasser schützt vor Hitze; wer den Zoll verweigert, zahlt im Basar mehr', sandbox(() => {
+    if (!karakCenter()) return true; const k = S.ents.world.filter(e => e.karak), bazaar = k.find(e => e.karakBazaar);
+    const people = k.length >= 10 && bazaar && k.some(e => e.karakElder) && k.filter(e => e.karakToll).length === 2;
+    const p = stage(); addItem(p, 'wasserschlauch', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'wasserschlauch')); const cool = stat(p, 'erfrischt');
+    const f0 = S.flags.karakRefused; S.flags.karakRefused = false; const a = price('potion', true, bazaar); S.flags.karakRefused = true; const b = price('potion', true, bazaar); S.flags.karakRefused = f0;
+    return people && cool && b > a;
+  }));
   ok('Magitech-Waffen (Roadmap C.10): Schuss kostet Energie, leer schießt nicht, Zelle füllt auf 100, Kanone streut, Präzisionsgewehr schlägt durch, Schockpistole lähmt', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('magiegewehr'); p.stamina = p.maxStamina = 1e4; p.aim = 0;
     shoot(p, ITEMS.magiegewehr); const cost = p.equip.weapon.charge === 100 - ITEMS.magiegewehr.energy;
@@ -15494,7 +15586,7 @@ export function selftest() {
     splitEnd('Test'); return fell && held && bones && robots && shut && ruins && flee && split && freed && !S.after.split;
   }));
   ok('Folgen §5c/5: Seuche nicht eingedämmt — bleibt im Ort, Quarantäne (Wachen, Schmuggelauftrag), der Spieler erkrankt und die Heilerin heilt; ohne Kranke ist der Ort frei', afterBox(() => {
-    const p = stage(); S.after = {}; S.big = null; const k = bigTowns().find(t => villagersOf(t).length >= 5); if (!k) return false;
+    const p = stage(); S.after = {}; S.big = null; S.eco && (S.eco = { ...S.eco, caravans: [] }); const k = bigTowns().find(t => villagersOf(t).length >= 5); if (!k) return false;   /* ohne Karawanen: die Probe prüft einen Ort, Ausbreitung ist Zufall */
     villagersOf(k).slice(0, 3).forEach(c => { c.sick = true; });
     const stays = plagueStays({ town: k, dead: 3, cured: 1 }) && !!S.after.plague[k];
     S.day = (S.day | 0) + 2; plagueDay(); const quar = !!S.after.quar[k] && S.ents.world.some(e => e.quarGuard === k) && S.contracts.some(c => c.smuggle && c.target === k);

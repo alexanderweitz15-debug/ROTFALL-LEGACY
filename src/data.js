@@ -315,6 +315,7 @@ export const ITEMS = {
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
+  wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
   potion:     { name:'Trank der Genesung', slot:'consumable', use:'heal', heal:40, stack:5, rarity:'uncommon', value:55 },
   // S13: Werkzeuge der Arbeiter (nur Bild und Bewegung bei der Arbeit; nicht im Handel, keine Beute)
   tool_hammer: { name:'Schmiedehammer', slot:'tool', wtype:'hammer', arc:1.4, value:0, rarity:'common' },
