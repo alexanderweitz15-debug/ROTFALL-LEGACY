@@ -110,7 +110,11 @@ export function damageOf(c) {
   if (stat(c, 'wolf_form') && gearOf(c) >= 2) m += 0.25;                              // S15 Hainfell: stärkerer Biss
   if (stat(c, 'song')) m += 0.15;                                                      // Kriegslied
   m += setOf(c)?.bonus.dmg || 0;                                                       // S13: Set-Bonus
-  return (base + attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * Math.max(0.2, m);   // Phase 1: jede Stufe etwas stärker
+  // Balance-Runde: der feste Anteil (Attribut, Übung, Stufe) kommt je Treffer dazu — ohne Ausgleich war der Dolch (300 ms) viermal so
+  // stark wie der Zweihänder. Jetzt wächst er mit der Schwungdauer (600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2);
+  // Fernwaffen ×1. Dolche behalten ihren Rückenstich (Krit ×2,6 von hinten) und die geringe Ausdauer je Hieb.
+  const spd = it && !it.ranged ? Math.min(2, Math.max(0.6, it.speed / 600)) : 1;
+  return (base + (attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * spd) * Math.max(0.2, m);   // Phase 1: jede Stufe etwas stärker
 }
 function speedOf(c) {
   let s = 2.25 + c.attributes.agility * 0.045;
@@ -1595,7 +1599,14 @@ function styleArea(on = true) {
 }
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
-export const BAL = { hp: 1.7, dmg: 1.4 };
+export const BAL = { hp: 1.7, dmg: 1.4, lvl: 0.06 };   // lvl: Gegnerschaden je Stufe (Balance-Runde: 0,05 → 0,06, sonst ab Stufe 25 kaum noch Gefahr)
+// Balance-Runde (docs/BALANCE.md): Bosse (MONSTERS.boss und Regionalbosse) — mehr Leben, weniger Wucht je Treffer. Gemessen
+// (RF.simFight, Schwer, übliche Ausrüstung) endeten Bossfeiten nach 10–26 s und fast immer mit 2–3 Treffern bis zum Boden:
+// Glücksspiel statt Kampf. Ziel 60–180 s, echte Gefahr, mit Rolle und Deckung gewinnbar. Schaden gilt für alles, was der Boss
+// austeilt (Hieb, Fläche, Geschoss; hurt()).
+// Omega (bossScale:false) ist eine Heeresschlacht mit Verbündeten und bleibt bei seinen Werten.
+export const BOSS = { hp: 2, dmg: 0.6 };
+const bossScaled = e => !!e?.boss && e.kind === 'enemy' && MONSTERS[e.mtype]?.bossScale !== false;
 // S15 P12 Schwierigkeitsgrade (PLAN_OFFEN Block B). Schwer ist der Standard. Wirkt auf Leben und Schaden der Gegner (über BAL),
 // die Ansagezeit schwerer Angriffe, Beutechancen und wie schnell Kopfgeld verfällt; die Gliedergrenze steht in body.js cutOf.
 export const DIFF = {
@@ -1654,7 +1665,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     faction: m.faction, boss: !!m.boss, ...opts,
   };
   if (!e.boss && (opts.level == null || opts.zone) && !map.startsWith('__')) e.level = zoneLevel(map, tx, ty, m);   // Phase 1: Gebietsspanne
-  e.maxHp = e.hp = Math.round(m.hp * (1 + e.level * 0.04) * BAL.hp);
+  e.maxHp = e.hp = Math.round(m.hp * (1 + e.level * 0.04) * BAL.hp * (bossScaled(e) ? BOSS.hp : 1)); if (bossScaled(e)) e.bossV = 1;   // bossV: schon nach BOSS bemessen (Ladeprüfung)
   if (!e.boss && !opts.noVariant && !m.prey && !e.servant && !map.startsWith('__') && !S._quiet && Math.random() < 0.18) applyVariant(e, m);   // S13: Gegnervarianten (eigener Zufall: die Weltfolge bleibt stabil)
   if (HUMANOID.has(mtype)) { e.build = pick(Object.keys(B.BUILDS)); B.initBody(e, e.maxHp); }   // Menschenähnliche haben Trefferzonen
   S.ents[map].push(e);
@@ -1690,12 +1701,12 @@ const REGION_BOSSES = [
     call: 'wolf', callText: 'heult. Das Rudel antwortet.', area: a => a.map === 'world' && a.x < 130 + OX && a.y > 250 && a.types.includes('wolf'), from: 'wolf', to: 'wild_dog',
     effect: () => { if (S.towns.eren) S.towns.eren.stock.pelt += 8; S.factions.valen += 3; },
     text: 'Ohne Graumähne zerfällt das Rudel der Schlucht. Die Jäger in Eren atmen auf — und in den Westwald ziehen verwilderte Hunde.' },
-  { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 240, r: 13, title: 'Karrak, der Sandfürst',
+  { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 340, dmg: 1.8, r: 13,   /* Balance-Runde: vorher 240 LP, Banditenhieb — in 6 s erledigt */ title: 'Karrak, der Sandfürst',
     call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
     effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; },
     text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf — doch in die leeren Lager ziehen Goblin-Krieger.' },
   // Endgame (Session 11): Varg in der Kernburg der Kettenfeste. Tod = Befreiung der Goblins; Reste der Kette werden zu Räubern.
-  { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 260, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
+  { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 360, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
     call: 'chain_brute', callText: 'lässt die Kette klirren. Knechte stürmen aus der Halle.', area: a => !!a.eisen, from: 'chain_brute', to: 'bandit',
     guards: 2, guardType: 'rotgardist', effect: () => liberate(),
     court: [[-4, -3, 'rotgardist'], [-4, 3, 'rotgardist'], [-9, -4, 'rotgardist'], [-9, 4, 'rotgardist'], [-12, -5, 'kettenschuetze'], [-12, 5, 'kettenschuetze']],
@@ -1708,7 +1719,7 @@ function ensureRegionBosses() {
     const L = LOCATIONS.find(l => l.key === b.loc); if (!L) continue;
     const [bx, by] = b.at || [Math.round(L.x), Math.round(L.y)];
     const e = spawnEnemy(b.mtype, 'world', bx, by, { level: b.level, boss: true, rboss: b.id, title: b.title });
-    e.maxHp = e.hp = Math.round(b.hp * BAL.hp); e.r = b.r; if (e.body) B.initBody(e, e.maxHp);
+    e.maxHp = e.hp = Math.round(b.hp * BAL.hp * BOSS.hp); e.r = b.r; if (b.dmg) e.dmgMul = b.dmg; if (e.body) B.initBody(e, e.maxHp);
     if (b.court) { e.parley = true; e.facing = 2; }                  // S12: Varg hält Hof — man kann ihn ansprechen
     for (const [i, [dx, dy, gt]] of (b.court || [[-3, -3, b.guardType || b.call], [-3, 3, b.guardType || b.call]]).slice(0, b.court ? 99 : b.guards || 0).entries())
       { const g = spawnEnemy(gt, 'world', bx + dx, by + dy, { level: b.level - 4, anchor: { x: (bx + dx) * TS, y: (by + dy) * TS } }); g.court = true; g.facing = i % 2 ? 3 : 2; }   // Leibwache / Hofstaat
@@ -1726,7 +1737,7 @@ function spawnType(a) {                                             // Machtvaku
 // oft Veteranen (+30 % Leben, größer, bessere Beute). Die Welt skaliert nicht zum Spieler — der Ort bestimmt die Gefahr.
 // Gegner-Skalierung (Master-Prompt 2 §20/§21): Jedes Gebiet hat eine Levelspanne nach seiner Gefahr. Innerhalb dieser
 // Spanne passt sich der Gegner an den Spieler an (±2, zähe Arten etwas höher); darüber hinaus nie. Frühe Gebiete werden
-// später leicht, späte bleiben hart. Stärke je Stufe bleibt maßvoll (+4 % Leben, +5 % Schaden).
+// später leicht, späte bleiben hart. Stärke je Stufe bleibt maßvoll (+4 % Leben, +6 % Schaden, BAL.lvl).
 const ZONE = [[1, 8], [1, 10], [3, 15], [8, 22], [15, 35], [25, 50]];
 const REGION_TIER = { deadland: 4, eisen: 3, mountain: 3, desert: 3, blight: 3, aurel: 2 };
 function zoneTier(map, tx, ty) {
@@ -1998,6 +2009,10 @@ export function continueGame(given = null) {                        /* Koop K2: 
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
+  for (const arr of Object.values(S.ents)) for (const e of arr || []) if (bossScaled(e) && e.alive && !e.bossV) {   /* Balance-Runde: Bosse alter Stände bekommen das neue Leben (BOSS.hp), sonst wären sie mit der geringeren Wucht nur leichter */
+    const f = e.hp / (e.maxHp || 1), rb = bossOf(e); e.bossV = 1; if (rb?.dmg) e.dmgMul = rb.dmg;
+    if (e.body) { for (const k of ['head', 'torso']) { const P = e.body[k], r = P.max ? P.hp / P.max : 1; P.max = Math.round(P.max * BOSS.hp); P.hp = P.max * r; } B.syncHp(e); }
+    else { e.maxHp = Math.round((e.maxHp || 1) * BOSS.hp); e.hp = Math.round(e.maxHp * f); } }
   if (S.halt?.tickmar) { if (S.big?.kind === 'strike') S.halt['tickmar:magitech'] = Math.max(S.halt['tickmar:magitech'] || 0, S.big.until); delete S.halt.tickmar; }   /* Roadmap P4: alter Streik-Schlüssel */
   for (const c of S.ents.world) if (c.villager && (c.prof === 'Prothesenhändlerin' || c.prof === 'Kybernetiker') && !c.shop) Object.assign(c, { shop: true, pool: MARKET_POOL[c.prof], till: 20 });   /* Roadmap P5: Bionik-Händler in alten Ständen */
   { const v = S.ents.world.find(e => e.key === 'vell'); if (v?.pool && !v.pool.includes('spezialoel')) v.pool = [...v.pool, 'spezialoel', 'feinwerkzeug', 'auge_aurel', 'auge_meister']; }   /* Roadmap P5 */
@@ -3107,7 +3122,7 @@ const EYE_ZAP = new Set(['magic', 'shadow', 'shock', 'arcane']);   /* Roadmap P2
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null;
-  let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * 0.05) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
+  let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * BAL.lvl) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
   if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
@@ -3121,7 +3136,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   // Kritisch
   const ambush = attacker === S.player && target.kind === 'enemy' && teamOf(target) === 'neutral';   // S12: Schleichangriff auf Ahnungslose
   const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen');
-  const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) < 1;
+  const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) > Math.PI - 1;   // Balance-Runde: vorher „< 1“ = von VORN (Dolch-Krit ×2,6 gegen jeden, der einen ansieht)
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
   // Heilig gegen Untot
@@ -3216,6 +3231,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (node(target, 'k_berserk')) dmg *= 1.15;                         // Preis des Berserkers
   if (stat(target, 'frenzy')) dmg *= 1.2;                              // Preis der Raserei
   if (source && source.cowed > performance.now()) dmg *= 0.8;          // eingeschüchtert (Kampfschrei)
+  if (source !== target && bossScaled(source)) dmg *= BOSS.dmg;         // Balance-Runde: Bosswucht (BOSS)
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
@@ -3981,7 +3997,7 @@ function archerAI(e, tgt, d, sp, dt, m) {
       e.atkCd = m.atk; e.repos = 500 + rnd() * 600; e.circle = chance(0.5) ? 1 : -1;
       const mag = m.missile === 'shadow';                     // Kultist: Schattenblitz (langsamer, man kann ausweichen)
       S.projectiles.push({ id: uid(), kind: m.missile || 'arrow', map: e.map, x: e.x + cs * 12, y: e.y - 10 + sn * 8,
-        vx: cs * (mag ? 4.6 : 7), vy: sn * (mag ? 4.6 : 7), owner: e.id, dmg: m.dmg * (1 + e.level * 0.05) * BAL.dmg, life: 1600, team:'foe' });
+        vx: cs * (mag ? 4.6 : 7), vy: sn * (mag ? 4.6 : 7), owner: e.id, dmg: m.dmg * (1 + e.level * BAL.lvl) * BAL.dmg * (e.dmgMul || 1), life: 1600, team:'foe' });   /* Balance-Runde: Varianten (Rasender, Vernarbter) wirken auch bei Schützen */
       if (mag) { e.castT = performance.now(); fx(e.x + cs * 12, e.y - 14, 'shadow', 6); }
       sfx('bow', 0.2, earVol(e));
     }
@@ -11411,15 +11427,15 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
 // der Tod des Gegners löst keine Weltfolgen aus (simDummy in die). Ergebnis: { win, dead, sec, hpLost, rolls, potsUsed, ehpLeft }.
 export function simFight(mtype, o = {}) {
   const { level = 5, weapon = 'longsword', gear = {}, attrs = null, skill = null, elvl = null, ehp = null, eopt = {}, mode = 'smart', seed = 1, maxT = 180000, pots = 0, flags = {} } = o;
-  const skip = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings']), snap = {};
-  for (const k of Object.keys(S)) if (!skip.has(k)) { try { snap[k] = structuredClone(S[k]); } catch (err) { /* nicht klonbar: bleibt */ } }
+  const skip = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings']), snap = {}, snapJ = {};
+  for (const k of Object.keys(S)) if (!skip.has(k)) { try { snapJ[k] = JSON.stringify(S[k]); snap[k] = structuredClone(S[k]); } catch (err) { /* nicht klonbar: bleibt */ } }   // zurückgesetzt wird nur, was sich geändert hat (Verweise bleiben heil)
   const keep = { player: S.player, map: S.map, party: S.party, combat, projectiles: S.projectiles, rising: S.rising, quiet: S._quiet };
-  const kb = new Set(keys), md = mouse.down, ms = mouse.seen, pnow = performance.now;
+  const kb = new Set(keys), md = mouse.down, ms = mouse.seen, pnow = performance.now, boss0 = { ...BOSS };
   let vt = pnow.call(performance); performance.now = () => vt;   /* virtuelle Uhr: Nachladen, Landung, Schwung laufen in Kampfzeit, nicht in Rechenzeit */
   S.projectiles = []; S.rising = []; S.party = [];
   MAPS.__d = { w: 60, h: 40, tiles: new Uint8Array(2400).fill(T.GRASS) }; S.ents.__d = []; solidIndex.__d = new Map(); S._quiet = true;
   try {
-    Object.assign(S.flags, flags); seedRng(seed); S.difficulty = o.diff || 'schwer'; applyDifficulty();   // Messung immer auf „Schwer“ (Standard), sonst die Stufe des Spielstands
+    Object.assign(S.flags, flags); seedRng(seed); S.difficulty = o.diff || 'schwer'; applyDifficulty(); if (o.boss) Object.assign(BOSS, o.boss);   // Messung immer auf „Schwer“ (Standard), sonst die Stufe des Spielstands
     const it = weapon ? ITEMS[weapon] : null, ranged = !!it?.ranged, pts = level - 1 + Math.floor(level / 5);
     const A = attrs || (ranged ? { agility: 10 + Math.round(pts * 0.5), endurance: 10 + Math.round(pts * 0.4), strength: 9 + Math.round(pts * 0.1) }
       : { strength: 10 + Math.round(pts * 0.5), endurance: 10 + Math.round(pts * 0.4), agility: 9 + Math.round(pts * 0.1) });
@@ -11430,32 +11446,37 @@ export function simFight(mtype, o = {}) {
     S.player = p; S.map = '__d'; S.ents.__d.push(p);
     const eo = { ...eopt }; if (elvl != null) eo.level = elvl;
     const e = spawnEnemy(mtype, '__d', 34, 20, eo);
-    if (ehp) { e.maxHp = e.hp = Math.round(ehp * BAL.hp); if (e.body) B.initBody(e, e.maxHp); }
+    if (ehp) { e.maxHp = e.hp = Math.round(ehp * BAL.hp * (bossScaled(e) ? BOSS.hp : 1)); if (e.body) B.initBody(e, e.maxHp); }
     e.simDummy = true; e.parley = false; e.aggroId = p.id; e.aiState = 'pursue';
-    const hp0 = B.vital(p), eMax = e.maxHp, st = { sw: 0, hits: 0, tired: 0, far: 0 }; let t = 0, rolls = 0, potsUsed = 0;
+    const hp0 = B.vital(p), eMax = e.maxHp, ev0 = e.body ? B.vital(e) : e.hp, st = { sw: 0, hits: 0, tired: 0, far: 0, cells: 0 }; let t = 0, rolls = 0, potsUsed = 0, ann = -1e9;
     keys.clear(); mouse.seen = false; mouse.down = true;
     for (; t < maxT && e.alive && p.alive && !p.downed; t += 16) {
       vt += 16; mouse.wx = e.x; mouse.wy = e.y - 12; combat = S.ents.__d.filter(x => x.alive);
       if (p.x > 56 * TS || p.x < 4 * TS) { const sh = p.x > 56 * TS ? -30 * TS : 30 * TS; for (const x of S.ents.__d) x.x += sh; }   // Endlosband
       if (mode === 'smart') {
-        const late = e.swing > 0 && !e.hitDone && e.swing * (e.swingDur || 500) >= 250;   /* Reaktionszeit ~250 ms: nur langsame Hiebe sind ohne Ansage ausweichbar */
-        const d = dist(p, e), threat = (e.telegraph > 0 || e.windup || (e.special && e.special.t > 0) || !!e.leap || e.draw > 0 || late) && d < 220;
-        if (threat && !p.dodge && !(p.dodgeCd > 0) && dodge()) rolls++;
-        for (const k of ['w', 'a', 's', 'd']) keys.delete(k);
+        if (e.telegraph > 0 || e.windup) ann = vt;                                            /* Ansage gesehen */
+        const sw = e.swing > 0 && !e.hitDone, tth = sw ? (swingHit(e) - e.swing) * (e.swingDur || 500) : 1e9;
+        const late = sw && tth < 200 && (vt - ann < 1500 || e.swing * (e.swingDur || 500) >= 250);   /* angesagt: kurz vor dem Treffer rollen; sonst Reaktionszeit ~250 ms */
+        const d = dist(p, e), threat = d < 220 && ((e.telegraph > 0 && e.telegraph < 180) || (e.special && e.special.t < 220) || !!e.leap || e.draw > 0 || late);
+        for (const k of ['w', 'a', 's', 'd']) keys.delete(k);                                   /* ohne Richtung rollt man rückwärts, weg vom Ziel */
+        const far = !ranged && d > (it ? it.reach : 30) + (e.r || 10) + 4, toward = () => { if (Math.abs(e.x - p.x) > 8) keys.add(e.x < p.x ? 'a' : 'd'); if (Math.abs(e.y - p.y) > 8) keys.add(e.y < p.y ? 'w' : 's'); };
+        if (far && e.draw > 0) toward();                                                        /* gegen Schützen: nach vorn rollen */
+        if (threat && !o.nododge && !p.dodge && !(p.dodgeCd > 0) && dodge()) rolls++;
         mouse.down = !(e.phased > vt) && !e.invuln;   /* wer spielen kann, haut nicht in einen körperlosen Geist oder einen brüllenden Boss */
         if (ranged) { if (d < 170) keys.add(e.x < p.x ? 'd' : 'a'); }
-        else if (d > (it ? it.reach : 30) + (e.r || 10) + 4 && !threat) { if (Math.abs(e.x - p.x) > 8) keys.add(e.x < p.x ? 'a' : 'd'); if (Math.abs(e.y - p.y) > 8) keys.add(e.y < p.y ? 'w' : 's'); }   /* Nahkämpfer gehen auf Schlagweite */
+        else if (far && (!threat || e.draw > 0)) toward();   /* Nahkämpfer gehen auf Schlagweite */
       }
       if (potsUsed < pots && B.vital(p) < hp0 * 0.35) { potsUsed++; B.heal(p, ITEMS.potion.heal); }
+      if (it?.energy && p.equip.weapon && (p.equip.weapon.charge ?? 100) < it.energy && st.cells < (o.cells || 0)) { p.equip.weapon.charge = 100; st.cells++; }   /* Energiezellen */
       const sw0 = p.swing, eh0 = e.body ? B.vital(e) : e.hp;
       controlPlayer(16); for (const x of [...S.ents.__d]) think(x, 16); updateProjectiles(16);
       if (!(sw0 > 0) && p.swing > 0) st.sw++; if ((e.body ? B.vital(e) : e.hp) < eh0) st.hits++; if (p.stamina < 5) st.tired += 16; if (dist(p, e) > 120) st.far += 16;
     }
     return { mtype, level, weapon, elvl: e.level, win: !e.alive, dead: !p.alive || !!p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100), rolls, potsUsed,
-      ehp: eMax, ehpLeft: e.alive ? Math.round(Math.max(0, e.body ? B.vital(e) : e.hp) / eMax * 100) : 0, pdmg: Math.round(damageOf(p)), parmor: armorOf(p), php: Math.round(hp0), swings: st.sw, landed: st.hits, tiredS: +(st.tired / 1000).toFixed(1), farS: +(st.far / 1000).toFixed(1) };
+      ehp: eMax, ehpLeft: e.alive ? Math.round(Math.max(0, e.body ? B.vital(e) : e.hp) / ev0 * 100) : 0, dealt: Math.round(ev0 - Math.max(0, e.alive ? (e.body ? B.vital(e) : e.hp) : 0)), pdmg: Math.round(damageOf(p)), parmor: armorOf(p), php: Math.round(hp0), swings: st.sw, landed: st.hits, tiredS: +(st.tired / 1000).toFixed(1), farS: +(st.far / 1000).toFixed(1), cells: st.cells };
   } finally {
-    performance.now = pnow; keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms;
-    for (const [k, v] of Object.entries(snap)) S[k] = v;
+    performance.now = pnow; Object.assign(BOSS, boss0); keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms;
+    for (const [k, v] of Object.entries(snap)) { let same = false; try { same = JSON.stringify(S[k]) === snapJ[k]; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
     applyDifficulty();
     Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, projectiles: keep.projectiles, rising: keep.rising, _quiet: keep.quiet }); combat = keep.combat;
     delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
@@ -12864,18 +12885,19 @@ export function selftest() {
     const weapons = Object.entries(ITEMS).filter(([, it]) => it.slot === 'weapon');
     const data = weapons.every(([k, it]) => FEEL[it.wtype] && SP.weaponSprite(k, it.rarity, it.holy, it.wtype).cv.width > 0);
     const p = stage(); p.aim = 0; combat = S.ents.__a;
-    const mk = (x, y = 0) => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + x; e.y = p.y + y; e.stagger = 0; return e; };
+    const mk = (x, y = 0) => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + x; e.y = p.y + y; e.stagger = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x); return e; };   // Balance-Runde: Gegner sieht den Helden an (sonst Rückenstich-Krit)
     const dealt = (w, e, mult = 1) => { p.equip.weapon = mkItem(w); const h = e.hp; seedRng(4); hit(p, e, mult); return h - e.hp; };
     const a = mk(30), plain = dealt('rapier', a); p.riposteUntil = performance.now() + 1000; const rip = dealt('rapier', mk(30));
     const sh = mk(30); sh.equip = { offhand: { key: 'kite_shield' } }; ITEMS.__wall = { slot: 'offhand', block: 1.43 }; sh.equip.offhand = { key: '__wall' };
     const blockedSword = dealt('longsword', sh), crushed = dealt('warhammer', sh); delete ITEMS.__wall; sh.equip.offhand = null; a.alive = sh.alive = false;
-    const near = mk(24, 0), far = mk(80, 6); p.equip.weapon = mkItem('halberd'); const hn = near.hp, hf = far.hp; seedRng(4); resolveSwing(p);
+    const near = mk(24, 0), far = mk(80, 6); near.aim = far.aim = 0; near.body = far.body = null; p.equip.weapon = mkItem('halberd'); const hn = near.hp, hf = far.hp; seedRng(4); resolveSwing(p);   /* ohne Trefferzonen: Kopfdeckel/Glieder verfälschen den Vergleich Spitze/Schaft nicht */
     p.equip.weapon = mkItem('crossbow'); p.stamina = 100; p.swing = 0; p.atkCd = 0; const n0 = S.projectiles.length; resolveSwing(p);
     const shot = S.projectiles.length === n0 + 1 && S.projectiles.at(-1).kind === 'bolt' && p.reloadUntil > performance.now();
     attack(p); const noReshoot = !(p.swing > 0);
     p.reloadUntil = 0; p.equip.weapon = mkItem('wand'); p.maxMana = 50; p.mana = 5; p.swing = 0; p.atkCd = 0; attack(p); const paid = p.mana === 1;
     p.swing = 0; p.atkCd = 0; attack(p); const refused = !(p.swing > 0);
     S.projectiles.length = n0;
+    if (!(data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused)) console.warn('Waffen P7', data, rip, plain, blockedSword, crushed, sh.stagger, hn - near.hp, hf - far.hp, shot, noReshoot, paid, refused);
     return data && rip > plain * 1.8 && blockedSword === 0 && crushed > 0 && sh.stagger > 0 && hn > near.hp && hf > far.hp && (hf - far.hp) > (hn - near.hp) && shot && noReshoot && paid && refused;
   }));
   ok('Rarität (Phase 8): Verteilung abgestuft, nie mythisch zufällig, Unikate fest; Affixe je Stufe (episch: 1 spielverändernd, legendär: Sondereffekt); Affixe wirken; Aufheben behält das Exemplar', sandbox(() => {
@@ -13342,6 +13364,18 @@ export function selftest() {
     const ratio = pts / learnable;
     if (!(pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, sum, g.level, g.attrPoints);
     return pts === 31 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
+  }));
+  ok('Balance-Runde (docs/BALANCE.md): Bosse ×2 Leben und ×0,6 Wucht (Omega ausgenommen); fester Schadensanteil wächst mit der Schwungdauer; Geist bleibt nicht dauerhaft körperlos; RF.simFight ändert die Welt nicht', sandbox(() => {
+    const p = stage(); p.level = 20; recalc(p);
+    seedRng(3); const g = spawnEnemy('gorak', '__a', 12, 10, { level: 10 }); seedRng(3); const g2 = spawnEnemy('gorak', '__a', 12, 14, { level: 10, boss: false }); g2.alive = false;
+    const om = spawnEnemy('omega', '__a', 20, 10, { level: 20 }), w0 = spawnEnemy('wolf', '__a', 14, 12, { level: 5 });
+    const hpOk = Math.abs(g.maxHp / g2.maxHp - BOSS.hp) < 0.05 && g.bossV === 1 && om.maxHp === Math.round(MONSTERS.omega.hp * 1.8 * BAL.hp) && !om.bossV;
+    const h0 = w0.hp; hurt(w0, 10, g); const bossHit = Math.abs((h0 - w0.hp) - 10 * BOSS.dmg) < 0.2; const h1 = w0.hp; hurt(w0, 10, om); const omegaHit = Math.abs((h1 - w0.hp) - 10) < 0.2;
+    const flat = k => { p.equip.weapon = { key: k, cond: 1 }; return damageOf(p) - ITEMS[k].dmg; }, fr = flat('dagger') / flat('greatsword');
+    const wr = spawnEnemy('wraith', '__a', 16, 10); p.equip.weapon = { key: 'longsword', cond: 1 }; seedRng(5); hit(p, wr, 1); const ph = wr.phased; hit(p, wr, 1); const noRefresh = wr.phased === ph;
+    const f0 = JSON.stringify(S.flags), k0 = S.kills, r = simFight('bandit', { level: 5, elvl: 3, maxT: 20000 }), clean = JSON.stringify(S.flags) === f0 && S.kills === k0 && S.player === p && typeof r.win === 'boolean';
+    if (!(hpOk && bossHit && omegaHit && fr > 0.3 && fr < 0.45 && noRefresh && clean)) console.warn('Balance-Runde', hpOk, g.maxHp, om.maxHp, bossHit, omegaHit, fr, noRefresh, clean);
+    return hpOk && bossHit && omegaHit && fr > 0.3 && fr < 0.45 && noRefresh && clean;
   }));
   ok('S13 Fraktionssets: erst alle Teile geben den Bonus (Rüstung, Schaden, Ausdauer, gegen Untote); Effekte-Fenster zeigt das Set; jedes Setteil hat Werte und Aussehen', sandbox(() => {
     const p = stage(); p.equip.chest = mkItem('kronharnisch'); p.equip.head = null; recalc(p);
@@ -13847,7 +13881,7 @@ export function selftest() {
   }));
   ok('Magitech-Waffen (Roadmap C.10): Schuss kostet Energie, leer schießt nicht, Zelle füllt auf 100, Kanone streut, Präzisionsgewehr schlägt durch, Schockpistole lähmt', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('magiegewehr'); p.stamina = p.maxStamina = 1e4; p.aim = 0;
-    shoot(p, ITEMS.magiegewehr); const cost = p.equip.weapon.charge === 92;
+    shoot(p, ITEMS.magiegewehr); const cost = p.equip.weapon.charge === 100 - ITEMS.magiegewehr.energy;
     p.equip.weapon.charge = 3; p.swing = 0; p.atkCd = 0; p.reloadUntil = 0; attack(p); const blocked = !(p.swing > 0);
     addItem(p, 'energiezelle', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'energiezelle')); const full = p.equip.weapon.charge === 100 && !hasItem(p, 'energiezelle');
     shoot(p, ITEMS.kristallkanone); const k = S.projectiles.at(-1); shoot(p, ITEMS.praezisionsgewehr); const q = S.projectiles.at(-1); shoot(p, ITEMS.schockpistole); const s = S.projectiles.at(-1);

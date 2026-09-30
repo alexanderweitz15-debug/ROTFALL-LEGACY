@@ -3,6 +3,8 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Mehrere Spielstände mit Erfolgs-Symbolen, Koop-Stände getrennt; Goblins und Untote in vielen Varianten.
+- Magitech-Waffen 2.0 (Roadmap C.10): Energie je Schuss mit Energiezellen, fünf neue Waffen (Schockpistole, Magiegewehr, Runenarmbrust, Kristallkanone, Präzisionsgewehr) mit Streuung, Durchschlag, Lähmen, Brand; Rangsperre in Aurelion.
 - Koop: Ingame-Chat (Enter), Charakterkarten, Erben in gleicher Zahl, Gast-Schlag bei gehaltener Maus und kurzen Klicks repariert, Koop aus laufendem Spiel lässt Gäste sofort rein, lokaler Testweg ?coopLocal.
 - Koop: Gast führt eigene Gespräche (Lehrer, Fraktionen, Aufträge mit Rückfrage beim Host), eigene Fraktionsränge, Tod erst wenn alle am Boden, Erben für alle, Code immer sichtbar, Pfeil zum Mitspieler, Kerker nur für den Helden.
 - Koop-Warteraum: eigener Charakter für den Gast, Bereit-Knopf, gespeicherte Gastcharaktere; Gast sieht Häuser, Licht, Inventar, Statpunkte, Aufträge, E-Hinweise; Taten des Gasts kosten Ruf; Kamerafahrten für Gäste; Zeppeline über Aurelion ziehen nicht mehr mit.

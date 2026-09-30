@@ -70,14 +70,14 @@ export const ITEMS = {
   kriegssichel: { name:'Kriegssichel', slot:'weapon', wtype:'axe', dmg:12, reach:40, arc:1.6, speed:600, stam:9, ap:0.15, rarity:'uncommon', value:80, skill:'onehanded', lore:'Der Haken zieht Schilde beiseite.' },
   doppelklinge: { name:'Doppelklinge', slot:'weapon', wtype:'polearm', dmg:17, reach:52, arc:3.2, speed:760, stam:14, sweep:true, rarity:'rare', value:240, skill:'polearms', twohand:true, lore:'Zwei Klingen an einem Schaft. Wer sie führt, steht nie mit dem Rücken zur Wand.' },
   schlagkralle: { name:'Schlagkralle', slot:'weapon', wtype:'dagger', dmg:8, reach:30, arc:1.2, speed:330, stam:5, rarity:'common', value:40, skill:'unarmed', lore:'Drei Klingen über den Knöcheln. Schnell, nah, hässlich.' },
-  wurfmesser:   { name:'Wurfmesser', slot:'weapon', wtype:'throw', dmg:8, reach:300, speed:520, stam:5, rarity:'common', value:45, skill:'archery', ranged:true, proj:'knife', lore:'Ein Gürtel voll davon. Man sammelt sie hinterher wieder ein — meistens.' },
+  wurfmesser:   { name:'Wurfmesser', slot:'weapon', wtype:'throw', dmg:8, reach:300, speed:680, stam:5, rarity:'common', value:45, skill:'archery', ranged:true, proj:'knife', lore:'Ein Gürtel voll davon. Man sammelt sie hinterher wieder ein — meistens.' },
   wurfbeil:     { name:'Wurfbeil', slot:'weapon', wtype:'throw', dmg:14, reach:260, speed:900, stam:8, ap:0.2, rarity:'uncommon', value:90, skill:'archery', ranged:true, proj:'taxe', lore:'Kopflastig, dreht sich zweimal und trifft mit der Schneide.' },
   schleuder:    { name:'Schleuder', slot:'weapon', wtype:'sling', dmg:7, reach:340, speed:700, stam:5, rarity:'common', value:15, skill:'archery', ranged:true, proj:'stone', lore:'Ein Lederriemen und ein Kiesel. Hirten treffen damit Wölfe zwischen die Augen.' },
   messingpistole:{ name:'Messingpistole', slot:'weapon', wtype:'crossbow', dmg:24, reach:320, speed:320, reload:2200, stam:4, ap:0.6, rarity:'rare', value:380, skill:'archery', ranged:true, proj:'bullet', magitech:true, energy:6, lore:'Magitech aus Gelenkhall. Ein Kristall zündet, ein Messingbolzen fliegt.' },
   // Roadmap C.10 Magitech-Waffen: unterscheiden sich nicht nur in Stärke, sondern in Reichweite, Energie je Schuss (energy, Zelle hält 100),
   // Durchschlag (ap, pierce), Streuung (splash), Wirkung (mstatus), Nachladen und Preis. mtier: Rangsperre wie bei der Bionik (2 Schein, 3 Bürgerrecht).
   schockpistole: { name:'Schockpistole', slot:'weapon', wtype:'crossbow', dmg:12, reach:260, speed:320, reload:800, stam:3, rarity:'uncommon', value:260, skill:'archery', ranged:true, proj:'bullet', magitech:true, energy:5, mstatus:{ key:'shocked', chance:0.6 }, lore:'Kein Loch, nur ein Schlag, der die Muskeln verknotet. Die Stadtwache von Aurelheim trägt sie gern.' },
-  magiegewehr:   { name:'Magiegewehr', slot:'weapon', wtype:'crossbow', dmg:30, reach:520, speed:360, reload:900, stam:4, ap:0.6, rarity:'rare', value:560, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:8, mtier:2, lore:'Der Kristall im Kolben lädt schneller nach als jede Armbrust. Dafür frisst er Zellen.' },
+  magiegewehr:   { name:'Magiegewehr', slot:'weapon', wtype:'crossbow', dmg:30, reach:520, speed:360, reload:1200, stam:4, ap:0.6, rarity:'rare', value:560, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:10, mtier:2, lore:'Der Kristall im Kolben lädt schneller nach als jede Armbrust. Dafür frisst er Zellen.' },
   runenarmbrust: { name:'Runenarmbrust', slot:'weapon', wtype:'crossbow', dmg:28, reach:440, speed:420, reload:1500, stam:6, ap:0.5, rarity:'rare', value:480, skill:'archery', ranged:true, twohand:true, magitech:true, energy:6, mstatus:{ key:'burning', chance:0.5 }, mtier:2, lore:'Eingeritzte Feuerrunen glühen am Bolzen auf, sobald er die Sehne verlässt.' },
   kristallkanone:{ name:'Kristallkanone', slot:'weapon', wtype:'crossbow', dmg:40, reach:380, speed:420, reload:2600, stam:9, ap:0.3, rarity:'epic', value:980, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:25, splash:64, mtier:3, lore:'Ein Splitter Himmelskristall, in Messing gefasst. Wo er einschlägt, platzt die Luft.' },
   praezisionsgewehr:{ name:'Präzisionsgewehr', slot:'weapon', wtype:'crossbow', dmg:48, reach:680, speed:420, reload:3200, stam:6, ap:0.9, rarity:'epic', value:1200, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:15, pierce:1, mtier:3, lore:'Mit Linsenvisier aus der Akademie. Die Kugel geht durch den ersten Mann und trifft den zweiten.' },
@@ -85,8 +85,8 @@ export const ITEMS = {
   donnerbuechse:{ name:'Donnerbüchse', slot:'weapon', wtype:'crossbow', dmg:40, reach:480, speed:380, reload:3200, stam:6, ap:0.8, rarity:'epic', value:650, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:12, lore:'Die Waffe der Sonnenlegion. Laut genug, dass Pferde scheuen.' },
   sturmsense:   { name:'Sturmsense', slot:'weapon', wtype:'polearm', dmg:27, reach:62, arc:2.6, speed:960, stam:17, sweep:true, rarity:'legendary', unique:true, value:700, skill:'polearms', twohand:true, lore:'Die Sense der Bäuerin, die bei Hundertfeld drei Reiter aus dem Sattel mähte.' },
   donnerwort:   { name:'Donnerwort', slot:'weapon', wtype:'crossbow', dmg:52, reach:500, speed:380, reload:3000, stam:6, ap:0.9, rarity:'legendary', unique:true, value:900, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:12, lore:'Ein Prototyp aus Tickmar, gestohlen, bevor der Rat ihn verbieten konnte.' },
-  shortbow:     { name:'Kurzbogen', slot:'weapon', wtype:'bow', dmg:9, reach:360, speed:820, stam:8, rarity:'common', value:55, skill:'archery', ranged:true },
-  longbow:      { name:'Langbogen', slot:'weapon', wtype:'bow', dmg:15, reach:460, speed:1080, stam:11, rarity:'rare', value:190, skill:'archery', ranged:true, twohand:true },
+  shortbow:     { name:'Kurzbogen', slot:'weapon', wtype:'bow', dmg:9, reach:360, speed:700, stam:8, rarity:'common', value:55, skill:'archery', ranged:true },
+  longbow:      { name:'Langbogen', slot:'weapon', wtype:'bow', dmg:18, reach:460, speed:920, stam:11, rarity:'rare', value:190, skill:'archery', ranged:true, twohand:true },
   rapier:       { name:'Rapier', slot:'weapon', wtype:'rapier', dmg:9, reach:54, arc:0.45, speed:380, stam:6, crit:2.2, riposte:true, rarity:'uncommon', value:150, skill:'onehanded',
                   lore:'Salzhafener Klingenschule: nicht schlagen, stechen. Wer pariert, darf zurückstechen — doppelt.' },
   warhammer:    { name:'Kriegshammer', slot:'weapon', wtype:'hammer', dmg:24, reach:44, arc:1.4, speed:1150, stam:20, ap:0.6, stagger:2.0, crush:true, rarity:'rare', value:240, skill:'twohanded', twohand:true,
@@ -440,7 +440,7 @@ export const MONSTERS = {
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
   death_captain:{ name:'Hauptmann der Toten', heavy:{ kind:'slam', every:3, wind:750, mul:1.9, r:75 }, hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true, role:'Elite',   // §81: führt die letzte Befreiungswelle
                pal:{skin:'#d8d0ba',cloth:'#2a1416',metal:'#50463f',glow:'#c05a3a'} },
-  hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:280, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
+  hrodvar:   { name:'Hrodvar, König unter dem Eis', hp:220, dmg:19, speed:1.0, reach:46, atk:1500, telegraph:650, xp:220, sight:280, r:14, boss:true, threat:4, faction:'undead', interiors:false,
                pal:{skin:'#d4dde2',cloth:'#1d2a36',metal:'#8fb3c7',glow:'#9fd8ff'} },   // Tiefhall; eigene Angriffsmuster in game.js frostKingAI (Eiskreis, Eislanze, Leibwache)
   // ---- Session 7 (Phase 11): je Gegner eigenes Verhalten (ai), Stärke/Schwäche im GDD-Datenblatt ----
   // S15 P5: Akademie-Prüfungen (Aurelheim). Puppen stehen still, Studenten zaubern; beide sterben nie (Prüfung endet vorher).
@@ -476,7 +476,7 @@ export const MONSTERS = {
                pal:{skin:'#d8d0ba',cloth:'#12141a',metal:'#2a2e36',glow:'#6fd8ff'} },   // jeder Treffer nährt ihn (Lebensraub)
   garmadon:   { name:'König Garmadon', hp:620, dmg:24, speed:1.05, reach:52, atk:1400, telegraph:560, xp:900, sight:320, r:20, boss:true, threat:5, faction:'undead', interiors:true, role:'Endgegner', scale:1.9,
                pal:{skin:'#e0d8c4',cloth:'#1a0a0c',metal:'#3a2a24',glow:'#e03a2a'} },   // MP2 §63: spricht, lässt nicht gehen; drei Phasen
-  omega:      { name:'Omega, der Gefallene', hp:600, dmg:30, speed:0.9, reach:70, atk:1500, telegraph:700, xp:3000, sight:420, r:40, boss:true, threat:6, faction:'omega', interiors:false, role:'Gott', fly:true, eye:1,
+  omega:      { name:'Omega, der Gefallene', bossScale:false, hp:600, dmg:30, speed:0.9, reach:70, atk:1500, telegraph:700, xp:3000, sight:420, r:40, boss:true, threat:6, faction:'omega', interiors:false, role:'Gott', fly:true, eye:1,
                pal:{skin:'#f0e2c0',cloth:'#5a1010',metal:'#c8a040',glow:'#ffd27a'} },   // Phase 7: Endkampf — Sternenfall, Strahl, Nova
   // ---- Nutzer (S13): Omegas Engel — Omega ruft sie im Kampf; alle fliegen ----
   angel_blade: { name:'Klingenengel', hp:90, dmg:16, speed:1.5, reach:40, atk:1100, telegraph:380, xp:90, sight:360, r:12, threat:4, faction:'omega', interiors:true, role:'Elite', fly:true, angel:1,
@@ -496,7 +496,7 @@ export const MONSTERS = {
   deer:      { name:'Hirsch', hp:30, dmg:0, speed:1.9, reach:0, atk:9999, xp:6, sight:200, r:12, threat:0, faction:'beast', interiors:false, prey:true,
                pal:{body:'#8a6040',dark:'#5a3e28',eye:'#1a120c'} },                   // Wildtier, kein Gegner: flieht, Wölfe jagen ihn
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
-  dodon:     { name:'Dodon, Hüter von Morrgrund', heavy:{ kind:'slam', every:2, wind:900, mul:2.4, r:95 }, hp:760, dmg:27, speed:0.95, reach:62, atk:1700, telegraph:760, xp:600, sight:320, r:22, boss:true, threat:5, faction:'goblin', interiors:false, scale:2.1,   // S15: der Riese der Grubenstämme
+  dodon:     { name:'Dodon, Hüter von Morrgrund', heavy:{ kind:'slam', every:2, wind:900, mul:2.4, r:95 }, hp:620, dmg:27, speed:0.95, reach:62, atk:1700, telegraph:760, xp:600, sight:320, r:22, boss:true, threat:5, faction:'goblin', interiors:false, scale:2.1,   // S15: der Riese der Grubenstämme
     pal:{skin:'#56703a',cloth:'#3a2c1c',metal:'#8a8272'} },
   gorak:     { name:'Gorak, Grubenwart', hp:240, dmg:24, speed:1.0, reach:52, atk:2000, telegraph:800, xp:180, sight:300, r:20, boss:true, threat:4, faction:'goblin', interiors:false, pal:{skin:'#556b34',cloth:'#33261a',metal:'#9a8e78'} },
 };
