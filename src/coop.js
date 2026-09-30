@@ -100,6 +100,7 @@ async function host() {
   setInterval(() => { if (A.S.paused) broadcast({ t: 'ping' }); }, 2000);   /* Welt steht (Todesbildschirm): Lebenszeichen, sonst meldet der Gast „Host antwortet nicht“ */
   { const b = document.createElement('button'); b.id = 'coop-hud'; b.className = 'plaque'; b.textContent = `Koop · Code ${code} · Tauschen`; b.title = 'Gegenstände an einen Gast geben; sein Goldanteil und seine Beute'; b.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;padding:4px 10px'; b.onclick = hostTrade; document.body.appendChild(b); }   /* Host-Fenster im Hintergrund: Welt läuft (gedrosselt) weiter, siehe game.js stepHidden */
   peer.on('disconnected', () => setTimeout(() => { if (!peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) { /* nächster Versuch beim nächsten Abbruch */ } }, 1500));   /* Vermittler weg (Netz-Schluckauf): sonst finden neue Gäste den Code nie wieder */
+  window.addEventListener('pagehide', () => broadcast({ t: 'bye', why: 'Der Host hat das Spiel geschlossen.' }));
   peer.on('connection', c => { c.on('open', () => { c.on('data', d => onHostData(c, d)); c.on('close', () => dropGuest(c.peer)); }); });
   status(`Warteraum offen. Code: ${code} — sag ihn deinen Mitspielern.`);
   $('coop-host').disabled = $('coop-join').disabled = true;
@@ -228,6 +229,7 @@ function onHostData(c, raw) {
     g.ready = false; hostLobby(); return; }
   if (d.t === 'ready') { if (g.entId) return; g.ready = !!d.on && !!g.choice; hostLobby(); if (g.ready && S.coop.started) admit(g); return; }
   if (d.t === 'ping') return;
+  if (d.t === 'leave') { try { c.close(); } catch (e) { /* schon zu */ } dropGuest(c.peer); return; }
   if (d.t === 'in') { g.inp = d; g.at = now(); return; }
   if (d.t === 'cmd') { const m = A.byId(g.entId); if (!m) return; guestCommand(m, d, g); return; }
   if (d.t === 'chat') { chatLine(g.name, String(d.text).slice(0, 200)); muteLog = true; A.log(`${g.name}: ${String(d.text).slice(0, 200)}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: g.name, text: String(d.text).slice(0, 200) }); return; }
@@ -392,6 +394,7 @@ async function join(code) {
   status('Verbinde …'); const Peer = await loadPeer();
   peer = new Peer(peerOpts()); await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
   conn = peer.connect('rotfall-' + code, { reliable: true }); lastCode = code;
+  window.addEventListener('pagehide', () => { try { send({ t: 'leave' }); conn.close(); } catch (e) { /* schon zu */ } });   /* Fenster zu: sofort abmelden, damit die Figur beim Host gleich verschwindet */
   { const c0 = conn; setTimeout(() => { if (c0 === conn && !c0.open && A.S.coop?.role !== 'guest') status('Keine Verbindung zum Host. Entweder stimmt der Code nicht, der Host hat sein Spiel nicht offen — oder euer Netz sperrt direkte Verbindungen (oft in Schul- und Firmennetzen). Dann einen TURN-Server eintragen (siehe oben) oder ein anderes Netz nutzen, z. B. einen Handy-Hotspot.'); }, 20000); }
   setInterval(() => send({ t: 'ping' }), 2000);   /* Lebenszeichen auch bei der Figurenwahl und im Hintergrund (keine Bildschleife), sonst trennt der Host nach 10 s */
   conn.on('open', () => { conn.send(JSON.stringify({ t: 'hello', name: myName(), ver: VER })); status('Verbunden. Warte auf den Spielstand des Hosts …'); });
