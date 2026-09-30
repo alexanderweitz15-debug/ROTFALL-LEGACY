@@ -4577,7 +4577,7 @@ function provoke(target, attacker) {
   else { target.fleeing = true; if (target.shop) target.shopClosed = clock() + 1440; }   // Zivilisten und Händler fliehen; Laden bis morgen zu
   if (!firstTime) return;                                                       // Ruf/Alarm nur einmal je Tat
   const critic = partyMembers().find(m => !(m.traits || []).includes('grausam'));   // die Gruppe sieht es
-  for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 5;
+  for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) { m.morale -= 5; loyAdd(m, (m.traits || []).includes('gütig') ? -6 : -2); }   /* §5e.1: Loyalität */
   if (critic) log(`${critic.name}: „Was tust du da?!“`, 'party');
   // Zeugen im Umkreis (Distanz = Kern des Alarms; Wände zählen grob über Distanz)
   const witnesses = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e !== target && !S.party.includes(e.id) && dist(e, target) < 240);
@@ -4785,7 +4785,9 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   Object.entries(R.need).forEach(([k, n]) => matTake(k, n)); if (ke) removeItem(p, 'koenigseisen', 1);
   const qi = craftQual(skill, ke), [qn, , tier] = QUAL[qi], it = ITEMS[key];
   p.skills[sk] = Math.min(100, skill + 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
-  if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0); addItem(p, key, n); log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
+  if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0);
+    if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
+    log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
   const o = mkItem(key); o.cond = qi === 0 ? 0.6 : 1; o.qual = qn; o.maker = p.name;
   if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(it.rarity || 'common')) rollRarity(o, it, 0, tier);
   if (p.inv.length >= p.invCap) dropItemAt(S.map, p.x, p.y + 12, o); else p.inv.push(o);
@@ -6605,6 +6607,7 @@ function rulerSlain(c, source) {
 // Neun Arten, regional: Kopfgeld, Monster, Jagd, Verteidigung, Patrouille, Eskorte, Lieferung, Vermisste, Vorräte.
 // Ziele stehen wirklich in der Welt (flüchtig, werden nachgesetzt), Fortschritt zählt, Abgabe beim Geber, Lohn: Gold, XP, Ruf.
 const CON = {
+  comp:    { name: 'Persönlich', text: () => 'Einem Gefährten beistehen', mil: 0 },   /* Nutzer §5e.1 */
   rumor:   { name: 'Gerücht', text: () => 'Dem Gerücht nachgehen (der Kartenpunkt ist nur ungefähr)', mil: 0 },   /* Nutzer §5e.4 */
   bounty:  { name: 'Kopfgeld', text: n => `Den Anführer und ${n - 1} seiner Leute töten`, mil: 1 },
   monster: { name: 'Monsterjagd', text: n => `${n} Bestien töten`, mil: 1 },
@@ -6623,7 +6626,7 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   Heilerin: 'herbs', Kräuterfrau: 'herbs', Fischer: 'missing', Graf: 'trail', 'Gräfin': 'deliver', Edelmann: 'bounty', Edelfrau: 'deliver', Hofbeamter: 'trail', Richterin: 'trail',
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 const townFac = town => TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
-const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor');   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
+const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
   return r === 'deadland' ? ['skeleton', 'ghoul', 'skeleton'] : r === 'desert' ? ['bandit', 'bandit_archer'] : r === 'eisen' || r === 'mountain' ? ['wolf', 'goblin_warrior', 'bandit']
@@ -6962,7 +6965,8 @@ function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contrac
  if (C && ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind)) conProgress(C);
   if (C && C.kind === 'bounty' && e.title === C.name) C.leaderDead = true;
   if (C && C.kind === 'trail' && e.title === C.name && C.have === 3) conProgress(C);
-  if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
+  if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;
+  if (C && C.kind === 'comp') C.compDead = true;   /* Gefährten-Auftrag: Ziel tot, auch fern vom Helden */   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
   if (C && C.kind === 'camps' && e.campIdx != null && !(C.cleared ||= [])[e.campIdx] && !S.ents.world.some(o => o !== e && o.alive && o.contract === C.id && o.campIdx === e.campIdx)) {
     C.cleared[e.campIdx] = true; conProgress(C); log(`Lager ${C.cleared.filter(Boolean).length}/${C.need} ausgehoben.`, 'quest'); } }
 // Eskorte (Nutzer: „der NPC ist zu langsam und man weiß nicht wohin“): Der Reisende geht selbst den Straßenweg zum Ziel, etwa im
@@ -6988,7 +6992,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -10199,7 +10203,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10472,17 +10476,98 @@ function startRevive(c) {                                    // AUDIT: Aufrichte
 const TRAIT_SAY = { grausam: 'Mehr Blut, weniger Reden. So mag ich das.', gütig: 'Ich hoffe, wir helfen unterwegs auch mal jemandem.', faul: 'Könnten wir nicht mal einen Tag nur sitzen?',
   fleißig: 'Gib mir was zu tun. Stillstehen macht mich krank.', furchtsam: 'Ich höre jedes Knacken im Wald. Jedes.', neugierig: 'Was glaubst du, liegt hinter dem nächsten Hügel?',
   mürrisch: 'Frag nicht so viel.', misstrauisch: 'Ich trau keinem hier. Dir … fast.', mutig: 'Wenn es kracht, stell mich nach vorn.' };
+// ================= Gefährten 2.0 (Nutzer §5e.1) =================
+// Loyalität (0–100, Start 50) ist ein Langzeitwert neben der Moral: jeder Tag gemeinsam +1, gute Moral +1, schlechte −2,
+// Verbrechen vor ihren Augen −2 (gütige −6), Lagerfeuer-Gespräche +5, der persönliche Auftrag +25. Unter 30 warnt der Gefährte,
+// unter 15 kann JEDER verraten (30 % am Tag): mit Gold verschwinden oder die Waffe gegen dich ziehen. Keine Romanze — wer den
+// persönlichen Auftrag mit dir erledigt und über 70 Loyalität hat, wird Freund fürs Leben (verrät nie, +2 auf sein bestes Attribut).
+const loyOf = m => m.loyal ?? 50;
+function loyAdd(m, n) { if (!m || m.friend && n < 0) return; m.loyal = clamp(loyOf(m) + n, 0, 100); }
+function loyDay() {
+  for (const m of partyMembers()) { if (!m.alive || m.coopHero || m.coopPilot) continue;
+    loyAdd(m, 1 + ((m.morale ?? 50) > 70 ? 1 : 0) - ((m.morale ?? 50) < 30 ? 3 : 0));
+    const L = loyOf(m); if (m.friend) continue;
+    if (L < 15 && chance(0.3)) { betray(m); continue; }
+    if (L < 30) log(`${m.name} spricht kaum noch mit dir. (Loyalität ${Math.round(L)} — Gespräche am Feuer, Siege und Rücksicht helfen.)`, 'party');
+  }
+}
+function betray(m) {
+  S.party = S.party.filter(id => id !== m.id); m.retainer = false; m.recruit = false;
+  if (S.gold > 40 && chance(0.5)) { const g = Math.min(300, Math.round(S.gold * 0.3)); S.gold -= g; S.ents[m.map] = S.ents[m.map].filter(e => e !== m);
+    log(`${m.name} ist in der Nacht verschwunden — und ${g} Gold mit ihm. Verrat.`, 'party'); chronicle(`${m.name} verrät die Gruppe`, 'event', `Mit ${g} Gold in die Nacht.`); UI.toast('VERRAT', 2600); return 'stole'; }
+  Object.assign(m, { faction: 'bandit', angry: true, brave: true, aggroId: S.player.id, betrayer: true, visitor: true, transient: true, greet: '„Zu spät für Worte.“' });
+  float(m, 'Verrat!', 'rgba(220,60,50,ALPHA)', true); log(`${m.name} zieht die Waffe gegen dich: „Ich hab genug von dir und deinem Weg.“`, 'combat'); chronicle(`${m.name} wendet sich gegen die Gruppe`, 'event', 'Loyalität ist kein Geschenk.'); UI.toast('VERRAT', 2600); return 'fight';
+}
+const FIRE_TALK = [
+  (m, h) => `„${h ? `In ${h}` : 'Daheim'} gab es einen Brunnen, an dem wir als Kinder Münzen versenkt haben. Ich frage mich, ob sie noch da sind.“`,
+  m => `„Ich war ${m.prof || 'niemand'}. Manchmal wache ich auf und denke, ich müsste zur Arbeit. Dann rieche ich das Feuer und weiß wieder, wo ich bin.“`,
+  () => '„Weißt du, was ich am meisten vermisse? Stille. Echte Stille. Ohne dass man auf Schritte horcht.“',
+  () => '„Mein Vater hat gesagt, man erkennt einen Menschen daran, wie er mit denen umgeht, die ihm nichts nützen. Ich schaue dir zu. Nur dass du es weißt.“',
+  () => '„Die Toten im Osten … glaubst du, die erinnern sich an irgendwas? Ich hoffe nicht. Das wäre schlimmer als alles andere.“',
+  () => '„Wenn das hier vorbei ist — falls es je vorbei ist — mache ich eine Schenke auf. Kein Schwert über dem Tresen. Nur Brot und Bier.“',
+  () => '„Ich hatte einen Bruder. Er hat an Valen geglaubt. Ich glaube an dich — das ist weniger dumm, hoffe ich.“',
+  () => '„Hörst du das? Nichts. Genieß es. Morgen wird wieder geschrien.“',
+];
+const nightNow = () => S.minute >= 19 * 60 || S.minute < 5 * 60;
+function fireChoices(npc) {
+  if (!S.party.includes(npc.id) || npc.coopHero || npc.coopPilot) return [];
+  const out = [], day = S.day | 0;
+  if (nightNow() && npc.fireDay !== day) out.push({ text: 'Setz dich ans Feuer. Erzähl.', fn: () => {
+    npc.fireDay = day; npc.fireTalks = (npc.fireTalks || 0) + 1; loyAdd(npc, 5); npc.morale = Math.min(100, (npc.morale ?? 50) + 5);
+    const t = FIRE_TALK[(npc.fireTalks + (npc.seed | 0)) % FIRE_TALK.length](npc, npc.homeTown ? townName(npc.homeTown) : null);
+    UI.dialogue(npc, `${t}\n(Loyalität +5)`, [...(npc.fireTalks >= 3 && !npc.compQuest ? [{ text: '„Du wolltest mir noch etwas sagen.“', fn: () => compOffer(npc) }] : []), { text: 'Weiter', fn: () => companionTalk(npc) }]); } });
+  else if (!nightNow() && !npc.fireDay) out.push({ text: '(Am Abend, am Feuer, erzählen Gefährten mehr.)', fn: () => companionTalk(npc) });
+  if (npc.fireTalks >= 3 && !npc.compQuest && npc.fireDay === day) out.push({ text: '„Du wolltest mir noch etwas sagen.“', fn: () => compOffer(npc) });
+  return out;
+}
+function compOffer(npc) {
+  const p = S.player, pool = ['bandit', 'bandit_archer', 'wolf', 'bear'], a = rnd() * 6.283, r = ri(40, 70);
+  const q = freeSpotNear('world', (p.x / TS | 0) + Math.round(Math.cos(a) * r), (p.y / TS | 0) + Math.round(Math.sin(a) * r), 3);
+  const EK = pickElite(q?.x ?? p.x, q?.y ?? p.y, pool) || pickElite(p.x, p.y, ['bandit']);
+  if (!q || !EK) return UI.dialogue(npc, '„… Ach, vergiss es. Ein andermal.“', [{ text: 'Weiter', fn: () => companionTalk(npc) }]);
+  const E = ELITES[EK], tx = q.x / TS | 0, ty = q.y / TS | 0, where = locAt(tx, ty)?.name || 'der Wildnis';
+  UI.dialogue(npc, `„${E.name}. Du hast den Namen vielleicht gehört. ${E.say} Er hat mir genommen, was ich hatte. Ich weiß jetzt, wo er ist — bei ${where}. Ich gehe nicht allein.“`, [
+    { text: 'Wir gehen zusammen.', fn: () => { UI.closeDialogue();
+      const C = { id: uid(), town: npc.homeTown || Object.keys(TOWN_PLAN)[0], kind: 'comp', giver: 'comp', giverName: npc.name, have: 0, need: 1, state: 'offer', day: S.day | 0, x: tx, y: ty, tx, ty, elite: EK, compId: npc.id,
+        reward: { gold: 0, xp: 150, rep: 0 }, title: `${npc.name}: ${E.name}`, desc: `${npc.name} will ${E.name} bei ${where} stellen. Nimm ${npc.name} mit — es ist ${npc.name}s Kampf.` };
+      npc.compQuest = C.id; (S.contracts ||= []).push(C); if (acceptContract(C) === false) { S.contracts = S.contracts.filter(c => c !== C); npc.compQuest = null; } } },
+    { text: 'Nicht jetzt.', fn: () => { loyAdd(npc, -3); companionTalk(npc); } }]);
+}
+function compTick() {
+  const p = S.player; if (!p || S.map !== 'world') return;
+  for (const C of (S.contracts || []).filter(c => c.kind === 'comp' && c.state === 'active')) {
+    const m = byId(C.compId);
+    if (!m || !m.alive) { compDone(C, false, m ? `${m.name} ist tot. Der Auftrag stirbt mit ${m.name}.` : 'Der Gefährte ist fort.'); continue; }
+    if (C.compDead) { compDone(C, S.party.includes(m.id)); continue; }
+    const near = Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30;
+    if (near && !S.ents.world.some(e => e.contract === C.id && e.alive)) { const E = ELITES[C.elite], e = spawnEnemy(E.base, 'world', C.tx, C.ty); applyElite(e, C.elite); Object.assign(e, { contract: C.id, transient: true, anchor: { x: C.tx * TS, y: C.ty * TS } });
+      if (!C.seen) { C.seen = true; log(`${m.name}: „Da ist er. ${E.name}.“`, 'quest'); } }
+  }
+}
+function compDone(C, ok, why) {
+  C.state = 'claimed'; C.have = 1; const st = S.quests['c_' + C.id]; if (st) { st.state = ok ? 'done' : 'failed'; st.progress = [1]; st.outcome = ok ? 'Gemeinsam gestellt.' : (why || 'Ohne den Gefährten erledigt.'); }
+  const m = byId(C.compId); if (S.track === 'c_' + C.id) S.track = null;
+  if (!m?.alive) return log(why || 'Der persönliche Auftrag ist gescheitert.', 'quest');
+  if (!ok) { loyAdd(m, -10); return log(`${E_NAME(C)} ist tot — aber ${m.name} war nicht dabei. „Das war meine Sache.“ (Loyalität −10)`, 'party'); }
+  loyAdd(m, 25); gainXp(S.player, C.reward.xp);
+  if (loyOf(m) >= 70 && !m.friend) { m.friend = true; const best = Object.entries(m.attributes || {}).sort((a, b) => b[1] - a[1])[0]; if (best) m.attributes[best[0]] += 2; recalc(m);
+    log(`${m.name}: „Ich schulde dir alles. Wohin du gehst, gehe ich.“ ${m.name} ist jetzt Freund fürs Leben (verrät nie, ${best ? `${best[0] === 'strength' ? 'Stärke' : best[0] === 'agility' ? 'Beweglichkeit' : best[0] === 'endurance' ? 'Ausdauer' : best[0] === 'willpower' ? 'Willenskraft' : best[0]} +2` : ''}).`, 'party');
+    chronicle(`${m.name} wird ein Freund fürs Leben`, 'legend', `Gemeinsam gegen ${E_NAME(C)}.`); UI.toast('FREUND FÜRS LEBEN', 2600); }
+  else log(`${m.name}: „Es ist vorbei. Danke.“ (Loyalität +25)`, 'party');
+}
+const E_NAME = C => ELITES[C.elite]?.name || 'Der Feind';
 function companionTalk(npc) {
   const back = () => talk(npc), mor = npc.morale ?? 50, hurt = npc.hp < npc.maxHp * 0.6, mem = (npc.memories || []).slice(-1)[0];
   const how = [mor >= 70 ? '„Gut. Mit dir fühlt sich der Weg kürzer an.“' : mor >= 40 ? '„Es geht. Die Füße tun weh, aber es geht.“' : '„Ehrlich? Ich weiß nicht, wie lange ich das noch mache.“',
     hurt ? '„Und die Wunde pocht. Ein Verband wäre gut.“' : '', mem && MEMORY_TEXT[mem.key] ? `„Ich denke noch daran, wer ${MEMORY_TEXT[mem.key]}${mem.about ? ` (${mem.about})` : ''}.“` : '',
-    (npc.traits || []).map(t => TRAIT_SAY[t]).filter(Boolean).slice(0, 1).map(t => `„${t}“`)[0] || ''].filter(Boolean).join('\n');
+    (npc.traits || []).map(t => TRAIT_SAY[t]).filter(Boolean).slice(0, 1).map(t => `„${t}“`)[0] || '', `(Loyalität ${Math.round(loyOf(npc))}${npc.friend ? ' · Freund fürs Leben' : loyOf(npc) < 30 ? ' — kurz vor dem Bruch' : ''})`].filter(Boolean).join('\n');   /* §5e.1 */
   const others = partyMembers().filter(m => m !== npc), opinion = others.length ? others.map(m => {
     const r = npc.rel?.friend === m.id ? 'mein Freund' : npc.rel?.rival === m.id || npc.rel?.foe === m.id ? 'geht mir auf die Nerven' : (m.traits || []).some(t => (npc.traits || []).includes(t)) ? 'ist wie ich' : 'ist in Ordnung';
     return `${m.name} ${r}.`; }).join(' ') : 'Welche anderen? Wir sind nur zu zweit.';
   const home = npc.homeTown ? townName(npc.homeTown) : null;
   const bio = `„Ich war ${npc.prof || 'niemand Besonderes'}${home ? ` in ${home}` : ''}. ${npc.volunteer ? 'Ich bin mitgekommen, weil ich es wollte — nicht wegen Gold.' : npc.merc ? 'Ich kämpfe für Gold. Das ist ehrlicher, als es klingt.' : npc.retainer ? 'Du hast mich einmal heimgeschickt. Ich bin trotzdem wiedergekommen.' : 'Mehr gibt es kaum zu erzählen.'}“`;
   UI.dialogue(npc, `„Wie es mir geht?“\n${how}`, [
+    ...fireChoices(npc),
     { text: 'Was hältst du von den anderen?', fn: () => UI.dialogue(npc, `„${opinion}“`, [{ text: 'Weiter', fn: back }]) },
     { text: 'Erzähl mir von dir.', fn: () => UI.dialogue(npc, bio, [{ text: 'Weiter', fn: back }]) },
     { text: 'Weiter', fn: back }]);
@@ -12869,6 +12954,9 @@ function debugSections() {
       'Handwerk: Material geben (Eisen, Holz, Felle, Königseisen …)': () => { S.res.iron += 30; S.res.wood += 30; S.res.herb = (S.res.herb || 0) + 12; ['pelt', 'cloth', 'ingot', 'ersatzteile', 'automatenkern', 'koenigseisen'].forEach(k => addItem(P(), k, 5)); UI.toast('Material'); },   /* Nutzer §5d.8 */
       'Handwerk: Schmieden 90': () => { P().skills.smithing = 90; P().skills.crafting = 90; UI.toast('Schmieden/Handwerk 90'); },
       'Handwerk: Esse hier öffnen': () => craftMenu('forge', P()), 'Handwerk: Werkbank hier öffnen': () => craftMenu('bench', P()), 'Handwerk: Kessel hier öffnen': () => craftMenu('kessel', P()),
+      'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
+      'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
+      'Gefährten: Loyalitätstag': () => loyDay(),
       'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
       'Verletzung: einen Tag vergehen lassen': () => woundDay(),
       'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
@@ -13625,7 +13713,7 @@ export function selftest() {
       const foes = S.ents.world.filter(e => e.contract === C.id && e.alive), placed = foes.length === C.need && !!QUESTS['c_' + C.id] && S.quests['c_' + C.id].state === 'active';
       for (const e of foes) conKill(e); const counted = C.have === C.need;
       const g0 = S.gold; claimContract(C); const paid = S.gold > g0 && C.state === 'claimed' && S.quests['c_' + C.id].state === 'done';
-      const kinds = Object.keys(CON).filter(k => k !== 'rumor').every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
+      const kinds = Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp').every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
       return boards && vms && placed && counted && paid && kinds;
     } finally { for (const k of Object.keys(QUESTS)) if (QUESTS[k].dyn && !keep.q[k]) delete QUESTS[k];   // keine Test-Aufträge im echten Buch
       S.contracts = keep.c; S.conDay = keep.d; S.quests = keep.q; S.gold = keep.g; S.ents.world = keep.ents; Object.assign(S.factions, keep.f); p.x = px; p.y = py; }
@@ -14850,8 +14938,8 @@ export function selftest() {
   ok('S13 Dialog: Gefährten erzählen, wie es ihnen geht (Moral, Wunden, Erinnerung), was sie von den anderen halten und wer sie sind; Gegner rufen beim Entdecken', sandbox(() => {
     const p = stage(), a = actor(p.x + 40, p.y), b = actor(p.x + 60, p.y); S.party.push(a.id, b.id); a.morale = 20; a.rel = { friend: b.id }; remember(a, 'saved_life', 'Probe');
     companionTalk(a); const t1 = document.getElementById('dlg-text').textContent, opts = [...document.querySelectorAll('#dlg-choices button')].map(x => x.textContent);
-    const how = /weiß nicht, wie lange/.test(t1) && /Leben gerettet/.test(t1) && opts.length === 3;
-    document.querySelectorAll('#dlg-choices button')[0].click(); const friend = /mein Freund/.test(document.getElementById('dlg-text').textContent); UI.closeDialogue();
+    const how = /weiß nicht, wie lange/.test(t1) && /Leben gerettet/.test(t1) && opts.length >= 3;   /* §5e.1: nachts kommt „am Feuer erzählen“ dazu */
+    [...document.querySelectorAll('#dlg-choices button')].find(x => /anderen/.test(x.textContent)).click(); const friend = /mein Freund/.test(document.getElementById('dlg-text').textContent); UI.closeDialogue();
     const e = spawnEnemy('bandit', '__a', 12, 10); let barked = false; for (let i = 0; i < 30 && !barked; i++) { e.talk = null; enemyBark(e, MONSTERS.bandit); barked = !!e.talk?.say; }
     return how && friend && barked;
   }));
@@ -15490,6 +15578,17 @@ export function selftest() {
       const master = p.inv.find(x => x.key === 'dagger' && ['Meisterlich', 'Meisterstück'].includes(x.qual)); const rarer = !!master?.rar && master.maker === p.name;
       return used && better && keOk && brewed && none && rarer;
     } finally { Object.assign(S.res, r0); }
+  }));
+  ok('Gefährten 2.0 (Nutzer §5e.1): Loyalität steigt am Feuer, sinkt bei Verbrechen, niedrige Loyalität führt zu Verrat, persönlicher Auftrag macht zum Freund, Freunde verraten nie', sandbox(() => {
+    const p = stage(), m = actor(330, 300, { kind: 'npc' }); m.traits = ['gütig']; S.party = [m.id]; S.gold = 200; const m0 = S.minute, c0 = S.contracts;
+    try { S.minute = 21 * 60; const ch = fireChoices(m); ch[0].fn(); UI.closeDialogue(); const warmed = loyOf(m) === 55 && m.fireTalks === 1;
+      const t = actor(360, 300, { kind: 'npc' }); t.key = 'probe_victim'; provoke(t, p); const hurtLoy = loyOf(m) === 49;
+      for (let i = 0; i < 40 && S.party.includes(m.id); i++) { m.loyal = 5; loyDay(); } const gone = !S.party.includes(m.id);
+      const f = actor(300, 330, { kind: 'npc' }); S.party = [f.id]; f.loyal = 60; S.contracts = []; const C = { id: uid(), kind: 'comp', state: 'active', compId: f.id, elite: Object.keys(ELITES)[0], have: 0, need: 1, reward: { xp: 10 } }; S.contracts.push(C);
+      C.compDead = true; S.map = 'world'; compTick(); S.map = '__a'; const friend = f.friend && loyOf(f) === 85 && C.state === 'claimed';
+      loyAdd(f, -80); const loyal = loyOf(f) === 85;
+      return warmed && hurtLoy && gone && friend && loyal;
+    } finally { S.minute = m0; S.contracts = c0; }
   }));
   ok('Verletzungen (Nutzer §5e.7): gebrochenes Glied heilt nur bis 40 %, Heilerin schient (doppelt schnell), verheilt nach Tagen mit Narbe (+1 Rüstung), Entzündung zehrt und wird gereinigt', sandbox(() => {
     const p = stage(); S.gold = 100; const P = p.body.larm; P.hp = 0; P.broken = 4; P.splint = false; B.fullHeal(p); const capped = P.hp === Math.round(P.max * 0.4);
