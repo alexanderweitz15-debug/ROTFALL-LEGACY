@@ -575,3 +575,13 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Grad III „Stimme Dodons“:** Dodons Echo (Schaden und langes Taumeln für alle Feinde in 180 px, 60 Mut).
 - **Grade:** Taten = Feinde besiegen, während ein Goblin an deiner Seite kämpft; Grisk weiht (30 Taten + Stufe 8, dann 90 + Stufe 16).
 - **Debug:** „Goblins: Grubenhäuptling-Voraussetzungen“ und „Titelklasse freischalten: Grubenhäuptling“. Probe „Grubenhäuptling (Nutzer §5e.9)“.
+
+## Runde: König Varon und die Varonsburg (Nutzer §5d.4, Version 21)
+- **Ort:** Nördlich von Nordfurt steht das Tor der Varonsburg. Drinnen: Ringmauer mit Hof, Markt und Brunnen, Zelte der Königsgarde, Bergfried mit Thronsaal, Adelsflügel (West), Kanzlei der Spitzelmeisterin (Ost), Schmiede (Kronstahl, Kronharnisch und Kronhelm) und Kerker.
+- **Varon:** harter Kriegskönig, aber Kanzler Aldhelm lenkt, wer vorgelassen wird, und der König ist paranoid gegen Aurelion.
+- **Audienz:** mit Rang 1 bei Valen oder über den Kanzler (100 Gold). Wer bei Aurelion 25 Ruf oder mehr hat, wird als Spion abgewiesen (Valen −3).
+- **Auftragskette:** 1) Einen Hauptmann der Toten vor Nordfurt erschlagen (Tagebuch mit Kartenpunkt; +150 Gold). 2) Den Verräter unter drei Adligen finden: Spitzelmeisterin Ysmay nennt den Hinweis (Siegelwachs), die Adligen reagieren im Gespräch verschieden. Beim König anklagen: richtig +300 Gold, Valen +10; falsch stirbt ein Unschuldiger (Valen −5). 3) Ritterschlag: Titel „Ritter Varons“, Kronhelm, Valen +15 — oder verweigern (Valen −10).
+- **Kerker:** Drei Gefangene aus Aurelion. Kerkermeister Grimm lässt für 80 Gold einen laufen (Aurelion +5, Valen −5).
+- **Varon töten:** möglich; der Thron bleibt leer, Valen −100, Chronik und Spielstand-Symbol ☠.
+- **Spielstände:** neue Symbole ⚔ (Ritter König Varons) und ☠ (König Varon ist tot).
+- **Debug:** „Varon: in die Varonsburg“, „Varon: Audienz und Auftrag 1 erledigt“. Probe „König Varon (Nutzer §5d.4)“.
