@@ -613,3 +613,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Gelenkhall (Prothesenstadt):** Reihen ruhender Automaten, Feinwerkbank, Drehbank, Patienten mit Prothesen. Meisterin Vessa wartet alle Prothesen und das Auge für 40 Gold auf 100 %.
 - Der Grundriss der Städte bleibt gleich (alte Spielstände passen weiter); das Gesicht entsteht bei jedem Laden neu.
 - **Debug:** „Nebenstädte: zu Sankt Serin“. Probe „Nebenstädte (Nutzer §5d.10)“.
+
+## Runde: Animation und Kampfgefühl (Nutzer §5f, Version 21)
+- **Kombo:** Wer im Nahkampf im Stand (nicht beim Laufen) ohne Pause nachschlägt (bis 0,6 s nach dem Ende des Schwungs), zählt mit. Der dritte Schlag ist ein **Wuchtschlag**: +30 % Schaden, der Gegner taumelt, „Wucht!“, Ring und Wackeln; der Schwung dauert 15 % länger. Fernkampf zählt nicht. Beim ersten Wuchtschlag erklärt es das Log.
+- **Humpeln:** Ist nur ein Bein ausgefallen, geht man im ungleichen Takt (schnell–langsam, 70–100 % des Tempos) — zusätzlich zur Verlangsamung durch das Bein.
+- **Blutspur:** Wer blutet und sich bewegt, tropft.
+- **Hilferufe:** Verletzte Menschen am Boden rufen in der Nähe des Helden um Hilfe.
+- **Gesten:** Wen man anspricht, der zeigt oder zuckt mit den Schultern; wer dich nicht mag, wehrt ab.
+- Probe „Animation und Kampfgefühl (Nutzer §5f)“.
