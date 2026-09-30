@@ -2,7 +2,7 @@
 import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=22';
 import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=22';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=22';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=22';
 import * as R from './render.js?v=22';
 import * as HB from './buildings.js?v=22';
 import * as UI from './ui.js?v=22';
@@ -8176,10 +8176,19 @@ function dwarfChoices(npc, choices) {
 // Adligen finden (Spitzelmeisterin Ysmay gibt den Hinweis, Gespräche verraten ihn), 3) Ritterschlag (Titel, Kronhelm, Valen +15).
 // Im Kerker sitzen Gefangene aus Aurelion — der Kerkermeister lässt einen für 80 Gold laufen (Aurelion +5, Valen −5).
 const VARON_NOBLES = [['Herzog Emmerich', 'Graf'], ['Gräfin Adelheid', 'Gräfin'], ['Baron Lothar', 'Graf']];
-function ensureVaronGate() {
-  if (S.ents.world.some(e => e.portal === 'varonburg')) return; const [x, y] = worldPt(118, 38), q = freeSpotNear('world', x, y, 8); if (!q) return;
-  S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'varonburg', transient: true, label: 'Varonsburg — Tor des Königs' });
-  for (const dx of [-3, 3]) { const b = freeSpotNear('world', (q.x / TS | 0) + dx, (q.y / TS | 0) + 1, 1); if (b) S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_torn', map: 'world', x: b.x, y: b.y, r: 6, solid: false, transient: true }); }
+function ensureVaronGate() {   /* §5g.1: das Tor zum Thronsaal ist jetzt der Eingang des Bergfrieds in Varonheim */
+  const [kx, ky] = CAPITAL.keep; S.ents.world = S.ents.world.filter(e => !(e.portal === 'varonburg' && Math.hypot(e.x / TS - kx, e.y / TS - ky) > 3));
+  if (S.ents.world.some(e => e.portal === 'varonburg')) return; const q = { x: kx * TS + TS / 2, y: ky * TS + TS / 2 };
+  S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'varonburg', transient: true, label: 'Bergfried der Varonsburg — Thronsaal' });
+  capitalMigrate();
+}
+function capitalMigrate() {                                        /* §5g.1: Varonheim besiedeln (neue und alte Stände), Garde am Tor */
+  if (!TOWN_PLAN.varonheim) return;
+  if (!S.flags.capitalBuilt) { S.flags.capitalBuilt = 1; spawnResidents(); if (S.day > 1) log('Südlich von Nordfurt steht jetzt Varonheim, die Hauptstadt König Varons — mit der Varonsburg im Norden der Stadt.', 'world'); }
+  if (S.ents.world.some(e => e.capGuard)) return; const [cx, cy] = TOWN_PLAN.varonheim.square, [x0, y0, x1, y1] = TOWN_PLAN.varonheim.area;
+  for (const [x, y] of [[x0 + 1, cy - 8], [x0 + 1, cy - 4], [x1 - 1, cy - 8], [x1 - 1, cy - 4], [cx - 2, y1 - 1], [cx + 2, y1 - 1], [cx - 2, CAPITAL.keep[1] + 6], [cx + 2, CAPITAL.keep[1] + 6], [cx - 6, cy], [cx + 6, cy]]) {
+    const q = freeSpotNear('world', x + (x === x0 + 1 ? 2 : x === x1 - 1 ? -2 : 0), y, 2); if (!q) continue;
+    const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { capGuard: true, guard: true, transient: true, visitor: true, post: 'varonheim', greet: pick(['„Varonheim schläft nie. Wir auch nicht.“', '„Nachts bleibt man drinnen. Befehl des Königs.“']) }); S.ents.world.push(g); }
 }
 function buildVaronburg() {
   const w = 72, h = 62, tiles = new Uint8Array(w * h).fill(T.GRASS); MAPS.varonburg = { w, h, tiles, ver: ((MAPS.varonburg?.ver) || 0) + 1 };
@@ -15312,8 +15321,8 @@ export function selftest() {
     ok('Bewohner: jedes Wohn- und Arbeitshaus bewohnt, ihr Nachtplatz liegt im eigenen Haus', HOUSES.every(b => {
       if (!TRADES[b.type] || !TOWN_PLAN[b.town] || HB.wearOf(b) === 2 || (b.town === 'eren' && ['tavern', 'smithy', 'healer'].includes(b.type))) return true;   // Kettenfeste: Fraktionsbau, keine Bürger
       const rs = S.ents.world.filter(c => c.homeId === b.id);
-      return rs.length > 0 && rs.every(c => { const x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0;
-        return x > b.x && x < b.x + b.w - 1 && y > b.y && y < b.y + b.h - 1 && walk(x, y); });
+      const okH = rs.length > 0 && rs.every(c => { const x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0;
+        return x > b.x && x < b.x + b.w - 1 && y > b.y && y < b.y + b.h - 1 && walk(x, y); }); return okH;
     }));
     ok('Figuren mit Namen: Nachtplatz im eigenen Haus (freie Kachel), tagsüber ein Arbeitsplatz, Läden mit Ladenschluss', Object.entries(NPC_DAY).every(([k, d]) => {
       const c = S.ents.world.find(e => e.key === k); if (!c || !c.alive) return true;
@@ -16264,6 +16273,13 @@ export function selftest() {
       zoneBuild(1); return none && started && one && four;
     } finally { S.settlement = st0; Object.assign(S.res, r0); }
   }));
+  ok('Varonheim (Nutzer §5g.1): Hauptstadt mit mindestens 20 Häusern, Bewohnern und Garde; das Bergfried-Tor führt in den Thronsaal; vom Markt sind alle vier Stadttore und das Burgtor erreichbar', (() => {
+    const P = TOWN_PLAN.varonheim; if (!P) return false; const [x0, y0, x1, y1] = P.area, [sx, sy] = P.square, M = MAPS.world;
+    const hs = HOUSES.filter(b => b.town === 'varonheim').length, folk = S.ents.world.filter(e => e.kind === 'npc' && e.homeTown === 'varonheim').length, gate = S.ents.world.find(e => e.portal === 'varonburg');
+    const seen = new Set(), q = [[sx, sy]]; while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1 || SOLID.has(M.tiles[y * M.w + x])) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+    const cx = CAPITAL.x, cy = CAPITAL.y, gates = [[x0 - 1, cy], [x1 + 1, cy], [cx, y1 + 1], CAPITAL.keep].every(([x, y]) => seen.has(x + ',' + y));
+    return hs >= 20 && folk >= 30 && !!gate && Math.hypot(gate.x / TS - CAPITAL.keep[0], gate.y / TS - CAPITAL.keep[1]) < 2 && gates;
+  })());
   ok('König Varon (Nutzer §5d.4): Tor im Norden, Burg mit König, Kanzler, Adligen, Kerker und Garde, alles erreichbar; Audienz über den Kanzler, Aurelion-Freunde abgewiesen, Verräter-Suche, Ritterschlag, Gefangener freikaufen', sandbox(() => {
     const p = stage(), f0 = structuredClone(S.flags), v0 = S.ents.varonburg, mv = MAPS.varonburg, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen;
     try { const W0 = S.ents.world.slice(); S.ents.world = S.ents.world.filter(e => e.portal !== 'varonburg'); ensureVaronGate(); const gate = S.ents.world.some(e => e.portal === 'varonburg'); S.ents.world = W0;

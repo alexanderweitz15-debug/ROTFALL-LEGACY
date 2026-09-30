@@ -25,7 +25,7 @@ export const TOWN_STYLE = {
   // Hochreich Aurelion (S12): heller Stein, Schiefer und Ziegel — sichtbar reicher als der Norden
   aurelheim: { roof: 'slate', wall: 'palestone', alt: 'tile' }, kupferhafen: { roof: 'tile', wall: 'plaster', alt: 'slate' }, gelenkhall: { roof: 'tile', wall: 'stone', alt: 'slate' },
   tickmar: { roof: 'slate', wall: 'blackstone', alt: 'tile' }, sanktserin: { roof: 'slate', wall: 'palestone' }, aurelheim_land: { roof: 'slate', wall: 'palestone', alt: 'tile' },           // S12 Karak-Atar: Lehmputz, Ziegel
-  kettenfeste: { roof: 'slate', wall: 'blackstone' }, // Eiserne Kette (Session 11): Schiefer, schwarzer Stein
+  kettenfeste: { roof: 'slate', wall: 'blackstone' }, varonheim: { roof: 'slate', wall: 'blackstone', alt: 'shingle' },   /* Nutzer §5g.1: Varons Hauptstadt */ // Eiserne Kette (Session 11): Schiefer, schwarzer Stein
   // Dörfer (Session 12): Bauweise nach Herrschaft — Valen Stroh/Fachwerk, Orden Schiefer/heller Stein, Händler Holz, Tributdörfer ärmlich
   haselbrueck: { roof: 'thatch', wall: 'timber', alt: 'shingle' }, muehlbach: { roof: 'thatch', wall: 'timber', alt: 'tile' }, weidenau: { roof: 'thatch', wall: 'wood', alt: 'shingle' },
   rastfurt: { roof: 'shingle', wall: 'wood', alt: 'tile' }, lichtenrain: { roof: 'slate', wall: 'palestone', alt: 'tile' },

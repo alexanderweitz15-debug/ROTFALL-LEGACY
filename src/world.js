@@ -1320,6 +1320,7 @@ function extendSouth() {
   for (let i = 0; i < 1400; i++) { const x = 480 + Math.floor(nz(i, 71) * 840), y = 760 + Math.floor(nz(71, i) * 440);   // Aurelion: Haine und Alleen
     if (t[y * W + x] === T.GRASS && spornAt(x, y) > 8 && vnE(x + 1200, y, 26) > 0.56) prop('tree', x, y, { solid: true, r: 12, hp: 3 }); }
   for (const C of AUREL_CITIES) buildAurelCity(C);
+  buildCapital();   /* Nutzer §5g.1: Varons Hauptstadt */
   const G = k => AUREL_CITIES.find(c => c.key === k), gate = (c, s) => s === 'W' ? [c.x - c.hw, c.y] : s === 'E' ? [c.x + c.hw, c.y] : s === 'N' ? [c.x, c.y - c.hh] : [c.x, c.y + c.hh];
   for (const [a, sa, b, sb] of [['aurelheim', 'N', 'kupferhafen', 'S'], ['aurelheim', 'E', 'gelenkhall', 'W'], ['gelenkhall', 'E', 'tickmar', 'W'], ['aurelheim', 'S', 'sanktserin', 'N']]) {
     const [x0, y0] = gate(G(a), sa), [x1, y1] = gate(G(b), sb); lay(x0, y0, x1, y1); }
@@ -1349,6 +1350,50 @@ export const AUREL_CITIES = [
   { key: 'tickmar',     name: 'Tickmar',     x: 1120, y: 1070, hw: 22, hh: 16, types: ['store', 'smithy', 'store', 'house', 'smithy', 'barn'] },
   { key: 'sanktserin',  name: 'Sankt Serin', x: 820,  y: 1110, hw: 22, hh: 16, types: ['chapel', 'manor', 'house', 'healer', 'manor', 'house'] },
 ];
+// ================= Varonheim, Hauptstadt König Varons (Nutzer §5g.1, 01.10.2026) =================
+// Südlich von Nordfurt (nördlich ist nur Meer): Ringmauer mit Türmen und vier Toren (alte Straßen behalten einen Durchlass), im Norden
+// der Burgbezirk mit eigener Mauer und dem Bergfried — sein Tor führt in den Thronsaal (Karte 'varonburg'). Viertel: Tempel (NW),
+// Adel (NO), Markt mit Galgen (Mitte), Armenviertel (SW), Handwerk und Garnison (SO). Schwarzer Stein und Schiefer.
+export const CAPITAL = { key: 'varonheim', name: 'Varonheim', x: 475, y: 147, hw: 35, hh: 23 };
+CAPITAL.keep = [CAPITAL.x, CAPITAL.y - CAPITAL.hh + 13];
+LOCATIONS.push({ key: CAPITAL.key, name: CAPITAL.name, x: CAPITAL.x, y: CAPITAL.y, r: 36, kind: 'city', threat: 0, faction: 'valen', town: true, fin: true });
+const CAP_SIZE = { chapel: [7, 6], manor: [6, 5], barracks: [6, 5], cottage: [5, 4], house: [5, 4], store: [6, 5], tavern: [6, 5], bakery: [5, 4], smithy: [5, 4], stable: [6, 5], healer: [5, 4] };
+function buildCapital() {
+  const C = CAPITAL, m = MAPS.world, W = m.w, t = m.tiles, cx = C.x, cy = C.y, x0 = cx - C.hw, x1 = cx + C.hw, y0 = cy - C.hh, y1 = cy + C.hh;
+  for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 - 3 && qx <= x1 + 3 && qy >= y0 - 3 && qy <= y1 + 3) props.splice(i, 1); }
+  const gate = (x, y) => (Math.abs(y - cy) <= 1 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 1 && (y === y0 || y === y1));
+  for (let y = y0 - 3; y <= y1 + 3; y++) for (let x = x0 - 3; x <= x1 + 3; x++) {
+    const i = y * W + x, was = t[i], edge = x === x0 || x === x1 || y === y0 || y === y1, inside = x > x0 && x < x1 && y > y0 && y < y1;
+    t[i] = edge ? (gate(x, y) || was === T.ROAD ? T.STONE : T.WALL) : inside ? T.GRASS : (was === T.WATER || was === T.ROCK ? T.DIRT : was);
+  }
+  const block = (ax, ay, bx, by) => { for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) t[y * W + x] = T.WALL; };
+  for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [cx - 18, y0], [cx + 18, y0], [cx - 18, y1], [cx + 18, y1], [x0, cy - 12], [x0, cy + 12], [x1, cy - 12], [x1, cy + 12]]) block(x - 1, y - 1, x + 1, y + 1);   // Türme
+  const street = (ax, ay, bx, by) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) t[y * W + x] = T.STONE; };
+  // Burgbezirk: eigene Mauer, Innenhof, Bergfried (massiv), Tor nach Süden
+  const bx0 = cx - 15, bx1 = cx + 15, by0 = y0 + 1, by1 = y0 + 17;
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) t[y * W + x] = (x === bx0 || x === bx1 || y === by0 || y === by1) && !(y === by1 && Math.abs(x - cx) <= 1) ? T.WALL : T.STONE;
+  block(cx - 8, y0 + 3, cx + 8, y0 + 11); block(cx - 10, y0 + 2, cx - 8, y0 + 4); block(cx + 8, y0 + 2, cx + 10, y0 + 4); block(bx0 - 1, by1 - 1, bx0 + 1, by1 + 1); block(bx1 - 1, by1 - 1, bx1 + 1, by1 + 1);
+  street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, by1, cx + 1, y1 - 1); street(cx - 1, y0 + 1, cx + 1, by0);   // Hauptstraßen
+  street(x0 + 1, by1 + 2, x1 - 1, by1 + 2);                                                                         // Wallstraße vor der Burg
+  const hs = [], at = (x, y) => t[y * W + x];
+  const fits = (hx, hy, w, h) => hx > x0 + 1 && hx + w < x1 - 1 && hy > y0 + 1 && hy + h < y1 - 1 && hs.every(([a, b, c, d]) => hx + w + 2 <= a || a + c + 2 <= hx || hy + h + 2 <= b || b + d + 2 <= hy)
+    && [...Array(w * h).keys()].every(k => at(hx + (k % w), hy + ((k / w) | 0)) === T.GRASS);
+  const put = (hx, hy, type, door) => { const [w, h] = CAP_SIZE[type] || [5, 4]; if (!fits(hx, hy, w, h)) return false; house('world', hx, hy, w, h, door, { type, town: C.key }); hs.push([hx, hy, w, h]); return true; };
+  const district = (hx, hy, k) => hy < cy - 2 ? (hx < cx ? ['chapel', 'healer', 'house', 'house'][k % 4] : ['manor', 'manor', 'house'][k % 3])
+    : hx < cx ? ['cottage', 'cottage', 'house', 'tavern', 'cottage'][k % 5] : ['smithy', 'barracks', 'stable', 'store', 'house'][k % 5];
+  let k = 0;
+  for (let hy = y0 + 2; hy < y1 - 3; hy += 6) for (let hx = x0 + 2; hx < x1 - 3; hx += 7) for (const tp of [district(hx, hy, k), 'house', 'cottage']) if (put(hx, hy, tp, hy < cy ? 'S' : 'N')) { k++; break; }   /* dicht bebaut; passt der große Bau nicht, ein kleinerer */
+  for (const [hx, hy, tp] of [[cx - 16, cy + 3, 'store'], [cx + 10, cy + 3, 'tavern'], [cx - 16, cy + 10, 'bakery'], [cx + 10, cy + 10, 'store']]) put(hx, hy, tp, hx < cx ? 'E' : 'W');
+  street(cx - 8, cy + 2, cx + 8, cy + 10);                                                                          // Markt
+  const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && at(x, y) !== T.WATER && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, { planned: true, ...o }); };
+  P('well', cx - 4, cy + 6, { solid: true }); P('chain_post', cx + 4, cy + 6, { solid: true, label: 'Galgen des Königs' }); P('statue', cx, cy + 9, { solid: true, r: 10, label: 'Standbild König Varons' });
+  for (const [x, y] of [[x0 - 1, cy - 3], [x0 - 1, cy + 3], [x1 + 1, cy - 3], [x1 + 1, cy + 3], [cx - 3, y1 + 1], [cx + 3, y1 + 1], [cx - 3, by1 + 1], [cx + 3, by1 + 1]]) P('banner_torn', x, y, { label: 'Schwarzes Banner Valens' });
+  for (let x = x0 + 4; x < x1 - 2; x += 6) { P('lantern', x, cy - 2); P('lantern', x + 3, cy + 2); }
+  for (const [x, y] of [[cx - 12, y0 + 6], [cx + 12, y0 + 6], [cx - 12, y0 + 14], [cx + 12, y0 + 14]]) P('tent_prop', x, y, { solid: true, label: 'Zelt der Königsgarde' });
+  lay(cx, y0 - 1, 467, 113);                                                                                        // Straße nach Nordfurt
+  TOWN_PLAN[C.key] = { village: true, lord: 'valen', capital: true, area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy + 6], perHead: 45, fields: [],
+    plazas: [[T.STONE, cx - 8, cy + 2, cx + 8, cy + 10]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+}
 for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
 // Nutzer §5d.10 (01.10.2026): eigene Grundrisse der Nebenstädte. Tore bleiben an den vier Seiten (Straßen draußen), innen hat
 // jede Stadt ihr Gesicht. Rückgabe: Platz [x0, y0, x1, y1] für Treffpunkte. Häuser zuerst setzen (put braucht Gras), dann pflastern.
