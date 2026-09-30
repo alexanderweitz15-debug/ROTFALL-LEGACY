@@ -3,6 +3,8 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Folgen großer Ereignisse (Dorf ausgelöscht, Sklavenaufstand, Streik, Stadtfall in Aurelion, Seuche, Hexenprozess, Omegas Ende), Eisenfeste belebt mit dunklen Klassen und Übernahme nach Varg, Zweiwaffen, Peitschen, Sensen und Sensendorf Weidenau, Legendäre je Boss.
+- 32 Elite-Mini-Bosse mit eigenem Aussehen, Kräften und Beute; Schildarten (Buckler, Turm, Stachel, Magitech); Nahschuss trifft; Tier- und Banditen-Varianten.
 - Wetter mit Wirkung (Regen, Nebel, Schnee, Sandsturm, Hitze, Blutregen), Lehrer-Bewährung, Wachen kämpfen nach Widerstand, Talentpunkt jede dritte Stufe, Plan §5c–§5e mit Nutzerentscheiden.
 - Mehrere Spielstände mit Erfolgs-Symbolen, Koop-Stände getrennt; Goblins und Untote in vielen Varianten.
 - Magitech-Waffen 2.0 (Roadmap C.10): Energie je Schuss mit Energiezellen, fünf neue Waffen (Schockpistole, Magiegewehr, Runenarmbrust, Kristallkanone, Präzisionsgewehr) mit Streuung, Durchschlag, Lähmen, Brand; Rangsperre in Aurelion.

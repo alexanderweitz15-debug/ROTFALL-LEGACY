@@ -678,6 +678,9 @@ function drawChain(e) {
   for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t + Math.sin(t * Math.PI) * 5;
     ctx.fillStyle = '#1a1816'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4); ctx.fillStyle = i % 2 ? '#8a857e' : '#b8b2a8'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); }   // Glied mit Kontur, auch auf dunklem Boden lesbar
 }
+function drawChildNpc(e, now) {                                        // §5d.1: Kinder der Eisenfeste — kleiner gezeichnet
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.7, 0.7); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
+}
 function drawGoblinNpc(e, now) {
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.82, 0.82); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
   if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
@@ -744,7 +747,7 @@ function drawEntity(e, now) {
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
     case 'enemy': return e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now);   // S15 P5: Übungspuppe der Akademie
-    case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); return drawHumanoid(e, now);
+    case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
@@ -2023,15 +2026,16 @@ function drawCreature(e, now) {
   if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
   if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
     const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : e.mtype === 'horse' ? 1.35 : e.mtype === 'cow' ? 1.3 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
-    if (K !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K, K); ctx.translate(-e.x, -e.y); }
+    const V = beastVar(e, p), K2 = K * V.k;   /* Nutzer §5f: Tiere in Varianten (Fell, Größe, Jungtier, Albino) */
+    if (K2 !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K2, K2); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
     const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
-    const f = SP.beastFrame(e.mtype, p, sideDir(e), pose, fr);
-    shadow(e.x, e.y + 3, (e.r + 4) / K, .35);
+    const f = SP.beastFrame(e.mtype, V.pal, sideDir(e), pose, fr);
+    shadow(e.x, e.y + 3, (e.r + 4) / K2, .35);
     SP.blit(ctx, f, e.x, e.y + 5);
     const fw = flashAlpha(e, now);
     if (fw > 0) { ctx.globalAlpha = fw; SP.blit(ctx, Object.assign(SP.flashOf(f), { px: f.px, ox: f.ox, oy: f.oy }), e.x, e.y + 5); ctx.globalAlpha = 1; }
-    if (K !== 1) ctx.restore();
+    if (K2 !== 1) ctx.restore();
     if (e.mtype === 'bear' && e.telegraph > 0) dottedLine(e.x, e.y - 8, e.aim ?? 0, 200, now);   // Ansage des Sturmlaufs
     return;
   }
@@ -2455,6 +2459,16 @@ function drawAirship(x, y, s, dir, now, h, smoke) {
   ctx.restore();
 }
 // S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
+// Nutzer §5f: Tier-Varianten aus dem Seed — wenige Stufen je Art, damit der Bild-Cache klein bleibt (Schlüssel: pal.body)
+const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), Bc = p(b); return '#' + A.map((v, i) => Math.round(v + (Bc[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'] };
+function beastVar(e, p) {
+  if (e.epal) return { pal: { ...p, ...e.epal }, k: 1.2 };   /* Elite-Tier: eigenes Fell, größer */
+  const T = BEAST_TINT[e.mtype]; if (!T || e.alpha || e.rboss || !p.body || !/^#[0-9a-f]{6}$/i.test(p.body)) return { pal: p, k: 1 };
+  const h = Math.abs(((e.seed || 0) * 719) | 0), albino = h % 41 === 7 && e.mtype !== 'cow' && e.mtype !== 'sheep', young = h % 9 === 4;
+  const body = albino ? '#d8d4c8' : hexMix(p.body, T[h % T.length], 0.45 + (h % 3) * 0.15);
+  return { pal: { ...p, body, dark: p.dark && /^#/.test(p.dark) ? hexMix(p.dark, body, 0.25) : p.dark, eye: albino ? '#c84a4a' : p.eye }, k: young ? 0.72 : 0.9 + (h % 5) * 0.05 };
+}
 function drawFires(now) {
   for (const F of S.fires || []) {
     const b = HOUSES.find(h => h.id === F.house); if (!b || b.map !== S.map) continue;
