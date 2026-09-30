@@ -3,7 +3,7 @@ import { S, clamp, seasonOf } from './state.js?v=20';
 import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=20';
 import * as HB from './buildings.js?v=20';
 import { ITEMS, MONSTERS } from './data.js?v=20';
-import { buildOf, crawling } from './body.js?v=20';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=20';
 import * as SP from './sprites.js?v=20';
 import { trailPt, WAGON_GAP } from './sim.js?v=20';
 import { ICON_R } from './iconsR.js?v=20';
@@ -2329,7 +2329,7 @@ function drawLight(now) {
   dctx.globalCompositeOperation = 'destination-out';
   const pl = S.player;
   const lights = [...staticLights()];
-  if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: DUNGEONS[S.map] ? 150 : 120 });
+  if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: lightR(pl, DUNGEONS[S.map] ? 150 : 120) });   /* Roadmap P2: Nachtsicht des Roboterauges */
   if (isNight()) for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2)   // erleuchtete Fenster werfen warmes Licht auf die Straße
     lights.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
   for (const l of lights) {
@@ -2352,6 +2352,12 @@ function drawLight(now) {
     ctx.drawImage(WARM, sx - r, sy - r, r * 2, r * 2);
   }
   ctx.globalCompositeOperation = 'source-over';
+  if (pl && pl.map === S.map && a > 0.25 && eyeOf(pl)?.heat) {   /* Roadmap P2: Wärmesicht (Auge Stufe 4) — Gegner als glühender Umriss im Dunkeln, nur Anzeige */
+    ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(255,110,60,${Math.min(0.8, a) * (0.75 + 0.25 * Math.sin(now / 240))})`;
+    for (const e of S.ents[S.map] || []) { if (e.kind !== 'enemy' || !e.alive || Math.hypot(e.x - pl.x, e.y - pl.y) > 560) continue;
+      const sx = (e.x - cam.x) * cam.zoom, sy = (e.y - 14 - cam.y) * cam.zoom; if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
+      ctx.beginPath(); ctx.ellipse(sx, sy, 9 * cam.zoom, 17 * cam.zoom, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.restore(); }
 }
 
 const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() }));
