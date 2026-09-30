@@ -1,5 +1,5 @@
 // Stil R (Session 14, Nutzer: „Referenz 5 selbst im Code nachzeichnen, mit Animation — erst nur optional wählbar“).
-// Stil D bleibt Standard; R wird unter Optionen → Grafikstil gewählt (sprites.js setArt('R')).
+// Stil R ist seit S15 Standard (state.js settings.art); D und F bleiben unter Optionen → Grafikstil wählbar (sprites.js setArt).
 //
 // Raster: Figuren werden direkt im Zielraster gemalt — ein Pixel = RPX Frame-Einheiten, der Renderer vergrößert um
 // FIGK (1,2) → 1,5 Welt-Einheiten je Pixel wie Props und Boden. Kein Vergröbern, keine Nachbearbeitung.

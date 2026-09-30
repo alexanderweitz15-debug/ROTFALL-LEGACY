@@ -1193,8 +1193,8 @@ Alles hier sind **Beobachtungen** beim Lesen. Sie sagen nichts darüber, was bea
 
 **Inhalt und Systeme**
 1. **Beobachtung — P15 im Debug nicht erreichbar:**
-   - Die acht großen Ereignisse (Seuche bis Streik) haben keinen eigenen Knopf im Debug-Bereich „Ereignisse“; nur der Selbsttest ruft `BIG_START` direkt auf.
-   - Die Statustabelle in `PLAN_S15.md` führt P15 noch als „OFFEN (später)“, obwohl der Code steht.
+   - Die acht großen Ereignisse (Seuche bis Streik) haben seit Version 20 Knöpfe im Debug-Bereich „Ereignisse“ („Großes Ereignis: …“ und „Großes Ereignis beenden“).
+   - `PLAN_S15.md` führt P15 inzwischen als „FERTIG (Version 19)“; Debug-Knöpfe für die acht Ereignisse gibt es seit Version 20.
    - `MECHANIKEN.md` und `GUIDE_EREIGNISSE.md` erwähnen die acht Ereignisse nicht (Stand der Durchsicht).
 2. **Beobachtung — Zauberlehrer ohne Figur:**
    - `sp_regen` nennt als Lehrer „Druidin“, `sp_shock` die „Magitech-Ingenieurin“. Keine NPC-Definition hat für diese Figuren `spellsTaught`.
