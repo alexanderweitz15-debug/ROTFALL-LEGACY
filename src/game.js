@@ -10477,7 +10477,7 @@ function playerDeath(cause, source) {
   chronicle(`${p.name} fiel bei ${loc}`, 'death', `${cause}. Was er baute, steht noch.`);
   S.paused = true;
   UI.showDeath(rec, () => { UI.hideDeath(); chooseSuccessor(); });
-  coopHooks.hostDied?.(makeSuccessorCandidates().length, p.level);   /* Koop: Mitspieler bekommen gleich viele Erben zur Wahl */
+  coopHooks.hostDied?.(0, p.level);   /* Koop: Mitspieler warten auf die Erbenwahl (Zahl der Erben folgt in chooseSuccessor) */
   save();
 }
 
@@ -10525,6 +10525,7 @@ function chooseSuccessor() {
     setTimeout(() => location.reload(), 6000);
     return;
   }
+  coopHooks.heirCount?.(cands.length);   /* Koop: Mitspieler bekommen genau so viele Erben zur Wahl */
   UI.showSuccessors(cands, c => adoptSuccessor(c));
 }
 function adoptSuccessor(c) {
@@ -13857,7 +13858,7 @@ function openCreation(done, back, name) { creation.hook = done; creation.back = 
 // Koop: der eigene Charakter eines Gasts. Gebaut wie der Held in newGame (Herkunft: Werte, Fertigkeiten, Ausrüstung, Gold als Beutel),
 // aber als Gruppenmitglied. Er fängt zwei Stufen unter dem Helden an, damit er mithalten kann. coopOwner = Name des Gasts.
 function makeGuestHero(cfg, owner) {
-  const o = ORIGINS[cfg.origin] || ORIGINS.wanderer, p0 = S.player, q = freeSpotNear(p0.map, p0.x / TS | 0, p0.y / TS | 0, 3) || { x: p0.x + 30, y: p0.y };
+  const o = ORIGINS[cfg.origin] || ORIGINS.wanderer, p0 = S.player, q = { x: p0.x + (solidTile(p0.map, p0.x + 28, p0.y) ? -28 : 28), y: p0.y }   /* direkt neben den Helden (freeSpotNear sucht in Städten große freie Flächen und landete weit weg) */;
   const h = makeChar({ kind: 'npc', key: 'coop_' + owner, name: String(cfg.name || owner).slice(0, 18), x: q.x, y: q.y, map: p0.map, level: cfg.level || Math.max(1, (p0.level || 1) - 2),
     attrs: baseAttrs(), skills: { ...o.skills }, traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])], origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   h.attributes = Object.fromEntries(Object.entries(h.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
@@ -13870,7 +13871,7 @@ function makeGuestHero(cfg, owner) {
 // Koop: Gastcharaktere ohne verbundenen Gast warten in S.coopHeroes (gespeichert), nicht in der Welt oder Gruppe.
 function parkCoopHero(h) { if (!h) return; for (const k of Object.keys(S.ents)) S.ents[k] = S.ents[k].filter(e => e !== h); S.party = S.party.filter(id => id !== h.id);
   h.coopPilot = null; h.coopName = null; h.vx = h.vy = 0; h.dodge = null; (S.coopHeroes ||= {})[h.coopOwner] = h; }
-function unparkCoopHero(owner) { const h = S.coopHeroes?.[owner]; if (!h) return null; delete S.coopHeroes[owner]; const p0 = S.player, q = freeSpotNear(p0.map, p0.x / TS | 0, p0.y / TS | 0, 3) || { x: p0.x + 30, y: p0.y };
+function unparkCoopHero(owner) { const h = S.coopHeroes?.[owner]; if (!h) return null; delete S.coopHeroes[owner]; const p0 = S.player, q = { x: p0.x + (solidTile(p0.map, p0.x + 28, p0.y) ? -28 : 28), y: p0.y }   /* direkt neben den Helden (freeSpotNear sucht in Städten große freie Flächen und landete weit weg) */;
   Object.assign(h, { map: p0.map, x: q.x, y: q.y }); if (!h.alive) return null; S.ents[h.map].push(h); S.party.push(h.id); return h; }
 function el2(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
