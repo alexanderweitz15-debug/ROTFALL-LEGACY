@@ -293,6 +293,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 
 **Sonnet-Testfall:** Nachts in der Wildnis ohne und mit Auge Stufe 3 je einen Screenshot vergleichen. Kartennebel-Radius messen. Speichern, laden, Auge vorhanden.
 
+**Status: FERTIG (Logik, Items, UI, Debug, Probe).** `body.js`: `EYE_Q`, `eyeOf`, `fogR`, `lightR`, `eyeCrit`, `attachEye`, `wearEye`, `bionicDefaults`. `game.js`: Zweig `use: 'eye'` in `useConsumable`, `eyeOptions` in `mechMenu` (ersetzt die Linse), Fernkampf-Krit in `hurtFromProjectile`, Magie-Verschleiß in `hurt()` (`EYE_ZAP`), X-Zeile in `activeEffects`, Migration in `continueGame`, Debug „Bionik“. Offen, weil in gesperrten Bereichen der Hauptsitzung: Aufruf `B.fogR(p)` statt `p.lens ? 28 : 18` im `update()`-Nebel und `lightR(pl, …)` sowie Wärmesicht in `render.js drawLight`. Bis dahin wirkt jedes eingesetzte Auge wie die alte Linse (28 Felder), weil `attachEye` `p.lens` setzt.
+
 ### P3 — Roboterarm, -bein, Hand- und Fußmodule, Sichtbarkeit (P0)
 
 **Ziel:** Arm und Bein in allen Qualitätsstufen; Hand und Fuß als Module; Prothesen im Stil R sichtbar.
@@ -486,3 +488,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - Luftschiff-Absturz-Cinematic mehrstufig (B.14) auf P8.
 - Goblin-Befreiung als inszenierte Szene (B.9) mit `focus`-Shots und Personen-Toden aus P8.
 - Hit-Reaction-Varianten je Material (Rüstung, Fleisch, Untot, Automat) über `ANIM_DEFS.hit` und `fx`.
+
+
+## 6. Koop (K2)
+
+Der Netzwerk-Koop ist als eigenes Paket geplant: `docs/PLAN_COOP.md`. Reihenfolge laut Nutzer: P2 läuft parallel durch einen Opus-Agenten, K2 baut die Hauptsitzung. K1 (Couch-Koop) entfällt.

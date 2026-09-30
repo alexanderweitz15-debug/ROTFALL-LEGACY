@@ -129,6 +129,24 @@ export const mechBonus = (c, kind) => { if (!c.body) return 0; let b = 0;
 // Verschleiß eines getroffenen Prothesenglieds (Roadmap P1): nur echte Treffer, nur das getroffene Teil, Schrott doppelt so schnell.
 export function wearProsthesis(c, part, base = 1.2) { const P = c.body?.[part]; if (!P?.mech) return null; const was = P.mechCond ?? 100;
   P.mechCond = Math.max(0, was - base * (MECH_Q[P.mech] || MECH_Q[2]).wear); return { was, now: P.mechCond, broke: was >= 30 && P.mechCond < 30 }; }
+// Roadmap P2 (Roboterauge): eigenes Feld c.eye = { q: 1..4, cond: 0..100 }, bewusst KEIN Teil in PARTS (Trefferverteilung und alte Körper bleiben).
+// fog = Kartennebel-Radius in Kacheln (ohne Auge 18), light = Spielerlicht +Anteil (Nachtsicht ab Stufe 3), crit = Fernkampf-Krit, heat = Wärmesicht (Stufe 4).
+export const EYE_Q = {
+  1: { name: 'Schrott',      fog: 22, light: 0,    crit: 0,    wear: 2.0 },
+  2: { name: 'Aurelionisch', fog: 28, light: 0,    crit: 0.02, wear: 1.0 },
+  3: { name: 'Meisterstück', fog: 32, light: 0.4,  crit: 0.04, wear: 0.7 },
+  4: { name: 'Prototyp',     fog: 36, light: 0.5,  crit: 0.06, wear: 0.5, heat: true },
+};
+/* wirkendes Auge oder null: unter 30 % Zustand ist es blind wie Glas */
+export const eyeOf = c => { const E = c?.eye; if (!E?.q || (E.cond ?? 100) < 30) return null; return EYE_Q[E.q] || EYE_Q[2]; };
+export const fogR = c => eyeOf(c)?.fog ?? (c?.lens && !c?.eye ? 28 : 18);
+export const lightR = (c, base) => base * (1 + (eyeOf(c)?.light || 0));
+export const eyeCrit = c => eyeOf(c)?.crit || 0;
+export function attachEye(c, q) { c.eye = { q: Math.max(1, Math.min(4, q | 0)), cond: 100 }; c.lens = true; return c.eye; }
+export function wearEye(c, amt) { const E = c?.eye; if (!E?.q) return null; const was = E.cond ?? 100;
+  E.cond = Math.max(0, was - amt * (EYE_Q[E.q] || EYE_Q[2]).wear); return { was, now: E.cond, broke: was >= 30 && E.cond < 30 }; }
+/* Roadmap P2: Save-Defaults für Bionik — alte Linse (p.lens) wird ein Aurelion-Auge; p.lens bleibt als Lesefallback stehen */
+export function bionicDefaults(c) { if (!c) return c; if (c.lens && !c.eye) c.eye = { q: 2, cond: 100 }; if (c.eye) c.eye.cond ??= 100; return c; }
 export function worstPart(c) {
   let best = null, br = 1;
   for (const p of PARTS) { if (c.body[p].lost) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }

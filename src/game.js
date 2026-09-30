@@ -463,6 +463,12 @@ function useConsumable(c, idx, target = c, part = null) {
     log(`${c.name} bekommt ${it.name} (${B.PART_NAME[part]}).`, 'party'); UI.toast(`${it.name.toUpperCase()} ANGELEGT`, 2400); recalc(c);
     return UI.refreshHUD();
   }
+  if (it.use === 'eye') {                                    // Roadmap P2: Roboterauge einsetzen — ersetzt ein altes Auge, das alte geht verloren
+    const old = c.eye?.q; if (old && old >= (it.tier || 1) && (c.eye.cond ?? 100) >= 30) return UI.toast(`${c.name} hat schon ein gleich gutes Auge (${B.EYE_Q[old].name}).`);
+    removeItem(c, slot.key, 1); const q = B.attachEye(c, it.tier || 1).q, E = B.EYE_Q[q];
+    log(`${c.name} setzt ${it.name} ein. Sichtweite ${E.fog} Felder${E.crit ? `, Fernkampf-Krit +${Math.round(E.crit * 100)} %` : ''}${E.light ? `, Nachtsicht +${Math.round(E.light * 100)} %` : ''}${E.heat ? ', Wärmesicht' : ''}. Magie stört es.`, 'party');
+    UI.toast(`${it.name.toUpperCase()} EINGESETZT`, 2400); return UI.refreshHUD();
+  }
   if (it.use === 'elixir') {                                 // S15 P2: ein Elixier zur Zeit, gemeinsame Abklingzeit
     if ((c.elixirCd || 0) > clock()) return UI.toast(`Noch ${Math.ceil(c.elixirCd - clock())} s, bevor der Magen das nächste verträgt.`);
     removeItem(c, slot.key, 1); c.elixirCd = clock() + 30;
@@ -1961,6 +1967,7 @@ export function continueGame() {
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
+  B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
     if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches', 'spellsTaught', 'spellRule']) if (def[k] !== undefined) e[k] = def[k]; }
   const allE = Object.values(S.ents).flat();   // S15 Fehlersuche: Gefährten auf anderen Karten zählen, Tote mit Nachfolger-Frist und zerstörte Orte nicht
@@ -3045,6 +3052,7 @@ function weaponMult(it, t, armor0) {
 // Mechanik-Check S14: Flächenangriffe (Ringe, Einschläge, Strahl) laufen über areaHit — Deckung, Schild und Nahkampfabwehr
 // greifen dort nicht (Rolle = Raum, Deckung = Stand). Geschosse bleiben blockbar.
 let AREA = false;
+const EYE_ZAP = new Set(['magic', 'shadow', 'shock', 'arcane']);   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null;
@@ -3171,9 +3179,11 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   const brawlHit = target.brawl && source && (source.brawl || source === S.player);   // S12: Prügelei ohne Tote
   if (brawlHit) { dmg *= 0.5; if (source === S.player && S.brawls?.[target.brawlV]) S.brawls[target.brawlV].helped = target.brawlSide === 'dorf' ? 'kette' : 'dorf'; }
   if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit);
-    if (kind === 'physical' && source && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
+    if (kind === 'physical' && source && dmg > 0 && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
       if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); } } }
   else target.hp -= dmg;
+  if (target.eye?.q && dmg > 0 && EYE_ZAP.has(kind)) { const w = B.wearEye(target, Math.min(8, 1.5 + dmg * 0.15));   /* Roadmap P2: Magie-Anfälligkeit — Schatten- und Magietreffer stören das Roboterauge */
+    if (target === S.player && w) { if (w.broke) { UI.toast('ROBOTERAUGE GESTÖRT', 2200); log('Dein Roboterauge flackert unter 30 % und zeigt nur noch Rauschen. Ein Kybernetiker oder die Werkbank in Gelenkhall richtet es.', 'party'); } else if (w.was - w.now >= 1 && !S.flags.eyeZapHint) { S.flags.eyeZapHint = true; log('Magie knistert im Messing deines Auges. Zauber nutzen es ab.', 'party'); } } }
   credit(target, source, dmg);                                            // Phase 1: XP nach Beitrag
   if (node(target, 'k_second') && target.alive && !target.downed && target.hp < target.maxHp * 0.25 && clock() > (target.secondWind || 0)) {
     target.secondWind = clock() + 180; B.heal(target, target.maxHp * 0.3); target.stamina = target.maxStamina;   // Zweiter Atem (3 Spielstunden = 3 min)
@@ -3542,7 +3552,7 @@ function projHit(p) {
   return false;
 }
 function hurtFromProjectile(attacker, target, p) {
-  const crit = chance(0.12);
+  const crit = chance(0.12 + (p.spell ? 0 : B.eyeCrit(attacker)));   /* Roadmap P2: Roboterauge zielt mit (+2/+4/+6 % ab Stufe 2) */
   let dmg = p.dmg * (crit ? 2 : 1) * (p.mult || 1);
   const armor = (target.kind === 'enemy' ? (target.armor || 0) * 1.2 : armorOf(target)) * (1 - (p.ap || 0));   // Bolzen schlagen durch
   dmg = Math.max(1, dmg - armor * 0.5);
@@ -7005,8 +7015,9 @@ function mechMenu() {
   for (const k of parts) if ((p.body[k].mechUp || 0) < 2) { const up = k.endsWith('arm') ? 'Kraftfeder' : 'Laufwerk', cost = 250 * ((p.body[k].mechUp || 0) + 1);
     opts.push({ text: `${up} für ${NAME[k]} (Stufe ${(p.body[k].mechUp || 0) + 1}, ${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; p.body[k].mechUp = (p.body[k].mechUp || 0) + 1; recalc(p); say(`${up} eingesetzt: +5 % ${k.endsWith('arm') ? 'Schlagkraft' : 'Tempo'}.`); } }); }
   opts.push(...mechSwapOptions(p, say));   // Nutzer S13: gesunde Glieder freiwillig ersetzen
-  if (!p.lens) opts.push({ text: 'Linse ins Auge setzen lassen — weiter sehen (300 Gold)', fn: () => { if (S.gold < 300) return say('Zu wenig Gold.'); S.gold -= 300; p.lens = true; say('Messing um das Auge, Glas davor. Die Welt reicht plötzlich weiter.'); } });
-  const state = parts.length ? parts.map(k => `${NAME[k]}: Stufe ${p.body[k].mech}, Zustand ${Math.round(p.body[k].mechCond ?? 100)} %${(p.body[k].mechCond ?? 100) < 30 ? ' (BESCHÄDIGT — wirkungslos)' : ''}${p.body[k].mechUp ? `, Aufrüstung ${p.body[k].mechUp}` : ''}`).join('\n') : 'Du trägst keine Prothese. Meisterin Vell verkauft welche.';
+  opts.push(...eyeOptions(p, say));   /* Roadmap P2: Roboterauge einsetzen und warten (ersetzt die alte Linse) */
+  const eyeLine = p.eye?.q ? `\nAuge: ${B.EYE_Q[p.eye.q]?.name || '?'} (Stufe ${p.eye.q}), Zustand ${Math.round(p.eye.cond ?? 100)} %${(p.eye.cond ?? 100) < 30 ? ' (GESTÖRT — wirkungslos)' : ''}` : '';
+  const state = (parts.length ? parts.map(k => `${NAME[k]}: Stufe ${p.body[k].mech}, Zustand ${Math.round(p.body[k].mechCond ?? 100)} %${(p.body[k].mechCond ?? 100) < 30 ? ' (BESCHÄDIGT — wirkungslos)' : ''}${p.body[k].mechUp ? `, Aufrüstung ${p.body[k].mechUp}` : ''}`).join('\n') : 'Du trägst keine Prothese. Meisterin Vell verkauft welche.') + eyeLine;
   UI.dialogue(p, `Werkbank der Prothesenmacherin\n${state}`, [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
 function ensureGoblinVillage() {
@@ -7818,8 +7829,19 @@ function mechSwapOptions(p, say) {
   const NAME = { larm: 'linken Arm', rarm: 'rechten Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' }, TIER = [[2, 'Aurelionisch', 700], [3, 'Meisterwerk', 1400]], out = [];
   for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = p.body[k]; if (P.mech || P.lost) continue;
     for (const [tier, name, cost] of TIER) out.push({ text: `${NAME[k]} ersetzen lassen — ${name} (${cost} Gold)`, fn: () => {
-      if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; Object.assign(P, { mech: tier, mechCond: 100, lost: false, hp: P.max }); B.syncHp(p); recalc(p);
+      if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; B.attachProsthesis(p, k, tier); recalc(p);
       log(`Meisterin Vell trennt, fügt, stellt ein. Dein ${NAME[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich den ${NAME[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); }
+  return out;
+}
+// Roadmap P2: Roboterauge beim Prothesenmacher — einsetzen (Stufe 2/3, ersetzt ein schwächeres) und warten (2 Gold je fehlendem Prozent)
+const EYE_COST = { 2: 700, 3: 1800 };
+function eyeOptions(p, say) {
+  const out = [], E = p.eye, q0 = E?.q || 0, cond = E?.cond ?? 100;
+  if (q0 && cond < 100) { const cost = Math.round((100 - cond) * 2); out.push({ text: `Auge warten lassen (${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; E.cond = 100; say('Linse geputzt, Iris nachgestellt. Das Rauschen ist weg.'); } }); }
+  for (const q of [2, 3]) if (q > q0) out.push({ text: `Roboterauge einsetzen lassen — ${B.EYE_Q[q].name}${q0 ? ' (ersetzt dein altes)' : ''} (${EYE_COST[q]} Gold)`, fn: () => {
+    if (S.gold < EYE_COST[q]) return say('Zu wenig Gold.'); S.gold -= EYE_COST[q]; const X = B.EYE_Q[B.attachEye(p, q).q];
+    log(`Ein Roboterauge (${X.name}): Sichtweite ${X.fog} Felder, Fernkampf-Krit +${Math.round(X.crit * 100)} %${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}. Magie stört es.`, 'party');
+    say('Messing um das Auge, Glas davor. Die Welt reicht plötzlich weiter.'); } });
   return out;
 }
 // Das Heilige Gericht in Aurelheim: Ablass (Kopfgeld tilgen), Klage gegen ein Haus, einer Verhandlung beiwohnen
@@ -8686,6 +8708,8 @@ function activeEffects() {
     else if (P.mech) { const mc = Math.round(P.mechCond ?? 100);   /* S15 Hinweise: Zustand sichtbar, unter 30 % wirkungslos */
       add('Körper', '⚙', `${PART_DE[k]}: Prothese`, mc < 30 ? 'bad' : 'info', [`Stufe ${P.mech}. Zustand ${mc} %${mc < 30 ? ' — beschädigt, wirkungslos' : ''}.`, 'Nutzt sich bei jedem Treffer ab. Instand setzen an der Werkbank in Gelenkhall.'], mc < 30); }
     else if (P.hp <= 0) add('Körper', '✕', `${PART_DE[k]} ausgefallen`, 'bad', [k.includes('arm') ? 'Die Hand trägt nichts mehr.' : k === 'head' ? 'Lebensgefahr.' : 'Du humpelst.', 'Verband oder Heilerin.'], true); }
+  if (p.eye?.q) { const ec = Math.round(p.eye.cond ?? 100), X = B.EYE_Q[p.eye.q] || B.EYE_Q[2];   /* Roadmap P2: Roboterauge */
+    add('Körper', '◉', `Auge: ${X.name}`, ec < 30 ? 'bad' : 'info', [`Stufe ${p.eye.q}. Zustand ${ec} %${ec < 30 ? ' — gestört, wirkungslos' : ''}.`, `Sichtweite ${X.fog} Felder${X.crit ? `, Fernkampf-Krit +${Math.round(X.crit * 100)} %` : ''}${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}${X.heat ? ', Wärmesicht' : ''}.`, 'Magie- und Schattentreffer nutzen es ab. Warten beim Prothesenmacher.'], ec < 30); }
   // Fraktionen: Ruf-Stufe und Rang mit Preiswirkung
   for (const [f, F] of Object.entries(FACTIONS)) {
     const t = S.factions[f] != null ? repTier(f) : null, r = S.ranks[f] ?? -1, lg = S.legend?.[f];
@@ -10882,6 +10906,11 @@ function debugSections() {
       'Nächsten Gegner töten': () => { const e = S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (e) die(e, 'Debug', p); },
       'Gegner im Umkreis töten': () => { for (const e of S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive && dist(x, p) < 600)) die(e, 'Debug', p); },
       'Gegner taumeln lassen': () => { for (const e of S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive && dist(x, p) < 600)) e.stagger = 1500; },
+    }],
+    ['Bionik', '', {   /* Roadmap P2–P5: Bionik-Tests */
+      ...Object.fromEntries([1, 2, 3, 4].map(q => [`Auge Stufe ${q} (${B.EYE_Q[q].name})`, () => { B.attachEye(p, q); UI.toast(`Roboterauge Stufe ${q}`); }])),
+      'Auge entfernen': () => { p.eye = null; p.lens = false; UI.toast('Kein Roboterauge'); },
+      'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
     }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
@@ -13194,6 +13223,17 @@ export function selftest() {
     if (a.body) { a.body.torso.hp = -2; B.syncHp(a); } downed(a, 'Test'); a.status = [{ key: 'bleeding', name: 'Blutend', left: 30000 }]; a.downTimer = 3000;
     for (let i = 0; i < 60 && a.downed; i++) tickCombatant(a, 100);
     return a.alive && !(a.status || []).some(s => s.key === 'bleeding');
+  }));
+  ok('Roadmap P2 Roboterauge: alte Linse wird Auge Stufe 2, Stufe 3 sieht weiter und heller, unter 30 % wirkungslos, Magie nutzt es ab, Gift nicht', sandbox(() => {
+    const p = stage(); p.lens = true; delete p.eye; B.bionicDefaults(p); const mig = p.eye?.q === 2 && p.eye.cond === 100 && B.fogR(p) === 28;
+    const q = stage(), r0 = B.lightR(q, 120), f0 = B.fogR(q); q.inv = []; addItem(q, 'auge_meister', 1); useConsumable(q, 0); const used = q.eye?.q === 3 && !q.inv.some(x => x && x.key === 'auge_meister');
+    const better = B.lightR(q, 120) > r0 && B.fogR(q) > f0 && B.eyeCrit(q) > 0;
+    q.inv = []; addItem(q, 'auge_schrott', 1); useConsumable(q, 0); const kept = q.eye.q === 3 && q.inv.some(x => x && x.key === 'auge_schrott');   /* schwächeres Auge wird nicht eingesetzt */
+    q.eye.cond = 29; const off = B.lightR(q, 120) === r0 && B.eyeCrit(q) === 0 && B.fogR(q) === 18; q.eye.cond = 100;
+    const e = spawnEnemy('bandit', '__a', 12, 10); hurt(q, 1, null, 'Gift'); const noPoison = q.eye.cond === 100;
+    hurt(q, 10, e, e.name, false, 'magic'); const zapped = q.eye.cond < 100; B.fullHeal(q);
+    const n = stage(); hurt(n, 5, e, e.name, false, 'magic'); const safe = n.eye == null && B.fogR(n) === 18;
+    return mig && used && better && kept && off && noPoison && zapped && safe;
   }));
   ok('Bionik-Fundament (Roadmap P1): neue Prothese kommt frisch, Schrott ist schlechter als Fleisch, Verschleiß nur am getroffenen Glied und nicht durch Gift', sandbox(() => {
     const p = stage(), L = p.body.larm; L.mechCond = 10; L.mechUp = 2; B.damagePart(p, 'larm', 9999); const cut = L.lost && L.mechCond === undefined && L.mechUp === undefined;

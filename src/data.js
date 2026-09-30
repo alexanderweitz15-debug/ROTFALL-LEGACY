@@ -264,6 +264,11 @@ export const ITEMS = {
   aurelbein:   { name:'Aurelionisches Bein', slot:'consumable', use:'prosthesis', part:'leg', tier:2, stack:1, rarity:'rare', value:850, desc:'Kniegelenk mit Dämpfer, Sohle aus Gummi und Stahl. Voll belastbar.' },
   meisterarm:  { name:'Meisterarm von Gelenkhall', slot:'consumable', use:'prosthesis', part:'arm', tier:3, stack:1, rarity:'epic', value:2400, desc:'Feinwerk der Kybernetiker. Stärker als Fleisch: Hiebe mit diesem Arm treffen härter (+10 %).' },
   meisterbein: { name:'Meisterbein von Gelenkhall', slot:'consumable', use:'prosthesis', part:'leg', tier:3, stack:1, rarity:'epic', value:2200, desc:'Feinwerk der Kybernetiker. Schneller als Fleisch (+6 % Tempo).' },
+  // Roadmap P2: Roboteraugen — eigenes Feld c.eye, ersetzen ein schwächeres Auge; Magie nutzt sie ab
+  auge_schrott: { name:'Schrottauge', slot:'consumable', use:'eye', tier:1, stack:1, rarity:'uncommon', value:180, desc:'Ein Glas in einer Blechfassung. Sieht etwas weiter (Sichtweite 22), nutzt sich doppelt so schnell ab.' },
+  auge_aurel:   { name:'Aurelionisches Auge', slot:'consumable', use:'eye', tier:2, stack:1, rarity:'rare', value:750, desc:'Messingiris mit Schleifglas. Sichtweite 28, Fernkampf-Krit +2 %.' },
+  auge_meister: { name:'Meisterauge von Gelenkhall', slot:'consumable', use:'eye', tier:3, stack:1, rarity:'epic', value:2000, desc:'Kristalllinse mit Restlichtverstärker. Sichtweite 32, Fernkampf-Krit +4 %, Nachtsicht +40 %.' },
+  auge_proto:   { name:'Prototyp-Auge', slot:'consumable', use:'eye', tier:4, stack:1, rarity:'legendary', value:4200, desc:'Aus der Akademie, nicht zu kaufen. Sichtweite 36, Fernkampf-Krit +6 %, Nachtsicht +50 %, Wärmesicht.' },
   dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
   auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
   vargs_kette: { name:'Vargs Kette', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Das erste Glied, das Varg je geschmiedet hat. Kalt, schwer — und es summt, wenn man an Omega denkt.' },
