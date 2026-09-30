@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Goblins nach der Befreiung: Grubenhort wächst zur Goblinstadt (Spenden helfen), Außenposten von Morrgrund, Goblin-Helden anwerben, Dodon zieht ins eigene Dorf, Menschen reagieren.
 - Gewölbe: Modifikatoren (dunkel, überflutet, verflucht), Hebeltüren, Geheimkammern, drei geheime Gewölbe über Karten, Endlosgewölbe „Der Schlund“.
 - Akademie: als Student einschreiben, Vorlesungen, Semester, Rivalin, verbotene Abteilung.
 - Dynastie: Heirat, Kinder wachsen in Spielzeit, Adoption beim Priester, Freund als Erbe; Kinder und Ehepartner erben zuerst.
