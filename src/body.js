@@ -6,7 +6,7 @@ import { rnd, clamp, S } from './state.js?v=22';
 export const PARTS = ['head', 'torso', 'larm', 'rarm', 'lleg', 'rleg'];
 export const PART_NAME = { head:'Kopf', torso:'Rumpf', larm:'Linker Arm', rarm:'Rechter Arm', lleg:'Linkes Bein', rleg:'Rechtes Bein' };
 const SHARE = { head:0.25, torso:0.45, larm:0.2, rarm:0.2, lleg:0.25, rleg:0.25 };   // Anteil der Basis-HP
-const HIT_W = { head:6, torso:46, larm:12, rarm:12, lleg:12, rleg:12 };              // Trefferwahrscheinlichkeit
+export const HIT_W = { head:6, torso:46, larm:12, rarm:12, lleg:12, rleg:12 };              // Trefferwahrscheinlichkeit
 const HEAD_CAP = 0.6;
 // S14 (Nutzer): Arme und Beine haben feste 100 LP (× Körperbau), fallen bei 0 aus (funktionslos bis Heilung) und sind erst ab −200 ab
 export const LIMB_HP = 100, LIMB_CUT = -200;

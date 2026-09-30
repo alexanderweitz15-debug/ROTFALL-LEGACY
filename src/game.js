@@ -2427,7 +2427,7 @@ function update(dt, now) {
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
-    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'));
+    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright);
   }
   respawnTimer += dt;
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
@@ -2888,7 +2888,7 @@ function controlPlayer(dt) {
     if (d.dash) for (const f of combat) if (f.alive && !f.downed && isHostile(p, f) && !d.dash.hit.includes(f.id) && dist(p, f) < 36 + (f.r || 10)) {
       d.dash.hit.push(f.id); hit(p, f, d.dash.mult); f.stagger = Math.max(f.stagger || 0, 350);
     }
-    if (d.t % 55 < dt) S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ghost', s: 1, life: 220, maxLife: 220, face: p.facing });
+    if (d.t % 55 < dt) S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'afterimage', src: p.id, s: 1, life: 220, maxLife: 220, face: p.facing });   /* Audit C3: eigenes Nachbild statt 'ghost' */
     if (!d.dash && d.t >= U - 40) p.invuln = false;                   // die letzten 40 ms (Landung) sind verwundbar — i-Frames sind die Rolle, nicht das Aufstehen
     if (d.t >= U) { p.dodge = null; p.invuln = false; if (!d.dash) { p.landT = performance.now() + 110; fx(p.x, p.y + 4, 'dust', 4); } }
     return;
@@ -3732,19 +3732,23 @@ function levelUp(c) {
 }
 
 // ================= Effekte =================
+/* Audit C5: Darstellung würfelt mit vrnd (Math.random), Spiellogik mit rnd(). So ändern Gewaltstufe und Partikelmenge nie Beute oder KI.
+   FX_CAP deckelt die Partikel, damit große Schlachten flüssig bleiben (die ältesten fallen zuerst weg). */
+const vrnd = Math.random, FX_CAP = 900;
 function fx(x, y, type, n = 6) {
   if (S.settings.violence === 'low' && type === 'blood') return;
   if (type === 'heal' && S.player) sfx('heal', 0, clamp(1 - Math.hypot(S.player.x - x, S.player.y - y) / 650, 0, 1));
+  if (S.fx.length > FX_CAP) S.fx.splice(0, S.fx.length - FX_CAP + n);
   for (let i = 0; i < n; i++) {
-    const a = rnd() * Math.PI * 2, sp = 0.6 + rnd() * 2.2;
-    S.fx.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8, type, s: 1.5 + rnd() * 2.4, life: 380 + rnd() * 420, maxLife: 700 });
+    const a = vrnd() * Math.PI * 2, sp = 0.6 + vrnd() * 2.2;
+    S.fx.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8, type, s: 1.5 + vrnd() * 2.4, life: 380 + vrnd() * 420, maxLife: 700 });
   }
 }
 function float(e, text, color, big = false) {
-  S.floats.push({ x: e.x + ri(-6, 6), y: e.y - 26, rise: 0, text, color, big, life: 900, maxLife: 900 });
+  S.floats.push({ x: e.x + Math.round(vrnd() * 12 - 6), y: e.y - 26, rise: 0, text, color, big, life: 900, maxLife: 900 });
 }
 const RISING = new Set(['heal', 'necro', 'shadow']);           // Magie steigt auf, Blut und Splitter fallen
-const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock']);     // bleiben am Ort
+const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock', 'afterimage']);     // bleiben am Ort
 function updateFx(dt) {
   for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
   S.fx = S.fx.filter(f => f.life > 0);
@@ -13434,6 +13438,11 @@ function debugSections() {
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
     }],
     fortDebug(tp),   /* §5d.1 Eisenfeste: Festungsleben, Sklavenmarkt, Übernahme */
+    ['Klang & Effekte (Audit C3–C5)', sel('dbAmb', ['greenmark', 'forest', 'marsh', 'desert', 'blight', 'deadland', 'aurel', 'eisen', 'frozen', 'coast', 'under'].map(k => [k, k])), {
+      'Umgebung vorspielen (8 s)': () => { ambience(true); const k = v('dbAmb'); for (let i = 0; i < 8; i++) setTimeout(() => ambienceTick(k === 'under' ? 'blight' : k, true, false, k === 'under'), i * 1000); UI.toast(`Umgebungsklang: ${k}`); },
+      'Partikel-Stresstest (Deckel 900)': () => { for (let i = 0; i < 400; i++) fx(p.x + ri(-200, 200), p.y + ri(-150, 150), pick(['blood', 'spark', 'ghost', 'dust']), 6); UI.toast(`Partikel: ${S.fx.length}`); },
+      'Nachbild und Geisterschleier zeigen': () => { S.fx.push({ x: p.x - 20, y: p.y, vx: 0, vy: 0, type: 'afterimage', src: p.id, s: 1, life: 900, maxLife: 900, face: p.facing }); S.fx.push({ x: p.x + 30, y: p.y, vx: 0, vy: 0, type: 'ghost', s: 1, life: 900, maxLife: 900 }); UI.toast('Links Nachbild, rechts Geisterschleier'); },
+    }],
     ['Spieler', `${sel('dbFac', facs)} <input id="dbN" value="25" size="4"> ${sel('dbStat', stats)}`, {
       'Gottmodus an/aus': () => { (S.dbg ||= {}).god = !S.dbg.god; UI.toast(S.dbg.god ? 'GOTTMODUS AN' : 'GOTTMODUS AUS'); },
       'Heilen': () => { B.fullHeal(p); p.downed = false; }, 'Ausdauer voll': () => { p.stamina = p.maxStamina; }, 'Mana voll': () => { p.mana = p.maxMana; },
@@ -13686,6 +13695,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
 export function simFight(mtype, o = {}) {
   const { level = 5, weapon = 'longsword', gear = {}, attrs = null, skill = null, elvl = null, ehp = null, eopt = {}, mode = 'smart', seed = 1, maxT = 180000, pots = 0, flags = {} } = o;
   const skip = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings']), snap = {}, snapJ = {};
+  const origKeys = new Set(Object.keys(S).filter(k => !skip.has(k)));   /* Fehlersuche: welche Schlüssel gab es vorher — neu angelegte (z. B. S.difficulty) müssen weg, nicht nur falsch bleiben */
   for (const k of Object.keys(S)) if (!skip.has(k)) { try { snapJ[k] = JSON.stringify(S[k]); snap[k] = structuredClone(S[k]); } catch (err) { /* nicht klonbar: bleibt */ } }   // zurückgesetzt wird nur, was sich geändert hat (Verweise bleiben heil)
   const keep = { player: S.player, map: S.map, party: S.party, combat, projectiles: S.projectiles, rising: S.rising, quiet: S._quiet };
   const kb = new Set(keys), md = mouse.down, ms = mouse.seen, pnow = performance.now, boss0 = { ...BOSS };
@@ -13735,6 +13745,7 @@ export function simFight(mtype, o = {}) {
   } finally {
     performance.now = pnow; Object.assign(BOSS, boss0); keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms;
     for (const [k, v] of Object.entries(snap)) { let same = false; try { same = JSON.stringify(S[k]) === snapJ[k]; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
+    for (const k of Object.keys(S)) if (!skip.has(k) && !origKeys.has(k)) delete S[k];   /* Fehlersuche: z. B. S.difficulty gab es vorher nicht — sonst bliebe „schwer“ für den Rest der Sitzung hängen */
     applyDifficulty();
     Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, projectiles: keep.projectiles, rising: keep.rising, _quiet: keep.quiet }); combat = keep.combat;
     delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
@@ -15179,7 +15190,7 @@ export function selftest() {
     const weak = ['berserker', 'assassin', 'bard', 'alchemist'].every(k => CLASSES[k].weak && CLASSES[k].abilities.every(a => ABILITIES[a]));
     const p = stage(); p.equip.weapon = mkItem('longsword'); p.equip.weapon.cond = 1; p.knownClasses = ['wanderer', 'warrior', 'berserker', 'bard', 'alchemist', 'rogue', 'assassin'];
     p.currentClass = 'warrior'; const d0 = damageOf(p); setClass('bard'); const dBard = damageOf(p);
-    setClass('berserker'); p.cooldowns = {}; p.stamina = 100; useAbility('frenzy'); const dRage = damageOf(p), hurtMore = (() => { const h = p.hp; hurt(p, 10, null, 'Test'); return h - p.hp; })();
+    setClass('berserker'); p.cooldowns = {}; p.stamina = 100; useAbility('frenzy'); const dRage = damageOf(p), hurtMore = (() => { const w0 = { ...B.HIT_W }, h = p.hp; for (const k in B.HIT_W) B.HIT_W[k] = k === 'torso' ? 1 : 0; try { hurt(p, 10, null, 'Test'); } finally { Object.assign(B.HIT_W, w0); } return h - p.hp; })();   /* Rumpftreffer erzwingen: ein Gliedtreffer zieht nur 40 % × ½ vom Rumpf (Zufall) */   /* ohne Trefferzone: Arm-Treffer ziehen weniger LP ab (Zufall) */
     setClass('alchemist'); p.cooldowns = {}; p.inv = []; useAbility('brew'); const noHerb = !hasItem(p, 'potion', 1); addItem(p, 'herb', 3); useAbility('brew'); const brewed = hasItem(p, 'potion', 1) && !hasItem(p, 'herb', 1);
     setClass('assassin'); p.cooldowns = {}; p.equip.chest = mkItem('plate_cuirass'); const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 80; w.y = p.y; combat = S.ents.__a;
     const x0 = p.x; useAbility('shadowstep'); const blocked = p.x === x0; p.equip.chest = null; p.cooldowns = {}; p.stamina = 100; useAbility('shadowstep'); const stepped = p.x !== x0 && p.shadowNext > performance.now();
@@ -15508,7 +15519,8 @@ export function selftest() {
     return h.includes('<h3>Titel</h3>') && h.includes('<li') && h.includes('<b>fett</b>') && h.includes('<td>1</td>') && !h.includes('---') && h.includes('Siehe GUIDE.') && !h.includes('](');
   })());
   ok('S13 Kutschen und Fähren: Kutscher in jeder größeren Stadt, Fährmann in Salzhafen; Reise kostet Gold und Zeit; ein Überfall hält auf halber Strecke an', (() => {
-    const p = S.player, keep = JSON.stringify({ g: S.gold, m: S.minute, d: S.day, x: p.x, y: p.y }), W0 = S.ents.world; S.ents.world = W0.slice();
+    const p = S.player, keep = JSON.stringify({ g: S.gold, m: S.minute, d: S.day, x: p.x, y: p.y }), W0 = S.ents.world;
+    S.ents.world = W0.filter(e => !(e.kind === 'enemy' && e.alive && dist(e, p) < 500));   /* Feinde in der Nähe sperren journey (foesNear) — Probe prüft die Reise, nicht den Zufall */
     try {
       ensureCoaches(); const coaches = S.ents.world.filter(e => e.coach).length >= 4 && S.ents.world.some(e => e.ferry === 'saltport');
       S.gold = 500; const T = tripOf('eren', 'northcity'); T.risk = 0; const m0 = S.day * 1440 + S.minute; journey(T, 'Die Kutsche');
