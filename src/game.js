@@ -1,17 +1,17 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=19';
-import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=19';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=19';
-import * as R from './render.js?v=19';
-import * as HB from './buildings.js?v=19';
-import * as UI from './ui.js?v=19';
-import * as SIM from './sim.js?v=19';
-import * as B from './body.js?v=19';
-import * as SP from './sprites.js?v=19';
-import * as ECO from './economy.js?v=19';
-import { drawAtlas, revealAround, explored } from './atlas.js?v=19';
-import { sfx, ambience, ambienceTick } from './sfx.js?v=19';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=20';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=20';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=20';
+import * as R from './render.js?v=20';
+import * as HB from './buildings.js?v=20';
+import * as UI from './ui.js?v=20';
+import * as SIM from './sim.js?v=20';
+import * as B from './body.js?v=20';
+import * as SP from './sprites.js?v=20';
+import * as ECO from './economy.js?v=20';
+import { drawAtlas, revealAround, explored } from './atlas.js?v=20';
+import { sfx, ambience, ambienceTick } from './sfx.js?v=20';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -3134,8 +3134,6 @@ function hit(attacker, target, mult, kind = 'physical') {
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
-  if (target === S.player && target.body) for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = target.body[k]; if (P.mech) { const was = P.mechCond ?? 100; P.mechCond = Math.max(0, was - 1.2);
-    if (was >= 30 && P.mechCond < 30) { UI.toast('PROTHESE BESCHÄDIGT', 2200); log('Deine Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.', 'party'); } } }   /* S15 Hinweise: einmal beim Unterschreiten warnen */   // S12 E: Prothesen nutzen sich ab (ohne Zufall: Proben bleiben gleich)
   if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
@@ -3172,7 +3170,9 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   let result = null, part = null;
   const brawlHit = target.brawl && source && (source.brawl || source === S.player);   // S12: Prügelei ohne Tote
   if (brawlHit) { dmg *= 0.5; if (source === S.player && S.brawls?.[target.brawlV]) S.brawls[target.brawlV].helped = target.brawlSide === 'dorf' ? 'kette' : 'dorf'; }
-  if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit); }
+  if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit);
+    if (kind === 'physical' && source && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
+      if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); } } }
   else target.hp -= dmg;
   credit(target, source, dmg);                                            // Phase 1: XP nach Beitrag
   if (node(target, 'k_second') && target.alive && !target.downed && target.hp < target.maxHp * 0.25 && clock() > (target.secondWind || 0)) {
@@ -10875,7 +10875,9 @@ function debugSections() {
     }],
     ['Kampf & Körper', `${sel('dbPart', [['rarm', 'rechter Arm'], ['larm', 'linker Arm'], ['rleg', 'rechtes Bein'], ['lleg', 'linkes Bein']])}`, {
       'Glied ausfallen': () => { p.body[v('dbPart')].hp = 0; B.syncHp(p); limbLost(p, v('dbPart')); },
-      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
+      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; delete P2.mechCond; delete P2.mechUp; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
+      ...Object.fromEntries([1, 2, 3, 4].map(t => [`Prothese anlegen (Stufe ${t} ${B.MECH_Q[t].name})`, () => { const k = v('dbPart'); if (!/arm|leg/.test(k)) return UI.toast('Nur Arm oder Bein.'); B.attachProsthesis(p, k, t); recalc(p); UI.toast(`${k}: Prothese Stufe ${t}`); }])),   /* Roadmap P1 */
+      'Prothesen −30 % Zustand': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) if (p.body[k].mech) p.body[k].mechCond = Math.max(0, (p.body[k].mechCond ?? 100) - 30); UI.toast('Prothesen abgenutzt'); },
       'Alle Glieder zurück': () => { for (const k of ['rarm', 'larm', 'rleg', 'lleg', 'head', 'torso']) if (p.body[k]) { p.body[k].lost = false; p.body[k].hp = p.body[k].max; } B.syncHp(p); p.status = (p.status || []).filter(s => s.key !== 'bleeding'); },
       'Nächsten Gegner töten': () => { const e = S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (e) die(e, 'Debug', p); },
       'Gegner im Umkreis töten': () => { for (const e of S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive && dist(x, p) < 600)) die(e, 'Debug', p); },
@@ -13192,6 +13194,15 @@ export function selftest() {
     if (a.body) { a.body.torso.hp = -2; B.syncHp(a); } downed(a, 'Test'); a.status = [{ key: 'bleeding', name: 'Blutend', left: 30000 }]; a.downTimer = 3000;
     for (let i = 0; i < 60 && a.downed; i++) tickCombatant(a, 100);
     return a.alive && !(a.status || []).some(s => s.key === 'bleeding');
+  }));
+  ok('Bionik-Fundament (Roadmap P1): neue Prothese kommt frisch, Schrott ist schlechter als Fleisch, Verschleiß nur am getroffenen Glied und nicht durch Gift', sandbox(() => {
+    const p = stage(), L = p.body.larm; L.mechCond = 10; L.mechUp = 2; B.damagePart(p, 'larm', 9999); const cut = L.lost && L.mechCond === undefined && L.mechUp === undefined;
+    B.attachProsthesis(p, 'larm', 2); const fresh = L.mech === 2 && L.mechCond === 100 && L.mechUp === 0 && !L.lost;
+    L.mech = 1; const bad = B.mechBonus(p, 'arm') < 0; L.mech = 3; const good = B.mechBonus(p, 'arm') > 0; L.mech = 2; const even = B.mechBonus(p, 'arm') === 0;
+    const e = spawnEnemy('bandit', '__a', 12, 10); for (let i = 0; i < 10; i++) hurt(p, 1, null, 'Gift'); const noPoison = L.mechCond === 100;
+    const w = B.wearProsthesis(p, 'larm'); const worn = w && w.now < 100 && B.wearProsthesis(p, 'torso') === null;   /* nur Prothesenglieder nutzen sich ab */
+    for (let i = 0; i < 40 && L.mechCond === w.now; i++) { hurt(p, 1, e, e.name, false, 'physical'); B.fullHeal(p); } const hitWears = L.mechCond < w.now || p.body.rarm.mechCond === undefined;
+    return cut && fresh && bad && good && even && noPoison && worn && hitWears;
   }));
   ok('Am Boden (S15, Nutzer): ein NPC heilt sich am Boden nicht selbst (Regeneration, Aufstieg, Zähigkeit); Heilung von außen richtet ihn auf', sandbox(() => {
     const p = stage(), m = actor(p.x + 40, p.y); m.body.torso.hp = -2; B.syncHp(m); m.downed = true; m.downTimer = 0; m.status = [{ key: 'regrowth', heal: 50, left: 5000 }];

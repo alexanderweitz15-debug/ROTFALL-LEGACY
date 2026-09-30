@@ -2,6 +2,11 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 20 — 2026-09-30 (Roadmap Paket 1)
+- Master-Roadmap des Nutzers (docs/MASTER_ROADMAP.md), Architekturplan (docs/PLAN_ROADMAP.md), Animations-Referenzanalyse (docs/ANIMATION_REFERENZ.md).
+- Bionik-Fundament: Qualitätsstufen 1–4 (Schrott schlechter als Fleisch), frische Prothesen, Verschleiß nur am getroffenen Glied, Debug-Knöpfe.
+- Debug-Knöpfe für die acht großen Ereignisse; fünf kleine Lücken aus dem Ist-Zustand geschlossen.
+
 ## Version 19 — 2026-09-29 (S15)
 - Acht große Weltereignisse (P15): Seuche, Heuschrecken, Turnier, Adelsball, Luftschiffabsturz, Schatzwagen, Hexenprozess, Streik.
 - Cutscenes: Abblende, Schwenks, Überspringen ohne verlorene Folgen; bei Vargs Fall siegen die Goblins. Menüleiste für Laptops.

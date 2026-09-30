@@ -228,3 +228,10 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Cutscenes:** Schnitte blenden kurz ab, der Text blendet ein, Einstellungen können langsam schwenken. Wer überspringt, verpasst keine Folgen mehr (die Welt-Änderungen der restlichen Einstellungen passieren trotzdem). Bei Vargs Fall besiegen die befreiten Goblins sichtbar die letzten, erschöpften Paladine, die sich ergeben.
 - **Menüleiste:** passt sich an kleinere Bildschirme an (Laptop): engere Abstände, unter 1400 px ohne Tastenkürzel, notfalls seitlich scrollbar.
 - **Tastenliste** in Optionen und Handbuch vollständig: Deckung/Parade (Umschalt), R, 1–9 und 0, Rechtsklick, Überspringen, T/Z/H.
+
+## Runde: Roadmap Paket 1 — Bionik-Fundament (Version 20)
+
+- **Qualitätsstufen der Prothesen** (`MECH_Q` in body.js): Stufe 1 Schrott ist schlechter als ein echtes Glied (Arm −8 %, Bein −6 %) und nutzt sich doppelt so schnell ab; Stufe 2 Aurelionisch ist gleichwertig; Stufe 3 Meisterstück gibt +10 % / +6 %; Stufe 4 Prototyp (noch ohne Händler) +15 % / +10 % und hält am längsten. Aufrüstungen (Kraftfeder, Laufwerk) geben weiter +5 % je Stufe. Zwei Prothesen derselben Art zählen zusammen.
+- **Frische Prothese:** Eine neue Prothese kommt immer mit 100 % Zustand und ohne Aufrüstung. Vorher erbte sie den Zustand des alten Stumpfs und war manchmal von Anfang an wirkungslos.
+- **Verschleiß nur am getroffenen Glied:** Prothesen nutzen sich nur ab, wenn genau dieses Glied einen echten Treffer bekommt. Gift, Blutung, Brand und Treffer an anderen Körperteilen nutzen sie nicht mehr ab. Das gilt auch für Gefährten.
+- **Debug (Kampf und Körper):** „Prothese anlegen (Stufe 1–4)“ am gewählten Glied und „Prothesen −30 % Zustand“.

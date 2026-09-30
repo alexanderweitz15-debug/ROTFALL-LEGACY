@@ -1,8 +1,8 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
-import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=19';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=19';
-import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=19';
-import * as ECO from './economy.js?v=19';
+import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=20';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=20';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=20';
+import * as ECO from './economy.js?v=20';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
