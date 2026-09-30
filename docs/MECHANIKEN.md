@@ -622,3 +622,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Hilferufe:** Verletzte Menschen am Boden rufen in der Nähe des Helden um Hilfe.
 - **Gesten:** Wen man anspricht, der zeigt oder zuckt mit den Schultern; wer dich nicht mag, wehrt ab.
 - Probe „Animation und Kampfgefühl (Nutzer §5f)“.
+
+## Runde: Varonheim, Hauptstadt König Varons (Nutzer §5g.1, Version 22)
+- **Lage:** direkt südlich von Nordfurt (nördlich davon ist nur Meer), Straße nach Nordfurt. Ringmauer mit Ecktürmen, Mauertürmen und vier Toren; wo alte Straßen auf die Mauer treffen, bleibt ein Durchlass.
+- **Burgbezirk im Norden:** eigene Mauer mit Türmen, Innenhof mit Gardezelten, massiver Bergfried. Das Tor vor dem Bergfried führt in den Thronsaal (die Varonsburg mit Hof, Adel, Kerker). Das frühere Tor nördlich von Nordfurt gibt es nicht mehr.
+- **Viertel:** Tempelviertel (Nordwest), Adelsviertel (Nordost), Markt mit Brunnen, Galgen und Standbild des Königs (Mitte), Armenviertel mit Hütten (Südwest), Handwerk und Garnison (Südost). Dunkler Stein und Schiefer.
+- **Leben:** Bewohner nach den Berufen Valens, Königsgarde an Toren, Burgtor und Markt. Alte Spielstände bekommen die Stadt beim Laden (Log-Meldung).
+- Probe „Varonheim (Nutzer §5g.1)“.

@@ -562,7 +562,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 
 Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem Punkt ein Sonnet-Bug-Agent (ohne Screenshots).
 
-1. **Varons Hauptstadt:** neue große Stadt in der Oberwelt nördlich von Nordfurt, die Varonsburg steht sichtbar darin (Weltaufbau ändert sich, Migration für alte Stände).
+1. **Varons Hauptstadt (GEBAUT: Varonheim südlich von Nordfurt — nördlich ist Meer):** neue große Stadt in der Oberwelt nördlich von Nordfurt, die Varonsburg steht sichtbar darin (Weltaufbau ändert sich, Migration für alte Stände).
 2. **Blutkult (Blutmagier/Vampire) als Varons Hauptfeind:** Unterwanderung (Verschwundene, Maskierte nachts, Blutzeichen, Spuren und Verdächtige), Katakomben unter der Hauptstadt mit Blutfürst, selbst beitreten (Vampir als Titelklasse mit Blutdurst), Wendung am Hof (jemand am Hof gehört heimlich zum Kult).
 3. **Ressourcen-Sprites:** Bäume, Erz, Stein, Kräuter schöner; Abbau sichtbar.
 4. **Begehbare Zelte:** Zelte als kleine Bauten mit Innenraum (Lager, Banden, Pilger, Garnison).

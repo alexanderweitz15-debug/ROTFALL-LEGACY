@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 22 — 2026-09-30 (Koop, Bionik 2–5, Welt-Ausbau §5b–§5f)
+- Varonheim: Hauptstadt König Varons südlich von Nordfurt, mit der Varonsburg im Burgbezirk.
 - Freie Seefahrt: eigenes Schiff, Kurse (Küste, Handelsroute, Wrackfeld), Seehandel mit Hafenpreisen, Piraterie, Bergung, Rumpf und Reparatur.
 - Tiefhall: lebende Königsstadt der Zwerge unter der toten Halle (König, Runenschmiedin mit Königseisen, Händler, Brauerei, Mine).
 - Kampfgefühl und Animation: Kombos mit Wuchtschlag, Humpeln im ungleichen Takt, Blutspur, Hilferufe Verletzter, Gesten im Gespräch.
