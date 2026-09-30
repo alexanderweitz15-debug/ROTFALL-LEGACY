@@ -2311,6 +2311,8 @@ function update(dt, now) {
   drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
   hudTimer += dt;
   if (hudTimer > 180) {
+    const gone = e => e && (!e.alive || e.map !== S.map || !S.ents[S.map].includes(e) || dist(e, S.player) > 900);   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
+    if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
     hudTimer = 0; UI.refreshHUD(); UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
     if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, B.fogR(p));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
@@ -10714,7 +10716,7 @@ function bindInput() {
     if (S.cine && (k === 'escape' || k === ' ')) { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
     keys.add(k);
     if (coopHooks.key?.(k, e)) { e.preventDefault(); return; }   /* Koop K2: Tasten für Gast (alles) und Host (Enter = Nachricht) */
-    if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else UI.openModal('settings'); }
+    if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else if (selected) { selected = null; UI.renderContext(null); } else UI.openModal('settings'); }   /* Esc hebt zuerst eine Auswahl auf */
     if (UI.dialogueOpen() || UI.modalOpen) return;
     if (k === 'e') doInteract();
     if (k === 'i') UI.openModal('inventory');
