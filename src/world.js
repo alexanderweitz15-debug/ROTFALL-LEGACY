@@ -1,6 +1,6 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
-import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=19';
-import { FURNISH, wearOf } from './buildings.js?v=19';
+import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=20';
+import { FURNISH, wearOf } from './buildings.js?v=20';
 
 export const TS = 32;                // Kachelgröße
 export const T = { GRASS:0, DIRT:1, ROAD:2, WATER:3, MARSH:4, STONE:5, PLANK:6, ROCK:7, WALL:8, SAND:9, DFLOOR:10, DWALL:11, ASH:12, FIELD:13 };

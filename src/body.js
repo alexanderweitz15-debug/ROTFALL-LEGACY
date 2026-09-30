@@ -1,7 +1,7 @@
 // Trefferzonen (Kenshi-artig): jede Figur hat eigene HP pro Körperteil.
 // Kopf 0 = Enthauptung. Rumpf 0 = am Boden/Tod. Arm 0 = Waffe fällt. Bein 0 = lahm, beide = kriechen.
 // c.hp / c.maxHp bleiben als Summe erhalten, damit Balken und KI-Schwellen ohne Umbau weiterlaufen.
-import { rnd, clamp, S } from './state.js?v=19';
+import { rnd, clamp, S } from './state.js?v=20';
 
 export const PARTS = ['head', 'torso', 'larm', 'rarm', 'lleg', 'rleg'];
 export const PART_NAME = { head:'Kopf', torso:'Rumpf', larm:'Linker Arm', rarm:'Rechter Arm', lleg:'Linkes Bein', rleg:'Rechtes Bein' };
@@ -84,7 +84,7 @@ export function damagePart(c, part, dmg, crit) {
     const spill = Math.min(-P.hp, dmg) * 0.5;           // Überschuss geht halb in den Rumpf
     c.body.torso.hp -= spill;
     const cut = cutOf();
-    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; P.hp = cut; result = 'severed'; }   // erst ab −200 ab (Sehr schwer −100)
+    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; delete P.mechCond; delete P.mechUp; P.hp = cut; result = 'severed'; }   /* Roadmap P1: kein alter Prothesenzustand am Stumpf */   // erst ab −200 ab (Sehr schwer −100)
     else if (wasUp) result = 'disabled';
     P.hp = Math.max(P.hp, cut === -Infinity ? LIMB_CUT : cut);
   } else if (part !== 'torso' && part !== 'head' && P.hp === 0 && wasUp) result = 'disabled';
@@ -111,12 +111,24 @@ export function heal(c, amount) {
   syncHp(c);
 }
 export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost) c.body[p].hp = c.body[p].max; syncHp(c); }
-// S12: Prothese an ein verlorenes Glied — tier 1 Schrott, 2 Aurelion, 3 Meisterstück
-export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = tier; P.hp = P.max; syncHp(c); }
-// S12 E: Meisterglied +10 % (Arm) / +6 % (Bein); Aufrüstung +5 % je Stufe; unter 30 % Zustand wirkt die Prothese nicht
+// Roadmap P1 (Bionik-Qualität): Stufe 1 Schrott ist schlechter als ein echtes Glied, 2 Aurelion gleichwertig, 3 Meisterstück besser,
+// 4 Prototyp selten und am besten. wear = wie schnell sie sich abnutzt (×), name für Anzeige und Händler.
+export const MECH_Q = {
+  1: { name: 'Schrott',      arm: -0.08, leg: -0.06, wear: 2.0 },
+  2: { name: 'Aurelionisch', arm: 0,     leg: 0,     wear: 1.0 },
+  3: { name: 'Meisterstück', arm: 0.10,  leg: 0.06,  wear: 0.7 },
+  4: { name: 'Prototyp',     arm: 0.15,  leg: 0.10,  wear: 0.5 },
+};
+// S12: Prothese an ein verlorenes Glied. Sie kommt immer frisch: voller Zustand, keine Aufrüstung (vorher erbte sie den alten Stumpf).
+export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; P.hp = P.max; syncHp(c); }
+// Bonus oder Malus der Prothesen einer Art (Summe beider Seiten): Schrott zieht ab, Meisterstück und Prototyp geben dazu, Aufrüstung +5 % je Stufe.
+// Unter 30 % Zustand wirkt eine Prothese nicht, weder gut noch schlecht (sie hängt nur noch dran).
 export const mechBonus = (c, kind) => { if (!c.body) return 0; let b = 0;
-  for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; b = Math.max(b, (P.mech >= 3 ? (kind === 'arm' ? 0.1 : 0.06) : 0) + (P.mechUp || 0) * 0.05); }
+  for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; b += (MECH_Q[P.mech] || MECH_Q[2])[kind] + (P.mechUp || 0) * 0.05; }
   return b; };
+// Verschleiß eines getroffenen Prothesenglieds (Roadmap P1): nur echte Treffer, nur das getroffene Teil, Schrott doppelt so schnell.
+export function wearProsthesis(c, part, base = 1.2) { const P = c.body?.[part]; if (!P?.mech) return null; const was = P.mechCond ?? 100;
+  P.mechCond = Math.max(0, was - base * (MECH_Q[P.mech] || MECH_Q[2]).wear); return { was, now: P.mechCond, broke: was >= 30 && P.mechCond < 30 }; }
 export function worstPart(c) {
   let best = null, br = 1;
   for (const p of PARTS) { if (c.body[p].lost) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
