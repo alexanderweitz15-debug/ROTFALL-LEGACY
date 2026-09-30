@@ -529,7 +529,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 4. **König Varon:** Mischung aus hartem Kriegskönig, schwachem, von Adligen gelenktem König und Paranoia (verfeindet mit Aurelion) — **neue Burgstadt im Norden** mit Thronsaal, Hof, Kerker, Adel.
 5. **Schwarze Feste (GEBAUT):** Hauptstadt der Untoten (Hof der Stillen Schar, Händler, Rang-Aufträge), Totentempel (Seelenhandel, Leichenzüge, Rituale), nach Garmadon **eroberbar** (Belagerung als Großereignis).
 6. **Tiefhall:** lebende Zwerge in einer **Bergstadt** auf einer tieferen Ebene (Händler, Schmiede mit Königseisen).
-7. **Banden:** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
+7. **Banden (GEBAUT):** zufällige Banden, die entstehen und zerfallen (Lager, Anführer, Gebiet, Schutzgeld).
 8. **Handwerk:** Rezepte an Esse/Werkbank/Kessel, **Qualität nach Fertigkeit**, Spezialmaterialien (Königseisen, Magitech).
 9. **Seevolk:** **freie Seefahrt** mit eigenem Schiff, mehrere Inseln, Seehandel und Piraterie.
 10. **Aurelions Nebenstädte:** **eigene Grundrisse** und eigener Charakter je Stadt (Klinik-/Tempelstadt Sankt Serin, Werftstadt Kupferhafen, Fabrikstadt Tickmar, Gelenkhall).
