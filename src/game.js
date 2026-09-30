@@ -8392,7 +8392,7 @@ function bigChoices(npc, choices) {
 }
 function hasBigAt(k) { return S.big?.town === k; }
 const EVENTS = [
-  evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evTaxman, evFailedHarvest, evFire, evMagitech, evHauntEv,
+  evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evFire, evMagitech, evHauntEv,   /* Steuereintreiber und Missernte standen doppelt drin (Gewichtung ohne Kommentar); jetzt einfach */
   evMagicCore, evAnomaly, evMeteor, evSuccession,
   () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
@@ -9665,7 +9665,8 @@ function dismiss(npc) {
 }
 function giveGear(m) {
   const p = S.player;
-  const best = p.inv.map((s, i) => ({ s, i })).filter(({ s }) => ITEMS[s.key].slot === 'weapon' || ITEMS[s.key].armor)
+  const fits = it => !it.bound && (!it.classSet || m.currentClass === it.classSet || m.titleClass === it.classSet) && !(it.slot === 'weapon' && it.ranged && (m.skills?.archery || 0) < 5 && (m.skills?.onehanded || 0) > (m.skills?.archery || 0));   /* S15: gebundene Klassenrüstung und Bögen für Nahkämpfer nicht verschenken */
+  const best = p.inv.map((s, i) => ({ s, i })).filter(({ s }) => (ITEMS[s.key].slot === 'weapon' || ITEMS[s.key].armor) && fits(ITEMS[s.key]))
     .sort((a, b) => (ITEMS[b.s.key].dmg || ITEMS[b.s.key].armor || 0) - (ITEMS[a.s.key].dmg || ITEMS[a.s.key].armor || 0))[0];
   if (!best) return UI.toast('Nichts zu geben.');
   const it = ITEMS[best.s.key];
@@ -10841,6 +10842,8 @@ function debugSections() {
       'Magitech-Unfall (Tickmar)': () => { if (!magitechAccident('tickmar')) UI.toast('Keine Fabrikhalle gefunden.'); },
       'Erbfolgestreit (Aurelion)': () => { if (S.succession) S.succession.done = S.succession.done || 'alt'; evSuccession(); UI.toast('Erbstreit im Haus ' + S.succession.house); },   // S15 P9
       'Meteorsplitter': () => { S.meteor = null; evMeteor(); UI.toast('Einschlag bei ' + (S.meteor?.where || '—')); },   // S15 P9
+      ...Object.fromEntries(Object.entries(BIG).map(([k, n]) => [`Großes Ereignis: ${n}`, () => { if (S.big) bigEnd(); if (!BIG_START[k].ok()) return UI.toast('Bedingung nicht erfüllt.'); BIG_START[k].go(); }])),   /* S15 P15: jedes große Ereignis direkt auslösen */
+      'Großes Ereignis beenden': () => { if (S.big) bigEnd(`${BIG[S.big.kind]} vorzeitig beendet (Debug).`); else UI.toast('Kein großes Ereignis aktiv.'); },
       'Flüchtiger Sklave (hier)': () => spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'runaway'),
       'Magische Anomalie': () => { S.anomaly = null; evAnomaly(); UI.toast('Anomalie bei ' + (S.anomaly?.where || '—')); },   // S15 P7
       'Magiekern (Artefakt-Konflikt)': () => { delete S.flags.coreEv; S.ents.world = S.ents.world.filter(e => !e.coreHolder); evMagicCore(); UI.toast('Snikk in Grubenhort hat den Kern.'); },   // S15 P7
