@@ -546,3 +546,12 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .coop-box input{min-width:0}
 .coop-box details{font-size:12px}
 .coop-box details label{margin-top:4px}
+/* Koop-Chat unten links */
+#coop-chat{position:fixed;left:12px;bottom:120px;width:min(420px,70vw);z-index:36;pointer-events:none;font:13px Spectral,serif}
+#coop-chat-log{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:hidden;justify-content:flex-end}
+.cc-line{background:rgba(12,10,8,.72);color:#e7dcc2;padding:3px 8px;border-left:2px solid #c8a050;transition:opacity .6s}
+.cc-line b{color:#e8c070}
+.cc-line.old{opacity:0}
+#coop-chat.open .cc-line.old{opacity:.85}
+#coop-chat-in{pointer-events:auto;width:100%;box-sizing:border-box;margin-top:4px;background:#0d0b08;border:1px solid #c8a050;color:#f0e6cd;padding:6px 8px;font:14px Spectral,serif}
+#coop-chat-in.hidden{display:none}

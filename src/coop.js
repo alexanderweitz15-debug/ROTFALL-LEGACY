@@ -15,7 +15,29 @@ const SENT = new Set(['enemy', 'npc', 'player', 'caravan', 'mount', 'item', 'gra
 const HEAVY = new Set(['inv', 'memories', 'plan', 'path', 'schedule', 'dmgBy', 'rel', 'talk', 'lastInput', 'hitIds', 'cooldowns', 'tree', 'spells', 'spellUse', 'hotbar']);
 const rnd6 = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
 
+// Testweg ohne Netz: zwei Fenster im selben Browser reden über einen BroadcastChannel. Bildet nur das nach, was dieses Modul von
+// PeerJS braucht (open, connection, connect, data, close, send). Einschalten mit ?coopLocal in der Adresse.
+const LOCAL = /[?&]coopLocal/.test(location.search);
+class Ev { constructor() { this.h = {}; } on(k, f) { (this.h[k] ||= []).push(f); return this; } emit(k, ...a) { for (const f of this.h[k] || []) f(...a); } }
+class LocalConn extends Ev {
+  constructor(bc, me, other) { super(); this.bc = bc; this.me = me; this.peer = other; this.open = false; }
+  send(d) { if (this.open) this.bc.postMessage({ k: 'data', from: this.me, to: this.peer, d }); }
+  close() { if (!this.open) return; this.open = false; this.bc.postMessage({ k: 'bye', from: this.me, to: this.peer }); this.emit('close'); }
+}
+class LocalPeer extends Ev {
+  constructor(id) { super(); if (typeof id === 'object') id = null; this.id = id || 'local-' + Math.random().toString(36).slice(2, 10); this.open = true; this.conns = {};
+    this.bc = new BroadcastChannel('rotfall-local'); this.bc.onmessage = e => this.msg(e.data); setTimeout(() => this.emit('open', this.id), 50);
+    window.addEventListener('beforeunload', () => { for (const c of Object.values(this.conns)) c.close(); }); }
+  msg(m) { if (m.to !== this.id) return; let c = this.conns[m.from];
+    if (m.k === 'hello') { c = this.conns[m.from] = new LocalConn(this.bc, this.id, m.from); this.emit('connection', c); c.open = true; this.bc.postMessage({ k: 'ack', from: this.id, to: m.from }); setTimeout(() => c.emit('open'), 0); }
+    else if (m.k === 'ack' && c) { c.open = true; c.emit('open'); }
+    else if (m.k === 'data' && c) c.emit('data', m.d);
+    else if (m.k === 'bye' && c) { c.open = false; c.emit('close'); } }
+  connect(id) { const c = this.conns[id] = new LocalConn(this.bc, this.id, id); this.bc.postMessage({ k: 'hello', from: this.id, to: id }); return c; }
+  reconnect() {} get disconnected() { return false; } get destroyed() { return false; }
+}
 function loadPeer() {
+  if (LOCAL) return Promise.resolve(LocalPeer);
   if (window.Peer) return Promise.resolve(window.Peer);
   return new Promise((ok, no) => { const s = document.createElement('script'); s.src = PEERJS; s.onload = () => ok(window.Peer); s.onerror = () => no(new Error('PeerJS nicht ladbar')); document.head.appendChild(s); });
 }
@@ -70,9 +92,9 @@ async function host() {
   const Peer = await loadPeer(); const code = rnd6();
   peer = new Peer('rotfall-' + code, peerOpts());
   await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
-  S.coop = { role: 'host', code, guests: {}, bytes: 0, t0: now() };
-  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.hostDied = hostDied; A.coopHooks.afterHeir = afterHeir;
-  A.coopHooks.key = k => { if (k !== 'enter' || A.UI.dialogueOpen() || A.UI.modalOpen) return false; const t = window.prompt('Nachricht an die Gäste:'); if (t) { muteLog = true; A.log(`${S.player.name}: ${t.slice(0, 200)}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: S.player.name, text: t.slice(0, 200) }); } A.keys.delete('enter'); return true; };
+  S.coop = { role: 'host', code, guests: {}, bytes: 0, t0: now(), started: A.isRunning() };   /* aus dem laufenden Spiel geöffnet: wer bereit ist, kommt sofort dazu */
+  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.hostDied = hostDied; A.coopHooks.heirCount = heirCount; A.coopHooks.afterHeir = afterHeir;
+  A.coopHooks.key = k => { if (k !== 'enter' || A.UI.dialogueOpen() || A.UI.modalOpen) return false; A.keys.delete('enter'); openChat(t => { chatLine(S.player.name, t); muteLog = true; A.log(`${S.player.name}: ${t}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: S.player.name, text: t }); }); return true; };
   A.onLog(e => { if (!muteLog) broadcast({ t: 'log', text: e.text, cat: e.cat }); });
   setInterval(() => { if (document.hidden) A.stepHidden(); }, 50);
   setInterval(() => { if (A.S.paused) broadcast({ t: 'ping' }); }, 2000);   /* Welt steht (Todesbildschirm): Lebenszeichen, sonst meldet der Gast „Host antwortet nicht“ */
@@ -119,18 +141,41 @@ function drawCards(box, cards) {
     try { A.R.drawHumanoid({ kind: 'npc', x: 0, y: 0, pal: c.fig.pal || {}, facing: 0, seed: 1, build: c.fig.build || 'ausgewogen', equip: c.fig.equip || {}, aim: Math.PI / 2 - 0.35 }, performance.now(), x); } catch (e) { /* Figur nicht zeichenbar: Karte bleibt leer */ }
     x.restore(); });
 }
+// Chat im Spiel: Enter öffnet die Eingabe unten links, Enter schickt, Esc bricht ab. Zeilen bleiben 15 s sichtbar (bei offener Eingabe alle).
+function chatBox() {
+  let b = $('coop-chat'); if (b) return b;
+  b = document.createElement('div'); b.id = 'coop-chat';
+  b.innerHTML = '<div id="coop-chat-log"></div><input id="coop-chat-in" maxlength="200" placeholder="Nachricht … (Enter schickt, Esc schließt)" class="hidden">';
+  document.body.appendChild(b); return b;
+}
+function chatLine(from, text) {
+  chatBox(); const log = $('coop-chat-log'), row = document.createElement('div'); row.className = 'cc-line';
+  row.innerHTML = `<b>${esc(from)}:</b> ${esc(text)}`; log.appendChild(row); while (log.children.length > 30) log.firstChild.remove();
+  setTimeout(() => row.classList.add('old'), 15000);
+}
+function openChat(onSend) {
+  chatBox(); const inp = $('coop-chat-in'); $('coop-chat').classList.add('open'); inp.classList.remove('hidden'); inp.value = ''; setTimeout(() => inp.focus(), 0);
+  const close = () => { inp.classList.add('hidden'); $('coop-chat').classList.remove('open'); inp.onkeydown = null; inp.blur(); };
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { const t = inp.value.trim().slice(0, 200); close(); if (t) onSend(t); } else if (e.key === 'Escape') close(); };
+}
 const esc = t => String(t).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
 function choiceText(c) { return c.mode === 'heir' || c.heir ? `Erbe „${c.name || c.cfg?.name}“` : c.mode === 'new' ? `neuer Charakter „${c.cfg?.name}“ (${A.ORIGINS[c.cfg?.origin]?.name || 'Wanderer'})` : c.mode === 'saved' ? `spielt „${c.name}“ weiter` : `übernimmt ${c.name}`; }
 // Koop (Nutzer): Stirbt der Held, sind alle Spieler am Boden. Jeder Gast wählt dann wie der Host einen Erben, gleich viele zur Auswahl;
 // er kommt dazu, sobald der Host seinen Erben gewählt hat.
 function hostDied(n, level) {
-  const S = A.S, pk = a => a[Math.floor(Math.random() * a.length)], O = Object.keys(A.ORIGINS);
+  const S = A.S;
   for (const g of Object.values(S.coop?.guests || {})) {
     const m = g.entId && A.byId(g.entId); if (m) { m.coopPilot = null; m.coopName = null; }
-    g.entId = null; g.ready = false; g.choice = null;
-    g.heirs = Array.from({ length: Math.max(1, n) }, () => ({ name: pk(A.FIRST_M), origin: pk(O), pal: { skin: pk(A.SKIN), hair: pk(A.HAIR), cloth: pk(A.CLOTH) }, build: 'ausgewogen', level: Math.max(1, (m?.level || level || 1) - 1) }));
-    sendLobby(g, 'Alle sind gefallen. Wähle deinen Erben — er stößt zur Gruppe, sobald der Host seinen gewählt hat.');
+    g.deadLevel = m?.level || level || 1; g.entId = null; g.ready = false; g.choice = null; g.heirs = null;
+    sendLobby(g, 'Alle sind gefallen. Gleich wählst du deinen Erben — genau so viele zur Auswahl wie der Host.');
   }
+  hostLobby();
+}
+function heirCount(n) {
+  const pk = a => a[Math.floor(Math.random() * a.length)], O = Object.keys(A.ORIGINS);
+  for (const g of Object.values(A.S.coop?.guests || {})) { if (g.entId) continue;
+    g.heirs = Array.from({ length: Math.max(1, n) }, () => ({ name: pk(A.FIRST_M), origin: pk(O), pal: { skin: pk(A.SKIN), hair: pk(A.HAIR), cloth: pk(A.CLOTH) }, build: 'ausgewogen', level: Math.max(1, (g.deadLevel || 1) - 1) }));
+    sendLobby(g, 'Alle sind gefallen. Wähle deinen Erben — er stößt zur Gruppe, sobald der Host seinen gewählt hat.'); }
 }
 function afterHeir() { for (const g of Object.values(A.S.coop?.guests || {})) if (g.ready && g.choice && !g.entId) admit(g); }
 function startCoop() {
@@ -148,17 +193,20 @@ function admit(g) {
   else if (c.mode === 'saved') m = A.unparkCoopHero(g.name);
   else { m = A.byId(c.entId); if (!m || !S.party.includes(m.id) || !m.alive || (m.coopPilot && m.coopPilot !== g.id)) m = null; }
   if (!m) { g.ready = false; g.choice = null; sendLobby(g, 'Diese Wahl geht nicht mehr. Bitte neu wählen.'); hostLobby(); return; }
+  g.deadLevel = 0;
   if (!m.hotbar?.length) m.hotbar = A.GUEST_BAR.map(key => ({ type: 'item', key }));
-  m.coopPilot = g.id; m.coopName = g.name; g.entId = m.id; g.known = new Set(); g.map = null; g.seen = now();
+  m.coopPilot = g.id; m.coopName = g.name; g.entId = m.id; g.known = new Set(); g.map = null; g.seen = now() + 40000;   /* der Gast baut jetzt die Welt auf (dauert, im Hintergrundfenster noch länger): so lange nicht als getrennt werten */
   sendTo(g, { t: 'welcome', save: A.saveData(), hostName: S.player.name }); sendTo(g, { t: 'assign', entId: m.id });
+  lastQuests = '';   /* Aufträge gleich an den neuen Gast */
   A.log(`Koop: ${g.name} ist im Spiel als ${m.name}.`, 'party'); A.UI.toast(`${g.name.toUpperCase()} IST IM SPIEL`, 2400); hostLobby();
 }
 function sendLobby(g, note) {
   const S = A.S, saved = S.coopHeroes?.[g.name];
   sendTo(g, { t: 'lobby', hostName: S.player?.name || myName(), note: note || null, started: !!S.coop.started, party: partyList().filter(p => !A.byId(p.id)?.coopHero),
-    saved: saved && saved.alive && !g.heirs ? { name: saved.name, level: saved.level, prof: saved.prof } : null, heirs: g.heirs ? g.heirs.map(h => ({ name: h.name, origin: A.ORIGINS[h.origin]?.name, level: h.level })) : null });
+    saved: saved && saved.alive && !g.heirs ? { name: saved.name, level: saved.level, prof: saved.prof } : null, heirs: g.heirs ? g.heirs.map(h => ({ name: h.name, origin: A.ORIGINS[h.origin]?.name, level: h.level })) : null, locked: !!g.deadLevel && !g.heirs });
 }
-function broadcast(msg) { const G = A.S.coop?.guests; if (!G) return; const s = JSON.stringify(msg); for (const g of Object.values(G)) { try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* Verbindung tot: dropGuest kommt über close */ } } }
+const INGAME = new Set(['world', 'quests', 'cam', 'log', 'toast']);   /* nur an Gäste, die schon im Spiel sind (nicht im Warteraum) */
+function broadcast(msg) { const G = A.S.coop?.guests; if (!G) return; const s = JSON.stringify(msg); for (const g of Object.values(G)) { if (INGAME.has(msg.t) && !g.entId) continue; try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* Verbindung tot: dropGuest kommt über close */ } } }
 function sendTo(g, msg) { const s = typeof msg === 'string' ? msg : JSON.stringify(msg); try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* siehe oben */ } }
 function partyList() { return (A.S.player ? A.partyMembers() : []).filter(m => m.alive && m.kind === 'npc').map(m => ({ id: m.id, name: m.name, prof: m.prof, level: m.level, taken: !!m.coopPilot })); }
 function onHostData(c, raw) {
@@ -182,7 +230,7 @@ function onHostData(c, raw) {
   if (d.t === 'ping') return;
   if (d.t === 'in') { g.inp = d; g.at = now(); return; }
   if (d.t === 'cmd') { const m = A.byId(g.entId); if (!m) return; guestCommand(m, d, g); return; }
-  if (d.t === 'chat') { muteLog = true; A.log(`${g.name}: ${String(d.text).slice(0, 200)}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: g.name, text: String(d.text).slice(0, 200) }); return; }
+  if (d.t === 'chat') { chatLine(g.name, String(d.text).slice(0, 200)); muteLog = true; A.log(`${g.name}: ${String(d.text).slice(0, 200)}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: g.name, text: String(d.text).slice(0, 200) }); return; }
   if (d.t === 'party') { sendLobby(g); return; }
 }
 function dropGuest(peerId) {
@@ -304,7 +352,7 @@ let acc = 0, wAcc = 0, lastQuests = '', camOn = false;
 function hostTick(dt) {
   const S = A.S, G = S.coop?.guests; if (!G) return; acc += dt; wAcc += dt;
   mateArrows(A.partyMembers().filter(m => m.coopPilot && m.map === S.map));
-  for (const [id, g] of Object.entries(G)) if (now() - (g.seen || now()) > 10000) { try { g.conn.close(); } catch (e) { /* schon zu */ } dropGuest(id); }   /* 10 s ohne Lebenszeichen: Gast gilt als getrennt */
+  for (const [id, g] of Object.entries(G)) if (now() - (g.seen || now()) > 20000) { try { g.conn.close(); } catch (e) { /* schon zu */ } dropGuest(id); }   /* 20 s ohne Lebenszeichen: Gast gilt als getrennt */
   for (const g of Object.values(G)) { if (g.entId) { const m = A.byId(g.entId); if (m) { m.dodgeCd = Math.max(0, (m.dodgeCd || 0) - dt); m.landT ??= 0; if (m.map !== S.map && m.alive) remoteControl(m, dt); } } }   /* Figur auf einer anderen Karte (Held im Kerker): die Welt dort rechnet nicht, aber laufen darf sie */
   if (acc < 50) return; acc = 0;
   for (const g of Object.values(G)) {
@@ -354,17 +402,19 @@ function send(msg) { if (conn?.open) conn.send(JSON.stringify(msg)); }
 function onGuestData(raw) {
   const { S } = A; let d; try { d = JSON.parse(raw); } catch (e) { return; }
   hostSeen = now(); lostWarned = false;
+  if (!S.coop && ['world', 'ents', 'self', 'quests', 'cam', 'travel', 'assign'].includes(d.t)) return;   /* noch im Warteraum: Weltdaten kommen erst mit „welcome“ */
   if (d.t === 'bye') { status(d.why); A.UI.toast?.(d.why, 5000); return; }
   if (d.t === 'welcome') {
     S.coop = { role: 'guest', hostName: d.hostName, me: null, targets: {} };
     const data = JSON.parse(d.save); A.continueGame(data);   /* Welt aus dem Spielstand des Hosts bauen, ohne Speichern */
     for (const k of Object.keys(S.ents)) S.ents[k] = keepLocal(S.ents[k]);   /* Figuren, Beute und Gräber kommen vom Host; alte Kopien aus dem Stand wären Geister (beim Host längst tot oder weg) */
     A.UI.toast(`KOOP: WELT VON ${String(d.hostName).toUpperCase()}`, 3000); return; }
-  if (d.t === 'lobby') { joined = false; A.coopHooks.guestTick = null; showLobby(d); return; }
+  if (d.t === 'lobby') { joined = false; A.coopHooks.guestTick = null; if (d.heirs || d.note) { myChoice = null; iAmReady = false; } showLobby(d); return; }   /* neu wählen: alte Wahl gilt nicht mehr */
   if (d.t === 'quests') { const [q, c, tr] = JSON.parse(d.q); S.quests = q; S.contracts = c; S.track = tr; if (A.UI.modalOpen === 'quests') A.UI.refreshModal(); return; }
   if (d.t === 'assign') { me = A.byId(d.entId); S.coop.me = d.entId; joined = true; $('coop-panel')?.classList.add('hidden');
     S.player = me; A.UI.setHudTarget(me);   /* beim Gast ist „der Spieler“ seine Figur: Häuser öffnen sich für ihn, Licht, Nebel, Inventar (I), Charakter (C) und Leiste zeigen seine Sachen */
     A.coopHooks.cmd = c => { send({ t: 'cmd', ...c }); return true; };
+    $('game-canvas')?.addEventListener('mousedown', e => { if (e.button === 0) pending.atk = true; });
     A.UI.uiHooks.act = (name, args) => { send({ t: 'cmd', kind: 'act', name, args }); return true; }; A.coopHooks.guestTick = guestTick; A.coopHooks.key = guestKey; A.bindInput();
     A.UI.toast(`DU STEUERST ${me.name.toUpperCase()}`, 3000); A.log(`Koop: Du steuerst ${me.name}. WASD laufen, Maus zielen, Klick oder Leertaste angreifen, Q rollen, Umschalt decken, E aufheben (wer zuerst aufhebt, hat es), mit Leuten reden (auch Lehrer, Fraktionen, Aufträge), bei Händlern handeln, an Eingängen den Host fragen, I Gepäck, U Tausch mit dem Host, C Charakter, J Aufträge (die des Hosts), Enter schreiben. Erfahrung bekommst du wie der Held, vom Auftragsgold einen gleichen Anteil. Der Host (${S.coop.hostName}) speichert und führt Gespräche.`, 'party'); return; }
   if (d.t === 'travel') { if (S.map !== d.map) { S.map = d.map; S.ents[d.map] = keepLocal(S.ents[d.map] || []); S.coop.targets = {}; } return; }
@@ -378,7 +428,7 @@ function onGuestData(raw) {
   if (d.t === 'dlg') { if (d.close) { if (!shopData && !tradeOpen) A.UI.closeDialogue(); return; } const npc = A.byId(d.npcId) || { name: d.name }; A.UI.dialogue(npc, d.text, d.opts.map((text, i) => ({ text, fn: () => send({ t: 'cmd', kind: 'dlg', i }) }))); return; }
   if (d.t === 'modal') { A.UI.openModal(d.name, me); return; }
   if (d.t === 'log') { A.log(d.text, d.cat); return; }
-  if (d.t === 'chat') { A.log(`${d.from}: ${d.text}`, 'party'); A.UI.toast(`${d.from}: ${d.text}`, 3500); return; }
+  if (d.t === 'chat') { chatLine(d.from, d.text); A.log(`${d.from}: ${d.text}`, 'party'); return; }
 }
 function keepLocal(list) { const S = A.S; return list.filter(e => e.kind === 'prop' || e === S.player || S.party.includes(e.id) || (!SENT.has(e.kind) && !e.transient)); }   /* Gast: nur was der Host nie schickt */
 // Gast: Warteraum. Eigenen Charakter erstellen (dieselbe Maske wie bei einer neuen Geschichte), gespeicherten weiterspielen
@@ -391,7 +441,7 @@ function showLobby(d) {
     `<div class="ledger">Deine Wahl: <b>${myChoice ? esc(choiceText(myChoice)) : 'noch keine'}</b></div>` +
     (d.heirs ? '<div class="ledger">Deine Erben:</div>' + d.heirs.map((h, i) => `<button class="plaque" data-heir="${i}">${esc(h.name)} — ${esc(h.origin)}, Stufe ${h.level}</button>`).join('') : d.locked ? '' : `<button class="plaque" id="coop-new">Eigenen Charakter erstellen</button>`) +
     (d.saved ? `<button class="plaque" id="coop-saved">Mit ${esc(d.saved.name)} weiterspielen (Stufe ${d.saved.level})</button>` : '') +
-    (d.party.length ? '<div class="ledger">Oder einen Gefährten des Hosts übernehmen:</div>' + d.party.map(p => `<button class="plaque" data-pick="${p.id}" ${p.taken ? 'disabled' : ''}>${esc(p.name)} — ${esc(p.prof)}, Stufe ${p.level}${p.taken ? ' (vergeben)' : ''}</button>`).join('') : '') +
+    (d.party.length && !d.locked ? '<div class="ledger">Oder einen Gefährten des Hosts übernehmen:</div>' + d.party.map(p => `<button class="plaque" data-pick="${p.id}" ${p.taken ? 'disabled' : ''}>${esc(p.name)} — ${esc(p.prof)}, Stufe ${p.level}${p.taken ? ' (vergeben)' : ''}</button>`).join('') : '') +
     `<button class="plaque" id="coop-ready" ${myChoice ? '' : 'disabled'}>${iAmReady ? 'Doch nicht bereit' : 'Bereit'}</button>` +
     `<div class="ledger">${d.started ? 'Das Spiel läuft schon: mit „Bereit“ bist du sofort drin.' : 'Wenn alle bereit sind, startet der Host.'}</div>`;
   const choose = c => { myChoice = c; iAmReady = false; send({ t: 'choice', ...c }); showLobby(); };
@@ -423,13 +473,13 @@ function guestKey(k, e) {
   if (k === 'u') { guestTrade(); return true; }
   if (k === 'escape' && A.UI.dialogueOpen()) { tradeOpen = false; shopData = null; A.UI.closeDialogue(); return true; }
   if (k === 'c' || k === 'g') { A.UI.openModal(k === 'g' ? 'party' : 'character', me); return true; }
-  if (k === 'enter') { const t = window.prompt('Nachricht an den Host:'); A.keys.delete('enter'); if (t) send({ t: 'chat', text: t.slice(0, 200) }); return true; }
+  if (k === 'enter') { A.keys.delete('enter'); openChat(t => send({ t: 'chat', text: t })); return true; }
   if (k === 'e' || k === 'q' || (k >= '0' && k <= '9')) { inSeq++; pending[k === 'e' ? 'use' : k === 'q' ? 'dodge' : 'slot'] = k === 'e' || k === 'q' ? true : (k === '0' ? 9 : +k - 1); return true; }
   if (k === 'j') { A.UI.openModal('quests'); return true; }
   if (['b', 'f', 'k', 'm', 't', 'x', 'h', 'z', 'r', 'n'].includes(k)) { if (k === 'm') { A.UI.openModal('map'); return true; } A.UI.toast('Im Koop nur der Host.', 1400); return true; }
   return false;
 }
-const pending = { use: false, dodge: false, slot: null };
+const pending = { use: false, dodge: false, slot: null, atk: false };   /* atk: ein kurzer Klick zwischen zwei Sendungen geht nicht verloren */
 // Gast: Gepäck und Tausch (Taste I). Wer zuerst aufhebt, hat es; hier gibt man ab, legt an oder benutzt. Der Host führt alles aus.
 let tradeOpen = false, shopData = null, shopSell = false;
 // Gast beim Händler: kaufen und verkaufen mit dem eigenen Beutel (Anteil am Auftragsgold, Verkäufe)
@@ -475,9 +525,9 @@ function guestTick(dt) {
   const m = A.MAPS[S.map]; if (m) { R.cam.x = Math.max(0, Math.min(R.cam.x, m.w * A.TS - V.W / R.cam.zoom)); R.cam.y = Math.max(0, Math.min(R.cam.y, m.h * A.TS - V.H / R.cam.zoom)); }
   inAcc += dt; if (inAcc < 33) return; inAcc = 0;
   const wp = R.screenToWorld(A.mouse.x, A.mouse.y), mv = A.moveInput(), aim = Math.round(Math.atan2(wp.y - me.y + 12, wp.x - me.x) * 100) / 100;
-  const msg = { t: 'in', seq: inSeq, mv: [mv.dx, mv.dy], aim, atk: (A.mouse.down || A.keys.has(' ')) && !A.UI.modalOpen && !A.UI.dialogueOpen() ? 1 : 0, guard: A.keys.has('shift') ? 1 : 0, dodge: pending.dodge ? 1 : 0, use: pending.use ? 1 : 0, slot: pending.slot };
-  pending.dodge = false; pending.use = false; pending.slot = null;
-  const s = JSON.stringify(msg); if (s !== lastIn || msg.seq !== lastSeq || A.keys.size || now() - lastSent > 2000) { lastIn = s; lastSeq = msg.seq; lastSent = now(); send(msg); }   /* alle 2 s ein Lebenszeichen */
+  const msg = { t: 'in', seq: inSeq, mv: [mv.dx, mv.dy], aim, atk: (A.mouse.down || A.keys.has(' ') || pending.atk) && !A.UI.modalOpen && !A.UI.dialogueOpen() ? 1 : 0, guard: A.keys.has('shift') ? 1 : 0, dodge: pending.dodge ? 1 : 0, use: pending.use ? 1 : 0, slot: pending.slot };
+  pending.dodge = false; pending.use = false; pending.slot = null; pending.atk = false;
+  const s = JSON.stringify(msg); if (s !== lastIn || msg.seq !== lastSeq || A.keys.size || A.mouse.down || now() - lastSent > 250) { lastIn = s; lastSeq = msg.seq; lastSent = now(); send(msg); }   /* gehaltene Maustaste und Stillstand: spätestens alle 250 ms neu schicken, sonst übernimmt beim Host nach 1 s die KI */
   if (now() - hostSeen > 10000 && !lostWarned) { lostWarned = true; A.UI.toast('KOOP: HOST ANTWORTET NICHT', 5000); A.log('Koop: Seit 10 Sekunden kommt nichts vom Host. Ist sein Fenster zu? Zum Weiterspielen die Seite neu laden.', 'party'); }
   A.UI.refreshHUD(); A.updatePrompt();
   mateArrows((S.ents[S.map] || []).filter(e => e !== me && e.alive && (e.kind === 'player' || e.coopPilot)));   /* E-Hinweise (Aufheben, Händler, Eingang) aus Sicht der eigenen Figur */

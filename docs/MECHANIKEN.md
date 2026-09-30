@@ -311,6 +311,8 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Tod im Koop (Nutzer):** Wer am Boden liegt, stirbt nicht, solange ein anderer Spieler noch steht und ihn aufrichten kann. Erst wenn alle am Boden sind, stirbt man. Stirbt der Held, wählen Host und Gäste je einen Erben, jeder bekommt gleich viele zur Auswahl; die Erben der Gäste stoßen dazu, sobald der Host seinen gewählt hat.
 - **Warteraum-Karten:** Jeder Spieler steht als Karte im Warteraum (wie bei einem Kampfspiel): Spielername oben, die Figur mit Aussehen und Ausrüstung, Charaktername, Stufe, Klasse, „BEREIT“ golden umrandet. Host und Gäste sehen dieselben Karten.
 - **Netz sperrt Verbindungen (Schule, Firma):** Im Koop-Fenster unter „Verbindung klappt nicht?“ einen TURN-Server (Relay) eintragen, beide Spieler dasselbe. Ohne ihn hilft ein anderes Netz, z. B. ein Handy-Hotspot.
+- **Chat:** Enter öffnet unten links eine Eingabe, Enter schickt, Esc schließt. Nachrichten stehen 15 s im Bild (bei offener Eingabe alle), zusätzlich im Protokoll.
+- **Test ohne Netz:** Mit `?coopLocal` in der Adresse laufen Host und Gast in zwei Fenstern desselben Browsers über einen BroadcastChannel statt WebRTC (für Tests und zum Ausprobieren an einem Rechner).
 - **Anzeige:** Der Koop-Code steht die ganze Zeit oben rechts (Host und Gast). Ist ein Mitspieler außerhalb des Bildes, zeigt ein Pfeil am Rand zu ihm, mit Name und Entfernung.
 - **Kerker:** Nur der Held kommt in den Kerker; die Gruppe und der Mitspieler warten draußen, der Mitspieler kann dort laufen. Erwischt der Wärter den Helden, kann er nicht weglaufen; Esc zählt wie „zurück in die Zelle“.
 - **Grenzen:** Der Held reist für die ganze Gruppe (Eingänge fragt der Gast an).
