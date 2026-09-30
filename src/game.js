@@ -6402,7 +6402,8 @@ function sideCityMigrate() {
   const towns = ['sanktserin', 'kupferhafen', 'tickmar', 'gelenkhall'].filter(k => TOWN_PLAN[k]); if (!towns.length) return;
   const sig = 'lay2:' + towns.map(k => HOUSES.filter(b => b.town === k).length).join(','); if (S.flags.sideLay === sig) return;
   const ids = new Set(HOUSES.map(b => b.id));
-  S.ents.world = S.ents.world.filter(e => !(e.kind === 'npc' && towns.includes(e.homeTown) && e.homeId && !ids.has(e.homeId)));
+  /* Fehlersuche §5d.10: alte Automaten-Wachen standen nach dem Umbau in Mauer/Wasser (feste Koordinaten trafen neue Grundrisse) — mit entfernen, ensureAurelion() setzt sie frisch */
+  S.ents.world = S.ents.world.filter(e => !(e.kind === 'npc' && towns.includes(e.homeTown) && e.homeId && !ids.has(e.homeId)) && !(e.robot && towns.includes(e.post)));
   spawnResidents(); S.flags.sideLay = sig;
   if (S.day > 1) log('Aurelions Nebenstädte wurden umgebaut: Sankt Serin um den Tempel, Kupferhafen um die Werft, Tickmar im Raster, Gelenkhall um den Ring.', 'world');
 }
