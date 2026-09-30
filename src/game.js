@@ -117,7 +117,8 @@ export function damageOf(c) {
   // stark wie der Zweihänder. Jetzt wächst er mit der Schwungdauer (600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2);
   // Fernwaffen ×1. Dolche behalten ihren Rückenstich (Krit ×2,6 von hinten) und die geringe Ausdauer je Hieb.
   const spd = it && !it.ranged ? Math.min(2, Math.max(0.6, it.speed / 600)) : 1;
-  return (base + (attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * spd) * Math.max(0.2, m);   // Phase 1: jede Stufe etwas stärker
+  const rausch = c.status?.find(t => t.key === 'rausch');   /* Schenke: Rausch macht mutig */
+  return (base + (attr * 0.35 + skill * 0.22 + (c.level || 1) * 0.35) * spd) * Math.max(0.2, m) * (1 + 0.05 * Math.min(3, rausch?.stacks || 0));   // Phase 1: jede Stufe etwas stärker
 }
 function speedOf(c) {
   let s = 2.25 + c.attributes.agility * 0.045;
@@ -2892,7 +2893,8 @@ function controlPlayer(dt) {
     p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x);
     return;
   }
-  const { dx, dy } = moveInput();
+  let { dx, dy } = moveInput();
+  { const r = p.status?.find(s => s.key === 'rausch'); if (r && (dx || dy)) { const a = Math.sin(performance.now() / 380) * 0.35 * Math.min(3, r.stacks || 1), c = Math.cos(a), s = Math.sin(a); [dx, dy] = [dx * c - dy * s, dx * s + dy * c]; } }   /* Schenke: Rausch lässt schwanken */
   tickChannel(p, dt, dx || dy);
   if (p.channel) { p.vx = p.vy = 0; p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x); return; }
   updateGuard(p, keys.has('shift') || touch.guard);
@@ -6945,7 +6947,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick();   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -7698,7 +7700,7 @@ function keepSiegeDay() {
   n.garrison = Math.max(8, Math.round(n.garrison * 0.9));   /* Belagerung zehrt */
 }
 function keepChoices(npc, choices) {
-  if (npc.keepMarshal) choices.unshift({ text: 'Wie steigt man bei den Toten auf?', fn: () => UI.dialogue(npc, `„${deadWelcome() ? 'Du gehörst schon zu uns. Diene der Schar: Überfälle, Seelen, Treue.' : 'Erst der Pakt oder ein Rang bei der Stillen Schar. In Vharnholm fragt man nach dir.'}“\n${rankGuide('undead')}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if (npc.keepMarshal) choices.unshift({ text: 'Wie steigt man bei den Toten auf?', fn: () => UI.dialogue(npc, `„${deadWelcome() ? 'Du gehörst schon zu uns. Diene der Schar: Überfälle, Seelen, Treue.' : 'Erst der Pakt oder ein Rang bei der Stillen Schar. In Vharnholm fragt man nach dir.'}“\n${rankGuide('undead')?.next || ''}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });   /* Fehlersuche: rankGuide() gibt ein Objekt zurück, nicht String — sonst „[object Object]“ im Dialog */
   if (npc.keepPriest) choices.unshift({ text: 'Eine Seele opfern (Seelenphiole)', fn: () => {
     if (!hasItem(S.player, 'soul_vial')) return UI.dialogue(npc, '„Ohne Seele kein Segen. Die Seelenhändlerin hat welche, oder hol sie dir aus Leben, die niemand vermisst.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     removeItem(S.player, 'soul_vial', 1); addStatus(S.player, { key: 'blessing', name: 'Totensegen', good: true, left: 900000, desc: 'Die Toten sehen dich als einen der Ihren: +5 Rüstung.' }); if (S.factions.undead != null) S.factions.undead = clamp(S.factions.undead + 3, -100, 100);
@@ -10430,7 +10432,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -10594,6 +10596,76 @@ const RUMOR_TXT = {
   treasure: w => `„Ein Kaufmann hat bei ${w} eine Kiste vergraben, bevor die Räuber ihn erwischten. Keiner hat sie je gehoben.“`,
   beast: w => `„Bei ${w} geht etwas um, größer als ein Wolf. Zwei Hirten sind nicht heimgekommen.“`,
   deserter: w => `„Bei ${w} versteckt sich ein Deserteur aus Valens Heer. Auf seinen Kopf ist Gold ausgesetzt.“` };
+// ================= Spiele in der Schenke (Nutzer §5e.5) =================
+// In jeder Schenke: Würfeln (zwei Würfel, Falschspieler mit Wahrnehmung entlarven), Siebzehn und Vier (Karten), Armdrücken
+// (Stärke), Trinkwette (Ausdauer; macht betrunken) und Faustkampf ohne Tote (Waffen weg, wer liegt, verliert). Rausch lässt die
+// Steuerung schwanken und macht mutig (+5 % Schaden je Stufe, bis 3), er vergeht nach ein paar Minuten.
+const inTavern = e => HOUSES.some(b => b.type === 'tavern' && b.map === (e.map || 'world') && R.playerInside(b, e));
+const STAKES = [10, 25, 50];
+function tavernHint() { if (!S.flags.tavernHint && S.player && inTavern(S.player)) { S.flags.tavernHint = 1; log('Schenke: Sprich Gäste oder den Wirt an — „Lust auf ein Spiel?“ Würfeln, Karten, Armdrücken, Trinkwette, Faustkampf.', 'quest'); } }
+function tavernChoices(npc, choices) {
+  if (!npc.alive || npc.guard || npc.kind !== 'npc' || S.party.includes(npc.id) || !(inTavern(npc) || npc.prof === 'Wirt' || npc.prof === 'Schankmagd') || !inTavern(S.player)) return;
+  choices.push({ text: 'Lust auf ein Spiel?', fn: () => UI.dialogue(npc, `„${pick(['Immer. Was soll es sein?', 'Wenn du verlierst, zahlst du die nächste Runde.', 'Ich spiele nicht um Ehre. Nur um Gold.'])}“`, [
+    ...STAKES.filter(g => S.gold >= g).map(g => ({ text: `Würfeln (${g} Gold)`, fn: () => dice(npc, g) })),
+    ...(S.gold >= 20 ? [{ text: 'Siebzehn und Vier (20 Gold)', fn: () => cards(npc, 20, [drawCard(), drawCard()]) }] : []),
+    { text: 'Armdrücken (10 Gold)', fn: () => armWrestle(npc, 10) },
+    { text: 'Trinkwette (15 Gold)', fn: () => drinkBet(npc, 15, 0) },
+    { text: 'Faustkampf, bis einer liegt (30 Gold)', fn: () => fistStart(npc, 30) },
+    { text: 'Lieber nicht.', fn: () => UI.closeDialogue() }]) });
+}
+const d6 = () => ri(1, 6);
+function dice(npc, g) {
+  if (S.gold < g) return UI.closeDialogue(); const cheat = (npc.traits || []).includes('hinterhältig') || chance(0.12), a = d6() + d6(), b = cheat ? Math.max(d6() + d6(), 9) : d6() + d6();
+  const spot = cheat && chance(0.25 + (S.player.attributes?.perception || 10) * 0.025);
+  const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') S.gold += g; else if (res === 'lose') S.gold -= g;
+  UI.dialogue(npc, `Du wirfst ${a}, ${npc.name} wirft ${b}. ${res === 'win' ? `Du gewinnst ${g} Gold.` : res === 'lose' ? `Du verlierst ${g} Gold.` : 'Gleichstand — nochmal.'}${spot ? '\n(Dir fällt auf: seine Würfel rollen immer auf dieselbe Seite …)' : ''}`, [
+    ...(spot && res === 'lose' ? [{ text: '„Falschspieler!“', fn: () => { S.gold += g * 2; addRel(npc.key, -15); UI.dialogue(npc, '„Schon gut, schon gut! Hier, nimm und schrei nicht so.“ (Einsatz doppelt zurück)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }] : []),
+    ...(S.gold >= g ? [{ text: 'Noch eine Runde', fn: () => dice(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
+}
+const drawCard = () => pick([2, 3, 4, 7, 8, 9, 10, 10, 10, 11]);
+const handSum = h => h.reduce((a, c) => a + c, 0);
+function cards(npc, g, hand) {
+  const sum = handSum(hand);
+  if (sum > 21) { S.gold -= g; return UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Überkauft! Du verlierst ${g} Gold.`, [{ text: 'Genug.', fn: () => UI.closeDialogue() }]); }
+  UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Noch eine?`, [
+    { text: 'Karte', fn: () => cards(npc, g, [...hand, drawCard()]) },
+    { text: 'Ich bleibe', fn: () => { const h = [drawCard(), drawCard()]; while (handSum(h) < 16) h.push(drawCard()); const n = handSum(h), win = n > 21 || sum > n, draw = n === sum;
+      if (win) S.gold += g; else if (!draw) S.gold -= g;
+      UI.dialogue(npc, `${npc.name}: ${h.join(' + ')} = ${n}${n > 21 ? ' — überkauft' : ''}. ${win ? `Du gewinnst ${g} Gold.` : draw ? 'Gleichstand.' : `Du verlierst ${g} Gold.`}`, [...(S.gold >= g ? [{ text: 'Neues Spiel', fn: () => cards(npc, g, [drawCard(), drawCard()]) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]); } }]);
+}
+function armWrestle(npc, g) {
+  const me = (S.player.attributes?.strength || 10) + d6() + d6(), him = (npc.attributes?.strength || 10) + d6() + d6(), win = me >= him;
+  if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); } else S.gold = Math.max(0, S.gold - g);
+  S.player.stamina = Math.max(0, S.player.stamina - 20);
+  UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }, { text: 'Genug.', fn: () => UI.closeDialogue() }]);
+}
+function drinkBet(npc, g, round) {
+  const p = S.player, r = p.status?.find(s => s.key === 'rausch'), st = (r?.stacks || 0) + 1;
+  addStatus(p, { key: 'rausch', name: `Rausch ${Math.min(3, st)}`, stacks: Math.min(3, st), left: 240000, desc: 'Die Welt schwankt: die Steuerung zieht zur Seite. Etwas mutiger (+5 % Schaden je Stufe).' });
+  const meOut = chance(0.08 + round * 0.12 - (p.attributes?.endurance || 10) * 0.006), himOut = chance(0.1 + round * 0.12);
+  if (meOut && !himOut) { S.gold = Math.max(0, S.gold - g); return UI.dialogue(npc, `Beim ${round + 1}. Krug wird dir schwarz vor Augen. ${npc.name} lacht. (−${g} Gold)`, [{ text: '[Wankend gehen]', fn: () => UI.closeDialogue() }]); }
+  if (himOut && !meOut) { S.gold += g; addFame(1, undefined, 'Trinkwette'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
+  UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); UI.closeDialogue(); } }]);
+}
+function fistStart(npc, g) {
+  const p = S.player; UI.closeDialogue();
+  S.fist = { npc: npc.id, g, pw: p.equip.weapon, nw: npc.equip.weapon }; p.equip.weapon = null; npc.equip.weapon = null; recalc(p); recalc(npc);
+  Object.assign(p, { brawl: true, brawlSide: 'a', brawlV: 'fist' }); Object.assign(npc, { brawl: true, brawlSide: 'b', brawlV: 'fist', angry: true, aggroId: p.id, brave: true });
+  log(`Faustkampf gegen ${npc.name}: Waffen weg, wer liegt, verliert. Niemand stirbt.`, 'combat'); UI.toast('FAUSTKAMPF', 1600);
+}
+function fistEnd(win) {
+  const F = S.fist, p = S.player, npc = byId(F.npc); S.fist = null;
+  p.brawl = false; p.brawlSide = null; p.brawlV = null; if (!p.equip.weapon) p.equip.weapon = F.pw; recalc(p);
+  if (npc) { npc.brawl = false; npc.brawlSide = null; npc.brawlV = null; npc.angry = false; npc.aggroId = null; if (!npc.equip.weapon) npc.equip.weapon = F.nw; recalc(npc); }
+  if (win) { S.gold += F.g; addFame(2, undefined, 'Faustkampf'); if (npc) addRel(npc.key, 5); log(`Du gewinnst den Faustkampf. +${F.g} Gold, und die Schenke kennt jetzt deinen Namen.`, 'combat'); }
+  else { S.gold = Math.max(0, S.gold - F.g); log(`Du gehst zu Boden. −${F.g} Gold. Man hilft dir auf und schiebt dir einen Krug hin.`, 'combat'); }
+}
+function fistTick() {
+  const F = S.fist; if (!F) return; const p = S.player, npc = byId(F.npc);
+  if (!npc || !npc.alive || !p.alive) return fistEnd(!!(p.alive && (!npc || !npc.alive)));
+  if (npc.downed) return fistEnd(true); if (p.downed) return fistEnd(false);
+  if (dist(p, npc) > 400 || p.map !== npc.map) { log('Du läufst davon. Der Faustkampf ist verloren.', 'combat'); fistEnd(false); }
+}
 function rumorOffer(npc) {
   const open = (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active').length; if (open >= 2 || npc._rumorDay === (S.day | 0) || !npc.homeTown || !TOWN_PLAN[npc.homeTown]) return null;
   npc._rumorDay = S.day | 0; if (!chance(0.35)) return null;
@@ -12640,6 +12712,8 @@ function debugSections() {
       'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
       ...Object.fromEntries(Object.entries(B.MECH_MOD).map(([m, M]) => [`Modul: ${M.name}`, () => { const k = ['l', 'r'].map(s => s + M.part).find(q => p.body[q].mech) || 'l' + M.part; if (!p.body[k].mech) B.attachProsthesis(p, k, 2); p.body[k].mod = m; recalc(p); UI.toast(`${M.name} an ${k}`); }])),   /* Roadmap P3: legt bei Bedarf eine Stufe-2-Prothese an */
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
+      'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
+      'Schenke: Faustkampf mit nächstem NPC': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && !e.guard && e !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (n) fistStart(n, 0); },
       'Elite-Mini-Boss hier (zufällig)': () => { const k = pick(Object.keys(ELITES)); spawnEliteHere(k); UI.toast(ELITES[k].name); },   /* Nutzer: Mini-Bosse */
       'Alle Elite-Mini-Bosse nebeneinander': () => { const p = P(); Object.keys(ELITES).forEach((k, i) => { const e = spawnEliteHere(k); e.x = p.x - 300 + (i % 8) * 80; e.y = p.y - 150 + Math.floor(i / 8) * 90; e.aggroId = null; e.sight0 = 0; }); UI.toast(`${Object.keys(ELITES).length} Mini-Bosse`); },
       'Magitech-Waffen geben': () => { for (const k of ['schockpistole', 'magiegewehr', 'runenarmbrust', 'kristallkanone', 'praezisionsgewehr']) giveItem(p, mkItem(k)); addItem(p, 'energiezelle', 5); UI.toast('Fünf Magitech-Waffen, fünf Zellen'); },   /* Roadmap C.10 */
@@ -15234,6 +15308,15 @@ export function selftest() {
       n.garrison = 40; keepSiegeDay(); const shrink = n.garrison === 36;
       return court.length >= 4 && refused && camp && shrink;
     } finally { n.owner = o0; n.garrison = g0; S.flags.garmadonSlain = f0; S.flags.keepSiege = s0; S.ents.world = S.ents.world.filter(e => !e.keepSiege); }
+  }));
+  ok('Schenke (Nutzer §5e.5): Würfeln und Karten verändern das Gold, Trinkwette macht betrunken und die Steuerung schwankt, Faustkampf nimmt Waffen und gibt sie zurück, Sieger bekommt den Einsatz', sandbox(() => {
+    const p = stage(); S.gold = 200; const n = actor(330, 300, { kind: 'npc' }); n.key = 'probe_wirt';
+    const g0 = S.gold; let changed = false; for (let i = 0; i < 12 && !changed; i++) { dice(n, 10); changed = S.gold !== g0; } UI.closeDialogue();
+    drinkBet(n, 15, 0); const drunk = stat(p, 'rausch'); UI.closeDialogue();
+    const dmgSober = (() => { p.status = p.status.filter(s => s.key !== 'rausch'); return damageOf(p); })(); addStatus(p, { key: 'rausch', stacks: 2, left: 1000 }); const braver = damageOf(p) > dmgSober;
+    p.equip.weapon = mkItem('longsword'); const w = p.equip.weapon; fistStart(n, 30); const unarmed = !p.equip.weapon && p.brawl && n.brawl;
+    const g1 = S.gold; n.downed = true; fistTick(); const won = !S.fist && p.equip.weapon === w && !p.brawl && S.gold === g1 + 30;
+    return changed && drunk && braver && unarmed && won;
   }));
   ok('Gerüchte (Nutzer §5e.4): ein Gerücht wird zum Auftrag mit ungefährem Punkt; vor Ort liegt die Kiste (gelöst beim Öffnen), eine falsche ist leer; Deserteur lässt sich ausliefern', sandbox(() => {
     const p = stage(); const c0 = S.contracts; S.contracts = []; const npc = S.ents.world.find(e => e.kind === 'npc' && e.homeTown && TOWN_PLAN[e.homeTown]); if (!npc) return true;

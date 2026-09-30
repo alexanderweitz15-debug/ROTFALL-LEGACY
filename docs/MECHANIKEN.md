@@ -468,3 +468,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Selten falsch (12 %):** die Kiste ist leer — und manchmal lauern Räuber.
 - Höchstens zwei offene Gerüchte. Selbsttest „Gerüchte (Nutzer §5e.4)“.
 
+## Runde: Spiele in der Schenke (Nutzer §5e.5, Version 21)
+- **Wo:** In jeder Schenke (Haus vom Typ Schenke) bei Gästen, dem Wirt oder der Schankmagd: „Lust auf ein Spiel?“. Beim ersten Betreten erklärt ein Hinweis im Log das Angebot.
+- **Würfeln:** Einsatz 10, 25 oder 50 Gold, je zwei Würfel, höhere Summe gewinnt. Hinterhältige (und 12 % aller anderen) spielen falsch und würfeln mindestens 9. Mit guter Wahrnehmung fällt es auf; bei verlorenem Wurf kann man „Falschspieler!“ rufen und bekommt den doppelten Einsatz zurück (Beziehung −15).
+- **Siebzehn und Vier:** 20 Gold. Karten ziehen bis man bleibt; über 21 verliert. Die Gegenseite zieht bis mindestens 16.
+- **Armdrücken:** 10 Gold. Stärke + 2W6 gegen Stärke + 2W6; Sieg gibt Ruhm +1 und Beziehung +3, kostet Ausdauer.
+- **Trinkwette:** 15 Gold. Jeder Krug gibt eine Stufe **Rausch** (bis 3, 4 Minuten): die Steuerung schwankt zur Seite, der Schaden steigt um 5 % je Stufe. Wer zuerst umkippt, verliert; Ausdauer hilft.
+- **Faustkampf:** 30 Gold. Beide legen die Waffen ab (danach automatisch zurück), Schaden halbiert, niemand stirbt: wer am Boden liegt, verliert und steht nach 20 s wieder auf. Kein Verbrechen, keine Wachen. Weglaufen (über 400 px) zählt als Niederlage. Sieg: Einsatz, Ruhm +2, Beziehung +5.
+- **Debug:** „Schenke: betrunken (Rausch 3)“, „Schenke: Faustkampf mit nächstem NPC“. Probe „Schenke (Nutzer §5e.5)“.
