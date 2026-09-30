@@ -23,7 +23,11 @@ const WEATHER_ICON = {
   sandstorm: ico('<path d="M2 5h9M4 8h10M2 11h8"/>'),
   snow: ico('<path d="M8 2v12M2.8 5l10.4 6M2.8 11l10.4-6"/>'),
 };                        // Aktionen aus game.js
-export function bind(actions) { A = actions; }
+// Koop: diese Knöpfe verändern die eigene Figur; beim Gast gehen sie an den Host (uiHooks.act), der sie mit der Gastfigur ausführt
+const ROUTED = ['setClass', 'setTitleClass', 'learnNode'];
+let RAW = {};
+export const uiRaw = n => RAW[n];
+export function bind(actions) { A = actions; RAW = { ...actions }; for (const k of ROUTED) if (typeof RAW[k] === 'function') A[k] = (...a) => uiHooks.act?.(k, a) ? undefined : RAW[k](...a); }
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
@@ -456,7 +460,9 @@ function countItem(key) { return S.player.inv.filter(x => x && x.key === key).re
 
 // ---------------- Dialog ----------------
 export let dlgWith = null;
+export const uiHooks = {};                                           /* Koop: Gespräche eines Gasts laufen beim Host, das Fenster erscheint beim Gast (coop.js) */
 export function dialogue(npc, text, choices) {
+  if (uiHooks.dialogue?.(npc, text, choices)) return;
   const box = $('dialogue');
   box.classList.remove('hidden'); dlgWith = npc;   // S13: wer weggeht, beendet das Gespräch (game.js updatePrompt)
   $('dlg-name').textContent = npc.name;
@@ -469,7 +475,7 @@ export function dialogue(npc, text, choices) {
     cc.appendChild(b);
   });
 }
-export function closeDialogue() { $('dialogue').classList.add('hidden'); }
+export function closeDialogue() { if (uiHooks.close?.()) return; $('dialogue').classList.add('hidden'); }
 export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
 let toastTimer = 0;
@@ -497,6 +503,7 @@ export let modalOpen = null;
 export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOpen = null; openModal(n, arg); }
 export function closeModal() { $('modal').classList.add('hidden'); modalOpen = null; [...$('nav').children].forEach(b => b.classList.remove('active')); S.paused = false; }
 export function openModal(name, arg) {
+  if (uiHooks.modal?.(name, arg)) return;
   if (modalOpen === name) return closeModal();
   modalOpen = name;
   const m = $('modal'); m.classList.remove('hidden');

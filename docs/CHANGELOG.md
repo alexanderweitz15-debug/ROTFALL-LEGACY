@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Koop: Gast führt eigene Gespräche (Lehrer, Fraktionen, Aufträge mit Rückfrage beim Host), eigene Fraktionsränge, Tod erst wenn alle am Boden, Erben für alle, Code immer sichtbar, Pfeil zum Mitspieler, Kerker nur für den Helden.
 - Koop-Warteraum: eigener Charakter für den Gast, Bereit-Knopf, gespeicherte Gastcharaktere; Gast sieht Häuser, Licht, Inventar, Statpunkte, Aufträge, E-Hinweise; Taten des Gasts kosten Ruf; Kamerafahrten für Gäste; Zeppeline über Aurelion ziehen nicht mehr mit.
 - Nachtrag: Koop auch im laufenden Spiel (Einstellungen), Gast handelt bei Händlern mit eigenem Beutel, Gast fragt an Eingängen den Host (Gruppe reist zusammen), Auftragsgold aller Quests geteilt.
 - Netzwerk-Koop (K2): Knopf „Koop (Netzwerk)“ auf dem Titelbildschirm. Host öffnet sein Spiel mit 6-stelligem Code, Gast tritt über WebRTC (PeerJS) bei und steuert einen Gefährten. Der Host rechnet und speichert allein.

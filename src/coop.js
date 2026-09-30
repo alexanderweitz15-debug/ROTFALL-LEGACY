@@ -57,12 +57,12 @@ async function host() {
   peer = new Peer('rotfall-' + code, { debug: 0 });
   await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
   S.coop = { role: 'host', code, guests: {}, bytes: 0, t0: now() };
-  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct;
+  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.hostDied = hostDied; A.coopHooks.afterHeir = afterHeir;
   A.coopHooks.key = k => { if (k !== 'enter' || A.UI.dialogueOpen() || A.UI.modalOpen) return false; const t = window.prompt('Nachricht an die Gäste:'); if (t) { muteLog = true; A.log(`${S.player.name}: ${t.slice(0, 200)}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: S.player.name, text: t.slice(0, 200) }); } A.keys.delete('enter'); return true; };
   A.onLog(e => { if (!muteLog) broadcast({ t: 'log', text: e.text, cat: e.cat }); });
   setInterval(() => { if (document.hidden) A.stepHidden(); }, 50);
   setInterval(() => { if (A.S.paused) broadcast({ t: 'ping' }); }, 2000);   /* Welt steht (Todesbildschirm): Lebenszeichen, sonst meldet der Gast „Host antwortet nicht“ */
-  { const b = document.createElement('button'); b.id = 'coop-hud'; b.className = 'plaque'; b.textContent = 'Koop: Tauschen'; b.title = 'Gegenstände an einen Gast geben; sein Goldanteil und seine Beute'; b.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;padding:4px 10px'; b.onclick = hostTrade; document.body.appendChild(b); }   /* Host-Fenster im Hintergrund: Welt läuft (gedrosselt) weiter, siehe game.js stepHidden */
+  { const b = document.createElement('button'); b.id = 'coop-hud'; b.className = 'plaque'; b.textContent = `Koop · Code ${code} · Tauschen`; b.title = 'Gegenstände an einen Gast geben; sein Goldanteil und seine Beute'; b.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;padding:4px 10px'; b.onclick = hostTrade; document.body.appendChild(b); }   /* Host-Fenster im Hintergrund: Welt läuft (gedrosselt) weiter, siehe game.js stepHidden */
   peer.on('disconnected', () => setTimeout(() => { if (!peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) { /* nächster Versuch beim nächsten Abbruch */ } }, 1500));   /* Vermittler weg (Netz-Schluckauf): sonst finden neue Gäste den Code nie wieder */
   peer.on('connection', c => { c.on('open', () => { c.on('data', d => onHostData(c, d)); c.on('close', () => dropGuest(c.peer)); }); });
   status(`Warteraum offen. Code: ${code} — sag ihn deinen Mitspielern.`);
@@ -81,7 +81,19 @@ function hostLobby() {
   if ($('coop-back')) $('coop-back').onclick = () => $('coop-panel').classList.add('hidden');
 }
 const esc = t => String(t).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
-function choiceText(c) { return c.mode === 'new' ? `neuer Charakter „${c.cfg?.name}“ (${A.ORIGINS[c.cfg?.origin]?.name || 'Wanderer'})` : c.mode === 'saved' ? `spielt „${c.name}“ weiter` : `übernimmt ${c.name}`; }
+function choiceText(c) { return c.mode === 'heir' || c.heir ? `Erbe „${c.name || c.cfg?.name}“` : c.mode === 'new' ? `neuer Charakter „${c.cfg?.name}“ (${A.ORIGINS[c.cfg?.origin]?.name || 'Wanderer'})` : c.mode === 'saved' ? `spielt „${c.name}“ weiter` : `übernimmt ${c.name}`; }
+// Koop (Nutzer): Stirbt der Held, sind alle Spieler am Boden. Jeder Gast wählt dann wie der Host einen Erben, gleich viele zur Auswahl;
+// er kommt dazu, sobald der Host seinen Erben gewählt hat.
+function hostDied(n, level) {
+  const S = A.S, pk = a => a[Math.floor(Math.random() * a.length)], O = Object.keys(A.ORIGINS);
+  for (const g of Object.values(S.coop?.guests || {})) {
+    const m = g.entId && A.byId(g.entId); if (m) { m.coopPilot = null; m.coopName = null; }
+    g.entId = null; g.ready = false; g.choice = null;
+    g.heirs = Array.from({ length: Math.max(1, n) }, () => ({ name: pk(A.FIRST_M), origin: pk(O), pal: { skin: pk(A.SKIN), hair: pk(A.HAIR), cloth: pk(A.CLOTH) }, build: 'ausgewogen', level: Math.max(1, (m?.level || level || 1) - 1) }));
+    sendLobby(g, 'Alle sind gefallen. Wähle deinen Erben — er stößt zur Gruppe, sobald der Host seinen gewählt hat.');
+  }
+}
+function afterHeir() { for (const g of Object.values(A.S.coop?.guests || {})) if (g.ready && g.choice && !g.entId) admit(g); }
 function startCoop() {
   const S = A.S; S.coop.started = true; $('coop-panel').classList.add('hidden');
   if (!A.isRunning()) { A.bindInput(); A.continueGame(); }
@@ -92,6 +104,7 @@ function startCoop() {
 // Gast kommt ins Spiel: Figur bauen oder holen, Welt schicken, zuweisen
 function admit(g) {
   const S = A.S, c = g.choice; let m = null;
+  if (S.paused && S.player && !S.player.alive) return;   /* Host wählt noch seinen Erben: afterHeir holt den Gast dann */
   if (c.mode === 'new') { const old = S.coopHeroes?.[g.name]; if (old) delete S.coopHeroes[g.name]; m = A.makeGuestHero(c.cfg, g.name); }
   else if (c.mode === 'saved') m = A.unparkCoopHero(g.name);
   else { m = A.byId(c.entId); if (!m || !S.party.includes(m.id) || !m.alive || (m.coopPilot && m.coopPilot !== g.id)) m = null; }
@@ -104,7 +117,7 @@ function admit(g) {
 function sendLobby(g, note) {
   const S = A.S, saved = S.coopHeroes?.[g.name];
   sendTo(g, { t: 'lobby', hostName: S.player?.name || myName(), note: note || null, started: !!S.coop.started, party: partyList().filter(p => !A.byId(p.id)?.coopHero),
-    saved: saved && saved.alive ? { name: saved.name, level: saved.level, prof: saved.prof } : null });
+    saved: saved && saved.alive && !g.heirs ? { name: saved.name, level: saved.level, prof: saved.prof } : null, heirs: g.heirs ? g.heirs.map(h => ({ name: h.name, origin: A.ORIGINS[h.origin]?.name, level: h.level })) : null });
 }
 function broadcast(msg) { const G = A.S.coop?.guests; if (!G) return; const s = JSON.stringify(msg); for (const g of Object.values(G)) { try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* Verbindung tot: dropGuest kommt über close */ } } }
 function sendTo(g, msg) { const s = typeof msg === 'string' ? msg : JSON.stringify(msg); try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* siehe oben */ } }
@@ -121,6 +134,7 @@ function onHostData(c, raw) {
   const g = G[c.peer]; if (!g) return;
   g.seen = now();
   if (d.t === 'choice') { if (g.entId) return; const m = d.mode === 'companion' && A.byId(d.entId);
+    if (d.mode === 'heir' && g.heirs?.[d.i]) { g.choice = { mode: 'new', cfg: g.heirs[d.i], heir: true }; g.heirs = null; g.ready = false; hostLobby(); return; }
     g.choice = d.mode === 'new' ? { mode: 'new', cfg: { name: String(d.cfg?.name || g.name).slice(0, 18), origin: A.ORIGINS[d.cfg?.origin] ? d.cfg.origin : 'wanderer', pal: d.cfg?.pal, build: d.cfg?.build } }
       : d.mode === 'saved' && S.coopHeroes?.[g.name] ? { mode: 'saved', name: S.coopHeroes[g.name].name }
       : m ? { mode: 'companion', entId: m.id, name: m.name } : null;
@@ -146,8 +160,37 @@ function guestCommand(m, d, g) {
   else if (d.kind === 'give' && m.inv[d.idx]) { const it = m.inv[d.idx]; if (A.giveItem(A.S.player, it)) { m.inv.splice(d.idx, 1); A.log(`${g.name} gibt dir ${A.ITEMS[it.key]?.name || it.key}.`, 'party'); } else sendTo(g, { t: 'toast', text: 'Die Tasche des Helden ist voll.' }); }
   else if (d.kind === 'attr' && m.attrPoints > 0 && m.attributes?.[d.key] != null) { m.attributes[d.key]++; m.attrPoints--; A.recalc(m); }
   else if (d.kind === 'buy' || d.kind === 'sell') { guestShopDeal(m, g, d); return; }
+  else if (d.kind === 'dlg') { const c = g.dlg?.[d.i]; g.dlg = null; if (c?.fn) runAs(m, g, () => c.fn()); return; }
+  else if (d.kind === 'act' && ['setClass', 'setTitleClass', 'learnNode'].includes(d.name) && A.UI.uiRaw(d.name)) { runAs(m, g, () => A.UI.uiRaw(d.name)(...(d.args || []))); }
   else if (d.kind === 'gold' && (m.coopGold || 0) > 0) { A.S.gold += m.coopGold; A.log(`${g.name} gibt dir ${m.coopGold} Gold.`, 'party'); m.coopGold = 0; }
   g.selfAt = 0;   /* Selbst-Zustand sofort neu schicken */
+}
+
+// K2.7: Gespräche und Figurenknöpfe des Gasts. Der Host führt sie aus, als wäre die Gastfigur der Held (S.player) und mit ihren
+// eigenen Fraktionsrängen (S.ranks); der Ruf (S.factions) bleibt gemeinsam. Dialogfenster gehen an den Gast, Händlerfenster als Gastladen.
+// Nimmt der Gast dabei einen Auftrag an, fragt ein Fenster beim Host, ob er einverstanden ist (sonst wird er zurückgenommen).
+const RANK0 = { valen: -1, order: -1, undead: -1, chain: -1 };
+function runAs(m, g, fn) {
+  const S = A.S, P = S.player, Rk = S.ranks, H = A.UI.uiHooks, before = JSON.stringify([S.quests, S.contracts || []]);
+  m.ranks ||= Object.fromEntries(Object.keys(Rk || RANK0).map(k => [k, -1]));
+  H.dialogue = (npc, text, choices) => { g.dlg = choices; sendTo(g, { t: 'dlg', name: npc.name, npcId: npc.id, text, opts: choices.map(c => c.text) }); return true; };
+  H.close = () => { g.dlg = null; sendTo(g, { t: 'dlg', close: 1 }); return true; };
+  H.modal = (name, arg) => { if (name === 'trade' && arg?.shop) sendShop(m, g, arg); else sendTo(g, { t: 'modal', name }); return true; };
+  S.player = m; S.ranks = m.ranks;
+  try { fn(); } catch (e) { console.error(e); sendTo(g, { t: 'toast', text: 'Das ging nicht: ' + e.message }); }
+  finally { m.ranks = S.ranks; S.player = P; S.ranks = Rk; H.dialogue = H.close = H.modal = null; }
+  g.selfAt = 0;
+  const after = JSON.stringify([S.quests, S.contracts || []]); if (after !== before) askHostQuest(g, m, before, after);
+}
+function askHostQuest(g, m, before, after) {
+  const S = A.S, [q0, c0] = JSON.parse(before), gained = Object.keys(S.quests).filter(k => !q0[k] || (q0[k].state !== S.quests[k].state && S.quests[k].state === 'active'));
+  const newC = (S.contracts || []).filter(c => c.state === 'active' && !c0.some(o => o.id === c.id && o.state === 'active'));
+  const names = [...new Set([...gained.filter(k => !k.startsWith('c_')).map(k => A.QUESTS?.[k]?.name || S.quests[k]?.title || k), ...newC.map(c => c.title)])]; if (!names.length) return;
+  A.dialogue(m, `${g.name} (${m.name}) hat angenommen: ${names.join(', ')}.
+Wollt ihr das gemeinsam machen? Aufträge gelten für die ganze Gruppe.`, [
+    { text: 'Ja, machen wir.', fn: () => { A.UI.closeDialogue(); sendTo(g, { t: 'toast', text: `${S.player.name} ist dabei.` }); } },
+    { text: 'Nein, lass das.', fn: () => { A.UI.closeDialogue(); const [q1, c1] = JSON.parse(before); for (const k of gained) { if (q1[k]) S.quests[k] = q1[k]; else delete S.quests[k]; } for (const c of newC) { const o = c1.find(x => x.id === c.id); if (o) Object.assign(c, o); else c.state = 'offer'; }
+      sendTo(g, { t: 'toast', text: `${S.player.name} will das nicht. Auftrag zurückgegeben.` }); A.log(`Auftrag zurückgegeben: ${names.join(', ')}.`, 'quest'); } }]);
 }
 
 // K2.6/K2.7 (einfach): was die Gastfigur mit E vor sich hat, wenn es kein Gegenstand ist
@@ -162,7 +205,9 @@ function guestAct(m, t) {
     sendTo(g, { t: 'toast', text: `Du fragst ${S.player.name}, ob ihr hindurchgeht.` }); return { kind: 'ask' };
   }
   if (t.kind === 'npc' && t.shop) { const no = A.shopRefusal(t); if (no) { sendTo(g, { t: 'toast', text: `${t.name}: ${no}` }); return { kind: 'closed' }; } sendShop(m, g, t); return { kind: 'shop' }; }
-  sendTo(g, { t: 'toast', text: `${t.name}: Gespräche führt ${S.player.name}. Händler kannst du selbst ansprechen.` }); return { kind: 'talk' };
+  if (t.kind === 'prop' && t.type === 'board') { runAs(m, g, () => A.doInteract(t)); return { kind: 'board' }; }   /* Anschlagbrett: Aufträge wie der Held */
+  if (t.kind === 'npc') { runAs(m, g, () => A.talk(t)); return { kind: 'talk' }; }
+  return null;
 }
 function sendShop(m, g, npc) {
   const I = A.ITEMS, buy = A.shopStock(npc).filter(s => s.count >= 1).slice(0, 16).map(s => ({ key: s.key, count: s.count, name: I[s.key].name, price: A.price(s.key, true, npc) }));
@@ -243,7 +288,7 @@ function hostTick(dt) {
     const fl = S.floats.filter(f => (f.maxLife || 900) - f.life < 60 && Math.hypot(f.x - m.x, f.y - m.y) < NEAR).slice(0, 12).map(f => ({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big }));
     const pr = S.projectiles.filter(p => p.map === m.map && Math.hypot(p.x - m.x, p.y - m.y) < NEAR).map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, kind: p.kind, map: p.map }));
     if (upd.length || add.length || del.length || fx.length || fl.length || pr.length) sendTo(g, { t: 'ents', map: m.map, upd, add, del, fx, fl, pr });
-    if (now() - (g.selfAt || 0) > 200) { g.selfAt = now(); sendTo(g, { t: 'self', inv: m.inv, equip: m.equip, stamina: m.stamina, maxStamina: m.maxStamina, mana: m.mana, maxMana: m.maxMana, morale: m.morale, body: m.body, hp: m.hp, maxHp: m.maxHp, hotbar: m.hotbar, level: m.level, xp: m.xp, xpNext: m.xpNext, dodgeCd: m.dodgeCd, coopGold: m.coopGold || 0, attributes: m.attributes, attrPoints: m.attrPoints || 0, skills: m.skills }); }
+    if (now() - (g.selfAt || 0) > 200) { g.selfAt = now(); sendTo(g, { t: 'self', inv: m.inv, equip: m.equip, stamina: m.stamina, maxStamina: m.maxStamina, mana: m.mana, maxMana: m.maxMana, morale: m.morale, body: m.body, hp: m.hp, maxHp: m.maxHp, hotbar: m.hotbar, level: m.level, xp: m.xp, xpNext: m.xpNext, dodgeCd: m.dodgeCd, coopGold: m.coopGold || 0, attributes: m.attributes, attrPoints: m.attrPoints || 0, skills: m.skills, currentClass: m.currentClass, knownClasses: m.knownClasses, titleClass: m.titleClass, titleClasses: m.titleClasses, tgrade: m.tgrade, tree: m.tree, skillPoints: m.skillPoints || 0, abilities: m.abilities, spells: m.spells, ranks: m.ranks || null, titles: m.titles }); }
   }
   if (S.cine) broadcast({ t: 'cam', x: Math.round(A.R.cam.x), y: Math.round(A.R.cam.y), z: A.R.cam.zoom, text: S.cine.shots?.[S.cine.i]?.text || '' }); else if (camOn) { camOn = false; broadcast({ t: 'cam', off: 1 }); }   /* Kamerafahrt: Gäste sehen mit */
   if (S.cine) camOn = true;
@@ -254,12 +299,12 @@ function hostTick(dt) {
 function lightEnt(e) { const o = {}; for (const k of Object.keys(e)) if (!HEAVY.has(k)) o[k] = e[k]; if (e.equip) o.equip = e.equip; return o; }
 
 // ---------------------------------------------------------------- Gast
-let me = null, joined = false, inSeq = 0, inAcc = 0, lastIn = '';
+let lastCode = '', me = null, joined = false, inSeq = 0, inAcc = 0, lastIn = '';
 async function join(code) {
   if (!/^[A-Z0-9]{6}$/.test(code)) return status('Der Code hat 6 Zeichen.');
   status('Verbinde …'); const Peer = await loadPeer();
   peer = new Peer({ debug: 0 }); await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
-  conn = peer.connect('rotfall-' + code, { reliable: true });
+  conn = peer.connect('rotfall-' + code, { reliable: true }); lastCode = code;
   { const c0 = conn; setTimeout(() => { if (c0 === conn && !c0.open && A.S.coop?.role !== 'guest') status('Keine Antwort vom Host. Code prüfen; der Host muss sein Spiel offen haben. Nochmal „Beitreten“ drücken.'); }, 20000); }
   setInterval(() => send({ t: 'ping' }), 2000);   /* Lebenszeichen auch bei der Figurenwahl und im Hintergrund (keine Bildschleife), sonst trennt der Host nach 10 s */
   conn.on('open', () => { conn.send(JSON.stringify({ t: 'hello', name: myName(), ver: VER })); status('Verbunden. Warte auf den Spielstand des Hosts …'); });
@@ -280,15 +325,18 @@ function onGuestData(raw) {
   if (d.t === 'quests') { const [q, c, tr] = JSON.parse(d.q); S.quests = q; S.contracts = c; S.track = tr; if (A.UI.modalOpen === 'quests') A.UI.refreshModal(); return; }
   if (d.t === 'assign') { me = A.byId(d.entId); S.coop.me = d.entId; joined = true; $('coop-panel')?.classList.add('hidden');
     S.player = me; A.UI.setHudTarget(me);   /* beim Gast ist „der Spieler“ seine Figur: Häuser öffnen sich für ihn, Licht, Nebel, Inventar (I), Charakter (C) und Leiste zeigen seine Sachen */
-    A.coopHooks.cmd = c => { send({ t: 'cmd', ...c }); return true; }; A.coopHooks.guestTick = guestTick; A.coopHooks.key = guestKey; A.bindInput();
-    A.UI.toast(`DU STEUERST ${me.name.toUpperCase()}`, 3000); A.log(`Koop: Du steuerst ${me.name}. WASD laufen, Maus zielen, Klick oder Leertaste angreifen, Q rollen, Umschalt decken, E aufheben (wer zuerst aufhebt, hat es), bei Händlern handeln, an Eingängen den Host fragen, I Gepäck, U Tausch mit dem Host, C Charakter, J Aufträge (die des Hosts), Enter schreiben. Erfahrung bekommst du wie der Held, vom Auftragsgold einen gleichen Anteil. Der Host (${S.coop.hostName}) speichert und führt Gespräche.`, 'party'); return; }
+    A.coopHooks.cmd = c => { send({ t: 'cmd', ...c }); return true; };
+    A.UI.uiHooks.act = (name, args) => { send({ t: 'cmd', kind: 'act', name, args }); return true; }; A.coopHooks.guestTick = guestTick; A.coopHooks.key = guestKey; A.bindInput();
+    A.UI.toast(`DU STEUERST ${me.name.toUpperCase()}`, 3000); A.log(`Koop: Du steuerst ${me.name}. WASD laufen, Maus zielen, Klick oder Leertaste angreifen, Q rollen, Umschalt decken, E aufheben (wer zuerst aufhebt, hat es), mit Leuten reden (auch Lehrer, Fraktionen, Aufträge), bei Händlern handeln, an Eingängen den Host fragen, I Gepäck, U Tausch mit dem Host, C Charakter, J Aufträge (die des Hosts), Enter schreiben. Erfahrung bekommst du wie der Held, vom Auftragsgold einen gleichen Anteil. Der Host (${S.coop.hostName}) speichert und führt Gespräche.`, 'party'); return; }
   if (d.t === 'travel') { if (S.map !== d.map) { S.map = d.map; S.ents[d.map] = keepLocal(S.ents[d.map] || []); S.coop.targets = {}; } return; }
   if (d.t === 'ents') { applyEnts(d); return; }
   if (d.t === 'cam') { S.coop.cam = d.off ? null : d; showCineText(d.off ? '' : d.text); return; }
-  if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills }); A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
+  if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills, currentClass: d.currentClass, knownClasses: d.knownClasses, titleClass: d.titleClass, titleClasses: d.titleClasses, tgrade: d.tgrade, tree: d.tree, skillPoints: d.skillPoints, abilities: d.abilities, spells: d.spells, titles: d.titles }); if (d.ranks) S.ranks = d.ranks;   /* eigene Ränge des Gasts */ A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
   if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
   if (d.t === 'toast') { A.UI.toast(d.text); return; }
   if (d.t === 'shop') { shopData = d; guestShop(); return; }
+  if (d.t === 'dlg') { if (d.close) { if (!shopData && !tradeOpen) A.UI.closeDialogue(); return; } const npc = A.byId(d.npcId) || { name: d.name }; A.UI.dialogue(npc, d.text, d.opts.map((text, i) => ({ text, fn: () => send({ t: 'cmd', kind: 'dlg', i }) }))); return; }
+  if (d.t === 'modal') { A.UI.openModal(d.name, me); return; }
   if (d.t === 'log') { A.log(d.text, d.cat); return; }
   if (d.t === 'chat') { A.log(`${d.from}: ${d.text}`, 'party'); A.UI.toast(`${d.from}: ${d.text}`, 3500); return; }
 }
@@ -301,13 +349,14 @@ function showLobby(d) {
   const box = $('coop-guests');
   box.innerHTML = `<h3>Warteraum bei ${esc(d.hostName)}</h3>${d.note ? `<p class="ledger">${esc(d.note)}</p>` : ''}` +
     `<div class="ledger">Deine Wahl: <b>${myChoice ? esc(choiceText(myChoice)) : 'noch keine'}</b></div>` +
-    `<button class="plaque" id="coop-new">Eigenen Charakter erstellen</button>` +
+    (d.heirs ? '<div class="ledger">Deine Erben:</div>' + d.heirs.map((h, i) => `<button class="plaque" data-heir="${i}">${esc(h.name)} — ${esc(h.origin)}, Stufe ${h.level}</button>`).join('') : d.locked ? '' : `<button class="plaque" id="coop-new">Eigenen Charakter erstellen</button>`) +
     (d.saved ? `<button class="plaque" id="coop-saved">Mit ${esc(d.saved.name)} weiterspielen (Stufe ${d.saved.level})</button>` : '') +
     (d.party.length ? '<div class="ledger">Oder einen Gefährten des Hosts übernehmen:</div>' + d.party.map(p => `<button class="plaque" data-pick="${p.id}" ${p.taken ? 'disabled' : ''}>${esc(p.name)} — ${esc(p.prof)}, Stufe ${p.level}${p.taken ? ' (vergeben)' : ''}</button>`).join('') : '') +
     `<button class="plaque" id="coop-ready" ${myChoice ? '' : 'disabled'}>${iAmReady ? 'Doch nicht bereit' : 'Bereit'}</button>` +
     `<div class="ledger">${d.started ? 'Das Spiel läuft schon: mit „Bereit“ bist du sofort drin.' : 'Wenn alle bereit sind, startet der Host.'}</div>`;
   const choose = c => { myChoice = c; iAmReady = false; send({ t: 'choice', ...c }); showLobby(); };
-  $('coop-new').onclick = () => { el.classList.add('hidden'); A.openCreation(cfg => { el.classList.remove('hidden'); choose({ mode: 'new', cfg }); }, () => el.classList.remove('hidden'), myName()); };
+  [...box.querySelectorAll('[data-heir]')].forEach(b => b.onclick = () => { const h = d.heirs[+b.dataset.heir]; showLobby.d = { ...d, heirs: null, party: [], locked: true }; choose({ mode: 'heir', i: +b.dataset.heir, name: h.name, cfg: { name: h.name, origin: '' } }); });
+  if ($('coop-new')) $('coop-new').onclick = () => { el.classList.add('hidden'); A.openCreation(cfg => { el.classList.remove('hidden'); choose({ mode: 'new', cfg }); }, () => el.classList.remove('hidden'), myName()); };
   if ($('coop-saved')) $('coop-saved').onclick = () => choose({ mode: 'saved', name: d.saved.name });
   [...box.querySelectorAll('[data-pick]')].forEach(b => b.onclick = () => choose({ mode: 'companion', entId: b.dataset.pick, name: d.party.find(p => p.id === b.dataset.pick)?.name }));
   $('coop-ready').onclick = () => { iAmReady = !iAmReady; send({ t: 'ready', on: iAmReady }); showLobby(); };
@@ -392,7 +441,7 @@ function guestTick(dt) {
   A.UI.refreshHUD(); A.updatePrompt();
   mateArrows((S.ents[S.map] || []).filter(e => e !== me && e.alive && (e.kind === 'player' || e.coopPilot)));   /* E-Hinweise (Aufheben, Händler, Eingang) aus Sicht der eigenen Figur */
   const el = $('coop-hud') || (() => { const d = document.createElement('div'); d.id = 'coop-hud'; d.className = 'ledger'; d.style.cssText = 'position:fixed;right:12px;top:52px;z-index:30;font-size:12px;color:#c9bfa6;text-align:right'; document.body.appendChild(d); return d; })();
-  el.textContent = `Koop: Gast bei ${S.coop.hostName}${S.coop.hostBusy ? ' · Host ist im Menü oder Gespräch' : ''}${S.coop.cineText ? ' · Kamerafahrt läuft' : ''}`;
+  el.textContent = `Koop: Gast bei ${S.coop.hostName} · Code ${lastCode}${S.coop.hostBusy ? ' · Host ist im Menü oder Gespräch' : ''}${S.coop.cineText ? ' · Kamerafahrt läuft' : ''}`;
 }
 let lastSeq = -1, lastSent = 0, hostSeen = now(), lostWarned = false;
 // Pfeil am Bildrand zu jedem Mitspieler, der gerade nicht zu sehen ist (Name und Entfernung dabei)
