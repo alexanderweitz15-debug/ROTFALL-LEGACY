@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Verletzungen über Tage: Brüche (heilen nur bis 40 %, Heilerin schient), Entzündungen, Narben (+1 Rüstung).
 - Spiele in der Schenke: Würfeln (Falschspieler entlarven), Siebzehn und Vier, Armdrücken, Trinkwette mit Rausch (schwankende Steuerung), Faustkampf ohne Tote.
 - Gerüchte mit echten Zielen (Schatz, Bestie, Deserteur; ungefährer Kartenpunkt, selten falsch).
 - Karak-Atar belebt (Basar, Wegzoll, Wasser gegen Hitze, Sternenritual), Schwarze Feste mit Hof der Untoten, Totentempel und Belagerung nach Garmadon; CLAUDE.md für künftige Sitzungen.

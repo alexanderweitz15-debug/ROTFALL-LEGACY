@@ -93,10 +93,12 @@ export function damagePart(c, part, dmg, crit) {
   return result;
 }
 
+// Nutzer §5e.7: ein gebrochenes Glied heilt nur bis 40 %, bis der Bruch nach Tagen verheilt ist.
+export const topOf = P => P.broken ? Math.round(P.max * 0.4) : P.max;
 export function healPart(c, part, amount) {
   const P = c.body[part], was = P.hp;
   if (P.lost) return { restored: false, gained: 0 };
-  P.hp = Math.min(P.max, P.hp + amount);
+  P.hp = Math.max(P.hp, Math.min(topOf(P), P.hp + amount));
   syncHp(c);
   return { restored: was <= 0 && P.hp > 0, gained: P.hp - was };
 }
@@ -104,13 +106,13 @@ export function healPart(c, part, amount) {
 export function heal(c, amount) {
   if (!c.body) { c.hp = Math.min(c.maxHp, c.hp + amount); return; }
   for (let guard = 0; amount > 0.1 && guard < 12; guard++) {
-    const p = c.body.torso.hp <= 0 ? 'torso' : worstPart(c); if (!p) break;   // wer am Boden liegt, braucht zuerst den Rumpf
-    const P = c.body[p], give = Math.min(amount, P.max - P.hp, Math.max(4, amount / 2));
+    const p = c.body.torso.hp <= 0 ? 'torso' : worstPart(c, true); if (!p) break;   // wer am Boden liegt, braucht zuerst den Rumpf
+    const P = c.body[p], give = Math.min(amount, topOf(P) - P.hp, Math.max(4, amount / 2)); if (give <= 0) break;
     P.hp += give; amount -= give;
   }
   syncHp(c);
 }
-export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost) c.body[p].hp = c.body[p].max; syncHp(c); }
+export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost) c.body[p].hp = Math.max(c.body[p].hp, topOf(c.body[p])); syncHp(c); }
 // Roadmap P1 (Bionik-Qualität): Stufe 1 Schrott ist schlechter als ein echtes Glied, 2 Aurelion gleichwertig, 3 Meisterstück besser,
 // 4 Prototyp selten und am besten. wear = wie schnell sie sich abnutzt (×), name für Anzeige und Händler.
 export const MECH_Q = {
@@ -159,9 +161,9 @@ export const bionicParts = c => [...['larm', 'rarm', 'lleg', 'rleg'].filter(k =>
 export function setBionicCond(c, k, v) { v = Math.max(0, Math.min(100, v)); if (k === 'eye') { if (c.eye) c.eye.cond = v; } else if (c.body?.[k]?.mech) c.body[k].mechCond = v; }
 /* Roadmap P2: Save-Defaults für Bionik — alte Linse (p.lens) wird ein Aurelion-Auge; p.lens bleibt als Lesefallback stehen */
 export function bionicDefaults(c) { if (!c) return c; if (c.lens && !c.eye) c.eye = { q: 2, cond: 100 }; if (c.eye) c.eye.cond ??= 100; return c; }
-export function worstPart(c) {
+export function worstPart(c, room = false) {   /* room: nur Teile, die noch heilen können (Bruch) */
   let best = null, br = 1;
-  for (const p of PARTS) { if (c.body[p].lost) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
+  for (const p of PARTS) { if (c.body[p].lost || (room && c.body[p].hp >= topOf(c.body[p]) - 1e-6)) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
   return best;
 }
 export function speedFactor(c) {
