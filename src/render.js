@@ -1561,6 +1561,10 @@ function drawProp(e, now) {
       ctx.strokeStyle = `rgba(78,143,122,${.4 + .3 * Math.sin(now / 300)})`; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.lineTo(x, y - 8); ctx.moveTo(x - 3, y - 22); ctx.lineTo(x + 3, y - 22); ctx.stroke();
       break; }
+    case 'lever': {                                       /* Nutzer §5e.3: Hebel im Gewölbe */
+      shadow(x, y + 4, 7, .35); ctx.fillStyle = '#3a3733'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#4a463f'; ctx.fillRect(x - 6, y - 4, 12, 2);
+      const a = e.on ? 0.7 : -0.7; ctx.strokeStyle = '#5a4630'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y - 2); ctx.lineTo(x + Math.sin(a) * 14, y - 2 - Math.cos(a) * 14); ctx.stroke();
+      ctx.fillStyle = '#8a2a20'; ctx.beginPath(); ctx.arc(x + Math.sin(a) * 14, y - 2 - Math.cos(a) * 14, 2.5, 0, 7); ctx.fill(); break; }
     case 'watchtower_ruin':                               // verfallener Wachturm
       shadow(x, y + 5, 13, .4);
       ctx.fillStyle = '#3a3733'; ctx.fillRect(x - 9, y - 30, 18, 34);
@@ -2338,7 +2342,7 @@ function drawFx(now) {
 // ---------------- Licht & Wetter ----------------
 export function ambient() {
   const h = S.minute / 60;
-  if (DUNGEONS[S.map] && !DUNGEONS[S.map].open) return 0.82;   // Himmelsinsel: Tageslicht
+  if (DUNGEONS[S.map] && !DUNGEONS[S.map].open) return DUNGEONS[S.map].darker ? 0.94 : 0.82;   // Himmelsinsel: Tageslicht   /* §5e.3: dunkle Gewölbe-Ebene */
   let a = 0;
   if (h < 5) a = 0.72; else if (h < 7) a = 0.72 - (h - 5) / 2 * 0.62;
   else if (h < 17) a = 0.08; else if (h < 20) a = 0.08 + (h - 17) / 3 * 0.5;
