@@ -127,6 +127,7 @@ export function ecoPrice(town, g, buy) {
   let f = clamp(target(t, g) / ((t.stock[g] || 0) + 1), 0.4, 3);
   if (isAurel(town)) f *= 1.15;
   if (occupied(town) && buy) f *= 1.5;   // S15: Besatzung macht Kaufen teuer, nicht Verkaufen
+  f *= (S.after?.pmul?.[g] || 1) * (S.after?.tmul?.[town] || 1);   /* Folgen §5c: Aufstand/Streik verteuern Waren, Flüchtlinge die Zielstadt */
   const p = ITEMS[g].value * f;
   return Math.max(1, Math.round(buy ? p * 1.12 : p * 0.88));
 }
@@ -274,7 +275,7 @@ export function ecoDay() {
 }
 
 // ---------------- Händlerzüge (abstrakt, fern vom Helden) ----------------
-const tradeTowns = () => Object.keys(S.towns).filter(k => LOC[k] && !occupied(k) && !razed(k) && LOC[k].faction !== 'undead');
+const tradeTowns = () => Object.keys(S.towns).filter(k => LOC[k] && !occupied(k) && !razed(k) && LOC[k].faction !== 'undead' && !S.after?.quar?.[k]);   /* Folgen §5c: Quarantäne = kein Handel */
 const tripDays = (a, b) => Math.max(1, Math.ceil(Math.hypot(LOC[a].x - LOC[b].x, LOC[a].y - LOC[b].y) / 260));
 export function riskOf(a, b, guards) {
   let r = 0.06;

@@ -294,6 +294,7 @@ export const ITEMS = {
   vargs_tagebuch: { name:'Vargs Tagebuch', slot:'material', stack:1, rarity:'rare', value:0, lore:'Enge Schrift, Blutflecken. Die letzte Seite beschreibt ein Ritual: Krone, Kette, Splitter, zehn Seelen, ein Freund, das eigene Blut.' },
   himmelssplitter: { name:'Splitter vom Himmel', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Ein Stück des Sterns, den Aurelion über seine Insel hob. Warm wie Haut.' },
   sternenklinge: { name:'Sternenklinge', slot:'weapon', wtype:'sword', dmg:26, reach:50, arc:1.7, speed:600, stam:10, holy:true, rarity:'mythic', value:2000, skill:'onehanded', desc:'Aus dem geschmiedet, was von Omegas Herz blieb.' },
+  pferchschluessel: { name:'Pferchschlüssel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Schwerer Eisenschlüssel mit Kettenmarke. Er öffnet die Sklavenpferche der Eisenfeste.' },   // §5d.1
   tributgut: { name:'Tributgut', slot:'material', stack:40, rarity:'common', value:10, lore:'Korn, Salz, Werkzeug — was ein Dorf der Kette abgeben musste.' },
   automatenkern: { name:'Automatenkern', slot:'material', stack:20, rarity:'uncommon', value:60, lore:'Ein Messingherz voller Zahnräder. Tickt noch, wenn man es ans Ohr hält.' },
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
@@ -531,6 +532,20 @@ export const CLASSES = {
   darkpaladin: { name:'Dunkler Hochpaladin', tier:3, parent:'warrior', abilities:['chain_strike','fear_aura','chain_command','blood_price'], faction:'chain',
                desc:'Ordnung durch Furcht. Wer kniet, lebt.',
                weak:'In freien Dörfern gefürchtet: Händler verlangen mehr, manche handeln gar nicht, Leute weichen aus.' },
+  // §5d.1 Dunkle Klassen der Kette: Lehrer in der Eisenfeste, je Grundklasse eine. chainRank = nötiger Kettenrang
+  // (0 Treiber, 1 Kettenknecht, 2 Grenzreiter). alt = weitere Grundklassen, die als Vorstufe genügen (Dunkler Priester: Kleriker oder Magier).
+  darkpriest: { name:'Dunkler Priester', tier:2, parent:'cleric', alt:['mage'], chainRank:1, abilities:['omega_brand','chain_prayer','blood_offering'], faction:'chain',
+               desc:'Omegas Wort, mit Blut geschrieben.',
+               weak:'Gefürchtet in freien Dörfern; Opferblut kostet eigenes Leben.' },
+  chainhunter: { name:'Kettenjäger', tier:2, parent:'archer', chainRank:2, abilities:['aimed_shot','net_shot','hound_call'], faction:'chain',
+               desc:'Wer läuft, wird gefangen. Wer sich wehrt, wird gebracht.',
+               weak:'Gefürchtet in freien Dörfern; das Fangnetz hält Große nicht fest.' },
+  torturer:  { name:'Folterknecht', tier:2, parent:'rogue', chainRank:1, abilities:['backstab','break_will','execute'], faction:'chain',
+               desc:'Henker der Kette. Jeder Wille bricht, man muss nur wissen, wo.',
+               weak:'Gefürchtet in freien Dörfern; der Henkersstreich trifft nur Geschwächte hart.' },
+  chainbard: { name:'Kettenbarde', tier:2, parent:'bard', chainRank:0, abilities:['war_song','march_drum','dirge'], faction:'chain',
+               desc:'Trommeln für den Gleichschritt, Klagelieder für die anderen.',
+               weak:'Gefürchtet in freien Dörfern; eigener Waffenschaden −15 % wie beim Barden.' },
 };
 
 export const ABILITIES = {
@@ -558,6 +573,16 @@ export const ABILITIES = {
   fear_aura:   { name:'Furcht-Aura', cd:18000, stam:14, desc:'Feinde im Umkreis (170 px) verlieren den Mut: −20 % Schaden, Angeschlagene fliehen. Zivilisten laufen davon.' },
   chain_command:{ name:'Befehl der Kette', cd:30000, stam:10, desc:'Kettenwachen in Rufweite (500 px) folgen dir 60 s lang in den Kampf.' },
   blood_price: { name:'Blutpreis', cd:12000, stam:12, desc:'Gefesselte, Eingeschüchterte und Fliehende im Umkreis zahlen: Schaden, 60 % davon heilen dich.' },
+  // §5d.1 Dunkle Klassen der Kette
+  omega_brand: { name:'Brandmal Omegas', cd:9000, mana:14, desc:'Der Feind vor dir (bis 260 px) wird gebrandmarkt: Schaden, er brennt und nimmt 12 s lang 25 % mehr Schaden.' },
+  chain_prayer:{ name:'Kettengebet', cd:20000, mana:20, desc:'Heilt dich und die Gruppe. Feinde im Umkreis (150 px) nehmen heiligen Schaden, Tote doppelt.' },
+  blood_offering:{ name:'Opferblut', cd:15000, desc:'12 % deines Lebens für die Hälfte deines Manas. Kostet kein Mana.' },
+  net_shot:    { name:'Fangnetz', cd:10000, stam:16, desc:'Ein Netz auf den Feind vor dir (bis 280 px): 3 s festgehalten, leichter Schaden. Große taumeln nur.' },
+  hound_call:  { name:'Kettenhund', cd:40000, stam:12, desc:'Ein Hund der Feste jagt 30 s an deiner Seite (einer zugleich).' },
+  break_will:  { name:'Wille brechen', cd:14000, stam:14, desc:'Der nächste Feind in Griffweite (70 px) blutet, taumelt und ist 10 s eingeschüchtert. Angeschlagene fliehen.' },
+  execute:     { name:'Henkersstreich', cd:12000, stam:22, desc:'Ein Hieb: ×1,2 — gegen Geschwächte (unter 30 % Leben), Gefesselte oder Eingeschüchterte ×3.' },
+  march_drum:  { name:'Marschtrommel', cd:25000, stam:12, desc:'15 s für dich und die Gruppe: Tempo +12 %, Ausdauer kehrt schneller. Kettenwachen in Hörweite marschieren 30 s mit.' },
+  dirge:       { name:'Klagelied der Kette', cd:16000, stam:14, desc:'Feinde im Umkreis (160 px) werden 6 s langsamer und 8 s eingeschüchtert (−20 % Schaden).' },
   first_aid:   { name:'Feldverband', cd:25000, stam:10, tree:true, desc:'Heilt sofort 15 % deines Lebens und stillt Blutungen.' },
   // ---- Titelfähigkeiten: kosten die Ressource ihrer Titelklasse (cost) oder laden sie auf (gain), nie Mana/Ausdauer ----
   raise_dead:  { name:'Totenruf', title:'necromancer', cd:4000, cost:2, desc:'Eine Leiche in der Nähe steht als Diener auf (60 s, höchstens 2). Kostet 2 Seelenessenz.' },
@@ -815,6 +840,7 @@ export const FACTIONS = {
   aurel: { name:'Das Hochreich Aurelion', colors:['#2a2a30','#c8a050'], desc:'Adelshäuser, Handelsherren, Automaten und Messingglieder. Reich genug, um sich jede Ordnung zu kaufen — auch die der anderen.', ranks:['Fremder','Registrierter Besucher','Bürger','Anerkannter Bürger','Handelsbürger','Gildenmitglied','Hoher Beamter','Mitglied des Hohen Rates'] },   // MP2 §81
   chain: { name:'Die Eiserne Kette', colors:['#111214','#5a1a1c'], desc:'Sie nennen es Ordnung. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.', ranks:['Treiber','Kettenknecht','Grenzreiter','Aufseher','Dunkler Hochpaladin'] },   // S12: Spielerränge; Kettenmeister ist Varg allein
   sea:   { name:'Das Seevolk', colors:['#1e2a36','#c8b890'], desc:'Salzbund und Sturmklinge: Händler und Plünderer derselben Inseln, die sich mehr hassen als jeden Fremden. Wer auf dem Wasser lebt, schuldet dem Land nichts.', ranks:['Landratte','Deckhand','Maat','Steuermann','Kapitän'] },   // S14
+  frei:  { name:'Die Freien vom Grubenhort', colors:['#4a3a26','#d8c890'], desc:'Befreite Sklaven der Eisenfeste, Menschen und Goblins. Kein Herr, kein Tribut — nur ein Lager am Grubenhort und die Angst, dass die Kette wiederkommt.' },   /* Folgen §5c: nach dem Sklavenaufstand */
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };
 
@@ -924,6 +950,19 @@ export const NPCS = [
   { key:'wendel', name:'Hadubrand', prof:'Pferdezüchter', faction:'valen', age:51, atTown:'muehlbach', off:[9, -3], weapon:'staff', horseBreeder:true,   // S15: Pferdehof (Nutzer: „richtigen Bauern mit Menü, wo man die Pferde sieht“)
     traits:['geduldig','stolz'], attrs:{endurance:12}, cls:'wanderer', recruit:false,
     greet:'„Jedes Pferd hier hat einen Namen und einen Kopf. Such dir eins aus, das zu deinem passt.“' },
+  // §5d.1 Lehrer der dunklen Klassen in der Eisenfeste. atFort: Weltkacheln im Mauerring (game.js spawnNpcDef). Sie lehren nur mit Kettenrang (CLASSES.chainRank).
+  { key:'ansgar', name:'Vater Ansgar', prof:'Hochpriester der Kette', faction:'chain', age:61, atFort:[128, 197], weapon:'mace',
+    traits:['streng','diszipliniert'], attrs:{willpower:15,intelligence:14}, cls:'cleric', recruit:false,
+    greet:'„Omega fiel, damit wir aufstehen. Wer kniet, versteht es zuerst.“', teaches:['darkpriest'] },
+  { key:'rulf', name:'Rulf Hundeführer', prof:'Meister der Kettenjäger', faction:'chain', age:44, atFort:[196, 207], weapon:'crossbow',
+    traits:['geduldig','grausam'], attrs:{perception:15,agility:13}, cls:'ranger', recruit:false,
+    greet:'„Die Hunde riechen Angst. Ich rieche, wohin sie läuft.“', teaches:['chainhunter'] },
+  { key:'mordek', name:'Meister Mordek', prof:'Henker der Kette', faction:'chain', age:52, atFort:[142, 207], weapon:'axe',
+    traits:['genau','grausam'], attrs:{strength:14,agility:12}, cls:'rogue', recruit:false,
+    greet:'„Die meisten reden vor dem ersten Schnitt. Die klugen vor dem ersten Blick.“', teaches:['torturer'] },
+  { key:'sibylla', name:'Sibylla Eisentrommel', prof:'Kettenbardin', faction:'chain', age:33, atFort:[158, 197], weapon:'dagger',
+    traits:['ehrgeizig','stolz'], attrs:{charisma:15,endurance:12}, cls:'bard', recruit:false,
+    greet:'„Tausend Füße, ein Takt. Den gebe ich vor.“', teaches:['chainbard'] },
   { key:'lila', name:'Lila', prof:'Jorans Tochter', faction:null, age:17, home:'banditcamp',
     traits:['neugierig','ehrgeizig'], attrs:{agility:11}, cls:'wanderer', recruit:true, recruitRel:20, kin:'daughter',
     greet:'„Bitte sag ihm nicht, wo ich bin.“' },
@@ -1061,6 +1100,8 @@ export const QUESTS = {
     reward:{gold:220,xp:260,rep:{merch:12},item:'flail'}, turnin:'gerold' },
   q_tribut: { name:'Geraubter Tribut', giver:null, desc:'Du hast einem Tributzug der Eisernen Kette die Abgaben abgenommen. Behalten — oder dem Dorf zurückgeben, dem sie gehören?',
     objectives:[{type:'custom',count:1,text:'Tributgut behalten oder dem Dorf zurückbringen'}] },
+  q_pferch: { name:'Die Pferche öffnen', giver:null, desc:'Bruni sitzt im Sklavenpferch der Eisenfeste, mit sieben anderen. Der Schlüssel hängt an Vesks Gürtel — oder liegt bei Schreiberin Edda, die für Gold vieles vergisst. Nachts schlafen die Wachen am Markt.',   // §5d.1
+    objectives:[{type:'item',target:'pferchschluessel',count:1,text:'Den Pferchschlüssel beschaffen (Vesk bestehlen oder Edda bestechen)'},{type:'custom',count:1,text:'Nachts den Sklavenpferch öffnen'}], reward:{xp:180,rep:{goblin:10,chain:-15}} },
   q_runaway: { name:'Entlaufene', giver:null, desc:'Aus der Eisenfeste ist jemand geflohen. Die Kette will ihn zurück. Ob er zurückkommt, liegt bei dir.',
     objectives:[{type:'custom',count:1,text:'Den Entlaufenen stellen: zurückbringen oder laufen lassen'}] },
   q_grisk_lost: { name:'Verschleppte', giver:'grisk', desc:'Die Kette hat nicht alle in den Steinbruch gebracht. Drei von uns wurden verkauft, verschleppt, vergessen. Finde sie. Sag ihnen, dass sie frei sind.',
