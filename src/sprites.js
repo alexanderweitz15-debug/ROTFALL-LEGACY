@@ -12,11 +12,11 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=20';
-import { ITEMS } from './data.js?v=20';   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=20';
+import { ATLAS } from './ref5_atlas.js?v=21';
+import { ITEMS } from './data.js?v=21';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=21';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=20';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=21';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -303,7 +303,7 @@ function varyChain(s, seed) {
 }
 // Referenz 3 (Session 12): Zustand sichtbar — Abnutzung 0 neu … 3 zerschlissen, Blut 0/1/2 nach Leben. Diskrete Stufen halten den Frame-Cache klein.
 // S14: Zustand der Glieder (larm rarm lleg rleg): 0 heil, 1 ausgefallen, 2 verloren (Prothese = heil) — für den Stil R sichtbar
-export const msOf = e => !e?.body ? '' : ['larm', 'rarm', 'lleg', 'rleg'].map(k => { const P = e.body[k]; return P.mech ? 0 : P.lost ? 2 : P.hp <= 0 ? 1 : 0; }).join('');
+export const msOf = e => !e?.body ? '' : ['larm', 'rarm', 'lleg', 'rleg'].map(k => { const P = e.body[k]; return P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0; }).join('');   /* Roadmap P3: 3 = Prothese (Messingglied in Stil R) */
 export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
 const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
 const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };

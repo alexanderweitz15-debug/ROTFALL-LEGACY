@@ -55,6 +55,9 @@ Ins Hochreich **Aurelion** fährt dich ein Kutscher nur mit **Aufenthaltsschein*
 
 ---
 
+### Zu zweit spielen (Koop über das Netz)
+Auf dem Titelbildschirm „Koop (Netzwerk)“. Einer öffnet sein Spiel und nennt dem anderen den Code aus 6 Zeichen; der andere tritt bei und übernimmt einen Gefährten aus der Gruppe. Erfahrung und Auftragsgold werden geteilt, Beute hat, wer sie zuerst aufhebt; getauscht wird mit I (Gast) oder dem Knopf „Koop: Tauschen“ (Host). Enter schreibt eine Nachricht. Nur der Host speichert.
+
 ## 3. Die Welt und ihre Hintergründe
 
 ### Die Länder

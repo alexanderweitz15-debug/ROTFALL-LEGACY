@@ -1,7 +1,7 @@
 // Trefferzonen (Kenshi-artig): jede Figur hat eigene HP pro Körperteil.
 // Kopf 0 = Enthauptung. Rumpf 0 = am Boden/Tod. Arm 0 = Waffe fällt. Bein 0 = lahm, beide = kriechen.
 // c.hp / c.maxHp bleiben als Summe erhalten, damit Balken und KI-Schwellen ohne Umbau weiterlaufen.
-import { rnd, clamp, S } from './state.js?v=20';
+import { rnd, clamp, S } from './state.js?v=21';
 
 export const PARTS = ['head', 'torso', 'larm', 'rarm', 'lleg', 'rleg'];
 export const PART_NAME = { head:'Kopf', torso:'Rumpf', larm:'Linker Arm', rarm:'Rechter Arm', lleg:'Linkes Bein', rleg:'Rechtes Bein' };
@@ -84,7 +84,7 @@ export function damagePart(c, part, dmg, crit) {
     const spill = Math.min(-P.hp, dmg) * 0.5;           // Überschuss geht halb in den Rumpf
     c.body.torso.hp -= spill;
     const cut = cutOf();
-    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; delete P.mechCond; delete P.mechUp; P.hp = cut; result = 'severed'; }   /* Roadmap P1: kein alter Prothesenzustand am Stumpf */   // erst ab −200 ab (Sehr schwer −100)
+    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; delete P.mechCond; delete P.mechUp; delete P.mod; P.hp = cut; result = 'severed'; }   /* Roadmap P1: kein alter Prothesenzustand am Stumpf */   // erst ab −200 ab (Sehr schwer −100)
     else if (wasUp) result = 'disabled';
     P.hp = Math.max(P.hp, cut === -Infinity ? LIMB_CUT : cut);
   } else if (part !== 'torso' && part !== 'head' && P.hp === 0 && wasUp) result = 'disabled';
@@ -120,15 +120,24 @@ export const MECH_Q = {
   4: { name: 'Prototyp',     arm: 0.15,  leg: 0.10,  wear: 0.5 },
 };
 // S12: Prothese an ein verlorenes Glied. Sie kommt immer frisch: voller Zustand, keine Aufrüstung (vorher erbte sie den alten Stumpf).
-export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; P.hp = P.max; syncHp(c); }
+export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; delete P.mod; P.hp = P.max; syncHp(c); }
+// Roadmap P3: Hand- und Fußmodule auf einer Prothese (c.body[k].mod). Nur auf Gliedern mit mech; wirken nur, solange die Prothese ≥ 30 % hat.
+export const MECH_MOD = {
+  greifhand:   { part: 'arm', name: 'Greifhand',   arm: 0,    desc: 'Schwere Rüstung und Schild bremsen 30 % weniger; selbst ausbessern bis 90 %.' },
+  klingenhand: { part: 'arm', name: 'Klingenhand', arm: 0.12, desc: '+12 % Nahkampf, aber diese Hand hält keinen Schild mehr (kein Schildblock).' },
+  federfuss:   { part: 'leg', name: 'Federfuß',    leg: 0.08, desc: '+8 % Tempo.' },
+  ankerfuss:   { part: 'leg', name: 'Ankerfuß',    leg: -0.05, desc: 'Kein Rückstoß durch Treffer, aber −5 % Tempo.' },
+};
+export const hasMod = (c, mod) => { if (!c?.body) return false; for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = c.body[k]; if (P?.mech && P.mod === mod && (P.mechCond ?? 100) >= 30) return true; } return false; };
 // Bonus oder Malus der Prothesen einer Art (Summe beider Seiten): Schrott zieht ab, Meisterstück und Prototyp geben dazu, Aufrüstung +5 % je Stufe.
 // Unter 30 % Zustand wirkt eine Prothese nicht, weder gut noch schlecht (sie hängt nur noch dran).
 export const mechBonus = (c, kind) => { if (!c.body) return 0; let b = 0;
-  for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; b += (MECH_Q[P.mech] || MECH_Q[2])[kind] + (P.mechUp || 0) * 0.05; }
+  for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; const plus = (MECH_Q[P.mech] || MECH_Q[2])[kind] + (P.mechUp || 0) * 0.05 + (MECH_MOD[P.mod]?.[kind] || 0);   /* Roadmap P3: Modul-Bonus */
+    b += plus > 0 && (P.mechCond ?? 100) < 50 ? plus * 0.5 : plus; }   /* Roadmap P4: unter 50 % Zustand nur noch der halbe Vorteil (Nachteile bleiben ganz) */
   return b; };
 // Verschleiß eines getroffenen Prothesenglieds (Roadmap P1): nur echte Treffer, nur das getroffene Teil, Schrott doppelt so schnell.
 export function wearProsthesis(c, part, base = 1.2) { const P = c.body?.[part]; if (!P?.mech) return null; const was = P.mechCond ?? 100;
-  P.mechCond = Math.max(0, was - base * (MECH_Q[P.mech] || MECH_Q[2]).wear); return { was, now: P.mechCond, broke: was >= 30 && P.mechCond < 30 }; }
+  P.mechCond = Math.max(0, was - base * (MECH_Q[P.mech] || MECH_Q[2]).wear); return { was, now: P.mechCond, broke: was >= 30 && P.mechCond < 30, half: was >= 50 && P.mechCond < 50 }; }
 // Roadmap P2 (Roboterauge): eigenes Feld c.eye = { q: 1..4, cond: 0..100 }, bewusst KEIN Teil in PARTS (Trefferverteilung und alte Körper bleiben).
 // fog = Kartennebel-Radius in Kacheln (ohne Auge 18), light = Spielerlicht +Anteil (Nachtsicht ab Stufe 3), crit = Fernkampf-Krit, heat = Wärmesicht (Stufe 4).
 export const EYE_Q = {
@@ -145,6 +154,9 @@ export const eyeCrit = c => eyeOf(c)?.crit || 0;
 export function attachEye(c, q) { c.eye = { q: Math.max(1, Math.min(4, q | 0)), cond: 100 }; c.lens = true; return c.eye; }
 export function wearEye(c, amt) { const E = c?.eye; if (!E?.q) return null; const was = E.cond ?? 100;
   E.cond = Math.max(0, was - amt * (EYE_Q[E.q] || EYE_Q[2]).wear); return { was, now: E.cond, broke: was >= 30 && E.cond < 30 }; }
+/* Roadmap P4: alle Bionik-Teile einer Figur mit Zustand (Glieder mit mech und das Auge) — für Öl, Selbstwartung, Händler */
+export const bionicParts = c => [...['larm', 'rarm', 'lleg', 'rleg'].filter(k => c?.body?.[k]?.mech).map(k => ({ k, name: PART_NAME[k], cond: c.body[k].mechCond ?? 100 })), ...(c?.eye?.q ? [{ k: 'eye', name: 'Roboterauge', cond: c.eye.cond ?? 100 }] : [])];
+export function setBionicCond(c, k, v) { v = Math.max(0, Math.min(100, v)); if (k === 'eye') { if (c.eye) c.eye.cond = v; } else if (c.body?.[k]?.mech) c.body[k].mechCond = v; }
 /* Roadmap P2: Save-Defaults für Bionik — alte Linse (p.lens) wird ein Aurelion-Auge; p.lens bleibt als Lesefallback stehen */
 export function bionicDefaults(c) { if (!c) return c; if (c.lens && !c.eye) c.eye = { q: 2, cond: 100 }; if (c.eye) c.eye.cond ??= 100; return c; }
 export function worstPart(c) {

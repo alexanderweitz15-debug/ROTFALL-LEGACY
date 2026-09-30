@@ -322,6 +322,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 
 **Sonnet-Testfall:** Figurenblatt (Debug „Grafik“, Posen-Übersicht) mit Messingarm links/rechts in allen vier Richtungen prüfen: sichtbar, kein Flackern. `frameCacheInfo().clears` nach 2 Minuten in Aurelheim ist 0.
 
+**Status: FERTIG (Logik, Items, Stil-R-Bild, UI, Debug, Probe).** `body.js`: `MECH_MOD`, `hasMod`, Modul-Bonus in `mechBonus`, `attachProsthesis`/`damagePart` löschen `mod`. `sprites.js msOf`: Prothese = 3. `fig5.js`: `mechArm`/`mechLeg` färben Ärmel+Hand bzw. Hosenbein in `L.gold`/`L.metal` (Vorder-, Rück- und Seitenansicht). `game.js`: Zweig `use: 'mechmod'`, Ankerfuß in `hurt()` (Rückstoß) und im Block-Ruck, Klingenhand im Block (`shield`), Greifhand in `speedOf` und `mendAt`, Modulzeile in `activeEffects`, Debug „Bionik“. Die Probe prüft statt `miss`-Differenz die Bild-Identität (robust gegen einen zweiten Selbsttestlauf).
+
 ### P4 — Wartung, Werkzeug, Material, Selbstreparatur (P0)
 
 **Ziel:** Medizin heilt Fleisch, Werkzeug repariert Maschine. Die Reparatur hängt an der Wirtschaft.
@@ -350,6 +352,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - Selbstreparatur ohne Feinwerkzeug → Toast, kein Verbrauch.
 
 **Sonnet-Testfall:** E2E-Test 1 aus MASTER_ROADMAP C.41: Arm verlieren → Händler → Roboterarm → Werte → Schaden → Werkzeug fehlt → beschaffen → Reparatur → speichern/laden.
+
+**Status: FERTIG (Logik, Items, UI, Debug, Probe).** `data.js`: `feinwerkzeug`, `spezialoel` (`use: 'mechkit'`), `ersatzteile`. `body.js`: `bionicParts`, `setBionicCond`, halber Vorteil unter 50 % in `mechBonus`, `wearProsthesis` meldet `half`. `game.js`: Zweig `mechkit`, `selfCap`/`selfRepair` und Auswahl in `mendAt(t, skipMech)`, `mechRate(town)` über `ECO.ecoPrice` in `mechMenu`/`eyeOptions`, Streik-Fix (`BIG_START.strike` setzt `S.halt['tickmar:magitech']`, `strikeOff()` statt `delete S.halt.tickmar`, Migration des alten Schlüssels in `continueGame`). Abweichung: keine Tages-Wartung nach `oilMount` (bewusst weggelassen, Öl und Selbstwartung decken es ab). Die Probe prüft den Stillstand über den `S.halt`-Schlüssel, den `ecoDay` liest, statt `ecoDay` selbst laufen zu lassen.
 
 ### P5 — Bionik-Händler, Chirurg, Schwarzmarkt, Rang-Gating, Bionik-Anzeige (P0 Händler und Aurelion-Integration)
 
@@ -383,6 +387,8 @@ Jedes Paket erfüllt `MASTER_ROADMAP` A.3:
 - `bodyChart` enthält `bp-mech` für ein Prothesen-Glied.
 
 **Sonnet-Testfall:** E2E-Test 2 (Roboterauge) und je ein Screenshot vom Charakterbogen mit 0, 1 und 2 Prothesen. Den Rangführer lesen und prüfen, ob die Zugangszeilen mit dem Verhalten übereinstimmen.
+
+**Status: FERTIG (Logik, UI, Debug, Probe).** `game.js`: `MECH_SCOPE` und `mechMenu(npc)` (Umfang je Beruf, gibt die Optionen zurück), `aurelRank`/`bionicLack`/`bionicTier`, Sperren in `mechSwapOptions` (mit `who`), `eyeOptions` und `shopStock`, `bionicChoices(npc)` in `talk()`, `blackOffers`/`blackMarket` (Rook, Nix — statt eines neuen Bandenhändlers), `MARKET_POOL` für Prothesenhändlerin und Kybernetiker plus Nachtrag in `continueGame`, Vells Pool erweitert, `AUREL_BIONIC` im Rangführer, gebrauchte Ware über `slot.used` in `useConsumable`. `ui.js`: `mechNote`, `bp-mech` in `bodyChart`/`woundNotes`, `bionicBlock` im Charakterbogen. `style.css`: `.bp-mech`. Die bestehende Probe „Nutzer S13 Aurelion“ setzt jetzt `S.ranks.aurel = 2`, weil Chirurgie Bürgerrang braucht.
 
 ### P6 — Luftschiff-Datenmodell, Flotte, Hafen Kupferhafen (P0 Luftschiff-Grundüberarbeitung)
 

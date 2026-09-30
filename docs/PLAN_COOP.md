@@ -131,6 +131,11 @@ Kein zweites Bewegungs- oder Kampfsystem. Alles, was die Gastfigur tut, läuft d
 ### K2.4 — Inventar und Menüs des Gasts (1 Sitzung)
 - `cmd equip/unequip/useItem/drop`, `self`-Nachricht, `invUI(m)`, `charUI(m)`, Gruppenfenster ohne Befehle für den Gast.
 
+### K2.4b — Teilen (Nutzerwunsch 30.09.2026, Pflicht)
+- **Erfahrung wird geteilt:** Die Gastfigur bekommt dieselbe Erfahrung wie die Gruppe (Gruppen-XP in game.js gilt schon für alle Mitglieder; prüfen, dass die Gastfigur nicht ausgenommen wird, z. B. bei Kills durch die Gastfigur selbst → auch der Held bekommt seinen Anteil).
+- **Beute wird über ein Menü geteilt:** Wer zuerst aufhebt, hat es zuerst. Zusätzlich ein Übergabemenü (Gruppenfenster oder Inventar → „An … geben“), mit dem Host und Gast Gegenstände zwischen Held und Gastfigur schieben. Für den Gast läuft das über `cmd give {idx, toId}`; der Host führt den Tausch aus (bestehende `giveItem`/Inventar-Funktionen nutzen, kein zweites Inventarsystem).
+- **Auftragsgold wird geteilt:** Belohnungen aus Aufträgen/Missionen werden zwischen Host und verbundenen Gästen aufgeteilt (Gastanteil landet als Gold im Inventar der Gastfigur oder in einem `S.coop.guests[id].gold`-Konto, das der Gast beim Übergabemenü sieht). Aufteilung gleichmäßig, Rest beim Host.
+
 ### K2.5 — Karten, Kämpfe, Ereignisse (1–2 Sitzungen)
 - Kartenwechsel mit dem Host; Ereignis-Spiegel (Toast, Log, Effekte, Kamerafahrten als Zuschauer); Tod der Gastfigur → Figurwahl neu.
 - Regressionsliste: Speichern beim Host während der Gast verbunden ist; Laden eines Stands ohne Koop (keine `coopPilot`-Reste); Gast trennt mitten im Kampf (Figur fällt in KI zurück); Host schließt Browser (Gast bekommt `bye`); Version passt nicht (klare Meldung).

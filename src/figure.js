@@ -7,7 +7,7 @@
 // alten 20×25-Rasters). Jedes Teil wird mit eigenem Volumen schattiert (Licht oben links, Formschatten rechts), wirft
 // Schlagschatten auf Teile dahinter; danach Kontur und handgesetzte Details. Noch nicht im Spiel verdrahtet —
 // erst die Grundlage gegen die Referenz prüfen (Nutzervorgabe), dann übertragen.
-import { ramp, mix, toCanvas } from './sprites.js?v=20';
+import { ramp, mix, toCanvas } from './sprites.js?v=21';
 
 export const FW = 40, FH = 66, FPX = 1, FOX = 20, FOY = 57;   // Rastergröße, Welt je Pixel, Pivot (Fußmitte)
 // Proportion (Nutzer: „noch etwas weird“): Formen werden im Entwurfsmaß (Füße bei y 53) gezeichnet und beim Rastern

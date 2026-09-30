@@ -248,3 +248,54 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 - **Anzeige:** X-Fenster zeigt „Auge: …“ mit Stufe, Zustand und Wirkung; die Werkbank nennt das Auge im Zustandstext.
 - **Alte Stände:** Die alte Linse (`p.lens`) wird beim Laden ein Aurelionisches Auge (Stufe 2, 100 %).
 - **Debug (Bionik):** „Auge Stufe 1–4“, „Auge entfernen“, „Auge beschädigen (−30 %)“.
+
+## Runde: Roadmap Paket 3 — Prototyp-Glieder, Module, sichtbare Prothesen (Version 20)
+
+- **Prototyp-Arm und Prototyp-Bein** (Stufe 4): Hiebe +15 % bzw. Tempo +10 %, halber Verschleiß. Sehr selten, nicht beim normalen Händler.
+- **Module** (`c.body[k].mod`, Tabelle `MECH_MOD` in body.js): werden wie ein Gegenstand benutzt und auf eine Prothese gesteckt. Ohne passende Prothese kommt ein Hinweis, das Modul bleibt in der Tasche. Ein altes Modul an derselben Stelle kommt zurück in die Tasche.
+  - Greifhand (Arm): Schild und schwere Rüstung bremsen 30 % weniger; selbst ausbessern an Werkbank/Amboss bis 90 % statt 80 %.
+  - Klingenhand (Arm): +12 % Nahkampf, aber kein Schildblock mehr (die Deckung zählt wie ohne Schild).
+  - Federfuß (Bein): +8 % Tempo.
+  - Ankerfuß (Bein): Treffer und Blocks stoßen dich nicht zurück, −5 % Tempo.
+  - Module wirken nur, solange die Prothese mindestens 30 % Zustand hat. Eine neue Prothese an derselben Stelle kommt ohne Modul; beim Abtrennen geht das Modul verloren.
+- **Sichtbarkeit:** Im Stil R sind Prothesen jetzt als Messingglied zu sehen (Arm mit Metallhand, Bein bis zum Stiefel), auch bei NPCs. Nur Prothesenträger bekommen eigene Bilder im Zwischenspeicher.
+- **Anzeige:** Das X-Fenster nennt bei jeder Prothese Stufe, Stufenname, Zustand und Modul mit Wirkung.
+- **Debug (Bionik):** „Modul: …“ (legt bei Bedarf eine Stufe-2-Prothese an) und „Module abnehmen“. „Glied abtrennen“ entfernt auch das Modul.
+
+## Runde: Roadmap Paket 4 — Wartung, Werkzeug, Material, Selbstreparatur (Version 20)
+
+- **Grundsatz:** Medizin heilt Fleisch, Werkzeug repariert Maschine. Verbände und Heiler tun für Prothesen und Auge nichts.
+- **Stufenweiser Leistungsabfall:** Unter 50 % Zustand bringt eine Prothese nur noch den halben Vorteil (Nachteile von Schrott bleiben ganz); unter 30 % wirkt sie gar nicht. Beim Unterschreiten von 50 % kommt ein Hinweis im Log.
+- **Spezialöl** (benutzen): die am stärksten abgenutzte Prothese oder das Auge +25, höchstens bis 90 %.
+- **Selbstwartung** an Werkbank, Amboss oder Esse: Beim Benutzen fragt die Werkbank, ob du Prothesen und Auge warten oder Ausrüstung ausbessern willst. Nötig sind **Feinwerkzeug** (wird nicht verbraucht) und je Teil **1 Magitech-Teil** oder **2 Ersatzteile**. Obergrenze 70 %, Schmiedekunst hebt sie (70 + Wert/5, höchstens 95), die Greifhand +10. Ohne Werkzeug oder Material kommt ein Hinweis, nichts wird verbraucht. Kostet 20 Minuten je Teil und übt Schmiedekunst.
+- **Preise hängen an der Wirtschaft:** Wartung beim Prothesenmacher kostet 2 Gold je fehlendem Prozent × Magitech-Faktor der Stadt (0,6 bis 2,5, aus dem Magitech-Preis). Das Wartungsfenster zeigt den Faktor und warnt, wenn Tickmars Fabrik stillsteht.
+- **Streik in Tickmar** legt jetzt wirklich die Magitech-Fabrik still (vorher nur im Text), bis der Streik endet oder beigelegt ist. Ein längerer Stillstand durch einen Magitech-Unfall bleibt dabei bestehen.
+- **Fertigkeit Schmiedekunst:** hat jetzt eine Wirkung (Grenze der Selbstwartung); der Tooltip im Charakterbogen sagt es.
+- **Debug (Bionik):** „Wartungsset geben“, „Selbst warten (ohne Werkbank)“, „Magitech-Werk stilllegen (3 Tage)“, „Magitech-Werk anfahren“.
+
+## Runde: Roadmap Paket 5 — Bionik-Händler, Chirurg, Schwarzmarkt, Rang, Anzeige (Version 20)
+
+- **Wer macht was:**
+  - **Prothesenhändlerin** (Aurelion-Läden): verkauft Schrott- und Aurelion-Glieder, Schrott- und Aurelion-Auge, Spezialöl, Ersatzteile.
+  - **Kybernetiker** (Aurelion-Werkstätten): Gespräch „Kannst du meine Prothesen warten?“ → Instandsetzen, Kraftfeder/Laufwerk, Auge warten; verkauft Module, Öl, Ersatzteile, Feinwerkzeug.
+  - **Medica** in Aurelion: „Kannst du mir ein Glied oder ein Auge ersetzen?“ → Chirurgie an gesunden Gliedern und Roboterauge.
+  - **Meisterin Vell** (Gelenkhall) und ihre Werkbank: alles. Vell verkauft jetzt auch Öl, Feinwerkzeug und Augen.
+  - **Schwarzmarkt** bei Rook und bei Nix (Salzhafen): „Hast du Messing unter dem Tisch?“. Kein Rang nötig, +50 % Preis, täglich wechselndes Angebot, selten ein Prototyp. Glieder und Augen sind mit 40 % Chance gebraucht und haben beim Einsetzen nur 60 % Zustand.
+- **Rang in Aurelion** (Schein, Bürgerrecht, Akademie-Adept zählen mit):
+  - Stufe 1: frei.
+  - Stufe 2 und Module: Aufenthaltsschein (Rang 1).
+  - Stufe 3 und Chirurgie an gesunden Gliedern: Bürgerrecht (Rang 2) oder Akademie-Adept.
+  - Prototyp: Rang 4.
+  - Händler zeigen gesperrte Ware nicht; die Frage „Warum verkaufst du mir nicht alles?“ nennt, was fehlt. Gesperrte Operationen stehen mit „gesperrt: …“ im Menü. Der Rangführer von Aurelion nennt je Rang die Zeile „Zugang: …“.
+- **Charakterbogen:** Prothesen-Glieder sind in der Körperfigur messingfarben umrandet, mit Tooltip (Stufe, Zustand, Modul); die Wundliste zeigt ⚙. Neuer Abschnitt „Bionik“ mit jeder Prothese und einer Zeile „Auge“ (natürlich oder Roboterauge mit Stufe und Zustand).
+- **Alte Stände:** Prothesenhändlerinnen und Kybernetiker bekommen ihren Laden beim Laden nachgetragen.
+- **Debug (Bionik):** „Aurel-Rang +1“, „Kybernetiker/Medica/Prothesenhändlerin hier spawnen“ (vorübergehend), „Schwarzmarkt öffnen“.
+
+## Runde: Netzwerk-Koop K2 (Version 21)
+- **Start:** Titelbildschirm → „Koop (Netzwerk)“. Der Host braucht einen Spielstand und drückt „Spiel öffnen“; er bekommt einen Code aus 6 Zeichen. Der Gast gibt den Code ein und drückt „Beitreten“. Beide brauchen dieselbe Version (sonst klare Meldung). Die Verbindung läuft über WebRTC (PeerJS, öffentlicher Vermittler; die Spieldaten gehen direkt zwischen den Browsern). Ohne Knopfdruck wird `src/coop.js` nie geladen.
+- **Wer rechnet:** Nur der Host simuliert die Welt und speichert. Der Gast bekommt einmal den Spielstand, danach 20-mal pro Sekunde, was sich im Umkreis von 1400 px um seine Figur ändert, zweimal pro Sekunde Zeit, Wetter, Gold und Ruf, fünfmal pro Sekunde die Werte seiner Figur. Der Gast speichert nie (`save()` liefert beim Gast `false`); `S.coop` und die Gastzuordnung (`coopPilot`) landen nie im Spielstand.
+- **Gastfigur:** Der Gast wählt einen Gefährten aus der Gruppe des Hosts. Steuerung wie beim Helden: WASD, Maus zielen, Klick/Leertaste Angriff, Q Rolle, Umschalt Deckung, E aufheben, 1–0 Leiste, C Charakter, I Gepäck und Tausch, M Karte, Enter Nachricht. Gespräche, Gebäude, Handel und Gruppenbefehle bleiben beim Host. Kommt eine Sekunde lang keine Eingabe, folgt die Figur wieder der Gefährten-KI; trennt der Gast, ebenso. Stirbt die Figur, wählt der Gast neu.
+- **Teilen (Nutzer):** Erfahrung: die Gastfigur bekommt dieselbe Erfahrung wie der Held (statt 60 %), bei Kills teilen Held und Gastfiguren ihren Kampfanteil und jeder bekommt ihn ganz. Auftragsgold: jede Gastfigur bekommt einen gleichen Teil in ihren Beutel (`coopGold`), der Rest geht an den Held; der Gast kann den Beutel jederzeit dem Held geben. Beute: wer zuerst aufhebt, hat sie; abgeben über das Tauschmenü (Gast: Taste I; Host: Knopf „Koop: Tauschen“ oben rechts).
+- **Hintergrundfenster:** Liegt das Host-Fenster im Hintergrund, rechnet das Spiel über einen Zeitgeber weiter (Browser drosseln auf etwa 1 Hz, Nachholen in 50-ms-Schritten), damit der Gast nicht einfriert.
+- **Debug:** `RF.coop.fakeGuest(entId)` verbindet einen Attrappen-Gast ohne Netz (`.input({mv:[1,0], atk:1})`, `.drop()`). Selbsttest „Koop K2“.
+- **Grenzen (noch offen):** Gast bleibt auf der Karte des Hosts (K2.6), Gast führt keine Gespräche (K2.7).
