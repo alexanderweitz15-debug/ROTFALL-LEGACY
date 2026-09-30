@@ -3461,6 +3461,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
+  if (c.deserter && c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor' && x.state === 'active'); if (RC) { RC.reward.gold = 0; rumorDone(RC, true); } }   /* Gerücht: Deserteur im Kampf gefallen statt überredet — Auftrag trotzdem abgeschlossen, kein Lohn */
   if (c.runaway && S.quests.q_runaway?.state === 'active') runawayEnd('Der Entlaufene ist tot.', 3);   // S12 A3
   if (c.robot && c.faction === 'aurel' && source && (source === S.player || S.party.includes(source.id))) startHunt(1);   // S12 E: Aurelion fahndet
   if (c.skyRuler) rulerSlain(c, source);
@@ -6922,6 +6923,7 @@ function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contrac
  if (C && ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind)) conProgress(C);
   if (C && C.kind === 'bounty' && e.title === C.name) C.leaderDead = true;
   if (C && C.kind === 'trail' && e.title === C.name && C.have === 3) conProgress(C);
+  if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
   if (C && C.kind === 'camps' && e.campIdx != null && !(C.cleared ||= [])[e.campIdx] && !S.ents.world.some(o => o !== e && o.alive && o.contract === C.id && o.campIdx === e.campIdx)) {
     C.cleared[e.campIdx] = true; conProgress(C); log(`Lager ${C.cleared.filter(Boolean).length}/${C.need} ausgehoben.`, 'quest'); } }
 // Eskorte (Nutzer: „der NPC ist zu langsam und man weiß nicht wohin“): Der Reisende geht selbst den Straßenweg zum Ziel, etwa im
