@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Gerüchte mit echten Zielen (Schatz, Bestie, Deserteur; ungefährer Kartenpunkt, selten falsch).
 - Karak-Atar belebt (Basar, Wegzoll, Wasser gegen Hitze, Sternenritual), Schwarze Feste mit Hof der Untoten, Totentempel und Belagerung nach Garmadon; CLAUDE.md für künftige Sitzungen.
 - Folgen großer Ereignisse (Dorf ausgelöscht, Sklavenaufstand, Streik, Stadtfall in Aurelion, Seuche, Hexenprozess, Omegas Ende), Eisenfeste belebt mit dunklen Klassen und Übernahme nach Varg, Zweiwaffen, Peitschen, Sensen und Sensendorf Weidenau, Legendäre je Boss.
 - 32 Elite-Mini-Bosse mit eigenem Aussehen, Kräften und Beute; Schildarten (Buckler, Turm, Stachel, Magitech); Nahschuss trifft; Tier- und Banditen-Varianten.

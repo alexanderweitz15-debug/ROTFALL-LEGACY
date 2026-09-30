@@ -59,6 +59,10 @@ There is no linter. After editing a file, at least parse-check it (e.g. with aco
 - **ui.js** — HUD, modals (`openModal(name)`), dialogue (`dialogue(npc, text, choices)`). `bind(actions)` receives callbacks from game.js. `uiHooks` lets coop reroute dialogues and modals.
 - **coop.js** — opt-in network co-op (PeerJS/WebRTC, lazy-loaded only from the co-op button). The host simulates everything and saves; guests send input, receive entity deltas, and never save. Guests play their own hero (`coopHero`, parked in `S.coopHeroes` when offline) or pilot a companion (`m.coopPilot`). Hooks into game.js go through `coopHooks` and the `coopAPI()` object. Full design in `docs/PLAN_COOP.md`.
 
+**Transient content pattern:** many NPC groups (Aurelion, Eisenfeste life, Karak-Atar, Black Keep court, Weidenau militia, mini-boss followers) are marked `transient: true`. They are not saved; instead an idempotent `ensure*()` rebuilds them on every load. Those functions are called in both `newGame()` and `continueGame()` (search `ensureDefenseMasters();`). Add new populations the same way. NPC dialogue options are appended in `talk()` via helper hooks such as `bionicChoices`, `karakChoices` and `keepChoices`.
+
+**Probes and RNG:** `chance()`/`pick()` draw from the shared seeded RNG. Adding entities or RNG calls anywhere can change the outcome of random-dependent probes. If an unrelated probe starts failing, log its intermediate values before assuming a regression; sometimes it exposes a real logic bug.
+
 Map ids: `S.map` is `'world'` or a dungeon/area key; entities live in `S.ents[map]`. `byId()` resolves ids across maps. Time: `S.minute` (1 real second = 1 game minute), `S.day`. Difficulty via `DIFF`/`applyDifficulty`.
 
 ## Docs worth knowing

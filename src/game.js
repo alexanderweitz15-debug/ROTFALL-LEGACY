@@ -3510,7 +3510,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.kind === 'enemy') {
     const m = MONSTERS[c.mtype];
     log(`${m.name} fällt.`, 'combat');
-    dropLoot(c); if (c.eliteKey) eliteDrop(c);
+    dropLoot(c); if (c.eliteKey) eliteDrop(c); if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
     { const L = c.rboss === 'sandlord' ? 'sandfuerstenklinge' : c.alpha || c.rboss === 'alpha' ? 'leitwolfzahn' : null; if (L) dropItemAt(c.map, c.x, c.y + 12, mkItem(L)); }   /* Nutzer §5f: Legendäre der Regionalbosse */   /* Nutzer: sichere Beute der Mini-Bosse */
     const full = m.xp + c.level * 2, share0 = xpShares(c), pilots = partyMembers().filter(pm => pm.coopPilot);
     const pool = pilots.length ? share0(S.player.id) + pilots.reduce((a, pm) => a + share0(pm.id), 0) : 0;   /* Koop (Nutzer): Held und Gastfiguren teilen ihren Kampfanteil, jeder bekommt den ganzen */
@@ -6563,6 +6563,7 @@ function rulerSlain(c, source) {
 // Neun Arten, regional: Kopfgeld, Monster, Jagd, Verteidigung, Patrouille, Eskorte, Lieferung, Vermisste, Vorräte.
 // Ziele stehen wirklich in der Welt (flüchtig, werden nachgesetzt), Fortschritt zählt, Abgabe beim Geber, Lohn: Gold, XP, Ruf.
 const CON = {
+  rumor:   { name: 'Gerücht', text: () => 'Dem Gerücht nachgehen (der Kartenpunkt ist nur ungefähr)', mil: 0 },   /* Nutzer §5e.4 */
   bounty:  { name: 'Kopfgeld', text: n => `Den Anführer und ${n - 1} seiner Leute töten`, mil: 1 },
   monster: { name: 'Monsterjagd', text: n => `${n} Bestien töten`, mil: 1 },
   hunt:    { name: 'Jagd', text: n => `${n} Tiere erlegen, die das Vieh reißen`, mil: 0 },
@@ -6580,7 +6581,7 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   Heilerin: 'herbs', Kräuterfrau: 'herbs', Fischer: 'missing', Graf: 'trail', 'Gräfin': 'deliver', Edelmann: 'bounty', Edelfrau: 'deliver', Hofbeamter: 'trail', Richterin: 'trail',
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 const townFac = town => TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
-const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON);
+const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor');   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
   return r === 'deadland' ? ['skeleton', 'ghoul', 'skeleton'] : r === 'desert' ? ['bandit', 'bandit_archer'] : r === 'eisen' || r === 'mountain' ? ['wolf', 'goblin_warrior', 'bandit']
@@ -6944,6 +6945,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
+  rumorTick();   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -10428,7 +10430,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -10583,7 +10585,57 @@ function askTopic(npc, k) {
     log(`Neues Wissen: ${LORE[A.teach].name}.`, 'quest'); }
   UI.dialogue(npc, A.line + extra, [{ text: 'Noch eine Frage …', fn: () => askMenu(npc) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
+// ================= Gerüchte mit Zielen (Nutzer §5e.4) =================
+// Beim Plaudern erzählt manchmal jemand von einem Schatz, einer Bestie oder einem Deserteur irgendwo draußen. Wer nachgeht, bekommt
+// einen Auftrag mit ungefährem Kartenpunkt (bis 6 Felder daneben). Vor Ort liegt der Schatz, lauert die Bestie (ein Mini-Boss der
+// Tiere) oder versteckt sich der Deserteur (verschonen, ausliefern oder anwerben). Selten (12 %) ist ein Gerücht falsch: leere
+// Kiste — und manchmal ein Hinterhalt. Höchstens zwei offene Gerüchte, ein Gerücht je Person und Tag.
+const RUMOR_TXT = {
+  treasure: w => `„Ein Kaufmann hat bei ${w} eine Kiste vergraben, bevor die Räuber ihn erwischten. Keiner hat sie je gehoben.“`,
+  beast: w => `„Bei ${w} geht etwas um, größer als ein Wolf. Zwei Hirten sind nicht heimgekommen.“`,
+  deserter: w => `„Bei ${w} versteckt sich ein Deserteur aus Valens Heer. Auf seinen Kopf ist Gold ausgesetzt.“` };
+function rumorOffer(npc) {
+  const open = (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active').length; if (open >= 2 || npc._rumorDay === (S.day | 0) || !npc.homeTown || !TOWN_PLAN[npc.homeTown]) return null;
+  npc._rumorDay = S.day | 0; if (!chance(0.35)) return null;
+  const [sx, sy] = TOWN_PLAN[npc.homeTown].square, a = rnd() * 6.283, r = ri(28, 60), q = freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3); if (!q) return null;
+  const kind = pick(['treasure', 'treasure', 'beast', 'deserter']), tx = q.x / TS | 0, ty = q.y / TS | 0, where = locAt(tx, ty)?.name || 'der Wildnis';
+  const C = { id: uid(), town: npc.homeTown, kind: 'rumor', rk: kind, giver: 'board', giverName: npc.name, have: 0, need: 1, state: 'offer', day: S.day | 0, tx, ty, lie: chance(0.12),
+    x: tx + ri(-6, 6), y: ty + ri(-6, 6), reward: { gold: kind === 'deserter' ? 60 : 0, xp: 60, rep: 0 } };
+  C.title = { treasure: `Gerücht: Schatz bei ${where}`, beast: `Gerücht: Bestie bei ${where}`, deserter: `Gerücht: Deserteur bei ${where}` }[kind];
+  C.desc = `${RUMOR_TXT[kind](where)} Der Punkt auf der Karte ist nur ungefähr — such in der Gegend.`;
+  return C;
+}
+function rumorTick() {
+  const p = S.player; if (!p || S.map !== 'world') return;
+  for (const C of (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active')) {
+    const near = Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30, here = S.ents.world.filter(e => e.contract === C.id);
+    if (C.spawned && !here.length && !C.beastDead) C.spawned = false;   /* nach dem Laden sind flüchtige Ziele weg: neu setzen */
+    if (near && !here.length && !C.spawned) { C.spawned = true; const x = C.tx * TS + 16, y = C.ty * TS + 16;
+      if (C.rk === 'treasure') S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x, y, r: 10, solid: true, transient: true, contract: C.id, label: 'Vergrabene Kiste', loot: C.lie ? [] : [pick(['longsword', 'rapier', 'kriegssichel', 'longbow', 'chain_hauberk']), 'potion', pick(['talisman_ausdauer', 'talisman_krieger', 'elixier_staerke', 'potion'])], lootBonus: 2 });
+      else if (C.rk === 'beast') { const ks = Object.keys(ELITES).filter(k => ['wolf', 'bear', 'boar'].includes(ELITES[k].base)), k = pick(ks), e = spawnEnemy(ELITES[k].base, 'world', C.tx, C.ty); applyElite(e, k); Object.assign(e, { contract: C.id, transient: true, anchor: { x, y } }); }
+      else { const d = makeChar({ name: pick(FIRST_M), prof: 'Deserteur', x, y, level: 6, faction: null, traits: ['furchtsam'] }); Object.assign(d, { contract: C.id, transient: true, visitor: true, deserter: true, anchor: { x, y }, greet: '„Nicht schießen! Ich — ich wollte nur nicht sterben. Nicht für die.“' }); d.equip.weapon = mkItem('rusty_sword'); S.ents.world.push(d); }
+      log(C.lie && C.rk !== 'treasure' ? 'Hier soll es sein …' : 'Hier soll es sein. Such genau.', 'quest'); }
+    if (!C.spawned) continue;
+    if (C.rk === 'treasure') { const ch = here.find(e => e.type === 'chest'); if (ch?.opened) { if (C.lie) { log('Die Kiste ist leer. Das Gerücht war falsch.', 'quest'); if (chance(0.5)) { for (let i = 0; i < 3; i++) { const b = spawnEnemy('bandit', 'world', C.tx + ri(-5, 5), C.ty + ri(-5, 5)); Object.assign(b, { transient: true, aggroId: p.id }); } log('Und es war eine Falle — Räuber brechen aus dem Gebüsch!', 'combat'); } } rumorDone(C, !C.lie); } }
+    if (C.rk === 'beast' && C.beastDead) rumorDone(C, true);
+  }
+}
+function rumorDone(C, ok) {
+  C.state = 'claimed'; C.have = 1; const st = S.quests['c_' + C.id]; if (st) { st.state = ok ? 'done' : 'failed'; st.progress = [1]; st.outcome = ok ? 'Das Gerücht stimmte.' : 'Das Gerücht war falsch.'; }
+  if (ok) { if (C.reward.gold) S.gold += questGold(C.reward.gold); gainXp(S.player, C.reward.xp); }
+  S.ents.world = S.ents.world.filter(e => e.contract !== C.id || e.kind === 'enemy' || e.kind === 'prop'); if (S.track === 'c_' + C.id) S.track = null;
+}
+function rumorChoices(npc, choices) {
+  if (!npc.deserter) return; const C = (S.contracts || []).find(c => c.id === npc.contract); if (!C || C.state !== 'active') return;
+  choices.unshift({ text: 'Lauf. Ich habe dich nicht gesehen.', fn: () => { UI.closeDialogue(); addRel(npc.key, 20); S.factions.valen = clamp((S.factions.valen || 0) - 2, -100, 100); log(`${npc.name} verschwindet im Unterholz. Valen wird es nicht erfahren — hoffentlich.`, 'quest'); C.reward.gold = 0; rumorDone(C, true); } },
+    { text: 'Du kommst mit. Valen zahlt für dich.', fn: () => { UI.closeDialogue(); S.factions.valen = clamp((S.factions.valen || 0) + 3, -100, 100); log(`${npc.name} lässt die Schultern sinken. Eine Streife holt ihn ab. Valen zahlt ${C.reward.gold} Gold.`, 'quest'); rumorDone(C, true); } },
+    ...(S.party.length < (S.player.partyCap || 3) ? [{ text: 'Kämpf lieber für mich.', fn: () => { UI.closeDialogue(); Object.assign(npc, { transient: false, visitor: false, contract: null, deserter: false, morale: 60 }); S.party.push(npc.id); C.reward.gold = 0; log(`${npc.name} schließt sich dir an. Valen wird ihn trotzdem suchen.`, 'party'); rumorDone(C, true); } }] : []));
+}
 function gossip(npc) {
+  { const C = rumorOffer(npc); if (C) { const where = C.title.replace(/^Gerücht: \S+ bei /, '');
+    return UI.dialogue(npc, `${RUMOR_TXT[C.rk](where)}\n(Ein Gerücht — es kann stimmen oder auch nicht.)`, [
+      { text: 'Dem gehe ich nach.', fn: () => { S.contracts ||= []; S.contracts.push(C); if (acceptContract(C) === false) S.contracts = S.contracts.filter(c => c !== C); UI.closeDialogue(); } },
+      { text: 'Und sonst?', fn: () => gossip(npc) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }
   const news = recentNews().map((c, i) => `„${NEWS_OPEN[i % NEWS_OPEN.length]} ${newsLine(c.text)}.“`);
   if (news.length && npc._heardNews !== (S.day | 0)) {                // pro Tag zuerst das Neueste
     npc._heardNews = S.day | 0;
@@ -13340,7 +13392,7 @@ export function selftest() {
       const foes = S.ents.world.filter(e => e.contract === C.id && e.alive), placed = foes.length === C.need && !!QUESTS['c_' + C.id] && S.quests['c_' + C.id].state === 'active';
       for (const e of foes) conKill(e); const counted = C.have === C.need;
       const g0 = S.gold; claimContract(C); const paid = S.gold > g0 && C.state === 'claimed' && S.quests['c_' + C.id].state === 'done';
-      const kinds = Object.keys(CON).every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
+      const kinds = Object.keys(CON).filter(k => k !== 'rumor').every(k => { const c = makeContract('eren', k, 'board'); return c.title && c.desc && c.need >= 1 && c.x > 0; });
       return boards && vms && placed && counted && paid && kinds;
     } finally { for (const k of Object.keys(QUESTS)) if (QUESTS[k].dyn && !keep.q[k]) delete QUESTS[k];   // keine Test-Aufträge im echten Buch
       S.contracts = keep.c; S.conDay = keep.d; S.quests = keep.q; S.gold = keep.g; S.ents.world = keep.ents; Object.assign(S.factions, keep.f); p.x = px; p.y = py; }
@@ -15182,6 +15234,17 @@ export function selftest() {
       n.garrison = 40; keepSiegeDay(); const shrink = n.garrison === 36;
       return court.length >= 4 && refused && camp && shrink;
     } finally { n.owner = o0; n.garrison = g0; S.flags.garmadonSlain = f0; S.flags.keepSiege = s0; S.ents.world = S.ents.world.filter(e => !e.keepSiege); }
+  }));
+  ok('Gerüchte (Nutzer §5e.4): ein Gerücht wird zum Auftrag mit ungefährem Punkt; vor Ort liegt die Kiste (gelöst beim Öffnen), eine falsche ist leer; Deserteur lässt sich ausliefern', sandbox(() => {
+    const p = stage(); const c0 = S.contracts; S.contracts = []; const npc = S.ents.world.find(e => e.kind === 'npc' && e.homeTown && TOWN_PLAN[e.homeTown]); if (!npc) return true;
+    const m0 = S.map; try {
+      let C = null; for (let i = 0; i < 30 && !C; i++) { npc._rumorDay = -1; C = rumorOffer(npc); } if (!C) return false;
+      C.rk = 'treasure'; C.lie = false; S.contracts.push(C); acceptContract(C); const fuzzy = Math.hypot(C.x - C.tx, C.y - C.ty) <= 9;
+      S.map = 'world'; p.map = 'world'; p.x = C.tx * TS; p.y = C.ty * TS; rumorTick(); const ch = S.ents.world.find(e => e.contract === C.id && e.type === 'chest'); if (!ch) return false; ch.opened = true; rumorTick(); const solved = C.state === 'claimed' && S.quests['c_' + C.id]?.state === 'done';
+      const D = { ...C, id: uid(), rk: 'deserter', state: 'active', spawned: false, reward: { gold: 60, xp: 10, rep: 0 } }; S.contracts.push(D); rumorTick(); const des = S.ents.world.find(e => e.contract === D.id && e.deserter);
+      const ch2 = []; rumorChoices(des, ch2); const g0 = S.gold; ch2[1].fn(); const paid = S.gold > g0 && D.state === 'claimed';
+      return fuzzy && solved && !!des && paid;
+    } finally { S.map = m0; S.ents.world = S.ents.world.filter(e => !e.contract || !(S.contracts || []).some(c => c.id === e.contract)); S.contracts = c0; }
   }));
   ok('Karak-Atar (Nutzer §5d.2): Basar, Wasserhändlerin, Älteste, Zöllner und Sandreiter stehen; Wasser schützt vor Hitze; wer den Zoll verweigert, zahlt im Basar mehr', sandbox(() => {
     if (!karakCenter()) return true; const k = S.ents.world.filter(e => e.karak), bazaar = k.find(e => e.karakBazaar);
