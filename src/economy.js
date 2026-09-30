@@ -2,7 +2,7 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=22';
+import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=22';
 import { ITEMS, GOODS, TOWNS } from './data.js?v=22';
 import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=22';
 
@@ -288,7 +288,7 @@ function caravanDay() {
   const E = S.eco;
   for (const c of [...E.caravans]) {
     if (!c.raided && chance(riskOf(c.from, c.to, c.guards))) {
-      c.raided = true; const lost = Math.ceil(c.n * (0.5 + Math.random() * 0.5)); c.n -= lost;
+      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost;
       log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
       if (chance(0.3)) chronicle(`Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
     }
@@ -348,7 +348,7 @@ function myCaravanDay() {
     my.raided = true;
     if (my.guards >= 3 && chance(0.5)) log('Räuber griffen deinen Wagen an. Deine Wachen schlugen sie zurück.', 'economy');
     else {
-      let lost = 0; for (const g of Object.keys(my.cargo)) { const l = Math.ceil(my.cargo[g] * (0.4 + Math.random() * 0.5)); my.cargo[g] -= l; lost += l; }
+      let lost = 0; for (const g of Object.keys(my.cargo)) { const l = Math.ceil(my.cargo[g] * (0.4 + rnd() * 0.5)); my.cargo[g] -= l; lost += l; }
       log(`Dein Wagen wurde überfallen: ${lost} Ladungen verloren.`, 'economy'); chronicle(`Räuber plünderten den Wagen von ${S.player?.name || 'dir'}`, 'news');
     }
   }

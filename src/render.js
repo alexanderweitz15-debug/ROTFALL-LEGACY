@@ -2329,8 +2329,12 @@ function drawFx(now) {
     else if (f.type === 'fire') { ctx.fillStyle = `rgba(${230 - t * 80 | 0},${140 - t * 90 | 0},60,.9)`; ctx.fillRect(f.x, f.y, f.s, f.s); }
     else if (f.type === 'frost') { ctx.fillStyle = 'rgba(190,230,250,.85)'; ctx.fillRect(f.x, f.y, 3, 3); }
     else if (f.type === 'necro') { ctx.fillStyle = 'rgba(78,143,122,.7)'; ctx.fillRect(f.x, f.y, 3, 3); }
-    else if (f.type === 'ghost') {                         // Nachbild der Ausweichrolle: helle Silhouette der gerollten Figur
-      const pl = S.player; if (pl) { const tk = SP.humanFrame(SP.humanSpec(pl), 'S', 'tuck'), fr = Object.assign(SP.flashOf(tk), { px: tk.px, ox: tk.ox, oy: tk.oy });
+    else if (f.type === 'ghost') {                         /* Audit C3: Geisterschleier (Gespenster, Auflösen) — senkrechte, nach oben blassere Streifen */
+      const a0 = ctx.globalAlpha; for (let i = 0; i < 4; i++) { const h = 10 + ((i * 7) % 5) * 3, x = f.x - 6 + i * 4 + Math.sin(t * 6 + i) * 1.5;
+        for (let k = 0; k < h; k += 2) { ctx.globalAlpha = a0 * 0.45 * (1 - k / h) * (1 - t); ctx.fillStyle = k < 4 ? '#c8d8e0' : '#8aa8b8'; ctx.fillRect(Math.round(x), Math.round(f.y - 4 - k - t * 10), 2, 2); } }
+      ctx.globalAlpha = a0; }
+    else if (f.type === 'afterimage') {                    // Nachbild der Ausweichrolle: helle Silhouette der gerollten Figur
+      const pl = (f.src && S.ents[S.map]?.find(e => e.id === f.src)) || S.player; if (pl) { const tk = SP.humanFrame(SP.humanSpec(pl), 'S', 'tuck'), fr = Object.assign(SP.flashOf(tk), { px: tk.px, ox: tk.ox, oy: tk.oy });
         ctx.globalAlpha *= 0.3; SP.blit(ctx, fr, f.x, f.y - 8); } }
     else if (f.type === 'shock') {                         // Bodenbeben: Staubring breitet sich aus
       const r = 14 + t * 110; ctx.fillStyle = f.ice ? (t < 0.5 ? '#bfe3f5' : '#7fb0c8') : t < 0.5 ? '#8a7a5a' : '#5a4d38';   // ice: Hrodvars Eiskreis

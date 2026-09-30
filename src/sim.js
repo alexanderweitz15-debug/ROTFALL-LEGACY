@@ -348,8 +348,10 @@ function cleanupArmies() {
     return false;
   });
 }
-// Audit V1: Heeresdeckel (Schwer 110, sonst 80) — auch beim Laden, damit alte Stände mit Riesenheeren nicht weiterrollen
-export const ARMY_CAP = () => S.difficulty === 'sehr_schwer' || S.difficulty === 'schwer' ? 110 : 80;
+// Audit V1: Heeresdeckel (Schwer 110, sonst 80) — auch beim Laden, damit alte Stände mit Riesenheeren nicht weiterrollen.
+// Fehlt S.difficulty (alter Stand, noch nie gesetzt), gilt wie überall sonst (diffOf(), Debug-Umschalter) „Schwer“ als Grundstufe — sonst
+// bekäme ein frischer Spielstand versehentlich den niedrigeren Deckel.
+export const ARMY_CAP = () => (S.difficulty || 'schwer') === 'sehr_schwer' || (S.difficulty || 'schwer') === 'schwer' ? 110 : 80;
 export function clampArmies() { for (const a of S.war?.armies || []) a.strength = Math.min(a.strength, ARMY_CAP()); }
 export function warDay() {
   const W = S.war;

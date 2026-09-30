@@ -85,7 +85,9 @@ export function ambience(on) {
 
 // Grundstimmung: leiser Zweiklang je Region (Quinte = Weite, kleine Sekunde = Bedrohung), weich überblendet.
 const MOOD = { greenmark: [110, 164.8], plains: [110, 164.8], forest: [98, 146.8], marsh: [87.3, 130.8], mountain: [123.5, 185],
-  desert: [103.8, 155.6], badland: [92.5, 98], blight: [73.4, 77.8] };
+  desert: [103.8, 155.6], badland: [92.5, 98], blight: [73.4, 77.8],
+  /* Audit C4: eigene Stimmung statt Grünland-Rückfall */
+  deadland: [69.3, 73.4], aurel: [130.8, 196], eisen: [98, 103.8], frozen: [116.5, 174.6], coast: [110, 146.8], under: [65.4, 69.3] };
 let pad = null, lastRegion = null;
 function setMood(region) {
   const f = MOOD[region] || MOOD.greenmark, t = ac.currentTime;
@@ -100,16 +102,47 @@ function setMood(region) {
 
 // Regionale Einzelgeräusche, etwa einmal pro Sekunde gewürfelt. Selten und leise: Atmosphäre, kein Lärm.
 // region: regionAt(); day: Tageslicht; town: in einer Siedlung.
-export function ambienceTick(region, day, town) {
+// under: geschlossene Karte unter Tage (Audit C4: Tropfen und Hall statt Vogelgezwitscher).
+export function ambienceTick(region, day, town, under) {
   if ((S.settings.volume ?? 0.7) <= 0 || !ac || !wind) return;
   try {
-    const t = ac.currentTime;
-    if (region !== lastRegion) { lastRegion = region; setMood(region); }
+    const t = ac.currentTime, key = under ? 'under' : region;
+    if (key !== lastRegion) { lastRegion = key; setMood(key); }
     const r = Math.random();
+    if (under) {
+      if (r < 0.16) { const f = 1500 + Math.random() * 900; tone(t, 0.06, 'sine', f, f * 0.6, 0.02); tone(t + 0.28, 0.06, 'sine', f, f * 0.6, 0.007); }   /* Tropfen mit Hall */
+      else if (r < 0.2) noise(t, 2.2, 'lowpass', 140, 90, 0.035);                                                                                      /* fernes Grollen im Fels */
+      if (region === 'blight' && r > 0.94) for (let i = 0; i < 4; i++) noise(t + i * 0.07, 0.03, 'bandpass', 1600, 900, 0.02, 4);                     /* Knochen */
+      return;
+    }
     if (town) {
       if (r < 0.10) { noise(t, 0.05, 'bandpass', 3000, 2400, 0.05, 10); noise(t + 0.4, 0.05, 'bandpass', 3000, 2400, 0.04, 10); }   // Schmiedehammer
       else if (r < 0.22) noise(t, 0.5, 'bandpass', 420, 380, 0.025, 2);                                                          // Stimmengemurmel
       else if (r < 0.26) { tone(t, 0.18, 'sawtooth', 320, 260, 0.02); tone(t + 0.22, 0.25, 'sawtooth', 300, 240, 0.02); }      // Tier (Ziege)
+      return;
+    }
+    if (region === 'aurel') {                                                          /* Audit C4: Dampf, Messing, Zahnräder */
+      if (r < 0.12) noise(t, 0.7, 'highpass', 2500, 4000, 0.018);
+      else if (r < 0.2) { tone(t, 0.08, 'square', 620, 600, 0.012); tone(t + 0.09, 0.1, 'square', 930, 900, 0.01); }
+      else if (r < 0.28) for (let i = 0; i < 6; i++) noise(t + i * 0.09, 0.02, 'bandpass', 2600, 2600, 0.012, 8);
+      return;
+    }
+    if (region === 'eisen') {                                                          /* Audit C4: Hämmer und Ketten */
+      if (r < 0.12) for (let i = 0; i < 3; i++) noise(t + i * 0.55, 0.05, 'bandpass', 2400, 1900, 0.04, 9);
+      else if (r < 0.2) for (let i = 0; i < 5; i++) noise(t + i * 0.05, 0.03, 'bandpass', 1900 + i * 150, 1200, 0.025, 4);
+      else if (r < 0.26) noise(t, 1.6, 'bandpass', 600, 280, 0.03, 1);
+      return;
+    }
+    if (region === 'deadland') {                                                       /* Audit C4: Knochenwind */
+      if (r < 0.14) noise(t, 2.4, 'bandpass', 520, 260, 0.045, 3);
+      else if (r < 0.2) tone(t, 1.8, 'sine', 180, 120, 0.012);
+      else if (r < 0.24) for (let i = 0; i < 3; i++) noise(t + i * 0.09, 0.03, 'bandpass', 1500, 900, 0.025, 4);
+      return;
+    }
+    if (region === 'frozen') { if (r < 0.14) noise(t, 2, 'bandpass', 1300, 700, 0.03, 4); else if (r < 0.2) noise(t, 0.05, 'highpass', 5000, 3000, 0.02); return; }   /* Eiswind, Knacken */
+    if (region === 'coast') {                                                          /* Audit C4: Brandung und Möwen */
+      if (r < 0.2) noise(t, 2.6, 'lowpass', 500, 900, 0.05);
+      else if (r < 0.3) { tone(t, 0.25, 'sine', 1500, 1000, 0.016); tone(t + 0.3, 0.3, 'sine', 1400, 900, 0.014); }
       return;
     }
     if (region === 'blight') {
