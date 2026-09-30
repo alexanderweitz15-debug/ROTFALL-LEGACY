@@ -10698,9 +10698,15 @@ function fistEnd(win) {
 }
 function fistTick() {
   const F = S.fist; if (!F) return; const p = S.player, npc = byId(F.npc);
-  if (!npc || !npc.alive || !p.alive) return fistEnd(!!(p.alive && (!npc || !npc.alive)));
+  if (!npc) return fistVoid();   /* Schenke: Gegner nach dem Laden weg (z. B. flüchtiges Schenkenpersonal) — niemand gewinnt, kein Gold fließt (BUG: sonst Gratis-Sieg durch Speichern/Laden) */
+  if (!npc.alive || !p.alive) return fistEnd(!!(p.alive && !npc.alive));
   if (npc.downed) return fistEnd(true); if (p.downed) return fistEnd(false);
   if (dist(p, npc) > 400 || p.map !== npc.map) { log('Du läufst davon. Der Faustkampf ist verloren.', 'combat'); fistEnd(false); }
+}
+function fistVoid() {
+  const F = S.fist, p = S.player; S.fist = null;
+  p.brawl = false; p.brawlSide = null; p.brawlV = null; if (!p.equip.weapon) p.equip.weapon = F.pw; recalc(p);
+  log('Der Faustkampf endet ohne Sieger — dein Gegner ist verschwunden. Dein Einsatz bleibt unangetastet.', 'combat');
 }
 function rumorOffer(npc) {
   const open = (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active').length; if (open >= 2 || npc._rumorDay === (S.day | 0) || !npc.homeTown || !TOWN_PLAN[npc.homeTown]) return null;

@@ -486,4 +486,5 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Runde: Titelbild mit wechselnden Orten (Nutzer, Version 21)
 - Bei jedem Start zeigt das Titelbild zufällig einen Ort: die zerfallene Grenzfeste, Aurelion (Türme, Kuppel, Luftschiff), einen Goblinhort (Riesenpilze, Lehmhütten, Schrott, Sporen), die Eisenfeste (Schlote mit Rauch, Ketten, glühendes Tor), Karak-Atar (Kuppeln, Minarett, Palmen, Karawane, funkelnde Sterne) oder die Schwarze Feste (Spitztürme, tote Bäume, Gräber, Nebel, grünes Feuer). Unten rechts steht der Name des Ortes.
+- Alle 24 Sekunden blendet das Bild weich zu einem anderen Ort über. Jeder Ort hat Mond (Eisenfeste: Blutsonne), einen passenden Begleiter am Feuer (Paladin, Automat, Goblinkrieger, Kettenmeister, Wüstenwanderer, Skelett) und eigenes Wetter: Laub und Raben, Suchscheinwerfer und Warnlichter, Sporen, Asche und Rauch, Sandwehen und Karawane, Nebel, Irrlichter und Raben. Dazu Sternschnuppen und Lichtschein an den Fenstern.
 - Konsole (mit ?dev): `RF.R.setTitleTheme('goblin')` usw. wechselt den Ort sofort.

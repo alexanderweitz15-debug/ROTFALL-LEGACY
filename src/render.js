@@ -2700,7 +2700,7 @@ const TITLE_THEMES = {
 };
 const TITLE_KEYS = Object.keys(TITLE_THEMES);
 let TITLE_T = TITLE_KEYS[Math.random() * TITLE_KEYS.length | 0];   // Zufall nur fürs Bild, nicht die Welt-RNG
-export function setTitleTheme(k) { if (TITLE_THEMES[k]) { TITLE_T = k; titleCache.key = ''; } }   /* Debug/Konsole: RF.R.setTitleTheme('goblin') */
+export function setTitleTheme(k) { if (TITLE_THEMES[k]) { TITLE_T = k; titleCache.key = ''; titleRot.t0 = 0; } }   /* Debug/Konsole: RF.R.setTitleTheme('goblin') */
 function titleLayers(lw, lh) {
   const key = lw + 'x' + lh + TITLE_T; if (titleCache.key === key) return titleCache;
   const TH = TITLE_THEMES[TITLE_T];
@@ -2716,6 +2716,11 @@ function titleLayers(lw, lh) {
   }
   titleCache.stars = [];
   for (let i = 0; i < TH.stars; i++) { const x = h2(i, 5) * lw | 0, y = h2(5, i) * lh * 0.32 | 0; P(b, i % 5 ? '#6a6660' : '#b0a894', x, y); titleCache.stars.push([x, y]); }
+  const MOON = { feste: ['#e8d8b0', 0.82, 0.16, 9], aurelion: ['#d8e0ff', 0.9, 0.12, 7], goblin: ['#c8e090', 0.78, 0.2, 11], eisenfeste: ['#e05020', 0.86, 0.4, 16], karak: ['#fff0d0', 0.86, 0.14, 6], totenland: ['#a0ffd0', 0.8, 0.15, 10] }[TITLE_T];
+  if (MOON) { const [mc, fx0, fy0, r0] = MOON, mx = Math.round(lw * fx0), my = Math.round(lh * fy0), r = Math.max(4, Math.round(r0 * lh / 190));   /* Nutzer: Mond (Eisenfeste: Blutsonne) mit Hof und Kratern */
+    for (let i = 8; i >= 1; i--) { b.fillStyle = SP.mix(mc, '#000000', 0.2) + Math.round(10 * (1 - i / 9)).toString(16).padStart(2, '0'); b.beginPath(); b.arc(mx, my, r + i * 1.6, 0, 7); b.fill(); }
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const d = dx * dx + dy * dy; if (d > r * r) continue;
+      const shade = (dx + dy) / (2 * r), cr = h2(mx + dx >> 1, my + dy >> 1) < 0.14; P(b, cr ? SP.mix(mc, '#000000', 0.28) : SP.mix(mc, shade > 0.25 ? '#000000' : '#ffffff', shade > 0.25 ? 0.18 : 0.08), mx + dx, my + dy); } }
   const ridge = (o, base, amp, sc, col, rim) => {           // Bergkette (oder Dünen): gezackte bzw. weiche Silhouette mit Randlicht
     for (let x = 0; x < lw; x++) {
       const yy = TH.dunes ? Math.round(base - (Math.sin(x / sc * 1.3 + base) * 0.5 + 0.5) * amp * 0.8 - vnoise(x / (sc * 2), 3) * amp * 0.3)
@@ -2754,7 +2759,7 @@ function titleLayers(lw, lh) {
     dome(bx - 6, by - 16, 17, SP.mix(stone, rim, 0.2), '#e0d8ff');
     for (const [dx, hh, w] of T) { const H = Math.round(hh * sc * 0.72), x0 = bx + dx - w / 2; block(x0, by - H, w, H + 8, { smooth: true }); spire(bx + dx, by - H - 1, w - 2, Math.round(w * 1.4), '#e0d8ff'); winGrid(x0, by - H, w, H, 3, 4, 0.55); }
     for (const [a, c2, y] of [[-54, -26, 0.55], [-26, 8, 0.4], [34, 58, 0.5]]) for (let x = bx + a; x <= bx + c2; x++) P(g, rim2, x, by - Math.round(86 * sc * y));
-    banner = [bx - 26, by - Math.round(112 * sc * 0.72) - 20];
+    banner = [bx + 58, by - Math.round(64 * sc * 0.72) - 16];
   } else if (TITLE_T === 'goblin') {                       // Lehmkuppeln, Riesenpilze, Schrottbleche, Laternenmast
     for (const [dx, h, cw, capC] of [[-64, 34, 22, '#5a2a3a'], [-18, 52, 30, '#6a3a24'], [40, 40, 24, '#4a2a4a'], [74, 26, 16, '#6a2a2a']]) {
       const H = Math.round(h * sc * 1.4); for (let y = 0; y < H; y++) P(g, y % 5 === 0 ? '#5a5040' : '#6a6048', bx + dx - 2, by - y, 5, 1);
@@ -2799,30 +2804,61 @@ function titleLayers(lw, lh) {
 // Eigene Bewegung je Thema (über dem Hintergrund, vor dem Feuer)
 function titleExtra(o, P, L, lw, lh, t, back = false) {
   const k = L.tk;
-  if (back) { if (k === 'karak') for (let c2 = 0; c2 < 4; c2++) { const x = Math.round(lw - ((t / 140 + c2 * 11) % (lw + 60))), y = Math.round(lh * 0.6), st = (t / 200 + c2) % 2 < 1;
+  if (back) {
+    if (t % 9000 < 700) { const q = (t % 9000) / 700, sx = lw * (0.45 + h2(t / 9000 | 0, 1) * 0.45), sy = lh * (0.05 + h2(1, t / 9000 | 0) * 0.15);   /* Sternschnuppe */
+      for (let i = 0; i < 10; i++) { const x = sx - q * 40 + i * 1.6, y = sy + q * 14 - i * 0.55; o.fillStyle = `rgba(255,245,220,${(1 - i / 10) * (1 - q) * 0.9})`; o.fillRect(Math.round(x), Math.round(y), 1, 1); } }
+    if (k === 'aurelion') { o.save(); o.globalCompositeOperation = 'lighter';   /* Suchscheinwerfer hinter den Türmen */
+      for (let i = 0; i < 3; i++) { const bx0 = lw * (0.5 + i * 0.18), by0 = lh * 0.68, a = -Math.PI / 2 + Math.sin(t / (2600 + i * 700) + i * 2) * 0.55, len = lh * 0.8;
+        o.fillStyle = 'rgba(120,170,255,0.07)'; o.beginPath(); o.moveTo(bx0, by0); o.lineTo(bx0 + Math.cos(a - 0.05) * len, by0 + Math.sin(a - 0.05) * len); o.lineTo(bx0 + Math.cos(a + 0.05) * len, by0 + Math.sin(a + 0.05) * len); o.fill(); }
+      o.restore(); }
+    if (k === 'karak') for (let c2 = 0; c2 < 4; c2++) { const x = Math.round(lw - ((t / 140 + c2 * 11) % (lw + 60))), y = Math.round(lh * 0.6), st = (t / 200 + c2) % 2 < 1;
       P('#1a120a', x, y, 6, 2); P('#1a120a', x + 2, y - 1, 2, 1); P('#1a120a', x - 1, y - 2, 1, 3); P('#1a120a', x - 2, y - 3, 2, 1); P('#1a120a', x + (st ? 0 : 1), y + 2, 1, 2); P('#1a120a', x + (st ? 5 : 4), y + 2, 1, 2); } return; }
   if (k === 'aurelion') {                                   // Luftschiff zieht langsam durchs Bild, Positionslicht blinkt
     const x = ((t / 90) % (lw + 120)) - 60, y = Math.round(lh * 0.22 + Math.sin(t / 2000) * 2);
     for (let yy = -4; yy <= 4; yy++) { const ww = Math.round(Math.sqrt(1 - (yy / 4.5) ** 2) * 16); P(yy < -2 ? '#8a7ab0' : '#3a3552', x - ww, y + yy, ww * 2, 1); }
     P('#2a2640', x - 5, y + 5, 10, 2); P('#2a2640', x + 15, y - 3, 3, 6); if (t % 1400 < 300) P('#ff5a4a', x - 16, y);
     P('#e0fbff', x - 3, y + 5); P('#e0fbff', x + 1, y + 5);
+    for (const [x, y] of (L.windows || []).slice(-7)) if (t % 1600 < 200) P('#ff4a3a', x, y - 2);   /* Warnlichter */
   } else if (k === 'goblin') {                              // Sporen und Glühwürmchen schweben
     for (let i = 0; i < 26; i++) { const pp = (t / 60 + i * 53) % (lh * 0.7), x = (h2(i, 2) * lw + Math.sin(t / 900 + i) * 6) | 0, y = lh * 0.9 - pp; if ((t / 300 + i) % 4 > 1) P(i % 3 ? '#8ad04a' : '#d8ff90', x, y); }
   } else if (k === 'eisenfeste') {                          // Rauch aus den Schloten, Glut flackert
     for (const [sx, sy] of L.stacks || []) for (let i = 0; i < 14; i++) { const pp = (t / 45 + i * 11) % 60, r = 1 + pp / 14 | 0, x = sx + Math.sin(t / 700 + i + sx) * pp / 10 + pp / 6, y = sy - pp * 0.8;
       o.fillStyle = pp < 8 ? 'rgba(160,70,30,.8)' : `rgba(52,46,44,${(0.75 * (1 - pp / 60)).toFixed(2)})`; o.fillRect(Math.round(x - r), Math.round(y - r), r * 2 + 1, r * 2 + 1); }
+    for (let i = 0; i < 30; i++) { const pp = (t / 70 + i * 37) % lh, x = (h2(i, 8) * lw + Math.sin(t / 800 + i) * 5 - pp * 0.2 + lw) % lw; P(i % 4 ? '#5a5250' : '#c0501a', x, pp); }   /* Asche und Glutflocken */
   } else if (k === 'karak') {                               // Sterne funkeln, Karawane zieht über die Düne
     for (const [i, [x, y]] of (L.stars || []).entries()) if (Math.sin(t / 300 + i * 2.1) > 0.7) P('#fff0c0', x, y);
+    for (let i = 0; i < 8; i++) { const x = ((t / (18 + i * 3) + i * 97) % (lw + 60)) - 30, y = lh * (0.8 + h2(i, 6) * 0.12); o.fillStyle = 'rgba(230,190,130,0.22)'; o.fillRect(Math.round(x), Math.round(y), 12 + i % 3 * 6, 1); }   /* Sandwehen */
+  } else if (k === 'feste') {                               // fallendes Laub im Abendwind
+    for (let i = 0; i < 14; i++) { const pp = (t / 40 + i * 71) % (lh + 40), x = (h2(i, 4) * lw + pp * 0.6 + Math.sin(t / 500 + i) * 4) % lw, y = pp - 20; P(i % 3 ? '#7a4a22' : '#a0602a', x, y, (t / 300 + i) % 2 < 1 ? 2 : 1, 1); }
   } else if (k === 'totenland') {                           // Nebelbänder und Irrlichter
     for (let i = 0; i < 4; i++) { const y = Math.round(lh * (0.72 + i * 0.045)), off = ((t / (120 + i * 60)) % (lw + 120)) - 60;
       for (let j = 0; j < 3; j++) { o.fillStyle = `rgba(120,200,170,${0.05 + i * 0.015})`; o.fillRect(Math.round(off + j * lw / 2.5 - i * 29), y, 50 - i * 5, 2); } }
     for (let i = 0; i < 6; i++) { const x = (h2(i, 9) * lw + Math.sin(t / 1300 + i) * 14) | 0, y = lh * 0.74 + Math.sin(t / 700 + i * 2) * 5; if (Math.sin(t / 500 + i) > -0.3) P('#8affc8', x, y); }
   }
+  if (k === 'totenland' || k === 'feste') {                  /* Rabenschwarm zieht über den Himmel */
+    const fx0 = lw + 30 - (t / 55) % (lw + 120);
+    for (let i = 0; i < 6; i++) { const x = Math.round(fx0 + i * 7 + (i & 1) * 3), y = Math.round(lh * 0.24 + Math.sin(i * 1.7) * 4 + Math.sin(t / 900 + i) * 2), up = (t / 140 + i) % 2 < 1;
+      P('#060606', x, y, 2, 1); P('#060606', x - 1, y + (up ? -1 : 1)); P('#060606', x + 2, y + (up ? -1 : 1)); }
+  }
 }
+// Begleiter am Feuer passend zum Ort (Nutzer: Titelbild cooler)
+const TITLE_COMP = {};
+function titleComp(k) {
+  if (TITLE_COMP[k]) return TITLE_COMP[k];
+  const mon = (mt, seed) => MONSTERS[mt] ? SP.monsterSpec({ kind: 'enemy', mtype: mt, seed }, MONSTERS[mt]) : TITLE_B;
+  TITLE_COMP[k] = { feste: TITLE_B, goblin: mon('goblin_warrior', 5), totenland: mon('skeleton', 4), eisenfeste: mon('chain_master', 2), aurelion: mon('automat', 3),
+    karak: SP.humanSpec({ seed: 7, hooded: true, pal: { skin: '#8d6644', hair: '#1a1410', cloth: '#c8a870' }, equip: { cloak: { key: 'traveler_cloak' } } }) }[k] || TITLE_B;
+  return TITLE_COMP[k];
+}
+// Alle 24 Sekunden blendet das Titelbild zu einem anderen Ort über
+const titleRot = { t0: 0, prev: null, fs: 0 };
 let TITLE_HERO = null;
 export function setTitleHero(ch) { TITLE_HERO = ch ? { kind: 'player', pal: ch.pal, seed: ch.seed || 1, build: ch.build, equip: ch.equip || {}, body: ch.body, prof: ch.prof, spec: null } : null; }
 export function drawTitleScene(canvas, t) {
   const c = canvas.getContext('2d');
+  if (!titleRot.t0) titleRot.t0 = t;
+  if (t - titleRot.t0 > 24000 && canvas.width) { titleRot.t0 = t; const pv = document.createElement('canvas'); pv.width = canvas.width; pv.height = canvas.height; pv.getContext('2d').drawImage(canvas, 0, 0);
+    titleRot.prev = pv; titleRot.fs = t; const ks = TITLE_KEYS.filter(x => x !== TITLE_T); TITLE_T = ks[Math.random() * ks.length | 0]; titleCache.key = ''; }
   const w = canvas.width = canvas.clientWidth, h = canvas.height = canvas.clientHeight;
   if (!w || !h) return;                                      // Phase 1: verstecktes Canvas (Größe 0) — sonst wirft drawImage
   const k = Math.max(3, Math.round(h / 190)), lw = Math.ceil(w / k), lh = Math.ceil(h / k);
@@ -2842,7 +2878,7 @@ export function drawTitleScene(canvas, t) {
   for (const [i, [x, y]] of L.windows.entries()) {         // Fenster: einige erleuchtet, flackernd
     if (i % 3 === 2) continue;
     const fl = Math.sin(t / 230 + i * 1.7) > -0.6;
-    P(fl ? L.theme.win[0] : L.theme.win[2], x, y, 1, 2); if (fl) P(L.theme.win[1], x, y);
+    P(fl ? L.theme.win[0] : L.theme.win[2], x, y, 1, 2); if (fl) { P(L.theme.win[1], x, y); o.fillStyle = L.theme.win[0] + '22'; o.fillRect(x - 1, y - 1, 3, 4); }   /* Lichtschein */
   }
   titleExtra(o, P, L, lw, lh, t);   /* Nutzer: Bewegung je Ort */
   const [bnx, bny] = L.banner, sway = Math.round(Math.sin(t / 700) * 1.5);   // zerrissenes Banner am Bergfried
@@ -2873,7 +2909,7 @@ export function drawTitleScene(canvas, t) {
   c.drawImage(cv, 0, 0, lw * k, lh * k);
   // Rastende am Feuer (S14, Nutzer: sahen schlecht aus): direkt aufs Bild in ganzzahligen Pixeln, nicht ins grobe Szenenraster
   // (dort wurden feine Frames auf 0,6 Rasterpunkte gestaucht und verschmierten)
-  const B = SP.humanFrame(TITLE_B, 'W', 'i0'), bp = B.px || 2, sp = Math.max(3, Math.round(k * bp * 0.75)), gx = fx * k, gy = (fy + 4) * k;
+  const B = SP.humanFrame(titleComp(L.tk), 'W', 'i0'), bp = B.px || 2, sp = Math.max(3, Math.round(k * bp * 0.75)), gx = fx * k, gy = (fy + 4) * k;
   c.filter = 'brightness(0.9) sepia(0.15)';
   c.drawImage(B, Math.round(gx + 12 * k), Math.round(gy - B.oy * sp), B.width * sp, B.height * sp);
   if (TITLE_HERO) {                                                    // Phase 1: der eigene Charakter, 3/4 von vorn, mit Ausrüstung und Waffe wie im Spiel
@@ -2886,4 +2922,5 @@ export function drawTitleScene(canvas, t) {
   c.fillStyle = shade; c.fillRect(0, 0, w, h);
   c.font = `italic ${Math.max(12, Math.round(k * 4))}px Spectral, Georgia, serif`; c.textAlign = 'right'; c.fillStyle = 'rgba(217,205,178,.55)';   /* Nutzer: welcher Ort gerade zu sehen ist */
   c.fillText(L.theme.name, w - 18, h - 16); c.textAlign = 'left';
+  if (titleRot.prev) { const q = (t - titleRot.fs) / 1600; if (q >= 1) titleRot.prev = null; else { c.globalAlpha = 1 - q; c.drawImage(titleRot.prev, 0, 0); c.globalAlpha = 1; } }   /* Überblenden */
 }
