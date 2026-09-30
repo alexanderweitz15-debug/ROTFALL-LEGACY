@@ -3,6 +3,7 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Handwerk: Rezepte an Esse, Werkbank und Kessel (Lagerfeuer), Güte von Grob bis Meisterstück nach Fertigkeit, Königseisen hebt die Güte.
 - Banden entstehen zufällig mit Lager, Gebiet, Hinterhalten und Schutzgeld; Anführer tot = Bande zerfällt, Kopfgeld.
 - Titelbild zeigt zufällig einen von sechs Orten (Grenzfeste, Aurelion, Goblinhort, Eisenfeste, Karak-Atar, Schwarze Feste) mit eigener Bewegung.
 - Verletzungen über Tage: Brüche (heilen nur bis 40 %, Heilerin schient), Entzündungen, Narben (+1 Rüstung).

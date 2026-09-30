@@ -88,6 +88,7 @@ export const ITEMS = {
   runenarmbrust: { name:'Runenarmbrust', slot:'weapon', wtype:'crossbow', dmg:28, reach:440, speed:420, reload:1500, stam:6, ap:0.5, rarity:'rare', value:480, skill:'archery', ranged:true, twohand:true, magitech:true, energy:6, mstatus:{ key:'burning', chance:0.5 }, mtier:2, lore:'Eingeritzte Feuerrunen glühen am Bolzen auf, sobald er die Sehne verlässt.' },
   kristallkanone:{ name:'Kristallkanone', slot:'weapon', wtype:'crossbow', dmg:40, reach:380, speed:420, reload:2600, stam:9, ap:0.3, rarity:'epic', value:980, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:25, splash:64, mtier:3, lore:'Ein Splitter Himmelskristall, in Messing gefasst. Wo er einschlägt, platzt die Luft.' },
   praezisionsgewehr:{ name:'Präzisionsgewehr', slot:'weapon', wtype:'crossbow', dmg:48, reach:680, speed:420, reload:3200, stam:6, ap:0.9, rarity:'epic', value:1200, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:15, pierce:1, mtier:3, lore:'Mit Linsenvisier aus der Akademie. Die Kugel geht durch den ersten Mann und trifft den zweiten.' },
+  koenigseisen:  { name:'Königseisen', slot:'material', stack:20, rarity:'rare', value:120, lore:'Dunkles Eisen aus der Tiefhall. Beim Schmieden verarbeitet, hebt es jede Arbeit um eine Güte.' },   /* Nutzer §5d.8 */
   trophaee:      { name:'Trophäe', slot:'material', rarity:'rare', value:90, lore:'Beweis für einen erledigten Mini-Boss. Händler zahlen gut, Wirte hängen so etwas gern an die Wand.' },
   energiezelle:  { name:'Energiezelle', slot:'consumable', use:'cell', stack:9, rarity:'common', value:30, lore:'Ein Kristall in Messing. Füllt die Energie einer Magitech-Waffe auf 100.' },
   donnerbuechse:{ name:'Donnerbüchse', slot:'weapon', wtype:'crossbow', dmg:40, reach:480, speed:380, reload:3200, stam:6, ap:0.8, rarity:'epic', value:650, skill:'archery', ranged:true, twohand:true, proj:'bullet', magitech:true, energy:12, lore:'Die Waffe der Sonnenlegion. Laut genug, dass Pferde scheuen.' },
@@ -1266,6 +1267,30 @@ export const WAR_EDGES = [['graveyard','marsh'], ['graveyard','fortress'], ['mar
 // pal: Tierfell), Kräften und Beute. base: eigene Art, crew: Gefolge, where: Gegenden (conPool), hp/dmg/spd/armor: Faktoren und Zusatz,
 // power: burn/frost/shock (Treffer setzt Zustand), regen (heilt sich), summon (ruft bei halbem Leben Gefolge), rally (Gefolge eilt herbei),
 // charge (sehr schnell), tough (Panzer). drop: sichere Beute (Seltenheit wird hochgewürfelt). say: Aushang-Text.
+// Nutzer §5d.8: Rezepte. st = Station (forge: Esse/Amboss, Fertigkeit Schmieden; bench: Werkbank, Handwerk; kessel: Lagerfeuer,
+// Medizin). need = Vorrat (Holz, Stein, Eisen, Kräuter) oder Gegenstände aus der Tasche. min = nötige Fertigkeit, n = Anzahl.
+export const RECIPES = {
+  dagger:        { st: 'forge', need: { iron: 2 } },
+  longsword:     { st: 'forge', need: { iron: 4, wood: 1 } },
+  axe:           { st: 'forge', need: { iron: 3, wood: 2 } },
+  spear:         { st: 'forge', need: { iron: 2, wood: 3 } },
+  kriegssichel:  { st: 'forge', need: { iron: 4, wood: 1 }, min: 15 },
+  grassense:     { st: 'forge', need: { iron: 3, wood: 2 }, min: 10 },
+  iron_helm:     { st: 'forge', need: { iron: 4 } },
+  kite_shield:   { st: 'forge', need: { iron: 4, wood: 2 }, min: 15 },
+  chain_hauberk: { st: 'forge', need: { iron: 7 }, min: 20 },
+  plate_cuirass: { st: 'forge', need: { iron: 10, ingot: 2 }, min: 40 },
+  wooden_shield: { st: 'bench', need: { wood: 4 } },
+  buckler:       { st: 'bench', need: { wood: 2, iron: 1 } },
+  shortbow:      { st: 'bench', need: { wood: 4 } },
+  longbow:       { st: 'bench', need: { wood: 6 }, min: 25 },
+  leather_cap:   { st: 'bench', need: { pelt: 1 } },
+  leather_jerkin:{ st: 'bench', need: { pelt: 3 } },
+  schockpistole: { st: 'bench', need: { ersatzteile: 4, automatenkern: 1, iron: 2 }, min: 30 },
+  energiezelle:  { st: 'bench', need: { ersatzteile: 1, automatenkern: 1 }, n: 2 },
+  potion:        { st: 'kessel', need: { herb: 3 } },
+  bandage:       { st: 'kessel', need: { cloth: 1 }, n: 3 },
+};
 export const ELITES = {
   schlitzer:   { name: 'Hagen der Schlitzer', base: 'bandit', where: ['bandit'], hp: 1.8, dmg: 1.2, power: 'rally', drop: 'longsword', look: { face: 'mask', scarf: '#8a1a14', cape: '#5a1a1c' }, say: 'schlitzt Kaufleute auf der Landstraße und lässt die Leichen im Graben. Er trägt ein rotes Tuch vor dem Mund.' },
   einauge:     { name: 'Ruprecht Einauge', base: 'bandit_archer', crew: 'bandit', where: ['bandit', 'bandit_archer'], hp: 1.6, dmg: 1.35, power: 'rally', drop: 'longbow', look: { helm: 'hat', helmCol: '#1a1816', beard: 1, cloak: '#2a2622' }, say: 'trifft mit seinem einen Auge noch jeden Wachmann auf hundert Schritt. Seine Bande lauert im Unterholz.' },
