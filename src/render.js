@@ -108,6 +108,12 @@ export function drawFrame(now) {
     ctx.fillStyle = '#b8a370'; ctx.fillRect(t.x - 15, t.y - 45, 30 * k, 3);
   }
 
+  if (S.coop) for (const e of list) if (e.alive && (e.kind === 'player' || e.coopPilot)) {   /* Koop (Nutzer): Name über dem Kopf jedes Spielers */
+    const t = e.coopName ? `${e.name} (${e.coopName})` : e.name, y = e.y - 44;
+    ctx.font = 'bold 9px Spectral, serif'; ctx.textAlign = 'center'; const w = ctx.measureText(t).width + 8;
+    ctx.fillStyle = 'rgba(12,10,8,.7)'; ctx.fillRect(e.x - w / 2, y - 9, w, 12);
+    ctx.fillStyle = e.kind === 'player' ? '#e8c070' : '#9fd0f0'; ctx.fillText(t, e.x, y); ctx.textAlign = 'left';
+  }
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   drawFires(now);     // S14: Brand in der Stadt
   ctx.restore();
