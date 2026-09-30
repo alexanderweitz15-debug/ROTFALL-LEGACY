@@ -1033,7 +1033,7 @@ const frameCache = new Map(), cacheStat = { miss: 0, clears: 0 };
 export const frameCacheInfo = () => ({ size: frameCache.size, ...cacheStat });
 function cacheGet(k, make) {
   let f = frameCache.get(k); if (f) return f;
-  if (frameCache.size > 4000) { frameCache.clear(); warmed.clear(); cacheStat.clears++; }
+  if (frameCache.size > 4000) { let n = 400; for (const key of frameCache.keys()) { frameCache.delete(key); if (--n <= 0) break; } cacheStat.clears++; }   /* Audit D7: älteste 10 % verwerfen statt alles (kein Spitzenruckler), warmed bleibt */
   cacheStat.miss++;
   f = make(); frameCache.set(k, f); return f;
 }

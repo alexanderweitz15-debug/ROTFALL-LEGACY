@@ -776,7 +776,7 @@ function drawHouse(b, now) {
     ctx.globalAlpha = a * (HB.wearOf(b) === 2 ? 0.75 : 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(src, x0, y0, dw, dh); ctx.globalAlpha = 1; return; } }
   const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b);   // Verfall (auch Kriegsschäden) im Schlüssel
   let cv = houseCache.get(key);
-  if (!cv) { if (houseCache.size > 120) houseCache.clear(); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
+  if (!cv) { trimCache(houseCache, 120); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
   const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
   const a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15;
   roofAlpha.set(b, a);
@@ -950,7 +950,7 @@ function drawPropPixel(e, now) {
   if (per) { ph = ((now / per * 6 + h2(e.x | 0, 7) * 6) | 0) % 6; key += '#' + ph; }
   let cv = propCache.get(key);
   if (!cv) {
-    if (propCache.size > 600) propCache.clear();
+    trimCache(propCache, 600);
     const B = PROP_BOX[e.type] || 96;
     cv = document.createElement('canvas'); cv.width = cv.height = Math.round(B * PROP_RES);   // G5: feines Raster (1 Welt je Pixel) wie Figuren
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
@@ -1826,6 +1826,8 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
 // S14: swingOf wohnt in fig5.js (eine Quelle für Stil D und R, kein Import-Zyklus)
 export const swingOf = SP.swingOf;
 // Hiebvariante je Schlag: beim Beginn eines Schwungs gewählt (Kombo mit Zufall), je Figur gemerkt (Gegner zeichnen über Kopien → id)
+// Audit D7: voller Cache verwirft die ältesten 10 % (Einfügereihenfolge) statt alles — sonst baut ein Bild alle Häuser/Props neu.
+function trimCache(m, max) { if (m.size <= max) return; let n = Math.ceil(max / 10); for (const k of m.keys()) { m.delete(k); if (--n <= 0) break; } }
 const SWING_V = new Map();
 function swingVar(e, sw) {
   if (SWING_V.size > 3000) SWING_V.clear();                          // ponytail: grobe Aufräumung, reicht bei ein paar hundert Kämpfern
@@ -2209,7 +2211,7 @@ const bakeCache = new Map();
 function drawBaked(key, e, box, fn) {
   let cv = bakeCache.get(key);
   if (!cv) {
-    if (bakeCache.size > 400) bakeCache.clear();
+    trimCache(bakeCache, 400);
     cv = document.createElement('canvas'); cv.width = cv.height = box / 2;
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(0.5, 0, 0, 0.5, 0, 0); ctx = o;
