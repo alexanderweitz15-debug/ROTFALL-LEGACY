@@ -531,3 +531,18 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .coop-box input{background:#0d0b08;border:1px solid #4a3d24;color:#e7dcc2;padding:6px 8px;font:14px Spectral,serif;flex:1}
 .coop-row{display:flex;gap:8px;align-items:center}
 #coop-guests{display:grid;gap:6px}
+/* Koop-Warteraum: Charakterkarten */
+.coop-box{width:min(720px,94vw)}
+.coop-cards{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:8px 0}
+.coop-card{width:140px;background:linear-gradient(180deg,#2a2219,#15110c);border:2px solid #4a3d24;padding:6px;text-align:center;display:grid;gap:2px}
+.coop-card.ready{border-color:#c8a050;box-shadow:0 0 12px rgba(200,160,80,.35)}
+.coop-card canvas{width:120px;height:150px;margin:0 auto;image-rendering:pixelated;background:radial-gradient(circle at 50% 70%,rgba(120,95,60,.35),transparent 70%)}
+.cc-who{font:bold 14px Cinzel,serif;color:#f0e6cd;letter-spacing:.06em;text-transform:uppercase}
+.cc-name{font:14px Spectral,serif;color:#e7dcc2}
+.cc-sub{font-size:12px;color:#a79b83}
+.cc-state{font:11px Cinzel,serif;letter-spacing:.1em;color:#8a7d66}
+.coop-card.ready .cc-state{color:#c8a050}
+.coop-box{box-sizing:border-box}
+.coop-box input{min-width:0}
+.coop-box details{font-size:12px}
+.coop-box details label{margin-top:4px}

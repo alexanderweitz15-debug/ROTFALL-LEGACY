@@ -13884,7 +13884,7 @@ function titleLoop(t) {
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
 function coopAPI() {
   return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
-    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
+    isRunning: () => running, moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS, addItem, price, shopStock, ecoTown, travelVia, shopRefusal, openCreation, loadRaw, CLASSES, FIRST_M, SKIN, HAIR, CLOTH, updatePrompt, recalc, talk, QUESTS, doInteract, GUEST_BAR, makeGuestHero, parkCoopHero, unparkCoopHero, ORIGINS, dialogue: (...a) => UI.dialogue(...a), clock };
 }
 function boot() {
   UI.initUI();
