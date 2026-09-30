@@ -1860,7 +1860,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim();
 
   const o = ORIGINS[cfg.origin];
@@ -2044,7 +2044,7 @@ export function continueGame(given = null) {                        /* Koop K2: 
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  aurelMetroMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); sideCityMigrate(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
   ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
@@ -6397,6 +6397,15 @@ const favor = k => ((S.houses ||= {})[k] ??= 0);
 function houseSeat(k) { const H = AUREL_HOUSES.find(h => h.key === k), c = S.ents.world.find(e => e.houseKey === k); return c ? { x: c.x / TS | 0, y: c.y / TS | 0 } : TOWN_PLAN[H.town] ? { x: TOWN_PLAN[H.town].square[0], y: TOWN_PLAN[H.town].square[1] } : null; }
 // Phase 5: Spielstände aus der Zeit vor der Metropole — Bewohner ohne Haus weg, leere Häuser besiedeln (idempotent je Haus),
 // Automaten-Wachen und Wachposten der alten Stadt neu verteilen. Einmal je Spielstand.
+// Nutzer §5d.10 (01.10.2026): neue Grundrisse der Nebenstädte — Bewohner ohne Haus werden entfernt und neu angesiedelt
+function sideCityMigrate() {
+  const towns = ['sanktserin', 'kupferhafen', 'tickmar', 'gelenkhall'].filter(k => TOWN_PLAN[k]); if (!towns.length) return;
+  const sig = 'lay2:' + towns.map(k => HOUSES.filter(b => b.town === k).length).join(','); if (S.flags.sideLay === sig) return;
+  const ids = new Set(HOUSES.map(b => b.id));
+  S.ents.world = S.ents.world.filter(e => !(e.kind === 'npc' && towns.includes(e.homeTown) && e.homeId && !ids.has(e.homeId)));
+  spawnResidents(); S.flags.sideLay = sig;
+  if (S.day > 1) log('Aurelions Nebenstädte wurden umgebaut: Sankt Serin um den Tempel, Kupferhafen um die Werft, Tickmar im Raster, Gelenkhall um den Ring.', 'world');
+}
 function aurelMetroMigrate() {
   if (!TOWN_PLAN.aurelheim?.metro) return;
   const mh = HOUSES.filter(b => b.town === 'aurelheim'), sig = 'v2:' + mh.length + ':' + (mh[0]?.id || '') + ':' + (mh[mh.length - 1]?.id || '');   // Aufbau geändert → neu besiedeln
@@ -14574,7 +14583,7 @@ export function selftest() {
       // 4. Händlerzug: Überschuss in Mühlbach, Not in Kreuzweg
       E.caravans = []; S.towns.muehlbach.stock.cloth = 300; K.stock.cloth = 0; ECO.ecoDay(); const car = E.caravans.some(c => c.good === 'cloth' && c.from === 'muehlbach');
       // 5. Eigener Wagen: kaufen, laden, fahren, am Ziel verkaufen
-      S.gold = 5000; E.my = null; ECO.buyWagon('muehlbach'); const r = ECO.loadGood('cloth', 10, g => ECO.ecoPrice('muehlbach', g, true));
+      S.gold = 5000; E.my = null; S.towns.muehlbach.stock.cloth = 300; ECO.buyWagon('muehlbach');   /* Vorrat neu, der Händlerzug davor nimmt je nach Nachfrage mit */ const r = ECO.loadGood('cloth', 10, g => ECO.ecoPrice('muehlbach', g, true));
       ECO.sendWagon('kreuzweg', 4); E.my.raided = true; const g0 = S.gold; for (let d = 0; d < 6 && E.my.to; d++) { S.day++; ECO.ecoDay(); }
       const wagon = r.got === 10 && !E.my.to && E.my.at === 'kreuzweg' && S.gold > g0 && ECO.cargoOf(E.my) === 0;
       // 6. Betrieb kaufen: Einnahmen am nächsten Tag

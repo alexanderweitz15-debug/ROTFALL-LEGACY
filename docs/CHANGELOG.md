@@ -6,6 +6,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Freie Seefahrt: eigenes Schiff, Kurse (Küste, Handelsroute, Wrackfeld), Seehandel mit Hafenpreisen, Piraterie, Bergung, Rumpf und Reparatur.
 - Tiefhall: lebende Königsstadt der Zwerge unter der toten Halle (König, Runenschmiedin mit Königseisen, Händler, Brauerei, Mine).
 - Kampfgefühl und Animation: Kombos mit Wuchtschlag, Humpeln im ungleichen Takt, Blutspur, Hilferufe Verletzter, Gesten im Gespräch.
+- Eigene Grundrisse: Sankt Serin (Tempelbezirk, Kreuzgang), Kupferhafen (Werftplatz, Hafenbecken mit Stegen), Tickmar (Straßenraster, Fabrikhof), Gelenkhall (Ringstraße um den Werkstattplatz).
 - Aurelions Nebenstädte mit eigenem Gesicht: Sankt Serin (Segen), Kupferhafen (Werft), Tickmar (Fabrikladen), Gelenkhall (Prothesenpflege).
 - Mehr Varianten: Automaten (Metall, Verschleiß, Leuchtfarbe), Engel (Gold, Mantel, Licht), Bewohner (Alter, Hut, Tuch, Flicken), Wachen (Wappenfarbe je Stadt).
 - Neue Waffen mit eigener Zeichnung: Morgenstern, Kettenkugel (Flegel), Katar; Goblin-Volkswaffen Schrottkeule und Schrottklinge.
