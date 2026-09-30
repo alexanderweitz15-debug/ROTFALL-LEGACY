@@ -4883,6 +4883,7 @@ function doInteract(target = null) {
     return;
   }
   if (t.kind === 'grave') {
+    if (t.hero != null && S.legacy.ancestors[t.hero]) return graveTalk(t);   /* Nutzer §5e.10: Ahnengrab mit Epilog */
     if (t.loot && t.loot.length) {
       const it = t.loot.pop();
       if (giveItem(p, it)) { log(`Aus dem Grab geborgen: ${ITEMS[it.key].name}.`, 'world'); onItemGained(it.key); }   // AUDIT H-05: Erbstück bleibt, was es war
@@ -12253,7 +12254,9 @@ function playerDeath(cause, source) {
   const rec = { name: p.name, age: p.age, days: S.day - (p.bornDay || 1), kills: p.kills || 0, battles: S.battles,
     settlements: S.settlement ? 1 : 0, family: S.party.length ? partyMembers().map(m => m.name).join(', ') : '—',
     cause, location: loc, year: year(), titles: (p.titles || []).join(', ') };
+  rec.level = p.level; rec.gen = S.legacy.gen; rec.fame = fameOf(); rec.deeds = newDeeds(); rec.fac = { ...S.factions };   /* Nutzer §5e.10: Stoff für den Epilog */
   S.legacy.ancestors.push(rec);
+  { const g = [...(S.ents[p.map] || [])].reverse().find(e => e.kind === 'grave' && e.charKey === 'player' && e.hero == null); if (g) { g.hero = S.legacy.ancestors.length - 1; g.label = `Grab: ${p.name}, Haus ${S.legacy.house}`; } }
   chronicle(`${p.name} fiel bei ${loc}`, 'death', `${cause}. Was er baute, steht noch.`);
   S.paused = true;
   UI.showDeath(rec, () => { UI.hideDeath(); chooseSuccessor(); });
@@ -12261,6 +12264,50 @@ function playerDeath(cause, source) {
   save();
 }
 
+// ================= Epilog (Nutzer §5e.10) =================
+// Am Grab eines früheren Helden des Hauses: Erbstücke bergen, das Epitaph lesen oder den Epilog hören — was die Welt von ihm
+// erzählt (große Taten seiner Generation, Ruhm, wer ihn ehrte und wer ihn verfluchte, Gefährten, Siedlung). Danach wählt man:
+// gleich weiterspielen oder „Zwanzig Jahre später“ (einmal je Generation, nicht im Koop): die Welt altert, der Erbe ist gereift.
+const DEEDS = [['garmadonSlain', 'Garmadon, der Totenkönig, fiel.'], ['chainsBroken', 'Die Ketten der Eisenmark wurden gebrochen.'], ['ilvarDead', 'Ilvar und sein Turm stürzten.'],
+  ['skyDead', 'Der Herr der Himmelsinsel fiel aus den Wolken.'], ['sandlordSlain', 'Karrak, der Sandfürst, fiel in seiner Wüste.'], ['alphaSlain', 'Der Leitwolf des Nordens heult nicht mehr.'],
+  ['wardenSlain', 'Der Wächter der Tiefe liegt still.'], ['hrodvarSlain', 'Hrodvar fiel.'], ['whitebeardSlain', 'Weißbart, der Pirat, ging mit seinem Schiff unter.'], ['vargSlain', 'Varg, der Kettenherr, ist tot.']];
+function newDeeds() { const done = (S.legacy.deeds ||= []), out = DEEDS.filter(([f]) => S.flags[f] && !done.includes(f)); done.push(...out.map(([f]) => f)); return out.map(([, t]) => t); }
+const FAC_NAME = { valen: 'Valens Krone', order: 'der Weiße Orden', undead: 'die Stille Schar', aurel: 'Aurelion', merch: 'die Kaufleute', bandit: 'die Banden', kette: 'die Kette' };
+function epilogText(rec) {
+  const he = rec.name, L = [];
+  L.push(`${he}, ${rec.titles ? rec.titles + ', ' : ''}Stufe ${rec.level || '?'}, Generation ${rec.gen || '?'} von Haus ${S.legacy.house}. Gefallen im Jahr ${rec.year} bei ${rec.location}: ${rec.cause}.`);
+  L.push(rec.deeds?.length ? `Was ${he} vollbrachte: ${rec.deeds.join(' ')}` : `Große Taten schrieb niemand auf. Aber ${rec.kills || 0} Feinde lagen hinter ${he}, und ${rec.days || 0} Tage auf der Straße sind auch ein Leben.`);
+  const f = rec.fame || 0; L.push(f >= 60 ? `In den Schenken singt man noch heute von ${he}. Kinder spielen die Kämpfe nach.` : f >= 25 ? `Wer in den Städten nachfragt, findet noch Leute, die ${he} gekannt haben.` : `Die Welt hat ${he} schnell vergessen. Nur das Haus erinnert sich.`);
+  const fac = Object.entries(rec.fac || {}).filter(([k]) => FAC_NAME[k]).sort((a, b) => b[1] - a[1]);
+  if (fac.length && fac[0][1] >= 30) L.push(`${FAC_NAME[fac[0][0]]} ehrte ${he} mit einem Platz in den Listen der Treuen.`);
+  if (fac.length && fac[fac.length - 1][1] <= -30) L.push(`${FAC_NAME[fac[fac.length - 1][0]]} verflucht den Namen bis heute.`);
+  if (rec.family && rec.family !== '—') L.push(`An ${he}s Seite gingen: ${rec.family}.`);
+  if (rec.settlements) L.push(`Die Siedlung, die ${he} gründete, steht noch.`);
+  return L.join('\n\n');
+}
+function graveTalk(t) {
+  const rec = S.legacy.ancestors[t.hero], p = S.player, leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
+  const canSkip = t.hero === S.legacy.ancestors.length - 1 && S.legacy.skipGen !== S.legacy.gen && !S.coop?.role;
+  const after = () => UI.dialogue(p, 'Die Geschichte geht weiter. Wie?', [
+    { text: 'Gleich weiter. Es gibt zu tun.', fn: () => { UI.closeDialogue(); log(`${p.name} wendet sich vom Grab ab. Die Straße wartet.`, 'world'); } },
+    ...(canSkip ? [{ text: 'Zwanzig Jahre später …', fn: () => { UI.closeDialogue(); timeSkip(20); } }] : []), ...leave]);
+  UI.dialogue(p, `Das Grab von ${rec.name}. Moos am Stein.`, [
+    ...(t.loot?.length ? [{ text: `Erbstücke bergen (${t.loot.length})`, fn: () => { UI.closeDialogue(); const it = t.loot.pop(); if (giveItem(p, it)) { log(`Aus dem Grab geborgen: ${ITEMS[it.key].name}.`, 'world'); onItemGained(it.key); } else t.loot.push(it); } }] : []),
+    { text: 'Das Epitaph lesen', fn: () => UI.dialogue(p, t.epitaph.replace(/<br>/g, '\n'), [{ text: 'Weiter', fn: () => graveTalk(t) }]) },
+    { text: `Epilog: Was von ${rec.name} bleibt`, fn: () => { rec.heard = true; UI.dialogue(p, epilogText(rec), [{ text: 'Weiter', fn: after }]); } }, ...leave]);
+}
+function timeSkip(years) {
+  const p = S.player, d = years * 60; S.legacy.skipGen = S.legacy.gen;
+  S.day += d; syncClock(); p.bornDay = (p.bornDay || S.day) - d;
+  for (const c of [p, ...partyMembers()]) c.age = (c.age || 25) + years;
+  for (let i = 0; i < 4; i++) gainXp(p, Math.max(1, (p.xpNext || 100) - (p.xp || 0)));
+  for (const b of bandsOf()) bandGone(b);
+  for (const C of activeCons()) { C.state = 'claimed'; const st = S.quests['c_' + C.id]; if (st) { st.state = 'failed'; st.outcome = 'Zwanzig Jahre sind vergangen.'; } }
+  S.ents.world = S.ents.world.filter(e => !(e.contract && e.kind !== 'enemy'));
+  chronicle(`Zwanzig Jahre vergehen`, 'legacy', `${p.name} ist jetzt ${p.age}. Haus ${S.legacy.house} hat überdauert.`);
+  log(`Zwanzig Jahre vergehen. ${p.name} ist jetzt ${p.age} Jahre alt, gereift und erfahrener (Stufe ${p.level}). Es ist das Jahr ${year()}.`, 'world');
+  UI.toast(`ZWANZIG JAHRE SPÄTER — JAHR ${year()}`, 4200); UI.refreshHUD();
+}
 function makeSuccessorCandidates() {
   const out = [];
   for (const m of partyMembers()) { m.relation = 'Gefährte'; out.push(m); }
@@ -12334,6 +12381,7 @@ function adoptSuccessor(c) {
   chronicle(`${c.name} übernimmt Haus ${S.legacy.house}`, 'legacy',
     `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : old.map === 'deep' ? 'der Tiefhall' : 'der Erde von Greenmark'}.`);
   log(`${c.name} führt Haus ${S.legacy.house} weiter. Generation ${S.legacy.gen}.`, 'death');
+  log(`Am Grab von ${old.name} (${S.legacy.ancestors[S.legacy.ancestors.length - 1]?.location || 'wo er fiel'}) kannst du hören, was von ${old.name} bleibt — und entscheiden, ob die Geschichte gleich weitergeht oder zwanzig Jahre später.`, 'quest');   /* Nutzer §5e.10 */
   S.paused = false;
   coopHooks.afterHeir?.();   /* Koop: Erben der Mitspieler kommen jetzt dazu */
   UI.toast(`GENERATION ${S.legacy.gen} — ${c.name}`, 5000);
@@ -12957,6 +13005,8 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Epilog: Ahnengrab hier (letzter Vorfahr oder Probe)': () => { const p = P(); if (!S.legacy.ancestors.length) S.legacy.ancestors.push({ name: 'Probe-Ahn', year: year(), location: 'hier', cause: 'Test', level: 10, gen: 1, fame: 40, deeds: ['Garmadon, der Totenkönig, fiel.'], fac: { valen: 50, order: -40 }, family: '—' });   /* Nutzer §5e.10 */
+        S.ents[S.map].push({ id: uid(), kind: 'grave', map: S.map, x: p.x + 30, y: p.y, r: 10, label: 'Ahnengrab', epitaph: 'Test', loot: [], charKey: 'player', hero: S.legacy.ancestors.length - 1 }); UI.toast('Grab rechts neben dir (E)'); },
       'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
       'Verletzung: einen Tag vergehen lassen': () => woundDay(),
       'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
@@ -15589,6 +15639,15 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Epilog (Nutzer §5e.10): Taten werden je Generation einmal gezählt, der Epilog nennt Taten, Ruhm, Ehre und Fluch; zwanzig Jahre später altert der Held und reift', sandbox(() => {
+    const p = stage(), f0 = { ...S.flags }, lg = structuredClone(S.legacy), d0 = S.day, b0 = S.bands, c0 = S.contracts; S.bands = []; S.contracts = [];
+    try { S.legacy.deeds = []; S.flags.garmadonSlain = 1; const a = newDeeds(), b = newDeeds(); const once = a.length === 1 && b.length === 0;
+      const txt = epilogText({ name: 'Ahn', year: 20, location: 'Eren', cause: 'Pfeil', level: 12, gen: 1, fame: 70, deeds: a, fac: { valen: 50, order: -50 }, family: 'Brenna', settlements: 1 });
+      const says = /Garmadon/.test(txt) && /singt man/.test(txt) && /ehrte/.test(txt) && /verflucht/.test(txt) && /Brenna/.test(txt);
+      p.age = 30; const lv = p.level; timeSkip(20); const aged = p.age === 50 && S.day === d0 + 1200 && p.level > lv && S.legacy.skipGen === S.legacy.gen;
+      return once && says && aged;
+    } finally { S.flags = f0; S.legacy = lg; S.day = d0; S.bands = b0; S.contracts = c0; syncClock(); }
   }));
   ok('Verletzungen (Nutzer §5e.7): gebrochenes Glied heilt nur bis 40 %, Heilerin schient (doppelt schnell), verheilt nach Tagen mit Narbe (+1 Rüstung), Entzündung zehrt und wird gereinigt', sandbox(() => {
     const p = stage(); S.gold = 100; const P = p.body.larm; P.hp = 0; P.broken = 4; P.splint = false; B.fullHeal(p); const capped = P.hp === Math.round(P.max * 0.4);

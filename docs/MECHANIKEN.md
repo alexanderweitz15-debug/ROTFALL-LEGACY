@@ -512,3 +512,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Freund fürs Leben:** Wer danach 70 oder mehr Loyalität hat, wird Freund fürs Leben (♥): verrät nie mehr, +2 auf sein bestes Attribut. Keine Romanze.
 - **Verrat:** Unter 30 warnt der Gefährte jeden Tag. Unter 15 kann jeder Gefährte verraten (30 % am Tag): mit bis zu 30 % deines Golds (höchstens 300) verschwinden oder die Waffe gegen dich ziehen.
 - **Debug:** „Gefährten: Loyalität −40“, „Gefährten: Loyalität +30 und 3 Feuergespräche“, „Gefährten: Loyalitätstag“. Probe „Gefährten 2.0 (Nutzer §5e.1)“.
+
+## Runde: Epilog (Nutzer §5e.10, Version 21)
+- **Ahnengrab:** Wo ein Held des Hauses fällt, steht sein Grab (Name und Haus). Beim Erben erinnert ein Log-Eintrag daran, wo es liegt.
+- **Am Grab (E):** Erbstücke bergen, das Epitaph lesen oder „Epilog: Was von … bleibt“. Der Epilog erzählt die großen Taten dieser Generation (jede Tat zählt nur für die Generation, in der sie geschah), wie berühmt der Held war, welche Macht ihn ehrte (Ruf ab 30) und welche ihn verflucht (Ruf ab −30), wer an seiner Seite ging und ob seine Siedlung steht.
+- **Danach die Wahl:** „Gleich weiter“ oder „Zwanzig Jahre später …“ (nur am Grab des letzten Vorfahren, einmal je Generation, nicht im Koop): 1200 Tage vergehen, Held und Gefährten altern um 20 Jahre, der Held steigt 4 Stufen auf, offene Aufträge und Banden verfallen.
+- **Debug:** „Epilog: Ahnengrab hier“. Probe „Epilog (Nutzer §5e.10)“.
