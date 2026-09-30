@@ -8084,7 +8084,7 @@ function travel(to) {
   const p = S.player, from = S.map;
   leavePursuit(from, to);
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
-  const members = [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   // Diener gehen mit ihrem Herrn
+  const members = to === 'kerker' && S.jail ? [] : [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   /* Nutzer: in den Kerker kommt nur der Held, die Gruppe (auch der Mitspieler) wartet draußen */   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   if (to !== 'world' && p.mounted && S.map === 'world') leaveHorse(p);   // S15: das Pferd wartet vor der Tür
   S.map = to; p.map = to; if (to !== 'world') p.mounted = null;   // S13: Reittier bleibt draußen
