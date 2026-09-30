@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=21';
-import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES } from './data.js?v=21';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=21';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=21';
 import * as R from './render.js?v=21';
 import * as HB from './buildings.js?v=21';
@@ -151,11 +151,12 @@ function mkItem(key, count = 1, roll = null) {
   if (it.fixed) o.afx = { ...(o.afx || {}), ...it.fixed };   // S15 P2: Talisman-Werte gelten immer
   return o;
 }
-export function rollRarity(o, it, bonus = 0) {
+export function rollRarity(o, it, bonus = 0, force = null) {   /* force: feste Güte (Handwerk) */
   let r = rnd(), tier = 'common';
   const w = Object.entries(RARITY_DROP).map(([k, p]) => [k, RARITY_ORDER.indexOf(k) >= 2 ? p * (1 + bonus * 0.5) : p]);
   const sum = w.reduce((n, [, p]) => n + p, 0); r *= sum;
   for (const [k, p] of w) { if (r < p) { tier = k; break; } r -= p; }
+  if (force) tier = force;
   const base = it.rarity || 'common';
   if (RARITY_ORDER.indexOf(tier) <= RARITY_ORDER.indexOf(base)) return o;          // nicht besser als die Grundware
   o.rar = tier; o.afx = {};
@@ -934,7 +935,7 @@ const JOB_AT = {
   Kaufmann: { stall: true }, Kaufherr: { stall: true }, 'Händlerin': { stall: true }, 'Tuchhändlerin': { stall: true }, 'Gewürzhändler': { stall: true },
 };
 const STALL_SELL = { 'Bäcker': ['bread', 'bread', 'dried_meat'], Weber: ['traveler_cloak', 'leather_cap', 'bandage'], 'Böttcher': ['wood', 'bread'], Bauer: ['bread', 'dried_meat', 'herb'], Magd: ['herb', 'bread', 'bandage'], Handwerker: ['wood', 'stone', 'bandage'] };
-const SMITH_POOL = ['rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
+const SMITH_POOL = ['koenigseisen', 'rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
 const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion'];
 function spotBy(prop, b) {                                        // freier Stehplatz neben dem Möbel, drinnen zuerst Richtung Tür
   for (const [ox, oy] of [[0, 22], [0, -22], [22, 0], [-22, 0], [16, 18], [-16, 18]]) {
@@ -4651,7 +4652,7 @@ function act(c, kind, ms, toward) {
 const houseOf = t => t.house && HOUSES.find(b => b.id === t.house);
 const FURN_USE = { bed: 'Schlafen', bunk: 'Schlafen', stall: 'Handeln', counter: 'Handeln', bench: 'Rasten', throne: 'Auf den Thron setzen',
   cask_rack: 'Zapfen', shelf: 'Durchsuchen', desk: 'Durchsuchen', crate_stack: 'Durchsuchen', weapon_rack: 'Durchsuchen',
-  machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Ausrüstung ausbessern', anvil: 'Ausrüstung ausbessern', workbench_int: 'Ausrüstung ausbessern', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
+  machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Schmieden oder ausbessern', anvil: 'Schmieden oder ausbessern', workbench_int: 'Werkbank: bauen oder ausbessern', campfire_static: 'Am Kessel brauen', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
 const furnAct = t => t.kind === 'prop' && !t.harvest && !t.loot && !t.feast && !t.bond && !t.mechBench ? FURN_USE[t.type] || null : null;
 const INN_PRICE = 8, TAP_PRICE = 3;
 function furnWitnesses(t) {
@@ -4667,7 +4668,8 @@ function useFurniture(t) {
     case 'stall': case 'counter': return tradeAt(t);
     case 'bench': case 'throne': return sitOn(t, b);
     case 'cask_rack': return tapCask(t, b);
-    case 'forge': case 'anvil': case 'workbench_int': return mendAt(t);
+    case 'forge': case 'anvil': case 'workbench_int': return craftMenu(t.type === 'workbench_int' ? 'bench' : 'forge', t);   /* Nutzer §5d.8: Handwerk */
+    case 'campfire_static': return craftMenu('kessel', t);
     case 'machine': case 'gearpile': return factoryWork(t);   // Nutzer S13: Fabrik benutzbar
     case 'trough': case 'well': if ((p.drinkCd || 0) > clock()) return UI.toast(`Du hast gerade erst getrunken (noch ${Math.ceil(p.drinkCd - clock())} s).`);   // S13 (Nutzer): 20 s Abklingzeit
       p.drinkCd = clock() + 20; act(p, 'kneel', 700, t); p.stamina = p.maxStamina; p.status = (p.status || []).filter(s => s.key !== 'burning');
@@ -4765,6 +4767,41 @@ function selfRepair(t) {
   if (t) { act(p, 'work', 1500, t); passTime(20 * done); } p.skills.smithing = Math.min(100, (p.skills.smithing || 0) + 0.4 * done); recalc(p);
   log(`Selbst gewartet: ${done} Teil${done > 1 ? 'e' : ''} auf ${cap} % (${used.join(', ')}). Das Feinwerkzeug bleibt, das Material ist verbraucht.${done < todo.length ? ' Für den Rest fehlt Material.' : ''}`, 'economy'); UI.refreshHUD();
   return true;
+}
+// ================= Handwerk mit Qualität (Nutzer §5d.8) =================
+// Esse/Amboss (Schmieden), Werkbank (Handwerk) und jedes Lagerfeuer als Kessel (Medizin) haben Rezepte (data.js RECIPES).
+// Die Güte hängt an der Fertigkeit und etwas Glück: Grob (schlechter Zustand), Solide, Gut, Meisterlich, Meisterstück (höhere
+// Seltenheit mit Zusatzwerten). Königseisen hebt eine Schmiedearbeit um eine Stufe. Jede Arbeit übt die Fertigkeit.
+const ST_NAME = { forge: 'Esse', bench: 'Werkbank', kessel: 'Kessel' }, ST_SKILL = { forge: 'smithing', bench: 'crafting', kessel: 'medicine' };
+const QUAL = [['Grob', 0.2, null], ['Solide', 0.45, null], ['Gut', 0.7, 'uncommon'], ['Meisterlich', 0.9, 'rare'], ['Meisterstück', 9, 'epic']];
+const matHave = k => (S.res[k] || 0) + S.player.inv.filter(x => x.key === k).reduce((n, x) => n + (x.count || 1), 0);
+function matTake(k, n) { const r = Math.min(S.res[k] || 0, n); if (r) S.res[k] -= r; if (n - r > 0) removeItem(S.player, k, n - r); }
+const needTxt = R => Object.entries(R.need).map(([k, n]) => `${n} ${ITEMS[k]?.name || k}`).join(', ');
+function craftQual(skill, ke) { const q = skill / 100 * 0.75 + rnd() * 0.35 - 0.05; let i = QUAL.findIndex(Q => q < Q[1]); if (ke) i = Math.min(QUAL.length - 1, i + 1); return i; }
+function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und Geste (Probe) */
+  const R = RECIPES[key], p = S.player, sk = ST_SKILL[R.st], skill = p.skills[sk] || 0;
+  if (skill < (R.min || 0)) { UI.toast(`Dafür brauchst du ${SKILL_NAMES[sk] || sk} ${R.min}.`); return null; }
+  if (Object.entries(R.need).some(([k, n]) => matHave(k) < n) || (ke && !hasItem(p, 'koenigseisen'))) { UI.toast(`Dir fehlt Material: ${needTxt(R)}.`); return null; }
+  Object.entries(R.need).forEach(([k, n]) => matTake(k, n)); if (ke) removeItem(p, 'koenigseisen', 1);
+  const qi = craftQual(skill, ke), [qn, , tier] = QUAL[qi], it = ITEMS[key];
+  p.skills[sk] = Math.min(100, skill + 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
+  if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0); addItem(p, key, n); log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
+  const o = mkItem(key); o.cond = qi === 0 ? 0.6 : 1; o.qual = qn; o.maker = p.name;
+  if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(it.rarity || 'common')) rollRarity(o, it, 0, tier);
+  if (p.inv.length >= p.invCap) dropItemAt(S.map, p.x, p.y + 12, o); else p.inv.push(o);
+  log(`${ST_NAME[R.st]}: ${it.name} — ${qn}${qi >= 3 ? '! Eine Arbeit, auf die man stolz sein kann.' : '.'}`, 'economy'); if (qi >= 3) UI.toast(`${qn.toUpperCase()}: ${it.name}`, 2200);
+  return o;
+}
+function craftMenu(st, t) {
+  const p = S.player, sk = ST_SKILL[st], skill = Math.round(p.skills[sk] || 0), list = Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k]);
+  if (!S.flags.craftHint) { S.flags.craftHint = 1; log('Handwerk: Rezepte an Esse, Werkbank und Lagerfeuer (Kessel). Je höher die Fertigkeit, desto besser die Güte — Königseisen hebt eine Schmiedearbeit um eine Stufe.', 'quest'); }
+  const ch = list.map(([k, R]) => { const ok = Object.entries(R.need).every(([m, n]) => matHave(m) >= n) && skill >= (R.min || 0);
+    return { text: `${ok ? '' : '✗ '}${ITEMS[k].name}${R.n ? ` ×${R.n}` : ''} — ${needTxt(R)}${R.min && skill < R.min ? ` (braucht ${R.min})` : ''}`, fn: () => { UI.closeDialogue(); craftItem(k); } }; });
+  if (st === 'forge' && hasItem(p, 'koenigseisen')) ch.unshift({ text: 'Mit Königseisen schmieden (eine Güte höher) …', fn: () => UI.dialogue(p, 'Welches Stück mit Königseisen?', [
+    ...list.map(([k, R]) => ({ text: `${ITEMS[k].name} — ${needTxt(R)} + Königseisen`, fn: () => { UI.closeDialogue(); craftItem(k, true); } })), { text: '[Zurück]', fn: () => craftMenu(st, t) }]) });
+  if (st !== 'kessel') ch.push({ text: st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern (oder Prothesen warten)', fn: () => { UI.closeDialogue(); mendAt(t); } });
+  ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
+  UI.dialogue(p, `${ST_NAME[st]} — ${({ smithing: 'Schmieden', crafting: 'Handwerk', medicine: 'Medizin' })[sk]} ${skill}. Was stellst du her?`, ch);
 }
 function mendAt(t, skipMech = false) {
   if (!skipMech && B.bionicParts(S.player).some(x => x.cond < selfCap(S.player))) return UI.dialogue(S.player, 'Werkbank: Was willst du tun?', [   /* Roadmap P4 */
@@ -10324,8 +10361,13 @@ const HEALER_MS = 3500;
 const BAND_NAMES = ['Die Krähen', 'Die Rote Hand', 'Die Grauen Wölfe', 'Die Schlitzer', 'Die Galgenbrüder', 'Die Aschemäntel', 'Die Nachtfalken', 'Die Schwarzen Stiefel'];
 const bandsOf = () => (S.bands ||= []).filter(b => !b.gone);
 function bandFound(town, at = null) {
-  const T = TOWN_PLAN[town]; if (!T?.square) return null; const [sx, sy] = T.square, a = rnd() * 6.283, r = ri(30, 50);
-  const q = at ? freeSpotNear('world', at[0], at[1], 3) : freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3); if (!q) return null;
+  const T = TOWN_PLAN[town]; if (!T?.square) return null; const [sx, sy] = T.square;
+  let q = at ? freeSpotNear('world', at[0], at[1], 3) : null;
+  if (!at) for (let tries = 0; tries < 8 && !q; tries++) {   /* Fehlersuche: nicht mitten in der Stadt ansiedeln (große Städte reichen weiter als 30-50 Felder) */
+    const a = rnd() * 6.283, r = ri(30, 50), cand = freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3);
+    if (cand && !townAt(cand.x / TS | 0, cand.y / TS | 0, 12)) q = cand;
+  }
+  if (!q) return null;
   const used = new Set(bandsOf().map(b => b.name)), tx = q.x / TS | 0, ty = q.y / TS | 0;
   const B0 = { id: uid(), name: pick(BAND_NAMES.filter(n => !used.has(n))) || 'Die Namenlosen', lead: `${pick(FIRST_M)} ${pick(['Krähenfuß', 'der Graue', 'Blutzahn', 'Schiefmaul', 'Einhand', 'der Fuchs'])}`,
     town, tx, ty, born: S.day | 0, men: ri(4, 6), paid: -1, amb: -999, where: locAt(tx, ty)?.name || `dem Umland von ${townName(town)}` };
@@ -10356,11 +10398,13 @@ function bandTick() {
     const d = Math.hypot(p.x / TS - b.tx, p.y / TS - b.ty), here = S.ents.world.some(e => e.bandId === b.id && e.kind !== 'corpse' && e.alive !== false);
     if (d < 45 && !here) bandSpawn(b);
     else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive));
-    if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && chance(0.01)) {   /* Hinterhalt im Gebiet */
-      b.amb = S.minute; const a = rnd() * 6.283;
-      for (let i = 0; i < Math.min(3, b.men); i++) { const e = spawnEnemy(pick(['bandit', 'bandit_archer']), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
-        Object.assign(e, { bandId: b.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: b.tx * TS, y: b.ty * TS } }); }
-      log(`Hinterhalt! Männer von ${b.name} — du bist in ihrem Gebiet und hast nicht gezahlt.`, 'combat'); UI.toast('HINTERHALT', 1800);
+    if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(0.01)) {   /* Hinterhalt im Gebiet, nicht in der Stadt */
+      const free = b.men - S.ents.world.filter(e => e.bandId === b.id && e.kind === 'enemy' && e.alive).length;   /* Fehlersuche: nie mehr Kämpfer stellen als die Bande noch hat (sonst wächst sie durchs Hin- und Herlaufen) */
+      if (free > 0) { b.amb = S.minute; const a = rnd() * 6.283;
+        for (let i = 0; i < Math.min(3, free); i++) { const e = spawnEnemy(pick(['bandit', 'bandit_archer']), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
+          Object.assign(e, { bandId: b.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: b.tx * TS, y: b.ty * TS } }); }
+        log(`Hinterhalt! Männer von ${b.name} — du bist in ihrem Gebiet und hast nicht gezahlt.`, 'combat'); UI.toast('HINTERHALT', 1800);
+      }
     }
   }
 }
@@ -12822,6 +12866,9 @@ function debugSections() {
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
       'Banden: einen Tag vergehen lassen': () => bandDay(),
+      'Handwerk: Material geben (Eisen, Holz, Felle, Königseisen …)': () => { S.res.iron += 30; S.res.wood += 30; S.res.herb = (S.res.herb || 0) + 12; ['pelt', 'cloth', 'ingot', 'ersatzteile', 'automatenkern', 'koenigseisen'].forEach(k => addItem(P(), k, 5)); UI.toast('Material'); },   /* Nutzer §5d.8 */
+      'Handwerk: Schmieden 90': () => { P().skills.smithing = 90; P().skills.crafting = 90; UI.toast('Schmieden/Handwerk 90'); },
+      'Handwerk: Esse hier öffnen': () => craftMenu('forge', P()), 'Handwerk: Werkbank hier öffnen': () => craftMenu('bench', P()), 'Handwerk: Kessel hier öffnen': () => craftMenu('kessel', P()),
       'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
       'Verletzung: einen Tag vergehen lassen': () => woundDay(),
       'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
@@ -15432,6 +15479,18 @@ export function selftest() {
       return camp && paid && !!L && broken;
     } finally { S.ents.world = S.ents.world.filter(e => !e.bandId); S.bands = b0; S.map = m0; p.x = px; p.y = py; p.map = pm; }
   }));
+  ok('Handwerk (Nutzer §5d.8): Rezept verbraucht Material, Güte steigt mit der Fertigkeit, Königseisen hebt die Güte, Kessel braut Tränke, ohne Material nichts', sandbox(() => {
+    const p = stage(), r0 = { ...S.res }; p.inv = []; p.invCap = 40;
+    try { S.res.iron = 100; S.res.wood = 100; p.skills.smithing = 0; const qOf = () => { const q = craftItem('dagger', false, true)?.qual; return QUAL.findIndex(Q => Q[0] === q); }; const lo = []; for (let i = 0; i < 6; i++) lo.push(qOf());
+      p.skills.smithing = 100; const hi = []; for (let i = 0; i < 6; i++) hi.push(qOf());
+      const used = S.res.iron === 100 - 24; const better = hi.reduce((a, b) => a + b) > lo.reduce((a, b) => a + b) && hi.every(q => q >= 2);
+      p.skills.smithing = 0; addItem(p, 'koenigseisen', 1); const ke = craftItem('longsword', true, true); const keOk = !!ke && !hasItem(p, 'koenigseisen');
+      S.res.herb = 3; const n0 = p.inv.filter(x => x.key === 'potion').reduce((n, x) => n + (x.count || 1), 0); craftItem('potion', false, true); const brewed = p.inv.filter(x => x.key === 'potion').reduce((n, x) => n + (x.count || 1), 0) > n0 && S.res.herb === 0;
+      S.res.iron = 0; const none = craftItem('dagger', false, true) === null;
+      const master = p.inv.find(x => x.key === 'dagger' && ['Meisterlich', 'Meisterstück'].includes(x.qual)); const rarer = !!master?.rar && master.maker === p.name;
+      return used && better && keOk && brewed && none && rarer;
+    } finally { Object.assign(S.res, r0); }
+  }));
   ok('Verletzungen (Nutzer §5e.7): gebrochenes Glied heilt nur bis 40 %, Heilerin schient (doppelt schnell), verheilt nach Tagen mit Narbe (+1 Rüstung), Entzündung zehrt und wird gereinigt', sandbox(() => {
     const p = stage(); S.gold = 100; const P = p.body.larm; P.hp = 0; P.broken = 4; P.splint = false; B.fullHeal(p); const capped = P.hp === Math.round(P.max * 0.4);
     addStatus(p, { key: 'infektion', name: 'x', left: 1e12, since: (S.day | 0) - 2 }); const t0 = p.body.torso.hp; woundDay(); const hurtIt = p.body.torso.hp < t0 && P.broken === 3;
@@ -16117,7 +16176,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=21').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=21').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

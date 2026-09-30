@@ -496,3 +496,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Wachsen und Zerfallen:** Jeden Tag ohne Schutzgeld raubt die Bande Reisende aus und wächst (50 %, bis 9 Mann). Nach 12 Tagen zerstreitet sie sich zu 25 % am Tag von selbst. Gefallene Mitglieder fehlen der Bande dauerhaft.
 - **Zerschlagen:** Fällt der Anführer, zerfällt die Bande. Die nächste Stadt zahlt Kopfgeld (60 + 10 je übrigem Mann), Ruhm +2, Ruf bei der Stadt +3.
 - **Debug:** „Bande hier gründen (neben dir)“, „Banden: einen Tag vergehen lassen“. Probe „Banden (Nutzer §5d.7)“.
+
+## Runde: Handwerk mit Qualität (Nutzer §5d.8, Version 21)
+- **Stationen:** Esse und Amboss (Fertigkeit Schmieden: Waffen, Helme, Schilde, Kettenhemd, Plattenharnisch), Werkbank (Handwerk: Bögen, Holz- und Lederzeug, Schockpistole, Energiezellen) und jedes Lagerfeuer als Kessel (Medizin: Heiltrank aus 3 Kräutern, Verbände aus Tuch). Ausbessern und Prothesen-Wartung gibt es dort weiter.
+- **Material:** aus dem Vorrat (Holz, Stein, Eisenerz, Kräuter) oder aus der Tasche (Felle, Tuch, Eisenbarren, Ersatzteile, Automatenkern, Königseisen). Rezepte mit ✗ haben zu wenig Material oder brauchen mehr Fertigkeit.
+- **Güte:** hängt an der Fertigkeit plus etwas Glück: Grob (Zustand 60 %), Solide, Gut (ungewöhnlich), Meisterlich (selten), Meisterstück (episch, mit spielveränderndem Zusatzwert). Tränke und Zellen: ab Meisterlich eins mehr. Im Tooltip steht Güte und Hersteller.
+- **Königseisen:** beim Schmied erhältlich. „Mit Königseisen schmieden“ hebt die Güte um eine Stufe.
+- **Übung:** jede Arbeit steigert die Fertigkeit (anfangs schnell, später langsam) und kostet 45 Minuten (Kessel 20).
+- **Debug:** „Handwerk: Material geben“, „Handwerk: Schmieden 90“, „Handwerk: Esse/Werkbank/Kessel hier öffnen“. Probe „Handwerk (Nutzer §5d.8)“.
