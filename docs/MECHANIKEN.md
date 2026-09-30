@@ -384,3 +384,67 @@ Wetter wirkt nur draußen auf der Weltkarte (nicht in Häusern, Höhlen, Dungeon
 - **Blutregen:** Gegner wittern dich 25 % früher.
 - Gegner werden durch Tempo und Sicht genauso beeinflusst. Selbsttest „Wetter mit Wirkung (Roadmap C.12)“.
 
+## Runde: Folgen großer Ereignisse (PLAN_ROADMAP §5c, Version 21)
+Was nach einem großen Ereignis bleibt, steht im Spielstand unter `S.after` (fehlt es, ist nichts geschehen; alte Stände laden unverändert). **Dauer je Schwierigkeit:** Auf *Angsthase* erholt sich die Welt nach etwa drei Wochen (21 Tage) von selbst; auf *Schwer* und *Sehr schwer* bleiben die Folgen, bis der Spieler sie umkehrt. Jede Folge wird angesagt (Protokoll, Hinweis oben, Chronik → Gerüchte) und, wo es passt, im Gespräch erklärt. **Rachezüge** (Kette, Haus Vantor, Inquisition, Fraktion eines ausgelöschten Dorfes) stellen den Spieler draußen wie Kopfgeldjäger — nie in Städten oder mitten im Kampf.
+- **Dorf ausgelöscht** (Tote, Bestien/Krieg, Seuche oder der Spieler — wenn der letzte Bewohner stirbt, fällt das Dorf): Ruine mit ausgebrannten Häusern und sechs Gräbern der Bewohner. Nach 1 Tag gehen nachts die Toten zwischen den Gräbern um (Priester-Auftrag „Totenruhe“, nur nachts 22–5 Uhr lösbar), nach 2 Tagen nisten sich Räuber ein (im Westgebirge Goblins; Aushang „Ruine ausräuchern“ im Nachbarort — das Nest steht auch ohne Auftrag da und zählt, wenn man es aushebt). *Angsthase:* nach 10 Tagen kehren Überlebende zurück, die Ruine wächst in Stufen neu (Zelte, erste Häuser, Dorf). *Schwer:* erst wenn Nest und Spuk erledigt sind, ziehen Siedler ein. War es der Spieler: 400 Gold Kopfgeld und Ruf −40 beim Herrn des Dorfes, bei allen anderen −8, ein Rachezug, ein Eintrag in der Chronik.
+- **Sklavenaufstand in der Eisenfeste:** Ein Gefangener lässt sich anstiften („Erhebt euch — ich kämpfe mit euch“), selten beginnt er von selbst. Er läuft als Prügelei gegen die Aufseher (wie der Tributaufstand; wer mitprügelt, hilft einer Seite). Gewonnen: Die Befreiten gründen am Grubenhort die **Freie Siedlung** (Zelte, Sprecherin Ranna mit Aufträgen, Händler Tobbe, neue Fraktion „Die Freien vom Grubenhort“); Mine, Schmelze, Steinbruch und Schmiede der Feste stehen still, Erz +35 %, Barren +25 %, Steinwaren +30 %; die Kette schickt Rachezüge (und bei Anstiftung Kopfgeld und Kopfgeldjäger) und überfällt nach 3 Tagen das Lager (bist du da, kämpfst du mit; sonst sterben zwei Befreite); Tributdörfer sagen sich je nach Ruf los (kein Tribut mehr). *Angsthase:* nach 21 Tagen holt die Kette Arbeit und Dörfer zurück, die Freien bleiben frei. Verloren: Kette zieht die Ketten enger, Anstifter bekommen Kopfgeld.
+- **Streik in Tickmar gewonnen** („Ich stehe zu euch“): Magitech (Ware) +30 %, Bionik- und Magitech-Stücke bei Händlern +25 %, Fabrikunfälle seltener. Grete Rußhand bleibt als **Sprecherin des Arbeiterrats** (Aufträge, Petition „Arbeitsschutz“ — 200 Gold oder im Rat —, danach keine Fabrikunfälle mehr) und hat eine Stimme im Hohen Rat. Nach 3 Tagen streikt eine andere Fabrikstadt (Werke still, Magitech +45 %), bis man beim Streikführer vermittelt (Willenskraft) oder die Streikenden unterstützt. Haus Vantor rächt sich: Schläger nach 2 Tagen, nach 5 Tagen eine Intrige (Aufenthaltsschein eingezogen, Aurelion −5). *Angsthase:* nach 21 Tagen normale Preise.
+- **Städte Aurelions fallen** (Tod der Kaiserin: Thronstreit, an manchen Tagen fällt eine Stadt, höchstens drei; oder Debug): Die Toten besetzen die Stadt (Kriegsknoten), Knochenwachen statt Automaten, Trümmer, ausgebrannte Häuser, alle Läden zu (Bionik und Magitech dort nicht zu haben), die Wirtschaft steht. Flüchtlinge ziehen in die nächste Stadt Aurelions (Preise dort +20 %, Aushang „Unterstände“, ggf. Schmuggel). **Befreiung** wie bei Menschenstädten: vor Ort die Wellen der Besatzung brechen; danach ziehen Automaten wieder auf, Läden öffnen, Häuser werden Tag für Tag aufgebaut. Ab **zwei** gefallenen Städten **zerbricht das Hochreich**: Häuserkrieg (Preise steigen, Gunst sinkt, Scharmützel von Waffenknechten in Städten — wem du hilfst, dessen Gunst steigt). Frieden vermittelt man bei einem Hausherrn (Willenskraft, 300 Gold). *Angsthase:* die Sonnenlegion erobert gefallene Städte nach 21 Tagen zurück, der Häuserkrieg endet von selbst.
+- **Seuche nicht eingedämmt** (weniger als 3 Geheilte und mindestens so viele Tote): Das Fleckfieber bleibt in den befallenen Orten. Täglich stirbt dort wohl ein Kranker (der Ort schrumpft, ein Dorf kann zur Ruine werden), Gesunde stecken sich an, Händlerzüge tragen es weiter. Nach 2 Tagen **Quarantäne**: Wachen, Läden zu, keine Händlerzüge; wer tagsüber vor ihren Augen hinausgeht, bekommt 40 Gold Kopfgeld (nachts unbemerkt); in den Nachbarorten hängen Schmuggelaufträge „Arznei nach …“. Wer sich unter Kranken aufhält, kann **selbst erkranken** (Status Fleckfieber: täglich Leben −5, Ausdauer halb; Heilerin oder Medica heilt für 40 Gold, Schlaf nicht). Ein Ort ist frei, wenn niemand mehr krank ist (Heilkraut an die Kranken). *Angsthase:* nach 10 Tagen klingt es ab, das eigene Fieber bricht nach 6 Tagen.
+- **Hexenprozess:** Die Wahl beim Prozess ist jetzt wirklich erreichbar (vorher antwortete die Angeklagte nur mit dem Gruß). *Verbrannt:* Angst im Ort (Wohlstand −15, weniger Aufträge), Kräuterkundige und Magier des Ortes fliehen nach Aurelheim (auf Angsthase kommen sie nach 21 Tagen heim, sonst wenn man dort für sie bürgt), die Akademie nennt es Barbarei (Aurelion −3, Magierkönig −6), der **Eifer** des Ordens steigt. *Gerettet* (Fürsprache oder Flucht in der Nacht): Sie bleibt bzw. versteckt sich (in der eigenen Siedlung, sonst in einem Zelt nahe dem Ort), lehrt Blutung stillen und Regeneration und kann Gefährtin werden; nach einer Flucht jagt die Inquisition die Fluchthelfer. Ab Eifer 2 zieht eine **Hexenjagd-Welle** durch andere Städte: alle 3 Tage eine Anklage, am Tag darauf der Scheiterhaufen, außer man spricht für sie (Willenskraft gegen Eifer) oder bringt sie nachts fort. Jede Rettung senkt den Eifer; die Welle endet nach zwei Anklagen, bei Eifer unter 2 oder (Angsthase) nach 21 Tagen.
+- **Omegas Ende** (4 Tage, je frischer und je näher beim Spieler, desto mehr Leute): *erschlagen* — im Osten (Totenland, Vharnholm) Panik: Bewohner rennen durcheinander und rufen, Läden bleiben zu, einige fliehen; im Westen Jubel (in den Himmel zeigen, Funken) und täglich ein Pilgerzug aus einem Westdorf zum Altar der Eisenfeste. *Avatar* — dieselben Reaktionen, andere Rufe (der Osten fürchtet die Hand des Gottes, der Westen feiert sie). *Schlaf* — der Westen kniet und betet, im Osten bleibt es ruhig.
+- **Debug:** Bereich „Folgen großer Ereignisse“ — Dorf auslöschen (Tote / durch dich), Ruine 2 Tage weiter, Nest bzw. Totenruhe erledigen, Sklavenaufstand starten / gewonnen, Rachezug jetzt, Streik gewonnen, Streikwelle, Aurelion-Stadt fällt / befreien, Tod der Kaiserin, Hochreich zerbricht, Scharmützel hier, Seuche bleibt, Quarantäne, selbst erkranken, Seuche heilen, Hexe verbrannt / gerettet, Hexenjagd-Welle, Omega erschlagen / Avatar / Schlaf, 22 Tage vorspulen, Folgen anzeigen. Selbsttests „Folgen §5c/1“ bis „/7“ (je eine Probe auf einer Kopie der Welt).
+
+## Runde: Eisenfeste bevölkert (PLAN_ROADMAP §5d.1, Version 21)
+Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt ein Hinweis alle Zeiten. Schilder am Appellplatz, an der Messe, am Kasernenmarkt und am Sklavenmarkt nennen sie ebenfalls. Alte Stände bekommen alles beim Laden (`ensureFortLife`, einmalig, Spielstand `S.fort`).
+- **Militär:** Acht Kettensoldaten, Drillmeister Harrik und Zuchtmeister Grot.
+  - 6 Uhr Appell auf dem Appellplatz (in Reihen, sie zählen durch).
+  - 7–11 Uhr Drill im Takt.
+  - 11–12:30 und 18:30–20 Uhr Messe an den Tischen.
+  - Nachmittags Wachdienst an Ställen, Schmiede, Quartieren, Mine und Toren.
+  - Nachts schlafen sie in ihrer Kaserne.
+- **Auspeitschung:** Jeden Tag um 17 Uhr am Schandpfahl. Soldaten und Priester sehen zu.
+  - Bei Zuchtmeister Grot kann man sie beenden: als Befehl ab Rang Grenzreiter, oder für 40 Gold.
+  - Oder man nimmt selbst die Peitsche (Kette +3, Goblins −5 bei einem Goblin).
+- **Zivilisten:** Soldatenfrauen und Kinder (Kinder kleiner gezeichnet, sie spielen am Platz).
+  - Waffenschmied Gerlach (Laden und Ausbessern) und Quartiermeister Bodo (Vorräte).
+  - Feldscherin Maren heilt wie eine Heilerin.
+  - Kasernenmarkt mit Kettenkrämerin (Kettenwaren) und Marketenderin (Essen).
+- **Kettenpriester und Schreiber:** Priester beten vormittags und abends am Altar Omegas und predigen nachmittags am Platz. Schreiberin Edda zeigt das Register der Feste.
+- **Sklavenmarkt** (Pferche im Süden des Rings):
+  - Sklavenhändler Vesk verkauft Freikauf für 140 Gold.
+  - Jeden dritten Tag ist um 10 Uhr Versteigerung mit Käufern. Mitbieten kostet 90 Gold, der Gefangene wird frei.
+  - Freigelassene Goblins geben Goblins +3.
+  - Alle zwei Tage kommen neue Gefangene (höchstens 7).
+- **Auftrag „Die Pferche öffnen“** (`q_pferch`, von Bruni im Pferch):
+  - Den Pferchschlüssel beschaffen: Vesk bestehlen (Geschick und Wahrnehmung; misslingt es, gibt es 60 Kopfgeld bei der Kette) oder Edda 80 Gold geben.
+  - Dann **nachts** (21–6 Uhr) den Pferch öffnen (E am Pferch). Alle kommen frei, Kette −15, Goblins +10.
+- **Dunkle Klassen:** Dunkler Priester, Kettenjäger, Folterknecht und Kettenbarde bei Lehrern in der Feste. Voraussetzung ist ein Kettenrang (siehe KLASSEN_GUIDE.md).
+- **Nach Vargs Fall:** Soldaten, Priester, Schreiber und Händler ziehen ab. Zivilisten bleiben. Ein Hinweis sagt, dass die Feste herrenlos ist.
+  - Bei Bodo, einem anderen Zivilisten oder Grisk wählt man, wer die Feste hält:
+    - Grubenstämme: Goblins +15, Valen −5.
+    - Garnison Valens: Valen +15, Goblins −10.
+    - Flüchtlinge: Valen, Goblins und Händler je +5.
+  - Die Banner werden getauscht, ein Anführer und fünf Bewohner ziehen ein.
+  - Die Feste **wächst** alle 4 Tage (ab 3 Tagen nach der Wahl) in 3 Stufen: je drei neue Bewohner, dazu Zelte, Stände oder Waffenständer.
+- **Spielstand:** `S.fort` (freed, bought, flogs, heir, stage, nextGrow, hints, veskWary, flogStop). Figuren tragen `fl` (Rolle) und `flHome`.
+- **Debug:** Bereich „Eisenfeste (§5d.1)“:
+  - Zum Appellplatz oder Sklavenmarkt springen.
+  - Appell, Drill, Auspeitschung oder Versteigerung sofort starten.
+  - Pferchschlüssel und Nacht.
+  - Fall der Feste mit Übernahme-Wahl, nächste Ausbaustufe.
+- **Selbsttests:** „Eisenfeste (§5d.1)“, „Dunkle Klassen (§5d.1)“, „Sklavenmarkt und Übernahme (§5d.1)“.
+
+## Runde: Elite-Mini-Bosse, Schildarten, Nahschuss, Tier- und Banditen-Varianten (Version 21)
+- **32 Elite-Mini-Bosse** (`data.js ELITES`) führen die Kopfgeld-Aufträge an, statt immer gleicher Namen. Jeder hat Namen, Aushang-Text (was er tut), eigenes Aussehen (Helm, Rüstung, Farben, Leuchten; Tiere mit eigenem Fell und größer), Werte (Leben, Wucht, Tempo, Panzer) und eine **Kraft**: Brand, Frost, Lähmen (Treffer setzen den Zustand, 35 %), Regeneration, Verstärkung rufen (bei halbem Leben zwei Gefolgsleute), Bande herbeirufen, Sturmangriff (schnell), Panzer. Der Aushang nennt die Kraft. Gegend passt: Wüstenräuber in der Wüste, Untote im Totenland, Kettenleute im Westen, Automat in Aurelion.
+- **Beute:** sicher eine Waffe/ein Gegenstand passend zum Mini-Boss (Seltenheit hochgewürfelt), eine **Trophäe** mit seinem Namen (verkaufbar) und Gold. Getötete kehren nicht wieder, bis alle einmal dran waren.
+- **Schildarten:** Buckler (Parade-Fenster +60 %, hält nur ein Drittel), Turmschild (hält fast alles, kaum Parade, langsam), Stachelschild (35 % des Hiebs zurück an den Angreifer), Magitech-Schild (Energiefeld hält jeden Hieb ganz ab, 6 Energie je Block, Energiezelle füllt auf). Tooltip erklärt jede Art. Händler: Waffenhändler (Buckler, Stachelschild), Magitech-Ingenieurin (Magitech-Schild).
+- **Nahschuss (Nutzer-Bug):** Geschosse starten jetzt nah am Schützen und prüfen gegen die Brust des Ziels — Gegner direkt vor dem Schützen werden getroffen.
+- **Varianten:** Wölfe, Keiler, Bären, Hirsche, Hunde, Kühe, Schafe mit Fellfarben, Größen, Jungtieren und seltenen Albinos; Banditen mit Masken, Tüchern, Beutehelmen, Fellkragen, Hut und Bart, Kettenhemd.
+- **Debug:** „Elite-Mini-Boss hier (zufällig)“, „Alle Elite-Mini-Bosse nebeneinander“. Selbsttests „Elite-Mini-Bosse“, „Nahschuss und Schildarten“, „Vielfalt“ (mit Banditen).
+- **Zweiwaffen (Schurke, Assassine, Berserker):** Wer eine Einhandwaffe führt und eine zweite anlegt, nimmt sie in die Nebenhand. Die Schläge wechseln die Hand und kommen 15 % schneller; keine Schildparade. Andere Klassen tauschen wie bisher.
+- **Peitschen:** Lederpeitsche, Dornenpeitsche (Blutung) — Reichweite ~100, schnell; ein Treffer zieht den Gegner bis zu 40 px heran (nicht Bosse). Kettenpeitsche wie bisher (fesselt).
+- **Sensen:** Grassense, Erntesense, Doppelsense (Blutung), Mondsense (Durchschlag) zu Kriegssense, Sturmsense, Sensenlanze; alle mähen im weiten Bogen mehrere Gegner.
+- **Weidenau, das Sensendorf:** vier Leute der Sensenwehr bewachen den Platz (nur Sensen), die Sensenschmiedin Walburga verkauft alle Sensen.
+- **Legendäre je Boss:** Dodon (Morrs Keule), Karrak der Sandfürst (Klinge des Sandfürsten), Leitwolf (Leitwolfzahn), Ilvar (Nachtglasstab) ergänzt; die übrigen Bosse hatten schon eine.
+

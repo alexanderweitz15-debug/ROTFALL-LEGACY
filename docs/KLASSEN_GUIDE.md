@@ -26,6 +26,18 @@ Jeder beginnt als **Wanderer**. Neue Klassen lernt man bei **Lehrern** (ansprech
 | **Waldläufer** | Schütze | Wildnis, Fallen, Tiere |
 | **Assassine** | Schurke | Unsichtbar sein, dann tödlich |
 
+### Dunkle Klassen der Kette (Eisenfeste)
+
+Jede Grundklasse hat eine dunkle Folgeklasse der Eisernen Kette. Die Lehrer stehen in der Eisenfeste rund um den Appellplatz. Sie lehren nur Leute der Kette: Beitritt bei jeder Kettenwache (Ansehen 10), dann Ränge über Aufträge der Kette. Wie überall braucht der Lehrer erst Beziehung 20. Wer eine dunkle Klasse führt, wird in freien Dörfern gefürchtet.
+
+| Klasse | Braucht | Lehrer | Fähigkeiten |
+|---|---|---|---|
+| **Dunkler Hochpaladin** | Krieger, Rang Aufseher | Weihe bei Varg oder einem Dunklen Paladin | Kettenschlag, Furcht-Aura, Befehl der Kette, Blutpreis |
+| **Dunkler Priester** | Kleriker **oder** Magier, Rang Kettenknecht | Vater Ansgar | Brandmal Omegas (markiert, brennt), Kettengebet (heilt die Gruppe, trifft Tote doppelt), Opferblut (Leben gegen Mana) |
+| **Kettenjäger** | Schütze, Rang Grenzreiter | Rulf Hundeführer | Gezielter Schuss, Fangnetz (3 s festhalten), Kettenhund (30 s Begleiter) |
+| **Folterknecht** | Schurke, Rang Kettenknecht | Meister Mordek | Meuchelstich, Wille brechen (Blutung, eingeschüchtert), Henkersstreich (×3 gegen Geschwächte) |
+| **Kettenbarde** | Barde, Rang Treiber | Sibylla Eisentrommel | Kriegslied, Marschtrommel (Tempo, Kettenwachen marschieren mit), Klagelied der Kette (Feinde langsam und eingeschüchtert) |
+
 ## Titelklassen (durch eine Tat, nicht beim Lehrer)
 
 | Titel | So schaltest du ihn frei |

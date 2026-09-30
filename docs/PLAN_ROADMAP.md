@@ -523,7 +523,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 
 ## 5d. Zehn dünne Bereiche — Nutzerentscheide (30.09.2026)
 
-1. **Eisenfeste** bevölkern: mehr Militärleben (Appell, Drill, Kaserne, Messe, Auspeitschung), Zivilisten (Soldatenfamilien, Schmiede, Quartiermeister, Feldscher, Kasernenmarkt), Sklavenmarkt, Kettenpriester und Schreiber. **Dunkle Klassen** der Kette je nach Grundklasse: Dunkler Hochpaladin (Krieger, gibt es), **Dunkler Priester** (Kleriker/Magier), **Kettenjäger** (Schütze), **Folterknecht/Henker** (Schurke), **Kettenbarde** (Barde) — Lehrer in der Feste, Rang in der Kette nötig. **Nach Vargs Fall entscheidet der Spieler**, wer die Feste übernimmt (Goblins, Valen, Flüchtlinge).
+1. ✅ **Erledigt (Version 21, siehe MECHANIKEN.md „Eisenfeste bevölkert“).** **Eisenfeste** bevölkern: mehr Militärleben (Appell, Drill, Kaserne, Messe, Auspeitschung), Zivilisten (Soldatenfamilien, Schmiede, Quartiermeister, Feldscher, Kasernenmarkt), Sklavenmarkt, Kettenpriester und Schreiber. **Dunkle Klassen** der Kette je nach Grundklasse: Dunkler Hochpaladin (Krieger, gibt es), **Dunkler Priester** (Kleriker/Magier), **Kettenjäger** (Schütze), **Folterknecht/Henker** (Schurke), **Kettenbarde** (Barde) — Lehrer in der Feste, Rang in der Kette nötig. **Nach Vargs Fall entscheidet der Spieler**, wer die Feste übernimmt (Goblins, Valen, Flüchtlinge).
 2. **Karak-Atar:** neutrale Handelsstadt unter Herrschaft der Sandfürsten (Basar, Wegzoll, Schmuggel aus Aurelion) **und** eigenes Wüstenvolk mit Kultur (Wasserhandel, Rituale).
 3. **Eigene Siedlung (P14):** Ort frei wählbar; Mischung beim Bauen (wichtige Bauten selbst setzen, Wohnhäuser bauen Siedler in Zonen).
 4. **König Varon:** Mischung aus hartem Kriegskönig, schwachem, von Adligen gelenktem König und Paranoia (verfeindet mit Aurelion) — **neue Burgstadt im Norden** mit Thronsaal, Hof, Kerker, Adel.
@@ -548,6 +548,15 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 8. **Akademie:** der Spieler wird **Student** (Semester, Vorlesungen, Rivalen, verbotene Abteilung als eigener Pfad).
 9. **Goblins nach der Befreiung:** Grubenhort wird **Außenposten** von Morrgrund. Belohnungen: Goblin-Titelklasse, Goblin-Gefährte, Goblin-Händler, Dodon als Gefährte — **Dodon zieht nur in das Dorf des Spielers**, wenn man eines hat. Ab dann kann man **Goblins rekrutieren** (einzelne Helden und Trupps). Goblins bauen **größere Städte südlich der Eisenfeste** (kartenabhängig): wachsen langsam von selbst, schneller mit Spielerhilfe; Stil gemischt aus Pilz-/Lehmhütten, umgebautem Kettenschrott und Tunneln/Gruben. Menschen reagieren **je nach Stadt** (Valen offen, Orden feindlich, Aurelion neugierig).
 10. **Epilog:** nur auf Wunsch am Grab; danach **Wahl des Spielers**: weiterspielen oder 20 Jahre später mit einem Erben.
+
+## 5f. Sprites, Waffen, Animation — Nutzerentscheide (30.09.2026)
+
+- **Varianten für alle:** Bewohner und Wachen (Frisuren, Bärte, Alter, Kleidung je Stadt/Region, Wachenwappen), Banditen und Söldner (Masken, Tücher, Beutestücke, Narben), Tiere (Fellfarben, Größen, jung/alt, Albinos), Automaten und Engel (Messing/Stahl, beschädigt, Leuchtfarben). Dazu weiter Goblins/Untote (§5b).
+- **Waffen:** exotische Nahkampfwaffen (Kriegssense, Morgenstern, Katar, Peitsche, Kettenkugel), einzigartige Legendäre mit Geschichte und Spezialeffekt je Boss/Region, Volkswaffen (Goblin, Zwerg, Seevolk, Wüste) mit eigenem Look, Zweiwaffen-Kampf und mehr Schildarten.
+- **Animation:** Kampf (Schlagvarianten, Kombos, Treffer-Reaktionen, Finisher), Alltag der NPCs (Arbeiten, Essen, Gesten im Gespräch, Handwerk, Tiere füttern), Tod und Verletzung (Humpeln, Kriechen, Hilferufe, Verbluten), Umgebung (Fahnen, Rauch, Wasser, Vogelschwärme, Türen).
+- **Technik:** beides — Bausteine als Daten für die Masse, handgezeichnet für Bosse und Helden. Nach BALANCE_GUIDE.md einpflegen.
+- **Nutzer-Nachtrag:** Nahschuss-Bug (Geschosse treffen nahe Gegner nicht) — behoben. Exoten zuerst: Peitsche (heranziehen, schnell und weit) und Sensen/Stangenwaffen (mehrere treffen). **Mehr Sensen** und ein **Dorf mit Sensen-Bürgerwehr** (Weidenau), dort Sensen kaufen. **Zweiwaffen** nur Schurke, Assassine, Berserker. **Schilde:** Turmschild, Buckler, Stachelschild, Magitech-Schild. **Je Boss eine eigene Legendäre.**
+- **Elite-Mini-Bosse:** mindestens 30 mit eigenem Aussehen und Beute für Kopfgeld-Aufträge (gebaut: 32).
 
 ## 6. Koop (K2)
 

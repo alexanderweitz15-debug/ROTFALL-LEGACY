@@ -243,6 +243,22 @@ const CIVIC = {
   Spielfrau: { hooded: 1, hood: '#5a2230', cloak: '#3a1820', robe: 'cloth' },
   Alchemist: { robe: '#26302e', pouch: 1, strap: 1 },
   'Händlerin': { robe: 'cloth' },
+  // §5d.1 Leute der Eisenfeste (Nutzer §5b: mehr Vielfalt) — jeder Stand an der Silhouette erkennbar
+  Drillmeister: { beard: 1, cape: '#3a1114', scarf: '#5a1a1c', hs: 2 }, Zuchtmeister: { hooded: 1, hood: '#141012', face: 'cloth', glove: '#2a1a14', strap: 1 },
+  'Sklavenhändler': { hem: 44, cape: '#4a2a1a', helm: 'wide', helmCol: '#2a1a14', pouch: 1, strap: 1, beard: 1, charm: 1 },
+  'Schreiber der Kette': { robe: '#2a2622', stole: '#5a1a1c', hooded: 1, hood: '#1e1a18', pouch: 1 },
+  Kettenpriester: { robe: '#2a0e10', hooded: 1, hood: '#1a0a0c', stole: '#8a1a1c', chn: 1 },
+  'Hochpriester der Kette': { robe: '#1e0a0c', stole: '#b02a20', hooded: 1, hood: '#140608', chn: 1, cape: '#3a0e10' },
+  Soldatenfrau: { robe: 'cloth', helm: 'scarf', helmCol: '#4a3a30', apron: 1, apronCol: '#6a5a48' }, Soldatenkind: { hem: 35, scarf: '#5a1a1c' },
+  Quartiermeister: { hem: 44, apron: 1, apronCol: '#3a3026', pouch: 1, strap: 1, beard: 1 }, Feldscher: { robe: '#8a8070', apron: 1, apronCol: '#7a2a20', glove: '#5a2a20', pouch: 1 },
+  'Waffenschmied der Kette': { apron: 1, apronCol: '#2a2420', glove: '#3a2c20', beard: 1, hs: 2 },
+  Kettenkrämerin: { robe: 'cloth', scarf: '#5a1a1c', pouch: 1 }, Marketenderin: { robe: 'cloth', apron: 1, apronCol: '#8a7a60', helm: 'scarf', helmCol: '#6a5040' },
+  Käufer: { hem: 44, cape: '#3a2a3a', helm: 'wide', helmCol: '#2a2018', pouch: 1 }, Käuferin: { robe: '#3a2a3a', cape: '#2a2018', helm: 'scarf', helmCol: '#5a4a3a', pouch: 1 },
+  'Meister der Kettenjäger': { hooded: 1, hood: '#2a2218', cloak: '#1e1a14', quiver: 1, fur: '#3a2e22', strap: 1 },
+  'Henker der Kette': { hooded: 1, hood: '#141012', face: 'cloth', apron: 1, apronCol: '#3a1a14', glove: '#2a1a14' },
+  Kettenbardin: { robe: 'cloth', sash: '#5a1a1c', strap: 1, charm: 1 },
+  'Gefangene im Pferch': { robe: '#3a3530', wraps: 1 }, 'Am Schandpfahl': { bare: 1, wraps: 1 },
+  'Sprecherin der Freien Feste': { robe: 'cloth', scarf: '#6a8a5a', pouch: 1 }, 'Hauptmann der Garnison': { cape: '#2f4260', beard: 1 },
 };
 // S12 Automaten des Hochreichs: Messingpanzer, Maskengesicht, bernsteinfarbene Augen
 const ROBOT_LOOK = { skin: '#8a8272', hair: '#8a8272', hs: 2, beard: 0, face: 'mask', glow: '#8a5420', armor: 'plate', armorCol: '#7a6038', pauld: '#8a7040', helm: 'great', helmCol: '#8a7a58',
@@ -315,6 +331,19 @@ function varyGoblin(s, t, seed) {
     else if (look === 2) Object.assign(s, { armor: 'chain', armorCol: '#5a5650', shield: '', fur: '#4a3a26' });   // erbeutetes Kettenhemd
     else if (look === 3) Object.assign(s, { helm: 'nasal', helmCol: '#6a6258', shieldCol: '#5a2a1c', markCol: '#8a2a20' });
   }
+}
+// Nutzer §5f: Banditen und Söldner — Masken, Tücher, Beutestücke (fremde Helme, Schulterplatten), verschiedene Mäntel
+function varyBandit(s, t, seed) {
+  const h = (seed * 571) | 0, look = Math.abs(h >> 9) % 7;
+  s.skin = pickH(['#b2926f', '#c8a07a', '#8d6644', '#d6b089', '#6d4a30'], h, 0);
+  s.bd = pickH(['', 'drahtig', 'bullig', '', 'gedrungen'], h, 1);
+  if (s.hooded) { s.hood = pickH(['#2e241a', '#2f3a24', '#3a2a22', '#1e1c1a', '#4a3a26'], h, 2); s.cloak = pickH(['#261e16', '#26301d', '#2a1e1a', '#1a1816'], h, 3); }
+  if (look === 1) Object.assign(s, { hooded: 0, face: 'mask', helm: 'cap', helmCol: '#5a4e40' });         // Maske und Kappe
+  else if (look === 2) Object.assign(s, { hooded: 0, helm: 'nasal', helmCol: '#7a7874', pauld: '#6a6a66' });   // erbeuteter Soldatenhelm
+  else if (look === 3) Object.assign(s, { scarf: pickH(['#7a2a20', '#b8a070', '#2a4a6a', '#4a6a2a'], h, 4) });   // buntes Halstuch
+  else if (look === 4) Object.assign(s, { fur: pickH(['#4a3a26', '#6a5a3a'], h, 4), armor: 'leather', armorCol: '#3a2a1c' });   // Fellkragen
+  else if (look === 5) Object.assign(s, { hooded: 0, helm: 'hat', helmCol: '#2a2622', beard: 1 });   // Hut und Bart
+  else if (look === 6) Object.assign(s, { armor: 'chain', armorCol: '#5a5a56', sash: '#5a1a1c' });   // Söldner im Kettenhemd
 }
 function varyUndead(s, t, seed) {
   const h = (seed * 613) | 0;
@@ -428,6 +457,7 @@ export function humanSpec(e) {
   const sils = [AL, HL, CL, FL].map(x => x?.sil).filter(Boolean); if (sils.length) s.sil = [...new Set(sils.join(' ').split(' '))].join(' ');
   if (off === 'wooden_shield') { s.shield = 'round'; s.shieldCol = '#5a4630'; s.mark = 'boss'; s.markCol = '#8a8172'; }
   else if (off === 'buckler') { s.shield = 'round'; s.shieldCol = '#77736a'; s.mark = 'boss'; s.markCol = '#a8a196'; }
+  else if (off && ITEMS[off]?.slot === 'weapon') { /* Zweiwaffen: keine Schildzeichnung */ }
   else if (off) { s.shield = 'heater'; s.shieldCol = p.shield || '#4a3f30'; s.markCol = p.shieldBoss || '#8a8172';
     s.mark = e.faction === 'order' ? 'cross' : e.faction === 'valen' ? 'chevron' : 'boss'; }
   const w = eq.weapon && eq.weapon.key;
@@ -563,6 +593,7 @@ export function monsterSpec(e, m) {
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
   }
   if (t === 'goblin' || t === 'goblin_warrior') varyGoblin(s, t, e.seed || 0);   /* Nutzer §5b: Vielfalt */
+  else if (['bandit', 'bandit_archer', 'bandit_spear'].includes(t) && !e.boss && !e.rboss) varyBandit(s, t, e.seed || 0);   /* Nutzer §5f */
   else if (['skeleton', 'zombie', 'ghoul', 'bone_archer'].includes(t) && !e.boss) varyUndead(s, t, e.seed || 0);
   const EL = { chain_master: ['blutkette', 'blutkettenhelm'], garmadon: ['totenkrone', 'schaedelhelm'], death_knight: ['totenkrone'], hrodvar: ['totenkrone'], death_captain: ['generalspanzer'] }[t];   // S14: Bosse im Endgame-Set
   if (EL) for (const k of EL) Object.assign(s, ARMOR_LOOK[k], t === 'hrodvar' ? { armorCol: '#5d7383', rn: '#9fd8ff', cloak: '#16202a', pauld: '#8fb3c7' } : t === 'garmadon' ? { cloak: '#2a0a0c', rn: '#e03a2a', ge: '#e03a2a' } : {});
@@ -574,7 +605,8 @@ export function monsterSpec(e, m) {
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
   s.ms = msOf(e); s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
-  s.bd = m?.angel ? 'bullig' : e.build || ''; s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
+  s.bd = m?.angel ? 'bullig' : e.build || ''; s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
+  if (e.elook) Object.assign(s, e.elook);   /* Nutzer: Elite-Mini-Bosse haben ihr eigenes Aussehen */   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
 
