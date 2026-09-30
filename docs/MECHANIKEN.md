@@ -533,3 +533,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Rivalin:** Beim Einschreiben sucht sich eine Studentin dich als Rivalin aus; sie fordert dich zum Duell der Akademie.
 - **Verbotene Abteilung (eigener Pfad):** ab 5 Vorlesungen beim Archivar nachfragen; nur nachts (22–4 Uhr) kann man sich einschleichen (Schleichen, Wahrnehmung, Glück). Drei Besuche geben verbotenes Wissen (Intelligenz +3, Willenskraft +3). Wer erwischt wird, fliegt von der Akademie (Aurelion −10) und kommt nicht wieder hinein.
 - **Debug:** „Akademie: einschreiben“, „Akademie: 8 Vorlesungen und eine Prüfung gutschreiben“. Probe „Akademie (Nutzer §5e.8)“.
+
+## Runde: Gewölbe — Rätsel, Geheimnisse, Schlund (Nutzer §5e.3, Version 21)
+- **Modifikatoren:** Ab Ebene 2 (bei schweren Gewölben schon ab 1) kann eine Ebene dunkel (fast kein Licht, kaum Fackeln), überflutet (Sumpfwasser bremst alle) oder verflucht sein (Wächter +2 Stufen, +25 % Leben, +15 % Schaden). Der Name der Ebene und das Log sagen es. Jede Ebene ist immer gleich.
+- **Hebeltür:** Manche Treppen hinab sind vergittert. Irgendwo auf der Ebene steht ein Hebel (E: „Hebel ziehen“).
+- **Geheimkammer:** Hinter mancher Wand liegt eine Kammer mit einer besseren Truhe. Wer nah an der Wand steht, bemerkt sie mit etwas Glück (Wahrnehmung hilft) — die Wand gibt nach.
+- **Geheime Gewölbe:** Schmugglergrotte, Sternkammer und Wurzelhalle stehen auf keiner Karte. Jeder geplünderte Hort enthält eine verblasste Karte zum nächsten geheimen Gewölbe; dann erscheint sein Eingang.
+- **Der Schlund (Endlosgewölbe):** beim Versunkenen Tempel. Jede Ebene ist schwerer, alle fünf Ebenen warten ein Wächter und eine Truhe (jede nur einmal). Die tiefste Ebene wird gemerkt; jede fünfte neue Bestmarke kommt in die Chronik.
+- **Debug:** „Gewölbe: alle geheimen Gewölbe aufdecken“, „Gewölbe: Schlund betreten“. Probe „Gewölbe (Nutzer §5e.3)“.

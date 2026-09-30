@@ -4652,7 +4652,7 @@ function act(c, kind, ms, toward) {
 const houseOf = t => t.house && HOUSES.find(b => b.id === t.house);
 const FURN_USE = { bed: 'Schlafen', bunk: 'Schlafen', stall: 'Handeln', counter: 'Handeln', bench: 'Rasten', throne: 'Auf den Thron setzen',
   cask_rack: 'Zapfen', shelf: 'Durchsuchen', desk: 'Durchsuchen', crate_stack: 'Durchsuchen', weapon_rack: 'Durchsuchen',
-  machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Schmieden oder ausbessern', anvil: 'Schmieden oder ausbessern', workbench_int: 'Werkbank: bauen oder ausbessern', campfire_static: 'Am Kessel brauen', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
+  machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Schmieden oder ausbessern', anvil: 'Schmieden oder ausbessern', workbench_int: 'Werkbank: bauen oder ausbessern', campfire_static: 'Am Kessel brauen', lever: 'Hebel ziehen', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
 const furnAct = t => t.kind === 'prop' && !t.harvest && !t.loot && !t.feast && !t.bond && !t.mechBench ? FURN_USE[t.type] || null : null;
 const INN_PRICE = 8, TAP_PRICE = 3;
 function furnWitnesses(t) {
@@ -4670,6 +4670,7 @@ function useFurniture(t) {
     case 'cask_rack': return tapCask(t, b);
     case 'forge': case 'anvil': case 'workbench_int': return craftMenu(t.type === 'workbench_int' ? 'bench' : 'forge', t);   /* Nutzer §5d.8: Handwerk */
     case 'campfire_static': return craftMenu('kessel', t);
+    case 'lever': return pullLever(t);   /* §5e.3 */
     case 'machine': case 'gearpile': return factoryWork(t);   // Nutzer S13: Fabrik benutzbar
     case 'trough': case 'well': if ((p.drinkCd || 0) > clock()) return UI.toast(`Du hast gerade erst getrunken (noch ${Math.ceil(p.drinkCd - clock())} s).`);   // S13 (Nutzer): 20 s Abklingzeit
       p.drinkCd = clock() + 20; act(p, 'kneel', 700, t); p.stamina = p.maxStamina; p.status = (p.status || []).filter(s => s.key !== 'burning');
@@ -4923,6 +4924,7 @@ function doInteract(target = null) {
   if (t.loot && t.loot.length && !t.opened) {
     t.opened = true;
     if (t.vaultHoard) vaultHoardOpened(t);
+    if (t.schlundChest) ((S.vaults.schlund ||= { best: 0, cleared: {}, looted: false }).chests ||= {})[t.schlundChest] = S.day | 0;   /* §5e.3: jede Schlund-Truhe nur einmal */
     for (const k of t.loot) { const o = mkItem(k, 1, { bonus: t.lootBonus ?? 1 }); if (!giveItem(p, o)) dropItemAt(p.map, p.x + ri(-12, 12), p.y + 10, o); onItemGained(k);
       log(`Gefunden: ${ITEMS[k].name}${o.rar ? ` (${RARITY[o.rar]})` : ''}.`, 'world'); }
     UI.toast(`${t.label || 'Behälter'} geöffnet`);
@@ -6713,7 +6715,7 @@ function evHaunt() {
 }
 // S15 (Nutzer): Aufträge von Bewohnern nennen den Namen des Auftraggebers, und der Rückweg zeigt auf ihn selbst, wo er gerade ist
 // (nicht auf den Stadtplatz). Auf „Sehr schwer“ steht kein Name und es gibt keinen Wegpunkt: man muss sich merken, wer es war.
-const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev';
+const resGiver = C => C && C.giver !== 'board' && C.giver !== 'vm' && C.giver !== 'dev' && C.giver !== 'comp';   /* Fehlersuche §5e.1: 'comp' ist kein NPC-Schlüssel — sonst gilt der Gefährte selbst als toter Auftraggeber und der Auftrag scheitert sofort */
 const conHard = C => resGiver(C) && S.difficulty === 'sehr_schwer';
 const giverEnt = C => resGiver(C) ? S.ents.world.find(e => e.key === C.giver && e.alive !== false) : null;
 function questOf(C) { const who = C.giver === 'board' ? 'Anschlagbrett' : C.giver === 'vm' ? 'Verteidigungsmeister' : conHard(C) ? 'ein Bewohner — merk dir, wer' : `${C.giverName || giverEnt(C)?.name || 'ein Bewohner'}`;
@@ -6993,7 +6995,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -9116,7 +9118,18 @@ const VAULTS = {
     deco: ['bones', 'bone_spire', 'gravestone', 'candles'], enter: 'Die Wände sind aus Knochen gefügt. Sehr schwer — nur für die Stärksten.' },
   uhrwerkhalle: { name: 'Verfallene Uhrwerkhalle', at: 'tickmar', dx: 34, dy: 10, tier: 5, floors: 4, pool: ['automat', 'automat', 'rotgardist', 'kettenschuetze'], boss: 'automat', bossName: 'Der Regulator',
     deco: ['crate_stack', 'barrel', 'broken_pillar', 'anvil'], enter: 'Zahnräder, so groß wie Häuser, stehen still. Fast alle. Sehr schwer — nur für die Stärksten.' },
+  /* Nutzer §5e.3: geheime Gewölbe — nur über Karten aus einem Hort zu finden */
+  schmugglergrotte: { name: 'Schmugglergrotte', at: 'westwald', dx: -14, dy: 12, tier: 2, floors: 2, hidden: true, pool: ['bandit', 'bandit_archer', 'bandit_spear'], boss: 'bandit', bossName: 'Die Schmugglerkönigin',
+    deco: ['crate_stack', 'barrel', 'sack', 'crate'], enter: 'Salzgeruch und gestapelte Kisten. Hier wird seit Jahren geschmuggelt.' },
+  sternkammer: { name: 'Sternkammer', at: 'oldtower', dx: -10, dy: -12, tier: 4, floors: 3, hidden: true, pool: ['wraith', 'shade', 'cultist'], boss: 'wraith', bossName: 'Der Sternenlose',
+    deco: ['candles', 'broken_pillar', 'bones', 'candles'], enter: 'Die Decke ist mit Sternbildern bemalt, die es am Himmel nicht gibt.' },
+  wurzelhalle: { name: 'Wurzelhalle', at: 'knochenwald', dx: 12, dy: -10, tier: 4, floors: 3, hidden: true, pool: ['wolf', 'bear', 'ghoul'], boss: 'bear', bossName: 'Die Mutter der Wurzeln',
+    deco: ['bones', 'broken_pillar', 'bones', 'sack'], enter: 'Wurzeln, dick wie Männer, drücken durch die Wände. Etwas Großes atmet.' },
+  /* Nutzer §5e.3: Endlosgewölbe — jede Ebene schwerer, alle fünf Ebenen ein Wächter und eine Truhe */
+  schlund: { name: 'Der Schlund', at: 'sunkentemple', dx: -6, dy: -8, tier: 3, floors: 999, endless: true, pool: ['skeleton', 'ghoul', 'bandit', 'wraith', 'bone_knight', 'automat'], boss: 'death_knight', bossName: 'Wächter der Tiefe',
+    deco: ['bones', 'broken_pillar', 'candles', 'gravestone'], enter: 'Eine Treppe, die nicht aufhört. Wie tief kommst du?' },
 };
+const VAULT_MOD = { dunkel: 'Es ist stockdunkel hier unten.', 'überflutet': 'Das Wasser steht knöcheltief — jeder Schritt ist schwer.', verflucht: 'Ein Fluch liegt auf dieser Ebene: die Wächter sind stärker, der Lohn auch.' };
 function vaultRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function vaultLoot(tier) {
   const eq = Object.entries(ITEMS).filter(([k, it]) => ['weapon', 'chest', 'head', 'offhand'].includes(it.slot) && !it.unique && it.value >= [0, 20, 60, 120, 200, 260][tier] && it.value <= [0, 120, 240, 400, 700, 900][tier]).map(([k]) => k);
@@ -9126,7 +9139,7 @@ function vaultLoot(tier) {
 }
 function ensureVaultSites() {
   for (const [k, V] of Object.entries(VAULTS)) {
-    if (S.ents.world.some(e => e.vaultSite === k)) continue;
+    if (S.ents.world.some(e => e.vaultSite === k) || (V.hidden && !S.flags['vaultHint_' + k])) continue;   /* §5e.3: geheime erst mit Karte */
     const L = LOCATIONS.find(l => l.key === V.at); if (!L) continue;
     const q = freeSpotNear('world', L.x + V.dx, L.y + V.dy, 6);
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'vault', vaultSite: k, label: `${V.name}${V.tier >= 5 ? ' (sehr gefährlich)' : ''}` });
@@ -9146,21 +9159,32 @@ function buildVault(site, floor) {
   for (const o of rooms) for (let j = o.y; j < o.y + o.h; j++) for (let i = o.x; i < o.x + o.w; i++) set(i, j);
   for (let i = 1; i < rooms.length; i++) { const a = rooms[i - 1], b = rooms[i]; let x = a.cx, y = a.cy;
     while (x !== b.cx) { set(x, y); set(x, y + 1); x += x < b.cx ? 1 : -1; } while (y !== b.cy) { set(x, y); set(x + 1, y); y += y < b.cy ? 1 : -1; } }
+  const r2 = vaultRng((S.seed | 0) * 17 + floor * 331 + site.length * 7919), mod = (floor > 1 || V.tier >= 3 || V.endless) ? ['', '', 'dunkel', 'überflutet', 'verflucht'][Math.floor(r2() * 5)] : '';   /* §5e.3: eigener Zufall, Layout bleibt gleich */
+  if (mod === 'überflutet') for (const o of rooms) for (let j = o.y; j < o.y + o.h; j++) for (let i = o.x; i < o.x + o.w; i++) if (r2() < 0.6) tiles[j * w + i] = T.MARSH;
+  MAPS.vault.ver = (MAPS.vault.ver || 0) + 1; DUNGEONS.vault.darker = mod === 'dunkel'; S.vaultMod = mod; if (mod) DUNGEONS.vault.name += ` (${mod})`;
   const P = [], prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'vault', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 12, solid: false, transient: true, ...o }; P.push(e); return e; };
   const first = rooms[0], last = rooms[rooms.length - 1], prog = (S.vaults ||= {})[site] ||= { best: 0, cleared: {}, looted: false };
   prop('mine_exit', first.cx, first.y + first.h - 1, { portal: 'world', label: `Aufstieg (${V.name} verlassen)` });
-  if (floor < V.floors) prop('mine_entrance', last.cx, last.cy, { portal: 'vault', vaultNext: true, label: `Hinab zur Ebene ${floor + 1}` });
-  for (const o of rooms) { prop('torch', o.x + 1, o.y, {}); for (let i = 0; i < 2; i++) prop(V.deco[R(0, V.deco.length - 1)], R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { solid: i === 0, r: 9 }); }
+  const locked = floor < V.floors && rooms.length > 3 && r2() < 0.5;   /* §5e.3: Hebeltür */
+  if (floor < V.floors) prop('mine_entrance', last.cx, last.cy, { portal: 'vault', vaultNext: true, vaultLocked: locked, label: locked ? 'Hinab (verriegelt — irgendwo ist ein Hebel)' : `Hinab zur Ebene ${floor + 1}` });
+  if (locked) { const o = rooms[1 + Math.floor(r2() * (rooms.length - 2))]; prop('lever', o.x + o.w - 2, o.y + 1, { solid: true, r: 8, lever: true, label: 'Hebel' }); }
+  { const cand = rooms.slice(1, -1).filter(o => o.y + o.h + 5 < h - 1 && [...Array(5)].every((_, dy) => [-2, -1, 0, 1, 2].every(dx => tiles[(o.y + o.h + dy) * w + o.cx + dx] === T.DWALL)));   /* §5e.3: Geheimkammer hinter einer Wand */
+    if (cand.length && r2() < 0.6) { const o = cand[Math.floor(r2() * cand.length)]; for (let j = o.y + o.h + 1; j < o.y + o.h + 4; j++) for (let i = o.cx - 2; i <= o.cx + 2; i++) set(i, j);
+      MAPS.vault.secret = { x: o.cx, y: o.y + o.h, found: false };
+      prop('chest', o.cx, o.y + o.h + 2, { solid: true, loot: vaultLoot(Math.min(5, V.tier + 1)), lootBonus: V.tier + 1, label: 'Verborgene Truhe' }); } else MAPS.vault.secret = null; }
+  for (const o of rooms) { if (mod !== 'dunkel' || o === first) prop('torch', o.x + 1, o.y, {}); for (let i = 0; i < 2; i++) prop(V.deco[R(0, V.deco.length - 1)], R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { solid: i === 0, r: 9 }); }
   const cleared = (prog.cleared[floor] || -99) + 7 > (S.day | 0);
+  const endBoss = V.endless && floor % 5 === 0;   /* Endlos: alle fünf Ebenen Wächter und Truhe */
+  if (endBoss && !(prog.chests ||= {})[floor]) prop('chest', last.cx - 2, last.y + 1, { solid: true, loot: vaultLoot(Math.min(5, 2 + (floor / 5 | 0))), lootBonus: Math.min(6, 2 + (floor / 5 | 0)), label: `Truhe der Ebene ${floor}`, schlundChest: floor });
   if (floor === V.floors && !prog.looted) prop('chest', last.cx, last.y + 1, { solid: true, loot: vaultLoot(V.tier), lootBonus: V.tier, vaultHoard: site, label: `Hort — ${V.name}` });
   else if (!cleared && r() < 0.6) { const o = rooms[R(1, rooms.length - 1)]; prop('crate', o.x + 1, o.y + o.h - 2, { solid: true, loot: ['bandage', R(0, 1) ? 'potion' : 'bread'], lootBonus: Math.max(0, V.tier - 2), label: 'Vorrat' }); }
   MAPS.vault.entry = { x: first.cx * TS + TS / 2, y: (first.y + first.h - 3) * TS };
   S.ents.vault = P; indexSolids('vault');
   if (!cleared) for (const o of rooms.slice(1)) for (let i = 0, n = R(1, 2 + (V.tier >= 3 ? 1 : 0)); i < n; i++) {
-    const e = spawnEnemy(V.pool[R(0, V.pool.length - 1)], 'vault', R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { level: 1 + V.tier * 3 + floor * 2 });
-    Object.assign(e, { transient: true, vaultFoe: true });
+    const e = spawnEnemy(V.pool[R(0, V.pool.length - 1)], 'vault', R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { level: 1 + V.tier * 3 + floor * 2 + (mod === 'verflucht' ? 2 : 0) });
+    Object.assign(e, { transient: true, vaultFoe: true }); if (mod === 'verflucht') { e.maxHp = e.hp = Math.round(e.maxHp * 1.25); e.dmgMul = (e.dmgMul || 1) * 1.15; if (e.body) B.initBody(e, e.maxHp); }
   }
-  if (!cleared && floor === V.floors) { const b = spawnEnemy(V.boss, 'vault', last.cx, last.cy + 1, { level: 3 + V.tier * 3 + floor * 2, noVariant: true });
+  if (!cleared && (floor === V.floors || endBoss)) { const b = spawnEnemy(V.boss, 'vault', last.cx, last.cy + 1, { level: 3 + V.tier * 3 + floor * 2, noVariant: true });
     applyVariant(b, MONSTERS[V.boss], 'leader'); Object.assign(b, { transient: true, vaultFoe: true, elite: true, title: V.bossName, vaultBoss: site }); b.maxHp = b.hp = Math.round(b.maxHp * (1.5 + V.tier * 0.2)); if (b.body) B.initBody(b, b.maxHp); }
   S.vaultAt = { site, floor }; prog.best = Math.max(prog.best, floor);
   return MAPS.vault.entry;
@@ -9169,21 +9193,38 @@ function enterVault(site) {
   const V = VAULTS[site]; if (!V) return;
   if (foesNear(S.player)) return UI.toast('Nicht jetzt — Feinde sind nah.');
   buildVault(site, 1); travel('vault');
-  UI.toast(`${V.name}${V.tier >= 5 ? ' — sehr gefährlich' : ''}`, 2600);
+  UI.toast(`${V.name}${V.tier >= 5 ? ' — sehr gefährlich' : ''}`, 2600); if (S.vaultMod) log(VAULT_MOD[S.vaultMod], 'world');
 }
 function vaultDescend() {
   const A = S.vaultAt, V = A && VAULTS[A.site]; if (!V) return;
   const left = S.ents.vault.filter(e => e.kind === 'enemy' && e.alive && !e.surrendered).length;
   if (left) return UI.toast(`Die Treppe ist versperrt. Noch ${left} Wächter auf dieser Ebene.`, 2600);
+  if (S.ents.vault.some(e => e.vaultNext && e.vaultLocked)) return UI.toast('Ein Gitter versperrt die Treppe. Irgendwo auf dieser Ebene muss ein Hebel sein.', 2800);   /* §5e.3 */
   S.vaults[A.site].cleared[A.floor] = S.day | 0;
   const persons = S.ents.vault.filter(e => e === S.player || S.party.includes(e.id) || e.servant === S.player.id);
   const at = buildVault(A.site, A.floor + 1);
   for (const m of persons) { m.x = at.x + (m === S.player ? 0 : ri(-24, 24)); m.y = at.y + (m === S.player ? 0 : ri(-24, 24)); S.ents.vault.push(m); }
-  log(`Ebene ${A.floor + 1} von ${V.floors}: ${V.name}.`, 'world'); UI.toast(DUNGEONS.vault.name, 2400); camShake(3, 200);
+  log(`Ebene ${A.floor + 1}${V.endless ? '' : ` von ${V.floors}`}: ${V.name}.${S.vaultMod ? ' ' + VAULT_MOD[S.vaultMod] : ''}`, 'world'); UI.toast(DUNGEONS.vault.name, 2400); camShake(3, 200);
+  if (V.endless && A.floor + 1 > (S.flags.schlundBest || 0)) { S.flags.schlundBest = A.floor + 1; if ((A.floor + 1) % 5 === 0) chronicle(`${S.player.name} erreicht Ebene ${A.floor + 1} im Schlund`, 'legend', 'Tiefer als die meisten.'); }
 }
 function vaultHoardOpened(t) {
   const prog = S.vaults?.[t.vaultHoard]; if (!prog || prog.looted) return; prog.looted = true; prog.cleared[VAULTS[t.vaultHoard].floors] = S.day | 0;
   chronicle(`${VAULTS[t.vaultHoard].name} geplündert`, 'news', `${S.player.name} kam mit dem Hort wieder herauf.`);
+  const next = Object.keys(VAULTS).find(k => VAULTS[k].hidden && !S.flags['vaultHint_' + k]);   /* §5e.3: im Hort liegt eine Karte zum nächsten geheimen Gewölbe */
+  if (next) { S.flags['vaultHint_' + next] = 1; const L = LOCATIONS.find(l => l.key === VAULTS[next].at); ensureVaultSites();
+    log(`Im Hort liegt eine verblasste Karte: ein Eingang nahe ${L?.name || 'einem alten Ort'} — ${VAULTS[next].name}. Er ist jetzt auf der Karte.`, 'quest'); UI.toast(`KARTE GEFUNDEN: ${VAULTS[next].name.toUpperCase()}`, 3000); }
+}
+// §5e.3: Hebel und Geheimwand
+function pullLever(t) {
+  if (t.on) return UI.toast('Der Hebel ist schon umgelegt.'); t.on = true; act(S.player, 'work', 600, t); sfx('metal', 0.6, 1); camShake(2, 200);
+  for (const e of S.ents.vault || []) if (e.vaultNext && e.vaultLocked) { e.vaultLocked = false; e.label = `Hinab zur Ebene ${(S.vaultAt?.floor || 1) + 1}`; }
+  log('Irgendwo rasselt ein Gitter nach oben. Der Weg hinab ist frei.', 'world');
+}
+function vaultTick() {
+  const s = MAPS.vault?.secret, p = S.player; if (S.map !== 'vault' || !s || s.found || !p) return;
+  if (Math.hypot(p.x / TS - s.x, p.y / TS - s.y) < 3 && chance(0.15 + (p.attributes?.perception || 10) * 0.02)) {
+    s.found = true; MAPS.vault.tiles[s.y * MAPS.vault.w + s.x] = T.DFLOOR; MAPS.vault.ver = (MAPS.vault.ver || 0) + 1;
+    fx(s.x * TS + 16, s.y * TS + 16, 'dust', 14); log('Ein Luftzug aus der Wand — du drückst dagegen, und ein Stein gibt nach. Eine Geheimkammer!', 'quest'); UI.toast('GEHEIMKAMMER', 2200); }
 }
 function hourTick(h) {
   wxHour(h);   /* Roadmap C.12 */
@@ -12398,7 +12439,12 @@ function graveTalk(t) {
 function timeSkip(years) {
   const p = S.player, d = years * 60; S.legacy.skipGen = S.legacy.gen;
   S.day += d; syncClock(); p.bornDay = (p.bornDay || S.day) - d;
-  for (const c of [p, ...partyMembers()]) c.age = (c.age || 25) + years;
+  for (const c of [p, ...partyMembers()]) { c.age = (c.age || 25) + years;
+    /* Fehlersuche §5e.10: woundDay() heilt Brüche je Kalendertag, aber dayTick() feuert beim Zeitsprung nur einmal —
+       ohne diese Auflösung blieben Held und Gefährten nach zwanzig Jahren für immer gebrochen. */
+    let healed = 0; if (c.body) for (const k of B.PARTS) { const P = c.body[k]; if (P.broken) { delete P.broken; delete P.splint; healed++; } }
+    if (healed) { c.scars = (c.scars || 0) + healed; addStatus(c, { key: 'narben', name: `Narben (${c.scars})`, good: true, left: 1e12, desc: `Verheilte Brüche: +${Math.min(5, c.scars)} Rüstung.` }); }
+    c.status = (c.status || []).filter(s => s.key !== 'infektion'); }
   for (let i = 0; i < 4; i++) gainXp(p, Math.max(1, (p.xpNext || 100) - (p.xp || 0)));
   for (const b of bandsOf()) bandGone(b);
   for (const C of activeCons()) { C.state = 'claimed'; const st = S.quests['c_' + C.id]; if (st) { st.state = 'failed'; st.outcome = 'Zwanzig Jahre sind vergangen.'; } }
@@ -13104,6 +13150,8 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Gewölbe: alle geheimen Gewölbe aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].hidden) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Geheime Gewölbe auf der Karte'); },   /* Nutzer §5e.3 */
+      'Gewölbe: Schlund betreten': () => enterVault('schlund'),
       'Akademie: einschreiben (ohne Schein und Gold)': () => { S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: Object.keys(S.acad || {}).length, rival: null, forb: 0 }; S.flags.acadBanned = false; UI.toast('Student'); },   /* Nutzer §5e.8 */
       'Akademie: 8 Vorlesungen und eine Prüfung gutschreiben': () => { if (!S.student) return UI.toast('Erst einschreiben'); S.student.lec = 8; S.student.total += 8; S.student.trialsAt = -1; UI.toast('Semester abschließbar beim Magister'); },
       'Dynastie: nächsten NPC heiraten': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.key && !e.guard && !S.party.includes(e.id)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return; S.relations[n.key] = 90; S.legacy.spouse = n.id; n.spouse = n.married = true; UI.toast(`Verheiratet: ${n.name}`); },   /* Nutzer §5e.2 */
@@ -15068,13 +15116,13 @@ export function selftest() {
   ok('S13 Gewölbe: fünf Eingänge in der Welt; Ebenen zufällig, aber je Ort gleich; alles vom Eingang erreichbar; Treppe erst nach allen Wächtern; letzte Ebene mit Wächter und Hort', (() => {
     const keep = { v: S.ents.vault, m: MAPS.vault, p: JSON.stringify(S.vaults || null), a: S.vaultAt }, W0 = S.ents.world; S.ents.world = W0.slice();
     try {
-      ensureVaultSites(); const sites = Object.keys(VAULTS).every(k => S.ents.world.some(e => e.vaultSite === k && e.portal === 'vault'));
+      ensureVaultSites(); const sites = Object.keys(VAULTS).filter(k => !VAULTS[k].hidden || S.flags['vaultHint_' + k]).every(k => S.ents.world.some(e => e.vaultSite === k && e.portal === 'vault'));   /* §5e.3: geheime erst mit Karte */
       S.vaults = {}; buildVault('raeuberhoehle', 1); const t1 = MAPS.vault.tiles.slice(); buildVault('raeuberhoehle', 1); const same = MAPS.vault.tiles.every((t, i) => t === t1[i]);
       const M = MAPS.vault, free = (x, y) => x >= 0 && y >= 0 && x < M.w && y < M.h && !SOLID.has(M.tiles[y * M.w + x]), seen = new Set(), q = [[M.entry.x / TS | 0, M.entry.y / TS | 0]];
       while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || !free(x, y)) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
       const down = S.ents.vault.find(e => e.vaultNext), up = S.ents.vault.find(e => e.portal === 'world'), reach = down && seen.has((down.x / TS | 0) + ',' + (down.y / TS | 0));
       const foes = S.ents.vault.filter(e => e.kind === 'enemy'); vaultDescend(); const locked = S.vaultAt.floor === 1 && foes.length >= 3;
-      for (const e of foes) e.alive = false; vaultDescend(); const second = S.vaultAt.floor === 2;
+      for (const e of foes) e.alive = false; const lever = S.ents.vault.find(e => e.lever); if (lever) pullLever(lever); vaultDescend(); const second = S.vaultAt.floor === 2;   /* §5e.3: evtl. erst den Hebel */
       const boss = S.ents.vault.find(e => e.vaultBoss === 'raeuberhoehle'), hoard = S.ents.vault.find(e => e.vaultHoard === 'raeuberhoehle');
       return sites && same && !!up && reach && locked && second && !!boss && boss.title && hoard?.loot?.length >= 3 && hoard.lootBonus === 1 && !S.ents.vault.some(e => e.vaultNext);
     } finally { S.ents.vault = keep.v; MAPS.vault = keep.m; S.vaults = JSON.parse(keep.p) || undefined; S.vaultAt = keep.a; S.ents.world = W0; indexSolids('vault'); }
@@ -15743,6 +15791,20 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Gewölbe (Nutzer §5e.3): geheime Gewölbe erst nach Karte, Hort verrät das nächste, Modifikatoren und Hebel gleich je Ebene, Hebel entriegelt, Geheimwand öffnet sich, Schlund hat alle 5 Ebenen Wächter und Truhe', sandbox(() => {
+    const p = stage(), f0 = { ...S.flags }, va = structuredClone(S.vaults || {}), at0 = S.vaultAt, vm = S.vaultMod, ents0 = S.ents.vault, mv = MAPS.vault, dv = { ...DUNGEONS.vault }, sites0 = S.ents.world.filter(e => e.vaultSite);
+    try { for (const k of Object.keys(VAULTS)) delete S.flags['vaultHint_' + k]; S.ents.world = S.ents.world.filter(e => !e.vaultSite); ensureVaultSites();
+      const hiddenOff = !S.ents.world.some(e => e.vaultSite === 'sternkammer') && S.ents.world.some(e => e.vaultSite === 'kasematten');
+      S.vaults = { kasematten: { best: 3, cleared: {}, looted: false } }; vaultHoardOpened({ vaultHoard: 'kasematten' }); const revealed = S.ents.world.some(e => e.vaultSite === 'schmugglergrotte');
+      let mods = new Set(), lever = null, secret = null, same = true;
+      for (const k of ['kasematten', 'tempelgruft', 'knochengruft', 'uhrwerkhalle']) for (let f = 1; f <= 3; f++) { buildVault(k, f); const m1 = S.vaultMod, l1 = S.ents.vault.some(e => e.lever); buildVault(k, f); same = same && m1 === S.vaultMod && l1 === S.ents.vault.some(e => e.lever);
+        mods.add(S.vaultMod); if (!lever && S.ents.vault.some(e => e.lever)) lever = [k, f]; if (!secret && MAPS.vault.secret) secret = [k, f]; }
+      let unlocked = true; if (lever) { buildVault(...lever); pullLever(S.ents.vault.find(e => e.lever)); unlocked = !S.ents.vault.some(e => e.vaultNext && e.vaultLocked); }
+      let opened = true; if (secret) { buildVault(...secret); const s = MAPS.vault.secret; S.map = 'vault'; p.map = 'vault'; p.x = s.x * TS; p.y = (s.y - 1) * TS; p.attributes.perception = 60; vaultTick(); opened = s.found && MAPS.vault.tiles[s.y * MAPS.vault.w + s.x] === T.DFLOOR; }
+      buildVault('schlund', 5); const deep = S.ents.vault.some(e => e.schlundChest === 5) && S.ents.vault.some(e => e.vaultBoss === 'schlund');
+      return hiddenOff && revealed && same && mods.size >= 2 && !!lever && unlocked && !!secret && opened && deep;
+    } finally { MAPS.vault = mv; Object.assign(DUNGEONS.vault, dv); S.flags = f0; S.vaults = va; S.vaultAt = at0; S.vaultMod = vm; S.ents.vault = ents0; S.ents.world = [...S.ents.world.filter(e => !e.vaultSite), ...sites0]; }
   }));
   ok('Akademie (Nutzer §5e.8): Einschreiben kostet Semestergeld, Vorlesung einmal am Tag morgens, nach 8 Vorlesungen und einer Prüfung Semester fertig, nach drei Absolvent', sandbox(() => {
     const p = stage(), st0 = S.student, a0 = S.acad, r0 = S.acadRank, f0 = S.flags.acadBanned, pm = S.permit; S.gold = 300; S.permit = (S.day | 0) + 5; S.flags.acadBanned = false;
