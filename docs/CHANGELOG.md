@@ -2,6 +2,11 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Netzwerk-Koop (K2): Knopf „Koop (Netzwerk)“ auf dem Titelbildschirm. Host öffnet sein Spiel mit 6-stelligem Code, Gast tritt über WebRTC (PeerJS) bei und steuert einen Gefährten. Der Host rechnet und speichert allein.
+- Teilen im Koop: Erfahrung wie der Held, Auftragsgold zu gleichen Teilen, Beute hat, wer sie zuerst aufhebt; Tauschmenü (Gast: I, Host: Knopf oben rechts); Chat mit Enter.
+- Bionik Pakete 2–5: Roboterauge, Prototyp-Glieder und Module, Wartung mit Werkzeug und Öl, Händler, Chirurgie, Schwarzmarkt, Rangsperren, Bionik im Charakterbogen.
+
 ## Version 20 — 2026-09-30 (Roadmap Paket 1)
 - Master-Roadmap des Nutzers (docs/MASTER_ROADMAP.md), Architekturplan (docs/PLAN_ROADMAP.md), Animations-Referenzanalyse (docs/ANIMATION_REFERENZ.md).
 - Bionik-Fundament: Qualitätsstufen 1–4 (Schrott schlechter als Fleisch), frische Prothesen, Verschleiß nur am getroffenen Glied, Debug-Knöpfe.

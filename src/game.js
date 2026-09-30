@@ -1,17 +1,17 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, SAVE_VERSION, log, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=20';
-import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=20';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=20';
-import * as R from './render.js?v=20';
-import * as HB from './buildings.js?v=20';
-import * as UI from './ui.js?v=20';
-import * as SIM from './sim.js?v=20';
-import * as B from './body.js?v=20';
-import * as SP from './sprites.js?v=20';
-import * as ECO from './economy.js?v=20';
-import { drawAtlas, revealAround, explored } from './atlas.js?v=20';
-import { sfx, ambience, ambienceTick } from './sfx.js?v=20';
+import { S, SAVE_VERSION, log, onLog, chronicle, save, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=21';
+import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS } from './data.js?v=21';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR } from './world.js?v=21';
+import * as R from './render.js?v=21';
+import * as HB from './buildings.js?v=21';
+import * as UI from './ui.js?v=21';
+import * as SIM from './sim.js?v=21';
+import * as B from './body.js?v=21';
+import * as SP from './sprites.js?v=21';
+import * as ECO from './economy.js?v=21';
+import { drawAtlas, revealAround, explored } from './atlas.js?v=21';
+import { sfx, ambience, ambienceTick } from './sfx.js?v=21';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -115,7 +115,7 @@ function speedOf(c) {
   let s = 2.25 + c.attributes.agility * 0.045;
   const off = c.equip.offhand && ITEMS[c.equip.offhand.key].slow || 0;
   const ch = c.equip.chest && ITEMS[c.equip.chest.key].slow || 0;
-  s *= (1 - off - ch);
+  s *= (1 - (off + ch) * (B.hasMod(c, 'greifhand') ? 0.7 : 1));   /* Roadmap P3: Greifhand trägt schwere Ausrüstung leichter */
   if (c.stamina <= 0) s *= 0.55;
   if (c.mounted) s *= mountSpeed(c);                                  // S13: Reittier
   if (c.status && c.status.some(t => t.key === 'chilled')) s *= 0.6;   // Hrodvars Eiskreis
@@ -459,15 +459,29 @@ function useConsumable(c, idx, target = c, part = null) {
   if (it.use === 'prosthesis') {                             // S12: Prothese anlegen — nur an ein verlorenes Glied
     const part = ['l', 'r'].map(s => s + it.part).find(p => c.body?.[p]?.lost);
     if (!part) return UI.toast(`Kein verlorener ${it.part === 'arm' ? 'Arm' : 'Bein'} — die Prothese passt nirgends.`);
-    removeItem(c, slot.key, 1); B.attachProsthesis(c, part, it.tier || 1);
-    log(`${c.name} bekommt ${it.name} (${B.PART_NAME[part]}).`, 'party'); UI.toast(`${it.name.toUpperCase()} ANGELEGT`, 2400); recalc(c);
+    const used = slot.used; if ((slot.count || 1) > 1) slot.count--; else c.inv.splice(idx, 1); B.attachProsthesis(c, part, it.tier || 1); if (used) c.body[part].mechCond = used;   /* Roadmap P5: gebrauchte Ware vom Schwarzmarkt */
+    log(`${c.name} bekommt ${it.name} (${B.PART_NAME[part]}).${used ? ` Gebraucht: nur ${used} % Zustand.` : ''}`, 'party'); UI.toast(`${it.name.toUpperCase()} ANGELEGT`, 2400); recalc(c);
     return UI.refreshHUD();
   }
   if (it.use === 'eye') {                                    // Roadmap P2: Roboterauge einsetzen — ersetzt ein altes Auge, das alte geht verloren
     const old = c.eye?.q; if (old && old >= (it.tier || 1) && (c.eye.cond ?? 100) >= 30) return UI.toast(`${c.name} hat schon ein gleich gutes Auge (${B.EYE_Q[old].name}).`);
-    removeItem(c, slot.key, 1); const q = B.attachEye(c, it.tier || 1).q, E = B.EYE_Q[q];
+    const used = slot.used; if ((slot.count || 1) > 1) slot.count--; else c.inv.splice(idx, 1); const q = B.attachEye(c, it.tier || 1).q, E = B.EYE_Q[q]; if (used) c.eye.cond = used;   /* Roadmap P5: gebraucht */
     log(`${c.name} setzt ${it.name} ein. Sichtweite ${E.fog} Felder${E.crit ? `, Fernkampf-Krit +${Math.round(E.crit * 100)} %` : ''}${E.light ? `, Nachtsicht +${Math.round(E.light * 100)} %` : ''}${E.heat ? ', Wärmesicht' : ''}. Magie stört es.`, 'party');
     UI.toast(`${it.name.toUpperCase()} EINGESETZT`, 2400); return UI.refreshHUD();
+  }
+  if (it.use === 'mechmod') {                                // Roadmap P3: Hand- oder Fußmodul auf eine Prothese stecken — ein altes Modul kommt zurück in die Tasche
+    const M = B.MECH_MOD[it.mod], ks = ['l', 'r'].map(s => s + M.part).filter(k => c.body?.[k]?.mech && c.body[k].mod !== it.mod);
+    const part = ks.find(k => !c.body[k].mod) || ks[0];
+    if (!part) return UI.toast(`Keine passende Prothese: ${M.name} braucht einen Prothesen-${M.part === 'arm' ? 'arm' : 'bein'}.`);
+    const P = c.body[part], old = P.mod; removeItem(c, slot.key, 1); if (old) addItem(c, old, 1); P.mod = it.mod; recalc(c);
+    log(`${c.name}: ${M.name} am ${B.PART_NAME[part]}${old ? ` (statt ${B.MECH_MOD[old]?.name})` : ''}. ${M.desc}${(P.mechCond ?? 100) < 30 ? ' Die Prothese ist beschädigt — das Modul wirkt erst nach der Instandsetzung.' : ''}`, 'party');
+    UI.toast(`${M.name.toUpperCase()} ANGESTECKT`, 2400); return UI.refreshHUD();
+  }
+  if (it.use === 'mechkit') {                                // Roadmap P4: Spezialöl — das am stärksten abgenutzte Bionik-Teil +25, höchstens 90 %
+    const all = B.bionicParts(c), w = all.filter(x => x.cond < 90).sort((a, b) => a.cond - b.cond)[0];
+    if (!w) return UI.toast(all.length ? 'Alles über 90 % — mehr schafft Öl nicht. Feinwerkzeug oder ein Kybernetiker.' : 'Du trägst keine Prothese und kein Roboterauge.');
+    const to = Math.min(90, w.cond + 25); removeItem(c, slot.key, 1); B.setBionicCond(c, w.k, to); recalc(c);
+    log(`${c.name} ölt ${w.k === 'eye' ? 'das Roboterauge' : `die Prothese (${w.name})`}: ${Math.round(w.cond)} → ${Math.round(to)} %.`, 'party'); UI.toast('GEÖLT', 1600); return UI.refreshHUD();
   }
   if (it.use === 'elixir') {                                 // S15 P2: ein Elixier zur Zeit, gemeinsame Abklingzeit
     if ((c.elixirCd || 0) > clock()) return UI.toast(`Noch ${Math.ceil(c.elixirCd - clock())} s, bevor der Magen das nächste verträgt.`);
@@ -707,7 +721,9 @@ const AUREL_TRADES = { house: ['Edelmann', 'Edelfrau', 'Kaufherr', 'Handwerker',
   academy: ['Magister', 'Studentin', 'Gelehrter'], observatory: ['Sternkundiger'], library: ['Archivar', 'Schreiberin'], court: ['Richterin', 'Gerichtsschreiber'], hospital: ['Medica', 'Pfleger'],
   bathhouse: ['Bader'], magitech: ['Magitech-Ingenieurin', 'Kristallschleifer'], factoryhall: ['Werkmeister', 'Fabrikarbeiter'], legion: ['Sonnenlegionär', 'Offizier der Sonnenlegion'] };   // Phase 5: begehbare Prachtbauten
 const MARKET_POOL = { 'Gewürzhändler': ['herb', 'herb', 'bread', 'dried_meat', 'potion', 'elixier_staerke', 'elixier_ausdauer', 'elixier_eile', 'elixier_regen'], 'Tuchhändlerin': ['traveler_cloak', 'leather_jerkin', 'leather_cap'], Juwelier: ['potion', 'potion', 'bandage', 'talisman_ausdauer', 'talisman_leichtfuss', 'talisman_krieger', 'talisman_waechter', 'talisman_magie', 'talisman_leben', 'eulenauge', 'elixier_auge', 'elixier_lehre'],
-  Waffenhändler: ['longsword', 'spear', 'shortbow', 'halberd', 'rusty_sword', 'doppelklinge', 'wurfmesser', 'schleuder'], 'Magitech-Ingenieurin': ['messingpistole', 'donnerbuechse', 'potion'], 'Rüstmeisterin': ['chain_hauberk', 'plate_cuirass', 'kite_shield', 'iron_helm', 'great_helm', 'sonnenharnisch', 'sonnenhelm', 'ordensharnisch', 'ordenshelm', 'thronharnisch', 'thronhelm', 'kettenhandschuhe', 'panzerhandschuhe', 'kettenbeinlinge', 'beinschienen', 'thron_handschuhe', 'thron_beinschienen', 'hochritter_handschuhe', 'hochritter_beinschienen'] };
+  Waffenhändler: ['longsword', 'spear', 'shortbow', 'halberd', 'rusty_sword', 'doppelklinge', 'wurfmesser', 'schleuder'], 'Magitech-Ingenieurin': ['messingpistole', 'donnerbuechse', 'potion'],
+  Prothesenhändlerin: ['schrottarm', 'schrottbein', 'aurelarm', 'aurelbein', 'auge_schrott', 'auge_aurel', 'spezialoel', 'ersatzteile'],   /* Roadmap P5: Stufe 1–2 */
+  Kybernetiker: ['spezialoel', 'spezialoel', 'ersatzteile', 'feinwerkzeug', 'greifhand', 'federfuss', 'ankerfuss', 'klingenhand'],   /* Roadmap P5: Wartung und Module */ 'Rüstmeisterin': ['chain_hauberk', 'plate_cuirass', 'kite_shield', 'iron_helm', 'great_helm', 'sonnenharnisch', 'sonnenhelm', 'ordensharnisch', 'ordenshelm', 'thronharnisch', 'thronhelm', 'kettenhandschuhe', 'panzerhandschuhe', 'kettenbeinlinge', 'beinschienen', 'thron_handschuhe', 'thron_beinschienen', 'hochritter_handschuhe', 'hochritter_beinschienen'] };
 const TRADE_GREET = {
   Graf: '„Ihr seid weit gereist, sieht man. Und riecht man.“', 'Gräfin': '„Der Norden schickt uns immer die Zähesten. Die Klugen bleiben dort und sterben.“',
   Edelmann: '„Ein Arm aus Gelenkhall ist ein Zeichen von Stand, nicht von Unglück.“', Edelfrau: '„Unsere Automaten verneigen sich tiefer als eure Knechte.“',
@@ -1861,8 +1877,8 @@ function rescaleSave(fresh) {
   Object.assign(S.flags, { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, rescale: false });
   log('Die Welt ist weiter geworden. (Spielstand auf die größere Karte umgerechnet.)', 'world');
 }
-export function continueGame() {
-  const data = loadRaw(); if (!data) return;
+export function continueGame(given = null) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
+  const data = given || loadRaw(); if (!data) return;
   const gone = data.propsGone; delete data.propsGone;
   applySave(data); applyDifficulty();                                  // S15 P12
   { const p = S.player; if (p?.titleClasses?.length && !p.tgrade) { p.tgrade = {};   // S15: alte Stände behalten jede Fähigkeit, die sie vor den Titelgraden hatten
@@ -1968,6 +1984,9 @@ export function continueGame() {
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
+  if (S.halt?.tickmar) { if (S.big?.kind === 'strike') S.halt['tickmar:magitech'] = Math.max(S.halt['tickmar:magitech'] || 0, S.big.until); delete S.halt.tickmar; }   /* Roadmap P4: alter Streik-Schlüssel */
+  for (const c of S.ents.world) if (c.villager && (c.prof === 'Prothesenhändlerin' || c.prof === 'Kybernetiker') && !c.shop) Object.assign(c, { shop: true, pool: MARKET_POOL[c.prof], till: 20 });   /* Roadmap P5: Bionik-Händler in alten Ständen */
+  { const v = S.ents.world.find(e => e.key === 'vell'); if (v?.pool && !v.pool.includes('spezialoel')) v.pool = [...v.pool, 'spezialoel', 'feinwerkzeug', 'auge_aurel', 'auge_meister']; }   /* Roadmap P5 */
   for (const def of NPCS) { const e = S.ents.world.find(x => x.key === def.key);   // Handelsdaten aus den Daten nachziehen (neue Läden, Warenpools)
     if (e) for (const k of ['shop', 'pool', 'town', 'market', 'smith', 'teaches', 'spellsTaught', 'spellRule']) if (def[k] !== undefined) e[k] = def[k]; }
   const allE = Object.values(S.ents).flat();   // S15 Fehlersuche: Gefährten auf anderen Karten zählen, Tote mit Nachfolger-Frist und zerstörte Orte nicht
@@ -2024,6 +2043,7 @@ function loop(now) {
   requestAnimationFrame(loop);                              // zuerst: ein Fehler darf die Schleife nicht beenden
   try {
     if (hitStop > 0) hitStop -= dt;                             // Hit-Stop: Welt steht kurz, Bild läuft weiter
+    else if (S.coop?.role === 'guest') coopHooks.guestTick?.(dt, now);   /* Koop K2: der Gast rechnet keine Welt, nur Bild und Eingabe */
     else if (!S.paused) update(dt, now);
     R.drawFrame(now);
   }
@@ -2185,8 +2205,19 @@ function drawMini(dt) {
   c.fillStyle = '#1a140c'; c.fillRect(cv.width / 2 - 3, cv.height / 2 - 3, 6, 6); c.fillStyle = '#f2d27a'; c.fillRect(cv.width / 2 - 2, cv.height / 2 - 2, 4, 4);
   c.strokeStyle = '#4d4227'; c.lineWidth = 2; c.strokeRect(1, 1, cv.width - 2, cv.height - 2);
 }
+// Koop K2: liegt das Host-Fenster im Hintergrund, ruft der Browser keine Bildschleife mehr auf. Damit die Gäste nicht einfrieren,
+// rechnet coop.js über einen Zeitgeber weiter (Browser drosseln ihn auf etwa 1 Hz; darum in 50-ms-Schritten nachholen, höchstens 1 s).
+let hiddenLast = 0;
+function stepHidden() {
+  const now = performance.now(); let dt = now - hiddenLast; hiddenLast = now;
+  if (!running || S.paused || dt > 3000) return; dt = Math.min(1000, dt);
+  while (dt > 0) { update(Math.min(50, dt), performance.now()); dt -= 50; }
+  last = performance.now();
+}
+const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
 function update(dt, now) {
   const p = S.player;
+  coopHooks.hostTick?.(dt);
   // Zeit
   if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
   if (S.voyage) seaTick(dt);  // S14: Überfahrt an Deck
@@ -3180,7 +3211,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (brawlHit) { dmg *= 0.5; if (source === S.player && S.brawls?.[target.brawlV]) S.brawls[target.brawlV].helped = target.brawlSide === 'dorf' ? 'kette' : 'dorf'; }
   if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit);
     if (kind === 'physical' && source && dmg > 0 && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
-      if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); } } }
+      if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); }
+      else if (w?.half && target === S.player) log('Deine Prothese knirscht: unter 50 % Zustand bringt sie nur noch den halben Vorteil. Spezialöl oder Feinwerkzeug an einer Werkbank helfen.', 'party'); } }   /* Roadmap P4 */
   else target.hp -= dmg;
   if (target.eye?.q && dmg > 0 && EYE_ZAP.has(kind)) { const w = B.wearEye(target, Math.min(8, 1.5 + dmg * 0.15));   /* Roadmap P2: Magie-Anfälligkeit — Schatten- und Magietreffer stören das Roboterauge */
     if (target === S.player && w) { if (w.broke) { UI.toast('ROBOTERAUGE GESTÖRT', 2200); log('Dein Roboterauge flackert unter 30 % und zeigt nur noch Rauschen. Ein Kybernetiker oder die Werkbank in Gelenkhall richtet es.', 'party'); } else if (w.was - w.now >= 1 && !S.flags.eyeZapHint) { S.flags.eyeZapHint = true; log('Magie knistert im Messing deines Auges. Zauber nutzen es ab.', 'party'); } } }
@@ -3205,7 +3237,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
     const a = Math.atan2(target.y - source.y, target.x - source.x), fl = feelOf(source);
     const poised = target.poiseUntil > performance.now();          // §82 Standfestigkeit: kurz nach einem Taumeln kein neues (kein Dauerlähmen)
     const kb = Math.min(20, (2 + dmg * 0.22) * (0.6 + fl.w)) * (crit ? 1.5 : 1) * (target.boss ? 0.25 : 1) * (poised ? 0.3 : 1);
-    target.kb = { x: Math.cos(a) * kb, y: Math.sin(a) * kb, t: 140, T: 140 };
+    if (!B.hasMod(target, 'ankerfuss')) target.kb = { x: Math.cos(a) * kb, y: Math.sin(a) * kb, t: 140, T: 140 };   /* Roadmap P3: Ankerfuß — kein Rückstoß */
     // Taumeln: kurzer Kontrollverlust; schwere Treffer brechen die Angriffsvorbereitung (nicht beim Boss außer kritisch)
     const stg = stagOf(source) * (crit ? 1.4 : 1);
     if (stg >= 0.3 && !poised && teamOf(target) !== 'player' && (!target.boss || (crit && stg >= 1))) {   // Dolch/Bogen: kein Taumeln (sonst Dauerlähmung)   // Spieler/Gefährten taumeln nicht (Steuerung bleibt direkt)
@@ -3357,7 +3389,9 @@ function die(c, cause = 'Wunden', source) {
     const m = MONSTERS[c.mtype];
     log(`${m.name} fällt.`, 'combat');
     dropLoot(c);
-    const full = m.xp + c.level * 2, share = xpShares(c), px = Math.round(full * share(S.player.id));
+    const full = m.xp + c.level * 2, share0 = xpShares(c), pilots = partyMembers().filter(pm => pm.coopPilot);
+    const pool = pilots.length ? share0(S.player.id) + pilots.reduce((a, pm) => a + share0(pm.id), 0) : 0;   /* Koop (Nutzer): Held und Gastfiguren teilen ihren Kampfanteil, jeder bekommt den ganzen */
+    const share = id => pilots.length && (id === S.player.id || pilots.some(pm => pm.id === id)) ? pool : share0(id), px = Math.round(full * share(S.player.id));
     if (px > 0) gainXp(S.player, px);
     for (const pm of partyMembers()) { const q = Math.round(full * share(pm.id)); if (q > 0) { pm.xp += q; while (pm.xp >= pm.xpNext) levelUp(pm); } }
     S.kills++;
@@ -3473,10 +3507,17 @@ function credit(target, src, dmg) {
   (target.dmgBy ||= {})[k] = (target.dmgBy[k] || 0) + dmg;
 }
 function xpShares(c) { const D = c.dmgBy || {}, tot = Object.values(D).reduce((a, v) => a + v, 0); return id => tot ? (D[id] || 0) / tot : 0; }
+// Koop (Nutzer): Auftragsgold wird mit den Gästen geteilt. Jede Gastfigur bekommt einen gleichen Teil in ihren Beutel (m.coopGold,
+// sichtbar beim Gast, jederzeit an den Helden übergebbar); der Rest bleibt beim Held. Ohne Koop: alles beim Held.
+function questGold(n) {
+  const pilots = partyMembers().filter(m => m.coopPilot); if (!pilots.length || n <= 0) return n;
+  const part = Math.floor(n / (pilots.length + 1)); for (const m of pilots) { m.coopGold = (m.coopGold || 0) + part; log(`${m.coopName || m.name} erhält ${part} Gold als Anteil.`, 'party'); }
+  return n - part * pilots.length;
+}
 function gainXp(c, n) {
   if (!c || !c.alive) return;
   c.xp += (c === S.player && (c.status || []).some(s => s.key === 'rested') ? n * 1.1 : n) * (1 + elx(c, 'xp'));   // S15 P2: Trank der Lehre   // Session 13: ausgeschlafen
-  for (const m of partyMembers()) { m.xp += n * 0.6; if (m.xp >= m.xpNext) levelUp(m); }
+  for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
 function levelUp(c) {
@@ -4293,6 +4334,7 @@ function partyCare(m, dt) {                                  // true = kümmert 
 }
 function partyAI(m, dt) {
   const p = S.player;
+  if (m.coopPilot && m.map === S.map && coopHooks.remote?.(m, dt)) return;   /* Koop K2: ein Gast steuert diese Figur; ohne Eingabe seit 1 s folgt sie wieder der KI */
   if (m.downed) { m.vx = m.vy = 0; return; }
   if (m.map !== S.map) { m.map = S.map; m.x = p.x + ri(-30, 30); m.y = p.y + ri(-30, 30);
     if (!S.ents[S.map].includes(m)) S.ents[S.map].push(m); }
@@ -4526,16 +4568,44 @@ function rummage(t, b) {
   const g = t.type === 'desk' ? ri(3, 15) : rnd() < 0.3 ? ri(1, 6) : 0; S.gold += g;
   log(got.length || g ? `Gefunden: ${[...got, g ? g + ' Gold' : ''].filter(Boolean).join(', ')}.${owned ? ' Niemand hat es gesehen.' : ''}` : 'Nichts Brauchbares.', 'world');
 }
-function mendAt(t) {
+// Roadmap P4: Selbstwartung von Prothesen und Auge an Werkbank oder Amboss — Feinwerkzeug (bleibt) und je Teil 1 Magitech oder 2 Ersatzteile.
+// Obergrenze 70 %, Schmiedekunst hebt sie (bis 95 %), die Greifhand +10. Mehr schafft nur der Kybernetiker.
+const selfCap = p => Math.round(Math.min(95, 70 + (p.skills?.smithing || 0) * 0.2 + (B.hasMod(p, 'greifhand') ? 10 : 0)));
+function selfRepair(t) {
+  const p = S.player, cap = selfCap(p), todo = B.bionicParts(p).filter(x => x.cond < cap);
+  if (!todo.length) return UI.toast(`Nichts unter ${cap} % — mehr schafft nur ein Kybernetiker.`), false;
+  if (!hasItem(p, 'feinwerkzeug')) return UI.toast('Ohne Feinwerkzeug geht das nicht. Kybernetiker und Prothesenhändler verkaufen es.', 3200), false;
+  let done = 0; const used = [];
+  for (const x of todo) { if (hasItem(p, 'magitech')) { removeItem(p, 'magitech', 1); used.push('1 Magitech'); } else if (countItem(p, 'ersatzteile') >= 2) { removeItem(p, 'ersatzteile', 2); used.push('2 Ersatzteile'); } else break;
+    B.setBionicCond(p, x.k, cap); done++; }
+  if (!done) return UI.toast('Dir fehlt Material: je Teil 1 Magitech-Teil oder 2 Ersatzteile.', 3200), false;
+  if (t) { act(p, 'work', 1500, t); passTime(20 * done); } p.skills.smithing = Math.min(100, (p.skills.smithing || 0) + 0.4 * done); recalc(p);
+  log(`Selbst gewartet: ${done} Teil${done > 1 ? 'e' : ''} auf ${cap} % (${used.join(', ')}). Das Feinwerkzeug bleibt, das Material ist verbraucht.${done < todo.length ? ' Für den Rest fehlt Material.' : ''}`, 'economy'); UI.refreshHUD();
+  return true;
+}
+function mendAt(t, skipMech = false) {
+  if (!skipMech && B.bionicParts(S.player).some(x => x.cond < selfCap(S.player))) return UI.dialogue(S.player, 'Werkbank: Was willst du tun?', [   /* Roadmap P4 */
+    { text: `Prothesen und Auge selbst warten (bis ${selfCap(S.player)} %, Feinwerkzeug + Material)`, fn: () => { UI.closeDialogue(); selfRepair(t); } },
+    { text: 'Ausrüstung ausbessern', fn: () => { UI.closeDialogue(); mendAt(t, true); } }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   const p = S.player, smith = S.ents[S.map].find(e => e.kind === 'npc' && e.alive && !e.downed && e.shop && /[Ss]chmied/.test(e.prof || e.name || '') && dist(e, t) < 200);
   if (smith) return repairAll(smith);
-  const items = [...Object.values(p.equip).filter(Boolean), ...p.inv].filter(i => i.cond != null && i.cond < 0.8);
+  const cap = B.hasMod(p, 'greifhand') ? 0.9 : 0.8;   /* Roadmap P3: Greifhand arbeitet feiner */
+  const items = [...Object.values(p.equip).filter(Boolean), ...p.inv].filter(i => i.cond != null && i.cond < cap);
   if (!items.length) return UI.toast('Nichts, was du selbst noch besser machst.');
   const need = Math.ceil(items.length / 2);
   if ((S.res.iron || 0) < need) return UI.toast(`Du brauchst ${need} Eisenerz zum Ausbessern.`);
-  S.res.iron -= need; act(p, 'work', 1500, t); passTime(30); items.forEach(i => i.cond = 0.8);
+  S.res.iron -= need; act(p, 'work', 1500, t); passTime(30); items.forEach(i => i.cond = cap);
   p.skills.smithing = Math.min(100, (p.skills.smithing || 0) + 0.5);
   log(`${items.length} Stücke selbst ausgebessert (${need} Eisenerz). Ein Schmied macht es besser.`, 'economy'); UI.refreshHUD();
+}
+function doInteractFor(m) {                                          /* Koop K2: Gastfigur hebt auf, was vor ihr liegt; Gespräche und Gebäude bleiben Sache des Hosts */
+  const items = (S.ents[m.map] || []).filter(e => e.kind === 'item' && Math.hypot(e.x - m.x, e.y - m.y) < 40).sort((a, b) => Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y));
+  const t = items[0]; if (!t) return;
+  if (m.inv.length >= (m.invCap || 20)) return log(`${m.name}: Gepäck voll.`, 'party');
+  m.inv.push(t.item); S.ents[m.map].splice(S.ents[m.map].indexOf(t), 1); log(`${m.coopName || m.name} nimmt ${t.item.name}.`, 'party');
+}
+function useSlotFor(m, i) {                                          /* Koop K2: Leiste der Gastfigur, nur Verbrauchsgüter */
+  const s = m.hotbar?.[i]; if (!s || s.type === 'ability') return; const idx = m.inv.findIndex(x => x.key === s.key); if (idx >= 0) useConsumable(m, idx);
 }
 function doInteract() {
   const p = S.player, t = interactables()[0];
@@ -4835,7 +4905,7 @@ function ensureAurelion() {
     const [cx, cy] = TOWN_PLAN.gelenkhall.square, pos = freeSpotNear('world', cx + 3, cy - 3, 2);
     const c = makeChar({ name: 'Meisterin Vell', prof: 'Prothesenmacherin', x: pos.x, y: pos.y, level: 8, faction: 'aurel', traits: ['gütig'] });
     Object.assign(c, { key: 'vell', greet: '„Zeig mir, was dir fehlt. Ich baue es dir nach — besser, als es war.“', anchor: { x: pos.x, y: pos.y }, schedulePos: { x: pos.x, y: pos.y },
-      shop: true, pool: ['schrottarm', 'schrottbein', 'aurelarm', 'aurelbein', 'aurelarm', 'meisterarm', 'meisterbein', 'potion', 'bandage'], pal: { skin: '#d6b089', hair: '#6a5a4a', cloth: '#3a3a44' } });
+      shop: true, pool: ['schrottarm', 'schrottbein', 'aurelarm', 'aurelbein', 'aurelarm', 'meisterarm', 'meisterbein', 'potion', 'bandage', 'spezialoel', 'feinwerkzeug', 'auge_aurel', 'auge_meister'], pal: { skin: '#d6b089', hair: '#6a5a4a', cloth: '#3a3a44' } });
     c.body.rarm.mech = 3; S.ents.world.push(c);   // sie trägt selbst einen Meisterarm
   }
   const vell = S.ents.world.find(e => e.key === 'vell'), vh = HOUSES.find(b => b.town === 'gelenkhall' && b.type === 'healer') || HOUSES.find(b => b.town === 'gelenkhall');
@@ -6061,7 +6131,7 @@ function claimContract(C, npc) {
   const share = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + share * 1.5);   // S14 (Nutzer): wer die Wachen kämpfen lässt, bekommt weniger
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
-  C.state = 'claimed'; S.gold += C.reward.gold; if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] += C.reward.rep;
+  C.state = 'claimed'; S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] += C.reward.rep;
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
   if (S.trust?.[C.town] < 0) S.trust[C.town]++;                        // erfüllte Aufträge bringen Vertrauen zurück
@@ -7006,19 +7076,28 @@ function ensureSaltportContacts() {
   if (S.quests.q_rask?.state === 'active' && !S.ents.world.some(e => e.raskChest) && S.flags.raskAt) {
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: S.flags.raskAt[0], y: S.flags.raskAt[1], r: 10, solid: true, transient: true, raskChest: true, label: 'Rasks Kiste' }); indexSolids('world'); }
 }
-function mechMenu() {
+// Roadmap P4: Wartungspreise folgen dem Magitech-Preis der Stadt (ECO): Streik, Unfall oder leere Lager in Tickmar machen Wartung teurer.
+const mechRate = town => clamp(ECO.ecoPrice(S.towns?.[town] ? town : 'tickmar', 'magitech', true) / (ITEMS.magitech.value * 1.12 * 1.15), 0.6, 2.5);
+// Roadmap P5: Leistungsumfang je Beruf — Vell und die Werkbank können alles, Kybernetiker warten und rüsten auf, die Medica operiert (Chirurgie, Auge).
+const MECH_SCOPE = { Kybernetiker: { repair: 1, up: 1, eyeCare: 1 }, Medica: { swap: 1, eye: 1, eyeCare: 1 } };
+function mechMenu(npc = null) {
   const p = S.player, parts = ['larm', 'rarm', 'lleg', 'rleg'].filter(k => p.body[k].mech), NAME = { larm: 'linker Arm', rarm: 'rechter Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' };
-  const back = () => mechMenu(), say = t => UI.dialogue(p, t, [{ text: 'Weiter', fn: back }]);
-  const repair = parts.reduce((a, k) => a + Math.round((100 - (p.body[k].mechCond ?? 100)) * 2), 0);
+  const role = npc && npc.key !== 'vell' ? npc.prof : null, can = role ? MECH_SCOPE[role] || {} : { repair: 1, up: 1, swap: 1, eye: 1, eyeCare: 1 };
+  const town = npc?.homeTown || npc?.town || (p.map === 'world' && townAt(p.x / TS | 0, p.y / TS | 0)) || 'gelenkhall', rate = mechRate(town);
+  const back = () => mechMenu(npc), say = t => UI.dialogue(npc || p, t, [{ text: 'Weiter', fn: back }]);
+  const repair = Math.round(parts.reduce((a, k) => a + (100 - (p.body[k].mechCond ?? 100)) * 2, 0) * rate);
   const opts = [];
-  if (repair > 0) opts.push({ text: `Alle Prothesen instand setzen (${repair} Gold)`, fn: () => { if (S.gold < repair) return say('Zu wenig Gold.'); S.gold -= repair; for (const k of parts) p.body[k].mechCond = 100; say('Gefettet, gerichtet, gespannt. Wie neu.'); } });
-  for (const k of parts) if ((p.body[k].mechUp || 0) < 2) { const up = k.endsWith('arm') ? 'Kraftfeder' : 'Laufwerk', cost = 250 * ((p.body[k].mechUp || 0) + 1);
+  if (can.repair && repair > 0) opts.push({ text: `Alle Prothesen instand setzen (${repair} Gold)`, fn: () => { if (S.gold < repair) return say('Zu wenig Gold.'); S.gold -= repair; for (const k of parts) p.body[k].mechCond = 100; say('Gefettet, gerichtet, gespannt. Wie neu.'); } });
+  if (can.up) for (const k of parts) if ((p.body[k].mechUp || 0) < 2) { const up = k.endsWith('arm') ? 'Kraftfeder' : 'Laufwerk', cost = 250 * ((p.body[k].mechUp || 0) + 1);
     opts.push({ text: `${up} für ${NAME[k]} (Stufe ${(p.body[k].mechUp || 0) + 1}, ${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; p.body[k].mechUp = (p.body[k].mechUp || 0) + 1; recalc(p); say(`${up} eingesetzt: +5 % ${k.endsWith('arm') ? 'Schlagkraft' : 'Tempo'}.`); } }); }
-  opts.push(...mechSwapOptions(p, say));   // Nutzer S13: gesunde Glieder freiwillig ersetzen
-  opts.push(...eyeOptions(p, say));   /* Roadmap P2: Roboterauge einsetzen und warten (ersetzt die alte Linse) */
+  if (can.swap) opts.push(...mechSwapOptions(p, say, npc && npc.key !== 'vell' ? npc.name : 'Meisterin Vell'));   // Nutzer S13: gesunde Glieder freiwillig ersetzen
+  opts.push(...eyeOptions(p, say, can, rate));   /* Roadmap P2: Roboterauge einsetzen und warten (ersetzt die alte Linse) */
   const eyeLine = p.eye?.q ? `\nAuge: ${B.EYE_Q[p.eye.q]?.name || '?'} (Stufe ${p.eye.q}), Zustand ${Math.round(p.eye.cond ?? 100)} %${(p.eye.cond ?? 100) < 30 ? ' (GESTÖRT — wirkungslos)' : ''}` : '';
   const state = (parts.length ? parts.map(k => `${NAME[k]}: Stufe ${p.body[k].mech}, Zustand ${Math.round(p.body[k].mechCond ?? 100)} %${(p.body[k].mechCond ?? 100) < 30 ? ' (BESCHÄDIGT — wirkungslos)' : ''}${p.body[k].mechUp ? `, Aufrüstung ${p.body[k].mechUp}` : ''}`).join('\n') : 'Du trägst keine Prothese. Meisterin Vell verkauft welche.') + eyeLine;
-  UI.dialogue(p, `Werkbank der Prothesenmacherin\n${state}`, [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  const halt = (S.halt?.['tickmar:magitech'] || 0) > S.day, priceLine = `\nWartung: ×${rate.toFixed(2)} (Magitech in ${townName(town)} ${ECO.ecoPrice(S.towns?.[town] ? town : 'tickmar', 'magitech', true)} Gold)${halt ? ' — Tickmars Fabrik steht still, Teile sind knapp.' : ''}`;   /* Roadmap P4 */
+  const scope = role === 'Kybernetiker' ? '\nKybernetiker warten und rüsten auf; operieren tut die Medica.' : role === 'Medica' ? '\nDie Medica ersetzt Glieder und setzt Augen ein; warten tun die Kybernetiker.' : '';   /* Roadmap P5 */
+  UI.dialogue(npc || p, `${npc && npc.key !== 'vell' ? `${npc.name} (${npc.prof})` : 'Werkbank der Prothesenmacherin'}\n${state}${priceLine}${scope}`, [...opts, ...(npc ? [{ text: 'Zurück', fn: () => talk(npc) }] : []), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  return opts;   /* Roadmap P5: für Selbsttest und Debug */
 }
 function ensureGoblinVillage() {
   for (const d of GOBLIN_VILLAGE) if (!S.ents.world.some(e => e.key === d.key)) {
@@ -7825,24 +7904,63 @@ function factoryWork(t) {
   log(`Eine Stunde Schicht in der Fabrik: ${pay} Gold. Haus Vantor merkt sich fleißige Hände.`, 'economy'); UI.refreshHUD();
 }
 // Prothesen (Nutzer): auch ein gesundes Glied kann gegen Messing getauscht werden — freiwillig, teuer, mit Bonus
-function mechSwapOptions(p, say) {
+/* Roadmap P5: Bionik-Zugang nach Rang in Aurelion (S.ranks.aurel, Schein, Bürgerrecht, Akademie-Adept). null = erlaubt, sonst der Grund */
+const aurelRank = () => Math.max(S.ranks?.aurel ?? 0, hasPermit() ? 1 : 0, S.flags.aurelCitizen ? 2 : 0);
+function bionicLack(tier, surgery = false) { const r = aurelRank();
+  if (tier >= 4) return r >= 4 ? null : 'Prototypen erst ab Rang 4 in Aurelion';
+  if (tier >= 3 || surgery) return r >= 2 || (S.acadRank || 0) >= 2 ? null : 'Bürgerrecht in Aurelion oder Akademie-Adept';
+  if (tier >= 2) return r >= 1 ? null : 'Aufenthaltsschein in Aurelion';
+  return null; }
+const bionicTier = it => it && (it.use === 'prosthesis' || it.use === 'eye') ? it.tier || 1 : it?.use === 'mechmod' ? 2 : 0;
+function mechSwapOptions(p, say, who = 'Meisterin Vell') {
   const NAME = { larm: 'linken Arm', rarm: 'rechten Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' }, TIER = [[2, 'Aurelionisch', 700], [3, 'Meisterwerk', 1400]], out = [];
   for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = p.body[k]; if (P.mech || P.lost) continue;
-    for (const [tier, name, cost] of TIER) out.push({ text: `${NAME[k]} ersetzen lassen — ${name} (${cost} Gold)`, fn: () => {
+    for (const [tier, name, cost] of TIER) { const lack = bionicLack(tier, true);   /* Roadmap P5: Chirurgie an gesunden Gliedern ab Bürgerrecht oder Adept */
+      out.push({ text: `${NAME[k]} ersetzen lassen — ${name} (${cost} Gold)${lack ? ` — gesperrt: ${lack}` : ''}`, fn: () => {
+      if (lack) return say(`„Gesunde Glieder schneide ich nur bei Leuten mit Rang ab. Dir fehlt: ${lack}.“`);
       if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; B.attachProsthesis(p, k, tier); recalc(p);
-      log(`Meisterin Vell trennt, fügt, stellt ein. Dein ${NAME[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich den ${NAME[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); }
+      log(`${who} trennt, fügt, stellt ein. Dein ${NAME[k]} ist jetzt aus Messing (${name}).`, 'economy'); chronicle('Messing statt Fleisch', 'legend', `${p.name} lässt sich den ${NAME[k]} ersetzen.`); say('„Beweg die Finger. Siehst du? Besser als vorher.“'); } }); } }
   return out;
 }
 // Roadmap P2: Roboterauge beim Prothesenmacher — einsetzen (Stufe 2/3, ersetzt ein schwächeres) und warten (2 Gold je fehlendem Prozent)
 const EYE_COST = { 2: 700, 3: 1800 };
-function eyeOptions(p, say) {
+function eyeOptions(p, say, can = { eye: 1, eyeCare: 1 }, rate = 1) {
   const out = [], E = p.eye, q0 = E?.q || 0, cond = E?.cond ?? 100;
-  if (q0 && cond < 100) { const cost = Math.round((100 - cond) * 2); out.push({ text: `Auge warten lassen (${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; E.cond = 100; say('Linse geputzt, Iris nachgestellt. Das Rauschen ist weg.'); } }); }
-  for (const q of [2, 3]) if (q > q0) out.push({ text: `Roboterauge einsetzen lassen — ${B.EYE_Q[q].name}${q0 ? ' (ersetzt dein altes)' : ''} (${EYE_COST[q]} Gold)`, fn: () => {
+  if (can.eyeCare && q0 && cond < 100) { const cost = Math.round((100 - cond) * 2 * rate); out.push({ text: `Auge warten lassen (${cost} Gold)`, fn: () => { if (S.gold < cost) return say('Zu wenig Gold.'); S.gold -= cost; E.cond = 100; say('Linse geputzt, Iris nachgestellt. Das Rauschen ist weg.'); } }); }
+  if (can.eye) for (const q of [2, 3]) if (q > q0) { const lack = bionicLack(q); out.push({ text: `Roboterauge einsetzen lassen — ${B.EYE_Q[q].name}${q0 ? ' (ersetzt dein altes)' : ''} (${EYE_COST[q]} Gold)${lack ? ` — gesperrt: ${lack}` : ''}`, fn: () => {
+    if (lack) return say(`„Dieses Auge setze ich nur Leuten mit Rang ein. Dir fehlt: ${lack}.“`);   /* Roadmap P5 */
     if (S.gold < EYE_COST[q]) return say('Zu wenig Gold.'); S.gold -= EYE_COST[q]; const X = B.EYE_Q[B.attachEye(p, q).q];
     log(`Ein Roboterauge (${X.name}): Sichtweite ${X.fog} Felder, Fernkampf-Krit +${Math.round(X.crit * 100)} %${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}. Magie stört es.`, 'party');
-    say('Messing um das Auge, Glas davor. Die Welt reicht plötzlich weiter.'); } });
+    say('Messing um das Auge, Glas davor. Die Welt reicht plötzlich weiter.'); } }); }
   return out;
+}
+// Roadmap P5: Bionik im Gespräch — Kybernetiker (Wartung), Medica in Aurelion (Chirurgie, Auge), Vell (alles), Schwarzmarkt bei Rook und Nix
+function bionicChoices(npc) {
+  if (!npc || npc.hostile || !npc.alive) return [];
+  const out = [], aurel = TOWN_PLAN[npc.homeTown || npc.town]?.lord === 'aurel';
+  if (npc.prof === 'Kybernetiker') out.push({ text: 'Kannst du meine Prothesen warten?', fn: () => mechMenu(npc) });
+  if (npc.prof === 'Medica' && aurel) out.push({ text: 'Kannst du mir ein Glied oder ein Auge ersetzen?', fn: () => mechMenu(npc) });
+  if (npc.key === 'vell') out.push({ text: 'Prothesen warten, tauschen, Auge einsetzen', fn: () => mechMenu(npc) });
+  if (npc.key === 'rook' || npc.key === 'nix') out.push({ text: 'Hast du Messing unter dem Tisch? (Schwarzmarkt)', fn: () => blackMarket(npc) });
+  const locked = (npc.shop && npc.pool || []).filter(k => bionicTier(ITEMS[k]) && bionicLack(bionicTier(ITEMS[k])));   /* Hinweis: was der Rang noch sperrt */
+  if (locked.length) out.push({ text: 'Warum verkaufst du mir nicht alles?', fn: () => UI.dialogue(npc, `„Nicht ohne Rang in Aurelion. ${[...new Set(locked.map(k => `${ITEMS[k].name}: ${bionicLack(bionicTier(ITEMS[k]))}`))].join('; ')}.“\n(Die Ware wechselt jeden Tag.)`, [{ text: 'Weiter', fn: () => talk(npc) }]) });
+  return out;
+}
+// Schwarzmarkt: kein Rang nötig, +50 % Preis, 40 % Chance auf gebrauchte Ware (60 % Zustand); selten ein Prototyp. Angebot wechselt täglich.
+const BLACK_POOL = ['schrottarm', 'schrottbein', 'auge_schrott', 'aurelarm', 'aurelbein', 'auge_aurel', 'spezialoel', 'ersatzteile', 'feinwerkzeug', 'federfuss', 'greifhand'], BLACK_RARE = ['protoarm', 'protobein', 'auge_proto', 'klingenhand'];
+function blackOffers(npc) {
+  if (npc._black?.day !== (S.day | 0)) { const list = []; for (let g = 0; list.length < 4 && g < 40; g++) { const k = pick(BLACK_POOL); if (!list.includes(k)) list.push(k); } if (chance(0.25)) list.push(pick(BLACK_RARE)); npc._black = { day: S.day | 0, list }; }
+  return npc._black.list;
+}
+function blackMarket(npc) {
+  const back = () => blackMarket(npc), say = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
+  const opts = blackOffers(npc).map(k => { const c = Math.round(price(k, true, npc) * 1.5); return { text: `${ITEMS[k].name} (${c} Gold)`, fn: () => {
+    if (S.gold < c) return say('„Kein Gold, kein Messing.“'); if (!addItem(S.player, k, 1)) return say('„Deine Tasche ist voll.“');
+    S.gold -= c; npc._black.list = npc._black.list.filter(x => x !== k); const worn = bionicTier(ITEMS[k]) && ITEMS[k].use !== 'mechmod' && chance(0.4);
+    if (worn) { const s = [...S.player.inv].reverse().find(x => x && x.key === k && !x.used); if (s) s.used = 60; }
+    log(`Schwarzmarkt: ${ITEMS[k].name} für ${c} Gold.${worn ? ' Gebraucht — beim Einsetzen nur 60 % Zustand.' : ''}`, 'economy'); UI.refreshHUD();
+    say(worn ? '„Hatte schon einen Besitzer. Der braucht ihn nicht mehr.“' : '„Frisch aus einer Kiste, die nie in Gelenkhall ankam.“'); } }; });
+  UI.dialogue(npc, `„Keine Fragen, keine Siegel. Dafür kostet es die Hälfte mehr, und nicht alles ist neu.“\n(Schwarzmarkt: kein Rang nötig, +50 % Preis, manche Teile gebraucht.)`, [...opts, { text: 'Zurück', fn: () => talk(npc) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
 // Das Heilige Gericht in Aurelheim: Ablass (Kopfgeld tilgen), Klage gegen ein Haus, einer Verhandlung beiwohnen
 function holyCourt(npc) {
@@ -8292,6 +8410,8 @@ function bigDay() {
 }
 function bigEnd(text) { const B = S.big; if (!B) return; S.big = null; S.ents.world = S.ents.world.filter(e => e.bigEv !== B.id); if (text) { log(text, 'world'); chronicle(text, 'news'); } }
 const bigAnnounce = (title, text) => { log(text, 'world'); chronicle(title, 'news', text); UI.toast(title.toUpperCase(), 2800); };
+/* Roadmap P4: Streikende hebt nur den eigenen Stillstand auf; ein längerer Unfall-Stillstand (magitechAccident) bleibt. tickmar = alter Schlüssel */
+function strikeOff() { if (!S.halt) return; delete S.halt.tickmar; if (S.big?.kind === 'strike' && (S.halt['tickmar:magitech'] || 0) <= S.big.until) delete S.halt['tickmar:magitech']; }
 const BIG_START = {
   plague: { ok: () => bigTowns().some(k => villagersOf(k).length >= 4), go: () => {
     const k = pick(bigTowns().filter(k => villagersOf(k).length >= 4)); S.big = { id: uid(), kind: 'plague', town: k, day: S.day | 0, until: (S.day | 0) + 8, dead: 0, cured: 0 };
@@ -8332,7 +8452,7 @@ const BIG_START = {
     S.big = { id: uid(), kind: 'witch', town: k, until: (S.day | 0) + 2, who: w.id, name: w.name }; w.accused = true;
     bigAnnounce(`Hexenprozess in ${townName(k)}`, `Die Inquisition des Ordens klagt ${w.name} aus ${townName(k)} der Hexerei an. Übermorgen soll sie brennen. Man kann für sie sprechen, schweigen, oder sie in der Nacht fortbringen.`); } },
   strike: { ok: () => !!TOWN_PLAN.tickmar, go: () => {
-    S.big = { id: uid(), kind: 'strike', town: 'tickmar', until: (S.day | 0) + 3 }; (S.halt ||= {}).tickmar = true;
+    S.big = { id: uid(), kind: 'strike', town: 'tickmar', until: (S.day | 0) + 3 }; (S.halt ||= {})['tickmar:magitech'] = Math.max(S.halt['tickmar:magitech'] || 0, S.big.until);   /* Roadmap P4: der Streik legt die Magitech-Fabrik wirklich still (vorher nur Text) */
     const q = freeSpotNear('world', TOWN_PLAN.tickmar.square[0] + 1, TOWN_PLAN.tickmar.square[1] - 1, 2), h = makeChar({ name: 'Grete Rußhand', prof: 'Streikführerin', x: q.x, y: q.y, level: 4 });
     Object.assign(h, { bigEv: S.big.id, strikeLead: true, transient: true, anchor: { x: q.x, y: q.y }, greet: '„Keine Hand rührt sich mehr, bis Vantor zahlt, was er schuldet.“' }); S.ents.world.push(h);
     bigAnnounce('Streik in Tickmar', 'Die Arbeiter der Fabriken von Tickmar legen die Arbeit nieder. Magitech wird knapp. Grete Rußhand führt den Streik an; Fabrikherr Vantor will ihn brechen. Wessen Seite ergreifst du?'); } },
@@ -8351,7 +8471,7 @@ function bigTick(B) {
   if (B.kind === 'witch' && day >= B.until) { const w = byId(B.who);
     if (w?.alive && w.accused) { w.accused = false; w.alive = false; S.ents.world = S.ents.world.filter(e => e !== w); S.factions.order = clamp((S.factions.order || 0) + 2, -100, 100); return bigEnd(`${B.name} ist in ${townName(B.town)} verbrannt worden. Niemand hat für sie gesprochen.`); }
     return bigEnd(); }
-  if (B.kind === 'strike' && day >= B.until) { if (S.halt) delete S.halt.tickmar; return bigEnd('Der Streik in Tickmar zerfällt. Die Leute gehen zurück an die Maschinen, hungrig und wütend.'); }
+  if (B.kind === 'strike' && day >= B.until) { strikeOff(); return bigEnd('Der Streik in Tickmar zerfällt. Die Leute gehen zurück an die Maschinen, hungrig und wütend.'); }
   if (day >= B.until) bigEnd(B.kind === 'tourney' ? `Das Turnier von ${townName(B.town)} ist vorbei.` : B.kind === 'ball' ? 'Der Ball der Häuser ist vorbei.' : null);
 }
 function bigSecond() {                                                // jede Sekunde: Schatzwagen-Überfall, Turnierkämpfe
@@ -8405,10 +8525,10 @@ function bigChoices(npc, choices) {
       npc.accused = false; S.ents.world = S.ents.world.filter(e => e !== npc); if (chance(0.35)) addBounty('order', 120, 'Fluchthilfe'); addRel(npc.key, 20); bigEnd(`${B.name} ist in der Nacht aus ${townName(B.town)} verschwunden. Die Inquisition tobt.`); UI.closeDialogue(); } },
     { text: 'Ich kann nichts tun.', fn: () => UI.closeDialogue() }]) });
   if (npc.strikeLead && B.kind === 'strike') choices.unshift({ text: 'Worum geht es beim Streik?', fn: () => UI.dialogue(npc, '„Vierzehn Stunden an den Kesseln, drei Finger weniger, und der Lohn kommt einen Monat zu spät. Vantor will uns mit Automaten ersetzen. Wir wollen nur, was man uns schuldet.“', [
-    { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); S.prices = (S.prices || 1) * 1.03; if (S.halt) delete S.halt.tickmar; addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); UI.closeDialogue(); } },
-    { text: 'Ich vermittle. (Willenskraft)', fn: () => { const ok = (p.attributes.willpower || 8) + ri(0, 8) >= 12; if (S.halt) delete S.halt.tickmar;
+    { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); S.prices = (S.prices || 1) * 1.03; strikeOff(); addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); UI.closeDialogue(); } },
+    { text: 'Ich vermittle. (Willenskraft)', fn: () => { const ok = (p.attributes.willpower || 8) + ri(0, 8) >= 12; strikeOff();
       if (ok) { S.houses.vantor = clamp(favor('vantor') + 3, -100, 100); S.gold += 60; bigEnd('Du bringst Grete und Vantor an einen Tisch. Halber Rückstand, kürzere Schichten. Beide zahlen dir etwas (60 Gold).'); } else bigEnd('Die Vermittlung platzt. Am Ende geben die Hungrigen nach, ohne etwas zu bekommen.'); UI.closeDialogue(); } },
-    { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += 100; addRel(npc.key, -30); if (S.halt) delete S.halt.tickmar; bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
+    { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += 100; addRel(npc.key, -30); strikeOff(); bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
     { text: 'Später.', fn: () => UI.closeDialogue() }]) });
   if (npc.crashSurvivor && !npc.downed && !npc.thanked) { npc.thanked = true; S.factions.aurel = clamp((S.factions.aurel || 0) + 6, -100, 100); S.gold += 40; choices.unshift({ text: 'Wie geht es dir?', fn: () => say('„Du hast mich aus dem Wrack geholt. Aurelion zahlt seine Schulden: nimm das.“ (40 Gold, Aurelion +6)') }); }
 }
@@ -8706,7 +8826,7 @@ function activeEffects() {
   for (const k of B.PARTS) { const P = p.body?.[k]; if (!P) continue;
     if (P.lost) add('Körper', '✕', `${PART_DE[k]} verloren`, 'bad', [k.includes('arm') ? 'Keine Waffe oder kein Schild in dieser Hand.' : 'Stark verlangsamt.', 'Prothesen gibt es in Gelenkhall.'], true);
     else if (P.mech) { const mc = Math.round(P.mechCond ?? 100);   /* S15 Hinweise: Zustand sichtbar, unter 30 % wirkungslos */
-      add('Körper', '⚙', `${PART_DE[k]}: Prothese`, mc < 30 ? 'bad' : 'info', [`Stufe ${P.mech}. Zustand ${mc} %${mc < 30 ? ' — beschädigt, wirkungslos' : ''}.`, 'Nutzt sich bei jedem Treffer ab. Instand setzen an der Werkbank in Gelenkhall.'], mc < 30); }
+      add('Körper', '⚙', `${PART_DE[k]}: Prothese`, mc < 30 ? 'bad' : 'info', [`Stufe ${P.mech} (${B.MECH_Q[P.mech]?.name || '?'}). Zustand ${mc} %${mc < 30 ? ' — beschädigt, wirkungslos' : ''}.`, ...(P.mod && B.MECH_MOD[P.mod] ? [`Modul: ${B.MECH_MOD[P.mod].name} — ${B.MECH_MOD[P.mod].desc}`] : []), 'Nutzt sich bei jedem Treffer ab, unter 50 % nur halbe Wirkung. Spezialöl, Feinwerkzeug an Werkbank oder Amboss, oder ein Kybernetiker in Aurelion.'], mc < 30); }
     else if (P.hp <= 0) add('Körper', '✕', `${PART_DE[k]} ausgefallen`, 'bad', [k.includes('arm') ? 'Die Hand trägt nichts mehr.' : k === 'head' ? 'Lebensgefahr.' : 'Du humpelst.', 'Verband oder Heilerin.'], true); }
   if (p.eye?.q) { const ec = Math.round(p.eye.cond ?? 100), X = B.EYE_Q[p.eye.q] || B.EYE_Q[2];   /* Roadmap P2: Roboterauge */
     add('Körper', '◉', `Auge: ${X.name}`, ec < 30 ? 'bad' : 'info', [`Stufe ${p.eye.q}. Zustand ${ec} %${ec < 30 ? ' — gestört, wirkungslos' : ''}.`, `Sichtweite ${X.fog} Felder${X.crit ? `, Fernkampf-Krit +${Math.round(X.crit * 100)} %` : ''}${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}${X.heat ? ', Wärmesicht' : ''}.`, 'Magie- und Schattentreffer nutzen es ab. Warten beim Prothesenmacher.'], ec < 30); }
@@ -8869,6 +8989,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
+  choices.push(...bionicChoices(npc));   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -9323,7 +9444,7 @@ function lilaOutcome(npc) {
 }
 function finishLila(outcome, r) {
   const st = S.quests.q_lila; st.state = 'done'; st.outcome = outcome;
-  if (r.gold) S.gold += r.gold;
+  if (r.gold) S.gold += questGold(r.gold);
   if (r.xp) gainXp(S.player, r.xp);
   if (r.rep) for (const [f, v] of Object.entries(r.rep)) S.factions[f] += v;
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
@@ -9552,6 +9673,8 @@ const RANK_PERKS = { undead: ['Die Toten sind dir nicht feind; Handel in Vharnho
   chain: ['Tore der Eisenfeste offen, Aufträge der Kette', null, null, 'Zugang zur Weihe bei Varg', 'Kettenbrecher und Eisenfürst; man fürchtet dich'],
   aurel: ['Automaten prüfen dich', 'Aufenthalt erlaubt', 'Himmelsfeste mit Siegel, Handel ohne Schein', null, null, null, 'Weg in den Hohen Rat', 'Sitzungen des Rates alle 7 Tage, Gesetze'],
   goblin: ['Goblins sind friedlich und reden mit dir', null, null] };
+/* Roadmap P5: Bionik-Zugang je Aurelion-Rang (so rechnet bionicLack) */
+const AUREL_BIONIC = ['Zugang: Schrottglieder und Schrottauge (auch Schwarzmarkt)', 'Zugang: aurelionische Prothesen, Auge Stufe 2, Module', 'Zugang: Meisterstücke, Chirurgie an gesunden Gliedern (auch als Akademie-Adept)', null, 'Zugang: Prototypen'];
 function rankGuide(f) {
   const F = FACTIONS[f], r = S.ranks[f] ?? -1, rep = S.factions[f] ?? 0; if (!F?.ranks) return null;
   const need = i => {
@@ -9563,7 +9686,7 @@ function rankGuide(f) {
     if (f === 'chain' && i === 4) return 'Aufseher und die Weihe der Kette bei Varg';
     const L = RANK_LINES[f]; return `Ansehen ${i * 25}, dann die Rangprüfung (zwei Aufträge) bei ${L?.giver ? NPCS.find(n => n.key === L.giver)?.name : 'einer Kettenwache der Festung'}`;
   };
-  const rows = F.ranks.map((n, i) => ({ name: n, need: need(i), perk: [RANK_PERKS[f]?.[i], i > 0 ? `Händler der Fraktion −${Math.min(35, i * 3)} %, Wachen grüßen dich` : null].filter(Boolean).join('; ') || '—', state: i <= r ? 'done' : i === r + 1 ? 'next' : 'later' }));
+  const rows = F.ranks.map((n, i) => ({ name: n, need: need(i), perk: [RANK_PERKS[f]?.[i], f === 'aurel' ? AUREL_BIONIC[i] : null, i > 0 ? `Händler der Fraktion −${Math.min(35, i * 3)} %, Wachen grüßen dich` : null].filter(Boolean).join('; ') || '—', state: i <= r ? 'done' : i === r + 1 ? 'next' : 'later' }));
   const nx = rows.find(x => x.state === 'next');
   return { rows, next: nx ? `Nächster Rang: ${nx.name} — ${nx.need}.` : r >= 0 ? 'Höchster Rang erreicht.' : '', rep };
 }
@@ -9743,8 +9866,8 @@ function shopStock(npc) {
     npc._stockDay = S.day;
     const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
       'wooden_shield', 'leather_jerkin', 'leather_cap', 'chain_hauberk', 'pickaxe', 'traveler_cloak'];
-    npc._stock = [];
-    for (let i = 0; i < (npc.shop ? 7 : 0); i++) { const k = pick(pool); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
+    npc._stock = []; const open = pool.filter(k => !bionicTier(ITEMS[k]) || !bionicLack(bionicTier(ITEMS[k])));   /* Roadmap P5: Bionik nach Rang in Aurelion */
+    for (let i = 0; i < (npc.shop && open.length ? 7 : 0); i++) { const k = pick(open); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
   }
   const tk = sellsGoods(npc) ? ecoTown(npc) : null;
   if (!tk) return npc._stock;
@@ -10544,6 +10667,7 @@ function bindInput() {
     if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
     if (S.cine && (k === 'escape' || k === ' ')) { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
     keys.add(k);
+    if (coopHooks.key?.(k, e)) { e.preventDefault(); return; }   /* Koop K2: Tasten für Gast (alles) und Host (Enter = Nachricht) */
     if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else UI.openModal('settings'); }
     if (UI.dialogueOpen() || UI.modalOpen) return;
     if (k === 'e') doInteract();
@@ -10664,7 +10788,7 @@ function guarded(attacker, target, dmg) {
     target.riposteUntil = now + 1200;                                // Rapier: der nächste Stich ist eine Riposte
     return true;
   }
-  const shield = ITEMS[target.equip?.offhand?.key]?.block, cost = dmg * (shield ? 0.8 : 1.2);
+  const shield = !B.hasMod(target, 'klingenhand') && ITEMS[target.equip?.offhand?.key]?.block, cost = dmg * (shield ? 0.8 : 1.2);   /* Roadmap P3: Klingenhand hält keinen Schild */
   if (target.stamina < cost) {                                       // Deckung bricht
     target.cover = null; target.guardBroken = now + 900; target.stagger = Math.max(target.stagger || 0, 500); target.stamina = 0;
     float(target, 'Deckung gebrochen', 'rgba(210,90,70,ALPHA)'); sfx('metal', 0.8, 1); camShake(5, 160);
@@ -10675,7 +10799,7 @@ function guarded(attacker, target, dmg) {
   fx(target.x + Math.cos(target.aim) * 12, target.y - 12 + Math.sin(target.aim) * 7, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
   if (target.equip?.offhand && shield) target.equip.offhand.cond = Math.max(0.05, (target.equip.offhand.cond ?? 1) - 0.004);
   sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50);
-  const ba = Math.atan2(target.y - attacker.y, target.x - attacker.x); target.kb = { x: Math.cos(ba) * 7, y: Math.sin(ba) * 7, t: 90, T: 90 };   // S14: Block-Ruck, die Deckung gibt nach
+  const ba = Math.atan2(target.y - attacker.y, target.x - attacker.x); if (!B.hasMod(target, 'ankerfuss')) target.kb = { x: Math.cos(ba) * 7, y: Math.sin(ba) * 7, t: 90, T: 90 };   // S14: Block-Ruck, die Deckung gibt nach
   return true;
 }
 const stat = (c, k) => !!(c.status && c.status.some(s => s.key === k));
@@ -10899,7 +11023,7 @@ function debugSections() {
     }],
     ['Kampf & Körper', `${sel('dbPart', [['rarm', 'rechter Arm'], ['larm', 'linker Arm'], ['rleg', 'rechtes Bein'], ['lleg', 'linkes Bein']])}`, {
       'Glied ausfallen': () => { p.body[v('dbPart')].hp = 0; B.syncHp(p); limbLost(p, v('dbPart')); },
-      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; delete P2.mechCond; delete P2.mechUp; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
+      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; delete P2.mechCond; delete P2.mechUp; delete P2.mod; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
       ...Object.fromEntries([1, 2, 3, 4].map(t => [`Prothese anlegen (Stufe ${t} ${B.MECH_Q[t].name})`, () => { const k = v('dbPart'); if (!/arm|leg/.test(k)) return UI.toast('Nur Arm oder Bein.'); B.attachProsthesis(p, k, t); recalc(p); UI.toast(`${k}: Prothese Stufe ${t}`); }])),   /* Roadmap P1 */
       'Prothesen −30 % Zustand': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) if (p.body[k].mech) p.body[k].mechCond = Math.max(0, (p.body[k].mechCond ?? 100) - 30); UI.toast('Prothesen abgenutzt'); },
       'Alle Glieder zurück': () => { for (const k of ['rarm', 'larm', 'rleg', 'lleg', 'head', 'torso']) if (p.body[k]) { p.body[k].lost = false; p.body[k].hp = p.body[k].max; } B.syncHp(p); p.status = (p.status || []).filter(s => s.key !== 'bleeding'); },
@@ -10911,6 +11035,16 @@ function debugSections() {
       ...Object.fromEntries([1, 2, 3, 4].map(q => [`Auge Stufe ${q} (${B.EYE_Q[q].name})`, () => { B.attachEye(p, q); UI.toast(`Roboterauge Stufe ${q}`); }])),
       'Auge entfernen': () => { p.eye = null; p.lens = false; UI.toast('Kein Roboterauge'); },
       'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
+      ...Object.fromEntries(Object.entries(B.MECH_MOD).map(([m, M]) => [`Modul: ${M.name}`, () => { const k = ['l', 'r'].map(s => s + M.part).find(q => p.body[q].mech) || 'l' + M.part; if (!p.body[k].mech) B.attachProsthesis(p, k, 2); p.body[k].mod = m; recalc(p); UI.toast(`${M.name} an ${k}`); }])),   /* Roadmap P3: legt bei Bedarf eine Stufe-2-Prothese an */
+      'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
+      'Wartungsset geben': () => { addItem(p, 'feinwerkzeug', 1); addItem(p, 'spezialoel', 3); addItem(p, 'ersatzteile', 4); addItem(p, 'magitech', 2); UI.toast('Feinwerkzeug, 3 Öl, 4 Ersatzteile, 2 Magitech'); },   /* Roadmap P4 */
+      'Selbst warten (ohne Werkbank)': () => selfRepair(null),
+      'Magitech-Werk stilllegen (3 Tage)': () => { (S.halt ||= {})['tickmar:magitech'] = (S.day | 0) + 3; UI.toast(`Tickmar steht bis Tag ${(S.day | 0) + 3}. Wartung ×${mechRate('tickmar').toFixed(2)}`); },
+      'Magitech-Werk anfahren': () => { if (S.halt) delete S.halt['tickmar:magitech']; UI.toast('Tickmar arbeitet wieder'); },
+      'Aurel-Rang +1 (0–7)': () => { S.ranks.aurel = ((S.ranks.aurel ?? -1) + 1) % 8; UI.toast(`Aurelion-Rang ${S.ranks.aurel}`); },   /* Roadmap P5 */
+      ...Object.fromEntries(['Kybernetiker', 'Medica', 'Prothesenhändlerin'].map(prof => [`${prof} hier spawnen`, () => { const q = freeSpotNear(S.map, (p.x / TS | 0) + 2, p.y / TS | 0, 2);
+        const c = makeChar({ name: 'Probe-' + prof, prof, x: q.x, y: q.y, level: 3, map: S.map }); Object.assign(c, { transient: true, visitor: true, homeTown: 'gelenkhall', anchor: { x: q.x, y: q.y }, ...(MARKET_POOL[prof] ? { shop: true, pool: MARKET_POOL[prof] } : {}) }); S.ents[S.map].push(c); talk(c); }])),
+      'Schwarzmarkt öffnen (Rook oder Nix)': () => { const n = S.ents.world.find(e => (e.key === 'rook' || e.key === 'nix') && e.alive); if (n) blackMarket(n); else UI.toast('Weder Rook noch Nix leben.'); },
     }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
@@ -12021,7 +12155,7 @@ export function selftest() {
       S.laws.slavery = 'abolish'; factoryWork(m); const fair = S.gold === 130;
       S.bounty = { valen: 100 }; S.gold = 500; const judge = actor(340, 300, { prof: 'Richterin' }); holyCourt(judge); UI.closeDialogue();
       const abl = Math.round(bountyTotal() * 0.8) === 80;
-      S.gold = 5000; let msg = ''; const opts = mechSwapOptions(p, t => { msg = t; }); opts[0].fn(); const swap = p.body.larm.mech === 2 && S.gold === 4300 && !!msg;
+      S.gold = 5000; S.ranks.aurel = 2; let msg = ''; const opts = mechSwapOptions(p, t => { msg = t; });   /* Roadmap P5: Chirurgie braucht Bürgerrang */ opts[0].fn(); const swap = p.body.larm.mech === 2 && S.gold === 4300 && !!msg;
       return pay && fair && abl && swap && opts.length === 8;
     } finally { S.laws = L0; S.houses = h0; }
   }));
@@ -13235,6 +13369,50 @@ export function selftest() {
     const n = stage(); hurt(n, 5, e, e.name, false, 'magic'); const safe = n.eye == null && B.fogR(n) === 18;
     return mig && used && better && kept && off && noPoison && zapped && safe;
   }));
+  ok('Roadmap P3 Module und Messingglied: Prothese in msOf als 3, Stil R malt sie mit neuem Cache-Eintrag, Module nur auf Prothesen, Klingenhand stärker, Ankerfuß ohne Rückstoß', sandbox(() => {
+    const p = stage(), art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+    try {
+      const f0 = SP.humanFrameR(SP.humanSpec(p), 'S', 'i0'); B.attachProsthesis(p, 'rarm', 2); const ms = SP.msOf(p)[1] === '3';
+      const s1 = SP.humanSpec(p), f1 = SP.humanFrameR(s1, 'S', 'i0'), m1 = SP.frameCacheInfo().miss, same = SP.humanFrameR(s1, 'S', 'i0') === f1 && SP.frameCacheInfo().miss === m1;
+      const px = f => f.getContext('2d').getImageData(0, 0, f.width, f.height).data, d0 = px(f0), d1 = px(f1); const cached = f1 !== f0 && same && d1.some((v, i) => v !== d0[i]);   /* eigenes Bild, einmal gebacken, sichtbar anders (Messing) */
+      p.inv = []; addItem(p, 'federfuss', 1); useConsumable(p, 0); const noLeg = !p.body.lleg.mod && !p.body.rleg.mod && p.inv.some(x => x && x.key === 'federfuss');
+      const a0 = B.mechBonus(p, 'arm'); p.inv = []; addItem(p, 'klingenhand', 1); useConsumable(p, 0); const blade = p.body.rarm.mod === 'klingenhand' && B.mechBonus(p, 'arm') > a0;
+      B.attachProsthesis(p, 'lleg', 2); p.body.lleg.mod = 'ankerfuss'; const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 30; e.y = p.y; p.kb = null; hurt(p, 5, e, e.name); const anchored = p.kb == null && B.hasMod(p, 'ankerfuss');
+      p.body.lleg.mechCond = 10; const offWhenBroken = !B.hasMod(p, 'ankerfuss');
+      B.attachProsthesis(p, 'rarm', 3); const cleared = !p.body.rarm.mod;
+      return ms && cached && noLeg && blade && anchored && offWhenBroken && cleared;
+    } finally { SP.setArt(art0); }
+  }));
+  ok('Roadmap P4 Wartung: Streik legt Tickmars Magitech still, knappes Magitech macht Wartung teurer, Selbstwartung braucht Feinwerkzeug und Material, Öl bis 90 %, unter 50 % halbe Wirkung', sandbox(() => {
+    const k0 = { h: structuredClone(S.halt || {}), b: S.big, w: S.ents.world, st: S.towns?.tickmar ? structuredClone(S.towns.tickmar.stock) : null, bl: S.bigLast, bn: S.bigNext };
+    try {
+      S.ents.world = k0.w.slice(); S.halt = {}; S.big = null; BIG_START.strike.go(); const halted = (S.halt['tickmar:magitech'] || 0) > S.day && !S.halt.tickmar;
+      S.halt['tickmar:magitech'] = S.big.until; strikeOff(); const lifted = !S.halt['tickmar:magitech'];
+      S.halt['tickmar:magitech'] = S.big.until + 5; strikeOff(); const keepsAccident = S.halt['tickmar:magitech'] === S.big.until + 5; S.big = k0.b;
+      let dearer = true; const T = S.towns?.tickmar; if (T) { T.stock.magitech = 500; const r1 = mechRate('tickmar'); T.stock.magitech = 0; dearer = mechRate('tickmar') > r1; }
+      const p = stage(); B.attachProsthesis(p, 'larm', 3); p.body.larm.mechCond = 20; p.inv = []; addItem(p, 'magitech', 1);
+      const noTool = selfRepair(null) === false && p.body.larm.mechCond === 20 && hasItem(p, 'magitech');
+      addItem(p, 'feinwerkzeug', 1); const fixed = selfRepair(null) === true && p.body.larm.mechCond === selfCap(p) && !hasItem(p, 'magitech') && hasItem(p, 'feinwerkzeug');
+      p.body.larm.mechCond = 80; p.inv = []; addItem(p, 'spezialoel', 2); useConsumable(p, 0); const oiled = p.body.larm.mechCond === 90; useConsumable(p, 0); const capped = p.body.larm.mechCond === 90 && countItem(p, 'spezialoel') === 1;
+      const full = B.mechBonus(p, 'arm'); p.body.larm.mechCond = 45; const half = B.mechBonus(p, 'arm'); p.body.larm.mechCond = 25; const none = B.mechBonus(p, 'arm');
+      return halted && lifted && keepsAccident && dearer && noTool && fixed && oiled && capped && half > 0 && half < full && none === 0;
+    } finally { S.halt = k0.h; S.big = k0.b; S.ents.world = k0.w; S.bigLast = k0.bl; S.bigNext = k0.bn; if (k0.st) S.towns.tickmar.stock = k0.st; }
+  }));
+  ok('Roadmap P5 Händler und Rang: Rang 0 sperrt Meisterstücke und Chirurgie, Rang 2 öffnet sie; Kybernetiker liefert Wartung aus mechMenu; Schwarzmarkt ohne Rang; Charakterbogen markiert Prothesen', sandbox(() => {
+    const r0 = S.ranks.aurel, pm = S.permit, ac = S.acadRank, fl = { c: S.flags.aurelCitizen, m: S.flags.marriedHouse }, aj = S.aurelJob, bd = S.bond;
+    try {
+      const p = stage(); S.permit = -1; S.acadRank = 0; S.flags.aurelCitizen = false; S.flags.marriedHouse = false; S.aurelJob = null; S.bond = null; S.ranks.aurel = 0;
+      const shop = actor(340, 300, { prof: 'Prothesenhändlerin' }); Object.assign(shop, { shop: true, pool: ['meisterarm', 'aurelarm', 'schrottarm'] }); shop._stockDay = null;
+      const lowStock = shopStock(shop).every(s => s.key === 'schrottarm'), lockedSwap = mechSwapOptions(p, () => {}).every(o => o.text.includes('gesperrt'));
+      S.ranks.aurel = 2; shop._stockDay = null; const hiStock = shopStock(shop).some(s => s.key !== 'schrottarm'), openSwap = mechSwapOptions(p, () => {}).some(o => !o.text.includes('gesperrt'));
+      const kyb = actor(360, 300, { prof: 'Kybernetiker' }); kyb.homeTown = 'gelenkhall'; B.attachProsthesis(p, 'rarm', 2); p.body.rarm.mechCond = 50;
+      const hasOpt = bionicChoices(kyb).some(o => o.text.includes('warten')), seen = mechMenu(kyb).map(o => o.text).join('|'); UI.closeDialogue();
+      const kybOk = seen.includes('instand setzen') && !seen.includes('ersetzen lassen');
+      S.ranks.aurel = 0; const rook = actor(380, 300, { name: 'Rook' }); rook.key = 'rook'; const black = bionicChoices(rook).some(o => o.text.includes('Schwarzmarkt')) && blackOffers(rook).length >= 3;
+      const chart = UI.bodyChart(p).includes('bp-mech');
+      return lowStock && lockedSwap && hiStock && openSwap && hasOpt && kybOk && black && chart;
+    } finally { S.ranks.aurel = r0; S.permit = pm; S.acadRank = ac; S.flags.aurelCitizen = fl.c; S.flags.marriedHouse = fl.m; S.aurelJob = aj; S.bond = bd; if (fl.c === undefined) delete S.flags.aurelCitizen; if (fl.m === undefined) delete S.flags.marriedHouse; }
+  }));
   ok('Bionik-Fundament (Roadmap P1): neue Prothese kommt frisch, Schrott ist schlechter als Fleisch, Verschleiß nur am getroffenen Glied und nicht durch Gift', sandbox(() => {
     const p = stage(), L = p.body.larm; L.mechCond = 10; L.mechUp = 2; B.damagePart(p, 'larm', 9999); const cut = L.lost && L.mechCond === undefined && L.mechUp === undefined;
     B.attachProsthesis(p, 'larm', 2); const fresh = L.mech === 2 && L.mechCond === 100 && L.mechUp === 0 && !L.lost;
@@ -13243,6 +13421,16 @@ export function selftest() {
     const w = B.wearProsthesis(p, 'larm'); const worn = w && w.now < 100 && B.wearProsthesis(p, 'torso') === null;   /* nur Prothesenglieder nutzen sich ab */
     for (let i = 0; i < 40 && L.mechCond === w.now; i++) { hurt(p, 1, e, e.name, false, 'physical'); B.fullHeal(p); } const hitWears = L.mechCond < w.now || p.body.rarm.mechCond === undefined;
     return cut && fresh && bad && good && even && noPoison && worn && hitWears;
+  }));
+  ok('Koop K2: Gastfigur wird ferngesteuert statt KI, Auftragsgold geteilt, Stand ohne Gastzuordnung, Gast speichert nie', sandbox(() => {
+    const p = stage(), m = spawnEnemy('bandit', '__a', 12, 10); m.kind = 'npc'; m.team = 'player'; S.party = [m.id]; m.coopPilot = 'probe'; m.coopName = 'Probe'; m.inv = [];
+    const was = coopHooks.remote; let called = 0; coopHooks.remote = () => (called++, true);
+    try { partyAI(m, 16); } finally { coopHooks.remote = was; }
+    const g0 = questGold(100), split = g0 === 50 && m.coopGold === 50;
+    const d = JSON.parse(saveData()), clean = !('coop' in d) && Object.values(d.ents).every(l => l.every(e => !e.coopPilot));
+    const c0 = S.coop; S.coop = { role: 'guest' }; const noSave = save() === false; S.coop = c0;
+    m.coopPilot = null; const solo = questGold(80) === 80;
+    return called === 1 && split && clean && noSave && solo;
   }));
   ok('Am Boden (S15, Nutzer): ein NPC heilt sich am Boden nicht selbst (Regeneration, Aufstieg, Zähigkeit); Heilung von außen richtet ihn auf', sandbox(() => {
     const p = stage(), m = actor(p.x + 40, p.y); m.body.torso.hp = -2; B.syncHp(m); m.downed = true; m.downTimer = 0; m.status = [{ key: 'regrowth', heal: 50, left: 5000 }];
@@ -13618,6 +13806,11 @@ function titleLoop(t) {
   requestAnimationFrame(titleLoop);
 }
 
+// Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
+function coopAPI() {
+  return { S, R, UI, B, MAPS, TS, coopHooks, keys, mouse, log, onLog, byId, partyMembers, dist, saveData, applySave, hasSave, continueGame, bindInput,
+    moveInput, moveEnt, speedOf, attack, hostilesOf, updateGuard, updateFx, fx, DODGE, equip, unequip, useConsumable, dropItemAt, doInteractFor, useSlotFor, stepHidden, giveItem, questGold, ITEMS };
+}
 function boot() {
   UI.initUI();
   UI.bind({
@@ -13666,6 +13859,7 @@ function boot() {
     b.onclick = () => {
       const act = b.dataset.act;
       if (act === 'continue') { bindInput(); continueGame(); }
+      else if (act === 'coop') { import('./coop.js?v=21').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { if (loadRaw() && !confirm('Es gibt einen Spielstand. Eine neue Geschichte überschreibt ihn beim ersten Speichern. Fortfahren?')) return;   // BUG-086
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -13676,7 +13870,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=21').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, seaVoyage, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

@@ -96,7 +96,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine']);
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop']);   /* Koop K2: Verbindungszustand wird nie gespeichert */
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
@@ -109,7 +109,7 @@ export function saveData() {
   for (const k of Object.keys(S)) if (!SKIP.has(k) && k !== 'ents') out[k] = S[k];
   for (const m of Object.keys(S.ents)) {
     if (m.startsWith('__')) continue;                  // Test-/Stilkarten
-    const B = PROP_BASE[m], list = S.ents[m].filter(e => !e.transient);
+    const B = PROP_BASE[m], list = S.ents[m].filter(e => !e.transient).map(e => e.coopPilot ? { ...e, coopPilot: null, coopName: null } : e);   /* Koop K2: keine Gastzuordnung im Stand */
     if (!B || !B.size) { out.ents[m] = list; continue; }       // ohne Grundzustand (sollte nicht vorkommen): alles speichern
     const have = new Set();
     out.ents[m] = list.filter(e => { if (e.kind !== 'prop' || !e.gk || !B.has(e.gk) || have.has(e.gk)) return true; have.add(e.gk); return sig(e) !== B.get(e.gk); });
@@ -140,7 +140,8 @@ export function adoptPropKeys(map, fresh) {
 export function save() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
   if (S._quiet || S.cine) return false;
-  if (!S.player) return false;                                   // S15 Fehlersuche: im Titelmenü gibt es noch keinen Helden — nie einen leeren Stand über den echten schreiben                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
+  if (!S.player) return false;                                   // S15 Fehlersuche
+  if (S.coop?.role === 'guest') return false;                    // Koop K2: der Gast spielt in der Welt des Hosts und speichert nie: im Titelmenü gibt es noch keinen Helden — nie einen leeren Stand über den echten schreiben                           // S12: Selbsttest-Proben (auch Kartenwechsel darin) schreiben nie in den echten Stand
   try {
     localStorage.setItem(SAVE_KEY, saveData());
     return true;

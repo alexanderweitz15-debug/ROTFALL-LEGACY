@@ -264,6 +264,17 @@ export const ITEMS = {
   aurelbein:   { name:'Aurelionisches Bein', slot:'consumable', use:'prosthesis', part:'leg', tier:2, stack:1, rarity:'rare', value:850, desc:'Kniegelenk mit Dämpfer, Sohle aus Gummi und Stahl. Voll belastbar.' },
   meisterarm:  { name:'Meisterarm von Gelenkhall', slot:'consumable', use:'prosthesis', part:'arm', tier:3, stack:1, rarity:'epic', value:2400, desc:'Feinwerk der Kybernetiker. Stärker als Fleisch: Hiebe mit diesem Arm treffen härter (+10 %).' },
   meisterbein: { name:'Meisterbein von Gelenkhall', slot:'consumable', use:'prosthesis', part:'leg', tier:3, stack:1, rarity:'epic', value:2200, desc:'Feinwerk der Kybernetiker. Schneller als Fleisch (+6 % Tempo).' },
+  // Roadmap P3: Prototyp-Glieder (Stufe 4) und Module für Prothesen (Schlüssel = Modulname in body.js MECH_MOD)
+  protoarm:    { name:'Prototyp-Arm', slot:'consumable', use:'prosthesis', part:'arm', tier:4, stack:1, rarity:'legendary', value:5200, desc:'Aus der Versuchswerkstatt der Akademie. Hiebe +15 %, nutzt sich nur halb so schnell ab.' },
+  protobein:   { name:'Prototyp-Bein', slot:'consumable', use:'prosthesis', part:'leg', tier:4, stack:1, rarity:'legendary', value:4800, desc:'Aus der Versuchswerkstatt der Akademie. +10 % Tempo, nutzt sich nur halb so schnell ab.' },
+  greifhand:   { name:'Greifhand', slot:'consumable', use:'mechmod', mod:'greifhand', stack:1, rarity:'rare', value:480, desc:'Modul für einen Prothesenarm. Schwere Rüstung und Schild bremsen 30 % weniger; selbst ausbessern bis 90 %.' },
+  klingenhand: { name:'Klingenhand', slot:'consumable', use:'mechmod', mod:'klingenhand', stack:1, rarity:'epic', value:900, desc:'Modul für einen Prothesenarm. +12 % Nahkampf, aber kein Schildblock mehr.' },
+  federfuss:   { name:'Federfuß', slot:'consumable', use:'mechmod', mod:'federfuss', stack:1, rarity:'rare', value:520, desc:'Modul für ein Prothesenbein. +8 % Tempo.' },
+  ankerfuss:   { name:'Ankerfuß', slot:'consumable', use:'mechmod', mod:'ankerfuss', stack:1, rarity:'rare', value:560, desc:'Modul für ein Prothesenbein. Treffer stoßen dich nicht mehr zurück, −5 % Tempo.' },
+  // Roadmap P4: Wartung — Medizin heilt Fleisch, Werkzeug repariert Maschine (Magitech-Teile, Werkzeugkiste, Eisenbarren gibt es schon als Waren)
+  feinwerkzeug: { name:'Feinwerkzeug', slot:'material', stack:1, rarity:'rare', value:320, lore:'Uhrmacherzangen, Federhaken, ein Lupenglas. Wird nicht verbraucht: damit wartest du Prothesen und Auge selbst an einer Werkbank oder einem Amboss.' },
+  spezialoel:   { name:'Spezialöl', slot:'consumable', use:'mechkit', stack:5, rarity:'uncommon', value:70, desc:'Ein Fläschchen Kristallöl. Bringt die am stärksten abgenutzte Prothese (oder das Auge) um 25 Punkte hoch, höchstens auf 90 %.' },
+  ersatzteile:  { name:'Ersatzteile', slot:'material', stack:20, rarity:'common', value:30, lore:'Federn, Stifte, Zahnräder in Wachspapier. Zwei davon ersetzen bei der Selbstwartung ein Magitech-Teil.' },
   // Roadmap P2: Roboteraugen — eigenes Feld c.eye, ersetzen ein schwächeres Auge; Magie nutzt sie ab
   auge_schrott: { name:'Schrottauge', slot:'consumable', use:'eye', tier:1, stack:1, rarity:'uncommon', value:180, desc:'Ein Glas in einer Blechfassung. Sieht etwas weiter (Sichtweite 22), nutzt sich doppelt so schnell ab.' },
   auge_aurel:   { name:'Aurelionisches Auge', slot:'consumable', use:'eye', tier:2, stack:1, rarity:'rare', value:750, desc:'Messingiris mit Schleifglas. Sichtweite 28, Fernkampf-Krit +2 %.' },

@@ -1,15 +1,15 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=20';
-import * as CS from './cloudsave.js?v=20';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=20';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=20';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=20';
-import { wearOf } from './buildings.js?v=20';
-import { townState, townPrice } from './sim.js?v=20';
-import { GOODS } from './data.js?v=20';
-import { target as ecoTarget } from './economy.js?v=20';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS } from './body.js?v=20';
-import { sfx, ambience } from './sfx.js?v=20';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData } from './state.js?v=21';
+import * as CS from './cloudsave.js?v=21';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=21';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=21';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=21';
+import { wearOf } from './buildings.js?v=21';
+import { townState, townPrice } from './sim.js?v=21';
+import { GOODS } from './data.js?v=21';
+import { target as ecoTarget } from './economy.js?v=21';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=21';
+import { sfx, ambience } from './sfx.js?v=21';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -75,8 +75,10 @@ function bar(label, val, max, cls, extra = '') {
     <div class="bar-track"><div class="bar-fill ${cls}" style="transform:scaleX(${clamp(val / max, 0, 1)})"></div></div></div>`;
 }
 
+let hudFor = null;                                                  /* Koop K2: der Gast sieht die Werte seiner Gastfigur statt des Helden */
+export function setHudTarget(m) { hudFor = m; }
 export function refreshHUD() {
-  const p = S.player; if (!p) return;
+  const p = hudFor || S.player; if (!p) return;
   $('pc-name').textContent = p.name;
   const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
   $('pc-class').textContent = `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`;   // S15 (Nutzer): freie Punkte sichtbar
@@ -231,7 +233,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=20').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=21').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -417,7 +419,7 @@ export function relLabel(v) {
 let hbSig = '';
 export function renderHotbar() {
   const hb = $('hotbar'); if (!hb) return;
-  const p = S.player; if (!p) return;
+  const p = (hudFor || S.player); if (!p) return;
   const slots = p.hotbar || [];
   // Nur neu aufbauen, wenn sich Belegung, Anzahl oder Abklingzeit (Viertelsekunden) ändern — sonst flackern die Icons.
   const sig = slots.map(s => !s ? '-' : s.type + ':' + s.key + ':' + (s.type === 'item' ? countItem(s.key) : Math.ceil((p.cooldowns?.[s.key] || 0) / 250))).join('|');
@@ -568,7 +570,9 @@ function invUI(body) {
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
 const USE_TXT = { bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
   soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
-  eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.' };   /* Roadmap P2 */
+  eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.',   /* Roadmap P2 */
+  mechmod: 'Modul auf eine Prothese stecken (Arm- oder Beinprothese nötig). Ein altes Modul kommt zurück in die Tasche.',   /* Roadmap P3 */
+  mechkit: 'Wartung: bringt die am stärksten abgenutzte Prothese oder das Auge um 25 Punkte hoch (höchstens 90 %).' };   /* Roadmap P4 */
 function itemPurpose(it) {
   if (it.good) return 'Handelsware: jede Stadt zahlt einen anderen Preis — billig kaufen, wo es viel gibt, teuer verkaufen, wo es fehlt.';
   if (it.res) return 'Baustoff: kommt in deinen Vorrat (Lager, Siedlung, Ausbessern).';
@@ -645,18 +649,28 @@ export function bodyChart(c, { big = false, click = false } = {}) {
       <rect width="2" height="2" fill="#2a120e"/><rect width="1" height="1" fill="#8c2a22"/><rect x="1" y="1" width="1" height="1" fill="#8c2a22"/></pattern></defs>
     <g fill="#0c0a08">${PARTS.map(p => rects(PART_PX[p], 1)).join('')}</g>
     ${PARTS.map(p => {
-      const st = partState(c.body[p]);
-      const label = `${PART_NAME[p]}: ${Math.max(0, Math.round(c.body[p].hp))}/${c.body[p].max} — ${STATE_WORD[st]}`;
-      return `<g class="bp bp-${st}${click ? ' bp-click' : ''}" data-part="${p}" data-tip="${label}" aria-label="${label}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>${rects(PART_PX[p], 0)}
+      const st = partState(c.body[p]), mn = mechNote(c.body[p]);   /* Roadmap P5: Prothese markieren */
+      const label = `${PART_NAME[p]}: ${Math.max(0, Math.round(c.body[p].hp))}/${c.body[p].max} — ${STATE_WORD[st]}${mn ? ` · ${mn}` : ''}`;
+      return `<g class="bp bp-${st}${mn ? ' bp-mech' : ''}${click ? ' bp-click' : ''}" data-part="${p}" data-tip="${label}" aria-label="${label}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>${rects(PART_PX[p], 0)}
         ${rects(PART_PX[p].slice(0, 1), 0, ' class="bp-hi"')}</g>`;
     }).join('')}
   </svg>`;
 }
+/* Roadmap P5: Kurztext einer Prothese (Stufe, Zustand, Modul) oder '' */
+const mechNote = P => { if (!P?.mech) return ''; const c = Math.round(P.mechCond ?? 100);
+  return `Prothese ${MECH_Q[P.mech]?.name || ''} (Stufe ${P.mech}), Zustand ${c} %${c < 30 ? ' — wirkungslos' : c < 50 ? ' — halbe Wirkung' : ''}${P.mod && MECH_MOD[P.mod] ? `, Modul ${MECH_MOD[P.mod].name}` : ''}`; };
+/* Roadmap P5: Bionik im Charakterbogen — jede Prothese und das Auge mit Stufe, Zustand, Modul; Hinweis auf Wartung */
+function bionicBlock(p) {
+  const rows = PARTS.filter(k => p.body?.[k]?.mech).map(k => `<div class="bp-mech" title="${mechNote(p.body[k])}"><dt>${PART_NAME[k]} ⚙</dt><dd>${mechNote(p.body[k]).replace(/^Prothese /, '')}</dd></div>`);
+  const E = p.eye, ec = Math.round(E?.cond ?? 100), X = E?.q ? EYE_Q[E.q] || EYE_Q[2] : null;
+  rows.push(`<div title="${X ? `Sichtweite ${X.fog} Felder${X.crit ? `, Fernkampf-Krit +${Math.round(X.crit * 100)} %` : ''}${X.light ? `, Nachtsicht +${Math.round(X.light * 100)} %` : ''}${X.heat ? ', Wärmesicht' : ''}. Magie nutzt es ab.` : 'Roboteraugen setzen Medica in Aurelion und Meisterin Vell ein.'}"><dt>Auge</dt><dd>${X ? `${X.name} (Stufe ${E.q}), Zustand ${ec} %${ec < 30 ? ' — gestört' : ''}` : 'natürlich'}</dd></div>`);
+  return `<h3>Bionik</h3><dl class="ledger-list">${rows.join('')}</dl>${rows.length > 1 || X ? '<p class="tafel-hint">Wartung: Spezialöl, Feinwerkzeug an Werkbank oder Amboss, Kybernetiker in Aurelion.</p>' : ''}`;
+}
 function woundNotes(c, click) {
   return PARTS.map(p => {
-    const P = c.body[p], st = partState(P), pct = Math.max(0, P.hp / P.max * 100);
-    return `<button class="wound w-${st}" data-part="${p}" ${click ? '' : 'tabindex="-1"'}>
-      <span class="w-name">${PART_NAME[p]}</span><span class="w-val">${P.lost ? 'ab' : Math.round(P.hp)}<small>/${P.max}</small></span>
+    const P = c.body[p], st = partState(P), pct = Math.max(0, P.hp / P.max * 100), mn = mechNote(P);
+    return `<button class="wound w-${st}${mn ? ' bp-mech' : ''}" data-part="${p}" ${click ? '' : 'tabindex="-1"'}${mn ? ` title="${mn}"` : ''}>
+      <span class="w-name">${PART_NAME[p]}${P.mech ? ' ⚙' : ''}</span><span class="w-val">${P.lost ? 'ab' : Math.round(P.hp)}<small>/${P.max}</small></span>
       <span class="w-bar"><i style="width:${pct}%"></i></span><span class="w-state">${STATE_WORD[st]}</span></button>`;
   }).join('');
 }
@@ -677,7 +691,7 @@ function charUI(body, who) {
     survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.',
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
     leadership: 'Je 10 Punkte ein Gefährte mehr in der Gruppe. Steigt bisher nicht durch Übung.',
-    smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. (noch ohne Wirkung)',
+    smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
     hunting: '(noch ohne Wirkung)', crafting: '(noch ohne Wirkung)', stealth: '(noch ohne Wirkung)' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
@@ -709,6 +723,7 @@ function charUI(body, who) {
       <div class="chart-wrap">${bodyChart(p, { big: true, click: true })}</div>
       <div class="wounds" id="wounds">${woundNotes(p, true)}</div>
       <p class="tafel-hint">${bandages ? `Körperteil anklicken, um einen Verband anzulegen · ${bandages} Verbände im Gepäck` : 'Keine Verbände im Gepäck. Mara und Gerold verkaufen welche, aus Tuch lassen sie sich schneiden.'}</p>
+      ${bionicBlock(p)}
     </section>
     <section class="tafel-ruest">
       <h3>Rüstzeug</h3>

@@ -363,6 +363,9 @@ input{caret-color:var(--gold)}
 .bp-kritisch{fill:#8c2a22} .bp-kritisch .bp-hi{fill:#b0402e}
 .bp-aus .bp-hi{fill:#c05236}
 .bp-click{cursor:pointer}
+/* Roadmap P5: Prothesen-Glieder in Messing */
+g.bp-mech{stroke:#d8b060;stroke-width:.5} g.bp-mech.bp-heil{fill:#8a6c30} g.bp-mech.bp-heil .bp-hi{fill:#b8923e}
+.wound.bp-mech .w-name, dl .bp-mech dt{color:#d8b060}
 .bp-click:hover{fill:#bd9433} .bp-click:hover .bp-hi{fill:#e0b85a}
 .pc-body{display:flex;gap:10px;align-items:center;padding:4px 10px 2px}
 .pc-wounds{font-size:12px;line-height:1.5;color:#a79b83}
@@ -518,3 +521,13 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
   #nav button i{display:none}
   #nav button{padding:7px 5px;letter-spacing:.03em}
 }
+
+/* Koop K2 (Netzwerk): Panel auf dem Titelbildschirm */
+#coop-panel{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#coop-panel.hidden{display:none}
+.coop-box{width:min(460px,92vw);max-height:90vh;overflow:auto;background:linear-gradient(180deg,#1d1813,#12100c);border:1px solid #5a4a2a;padding:18px 20px;display:grid;gap:10px;color:#e7dcc2}
+.coop-box h2{margin:0;font:22px Cinzel,serif;letter-spacing:.1em}
+.coop-box label{display:flex;gap:8px;align-items:center;font-size:13px}
+.coop-box input{background:#0d0b08;border:1px solid #4a3d24;color:#e7dcc2;padding:6px 8px;font:14px Spectral,serif;flex:1}
+.coop-row{display:flex;gap:8px;align-items:center}
+#coop-guests{display:grid;gap:6px}
