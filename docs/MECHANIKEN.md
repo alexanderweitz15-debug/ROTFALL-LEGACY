@@ -558,3 +558,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Waren:** Hilda verkauft Königseisen (für Handwerk: eine Güte höher), die Zwergenaxt (Einhand, 17 Schaden, Durchschlag) und den Runenhammer (Zweihand, 27 Schaden, Wucht). Balin führt Tränke, Vorräte, Eisenbarren, Werkzeug und Ersatzteile.
 - **Technik:** Die Stadt wird wie ein Gewölbe beim Betreten neu gebaut (immer gleich), gespeichert wird nur die Freundschaft.
 - **Debug:** „Tiefhall: in die Königsstadt“, „Tiefhall: Freund der Halle“. Probe „Tiefhall (Nutzer §5d.6)“.
+
+## Runde: Freie Seefahrt (Nutzer §5d.9, Version 21)
+- **Eigenes Schiff:** beim Kapitän des Salzbunds in Salzhafen oder Kupferhafen für 900 Gold. Danach bietet jeder Kapitän (auch auf Tangkron) „Mit der … auslegen“ — ohne Fahrgeld.
+- **Kurse:** Küstenkurs (ruhig oder Sturm), Handelsroute (meist kreuzt ein Handelsschiff: entern oder vorbeiziehen lassen; sonst Freibeuter) oder Wrackfeld (ein Riff kratzt am Rumpf, dafür eine Kiste Bergungsgut an Deck).
+- **Piraterie:** Wer ein Handelsschiff entert und die Seeleute besiegt, bekommt 100–200 Gold und Ladung, verliert aber 12 Ruf beim Seevolk. Die erste Prise kommt in die Chronik.
+- **Seehandel:** Laderaum mit 20 Plätzen. Salz, Tuch, Korn und Pökelfleisch haben in jedem Hafen eigene Preise (z. B. Salz billig in Salzhafen, teuer auf Tangkron); verkauft wird zu 90 % des Hafenpreises.
+- **Rumpf:** Sturm, Enterer und Riffe beschädigen den Rumpf (nie unter 5 %). Reparatur beim Kapitän: 2 Gold je Prozent.
+- **Debug:** „Seefahrt: eigenes Schiff geben“. Probe „Freie Seefahrt (Nutzer §5d.9)“.

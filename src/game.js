@@ -7111,7 +7111,7 @@ function ensureSeafolk() {
 function seaTalk(npc) {
   const from = npc.seaCaptain, dests = from === 'isle' ? Object.keys(SEA_PORTS).filter(k => TOWN_PLAN[k]) : ['isle'];
   const opts = dests.map(k => ({ text: `${k === 'isle' ? 'Nach Tangkron (Gischtinseln)' : 'Nach ' + SEA_PORTS[k]} — ${SEA_FARE} Gold, ~6 Std`, fn: () => seaVoyage(k, from) }));
-  UI.dialogue(npc, from === 'isle' ? '„Das Festland ruft? Es ruft immer zu laut.“' : '„Zu den Gischtinseln. Sturm gibt es gratis, Freibeuter manchmal auch. Wer an Deck steht, kämpft mit.“', [...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.dialogue(npc, from === 'isle' ? '„Das Festland ruft? Es ruft immer zu laut.“' : '„Zu den Gischtinseln. Sturm gibt es gratis, Freibeuter manchmal auch. Wer an Deck steht, kämpft mit.“', [...shipChoices(npc, from), ...opts, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
 // Roadmap P7: See- und Luftreise teilen sich Deck, Ablauf und Ereignisse (startVoyage, seaTick). V.air = Luftschiff: Himmel statt
 // Wasser (render.js), Motorschaden als eigenes Ereignis, Sturm beschädigt das Schiff, Ankunft am Mast (S.airLand). VOY_TXT hält die Texte.
@@ -7122,6 +7122,62 @@ const VOY_TXT = {
   air: { board: 'ENTERHAKEN! LUFTPIRATEN', boardLog: 'Ein schwarzes Luftschiff schiebt sich aus der Wolke längsseits. Enterhaken fliegen, Luftpiraten schwingen sich an Seilen über die Reling.', foeName: ['Luftpirat', 'Harpunier der Luftpiraten'],
     wave: 'Böe!', waveCause: 'Sturmböe', storm: 'Eine Sturmböe reißt am Ballon. Der Kapitän brüllt: „Unter Deck oder an die Taue!“', below: 'Du hockst im Frachtraum zwischen Kisten. Die Gondel schwankt, die Spanten knarren.',
     help: 'An Deck bleiben und die Taue halten (+Ruf bei Aurelion)', downed: 'Du kommst in einer Koje zu dir. Der Kapitän hat abgedreht — „Verletzte fliege ich zurück, nicht weiter.“' } };
+// ================= Freie Seefahrt (Nutzer §5d.9) =================
+// Beim Kapitän ein eigenes Schiff kaufen (900 Gold). Damit frei zwischen Salzhafen, Kupferhafen und Tangkron segeln, ohne Fahrgeld,
+// auf einem von drei Kursen: Küstenkurs (ruhig oder Sturm), Handelsroute (Handelsschiffe kreuzen — entern ist Piraterie: Beute und
+// Ladung, aber das Seevolk vergisst es nicht) oder Wrackfeld (Bergungsgut, aber Riffe kratzen am Rumpf). Seehandel: Salz, Tuch, Korn
+// und Pökelfleisch im Laderaum (20 Plätze), jeder Hafen hat eigene Preise. Sturm, Enterer und Riffe beschädigen den Rumpf; der
+// Kapitän im Hafen repariert gegen Gold.
+const SHIP_PRICE = 900, CARGO = { salt: 'Salz', cloth: 'Tuch', grain: 'Korn', meat: 'Pökelfleisch' };
+const PORT_PRICE = { saltport: { salt: 6, cloth: 16, grain: 8, meat: 12 }, kupferhafen: { salt: 12, cloth: 10, grain: 11, meat: 9 }, isle: { salt: 10, cloth: 20, grain: 15, meat: 6 } };
+const cargoUsed = () => Object.values(S.ship?.cargo || {}).reduce((a, b) => a + b, 0);
+const portName = k => k === 'isle' ? 'Tangkron' : SEA_PORTS[k] || k;
+function shipChoices(npc, from) {
+  const back = () => seaTalk(npc);
+  if (!S.ship) return from === 'isle' ? [] : [{ text: `Ein eigenes Schiff kaufen (${SHIP_PRICE} Gold)`, fn: () => {
+    if (S.gold < SHIP_PRICE) return UI.dialogue(npc, `„${SHIP_PRICE} Gold. Ein Schiff ist kein Ruderboot.“`, [{ text: 'Zurück', fn: back }]);
+    S.gold -= SHIP_PRICE; S.ship = { name: pick(['Seeschwalbe', 'Graue Möwe', 'Salzbraut', 'Nebelreiter', 'Gischtläufer']), hull: 100, cargo: {}, cap: 20, at: from };
+    chronicle(`${S.player.name} kauft die „${S.ship.name}“`, 'legend', 'Ein eigenes Schiff. Das Meer gehört jetzt auch dir.'); UI.toast(`EIGENES SCHIFF: ${S.ship.name.toUpperCase()}`, 3000);
+    UI.dialogue(npc, `„Die ‚${S.ship.name}‘. Gute Planken, ehrliche Segel. Ich stelle dir eine kleine Mannschaft. Sprich mich in jedem Hafen an, dann legst du ab — und denk an den Laderaum.“`, [{ text: 'Zurück', fn: back }]); } }];
+  const out = [{ text: `Mit der „${S.ship.name}“ auslegen (Rumpf ${S.ship.hull} %)`, fn: () => {
+    const dests = ['saltport', 'kupferhafen', 'isle'].filter(k => k !== from && (k === 'isle' || TOWN_PLAN[k]));
+    UI.dialogue(npc, '„Wohin, Kapitän? Und welchen Kurs?“', [...dests.flatMap(k => [['coast', 'Küstenkurs'], ['trade', 'Handelsroute'], ['wreck', 'Wrackfeld']].map(([c, n]) => ({ text: `${portName(k)} — ${n}`, fn: () => ownVoyage(k, from, c) }))), { text: 'Zurück', fn: back }]); } },
+    { text: `Laderaum und Seehandel (${cargoUsed()}/${S.ship.cap})`, fn: () => cargoMenu(npc, from) }];
+  if (S.ship.hull < 100) out.push({ text: `Rumpf reparieren (${(100 - S.ship.hull) * 2} Gold)`, fn: () => { const c = (100 - S.ship.hull) * 2; if (S.gold < c) return UI.dialogue(npc, '„Zu wenig Gold für so viel Holz.“', [{ text: 'Zurück', fn: back }]);
+    S.gold -= c; S.ship.hull = 100; log(`Die „${S.ship.name}“ ist ausgebessert.`, 'economy'); back(); } });
+  return out;
+}
+function cargoMenu(npc, port) {
+  const P = PORT_PRICE[port] || PORT_PRICE.saltport, C = S.ship.cargo, back = () => cargoMenu(npc, port);
+  const rows = Object.keys(CARGO).map(k => `${CARGO[k]}: kaufen ${P[k]}, verkaufen ${Math.round(P[k] * 0.9)} Gold · an Bord ${C[k] || 0}`).join('\n');
+  UI.dialogue(npc, `Preise in ${portName(port)} (je Einheit):\n${rows}\nLaderaum ${cargoUsed()}/${S.ship.cap}.`, [
+    ...Object.keys(CARGO).map(k => ({ text: `5 ${CARGO[k]} kaufen (${P[k] * 5} Gold)`, fn: () => { if (S.gold < P[k] * 5) return UI.toast('Zu wenig Gold.'); if (cargoUsed() + 5 > S.ship.cap) return UI.toast('Der Laderaum ist voll.'); S.gold -= P[k] * 5; C[k] = (C[k] || 0) + 5; back(); } })),
+    ...Object.keys(CARGO).filter(k => C[k] > 0).map(k => ({ text: `${C[k]} ${CARGO[k]} verkaufen (${Math.round(P[k] * 0.9) * C[k]} Gold)`, fn: () => { const g = Math.round(P[k] * 0.9) * C[k]; S.gold += g; log(`Verkauft: ${C[k]} ${CARGO[k]} in ${portName(port)} für ${g} Gold.`, 'economy'); C[k] = 0; back(); } })),
+    { text: 'Zurück', fn: () => seaTalk(npc) }]);
+}
+function ownVoyage(to, from, course) {
+  const p = S.player; if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.'); UI.closeDialogue();
+  const r = rnd(), ev = course === 'trade' ? (r < 0.7 ? 'prize' : 'pirates') : course === 'wreck' ? 'wreck' : (r < 0.5 ? 'storm' : 'calm');
+  startVoyage({ to, from, ev, t: 0, dur: 18000, phase: 0, own: true }, `Die „${S.ship.name}“ legt ab. Kurs: ${course === 'trade' ? 'die Handelsroute' : course === 'wreck' ? 'das Wrackfeld' : 'die Küste entlang'} nach ${portName(to)}.`);
+}
+function ownSeaEvent(V, p) {                                          /* Freie Seefahrt: Prise und Wrack mitten auf der Fahrt */
+  if (V.phase !== 0 || V.t < 5000) return false;
+  if (V.ev === 'wreck') { V.phase = 1; const [bx0, by0, bx1, by1] = MAPS.deck.box; S.ship.hull = Math.max(5, S.ship.hull - ri(6, 12));
+    S.ents.deck.push({ id: uid(), kind: 'prop', type: 'chest', map: 'deck', x: ((bx0 + bx1) >> 1) * TS, y: ((by0 + by1) >> 1) * TS, r: 10, solid: true, transient: true, loot: vaultLoot(3), lootBonus: 2, label: 'Bergungsgut aus dem Wrack' });
+    camShake(4, 300); log('Ein Riff kratzt am Rumpf — dann treibt ein Wrack vorbei. Die Mannschaft fischt eine Kiste heraus und stellt sie an Deck.', 'world'); return true; }
+  if (V.ev === 'prize') { V.phase = 1; UI.dialogue(p, 'Ein Handelsschiff des Salzbunds kreuzt voraus, tief im Wasser, schwer beladen. Die Mannschaft sieht dich an.', [
+    { text: 'Entern! (Piraterie — das Seevolk wird es erfahren)', fn: () => { UI.closeDialogue(); V.pirated = true; const [bx0, by0, bx1, by1] = MAPS.deck.box;
+      for (let i = 0; i < ri(3, 4); i++) { const e = spawnEnemy('sea_raider', 'deck', ri(bx0 + 2, bx1 - 2), i % 2 ? by0 + 1 : by1 - 1, { level: Math.max(3, p.level - 2) }); if (e) Object.assign(e, { name: 'Seemann des Salzbunds', title: 'Seemann des Salzbunds', aggroId: p.id, aiState: 'pursue', transient: true }); }
+      UI.toast('ENTERN!', 1800); log('Enterhaken fliegen. Die Seeleute des Salzbunds greifen zu den Messern.', 'combat'); } },
+    { text: 'Vorbeiziehen lassen', fn: () => { UI.closeDialogue(); log('Das Handelsschiff zieht vorbei. Jemand winkt.', 'world'); } }]); return true; }
+  return false;
+}
+function ownArrive(V) {                                               /* Freie Seefahrt: Beute nach geglückter Prise, Schiff liegt im Zielhafen */
+  S.ship.at = V.to;
+  if (V.pirated) { const g = ri(100, 200); S.gold += g; let room = S.ship.cap - cargoUsed(); for (const k of Object.keys(CARGO)) { const n = Math.min(room, ri(1, 4)); if (n > 0) { S.ship.cargo[k] = (S.ship.cargo[k] || 0) + n; room -= n; } }
+    S.factions.sea = clamp((S.factions.sea || 0) - 12, -100, 100); S.flags.piracy = (S.flags.piracy || 0) + 1; if (S.flags.piracy === 1) chronicle(`${S.player.name} wird Pirat`, 'event', 'Die erste Prise. Der Salzbund schreibt den Namen auf.');
+    log(`Prise gemacht: ${g} Gold und Ladung im Laderaum. Das Seevolk vergisst es nicht (−12).`, 'faction'); }
+}
 function startVoyage(V, text) {
   S.voyage = V; S.seaPort = V.to === 'isle' ? V.from : V.to;
   S.ents.deck = S.ents.deck.filter(e => e.kind === 'prop');
@@ -7148,8 +7204,9 @@ function seaTick(dt) {
   }
   if (foes.length) return;                                            // Enterkampf: das Schiff treibt, bis alle liegen
   V.t += dt;
+  if (V.own && S.ship && ownSeaEvent(V, p)) return;   /* §5d.9 */
   if (V.ev === 'pirates' && V.phase === 0 && V.t > 5000) {
-    V.phase = 1; camShake(6, 400); sfx('metal', 0.8, 1); UI.toast(X.board, 2600);
+    V.phase = 1; camShake(6, 400); sfx('metal', 0.8, 1); UI.toast(X.board, 2600); if (V.own && S.ship) S.ship.hull = Math.max(5, S.ship.hull - 5);
     log(X.boardLog, 'combat');
     const n = ri(3, 4) + (p.level > 12 ? 1 : 0);
     const [bx0, by0, bx1, by1] = MAPS.deck.box;
@@ -7164,6 +7221,7 @@ function seaTick(dt) {
       camShake(7, 500); fx(p.x, p.y - 10, 'dust', 10); sfx('metal', 0.3, 1);
       if (!V.below) { const a = rnd() * 6.283; p.kb = { x: Math.cos(a) * 40, y: Math.sin(a) * 40, t: 220, T: 220 }; hurt(p, Math.round(ri(3, 7) * weak), null, X.waveCause); float(p, X.wave, 'rgba(170,200,230,ALPHA)'); }
       if (ship) ship.hull = Math.max(5, ship.hull - Math.round(ri(2, 5) * weak * (1 - 0.2 * (ship.up?.hull || 0))));
+      if (V.own && S.ship) S.ship.hull = Math.max(5, S.ship.hull - ri(2, 5));   /* §5d.9: eigenes Schiff leidet im Sturm */
     }
     if (V.phase === 0) { V.phase = 1; UI.dialogue(p, X.storm, [
       { text: 'Unter Deck gehen (sicher, die Fahrt dauert länger)', fn: () => { V.below = true; V.dur += 8000; UI.closeDialogue(); log(X.below, 'world'); } },
@@ -7176,7 +7234,7 @@ function seaTick(dt) {
       if (V.emergency) { airDock(ship, V.from, true); S.airLand = V.landAt; log('Notlandung im offenen Land. Die Mannschaft bleibt beim Schiff; den Rest des Weges gehst du zu Fuß.', 'world'); UI.toast('NOTLANDUNG', 2600); }
       else { airDock(ship, V.to); S.airLand = ECO.airPt(V.to); log(`Die Gondel setzt am Mast von ${townName(V.to)} auf.`, 'world'); }
       return travel('world'); }
-    passTime(V.below ? 480 : 360);
+    passTime(V.below ? 480 : 360); if (V.own && S.ship) ownArrive(V);
     if (V.helped || V.phase === 1 && V.ev === 'pirates') { S.factions.sea = clamp((S.factions.sea || 0) + (V.ev === 'pirates' ? 6 : 3), -100, 100); log(`Der Kapitän nickt dir zu. Das Seevolk vergisst so etwas nicht (+${V.ev === 'pirates' ? 6 : 3} Ruf).`, 'faction'); }
     ensureSeafolk(); travel(V.to === 'isle' ? 'isle' : 'world');   // S15 Fehlersuche: toter Kapitän? Bei Ankunft steht ein neuer da
   }
@@ -13264,6 +13322,7 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Seefahrt: eigenes Schiff geben': () => { S.ship = { name: 'Probe-Möwe', hull: 70, cargo: {}, cap: 20, at: 'saltport' }; UI.toast('Eigenes Schiff (beim Kapitän in Salzhafen/Kupferhafen)'); },   /* Nutzer §5d.9 */
       'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
       'Tiefhall: Freund der Halle': () => { S.flags.dwarfFriend = 1; UI.toast('Freund der Tiefhall'); },
       'Goblins: Grubenhort wächst (+20)': () => { S.flags.goblinsFreed = true; gobGrow(20, '(Debug)'); },   /* Nutzer §5e.9 */
@@ -15909,6 +15968,17 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Freie Seefahrt (Nutzer §5d.9): Schiff kaufen, Laderaum kaufen und verkaufen mit Hafenpreisen, eigene Fahrt ohne Fahrgeld, Prise bringt Beute und kostet Ruf, Wrack gibt Bergungsgut und kratzt am Rumpf', sandbox(() => {
+    const p = stage(), sh = S.ship, fs = S.factions.sea, pc = S.flags.piracy; S.gold = 2000; S.ship = null;
+    try { const cap = actor(330, 300, { kind: 'npc' }); cap.seaCaptain = 'saltport'; let ch = shipChoices(cap, 'saltport'); ch[0].fn(); UI.closeDialogue(); const bought = !!S.ship && S.gold === 1100;
+      cargoMenu(cap, 'saltport'); [...document.querySelectorAll('#dlg-choices button')].find(b => /5 Salz kaufen/.test(b.textContent)).click(); UI.closeDialogue(); const loaded = S.ship.cargo.salt === 5 && S.gold === 1070;
+      cargoMenu(cap, 'isle'); [...document.querySelectorAll('#dlg-choices button')].find(b => /Salz verkaufen/.test(b.textContent)).click(); UI.closeDialogue(); const sold = !S.ship.cargo.salt && S.gold === 1070 + 45;
+      MAPS.deck.box ||= [2, 2, 20, 10]; const d0 = S.ents.deck; S.ents.deck = S.ents.deck.filter(e => e.kind === 'prop');
+      const V = { to: 'isle', from: 'saltport', ev: 'wreck', t: 6000, dur: 18000, phase: 0, own: true }; ownSeaEvent(V, p); const wreck = S.ents.deck.some(e => e.label?.startsWith('Bergungsgut')) && S.ship.hull < 100;
+      const g0 = S.gold, f0 = S.factions.sea || 0; ownArrive({ to: 'isle', pirated: true }); const prize = S.gold > g0 && S.factions.sea === f0 - 12 && cargoUsed() > 0 && S.ship.at === 'isle';
+      S.ents.deck = d0; return bought && loaded && sold && wreck && prize;
+    } finally { S.ship = sh; S.factions.sea = fs; S.flags.piracy = pc; }
   }));
   ok('Tiefhall (Nutzer §5d.6): Treppe im Thronsaal der alten Halle, Königsstadt mit König, Schmiedin (Königseisen), Händlern und Wachen, alles erreichbar; Handel erst als Freund der Halle', sandbox(() => {
     const p = stage(), f0 = S.flags.dwarfFriend, z0 = S.ents.zwerge, mz = MAPS.zwerge;
