@@ -10204,7 +10204,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay(); familyDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10658,7 +10658,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -12264,6 +12264,54 @@ function playerDeath(cause, source) {
   save();
 }
 
+// ================= Dynastie (Nutzer §5e.2) =================
+// Heirat: wer dich sehr mag (Beziehung 60+) und erwachsen ist, kann dich heiraten; der Ehepartner bleibt daheim. Verheiratet kommt
+// ab und zu ein Kind zur Welt (1 % am Tag, knapp jedes zweite Jahr, höchstens vier). Kinder wachsen in Spielzeit (ein Jahr = 60 Tage) und können
+// ab 16 das Haus erben. Adoption: beim Priester ein Waisenkind aufnehmen (50 Gold) oder einen Freund fürs Leben als Erben annehmen.
+// Beim Tod stehen eigene erwachsene Kinder und der Ehepartner zuerst zur Wahl, dann Gefährten, dann entfernte Verwandte (Zufall).
+const kidAge = k => Math.floor(((S.day | 0) - k.born) / 60) + (k.age0 || 0);
+const spouseOf = () => S.legacy.spouse ? byId(S.legacy.spouse) : null;
+function familyHeirs() {
+  const out = [], p = S.player;
+  for (const k of (S.legacy.children || []).filter(k => kidAge(k) >= 16).slice(0, 3)) {
+    const c = makeChar({ name: k.name, age: kidAge(k), x: p.x, y: p.y, level: Math.max(1, Math.floor((p.level || 1) * 0.5)), traits: [pick(['mutig', 'ehrgeizig', 'loyal', 'gütig'])],
+      attrs: { strength: ri(8, 14), agility: ri(8, 14), endurance: ri(8, 13), intelligence: ri(7, 13), perception: ri(8, 13), willpower: ri(7, 13) }, skills: { onehanded: ri(4, 12), archery: ri(3, 10), survival: ri(3, 9) },
+      cls: pick(['wanderer', 'warrior', 'archer']), pal: { ...p.pal, cloth: pick(CLOTH) } });
+    c.relation = `${k.adopted ? 'Adoptiv' : ''}${k.female ? 'tochter' : 'sohn'} von ${p.name}`.replace(/^t/, 'T').replace(/^s/, 'S'); c.childId = k.id; kinKit(c); out.push(c);
+  }
+  const sp = spouseOf(); if (sp?.alive && out.length < 3) { sp.relation = `Ehepartner von ${p.name}`; out.push(sp); }
+  return out;
+}
+function bearChild(adopted = false, age0 = 0) {
+  const female = chance(0.5), k = { id: uid(), name: pick(female ? ['Sigrun', 'Halla', 'Brenna', 'Rana', 'Ilse', 'Wenna', 'Liv', 'Ada'] : ['Tomas', 'Elric', 'Ivar', 'Kord', 'Hamo', 'Jorg', 'Arn', 'Bero']),
+    female, born: S.day | 0, adopted, age0 };
+  (S.legacy.children ||= []).push(k); return k;
+}
+function familyDay() {
+  const sp = spouseOf(); if (S.legacy.spouse && !sp?.alive) { log('Dein Ehepartner ist tot. Das Haus trauert.', 'death'); S.legacy.spouse = null; }
+  if (sp?.alive && (S.legacy.children || []).filter(k => !k.adopted).length < 4 && chance(0.01)) { const k = bearChild(); log(`${sp.name} schickt Nachricht: Ein Kind ist geboren — ${k.name}. Haus ${S.legacy.house} wächst.`, 'quest'); chronicle(`${k.name} wird geboren`, 'legacy', `Kind von ${S.player.name} und ${sp.name}.`); UI.toast(`KIND GEBOREN: ${k.name.toUpperCase()}`, 3000); }
+  for (const k of S.legacy.children || []) if (kidAge(k) >= 16 && !k.grown) { k.grown = true; log(`${k.name} ist jetzt erwachsen (16) und könnte Haus ${S.legacy.house} erben.`, 'quest'); }
+}
+function dynastyChoices(npc, choices) {
+  const p = S.player, rel = S.relations[npc.key] ?? 0, day = S.day | 0;
+  if (npc.spouse && npc.id === S.legacy.spouse) {
+    const kids = (S.legacy.children || []); choices.unshift({ text: 'Wie geht es den Kindern?', fn: () => UI.dialogue(npc, kids.length ? `„${kids.map(k => `${k.name} ist ${kidAge(k)}${k.adopted ? ' (angenommen)' : ''}`).join(', ')}. Sie fragen jeden Abend nach dir.“` : '„Noch haben wir keine. Vielleicht, wenn du öfter daheim wärst.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+    return;
+  }
+  const adult = (npc.age || 25) >= 18 && !npc.child && !npc.guard && !npc.undead && !npc.robot && npc.kind === 'npc' && !npc.transient && npc.key && !S.party.includes(npc.id);
+  if (adult && !S.legacy.spouse && rel >= 60 && !npc.married) choices.push({ text: 'Willst du mein Leben teilen? (Heirat)', fn: () => {
+    if (npc.proposedDay === day) return UI.dialogue(npc, '„Frag mich nicht zweimal am selben Tag.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    npc.proposedDay = day; if (rel < 75 && chance(0.4)) return UI.dialogue(npc, '„Ich … mag dich. Aber ich brauche noch Zeit.“ (Beziehung erhöhen und später fragen)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.legacy.spouse = npc.id; npc.spouse = true; npc.married = true; addRel(npc.key, 20); addFame(1, undefined, 'Hochzeit');
+    chronicle(`${p.name} heiratet ${npc.name}`, 'legacy', `Haus ${S.legacy.house} bekommt ein Zuhause.`); UI.toast('HOCHZEIT', 3000);
+    UI.dialogue(npc, `„Ja. Ja! Aber ich bleibe hier — irgendwer muss das Haus hüten, während du die Welt rettest.“\n(${npc.name} lebt weiter in ${npc.homeTown ? townName(npc.homeTown) : 'seinem Zuhause'}. Kinder kommen mit der Zeit.)`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+  if (npc.prof === 'Priester' || npc.prof === 'Priesterin') choices.push({ text: 'Ein Waisenkind aufnehmen (50 Gold Spende)', fn: () => {
+    if (S.gold < 50) return UI.dialogue(npc, '„Die Waisen brauchen Brot, keine Versprechen. Fünfzig Gold.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= 50; const k = bearChild(true, ri(4, 12)); addFame(1, undefined, 'Adoption'); chronicle(`${p.name} nimmt ${k.name} auf`, 'legacy', 'Ein Waisenkind bekommt einen Namen und ein Haus.');
+    UI.dialogue(npc, `„${k.name}, ${kidAge(k)} Jahre. Gib gut auf ${k.female ? 'sie' : 'ihn'} acht.“ (${k.name} wächst im Haus auf und kann mit 16 erben.)`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+  if (S.party.includes(npc.id) && npc.friend && !npc.heirSworn) choices.push({ text: 'Willst du mein Erbe sein?', fn: () => { npc.heirSworn = true; loyAdd(npc, 10);
+    UI.dialogue(npc, '„Wenn es so weit kommt — dann trage ich deinen Namen weiter.“ (Steht bei der Erbfolge sicher zur Wahl.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+}
 // ================= Epilog (Nutzer §5e.10) =================
 // Am Grab eines früheren Helden des Hauses: Erbstücke bergen, das Epitaph lesen oder den Epilog hören — was die Welt von ihm
 // erzählt (große Taten seiner Generation, Ruhm, wer ihn ehrte und wer ihn verfluchte, Gefährten, Siedlung). Danach wählt man:
@@ -12309,8 +12357,8 @@ function timeSkip(years) {
   UI.toast(`ZWANZIG JAHRE SPÄTER — JAHR ${year()}`, 4200); UI.refreshHUD();
 }
 function makeSuccessorCandidates() {
-  const out = [];
-  for (const m of partyMembers()) { m.relation = 'Gefährte'; out.push(m); }
+  const out = [...familyHeirs()];   /* Nutzer §5e.2: eigene erwachsene Kinder und der Ehepartner zuerst */
+  for (const m of partyMembers()) { if (out.length >= 3) break; m.relation = m.friend ? 'Freund fürs Leben' : 'Gefährte'; out.push(m); }
   // Familie ist Glückssache: ob es Kinder, Eltern oder Geschwister gibt, hängt vom Alter des Toten und vom Zufall ab.
   // Mit jeder Generation dünnt das Haus aus; bleibt niemand, erlischt es.
   const age = S.player.age || 25, luck = Math.max(0.35, 1 - (S.legacy.gen - 1) * 0.12), kin = [];
@@ -12357,7 +12405,7 @@ function chooseSuccessor() {
 }
 function adoptSuccessor(c) {
   const old = S.player;
-  S.party = S.party.filter(id => id !== c.id);
+  S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
   c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
@@ -13005,6 +13053,9 @@ function debugSections() {
       'Gefährten: Loyalität −40 (nächster Tag = Verratsgefahr)': () => { partyMembers().forEach(m => loyAdd(m, -40)); UI.toast('Loyalität gesenkt'); },   /* Nutzer §5e.1 */
       'Gefährten: Loyalität +30 und 3 Feuergespräche': () => { partyMembers().forEach(m => { loyAdd(m, 30); m.fireTalks = 3; m.fireDay = S.day | 0; }); UI.toast('Loyalität +30'); },
       'Gefährten: Loyalitätstag': () => loyDay(),
+      'Dynastie: nächsten NPC heiraten': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.key && !e.guard && !S.party.includes(e.id)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return; S.relations[n.key] = 90; S.legacy.spouse = n.id; n.spouse = n.married = true; UI.toast(`Verheiratet: ${n.name}`); },   /* Nutzer §5e.2 */
+      'Dynastie: Kind geboren': () => { const k = bearChild(); UI.toast(k.name); },
+      'Dynastie: Kinder altern 16 Jahre': () => { (S.legacy.children || []).forEach(k => k.born -= 960); familyDay(); UI.toast('Kinder erwachsen'); },
       'Epilog: Ahnengrab hier (letzter Vorfahr oder Probe)': () => { const p = P(); if (!S.legacy.ancestors.length) S.legacy.ancestors.push({ name: 'Probe-Ahn', year: year(), location: 'hier', cause: 'Test', level: 10, gen: 1, fame: 40, deeds: ['Garmadon, der Totenkönig, fiel.'], fac: { valen: 50, order: -40 }, family: '—' });   /* Nutzer §5e.10 */
         S.ents[S.map].push({ id: uid(), kind: 'grave', map: S.map, x: p.x + 30, y: p.y, r: 10, label: 'Ahnengrab', epitaph: 'Test', loot: [], charKey: 'player', hero: S.legacy.ancestors.length - 1 }); UI.toast('Grab rechts neben dir (E)'); },
       'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
@@ -15639,6 +15690,17 @@ export function selftest() {
       loyAdd(f, -80); const loyal = loyOf(f) === 85;
       return warmed && hurtLoy && gone && friend && loyal;
     } finally { S.minute = m0; S.contracts = c0; }
+  }));
+  ok('Dynastie (Nutzer §5e.2): Heirat ab Beziehung 60, Kinder wachsen in Spielzeit, erwachsene Kinder und Ehepartner stehen zuerst zur Erbwahl, Adoption beim Priester', sandbox(() => {
+    const p = stage(), lg = structuredClone(S.legacy); S.gold = 200;
+    try { S.legacy.children = []; S.legacy.spouse = null;
+      const n = actor(330, 300, { kind: 'npc', age: 30 }); n.key = 'probe_love'; S.relations.probe_love = 90; const ch = []; dynastyChoices(n, ch); const offer = ch.find(c => /Heirat/.test(c.text)); offer?.fn(); UI.closeDialogue();
+      const wed = S.legacy.spouse === n.id && n.spouse;
+      const pr = actor(360, 300, { kind: 'npc', prof: 'Priester' }), c2 = []; dynastyChoices(pr, c2); c2.find(c => /Waisenkind/.test(c.text)).fn(); UI.closeDialogue(); const adopted = S.legacy.children.length === 1 && S.gold === 150 && S.legacy.children[0].adopted;
+      const k = bearChild(); const young = kidAge(k) === 0 && !familyHeirs().some(c => c.childId === k.id); k.born -= 16 * 60; const heirs = familyHeirs(); const first = heirs[0]?.childId === k.id && heirs.some(c => c === n);
+      const cands = makeSuccessorCandidates(); const inList = cands[0]?.childId === k.id;
+      return !!offer && wed && adopted && young && first && inList;
+    } finally { S.legacy = lg; }
   }));
   ok('Epilog (Nutzer §5e.10): Taten werden je Generation einmal gezählt, der Epilog nennt Taten, Ruhm, Ehre und Fluch; zwanzig Jahre später altert der Held und reift', sandbox(() => {
     const p = stage(), f0 = { ...S.flags }, lg = structuredClone(S.legacy), d0 = S.day, b0 = S.bands, c0 = S.contracts; S.bands = []; S.contracts = [];
