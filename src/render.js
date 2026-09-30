@@ -2365,8 +2365,12 @@ const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math
 function drawSkyLife(now) {
   if (S.map !== 'world' || !S.player) return;
   const P = S.player, day = S.minute > 360 && S.minute < 1170;
-  if (curRegion === 'aurel') for (let i = 0; i < 2; i++) {
-    const x = P.x + ((now / 55 + i * 1300) % 2600) - 1300, y = P.y - 260 + i * 190, s = i ? 0.8 : 1;
+  /* Nutzer-Bug: die Luftschiffe hingen am Spieler und zogen mit. Jetzt fliegen sie auf festen Bahnen der Welt (alle 900 px eine Bahn,
+     auf jeder Bahn ein Schiff je 2600 px, periodisch und damit ohne Sprung), gezeichnet wird nur, was in der Nähe ist. */
+  if (curRegion === 'aurel') for (let ly = Math.floor((P.y - 800) / 900); ly <= Math.floor((P.y + 800) / 900); ly++) for (let lx = Math.floor((P.x - 1800) / 2600); lx <= Math.floor((P.x + 1800) / 2600); lx++) {
+    const off = ((ly * 7919) % 2600 + 2600) % 2600, dir = ly & 1 ? -1 : 1, t = ((dir * now / 55 + off) % 2600 + 2600) % 2600;
+    const x = lx * 2600 + t, y = ly * 900 + 120 + (off % 400), s = ly & 1 ? 0.8 : 1;
+    if (Math.abs(x - P.x) > 1500) continue;
     ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x + 40, y + 260, 60 * s, 14 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.ellipse(x, y, 58 * s, 22 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#c8a050'; ctx.fillRect(x - 58 * s, y - 2, 116 * s, 4 * s); ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(x - 10 * s, y - 6 * s, 40 * s, 10 * s, 0, 0, 7); ctx.fill();

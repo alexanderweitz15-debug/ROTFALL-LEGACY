@@ -3,6 +3,8 @@
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
 ## Version 21 — 2026-09-30 (Koop und Bionik 2–5)
+- Koop-Warteraum: eigener Charakter für den Gast, Bereit-Knopf, gespeicherte Gastcharaktere; Gast sieht Häuser, Licht, Inventar, Statpunkte, Aufträge, E-Hinweise; Taten des Gasts kosten Ruf; Kamerafahrten für Gäste; Zeppeline über Aurelion ziehen nicht mehr mit.
+- Nachtrag: Koop auch im laufenden Spiel (Einstellungen), Gast handelt bei Händlern mit eigenem Beutel, Gast fragt an Eingängen den Host (Gruppe reist zusammen), Auftragsgold aller Quests geteilt.
 - Netzwerk-Koop (K2): Knopf „Koop (Netzwerk)“ auf dem Titelbildschirm. Host öffnet sein Spiel mit 6-stelligem Code, Gast tritt über WebRTC (PeerJS) bei und steuert einen Gefährten. Der Host rechnet und speichert allein.
 - Teilen im Koop: Erfahrung wie der Held, Auftragsgold zu gleichen Teilen, Beute hat, wer sie zuerst aufhebt; Tauschmenü (Gast: I, Host: Knopf oben rechts); Chat mit Enter.
 - Bionik Pakete 2–5: Roboterauge, Prototyp-Glieder und Module, Wartung mit Werkzeug und Öl, Händler, Chirurgie, Schwarzmarkt, Rangsperren, Bionik im Charakterbogen.
