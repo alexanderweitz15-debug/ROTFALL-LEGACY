@@ -476,3 +476,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Trinkwette:** 15 Gold. Jeder Krug gibt eine Stufe **Rausch** (bis 3, 4 Minuten): die Steuerung schwankt zur Seite, der Schaden steigt um 5 % je Stufe. Wer zuerst umkippt, verliert; Ausdauer hilft.
 - **Faustkampf:** 30 Gold. Beide legen die Waffen ab (danach automatisch zurück), Schaden halbiert, niemand stirbt: wer am Boden liegt, verliert und steht nach 20 s wieder auf. Kein Verbrechen, keine Wachen. Weglaufen (über 400 px) zählt als Niederlage. Sieg: Einsatz, Ruhm +2, Beziehung +5.
 - **Debug:** „Schenke: betrunken (Rausch 3)“, „Schenke: Faustkampf mit nächstem NPC“. Probe „Schenke (Nutzer §5e.5)“.
+
+## Runde: Verletzungen über Tage (Nutzer §5e.7, Version 21)
+- **Bruch:** Fällt beim Helden oder einem Gefährten ein Arm oder Bein aus (nicht abgetrennt, keine Prothese), ist es zu 60 % gebrochen. Das Glied heilt dann durch nichts über 40 % (Tränke, Schlaf, Magie), bis der Bruch nach 4 Tagen verheilt. Im Körperbogen steht ✚ und die Restdauer.
+- **Schienen:** Heilerin, Medica oder Feldscher: „Wunden versorgen“ (25 Gold) schient alle Brüche der Gruppe (heilen doppelt so schnell) und reinigt Entzündungen.
+- **Entzündung:** Ausgefallene Glieder entzünden sich zu 25 % (abgetrennt 60 %). Jeden Tag Rumpf −4 × Tage und halbe Ausdauer; nach 6 Tagen klingt sie von selbst ab.
+- **Narben:** Jeder verheilte Bruch hinterlässt eine Narbe: +1 Rüstung je Narbe (höchstens 5), Status „Narben (n)“.
+- **Debug:** „Verletzung: linker Arm gebrochen + Entzündung“, „Verletzung: einen Tag vergehen lassen“. Probe „Verletzungen (Nutzer §5e.7)“.

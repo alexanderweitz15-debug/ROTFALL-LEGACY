@@ -90,7 +90,7 @@ export function armorOf(c) {
   if (ch?.ally && S.ents[c.map]?.some(e => e !== c && e.alive && (e.kind === 'npc' || e.kind === 'player') && !e.captive && dist(e, c) < 90 && !isHostile(c, e))) v += ch.ally;
   const bless = (c.status || []).find(s => s.key === 'blessing');
   v = (v + tfx(c, 'armor') + (node(c, 'k_grove') && inNature(c) ? 3 : 0)) * (node(c, 'k_bulwark') ? 1.3 : 1);
-  return Math.round(v + (bless ? 5 : 0) + elx(c, 'armor') + (stat(c, 'wolf_form') ? 3 : 0) + (c.level || 1) * 0.25 + (setOf(c)?.bonus.armor || 0));   // Phase 1: Stufe härtet ab
+  return Math.round(v + (bless ? 5 : 0) + elx(c, 'armor') + (stat(c, 'wolf_form') ? 3 : 0) + (c.level || 1) * 0.25 + (setOf(c)?.bonus.armor || 0) + Math.min(5, c.scars || 0));   /* §5e.7: Narben härten ab */   // Phase 1: Stufe härtet ab
 }
 const wpnOf = c => c.status?.some(s => s.key === 'wolf_form') ? null : c.dualTurn && dualOn(c) ? c.equip.offhand : c.equip?.weapon;
 // Nutzer §5f: Zweiwaffen nur für Schurke, Assassine, Berserker — zweite Einhandwaffe in der Nebenhand, die Schläge wechseln die Hand
@@ -3406,6 +3406,7 @@ function limbLost(c, part, severed = false) {
   if (dist(c, S.player) < 600) log(`${who}: ${B.PART_NAME[part]} ${what}.`, 'combat');
   if (severed) { fx(c.x, c.y - 14, 'blood', 16); (c.status ||= []).some(s => s.key === 'bleeding') || c.status.push({ key: 'bleeding', name: 'Blutend', left: 30000 }); }
   if (B.crawling(c) && c === S.player) UI.toast('Beide Beine versagen — du kriechst.', 3000);
+  woundSet(c, part, severed);   /* Nutzer §5e.7: Bruch und Entzündung über Tage */
   const dropAt = it => { if (it) dropItemAt(c.map, c.x + ri(-14, 14), c.y + ri(4, 14), it); };
   if (c.equip) {                                            // Menschen: Waffe/Schild fällt zu Boden
     if (part === 'rarm' && c.equip.weapon) { dropAt(c.equip.weapon); c.equip.weapon = null; }
@@ -3461,6 +3462,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
+  if (c.deserter && c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor' && x.state === 'active'); if (RC) { RC.reward.gold = 0; rumorDone(RC, true); } }   /* Gerücht: Deserteur im Kampf gefallen statt überredet — Auftrag trotzdem abgeschlossen, kein Lohn */
   if (c.runaway && S.quests.q_runaway?.state === 'active') runawayEnd('Der Entlaufene ist tot.', 3);   // S12 A3
   if (c.robot && c.faction === 'aurel' && source && (source === S.player || S.party.includes(source.id))) startHunt(1);   // S12 E: Aurelion fahndet
   if (c.skyRuler) rulerSlain(c, source);
@@ -6922,6 +6924,7 @@ function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contrac
  if (C && ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind)) conProgress(C);
   if (C && C.kind === 'bounty' && e.title === C.name) C.leaderDead = true;
   if (C && C.kind === 'trail' && e.title === C.name && C.have === 3) conProgress(C);
+  if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;   /* Gerücht: Bestie auch fern vom Helden oder von Gefährten erlegt (sonst BUG-138-artig endlos aktiv) */
   if (C && C.kind === 'camps' && e.campIdx != null && !(C.cleared ||= [])[e.campIdx] && !S.ents.world.some(o => o !== e && o.alive && o.contract === C.id && o.campIdx === e.campIdx)) {
     C.cleared[e.campIdx] = true; conProgress(C); log(`Lager ${C.cleared.filter(Boolean).length}/${C.need} ausgehoben.`, 'quest'); } }
 // Eskorte (Nutzer: „der NPC ist zu langsam und man weiß nicht wohin“): Der Reisende geht selbst den Straßenweg zum Ziel, etwa im
@@ -10158,6 +10161,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
+  woundDay();   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10311,6 +10315,35 @@ function activeEffects() {
 // AUDIT H-03: Heilerinnen behandeln gegen Gold — Held und Gruppe in der Nähe, Blutung und Gift inklusive. Dauert (Nutzer): die Heilerin
 // kniet HEALER_MS lang bei dir; wer sich bewegt oder angreift, bricht ab (kein Gold weg).
 const HEALER_MS = 3500;
+// ================= Verletzungen über Tage (Nutzer §5e.7) =================
+// Fällt beim Helden oder einem Gefährten ein Arm oder Bein aus, ist es oft gebrochen (60 %): das Glied heilt nur bis 40 %, bis der
+// Bruch nach 4 Tagen verheilt (geschient doppelt so schnell). Offene Wunden entzünden sich manchmal (25 %, abgetrennt 60 %):
+// jeden Tag Rumpf −4 × Tage und halbe Ausdauer, nach 6 Tagen klingt es ab. Heilerin, Medica oder Feldscher schienen und reinigen
+// (25 Gold). Ein verheilter Bruch hinterlässt eine Narbe: +1 Rüstung je Narbe (bis 5).
+const woundOwner = c => c && (c === S.player || S.party.includes(c.id)) && c.body;
+function woundSet(c, part, severed) {
+  if (!woundOwner(c)) return; const P = c.body[part];
+  if (!severed && !P.mech && !P.broken && chance(0.6)) { P.broken = 4; P.splint = false; if (c === S.player) { log(`${B.PART_NAME[part]} gebrochen! Heilt nur bis 40 %, bis der Bruch in ein paar Tagen verheilt. Eine Heilerin kann schienen.`, 'combat'); UI.toast(`${B.PART_NAME[part].toUpperCase()} GEBROCHEN`, 2400); } }
+  if (!stat(c, 'infektion') && chance(severed ? 0.6 : 0.25)) { addStatus(c, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Jeden Tag Rumpf-Schaden und halbe Ausdauer. Heilerin, Medica oder Feldscher reinigen sie (25 Gold); nach sechs Tagen klingt sie ab.' }); if (c === S.player) log('Die Wunde ist schmutzig. Sie wird sich entzünden, wenn niemand sie reinigt.', 'combat'); }
+}
+function woundDay() {
+  for (const c of [S.player, ...partyMembers()]) { if (!c?.alive || !c.body) continue; const me = c === S.player ? 'Dein' : `${c.name}s`;
+    for (const k of B.PARTS) { const P = c.body[k]; if (!P.broken) continue; P.broken -= P.splint ? 2 : 1;
+      if (P.broken <= 0) { delete P.broken; delete P.splint; c.scars = (c.scars || 0) + 1; addStatus(c, { key: 'narben', name: `Narben (${c.scars})`, good: true, left: 1e12, desc: `Verheilte Brüche: +${Math.min(5, c.scars)} Rüstung.` }); log(`${me} Bruch (${B.PART_NAME[k]}) ist verheilt. Eine Narbe bleibt — und härtet ab.`, 'party'); } }
+    const s = c.status?.find(q => q.key === 'infektion'); if (!s) continue; const d = (S.day | 0) - (s.since ?? (S.day | 0));
+    if (d >= 6) { c.status = c.status.filter(q => q !== s); log(`${me} Entzündung klingt ab.`, 'party'); continue; }
+    c.body.torso.hp = Math.max(1, c.body.torso.hp - 4 * Math.max(1, d)); B.syncHp(c); c.stamina = Math.min(c.stamina, c.maxStamina * 0.5);
+    if (c === S.player) log(`Die Wunde pocht und eitert (Rumpf −${4 * Math.max(1, d)}). Eine Heilerin sollte sie reinigen.`, 'party');
+  }
+}
+function woundCare(npc, choices) {
+  const p = S.player, who = [p, ...partyMembers()].filter(c => c?.alive && c.body && (B.PARTS.some(k => c.body[k].broken && !c.body[k].splint) || stat(c, 'infektion')));
+  if (!isHealer(npc) || !who.length) return;
+  choices.unshift({ text: `Wunden versorgen: schienen und reinigen (25 Gold)`, fn: () => {
+    if (S.gold < 25) return UI.dialogue(npc, '„Fünfundzwanzig Gold. Schienen und Branntwein wachsen nicht auf Bäumen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= 25; for (const c of who) { for (const k of B.PARTS) if (c.body[k].broken) c.body[k].splint = true; c.status = c.status.filter(q => q.key !== 'infektion'); }
+    UI.closeDialogue(); log('Die Brüche sind geschient (heilen doppelt so schnell), die Wunden ausgebrannt und verbunden.', 'party'); } });
+}
 const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Medica' || n.prof === 'Feldscher' || n.key === 'elena';   // §5d.1: Feldscher der Eisenfeste
 const woundedGroup = () => [S.player, ...partyMembers().filter(m => m.alive && !m.downed && dist(m, S.player) < 200)].filter(c => c.hp < c.maxHp || (c.status || []).some(s => SLEEP_CURES.has(s.key)));
 const healCost = () => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0)));
@@ -10432,7 +10465,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -12712,6 +12745,8 @@ function debugSections() {
       'Auge beschädigen (−30 %)': () => { if (!p.eye?.q) return UI.toast('Kein Roboterauge.'); p.eye.cond = Math.max(0, (p.eye.cond ?? 100) - 30); UI.toast(`Auge ${Math.round(p.eye.cond)} %`); },
       ...Object.fromEntries(Object.entries(B.MECH_MOD).map(([m, M]) => [`Modul: ${M.name}`, () => { const k = ['l', 'r'].map(s => s + M.part).find(q => p.body[q].mech) || 'l' + M.part; if (!p.body[k].mech) B.attachProsthesis(p, k, 2); p.body[k].mod = m; recalc(p); UI.toast(`${M.name} an ${k}`); }])),   /* Roadmap P3: legt bei Bedarf eine Stufe-2-Prothese an */
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
+      'Verletzung: linker Arm gebrochen + Entzündung': () => { const p = P(); p.body.larm.broken = 4; p.body.larm.splint = false; addStatus(p, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Test' }); UI.toast('Bruch + Entzündung'); },   /* Nutzer §5e.7 */
+      'Verletzung: einen Tag vergehen lassen': () => woundDay(),
       'Schenke: betrunken (Rausch 3)': () => { addStatus(P(), { key: 'rausch', name: 'Rausch 3', stacks: 3, left: 240000, desc: 'Die Welt schwankt.' }); UI.toast('Rausch 3'); },   /* Nutzer §5e.5 */
       'Schenke: Faustkampf mit nächstem NPC': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && !e.guard && e !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (n) fistStart(n, 0); },
       'Elite-Mini-Boss hier (zufällig)': () => { const k = pick(Object.keys(ELITES)); spawnEliteHere(k); UI.toast(ELITES[k].name); },   /* Nutzer: Mini-Bosse */
@@ -15308,6 +15343,13 @@ export function selftest() {
       n.garrison = 40; keepSiegeDay(); const shrink = n.garrison === 36;
       return court.length >= 4 && refused && camp && shrink;
     } finally { n.owner = o0; n.garrison = g0; S.flags.garmadonSlain = f0; S.flags.keepSiege = s0; S.ents.world = S.ents.world.filter(e => !e.keepSiege); }
+  }));
+  ok('Verletzungen (Nutzer §5e.7): gebrochenes Glied heilt nur bis 40 %, Heilerin schient (doppelt schnell), verheilt nach Tagen mit Narbe (+1 Rüstung), Entzündung zehrt und wird gereinigt', sandbox(() => {
+    const p = stage(); S.gold = 100; const P = p.body.larm; P.hp = 0; P.broken = 4; P.splint = false; B.fullHeal(p); const capped = P.hp === Math.round(P.max * 0.4);
+    addStatus(p, { key: 'infektion', name: 'x', left: 1e12, since: (S.day | 0) - 2 }); const t0 = p.body.torso.hp; woundDay(); const hurtIt = p.body.torso.hp < t0 && P.broken === 3;
+    const h = actor(330, 300, { kind: 'npc', prof: 'Heilerin' }), ch = []; woundCare(h, ch); ch[0].fn(); const cared = P.splint && !stat(p, 'infektion') && S.gold === 75;
+    const a0 = armorOf(p); woundDay(); woundDay(); const healed = !P.broken && p.scars === 1 && armorOf(p) === a0 + 1; B.fullHeal(p); const full = P.hp === P.max;
+    return capped && hurtIt && cared && healed && full;
   }));
   ok('Schenke (Nutzer §5e.5): Würfeln und Karten verändern das Gold, Trinkwette macht betrunken und die Steuerung schwankt, Faustkampf nimmt Waffen und gibt sie zurück, Sieger bekommt den Einsatz', sandbox(() => {
     const p = stage(); S.gold = 200; const n = actor(330, 300, { kind: 'npc' }); n.key = 'probe_wirt';

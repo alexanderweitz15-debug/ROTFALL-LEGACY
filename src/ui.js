@@ -662,13 +662,14 @@ export function bodyChart(c, { big = false, click = false } = {}) {
     ${PARTS.map(p => {
       const st = partState(c.body[p]), mn = mechNote(c.body[p]);   /* Roadmap P5: Prothese markieren */
       const label = `${PART_NAME[p]}: ${Math.max(0, Math.round(c.body[p].hp))}/${c.body[p].max} — ${STATE_WORD[st]}${mn ? ` · ${mn}` : ''}`;
-      return `<g class="bp bp-${st}${mn ? ' bp-mech' : ''}${click ? ' bp-click' : ''}" data-part="${p}" data-tip="${label}" aria-label="${label}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>${rects(PART_PX[p], 0)}
+      return `<g class="bp bp-${st}${c.body[p].mech ? ' bp-mech' : ''}${click ? ' bp-click' : ''}" data-part="${p}" data-tip="${label}" aria-label="${label}" ${st === 'aus' ? `fill="url(#${uid})"` : ''}>${rects(PART_PX[p], 0)}
         ${rects(PART_PX[p].slice(0, 1), 0, ' class="bp-hi"')}</g>`;
     }).join('')}
   </svg>`;
 }
 /* Roadmap P5: Kurztext einer Prothese (Stufe, Zustand, Modul) oder '' */
-const mechNote = P => { if (!P?.mech) return ''; const c = Math.round(P.mechCond ?? 100);
+const brokeNote = P => P?.broken ? `Gebrochen: heilt nur bis 40 %, noch ${P.broken} Tag(e)${P.splint ? ', geschient' : ' — Heilerin kann schienen'}` : '';   /* Nutzer §5e.7 */
+const mechNote = P => { if (!P?.mech) return brokeNote(P); const c = Math.round(P.mechCond ?? 100);
   return `Prothese ${MECH_Q[P.mech]?.name || ''} (Stufe ${P.mech}), Zustand ${c} %${c < 30 ? ' — wirkungslos' : c < 50 ? ' — halbe Wirkung' : ''}${P.mechUp ? `, Aufrüstung ${P.mechUp}` : ''}${P.mod && MECH_MOD[P.mod] ? `, Modul ${MECH_MOD[P.mod].name}` : ''}`; };
 /* Roadmap P5: Bionik im Charakterbogen — jede Prothese und das Auge mit Stufe, Zustand, Modul; Hinweis auf Wartung */
 function bionicBlock(p) {
@@ -680,8 +681,8 @@ function bionicBlock(p) {
 function woundNotes(c, click) {
   return PARTS.map(p => {
     const P = c.body[p], st = partState(P), pct = Math.max(0, P.hp / P.max * 100), mn = mechNote(P);
-    return `<button class="wound w-${st}${mn ? ' bp-mech' : ''}" data-part="${p}" ${click ? '' : 'tabindex="-1"'}${mn ? ` title="${mn}"` : ''}>
-      <span class="w-name">${PART_NAME[p]}${P.mech ? ' ⚙' : ''}</span><span class="w-val">${P.lost ? 'ab' : Math.round(P.hp)}<small>/${P.max}</small></span>
+    return `<button class="wound w-${st}${P.mech ? ' bp-mech' : ''}" data-part="${p}" ${click ? '' : 'tabindex="-1"'}${mn ? ` title="${mn}"` : ''}>
+      <span class="w-name">${PART_NAME[p]}${P.mech ? ' ⚙' : ''}${P.broken ? ' ✚' : ''}</span><span class="w-val">${P.lost ? 'ab' : Math.round(P.hp)}<small>/${P.max}</small></span>
       <span class="w-bar"><i style="width:${pct}%"></i></span><span class="w-state">${STATE_WORD[st]}</span></button>`;
   }).join('');
 }
