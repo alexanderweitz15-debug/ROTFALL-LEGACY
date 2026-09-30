@@ -547,7 +547,7 @@ Dauer der Folgen **je nach Schwierigkeit**: Leicht/Normal erholt sich die Welt n
 7. **Verletzungen (GEBAUT):** Brüche und Infektionen halten **Tage**, Heiler/Feldscher beschleunigt; Narben.
 8. **Akademie:** der Spieler wird **Student** (Semester, Vorlesungen, Rivalen, verbotene Abteilung als eigener Pfad).
 9. **Goblins nach der Befreiung:** Grubenhort wird **Außenposten** von Morrgrund. Belohnungen: Goblin-Titelklasse, Goblin-Gefährte, Goblin-Händler, Dodon als Gefährte — **Dodon zieht nur in das Dorf des Spielers**, wenn man eines hat. Ab dann kann man **Goblins rekrutieren** (einzelne Helden und Trupps). Goblins bauen **größere Städte südlich der Eisenfeste** (kartenabhängig): wachsen langsam von selbst, schneller mit Spielerhilfe; Stil gemischt aus Pilz-/Lehmhütten, umgebautem Kettenschrott und Tunneln/Gruben. Menschen reagieren **je nach Stadt** (Valen offen, Orden feindlich, Aurelion neugierig).
-10. **Epilog:** nur auf Wunsch am Grab; danach **Wahl des Spielers**: weiterspielen oder 20 Jahre später mit einem Erben.
+10. **Epilog (GEBAUT):** nur auf Wunsch am Grab; danach **Wahl des Spielers**: weiterspielen oder 20 Jahre später mit einem Erben.
 
 ## 5f. Sprites, Waffen, Animation — Nutzerentscheide (30.09.2026)
 
