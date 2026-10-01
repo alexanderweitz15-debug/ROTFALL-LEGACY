@@ -15,3 +15,7 @@
 | RB-009 | readRaw liefert null für komprimierten Slot, der nach dem Boot entstand (anderer Tab) | MEDIUM | state.js readRaw, game.js slotCards/continueGame | TESTING (Cache mit Rohwert, Nachentpacken bei Laden/Fortsetzen/Liste; live geprüft) |
 | RB-010 | Zollgesetz senkt das Überfallrisiko nie (economy.js:284 gegen game.js:9126) — Verdacht des Designers | ? | economy.js | zu prüfen in T09 |
 | RB-011 | Stand zwischen Tod und Erbenwahl gespeichert: lädt er richtig? — Annahme des Designers | ? | game.js continueGame | zu prüfen in T10 |
+| RB-013 | Sonnenbrand verteilt sich über Trefferzonen, kommt nur zu ~60 % an (Hunter 3) | HIGH | game.js hurt/vampTick | TESTING (Schadensart 'sun' trifft den Rumpf; Probe misst die Menge) |
+| RB-014 | Kult-Haken in die() fielen bei fernen/verbündeten Toten weg (Aldhelm-Tod ohne Folgen) | HIGH | game.js die | TESTING (Haken vor den Ausstieg gezogen) |
+| RB-015 | Licht im Bosskampf zählte während der Unverwundbarkeit gegen den Deckel | LOW | game.js aldhelmAI | TESTING |
+| RB-016 | Gemischte Zeilenenden in game.js durch die Bearbeitungshilfe | LOW | Werkzeug | VERIFIED (normalisiert, Hilfe korrigiert) |

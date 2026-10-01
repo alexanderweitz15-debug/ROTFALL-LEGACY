@@ -7,3 +7,4 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - 01.10.: Tageswechsel bleibt `if` (RB-007 abgelehnt).
 - 01.10.: Grafikstil F abgeschaltet statt gelöscht (Audit CUT). Vom Entwickler bestätigt (01.10.).
 - 01.10.: Cache-Schlüssel auf v=23 (Control: Commits sind öffentlich).
+- 01.10.: Trinken an Gefährten erlaubt wie im fixierten Entwurf §15 (Beziehung −20, Moral −15, beim zweiten Mal geht er) — Hunter-Hinweis, kein neues Design.

@@ -1571,7 +1571,7 @@ SPAWN_AREAS.push(
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
-const HUMANOID = new Set(['blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
+const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -1682,7 +1682,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     level: opts.level || Math.max(1, ri(1, 3) + (m.threat || 1) * 2),
     hp: m.hp, maxHp: m.hp, r: m.r, armor: m.threat, alive:true, seed: rnd() * 100,
     swing:0, atkCd:0, telegraph:0, aiState:'idle', aiTimer:0, anchor:{ x: pos.x, y: pos.y },
-    weaponKey: { goblin:'dagger', goblin_warrior:'axe', dodon:'mauerbrecher', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', blood_cultist:'dagger', blood_mage:'staff', thrall:'dagger', chalice_guard:'longsword', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff', bone_knight:'longsword', bone_archer:'shortbow', necromancer:'staff', ash_demon:'axe', shade:'dagger', death_knight:'greatsword', garmadon:'greatsword', angel_blade:'longsword', angel_archer:'shortbow', sea_raider:'entermesser', sea_harpooner:'harpune', whitebeard:'sturmanker' }[mtype] || null,
+    weaponKey: { goblin:'dagger', goblin_warrior:'axe', dodon:'mauerbrecher', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', blood_cultist:'dagger', aldhelm:'longsword', blood_mage:'staff', thrall:'dagger', chalice_guard:'longsword', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff', bone_knight:'longsword', bone_archer:'shortbow', necromancer:'staff', ash_demon:'axe', shade:'dagger', death_knight:'greatsword', garmadon:'greatsword', angel_blade:'longsword', angel_archer:'shortbow', sea_raider:'entermesser', sea_harpooner:'harpune', whitebeard:'sturmanker' }[mtype] || null,
     shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : mtype === 'bone_knight' ? { key:'kite_shield' } : null,
     faction: m.faction, boss: !!m.boss, ...opts,
   };
@@ -3369,7 +3369,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   let result = null, part = null;
   const brawlHit = target.brawl && source && (source.brawl || source === S.player);   // S12: Prügelei ohne Tote
   if (brawlHit) { dmg *= 0.5; if (source === S.player && S.brawls?.[target.brawlV]) S.brawls[target.brawlV].helped = target.brawlSide === 'dorf' ? 'kette' : 'dorf'; }
-  if (target.body) { part = brawlHit ? 'torso' : B.pickPart(source, target, crit); result = B.damagePart(target, part, dmg, crit);
+  if (target.body) { part = brawlHit || kind === 'sun' ? 'torso' : B.pickPart(source, target, crit);   /* RB-013: Sonnenbrand verteilt sich nicht auf Glieder */ result = B.damagePart(target, part, dmg, crit);
     if (kind === 'physical' && source && dmg > 0 && !brawlHit && (target === S.player || S.party.includes(target.id))) { const w = B.wearProsthesis(target, part);   // Roadmap P1: Verschleiß nur am getroffenen Glied, nicht durch Gift oder Blutung
       if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese (${B.PART_NAME[part]}) ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); }
       else if (w?.half && target === S.player) log(`Deine Prothese (${B.PART_NAME[part]}) knirscht: unter 50 % Zustand bringt sie nur noch den halben Vorteil. Spezialöl oder Feinwerkzeug an einer Werkbank helfen.`, 'party'); } }   /* Roadmap P4 */
@@ -3541,6 +3541,10 @@ function die(c, cause = 'Wunden', source) {
   }
   if (c.livestock && !c.herdCounted) { const H = c.livestock === 'player' ? S.settlement?.herd : ECO.herdOf(c.livestock); if (H?.[c.mtype] > 0) H[c.mtype]--; }   // S14: jedes tote Tier fehlt der Herde
   if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
+  /* §5g.2: Kult-Folgen vor dem Ausstieg für ferne/verbündete Tote — auch wer dem Kelch beitrat und Aldhelm herausfordert, beendet ihn */
+  if (c.cultThrall && S.cult) { const m = S.cult.missing.find(x => x.ent.id === c.cultThrall); if (m) { m.dead = true; chronicle(`${m.ent.name} aus Varonheim ist tot`, 'news', 'Als Blutknecht in den Katakomben gefallen.'); } }
+  if (c.mtype === 'aldhelm' && S.cult) cultEnd('destroyed');   /* §5g.2 */
+  if (c.cultHedda && S.cult) { S.cult.heddaDead = true; log('Hedda fällt. Der Kelch auf dem Altar ist plötzlich nur noch ein Becher.', 'quest'); } if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
   if (c.varonKing && !S.flags.varonDead) { S.flags.varonDead = S.day | 0; S.factions.valen = -100; chronicle('König Varon ist tot', 'legend', 'Der Thron im Norden ist leer. Kanzler Aldhelm regiert — bis ihn jemand daran hindert.'); UI.toast('KÖNIG VARON IST TOT', 3600); }   /* §5d.4 */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
@@ -3556,8 +3560,7 @@ function die(c, cause = 'Wunden', source) {
     const m = MONSTERS[c.mtype];
     log(`${m.name} fällt.`, 'combat');
     dropLoot(c); if (c.eliteKey) eliteDrop(c); if (c.mtype === 'blood_cultist' && cultOn()) cultClue('mask');   /* §5g.2 */
-    if (c.cultThrall && S.cult) { const m = S.cult.missing.find(x => x.ent.id === c.cultThrall); if (m) { m.dead = true; chronicle(`${m.ent.name} aus Varonheim ist tot`, 'news', 'Als Blutknecht in den Katakomben gefallen.'); } }
-    if (c.cultHedda && S.cult) { S.cult.heddaDead = true; log('Hedda fällt. Der Kelch auf dem Altar ist plötzlich nur noch ein Becher.', 'quest'); } if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
+    if (source?.alive && source.equip?.weapon?.key === 'kanzlerdegen' && (c.status || []).some(q => q.key === 'bleeding')) { B.heal(source, source.maxHp * 0.08); float(source, '+Blut', 'rgba(200,60,60,ALPHA)'); }   /* Kanzlerdegen */
     { const L = c.rboss === 'sandlord' ? 'sandfuerstenklinge' : c.alpha || c.rboss === 'alpha' ? 'leitwolfzahn' : null; if (L) dropItemAt(c.map, c.x, c.y + 12, mkItem(L)); }   /* Nutzer §5f: Legendäre der Regionalbosse */   /* Nutzer: sichere Beute der Mini-Bosse */
     const full = m.xp + c.level * 2, share0 = xpShares(c), pilots = partyMembers().filter(pm => pm.coopPilot);
     const pool = pilots.length ? share0(S.player.id) + pilots.reduce((a, pm) => a + share0(pm.id), 0) : 0;   /* Koop (Nutzer): Held und Gastfiguren teilen ihren Kampfanteil, jeder bekommt den ganzen */
@@ -3835,7 +3838,7 @@ function nearestTarget(e, list, maxD) {
   return best;
 }
 
-const VOICE = { blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
+const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
   bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek' };   // Phase 6
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
@@ -3946,6 +3949,7 @@ function updateEnemy(e, dt) {
   if (e.mtype === 'hrodvar') return frostKingAI(e, tgt, d, reach, sp, dt, m);
   if (e.mtype === 'whitebeard' && whitebeardAI(e, tgt, d, dt, m)) return;
   if (e.mtype === 'garmadon') return garmadonAI(e, tgt, d, reach, sp, dt, m);
+  if (e.mtype === 'aldhelm') return aldhelmAI(e, tgt, d, reach, sp, dt, m);   /* §5g.2 */
   if (e.mtype === 'omega') return omegaAI(e, tgt, d, reach, sp, dt, m);
   if (e.mtype === 'bandit' && banditAI(e, tgt, d, reach, sp, dt, m)) return;
   if (e.mtype === 'bandit_spear' && spearAI(e, tgt, d, reach, sp, dt, m)) return;
@@ -8238,7 +8242,7 @@ function buildVaronburg() {
   const put = (name, prof, tx, ty, o = {}) => { const c = makeChar({ name, prof, x: tx * TS + TS / 2, y: ty * TS + TS / 2, map: 'varonburg', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
     pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; S.ents.varonburg.push(c); return c; };
   if (!S.flags.varonDead) { const k = put('Varon', 'König', keep.cx, keep.y + 4, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
-  put('Aldhelm', 'Kanzler', keep.cx + 3, keep.y + 5, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
+  if ((S.cult?.stage || 0) < 4) put('Aldhelm', 'Kanzler', keep.cx + 3, keep.y + 5, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
   put('Brandt', 'Marschall', keep.cx - 4, keep.y + 6, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
   put('Ysmay', 'Spitzelmeisterin', east.cx, east.cy, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
   VARON_NOBLES.forEach(([n, pr], i) => { if ((S.flags.varonExecuted || []).includes(i)) return;   /* Bugfix: Gerichtete bleiben nach Neubau tot */
@@ -11121,7 +11125,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -12381,7 +12385,7 @@ function gradeTalk(npc) {
   const T = TITLE_CLASSES[key], r = gradeReady(p, key); if (!r) return null;
   return { text: `Weihe zum Grad ${r.g + 1}: „${T.gradeNames[r.g]}“`, fn: () => {
     if (!r.ok) return UI.dialogue(npc, `„Noch nicht. ${r.deeds < r.N.deeds ? `Taten: ${r.deeds} von ${r.N.deeds} — ${T.deed}.` : ''}${p.level < r.N.level ? ` Und du brauchst Stufe ${r.N.level}.` : ''}“`, [{ text: 'Ich komme wieder.', fn: () => UI.closeDialogue() }]);
-    (p.tgrade ||= {})[key] = r.g + 1; const neu = T.grades[r.g];
+    (p.tgrade ||= {})[key] = r.g + 1; const neu = T.grades[r.g]; if (key === 'vampire') cultGrade(r.g + 1);   /* §5g.2 Blutweihe */
     if (!p.titles.includes(T.gradeNames[r.g])) p.titles.push(T.gradeNames[r.g]);
     chronicle(`${p.name} wird ${T.gradeNames[r.g]}`, 'class', `${npc.name} weiht zum Grad ${r.g + 1} der ${T.name}.`);
     UI.toast(`${T.name.toUpperCase()} · GRAD ${r.g + 1}`, 4200); fx(p.x, p.y - 14, 'heal', 16);
@@ -12485,7 +12489,7 @@ function vampTick(c, dt) {
   if (sun > 0) {
     const k = sun * (bloodOf(c) >= 70 ? 1.5 : 1) * (c.downed ? 0.5 : 1);   /* Nutzer: am Boden brennt es halb weiter — die Gruppe muss dich in den Schatten holen */
     V.burn = (V.burn || 0) + s * 1.2 * k;
-    if (V.burn >= 1) { const n = Math.floor(V.burn); V.burn -= n; hurt(c, n, null, 'Sonnenlicht'); fx(c.x, c.y - 18, 'dust', 2); }
+    if (V.burn >= 1) { const n = Math.floor(V.burn); V.burn -= n; hurt(c, n, null, 'Sonnenlicht', false, 'sun'); fx(c.x, c.y - 18, 'dust', 2); }   /* RB-013: 'sun' trifft den Rumpf voll */
     addStatus(c, { key: 'sunburn', name: 'Sonnenbrand', left: 1500, desc: 'Die Sonne brennt: Schaden jede Sekunde, 20 % schwächere Schläge. Haus, Höhle, Kapuze oder Wolken helfen.' });
     vampHint(c, 'sun', 'Die Sonne brennt. Geh in ein Haus, unter die Erde, zieh eine Kapuze über — oder warte auf Wolken.');
   } else if (nightNow() && bloodOf(c) < 50 && !c.downed) { V.mend = (V.mend || 0) + s * 0.4; if (V.mend >= 1) { B.heal(c, Math.floor(V.mend)); V.mend %= 1; } }
@@ -12512,7 +12516,8 @@ const asleep = e => e.kind === 'npc' && e.villager && nightNow() && !e.vx && !e.
 function feedTarget(p) {
   const near = S.ents[p.map].filter(e => e !== p && dist(e, p) < 60 + (e.r || 10) && !S.party.includes(e.id));
   return near.find(e => e.alive && vampHuman(e) && (e.downed || e.surrendered || e.captive || e.shackled || asleep(e)))
-    || near.find(e => (e.alive && e.downed || e.kind === 'corpse') && MONSTERS[e.mtype]?.prey && !e.drained);
+    || near.find(e => (e.alive && e.downed || e.kind === 'corpse') && MONSTERS[e.mtype]?.prey && !e.drained)
+    || S.ents[p.map].find(e => e.alive && S.party.includes(e.id) && !e.coopHero && !e.robot && !isVamp(e) && vampHuman(e) && dist(e, p) < 60 + (e.r || 10));   /* Hunter-Befund: Gefährten als Spender — mit Preis */
 }
 function bloodSeen(p, v) {                                     /* Zeugen: diese Macht weiß jetzt, was du bist */
   const ws = S.ents[p.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && e !== v && !e.undead && e.faction !== 'undead' && e.faction !== 'blut' && !S.party.includes(e.id) && dist(e, p) < 280 && clearLine(e, p));
@@ -12681,6 +12686,7 @@ function buildCatacombs(from) {
   const fill = (x, y, rw, rh, t = T.DFLOOR) => { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) tiles[j * w + i] = t; };
   const R = { bein: [30, 54, 20, 12], pfer: [6, 34, 20, 14], arch: [54, 34, 20, 14], kelch: [28, 30, 24, 18] };
   for (const r of Object.values(R)) fill(...r);
+  const krypta = (S.cult?.stage || 0) >= 4; if (krypta) { fill(26, 6, 28, 18); fill(38, 24, 4, 6); }   /* Scheibe 4: nach der Enthüllung ist der Gang zur Krypta offen */
   fill(38, 48, 4, 6); fill(26, 39, 2, 4); fill(52, 39, 2, 4); fill(14, 48, 4, 10); fill(14, 56, 16, 3); fill(62, 48, 4, 10); fill(50, 56, 16, 3); fill(70, 30, 3, 4);
   const C = S.cult || {}, P = [], day = S.day | 0, prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'katakomben', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, ...o }; P.push(e); return e; };
   prop('portcullis', 40, 65, { portal: 'world', r: 14, label: 'Hinauf — Gruft am Friedhof' });
@@ -12688,6 +12694,8 @@ function buildCatacombs(from) {
   for (let i = 0; i < 6; i++) prop('bones', 32 + i * 3, 56 + (i % 2) * 6, { r: 6 });
   for (let i = 0; i < 4; i++) prop('cage', 8 + i * 5, 36, { solid: true, r: 12, cultCage: i });
   prop('altar_small', 40, 32, { solid: true, r: 12, label: 'Altar des Kelchs' }); for (const [x, y] of [[33, 33], [47, 33], [33, 45], [47, 45], [40, 46]]) prop('candles', x, y, { r: 6 });
+  if (krypta) { for (let i = 0; i < 6; i++) { prop('column', 30 + (i % 3) * 10, 9 + (i >> 1 & 1) * 0 + (i < 3 ? 0 : 11), { solid: true }); prop('candles', 31 + (i % 3) * 9, 12 + (i < 3 ? 0 : 8), { r: 6 }); }
+    for (const [x, y] of [[31, 10], [49, 10], [31, 20], [49, 20]]) prop('torch', x, y, { lightShaft: true, label: 'Lichtschacht' }); prop('desk', 40, 8, { solid: true, label: 'Pult des Kanzlers' }); }
   prop('desk', 63, 36, { solid: true, rite: 'cultseal', label: 'Pult der Kanzlei' }); prop('shelf', 56, 35, { solid: true }); prop('shelf', 70, 35, { solid: true }); prop('candles', 64, 46, { r: 6 });
   for (const [x, y] of [[31, 55], [48, 55], [7, 35], [24, 47], [55, 47], [29, 31], [50, 31]]) prop('torch', x, y, {});
   S.ents.katakomben = P; MAPS.katakomben.entry = from === 'varonburg' ? { x: 70 * TS, y: 33 * TS } : { x: 40 * TS, y: 62 * TS };
@@ -12705,6 +12713,9 @@ function buildCatacombs(from) {
         greet: C.joined ? '„Kind des Kelchs. Durstig? Ich habe, was du brauchst.“' : '„Ein Gast. Selten, dass jemand freiwillig so tief kommt. Bist du gekommen, um zu trinken — oder um zu sterben?“' });
       S.ents.katakomben.push(c); }
   }
+  if (krypta && !C.end) { const a = foe('aldhelm', 40, 12, { level: 16, title: 'Aldhelm, Blutfürst von Varonheim', boss: true }); if (a) a.name = 'Aldhelm'; }
+  if (C.allies && !C.end) { const at = MAPS.katakomben.entry; [['Brandt', 'Marschall'], ['Gardist', 'Königsgarde'], ['Gardist', 'Königsgarde']].forEach(([n, pr], i) => {
+    const g = guardChar('valen', { x: at.x + (i - 1) * 30, y: at.y - 20 }, pr, i ? 12 : 16); Object.assign(g, { map: 'katakomben', name: n, servant: S.player.id, pet: true, transient: true, brave: true, guard: false }); S.ents.katakomben.push(g); }); }
   indexSolids('katakomben'); return MAPS.katakomben.entry;
 }
 function ensureCatacombGate() {                                /* Eingang A am Friedhof: sichtbar, sobald der Weg bekannt ist */
@@ -12746,6 +12757,84 @@ function cultSealRite(t) {
   C.seal = S.day | 0; addItem(S.player, 'rotes_siegel', 1); UI.toast('ROTES SIEGEL', 3000);
   log('Im Pult der Kanzlei liegt das Rote Siegel — der Siegelring des Kanzlers. Mit diesem Beweis kann man zum König gehen. (Die Enthüllung folgt mit der nächsten Scheibe.)', 'quest');
   say('Unter Listen von Namen — Namen aus Varonheim — liegt ein Siegelring. Rotes Wachs in den Rillen. Das Wappen der Kanzlei. „A.“');
+}
+// ================= Blutkult: Aldhelm, der Blutfürst (§5g.2, Scheibe 4) =================
+// Enthüllung genau einmal: mit dem Roten Siegel beim König (Kamerafahrt am Hof, Marschall Brandt kommt mit), über Ysmay (ohne Szene)
+// oder von innen bei der Blutweihe (Grad II). Danach wartet Aldhelm in der Krypta. Seine Blutfesseln heilen ihn aus jedem noch
+// gefangenen Bürger — wer die Pferche vorher leert, kämpft leichter. Bei Tag fallen durch vier Schächte Lichtstreifen; im Licht brennt er.
+function cultReveal(how) {
+  const C = S.cult; if (!C || C.reveal != null) return false;
+  C.reveal = S.day | 0; C.revealHow = how; C.stage = Math.max(C.stage, 4); C.keyB = true; ensureCatacombGate();
+  chronicle('Kanzler Aldhelm ist der Blutfürst', 'news', how === 'king' ? 'Vor dem ganzen Hof bricht das Siegel in seiner Hand.' : how === 'inside' ? 'Bei der Blutweihe nimmt er die Maske ab.' : 'Die Spitzelmeisterin kennt das Siegel.');
+  log('Aldhelm, der Kanzler des Königs, ist der Herr des Kelchs. Er erwartet dich in der Krypta unter der Kelchhalle — der Gang ist jetzt offen.', 'quest'); UI.toast('ALDHELM IST DER BLUTFÜRST', 3600); return true;
+}
+function cultCourt() {                                         /* Beweis beim König: Kamerafahrt am Hof */
+  const vb = S.ents.varonburg || [], ald = vb.find(e => e.varonChancellor), king = vb.find(e => e.varonKing), p = S.player;
+  const at = (e, dy = 40) => e ? { map: 'varonburg', x: e.x, y: e.y + dy } : { map: p.map, x: p.x, y: p.y };
+  cinematic([
+    { ...at(king), dur: 2600, text: '„Majestät — Euer Kanzler siegelt mit Rot. Mit diesem Ring. Und mit dem Blut Eurer Stadt.“' },
+    { ...at(ald), dur: 2800, text: 'Aldhelm lächelt. Das Siegel bricht in seiner Hand. Eine nach der anderen verlöschen die Kerzen am Thron.', setup: () => { if (ald) { fx(ald.x, ald.y - 14, 'blood', 16); camShake(3, 300); } } },
+    { ...at(ald), dur: 2600, text: 'Als das Licht zurückkommt, ist er fort — durch die Geheimtür der Kanzlei. Marschall Brandt zieht das Schwert: „Ich komme mit.“',
+      setup: () => { S.ents.varonburg = (S.ents.varonburg || []).filter(e => !e.varonChancellor); cultReveal('king'); S.cult.allies = true; } },
+  ], () => { removeItem(p, 'rotes_siegel', 1); S.factions.valen = (S.factions.valen || 0) + 5; });
+}
+function cultCourtChoices(npc, choices) {
+  const C = S.cult, p = S.player; if (!C || C.reveal != null || C.end) return;
+  const say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]), seal = hasItem(p, 'rotes_siegel', 1);
+  if (npc.varonKing && C.stage >= 2) choices.unshift({ text: seal ? 'Majestät, Euer Kanzler … (das Rote Siegel zeigen)' : 'Majestät, Euer Kanzler steckt hinter den Verschwundenen.', fn: () => {
+    if (seal) { UI.closeDialogue(); return cultCourt(); }
+    S.factions.valen = (S.factions.valen || 0) - 5; C.heat = (C.heat || 0) + 1; C.warned = true;
+    say('„Ohne Beweis? Gegen den Mann, der mein Reich zusammenhält? Geh, bevor ich es mir anders überlege.“ (Valen −5. Aldhelm weiß jetzt, dass du suchst.)'); } });
+  if (npc.varonSpy && seal) choices.unshift({ text: 'Ysmay, kennst du dieses Siegel?', fn: () => { cultReveal('ysmay');
+    say('„Rotes Wachs. Nur eine Hand am Hof siegelt so. Ich gehe damit nicht zum König — wer es tut, verschwindet. Aber du … du weißt jetzt, wo er wohnt. Unter der Kanzlei.“'); } });
+}
+function cultGrade(g) { if (g >= 2 && S.cult?.joined != null && cultReveal('inside')) log('Bei der Blutweihe nimmt der Herr des Kelchs die Maske ab: Kanzler Aldhelm. „Überrascht? Der König unterschreibt alles. Auch das hier.“', 'quest'); }
+function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
+  const C = S.cult || {}, now = performance.now();
+  if (!C.introSeen && d < 320 && tgt === S.player && !S.cine) { C.introSeen = true;
+    return cinematic([{ map: e.map, x: 40 * TS, y: 18 * TS, dur: 2200, text: 'Die Krypta des Kanzlers. Sechs Säulen, sechs Kerzen. Durch Gitter oben fällt der Markt herein.' },
+      { map: e.map, x: e.x, y: e.y + 40, dur: 2600, text: '„Der König unterschreibt alles, was ich ihm hinlege. Heute unterschreibst du.“' },
+      { map: e.map, x: e.x, y: e.y + 40, dur: 1800, text: 'ALDHELM — BLUTFÜRST VON VARONHEIM', setup: () => { camShake(4, 300); fx(e.x, e.y - 14, 'blood', 14); } }]); }
+  if (!e.phase) e.phase = 1;
+  const caged = (C.missing || []).filter(x => !x.freed && !x.thrall && !x.dead);
+  const mend = n => { if (e.body) B.heal(e, n); else e.hp = Math.min(e.maxHp, e.hp + n); };
+  if (e.phase < 3 && caged.length && e.hp < e.maxHp) { mend(e.maxHp * 0.004 * caged.length * dt / 1000);
+    if (!C.fetterHint) { C.fetterHint = true; UI.toast('ER TRINKT AUS DEN KÄFIGEN', 2600); log(`Rote Fäden laufen von Aldhelm zu den Pferchen: ${caged.length} Gefangene nähren ihn. Öffne die Käfige — dann reißen die Fäden.`, 'combat'); } }
+  const day = hourNow() >= 6 && hourNow() < 19, shaft = day && S.ents[e.map].find(s => s.lightShaft && Math.hypot(s.x - e.x, s.y - e.y) < 46);
+  if (shaft && !e.invuln && (e.lightDmg || 0) < e.maxHp * 0.25) { const n = e.maxHp * 0.03 * dt / 1000; e.lightDmg = (e.lightDmg || 0) + n; hurt(e, n, null, 'Licht', false, 'magic'); e.telegraph = 0; e.windup = false; if (!e.lightT || now > e.lightT) { e.lightT = now + 900; float(e, 'Licht!', 'rgba(255,240,180,ALPHA)'); } }
+  if (e.phase === 1 && e.hp <= e.maxHp * 0.6) { e.phase = 2; e.roar = 1000; e.invuln = true; e.special = null;
+    log(`${m.name}: „Genug Höflichkeit.“ Er wirft die Robe ab.`, 'combat'); UI.toast('DER BLUTFÜRST', 2200); camShake(6, 350);
+    for (let i = 0; i < 2; i++) { const g = spawnEnemy('thrall', e.map, (e.x / TS | 0) + (i ? 3 : -3), (e.y / TS | 0) + 2, { level: 12 }); if (g) Object.assign(g, { transient: true, aggroId: tgt.id, aiState: 'pursue' }); } }
+  if (e.phase === 2 && e.hp <= e.maxHp * 0.3) { e.phase = 3; e.roar = 1000; e.invuln = true; e.special = null;
+    let n = 0; for (const x of caged) { x.dead = true; n++; chronicle(`${x.ent.name} aus Varonheim ist tot`, 'news', 'Aldhelm trank ihn im Kampf leer.'); }
+    S.ents[e.map] = S.ents[e.map].filter(c => !c.cultCaptive || !caged.some(x => x.ent.id === c.cultCaptive));
+    if (n) mend(e.maxHp * 0.1 * n); log(`${m.name} trinkt aus dem Kelch${n ? ` — und aus ${n} Gefangenen` : ''}. Er wird schneller.`, 'combat'); UI.toast('DER KELCH', 2200);
+    if (isVamp(tgt) && (tgt.attributes?.willpower || 10) < 14) { (tgt.vamp ||= {}).frenzyT = now + 1500; float(tgt, 'Blutruf', 'rgba(200,60,60,ALPHA)'); } }
+  if (e.roar > 0) { e.roar -= dt; e.vx = e.vy = 0; if (e.roar <= 0) e.invuln = false; return; }
+  const fast = e.phase === 3 ? 1.3 : 1, sa = e.special;
+  if (sa?.kind === 'mist') { sa.t -= dt; e.vx = e.vy = 0; if (sa.t <= 0) { e.special = null; const a = tgt.aim ?? 0; fx(e.x, e.y - 10, 'ghost', 10); e.x = tgt.x - Math.cos(a) * 40; e.y = tgt.y - Math.sin(a) * 40; fx(e.x, e.y - 10, 'ghost', 10); e.atkCd = 0; } return; }
+  if (sa?.kind === 'seal') { sa.t -= dt; if (sa.t <= 0) { e.special = null; for (const s of sa.spots) { fx(s.x, s.y - 6, 'blood', 10); for (const t of combat) if (t.alive && t !== e && isHostile(e, t) && Math.hypot(t.x - s.x, t.y - s.y) < 44) { if (t.invuln) evaded(t); else areaHit(e, t, 0.8); } } } }
+  e.mistCd = (e.mistCd ?? 6000) - dt; e.sealCd = (e.sealCd ?? 5000) - dt;
+  if (e.phase >= 2 && !e.special && e.mistCd <= 0) { e.mistCd = 6500; e.special = { kind: 'mist', t: 600 }; float(e, 'Nebel …', 'rgba(220,220,230,ALPHA)'); return; }
+  if (e.phase >= 2 && !e.special && e.sealCd <= 0) { e.sealCd = 5500; const spots = [{ x: tgt.x, y: tgt.y }]; for (let i = 0; i < 2; i++) spots.push({ x: tgt.x + ri(-100, 100), y: tgt.y + ri(-70, 70) });
+    e.special = { kind: 'seal', t: 700, spots }; for (const s of spots) S.fx.push({ x: s.x, y: s.y, vx: 0, vy: 0, type: 'ring', s: 1.1, life: 700, maxLife: 700 }); }
+  if (d > reach * 0.8) { seek(e, e.aim, sp * fast, dt, tgt); return; }
+  e.vx = e.vy = 0;
+  if (e.atkCd <= 0 && e.swing <= 0) {
+    if (e.telegraph <= 0 && !e.windup) { e.windup = true; e.telegraph = m.telegraph / fast; return; }
+    if (e.telegraph > 0) return;
+    e.windup = false; e.atkCd = m.atk / fast; e.swingDur = m.atk * 0.5 / fast; e.swing = 0.001; e.hitDone = false; e.enemySwing = true;
+  }
+}
+function cultEnd(kind) {
+  const C = S.cult; if (!C || C.end) return; C.end = kind; C.stage = 5; AF().cult = { end: kind, day: S.day | 0 };
+  if (kind === 'destroyed') {
+    for (const m of C.missing) if (!m.freed && !m.thrall && !m.dead) { m.freed = true; const E = m.ent, home = E.anchor || { x: TOWN_PLAN.varonheim.square[0] * TS, y: TOWN_PLAN.varonheim.square[1] * TS };
+      Object.assign(E, { map: 'world', alive: true, downed: false, x: home.x, y: home.y }); S.ents.world.push(E); }
+    S.factions.valen = (S.factions.valen || 0) + 15; S.flags.ysmayChancellor = 1; C.heat = 0; cultProps();
+    S.ents.world = S.ents.world.filter(e => !e.cultNight);
+    afterSay('Der Blutfürst ist tot', 'Aldhelm ist tot, der Kelch zerbrochen. Die Gefangenen kehren nach Varonheim zurück. Ysmay wird Kanzlerin; die Audienz beim König kostet kein Gold mehr.', 'battle');
+  }
 }
 // Ausweichen im letzten Moment (Hieb, Geschoss oder Flächenangriff hätte getroffen): einmal je Rolle. Zählt für die Probe
 // der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
@@ -12856,6 +12945,10 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
       fx(t.x, t.y - 14, 'blood', 12); sfx('hit', 0.4);
       if (!vampHuman(t)) { t.drained = true; setBlood(p, Math.max(Math.min(bloodOf(p), 50), bloodOf(p) - 10)); log('Tierblut. Es füllt, aber es sättigt nicht.', 'party'); return true; }
       setBlood(p, bloodOf(p) - 45);
+      if (S.party.includes(t.id)) { const n = (V.compFed ||= {})[t.id] = (V.compFed[t.id] || 0) + 1; if (t.key) S.relations[t.key] = (S.relations[t.key] || 0) - 20; t.morale = Math.max(0, (t.morale ?? 50) - 15);
+        fed[t.id] = day; addStatus(t, { key: 'drained', name: 'Ausgezehrt', left: 1440000, desc: 'Blass und schwach.' });
+        if (n >= 2) { log(`${t.name}: „Nie wieder. Such dir jemand anderen — ich gehe.“`, 'party'); dismiss(t); } else log(`${t.name} lässt es geschehen und sieht dich danach lange nicht an. (Beziehung −20, Moral −15; ein zweites Mal, und er geht.)`, 'party');
+        return true; }
       if (fed[t.id] === day) { log(`${t.name || 'Das Opfer'} hält ein zweites Mal nicht aus.`, 'death'); die(t, 'Ausgeblutet', p); if (t.kind === 'npc') bloodshed(t, false); }
       else { fed[t.id] = day; addStatus(t, { key: 'drained', name: 'Ausgezehrt', left: 1440000, desc: 'Blass und schwach. Ein zweites Mal heute wäre tödlich.' }); float(t, 'ausgezehrt', 'rgba(200,170,170,ALPHA)'); }
       for (const m of partyMembers()) if (dist(m, p) < 300 && !isVamp(m)) { m.morale = Math.max(0, (m.morale ?? 50) - 10); float(m, 'Bei den Göttern …', 'rgba(200,180,160,ALPHA)'); }
@@ -13817,6 +13910,12 @@ function debugSections() {
       'Katakomben betreten': () => { ensureBloodCult(); if ((S.cult.stage || 0) < 3) Object.assign(S.cult, { stage: 3, gateA: true }); ensureCatacombGate(); if (S.map !== 'world') travel('world'); travel('katakomben'); },
       'Gefangene werden Knechte (6 Tage vorspulen)': () => { for (const m of S.cult?.missing || []) m.day -= 7; cultHour(12); UI.toast('Verwandelt'); },
       'Rotes Siegel geben': () => { addItem(p, 'rotes_siegel', 1); if (S.cult) S.cult.seal = S.day | 0; },
+    }],
+    ['Blutkult: Aldhelm (§5g.2, Scheibe 4)', '', {
+      'Enthüllen (wie über Ysmay)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 3); cultReveal('ysmay'); },
+      'Hofszene mit Siegel': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 2); addItem(p, 'rotes_siegel', 1); if (S.map !== 'varonburg') { if (S.map !== 'world') travel('world'); travel('varonburg'); } cultCourt(); },
+      'In die Krypta (Bosskampf)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 3); cultReveal('ysmay'); if (S.map !== 'world') travel('world'); travel('katakomben'); const q = freeSpotNear('katakomben', 40, 26, 2); P().x = q.x; P().y = q.y; },
+      'Kult zerschlagen (Ausgang)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); cultEnd('destroyed'); },
     }],
     ['Spielstand (Audit D6)', '', {
       'Größe messen und Rundlauf prüfen': async () => { const t0 = performance.now(), str = saveData(), t1 = performance.now(), z = await zipSave(str), t2 = performance.now(), back = await unzipSave(z);
@@ -16690,7 +16789,7 @@ export function selftest() {
       p.map = 'world'; p.x = 20 * TS; p.y = 20 * TS; S.weather = 'clear'; S.minute = 12 * 60; const noon = sunOn(p);
       S.weather = 'fog'; const fog = sunOn(p); S.weather = 'clear'; p.equip.head = mkItem('totenrufer_kapuze'); const hood = sunOn(p); p.equip.head = null;
       S.minute = 0; const night = sunOn(p); S.minute = 12 * 60;
-      const h0 = p.hp; vampTick(p, 5000); const burnt = p.hp < h0 && stat(p, 'sunburn');
+      const h0 = p.hp; vampTick(p, 5000); const burnt = h0 - p.hp >= 5 && stat(p, 'sunburn');   /* RB-013: 1,2/s × 5 s ≈ 6 voll */
       S.minute = 0; p.status = []; setBlood(p, 30); vampTick(p, 60000); const thirst = Math.abs(bloodOf(p) - 34) < 0.2;
       return schema && got && noon > 0.9 && Math.abs(fog - 0.3) < 0.01 && Math.abs(hood - 0.5) < 0.01 && night === 0 && burnt && thirst;
     } finally { S.weather = W0; }
@@ -16756,6 +16855,21 @@ export function selftest() {
       cultSealRite(S.ents.katakomben.find(e => e.rite === 'cultseal')); UI.closeDialogue(); const seal = hasItem(p, 'rotes_siegel', 1) && S.cult.seal != null;
       return turned && exits && !!cap && !!thr && freed && joined && seal;
     } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.growth = G0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
+  }));
+  ok('Blutkult S4: Enthüllung genau einmal; Krypta mit Aldhelm; Fesseln heilen ihn je Gefangenem; Phase 2 bei 60 %; Licht brennt ihn bei Tag; sein Tod zerschlägt den Kult (Gefangene heim, cultWar aus)', sandbox(() => {
+    const p = stage(), C0 = S.cult ? structuredClone(S.cult) : null, W0 = S.ents.world, K0 = S.ents.katakomben, M0 = MAPS.katakomben, G0 = structuredClone(S.growth || {}), A0 = structuredClone(S.after || {}), min0 = S.minute;
+    S.ents.world = W0.slice();
+    try {
+      S.cult = { stage: 3, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; const v1 = cultTake();
+      const once = cultReveal('ysmay') && !cultReveal('king') && S.cult.stage === 4 && S.cult.revealHow === 'ysmay';
+      buildCatacombs('world'); const a = S.ents.katakomben.find(e => e.mtype === 'aldhelm'), M = MONSTERS.aldhelm; if (!a) return false;
+      S.cult.introSeen = true; S.minute = 0; hurt(a, a.maxHp * 0.2, null, 'Probe'); const h1 = a.hp; aldhelmAI(a, p, 600, M.reach, 1, 1000, M); const fed = a.hp > h1;
+      hurt(a, a.hp - a.maxHp * 0.55, null, 'Probe'); aldhelmAI(a, p, 600, M.reach, 1, 16, M); const ph2 = a.phase === 2;
+      S.minute = 12 * 60; a.roar = 0; a.invuln = false; const sh = S.ents.katakomben.find(e => e.lightShaft); a.x = sh.x; a.y = sh.y; const h2 = a.hp; aldhelmAI(a, p, 600, M.reach, 1, 1000, M); const burnt = a.hp < h2 && a.lightDmg > 0;
+      die(a, 'Probe', p); const end = S.cult.end === 'destroyed' && S.after.cult?.end === 'destroyed' && !cultWar() && S.ents.world.includes(v1);
+      if (!(once && fed && ph2 && burnt && end)) console.warn('S4DBG', JSON.stringify({ once, fed, ph2, burnt, end, h1, h2, hp: a.hp, max: a.maxHp, ld: a.lightDmg, ce: S.cult.end, ae: S.after.cult, war: cultWar(), home: S.ents.world.includes(v1) }));
+      return once && fed && ph2 && burnt && end;
+    } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.growth = G0; S.after = A0; S.minute = min0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
   }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };

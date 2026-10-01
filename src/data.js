@@ -325,6 +325,8 @@ export const ITEMS = {
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
+  kanzlerdegen: { name:'Kanzlerdegen „Rotes Siegel“', slot:'weapon', wtype:'sword', dmg:18, reach:48, arc:1.5, speed:450, stam:7, bleed:0.3, rarity:'legendary', unique:true, value:1000, skill:'onehanded', desc:'Aldhelms Degen. Wer einen Blutenden damit fällt, trinkt ein wenig von ihm: +8 % Leben.' },   /* §5g.2 */
+  kanzlerrobe: { name:'Robe des Kanzlers', slot:'chest', armor:6, rarity:'epic', value:420, desc:'Schwarzer Samt, rotes Futter. Nachts wärmer, als sie sein sollte.' },
   rotes_siegel: { name:'Rotes Siegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Ein Siegelring aus dunklem Gold, rotes Wachs in den Rillen. Das Wappen der Kanzlei von Varonheim. Wer damit siegelt, spricht für den Kanzler.' },   /* §5g.2 Beweis */
   blutmaske:  { name:'Blutmaske', slot:'material', stack:9, rarity:'uncommon', value:15, lore:'Wachs, rot gefärbt, mit Augenlöchern. Sie riecht nach Kerzen und Eisen.' },   /* §5g.2 Spur */
   blutphiole: { name:'Blutphiole', slot:'consumable', use:'blood', stack:5, rarity:'uncommon', value:40, lore:'Dunkel, dick, noch warm. Für die einen ein Beweis, für die anderen ein Mahl.' },   /* §5g.2 */
@@ -410,6 +412,7 @@ export const LOOT = {
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
   crypt_warden:[['kettenbeinlinge',0.15],['talisman_waechter',0.08],['knochenspalter',0.3],['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
   death_captain:[['elixier_stein',0.15],['elixier_wacht',0.2],['panzerhandschuhe',0.15],['beinschienen',0.12],['talisman_toten',0.1],['totenmuenze',0.02],['totenglocke',0.3],['legionaersplatte',0.3],['bone',1],['chain_hauberk',0.5],['iron_helm',0.4],['potion',0.8],['flail',0.3]],
+  aldhelm:    [['blutphiole',1],['potion',1]],
   blood_mage: [['blutphiole',0.5],['blutmaske',0.3],['staff',0.05]],
   thrall:     [['bread',0.2],['bandage',0.2]],
   chalice_guard: [['blutphiole',0.6],['kite_shield',0.1],['chain_hauberk',0.06]],
@@ -433,6 +436,7 @@ export const LOOT = {
 // Je Tod: 90 % eine Waffe aus weapons, 60 % ein Teil aus armor, 25 % ein Stück aus unique (sonst nichts davon).
 // Waffen und Rüstung aus LOOT[boss] zählen bei Bossen nicht mehr einzeln, alles andere (Tränke, Schlüssel, Karten) schon.
 export const BOSS_LOOT = {
+  aldhelm:      { weapons:['kanzlerdegen'], armor:['kanzlerrobe'], unique:['kanzlerdegen'] },   /* §5g.2 */
   whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel'], unique:['sturmanker'] },
   chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen'], unique:['roter_henker'] },
   gorak:        { weapons:['gorak_cleaver', 'mauerbrecher'], armor:['grubenkoenig', 'schrotthelm'], unique:['gorak_cleaver'] },
@@ -481,6 +485,7 @@ export const MONSTERS = {
   acad_dummy:  { name:'Übungspuppe', interiors:false, hp:1, dmg:0, speed:0, reach:0, atk:99999, xp:0, sight:0, r:11, threat:0, pal:{skin:'#c8a868',cloth:'#8a6a3a',metal:'#5a4a30'} },
   acad_student:{ name:'Student der Akademie', interiors:false, hp:60, dmg:6, speed:1.2, reach:240, atk:1600, ranged:true, missile:'shadow', xp:0, sight:320, r:11, threat:1, spells:['sp_spark', 'sp_froststrike'],
                  pal:{skin:'#d8b89a',cloth:'#2c3a6a',metal:'#8a7a50',glow:'#9fd0ff'} },
+  aldhelm:    { name:'Aldhelm, Blutfürst von Varonheim', hp:380, dmg:21, speed:1.3, reach:40, atk:1400, telegraph:600, xp:450, sight:400, r:13, boss:true, threat:4, faction:'blut', interiors:true, role:'Endgegner', pal:{skin:'#e0ccc0',cloth:'#141014',metal:'#7a2228'} },   /* §5g.2 Boss */
   blood_mage: { name:'Blutmagier', hp:38, dmg:12, speed:1.1, reach:250, atk:1700, ranged:true, missile:'shadow', leech:0.4, xp:32, sight:300, r:11, threat:2, faction:'blut', interiors:true, role:'Fernkampf', pal:{skin:'#d0bcb0',cloth:'#3a0a10',metal:'#7a2228'} },   /* §5g.2: sein Geschoss heilt ihn */
   thrall:     { name:'Blutknecht', hp:34, dmg:8, speed:1.25, reach:30, atk:850, xp:14, sight:240, r:11, threat:1, faction:'blut', interiors:true, role:'Masse', pal:{skin:'#c8b0a8',cloth:'#4a3a30',metal:'#5a4a40'} },
   chalice_guard: { name:'Kelchwächter', hp:120, dmg:16, speed:1.0, reach:40, atk:1500, telegraph:550, xp:70, sight:260, r:13, threat:3, faction:'blut', interiors:true, role:'Elite', pal:{skin:'#c8b4a8',cloth:'#2a0a0e',metal:'#5a1a1e'} },
