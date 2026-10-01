@@ -1951,8 +1951,9 @@ function rescaleSave(fresh) {
   Object.assign(S.flags, { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, rescale: false });
   log('Die Welt ist weiter geworden. (Spielstand auf die größere Karte umgerechnet.)', 'world');
 }
-export function continueGame(given = null) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
-  const data = given || loadRaw(); if (!data) return;
+export function continueGame(given = null, retried = false) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
+  if (!given && !retried && readRaw() == null && localStorage.getItem(SAVE_KEY)) return void unpackAll().then(() => continueGame(null, true));   /* RB-009: in einem anderen Tab gepackt */
+  const data = given || loadRaw(); if (!data) { if (retried) UI.toast?.('Spielstand nicht lesbar.', 3000); return; }
   const gone = data.propsGone; delete data.propsGone;
   applySave(data); applyDifficulty();                                  /* S15 P12 */
   if (!given) for (const l of Object.values(S.ents)) for (const e of [...l]) if (e.coopHero) parkCoopHero(e);   /* Koop: Gastcharaktere warten, bis ihr Spieler wieder verbunden ist */
@@ -17029,9 +17030,11 @@ function titleLoop(t) {
 // Koop K2: alles, was src/coop.js aus dem Spiel braucht, an einer Stelle (kein zweiter Import-Kreis)
 // Nutzer (30.09.2026): Spielstände. Liste je Art (Einzelspieler / Koop), jede Karte mit Held, Haus, Stufe, Tag, Generation und
 // Erfolgs-Symbolen (Garmadon tot = Schädel usw., Tooltip nennt den Erfolg). Laden setzt den aktiven Platz, Löschen fragt nach.
-function slotCards(mode, onLoad) {
+function slotCards(mode, onLoad, again = true) {
   const idx = slotIndex(), list = Object.values(idx).filter(x => (x.mode || 'single') === mode).sort((a, b) => (b.at || 0) - (a.at || 0));
-  for (const x of list) if (x.name == null) { try { Object.assign(x, slotMetaFrom(JSON.parse(readRaw(slotKey(x.id))))); } catch (e) { x.name = '?'; } }   /* alter Stand ohne Übersicht */
+  let pending = false;   /* RB-009: gepackter Stand aus einem anderen Tab — erst entpacken, dann neu zeigen */
+  for (const x of list) if (x.name == null) { const r = readRaw(slotKey(x.id)); if (r == null && localStorage.getItem(slotKey(x.id))) { x.name = '…'; pending = true; continue; }
+    try { Object.assign(x, slotMetaFrom(JSON.parse(r))); } catch (e) { x.name = '?'; } }   /* alter Stand ohne Übersicht */
   const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
   const html = list.length ? list.map(x => `<div class="slot-card${x.id === SLOT ? ' active' : ''}"><div class="sl-head"><b>${esc(x.name)}</b> <span>${esc(x.house ? 'Haus ' + x.house : '')}</span></div>
     <div class="sl-sub">Stufe ${x.level || 1} · Tag ${x.day || 1} · Generation ${x.gen || 1}${x.dead ? ' · gefallen' : ''}${x.at ? ' · ' + new Date(x.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>
@@ -17039,7 +17042,8 @@ function slotCards(mode, onLoad) {
     <div class="sl-act"><button class="plaque" data-load="${x.id}">${mode === 'coop' ? 'Hosten' : 'Laden'}</button><button class="plaque ghost" data-del="${x.id}">Löschen</button></div></div>`).join('')
     : `<p class="ledger">Noch kein ${mode === 'coop' ? 'Koop-' : ''}Spielstand.</p>`;
   const wrap = document.createElement('div'); wrap.className = 'slot-list'; wrap.innerHTML = html;
-  wrap.querySelectorAll('[data-load]').forEach(b => b.onclick = () => onLoad(b.dataset.load));
+  wrap.querySelectorAll('[data-load]').forEach(b => b.onclick = async () => { await unpackAll(); onLoad(b.dataset.load); });   /* RB-009: Stand frisch entpacken (anderer Tab) */
+  if (pending && again) unpackAll().then(() => { if (wrap.isConnected) wrap.replaceWith(slotCards(mode, onLoad, false)); });   /* nur ein Versuch: kaputter Stand bleibt „…“ */
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const x = idx[b.dataset.del]; if (!confirm(`Spielstand „${x?.name || '?'}“ endgültig löschen?`)) return; deleteSlot(b.dataset.del); wrap.replaceWith(slotCards(mode, onLoad)); });
   return wrap;
 }
