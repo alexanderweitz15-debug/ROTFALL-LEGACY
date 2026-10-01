@@ -2107,7 +2107,7 @@ function telegraphArc(e, R, half, now) {
 
 // Leichen: kurze Sterbeanimation (Treffer → Knien → Fallen), dann liegend, Blutlache wächst.
 function drawCorpse(e, now) {
-  const age = e.born ? Math.max(0, now - e.born) : 9999;   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
+  const age = e.born ? Math.max(0, now - e.born) / (e.slow || 1) : 9999;   /* T10: der Held fällt in Zeitlupe */   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
   ctx.globalAlpha = clamp(e.life / 1000, 0, 1);
   const D = e.dc && ANIM_DEFS.death[e.dc];                  /* Roadmap P8: Blutlache nur bei blutigen Toden */
   if (!D || D.pool) { const pool = Math.min(14, 5 + age / 70);

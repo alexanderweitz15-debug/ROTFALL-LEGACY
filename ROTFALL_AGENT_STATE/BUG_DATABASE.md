@@ -25,3 +25,4 @@
 | RB-020 | Befreite Verschwundene konnten erneut entführt werden (Hunter 4; dort RB-018 genannt) | MEDIUM | game.js cultTake | TESTING |
 | RB-021 | Balance-Messung Aldhelm mit `ehp` umging den Boss-Faktor ×2 (Grundleben 560 war zu hoch) | MEDIUM | data.js aldhelm, docs/BALANCE.md | TESTING (Grundleben 340, 8 Seeds nachgemessen) |
 | RB-022 | Proben sicherten nur `S.prices`; nach T09 verändern Ereignisse Stadtlager und Zoll | LOW | Selbsttest | TESTING (Sicherungen erweitert, BUG-123 grün) |
+| RB-023 | Stirbt König Varon, fällt Valen auf −100 — egal wer ihn tötet (`game.js` die, `source` ungeprüft; Designer-Befund) | MEDIUM | game.js die | OPEN (gehört zu Varonheim-Belagerung / Rote Krönung) |

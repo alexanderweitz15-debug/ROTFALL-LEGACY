@@ -12,7 +12,7 @@ import * as SP from './sprites.js?v=23';
 import * as ECO from './economy.js?v=23';
 import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=23';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=23';
-import { sfx, ambience, ambienceTick } from './sfx.js?v=23';
+import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=23';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -2141,7 +2141,7 @@ function loop(now) {
   try {
     if (hitStop > 0) hitStop -= dt;                             // Hit-Stop: Welt steht kurz, Bild läuft weiter
     else if (S.coop?.role === 'guest') coopHooks.guestTick?.(dt, now);   /* Koop K2: der Gast rechnet keine Welt, nur Bild und Eingabe */
-    else if (!S.paused) update(dt, now);
+    else if (!S.paused) update(S.dying ? dt * 0.25 : dt, now);   /* T10: Heldentod in Zeitlupe */
     R.drawFrame(now);
   }
   catch (err) { if (!loop.failed) { loop.failed = true; console.error(err); log('Interner Fehler: ' + err.message, 'world'); } }
@@ -2338,6 +2338,7 @@ function stepHidden() {
 }
 const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
 function update(dt, now) {
+  if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
   const p = S.player;
   coopHooks.hostTick?.(dt);
   // Zeit
@@ -3335,6 +3336,7 @@ function hit(attacker, target, mult, kind = 'physical') {
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
   if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */
+  if (S.dying && (target === S.player || S.party.includes(target.id))) return;   /* T10: im Todesmoment stirbt niemand von der Gruppe */
   if (target.disguised && !target.unmasked && source) { target.unmasked = true; float(target, 'Maskierter!', 'rgba(200,60,60,ALPHA)'); }   /* §5g.2: gestellt */   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
@@ -3544,6 +3546,7 @@ function die(c, cause = 'Wunden', source) {
   }
   if (c.livestock && !c.herdCounted) { const H = c.livestock === 'player' ? S.settlement?.herd : ECO.herdOf(c.livestock); if (H?.[c.mtype] > 0) H[c.mtype]--; }   // S14: jedes tote Tier fehlt der Herde
   if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
+  if (c.nemesisId) nemesisSlain(c, source);   /* T10 Ahnenfeind */
   /* §5g.2: Kult-Folgen vor dem Ausstieg für ferne/verbündete Tote — auch wer dem Kelch beitrat und Aldhelm herausfordert, beendet ihn */
   if (c.cultThrall && S.cult) { const m = S.cult.missing.find(x => x.ent.id === c.cultThrall); if (m) { m.dead = true; chronicle(`${m.ent.name} aus Varonheim ist tot`, 'news', 'Als Blutknecht in den Katakomben gefallen.'); } }
   if (c.mtype === 'aldhelm' && S.cult) cultEnd(S.cult.challenge ? 'player' : 'destroyed');   /* §5g.2: wer ihn als Kind des Kelchs trinkt, wird Blutfürst */
@@ -3854,6 +3857,8 @@ function updateEnemy(e, dt) {
   if (e.servant && !e.pet && (performance.now() > e.until || !byId(e.servant)?.alive)) return crumble(e);   // der Ruf verklingt
   if (e.minionOf && !byId(e.minionOf)?.alive) return crumble(e);   // Phase 6: stirbt der Nekromant, zerfallen seine Diener
   if (e.prisoner) return captiveTick(e, dt);   /* T08 */
+  if (S.dying && S.dying.killer === e.id) { e.vx = e.vy = 0; e.swing = 0; e.telegraph = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x);   /* T10: der Mörder bleibt stehen und zeigt auf den Toten */
+    if (!S.dying.shown) { S.dying.shown = true; gesture(e, 'zeigen', 1600, p); if (HUMANOID.has(e.mtype) && MONSTERS[e.mtype].faction !== 'undead') float(e, 'Bleib liegen.', 'rgba(220,200,180,ALPHA)'); else sfx(MONSTERS[e.mtype].faction === 'undead' ? 'rattle' : 'growl', 0.8, 1); } return; }
   const far = dist(e, p) > 1100;
   if (far) { e.vx = e.vy = 0; return; }                       // Stufe C: außerhalb der Sicht keine Simulation
   const m = MONSTERS[e.mtype];
@@ -7068,7 +7073,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -8928,6 +8933,8 @@ function camAim(p, dt) {
     const f = shot.focus == null ? null : typeof shot.focus === 'object' ? shot.focus : byId(shot.focus);
     return f && f.x != null ? { x: f.x, y: f.y - 12 } : { x: p.x, y: p.y };
   }
+  if (S.dying) { const D = S.dying, k = D.killer && byId(D.killer); R.cam.cz = 0; R.cam.cineZ = (R.cam.cineZ || 1) + (1.4 - (R.cam.cineZ || 1)) * Math.min(1, dt / 600); R.cam.zoom = (R.cam.base || 1.3) * R.cam.cineZ;   /* T10 */
+    return k && k.alive && dist(k, p) < 160 ? { x: (p.x + k.x) / 2, y: (p.y + k.y) / 2 - 12 } : { x: p.x, y: p.y - 12 }; }
   R.cam.cineZ = 1;
   // Kampf-Zoom: rückt sanft ~8 % heran, solange ein Feind nahe und auf den Spieler aus ist; langsam zurück.
   const engaged = S.settings.motion && combat.some(e => e.kind === 'enemy' && e.alive && isHostile(p, e) && dist(p, e) < 240 && (e.aggroId === p.id || e.aiState === 'pursue'));
@@ -10672,7 +10679,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay();   /* T08 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay(); nemesisDay();   /* T08, T10 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -11398,6 +11405,7 @@ function rumorTick() {
   const p = S.player; if (!p || S.map !== 'world') return;
   for (const C of (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active')) {
     const near = Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30, here = S.ents.world.filter(e => e.contract === C.id);
+    if (C.rk === 'nemesis') { const N = (S.nemeses || []).find(n => n.id === C.nemesisId); if (!N) rumorDone(C, true); else Object.assign(C, { tx: N.tx, ty: N.ty, x: N.tx, y: N.ty }); continue; }   /* T10 */
     if (C.rk === 'band') { const b = (S.bands || []).find(x => x.id === C.bandRef);   /* T08 Verhör: erfüllt, wenn die Bande fort ist; gelogen, wenn dort nichts ist */
       if (!b || b.gone) rumorDone(C, true); else if (C.lie && near) { log('Hier ist kein Lager. Er hat gelogen.', 'quest'); rumorDone(C, false); } continue; }
     if (C.spawned && !here.length && !C.beastDead) C.spawned = false;   /* nach dem Laden sind flüchtige Ziele weg: neu setzen */
@@ -12898,6 +12906,84 @@ function cultPathChoices(npc, choices) {
   if (npc.cultHedda && C.end === 'player') choices.unshift({ text: C.tithe ? 'Den Zehnt aussetzen (die Stadt schonen, selbst dürsten)' : 'Den Zehnt fordern (alle fünf Tage ein Bürger — der Kult wird satt)', fn: () => {
     C.tithe = !C.tithe; say(C.tithe ? '„Wie es sich gehört. Alle fünf Nächte ein Gefäß.“ (Valen bekommt weniger Nachschub, solange der Zehnt läuft.)' : '„Wie Ihr wünscht. Aber der Kelch vergisst nicht, wer ihn hungern lässt.“'); } });
 }
+// ================= T10 Heldentod als Moment und Ahnenfeind (Audit D8, A6) =================
+// Heldentod: 3 s Zeitlupe (Welt ×0,25), Kamera rückt heran (Leiche und Mörder im Bild), alles wird still, eine Totenglocke, Name und Haus
+// im Bild; ESC/Leertaste überspringt. Gespeichert ist der Tod schon vorher. Der Mörder bleibt stehen und zeigt auf den Toten.
+// Ahnenfeind: Wer den Helden tötet (kein Boss, keine Wache, keine Umwelt), nimmt seine Waffe aus dem Grab, bekommt einen Namen, wächst,
+// wandert zwischen Lagern seiner Region und greift ab Tag 10 alle 10–20 Tage die Familie an. Bis zu drei Ahnenfeinde zugleich (Nutzer).
+function dyingEnd() {
+  const D = S.dying; if (!D) return; S.dying = null; cineBars(false); duck(1, 900); if (D.preview) return;   /* Debug-Vorschau: kein Todesbildschirm */
+  S.paused = true; UI.showDeath(D.rec, () => { UI.hideDeath(); chooseSuccessor(); });
+  coopHooks.hostDied?.(0, S.player?.level);   /* Koop: Mitspieler warten auf die Erbenwahl */
+}
+const NEM_EPI = { human: ['der Vaterstecher', 'Erbenschlächter', 'der Grabräuber', 'Ahnentöter'], beast: ['Grauzahn', 'Narbenfell', 'Blutmaul', 'Altfang'], undead: ['Knochenhand', 'der Bleiche', 'Grabwind'] };
+const nemFam = mt => MONSTERS[mt]?.faction === 'undead' ? 'undead' : HUMANOID.has(mt) ? 'human' : 'beast';
+function nemesisFrom(k, p) {
+  if (!k || k.kind !== 'enemy' || !k.alive || k.boss || MONSTERS[k.mtype]?.boss || bossOf(k) || k.parley || k.goblinStorm || k.servant) return null;
+  S.nemeses ||= [];
+  const old = k.nemesisId && S.nemeses.find(n => n.id === k.nemesisId);
+  if (old) { old.kills++; old.lvl += 2; old.victims.push(p.name); if (old.victims.length >= 2) old.title = 'Schrecken zweier Generationen';
+    chronicle(`${old.name} tötet auch ${p.name}`, 'legacy', `Zwei Generationen von Haus ${S.legacy.house}. Man nennt ihn jetzt den Schrecken zweier Generationen.`); return old; }
+  if (S.nemeses.length >= 3) { chronicle(`${k.title || MONSTERS[k.mtype].name} tötete ${p.name}`, 'death', 'Ein Mörder unter vielen — Haus ' + S.legacy.house + ' hat schon drei Feinde.'); return null; }
+  const fam = nemFam(k.mtype), epi = pick(NEM_EPI[fam]), name = k.eliteKey && k.title ? k.title : fam === 'beast' ? epi : `${pick(FIRST_M)} ${epi}`;
+  const g = [...(S.ents[p.map] || [])].reverse().find(e => e.kind === 'grave' && e.charKey === 'player'), wi = g ? g.loot.findIndex(i => ITEMS[i?.key]?.slot === 'weapon') : -1;
+  const weapon = wi >= 0 ? g.loot.splice(wi, 1)[0] : null;
+  if (weapon) (weapon.history ||= []).push(`Jahr ${year()}: genommen von ${name}, über der Leiche von ${p.name}.`);
+  const day = S.day | 0, N = { id: uid(), mtype: k.mtype, name, lvl: (k.level || 5) + 3, weapon, kills: 1, region: fameRegion(k), map: k.map, tx: k.x / TS | 0, ty: k.y / TS | 0,
+    since: day, next: day + ri(10, 20), moveDay: day + ri(3, 5), victims: [p.name], elite: k.eliteKey || null };
+  S.nemeses.push(N); k.nemesisId = N.id; k.title = name;
+  chronicle(`${name} wird zum Ahnenfeind`, 'legacy', `${name} tötete ${p.name}${weapon ? ` und nahm ${ITEMS[weapon.key].name} aus dem Grab` : ''}.`); return N;
+}
+function nemesisTick() {                                      /* in der Nähe erscheint er (flüchtig) mit zwei Gefolgsleuten */
+  const p = S.player; if (!p?.alive || !S.nemeses?.length || S.dying) return;
+  for (const N of S.nemeses) {
+    if ((N.map || 'world') !== p.map || S.ents[p.map].some(e => e.nemesisId === N.id && e.alive) || Math.hypot(p.x / TS - N.tx, p.y / TS - N.ty) > 45) continue;
+    const e = spawnEnemy(N.mtype, p.map, N.tx, N.ty, { level: Math.min(N.lvl, (p.level || 1) + 3) }); if (!e) continue;
+    if (N.elite && ELITES[N.elite]) applyElite(e, N.elite);
+    Object.assign(e, { nemesisId: N.id, title: N.name, name: N.name, transient: true, weaponKey: N.weapon?.key && ITEMS[N.weapon.key]?.slot === 'weapon' && nemFam(N.mtype) !== 'beast' ? N.weapon.key : e.weaponKey });
+    e.maxHp = e.hp = Math.round(e.maxHp * 1.3); if (e.body) B.rescale(e, e.maxHp);
+    const pool = conPool(N.tx, N.ty) || []; for (let i = 0; i < 2 && pool.length; i++) { const f = spawnEnemy(pick(pool), p.map, N.tx + ri(-3, 3), N.ty + ri(-3, 3)); if (f) f.transient = true; }
+    if (!N.seen) { N.seen = true; UI.toast(`AHNENFEIND: ${N.name.toUpperCase()}`, 3200); log(`${N.name} ist hier — der Mörder von ${N.victims.join(' und ')}.${N.weapon ? ` Er trägt ${ITEMS[N.weapon.key].name}.` : ''}`, 'combat'); }
+  }
+}
+function nemesisDay() {
+  const day = S.day | 0;
+  for (const N of S.nemeses || []) {
+    if (day >= (N.moveDay || 0) && (N.map || 'world') === 'world') { N.moveDay = day + ri(3, 5); N.seen = false;
+      const camps = bandsOf().filter(b => fameRegion({ map: 'world', x: b.tx * TS, y: b.ty * TS }) === N.region); if (camps.length) { const c = pick(camps); N.tx = c.tx + ri(-4, 4); N.ty = c.ty + ri(-4, 4); } }
+    if (day >= N.next && day >= N.since + 10) { N.next = day + ri(10, 20); nemesisAttack(N); }
+  }
+}
+function nemesisAttack(N) {
+  const sp = spouseOf(), home = sp?.alive ? sp.homeTown : null, kids = (S.legacy.children || []).filter(k => kidAge(k) < 16 && !k.taken);
+  if (home && TOWN_PLAN[home]) {
+    const p = S.player, [hx, hy] = TOWN_PLAN[home].square, near = p.map === 'world' && Math.hypot(p.x / TS - hx, p.y / TS - hy) < 60;
+    log(`Ein Bote: ${N.name} zieht gegen ${townName(home)}, wo deine Familie lebt!`, 'quest'); UI.toast(`${N.name.toUpperCase()} GREIFT ${townName(home).toUpperCase()} AN`, 3600);
+    if (near) { Object.assign(N, { map: 'world', tx: hx + 6, ty: hy + 6, seen: false }); return 'here'; }   /* du bist nah: er kommt selbst */
+    raidDamage(home); N.kills++; N.lvl++;
+    if (kids.length && chance(0.3)) { const kid = pick(kids); kid.taken = true; const C = makeContract(home, 'missing', 'board');   /* Nutzer: Häuser brennen, 30 % wird ein Kind entführt */
+      if (C) { Object.assign(C, { name: kid.name, twist: 'captive', kidId: kid.id, title: `Entführt: ${kid.name}`, desc: `${N.name} hat ${kid.name} verschleppt. Bring das Kind heim.` }); (S.contracts ||= []).push(C); }
+      chronicle(`${N.name} verschleppt ${kid.name}`, 'legacy', `Aus ${townName(home)}. Am Brett hängt die Suche.`); return 'kid'; }
+    chronicle(`${N.name} überfällt ${townName(home)}`, 'legacy', 'Häuser brennen. Die Familie lebt.'); return 'raid';
+  }
+  const vs = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village && fameRegion({ map: 'world', x: TOWN_PLAN[k].square[0] * TS, y: TOWN_PLAN[k].square[1] * TS }) === N.region);
+  if (vs.length) { const v = pick(vs); raidDamage(v); N.kills++; chronicle(`${N.name} überfällt ${townName(v)}`, 'news', 'Man sagt, er trägt eine Klinge, die nicht ihm gehört.'); return 'village'; }
+  return null;
+}
+function nemesisSlain(e, by) {
+  const i = (S.nemeses || []).findIndex(n => n.id === e.nemesisId); if (i < 0) return; const N = S.nemeses.splice(i, 1)[0]; (S.nemesisPast ||= []).push(N.name);
+  if (N.weapon) { N.weapon.history = [...(N.weapon.history || []), `Jahr ${year()}: zurückgeholt von ${S.player.name}, Generation ${S.legacy.gen}.`]; dropItemAt(e.map, e.x, e.y + 12, N.weapon); }
+  if (by === S.player || S.party.includes(by?.id)) { const p = S.player; p.titles ||= []; if (!p.titles.includes('Rächer des Hauses')) p.titles.push('Rächer des Hauses'); addFame(10, N.region, 'Rache'); }
+  chronicle(`Rache des Hauses ${S.legacy.house}`, 'legacy', `${N.name}, Mörder von ${N.victims.join(' und ')}, ist tot.`); UI.toast('RACHE', 2800);
+  for (const C of S.contracts || []) if (C.nemesisId === N.id && C.state === 'active') rumorDone(C, true);
+}
+function nemesisHeir() {                                       /* der Erbe erfährt von den Feinden seines Hauses (Steckbrief mit Kartenkreis) */
+  for (const N of S.nemeses || []) { if ((S.contracts || []).some(C => C.nemesisId === N.id && C.state === 'active')) continue;
+    UI.toast(`AHNENFEIND: ${N.name.toUpperCase()}`, 3600); log(`Ahnenfeind: ${N.name}, Mörder von ${N.victims.join(' und ')}, hält sich bei ${locAt(N.tx, N.ty)?.name || 'der Wildnis'} auf.${N.weapon ? ` Er trägt ${ITEMS[N.weapon.key].name} — die Waffe deines Vorfahren.` : ''}`, 'quest');
+    const C = { id: uid(), town: null, kind: 'rumor', rk: 'nemesis', nemesisId: N.id, giver: 'board', giverName: 'Haus ' + S.legacy.house, have: 0, need: 1, state: 'offer', day: S.day | 0, tx: N.tx, ty: N.ty, x: N.tx, y: N.ty, lie: false,
+      reward: { gold: 80 + N.lvl * 10, xp: 120, rep: 0 }, title: `Steckbrief: ${N.name}`, desc: `Ahnenfeind von Haus ${S.legacy.house}. Lebend oder tot. Der Punkt auf der Karte ist sein letzter bekannter Ort.` };
+    (S.contracts ||= []).push(C); if (acceptContract(C) === false) S.contracts.pop(); }
+}
 // ================= T09 Läden am Stadtlager (Audit V3) =================
 // Jeder Gegenstand hängt an einer Leitware (Waffen an „arms“, Werkzeug an „tools“, Stoffrüstung an „cloth“ …). Der Preis folgt dem
 // Lager der Stadt (0,7–1,8×), die Auswahl dem Vorrat (mindestens zwei billige Plätze), ein Kauf zieht eine halbe Leitware ab.
@@ -12977,6 +13063,7 @@ function captiveMenu(e) {
   const p = S.player, nm = e.title || e.name || MONSTERS[e.mtype].name, bound = !!e.prisoner, C = wantedC(e);
   const ch = [];
   if (!e.asked && !e.downed) ch.push({ text: 'Verhören — ruhig', fn: () => captiveAsk(e, false) }, { text: 'Verhören — hart (Ruf der Klinge −3, er kann sterben)', fn: () => captiveAsk(e, true) });
+  if (e.nemesisId) { const N = (S.nemeses || []).find(n => n.id === e.nemesisId); if (N) ch.unshift({ text: `[Rache] Für ${N.victims.join(' und ')}`, fn: () => { UI.closeDialogue(); e.surrendered = false; e.prisoner = null; die(e, 'Rache des Hauses', p); } }); }   /* T10: Rache zählt nicht als Grausamkeit */
   if (!bound) ch.push({ text: hasItem(p, 'strick', 1) ? 'Fesseln (1 Strick)' : 'Fesseln — du hast keinen Strick (6 Gold beim Händler)', fn: () => {
     if (!removeItem(p, 'strick', 1)) return UI.toast('Kein Strick.');
     Object.assign(e, { prisoner: { by: p.id, since: S.day | 0 }, transient: false, surrendered: true, disarmed: true, fleeing: false, aggroId: null, aiState: 'idle', anchor: null });
@@ -13389,6 +13476,8 @@ function playerDeath(cause, source) {
   cultHeroDied();   /* §5g.2: stirbt der Blutfürst, übernimmt Hedda */
   const p = S.player;
   if (S._quiet || (p.map || '').startsWith('__')) return;             // BUG-107: Selbsttest-Proben sterben nicht ins Erbe (vorher Todesbildschirm + Speichern)
+  if (S.dying) return;                                                 /* T10: kein zweiter Tod im Moment */
+  const killer = source && typeof source === 'object' ? source : source ? byId(source) : null, nem = nemesisFrom(killer, p);   /* T10 Ahnenfeind */
   if (S.flags.goblinStormActive && !S.flags.morrDead) morrFall();   // S15 (Nutzer): stirbst du im Sturm, stirbt das letzte Dorf der Goblins
   const loc = DUNGEONS[S.map] ? DUNGEONS[S.map].name : (locAt(p.x / TS | 0, p.y / TS | 0)?.name || 'Greenmark-Grenzland');
   const rec = { name: p.name, age: p.age, days: S.day - (p.bornDay || 1), kills: p.kills || 0, battles: S.battles,
@@ -13397,11 +13486,12 @@ function playerDeath(cause, source) {
   rec.level = p.level; rec.gen = S.legacy.gen; rec.fame = fameOf(); rec.deeds = newDeeds(); rec.fac = { ...S.factions };   /* Nutzer §5e.10: Stoff für den Epilog */
   S.legacy.ancestors.push(rec);
   { const g = [...(S.ents[p.map] || [])].reverse().find(e => e.kind === 'grave' && e.charKey === 'player' && e.hero == null); if (g) { g.hero = S.legacy.ancestors.length - 1; g.label = `Grab: ${p.name}, Haus ${S.legacy.house}`; } }
-  chronicle(`${p.name} fiel bei ${loc}`, 'death', `${cause}. Was er baute, steht noch.`);
-  S.paused = true;
-  UI.showDeath(rec, () => { UI.hideDeath(); chooseSuccessor(); });
-  coopHooks.hostDied?.(0, p.level);   /* Koop: Mitspieler warten auf die Erbenwahl (Zahl der Erben folgt in chooseSuccessor) */
-  save();
+  chronicle(`${p.name} fiel bei ${loc}`, 'death', `${cause}. Was er baute, steht noch.${nem ? ` Sein Mörder, ${nem.name}, ${nem.weapon ? `trägt jetzt ${ITEMS[nem.weapon.key].name}` : 'lebt'}.` : ''}`);
+  if (nem) { rec.nemesis = nem.name; rec.cause = `${cause} — ${nem.name}${nem.weapon ? ` trägt jetzt ${ITEMS[nem.weapon.key].name}` : ''}`; }
+  save();                                                              /* T10: der Tod ist gespeichert, bevor der Moment beginnt */
+  S.dying = { t0: performance.now(), killer: killer?.id || null, rec };
+  { const cp = [...(S.ents[p.map] || [])].reverse().find(e => e.kind === 'corpse' && e.person); if (cp) cp.slow = 3; }
+  cineBars(true, `${p.name} · Haus ${S.legacy.house} · ${S.legacy.gen}. Generation`); duck(0.2, 700); sfx('bell', 1, 1);
 }
 
 // ================= Dynastie (Nutzer §5e.2) =================
@@ -13549,6 +13639,7 @@ function chooseSuccessor() {
   UI.showSuccessors(cands, c => adoptSuccessor(c));
 }
 function adoptSuccessor(c) {
+  setTimeout(() => nemesisHeir(), 1500);   /* T10: der Erbe erfährt vom Ahnenfeind */
   const old = S.player; for (const k in S.fameStyle || {}) S.fameStyle[k] = Math.round(S.fameStyle[k] / 2);   /* T08: der Ruf der Klinge verblasst mit dem Erben */
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
@@ -13733,6 +13824,7 @@ function bindInput() {
     if ($('game').classList.contains('hidden')) return;
     if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
     if (S.cine && (k === 'escape' || k === ' ')) { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
+    if (S.dying && (k === 'escape' || k === ' ')) { e.preventDefault(); dyingEnd(); return; }   /* T10: Heldentod überspringen */   // Nutzer S13: Kamerafahrt überspringen
     keys.add(k);
     if (coopHooks.key?.(k, e)) { e.preventDefault(); return; }   /* Koop K2: Tasten für Gast (alles) und Host (Enter = Nachricht) */
     if (k === 'escape') { if (placing) cancelPlacing(); else if (UI.dialogueOpen()) UI.closeDialogue(); else if (UI.modalOpen) UI.closeModal(); else if (selected) { selected = null; UI.renderContext(null); } else UI.openModal('settings'); }   /* Esc hebt zuerst eine Auswahl auf */
@@ -14108,6 +14200,13 @@ function debugSections() {
       'Spieler wird Blutfürst (sofort)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); if (!isVamp(p)) unlockTitle('vampire', 'Debug'); S.cult.joined ??= S.day | 0; S.cult.challenge = true; S.cult.end = null; cultEnd('player'); },
       'Zehnt umschalten': () => { if (S.cult) { S.cult.tithe = !S.cult.tithe; UI.toast(S.cult.tithe ? 'Zehnt läuft' : 'Zehnt ausgesetzt'); } },
       'Ausgang zurücksetzen (Stufe 4)': () => { if (S.cult) { S.cult.end = null; S.cult.stage = 4; delete AF().cult; UI.toast('Kein Ausgang'); } },
+    }],
+    ['Ahnenfeind und Heldentod (T10)', '', {
+      'Nächster Gegner wird Ahnenfeind': () => { const e = S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive).sort((a, b) => dist(a, p) - dist(b, p))[0]; const N = e && nemesisFrom(e, p); UI.toast(N ? `Ahnenfeind: ${N.name}` : 'Kein passender Gegner (Boss? schon drei?)'); },
+      'Ahnenfeinde hierher holen': () => { for (const N of S.nemeses || []) Object.assign(N, { map: S.map, tx: (p.x / TS | 0) + 8, ty: p.y / TS | 0, seen: false }); },
+      'Angriff des ersten Ahnenfeinds jetzt': () => { const N = (S.nemeses || [])[0]; if (!N) return UI.toast('Kein Ahnenfeind.'); UI.toast(`Angriff: ${nemesisAttack(N) || 'nichts'}`); },
+      'Steckbrief für den Erben': () => nemesisHeir(),
+      'Heldentod-Moment vorspielen (ohne Tod)': () => { S.dying = { t0: performance.now(), killer: null, rec: {}, preview: true }; cineBars(true, `${p.name} · Haus ${S.legacy.house} · ${S.legacy.gen}. Generation`); duck(0.2, 700); sfx('bell', 1, 1); },
     }],
     ['Läden und Lager (T09)', sel('dbGood', Object.entries(GOOD_NAME)), {
       'Ware hier knapp (Lager 0)': () => { const tk = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!S.towns?.[tk]) return UI.toast('Keine Stadt mit Markt hier.'); S.towns[tk].stock[v('dbGood')] = 0; UI.toast(`${GOOD_NAME[v('dbGood')]} knapp in ${townName(tk)}`); },
@@ -17135,6 +17234,29 @@ export function selftest() {
       if (!(bases && follows && took && toll && S.prices === undefined)) console.warn('T09DBG', JSON.stringify({ bases, b: [baseOf('longsword'), baseOf('pickaxe'), baseOf('bread'), baseOf('potion'), baseOf('traveler_cloak')], dear, cheap, pHigh, pLow, took, a0, arms: T.stock.arms, at, pa, pb, pn0, pn1, pr: S.prices }));
       return bases && follows && took && toll && S.prices === undefined;
     } finally { S.towns = T0; S.tollMul = tm; }
+  }));
+  ok('T10 Ahnenfeind: Mörder (kein Boss) wird benannt und nimmt die Waffe samt Geschichte aus dem Grab; tötet er wieder, wächst er; höchstens drei; sein Tod gibt die Waffe zurück und den Titel', sandbox(() => {
+    const p = stage(), N0 = S.nemeses, NP0 = S.nemesisPast;
+    try {
+      S.nemeses = []; const g = { id: uid(), kind: 'grave', map: '__a', x: p.x, y: p.y, r: 10, loot: [mkItem('longsword')], charKey: 'player' }; S.ents.__a.push(g);
+      const k = spawnEnemy('bandit', '__a', 12, 10), N = nemesisFrom(k, p);
+      const made = !!N && N.weapon?.key === 'longsword' && !g.loot.length && N.weapon.history?.length === 1 && k.nemesisId === N.id;
+      const again = nemesisFrom(k, p) === N && N.kills === 2 && N.title === 'Schrecken zweier Generationen';
+      const bo = spawnEnemy('bandit', '__a', 13, 10); bo.boss = true; const noBoss = nemesisFrom(bo, p) === null;
+      for (let i = 0; i < 2; i++) nemesisFrom(spawnEnemy('bandit', '__a', 12 + i, 12), p);
+      const cap = S.nemeses.length === 3 && nemesisFrom(spawnEnemy('bandit', '__a', 15, 12), p) === null;
+      k.x = p.x + 30; k.y = p.y; die(k, 'Probe', p);
+      const slain = !S.nemeses.some(n => n.id === N.id) && (p.titles || []).includes('Rächer des Hauses') && S.ents.__a.some(e => e.kind === 'item' && e.item?.key === 'longsword' && e.item.history?.length === 2);
+      return made && again && noBoss && cap && slain;
+    } finally { S.nemeses = N0; S.nemesisPast = NP0; }
+  }));
+  ok('T10 Heldentod-Moment: Gruppe unverwundbar, der Moment wird nicht gespeichert; ohne Familie überfällt der Ahnenfeind ein Dorf seiner Region', sandbox(() => {
+    const p = stage(), m = actor(p.x + 40, p.y, { name: 'Gefährte' }); S.party.push(m.id); const h = m.hp; S.dying = { t0: performance.now(), killer: null, rec: {} };
+    try {
+      hurt(m, 10, null, 'Probe'); const inv = m.hp === h, unsaved = JSON.parse(saveData()).dying === undefined;
+      const sp0 = S.legacy.spouse; S.legacy.spouse = null; const N = { name: 'Probe', region: 'mitte', kills: 1, lvl: 5 }; const r = nemesisAttack(N); S.legacy.spouse = sp0;
+      return inv && unsaved && r === 'village' && N.kills === 2;
+    } finally { S.dying = null; }
   }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };

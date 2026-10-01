@@ -50,6 +50,7 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
       case 'dodge': noise(t, 0.2, 'lowpass', 900, 200, 0.2 * v, 0.7); break;
       case 'step':  noise(t, 0.04, 'lowpass', 500 + Math.random() * 200, 150, 0.08 * v); break;
       case 'death': tone(t, 0.45, 'sawtooth', 180, 50, 0.12 * v); noise(t, 0.3, 'lowpass', 900, 120, 0.2 * v); break;
+      case 'bell':   tone(t, 2.6, 'sine', 196, 194, 0.16 * v); tone(t, 2.0, 'sine', 392.5, 390, 0.06 * v); tone(t + 0.01, 1.4, 'triangle', 588, 584, 0.03 * v); break;   /* T10: Totenglocke beim Heldentod */
       case 'bow':   tone(t, 0.12, 'triangle', 330, 180, 0.2 * v); noise(t, 0.08, 'highpass', 3000, 5000, 0.08 * v); break;
       case 'magic': tone(t, 0.3, 'sine', 300, 900, 0.14 * v); tone(t + 0.04, 0.26, 'triangle', 600, 1500, 0.06 * v); break;
       case 'fire':  noise(t, 0.35, 'lowpass', 1800, 200, 0.35 * v, 0.8); break;
@@ -66,6 +67,9 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
   } catch (e) { /* Audio optional (z. B. ohne Nutzergeste) */ }
 }
 
+// T10: alles leiser (Heldentod), danach wieder zurück. level 0…1 relativ zur eingestellten Lautstärke.
+export function duck(level, ms = 500) { if (!ac || !master) return; const t = ac.currentTime, v = (S.settings.volume ?? 0.7) * level;
+  try { master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(v, t + ms / 1000); } catch (e) { /* Audio optional */ } }
 // Umgebung: leiser Wind (gefiltertes Rauschen, langsam schwankend)
 export function ambience(on) {
   if ((S.settings.volume ?? 0.7) <= 0) on = false;
