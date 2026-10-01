@@ -125,7 +125,7 @@ export const bizWorkers = (b, C) => (C[b.town]?.work[b.trade] || 0) + b.hired * 
 export function ecoPrice(town, g, buy) {
   const t = S.towns[town]; if (!t) return ITEMS[g].value;
   let f = clamp(target(t, g) / ((t.stock[g] || 0) + 1), 0.4, 3);
-  if (isAurel(town)) f *= 1.15;
+  if (isAurel(town)) f *= 1.15 * (S.tollMul || 1);   /* T09: Aurelions Zölle (Gesetz, Kaiserin, Spaltung) */
   if (occupied(town) && buy) f *= 1.5;   // S15: Besatzung macht Kaufen teuer, nicht Verkaufen
   f *= (S.after?.pmul?.[g] || 1) * (S.after?.tmul?.[town] || 1);   /* Folgen §5c: Aufstand/Streik verteuern Waren, Flüchtlinge die Zielstadt */
   const p = ITEMS[g].value * f;

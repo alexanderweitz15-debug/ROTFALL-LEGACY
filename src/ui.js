@@ -1003,7 +1003,7 @@ function tradeUI(body, npc) {
     const cv = el('canvas'); cv.width = cv.height = 34; row.appendChild(cv);
     row.appendChild(el('div', '', `<div class="s-name">${it.name}${slot.count > 1 ? ' ×' + slot.count : ''}</div><div class="s-key">${price} Gold</div>`));
     setTimeout(() => drawItemIconTo(cv, slot.key), 0);
-    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div><div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
+    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div>${A.priceNote?.(slot.key, npc) ? `<div class="ledger" style="color:${/^Teuer/.test(A.priceNote(slot.key, npc)) ? '#d08a6a' : '#9ac08a'}">${A.priceNote(slot.key, npc)}</div>` : ''}<div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
     row.onclick = () => { isBuy ? A.buy(npc, slot.key) : A.sell(i, npc); refreshModal(npc); };
     box.appendChild(row);
   });

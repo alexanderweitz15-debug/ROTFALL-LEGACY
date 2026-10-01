@@ -719,3 +719,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - *Gnadenlos* (≤ −20) / *Schlächter* (≤ −60): Gegner fliehen früher, ergeben sich seltener — als Schlächter nie; ab −40 überfallen Banden dich halb so oft.
   - Gütige Gefährten leiden unter Grausamkeit, grausame freuen sich. Der Erbe erbt den halben Ruf.
 - **Debug:** „Gefangene und Klinge (T08)“. Proben „T08 Gefangene und Steckbriefe“, „T08 Verhör und Ruf der Klinge“.
+
+## Runde: T09 Läden am Stadtlager (Audit V3, 01.10.2026)
+- **Preise je Stadt:** Jeder Gegenstand hängt an einer Ware der Stadt: Waffen und Rüstung aus Eisen an *Waffen*, Werkzeug an *Werkzeug*, Leder- und Stoffkleidung an *Leder*/*Tuch*, Essen an *Korn*/*Fleisch*, Prothesen an *Magitech*. Ist diese Ware im Lager der Stadt knapp, wird alles daran teurer (bis ×1,8); ist sie reichlich, billiger (bis ×0,7). Tränke, Kräuter und Talismane bleiben fest. Den alten Weltpreis „alles kostet x % mehr“ gibt es nicht mehr.
+- **Auswahl:** Was ein Laden anbietet, richtet sich nach dem Vorrat — ein Schmied ohne Waffen im Lager hat kaum Klingen. Mindestens zwei billige Dinge gibt es immer.
+- **Kauf:** Jeder Kauf zieht eine halbe Einheit der Ware aus dem Lager. Verkaufen füllt das Lager nicht auf.
+- **Ereignisse wirken auf Lager:** Missernte halbiert das Korn der getroffenen Dörfer; Valens Aushebung nimmt Waffen und Korn aus Valens Städten; Flüchtlinge essen Erens Korn; eine neue Ader füllt das Erz der Bergbaustadt; ein ausbleibender Händlerzug fehlt in Nordfurt; die Kaufleute öffnen ihre Speicher für die Stadt mit der größten Not.
+- **Aurelions Zölle:** Gesetz (senken/erhöhen), Tod der Kaiserin, Spaltung und Unruhe verändern den Zoll auf Waren des Hochreichs (bis ×1,3). Er fällt täglich um 1 % zurück.
+- **Im Laden:** Beim Überfahren einer Ware steht im Info-Feld „Teuer: Waffen knapp in Nordfurt“ oder „Günstig: …“. Im Status-Fenster zeigt „Teuerung hier“, was in der aktuellen Stadt knapp ist, und „Zölle Aurelions“ den Zoll.
+- **Debug:** „Läden und Lager (T09)“. Probe „T09 Läden am Stadtlager“.

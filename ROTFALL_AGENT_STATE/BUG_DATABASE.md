@@ -21,3 +21,7 @@
 | RB-016 | Gemischte Zeilenenden in game.js durch die Bearbeitungshilfe | LOW | Werkzeug | VERIFIED (normalisiert, Hilfe korrigiert) |
 | RB-017 | T08-Feld `captive` kollidierte mit den Goblin-Gefangenen der Kette (Konvoi stand still) | HIGH | game.js | TESTING (Feld heißt `prisoner`; Eisenmark-Probe grün) |
 | RB-018 | `acceptContract` gibt nichts zurück — Rückgabeprüfung entfernte neue Aufträge | MEDIUM | game.js captiveAsk/informantDay | TESTING |
+| RB-019 | Hedda verkauft 7–28 Blutphiolen am Tag statt 3 (Hunter 4; dort RB-017 genannt) | HIGH | game.js shopStock | TESTING (fester Tagesbestand `fixedStock`) |
+| RB-020 | Befreite Verschwundene konnten erneut entführt werden (Hunter 4; dort RB-018 genannt) | MEDIUM | game.js cultTake | TESTING |
+| RB-021 | Balance-Messung Aldhelm mit `ehp` umging den Boss-Faktor ×2 (Grundleben 560 war zu hoch) | MEDIUM | data.js aldhelm, docs/BALANCE.md | TESTING (Grundleben 340, 8 Seeds nachgemessen) |
+| RB-022 | Proben sicherten nur `S.prices`; nach T09 verändern Ereignisse Stadtlager und Zoll | LOW | Selbsttest | TESTING (Sicherungen erweitert, BUG-123 grün) |

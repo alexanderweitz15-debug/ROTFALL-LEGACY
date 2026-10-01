@@ -10,6 +10,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Blutkult Scheibe 1: Titelklasse Vampir (Blutdurst, Sonne, Trinken, Stigma, Heilung bei Aldis oder in Sankt Serin).
 - Blutkult Scheiben 2–5: Verschwundene und Maskierte in Varonheim, Spuren und Anklage, Katakomben mit Hedda und Gefangenen, Aldhelm als Blutfürst (Hofszene, Krypta-Boss), Rote Krönung, Erpressung, der Held als Blutfürst.
 - Gefangene nehmen (fesseln, verhören, anwerben, ausrauben, laufen lassen, hinrichten), Steckbriefe lebend ×1,5, Ruf der Klinge je Region.
+- Läden am Stadtlager: Preise und Auswahl je Stadt nach Vorrat (0,7–1,8×), Ereignisse verändern Lager, Aurelions Zölle; der Weltpreis entfällt.
 
 ## Version 22 — 2026-09-30 (Koop, Bionik 2–5, Welt-Ausbau §5b–§5f)
 - Audit T01–T04: Wucht mit Standfestigkeit, Krieg mit Nachschub, Nachbild und Geisterschleier getrennt, eigener Effekt-Zufall mit Partikeldeckel, Umgebungsklang je Region und unter Tage.

@@ -2053,6 +2053,7 @@ export function continueGame(given = null, retried = false) {                   
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
+  delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
@@ -6671,7 +6672,7 @@ function rulerSlain(c, source) {
     rat: 'Der Sprecher des Rates ist tot. Die Häuser misstrauen einander, Intrigen werden blutiger.',
     orakel: 'Das Uhrwerk-Orakel steht still. Ohne seine Berechnung arbeiten die Automaten ungenauer.',
     magierkoenig: 'Der Magierkönig ist tot. Die Akademie schließt ihre Tore, Magitech wird knapp.' }[c.skyRuler];
-  if (c.skyRuler === 'kaiserin') S.prices = (S.prices || 1) * 1.3;
+  if (c.skyRuler === 'kaiserin') S.tollMul = 1.3;   /* T09: Aurelion schließt die Märkte (Zoll ×1,3) */
   chronicle(`${c.name} ermordet`, 'death', what); log(what, 'death'); UI.toast('MORD AUF DER HIMMELSINSEL', 3600);
 }
 // ================= Aufträge aus der Welt (Master-Prompt 2 §11–§14, Phase 2) =================
@@ -6756,7 +6757,7 @@ function ignoredContract(C) {
   const G = growthOf(C.town);
   if (C.kind === 'bounty' || C.kind === 'monster') { if (G) G.prosper = Math.max(-20, G.prosper - 3); chronicle(`${townName(C.town)}: ${C.title} blieb liegen`, 'news', 'Niemand hat sich darum gekümmert. Die Straßen sind unsicherer.'); }
   else if (C.kind === 'supply' || C.kind === 'herbs') { if (G) G.prosper = Math.max(-20, G.prosper - 2); }
-  else if (C.kind === 'hunt') S.prices = (S.prices || 1) * 1.01;
+  else if (C.kind === 'hunt') stockShock([C.town], 'meat', -2);   /* T09 */
 }
 // S13 (WELT_EVENTS §3: „Aufträge aus dem Krieg“): Halten die Toten eine Nachbarstadt, hängt am Brett ein Schmuggelauftrag — Vorräte
 // für die Eingeschlossenen. Das Paket muss nur bis an den Platz der besetzten Stadt, mitten durch die Besatzer.
@@ -8518,7 +8519,7 @@ function twinFallCheck() {
   S.flags.twinFall = Math.max(1, S.day | 0);
   grantLegend(S.legend?.merch ? 'aurel' : 'merch', 'Ende der Brüder', 'Varg und Garmadon sind tot. Das Blut, aus dem Kette und Totenreich wuchsen, ist versiegt.');
   chronicle('Das Ende der Brüder', 'war', 'Zwei Brüder, ein Blut — beide tot. Weder Kette noch Tote haben noch einen Herrn.');
-  S.prices = (S.prices || 1) * 1.05;                                   // Unruhe: Handel stockt eine Weile
+  S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.05);                 /* Unruhe: Aurelions Handel stockt eine Weile (T09) */
   if (!S.chainRest) spawnChainRest();                                  // Reste der Kette werden Räuber
   for (const f of ['valen', 'order', 'aurel']) S.factions[f] = clamp((S.factions[f] || 0) + 10, -100, 100);
   const run = () => S.cine ? setTimeout(run, 1000) : twinFallCinematic();   // nach einer laufenden Kamerafahrt
@@ -9148,10 +9149,10 @@ function applyLaw(topic, key) {
   if (topic === 'refugees') { refugeeLaw(key); if (key === 'city') { add('valen', 10); add('order', 5); } if (key === 'reject') { add('valen', -10); add('order', -10); } }
   if (topic === 'slavery') { if (S.bond?.kind === 'aurel' && key !== 'expand') { S.bond.debt = Math.round(S.bond.debt * (key === 'abolish' ? 0 : 0.5)); if (key === 'abolish') freeBond('Der Hohe Rat hat die Schuldknechtschaft abgeschafft. Du bist frei.', true); }
     for (const e of S.ents.world) if (e.captive && e.bondKind === 'aurel' && key === 'abolish') { e.captive = false; e.prof = 'Fabrikarbeiter'; }
-    if (key === 'abolish') { add('valen', 10); S.prices = (S.prices || 1) * 1.05; } if (key === 'expand') add('valen', -15); }
+    if (key === 'abolish') { add('valen', 10); S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.05); } if (key === 'expand') add('valen', -15); }
   if (topic === 'faith') { if (key === 'ban') { add('chain', -20); for (const e of S.ents.world) if (e.palKind && !e.faithKey && inAurel(e)) e.anchor = { x: e.x - 1600, y: e.y }; } if (key === 'ally') { add('chain', 20); add('valen', -5); } }
   if (topic === 'legion') { if (key === 'east' && S.war) for (const n of Object.values(S.war.nodes)) if (n.owner === 'undead' && n.garrison) n.garrison = Math.round(n.garrison * 0.8); if (key === 'home') S.gold += 0; }
-  if (topic === 'toll') S.prices = (S.prices || 1) * (key === 'lower' ? 0.92 : key === 'raise' ? 1.08 : 1);
+  if (topic === 'toll') S.tollMul = clamp((S.tollMul || 1) * (key === 'lower' ? 0.92 : key === 'raise' ? 1.08 : 1), 0.85, 1.3);   /* T09 */
   if (['legion', 'toll'].includes(topic)) delete S.laws[topic];         // Dauerthemen: jederzeit neu verhandelbar
 }
 // Flüchtlinge je nach Beschluss: in der Stadt (Bürger), im Lager vor dem Tor (Zelte, Hunger, Fabrikarbeit) oder abgewiesen
@@ -9677,7 +9678,8 @@ function evDeserters() {                                                 // Dese
 function evFailedHarvest() {                                             // Missernte in den Bauerndörfern
   const V = [...villOf('valen'), ...villOf('merch')]; if (!V.length) return null; const hit = V.sort(() => rnd() - 0.5).slice(0, 2);
   for (const t of hit) { const G = growthOf(t); G.prosper = Math.max(-20, G.prosper - 10); }
-  S.prices = (S.prices || 1) * 1.06; chronicle('Missernte', 'news', `${hit.map(townName).join(' und ')} haben kaum etwas eingefahren.`);
+  for (const t of hit) if (S.towns?.[t]?.stock) S.towns[t].stock.grain = Math.floor((S.towns[t].stock.grain || 0) / 2);   /* T09: Brot wird dort teurer */
+  chronicle('Missernte', 'news', `${hit.map(townName).join(' und ')} haben kaum etwas eingefahren.`);
   log(`Missernte in ${hit.map(townName).join(' und ')}. Brot wird teurer.`, 'economy'); return hit[0];
 }
 function evPilgrimRaid() {                                               // Räuber lauern einem Pilgerzug auf
@@ -9792,7 +9794,7 @@ const BIG_START = {
     bigAnnounce(`Seuche in ${townName(k)}`, `In ${townName(k)} geht das Fleckfieber um. Kranke Bewohner husten auf den Gassen. Ein Heilkraut hilft (sprich sie an). Wer nichts tut, sieht die Seuche ins Nachbardorf ziehen.`); } },
   locusts: { ok: () => bigTowns().some(k => TOWN_PLAN[k].fields?.length), go: () => {
     const k = pick(bigTowns().filter(k => TOWN_PLAN[k].fields?.length)); S.big = { id: uid(), kind: 'locusts', town: k, until: (S.day | 0) + 3 };
-    if (S.towns?.[k]?.stock) S.towns[k].stock.grain = Math.floor((S.towns[k].stock.grain || 0) / 2); S.prices = (S.prices || 1) * 1.06;
+    if (S.towns?.[k]?.stock) S.towns[k].stock.grain = Math.floor((S.towns[k].stock.grain || 0) / 2);
     bigAnnounce(`Heuschrecken über ${townName(k)}`, `Eine schwarze Wolke fällt über die Felder von ${townName(k)}. Das Korn ist halb verloren, Brot wird teurer. Rauch vertreibt sie: Ein Bauer dort weiß wie.`); } },
   tourney: { ok: () => ['northcity', 'eren', 'saltport'].some(k => TOWN_PLAN[k] && bigTowns().includes(k)), go: () => {
     const k = pick(['northcity', 'eren', 'saltport'].filter(k => TOWN_PLAN[k] && bigTowns().includes(k))); S.big = { id: uid(), kind: 'tourney', town: k, until: (S.day | 0) + 2, round: 0 };
@@ -9901,7 +9903,7 @@ function bigChoices(npc, choices) {
       npc.accused = false; if (chance(0.35)) addBounty('order', 120, 'Fluchthilfe'); addRel(npc.key, 20); bigEnd(`${B.name} ist in der Nacht aus ${townName(B.town)} verschwunden. Die Inquisition tobt.`); witchSaved(npc, B, 'flight'); UI.closeDialogue(); } },
     { text: 'Ich kann nichts tun.', fn: () => UI.closeDialogue() }]) });
   if (npc.strikeLead && B.kind === 'strike') choices.unshift({ text: 'Worum geht es beim Streik?', fn: () => UI.dialogue(npc, '„Vierzehn Stunden an den Kesseln, drei Finger weniger, und der Lohn kommt einen Monat zu spät. Vantor will uns mit Automaten ersetzen. Wir wollen nur, was man uns schuldet.“', [
-    { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); S.prices = (S.prices || 1) * 1.03; strikeOff(); addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); strikeWon(); UI.closeDialogue(); } },
+    { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); stockShock(['tickmar'], 'magitech', -3); strikeOff(); addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); strikeWon(); UI.closeDialogue(); } },
     { text: 'Ich vermittle. (Willenskraft)', fn: () => { const ok = (p.attributes.willpower || 8) + ri(0, 8) >= 12; strikeOff();
       if (ok) { S.houses.vantor = clamp(favor('vantor') + 3, -100, 100); S.gold += questGold(60); bigEnd('Du bringst Grete und Vantor an einen Tisch. Halber Rückstand, kürzere Schichten. Beide zahlen dir etwas (60 Gold).'); } else bigEnd('Die Vermittlung platzt. Am Ende geben die Hungrigen nach, ohne etwas zu bekommen.'); UI.closeDialogue(); } },
     { text: 'Geht zurück an die Arbeit. (Vantor)', fn: () => { S.houses.vantor = clamp(favor('vantor') + 10, -100, 100); S.gold += questGold(100); addRel(npc.key, -30); strikeOff(); bigEnd('Vantors Männer räumen die Straße. Der Streik ist gebrochen. Vantor zahlt dir 100 Gold, die Arbeiter spucken aus, wenn du vorbeigehst.'); UI.closeDialogue(); } },
@@ -9913,11 +9915,11 @@ function hasBigAt(k) { return S.big?.town === k; }
 const EVENTS = [
   evTaxman, evDeserters, evFailedHarvest, evPilgrimRaid, evFire, evMagitech, evHauntEv,   /* Steuereintreiber und Missernte standen doppelt drin (Gewichtung ohne Kommentar); jetzt einfach */
   evMagicCore, evAnomaly, evMeteor, evSuccession,
-  () => { log('Eine Karawane wurde auf der Alten Straße überfallen.', 'economy'); S.prices = (S.prices || 1) * 1.05; },
+  () => { stockShock(['northcity'], 'cloth', -3, 'Ein Händlerzug blieb aus.'); },   /* T09 (V17d): echte Überfälle meldet caravanDay */
   () => { log('Untote wurden nördlich von Eren gesichtet.', 'faction'); spawnEnemy('skeleton', 'world', ...pushOut('world', ...worldPt(60 + ri(-6, 6), 50 + ri(-4, 4)))); },
-  () => { log('Flüchtlinge erreichen Eren. Die Preise steigen.', 'economy'); S.prices = (S.prices || 1) * 1.08; },
+  () => { stockShock(['eren'], 'grain', -6, 'Flüchtlinge erreichen Eren.'); },
   () => { log('Valen zieht Truppen an der Nordfurt zusammen.', 'faction'); },
-  () => { log('In der Grube wurde eine neue Ader gefunden.', 'economy'); S.prices = (S.prices || 1) * 0.96; },
+  () => { const mt = Object.keys(S.towns || {}).sort((a, b) => (S.towns[b].prod?.ore || 0) - (S.towns[a].prod?.ore || 0))[0]; if (mt) stockShock([mt], 'ore', 20, 'In der Grube wurde eine neue Ader gefunden.'); },
   () => { log('Banditen fordern Wegzoll auf der Alten Straße.', 'world'); spawnEnemy('bandit', 'world', ...pushOut('world', ...worldPt(96 + ri(-6, 6), 64 + ri(-3, 3)))); },
   () => { const f = pick(['valen', 'order', 'merch']); S.factions[f] += ri(-2, 3); log(`Gerüchte verändern dein Ansehen bei ${FACTIONS[f].name}.`, 'faction'); },
 ];
@@ -10228,14 +10230,14 @@ function aurelFallDay() {
 }
 function aurelSplit() {
   const A = AF(); A.split = { day: S.day | 0, until: afterUntil() };
-  S.prices = (S.prices || 1) * 1.1; for (const H of AUREL_HOUSES) S.houses[H.key] = clamp(favor(H.key) + ri(-10, 10), -100, 100);
+  S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.1); for (const H of AUREL_HOUSES) S.houses[H.key] = clamp(favor(H.key) + ri(-10, 10), -100, 100);
   afterSay('Das Hochreich zerbricht', 'Zu viele Städte sind gefallen. Die Häuser Aurivel, Kessmark, Solandre und Vantor sagen sich voneinander los und bekriegen sich: Scharmützel auf den Plätzen, Zölle an jeder Brücke, die Preise steigen. Frieden stiftet nur, wer mit einem Hausherrn redet (Frieden vermitteln).', 'war');
 }
 function splitDay() {
   const X = S.after?.split; if (!X) return; const day = S.day | 0;
   if (X.until != null && day >= X.until) return splitEnd('Die Häuser sind des Krieges müde. Ein brüchiger Friede kehrt ein.');
   const a = pick(AUREL_HOUSES), b = pick(AUREL_HOUSES.filter(h => h !== a)), town = pick(aurelCities().filter(k => !heldBy(k))); if (!town) return;
-  S.houses[a.key] = clamp(favor(a.key) - 2, -100, 100); S.houses[b.key] = clamp(favor(b.key) - 2, -100, 100); S.prices = (S.prices || 1) * 1.01;
+  S.houses[a.key] = clamp(favor(a.key) - 2, -100, 100); S.houses[b.key] = clamp(favor(b.key) - 2, -100, 100);
   X.skirm = { a: a.key, b: b.key, town }; log(`Häuserkrieg: Waffenknechte von ${a.name} und ${b.name} liegen sich in ${townName(town)} in den Haaren.`, 'faction');
 }
 function splitSecond() {
@@ -10585,7 +10587,7 @@ function factionAgenda() {
   const who = ['valen', 'order', 'merch', ...(S.flags.chainsBroken ? [] : ['chain']), 'aurel'][day % (S.flags.chainsBroken ? 4 : 5)];
   const say = (title, detail) => { chronicle(title, 'news', detail); log(`${title}. ${detail}`, 'faction'); return title; };
   if (who === 'valen') {
-    if (und >= 2) { for (const a of W.armies) if (a.faction === 'valen') a.strength += 12; S.prices = (S.prices || 1) * 1.03; sendPatrol('valen');
+    if (und >= 2) { for (const a of W.armies) if (a.faction === 'valen') a.strength += 12; { const vt = Object.keys(S.towns || {}).filter(k => townFac(k) === 'valen'); stockShock(vt, 'arms', -4); stockShock(vt, 'grain', -4); } sendPatrol('valen');
       return say('Valen ruft zu den Waffen', 'Die Krone hebt Männer aus, Brot wird teurer. Streifen ziehen über die Straßen.'); }
     if (chance(0.5)) { const C = postContract('valen', 'bounty'); if (C) return say(`Valen setzt ein Kopfgeld aus: ${C.name}`, `Aushang in ${townName(C.town)}.`); }
     sendPatrol('valen'); return say('Valen verstärkt die Streifen', 'Soldaten der Krone ziehen zwischen den Dörfern.');
@@ -10596,7 +10598,8 @@ function factionAgenda() {
     return say('Der Orden hält Andachten in allen Dörfern', 'Die Glocken läuten länger als sonst.');
   }
   if (who === 'merch') {
-    if ((S.prices || 1) > 1.1) { S.prices = Math.max(1, S.prices * 0.95); return say('Die Kaufleute öffnen ihre Speicher', 'Die Preise sinken ein wenig.'); }
+    { let best = null; for (const [k, t] of Object.entries(S.towns || {})) for (const g of GOODS) { const need = ECO.target(t, g) - (t.stock[g] || 0); if (need > 4 && (!best || need > best.need)) best = { k, g, need }; }
+      if (best) { stockShock([best.k], best.g, 6); return say('Die Kaufleute öffnen ihre Speicher', `${townName(best.k)} bekommt ${GOOD_NAME[best.g] || ITEMS[best.g]?.name || best.g} aus den Lagern der Gilde.`); } }
     const C = postContract('merch', 'escort') || postContract('valen', 'escort'); sendPatrol('merch');
     return say('Die Gilde zahlt für Geleitschutz', C ? `Aushang in ${townName(C.town)}.` : 'Söldner ziehen mit den Wagen.');
   }
@@ -10604,7 +10607,7 @@ function factionAgenda() {
     if ((S.factions.chain || 0) < -20 || chance(0.5)) { sendPatrol('chain'); return say('Die Kette schickt Streifen in die Tributdörfer', 'Schwarze Rüstungen auf den Wegen im Westen.'); }
     return say('Varg lässt die Mauern der Eisenfeste ausbessern', 'In den Gruben wird doppelt gearbeitet.');
   }
-  if (chance(0.5)) { S.prices = (S.prices || 1) * 1.02; return say('Aurelion erhöht die Zölle', 'Waren aus dem Hochreich werden teurer.'); }
+  if (chance(0.5)) { S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.05); return say('Aurelion erhöht die Zölle', 'Waren aus dem Hochreich werden teurer.'); }
   return say('Ein Gesandter Aurelions reist nach Nordfurt', 'Man spricht von Verträgen. Oder von Drohungen.');
 }
 // S14 Jahreszeiten: Wechsel wird angesagt; im Winter ziehen Rudel an die Weiden der Norddörfer (Wolfswinter) und die Bretter suchen Jäger
@@ -10711,7 +10714,7 @@ function dayTick() {
     chronicle(`${w.name} erhält einen Namen`, 'item', w.lore);
     UI.toast(`${w.name}`, 4000);
   }
-  S.prices = clamp((S.prices || 1) * (0.98 + rnd() * 0.04), 0.7, 1.6);
+  if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01) : Math.min(1, S.tollMul + 0.01);   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
   save();
   log(`Tag ${S.day} bricht an.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town)) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
@@ -10810,7 +10813,9 @@ function activeEffects() {
   else if (inAurel(p)) add('Gesetz', '⚜', 'Ohne Schein in Aurelion', 'bad', ['Automaten kontrollieren dich: Strafe oder Ausweisung. Schein am Passamt.'], true);
   // Welt: Beschlüsse des Rates, allgemeine Preise, Katastrophe
   for (const [t, k] of Object.entries(S.laws || {})) { const T = TOPICS[t], o = T?.opts.find(x => x.key === k); if (o) add('Welt', '§', T.title, 'info', [`Beschluss: ${o.text}`]); }
-  if (Math.abs((S.prices || 1) - 1) > 0.02) add('Welt', '¤', 'Preise', (S.prices || 1) > 1 ? 'bad' : 'good', [`Alles kostet ${Math.round(((S.prices || 1) - 1) * 100)} % ${(S.prices || 1) > 1 ? 'mehr' : 'weniger'} als üblich.`]);
+  { const tk = S.map === 'world' && townAt(S.player.x / TS | 0, S.player.y / TS | 0, 4), dear = tk && S.towns?.[tk] ? Object.keys(GOOD_NAME).filter(g => baseMul(tk, g) >= 1.25) : [];   /* T09: Teuerung hier statt Weltpreis */
+    if (dear.length) add('Welt', '¤', 'Teuerung hier', 'bad', [`In ${townName(tk)} knapp und teuer: ${dear.map(g => GOOD_NAME[g]).join(', ')}.`]);
+    if (S.tollMul && Math.abs(S.tollMul - 1) > 0.02) add('Welt', '¤', 'Zölle Aurelions', S.tollMul > 1 ? 'bad' : 'good', [`Waren aus dem Hochreich kosten ${Math.round((S.tollMul - 1) * 100)} % ${S.tollMul > 1 ? 'mehr' : 'weniger'}.`]); }
   if (S.omega?.cat && !S.omega.ending) add('Welt', '☄', 'Omegas Zorn', 'bad', ['Blutregen überall, jede Stunde stehen Tote auf, bis Omega fällt.'], true);
   // Besitz
   const own = S.eco?.biz?.filter(b => b.owner === 'player') || [];
@@ -12210,7 +12215,7 @@ function rawPrice(key, isBuy, npc, inst = null) {
     const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
     return Math.max(1, Math.round((isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)) * repPrice(npc, isBuy)));
   }
-  const v = ITEMS[key].value * (S.prices || 1) * (inst ? RARITY_VALUE[rarOf(inst)] || 1 : 1) * afterItemMul(key);   /* Folgen §5c: Streik verteuert Bionik */
+  const v = ITEMS[key].value * baseMul(npc && ecoTown(npc), baseOf(key)) * (inst ? RARITY_VALUE[rarOf(inst)] || 1 : 1) * afterItemMul(key);   /* T09: Preis nach Stadtlager statt Weltfaktor */   /* Folgen §5c: Streik verteuert Bionik */
   const t = (S.player.skills.trading || 0) / 100;
   return Math.max(1, Math.round((isBuy ? v * (1.35 - t * 0.3) : v * (0.45 + t * 0.25)) * repPrice(npc, isBuy)));   // §43: Ruf verändert den Preis
 }
@@ -12219,8 +12224,12 @@ function shopStock(npc) {
     npc._stockDay = S.day;
     const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
       'wooden_shield', 'leather_jerkin', 'leather_cap', 'chain_hauberk', 'pickaxe', 'traveler_cloak'];
-    npc._stock = []; const open = pool.filter(k => !bionicTier(ITEMS[k]) || !bionicLack(bionicTier(ITEMS[k])));   /* Roadmap P5: Bionik nach Rang in Aurelion */
-    for (let i = 0; i < (npc.shop && open.length ? 7 : 0); i++) { const k = pick(open); npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); }
+    npc._stock = []; const open = npc.fixedStock ? [] : pool.filter(k => !bionicTier(ITEMS[k]) || !bionicLack(bionicTier(ITEMS[k])));   /* RB-019: fester Tagesbestand (Hedda: 3 Phiolen) */
+    if (npc.fixedStock) npc._stock = npc.fixedStock.map(s => ({ ...s }));   /* Roadmap P5: Bionik nach Rang in Aurelion */
+    const tk0 = ecoTown(npc), T0 = tk0 && S.towns[tk0], w = k => { const b = baseOf(k); if (!T0 || !b || T0.stock[b] == null) return 1; const st = T0.stock[b]; return st < 1 ? 0 : clamp(st / ECO.target(T0, b), 0.1, 1.5); };   /* T09: Auswahl nach Vorrat */
+    const armsCap = T0 ? Math.floor((T0.stock.arms || 0) / 2) : 99, put = k => { if (baseOf(k) === 'arms' && npc._stock.filter(s => baseOf(s.key) === 'arms').length >= armsCap) return false; npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 }); return true; };
+    if (npc.shop && open.length) { for (const k of open.slice().sort((a, b) => ITEMS[a].value - ITEMS[b].value).slice(0, 2)) npc._stock.push({ key: k, count: ITEMS[k].stack ? ri(1, 4) : 1 });   /* Mindestbestand: kein Laden leer */
+      for (let i = 0; i < 5; i++) { const tot = open.reduce((s, k) => s + w(k), 0); if (tot <= 0) break; let r = rnd() * tot; const k = open.find(k2 => (r -= w(k2)) <= 0) || open[open.length - 1]; put(k); } }
   }
   const tk = sellsGoods(npc) ? ecoTown(npc) : null;
   if (!tk) return npc._stock;
@@ -12241,6 +12250,7 @@ function buy(npc, key) {
   }
   if (!addItem(S.player, key, 1)) return;
   S.gold -= c;
+  { const b = baseOf(key), tk = ecoTown(npc), T = tk && S.towns[tk]; if (b && T?.stock[b] != null) { T.stock[b] = Math.max(0, T.stock[b] - 0.5); (T.bought ||= {})[b] = (T.bought[b] || 0) + 0.5; } }   /* T09: ein Kauf zieht Ware aus dem Lager */
   const s = npc._stock.find(x => x.key === key);
   if (s) { s.count--; if (s.count <= 0) npc._stock.splice(npc._stock.indexOf(s), 1); }
   S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3);
@@ -12615,7 +12625,7 @@ function cultStart(why) {
 }
 function cultTake() {                                          /* ein Bewohner verschwindet (er lebt — vorerst) */
   const C = S.cult; if ((C.taken || 0) >= 8) return null;
-  const vs = villagersOf('varonheim').filter(c => !NAMED_NPC.has(c.key) && !c.shop && !c.guard && !c.cultSuspect && !c.downed && !c.captive); if (!vs.length) return null;
+  const vs = villagersOf('varonheim').filter(c => !C.missing.some(m => m.ent.id === c.id) && !NAMED_NPC.has(c.key) && !c.shop && !c.guard && !c.cultSuspect && !c.downed && !c.captive); if (!vs.length) return null;
   const v = pick(vs), i = S.ents.world.indexOf(v); if (i < 0) return null; S.ents.world.splice(i, 1);
   const home = HOUSES.find(b => b.id === v.homeId), mark = home ? { x: (home.x + home.w / 2) * TS, y: (home.y + home.h) * TS + 12 } : { x: v.x, y: v.y + 20 };
   C.missing.push({ ent: v, day: S.day | 0, mark, seen: false }); C.taken = (C.taken || 0) + 1;
@@ -12722,7 +12732,7 @@ function buildCatacombs(from) {
     foe('chalice_guard', 36, 40, { level: 14 }); foe('chalice_guard', 44, 40, { level: 14 }); foe('blood_mage', 33, 36); foe('blood_mage', 47, 36); foe('blood_mage', 60, 42);
     if (!C.heddaDead) { const q = { x: 40 * TS + TS / 2, y: 35 * TS }, c = makeChar({ name: 'Hedda', prof: 'Kelchwahrerin', map: 'katakomben', x: q.x, y: q.y, level: 15 });
       Object.assign(c, { key: 'hedda', cultHedda: true, transient: true, visitor: true, faction: 'blut', anchor: { ...q }, pal: { ...c.pal, cloth: '#4a0e14', glow: '#c0303a' }, hooded: true,
-        ...(C.joined ? { shop: true, market: false, pool: ['blutphiole', 'blutphiole', 'blutphiole'] } : {}),
+        ...(C.joined ? { shop: true, market: false, pool: ['blutphiole'], fixedStock: [{ key: 'blutphiole', count: 3 }] } : {}),
         greet: C.joined ? '„Kind des Kelchs. Durstig? Ich habe, was du brauchst.“' : '„Ein Gast. Selten, dass jemand freiwillig so tief kommt. Bist du gekommen, um zu trinken — oder um zu sterben?“' });
       S.ents.katakomben.push(c); }
   }
@@ -12887,6 +12897,34 @@ function cultPathChoices(npc, choices) {
     { text: 'Das stärkere Blut: Aldhelm herausfordern', fn: () => { C.challenge = true; say('„So sei es. Er wartet in der Krypta. Wer ihn trinkt, trägt den Kelch — und den Hass des Ordens.“'); } });
   if (npc.cultHedda && C.end === 'player') choices.unshift({ text: C.tithe ? 'Den Zehnt aussetzen (die Stadt schonen, selbst dürsten)' : 'Den Zehnt fordern (alle fünf Tage ein Bürger — der Kult wird satt)', fn: () => {
     C.tithe = !C.tithe; say(C.tithe ? '„Wie es sich gehört. Alle fünf Nächte ein Gefäß.“ (Valen bekommt weniger Nachschub, solange der Zehnt läuft.)' : '„Wie Ihr wünscht. Aber der Kelch vergisst nicht, wer ihn hungern lässt.“'); } });
+}
+// ================= T09 Läden am Stadtlager (Audit V3) =================
+// Jeder Gegenstand hängt an einer Leitware (Waffen an „arms“, Werkzeug an „tools“, Stoffrüstung an „cloth“ …). Der Preis folgt dem
+// Lager der Stadt (0,7–1,8×), die Auswahl dem Vorrat (mindestens zwei billige Plätze), ein Kauf zieht eine halbe Leitware ab.
+// Ereignisse verändern Lager statt eines Weltfaktors (stockShock); Aurelion hat Zölle (S.tollMul, fällt täglich um 1 % zurück).
+const BASE_CACHE = new Map();
+function baseOf(key) {
+  if (BASE_CACHE.has(key)) return BASE_CACHE.get(key);
+  const it = ITEMS[key]; let b = null;
+  if (!it) b = null; else if (it.base !== undefined) b = it.base; else if (it.good) b = key;
+  else if (it.use === 'prosthesis' || bionicTier(it)) b = 'magitech';
+  else if (it.slot === 'weapon' || it.slot === 'offhand') b = it.tool ? 'tools' : 'arms';
+  else if (['chest', 'head', 'legs', 'hands', 'feet'].includes(it.slot)) { const n = RECIPES[key]?.need || {}; b = n.iron || n.ingot ? 'arms' : n.pelt ? 'pelt' : n.cloth ? 'cloth' : (it.armor || 0) >= 6 ? 'arms' : 'pelt'; }
+  else if (it.slot === 'cloak') b = 'cloth';
+  else if (it.use === 'food') b = /meat|fleisch|wurst|schinken|braten/.test(key) ? 'meat' : 'grain';
+  else if (key === 'bandage' || key === 'strick') b = 'cloth';
+  BASE_CACHE.set(key, b); return b;
+}
+const baseMul = (tk, b) => !b || !tk || !S.towns?.[tk] || !ITEMS[b] ? 1 : clamp(ECO.ecoPrice(tk, b, true) / (ITEMS[b].value * 1.12), 0.7, 1.8);
+const GOOD_NAME = { arms: 'Waffen', tools: 'Werkzeug', cloth: 'Tuch', pelt: 'Leder', grain: 'Korn', meat: 'Fleisch', magitech: 'Magitech' };
+function priceNote(key, npc) {
+  const tk = npc && ecoTown(npc), b = baseOf(key), m = baseMul(tk, b); if (!tk || !b) return '';
+  return m >= 1.25 ? `Teuer: ${GOOD_NAME[b] || ITEMS[b]?.name || b} knapp in ${townName(tk)} (×${m.toFixed(2)})` : m <= 0.85 ? `Günstig: ${GOOD_NAME[b] || ITEMS[b]?.name || b} reichlich in ${townName(tk)} (×${m.toFixed(2)})` : '';
+}
+function stockShock(towns, good, n, why) {
+  const hit = towns.filter(k => S.towns?.[k]?.stock); for (const k of hit) S.towns[k].stock[good] = Math.max(0, (S.towns[k].stock[good] || 0) + n);
+  if (why && hit.length) log(`${why} (${GOOD_NAME[good] || ITEMS[good]?.name || good}: ${n > 0 ? 'mehr' : 'weniger'} in ${hit.map(townName).join(', ')})`, 'economy');
+  return hit;
 }
 // ================= T08 Verhör und Ruf der Klinge (Audit A5, A10) =================
 // Verhör: ruhig (70 % wahr) oder hart (95 % wahr, er kann sterben, Grausamkeit). Er verrät das nächste Bandenlager als Gerücht mit
@@ -14070,6 +14108,12 @@ function debugSections() {
       'Spieler wird Blutfürst (sofort)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); if (!isVamp(p)) unlockTitle('vampire', 'Debug'); S.cult.joined ??= S.day | 0; S.cult.challenge = true; S.cult.end = null; cultEnd('player'); },
       'Zehnt umschalten': () => { if (S.cult) { S.cult.tithe = !S.cult.tithe; UI.toast(S.cult.tithe ? 'Zehnt läuft' : 'Zehnt ausgesetzt'); } },
       'Ausgang zurücksetzen (Stufe 4)': () => { if (S.cult) { S.cult.end = null; S.cult.stage = 4; delete AF().cult; UI.toast('Kein Ausgang'); } },
+    }],
+    ['Läden und Lager (T09)', sel('dbGood', Object.entries(GOOD_NAME)), {
+      'Ware hier knapp (Lager 0)': () => { const tk = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!S.towns?.[tk]) return UI.toast('Keine Stadt mit Markt hier.'); S.towns[tk].stock[v('dbGood')] = 0; UI.toast(`${GOOD_NAME[v('dbGood')]} knapp in ${townName(tk)}`); },
+      'Ware hier reichlich (Lager 200)': () => { const tk = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!S.towns?.[tk]) return UI.toast('Keine Stadt mit Markt hier.'); S.towns[tk].stock[v('dbGood')] = 200; UI.toast(`${GOOD_NAME[v('dbGood')]} reichlich in ${townName(tk)}`); },
+      'Aurelions Zoll ×1,3': () => { S.tollMul = 1.3; }, 'Zoll zurück auf 1': () => { S.tollMul = 1; },
+      'Läden neu bestücken (heute)': () => { for (const e of S.ents[S.map]) if (e.shop) e._stockDay = null; UI.toast('Läden würfeln neu'); },
     }],
     ['Gefangene und Klinge (T08)', '', {
       'Ergebenen Räuber hier': () => { const e = spawnEnemy('bandit', S.map, (p.x / TS | 0) + 2, p.y / TS | 0); if (e) Object.assign(e, { surrendered: true, disarmed: true, transient: true }); },
@@ -15431,7 +15475,7 @@ export function selftest() {
     return seen === 2 && done && ghost && noSave && !p.cineGhost && p.x === x0 && p.y === y0 && !S.cine;
   }));
   ok('Nutzer S13 Hoher Rat: Stimmen folgen Haltung, Beziehung und Begründung; die Kaiserin zählt doppelt; Beschlüsse ändern die Welt (Flüchtlingslager, Schuldknechtschaft)', sandbox(() => {
-    const L0 = structuredClone(S.laws || {}), c0 = structuredClone(S.council || {}), h0 = structuredClone(S.houses || {}), W0 = S.ents.world.slice();
+    const L0 = structuredClone(S.laws || {}), c0 = structuredClone(S.council || {}), h0 = structuredClone(S.houses || {}), W0 = S.ents.world.slice(), tm0P = S.tollMul;
     try {
       S.council = { rel: {} }; S.houses = {}; for (const H of AUREL_HOUSES) S.houses[H.key] = 0; stage();
       const cold = councilVote('refugees', 'city', 'gewinn');
@@ -15442,7 +15486,7 @@ export function selftest() {
       applyLaw('slavery', 'regulate'); const law = S.laws.slavery === 'regulate';
       applyLaw('toll', 'raise'); const again = !S.laws.toll;               // Dauerthemen bleiben verhandelbar
       return !cold.pass && warm.pass && weight && camp && law && again && refs >= 0;
-    } finally { S.laws = L0; S.council = c0; S.houses = h0; S.ents.world = W0; indexSolids('world'); S.prices = 1; }
+    } finally { S.laws = L0; S.council = c0; S.houses = h0; S.ents.world = W0; indexSolids('world'); delete S.prices; S.tollMul = tm0P; }
   }));
   ok('Nutzer S13 Fall der Untoten: Vharnholm-Entscheidung (Bürger), befreite Städte, das Land heilt ohne Zufall; nach Vargs Fall ziehen Flüchtlinge nach Aurelion', sandbox(() => {
     const L0 = structuredClone(S.laws || {}), W0 = S.ents.world.slice(), f0 = S.factions.undead;
@@ -16089,7 +16133,7 @@ export function selftest() {
     return pal.length > 30 && gates && !!oda && inC(oda) && guards.length === 3 && !!sack && !SOLID.has(tileAt('world', sack.x / TS | 0, sack.y / TS | 0));
   })());
   ok('S13 Ende der Brüder: erst wenn Varg UND Garmadon tot sind, genau einmal (Legende, Ruf, Kettenrest); Legion nur mit Zusage', (() => {
-    const keep = JSON.stringify({ f: S.flags, fa: S.factions, l: S.legend, t: S.player.titles, p: S.prices, c: S.chainRest }), W0 = S.ents.world, G0 = S.ents.garmadon;
+    const keep = JSON.stringify({ f: S.flags, fa: S.factions, l: S.legend, t: S.player.titles, p: S.prices, c: S.chainRest, tw: S.towns, tm: S.tollMul ?? null }), W0 = S.ents.world, G0 = S.ents.garmadon;
     S.ents.world = W0.slice(); S.ents.garmadon = G0.slice();
     try {
       Object.assign(S.flags, { garmadonSlain: true, chainsBroken: false, twinFall: 0, legionCame: false, legionHome: false }); S.chainRest = null;
@@ -16098,7 +16142,7 @@ export function selftest() {
       const rest = S.ents.world.filter(e => e.chainRest && e.alive).length;
       S.map === 'garmadon' || (S.flags.chainsBroken = false); legionArrives(); const noLegion = !S.ents.garmadon.some(e => e.legion);   // nicht in der Gruft: keine Legion
       return early && !!S.flags.twinFall && v1 === Math.min(100, v0 + 10) && S.factions.valen === v1 && Object.values(S.legend || {}).includes('Ende der Brüder') && rest >= 5 && noLegion;
-    } finally { const k = JSON.parse(keep); S.flags = k.f; S.factions = k.fa; S.legend = k.l; S.player.titles = k.t; S.prices = k.p; S.chainRest = k.c; S.ents.world = W0; S.ents.garmadon = G0; }
+    } finally { const k = JSON.parse(keep); S.flags = k.f; S.factions = k.fa; S.legend = k.l; S.player.titles = k.t; S.prices = k.p; S.chainRest = k.c; S.towns = k.tw; S.tollMul = k.tm ?? undefined; S.ents.world = W0; S.ents.garmadon = G0; }
   })());
   ok('S13 Gespräch endet, wenn man weggeht (nah bleibt es offen)', sandbox(() => {
     const p = stage(), a = actor(p.x + 60, p.y); UI.dialogue(a, 'Hallo', [{ text: 'x' }]);
@@ -16147,7 +16191,7 @@ export function selftest() {
     return frozen && first && second && done && wound;
   }));
   ok('S13 Fraktionen handeln selbst: jeden Tag eine Macht mit Nachricht; Aushänge landen am Brett einer eigenen Stadt; Streifen tragen Farben und Waffen', (() => {
-    const keep = JSON.stringify({ c: S.contracts, p: S.prices, d: S.day, a: (S.war?.armies || []).map(a => a.strength) }), W0 = S.ents.world, tp = TRAV_PEND.length; S.ents.world = W0.slice();
+    const keep = JSON.stringify({ c: S.contracts, p: S.prices, d: S.day, a: (S.war?.armies || []).map(a => a.strength), tw: S.towns, tm: S.tollMul ?? null }), W0 = S.ents.world, tp = TRAV_PEND.length; S.ents.world = W0.slice();
     try {
       const titles = []; for (let d = 0; d < 5; d++) { S.day = 100 + d; titles.push(factionAgenda()); }
       const C = postContract('valen', 'bounty'), board = C && C.giver === 'board' && TOWN_PLAN[C.town].lord === 'valen' && C.state === 'offer';
@@ -16155,7 +16199,7 @@ export function selftest() {
       const crew = lead && typeof lead === 'object' ? S.ents.world.filter(e => e === lead || e.travLead === lead.id) : null;
       const armed = !crew || (crew.length === 3 && crew.every(e => e.faction === 'valen' && e.equip.weapon && e.patrol === 'valen'));
       return titles.every(t => typeof t === 'string' && t.length > 5) && new Set(titles).size >= 4 && board && armed;
-    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.prices = k.p; S.day = k.d; (S.war?.armies || []).forEach((a, i) => { if (k.a[i] != null) a.strength = k.a[i]; }); S.ents.world = W0; TRAV_PEND.length = tp; }
+    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.prices = k.p; S.day = k.d; S.towns = k.tw; S.tollMul = k.tm ?? undefined; (S.war?.armies || []).forEach((a, i) => { if (k.a[i] != null) a.strength = k.a[i]; }); S.ents.world = W0; TRAV_PEND.length = tp; }
   })());
   ok('S13 Reaktionen auf Ereignisse: eine Leiche erschreckt Umstehende (Sprechblase), stirbt die Händlerin, trauert ihr Ort zwei Tage', sandbox(() => {
     const p = stage(), m0 = S.mourn; S.mourn = {};
@@ -16242,14 +16286,14 @@ export function selftest() {
     return new Set(sig).size === keys.length && specs[1].beard === 1 && specs[2].hair === '#a8421e' && specs[3].cape === '#9b2e26';
   })());
   ok('S13 Echte Weltereignisse (Steuereintreiber, Deserteure mit Aushang, Missernte) und Folgen verfallener Aufträge', (() => {
-    const keep = JSON.stringify({ g: S.growth, p: S.prices, c: S.contracts }), W0 = S.ents.world; S.ents.world = W0.slice();
+    const keep = JSON.stringify({ g: S.growth, p: S.prices, c: S.contracts, tw: S.towns }), W0 = S.ents.world; S.ents.world = W0.slice();
     try {
       const t = evTaxman(), tax = !t || S.ents.world.some(e => e.prof === 'Steuereintreiber');
       const n0 = S.ents.world.filter(e => e.kind === 'enemy').length, c0 = (S.contracts || []).length; evDeserters(); const des = S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3 && S.contracts.length === c0 + 1;
-      const p0 = S.prices || 1, h = evFailedHarvest(), harvest = !h || S.prices > p0;
+      const gr0 = Object.fromEntries(Object.keys(S.towns).map(k => [k, S.towns[k].stock.grain])), h = evFailedHarvest(), harvest = !h || !S.towns[h] || S.towns[h].stock.grain <= Math.floor((gr0[h] || 0) / 2);   /* T09: Missernte halbiert das Korn statt eines Weltpreises */
       const C = makeContract('eren', 'bounty', 'board'); const g0 = growthOf('eren').prosper; ignoredContract(C); const ignored = growthOf('eren').prosper < g0 || g0 <= -20;
       return tax && des && harvest && ignored && EVENTS.length >= 13;
-    } finally { const k = JSON.parse(keep); S.growth = k.g; S.prices = k.p; S.contracts = k.c; S.ents.world = W0; }
+    } finally { const k = JSON.parse(keep); S.growth = k.g; S.prices = k.p; S.contracts = k.c; S.towns = k.tw; S.ents.world = W0; }
   })());
   ok('S13 Spurensuche: drei Spuren nacheinander, dann das Lager mit dem Täter; sein Tod erfüllt den Auftrag. Karawanenüberfall hinterlässt Aushang „Überlebende“', (() => {
     const p = S.player, keep = JSON.stringify({ c: S.contracts, q: S.quests, tr: S.track, x: p.x, y: p.y, xp: [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints], k: S.kills, pk: p.kills, g: S.gold }), W0 = S.ents.world, qk = Object.keys(QUESTS); S.ents.world = W0.slice(); S.contracts = [];
@@ -17026,8 +17070,9 @@ export function selftest() {
       S.cult = { stage: 3, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; const v1 = cultTake();
       const once = cultReveal('ysmay') && !cultReveal('king') && S.cult.stage === 4 && S.cult.revealHow === 'ysmay';
       buildCatacombs('world'); const a = S.ents.katakomben.find(e => e.mtype === 'aldhelm'), M = MONSTERS.aldhelm; if (!a) return false;
-      S.cult.introSeen = true; S.minute = 0; hurt(a, a.maxHp * 0.2, null, 'Probe'); const h1 = a.hp; aldhelmAI(a, p, 600, M.reach, 1, 1000, M); const fed = a.hp > h1;
-      hurt(a, a.hp - a.maxHp * 0.55, null, 'Probe'); aldhelmAI(a, p, 600, M.reach, 1, 16, M); const ph2 = a.phase === 2;
+      const w0 = { ...B.HIT_W }, torso = n => { for (const k in B.HIT_W) B.HIT_W[k] = k === 'torso' ? 1 : 0; try { hurt(a, n, null, 'Probe'); } finally { Object.assign(B.HIT_W, w0); } };   /* Rumpf: sonst verteilt sich der Schaden zufällig */
+      S.cult.introSeen = true; S.minute = 0; torso(a.maxHp * 0.2); const h1 = a.hp; aldhelmAI(a, p, 600, M.reach, 1, 1000, M); const fed = a.hp > h1;
+      torso(a.hp - a.maxHp * 0.55); aldhelmAI(a, p, 600, M.reach, 1, 16, M); const ph2 = a.phase === 2;
       S.minute = 12 * 60; a.roar = 0; a.invuln = false; const sh = S.ents.katakomben.find(e => e.lightShaft); a.x = sh.x; a.y = sh.y; const h2 = a.hp; aldhelmAI(a, p, 600, M.reach, 1, 1000, M); const burnt = a.hp < h2 && a.lightDmg > 0;
       die(a, 'Probe', p); const end = S.cult.end === 'destroyed' && S.after.cult?.end === 'destroyed' && !cultWar() && S.ents.world.includes(v1);
       if (!(once && fed && ph2 && burnt && end)) console.warn('S4DBG', JSON.stringify({ once, fed, ph2, burnt, end, h1, h2, hp: a.hp, max: a.maxHp, ld: a.lightDmg, ce: S.cult.end, ae: S.after.cult, war: cultWar(), home: S.ents.world.includes(v1) }));
@@ -17076,6 +17121,20 @@ export function selftest() {
       if (C) { delete QUESTS['c_' + C.id]; delete S.quests['c_' + C.id]; }
       return asked && old && hard && cap && tiers;
     } finally { S.fameStyle = F0; S.fameStyleDay = FD0; S.contracts = K0; S.bands = B0; S.track = T0; }
+  }));
+  ok('T09 Läden am Stadtlager: Leitware je Gegenstand; Preis folgt dem Lager (0,7–1,8×); Kauf zieht eine halbe Leitware ab; Zölle nur in Aurelion; kein Weltpreis mehr', sandbox(() => {
+    const T0 = structuredClone(S.towns), tm = S.tollMul;
+    try {
+      const bases = baseOf('longsword') === 'arms' && baseOf('pickaxe') === 'tools' && baseOf('bread') === 'grain' && baseOf('potion') === null && baseOf('traveler_cloak') === 'cloth';
+      const tk = 'northcity', T = S.towns[tk], [sx, sy] = TOWN_PLAN[tk].square, npc = { kind: 'npc', homeTown: tk, x: sx * TS, y: sy * TS, map: 'world', faction: 'valen', shop: true };
+      T.stock.arms = 0; const dear = baseMul(tk, 'arms'), pHigh = rawPrice('longsword', true, npc); T.stock.arms = 200; const cheap = baseMul(tk, 'arms'), pLow = rawPrice('longsword', true, npc);
+      const follows = dear === 1.8 && cheap === 0.7 && pHigh > pLow * 2;
+      S.gold = 9999; npc._stock = [{ key: 'longsword', count: 1 }]; npc._stockDay = S.day; const a0 = T.stock.arms; buy(npc, 'longsword'); const took = Math.abs(T.stock.arms - (a0 - 0.5)) < 1e-9;
+      const at = Object.keys(S.towns).find(k => TOWN_PLAN[k]?.lord === 'aurel'); S.tollMul = 1; const pa = ECO.ecoPrice(at, 'tools', true), pn0 = ECO.ecoPrice(tk, 'tools', true);
+      S.tollMul = 1.3; const pb = ECO.ecoPrice(at, 'tools', true), pn1 = ECO.ecoPrice(tk, 'tools', true); const toll = !!at && pb > pa && pn1 === pn0;
+      if (!(bases && follows && took && toll && S.prices === undefined)) console.warn('T09DBG', JSON.stringify({ bases, b: [baseOf('longsword'), baseOf('pickaxe'), baseOf('bread'), baseOf('potion'), baseOf('traveler_cloak')], dear, cheap, pHigh, pLow, took, a0, arms: T.stock.arms, at, pa, pb, pn0, pn1, pr: S.prices }));
+      return bases && follows && took && toll && S.prices === undefined;
+    } finally { S.towns = T0; S.tollMul = tm; }
   }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };
@@ -17866,6 +17925,7 @@ function boot() {
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
     fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),
+    priceNote: (k, npc) => priceNote(k, npc),   /* T09 */
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
