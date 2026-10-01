@@ -676,3 +676,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Ohne Anklage:** Wido öffnet für 50 Gold (oder wenn er dir vertraut) den alten **Zugang zum Beinhaus** am Friedhof.
 - Beide Wege führen in die Katakomben — **die Katakomben selbst folgen mit Scheibe 3**.
 - **Debug:** „Blutkult: Unterwanderung“. Probe „Blutkult S2“.
+
+## Runde: Blutkult, Scheibe 3 — Katakomben von Varonheim (§5g.2, 01.10.2026)
+- **Eingänge:** die **alte Gruft am Friedhof** (Nordwesten der Stadt; erscheint, sobald der Weg bekannt ist — durch Wido oder die richtige Anklage) und die **Treppe im Kanzleikeller** der Varonsburg (mit Albins Schlüssel). Innen führt jeder Ausgang zum anderen Eingang zurück.
+- **Räume:** Beinhaus (Blutknechte), Pferche (Käfige, Maskierte), Kelchhalle (Hedda, Kelchwächter, Blutmagier, Altar), Archiv der Kanzlei.
+- **Gegner (Gebiet Stufe 12–16):** **Maskierter** (schnell, Dolch), **Blutmagier** (Fernkampf, sein Geschoss heilt ihn um 40 % des Schadens — unterbrechen oder decken), **Blutknecht** (schwach, viele; trägt den Namen eines Verschwundenen), **Kelchwächter** (Platte, Schild, deutliche Ansage).
+- **Gefangene:** Die Verschwundenen hängen in den Käfigen (höchstens vier). **E → Käfig öffnen:** Sie laufen nach Hause, Varonheim gewinnt Wohlstand, der Gefangene vertraut dir. **Zu spät:** Wer länger als sechs Tage im Pferch hängt (oder als Fünfter dazukommt), wird zum **Blutknecht** — mit seinem Namen. Fällt er, meldet die Chronik seinen Tod.
+- **Hedda, die Kelchwahrerin:** spricht zuerst. **„Trinken“** = Beitritt: du wirst Vampir, der Kult ist dir freundlich gesinnt, Hedda verkauft Blutphiolen und weiht dich in höhere Grade. **„Ich bin gekommen, euch zu beenden“** = Kampf gegen Hedda (Blutmagierin, deutlich stärker) und die Halle.
+- **Archiv:** Im Pult der Kanzlei liegt das **Rote Siegel** — der Siegelring des Kanzlers, Beweis für die Enthüllung (folgt mit Scheibe 4).
+- **Debug:** „Blutkult: Katakomben“. Probe „Blutkult S3“.

@@ -174,7 +174,7 @@ function humanAtlas(e) {
 }
 const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
-  cultist: 'schamane', blood_cultist: 'schamane', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
+  cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
   flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
@@ -585,6 +585,12 @@ export function monsterSpec(e, m) {
     Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: t === 'sea_harpooner' ? '#3a3a2c' : '#2c3a44', pants: '#3a3226', sash: '#8a2a20', strap: 1, helm: 'scarf', helmCol: ['#7a2a20', '#2a4a6a', '#6a5a2a'][(e.seed | 0) % 3], beard: (e.seed | 0) % 2 });
     if (t === 'sea_harpooner') Object.assign(s, { helm: 'hat', helmCol: '#2a2622', quiver: 0 });
     if (t === 'whitebeard') Object.assign(s, { bd: 'bullig', hv: 1, pb: 1, helm: 'hat', helmCol: '#141414', hair: '#e8e4dc', beard: 1, beardLong: 1, cloak: '#141c24', capeL: 1, armor: 'plate', armorCol: '#3a3e44', pauld: '#8a8a86', fur: '#d8d2c4', chn: 1, glove: '#4a3a2a' });
+  } else if (t === 'blood_mage') {                                      // §5g.2 Blutmagier: rote Robe, offene Kapuze, Glimmen
+    s.hooded = 1; s.hood = '#3a0a10'; s.robe = '#4a0e14'; s.cloak = '#1a0608'; s.face = 'skin'; s.glow = '#c0303a'; s.mark = 'chevron'; s.markCol = '#c0303a';
+  } else if (t === 'thrall') {                                          // Blutknecht: bleich, zerrissene Alltagskleidung (er war Bürger)
+    s.skin = '#cdb8b0'; s.cloth = ['#5a4a3a', '#4a5a4a', '#5a4a5a'][((e.seed || 0) | 0) % 3]; s.wear = 3; s.blood = 2; s.glow = '#a02028';
+  } else if (t === 'chalice_guard') {                                   // Kelchwächter: dunkle Platte, rotes Wappen
+    Object.assign(s, { armor: 'plate', armorCol: '#2a1a1c', helm: 'great', helmCol: '#3a2224', tabard: '#5a1a1e', cloak: '#1a0a0c', shield: 'kite', shieldCol: '#4a1418' });
   } else if (t === 'blood_cultist') {                                   // §5g.2 Maskierter: Kapuze in Blutrot, Wachsmaske, dunkler Umhang (Farbe je Figur)
     s.hooded = 1; s.hood = ['#3a0e12', '#2a0a0e', '#40181a'][((e.seed || 0) | 0) % 3]; s.cloak = '#1a0a0c'; s.robe = '#24100f'; s.face = 'mask'; s.mark = 'chevron'; s.markCol = '#7a2228';
   } else if (t === 'cultist') {                                         // Kultist: Robe, tiefe Kapuze, violettes Glimmen

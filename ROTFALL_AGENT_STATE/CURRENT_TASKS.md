@@ -10,11 +10,12 @@ Status nach `AGENT_SYSTEM.md`. **Diese Tafel ist maßgeblich**; `docs/audit/STAT
 | T04 Effekte, Zufall, Klang | TESTING (Control: NEEDS FIX → Probe ergänzt) | Engineer | gleiche Schwebetexte bündeln + `ambienceKind`: DEFERRED (kein Spielerwert jetzt) |
 | T06 Spielstand komprimiert, Caches, HUD | TESTING (Control: NEEDS FIX → Speicherpfad gefixt) | Engineer | Vorwärmen bei Reise: DEFERRED |
 | T05 Kleine Korrekturen (V17, A13, Stil F, Doku) | IMPLEMENTED → TESTING | Engineer; Hunter steht aus | Probe „Audit T05“, 325/325; JOIN_FOES geprüft, keine Änderung nötig |
-| T07 §5g.2 Blutkult | IN_DEVELOPMENT — Scheibe 1 (Vampir + Stigma) TESTING (Hunter läuft), Scheibe 2 (Unterwanderung) IMPLEMENTED | Engineer | `proposals/blutkult.md`; vereinfacht: Beschatten (Weg B) und Tagebuch-Auftrag folgen mit Scheibe 3; Scheiben 3–5 offen |
+| T07 §5g.2 Blutkult | IN_DEVELOPMENT — Scheibe 1 (Vampir + Stigma) TESTING (Hunter läuft), Scheibe 2 (Unterwanderung) und 3 (Katakomben) IMPLEMENTED | Engineer | `proposals/blutkult.md`; vereinfacht/offen: Beschatten (Weg B), Tagebuch-Auftrag, Fledermausschwärme, Blutmaske als eigene Gesichtsform; Scheiben 4–5 offen |
 | T08 Gefangene, Steckbriefe, Ruf der Klinge | DESIGN_LOCKED | Engineer | `proposals/t08_gefangene_steckbriefe_ruf.md` |
 | T09 Läden am Stadtlager | DESIGN_LOCKED | Engineer | `proposals/t09_laeden_stadtlager.md` |
 | T10 Ahnenfeind und Heldentod | DESIGN_LOCKED | Engineer | `proposals/t10_ahnenfeind_heldentod.md` (3 s, bis 3 Ahnenfeinde) |
 | Varonheim als Kriegsknoten (belagerbar) | APPROVED | Engineer | Nutzer 01.10.; Design im Rahmen T02/T40 |
 | RB-008 Slotwechsel schreibt falschen Stand (CRITICAL) | TESTING (Control-Nachtrag: laufendes Komprimieren beim Wechsel → jetzt sofort in den alten Platz) | Engineer | Hunter-Bericht |
-| RB-009 komprimierter Slot außerhalb UNZ liest null (MEDIUM) | VERIFIED | Engineer | Hunter-Bericht |
+| RB-009 komprimierter Slot außerhalb UNZ liest null (MEDIUM) | VERIFIED |
+| RB-012 Kutschen-Probe wackelt (etwa jeder dritte Lauf) | IN_DEVELOPMENT | Engineer | Diagnose bei Fehlschlag eingebaut (KDBG), Ursache noch offen | Engineer | Hunter-Bericht |
 | übrige T08–T40 | PLANNED | – | `docs/audit/TASKS.md` |
