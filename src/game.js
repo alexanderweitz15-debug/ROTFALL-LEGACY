@@ -2355,6 +2355,7 @@ function update(dt, now) {
   dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
+  if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -5833,8 +5834,12 @@ function planCampaign(type) {
 function startMuster(C) {
   const K = CAMP_TYPES[C.type], n = Math.min(K.show, C.size), [mx, my] = MUSTER;
   const lead = guardChar('chainpal', freeSpotNear('world', mx, my, 2), 'Kriegsmeister'); Object.assign(lead, { faction: 'chain', camp: C.id, campLead: true, campI: 0 }); S.ents.world.push(lead);
+  const men = [];
   for (let i = 0; i < n; i++) { const kit = C.type === 'heer' && i % 4 === 0 ? 'chainpal' : i % 3 === 2 ? 'chainx' : 'chain';
-    const g = guardChar(kit, freeSpotNear('world', mx - 2 - (i % 5) * 2, my - 4 + ((i / 5) | 0) * 2, 2)); Object.assign(g, { faction: 'chain', camp: C.id, campIdx: i + 1 }); S.ents.world.push(g); }
+    const g = guardChar(kit, freeSpotNear('world', mx - 2 - (i % 5) * 2, my - 4 + ((i / 5) | 0) * 2, 2)); Object.assign(g, { faction: 'chain', camp: C.id, campIdx: i + 1 }); S.ents.world.push(g); men.push(g); }
+  const pl = S.player; if (!S._quiet && pl.map === 'world' && Math.hypot(pl.x / TS - mx, pl.y / TS - my) < 30) {   /* T17: Musterung mit Horn und Ansprache, wenn du dabei bist */
+    sfx('horn', 0, 0.7); bubble(lead, 'Antreten!', 2000);
+    cineLater(() => { if (!lead.alive) return; bubble(lead, `Morgen marschieren wir gegen ${townName(C.target)}!`, 3000); men.forEach(g => g.alive && gesture(g, 'salutieren', 900)); sfx('metal', 0.8, 0.6); }, 2200); }
   S.ents.world.push({ id: uid(), kind: 'prop', type: 'cart', map: 'world', x: (mx + 4) * TS, y: (my + 5) * TS, r: 14, solid: true, transient: true, campSupply: C.id, label: 'Proviantwagen des Feldzugs' });
   C.phase = 'muster'; C.marchAt = clock() + 180; C.shown = n + 1;
   log(`Vor dem Kettentor mustert die Kette ${C.size} Mann — ${K.name}.`, 'world'); chronicle(`Musterung vor dem Kettentor: ${C.size} Mann`, 'news');
@@ -7601,9 +7606,39 @@ function goblinStorm(v) {
   if (d) { d.x = v.x + 70; d.y = v.y + 40; d.goblinStorm = true; d.parley = false; d.aggroId = v.id; d.anchor = { x: d.x, y: d.y }; d.aiState = 'pursue'; }
   for (let i = 0; i < 12; i++) { const g = spawnEnemy(i % 3 ? 'goblin' : 'goblin_warrior', v.map, tx + ri(-5, 5), ty + ri(3, 7), { level: 12 });
     if (g) Object.assign(g, { goblinStorm: true, transient: true, aggroId: v.id, aiState: 'pursue', name: 'Krieger von Morrgrund' }); }
-  camShake(8, 700); UI.toast('DIE GRUBENSTÄMME STÜRMEN DIE HALLE', 3200);
+  if (!stormScene(v, d)) { camShake(8, 700); UI.toast('DIE GRUBENSTÄMME STÜRMEN DIE HALLE', 3200); }
   log('Hörner aus Knochen. Dann Geschrei, hundertfach. Dodon bricht durch das Tor, hinter ihm die Grubenstämme — der letzte Sturm von Morrgrund.', 'combat');
   chronicle('Der Sturm von Morrgrund', 'battle', 'Dodon und die Grubenstämme stürmen die Halle des Kettenmeisters.');
+}
+// T17/T20: der Aufbruch des Sturms als Szene (Welt steht, 8 s): Horn, Dodon bricht durch, Goblins rufen „Frei!“, Varg antwortet.
+function stormScene(v, d) {
+  if (S._quiet || S.cine || S.coop?.role === 'guest' || S.dying) return false;
+  (S.flags.introSeen ||= {}).chain_master = S.legacy.gen;           /* Varg tritt hier auf — kein zweiter Auftritt */
+  const gs = S.ents[v.map].filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon').slice(0, 3), gate = gs[0] || d || v;
+  cinematic([
+    { dur: 2000, zoom: 1.0, focus: gate.id, text: 'Hörner aus Knochen.', beats: [{ t: 0, sfx: 'horn', duck: 0.6, ms: 300 }, { t: 0.3, fx: 'dust', at: gate, n: 12 }] },
+    { dur: 2600, zoom: 1.25, focus: (d || gate).id, text: 'Dodon bricht durch das Tor, hinter ihm die Grubenstämme.', beats: [{ t: 0.1, shake: 8, ms: 600, sfx: 'crit' }, { t: 0.15, sfx: 'shout' },
+      ...(d ? [{ t: 0.25, gesture: 'zeigen', who: d, toward: v, ms: 1400 }, { t: 0.3, say: 'Morrgrund! Heute bricht die Kette!', who: d, ms: 2600 }] : []),
+      ...gs.map((g, i) => ({ t: 0.5 + i * 0.12, float: 'Frei!', who: g }))] },
+    { dur: 2000, zoom: 1.4, focus: v.id, beats: [{ t: 0, sfx: 'chains' }, { t: 0.1, gesture: 'zeigen', who: v, toward: d || S.player, ms: 1400 }, { t: 0.1, say: 'Dann sterbt alle.', who: v, ms: 2200 }, { t: 0.3, card: { title: 'VARG', sub: 'Kettenmeister der Eisenmark', ms: 2600 } }] },
+    { dur: 1500, zoom: 1.0, focus: S.player.id, beats: [{ t: 0, card: { title: 'DER STURM VON MORRGRUND', sub: 'Der letzte Sturm der Grubenstämme', ms: 2400 } }, { t: 0.7, duck: 1, ms: 500 }] },
+  ], null, { pause: true, stay: true });
+  return true;
+}
+// T17: Ankunft — beim ersten Betreten jeder Siedlung (je Spielstand) Namenskarte mit Herrschaft; besetzt/belagert erneut einmal.
+let arrT = 0;
+const ARRIVE_SAY = ['Willkommen. Halt dich an die Gesetze.', 'Der Platz ist dort drüben.', 'Fremd hier? Der Markt liegt in der Mitte.', 'Waffen bleiben in der Scheide.'];
+function arrivalTick() {
+  const p = S.player; if (!p || p.map !== 'world' || S.cine || S.dying || S._quiet || S.coop?.role === 'guest') return;
+  const k = townAt(p.x / TS | 0, p.y / TS | 0); if (!k || !TOWN_PLAN[k]) return;
+  const n = S.war?.nodes?.[k], occ = n?.owner === 'undead', sg = !!n?.siege && !occ, key = k + (occ ? ':occ' : sg ? ':siege' : '');
+  const seen = (S.flags.seenTowns ||= {}); if (seen[key] != null) return; seen[key] = S.day | 0;
+  const P = TOWN_PLAN[k], lord = n?.owner || P.lord;
+  const sub = occ ? 'Besetzt von den Toten' : sg ? 'Belagert' : k === 'varonheim' ? 'Hauptstadt Valens · Sitz König Varons' : `${P.metro ? 'Metropole' : P.village ? 'Dorf' : 'Stadt'} · ${FACTIONS[lord]?.name || 'frei'}`;
+  nameCard(townName(k).toUpperCase(), sub, 3200); sfx(occ || k === 'varonheim' ? 'bell' : 'ui', 0, k === 'varonheim' ? 0.35 : 0.6);
+  const g = !occ && S.ents.world.find(e => e.kind === 'npc' && e.alive && e.guard && dist(e, p) < 260);
+  if (g) { gesture(g, 'zeigen', 1400, P.square ? { x: P.square[0] * TS, y: P.square[1] * TS } : p); bubble(g, ARRIVE_SAY[(vrnd() * ARRIVE_SAY.length) | 0], 2600); }
+  log(`Du erreichst ${townName(k)} (${sub}).`, 'world');
 }
 function goblinStormWon() {
   S.flags.goblinStormActive = false; S.flags.goblinStormWon = true; S.factions.goblin = Math.min(100, (S.factions.goblin || 0) + 30);
@@ -12976,10 +13011,11 @@ function cultCourtChoices(npc, choices) {
 function cultGrade(g) { if (g >= 2 && S.cult?.joined != null && cultReveal('inside')) log('Bei der Blutweihe nimmt der Herr des Kelchs die Maske ab: Kanzler Aldhelm. „Überrascht? Der König unterschreibt alles. Auch das hier.“', 'quest'); }
 function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
   const C = S.cult || {}, now = performance.now();
-  if (!C.introSeen && e.map === 'katakomben' && d < 320 && tgt === S.player && !S.cine) { C.introSeen = true;
-    return cinematic([{ map: e.map, x: 40 * TS, y: 18 * TS, dur: 2200, text: 'Die Krypta des Kanzlers. Sechs Säulen, sechs Kerzen. Durch Gitter oben fällt der Markt herein.' },
-      { map: e.map, x: e.x, y: e.y + 40, dur: 2600, text: '„Der König unterschreibt alles, was ich ihm hinlege. Heute unterschreibst du.“' },
-      { map: e.map, x: e.x, y: e.y + 40, dur: 1800, text: 'ALDHELM — BLUTFÜRST VON VARONHEIM', setup: () => { camShake(4, 300); fx(e.x, e.y - 14, 'blood', 14); } }]); }
+  if (!C.introSeen && e.map === 'katakomben' && d < 320 && tgt === S.player && !S.cine) { C.introSeen = true;   /* T17: Auftritt mit stehender Welt, Kerzen, Blase, Karte */
+    const cand = S.ents.katakomben.filter(x => x.kind === 'prop' && (x.type === 'candles' || x.type === 'torch') && dist(x, e) < 420).slice(0, 6);
+    return cinematic([{ dur: 1800, zoom: 1.0, focus: { x: 40 * TS, y: 18 * TS }, text: 'Die Krypta des Kanzlers. Sechs Säulen, sechs Kerzen.', beats: [{ t: 0, sfx: 'moan', duck: 0.5, ms: 300 }, ...cand.map((c, i) => ({ t: 0.1 + i * 0.13, fx: 'fire', at: c, n: 4, sfx: 'ui' }))] },
+      { dur: 2600, zoom: 1.4, focus: e.id, beats: [{ t: 0.05, gesture: 'zeigen', who: e, toward: S.player, ms: 1400 }, { t: 0.1, say: 'Der König unterschreibt alles, was ich ihm hinlege. Heute unterschreibst du.', who: e, ms: 3000 }] },
+      { dur: 1600, zoom: 1.5, focus: e.id, beats: [{ t: 0, card: { title: 'ALDHELM', sub: 'Blutfürst von Varonheim', ms: 3000 }, shake: 4, ms: 300, fx: 'blood', at: e, n: 14, sfx: 'heartbeat' }, { t: 0.8, duck: 1, ms: 400 }] }], null, { pause: true, stay: true }); }
   if (!e.phase) e.phase = 1;
   const caged = (C.missing || []).filter(x => !x.freed && !x.thrall && !x.dead);
   const mend = n => { if (e.body) B.heal(e, n); else e.hp = Math.min(e.maxHp, e.hp + n); };
@@ -14610,6 +14646,8 @@ function debugSections() {
       'Szene: Varonheim ist gefallen': () => capitalScene('fell'),
       'Sprechblase am nächsten': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; bubble(n || p, 'Hier ist eine Sprechblase.', 3000); },
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
+      'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
+      'Ankunftskarten zurücksetzen': () => { S.flags.seenTowns = {}; UI.toast('Städte zeigen ihre Karte wieder'); },
     }],
     ['Kamerafahrten', '', {
       'Fall Vargs': () => vargCinematic(), 'Fall der Untoten': () => undeadFallCinematic(), 'Beenden': () => cineEnd(),

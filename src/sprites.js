@@ -686,7 +686,8 @@ const POSES = {
   guard: { u: 1, leg: 1, act: 'guard' },                              // Deckung: tief, Schrittstellung, Arme vor dem Körper
   sit: { u: 4, leg: 0, act: 'sit' },                                  // Sitzen (Bank, Schenke): Oberschenkel waagrecht
   trade: { u: 0, leg: 0, act: 'trade' },                              // Handeln: Ware vorzeigen, Hand offen
-  zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
+  zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },
+  salutieren: { u: 0, leg: 0, act: 'trade' }, jubeln: { u: -1, leg: 0, act: 'cast' }, trauern: { u: 1, leg: 1, act: 'guard' }, knien: { u: 3, leg: 0, act: 'kneel' },   /* T17 (Stil D) */   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
 };
 
 // ---------------- Menschen / Goblins / Skelette ----------------

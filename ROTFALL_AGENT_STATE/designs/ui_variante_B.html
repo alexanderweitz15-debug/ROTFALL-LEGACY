@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ROTFALL UI — Variante B „Diegetisch-minimal“</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* Variante B „Diegetisch-minimal“: das Spielfeld füllt den ganzen Bildschirm. Alles sitzt an den Rändern, halb durchsichtig,
+   und erscheint nur, wenn es gebraucht wird. Menü = Rad um den Helden. Hier offen: Rad → „Bauen“ → Geist der Hütte mit Kostenkarte.
+   Statisches Mockup 1280×720, Pixelraster per box-shadow. */
+:root{--ink:#0d0b08;--iron:#3b3227;--gold:#c9a94e;--rust:#a4402c;--moss:#5c6b3c;--text:#ddd1b6;--dim:#8d836e;--glass:rgba(12,10,7,.72)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#000;height:100%}
+body{display:flex;align-items:center;justify-content:center;font-family:"Spectral",serif;color:var(--text);min-height:100vh}
+.screen{position:relative;width:1280px;height:720px;overflow:hidden;background:#0f120c;box-shadow:0 0 0 1px #000,0 30px 80px #000}
+.cz{font-family:"Cinzel",serif;letter-spacing:.14em;text-transform:uppercase}
+.px{position:relative;display:block}.px i{position:absolute;left:0;top:0;display:block}
+
+/* Welt: Wiese, Lagerplatz, Feuer, Palisade */
+.world{position:absolute;inset:0;background:
+  radial-gradient(ellipse at 52% 56%,rgba(240,170,60,.22),transparent 28%),
+  radial-gradient(ellipse at 50% 50%,#1b2213,#121709 70%),
+  repeating-linear-gradient(0deg,transparent 0 31px,rgba(0,0,0,.18) 31px 32px),repeating-linear-gradient(90deg,transparent 0 31px,rgba(0,0,0,.18) 31px 32px)}
+.world::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 160px 40px rgba(0,0,0,.85);pointer-events:none}
+.tree{position:absolute;width:40px;height:56px;background:radial-gradient(circle at 50% 35%,#2f4a24 0 40%,transparent 41%),linear-gradient(#3a2a1a,#3a2a1a) 48% 60%/6px 24px no-repeat}
+.rock{position:absolute;width:26px;height:16px;background:#4a4a46;clip-path:polygon(20% 0,80% 0,100% 60%,80% 100%,20% 100%,0 60%)}
+.fire{position:absolute;left:632px;top:395px;width:24px;height:22px;background:radial-gradient(circle at 50% 100%,#f0c060 0 30%,#c8582a 31% 60%,transparent 61%)}
+.fire::after{content:"";position:absolute;left:-6px;bottom:-4px;width:36px;height:8px;background:repeating-linear-gradient(90deg,#4a3a2a 0 6px,#2a2019 6px 8px)}
+.pal{position:absolute;height:22px;background:repeating-linear-gradient(90deg,#5a4630 0 6px,#3a2a1a 6px 8px);border-top:3px solid #6a5a44}
+.hut{position:absolute;left:700px;top:300px}
+/* Geist der Hütte: Platzierung */
+.ghost{position:absolute;left:470px;top:280px;width:96px;height:96px;border:2px dashed rgba(201,169,78,.9);background:rgba(201,169,78,.12);
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr)}
+.ghost b{border:1px solid rgba(201,169,78,.25)}.ghost b.bad{background:rgba(164,64,44,.5)}
+.ghost .sil{position:absolute;left:50%;top:50%;transform:translate(-50%,-62%);opacity:.75}
+.ghostlabel{position:absolute;left:470px;top:380px;width:96px;text-align:center;font-size:9px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+
+/* Kopfzeile: 24 px, durchsichtig, nur Zeit, Wetter, Gold */
+.top{position:absolute;left:0;right:0;top:0;height:24px;display:flex;align-items:center;justify-content:center;gap:18px;font-size:11px;color:#b8ac93;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),transparent)}
+.top .gold{color:var(--gold)}.top .gold::before{content:"◈ "}
+.dial{width:60px;height:9px;position:relative;border-bottom:1px solid #4a3f2c}
+.dial::before{content:"";position:absolute;left:0;right:0;top:0;height:18px;border:1px solid #4a3f2c;border-bottom:none;border-radius:40px 40px 0 0}
+.dial .sun{position:absolute;left:40%;top:-3px;width:6px;height:6px;background:var(--gold);box-shadow:0 0 6px var(--gold);transform:rotate(45deg)}
+.wx{width:12px;height:9px;background:linear-gradient(#8a8a94,#8a8a94) 2px 0/8px 3px no-repeat,linear-gradient(#8a8a94,#8a8a94) 0 4px/12px 4px no-repeat}
+
+/* Held oben links: Porträt mit Lebensring, Ausdauerring, Zustände */
+.me{position:absolute;left:18px;top:16px;display:flex;gap:10px;align-items:center}
+.ring{width:74px;height:74px;border-radius:50%;background:conic-gradient(#b23b2c 0 82%,#2a1512 82% 100%);display:flex;align-items:center;justify-content:center;position:relative}
+.ring::before{content:"";position:absolute;inset:5px;border-radius:50%;background:conic-gradient(#a2903c 0 94%,#2a2412 94% 100%)}
+.ring .in{position:relative;width:56px;height:56px;border-radius:50%;background:#120f0c;border:1px solid #3b3227;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
+.me .t{font-size:12px}.me .t b{display:block;font-weight:400;color:#e7dcc2;font-size:14px}.me .t small{color:var(--dim);font-size:10px;display:block}
+.me .fx{display:flex;gap:3px;margin-top:4px}.me .fx span{width:14px;height:14px;border:1px solid #3b3227;background:rgba(25,21,16,.8);font-size:8px;display:flex;align-items:center;justify-content:center;color:#cbbf8a}
+.me .fx span.bad{color:#d0705c;border-color:#5a2a22}
+/* Gruppe: kleine Ringe darunter */
+.party{position:absolute;left:24px;top:104px;display:flex;gap:8px}
+.party .r{width:30px;height:30px;border-radius:50%;background:conic-gradient(#9c3327 0 70%,#2a1512 70% 100%);display:flex;align-items:center;justify-content:center}
+.party .r i{width:24px;height:24px;border-radius:50%;background:#120f0c;border:1px solid #3b3227;display:block;overflow:hidden}
+/* Körper als Mini-Silhouette, erscheint nur bei Wunde */
+.wound{position:absolute;left:18px;top:148px;display:flex;gap:6px;align-items:center;font-size:10px;color:#d0705c;opacity:.9}
+.sil{width:18px;height:32px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:7px 10px 7px 8px;gap:1px}
+.sil b{background:#3a3327}.sil b.head{grid-column:2}.sil b.torso{grid-column:2;grid-row:2}.sil b.al,.sil b.ar{grid-row:2}.sil b.ll{grid-column:1/3;grid-row:3/5}.sil b.lr{grid-column:2/4;grid-row:3/5}.sil b.w{background:#a4402c}
+
+/* Ressourcen oben rechts, nur Piktogramm + Zahl */
+.res{position:absolute;right:18px;top:34px;display:flex;flex-direction:column;gap:4px;font-size:11px;color:#b3a78e;align-items:flex-end}
+.res span{display:flex;gap:6px;align-items:center}
+.ri{width:9px;height:9px;display:inline-block}.ri.wood{background:#7a5a30}.ri.stone{background:#777;clip-path:polygon(20% 0,80% 0,100% 50%,80% 100%,20% 100%,0 50%)}.ri.iron{background:#8a8a94}.ri.food{background:#b58b3a;border-radius:50%}
+.res span.bad{color:#d0705c}
+
+/* rechte Leiste: Piktogramme, Tastenbuchstaben nur beim Zeigen */
+.rail{position:absolute;right:0;top:120px;bottom:120px;width:36px;display:flex;flex-direction:column;justify-content:center;gap:10px;align-items:center;background:linear-gradient(270deg,rgba(0,0,0,.5),transparent)}
+.rail span{width:22px;height:22px;border:1px solid #3b3227;background:rgba(25,21,16,.75);display:flex;align-items:center;justify-content:center;position:relative}
+.rail span i{width:10px;height:10px;display:block}
+.rail span.on{border-color:var(--gold)}
+.rail span::after{content:attr(data-k);position:absolute;right:26px;font-size:9px;color:var(--dim);letter-spacing:.1em}
+.i-char{background:#c9a07a;border-radius:50% 50% 20% 20%}.i-bag{background:#9a7a5a;clip-path:polygon(20% 30%,80% 30%,100% 100%,0 100%)}.i-grp{background:#4a6a7a;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.i-build{background:#7a5a30;clip-path:polygon(50% 0,100% 40%,100% 100%,0 100%,0 40%)}.i-map{background:#5c6b3c;clip-path:polygon(0 20%,33% 0,66% 20%,100% 0,100% 80%,66% 100%,33% 80%,0 100%)}
+.i-quest{background:#7a2c22;clip-path:polygon(0 0,100% 0,100% 60%,50% 100%,0 60%)}.i-codex{background:#d6c39a}.i-opt{background:#8a8a94;border-radius:50%}
+
+/* Zielkarte: schwebt bei der Figur in der Welt */
+.target{position:absolute;left:760px;top:250px;background:var(--glass);border:1px solid #3b3227;border-left:2px solid var(--gold);padding:6px 10px;font-size:11px;min-width:150px}
+.target b{display:block;font-family:"Cinzel",serif;font-size:12px;letter-spacing:.1em;color:#e7dcc2}
+.target small{color:var(--dim);display:block}
+.target .rel{height:4px;background:#100d0a;border:1px solid #2b2419;margin:4px 0;position:relative}.target .rel i{position:absolute;left:50%;top:0;bottom:0;width:22%;background:#5c6b3c}
+.target .k{display:flex;gap:6px;margin-top:4px}.target .k span{border:1px solid #3b3227;padding:1px 6px;font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+
+/* Meldungsfluss unten links: 4 Zeilen, oben verblassend, neueste unten */
+.feed{position:absolute;left:18px;bottom:60px;width:430px;font-size:12px;line-height:1.5}
+.feed .row{display:flex;gap:8px;align-items:center;padding:1px 0}
+.feed .row:nth-child(1){opacity:.25}.feed .row:nth-child(2){opacity:.45}.feed .row:nth-child(3){opacity:.7}
+.feed .row.new{color:#f0e6cd}
+.feed time{font-size:10px;color:var(--dim)}
+.c{width:8px;height:8px;flex:none}.c.combat{background:#c78b78;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}.c.world{background:#9fb07a;border-radius:50%}.c.econ{background:#bda06a;transform:rotate(45deg)}.c.quest{background:#c9a94e;clip-path:polygon(0 0,100% 0,100% 60%,50% 100%,0 60%)}
+.feed .more{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:3px}.feed .more b{color:var(--gold);font-weight:400}
+
+/* Leiste unten Mitte: Rauten */
+.hot{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px}
+.hot span{width:30px;height:30px;transform:rotate(45deg);border:1px solid #3b3227;background:rgba(19,16,9,.85);display:flex;align-items:center;justify-content:center;position:relative}
+.hot span i{transform:rotate(-45deg);width:14px;height:14px;display:block}
+.hot span u{position:absolute;right:-6px;bottom:-6px;transform:rotate(-45deg);font-size:8px;color:#cbbf8a;text-decoration:none}
+.hot span.e{opacity:.3}
+.g.potion{background:linear-gradient(#b23b2c 0 70%,#ddd 70%);clip-path:polygon(35% 0,65% 0,65% 25%,100% 60%,100% 100%,0 100%,0 60%,35% 25%)}
+.g.sword{background:#8a8a94;clip-path:polygon(45% 0,55% 0,55% 70%,80% 70%,80% 78%,55% 78%,55% 100%,45% 100%,45% 78%,20% 78%,20% 70%,45% 70%)}
+.g.bandage{background:repeating-linear-gradient(45deg,#d8ccb0 0 3px,#b8ac93 3px 5px)}
+.g.bread{background:#b58b3a;border-radius:50% 50% 30% 30%}
+
+/* RADIALMENÜ um den Helden */
+.radial{position:absolute;left:480px;top:220px;width:300px;height:300px;border-radius:50%;
+  background:conic-gradient(from -22.5deg,rgba(25,21,16,.82) 0 45deg,rgba(35,29,20,.82) 45deg 90deg,rgba(25,21,16,.82) 90deg 135deg,rgba(201,169,78,.35) 135deg 180deg,rgba(25,21,16,.82) 180deg 225deg,rgba(35,29,20,.82) 225deg 270deg,rgba(25,21,16,.82) 270deg 315deg,rgba(35,29,20,.82) 315deg 360deg);
+  border:1px solid #5a4b36;box-shadow:0 0 0 6px rgba(0,0,0,.35),0 0 60px rgba(0,0,0,.8)}
+.radial::before{content:"";position:absolute;inset:92px;border-radius:50%;background:rgba(6,5,4,.2);border:1px solid #3b3227}
+.wedge{position:absolute;width:64px;text-align:center;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#cbbf8a;display:flex;flex-direction:column;align-items:center;gap:4px}
+.wedge i{width:18px;height:18px;display:block}.wedge.on{color:var(--gold)}.wedge.on i{filter:drop-shadow(0 0 4px var(--gold))}
+.wedge small{font-size:8px;color:var(--dim)}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;font-size:9px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase}
+.center b{display:block;color:#e7dcc2;font-family:"Cinzel",serif;font-size:11px}
+
+/* Kostenkarte am Geist */
+.cost{position:absolute;left:300px;top:400px;width:170px;background:var(--glass);border:1px solid #5a4b36;border-top:2px solid var(--gold);padding:8px 10px;font-size:11px}
+.cost b{display:block;font-family:"Cinzel",serif;font-size:12px;letter-spacing:.12em;color:#e7dcc2}
+.cost small{color:var(--dim);display:block;margin-bottom:6px}
+.cost .r{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px dotted #2b2419}
+.cost .r.bad{color:#d0705c}.cost .r span{display:flex;gap:6px;align-items:center}
+.cost .fp{display:grid;grid-template-columns:repeat(3,10px);gap:1px;margin:6px 0}.cost .fp i{height:10px;background:rgba(201,169,78,.5)}
+.cost .k{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-top:6px}.cost .k em{color:var(--gold);font-style:normal}
+.hint{position:absolute;right:50px;bottom:14px;font-size:9px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="world">
+    <span class="tree" style="left:120px;top:140px"></span><span class="tree" style="left:180px;top:520px"></span><span class="tree" style="left:1040px;top:120px"></span><span class="tree" style="left:1120px;top:560px"></span><span class="tree" style="left:260px;top:220px"></span>
+    <span class="rock" style="left:900px;top:600px"></span><span class="rock" style="left:340px;top:640px"></span>
+    <span class="pal" style="left:420px;top:200px;width:460px"></span><span class="pal" style="left:420px;top:200px;width:22px;height:300px;background:repeating-linear-gradient(0deg,#5a4630 0 6px,#3a2a1a 6px 8px)"></span>
+    <span class="fire"></span>
+    <span class="px hut" data-px="hut" data-s="5"></span>
+    <!-- Geist der Hütte -->
+    <div class="ghost"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b class="bad"></b><b></b><span class="px sil" data-px="hut" data-s="5"></span></div>
+    <div class="ghostlabel">Hütte · 1 Feld blockiert</div>
+    <!-- Figuren -->
+    <span class="px" data-px="hero" data-s="3" style="position:absolute;left:612px;top:338px"></span>
+    <span class="px" data-px="hero2" data-s="3" style="position:absolute;left:690px;top:430px"></span>
+    <span class="px" data-px="hero3" data-s="3" style="position:absolute;left:820px;top:330px"></span>
+  </div>
+
+  <header class="top"><div class="dial"><span class="sun"></span></div><span>Tag 4 · 10:00 · Frühling</span><span class="wx"></span><span class="gold">325</span></header>
+
+  <div class="me">
+    <div class="ring"><div class="in"><span class="px" data-px="hero" data-s="2"></span></div></div>
+    <div class="t"><b>Ragnar</b><small>Wanderer · St. 12 · 213 / 261</small><div class="fx"><span>●</span><span class="bad">✶</span><span>✚</span></div></div>
+  </div>
+  <div class="party"><div class="r"><i></i></div><div class="r" style="background:conic-gradient(#9c3327 0 95%,#2a1512 95% 100%)"><i></i></div></div>
+  <div class="wound"><div class="sil"><b class="head"></b><b class="al"></b><b class="torso"></b><b class="ar w"></b><b class="ll"></b><b class="lr"></b></div>Rechter Arm verwundet</div>
+
+  <div class="res"><span><i class="ri wood"></i>80</span><span><i class="ri stone"></i>30</span><span><i class="ri iron"></i>12</span><span class="bad"><i class="ri food"></i>0</span></div>
+
+  <nav class="rail">
+    <span data-k="C"><i class="i-char"></i></span><span data-k="I"><i class="i-bag"></i></span><span data-k="G"><i class="i-grp"></i></span>
+    <span class="on" data-k="B"><i class="i-build"></i></span><span data-k="M"><i class="i-map"></i></span><span data-k="J"><i class="i-quest"></i></span><span data-k="H"><i class="i-codex"></i></span><span data-k="Esc"><i class="i-opt"></i></span>
+  </nav>
+
+  <div class="target"><b>Tomas</b><small>Gefährte · Krieger St. 9 · Loyalität 61</small><div class="rel"><i></i></div><small>„Hier? Der Boden ist weich. Gut für Pfosten.“</small><div class="k"><span>G Befehl</span><span>E Reden</span></div></div>
+
+  <div class="feed">
+    <div class="row"><time>09:40</time><i class="c world"></i><span>Die Siedler haben die Palisade ausgebessert.</span></div>
+    <div class="row"><time>09:52</time><i class="c econ"></i><span>Hofvorrat: 2 Fleisch, 1 Fell.</span></div>
+    <div class="row"><time>09:58</time><i class="c combat"></i><span>Wolf getroffen — 14 Schaden, es blutet.</span></div>
+    <div class="row new"><time>10:00</time><i class="c quest"></i><span>„Patrouille um Haselbrück“ abgeschlossen. +60 Gold.</span></div>
+    <div class="more"><b>L</b> ganzes Tagebuch · 3 ungelesen</div>
+  </div>
+
+  <div class="hot">
+    <span><i class="g sword"></i></span><span><i class="g potion"></i><u>3</u></span><span><i class="g bandage"></i><u>5</u></span><span><i class="g bread"></i><u>2</u></span>
+    <span class="e"></span><span class="e"></span><span class="e"></span><span class="e"></span>
+  </div>
+
+  <!-- Radialmenü (Taste Tab gedrückt) -->
+  <div class="radial">
+    <div class="wedge" style="left:118px;top:14px"><i class="i-char"></i>Charakter<small>C</small></div>
+    <div class="wedge" style="left:204px;top:50px"><i class="i-bag"></i>Gepäck<small>I</small></div>
+    <div class="wedge" style="left:226px;top:128px"><i class="i-grp"></i>Gruppe<small>G</small></div>
+    <div class="wedge on" style="left:204px;top:210px"><i class="i-build"></i>Bauen<small>B</small></div>
+    <div class="wedge" style="left:118px;top:246px"><i class="i-map"></i>Karte<small>M</small></div>
+    <div class="wedge" style="left:32px;top:210px"><i class="i-quest"></i>Aufträge<small>J</small></div>
+    <div class="wedge" style="left:10px;top:128px"><i class="i-codex"></i>Kodex<small>H</small></div>
+    <div class="wedge" style="left:32px;top:50px"><i class="i-opt"></i>Optionen<small>Esc</small></div>
+    <div class="center">Rad<b>Bauen</b></div>
+  </div>
+
+  <div class="cost">
+    <b>Hütte</b><small>Festes Dach · 4 Plätze · zieht Siedler an</small>
+    <div class="r"><span><i class="ri wood"></i>Holz</span><span>20 / 80</span></div>
+    <div class="r bad"><span><i class="ri stone"></i>Stein</span><span>8 / 30 ✓</span></div>
+    <div class="r"><span>Bauzeit</span><span>22 s · 2 Helfer</span></div>
+    <div class="fp"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i style="background:rgba(164,64,44,.6)"></i><i></i></div>
+    <div class="k"><em>Linksklick</em> setzen · <em>R</em> drehen · <em>Esc</em> abbrechen</div>
+  </div>
+  <div class="hint">Tab halten: Rad · loslassen: Auswahl</div>
+</div>
+
+<script>
+const PAL = { '.':null, h:'#3a2a1a', k:'#c9a07a', a:'#6a5a44', l:'#4a3a2c', b:'#2a2019', w:'#8a8a94', c:'#5a2a22', g:'#8aa06a', e:'#1a1410', r:'#6a4436', s:'#3a2a1a', d:'#2a1a10', t:'#8a6a34' };
+const MAPS = {
+hero:['....hhhh....','...hhhhhh...','...hkkkkh...','...hkekkh...','....kkkk....','.....kk.....','...aaaaaa.w.','..aaaaaaaaw.','.kaaaaaaaaw.','.kaaaaaaaaw.','..aaaaaaaaw.','...aaaaaa.w.','...aaaaaa...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..'],
+hero2:['....cccc....','...cccccc...','...ckkkkc...','...ckekkc...','....kkkk....','.....kk.....','...cccccc...','..cccccccc..','.kcccccccck.','.kcccccccck.','..cccccccc..','...cccccc...','...cccccc...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..'],
+hero3:['....hhhh....','...hhhhhh...','...hkkkkh...','...hkekkh...','....kkkk....','.....kk.....','...gggggg...','..gggggggg..','.kggggggggk.','.kggggggggk.','..gggggggg..','...gggggg...','...gggggg...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..'],
+hut:['......tt......','.....tttt.....','....tttttt....','...tttttttt...','..tttttttttt..','.tttttttttttt.','..ssssssssss..','..ssssddssss..','..ssssddssss..','..ssssddssss..']};
+document.querySelectorAll('[data-px]').forEach(el=>{ const rows=MAPS[el.dataset.px], s=+el.dataset.s||2, sh=[];
+  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{ if(PAL[ch]) sh.push(`${x*s}px ${y*s}px 0 0 ${PAL[ch]}`); }));
+  el.style.width=rows[0].length*s+'px'; el.style.height=rows.length*s+'px';
+  const i=document.createElement('i'); i.style.cssText=`width:${s}px;height:${s}px;box-shadow:${sh.join(',')}`; el.appendChild(i); });
+</script>
+</body>
+</html>

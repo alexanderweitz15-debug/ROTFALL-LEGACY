@@ -764,3 +764,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Neue Klänge:** Knochenhorn, Ketten, Trommel, Herzschlag, Eis bricht.
 - **Debug:** „Regie (T17)“ — Boss-Auftritt vorspielen (gewählt), Auftritte zurücksetzen, die drei Varonheim-Szenen, Sprechblase, Namenskarte. Probe „T17 Regiebuch“.
 - **Log:** Das Nachrichtenfeld unten bleibt am neuesten Eintrag, solange du nicht selbst hochscrollst (vorher sprang es zu alten Einträgen).
+
+## Runde: Regiebuch, Scheibe 2 (T17, 01.10.2026)
+- **Goblinsturm als Szene:** Rufst du den Sturm, steht die Welt 8 Sekunden: Knochenhörner, Dodon bricht durch, die Goblins rufen „Frei!“, Varg antwortet — dann beginnt der Kampf. ESC überspringt.
+- **Aldhelm** tritt jetzt mit stehender Welt auf: Kerzen flammen nacheinander auf, er spricht in einer Blase, seine Namenskarte erscheint.
+- **Ankunft:** Betrittst du eine Siedlung zum ersten Mal, erscheint ihr Name mit der Herrschaft („Stadt · Valen“, „Besetzt von den Toten“, „Belagert“); eine Wache zeigt dir den Weg. Wird ein Ort besetzt oder belagert, zeigt er es beim nächsten Besuch erneut.
+- **Musterung der Kette:** Stehst du dabei, hörst du das Horn; der Kriegsmeister ruft „Antreten!“, nennt das Ziel, die Soldaten salutieren.
+- **Neue Gesten:** salutieren, jubeln, trauern, knien.
+- **Debug:** „Regie (T17)“ zusätzlich „Gesten vorführen (Held)“, „Ankunftskarten zurücksetzen“.
