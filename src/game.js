@@ -17500,6 +17500,16 @@ export function selftest() {
       return calm && early && host && pause && easy && dead;
     } finally { S.war = W0; S.difficulty = d0; }
   }));
+  ok('Varonheim / RB-039 + RB-038: ein gewöhnliches Totenheer zieht nicht auf die Hauptstadt; Entsatzheere vor der belagerten Stadt vereinen sich', sandbox(() => {
+    const W0 = structuredClone(S.war), m0 = S.player.map;
+    try {
+      S.player.map = 'deep'; S.war.battles = []; for (const [k, n] of Object.entries(S.war.nodes)) n.owner = k === 'varonheim' ? 'valen' : 'undead';
+      const u = { id: 'pu', faction: 'undead', at: 'northcity', prev: 'northcity', strength: 60, name: 'Probe' }; S.war.armies = [u]; SIM.warTick(); SIM.warTick(); const stays = u.at !== 'varonheim';
+      const h = { id: 'ph', faction: 'undead', at: 'varonheim', prev: 'ashford', strength: 200, name: 'Heer', host: true }, v1 = { id: 'v1', faction: 'valen', at: 'varonheim', prev: 'northcity', strength: 30, name: 'A' }, v2 = { id: 'v2', faction: 'valen', at: 'varonheim', prev: 'northcity', strength: 30, name: 'B' };
+      S.war.nodes.varonheim.siege = { day: S.day | 0 }; S.war.armies = [h, v1, v2]; SIM.warTick(); const merged = S.war.armies.filter(a => a.faction === 'valen').length <= 1;
+      return stays && merged;
+    } finally { S.war = W0; S.player.map = m0; }
+  }));
   ok('Varonheim S1: 60 Kriegstage ohne Spieler (fester Zufall) — Varonheim gehört danach noch Valen', sandbox(() => {
     const keep = structuredClone({ w: S.war, t: S.towns, e: S.eco || null, ps: S.priceSeen || {} }), W0 = S.ents.world.slice(), m0 = S.player.map, rd = SIM.H.raidDamage, A0 = S.after ? structuredClone(S.after) : undefined;
     try {

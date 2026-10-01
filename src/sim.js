@@ -333,7 +333,7 @@ export function warTick() {                                  // alle 6 Spielstun
     let next = null;
     if (a.faction === 'undead' && a.at === CAPK && held) next = null;   /* Belagerer bleibt vor der Hauptstadt */
     else if (a.faction === 'valen' && held && C.siege) next = a.at === CAPK ? null : path(a.at, n => n === CAPK);   /* Entsatz-Vorrang */
-    else if (a.faction === 'undead') next = a.order && W.nodes[a.order] ? (a.at === a.order ? null : path(a.at, n => n === a.order)) : path(a.at, n => W.nodes[n].owner !== 'undead');   // S15 P20: Befehl des Spielers
+    else if (a.faction === 'undead') next = a.order && W.nodes[a.order] ? (a.at === a.order ? null : path(a.at, n => n === a.order)) : path(a.at, n => W.nodes[n].owner !== 'undead' && n !== CAPK);   /* RB-039: die Hauptstadt greift nur Morvaths Heerzug (oder ein Befehl) an */   // S15 P20: Befehl des Spielers
     else next = path(a.at, n => W.nodes[n].owner === 'undead' && S.towns[n]) || path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));   /* Hunter-Befund: verlorene Städte zuerst zurückholen */
     if (!next || (a.faction === 'valen' && a.strength < 25)) next = null;   // zu schwach: halten
     // §74 Vorwarnung: bevor ein Untotenheer auf eine Siedlung zieht, melden Späher es — das Heer sammelt sich einen Zug (6 Std.)
@@ -347,6 +347,9 @@ export function warTick() {                                  // alle 6 Spielstun
     }
     if (next) { a.prev = a.at; a.at = next; }
   }
+  if (held && C.siege) { const rel = W.armies.filter(a => a.faction === 'valen' && a.at === CAPK);   /* RB-038: Entsatzheere vor der Hauptstadt vereinen sich */
+    for (const r of rel.slice(1)) { rel[0].strength = Math.min(ARMY_CAP(), rel[0].strength + r.strength); r.strength = 0; }
+    if (rel.length > 1) { W.armies = W.armies.filter(a => !rel.slice(1).includes(a)); log(`Vor Varonheim vereinen sich ${rel.length} Entsatzheere unter ${rel[0].name}.`, 'faction'); } }
   for (const node of Object.keys(W.nodes)) resolveNode(node);
 }
 

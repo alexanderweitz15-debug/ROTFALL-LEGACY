@@ -43,3 +43,5 @@ Eine Zeile je Bug (ausführliche Berichte: ROTFALL_AGENT_STATE/HANDOFFS/bug_to_i
 | RB-035 | Heldentod während einer Kamerafahrt: Speichern verworfen (guardSave), Tod nicht gesichert (Hunter 6, dort RB-028) | HIGH | game.js playerDeath | TESTING (cineEnd vor dem Speichern) |
 | RB-036 | Ahnenfeind heilte bei jedem Neuerscheinen voll (Hunter 6, dort RB-029) | MEDIUM | game.js nemesisTick/Day | TESTING (hpFrac, +20 %/Tag; Probe „RB-036“) |
 | RB-037 | `cultHeroDied` lief vor der Stumm-Prüfung in Proben (Hunter 6, dort RB-030) | LOW | game.js playerDeath | TESTING |
+| RB-038 | Entsatz-Vorrang: mehrere Valen-Heere vor Varonheim kämpften einzeln (Verifier 7) | HIGH | sim.js warTick | IMPLEMENTED (vereinen sich; Probe „RB-039 + RB-038“) |
+| RB-039 | Gewöhnliche Totenheere zogen ohne Heerzug auf Varonheim (Verifier 7) | HIGH | sim.js warTick | IMPLEMENTED (Hauptstadt nur für Heerzug/Befehl Ziel) |
