@@ -528,7 +528,7 @@ function paintRock(o, m, cx, cy, kind = T.ROCK) {      // auch Höhlenwände (DW
 const CASTLE = (() => { const C = CAPITAL, y0 = C.y - C.hh; return { x0: C.x - 31, x1: C.x + 31, y0: y0, y1: y0 + 23, kx0: C.x - 14, kx1: C.x + 14, ky0: y0 + 3, ky1: y0 + 15,
   towers: [[C.x - 30, y0 + 1], [C.x + 30, y0 + 1], [C.x - 30, y0 + 22], [C.x + 30, y0 + 22]].map(([x, y]) => [x * 16 + 8, y * 16 + 6, 20])        /* Mitte in Texeln, Radius */
     .concat([[C.x - 14, y0 + 3, 12, 12], [C.x + 14, y0 + 3, 4, 12], [C.x - 14, y0 + 15, 12, 4], [C.x + 14, y0 + 15, 4, 4]].map(([x, y, ox, oy]) => [x * 16 + ox, y * 16 + oy, 11])) }; })();
-const SLATE_C = ['#15181e', '#1e232b', '#272d37', '#323a46', '#424c5a'];
+const SLATE_C = ['#181c23', '#272d37', '#333b47', '#414b59', '#55616f'];
 function castleCone(P, tx, ty, X, Y) {                    // Kegeldach: je Pixel aus dem Abstand zur Turmmitte (über Chunkgrenzen hinweg stimmig)
   for (const [mx, my, R] of CASTLE.towers) {
     if (Math.abs(tx * 16 + 8 - mx) > R + 8 || Math.abs(ty * 16 + 8 - my) > R + 8) continue;
@@ -571,12 +571,12 @@ function paintWalls(o, m, cx, cy) {
 }
 function paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E) {
   const K = CASTLE, keep = tx >= K.kx0 && tx <= K.kx1 && ty >= K.ky0 && ty <= K.ky1;
-  if (keep && N && Wd && E && (Sd || ty < K.ky1)) {        // Bergfried: Schieferdach, First in der Mitte, Nordhälfte im Licht
-    const ridge = ((K.ky0 + K.ky1) / 2) * 16 + 8;
-    for (let y = 0; y < 16; y++) { const WY = ty * 16 + y, north = WY < ridge, row = Math.floor(WY / 4), off = (row & 1) * 3;
-      for (let x = 0; x < 16; x++) { const WX = tx * 16 + x, joint = WY % 4 === 3 || (WX + off) % 6 === 0, r = h2(WX, WY);
-        P(Math.abs(WY - ridge) < 2 ? '#56606c' : joint ? SLATE_C[0] : north ? (r < 0.15 ? SLATE_C[4] : SLATE_C[3]) : (r < 0.15 ? SLATE_C[2] : SLATE_C[1]), X + x, Y + y); } }
-    if (tx === K.kx0 + 1 || tx === K.kx1 - 1) P('#0e1014', X + (tx === K.kx0 + 1 ? 0 : 15), Y, 1, 16);
+  if (keep && N && Wd && E && (Sd || ty < K.ky1)) {        // Bergfried: Walmdach aus Schiefer — Nord- und Westfläche im Licht, Grate hell, First
+    const L = (K.kx0 + 1) * 16, Rr = K.kx1 * 16, Tp = (K.ky0 + 1) * 16, B = K.ky1 * 16;
+    for (let y = 0; y < 16; y++) { const WY = ty * 16 + y, row = Math.floor(WY / 4), off = (row & 1) * 3, dy = Math.min(WY - Tp, B - 1 - WY);
+      for (let x = 0; x < 16; x++) { const WX = tx * 16 + x, dx = Math.min(WX - L, Rr - 1 - WX), joint = WY % 4 === 3 || (WX + off) % 6 === 0, r = h2(WX, WY);
+        const face = dy <= dx ? (WY - Tp < B - 1 - WY ? 4 : 1) : (WX - L < Rr - 1 - WX ? 3 : 2), edge = Math.abs(dx - dy) < 1 || (dy <= dx && Math.abs((WY - Tp) - (B - 1 - WY)) < 2);
+        P(edge ? '#6a7686' : joint ? SP.mix(SLATE_C[face], SLATE_C[0], 0.6) : r < 0.12 ? SP.mix(SLATE_C[face], '#7a8696', 0.18) : SLATE_C[face], X + x, Y + y); } }
     castleCone(P, tx, ty, X, Y); return;
   }
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {   // Wehrgang: dunkle Platten aus Basalt
@@ -970,18 +970,18 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
-const PROP_PERIOD = { machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const VARIANTS = { market_stall: 4, grave_cross: 3, tomb: 2, cargo_pile: 2, crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const PROP_PERIOD = { fountain_grand: 900, banner_pole: 5030, machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const PROP_BOX = { fountain_grand: 160, banner_pole: 128, street_lamp: 128, star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 // Session 13 (Nutzer): Möbel und Stände in Menschengröße — gezeichnet wie bisher, um den Fußpunkt vergrößert
-const PROP_SCALE = { bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
+const PROP_SCALE = { market_stall: 1.6, bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
 SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear(); bakeCache.clear(); iconCache.clear(); groundIcons.clear(); chunkCache.clear(); });   // Stil gewechselt: alles neu backen
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
-export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
+export const stallShut = e => (e.type === 'stall' || e.type === 'market_stall') && !e.fest && !marketOpen();
 // S15 P6: Turm des Nachtglases — ein Wahrzeichen: schmaler, sehr hoher Schaft aus dunklem Stein über breitem Sockel, Strebepfeiler,
 // Galerie, Dornenkrone mit Seelenfeuer. Das Bild wird einmal gemalt (Pixelraster 2 × 2), darüber leben die Fenster und die Funken.
 let TOWER_CV = null, TOWER_AT = { arr: null, e: null };
@@ -1801,6 +1801,95 @@ function drawProp(e, now) {
       ctx.fillStyle = '#5a452b'; ctx.fillRect(x - 5, y - 44, 10, 8);
       ctx.fillStyle = 'rgba(20,14,8,.6)'; ctx.fillRect(x + 2, y - 31, 10, 1.5); ctx.fillRect(x - 12, y - 19, 10, 1.5); ctx.fillRect(x - 3, y - 41, 6, 1.5);
       break;
+    /* ---- Artist Runde 5 (Varonheim): Straßenmöbel der Hauptstadt. Platzieren macht der Engineer (world.js prop()). ---- */
+    case 'market_stall': {                                // Marktstand mit gestreifter Markise; Varianten: Obst, Tuch, Töpfe, Fisch
+      const v = e._var || 0, AW = [['#7d3b2c', '#c9b98a'], ['#2f5034', '#c9b98a'], ['#2f4260', '#b8973e'], ['#5a1618', '#c9a24a']][v];
+      shadow(x, y + 5, 16, .3);
+      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 15, y - 26, 2.5, 28); ctx.fillRect(x + 12.5, y - 26, 2.5, 28);
+      ctx.fillStyle = '#5a4128'; ctx.fillRect(x - 14, y - 7, 28, 9); ctx.fillStyle = '#6e5033'; ctx.fillRect(x - 14, y - 7, 28, 2); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 14, y + 1, 28, 1);
+      if (e._shut) {                                      // zu: Plane über der Theke, Markise eingerollt
+        ctx.fillStyle = AW[0]; ctx.fillRect(x - 17, y - 28, 34, 3); ctx.fillStyle = AW[1]; for (let i = 0; i < 34; i += 6) ctx.fillRect(x - 17 + i, y - 28, 2, 3);
+        ctx.fillStyle = '#5c5343'; ctx.fillRect(x - 15, y - 12, 30, 13); ctx.fillStyle = '#4a4336'; ctx.fillRect(x - 15, y - 6, 30, 1.5); ctx.fillRect(x - 5, y - 12, 1.5, 13); break;
+      }
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = AW[i & 1];
+        ctx.beginPath(); ctx.moveTo(x - 17 + i * 34 / 6, y - 29); ctx.lineTo(x - 17 + (i + 1) * 34 / 6, y - 29); ctx.lineTo(x - 18 + (i + 1) * 6, y - 18); ctx.lineTo(x - 18 + i * 6, y - 18); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x - 18 + i * 6, y - 18); ctx.lineTo(x - 15 + i * 6, y - 15); ctx.lineTo(x - 12 + i * 6, y - 18); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,240,210,.18)'; ctx.fillRect(x - 17, y - 29, 34, 1.5); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x - 14, y - 14, 28, 3);
+      if (v === 0) { const F = ['#a83a2a', '#c9a84a', '#6a8a3a', '#b85a2a']; for (let k = 0; k < 9; k++) { ctx.fillStyle = F[k % 4]; ctx.beginPath(); ctx.arc(x - 11 + (k % 5) * 5 + (k > 4 ? 2.5 : 0), y - 8 - (k > 4 ? 2.5 : 0), 2, 0, 7); ctx.fill(); } }
+      else if (v === 1) { const F = ['#6a3a5a', '#3a5a6a', '#8a6a3a', '#7a2a24', '#c9b98a']; for (let k = 0; k < 5; k++) { ctx.fillStyle = F[k]; ctx.fillRect(x - 12 + k * 5, y - 12 + (k & 1), 4, 6); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(x - 12 + k * 5, y - 12 + (k & 1), 1, 6); } }
+      else if (v === 2) { for (let k = 0; k < 4; k++) { ctx.fillStyle = k & 1 ? '#8a5a3a' : '#6a4a32'; ctx.beginPath(); ctx.ellipse(x - 9 + k * 6, y - 10, 2.8, 3.5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a1e14'; ctx.fillRect(x - 10 + k * 6, y - 14, 2, 1.2); } }
+      else { ctx.fillStyle = '#2a241e'; ctx.fillRect(x - 13, y - 17, 26, 1); for (let k = 0; k < 4; k++) { ctx.fillStyle = k & 1 ? '#8a9aa0' : '#6a7a80'; ctx.beginPath(); ctx.ellipse(x - 9 + k * 6, y - 13, 1.8, 3.5, 0, 0, 7); ctx.fill(); }
+        ctx.fillStyle = '#9aa8ae'; ctx.fillRect(x - 10, y - 9, 20, 2); }
+      break; }
+    case 'fountain_grand': {                              // großer Prunkbrunnen: Becken, zwei Schalen, Krone Varons, Wasserschleier
+      shadow(x, y + 4, 40, .35);
+      ctx.fillStyle = '#3e3c40'; ctx.beginPath(); ctx.ellipse(x, y - 3, 38, 15, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 6, 38, 15, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1e3a4e'; ctx.beginPath(); ctx.ellipse(x, y - 7, 33, 12, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2c5268'; ctx.beginPath(); ctx.ellipse(x - 4, y - 9, 22, 7, 0, 0, 7); ctx.fill();
+      const f = now / 900 * 6.283;
+      ctx.strokeStyle = 'rgba(160,200,220,.45)'; ctx.lineWidth = 1; for (let k = 0; k < 3; k++) { const rr = 8 + ((k * 7 + now / 120) % 22); ctx.beginPath(); ctx.ellipse(x, y - 7, rr, rr * 0.36, 0, 0, 7); ctx.stroke(); }
+      ctx.fillStyle = '#4a4850'; ctx.fillRect(x - 4, y - 30, 8, 24); ctx.fillStyle = '#6a6870'; ctx.fillRect(x - 4, y - 30, 2, 24);
+      ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 30, 16, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2c5268'; ctx.beginPath(); ctx.ellipse(x, y - 31, 13, 3.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#4a4850'; ctx.fillRect(x - 2.5, y - 46, 5, 16); ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 46, 8, 3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#b8973e'; ctx.fillRect(x - 4, y - 53, 8, 4); ctx.fillRect(x - 4, y - 56, 2, 3); ctx.fillRect(x - 1, y - 57, 2, 4); ctx.fillRect(x + 2, y - 56, 2, 3);   /* Krone Varons */
+      ctx.fillStyle = 'rgba(190,225,240,.55)';
+      for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283, s = Math.abs(Math.sin(f + k)); ctx.fillRect(x + Math.cos(a) * 14, y - 30 + s * 20 + Math.sin(a) * 4, 1.5, 3); }
+      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; ctx.fillRect(x + Math.cos(a) * 7, y - 46 + Math.abs(Math.sin(f * 1.3 + k)) * 14, 1.2, 2.5); }
+      ctx.fillStyle = 'rgba(220,240,250,.4)'; ctx.fillRect(x - 0.8, y - 50 - Math.abs(Math.sin(f)) * 3, 1.6, 5);
+      break; }
+    case 'street_lamp': {                                 // Kandelaber der Königsstraße: Steinsockel, eiserner Mast, zwei Laternen
+      shadow(x, y + 3, 7, .3);
+      ctx.fillStyle = '#3a383e'; ctx.fillRect(x - 5, y - 6, 10, 8); ctx.fillStyle = '#55525a'; ctx.fillRect(x - 5, y - 6, 10, 2);
+      ctx.fillStyle = '#1e1c1f'; ctx.fillRect(x - 1.5, y - 52, 3, 47); ctx.fillStyle = '#3a373c'; ctx.fillRect(x - 1.5, y - 52, 1, 47);
+      ctx.fillRect(x - 12, y - 50, 24, 2); ctx.fillStyle = '#1e1c1f'; ctx.beginPath(); ctx.moveTo(x - 2, y - 52); ctx.lineTo(x, y - 58); ctx.lineTo(x + 2, y - 52); ctx.fill();
+      for (const s of [-1, 1]) { const lx = x + s * 11;
+        ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 48, 1, 3); ctx.fillRect(lx - 4, y - 45, 8, 2); ctx.fillRect(lx - 3, y - 35, 6, 2);
+        ctx.fillStyle = '#e2a95a'; ctx.fillRect(lx - 3, y - 43, 6, 8); ctx.fillStyle = '#f6d896'; ctx.fillRect(lx - 1, y - 41, 2, 4);
+        ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 43, 1, 8); }
+      break; }
+    case 'banner_pole': {                                 // Königsbanner (heil): hoher Mast mit Kronenknauf, langes Tuch mit goldener Krone
+      const s = Math.sin(now / 800 + x) * 2;
+      shadow(x, y + 3, 6, .3);
+      ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 1.5, y - 62, 3, 64); ctx.fillStyle = '#4a3a28'; ctx.fillRect(x - 1.5, y - 62, 1, 64);
+      ctx.fillStyle = '#b8973e'; ctx.fillRect(x - 3, y - 66, 6, 3); ctx.fillRect(x - 3, y - 68, 1.5, 2); ctx.fillRect(x - 0.75, y - 69, 1.5, 3); ctx.fillRect(x + 1.5, y - 68, 1.5, 2);
+      ctx.fillStyle = '#2a1a14'; ctx.fillRect(x - 12, y - 60, 24, 2);
+      ctx.fillStyle = '#5a1618'; ctx.beginPath(); ctx.moveTo(x - 11, y - 58); ctx.lineTo(x + 11, y - 58); ctx.lineTo(x + 11 + s, y - 22); ctx.lineTo(x + s * 0.8, y - 15); ctx.lineTo(x - 11 + s, y - 22); ctx.fill();
+      ctx.fillStyle = '#7a2224'; ctx.fillRect(x - 11, y - 58, 3, 35); ctx.fillStyle = '#3a0e10'; ctx.fillRect(x + 7 + s * 0.6, y - 57, 3, 34);
+      ctx.fillStyle = '#c9a24a'; ctx.fillRect(x - 11, y - 55, 22, 1.5); ctx.fillRect(x - 11 + s * 0.6, y - 26, 22, 1.5);   /* Goldborten */
+      ctx.fillRect(x - 5 + s * 0.4, y - 42, 10, 5); ctx.fillRect(x - 5 + s * 0.4, y - 46, 2, 4); ctx.fillRect(x - 1 + s * 0.4, y - 48, 2, 6); ctx.fillRect(x + 3 + s * 0.4, y - 46, 2, 4);   /* Krone */
+      ctx.fillStyle = '#5a1618'; ctx.fillRect(x - 3 + s * 0.4, y - 41, 1.5, 2); ctx.fillRect(x + 1.5 + s * 0.4, y - 41, 1.5, 2);
+      break; }
+    case 'barrel_stack': {                                // Fasspyramide im Handwerkerviertel
+      shadow(x, y + 4, 16, .35);
+      const fass = (bx, by) => { ctx.fillStyle = '#5b412a'; ctx.beginPath(); ctx.moveTo(bx - 7, by - 16); ctx.quadraticCurveTo(bx - 9.5, by - 7, bx - 7, by + 2); ctx.lineTo(bx + 7, by + 2); ctx.quadraticCurveTo(bx + 9.5, by - 7, bx + 7, by - 16); ctx.fill();
+        ctx.fillStyle = '#6e5033'; ctx.fillRect(bx - 6, by - 15, 3.5, 16); ctx.fillStyle = '#3a3834'; ctx.fillRect(bx - 8, by - 12, 16, 2); ctx.fillRect(bx - 8, by - 3, 16, 2);
+        ctx.fillStyle = '#4a3522'; ctx.beginPath(); ctx.ellipse(bx, by - 16, 7, 2.5, 0, 0, 7); ctx.fill(); };
+      fass(x - 8, y); fass(x + 8, y); fass(x, y - 15); break; }
+    case 'cargo_pile': {                                  // Ladegut: Kisten, Säcke, ein Fass
+      const v = e._var || 0; shadow(x, y + 4, 18, .35);
+      const kiste = (bx, by, w, h) => { ctx.fillStyle = '#6f5130'; ctx.fillRect(bx, by - h, w, h); ctx.fillStyle = '#8a6a40'; ctx.fillRect(bx, by - h, w, 2); ctx.fillStyle = '#4a3420'; ctx.fillRect(bx, by - h, 1.5, h); ctx.fillRect(bx + w - 1.5, by - h, 1.5, h);
+        ctx.strokeStyle = '#4a3420'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(bx + 1, by - 1); ctx.lineTo(bx + w - 1, by - h + 2); ctx.stroke(); };
+      kiste(x - 16, y + 2, 14, 12); kiste(x - 14, y - 10, 11, 9);
+      for (const [sx, sy] of v ? [[x + 4, y], [x + 11, y + 1]] : [[x + 5, y]]) { ctx.fillStyle = '#9a8a66'; ctx.beginPath(); ctx.ellipse(sx, sy - 5, 5, 6, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#7a6a4a'; ctx.fillRect(sx - 1, sy - 12, 2, 2); }
+      if (!v) { ctx.fillStyle = '#5b412a'; ctx.fillRect(x + 9, y - 14, 10, 16); ctx.fillStyle = '#3a3834'; ctx.fillRect(x + 8, y - 11, 12, 1.5); ctx.fillRect(x + 8, y - 3, 12, 1.5); ctx.fillStyle = '#4a3522'; ctx.beginPath(); ctx.ellipse(x + 14, y - 14, 5, 2, 0, 0, 7); ctx.fill(); }
+      break; }
+    case 'grave_cross': {                                 // Grabhügel mit Kreuz: Holz, Stein, Eisen
+      const v = e._var || 0, C = ['#4a3a28', '#6a665e', '#2a282c'][v], L = ['#6a5438', '#8a857a', '#4a474e'][v];
+      ctx.fillStyle = '#2a2418'; ctx.beginPath(); ctx.ellipse(x, y, 11, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3a3222'; ctx.beginPath(); ctx.ellipse(x - 1, y - 1, 9, 3.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#4a5a32'; ctx.fillRect(x - 6, y - 2, 2, 1); ctx.fillRect(x + 3, y, 2, 1);
+      ctx.fillStyle = C; ctx.fillRect(x - 1.5, y - 22, 3.5, 20); ctx.fillRect(x - 6, y - 17, 12, 3); ctx.fillStyle = L; ctx.fillRect(x - 1.5, y - 22, 1, 20); ctx.fillRect(x - 6, y - 17, 12, 1);
+      if (v === 2) { ctx.strokeStyle = '#4a474e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.2, y - 15.5, 4, 0, 7); ctx.stroke(); }
+      if (v === 0) { ctx.fillStyle = '#7a6a4a'; ctx.fillRect(x + 2, y - 12, 1, 4); ctx.fillStyle = '#6a2a24'; ctx.fillRect(x + 1.5, y - 8, 2, 2); }   /* Bändchen */
+      break; }
+    case 'tomb': {                                        // Steinsarg mit eingehauenem Kreuz, Moos; Variante mit Kopfstein
+      const v = e._var || 0; shadow(x, y + 3, 15, .35);
+      ctx.fillStyle = '#3e3c40'; ctx.fillRect(x - 13, y - 8, 26, 10); ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 13, y - 1, 26, 3);
+      ctx.fillStyle = v ? '#6a665e' : '#5a5860'; ctx.fillRect(x - 14, y - 13, 28, 6); ctx.fillStyle = v ? '#8a857a' : '#76747c'; ctx.fillRect(x - 14, y - 13, 28, 1.5);
+      ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 1, y - 12.5, 2, 5); ctx.fillRect(x - 4, y - 11, 8, 1.5);
+      ctx.fillStyle = '#4a5a32'; ctx.fillRect(x + 7, y - 9, 5, 2); ctx.fillRect(x - 12, y - 2, 4, 2); ctx.fillStyle = '#3a4a2a'; ctx.fillRect(x + 9, y - 7, 3, 3);
+      if (v) { ctx.fillStyle = '#5a5860'; ctx.fillRect(x - 3, y - 22, 6, 9); ctx.beginPath(); ctx.arc(x, y - 22, 3, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 0.5, y - 21, 1, 5); }
+      break; }
     case 'barrel': {                                      // Fass: Dauben, Eisenreifen; Varianten: Deckel / offen mit Wasser / Deckel mit Kelle
       const v = e._var || 0;
       shadow(x, y + 4, 9, .35);
@@ -2538,6 +2627,7 @@ function staticLights() {
   if (lightCache.map === S.map && lightCache.n === n && now - (lightCache.t || 0) < 3000) return lightCache.list;
   const list = [];
   for (const e of arr) {
+    if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
     if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
     if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
     if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });

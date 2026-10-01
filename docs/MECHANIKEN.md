@@ -837,3 +837,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Belagerung:** Das Heer verliert vor den Mauern weniger (0,4 je Zug) — der Sturm ist ernst. Wer den Kult laufen lässt, verliert die Hauptstadt auf Schwer etwa um Tag 120–150, auf Sehr schwer um Tag 100. Wer den Kult zerschlägt und die Front hält, sieht keinen Heerzug.
 - **Ersatzwachen** bringen der Hauptstadt je Mann 4 Besatzung zurück.
 - **Karawanen** laden nur, was über 80 % des Bedarfs einer Stadt liegt (neue Spiele beginnen nicht mehr mit leeren Lagern).
+
+## Die Varonsburg ist begehbar (Varonheim-Umbau, Scheibe 2)
+- Die Burg steht jetzt mitten in Varonheim in der Weltkarte — kein Portal, kein Ladebildschirm. Durch das offene Burgtor im Norden der Stadt kommst du in den Burghof.
+- **Bauten:** Thronsaal (König Varon, Kanzler Aldhelm, Marschall Brandt), Adelsflügel (die drei Adligen), Kanzlei (Spitzelmeisterin Ysmay; mit dem zweiten Katakombenschlüssel führt hier die Kellertreppe hinab), Verlies (Kerkermeister Grimm, Gefangene aus Aurelion), Kronschmiede (Hagen). Im Hof verkauft Hoflieferant Hofmar Proviant.
+- Fällt Varonheim, steht die Burg leer — der Hof ist im Exil. Wird die Stadt befreit, kehrt er zurück.
+- Wer in einem alten Spielstand in der Burgkarte stand, steht nach dem Laden vor dem Burgtor.
+- Debug: „Varon: in den Thronsaal“.

@@ -266,6 +266,7 @@ export function caravanFrame(c, dt, player, nearFoes) {
   if (nearFoes) c.attacked = true;                               // unter Angriff: rollt langsam weiter
   if (c.restUntil > clockMin()) { c.vx = c.vy = 0; return; }     // Ankunft: abladen, neu beladen, dann zurück
   if (c.restUntil) { c.restUntil = 0; c.trail = []; }             // Abfahrt: der Zug wendet (neue Spur)
+  if (!(c.wp >= 0 && c.wp < ROUTE.length)) c.wp = 0;              /* Artist R5: Route neu vermessen (andere Welt) — alter Wegpunkt wäre außerhalb */
   const idx = c.dir > 0 ? c.wp : ROUTE.length - 1 - c.wp;
   const [tx, ty] = ROUTE[idx];
   const gx = tx * TS, gy = ty * TS, d = Math.hypot(gx - c.x, gy - c.y);

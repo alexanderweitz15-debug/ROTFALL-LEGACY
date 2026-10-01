@@ -360,6 +360,17 @@ function varyGoblin(s, t, seed) {
     else if (look === 2) Object.assign(s, { armor: 'chain', armorCol: '#5a5650', shield: '', fur: '#4a3a26' });   // erbeutetes Kettenhemd
     else if (look === 3) Object.assign(s, { helm: 'nasal', helmCol: '#6a6258', shieldCol: '#5a2a1c', markCol: '#8a2a20' });
   }
+  /* Artist Runde 6 (Nutzer §5b): weitere Goblin-Grundformen — Tierschädel, Strohumhang, Schrott-Schulterplatten mit Dornen */
+  const l2 = Math.abs(h >> 15) % 7;
+  if (t === 'goblin') {
+    if (l2 === 5) Object.assign(s, { hooded: 0, helm: 'skull', helmCol: '#c8bca0', charm: 1 });                                /* Schädelträger mit Knochenamulett */
+    else if (l2 === 6) Object.assign(s, { hooded: 1, hood: '#6a5c3c', cloak: '#5a4a2a', straw: 1, helm: '' });                  /* Sumpfgänger im Strohumhang */
+  } else if (t === 'goblin_warrior') {
+    s.shieldCol = pickH(['#3d2f20', '#5a2a1c', '#2e3a24', '#4a4038'], h, 6);
+    if (l2 === 4) Object.assign(s, { pauld: '#5a5650', pb: 1, spk: 1, asy: 1 });                                               /* Schrottplatte mit Dornen */
+    else if (l2 === 5) Object.assign(s, { helm: 'skull', helmCol: '#c8bca0', fur: '#4a3a26', chn: 1 });                         /* Schädelhelm, Beutekette */
+    else if (l2 === 6) Object.assign(s, { helm: '', hs: 1, mark: 'chevron', markCol: '#8a2a20', sash: '#6a2a1c', bare: 1, armor: '' });   /* Berserker: bemalt, ohne Rüstung */
+  }
 }
 // Nutzer §5f: Banditen und Söldner — Masken, Tücher, Beutestücke (fremde Helme, Schulterplatten), verschiedene Mäntel
 function varyBandit(s, t, seed) {
@@ -373,6 +384,10 @@ function varyBandit(s, t, seed) {
   else if (look === 4) Object.assign(s, { fur: pickH(['#4a3a26', '#6a5a3a'], h, 4), armor: 'leather', armorCol: '#3a2a1c' });   // Fellkragen
   else if (look === 5) Object.assign(s, { hooded: 0, helm: 'hat', helmCol: '#2a2622', beard: 1 });   // Hut und Bart
   else if (look === 6) Object.assign(s, { armor: 'chain', armorCol: '#5a5a56', sash: '#5a1a1c' });   // Söldner im Kettenhemd
+  /* Artist Runde 6 (Nutzer §5f „Narben“): Gesichter der Räuber — Narbe, Stoppeln, Augenklappe; selten kahl mit Schulterbeute */
+  const l2 = Math.abs(h >> 15) % 6;
+  if (!s.hooded && s.face !== 'mask') { s.sc = l2 % 4; s.beard = s.beard || pickH([0, 2, 1, 3, 2], h, 5); }
+  if (l2 === 5) Object.assign(s, { hooded: 0, helm: '', face: 'human', hs: 1, pauld: '#6a665e', pb: 1, asy: 1, sc: 1 + Math.abs(h >> 18) % 3 });   /* kahl, eine erbeutete Schulterplatte */
 }
 function varyUndead(s, t, seed) {
   const h = (seed * 613) | 0;
@@ -397,6 +412,72 @@ function varyUndead(s, t, seed) {
     if (look % 2) Object.assign(s, { hooded: 0, helm: 'cap', helmCol: '#4a4640' });
     if (look >= 3) s.cloak = pickH(['#1a1c20', '#2a1a14', '#1a2a20'], h, 4);
   }
+  /* Artist Runde 6 (Nutzer §5b: „immer mehr Varianten für Untote“): weitere Grundformen je Art, alles fest aus e.seed */
+  const l2 = Math.abs(h >> 15) % 8;
+  if (t === 'skeleton') {
+    if (l2 === 6) Object.assign(s, { hooded: 0, helm: 'horned', helmCol: '#4a4038', fur: pickH(['#4a3a26', '#3a2e22'], h, 5), armor: '' });   /* toter Nordmann: Hörnerhelm, Fellkragen */
+    else if (l2 === 7) Object.assign(s, { hooded: 0, helm: '', robe: pickH(['#2a2620', '#1e1a24', '#2a1a1a'], h, 5), stole: '#4a1418', charm: 1, armor: '' });   /* toter Priester: Kuttenrest, Stola, Knochenamulett */
+    else if (l2 === 5 && !s.hooded) s.chn = 1;   /* rostige Kette quer über der Brust */
+  } else if (t === 'zombie' || t === 'ghoul') {
+    const base = s.skin || '#7e8a64';
+    s.skin = mix(base, pickH(['#9aa070', '#6a6a5a', '#7a5a4a', '#b8b49a', '#5a6a4a'], h, 5), 0.45);   /* Verwesungsfarbe: aufgedunsen, grau, braun, bleich, moosig */
+    if (l2 === 5) Object.assign(s, { bare: 1, armor: '', robe: '', apron: 0, hooded: 0 });   /* Hemd längst verrottet: nackter Oberkörper */
+    else if (l2 === 6) Object.assign(s, { hooded: 0, helm: pickH(['wide', 'scarf', 'hat'], h, 6), helmCol: pickH(['#5a4a2e', '#4a3a2a', '#3a342a'], h, 7) });   /* toter Bauer: Hut oder Kopftuch */
+    else if (l2 === 7) Object.assign(s, { hooded: 0, helm: 'nasal', helmCol: '#5a5048', armor: 'chain', armorCol: '#4a463e', tabard: pickH(['#2a3a5a', '#3a1a1a', '#2a2a1c'], h, 6) });   /* gefallener Soldat mit Wappenrest */
+  } else if (t === 'bone_archer') {
+    if (l2 === 2 || l2 === 6) Object.assign(s, { hooded: 0, helm: 'nasal', helmCol: '#5a6068', armor: 'leather', armorCol: '#3a3228' });   /* Schütze der alten Garde */
+    else if (l2 === 4) Object.assign(s, { hooded: 0, helm: '', scarf: pickH(['#4a1418', '#2a3a2a', '#3a3a44'], h, 6) });   /* barhäuptig mit Tuchfetzen */
+    else if (l2 === 7) Object.assign(s, { hood: pickH(['#2a1a1a', '#1a2a24', '#2a2a30'], h, 6), cloak: '#141214', fur: '#3a2e22' });
+  }
+}
+/* Artist Runde 6: Untote, die bisher nur ein Aussehen hatten (Geist, Schattenwesen, Knochenritter, Wächter, Nekromant, Koloss) */
+function varyDead(s, t, seed, own) {
+  const h = (seed * 829) | 0, look = Math.abs(h >> 9) % 4;
+  if (t === 'wraith') {
+    const V = pickH([['#aab4c0', '#8a96a4'], ['#a8b8a0', '#7a8c74'], ['#9c9a94', '#76746e'], ['#b0a8c0', '#8a80a0']], h, 0);   /* Schleier: bleichblau, grabgrün, aschgrau, dämmerviolett */
+    Object.assign(s, { hood: V[0], cloth: V[0], pants: V[0], cloak: V[1] });
+    if (!own) s.glow = pickH(['#cfe6ff', '#cfe6ff', '#a8f0c8', '#e8d0ff'], h, 1);
+    if (look === 1) Object.assign(s, { chn: 1, wraps: 1 });                                       /* gebundene Seele in Ketten */
+    else if (look === 2) Object.assign(s, { sil: 'motes', mc: s.glow, capeL: 1 });                /* Irrlicht: schwebende Funken, langer Schleier */
+    else if (look === 3) Object.assign(s, { hooded: 0, helm: 'crown', helmCol: '#8a8470', capeL: 1 });   /* gekrönter Geist eines alten Herrn */
+  } else if (t === 'shade') {
+    if (!own) s.glow = pickH(['#9a7ae0', '#c03a3a', '#5a9ae0', '#8ad05a'], h, 0);
+    if (look === 1) Object.assign(s, { sil: 'motes', mc: s.glow });
+    else if (look === 2) Object.assign(s, { sil: 'horns', capeL: 1 });                              /* gehörnter Schatten */
+    else if (look === 3) Object.assign(s, { sil: 'flames', mc: s.glow, hood: '#16121e' });          /* Schatten mit Seelenflammen */
+  } else if (t === 'bone_knight') {
+    const C = pickH([['#1a1d22', '#7fd0b8'], ['#2a1416', '#c05a3a'], ['#1c2a1e', '#9fd06a'], ['#24202e', '#b07ae0']], h, 0);
+    Object.assign(s, { tabard: C[0], markCol: C[1], shield: pickH(['heater', 'round', 'kite', 'heater'], h, 1), shieldCol: pickH(['#2a2e34', '#3a2a22', '#2a2a24'], h, 2) });
+    if (look === 1) Object.assign(s, { helm: 'great', helmCol: '#4a4f55', armor: 'plate', armorCol: '#3d4247' });        /* Topfhelm, Plattenreste */
+    else if (look === 2) Object.assign(s, { helm: 'horned', helmCol: '#3a3632', pauld: '#c8bca0', fur: '#3a2e22' });     /* Hörnerhelm, Knochenschulter */
+    else if (look === 3) Object.assign(s, { helm: 'skull', helmCol: '#cfc6b0', cloak: '#141214', armor: 'plate', armorCol: '#4a4038' });   /* Schädelkrone, rostige Platte */
+  } else if (t === 'crypt_warden') {
+    const C = pickH([['#1c1f24', '#7fd0b8'], ['#2a1a14', '#d8b060'], ['#1a2224', '#9fd8ff']], h, 0);
+    Object.assign(s, { tabard: C[0], markCol: C[1] });
+    if (look === 1) Object.assign(s, { helm: 'visor', crest: '', cloak: '#141619' });
+    else if (look === 2) Object.assign(s, { helm: 'crown', helmCol: '#6a6450', pauld: '#4a4f55', pb: 1 });                /* Ahnenwächter mit Grabkrone */
+    else if (look === 3) Object.assign(s, { shield: 'kite', crest: '#5a2a22', cloak: '#1c1012', capeL: 1 });
+  } else if (t === 'necromancer') {
+    const R = pickH([['#1a1420', '#141018', '#8fe0b0'], ['#2a2622', '#1e1a16', '#c8bca0'], ['#200c0e', '#140808', '#c05a3a'], ['#141a14', '#0e140e', '#9fd06a']], h, 0);
+    Object.assign(s, { robe: R[0], hood: R[1], markCol: R[2] });
+    if (look === 1) Object.assign(s, { charm: 1, sil: 'collar' });                                 /* hoher Totenkragen */
+    else if (look === 2) Object.assign(s, { hooded: 0, helm: 'skull', helmCol: '#cfc6b0', stole: '#4a1418' });   /* Schädelkappe statt Kapuze */
+    else if (look === 3) Object.assign(s, { chn: 1, sil: 'motes', mc: s.glow || '#8fe0b0' });
+  } else if (t === 'flesh_golem') {
+    s.skin = mix(s.skin || '#8a7064', pickH(['#9a7a6a', '#7a8a6a', '#a89a8a', '#6a5a5a'], h, 0), 0.4);   /* Flickwerk aus verschiedenem Fleisch */
+    if (look === 1) Object.assign(s, { chn: 1, glove: '#3a3a38' });                                 /* Ketten des Erbauers */
+    else if (look === 2) Object.assign(s, { asy: 1, pauld: '#c8bca0', pb: 1, spk: 1 });              /* Knochenplatten auf einer Schulter */
+    else if (look === 3) Object.assign(s, { face: 'mask', helm: 'cap', helmCol: '#4a4640' });       /* eiserne Maske */
+  }
+}
+/* Artist Runde 6: Kopfgeldjäger sehen nicht mehr alle gleich aus (Tuch, Hut, Maske, Narbe) */
+function varyHunter(s, seed, tier) {
+  const h = (seed * 449) | 0, look = Math.abs(h >> 9) % 4;
+  s.skin = pickH(['#b2926f', '#c8a07a', '#8d6644', '#d6b089', '#6d4a30'], h, 0);
+  s.cloak = pickH(['#2a2622', '#1e1c1a', '#2a221c', '#1c2024'], h, 1);
+  if (look === 1) Object.assign(s, { scarf: pickH(['#4a1a1a', '#3a3a30', '#2a3a4a'], h, 2) });
+  else if (look === 2 && tier < 3) Object.assign(s, { hooded: 0, helm: 'wide', helmCol: '#1e1a16', sc: 1 + Math.abs(h >> 13) % 3, beard: 2 });   /* breitkrempiger Hut, Narbe */
+  else if (look === 3 && tier < 3) Object.assign(s, { face: 'mask' });
 }
 // Artist Runde 4 (Nutzer: „viel zu kacke von den Sprites“, PLAN_ROADMAP §5b): Leute in den Städten. Alles fest aus e.seed, damit jede Figur
 // nach dem Laden gleich aussieht. fc Gesichtsvariante (Brauen), ag Alter 0 jung / 1 grau an den Schläfen / 2 alt (Falten, gebeugt),
@@ -681,6 +762,8 @@ export function monsterSpec(e, m) {
   if (t === 'goblin' || t === 'goblin_warrior') varyGoblin(s, t, e.seed || 0);   /* Nutzer §5b: Vielfalt */
   else if (['bandit', 'bandit_archer', 'bandit_spear'].includes(t) && !e.boss && !e.rboss) varyBandit(s, t, e.seed || 0);   /* Nutzer §5f */
   else if (['skeleton', 'zombie', 'ghoul', 'bone_archer'].includes(t) && !e.boss) varyUndead(s, t, e.seed || 0);
+  else if (['wraith', 'shade', 'bone_knight', 'crypt_warden', 'necromancer', 'flesh_golem'].includes(t) && !e.boss && !e.rboss) varyDead(s, t, e.seed || 0, !!e.glow);   /* Artist Runde 6 */
+  else if (t === 'bounty_hunter') varyHunter(s, e.seed || 0, e.tier || 0);
   const EL = { chain_master: ['blutkette', 'blutkettenhelm'], garmadon: ['totenkrone', 'schaedelhelm'], death_knight: ['totenkrone'], hrodvar: ['totenkrone'], death_captain: ['generalspanzer'] }[t];   // S14: Bosse im Endgame-Set
   if (EL) for (const k of EL) Object.assign(s, ARMOR_LOOK[k], t === 'hrodvar' ? { armorCol: '#5d7383', rn: '#9fd8ff', cloak: '#16202a', pauld: '#8fb3c7' } : t === 'garmadon' ? { cloak: '#2a0a0c', rn: '#e03a2a', ge: '#e03a2a' } : {});
   if (e.shield && !s.shield) { s.shield = 'round'; s.shieldCol = '#4a3f30'; s.mark = 'boss'; s.markCol = '#8a8172'; }
@@ -688,11 +771,12 @@ export function monsterSpec(e, m) {
   s.wear = { goblin: 2, goblin_warrior: 2, bandit: 1 + sd, bandit_archer: 1 + sd, bandit_spear: 1 + sd, bounty_hunter: 1, ghoul: 3, skeleton: 2, crypt_warden: 2, death_captain: 2, cultist: 1, chain_brute: 1, kettenschuetze: 1, valen_soldier: 1 }[t] || 0;
   s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
   if (t === 'goblin' || t === 'goblin_warrior') s.wear = 2 + ((((e.seed || 0) * 5) | 0) >> 1) % 2;   /* Artist Runde 4: Goblins in Lumpen, mal geflickt, mal zerfetzt */
+  if (!e.boss && (t === 'skeleton' || t === 'zombie' || t === 'ghoul' || t === 'bone_archer' || t === 'wraith')) s.wear = 1 + Math.abs(((e.seed || 0) * 37) | 0) % 3;   /* Artist Runde 6: Verwesungsgrad 1–3 je Toter */
   if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
   s.ms = msOf(e); s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
-  s.bd = m?.angel ? 'bullig' : e.build || ''; s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
+  s.bd = m?.angel ? 'bullig' : e.build || s.bd || '';   /* Artist Runde 6: Körperbau aus den Varianten nicht mehr überschreiben */ s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
   if (e.elook) Object.assign(s, e.elook);   /* Nutzer: Elite-Mini-Bosse haben ihr eigenes Aussehen */   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }

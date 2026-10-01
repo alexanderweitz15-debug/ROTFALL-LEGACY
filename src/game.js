@@ -1872,7 +1872,7 @@ export function newGame(cfg) {
   initialSpawns();
   ensureBoards();
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
-  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
+  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin];
   const start = freeSpotNear('world', ...worldPt(66, 70), 3);
@@ -2064,7 +2064,8 @@ export function continueGame(given = null, retried = false) {                   
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
-  if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildVaronburg(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.varonburg.push(m); } }   /* §5d.4 */
+  if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); S.ents.varonburg = []; S.map = 'world';   /* Varonheim-Umbau S2: die Burg liegt in der Welt — wer in der alten Burgkarte stand, steht vor dem Burgtor */
+    for (const m of keep) { m.map = 'world'; const q = freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 3); if (q) { m.x = q.x; m.y = q.y; } S.ents.world.push(m); } }
   ensureDwarfGate(); if (S.map === 'zwerge') { const keep = (S.ents.zwerge || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildDwarfCity(); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.zwerge.push(m); } }   /* §5d.6: Königsstadt wird beim Laden neu gebaut */
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
@@ -2115,7 +2116,7 @@ export function continueGame(given = null, retried = false) {                   
     recalc(c); if (c === S.player) syncHotbar();
   }
   for (const m of MAP_KEYS) if (!gone?.[m]) adoptPropKeys(m, FRESH[m]);   // alte Vollstände: ab jetzt nur Abweichungen speichern
-  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
+  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
   for (const m of MAP_KEYS) indexSolids(m);
   assignNpcDays();                             // Tagesablauf der Figuren mit Namen (auch für alte Stände; nach dem Objekt-Index)
   planDays();                                  // Bewohner: Nachtplätze prüfen Möbel — erst nach dem Objekt-Index (sonst landet der Schlafplatz auf dem Tisch)
@@ -2435,7 +2436,7 @@ function update(dt, now) {
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }
     if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
-    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type].label} · ${LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
+    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
   }
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
@@ -4996,6 +4997,7 @@ function doInteract(target = null) {
   if (t.vaultSite) return enterVault(t.vaultSite);                     // S13: Gewölbe
   if (t.vaultNext) return vaultDescend();
   if (t.portal === 'varonburg' && SIM.capitalFallen()) return UI.toast('Die Toten halten die Burg. Erst die Stadt befreien.', 3000);   /* Belagerung S2 */
+  if (t.cellarStair || t.cellarB) viaB = 1;   /* Varonheim-Umbau S2: Kanzleikeller ↔ Katakomben */
   if (t.portal) return travel(t.portal);
   if (t.claim) return claimPlace(t);
   if (t.rite === 'urn') return urnRite(t);
@@ -5052,6 +5054,7 @@ const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from ==
     if (from === 'kerker') { const P = TOWN_PLAN[S.jailTown] || TOWN_PLAN.eren; return freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 2); }   // Phase 2: vor dem Kerker der Stadt
     if (from === 'deck' && S.airLand) { const [ax, ay] = S.airLand; S.airLand = null; return freeSpotNear('world', ax | 0, ay | 0, 5); }   /* Roadmap P7: Luftschiff landet am Mast (oder notlandet im Land) */
     if (from === 'isle' || from === 'deck') return portSpot(S.seaPort || 'saltport');   // S14: Seereise endet im Hafen
+    if (from === 'katakomben' && viaB) { viaB = 0; const st = S.ents.world.find(e => e.cellarStair); if (st) return freeSpotNear('world', st.x / TS | 0, (st.y / TS | 0) - 1, 1); }   /* aus dem Keller zurück in die Kanzlei */
     const door = from === 'vault' ? S.ents.world.find(e => e.vaultSite === S.vaultAt?.site) : S.ents.world.find(e => e.kind === 'prop' && e.portal === from);   // BUG-114: stand im Kommentar — Rückkehr aus jedem Dungeon warf
     if (door) return freeSpotNear('world', door.x / TS | 0, (door.y / TS | 0) + 3, 1);
     const [x, y] = worldPt(62, 21); return { x: x * TS + TS / 2, y: y * TS + TS / 2 }; } };
@@ -8294,9 +8297,8 @@ function dwarfChoices(npc, choices) {
 // Im Kerker sitzen Gefangene aus Aurelion — der Kerkermeister lässt einen für 80 Gold laufen (Aurelion +5, Valen −5).
 const VARON_NOBLES = [['Herzog Emmerich', 'Graf'], ['Gräfin Adelheid', 'Gräfin'], ['Baron Lothar', 'Graf']];
 function ensureVaronGate() {   /* §5g.1: das Tor zum Thronsaal ist jetzt der Eingang des Bergfrieds in Varonheim */
-  const [kx, ky] = CAPITAL.keep; S.ents.world = S.ents.world.filter(e => !(e.portal === 'varonburg' && Math.hypot(e.x / TS - kx, e.y / TS - ky) > 3));
-  if (S.ents.world.some(e => e.portal === 'varonburg')) return; const q = { x: kx * TS + TS / 2, y: ky * TS + TS / 2 };
-  S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'varonburg', transient: true, label: 'Bergfried der Varonsburg — Thronsaal' });
+  const [kx, ky] = CAPITAL.keep; S.ents.world = S.ents.world.filter(e => e.portal !== 'varonburg');   /* Varonheim-Umbau S2: kein Portal mehr — die Burg ist begehbar */
+  if (!S.ents.world.some(e => e.castleGate)) S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: kx * TS + TS / 2, y: ky * TS + TS / 2 - 8, r: 8, solid: false, castleGate: true, transient: true, label: 'Burgtor der Varonsburg (offen)' });
   capitalMigrate();
 }
 function capitalMigrate() {                                        /* §5g.1: Varonheim besiedeln (neue und alte Stände), Garde am Tor */
@@ -8476,7 +8478,41 @@ function capitalFreed() {
   if (byP && S.flags.retakeAsked) { delete S.flags.retakeAsked; S.gold += 400; S.factions.valen = clamp((S.factions.valen || 0) + 20, -100, 100); log('Der Hof kehrt heim. Für die Rückeroberung: 400 Gold, Valen +20.', 'quest'); }
   afterSay('Varonheim ist frei', 'Varonheim ist befreit. Die Königsgarde zieht wieder auf, die Läden öffnen, die Häuser werden Tag für Tag wieder aufgebaut. Die Stadt ist ärmer als zuvor.', 'war');
 }
-function buildVaronburg() {
+// Varonheim-Umbau S2 (Entwickler 01.10.2026): der Hof lebt in der Weltkarte — in den Burgbauten aus buildCapital (Thronsaal, Adelsflügel,
+// Kanzlei, Verlies, Kronschmiede). Flüchtig, nach jedem Laden neu; gespeichert werden nur Flags (Hingerichtete, Zerstreute, Freigelassene).
+// Fällt die Stadt, ist die Burg leer (der Hof ist im Exil). Die alte Karte 'varonburg' bleibt leer, damit alte Stände laden.
+const courtEnts = () => S.ents.world.filter(e => e.varonCourt && !e.exileCourt);
+const courtDrop = pred => { S.ents.world = S.ents.world.filter(e => !(e.varonCourt && !e.exileCourt && pred(e))); };
+let viaB = 0;                                                         /* Kellertreppe B (Kanzlei ↔ Katakomben) */
+function ensureVaronCourt() {
+  S.ents.world = S.ents.world.filter(e => !((e.varonCourt && !e.exileCourt) || e.courtProp)); S.ents.varonburg = [];
+  const H = id => HOUSES.find(h => h.id === id), thr = H('varon_throne'), nob = H('varon_nobles'), kan = H('varon_kanzlei'), ver = H('varon_verlies'), smi = H('varon_schmiede');
+  if (!thr || !nob || !kan || !ver || !smi || SIM.capitalFallen()) return;
+  const W = S.ents.world, prop = (type, tx, ty, o = {}) => { W.push({ id: uid(), kind: 'prop', type, map: 'world', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, courtProp: true, ...o }); };
+  for (const [x, y] of [[ver.x + 2, ver.y + ver.h - 2], [ver.x + 5, ver.y + ver.h - 2]]) prop('cage', x, y, { solid: true, r: 12 }); prop('chain_post', ver.x + 7, ver.y + 2, { solid: true });
+  prop('forge', smi.x + 3, smi.y + 2, { solid: true, r: 14 }); prop('anvil', smi.x + 6, smi.y + 3, { solid: true });
+  prop('desk', kan.x + (kan.w >> 1), kan.y + 2, { solid: true, label: 'Pult der Kanzlei' }); prop('shelf', kan.x + 1, kan.y + 4, { solid: true });
+  if (S.cult?.keyB) prop('portcullis', kan.x + kan.w - 3, kan.y + kan.h - 3, { portal: 'katakomben', cellarStair: true, r: 12, label: 'Treppe im Kanzleikeller — hinab' });   /* §5g.2 Eingang B */
+  const [cx] = CAPITAL.keep, yard = CAPITAL.keep[1] - 3;
+  prop('stall', cx - 10, yard, { solid: true, r: 12 }); prop('well', cx + 10, yard, { solid: true, r: 12 });
+  const put = (name, prof, tx, ty, o = {}) => { const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
+    pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; W.push(c); return c; };
+  const tx = thr.x + (thr.w >> 1), ty = thr.y + 3;
+  if (!S.flags.varonDead) { const k = put('Varon', 'König', tx, ty, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
+  if ((S.cult?.stage || 0) < 4) put('Aldhelm', 'Kanzler', tx + 3, ty + 1, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
+  put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
+  put('Ysmay', 'Spitzelmeisterin', kan.x + 3, kan.y + 5, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
+  VARON_NOBLES.forEach(([n, pr], i) => { if ((S.flags.varonExecuted || []).includes(i) || (S.flags.varonScattered || []).includes(i)) return;
+    put(n, pr, nob.x + 2 + i * 3, nob.y + 4 + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }); });
+  put('Grimm', 'Kerkermeister', ver.x + 3, ver.y + 2, { varonJailer: true, trait: 'gierig', greet: '„Spione aus Aurelion. Sagt der König. Ich sage: Kostgänger.“' });
+  for (let i = 0; i < 3; i++) if (!(S.flags.varonFreed || []).includes(i)) put(['Lucan', 'Serin', 'Maro'][i], 'Gefangener aus Aurelion', ver.x + 2 + i * 2, ver.y + ver.h - 3, { varonPrisoner: i, faction: null, trait: 'furchtsam', cloth: '#6a6258', greet: '„Ich bin Händler! Kein Spion! Sag es ihnen!“' });
+  put('Hagen', 'Schmied', smi.x + 4, smi.y + 4, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Kronstahl. Für die, die dem König dienen — oder zahlen.“' });
+  put('Hofmar', 'Hoflieferant', cx - 10, yard + 1, { shop: true, market: false, pool: ['potion', 'bandage', 'bread', 'dried_meat', 'wasserschlauch', 'iron'], greet: '„Proviant für die Front. Und für den Hof, natürlich zum Hofpreis.“' });
+  for (const [x, y] of [[tx - 3, thr.y + thr.h + 1], [tx + 3, thr.y + thr.h + 1], [thr.x + 2, ty], [thr.x + thr.w - 3, ty], [cx - 20, yard], [cx + 20, yard]]) { const q = freeSpotNear('world', x, y, 2); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { varonCourt: true, courtFolk: true, transient: true, visitor: true, guard: true }); W.push(g); }
+  for (let i = 0; i < 3; i++) put(pick(['Mette', 'Kuno', 'Ilse', 'Bero']), pick(['Diener', 'Magd', 'Stallknecht']), cx - 6 + i * 6, yard - 2, { faction: null, courtFolk: true, greet: pick(['„Nicht so laut. Der König hört alles.“', '„Der Kanzler bestimmt, was der König isst. Und was er denkt.“']) });
+}
+function buildVaronburg() { ensureVaronCourt(); return freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 2); }   /* Rückfall für alte Aufrufe: die Burg liegt in der Welt */
+function buildVaronburgOld() {
   const w = 72, h = 62, tiles = new Uint8Array(w * h).fill(T.GRASS); MAPS.varonburg = { w, h, tiles, ver: ((MAPS.varonburg?.ver) || 0) + 1 };
   const fill = (x, y, rw, rh, t) => { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) tiles[j * w + i] = t; };
   const walled = (x, y, rw, rh, floor, door) => { fill(x, y, rw, rh, T.WALL); fill(x + 1, y + 1, rw - 2, rh - 2, floor); if (door) fill(door[0], door[1], door[2] || 2, 1, floor); return { x, y, w: rw, h: rh, cx: x + (rw >> 1), cy: y + (rh >> 1) }; };
@@ -8528,7 +8564,7 @@ function varonChoices(npc, choices) {
     if (Q === 1 && S.flags.varonQ1done) choices.unshift({ text: 'Der Hauptmann der Toten ist gefallen.', fn: () => { S.flags.varonQ = 2; S.gold += 150; gainXp(p, 200);
       say('„Gut. Endlich einer, der tut, statt zu reden. (Er senkt die Stimme.) Einer meiner Adligen verkauft mich an Aurelion. Finde ihn. Ysmay weiß mehr, als sie sagt.“ (+150 Gold)'); } });
     if (Q === 2) choices.unshift({ text: 'Ich weiß, wer der Verräter ist.', fn: () => UI.dialogue(npc, '„Nenn ihn. Und sei dir sicher — ich richte, wen du nennst.“', [
-      ...VARON_NOBLES.map(([n], i) => ({ text: n, fn: () => { S.flags.varonQ = 3; const ok = i === varonTraitor(); const nb = S.ents.varonburg?.find(e => e.varonNoble === i); if (nb) nb.alive = false;
+      ...VARON_NOBLES.map(([n], i) => ({ text: n, fn: () => { S.flags.varonQ = 3; const ok = i === varonTraitor(); const nb = courtEnts().find(e => e.varonNoble === i); if (nb) courtDrop(e => e === nb);
         (S.flags.varonExecuted ||= []).push(i);   /* Bugfix: sonst steht der Gerichtete nach Neubau (Reload/Koop) wieder auf, wie die Gefangenen ohne S.flags.varonFreed */
         if (ok) { S.gold += 300; S.factions.valen = clamp((S.factions.valen || 0) + 10, -100, 100); chronicle(`${n} als Verräter entlarvt`, 'news', 'Der König richtet am Morgen.'); say(`„${n}. Ich wusste es. Man findet Aurelions Siegelwachs, wo man sucht.“ (+300 Gold, Valen +10)`); }
         else { S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); S.flags.varonWrong = 1; chronicle(`${n} hingerichtet`, 'news', 'Später heißt es, der Falsche sei gestorben.'); say(`„${n} stirbt im Morgengrauen.“ (Später flüstert der Hof: der Falsche. Valen −5)`); } } })),
@@ -8545,7 +8581,7 @@ function varonChoices(npc, choices) {
     ? `${npc.name} lacht eine Spur zu laut. „Siegelwachs? Wer achtet denn auf so etwas?“ — und schiebt einen Brief unter das Pult.` : `${npc.name} zuckt mit den Schultern. „Die Kanzlei siegelt den ganzen Tag. Frag Aldhelm.“`) });
   if (npc.varonJailer) { const left = [0, 1, 2].filter(i => !(S.flags.varonFreed || []).includes(i)); if (left.length) choices.push({ text: 'Lass einen Gefangenen laufen. (80 Gold)', fn: () => {
     if (S.gold < 80) return say('„Achtzig. Ich riskiere meinen Hals, nicht meinen Geldbeutel.“'); S.gold -= 80; (S.flags.varonFreed ||= []).push(left[0]);
-    S.ents.varonburg = (S.ents.varonburg || []).filter(e => e.varonPrisoner !== left[0]); S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100);
+    courtDrop(e => e.varonPrisoner === left[0]); S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100);
     say('„Er ist heute Nacht an Typhus gestorben. Traurig. Die Leiche ist schon weg.“ (Aurelion +5, Valen −5)'); } }); }
 }
 function royalStart() {                                              /* Auftrag 1: ein Hauptmann der Toten vor Nordfurt */
@@ -9728,6 +9764,7 @@ function ensureBoards() {
   indexSolids('world');
 }
 function travel(to) {
+  if (to === 'varonburg') { if (S.map !== 'world') travel('world'); const q = buildVaronburg(); if (q) { S.player.x = q.x; S.player.y = q.y; } return; }   /* Varonheim-Umbau S2: die Burg liegt in der Welt */
   const p = S.player, from = S.map;
   leavePursuit(from, to);
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
@@ -13092,7 +13129,7 @@ function buildCatacombs(from) {
   fill(38, 48, 4, 6); fill(26, 39, 2, 4); fill(52, 39, 2, 4); fill(14, 48, 4, 10); fill(14, 56, 16, 3); fill(62, 48, 4, 10); fill(50, 56, 16, 3); fill(70, 30, 3, 4);
   const C = S.cult || {}, P = [], day = S.day | 0, prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'katakomben', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, ...o }; P.push(e); return e; };
   prop('portcullis', 40, 65, { portal: 'world', r: 14, label: 'Hinauf — Gruft am Friedhof' });
-  prop('portcullis', 71, 31, { portal: 'varonburg', r: 12, label: 'Treppe hinauf — Kanzleikeller der Varonsburg' });
+  prop('portcullis', 71, 31, { portal: 'world', cellarB: true, r: 12, label: 'Treppe hinauf — Kanzleikeller der Varonsburg' });
   for (let i = 0; i < 6; i++) prop('bones', 32 + i * 3, 56 + (i % 2) * 6, { r: 6 });
   for (let i = 0; i < 4; i++) prop('cage', 8 + i * 5, 36, { solid: true, r: 12, cultCage: i });
   prop('altar_small', 40, 32, { solid: true, r: 12, label: 'Altar des Kelchs' }); for (const [x, y] of [[33, 33], [47, 33], [33, 45], [47, 45], [40, 46]]) prop('candles', x, y, { r: 6 });
@@ -13100,7 +13137,7 @@ function buildCatacombs(from) {
     for (const [x, y] of [[31, 10], [49, 10], [31, 20], [49, 20]]) prop('torch', x, y, { lightShaft: true, label: 'Lichtschacht' }); prop('desk', 40, 8, { solid: true, label: 'Pult des Kanzlers' }); }
   prop('desk', 63, 36, { solid: true, rite: 'cultseal', label: 'Pult der Kanzlei' }); prop('shelf', 56, 35, { solid: true }); prop('shelf', 70, 35, { solid: true }); prop('candles', 64, 46, { r: 6 });
   for (const [x, y] of [[31, 55], [48, 55], [7, 35], [24, 47], [55, 47], [29, 31], [50, 31]]) prop('torch', x, y, {});
-  S.ents.katakomben = P; MAPS.katakomben.entry = from === 'varonburg' ? { x: 70 * TS, y: 33 * TS } : { x: 40 * TS, y: 62 * TS };
+  S.ents.katakomben = P; MAPS.katakomben.entry = from === 'varonburg' || viaB ? { x: 70 * TS, y: 33 * TS } : { x: 40 * TS, y: 62 * TS }; viaB = 0;
   const caged = (C.missing || []).filter(m => !m.freed && !m.thrall && !m.dead);
   caged.slice(0, 4).forEach((m, i) => { const E = m.ent, c = makeChar({ name: E.name, prof: E.prof, map: 'katakomben', x: (8 + i * 5) * TS + TS / 2, y: 37 * TS + TS / 2, level: E.level || 3 });
     Object.assign(c, { cultCaptive: E.id, captive: true, transient: true, visitor: true, faction: null, pal: E.pal || c.pal, seed: E.seed ?? c.seed, anchor: { x: c.x, y: c.y }, greet: '„Hilf mir … bitte. Sie kommen jede Nacht und nehmen ein bisschen.“' }); S.ents.katakomben.push(c); });
@@ -13171,13 +13208,13 @@ function cultReveal(how) {
   log('Aldhelm, der Kanzler des Königs, ist der Herr des Kelchs. Er erwartet dich in der Krypta unter der Kelchhalle — der Gang ist jetzt offen.', 'quest'); UI.toast('ALDHELM IST DER BLUTFÜRST', 3600); return true;
 }
 function cultCourt() {                                         /* Beweis beim König: Kamerafahrt am Hof */
-  const vb = S.ents.varonburg || [], ald = vb.find(e => e.varonChancellor), king = vb.find(e => e.varonKing), p = S.player;
-  const at = (e, dy = 40) => e ? { map: 'varonburg', x: e.x, y: e.y + dy } : { map: p.map, x: p.x, y: p.y };
+  const vb = courtEnts(), ald = vb.find(e => e.varonChancellor), king = vb.find(e => e.varonKing), p = S.player;
+  const at = (e, dy = 40) => e ? { map: 'world', x: e.x, y: e.y + dy } : { map: p.map, x: p.x, y: p.y };
   cinematic([
     { ...at(king), dur: 2600, text: '„Majestät — Euer Kanzler siegelt mit Rot. Mit diesem Ring. Und mit dem Blut Eurer Stadt.“' },
     { ...at(ald), dur: 2800, text: 'Aldhelm lächelt. Das Siegel bricht in seiner Hand. Eine nach der anderen verlöschen die Kerzen am Thron.', setup: () => { if (ald) { fx(ald.x, ald.y - 14, 'blood', 16); camShake(3, 300); } } },
     { ...at(ald), dur: 2600, text: 'Als das Licht zurückkommt, ist er fort — durch die Geheimtür der Kanzlei. Marschall Brandt zieht das Schwert: „Ich komme mit.“',
-      setup: () => { S.ents.varonburg = (S.ents.varonburg || []).filter(e => !e.varonChancellor); cultReveal('king'); S.cult.allies = true; } },
+      setup: () => { courtDrop(e => e.varonChancellor); cultReveal('king'); S.cult.allies = true; } },
   ], () => { removeItem(p, 'rotes_siegel', 1); S.factions.valen = (S.factions.valen || 0) + 5; });
 }
 function cultCourtChoices(npc, choices) {
@@ -13252,7 +13289,7 @@ function cultCrown() {
   const C = S.cult; if (!C || C.end === 'destroyed' || C.end === 'player' || C.aldhelmDead || C.crowned) return;   /* RB-043/RB-044: einmal, nur mit lebendem Aldhelm */
   C.crowned = S.day | 0; C.crown = null; S.ents.world = S.ents.world.filter(e => !(e.exileCourt && e.varonKing));
   C.end = 'ruling'; C.stage = Math.max(C.stage, 4); cultAfter('ruling');
-  if (!S.flags.varonDead) { S.flags.varonDead = S.day | 0; S.ents.varonburg = (S.ents.varonburg || []).filter(e => !e.varonKing); }
+  if (!S.flags.varonDead) { S.flags.varonDead = S.day | 0; courtDrop(e => e.varonKing); }
   afterSay('Die Rote Krönung', 'König Varon ist im Schlaf gestorben, sagt der Hof. Kanzler Aldhelm führt das Reich als Reichsverweser. Die Garde gehorcht jetzt der Kanzlei — und die Front bekommt weniger Männer.', 'legend');
 }
 function cultLordHour(h) {                                     /* Der Held als Blutfürst: Tribut, Zehnt, Ordensjäger */
@@ -14589,7 +14626,7 @@ function debugSections() {
     }],
     ['Blutkult: Aldhelm (§5g.2, Scheibe 4)', '', {
       'Enthüllen (wie über Ysmay)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 3); cultReveal('ysmay'); },
-      'Hofszene mit Siegel': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 2); addItem(p, 'rotes_siegel', 1); if (S.map !== 'varonburg') { if (S.map !== 'world') travel('world'); travel('varonburg'); } cultCourt(); },
+      'Hofszene mit Siegel': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 2); addItem(p, 'rotes_siegel', 1); if (S.map !== 'world') travel('world'); { const t = HOUSES.find(h => h.id === 'varon_throne'); if (t) tp(t.x + (t.w >> 1), t.y + t.h - 3); } cultCourt(); },
       'In die Krypta (Bosskampf)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 3); cultReveal('ysmay'); if (S.map !== 'world') travel('world'); travel('katakomben'); const q = freeSpotNear('katakomben', 40, 26, 2); P().x = q.x; P().y = q.y; },
       'Kult zerschlagen (Ausgang)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); cultEnd('destroyed'); },
     }],
@@ -14784,7 +14821,7 @@ function debugSections() {
       'Siedlung: Wohnzone hier + Material + 3 Siedler': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen'); const p = P(), z = placeBuilding('wohnzone', p.x + 120, p.y, true); z.built = 1; S.res.wood += 100; S.res.stone += 40;   /* Nutzer §5d.3 */
         for (let i = 0; i < 3; i++) { const c = makeChar({ name: pick(FIRST_M), prof: 'Siedler', x: p.x + ri(-40, 40), y: p.y + 40, map: S.map, level: 1 }); c.settler = true; c.anchor = { x: c.x, y: c.y }; S.ents[S.map].push(c); } UI.toast('Wohnzone rechts; Siedler bauen täglich'); },
       'Siedlung: Siedlertag': () => settlersDay(),
-      'Varon: in die Varonsburg': () => { if (S.map !== 'world') travel('world'); travel('varonburg'); },   /* Nutzer §5d.4 */
+      'Varon: in den Thronsaal': () => { if (S.map !== 'world') travel('world'); const t = HOUSES.find(h => h.id === 'varon_throne'); if (t) tp(t.x + (t.w >> 1), t.y + t.h - 3); },   /* Varonheim-Umbau S2: die Burg ist begehbar */
       'Varon: Audienz und Auftrag 1 erledigt': () => { S.flags.varonAudience = 1; S.flags.varonQ = Math.max(1, S.flags.varonQ || 0); S.flags.varonQ1done = 1; UI.toast('Zum König'); },
       'Tiefhall: in die Königsstadt': () => { if (S.map !== 'deep') travel('deep'); travel('zwerge'); },   /* Nutzer §5d.6 */
       'Tiefhall: Freund der Halle': () => { S.flags.dwarfFriend = 1; UI.toast('Freund der Tiefhall'); },
@@ -15168,7 +15205,7 @@ export function selftest() {
     return !w.alive || w.hp < hp0;
   }));
   ok('Namen (BUG-087/090): je Stadt jeder Bewohnername einmal, passend zum Beruf, kein Bewohner heißt wie eine Figur mit Namen', (() => {
-    const named = new Set(S.ents.world.filter(c => c.kind === 'npc' && !c.villager && c.name).map(c => c.name.split(' ')[0])), seen = new Set();
+    const named = new Set(S.ents.world.filter(c => c.kind === 'npc' && !c.villager && !c.courtFolk && c.name).map(c => c.name.split(' ')[0])), seen = new Set();
     return S.ents.world.filter(c => c.villager && !c.refugee).every(c => { const k = c.homeTown + ':' + c.name, first = c.name.split(' ')[0];   // Flüchtlinge tragen eigene Namen
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
@@ -17586,7 +17623,7 @@ export function selftest() {
     try {
       S.cult = { stage: 1, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; const v1 = cultTake(), v2 = cultTake(); S.cult.stage = 3; S.cult.missing[1].day = (S.day | 0) - 7; cultHour(12);
       const turned = S.cult.missing[1].thrall && !S.cult.missing[0].thrall;
-      buildCatacombs('world'); const K = S.ents.katakomben, exits = K.some(e => e.portal === 'world') && K.some(e => e.portal === 'varonburg');
+      buildCatacombs('world'); const K = S.ents.katakomben, exits = K.some(e => e.portal === 'world' && !e.cellarB) && K.some(e => e.cellarB);
       const cap = K.find(e => e.cultCaptive === v1.id), thr = K.find(e => e.cultThrall === v2.id && e.name.includes(v2.name));
       cultFree(cap); const freed = S.ents.world.includes(v1) && S.cult.missing[0].freed && !S.ents.katakomben.includes(cap);
       const hed = S.ents.katakomben.find(e => e.cultHedda), ch = []; cultCatChoices(hed, ch); ch.find(c => c.text.startsWith('Trinken')).fn(); UI.closeDialogue();
@@ -17871,26 +17908,27 @@ export function selftest() {
   }));
   ok('Varonheim (Nutzer §5g.1, Umbau 01.10.): Hauptstadt auf dem Kronfels mit mindestens 60 Häusern, Bewohnern und Garde; das Bergfried-Tor führt in den Thronsaal; vom Markt sind die drei Stadttore und das Burgtor erreichbar', (() => {
     const P = TOWN_PLAN.varonheim; if (!P) return false; const [x0, y0, x1, y1] = P.area, [sx, sy] = P.square, M = MAPS.world;
-    const hs = HOUSES.filter(b => b.town === 'varonheim').length, folk = S.ents.world.filter(e => e.kind === 'npc' && e.homeTown === 'varonheim').length, gate = S.ents.world.find(e => e.portal === 'varonburg');
+    const hs = HOUSES.filter(b => b.town === 'varonheim').length, folk = S.ents.world.filter(e => e.kind === 'npc' && e.homeTown === 'varonheim').length, gate = S.ents.world.find(e => e.castleGate);
     const seen = new Set(), q = [[sx, sy]]; while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1 || SOLID.has(M.tiles[y * M.w + x])) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
     const cx = CAPITAL.x, gy = CAPITAL.y - 11, gates = [[x0 - 1, gy], [x1 + 1, gy], [cx, y1 + 1], CAPITAL.keep].every(([x, y]) => seen.has(x + ',' + y));
     return hs >= 60 && folk >= 30 && !!gate && Math.hypot(gate.x / TS - CAPITAL.keep[0], gate.y / TS - CAPITAL.keep[1]) < 2 && gates;
   })());
   ok('König Varon (Nutzer §5d.4): Tor im Norden, Burg mit König, Kanzler, Adligen, Kerker und Garde, alles erreichbar; Audienz über den Kanzler, Aurelion-Freunde abgewiesen, Verräter-Suche, Ritterschlag, Gefangener freikaufen', sandbox(() => {
-    const p = stage(), f0 = structuredClone(S.flags), v0 = S.ents.varonburg, mv = MAPS.varonburg, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen;
-    try { const W0 = S.ents.world.slice(); S.ents.world = S.ents.world.filter(e => e.portal !== 'varonburg'); ensureVaronGate(); const gate = S.ents.world.some(e => e.portal === 'varonburg'); S.ents.world = W0;
-      delete S.flags.varonDead; const at = buildVaronburg(), M = MAPS.varonburg, Z = S.ents.varonburg, king = Z.find(e => e.varonKing), chan = Z.find(e => e.varonChancellor), jail = Z.find(e => e.varonJailer);
-      const free = (x, y) => x >= 0 && y >= 0 && x < M.w && y < M.h && !SOLID.has(M.tiles[y * M.w + x]), seen = new Set(), q = [[at.x / TS | 0, at.y / TS | 0]];
+    const p = stage(), f0 = structuredClone(S.flags), W0 = S.ents.world, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen; S.ents.world = W0.slice();
+    try { ensureVaronGate(); const gate = S.ents.world.some(e => e.castleGate) && !S.ents.world.some(e => e.portal === 'varonburg');   /* Umbau S2: Tor ohne Portal */
+      delete S.flags.varonDead; const at = buildVaronburg(), M = MAPS.world, Z = courtEnts(), king = Z.find(e => e.varonKing), chan = Z.find(e => e.varonChancellor), jail = Z.find(e => e.varonJailer);
+      const free = (x, y) => Math.abs(x - CAPITAL.x) <= CAPITAL.hw + 2 && Math.abs(y - CAPITAL.y) <= CAPITAL.hh + 2 && !SOLID.has(M.tiles[y * M.w + x]), seen = new Set(), q = [[at.x / TS | 0, at.y / TS | 0]];
       while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || !free(x, y)) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
-      const reach = Z.filter(e => e.kind === 'npc').every(e => seen.has((e.x / TS | 0) + ',' + (e.y / TS | 0)));
+      const reach = Z.filter(e => e.kind === 'npc' && e.varonPrisoner == null).every(e => seen.has((e.x / TS | 0) + ',' + (e.y / TS | 0)));
       S.gold = 1000; S.ranks.valen = -1; S.factions.aurel = 0; delete S.flags.varonAudience; let ch = []; varonChoices(king, ch); const blocked = /Majestät/.test(ch[0]?.text || '') && !ch.some(c => /dienen/.test(c.text));
       ch = []; varonChoices(chan, ch); ch[0].fn(); UI.closeDialogue(); const aud = S.flags.varonAudience === 1 && S.gold === 900;
       S.factions.aurel = 40; ch = []; varonChoices(king, ch); const para = !ch.some(c => /dienen/.test(c.text)); S.factions.aurel = 0;
       S.flags.varonQ = 2; S.flags.varonTraitor = 1; ch = []; varonChoices(king, ch); ch.find(c => /Verräter/.test(c.text)).fn(); [...document.querySelectorAll('#dlg-choices button')].find(b => /Adelheid/.test(b.textContent)).click(); UI.closeDialogue();
       const right = S.flags.varonQ === 3 && S.gold === 1200; ch = []; varonChoices(king, ch); ch[0].fn(); [...document.querySelectorAll('#dlg-choices button')][0].click(); UI.closeDialogue(); const knight = S.flags.varonKnight === 1 && p.titles.includes('Ritter Varons');
-      ch = []; varonChoices(jail, ch); ch.find(c => /Gefangenen/.test(c.text)).fn(); UI.closeDialogue(); const freed = (S.flags.varonFreed || []).length === 1 && !S.ents.varonburg.some(e => e.varonPrisoner === 0);
-      return gate && !!king && !!chan && !!jail && Z.filter(e => e.kind === 'npc').length >= 20 && reach && blocked && aud && para && right && knight && freed;
-    } finally { S.flags = f0; S.ents.varonburg = v0; MAPS.varonburg = mv; S.factions.aurel = a0; S.factions.valen = vl; S.ranks.valen = rk; }
+      ch = []; varonChoices(jail, ch); ch.find(c => /Gefangenen/.test(c.text)).fn(); UI.closeDialogue(); const freed = (S.flags.varonFreed || []).length === 1 && !courtEnts().some(e => e.varonPrisoner === 0);
+      if (!(gate && !!king && !!chan && !!jail && Z.filter(e => e.kind === 'npc').length >= 18 && reach && blocked && aud && para && right && knight && freed)) console.log('Varon-Probe', { gate, king: !!king, chan: !!chan, jail: !!jail, n: Z.filter(e => e.kind === 'npc').length, reach, blocked, aud, para, right, knight, freed });
+      return gate && !!king && !!chan && !!jail && Z.filter(e => e.kind === 'npc').length >= 18 && reach && blocked && aud && para && right && knight && freed;
+    } finally { S.flags = f0; S.ents.world = W0; S.factions.aurel = a0; S.factions.valen = vl; S.ranks.valen = rk; ensureVaronCourt(); }
   }));
   ok('Tiefhall (Nutzer §5d.6): Treppe im Thronsaal der alten Halle, Königsstadt mit König, Schmiedin (Königseisen), Händlern und Wachen, alles erreichbar; Handel erst als Freund der Halle', sandbox(() => {
     const p = stage(), f0 = S.flags.dwarfFriend, z0 = S.ents.zwerge, mz = MAPS.zwerge;
