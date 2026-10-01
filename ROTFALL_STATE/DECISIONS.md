@@ -114,3 +114,10 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Ersatzwachen bringen die Besatzung zurück (**+4 je Mann**).
 - Scout Runde 5 gewählt: Turnier in Varonheim, Gildenstreik, Markt reagiert auf Bedrohung, Flüchtlinge ins Armenviertel.
 - Scout Runde 6 gewählt: Überfälle mit Ursache, Heilerhütte, Siedlung wird schutzlos, Moral sichtbar.
+
+## 01.10.2026 — Emergente Quests, Stadt ohne Wachen S2, Siedlung
+- Emergente Quests (PROPOSALS/emergente_quests.md): alle vier bauen, Reihenfolge E2 → E1 → E4 → E3.
+- Heimgeholter Deserteur darf einen verlorenen Wachposten füllen, nie in Varonheim.
+- Groll der Witwe trifft auch den Erben, höchstens noch ein Mörder.
+- Stadt ohne Wachen S2: Fristen je Schritt — Angsthase 4+4, Schwer 2+2, Sehr schwer 1+1 Tage.
+- Eigene Siedlung wird ohne Wachen nie übernommen, nur geplündert.

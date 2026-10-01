@@ -2732,7 +2732,7 @@ function drawAirship(x, y, s, dir, now, h, smoke) {
 // S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
 // Nutzer §5f: Tier-Varianten aus dem Seed — wenige Stufen je Art, damit der Bild-Cache klein bleibt (Schlüssel: pal.body)
 const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), Bc = p(b); return '#' + A.map((v, i) => Math.round(v + (Bc[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
-const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'] };
+const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'], bone_hound: ['#d8d0b0', '#a8a498', '#8a7a5a', '#c8b890'] };   /* Artist Runde 6: Knochenhunde vergilbt, grau, erdig */
 function beastVar(e, p) {
   if (e.epal) return { pal: { ...p, ...e.epal }, k: 1.2 };   /* Elite-Tier: eigenes Fell, größer */
   const T = BEAST_TINT[e.mtype]; if (!T || e.alpha || e.rboss || !p.body || !/^#[0-9a-f]{6}$/i.test(p.body)) return { pal: p, k: 1 };
