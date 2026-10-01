@@ -117,6 +117,7 @@ export function drawFrame(now) {
     ctx.fillStyle = 'rgba(12,10,8,.7)'; ctx.fillRect(e.x - w / 2, y - 9, w, 12);
     ctx.fillStyle = e.kind === 'player' ? '#e8c070' : '#9fd0f0'; ctx.fillText(t, e.x, y); ctx.textAlign = 'left';
   }
+  drawAmbience(now, list, m, x0, y0, x1, y1);   /* Artist Runde 7: Umgebungsleben */
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   drawFires(now);     // S14: Brand in der Stadt
   ctx.restore();
@@ -2689,6 +2690,114 @@ function drawLight(now) {
 }
 
 const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() }));
+/* Artist Runde 7 (Entwickler: „Umgebungsanimationen“): Umgebungsleben — reine Bildkosmetik, keine Spielregel.
+   Lagerfeuerrauch, fallendes Laub, Glühwürmchen, Krähen/Möwen, Küstengischt und Fischsprung, Fledermäuse, Fliegen, Morgennebel.
+   Zufall nur aus Kachel-Hash h2 und Zeit (nie rnd()/chance() aus state.js), kein Feld in S, nichts im Spielstand, kein Koop-Verkehr.
+   Aus bei „Reduzierte Bewegung“, außerhalb der Weltkarte und im Haus. Budget: höchstens AMB_CAP Rechtecke je Frame. */
+const AMB = { on: true, ms: 0, n: 0, crow: new Map(), regC: new Map() }, AMB_CAP = 200;
+export function ambientStats() { return { on: AMB.on, ms: +AMB.ms.toFixed(3), rects: AMB.n }; }   /* Konsole/Debug: RF.R.ambientStats() */
+export function setAmbient(v) { AMB.on = !!v; }                                                    /* Konsole/Debug: RF.R.setAmbient(false) zum Messen */
+const ambReg = (tx, ty) => { const k = tx * 65536 + ty; let r = AMB.regC.get(k); if (r === undefined) { if (AMB.regC.size > 3000) AMB.regC.clear(); r = regionAt(tx, ty); AMB.regC.set(k, r); } return r; };
+const ambMod = (a, n) => ((a % n) + n) % n;
+function ambRect(x, y, w, h) { if (AMB.n >= AMB_CAP) return; AMB.n++; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function drawAmbience(now, list, m, x0, y0, x1, y1) {
+  AMB.n = 0;
+  if (!AMB.on || !S.settings?.motion || S.map !== 'world' || !S.player || !m.tiles) return;
+  const P = S.player, ptx = P.x / TS | 0, pty = P.y / TS | 0;
+  for (const b of HOUSES) if (b.map === 'world' && ptx >= b.x && ptx < b.x + b.w && pty >= b.y && pty < b.y + b.h && playerInside(b)) return;   /* im Haus: draußen ruht alles */
+  const t0 = performance.now(), h = S.minute / 60, sn = seasonOf(), wx = S.weather, wet = wx === 'rain' || wx === 'bloodrain' || wx === 'snow' || wx === 'sandstorm';
+  const night = h >= 19.5 || h < 5, VW = W / cam.zoom, VH = H / cam.zoom;
+  ctx.save();
+  /* 1. Lagerfeuer: drei Rauchwölkchen, zwei Funken; 7. Fliegen über Leichen und Blut; Anker für Krähen und Fledermäuse */
+  let fires = 0, swarms = 0; const crows = [], caves = [];
+  for (const e of list) {
+    if ((e.kind === 'prop' && (e.type === 'campfire_static' || e.type === 'campfire')) || (e.kind === 'building' && e.type === 'campfire' && e.built >= 1)) {
+      if (fires >= 8) continue; fires++;
+      const sd = h2(e.x | 0, e.y | 0);
+      for (let i = 0; i < 3; i++) { const k = (now / 2300 + i / 3 + sd) % 1, s = 2 + (k * 4 | 0);
+        ctx.globalAlpha = (1 - k) * 0.42; ctx.fillStyle = '#5c5850'; ambRect(e.x + Math.sin(k * 4 + i + sd * 9) * 3 + k * 10 - s / 2, e.y - 16 - k * 44 - s / 2, s, s); }
+      ctx.fillStyle = '#f0b050';
+      for (let j = 0; j < 2; j++) { const k = (now / 950 + j * 0.5 + sd) % 1; if (k > 0.8) continue;
+        ctx.globalAlpha = 1 - k; ambRect(e.x + Math.sin(now / 160 + j * 3 + sd * 7) * 4, e.y - 10 - k * 32, 1.5, 1.5); }
+    } else if (e.kind === 'corpse' || (e.kind === 'prop' && (e.type === 'blood' || e.type === 'bones'))) {
+      if (e.kind === 'corpse' || e.type === 'bones' || h2(e.x | 0, (e.y | 0) + 3) < 0.5) crows.push(e);
+      if (swarms >= 4 || wet || sn === 3 || e.type === 'bones') continue; swarms++;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = '#141210';
+      for (let i = 0; i < 4; i++) { const a = now / (260 + i * 37) + i * 1.7; ambRect(e.x + Math.cos(a) * (6 + i * 2), e.y - 8 + Math.sin(a * 1.3) * 4 - i, 1, 1); }
+    } else if (night && e.kind === 'prop' && e.type === 'mine_entrance') caves.push(e);
+  }
+  /* Kacheldurchlauf im Bild: Gischt an der Küste, Fischsprung, Krähen auf Feldern (und im Totenland), Möwen am Strand */
+  const tl = m.tiles, mw = m.w, isWt = (tx, ty) => tx < 0 || ty < 0 || tx >= mw || ty >= m.h || tl[ty * mw + tx] === T.WATER;
+  const slot = Math.floor(now / 5200); let fish = null, fishH = 2, spray = 0, water = 0; const gulls = [];
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const t = tl[ty * mw + tx];
+    if (t === T.WATER) { water++;
+      const n = !isWt(tx, ty - 1), s = !isWt(tx, ty + 1), w = !isWt(tx - 1, ty), e = !isWt(tx + 1, ty);
+      if (n || s || w || e) { const hv = h2(tx * 3 + 1, ty * 7 + 2); if (hv > 0.5 || spray >= 60) continue;
+        const k = (now / 1100 + hv * 9) % 1; if (k > 0.45) continue; spray++;
+        ctx.globalAlpha = (0.45 - k) * 1.6; ctx.fillStyle = '#d8e4e8';
+        const px = tx * TS + (w ? 2 : e ? TS - 5 : 6 + hv * 36 % 20), py = ty * TS + (n ? 2 : s ? TS - 4 : 6 + hv * 52 % 20);
+        ambRect(px + k * (w ? 6 : e ? -6 : 0), py + k * (n ? 5 : s ? -5 : 0), n || s ? 3 : 1, n || s ? 1 : 3);
+      } else { const f = h2(tx * 31 + slot, ty * 17 - slot); if (f < fishH) { fishH = f; fish = [tx, ty]; } }
+    } else if (t === T.FIELD) { if (crows.length < 8 && h2(tx * 5 + 3, ty * 11 + 7) < 0.012) crows.push({ x: tx * TS + 16, y: ty * TS + 20 }); }
+    else if (t === T.SAND) { if (gulls.length < 4 && h2(tx * 13 + 5, ty * 3 + 9) < 0.04 && (isWt(tx + 1, ty) || isWt(tx - 1, ty) || isWt(tx, ty + 1) || isWt(tx, ty - 1))) gulls.push({ x: tx * TS + 16, y: ty * TS + 18, gull: 1 }); }
+    else if (t !== T.WALL && t !== T.ROCK && crows.length < 8 && h2(tx * 7 + 11, ty * 5 + 13) < 0.004 && ambReg(tx >> 3 << 3, ty >> 3 << 3) === 'deadland') crows.push({ x: tx * TS + 16, y: ty * TS + 20 });
+  }
+  if (fish) { const p = (now % 5200) / 1000, fx = fish[0] * TS + 16, fy = fish[1] * TS + 18;   /* höchstens ein Fisch zugleich, alle 5 s ein anderer Ort */
+    if (p < 1.25) { ctx.globalAlpha = 0.9;
+      if (p < 1) { ctx.fillStyle = '#9aa8b0'; ambRect(fx - 8 + p * 16, fy - Math.sin(p * Math.PI) * 15, 3, 2); }
+      if (p < 0.22 || p > 0.9) { const r = p < 0.22 ? p * 30 : (p - 0.9) * 30, sx = p < 0.22 ? fx - 8 : fx + 8; ctx.fillStyle = '#d8e4e8'; ambRect(sx - r - 1, fy, 2, 1); ambRect(sx + r, fy, 2, 1); }
+    } }
+  /* 4. Krähen und Möwen: sitzen, picken; flattern auf, wenn der Spieler näher als 90 px kommt (Zustand nur hier im Renderer) */
+  if (AMB.crow.size > 80) for (const [k, v] of AMB.crow) if (now - v.t > 6000) AMB.crow.delete(k);
+  for (const c of crows.slice(0, 8).concat(gulls)) {
+    const key = ((c.x | 0) << 16) ^ (c.y | 0), d = Math.hypot(c.x - P.x, c.y - P.y); let st = AMB.crow.get(key);
+    if (!st && d < 90) AMB.crow.set(key, st = { t: now, dir: c.x >= P.x ? 1 : -1 });
+    if (st && d > 260 && now - st.t > 1800) { AMB.crow.delete(key); st = null; }
+    const sd = h2(c.x | 0, c.y | 0), ox = (sd - 0.5) * 18, col = c.gull ? '#d8d4c8' : '#100e0e';
+    ctx.globalAlpha = 1; ctx.fillStyle = col;
+    if (!st) { const peck = Math.sin(now / 400 + sd * 20) > 0.85 ? 2 : 0, f = sd > 0.5 ? 1 : -1;
+      ambRect(c.x + ox - 2, c.y - 4, 5, 3); ambRect(c.x + ox + (f > 0 ? 2 : -3), c.y - 6 + peck, 2, 2); }
+    else { const p = (now - st.t) / 1500; if (p > 1) continue;
+      const bx = c.x + ox + st.dir * p * 170, by = c.y - 5 - p * 130 - Math.sin(p * 9) * 3, fl = Math.sin(now / 55 + sd * 9) > 0 ? -2 : 1;
+      ambRect(bx - 1, by, 3, 2); ambRect(bx - 5, by + fl, 4, 1); ambRect(bx + 2, by + fl, 4, 1); }
+  }
+  /* 2. Fallendes Laub: Wald und Grünmark, viel im Herbst; Seitenschwung per Sinus; weltfest (Fenster-Umbruch um die Kamera) */
+  if ((curRegion === 'forest' || curRegion === 'greenmark') && sn !== 3 && wx !== 'snow') {
+    const n = sn === 2 ? 26 : curRegion === 'forest' ? 8 : 0, pal = sn === 2 ? LEAF.autumn : LEAF.birch;
+    for (let i = 0; i < n; i++) { const d = rainDrops[100 + i], sw = Math.sin(now / 650 * d.s + i * 2.1);
+      const lx = cam.x + ambMod(d.x * 9000 + now / 120 * d.s + sw * 16, VW), ly = cam.y + ambMod(d.y * 9000 + now / 55 * d.s, VH);
+      ctx.globalAlpha = 0.85; ctx.fillStyle = pal[2 + (i & 1)]; const flat = Math.abs(sw) < 0.5; ambRect(lx, ly, flat ? 3 : 2, flat ? 1 : 2); }
+  }
+  /* 3. Glühwürmchen: nachts 21–4 Uhr im Moor und im Wald (im Sommer auch in der Grünmark), blinkend, weltfest je 160-px-Zelle */
+  if ((h >= 21 || h < 4) && !wet && sn !== 3) {
+    const ok = r => r === 'marsh' || r === 'forest' || (sn === 1 && r === 'greenmark'); let nf = 0;
+    if (ok(curRegion)) for (let cy = Math.floor(cam.y / 160); cy <= Math.floor((cam.y + VH) / 160) && nf < 24; cy++) for (let cx = Math.floor(cam.x / 160); cx <= Math.floor((cam.x + VW) / 160) && nf < 24; cx++) {
+      const hv = h2(cx * 19 + 3, cy * 23 + 1); if (hv > 0.75 || !ok(ambReg((cx * 5) >> 3 << 3, (cy * 5) >> 3 << 3))) continue;
+      for (let j = 0; j < 2 && nf < 24; j++) { const ph = hv * 40 + j * 2.3, bl = Math.sin(now / (380 + j * 90) + ph); if (bl < 0.1) continue; nf++;
+        const fx = cx * 160 + 40 + hv * 80 + Math.sin(now / 2300 + ph) * 26, fy = cy * 160 + 50 + j * 50 + Math.cos(now / 1900 + ph * 1.3) * 18;
+        ctx.globalAlpha = bl * 0.35; ctx.fillStyle = '#c8e860'; ambRect(fx - 1, fy - 1, 4, 4); ctx.globalAlpha = bl; ctx.fillStyle = '#f0ffa0'; ambRect(fx, fy, 2, 2); }
+    }
+  }
+  /* 6. Fledermäuse: nachts vor Mineneingängen und im Totenland, zackiger Flug, höchstens 5 */
+  if (night && !wet) { const swarm = caves.slice(0, 1).map(e => ({ x: e.x, y: e.y - 30, n: 3 }));
+    if (curRegion === 'deadland' || curRegion === 'blight') { const cx = Math.floor(P.x / 600), cy = Math.floor(P.y / 600);   /* ein Schwarm je 600-px-Feld, am Feld verankert */
+      for (let k = 0; k < 4 && swarm.length < 2; k++) { const gx = cx + (k & 1), gy = cy + (k >> 1); if (h2(gx * 7 + 1, gy * 3 + 5) < 0.5) swarm.push({ x: gx * 600 + 150 + h2(gx, gy) * 300, y: gy * 600 + 200, n: swarm.length ? 2 : 3 }); } }
+    ctx.globalAlpha = 1; ctx.fillStyle = '#0e0c10';
+    for (const sw of swarm) for (let i = 0; i < sw.n; i++) { const a = now / (520 + i * 60) + i * 2.4, r = 34 + i * 9;
+      const bx = sw.x + Math.cos(a) * r + Math.sin(now / 70 + i) * 3, by = sw.y + Math.sin(a * 1.7) * r * 0.45 + Math.sin(now / 53 + i * 2) * 2, fl = Math.sin(now / 45 + i) > 0 ? -1 : 1;
+      ambRect(bx - 1, by, 2, 2); ambRect(bx - 4, by + fl, 3, 1); ambRect(bx + 1, by + fl, 3, 1); }
+  }
+  /* 8. Morgennebel 5–8 Uhr über Moor und Wasser: wenige große, halb durchsichtige Schwaden, die langsam treiben */
+  if (h >= 5 && h < 8 && wx !== 'fog' && wx !== 'sandstorm' && (curRegion === 'marsh' || water > 60) && !['desert', 'badland', 'deadland', 'mountain'].includes(curRegion)) {
+    const k = 1 - Math.abs(h - 6.5) / 1.5; ctx.fillStyle = '#c8ccc6';
+    for (let i = 0; i < 6; i++) { const w = 260 + i * 30, hh = 34 + (i % 3) * 10;
+      const fx = cam.x - w + ambMod(i * 977 + now / (90 + i * 14), VW + w), fy = cam.y + ambMod(i * 0.173 * VH + 60, VH);
+      ctx.globalAlpha = 0.07 * k; ambRect(fx, fy, w, hh); ctx.globalAlpha = 0.06 * k; ambRect(fx + w * 0.15, fy - hh * 0.3, w * 0.7, hh * 1.6); }
+  }
+  ctx.restore();
+  AMB.ms = AMB.ms * 0.9 + (performance.now() - t0) * 0.1;
+}
 // Nutzer S13: kleine Animationen am Himmel — Luftschiffe über dem Hochreich (mit Schatten), Vogelschwärme am Tag im Freien
 function drawSkyLife(now) {
   if (S.map !== 'world' || !S.player) return;

@@ -853,3 +853,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Rang:** Offizier (Rang 4) geht ohne Durchsuchung durch. Ritter (Rang 3) oder „Ritter Varons“ behält die angelegte Klinge. Bei Valen „Verhasst“ kein Zutritt. Mit Kopfgeld bei Valen folgt die Festnahme.
 - **Drinnen zuschlagen:** Sieht die Garde es, gibt es erst die Warnung „Waffe weg!“. Ein zweiter Schlag binnen 20 s löst Alarm aus: die Garde greift an, Valen −20, Kopfgeld 200.
 - Debug: Abschnitt Varonheim, Einträge „Burgfrieden: …“ und „Varon: ans Burgtor“.
+
+## Schmuggel in die Varonsburg (Varonheim-Umbau, Scheibe 4)
+- **Verstecken:** Hast du eine Kleinwaffe (Dolch, Hakenmesser, Katar, Wurfmesser, Wurfbeil, Dietrich), bietet die Torwache „Durchsuchen lassen und … verstecken“ an. Die Chance steht dabei: 15 % + Schleichen × 1,5 (höchstens +45). Dazu: Ruf „Gnädig/Barmherzig“ +10, „Gnadenlos“ −20, Aurelion-Ruf ab 25 −15, Valen-Rang Veteran +25, Stiefelscheide +30, Verdacht −20. Begrenzt auf 5–90 %.
+- **Erwischt:** Die Waffe geht in die Waffenkammer, 150 Gold Strafe, Valen −5, drei Tage Verdacht. Wer im Verdacht erneut erwischt wird, kommt in den Kerker.
+- **Stiefelscheide:** Gibt es bei Yusuf im Basar von Karak-Atar (160 Gold).
+- **Diener:** Die Diener im Burghof holen für 300 Gold eine Waffe aus deiner Waffenkammer. Am nächsten Tag fragst du nach deiner Ware. In 15 % der Fälle verraten sie dich: die Waffe liegt wieder in der Kammer, Valen −5, ein Tag Verdacht.
+- **Kellerweg:** Wer mit dem zweiten Katakombenschlüssel über den Kanzleikeller kommt, wird nicht kontrolliert, bis ihn eine Wache sieht. Dann: 150 Gold Strafe und Durchsuchung oder Flucht (Alarm).
+- **Halle bleibt gefährlich:** Wer drinnen eine Waffe zieht, löst Warnung und dann Alarm aus.
+- **Schlächter** (Ruf der Klinge ≤ −60) kommen ohne Ritterwürde nicht hinein.

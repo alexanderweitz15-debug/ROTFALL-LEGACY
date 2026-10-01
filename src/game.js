@@ -7925,7 +7925,7 @@ function ensureKarak() {
   const [cx, cy] = c0, at = (dx, dy) => freeSpotNear('world', cx + dx, cy + dy, 2), desert = ['#c8a870', '#b89060', '#8a5a2a', '#e0d0a8'];
   const mk = (name, prof, dx, dy, o = {}) => { const q = at(dx, dy), c = makeChar({ name, prof, x: q.x, y: q.y, level: 6, faction: null, traits: ['ehrgeizig'], pal: { skin: pick(['#8d6644', '#b98f66', '#6d4a30']), cloth: pick(desert) } });
     Object.assign(c, { karak: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, hooded: true }, o); S.ents.world.push(c); return c; };
-  mk('Yusuf', 'Basarhändler', -3, -2, { shop: true, pool: ['katar', 'katar', 'kriegssichel', 'wurfbeil', 'wurfmesser', 'shortbow', 'dornensaebel', 'schockpistole', 'energiezelle', 'spezialoel', 'potion', 'bandage'], market: false, till: 21, karakBazaar: true, greet: '„Seide aus dem Süden, Klingen aus dem Norden, und was Aurelion nicht verkaufen will. Schau.“' });
+  mk('Yusuf', 'Basarhändler', -3, -2, { shop: true, pool: ['katar', 'katar', 'kriegssichel', 'wurfbeil', 'wurfmesser', 'shortbow', 'dornensaebel', 'schockpistole', 'energiezelle', 'spezialoel', 'potion', 'bandage', 'stiefelscheide'], market: false, till: 21, karakBazaar: true, greet: '„Seide aus dem Süden, Klingen aus dem Norden, und was Aurelion nicht verkaufen will. Schau.“' });
   mk('Leyla', 'Wasserhändlerin', 2, 2, { shop: true, pool: ['wasserschlauch', 'wasserschlauch', 'wasserschlauch', 'bread', 'dried_meat'], market: false, greet: '„Wasser ist hier mehr wert als Gold. Heute verkaufe ich es dir trotzdem für Gold.“' });
   mk('Amina', 'Stammesälteste', 0, 5, { karakElder: true, greet: '„Die Sterne haben uns durch die Wüste geführt, lange bevor die Sandfürsten kamen.“' });
   const lord = S.flags.sandlordSlain ? 'Farid' : null;
@@ -8527,11 +8527,11 @@ const keepBanned = it => { const I = ITEMS[it?.key]; return !!I && (I.slot === '
 const keepItName = it => `${it.name || ITEMS[it.key]?.name || it.key}${(it.count || 1) > 1 ? ' ×' + it.count : ''}`;
 const keepKnight = () => (S.ranks?.valen ?? -1) >= 3 || (S.player.titles || []).includes('Ritter Varons');
 const keepSusp = () => (S.flags.keepSusp || 0) > (S.day | 0);
-function keepSearch(c, keepBlade) {
+function keepSearch(c, keepBlade, hid) {
   const D = (S.keepDepot ||= {}), d = (D[c.id] ||= { items: [], equip: {}, day: S.day | 0, name: c.name }), out = [];
-  for (const sl of ['weapon', 'offhand']) { const it = c.equip[sl]; if (!it || (sl === 'offhand' && ITEMS[it.key]?.slot === 'offhand') || !keepBanned(it) || (keepBlade && sl === 'weapon')) continue;
+  for (const sl of ['weapon', 'offhand']) { const it = c.equip[sl]; if (!it || (sl === 'offhand' && ITEMS[it.key]?.slot === 'offhand') || !keepBanned(it) || it === hid || (keepBlade && sl === 'weapon')) continue;
     if (d.equip[sl]) d.items.push(it); else d.equip[sl] = it; c.equip[sl] = null; out.push(it); }
-  for (let i = c.inv.length - 1; i >= 0; i--) if (keepBanned(c.inv[i])) { const it = c.inv.splice(i, 1)[0]; d.items.push(it); out.push(it); }
+  for (let i = c.inv.length - 1; i >= 0; i--) if (keepBanned(c.inv[i]) && c.inv[i] !== hid) { const it = c.inv.splice(i, 1)[0]; d.items.push(it); out.push(it); }
   if (!d.items.length && !d.equip.weapon && !d.equip.offhand) delete D[c.id];
   recalc(c); if (c === S.player) { syncHotbar(); UI.refreshHUD(); } return out;
 }
@@ -8550,8 +8550,8 @@ function keepLeave(atGate) {
 }
 function keepOut() { const [kx, ky] = CAPITAL.keep, q = freeSpotNear('world', kx, ky + 3, 2), p = S.player; if (q) { p.x = q.x; p.y = q.y; p.vx = p.vy = 0; } }
 function keepGrant(kind) { S.keepPass ||= {}; for (const m of [S.player, ...keepParty()]) S.keepPass[m.id] = kind; }
-function keepSearchAll() {
-  const blade = keepKnight(), got = [S.player, ...keepParty()].flatMap(m => keepSearch(m, blade && m === S.player)); keepGrant('search');
+function keepSearchAll(hid) {
+  const blade = keepKnight(), got = [S.player, ...keepParty()].flatMap(m => keepSearch(m, blade && m === S.player, hid)); keepGrant('search');
   log(got.length ? `Burgfrieden: abgegeben in der Waffenkammer — ${got.map(keepItName).join(', ')}.${blade ? ' Als Ritter des Königs behältst du deine Klinge.' : ''} Beim Hinausgehen durchs Burgtor bekommst du alles zurück.` : 'Burgfrieden: Die Wache tastet dich ab und findet nichts. Du darfst hinein.', 'world');
   return got;
 }
@@ -8570,11 +8570,59 @@ function keepHalt() {
   if ((S.bounty?.valen || 0) > 0) { keepOut(); g.x = p.x + 30; g.y = p.y; S.flags.arrestCd = 0; return arrestCheck(g, p, 16); }
   if (repTier('valen')?.name === 'Verhasst') { keepOut(); return UI.dialogue(g, '„Nicht du. Mit oder ohne Klinge.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); }
   if ((S.ranks?.valen ?? -1) >= 4) { keepGrant('officer'); log('Die Torwache salutiert: Ein Offizier des Königs wird nicht durchsucht.', 'world'); return; }
+  if (styleTier(styleOf('greenmark')) === 'Schlächter' && !keepKnight()) { keepOut(); return UI.dialogue(g, '„Dich kennt man. Schlächter kommen nicht in des Königs Halle.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); }
+  const [kx, ky] = CAPITAL.keep;
+  if (Math.hypot(p.x / TS - kx, p.y / TS - ky) > 8) {                /* S4: über den Kanzleikeller hereingekommen — erst wer gesehen wird, wird angehalten */
+    const seer = courtEnts().find(e => e.guard && e.alive && !e.downed && coneSees(e, p, 160)); if (!seer) return;
+    return UI.dialogue(seer, '„Halt! Wie bist du hier hereingekommen?“', [
+      { text: 'Durchsuchen lassen (150 Gold Strafe)', fn: () => { UI.closeDialogue(); S.gold = Math.max(0, S.gold - 150); keepSearchAll(); log('Ohne Kontrolle in der Burg erwischt: 150 Gold Strafe, deine Waffen liegen in der Waffenkammer am Tor.', 'faction'); } },
+      { text: 'Wegrennen', fn: () => { UI.closeDialogue(); keepAlarm(p, 'Eindringen in die Varonsburg'); } }]);
+  }
   keepOut(); const susp = keepSusp(), canBribe = S.gold >= 5000 && !susp && S.flags.keepBribeDay !== (S.day | 0);
+  const small = [p.equip.weapon, p.equip.offhand, ...p.inv].find(keepSmall);
   UI.dialogue(g, susp ? '„Du schon wieder. Diesmal gründlich. Arme hoch.“' : `„Burgfrieden. Keine Klinge in des Königs Halle. Arme hoch.“${keepKnight() ? ' Er sieht dein Wappen. „Ein Ritter des Königs trägt sein Schwert. Der Rest bleibt hier.“' : ''}`, [
+    ...(small ? [{ text: `Durchsuchen lassen und ${keepItName(small)} verstecken (${keepSmuggleOdds()} %)`, fn: () => { UI.closeDialogue(); keepHide(small); if (S.keepPass?.[p.id] && !S.jail) { const q = freeSpotNear('world', kx, ky - 2, 2); if (q) { p.x = q.x; p.y = q.y; } } } }] : []),
     { text: 'Durchsuchen lassen (Waffen in die Waffenkammer)', fn: () => { UI.closeDialogue(); keepSearchAll(); const [kx, ky] = CAPITAL.keep, q = freeSpotNear('world', kx, ky - 2, 2); if (q) { p.x = q.x; p.y = q.y; } } },
     ...(canBribe ? [{ text: 'Bestechen (5000 Gold, etwa 3 zu 10 — scheitert es, kommt die Wache laut)', fn: () => { UI.closeDialogue(); keepBribe(); if (S.keepPass?.[p.id]) { const [kx, ky] = CAPITAL.keep, q = freeSpotNear('world', kx, ky - 2, 2); if (q) { p.x = q.x; p.y = q.y; } } } }] : []),
     { text: 'Umkehren', fn: () => UI.closeDialogue() }]);
+}
+// Umbau S4 — Schmuggel (§5.7): eine Kleinwaffe (Dolch, Wurfmesser, Dietrich …) beim Durchsuchen verstecken: 15 % + Schleichen × 1,5
+// (höchstens +45) + Ruf/Rang-Zuschläge + Stiefelscheide 30, begrenzt 5–90 %. Erwischt: abgegeben, 150 Gold Strafe, Valen −5, drei Tage
+// Verdacht; im Verdacht erwischt: Kerker. Diener im Burghof holen für 300 Gold eine Waffe aus der Waffenkammer (am nächsten Tag, 15 % Verrat).
+// Wer über den Kanzleikeller kommt, ist ungeprüft — bis die Garde ihn sieht.
+const keepSmall = it => !!it && (['dagger', 'throw'].includes(ITEMS[it.key]?.wtype) || it.key === 'dietrich');
+function keepSmuggleOdds() {
+  const p = S.player, st = styleTier(styleOf('greenmark')), rk = S.ranks?.valen ?? -1;
+  const v = 15 + Math.min(45, (p.skills?.stealth || 0) * 1.5) + (st === 'Gnadenlos' ? -20 : st === 'Gnädig' || st === 'Barmherzig' ? 10 : 0) + ((S.factions.aurel || 0) >= 25 ? -15 : 0)
+    + (rk === 2 ? 25 : 0) + (hasItem(p, 'stiefelscheide') ? 30 : 0) + (keepSusp() ? -20 : 0);
+  return clamp(Math.round(v), 5, 90);
+}
+function keepHide(it, force) {
+  const p = S.player, odds = keepSmuggleOdds(), ok = force ?? rnd() * 100 < odds, name = keepItName(it);
+  if (ok) { keepSearchAll(it); log(`Geschmuggelt: ${name} bleibt unentdeckt (${odds} %). Ziehst du es drinnen vor der Garde, gibt es Alarm.`, 'world'); return true; }
+  if (keepSusp()) { keepSearchAll(); log(`Erwischt — schon wieder: ${name}. Diesmal geht es in den Kerker.`, 'faction'); keepOut(); goToJail('valen', 150, 'varonheim'); return false; }
+  S.gold = Math.max(0, S.gold - 150); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); S.flags.keepSusp = (S.day | 0) + 3; keepSearchAll();
+  log(`Erwischt: ${name} gefunden. 150 Gold Strafe, Valen −5, drei Tage Verdacht (gründlich, keine Bestechung). Ein zweites Mal heißt Kerker.`, 'faction'); UI.toast('ERWISCHT', 2000); return false;
+}
+function keepAlarm(c, why) {
+  for (const g of courtEnts().filter(e => e.guard && e.alive)) { g.angry = true; g.brave = true; g.aggroId = c.id; g.sawPlayer = clock(); }
+  S.factions.valen = clamp((S.factions.valen || 0) - 20, -100, 100); addBounty('valen', 200, why); log('Alarm in der Varonsburg! Die Königsgarde greift an (Valen −20).', 'combat');
+}
+function servantSmuggle(npc, choices) {                            /* Diener holen eine Waffe aus der Waffenkammer */
+  const p = S.player, D = S.keepDepot?.[p.id], J = S.keepStash;
+  if (J && J.day <= (S.day | 0) && inKeep(p)) return choices.unshift({ text: 'Hast du meine Ware?', fn: () => {
+    S.keepStash = null;
+    if (J.betray) { (S.keepDepot ||= {})[p.id] ||= { items: [], equip: {}, day: S.day | 0, name: p.name }; S.keepDepot[p.id].items.push(J.item); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); S.flags.keepSusp = Math.max(S.flags.keepSusp || 0, (S.day | 0) + 1);
+      log(`${npc.name} hat dich verraten: ${keepItName(J.item)} liegt wieder in der Waffenkammer. Valen −5, ein Tag Verdacht.`, 'faction'); return UI.dialogue(npc, '„Ich … der Waffenmeister hat mich gesehen. Es tut mir leid. Wirklich.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); }
+    p.inv.push(J.item); log(`${npc.name} steckt dir ${keepItName(J.item)} zu — in einem Wäschebündel aus der Gesindekammer.`, 'world'); UI.dialogue(npc, '„Unter den Laken. Und wir kennen uns nicht.“', [{ text: '[Nehmen]', fn: () => UI.closeDialogue() }]); } });
+  if (J || !D || !inKeep(p)) return;
+  const it = D.equip?.weapon || D.items?.find(x => ITEMS[x.key]?.slot === 'weapon'); if (!it) return;
+  choices.unshift({ text: `${keepItName(it)} aus der Waffenkammer holen lassen (300 Gold)`, fn: () => {
+    if (S.gold < 300) return UI.dialogue(npc, '„Für nichts riskiere ich nicht meinen Hals.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= 300; if (D.equip.weapon === it) D.equip.weapon = null; else D.items.splice(D.items.indexOf(it), 1);
+    if (!D.items.length && !D.equip.weapon && !D.equip.offhand) delete S.keepDepot[p.id];
+    S.keepStash = { item: it, day: (S.day | 0) + 1, betray: chance(0.15), by: npc.name };
+    log(`${npc.name} nimmt 300 Gold: Morgen liegt ${keepItName(it)} in der Gesindekammer. Frag dann nach deiner Ware.`, 'world'); UI.dialogue(npc, '„Morgen. Nicht vorher. Und nicht hier.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
 }
 let keepWas = false, keepWarnAt = 0;
 function keepTick() {
@@ -8592,8 +8640,7 @@ function keepDraw(c) {                                               /* drinnen 
   const G = courtEnts().filter(e => e.guard && e.alive && !e.downed && dist(e, c) < 300); if (!G.length) return;
   const now = performance.now();
   if (now - keepWarnAt > 20000) { keepWarnAt = now; float(c, 'Waffe weg!', 'rgba(230,120,90,ALPHA)'); UI.toast('„WAFFE WEG!“ — noch einmal, und die Garde greift an', 2400); return; }
-  keepWarnAt = 0; for (const g of courtEnts().filter(e => e.guard && e.alive)) { g.angry = true; g.brave = true; g.aggroId = c.id; g.sawPlayer = clock(); }
-  S.factions.valen = clamp((S.factions.valen || 0) - 20, -100, 100); addBounty('valen', 200, 'Waffe gezogen im Burgfrieden'); log('Alarm in der Varonsburg! Die Königsgarde greift an (Valen −20).', 'combat');
+  keepWarnAt = 0; keepAlarm(c, 'Waffe gezogen im Burgfrieden');
 }
 function buildVaronburg() { ensureVaronCourt(); return freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 2); }   /* Rückfall für alte Aufrufe: die Burg liegt in der Welt */
 function buildVaronburgOld() {
@@ -8635,6 +8682,7 @@ function buildVaronburgOld() {
 const varonTraitor = () => (S.flags.varonTraitor ??= ri(0, 2));
 function varonChoices(npc, choices) {
   const p = S.player, Q = S.flags.varonQ || 0, say = (t, back) => UI.dialogue(npc, t, [{ text: back ? 'Weiter' : '[Gehen]', fn: back || (() => UI.closeDialogue()) }]);
+  if (npc.courtFolk && !npc.guard) servantSmuggle(npc, choices);   /* Umbau S4 */
   if (npc.keepWarden) {                                              /* Umbau S3: Torwache und Waffenkammer */
     const own = Object.keys(S.keepDepot || {}).filter(id => id === p.id || S.party.includes(id) || !byId(id));
     if (own.length) choices.unshift({ text: 'Meine Waffen zurück', fn: () => { const b = own.flatMap(id => keepReturn(byId(id)?.alive ? byId(id) : p, id)); log(`Waffenkammer: zurück ${b.map(keepItName).join(', ')}.`, 'world'); say(own.some(id => id !== p.id && !byId(id)) ? '„Auf den Namen deines Hauses verwahrt. Hier.“' : '„Hier. Zähl nach, ich tue es auch.“'); } });
@@ -14915,6 +14963,8 @@ function debugSections() {
       'Burgfrieden: Bestechung gelingt': () => { S.gold = Math.max(S.gold, 5000); keepBribe(true); },
       'Burgfrieden: Bestechung scheitert': () => { S.gold = Math.max(S.gold, 5000); keepBribe(false); },
       'Burgfrieden: Verdacht aus, Pass weg': () => { delete S.flags.keepSusp; delete S.flags.keepBribeDay; S.keepPass = {}; UI.toast('Verdacht und Pass gelöscht'); },
+      'Schmuggel: Chance anzeigen': () => UI.toast(`Verstecken: ${keepSmuggleOdds()} %`),
+      'Schmuggel: Dienerware jetzt fällig': () => { if (S.keepStash) { S.keepStash.day = S.day | 0; UI.toast('Ware liegt bereit'); } else UI.toast('Keine Bestellung'); },
       'Burgfrieden: Valen-Rang Offizier': () => { S.ranks.valen = 4; UI.toast('Rang Offizier'); },
       'Varon: ans Burgtor': () => { if (S.map !== 'world') travel('world'); tp(CAPITAL.keep[0], CAPITAL.keep[1] + 3); },
       'Varon: in den Thronsaal': () => { if (S.map !== 'world') travel('world'); const t = HOUSES.find(h => h.id === 'varon_throne'); if (t) tp(t.x + (t.w >> 1), t.y + t.h - 3); },   /* Varonheim-Umbau S2: die Burg ist begehbar */
@@ -18523,6 +18573,19 @@ export function selftest() {
       if (!(dep && back && bribeOk && bribeBad && knight && inside && officer)) console.log('Burgfrieden-Probe', { dep, back, bribeOk, bribeBad, knight, inside, officer });
       return dep && back && bribeOk && bribeBad && knight && inside && officer;
     } finally { S.flags = f0; S.keepDepot = D0; S.keepPass = K0; S.bounty = b0; S.factions.valen = v0; S.ranks.valen = r0; S.gold = g0; Object.assign(p.equip, e0); p.inv = i0; p.titles = t0; S.party = pt0; [p.map, p.x, p.y] = m0; UI.closeDialogue(); }
+  }));
+  ok('Varonheim-Umbau S4 (Schmuggel): Chance 15 % + Stiefelscheide 30 (5–90); versteckter Dolch bleibt, Schwert geht ins Depot; erwischt = 150 Gold, Valen −5, Verdacht; Diener holt für 300 Gold eine Waffe aus der Waffenkammer (am nächsten Tag)', sandbox(() => {
+    const p = stage(), f0 = structuredClone(S.flags), D0 = S.keepDepot, K0 = S.keepPass, J0 = S.keepStash, v0 = S.factions.valen, r0 = S.ranks.valen, a0 = S.factions.aurel, g0 = S.gold, e0 = { ...p.equip }, i0 = p.inv.slice(), pt0 = S.party, m0 = [p.map, p.x, p.y], sk0 = p.skills?.stealth, st0 = structuredClone(S.fameStyle || {});
+    try { S.keepDepot = {}; S.keepPass = {}; S.keepStash = null; S.party = []; S.ranks.valen = 0; S.factions.aurel = 0; S.fameStyle = {}; delete S.flags.keepSusp; p.skills.stealth = 0;
+      const o1 = keepSmuggleOdds(); p.inv = []; p.equip.weapon = mkItem('longsword'); addItem(p, 'dagger'); addItem(p, 'stiefelscheide'); const o2 = keepSmuggleOdds();
+      const dg = p.inv.find(i => i.key === 'dagger'); keepHide(dg, true); const hid = hasItem(p, 'dagger') && !p.equip.weapon && S.keepDepot[p.id]?.equip.weapon?.key === 'longsword';
+      keepLeave(true); S.keepPass = {}; S.gold = 1000; S.factions.valen = 0; keepHide(p.inv.find(i => i.key === 'dagger'), false); const caught = S.gold === 850 && S.factions.valen === -5 && keepSusp() && !hasItem(p, 'dagger');
+      const [x0, y0] = keepZone(); p.map = 'world'; p.x = (x0 + 30) * TS + 16; p.y = (y0 + 12) * TS + 16; const maid = { name: 'Mette', courtFolk: true }; let ch = []; servantSmuggle(maid, ch);
+      ch.find(c => /holen lassen/.test(c.text))?.fn(); UI.closeDialogue(); const ordered = S.gold === 550 && !!S.keepStash && !S.keepDepot[p.id]?.equip.weapon;
+      S.keepStash.day = S.day | 0; S.keepStash.betray = false; ch = []; servantSmuggle(maid, ch); ch[0].fn(); UI.closeDialogue(); const got = p.inv.some(i => i.key === 'longsword') && !S.keepStash;
+      if (!(o1 === 15 && o2 === 45 && hid && caught && ordered && got)) console.log('Schmuggel-Probe', { o1, o2, hid, caught, ordered, got });
+      return o1 === 15 && o2 === 45 && hid && caught && ordered && got;
+    } finally { S.flags = f0; S.keepDepot = D0; S.keepPass = K0; S.keepStash = J0; S.factions.valen = v0; S.ranks.valen = r0; S.factions.aurel = a0; S.gold = g0; Object.assign(p.equip, e0); p.inv = i0; S.party = pt0; [p.map, p.x, p.y] = m0; p.skills.stealth = sk0; S.fameStyle = st0; UI.closeDialogue(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
