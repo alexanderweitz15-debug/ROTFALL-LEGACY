@@ -334,7 +334,7 @@ function bakeGround(o, m, cx, cy) {
     let kind = TILE_KIND[t] || 'grass';
     if (t === T.DFLOOR && DUNGEONS[S.map]?.floor === 'scree') kind = 'scree';   // Minenboden: Geröll, kein Pflaster (Tiefhall: gebaute Halle, Pflaster)
     if (t === T.STONE && world && !townAt(tx, ty, 2) && regionAt(tx, ty) === 'mountain') kind = 'scree';   // Hochgebirge: Geröll, kein Pflaster
-    typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * 4) | 0;
+    typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * (SP.drawnOn() ? 8 : 4)) | 0;   /* Artist Runde 2: Stil R acht Kachelvarianten (weniger Wiederholung) */
     if (t === T.GRASS || t === T.DIRT) {                  // Wiesen hell, Senken dunkel
       const n = vnoise(tx / 11, ty / 11) * 0.7 + vnoise(tx / 4, ty / 4) * 0.3;
       if (n > 0.58) { sd.data[k * 4] = 150; sd.data[k * 4 + 1] = 160; sd.data[k * 4 + 2] = 90; sd.data[k * 4 + 3] = (n - 0.58) * 0.35 * 255; }
@@ -390,11 +390,39 @@ function bakeGround(o, m, cx, cy) {
     }
   }
   if (img) putLayer(o, img);
+  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW);
   // Helligkeit und Regionstönung: 1 Pixel je Kachelmitte, bilinear hochskaliert — weiche Verläufe statt Kachelrechtecke
   shadeCtx.putImageData(sd, 0, 0); tctx.putImageData(td, 0, 0);
   o.save(); o.imageSmoothingEnabled = true;
   o.drawImage(shadeCv, -16, -16, TW * 16, TW * 16); o.drawImage(tintCv, -16, -16, TW * 16, TW * 16);   // Pixelmitte i ↔ Kachelmitte
   o.restore();
+}
+/* Artist Runde 2 (Stil R): Flecken im Maßstab von ein bis drei Kacheln über Gras, Erde, Weg und Sumpf — trockene helle und satte
+   dunkle Inseln mit organischem Rand, dazu Büschel an Weltpositionen (nicht je Kachel). Bricht das Kachelraster, ohne Rauschen. */
+const MOTT = new Uint8Array(32); MOTT[T.GRASS] = 1; MOTT[T.DIRT] = 2; MOTT[T.ROAD] = 3; MOTT[T.MARSH] = 4;
+let motImg = null;
+function mottleR(o, x0t, y0t, typ, TW) {
+  const SZ = CH * 16; motImg ||= new ImageData(SZ, SZ); const D = motImg.data; D.fill(0);
+  const A = latNoise(x0t * 16, y0t * 16, SZ, 22, 311, 7), B = latNoise(x0t * 16, y0t * 16, SZ, 7, 977, 3);
+  let any = false;
+  const put = (o4, r, g, b, a) => { D[o4] = r; D[o4 + 1] = g; D[o4 + 2] = b; D[o4 + 3] = a; };
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+    const m = MOTT[typ[(j + 1) * TW + i + 1]]; if (!m) continue; any = true;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const X = (x0t + i) * 16 + x, Y = (y0t + j) * 16 + y, a = A(X, Y) * 0.72 + B(X, Y) * 0.28, o4 = ((j * 16 + y) * SZ + i * 16 + x) * 4;
+      if (m === 1) {
+        if (a > 0.63) put(o4, 140, 132, 64, a > 0.7 ? 52 : 34);              /* trockene, helle Stellen */
+        else if (a < 0.34) put(o4, 8, 20, 6, a < 0.27 ? 78 : 50);            /* sattes, dunkles Gras */
+        const q = h2(X * 3 + 11, Y * 7 + 5);
+        if (q > 0.9965 && x < 14 && y > 1) { const b = ((j * 16 + y) * SZ + i * 16 + x) * 4;   /* Büschel: Fuß dunkel, Spitzen hell */
+          put(b, 14, 22, 10, 150); put(b + 4, 14, 22, 10, 150); put(b + 8, 14, 22, 10, 120); put(b - SZ * 4 + 4, 120, 140, 70, 110); put(b - SZ * 4, 90, 110, 50, 90); put(b - SZ * 8 + 4, 150, 160, 90, 70); }
+      } else if (m === 2 || m === 3) {
+        if (a < 0.33) put(o4, 18, 12, 6, a < 0.27 ? 70 : 44);              /* feuchte, dunkle Erde */
+        else if (a > 0.66) put(o4, 150, 130, 96, 30);                        /* staubig */
+      } else if (a < 0.36) put(o4, 4, 14, 10, 60);                           /* Sumpf: tiefere Stellen */
+    }
+  }
+  if (any) putLayer(o, motImg);
 }
 // Wertrauschen mit vorab gehashten Gitterpunkten für ein Quadrat [gx0, gx0+AW) — gleiches Ergebnis wie
 // vnoise(X/sc+ox, Y/scy+oy), aber ~50× weniger Hashes (Backen der Chunks bleibt billig).
@@ -995,13 +1023,84 @@ function crown(cx, cy, R, pal, seed, n) {
     ctx.fillStyle = sn < -0.2 ? (cs < 0.2 ? pal[3] : pal[2]) : sn < 0.35 ? pal[1] : pal[0];
     ctx.beginPath(); ctx.arc(cx + cs * rr * 1.05, cy + sn * rr * 0.75, R * 0.1 + 1, 0, 7); ctx.fill(); }
 }
+/* Artist Runde 2 (Stil R): Tanne, Birke, Weide und toter Baum im Maßstab der neuen Eiche. Gleiche Regeln: Licht von oben links,
+   Schatten unten rechts, gebrochene Silhouette (Nadelspitzen, Strähnen, Zweige), klare Wertstufen. Wird nur beim Backen gerufen. */
+const PINE_R = ['#0e1912', '#192a1d', '#233a27', '#325035', '#476a45'];
+const WILLOW_R = ['#131c15', '#22302a', '#334535', '#4e6244'];
+function treeR(sp, x, y, v) {
+  const seed = (v * 997) | 0, P = c => { ctx.fillStyle = c; };
+  const poly = pts => { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
+  if (sp === 'pine' || sp === 'snowpine') {                 // Tanne: sechs hängende Astetagen mit Nadelsaum, oben spitz
+    const snow = sp === 'snowpine', G = PINE_R, top = y - 62 - (v - 0.5) * 10, N = 6;
+    P('#24190f'); ctx.fillRect(x - 2.5, y - 10, 5, 16); P('#46341f'); ctx.fillRect(x - 2.5, y - 10, 1.5, 16);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1), yb = y - 1 - (y - 1 - (top + 15)) * t, hgt = 17 - t * 4, w = (20 - t * 13) * (0.92 + h2(seed, i) * 0.16), ap = yb - hgt;
+      P(G[1]); poly([x, ap, x + w, yb, x - w, yb]);
+      for (let k = -w + 1.5; k <= w - 1.5; k += 3.2) { const d = 1.8 + h2(seed + i, (k * 3) | 0) * 2.6;   /* Nadelspitzen hängen über die Etage darunter */
+        P(k < -w * 0.2 ? G[2] : k < w * 0.35 ? G[1] : G[0]); poly([x + k - 1.7, yb - 0.6, x + k + 1.7, yb - 0.6, x + k + 0.4, yb + d]); }
+      P(G[2]); poly([x, ap, x - w * 0.1, yb - 1.5, x - w + 1, yb - 0.5]);
+      P(G[3]); poly([x - 0.3, ap + 1, x - w * 0.42, yb - hgt * 0.38, x - w * 0.86, yb - 1.2, x - w * 0.5, yb - 2.5]);
+      P(G[0]); poly([x + 1.5, ap + hgt * 0.45, x + w - 0.5, yb - 0.2, x + w * 0.25, yb - 0.2]);
+      if (i < N - 1) { P(G[4]); ctx.fillRect(x - w * 0.55, yb - hgt * 0.42, 1.6, 1.2); }
+      if (snow) { P('#cdd6dd'); poly([x, ap - 0.6, x - w * 0.82, yb - 2.2, x - w * 0.5, yb - 1.2, x + w * 0.15, ap + hgt * 0.55]);
+        P('#f2f6f8'); poly([x, ap - 0.6, x - w * 0.45, ap + hgt * 0.5, x - w * 0.1, ap + hgt * 0.42]); }
+    }
+    P(G[3]); poly([x, top - 5, x + 1.6, top + 3, x - 1.6, top + 3]);
+    if (snow) { P('#f2f6f8'); poly([x, top - 5, x - 1.2, top, x + 0.4, top]); }
+    return true;
+  }
+  if (sp === 'birch') {                                     // Birke: schlanker, leicht geneigter weißer Stamm, Kerben, lockere hängende Krone
+    const lean = (v - 0.5) * 7, at = yy => x + lean * (y - yy) / 52;
+    P('#7e776a'); poly([x - 3, y + 5, x + 3, y + 5, at(y - 48) + 1.5, y - 48, at(y - 48) - 1.5, y - 48]);
+    P('#d6d0c0'); poly([x - 3, y + 5, x - 0.4, y + 5, at(y - 48) - 0.2, y - 48, at(y - 48) - 1.5, y - 48]);
+    P('#28221c'); for (let i = 0; i < 8; i++) { const yy = y + 1 - i * 6 - (h2(seed, i) * 2 | 0); ctx.fillRect(at(yy) - 2.8 + (i % 2) * 2.2, yy, 2 + (i % 3) * 0.8, 1.3); }
+    ctx.strokeStyle = '#3e3830'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(at(y - 30), y - 30); ctx.lineTo(at(y - 30) - 9, y - 40); ctx.moveTo(at(y - 36), y - 36); ctx.lineTo(at(y - 36) + 9, y - 45); ctx.stroke(); ctx.lineCap = 'butt';
+    const cx = at(y - 46);
+    crown(cx - 8, y - 41, 10, LEAF.birch, 31 + seed, 8);
+    crown(cx + 8, y - 46, 10, LEAF.birch, 57 + seed, 8);
+    crown(cx - 1, y - 56, 11, LEAF.birch, 83 + seed, 9);
+    for (let i = 0; i < 9; i++) { const sx = cx - 17 + i * 4.2, sy = y - 40 + Math.abs(i - 4) * 1.2 + h2(seed, i + 9) * 3, len = 4 + h2(i, seed) * 6;   /* hängende Zweigspitzen */
+      P(i < 4 ? LEAF.birch[2] : LEAF.birch[1]); ctx.fillRect(sx, sy, 1.6, len); P(LEAF.birch[0]); ctx.fillRect(sx, sy + len - 1.5, 1.6, 1.5); }
+    return true;
+  }
+  if (sp === 'willow') {                                    // Weide: knorriger Stamm, runde Kuppel, Vorhang aus hängenden Strähnen
+    const W = WILLOW_R;
+    P('#251c14'); poly([x - 8, y + 5, x - 3, y - 2, x - 5, y - 20, x - 1, y - 28, x + 4, y - 24, x + 4, y - 2, x + 9, y + 5]);
+    P('#4a3a28'); poly([x - 8, y + 5, x - 5, y + 5, x - 2.5, y - 2, x - 3.5, y - 20, x - 5, y - 20, x - 3, y - 2]);
+    crown(x, y - 38, 20, W, 11 + seed, 13);
+    for (let i = 0; i < 17; i++) { const t = i / 16, sx = x - 22 + t * 44, dx = (sx - x) / 23,
+      sy = y - 40 + 15 * Math.sqrt(Math.max(0, 1 - dx * dx)) - 4 + h2(seed, i) * 3, len = 12 + h2(i, seed + 2) * 12 + (1 - Math.abs(dx)) * 4;
+      P(t < 0.35 ? W[2] : t < 0.7 ? W[1] : W[0]); ctx.fillRect(sx, sy, 2.2, len);
+      if (t < 0.45) { P(W[3]); ctx.fillRect(sx, sy + 1, 1, len * 0.5); }
+      P(W[0]); ctx.fillRect(sx + 0.4, sy + len - 2.5, 1.6, 2.5); }
+    for (let i = 0; i < 7; i++) { const sx = x - 12 + i * 4 + h2(i, seed + 5) * 2, sy = y - 50 + h2(seed + 5, i) * 6;   /* Strähnen schon in der Kuppel */
+      P(i < 3 ? W[2] : W[1]); ctx.fillRect(sx, sy, 1.6, 9 + h2(i, 3) * 5); }
+    return true;
+  }
+  if (sp === 'dead') {                                      // toter Baum: Wurzelfuß, dicker Stamm, verjüngte Äste, Zweige; Licht oben links
+    const k = (v * 3) | 0, D = '#2a2018', L = '#5c4b37';
+    const limb = (w, c, pts) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.stroke(); };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    P(D); poly([x - 9, y + 5, x - 3, y - 4, x + 3, y - 4, x + 10, y + 5, x + 3, y + 3, x - 2, y + 3]);
+    const B = k === 0 ? [[7, [0, 4, -1, -26, 1, -46]], [4, [0, -26, 13, -34, 20, -32]], [3, [-1, -18, -12, -27, -16, -39]], [2.5, [1, -40, 7, -52]], [2, [20, -32, 24, -38]], [1.6, [-12, -27, -19, -29]], [1.6, [13, -34, 15, -42]]]
+      : k === 1 ? [[7, [0, 4, 0, -16]], [5, [0, -16, -9, -34, -12, -48]], [5, [0, -16, 8, -32, 13, -44]], [2.4, [-9, -34, -18, -38]], [2.4, [8, -32, 16, -30]], [2, [13, -44, 18, -52]], [2, [-12, -48, -9, -55]], [1.6, [-18, -38, -21, -45]]]
+      : [[8, [0, 4, 3, -14, 9, -28]], [3.5, [3, -14, -9, -21, -15, -19]], [3.5, [9, -28, 5, -38]], [2.5, [9, -28, 17, -32]], [1.8, [5, -38, 1, -44]], [1.8, [17, -32, 21, -40]], [1.6, [-15, -19, -19, -25]]];
+    for (const [w, pts] of B) limb(w, D, pts);
+    for (const [w, pts] of B) if (w >= 3) limb(Math.max(1.2, w * 0.3), L, pts.map((q, i) => q + (i % 2 ? -0.6 : -w * 0.28)));
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    return true;
+  }
+  return false;
+}
 function drawProp(e, now) {
   const x = e.x, y = e.y;
   switch (e.type) {
     case 'tree': {                                        // drei Arten: Eiche, Tanne, knorrige Birke
       const v = e._v ?? h2(x | 0, y | 0), sp = e._sp || ['oak', 'pine', 'birch'][(v * 3) | 0];
       shadow(x, y + 6, 14, .4);
-      if (sp === 'dead') {                                // toter Baum: kahle, gekrümmte Äste
+      if (sp !== 'oak' && SP.drawnOn() && treeR(sp, x, y, v)) { if (e.hp < 3) { ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3); } break; }   /* Artist Runde 2: eigene Baumformen im Stil R */
+      if (sp === 'dead') {                              // toter Baum: kahle, gekrümmte Äste
         ctx.strokeStyle = '#3a2e22'; ctx.lineWidth = 4; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x - 1, y - 26); ctx.moveTo(x, y - 12); ctx.lineTo(x - 12, y - 24); ctx.lineTo(x - 16, y - 34);
         ctx.moveTo(x - 1, y - 20); ctx.lineTo(x + 10, y - 32); ctx.moveTo(x - 1, y - 26); ctx.lineTo(x + 3, y - 40); ctx.stroke();

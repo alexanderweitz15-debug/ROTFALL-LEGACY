@@ -1,6 +1,6 @@
 # T12 — „Straßen haben Herren“: Banden, Lager und Händlerzüge verbunden (V4)
 
-**Status:** APPROVED (Audit-Wahl 01.10.) → hier umsetzungsreif. **Autor:** Designer (Opus) · **Stand:** 01.10.2026
+**Status:** APPROVED (Antworten 01.10.2026 in DECISIONS.md)
 Kennzeichnung: **FAKT** (Datei:Zeile), **VORSCHLAG**, **ANNAHME**. Aufgabentext: `docs/audit/TASKS.md` T12, Audit `docs/audit/TEIL_B_WELT.md` V4.
 
 ---

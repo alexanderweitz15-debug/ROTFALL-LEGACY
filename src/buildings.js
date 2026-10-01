@@ -265,11 +265,16 @@ export function houseSprite(b, lit) {
   const R = ramp(mix(varOf(ROOF_VAR, roofKind, b, 91), '#6a5a48', (n(1, 2) - 0.5) * 0.25));
   const { cx, halfW, apexY, GH } = gableOf(b);
   const inGable = (x, y) => y >= apexY && y < yF && Math.abs(x - cx) <= halfW * (y - apexY) / GH;
+  /* Artist Runde 2 (Stil R): Fachwerk- und Putzhäuser tragen im Giebel eine senkrechte Bretterschalung statt einer hellen Putzfläche —
+     das große helle Dreieck verschwindet, Dach und Giebel trennen sich im Wert. Je Brett eigener Ton, helle Kante links, Fuge dunkel. */
+  const boards = RR && (wallKind === 'timber' || wallKind === 'plaster'), Gw = ramp(mix('#5e4630', '#6a5a48', n(6, 6) * 0.5));
+  const boardAt = (x, y) => { const bx = Math.floor((x + 1) / 3), xo = (x + 1) - bx * 3, tn = hh(bx, 17, s); if (xo === 2) return Gw.dk;
+    let c = tn > 0.7 ? mix(Gw.b, Gw.hi, 0.35) : tn < 0.25 ? mix(Gw.b, Gw.sh, 0.4) : Gw.b; if (xo === 0) c = mix(c, Gw.hi, 0.3); if (n(x, y + 300) > 0.93) c = mix(c, Gw.dk, 0.4); return c; };
   const cw = roofKind === 'thatch' ? 3 : 4;                               // Lagenbreite (Texel)
   const patches = T.patch ? [0, 1].map(i => ({ x: Math.round(cx + (i ? 1 : -1) * halfW * (0.3 + hh(i, 3, s) * 0.45)) - 3, y: 3 + Math.round(hh(i, 4, s) * Math.max(1, apexY - 6)) })) : [];
   for (let y = 0; y < yF; y++) for (let x = 0; x < W; x++) {
     if (inGable(x, y)) {                                                   // Giebelfeld in Wandmaterial
-      if (y < yF) g.p(x, y, mix(wallAt(x, y), '#1a1510', 0.12 + 0.1 * (1 - (y - apexY) / GH)));   // Giebelfeld liegt im Schatten des Dachs
+      if (y < yF) g.p(x, y, mix(boards ? boardAt(x, y) : wallAt(x, y), '#1a1510', 0.12 + 0.1 * (1 - (y - apexY) / GH)));   // Giebelfeld liegt im Schatten des Dachs
       continue;
     }
     const k = Math.abs(x - cx), west = x < cx, depth = 1 - y / (yF + 2);

@@ -785,3 +785,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Ortskarte:** Klick auf einen Ort der Weltkarte (M) zeigt Art, Herrschaft, Zustand, Gefahr, zuletzt gesehene Warenpreise und deine Aufträge dort.
 - **Steckbrief mit Gesicht:** Am Anschlagbrett sind Kopfgelder auf benannte Mini-Bosse mit ☠ markiert; beim Lesen siehst du das Gesicht des Gesuchten.
 - **Bestiarium:** Kodex → Gegner zeigt jedes erschlagene Wesen als Bild.
+
+## Runde: Feinde unter sich, Varons Tod, Startpreise (Entwickler 01.10.2026)
+- **Feinde verschiedener Mächte bekämpfen sich:** Tote gegen alles Lebende (Banden, Kette, Goblins, Piraten, Orden, Valen, Händler, Kelch, Aurelion), die Kette gegen Banden und Goblins, Orden gegen Kelch. Wer einen Feind deutlich näher hat (unter 60 % deiner Entfernung), kämpft lieber gegen den als gegen dich. Tiere, Diener, Ergebene und Gesprächspartner bleiben außen vor.
+- **Varons Tod:** Stirbt König Varon, steht die Welt kurz still — Glocken, der Hof weicht zurück oder trauert, Namenskarte „KÖNIG VARON IST TOT“, Marschall Brandt ruft. Reichsverweser wird Kanzler Aldhelm (solange der Kult nicht zerschlagen ist), sonst Marschall Brandt. Hast du ihn erschlagen: Kopfgeld 1500 bei der Krone, die Garde in Sichtweite greift an. Debug: „Regie (T17)“ → „Varons Tod vorspielen“.
+- **Startpreise:** Ein neues Spiel beginnt mit Stadtlagern von mindestens 80 % des Bedarfs (vorher lagen Tuch und Leder in Eren am Höchstpreis); Nordfurts Kornmangel bleibt.
+- **Erpressung des Kanzlers:** Die Wahl sagt jetzt vorher, dass das Rote Siegel danach für immer fort ist.

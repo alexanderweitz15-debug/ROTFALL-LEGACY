@@ -3210,6 +3210,13 @@ function groundTick() {
   }
 }
 const WILD_BEASTS = new Set(['wolf', 'bear', 'boar']);
+// Welche Gegner-Mächte einander angreifen (Fraktion aus MONSTERS; Tiere, Beute, Diener, Ergebene, Gesprächspartner bleiben außen vor)
+const FOE_FAC = { undead: ['bandit', 'chain', 'goblin', 'pirate', 'order', 'valen', 'merch', 'blut', 'aurel'], chain: ['bandit', 'goblin', 'undead'], bandit: ['chain', 'undead'], goblin: ['chain', 'undead'], pirate: ['undead'], order: ['undead', 'blut'], blut: ['order', 'undead'] };
+function foeFacs(a, b) {
+  if (a.servant || b.servant || a.pet || b.pet || a.surrendered || b.surrendered || a.parley || b.parley || a.goblinStorm || b.goblinStorm || a.prisoner || b.prisoner) return false;
+  const fa = a.faction || MONSTERS[a.mtype]?.faction, fb = b.faction || MONSTERS[b.mtype]?.faction; if (!fa || !fb || fa === fb) return false;
+  return !!FOE_FAC[fa]?.includes(fb) && teamOf(a) === 'foe' && teamOf(b) === 'foe';
+}
 function isHostile(a, b) {
   if (a.trial || b.trial) return (a === S.player || b === S.player) && (a.trial || b.trial) !== 'heal';   // S15 P5: Prüflinge nur gegen dich
   if (a.kind === 'enemy' && b.kind === 'enemy' && (WILD_BEASTS.has(a.mtype) !== WILD_BEASTS.has(b.mtype)) && !a.servant && !b.servant && !a.pet && !b.pet && !a.spirit && !b.spirit && !a.goblinStorm && !b.goblinStorm
@@ -3219,6 +3226,7 @@ function isHostile(a, b) {
   if (a.holdOf || b.holdOf) { const r = a.holdOf ? a : b, o = r === a ? b : a; if (o.kind === 'npc' && (o.raidDef === r.holdOf || (o.guard && o.angry))) return true; }   // S15 P20: Überfall der Toten
   if (a.raidOf || b.raidOf) { const r = a.raidOf ? a : b, o = r === a ? b : a; if (o.kind === 'npc' && (o.homeTown === r.raidOf || o.raidDef === r.raidOf)) return true; }   // S12 A4: Überfall aufs Dorf
   if (a.faction && a.faction === b.faction && a.kind !== 'player' && b.kind !== 'player' && !a.angry && !b.angry && !a.servant && !b.servant) return false;   // Gleiche Fraktion: kein Kampf (Stille Wächter vs. Skelette)
+  if (a.kind === 'enemy' && b.kind === 'enemy' && foeFacs(a, b)) return true;   /* Entwickler 01.10.2026: Feinde verschiedener Mächte bekämpfen sich (Tote gegen Lebende, Kette gegen Banden und Goblins) */
   const ta = teamOf(a), tb = teamOf(b);
   return ta !== tb && ta !== 'neutral' && tb !== 'neutral';
 }
@@ -3547,7 +3555,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.mtype === 'aldhelm' && S.cult) cultEnd(S.cult.challenge ? 'player' : 'destroyed');   /* §5g.2: wer ihn als Kind des Kelchs trinkt, wird Blutfürst */
   if (c.cultHedda && S.cult) { S.cult.heddaDead = true; log('Hedda fällt. Der Kelch auf dem Altar ist plötzlich nur noch ein Becher.', 'quest'); } if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
   if (c.varonKing && !S.flags.varonDead) { const byP = !!source && (source === S.player || S.party.includes(source.id) || source.servant === S.player.id || source.coopHero);   /* RB-023: nur der Spieler und seine Gruppe büßen */
-    S.flags.varonDead = S.day | 0; if (byP) S.factions.valen = -100;
+    S.flags.varonDead = S.day | 0; if (byP) S.factions.valen = -100; kingDeath(c, byP);   /* Entwickler 01.10.2026: Varons Tod ist ein Ereignis */
     chronicle(byP ? 'König Varon ist tot' : 'König Varon ist gefallen', 'legend', c.exile ? 'Der König fiel im Exil. Marschall Brandt führt, was vom Hof übrig ist.' : byP ? 'Der Thron im Norden ist leer. Kanzler Aldhelm regiert — bis ihn jemand daran hindert.' : 'Nicht durch deine Hand. Der Thron im Norden ist leer.'); UI.toast('KÖNIG VARON IST TOT', 3600); }   /* §5d.4 */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
@@ -3870,6 +3878,7 @@ function updateEnemy(e, dt) {
   const ag = e.aggroId ? byId(e.aggroId) : null;
   const sight = m.sight * (e.wary > clock() ? 1.5 : 1) * (S.map === 'world' && e.map === 'world' ? (WX[wxKey()]?.foeSight || 1) : 1);   /* Roadmap C.12 */           // nach abgebrochener Jagd: wachsamer
   let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
+  if (tgt && tgt === ag) { const nt = nearestTarget(e, targets, sight); if (nt && nt !== ag && dist(e, nt) < dist(e, ag) * 0.6) tgt = nt; }   /* Entwickler: steht ein anderer Feind deutlich näher, kämpft man lieber gegen den */
   if (e.mtype === 'bear' && tgt && !e.provoked && dist(e, tgt) > 110 && tgt !== ag) tgt = null;   // Revier: nur wer zu nahe kommt
   if (tgt && e.giveUp && e.giveUp.id === tgt.id && e.giveUp.until > performance.now()) tgt = null;
   if (tgt === S.player && BOSS_CARDS[e.mtype] && !S.cine && dist(e, tgt) < 340) bossIntro(e);   /* T17: Boss-Auftritt beim ersten Blickkontakt (einmal je Held) */   // BUG-088: aufgegeben (kein Weg) — nicht sofort wieder anrennen
@@ -8301,6 +8310,25 @@ function ensureVaronExile() {
   for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3, sy + 2, 3); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { exileCourt: true, guard: true, transient: true, visitor: true, post: k }); S.ents.world.push(g); }
 }
 const varonBound = () => cultWar() || SIM.capitalFallen();   /* §5g.8 (Nutzer): Kult aktiv/herrschend oder Hauptstadt besetzt = Valen gebunden; ein toter König bindet nicht (Brandt führt) — wirkt ab T40 */
+// Varons Tod (Entwickler 01.10.2026, Scout #31): Szene mit stehender Welt (Glocken, Namenskarte, der Hof reagiert), dann Folgen —
+// Reichsverweser (Aldhelm, wenn der Kult nicht zerschlagen ist, sonst Marschall Brandt), Trauer in Varonheim, und wer den König
+// erschlug, wird gejagt: Kopfgeld der Krone, die Garde in Sichtweite greift an.
+function kingDeath(k, byP) {
+  const regent = S.cult?.end === 'destroyed' ? 'Marschall Brandt' : 'Kanzler Aldhelm';   /* Aldhelm lebt, solange der Kult nicht zerschlagen ist */
+  S.flags.varonRegent = regent;
+  if (byP) { addBounty('valen', 1500, 'Königsmord'); for (const g of S.ents[k.map] || []) if (g.kind === 'npc' && g.alive && g.guard && dist(g, k) < 600) { g.angry = true; g.aggroId = S.player.id; } }
+  afterSay('Der König ist tot', `König Varon ist tot${byP ? ' — erschlagen von deiner Hand' : ''}. ${regent} führt das Reich als Reichsverweser. In Varonheim läuten die Glocken.${byP ? ' Die Krone setzt 1500 Gold auf deinen Kopf.' : ''}`, 'legend', false);
+  if (S._quiet || S.coop?.role === 'guest' || S.dying) return;
+  const court = (S.ents[k.map] || []).filter(e => e.kind === 'npc' && e.alive && e !== k && dist(e, k) < 420).slice(0, 6), marshal = court.find(e => e.varonMarshal), body = { x: k.x, y: k.y };
+  const run = () => cinematic([
+    { dur: 1800, zoom: 1.35, focus: body, text: '', beats: [{ t: 0, sfx: 'bell', duck: 0.35, ms: 300 }, { t: 0.4, sfx: 'bell' }, { t: 0.15, fx: 'blood', at: body, n: 12 },
+      ...court.map((c, i) => ({ t: 0.2 + i * 0.07, gesture: byP ? 'abwehren' : 'trauern', who: c, toward: body, ms: 1600 }))] },
+    { dur: 2600, zoom: 1.2, focus: (marshal || court[0] || S.player).id, beats: [{ t: 0, card: { title: 'KÖNIG VARON IST TOT', sub: `${regent} führt das Reich`, ms: 3400 } }, { t: 0.1, sfx: 'bell' },
+      ...(marshal ? [{ t: 0.15, say: byP ? 'Königsmörder! Packt ihn!' : 'Der König ist tot. Haltet die Tore.', who: marshal, ms: 2600 }, { t: 0.15, gesture: byP ? 'zeigen' : 'knien', who: marshal, toward: S.player, ms: 1600 }] : [])] },
+    { dur: 900, zoom: 1.05, focus: S.player.id, beats: [{ t: 0.5, duck: 1, ms: 500 }] },
+  ], null, { pause: true, stay: true });
+  if (S.cine) cineLater(run, 1200); else run();
+}
 function capitalDay() {                                           /* Rote Krönung ruht, solange Varonheim besetzt ist */
   if (SIM.capitalFallen() && S.cult?.crown && !S.cult.end) S.cult.crown++;
 }
@@ -13099,7 +13127,7 @@ function cultPathChoices(npc, choices) {
   const C = S.cult, p = S.player; if (!C) return; const day = S.day | 0;
   const say = (t, more = []) => UI.dialogue(npc, t, [...more, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   if (npc.varonChancellor && C.reveal == null && !C.end && !C.blackmail && hasItem(p, 'rotes_siegel', 1)) choices.unshift({ text: 'Ich habe Euer Siegel, Kanzler. (Erpressen)', fn: () => {
-    say('„Ah. Ein kluger Mensch. Kluge Menschen leben lange — wenn sie vergessen. Fünfhundert Gold, und du hast nie etwas gesehen.“', [{ text: 'Abgemacht. (500 Gold, das Siegel geht an ihn)', fn: () => {
+    say('„Ah. Ein kluger Mensch. Kluge Menschen leben lange — wenn sie vergessen. Fünfhundert Gold, und du hast nie etwas gesehen.“ (Gibst du das Siegel her, gibt es keinen Beweis mehr gegen ihn.)', [{ text: 'Abgemacht. (500 Gold — das Siegel ist dann für immer fort: Aldhelm lässt sich nie mehr enthüllen, und die Rote Krönung rückt näher)', fn: () => {   /* RB-041: Entwickler — harte Folge, vorher deutlich gesagt */
       removeItem(p, 'rotes_siegel', 1); S.gold += 500; C.blackmail = day; C.end = 'hidden'; cultAfter('hidden'); UI.closeDialogue();
       log('Aldhelm zahlt. Das Siegel ist fort, der Kult arbeitet weiter — leiser. Und eine Uhr läuft: die Rote Krönung.', 'quest'); } }]); } });
   if (npc.cultHedda && C.joined != null && C.reveal != null && !C.end) choices.unshift(
@@ -14678,6 +14706,7 @@ function debugSections() {
       'Szene: Varonheim ist gefallen': () => capitalScene('fell'),
       'Sprechblase am nächsten': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; bubble(n || p, 'Hier ist eine Sprechblase.', 3000); },
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
+      'Varons Tod vorspielen (Szene, ohne Folgen am Stand)': () => { const k = S.ents[S.map].find(e => e.varonKing) || p; const f0 = { ...S.flags }, b0 = structuredClone(S.bounty || {}); kingDeath(k, false); Object.assign(S.flags, f0); S.bounty = b0; },
       'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
       'Ankunftskarten zurücksetzen': () => { S.flags.seenTowns = {}; UI.toast('Städte zeigen ihre Karte wieder'); },
@@ -15129,7 +15158,7 @@ export function selftest() {
     const g = spawnEnemy('gorak', '__a', 22, 20); g.aggroId = p.id; combat = S.ents.__a.filter(e => e.alive);
     let charged = false; for (let i = 0; i < 400 && !charged; i++) { g.x = p.x - 200; g.y = p.y; think(g, 16); charged = g.special?.kind === 'charge'; }
     const h = spawnEnemy('hrodvar', '__a', 22, 26); h.aggroId = p.id; S.projectiles = [];
-    let lance = false; for (let i = 0; i < 400 && !lance; i++) { h.x = p.x - 220; h.y = p.y + 40; combat = S.ents.__a.filter(e => e.alive); think(h, 16); lance = S.projectiles.some(q => q.kind === 'frost'); }
+    let lance = false; for (let i = 0; i < 400 && !lance; i++) { h.x = p.x - 220; h.y = p.y + 40; combat = S.ents.__a.filter(e => e.alive && e !== g); think(h, 16);   /* Gorak und Hrodvar sind verfeindet (Mächte kämpfen gegeneinander) */ lance = S.projectiles.some(q => q.kind === 'frost'); }
     g.phase = 2; g.hp = g.maxHp * 0.2; g.special = null; g.roar = 0; think(g, 16);
     return charged && g.phase === 3 && lance;
   }));
@@ -17625,6 +17654,15 @@ export function selftest() {
       talk(g); const chat = UI.dialogueOpen() && [...document.querySelectorAll('#dlg-choices button')].some(b => b.textContent.startsWith('Was gibt es Neues')); UI.closeDialogue();
       return quiet && chat;
     } finally { S.flags.allTalk = a0; UI.closeDialogue(); }
+  }));
+  ok('RB-042: Ein neues Spiel beginnt nicht mit Höchstpreisen in Eren (Tuch, Leder, Korn unter ×1,5); Nordfurts Kornmangel bleibt (Kriegsentwurf)', sandbox(() => {
+    const T0 = S.towns, E0 = S.eco, A0 = S.after, own = S.war?.nodes?.eren?.owner;
+    try {
+      if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen';   /* im Sicherungsstand halten die Toten Eren (Kaufen ×1,5) */
+      delete S.towns; delete S.eco; S.after = undefined; ECO.initEco();
+      const ok = ['cloth', 'pelt', 'grain'].every(g => baseMul('eren', g) < 1.5)   /* 80 % Lager = leicht teurer, nie mehr der Deckel 1,8 */ && S.towns.northcity.stock.grain < ECO.target(S.towns.northcity, 'grain') * 0.5;
+      return ok;
+    } finally { S.towns = T0; S.eco = E0; S.after = A0; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = own; }
   }));
   ok('T10 Ahnenfeind: Mörder (kein Boss) wird benannt und nimmt die Waffe samt Geschichte aus dem Grab; tötet er wieder, wächst er; höchstens drei; sein Tod gibt die Waffe zurück und den Titel', sandbox(() => {
     const p = stage(), N0 = S.nemeses, NP0 = S.nemesisPast;

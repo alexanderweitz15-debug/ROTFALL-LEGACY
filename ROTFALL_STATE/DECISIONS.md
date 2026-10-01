@@ -82,3 +82,17 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 
 ## 01.10.2026 — Gespräche
 - Entwickler: „Reduziere die Anzahl der NPCs, mit denen man reden kann. Man soll nicht alle nach der Geschichte etc. fragen können.“ Umsetzung: einfache Bewohner nur Sprechblase; Plauder- und Wissensfragen nur bei gesprächigen Rollen (Namen, Wachen, Wirte, Reisende, Lehrer, Gelehrte, Priester, Vorsteher, Gefährten); Dienste bleiben.
+
+## 01.10.2026 — Antworten zu T11/A14 und T12
+- **Verhungern:** auf **Schwer und Sehr schwer** möglich (ab Tag 5 ohne Essen, zwei Warnungen vorher) — Abweichung von der Empfehlung (nur Sehr schwer).
+- **Lager:** am Feuer und mit Schlafrolle; neue Wetter im Menschenland: Gewitter und Schlamm.
+- **Angsthase:** statt Tod Erwachen beim Heiler, −30 % Gold, 12 Stunden.
+- **T12:** Rooks Hauptmann darf eine Straße melken (25 % der Beute); Rook-Ruf −10 für Bandenführer-Mord ab Rang Klinge; Schutzgeld deckt den eigenen Wagen; Patrouillen schwächen Banden (35 % je Durchgang).
+- **Scout Runde 3** gewählt: Händler wechselt Route, Deserteure werden Banden, Bewohner wandert ab, Wachhauptmann desertiert → Designer (npc_eigene_ziele.md).
+
+## 01.10.2026 — Stadt ohne Schutz, Varonheim-Umbau, Feinde unter sich, Varons Tod
+- **Stadt ohne Schutz** (PROPOSALS/stadt_ohne_wachen.md): Übernahme je nach Lage (Totenheer nur bei Kriegsknoten, sonst Bande; Kette nur am Westrand); Tempo 2 + 2 Tage (Angsthase +2, Sehr schwer −1); Spieler wird Stadtherr zuerst nur über Tote/Blutfürst; Varonheim fällt nicht direkt, nur beschleunigt (Burgwache tot → König flieht vorzeitig).
+- **Varonheim-Umbau** (PROPOSALS/varonheim_umbau.md): Faktor 3 (117×87), Lage Kronfels (Mitte 558/107), alte Stelle = Königsfelder; Startort-Wahl mit Varonheim als Vorgabe; Burg in der Weltkarte (nur Katakomben eigene Karte); Tor mit Durchsuchung, Bestechung 5000 Gold bei 30 %.
+- **Feinde verschiedener Mächte** bekämpfen sich; näherer Feind wird bevorzugt (Entwickler).
+- **Varons Tod** ist ein Ereignis mit Szene, Reichsverweser und Kopfgeld (Entwickler: „es fehlt noch ein Event, wenn Varon stirbt“).
+- Entwickler: „Guck, ob alle Weltevents zusammenpassen“ → Designer-Abgleich (PROPOSALS/weltereignisse_abgleich.md).

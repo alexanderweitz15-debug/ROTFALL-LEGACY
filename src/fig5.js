@@ -509,6 +509,7 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
     C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     if (!back) { const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[14, 17], [13, 18], [13, 18], [13, 18], [14, 17]], hx); ids.face = f; }
+    if (gob) { const ear = C.part(L.skin, 'skin'); C.poly(ear, [[12.5 + hx, y0 + 3], [8 + hx, y0 + 1], [9 + hx, y0 + 3], [12.5 + hx, y0 + 5]]); C.poly(ear, [[19.5 + hx, y0 + 3], [24 + hx, y0 + 1], [23 + hx, y0 + 3], [19.5 + hx, y0 + 5]]); }   /* Artist Runde 2: Goblinohren ragen aus der Kapuze (Silhouette) */
     ids.hood = hd; return;
   }
   const hd = C.part(L.skin, gob ? 'skin' : X.bone ? 'bone' : 'skin', { grp: 'head' });
@@ -639,6 +640,7 @@ function headW(C, L, X, hx, hy, ids, meta) {
     const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
     C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 19], [13, 19], [14, 18]], hx);
     const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[12, 14], [12, 15], [12, 15], [12, 14], [13, 14]], hx);
+    if (gob) C.poly(C.part(L.skin, 'skin'), [[18.5 + hx, y0 + 3], [23 + hx, y0], [22 + hx, y0 + 3], [18.5 + hx, y0 + 5]]);   /* Artist Runde 2: Goblinohr aus der Kapuze */
     ids.face = f; ids.hood = hd; return;
   }
   const hd = C.part(L.skin, X.bone ? 'bone' : 'skin', { grp: 'head' });
@@ -692,7 +694,12 @@ function details(C, L, R, view, M, pose) {
   if (!back) {
     if (I.face !== undefined) {                                      // Kapuze: Gesicht im Schatten, Augen als Akzent
       const ex = side ? [13] : [14, 17], ey = y0 + 4;
-      if (L.face === 'skull') { for (const x of ex) { C.set(x + hx, ey - 1, L.bone.sh); C.set(x + hx, ey, G1 || '#0a0808'); } for (let x = side ? 12 : 15; x <= (side ? 14 : 16); x++) C.set(x + hx, ey + 2, x % 2 ? L.bone.b : L.bone.sh); }
+      if (L.face === 'skull') {                                      /* Artist Runde 2: Schädel unter der Kapuze lesbar — Knochenstirn, Augenhöhlen mit Glimmen, Nasenloch, Zähne */
+        const Bn = L.bone, f = I.face, o = (x, y, c) => C.on(f, x + hx, y, c);
+        if (!side) { for (let x = 14; x <= 17; x++) { o(x, ey - 2, x === 14 ? Bn.hi : Bn.b); o(x, ey - 1, x === 17 ? Bn.sh : Bn.b); o(x, ey + 1, x === 17 ? Bn.sh : Bn.b); o(x, ey + 2, x % 2 ? VOID : Bn.hi); }
+          o(14, ey, G1 || VOID); o(15, ey, Bn.b); o(16, ey, Bn.sh); o(17, ey, G1 || VOID); o(15, ey + 1, VOID); }
+        else { for (let x = 12; x <= 14; x++) { o(x, ey - 2, x === 12 ? Bn.hi : Bn.b); o(x, ey - 1, x === 14 ? Bn.sh : Bn.b); }
+          o(12, ey, Bn.b); o(13, ey, G1 || VOID); o(14, ey, Bn.sh); o(12, ey + 1, VOID); o(13, ey + 1, Bn.b); o(14, ey + 1, Bn.sh); o(13, ey + 2, Bn.hi); o(14, ey + 2, VOID); } }
       else if (L.face === 'mask') { const Mk = L.metal; for (let y = ey - 1; y <= ey + 2; y++) for (let x = side ? 12 : 14; x <= (side ? 14 : 17); x++) C.on(I.face, x + hx, y, y === ey - 1 ? Mk.hi : Mk.b); for (const x of ex) C.set(x + hx, ey, G1 || '#0a0808'); }
       else if (L.face === 'cloth' && L.scarf) { for (const x of ex) C.set(x + hx, ey, G1 || '#d09048'); for (let y = ey + 1; y <= ey + 3; y++) for (let x = side ? 12 : 13; x <= (side ? 15 : 18); x++) C.on(I.face, x + hx, y, y === ey + 1 ? L.scarf.hi : L.scarf.b); }
       else { for (let x = side ? 12 : 14; x <= (side ? 14 : 17); x++) C.on(I.face, x + hx, ey + 1, mix(S.dk, VOID, 0.35)); for (const x of ex) C.set(x + hx, ey, G1 || '#c89048'); }
@@ -724,6 +731,11 @@ function details(C, L, R, view, M, pose) {
         if (!side) C.on(h, 16 + hx, ey + 1, S.sh);                                       // Nase (seitlich: Kopfkontur)
         if (!L.beard) { if (!side) { C.on(h, 15 + hx, ey + 3, S.sh); C.on(h, 16 + hx, ey + 3, S.dk); } else C.on(h, 13 + hx, ey + 3, S.sh); }
         if (L.helm === 'wide' || L.helm === 'hat' || L.helm === 'kettle') for (let x = 13; x <= 18; x++) C.on(h, x + hx, ey - 1, S.dk);   // Krempe wirft Schatten
+        if (L.face === 'rot') {                                      /* Artist Runde 2: Seuchenleiche — eingesunkene Augen mit trübem Glimmen, offener Kiefer, Faulfleck */
+          const Gr = G1 || '#c8c070', rot = mix(S.dk, '#3a2a1a', 0.5);
+          for (const x of exs) { C.on(h, x + hx, ey - 1, VOID); C.on(h, x + hx, ey, Gr); }
+          if (!side) { C.on(h, 15 + hx, ey + 3, '#2a0a08'); C.on(h, 16 + hx, ey + 3, '#2a0a08'); C.on(h, 15 + hx, y0 + 7, VOID); C.on(h, 16 + hx, y0 + 7, VOID); C.on(h, 13 + hx, ey + 1, rot); C.on(h, 13 + hx, ey + 2, rot); C.on(h, 18 + hx, ey - 1, rot); }
+          else { C.on(h, 12 + hx, ey + 3, '#2a0a08'); C.on(h, 13 + hx, ey + 3, '#2a0a08'); C.on(h, 13 + hx, y0 + 7, VOID); C.on(h, 15 + hx, ey + 1, rot); } }
       }
       if (L.face === 'cloth' && L.scarf) for (let y = ey + 1; y <= ey + 3; y++) for (let x = side ? 11 : 13; x <= (side ? 15 : 18); x++) C.set(x + hx, y, y === ey + 1 ? L.scarf.hi : L.scarf.b);
     }
@@ -979,6 +991,10 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   if (T.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, x + y < 0 ? '#ece4d4' : '#c8c0b0');   // Kuh: weiße Flecken
   if (type === 'horse') { for (let y = hy - 1; y <= hy + 2; y += 1.25) set(hx - 1, y, '#e8e0d0'); }                                   // Blesse
   if (T.rump) for (let y = -2; y <= 2; y += 1.3) set(cx + brx - 1.5, cy + y, '#e0d4bc');
+  if (type === 'wolf' || type === 'wild_dog') {                     /* Artist Runde 2: dunkler Sattel auf dem Rücken, Brauenschatten — Wolf hebt sich vom Boden ab */
+    const W0 = Cx.w; for (let x = 0; x < W0; x++) { let y = 0; while (y < Cx.h && Cx.id[y * W0 + x] !== P.body) y++; if (y >= Cx.h - 2) continue;
+      for (let d = 1; d <= 2; d++) { const i = (y + d) * W0 + x; if (Cx.id[i] === P.body) Cx.col[i] = d === 1 ? mix(D.b, F.sh, 0.3) : mix(F.sh, D.b, 0.4); } }
+    set(hx - hrx * 0.35, hy - 2.2, D.dk); set(hx - hrx * 0.35 + 1.3, hy - 2.2, D.sh); set(hx - hrx * 0.35, hy - 1, eye); }
   if (type === 'wolf') for (let i = 0; i < 4; i++) set(cx - 6 + i * 4, cy - bry + 1.3, F.hi);
   Cx.outline(); return Cx.toG();
 }

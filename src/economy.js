@@ -102,12 +102,14 @@ export const capOf = town => Math.min(400, 60 + 40 * siteCount(town, ['store', '
 // ---------------- Start / Altstände ----------------
 export function initEco() {
   S.towns ||= structuredClone(TOWNS);
+  const fresh = !S.eco;                                               /* RB-042: neues Spiel (alte Stände behalten ihr Lager) */
   S.eco ||= { biz: [], caravans: [], orders: [], my: null, income: 0 };
   const C = census();
   for (const l of TOWN_LOCS) {
     const t = (S.towns[l.key] ||= { name: l.name, pop: Math.max(8, C[l.key].heads * 2), stock: {}, prod: {}, use: {} });
     t.use = useOf(l.key, C[l.key]);
     for (const g of GOODS) if (t.stock[g] == null) t.stock[g] = Math.round(target(t, g) * 0.8);
+    if (fresh) for (const g of GOODS) if (!(l.key === 'northcity' && g === 'grain')) t.stock[g] = Math.max(t.stock[g], Math.round(target(t, g) * 0.8));   /* RB-042: die festen Startwerte aus TOWNS (Eren: Tuch 5, Leder 8) lagen weit unter dem Bedarf → Höchstpreis am ersten Tag; Nordfurts Kornmangel bleibt gewollt (Heeresversorgung) */
   }
   syncBiz(C);
 }

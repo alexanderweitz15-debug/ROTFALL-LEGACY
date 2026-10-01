@@ -609,7 +609,7 @@ export function monsterSpec(e, m) {
   } else if (t === 'necromancer') {                                     // Phase 6 Nekromant: Knochengesicht unter schwarzer Kapuze, grünes Glimmen
     s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = ''; s.hooded = 1; s.hood = '#141018'; s.robe = '#1a1420'; s.cloak = '#0e0a12'; s.mark = 'chevron'; s.markCol = '#8fe0b0';
   } else if (t === 'zombie') {                                          // Seuchenleiche: grünliche Haut, zerrissene Kleider, keine Stiefel
-    s.hooded = 0; s.cloth = '#3a3024'; s.pants = '#2e281e'; s.boots = ''; s.glow = p.glow; s.hs = 3; s.armor = 'leather'; s.armorCol = '#2e2a20';
+    s.hooded = 0; s.cloth = '#3a3024'; s.pants = '#2e281e'; s.boots = ''; s.glow = p.glow; s.hs = 3; s.armor = 'leather'; s.armorCol = '#2e2a20'; s.face = 'rot';   /* Artist Runde 2: eigenes Totengesicht (fig5 details) */
   } else if (t === 'shade') {                                           // Schattenwesen: schwarz in schwarz, violette Augen
     s.sp = 'skeleton'; s.skin = p.skin; s.face = 'skull'; s.glow = p.glow; s.boots = ''; s.hooded = 1; s.hood = '#0e0c14'; s.cloak = '#0a0810'; s.cloth = '#0e0c14'; s.pants = '#0e0c14';
   } else if (t === 'ash_demon') {                                       // Aschdämon: verkohlte Platte, Flammenkamm, glühende Augen
@@ -1508,6 +1508,52 @@ function paveR(P, base, v, n, moss) {
   });
   if (moss) for (let i = 0; i < 2; i++) if (n(i, 77 + v) > 0.55) { const r = PAVE_ROWS[i + 1], x = (n(78 + v, i) * 16) | 0; P(x, r[0] - 1, mix(joint, '#4a5a2a', 0.55)); }
 }
+/* Artist Runde 2: Feldsteinweg (road) im Stil R — vier Reihen runder Steine verschiedener Breite, Erde in den Fugen, Ecken
+   abgerundet, hie und da fehlt ein Stein (ausgetretene Lücke mit Erde). Licht oben links. Alles über den Kachelrand gewickelt. */
+function cobbleR(P, base, v, n) {
+  const earth = mix(base.dk, '#3a2c1e', 0.45), earthL = mix(base.sh, '#4a3a28', 0.4);
+  for (let r = 0; r < 4; r++) {
+    const y0 = r * 4, cuts = []; let x = ((r * 7 + v * 5) % 16 + (r & 1) * 2) % 16, left = 16;
+    while (left > 0) { let w = 3 + ((n(r * 11 + cuts.length, 90 + v) * 3) | 0); if (left - w < 3) w = left; cuts.push([x, w]); x = (x + w) % 16; left -= w; }
+    for (let xx = 0; xx < 16; xx++) P(xx, y0 + 3, n(xx, y0 + 40 + v) > 0.6 ? earthL : earth);
+    cuts.forEach(([c, w], k) => {
+      const h = n(r * 5 + k, 70 + v), gone = h < 0.1, tone = h > 0.7 ? mix(base.b, base.hi, 0.25) : h < 0.35 ? mix(base.b, base.sh, 0.25) : base.b;
+      for (let i = 0; i < w; i++) { const xx = (c + i) % 16;
+        for (let y = y0; y < y0 + 3; y++) {
+          const edge = i === 0 || i === w - 1, corner = edge && (y === y0 || y === y0 + 2);
+          let col = gone || corner ? (n(xx, y + 7 * v) > 0.5 ? earth : earthL) : tone;
+          if (!gone && !corner) { if (i === 0) col = mix(tone, earth, 0.55); else if (y === y0) col = mix(tone, base.hi, 0.45); else if (y === y0 + 2 || i === w - 1) col = mix(tone, base.dk, 0.35); }
+          P(xx, y, col);
+        } }
+      if (gone && n(k, r + 9 * v) > 0.5) P((c + 1) % 16, y0 + 1, mix(base.b, base.sh, 0.3));   /* Splitter in der Lücke */
+    });
+  }
+}
+/* Artist Runde 2: Gewölbeboden (dfloor) im Stil R — zwei Reihen großer Steinplatten statt Stadtpflaster, Fugen tief und schmutzig,
+   Risse, abgeplatzte Ecken, Schmutz zur Fuge hin. Liest sich als Kerker, nicht als Marktplatz. */
+function flagR(P, base, v, n) {
+  const joint = mix(base.dk, '#050404', 0.35), grime = mix(base.sh, base.dk, 0.5);
+  for (let r = 0; r < 2; r++) {
+    const y0 = r * 8, y1 = y0 + 7, c0 = (r * 5 + v * 3) % 16, c1 = (c0 + 6 + ((n(r, 31 + v) * 5) | 0)) % 16, cuts = [c0, c1].sort((a, b) => a - b);
+    for (let x = 0; x < 16; x++) P(x, y1, joint);
+    for (const c of cuts) for (let y = y0; y < y1; y++) P(c, y, joint);
+    cuts.forEach((c, k) => {
+      const end = cuts[(k + 1) % 2], len = ((end - c - 1) + 16) % 16, h = n(r * 3 + k, 52 + v);
+      const tone = h > 0.62 ? mix(base.b, base.hi, 0.18) : h < 0.3 ? mix(base.b, base.sh, 0.3) : base.b;
+      for (let i = 0; i < len; i++) { const x = (c + 1 + i) % 16;
+        for (let y = y0; y < y1; y++) {
+          let col = tone; const g = n(x * 5 + 3, y * 3 + v);
+          if (y === y0 || i === 0) col = mix(tone, base.hi, y === y0 && i === 0 ? 0.5 : 0.3);
+          else if (y === y1 - 1 || i === len - 1) col = grime;
+          else if (g > 0.9) col = mix(tone, base.sh, 0.35); else if (g < 0.05) col = mix(tone, base.hi, 0.2);
+          P(x, y, col);
+        } }
+      if (h > 0.8 && len >= 5) { const dir = n(k, r + 40 + v) > 0.5 ? 1 : -1; let x = c + 2 + (dir < 0 ? len - 4 : 0), y = y0 + 1 + ((n(r, k + v) * 2) | 0); for (let s = 0; s < 4; s++) { P((x + 16) % 16, y, joint); x += n(s, k + r + v) > 0.5 ? dir : 0; y += 1; if (y >= y1 - 1) break; } }   /* Riss */
+      if (h < 0.25) { P((c + 1) % 16, y0, joint); P((c + 2) % 16, y0, joint); P((c + 1) % 16, y0 + 1, grime); }   /* abgeplatzte Ecke */
+    });
+  }
+  if (n(3, 77 + v) > 0.8) { const x = (n(4, v) * 13) | 0, y = 2 + ((n(v, 4) * 10) | 0); P(x, y, '#b8ae98'); P(x + 1, y, '#8e8674'); P(x + 1, y + 1, joint); }   /* Knochensplitter oder Kiesel */
+}
 export function tileTexture(t, v, cols, kind) {
   return cacheGet('tile|' + t + '|' + v + '|' + kind + '|' + cols[0] + (ART === 'R' ? '|R' : ''), () => {   // Art + Farbe im Schlüssel: sonst verschmutzt ein Aufruf mit fremder Palette den Cache
     const cv = document.createElement('canvas'); cv.width = cv.height = 16;
@@ -1526,8 +1572,10 @@ export function tileTexture(t, v, cols, kind) {
         P(x, y + 1, base.sh); P(x + 1, y + 1, base.sh); P(x + 2, y + 1, mix(base.b, base.sh, 0.5)); P(x + 1, y, mix(base.b, base.hi, 0.6)); P(x, y, i % 2 ? mix(base.b, base.hi, 0.4) : base.b); }
       if (n(5, 5) > 0.82) { const x = (n(7, 1) * 14) | 0, y = (n(1, 7) * 14) | 0; P(x, y, ['#b8a050', '#a04a38', '#c8c0a0'][v % 3]); P(x + 1, y + 1, base.dk); }
       else if (n(5, 6) > 0.8) { const x = (n(8, 1) * 14) | 0, y = (n(1, 8) * 14) | 0; P(x, y, '#8a8070'); P(x + 1, y, '#6a6258'); P(x, y + 1, '#3a342c'); }
-    } else if ((kind === 'stone' || kind === 'dfloor') && ART === 'R') {   /* Artist 01.10.: Kopfsteinpflaster statt 8er-Raster — unregelmäßige Steine, Licht oben links, Fugen dunkel */
-      paveR(P, base, v, n, kind === 'stone');
+    } else if (kind === 'stone' && ART === 'R') {   /* Artist 01.10.: Kopfsteinpflaster statt 8er-Raster — unregelmäßige Steine, Licht oben links, Fugen dunkel */
+      paveR(P, base, v, n, true);
+    } else if (kind === 'dfloor' && ART === 'R') { flagR(P, base, v, n);   /* Artist Runde 2: Kerkerplatten */
+    } else if (kind === 'road' && ART === 'R') { cobbleR(P, base, v, n);   /* Artist Runde 2: Feldsteinweg statt Ziegelraster */
     } else if (kind === 'road' || kind === 'stone' || kind === 'dfloor') {
       const bw = kind === 'road' ? 5 : 8, bh = kind === 'road' ? 4 : 8;
       for (let y = 0; y < 16; y += bh) for (let x = -((y / bh) % 2) * (bw >> 1); x < 16; x += bw) {
