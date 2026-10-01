@@ -325,6 +325,7 @@ export const ITEMS = {
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
+  blutphiole: { name:'Blutphiole', slot:'consumable', use:'blood', stack:5, rarity:'uncommon', value:40, lore:'Dunkel, dick, noch warm. Für die einen ein Beweis, für die anderen ein Mahl.' },   /* §5g.2 */
   potion:     { name:'Trank der Genesung', slot:'consumable', use:'heal', heal:40, stack:5, rarity:'uncommon', value:55 },
   // S13: Werkzeuge der Arbeiter (nur Bild und Bewegung bei der Arbeit; nicht im Handel, keine Beute)
   tool_hammer: { name:'Schmiedehammer', slot:'tool', wtype:'hammer', arc:1.4, value:0, rarity:'common' },
@@ -679,6 +680,12 @@ export const ABILITIES = {
   sp_heal:      { name:'Starke Heilung', school:'heal', tier:3, mana:26, cd:9000, cast:900, spell:{ shape:'self', heal:[36, 2.0] }, teach:'Ordenspriesterin (Rang 2)', desc:'Eine lange Formel. Wer sie beendet, steht wieder.' },
   sp_shield:    { name:'Schild', school:'ward', tier:1, mana:9, cd:9000, cast:250, spell:{ shape:'self', absorb:[10, 0.8], left:8000 }, teach:'Ordenspriesterin, Wandermagier in Kreuzweg', desc:'Eine Haut aus Licht. Hält ein paar Hiebe.' },
   sp_circle:    { name:'Schutzkreis', school:'ward', tier:3, mana:24, cd:18000, cast:600, spell:{ shape:'group', absorb:[14, 1.0], left:10000, r:150 }, teach:'Ordenspriesterin (Rang 2)', desc:'Ein Kreis schützt dich und deine Gruppe.' },
+  feed:        { name:'Trinken', title:'vampire', cd:2000, desc:'Von einem wehrlosen Menschen trinken (am Boden, ergeben, gefesselt oder schlafend): Blutdurst −45. Ein zweites Mal am selben Tag tötet. Tierblut −10, nie unter 50.' },
+  blood_lash:  { name:'Blutpeitsche', title:'vampire', cd:6000, gain:12, desc:'Blutgeschoss; 40 % des Schadens heilen dich. +12 Blutdurst.' },
+  mist_step:   { name:'Nebelschritt', title:'vampire', cd:9000, gain:10, desc:'Als Nebel 140 weit springen, 0,5 s unverwundbar; wer dich verfolgt, verliert dich. +10 Blutdurst.' },
+  thrall_gaze: { name:'Bannblick', title:'vampire', cd:30000, gain:20, desc:'Ein fliehender oder ergebener Mensch kämpft 40 s für dich, danach ergibt er sich. +20 Blutdurst.' },
+  bat_swarm:   { name:'Fledermausschwarm', title:'vampire', cd:18000, gain:15, desc:'4 s Schwarm um dich (Kreis 90): Gegner treffen schlechter und sind langsamer. +15 Blutdurst.' },
+  red_harvest: { name:'Rote Ernte', title:'vampire', cd:40000, gain:40, desc:'Nur bei Blutdurst höchstens 40: jeder blutende Feind im Kreis 120 nimmt Schaden, du heilst die Hälfte. +40 Blutdurst.' },
   unleash:     { name:'Entfesseln', title:'warlock', cd:15000, min:40, cost:'all', desc:'Ab 40 Verderbnis: alles bricht als Ring aus Schatten aus (Schaden = Verderbnis × 0,6). Danach 0.' },
 };
 
@@ -727,7 +734,7 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Der Hain nimmt, was er gibt: Stärke −1 für immer.', attr:{ strength:-1 } },
     rep:{ order:5 },
     unlock:'„Der Ruf des Hains“: Mira im Alten Hain des Westwalds helfen — das Rudel der Wolfsschlucht vertreiben, Heilkraut für die Quelle bringen.' },
-  monk: { name:'Mönch', title:'Hand des Ordens', glow:'#e6cf8a', faction:'order', excludes:['necromancer', 'warlock'], reversible:false,
+  monk: { name:'Mönch', title:'Hand des Ordens', glow:'#e6cf8a', faction:'order', excludes:['necromancer', 'warlock', 'vampire'], reversible:false,
     desc:'Die Stille Hand von Sonnwacht: nicht getroffen werden, dann zuschlagen. Kraft aus Aufmerksamkeit, nicht aus Eisen.',
     resource:{ key:'focus', name:'Fokus', max:5, start:0, css:'focus',
       rule:'Jedes Ausweichen, das einen Treffer oder ein Geschoss ins Leere laufen lässt, gibt +1. Wirst du getroffen, verlierst du 1. Sonst bleibt er.' },
@@ -754,6 +761,20 @@ export const TITLE_CLASSES = {
     cost:{ desc:'Die Tunnel formen dich: Intelligenz −1 für immer, und der Weiße Orden nennt dich Goblinfreund.', attr:{ intelligence:-1 } },
     rep:{ goblin:20, order:-10 },
     unlock:'„Einer von uns“: Grisk in Grubenhort — die Stämme befreien, Grubenhort zur Grubenstadt wachsen lassen und bei den Goblins 40 Ruf haben.' },
+  /* §5g.2 Blutkult (Nutzer 01.10.2026): heilbar, und zwar beliebig oft — reversible:true, Heilung setzt kein forsaken */
+  vampire: { name:'Vampir', title:'Gezeichneter', glow:'#c0303a', faction:'blut', excludes:['monk'], reversible:true,
+    desc:'Ein Schluck aus dem Kelch unter Varonheim. Kraft, Nacht und Durst — und eine Sonne, die dich nicht mehr will.',
+    resource:{ key:'blood', name:'Blutdurst', max:100, start:30, css:'corruption',
+      rule:'Steigt von selbst (+4 je Spielstunde) und mit jeder Titelfähigkeit. Trinken senkt ihn. Ab 70 bist du stärker, aber man sieht es dir an; bei 100 packt dich die Raserei.' },
+    abilities:['feed', 'blood_lash', 'mist_step', 'thrall_gaze', 'bat_swarm', 'red_harvest'],
+    grades:[['feed', 'blood_lash', 'mist_step'], ['thrall_gaze', 'bat_swarm'], ['red_harvest']], mentor:'hedda',
+    deed:'Trinken und Titelzauber in der Nacht',
+    gradeNames:['Gezeichneter', 'Kind der Nacht', 'Herr des Kelchs'],
+    passive:{ name:'Nachtgeschöpf', desc:'Nachts +10 % Schaden; ist der Blutdurst unter 50, heilen Wunden nachts langsam (0,4/s).' },
+    flaw:{ name:'Das Licht brennt', desc:'Im Sonnenlicht verbrennst du (1,2/s) und schlägst 20 % schwächer; in Haus, Höhle, unter Kapuze oder Wolken weniger. Am Boden brennt es halb weiter.' },
+    cost:{ desc:'Dein Herz schlägt kalt: Tränke, Verbände und Heilzauber wirken nur halb.', healMul:0.5 },
+    rep:{ blut:40, order:-40, valen:-10 },
+    unlock:'„Der Kelch“: in den Katakomben unter Varonheim von Hedda, der Kelchwahrerin, trinken.' },
 };
 export const MAX_TITLES = 2;                       // höchstens zwei Titelklassen je Figur (Nutzerwunsch), getragen wird eine
 
@@ -763,13 +784,31 @@ export const MAX_TITLES = 2;                       // höchstens zwei Titelklass
 // S15 P7: Wie jede Macht über die Schulen denkt. love: Lehrer dieser Macht verlangen weniger; hate: Wirken vor ihren Leuten ist ein
 // Verbrechen (Kopfgeld, beim Orden doppelt). Nekromanten- und Hexenmeister-Fähigkeiten zählen als Schatten.
 export const MAGIC_VIEW = {
-  order:  { love: ['heal', 'ward'], hate: ['shadow'], say: 'Heilung und Schutz sind Werk des Lichts. Totenmagie wird verfolgt.' },
-  valen:  { love: [], hate: ['shadow'], say: 'Misstraut allen Zauberern und duldet sie, solange sie nützen. Totenmagie ist verboten.' },
+  order:  { love: ['heal', 'ward'], hate: ['shadow', 'blood'], say: 'Heilung und Schutz sind Werk des Lichts. Totenmagie wird verfolgt.' },
+  valen:  { love: [], hate: ['shadow', 'blood'], say: 'Misstraut allen Zauberern und duldet sie, solange sie nützen. Totenmagie ist verboten.' },
   aurel:  { love: ['arcane', 'fire', 'frost', 'shock'], hate: [], say: 'Magie ist Wissenschaft: an der Akademie gelehrt, mit Schein und Gebühr.' },
   merch:  { love: [], hate: [], say: 'Was sich verkauft, ist erlaubt.' },
-  chain:  { love: ['faith'], hate: ['shadow', 'arcane'], say: 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.' },
+  chain:  { love: ['faith'], hate: ['shadow', 'arcane', 'blood'], say: 'Nur Omegas Glaubensmagie ist rein. Fremde Zauberer sind Ketzer.' },
   undead: { love: ['shadow'], hate: [], say: 'Totenmagie ist ihr Recht und ihre Religion.' },
-  goblin: { love: [], hate: ['shadow'], say: 'Wer die Toten ruft, hat sie selbst nicht begraben.' },
+  goblin: { love: [], hate: ['shadow', 'blood'], say: 'Wer die Toten ruft, hat sie selbst nicht begraben.' },
+};
+// §5g.2 / Audit V9: Stigma — wie eine Macht reagiert, wenn sie weiß (oder sieht), was du bist. price: Handelsaufschlag;
+// deny: kein Handel, kein Bett, kein Heiler, kein Lehrer; report: 'guard' = Kopfgeld (einmal je Tag), 'hunt' = der Orden schickt Jäger.
+// T15 (Messing) hängt später eine zweite Art daneben.
+export const STIGMA = {
+  vampire: {
+    order:  { price:1,   deny:true,  report:'hunt',  greet:'„Zurück, Blutsauger. Das Licht sieht dich.“' },
+    valen:  { price:1.5, deny:false, report:'guard', greet:'„Du bist bleich wie ein Toter. Bleib, wo ich dich sehe.“' },
+    chain:  { price:1,   deny:true,  report:'guard', greet:'„Omega verbrennt, was nicht atmet.“' },
+    aurel:  { price:1.2, deny:false, report:null,    greet:'„Faszinierend. Die Akademie zahlt gut für Proben.“' },
+    merch:  { price:1.2, deny:false, report:null,    greet:'„Gold ist Gold. Aber fass mich nicht an.“' },
+    goblin: { price:1.2, deny:false, report:null,    greet:'„Riecht nach Grube. Und nach Blut.“' },
+    sea:    { price:1.2, deny:false, report:null,    greet:'„Auf See frisst die Sonne jeden. Dich zuerst.“' },
+    frei:   { price:1.2, deny:false, report:null,    greet:'„Wir haben genug Herren gehabt. Auch solche wie dich.“' },
+    bandit: { price:1,   deny:false, report:null,    greet:'„Zahnig. Gefällt mir.“' },
+    undead: { price:0.9, deny:false, report:null,    greet:'„Kalt wie wir. Setz dich.“' },
+    blut:   { price:0.8, deny:false, report:null,    greet:'„Kind des Kelchs.“' },
+  },
 };
 export const SKILL_BRANCHES = {
   combat:  { name:'Kampf', desc:'Wer vorne steht.' },
@@ -885,6 +924,7 @@ export const FACTIONS = {
   aurel: { name:'Das Hochreich Aurelion', colors:['#2a2a30','#c8a050'], desc:'Adelshäuser, Handelsherren, Automaten und Messingglieder. Reich genug, um sich jede Ordnung zu kaufen — auch die der anderen.', ranks:['Fremder','Registrierter Besucher','Bürger','Anerkannter Bürger','Handelsbürger','Gildenmitglied','Hoher Beamter','Mitglied des Hohen Rates'] },   // MP2 §81
   chain: { name:'Die Eiserne Kette', colors:['#111214','#5a1a1c'], desc:'Sie nennen es Ordnung. Wer arbeitet, lebt. Wer nicht arbeitet, arbeitet trotzdem.', ranks:['Treiber','Kettenknecht','Grenzreiter','Aufseher','Dunkler Hochpaladin'] },   // S12: Spielerränge; Kettenmeister ist Varg allein
   sea:   { name:'Das Seevolk', colors:['#1e2a36','#c8b890'], desc:'Salzbund und Sturmklinge: Händler und Plünderer derselben Inseln, die sich mehr hassen als jeden Fremden. Wer auf dem Wasser lebt, schuldet dem Land nichts.', ranks:['Landratte','Deckhand','Maat','Steuermann','Kapitän'] },   // S14
+  blut:  { name:'Der Kelch', colors:['#3a0e12','#c0303a'], desc:'Blutmagier und Vampire unter Varonheim. Sie nehmen die, die keiner vermisst — bis jemand fragt.' },   /* §5g.2: ohne Ränge, Rangfolge über die Titelgrade */
   frei:  { name:'Die Freien vom Grubenhort', colors:['#4a3a26','#d8c890'], desc:'Befreite Sklaven der Eisenfeste, Menschen und Goblins. Kein Herr, kein Tribut — nur ein Lager am Grubenhort und die Angst, dass die Kette wiederkommt.' },   /* Folgen §5c: nach dem Sklavenaufstand */
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };

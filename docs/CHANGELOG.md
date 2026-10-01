@@ -2,6 +2,13 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)
+- Spielstand rund 20× kleiner (komprimiert), Speichern gebündelt; Seuchen-Fehler (14 000 Props im Stand) behoben; Slotwechsel und andere Tabs sicher.
+- Krieg mit Gegengewicht (Aufgebot nach Verlusten, Besatzungen füllen sich, Mauern, Entsatz aus Varonheim); Wucht mit Standfestigkeit.
+- Umgebungsklang je Region und unter Tage, Geisterschleier und Nachbild getrennt, eigener Effekt-Zufall mit Partikeldeckel, flüssigeres HUD und Caches.
+- Führung wächst mit der Gruppe, ehrliche Fertigkeits-Tooltips, Grafikstil F abgeschaltet.
+- Blutkult Scheibe 1: Titelklasse Vampir (Blutdurst, Sonne, Trinken, Stigma, Heilung bei Aldis oder in Sankt Serin).
+
 ## Version 22 — 2026-09-30 (Koop, Bionik 2–5, Welt-Ausbau §5b–§5f)
 - Audit T01–T04: Wucht mit Standfestigkeit, Krieg mit Nachschub, Nachbild und Geisterschleier getrennt, eigener Effekt-Zufall mit Partikeldeckel, Umgebungsklang je Region und unter Tage.
 - Varonheim: Hauptstadt König Varons südlich von Nordfurt, mit der Varonsburg im Burgbezirk.

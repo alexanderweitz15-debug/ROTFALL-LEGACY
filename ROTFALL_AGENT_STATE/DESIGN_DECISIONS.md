@@ -7,9 +7,8 @@ Nur Entscheidungen des Nutzers. Neueste oben.
 - **Freie vom Grubenhort:** bleiben eigene Fraktion.
 - **Varonheim wird belagerbar** (abweichend von der Empfehlung): eigener Kriegsknoten mit starker Besatzung; fällt sie, große Folgen (König flieht, Hof zerfällt).
 - **T08:** Steckbriefe am vorhandenen Anschlagbrett und beim Verteidigungsmeister. Fesseln braucht einen Strick (6 Gold, verbraucht). Grausamkeits-Ruf hart: ab „Schlächter“ ergibt sich niemand mehr, Gegner fliehen früher, Banden meiden dich.
-- **T09:** Preise 0,7–1,8× je Stadt. (Lead, technisch: Leitware automatisch ableiten, nur Ausnahmen von Hand; altes `S.prices` beim Laden löschen.)
+- **T09:** Preise 0,7–1,8× je Stadt.
 - **T10:** Heldentod **3 s** mit Glockenton und Namenseinblendung (ESC überspringt). **Bis zu 3 Ahnenfeinde** gleichzeitig. Angriffe auf die Familie: Häuser brennen, 30 % Kind entführt → Befreiungsauftrag, niemand stirbt sicher.
-- Lead (Textänderung): Todesritter-Knoten „Blutfürst“ heißt künftig „Blutritter“, damit der Name frei für Aldhelm ist.
 
 ## 01.10.2026 (früher am Tag)
 - Modelle: vorerst nur Opus und Sonnet.
