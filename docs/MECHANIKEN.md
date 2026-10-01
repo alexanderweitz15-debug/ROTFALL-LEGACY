@@ -772,3 +772,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Musterung der Kette:** Stehst du dabei, hörst du das Horn; der Kriegsmeister ruft „Antreten!“, nennt das Ziel, die Soldaten salutieren.
 - **Neue Gesten:** salutieren, jubeln, trauern, knien.
 - **Debug:** „Regie (T17)“ zusätzlich „Gesten vorführen (Held)“, „Ankunftskarten zurücksetzen“.
+
+## Runde: UI-Umbau, Scheibe 1 (Entwickler 01.10.2026)
+- **Kopfleiste:** schlanker, 9 Reiter statt 14 — Charakter (C), Gepäck (I), Gruppe (G), Lager & Siedlung (B), Karte (M), Aufträge (J), Mächte (F), Kodex (H), Optionen. Sobald die Pixel-Piktogramme da sind, zeigt jeder Reiter ein Bild statt eines Wortes; der Name steht im Tooltip.
+- **Unterreiter:** Im Fenster Charakter wechselst du zwischen Werte, Talente, Zauber und Effekte; unter Mächte zwischen Fraktionen und Chronik. Die alten Tasten (T, Z, X, K) gehen weiter.
+- **Freie Punkte:** Ein Goldpunkt am Reiter Charakter (und ✦ hinter der Klasse) zeigt freie Stat- oder Talentpunkte; der Tooltip nennt die Zahl.
+- **Vorrat und Wetter** als Piktogramm mit Zahl. Zeit, Wetter, Jahreszeit und Jahr stehen nur noch oben (Jahr im Tooltip der Uhr), nicht mehr doppelt rechts.
+- **Protokoll:** höher, jede Zeile mit Kategoriezeichen; scrollst du hoch, erscheint „Neu ↓“, ein Klick springt zum neuesten Eintrag.

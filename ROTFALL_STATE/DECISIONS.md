@@ -66,3 +66,12 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 ## 01.10.2026 — Team und Werkzeuge
 - Neues 6-Agenten-Team (`TEAM.md`) ersetzt das 12-Rollen-System.
 - Alle Plugins erlaubt, **außer** SpriteCook, kostenpflichtigen Bild-Generatoren, pixel-plugin und Aseprite (alte Sperre bleibt).
+
+## 01.10.2026 — UI-Umbau (PROPOSALS/ui_redesign.md)
+- Variante: **C als Gerüst + B-Kopfleiste/Meldungsfluss + A-Pergament** nur für Kodex, Chronik, Erbe, Auftragsbuch.
+- Obere Leiste: 14 Text-Reiter → **8 Gruppen mit Piktogrammen**; Talente/Zauber/Effekte als Reiter im Charakterfenster.
+- Meldungen: Protokoll unten bleibt **und** verblassender Meldungsfluss (mehrere zugleich) statt Einzel-Toast.
+- Siedlung, Handel, Gruppe, Handwerk als **angedocktes Seitenfenster ab Scheibe 3**.
+
+## 01.10.2026 — Agenten laufen dauerhaft
+- Entwickler: „Starte alle Agents. Die sollen ja die ganze Zeit laufen.“ Die Obergrenze von zwei Unteragenten ist aufgehoben. Scout, Designer, Artist und Verifier laufen parallel; wird einer fertig, startet der Director seine nächste Aufgabe. Der Engineer ist die Hauptsitzung.

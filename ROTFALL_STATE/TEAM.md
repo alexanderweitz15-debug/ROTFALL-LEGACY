@@ -74,7 +74,7 @@ Zusatz des Entwicklers (01.10.2026): **„die dürfen alle Plugins benutzen, die
 | Artist | Opus 5.5 | mittel | Sprites, Animation, VFX, Szenen-Regie, UI-Look |
 | Verifier | Sonnet | mittel | prüft fremde Arbeit, repariert nichts |
 
-- Höchstens zwei Unteragenten laufen gleichzeitig.
+- Alle Unteragenten laufen dauerhaft parallel (Entwickler 01.10.2026, ersetzt die Grenze von zwei).
 - Hinweis: Die Hauptsitzung lief beim Wechsel noch auf Opus 5.5. Den Wechsel auf Fable 5.1 macht der Entwickler in der Modellwahl der App.
 - Bis dahin übernimmt die Hauptsitzung die Rolle Director plus Engineer: Sie schreibt den Code selbst und gibt die Prüfung an den Verifier.
 

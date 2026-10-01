@@ -31,22 +31,39 @@ export function bind(actions) { A = actions; RAW = { ...actions }; for (const k 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
+// UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
+// [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
-  ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
-  ['skills', 'Talente', 'T'], ['spells', 'Zauber', 'Z'], ['quests', 'Aufträge', 'J'], ['effects', 'Effekte', 'X'], ['codex', 'Kodex', 'H'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
+  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']], ['inv', 'Gepäck', 'I', ['inventory']],
+  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement']], ['map', 'Karte', 'M', ['map']],
+  ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
+const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+// Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
+let ICO = null;
+const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
+const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
+function loadIcons() { import('./icons.js?v=23').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function paintNav() {
+  for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 2);
+    b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : `<span class="navlbl">${G[1]}</span>`) + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }
+}
+function iconCss() {                                                   /* Protokoll-Zeichen als CSS-Hintergrund: nicht 90 Bilder je Neuaufbau */
+  let st = $('ico-css'); if (!st) { st = document.createElement('style'); st.id = 'ico-css'; document.head.appendChild(st); }
+  st.textContent = ['combat', 'party', 'world', 'quest', 'faction', 'economy', 'death'].map(c => { const u = pico('log_' + c, 1); return u ? `#log .lc-${c}{background-image:url(${u})}` : ''; }).join('\n');
+}
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
 let logFilter = null;
 
 export function initUI() {
   const nav = $('nav');
-  NAV.forEach(([k, label, key]) => {
-    const b = el('button', '', label + (key ? `<i>${key}</i>` : ''));
-    b.onclick = () => k === 'world' ? closeModal() : openModal(k);
+  NAV.forEach(([g, label, key, wins]) => {
+    const b = el('button', '', ''); b.dataset.g = g; b.title = `${label}${key ? ` (${key})` : ''}`;
+    b.onclick = () => wins.includes(modalOpen) ? closeModal() : openModal(wins[0]);
     nav.appendChild(b);
   });
+  paintNav(); loadIcons();
   const lf = $('log-filters');
   LOGCATS.forEach((c, i) => {
     const b = el('button', i === 0 ? 'on' : '', c);
@@ -88,7 +105,9 @@ export function refreshHUD() {
   const p = hudFor || S.player; if (!p) return;
   hudSet('pc-name', p.name);
   const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
-  hudSet('pc-class', `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`);   // S15 (Nutzer): freie Punkte sichtbar
+  hudSet('pc-class', `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 || p.skillPoints > 0 ? ' ✦' : ''}`);   // S15 (Nutzer): freie Punkte sichtbar — UI-Umbau: als Goldpunkt am Reiter Charakter
+  { const free = [p.attrPoints > 0 ? `${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei` : '', p.skillPoints > 0 ? `${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''].filter(Boolean).join(' · '), nb = $('nav')?.querySelector('[data-g="char"]');
+    if (nb && nb.dataset.free !== free) { nb.dataset.free = free; nb.classList.toggle('badge', !!free); nb.title = free ? `Charakter (C) — ${free}` : 'Charakter (C)'; $('pc-class').title = free; } }
   const fr = topRank(p);
   hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
@@ -121,12 +140,13 @@ export function refreshHUD() {
     list.appendChild(d);
     drawPortraitTo(cv, m);
   } }
-  hudSet('res-list', [['Holz', S.res.wood], ['Stein', S.res.stone], ['Eisen', S.res.iron],
-    ['Kraut', S.res.herb], ['Nahrung', S.res.food], ['Gold', S.gold]]
-    .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join(''), true);
+  hudSet('res-list', [['wood', 'Holz', S.res.wood], ['stone', 'Stein', S.res.stone], ['iron', 'Eisen', S.res.iron],
+    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', S.res.food], ['gold', 'Gold', S.gold]]
+    .map(([i, k, v]) => { const im = icoImg('res_' + i, 2, 'resico'); return `<span title="${k}" class="${im ? 'hasico' : ''}">${im || k}<b>${Math.floor(v)}</b></span>`; }).join(''), true);   /* UI-Umbau: Piktogramm + Zahl */
   // Kopfzeile
   hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
-  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
+  if ($('clock-time').title !== `Jahr ${year()}`) $('clock-time').title = `Jahr ${year()}`;   /* UI-Umbau: Zeit, Wetter, Jahr stehen nur noch oben */
+  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = icoImg('w_' + (S.weather === 'sandstorm' ? 'heat' : S.weather), 2, 'wico') || WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
   hudSet('clock-gold', String(S.gold));
   renderHotbar();
 }
@@ -274,8 +294,10 @@ function renderLog() {
   const box = $('log'); if (!box) return;
   if (!box._stick) { box._stick = true; box.addEventListener('scroll', () => { if (box.clientHeight) logStick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24; }, { passive: true }); }
   box.innerHTML = S.log.filter(e => !logFilter || e.cat === logFilter).slice(-90)
-    .map(e => `<div class="c-${e.cat}"><time>${e.t}</time>${e.text}</div>`).join('');
-  if (logStick) { box.scrollTop = box.scrollHeight; requestAnimationFrame(() => { if (logStick) box.scrollTop = box.scrollHeight; }); }
+    .map(e => `<div class="c-${e.cat}"><span class="lc lc-${e.cat}"></span><time>${e.t}</time>${e.text}</div>`).join('');
+  let pill = $('log-new'); if (!pill) { pill = el('button', 'hidden', 'Neu ↓'); pill.id = 'log-new'; pill.onclick = () => { logStick = true; box.scrollTop = box.scrollHeight; pill.classList.add('hidden'); }; box.parentElement?.appendChild(pill);
+    box.addEventListener('scroll', () => { if (logStick) pill.classList.add('hidden'); }, { passive: true }); }   /* UI-Umbau: hochgescrollt → Hinweis auf Neues */
+  if (logStick) { box.scrollTop = box.scrollHeight; requestAnimationFrame(() => { if (logStick) box.scrollTop = box.scrollHeight; }); } else pill.classList.remove('hidden');
 }
 
 // ---------------- Kontextpanel ----------------
@@ -314,10 +336,7 @@ export function renderContext(target) {
       <div class="ctx-sub">${DUNGEONS[S.map] ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
       <div class="ctx-line"><span>Gefahr</span><b class="${tCls}">${tName}</b></div>
       ${A.zoneRange ? (z => `<div class="ctx-line"><span>Gegnerstufen</span><b class="${z[0] > p.level + 2 ? 'threat-high' : z[1] < p.level - 3 ? 'threat-low' : 'threat-med'}">${z[0]}–${z[1]}</b></div>`)(A.zoneRange(S.map, tx, ty)) : ''}
-      <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel',bloodrain:'Blutregen',sandstorm:'Sandsturm',snow:'Schnee'}[S.weather]}</b></div>
-      <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>
-      <div class="ctx-line"><span>Jahreszeit</span><b>${SEASONS[seasonOf()]}</b></div>
-      <div class="ctx-line"><span>Jahr</span><b>${year()}</b></div>`;
+`;   /* UI-Umbau: Wetter, Zeit, Jahreszeit, Jahr stehen in der Kopfleiste (vorher doppelt) */
     if (here && S.towns && S.towns[here.key]) {
       const t = S.towns[here.key], owner = S.war.nodes[here.key]?.owner;
       h += `<div class="ctx-block"><div class="ctx-sub">Stadt</div>
@@ -516,13 +535,17 @@ export function openModal(name, arg) {
   modalOpen = name;
   const m = $('modal'); m.classList.remove('hidden');
   const body = $('modal-body'); body.innerHTML = '';
-  const idx = NAV.findIndex(n => n[0] === name);
-  [...$('nav').children].forEach((b, i) => b.classList.toggle('active', i === idx));
+  const grp = NAV.find(n => n[3].includes(name));
+  [...$('nav').children].forEach(b => b.classList.toggle('active', b.dataset.g === grp?.[0]));
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
     classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
+  let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
+  const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
+  tabs.innerHTML = subs.length > 1 && subs.includes(name) ? subs.map(k => `<button data-sub="${k}" class="${k === name ? 'on' : ''}">${SUBTAB[k]}</button>`).join('') : '';
+  tabs.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { if (b.dataset.sub !== modalOpen) openModal(b.dataset.sub); });
   if (R) R[1](body, arg);
 }
 
