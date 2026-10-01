@@ -2,7 +2,7 @@
 import { S, clamp, seasonOf } from './state.js?v=23';
 import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=23';
 import * as HB from './buildings.js?v=23';
-import { ITEMS, MONSTERS } from './data.js?v=23';
+import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
 import * as SP from './sprites.js?v=23';
 import { trailPt, WAGON_GAP } from './sim.js?v=23';
@@ -774,7 +774,7 @@ function drawEntity(e, now) {
     case 'item': return drawGroundItem(e, now);
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
-    case 'enemy': return e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now);   // S15 P5: Übungspuppe der Akademie
+    case 'enemy': { const r = e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now); facPip(e); return r; }   // S15 P5: Übungspuppe der Akademie; Scout R4: Zeichen der Macht
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
@@ -823,6 +823,16 @@ function drawHouse(b, now) {
   }
 }
 
+// Scout R4 (Entwickler 01.10.2026): kleines Rautenzeichen in der Farbe der Macht über Feinden, die mit anderen Mächten verfeindet sind
+// (Tote, Banden, Kette, Goblins, Orden, Kelch, Piraten) — so sieht man, wen man gegeneinander hetzen kann. Erschöpfte Sieger blinken.
+const PIP_FAC = new Set(['undead', 'bandit', 'chain', 'goblin', 'order', 'blut', 'pirate']);
+function facPip(e) {
+  if (!e.alive || e.boss) return; const f = e.faction || MONSTERS[e.mtype]?.faction; if (!PIP_FAC.has(f)) return;
+  const col = FACTIONS[f]?.colors?.[1] || '#888', y = e.y - 64 * (MONSTERS[e.mtype]?.scale || 1), spent = e.spent > performance.now();
+  if (spent && ((performance.now() / 180) | 0) % 2) return;
+  ctx.fillStyle = '#100d0a'; ctx.beginPath(); ctx.moveTo(e.x, y - 5); ctx.lineTo(e.x + 4, y); ctx.lineTo(e.x, y + 5); ctx.lineTo(e.x - 4, y); ctx.fill();
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(e.x, y - 3.5); ctx.lineTo(e.x + 2.5, y); ctx.lineTo(e.x, y + 3.5); ctx.lineTo(e.x - 2.5, y); ctx.fill();
+}
 // Karawane (BUG-011): Leitwagen mit Plane, Kutscher und Ochsengespann; Beiwagen (offene Ladefläche, ein Maultier) folgt der Spur.
 function drawCaravan(e, now) {
   const moving = !!(e.vx || e.vy), f = e.facing === 2 ? -1 : 1;

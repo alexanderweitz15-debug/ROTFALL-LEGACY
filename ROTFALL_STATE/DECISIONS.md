@@ -107,3 +107,9 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Gewählt: Fraktionszeichen am Gegner, Kampfbericht nach Dreieckskämpfen, Köder-Pfeife, Schwache Flanke (alle klein).
 - Kopfleiste: größere Symbole mit kurzer Beschriftung darunter (Entwickler: „Symbole sehr klein, kleine Beschriftung unter dem Symbol“).
 - Varonheim-Umbau Scheibe 1 gebaut (Kronfels, Faktor 3).
+
+## 01.10.2026 — Bedrohung gesamt (PROPOSALS/bedrohung_gesamt.md) und lebendige Hauptstadt
+- Varonheim soll auf **Schwer bei Nichtstun (Kult ignoriert) gegen Tag 120–150 fallen**; Sehr schwer früher.
+- Die verlorene Front allein darf den Heerzug auslösen, **frühestens Tag 75** (mit Deckeln gegen Krisen-Stapel).
+- Ersatzwachen bringen die Besatzung zurück (**+4 je Mann**).
+- Scout Runde 5 gewählt: Turnier in Varonheim, Gildenstreik, Markt reagiert auf Bedrohung, Flüchtlinge ins Armenviertel.

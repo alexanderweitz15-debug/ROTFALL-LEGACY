@@ -330,6 +330,7 @@ export const ITEMS = {
   strick:     { name:'Strick', slot:'material', stack:10, rarity:'common', value:6, lore:'Hält einen Gefangenen. Meistens.' },   /* T08: zum Fesseln Ergebener und Bewusstloser */
   rotes_siegel: { name:'Rotes Siegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Ein Siegelring aus dunklem Gold, rotes Wachs in den Rillen. Das Wappen der Kanzlei von Varonheim. Wer damit siegelt, spricht für den Kanzler.' },   /* §5g.2 Beweis */
   blutmaske:  { name:'Blutmaske', slot:'material', stack:9, rarity:'uncommon', value:15, lore:'Wachs, rot gefärbt, mit Augenlöchern. Sie riecht nach Kerzen und Eisen.' },   /* §5g.2 Spur */
+  koederpfeife: { name:'Köderpfeife', slot:'consumable', use:'lure', stack:1, rarity:'uncommon', value:45, lore:'Ein schriller Ruf, den nur Feinde hören wollen. Wer dich jagt, sieht sich plötzlich nach einem anderen um.' },   /* Scout R4 */
   blutphiole: { name:'Blutphiole', slot:'consumable', use:'blood', stack:5, rarity:'uncommon', value:40, lore:'Dunkel, dick, noch warm. Für die einen ein Beweis, für die anderen ein Mahl.' },   /* §5g.2 */
   potion:     { name:'Trank der Genesung', slot:'consumable', use:'heal', heal:40, stack:5, rarity:'uncommon', value:55 },
   // S13: Werkzeuge der Arbeiter (nur Bild und Bewegung bei der Arbeit; nicht im Handel, keine Beute)

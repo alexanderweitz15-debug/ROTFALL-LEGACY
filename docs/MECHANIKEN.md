@@ -817,3 +817,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Alte Spielstände:** Beim ersten Laden ziehen die Bewohner in die neuen Häuser, alte Spuren verschwinden; wer auf der alten Fläche stand, steht auf dem neuen Markt. Ein Logeintrag erklärt es.
 - **Noch nicht:** Die Burg ist weiter ein eigener Ort (Tor am Bergfried); begehbare Burg, Torkontrolle (Waffen abgeben, Bestechung 5000 Gold zu 30 %) und Start in Varonheim folgen in den nächsten Scheiben.
 - **Kopfleiste:** größere Symbole mit kurzer Beschriftung darunter (Charakter, Inventar, Gruppe, Siedlung, Karte, Aufträge, Mächte, Kodex, Optionen), die Taste klein in der Ecke.
+
+## Runde: Mächte unter sich nutzen (Scout Runde 4, 01.10.2026)
+- **Zeichen der Macht:** Über Feinden, die mit anderen Mächten verfeindet sind (Tote, Banden, Kette, Goblins, Orden, Kelch, Piraten), sitzt eine kleine Raute in der Farbe ihrer Macht — so siehst du, wen du gegeneinander hetzen kannst.
+- **Kampfbericht:** Gehen zwei Mächte in deiner Nähe aufeinander los, meldet es das Protokoll (beim ersten Mal ein Hinweis „MÄCHTE UNTER SICH“).
+- **Schwache Flanke:** Wer einen Feind einer anderen Macht erschlägt, ist 6 Sekunden außer Atem (seine Raute blinkt): du und deine Gruppe trefft ihn um 35 % härter („Flanke!“).
+- **Köderpfeife** (Händler, 45 Gold, wird nicht verbraucht): Der nächste Verfolger wendet sich einem Feind seiner Feinde in der Nähe zu. 30 Sekunden Pause; ohne passenden Feind nur 5 Sekunden.
+- **Leute:** Gesichter mit Brauen, Alter, Bartarten und Narben; Kleidung je Region (Valen blaugrau, Aurelion Seide mit Messingborte, Kette Schwarz und Eisen, Goblins Lumpen); Wachen mit Helmkamm in der Stadtfarbe.

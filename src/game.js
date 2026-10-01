@@ -475,6 +475,7 @@ function useConsumable(c, idx, target = c, part = null) {
     removeItem(c, slot.key, 1); w.charge = 100; if (c === S.player) { UI.toast(`${ITEMS[w.key].name}: Energie 100/100`, 1800); sfx('magic', 0.3); } fx(c.x, c.y - 14, 'spark', 6);
     return UI.refreshHUD();
   }
+  if (it.use === 'lure') return lureWhistle(c);                     /* Scout R4: Köderpfeife (wird nicht verbraucht) */
   if (it.use === 'blood') {                                  /* §5g.2 Blutphiole: stillt den Durst; Lebenden wird übel */
     removeItem(c, slot.key, 1); fx(c.x, c.y - 14, 'blood', 6);
     if (isVamp(c)) { setBlood(c, bloodOf(c) - 25); log(`${c.name} trinkt eine Blutphiole. Der Durst schweigt — für eine Weile.`, 'party'); }
@@ -3220,6 +3221,26 @@ function foeFacs(a, b) {
   const fa = a.faction || MONSTERS[a.mtype]?.faction, fb = b.faction || MONSTERS[b.mtype]?.faction; if (!fa || !fb || fa === fb) return false;
   return !!FOE_FAC[fa]?.includes(fb) && teamOf(a) === 'foe' && teamOf(b) === 'foe';
 }
+// Scout R4 (Entwickler 01.10.2026): Dreieckskämpfe sichtbar und nutzbar — Bericht im Log (je Paar höchstens alle 20 s, nur in deiner
+// Nähe), der Sieger ist 6 s erschöpft („Flanke!“, +35 % Schaden für dich und deine Gruppe).
+const triSeen = new Map();
+function triReport(dead, killer) {
+  killer.spent = performance.now() + 6000; killer.spentShown = 0;
+  const p = S.player; if (S._quiet || p.map !== dead.map || dist(p, dead) > 900) return;
+  const fa = killer.faction || MONSTERS[killer.mtype]?.faction, fb = dead.faction || MONSTERS[dead.mtype]?.faction, key = [fa, fb].sort().join('|'), now = performance.now();
+  if ((triSeen.get(key) || 0) > now) return; triSeen.set(key, now + 20000);
+  log(`${FACTIONS[fa]?.name || fa} und ${FACTIONS[fb]?.name || fb} gehen aufeinander los — ${MONSTERS[dead.mtype]?.name || 'einer'} fällt. Der Sieger ist kurz außer Atem: jetzt zuschlagen trifft härter.`, 'combat');
+  if (!S.flags.triHint) { S.flags.triHint = 1; UI.toast('MÄCHTE UNTER SICH', 2200); }
+}
+// Köderpfeife: der nächste Verfolger wendet sich einem Feind seiner Feinde zu (Sichtweite 600 px), 30 s Pause
+function lureWhistle(c) {
+  const now = performance.now(); if ((c.lureCd || 0) > now) { if (c === S.player) UI.toast(`Die Pfeife braucht noch ${Math.ceil((c.lureCd - now) / 1000)} s.`); return; }
+  const hunters = S.ents[c.map].filter(e => e.kind === 'enemy' && e.alive && !e.downed && e.aggroId === c.id && dist(e, c) < 500).sort((a, b) => dist(a, c) - dist(b, c));
+  for (const h of hunters) { const prey = S.ents[c.map].filter(o => o.kind === 'enemy' && o.alive && o !== h && foeFacs(h, o) && dist(o, h) < 600).sort((a, b) => dist(a, h) - dist(b, h))[0];
+    if (!prey) continue; h.aggroId = prey.id; h.aiState = 'pursue'; prey.aggroId = h.id; c.lureCd = now + 30000; sfx('whistle', 0.4, 1); float(c, 'pfeift', 'rgba(230,220,180,ALPHA)');
+    log(`${MONSTERS[h.mtype]?.name || 'Dein Verfolger'} wendet sich ab und geht auf ${MONSTERS[prey.mtype]?.name || 'einen anderen'} los.`, 'combat'); return true; }
+  c.lureCd = now + 5000; sfx('whistle', 0.4, 1); if (c === S.player) UI.toast('Kein Feind seiner Feinde in der Nähe.');
+}
 function isHostile(a, b) {
   if (a.trial || b.trial) return (a === S.player || b === S.player) && (a.trial || b.trial) !== 'heal';   // S15 P5: Prüflinge nur gegen dich
   if (a.kind === 'enemy' && b.kind === 'enemy' && (WILD_BEASTS.has(a.mtype) !== WILD_BEASTS.has(b.mtype)) && !a.servant && !b.servant && !a.pet && !b.pet && !a.spirit && !b.spirit && !a.goblinStorm && !b.goblinStorm
@@ -3264,6 +3285,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (target.faction === 'undead' || MONSTERS[target.mtype]?.faction === 'undead') dmg *= 1 + afx(attacker, 'slayer') + elx(attacker, 'slayer');   // S15 P2: Totenbann
   if ((attacker.status || []).some(s => s.key === 'omegawrath')) dmg *= target.faction === 'undead' ? 1.35 : 1.1;   // Phase 7: Gebet an Omega; S13 (Nutzer): gegen Untote stärker
   if (attacker.omegaAvatar) dmg *= 1.3;   // Phase 7: Avatar Omegas
+  if (target.spent > performance.now() && (attacker === S.player || S.party.includes(attacker.id))) { dmg *= 1.35; if (!target.spentShown) { target.spentShown = 1; float(target, 'Flanke!', 'rgba(230,200,120,ALPHA)'); } }   /* Scout R4: Sieger eines Dreieckskampfs ist kurz erschöpft */
   // Kritisch
   const ambush = attacker === S.player && target.kind === 'enemy' && teamOf(target) === 'neutral';   // S12: Schleichangriff auf Ahnungslose
   const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen');
@@ -3560,6 +3582,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.cultHedda && S.cult) { S.cult.heddaDead = true; log('Hedda fällt. Der Kelch auf dem Altar ist plötzlich nur noch ein Becher.', 'quest'); } if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
   if (c.varonKing && !S.flags.varonDead) { const byP = !!source && (source === S.player || S.party.includes(source.id) || source.servant === S.player.id || source.coopHero);   /* RB-023: nur der Spieler und seine Gruppe büßen */
     S.flags.varonDead = S.day | 0; if (byP) S.factions.valen = -100; kingDeath(c, byP);   /* Entwickler 01.10.2026: Varons Tod ist ein Ereignis */ }   /* RB-045: Chronik und Hinweis schreibt kingDeath */   /* §5d.4 */
+  if (c.kind === 'enemy' && source?.kind === 'enemy' && source.alive && foeFacs(c, source)) triReport(c, source);   /* Scout R4: Mächte unter sich (vor dem frühen Ausstieg für Feinde) */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
     const m = MONSTERS[c.mtype];
     if (dist(S.player, c) < 500) log(`${m.name} fällt.`, 'combat');
@@ -12563,7 +12586,7 @@ function rawPrice(key, isBuy, npc, inst = null) {
 function shopStock(npc) {
   if (!npc._stockDay || npc._stockDay !== S.day) {
     npc._stockDay = S.day;
-    const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
+    const pool = npc.pool || NPCS.find(n => n.key === npc.key)?.pool || ['bread', 'dried_meat', 'herb', 'potion', 'bandage', 'koederpfeife', 'rusty_sword', 'longsword', 'axe', 'spear', 'shortbow',
       'wooden_shield', 'leather_jerkin', 'leather_cap', 'chain_hauberk', 'pickaxe', 'traveler_cloak'];
     npc._stock = []; const open = npc.fixedStock ? [] : pool.filter(k => !bionicTier(ITEMS[k]) || !bionicLack(bionicTier(ITEMS[k])));   /* RB-019: fester Tagesbestand (Hedda: 3 Phiolen) */
     if (npc.fixedStock) npc._stock = npc.fixedStock.map(s => ({ ...s }));   /* Roadmap P5: Bionik nach Rang in Aurelion */
@@ -18333,6 +18356,13 @@ export function selftest() {
       return full && after4 && reload && alarm && reinf;
     } finally { S.schutz = sc0; S.war.capThreat = th0; S.cult = cu0; }
   }));
+  ok('Scout R4: Tötet ein Feind einen Feind einer anderen Macht, ist der Sieger erschöpft (+35 % Schaden für dich); die Köderpfeife lenkt den Verfolger auf einen Feind seiner Feinde', sandbox(() => {
+    const p = stage(), b = spawnEnemy('bandit', '__a', 12, 10), u = spawnEnemy('skeleton', '__a', 13, 10), s = spawnEnemy('skeleton', '__a', 16, 10);
+    die(u, 'Probe', b); const spent = b.spent > performance.now();
+    s.aggroId = p.id; s.x = p.x + 60; s.y = p.y; const b2 = spawnEnemy('bandit', '__a', 14, 12); b2.x = s.x + 80; b2.y = s.y; addItem(p, 'koederpfeife', 1);
+    p.lureCd = 0; useConsumable(p, p.inv.findIndex(i => i?.key === 'koederpfeife')); const lured = s.aggroId !== p.id && foeFacs(s, byId(s.aggroId) || {}) && hasItem(p, 'koederpfeife', 1);
+    return spent && lured;
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -18646,7 +18676,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=23').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=23').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
