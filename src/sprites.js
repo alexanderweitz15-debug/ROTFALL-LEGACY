@@ -114,14 +114,14 @@ const artHooks = [];
 export const onArtChange = fn => artHooks.push(fn);
 export const drawnOn = () => ART === 'R';                          // S14: Stil R (Nutzer: erst nur optional wählbar)
 export function setArt(v) {
-  v = v === 'F' || v === 'R' ? v : 'D'; if (v === ART) return; ART = v;
+  v = v === 'R' || v === 'F' ? 'R' : 'D'; if (v === ART) return; ART = v;   /* Audit T05: Stil F (Referenzblatt) abgeschaltet — gespeichertes F wird R; Code bleibt eingefroren */
   frameCache.clear(); lookCache.clear(); WPN.clear(); warmed.clear();
   for (const f of artHooks) f();
 }
 // ---- Atlas (Referenz 5) ----
 const atlasImg = new Image(); let atlasReady = false;
 atlasImg.onload = () => { atlasReady = true; frameCache.clear(); warmed.clear(); for (const f of artHooks) f(); };
-atlasImg.src = new URL('./assets/ref5_atlas.png', import.meta.url).href;
+/* Audit T05: das Atlas-PNG lädt nicht mehr (Stil F ist aus). Zum Wiederbeleben: atlasImg.src = new URL('./assets/ref5_atlas.png', import.meta.url).href; */
 export const atlasOn = () => ART === 'F' && atlasReady;
 export const APX = 0.95;                                            // Welt-Einheiten je Atlas-Pixel (Figur ~70 px → ~66 Einheiten, dann FIGK)
 const atlasCache = new Map();

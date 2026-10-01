@@ -708,9 +708,11 @@ function charUI(body, who) {
     toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
     survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.',
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
-    leadership: 'Je 10 Punkte ein Gefährte mehr in der Gruppe. Steigt bisher nicht durch Übung.',
+    leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
-    hunting: '(noch ohne Wirkung)', crafting: '(noch ohne Wirkung)', stealth: '(noch ohne Wirkung)' };
+    hunting: 'Noch ohne Wirkung — bekommt sie mit „Jagd und Wildnis“ (Fährten, Fallen, Häuten).',
+    crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
+    stealth: 'Hilft beim Hineinschleichen und Stehlen. Wächst noch nicht durch Übung — das kommt mit dem Schleich-System.' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
@@ -1032,7 +1034,7 @@ function settingsUI(body) {
       <div class="ctx-actions">${['low:Kaum Blut', 'reduced:Reduziert', 'standard:Voll'].map(s => { const [k, n] = s.split(':');
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Grafikstil</h3>
-      <div class="ctx-actions"><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Neu (gezeichnet)</button><button data-art="F" class="${S.settings.art === 'F' ? 'on' : ''}">Referenzblatt</button></div>
+      <div class="ctx-actions"><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Neu (gezeichnet)</button></div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>

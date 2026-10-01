@@ -115,7 +115,7 @@ Zeilennummern gibt es bewusst nicht, weil der Code sich ändert.
 
 **Stufen und Punkte** (`gainXp`, `levelUp`):
 - Die nötige Erfahrung wächst je Stufe um ×1,35, ab Stufe 10 um ×1,2, ab Stufe 20 um ×1,04 (Balance-Runde). Höchststufe 60 (≈ 0,42 Mio. EP). Viel Erfahrung auf einmal ergibt mehrere Stufen.
-- Jede Stufe gibt +1 Statpunkt (C), jede 5. Stufe einen zusätzlich („Meilenstein“). Talentpunkte (T): 1 zum Start und 1 auf jeder geraden Stufe (31 bei Stufe 60). Siehe docs/BALANCE.md.
+- Jede Stufe gibt +1 Statpunkt (C), jede 5. Stufe einen zusätzlich („Meilenstein“). Talentpunkte (T): 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60; `TALENT_EVERY`). Siehe docs/BALANCE.md.
 - Ein Aufstieg heilt voll, außer man liegt am Boden.
 - „Ausgeruht“ gibt +10 % Erfahrung, der Trank der Lehre mehr.
 
@@ -1041,7 +1041,7 @@ Zeilennummern gibt es bewusst nicht, weil der Code sich ändert.
 - **Selbst ausbessern** an Esse, Amboss oder Werkbank ohne Schmied (`mendAt`): bis 80 %, Eisenerz je 2 Stücke, 30 Minuten, Schmieden +0,5.
 - **Eigene Siedlungsschmiede:** bis 100 % mit Eisen.
 - **Handwerk:** Verbände aus Tuch; Trank brauen (Alchemist, 3 Heilkraut → Heiltrank).
-- **Beobachtung:** Ein allgemeines Herstellsystem für Waffen oder Rüstung aus Rohstoffen gibt es im Code nicht.
+- **Herstellen** (`RECIPES`, `craftItem`, `craftMenu`): an Esse (Schmieden), Werkbank (Handwerk) und Kessel (Medizin); Rezepte mit Mindestwert, Qualität nach Fertigkeit, die Fertigkeit steigt beim Herstellen.
 
 ### 2.21 Reisen
 
@@ -1202,7 +1202,7 @@ Alles hier sind **Beobachtungen** beim Lesen. Sie sagen nichts darüber, was bea
    - PLAN_S15 P5 nennt Druidin, Moorhexe und Omega-Priester als offen.
 3. **Beobachtung — Seevolk-Ränge 2 und 4:** `rankGuide` sagt dazu „Dieser Rang ist noch nicht erreichbar“ (auch in PLAN_S15 P8 und P21 erwähnt).
 4. **Beobachtung — `SCALING` ist leer:** Kein Gegner wächst mit, auch nicht der Kopfgeldjäger, für den es laut Kommentar gedacht war. Die Jäger skalieren stattdessen über `spawnHunters`.
-5. **Beobachtung — Kein Herstellsystem:** Außer Verbänden und Tränken (Alchemist) lässt sich nichts herstellen. Schmieden repariert nur. Die Siedlungsschmiede „Waffen aus Eisen“ (Beschreibung in `BUILDINGS`) stellt im Code nur Reparatur bereit (`BUILD_USE.smithy` „Schmieden“, geprüft wurde nur das Menü).
+5. **Beobachtung (veraltet, Stand S15):** Inzwischen gibt es Herstellen an Esse, Werkbank und Kessel (`RECIPES`, `craftItem`, `craftMenu`; Qualität nach Fertigkeit). Früherer Befund: Außer Verbänden und Tränken (Alchemist) ließ sich nichts herstellen. Schmieden repariert nur. Die Siedlungsschmiede „Waffen aus Eisen“ (Beschreibung in `BUILDINGS`) stellt im Code nur Reparatur bereit (`BUILD_USE.smithy` „Schmieden“, geprüft wurde nur das Menü).
 6. **Beobachtung — Keine Musik:** Es gibt nur synthetisierte Geräusche und Atmosphäre. PHASE_STATUS nennt Phase 18 (Klang) „nicht begonnen“.
 7. **Beobachtung — Boss-Intros fehlen:** Es gibt keine Kamerafahrten beim ersten Sichtkontakt mit Varg, Hrodvar, Garmadon, Gorak oder Dodon, keine zum Kerkerausbruch und keine zur Ankunft in Aurelheim (PLAN_OFFEN S14 Warteschlange, noch nicht abgehakt).
 8. **Beobachtung — Schwarze Feste nicht befreibar:** Das Untotenheer steht dauerhaft dort (BUG-100). Die Umgebung ist leer und dunkel, ein Goblin steht falsch im Totenland (BUG-143).

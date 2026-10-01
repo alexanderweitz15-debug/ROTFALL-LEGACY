@@ -32,8 +32,7 @@ export function townState(key) {
   const t = S.towns[key], node = S.war.nodes[key];
   if (node && node.owner === 'undead') return 'Besetzt';
   if (S.war.armies.some(a => a.faction === 'undead' && (a.at === key || (NEIGH[key] || []).includes(a.at)))) return 'Bedroht';
-  if (t.stock.grain < 5) return 'Hunger';
-  if (t.hunger) return 'Hunger';
+  if (key !== 'vharnholm' && (t.stock.grain < 5 || t.hunger)) return 'Hunger';   /* Audit V17a: die Stillen essen nicht */
   return GOODS.filter(g => t.stock[g] >= ECO.target(t, g)).length >= 8 ? 'Wohlhabend' : 'Ruhig';
 }
 // S13: Preise, Produktion und Verbrauch aller Städte liegen in economy.js
@@ -368,8 +367,7 @@ export function warDay() {
   // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt (die Toten nur, solange Garmadon lebt)
   if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
     const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard';
-    W.nodes[base].owner = 'undead';
-    W.armies.push(newArmy('undead', base, 30)); log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
+    W.armies.push(newArmy('undead', base, 30));   /* Audit V17c: der Friedhof wird nicht mehr stillschweigend umgefärbt — hält Valen ihn, muss das Heer ihn erst nehmen */ log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
   const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt */
   if (!W.armies.some(a => a.faction === 'valen')) {

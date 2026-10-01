@@ -5,9 +5,9 @@ Alte Fassung: `archive/STYLE_GUIDE_bis_S13.md`. Referenzen: `docs/reference/` (3
 ## Stile (Optionen → Grafikstil)
 | Stil | Stand | Quelle |
 |---|---|---|
-| D „Klassisch“ | **Standard** | `figure.js` (Figuren 40×66 fein, ×1,2), Props/Boden 1,5 Welt je Pixel |
-| R „Gezeichnet (Test)“ | optional (S14) | `fig5.js`: Referenz 5 im Code nachgezeichnet, Figuren, Tiere, Waffen, Gorak im Zielraster |
-| F „Neu (Referenz 5)“ | optional, aus | Atlas aus dem Referenzblatt (`assets/ref5_atlas.png`) |
+| R „Neu (gezeichnet)“ | **Standard** (seit S15) | `fig5.js`: Referenz 5 im Code nachgezeichnet, Figuren, Tiere, Waffen, Gorak im Zielraster |
+| D „Klassisch“ | wählbar, eingefroren (keine neuen Zeichnungen) | `figure.js` (Figuren 40×66 fein, ×1,2), Props/Boden 1,5 Welt je Pixel |
+| F „Referenzblatt“ | abgeschaltet (Audit T05, 01.10.2026): gespeichertes F wird R, das PNG lädt nicht mehr; Code eingefroren | Atlas aus dem Referenzblatt (`assets/ref5_atlas.png`) |
 Stilwechsel leert die Bild-Caches (`setArt`); gespeichert wird nur `S.settings.art`.
 
 ## Grundregeln (alle Stile)

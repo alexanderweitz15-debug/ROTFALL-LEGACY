@@ -1960,7 +1960,8 @@ export function continueGame(given = null) {                        /* Koop K2: 
   { const p = S.player; if (p?.titleClasses?.length && !p.tgrade) { p.tgrade = {};   // S15: alte Stände behalten jede Fähigkeit, die sie vor den Titelgraden hatten
     for (const k of p.titleClasses) { const T = TITLE_CLASSES[k]; p.tgrade[k] = Math.max(1, ...T.abilities.map(a => T.grades.findIndex(g => g.includes(a)) + 1)); } } }
   if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
-  if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
+  if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }
+  if (S.settings.art === 'F') S.settings.art = 'R';   /* Audit T05: Stil F gibt es nicht mehr */   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
   SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
   seedRng(S.seed);
   const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [], varonburg: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
@@ -3225,7 +3226,7 @@ function weaponMult(it, t, armor0) {
 // Mechanik-Check S14: Flächenangriffe (Ringe, Einschläge, Strahl) laufen über areaHit — Deckung, Schild und Nahkampfabwehr
 // greifen dort nicht (Rolle = Raum, Deckung = Stand). Geschosse bleiben blockbar.
 let AREA = false;
-const EYE_ZAP = new Set(['magic', 'shadow', 'shock', 'arcane']);   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
+const EYE_ZAP = new Set(['magic', 'shadow']);   /* Audit T05: nur Arten, die hurt() wirklich erreicht (Blitz- und Arkanzauber kommen als 'magic') */   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null;
@@ -3551,6 +3552,7 @@ function die(c, cause = 'Wunden', source) {
     S.kills++;
     if (S.player.alive) S.player.kills = (S.player.kills || 0) + 1;
     S.battles = Math.max(1, Math.round(S.kills / 3));
+    if ((px > 0 || source === S.player || S.party.includes(source?.id)) && S.player.alive && partyMembers().some(pm => !pm.coopHero && dist(pm, S.player) < 400)) leadGrow(0.07);   /* Audit A13: Führung wächst durch Siege mit der Gruppe (~0,2 je Kampf) */
     const pw = S.player.equip.weapon;
     if (pw && dist(S.player, c) < 260) pw.kills = (pw.kills || 0) + 1;
     if (c.boss) {
@@ -3710,8 +3712,8 @@ function gainXp(c, n) {
   for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
-// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder dritten Stufe (gerade Stufen)
-// plus der Startpunkt — bei 60 also 31 Punkte für 64 Knoten (59 lernbar, fünf Schlüsselknoten schließen einander aus): viele,
+// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder dritten Stufe
+// plus der Startpunkt — bei 60 also 21 Punkte für 64 Knoten (59 lernbar, fünf Schlüsselknoten schließen einander aus): viele,
 // nicht alle. Statpunkt je Stufe und der Meilenstein-Statpunkt alle 5 Stufen bleiben. Alte Stände behalten ihre Punkte.
 // Kurve: ab Stufe 20 nur noch ×1,04 je Stufe (vorher ×1,12: 3,1 Mio. EP bis 60, unerreichbar; jetzt ≈ 0,46 Mio.).
 export const MAX_LEVEL = 60, TALENT_EVERY = 3;   /* Nutzer: Talentpunkt jede dritte Stufe (21 bis Stufe 60, gut ein Drittel der Talente) */
@@ -10916,7 +10918,13 @@ const TRAIT_SAY = { grausam: 'Mehr Blut, weniger Reden. So mag ich das.', gütig
 // unter 15 kann JEDER verraten (30 % am Tag): mit Gold verschwinden oder die Waffe gegen dich ziehen. Keine Romanze — wer den
 // persönlichen Auftrag mit dir erledigt und über 70 Loyalität hat, wird Freund fürs Leben (verrät nie, +2 auf sein bestes Attribut).
 const loyOf = m => m.loyal ?? 50;
-function loyAdd(m, n) { if (!m || m.friend && n < 0) return; m.loyal = clamp(loyOf(m) + n, 0, 100); }
+function loyAdd(m, n) { if (!m || m.friend && n < 0) return; if (n > 0) n *= 1 + (S.player?.skills?.leadership || 0) / 200; m.loyal = clamp(loyOf(m) + n, 0, 100); }   /* Audit A13: Führung beschleunigt Loyalität */
+// Audit A13: Führung wächst (Siege mit Gefährten, Befehle). Jede volle 10 gibt einen Gefährtenplatz (recalc → partyCap).
+function leadGrow(n) {
+  const p = S.player, sk = p.skills || (p.skills = {}), was = sk.leadership || 0; sk.leadership = Math.min(100, was + n);
+  if (!S.flags.leadHint) { S.flags.leadHint = 1; log('Führung wächst, wenn du mit Gefährten siegst oder ihnen Befehle gibst. Je 10 Punkte darf einer mehr mitreisen, und Loyalität wächst schneller.', 'party'); }
+  if (Math.floor(was / 10) < Math.floor(sk.leadership / 10)) { recalc(p); log(`Führung ${Math.floor(sk.leadership)}: Deine Gruppe darf jetzt ${p.partyCap} Gefährten zählen.`, 'party'); UI.toast('FÜHRUNG GESTIEGEN', 2200); }
+}
 function loyDay() {
   for (const m of partyMembers()) { if (!m.alive || m.coopHero || m.coopPilot) continue;
     loyAdd(m, 1 + ((m.morale ?? 50) > 70 ? 1 : 0) - ((m.morale ?? 50) < 30 ? 3 : 0));
@@ -12133,6 +12141,7 @@ function giveGear(m) {
   UI.refreshHUD();
 }
 function partyCommand(cmd) {
+  if (cmd !== S.partyCmd && partyMembers().length && foesNear(S.player) && clock() - (S._leadCmdT || -999) > 30) { S._leadCmdT = clock(); leadGrow(0.05); }   /* Audit A13: Befehle im Kampf üben Führung (höchstens alle 30 Spielminuten) */
   S.partyCmd = cmd;
   log(`Befehl: ${({ follow:'Folgen', attack:'Angreifen', hold:'Stellung halten', retreat:'Zurückziehen', protect:'Anführer schützen' })[cmd]}`, 'party');
 }
@@ -13551,7 +13560,7 @@ function debugSections() {
     }],
     // S14 (Nutzer: Debug-Menü prüfen und erweitern)
     ['Grafik', `${sel('dbSet', Object.keys(ARMOR_SETS).map(k => [k, ARMOR_SETS[k].name]))}`, {
-      'Stil: Klassisch': () => { S.settings.art = 'D'; SP.setArt('D'); }, 'Stil: Neu (gezeichnet)': () => { S.settings.art = 'R'; SP.setArt('R'); }, 'Stil: Referenzblatt': () => { S.settings.art = 'F'; SP.setArt('F'); },
+      'Stil: Klassisch': () => { S.settings.art = 'D'; SP.setArt('D'); }, 'Stil: Neu (gezeichnet)': () => { S.settings.art = 'R'; SP.setArt('R'); },
       'Rüstungsset anlegen': () => { for (const k of ARMOR_SETS[v('dbSet')].pieces) p.equip[ITEMS[k].slot] = mkItem(k); recalc(p); },
       'Ausrüstung ablegen': () => { for (const sl of ['head', 'chest', 'cloak', 'legs', 'hands', 'feet']) p.equip[sl] = null; recalc(p); },
     }],
@@ -16298,6 +16307,16 @@ export function selftest() {
     const clean = [...s].every(ch => { const c = ch.charCodeAt(0); return c >= 32 && (c < 0xd800 || c > 0xdfff); });
     return same && clean && s.length < u8.length * 0.6 && S.ents.world.every(e => e.kind !== 'prop' || e.sick === undefined);
   })());
+  ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
+    const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };
+    kill(); const alone = p.skills.leadership === 9.97;
+    const m = actor(p.x + 60, p.y, { name: 'Gefährte' }); S.party.push(m.id); kill(); const grew = p.skills.leadership > 9.97 && p.partyCap === cap0 + 1;
+    m.loyal = 50; loyAdd(m, 10); const fast = m.loyal > 60;
+    const T0 = S.towns.vharnholm, st = T0 && structuredClone(T0.stock); let noHunger = true;
+    if (T0) { T0.stock.grain = 0; noHunger = SIM.townState('vharnholm') !== 'Hunger'; T0.stock = st; }
+    const art0 = SP.drawnOn() ? 'R' : 'D'; SP.setArt('F'); const fOff = SP.drawnOn() && !SP.atlasOn(); SP.setArt(art0);
+    return alone && grew && fast && noHunger && fOff;
+  }));
   ok('Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit auch gegen Hammer und Wuchtschlag)', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('warhammer'); const e = spawnEnemy('death_knight', '__a', 12, 10); e.x = p.x + 30; e.y = p.y;
     hit(p, e, 1); const first = e.stagger > 0 && e.poiseUntil > performance.now(); e.stagger = 0; hit(p, e, 1); const second = !(e.stagger > 0);
