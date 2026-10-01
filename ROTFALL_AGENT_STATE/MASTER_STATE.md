@@ -3,7 +3,7 @@
 Zuerst lesen. Kurz halten; Details stehen in den verlinkten Dateien.
 
 ## Stand
-- Version 22 (`?v=22`), Selbsttest 325/325 (frisch geladen, 01.10.). Letzter Commit: siehe git log.
+- Selbsttest 331/331 (frisch geladen, 01.10.). Version 23 (`?v=23`). main nur noch mit [VERIFIED]. Letzter Commit: siehe git log.
 - Modelle: nur Opus 5.5 und Sonnet (Nutzer 01.10.). Fable-Rollen übernimmt Opus. Regeln: `AGENT_SYSTEM.md`.
 - Hauptstrang = Director + Lead + Implementation Engineer (Opus). Nur er ändert `src/`.
 

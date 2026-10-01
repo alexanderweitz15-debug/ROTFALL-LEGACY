@@ -10,7 +10,7 @@ Status nach `AGENT_SYSTEM.md`. **Diese Tafel ist maßgeblich**; `docs/audit/STAT
 | T04 Effekte, Zufall, Klang | TESTING (Control: NEEDS FIX → Probe ergänzt) | Engineer | gleiche Schwebetexte bündeln + `ambienceKind`: DEFERRED (kein Spielerwert jetzt) |
 | T06 Spielstand komprimiert, Caches, HUD | TESTING (Control: NEEDS FIX → Speicherpfad gefixt) | Engineer | Vorwärmen bei Reise: DEFERRED |
 | T05 Kleine Korrekturen (V17, A13, Stil F, Doku) | IMPLEMENTED → TESTING | Engineer; Hunter steht aus | Probe „Audit T05“, 325/325; JOIN_FOES geprüft, keine Änderung nötig |
-| T07 §5g.2 Blutkult | IN_DEVELOPMENT — Scheibe 1 (Vampir + Stigma) IMPLEMENTED | Engineer | `proposals/blutkult.md`; Scheiben 2–5 offen |
+| T07 §5g.2 Blutkult | IN_DEVELOPMENT — Scheibe 1 (Vampir + Stigma) TESTING (Hunter läuft), Scheibe 2 (Unterwanderung) IMPLEMENTED | Engineer | `proposals/blutkult.md`; vereinfacht: Beschatten (Weg B) und Tagebuch-Auftrag folgen mit Scheibe 3; Scheiben 3–5 offen |
 | T08 Gefangene, Steckbriefe, Ruf der Klinge | DESIGN_LOCKED | Engineer | `proposals/t08_gefangene_steckbriefe_ruf.md` |
 | T09 Läden am Stadtlager | DESIGN_LOCKED | Engineer | `proposals/t09_laeden_stadtlager.md` |
 | T10 Ahnenfeind und Heldentod | DESIGN_LOCKED | Engineer | `proposals/t10_ahnenfeind_heldentod.md` (3 s, bis 3 Ahnenfeinde) |
