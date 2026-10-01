@@ -3,9 +3,10 @@
 Zuerst lesen. Kurz halten; Details stehen in den verlinkten Dateien.
 
 ## Stand
-- Selbsttest 334/334 (frisch geladen, 01.10.). Version 23 (`?v=23`). main nur noch mit [VERIFIED]. Letzter Commit: siehe git log.
-- Modelle: nur Opus 5.5 und Sonnet (Nutzer 01.10.). Fable-Rollen übernimmt Opus. Regeln: `AGENT_SYSTEM.md`.
-- Hauptstrang = Director + Lead + Implementation Engineer (Opus). Nur er ändert `src/`.
+- Selbsttest 340/340 (01.10., Commit 6e91074). Version 23 (`?v=23`). main nur noch mit [VERIFIED].
+- Modelle (Nutzer 01.10., zweite Fassung): Fable 5.1 = Director, Welt, Darstellung; Opus 5.5 = Lead, Design, Control, Implementierung; Sonnet = Hunter, Token-Optimierer. Regeln: `AGENT_SYSTEM.md`.
+- Hauptstrang = Lead + Implementation Engineer (Opus). Nur er ändert `src/`. Director (Fable) berichtet an ihn.
+- In Arbeit: Varonheim-Belagerung Scheibe 1 (Hauptstrang); Hunter 6 prüft T10; Control prüft alle TESTING-Punkte.
 
 ## Laufende Arbeit
 - Audit-Aufgabenliste T01–T40: `docs/audit/TASKS.md`; Detailtafel: `docs/audit/STATUS.md`; Kurzliste: `CURRENT_TASKS.md`.

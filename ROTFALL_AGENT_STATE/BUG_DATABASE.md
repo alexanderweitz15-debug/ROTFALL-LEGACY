@@ -25,7 +25,18 @@
 | RB-020 | Befreite Verschwundene konnten erneut entführt werden (Hunter 4; dort RB-018 genannt) | MEDIUM | game.js cultTake | TESTING |
 | RB-021 | Balance-Messung Aldhelm mit `ehp` umging den Boss-Faktor ×2 (Grundleben 560 war zu hoch) | MEDIUM | data.js aldhelm, docs/BALANCE.md | TESTING (Grundleben 340, 8 Seeds nachgemessen) |
 | RB-022 | Proben sicherten nur `S.prices`; nach T09 verändern Ereignisse Stadtlager und Zoll | LOW | Selbsttest | TESTING (Sicherungen erweitert, BUG-123 grün) |
-| RB-023 | Stirbt König Varon, fällt Valen auf −100 — egal wer ihn tötet (`game.js` die, `source` ungeprüft; Designer-Befund) | MEDIUM | game.js die | OPEN (gehört zu Varonheim-Belagerung / Rote Krönung) |
+| RB-023 | Stirbt König Varon, fällt Valen auf −100 — egal wer ihn tötet (`game.js` die, `source` ungeprüft; Designer-Befund) | MEDIUM | game.js die | TESTING (Belagerung S2: nur Spieler/Gruppe; Probe „RB-023“) — alt: OPEN (gehört zu Varonheim-Belagerung / Rote Krönung) |
 | RB-024 | Fesseln setzte `anchor: null` — nach Loslassen/Losreißen warf die Gegner-KI jedes Bild einen Fehler (Hunter 5, dort RB-023) | CRITICAL | game.js captiveMenu/captiveTick | TESTING (Anker bleibt, beim Loslassen neu gesetzt; Probe RB-024) |
 | RB-025 | Hauptmenü zeigte „v22“ (index.html:71) | LOW | index.html | TESTING |
 | RB-026 | Automaten-Wachen nahmen keine Gefangenen an (robotTalk vor captiveChoices) | MEDIUM | game.js talk | TESTING |
+| RB-027 | Ab „Schlächter“ ergaben sich noch 8–16 % (Nutzer: niemand) (Control 2) | MEDIUM | game.js updateEnemy | TESTING (`surrenderP`, Probe „Control 2“) |
+| RB-028 | `deleteSlot` schreibt bei ausstehendem Speichern in den gelöschten Platz (Control 2) | LOW | state.js | OPEN |
+| RB-029 | Handel billig/teuer ohne Grenze (+71 % je Stück), Verkauf füllte kein Lager (Control 2) | MEDIUM | game.js sell/rawPrice | TESTING (Verkauf +0,5 Lager, Verkaufsfaktor ≤ 1,3; Probe „Control 2“) |
+| RB-030 | Vampir-Spieler brannte im Lichtschacht nicht (Control 2) | MEDIUM | game.js sunOn | TESTING (Probe „Control 2“) |
+| RB-031 | Nach der Erpressung ist das Rote Siegel weg — Kult nie mehr zerschlagbar (Control 2) | MEDIUM | game.js cultPathChoices | WAITING_FOR_DEVELOPER |
+| RB-032 | Text der Roten Krönung nennt eine Ausgangssperre, die es nicht gibt (Control 2) | LOW | game.js cultCrown | TESTING (Text geändert) |
+| RB-033 | Gift, Feuer, Blutung kommen nur zu ~60 % an (Control 2) | LOW | game.js status | OPEN (Systems-Entscheid) |
+| RB-034 | Ahnenfeind: die alte Mörder-Figur sperrte jede neue Begegnung, wenn er weiterzog (Hunter 6, dort RB-027) | HIGH | game.js nemesisTick | TESTING |
+| RB-035 | Heldentod während einer Kamerafahrt: Speichern verworfen (guardSave), Tod nicht gesichert (Hunter 6, dort RB-028) | HIGH | game.js playerDeath | TESTING (cineEnd vor dem Speichern) |
+| RB-036 | Ahnenfeind heilte bei jedem Neuerscheinen voll (Hunter 6, dort RB-029) | MEDIUM | game.js nemesisTick/Day | TESTING (hpFrac, +20 %/Tag; Probe „RB-036“) |
+| RB-037 | `cultHeroDied` lief vor der Stumm-Prüfung in Proben (Hunter 6, dort RB-030) | LOW | game.js playerDeath | TESTING |

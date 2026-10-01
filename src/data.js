@@ -1339,13 +1339,16 @@ export const WAR_NODES = {
   altvharn: { owner:'undead', garrison:16 }, sonnwacht: { owner:'order', garrison:20 },
   kreuzweg: { owner:null, garrison:0 }, ashford: { owner:'valen', garrison:8 },
   saltport: { owner:'valen', garrison:14 }, oldbridge: { owner:null, garrison:0 },
+  varonheim: { owner:'valen', garrison:60, walls:100 },   /* Varonheim-Belagerung (Nutzer 01.10.2026): Hauptstadt mit Mauern */
 };
 export const WAR_EDGES = [['graveyard','marsh'], ['graveyard','fortress'], ['marsh','eren'], ['fortress','eren'],
   ['fortress','ruins'], ['ruins','eren'], ['eren','road'], ['road','northcity'],
   // Süd-/Ostfront
   ['blackkeep','necropolis'], ['necropolis','altvharn'], ['altvharn','sonnwacht'], ['altvharn','oldbridge'],
   ['sonnwacht','ashford'], ['ashford','northcity'], ['kreuzweg','oldbridge'], ['kreuzweg','ashford'],
-  ['kreuzweg','eren'], ['oldbridge','saltport'], ['oldbridge','eren']];
+  ['kreuzweg','eren'], ['oldbridge','saltport'], ['oldbridge','eren'],
+  // Varonheim liegt hinter der Linie Nordfurt–Aschfurt; Kanten am Ende, damit die Breitensuche die Hauptstadt bei gleicher Tiefe zuletzt wählt
+  ['northcity','varonheim'], ['ashford','varonheim']];
 
 // Nutzer (30.09.2026): Elite-Mini-Bosse für Kopfgeld-Aufträge — jeder mit Namen, Geschichte, eigenem Aussehen (look: Figuren-Spec,
 // pal: Tierfell), Kräften und Beute. base: eigene Art, crew: Gefolge, where: Gegenden (conPool), hp/dmg/spd/armor: Faktoren und Zusatz,

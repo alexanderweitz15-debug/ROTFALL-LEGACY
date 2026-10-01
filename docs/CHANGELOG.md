@@ -12,6 +12,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Gefangene nehmen (fesseln, verhören, anwerben, ausrauben, laufen lassen, hinrichten), Steckbriefe lebend ×1,5, Ruf der Klinge je Region.
 - Läden am Stadtlager: Preise und Auswahl je Stadt nach Vorrat (0,7–1,8×), Ereignisse verändern Lager, Aurelions Zölle; der Weltpreis entfällt.
 - Heldentod als Moment (Zeitlupe, Zoom, Totenglocke, Name) und Ahnenfeinde: der Mörder nimmt die Waffe, wächst, greift die Familie an; Rache gibt sie zurück.
+- Varonheim belagerbar (Scheibe 1): Kriegsknoten mit Mauern, Bedrohung mit Ansagen, Morvaths Heerzug, mehrtägige Belagerung, Entsatz aus der Hauptstadt; Scheibe 2: Fall mit Exilhof in Salzhafen, zerfallender Hof, Rückeroberung; Königstod kostet nur durch eigene Hand.
 
 ## Version 22 — 2026-09-30 (Koop, Bionik 2–5, Welt-Ausbau §5b–§5f)
 - Audit T01–T04: Wucht mit Standfestigkeit, Krieg mit Nachschub, Nachbild und Geisterschleier getrennt, eigener Effekt-Zufall mit Partikeldeckel, Umgebungsklang je Region und unter Tage.
