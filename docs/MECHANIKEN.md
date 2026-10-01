@@ -824,3 +824,16 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Schwache Flanke:** Wer einen Feind einer anderen Macht erschlägt, ist 6 Sekunden außer Atem (seine Raute blinkt): du und deine Gruppe trefft ihn um 35 % härter („Flanke!“).
 - **Köderpfeife** (Händler, 45 Gold, wird nicht verbraucht): Der nächste Verfolger wendet sich einem Feind seiner Feinde in der Nähe zu. 30 Sekunden Pause; ohne passenden Feind nur 5 Sekunden.
 - **Leute:** Gesichter mit Brauen, Alter, Bartarten und Narben; Kleidung je Region (Valen blaugrau, Aurelion Seide mit Messingborte, Kette Schwarz und Eisen, Goblins Lumpen); Wachen mit Helmkamm in der Stadtfarbe.
+
+## Runde: Lebendige Hauptstadt (Scout Runde 5, 01.10.2026)
+- **Königsturnier:** Das große Turnier kann jetzt auch in Varonheim stattfinden (doppelt so oft wie anderswo), solange die Stadt frei und nicht belagert ist.
+- **Gildenstreik (neues großes Ereignis):** Die Gilden der Hauptstadt streiken, weil die Kanzlei Kriegsaufträge in Schuldscheinen zahlt — drei Tage keine Werkzeuge, Waffen und Tuch aus Varonheim. Meister Odo im Gildenviertel: Schuld begleichen (200 Gold, Händler +5) oder die Meister an die Esse treiben (Valen +3, Händler −5, Wohlstand −5). Debug: „Großes Ereignis: Gildenstreik“.
+- **Hamsterkäufe:** Ab Bedrohung 10 (Gerücht über Morvaths Heerzug) steigen in Varonheim Korn, Fleisch, Salz und Waffen im Einkauf um bis zu 30 %.
+- **Flüchtlinge:** Fällt eine Stadt Valens, fliehen die Leute in die Hauptstadt (solange sie Valen hält) und drängen sich im Armenviertel im Südwesten.
+
+## Runde: Bedrohung der Hauptstadt neu eingestellt (Entwickler 01.10.2026)
+- **Quellen der Bedrohung (je Tag, höchstens +1,5; Sehr schwer +2):** verlorene Front (6+ Orte der Toten im Kriegsgraphen; Aurelions Städte zählen nicht) +1, sonst −0,75; kein Valen-Feldheer +0,5; Wachen fehlen in Varonheim +0,5; Blutkult (herrschend +1, versteckt +0,5); leerer Thron +0,5.
+- **Morvaths Heerzug:** frühestens an Tag 75 (Sehr schwer 60), Stärke 100 (Sehr schwer 110); vorher bleibt die Bedrohung höchstens bei 19 („Morvath sammelt noch“). Einmalige Stöße (z. B. der Wachen-Alarm) heben sie nie über 19.
+- **Belagerung:** Das Heer verliert vor den Mauern weniger (0,4 je Zug) — der Sturm ist ernst. Wer den Kult laufen lässt, verliert die Hauptstadt auf Schwer etwa um Tag 120–150, auf Sehr schwer um Tag 100. Wer den Kult zerschlägt und die Front hält, sieht keinen Heerzug.
+- **Ersatzwachen** bringen der Hauptstadt je Mann 4 Besatzung zurück.
+- **Karawanen** laden nur, was über 80 % des Bedarfs einer Stadt liegt (neue Spiele beginnen nicht mehr mit leeren Lagern).

@@ -184,3 +184,161 @@ Begründung im Einzelnen:
 - **F1 – Soll Varonheim bei Nichtstun auf Schwer überhaupt fallen?** Heute endet es meist in einer Belagerung, die hält: 1 von 5 Läufen fällt bis Tag 200. Wenn ja, an welchem Zieltag? Vorschlag: auf Schwer mehrheitlich zwischen Tag 130 und 160. Dann wäre `sally` (Entsatzbonus) die Stellschraube, nicht die Heerstärke; 80 statt 70 änderte nichts.
 - **F2 – Darf die Front allein, ohne Rote Krönung, je einen Heerzug auslösen?** Heute nie: In 10 Läufen mit zerschlagenem Kult gab es keinen einzigen. Wer den Kult zerschlägt, rettet die Hauptstadt für immer. Wenn nein, ist das so gewollt und gehört als Hinweis ins Spiel.
 - **F3 – Garde töten während „Varonheim rüstet“:** Heute folgt der Fall fast sicher, 11–15 Tage nach dem Start des Heerzugs. Soll das so bleiben, oder soll der Ersatz die Besatzung zurückbringen (`guardBack`, Empfehlung)?
+
+---
+
+## 6. Festgelegte Werte (nach den Antworten des Entwicklers, 01.10.2026)
+
+### 6.1 Antworten und Status
+
+Antworten des Entwicklers:
+- **F1:** Ja. Auf Schwer fällt Varonheim bei Nichtstun (Kult ignoriert) etwa zwischen Tag 120 und 150.
+- **F2:** Ja, die verlorene Front allein darf den Heerzug auslösen, frühestens an Tag 75 und mit Deckeln.
+- **F3:** Ja, der Ersatz bringt +4 Besatzung je Mann.
+
+Status: **APPROVED (Werte), bereit für den Engineer.**
+
+### 6.2 Neue Grundlinie
+
+Der Commit `b6f5a5e` (Varonheim-Umbau, sim.js 14:41) hat Lage und Wege verschoben. Die Messung von §2 gilt deshalb nur noch als Vorher-Bild.
+
+Neu gemessen mit der **alten** Formel, Schwer, Kult ignoriert:
+- Heerzug 2 von 5 (Tag 90 und 149)
+- **kein Fall** bis Tag 200
+
+### 6.3 Was die Messung gezeigt hat
+
+- **Der Entsatzbonus ist nicht die Stellschraube.**
+  - `sally` 1,15 → 0,9 änderte nichts.
+  - Der Heerzug verliert auf dem Marsch etwa 18 Stärke, in der Belagerung 3 am Tag (`attAttr` 0,75 je Zug).
+  - Nach 11–12 Tagen bis zur Bresche stürmt er mit etwa 25 gegen 49 × 1,2 und verliert.
+- **Die Stellschrauben sind:**
+  - Heerstärke 100 / 110 und `attAttr` 0,4: Der Sturm wird dadurch ernst.
+  - `calm` −1 → −0,75 (Tageswert bei gehaltener Front): Nach der Krönung steigt die Bedrohung jetzt langsam (+0,25 am Tag), statt bei 0 zu stehen.
+- **`sally` bleibt 1,15.**
+
+### 6.4 Konstanten (`src/sim.js`, ersetzt `CAP_SIEGE`)
+
+```diff
+-export const CAP_SIEGE = { gcap: 60, refill: 3, wallRep: 10, wallHit: 0.05, wallMin: 2, attAttr: 0.75, garAttr: 0.25, inner: 1.2, sally: 1.15,
+-  occ: 30, host: { schwer: 70, sehr_schwer: 80 }, thr: [10, 15, 20], cd: 30, from: 20, cutDay: 6 };
++export const CAP_SIEGE = { gcap: 60, refill: 3, wallRep: 10, wallHit: 0.05, wallMin: 2, attAttr: 0.4, garAttr: 0.25, inner: 1.2, sally: 1.15,
++  occ: 30, host: { schwer: 100, sehr_schwer: 110 }, thr: [10, 15, 20], cd: 30, cutDay: 6,
++  from: { schwer: 20, sehr_schwer: 5 },              /* Entwickler: Sehr schwer 15 Tage früher */
++  hostMin: { schwer: 75, sehr_schwer: 60 },          /* Entwickler F2: frühester Heerzug, egal was sich stapelt */
++  dMax: { schwer: 1.5, sehr_schwer: 2 },             /* Deckel: Summe aller Tagesquellen */
++  bumpCeil: 19,                                      /* Einmal-Stöße lösen den Heerzug nie selbst aus */
++  w: { front: 1, calm: -0.75, noArmy: 0.5, schutz: 0.5, throne: 0.5 },
++  guardHit: 4, guardBack: 4,                         /* Entwickler F3 */
++  reliefFloor: 25 };                                 /* künftiger Schwund (#39, T12) drückt ein Valen-Heer nie darunter */
+```
+
+Angsthase bleibt ohne Heerzug (bestehende Prüfung). `ARMY_CAP` ist auf Schwer und Sehr schwer 110, deckt also 100 und 110 ab.
+
+### 6.5 Formel (`src/sim.js`)
+
+**`capThreatDay` (sim.js:54–67):**
+
+```diff
++const WAR_KEYS = Object.keys(WAR_NODES);                      /* Entwickler: Aurelions gefallene Städte treiben Morvath nicht an */
++const dk = () => S.difficulty === 'sehr_schwer' ? 'sehr_schwer' : 'schwer';
++export function threatBump(v) {                               /* Einmal-Stöße (Schutz-Alarm u. a.): nie über bumpCeil */
++  if (!S.war) return; const t = S.war.capThreat || 0; S.war.capThreat = Math.max(t, Math.min(CAP_SIEGE.bumpCeil, t + v)); }
+ export function capThreatDay() {
+   const W = S.war, n = W.nodes[CAPK];
+-  if (!n || n.owner !== 'valen' || (S.day | 0) < CAP_SIEGE.from - (S.difficulty === 'sehr_schwer' ? 15 : 0) || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > S.day) return;
+-  const undNodes = Object.values(W.nodes).filter(x => x.owner === 'undead').length;
+-  const d = (undNodes >= 6 ? 1 : -1) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? 0.5 : 0) + (W.armies.some(a => a.faction === 'valen') ? 0 : 0.5) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? 0.5 : 0);
+-  W.capThreat = clamp((W.capThreat || 0) + d, 0, 40);
++  const day = S.day | 0, k = dk(), w = CAP_SIEGE.w;
++  if (!n || n.owner !== 'valen' || day < CAP_SIEGE.from[k] || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > day) return;
++  const undNodes = WAR_KEYS.filter(x => W.nodes[x]?.owner === 'undead').length;
++  const d = Math.min(CAP_SIEGE.dMax[k], (undNodes >= 6 ? w.front : w.calm) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? w.schutz : 0)
++    + (W.armies.some(a => a.faction === 'valen') ? 0 : w.noArmy) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? w.throne : 0));
++  W.capThreat = clamp((W.capThreat || 0) + d, 0, day >= CAP_SIEGE.hostMin[k] ? 40 : CAP_SIEGE.bumpCeil);   /* vor hostMin: höchstens Stufe 2 */
+   const st = CAP_SIEGE.thr.filter(x => W.capThreat >= x).length;
+```
+
+Die Reihenfolge in `warDay` bleibt unverändert: Gezählt und geprüft wird vor dem Mustern, wie gemessen.
+
+**`launchHost` (sim.js:44–53):**
+
+```diff
+-  const a = { …, strength: Math.min(CAP_SIEGE.host[S.difficulty] || CAP_SIEGE.host.schwer, ARMY_CAP()), … };
++  if ((S.day | 0) < CAP_SIEGE.hostMin[dk()]) return null;     /* zweite Sicherung (künftige Auslöser) */
++  const a = { …, strength: Math.min(CAP_SIEGE.host[dk()], ARMY_CAP()), … };
+```
+
+Das Debug-Menü „Belagerung jetzt“ schiebt das Heer direkt hinein und bleibt davon unberührt.
+
+**`siegeTick` / `capDay`:**
+- Keine Formeländerung. Es wirkt nur `attAttr` 0,4 aus `CAP_SIEGE`.
+- `capDay` füllt bei Schutzstufe ≥ 1 weiter nicht auf; das bleibt so.
+
+**Schwund künftiger Systeme:** #39 und T12 rechnen ein Valen-Heer nur bis `CAP_SIEGE.reliefFloor` herunter und nie, solange es vor der belagerten Hauptstadt steht.
+
+### 6.6 `src/game.js`
+
+**`schutzLoss` (ca. game.js:8356):**
+
+```diff
+-  … if (n && n.owner === 'valen') n.garrison = Math.max(0, n.garrison - 4);
++  … if (n && n.owner === 'valen') n.garrison = Math.max(0, n.garrison - SIM.CAP_SIEGE.guardHit);
+```
+
+**`schutzAlarm` (ca. game.js:8394):**
+
+```diff
+-  if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') { S.war.capThreat = (S.war.capThreat || 0) + 3; log(…); }
++  if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') { SIM.threatBump(3); log(…); }
+```
+
+**`schutzDay` (ca. game.js:8440):**
+
+```diff
+-    if (k === 'varonheim') { if (afterLive()) { S.ents.world = S.ents.world.filter(e => !e.capGuard); capitalMigrate(); } }
++    if (k === 'varonheim') { const N = S.war?.nodes?.varonheim;   /* Entwickler F3: Ersatz bringt die Besatzung zurück */
++      if (N?.owner === 'valen') N.garrison = Math.min(SIM.CAP_SIEGE.gcap, N.garrison + SIM.CAP_SIEGE.guardBack * n);
++      if (afterLive()) { S.ents.world = S.ents.world.filter(e => !e.capGuard); capitalMigrate(); } }
+```
+
+### 6.7 Proben und Hinweise für den Engineer
+
+**Proben anpassen:**
+- **game.js:17693** (Heerzug-Probe):
+  - Sie erwartet `h.strength === 70` und einen Heerzug ab `S.day = 30`.
+  - Neu: Stärke gleich `CAP_SIEGE.host[...]`, und `S.day` ≥ 75 setzen.
+- **game.js:18353** (Alarm-Probe): `capThreat >= 3` gilt weiter.
+- **Neue Probe:** Mit 3 untoten Städten Aurelions gibt es keinen Front-Zuschlag. Vor `hostMin` startet kein Heerzug.
+
+**Hinweise im Spiel (Pflicht für jede neue Mechanik):**
+- Das Gerücht auf Stufe 1 bekommt den Zusatz: „Fällt die Front oder stirbt der König, rückt er näher.“
+- Bei Stufe 2 vor `hostMin` sagt die Chronik: „Morvath sammelt noch.“
+- In `MECHANIKEN.md`:
+  - die Quellen der Bedrohung
+  - frühester Heerzug an Tag 75 bzw. 60
+  - der Ersatz bringt Besatzung zurück
+
+### 6.8 Nachmessung mit den festgelegten Werten
+
+Messaufbau:
+- Seeds 101–505, je 200 Tage, Formel von §6.5 im Messgerüst nachgebaut.
+- Die eingebaute Zählung wurde über `hostCd` stillgelegt; `launchHost` und `siegeTick` liefen echt.
+- Konstanten über das veränderliche `CAP_SIEGE`, danach zurückgesetzt.
+- Der Spielstand wurde geprüft und ist unverändert.
+
+| Szenario | Heerzug (erster Tag) | Fall (Tage) | Median Fall |
+|---|---|---|---|
+| **Schwer, Kult ignoriert** | 92, 117, 120, 124, 134 | 99, 126, 129, 132, 183 | **129** ✔ (Ziel 120–150) |
+| **Sehr schwer, Kult ignoriert** | 79, 89, 90, 92, 100 | 87, 97, 98, 100, 108 | **98** ✔ (31 Tage früher) |
+| Schwer, Kult zerschlagen, Front hält | keiner | 0/5 | ✔; Bedrohung höchstens 6 |
+| Sehr schwer, Kult zerschlagen, Front hält | keiner | 0/5 | ✔; Bedrohung bis 19 durch den frühen Start, gehalten von `bumpCeil` und `hostMin` |
+| Schwer, zerschlagen + 3 Städte Aurelions untot | keiner | 0/5 | ✔ Aurelion zählt nicht mehr |
+| Schwer, zerschlagen, **Front verloren** (Valen-Feldheere ab Tag 60 ausgelöscht) | 97, 105, 128 (3/5) | 104, 111, 178 | F2 ✔: möglich, nie vor 75 |
+| Schwer, ignoriert + **Garde tot bei Bedrohung 15** (mit `guardBack`) | 90, 107, 110, 111, 119 | 97, 116, 119, 119, 174 | **119**: 10 Tage früher; der Fall kommt nur über den Heerzug ✔ |
+| Schwer, ignoriert + Schwund −2/Tag ab 60, `reliefFloor` 25 | 109–127 | 118, 125, 134, 157, 167 | **134**: Stapelung bleibt im Fenster ✔ |
+
+Hinweise zur Wertung:
+- **Streuung:** Je ein Lauf fällt früh (99) oder spät (183). Der Median liegt im Ziel.
+- **Nicht gemessen:** die Tagesfunktionen aus game.js (`campaignDay`, `raidDay`, `aurelDay`) und Schlachten am Spieler (UNVERIFIED).
+- **Nach dem Einbau:** Der Verifier misst die Tabelle mit dem echten `capThreatDay` nach. Abnahme: ±10 Tage auf die Mediane.

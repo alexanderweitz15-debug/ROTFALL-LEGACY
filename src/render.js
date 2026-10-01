@@ -1,6 +1,6 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp, seasonOf } from './state.js?v=23';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=23';
+import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
 import * as HB from './buildings.js?v=23';
 import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
@@ -523,8 +523,25 @@ function paintRock(o, m, cx, cy, kind = T.ROCK) {      // auch Höhlenwände (DW
 // ---------------- Mauern mit Höhe: Wehrgang oben, Quaderfront nach Süden, Zinnen an offenen Seiten ----------------
 // Mauerkacheln sahen von oben wie Pflaster aus. Freistehende Mauern (Stadtmauer, Feste) bekommen Zinnen; Hauswände
 // nur die Front (innen sichtbar, wenn das Dach ausblendet).
+/* Artist Runde 5: die Burg auf dem Kronfels (Varonheim) liest sich als Burg — dunklerer Stein, breitere Zinnen, Bergfried mit
+   Schieferdach und First, Ecktürme mit Kegeldach. Grenzen wie buildCapital() in world.js (Burgbezirk cx±30, y0+1…y0+22). */
+const CASTLE = (() => { const C = CAPITAL, y0 = C.y - C.hh; return { x0: C.x - 31, x1: C.x + 31, y0: y0, y1: y0 + 23, kx0: C.x - 14, kx1: C.x + 14, ky0: y0 + 3, ky1: y0 + 15,
+  towers: [[C.x - 30, y0 + 1], [C.x + 30, y0 + 1], [C.x - 30, y0 + 22], [C.x + 30, y0 + 22]].map(([x, y]) => [x * 16 + 8, y * 16 + 6, 20])        /* Mitte in Texeln, Radius */
+    .concat([[C.x - 14, y0 + 3, 12, 12], [C.x + 14, y0 + 3, 4, 12], [C.x - 14, y0 + 15, 12, 4], [C.x + 14, y0 + 15, 4, 4]].map(([x, y, ox, oy]) => [x * 16 + ox, y * 16 + oy, 11])) }; })();
+const SLATE_C = ['#15181e', '#1e232b', '#272d37', '#323a46', '#424c5a'];
+function castleCone(P, tx, ty, X, Y) {                    // Kegeldach: je Pixel aus dem Abstand zur Turmmitte (über Chunkgrenzen hinweg stimmig)
+  for (const [mx, my, R] of CASTLE.towers) {
+    if (Math.abs(tx * 16 + 8 - mx) > R + 8 || Math.abs(ty * 16 + 8 - my) > R + 8) continue;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const dx = tx * 16 + x - mx, dy = ty * 16 + y - my, d = Math.hypot(dx, dy); if (d > R) continue;
+      const lit = d < 0.5 ? 1 : -(dx + dy) / (d * 1.414), ring = Math.floor(d / 3) % 2, k = Math.max(0, Math.min(4, Math.round(2 + lit * 1.6 * (d / R) + (ring ? -0.4 : 0))));
+      P(d > R - 1.2 ? '#0c0d10' : d < 1.6 ? '#8a8270' : SLATE_C[k], X + x, Y + y);
+    }
+  }
+}
 function paintWalls(o, m, cx, cy) {
   const x0t = cx * CH, y0t = cy * CH, isW = (tx, ty) => tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && m.tiles[ty * m.w + tx] === T.WALL;
+  const K = CASTLE, castleAt = (tx, ty) => m === MAPS.world && tx >= K.x0 && tx <= K.x1 && ty >= K.y0 && ty <= K.y1;
   let houses = null;
   const inHouse = (tx, ty) => (houses ||= HOUSES.filter(b => b.map === S.map && b.x < x0t + CH + 1 && b.x + b.w > x0t - 1 && b.y < y0t + CH + 1 && b.y + b.h > y0t - 1))
     .some(b => tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h);
@@ -532,6 +549,7 @@ function paintWalls(o, m, cx, cy) {
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
     const tx = x0t + i, ty = y0t + j; if (!isW(tx, ty)) continue;
     const X = i * 16, Y = j * 16, N = isW(tx, ty - 1), Sd = isW(tx, ty + 1), Wd = isW(tx - 1, ty), E = isW(tx + 1, ty), house = inHouse(tx, ty);
+    if (castleAt(tx, ty) && !house) { paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E); continue; }
     if (!N) P('#6a6258', X, Y, 16, 1);                    // Kantenlicht oben/links, Schatten rechts
     if (!Wd) P('#5e574d', X, Y, 1, 16);
     if (!E) P('#1e1b17', X + 15, Y, 1, 16);
@@ -550,6 +568,37 @@ function paintWalls(o, m, cx, cy) {
     if (!Wd) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 1, Y + k, 2, 3);
     if (!E) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 12, Y + k, 2, 3);
   }
+}
+function paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E) {
+  const K = CASTLE, keep = tx >= K.kx0 && tx <= K.kx1 && ty >= K.ky0 && ty <= K.ky1;
+  if (keep && N && Wd && E && (Sd || ty < K.ky1)) {        // Bergfried: Schieferdach, First in der Mitte, Nordhälfte im Licht
+    const ridge = ((K.ky0 + K.ky1) / 2) * 16 + 8;
+    for (let y = 0; y < 16; y++) { const WY = ty * 16 + y, north = WY < ridge, row = Math.floor(WY / 4), off = (row & 1) * 3;
+      for (let x = 0; x < 16; x++) { const WX = tx * 16 + x, joint = WY % 4 === 3 || (WX + off) % 6 === 0, r = h2(WX, WY);
+        P(Math.abs(WY - ridge) < 2 ? '#56606c' : joint ? SLATE_C[0] : north ? (r < 0.15 ? SLATE_C[4] : SLATE_C[3]) : (r < 0.15 ? SLATE_C[2] : SLATE_C[1]), X + x, Y + y); } }
+    if (tx === K.kx0 + 1 || tx === K.kx1 - 1) P('#0e1014', X + (tx === K.kx0 + 1 ? 0 : 15), Y, 1, 16);
+    castleCone(P, tx, ty, X, Y); return;
+  }
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {   // Wehrgang: dunkle Platten aus Basalt
+    const WX = tx * 16 + x, WY = ty * 16 + y, joint = WY % 8 === 7 || (WX + ((WY >> 3) & 1) * 4) % 8 === 0, r = h2(WX, WY);
+    P(joint ? '#17161a' : r < 0.1 ? '#36343a' : r > 0.92 ? '#222026' : '#2b2a30', X + x, Y + y);
+  }
+  if (!N) P('#55525a', X, Y, 16, 1);
+  if (!Wd) P('#4a4850', X, Y, 1, 16);
+  if (!E) P('#0c0b0e', X + 15, Y, 1, 16);
+  if (!Sd) {                                              // Front: hohe dunkle Quader, Schießscharten
+    for (let r = 0; r < 9; r++) for (let x = 0; x < 16; x++) {
+      const joint = r === 4 || r === 8 || (x + (r < 4 ? 0 : 4) + (tx * 5 % 8)) % 8 === 0;
+      P(r === 0 ? '#4a4850' : joint ? '#100f12' : h2(tx * 16 + x, ty * 16 + r) < 0.1 ? '#2e2c32' : r > 5 ? '#1c1b20' : '#25242a', X + x, Y + 7 + r);
+    }
+    if (tx % 3 === 0) { P('#08080a', X + 7, Y + 9, 2, 5); P('#08080a', X + 6, Y + 11, 4, 1); }
+  }
+  const merlon = (x, y, w, h) => { P('#45434b', x, y, w, h); P('#5e5b64', x, y, w, 1); P('#0c0b0e', x + w, y + 1, 1, h); P('#0c0b0e', x, y + h, w + 1, 1); };
+  if (!N) for (let k = 1; k < 16; k += 8) merlon(X + k, Y + 1, 5, 3);   // breite Zinnen, weite Scharten
+  if (!Sd) for (let k = 1; k < 16; k += 8) merlon(X + k, Y + 3, 5, 3);
+  if (!Wd) for (let k = 2; k < (Sd ? 16 : 7); k += 8) merlon(X + 1, Y + k, 3, 5);
+  if (!E) for (let k = 2; k < (Sd ? 16 : 7); k += 8) merlon(X + 11, Y + k, 3, 5);
+  castleCone(P, tx, ty, X, Y);
 }
 // ---------------- Wasser: weiche Ufer, Tiefe, Schaum, Schilf (statt Kachelquadrate) ----------------
 const WATER_PAL = {            // tief, mittel, flach, Licht, Schaum

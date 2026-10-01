@@ -1920,6 +1920,7 @@ function bindSim() {
     const L = LOCATIONS.find(l => l.key === to), pos = freeSpotNear('world', tx + ri(-3, 3), ty + ri(-3, 3), 3);
     const c = makeChar({ name: pick(['Aske', 'Brida', 'Hamo', 'Ilse', 'Jorg', 'Wenna']), prof: 'Flüchtling', x: pos.x, y: pos.y, level: 1, traits: ['furchtsam'] });
     c.anchor = { x: L.x * TS, y: L.y * TS }; c.villager = true; c.refugee = true;
+    if (to === 'varonheim' && TOWN_PLAN.varonheim) { const [x0, , , y1] = TOWN_PLAN.varonheim.area, sl = freeSpotNear('world', x0 + 8 + ri(0, 30), y1 - 8 - ri(0, 25), 3); if (sl) c.anchor = { x: sl.x, y: sl.y }; c.greet = '„Im Armenviertel ist noch Platz. Zwischen den Ratten.“'; }   /* Scout R5: Flüchtlinge drängen ins Armenviertel der Hauptstadt */
     S.ents.world.push(c);
   };
 }
@@ -8377,7 +8378,7 @@ const SCHUTZ_NAME = ['Bewacht', 'Geschwächt', 'Schutzlos'];
 function schutzLoss(c, byP) {
   const k = guardTownOf(c), soll = schutzSoll(k), Z = schutzOf(k); Z.lost = Math.min(soll, Z.lost + 1); Z.at = S.day | 0;
   if (byP) { Z.byP = Math.min(Z.lost, Z.byP + 1); const f = townFac(k); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] - 4, -100, 100); }
-  const n = k === 'varonheim' && S.war?.nodes?.varonheim; if (n && n.owner === 'valen') n.garrison = Math.max(0, n.garrison - 4);   /* die Garde ist die Besatzung */
+  const n = k === 'varonheim' && S.war?.nodes?.varonheim; if (n && n.owner === 'valen') n.garrison = Math.max(0, n.garrison - SIM.CAP_SIEGE.guardHit);   /* die Garde ist die Besatzung */
   schutzCheck(k);
 }
 function schutzCheck(k) {
@@ -8391,7 +8392,7 @@ function schutzAlarm(k) {
   const Z = schutzOf(k), name = townName(k), f = townFac(k), p = S.player, P = TOWN_PLAN[k], sq = P?.square || [0, 0], near = p.map === 'world' && Math.hypot(p.x / TS - sq[0], p.y / TS - sq[1]) < 60, guilty = Z.byP / Math.max(1, Z.lost) >= 0.5;
   Z.alarm = S.day | 0;
   afterSay(`${name} ist schutzlos`, `In ${name} läutet die Sturmglocke: Die Wache ist gefallen${guilty ? ' — durch deine Hand' : ''}. Wer kann, flieht; die Läden sind zu, eine Miliz sammelt sich am Platz. ${schutzReinfText(k)}`, 'war', !near);
-  if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') { S.war.capThreat = (S.war.capThreat || 0) + 3; log('Morvaths Späher sehen offene Tore in Varonheim. Die Gefahr für die Hauptstadt wächst.', 'faction'); }
+  if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') { SIM.threatBump(3);   /* nie über 19: der Alarm allein löst keinen Heerzug aus */ log('Morvaths Späher sehen offene Tore in Varonheim. Die Gefahr für die Hauptstadt wächst.', 'faction'); }
   const to = travelTowns().filter(x => x !== k && (townFac(x) === f || !townFac(x)) && !townDanger(x)).sort((a, b) => townGap(k, a) - townGap(k, b))[0];
   let fled = 0; for (let i = 0; i < 6 && !S._quiet; i++) if (emigrate(k, 'schutz', to)) fled++;
   const T = S.towns?.[k]; if (T && to && S.towns[to]) { const m = Math.round(T.pop * 0.2); T.pop -= m; S.towns[to].pop += Math.round(m * 0.7); }
@@ -8437,7 +8438,8 @@ function schutzDay() {
     const n = Math.min(Z.lost, R[1]); Z.reinf = day; Z.lost -= n; Z.byP = Math.max(0, Math.min(Z.byP, Z.lost));
     if (f === 'merch') growthOf(k).prosper -= 5 * n;
     if (f === 'valen') { const src = Object.keys(S.war?.nodes || {}).filter(x => x !== k && TOWN_PLAN[x] && S.war.nodes[x].owner === 'valen' && S.war.nodes[x].garrison > 15).sort((a, b) => townGap(k, a) - townGap(k, b))[0]; if (src) S.war.nodes[src].garrison -= n; }
-    if (k === 'varonheim') { if (afterLive()) { S.ents.world = S.ents.world.filter(e => !e.capGuard); capitalMigrate(); } }
+    if (k === 'varonheim') { const N = S.war?.nodes?.varonheim; if (N?.owner === 'valen') N.garrison = Math.min(SIM.CAP_SIEGE.gcap, N.garrison + SIM.CAP_SIEGE.guardBack * n);   /* Entwickler: Ersatz bringt die Besatzung zurück */
+      if (afterLive()) { S.ents.world = S.ents.world.filter(e => !e.capGuard); capitalMigrate(); } }
     else if (TOWN_PLAN[k]?.lord === 'aurel') { if (afterLive()) { S.ents.world = S.ents.world.filter(e => !(e.robot && e.post === k)); ensureAurelion(); } }
     else if (afterLive()) spawnGuardPosts();
     log(`${n} Mann Ersatz für die Wache von ${townName(k)} sind eingetroffen.${Z.lost ? ` Es fehlen noch ${Z.lost}.` : ' Die Wache ist wieder vollzählig.'}`, 'world');
@@ -10122,7 +10124,7 @@ function evFire() { const T = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].m
 // Seuche, Heuschrecken, Turnier, Adelsball, Luftschiffabsturz, Schatzkarawane, Hexenprozess, Streik. Jedes Ereignis steht in S.big,
 // wird im Log, in der Chronik und als Gerücht angekündigt und endet nach seiner Frist von selbst. Handeln kann der Spieler über
 // Gespräche (bigChoices) und Orte in der Welt. Nie zwei gleiche hintereinander, höchstens eines zur Zeit.
-const BIG = { plague: 'Seuche', locusts: 'Heuschrecken', tourney: 'Turnier', ball: 'Adelsball', airship: 'Luftschiffabsturz', treasure: 'Schatzkarawane', witch: 'Hexenprozess', strike: 'Streik' };
+const BIG = { plague: 'Seuche', locusts: 'Heuschrecken', tourney: 'Turnier', ball: 'Adelsball', airship: 'Luftschiffabsturz', treasure: 'Schatzkarawane', witch: 'Hexenprozess', strike: 'Streik', guildstrike: 'Gildenstreik' };
 const bigTowns = () => Object.keys(TOWN_PLAN).filter(k => k !== 'vharnholm' && !S.razed?.[k] && !heldBy(k) && TOWN_PLAN[k].lord !== 'aurel' && S.war?.nodes?.[k]?.owner !== 'undead');
 const sqPt = k => { const [x, y] = TOWN_PLAN[k].square; return { x: x * TS + 16, y: y * TS + 16 }; };
 function bigDay() {
@@ -10132,6 +10134,7 @@ function bigDay() {
   const k = kinds.length && pick(kinds); S.bigNext = (S.day | 0) + ri(3, 5); if (!k) return;
   S.bigLast = [...recent, k].slice(-3); BIG_START[k].go();
 }
+function guildOff() { for (const g of ['tools', 'arms', 'cloth']) if (S.halt?.['varonheim:' + g]) delete S.halt['varonheim:' + g]; }   /* Gildenstreik endet */
 function bigEnd(text) { const B = S.big; if (!B) return; S.big = null; S.ents.world = S.ents.world.filter(e => e.bigEv !== B.id); if (text) { log(text, 'world'); chronicle(text, 'news'); } }
 const bigAnnounce = (title, text) => { log(text, 'world'); chronicle(title, 'news', text); UI.toast(title.toUpperCase(), 2800); };
 /* Roadmap P4: Streikende hebt nur den eigenen Stillstand auf; ein längerer Unfall-Stillstand (magitechAccident) bleibt. tickmar = alter Schlüssel */
@@ -10146,8 +10149,8 @@ const BIG_START = {
     const k = pick(bigTowns().filter(k => TOWN_PLAN[k].fields?.length)); S.big = { id: uid(), kind: 'locusts', town: k, until: (S.day | 0) + 3 };
     if (S.towns?.[k]?.stock) S.towns[k].stock.grain = Math.floor((S.towns[k].stock.grain || 0) / 2);
     bigAnnounce(`Heuschrecken über ${townName(k)}`, `Eine schwarze Wolke fällt über die Felder von ${townName(k)}. Das Korn ist halb verloren, Brot wird teurer. Rauch vertreibt sie: Ein Bauer dort weiß wie.`); } },
-  tourney: { ok: () => ['northcity', 'eren', 'saltport'].some(k => TOWN_PLAN[k] && bigTowns().includes(k)), go: () => {
-    const k = pick(['northcity', 'eren', 'saltport'].filter(k => TOWN_PLAN[k] && bigTowns().includes(k))); S.big = { id: uid(), kind: 'tourney', town: k, until: (S.day | 0) + 2, round: 0 };
+  tourney: { ok: () => ['varonheim', 'northcity', 'eren', 'saltport'].some(k => TOWN_PLAN[k] && (bigTowns().includes(k) || (k === 'varonheim' && !heldBy(k) && !S.war?.nodes?.varonheim?.siege))), go: () => {   /* Scout R5: auch das Königsturnier in der Hauptstadt */
+    const k = pick(['varonheim', 'varonheim', 'northcity', 'eren', 'saltport'].filter(k => TOWN_PLAN[k] && (bigTowns().includes(k) || (k === 'varonheim' && !heldBy(k) && !S.war?.nodes?.varonheim?.siege)))); S.big = { id: uid(), kind: 'tourney', town: k, until: (S.day | 0) + 2, round: 0 };
     const q = freeSpotNear('world', TOWN_PLAN[k].square[0] + 2, TOWN_PLAN[k].square[1] + 1, 2), h = makeChar({ name: 'Herold Anselm', prof: 'Herold', x: q.x, y: q.y, level: 3 });
     Object.assign(h, { bigEv: S.big.id, herald: true, transient: true, anchor: { x: q.x, y: q.y }, greet: '„Hört, hört! Das Turnier von ' + townName(k) + '! Drei Gänge, drei Ritter, ein Sieger.“' }); S.ents.world.push(h);
     bigAnnounce(`Turnier in ${townName(k)}`, `In ${townName(k)} ruft ein Herold zum Turnier: drei Kämpfe gegen Ritter, bis einer aufgibt. Einsatz 20 Gold, dem Sieger winken 200 Gold und Ruhm. Zwei Tage lang.`); } },
@@ -10178,6 +10181,11 @@ const BIG_START = {
     const k = pick(bigTowns().filter(k => villagersOf(k).some(c => FIRST_F.includes(c.name)))), w = villagersOf(k).find(c => FIRST_F.includes(c.name));
     S.big = { id: uid(), kind: 'witch', town: k, until: (S.day | 0) + 2, who: w.id, name: w.name }; w.accused = true;
     bigAnnounce(`Hexenprozess in ${townName(k)}`, `Die Inquisition des Ordens klagt ${w.name} aus ${townName(k)} der Hexerei an. Übermorgen soll sie brennen. Man kann für sie sprechen, schweigen, oder sie in der Nacht fortbringen.`); } },
+  guildstrike: { ok: () => !!TOWN_PLAN.varonheim && !heldBy('varonheim') && !S.war?.nodes?.varonheim?.siege && (S.schutz?.varonheim?.stage || 0) < 2, go: () => {   /* Scout R5: Gildenstreik im Gildenviertel der Hauptstadt */
+    S.big = { id: uid(), kind: 'guildstrike', town: 'varonheim', until: (S.day | 0) + 3 }; for (const g of ['tools', 'arms', 'cloth']) (S.halt ||= {})['varonheim:' + g] = Math.max(S.halt['varonheim:' + g] || 0, S.big.until);
+    const [sx, sy] = TOWN_PLAN.varonheim.square, q = freeSpotNear('world', sx + 20, sy + 2, 3), h = makeChar({ name: 'Meister Odo', prof: 'Gildenmeister', x: q.x, y: q.y, level: 6 });
+    Object.assign(h, { bigEv: S.big.id, guildLead: true, transient: true, anchor: { x: q.x, y: q.y }, greet: '„Die Krone zahlt in Versprechen. Wir schmieden erst wieder, wenn sie in Silber zahlt.“' }); S.ents.world.push(h);
+    bigAnnounce('Gildenstreik in Varonheim', 'Die Gilden der Hauptstadt legen Hämmer und Webstühle nieder: Die Kanzlei zahlt ihre Kriegsaufträge nicht. Werkzeug, Waffen und Tuch werden in Varonheim knapp. Meister Odo führt den Streik im Gildenviertel an.'); } },
   strike: { ok: () => !!TOWN_PLAN.tickmar && !heldBy('tickmar'), go: () => {   /* RB-049 */
     S.big = { id: uid(), kind: 'strike', town: 'tickmar', until: (S.day | 0) + 3 }; (S.halt ||= {})['tickmar:magitech'] = Math.max(S.halt['tickmar:magitech'] || 0, S.big.until);   /* Roadmap P4: der Streik legt die Magitech-Fabrik wirklich still (vorher nur Text) */
     const q = freeSpotNear('world', TOWN_PLAN.tickmar.square[0] + 1, TOWN_PLAN.tickmar.square[1] - 1, 2), h = makeChar({ name: 'Grete Rußhand', prof: 'Streikführerin', x: q.x, y: q.y, level: 4 });
@@ -10252,6 +10260,10 @@ function bigChoices(npc, choices) {
     { text: 'In der Nacht bringe ich dich fort. (Verbrechen)', fn: () => { const h = S.minute / 60; if (h > 5 && h < 22) return say('„Nicht am Tag! Komm, wenn es dunkel ist.“');
       npc.accused = false; if (chance(0.35)) addBounty('order', 120, 'Fluchthilfe'); addRel(npc.key, 20); bigEnd(`${B.name} ist in der Nacht aus ${townName(B.town)} verschwunden. Die Inquisition tobt.`); witchSaved(npc, B, 'flight'); UI.closeDialogue(); } },
     { text: 'Ich kann nichts tun.', fn: () => UI.closeDialogue() }]) });
+  if (npc.guildLead && B.kind === 'guildstrike') choices.unshift({ text: 'Worum geht es beim Gildenstreik?', fn: () => UI.dialogue(npc, '„Seit dem Krieg bestellt die Kanzlei Klingen, Pfeile, Zeltbahnen — und zahlt mit Schuldscheinen. Wer soll davon Eisen kaufen?“', [
+    { text: 'Ich zahle die Schuld der Krone. (200 Gold, Händler +5)', fn: () => { if (S.gold < 200) return UI.dialogue(npc, '„Mit leeren Taschen kauft man keinen Frieden.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); S.gold -= 200; S.factions.merch = clamp((S.factions.merch || 0) + 5, -100, 100); guildOff(); addRel(npc.key, 15); bigEnd('Du begleichst die Schuld der Krone. Die Essen der Gilden brennen wieder (Händler +5).'); UI.closeDialogue(); } },
+    { text: 'Der König braucht Waffen. Zurück an die Arbeit. (Valen +3, Händler −5)', fn: () => { S.factions.valen = clamp((S.factions.valen || 0) + 3, -100, 100); S.factions.merch = clamp((S.factions.merch || 0) - 5, -100, 100); growthOf('varonheim').prosper -= 5; guildOff(); addRel(npc.key, -25); bigEnd('Die Garde treibt die Meister zurück an die Esse. Die Waffen kommen — der Groll bleibt (Valen +3, Händler −5).'); UI.closeDialogue(); } },
+    { text: 'Später.', fn: () => UI.closeDialogue() }]) });
   if (npc.strikeLead && B.kind === 'strike') choices.unshift({ text: 'Worum geht es beim Streik?', fn: () => UI.dialogue(npc, '„Vierzehn Stunden an den Kesseln, drei Finger weniger, und der Lohn kommt einen Monat zu spät. Vantor will uns mit Automaten ersetzen. Wir wollen nur, was man uns schuldet.“', [
     { text: 'Ich stehe zu euch. (Arbeiter)', fn: () => { S.houses.vantor = clamp(favor('vantor') - 10, -100, 100); stockShock(['tickmar'], 'magitech', -3); strikeOff(); addRel(npc.key, 15); bigEnd('Mit deiner Hilfe setzen die Arbeiter von Tickmar ihren Lohn durch. Vantor schäumt (Haus Vantor −10), die Leute singen in den Gassen.'); strikeWon(); UI.closeDialogue(); } },
     { text: 'Ich vermittle. (Willenskraft)', fn: () => { const ok = (p.attributes.willpower || 8) + ri(0, 8) >= 12; strikeOff();
@@ -17680,7 +17692,7 @@ export function selftest() {
       return node && edges && sieged && drop && noStorm && relief && held && fell;
     } finally { S.war = W0; S.towns = T0; if (A0 === undefined) delete S.after; else S.after = A0; S.player.map = m0; SIM.H.raidDamage = rd; }
   }));
-  ok('Varonheim S1: Bedrohung wächst erst ab Tag 20 und nur bei verlorener Front; Stufen 10/15/20, bei 20 bricht Morvaths Heerzug (70, Befehl Varonheim, vom nächsten Untotenknoten) auf, danach 30 Tage Pause; nicht auf Angsthase, nicht nach Garmadon', sandbox(() => {
+  ok('Varonheim S1: Bedrohung wächst erst ab Tag 20 und nur bei verlorener Front; Stufen 10/15/20, bei 20 bricht Morvaths Heerzug (100, frühestens Tag 75, Befehl Varonheim, vom nächsten Untotenknoten) auf, danach 30 Tage Pause; nicht auf Angsthase, nicht nach Garmadon', sandbox(() => {
     const W0 = structuredClone(S.war), d0 = S.difficulty;
     try {
       const reset = () => { S.war.capThreat = 0; S.war.capStage = 0; S.war.hostCd = 0; S.war.armies = []; for (const k of Object.keys(S.war.nodes)) S.war.nodes[k].owner = 'valen'; };
@@ -17689,8 +17701,9 @@ export function selftest() {
       S.day = 30; S.difficulty = 'schwer'; S.flags.garmadonSlain = 0; reset();
       run(15); const calm = S.war.capThreat === 0 && !S.war.armies.length;
       lose(); S.day = 10; run(15); const early = S.war.capThreat === 0;
-      S.day = 30; let st = 0; const h = (() => { let x = null; for (let i = 0; i < 40 && !x; i++) { SIM.capThreatDay(); st = Math.max(st, S.war.capStage); x = S.war.armies.find(a => a.host); } return x; })();
-      const host = !!h && h.strength === 70 && h.order === 'varonheim' && S.war.nodes[h.at].owner === 'undead' && S.war.capThreat === 5 && st >= 2;
+      S.day = 30; run(40); const capped = !S.war.armies.some(a => a.host) && S.war.capThreat <= SIM.CAP_SIEGE.bumpCeil;   /* vor Tag 75 kein Heerzug */
+      S.day = 80; let st = S.war.capStage; const h = (() => {   /* Stufe 2 ist vor Tag 75 schon erreicht */ let x = null; for (let i = 0; i < 40 && !x; i++) { SIM.capThreatDay(); st = Math.max(st, S.war.capStage); x = S.war.armies.find(a => a.host); } return x; })();
+      const host = capped && !!h && h.strength === SIM.CAP_SIEGE.host.schwer && h.order === 'varonheim' && S.war.nodes[h.at].owner === 'undead' && S.war.capThreat === 5 && st >= 2;
       S.war.armies = []; run(10); const pause = !S.war.armies.length && S.war.capThreat === 5;
       reset(); lose(); S.difficulty = 'angsthase'; const easy = !run(40);
       reset(); lose(); S.difficulty = 'schwer'; S.flags.garmadonSlain = 1; const dead = !run(40);

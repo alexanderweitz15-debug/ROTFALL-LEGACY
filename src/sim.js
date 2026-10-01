@@ -30,8 +30,15 @@ export function migrateNodes() { for (const [k, n] of Object.entries(WAR_NODES))
 // Besatzung hungert), gestürmt wird erst bei Mauern 0. Ein Entsatzheer, das verliert, kostet die Stadt nicht. Ohne Anlass kommen die Toten
 // kaum bis hierher; darum zählt eine Bedrohung (ab Tag 20, nur bei verlorener Front, Kult, leerem Thron) bis 20, dann bricht Morvaths
 // Heerzug auf. Alle Zahlen an einer Stelle für die Balance.
-export const CAP_SIEGE = { gcap: 60, refill: 3, wallRep: 10, wallHit: 0.05, wallMin: 2, attAttr: 0.75, garAttr: 0.25, inner: 1.2, sally: 1.15,
-  occ: 30, host: { schwer: 70, sehr_schwer: 80 }, thr: [10, 15, 20], cd: 30, from: 20, cutDay: 6 };
+// Bedrohung gesamt (Entwickler 01.10.2026): auf Schwer fällt die Hauptstadt bei Nichtstun (Kult ignoriert) um Tag 120–150, auf Sehr schwer
+// früher; die Front allein löst den Heerzug frühestens Tag 75 (60) aus; Einmal-Stöße nie über 19; Ersatzwachen bringen Besatzung zurück.
+export const CAP_SIEGE = { gcap: 60, refill: 3, wallRep: 10, wallHit: 0.05, wallMin: 2, attAttr: 0.4, garAttr: 0.25, inner: 1.2, sally: 1.15,
+  occ: 30, host: { schwer: 100, sehr_schwer: 110 }, thr: [10, 15, 20], cd: 30, cutDay: 6,
+  from: { schwer: 20, sehr_schwer: 5 }, hostMin: { schwer: 75, sehr_schwer: 60 }, dMax: { schwer: 1.5, sehr_schwer: 2 }, bumpCeil: 19,
+  w: { front: 1, calm: -0.75, noArmy: 0.5, schutz: 0.5, throne: 0.5 }, guardHit: 4, guardBack: 4, reliefFloor: 25 };
+const WAR_KEYS = Object.keys(WAR_NODES);                      /* Entwickler: Aurelions gefallene Städte treiben Morvath nicht an */
+const dk = () => S.difficulty === 'sehr_schwer' ? 'sehr_schwer' : 'schwer';
+export function threatBump(v) { if (!S.war) return; const t = S.war.capThreat || 0; S.war.capThreat = Math.max(t, Math.min(CAP_SIEGE.bumpCeil, t + v)); }   /* Einmal-Stöße: nie über bumpCeil */
 const CAPK = 'varonheim';
 export const capitalFallen = () => S.war?.nodes?.[CAPK]?.owner === 'undead';
 export const exileOf = () => ['saltport', 'northcity', 'eren'].find(k => S.war?.nodes?.[k]?.owner === 'valen') || null;   /* Fluchtort des Königs */
@@ -43,8 +50,9 @@ function nearestHeld(from, fac) {                                  // nächster 
 export function threatCut(v) { if (S.war) S.war.capThreat = Math.max(0, (S.war.capThreat || 0) - v); }
 export function launchHost() {                                     // Morvaths Heerzug: kein Zufall, Stärke nach Schwierigkeit
   const W = S.war; if (!W.nodes[CAPK] || W.nodes[CAPK].owner !== 'valen' || W.armies.some(a => a.host)) return null;
+  if ((S.day | 0) < CAP_SIEGE.hostMin[dk()]) return null;     /* zweite Sicherung: nie vor Tag 75 (Sehr schwer 60) */
   const base = nearestHeld(CAPK, 'undead'); if (!base) return null;
-  const a = { id: uid(), faction: 'undead', at: base, prev: base, strength: Math.min(CAP_SIEGE.host[S.difficulty] || CAP_SIEGE.host.schwer, ARMY_CAP()), name: 'Morvaths Heerzug', order: CAPK, host: true };
+  const a = { id: uid(), faction: 'undead', at: base, prev: base, strength: Math.min(CAP_SIEGE.host[dk()], ARMY_CAP()), name: 'Morvaths Heerzug', order: CAPK, host: true };
   W.armies.push(a); W.capThreat = 5; W.capStage = 0; W.hostCd = (S.day | 0) + CAP_SIEGE.cd;
   chronicle('Die Toten marschieren auf Varonheim', 'legend', `${a.name} (Stärke ${a.strength}) bricht von ${LOC[base].name} auf. Ziel: die Hauptstadt.`);
   log(`Morvaths Heerzug bricht von ${LOC[base].name} auf — Ziel ist Varonheim. Wer die Front hält, gewinnt Zeit.`, 'faction');
@@ -53,15 +61,17 @@ export function launchHost() {                                     // Morvaths H
 }
 export function capThreatDay() {                                   // einmal am Tag aus warDay
   const W = S.war, n = W.nodes[CAPK];
-  if (!n || n.owner !== 'valen' || (S.day | 0) < CAP_SIEGE.from - (S.difficulty === 'sehr_schwer' ? 15 : 0) ||   /* Entwickler: Sehr schwer 15 Tage früher */ S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > S.day) return;
-  const undNodes = Object.values(W.nodes).filter(x => x.owner === 'undead').length;
-  const d = (undNodes >= 6 ? 1 : -1) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? 0.5 : 0) + (W.armies.some(a => a.faction === 'valen') ? 0 : 0.5) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? 0.5 : 0);
-  W.capThreat = clamp((W.capThreat || 0) + d, 0, 40);
+  const day = S.day | 0, k = dk(), w = CAP_SIEGE.w;
+  if (!n || n.owner !== 'valen' || day < CAP_SIEGE.from[k] || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > day) return;   /* Sehr schwer ab Tag 5 */
+  const undNodes = WAR_KEYS.filter(x => W.nodes[x]?.owner === 'undead').length;
+  const d = Math.min(CAP_SIEGE.dMax[k], (undNodes >= 6 ? w.front : w.calm) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? w.schutz : 0)
+    + (W.armies.some(a => a.faction === 'valen') ? 0 : w.noArmy) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? w.throne : 0));
+  W.capThreat = clamp((W.capThreat || 0) + d, 0, day >= CAP_SIEGE.hostMin[k] ? 40 : CAP_SIEGE.bumpCeil);   /* vor dem frühesten Heerzug höchstens Stufe 2 */
   const st = CAP_SIEGE.thr.filter(x => W.capThreat >= x).length;
   W.capStage = Math.min(W.capStage || 0, st);                      // gesunken: die Stufe darf beim nächsten Anstieg wieder angesagt werden
   while (W.capStage < st) {
     W.capStage++;
-    if (W.capStage === 1) { chronicle('Gerücht: Morvath sammelt Knochen', 'news', 'Man sagt, Morvath sammelt Knochen für einen Stoß gegen die Krone.'); log('Gerücht in den Schänken: Morvath sammelt Knochen für einen Stoß gegen die Krone. Je mehr Land die Toten halten, desto näher rückt er.', 'faction'); }
+    if (W.capStage === 1) { chronicle('Gerücht: Morvath sammelt Knochen', 'news', 'Man sagt, Morvath sammelt Knochen für einen Stoß gegen die Krone. Fällt die Front oder stirbt der König, rückt er näher.'); log('Gerücht in den Schänken: Morvath sammelt Knochen für einen Stoß gegen die Krone. Je mehr Land die Toten halten, desto näher rückt er. In Varonheim hamstern die Leute — Korn, Fleisch, Salz und Waffen werden teurer.', 'faction'); }
     if (W.capStage === 2) { chronicle('Varonheim rüstet', 'news', 'Die Hauptstadt mustert und bessert die Mauern aus. Man fürchtet einen Heerzug der Toten.'); log('Varonheim rüstet: Die Krone fürchtet einen Heerzug der Toten.', 'faction'); if (nearPlayer(CAPK)) H.toast('VARONHEIM RÜSTET'); }
     if (W.capStage === 3) { launchHost(); break; }
   }
@@ -248,7 +258,7 @@ const clockMin = () => S.day * 1440 + S.minute;
 function load(c, from) {
   const t = S.towns[from];
   c.cargo = {};
-  const surplus = GOODS.map(g => [g, t.stock[g] - (t.use[g] || 0) * 4]).filter(([, v]) => v > 3).sort((a, b) => b[1] - a[1]).slice(0, 2);
+  const surplus = GOODS.map(g => [g, t.stock[g] - Math.max((t.use[g] || 0) * 4, ECO.target(t, g) * 0.8)]).filter(([, v]) => v > 3).sort((a, b) => b[1] - a[1]).slice(0, 2);
   for (const [g, v] of surplus) { const n = Math.min(Math.floor(v), 15); c.cargo[g] = n; t.stock[g] -= n; }
 }
 export function caravanFrame(c, dt, player, nearFoes) {
@@ -413,7 +423,7 @@ function capture(node, faction) {
     if (faction === 'undead') {
       const t = S.towns[node], lost = Math.round(t.pop * 0.4);
       t.pop -= lost;
-      const refuge = node === CAPK ? exileOf() : node === 'eren' ? 'northcity' : 'eren';   /* Varonheim: zum Fluchtort des Königs */
+      const refuge = node === CAPK ? exileOf() : S.war.nodes[CAPK]?.owner === 'valen' && LOC[node]?.faction === 'valen' ? CAPK : node === 'eren' ? 'northcity' : 'eren';   /* Varonheim: zum Fluchtort des Königs; Scout R5: Valens Flüchtlinge suchen Schutz in der Hauptstadt (Armenviertel) */
       if (S.towns[refuge]) S.towns[refuge].pop += Math.round(lost * 0.7);
       chronicle(`${L.name} fällt an die Untoten`, 'battle', `${lost} Menschen fliehen. Die Straßen füllen sich mit Flüchtlingen.`);
       if (refuge) log(`Flüchtlinge aus ${L.name} ziehen nach ${LOC[refuge].name}.`, 'world');
