@@ -26,3 +26,6 @@
 | RB-021 | Balance-Messung Aldhelm mit `ehp` umging den Boss-Faktor ×2 (Grundleben 560 war zu hoch) | MEDIUM | data.js aldhelm, docs/BALANCE.md | TESTING (Grundleben 340, 8 Seeds nachgemessen) |
 | RB-022 | Proben sicherten nur `S.prices`; nach T09 verändern Ereignisse Stadtlager und Zoll | LOW | Selbsttest | TESTING (Sicherungen erweitert, BUG-123 grün) |
 | RB-023 | Stirbt König Varon, fällt Valen auf −100 — egal wer ihn tötet (`game.js` die, `source` ungeprüft; Designer-Befund) | MEDIUM | game.js die | OPEN (gehört zu Varonheim-Belagerung / Rote Krönung) |
+| RB-024 | Fesseln setzte `anchor: null` — nach Loslassen/Losreißen warf die Gegner-KI jedes Bild einen Fehler (Hunter 5, dort RB-023) | CRITICAL | game.js captiveMenu/captiveTick | TESTING (Anker bleibt, beim Loslassen neu gesetzt; Probe RB-024) |
+| RB-025 | Hauptmenü zeigte „v22“ (index.html:71) | LOW | index.html | TESTING |
+| RB-026 | Automaten-Wachen nahmen keine Gefangenen an (robotTalk vor captiveChoices) | MEDIUM | game.js talk | TESTING |

@@ -11095,6 +11095,7 @@ function talk(npc) {
   if (npc.airMaster) return harborTalk(npc);                           /* Roadmap P6/P7: Hafenmeisterin und Mastwarte */
   if (npc.seaFolk && seaTalkGate(npc)) return;                            // S14: Überfahrt zu den Gischtinseln
   if (npc.coach || npc.ferry) return coachTalk(npc);                   // S13: Kutschen und Fähren
+  if (npc.robot && npc.guard && S.ents[npc.map]?.some(e => e.prisoner?.by === S.player.id && dist(e, npc) < 260)) { const ch = []; captiveChoices(npc, ch); if (ch.length) return UI.dialogue(npc, '„GEFANGENE? ÜBERGABE MÖGLICH.“', [...ch, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); }   /* RB-026: auch Automaten-Wachen nehmen Gefangene */
   if (npc.robot && !S.party.includes(npc.id)) return robotTalk(npc);   // Automaten tratschen nicht
   if (npc.omegaPriest) return priestTalk(npc);   // Phase 7
   if (npc.faithKey) return faithFigureTalk(npc);   // Nutzer S13: die fünf Köpfe der Kirche
@@ -13066,12 +13067,12 @@ function captiveMenu(e) {
   if (e.nemesisId) { const N = (S.nemeses || []).find(n => n.id === e.nemesisId); if (N) ch.unshift({ text: `[Rache] Für ${N.victims.join(' und ')}`, fn: () => { UI.closeDialogue(); e.surrendered = false; e.prisoner = null; die(e, 'Rache des Hauses', p); } }); }   /* T10: Rache zählt nicht als Grausamkeit */
   if (!bound) ch.push({ text: hasItem(p, 'strick', 1) ? 'Fesseln (1 Strick)' : 'Fesseln — du hast keinen Strick (6 Gold beim Händler)', fn: () => {
     if (!removeItem(p, 'strick', 1)) return UI.toast('Kein Strick.');
-    Object.assign(e, { prisoner: { by: p.id, since: S.day | 0 }, transient: false, surrendered: true, disarmed: true, fleeing: false, aggroId: null, aiState: 'idle', anchor: null });
+    Object.assign(e, { prisoner: { by: p.id, since: S.day | 0 }, transient: false, surrendered: true, disarmed: true, fleeing: false, aggroId: null, aiState: 'idle' });   /* RB-024: anchor bleibt (die KI braucht ihn nach dem Loslassen) */
     UI.closeDialogue(); act(p, 'kneel', 900, e); float(e, 'gefesselt', 'rgba(220,210,180,ALPHA)'); styleAct(0, 'Fesseln', e);
     if (!S.flags.captiveHint) { S.flags.captiveHint = 1; UI.toast('Gefesselt. Bring ihn zu einer Wache — Steckbriefe zahlen lebend mehr.', 4200); log('Gefesselte folgen dir und reisen mit. Bleibst du zu weit zurück oder gehst zu Boden, reißen sie sich los. Jede Wache einer nicht verfeindeten Stadt nimmt sie ab.', 'quest'); } } });
   if (partyMembers().length < (p.partyCap || 3) && !C) ch.push({ text: 'Anwerben (als Söldner, Loyalität gering)', fn: () => { UI.closeDialogue(); captiveRecruit(e); } });
   if (!e.robbed) ch.push({ text: 'Ausrauben', fn: () => { UI.closeDialogue(); dropLoot(e); e.robbed = true; if (!bound) { e.fleeing = true; e.surrendered = true; } styleAct(-1, 'Ausrauben', e); log(`${nm} wirft dir hin, was er hat.`, 'combat'); } });
-  ch.push({ text: 'Laufen lassen', fn: () => { UI.closeDialogue(); Object.assign(e, { prisoner: null, fleeing: true, surrendered: true, transient: true, letGo: true }); styleAct(4, 'Gnade', e); captiveLetGo(e); log(`${nm} rennt, ohne sich umzusehen.`, 'combat'); } });
+  ch.push({ text: 'Laufen lassen', fn: () => { UI.closeDialogue(); Object.assign(e, { prisoner: null, fleeing: true, surrendered: true, transient: true, letGo: true, anchor: { x: e.x, y: e.y } }); styleAct(4, 'Gnade', e); captiveLetGo(e); log(`${nm} rennt, ohne sich umzusehen.`, 'combat'); } });
   ch.push({ text: 'Hinrichten', fn: () => { UI.closeDialogue(); e.surrendered = false; e.prisoner = null; for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 3; styleAct(-6, 'Hinrichtung', e); die(e, 'hingerichtet', p); } });
   ch.push({ text: '[Lassen]', fn: () => UI.closeDialogue() });
   UI.dialogue(e, bound ? `${nm} hängt am Strick und schaut zu Boden.${C ? ' (Steckbrief: lebend bei einer Wache abliefern, +50 %.)' : ''}` : `${nm} liegt vor dir${e.downed ? ', bewusstlos' : ' und hebt die Hände'}.${C ? ' Das ist der Gesuchte vom Steckbrief.' : ''}`, ch);
@@ -13088,7 +13089,7 @@ function captiveTick(e, dt) {                                  /* gefesselt: fol
   if (e.prisoner.by !== p.id || e.map !== p.map) { e.vx = e.vy = 0; return; }
   const d = dist(e, p);
   e.lostT = d > 320 || p.downed ? (e.lostT || 0) + dt : 0;
-  if (e.lostT > 10000) { log(`${e.title || MONSTERS[e.mtype].name} hat sich losgerissen.`, 'combat'); Object.assign(e, { prisoner: null, fleeing: true, transient: true }); return; }
+  if (e.lostT > 10000) { log(`${e.title || MONSTERS[e.mtype].name} hat sich losgerissen.`, 'combat'); Object.assign(e, { prisoner: null, fleeing: true, transient: true, anchor: { x: e.x, y: e.y } }); return; }
   if (d > 60) seek(e, Math.atan2(p.y - e.y, p.x - e.x), MONSTERS[e.mtype].speed * 0.6 * dt / 16, dt, p); else e.vx = e.vy = 0;
 }
 function captiveChoices(npc, choices) {
@@ -17206,6 +17207,13 @@ export function selftest() {
       const ch2 = []; captiveChoices(g, ch2); ch2[0]?.fn(); UI.closeDialogue(); const wanted = C.state === 'claimed' && C.reward.gold === 150 && C.leaderDead;
       return bound && follows && paid && wanted;
     } finally { S.contracts = K0; delete S.quests.c_probeC; UI.closeDialogue(); }
+  }));
+  ok('RB-024: Gefesselt und wieder laufen gelassen — die Gegner-KI läuft ohne Fehler weiter (Anker bleibt)', sandbox(() => {
+    const p = stage(), click = t => [...document.querySelectorAll('#dlg-choices button')].find(b => b.textContent.includes(t))?.click();
+    const e = spawnEnemy('bandit', '__a', 12, 10); e.x = p.x + 40; e.y = p.y; e.surrendered = true; addItem(p, 'strick', 1);
+    captiveMenu(e); click('Fesseln'); captiveMenu(e); click('Laufen lassen'); UI.closeDialogue();
+    let ok2 = true; try { for (let i = 0; i < 20; i++) updateEnemy(e, 50); } catch (err) { ok2 = false; console.warn('RB024', err); }
+    return ok2 && !!e.anchor && !e.prisoner;
   }));
   ok('T08 Verhör und Ruf der Klinge: Verhör markiert das nächste Bandenlager als Gerücht; Klinge höchstens ±10 je Tag und Region; Stufen; alter Stand ohne Wert = 0', sandbox(() => {
     const p = stage(), F0 = S.fameStyle, FD0 = S.fameStyleDay, K0 = S.contracts, B0 = S.bands, T0 = S.track; S.contracts = [];

@@ -2,6 +2,12 @@
 
 Nur Entscheidungen des Nutzers. Neueste oben.
 
+## 01.10.2026 (Varonheim-Belagerung, proposals/varonheim_belagerung.md)
+- Heerzug 70 (Sehr schwer 80): die Hauptstadt fällt nur bei langer Vernachlässigung.
+- Fällt sie, flieht der König nach Salzhafen (sonst Nordfurt, sonst Eren); Exilhof mit Varon, Brandt, Ysmay, Hagen.
+- Rückeroberung möglich (4 Wellen oder Valen-Heer); die zerstreuten Adligen kommen nie zurück; keine Selbstheilung auf Schwer/Sehr schwer.
+- §5g.8: Eine besetzte Hauptstadt bindet Valen (Automaten übernehmen); ein toter König bindet nicht — Marschall Brandt führt den Einmarsch.
+
 ## 01.10.2026 (Control-Fragen)
 - Öffentliches `main` bekommt nur noch geprüfte Stände (Commit mit „[VERIFIED]“); Zwischenstände nur auf `claude-arbeit`.
 - Grafikstil F bleibt endgültig aus (Code eingefroren).
