@@ -9,6 +9,6 @@ Status nach `AGENT_SYSTEM.md`. Details: `docs/audit/STATUS.md`, `docs/audit/TASK
 | T03 §5g.1 Varonheim | TESTING | Hunter: keine Fehler; Control fehlt | Probe „Varonheim“ |
 | T04 Effekte, Zufall, Klang | TESTING | Hunter läuft | 324/324 |
 | T06 Spielstand komprimiert, Caches, HUD | TESTING | Hunter läuft | Probe „Audit D6“, 324/324 |
-| T05 Kleine Korrekturen (V17, A13, Stil F, Doku) | READY_FOR_IMPLEMENTATION | Engineer | technische Korrekturen, vorab freigegeben |
+| T05 Kleine Korrekturen (V17, A13, Stil F, Doku) | IMPLEMENTED → TESTING | Engineer; Hunter steht aus | Probe „Audit T05“, 325/325; JOIN_FOES geprüft, keine Änderung nötig |
 | T07 §5g.2 Blutkult | DESIGNING | Feature Designer (Opus) | Vorschlag, dann Fragen an den Entwickler |
 | übrige T08–T40 | PLANNED | – | `docs/audit/TASKS.md` |

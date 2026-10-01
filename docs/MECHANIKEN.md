@@ -646,3 +646,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Krieg mit Gegengewicht (V1, Hunter-Befund):** Je mehr Land die Toten halten, desto mehr Männer greifen in Valen zu den Waffen (+0,3 Stärke je verlorenem Knoten und Tag, bis +3; ohne Korn +1 statt 0). Besatzungen füllen sich täglich um 2 auf (Valens Städte bis 20, sonst bis 10). Stadtmauern geben Valens Verteidigern +30 %. Valens Heere holen zuerst verlorene Städte zurück. Hat Valen keine Stadt mehr, schickt Varonheim ein Entsatzheer gegen Nordfurt (Log und Chronik). Gemessen über 60 Tage ohne Spieler: Nordfurt und Eren wechseln mehrfach den Besitzer, keine Seite hält dauerhaft alles.
 - **Debug:** Abschnitt „Spielstand (Audit D6)“: Größe messen und Rundlauf prüfen, jetzt komprimiert speichern. Probe „Audit D6“.
 - **Flüssiger in Städten (D7, D16):** Volle Bild-Caches verwerfen nur ihre ältesten 10 % statt alles auf einmal (kein Ruckler, wenn viele Häuser und Figuren im Bild sind). Die Heldenleiste schreibt nur noch, was sich geändert hat; die Gruppenliste zeichnet Porträts nur neu, wenn sich an einem Gefährten etwas ändert.
+
+## Runde: Audit T05 Kleine Korrekturen (01.10.2026)
+- **Führung wächst (A13):** Jeder Sieg, bei dem ein Gefährte in der Nähe ist, übt Führung (+0,07 je Gegner, etwa +0,2 je Kampf). Ein neuer Befehl an die Gruppe mitten im Kampf übt sie auch (+0,05, höchstens alle 30 Spielminuten). Je volle 10 Punkte darf ein Gefährte mehr mitreisen (Log und Hinweis). Führung beschleunigt wachsende Loyalität (+0,5 % je Punkt). Beim ersten Mal erklärt es das Log.
+- **Ehrliche Fertigkeiten:** Die Tooltips sagen, was jede Fertigkeit heute tut: Handwerk verbessert Hergestelltes, Schleichen hilft beim Hineinschleichen und Stehlen (wächst erst mit dem Schleich-System), Jagd wirkt erst mit „Jagd und Wildnis“.
+- **Vharnholm hungert nie:** Die Stillen essen nicht; die Stadtanzeige meldet dort keinen Hunger mehr.
+- **Friedhof:** Ein neues Untotenheer ersteht dort, nimmt den Ort aber nicht mehr stillschweigend ein — hält Valen ihn, kommt es zur Schlacht.
+- **Roboterauge:** gestört wird es von Magie- und Schattentreffern (Blitz- und Arkanzauber zählen als Magie).
+- **Grafikstil F (Referenzblatt) abgeschaltet:** Wer ihn gespeichert hatte, sieht Stil R. Das Bild des Referenzblatts wird nicht mehr geladen. Stil D bleibt wählbar, bekommt aber keine neuen Zeichnungen.
+- Probe „Audit T05“.
