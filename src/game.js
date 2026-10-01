@@ -1899,7 +1899,7 @@ export function newGame(cfg) {
 }
 
 function bindSim() {
-  SIM.H.spawnEnemy = spawnEnemy;
+  SIM.H.spawnEnemy = spawnEnemy; SIM.H.cultDrain = cultDrain;   /* §5g.2 */
   SIM.H.pushOut = pushOut; SIM.H.inView = inView;                     // AUDIT: Heere und Räuber erscheinen außerhalb des Bildes
   SIM.H.hireEscorts = hireEscorts;
   SIM.H.toast = t => UI.toast(t, 3600);
@@ -3069,6 +3069,7 @@ function teamOf(c) {
     if (c.faction === 'chain' && !chainAtWar()) return 'neutral';     // S12: in der Eisenfeste wird erst geredet (Nutzerwunsch)                  // Wild: kein Gegner, aber jagdbar (Spieler, Wölfe)
     if (c.faction === 'undead') return S.ranks.undead >= 0 ? 'player' : 'foe';
     if (c.faction === 'valen') return valenHostile() ? 'foe' : 'player';
+    if (c.mtype === 'aldhelm' && S.cult?.challenge) return 'foe';   /* Das stärkere Blut */
     if (c.faction === 'blut') return c.disguised && !c.unmasked ? 'neutral' : S.cult?.joined ? 'player' : 'foe';   /* §5g.2: Maskierte sind verkleidet, bis man sie stellt */
     return 'foe';
   }
@@ -3543,7 +3544,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
   /* §5g.2: Kult-Folgen vor dem Ausstieg für ferne/verbündete Tote — auch wer dem Kelch beitrat und Aldhelm herausfordert, beendet ihn */
   if (c.cultThrall && S.cult) { const m = S.cult.missing.find(x => x.ent.id === c.cultThrall); if (m) { m.dead = true; chronicle(`${m.ent.name} aus Varonheim ist tot`, 'news', 'Als Blutknecht in den Katakomben gefallen.'); } }
-  if (c.mtype === 'aldhelm' && S.cult) cultEnd('destroyed');   /* §5g.2 */
+  if (c.mtype === 'aldhelm' && S.cult) cultEnd(S.cult.challenge ? 'player' : 'destroyed');   /* §5g.2: wer ihn als Kind des Kelchs trinkt, wird Blutfürst */
   if (c.cultHedda && S.cult) { S.cult.heddaDead = true; log('Hedda fällt. Der Kelch auf dem Altar ist plötzlich nur noch ein Becher.', 'quest'); } if (c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor'); if (RC) RC.beastDead = true; }   /* Gerücht: Bestie erlegt */
   if (c.varonKing && !S.flags.varonDead) { S.flags.varonDead = S.day | 0; S.factions.valen = -100; chronicle('König Varon ist tot', 'legend', 'Der Thron im Norden ist leer. Kanzler Aldhelm regiert — bis ihn jemand daran hindert.'); UI.toast('KÖNIG VARON IST TOT', 3600); }   /* §5d.4 */
   if (c.kind === 'enemy' && (teamOf(c) !== 'foe' || dist(S.player, c) > 500)) {   // Verbündete oder ferne Tote: keine Beute
@@ -11125,7 +11126,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -12623,10 +12624,15 @@ function cultMasks(h) {                                        /* Maskierte gehe
   Object.assign(e, { cultNight: true, disguised: true, transient: true, name: 'Maskierter' });
 }
 function cultHour(h) {
-  const C = S.cult; if (!C || !TOWN_PLAN.varonheim || C.end) return;
+  const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
   const p = S.player, here = p.map === 'world' && townAt(p.x / TS | 0, p.y / TS | 0) === 'varonheim', day = S.day | 0;
+  if (C.end === 'player') return cultLordHour(h);
+  if (C.end === 'destroyed') return;
+  if (C.stage && !C.crown && (C.stage >= 3 || day >= 45) && !afterHeals()) { C.crown = day + 20; log(`Am Hof flüstert man von einer „Roten Krönung“. Was immer das ist — es soll in zwanzig Tagen geschehen (Tag ${C.crown}).`, 'quest'); }
+  if (C.crown && day >= C.crown && h === 3 && C.end !== 'ruling') cultCrown();
+  if (C.end === 'hidden' || C.end === 'ruling') { if (h === 23 && day % 5 === 0) cultTake(); return; }   /* Scheibe 5: der Kult arbeitet weiter, leiser */
   if (!C.stage) { if (here && day >= 3) cultStart('Du bist in Varonheim.'); else if (S.flags.varonAudience) cultStart('Nach der Audienz beim König hört man es überall:'); else if (day >= 12) cultStart('Aus der Hauptstadt kommen Gerüchte.'); return; }
-  if (C.stage >= 4) return;                                    /* ab der Enthüllung (Scheibe 4) ändert sich das Spiel */
+  if (C.stage >= 4) return;                                    /* ab der Enthüllung (Scheibe 4) wartet der Kult in der Krypta */
   if (h === 23 && (day % 2 === 0 || C.extraTake)) { C.extraTake = false; cultTake(); }
   { const caged = C.missing.filter(m => !m.freed && !m.thrall && !m.dead);   /* Scheibe 3: nach sechs Tagen (oder ab dem fünften im Pferch) wird ein Gefangener zum Blutknecht */
     for (const m of caged) if (day - m.day > 6 || caged.filter(x => !x.thrall).length > 4 && m === caged.find(x => !x.thrall)) { m.thrall = true; log(`${m.ent.name} aus Varonheim kommt nicht mehr zurück. Nicht als Mensch.`, 'world'); } }
@@ -12713,7 +12719,7 @@ function buildCatacombs(from) {
         greet: C.joined ? '„Kind des Kelchs. Durstig? Ich habe, was du brauchst.“' : '„Ein Gast. Selten, dass jemand freiwillig so tief kommt. Bist du gekommen, um zu trinken — oder um zu sterben?“' });
       S.ents.katakomben.push(c); }
   }
-  if (krypta && !C.end) { const a = foe('aldhelm', 40, 12, { level: 16, title: 'Aldhelm, Blutfürst von Varonheim', boss: true }); if (a) a.name = 'Aldhelm'; }
+  if (krypta && C.end !== 'destroyed' && C.end !== 'player') { const a = foe('aldhelm', 40, 12, { level: 16, title: 'Aldhelm, Blutfürst von Varonheim', boss: true }); if (a) a.name = 'Aldhelm'; }
   if (C.allies && !C.end) { const at = MAPS.katakomben.entry; [['Brandt', 'Marschall'], ['Gardist', 'Königsgarde'], ['Gardist', 'Königsgarde']].forEach(([n, pr], i) => {
     const g = guardChar('valen', { x: at.x + (i - 1) * 30, y: at.y - 20 }, pr, i ? 12 : 16); Object.assign(g, { map: 'katakomben', name: n, servant: S.player.id, pet: true, transient: true, brave: true, guard: false }); S.ents.katakomben.push(g); }); }
   indexSolids('katakomben'); return MAPS.katakomben.entry;
@@ -12779,7 +12785,7 @@ function cultCourt() {                                         /* Beweis beim K�
   ], () => { removeItem(p, 'rotes_siegel', 1); S.factions.valen = (S.factions.valen || 0) + 5; });
 }
 function cultCourtChoices(npc, choices) {
-  const C = S.cult, p = S.player; if (!C || C.reveal != null || C.end) return;
+  const C = S.cult, p = S.player; if (!C || C.reveal != null || C.end === 'destroyed' || C.end === 'player') return;
   const say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]), seal = hasItem(p, 'rotes_siegel', 1);
   if (npc.varonKing && C.stage >= 2) choices.unshift({ text: seal ? 'Majestät, Euer Kanzler … (das Rote Siegel zeigen)' : 'Majestät, Euer Kanzler steckt hinter den Verschwundenen.', fn: () => {
     if (seal) { UI.closeDialogue(); return cultCourt(); }
@@ -12798,7 +12804,7 @@ function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
   if (!e.phase) e.phase = 1;
   const caged = (C.missing || []).filter(x => !x.freed && !x.thrall && !x.dead);
   const mend = n => { if (e.body) B.heal(e, n); else e.hp = Math.min(e.maxHp, e.hp + n); };
-  if (e.phase < 3 && caged.length && e.hp < e.maxHp) { mend(e.maxHp * 0.004 * caged.length * dt / 1000);
+  if (e.phase < 3 && caged.length && !C.challenge && e.hp < e.maxHp) {   /* Herausforderung: ohne Pferch-Fesseln */ mend(e.maxHp * 0.004 * caged.length * dt / 1000);
     if (!C.fetterHint) { C.fetterHint = true; UI.toast('ER TRINKT AUS DEN KÄFIGEN', 2600); log(`Rote Fäden laufen von Aldhelm zu den Pferchen: ${caged.length} Gefangene nähren ihn. Öffne die Käfige — dann reißen die Fäden.`, 'combat'); } }
   const day = hourNow() >= 6 && hourNow() < 19, shaft = day && S.ents[e.map].find(s => s.lightShaft && Math.hypot(s.x - e.x, s.y - e.y) < 46);
   if (shaft && !e.invuln && (e.lightDmg || 0) < e.maxHp * 0.25) { const n = e.maxHp * 0.03 * dt / 1000; e.lightDmg = (e.lightDmg || 0) + n; hurt(e, n, null, 'Licht', false, 'magic'); e.telegraph = 0; e.windup = false; if (!e.lightT || now > e.lightT) { e.lightT = now + 900; float(e, 'Licht!', 'rgba(255,240,180,ALPHA)'); } }
@@ -12827,7 +12833,10 @@ function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
   }
 }
 function cultEnd(kind) {
-  const C = S.cult; if (!C || C.end) return; C.end = kind; C.stage = 5; AF().cult = { end: kind, day: S.day | 0 };
+  const C = S.cult; if (!C || C.end === kind || C.end === 'destroyed' || C.end === 'player') return; C.end = kind; C.stage = 5; cultAfter(kind);   /* aus 'hidden'/'ruling' kann der Kult noch fallen */
+  if (kind === 'player') { C.lord = S.player.name; C.challenge = false; S.factions.valen = (S.factions.valen || 0) + 10; S.factions.order = (S.factions.order || 0) - 30;
+    afterSay('Ein neuer Blutfürst', `${S.player.name} hat Aldhelm getrunken und trägt den Kelch. König Varon lebt und weiß von nichts. Der Orden weiß es.`, 'legend');
+    log('Du bist Blutfürst von Varonheim: Täglich bringt die Kanzlei Tribut (2 Blutphiolen, 30 Gold). Bei Hedda bestimmst du den Zehnt. Der Orden jagt dich jetzt alle sieben Tage.', 'quest'); return; }
   if (kind === 'destroyed') {
     for (const m of C.missing) if (!m.freed && !m.thrall && !m.dead) { m.freed = true; const E = m.ent, home = E.anchor || { x: TOWN_PLAN.varonheim.square[0] * TS, y: TOWN_PLAN.varonheim.square[1] * TS };
       Object.assign(E, { map: 'world', alive: true, downed: false, x: home.x, y: home.y }); S.ents.world.push(E); }
@@ -12835,6 +12844,42 @@ function cultEnd(kind) {
     S.ents.world = S.ents.world.filter(e => !e.cultNight);
     afterSay('Der Blutfürst ist tot', 'Aldhelm ist tot, der Kelch zerbrochen. Die Gefangenen kehren nach Varonheim zurück. Ysmay wird Kanzlerin; die Audienz beim König kostet kein Gold mehr.', 'battle');
   }
+}
+// ================= Blutkult: Ausgänge und Kult-Weg (§5g.2, Scheibe 5) =================
+// end: 'destroyed' (Aldhelm tot) · 'hidden' (erpresst, der Kult arbeitet weiter im Verborgenen) · 'ruling' (Rote Krönung: Varon stirbt,
+// Aldhelm herrscht) · 'player' (der Held hat Aldhelm als Kind des Kelchs herausgefordert und ist Blutfürst). Die Rote Krönung läuft
+// ab Stufe 3 (oder Tag 45) 20 Tage — nur auf den Schwierigkeiten, auf denen Folgen nicht von selbst heilen.
+function cultDrain() { const C = S.cult; return !C ? 0 : C.end === 'ruling' ? 1 : C.end === 'hidden' || (C.end === 'player' && C.tithe) ? 0.5 : 0; }   /* weniger Nachschub für Valen */
+function cultAfter(kind) { AF().cult = { end: kind, day: S.day | 0 }; }
+function cultCrown() {
+  const C = S.cult; if (!C || C.end === 'destroyed' || C.end === 'player') return;
+  C.end = 'ruling'; C.stage = Math.max(C.stage, 4); cultAfter('ruling');
+  if (!S.flags.varonDead) { S.flags.varonDead = S.day | 0; S.ents.varonburg = (S.ents.varonburg || []).filter(e => !e.varonKing); }
+  afterSay('Die Rote Krönung', 'König Varon ist im Schlaf gestorben, sagt der Hof. Kanzler Aldhelm führt das Reich als Reichsverweser. Nachts herrscht Ausgangssperre in Varonheim — und die Front bekommt weniger Männer.', 'legend');
+}
+function cultLordHour(h) {                                     /* Der Held als Blutfürst: Tribut, Zehnt, Ordensjäger */
+  const C = S.cult, p = S.player, day = S.day | 0;
+  if (h === 8 && C.tribute !== day) { C.tribute = day; addItem(p, 'blutphiole', 2); S.gold += 30; log('Tribut aus der Kanzlei: 2 Blutphiolen und 30 Gold.', 'economy'); }
+  if (h === 23 && day % 5 === 0) { if (C.tithe) cultTake(); else { C.heat = (C.heat || 0) + 1; if (C.heat % 2 === 0) log('Hedda lässt ausrichten: „Der Kelch wird leer, Herr. Ein Blutfürst, der nicht nimmt, wird genommen.“', 'quest'); } }
+  if (h === 9 && day % 7 === 0 && C.orderHunt !== day) { C.orderHunt = day; afterAvenge('order', 3, 'Vampirjäger des Ordens', 1, 'order', 'Vampirjäger'); log('Der Orden weiß, wer unter Varonheim herrscht. Wieder sind Jäger unterwegs.', 'faction'); }
+}
+function cultHeroDied() {                                      /* stirbt der Blutfürst, übernimmt Hedda; der Erbe ist kein Vampir */
+  const C = S.cult; if (!C || C.end !== 'player') return;
+  C.end = 'hidden'; C.lord = null; C.challenge = false; cultAfter('hidden'); S.factions.order = (S.factions.order || 0) - 10;
+  chronicle('Der Kelch sucht einen neuen Herrn', 'news', 'Hedda führt den Kult, bis einer kommt, der stärker trinkt.');
+}
+function cultPathChoices(npc, choices) {
+  const C = S.cult, p = S.player; if (!C) return; const day = S.day | 0;
+  const say = (t, more = []) => UI.dialogue(npc, t, [...more, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (npc.varonChancellor && C.reveal == null && !C.end && !C.blackmail && hasItem(p, 'rotes_siegel', 1)) choices.unshift({ text: 'Ich habe Euer Siegel, Kanzler. (Erpressen)', fn: () => {
+    say('„Ah. Ein kluger Mensch. Kluge Menschen leben lange — wenn sie vergessen. Fünfhundert Gold, und du hast nie etwas gesehen.“', [{ text: 'Abgemacht. (500 Gold, das Siegel geht an ihn)', fn: () => {
+      removeItem(p, 'rotes_siegel', 1); S.gold += 500; C.blackmail = day; C.end = 'hidden'; cultAfter('hidden'); UI.closeDialogue();
+      log('Aldhelm zahlt. Das Siegel ist fort, der Kult arbeitet weiter — leiser. Und eine Uhr läuft: die Rote Krönung.', 'quest'); } }]); } });
+  if (npc.cultHedda && C.joined != null && C.reveal != null && !C.end) choices.unshift(
+    { text: 'Bei der Roten Krönung dienen (Varon stirbt, Aldhelm herrscht, du bist seine rechte Hand)', fn: () => { C.rightHand = day; C.crown = day + 1; say('„Morgen Nacht. Trink vorher. Ein König stirbt nicht leise.“'); } },
+    { text: 'Das stärkere Blut: Aldhelm herausfordern', fn: () => { C.challenge = true; say('„So sei es. Er wartet in der Krypta. Wer ihn trinkt, trägt den Kelch — und den Hass des Ordens.“'); } });
+  if (npc.cultHedda && C.end === 'player') choices.unshift({ text: C.tithe ? 'Den Zehnt aussetzen (die Stadt schonen, selbst dürsten)' : 'Den Zehnt fordern (alle fünf Tage ein Bürger — der Kult wird satt)', fn: () => {
+    C.tithe = !C.tithe; say(C.tithe ? '„Wie es sich gehört. Alle fünf Nächte ein Gefäß.“ (Valen bekommt weniger Nachschub, solange der Zehnt läuft.)' : '„Wie Ihr wünscht. Aber der Kelch vergisst nicht, wer ihn hungern lässt.“'); } });
 }
 // Ausweichen im letzten Moment (Hieb, Geschoss oder Flächenangriff hätte getroffen): einmal je Rolle. Zählt für die Probe
 // der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
@@ -13203,6 +13248,7 @@ function useSlot(i) {
 
 // ================= Tod & Erbe =================
 function playerDeath(cause, source) {
+  cultHeroDied();   /* §5g.2: stirbt der Blutfürst, übernimmt Hedda */
   const p = S.player;
   if (S._quiet || (p.map || '').startsWith('__')) return;             // BUG-107: Selbsttest-Proben sterben nicht ins Erbe (vorher Todesbildschirm + Speichern)
   if (S.flags.goblinStormActive && !S.flags.morrDead) morrFall();   // S15 (Nutzer): stirbst du im Sturm, stirbt das letzte Dorf der Goblins
@@ -13916,6 +13962,14 @@ function debugSections() {
       'Hofszene mit Siegel': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 2); addItem(p, 'rotes_siegel', 1); if (S.map !== 'varonburg') { if (S.map !== 'world') travel('world'); travel('varonburg'); } cultCourt(); },
       'In die Krypta (Bosskampf)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.stage = Math.max(S.cult.stage, 3); cultReveal('ysmay'); if (S.map !== 'world') travel('world'); travel('katakomben'); const q = freeSpotNear('katakomben', 40, 26, 2); P().x = q.x; P().y = q.y; },
       'Kult zerschlagen (Ausgang)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); cultEnd('destroyed'); },
+    }],
+    ['Blutkult: Ausgänge (§5g.2, Scheibe 5)', '', {
+      'Rote Krönung jetzt (Aldhelm herrscht)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); cultCrown(); },
+      'Erpresst (Kult versteckt)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.cult.end = 'hidden'; S.cult.blackmail = S.day | 0; cultAfter('hidden'); UI.toast('Kult versteckt'); },
+      'Herausforderung vorbereiten (Kind des Kelchs)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); if (!isVamp(p)) unlockTitle('vampire', 'Debug'); Object.assign(S.cult, { joined: S.day | 0, challenge: true, stage: Math.max(S.cult.stage, 3) }); cultReveal('inside'); UI.toast('Aldhelm wartet in der Krypta'); },
+      'Spieler wird Blutfürst (sofort)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); if (!isVamp(p)) unlockTitle('vampire', 'Debug'); S.cult.joined ??= S.day | 0; S.cult.challenge = true; S.cult.end = null; cultEnd('player'); },
+      'Zehnt umschalten': () => { if (S.cult) { S.cult.tithe = !S.cult.tithe; UI.toast(S.cult.tithe ? 'Zehnt läuft' : 'Zehnt ausgesetzt'); } },
+      'Ausgang zurücksetzen (Stufe 4)': () => { if (S.cult) { S.cult.end = null; S.cult.stage = 4; delete AF().cult; UI.toast('Kein Ausgang'); } },
     }],
     ['Spielstand (Audit D6)', '', {
       'Größe messen und Rundlauf prüfen': async () => { const t0 = performance.now(), str = saveData(), t1 = performance.now(), z = await zipSave(str), t2 = performance.now(), back = await unzipSave(z);
@@ -16870,6 +16924,21 @@ export function selftest() {
       if (!(once && fed && ph2 && burnt && end)) console.warn('S4DBG', JSON.stringify({ once, fed, ph2, burnt, end, h1, h2, hp: a.hp, max: a.maxHp, ld: a.lightDmg, ce: S.cult.end, ae: S.after.cult, war: cultWar(), home: S.ents.world.includes(v1) }));
       return once && fed && ph2 && burnt && end;
     } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.growth = G0; S.after = A0; S.minute = min0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
+  }));
+  ok('Blutkult S5: Rote Krönung (Varon tot, Aldhelm herrscht, Valen-Nachschub −1/Tag); Herausforderung als Kind des Kelchs → Spieler wird Blutfürst (Tribut, Zehnt); stirbt er, übernimmt Hedda', sandbox(() => {
+    const p = stage(), C0 = S.cult ? structuredClone(S.cult) : null, W0 = S.ents.world, K0 = S.ents.katakomben, M0 = MAPS.katakomben, V0 = S.ents.varonburg, A0 = structuredClone(S.after || {}), WAR0 = structuredClone(S.war), T0 = structuredClone(S.towns), E0 = S.eco ? structuredClone(S.eco) : null;
+    S.ents.world = W0.slice();
+    try {
+      S.cult = { stage: 3, clues: {}, missing: [], taken: 0, heat: 0, gone: [], crown: S.day | 0 }; cultHour(3); const crowned = S.cult.end === 'ruling' && !!S.flags.varonDead && S.after.cult?.end === 'ruling' && cultDrain() === 1 && cultWar();
+      const v = S.war.armies.find(a => a.faction === 'valen') || (S.war.armies.push({ id: 'pv', faction: 'valen', strength: 30, at: 'northcity', name: 'Probe' }), S.war.armies.at(-1)); v.strength = 30; SIM.warDay(); const withCult = v.strength;
+      S.cult.end = null; v.strength = 30; SIM.warDay(); const without = v.strength; const drained = Math.abs((without - withCult) - 1) < 0.01;
+      S.cult = { stage: 4, clues: {}, missing: [], taken: 0, heat: 0, gone: [], reveal: S.day | 0, joined: S.day | 0, challenge: true, introSeen: true };
+      buildCatacombs('world'); const a = S.ents.katakomben.find(e => e.mtype === 'aldhelm'), foeNow = !!a && teamOf(a) === 'foe';
+      die(a, 'Probe', p); const lord = S.cult.end === 'player' && S.cult.lord === p.name && cultWar();   /* §5g.8: herrscht der Kult, ist Varon gebunden */
+      const g0 = S.gold, ph0 = (p.inv.find(s => s.key === 'blutphiole')?.count) || 0; cultLordHour(8); const tribute = S.gold === g0 + 30 && ((p.inv.find(s => s.key === 'blutphiole')?.count) || 0) === ph0 + 2;
+      S.cult.tithe = true; const tithe = cultDrain() === 0.5; cultHeroDied(); const heir = S.cult.end === 'hidden' && !S.cult.lord;
+      return crowned && drained && foeNow && lord && tribute && tithe && heir;
+    } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.ents.varonburg = V0; S.after = A0; S.war = WAR0; S.towns = T0; if (E0) S.eco = E0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
   }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };

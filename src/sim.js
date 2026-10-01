@@ -360,7 +360,7 @@ export function warDay() {
   const valenGrain = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'valen' && S.towns[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
   // Hunter-Befund (01.10.): ohne Gegengewicht fielen in 15 Tagen alle Knoten. Je mehr Land verloren ist, desto mehr greift Valen zu
   // den Waffen (+0,3 je Untotenknoten, bis +3); ohne Korn wächst es langsam statt gar nicht.
-  for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : (valenGrain > 10 ? 3 : 1) + Math.min(3, 0.3 * undNodes);
+  for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : Math.max(0, (valenGrain > 10 ? 3 : 1) + Math.min(3, 0.3 * undNodes) - (H.cultDrain?.() || 0));   /* §5g.2: der Blutkult zehrt an Valen */
   clampArmies();
   // Besatzungen füllen sich täglich wieder auf (+2): Valen in Städten bis 20, sonst bis 10; höhere Startbesatzungen bleiben.
   for (const [k, n] of Object.entries(W.nodes)) if (n.owner) { const cap = n.owner === 'valen' && S.towns[k] ? 20 : 10; if (n.garrison < cap) n.garrison = Math.min(cap, n.garrison + 2); }
