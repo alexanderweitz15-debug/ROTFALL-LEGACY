@@ -862,3 +862,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kellerweg:** Wer mit dem zweiten Katakombenschlüssel über den Kanzleikeller kommt, wird nicht kontrolliert, bis ihn eine Wache sieht. Dann: 150 Gold Strafe und Durchsuchung oder Flucht (Alarm).
 - **Halle bleibt gefährlich:** Wer drinnen eine Waffe zieht, löst Warnung und dann Alarm aus.
 - **Schlächter** (Ruf der Klinge ≤ −60) kommen ohne Ritterwürde nicht hinein.
+
+## Start in Varonheim (Varonheim-Umbau, Scheibe 5)
+- Im Erstellungsbildschirm wählst du den **Startort**: Varonheim (Vorgabe) oder das klassische Grenzland vor Eren.
+- In Varonheim beginnst du im Viertel deiner Herkunft. Feldknecht: Königsfelder vor dem Südtor. Jäger: Westtor. Lehrling: Tempelviertel. Ehemaliger Soldat: Garnison. Wanderer: Taverne am Markt.
+- Am Anschlagbrett hängen drei leichte Aufträge: Wegmarken der Stadtwache, Botengang nach Nordfurt, Wolfsfelle für den Kürschner.
+- Die ersten Log-Zeilen nennen Brett, Burgtor und Straße nach Nordfurt. Sie weisen auch auf den Kodex (H) und deinen ersten Talentpunkt hin.
+- Der Blutkult beginnt für Hauptstädter erst ab Tag 10, wenn du Stufe 5 hast; sonst ab Tag 16.

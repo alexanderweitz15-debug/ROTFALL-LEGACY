@@ -2715,7 +2715,7 @@ function drawAmbience(now, list, m, x0, y0, x1, y1) {
       if (fires >= 8) continue; fires++;
       const sd = h2(e.x | 0, e.y | 0);
       for (let i = 0; i < 3; i++) { const k = (now / 2300 + i / 3 + sd) % 1, s = 2 + (k * 4 | 0);
-        ctx.globalAlpha = (1 - k) * 0.42; ctx.fillStyle = '#5c5850'; ambRect(e.x + Math.sin(k * 4 + i + sd * 9) * 3 + k * 10 - s / 2, e.y - 16 - k * 44 - s / 2, s, s); }
+        ctx.globalAlpha = (1 - k) * 0.5; ctx.fillStyle = '#9a948a'; ambRect(e.x + Math.sin(k * 4 + i + sd * 9) * 3 + k * 10 - s / 2, e.y - 16 - k * 44 - s / 2, s, s); }
       ctx.fillStyle = '#f0b050';
       for (let j = 0; j < 2; j++) { const k = (now / 950 + j * 0.5 + sd) % 1; if (k > 0.8) continue;
         ctx.globalAlpha = 1 - k; ambRect(e.x + Math.sin(now / 160 + j * 3 + sd * 7) * 4, e.y - 10 - k * 32, 1.5, 1.5); }

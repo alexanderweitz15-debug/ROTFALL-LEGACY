@@ -1874,8 +1874,8 @@ export function newGame(cfg) {
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
-  const o = ORIGINS[cfg.origin];
-  const start = freeSpotNear('world', ...worldPt(66, 70), 3);
+  const o = ORIGINS[cfg.origin], cap = cfg.start === 'varonheim' && !!TOWN_PLAN.varonheim;
+  const start = cap ? capStartSpot(cfg.origin) : freeSpotNear('world', ...worldPt(66, 70), 3);
   const p = makeChar({ kind:'player', key:'player', name: cfg.name, age: ri(19, 26), x: start.x, y: start.y,
     attrs: baseAttrs(), skills: { ...o.skills },            // Herkunftsbonus wird unten addiert, nicht überschrieben
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
@@ -1893,6 +1893,7 @@ export function newGame(cfg) {
   S.player = p; S.ents.world.push(p);
   syncHotbar();
 
+  if (cap) { capStart(p, o, cfg.origin); startGame(); coopHooks.afterNew?.(); return; }
   chronicle(`${p.name} bricht auf`, 'birth', `${o.name}. Kein Name, kein Land, keine Schulden. Noch nicht.`);
   log('Du erreichst das Grenzland von Greenmark.', 'world');
   { const [ex, ey] = TOWN_PLAN.eren.square, dx = ex - p.x / TS, dy = ey - p.y / TS;   // BUG-089: Richtung aus der echten Lage, nicht fest „Norden“
@@ -1902,6 +1903,32 @@ export function newGame(cfg) {
   coopHooks.afterNew?.();   /* Koop: neuer Koop-Stand — gleich den Warteraum öffnen */
 }
 
+// Varonheim-Umbau S5 (Entwickler 01.10.2026, PROPOSALS/varonheim_umbau.md §6): Start in der Hauptstadt (Vorgabe) oder klassisch im
+// Grenzland vor Eren. Das Viertel folgt der Herkunft; am Brett hängen drei leichte Aufträge; der Blutkult beginnt für Hauptstädter erst
+// ab Tag 10 und Stufe 5 (sonst Tag 16). Scout R8: Hinweise auf Kodex (H) und den ersten Talentpunkt gleich zum Start.
+const START_AT = {
+  varonheim: { name: 'Varonheim', desc: 'Die Hauptstadt König Varons. Du beginnst im Viertel deiner Herkunft, am Markt hängen leichte Aufträge. Am Burgtor gilt der Burgfrieden.' },
+  grenzland: { name: 'Grenzland vor Eren', desc: 'Der klassische Beginn: allein auf der Straße, Eren in Sichtweite.' },
+};
+function capStartSpot(origin) {
+  const P = TOWN_PLAN.varonheim, [x0, y0, x1, y1] = P.area, cx = CAPITAL.x, gy = CAPITAL.y - 11;
+  const at = { farmhand: [cx, y1 + 4], hunter: [x0 + 4, gy], apprentice: [x0 + 12, y0 + 22], soldier: [x1 - 15, y1 - 12], wanderer: [P.square[0] + 4, P.square[1] + 3] }[origin] || [P.square[0], P.square[1] + 3];
+  return freeSpotNear('world', at[0], at[1], 4) || freeSpotNear('world', P.square[0], P.square[1] + 3, 4);
+}
+const CAP_QUARTER = { farmhand: 'auf den Königsfeldern vor dem Südtor', hunter: 'am Westtor bei den Wildhändlern', apprentice: 'im Tempelviertel beim Heiler', soldier: 'bei der Garnison im Südosten', wanderer: 'in der Taverne am Markt' };
+function capStart(p, o, ok) {
+  S.flags.startCap = 1; S.flags.keepHint = 0;
+  chronicle(`${p.name} bricht in Varonheim auf`, 'birth', `${o.name}. Die Hauptstadt ist laut, eng und hungrig. Irgendwo hier fängt es an.`);
+  log(`Du erwachst in Varonheim, ${CAP_QUARTER[ok] || 'am Markt'}.`, 'world');
+  log('Am Anschlagbrett auf dem Markt hängen Aufträge für Anfänger. Im Norden liegt die Varonsburg — am Burgtor wird nach Waffen durchsucht. Die Königsstraße führt nach Westen nach Nordfurt.', 'world');
+  log('Tipp: H öffnet den Kodex mit allen Regeln. Du hast einen Talentpunkt — die Fähigkeiten findest du im Menü „Kräfte“.', 'world');
+  S.contracts = (S.contracts || []).filter(c => !(c.town === 'varonheim' && c.giver === 'board' && c.state === 'offer'));
+  const mk = (kind, title, desc, o2 = {}) => { const C = makeContract('varonheim', kind, 'board'); Object.assign(C, { title, desc, starter: true }, o2); C.reward.gold = Math.min(C.reward.gold, 60); S.contracts.push(C); return C; };
+  mk('patrol', 'Wegmarken der Stadtwache', 'Die Stadtwache ist dünn geworden. Geh die drei Wegmarken vor den Mauern ab und sieh nach, ob alles ruhig ist.');
+  const d = mk('deliver', 'Botengang nach Nordfurt', 'Ein versiegelter Brief der Kanzlei muss nach Nordfurt. Kein Umweg, keine Fragen.', { target: 'northcity' }); if (TOWN_PLAN.northcity) [d.tx, d.ty] = TOWN_PLAN.northcity.square;
+  mk('hunt', 'Wolfsfelle für den Kürschner', 'Die Wölfe vom Kronfels reißen Schafe auf den Königsfeldern. Der Kürschner zahlt für jeden Pelz, die Bauern für die Ruhe.', { need: 3 });
+  (S.conDay ||= {})['varonheim:board'] = S.day | 0;
+}
 function bindSim() {
   SIM.H.spawnEnemy = spawnEnemy; SIM.H.cultDrain = cultDrain;   /* §5g.2 */
   SIM.H.pushOut = pushOut; SIM.H.inView = inView;                     // AUDIT: Heere und Räuber erscheinen außerhalb des Bildes
@@ -13201,7 +13228,8 @@ function cultHour(h) {
   if (C.stage && !C.crown && !C.crowned && (C.stage >= 3 || day >= 45 - (S.difficulty === 'sehr_schwer' ? 15 : 0)) && !afterHeals()) {   /* Entwickler: Sehr schwer 15 Tage früher, Angsthase ohne Krönung */ C.crown = day + 20; log(`Am Hof flüstert man von einer „Roten Krönung“. Was immer das ist — es soll in zwanzig Tagen geschehen (Tag ${C.crown}).`, 'quest'); }
   if (C.crown && day >= C.crown && h === 3 && C.end !== 'ruling' && !C.crowned && !SIM.capitalFallen()) cultCrown();   /* RB-043 */
   if (C.end === 'hidden' || C.end === 'ruling') { if (h === 23 && day % 5 === 0) cultTake(); return; }   /* Scheibe 5: der Kult arbeitet weiter, leiser */
-  if (!C.stage) { if (here && day >= 3) cultStart('Du bist in Varonheim.'); else if (S.flags.varonAudience) cultStart('Nach der Audienz beim König hört man es überall:'); else if (day >= 12) cultStart('Aus der Hauptstadt kommen Gerüchte.'); return; }
+  const capD = S.flags.startCap ? (S.player.level >= 5 ? 10 : 16) : 3;   /* Umbau S5: wer in Varonheim beginnt, hat erst Ruhe */
+  if (!C.stage) { if (here && day >= capD) cultStart('Du bist in Varonheim.'); else if (S.flags.varonAudience) cultStart('Nach der Audienz beim König hört man es überall:'); else if (day >= Math.max(12, S.flags.startCap ? 16 : 0)) cultStart('Aus der Hauptstadt kommen Gerüchte.'); return; }
   if (C.stage >= 4) return;                                    /* ab der Enthüllung (Scheibe 4) wartet der Kult in der Krypta */
   if (h === 23 && (day % 2 === 0 || C.extraTake)) { C.extraTake = false; cultTake(); }
   { const caged = C.missing.filter(m => !m.freed && !m.thrall && !m.dead);   /* Scheibe 3: nach sechs Tagen (oder ab dem fünften im Pferch) wird ein Gefangener zum Blutknecht */
@@ -18587,6 +18615,18 @@ export function selftest() {
       return o1 === 15 && o2 === 45 && hid && caught && ordered && got;
     } finally { S.flags = f0; S.keepDepot = D0; S.keepPass = K0; S.keepStash = J0; S.factions.valen = v0; S.ranks.valen = r0; S.factions.aurel = a0; S.gold = g0; Object.assign(p.equip, e0); p.inv = i0; S.party = pt0; [p.map, p.x, p.y] = m0; p.skills.stealth = sk0; S.fameStyle = st0; UI.closeDialogue(); }
   }));
+  ok('Varonheim-Umbau S5 (Start): jede Herkunft hat ein erreichbares Startviertel in oder an Varonheim; drei Anfängeraufträge am Brett; Kult für Hauptstädter frühestens Tag 10', sandbox(() => {
+    const p = stage(), C0 = S.contracts, CD = structuredClone(S.conDay || {}), f0 = structuredClone(S.flags), cu0 = S.cult ? structuredClone(S.cult) : null;
+    try { const spots = Object.keys(ORIGINS).map(capStartSpot), P = TOWN_PLAN.varonheim, [x0, y0, x1, y1] = P.area;
+      const near = spots.every(q => q && q.x / TS >= x0 - 8 && q.x / TS <= x1 + 8 && q.y / TS >= y0 - 2 && q.y / TS <= y1 + 8 && !SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)));
+      S.contracts = []; capStart(p, ORIGINS.wanderer, 'wanderer'); const B2 = S.contracts.filter(c => c.town === 'varonheim' && c.starter); const three = B2.length === 3 && B2.some(c => c.kind === 'deliver' && c.target === 'northcity') && B2.every(c => c.reward.gold <= 60);
+      const kept = townContracts('varonheim', 'board').filter(c => c.starter).length === 3;
+      S.cult = { stage: 0, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; S.flags.startCap = 1; const lv = p.level; p.level = 1; const d0 = S.day;
+      S.day = 9; cultHour(12); const quiet = !S.cult.stage; p.level = lv; S.day = d0;
+      if (!(near && three && kept && quiet)) console.log('Start-Probe', { near, three, kept, quiet, spots: spots.map(q => q && [q.x / TS | 0, q.y / TS | 0]) });
+      return near && three && kept && quiet;
+    } finally { S.contracts = C0; S.conDay = CD; S.flags = f0; S.cult = cu0; }
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -18725,6 +18765,10 @@ function buildCreation() {
   if (db) { db.innerHTML = ''; const showD = () => { $('cr-diff-desc').textContent = DIFF[diff].desc; };
     for (const [k, D] of Object.entries(DIFF)) { const b = el2('button', 'build' + (k === diff ? ' sel' : ''), D.name); b.onclick = () => { diff = k; [...db.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showD(); }; db.appendChild(b); }
     showD(); }
+  let startAt = 'varonheim'; const sb = $('cr-start');                  /* Varonheim-Umbau S5: Startort, Vorgabe Hauptstadt */
+  if (sb) { sb.innerHTML = ''; const showS = () => { $('cr-start-desc').textContent = START_AT[startAt].desc; };
+    for (const [k, D] of Object.entries(START_AT)) { const b = el2('button', 'build' + (k === startAt ? ' sel' : ''), D.name); b.onclick = () => { startAt = k; [...sb.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showS(); }; sb.appendChild(b); }
+    showS(); }
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
     const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).map(s => SKILL_NAMES[s] || s).join(', ')}</small>`);
@@ -18762,7 +18806,7 @@ function buildCreation() {
     const house = ($('cr-house').value || name).slice(0, 18);
     if (creation.hook) { const h = creation.hook; creation.hook = creation.back = null; $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); return h({ name, house, origin, pal: { ...pal }, build }); }   /* Koop: der Gast erstellt seinen eigenen Charakter */
     bindInput();
-    newGame({ name, house, origin, pal, build, difficulty: diff });
+    newGame({ name, house, origin, pal, build, difficulty: diff, start: startAt });
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); const b = creation.back; creation.hook = creation.back = null; b?.(); };
 }
