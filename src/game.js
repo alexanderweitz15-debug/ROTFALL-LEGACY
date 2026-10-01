@@ -3661,6 +3661,9 @@ function die(c, cause = 'Wunden', source) {
   }
   // Person
   const isParty = S.party.includes(c.id);
+  { const byP = source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id;
+    if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
+    if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP); }   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
@@ -5171,7 +5174,8 @@ function arrestCheck(g, p, dt) {
   if (!g.guard || g.angry || g.downed || p.downed || p.cineGhost || p.map !== g.map || UI.dialogueOpen()) return false;
   if (S.bond || S.jail || g.bondGuard) return false;   // S15 (Nutzer-Bug): wer schon in Ketten oder im Kerker sitzt, wird nicht noch einmal festgenommen
   const fac = crimeFaction(g), b = (S.bounty || {})[fac] || 0;
-  if (['kerker', 'sky', 'deck', 'isle', 'vault', 'tower'].includes(p.map)) return false;   // S15: keine Festnahme im Kerker, auf der Himmelsinsel, auf See, in Gewölben
+  if (['kerker', 'sky', 'deck', 'isle', 'vault', 'tower'].includes(p.map)) return false;
+  if (p.map === 'world' && (S.schutz?.[townAt(p.x / TS | 0, p.y / TS | 0)]?.stage || 0) === 3) return false;   /* S2: in gesetzlosen Städten verhaftet niemand */   // S15: keine Festnahme im Kerker, auf der Himmelsinsel, auf See, in Gewölben
   if ((S.resist?.until || 0) > clock() && (!S.resist.fac || S.resist.fac === fac) && dist(g, p) < 320) { g.angry = true; g.brave = true; g.aggroId = p.id; g.sawPlayer = clock(); return false; }   /* Nutzer: nach Widerstand fragt keine Wache mehr „zahlen oder mitkommen“ — sie kämpfen, höchstens 10 Minuten */
   if (banned(fac) && !(g.wary > clock()) && dist(g, p) < 260) { g.angry = true; g.brave = true; g.aggroId = p.id; g.sawPlayer = clock(); return false; }   // S12 Blutbann
   if (!b || (S.flags.arrestCd || 0) > clock() || dist(g, p) > 240) return false;
@@ -6881,9 +6885,9 @@ function townContracts(town, giver) {
   if ((S.conDay[key] ?? -99) + 3 <= (S.day | 0)) {                    // alle 3 Tage neu: offene Angebote verfallen, laufende bleiben
     for (const c of S.contracts) if (c.town === town && c.giver === giver && c.state === 'offer' && c.day < (S.day | 0) - 2) ignoredContract(c);   // S13: niemand hat es erledigt
     S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer'));
-    const n = Math.max(1, (giver === 'vm' ? 3 : TOWN_PLAN[town]?.village ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
+    const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : TOWN_PLAN[town]?.village ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
     for (let i = 0; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
-    if (giver === 'board') { const C = smuggleContract(town); if (C) S.contracts.push(C); }   // S13: der Krieg schreibt eigene Aushänge
+    if (giver === 'board' && n) { const C = smuggleContract(town); if (C) S.contracts.push(C); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine)
     S.conDay[key] = S.day | 0;
   }
   return S.contracts.filter(c => c.town === town && c.giver === giver && c.state !== 'claimed');
@@ -6991,7 +6995,7 @@ function growTown(town, type) {
 function growthDay() {
   for (const t of Object.keys(TOWN_PLAN)) { if (!growable(t)) continue;
     const G = growthOf(t), fac = townFac(t), occ = S.war?.nodes[t]?.owner === 'undead', raided = S.deadRaid?.v === t;
-    G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25, -20, 100);
+    G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25 - (({ 2: 4, 3: 8 })[S.schutz?.[t]?.stage] || 0), -20, 100);   /* S2: schutzlos −4, gesetzlos −8 */
     if (G.prosper >= 100) growNow(t);
     const last = G.built.filter(s => !s.ruin).pop();
     if (G.prosper <= -20 && last) { last.ruin = true; const b = HOUSES.find(h => h.id === 'g' + t + '_' + last.x + '_' + last.y); if (b) b.wear = 2; G.prosper = 0; log(`${townName(t)} schrumpft: ein neues Haus steht leer und verfällt.`, 'world'); }
@@ -8350,7 +8354,7 @@ function capitalFall(why = 'Heerzug') {
     S.flags.varonFreed = [0, 1, 2];
   }
   if (S.cult?.end === 'ruling') { S.cult.end = 'hidden'; cultAfter('hidden'); chronicle('Aldhelm verliert den Hof', 'news', 'Ohne Stadt kein Reichsverweser. Der Kelch zieht sich in die Krypta zurück.'); }
-  ensureVaronExile(); capitalScene('fell');   /* T17: der Fall als Szene (nur in der Welt, nie in Proben) */
+  ensureVaronExile(); ensureVaronCourt(); capitalScene('fell');   /* T17: der Fall als Szene (nur in der Welt, nie in Proben) */   /* F-A: die Burg leert sich sofort, kein zweiter Varon */
   if (afterLive()) {
     S.ents.world = S.ents.world.filter(e => !e.capGuard);
     for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && e.shop && (e.homeTown === k || e.town === k || townAt(e.x / TS | 0, e.y / TS | 0) === k)) { e.shopClosed = 1e12; e.fallShut = k; }
@@ -8363,8 +8367,10 @@ function capitalFall(why = 'Heerzug') {
 // Nordfurt, Eren). Ohne eigene Stadt ist der König verschollen. Gespeichert wird nur S.after.capital.
 function ensureVaronExile() {
   S.ents.world = S.ents.world.filter(e => !e.exileCourt);
-  const A = S.after?.capital; if (!A || A.retaken != null || !SIM.capitalFallen()) return;
-  const k = A.exile && S.war.nodes[A.exile]?.owner === 'valen' ? A.exile : SIM.exileOf(); A.exile = k; A.kingLost = !k; if (!k || !TOWN_PLAN[k]) return;
+  const A = S.after?.capital, FL = !SIM.capitalFallen() && S.flags.varonFled;   /* S2: vorzeitige Flucht des Königs */
+  if (!FL && (!A || A.retaken != null || !SIM.capitalFallen())) return;
+  let k; if (FL) { k = S.war?.nodes?.[FL.to]?.owner === 'valen' ? FL.to : (FL.to = SIM.exileOf()); } else { k = A.exile && S.war.nodes[A.exile]?.owner === 'valen' ? A.exile : SIM.exileOf(); A.exile = k; A.kingLost = !k; }
+  if (!k || !TOWN_PLAN[k]) return;
   const [sx, sy] = TOWN_PLAN[k].square;
   const put = (name, prof, dx, dy, o = {}) => { const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
     Object.assign(c, { exileCourt: true, varonCourt: true, exile: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.world.push(c); return c; };
@@ -8405,7 +8411,63 @@ const guardTownOf = c => c.post && !c.raidDef && !c.avenger && !c.exileCourt && 
 function schutzSoll(k) { if (k === 'varonheim') return 10; if (GUARD_POSTS[k]) return GUARD_POSTS[k].posts.length; const P = TOWN_PLAN[k]; return P?.lord === 'aurel' ? (P.metro ? 20 : 8) : 0; }
 const schutzOf = k => ((S.schutz ||= {})[k] ||= { lost: 0, byP: 0, stage: 0 });
 const schutzAlive = k => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.guard && guardTownOf(e) === k).length;
-const SCHUTZ_NAME = ['Bewacht', 'Geschwächt', 'Schutzlos'];
+const SCHUTZ_NAME = ['Bewacht', 'Geschwächt', 'Schutzlos', 'Gesetzlos', 'Übernommen'];
+// Stadt ohne Schutz S2 (Entwickler 01.10.2026, PROPOSALS/stadt_ohne_wachen_s2.md): kommt kein Ersatz, wird eine schutzlose Stadt nach
+// einer Frist gesetzlos (Frist je Schritt: Angsthase 4, Schwer 2, Sehr schwer 1 Tag). Gesetzlos: keine Verhaftung, keine Aushänge,
+// Kaufen ×1,25, Wohlstand −8/Tag, nachts Plünderer (jeder erschlagene +3 beim Herrn, höchstens +12 je Nacht). Ersatz hält die Uhr an.
+const schutzWait = () => ({ angsthase: 4, sehr_schwer: 1 })[S.difficulty] ?? 2;
+function schutzLawless(k) {
+  const Z = schutzOf(k), name = townName(k), p = S.player, sq = TOWN_PLAN[k]?.square || [0, 0], near = p.map === 'world' && Math.hypot(p.x / TS - sq[0], p.y / TS - sq[1]) < 60;
+  Z.stage = 3; Z.since = S.day | 0;
+  afterSay(`${name} ist gesetzlos`, `In ${name} verhaftet niemand mehr. Plünderer ziehen nachts durch die Gassen, Aushänge gibt es keine, und wer kann, zieht fort. Kommt kein Ersatz, nimmt sich bald jemand die Stadt.`, 'war', !near);
+  if (near) UI.toast(`${name.toUpperCase()} IST GESETZLOS`, 3000);
+  if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') SIM.threatBump(2);
+}
+function schutzLift(k) {
+  S.ents.world = S.ents.world.filter(e => e.lawless !== k);
+  log(`In ${townName(k)} herrscht wieder Gesetz.`, 'world');
+}
+function lawlessHour(h) {
+  const p = S.player, night = h >= 22 || h <= 4;
+  for (const [k, Z] of Object.entries(S.schutz || {})) {
+    const sq = TOWN_PLAN[k]?.square; if (!sq) continue;
+    const d = p.map === 'world' ? Math.hypot(p.x / TS - sq[0], p.y / TS - sq[1]) : 999;
+    if ((Z.stage || 0) !== 3 || d > 90) { if (S.ents.world.some(e => e.lawless === k)) S.ents.world = S.ents.world.filter(e => e.lawless !== k); continue; }
+    if (!night || d > 60 || Z.lawN === (h >= 22 ? S.day | 0 : (S.day | 0) - 1)) continue;
+    Z.lawN = h >= 22 ? S.day | 0 : (S.day | 0) - 1; Z.lawThx = 0;
+    for (let i = 0, n = ri(2, 4); i < n; i++) { const q = freeSpotNear('world', sq[0] + ri(-6, 6), sq[1] + ri(-4, 4), 3); if (!q) continue;
+      const b = spawnEnemy(i ? 'bandit' : 'bandit_archer', 'world', q.x / TS | 0, q.y / TS | 0, { transient: true }); b.lawless = k; b.anchor = { x: sq[0] * TS, y: sq[1] * TS }; b.name = 'Plünderer';
+      const v = S.ents.world.filter(e => e.kind === 'npc' && e.alive && !e.guard && e.homeTown === k).sort((a, c) => dist(a, b) - dist(c, b))[0]; if (v) b.aggroId = v.id; }
+    log(`Plünderer ziehen durch ${townName(k)}. Wer sie vertreibt, dem danken es die Bürger.`, 'combat');
+  }
+}
+// Burgwache der Varonsburg (S2 §5): tote Burgwachen bleiben tot (S.schutzBurg), Ersatz kommt erst, wenn die Stadtwache vollzählig ist.
+// Hat der Spieler die Burgwache weitgehend erschlagen, während die Stadt schutzlos ist, flieht König Varon vorzeitig ins Exil — die
+// Stadt bleibt der Krone, der Hof ganz; er kehrt zurück, wenn Stadt- und Burgwache drei Tage lang wieder stehen.
+const BURG_GUARDS = 7;
+function burgLoss(c, byP) {
+  const B2 = (S.schutzBurg ||= { lost: 0, byP: 0 }); B2.lost = Math.min(BURG_GUARDS, B2.lost + 1); if (byP) B2.byP = Math.min(B2.lost, B2.byP + 1);
+  varonFlee();
+}
+function varonFlee() {
+  const B2 = S.schutzBurg || {}, F = S.flags;
+  if ((B2.lost || 0) < 5 || (B2.byP || 0) < 3 || (S.schutz?.varonheim?.stage || 0) < 2 || SIM.capitalFallen() || F.varonDead || F.varonFled || S.cult?.end === 'ruling') return false;
+  const to = SIM.exileOf(); if (!to) return false;
+  F.varonFled = { day: S.day | 0, to, evac0: F.varonEvac || 0, ok: 0 }; F.varonEvac = 1;
+  ensureVaronCourt(); ensureVaronExile();
+  const p = S.player, near = p.map === 'world' && Math.hypot(p.x / TS - CAPITAL.x, p.y / TS - CAPITAL.y) < 70;
+  afterSay('König Varon flieht', `König Varon flieht aus Varonheim nach ${townName(to)}. Die Stadt gehört weiter der Krone — nur der König fehlt. Er kehrt zurück, wenn Stadt- und Burgwache wieder stehen.`, 'war', !near);
+  if (near && afterLive()) nameCard('DER KÖNIG FLIEHT', 'Varon verlässt seine Stadt durch die Ausfallpforte.', 3400);
+  return true;
+}
+function burgDay() {
+  const B2 = S.schutzBurg, F = S.flags, cityOk = !(S.schutz?.varonheim);
+  if (B2?.lost && cityOk) { B2.lost = Math.max(0, B2.lost - 2); B2.byP = Math.min(B2.byP, B2.lost); if (afterLive()) ensureVaronCourt(); log(`Zwei neue Burgwachen ziehen in die Varonsburg ein.${B2.lost ? '' : ' Die Burgwache ist wieder vollzählig.'}`, 'world'); }
+  if (!F.varonFled) return;
+  if (SIM.capitalFallen()) return;
+  F.varonFled.ok = cityOk && !(B2?.lost) ? (F.varonFled.ok || 0) + 1 : 0;
+  if (F.varonFled.ok >= 3) { F.varonEvac = F.varonFled.evac0; delete F.varonFled; ensureVaronExile(); ensureVaronCourt(); log('Der König kehrt nach Varonheim zurück.', 'world'); chronicle('Varon kehrt heim', 'news', 'Die Wache steht wieder. Der König sitzt wieder auf seinem Thron.'); }
+}
 function schutzLoss(c, byP) {
   const k = guardTownOf(c), soll = schutzSoll(k), Z = schutzOf(k); Z.lost = Math.min(soll, Z.lost + 1); Z.at = S.day | 0;
   if (byP) { Z.byP = Math.min(Z.lost, Z.byP + 1); const f = townFac(k); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] - 4, -100, 100); }
@@ -8414,14 +8476,16 @@ function schutzLoss(c, byP) {
 }
 function schutzCheck(k) {
   const Z = schutzOf(k), soll = schutzSoll(k), r = soll ? Z.lost / soll : 0, was = Z.stage;
-  Z.stage = r >= 0.8 || (Z.lost > 0 && !schutzAlive(k)) ? 2 : r >= 0.5 ? 1 : 0;
+  const s0 = r >= 0.8 || (Z.lost > 0 && !schutzAlive(k)) ? 2 : r >= 0.5 ? 1 : 0;
+  Z.stage = s0 === 2 && was >= 3 ? was : s0;                         /* S2: gesetzlos/übernommen bleibt, solange die Wache fehlt */
   if (Z.stage >= 2 && was < 2) schutzAlarm(k);
+  if (Z.stage < 2 && was >= 3) schutzLift(k);
   if (Z.stage < 2 && was >= 2) schutzCalm(k);
   if (!Z.lost && !Z.stage) delete S.schutz[k];
 }
 function schutzAlarm(k) {
   const Z = schutzOf(k), name = townName(k), f = townFac(k), p = S.player, P = TOWN_PLAN[k], sq = P?.square || [0, 0], near = p.map === 'world' && Math.hypot(p.x / TS - sq[0], p.y / TS - sq[1]) < 60, guilty = Z.byP / Math.max(1, Z.lost) >= 0.5;
-  Z.alarm = S.day | 0;
+  Z.alarm = S.day | 0; Z.since = S.day | 0;
   afterSay(`${name} ist schutzlos`, `In ${name} läutet die Sturmglocke: Die Wache ist gefallen${guilty ? ' — durch deine Hand' : ''}. Wer kann, flieht; die Läden sind zu, eine Miliz sammelt sich am Platz. ${schutzReinfText(k)}`, 'war', !near);
   if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') { SIM.threatBump(3);   /* nie über 19: der Alarm allein löst keinen Heerzug aus */ log('Morvaths Späher sehen offene Tore in Varonheim. Die Gefahr für die Hauptstadt wächst.', 'faction'); }
   const to = travelTowns().filter(x => x !== k && (townFac(x) === f || !townFac(x)) && !townDanger(x)).sort((a, b) => townGap(k, a) - townGap(k, b))[0];
@@ -8462,11 +8526,14 @@ function schutzBlocked(k, f) {
 }
 function schutzReinfText(k) { const f = townFac(k), R = SCHUTZ_REINF[f]; return !R ? 'Ersatz kommt nicht.' : schutzBlocked(k, f) ? `${FACTIONS[f]?.name || 'Der Herr'} schickt vorerst keinen Ersatz.` : `${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz (${R[1] >= 99 ? 'alle' : R[1]} Mann alle ${R[0] > 1 ? R[0] + ' Tage' : 'Tage'}).`; }
 function schutzDay() {
-  const day = S.day | 0;
+  const day = S.day | 0; burgDay();
   for (const [k, Z] of Object.entries(S.schutz || {})) {
     if (!Z.lost) { schutzCheck(k); continue; }
-    const f = townFac(k), R = SCHUTZ_REINF[f]; if (!R || day - (Z.at || 0) < R[0] || day - (Z.reinf || 0) < R[0] || schutzBlocked(k, f)) continue;
-    const n = Math.min(Z.lost, R[1]); Z.reinf = day; Z.lost -= n; Z.byP = Math.max(0, Math.min(Z.byP, Z.lost));
+    const f = townFac(k), R = SCHUTZ_REINF[f];
+    if (!R || day - (Z.at || 0) < R[0] || day - (Z.reinf || 0) < R[0] || schutzBlocked(k, f)) {   /* S2: kein Ersatz — die Frist läuft */
+      if ((Z.stage || 0) >= 2) { Z.since ??= day; if (Z.stage === 2 && day - Z.since >= schutzWait()) schutzLawless(k); }
+      continue; }
+    const n = Math.min(Z.lost, R[1]); Z.reinf = day; Z.since = day; Z.lost -= n; Z.byP = Math.max(0, Math.min(Z.byP, Z.lost));
     if (f === 'merch') growthOf(k).prosper -= 5 * n;
     if (f === 'valen') { const src = Object.keys(S.war?.nodes || {}).filter(x => x !== k && TOWN_PLAN[x] && S.war.nodes[x].owner === 'valen' && S.war.nodes[x].garrison > 15).sort((a, b) => townGap(k, a) - townGap(k, b))[0]; if (src) S.war.nodes[src].garrison -= n; }
     if (k === 'varonheim') { const N = S.war?.nodes?.varonheim; if (N?.owner === 'valen') N.garrison = Math.min(SIM.CAP_SIEGE.gcap, N.garrison + SIM.CAP_SIEGE.guardBack * n);   /* Entwickler: Ersatz bringt die Besatzung zurück */
@@ -8502,7 +8569,7 @@ function capitalFreed() {
   for (const [id, d] of Object.entries(S.flags.raidDamage || {})) if (HOUSES.find(h => h.id === id)?.town === k) d.perm = false;
   const G = growthOf(k); G.prosper = Math.max(0, G.prosper - 30);
   if (afterLive()) capitalMigrate();
-  ensureVaronExile();                                             /* der Exilhof kehrt heim (ohne die Zerstreuten) */
+  ensureVaronExile(); ensureVaronCourt();                         /* der Exilhof kehrt heim (ohne die Zerstreuten) */   /* F-B: Hof wieder in der Burg */
   const p = S.player, byP = p.map === 'world' && Math.hypot(p.x / TS - CAPITAL.x, p.y / TS - CAPITAL.y) < 40;
   if (byP && S.flags.retakeAsked) { delete S.flags.retakeAsked; S.gold += 400; S.factions.valen = clamp((S.factions.valen || 0) + 20, -100, 100); log('Der Hof kehrt heim. Für die Rückeroberung: 400 Gold, Valen +20.', 'quest'); }
   afterSay('Varonheim ist frei', 'Varonheim ist befreit. Die Königsgarde zieht wieder auf, die Läden öffnen, die Häuser werden Tag für Tag wieder aufgebaut. Die Stadt ist ärmer als zuvor.', 'war');
@@ -8527,18 +8594,20 @@ function ensureVaronCourt() {
   const put = (name, prof, tx, ty, o = {}) => { const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
     pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; W.push(c); return c; };
   const tx = thr.x + (thr.w >> 1), ty = thr.y + 3;
-  if (!S.flags.varonDead) { const k = put('Varon', 'König', tx, ty, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
-  if ((S.cult?.stage || 0) < 4) put('Aldhelm', 'Kanzler', tx + 3, ty + 1, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
-  put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
-  put('Ysmay', 'Spitzelmeisterin', kan.x + 3, kan.y + 5, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
-  VARON_NOBLES.forEach(([n, pr], i) => { if ((S.flags.varonExecuted || []).includes(i) || (S.flags.varonScattered || []).includes(i)) return;
+  const fled = !!S.flags.varonFled;   /* S2: der König ist vorzeitig geflohen — der Hof mit ihm */
+  if (!S.flags.varonDead && !fled) { const k = put('Varon', 'König', tx, ty, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
+  if ((S.cult?.stage || 0) < 4 && !fled) put('Aldhelm', 'Kanzler', tx + 3, ty + 1, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
+  if (!fled) put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
+  if (!fled) put('Ysmay', 'Spitzelmeisterin', kan.x + 3, kan.y + 5, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
+  VARON_NOBLES.forEach(([n, pr], i) => { if (fled || (S.flags.varonExecuted || []).includes(i) || (S.flags.varonScattered || []).includes(i)) return;
     put(n, pr, nob.x + 2 + i * 3, nob.y + 4 + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }); });
   put('Grimm', 'Kerkermeister', ver.x + 3, ver.y + 2, { varonJailer: true, trait: 'gierig', greet: '„Spione aus Aurelion. Sagt der König. Ich sage: Kostgänger.“' });
   for (let i = 0; i < 3; i++) if (!(S.flags.varonFreed || []).includes(i)) put(['Lucan', 'Serin', 'Maro'][i], 'Gefangener aus Aurelion', ver.x + 2 + i * 2, ver.y + ver.h - 3, { varonPrisoner: i, faction: null, trait: 'furchtsam', cloth: '#6a6258', greet: '„Ich bin Händler! Kein Spion! Sag es ihnen!“' });
   put('Hagen', 'Schmied', smi.x + 4, smi.y + 4, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Kronstahl. Für die, die dem König dienen — oder zahlen.“' });
   put('Hofmar', 'Hoflieferant', cx - 10, yard + 1, { shop: true, market: false, pool: ['potion', 'bandage', 'bread', 'dried_meat', 'wasserschlauch', 'iron'], greet: '„Proviant für die Front. Und für den Hof, natürlich zum Hofpreis.“' });
-  for (const [x, y] of [[tx - 3, thr.y + thr.h + 1], [tx + 3, thr.y + thr.h + 1], [thr.x + 2, ty], [thr.x + thr.w - 3, ty], [cx - 20, yard], [cx + 20, yard]]) { const q = freeSpotNear('world', x, y, 2); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { varonCourt: true, courtFolk: true, transient: true, visitor: true, guard: true }); W.push(g); }
-  { const [gx, gy] = CAPITAL.keep, q = freeSpotNear('world', gx + 2, gy + 2, 2); if (q) { const g = guardChar('valen', q, 'Torwache der Burg', 13); Object.assign(g, { name: 'Gerold', varonCourt: true, keepWarden: true, transient: true, visitor: true, guard: true, anchor: { x: q.x, y: q.y }, greet: '„Burgfrieden. Keine Klinge in des Königs Halle.“' }); W.push(g); } }   /* Umbau S3: Torwache */
+  const burgLost = S.schutzBurg?.lost || 0;
+  for (const [x, y] of [[tx - 3, thr.y + thr.h + 1], [tx + 3, thr.y + thr.h + 1], [thr.x + 2, ty], [thr.x + thr.w - 3, ty], [cx - 20, yard], [cx + 20, yard]].slice(0, Math.max(0, BURG_GUARDS - 1 - burgLost))) { const q = freeSpotNear('world', x, y, 2); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { varonCourt: true, courtFolk: true, transient: true, visitor: true, guard: true }); W.push(g); }
+  if (burgLost < BURG_GUARDS) { const [gx, gy] = CAPITAL.keep, q = freeSpotNear('world', gx + 2, gy + 2, 2); if (q) { const g = guardChar('valen', q, 'Torwache der Burg', 13); Object.assign(g, { name: 'Gerold', varonCourt: true, keepWarden: true, transient: true, visitor: true, guard: true, anchor: { x: q.x, y: q.y }, greet: '„Burgfrieden. Keine Klinge in des Königs Halle.“' }); W.push(g); } }   /* Umbau S3: Torwache */
   prop('sign', CAPITAL.keep[0] - 2, CAPITAL.keep[1] + 2, { label: 'Burgfrieden. Keine Waffen in des Königs Halle. Abgabe in der Waffenkammer.' });
   for (let i = 0; i < 3; i++) put(pick(['Mette', 'Kuno', 'Ilse', 'Bero']), pick(['Diener', 'Magd', 'Stallknecht']), cx - 6 + i * 6, yard - 2, { faction: null, courtFolk: true, greet: pick(['„Nicht so laut. Der König hört alles.“', '„Der Kanzler bestimmt, was der König isst. Und was er denkt.“']) });
 }
@@ -10190,6 +10259,7 @@ function hourTick(h) {
   aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
   afterHour();                                                               /* Folgen §5c: Rachezüge, Ansteckung */
   cultHour(h);                                                               /* §5g.2 Blutkult */
+  lawlessHour(h);                                                            /* Stadt ohne Schutz S2: Plünderer */
   fortressHour();                                                            // S12: Tore der Eisenfeste
   travelHour();                                                              // S13: Reisende
   if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
@@ -13451,7 +13521,7 @@ function cultEnd(kind) {
 function cultDrain() { const C = S.cult; return !C ? 0 : C.end === 'ruling' ? 1 : C.end === 'hidden' || (C.end === 'player' && C.tithe) ? 0.5 : 0; }   /* weniger Nachschub für Valen */
 function cultAfter(kind) { AF().cult = { end: kind, day: S.day | 0 }; }
 function cultCrown() {
-  const C = S.cult; if (!C || C.end === 'destroyed' || C.end === 'player' || C.aldhelmDead || C.crowned) return;   /* RB-043/RB-044: einmal, nur mit lebendem Aldhelm */
+  const C = S.cult; if (!C || C.end === 'destroyed' || C.end === 'player' || C.aldhelmDead || C.crowned || S.flags.varonFled) return;   /* RB-043/RB-044: einmal, nur mit lebendem Aldhelm */   /* F-D: ist der König geflohen, ruht die Krönung */
   C.crowned = S.day | 0; C.crown = null; S.ents.world = S.ents.world.filter(e => !(e.exileCourt && e.varonKing));
   C.end = 'ruling'; C.stage = Math.max(C.stage, 4); cultAfter('ruling');
   if (!S.flags.varonDead) { S.flags.varonDead = S.day | 0; courtDrop(e => e.varonKing); }
@@ -15064,6 +15134,10 @@ function debugSections() {
       'Stadt ohne Schutz: Status hier': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!k || !schutzSoll(k)) return UI.toast('Keine Stadt mit Wachposten hier.'); const Z = S.schutz?.[k] || { lost: 0, byP: 0, stage: 0 }; UI.toast(`${townName(k)}: ${SCHUTZ_NAME[Z.stage]} · Soll ${schutzSoll(k)} · lebend ${schutzAlive(k)} · fehlen ${Z.lost} (du: ${Z.byP}) · ${schutzReinfText(k)}`, 6000); },
       'Stadt ohne Schutz: alle Wachen hier töten (als Spieler)': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); for (const g of S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.guard && guardTownOf(e) === k)) die(g, 'Debug', p); },
       'Stadt ohne Schutz: Tag vorspulen (Ersatz)': () => { for (const Z of Object.values(S.schutz || {})) { Z.at -= 3; Z.reinf = (Z.reinf || 0) - 3; } schutzDay(); },
+      'Stadt ohne Schutz: Frist vorspulen (alle)': () => { for (const Z of Object.values(S.schutz || {})) Z.since = (Z.since ?? S.day) - 5; schutzDay(); UI.toast('Frist vorgespult'); },
+      'Stadt ohne Schutz: Plünderer jetzt': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4), Z = k && S.schutz?.[k]; if (!Z || Z.stage !== 3) return UI.toast('Keine gesetzlose Stadt hier.'); delete Z.lawN; lawlessHour(23); },
+      'Burgwache töten (als Spieler)': () => { for (const g of courtEnts().filter(e => e.guard && e.alive)) die(g, 'Debug', p); UI.toast(`Burgwache: ${S.schutzBurg?.lost || 0} tot${S.flags.varonFled ? ', König geflohen' : ''}`); },
+      'König-Flucht zurücksetzen': () => { if (S.flags.varonFled) { S.flags.varonEvac = S.flags.varonFled.evac0; delete S.flags.varonFled; } S.schutzBurg = { lost: 0, byP: 0 }; ensureVaronExile(); ensureVaronCourt(); UI.toast('Hof wieder in der Burg'); },
       'Stadt ohne Schutz: zurücksetzen (alle)': () => { for (const k of Object.keys(S.schutz || {})) { S.schutz[k].lost = 0; schutzCheck(k); } S.schutz = {}; },
       'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
@@ -18626,6 +18700,22 @@ export function selftest() {
       if (!(near && three && kept && quiet)) console.log('Start-Probe', { near, three, kept, quiet, spots: spots.map(q => q && [q.x / TS | 0, q.y / TS | 0]) });
       return near && three && kept && quiet;
     } finally { S.contracts = C0; S.conDay = CD; S.flags = f0; S.cult = cu0; }
+  }));
+  ok('Stadt ohne Schutz S2: Frist je Schritt (Schwer 2 Tage, Angsthase 4) → gesetzlos (keine Verhaftung, Kaufen ×1,25, keine Aushänge); Burgwache bleibt tot, König flieht vorzeitig ins Exil und kehrt nach 3 Tagen mit voller Wache heim', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, Z0 = structuredClone(S.schutz || {}), B0 = S.schutzBurg ? { ...S.schutzBurg } : null, f0 = structuredClone(S.flags), d0 = S.difficulty, C0 = S.contracts, CD = structuredClone(S.conDay || {}), m0 = [p.map, p.x, p.y], b0 = structuredClone(S.bounty || {}), fa0 = { ...S.factions }; S.ents.world = W0.slice();
+    try { const k = Object.keys(GUARD_POSTS).find(x => x !== 'varonheim' && townFac(x) === 'valen' && TOWN_PLAN[x] && S.war?.nodes?.[x]?.owner !== 'undead' && !heldBy(x)), soll = schutzSoll(k), day = S.day | 0, mk = since => { S.schutz = { [k]: { lost: soll, byP: 0, stage: 2, since, at: day, reinf: day } }; };
+      S.difficulty = 'schwer'; const pr0 = ECO.ecoPrice(k, 'grain', true); mk(day - 2); schutzDay(); const law = S.schutz[k].stage === 3;
+      const pr = ECO.ecoPrice(k, 'grain', true) / pr0, cheap = pr > 1.2 && pr < 1.3;
+      S.contracts = []; delete S.conDay[k + ':board']; const none = townContracts(k, 'board').length === 0;
+      const [sx, sy] = TOWN_PLAN[k].square; p.map = 'world'; p.x = sx * TS; p.y = sy * TS; S.bounty = { valen: 200 }; S.flags.arrestCd = 0; const g = guardChar('valen', { x: p.x + 20, y: p.y }, 'Wache', 5); g.map = 'world'; const free = !arrestCheck(g, p, 16); UI.closeDialogue();
+      S.difficulty = 'angsthase'; mk(day - 3); schutzDay(); const slow = S.schutz[k].stage === 2;
+      S.difficulty = d0; S.schutz = { varonheim: { lost: 10, byP: 10, stage: 2, since: day, at: day, reinf: day } }; S.schutzBurg = { lost: 5, byP: 3 }; delete S.flags.varonFled; delete S.flags.varonDead;
+      const fled = varonFlee() && !!S.flags.varonFled && S.flags.varonEvac === 1 && S.ents.world.some(e => e.exileCourt && e.varonKing) && !courtEnts().some(e => e.varonKing) && !SIM.capitalFallen();
+      const guards = courtEnts().filter(e => e.guard).length === BURG_GUARDS - 5;
+      S.schutz = {}; S.schutzBurg = { lost: 0, byP: 0 }; burgDay(); burgDay(); burgDay(); const home = !S.flags.varonFled && courtEnts().some(e => e.varonKing) && !S.ents.world.some(e => e.exileCourt);
+      if (!(law && cheap && none && free && slow && fled && guards && home)) console.log('Schutz-S2-Probe', { k, law, pr, none, free, slow, fled, guards, home });
+      return law && cheap && none && free && slow && fled && guards && home;
+    } finally { S.ents.world = W0; S.schutz = Z0; S.schutzBurg = B0; S.flags = f0; S.difficulty = d0; S.contracts = C0; S.conDay = CD; [p.map, p.x, p.y] = m0; S.bounty = b0; Object.assign(S.factions, fa0); ensureVaronCourt(); ensureVaronExile(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

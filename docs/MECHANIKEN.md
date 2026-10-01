@@ -869,3 +869,14 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Am Anschlagbrett hängen drei leichte Aufträge: Wegmarken der Stadtwache, Botengang nach Nordfurt, Wolfsfelle für den Kürschner.
 - Die ersten Log-Zeilen nennen Brett, Burgtor und Straße nach Nordfurt. Sie weisen auch auf den Kodex (H) und deinen ersten Talentpunkt hin.
 - Der Blutkult beginnt für Hauptstädter erst ab Tag 10, wenn du Stufe 5 hast; sonst ab Tag 16.
+
+## Stadt ohne Schutz — gesetzlos, Burgwache und Flucht des Königs (Scheibe 2a)
+- **Gesetzlos:** Kommt zu einer schutzlosen Stadt kein Ersatz, wird sie nach einer Frist gesetzlos. Die Frist beträgt auf Angsthase 4 Tage, auf Schwer 2, auf Sehr schwer 1. Jede Ankunft von Ersatz setzt die Frist zurück.
+- **Was dann gilt:** Niemand verhaftet mehr; das Kopfgeld bleibt aber stehen. Es gibt keine neuen Aushänge, Kaufen kostet ein Viertel mehr, und der Wohlstand sinkt um 8 je Tag (schutzlos: −4).
+- **Plünderer:** Nachts ziehen 2–4 Plünderer durch die Gassen. Jeder, den du erschlägst, bringt +3 Ruf beim Stadtherrn, höchstens +12 je Nacht.
+- Stehen genug Wachen wieder, herrscht wieder Gesetz.
+- **Varonheim** wird gesetzlos, aber nie übernommen. Die Gesetzlosigkeit treibt Morvaths Bedrohung etwas an.
+- **Burgwache:** Getötete Burgwachen der Varonsburg kommen beim Laden nicht wieder. Erst wenn die Stadtwache vollzählig ist, ziehen täglich zwei neue ein.
+- **Der König flieht:** Hast du mindestens 3 der Burgwachen erschlagen, und sind 5 tot, während Varonheim schutzlos ist, flieht König Varon mit dem Hof ins Exil. Die Stadt bleibt der Krone. Die Rote Krönung ruht, solange er fort ist. Stehen Stadt- und Burgwache 3 Tage lang wieder, kehrt er zurück.
+- Debug: „Stadt ohne Schutz: Frist vorspulen“, „Plünderer jetzt“, „Burgwache töten“, „König-Flucht zurücksetzen“.
+- Die Übernahme durch Tote, Banden oder die Kette folgt in Scheibe 2b.

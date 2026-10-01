@@ -129,6 +129,7 @@ export function ecoPrice(town, g, buy) {
   let f = clamp(target(t, g) / ((t.stock[g] || 0) + 1), 0.4, 3);
   if (isAurel(town)) f *= 1.15 * (S.tollMul || 1);   /* T09: Aurelions Zölle (Gesetz, Kaiserin, Spaltung) */
   if (occupied(town) && buy) f *= 1.5;   // S15: Besatzung macht Kaufen teuer, nicht Verkaufen
+  else if (buy && (S.schutz?.[town]?.stage || 0) === 3) f *= 1.25;   /* Stadt ohne Schutz S2: gesetzlos — Kaufen ein Viertel teurer */
   if (town === 'varonheim' && buy && (S.war?.capThreat || 0) >= 10 && ['grain', 'meat', 'salt', 'arms'].includes(g)) f *= 1 + Math.min(0.3, (S.war.capThreat - 9) * 0.02);   /* Scout R5: Hamsterkäufe, wenn Morvath droht (bis +30 %) */
   f *= (S.after?.pmul?.[g] || 1) * (S.after?.tmul?.[town] || 1);   /* Folgen §5c: Aufstand/Streik verteuern Waren, Flüchtlinge die Zielstadt */
   const p = ITEMS[g].value * f;
