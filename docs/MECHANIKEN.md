@@ -666,3 +666,122 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Stigma:** Wer dich trinken oder rasen sieht, weiß es; seine Macht vergisst es nicht. Valen und die Kette setzen Kopfgeld aus (einmal je Tag), der Orden schickt nach der zweiten Meldung Vampirjäger. Wer es weiß — oder dich ohne Kapuze mit Sonnenbrand oder roten Augen aus der Nähe sieht —, grüßt dich anders und verlangt mehr (Valen ×1,5, Händler und Aurelion ×1,2; Untote und der Kelch weniger). Orden und Kette weisen dich ab: kein Handel, kein Bett, keine Heilung.
 - **Heilung (beliebig oft):** *Mutter Aldis* in Sonnwacht — Buße 200 Gold (oder Ansehen beim Orden ≥ 0), dann eine Nachtwache bis zum Morgen (Blutdurst +40; erreicht er 100, entscheidet die Willenskraft — scheitert sie, wirft man dich hinaus). Der Orden vergibt (+10). *Heilquelle von Sankt Serin* bei Mutter Aveline — umsonst, nur bei Sonnenaufgang (5–7 Uhr), aber alle Grade sind weg und Aurelion erfährt es. Danach erinnert man sich noch zehn Tage an dich. Wer wieder trinkt, kann wieder Vampir werden.
 - **Debug:** Abschnitt „Blutkult: Vampir“. Proben „Blutkult S1“ (drei).
+
+## Runde: Blutkult, Scheibe 2 — Unterwanderung von Varonheim (§5g.2, 01.10.2026)
+- **Start:** beim ersten Besuch in Varonheim ab Tag 3, nach einer Audienz beim König, sonst von selbst an Tag 12. Log und Chronik melden die ersten Vermissten.
+- **Verschwundene:** Jede zweite Nacht um 23 Uhr verschwindet ein einfacher Bewohner Varonheims (höchstens acht). Er ist nicht tot: Name, Haus und Aussehen bleiben gespeichert — er hängt in den Katakomben (Scheibe 3). An seiner Haustür bleibt ein **Blutzeichen**; am Platz steht die **Vermisstenliste**. Jeder Fall senkt den Wohlstand der Stadt. Die anderen Städte tratschen darüber.
+- **Maskierte:** Nachts (22–4 Uhr) gehen ein bis zwei Maskierte verkleidet durch die Gassen. Sie greifen nicht an. Greifst du einen an, ist er gestellt („Maskierter!“) und kämpft; die Königsgarde hilft. Er trägt eine **Blutmaske**. Am Morgen sind die Unentdeckten fort.
+- **Spuren (drei von vier):** ein Blutzeichen untersuchen (E); ein zweites Blutzeichen zeigt **rotes Siegelwachs** — oder Albin, den Hofschreiber, danach fragen; einen Bewohner Varonheims nach den Verschwundenen fragen (**Zeuge**); eine **Blutmaske** von einem Maskierten. Drei Spuren nennen drei Verdächtige: **Wido** (Totengräber), **Merle** (Apothekerin), **Albin** (Hofschreiber der Kanzlei).
+- **Anklage:** bei einem Gardisten der Königsgarde. Wen du nennst, holt die Garde — und hängt ihn am Morgen. **Falsch** (Wido oder Merle): ein Unschuldiger stirbt, Valen −3, in der nächsten Nacht verschwindet ein weiterer Mensch; du kannst erneut anklagen. **Richtig** (Albin): Verhöre ihn noch am selben Tag (frag einen Gardisten) und du bekommst den **Schlüssel zum Kanzleikeller**; wartest du bis zum Morgen, ist er vergiftet — die Garde gibt dir dann seine Habe mit dem Schlüssel.
+- **Ohne Anklage:** Wido öffnet für 50 Gold (oder wenn er dir vertraut) den alten **Zugang zum Beinhaus** am Friedhof.
+- Beide Wege führen in die Katakomben — **die Katakomben selbst folgen mit Scheibe 3**.
+- **Debug:** „Blutkult: Unterwanderung“. Probe „Blutkult S2“.
+
+## Runde: Blutkult, Scheibe 3 — Katakomben von Varonheim (§5g.2, 01.10.2026)
+- **Eingänge:** die **alte Gruft am Friedhof** (Nordwesten der Stadt; erscheint, sobald der Weg bekannt ist — durch Wido oder die richtige Anklage) und die **Treppe im Kanzleikeller** der Varonsburg (mit Albins Schlüssel). Innen führt jeder Ausgang zum anderen Eingang zurück.
+- **Räume:** Beinhaus (Blutknechte), Pferche (Käfige, Maskierte), Kelchhalle (Hedda, Kelchwächter, Blutmagier, Altar), Archiv der Kanzlei.
+- **Gegner (Gebiet Stufe 12–16):** **Maskierter** (schnell, Dolch), **Blutmagier** (Fernkampf, sein Geschoss heilt ihn um 40 % des Schadens — unterbrechen oder decken), **Blutknecht** (schwach, viele; trägt den Namen eines Verschwundenen), **Kelchwächter** (Platte, Schild, deutliche Ansage).
+- **Gefangene:** Die Verschwundenen hängen in den Käfigen (höchstens vier). **E → Käfig öffnen:** Sie laufen nach Hause, Varonheim gewinnt Wohlstand, der Gefangene vertraut dir. **Zu spät:** Wer länger als sechs Tage im Pferch hängt (oder als Fünfter dazukommt), wird zum **Blutknecht** — mit seinem Namen. Fällt er, meldet die Chronik seinen Tod.
+- **Hedda, die Kelchwahrerin:** spricht zuerst. **„Trinken“** = Beitritt: du wirst Vampir, der Kult ist dir freundlich gesinnt, Hedda verkauft Blutphiolen und weiht dich in höhere Grade. **„Ich bin gekommen, euch zu beenden“** = Kampf gegen Hedda (Blutmagierin, deutlich stärker) und die Halle.
+- **Archiv:** Im Pult der Kanzlei liegt das **Rote Siegel** — der Siegelring des Kanzlers, Beweis für die Enthüllung (folgt mit Scheibe 4).
+- **Debug:** „Blutkult: Katakomben“. Probe „Blutkult S3“.
+
+## Runde: Blutkult, Scheibe 4 — Aldhelm, der Blutfürst (§5g.2, 01.10.2026)
+- **Enthüllung (genau einmal):** *Beim König* mit dem Roten Siegel („Majestät, Euer Kanzler …“): Kamerafahrt am Hof — das Siegel bricht in Aldhelms Hand, die Kerzen verlöschen, er flieht durch die Geheimtür; Marschall Brandt und zwei Gardisten kämpfen in der Krypta an deiner Seite, Valen +5. *Ohne Beweis* glaubt dir der König nicht (Valen −5, der Kult ist gewarnt). *Über Ysmay* (Siegel zeigen): Enthüllung ohne Szene und ohne Verbündete. *Von innen:* Wer dem Kelch beigetreten ist, sieht Aldhelm bei der Blutweihe (Grad II) ohne Maske.
+- **Krypta des Kanzlers:** Nach der Enthüllung öffnet sich der Gang hinter der Kelchhalle. Beim ersten Anblick eine kurze Kamerafahrt mit Namenskarte.
+- **Bosskampf (Stufe 16, empfohlen 16–18):** *Blutfesseln* — jeder noch gefangene Bürger heilt Aldhelm (0,4 % Leben je Gefangenem und Sekunde); öffne die Käfige in den Pferchen, dann reißen die Fäden. *Ab 60 %:* er wirft die Robe ab, ruft zwei Blutknechte, springt als Nebel hinter dich (Ansage „Nebel …“) und legt Blutsiegel auf den Boden (rote Ringe, kurz danach Schaden). *Lichtschächte:* bei Tag (6–19 Uhr) fällt durch vier Gitter Licht; steht Aldhelm darin, brennt er (3 %/s, höchstens ein Viertel seines Lebens) und wird unterbrochen — locke ihn hinein. Ein Vampir-Spieler brennt dort auch. *Unter 30 %:* er trinkt aus dem Kelch und aus allen noch gefangenen Bürgern (sie sterben, +10 % Leben je Opfer) und wird schneller; einen Vampir lähmt sein Blutruf kurz (Willenskraft 14 schützt).
+- **Beute:** Kanzlerdegen „Rotes Siegel“ (legendär: blutende Gegner, die du damit fällst, heilen dich um 8 %), Robe des Kanzlers.
+- **Ausgang „zerschlagen“:** Alle noch gefangenen Bürger kehren heim, Valen +15, Ysmay wird Kanzlerin, die Audienz kostet nichts mehr, die Maskierten verschwinden. Die Folgen stehen im Gedächtnis der Welt (`S.after.cult`). Weitere Ausgänge (der Kult versteckt sich, herrscht, oder du wirst Blutfürst) folgen mit Scheibe 5.
+- **Debug:** „Blutkult: Aldhelm“. Probe „Blutkult S4“.
+- **Nachtrag Vampir (Hunter):** Sonnenbrand trifft immer voll den Rumpf (vorher verteilte er sich auf Glieder und kam nur zu etwa 60 % an). Ein Gefährte kann dir Blut geben, wenn sonst niemand Wehrloses da ist: Beziehung −20, Moral −15 — beim zweiten Mal verlässt er dich.
+
+## Runde: Blutkult, Scheibe 5 — Ausgänge und Kult-Weg (§5g.2, 01.10.2026)
+- **Rote Krönung (Uhr):** Sobald der Weg in die Katakomben bekannt ist (oder ab Tag 45), flüstert man am Hof von einer „Roten Krönung“ in zwanzig Tagen (Log nennt den Tag). Ist der Kult bis dahin nicht zerschlagen, stirbt König Varon „im Schlaf“ und Aldhelm herrscht als Reichsverweser. Auf „Angsthase“ läuft diese Uhr nicht.
+- **Erpressung:** Mit dem Roten Siegel kannst du Aldhelm am Hof erpressen (einmal, 500 Gold). Das Siegel ist dann weg, der Kult arbeitet versteckt weiter — die Uhr läuft.
+- **Solange der Kult versteckt ist oder herrscht:** alle fünf Nächte verschwindet ein Bürger; Valen bekommt weniger Nachschub für die Front (versteckt −0,5, herrschend −1 Stärke je Tag). Aldhelm bleibt in der Krypta und kann weiterhin enthüllt und getötet werden — dann ist der Kult zerschlagen.
+- **Kult-Weg (Kind des Kelchs, nach der Enthüllung von innen):** Bei Hedda wählst du — *der Roten Krönung dienen* (Varon stirbt am nächsten Abend, Aldhelm herrscht, du bist seine rechte Hand) oder *Das stärkere Blut* (Aldhelm in der Krypta herausfordern, ohne seine Blutfesseln).
+- **Blutfürst (wer Aldhelm herausfordert und siegt):** König Varon lebt und ahnt nichts, Valen +10, Orden −30. Täglich Tribut der Kanzlei (2 Blutphiolen, 30 Gold). Bei Hedda bestimmst du den **Zehnt**: fordern = alle fünf Tage ein Bürger (Valen bekommt weniger Nachschub); aussetzen = die Stadt wird geschont, aber der Kult murrt. Der Orden schickt alle sieben Tage Vampirjäger. **Stirbt der Held**, übernimmt Hedda den Kelch (versteckt), Orden −10 beim Haus; der Erbe ist kein Vampir.
+- **Fall Aurelions (§5g.8):** Ist der Kult erwacht und nicht zerschlagen — aktiv, versteckt, herrschend oder mit dir als Blutfürst —, gilt Varon als gebunden.
+- **Debug:** „Blutkult: Ausgänge“. Probe „Blutkult S5“.
+
+## Runde: T08 Gefangene, Steckbriefe, Ruf der Klinge (Audit A5, A10, §5g.24; 01.10.2026)
+- **Gefangene nehmen:** Ein Mensch, der sich ergibt („Gnade!“) oder bewusstlos liegt: **E → Gefangenen nehmen.**
+  - *Verhören — ruhig* (meist wahr) oder *hart* (fast immer wahr, Ruf der Klinge −3, er kann sterben): Er verrät das nächste Bandenlager als Gerücht mit Kartenkreis. Gelogen? Dann ist dort nichts.
+  - *Fesseln* (braucht einen **Strick**, 6 Gold an Marktständen): Er folgt dir langsam und reist mit dir zwischen den Karten. Bleibst du über zehn Sekunden mehr als zehn Schritte weg oder gehst zu Boden, reißt er sich los.
+  - *Anwerben* (Ruf +2): Er wird Söldner, aber seine Loyalität ist dünn (20).
+  - *Ausrauben* (−1): Er gibt dir, was er hat, und rennt.
+  - *Laufen lassen* (+4): Manchmal schickt er dir Tage später eine Nachricht über ein Bandenlager — manchmal kommt er selbst wieder, als Rächer.
+  - *Hinrichten* (−6): Gütige Gefährten verlieren Moral.
+- **Abliefern:** Jede Wache (auch Verteidigungsmeister) einer Stadt, die dir nicht feind ist, nimmt Gefesselte: gewöhnliche Räuber bringen 8 Gold + 2 je Stufe (höchstens drei je Stadt und Tag), Fraktion +1.
+- **Steckbriefe (§5g.24):** Kopfgeld-Aufträge heißen jetzt Steckbriefe: „Lebend oder tot.“ Der Gesuchte kann sich ergeben. Lebend bei einer Wache abgeliefert zahlt er **×1,5**.
+- **Ruf der Klinge:** je Region (Menschenland, Westlande, Hochreich, Totenland, Gischtinseln) von −100 bis +100, höchstens ±10 je Tag und Region; steht im Heldenfenster unter dem Ruhm. Gnade (Verschonen, Laufenlassen, Anwerben, Bestechungsgnade) hebt ihn, Grausamkeit (Hinrichten, hartes Verhör, Gnadenstoß an Menschen, Ausrauben) senkt ihn.
+  - *Barmherzig* (≥ 60) / *Gnädig* (≥ 20): Menschen ergeben sich öfter (bis doppelt so oft); ab +40 verlangen Banden 30 % weniger Schutzgeld.
+  - *Gnadenlos* (≤ −20) / *Schlächter* (≤ −60): Gegner fliehen früher, ergeben sich seltener — als Schlächter nie; ab −40 überfallen Banden dich halb so oft.
+  - Gütige Gefährten leiden unter Grausamkeit, grausame freuen sich. Der Erbe erbt den halben Ruf.
+- **Debug:** „Gefangene und Klinge (T08)“. Proben „T08 Gefangene und Steckbriefe“, „T08 Verhör und Ruf der Klinge“.
+
+## Runde: T09 Läden am Stadtlager (Audit V3, 01.10.2026)
+- **Preise je Stadt:** Jeder Gegenstand hängt an einer Ware der Stadt: Waffen und Rüstung aus Eisen an *Waffen*, Werkzeug an *Werkzeug*, Leder- und Stoffkleidung an *Leder*/*Tuch*, Essen an *Korn*/*Fleisch*, Prothesen an *Magitech*. Ist diese Ware im Lager der Stadt knapp, wird alles daran teurer (bis ×1,8); ist sie reichlich, billiger (bis ×0,7). Tränke, Kräuter und Talismane bleiben fest. Den alten Weltpreis „alles kostet x % mehr“ gibt es nicht mehr.
+- **Auswahl:** Was ein Laden anbietet, richtet sich nach dem Vorrat — ein Schmied ohne Waffen im Lager hat kaum Klingen. Mindestens zwei billige Dinge gibt es immer.
+- **Kauf:** Jeder Kauf zieht eine halbe Einheit der Ware aus dem Lager. Verkaufen füllt das Lager nicht auf.
+- **Ereignisse wirken auf Lager:** Missernte halbiert das Korn der getroffenen Dörfer; Valens Aushebung nimmt Waffen und Korn aus Valens Städten; Flüchtlinge essen Erens Korn; eine neue Ader füllt das Erz der Bergbaustadt; ein ausbleibender Händlerzug fehlt in Nordfurt; die Kaufleute öffnen ihre Speicher für die Stadt mit der größten Not.
+- **Aurelions Zölle:** Gesetz (senken/erhöhen), Tod der Kaiserin, Spaltung und Unruhe verändern den Zoll auf Waren des Hochreichs (bis ×1,3). Er fällt täglich um 1 % zurück.
+- **Im Laden:** Beim Überfahren einer Ware steht im Info-Feld „Teuer: Waffen knapp in Nordfurt“ oder „Günstig: …“. Im Status-Fenster zeigt „Teuerung hier“, was in der aktuellen Stadt knapp ist, und „Zölle Aurelions“ den Zoll.
+- **Debug:** „Läden und Lager (T09)“. Probe „T09 Läden am Stadtlager“.
+
+## Runde: T10 Heldentod als Moment und Ahnenfeind (Audit D8, A6; 01.10.2026)
+- **Heldentod:** Fällt der Held, wird es 3 Sekunden lang langsam (die Welt läuft mit einem Viertel), die Kamera rückt heran — steht der Mörder nah, sind beide im Bild —, die Welt wird still, eine Totenglocke schlägt, Name, Haus und Generation stehen im Bild. Der Mörder bleibt stehen und zeigt auf den Toten. Niemand aus der Gruppe kann in diesen Sekunden sterben. ESC oder Leertaste überspringen. Der Tod ist schon gespeichert, bevor der Moment beginnt.
+- **Ahnenfeind:** Wer den Helden tötet (kein Boss, keine Wache, keine Umwelt), wird zum Ahnenfeind: er bekommt einen Namen („Hagen der Vaterstecher“, bei Tieren „Grauzahn“), nimmt die Hauptwaffe aus dem Grab — mit ihrer Geschichte („genommen von …, über der Leiche von …“) — und wird stärker (höchstens drei Stufen über dem Erben, wenn man ihn trifft). Bis zu **drei** Ahnenfeinde gleichzeitig; tötet einer auch den Erben, wird er „Schrecken zweier Generationen“.
+- **Er lebt in der Welt:** Alle 3–5 Tage zieht er zu einem Bandenlager seiner Region. Kommt der Held in seine Nähe, steht er dort mit zwei Gefolgsleuten (Hinweis „AHNENFEIND: …“).
+- **Er greift an** (frühestens 10 Tage nach dem Tod, dann alle 10–20 Tage): Lebt deine Familie (Ehepartner), zieht er gegen ihre Stadt. Bist du in der Nähe, kommt er selbst; sonst brennen Häuser, und mit 30 % wird ein Kind entführt (Auftrag „Entführt: …“ am Brett). Ohne Familie überfällt er ein Dorf seiner Region.
+- **Der Erbe** erfährt beim Antritt von jedem Ahnenfeind: Steckbrief mit Kartenkreis (wandert mit ihm), Lohn nach seiner Stufe.
+- **Rache:** Fällt er, liegt die Waffe des Vorfahren da — ihre Geschichte bekommt eine neue Zeile („zurückgeholt von …“). Titel „Rächer des Hauses“, Ruhm +10 in seiner Region. Wer ihn gefangen nimmt, kann ihn mit „[Rache]“ richten — das zählt nicht als Grausamkeit.
+- **Debug:** „Ahnenfeind und Heldentod (T10)“ (auch: Moment vorspielen ohne Tod). Proben „T10 Ahnenfeind“, „T10 Heldentod-Moment“.
+
+## Runde: Varonheim wird belagerbar, Scheibe 1 (Nutzer 01.10.2026)
+- **Kriegsknoten:** Varonheim steht jetzt im Kriegsgraphen (Kanten nach Nordfurt und Aschfurt). Besatzung bis 60 (+3 am Tag), Mauern 0–100 % (+10 am Tag, solange keine Belagerung läuft). Die Hauptstadt mustert kein eigenes Aufgebot.
+- **Bedrohung:** Ab Tag 20 zählt die Krone die Gefahr: +1 am Tag, wenn die Toten 6 oder mehr Orte halten (sonst −1), +0,5 ohne Valen-Feldheer, + Blutkult (herrschend 1, versteckt 0,5), +0,5 bei leerem Thron. Du senkst sie: −3 je gewonnener Feldschlacht vor Ort (höchstens 6 am Tag), −10 je befreitem Ort, −5 für den Hauptmann aus König Varons erstem Auftrag.
+- **Stufen mit Ansage:** 10 = Gerücht („Morvath sammelt Knochen“), 15 = „Varonheim rüstet“, 20 = **Morvaths Heerzug** bricht vom nächsten Untotenort auf (Stärke 70, Sehr schwer 80) und kämpft sich zur Hauptstadt durch. Danach 30 Tage Ruhe. Nicht auf Angsthase, nicht nach Garmadons Tod. Die Kriegsübersicht zeigt die Stufe.
+- **Belagerung statt Sofortschlacht:** Steht ein Totenheer vor Varonheim, wird belagert: je Zug (6 Std.) sinken die Mauern (5 % der Heeresstärke, mindestens 2), das Heer verliert 0,75, die Besatzung hungert (−0,25). Gestürmt wird erst bei Mauern 0 (innere Mauer ×1,2). Hält die Besatzung, stehen die Mauern wieder auf 15 und das Heer weicht. Tagesmeldung im Log, Kriegskarte „belagert, Mauern … %“, Stadtzustand „Belagert“.
+- **Entsatz:** Alle Valen-Heere ziehen zuerst zur belagerten Hauptstadt (Ausfallbonus ×1,15). Verliert der Entsatz, fällt die Stadt trotzdem nicht. Hat Valen keine andere Stadt mehr, entsteht das Entsatzheer in Varonheim (nicht während einer Belagerung).
+- **Fall (Übergang bis Scheibe 2):** Die Königsgarde fällt, Läden schließen, Knochenwachen und Trümmer, Valens Feldheere −20 %, Flüchtlinge ziehen nach Salzhafen (sonst Nordfurt, Eren). Besatzung der Toten 30. Befreiung vor Ort in 4 Wellen (Hauptmann Stufe 9) oder durch Valens Heere; danach Garde zurück, Läden offen, Wohlstand −30. Exil, Hof und Kult folgen in Scheibe 2.
+- **Debug:** „Varonheim: Belagerung“ (Status, Bedrohung +10, Heerzug jetzt, Belagerung jetzt, Mauern 0, Fall, Befreien). Proben „Varonheim S1“ (3) und die angepasste „Audit T02“.
+
+## Runde: Varonheim, Scheibe 2 — Fall, Exil, Hof (Nutzer 01.10.2026)
+- **Exil:** Fällt Varonheim, flieht der Hof nach Salzhafen (sonst Nordfurt, sonst Eren): König Varon (oder, ist er tot, Marschall Brandt), Ysmay, Schmied Hagen und vier Gardisten. Im Exil empfängt der König jeden ohne Kanzlergebühr und gibt den Auftrag „Varonheim zurückerobern“. Hat Valen keine Stadt mehr, ist der König verschollen.
+- **Der Hof zerfällt:** Die lebenden Adligen zerstreuen sich und kehren nie zurück. Läuft die Verräter-Suche noch, ist es zu spät: Der Verräter flieht zu Aurelion. Die Gefangenen aus Aurelion entkommen. Das Burgtor bleibt zu, solange die Toten die Stadt halten.
+- **Blutkult:** Herrscht Aldhelm, verliert er den Hof (Kult „versteckt“, zehrt nur noch 0,5 an Valen). Entführungen ruhen, der Tribut des Blutfürsten ruht, die Rote Krönung wartet, solange die Stadt besetzt ist.
+- **Rückeroberung:** Brichst du vor Varonheim die vier Wellen, kehrt der Hof heim (ohne die Zerstreuten). Mit dem Auftrag des Königs: 400 Gold und Valen +20.
+- **Tod des Königs:** Nur wer selbst (oder mit seiner Gruppe) König Varon tötet, wird von Valen verachtet (−100). Fällt er durch andere — etwa auf der Flucht oder im Exil —, bleibt dein Ruf; Brandt führt.
+- **§5g.8 (wirkt ab T40):** Ist Varonheim besetzt oder der Blutkult aktiv, ist Valen gebunden und marschiert nicht in Aurelion ein; ein toter König allein bindet nicht.
+- **Debug:** „Varonheim: Belagerung“ zusätzlich „Zum Exilhof“, „König vorher fortbringen (Schalter)“. Proben „Varonheim S2“ und „RB-023“.
+
+## Runde: Regiebuch und Zwischensequenzen, Scheibe 1 (T17, Nutzer 01.10.2026)
+- **Boss-Auftritte:** Begegnest du einem Boss (Varg, Hrodvar, Garmadon, Weißbart, Dodon, Gorak, Omega) zum ersten Mal, steht die Welt für knapp 5 Sekunden still: Kamera zum Boss, Klang, Namenskarte, ein Satz als Sprechblase, Umstehende weichen zurück. Danach greift er an. Jeder Held sieht jeden Auftritt einmal; dein Erbe sieht sie neu.
+- **Überspringen:** ESC (oder Leertaste) beendet jede Szene sofort. Was die Szene an Folgen hat, passiert trotzdem — du verpasst nur Bild und Ton.
+- **Krieg um Varonheim als Szene:** Bricht Morvaths Heerzug auf oder beginnt die Belagerung, zeigt die Kamera es kurz, wenn du in der Nähe bist (Horn, marschierende Tote, Wächter auf der Mauer). Fällt Varonheim, siehst du es immer: Glocken, brennendes Burgtor, die Stadt in Flammen, dann der König im Exil.
+- **Sprechblasen:** In Szenen sprechen Figuren in Blasen über ihrem Kopf statt in Großbuchstaben-Meldungen.
+- **Neue Klänge:** Knochenhorn, Ketten, Trommel, Herzschlag, Eis bricht.
+- **Debug:** „Regie (T17)“ — Boss-Auftritt vorspielen (gewählt), Auftritte zurücksetzen, die drei Varonheim-Szenen, Sprechblase, Namenskarte. Probe „T17 Regiebuch“.
+- **Log:** Das Nachrichtenfeld unten bleibt am neuesten Eintrag, solange du nicht selbst hochscrollst (vorher sprang es zu alten Einträgen).
+
+## Runde: Regiebuch, Scheibe 2 (T17, 01.10.2026)
+- **Goblinsturm als Szene:** Rufst du den Sturm, steht die Welt 8 Sekunden: Knochenhörner, Dodon bricht durch, die Goblins rufen „Frei!“, Varg antwortet — dann beginnt der Kampf. ESC überspringt.
+- **Aldhelm** tritt jetzt mit stehender Welt auf: Kerzen flammen nacheinander auf, er spricht in einer Blase, seine Namenskarte erscheint.
+- **Ankunft:** Betrittst du eine Siedlung zum ersten Mal, erscheint ihr Name mit der Herrschaft („Stadt · Valen“, „Besetzt von den Toten“, „Belagert“); eine Wache zeigt dir den Weg. Wird ein Ort besetzt oder belagert, zeigt er es beim nächsten Besuch erneut.
+- **Musterung der Kette:** Stehst du dabei, hörst du das Horn; der Kriegsmeister ruft „Antreten!“, nennt das Ziel, die Soldaten salutieren.
+- **Neue Gesten:** salutieren, jubeln, trauern, knien.
+- **Debug:** „Regie (T17)“ zusätzlich „Gesten vorführen (Held)“, „Ankunftskarten zurücksetzen“.
+
+## Runde: UI-Umbau, Scheibe 1 (Entwickler 01.10.2026)
+- **Kopfleiste:** schlanker, 9 Reiter statt 14 — Charakter (C), Gepäck (I), Gruppe (G), Lager & Siedlung (B), Karte (M), Aufträge (J), Mächte (F), Kodex (H), Optionen. Sobald die Pixel-Piktogramme da sind, zeigt jeder Reiter ein Bild statt eines Wortes; der Name steht im Tooltip.
+- **Unterreiter:** Im Fenster Charakter wechselst du zwischen Werte, Talente, Zauber und Effekte; unter Mächte zwischen Fraktionen und Chronik. Die alten Tasten (T, Z, X, K) gehen weiter.
+- **Freie Punkte:** Ein Goldpunkt am Reiter Charakter (und ✦ hinter der Klasse) zeigt freie Stat- oder Talentpunkte; der Tooltip nennt die Zahl.
+- **Vorrat und Wetter** als Piktogramm mit Zahl. Zeit, Wetter, Jahreszeit und Jahr stehen nur noch oben (Jahr im Tooltip der Uhr), nicht mehr doppelt rechts.
+- **Protokoll:** höher, jede Zeile mit Kategoriezeichen; scrollst du hoch, erscheint „Neu ↓“, ein Klick springt zum neuesten Eintrag.
+
+## Runde: Weniger Gesprächspartner, Ortskarte, Steckbrief mit Gesicht, Bestiarium (Entwickler 01.10.2026)
+- **Nicht jeder redet:** Einfache Bewohner sagen nur einen Satz (Sprechblase) und gehen weiter ihrer Arbeit nach. Fragen nach Neuigkeiten, nach Omega oder nach Wissen beantworten Wirte, Wachen, Reisende, Lehrer, Gelehrte, Priester, Vorsteher, Gefährten und Figuren mit Namen. Wer einen Dienst hat (Handel, Heilung, Auftrag, Lieferung), bietet nur diesen an. Ein Hinweis im Log erklärt es beim ersten Mal. Debug: „Regie (T17)“ → „Gesprächig: alle NPCs (Schalter)“.
+- **Ortskarte:** Klick auf einen Ort der Weltkarte (M) zeigt Art, Herrschaft, Zustand, Gefahr, zuletzt gesehene Warenpreise und deine Aufträge dort.
+- **Steckbrief mit Gesicht:** Am Anschlagbrett sind Kopfgelder auf benannte Mini-Bosse mit ☠ markiert; beim Lesen siehst du das Gesicht des Gesuchten.
+- **Bestiarium:** Kodex → Gegner zeigt jedes erschlagene Wesen als Bild.

@@ -174,7 +174,7 @@ function humanAtlas(e) {
 }
 const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
-  cultist: 'schamane', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
+  cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
   flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
@@ -585,6 +585,16 @@ export function monsterSpec(e, m) {
     Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: t === 'sea_harpooner' ? '#3a3a2c' : '#2c3a44', pants: '#3a3226', sash: '#8a2a20', strap: 1, helm: 'scarf', helmCol: ['#7a2a20', '#2a4a6a', '#6a5a2a'][(e.seed | 0) % 3], beard: (e.seed | 0) % 2 });
     if (t === 'sea_harpooner') Object.assign(s, { helm: 'hat', helmCol: '#2a2622', quiver: 0 });
     if (t === 'whitebeard') Object.assign(s, { bd: 'bullig', hv: 1, pb: 1, helm: 'hat', helmCol: '#141414', hair: '#e8e4dc', beard: 1, beardLong: 1, cloak: '#141c24', capeL: 1, armor: 'plate', armorCol: '#3a3e44', pauld: '#8a8a86', fur: '#d8d2c4', chn: 1, glove: '#4a3a2a' });
+  } else if (t === 'aldhelm') {                                         // §5g.2 Aldhelm: Kanzlerschwarz, rotes Futter, rote Augen
+    Object.assign(s, { cloth: '#141014', robe: '#1a1418', cloak: '#3a0a10', face: 'skin', glow: '#c0303a', ge: '#c0303a', hair: '#9a9a9a', hs: 1, sash: '#7a2228' });
+  } else if (t === 'blood_mage') {                                      // §5g.2 Blutmagier: rote Robe, offene Kapuze, Glimmen
+    s.hooded = 1; s.hood = '#3a0a10'; s.robe = '#4a0e14'; s.cloak = '#1a0608'; s.face = 'skin'; s.glow = '#c0303a'; s.mark = 'chevron'; s.markCol = '#c0303a';
+  } else if (t === 'thrall') {                                          // Blutknecht: bleich, zerrissene Alltagskleidung (er war Bürger)
+    s.skin = '#cdb8b0'; s.cloth = ['#5a4a3a', '#4a5a4a', '#5a4a5a'][((e.seed || 0) | 0) % 3]; s.wear = 3; s.blood = 2; s.glow = '#a02028';
+  } else if (t === 'chalice_guard') {                                   // Kelchwächter: dunkle Platte, rotes Wappen
+    Object.assign(s, { armor: 'plate', armorCol: '#2a1a1c', helm: 'great', helmCol: '#3a2224', tabard: '#5a1a1e', cloak: '#1a0a0c', shield: 'kite', shieldCol: '#4a1418' });
+  } else if (t === 'blood_cultist') {                                   // §5g.2 Maskierter: Kapuze in Blutrot, Wachsmaske, dunkler Umhang (Farbe je Figur)
+    s.hooded = 1; s.hood = ['#3a0e12', '#2a0a0e', '#40181a'][((e.seed || 0) | 0) % 3]; s.cloak = '#1a0a0c'; s.robe = '#24100f'; s.face = 'mask'; s.mark = 'chevron'; s.markCol = '#7a2228';
   } else if (t === 'cultist') {                                         // Kultist: Robe, tiefe Kapuze, violettes Glimmen
     s.hooded = 1; s.hood = '#241a28'; s.robe = '#2a1f2e'; s.cloak = '#1c1420'; s.face = 'skin'; s.glow = p.glow; s.mark = 'chevron'; s.markCol = '#5a4a66';
   } else if (t === 'ghoul' || t === 'wraith') {                         // Wiedergänger: Leichenhaut, Fetzen; Geist: bleich, Kapuze, Schleier
@@ -676,7 +686,8 @@ const POSES = {
   guard: { u: 1, leg: 1, act: 'guard' },                              // Deckung: tief, Schrittstellung, Arme vor dem Körper
   sit: { u: 4, leg: 0, act: 'sit' },                                  // Sitzen (Bank, Schenke): Oberschenkel waagrecht
   trade: { u: 0, leg: 0, act: 'trade' },                              // Handeln: Ware vorzeigen, Hand offen
-  zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
+  zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },
+  salutieren: { u: 0, leg: 0, act: 'trade' }, jubeln: { u: -1, leg: 0, act: 'cast' }, trauern: { u: 1, leg: 1, act: 'guard' }, knien: { u: 3, leg: 0, act: 'kneel' },   /* T17 (Stil D) */   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
 };
 
 // ---------------- Menschen / Goblins / Skelette ----------------
@@ -1471,8 +1482,34 @@ export function pixelize(c, w, h, organic = 0, flat = false) {
 }
 
 // ---------------- Bodentexturen (16×16, doppelt skaliert = 1 Kachel) ----------------
+/* Artist 01.10.: Pflaster im Stil R. Drei Steinreihen (5/5/6 Texel), Fugen versetzt und über den Kachelrand gewickelt,
+   damit Nachbarkacheln nahtlos anschließen. Je Stein eigener Ton (Variante v streut), Kante oben/links hell, unten/rechts
+   dunkel, Fuge im dunkelsten Ton; selten Riss oder Moos in der Fuge. Ersetzt das starre 8×8-Raster (Lesbarkeit, Lichtrichtung). */
+const PAVE_ROWS = [[0, 4, [3, 9, 14]], [5, 9, [1, 6, 12]], [10, 15, [4, 10, 15]]];
+function paveR(P, base, v, n, moss) {
+  const joint = mix(base.sh, base.dk, 0.4);
+  PAVE_ROWS.forEach(([y0, y1, cuts0], r) => {
+    const sh = ((v * 5 + r * 3) % 7) - 3, cuts = cuts0.map(c => (c + sh + 16) % 16).sort((a, b) => a - b);   /* Fugen je Variante versetzt: kein Ziegelmuster */
+    for (let x = 0; x < 16; x++) P(x, y1, joint);
+    for (const c of cuts) for (let y = y0; y < y1; y++) P(c, y, joint);
+    cuts.forEach((c, k) => {
+      const end = cuts[(k + 1) % cuts.length], len = ((end - c - 1) + 16) % 16, h = n(r * 5 + k, 61 + v);
+      const tone = h > 0.66 ? mix(base.b, base.hi, 0.22) : h < 0.3 ? mix(base.b, base.sh, 0.22) : base.b;
+      for (let i = 0; i < len; i++) { const x = (c + 1 + i) % 16;
+        for (let y = y0; y < y1; y++) {
+          let col = tone;
+          if (y === y0 || i === 0) col = mix(tone, base.hi, i === 0 && y === y0 ? 0.6 : 0.4);
+          else if (y === y1 - 1 || i === len - 1) col = mix(tone, base.sh, 0.45);
+          else if (n(x * 3 + r, y * 7 + v) > 0.97) col = mix(tone, base.sh, 0.2);
+          P(x, y, col);
+        } }
+      if (h > 0.94 && len >= 4) { const cx = (c + 2) % 16; P(cx, y0 + 1, joint); P((cx + 1) % 16, y0 + 2, joint); }
+    });
+  });
+  if (moss) for (let i = 0; i < 2; i++) if (n(i, 77 + v) > 0.55) { const r = PAVE_ROWS[i + 1], x = (n(78 + v, i) * 16) | 0; P(x, r[0] - 1, mix(joint, '#4a5a2a', 0.55)); }
+}
 export function tileTexture(t, v, cols, kind) {
-  return cacheGet('tile|' + t + '|' + v + '|' + kind + '|' + cols[0], () => {   // Art + Farbe im Schlüssel: sonst verschmutzt ein Aufruf mit fremder Palette den Cache
+  return cacheGet('tile|' + t + '|' + v + '|' + kind + '|' + cols[0] + (ART === 'R' ? '|R' : ''), () => {   // Art + Farbe im Schlüssel: sonst verschmutzt ein Aufruf mit fremder Palette den Cache
     const cv = document.createElement('canvas'); cv.width = cv.height = 16;
     const c = cv.getContext('2d');
     // Grundton je Typ fast konstant (sonst Schachbrett-Muster); Varianten unterscheiden sich über Streupixel.
@@ -1489,6 +1526,8 @@ export function tileTexture(t, v, cols, kind) {
         P(x, y + 1, base.sh); P(x + 1, y + 1, base.sh); P(x + 2, y + 1, mix(base.b, base.sh, 0.5)); P(x + 1, y, mix(base.b, base.hi, 0.6)); P(x, y, i % 2 ? mix(base.b, base.hi, 0.4) : base.b); }
       if (n(5, 5) > 0.82) { const x = (n(7, 1) * 14) | 0, y = (n(1, 7) * 14) | 0; P(x, y, ['#b8a050', '#a04a38', '#c8c0a0'][v % 3]); P(x + 1, y + 1, base.dk); }
       else if (n(5, 6) > 0.8) { const x = (n(8, 1) * 14) | 0, y = (n(1, 8) * 14) | 0; P(x, y, '#8a8070'); P(x + 1, y, '#6a6258'); P(x, y + 1, '#3a342c'); }
+    } else if ((kind === 'stone' || kind === 'dfloor') && ART === 'R') {   /* Artist 01.10.: Kopfsteinpflaster statt 8er-Raster — unregelmäßige Steine, Licht oben links, Fugen dunkel */
+      paveR(P, base, v, n, kind === 'stone');
     } else if (kind === 'road' || kind === 'stone' || kind === 'dfloor') {
       const bw = kind === 'road' ? 5 : 8, bh = kind === 'road' ? 4 : 8;
       for (let y = 0; y < 16; y += bh) for (let x = -((y / bh) % 2) * (bw >> 1); x < 16; x += bw) {

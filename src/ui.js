@@ -5,6 +5,7 @@ import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACT
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=23';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=23';
 import { wearOf } from './buildings.js?v=23';
+import * as SP from './sprites.js?v=23';   /* Bestiarium: Gegnerbilder */
 import { townState, townPrice } from './sim.js?v=23';
 import { GOODS } from './data.js?v=23';
 import { target as ecoTarget } from './economy.js?v=23';
@@ -31,26 +32,43 @@ export function bind(actions) { A = actions; RAW = { ...actions }; for (const k 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
+// UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
+// [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['world', 'Welt', ''], ['character', 'Charakter', 'C'], ['party', 'Gruppe', 'G'], ['inventory', 'Inventar', 'I'],
-  ['settlement', 'Lager', 'B'], ['faction', 'Fraktion', 'F'], ['chronicle', 'Chronik', 'K'], ['map', 'Karte', 'M'],
-  ['skills', 'Talente', 'T'], ['spells', 'Zauber', 'Z'], ['quests', 'Aufträge', 'J'], ['effects', 'Effekte', 'X'], ['codex', 'Kodex', 'H'], ['settings', 'Optionen', 'Esc'],       // ohne Tastatur (Touch) sonst unerreichbar
+  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']], ['inv', 'Gepäck', 'I', ['inventory']],
+  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement']], ['map', 'Karte', 'M', ['map']],
+  ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
+const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+// Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
+let ICO = null;
+const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
+const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
+function loadIcons() { import('./icons.js?v=23').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function paintNav() {
+  for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 2);
+    b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : `<span class="navlbl">${G[1]}</span>`) + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }
+}
+function iconCss() {                                                   /* Protokoll-Zeichen als CSS-Hintergrund: nicht 90 Bilder je Neuaufbau */
+  let st = $('ico-css'); if (!st) { st = document.createElement('style'); st.id = 'ico-css'; document.head.appendChild(st); }
+  st.textContent = ['combat', 'party', 'world', 'quest', 'faction', 'economy', 'death'].map(c => { const u = pico('log_' + c, 1); return u ? `#log .lc-${c}{background-image:url(${u})}` : ''; }).join('\n');
+}
 const LOGCATS = ['Alle', 'Kampf', 'Gruppe', 'Welt', 'Quest', 'Fraktion', 'Handel'];
 const CATKEY = { Alle:null, Kampf:'combat', Gruppe:'party', Welt:'world', Quest:'quest', Fraktion:'faction', Handel:'economy' };
 let logFilter = null;
 
 export function initUI() {
   const nav = $('nav');
-  NAV.forEach(([k, label, key]) => {
-    const b = el('button', '', label + (key ? `<i>${key}</i>` : ''));
-    b.onclick = () => k === 'world' ? closeModal() : openModal(k);
+  NAV.forEach(([g, label, key, wins]) => {
+    const b = el('button', '', ''); b.dataset.g = g; b.title = `${label}${key ? ` (${key})` : ''}`;
+    b.onclick = () => wins.includes(modalOpen) ? closeModal() : openModal(wins[0]);
     nav.appendChild(b);
   });
+  paintNav(); loadIcons();
   const lf = $('log-filters');
   LOGCATS.forEach((c, i) => {
     const b = el('button', i === 0 ? 'on' : '', c);
-    b.onclick = () => { logFilter = CATKEY[c]; [...lf.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); renderLog(); };
+    b.onclick = () => { logFilter = CATKEY[c]; [...lf.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); logStick = true; renderLog(); };   /* neuer Filter: unten beginnen */
     lf.appendChild(b);
   });
   $('modal-close').onclick = closeModal;
@@ -88,7 +106,9 @@ export function refreshHUD() {
   const p = hudFor || S.player; if (!p) return;
   hudSet('pc-name', p.name);
   const TT = p.titleClass && TITLE_CLASSES[p.titleClass];
-  hudSet('pc-class', `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 ? ` · ${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei (C)` : ''}${p.skillPoints > 0 ? ` · ${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''}`);   // S15 (Nutzer): freie Punkte sichtbar
+  hudSet('pc-class', `Stufe ${p.level} · ${CLASSES[p.currentClass].name}${TT ? ' · ' + TT.name : ''}${p.attrPoints > 0 || p.skillPoints > 0 ? ' ✦' : ''}`);   // S15 (Nutzer): freie Punkte sichtbar — UI-Umbau: als Goldpunkt am Reiter Charakter
+  { const free = [p.attrPoints > 0 ? `${p.attrPoints} Statpunkt${p.attrPoints > 1 ? 'e' : ''} frei` : '', p.skillPoints > 0 ? `${p.skillPoints} Talentpunkt${p.skillPoints > 1 ? 'e' : ''} (T)` : ''].filter(Boolean).join(' · '), nb = $('nav')?.querySelector('[data-g="char"]');
+    if (nb && nb.dataset.free !== free) { nb.dataset.free = free; nb.classList.toggle('badge', !!free); nb.title = free ? `Charakter (C) — ${free}` : 'Charakter (C)'; $('pc-class').title = free; } }
   const fr = topRank(p);
   hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
@@ -121,12 +141,13 @@ export function refreshHUD() {
     list.appendChild(d);
     drawPortraitTo(cv, m);
   } }
-  hudSet('res-list', [['Holz', S.res.wood], ['Stein', S.res.stone], ['Eisen', S.res.iron],
-    ['Kraut', S.res.herb], ['Nahrung', S.res.food], ['Gold', S.gold]]
-    .map(([k, v]) => `<span>${k}<b>${Math.floor(v)}</b></span>`).join(''), true);
+  hudSet('res-list', [['wood', 'Holz', S.res.wood], ['stone', 'Stein', S.res.stone], ['iron', 'Eisen', S.res.iron],
+    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', S.res.food], ['gold', 'Gold', S.gold]]
+    .map(([i, k, v]) => { const im = icoImg('res_' + i, 2, 'resico'); return `<span title="${k}" class="${im ? 'hasico' : ''}">${im || k}<b>${Math.floor(v)}</b></span>`; }).join(''), true);   /* UI-Umbau: Piktogramm + Zahl */
   // Kopfzeile
   hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
-  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
+  if ($('clock-time').title !== `Jahr ${year()}`) $('clock-time').title = `Jahr ${year()}`;   /* UI-Umbau: Zeit, Wetter, Jahr stehen nur noch oben */
+  if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = icoImg('w_' + (S.weather === 'sandstorm' ? 'heat' : S.weather), 2, 'wico') || WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
   hudSet('clock-gold', String(S.gold));
   renderHotbar();
 }
@@ -222,8 +243,9 @@ function codexUI(body) {
       const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
     } else {
       const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
-      cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row"><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
+      cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row beast-row"><canvas class="beast-pic" data-mt="${k}" width="72" height="72"></canvas><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
         : '<div class="ledger">Hier stehen die Gegner, die du schon erschlagen hast.</div>';
+      cb.querySelectorAll('canvas[data-mt]').forEach(c => drawMonsterTo(c, c.dataset.mt));   /* Scout #8: Bestiarium mit Bild */
     }
   };
   body.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { codexTab = b.dataset.t; codexUI(body); });
@@ -266,13 +288,30 @@ function spellUI(body) {
   body.querySelectorAll('[data-bar]').forEach(b => b.onclick = () => { A.spellToBar(b.dataset.bar); spellUI(body); });
 }
 
+// Scout #8 (Entwickler 01.10.2026): Gegnerbild für den Kodex — dieselben Raster wie im Spiel (Tier, Brocken, Menschengestalt)
+const BEAST_KEYS = ['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'];
+function drawMonsterTo(cv, mt, seed = 2) {
+  const m = MONSTERS[mt], c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#14110d'; c.fillRect(0, 0, cv.width, cv.height); if (!m || m.eye || mt === 'carrion_wing') return;
+  try {
+    const f = BEAST_KEYS.includes(mt) ? SP.beastFrame(mt, m.pal || {}, 'E', '', 1) : mt === 'gorak' ? SP.bruteFrame(m.pal || {}, 'E', '', 0) : SP.humanFrame(SP.monsterSpec({ kind: 'enemy', mtype: mt, seed }, m), 'S', 'i0');
+    const k = Math.max(1, Math.floor(Math.min((cv.width - 4) / f.width, (cv.height - 4) / f.height)));
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(cv.width / 2 - f.width * k * 0.3, cv.height - 5, f.width * k * 0.6, 2);
+    c.drawImage(f, Math.round((cv.width - f.width * k) / 2), cv.height - 3 - f.height * k, f.width * k, f.height * k);
+  } catch (e) { /* unbekanntes Raster: leeres Bild */ }
+}
 // ---------------- Log ----------------
+// Nutzer 01.10.2026: der Log sprang nach oben (alte Einträge sichtbar). Ob er unten „klebt“, entscheidet jetzt nur das Scrollen des
+// Spielers (nicht die Höhe beim Neuaufbau, die bei verstecktem oder frisch gefülltem Kasten 0 ist); neu = unten, nach dem Layout.
+let logStick = true;
 function renderLog() {
   const box = $('log'); if (!box) return;
-  const near = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+  if (!box._stick) { box._stick = true; box.addEventListener('scroll', () => { if (box.clientHeight) logStick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24; }, { passive: true }); }
   box.innerHTML = S.log.filter(e => !logFilter || e.cat === logFilter).slice(-90)
-    .map(e => `<div class="c-${e.cat}"><time>${e.t}</time>${e.text}</div>`).join('');
-  if (near) box.scrollTop = box.scrollHeight;
+    .map(e => `<div class="c-${e.cat}"><span class="lc lc-${e.cat}"></span><time>${e.t}</time>${e.text}</div>`).join('');
+  let pill = $('log-new'); if (!pill) { pill = el('button', 'hidden', 'Neu ↓'); pill.id = 'log-new'; pill.onclick = () => { logStick = true; box.scrollTop = box.scrollHeight; pill.classList.add('hidden'); }; box.parentElement?.appendChild(pill);
+    box.addEventListener('scroll', () => { if (logStick) pill.classList.add('hidden'); }, { passive: true }); }   /* UI-Umbau: hochgescrollt → Hinweis auf Neues */
+  if (logStick) { box.scrollTop = box.scrollHeight; requestAnimationFrame(() => { if (logStick) box.scrollTop = box.scrollHeight; }); } else pill.classList.remove('hidden');
 }
 
 // ---------------- Kontextpanel ----------------
@@ -311,10 +350,7 @@ export function renderContext(target) {
       <div class="ctx-sub">${DUNGEONS[S.map] ? 'Dungeon' : here ? ({ village:'Dorf', wild:'Wildnis', dungeon:'Dungeon', road:'Straße', ruin:'Ruine', camp:'Lager', shrine:'Schrein', city:'Stadt' })[here.kind] : 'Wildnis'}</div>
       <div class="ctx-line"><span>Gefahr</span><b class="${tCls}">${tName}</b></div>
       ${A.zoneRange ? (z => `<div class="ctx-line"><span>Gegnerstufen</span><b class="${z[0] > p.level + 2 ? 'threat-high' : z[1] < p.level - 3 ? 'threat-low' : 'threat-med'}">${z[0]}–${z[1]}</b></div>`)(A.zoneRange(S.map, tx, ty)) : ''}
-      <div class="ctx-line"><span>Wetter</span><b>${{clear:'Klar',cloudy:'Bewölkt',rain:'Regen',fog:'Nebel',bloodrain:'Blutregen',sandstorm:'Sandsturm',snow:'Schnee'}[S.weather]}</b></div>
-      <div class="ctx-line"><span>Zeit</span><b>${timeStr()}</b></div>
-      <div class="ctx-line"><span>Jahreszeit</span><b>${SEASONS[seasonOf()]}</b></div>
-      <div class="ctx-line"><span>Jahr</span><b>${year()}</b></div>`;
+`;   /* UI-Umbau: Wetter, Zeit, Jahreszeit, Jahr stehen in der Kopfleiste (vorher doppelt) */
     if (here && S.towns && S.towns[here.key]) {
       const t = S.towns[here.key], owner = S.war.nodes[here.key]?.owner;
       h += `<div class="ctx-block"><div class="ctx-sub">Stadt</div>
@@ -513,13 +549,17 @@ export function openModal(name, arg) {
   modalOpen = name;
   const m = $('modal'); m.classList.remove('hidden');
   const body = $('modal-body'); body.innerHTML = '';
-  const idx = NAV.findIndex(n => n[0] === name);
-  [...$('nav').children].forEach((b, i) => b.classList.toggle('active', i === idx));
+  const grp = NAV.find(n => n[3].includes(name));
+  [...$('nav').children].forEach(b => b.classList.toggle('active', b.dataset.g === grp?.[0]));
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
     classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
+  let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
+  const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
+  tabs.innerHTML = subs.length > 1 && subs.includes(name) ? subs.map(k => `<button data-sub="${k}" class="${k === name ? 'on' : ''}">${SUBTAB[k]}</button>`).join('') : '';
+  tabs.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { if (b.dataset.sub !== modalOpen) openModal(b.dataset.sub); });
   if (R) R[1](body, arg);
 }
 
@@ -723,6 +763,7 @@ function charUI(body, who) {
       <p>${CLASSES[p.currentClass].name} · Stufe ${p.level} · ${bld.name} · ${p.age} Jahre${isPlayer ? ` · Haus ${S.legacy.house}, Generation ${S.legacy.gen}` : ''}</p>
       ${p.titles?.length ? `<p class="titles">${p.titles.map(t => `„${t}“`).join(' · ')}</p>` : ''}
       ${isPlayer && A.fameList ? `<p class="ledger">Ruhm: ${A.fameList().map(f => `${f.n} <b>${f.t}</b> (${f.v})`).join(' · ')}</p>` : ''}
+      ${isPlayer && A.styleList?.().length ? `<p class="ledger" title="Gnade (Verschonen, Laufenlassen, Anwerben) gegen Grausamkeit (Hinrichten, hartes Verhör, Gnadenstoß an Menschen). Barmherzig: Menschen ergeben sich öfter, Banden verlangen weniger. Schlächter: niemand ergibt sich mehr, Gegner fliehen früher, Banden meiden dich.">Klinge: ${A.styleList().map(f => `${f.n} <b>${f.t}</b> (${f.v > 0 ? '+' : ''}${f.v})`).join(' · ')}</p>` : ''}
     </header>
     <section class="tafel-befund">
       <h3>Befund</h3>
@@ -984,6 +1025,10 @@ function mapUI(body) {
     <span class="ledger" style="margin-left:10px">Entdeckte Orte erscheinen dauerhaft. Dunkel = unentdeckt.</span></div>`;
   const cv = $('wm'); cv.width = cv.clientWidth; cv.height = cv.clientHeight;
   A.drawWorldmap(cv, z);
+  cv.style.cursor = 'pointer'; body.style.position = 'relative';
+  cv.onclick = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * cv.width / r.width, y = (e.clientY - r.top) * cv.height / r.height, P = A.mapPick?.(x, y);   /* Scout #5: Ortskarte */
+    $('map-card')?.remove(); if (!P) return; const d = el('div', 'map-card', `<div class="ctx-head">${P.title}</div>${P.html}`); d.id = 'map-card';
+    d.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; d.style.top = Math.max(4, Math.min(e.clientY - r.top - 20, r.height - 180)) + 'px'; d.onclick = () => d.remove(); body.appendChild(d); };
   [...body.querySelectorAll('[data-z]')].forEach(b => b.onclick = () => { S.settings.mapZoom = +b.dataset.z; mapUI(body); });
 }
 
@@ -1002,7 +1047,7 @@ function tradeUI(body, npc) {
     const cv = el('canvas'); cv.width = cv.height = 34; row.appendChild(cv);
     row.appendChild(el('div', '', `<div class="s-name">${it.name}${slot.count > 1 ? ' ×' + slot.count : ''}</div><div class="s-key">${price} Gold</div>`));
     setTimeout(() => drawItemIconTo(cv, slot.key), 0);
-    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div><div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
+    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div>${A.priceNote?.(slot.key, npc) ? `<div class="ledger" style="color:${/^Teuer/.test(A.priceNote(slot.key, npc)) ? '#d08a6a' : '#9ac08a'}">${A.priceNote(slot.key, npc)}</div>` : ''}<div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
     row.onclick = () => { isBuy ? A.buy(npc, slot.key) : A.sell(i, npc); refreshModal(npc); };
     box.appendChild(row);
   });

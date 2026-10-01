@@ -63,11 +63,13 @@ class Px {
       if (Q.flat) c = R.b;
       else if (Q.mat === 'metal') c = t < 0.26 ? R.hi : t < 0.56 ? R.b : t < 0.86 ? R.sh : R.dk;
       else if (Q.mat === 'skin' || Q.mat === 'bone') c = t > 0.67 ? R.sh : t < 0.34 && tv < 0.55 ? R.hi : R.b;
-      else { c = t > 0.7 ? R.sh : t < 0.22 && wd >= 3 && tv < 0.6 ? mix(R.b, R.hi, 0.55) : R.b; if (wd >= 7 && t > 0.9) c = R.dk; }
+      else { c = t > 0.7 ? R.sh : t < 0.3 && wd >= 3 && tv < 0.7 ? R.hi : R.b; if (wd >= 7 && t > 0.9) c = R.dk; else if (wd >= 5 && t > 0.86) c = mix(R.sh, R.dk, 0.45);
+        else if (v1 - v0 >= 8 && tv > 0.82 && c === R.b) c = mix(R.b, R.sh, 0.5); }   /* Artist 01.10.: breiteres Licht links oben, Stoff unten satter im Schatten (Volumen) */
       if (!Q.flat && v1 - v0 >= 5 && y === v1 && Q.mat !== 'metal') c = R.sh;                  // Unterkante
       const up = y > 0 ? id[i - w] : -1, lf = x > 0 ? id[i - 1] : -1, rt = x < w - 1 ? id[i + 1] : -1, dn = y < h - 1 ? id[i + w] : -1;
-      if (!Q.flat && (up < 0 || (up < p && P[up].mat !== Q.mat)) && t < 0.65) c = Q.mat === 'metal' ? mix(R.hi, '#f4ecd8', 0.3) : mix(R.b, R.hi, 0.75);
+      if (!Q.flat && (up < 0 || (up < p && P[up].mat !== Q.mat)) && t < 0.65) c = Q.mat === 'metal' ? mix(R.hi, '#f4ecd8', 0.3) : Q.mat === 'cloth' ? mix(R.hi, '#f2e3c2', 0.12) : mix(R.b, R.hi, 0.75);
       else if (up > p && !P[up].noCast && !Q.flat) c = Q.mat === 'metal' ? R.sh : mix(c, R.dk, 0.6);
+      if (!Q.flat && lf < 0 && Q.mat !== 'metal' && tv < 0.75) c = mix(c, R.hi, 0.3);   /* Artist 01.10.: Kantenlicht an der linken Silhouette (Lichtquelle oben links) — Figur löst sich vom dunklen Boden */
       if (!Q.noLine) {
         const hard = (rt >= 0 && rt < p && !same(Q, P[rt])) || (dn >= 0 && dn < p && !same(Q, P[dn]));
         if (hard) c = mix(R.dk, '#070506', 0.3);
@@ -187,8 +189,11 @@ function rigS(pose) {
     case 'zeigen': R.aR = [[21.5, 14.5], [24.5, 16], [27.5, 15.5]]; R.hx = 1; break;                                      /* Roadmap P8 Gesten: Arm ausgestreckt */
     case 'abwehren': R.by = 1; R.hy = 1; R.aL = [[10.5, 14.5], [9, 11], [12, 8]]; R.aR = [[21.5, 14.5], [23, 11], [20, 8]]; break;   /* Hände vor dem Gesicht */
     case 'achsel': R.hy = -1; R.aL = [[10.5, 13.5], [8, 18], [5.5, 19]]; R.aR = [[21.5, 13.5], [24, 18], [26.5, 19]]; break;       /* Schultern hoch, Hände offen */
+    case 'salutieren': R.aR = [[21.5, 14.5], [20, 19], [16.5, 15.5]]; break;                                                    /* T17: Faust auf die Brust */
+    case 'jubeln': R.by = -1; R.hy = -1; R.aL = [[10.5, 13.5], [8, 9], [8.5, 4]]; R.aR = [[21.5, 13.5], [24, 9], [23.5, 4]]; break;   /* beide Arme hoch */
+    case 'trauern': R.by = 1; R.hy = 2; R.aL = [[10.5, 14.5], [11.5, 12], [14, 10]]; R.aR = [[21.5, 14.5], [20.5, 12], [18, 10]]; break;   /* Kopf gesenkt, Hände vors Gesicht */
     case 'carry': R.aL = [[10.5, 14.5], [10, 20], [14, 23]]; R.aR = [[21.5, 14.5], [22, 20], [18, 23]]; break;
-    case 'kneel': case 'search': case 'die1':
+    case 'kneel': case 'knien': case 'search': case 'die1':
       R.by = 5; R.lL = [[13.5, 31], [12.5, 39], [14, 44]]; R.lR = [[18.5, 31], [19.5, 36], [19.5, 42]]; R.kneel = 1;
       R.aL = [[10.5, 19.5], [10, 25], [12, 31]]; R.aR = [[21.5, 19.5], [22.5, 25], [20.5, 32]];
       if (pose === 'search') R.aR = [[21.5, 19.5], [21, 26], [17.5, 37]];
@@ -222,8 +227,11 @@ function rigW(pose) {
     case 'zeigen': R.aN = [[15.5, 14.5], [11.5, 15.5], [7, 15]]; R.hx = -1; break;                                         /* Roadmap P8 Gesten */
     case 'abwehren': R.by = 1; R.lean = 1; R.aN = [[15.5, 14.5], [12.5, 13], [10, 9]]; R.aF = [[17, 14.5], [14, 13.5], [11.5, 10]]; break;
     case 'achsel': R.hy = -1; R.aN = [[15.5, 13.5], [14, 19], [10.5, 19]]; R.aF = [[17, 13.5], [18, 19], [20.5, 19]]; break;
+    case 'salutieren': R.aN = [[15.5, 14.5], [14, 19], [13, 15.5]]; break;                                                       /* T17 */
+    case 'jubeln': R.by = -1; R.hy = -1; R.aN = [[15.5, 13.5], [14, 9], [13.5, 4]]; R.aF = [[17, 13.5], [18, 9], [18, 4]]; break;
+    case 'trauern': R.by = 1; R.hy = 2; R.lean = 1; R.aN = [[15.5, 14.5], [13.5, 13], [11.5, 10.5]]; R.aF = [[17, 14.5], [15, 13.5], [12.5, 11]]; break;
     case 'carry': R.aN = [[15.5, 14.5], [14.5, 20.5], [11.5, 23]]; R.aF = [[17, 14.5], [15.5, 20.5], [12.5, 23]]; break;
-    case 'kneel': case 'search': case 'die1':
+    case 'kneel': case 'knien': case 'search': case 'die1':
       R.by = 5; R.kneel = 1; R.lN = [[15.5, 31], [11.5, 35.5], [12.5, 42]]; R.lF = [[16.5, 31], [16, 40], [20.5, 43]];
       R.aN = [[15.5, 19.5], [14, 25], [12, 31]]; R.aF = [[17, 19.5], [16, 25], [13.5, 31]];
       if (pose === 'search') R.aN = [[15.5, 19.5], [13, 26], [9.5, 37]];

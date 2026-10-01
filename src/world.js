@@ -2019,6 +2019,7 @@ export const DUNGEONS = {
   kerker: { name: 'Kerker', floor: 'dfloor', amb: 'blight', enter: 'Die Tür fällt ins Schloss. Stroh, Eisen, der Geruch von zu vielen Leuten auf zu wenig Raum.' },   // Phase 2 §26
   omega: { name: 'Krater des Gefallenen Sterns', floor: 'scree', amb: 'blight', open: true, enter: 'Du trittst durch den Riss. Der Himmel ist rot, der Boden warm. In der Mitte des Kraters atmet etwas, das größer ist als ein Haus.' },   // Phase 7
   garmadon: { name: 'Gruft des Toten Königs', floor: 'dfloor', amb: 'blight', enter: 'Stufen aus Knochen führen hinab. Die Luft ist warm und riecht nach altem Blut. Irgendwo unten schlägt etwas wie ein Herz.' },   // Phase 6 MP2 §63
+  katakomben: { name: 'Katakomben von Varonheim', floor: 'dfloor', amb: 'blight', enter: 'Unter Varonheim riecht es nach Wachs und Eisen. Irgendwo tropft es — zu dick für Wasser.' },   /* §5g.2 Blutkult, gebaut beim Betreten (game.js buildCatacombs) */
   varonburg: { name: 'Varonsburg', floor: 'dfloor', amb: 'eisen', open: true, enter: 'Das Tor der Varonsburg schließt sich hinter dir. Schwarze Banner, Wachen auf jeder Mauer, und über allem der Bergfried des Königs.' },   /* Nutzer §5d.4 */
   zwerge: { name: 'Tiefhall — Königsstadt der Zwerge', floor: 'dfloor', amb: 'eisen', bright: true, enter: 'Unter der toten Halle brennt Licht. Hämmer, Stimmen, der Geruch von Bier und Kohle: die Zwerge leben.' },   /* Nutzer §5d.6 */
   vault: { name: 'Gewölbe', floor: 'dfloor', amb: 'blight', enter: '' },   // S13: zufällige Gewölbe (game.js buildVault)

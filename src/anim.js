@@ -20,6 +20,7 @@ export const ANIM_DEFS = {
   },
   gesture: {                                                         // Mischposen in fig5 rigS/rigW; ms = Standarddauer
     zeigen: { name: 'Zeigen', ms: 1400 }, abwehren: { name: 'Abwehren', ms: 1200 }, achsel: { name: 'Achselzucken', ms: 1100 },
+    salutieren: { name: 'Salutieren', ms: 900 }, jubeln: { name: 'Jubeln', ms: 1000 }, trauern: { name: 'Trauern', ms: 1800 }, knien: { name: 'Knien', ms: 1600 },   /* T17 */
   },
 };
 export const DEATH_KINDS = Object.keys(ANIM_DEFS.death);

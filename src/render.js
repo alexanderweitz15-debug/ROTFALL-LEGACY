@@ -951,12 +951,12 @@ function drawPropPixel(e, now) {
   let cv = propCache.get(key);
   if (!cv) {
     trimCache(propCache, 600);
-    const B = PROP_BOX[e.type] || 96;
+    const B = PROP_BOX[e.type] || (e.type === 'tree' && SP.drawnOn() ? 128 : 96);   /* Artist 01.10.: Bäume im Stil R größer (Maßstab zur Figur) */
     cv = document.createElement('canvas'); cv.width = cv.height = Math.round(B * PROP_RES);   // G5: feines Raster (1 Welt je Pixel) wie Figuren
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0);
     ctx = o;
-    const sc = PROP_SCALE[e.type]; if (sc) { o.translate(B / 2, B * 0.73); o.scale(sc, sc); o.translate(-B / 2, -B * 0.73); }
+    const sc = PROP_SCALE[e.type] || (e.type === 'tree' && SP.drawnOn() ? 1.3 : 0); if (sc) { o.translate(B / 2, B * 0.73); o.scale(sc, sc); o.translate(-B / 2, -B * 0.73); }
     try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg, _shut: shut }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
     SP.pixelize(o, cv.width, cv.height, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
@@ -985,6 +985,15 @@ function crown(cx, cy, R, pal, seed, n) {
   layer(pal[1], p => p);
   layer(pal[2], ([x, y, r]) => y < cy + R * 0.35 ? [x - r * 0.22, y - r * 0.3, r * 0.72] : null);
   layer(pal[3], ([x, y, r]) => x < cx + R * 0.2 && y < cy ? [x - r * 0.42, y - r * 0.48, r * 0.34] : null);
+  if (!SP.drawnOn()) return;
+  /* Artist 01.10. (Stil R): Tiefe und Blattsaum. Dunkle Löcher in der unteren Kronenmitte trennen die Blattballen,
+     kleine Büschel am Rand brechen die runde Wolkenform (Silhouette); oben links hell, unten dunkel (Lichtrichtung). */
+  ctx.fillStyle = pal[0];
+  for (let i = 0; i < 2; i++) { const a = h2(seed + 5, i) * 6.283, r = R * 0.4;
+    ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r, cy + R * 0.22 + Math.abs(Math.sin(a)) * r * 0.3, R * 0.16, R * 0.05, 0, 0, 7); ctx.fill(); }
+  for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283 + h2(seed, i + 40) * 0.35, rr = R * (0.92 + h2(i, seed + 3) * 0.22), sn = Math.sin(a), cs = Math.cos(a);
+    ctx.fillStyle = sn < -0.2 ? (cs < 0.2 ? pal[3] : pal[2]) : sn < 0.35 ? pal[1] : pal[0];
+    ctx.beginPath(); ctx.arc(cx + cs * rr * 1.05, cy + sn * rr * 0.75, R * 0.1 + 1, 0, 7); ctx.fill(); }
 }
 function drawProp(e, now) {
   const x = e.x, y = e.y;
@@ -2107,7 +2116,7 @@ function telegraphArc(e, R, half, now) {
 
 // Leichen: kurze Sterbeanimation (Treffer → Knien → Fallen), dann liegend, Blutlache wächst.
 function drawCorpse(e, now) {
-  const age = e.born ? Math.max(0, now - e.born) : 9999;   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
+  const age = e.born ? Math.max(0, now - e.born) / (e.slow || 1) : 9999;   /* T10: der Held fällt in Zeitlupe */   // born kann nach dem Frame-Zeitstempel liegen (Tod während eines langen Update-Schritts)
   ctx.globalAlpha = clamp(e.life / 1000, 0, 1);
   const D = e.dc && ANIM_DEFS.death[e.dc];                  /* Roadmap P8: Blutlache nur bei blutigen Toden */
   if (!D || D.pool) { const pool = Math.min(14, 5 + age / 70);
@@ -2551,9 +2560,21 @@ function drawWeather(now) {
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 }
 
+// T17 Regiebuch: Sprechblase über einer Figur (folgt ihr), dunkle Box, helle Schrift
+function drawBubble(f) {
+  const e = f.who && S.ents[S.map]?.find(x => x.id === f.who); if (e) { f.x = e.x; f.y = e.y - 44; }
+  const a = clamp(Math.min(f.life / 300, (f.maxLife - f.life) / 200 + 0.2), 0, 1), fs = Math.max(11, 13 * cam.zoom * 0.8);
+  ctx.font = `italic ${fs}px Spectral, serif`; const w = ctx.measureText(f.text).width + 16, h = fs + 10;
+  const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - cam.y) * cam.zoom - h;
+  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.fillRect(sx - w / 2, sy, w, h);
+  ctx.strokeStyle = 'rgba(200,170,110,.55)'; ctx.lineWidth = 1; ctx.strokeRect(sx - w / 2 + 0.5, sy + 0.5, w - 1, h - 1);
+  ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.beginPath(); ctx.moveTo(sx - 5, sy + h); ctx.lineTo(sx + 5, sy + h); ctx.lineTo(sx, sy + h + 6); ctx.fill();
+  ctx.fillStyle = '#e7dcc2'; ctx.fillText(f.text, sx, sy + h - 7); ctx.globalAlpha = 1;
+}
 function drawFloats() {
   ctx.textAlign = 'center';
   for (const f of S.floats) {
+    if (f.bubble) { drawBubble(f); continue; }
     const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - f.rise - cam.y) * cam.zoom;
     const a = clamp(f.life / f.maxLife, 0, 1);
     ctx.font = `${f.big ? 700 : 400} ${(f.big ? 20 : 15) * cam.zoom * 0.85}px Cinzel, serif`;

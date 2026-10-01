@@ -2,6 +2,16 @@
 
 Nur Entscheidungen des Nutzers. Neueste oben.
 
+## 01.10.2026 (Varonheim-Belagerung, proposals/varonheim_belagerung.md)
+- Heerzug 70 (Sehr schwer 80): die Hauptstadt fällt nur bei langer Vernachlässigung.
+- Fällt sie, flieht der König nach Salzhafen (sonst Nordfurt, sonst Eren); Exilhof mit Varon, Brandt, Ysmay, Hagen.
+- Rückeroberung möglich (4 Wellen oder Valen-Heer); die zerstreuten Adligen kommen nie zurück; keine Selbstheilung auf Schwer/Sehr schwer.
+- §5g.8: Eine besetzte Hauptstadt bindet Valen (Automaten übernehmen); ein toter König bindet nicht — Marschall Brandt führt den Einmarsch.
+
+## 01.10.2026 (Control-Fragen)
+- Öffentliches `main` bekommt nur noch geprüfte Stände (Commit mit „[VERIFIED]“); Zwischenstände nur auf `claude-arbeit`.
+- Grafikstil F bleibt endgültig aus (Code eingefroren).
+
 ## 01.10.2026 (Fragemenü zu den Entwürfen)
 - **Blutkult (proposals/blutkult.md):** Katakomben und Blutfürst im mittleren Spiel (Gegner 12–16, Blutfürst 16). Sonne: stetiger Brand (≈1,2/s) und −20 % Schaden, Schutz mildert, am Boden brennt es halb weiter (Gefährten müssen in den Schatten holen). Trinken von Wehrlosen (am Boden, ergeben, gefesselt, schlafend), Phiolen, Tierblut; zweimal am selben Tag tötet. Der Spieler darf neuer Blutfürst werden, mit laufenden Folgen (Blutzehnt, Tribut, Orden jagt dauerhaft). §5g.8: Kult aktiv oder herrschend = Varon gebunden, Automaten übernehmen; nur ein zerschlagener oder noch nicht erwachter Kult lässt Varon einmarschieren. **Heilung beliebig oft** (heilbar und neu ansteckbar, abweichend von der Empfehlung).
 - **Freie vom Grubenhort:** bleiben eigene Fraktion.
@@ -22,3 +32,19 @@ Nur Entscheidungen des Nutzers. Neueste oben.
 
 ## Früher
 - Siehe `docs/PLAN_ROADMAP.md` §5b–§5f. Freie vom Grubenhort: eigene Fraktion (§5c).
+
+## 01.10.2026 — Antworten auf die Director-Fragen (Fable)
+- **T15 Messing V10:** freigegeben, Energiezelle für Stufe-4-Prothesen alle **3 Tage** (nicht täglich); Kurzschluss bei Schock und Regen-Verschleiß ×1,3 wie im Audit.
+- **A14 Hunger und Müdigkeit:** freigegeben, **komplett** mit `DIFF.survival` (Angsthase nur Hinweise).
+- **Belagerung:** S2 (Fall, Exil, Hof, Rückeroberung) **direkt nach S1**; S3 später eingemischt; S4 vertagt.
+- **Nächster großer Vorschlag:** **T23 Fraktionsressourcen** zuerst (Fable, Welt/Fraktionen), T40 baut darauf.
+
+## 01.10.2026 — Regiebuch (T17), Blutkult-Siegel, Fraktionsressourcen (T23)
+- **Szenen überspringen:** immer mit ESC; die Folgen der Szene laufen trotzdem nach.
+- **Boss-Auftritte:** **4–6 s, das Spiel pausiert** (Kampf wartet) — Abweichung von der Empfehlung (2–3 s live).
+- **Sprechblasen** statt Großbuchstaben-Toasts in Szenen und Boss-Phasen; Toasts bleiben für Systemmeldungen. Kurze Kamera bei Weltereignissen in Spielernähe.
+- **RB-031 Rotes Siegel:** **harte Folge** — wer Aldhelm erpresst, hat das Siegel und damit den Weg zum Zerschlagen verspielt. Der Text muss es vorher deutlich sagen.
+- **T23 Aurelion:** Ressource = **Index aus Versorgung und Magitech**; Aurelion wird **je nach Wohlstand stärker** (Nutzer: „ich will, dass Aurelion je nach Wohlstand auch stärker wird“).
+- **T23 Seelen:** Morvaths Heerzug kostet 40 Seelen, keine Bedingung.
+- **T23 Eisenfeste-Vorrat:** einmalig in Stadtlager-Korn ×0,5 umwandeln, alter Wert gelöscht.
+- **T23 Kette ohne Hände (< 6 Köpfe):** Sklavenjagd gegen den Grubenhort **und** gegen Tributdörfer.

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ROTFALL UI — Variante A „Ledger“</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* Variante A „Ledger / Buch“: HUD bleibt dunkel und schlank, jedes Fenster ist eine aufgeschlagene Doppelseite aus Pergament.
+   Statisches Mockup, 1280×720. Figuren und Bauten sind CSS-Pixelraster (box-shadow), keine Bilder. */
+:root{--ink:#0d0b08;--panel:#161209;--iron:#3b3227;--iron-hi:#5a4b36;--gold:#c9a94e;--rust:#a4402c;--moss:#5c6b3c;
+  --text:#ddd1b6;--dim:#8d836e;--paper:#d6c39a;--paper2:#c7b184;--paper-dk:#a8926a;--inkt:#2b2015;--inkd:#5a4a36}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#000;height:100%}
+body{display:flex;align-items:center;justify-content:center;font-family:"Spectral",serif;color:var(--text);min-height:100vh}
+.screen{position:relative;width:1280px;height:720px;overflow:hidden;background:var(--ink);box-shadow:0 0 0 1px #000,0 30px 80px #000;
+  image-rendering:pixelated}
+.cz{font-family:"Cinzel",serif;letter-spacing:.14em;text-transform:uppercase}
+.px{position:relative;display:block}.px i{position:absolute;left:0;top:0;display:block}
+
+/* ---- schlanke Kopfleiste (30 px): nur Siegel, Tagesbogen, Wetter, Gold, Buch ---- */
+.top{position:absolute;left:0;right:0;top:0;height:30px;background:linear-gradient(180deg,#1c1711,#110e0a);border-bottom:1px solid var(--iron);
+  display:flex;align-items:center;padding:0 12px;gap:16px;font-size:12px}
+.sigil{width:14px;height:14px;background:radial-gradient(circle,transparent 3px,var(--rust) 3px,var(--rust) 4px,transparent 4px),linear-gradient(45deg,transparent 44%,#c9bfa6 44% 56%,transparent 56%);filter:drop-shadow(0 0 3px rgba(164,64,44,.6))}
+.brand{font-size:13px;color:#d9cdb2}.top .sp{flex:1}
+.daywheel{display:flex;align-items:center;gap:8px;color:#b8ac93}
+.arc{width:120px;height:14px;position:relative;border-bottom:1px solid #4a3f2c}
+.arc::before{content:"";position:absolute;left:0;right:0;top:0;height:26px;border:1px solid #4a3f2c;border-bottom:none;border-radius:60px 60px 0 0}
+.arc .sun{position:absolute;left:38%;top:-3px;width:7px;height:7px;background:var(--gold);box-shadow:0 0 6px var(--gold);transform:rotate(45deg)}
+.wx{width:14px;height:10px;background:linear-gradient(#8a8a94,#8a8a94) 2px 0/10px 4px no-repeat,linear-gradient(#8a8a94,#8a8a94) 0 4px/14px 4px no-repeat}
+.gold{color:var(--gold)}.gold::before{content:"◈ "}
+.book-btn{display:flex;align-items:center;gap:6px;color:var(--dim);border:1px solid var(--iron);padding:2px 8px;font-size:10px}
+.book-btn b{width:10px;height:12px;background:linear-gradient(90deg,var(--paper) 0 45%,#7a2c22 45% 55%,var(--paper) 55%);border:1px solid #2b2015}
+
+/* ---- linke HUD-Säule ---- */
+.left{position:absolute;left:0;top:30px;bottom:96px;width:188px;background:var(--panel);border-right:1px solid var(--iron);padding:10px}
+.hero{display:flex;gap:8px;align-items:flex-start}
+.port{width:46px;height:46px;background:#120f0c;border:1px solid var(--iron);display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.name{font-size:14px;color:#e7dcc2}.cls{font-size:9px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase}.rank{font-size:10px;color:var(--dim)}
+.bars{margin-top:10px;display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:12px 1fr 34px;gap:6px;align-items:center;font-size:9px;color:var(--dim)}
+.bar .ic{width:10px;height:10px}
+.bar .tr{height:8px;background:#100d0a;border:1px solid #33291d;position:relative;overflow:hidden}
+.bar .tr i{position:absolute;inset:0;transform-origin:left}
+.hp i{background:linear-gradient(180deg,#b23b2c,#6d1c15)} .st i{background:linear-gradient(180deg,#a2903c,#5d5220)} .xp i{background:linear-gradient(180deg,#8c7a3f,#4a3f1d)}
+.ic.heart{background:conic-gradient(var(--rust) 0 100%);clip-path:polygon(50% 100%,0 40%,15% 10%,50% 25%,85% 10%,100% 40%)}
+.ic.bolt{background:#b7a24a;clip-path:polygon(55% 0,20% 55%,48% 55%,40% 100%,80% 40%,52% 40%)}
+.ic.star{background:#9a874a;clip-path:polygon(50% 0,62% 38%,100% 38%,70% 60%,80% 100%,50% 76%,20% 100%,30% 60%,0 38%,38% 38%)}
+.fx{display:flex;gap:4px;margin-top:8px}
+.fx span{width:16px;height:16px;border:1px solid #3b3227;background:#191510;display:flex;align-items:center;justify-content:center;font-size:9px;color:#cbbf8a}
+.fx span.bad{color:#d0705c;border-color:#5a2a22}
+.body{margin-top:10px;display:flex;gap:8px;align-items:center}
+.sil{width:34px;height:60px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:12px 18px 14px 16px;gap:1px}
+.sil b{background:#3a3327;border:1px solid #2a2419}.sil b.head{grid-column:2}.sil b.torso{grid-column:2;grid-row:2}.sil b.al{grid-row:2}.sil b.ar{grid-row:2}
+.sil b.ll{grid-column:1/3;grid-row:3/5;margin-right:3px}.sil b.lr{grid-column:2/4;grid-row:3/5;margin-left:3px}
+.sil b.w{background:#7a3a2a;border-color:#a4402c}
+.body small{font-size:10px;color:var(--dim);line-height:1.4}
+.sep{height:1px;background:var(--iron);margin:10px 0}
+.party{display:flex;gap:6px}
+.party .m{width:38px;text-align:center}
+.party .m .pp{width:38px;height:38px;border:1px solid var(--iron);background:#120f0c;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.party .m .mb{height:3px;background:#5d1811;margin-top:2px}.party .m .mb i{display:block;height:100%;background:#9c3327}
+.party .m small{font-size:9px;color:var(--dim)}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px}
+.res span{display:flex;align-items:center;gap:5px;color:#b3a78e}.res span b{margin-left:auto;font-weight:400;color:#e0d4b8}
+.ri{width:10px;height:10px;display:inline-block}
+.ri.wood{background:#7a5a30;clip-path:polygon(0 30%,100% 30%,100% 70%,0 70%)}.ri.stone{background:#777;clip-path:polygon(20% 0,80% 0,100% 50%,80% 100%,20% 100%,0 50%)}
+.ri.iron{background:#8a8a94;clip-path:polygon(0 20%,100% 20%,100% 80%,0 80%)}.ri.food{background:#b58b3a;border-radius:50%}
+.ri.herb{background:#5c6b3c;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}.ri.gold{background:var(--gold);transform:rotate(45deg);width:8px;height:8px}
+
+/* ---- Spielfeld ---- */
+.view{position:absolute;left:188px;right:0;top:30px;bottom:96px;background:
+  radial-gradient(ellipse at 60% 40%,rgba(230,170,70,.18),transparent 40%),
+  repeating-linear-gradient(0deg,#1a1c12 0 31px,#15170f 31px 32px),repeating-linear-gradient(90deg,transparent 0 31px,#13150e 31px 32px);
+  box-shadow:inset 0 0 90px rgba(0,0,0,.85);overflow:hidden}
+.view .road{position:absolute;left:0;right:0;top:300px;height:70px;background:repeating-linear-gradient(90deg,#2a2419 0 31px,#262016 31px 32px);opacity:.9}
+.view .wall{position:absolute;left:380px;top:120px;width:360px;height:140px;background:repeating-linear-gradient(0deg,#4a4038 0 7px,#3a322b 7px 8px);border:2px solid #221c14}
+.view .roof{position:absolute;left:372px;top:70px;width:376px;height:60px;background:repeating-linear-gradient(90deg,#6a4436 0 6px,#5e3a2e 6px 12px);clip-path:polygon(0 100%,50% 0,100% 100%)}
+.view .win{position:absolute;width:14px;height:18px;background:#e2b45a;box-shadow:0 0 18px #e2b45a}
+.view .lamp{position:absolute;width:4px;height:28px;background:#2a2419}.view .lamp::after{content:"";position:absolute;left:-4px;top:-6px;width:12px;height:10px;background:#e8c070;box-shadow:0 0 26px 8px rgba(232,192,112,.45)}
+.prompt{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);font-size:11px;letter-spacing:.08em;color:#ddd1b6;background:rgba(10,8,6,.8);border:1px solid #3b3227;padding:4px 10px}
+.prompt b{color:var(--gold);font-weight:400}
+
+/* ---- unten: Tagebuchstreifen (Log) + Leiste ---- */
+.bottom{position:absolute;left:0;right:0;bottom:0;height:96px;display:grid;grid-template-columns:1fr 440px;gap:6px;padding:6px;background:var(--ink)}
+.diary{position:relative;background:linear-gradient(180deg,var(--paper),var(--paper2));border:1px solid #6a5a3e;box-shadow:inset 0 0 30px rgba(90,70,40,.35);
+  color:var(--inkt);font-size:12px;padding:6px 10px 6px 34px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+.diary::before{content:"";position:absolute;left:24px;top:0;bottom:0;width:1px;background:rgba(164,64,44,.45)}
+.diary .tab{position:absolute;left:0;top:-1px;width:22px;height:100%;background:#7a2c22;color:#f0e6cd;writing-mode:vertical-rl;font-size:9px;display:flex;align-items:center;justify-content:center;letter-spacing:.2em}
+.diary .row{display:grid;grid-template-columns:34px 14px 1fr;gap:6px;align-items:center;line-height:1.5;border-bottom:1px dotted rgba(60,40,20,.25)}
+.diary .row.new{color:#1a120a;font-weight:600}
+.diary time{font-size:10px;color:var(--inkd)}
+.diary .c{width:10px;height:10px}
+.c.combat{background:#8c3b2a;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}.c.world{background:#5c6b3c;border-radius:50%}.c.econ{background:#b58b3a;transform:rotate(45deg);width:8px;height:8px}
+.c.quest{background:#7a2c22;clip-path:polygon(0 0,100% 0,100% 60%,50% 100%,0 60%)}.c.party{background:#4a6a7a;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.diary .filters{position:absolute;right:8px;top:4px;display:flex;gap:4px}
+.diary .filters span{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--inkd);border:1px solid rgba(60,40,20,.3);padding:0 5px}
+.diary .filters span.on{background:rgba(60,40,20,.15);color:var(--inkt)}
+.hot{display:flex;align-items:center;justify-content:center;gap:5px;background:var(--panel);border:1px solid var(--iron);padding:6px}
+.slot{width:40px;height:40px;background:#131009;border:1px solid #3b3227;position:relative;display:flex;align-items:center;justify-content:center}
+.slot b{position:absolute;top:0;left:3px;font-size:8px;color:#6d6454;font-weight:400}.slot u{position:absolute;bottom:1px;right:3px;font-size:9px;color:#cbbf8a;text-decoration:none}
+.slot.e{opacity:.35}.slot .g{width:22px;height:22px}
+.g.potion{background:linear-gradient(#b23b2c 0 70%,#ddd 70%);clip-path:polygon(35% 0,65% 0,65% 25%,100% 60%,100% 100%,0 100%,0 60%,35% 25%)}
+.g.bandage{background:repeating-linear-gradient(45deg,#d8ccb0 0 4px,#b8ac93 4px 6px);border-radius:3px}
+.g.bread{background:#b58b3a;border-radius:50% 50% 30% 30%}
+.g.sword{background:#8a8a94;clip-path:polygon(45% 0,55% 0,55% 70%,80% 70%,80% 78%,55% 78%,55% 100%,45% 100%,45% 78%,20% 78%,20% 70%,45% 70%)}
+.g.skill{border:1px solid var(--gold);color:var(--gold);font-size:7px;display:flex;align-items:center;justify-content:center;letter-spacing:.08em}
+
+/* ---- DAS BUCH: Doppelseite mit Bändern ---- */
+.dim{position:absolute;inset:0;background:rgba(6,5,4,.62)}
+.book{position:absolute;left:150px;top:56px;width:990px;height:540px;display:grid;grid-template-columns:1fr 1fr;filter:drop-shadow(0 24px 40px #000)}
+.page{position:relative;background:
+  radial-gradient(ellipse at 20% 10%,rgba(255,250,230,.25),transparent 50%),
+  linear-gradient(180deg,var(--paper),var(--paper2) 80%,var(--paper-dk));color:var(--inkt);padding:26px 30px 22px 34px;overflow:hidden}
+.page.l{border-radius:4px 0 0 4px;box-shadow:inset -28px 0 40px -24px rgba(50,35,15,.75)}
+.page.r{border-radius:0 4px 4px 0;box-shadow:inset 28px 0 40px -24px rgba(50,35,15,.75)}
+.page::after{content:"";position:absolute;inset:8px;border:1px solid rgba(90,70,40,.35);pointer-events:none}
+.page h2{font-family:"Cinzel",serif;font-size:20px;letter-spacing:.16em;color:#2b2015;border-bottom:2px solid #7a2c22;padding-bottom:4px;margin-bottom:6px}
+.page h3{font-family:"Cinzel",serif;font-size:10px;letter-spacing:.2em;color:var(--inkd);margin:12px 0 5px;text-transform:uppercase}
+.page .sub{font-size:12px;color:var(--inkd);font-style:italic}
+.page .no{position:absolute;bottom:10px;font-size:10px;color:var(--inkd);letter-spacing:.2em}
+.page.l .no{left:34px}.page.r .no{right:34px}
+/* Bänder (Reiter) am rechten Rand */
+.ribbons{position:absolute;right:-30px;top:34px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.ribbons span{width:28px;height:52px;background:#5a2a22;color:#e7dcc2;writing-mode:vertical-rl;font-family:"Cinzel",serif;font-size:8px;letter-spacing:.18em;display:flex;align-items:center;justify-content:center;border:1px solid #2b1510;border-left:none;box-shadow:3px 3px 8px rgba(0,0,0,.5)}
+.ribbons span.on{background:#7a2c22;width:34px;color:#fff}
+.ribbons span i{font-style:normal;opacity:.6;font-size:7px;margin-top:3px}
+/* Papierpuppe */
+.doll{display:grid;grid-template-columns:86px 1fr 86px;gap:8px;align-items:center;margin-top:6px}
+.doll .fig{display:flex;justify-content:center;align-items:center;height:250px;background:
+  radial-gradient(ellipse at 50% 90%,rgba(60,40,20,.25),transparent 60%);border:1px dashed rgba(90,70,40,.4)}
+.eq{display:grid;gap:8px}
+.eq .s{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--inkd)}
+.eq .s b{width:34px;height:34px;border:1px solid #5a4a36;background:rgba(255,250,230,.35);display:flex;align-items:center;justify-content:center;flex:none;position:relative}
+.eq .s b::after{content:"";position:absolute;inset:3px;border:1px dotted rgba(90,70,40,.4)}
+.eq .s b.has::after{display:none}
+.eq .s small{line-height:1.2}.eq .s small em{display:block;font-style:normal;color:#1a120a;font-size:11px}
+.eq.rt .s{flex-direction:row-reverse;text-align:right}
+.led{font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:1px 18px}
+.led div{display:flex;justify-content:space-between;border-bottom:1px dotted rgba(60,40,20,.35);padding:1px 0}
+.led b{font-weight:600;color:#1a120a}
+.led .plus{color:#7a2c22;font-weight:600}
+/* Inventar als Tintenraster */
+.grid{display:grid;grid-template-columns:repeat(6,56px);gap:4px;margin-top:4px}
+.cell{width:56px;height:56px;border:1px solid #5a4a36;background:rgba(255,250,230,.3);position:relative;display:flex;align-items:center;justify-content:center}
+.cell::after{content:"";position:absolute;inset:4px;border:1px dotted rgba(90,70,40,.35)}
+.cell.sel{border:2px solid #7a2c22;background:rgba(122,44,34,.12)}
+.cell .g{width:30px;height:30px}
+.cell u{position:absolute;right:4px;bottom:2px;font-size:10px;text-decoration:none;color:#1a120a}
+.cell .cond{position:absolute;left:5px;right:5px;bottom:3px;height:2px;background:rgba(60,40,20,.25)}.cell .cond i{display:block;height:100%;background:#5c6b3c;width:70%}
+.g.helm{background:#8a8a94;border-radius:50% 50% 10% 10%}
+.g.cloth{background:repeating-linear-gradient(0deg,#9a7a5a 0 3px,#86684a 3px 6px);transform:skewX(-8deg)}
+.g.herb{background:#5c6b3c;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.g.ore{background:#777;clip-path:polygon(20% 0,80% 0,100% 50%,80% 100%,20% 100%,0 50%)}
+.g.key{background:#bd9433;clip-path:polygon(0 35%,60% 35%,60% 20%,100% 50%,60% 80%,60% 65%,0 65%)}
+.card{margin-top:10px;border-top:2px solid #7a2c22;padding-top:6px;font-size:12px;line-height:1.5}
+.card h4{font-family:"Cinzel",serif;font-size:14px;letter-spacing:.1em}
+.card .r{display:flex;justify-content:space-between;border-bottom:1px dotted rgba(60,40,20,.3)}
+.card .better{color:#3f6b2a;font-weight:600}
+.card .act{display:flex;gap:6px;margin-top:6px}
+.card .act span{border:1px solid #5a4a36;padding:2px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--inkd)}
+.card .act span.main{background:#7a2c22;color:#f0e6cd;border-color:#7a2c22}
+.stamp{position:absolute;right:40px;top:30px;transform:rotate(-12deg);border:2px solid rgba(122,44,34,.55);color:rgba(122,44,34,.7);font-family:"Cinzel",serif;font-size:10px;letter-spacing:.2em;padding:3px 8px}
+.hint{position:absolute;left:0;right:0;bottom:102px;text-align:center;font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- Kopfleiste: schlank, fast ohne Text -->
+  <header class="top">
+    <span class="sigil"></span><span class="brand cz">Rotfall</span>
+    <span class="sp"></span>
+    <div class="daywheel" title="Tag 4 · 10:00 · Frühling"><div class="arc"><span class="sun"></span></div><span>Tag 4 · 10:00</span><span class="wx" title="Bewölkt"></span></div>
+    <span class="gold">325</span>
+    <span class="book-btn cz"><b></b>Buch · Tab</span>
+  </header>
+
+  <!-- linke Säule -->
+  <aside class="left">
+    <div class="hero">
+      <div class="port"><span class="px" data-px="hero" data-s="2"></span></div>
+      <div><div class="name">Ragnar</div><div class="cls">Wanderer · St. 12</div><div class="rank">Ohne Banner</div></div>
+    </div>
+    <div class="bars">
+      <div class="bar hp"><span class="ic heart"></span><span class="tr"><i style="transform:scaleX(.82)"></i></span><span>213/261</span></div>
+      <div class="bar st"><span class="ic bolt"></span><span class="tr"><i style="transform:scaleX(.95)"></i></span><span>124/132</span></div>
+      <div class="bar xp"><span class="ic star"></span><span class="tr"><i style="transform:scaleX(.44)"></i></span><span>St. 12</span></div>
+    </div>
+    <div class="fx"><span title="Satt">●</span><span class="bad" title="Blutend">✶</span><span title="Gesegnet">✚</span></div>
+    <div class="body">
+      <div class="sil"><b class="head"></b><b class="al"></b><b class="torso"></b><b class="ar w"></b><b class="ll"></b><b class="lr"></b></div>
+      <small>Rechter Arm<br><em style="color:#d0705c">verwundet</em></small>
+    </div>
+    <div class="sep"></div>
+    <div class="cz" style="font-size:9px;color:var(--dim)">Gruppe 2 / 3</div>
+    <div class="party" style="margin-top:6px">
+      <div class="m"><div class="pp"><span class="px" data-px="hero2" data-s="2"></span></div><div class="mb"><i style="width:70%"></i></div><small>Elena</small></div>
+      <div class="m"><div class="pp"><span class="px" data-px="hero3" data-s="2"></span></div><div class="mb"><i style="width:95%"></i></div><small>Tomas</small></div>
+    </div>
+    <div class="sep"></div>
+    <div class="cz" style="font-size:9px;color:var(--dim);margin-bottom:6px">Vorrat</div>
+    <div class="res">
+      <span><i class="ri wood"></i>Holz<b>80</b></span><span><i class="ri stone"></i>Stein<b>30</b></span>
+      <span><i class="ri iron"></i>Eisen<b>12</b></span><span><i class="ri food"></i>Nahrung<b>0</b></span>
+      <span><i class="ri herb"></i>Kraut<b>0</b></span><span><i class="ri gold"></i>Gold<b>325</b></span>
+    </div>
+  </aside>
+
+  <!-- Spielfeld -->
+  <main class="view">
+    <div class="roof"></div><div class="wall"></div>
+    <span class="win" style="left:420px;top:170px"></span><span class="win" style="left:470px;top:170px"></span><span class="win" style="left:640px;top:170px"></span>
+    <div class="road"></div>
+    <span class="lamp" style="left:330px;top:290px"></span><span class="lamp" style="left:780px;top:290px"></span>
+    <span class="px" data-px="hero" data-s="3" style="position:absolute;left:530px;top:270px"></span>
+    <span class="px" data-px="hero2" data-s="3" style="position:absolute;left:600px;top:300px"></span>
+    <div class="prompt"><b>E</b> Sprechen · Richenza, Prothesenhändlerin</div>
+  </main>
+
+  <!-- unten -->
+  <footer class="bottom">
+    <div class="diary">
+      <span class="tab">TAGEBUCH</span>
+      <div class="filters"><span class="on">Alle</span><span>Kampf</span><span>Welt</span><span>Handel</span><span>Auftrag</span></div>
+      <div class="row"><time>09:40</time><i class="c world"></i><span>Die Tore der Eisenfeste öffnen sich für den Tag.</span></div>
+      <div class="row"><time>09:52</time><i class="c econ"></i><span>Richenza hat heute Aurelion-Glieder im Angebot.</span></div>
+      <div class="row"><time>09:58</time><i class="c combat"></i><span>Wolf getroffen — 14 Schaden, es blutet.</span></div>
+      <div class="row new"><time>10:00</time><i class="c quest"></i><span>Neuer Eintrag: „Patrouille um Haselbrück“ abgeschlossen. +60 Gold.</span></div>
+    </div>
+    <div class="hot">
+      <div class="slot"><b>1</b><span class="g sword"></span></div>
+      <div class="slot"><b>2</b><span class="g potion"></span><u>3</u></div>
+      <div class="slot"><b>3</b><span class="g bandage"></span><u>5</u></div>
+      <div class="slot"><b>4</b><span class="g bread"></span><u>2</u></div>
+      <div class="slot"><b>5</b><span class="g skill">Wucht</span></div>
+      <div class="slot e"><b>6</b></div><div class="slot e"><b>7</b></div><div class="slot e"><b>8</b></div><div class="slot e"><b>9</b></div><div class="slot e"><b>0</b></div>
+    </div>
+  </footer>
+
+  <!-- DAS BUCH (offenes Menü: Charakter + Inventar als Doppelseite) -->
+  <div class="dim"></div>
+  <div class="book">
+    <section class="page l">
+      <h2>Ragnar</h2>
+      <div class="sub">Wanderer · Stufe 12 · Haus Ragnar, 1. Generation · 22 Jahre</div>
+      <div class="doll">
+        <div class="eq">
+          <div class="s"><b class="has"><span class="g helm" style="width:22px;height:22px"></span></b><small>Kopf<em>Lederkappe</em></small></div>
+          <div class="s"><b></b><small>Rumpf<em>—</em></small></div>
+          <div class="s"><b></b><small>Hände<em>—</em></small></div>
+          <div class="s"><b class="has"><span class="g sword" style="width:22px;height:22px"></span></b><small>Waffe<em>Langschwert</em></small></div>
+        </div>
+        <div class="fig"><span class="px" data-px="hero" data-s="9"></span></div>
+        <div class="eq rt">
+          <div class="s"><b></b><small>Umhang<em>—</em></small></div>
+          <div class="s"><b></b><small>Beine<em>—</em></small></div>
+          <div class="s"><b></b><small>Füße<em>—</em></small></div>
+          <div class="s"><b></b><small>Talisman<em>—</em></small></div>
+        </div>
+      </div>
+      <h3>Befund</h3>
+      <div class="led">
+        <div><span>Stärke</span><b>9</b></div><div><span>Rüstung</span><b>4</b></div>
+        <div><span>Beweglichkeit</span><b>9 <span class="plus">+1</span></b></div><div><span>Schaden</span><b>17,4</b></div>
+        <div><span>Ausdauer</span><b>9</b></div><div><span>Tempo</span><b>100 %</b></div>
+        <div><span>Willenskraft</span><b>9</b></div><div><span>Feinde getötet</span><b>88</b></div>
+      </div>
+      <div class="sub" style="margin-top:8px">11 freie Punkte — ein Tintenklecks <span class="plus">+1</span> neben dem Wert setzt ihn.</div>
+      <span class="no">— IV —</span>
+    </section>
+    <section class="page r">
+      <span class="stamp">Tasche 11 / 24</span>
+      <h2>Gepäck</h2>
+      <div class="sub">Was du trägst, wiegt. Was du im Lager lässt, wartet.</div>
+      <div class="grid">
+        <div class="cell sel"><span class="g potion"></span><u>3</u></div>
+        <div class="cell"><span class="g bandage"></span><u>5</u></div>
+        <div class="cell"><span class="g bread"></span><u>2</u></div>
+        <div class="cell"><span class="g cloth"></span><u>4</u></div>
+        <div class="cell"><span class="g herb"></span><u>7</u></div>
+        <div class="cell"><span class="g ore"></span><u>3</u></div>
+        <div class="cell"><span class="g key"></span></div>
+        <div class="cell"><span class="g sword"></span><span class="cond"><i></i></span></div>
+        <div class="cell"><span class="g helm"></span><span class="cond"><i style="width:40%;background:#8c3b2a"></i></span></div>
+        <div class="cell"><span class="g herb"></span><u>2</u></div>
+        <div class="cell"><span class="g ore"></span></div>
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      </div>
+      <div class="card">
+        <h4>Heiltrank <span style="font-size:10px;color:var(--inkd)">· gewöhnlich · ×3</span></h4>
+        <div class="r"><span>Trinken</span><b>heilt sofort 40 Leben</b></div>
+        <div class="r"><span>Wert</span><b>18 Gold</b></div>
+        <div class="sub">„Schmeckt nach Eisen und Wacholder. Wirkt trotzdem.“</div>
+        <div class="act"><span class="main">Trinken · Doppelklick</span><span>Auf die Leiste</span><span>Ins Lager</span></div>
+      </div>
+      <span class="no">— V —</span>
+    </section>
+    <div class="ribbons">
+      <span>Welt<i>Esc</i></span><span class="on">Charakter<i>C</i></span><span>Gruppe<i>G</i></span><span>Lager<i>B</i></span><span>Karte<i>M</i></span><span>Aufträge<i>J</i></span><span>Kodex<i>H</i></span>
+    </div>
+  </div>
+  <div class="hint">Tab blättert · Q / E wechseln die Seite · Esc schließt das Buch</div>
+</div>
+
+<script>
+/* Pixelraster aus Zeichenkarten (box-shadow), ohne Bilddateien */
+const PAL = { '.':null, h:'#3a2a1a', k:'#c9a07a', a:'#6a5a44', l:'#4a3a2c', b:'#2a2019', w:'#8a8a94', c:'#5a2a22', g:'#8aa06a', e:'#1a1410' };
+const MAPS = {
+hero:['....hhhh....','...hhhhhh...','...hkkkkh...','...hkekkh...','....kkkk....','.....kk.....','...aaaaaa.w.','..aaaaaaaaw.','.kaaaaaaaaw.','.kaaaaaaaaw.','..aaaaaaaaw.','...aaaaaa.w.','...aaaaaa...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..'],
+hero2:['....cccc....','...cccccc...','...ckkkkc...','...ckekkc...','....kkkk....','.....kk.....','...cccccc...','..cccccccc..','.kcccccccck.','.kcccccccck.','..cccccccc..','...cccccc...','...cccccc...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..'],
+hero3:['....hhhh....','...hhhhhh...','...hkkkkh...','...hkekkh...','....kkkk....','.....kk.....','...gggggg...','..gggggggg..','.kggggggggk.','.kggggggggk.','..gggggggg..','...gggggg...','...gggggg...','...ll..ll...','...ll..ll...','...ll..ll...','...ll..ll...','..bbb..bbb..','..bbb..bbb..']};
+document.querySelectorAll('[data-px]').forEach(el=>{ const rows=MAPS[el.dataset.px], s=+el.dataset.s||2, sh=[];
+  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{ if(PAL[ch]) sh.push(`${x*s}px ${y*s}px 0 0 ${PAL[ch]}`); }));
+  el.style.width=rows[0].length*s+'px'; el.style.height=rows.length*s+'px';
+  const i=document.createElement('i'); i.style.cssText=`width:${s}px;height:${s}px;box-shadow:${sh.join(',')}`; el.appendChild(i); });
+</script>
+</body>
+</html>

@@ -1,22 +1,24 @@
+> **ABGELÖST (01.10.2026):** Gültig ist jetzt `ROTFALL_STATE/TEAM.md` (6 Agenten). Dieser Ordner ist Archiv.
+
 # ROTFALL – Multi-Agenten-System (Nutzeranweisung vom 01.10.2026)
 
 Dies ist die verbindliche Kurzfassung des Master-Prompts. Jeder Agent liest zuerst diese Datei und `MASTER_STATE.md`, sonst nur, was seine Aufgabe braucht.
 
-## Modelle (vorläufig, Nutzer: „Benutze erstmal nur Opus und Sonnet“)
+## Modelle (Nutzer 01.10.2026, zweite Fassung: „Start die agents“ — Fable 5.1 ist Director)
 
-Fable 5.1 wird vorerst nicht eingesetzt. Die dafür vorgesehenen Rollen übernimmt Opus 5.5.
+Fable 5.1 ist jetzt aktiv: Director, Welt-/Fraktionsspezialist und Darstellung laufen auf Fable (Denkstufe Hoch). Die frühere Einschränkung „erstmal nur Opus und Sonnet“ ist damit aufgehoben.
 
 | Rolle | Modell (vorgesehen) | Modell (jetzt) | Denkstufe |
 |---|---|---|---|
-| Director (Leitung, kreative Richtung) | Fable 5.1 | Opus 5.5 (Hauptstrang) | Hoch |
+| Director (Leitung, kreative Richtung) | Fable 5.1 | Fable 5.1 (Unteragent, berichtet an den Hauptstrang) | Hoch |
 | 1 Lead / Orchestrator | Opus 5.5 | Opus 5.5 (Hauptstrang) | Hoch beim Planen, Mittel beim Ausführen |
 | 2 Bug Hunter / QA | Opus oder Sonnet | Sonnet (schwierige Fälle Opus) | Mittel, Hoch bei schweren Fehlern |
 | 3 Feature Designer | Opus 5.5 | Opus 5.5 | Hoch |
 | 4 Systems Designer | Opus 5.5 | Opus 5.5 | Hoch |
 | 5 KI-/NPC-Spezialist | Opus 5.5 | Opus 5.5 | Hoch |
-| 6 Welt-/Fraktionsspezialist | Fable 5.1 | Opus 5.5 | Hoch |
+| 6 Welt-/Fraktionsspezialist | Fable 5.1 | Fable 5.1 | Hoch |
 | 7 Kampf-/Balance-Spezialist | Opus 5.5 | Opus 5.5 | Hoch |
-| 8 Kunst/Animation/Darstellung | Fable 5.1 | Opus 5.5 | Hoch |
+| 8 Kunst/Animation/Darstellung | Fable 5.1 | Fable 5.1 | Hoch |
 | 9 Control / Supervisor | Opus 5.5 | Opus 5.5 | Sehr hoch |
 | 10 Implementation Engineer | Opus 5.5 | Opus 5.5 (Hauptstrang, einziger, der `src/` ändert) | Mittel, Hoch bei komplexer Umsetzung |
 | 11 Token-Optimierer | Sonnet | Sonnet | Hoch |
@@ -76,3 +78,15 @@ Ziel sind Ketten wie: NPC-Entscheidung → Fraktionsfolge → Wirtschaftsfolge �
 ## Projektregeln aus CLAUDE.md (gelten weiter)
 
 Deutsch in UI, Kommentaren, Doku und Commits. Tests ändern nie den echten Spielstand. Jede Mechanik braucht einen Spielerhinweis, einen Debug-Eintrag und einen Eintrag in `docs/MECHANIKEN.md`. Nur der Implementation Engineer ändert `src/`; andere Agenten melden Befunde als Diff-Vorschlag.
+
+## Lesereihenfolge je Rolle (Agent 11, 01.10.2026)
+
+Immer zuerst `MASTER_STATE.md`, danach nur das Nötige:
+- Lead/Director: + `CURRENT_TASKS.md`, `HANDOFFS/control_to_director.md` (nur neuester Abschnitt).
+- Bug Hunter: + eigener Stand `AGENT_STATUS/bug_hunter.md`, offene Zeilen in `BUG_DATABASE.md`, der Commit-Diff — nicht `game.js` ganz lesen.
+- Implementation Engineer: + letzter Abschnitt des Handoffs an ihn, betroffene Funktionen per grep.
+- Feature/Systems/KI/Kampf/Welt/Darstellung: + eigene Datei in `proposals/`, sonst nur der Auftrag.
+- Control: + TESTING-Zeilen aus `CURRENT_TASKS.md`/`BUG_DATABASE.md`, nicht die ganze Handoff-Historie.
+- Token-Optimierer: + Dateigrößen (`wc -c`), Volltexte nur gezielt.
+
+Nie ohne Anlass: ganze `docs/`, ganze `HANDOFFS/`-Historie oder `game.js` komplett.
