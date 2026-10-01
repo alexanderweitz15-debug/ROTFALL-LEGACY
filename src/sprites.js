@@ -1482,8 +1482,34 @@ export function pixelize(c, w, h, organic = 0, flat = false) {
 }
 
 // ---------------- Bodentexturen (16×16, doppelt skaliert = 1 Kachel) ----------------
+/* Artist 01.10.: Pflaster im Stil R. Drei Steinreihen (5/5/6 Texel), Fugen versetzt und über den Kachelrand gewickelt,
+   damit Nachbarkacheln nahtlos anschließen. Je Stein eigener Ton (Variante v streut), Kante oben/links hell, unten/rechts
+   dunkel, Fuge im dunkelsten Ton; selten Riss oder Moos in der Fuge. Ersetzt das starre 8×8-Raster (Lesbarkeit, Lichtrichtung). */
+const PAVE_ROWS = [[0, 4, [3, 9, 14]], [5, 9, [1, 6, 12]], [10, 15, [4, 10, 15]]];
+function paveR(P, base, v, n, moss) {
+  const joint = mix(base.sh, base.dk, 0.4);
+  PAVE_ROWS.forEach(([y0, y1, cuts0], r) => {
+    const sh = ((v * 5 + r * 3) % 7) - 3, cuts = cuts0.map(c => (c + sh + 16) % 16).sort((a, b) => a - b);   /* Fugen je Variante versetzt: kein Ziegelmuster */
+    for (let x = 0; x < 16; x++) P(x, y1, joint);
+    for (const c of cuts) for (let y = y0; y < y1; y++) P(c, y, joint);
+    cuts.forEach((c, k) => {
+      const end = cuts[(k + 1) % cuts.length], len = ((end - c - 1) + 16) % 16, h = n(r * 5 + k, 61 + v);
+      const tone = h > 0.66 ? mix(base.b, base.hi, 0.22) : h < 0.3 ? mix(base.b, base.sh, 0.22) : base.b;
+      for (let i = 0; i < len; i++) { const x = (c + 1 + i) % 16;
+        for (let y = y0; y < y1; y++) {
+          let col = tone;
+          if (y === y0 || i === 0) col = mix(tone, base.hi, i === 0 && y === y0 ? 0.6 : 0.4);
+          else if (y === y1 - 1 || i === len - 1) col = mix(tone, base.sh, 0.45);
+          else if (n(x * 3 + r, y * 7 + v) > 0.97) col = mix(tone, base.sh, 0.2);
+          P(x, y, col);
+        } }
+      if (h > 0.94 && len >= 4) { const cx = (c + 2) % 16; P(cx, y0 + 1, joint); P((cx + 1) % 16, y0 + 2, joint); }
+    });
+  });
+  if (moss) for (let i = 0; i < 2; i++) if (n(i, 77 + v) > 0.55) { const r = PAVE_ROWS[i + 1], x = (n(78 + v, i) * 16) | 0; P(x, r[0] - 1, mix(joint, '#4a5a2a', 0.55)); }
+}
 export function tileTexture(t, v, cols, kind) {
-  return cacheGet('tile|' + t + '|' + v + '|' + kind + '|' + cols[0], () => {   // Art + Farbe im Schlüssel: sonst verschmutzt ein Aufruf mit fremder Palette den Cache
+  return cacheGet('tile|' + t + '|' + v + '|' + kind + '|' + cols[0] + (ART === 'R' ? '|R' : ''), () => {   // Art + Farbe im Schlüssel: sonst verschmutzt ein Aufruf mit fremder Palette den Cache
     const cv = document.createElement('canvas'); cv.width = cv.height = 16;
     const c = cv.getContext('2d');
     // Grundton je Typ fast konstant (sonst Schachbrett-Muster); Varianten unterscheiden sich über Streupixel.
@@ -1500,6 +1526,8 @@ export function tileTexture(t, v, cols, kind) {
         P(x, y + 1, base.sh); P(x + 1, y + 1, base.sh); P(x + 2, y + 1, mix(base.b, base.sh, 0.5)); P(x + 1, y, mix(base.b, base.hi, 0.6)); P(x, y, i % 2 ? mix(base.b, base.hi, 0.4) : base.b); }
       if (n(5, 5) > 0.82) { const x = (n(7, 1) * 14) | 0, y = (n(1, 7) * 14) | 0; P(x, y, ['#b8a050', '#a04a38', '#c8c0a0'][v % 3]); P(x + 1, y + 1, base.dk); }
       else if (n(5, 6) > 0.8) { const x = (n(8, 1) * 14) | 0, y = (n(1, 8) * 14) | 0; P(x, y, '#8a8070'); P(x + 1, y, '#6a6258'); P(x, y + 1, '#3a342c'); }
+    } else if ((kind === 'stone' || kind === 'dfloor') && ART === 'R') {   /* Artist 01.10.: Kopfsteinpflaster statt 8er-Raster — unregelmäßige Steine, Licht oben links, Fugen dunkel */
+      paveR(P, base, v, n, kind === 'stone');
     } else if (kind === 'road' || kind === 'stone' || kind === 'dfloor') {
       const bw = kind === 'road' ? 5 : 8, bh = kind === 'road' ? 4 : 8;
       for (let y = 0; y < 16; y += bh) for (let x = -((y / bh) % 2) * (bw >> 1); x < 16; x += bw) {

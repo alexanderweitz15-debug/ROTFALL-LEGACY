@@ -63,11 +63,13 @@ class Px {
       if (Q.flat) c = R.b;
       else if (Q.mat === 'metal') c = t < 0.26 ? R.hi : t < 0.56 ? R.b : t < 0.86 ? R.sh : R.dk;
       else if (Q.mat === 'skin' || Q.mat === 'bone') c = t > 0.67 ? R.sh : t < 0.34 && tv < 0.55 ? R.hi : R.b;
-      else { c = t > 0.7 ? R.sh : t < 0.22 && wd >= 3 && tv < 0.6 ? mix(R.b, R.hi, 0.55) : R.b; if (wd >= 7 && t > 0.9) c = R.dk; }
+      else { c = t > 0.7 ? R.sh : t < 0.3 && wd >= 3 && tv < 0.7 ? R.hi : R.b; if (wd >= 7 && t > 0.9) c = R.dk; else if (wd >= 5 && t > 0.86) c = mix(R.sh, R.dk, 0.45);
+        else if (v1 - v0 >= 8 && tv > 0.82 && c === R.b) c = mix(R.b, R.sh, 0.5); }   /* Artist 01.10.: breiteres Licht links oben, Stoff unten satter im Schatten (Volumen) */
       if (!Q.flat && v1 - v0 >= 5 && y === v1 && Q.mat !== 'metal') c = R.sh;                  // Unterkante
       const up = y > 0 ? id[i - w] : -1, lf = x > 0 ? id[i - 1] : -1, rt = x < w - 1 ? id[i + 1] : -1, dn = y < h - 1 ? id[i + w] : -1;
-      if (!Q.flat && (up < 0 || (up < p && P[up].mat !== Q.mat)) && t < 0.65) c = Q.mat === 'metal' ? mix(R.hi, '#f4ecd8', 0.3) : mix(R.b, R.hi, 0.75);
+      if (!Q.flat && (up < 0 || (up < p && P[up].mat !== Q.mat)) && t < 0.65) c = Q.mat === 'metal' ? mix(R.hi, '#f4ecd8', 0.3) : Q.mat === 'cloth' ? mix(R.hi, '#f2e3c2', 0.12) : mix(R.b, R.hi, 0.75);
       else if (up > p && !P[up].noCast && !Q.flat) c = Q.mat === 'metal' ? R.sh : mix(c, R.dk, 0.6);
+      if (!Q.flat && lf < 0 && Q.mat !== 'metal' && tv < 0.75) c = mix(c, R.hi, 0.3);   /* Artist 01.10.: Kantenlicht an der linken Silhouette (Lichtquelle oben links) — Figur löst sich vom dunklen Boden */
       if (!Q.noLine) {
         const hard = (rt >= 0 && rt < p && !same(Q, P[rt])) || (dn >= 0 && dn < p && !same(Q, P[dn]));
         if (hard) c = mix(R.dk, '#070506', 0.3);

@@ -951,12 +951,12 @@ function drawPropPixel(e, now) {
   let cv = propCache.get(key);
   if (!cv) {
     trimCache(propCache, 600);
-    const B = PROP_BOX[e.type] || 96;
+    const B = PROP_BOX[e.type] || (e.type === 'tree' && SP.drawnOn() ? 128 : 96);   /* Artist 01.10.: Bäume im Stil R größer (Maßstab zur Figur) */
     cv = document.createElement('canvas'); cv.width = cv.height = Math.round(B * PROP_RES);   // G5: feines Raster (1 Welt je Pixel) wie Figuren
     const o = cv.getContext('2d', { willReadFrequently: true }), saved = ctx;
     o.setTransform(PROP_RES, 0, 0, PROP_RES, 0, 0);
     ctx = o;
-    const sc = PROP_SCALE[e.type]; if (sc) { o.translate(B / 2, B * 0.73); o.scale(sc, sc); o.translate(-B / 2, -B * 0.73); }
+    const sc = PROP_SCALE[e.type] || (e.type === 'tree' && SP.drawnOn() ? 1.3 : 0); if (sc) { o.translate(B / 2, B * 0.73); o.scale(sc, sc); o.translate(-B / 2, -B * 0.73); }
     try { drawProp({ ...e, x: B / 2, y: B * 0.73, _v: (v + 0.5) / 3, _sp: sp, _var: variant, _reg: reg, _shut: shut }, per ? ph / 6 * per : 0); } finally { ctx = saved; }
     o.setTransform(1, 0, 0, 1, 0, 0);
     SP.pixelize(o, cv.width, cv.height, PROP_ORGANIC.has(e.type), PROP_FLAT.has(e.type));
@@ -985,6 +985,15 @@ function crown(cx, cy, R, pal, seed, n) {
   layer(pal[1], p => p);
   layer(pal[2], ([x, y, r]) => y < cy + R * 0.35 ? [x - r * 0.22, y - r * 0.3, r * 0.72] : null);
   layer(pal[3], ([x, y, r]) => x < cx + R * 0.2 && y < cy ? [x - r * 0.42, y - r * 0.48, r * 0.34] : null);
+  if (!SP.drawnOn()) return;
+  /* Artist 01.10. (Stil R): Tiefe und Blattsaum. Dunkle Löcher in der unteren Kronenmitte trennen die Blattballen,
+     kleine Büschel am Rand brechen die runde Wolkenform (Silhouette); oben links hell, unten dunkel (Lichtrichtung). */
+  ctx.fillStyle = pal[0];
+  for (let i = 0; i < 2; i++) { const a = h2(seed + 5, i) * 6.283, r = R * 0.4;
+    ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r, cy + R * 0.22 + Math.abs(Math.sin(a)) * r * 0.3, R * 0.16, R * 0.05, 0, 0, 7); ctx.fill(); }
+  for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283 + h2(seed, i + 40) * 0.35, rr = R * (0.92 + h2(i, seed + 3) * 0.22), sn = Math.sin(a), cs = Math.cos(a);
+    ctx.fillStyle = sn < -0.2 ? (cs < 0.2 ? pal[3] : pal[2]) : sn < 0.35 ? pal[1] : pal[0];
+    ctx.beginPath(); ctx.arc(cx + cs * rr * 1.05, cy + sn * rr * 0.75, R * 0.1 + 1, 0, 7); ctx.fill(); }
 }
 function drawProp(e, now) {
   const x = e.x, y = e.y;
