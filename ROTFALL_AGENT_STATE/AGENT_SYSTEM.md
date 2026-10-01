@@ -1,3 +1,5 @@
+> **ABGELÖST (01.10.2026):** Gültig ist jetzt `ROTFALL_STATE/TEAM.md` (6 Agenten). Dieser Ordner ist Archiv.
+
 # ROTFALL – Multi-Agenten-System (Nutzeranweisung vom 01.10.2026)
 
 Dies ist die verbindliche Kurzfassung des Master-Prompts. Jeder Agent liest zuerst diese Datei und `MASTER_STATE.md`, sonst nur, was seine Aufgabe braucht.

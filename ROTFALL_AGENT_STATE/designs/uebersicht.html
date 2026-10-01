@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ROTFALL UI — Drei Entwürfe im Vergleich</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0d0b08;--panel:#161209;--iron:#3b3227;--gold:#c9a94e;--rust:#a4402c;--text:#ddd1b6;--dim:#8d836e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--text);font-family:"Spectral",serif;padding:28px 24px 60px;max-width:1360px;margin:0 auto;line-height:1.6}
+h1{font-family:"Cinzel",serif;letter-spacing:.2em;font-size:22px;color:#e7dcc2}
+h2{font-family:"Cinzel",serif;letter-spacing:.16em;font-size:15px;color:var(--gold);margin:0 0 6px}
+.sub{color:var(--dim);font-size:13px;margin:4px 0 22px}
+.v{display:grid;grid-template-columns:660px 1fr;gap:22px;margin-bottom:34px;border:1px solid var(--iron);background:var(--panel);padding:14px}
+.frame{width:640px;height:360px;overflow:hidden;border:1px solid var(--iron);background:#000;position:relative}
+.frame iframe{width:1280px;height:720px;border:0;transform:scale(.5);transform-origin:0 0;pointer-events:none}
+.frame a{position:absolute;right:6px;bottom:6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);background:rgba(10,8,6,.85);border:1px solid var(--iron);padding:3px 8px;text-decoration:none}
+.txt{font-size:13px}
+.txt p{margin:0 0 8px}
+.txt b{color:#e7dcc2;font-weight:600}
+.txt ul{margin:4px 0 8px 18px}
+.tag{display:inline-block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--iron);padding:1px 7px;color:var(--dim);margin-right:4px}
+.tag.g{color:#9fb07a;border-color:#3f5a2a}.tag.r{color:#d0705c;border-color:#5a2a22}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--iron);padding:6px 10px;text-align:left;vertical-align:top}
+th{font-family:"Cinzel",serif;font-size:11px;letter-spacing:.14em;color:var(--gold);font-weight:500}
+td:first-child{color:var(--dim)}
+.rec{border:1px solid var(--gold);background:#1a1510;padding:12px 16px;margin-top:20px;font-size:13px}
+.note{font-size:12px;color:var(--dim);margin-top:14px}
+</style>
+</head>
+<body>
+<h1>ROTFALL — DREI ENTWÜRFE FÜR HUD UND MENÜS</h1>
+<div class="sub">Statische Mockups, je ein ganzer Bildschirm 1280×720 (HUD, schlanke Kopfleiste, Protokoll unten, ein offenes Menü). Alles CSS und Pixelraster, keine Bilder. Zum Öffnen in voller Größe rechts unten im Bild klicken. Vorschlagstext: <code>../proposals/ui_redesign.md</code></div>
+
+<section class="v">
+  <div class="frame"><iframe src="ui_variante_A.html" title="Variante A"></iframe><a href="ui_variante_A.html" target="_blank">Voll öffnen</a></div>
+  <div class="txt">
+    <h2>A · „Ledger“ — das Buch des Hauses</h2>
+    <span class="tag">Pergament</span><span class="tag">Doppelseite</span><span class="tag">Papierpuppe</span>
+    <p><b>Prinzip:</b> Das HUD bleibt dunkel und knapp; jedes Fenster ist eine aufgeschlagene Doppelseite mit Bändern als Reitern. Lesen statt Klicken — so fühlen sich Pentiment und Darkest Dungeon „handgemacht“ an: ein Material (Papier, Tinte, Siegelrot) trägt die ganze Menüwelt.</p>
+    <p><b>Gezeigt:</b> Charakter mit Papierpuppe (Ausrüstung um die Figur) links, Gepäck als Tintenraster rechts, Tagebuch-Streifen als Log (neueste Zeile unten, fett), Kopfleiste ohne Textreiter (nur Tagesbogen, Wetter, Gold, „Buch“).</p>
+    <ul><li><span class="tag g">Stark</span> größte Identität, Erbe/Chronik/Kodex werden natürlich „Kapitel“.</li>
+    <li><span class="tag r">Schwach</span> volle Bildschirmdeckung (kein Spielfeld sichtbar), 14 Reiter passen nicht als Bänder → Zusammenlegen nötig; Pergament im Kampf unpassend.</li></ul>
+  </div>
+</section>
+
+<section class="v">
+  <div class="frame"><iframe src="ui_variante_B.html" title="Variante B"></iframe><a href="ui_variante_B.html" target="_blank">Voll öffnen</a></div>
+  <div class="txt">
+    <h2>B · „Diegetisch-minimal“ — die Welt ist das Menü</h2>
+    <span class="tag">Vollbild</span><span class="tag">Radialmenü</span><span class="tag">Schwebende Karten</span>
+    <p><b>Prinzip:</b> Kein Rahmen, keine Spalten. Werte sitzen als Ringe am Porträt, Vorrat als Piktogramm + Zahl, Ziele bekommen eine schwebende Karte in der Welt. Das Menü ist ein Rad um den Helden (Tab halten). Hades und Mount & Blade zeigen, warum das trägt: die Hand bleibt auf der Bewegung, nichts verdeckt die Szene.</p>
+    <p><b>Gezeigt:</b> Rad → „Bauen“, der Geist der Hütte liegt im Gras mit Kostenkarte (Holz 20/80, Stein ✓, 1 Feld blockiert), Meldungsfluss unten links (vier Zeilen, oben verblassend), Kopfzeile 24 px durchsichtig.</p>
+    <ul><li><span class="tag g">Stark</span> maximaler Bildraum, beste Wirkung auf kleinen Bildschirmen und Touch; Bauen fühlt sich „in der Welt“ an.</li>
+    <li><span class="tag r">Schwach</span> wenig Platz für die Tiefe von ROTFALL (Fraktionen, Ränge, Wirtschaft) — große Fenster brauchen trotzdem eine zweite Ebene; Radialmenü mit Maus langsamer als Hotkeys.</li></ul>
+  </div>
+</section>
+
+<section class="v">
+  <div class="frame"><iframe src="ui_variante_C.html" title="Variante C"></iframe><a href="ui_variante_C.html" target="_blank">Voll öffnen</a></div>
+  <div class="txt">
+    <h2>C · „Taktisch“ — angedockte Tafeln</h2>
+    <span class="tag">Dock rechts</span><span class="tag">Reiter</span><span class="tag">Baukarten</span>
+    <p><b>Prinzip:</b> Kenshi und RimWorld lösen „viel Information, immer sichtbar“ mit angedockten Tafeln statt Vollbild-Fenstern: Das Spielfeld bleibt sichtbar, die Tafel hat Reiter und Kategorien, jede Zahl steht neben einem Piktogramm. Der Baumodus ist kein Textmenü, sondern Karten mit Silhouette, Kosten (rot wenn es fehlt), Bauzeit, Plätzen und Grundriss.</p>
+    <p><b>Gezeigt:</b> Kopfleiste 34 px mit Piktogramm-Reitern + Tastenbuchstabe und Warnchip („Überfall 02:00“), links Held + Gruppe + Siedler als Einheitenkarten mit Tätigkeit, rechts Dock „Bau | Siedler | Bestand“ mit neun Baukarten und Detail, unten dichtes Protokoll mit farbigen Kategorien und „Folgt ▾“.</p>
+    <ul><li><span class="tag g">Stark</span> passt zur Sandbox-Tiefe; Baumodus, Handel, Siedler, Gruppe werden alle zu Dock-Tafeln mit gleicher Grammatik; wenig Umbau am Code (Modal → Dock).</li>
+    <li><span class="tag r">Schwach</span> dichteste Variante, unter 1200 px muss das Dock überlagern; Gefahr der „Tabellen-Optik“, wenn die Karten nicht konsequent bebildert werden.</li></ul>
+  </div>
+</section>
+
+<h2 style="margin-top:10px">Vergleich</h2>
+<table>
+  <tr><th></th><th>A Ledger</th><th>B Diegetisch</th><th>C Taktisch</th></tr>
+  <tr><td>Kopfleiste</td><td>30 px, ohne Textreiter, „Buch“-Knopf</td><td>24 px, durchsichtig, nur Zeit/Wetter/Gold</td><td>34 px, 9 Piktogramm-Reiter + Warnchip</td></tr>
+  <tr><td>Protokoll</td><td>Tagebuch-Streifen, neueste Zeile unten, Kategorien als Tintenzeichen</td><td>Vier verblassende Zeilen, L öffnet das volle Tagebuch</td><td>Dichtes Protokoll mit Filtern, Kategoriefarben, „Folgt ▾“/„Neu ↓“</td></tr>
+  <tr><td>Fenster</td><td>Vollbild-Doppelseite</td><td>Rad + schwebende Karten, große Fenster als Zweitebene</td><td>Angedockte Tafel rechts, Spielfeld bleibt sichtbar</td></tr>
+  <tr><td>Bauen</td><td>Buchseite „Lager“ mit Skizzen</td><td>Geist in der Welt + Kostenkarte</td><td>Baukarten mit Silhouette, Kosten, Grundriss, Detail</td></tr>
+  <tr><td>Umbauaufwand</td><td>M–L (neue Fensterklasse, Pergament-Stil für 16 Fenster)</td><td>L (Radial, Weltkarten, zweite Ebene)</td><td>M (Modal → Dock, Karten-Renderer, Icons)</td></tr>
+  <tr><td>Kleine Bildschirme</td><td>gut (Buch skaliert)</td><td>sehr gut</td><td>mittel (Dock überlagert)</td></tr>
+  <tr><td>Koop</td><td>Gast sieht eigenes Buch — unkritisch</td><td>Rad pro Spieler — unkritisch</td><td>Dock pro Spieler; Host-Fenster (Handel, Bauen) bleiben Host</td></tr>
+</table>
+
+<div class="rec"><b>Empfehlung (Agent 8):</b> <b>C als Grundgerüst</b> (Dock, Reiter, Karten, dichtes Protokoll), dazu zwei Entleihungen: aus <b>B</b> die durchsichtige, textfreie Kopfleiste und den verblassenden Meldungsfluss über dem Spielfeld (zusätzlich zum vollen Protokoll), aus <b>A</b> das Pergament nur für die „Lesefenster“ Kodex, Chronik, Erbe und Auftragsbuch. Begründung im Vorschlag, Abschnitt „Empfehlung“.</div>
+<div class="note">Bildschirmfotos der drei Entwürfe liegen als PNG neben dieser Datei (ui_variante_A.png, _B.png, _C.png), sofern das Rendern mit dem lokalen Browser gelang.</div>
+</body>
+</html>

@@ -31,11 +31,11 @@ body{display:flex;align-items:center;justify-content:center;font-family:"Spectra
 .pal{position:absolute;height:22px;background:repeating-linear-gradient(90deg,#5a4630 0 6px,#3a2a1a 6px 8px);border-top:3px solid #6a5a44}
 .hut{position:absolute;left:700px;top:300px}
 /* Geist der Hütte: Platzierung */
-.ghost{position:absolute;left:470px;top:280px;width:96px;height:96px;border:2px dashed rgba(201,169,78,.9);background:rgba(201,169,78,.12);
+.ghost{position:absolute;left:250px;top:230px;width:96px;height:96px;border:2px dashed rgba(201,169,78,.9);background:rgba(201,169,78,.12);
   display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr)}
 .ghost b{border:1px solid rgba(201,169,78,.25)}.ghost b.bad{background:rgba(164,64,44,.5)}
 .ghost .sil{position:absolute;left:50%;top:50%;transform:translate(-50%,-62%);opacity:.75}
-.ghostlabel{position:absolute;left:470px;top:380px;width:96px;text-align:center;font-size:9px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.ghostlabel{position:absolute;left:250px;top:330px;width:96px;text-align:center;font-size:9px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
 
 /* Kopfzeile: 24 px, durchsichtig, nur Zeit, Wetter, Gold */
 .top{position:absolute;left:0;right:0;top:0;height:24px;display:flex;align-items:center;justify-content:center;gap:18px;font-size:11px;color:#b8ac93;
@@ -118,7 +118,7 @@ body{display:flex;align-items:center;justify-content:center;font-family:"Spectra
 .center b{display:block;color:#e7dcc2;font-family:"Cinzel",serif;font-size:11px}
 
 /* Kostenkarte am Geist */
-.cost{position:absolute;left:300px;top:400px;width:170px;background:var(--glass);border:1px solid #5a4b36;border-top:2px solid var(--gold);padding:8px 10px;font-size:11px}
+.cost{position:absolute;left:60px;top:360px;width:170px;background:var(--glass);border:1px solid #5a4b36;border-top:2px solid var(--gold);padding:8px 10px;font-size:11px}
 .cost b{display:block;font-family:"Cinzel",serif;font-size:12px;letter-spacing:.12em;color:#e7dcc2}
 .cost small{color:var(--dim);display:block;margin-bottom:6px}
 .cost .r{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px dotted #2b2419}
@@ -192,7 +192,8 @@ body{display:flex;align-items:center;justify-content:center;font-family:"Spectra
   <div class="cost">
     <b>Hütte</b><small>Festes Dach · 4 Plätze · zieht Siedler an</small>
     <div class="r"><span><i class="ri wood"></i>Holz</span><span>20 / 80</span></div>
-    <div class="r bad"><span><i class="ri stone"></i>Stein</span><span>8 / 30 ✓</span></div>
+    <div class="r"><span><i class="ri stone"></i>Stein</span><span>8 / 30 ✓</span></div>
+    <div class="r bad"><span>Platz</span><span>1 Feld blockiert</span></div>
     <div class="r"><span>Bauzeit</span><span>22 s · 2 Helfer</span></div>
     <div class="fp"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i style="background:rgba(164,64,44,.6)"></i><i></i></div>
     <div class="k"><em>Linksklick</em> setzen · <em>R</em> drehen · <em>Esc</em> abbrechen</div>
