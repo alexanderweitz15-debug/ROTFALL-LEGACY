@@ -810,3 +810,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Feste:** kein Adelsball im Häuserkrieg oder Thronstreit, kein Streik im besetzten Tickmar.
 - **Exil:** Fällt die Exilstadt, zieht der Hof sofort weiter.
 - **Stadt ohne Schutz:** Der Blutkult allein hält Valens Ersatz nicht auf (nur eine besetzte Hauptstadt oder hohe Bedrohung).
+
+## Runde: Varonheim auf dem Kronfels, Scheibe 1 (Entwickler 01.10.2026)
+- **Die Hauptstadt ist umgezogen und gewachsen:** Varonheim liegt jetzt auf dem Kronfels östlich von Nordfurt, dreimal so groß (117 × 87 Kacheln, rund 90 Häuser). Die Königsstraße läuft als Hauptachse von Nordfurt durch das West- und Osttor nach Aschfurt; der Kronweg führt vom Südtor zur alten Stelle (Königsfelder).
+- **Viertel:** Tempel und Friedhof (NW), Adel (NO), Händler (W), Markt mit Galgen und Standbild (Mitte), Gilden (O), Armenviertel (SW), Handwerk und Garnison (SO); im Norden auf dem Fels der Burgbezirk mit Wallplatz vor dem Burgtor.
+- **Alte Spielstände:** Beim ersten Laden ziehen die Bewohner in die neuen Häuser, alte Spuren verschwinden; wer auf der alten Fläche stand, steht auf dem neuen Markt. Ein Logeintrag erklärt es.
+- **Noch nicht:** Die Burg ist weiter ein eigener Ort (Tor am Bergfried); begehbare Burg, Torkontrolle (Waffen abgeben, Bestechung 5000 Gold zu 30 %) und Start in Varonheim folgen in den nächsten Scheiben.
+- **Kopfleiste:** größere Symbole mit kurzer Beschriftung darunter (Charakter, Inventar, Gruppe, Siedlung, Karte, Aufträge, Mächte, Kodex, Optionen), die Taste klein in der Ecke.

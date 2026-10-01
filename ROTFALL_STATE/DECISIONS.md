@@ -102,3 +102,8 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Tod der Kaiserin: **Häuserkrieg zuerst**, Aurelions gefallene Städte treiben Morvaths Heerzug **nicht** an.
 - Krisen-Takt: **Sehr schwer −15 Tage** (Krönung, Heerzug), **Angsthase ohne** Rote Krönung.
 - Nach Garmadons Tod: **kleine Trupps** der Toten überfallen weiter, löschen aber keine Dörfer mehr aus.
+
+## 01.10.2026 — Kampf-Ideen (Scout Runde 4) und UI
+- Gewählt: Fraktionszeichen am Gegner, Kampfbericht nach Dreieckskämpfen, Köder-Pfeife, Schwache Flanke (alle klein).
+- Kopfleiste: größere Symbole mit kurzer Beschriftung darunter (Entwickler: „Symbole sehr klein, kleine Beschriftung unter dem Symbol“).
+- Varonheim-Umbau Scheibe 1 gebaut (Kronfels, Faktor 3).

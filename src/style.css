@@ -81,7 +81,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .cr-appearance label{font-size:10px;color:var(--dim);text-transform:uppercase;grid-column:1/-1}
 
 /* ================= GAME SHELL ================= */
-#game{display:grid;grid-template-rows:42px 1fr 130px;background:var(--ink)}   /* UI-Umbau: schlanke Kopfleiste, höheres Protokoll */
+#game{display:grid;grid-template-rows:64px 1fr 130px;background:var(--ink)}   /* UI-Umbau: Kopfleiste mit großen Symbolen und Beschriftung (Entwickler), höheres Protokoll */
 #topbar{display:flex;align-items:center;gap:14px;padding:0 12px;
   background:linear-gradient(180deg,#221c15,#14110d);border-bottom:1px solid var(--iron)}
 .brand{font-family:"Cinzel",serif;font-size:16px;letter-spacing:.2em;color:#d9cdb2;display:flex;align-items:center;gap:8px}
@@ -97,10 +97,11 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #nav button.active{color:var(--gold);border-bottom-color:var(--rust)}
 #nav button i{font-style:normal;opacity:.55;font-size:9px;margin-left:5px}
 /* UI-Umbau Scheibe 1: Reiter als Piktogramm + Taste, Goldpunkt bei freien Punkten, Unterreiter im Fenster */
-#nav button{position:relative;display:flex;align-items:center;gap:2px;padding:4px 9px;text-transform:none}
-#nav .navico{width:24px;height:24px;image-rendering:pixelated;opacity:.82}
+#nav button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 10px 2px;text-transform:none;min-width:62px}
+#nav .navico{width:36px;height:36px;image-rendering:pixelated;opacity:.85}
 #nav button:hover .navico,#nav button.active .navico{opacity:1;filter:drop-shadow(0 0 3px rgba(201,169,78,.45))}
-#nav .navlbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+#nav .navlbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;line-height:1.1}
+#nav button i{position:absolute;top:2px;left:4px;margin:0;font-size:9px}
 #nav .dot{display:none;position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 4px var(--gold)}
 #nav button.badge .dot{display:block}
 #modal-tabs{display:flex;gap:2px;margin-left:18px;flex:1}

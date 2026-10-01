@@ -322,6 +322,7 @@ function path(from, goalFn) {                              // BFS über den Krie
 }
 const hostile = (a, b) => a && b && a !== b && (a === 'undead' || b === 'undead');
 function nearPlayer(node, r = 40) {
+  if (node === CAPK) r += 30;   /* Varonheim-Umbau: die Hauptstadt ist dreimal so groß */
   const l = LOC[node], p = S.player;
   return p && p.map === 'world' && Math.hypot(p.x / TS - l.x, p.y / TS - l.y) < r;
 }

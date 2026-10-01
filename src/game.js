@@ -1871,7 +1871,7 @@ export function newGame(cfg) {
   initialSpawns();
   ensureBoards();
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
-  bindSim(); SIM.initSim(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
+  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin];
   const start = freeSpotNear('world', ...worldPt(66, 70), 3);
@@ -2113,7 +2113,7 @@ export function continueGame(given = null, retried = false) {                   
     recalc(c); if (c === S.player) syncHotbar();
   }
   for (const m of MAP_KEYS) if (!gone?.[m]) adoptPropKeys(m, FRESH[m]);   // alte Vollstände: ab jetzt nur Abweichungen speichern
-  bindSim(); SIM.initSim(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
+  bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
   for (const m of MAP_KEYS) indexSolids(m);
   assignNpcDays();                             // Tagesablauf der Figuren mit Namen (auch für alte Stände; nach dem Objekt-Index)
   planDays();                                  // Bewohner: Nachtplätze prüfen Möbel — erst nach dem Objekt-Index (sonst landet der Schlafplatz auf dem Tisch)
@@ -8277,7 +8277,7 @@ function ensureVaronGate() {   /* §5g.1: das Tor zum Thronsaal ist jetzt der Ei
 }
 function capitalMigrate() {                                        /* §5g.1: Varonheim besiedeln (neue und alte Stände), Garde am Tor */
   if (!TOWN_PLAN.varonheim) return;
-  if (!S.flags.capitalBuilt) { S.flags.capitalBuilt = 1; spawnResidents(); if (S.day > 1) log('Südlich von Nordfurt steht jetzt Varonheim, die Hauptstadt König Varons — mit der Varonsburg im Norden der Stadt.', 'world'); }
+  if (!S.flags.capitalBuilt) { S.flags.capitalBuilt = 1; S.flags.capital2 = 1; S.ents.world = S.ents.world.filter(e => !(e.kind === 'enemy' && !e.armyId && !e.boss && townAt(e.x / TS | 0, e.y / TS | 0) === 'varonheim')); spawnResidents();   /* wer dort lagerte, wo jetzt die Stadt steht, ist fort */ if (S.day > 1) log('Östlich von Nordfurt steht auf dem Kronfels Varonheim, die Hauptstadt König Varons — mit der Varonsburg im Norden über dem Meer.', 'world'); }
   if (S.ents.world.some(e => e.capGuard) || heldBy('varonheim')) return; const [cx, cy] = TOWN_PLAN.varonheim.square, [x0, y0, x1, y1] = TOWN_PLAN.varonheim.area;   /* besetzt: keine Garde */
   for (const [x, y] of [[x0 + 1, cy - 8], [x0 + 1, cy - 4], [x1 - 1, cy - 8], [x1 - 1, cy - 4], [cx - 2, y1 - 1], [cx + 2, y1 - 1], [cx - 2, CAPITAL.keep[1] + 6], [cx + 2, CAPITAL.keep[1] + 6], [cx - 6, cy], [cx + 6, cy]].slice(0, Math.max(0, 10 - (S.schutz?.varonheim?.lost || 0)))) {   /* Stadt ohne Schutz: Tote kommen beim Laden nicht wieder */
     const q = freeSpotNear('world', x + (x === x0 + 1 ? 2 : x === x1 - 1 ? -2 : 0), y, 2); if (!q) continue;
@@ -8420,6 +8420,21 @@ function schutzDay() {
     log(`${n} Mann Ersatz für die Wache von ${townName(k)} sind eingetroffen.${Z.lost ? ` Es fehlen noch ${Z.lost}.` : ' Die Wache ist wieder vollzählig.'}`, 'world');
     schutzCheck(k);
   }
+}
+// Varonheim-Umbau (Entwickler 01.10.2026): alte Stände — die Hauptstadt zog auf den Kronfels (dreimal so groß). Einmalig: Reste auf der
+// alten Fläche weg, Bewohner ohne Haus (alte Häuser gibt es nicht mehr) ziehen aus, die neuen Häuser werden bezogen, wer dort steht,
+// kommt auf den neuen Markt.
+function capital2Migrate() {
+  if (S.flags.capital2) return; S.flags.capital2 = 1; if (!S.flags.capitalBuilt || !CAPITAL.old) return;
+  const O = CAPITAL.old, inOld = (e, pad) => Math.abs(e.x / TS - O.x) <= O.hw + pad && Math.abs(e.y / TS - O.y) <= O.hh + pad, ids = new Set(HOUSES.map(h => h.id));
+  const n0 = S.ents.world.length;
+  S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && inOld(e, 3) && (e.planned || e.capProp || e.cult || e.cultMark || e.label === 'Trümmer von Varonheim'))
+    && !(e.kind === 'npc' && e.homeTown === 'varonheim' && !ids.has(e.homeId) && !S.party.includes(e.id) && !NAMED_NPC.has(e.key))
+    && !(e.kind === 'enemy' && !e.armyId && !e.boss && townAt(e.x / TS | 0, e.y / TS | 0) === 'varonheim'));   /* Wild und Streuner, die dort lagerten, wo jetzt die Stadt steht */
+  spawnResidents();
+  const p = S.player; if (p.map === 'world' && inOld(p, 2)) { const [sx, sy] = TOWN_PLAN.varonheim.square, q = freeSpotNear('world', sx, sy + 3, 4); if (q) { p.x = q.x; p.y = q.y; } }
+  log(`Varonheim ist gewachsen: Die Hauptstadt liegt jetzt auf dem Kronfels östlich von Nordfurt, dreimal so groß wie zuvor. (${n0 - S.ents.world.length} alte Spuren geräumt)`, 'world');
+  chronicle('Varonheim zieht auf den Kronfels', 'news', 'Die Hauptstadt liegt jetzt auf dem Fels östlich von Nordfurt, die Burg über dem Nordmeer.');
 }
 function capitalDay() {                                           /* Rote Krönung ruht, solange Varonheim besetzt ist */
   if (SIM.capitalFallen() && S.cult?.crown && !S.cult.crowned) S.cult.crown++;   /* RB-043: auch bei verstecktem Kult */
@@ -17818,12 +17833,12 @@ export function selftest() {
       return capped && still;
     } finally { S.war = W0; S.flags.garmadonSlain = g0; S.towns = T0; if (E0) S.eco = E0; }
   }));
-  ok('Varonheim (Nutzer §5g.1): Hauptstadt mit mindestens 20 Häusern, Bewohnern und Garde; das Bergfried-Tor führt in den Thronsaal; vom Markt sind alle vier Stadttore und das Burgtor erreichbar', (() => {
+  ok('Varonheim (Nutzer §5g.1, Umbau 01.10.): Hauptstadt auf dem Kronfels mit mindestens 60 Häusern, Bewohnern und Garde; das Bergfried-Tor führt in den Thronsaal; vom Markt sind die drei Stadttore und das Burgtor erreichbar', (() => {
     const P = TOWN_PLAN.varonheim; if (!P) return false; const [x0, y0, x1, y1] = P.area, [sx, sy] = P.square, M = MAPS.world;
     const hs = HOUSES.filter(b => b.town === 'varonheim').length, folk = S.ents.world.filter(e => e.kind === 'npc' && e.homeTown === 'varonheim').length, gate = S.ents.world.find(e => e.portal === 'varonburg');
     const seen = new Set(), q = [[sx, sy]]; while (q.length) { const [x, y] = q.pop(), k = x + ',' + y; if (seen.has(k) || x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1 || SOLID.has(M.tiles[y * M.w + x])) continue; seen.add(k); q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
-    const cx = CAPITAL.x, cy = CAPITAL.y, gates = [[x0 - 1, cy], [x1 + 1, cy], [cx, y1 + 1], CAPITAL.keep].every(([x, y]) => seen.has(x + ',' + y));
-    return hs >= 20 && folk >= 30 && !!gate && Math.hypot(gate.x / TS - CAPITAL.keep[0], gate.y / TS - CAPITAL.keep[1]) < 2 && gates;
+    const cx = CAPITAL.x, gy = CAPITAL.y - 11, gates = [[x0 - 1, gy], [x1 + 1, gy], [cx, y1 + 1], CAPITAL.keep].every(([x, y]) => seen.has(x + ',' + y));
+    return hs >= 60 && folk >= 30 && !!gate && Math.hypot(gate.x / TS - CAPITAL.keep[0], gate.y / TS - CAPITAL.keep[1]) < 2 && gates;
   })());
   ok('König Varon (Nutzer §5d.4): Tor im Norden, Burg mit König, Kanzler, Adligen, Kerker und Garde, alles erreichbar; Audienz über den Kanzler, Aurelion-Freunde abgewiesen, Verräter-Suche, Ritterschlag, Gefangener freikaufen', sandbox(() => {
     const p = stage(), f0 = structuredClone(S.flags), v0 = S.ents.varonburg, mv = MAPS.varonburg, a0 = S.factions.aurel, vl = S.factions.valen, rk = S.ranks.valen;
@@ -18631,7 +18646,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=23').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=23').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
