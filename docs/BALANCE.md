@@ -145,3 +145,9 @@ Stufe 22–25 und legendäre Ausrüstung.
 5. **Varg**: Rumpf-Treffer entscheiden bei Menschenähnlichen (Rumpf ≈ 45 % des Lebens) — Bosse mit Körper fallen
    schneller als ihre Lebenszahl sagt. Eigene Rumpfreserve für Boss-Menschen erwägen.
 6. **Wurfmesser** (Reichweite 300, 45 Gold) bleibt die stärkste billige Fernwaffe; ggf. Munition (Einsammeln) einführen.
+
+## Aldhelm, Blutfürst von Varonheim (§5g.2, 01.10.2026)
+Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, offhand:'kite_shield' }, pots:3, elvl:16, seed:1–3 })`, ohne Blutfesseln, Lichtschächte und Verbündete:
+- Grundleben 380: Sieg nach 22–26 s — zu kurz (Ziel 40–180 s).
+- **Grundleben 560, Schaden 21 (gewählt):** Held Stufe 16 (Kette + Schild): 2/3 Siege, ⌀ 75 s, Lebensverlust ⌀ 43 %; Stufe 18 (Platte + Schild): 2/3, ⌀ 79 s, ⌀ 36 %.
+- Fesseln (je Gefangenem +0,4 %/s) machen ihn schwerer, Lichtschächte (bis −25 %) und Marschall Brandt leichter — die Vorgeschichte entscheidet. Empfohlene Stufe 16–18.

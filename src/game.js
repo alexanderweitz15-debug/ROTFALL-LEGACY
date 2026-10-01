@@ -12791,7 +12791,7 @@ function cultCourtChoices(npc, choices) {
 function cultGrade(g) { if (g >= 2 && S.cult?.joined != null && cultReveal('inside')) log('Bei der Blutweihe nimmt der Herr des Kelchs die Maske ab: Kanzler Aldhelm. „Überrascht? Der König unterschreibt alles. Auch das hier.“', 'quest'); }
 function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
   const C = S.cult || {}, now = performance.now();
-  if (!C.introSeen && d < 320 && tgt === S.player && !S.cine) { C.introSeen = true;
+  if (!C.introSeen && e.map === 'katakomben' && d < 320 && tgt === S.player && !S.cine) { C.introSeen = true;
     return cinematic([{ map: e.map, x: 40 * TS, y: 18 * TS, dur: 2200, text: 'Die Krypta des Kanzlers. Sechs Säulen, sechs Kerzen. Durch Gitter oben fällt der Markt herein.' },
       { map: e.map, x: e.x, y: e.y + 40, dur: 2600, text: '„Der König unterschreibt alles, was ich ihm hinlege. Heute unterschreibst du.“' },
       { map: e.map, x: e.x, y: e.y + 40, dur: 1800, text: 'ALDHELM — BLUTFÜRST VON VARONHEIM', setup: () => { camShake(4, 300); fx(e.x, e.y - 14, 'blood', 14); } }]); }
