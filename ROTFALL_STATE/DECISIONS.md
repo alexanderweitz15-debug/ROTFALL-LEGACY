@@ -96,3 +96,9 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - **Feinde verschiedener Mächte** bekämpfen sich; näherer Feind wird bevorzugt (Entwickler).
 - **Varons Tod** ist ein Ereignis mit Szene, Reichsverweser und Kopfgeld (Entwickler: „es fehlt noch ein Event, wenn Varon stirbt“).
 - Entwickler: „Guck, ob alle Weltevents zusammenpassen“ → Designer-Abgleich (PROPOSALS/weltereignisse_abgleich.md).
+
+## 01.10.2026 — Weltereignis-Abgleich (PROPOSALS/weltereignisse_abgleich.md)
+- König vor dem Fall fortbringen: **ja**, im Gespräch mit Gero/Brandt während der Belagerung (Belagerung S3).
+- Tod der Kaiserin: **Häuserkrieg zuerst**, Aurelions gefallene Städte treiben Morvaths Heerzug **nicht** an.
+- Krisen-Takt: **Sehr schwer −15 Tage** (Krönung, Heerzug), **Angsthase ohne** Rote Krönung.
+- Nach Garmadons Tod: **kleine Trupps** der Toten überfallen weiter, löschen aber keine Dörfer mehr aus.

@@ -799,3 +799,14 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Varonheim:** Jeder tote Königsgardist kostet die Hauptstadt 4 Besatzung; solange Gardisten fehlen, füllt sie sich nicht auf, und Morvaths Späher sehen offene Tore (Bedrohung +3 beim Alarm, dann +0,5 am Tag). Der Heerzug kommt früher und trifft eine ausgeblutete Stadt — der Fall selbst kommt weiter über die Belagerung.
 - **Kommt in Scheibe 2:** Gesetzlosigkeit (Plünderer, keine Verhaftungen, Wohlstand stürzt) und die Übernahme nach 2 + 2 Tagen (Totenheer bei Kriegsknoten, sonst eine Bande; die Kette nur im Westen).
 - **Debug:** „Regie (T17)“ → „Stadt ohne Schutz: Status / alle Wachen hier töten / Tag vorspulen / zurücksetzen“. Probe „Stadt ohne Schutz“.
+
+## Runde: Weltereignisse passen zusammen (Abgleich 01.10.2026)
+- **Rote Krönung** kommt genau einmal, nie während Varonheim besetzt ist, und nur mit lebendem Aldhelm. Auf Sehr schwer flüstert der Hof schon ab Tag 30 davon (sonst 45); auf Angsthase gibt es keine Krönung.
+- **Morvaths Heerzug:** Die Bedrohung zählt auf Sehr schwer schon ab Tag 5 (sonst 20).
+- **Varons Tod** wird einmal erzählt; Reichsverweser ist nur ein lebender Aldhelm, sonst Marschall Brandt; im Exil „gefallen im Exil“; Glocken nur, wenn die Stadt nicht besetzt ist.
+- **Nach Garmadons Tod** wird Varonheim richtig befreit (Hof, Läden, Garde kehren zurück). Die Toten überfallen nur noch mit kleinen Trupps (2–4) und löschen keine Dörfer mehr aus.
+- **Kult zerschlagen:** Kanzlerin Ysmay — die Audienz beim König ist frei.
+- **Goblinsturm:** Fliehst du vor Varg oder lädst neu, ist der Sturm vorbei (Morrgrund überlebt); nur ein Heldentod mitten im laufenden Sturm vernichtet Morrgrund.
+- **Feste:** kein Adelsball im Häuserkrieg oder Thronstreit, kein Streik im besetzten Tickmar.
+- **Exil:** Fällt die Exilstadt, zieht der Hof sofort weiter.
+- **Stadt ohne Schutz:** Der Blutkult allein hält Valens Ersatz nicht auf (nur eine besetzte Hauptstadt oder hohe Bedrohung).

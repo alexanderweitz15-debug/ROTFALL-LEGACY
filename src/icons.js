@@ -26,6 +26,8 @@ const PAL = {
   /* Wolke */ c: '#3e3e48', C: '#74747e', D: '#b4b4be',
   /* Magie */ v: '#3a1e5a', V: '#6b4a9d', U: '#b890e0',
   /* Sonne */ y: '#c8781e', A: '#fff2b0',
+  /* Stroh/Dach (Baukarten) */ h: '#5a3b27', H: '#8a5a30', F: '#b88a48',
+  /* tiefer Schatten, Türöffnung */ e: '#2b2116',
   Z: '#ffffff',
 };
 
@@ -514,6 +516,335 @@ const R = {
     '..............',
     '.....DDDDDDDDD',
     '.....CCCCCCCCC'],
+  /* ---------- Siedlung (16×16) ---------- */
+  kreuz: [
+    'EE...Er',
+    'EEE.ERr',
+    '.EEERr.',
+    '..ERr..',
+    '.ERrRr.',
+    'ERr.RRr',
+    'Rr...rr'],
+  sanduhr: [
+    '................',
+    '..xXXXXXXXXXXw..',
+    '..wwwwwwwwwwww..',
+    '...XDYYYYYYDw...',
+    '...X.DYYYYD.w...',
+    '...X..DYYD..w...',
+    '...X...DD...w...',
+    '...X..D.YD..w...',
+    '...X.D..Y.D.w...',
+    '...XD...Y..Dw...',
+    '...XD..YY..Dw...',
+    '...XD.YYYY.Dw...',
+    '...XDYYYYYYDw...',
+    '..xXXXXXXXXXXw..',
+    '..wwwwwwwwwwww..',
+    '................'],
+  wappen: [
+    '................',
+    '..JKKKKKKKKKKi..',
+    '..JrrrrrrrrrrI..',
+    '..JrrrrYYrrrrI..',
+    '..JrrrYYYYrrrI..',
+    '..JrrYYrrYYrrI..',
+    '..JrYYrYYrYYrI..',
+    '..JYYrYYYYrYYI..',
+    '..JrrYYrrYYrrI..',
+    '..JrYYrrrrYYrI..',
+    '...JrrrYYrrrI...',
+    '....JrrrrrrI....',
+    '.....JrrrrI.....',
+    '......JrrI......',
+    '.......Ji.......',
+    '................'],
+  krug: [
+    '................',
+    '................',
+    '...BWWWWWWB.....',
+    '..BWWWWWWWWB....',
+    '..JJJJJJJJJJ....',
+    '..XxXXxXXxXwIII.',
+    '..XxXXxXXxXw..I.',
+    '..JJJJJJJJJi..I.',
+    '..XxXXxXXxXw..I.',
+    '..XxXXxXXxXwIII.',
+    '..XxXXxXXxXw....',
+    '..JJJJJJJJJi....',
+    '..wwwwwwwwww....',
+    '................',
+    '................',
+    '................'],
+  siedler: [
+    '................',
+    '.....xXXXx...JJ.',
+    '....xXXXXXx...x.',
+    '....xXBWBBx...x.',
+    '....xBoBobx...x.',
+    '....xBBBBbx...x.',
+    '.....xbbbx....x.',
+    '...kkLLLLLl...x.',
+    '..LkkLLLLLLLlBx.',
+    '..LkLLLLLLLLl.x.',
+    '..LkLLwwwLLLl.x.',
+    '...LLLLLLLLl..x.',
+    '...LLLLLLLLl..x.',
+    '....xxx.xxx...x.',
+    '....www.www...w.',
+    '................'],
+  zone16: [
+    '................',
+    '.kkk..kkkk..kkk.',
+    '.k............k.',
+    '.k............k.',
+    '................',
+    '................',
+    '.k............k.',
+    '.k............k.',
+    '.k............k.',
+    '.k............k.',
+    '................',
+    '................',
+    '.k............k.',
+    '.k............k.',
+    '.kkk..kkkk..kkk.',
+    '................'],
+  minihaus: [
+    '...Fh...',
+    '..FFHh..',
+    '.FFHHhh.',
+    'FFFHHhhh',
+    '.XxeeXw.',
+    '.XxeeXw.',
+    '.wwwwww.'],
+  /* ---------- Baukarten (22×16, auf 24×18 mit Kontur) ---------- */
+  b_campfire: [
+    '......................',
+    '..........y...........',
+    '.........yY...........',
+    '.........YY..y........',
+    '........yYAY.yY.......',
+    '.......yYAAYyYY.......',
+    '.......YAAAAYYy.......',
+    '......yYAZZAAYy.......',
+    '......YAAZZZAYy.......',
+    '......yYAZZAAYy.......',
+    '.......yYAAAYy........',
+    '....STxXwyYYywXxTS....',
+    '...STSxXXwwwwXXxSsS...',
+    '...SsSwwXXxxXXwwSss...',
+    '....sss.wwwwww.sss....',
+    '......................'],
+  b_tent: [
+    '......................',
+    '..........w...........',
+    '..........x...........',
+    '..........Wb..........',
+    '.........WBbb.........',
+    '........WBBbbb........',
+    '.......WBBBbbbb.......',
+    '......WBBBeebbbb......',
+    '.....WBBBeeeebbbb.....',
+    '....WBBBBeeeebbbbb....',
+    '...WBBBBeeeeeebbbbb...',
+    '..WBBBBBeeeeeebbbbbb..',
+    '.WBBBBBBeeeeeebbbbbbb.',
+    'WBBBBBBBeeeeeebbbbbbbb',
+    '.w..................w.',
+    '......................'],
+  b_hut: [
+    '......................',
+    '..........FH..........',
+    '.........FFHH.........',
+    '........FFHFHH........',
+    '.......FFFHFHHh.......',
+    '......FFHFFHFHHh......',
+    '.....FFFHFFHFHHhh.....',
+    '....FFHFFHFFHFHHhh....',
+    '...FHFFHFFHFHFHHhhh...',
+    '..hhhhhhhhhhhhhhhhhh..',
+    '...XxXxXxeeeexXxXxw...',
+    '...XYYxXxeeeexXxXxw...',
+    '...XYYxXxeeeexXxXxw...',
+    '...XxXxXxeeeexXxXxw...',
+    '...XxXxXxeeeexXxXxw...',
+    '..ssssssssssssssssss..'],
+  b_storage: [
+    '......................',
+    '......................',
+    '..hhhhhhhhhhhhhhhhhh..',
+    '.hHFHFHFHFHFHFHFHFHhh.',
+    '.hhhhhhhhhhhhhhhhhhhh.',
+    '..Xeeeeeeeeeeeeeeeew..',
+    '..XeXXXXeeeeeeePPpew..',
+    '..XeXwxXeeXXXXePPpew..',
+    '..XeXxwXeeXwxXePppew..',
+    '..XeXXXXeeXxwXePPpew..',
+    '..XeXXXXeXXXXePPPpew..',
+    '..XeXwxXeXwxXePPppew..',
+    '..XeXxwXeXxwXepPppew..',
+    '..XeXXXXeXXXXeppppew..',
+    '..wwwwwwwwwwwwwwwwww..',
+    '......................'],
+  b_workbench: [
+    '......................',
+    '......................',
+    '......................',
+    '...xXXXXXXXXXXXXXXw...',
+    '...XeJJJeeeeeKKKKew...',
+    '...XeexeeJeeejjjjew...',
+    '...XeexeeJeeeeeexewJJ.',
+    '...XeeeeexeeeeeeeewJi.',
+    '.TTTTTTTTTTTTTTTTTTTS.',
+    '.SSSSSSSSSSSSSSSSSSSs.',
+    '.xXXXXXXXXXXXXXXXXXXw.',
+    '..Xx..............Xw..',
+    '..Xx..............Xw..',
+    '..Xxwwwwwwwwwwwwwwxw..',
+    '..Xx..............Xw..',
+    '......................'],
+  b_smithy: [
+    '.............C.D......',
+    '..............DC......',
+    '...............TS.....',
+    '.........jjIi..TS.....',
+    '.......jjjIIIiiTS.....',
+    '.....jjjIIIIIiiTS.....',
+    '...jjjIIIIIIIIIiiii...',
+    '.jjjjIIIIIIIIIIIIiiii.',
+    '.iiiiiiiiiiiiiiiiiiii.',
+    '..TSSTSSSTSSSTSSSTSs..',
+    '..TSeeeeeSTSSeeeeSSs..',
+    '..SSeyyyeSSSTeeeeSSs..',
+    '..TSyYAYySTSSeeeeSSs..',
+    '..SSyYYYySSTSeexeSSs..',
+    '..ssssssssssssssssss..',
+    '......................'],
+  b_farm: [
+    '......................',
+    '......................',
+    '......................',
+    '.kLxkLxkLxkLxkLxkLxkL.',
+    '.LlwLlwLlwLlwLlwLlwLl.',
+    '.xxwxxwxxwxxwxxwxxwxx.',
+    '.kLxkLxkLxkLxkLxkLxkL.',
+    '.LlwLlwLlwLlwLlwLlwLl.',
+    '.xxwxxwxxwxxwxxwxxwxx.',
+    '.kLxkLxkLxkLxkLxkLxkL.',
+    '.LlwLlwLlwLlwLlwLlwLl.',
+    '.X....X....X....X...X.',
+    'XXXXXXXXXXXXXXXXXXXXXw',
+    '.x....x....x....x...x.',
+    'xxxxxxxxxxxxxxxxxxxxxw',
+    '.w....w....w....w...w.'],
+  b_pasture: [
+    '......................',
+    '......................',
+    '................FH....',
+    '..............FFHHhh..',
+    '............FFFHHHhhhh',
+    '.............Xeeeeeexw',
+    '.kLLLkLLLLkLLXeQPPeexw',
+    'kLLWWWBLLkLLLXePPPPexw',
+    'LLWWWWWBoLLkLXePPPpexw',
+    'LkLBBBBbLLLLLXeeeeeexw',
+    'LLLobLobLLkLLwwwwwwwww',
+    'XXXXXXXXXXXXXXXXXXXXXw',
+    'xLLxLLLxLLLxLLLxLLLxLL',
+    'XXXXXXXXXXXXXXXXXXXXXw',
+    'x..x...x...x...x...x..',
+    '......................'],
+  b_well: [
+    '......................',
+    '..........FH..........',
+    '........FFHHhh........',
+    '......FFFHHHhhhh......',
+    '.....hhhhhhhhhhhh.....',
+    '......X...b....w......',
+    '......X...b....w......',
+    '......X..xXx...w......',
+    '......X..wxw...w......',
+    '....TTTTTTTTTTTTTT....',
+    '..TTSmmMMmmmmmmmmSSs..',
+    '..TSTSSTSSSTSSTSSSSs..',
+    '..SSSTSSTSSSSTSSTSss..',
+    '..SsSSsSSSsSSSsSSsss..',
+    '...ssssssssssssssss...',
+    '......................'],
+  b_palisade: [
+    '......................',
+    '..X.......X...........',
+    '.Xxw..X..Xxw......X...',
+    '.Xxw.Xxw.Xxw..X..Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.PPPpPPPpPPPpPPPpPPP..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.PPPpPPPpPPPpPPPpPPP..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.Xxw.Xxw.Xxw.Xxw.Xxw..',
+    '.www.www.www.www.www..',
+    '......................'],
+  b_gate: [
+    '..X................X..',
+    '.Xxw..............Xxw.',
+    '.XxwhhhhhhhhhhhhhhXxw.',
+    '.XxwHHHHHHHHHHHHHHXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwJJJJJJiJJJJJJiXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwXxXxXGwXGxXxXwXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwJJJJJJiJJJJJJiXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwXxXxXxwXxXxXxwXxw.',
+    '.XxwwwwwwwwwwwwwwwXxw.',
+    '......................'],
+  b_zone: [
+    '......................',
+    '......................',
+    '......................',
+    '.kkk.kkk.kkk.kkk.kkk..',
+    '.k..................k.',
+    '.k..................k.',
+    '......................',
+    '.k..................k.',
+    '.k..................k.',
+    '......................',
+    '.k..................k.',
+    '.k..................k.',
+    '......................',
+    '.k..................k.',
+    '.kkk.kkk.kkk.kkk.kkkk.',
+    '......................'],
+  pflock: [
+    'Xw',
+    'Xw',
+    'Xw',
+    'xw'],
+  b_watchtower: [
+    '..........FH..........',
+    '........FFHHhh........',
+    '......FFFHHHhhhh......',
+    '.....hhhhhhhhhhhh.....',
+    '......Xeeeeeeeew......',
+    '......XeeeYeeeew......',
+    '.....XXXXXXXXXXXw.....',
+    '.....xxxxxxxxxxxw.....',
+    '......Xxx....xxw......',
+    '......Xx.x..x.xw......',
+    '......Xx..xx..xw......',
+    '......Xx..xx..xw......',
+    '......Xx.x..x.xw......',
+    '......Xxx....xxw......',
+    '....ssXxssssssxwss....',
+    '......................'],
 };
 
 /* Paletten-Varianten */
@@ -565,14 +896,40 @@ const ICONS = {
   log_faction: [['banner', 0, 0]],
   log_economy: [['beutel', 0, 0]],
   log_death: [['schaedel', 0, 0]],
+  /* Baukarten-Zubehör (UI-Scheibe 2) */
+  cost_missing: [['kreuz', 8, 8]],
+  time: [['sanduhr', 0, 0]],
+  set_level: [['wappen', 0, 0]],
+  set_morale: [['krug', 1, 0]],
+  set_settler: [['siedler', 0, 0]],
+  zone_house: [['zone16', 0, 0, null, true], ['minihaus', 4, 5]],
 };
 
 export const ICON_KEYS = Object.keys(ICONS);
 
-/* Baut das 16×16-Farbgitter eines Symbols (Array von Farbstrings oder null). */
-function buildGrid(key) {
-  const layers = ICONS[key];
-  const grid = new Array(N * N).fill(null);
+/* Baukarten: ein Bild je Eintrag in BUILDINGS (data.js), Raster 24×18.
+   Schlüssel ohne Präfix; bldURL nimmt 'hut' wie 'bld_hut'. */
+const BW = 24, BH = 18;
+const BLD = {
+  campfire: [['b_campfire', 1, 1]],
+  tent: [['b_tent', 1, 1]],
+  hut: [['b_hut', 1, 1]],
+  storage: [['b_storage', 1, 1]],
+  workbench: [['b_workbench', 1, 1]],
+  smithy: [['b_smithy', 1, 1]],
+  farm: [['b_farm', 1, 1]],
+  pasture: [['b_pasture', 1, 1]],
+  well: [['b_well', 1, 1]],
+  palisade: [['b_palisade', 1, 1]],
+  gate: [['b_gate', 1, 1]],
+  wohnzone: [['b_zone', 1, 1, null, true], ['pflock', 2, 2], ['pflock', 21, 2], ['pflock', 2, 13], ['pflock', 21, 13], ['minihaus', 8, 6]],
+  watchtower: [['b_watchtower', 1, 1]],
+};
+export const BLD_KEYS = Object.keys(BLD).map(k => 'bld_' + k);
+
+/* Baut das Farbgitter (W×H) aus Ebenen (Array von Farbstrings oder null). */
+function buildGrid(key, layers = ICONS[key], W = N, H = N) {
+  const grid = new Array(W * H).fill(null);
   for (const [name, ox, oy, over, noOutline] of layers) {
     const rows = R[name];
     if (!rows) continue;
@@ -600,8 +957,8 @@ function buildGrid(key) {
       const col = layer[y * lw + x];
       if (!col) continue;
       const gx = ox - 1 + x, gy = oy - 1 + y;
-      if (gx < 0 || gy < 0 || gx >= N || gy >= N) continue;
-      grid[gy * N + gx] = col;
+      if (gx < 0 || gy < 0 || gx >= W || gy >= H) continue;
+      grid[gy * W + gx] = col;
     }
   }
   return grid;
@@ -627,6 +984,35 @@ export function iconURL(key, scale = 2) {
       if (!col) continue;
       cx.fillStyle = col;
       cx.fillRect((i % N) * s, ((i / N) | 0) * s, s, s);
+    }
+    const url = cv.toDataURL('image/png');
+    urlCache.set(ck, url);
+    return url;
+  } catch (e) {
+    return '';
+  }
+}
+
+/* Baukarten-Bild als data:-URL (PNG), 24×18 Pixel mal scale; je key+scale gecacht.
+   key: 'hut' oder 'bld_hut'; unbekannter key liefert ''. */
+export function bldURL(key, scale = 3) {
+  const k = typeof key === 'string' && key.startsWith('bld_') ? key.slice(4) : key;
+  if (!Object.prototype.hasOwnProperty.call(BLD, k)) return '';
+  const s = Math.max(1, Math.min(8, Math.round(+scale || 3)));
+  const ck = 'bld_' + k + '@' + s;
+  const hit = urlCache.get(ck);
+  if (hit !== undefined) return hit;
+  try {
+    if (typeof document === 'undefined') return '';
+    if (!cv) { cv = document.createElement('canvas'); cx = cv.getContext('2d'); }
+    cv.width = BW * s; cv.height = BH * s;
+    cx.clearRect(0, 0, cv.width, cv.height);
+    const grid = buildGrid(k, BLD[k], BW, BH);
+    for (let i = 0; i < grid.length; i++) {
+      const col = grid[i];
+      if (!col) continue;
+      cx.fillStyle = col;
+      cx.fillRect((i % BW) * s, ((i / BW) | 0) * s, s, s);
     }
     const url = cv.toDataURL('image/png');
     urlCache.set(ck, url);

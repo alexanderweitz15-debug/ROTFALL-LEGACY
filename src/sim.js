@@ -53,7 +53,7 @@ export function launchHost() {                                     // Morvaths H
 }
 export function capThreatDay() {                                   // einmal am Tag aus warDay
   const W = S.war, n = W.nodes[CAPK];
-  if (!n || n.owner !== 'valen' || (S.day | 0) < CAP_SIEGE.from || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > S.day) return;
+  if (!n || n.owner !== 'valen' || (S.day | 0) < CAP_SIEGE.from - (S.difficulty === 'sehr_schwer' ? 15 : 0) ||   /* Entwickler: Sehr schwer 15 Tage früher */ S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > S.day) return;
   const undNodes = Object.values(W.nodes).filter(x => x.owner === 'undead').length;
   const d = (undNodes >= 6 ? 1 : -1) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? 0.5 : 0) + (W.armies.some(a => a.faction === 'valen') ? 0 : 0.5) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? 0.5 : 0);
   W.capThreat = clamp((W.capThreat || 0) + d, 0, 40);
@@ -423,6 +423,7 @@ function capture(node, faction) {
   if (faction === 'undead') H.raidDamage?.(node);                 // §74 Nachwirkung: Kriegsschäden an Häusern
   if (node === CAPK && faction === 'undead') { for (const a of S.war.armies) if (a.faction === 'valen') a.strength *= 0.8; H.capitalFell?.(); }   /* „Die Krone ist gefallen“ */
   if (node === CAPK && was === 'undead' && faction !== 'undead') H.capitalFreed?.();
+  H.afterCapture?.(node, faction);
   if (was === 'undead' && faction !== 'undead') {                  // Befreiung — für jeden Ort, nicht nur für Orte mit Markt
     chronicle(`${L.name} befreit`, 'battle', `${FACTIONS[faction].name} nimmt ${L.name} zurück.`);
     H.toast(`${L.name.toUpperCase()} BEFREIT`);
