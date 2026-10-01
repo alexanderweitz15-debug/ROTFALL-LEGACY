@@ -6881,7 +6881,7 @@ function claimContract(C, npc) {
 function conList(npc, town, giver, title) {
   const list = townContracts(town, giver), back = () => conList(npc, town, giver, title), opts = [];
   for (const C of list) {
-    if (C.state === 'offer') opts.push({ text: `${C.title} — ${C.reward.gold} Gold`, fn: () => UI.dialogue(npc || S.player, `„${C.desc}“\nLohn: ${C.reward.gold} Gold, Erfahrung, Ansehen.`, [
+    if (C.state === 'offer') opts.push({ text: `${C.elite ? '☠ ' : ''}${C.title} — ${C.reward.gold} Gold`, fn: () => UI.dialogue((C.elite && eliteFace(C.elite)) || npc || S.player, `„${C.desc}“\nLohn: ${C.reward.gold} Gold, Erfahrung, Ansehen.`, [
       { text: 'Annehmen', fn: () => { acceptContract(C); back(); } }, { text: 'Zurück', fn: back }]) });   // (acceptContract prüft den Deckel)
     else if (C.state === 'active' && (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs')) opts.push({ text: `Abgeben: ${C.title}`, fn: () => { claimContract(C, npc); back(); } });
     else if (C.state === 'active') opts.push({ text: `(läuft) ${C.title} ${C.have}/${C.need}`, fn: back });
@@ -11348,9 +11348,21 @@ function talk(npc) {
     : rel <= -30 ? '„Du. Sag, was du willst, und dann geh.“' : npc.wary > now && npc.provoked ? '„Ich behalte dich im Auge.“'
     : pactBound() && !npc.undead && npc.faction !== 'undead' && !S.party.includes(npc.id) ? pactGreet(npc)
     : (npc.faction && S.factions[npc.faction] != null && repTier(npc.faction).greet) || contextGreet(npc, npc.greet);   // §43 Ruf färbt; sonst Kontext (Phase 1)
+  if (!talky(npc)) {                                                  /* Entwickler 01.10.2026: nicht jeder steht für Fragen bereit */
+    const keep = choices.filter(c => !CHATTER.test(c.text));
+    if (keep.length <= 1) { bubble(npc, greet.replace(/[„“]/g, '').slice(0, 80), 2600);
+      if (!S.flags.barkHint) { S.flags.barkHint = 1; log('Einfache Leute grüßen nur und gehen ihrer Arbeit nach. Fragen nach Neuigkeiten, Glauben oder Wissen stellst du Wirten, Wachen, Reisenden, Gelehrten und Leuten mit Namen.', 'world'); }
+      return; }
+    choices.splice(0, choices.length, ...keep);
+  }
   UI.dialogue(npc, greet, choices);
   if (rel === 0) addRel(npc.key, 1);
 }
+// Wer redet (Entwickler 01.10.2026): Figuren mit Namen und Geschichte, Gefährten, Wachen, Reisende, Lehrer, Wirte, Priester, Gelehrte.
+// Alle anderen bieten nur, was ihr Dienst ist (Handel, Auftrag, Heilung …) — ohne Dienst nur ein Satz als Sprechblase.
+const CHATTER = /^(Was gibt es Neues\?|Was hältst du von Omega\?|Ich hätte da eine Frage)/;
+const talky = n => !!(S.flags.allTalk || NAMED_NPC.has(n.key) || S.party.includes(n.id) || n.guard || n.traveler || n.travLead || n.teaches || n.spellsTaught?.length || n.musician
+  || n.varonCourt || n.exileCourt || n.capGuard || /Wirt|Priester|Pfarr|Mönch|Schreiber|Gelehrt|Chronist|Barde|Spielmann|Vorsteher|Bürgermeister|Hauptmann|Heiler/.test(n.prof || ''));
 
 // Gerüchte aus der Chronik (BUG-078, §79): Schlachten, Befreiungen, Tote, Bluttaten, Karawanen der letzten NEWS_DAYS Tage.
 // Ältere Ereignisse fallen heraus — die Leute reden über das, was gerade passiert ist.
@@ -13880,6 +13892,26 @@ function dangerNote(l, p, dry = false) {
   log(`${l.name}: ${DANGER[Math.min(5, l.threat)]}`, 'world');
   if (l.threat - Math.floor(p.level / 3) >= 1) UI.toast(`${l.name.toUpperCase()} — ${DANGER[Math.min(5, l.threat)]}`, 3600);
 }
+let mapXf = null;                                                     /* letzte Kartenabbildung für die Ortskarte beim Klick */
+// Scout #5 (Entwickler 01.10.2026): Klick auf die Weltkarte zeigt den nächsten entdeckten Ort — Art, Herr, Zustand, Gefahr,
+// zuletzt gesehene Warenpreise und deine Aufträge dort. Unentdeckte Orte bleiben unbekannt.
+function mapPick(px, py) {
+  if (!mapXf) return null; const { ox, oy, sc } = mapXf;
+  let best = null, bd = 26; for (const l of LOCATIONS) { const d = Math.hypot(ox + l.x * sc - px, oy + l.y * sc - py); if (d < bd) { bd = d; best = l; } }
+  if (!best) return null; const k = best.key, known = (S.flags.seen || {})[k] || S.flags.seenTowns?.[k] != null || S.priceSeen?.[k];
+  if (!known) return { title: 'Unbekannter Ort', html: '<div class="ledger">Noch nicht entdeckt.</div>' };
+  const n = S.war?.nodes?.[k], lord = n?.owner || TOWN_PLAN[k]?.lord || best.faction;
+  const kind = { village: 'Dorf', city: 'Stadt', camp: 'Lager', ruin: 'Ruine', shrine: 'Schrein', tower: 'Turm', farm: 'Hof', mine: 'Mine', wreck: 'Wrack', road: 'Straße', dungeon: 'Gewölbe', wild: 'Wildnis' }[best.kind] || 'Ort';
+  const st = S.towns?.[k] && S.war?.nodes ? SIM.townState(k) : null, PS = S.priceSeen?.[k];
+  const goods = PS ? Object.entries(PS.p).filter(([g]) => GOOD_NAME[g]).map(([g, v]) => `${GOOD_NAME[g]} <b>${Math.round(v)}</b>`).join(' · ') : '';
+  const cons = (S.contracts || []).filter(c => c.state === 'active' && (c.town === k || c.target === k)).map(c => c.title);
+  return { title: best.name, html: `<div class="ctx-sub">${kind}${lord && FACTIONS[lord] ? ' · ' + FACTIONS[lord].name : ''}${st ? ' · ' + st : ''}</div>`
+    + (best.threat != null ? `<div class="ctx-line"><span>Gefahr</span><b>${['Sicher', 'Gering', 'Mittel', 'Hoch', 'Tödlich'][Math.min(4, best.threat | 0)]}</b></div>` : '')
+    + (goods ? `<div class="ledger" style="margin-top:4px">Preise (Tag ${PS.day}): ${goods}</div>` : (S.towns?.[k] ? '<div class="ledger">Preise unbekannt — besuche den Markt.</div>' : ''))
+    + (cons.length ? `<div style="margin-top:4px"><b>Deine Aufträge:</b><br>${cons.join('<br>')}</div>` : '') };
+}
+// Scout #9: Steckbrief mit Gesicht — das Porträt des Gesuchten (Elite-Aussehen aus ELITES) statt des Bretts
+const eliteFace = k => { const E = ELITES[k], m = E && MONSTERS[E.base]; return m ? { name: `Gesucht: ${E.name}`, spec: SP.monsterSpec({ kind: 'enemy', mtype: E.base, seed: 3, eliteKey: k, elite: true, elook: E.look || null, epal: E.pal || null }, m) } : null; };
 function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mit Nebel (atlas.js); hier nur Aufträge, Heere, Spieler, Legende
   const c = cv.getContext('2d'), w = cv.width, h = cv.height;
   const boxes = [], place = (text, x, y, font = '11px Spectral, serif') => {   // BUG-085: Beschriftung ohne Überlappung
@@ -13900,7 +13932,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   const quests = [];
   for (const [k, v] of Object.entries(S.quests)) { if (v.state !== 'active') continue; const pt = questPoint(k); if (!pt) continue;
     const x = ox0 + pt.x * sc0, y = oy0 + pt.y * sc0; quests.push([k, x, y, place(QUESTS[k].name, x, y, 'italic 10px Spectral, serif')]); }
-  const { ox, oy, sc } = drawAtlas(cv, zoom, { place });
+  const { ox, oy, sc } = drawAtlas(cv, zoom, { place }); mapXf = { ox, oy, sc };
   for (const [k, x, y, at] of quests) {
     c.strokeStyle = '#d0603f'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y - 8); c.lineTo(x + 8, y); c.lineTo(x, y + 8); c.lineTo(x - 8, y); c.closePath(); c.stroke();
     if (at) { c.fillStyle = '#e59070'; c.font = 'italic 10px Spectral, serif'; c.textAlign = 'center'; c.fillText(QUESTS[k].name, at[0], at[1]); }
@@ -14646,6 +14678,7 @@ function debugSections() {
       'Szene: Varonheim ist gefallen': () => capitalScene('fell'),
       'Sprechblase am nächsten': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; bubble(n || p, 'Hier ist eine Sprechblase.', 3000); },
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
+      'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
       'Ankunftskarten zurücksetzen': () => { S.flags.seenTowns = {}; UI.toast('Städte zeigen ihre Karte wieder'); },
     }],
@@ -17583,6 +17616,16 @@ export function selftest() {
       return once && skip && paused && a && b && c;
     } finally { S.cine = c0; S.flags.introSeen = seen0; S.legacy.gen = g0; cineBars(false); }
   }));
+  ok('Gespräche (Entwickler): einfache Bewohner sagen nur einen Satz (Blase, kein Fenster, keine Fragen); Wachen reden weiter mit „Was gibt es Neues?“', sandbox(() => {
+    const p = stage(), a0 = S.flags.allTalk;
+    try {
+      delete S.flags.allTalk; const v = actor(p.x + 30, p.y, { name: 'Bäuerin' }); Object.assign(v, { prof: 'Bauer', key: 'probe_bauer', map: '__a' }); UI.closeDialogue();
+      talk(v); const quiet = !UI.dialogueOpen() && S.floats.some(f => f.bubble && f.who === v.id);
+      const g = actor(p.x - 30, p.y, { name: 'Wache' }); Object.assign(g, { prof: 'Wache', guard: true, key: 'probe_wache', map: '__a' });
+      talk(g); const chat = UI.dialogueOpen() && [...document.querySelectorAll('#dlg-choices button')].some(b => b.textContent.startsWith('Was gibt es Neues')); UI.closeDialogue();
+      return quiet && chat;
+    } finally { S.flags.allTalk = a0; UI.closeDialogue(); }
+  }));
   ok('T10 Ahnenfeind: Mörder (kein Boss) wird benannt und nimmt die Waffe samt Geschichte aus dem Grab; tötet er wieder, wächst er; höchstens drei; sein Tod gibt die Waffe zurück und den Titel', sandbox(() => {
     const p = stage(), N0 = S.nemeses, NP0 = S.nemesisPast;
     try {
@@ -18401,7 +18444,7 @@ function boot() {
       if (target !== S.player && dist(S.player, target) > 70) return UI.toast(`${target.name} ist zu weit weg.`);
       useConsumable(S.player, idx, target, part);
     },
-    drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
+    drawWorldmap, mapPick, drawWarmap, warStatus, facRelation, repTier,
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
     fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),

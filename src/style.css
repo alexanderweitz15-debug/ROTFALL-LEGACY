@@ -113,6 +113,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #logwrap{position:relative}
 #log-new{position:absolute;right:16px;bottom:10px;background:#2a2116;border:1px solid var(--rust);color:var(--gold);font-size:10px;letter-spacing:.08em;padding:2px 9px;border-radius:9px;cursor:pointer}
 #log-new.hidden{display:none}
+.map-card{position:absolute;width:250px;background:rgba(18,15,11,.96);border:1px solid var(--iron);box-shadow:0 4px 14px rgba(0,0,0,.6);padding:8px 10px;font-size:12px;z-index:5;cursor:pointer}
+.beast-row{display:flex;gap:10px;align-items:flex-start}
+.beast-pic{width:72px;height:72px;image-rendering:pixelated;border:1px solid #2b2419;flex:0 0 72px}
 .worldclock{display:flex;align-items:center;gap:14px;font-size:12px;color:#b8ac93;white-space:nowrap}
 .worldclock .gold{color:var(--gold)}
 .worldclock .gold::before{content:"◈ "}

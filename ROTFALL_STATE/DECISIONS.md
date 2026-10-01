@@ -75,3 +75,10 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 
 ## 01.10.2026 — Agenten laufen dauerhaft
 - Entwickler: „Starte alle Agents. Die sollen ja die ganze Zeit laufen.“ Die Obergrenze von zwei Unteragenten ist aufgehoben. Scout, Designer, Artist und Verifier laufen parallel; wird einer fertig, startet der Director seine nächste Aufgabe. Der Engineer ist die Hauptsitzung.
+
+## 01.10.2026 — Scout-Auswahl
+- Runde 1 gewählt: **Ortskarte beim Klick**, **Kopfgeldtafel mit Gesicht**, **Bestiarium mit Sprite** (alle klein, UI). Nicht gewählt (bleiben IDEA): Narbenbuch, Siedlung als Marktknoten.
+- Runde 2 gewählt: **Feldreparatur-Set** (zu T15), **Königstod als Szene**, **Luftbrücke für Belagerte**, **Verwundete aus Feldschlachten** → Designer arbeitet Luftbrücke und Verwundete aus (Balance/neue Daten); Feldreparatur und Königstod direkt mit T15 bzw. T17.
+
+## 01.10.2026 — Gespräche
+- Entwickler: „Reduziere die Anzahl der NPCs, mit denen man reden kann. Man soll nicht alle nach der Geschichte etc. fragen können.“ Umsetzung: einfache Bewohner nur Sprechblase; Plauder- und Wissensfragen nur bei gesprächigen Rollen (Namen, Wachen, Wirte, Reisende, Lehrer, Gelehrte, Priester, Vorsteher, Gefährten); Dienste bleiben.

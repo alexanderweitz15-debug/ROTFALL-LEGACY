@@ -5,6 +5,7 @@ import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACT
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=23';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=23';
 import { wearOf } from './buildings.js?v=23';
+import * as SP from './sprites.js?v=23';   /* Bestiarium: Gegnerbilder */
 import { townState, townPrice } from './sim.js?v=23';
 import { GOODS } from './data.js?v=23';
 import { target as ecoTarget } from './economy.js?v=23';
@@ -242,8 +243,9 @@ function codexUI(body) {
       const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
     } else {
       const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
-      cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row"><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
+      cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row beast-row"><canvas class="beast-pic" data-mt="${k}" width="72" height="72"></canvas><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
         : '<div class="ledger">Hier stehen die Gegner, die du schon erschlagen hast.</div>';
+      cb.querySelectorAll('canvas[data-mt]').forEach(c => drawMonsterTo(c, c.dataset.mt));   /* Scout #8: Bestiarium mit Bild */
     }
   };
   body.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { codexTab = b.dataset.t; codexUI(body); });
@@ -286,6 +288,18 @@ function spellUI(body) {
   body.querySelectorAll('[data-bar]').forEach(b => b.onclick = () => { A.spellToBar(b.dataset.bar); spellUI(body); });
 }
 
+// Scout #8 (Entwickler 01.10.2026): Gegnerbild für den Kodex — dieselben Raster wie im Spiel (Tier, Brocken, Menschengestalt)
+const BEAST_KEYS = ['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'];
+function drawMonsterTo(cv, mt, seed = 2) {
+  const m = MONSTERS[mt], c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#14110d'; c.fillRect(0, 0, cv.width, cv.height); if (!m || m.eye || mt === 'carrion_wing') return;
+  try {
+    const f = BEAST_KEYS.includes(mt) ? SP.beastFrame(mt, m.pal || {}, 'E', '', 1) : mt === 'gorak' ? SP.bruteFrame(m.pal || {}, 'E', '', 0) : SP.humanFrame(SP.monsterSpec({ kind: 'enemy', mtype: mt, seed }, m), 'S', 'i0');
+    const k = Math.max(1, Math.floor(Math.min((cv.width - 4) / f.width, (cv.height - 4) / f.height)));
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(cv.width / 2 - f.width * k * 0.3, cv.height - 5, f.width * k * 0.6, 2);
+    c.drawImage(f, Math.round((cv.width - f.width * k) / 2), cv.height - 3 - f.height * k, f.width * k, f.height * k);
+  } catch (e) { /* unbekanntes Raster: leeres Bild */ }
+}
 // ---------------- Log ----------------
 // Nutzer 01.10.2026: der Log sprang nach oben (alte Einträge sichtbar). Ob er unten „klebt“, entscheidet jetzt nur das Scrollen des
 // Spielers (nicht die Höhe beim Neuaufbau, die bei verstecktem oder frisch gefülltem Kasten 0 ist); neu = unten, nach dem Layout.
@@ -1011,6 +1025,10 @@ function mapUI(body) {
     <span class="ledger" style="margin-left:10px">Entdeckte Orte erscheinen dauerhaft. Dunkel = unentdeckt.</span></div>`;
   const cv = $('wm'); cv.width = cv.clientWidth; cv.height = cv.clientHeight;
   A.drawWorldmap(cv, z);
+  cv.style.cursor = 'pointer'; body.style.position = 'relative';
+  cv.onclick = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * cv.width / r.width, y = (e.clientY - r.top) * cv.height / r.height, P = A.mapPick?.(x, y);   /* Scout #5: Ortskarte */
+    $('map-card')?.remove(); if (!P) return; const d = el('div', 'map-card', `<div class="ctx-head">${P.title}</div>${P.html}`); d.id = 'map-card';
+    d.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; d.style.top = Math.max(4, Math.min(e.clientY - r.top - 20, r.height - 180)) + 'px'; d.onclick = () => d.remove(); body.appendChild(d); };
   [...body.querySelectorAll('[data-z]')].forEach(b => b.onclick = () => { S.settings.mapZoom = +b.dataset.z; mapUI(body); });
 }
 

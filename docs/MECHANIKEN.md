@@ -779,3 +779,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Freie Punkte:** Ein Goldpunkt am Reiter Charakter (und ✦ hinter der Klasse) zeigt freie Stat- oder Talentpunkte; der Tooltip nennt die Zahl.
 - **Vorrat und Wetter** als Piktogramm mit Zahl. Zeit, Wetter, Jahreszeit und Jahr stehen nur noch oben (Jahr im Tooltip der Uhr), nicht mehr doppelt rechts.
 - **Protokoll:** höher, jede Zeile mit Kategoriezeichen; scrollst du hoch, erscheint „Neu ↓“, ein Klick springt zum neuesten Eintrag.
+
+## Runde: Weniger Gesprächspartner, Ortskarte, Steckbrief mit Gesicht, Bestiarium (Entwickler 01.10.2026)
+- **Nicht jeder redet:** Einfache Bewohner sagen nur einen Satz (Sprechblase) und gehen weiter ihrer Arbeit nach. Fragen nach Neuigkeiten, nach Omega oder nach Wissen beantworten Wirte, Wachen, Reisende, Lehrer, Gelehrte, Priester, Vorsteher, Gefährten und Figuren mit Namen. Wer einen Dienst hat (Handel, Heilung, Auftrag, Lieferung), bietet nur diesen an. Ein Hinweis im Log erklärt es beim ersten Mal. Debug: „Regie (T17)“ → „Gesprächig: alle NPCs (Schalter)“.
+- **Ortskarte:** Klick auf einen Ort der Weltkarte (M) zeigt Art, Herrschaft, Zustand, Gefahr, zuletzt gesehene Warenpreise und deine Aufträge dort.
+- **Steckbrief mit Gesicht:** Am Anschlagbrett sind Kopfgelder auf benannte Mini-Bosse mit ☠ markiert; beim Lesen siehst du das Gesicht des Gesuchten.
+- **Bestiarium:** Kodex → Gegner zeigt jedes erschlagene Wesen als Bild.

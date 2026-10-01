@@ -7,6 +7,9 @@ Die Reihenfolge mischt große und kleine Arbeiten (Entwickler). Aufgabentexte: `
 | 1 | UI-Umbau Scheibe 1: Leiste 8 Gruppen mit Piktogrammen, Protokoll-Stil, Meldungsfluss, HUD-Piktogramme | APPROVED | `PROPOSALS/ui_redesign.md` |
 | 2 | T15 Messing: Stigma (V9) + Schwächen (V10, Energiezelle alle 3 Tage) | APPROVED | Hauptsitzung |
 | 3 | UI Scheibe 2–3 (Docks), Ausbau alter Features (Baukarten zuerst) | APPROVED (UI) / IDEA (Ausbau: `PROPOSALS/feature_audit_ausbau.md`) | |
+| 3a | Ortskarte beim Klick, Kopfgeldtafel mit Gesicht, Bestiarium mit Sprite | APPROVED | Scout #5/#9/#8, UI |
+| 3b | Feldreparatur-Set (mit T15), Königstod als Szene (T17) | APPROVED | Scout #26/#31 |
+| 3c | Luftbrücke für Belagerte, Verwundete aus Feldschlachten | APPROVED → Designer | Scout #21/#29 |
 | 4 | T11 §5g.6/21 + A14 Hunger/Müdigkeit (komplett, DIFF.survival) | APPROVED | |
 | 5 | T17 Regiebuch Scheibe 3/4: Hrodvar-Frost, Garmadon-Herzschlag, Hinrichtung am Galgen, Umbau alter Fahrten, Goblinsturm Sieg/Niederlage | APPROVED | `PROPOSALS/t17_regiebuch.md` |
 | 6 | T23 Fraktionsressourcen (Antworten in DECISIONS) | APPROVED | `PROPOSALS/t23_fraktionsressourcen.md` |

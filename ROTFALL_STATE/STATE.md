@@ -9,6 +9,7 @@ Zuerst lesen. Team und Projektfakten: `TEAM.md`. Kurz halten (unter 100 Zeilen).
 ## Fertig (VERIFIED)
 - Audit T01, T02, T03, T04, T06; Blutkult Scheibe 1.
 - Bugfixes RB-001…006, RB-008, RB-009, RB-013 (Sonne), RB-014, RB-015, RB-017, RB-018, RB-022, RB-024, RB-025.
+- (Verifier, 01.10.) T17 Regiebuch Scheiben 1+2, RB-038, RB-039, RB-027, RB-029, RB-030, RB-032; T05 (JOIN_FOES bewusst unverändert).
 
 ## Gebaut, ungeprüft (IMPLEMENTED/TESTING)
 - T05 Kleinkram.
