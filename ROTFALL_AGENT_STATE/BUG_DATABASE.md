@@ -19,3 +19,5 @@
 | RB-014 | Kult-Haken in die() fielen bei fernen/verbündeten Toten weg (Aldhelm-Tod ohne Folgen) | HIGH | game.js die | TESTING (Haken vor den Ausstieg gezogen) |
 | RB-015 | Licht im Bosskampf zählte während der Unverwundbarkeit gegen den Deckel | LOW | game.js aldhelmAI | TESTING |
 | RB-016 | Gemischte Zeilenenden in game.js durch die Bearbeitungshilfe | LOW | Werkzeug | VERIFIED (normalisiert, Hilfe korrigiert) |
+| RB-017 | T08-Feld `captive` kollidierte mit den Goblin-Gefangenen der Kette (Konvoi stand still) | HIGH | game.js | TESTING (Feld heißt `prisoner`; Eisenmark-Probe grün) |
+| RB-018 | `acceptContract` gibt nichts zurück — Rückgabeprüfung entfernte neue Aufträge | MEDIUM | game.js captiveAsk/informantDay | TESTING |

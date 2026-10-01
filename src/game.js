@@ -944,7 +944,7 @@ const JOB_AT = {
 };
 const STALL_SELL = { 'Bäcker': ['bread', 'bread', 'dried_meat'], Weber: ['traveler_cloak', 'leather_cap', 'bandage'], 'Böttcher': ['wood', 'bread'], Bauer: ['bread', 'dried_meat', 'herb'], Magd: ['herb', 'bread', 'bandage'], Handwerker: ['wood', 'stone', 'bandage'] };
 const SMITH_POOL = ['koenigseisen', 'morgenstern', 'kettenkugel', 'rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
-const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion'];
+const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion', 'strick'];   /* T08: Strick zum Fesseln */
 function spotBy(prop, b) {                                        // freier Stehplatz neben dem Möbel, drinnen zuerst Richtung Tür
   for (const [ox, oy] of [[0, 22], [0, -22], [22, 0], [-22, 0], [16, 18], [-16, 18]]) {
     const x = prop.x + ox, y = prop.y + oy, tx = x / TS | 0, ty = y / TS | 0;
@@ -2053,7 +2053,7 @@ export function continueGame(given = null, retried = false) {                   
   nameFix();
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
-  for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) if (e.sick === false) delete e.sick;   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
+  for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
@@ -3017,6 +3017,7 @@ function resolveSwing(c) {
     hitAny = true;
     if (f.downed) {                                            // Gnadenstoß: ein gestürzter Feind wird erledigt
       fx(f.x, f.y - 6, 'blood', 8); sfx('hit', feelOf(c).w, earVol(f));
+      if (c === S.player && HUMANOID.has(f.mtype)) styleAct(-2, 'Gnadenstoß', f);   /* T08 Ruf der Klinge */
       die(f, `Gnadenstoß durch ${c.name}`, c);
       break;
     }
@@ -3851,6 +3852,7 @@ function updateEnemy(e, dt) {
   if (e.mageHunter) mageHunterTick(e, dt);                           // S15 P7
   if (e.servant && !e.pet && (performance.now() > e.until || !byId(e.servant)?.alive)) return crumble(e);   // der Ruf verklingt
   if (e.minionOf && !byId(e.minionOf)?.alive) return crumble(e);   // Phase 6: stirbt der Nekromant, zerfallen seine Diener
+  if (e.prisoner) return captiveTick(e, dt);   /* T08 */
   const far = dist(e, p) > 1100;
   if (far) { e.vx = e.vy = 0; return; }                       // Stufe C: außerhalb der Sicht keine Simulation
   const m = MONSTERS[e.mtype];
@@ -3868,8 +3870,9 @@ function updateEnemy(e, dt) {
   if (e.mtype === 'bear' && tgt && !e.provoked && dist(e, tgt) > 110 && tgt !== ag) tgt = null;   // Revier: nur wer zu nahe kommt
   if (tgt && e.giveUp && e.giveUp.id === tgt.id && e.giveUp.until > performance.now()) tgt = null;   // BUG-088: aufgegeben (kein Weg) — nicht sofort wieder anrennen
   let sp = m.speed * (e.spdMul || 1) * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1) * ((e.status || []).some(q => q.key === 'chilled') ? 0.6 : 1) * (1 - 0.15 * ((e.status || []).find(q => q.key === 'frost')?.stacks || 0));   // Ranken halten, Frost bremst
-  if (e.hp < e.maxHp * 0.2 && !e.boss && !e.fleeing && !e.servant && chance(0.004)) { e.fleeing = true;
-    if (HUMANOID.has(e.mtype) && m.faction !== 'undead' && !e.contract && chance(0.4)) { e.surrendered = true; e.disarmed = true; float(e, 'Gnade!', 'rgba(230,220,180,ALPHA)', true); log(`${m.name} wirft die Waffe weg und ergibt sich.`, 'combat'); }   // S13: Kapitulation
+  const sty = HUMANOID.has(e.mtype) ? styleOf(fameRegion(e)) : 0;   /* T08 Ruf der Klinge: Grausamkeit lässt früher fliehen, Gnade öfter aufgeben */
+  if (e.hp < e.maxHp * (0.2 + Math.max(0, -sty) * 0.0015) && !e.boss && !e.fleeing && !e.servant && chance(0.004 * (1 + Math.max(0, -sty) / 50))) { e.fleeing = true;
+    if (HUMANOID.has(e.mtype) && m.faction !== 'undead' && (!e.contract || wantedC(e)) && chance(0.4 * clamp(1 + sty / 100, 0, 2))) {   /* T08: Steckbrief-Ziele ergeben sich auch */ e.surrendered = true; e.disarmed = true; float(e, 'Gnade!', 'rgba(230,220,180,ALPHA)', true); log(`${m.name} wirft die Waffe weg und ergibt sich.`, 'combat'); }   // S13: Kapitulation
     else log(`${m.name} flieht.`, 'combat'); }
   if (e.fleeing && tgt) {
     seek(e, Math.atan2(e.y - tgt.y, e.x - tgt.x), sp, dt);
@@ -4658,7 +4661,7 @@ function provoke(target, attacker) {
 function interactables() {
   const p = S.player;
   return S.ents[S.map].filter(e => e !== p && dist(e, p) < 62 &&
-    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') ||
+    (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') || (e.kind === 'enemy' && (takeable(e) || e.prisoner?.by === p.id)) ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
      (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
     .sort((a, b) => score(a) - score(b));
@@ -4678,6 +4681,7 @@ function updatePrompt() {
     t.kind === 'grave' ? `<b>E</b> Grab untersuchen` :
     t.kind === 'building' ? `<b>E</b> ${BUILD_USE[t.type]} — ${BUILDINGS[t.type].name}` :
     t.kind === 'npc' && t.downed ? `<b>E</b> ${t.name} aufrichten` :
+    t.kind === 'enemy' && t.prisoner ? `<b>E</b> Gefangener — ${t.title || MONSTERS[t.mtype].name}` : t.kind === 'enemy' && takeable(t) ? '<b>E</b> Gefangenen nehmen' :
     t.portal ? `<b>E</b> Betreten — ${t.label || ''}` :
     t.type === 'tree' ? `<b>E</b> Holz schlagen` :
     t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln` :
@@ -4910,6 +4914,7 @@ function doInteract(target = null) {
   if (t.kind === 'mount') return mountUp(t);                         // S15: aufsitzen
   if (t.kind === 'npc') return talk(t);
   if (t.kind === 'building') return useBuilding(t);                   // AUDIT S-01
+  if (t.kind === 'enemy' && !t.parley && (takeable(t) || t.prisoner)) return captiveMenu(t);   /* T08 */
   if (t.kind === 'enemy' && t.parley) return t.mtype === 'dodon' ? dodonParley(t) : t.mtype === 'garmadon' ? garmadonParley(t) : t.mtype === 'omega' ? omegaParley(t) : t.mtype === 'whitebeard' ? whitebeardParley(t) : vargParley(t);
   if (t.omegaAltar) return S.quests.q_omega?.state === 'active' ? omegaRitual(t) : omegaPray();
   if (t.cellDoor != null) return pickCell(t);
@@ -6715,7 +6720,7 @@ function makeContract(town, kind, giver) {
   C.x = q.x / TS | 0; C.y = q.y / TS | 0;
   const pool = conPool(C.x, C.y), far = Object.keys(TOWN_PLAN).filter(t => t !== town && t !== 'vharnholm' && TOWN_PLAN[t].lord !== 'aurel').sort((a, b) =>
     Math.hypot(TOWN_PLAN[a].square[0] - sx, TOWN_PLAN[a].square[1] - sy) - Math.hypot(TOWN_PLAN[b].square[0] - sx, TOWN_PLAN[b].square[1] - sy))[ri(0, 2)];
-  if (kind === 'bounty') { C.mtype = pool.includes('bandit') ? 'bandit' : pool[0]; C.need = ri(3, 5); C.name = `${pick(FIRST_M)} ${pick(['der Schlitzer', 'Einauge', 'die Krähe', 'Rotbart', 'der Stille'])}`; C.reward.gold += 60;
+  if (kind === 'bounty') { C.alive = true; C.mtype = pool.includes('bandit') ? 'bandit' : pool[0];   /* §5g.24: Steckbrief, lebend +50 % */ C.need = ri(3, 5); C.name = `${pick(FIRST_M)} ${pick(['der Schlitzer', 'Einauge', 'die Krähe', 'Rotbart', 'der Stille'])}`; C.reward.gold += 60;
     const EK = pickElite(C.x, C.y, pool); if (EK) { const E = ELITES[EK]; C.elite = EK; C.mtype = E.crew || E.base; C.name = E.name; C.reward.gold += 40; C.reward.xp += 40; } }   /* Nutzer: 32 Mini-Bosse statt immer gleicher Namen */
   if (kind === 'monster') { C.mtype = pick(pool.filter(m => m !== 'bandit' && m !== 'bandit_spear' && m !== 'bandit_archer')) || pool[0]; C.need = ri(3, 6); }
   if (kind === 'hunt') { C.mtype = 'wolf'; C.need = ri(3, 5); C.reward.gold -= 10; }
@@ -6734,9 +6739,9 @@ function makeContract(town, kind, giver) {
   C.twist = chance(0.35) ? ({ bounty: 'surrender', missing: 'captive', hunt: 'alpha', escort: chance(0.45) ? 'traitor' : null })[kind] || null : null;   // S13: Wendung (geheim)
   if (C.twist === 'alpha') C.reward.gold += 20;
   const where = locAt(C.x, C.y)?.name || 'der Wildnis', tn = C.target ? townName(C.target) : '';
-  C.title = { bounty: `Kopfgeld: ${C.name}`, monster: `Monsterjagd bei ${where}`, hunt: 'Wölfe reißen das Vieh', defense: `Verteidigung von ${townName(town)}`, patrol: `Patrouille um ${townName(town)}`,
+  C.title = { bounty: `Steckbrief: ${C.name}`, monster: `Monsterjagd bei ${where}`, hunt: 'Wölfe reißen das Vieh', defense: `Verteidigung von ${townName(town)}`, patrol: `Patrouille um ${townName(town)}`,
     escort: `Eskorte nach ${tn}`, deliver: `Paket nach ${tn}`, missing: `${C.name} wird vermisst`, supply: 'Holz und Stein', herbs: 'Heilkräuter für die Kranken', trail: `Spuren von ${C.name}`, camps: `Räuberlager um ${townName(town)}` }[kind];
-  C.desc = { bounty: `${C.name} überfällt Reisende bei ${where}. Tot oder gar nicht.`, monster: `Bei ${where} hausen Bestien. Macht sie nieder, bevor sie herkommen.`,
+  C.desc = { bounty: `${C.name} überfällt Reisende bei ${where}. Lebend oder tot — lebend bei einer Wache abgeliefert: +50 %.`, monster: `Bei ${where} hausen Bestien. Macht sie nieder, bevor sie herkommen.`,
     hunt: 'Wölfe schleichen nachts an die Weiden. Erlegt ein paar, dann trauen sie sich nicht mehr so nah.', defense: 'Späher melden einen Angriff für die nächsten Stunden. Wir brauchen jede Klinge am Rand der Siedlung.',
     patrol: 'Geh die drei Wegmarken um die Siedlung ab und sieh nach, ob alles ruhig ist.', escort: `${C.name} muss nach ${tn}. Allein kommt er nicht an. Bring ihn hin.`,
     deliver: `Dieses Paket muss nach ${tn}, zum Verteidigungsmeister dort. Versiegelt. Frag nicht.`, missing: `${C.name} ist nicht heimgekommen. Zuletzt gesehen bei ${where}.`,
@@ -6972,7 +6977,7 @@ function surrenderOffer(e, C) {
   const p = S.player, bribe = 40 + ri(0, 6) * 10;
   e.surrendered = true; e.aggroId = null; e.aiState = 'idle'; e.vx = e.vy = 0; float(e, 'Gnade!', 'rgba(230,220,180,ALPHA)');
   UI.dialogue(e, `„Genug! Ich ergebe mich! Ich hab ${bribe} Gold vergraben — nimm es und lass mich laufen. Ich verschwinde aus der Gegend, ich schwör's.“`, [
-    { text: `[Gnade] Nimm dein Leben. (+${bribe} Gold)`, fn: () => { S.gold += bribe; C.spared = true; C.leaderDead = true;
+    { text: `[Gnade] Nimm dein Leben. (+${bribe} Gold)`, fn: () => { S.gold += bribe; styleAct(4, 'Gnade', e); C.spared = true; C.leaderDead = true;
       S.ents.world = S.ents.world.filter(x => x.contract !== C.id); conProgress(C, C.need - C.have);
       ((S.conEcho ||= [])).push({ day: (S.day | 0) + ri(2, 4), town: C.town, name: C.name });
       log(`${C.name} flieht mit leeren Händen. Die Bande zerstreut sich.`, 'quest'); UI.closeDialogue(); } },
@@ -9373,7 +9378,7 @@ function travel(to) {
   const p = S.player, from = S.map;
   leavePursuit(from, to);
   const pi = S.ents[S.map].indexOf(p); if (pi >= 0) S.ents[S.map].splice(pi, 1);
-  const members = to === 'kerker' && S.jail ? [] : [...partyMembers(), ...S.ents[from].filter(e => e.servant === p.id && e.alive)];   /* Nutzer: in den Kerker kommt nur der Held, die Gruppe (auch der Mitspieler) wartet draußen */   // Diener gehen mit ihrem Herrn
+  const members = to === 'kerker' && S.jail ? [] : [...partyMembers(), ...S.ents[from].filter(e => (e.servant === p.id || e.prisoner?.by === p.id && dist(e, p) < 300) && e.alive)];   /* T08: Gefangene reisen mit */   /* Nutzer: in den Kerker kommt nur der Held, die Gruppe (auch der Mitspieler) wartet draußen */   // Diener gehen mit ihrem Herrn
   for (const m of members) { const a = S.ents[m.map]; if (a.includes(m)) a.splice(a.indexOf(m), 1); }
   if (to !== 'world' && p.mounted && S.map === 'world') leaveHorse(p);   // S15: das Pferd wartet vor der Tür
   S.map = to; p.map = to; if (to !== 'world') p.mounted = null;   // S13: Reittier bleibt draußen
@@ -10664,7 +10669,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay(); familyDay(); gobDay();   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay();   /* T08 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -10863,7 +10868,7 @@ function bandTick() {
     const d = Math.hypot(p.x / TS - b.tx, p.y / TS - b.ty), here = S.ents.world.some(e => e.bandId === b.id && e.kind !== 'corpse' && e.alive !== false);
     if (d < 45 && !here) bandSpawn(b);
     else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive));
-    if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(0.01)) {   /* Hinterhalt im Gebiet, nicht in der Stadt */
+    if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(styleOf() <= -40 ? 0.005 : 0.01)) {   /* T08: einen Schlächter meidet man */   /* Hinterhalt im Gebiet, nicht in der Stadt */
       const free = b.men - S.ents.world.filter(e => e.bandId === b.id && e.kind === 'enemy' && e.alive).length;   /* Fehlersuche: nie mehr Kämpfer stellen als die Bande noch hat (sonst wächst sie durchs Hin- und Herlaufen) */
       if (free > 0) { b.amb = S.minute; const a = rnd() * 6.283;
         for (let i = 0; i < Math.min(3, free); i++) { const e = spawnEnemy(pick(['bandit', 'bandit_archer']), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
@@ -10879,7 +10884,7 @@ function bandKill(c) {
     bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600); }
 }
 function bandChoices(npc, choices) {
-  if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = 20 + b.men * 8, day = S.day | 0;
+  if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = Math.round((20 + b.men * 8) * (styleOf() >= 40 ? 0.7 : 1)), day = S.day | 0;   /* T08: mit Barmherzigen verhandelt man */
   if (b.paid >= day) return choices.unshift({ text: 'Gilt unsere Abmachung noch?', fn: () => UI.dialogue(npc, `„Bis Tag ${b.paid + 1}. Dann reden wir wieder.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   choices.unshift({ text: `Schutzgeld zahlen (${cost} Gold, 5 Tage Ruhe)`, fn: () => {
     if (S.gold < cost) return UI.dialogue(npc, '„Das reicht nicht. Komm wieder, wenn deine Taschen schwerer sind — oder lauf schnell.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -11126,7 +11131,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -11388,6 +11393,8 @@ function rumorTick() {
   const p = S.player; if (!p || S.map !== 'world') return;
   for (const C of (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active')) {
     const near = Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30, here = S.ents.world.filter(e => e.contract === C.id);
+    if (C.rk === 'band') { const b = (S.bands || []).find(x => x.id === C.bandRef);   /* T08 Verhör: erfüllt, wenn die Bande fort ist; gelogen, wenn dort nichts ist */
+      if (!b || b.gone) rumorDone(C, true); else if (C.lie && near) { log('Hier ist kein Lager. Er hat gelogen.', 'quest'); rumorDone(C, false); } continue; }
     if (C.spawned && !here.length && !C.beastDead) C.spawned = false;   /* nach dem Laden sind flüchtige Ziele weg: neu setzen */
     if (near && !here.length && !C.spawned) { C.spawned = true; const x = C.tx * TS + 16, y = C.ty * TS + 16;
       if (C.rk === 'treasure') S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x, y, r: 10, solid: true, transient: true, contract: C.id, label: 'Vergrabene Kiste', loot: C.lie ? [] : [pick(['longsword', 'rapier', 'kriegssichel', 'longbow', 'chain_hauberk']), 'potion', pick(['talisman_ausdauer', 'talisman_krieger', 'elixier_staerke', 'potion'])], lootBonus: 2 });
@@ -12881,6 +12888,99 @@ function cultPathChoices(npc, choices) {
   if (npc.cultHedda && C.end === 'player') choices.unshift({ text: C.tithe ? 'Den Zehnt aussetzen (die Stadt schonen, selbst dürsten)' : 'Den Zehnt fordern (alle fünf Tage ein Bürger — der Kult wird satt)', fn: () => {
     C.tithe = !C.tithe; say(C.tithe ? '„Wie es sich gehört. Alle fünf Nächte ein Gefäß.“ (Valen bekommt weniger Nachschub, solange der Zehnt läuft.)' : '„Wie Ihr wünscht. Aber der Kelch vergisst nicht, wer ihn hungern lässt.“'); } });
 }
+// ================= T08 Verhör und Ruf der Klinge (Audit A5, A10) =================
+// Verhör: ruhig (70 % wahr) oder hart (95 % wahr, er kann sterben, Grausamkeit). Er verrät das nächste Bandenlager als Gerücht mit
+// Kartenkreis. Laufen lassen: 30 % wird er später zum Informanten, 15 % kommt er als Rächer selbst wieder.
+// Ruf der Klinge: je Ruhm-Region ein Wert −100 (Schlächter) … +100 (Barmherzig), höchstens ±10 je Tag und Region.
+function captiveAsk(e, hard) {
+  const p = S.player, nm = e.title || MONSTERS[e.mtype].name, say = t => UI.dialogue(e, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); e.asked = true;
+  if (hard) { styleAct(-3, 'Verhör', e); if (chance(0.15)) { UI.closeDialogue(); log(`${nm} überlebt das Verhör nicht.`, 'death'); return die(e, 'Verhör', p); } }
+  const b = bandsOf().sort((a, c) => Math.hypot(a.tx - e.x / TS, a.ty - e.y / TS) - Math.hypot(c.tx - e.x / TS, c.ty - e.y / TS))[0];
+  if (!b || e.map !== 'world') return say('„Ich weiß nichts. Ich schwör’s bei meiner Mutter.“');
+  const lie = !chance(hard ? 0.95 : 0.7), tx = b.tx + (lie ? ri(-35, 35) : 0), ty = b.ty + (lie ? ri(-35, 35) : 0);
+  const C = { id: uid(), town: b.town, kind: 'rumor', rk: 'band', bandRef: b.id, giver: 'board', giverName: nm, have: 0, need: 1, state: 'offer', day: S.day | 0, tx, ty, lie,
+    x: tx + ri(-6, 6), y: ty + ri(-6, 6), reward: { gold: 0, xp: 60, rep: 0 }, title: `Verhör: Lager von ${b.name}`, desc: `${nm} nennt das Lager von ${b.name} unter ${b.lead}. Der Punkt auf der Karte ist ungefähr — und vielleicht gelogen.` };
+  (S.contracts ||= []).push(C); if (acceptContract(C) === false) S.contracts.pop(); else log(`Verhör: ${b.name}, Lager bei ${b.where} (auf der Karte markiert).`, 'quest');
+  say(hard ? `„Aufhören! ${b.name}! Bei ${b.where}, unter ${b.lead}!“` : `„${b.name}. Sie lagern bei ${b.where}. Mehr weiß ich nicht.“`);
+}
+function captiveLetGo(e) {
+  const nm = e.title || MONSTERS[e.mtype].name, day = S.day | 0;
+  if (chance(0.3)) (S.informants ||= []).push({ day: day + ri(2, 4), name: nm });
+  else if (chance(0.2)) S.avenge = { day: day + ri(2, 4), name: nm, self: true };
+}
+function informantDay() {
+  const day = S.day | 0; S.informants = (S.informants || []).filter(I => { if (I.day > day) return true;
+    const b = bandsOf().sort((a, c) => Math.hypot(a.tx - S.player.x / TS, a.ty - S.player.y / TS) - Math.hypot(c.tx - S.player.x / TS, c.ty - S.player.y / TS))[0]; if (!b) return false;
+    const C = { id: uid(), town: b.town, kind: 'rumor', rk: 'band', bandRef: b.id, giver: 'board', giverName: I.name, have: 0, need: 1, state: 'offer', day, tx: b.tx, ty: b.ty, lie: false,
+      x: b.tx + ri(-6, 6), y: b.ty + ri(-6, 6), reward: { gold: 0, xp: 60, rep: 0 }, title: `Nachricht von ${I.name}: ${b.name}`, desc: `${I.name}, den du laufen ließt, schickt eine Nachricht: ${b.name} lagert bei ${b.where}.` };
+    (S.contracts ||= []).push(C); if (acceptContract(C) === false) S.contracts.pop(); else { log(`Ein Kind bringt dir einen Zettel — von ${I.name}, den du laufen ließt: ${b.name} lagert bei ${b.where}.`, 'quest'); styleAct(1, 'Informant'); }
+    return false; });
+}
+const styleOf = (r = fameRegion()) => (S.fameStyle ||= {})[r] || 0;
+const styleTier = v => v >= 60 ? 'Barmherzig' : v >= 20 ? 'Gnädig' : v > -20 ? 'Unbeschrieben' : v > -60 ? 'Gnadenlos' : 'Schlächter';
+function styleAct(n, why, e) {
+  if (!n) return 0;
+  if (e) { const D0 = (e.styleDone ||= {}); if (D0[why]) return 0; D0[why] = 1; }
+  const r = fameRegion(e || S.player), day = S.day | 0, D = ((S.fameStyleDay ||= {})[r] ||= { day, sum: 0 }); if (D.day !== day) { D.day = day; D.sum = 0; }
+  const k = n > 0 ? Math.min(n, Math.max(0, 10 - D.sum)) : Math.max(n, Math.min(0, -10 - D.sum)); if (!k) return 0;
+  D.sum += k; const F = (S.fameStyle ||= {}), before = styleTier(F[r] || 0); F[r] = clamp((F[r] || 0) + k, -100, 100); const now = styleTier(F[r]);
+  if (now !== before) { UI.toast(`KLINGE: ${now.toUpperCase()} (${FAME_REG[r]})`, 3000);
+    log(`Im ${FAME_REG[r]} gilt deine Klinge jetzt als ${now.toLowerCase()}. ${F[r] >= 20 ? 'Menschen ergeben sich dir eher, Banden verhandeln.' : F[r] <= -20 ? 'Gegner fliehen früher und ergeben sich seltener; Banden meiden dich.' : ''}`, 'faction'); }
+  const t = performance.now(); if (n < 0 && !(S._styleTalk > t)) { S._styleTalk = t + 600000; for (const m of partyMembers()) { if ((m.traits || []).includes('gütig')) { m.morale = Math.max(0, (m.morale ?? 50) - 3); float(m, '…', 'rgba(200,180,160,ALPHA)'); } else if ((m.traits || []).includes('grausam')) m.morale = Math.min(100, (m.morale ?? 50) + 2); } }
+  return k;
+}
+// ================= T08 Gefangene und Steckbriefe (Audit A5 + §5g.24) =================
+// E an einem ergebenen oder bewusstlosen Menschen öffnet das Gefangenen-Menü: fesseln (Strick), anwerben, ausrauben, laufen lassen,
+// hinrichten. Gefesselte folgen langsam und reisen mit; über 10 s weiter als 320 px weg — oder liegt der Held am Boden — reißen sie sich
+// los. Jede nicht verfeindete Wache nimmt sie: Steckbrief-Ziele lebend ×1,5, Räuber 8 + Stufe × 2 Gold (höchstens drei je Stadt und Tag).
+const takeable = e => e && e.kind === 'enemy' && e.alive && !e.prisoner && !e.captive && HUMANOID.has(e.mtype) && MONSTERS[e.mtype]?.faction !== 'undead' && !e.boss && !MONSTERS[e.mtype]?.boss && (e.surrendered || e.downed);
+const wantedC = e => e?.contract && (S.contracts || []).find(c => c.id === e.contract && c.state === 'active' && c.kind === 'bounty' && c.alive && e.title === c.name);
+function captiveMenu(e) {
+  const p = S.player, nm = e.title || e.name || MONSTERS[e.mtype].name, bound = !!e.prisoner, C = wantedC(e);
+  const ch = [];
+  if (!e.asked && !e.downed) ch.push({ text: 'Verhören — ruhig', fn: () => captiveAsk(e, false) }, { text: 'Verhören — hart (Ruf der Klinge −3, er kann sterben)', fn: () => captiveAsk(e, true) });
+  if (!bound) ch.push({ text: hasItem(p, 'strick', 1) ? 'Fesseln (1 Strick)' : 'Fesseln — du hast keinen Strick (6 Gold beim Händler)', fn: () => {
+    if (!removeItem(p, 'strick', 1)) return UI.toast('Kein Strick.');
+    Object.assign(e, { prisoner: { by: p.id, since: S.day | 0 }, transient: false, surrendered: true, disarmed: true, fleeing: false, aggroId: null, aiState: 'idle', anchor: null });
+    UI.closeDialogue(); act(p, 'kneel', 900, e); float(e, 'gefesselt', 'rgba(220,210,180,ALPHA)'); styleAct(0, 'Fesseln', e);
+    if (!S.flags.captiveHint) { S.flags.captiveHint = 1; UI.toast('Gefesselt. Bring ihn zu einer Wache — Steckbriefe zahlen lebend mehr.', 4200); log('Gefesselte folgen dir und reisen mit. Bleibst du zu weit zurück oder gehst zu Boden, reißen sie sich los. Jede Wache einer nicht verfeindeten Stadt nimmt sie ab.', 'quest'); } } });
+  if (partyMembers().length < (p.partyCap || 3) && !C) ch.push({ text: 'Anwerben (als Söldner, Loyalität gering)', fn: () => { UI.closeDialogue(); captiveRecruit(e); } });
+  if (!e.robbed) ch.push({ text: 'Ausrauben', fn: () => { UI.closeDialogue(); dropLoot(e); e.robbed = true; if (!bound) { e.fleeing = true; e.surrendered = true; } styleAct(-1, 'Ausrauben', e); log(`${nm} wirft dir hin, was er hat.`, 'combat'); } });
+  ch.push({ text: 'Laufen lassen', fn: () => { UI.closeDialogue(); Object.assign(e, { prisoner: null, fleeing: true, surrendered: true, transient: true, letGo: true }); styleAct(4, 'Gnade', e); captiveLetGo(e); log(`${nm} rennt, ohne sich umzusehen.`, 'combat'); } });
+  ch.push({ text: 'Hinrichten', fn: () => { UI.closeDialogue(); e.surrendered = false; e.prisoner = null; for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 3; styleAct(-6, 'Hinrichtung', e); die(e, 'hingerichtet', p); } });
+  ch.push({ text: '[Lassen]', fn: () => UI.closeDialogue() });
+  UI.dialogue(e, bound ? `${nm} hängt am Strick und schaut zu Boden.${C ? ' (Steckbrief: lebend bei einer Wache abliefern, +50 %.)' : ''}` : `${nm} liegt vor dir${e.downed ? ', bewusstlos' : ' und hebt die Hände'}.${C ? ' Das ist der Gesuchte vom Steckbrief.' : ''}`, ch);
+}
+function captiveRecruit(e) {
+  const p = S.player, q = { x: e.x, y: e.y }, c = makeChar({ name: e.title && !/[A-Z]{3}/.test(e.title) ? e.title.split(',')[0] : pick(FIRST_M), prof: 'Söldner', map: e.map, x: q.x, y: q.y, level: Math.max(1, e.level || 3) });
+  Object.assign(c, { loyal: 20, morale: 40, traits: [pick(['gierig', 'mürrisch'])], anchor: { ...q }, transient: false, visitor: false });
+  const wk = e.weaponKey || MONSTERS[e.mtype]?.weapon; if (wk && ITEMS[wk]) { c.equip.weapon = mkItem(wk); recalc(c); }
+  S.ents[e.map] = S.ents[e.map].filter(x => x !== e); S.ents[e.map].push(c); S.party.push(c.id); styleAct(2, 'Anwerben', e);
+  log(`${c.name} schließt sich dir an — für Gold und Brot. Seine Loyalität ist dünn (20).`, 'party'); UI.toast(`${c.name.toUpperCase()} — SÖLDNER`, 2400);
+}
+function captiveTick(e, dt) {                                  /* gefesselt: folgen, nicht kämpfen; zurückgelassen → losreißen */
+  const p = S.player; e.swing = 0; e.telegraph = 0; e.windup = false; e.aggroId = null;
+  if (e.prisoner.by !== p.id || e.map !== p.map) { e.vx = e.vy = 0; return; }
+  const d = dist(e, p);
+  e.lostT = d > 320 || p.downed ? (e.lostT || 0) + dt : 0;
+  if (e.lostT > 10000) { log(`${e.title || MONSTERS[e.mtype].name} hat sich losgerissen.`, 'combat'); Object.assign(e, { prisoner: null, fleeing: true, transient: true }); return; }
+  if (d > 60) seek(e, Math.atan2(p.y - e.y, p.x - e.x), MONSTERS[e.mtype].speed * 0.6 * dt / 16, dt, p); else e.vx = e.vy = 0;
+}
+function captiveChoices(npc, choices) {
+  const p = S.player; if (!(npc.guard || npc.vm || npc.varonJailer)) return;
+  const town = npc.homeTown || npc.post || townAt(npc.x / TS | 0, npc.y / TS | 0, 4), fac = town ? townFac(town) : npc.faction; if (fac && S.factions[fac] != null && S.factions[fac] <= -40) return;
+  const caps = S.ents[p.map].filter(e => e.prisoner?.by === p.id && e.alive && dist(e, npc) < 260); if (!caps.length) return;
+  choices.unshift({ text: `Gefangene abliefern (${caps.length})`, fn: () => {
+    const day = S.day | 0, D = ((S.flags.deliver ||= {})[town || 'x'] ||= { day, n: 0 }); if (D.day !== day) { D.day = day; D.n = 0; }
+    const out = [];
+    for (const e of caps) { const nm = e.title || MONSTERS[e.mtype].name, C = wantedC(e);
+      if (C) { C.leaderDead = true; C.alive = 'delivered'; C.reward = { ...C.reward, gold: Math.round(C.reward.gold * 1.5) }; conProgress(C, C.need - C.have); captiveGone(e); out.push(`${nm}: lebend — Steckbrief, Lohn ×1,5`); claimContract(C, npc); continue; }
+      if (['bandit', 'chain'].includes(MONSTERS[e.mtype].faction) || e.bandId) { if (D.n >= 3) { out.push(`${nm}: „Heute keinen mehr — der Kerker ist voll.“`); continue; }
+        const g = 8 + (e.level || 1) * 2; D.n++; S.gold += g; if (fac && S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 1, -100, 100); captiveGone(e); out.push(`${nm}: ${g} Gold`); continue; }
+      out.push(`${nm}: „Den suchen wir nicht.“`); }
+    UI.dialogue(npc, `„Her damit.“\n${out.join('\n')}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); UI.refreshHUD(); } });
+}
+function captiveGone(e) { const a = S.ents[e.map]; const i = a.indexOf(e); if (i >= 0) a.splice(i, 1); e.alive = false; }
 // Ausweichen im letzten Moment (Hieb, Geschoss oder Flächenangriff hätte getroffen): einmal je Rolle. Zählt für die Probe
 // der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
 function evaded(t) {
@@ -13411,7 +13511,7 @@ function chooseSuccessor() {
   UI.showSuccessors(cands, c => adoptSuccessor(c));
 }
 function adoptSuccessor(c) {
-  const old = S.player;
+  const old = S.player; for (const k in S.fameStyle || {}) S.fameStyle[k] = Math.round(S.fameStyle[k] / 2);   /* T08: der Ruf der Klinge verblasst mit dem Erben */
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
   c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
@@ -13970,6 +14070,15 @@ function debugSections() {
       'Spieler wird Blutfürst (sofort)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); if (!isVamp(p)) unlockTitle('vampire', 'Debug'); S.cult.joined ??= S.day | 0; S.cult.challenge = true; S.cult.end = null; cultEnd('player'); },
       'Zehnt umschalten': () => { if (S.cult) { S.cult.tithe = !S.cult.tithe; UI.toast(S.cult.tithe ? 'Zehnt läuft' : 'Zehnt ausgesetzt'); } },
       'Ausgang zurücksetzen (Stufe 4)': () => { if (S.cult) { S.cult.end = null; S.cult.stage = 4; delete AF().cult; UI.toast('Kein Ausgang'); } },
+    }],
+    ['Gefangene und Klinge (T08)', '', {
+      'Ergebenen Räuber hier': () => { const e = spawnEnemy('bandit', S.map, (p.x / TS | 0) + 2, p.y / TS | 0); if (e) Object.assign(e, { surrendered: true, disarmed: true, transient: true }); },
+      'Bewusstlosen Räuber hier': () => { const e = spawnEnemy('bandit', S.map, (p.x / TS | 0) + 2, p.y / TS | 0); if (e) { e.transient = true; B.damagePart(e, 'torso', 999); downed(e, 'Debug', p); } },
+      '5 Stricke': () => addItem(p, 'strick', 5),
+      'Steckbrief-Ziel ergeben hier': () => { const C = (S.contracts || []).find(c => c.kind === 'bounty' && c.state === 'active'); if (!C) return UI.toast('Erst einen Steckbrief annehmen.');
+        const e = spawnEnemy(C.mtype || 'bandit', S.map, (p.x / TS | 0) + 2, p.y / TS | 0); if (e) Object.assign(e, { contract: C.id, title: C.name, surrendered: true, disarmed: true }); },
+      'Klinge +50 (Region)': () => { (S.fameStyle ||= {})[fameRegion()] = clamp(styleOf() + 50, -100, 100); UI.toast(`Klinge: ${styleTier(styleOf())}`); },
+      'Klinge −50 (Region)': () => { (S.fameStyle ||= {})[fameRegion()] = clamp(styleOf() - 50, -100, 100); UI.toast(`Klinge: ${styleTier(styleOf())}`); },
     }],
     ['Spielstand (Audit D6)', '', {
       'Größe messen und Rundlauf prüfen': async () => { const t0 = performance.now(), str = saveData(), t1 = performance.now(), z = await zipSave(str), t2 = performance.now(), back = await unzipSave(z);
@@ -16940,6 +17049,34 @@ export function selftest() {
       return crowned && drained && foeNow && lord && tribute && tithe && heir;
     } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.ents.varonburg = V0; S.after = A0; S.war = WAR0; S.towns = T0; if (E0) S.eco = E0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
   }));
+  ok('T08 Gefangene und Steckbriefe: Ergebener wird mit Strick gefesselt (nicht mehr flüchtig, folgt); Räuber an der Wache 8 + Stufe × 2 Gold; Steckbrief-Ziel lebend abgeliefert = Lohn ×1,5', sandbox(() => {
+    const p = stage(), click = t => [...document.querySelectorAll('#dlg-choices button')].find(b => b.textContent.includes(t))?.click(), K0 = S.contracts; S.contracts = [];
+    try {
+      const e = spawnEnemy('bandit', '__a', 12, 10); e.x = p.x + 40; e.y = p.y; e.surrendered = true; addItem(p, 'strick', 1);
+      captiveMenu(e); click('Fesseln'); const bound = e.prisoner?.by === p.id && !e.transient && !hasItem(p, 'strick', 1);
+      e.x = p.x + 200; const d0 = dist(e, p); for (let i = 0; i < 10; i++) captiveTick(e, 50); const follows = dist(e, p) < d0;
+      const g = actor(p.x + 60, p.y + 30, { kind: 'npc', name: 'Wache' }); Object.assign(g, { guard: true, faction: 'valen', homeTown: 'northcity' });
+      e.x = p.x + 50; e.y = p.y; const lv = e.level || 1, gold0 = S.gold, ch = []; captiveChoices(g, ch); ch[0]?.fn(); UI.closeDialogue(); const paid = S.gold === gold0 + 8 + lv * 2 && !S.ents.__a.includes(e);
+      const C = { id: 'probeC', kind: 'bounty', state: 'active', alive: true, name: 'Probe der Gesuchte', need: 3, have: 1, town: 'northcity', reward: { gold: 100, xp: 10, rep: 1 }, title: 'Steckbrief: Probe' };
+      S.contracts.push(C); const w = spawnEnemy('bandit', '__a', 13, 10); Object.assign(w, { contract: 'probeC', title: 'Probe der Gesuchte', prisoner: { by: p.id }, x: p.x + 50, y: p.y + 10 });
+      const ch2 = []; captiveChoices(g, ch2); ch2[0]?.fn(); UI.closeDialogue(); const wanted = C.state === 'claimed' && C.reward.gold === 150 && C.leaderDead;
+      return bound && follows && paid && wanted;
+    } finally { S.contracts = K0; delete S.quests.c_probeC; UI.closeDialogue(); }
+  }));
+  ok('T08 Verhör und Ruf der Klinge: Verhör markiert das nächste Bandenlager als Gerücht; Klinge höchstens ±10 je Tag und Region; Stufen; alter Stand ohne Wert = 0', sandbox(() => {
+    const p = stage(), F0 = S.fameStyle, FD0 = S.fameStyleDay, K0 = S.contracts, B0 = S.bands, T0 = S.track; S.contracts = [];
+    try {
+      S.bands = [{ id: 'pb', name: 'Probebande', lead: 'Probe', where: 'Probehain', town: 'northcity', tx: 400, ty: 100, men: 3 }];
+      const e = { id: 'pe', kind: 'enemy', mtype: 'bandit', map: 'world', x: 398 * TS, y: 101 * TS, alive: true }; captiveAsk(e, false); UI.closeDialogue();
+      const C = S.contracts.find(c => c.rk === 'band' && c.bandRef === 'pb'), asked = !!C && C.state === 'active' && e.asked;
+      delete S.fameStyle; const old = styleOf() === 0; S.fameStyleDay = {};
+      const w = { x: 400 * TS, y: 100 * TS, map: 'world' }, rg = fameRegion(w); styleAct(-3, 'Verhör', w); const hard = styleOf(rg) === -3;
+      for (let i = 0; i < 5; i++) styleAct(4, 'Gnade', { x: w.x, y: w.y, map: 'world' }); const cap = styleOf(rg) === 10;   /* Tagesdeckel: netto höchstens +10 gegenüber dem Tagesbeginn */
+      const tiers = styleTier(70) === 'Barmherzig' && styleTier(-80) === 'Schlächter' && styleTier(0) === 'Unbeschrieben';
+      if (C) { delete QUESTS['c_' + C.id]; delete S.quests['c_' + C.id]; }
+      return asked && old && hard && cap && tiers;
+    } finally { S.fameStyle = F0; S.fameStyleDay = FD0; S.contracts = K0; S.bands = B0; S.track = T0; }
+  }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };
     kill(); const alone = p.skills.leadership === 9.97;
@@ -17728,7 +17865,8 @@ function boot() {
     drawWorldmap, drawWarmap, warStatus, facRelation, repTier,
     spellTeachers,                                                     // S15 P5: Kodex „Magie“, Zauberbuch
     magicView: MAGIC_VIEW, coreSmash,                                             // S15 P7
-    fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),   // S15 P8
+    fameList: () => Object.entries(FAME_REG).map(([k, n]) => ({ k, n, v: fameOf(k), t: fameTier(fameOf(k)) })),
+    styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
     stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall

@@ -11,7 +11,7 @@ Status nach `AGENT_SYSTEM.md`. **Diese Tafel ist maßgeblich**; `docs/audit/STAT
 | T06 Spielstand komprimiert, Caches, HUD | TESTING (Control: NEEDS FIX → Speicherpfad gefixt) | Engineer | Vorwärmen bei Reise: DEFERRED |
 | T05 Kleine Korrekturen (V17, A13, Stil F, Doku) | IMPLEMENTED → TESTING | Engineer; Hunter steht aus | Probe „Audit T05“, 325/325; JOIN_FOES geprüft, keine Änderung nötig |
 | T07 §5g.2 Blutkult | IMPLEMENTED (alle 5 Scheiben) → TESTING | Engineer; Hunter 4 prüft 2–4, Scheibe 5 steht aus | 334/334; offen/vereinfacht: Beschatten (Weg B), Kult-Aufträge 1–3, Tagebuch-Auftrag, Fledermausschwärme, nächtliche Ausgangssperre |
-| T08 Gefangene, Steckbriefe, Ruf der Klinge | DESIGN_LOCKED | Engineer | `proposals/t08_gefangene_steckbriefe_ruf.md` |
+| T08 Gefangene, Steckbriefe, Ruf der Klinge | IMPLEMENTED (4 Scheiben) | Engineer; Hunter steht aus | Probe T08 ×2; vereinfacht: Banden-Steckbrief für Anführer (Bandenkopfgeld zahlt weiter beim Tod), S.prisoners im Kerker, Wache mehr bei Schlächtern |
 | T09 Läden am Stadtlager | DESIGN_LOCKED | Engineer | `proposals/t09_laeden_stadtlager.md` |
 | T10 Ahnenfeind und Heldentod | DESIGN_LOCKED | Engineer | `proposals/t10_ahnenfeind_heldentod.md` (3 s, bis 3 Ahnenfeinde) |
 | Varonheim als Kriegsknoten (belagerbar) | APPROVED | Engineer | Nutzer 01.10.; Design im Rahmen T02/T40 |

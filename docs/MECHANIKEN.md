@@ -703,3 +703,19 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Blutfürst (wer Aldhelm herausfordert und siegt):** König Varon lebt und ahnt nichts, Valen +10, Orden −30. Täglich Tribut der Kanzlei (2 Blutphiolen, 30 Gold). Bei Hedda bestimmst du den **Zehnt**: fordern = alle fünf Tage ein Bürger (Valen bekommt weniger Nachschub); aussetzen = die Stadt wird geschont, aber der Kult murrt. Der Orden schickt alle sieben Tage Vampirjäger. **Stirbt der Held**, übernimmt Hedda den Kelch (versteckt), Orden −10 beim Haus; der Erbe ist kein Vampir.
 - **Fall Aurelions (§5g.8):** Ist der Kult erwacht und nicht zerschlagen — aktiv, versteckt, herrschend oder mit dir als Blutfürst —, gilt Varon als gebunden.
 - **Debug:** „Blutkult: Ausgänge“. Probe „Blutkult S5“.
+
+## Runde: T08 Gefangene, Steckbriefe, Ruf der Klinge (Audit A5, A10, §5g.24; 01.10.2026)
+- **Gefangene nehmen:** Ein Mensch, der sich ergibt („Gnade!“) oder bewusstlos liegt: **E → Gefangenen nehmen.**
+  - *Verhören — ruhig* (meist wahr) oder *hart* (fast immer wahr, Ruf der Klinge −3, er kann sterben): Er verrät das nächste Bandenlager als Gerücht mit Kartenkreis. Gelogen? Dann ist dort nichts.
+  - *Fesseln* (braucht einen **Strick**, 6 Gold an Marktständen): Er folgt dir langsam und reist mit dir zwischen den Karten. Bleibst du über zehn Sekunden mehr als zehn Schritte weg oder gehst zu Boden, reißt er sich los.
+  - *Anwerben* (Ruf +2): Er wird Söldner, aber seine Loyalität ist dünn (20).
+  - *Ausrauben* (−1): Er gibt dir, was er hat, und rennt.
+  - *Laufen lassen* (+4): Manchmal schickt er dir Tage später eine Nachricht über ein Bandenlager — manchmal kommt er selbst wieder, als Rächer.
+  - *Hinrichten* (−6): Gütige Gefährten verlieren Moral.
+- **Abliefern:** Jede Wache (auch Verteidigungsmeister) einer Stadt, die dir nicht feind ist, nimmt Gefesselte: gewöhnliche Räuber bringen 8 Gold + 2 je Stufe (höchstens drei je Stadt und Tag), Fraktion +1.
+- **Steckbriefe (§5g.24):** Kopfgeld-Aufträge heißen jetzt Steckbriefe: „Lebend oder tot.“ Der Gesuchte kann sich ergeben. Lebend bei einer Wache abgeliefert zahlt er **×1,5**.
+- **Ruf der Klinge:** je Region (Menschenland, Westlande, Hochreich, Totenland, Gischtinseln) von −100 bis +100, höchstens ±10 je Tag und Region; steht im Heldenfenster unter dem Ruhm. Gnade (Verschonen, Laufenlassen, Anwerben, Bestechungsgnade) hebt ihn, Grausamkeit (Hinrichten, hartes Verhör, Gnadenstoß an Menschen, Ausrauben) senkt ihn.
+  - *Barmherzig* (≥ 60) / *Gnädig* (≥ 20): Menschen ergeben sich öfter (bis doppelt so oft); ab +40 verlangen Banden 30 % weniger Schutzgeld.
+  - *Gnadenlos* (≤ −20) / *Schlächter* (≤ −60): Gegner fliehen früher, ergeben sich seltener — als Schlächter nie; ab −40 überfallen Banden dich halb so oft.
+  - Gütige Gefährten leiden unter Grausamkeit, grausame freuen sich. Der Erbe erbt den halben Ruf.
+- **Debug:** „Gefangene und Klinge (T08)“. Proben „T08 Gefangene und Steckbriefe“, „T08 Verhör und Ruf der Klinge“.

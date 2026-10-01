@@ -723,6 +723,7 @@ function charUI(body, who) {
       <p>${CLASSES[p.currentClass].name} · Stufe ${p.level} · ${bld.name} · ${p.age} Jahre${isPlayer ? ` · Haus ${S.legacy.house}, Generation ${S.legacy.gen}` : ''}</p>
       ${p.titles?.length ? `<p class="titles">${p.titles.map(t => `„${t}“`).join(' · ')}</p>` : ''}
       ${isPlayer && A.fameList ? `<p class="ledger">Ruhm: ${A.fameList().map(f => `${f.n} <b>${f.t}</b> (${f.v})`).join(' · ')}</p>` : ''}
+      ${isPlayer && A.styleList?.().length ? `<p class="ledger" title="Gnade (Verschonen, Laufenlassen, Anwerben) gegen Grausamkeit (Hinrichten, hartes Verhör, Gnadenstoß an Menschen). Barmherzig: Menschen ergeben sich öfter, Banden verlangen weniger. Schlächter: niemand ergibt sich mehr, Gegner fliehen früher, Banden meiden dich.">Klinge: ${A.styleList().map(f => `${f.n} <b>${f.t}</b> (${f.v > 0 ? '+' : ''}${f.v})`).join(' · ')}</p>` : ''}
     </header>
     <section class="tafel-befund">
       <h3>Befund</h3>
