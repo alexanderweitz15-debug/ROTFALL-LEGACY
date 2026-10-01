@@ -2551,9 +2551,21 @@ function drawWeather(now) {
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 }
 
+// T17 Regiebuch: Sprechblase über einer Figur (folgt ihr), dunkle Box, helle Schrift
+function drawBubble(f) {
+  const e = f.who && S.ents[S.map]?.find(x => x.id === f.who); if (e) { f.x = e.x; f.y = e.y - 44; }
+  const a = clamp(Math.min(f.life / 300, (f.maxLife - f.life) / 200 + 0.2), 0, 1), fs = Math.max(11, 13 * cam.zoom * 0.8);
+  ctx.font = `italic ${fs}px Spectral, serif`; const w = ctx.measureText(f.text).width + 16, h = fs + 10;
+  const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - cam.y) * cam.zoom - h;
+  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.fillRect(sx - w / 2, sy, w, h);
+  ctx.strokeStyle = 'rgba(200,170,110,.55)'; ctx.lineWidth = 1; ctx.strokeRect(sx - w / 2 + 0.5, sy + 0.5, w - 1, h - 1);
+  ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.beginPath(); ctx.moveTo(sx - 5, sy + h); ctx.lineTo(sx + 5, sy + h); ctx.lineTo(sx, sy + h + 6); ctx.fill();
+  ctx.fillStyle = '#e7dcc2'; ctx.fillText(f.text, sx, sy + h - 7); ctx.globalAlpha = 1;
+}
 function drawFloats() {
   ctx.textAlign = 'center';
   for (const f of S.floats) {
+    if (f.bubble) { drawBubble(f); continue; }
     const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - f.rise - cam.y) * cam.zoom;
     const a = clamp(f.life / f.maxLife, 0, 1);
     ctx.font = `${f.big ? 700 : 400} ${(f.big ? 20 : 15) * cam.zoom * 0.85}px Cinzel, serif`;

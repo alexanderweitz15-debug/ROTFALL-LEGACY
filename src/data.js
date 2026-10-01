@@ -1330,6 +1330,17 @@ export const TOWNS = {
   northcity: { name:'Nordfurt', pop:90, stock:{ grain:12, salt:30, cloth:25, pelt:3 }, prod:{ salt:5, cloth:4 }, use:{ grain:8, pelt:2, salt:1 } },
 };
 // Kriegsknoten = Orte aus world.LOCATIONS. garrison = Verteidiger ohne Heer.
+// T17 Regiebuch (Nutzer 01.10.2026): Boss-Auftritte, 4–6 s, das Spiel pausiert. title/sub = Namenskarte, sfx = Klang, fx = Partikel am Boss,
+// say = Satz in der Sprechblase, court = Umstehende weichen zurück, beat = Herzschlag, flash = Blitz. Aldhelm hat seinen eigenen Auftritt.
+export const BOSS_CARDS = {
+  chain_master: { title: 'VARG', sub: 'Kettenmeister der Eisenmark', sfx: 'chains', fx: 'spark', say: 'Dann wird deine Kette die schwerste in dieser Halle.', court: true },
+  hrodvar: { title: 'HRODVAR', sub: 'König unter dem Eis', sfx: 'crack', fx: 'frost', say: 'Der Stern fiel. Wir gruben ihm entgegen.' },
+  garmadon: { title: 'KÖNIG GARMADON', sub: 'Herr der Toten', sfx: 'heartbeat', fx: 'bone', say: 'Gut. Ich war lange nicht mehr müde.', beat: true, court: true },
+  whitebeard: { title: 'WEISSBART', sub: 'König der Sturmklinge', sfx: 'shout', fx: 'spark', say: 'Noch einer, der mein Meer will?', court: true },
+  dodon: { title: 'DODON', sub: 'Hüter von Morrgrund', sfx: 'shout', fx: 'dust', say: 'Morrgrund vergisst nicht.' },
+  gorak: { title: 'GORAK', sub: 'Grubenwart', sfx: 'growl', fx: 'dust', say: 'Meine Grube. Mein Fleisch.' },
+  omega: { title: 'OMEGA', sub: 'der Gefallene', sfx: 'magic', fx: 'ghost', say: 'Ich war einmal wie du.', flash: '#ffffff' },
+};
 export const WAR_NODES = {
   graveyard: { owner:'undead', garrison:10 }, marsh: { owner:null, garrison:0 }, fortress: { owner:null, garrison:0 },
   ruins: { owner:null, garrison:0 }, eren: { owner:'valen', garrison:14 }, road: { owner:'valen', garrison:4 },

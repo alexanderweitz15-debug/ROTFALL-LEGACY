@@ -755,3 +755,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Tod des Königs:** Nur wer selbst (oder mit seiner Gruppe) König Varon tötet, wird von Valen verachtet (−100). Fällt er durch andere — etwa auf der Flucht oder im Exil —, bleibt dein Ruf; Brandt führt.
 - **§5g.8 (wirkt ab T40):** Ist Varonheim besetzt oder der Blutkult aktiv, ist Valen gebunden und marschiert nicht in Aurelion ein; ein toter König allein bindet nicht.
 - **Debug:** „Varonheim: Belagerung“ zusätzlich „Zum Exilhof“, „König vorher fortbringen (Schalter)“. Proben „Varonheim S2“ und „RB-023“.
+
+## Runde: Regiebuch und Zwischensequenzen, Scheibe 1 (T17, Nutzer 01.10.2026)
+- **Boss-Auftritte:** Begegnest du einem Boss (Varg, Hrodvar, Garmadon, Weißbart, Dodon, Gorak, Omega) zum ersten Mal, steht die Welt für knapp 5 Sekunden still: Kamera zum Boss, Klang, Namenskarte, ein Satz als Sprechblase, Umstehende weichen zurück. Danach greift er an. Jeder Held sieht jeden Auftritt einmal; dein Erbe sieht sie neu.
+- **Überspringen:** ESC (oder Leertaste) beendet jede Szene sofort. Was die Szene an Folgen hat, passiert trotzdem — du verpasst nur Bild und Ton.
+- **Krieg um Varonheim als Szene:** Bricht Morvaths Heerzug auf oder beginnt die Belagerung, zeigt die Kamera es kurz, wenn du in der Nähe bist (Horn, marschierende Tote, Wächter auf der Mauer). Fällt Varonheim, siehst du es immer: Glocken, brennendes Burgtor, die Stadt in Flammen, dann der König im Exil.
+- **Sprechblasen:** In Szenen sprechen Figuren in Blasen über ihrem Kopf statt in Großbuchstaben-Meldungen.
+- **Neue Klänge:** Knochenhorn, Ketten, Trommel, Herzschlag, Eis bricht.
+- **Debug:** „Regie (T17)“ — Boss-Auftritt vorspielen (gewählt), Auftritte zurücksetzen, die drei Varonheim-Szenen, Sprechblase, Namenskarte. Probe „T17 Regiebuch“.
+- **Log:** Das Nachrichtenfeld unten bleibt am neuesten Eintrag, solange du nicht selbst hochscrollst (vorher sprang es zu alten Einträgen).

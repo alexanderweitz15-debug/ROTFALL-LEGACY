@@ -62,6 +62,11 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
       case 'rattle': for (let i = 0; i < 4; i++) noise(t + i * 0.06, 0.04, 'bandpass', 1600 + i * 200, 900, 0.22 * v, 3); break;
       case 'moan':   tone(t, 0.8, 'sine', 140, 95, 0.14 * v); tone(t + 0.1, 0.7, 'triangle', 210, 150, 0.05 * v); break;
       case 'shriek': tone(t, 0.5, 'sine', 900, 1900, 0.07 * v); tone(t + 0.05, 0.45, 'sine', 1350, 2600, 0.04 * v); break;
+      case 'horn':   tone(t, 1.1, 'sawtooth', 110, 98, 0.08 * v); tone(t, 1.1, 'sine', 55, 49, 0.12 * v); tone(t + 1.3, 1.0, 'sawtooth', 104, 92, 0.07 * v); tone(t + 1.3, 1.0, 'sine', 52, 46, 0.1 * v); break;   /* T17: Knochenhorn */
+      case 'chains': for (let i = 0; i < 4; i++) { noise(t + i * 0.09, 0.12, 'bandpass', 2400 - i * 250, 1800, 0.2 * v, 10); tone(t + i * 0.09, 0.1, 'square', 520 - i * 40, 440, 0.025 * v); } break;
+      case 'drum':   tone(t, 0.5, 'sine', 70, 40, 0.5 * v); noise(t, 0.08, 'lowpass', 600, 120, 0.3 * v); break;
+      case 'heartbeat': tone(t, 0.18, 'sine', 55, 40, 0.55 * v); tone(t + 0.16, 0.2, 'sine', 50, 36, 0.45 * v); break;
+      case 'crack':  noise(t, 0.12, 'bandpass', 2600, 1400, 0.35 * v, 4); tone(t, 0.1, 'triangle', 420, 160, 0.12 * v); noise(t + 0.06, 0.18, 'lowpass', 900, 150, 0.2 * v); break;
       case 'shout':  noise(t, 0.22, 'bandpass', 700, 400, 0.3 * v, 1.2); tone(t, 0.2, 'sawtooth', 190, 150, 0.05 * v); break;
     }
   } catch (e) { /* Audio optional (z. B. ohne Nutzergeste) */ }

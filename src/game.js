@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=23';
-import { MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=23';
+import { BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=23';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=23';
 import * as R from './render.js?v=23';
 import * as HB from './buildings.js?v=23';
@@ -1910,7 +1910,7 @@ function bindSim() {
     UI.toast(t.toUpperCase(), 4200); log(`Man nennt dich nun ${t}.`, 'faction');
   };
   SIM.H.raidDamage = raidDamage;
-  SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed;   /* Varonheim-Belagerung */
+  SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed; SIM.H.scene = capitalScene;   /* Varonheim-Belagerung; T17 Szenen */
   SIM.H.heldTaken = k => holdTown(k);   // S15 P20: Heer auf Befehl hat die Stadt genommen
   SIM.H.spawnRefugee = (tx, ty, to) => {
     const L = LOCATIONS.find(l => l.key === to), pos = freeSpotNear('world', tx + ri(-3, 3), ty + ri(-3, 3), 3);
@@ -2342,6 +2342,7 @@ function update(dt, now) {
   if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
   const p = S.player;
   coopHooks.hostTick?.(dt);
+  if (S.cine?.pause) { cineTick(dt); updateFx(dt); camStep(p, dt); return; }   /* T17 (Nutzer): Boss-Auftritt — die Welt steht, Bild und Szene laufen */
   // Zeit
   if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
   deathTick();                 /* Roadmap P8: Todesabläufe */
@@ -2406,15 +2407,7 @@ function update(dt, now) {
   updateProjectiles(dt);
   updateFx(dt);
   updateBuildings(dt);
-  // Kamera
-  const V = R.view(), tx0 = camAim(p, dt), tx = tx0.x - V.W / (2 * R.cam.zoom), ty = tx0.y - V.H / (2 * R.cam.zoom);
-  R.cam.punch = Math.max(0, (R.cam.punch || 0) - dt * 0.00025);
-  R.cam.x += (tx - R.cam.x) * Math.min(1, dt / 120);
-  R.cam.y += (ty - R.cam.y) * Math.min(1, dt / 120);
-  const m = MAPS[S.map];
-  R.cam.x = clamp(R.cam.x, 0, Math.max(0, m.w * TS - V.W / R.cam.zoom));
-  R.cam.y = clamp(R.cam.y, 0, Math.max(0, m.h * TS - V.H / R.cam.zoom));
-  if (shakeT > 0) { shakeT -= dt; R.cam.x += (rnd() - .5) * shake; R.cam.y += (rnd() - .5) * shake; }
+  camStep(p, dt);
 
   // Platzieren
   if (placing) {
@@ -3782,7 +3775,7 @@ const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock', 'afterimage']
 function updateFx(dt) {
   for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
   S.fx = S.fx.filter(f => f.life > 0);
-  for (const f of S.floats) { f.rise += dt / 22; f.life -= dt; }
+  for (const f of S.floats) { if (!f.bubble) f.rise += dt / 22; f.life -= dt; }
   S.floats = S.floats.filter(f => f.life > 0);
   let gone = false;                                                // BUG-108: nur Flecken/Leichen (gecacht), nicht alle 16 000 Einträge je Bild
   for (const e of actorsOf().dc) { e.life -= dt; if (e.life <= 0) gone = true; }
@@ -3877,7 +3870,8 @@ function updateEnemy(e, dt) {
   const sight = m.sight * (e.wary > clock() ? 1.5 : 1) * (S.map === 'world' && e.map === 'world' ? (WX[wxKey()]?.foeSight || 1) : 1);   /* Roadmap C.12 */           // nach abgebrochener Jagd: wachsamer
   let tgt = ag && ag.alive && !ag.downed && ag.map === e.map && isHostile(e, ag) && dist(e, ag) < sight * 1.6 ? ag : nearestTarget(e, targets, sight);
   if (e.mtype === 'bear' && tgt && !e.provoked && dist(e, tgt) > 110 && tgt !== ag) tgt = null;   // Revier: nur wer zu nahe kommt
-  if (tgt && e.giveUp && e.giveUp.id === tgt.id && e.giveUp.until > performance.now()) tgt = null;   // BUG-088: aufgegeben (kein Weg) — nicht sofort wieder anrennen
+  if (tgt && e.giveUp && e.giveUp.id === tgt.id && e.giveUp.until > performance.now()) tgt = null;
+  if (tgt === S.player && BOSS_CARDS[e.mtype] && !S.cine && dist(e, tgt) < 340) bossIntro(e);   /* T17: Boss-Auftritt beim ersten Blickkontakt (einmal je Held) */   // BUG-088: aufgegeben (kein Weg) — nicht sofort wieder anrennen
   let sp = m.speed * (e.spdMul || 1) * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1) * ((e.status || []).some(q => q.key === 'chilled') ? 0.6 : 1) * (1 - 0.15 * ((e.status || []).find(q => q.key === 'frost')?.stacks || 0));   // Ranken halten, Frost bremst
   const sty = HUMANOID.has(e.mtype) ? styleOf(fameRegion(e)) : 0;   /* T08 Ruf der Klinge: Grausamkeit lässt früher fliehen, Gnade öfter aufgeben */
   if (e.hp < e.maxHp * (0.2 + Math.max(0, -sty) * 0.0015) && !e.boss && !e.fleeing && !e.servant && chance(0.004 * (1 + Math.max(0, -sty) / 50))) { e.fleeing = true;
@@ -8247,7 +8241,7 @@ function capitalFall(why = 'Heerzug') {
     S.flags.varonFreed = [0, 1, 2];
   }
   if (S.cult?.end === 'ruling') { S.cult.end = 'hidden'; cultAfter('hidden'); chronicle('Aldhelm verliert den Hof', 'news', 'Ohne Stadt kein Reichsverweser. Der Kelch zieht sich in die Krypta zurück.'); }
-  ensureVaronExile();
+  ensureVaronExile(); capitalScene('fell');   /* T17: der Fall als Szene (nur in der Welt, nie in Proben) */
   if (afterLive()) {
     S.ents.world = S.ents.world.filter(e => !e.capGuard);
     for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && e.shop && (e.homeTown === k || e.town === k || townAt(e.x / TS | 0, e.y / TS | 0) === k)) { e.shopClosed = 1e12; e.fallShut = k; }
@@ -9003,11 +8997,107 @@ function camAim(p, dt) {
 }
 let lastCine = null;                                                  // Roadmap P8: letzte Fahrt (nur Bild, ohne Folgen) für „Cutscene wiederholen“
 function gesture(c, g, ms, toward) { const G = ANIM_DEFS.gesture[g]; if (!G || !c) return; act(c, 'gesture', ms || G.ms, toward); c.act.pose = g; }   /* Roadmap P8 */
-function cinematic(shots, done) {
+// T17 Regiebuch: opts.pause = die Welt steht (Boss-Auftritt), opts.stay = der Spieler bleibt sichtbar am Ort (kein Geist, kein Rücksprung).
+// Ein Shot kann beats tragen: Zeitachse t 0–1 mit sfx, duck, shake, fx, zoom, cam, gesture, say, float, text, card, flash, do.
+// Jeder Beat feuert genau einmal; wer überspringt, bekommt nur die Folgen (do), nicht Bild und Klang.
+function cinematic(shots, done, opts = {}) {
   if (S.cine || !shots.length) return;
-  lastCine = shots.map(s => ({ ...s, setup: null, tick: null, done: false, showOnly: true }));
-  const p = S.player; S.cine = { shots, i: -1, t: 0, back: { x: p.x, y: p.y, map: S.map }, done };
-  p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); cineNext();
+  lastCine = shots.map(s => ({ ...s, setup: null, tick: null, done: false, showOnly: true, beats: (s.beats || []).filter(b => !b.do).map(b => ({ ...b })) }));
+  const p = S.player; S.cine = { shots, i: -1, t: 0, back: { x: p.x, y: p.y, map: S.map }, done, pause: !!opts.pause, stay: !!opts.stay };
+  if (!opts.stay) p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); cineNext();
+}
+const cineWho = w => w == null ? null : typeof w === 'object' ? w : w === 'player' ? S.player : byId(w);
+function cineBeat(b, s, skip) {
+  if (b.do) b.do();
+  if (skip) return;
+  if (b.sfx) sfx(b.sfx, b.w ?? 0.4, b.vol ?? 1);
+  if (b.duck != null) duck(b.duck, b.ms || 400);
+  if (b.shake) camShake(b.shake, b.ms || 300);
+  if (b.fx) { const w = cineWho(b.at); if (w) fx(w.x + (b.dx || 0), w.y - (b.dy ?? 12), b.fx, b.n || 8); }
+  if (b.zoom) s.zoom = b.zoom;
+  if (b.cam) s.focus = b.cam === 'player' ? S.player.id : b.cam;
+  if (b.gesture) { const w = cineWho(b.who); if (w) gesture(w, b.gesture, b.ms, cineWho(b.toward)); }
+  if (b.say) bubble(cineWho(b.who), b.say, b.ms);
+  if (b.float) { const w = cineWho(b.who); if (w) float(w, b.float, b.color || 'rgba(230,220,180,ALPHA)', true); }
+  if (b.text != null) { const t = document.getElementById('cineText'); if (t) t.textContent = b.text; }
+  if (b.card) nameCard(b.card.title, b.card.sub, b.card.ms);
+  if (b.flash) document.getElementById('cineFade')?.animate?.([{ opacity: 0.85, background: b.flash }, { opacity: 0, background: b.flash }], { duration: b.ms || 220, easing: 'ease-out' });
+}
+function cineBeats(s, t, skip) { for (const b of s?.beats || []) { if (b.fired || (!skip && (b.t || 0) * (s.dur || 3000) > t)) continue; b.fired = true; try { cineBeat(b, s, skip); } catch (err) { console.error(err); } } }
+function bubble(e, text, ms = 2600) { if (!e || !text) return; S.floats = S.floats.filter(f => !(f.bubble && f.who === e.id)); S.floats.push({ x: e.x, y: e.y - 44, rise: 0, text, color: '#e7dcc2', life: ms, maxLife: ms, bubble: true, who: e.id }); }
+function nameCard(title, sub = '', ms = 3000) {                       /* T17: Namenskarte (Cinzel), nie zwei zugleich */
+  let el = document.getElementById('nameCard');
+  if (!el) { el = document.createElement('div'); el.id = 'nameCard'; el.style.cssText = 'position:fixed;left:0;right:0;top:24vh;text-align:center;z-index:61;pointer-events:none;opacity:0;text-shadow:0 2px 8px #000';
+    document.body.appendChild(el); }
+  el.innerHTML = `<div style="font:700 30px Cinzel,serif;letter-spacing:.18em;color:#e8d6a8">${title}</div><div style="font:italic 15px Spectral,serif;color:#b9a888;margin-top:4px">${sub}</div><div style="width:220px;height:1px;margin:8px auto 0;background:linear-gradient(90deg,transparent,#a8874f,transparent)"></div>`;
+  el.getAnimations?.().forEach(a => a.cancel());
+  el.animate?.([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none', offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: ms, easing: 'ease-out' });
+}
+function camStep(p, dt) {                                              /* Kamera folgt dem Blickpunkt (aus update; im Boss-Auftritt auch bei stehender Welt) */
+  const V = R.view(), tx0 = camAim(p, dt), tx = tx0.x - V.W / (2 * R.cam.zoom), ty = tx0.y - V.H / (2 * R.cam.zoom);
+  R.cam.punch = Math.max(0, (R.cam.punch || 0) - dt * 0.00025);
+  R.cam.x += (tx - R.cam.x) * Math.min(1, dt / 120);
+  R.cam.y += (ty - R.cam.y) * Math.min(1, dt / 120);
+  const m = MAPS[S.map];
+  R.cam.x = clamp(R.cam.x, 0, Math.max(0, m.w * TS - V.W / R.cam.zoom));
+  R.cam.y = clamp(R.cam.y, 0, Math.max(0, m.h * TS - V.H / R.cam.zoom));
+  if (shakeT > 0) { shakeT -= dt; R.cam.x += (rnd() - .5) * shake; R.cam.y += (rnd() - .5) * shake; }
+}
+// T17: Boss-Auftritt — einmal je Held (Generation), 4,9 s, die Welt steht (Nutzer). preview: Debug, die Figur verschwindet danach.
+function introDue(mtype) { const seen = (S.flags.introSeen ||= {}); if (seen[mtype] === S.legacy.gen) return false; seen[mtype] = S.legacy.gen; return true; }
+function bossIntro(e, preview = false) {
+  const K = BOSS_CARDS[e.mtype]; if (!K || S._quiet || S.cine || S.coop?.role === 'guest' || S.dying || (!preview && !introDue(e.mtype))) return false;
+  const p = S.player, mid = { x: (p.x + e.x) / 2, y: (p.y + e.y) / 2 };
+  const court = K.court ? S.ents[e.map].filter(c => c.kind === 'npc' && c.alive && c !== p && !S.party.includes(c.id) && dist(c, e) < 300).slice(0, 6) : [];
+  cinematic([
+    { dur: 1700, zoom: 1.15, focus: mid, beats: [{ t: 0, sfx: K.sfx, duck: 0.45, ms: 300 }, ...(K.flash ? [{ t: 0, flash: K.flash, ms: 160 }] : []), { t: 0.35, fx: K.fx, at: e, n: 14 },
+      ...(K.beat ? [{ t: 0.1, sfx: 'heartbeat', shake: 2, ms: 120 }, { t: 0.65, sfx: 'heartbeat', shake: 2, ms: 120 }] : []),
+      ...court.map((c, i) => ({ t: 0.2 + i * 0.06, gesture: 'abwehren', who: c, toward: e, ms: 1400 }))] },
+    { dur: 2300, zoom: 1.5, focus: e.id, beats: [{ t: 0, card: { title: K.title, sub: K.sub, ms: 3600 } }, { t: 0.1, gesture: 'zeigen', who: e, toward: p, ms: 1200 },
+      { t: 0.2, say: K.say, who: e, ms: 2800 }, { t: 0.65, fx: K.fx, at: e, n: 10, sfx: 'metal', w: 1 }] },
+    { dur: 900, zoom: 1.1, focus: mid, beats: [{ t: 0.1, shake: 5, ms: 320 }, { t: 0.5, duck: 1, ms: 400 }] },
+  ], () => { if (preview) { const a = S.ents[e.map], i = a.indexOf(e); if (i >= 0) a.splice(i, 1); } else e.aggroId = p.id; }, { pause: true, stay: true });
+  log(`${MONSTERS[e.mtype].name} stellt sich dir.`, 'combat');
+  return true;
+}
+// T17 + Belagerung: Szenen zum Krieg um Varonheim (Heerzug, Belagerung, Fall). Nur in der Welt, nie in Proben; läuft eine andere
+// Fahrt, folgt diese danach. Gespielte Figuren (cineCast) verschwinden am Ende — auch beim Überspringen.
+function capitalScene(kind, a) {
+  if (S._quiet || S.coop?.role === 'guest' || S.dying || S.map !== 'world' || S.jail || S.bond || UI.dialogueOpen()) return false;
+  if (S.cine) return cineLater(() => capitalScene(kind, a), 1500);
+  const P = (x, y) => ({ x: x * TS + 16, y: y * TS + 16 }), cast = [], C = CAPITAL;
+  const put = (t, x, y, o = {}) => { const e = spawnEnemy(t, 'world', x, y, o); if (e) { Object.assign(e, { cineCast: true, transient: true }); cast.push(e); } return e; };
+  const clear = () => { S.ents.world = S.ents.world.filter(e => !cast.includes(e)); };
+  if (kind !== 'fell' && Math.hypot(S.player.x / TS - C.x, S.player.y / TS - C.y) > 150) return false;   /* Nutzer: Kamera bei Weltereignissen nur in der Nähe; der Fall immer */
+  if (kind === 'host') {
+    const L = LOCATIONS.find(l => l.key === a?.at); if (!L) return false; const to = P(C.x, C.y);
+    for (let i = 0; i < 8; i++) put(i % 4 ? 'skeleton' : 'bone_knight', L.x + ri(-3, 3), L.y + ri(-2, 2), { marching: true, anchor: to });
+    cinematic([{ ...P(L.x, L.y + 3), dur: 4600, zoom: 0.95, text: 'Morvath sammelt die Knochen. Sie marschieren auf Varonheim.',
+      beats: [{ t: 0, sfx: 'horn', duck: 0.6, ms: 300 }, { t: 0.25, sfx: 'moan' }, { t: 0.3, fx: 'necro', at: P(L.x, L.y), n: 18 }, { t: 0.5, sfx: 'rattle', shake: 3, ms: 400 }, { t: 0.9, duck: 1, ms: 500 }] }], clear);
+    return true;
+  }
+  if (kind === 'siege') {
+    const wy = C.y - C.hh - 5, g = S.ents.world.find(e => e.capGuard && e.alive);
+    for (let i = 0; i < 6; i++) put('skeleton', C.x + ri(-8, 8), wy - ri(0, 3), { anchor: P(C.x, wy) }); put('flesh_golem', C.x, wy - 2, { anchor: P(C.x, wy) });
+    cinematic([
+      { ...P(C.x, wy + 2), dur: 4200, zoom: 1.0, text: `${a?.name || 'Die Toten'} schließt Varonheim ein.`, beats: [{ t: 0, sfx: 'horn' }, { t: 0.3, sfx: 'rattle', shake: 3, ms: 300 }, { t: 0.5, card: { title: 'VARONHEIM WIRD BELAGERT', sub: 'Die Mauern halten — noch.', ms: 3200 } }] },
+      { ...P(C.x, C.y), dur: 3400, zoom: 1.2, text: 'In der Stadt schließen sich die Läden.', beats: g ? [{ t: 0.1, cam: g.id }, { t: 0.15, gesture: 'zeigen', who: g, toward: P(C.x, wy), ms: 1400 }, { t: 0.2, say: 'Tore zu! Jeder Mann auf die Mauer!', who: g, ms: 2600 }, { t: 0.2, sfx: 'shout' }] : [{ t: 0.2, sfx: 'shout' }] },
+    ], clear);
+    return true;
+  }
+  if (kind === 'fell') {
+    const [kx, ky] = C.keep, A = S.after?.capital, hs = HOUSES.filter(h => h.town === 'varonheim' && h.map === 'world').slice(0, 24).filter((_, i) => i % 6 === 0);
+    const king = S.ents.world.find(e => e.exileCourt && e.varonKing) || S.ents.world.find(e => e.exileCourt && e.varonMarshal), brandt = S.ents.world.find(e => e.exileCourt && e.varonMarshal);
+    const shots = [
+      { ...P(kx, ky + 4), dur: 4000, zoom: 1.15, text: 'Das Burgtor hält nicht.', beats: [{ t: 0, sfx: 'bell', duck: 0.5, ms: 300 }, { t: 0.3, sfx: 'bell' }, { t: 0.6, sfx: 'bell' }, { t: 0.2, fx: 'fire', at: P(kx, ky + 1), n: 20 }, { t: 0.5, shake: 8, ms: 500, sfx: 'crit' }, { t: 0.55, fx: 'dust', at: P(kx, ky + 1), n: 16 }] },
+      { ...P(C.x, C.y), dur: 4200, zoom: 0.75, text: 'Die Toten halten die Hauptstadt.', beats: [...hs.map((h, i) => ({ t: 0.1 + i * 0.12, fx: 'fire', at: { x: (h.x + h.w / 2) * TS, y: (h.y + h.h / 2) * TS }, n: 14 })), { t: 0.35, card: { title: 'VARONHEIM IST GEFALLEN', sub: A?.why ? `(${A.why})` : '', ms: 3600 } }, { t: 0.4, sfx: 'moan' }] },
+    ];
+    if (king && A?.exile) shots.push({ x: king.x, y: king.y + 40, map: 'world', dur: 4000, zoom: 1.3, focus: king.id, text: `${townName(A.exile)}. Ein König ohne Stadt.`, beats: [{ t: 0.1, duck: 0.7, ms: 400 }, ...(brandt && brandt !== king ? [{ t: 0.25, say: 'Majestät. Wir holen sie zurück.', who: brandt, ms: 2800 }] : []), { t: 0.85, duck: 1, ms: 600 }] });
+    else shots.push({ ...P(C.x, C.y + C.hh + 6), dur: 3000, zoom: 1.0, text: 'Der König ist verschollen.', beats: [{ t: 0.8, duck: 1, ms: 600 }] });
+    cinematic(shots, clear);
+    return true;
+  }
+  return false;
 }
 function cineMove(map, x, y) {
   const p = S.player;
@@ -9023,13 +9113,15 @@ function cineNext() {
   const f = document.getElementById('cineFade'), t = document.getElementById('cineText');   // S15 (Nutzer: Cutscenes besser): Schnitt als kurze Abblende, Text blendet ein
   f?.animate?.([{ opacity: 1 }, { opacity: 0 }], { duration: C.i ? 650 : 900, easing: 'ease-out' }); t?.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 900, easing: 'ease-out' });
 }
-function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t);
+function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t); cineBeats(s, C.t, false);   /* T17: Zeitachse */
   if (s?.to && s.x != null) { const k = Math.min(1, C.t / (s.dur || 3000)), e = k * k * (3 - 2 * k); S.player.x = s.x + (s.to.x - s.x) * e; S.player.y = s.y + (s.to.y - s.y) * e; }   // S15: sanfte Kamerafahrt
   if (C.t >= (s?.dur || 3000)) cineNext(); }
 function cineEnd() {
   const C = S.cine; if (!C) return; S.cine = null;
   for (const s of C.shots.slice(C.i + 1)) if (!s.done && !s.showOnly) try { s.setup?.(); } catch (err) { console.error(err); }   // S15 Fehlersuche: wer überspringt, verpasst keine Folgen (Befreiung, Überfall …)
-  const p = S.player; cineMove(C.back.map, C.back.x, C.back.y); p.cineGhost = false; p.vx = p.vy = 0; cineBars(false);
+  for (const s of C.shots.slice(Math.max(0, C.i))) cineBeats(s, Infinity, true);   /* T17: übersprungene Beats — nur die Folgen */
+  document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel());
+  const p = S.player; if (!C.stay) cineMove(C.back.map, C.back.x, C.back.y); p.cineGhost = false; p.vx = p.vy = 0; cineBars(false);
   try { C.done?.(); } catch (err) { console.error(err); }
 }
 function cineBars(on, text = '') {
@@ -14510,6 +14602,15 @@ function debugSections() {
       'Geste abspielen (Held und nächster NPC)': () => { gesture(p, v('dbGest')); const n = S.ents[S.map].filter(x => x.kind === 'npc' && x.alive && x !== p && dist(x, p) < 400).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (n) gesture(n, v('dbGest'), 0, p); },
       'Alle Todesarten nebeneinander': () => { DEATH_KINDS.forEach((k, i) => { const e = spawnEnemy('bandit', S.map, (p.x / TS2 | 0) - 8 + i * 2, (p.y / TS2 | 0) + 3); if (e) { e.forceDc = k; e.x = p.x - 256 + i * 64; e.y = p.y + 90; die(e, 'Debug', p); } }); UI.toast('Von links: ' + DEATH_KINDS.join(', ')); },
     }],
+    ['Regie (T17)', sel('dbBoss', Object.keys(BOSS_CARDS).map(k => [k, BOSS_CARDS[k].title])), {
+      'Boss-Auftritt vorspielen (gewählt)': () => { const k = v('dbBoss'), e = spawnEnemy(k, S.map, (p.x / TS | 0) + 5, p.y / TS | 0); if (!e) return UI.toast('Kein Platz'); e.transient = true; bossIntro(e, true); },
+      'Boss-Auftritte zurücksetzen (dieser Held)': () => { S.flags.introSeen = {}; UI.toast('Boss-Auftritte kommen wieder'); },
+      'Szene: Heerzug der Toten': () => { const b = Object.keys(S.war.nodes).find(k => S.war.nodes[k].owner === 'undead') || 'graveyard'; capitalScene('host', { at: b }); },
+      'Szene: Varonheim wird belagert': () => capitalScene('siege', { name: 'Morvaths Heerzug' }),
+      'Szene: Varonheim ist gefallen': () => capitalScene('fell'),
+      'Sprechblase am nächsten': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; bubble(n || p, 'Hier ist eine Sprechblase.', 3000); },
+      'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
+    }],
     ['Kamerafahrten', '', {
       'Fall Vargs': () => vargCinematic(), 'Fall der Untoten': () => undeadFallCinematic(), 'Beenden': () => cineEnd(),
       'Kamerafahrt-Test (Zoom/Fokus)': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0];   /* Roadmap P8 */
@@ -17422,6 +17523,18 @@ export function selftest() {
       return keep && hit;
     } finally { S.factions.valen = v0; }
   }));
+  ok('T17 Regiebuch: Beats feuern genau einmal; Überspringen führt nur die Folgen (do) nach; Boss-Auftritt pausiert die Welt (Zeit steht, Szene läuft); einmal je Held, der Erbe sieht ihn neu', sandbox(() => {
+    const p = stage(), c0 = S.cine, seen0 = S.flags.introSeen, g0 = S.legacy.gen;
+    try {
+      let n = 0, k = 0, s = 0; S.cine = null;
+      cinematic([{ dur: 100, beats: [{ t: 0.5, do: () => n++ }, { t: 0.6, sfx: 'ui', do: () => s++ }] }, { dur: 100, beats: [{ t: 0.5, do: () => k++ }] }], null, { stay: true });
+      cineTick(60); cineTick(60); cineTick(10); const once = n === 1 && s === 1 && k === 0 && !p.cineGhost;
+      cineEnd(); const skip = k === 1 && n === 1 && !S.cine && !p.cineGhost;
+      S.cine = { shots: [{ dur: 5000 }], i: 0, t: 0, pause: true, stay: true }; const m0 = S.minute; update(100, performance.now()); const paused = S.minute === m0 && S.cine?.t === 100; S.cine = null;
+      S.flags.introSeen = {}; const a = introDue('gorak'), b = !introDue('gorak'); S.legacy.gen = g0 + 1; const c = introDue('gorak');
+      return once && skip && paused && a && b && c;
+    } finally { S.cine = c0; S.flags.introSeen = seen0; S.legacy.gen = g0; cineBars(false); }
+  }));
   ok('T10 Ahnenfeind: Mörder (kein Boss) wird benannt und nimmt die Waffe samt Geschichte aus dem Grab; tötet er wieder, wächst er; höchstens drei; sein Tod gibt die Waffe zurück und den Titel', sandbox(() => {
     const p = stage(), N0 = S.nemeses, NP0 = S.nemesisPast;
     try {
@@ -17443,7 +17556,7 @@ export function selftest() {
       S.nemeses = [{ id: 'nemP', mtype: 'bandit', name: 'Probe', lvl: 5, weapon: null, kills: 1, region: 'mitte', map: '__a', tx: (p.x / TS | 0) + 6, ty: p.y / TS | 0, since: 0, next: 999, moveDay: 999, victims: ['X'], hpFrac: 0.5, seen: true }];
       nemesisTick(); const e = S.ents.__a.find(x => x.nemesisId === 'nemP'); const half = !!e && Math.abs(e.hp / e.maxHp - 0.5) < 0.05;
       nemesisTick(); const one = S.ents.__a.filter(x => x.nemesisId === 'nemP').length === 1;
-      e.alive = false; nemesisDay(); const heal = Math.abs(S.nemeses[0].hpFrac - 0.7) < 1e-9;
+      e.alive = false; nemesisDay(); const heal = Math.abs(S.nemeses[0].hpFrac - 0.7) < 0.03;   /* Lebenspunkte sind gerundet */
       return half && one && heal;
     } finally { S.nemeses = N0; }
   }));

@@ -48,7 +48,7 @@ export function launchHost() {                                     // Morvaths H
   W.armies.push(a); W.capThreat = 5; W.capStage = 0; W.hostCd = (S.day | 0) + CAP_SIEGE.cd;
   chronicle('Die Toten marschieren auf Varonheim', 'legend', `${a.name} (Stärke ${a.strength}) bricht von ${LOC[base].name} auf. Ziel: die Hauptstadt.`);
   log(`Morvaths Heerzug bricht von ${LOC[base].name} auf — Ziel ist Varonheim. Wer die Front hält, gewinnt Zeit.`, 'faction');
-  H.toast('DIE TOTEN MARSCHIEREN AUF VARONHEIM');
+  H.toast('DIE TOTEN MARSCHIEREN AUF VARONHEIM'); H.scene?.('host', a);   /* T17: Szene */
   return a;
 }
 export function capThreatDay() {                                   // einmal am Tag aus warDay
@@ -78,7 +78,7 @@ function siegeTick(und, val) {                                     // ein Zug (6
   const n = S.war.nodes[CAPK];
   if (!n.siege) { n.siege = { day: S.day | 0, by: und.id }; n.walls ??= 100;
     chronicle('Varonheim wird belagert', 'battle', `${und.name} (Stärke ${Math.round(und.strength)}) lagert vor den Mauern der Hauptstadt.`);
-    log(`${und.name} schließt Varonheim ein. Die Mauern halten — noch. Valens Heere eilen zum Entsatz.`, 'faction'); H.toast('VARONHEIM WIRD BELAGERT'); return; }
+    log(`${und.name} schließt Varonheim ein. Die Mauern halten — noch. Valens Heere eilen zum Entsatz.`, 'faction'); H.toast('VARONHEIM WIRD BELAGERT'); H.scene?.('siege', und); return; }
   if (val) return nearPlayer(CAPK) ? materialize(CAPK, und, val) : battleAbstract(CAPK, und, val, CAP_SIEGE.sally);   /* Entsatz mit Ausfall der Besatzung */
   if (n.walls > 0) {
     n.walls = Math.max(0, n.walls - Math.max(CAP_SIEGE.wallMin, und.strength * CAP_SIEGE.wallHit));

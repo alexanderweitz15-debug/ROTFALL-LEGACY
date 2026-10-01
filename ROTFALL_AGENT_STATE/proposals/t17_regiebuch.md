@@ -1,7 +1,7 @@
 # T17 — Regiebuch und Boss-Intros (D1 + D15 = §5g.5), Vorlauf für T20
 
 FROM: Darstellung (Agent 8, Fable 5.1, Hoch) · TO: Lead / Implementation Engineer · 01.10.2026
-Status: **DESIGNING → bereit für die Umsetzung von Scheibe 1**, sobald die drei Fragen am Ende beantwortet sind (bis dahin gelten die Empfehlungen).
+Status: **DESIGN_LOCKED** (Nutzer 01.10.2026): Überspringen immer (Folgen laufen nach); **Boss-Auftritte 4–6 s, Spiel pausiert** (nicht live); Sprechblasen + Nahkamera bei Weltereignissen ja.
 Kennzeichnung: **FACT** (Datei:Zeile, selbst gelesen) · **FACT (TASKS)** (aus `docs/audit/TASKS.md`, nicht selbst gemessen) · **PROPOSAL** · **ASSUMPTION**.
 Kein Code in `src/` oder `docs/` wurde geändert. Alles hier ist Spezifikation.
 

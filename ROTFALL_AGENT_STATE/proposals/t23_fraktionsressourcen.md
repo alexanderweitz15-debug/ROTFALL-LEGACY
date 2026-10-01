@@ -1,6 +1,6 @@
 # T23 — Fraktionsressourcen: „Woher die Mächte ihre Kraft nehmen“ (V12 + V14)
 
-**Status:** WAITING_FOR_DEVELOPER · **Autor:** Welt-/Fraktionsspezialist (Agent 6, Fable 5.1, Hoch) · **Stand:** 01.10.2026
+**Status:** DESIGN_LOCKED (Antworten 01.10.2026 in DESIGN_DECISIONS.md) · **Autor:** Welt-/Fraktionsspezialist (Agent 6, Fable 5.1, Hoch) · **Stand:** 01.10.2026
 Kennzeichnung: **FAKT** = belegt (Datei:Zeile zum Zeitpunkt der Lesung; `game.js` wird parallel bearbeitet, Zeilen können wandern) · **VORSCHLAG** · **ANNAHME**.
 Entwicklerentscheidung (DESIGN_DECISIONS.md, 01.10.): „Nächster großer Vorschlag: T23 Fraktionsressourcen zuerst, T40 baut darauf.“
 Rahmen aus `docs/audit/TASKS.md` T23: eine Ressource je Macht, täglich in `warDay`, Kodex-Reiter „Mächte“, Tribut aus dem Dorfmarkt, `T.vorrat` migrieren. Abhängig von T02 (TESTING) und T09 (TESTING); T40 und T30 hängen an T23.

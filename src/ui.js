@@ -50,7 +50,7 @@ export function initUI() {
   const lf = $('log-filters');
   LOGCATS.forEach((c, i) => {
     const b = el('button', i === 0 ? 'on' : '', c);
-    b.onclick = () => { logFilter = CATKEY[c]; [...lf.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); renderLog(); };
+    b.onclick = () => { logFilter = CATKEY[c]; [...lf.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); logStick = true; renderLog(); };   /* neuer Filter: unten beginnen */
     lf.appendChild(b);
   });
   $('modal-close').onclick = closeModal;
@@ -267,12 +267,15 @@ function spellUI(body) {
 }
 
 // ---------------- Log ----------------
+// Nutzer 01.10.2026: der Log sprang nach oben (alte Einträge sichtbar). Ob er unten „klebt“, entscheidet jetzt nur das Scrollen des
+// Spielers (nicht die Höhe beim Neuaufbau, die bei verstecktem oder frisch gefülltem Kasten 0 ist); neu = unten, nach dem Layout.
+let logStick = true;
 function renderLog() {
   const box = $('log'); if (!box) return;
-  const near = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+  if (!box._stick) { box._stick = true; box.addEventListener('scroll', () => { if (box.clientHeight) logStick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24; }, { passive: true }); }
   box.innerHTML = S.log.filter(e => !logFilter || e.cat === logFilter).slice(-90)
     .map(e => `<div class="c-${e.cat}"><time>${e.t}</time>${e.text}</div>`).join('');
-  if (near) box.scrollTop = box.scrollHeight;
+  if (logStick) { box.scrollTop = box.scrollHeight; requestAnimationFrame(() => { if (logStick) box.scrollTop = box.scrollHeight; }); }
 }
 
 // ---------------- Kontextpanel ----------------
