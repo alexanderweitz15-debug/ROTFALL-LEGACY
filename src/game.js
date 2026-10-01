@@ -1,18 +1,18 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=22';
-import { MAGIC_VIEW, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=22';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=22';
-import * as R from './render.js?v=22';
-import * as HB from './buildings.js?v=22';
-import * as UI from './ui.js?v=22';
-import * as SIM from './sim.js?v=22';
-import * as B from './body.js?v=22';
-import * as SP from './sprites.js?v=22';
-import * as ECO from './economy.js?v=22';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=22';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=22';
-import { sfx, ambience, ambienceTick } from './sfx.js?v=22';
+import { S, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=23';
+import { MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=23';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=23';
+import * as R from './render.js?v=23';
+import * as HB from './buildings.js?v=23';
+import * as UI from './ui.js?v=23';
+import * as SIM from './sim.js?v=23';
+import * as B from './body.js?v=23';
+import * as SP from './sprites.js?v=23';
+import * as ECO from './economy.js?v=23';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=23';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=23';
+import { sfx, ambience, ambienceTick } from './sfx.js?v=23';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -112,6 +112,7 @@ export function damageOf(c) {
   if (c.titleClass === 'monk' && gearOf(c) >= 2 && (!it || ['polearm', 'spear', 'staff'].includes(it.wtype))) m += 0.3;   // S15 Robe der Stillen Hand: Stange und leere Hand
   if (stat(c, 'wolf_form') && gearOf(c) >= 2) m += 0.25;                              // S15 Hainfell: stärkerer Biss
   if (stat(c, 'song')) m += 0.15;                                                      // Kriegslied
+  if (isVamp(c)) m += (stat(c, 'sunburn') ? -0.2 : nightNow() ? 0.1 : 0) + (bloodOf(c) >= 70 ? 0.15 : 0);   /* §5g.2 Vampir: Sonne, Nacht, Durst */
   if (c.goblin && S.party.includes(c.id) && S.player?.titleClass === 'goblinlord') m += 0.1;   /* §5e.9 Stammesbande */
   m += setOf(c)?.bonus.dmg || 0;                                                       // S13: Set-Bonus
   // Balance-Runde: der feste Anteil (Attribut, Übung, Stufe) kommt je Treffer dazu — ohne Ausgleich war der Dolch (300 ms) viermal so
@@ -474,6 +475,12 @@ function useConsumable(c, idx, target = c, part = null) {
     removeItem(c, slot.key, 1); w.charge = 100; if (c === S.player) { UI.toast(`${ITEMS[w.key].name}: Energie 100/100`, 1800); sfx('magic', 0.3); } fx(c.x, c.y - 14, 'spark', 6);
     return UI.refreshHUD();
   }
+  if (it.use === 'blood') {                                  /* §5g.2 Blutphiole: stillt den Durst; Lebenden wird übel */
+    removeItem(c, slot.key, 1); fx(c.x, c.y - 14, 'blood', 6);
+    if (isVamp(c)) { setBlood(c, bloodOf(c) - 25); log(`${c.name} trinkt eine Blutphiole. Der Durst schweigt — für eine Weile.`, 'party'); }
+    else { c.stamina = Math.max(0, c.stamina - 30); log(`${c.name} würgt das Blut wieder hoch.`, 'party'); }
+    return UI.refreshHUD();
+  }
   if (it.use === 'soul') {                                   // Seelenphiole: Essenz für Totenrufer, Linderung für Hexer, sonst ein Schluck Kälte
     removeItem(c, slot.key, 1);
     if (c.titleClass === 'necromancer') setTres(c, tres(c) + 2); else if (c.titleClass === 'warlock') setTres(c, tres(c) - 30); else B.heal(c, 8);
@@ -540,14 +547,14 @@ function applyHealItem(c, key, target, part) {
   if (it.use === 'bandage' || key === 'herb') {
     part ||= B.worstPart(target) || 'torso';
     const P = target.body[part];
-    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1);
+    const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') || isVamp(target) ? 0.5 : 1);
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
   } else {
-    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') ? 0.5 : 1));   // S15 Blutfürst
+    B.heal(target, (it.heal + med * 0.3) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') || isVamp(target) ? 0.5 : 1));   // S15 Blutfürst (Todesritter); §5g.2 Vampir
     float(target, '+' + it.heal, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} gibt ${target === c ? 'sich' : target.name} ${it.name}.`, 'party');
   }
@@ -2738,6 +2745,7 @@ function tickCombatant(c, dt) {
   if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (wxOf(c).stam || 1) * (1 + (c.attributes?.endurance || 10) * 0.02 - 0.2 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0) + (stat(c, 'song') || stat(c, 'march') ? 0.5 : 0)));
   if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')) * (inAnomaly(c) ? 2 : 1));   // S15 P7: Anomalie
   if (c === S.player && c.titleClass) titleTick(c, dt);
+  if ((c === S.player || c.coopHero) && isVamp(c)) vampTick(c, dt);   /* §5g.2: der Fluch gilt auch ungetragen und auch für Koop-Helden */
   // Statuszeiten
   if (c.status && c.status.length) {
     if (c === S.player) for (const s of c.status) ((S.codex ||= {}).states ||= {})[s.key] = 1;   // S15 Kodex: erlebte Zustände
@@ -2875,6 +2883,7 @@ function controlPlayer(dt) {
   const p = S.player;
   if (S.cine) { p.vx = p.vy = 0; return; }   // Kamerafahrt: keine Steuerung
   if (p.downed) { p.vx = p.vy = 0; return; }
+  if (p.vamp?.frenzyT > performance.now()) { p.vx = p.vy = 0; return; }   /* §5g.2 Raserei: der Durst steuert */
   if (UI.dialogueOpen() && !S.jail?.caught) { p.vx = p.vy = 0; p.aim = Math.atan2(mouse.wy - p.y + 12, mouse.wx - p.x); return; }   /* Nutzer: solange ein Gespräch offen ist, steht man still */
   if (S.jail?.caught) {   // Bug 2 (Nutzer): beim Wärter-Gespräch nicht weglaufen können
     if (!UI.dialogueOpen()) S.jail.caughtBack?.();   // Esc hat das Gespräch geschlossen — zählt wie „zurück in die Zelle“
@@ -3230,7 +3239,7 @@ let AREA = false;
 const EYE_ZAP = new Set(['magic', 'shadow']);   /* Audit T05: nur Arten, die hurt() wirklich erreicht (Blitz- und Arkanzauber kommen als 'magic') */   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
-  const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null;
+  const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null, poised0 = target.poiseUntil > performance.now();   /* Control-Befund A1: vor hurt() lesen — hurt setzt selbst Standfestigkeit */
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * BAL.lvl) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
   if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
@@ -3238,7 +3247,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.titleClass === 'necromancer' && !node(attacker, 'k_lone')) dmg *= 0.85;             // Makel: Die Toten zehren
   if ((attacker.status || []).some(s => s.key === 'bloodtoll')) dmg *= 0.8;   // Phase 6: Blutzoll an Garmadon
   if (target.exposed > performance.now()) dmg *= 1.25;                   // S15 P3: offen nach einem schweren Angriff
-  if (attacker.comboFin) { dmg *= 1.3; if (!(target.poiseUntil > performance.now())) target.stagger = Math.max(target.stagger || 0, 700); if (!attacker.comboShown) { attacker.comboShown = true; float(target, 'Wucht!', 'rgba(240,200,120,ALPHA)'); camShake(4, 140); S.fx.push({ x: target.x, y: target.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.2, life: 350, maxLife: 350 }); } }   /* §5f: dritter Schlag der Kombo */
+  if (attacker.comboFin) { dmg *= 1.3; if (!poised0) { target.stagger = Math.max(target.stagger || 0, 700); if (target.kind === 'enemy') target.poiseUntil = performance.now() + 700 + 1200; } if (!attacker.comboShown) { attacker.comboShown = true; float(target, 'Wucht!', 'rgba(240,200,120,ALPHA)'); camShake(4, 140); S.fx.push({ x: target.x, y: target.y - 10, vx: 0, vy: 0, type: 'ring', s: 1.2, life: 350, maxLife: 350 }); } }   /* §5f: dritter Schlag der Kombo */
   if (setOf(attacker)?.bonus.holy && target.faction === 'undead') dmg *= 1 + setOf(attacker).bonus.holy;   // S13: Weißer Orden
   if (target.faction === 'undead' || MONSTERS[target.mtype]?.faction === 'undead') dmg *= 1 + afx(attacker, 'slayer') + elx(attacker, 'slayer');   // S15 P2: Totenbann
   if ((attacker.status || []).some(s => s.key === 'omegawrath')) dmg *= target.faction === 'undead' ? 1.35 : 1.1;   // Phase 7: Gebet an Omega; S13 (Nutzer): gegen Untote stärker
@@ -3306,7 +3315,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.mtype === 'ghoul' && target.alive && target.kind !== 'caravan') addStatus(target, { key: 'grabbed', name: 'Gepackt', left: 1500, desc: 'Langsamer (−50 %).' });
   if (attacker.mtype === 'wraith' && target.stamina != null) { target.stamina = Math.max(0, target.stamina - 15); fx(target.x, target.y - 14, 'frost', 5); }
   if (target.mtype === 'wraith' && target.alive && !(target.phased > performance.now())) target.phased = performance.now() + 900;   // Balance-Runde: ein abgeprallter Hieb verlängert die Körperlosigkeit nicht (vorher: Dauerhauen = Geist nie treffbar)
-  if (crush && target.alive && !target.downed && !(target.poiseUntil > performance.now())) { const st = MONSTERS[target.mtype]?.boss ? 300 : 650; target.stagger = Math.max(target.stagger || 0, st); target.swing = 0; target.telegraph = 0; target.windup = false; if (target.kind === 'enemy') target.poiseUntil = performance.now() + st + 1200; }   /* Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit) */   // Wucht: niemand bleibt stehen, wie er stand
+  if (crush && target.alive && !target.downed && !poised0) { const st = MONSTERS[target.mtype]?.boss ? 300 : 650; target.stagger = Math.max(target.stagger || 0, st); target.swing = 0; target.telegraph = 0; target.windup = false; if (target.kind === 'enemy') target.poiseUntil = performance.now() + st + 1200; }   /* Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit) */   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
   const fl = feelOf(attacker), mine = attacker === S.player;
@@ -3320,7 +3329,7 @@ function hit(attacker, target, mult, kind = 'physical') {
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
-  if (!target.alive || target.invuln || (target === S.player && S.dbg?.god)) return;   // Debug: Gottmodus
+  if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
   if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
@@ -3809,6 +3818,7 @@ function hurtFromProjectile(attacker, target, p) {
   if (p.kind === 'fire') { fx(p.x, p.y, 'fire', 12); sfx('fire', 0.5, earVol(target)); }
   if (p.kind === 'shadow') fx(p.x, p.y, 'shadow', 10);
   if (target.cover && guarded({ x: p.x - p.vx * 20, y: p.y - p.vy * 20, name: attacker.name, mtype: attacker.mtype }, target, dmg)) return;   // Geschoss aus der Blickrichtung: blocken, nicht parieren
+  if (p.leech && attacker?.alive) B.heal(attacker, dmg * p.leech);   /* §5g.2 Blutpeitsche: Lebensraub */
   hurt(target, dmg, attacker, attacker.name, crit, p.kind === 'fire' ? 'fire' : p.spell || p.kind === 'shadow' ? (p.kind === 'frost' ? 'frost' : 'magic') : 'physical');   // S15 Fehlersuche: Zaubergeschosse sind Magieschaden, nicht körperlich
   if (attacker.skills) attacker.skills.archery = Math.min(100, (attacker.skills.archery || 0) + 0.15);
 }
@@ -11046,6 +11056,7 @@ function talk(npc) {
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
   if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
+  { const sg = stigmaOf(npc); if (sg?.deny && !npc.guard && npc.key !== 'aldis') return UI.dialogue(npc, `${sg.greet} (Hier bekommst du nichts — keinen Handel, kein Bett, keine Heilung.)`, leave); }   /* §5g.2 Stigma: Abweisung; Mutter Aldis hört dich an (Heilung) */
   if (npc.enc) return encTalk(npc);                                     // S13: Begegnung mit Entscheidung
   if (npc.horseBreeder) return UI.dialogue(npc, npc.greet, [{ text: 'Zeig mir deine Pferde.', fn: () => { UI.closeDialogue(); UI.openModal('stable', npc); } }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);   // S15 Pferdehof
   if (npc.beastTrader) return beastMenu(npc);                            // S13: Tiere kaufen
@@ -11101,7 +11112,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -11218,6 +11229,7 @@ function grantLegend(fac, title, why) {
 }
 const rankName = f => { const r = S.ranks[f] ?? -1; return S.legend?.[f] || (r >= 0 && FACTIONS[f]?.ranks ? FACTIONS[f].ranks[Math.min(r, FACTIONS[f].ranks.length - 1)] : null); };
 function contextGreet(npc, base) {
+  { const sg = stigmaOf(npc); if (sg) return sg.greet; }   /* §5g.2: wer weiß oder sieht, was du bist */
   if (S.flags.garmadonSlain && npc.guard && ((npc.seed | 0) + (S.day | 0)) % 3 === 0) return '„Königsmörder! Die Wache grüßt dich. Ohne dich stünden die Toten vor dem Tor.“';   // Phase 6 §64
   const rn = npc.faction && npc.guard && rankName(npc.faction);
   if (rn && ((S.ranks[npc.faction] ?? -1) >= 1 || S.legend?.[npc.faction])) return S.legend?.[npc.faction] ? `„${rn}! Die Legende persönlich. Wir stehen bereit.“` : `„Zu Befehl, ${rn}.“`;   // Wachen grüßen nach Rang                                   // fester Zufall je Person und Stunde: nicht bei jedem Klick ein anderer Satz
@@ -11761,7 +11773,7 @@ function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction]
 // S15 P7 Verbotene Magie: Wer vor Zeugen einer Macht zaubert, die diese Schule verbietet, bekommt Kopfgeld bei ihr (60, Orden 120).
 // Ab der dritten bezeugten Tat jagen Magierjäger: Kopfgeldjäger mit „Bann“ (Zauber bricht ab, Mana halbiert, 5 s Stille).
 const FORBIDDEN_TITLES = new Set(['necromancer', 'warlock']);
-const schoolOf = key => ABILITIES[key]?.school || (FORBIDDEN_TITLES.has(ABILITIES[key]?.title) ? 'shadow' : null);
+const schoolOf = key => ABILITIES[key]?.school || (FORBIDDEN_TITLES.has(ABILITIES[key]?.title) ? 'shadow' : ABILITIES[key]?.title === 'vampire' && key !== 'feed' ? 'blood' : null);   /* §5g.2: Blutmagie; Trinken melden die Zeugen selbst (bloodSeen) */
 function magicSeen(p, key) {
   const school = schoolOf(key); if (!school || p !== S.player) return 0;
   const town = townAt(p.x / TS | 0, p.y / TS | 0, 4);
@@ -12165,7 +12177,8 @@ function addFame(n, r = fameRegion(), why = '') {
 }
 const repPrice = (npc, isBuy) => { const t = npc?.faction && S.factions[npc.faction] != null ? repTier(npc.faction) : null, f = npc && fearedBy(npc) ? fearLvl() : 0;
   const r = npc?.faction ? Math.max(0, S.ranks[npc.faction] ?? -1) : 0, lg = npc?.faction && S.legend?.[npc.faction] ? 0.25 : 0, rb = Math.min(0.35, r * 0.03 + lg);   // MP2 §80: Rang und Legende senken Preise
-  return (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1) * (isBuy && npc?.faction === 'aurel' && S.flags.coreRoute === 'aurel' ? 0.9 : 1); };   /* S15 Fehlersuche: Corvinus-Handel senkt Aurelions Preise um 10 % */   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
+  const sg = stigmaOf(npc), st = sg ? (isBuy ? sg.price : 1 / sg.price) : 1;   /* §5g.2 Stigma */
+  return st * (!t || !t.price ? 1 : isBuy ? t.price : 1 / t.price) * (isBuy ? 1 + 0.2 * f : 1 - 0.15 * f) * (isBuy ? 1 - rb : 1 + rb * 0.5) * omegaPriceMul(npc, isBuy) * (isBuy && npc && fameOf(fameRegion(npc)) >= 60 ? 0.95 : 1) * (isBuy && npc?.faction === 'aurel' && S.flags.coreRoute === 'aurel' ? 0.9 : 1); };   /* S15 Fehlersuche: Corvinus-Handel senkt Aurelions Preise um 10 % */   // S15 P8: Berühmte zahlen weniger   // S12: Kettenleute zahlen drauf
 function price(key, isBuy, npc, inst = null) {
   if (npc?.karakBazaar && S.flags.karakRefused) return Math.round(price(key, isBuy, { ...npc, karakBazaar: false }, inst) * (isBuy ? 1.3 : 0.8));   /* Karak-Atar: Zoll verweigert */
   if (!isBuy) return Math.max(1, Math.min(rawPrice(key, false, npc, inst), rawPrice(key, true, npc, inst) - 1));   // S15 Fehlersuche: Kaufen und sofort Verkaufen brachte Gewinn
@@ -12438,6 +12451,112 @@ function titleTick(c, dt) {
   }
   setTres(c, v);
 }
+// ================= Vampir (§5g.2 Blutkult, Scheibe 1) =================
+// Der Fluch gilt, solange „Vampir“ unter den Titelklassen steht — getragen oder nicht (sonst wäre Titelwechsel ein Sonnenschirm).
+// Blutdurst liegt in c.tres.blood. Sonne brennt draußen bei Tag; nachts und satt heilen Wunden. Bei 100 Raserei.
+// Trinken nur von Wehrlosen; Zeugen machen daraus Stigma (STIGMA in data.js): Preise, Abweisung, Kopfgeld, Ordensjäger.
+// Heilbar (Nutzer: beliebig oft): Mutter Aldis (Buße + Nachtwache) oder die Heilquelle von Sankt Serin bei Sonnenaufgang.
+const isVamp = c => !!c && (c.titleClasses || []).includes('vampire');
+const bloodOf = c => (c.tres ||= {}).blood ??= TITLE_CLASSES.vampire.resource.start;
+const setBlood = (c, v) => { (c.tres ||= {}).blood = clamp(v, 0, 100); };
+const hooded = c => /Kapuze|Haube|Gugel|Kutte|Kapuz/i.test(ITEMS[c.equip?.head?.key]?.name || '');
+function vampHint(c, k, txt) { const V = (c.vamp ||= {}), H = (V.hints ||= {}); if (H[k] || c !== S.player) return; H[k] = 1; log(txt, 'party'); }
+function sunOn(c) {                                            /* 0…1: wie stark die Sonne trifft */
+  const D = DUNGEONS[c.map]; if (c.map !== 'world' && !D?.open) return 0;
+  if (c.map === 'world' && HOUSES.some(b => b.map === 'world' && R.playerInside(b, c))) return 0;
+  const h = hourNow(), day = h >= 6 && h < 19 ? 1 : (h >= 5 && h < 6) || (h >= 19 && h < 20) ? 0.5 : 0; if (!day) return 0;
+  const w = S.weather, wk = w === 'clear' || w === 'heat' ? 1 : w === 'cloudy' || w === 'sandstorm' ? 0.5 : w === 'bloodrain' ? 0 : 0.3;
+  return day * wk * (hooded(c) ? 0.5 : 1);
+}
+function vampTick(c, dt) {
+  const s = dt / 1000, V = (c.vamp ||= {}), now = performance.now();
+  if (!c.alive) return;
+  if (!c.downed) setBlood(c, bloodOf(c) + s * 4 / 60);       /* +4 je Spielstunde (1 s = 1 Spielminute); am Boden steht er still */
+  const sun = sunOn(c);
+  if (sun > 0) {
+    const k = sun * (bloodOf(c) >= 70 ? 1.5 : 1) * (c.downed ? 0.5 : 1);   /* Nutzer: am Boden brennt es halb weiter — die Gruppe muss dich in den Schatten holen */
+    V.burn = (V.burn || 0) + s * 1.2 * k;
+    if (V.burn >= 1) { const n = Math.floor(V.burn); V.burn -= n; hurt(c, n, null, 'Sonnenlicht'); fx(c.x, c.y - 18, 'dust', 2); }
+    addStatus(c, { key: 'sunburn', name: 'Sonnenbrand', left: 1500, desc: 'Die Sonne brennt: Schaden jede Sekunde, 20 % schwächere Schläge. Haus, Höhle, Kapuze oder Wolken helfen.' });
+    vampHint(c, 'sun', 'Die Sonne brennt. Geh in ein Haus, unter die Erde, zieh eine Kapuze über — oder warte auf Wolken.');
+  } else if (nightNow() && bloodOf(c) < 50 && !c.downed) { V.mend = (V.mend || 0) + s * 0.4; if (V.mend >= 1) { B.heal(c, Math.floor(V.mend)); V.mend %= 1; } }
+  const b = bloodOf(c);
+  if (b >= 70) vampHint(c, 't70', 'Blutdurst 70: Du schlägst härter, aber man sieht es dir an — rote Augen, bleiche Haut. Leute in der Nähe merken es.');
+  if (b >= 90) vampHint(c, 't90', 'Du riechst Blut. Trink bald — bei 100 packt dich die Raserei.');
+  if (b >= 100 && !c.downed && !(V.frenzyT > now)) vampFrenzy(c);
+  for (const t of S.ents[c.map]) if (t.thrallOf === c.id && now > t.thrallUntil) {   /* Bannblick verklingt: der Mensch ergibt sich */
+    Object.assign(t, { servant: null, pet: false, thrallOf: null, surrendered: true, disarmed: true, aggroId: null, fleeing: true }); float(t, 'frei', 'rgba(220,200,200,ALPHA)'); }
+}
+function vampFrenzy(c) {
+  const V = c.vamp, dur = (c.attributes?.willpower || 10) >= 14 ? 2000 : 4000; V.frenzyT = performance.now() + dur; setBlood(c, 85);
+  addStatus(c, { key: 'vamp_frenzy', name: 'Raserei', left: dur, desc: 'Der Durst führt die Hand.' });
+  const t = S.ents[c.map].filter(e => e !== c && e.alive && !e.downed && (e.kind === 'npc' && !e.undead && !e.robot || e.kind === 'player') && dist(e, c) < 220).sort((a, b) => dist(a, c) - dist(b, c))[0];
+  fx(c.x, c.y - 14, 'blood', 14); camShake(3, 200);
+  if (c === S.player) { UI.toast('RASEREI', 2200); log('Der Durst nimmt dir die Hände. Du greifst an, was atmet.', 'combat'); }
+  if (!t) return;
+  const a = Math.atan2(t.y - c.y, t.x - c.x); c.x = t.x - Math.cos(a) * 22; c.y = t.y - Math.sin(a) * 22; c.aim = a;
+  hit(c, t, 1.2); if (c === S.player) bloodSeen(c, t);
+}
+const vampHuman = e => e && (e.kind === 'npc' ? !e.undead && !e.robot && !e.goblin && e.faction !== 'undead'
+  : e.kind === 'enemy' && HUMANOID.has(e.mtype) && !/goblin|automat|skeleton|bone|death|necro|shade|angel/.test(e.mtype));
+const asleep = e => e.kind === 'npc' && e.villager && nightNow() && !e.vx && !e.vy && HOUSES.some(b => b.map === e.map && R.playerInside(b, e));
+function feedTarget(p) {
+  const near = S.ents[p.map].filter(e => e !== p && dist(e, p) < 60 + (e.r || 10) && !S.party.includes(e.id));
+  return near.find(e => e.alive && vampHuman(e) && (e.downed || e.surrendered || e.captive || e.shackled || asleep(e)))
+    || near.find(e => (e.alive && e.downed || e.kind === 'corpse') && MONSTERS[e.mtype]?.prey && !e.drained);
+}
+function bloodSeen(p, v) {                                     /* Zeugen: diese Macht weiß jetzt, was du bist */
+  const ws = S.ents[p.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && e !== v && !e.undead && e.faction !== 'undead' && e.faction !== 'blut' && !S.party.includes(e.id) && dist(e, p) < 280 && clearLine(e, p));
+  if (!ws.length) return 0;
+  const town = townAt(p.x / TS | 0, p.y / TS | 0, 4), facs = new Set(ws.map(w => w.faction && STIGMA.vampire[w.faction] ? w.faction : town ? townFac(town) : 'valen'));
+  const day = S.day | 0, K = ((p.stigma ||= {}).vampire ||= {}), V = (p.vamp ||= {});
+  for (const f of facs) { const row = STIGMA.vampire[f]; if (!row) continue;
+    if (K[f] == null) log(`${FACTIONS[f]?.name || f}: Man weiß jetzt, was du bist.`, 'faction'); K[f] = day;
+    if (row.report === 'guard' && (V.rep ||= {})[f] !== day) { V.rep[f] = day; addBounty(f, 60, 'Blutsauger'); }
+    if (row.report === 'hunt') { const n = S.flags.vampOrderHeat = (S.flags.vampOrderHeat || 0) + 1;
+      if (n === 2 || n % 4 === 0) { afterAvenge('order', 3, 'Vampirjäger des Ordens', ri(1, 2), 'order', 'Vampirjäger'); log('Der Orden hat von dir gehört. Vampirjäger werden kommen.', 'faction'); } } }
+  for (const w of ws) { w.alarmed = true; if (!GUARDISH(w)) w.fleeing = true; }
+  float(p, 'Blutsauger!', 'rgba(200,60,60,ALPHA)'); return facs.size;
+}
+// Stigma: Wer weiß es (bezeugt) — oder sieht es gerade (Sonnenbrand, rote Augen ab 70, ohne Kapuze, ganz nah)? Nach der Heilung
+// erinnert man sich noch 10 Tage.
+function stigmaOf(npc, kind = 'vampire') {
+  const p = S.player; if (!p || !npc || npc.kind !== 'npc') return null;
+  const f = npc.faction || (npc.homeTown && townFac(npc.homeTown)) || null, row = f && STIGMA[kind]?.[f]; if (!row) return null;
+  const vamp = isVamp(p), knew = p.stigma?.[kind]?.[f] != null, cured = p.vamp?.cured != null && (S.day | 0) - p.vamp.cured < 10;
+  if (knew && (vamp || cured)) return row;
+  if (vamp && dist(npc, p) <= 120 && (stat(p, 'sunburn') || bloodOf(p) >= 70) && !hooded(p)) return row;
+  return null;
+}
+function cureTitle(key, where, wipeGrades) {                  /* Nutzer: Heilung beliebig oft — kein forsaken, später neu ansteckbar */
+  const p = S.player, T = TITLE_CLASSES[key];
+  p.titleClasses = (p.titleClasses || []).filter(k => k !== key);
+  if (p.titleClass === key) { p.titleClass = null; recalc(p); syncHotbar(); }
+  if (p.tres) delete p.tres[T.resource.key];
+  if (wipeGrades && p.tgrade) delete p.tgrade[key];
+  if (p.pal?.glow === T.glow) { p.pal = { ...p.pal }; if (p.vamp?.glow0) p.pal.glow = p.vamp.glow0; else delete p.pal.glow; }
+  (p.vamp ||= {}).cured = S.day | 0; p.status = (p.status || []).filter(s => s.key !== 'sunburn' && s.key !== 'vamp_frenzy');
+  chronicle(`${p.name} ist vom Blut geheilt`, 'class', `${where}. Das Herz schlägt wieder warm.`);
+  UI.toast('GEHEILT — KEIN VAMPIR MEHR', 4200); log('Das Blut ist fort. Man erinnert sich noch eine Weile an dich — zehn Tage, sagen sie.', 'party'); UI.refreshHUD();
+}
+function vampChoices(npc, choices) {
+  const p = S.player; if (!isVamp(p)) return;
+  const say = (t, more = []) => UI.dialogue(npc, t, [...more, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (npc.key === 'aldis') choices.unshift({ text: 'Um Heilung vom Blut bitten (Buße 200 Gold oder Ansehen beim Orden)', fn: () => {
+    const free = (S.factions.order || 0) >= 0; if (!free && S.gold < 200) return say('„Buße zuerst. Zweihundert Gold für die Armen — oder zeig mir, dass der Orden dir vertraut.“');
+    const h = hourNow(); if (h < 21 && h >= 6) return say('„Die Nachtwache beginnt nach neun. Komm in der Dunkelheit wieder — und bleib bis zum Morgen. Der Durst wird schreien.“');
+    if (!free) S.gold -= 200;
+    say('„Knie nieder. Bis die Sonne kommt, verlässt du diesen Raum nicht. Was immer der Durst dir sagt.“', [{ text: 'Die Nachtwache halten', fn: () => {
+      UI.closeDialogue(); const wait = ((30 - hourNow()) % 24) * 60; UI.sleepFade('Die Nachtwache. Der Durst schreit, Mutter Aldis betet.'); passTime(Math.max(30, wait));
+      setBlood(p, bloodOf(p) + 40);
+      if (bloodOf(p) >= 100 && (p.attributes.willpower || 10) + ri(0, 8) < 16) { setBlood(p, 85); S.factions.order = (S.factions.order || 0) - 10;
+        log('Kurz vor dem Morgen reißt dich der Durst hoch. Du stürzt dich auf die Priesterin — die Brüder werfen dich hinaus.', 'combat'); UI.toast('NACHTWACHE GESCHEITERT', 3000); return; }
+      cureTitle('vampire', 'Nachtwache bei Mutter Aldis in Sonnwacht'); S.factions.order = (S.factions.order || 0) + 10; if (p.stigma?.vampire) delete p.stigma.vampire.order; } }]); } });
+  if (npc.cityRole === 'serinBless') choices.unshift({ text: 'In die Heilquelle von Sankt Serin steigen (nur bei Sonnenaufgang, 5–7 Uhr)', fn: () => {
+    const h = hourNow(); if (h < 5 || h >= 7) return say('„Die Quelle heilt das Blut nur, wenn das erste Licht hineinfällt. Komm bei Sonnenaufgang.“');
+    UI.closeDialogue(); UI.sleepFade('Das Wasser ist hell und kalt. Du gehst unter — und eine Stunde lang weißt du nichts.'); passTime(60);
+    cureTitle('vampire', 'Heilquelle von Sankt Serin', true); chronicle('Aurelion erfährt von einem geheilten Vampir', 'news', 'Die Tempelheiler von Sankt Serin melden es der Akademie.'); } });
+}
 // Ausweichen im letzten Moment (Hieb, Geschoss oder Flächenangriff hätte getroffen): einmal je Rolle. Zählt für die Probe
 // der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
 function evaded(t) {
@@ -12541,6 +12660,40 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
       for (let i = 0; i < 3; i++) { const d = spawnEnemy('goblin_warrior', p.map, (p.x / TS | 0) + [-1, 1, 0][i], (p.y / TS | 0) + [1, 1, -1][i], { level: Math.max(2, p.level) });
         if (d) { Object.assign(d, { name: 'Stammeskrieger', servant: p.id, transient: true, until: performance.now() + 25000, soulServ: true, goblin: true }); fx(d.x, d.y - 8, 'dust', 10); } }
       float(p, 'Für die Gruben!', 'rgba(154,208,90,ALPHA)', true); sfx('metal', 0.6, 1); return true; }
+    case 'feed': {                                           /* §5g.2 */
+      const t = feedTarget(p); if (!t) { UI.toast('Niemand Wehrloses in Reichweite — am Boden, ergeben, gefesselt oder schlafend.'); return false; }
+      const V = (p.vamp ||= {}), fed = (V.fedOn ||= {}), day = S.day | 0; p.aim = Math.atan2(t.y - p.y, t.x - p.x); act(p, 'strike', 900, t);
+      fx(t.x, t.y - 14, 'blood', 12); sfx('hit', 0.4);
+      if (!vampHuman(t)) { t.drained = true; setBlood(p, Math.max(Math.min(bloodOf(p), 50), bloodOf(p) - 10)); log('Tierblut. Es füllt, aber es sättigt nicht.', 'party'); return true; }
+      setBlood(p, bloodOf(p) - 45);
+      if (fed[t.id] === day) { log(`${t.name || 'Das Opfer'} hält ein zweites Mal nicht aus.`, 'death'); die(t, 'Ausgeblutet', p); if (t.kind === 'npc') bloodshed(t, false); }
+      else { fed[t.id] = day; addStatus(t, { key: 'drained', name: 'Ausgezehrt', left: 1440000, desc: 'Blass und schwach. Ein zweites Mal heute wäre tödlich.' }); float(t, 'ausgezehrt', 'rgba(200,170,170,ALPHA)'); }
+      for (const m of partyMembers()) if (dist(m, p) < 300 && !isVamp(m)) { m.morale = Math.max(0, (m.morale ?? 50) - 10); float(m, 'Bei den Göttern …', 'rgba(200,180,160,ALPHA)'); }
+      bloodSeen(p, t); vampHint(p, 'feed', 'Getrunken: Blutdurst −45. Wer es sieht, erzählt es weiter — Wachen setzen Kopfgeld aus, der Orden schickt Jäger. Ein zweites Mal am selben Tag tötet.');
+      return true; }
+    case 'blood_lash': {
+      const f = foes.find(x => dist(p, x) < 360); const a = f ? Math.atan2(f.y - p.y, f.x - p.x) : (p.aim ?? 0);
+      S.projectiles.push({ id: uid(), kind: 'shadow', map: p.map, x: p.x + Math.cos(a) * 14, y: p.y - 12 + Math.sin(a) * 8, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5,
+        owner: p.id, dmg: (18 + p.attributes.intelligence * 1.3) * pact, life: 1400, team: 'player', splash: 0, leech: 0.4 });
+      fx(p.x, p.y - 14, 'blood', 6); return true; }
+    case 'mist_step': {
+      const a = p.aim ?? 0; let tx = p.x, ty = p.y; for (let d = 20; d <= 140; d += 10) { const x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d; if (solidTile(p.map, x, y)) break; tx = x; ty = y; }
+      fx(p.x, p.y - 10, 'ghost', 10); p.x = tx; p.y = ty; p.mistUntil = performance.now() + 500; fx(tx, ty - 10, 'ghost', 10);
+      const lost = foes.filter(f => f.aggroId === p.id && dist(f, p) < 320).sort((a2, b2) => dist(a2, p) - dist(b2, p))[0]; if (lost) { lost.aggroId = null; lost.aiState = 'idle'; float(lost, '?', 'rgba(220,220,220,ALPHA)'); }
+      return true; }
+    case 'thrall_gaze': {
+      const t = S.ents[p.map].find(e => e.alive && !e.downed && e.kind === 'enemy' && vampHuman(e) && !e.boss && !MONSTERS[e.mtype]?.boss && (e.fleeing || e.surrendered) && dist(e, p) < 220);
+      if (!t) { UI.toast('Kein Mensch in Reichweite, der flieht oder sich ergibt.'); return false; }
+      Object.assign(t, { servant: p.id, pet: true, thrallOf: p.id, thrallUntil: performance.now() + 40000, surrendered: false, fleeing: false, aggroId: null, disarmed: false });
+      fx(t.x, t.y - 14, 'blood', 10); float(t, 'gebannt', 'rgba(200,60,60,ALPHA)'); return true; }
+    case 'bat_swarm': {
+      for (const f of foes) if (dist(p, f) < 90) { f.cowed = performance.now() + 4000; addStatus(f, { key: 'chilled', name: 'Fledermäuse', left: 4000, desc: 'Fledermäuse im Gesicht: langsamer, schwächere Schläge.' }); }
+      fx(p.x, p.y - 20, 'shadow', 18); S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ring', s: 1.6, life: 600, maxLife: 600 }); return true; }
+    case 'red_harvest': {
+      if (bloodOf(p) > 40) { UI.toast('Zu durstig für die Rote Ernte (höchstens 40 Blutdurst).'); return false; }
+      let got = 0; for (const f of foes) if (dist(p, f) < 120 && stat(f, 'bleeding')) { const d = (16 + p.attributes.intelligence * 1.2) * pact; hurt(f, d, p, 'Rote Ernte', false, 'magic'); got += d; fx(f.x, f.y - 12, 'blood', 10); }
+      if (!got) { UI.toast('Kein blutender Feind in der Nähe.'); return false; }
+      B.heal(p, got / 2); float(p, '+' + Math.round(got / 2), 'rgba(200,60,60,ALPHA)'); S.fx.push({ x: p.x, y: p.y, vx: 0, vy: 0, type: 'ring', s: 2, life: 700, maxLife: 700 }); return true; }
     case 'scrap_bomb': {
       const a = p.aim ?? 0, bx = p.x + Math.cos(a) * 110, by = p.y + Math.sin(a) * 110;
       for (const f of foes) if (Math.hypot(f.x - bx, f.y - by) < 80) { hurt(f, 18 + (p.attributes.strength || 8) * 1.2 + p.level, p, 'Schrottbombe'); if (chance(0.5)) applySpellStatus(f, { key: 'burning', chance: 1 }, p); f.stagger = Math.max(f.stagger || 0, 400); }
@@ -12684,8 +12837,8 @@ function useAbility(key) {
     magicSeen(p, key);                                        // S15 P7: Totenmagie vor Zeugen
     p.cooldowns[key] = ab.cd * cdMul(p); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (cost === 'all') setTres(p, 0); else if (cost) setTres(p, v - cost);
-    if (ab.gain) corrupt(p, ab.gain);
-    titleDeed(p);
+    if (ab.gain) { if (ab.title === 'vampire') setBlood(p, bloodOf(p) + ab.gain); else corrupt(p, ab.gain); }
+    if (ab.title !== 'vampire' || nightNow()) titleDeed(p);   /* Vampir: Taten zählen nur nachts */
     return UI.refreshHUD();
   }
   if (ab.mana && p.mana < ab.mana) return UI.toast(p.maxMana ? 'Zu wenig Mana' : 'Das braucht Mana — nur Zauberkundige haben welches.');
@@ -13449,11 +13602,28 @@ function debugSections() {
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
     }],
     fortDebug(tp),   /* §5d.1 Eisenfeste: Festungsleben, Sklavenmarkt, Übernahme */
+    ['Blutkult: Vampir (§5g.2, Scheibe 1)', `<input id="dbBlood" placeholder="Blutdurst 0–100" size="10">`, {
+      'Vampir werden': () => { if (!unlockTitle('vampire', 'Debug')) UI.toast('Geht nicht (Mönch? zwei Titel?)'); },
+      'Blutdurst setzen': () => { if (!isVamp(p)) return UI.toast('Erst Vampir werden.'); setBlood(p, +v('dbBlood') || 0); UI.refreshHUD(); },
+      'Mittag, klarer Himmel (Sonne)': () => { S.minute = 12 * 60; S.weather = 'clear'; S.weatherLeft = 300; },
+      'Mitternacht': () => { S.minute = 0; },
+      'Wehrlosen Menschen hinlegen': () => { const q = freeSpotNear(S.map, (p.x / TS | 0) + 1, p.y / TS | 0, 2), c = makeChar({ name: 'Wehrloser', map: S.map, x: q.x, y: q.y, prof: 'Tagelöhner' });
+        Object.assign(c, { kind: 'npc', transient: true, surrendered: true, anchor: { x: q.x, y: q.y } }); S.ents[S.map].push(c); UI.toast('Liegt bereit (ergeben). Fähigkeit „Trinken“.'); },
+      '3 Blutphiolen': () => { addItem(p, 'blutphiole', 3); },
+      'Heilen (wie Orden)': () => { if (isVamp(p)) cureTitle('vampire', 'Debug'); },
+      'Stigma zeigen': () => { const K = p.stigma?.vampire || {}; UI.toast(Object.keys(K).length ? 'Wissen es: ' + Object.keys(K).map(f => FACTIONS[f]?.name || f).join(', ') : 'Niemand weiß es.', 4000); },
+      'Stigma vergessen': () => { if (p.stigma) delete p.stigma.vampire; },
+    }],
     ['Spielstand (Audit D6)', '', {
       'Größe messen und Rundlauf prüfen': async () => { const t0 = performance.now(), str = saveData(), t1 = performance.now(), z = await zipSave(str), t2 = performance.now(), back = await unzipSave(z);
         const msg = `JSON ${(str.length / 1e6).toFixed(2)} Mio. Zeichen (${Math.round(t1 - t0)} ms) → gepackt ${(z.length / 1e3).toFixed(0)} Tsd. (${Math.round(t2 - t1)} ms), Rundlauf ${back === str ? 'gleich' : 'FEHLER'}`;
         log(msg, 'world'); UI.toast(msg, 5000); },
       'Jetzt komprimiert speichern': () => { S._quiet ? UI.toast('Stumm (Test): kein Speichern.') : save(); },
+    }],
+    ['Krieg und Gruppe (Audit T02, T05)', '', {
+      'Krieg 10 Tage vorspulen (ohne Feldschlachten)': () => { const m0 = P().map; P().map = 'deep'; try { for (let d = 0; d < 10; d++) { for (let i = 0; i < 4; i++) SIM.warTick(); SIM.warDay(); } } finally { P().map = m0; }
+        const o = {}; for (const n of Object.values(S.war.nodes)) o[n.owner || 'frei'] = (o[n.owner || 'frei'] || 0) + 1; UI.toast('Knoten: ' + Object.entries(o).map(([k, n]) => `${FACTIONS[k]?.name || k} ${n}`).join(', '), 5000); },
+      'Führung +10': () => leadGrow(10),
     }],
     ['Klang & Effekte (Audit C3–C5)', sel('dbAmb', ['greenmark', 'forest', 'marsh', 'desert', 'blight', 'deadland', 'aurel', 'eisen', 'frozen', 'coast', 'under'].map(k => [k, k])), {
       'Umgebung vorspielen (8 s)': () => { ambience(true); const k = v('dbAmb'); for (let i = 0; i < 8; i++) setTimeout(() => ambienceTick(k === 'under' ? 'blight' : k, true, false, k === 'under'), i * 1000); UI.toast(`Umgebungsklang: ${k}`); },
@@ -15865,7 +16035,7 @@ export function selftest() {
     p.level = 8; (p.tdeed ||= {}).necromancer = 30; const T = gradeTalk({ key: 'ysra', name: 'Ysra' }); T.fn(); UI.closeDialogue();
     const g2 = gradeOf(p) === 2 && titleAbilities(p).includes('corpse_blast') && !titleAbilities(p).includes('soul_bind');
     const Tw = TITLE_CLASSES.warlock, old = Math.max(1, ...Tw.abilities.map(k => Tw.grades.findIndex(g => g.includes(k)) + 1));
-    const data = Object.values(TITLE_CLASSES).every(T2 => T2.grades.flat().every(k => ABILITIES[k]?.title) && T2.mentor && (NPCS.some(n => n.key === T2.mentor) || GOBLIN_VILLAGE.some(n => n.key === T2.mentor)) && T2.gradeNames.length === 3);
+    const data = Object.values(TITLE_CLASSES).every(T2 => T2.grades.flat().every(k => ABILITIES[k]?.title) && T2.mentor && (NPCS.some(n => n.key === T2.mentor) || GOBLIN_VILLAGE.some(n => n.key === T2.mentor) || T2.mentor === 'hedda') && T2.gradeNames.length === 3);   /* §5g.2: Hedda ist flüchtig (Katakomben, Scheibe 3) */
     return g1 && early && g2 && old === 3 && data;
   }));
   ok('Nekromant Grad II/III (S15): Leichenbersten trifft im Umkreis; Seelenfessel lässt den Toten in eigener Gestalt dienen; Einsamer Rufer schließt Legion aus', sandbox(() => {
@@ -16308,6 +16478,53 @@ export function selftest() {
     const clean = [...s].every(ch => { const c = ch.charCodeAt(0); return c >= 32 && (c < 0xd800 || c > 0xdfff); });
     return same && clean && s.length < u8.length * 0.6 && S.ents.world.every(e => e.kind !== 'prop' || e.sick === undefined);
   })());
+  ok('Blutkult S1 (§5g.2): Vampir-Schema und Stigma-Tabelle; Sonne nach Tageszeit, Wetter, Kapuze; Brand und Sonnenbrand; Durst +4 je Spielstunde', sandbox(() => {
+    const p = stage(), W0 = S.weather; const rows = Object.entries(STIGMA.vampire), schema = rows.every(([f, r]) => FACTIONS[f] && 'price' in r && 'deny' in r && 'report' in r && r.greet) && TITLE_CLASSES.vampire.reversible;
+    try {
+      unlockTitle('vampire', 'Probe'); const got = isVamp(p) && p.titleClass === 'vampire';
+      p.map = 'world'; p.x = 20 * TS; p.y = 20 * TS; S.weather = 'clear'; S.minute = 12 * 60; const noon = sunOn(p);
+      S.weather = 'fog'; const fog = sunOn(p); S.weather = 'clear'; p.equip.head = mkItem('totenrufer_kapuze'); const hood = sunOn(p); p.equip.head = null;
+      S.minute = 0; const night = sunOn(p); S.minute = 12 * 60;
+      const h0 = p.hp; vampTick(p, 5000); const burnt = p.hp < h0 && stat(p, 'sunburn');
+      S.minute = 0; p.status = []; setBlood(p, 30); vampTick(p, 60000); const thirst = Math.abs(bloodOf(p) - 34) < 0.2;
+      return schema && got && noon > 0.9 && Math.abs(fog - 0.3) < 0.01 && Math.abs(hood - 0.5) < 0.01 && night === 0 && burnt && thirst;
+    } finally { S.weather = W0; }
+  }));
+  ok('Blutkult S1: Trinken nur von Wehrlosen (−45), zweites Mal am selben Tag tötet; Raserei bei 100; Zeugen: Kopfgeld bei Valen, Orden schickt Jäger; Heilung beliebig oft', sandbox(() => {
+    const p = stage(), A0 = structuredClone(S.after || {});
+    try {
+      unlockTitle('vampire', 'Probe'); setBlood(p, 80);
+      const v = actor(p.x + 30, p.y, { kind: 'npc', name: 'Opfer' }); const none = !feedTarget(p); v.downed = true;
+      const ok1 = titleAbility(p, 'feed', ABILITIES.feed) && Math.abs(bloodOf(p) - 35) < 0.01 && stat(v, 'drained'); titleAbility(p, 'feed', ABILITIES.feed); const killed = !v.alive;
+      const g = actor(p.x + 80, p.y, { kind: 'npc', name: 'Wache', faction: 'valen', guard: true }); const b0 = S.bounty?.valen || 0;
+      const w2 = actor(p.x - 60, p.y, { kind: 'npc', name: 'Bruder', faction: 'order' });
+      bloodSeen(p, null); bloodSeen(p, null); const seen = (S.bounty?.valen || 0) === b0 + 60 && p.stigma.vampire.valen === (S.day | 0) && (S.after?.rev || []).some(r => r.fac === 'order');
+      const greet = stigmaOf(g)?.greet === STIGMA.vampire.valen.greet;
+      g.alive = false; w2.alive = false; const t = actor(p.x + 40, p.y + 10, { kind: 'npc', name: 'Passant' }); setBlood(p, 100); vampTick(p, 16); const frenzy = p.vamp.frenzyT > performance.now() && Math.abs(bloodOf(p) - 85) < 0.01;
+      cureTitle('vampire', 'Probe'); const cured = !isVamp(p) && !p.forsaken?.vampire; const again = unlockTitle('vampire', 'Probe zwei') && isVamp(p);
+      return none && ok1 && killed && seen && greet && frenzy && cured && again;
+    } finally { S.after = A0; }
+  }));
+  ok('Blutkult S1: Koop-Held als Vampir bekommt Durst über tickCombatant; Blutphiole −25; Heilmittel wirken halb', sandbox(() => {
+    const p = stage(), h = actor(p.x + 50, p.y, { kind: 'player', name: 'Gast' }); h.coopHero = true; h.titleClasses = ['vampire']; setBlood(h, 30);   /* makeChar übernimmt coopHero nicht */
+    S.minute = 0; tickCombatant(h, 60000); const coop = bloodOf(h) > 33.9;
+    unlockTitle('vampire', 'Probe'); setBlood(p, 60); addItem(p, 'blutphiole', 1); useConsumable(p, p.inv.findIndex(s => s.key === 'blutphiole')); const vial = Math.abs(bloodOf(p) - 35) < 0.01;
+    const w0 = { ...B.HIT_W }; for (const k in B.HIT_W) B.HIT_W[k] = k === 'torso' ? 1 : 0; try { hurt(p, 25, null, 'Test'); } finally { Object.assign(B.HIT_W, w0); }   /* Rumpf: voller Trank hülfe 25, halber 20 */
+    const hp0 = p.hp; addItem(p, 'potion', 1); applyHealItem(p, 'potion', p);   /* useConsumable öffnet beim Spieler die Zielwahl */
+    const gain = p.hp - hp0, half = gain > 0 && gain <= ITEMS.potion.heal * 0.5 + (p.skills.medicine || 0) * 0.15 + 0.5;
+    return coop && vial && half;
+  }));
+  ok('Audit T02: Valen stellt Heere nur in einer eigenen Stadt auf; ohne eigene Stadt schickt Varonheim Entsatz gegen Nordfurt', sandbox(() => {
+    const W0 = structuredClone(S.war), T0 = structuredClone(S.towns), E0 = S.eco ? structuredClone(S.eco) : null;
+    try {
+      S.war.armies = S.war.armies.filter(a => a.faction !== 'valen'); S.war.nodes.northcity.owner = 'undead'; S.war.nodes.eren.owner = 'valen';
+      let A = null; for (let i = 0; i < 60 && !A; i++) { SIM.warDay(); A = S.war.armies.find(a => a.faction === 'valen'); }
+      const own = !!A && S.war.nodes[A.at]?.owner === 'valen' && !!S.towns[A.at];
+      S.war.armies = S.war.armies.filter(a => a.faction !== 'valen'); for (const n of Object.values(S.war.nodes)) if (n.owner === 'valen') n.owner = 'undead';
+      let R2 = null; for (let i = 0; i < 60 && !R2; i++) { SIM.warDay(); R2 = S.war.armies.find(a => a.faction === 'valen'); }
+      return own && R2?.at === 'northcity';
+    } finally { S.war = W0; S.towns = T0; if (E0) S.eco = E0; }
+  }));
   ok('Audit T05: Führung wächst nur mit Gefährten (Sieg), beschleunigt Loyalität; Vharnholm hungert nie; Stil F wird R', sandbox(() => {
     const p = stage(); p.skills.leadership = 9.97; recalc(p); const cap0 = p.partyCap; const kill = () => { const e = spawnEnemy('wolf', '__a', 12, 9); e.x = p.x + 40; e.y = p.y; die(e, 'Test', p); };
     kill(); const alone = p.skills.leadership === 9.97;
@@ -16320,8 +16537,9 @@ export function selftest() {
   }));
   ok('Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit auch gegen Hammer und Wuchtschlag)', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('warhammer'); const e = spawnEnemy('death_knight', '__a', 12, 10); e.x = p.x + 30; e.y = p.y;
-    hit(p, e, 1); const first = e.stagger > 0 && e.poiseUntil > performance.now(); e.stagger = 0; hit(p, e, 1); const second = !(e.stagger > 0);
-    return first && second;
+    hit(p, e, 1); const first = e.stagger >= 600 && e.poiseUntil > performance.now(); e.stagger = 0; hit(p, e, 1); const second = !(e.stagger > 0);   /* Wucht wirklich 650 ms, dann standfest */
+    const f = spawnEnemy('bandit', '__a', 14, 10); f.x = p.x + 30; f.y = p.y + 20; p.equip.weapon = mkItem('dagger'); p.comboFin = true; hit(p, f, 1); const c1 = f.stagger >= 600; f.stagger = 0; hit(p, f, 1); p.comboFin = false; const c2 = !(f.stagger >= 600);   /* Kombo-Wuchtschlag: auch er nur einmal */
+    return first && second && c1 && c2;
   }));
   ok('Audit V1: Krieg mit Nachschub — Heere gedeckelt, nach Garmadon wachsen die Toten nicht, Valen stellt nur in eigener Stadt auf', sandbox(() => {
     const W0 = structuredClone(S.war), g0 = S.flags.garmadonSlain, T0 = structuredClone(S.towns), E0 = structuredClone(S.eco || null);
@@ -16894,6 +17112,13 @@ export function selftest() {
     return panic && cheer && pilgrims && pray && over;
   }));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
+  ok('Audit T04 (C3/C5, RB-005): Effekte und Schwebetexte ziehen nicht aus dem Spielzufall; Partikeldeckel 900; Nachbild bleibt am Ort', (() => {
+    const fx0 = S.fx, fl0 = S.floats.length; S.fx = [];
+    try { seedRng(4242); const a = rnd(); seedRng(4242); fx(0, 0, 'spark', 30); float({ x: 0, y: 0 }, 'Probe', 'rgba(0,0,0,ALPHA)'); const b = rnd();
+      for (let i = 0; i < 300; i++) fx(0, 0, 'spark', 6); const cap = S.fx.length <= FX_CAP + 6;
+      return a === b && cap && FIXED.has('afterimage') && FIXED.has('ghost');
+    } finally { S.fx = fx0; S.floats.length = fl0; seedRng(S.seed); }
+  })());
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -17064,7 +17289,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=22').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=23').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -17094,7 +17319,7 @@ function boot() {
     stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
-    saveNow: () => saveSync(), setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
+    saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
   });
   // Titelbildschirm
   $('legacy-summary').innerHTML = hasSave() ? (() => {
@@ -17110,7 +17335,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=22').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=23').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { setSlot(newSlot('single'));   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -17121,7 +17346,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=22').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=23').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

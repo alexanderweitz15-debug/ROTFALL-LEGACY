@@ -7,7 +7,7 @@ export const slotKey = id => id === 'legacy' ? LEGACY_KEY : 'rotfall.slot.' + id
 export let SLOT = localStorage.getItem(ACTIVE_KEY) || 'legacy';
 export let SAVE_KEY = slotKey(SLOT);
 export function setSlot(id) {
-  if (saveTimer) saveSync(); else saveGen++;   /* RB-008: ausstehendes Speichern gehört dem alten Platz (sofort dorthin), laufendes Komprimieren verwerfen */
+  if (saveTimer || saveBusy) saveSync(); else saveGen++;   /* RB-008 (+ Control): ausstehendes oder gerade komprimierendes Speichern gehört dem alten Platz — sofort dorthin */
   SLOT = id; SAVE_KEY = slotKey(id); localStorage.setItem(ACTIVE_KEY, id);
 }
 export function slotIndex() {
@@ -222,25 +222,27 @@ function saveFail(err) {
   console.warn('Speichern fehlgeschlagen', err);
   log('Spielstand konnte nicht geschrieben werden: ' + err.message + (/quota/i.test(err.message) ? ' — der Browser-Speicher ist voll. Im Titelmenü unter „Spielstände“ einen alten Stand löschen.' : ''), 'world');
 }
-let saveTimer = 0, saveGen = 0;
+let saveTimer = 0, saveGen = 0, saveBusy = false;
 export function save() {
   if (!guardSave()) return false;
   if (!saveTimer) saveTimer = setTimeout(flushSave, 0);   /* viele save() im selben Moment = ein Schreibvorgang */
   return true;
 }
 async function flushSave() {
-  saveTimer = 0; if (!guardSave()) return;
-  const key = SAVE_KEY, gen = ++saveGen;
+  saveTimer = 0; if (!guardSave()) return false;
+  const key = SAVE_KEY, gen = ++saveGen; saveBusy = true;
   try {
     const str = saveData(), z = typeof CompressionStream === 'function' ? await zipSave(str) : str;
-    if (gen !== saveGen || key !== SAVE_KEY) return;     /* inzwischen neuer gespeichert oder Platz gewechselt */
-    localStorage.setItem(key, z); if (z !== str) UNZ.set(key, [z, str]); else UNZ.delete(key); touchSlot();
-  } catch (err) { saveFail(err); }
+    if (gen !== saveGen || key !== SAVE_KEY || !guardSave()) return false;   /* neuer gespeichert, Platz gewechselt oder inzwischen stumm (Cloud-Import, Test) */
+    localStorage.setItem(key, z); if (z !== str) UNZ.set(key, [z, str]); else UNZ.delete(key); touchSlot(); return true;
+  } catch (err) { saveFail(err); return false; } finally { if (gen === saveGen) saveBusy = false; }
 }
+// Gezielt speichern (Knopf „Speichern“, „Beenden“): gleich komprimiert, damit es auch bei knappem Speicher passt.
+export function saveCompressed() { if (!guardSave()) return Promise.resolve(false); clearTimeout(saveTimer); saveTimer = 0; return flushSave(); }
 // Sofort und synchron (Beenden, Seite schließen): JSON. Scheitert das am Platz, bleibt der letzte komprimierte Stand stehen.
 export function saveSync() {
   if (!guardSave()) return false;
-  saveGen++; clearTimeout(saveTimer); saveTimer = 0;
+  saveGen++; saveBusy = false; clearTimeout(saveTimer); saveTimer = 0;
   try { const str = saveData(); localStorage.setItem(SAVE_KEY, str); UNZ.delete(SAVE_KEY); touchSlot(); return true; }
   catch (err) { if (!/quota/i.test(err.message)) saveFail(err); return false; }
 }

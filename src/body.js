@@ -1,7 +1,7 @@
 // Trefferzonen (Kenshi-artig): jede Figur hat eigene HP pro Körperteil.
 // Kopf 0 = Enthauptung. Rumpf 0 = am Boden/Tod. Arm 0 = Waffe fällt. Bein 0 = lahm, beide = kriechen.
 // c.hp / c.maxHp bleiben als Summe erhalten, damit Balken und KI-Schwellen ohne Umbau weiterlaufen.
-import { rnd, clamp, S } from './state.js?v=22';
+import { rnd, clamp, S } from './state.js?v=23';
 
 export const PARTS = ['head', 'torso', 'larm', 'rarm', 'lleg', 'rleg'];
 export const PART_NAME = { head:'Kopf', torso:'Rumpf', larm:'Linker Arm', rarm:'Rechter Arm', lleg:'Linkes Bein', rleg:'Rechtes Bein' };
