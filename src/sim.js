@@ -55,7 +55,7 @@ export function capThreatDay() {                                   // einmal am 
   const W = S.war, n = W.nodes[CAPK];
   if (!n || n.owner !== 'valen' || (S.day | 0) < CAP_SIEGE.from || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > S.day) return;
   const undNodes = Object.values(W.nodes).filter(x => x.owner === 'undead').length;
-  const d = (undNodes >= 6 ? 1 : -1) + (W.armies.some(a => a.faction === 'valen') ? 0 : 0.5) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? 0.5 : 0);
+  const d = (undNodes >= 6 ? 1 : -1) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? 0.5 : 0) + (W.armies.some(a => a.faction === 'valen') ? 0 : 0.5) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? 0.5 : 0);
   W.capThreat = clamp((W.capThreat || 0) + d, 0, 40);
   const st = CAP_SIEGE.thr.filter(x => W.capThreat >= x).length;
   W.capStage = Math.min(W.capStage || 0, st);                      // gesunken: die Stufe darf beim nächsten Anstieg wieder angesagt werden
@@ -72,6 +72,7 @@ function capDay(n) {                                               // Mauern, Be
     n.siege = null; chronicle('Die Belagerung von Varonheim ist aufgehoben', 'battle'); log('Die Toten ziehen von Varonheim ab. Die Belagerung ist aufgehoben.', 'faction'); H.toast('VARONHEIM IST FREI'); }
   if (n.siege) { log(`Varonheim, ${(S.day | 0) - n.siege.day + 1}. Belagerungstag: Mauern ${Math.round(n.walls)} %, Besatzung ${Math.round(n.garrison)}.`, 'faction'); return; }
   n.walls = Math.min(100, (n.walls ?? 100) + CAP_SIEGE.wallRep);
+  if ((S.schutz?.[CAPK]?.stage || 0) >= 1) return;   /* Stadt ohne Schutz: ohne Garde füllt sich die Besatzung nicht auf */
   if (n.garrison < CAP_SIEGE.gcap) n.garrison = Math.min(CAP_SIEGE.gcap, n.garrison + CAP_SIEGE.refill);
 }
 function siegeTick(und, val) {                                     // ein Zug (6 Std.) vor Varonheim, solange Valen die Stadt hält
