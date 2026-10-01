@@ -6,7 +6,10 @@ const LEGACY_KEY = 'rotfall.legacy.save', SLOTS_KEY = 'rotfall.slots', ACTIVE_KE
 export const slotKey = id => id === 'legacy' ? LEGACY_KEY : 'rotfall.slot.' + id;
 export let SLOT = localStorage.getItem(ACTIVE_KEY) || 'legacy';
 export let SAVE_KEY = slotKey(SLOT);
-export function setSlot(id) { SLOT = id; SAVE_KEY = slotKey(id); localStorage.setItem(ACTIVE_KEY, id); }
+export function setSlot(id) {
+  if (saveTimer) saveSync(); else saveGen++;   /* RB-008: ausstehendes Speichern gehört dem alten Platz (sofort dorthin), laufendes Komprimieren verwerfen */
+  SLOT = id; SAVE_KEY = slotKey(id); localStorage.setItem(ACTIVE_KEY, id);
+}
 export function slotIndex() {
   let idx = {}; try { idx = JSON.parse(localStorage.getItem(SLOTS_KEY) || '{}') || {}; } catch (e) { idx = {}; }
   if (!idx.legacy && localStorage.getItem(LEGACY_KEY)) idx.legacy = { id: 'legacy', mode: 'single', at: 0 };   /* alter Stand: Daten füllt slotMetaFrom beim ersten Blick */
@@ -15,7 +18,7 @@ export function slotIndex() {
 }
 function saveIndex(idx) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(idx)); } catch (e) { /* Übersicht ist nur Komfort */ } }
 export function newSlot(mode) { const id = (mode === 'coop' ? 'c' : 's') + Date.now().toString(36); const idx = slotIndex(); idx[id] = { id, mode, at: Date.now() }; saveIndex(idx); return id; }
-export function deleteSlot(id) { localStorage.removeItem(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
+export function deleteSlot(id) { localStorage.removeItem(slotKey(id)); UNZ.delete(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
 // Kurzbeschreibung eines Stands für die Liste: Held, Haus, Stufe, Tag, Generation und Erfolge als Symbole
 export const ACHIEVE = [
   ['garm', '💀', 'Garmadon ist tot', d => d.flags?.garmadonSlain],
@@ -201,11 +204,12 @@ export function unpack(s) {
 export async function zipSave(str) { return ZIP + pack(new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())); }
 export async function unzipSave(raw) { return raw?.startsWith(ZIP) ? new Response(new Blob([unpack(raw.slice(ZIP.length))]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : raw; }
 // Roher Stand als JSON-Text (entpackt aus UNZ); null, wenn es keinen gibt oder er noch nicht entpackt ist.
-export function readRaw(key = SAVE_KEY) { const raw = localStorage.getItem(key); return raw?.startsWith(ZIP) ? UNZ.get(key) ?? null : raw; }
+// UNZ merkt sich den gepackten Text mit (RB-009): schreibt ein anderer Tab den Platz neu, gilt der Cache nicht mehr.
+export function readRaw(key = SAVE_KEY) { const raw = localStorage.getItem(key); if (!raw?.startsWith(ZIP)) return raw; const u = UNZ.get(key); return u && u[0] === raw ? u[1] : null; }
 export async function unpackAll() {
   const keys = new Set([SAVE_KEY, LEGACY_KEY, ...Object.keys(slotIndex()).map(slotKey)]);
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^rotfall\./.test(k)) keys.add(k); }   /* auch Sicherungen (…vor-import, backup) */
-  for (const k of keys) { const raw = localStorage.getItem(k); if (raw?.startsWith(ZIP) && !UNZ.has(k)) try { UNZ.set(k, await unzipSave(raw)); } catch (e) { console.warn('Spielstand nicht entpackbar', k, e); } }
+  for (const k of keys) { const raw = localStorage.getItem(k); if (raw?.startsWith(ZIP) && UNZ.get(k)?.[0] !== raw) try { UNZ.set(k, [raw, await unzipSave(raw)]); } catch (e) { console.warn('Spielstand nicht entpackbar', k, e); } }
 }
 function guardSave() {
   if (S.map && S.map.startsWith('__')) return false;    // Test-/Stilkarten (__a, __style) nie speichern — Spieler stünde im Nichts
@@ -230,7 +234,7 @@ async function flushSave() {
   try {
     const str = saveData(), z = typeof CompressionStream === 'function' ? await zipSave(str) : str;
     if (gen !== saveGen || key !== SAVE_KEY) return;     /* inzwischen neuer gespeichert oder Platz gewechselt */
-    localStorage.setItem(key, z); if (z !== str) UNZ.set(key, str); else UNZ.delete(key); touchSlot();
+    localStorage.setItem(key, z); if (z !== str) UNZ.set(key, [z, str]); else UNZ.delete(key); touchSlot();
   } catch (err) { saveFail(err); }
 }
 // Sofort und synchron (Beenden, Seite schließen): JSON. Scheitert das am Platz, bleibt der letzte komprimierte Stand stehen.
