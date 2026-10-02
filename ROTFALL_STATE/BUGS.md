@@ -78,3 +78,9 @@ Statische Suche in `src/*.js` (keine Spielcode-Änderung). Vorschlags-IDs, keine
 | SC-03 | `src/game.js:8756` (`servantSmuggle`) | Mechanik „Diener im Burghof holen eine Waffe aus der Waffenkammer“ (dokumentiert in MECHANIKEN.md, Scheibe 4) hat keinen eigenen Debug-Menüpunkt — nur über echten Dialog oder den Selbsttest-Sandkasten erreichbar. Verstößt gegen die CLAUDE.md-Regel „jede Mechanik braucht einen Debug-Eintrag“. | `grep -n "servantSmuggle" src/game.js` → Aufrufe nur in `talk()` (8830) und im Selbsttest (18739-18741), kein `debugSections()`-Eintrag | Schwerer zu testen/vorzuführen ohne den ganzen Dialogpfad nachzuspielen. | klein |
 | SC-04 | `src/game.js:10596` | `hasBigAt(k)` definiert, nirgends aufgerufen; alle Stellen, die prüfen ob ein großes Ereignis in einer Stadt läuft, vergleichen `S.big?.kind`/`S.big.town` direkt inline statt über die Funktion. | `grep -n "hasBigAt" src/game.js` → nur die Definition | Vermutlich vergessener Kollisions-Schutz, damit nicht zwei große Ereignisse gleichzeitig dieselbe Stadt treffen — aktuell ungenutzt, aber auch kein Beleg, dass das je nötig war. | sehr klein |
 
+
+## Hunt 1 (02.10.2026) — bestätigte Bugs HB-01…HB-47
+Vollständige Einträge (Repro, Ursache, Schwere, Dateien) in `ROTFALL_STATE/hunt/BERICHT.md`. Status: CONFIRMED (live) oder CONFIRMED (Code). Noch nicht behoben — wartet auf Entscheid des Entwicklers.
+- Kritisch: HB-01 (gespeicherter Tod ohne Erbenwahl).
+- Hoch: HB-02 (performance.now-Zeitstempel überleben Laden), HB-03 (Zeitsprünge überspringen Stundenhaken), HB-04 (applySave leert S nicht), HB-05 (Abbruch q_undarmy löscht Heerzug-Befehl), HB-06 (c_mon1–3 unerfüllbar), HB-07 (Weißbart), HB-08 (Varon-Reihe nach Abbruch tot), HB-09 (Pferch/Tribut), HB-10 (Rotfall nie abgeschlossen).
+- Mittel: HB-11…HB-42. Niedrig: HB-43…HB-47. Wahrscheinlich: IH-15, IH-16.
