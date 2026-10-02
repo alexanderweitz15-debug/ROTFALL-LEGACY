@@ -2593,17 +2593,19 @@ const ENC_KINDS = {
   toll: { name: 'Wegelagerer', prof: 'Wegelagerer', n: 3, greet: '„Halt. Die Straße gehört heute uns. 25 Gold, und du gehst weiter.“', log: 'Bewaffnete versperren den Weg.' },
   hungry: { name: 'Hungernde Mutter', prof: 'Flüchtling', greet: '„Die Kinder haben seit zwei Tagen nichts gegessen. Hast du etwas übrig?“', log: 'Eine Flüchtlingsfamilie rastet am Weg.' },
   deserter: { name: 'Deserteur', prof: 'Deserteur', greet: '„Ich will keinen Ärger. Ich will nur nach Hause. Du hast mich nicht gesehen, ja?“', log: 'Ein Mann in zerrissenem Valen-Rock hält Abstand.' },
-  avenger: { name: 'Rächer', prof: 'Rächer', greet: '', log: 'Jemand folgt dir schon eine Weile.' },   // Kette aus Kopfgeldaufträgen (S.avenge)
+  avenger: { name: 'Rächer', prof: 'Rächer', greet: '', log: 'Jemand folgt dir schon eine Weile.' },
+  hired: { name: 'Gedungener', prof: 'Gedungener', greet: '', log: 'Jemand hat dich ins Auge gefasst — und folgt dir.' },   /* E3: von Hinterbliebenen bezahlt */   // Kette aus Kopfgeldaufträgen (S.avenge)
   runaway: { name: 'Entflohener Grubenarbeiter', prof: 'Entflohener', greet: '„Bitte! Sie jagen mich — Kettenreiter mit einem Hund. Versteck mich, oder bring mich weg!“', log: 'Jemand mit Kettenspuren an den Knöcheln hinkt von der Straße weg.' },   // S15 P9
   bait: { name: 'Weinende Frau', prof: 'Wanderin', greet: '„Hilfe! Mein Mann — dort hinten im Gebüsch! Bitte, schnell!“', log: 'Jemand ruft verzweifelt um Hilfe.' },
 };
-function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger' && (k !== 'runaway' || (tx < OX + 80 && !S.flags.chainsBroken))))) {   // S15 P9: Entflohene nur im Westen, solange die Kette steht
+function spawnChoiceEncounter(tx, ty, kind = pick(Object.keys(ENC_KINDS).filter(k => k !== 'avenger' && k !== 'hired' && (k !== 'runaway' || (tx < OX + 80 && !S.flags.chainsBroken))))) {   // S15 P9: Entflohene nur im Westen, solange die Kette steht
   const K = ENC_KINDS[kind], [bx, by] = pushOut('world', tx, ty), gid = uid(), out = [];
   for (let i = 0; i < (K.n || 1); i++) {
     const pos = freeSpotNear('world', bx + ri(-1, 1) * i, by + ri(-1, 1) * i, 3), fem = kind === 'hungry' || kind === 'bait';
     const c = makeChar({ name: i ? pick(FIRST_M) : K.name, prof: K.prof, x: pos.x, y: pos.y, level: kind === 'toll' ? ri(3, 6) + Math.floor(S.player.level / 3) : ri(1, 4), traits: [pick(['furchtsam', 'müde', 'mürrisch'])] });
     if (kind === 'avenger') { const A = S.avenge || { name: 'meinen Bruder' }; c.name = `${pick(FIRST_M)}, Bruder von ${A.name}`; c.greet = `„Du bist der, der ${A.name} erschlagen hat. Er war mein Bruder. Er hatte zwei Kinder.“`; c.level = S.player.level + 1; S.avenge = null; }
-    if (kind === 'toll' || kind === 'deserter' || kind === 'avenger') { c.equip.weapon = mkItem(kind === 'deserter' ? 'shortsword' in ITEMS ? 'shortsword' : 'dagger' : pick(['axe', 'spear', 'dagger'])); recalc(c); }
+    if (kind === 'hired') { const G = grudgeDue() || { whoName: 'jemand', id: null }; c.name = 'Gedungener'; c.greet = `„Nichts Persönliches. ${G.whoName} hat bezahlt.“`; c.level = S.player.level + 1; c.hiredBy = G.id; c.elite = true; if (G.id) G.next = (S.day | 0) + ri(4, 7); }
+    if (kind === 'toll' || kind === 'deserter' || kind === 'avenger' || kind === 'hired') { c.equip.weapon = mkItem(kind === 'deserter' ? 'shortsword' in ITEMS ? 'shortsword' : 'dagger' : pick(['axe', 'spear', 'dagger'])); recalc(c); }
     if (kind === 'wounded') B.damagePart(c, 'lleg', 8);
     Object.assign(c, { enc: kind, encGid: gid, encounter: true, transient: true, brave: kind === 'toll', anchor: { x: pos.x, y: pos.y }, greet: K.greet, female: fem || c.female });
     S.ents.world.push(c); out.push(c);
@@ -2667,6 +2669,11 @@ function encTalk(npc) {
       chronicle('Ein Deserteur wird Valen übergeben', 'news', 'Er ging ohne Widerstand. Man hängt sie am Tor.'); say(`Er lässt die Schultern sinken. Eine Streife nimmt ihn mit. (+${g} Gold, Valen +4)`, () => UI.closeDialogue()); } });
     if (S.party.length < p.partyCap) C.push({ text: 'Kämpf lieber für mich.', fn: () => { npc.enc = null; npc.transient = false; npc.recruit = true; npc.recruitRel = -100; S.party.push(npc.id); npc.morale = 55;
       log(`${npc.name} schließt sich dir an.`, 'party'); say('„Besser als der Galgen. Und besser bezahlt, hoffe ich.“', () => UI.closeDialogue()); } });
+  } else if (npc.enc === 'hired') {                                   /* E3 */
+    const G = (S.grudges || []).find(g => g.id === npc.hiredBy);
+    C.push({ text: '[Kämpfen] Dann versuch es.', fn: () => encTurn(npc) });
+    C.push({ text: '[100 Gold] Ich zahle dir mehr, als sie dir gezahlt hat.', fn: () => { if (S.gold < 100) return say('„Mit leeren Taschen überbietet man niemanden.“', () => encTurn(npc)); S.gold -= 100; fin('Er wiegt den Beutel. „Sie wird jemand anderen finden. Das tun sie immer.“'); } });
+    C.push({ text: `Sag ${G?.whoName || 'ihr'}, ich komme selbst.`, fn: () => { if (G) grudgeQuest(G); encTurn(npc); } });
   } else if (npc.enc === 'avenger') {
     C.push({ text: '[Kämpfen] Dann bring es zu Ende.', fn: () => encTurn(npc) });
     C.push({ text: '[60 Gold Blutgeld]', fn: () => { if (S.gold < 60) return fin('„Nicht einmal das hast du?“ Er spuckt aus. „Behalt dein Leben. Es ist ohnehin nichts wert.“');
@@ -2720,7 +2727,7 @@ function travelTick() {
     c.shop = true; c.brave = true; c.encounter = true; c.anchor = { x: pos.x, y: pos.y };
     c.equip.weapon = mkItem('dagger'); S.ents.world.push(c);
     log('Ein fahrender Händler kreuzt deinen Weg.', 'world'); UI.toast('Fahrender Händler', 2400);
-  } else if (roll < 0.9) spawnChoiceEncounter(tx + ox, ty + oy, S.avenge && (S.day | 0) >= S.avenge.day ? 'avenger' : undefined);            // S13: Begegnung mit Entscheidung
+  } else if (roll < 0.9) spawnChoiceEncounter(tx + ox, ty + oy, S.avenge && (S.day | 0) >= S.avenge.day ? 'avenger' : grudgeDue() ? 'hired' : undefined);            // S13: Begegnung mit Entscheidung
   else {                                                                    // Reisender (Gerücht)
     const pos = freeSpotNear('world', ...pushOut('world', tx + ox, ty + oy), 3);
     const c = makeChar({ name: pick(['Reisender', 'Pilgerin', 'Bote', 'Wanderin']), prof: 'Reisender', x: pos.x, y: pos.y, level: ri(1, 4),
@@ -3663,7 +3670,8 @@ function die(c, cause = 'Wunden', source) {
   const isParty = S.party.includes(c.id);
   { const byP = source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id;
     if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
-    if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP); }   /* S2: Burgwache bleibt tot */
+    if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP);
+    if (c.hiredBy) grudgeNote(c); }   /* E3 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
@@ -3678,6 +3686,52 @@ function die(c, cause = 'Wunden', source) {
 
 // Der Spieler hat einen Menschen getötet: Zeugen fürchten ihn einen Tag, Wachen greifen ein, die Gruppe urteilt.
 // Ein Unschuldiger (kein Feind im Moment des Todes) wiegt schwerer als ein zorniger Angreifer.
+// Emergente Quest E3 (Entwickler 01.10.2026): Ermordest du einen Bewohner, der verheiratet war oder mit jemandem lebte, trauert die
+// Hinterbliebene 3–6 Tage und kauft dann einen Mörder (Begegnung „Gedungener“, höchstens zwei). Bei ihm: ein Zettel mit ihrem Namen.
+// Bei ihr: Wergeld, reden (Wahrnehmung ≥ 12, 40 %), der Wache melden — oder ein zweiter Mord. Höchstens zwei offene Fälle zugleich.
+// Der Groll trifft auch den Erben (das Haus ist gemeint), aber höchstens noch ein Mörder.
+function grudgeFrom(victim, seen, force) {
+  if (!victim || victim.transient || victim.kind !== 'npc') return null;
+  const sp = typeof victim.married === 'string' ? byId(victim.married) : null, spouse = sp?.alive && !sp.transient ? sp : null;
+  const kin = spouse || (victim.homeId && S.ents.world.find(e => e.kind === 'npc' && e.alive && e !== victim && e.homeId === victim.homeId && !e.transient && !S.party.includes(e.id) && !e.guard));
+  if (!kin || kin.grudgeId) return null; const open = (S.grudges ||= []).filter(g => g.state === 'mourn' || g.state === 'hired');
+  if (open.length >= 2 || !(force ?? chance((spouse ? 0.7 : 0.4) * (seen ? 1 : 0.5)))) return null;
+  const day = S.day | 0, G = { id: uid(), who: kin.id, whoName: kin.name, victim: victim.name, town: kin.homeTown, day, at: day + ri(3, 6), tries: 0, state: 'mourn', next: 0 };
+  S.grudges.push(G); kin.grudgeId = G.id; if (seen) log(`${kin.name} hat gesehen, wer ${victim.name} erschlagen hat.`, 'crime'); return G;
+}
+const grudgeDue = () => (S.grudges || []).find(g => g.state === 'hired' && (S.day | 0) >= (g.next || 0));
+function grudgeDay() {
+  for (const G of S.grudges || []) {
+    if (G.state !== 'mourn' && G.state !== 'hired') continue; const w = byId(G.who);
+    if (!w?.alive) { G.state = 'done'; continue; }
+    if (G.state === 'hired' && G.tries >= 2) { G.state = 'done'; log(`${G.whoName} hat nichts mehr, womit sie einen Mörder bezahlen könnte.`, 'world'); continue; }
+    if (G.state === 'mourn' && (S.day | 0) >= G.at) { G.state = 'hired'; const Gr = growthOf(G.town); if (Gr) Gr.prosper = Math.max(-20, Gr.prosper - 2);
+      log(`Gerücht aus ${townName(G.town)}: ${G.whoName} hat ihr letztes Silber für einen Mörder ausgegeben. Pass auf, wen du unterwegs triffst.`, 'world'); }
+  }
+}
+function grudgeQuest(G) {
+  if ((S.contracts || []).some(c => c.rk === 'grudge' && c.ref === G.id && c.state !== 'claimed')) return; const w = byId(G.who); if (!w?.alive) return;
+  const tx = w.x / TS | 0, ty = w.y / TS | 0, C = { id: uid(), town: G.town, kind: 'rumor', rk: 'grudge', ref: G.id, giver: 'board', giverName: 'ein Zettel', have: 0, need: 1, state: 'offer', day: S.day | 0, tx, ty, lie: false, x: tx, y: ty,
+    reward: { gold: 0, xp: 40, rep: 0 }, title: `Die Auftraggeberin: ${G.whoName}`, desc: `Ein Zettel mit deinem Namen, unterschrieben von ${G.whoName} aus ${townName(G.town)}. Sie hat ${G.victim} verloren. Zahl Wergeld, rede mit ihr, melde sie der Wache — oder lass sie weiter zahlen.` };
+  (S.contracts ||= []).push(C); if (acceptContract(C) === false) S.contracts.pop(); else log(`Auftrag: Die Auftraggeberin — ${G.whoName} in ${townName(G.town)} (auf der Karte).`, 'quest');
+}
+function grudgeNote(c) {                                              /* der Gedungene ist gefallen: ein Zettel */
+  const G = (S.grudges || []).find(g => g.id === c.hiredBy); if (!G) return; G.tries = (G.tries || 0) + 1;
+  log(`In seiner Tasche: ein Zettel mit deinem Namen. Unterschrieben von ${G.whoName} aus ${townName(G.town)}.`, 'quest'); grudgeQuest(G);
+}
+function grudgeChoices(npc, choices) {
+  if (!npc.grudgeId) return; const G = (S.grudges || []).find(g => g.id === npc.grudgeId); if (!G || (G.state !== 'mourn' && G.state !== 'hired')) return;
+  const p = S.player, cost = Math.min(150, 50 + 20 * Math.floor(p.level / 5)), say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  choices.unshift({ text: `Über ${G.victim} …`, fn: () => UI.dialogue(npc, '„Du. Du warst es.“', [
+    { text: `Wergeld zahlen (${cost} Gold)`, fn: () => { if (S.gold < cost) return say('„So wenig ist er dir wert?“'); S.gold -= cost; G.state = 'paid'; styleAct(2, 'Wergeld');
+      chronicle(`${p.name} zahlte Wergeld für ${G.victim}`, 'news', `${G.whoName} nahm das Gold. Sie sah nicht auf.`); say('Sie nimmt das Gold, ohne dich anzusehen. „Geh.“'); } },
+    ...((p.attributes?.perception || 0) >= 12 ? [{ text: 'Er hat mich bedroht. Ich hatte keine Wahl.', fn: () => { if (chance(0.4)) { G.state = 'done'; say('Sie schweigt lange. „… Er hatte ein böses Maul. Immer schon.“ Sie wendet sich ab.'); } else say('„Lügner.“'); } }] : []),
+    ...(S.ents.world.some(e => e.kind === 'npc' && e.alive && e.guard && guardTownOf(e) === npc.homeTown) ? [{ text: 'Du hast einen Mörder bezahlt. Das melde ich der Wache.', fn: () => {
+      G.state = 'done'; S.ents.world = S.ents.world.filter(e => e !== npc); const f = townFac(npc.homeTown); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + 1, -100, 100);
+      const Gr = growthOf(npc.homeTown); if (Gr) Gr.prosper = Math.max(-20, Gr.prosper - 3); for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 4;
+      UI.closeDialogue(); log(`Die Wache führt ${G.whoName} ab. Ihr Haus steht leer. Deine Gefährten sehen dich nicht an.`, 'crime'); } }] : []),
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+}
 function bloodshed(victim, wasFoe) {
   const p = S.player, now = clock();
   for (const w of S.ents[victim.map]) {
@@ -3688,6 +3742,7 @@ function bloodshed(victim, wasFoe) {
   if (wasFoe) return;
   S.flags.murders = (S.flags.murders || 0) + 1;
   const seen = S.ents[victim.map].some(w => w.kind === 'npc' && w.alive && w !== victim && !S.party.includes(w.id) && dist(w, victim) < 300);
+  grudgeFrom(victim, seen);                                         /* E3: wer einen Menschen erschlägt, hinterlässt jemanden */
   const fac = crimeFaction(victim), rank = HIGH_RANK[victim.prof] || HIGH_RANK[victim.key];
   // S12 (Nutzer: „mehr Ruf-Verlust, krassere Konsequenzen für Mord an Adel oder Priester“): jeder Mord kostet Ruf — Gerüchte auch ohne Zeugen
   const loss = rank ? (seen ? 35 : 18) : (seen ? 10 : 3);
@@ -11407,7 +11462,7 @@ function dayTick() {
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
-  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); factionAgenda();                                             // S12: Tribut der Kette
+  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); grudgeDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
   herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
@@ -11908,7 +11963,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -12183,6 +12238,7 @@ function rumorTick() {
   for (const C of (S.contracts || []).filter(c => c.kind === 'rumor' && c.state === 'active')) {
     const near = Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 30, here = S.ents.world.filter(e => e.contract === C.id);
     if (C.rk === 'nemesis') { const N = (S.nemeses || []).find(n => n.id === C.nemesisId); if (!N) rumorDone(C, true); else Object.assign(C, { tx: N.tx, ty: N.ty, x: N.tx, y: N.ty }); continue; }   /* T10 */
+    if (C.rk === 'grudge') { const G = (S.grudges || []).find(g => g.id === C.ref), w = byId(G?.who); if (!G || G.state === 'paid' || G.state === 'done' || !w?.alive) rumorDone(C, true); else Object.assign(C, { tx: w.x / TS | 0, ty: w.y / TS | 0, x: w.x / TS | 0, y: w.y / TS | 0 }); continue; }   /* E3 */
     if (C.rk === 'band') { const b = (S.bands || []).find(x => x.id === C.bandRef);   /* T08 Verhör: erfüllt, wenn die Bande fort ist; gelogen, wenn dort nichts ist */
       if (!b || b.gone) rumorDone(C, true); else if (C.lie && near) { log('Hier ist kein Lager. Er hat gelogen.', 'quest'); rumorDone(C, false); } continue; }
     if (C.spawned && !here.length && !C.beastDead) C.spawned = false;   /* nach dem Laden sind flüchtige Ziele weg: neu setzen */
@@ -15062,6 +15118,9 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'E3: Groll — nächster Bewohner trauert (sofort angeworben)': () => { const v = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.homeId && !e.transient && !e.guard && S.ents.world.some(o => o !== e && o.alive && o.homeId === e.homeId)).sort((a, b) => dist(a, p) - dist(b, p))[0];
+        if (!v) return UI.toast('Kein Bewohner mit Hausgenossen in der Nähe.'); const G = grudgeFrom(v, true, true); if (!G) return UI.toast('Kein Groll möglich (schon zwei offen?)'); G.at = S.day | 0; grudgeDay(); UI.toast(`${G.whoName} heuert einen Mörder (Opfer: ${v.name}, lebt noch — nur Probe)`); },
+      'E3: Gedungener Mörder jetzt': () => { if (!grudgeDue()) return UI.toast('Kein angeworbener Groll.'); spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'hired'); },
       'E4: Vermisstenwelle im nächsten Dorf (sofort ein Opfer)': () => { const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS));
         if (S.vanish?.state === 'on') return UI.toast('Eine Welle läuft schon.'); const k = ks.find(x => vanishStart(x)); if (!k) return UI.toast('Kein Dorf mit Unterschlupf in Reichweite.'); vanishTake(); UI.toast(`${townName(k)}: ${VANISH[S.vanish.cause].name} · ${S.vanish.loc}`, 3000); },
       'E4: Vermisstenwelle 3 Tage vorspulen (Opfer altern)': () => { for (const t of S.vanish?.taken || []) t.day -= 3; if (S.vanish) { S.vanish.day0 -= 3; S.vanish.last -= 3; } UI.toast('Opfer 3 Tage älter'); },
@@ -19004,6 +19063,17 @@ export function selftest() {
       if (!(no && one && right && home)) console.log('E4-Probe', JSON.stringify({ k, no, one, right, home, cause: V.cause }));
       return no && one && right && home;
     } finally { S.vanish = V0; S.contracts = C0; S.conDay = CD; S.ents.world = W0; S.gold = g0; registerContracts(); }
+  }));
+  ok('E3: Mord an Verheiratetem legt Groll an (nicht bei Transienten); Trauer → Anwerbung → Gedungener mit Zettel → Auftrag; Wergeld beendet', sandbox(() => {
+    const p = stage(), G0 = structuredClone(S.grudges || []), C0 = S.contracts, W0 = S.ents.world, g0 = S.gold; S.ents.world = W0.slice();
+    try { S.grudges = []; S.contracts = []; const a = actor(320, 320), b = actor(384, 320); a.married = b.id; b.married = a.id;
+      const t = actor(448, 320); t.transient = true; const none = !grudgeFrom(t, true, true);
+      const G = grudgeFrom(a, true, true), mk = !!G && G.who === b.id && b.grudgeId === G.id; G.at = S.day | 0; grudgeDay(); const hired = G.state === 'hired' && grudgeDue() === G;
+      grudgeNote({ hiredBy: G.id }); const note = G.tries === 1 && S.contracts.some(c => c.rk === 'grudge' && c.ref === G.id);
+      S.gold = 500; let ch = []; grudgeChoices(b, ch); ch[0].fn(); [...document.querySelectorAll('#dlg-choices button')][0].click(); UI.closeDialogue(); const paid = G.state === 'paid' && !grudgeDue();
+      if (!(none && mk && hired && note && paid)) console.log('E3-Probe', JSON.stringify({ none, mk, hired, note, paid }));
+      return none && mk && hired && note && paid;
+    } finally { S.grudges = G0; S.contracts = C0; S.ents.world = W0; S.gold = g0; registerContracts(); UI.closeDialogue(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

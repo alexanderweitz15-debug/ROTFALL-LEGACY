@@ -927,3 +927,15 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Sensen sehen aus wie Sensen
 - Alle sieben Sensen haben ein eigenes, gebogenes Blatt. Die Blutkult-Sense hat ein lebendes Klauenblatt mit Adern, Knochendornen und einem Maul am Ansatz; die Adern pulsieren. Heilt ihr Lebensraub den Träger, schimmert er kurz rot (bei jeder Waffe mit Lebensraub).
+
+## Die Witwe heuert einen Mörder (Emergente Quest E3)
+- Ermordest du einen Bewohner, der verheiratet war oder mit jemandem lebte, kann die Hinterbliebene Groll fassen. Bei Ehepartnern liegt die Chance bei 70 %, bei Hausgenossen bei 40 %; ohne Zeugen halbiert. Mit Zeugen meldet das Log: „… hat gesehen, wer … erschlagen hat.“ Höchstens zwei offene Fälle gibt es zugleich.
+- Nach 3–6 Tagen Trauer kauft sie einen Mörder; ein Gerücht warnt dich. Unterwegs triffst du den **Gedungenen** („Nichts Persönliches.“). Du kannst kämpfen, ihn mit 100 Gold überbieten (dann kommt später ein anderer) oder sagen „Ich komme selbst.“
+- Fällt er, trägt er einen Zettel mit ihrem Namen bei sich. Daraus wird der Auftrag „Die Auftraggeberin“, und die Karte zeigt sie.
+- **Bei ihr:**
+  - Wergeld zahlen (50–150 Gold, steigt mit deiner Stufe).
+  - Mit ihr reden, ab Wahrnehmung 12; das klappt zu 40 %.
+  - Sie der Wache melden: Ihr Haus steht danach leer, deine Gefährten murren.
+  - Sie töten: ein zweiter Mord mit allen Folgen.
+- **Ohne dein Zutun:** Nach zwei gefallenen Mördern hat sie nichts mehr zum Bezahlen.
+- Debug: „E3: Groll — nächster Bewohner trauert“, „E3: Gedungener Mörder jetzt“.
