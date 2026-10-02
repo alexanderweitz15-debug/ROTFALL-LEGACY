@@ -1053,3 +1053,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - An die Kette verkaufen: 300 Gold, Kette +5, Valen −5.
   - In die eigene Siedlung: +20 Eisen, +10 Holz.
 - Debug: „Geheime Orte: zum Hundertfeld (Lanze)“.
+
+## Geheimer Ort: Der Ausbrecherstollen
+- Zwischen Steinbruch und Westgebirge stehen drei Kreidezeichen: ein durchgestrichenes Kettenglied. Lesen kann sie, wer Wahrnehmung 12 hat oder einen Goblin dabei.
+- Das dritte Zeichen führt zum Spalt: ein geheimes Gewölbe mit einer Ebene, bewacht vom Pferchmeister. Danach steht der Stollen auf der Karte.
+- Im Hort liegt der Grubenplan der Eisenfeste. Du gibst ihn den Grubenstämmen (Goblins +10) oder verkaufst ihn an die Kette (150 Gold, Kette +8, Goblins −20).
+- Debug: „Geheime Orte: zu den Kreidezeichen (Stollen)“.

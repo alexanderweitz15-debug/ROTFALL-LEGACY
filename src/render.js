@@ -243,10 +243,13 @@ function prefetchChunk(m, cx0, cy0, cx1, cy1) {
   pfArgs = [m, S.map, cx0, cy0, cx1, cy1];
   if (pfQueued) return;
   pfQueued = true;
+  /* PERF-R: im laufenden Spiel blieb selten > 8 ms Leerlauf — der Ring wurde nie gebacken und neue Chunks kamen gebündelt
+     mitten im Bild (Ruckler). Jetzt spätestens nach 300 ms ein Chunk, weitere nur bei viel Leerlauf. */
   idle(dl => {
     pfQueued = false;
-    while (dl.timeRemaining() > 8 && prefetchOne()) {}
-  });
+    let n = 0;
+    while ((n ? dl.timeRemaining() > 8 : dl.didTimeout || dl.timeRemaining() > 4) && prefetchOne()) n++;
+  }, { timeout: 300 });
 }
 function prefetchOne() {
   const [m, map, cx0, cy0, cx1, cy1] = pfArgs || [];
@@ -357,6 +360,15 @@ function warmTexels(keys) {
   const all = g.getImageData(0, 0, keys.length * 16, 16).data, RW = keys.length * 64;
   keys.forEach(([t, v, kind], n) => { const d = new Uint8ClampedArray(1024); for (let y = 0; y < 16; y++) d.set(all.subarray(y * RW + n * 64, y * RW + n * 64 + 64), y * 64); texData.set(t + '|' + v + '|' + kind, d); });
 }
+let texWarm = false;                                     // einmal nach dem Start in Leerlaufzeit: alle üblichen Bodentexturen auf einmal
+function prewarmTexels() {
+  if (texWarm) return; texWarm = true;
+  idle(() => { const keys = [], nv = SP.drawnOn() ? 8 : 4;
+    for (const t of Object.keys(TILE_KIND).map(Number)) { if (t === T.ROCK || t === T.WATER || t === T.DWALL) continue;
+      const kinds = [TILE_KIND[t]]; if (t === T.DFLOOR || t === T.STONE) kinds.push('scree');
+      for (const kind of kinds) for (let v = 0; v < nv; v++) if (!texData.has(t + '|' + v + '|' + kind)) keys.push([t, v, kind]); }
+    warmTexels(keys); });
+}
 const TINT_RGBA = {};                                    // 'rgba(r,g,b,a)' → [r,g,b,a]
 const tintOf = str => TINT_RGBA[str] || (TINT_RGBA[str] = str.match(/[\d.]+/g).map(Number));
 const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
@@ -388,7 +400,7 @@ function bakeGround(o, m, cx, cy) {
   const img = new ImageData(SZ, SZ), D = img.data;
   const tc = [], miss = [], seen = new Set();             // Texeldaten je Quellkachel
   for (let k = 0; k < TW * TW; k++) { const key = typ[k] + '|' + vari[k] + '|' + kin[k]; if (!texData.has(key) && !seen.has(key)) { seen.add(key); miss.push([typ[k], vari[k], kin[k]]); } }
-  warmTexels(miss);
+  warmTexels(miss); prewarmTexels();
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {     // Grundtexturen
     const k = (j + 1) * TW + i + 1, T0 = tc[k] || (tc[k] = texel(typ[k], vari[k], kin[k]));
     for (let y = 0; y < 16; y++) D.set(T0.subarray(y * 64, y * 64 + 64), ((j * 16 + y) * SZ + i * 16) * 4);
@@ -684,15 +696,17 @@ function paintWater(o, m, cx, cy) {
   const W = (x, y) => mask[y * AW + x] === 1;
   const img = new ImageData(SZ, SZ), D = img.data;
   const set = (o4, c, a = 255) => { D[o4] = c[0]; D[o4 + 1] = c[1]; D[o4 + 2] = c[2]; D[o4 + 3] = a; };
+  const isW = m === MAPS.world, sea = new Int32Array(CH), SHORE = [8, 10, 8];   /* PERF-R: Küstenlinie je Kachelspalte einmal statt je Pixel */
+  if (isW) for (let i = 0; i < CH; i++) sea[i] = seaLine(F.x0t + i) - 2;
   for (let y = M; y < M + SZ; y++) for (let x = M; x < M + SZ; x++) {
     const X = gx0 + x, Y = gy0 + y, o4 = ((y - M) * SZ + (x - M)) * 4, q = y * AW + x;
-    const rg = m === MAPS.world && (Y >> 4) >= seaLine(X >> 4) - 2 ? 'sea' : regAt(X, Y), P = WATER_RGB[rg] || WATER_RGB.greenmark;
-    const r1 = !W(x - 1, y) || !W(x + 1, y) || !W(x, y - 1) || !W(x, y + 1);
     if (!mask[q]) {                                      // Ufer: nasser, dunkler Saum auf dem Boden
-      if (W(x - 1, y) || W(x + 1, y) || W(x, y - 1) || W(x, y + 1)) set(o4, [8, 10, 8], 90);
-      else if (W(x - 2, y) || W(x + 2, y) || W(x, y - 2) || W(x, y + 2)) set(o4, [8, 10, 8], 45);
+      if (W(x - 1, y) || W(x + 1, y) || W(x, y - 1) || W(x, y + 1)) set(o4, SHORE, 90);
+      else if (W(x - 2, y) || W(x + 2, y) || W(x, y - 2) || W(x, y + 2)) set(o4, SHORE, 45);
       continue;
     }
+    const rg = isW && (Y >> 4) >= sea[(X >> 4) - F.x0t] ? 'sea' : regAt(X, Y), P = WATER_RGB[rg] || WATER_RGB.greenmark;
+    const r1 = !W(x - 1, y) || !W(x + 1, y) || !W(x, y - 1) || !W(x, y + 1);
     if (r1) { set(o4, h2(X * 5, Y * 3) < 0.65 ? P[4] : P[3]); continue; }   // Schaumkante
     const r2 = !W(x - 2, y) || !W(x + 2, y) || !W(x, y - 2) || !W(x, y + 2) || !W(x - 3, y) || !W(x, y - 3) || !W(x + 3, y) || !W(x, y + 3);
     const t = r2 ? 2 : (1 - depAt(X, Y)) * 2.4, k = Math.min(2, Math.floor(t) + (t % 1 > BAYER[(Y & 3) * 4 + (X & 3)] ? 1 : 0));
