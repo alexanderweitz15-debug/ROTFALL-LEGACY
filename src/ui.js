@@ -918,6 +918,7 @@ function settleUI(body) {
     <div><h3>${st.name}</h3>
       <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()}</div>
+      ${(() => { const I = A.raidInfo?.(); if (!I) return ''; return `<div class="ledger" title="Reichtum lockt an, wer in der Nähe ist. Schutzgeld an eine Bande schützt auch das Lager.">Bedrohung · Reichtum ${I.W} · Überfallgefahr je Nacht <b>${Math.round(I.ch * 100)} %</b><br><small>${I.L.length ? I.L.map(x => `◆ ${x.label} — ${x.dist} Felder`).join(' · ') : 'Keine Macht in der Nähe, nur Wölfe.'}</small></div>`; })()}
       ${(() => { const m = Math.round(st.morale ?? 60), B = A.moraleBand ? A.moraleBand(m) : { name: '', mul: 1 }, col = m >= 70 ? '#89a05a' : m >= 40 ? '#c9a24a' : m >= 20 ? '#c07a3a' : '#b0412e';
         return `<div class="ledger" title="Moral wirkt auf Ertrag und Zuzug. Ursachen: Brunnen, Ruhe, Anführer da, Hunger, Überbelegung, Tote.">Moral <b>${m}</b> · ${B.name}
           <div style="height:7px;background:#2a241c;margin:4px 0;border:1px solid #4a3f30"><div style="height:100%;width:${m}%;background:${col}"></div></div>

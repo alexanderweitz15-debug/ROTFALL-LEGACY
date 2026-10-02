@@ -3673,7 +3673,7 @@ function die(c, cause = 'Wunden', source) {
     if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
     if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP);
     if (c.hiredBy) grudgeNote(c);   /* E3 */
-    if (c.settler) moraleAdd(-4, `${c.name} getötet`); }   /* Siedlung M1 */   /* S2: Burgwache bleibt tot */
+    if (c.settler) { moraleAdd(-4, `${c.name} getötet`); S.flags.settlerDeaths = (S.flags.settlerDeaths || 0) + 1; } }   /* Siedlung M1/M2 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
@@ -10460,8 +10460,9 @@ function hourTick(h) {
   // Nachwachsen
   for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
   if (S.settlement) settlersHour();                                          // AUDIT S-02: Siedler kommen und gehen
-  if (h === 2 && S.settlement && !S.settlement.raidAt && chance(0.4)) { S.settlement.raidAt = clock() + 60;   // AUDIT: Angriff angesagt — mit Wachturm gewarnt
-    if (S.settlement.buildings.some(b => b.type === 'watchtower' && b.built >= 1)) { log(`Der Wachturm von ${S.settlement.name} meldet Fackeln am Waldrand.`, 'combat'); UI.toast('WACHTURM: ANGRIFF NAHT', 3600); } }
+  if (h === 2 && S.settlement && !S.settlement.raidAt && !S.settlement.raid && chance(raidChance(S.settlement))) { S.settlement.raidAt = clock() + 60; S.settlement.raid = raidPlan(S.settlement);   // AUDIT: Angriff angesagt — mit Wachturm gewarnt (M2: mit Ursache)
+    if (S.settlement.buildings.some(b => b.type === 'watchtower' && b.built >= 1)) { log(`Der Wachturm von ${S.settlement.name} meldet Fackeln am Waldrand — ${S.settlement.raid.label} (${S.settlement.raid.n}).`, 'combat'); UI.toast('WACHTURM: ANGRIFF NAHT', 3600); } }
+  if (S.settlement?.raid?.at) campRaidTick();
   if (S.settlement?.raidAt && clock() >= S.settlement.raidAt) raidSettlement();
   // Gruppengeschehen
   if (chance(0.25)) partyInteraction();
@@ -11333,7 +11334,7 @@ function useBuilding(b) {
   if (b.type === 'well') { act(p, 'kneel', 700, b); p.stamina = p.maxStamina; return UI.toast('Kaltes Wasser.'); }
   if (b.type === 'healer') return healHut(b);
   if (b.type === 'storage') return UI.openModal('inventory');
-  if (b.type === 'watchtower') return UI.toast(st?.raidAt ? 'Späher melden Bewegung — sie kommen bald!' : 'Ruhig. Der Turm sieht weit.', 2600);
+  if (b.type === 'watchtower') { const L = raidSources(st).filter(x => x.src !== 'wolf').sort((a, c) => c.w - a.w); return UI.toast(st?.raidAt ? `Späher melden Bewegung — ${st.raid?.label || 'sie'} kommen bald!` : `Ruhig. ${L.length ? `Größte Gefahr: ${L[0].label}, ${L[0].dist} Felder.` : 'Keine Macht in der Nähe.'} Überfallgefahr je Nacht ${Math.round(raidChance(st) * 100)} %.`, 3600); }
 }
 const settlerCap = () => S.settlement ? S.settlement.buildings.filter(b => b.built >= 1).reduce((n, b) => n + (b.def.pop || 0), 0) : 0;
 function settlersHour() {
@@ -11419,14 +11420,67 @@ function zoneBuild(n) {
       S.ents[map].push(h); addSolid(h); B0.push(h); log(`Die Siedler beginnen in der Wohnzone eine Hütte (−20 Holz, −8 Stein).`, 'world'); return; }
   }
 }
+// Siedlung M2 (Entwickler 01.10.2026): Überfälle haben eine Ursache. Reichtum W = 4 je Bau + 3 je Siedler + 2 je Tier + Vorrat/25.
+// Quellen in der Nähe: unbezahlte Bande (120 Felder, stellt ihre eigenen Männer), Tote (Ort der Toten 150 Felder), Kette (Tributdorf
+// 160 Felder, Kette-Ruf < 0; verschleppt statt zu töten), Goblins (Grubenhort 140 Felder), sonst Wölfe. Chance je Nacht 6 % + W/300
+// (höchstens 45 %), nur Wölfe 6 %. Größe 2 + W/15 (2–9). Bist du nicht auf der Karte, wird abstrakt gewürfelt. Bleiben Angreifer
+// 10 Minuten unbehelligt am Lager, plündern sie (Vorrat −30 %, ein Bau beschädigt, Moral −10). Abgewehrt ohne Tote: Moral +6.
+function campWealth(st) {
+  const B0 = st.buildings.filter(b => b.built >= 1 && b.type !== 'palisade' && b.type !== 'wohnzone').length, ss = S.ents[st.map || 'world'].filter(e => e.settler && e.alive).length, H = st.herd || {};
+  return 4 * B0 + 3 * ss + 2 * ((H.cow || 0) + (H.sheep || 0)) + Math.floor(((S.res.wood || 0) + (S.res.stone || 0) + 2 * (S.res.iron || 0) + (S.res.food || 0)) / 25);
+}
+function raidSources(st) {
+  const sx = st.x / TS, sy = st.y / TS, day = S.day | 0, d = (x, y) => Math.round(Math.hypot(x - sx, y - sy)), out = [];
+  for (const b of bandsOf()) if (!b.rules && b.paid < day && b.men > 0 && d(b.tx, b.ty) <= 120) out.push({ src: 'band', w: 3 + b.men / 2, f: 'bandit', label: `${b.name} (${b.men} Mann)`, dist: d(b.tx, b.ty), bandId: b.id });
+  const und = LOCATIONS.filter(l => (S.war?.nodes?.[l.key]?.owner === 'undead' || heldBy(l.key)) && d(l.x, l.y) <= 150).sort((a, c) => d(a.x, a.y) - d(c.x, c.y))[0];
+  if (und) out.push({ src: 'undead', w: 4, f: 'undead', label: `Die Toten (${und.name})`, dist: d(und.x, und.y) });
+  const tv = !S.flags.chainsBroken && (S.factions.chain || 0) < 0 && tribVillages().map(V => TOWN_PLAN[V.key]?.square).filter(Boolean).map(([x, y]) => d(x, y)).sort((a, b) => a - b)[0];
+  if (tv && tv <= 160) out.push({ src: 'chain', w: 2, f: 'chain', label: 'Die Kette', dist: tv });
+  const gh = LOCATIONS.find(l => l.key === 'grubenhort'); if (gh && !S.flags.goblinsFreed && (S.factions.goblin || 0) < 0 && d(gh.x, gh.y) <= 140) out.push({ src: 'goblin', w: 2, f: 'goblin', label: 'Goblins vom Grubenhort', dist: d(gh.x, gh.y) });
+  out.push({ src: 'wolf', w: 1, f: null, label: 'Wölfe', dist: 0 }); return out;
+}
+function raidChance(st) { const real = raidSources(st).some(s => s.src !== 'wolf'); return real ? Math.min(0.45, 0.06 + campWealth(st) / 300) : 0.06; }
+function raidPlan(st) {                                              /* Quelle auslosen, Größe bestimmen */
+  const L = raidSources(st), tot = L.reduce((s, x) => s + x.w, 0); let r = rnd() * tot, S0 = L[L.length - 1]; for (const x of L) { if ((r -= x.w) <= 0) { S0 = x; break; } }
+  let n = clamp(2 + Math.floor(campWealth(st) / 15), 2, 9) + (S.difficulty === 'angsthase' ? -1 : S.difficulty === 'sehr_schwer' ? 1 : 0); n = Math.max(2, n);
+  if (S0.src === 'band') n = Math.min(n, (S.bands || []).find(b => b.id === S0.bandId)?.men || n); if (S0.src === 'wolf') n = ri(2, 3);
+  return { src: S0.src, f: S0.f, label: S0.label, n, bandId: S0.bandId || null };
+}
+const RAID_MOBS = { band: () => pick(['bandit', 'bandit', 'bandit_archer', 'bandit_spear']), chain: () => pick(['chainhunter', 'kettenschuetze']), goblin: () => pick(['goblin', 'goblin', 'goblin_warrior']), wolf: () => 'wolf' };
+function campPlunder(st, R) {
+  for (const k of ['wood', 'stone', 'iron', 'food']) S.res[k] = Math.floor((S.res[k] || 0) * 0.7); if (st.farmStock) st.farmStock = {};
+  const b = st.buildings.filter(x => x.built >= 1 && x.type !== 'palisade' && x.type !== 'wohnzone'); if (b.length) { const t = pick(b); t.cond = Math.max(0.2, (t.cond ?? 1) - 0.4); }
+  moraleAdd(-10, 'Geplündert'); if (R?.src === 'band') { const B2 = (S.bands || []).find(x => x.id === R.bandId); if (B2) B2.men = Math.min(9, B2.men + 1); }
+  st.history.push({ text: `${R?.label || 'Räuber'} plündern ${st.name}`, year: year() }); log(`${R?.label || 'Die Angreifer'} plündern ${st.name}: Vorrat −30 %, ein Bau beschädigt.`, 'combat');
+}
+function campTake(st, n, why) {                                      /* Siedler sterben oder werden verschleppt */
+  const arr = S.ents[st.map || 'world'], ss = arr.filter(e => e.settler && e.alive).slice(0, n);
+  for (const s of ss) { arr.splice(arr.indexOf(s), 1); log(`${s.name} aus ${st.name} ${why}.`, 'death'); moraleAdd(-4, `${s.name} ${why}`); } return ss.length;
+}
+function campRaidAbstract(st, R) {                                   /* der Held ist woanders: würfeln */
+  const B0 = st.buildings.filter(b => b.built >= 1), ss = S.ents[st.map || 'world'].filter(e => e.settler && e.alive).length;
+  const D = ss + (S.flags.dodonHome ? 6 : 0) + Math.min(4, B0.filter(b => b.type === 'palisade').length * 0.3) + (B0.some(b => b.type === 'gate') ? 1 : 0) + (B0.some(b => b.type === 'watchtower') ? 2 : 0);
+  const A = R.n * ({ band: 1.5, undead: 1.5, chain: 2, goblin: 1, wolf: 0.8 })[R.src];
+  if (D * (0.8 + rnd() * 0.4) >= A) { const dead = Math.min(2, Math.floor(A / Math.max(1, D))); if (dead) campTake(st, dead, R.src === 'chain' ? 'wurde verschleppt' : 'ist im Kampf gefallen'); else moraleAdd(6, 'Überfall abgewehrt');
+    st.history.push({ text: `${R.label} abgewehrt`, year: year() }); log(`${st.name} hat ${R.label} abgewehrt.`, 'combat'); return 'held'; }
+  campPlunder(st, R); campTake(st, ri(1, 2), R.src === 'chain' ? 'wurde verschleppt' : 'ist im Kampf gefallen'); return 'plundered';
+}
 function raidSettlement() {
-  const st = S.settlement, n = ri(2, 4 + Math.floor(S.day / 20)), a = rnd() * Math.PI * 2, sx = st.x / TS | 0, sy = st.y / TS | 0;
-  log(`ANGRIFF: ${n} Angreifer nähern sich ${st.name}.`, 'combat');
-  UI.toast(`FEINDE NÄHERN SICH — ${n} Angreifer`, 4200); st.raidAt = null;
-  const type = chance(0.6) ? 'bandit' : 'skeleton';               // AUDIT: sie marschieren von außerhalb heran, statt mitten im Lager zu erscheinen
-  for (let i = 0; i < n; i++) { const [tx, ty] = pushOut(st.map || 'world', sx + Math.round(Math.cos(a) * 24) + ri(-2, 2), sy + Math.round(Math.sin(a) * 24) + ri(-2, 2));
-    const e = spawnEnemy(type, st.map || 'world', tx, ty); if (e) { e.anchor = { x: st.x, y: st.y }; e.marching = true; e.aiState = 'pursue'; } }
-  S.settlement.history.push({ text: 'Überfall abgewehrt oder erlitten', year: year() });
+  const st = S.settlement, R = st.raid || raidPlan(st), n = R.n, a = rnd() * Math.PI * 2, sx = st.x / TS | 0, sy = st.y / TS | 0, map = st.map || 'world'; st.raidAt = null;
+  log(`ANGRIFF: ${n} Angreifer nähern sich ${st.name} — ${R.label}. ${campWealth(st) >= 20 ? `Dein Vorrat hat sich herumgesprochen (Reichtum ${campWealth(st)}).` : 'Sie suchen leichte Beute.'}`, 'combat');
+  if (S.player.map !== map) { st.raid = null; return campRaidAbstract(st, R); }
+  UI.toast(`FEINDE NÄHERN SICH — ${n} Angreifer`, 4200);
+  const types = R.src === 'undead' ? SIM.undeadMix(n, 'village').map(u => u.type) : Array.from({ length: n }, () => RAID_MOBS[R.src]?.() || 'bandit');   /* AUDIT: sie marschieren von außerhalb heran */
+  for (const type of types) { const [tx, ty] = pushOut(map, sx + Math.round(Math.cos(a) * 24) + ri(-2, 2), sy + Math.round(Math.sin(a) * 24) + ri(-2, 2));
+    const e = spawnEnemy(type, map, tx, ty); if (e) { e.anchor = { x: st.x, y: st.y }; e.marching = true; e.aiState = 'pursue'; e.campRaid = true; e.transient = true; if (R.bandId) e.bandId = R.bandId; } }
+  st.raid = { ...R, at: clock(), dead0: S.flags.settlerDeaths || 0 };
+}
+function campRaidTick() {                                            /* stündlich: Plünderung oder abgewehrt */
+  const st = S.settlement, R = st?.raid; if (!R?.at || clock() - R.at < 600) return; const map = st.map || 'world';
+  const foes = S.ents[map].filter(e => e.campRaid && e.alive && !e.downed);
+  if (!foes.length) { st.raid = null; if ((S.flags.settlerDeaths || 0) === R.dead0) moraleAdd(6, 'Überfall abgewehrt'); st.history.push({ text: `${R.label} abgewehrt`, year: year() }); log(`${st.name} hat ${R.label} abgewehrt.`, 'combat'); return; }
+  const guard = [S.player, ...S.ents[map].filter(e => e.settler && e.alive), ...partyMembers()].some(c => c.alive && !c.downed && c.map === map && Math.hypot(c.x - st.x, c.y - st.y) < 400);
+  if (!guard) { campPlunder(st, R); S.ents[map] = S.ents[map].filter(e => !e.campRaid); st.raid = null; }
 }
 
 // S13 (Nutzer: „Fraktionen handeln selbstständig“). Jeden Morgen entscheidet eine der großen Mächte nach Lage der Welt, was sie tut —
@@ -15201,6 +15255,9 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Siedlung: Reichtum und Quellen anzeigen': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); UI.toast(`Reichtum ${campWealth(st)} · Gefahr ${Math.round(raidChance(st) * 100)} % · ${raidSources(st).map(x => x.label).join(', ')}`, 4000); },
+      'Siedlung: Überfall jetzt': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); st.raid = null; raidSettlement(); },
+      'Siedlung: Überfall abstrakt auswürfeln': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); UI.toast(campRaidAbstract(st, raidPlan(st))); },
       'Siedlung: Heilerhütte hier (fertig) + 5 Kräuter': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen.'); const b = placeBuilding('healer', p.x + 60, p.y, true); if (b) b.built = 1; addItem(p, 'herb', 5); UI.toast('Heilerhütte steht'); },
       'Siedlung: alle Siedler verletzen': () => { for (const c of S.ents[S.map].filter(e => e.settler && e.alive)) B.damagePart(c, 'torso', c.maxHp * 0.5); UI.toast('Siedler verletzt'); },
       'Siedlung: Moral −20': () => moraleAdd(-20, 'Debug'),
@@ -19203,6 +19260,23 @@ export function selftest() {
       return none && ok2 && isHealer({ prof: 'Heiler' });
     } finally { p.inv = i0; S.party = pt; S.minute = m0; S.day = d0; B.fullHeal(p); p.body.larm.broken = 0; p.status = (p.status || []).filter(q => q.key !== 'infektion'); }
   }));
+  ok('Siedlung M2: Überfallgefahr folgt dem Reichtum (arm < 12 %, reich 45 %), nur Wölfe 6 %; eine unbezahlte Bande stellt ihre eigenen Männer; abstrakt: viele Siedler wehren Wölfe ab, leeres Lager wird geplündert', sandbox(() => {
+    const st0 = S.settlement, r0 = { ...S.res }, W0 = S.ents.world, BA = structuredClone(S.bands || []), fa = { ...S.factions }, fl = structuredClone(S.flags);
+    try { S.ents.world = W0.slice(); S.bands = []; S.factions.chain = 10; S.factions.goblin = 10;
+      S.settlement = { name: 'Probehof', x: 20 * TS, y: 20 * TS, map: 'world', buildings: [{ type: 'campfire', built: 1 }], morale: 50, history: [], priorities: ['Ruhe'] };
+      for (const k of ['wood', 'stone', 'iron', 'food']) S.res[k] = 0; S.res.wood = 20; const st = S.settlement, wolfOnly = raidSources(st).every(x => x.src === 'wolf' || x.src === 'undead');
+      const poor = raidChance(st);
+      S.bands = [{ id: 'pb', name: 'Probebande', lead: 'X', town: 'eren', tx: 40, ty: 20, born: S.day | 0, men: 3, paid: -1, amb: -999, where: 'x' }];
+      st.buildings = Array.from({ length: 14 }, () => ({ type: 'hut', built: 1 })); S.res.wood = 2000; const rich = raidChance(st), pl = raidPlan(st);
+      let bandOk = true; for (let i = 0; i < 20; i++) { const R = raidPlan(st); if (R.src === 'band' && (R.n > 3 || R.bandId !== 'pb')) bandOk = false; }
+      S.bands[0].paid = S.day | 0; const paidSafe = !raidSources(st).some(x => x.src === 'band');
+      for (let i = 0; i < 6; i++) { const c = makeChar({ name: 'S' + i, prof: 'Siedler', x: st.x, y: st.y }); c.settler = true; S.ents.world.push(c); }
+      seedRng(5); const held = campRaidAbstract(st, { src: 'wolf', n: 3, label: 'Wölfe' }) === 'held';
+      S.ents.world = S.ents.world.filter(e => !e.settler); S.res.wood = 100; const pld = campRaidAbstract(st, { src: 'band', n: 6, label: 'Banditen' }) === 'plundered' && S.res.wood === 70;
+      if (!(poor < 0.12 && rich === 0.45 && bandOk && paidSafe && held && pld)) console.log('M2-Probe', JSON.stringify({ wolfOnly, poor, rich, bandOk, paidSafe, held, pld }));
+      return poor < 0.12 && rich === 0.45 && bandOk && paidSafe && held && pld;
+    } finally { S.settlement = st0; Object.assign(S.res, r0); S.ents.world = W0; S.bands = BA; Object.assign(S.factions, fa); S.flags = fl; }
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -19469,7 +19543,7 @@ function boot() {
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand,
+    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)

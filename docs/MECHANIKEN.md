@@ -972,3 +972,19 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Pflegen:** Das dauert 2 Stunden und kostet 1 Kraut je Person mit Befund. Du und deine Gefährten in der Nähe erhalten +35 % LP, Brüche werden geschient (heilen doppelt so schnell), Entzündung und Blutung verschwinden. Wer am Boden liegt, muss erst aufgerichtet werden. Ohne Kräuter ist es nur ein Dach.
 - **Pfleger:** Steht „Verwundete versorgen“ ganz oben in den Prioritäten, wird ein Siedler Heiler oder Heilerin. Er bietet dieselben Dienste wie Heiler in der Stadt und heilt verletzte Siedler über Nacht (Moral +1).
 - Debug: „Siedlung: Heilerhütte hier (fertig) + 5 Kräuter“, „Siedlung: alle Siedler verletzen“.
+
+## Überfälle auf die Siedlung haben eine Ursache (Siedlung M2)
+- **Reichtum:** 4 je fertigem Bau, 3 je Siedler, 2 je Nutztier und 1 je 25 Vorrat. Er lockt an, wer in der Nähe ist.
+- **Quellen in der Nähe:**
+  - eine Bande bis 120 Felder, die du nicht bezahlt hast; sie schickt ihre eigenen Männer, Schutzgeld schützt also auch das Lager;
+  - Orte der Toten bis 150 Felder;
+  - die Kette, wenn ein Tributdorf bis 160 Felder entfernt ist und du bei ihr schlecht stehst; sie verschleppt Siedler, statt sie zu töten;
+  - Goblins vom Grubenhort bis 140 Felder;
+  - sonst Wölfe.
+- **Gefahr je Nacht:** 6 % plus Reichtum/300, höchstens 45 %; mit nur Wölfen in der Nähe 6 %. Größe des Überfalls: 2 plus Reichtum/15 Angreifer, höchstens 9.
+- **Ansage:** Der Wachturm meldet, wer kommt. Benutzt du ihn, nennt er die größte Gefahr und die Überfallgefahr je Nacht. Das Siedlungsfenster zeigt einen Block „Bedrohung“.
+- **Ausgang:**
+  - Bleiben Angreifer 10 Minuten unbehelligt, plündern sie: Vorrat −30 %, ein Bau beschädigt, Moral −10. Eine Bande wächst davon.
+  - Abgewehrt ohne Tote: Moral +6.
+  - Bist du nicht auf der Karte, wird abgewogen: Siedler, Palisaden, Tor, Wachturm und Dodon gegen die Angreifer.
+- Debug: „Siedlung: Reichtum und Quellen anzeigen“, „Überfall jetzt“, „Überfall abstrakt auswürfeln“.
