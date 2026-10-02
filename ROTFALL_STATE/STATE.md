@@ -9,10 +9,11 @@ Zuerst lesen. Team und Projektfakten: `TEAM.md`. Kurz halten (unter 100 Zeilen).
 ## Fertig (VERIFIED)
 - Audit T01–T04, T06, T08; Blutkult S1; T17 Regiebuch S1+S2; Control-2-Fixes.
 - RB-001…006, 008, 009, 013–015, 017–020, 022, 024–027, 029, 030, 032, 038, 039, 041, 043–056.
+- (Verifier 02.10.) Varonheim-Umbau S2 (Burg begehbar), S3 (Burgfrieden), S4 (Schmuggel, Kern), S5 (Start, Jäger live, Rest per Code), Stadt ohne Schutz S2a.
 - Feinde unter sich (FOE_FAC), Königstod, Stadt ohne Schutz S1, Kampf-Ideen (Scout R4), Lebendige Hauptstadt (Scout R5), Varonheim S1 (Kronfels).
 
 ## Gebaut, ungeprüft
-- Varonheim-Umbau S2 (Burg in der Welt), S3 (Burgfrieden), S4 (Schmuggel), S5 (Start in Varonheim).
+- Stadt ohne Schutz S2b (Übernahme), Blutkult-Sense, UI-Scheibe 2 (Baumodus), Artist R6/R7 (nur teilweise gesehen).
 - Artist R5 (Viertel-Architektur, neue Props: market_stall, fountain_grand, street_lamp, banner_pole, barrel_stack, cargo_pile, grave_cross, tomb — noch nicht platziert), Artist R6 (Figurenvielfalt).
 - Fixes: Karawanen-Wegpunkt geklemmt, WEAR_BIAS für Burg, BTYPES der Burgbauten.
 - T05, Blutkult S2–5, T09, T10, Belagerung S1/S2 (Teile verifiziert).

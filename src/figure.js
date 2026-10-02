@@ -690,6 +690,23 @@ function humanDetails(C, L, P, side, back, b, hood) {
 // G3: Waffen im feinen Raster (1 Welt-Einheit je Pixel). Liegend, Spitze nach +x, Griff bei (gx, gy). Formen mit Volumen
 // (liegende Teile: Licht oben), danach Details (Wicklung, Hohlkehle, Nieten, Rost, Scharten). Jede Waffe eigene Form.
 // =====================================================================================================================
+/* Runde 9 (Artist): Sensenblatt quer zum Schaft. Mittellinie = quadratische Kurve Wurzel (x0,y0) → Kontrollpunkt (cx,cy) → Spitze (tx,ty),
+   Breite w an der Wurzel, zur Spitze schmal (Exponent pw). Rücken (außen, konvex) bekommt den Anteil bk der Breite, die Schneide den Rest.
+   s = -1 spiegelt die Seiten (Blatt zur anderen Schaftseite). Liefert Rücken- und Schneidenlinie für die Details. +y = vorn, wenn die Sense aufrecht steht. */
+const qpt = (x0, y0, cx, cy, tx, ty, t) => { const u = 1 - t; return [u * u * x0 + 2 * u * t * cx + t * t * tx, u * u * y0 + 2 * u * t * cy + t * t * ty]; };
+function sickle(C, pid, x0, y0, cx, cy, tx, ty, w, pw = 0.9, bk = 0.4, s = 1, n = 20) {
+  const Bk = [], Ed = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t, [x, y] = qpt(x0, y0, cx, cy, tx, ty, t);
+    const dx = 2 * u * (cx - x0) + 2 * t * (tx - cx), dy = 2 * u * (cy - y0) + 2 * t * (ty - cy), l = Math.hypot(dx, dy) || 1, nx = s * dy / l, ny = -s * dx / l;
+    const hw = Math.max(0.3, w * Math.pow(1 - t, pw));
+    Bk.push([x + nx * hw * bk, y + ny * hw * bk]); Ed.push([x - nx * hw * (1 - bk), y - ny * hw * (1 - bk)]);
+  }
+  C.poly(pid, [...Bk, ...Ed.slice().reverse()]);
+  return { back: Bk, edge: Ed };
+}
+const dense = P => P.flatMap((p, i) => i + 1 < P.length ? [p, [(p[0] + P[i + 1][0]) / 2, (p[1] + P[i + 1][1]) / 2]] : [p]);   /* dichtere Linie für Einzelpixel */
+const inset = (A, B, k) => A.map(([x, y], i) => [x + (B[i][0] - x) * k, y + (B[i][1] - y) * k]);   /* Linie zwischen Schneide (k=0) und Rücken (k=1) */
 const WDES = {
   rusty_sword: [40, 12, (C, M) => { const { St } = M;
     C.ell(M.ir, 2.5, 6, 2.3, 2.3); C.poly(M.wr, [[4, 4.6], [11, 4.6], [11, 7.4], [4, 7.4]]); C.poly(M.ir, [[11, 1.5], [13, 1.5], [13, 10.5], [11, 10.5]]);

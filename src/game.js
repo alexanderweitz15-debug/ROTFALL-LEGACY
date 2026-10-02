@@ -3591,7 +3591,7 @@ function die(c, cause = 'Wunden', source) {
   c.aggroId = null; c.threatId = null; c.angry = false; c.follow = null; c.lurk = null;
   const arr = S.ents[c.map];
   if (c.kind === 'caravan') {
-    SIM.caravanDied(c); caravanSurvivors(c);                         // S13: Folgeauftrag
+    SIM.caravanDied(c); caravanSurvivors(c, source);                 // S13: Folgeauftrag (E2: mit Täterbande)
     for (const e of escortsOf(c)) { e.escort = null; e.escortLost = true; e.anchor = { x: e.x, y: e.y }; }   // Wachen ohne Zug: bleiben, bis niemand hinsieht
     for (const [g, n] of Object.entries(c.cargo || {})) if (n > 0) dropItemAt(c.map, c.x + ri(-14, 14), c.y + ri(-10, 10), mkItem(g, Math.ceil(n / 2)));
     const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
@@ -5072,6 +5072,7 @@ function doInteract(target = null) {
     return;
   }
   if (t.type === 'board') return boardMenu(boardTown(t));             // Phase 2: Aufträge annehmen und abgeben
+  if (t.bandLoot && !t.opened) return bandLootOpen(t);               /* E2 */
   if ((t.type === 'crate' || t.type === 'chest') && !t.opened) {
     t.opened = true;
     const k = pick(['bread', 'bandage', 'herb', 'wood', 'stone']);
@@ -7042,7 +7043,7 @@ function conChoices(npc, choices) {
   const town = npc.homeTown, kind = PROF_CON[npc.prof];
   if (npc.contract) { const C = (S.contracts || []).find(c => c.id === npc.contract);           // Vermisste: heimschicken
     if (C?.kind === 'missing' && C.state === 'active' && S.ents.world.some(e => e.contract === C.id && e.kind === 'enemy' && e.alive)) choices.unshift({ text: 'Geh heim.', fn: () => UI.dialogue(npc, '„Nicht solange die da draußen sind! Die schneiden mich ab!“', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]) });
-    else if (C?.kind === 'missing' && C.state === 'active') choices.unshift({ text: 'Geh heim. Der Weg ist frei.', fn: () => { S.ents.world = S.ents.world.filter(e => e !== npc); conProgress(C); UI.closeDialogue(); } });
+    else if (C?.kind === 'missing' && C.state === 'active') choices.unshift({ text: 'Geh heim. Der Weg ist frei.', fn: () => { S.ents.world = S.ents.world.filter(e => e !== npc); conProgress(C); UI.closeDialogue(); if (C.bandRef) caravanLootQuest(C); } });   /* E2 */
     return; }
   S.contracts ||= [];
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
@@ -7109,12 +7110,54 @@ function trailStep(C, p, alive) {
   }
 }
 // S13 (Nutzer: „Karawane überfallen → Überlebende“): Ein echter Überfall auf einen Handelszug hinterlässt einen Aushang in der nächsten Stadt.
-function caravanSurvivors(c) {
+// Emergente Quest E2 (Entwickler 01.10.2026, PROPOSALS/emergente_quests.md): Stirbt die große Karawane, waren es bestimmte Räuber.
+// Täter: die Bande des Mörders, sonst die nächste Bande (60 Felder), sonst eine neue Bande abseits der Straße. Die halbe Ladung geht an
+// die Bande; Räuber in der Nähe ziehen mit der Beute ins Lager. Der gerettete Kutscher nennt die Bande — daraus wird ein Auftrag aufs
+// Lager. Fällt der Anführer, steht dort die geraubte Ladung: zurück ans Kontor (Finderlohn, Händler +4) oder behalten.
+// Wer die Karawane selbst überfällt, bekommt keinen Auftrag: Händler −10.
+const byPlayerSrc = s => !!s && (s === S.player || s === S.player.id || S.party.includes(s?.id ?? s) || (byId(s?.id ?? s)?.servant === S.player.id) || !!(byId(s?.id ?? s)?.coopPilot));
+function caravanCulprit(c, src) {
+  if (byPlayerSrc(src)) { S.factions.merch = clamp((S.factions.merch || 0) - 10, -100, 100); chronicle('Karawane überfallen', 'crime', 'Wer die Karawane überfiel, trug kein Bandenzeichen.'); log('Die Händler wissen, wer die Karawane überfallen hat (Händler −10).', 'faction'); return 'player'; }
+  const tx = c.x / TS | 0, ty = c.y / TS | 0, killer = typeof src === 'object' ? src : byId(src);
+  let b = killer?.bandId && bandsOf().find(x => x.id === killer.bandId);
+  b ||= bandsOf().filter(x => !x.rules).sort((a, d) => Math.hypot(a.tx - tx, a.ty - ty) - Math.hypot(d.tx - tx, d.ty - ty)).find(x => Math.hypot(x.tx - tx, x.ty - ty) <= 60);
+  if (!b && bandsOf().length < 3) { const town = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && k !== 'vharnholm').sort((a, d) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[d].square[0] - tx, TOWN_PLAN[d].square[1] - ty))[0];
+    const a = rnd() * 6.283, r = ri(25, 40); b = town && bandFound(town, [tx + Math.round(Math.cos(a) * r), ty + Math.round(Math.sin(a) * r)]); if (b) b.origin = 'caravan'; }
+  if (!b) return null;
+  const C2 = Object.entries(c.cargo || {}).filter(([, n]) => n > 0), half = C2.reduce((s, [, n]) => s + Math.floor(n / 2), 0);
+  b.loot = (b.loot || 0) + half; if (C2.length) b.good = C2.sort((x, y) => y[1] - x[1])[0][0];
+  for (const e of S.ents.world) if (e.kind === 'enemy' && e.alive && !e.bandId && /bandit/.test(e.mtype) && dist(e, c) < 15 * TS) { e.bandId = b.id; e.anchor = { x: b.tx * TS, y: b.ty * TS }; e.aggroId = null; }
+  log(`Die Spuren der Räuber führen nach ${b.where}. Wer den Kutscher findet, erfährt mehr.`, 'quest');
+  return b;
+}
+function caravanLootQuest(C) {                                       /* der Kutscher ist daheim: er nennt das Lager */
+  const b = (S.bands || []).find(x => x.id === C.bandRef); if (!b || b.gone) return null;
+  const Q = { id: uid(), town: b.town, kind: 'rumor', rk: 'band', bandRef: b.id, caravan: true, giver: 'board', giverName: C.name, have: 0, need: 1, state: 'offer', day: S.day | 0, tx: b.tx, ty: b.ty, lie: false,
+    x: b.tx + ri(-4, 4), y: b.ty + ri(-4, 4), reward: { gold: 60, xp: 80, rep: 3 }, title: `Die Ladung zurückholen: ${b.name}`, desc: `${C.name} hat gesehen, wohin ${b.name} unter ${b.lead} die Ochsen getrieben haben: zum Lager bei ${b.where}. Fällt der Anführer, liegt dort die geraubte Ladung.` };
+  (S.contracts ||= []).push(Q); if (acceptContract(Q) === false) { S.contracts.pop(); return null; }
+  log(`${C.name}: „Es waren ${b.name}. Ihr Lager ist bei ${b.where} — ich zeig’s dir auf der Karte.“`, 'quest'); UI.toast(`SPUR: ${b.name.toUpperCase()}`, 2400); return Q;
+}
+function bandLootChest(b) {                                          /* Anführer tot: die geraubte Ladung steht am Feuer */
+  if (!b.loot || !b.good || !ITEMS[b.good]) return null; const n = Math.min(20, b.loot); b.loot = 0;
+  const q = freeSpotNear('world', b.tx + 1, b.ty + 1, 2) || { x: b.tx * TS + 16, y: b.ty * TS + 16 };
+  const t = { id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q.x, y: q.y, r: 10, solid: true, label: `Geraubte Ladung (${ITEMS[b.good].name} ×${n})`, bandLoot: { good: b.good, n, town: b.town } };
+  S.ents.world.push(t); log(`Am Lagerfeuer von ${b.name} steht die geraubte Ladung: ${ITEMS[b.good].name} ×${n}.`, 'quest'); return t;
+}
+function bandLootOpen(t) {
+  const p = S.player, L = t.bandLoot, nm = ITEMS[L.good]?.name || L.good;
+  UI.dialogue({ ...p, name: 'Geraubte Ladung' }, `${nm} ×${L.n}, noch mit dem Siegel der Karawane. Wem gehört das jetzt?`, [
+    { text: `Ans Kontor zurückgeben (Finderlohn ${L.n * 4} Gold, Händler +4)`, fn: () => { t.opened = true; S.gold += L.n * 4; S.factions.merch = clamp((S.factions.merch || 0) + 4, -100, 100); const T2 = S.towns?.[L.town]; if (T2?.stock) T2.stock[L.good] = (T2.stock[L.good] || 0) + L.n;
+      log(`Die Ladung geht zurück nach ${townName(L.town)}. Finderlohn ${L.n * 4} Gold, die Händler merken sich deinen Namen (+4).`, 'economy'); UI.closeDialogue(); } },
+    { text: 'Behalten', fn: () => { t.opened = true; if (!addItem(p, L.good, L.n)) dropItemAt(p.map, p.x, p.y + 12, mkItem(L.good, L.n)); log(`Du behältst ${nm} ×${L.n}. Die Siegel brichst du ab.`, 'economy'); UI.closeDialogue(); } },
+    { text: 'Später', fn: () => UI.closeDialogue() }]);
+}
+function caravanSurvivors(c, src) {
+  const band = caravanCulprit(c, src); if (band === 'player') return null;
   const tx = c.x / TS | 0, ty = c.y / TS | 0, towns = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].village && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm');
   const town = towns.sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[b].square[0] - tx, TOWN_PLAN[b].square[1] - ty))[0]; if (!town) return null;
   const C = makeContract(town, 'missing', 'board'), q = freeSpotNear('world', tx + ri(-12, 12), ty + ri(-12, 12), 4);
   Object.assign(C, { x: q.x / TS | 0, y: q.y / TS | 0, name: `${pick(FIRST_M)} der Kutscher`, twist: chance(0.5) ? 'captive' : null, title: 'Überlebende der Karawane' });
-  C.desc = `Die Karawane wurde überfallen. ${C.name} ist in die Büsche geflohen — irgendwo dort draußen, nahe der Straße. Bring ihn heim.`; C.reward.gold += 25;
+  C.desc = `Die Karawane wurde überfallen${band ? ` — von ${band.name}` : ''}. ${C.name} ist in die Büsche geflohen — irgendwo dort draußen, nahe der Straße. Bring ihn heim.${band ? ' Er hat gesehen, wohin die Räuber zogen.' : ''}`; C.reward.gold += 25; if (band) C.bandRef = band.id;
   (S.contracts ||= []).push(C); log(`Aushang in ${townName(town)}: Überlebende der Karawane gesucht.`, 'quest'); return C;
 }
 function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contract && c.state === 'active');
@@ -11568,6 +11611,7 @@ function bandTick() {
 function bandKill(c) {
   const b = (S.bands || []).find(x => x.id === c.bandId); if (!b || b.gone) return; b.men = Math.max(0, b.men - 1);
   if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10; S.gold += g; addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
+    bandLootChest(b);   /* E2: geraubte Ladung */
     bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600);
     if (b.rules) schutzFreed(b.rules, 'player'); }   /* S2: die Stadt ist frei */
 }
@@ -14899,6 +14943,8 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'E2: Karawane stirbt jetzt (Täterbande)': () => { const c = S.ents.world.find(e => e.kind === 'caravan' && e.alive); if (!c) return UI.toast('Keine Karawane unterwegs.'); const k = S.ents.world.find(e => e.kind === 'enemy' && e.alive && /bandit/.test(e.mtype)) || null; die(c, 'Räuber', k); },
+      'E2: Kutscher gerettet (Folgeauftrag)': () => { const C = (S.contracts || []).find(c => c.kind === 'missing' && c.bandRef && c.state !== 'claimed'); if (!C) return UI.toast('Kein Kutscher-Auftrag mit Täterbande.'); caravanLootQuest(C); },
       'Blutkult-Sense geben': () => { addItem(P(), 'blutsense'); UI.toast('Blutkult-Sense im Gepäck'); },
       'Kult starten (Stufe 1)': () => { ensureBloodCult(); cultStart('Debug:'); },
       'Entführung jetzt': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); const v2 = cultTake(); UI.toast(v2 ? `${v2.name} verschwunden` : 'Niemand (Deckel 8?)'); },
@@ -17172,7 +17218,7 @@ export function selftest() {
       for (let i = 0; i < 3; i++) { const [x, y] = C.pts[i]; p.x = x * TS + TS / 2; p.y = y * TS + TS / 2; conTick(); }
       const three = C.have === 3; conTick(); const L = S.ents.world.find(e => e.contract === C.id && e.title === C.name && e.alive);
       if (L) die(L, 'Test', p); const done = C.have === 4;
-      const n0 = S.contracts.length, S2 = caravanSurvivors({ x: p.x, y: p.y }), surv = S.contracts.length === n0 + 1 && S2.kind === 'missing' && S2.state === 'offer' && /Karawane/.test(S2.title);
+      const n0 = S.contracts.length, BA = structuredClone(S.bands || []), S2 = caravanSurvivors({ x: p.x, y: p.y }); S.bands = BA; const surv = S.contracts.length === n0 + 1 && S2.kind === 'missing' && S2.state === 'offer' && /Karawane/.test(S2.title);
       return clue0 && three && !!L && done && surv;
     } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.kills = k.k; p.kills = k.pk; S.gold = k.g; S.ents.world = W0; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
   })());
@@ -18798,6 +18844,17 @@ export function selftest() {
       p.equip.weapon = mkItem('blutsense'); p.equip.weapon.afx = null; const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 20; w.y = p.y; B.damagePart(p, 'torso', 20); const hb = p.hp; seedRng(3); hit(p, w, 1); const healed = p.hp > hb;
       return once && healed;
     } finally { S.cult = C0; S.flags = f0; Object.assign(S.factions, fa0); S.ents.world = W0; }
+  }));
+  ok('E2: Karawanentod legt eine Täterbande mit Beute an, der Kutscher nennt sie, Anführer tot → Kiste mit der Ladung; die Karawane selbst überfallen → keine Bande, Händler −10', sandbox(() => {
+    const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, f0 = structuredClone(S.flags), g0 = S.gold; S.ents.world = W0.slice();
+    try { S.bands = []; S.contracts = []; const [ex, ey] = TOWN_PLAN.eren.square, car = { x: (ex + 20) * TS, y: ey * TS, cargo: { salt: 8 } };
+      const C = caravanSurvivors(car, null), b = S.bands[0], band = !!b && b.origin === 'caravan' && b.loot === 4 && b.good === 'salt' && !!C && C.bandRef === b.id && C.desc.includes(b.name);
+      C.state = 'active'; const Q = caravanLootQuest(C), quest = !!Q && Q.bandRef === b.id;
+      bandKill({ bandId: b.id, bandLead: true }); const chest = S.ents.world.find(e => e.bandLoot && e.bandLoot.n === 4); UI.closeDialogue();
+      const mer = S.factions.merch || 0; S.bands = []; S.contracts = []; const none = caravanSurvivors(car, p) === null && !S.bands.length && !S.contracts.length && (S.factions.merch || 0) === Math.max(-100, mer - 10);
+      if (!(band && quest && chest && none)) console.log('E2-Probe', JSON.stringify({ band, quest, chest: !!chest, none }));
+      return band && quest && !!chest && none;
+    } finally { S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.flags = f0; S.gold = g0; registerContracts(); UI.closeDialogue(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

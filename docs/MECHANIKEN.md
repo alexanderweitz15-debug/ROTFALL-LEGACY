@@ -901,3 +901,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Am Ende der Blutkult-Questreihe liegt Aldhelms Sense in seiner Krypta. Du bekommst sie, wenn Aldhelm tot ist oder du selbst Blutfürst wirst. Es gibt sie nur einmal.
 - Sie ist eine zweihändige Stangenwaffe mit weitem Bogen und Blutung. Ihr **Lebensraub** heilt dich um 12 % des Schadens, für jeden Getroffenen im Bogen.
 - Debug: „Blutkult-Sense geben“.
+
+## Karawanenräuber verfolgen (Emergente Quest E2)
+- Stirbt die große Karawane, waren es bestimmte Räuber: die Bande dessen, der sie erschlug, sonst die nächste Bande im Umkreis von 60 Feldern, sonst bildet sich eine neue Bande abseits der Straße. Die halbe Ladung geht an die Bande, Räuber in der Nähe ziehen mit der Beute ins Lager.
+- Der Aushang „Überlebende der Karawane“ nennt die Bande. Schickst du den Kutscher heim, zeigt er dir das Lager auf der Karte (Auftrag „Die Ladung zurückholen“).
+- Fällt der Anführer, steht am Lagerfeuer die geraubte Ladung (höchstens 20 Stück). Du gibst sie ans Kontor zurück (4 Gold Finderlohn je Stück, Händler +4) oder behältst sie.
+- Überfällst du die Karawane selbst, gibt es keinen Auftrag; die Händler wissen es (Händler −10).
+- Debug: „E2: Karawane stirbt jetzt (Täterbande)“, „E2: Kutscher gerettet (Folgeauftrag)“.
