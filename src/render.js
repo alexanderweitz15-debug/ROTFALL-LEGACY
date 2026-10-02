@@ -2790,7 +2790,7 @@ function drawAmbience(now, list, m, x0, y0, x1, y1) {
         const q = { x: gx * 500 + 100 + h2(gx, gy) * 300, y: gy * 500 + 100 + h2(gy + 9, gx) * 300, n: swarm.length ? 2 : 3 }; if (seen(q)) swarm.push(q); }
     for (const sw of swarm) if (seen(sw)) for (let i = 0; i < sw.n; i++) { const a = now / (520 + i * 60) + i * 2.4, r = 34 + i * 9;
       const bx = sw.x + Math.cos(a) * r + Math.sin(now / 70 + i) * 3, by = sw.y + Math.sin(a * 1.7) * r * 0.45 + Math.sin(now / 53 + i * 2) * 2, fl = Math.sin(now / 45 + i) > 0 ? -1 : 1;
-      AMB.glow.push(bx - 1, by, 3, 2, 1, '#050408', bx - 5, by + fl, 4, 1, 1, '#050408', bx + 2, by + fl, 4, 1, 1, '#050408'); }
+      AMB.glow.push(bx - 5, by + fl, 4, 2, 1, '#3e3846', bx + 2, by + fl, 4, 2, 1, '#3e3846', bx - 1, by, 3, 3, 1, '#1e1a22'); }   /* Schwingen etwas heller als der Nachtboden, sonst unsichtbar */
   }
   /* 8. Morgennebel 5–8 Uhr über Moor und Wasser: wenige große, halb durchsichtige Schwaden, die langsam treiben */
   if (h >= 5 && h < 8 && wx !== 'fog' && wx !== 'sandstorm' && (curRegion === 'marsh' || water > 60) && !['desert', 'badland', 'deadland', 'mountain'].includes(curRegion)) {

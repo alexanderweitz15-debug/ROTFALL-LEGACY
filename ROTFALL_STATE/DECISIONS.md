@@ -121,3 +121,9 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Groll der Witwe trifft auch den Erben, höchstens noch ein Mörder.
 - Stadt ohne Wachen S2: Fristen je Schritt — Angsthase 4+4, Schwer 2+2, Sehr schwer 1+1 Tage.
 - Eigene Siedlung wird ohne Wachen nie übernommen, nur geplündert.
+
+## 02.10.2026 — Belagerung S3, Geheime Orte, Start, Mittelspiel
+- Belagerung S3 (PROPOSALS/varonheim_belagerung_s3.md): Burgfrieden fällt erst bei Mauern 0. Kellerweg-Frage und Varons Strenge NICHT beantwortet → offen lassen / beim Bau erneut fragen.
+- Geheime Orte (PROPOSALS/geheime_orte.md): gleiche Lage in jeder Welt; Seelen-Ernte darf Morvaths Heerzug näher bringen (mit Warnung). Geisterschiff gratis: NICHT gewählt → kein Gratis-Transport.
+- Erste Spielstunde (Scout R8): „Hinweise führen hin“ (proaktive Hinweise) bauen. Vorverfolgter erster Auftrag: nicht gewählt.
+- Mittelspiel (Scout R9): alle vier bauen — Siedlung geht an Erben; Gold-Sog (Ausbau kostet auch Gold); Rang bremst Blutkult; Aurelion-Bionik wirkt im Kriegsgraphen.
