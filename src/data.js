@@ -556,6 +556,9 @@ export const MONSTERS = {
   acad_dummy:  { name:'Übungspuppe', interiors:false, hp:1, dmg:0, speed:0, reach:0, atk:99999, xp:0, sight:0, r:11, threat:0, pal:{skin:'#c8a868',cloth:'#8a6a3a',metal:'#5a4a30'} },
   acad_student:{ name:'Student der Akademie', interiors:false, hp:60, dmg:6, speed:1.2, reach:240, atk:1600, ranged:true, missile:'shadow', xp:0, sight:320, r:11, threat:1, spells:['sp_spark', 'sp_froststrike'],
                  pal:{skin:'#d8b89a',cloth:'#2c3a6a',metal:'#8a7a50',glow:'#9fd0ff'} },
+  /* Klassen-Prüfung (02.10.2026): Übungsfechter der Lehrer — Nahkampf, stirbt nie (die Prüfung endet vorher), kämpft nur gegen den Prüfling */
+  drill_fighter:{ name:'Übungsfechter', interiors:true, hp:60, dmg:6, speed:1.2, reach:34, atk:1150, xp:0, sight:320, r:11, threat:1,
+                 pal:{skin:'#d0a888',cloth:'#5a4a38',metal:'#8a8478'} },
   aldhelm:    { name:'Aldhelm, Blutfürst von Varonheim', hp:340, dmg:21, speed:1.3, reach:40, atk:1400, telegraph:600, xp:450, sight:400, r:13, boss:true, threat:4, faction:'blut', interiors:true, role:'Endgegner', pal:{skin:'#e0ccc0',cloth:'#141014',metal:'#7a2228'} },   /* §5g.2 Boss */
   blood_mage: { name:'Blutmagier', hp:38, dmg:12, speed:1.1, reach:250, atk:1700, ranged:true, missile:'shadow', leech:0.4, xp:32, sight:300, r:11, threat:2, faction:'blut', interiors:true, role:'Fernkampf', pal:{skin:'#d0bcb0',cloth:'#3a0a10',metal:'#7a2228'} },   /* §5g.2: sein Geschoss heilt ihn */
   thrall:     { name:'Blutknecht', hp:34, dmg:8, speed:1.25, reach:30, atk:850, xp:14, sight:240, r:11, threat:1, faction:'blut', interiors:true, role:'Masse', pal:{skin:'#c8b0a8',cloth:'#4a3a30',metal:'#5a4a40'} },
@@ -1188,7 +1191,14 @@ export const QUESTS = {
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
-  q_paladin1:{ name:'Prüfung: Wachsamkeit', giver:'kelan', desc:'Kelan verlangt Beweise, nicht Absichten. Tote Untote zählen als Beweis.',
+  // Klassen-Prüfung (Entwickler 02.10.2026, Tabelle 2.2 in PROPOSALS/klassen_talente.md): clsTrial = [Klasse, Schritt]. Jeder Lehrer der
+  // Klasse nimmt ab (game.js teach/trialOffer); Fortschritt je Figur (p.ktSteps), der letzte Schritt trägt reward.unlock.
+  kt_warrior1:{ name:'Prüfung des Kriegers: Blut an der Klinge', giver:null, clsTrial:['warrior', 1],
+    desc:'„Ein Krieger, der nie geblutet hat, ist ein Gerücht. Vier Banditen — auf der Straße, im Lager, egal wo. Komm mit ihrem Blut an der Klinge zurück.“',
+    objectives:[{type:'kill',target:'bandit',targets:['bandit','bandit_archer','bandit_spear'],count:4,text:'Banditen besiegen'}], reward:{xp:80} },
+  kt_warrior2:{ name:'Prüfung des Kriegers: Der Kreis', giver:null, clsTrial:['warrior', 2],
+    desc:'„Jetzt der Kreis. Mein Übungsfechter wartet. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt. Sag Bescheid, wenn du bereit bist.“',
+    objectives:[{type:'trial',target:'duel',count:1,text:'Das Duell im Kreis gewinnen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'warrior'} },  q_paladin1:{ name:'Prüfung: Wachsamkeit', giver:'kelan', desc:'Kelan verlangt Beweise, nicht Absichten. Tote Untote zählen als Beweis.',
     objectives:[{type:'kill',target:'skeleton',count:4,text:'Untote vernichten'}],
     reward:{xp:80,rep:{order:10}}, turnin:'kelan' },
   q_paladin2:{ name:'Prüfung: Das Siegel', giver:'kelan', desc:'Ein Ordenssiegel blieb in der Grube zurück. Hol es.',

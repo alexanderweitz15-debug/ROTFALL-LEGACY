@@ -464,7 +464,22 @@ function buyFarmAnimal(a) {
   if (S.gold < price) return UI.toast('Dafür reicht dein Gold nicht.');
   S.gold -= price; H[a]++; ensureFarmAnimals(); log(`${a === 'cow' ? 'Eine Kuh' : 'Ein Schaf'} für ${S.settlement.name}. Der Händler treibt es dir hin.`, 'economy'); UI.refreshHUD();
 }
+/* GUI Tierhändler (Entwickler 03.10.: „jedes System, das ein GUI verträgt“): Fenster mit Begleittier-Karten, Reittieren, Hoftieren und
+   dem eigenen Tier. Gleiche Regeln wie das Gespräch (ein Tier gleichzeitig, Preise aus BEAST_WARES); Koop-Gäste behalten das Gespräch. */
+function buyBeast(m) {
+  const W = BEAST_WARES.find(w => w[0] === m); if (!W || petOf()) return false;
+  if (S.gold < W[2]) { UI.toast('Dafür reicht dein Gold nicht.'); return false; }
+  S.gold -= W[2]; const p = S.player, e = spawnEnemy(m, p.map, (p.x / TS | 0) + 1, (p.y / TS | 0) + 1, { level: Math.max(2, p.level - 2), noVariant: true }); makePet(e); UI.refreshHUD(); return true;
+}
+function releasePet() { const e = petOf(); if (!e) return; e.servant = null; e.pet = false; e.transient = true; e.anchor = { x: e.x + 600, y: e.y }; S.pet = null; log(`${e.petName} trottet davon.`, 'party'); }
+function beastInfo() {
+  const pet = petOf(), cap = farmCap();
+  return { gold: S.gold, wares: BEAST_WARES.map(([m, name, price]) => { const M = MONSTERS[m]; return { m, name, price, hp: Math.round(M.hp * 1.2), dmg: M.dmg, speed: M.speed }; }),
+    pet: pet && { name: pet.petName, mtype: pet.mtype, hp: Math.round(pet.hp), maxHp: Math.round(pet.maxHp) }, mount: S.mount ? { name: S.mount.name, mech: S.mount.kind === 'mech_horse' } : null,
+    farm: cap ? { cap, cow: farmHerd().cow, sheep: farmHerd().sheep } : null };
+}
 function beastMenu(npc) {
+  if (S.coop?.role !== 'guest' && !S._quiet) { UI.closeDialogue(); return UI.openModal('beasts', npc); }
   const back = () => beastMenu(npc);   /* Entwickler 02.10.: „Zurück“ landete über talk() wieder hier — das Menü ging nie zu */
   UI.dialogue(npc, petOf() ? `„${petOf().petName} sieht gut aus. Ein zweites Tier? Das hält niemand lange durch.“` : '„Treu, ehrlich, beißt nur, wen du willst. Welches?“',
     [...(petOf() ? [] : BEAST_WARES.map(([m, n, g]) => ({ text: `${n} — ${g} Gold`, fn: () => {
@@ -1331,12 +1346,14 @@ function startTalk(e) {
   if (foe && foe.alive && dist(foe, e) < 160 && !festNow(e.homeTown)) {                  // §79: der Rivale steht in Hörweite — lästern
     const k = e.plan.n + (S.day | 0), line = RIVAL_TALK[k % RIVAL_TALK.length], until = now + 5200;
     e.talk = { with: o.id, until, at: now, say: line[0].replace('%', foe.name) }; o.talk = { with: e.id, until, at: now + 2600, say: line[1] };
+    if (!S._quiet) { gesture(e, 'zeigen', 1100, foe); if (!foe.act || foe.act.kind !== 'work') gesture(foe, 'abwehren', 1300, e); }   /* Visuell N8-2: man zeigt auf den Rivalen, der wehrt ab */
     return true;
   }
   const k = e.plan.n + o.plan.n + (S.day | 0), news = !festNow(e.homeTown) && k % 2 ? newsTalk(k) : null;   // jedes zweite Gespräch: Neuigkeiten, wenn es welche gibt
   const pool = festNow(e.homeTown) ? FEST_TALK : festDay(e.homeTown, (S.day | 0) + 1) && k % 3 === 0 ? PRE_FEST : TALK;
   const warm = e.rel?.friend === o.id || o.rel?.friend === e.id, line = news || (warm && k % 2 === 0 ? FRIEND_TALK[k % FRIEND_TALK.length] : pool[k % pool.length]), until = now + 5200;
   e.talk = { with: o.id, until, at: now, say: line[0] }; o.talk = { with: e.id, until, at: now + 2600, say: line[1] };
+  if (warm && !S._quiet) { gesture(e, 'jubeln', 800, o); gesture(o, 'jubeln', 800, e); }   /* Visuell N8-1: Freunde begrüßen sich sichtbar */
   return true;
 }
 function villagerDay(e, t, dt) {
@@ -1698,7 +1715,7 @@ SPAWN_AREAS.push(
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
-const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute', 'dampframme', 'blutschoepfer', 'netzwerferin', 'hofspion']);
+const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'drill_fighter', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute', 'dampframme', 'blutschoepfer', 'netzwerferin', 'hofspion']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -2354,6 +2371,7 @@ export function continueGame(given = null, retried = false) {                   
   ensureBoards();
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
+  for (const c of S.player.knownClasses || []) if (OWN_PATH.has(c)) (S.player.clsPass ||= {})[c] = 1;   /* Entwickler: eigene Wege zählen rückwirkend als bestandene Prüfung */
   { const got = talentTopUp(S.player); if (got) { recalc(S.player); log(`Die Talentregel hat sich geändert (ein Punkt auf jeder zweiten Stufe und je bestandener Klassenprüfung): ${got} Talentpunkt${got > 1 ? 'e' : ''} nachgereicht.`, 'party'); } }   /* Scheibe 0: Punkte rückwirkend nach der neuen Regel (nie weniger als vorher) */
   for (const h of [...Object.values(S.coopHeroes || {}), ...Object.values(S.ents).flat().filter(e => e?.coopHero)]) talentTopUp(h);   /* Koop-Gastfiguren bekamen bisher keine Talentpunkte */
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
@@ -2596,6 +2614,14 @@ function reactTick(dt) {   /* PERF-U: Figuren und Leichen aus actorsOf statt zwe
   if (!e || !chance(0.5)) return;
   e.reactAt = now + 90000; const say = reactLine(e); if (!say) return;
   e.talk = { with: p.id, until: now + 2600, at: now, say }; reactPlay(e, reactGest, p);
+}
+/* Visuell N9-7 (02.10.2026): Wer den Helden zuerst entdeckt, zeigt „!“ — das Zeichen springt in kurzen Abständen durch seine Gruppe
+   (gleiche Fraktion, bis 220 px, noch ohne Ziel). Nur Darstellung: wer angreift, entscheidet die KI wie bisher. Einmal je Figur. */
+function spotChain(e) {
+  e.spotted = true; emote(e, 'ausruf', 1000); gesture(e, 'zeigen', 700, S.player);
+  const near = S.ents[e.map].filter(o => o !== e && o.kind === 'enemy' && o.alive && !o.spotted && !o.aggroId && o.faction === e.faction && Math.abs(o.x - e.x) < 220 && Math.abs(o.y - e.y) < 220)
+    .sort((a, b) => dist(a, e) - dist(b, e)).slice(0, 6);
+  near.forEach((o, i) => { o.spotted = true; setTimeout(() => { if (o.alive) emote(o, 'ausruf', 900); }, 160 * (i + 1)); });
 }
 function reactPlay(e, G, toward) {   /* N2-S1: Geste (und ggf. Emote) zur Reaktion; nicht mitten in der Arbeit */
   if (!G || e.act?.kind === 'work' || e.sitting) return;
@@ -3744,6 +3770,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
   if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
+  if (S.trial && (target.trial || target === S.player) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
     float(target, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); fx(target.x, target.y + 2, 'dust', 5); setTres(target, tres(target) + 1); titleDeed(target); return; }
@@ -4348,7 +4375,7 @@ function nearestTarget(e, list, maxD) {
   return best;
 }
 
-const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
+const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', drill_fighter: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
   bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek', skel_bomb: 'rattle', skel_brute: 'rattle', mutant: 'shriek', mutant_brute: 'growl', waechterspinne: 'rattle', dampframme: 'rattle', blutschoepfer: 'moan', netzwerferin: 'shout', hofspion: 'shout' };   // Phase 6
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
@@ -4389,6 +4416,7 @@ function updateEnemy(e, dt) {
   if (tgt && tgt === ag) { const nt = nearestTarget(e, targets, sight); if (nt && nt !== ag && dist(e, nt) < dist(e, ag) * 0.6) tgt = nt; }   /* Entwickler: steht ein anderer Feind deutlich näher, kämpft man lieber gegen den */
   if (e.mtype === 'bear' && tgt && !e.provoked && dist(e, tgt) > 110 && tgt !== ag) tgt = null;   // Revier: nur wer zu nahe kommt
   if (tgt && e.giveUp && e.giveUp.id === tgt.id && e.giveUp.until > performance.now()) tgt = null;
+  if (tgt === S.player && e.aggroId !== tgt.id && !e.spotted && !S._quiet && HUMANOID.has(e.mtype)) spotChain(e);   /* Visuell N9-7: Warnkette */
   if (tgt === S.player && BOSS_CARDS[e.mtype] && !S.cine && dist(e, tgt) < 340) bossIntro(e);   /* T17: Boss-Auftritt beim ersten Blickkontakt (einmal je Held) */   // BUG-088: aufgegeben (kein Weg) — nicht sofort wieder anrennen
   let sp = m.speed * (e.spdMul || 1) * dt / 16 * speedMul(e.map, e.x, e.y) * B.speedFactor(e) * (e.hexed > performance.now() ? 0.7 : 1) * (e.rooted > performance.now() ? 0 : 1) * ((e.status || []).some(q => q.key === 'chilled') ? 0.6 : 1) * (1 - 0.15 * ((e.status || []).find(q => q.key === 'frost')?.stacks || 0));   // Ranken halten, Frost bremst
   const sty = HUMANOID.has(e.mtype) ? styleOf(fameRegion(e)) : 0;   /* T08 Ruf der Klinge: Grausamkeit lässt früher fliehen, Gnade öfter aufgeben */
@@ -6648,7 +6676,7 @@ function partyReact(key) {
 function chainRite(npc) {
   UI.dialogue(npc, '„Knie. Die Kette wird dir um die Schultern gelegt, nicht um den Hals. Wer sie trägt, befiehlt — und wird gefürchtet. Es gibt kein Zurück.“', [
     { text: 'Knien.', fn: () => {
-      const p = S.player; unlockClass('darkpaladin'); S.ranks.chain = 4; addItem(p, 'kettenbrecher'); addItem(p, 'eisenfuerst');   // MP2 §31: echter Rang; BUG-116: Gegenstände standen im Kommentar
+      const p = S.player; UI.closeDialogue(); unlockClass('darkpaladin', npc); S.ranks.chain = 4; addItem(p, 'kettenbrecher'); addItem(p, 'eisenfuerst');   // MP2 §31: echter Rang; BUG-116: Gegenstände standen im Kommentar
       S.factions.chain += 10; S.factions.valen -= 10; S.factions.order -= 15; partyReact('chain_rite');
       chronicle(`${p.name} kniet vor der Kette`, 'faction', 'Geweiht zum Dunklen Hochpaladin der Eisernen Kette.');
       log('Du bist Dunkler Hochpaladin. Schwarze Platte, Kettenbrecher — und Furcht, wohin du gehst.', 'faction'); UI.closeDialogue(); save(); } },
@@ -12927,6 +12955,7 @@ function talk(npc) {
   const choices = [];
   // Quests des Gebers
   for (const [k, Q] of Object.entries(QUESTS)) {
+    if (Q.clsTrial) { clsTrialChoices(npc, k, Q, choices); continue; }   /* Klassen-Prüfung: jeder Lehrer der Klasse; angeboten wird über „Kannst du mich ausbilden?“ */
     if (Q.giver ? Q.giver !== npc.key : !(Q.giverProf && npc.prof === Q.giverProf && (Q.giverMap ? npc.map === Q.giverMap : npc.post === 'kettenfeste') && !npc.hostile)) continue;   // S14: Geber nach Beruf (Kette, Seevolk)
     const st = S.quests[k];
     if (!st && questAvailable(k)) choices.push({ text: `Was liegt an? (${Q.name})`, fn: () => offerQuest(npc, k) });
@@ -12944,6 +12973,8 @@ function talk(npc) {
   if (npc.spellRule === 'academy') choices.push({ text: 'Ich will eine Prüfung ablegen.', fn: () => trialMenu(npc) });
   const tcls = teachable(npc);
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
+  for (const c of [].concat(npc.teaches || [])) if (c !== tcls && clsTrialOf(c).length && S.player.knownClasses.includes(c) && !S.player.clsPass?.[c] && !npc.hostile)
+    choices.push({ text: `Ich will die Prüfung als ${CLASSES[c].name} nachholen. (Talentpunkt)`, fn: () => teach(npc, c) });   /* alte Stände (Entscheidung 8) */
   if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
   if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead', 'merch', 'bandit'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
@@ -13490,7 +13521,9 @@ function turnIn(npc, k) {
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
   if (r.take) removeItem(S.player, r.take, r.takeCount || 1);
   if (r.item) { addItem(S.player, r.item); log(`Erhalten: ${ITEMS[r.item].name}.`, 'economy'); }
-  if (r.unlock) unlockClass(r.unlock);
+  if (Q.clsTrial) (S.player.ktSteps ||= {})[k] = 1;                    /* Klassen-Prüfung: Schritt gehört der Figur, die abgibt (Koop: jeder für sich) */
+  let rited = false;
+  if (r.unlock) rited = Q.clsTrial ? classPassed(r.unlock, npc) : unlockClass(r.unlock, npc);   /* Aufnahme mit Szene */
   if (RANK_Q[k]?.[2] === 1) promote(RANK_Q[k][0], RANK_Q[k][1]);   // zweiter Teil erledigt: Beförderung
   if (k === 'g_dod3') { turnInStorm(npc); return; }   // S15: der Pakt des Sturms
   if (k === 'q_salz2') chooseSeaSide('trader'); if (k === 'q_klinge2') chooseSeaSide('raider'); if (k === 'q_salz3') promote('sea', 3);   // S14 Seevolk
@@ -13498,6 +13531,8 @@ function turnIn(npc, k) {
   addFame(2);                                                          // S15 P8
   log(`Auftrag abgeschlossen: ${Q.name}`, 'quest');
   chronicle(`${Q.name} abgeschlossen`, 'quest');
+  if (rited) { UI.closeDialogue(); save(); return; }                  /* die Aufnahmeszene spricht für sich */
+  if (Q.clsTrial) { UI.dialogue(npc, `„Gut. Das war der erste Teil.“ (Weiter mit „Kannst du mich ausbilden?“ bei ${npc.name} oder einem anderen Lehrer der Klasse.)`, [{ text: 'Weiter', fn: () => trialOffer(npc, Q.clsTrial[0], S.player.knownClasses.includes(Q.clsTrial[0])) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); save(); return; }
   storyNext = NAMED_NPC.has(npc.key); emote(npc, 'freude', 1800); if (npc.kind === 'npc') gesture(npc, npc.guard ? 'salutieren' : 'jubeln', 0, S.player);   /* Q7-3: Körper statt Satz */
   UI.dialogue(npc, '„Das war mehr, als ich erwartet habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   save();
@@ -13511,7 +13546,7 @@ function onKill(mtype, e) {
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
-      if (o.type === 'kill' && (o.target === mtype || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
+      if (o.type === 'kill' && (o.target === mtype || o.targets?.includes(mtype) || (o.target === '*' && e?.kind === 'enemy' && !e.trial) || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Klassen-Prüfung: targets (Liste), * = jeder Feind */   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
         st.progress[i] = (st.progress[i] || 0) + 1;
         if (st.progress[i] <= (o.count || 1)) { log(`${QUESTS[k].name}: ${st.progress[i]}/${o.count}`, 'quest'); questNotch(e, st.progress[i], o.count || 1); }   /* Q5-1: Zählkerbe über der Leiche */
       }
@@ -13581,7 +13616,7 @@ function finishLila(outcome, r) {
 }
 
 // ================= Ausbildung / Fraktionen =================
-function unlockClass(cls) {
+function unlockClass(cls, npc = null) {
   const p = S.player;
   const chain = []; let k = cls;
   while (k) { chain.unshift(k); k = parentFor(k, p); }                     // §5d.1: Vorstufe auch über alt (Dunkler Priester: Magier)
@@ -13589,6 +13624,8 @@ function unlockClass(cls) {
   setClass(cls);
   chronicle(`${p.name} wird ${CLASSES[cls].name}`, 'class', CLASSES[cls].desc || '');
   UI.toast(`${CLASSES[cls].name.toUpperCase()} FREIGESCHALTET`, 4200);
+  if (OWN_PATH.has(cls) && !p.clsPass?.[cls]) { (p.clsPass ||= {})[cls] = 1; p.skillPoints = (p.skillPoints || 0) + 1; log(`Deine Aufträge waren die Prüfung: +1 Talentpunkt als ${CLASSES[cls].name}.`, 'party'); }   /* Entwickler: eigene Wege zählen als bestandene Prüfung */
+  return npc ? classRite(npc, cls) : false;
 }
 function setClass(cls) {
   const p = S.player;
@@ -13605,7 +13642,7 @@ function deathRite(npc) {
   const p = S.player;
   if (!p.knownClasses.includes('warrior')) return UI.dialogue(npc, '„Wer den Tod führen will, muss erst eine Klinge führen. Lern das Kriegshandwerk.“', [{ text: 'Verstanden.', fn: () => UI.closeDialogue() }]);
   UI.dialogue(npc, '„Du dienst über den Rang hinaus. Knie auf den kalten Stein — dein Herz schlägt weiter, aber es gehört uns.“', [
-    { text: 'Knien.', fn: () => { unlockClass('deathknight'); chronicle(`${p.name} empfängt die Todesweihe`, 'class', `${npc.name} weiht zum Todesritter.`); fx(p.x, p.y - 12, 'necro', 20); UI.closeDialogue(); save(); } },
+    { text: 'Knien.', fn: () => { UI.closeDialogue(); unlockClass('deathknight', npc); chronicle(`${p.name} empfängt die Todesweihe`, 'class', `${npc.name} weiht zum Todesritter.`); fx(p.x, p.y - 12, 'necro', 20); save(); } },   /* Klassen-Prüfung: Todesweihe als Szene */
     { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]);
 }
 // §5d.1: alt = weitere Grundklassen, die als Vorstufe genügen. parentFor liefert die Vorstufe, die der Held schon kann.
@@ -13698,26 +13735,137 @@ function spellMenu(npc) {
 //   heal   — einen Studenten mit verletztem Bein in 60 s stabilisieren (jedes Glied über der Hälfte)
 //   duel   — gegen einen Studenten: wer zuerst unter 20 % Leben fällt, verliert; dann endet der Kampf sofort
 // Rang: 1 bestanden = Hörer, 2–3 = Adept (Stufe III), 4 = Magister.
-const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, TRIAL_EXTRA = { ilvar: 'Endprüfung des Nachtglases' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
+const TRIALS = { aim: 'Zielübung', shield: 'Schildprüfung', heal: 'Heilprüfung', duel: 'Duell' }, TRIAL_EXTRA = { ilvar: 'Endprüfung des Nachtglases', pit: 'Grubenkampf', bow: 'Bogenübung', stab: 'Meuchelübung', hold: 'Ort halten' }, ACAD_RANKS = ['—', 'Hörer', 'Adept', 'Magister'];
 const acadRankOf = n => n >= 4 ? 3 : n >= 2 ? 2 : n >= 1 ? 1 : 0;
 function acadSpot() { const h = HOUSES.find(b => b.type === 'academy' && b.map === 'world'); return h ? { x: h.doorTile[0] * TS + TS / 2, y: (h.doorTile[1] + 6) * TS } : { x: S.player.x, y: S.player.y }; }
-function startTrial(kind, at = acadSpot()) {
+// ================= Klassen-Prüfung und Aufnahme (Entwickler 02.10.2026, PROPOSALS/klassen_talente.md) =================
+// Klasse lernen = Vertrauen (Bewährung oder Lehrgeld, wie bisher) + 1–2 Prüfungsaufträge (QUESTS mit clsTrial) + Aufnahmeszene.
+// Jeder Lehrer der Klasse nimmt ab; der Fortschritt gehört der Figur (p.ktSteps), im Koop also jedem selbst. Bestanden = +1 Talentpunkt
+// (p.clsPass). Paladin, Todesritter, Hochpaladin und die dunklen Klassen behalten ihre eigenen Wege (OWN_PATH); ihre Freischaltung
+// zählt als bestandene Prüfung. Meisterprüfungen laufen über startTrial am Lehrerort; scheitern darf man beliebig oft.
+const OWN_PATH = new Set(['paladin', 'deathknight', 'darkpaladin', 'darkpriest', 'chainhunter', 'torturer', 'chainbard']);
+const clsTrialOf = cls => Object.keys(QUESTS).filter(k => QUESTS[k].clsTrial?.[0] === cls).sort((a, b) => QUESTS[a].clsTrial[1] - QUESTS[b].clsTrial[1]);
+const ktNext = (p, cls) => clsTrialOf(cls).find(k => !p.ktSteps?.[k]) || null;
+const hasShield = p => ITEMS[p.equip?.offhand?.key]?.block > 0 || /schild|shield/i.test(p.equip?.offhand?.key || '');
+function trialOffer(npc, cls, redo = false) {
+  const p = S.player, k = ktNext(p, cls), C = CLASSES[cls];
+  if (!k) return classPassed(cls, npc);                                 /* alle Schritte schon erledigt (z. B. Lehrer gewechselt) */
+  const st = S.quests[k], Q = QUESTS[k], i = Q.objectives.findIndex(o => o.type === 'trial'), steps = clsTrialOf(cls).length;
+  if (st?.state === 'active') {
+    const ch = [];
+    if (questComplete(k)) ch.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
+    else if (i >= 0) ch.push({ text: `Ich bin bereit. (${Q.objectives[i].text.replace(/ \(.*\)$/, '')})`, fn: () => startClsTrial(npc, k) });
+    ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
+    return UI.dialogue(npc, `„Du bist mitten in der Prüfung: ${Q.name}.“\n${Q.objectives.map((o, j) => `• ${o.text}: ${Math.min(st.progress[j] || 0, o.count || 1)}/${o.count || 1}`).join('\n')}`, ch);
+  }
+  const intro = redo ? `„${C.name} kannst du schon — aber geprüft hat dich niemand. Bestehst du, bekommst du einen Talentpunkt.“`
+    : `„Bevor ich dich ${C.name} nenne, prüfe ich dich. ${steps > 1 ? 'Zwei Aufgaben: eine draußen, eine hier vor mir.' : 'Eine Aufgabe.'} Scheitern darfst du, so oft du willst.“`;
+  UI.dialogue(npc, `${intro}\n(Danach: die Aufnahme, ein Talentpunkt und ein eigenes Sternbild für ${C.name}.)`, [
+    { text: 'Ich höre.', fn: () => offerQuest(npc, k) }, { text: 'Später.', fn: () => UI.closeDialogue() }]);
+}
+function clsTrialChoices(npc, k, Q, choices) {                         /* aus talk(): nur Lehrer dieser Klasse, nur laufende Prüfungen der Figur */
+  if (npc.hostile || ![].concat(npc.teaches || []).includes(Q.clsTrial[0]) || S.quests[k]?.state !== 'active' || S.player.ktSteps?.[k]) return;
+  if (questComplete(k)) return choices.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
+  const i = Q.objectives.findIndex(o => o.type === 'trial');
+  if (i >= 0 && (S.quests[k].progress[i] || 0) < 1) choices.push({ text: `Ich bin bereit. (${Q.objectives[i].text.replace(/ \(.*\)$/, '')})`, fn: () => startClsTrial(npc, k) });
+}
+function startClsTrial(npc, k) {
+  const Q = QUESTS[k], i = Q.objectives.findIndex(o => o.type === 'trial'), o = Q.objectives[i], p = S.player;
+  if (S.trial) return UI.toast('Eine Prüfung läuft schon.');
+  if (o.need === 'shield' && !hasShield(p)) return UI.dialogue(npc, '„Mit Schild. Ein Ritter, der seinen Schild vergisst, beschützt niemanden.“ (Lege einen Schild in die Nebenhand.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (o.need === 'bow' && !ITEMS[p.equip?.weapon?.key]?.ranged) return UI.dialogue(npc, '„Mit einem Bogen. Oder willst du die Puppen anschreien?“ (Lege eine Fernwaffe an.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  UI.closeDialogue(); gesture(npc, 'zeigen', 1200, p);
+  startTrial(o.target, { x: p.x, y: p.y }, { qk: k, oi: i, cls: Q.clsTrial[0], npc: npc.id, npcName: npc.name, title: o.text.replace(/ \(.*\)$/, ''), need: o.need || null });
+}
+function clsTrialEnd(T, won) {
+  const p = S.player, st = S.quests[T.qk], who = byId(T.npc)?.name || 'der Lehrer';
+  if (!won) { if (p.downed) { p.downed = false; p.downTimer = 0; B.heal(p, p.maxHp * 0.3); }   /* niemand stirbt in einer Prüfung */
+    UI.toast(`${T.title.toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${T.title}: nicht bestanden. ${who} lässt dich es noch einmal versuchen — sprich ihn an, wenn du bereit bist.`, 'quest'); return; }
+  if (st?.state === 'active') st.progress[T.oi] = QUESTS[T.qk].objectives[T.oi].count || 1;
+  UI.toast(`${T.title.toUpperCase()}: BESTANDEN`, 2600); log(`${T.title}: bestanden. Sprich mit ${who}, um die Prüfung abzuschließen.`, 'quest');
+}
+// Treffer in einer Prüfung: true = der Treffer ist erledigt (zählt oder zählt nicht), hurt() endet.
+function ktTrialHurt(target, dmg, source, kind) {
+  const T = S.trial, p = S.player;
+  if (target.trial === 'bow' && T.kind === 'bow') { if (source === p && ITEMS[p.equip?.weapon?.key]?.ranged) { T.n++; float(target, 'Treffer', 'rgba(200,220,140,ALPHA)'); die(target, 'Pfeil', p); } else if (source === p) float(target, 'nur mit dem Bogen', 'rgba(200,190,160,ALPHA)'); return true; }
+  if (target.trial === 'stab' && T.kind === 'stab') { if (source === p && (performance.now() - (p.stabAt || 0) < 1500 || p.shadowNext > performance.now())) { T.n++; float(target, 'Meuchelstich', 'rgba(170,150,220,ALPHA)'); die(target, 'Meuchelstich', p); } else if (source === p) float(target, 'nur der Meuchelstich zählt', 'rgba(200,190,160,ALPHA)'); return true; }
+  if (T.kind === 'pit') {
+    if (target.duelist && target.hp - dmg < target.maxHp * 0.2) { const low = p.hp < p.maxHp * 0.3; if (!low) log('„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).', 'quest'); endTrial(low); return true; }
+    if (target === p && source?.duelist && p.hp - dmg < p.maxHp * 0.1) { endTrial(false); return true; }
+  }
+  if (T.kind === 'hold' && target === p && p.hp - dmg < p.maxHp * 0.1 && source?.trial === 'hold') { endTrial(false); return true; }
+  return false;
+}
+// Bestanden: Talentpunkt, Klasse (falls neu), Aufnahmeszene. Rückgabe true = eine Szene läuft.
+function classPassed(cls, npc) {
+  const p = S.player, first = !p.clsPass?.[cls], known = p.knownClasses.includes(cls);
+  if (first) { (p.clsPass ||= {})[cls] = 1; p.skillPoints = (p.skillPoints || 0) + 1; }
+  for (const k of clsTrialOf(cls)) (p.ktSteps ||= {})[k] = 1;
+  if (!known) unlockClass(cls); else { chronicle(`${p.name} besteht die Prüfung als ${CLASSES[cls].name}`, 'class', `${npc?.name || 'Ein Lehrer'} hat geprüft.`); setClass(cls); }
+  log(`Prüfung bestanden: ${CLASSES[cls].name}.${first ? ' +1 Talentpunkt.' : ''}`, 'party');
+  return classRite(npc, cls);
+}
+// Aufnahmeszene (Regiebuch): ~5,5 s, die Welt steht, ESC überspringt. Die Folgen sind schon geschehen (nichts hängt am Bild).
+const RITE = {
+  warrior: { col: '#c87848', say: 'Steh auf. Du bist kein Wanderer mehr.', fx: 'spark', sfx: 'metal' },
+  archer: { col: '#9ab868', say: 'Nimm den Pfeil. Er fliegt jetzt für dich.', fx: 'spark', sfx: 'bow' },
+  rogue: { col: '#8a7aa8', say: 'Hab dich nie gesehen.', fx: 'shadow', sfx: 'dodge' },
+  cleric: { col: '#f0e0a0', say: 'Das Licht ist ein Handwerk. Übe es jeden Tag.', fx: 'heal', sfx: 'heal' },
+  mage: { col: '#e8903a', say: 'Feuer gehorcht. Kurz. Vergiss das nie.', fx: 'fire', sfx: 'magic' },
+  bard: { col: '#d8a0c8', say: 'Sing, und sie folgen dir.', fx: 'spark', sfx: 'bell' },
+  alchemist: { col: '#88c070', say: 'Kraut, Feuer und Geduld. Vor allem Geduld.', fx: 'necro', sfx: 'fire' },
+  knight: { col: '#c8c8d8', say: 'Knie. Steh auf als einer, der etwas beschützt.', fx: 'spark', sfx: 'bell' },
+  paladin: { col: '#ffe8a0', say: 'Was du beschützt, macht dich zum Ritter. Steh auf, Paladin.', fx: 'heal', sfx: 'bell' },
+  ranger: { col: '#6a9a4a', say: 'Der Wald ist eine Karte. Jetzt liest du sie.', fx: 'dust', sfx: 'whistle' },
+  berserker: { col: '#c03a2a', say: 'Brüll. Lauter. So.', fx: 'blood', sfx: 'shout', shake: 5 },
+  assassin: { col: '#5a4a7a', say: 'Nicht da sein, dann dort.', fx: 'shadow', sfx: 'dodge' },
+  deathknight: { col: '#8ac0d8', say: 'Dein Herz schlägt weiter. Aber es gehört uns.', fx: 'necro', sfx: 'moan' },
+  darkpaladin: { col: '#8a2a20', say: 'Wer kniet, lebt. Steh auf und lass sie knien.', fx: 'shadow', sfx: 'chains', shake: 3 },
+  darkpriest: { col: '#b03a2a', say: 'Omegas Wort, mit deinem Blut geschrieben.', fx: 'fire', sfx: 'chains' },
+  chainhunter: { col: '#8a7a5a', say: 'Wer läuft, wird gefangen. Ab heute fängst du.', fx: 'dust', sfx: 'chains' },
+  torturer: { col: '#6a2a2a', say: 'Jeder Wille bricht. Du weißt jetzt, wo.', fx: 'blood', sfx: 'chains' },
+  chainbard: { col: '#a08a5a', say: 'Schlag die Trommel. Sie marschieren.', fx: 'spark', sfx: 'drum' },
+};
+function classRite(npc, cls, o = {}) {
+  const p = S.player, R0 = RITE[cls] || o.rite || { col: '#e8d6a8', say: 'Steh auf.', fx: 'spark', sfx: 'bell' }, C = o.title ? { name: o.title, desc: o.sub || '' } : CLASSES[cls];
+  const sky = o.sky || SKILL_BRANCHES[cls]?.sky, hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
+  const after = () => { if (hint) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } };
+  if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || !npc || npc.map !== p.map || S.cine) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
+  const ab = ABILITIES[(CLASSES[cls]?.abilities || [])[0]], seen = S.ents[p.map].filter(c => c.kind === 'npc' && c.alive && !c.downed && c !== npc && !S.party.includes(c.id) && dist(c, p) < 240).slice(0, 6);
+  cinematic([
+    { dur: 1800, zoom: 1.3, focus: npc.id, beats: [{ t: 0, sfx: R0.sfx, duck: 0.5, ms: 300 }, { t: 0.05, gesture: 'zeigen', who: npc, toward: p, ms: 1500 }, { t: 0.1, say: `„${R0.say}“`, who: npc, ms: 3200 }] },
+    { dur: 2000, zoom: 1.5, focus: p.id, beats: [{ t: 0, gesture: 'knien', who: p, ms: 1700 }, { t: 0.35, flash: R0.col, ms: 260 }, { t: 0.38, fx: R0.fx, at: p, n: 18, sfx: 'bell', shake: R0.shake || 0, ms: 240 },
+      ...seen.map((c, i) => ({ t: 0.5 + i * 0.05, gesture: c.guard ? 'salutieren' : 'jubeln', who: c, toward: p, ms: 1300 }))] },
+    { dur: 1700, zoom: 1.25, focus: p.id, beats: [{ t: 0, card: { title: C.name.toUpperCase(), sub: C.desc || '', ms: 3000 } },
+      { t: 0.15, gesture: ab?.mana ? 'zeigen' : 'salutieren', who: p, ms: 1000 }, { t: 0.2, fx: R0.fx, at: p, n: 10, dy: 20, sfx: ab?.mana ? 'magic' : 'swing' }, ...(ab ? [{ t: 0.25, float: ab.name, who: p, color: 'rgba(240,215,140,ALPHA)' }] : []),
+      { t: 0.85, duck: 1, ms: 400 }] },
+  ], after, { pause: true, stay: true });
+  return true;
+}function startTrial(kind, at = acadSpot(), o = {}) {
   endTrial(null);
-  const T = S.trial = { kind, until: clock() + { aim: 30, shield: 25, heal: 60, duel: 90 }[kind], n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2 }, m = S.player.map;
-  const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy; e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
+  const T = S.trial = { kind, until: clock() + ({ aim: 30, shield: 25, heal: 60, duel: 90, pit: 120, bow: 40, stab: 60, hold: 50 }[kind] || 60), n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2, ...o }, m = S.player.map;
+  const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy;
+    if (T.qk && m !== '__a' && m !== '__d' && solidTile(m, e.x, e.y)) { const q = freeSpotNear(m, e.x / TS | 0, e.y / TS | 0, 2); e.x = q.x; e.y = q.y; }   /* Klassen-Prüfung beim Lehrer: nicht in der Wand */
+    e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
   if (kind === 'aim') for (let i = 0; i < 5; i++) put('acad_dummy', -120 + i * 60, -60 - (i % 2) * 40);
+  if (kind === 'bow') for (let i = 0; i < 5; i++) put('acad_dummy', -160 + i * 80, -170 - (i % 2) * 50);   /* Schütze: zehn, zwanzig, dreißig Schritt */
+  if (kind === 'stab') for (let i = 0; i < 3; i++) put('acad_dummy', -70 + i * 70, -70);
   if (kind === 'shield') { const e = put('acad_dummy', 0, -160); if (e) { e.invuln = true; T.shooter = e.id; } }
   if (kind === 'ilvar') { T.until = clock() + 45; T.next = clock() + 1; }   // S15 P6: Wellen von Geistern, siehe trialTick
-  if (kind === 'duel') { const e = put('acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; } }
+  if (kind === 'hold') { T.next = clock() + 1; }
+  if (kind === 'duel' || kind === 'pit') { const e = put(T.qk ? 'drill_fighter' : 'acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; if (T.npcName) e.name = `Übungsfechter von ${T.npcName}`;
+    if (kind === 'pit') { e.maxHp = e.hp = e.maxHp * 2; if (e.body) B.initBody(e, e.maxHp); e.dmgMul = 1.6; } e.aggroId = S.player.id; } }   /* Grube: zäher und härter, damit man unter 30 % kommt */
   if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
     c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
-  UI.toast(`PRÜFUNG: ${(TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
-  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: 'Die Studentin hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.', duel: 'Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.', ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.' }[kind], 'quest');
+  UI.toast(`PRÜFUNG: ${(T.title || TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
+  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: `${T.qk ? 'Der Patient' : 'Die Studentin'} hat sich das Bein zertrümmert. Stabilisiere ${T.qk ? 'ihn' : 'sie'}: Verband, Kräuter oder Heilzauber.`, duel: `Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.${T.need === 'shield' ? ' Mit Schild in der Hand — legst du ihn ab, ist die Prüfung vorbei.' : ''}`, ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.',
+    pit: 'Grubenkampf. Gewonnen ist erst, wenn du selbst unter 30 % Leben bist, wenn der Gegner fällt — Schmerz lehrt. Niemand stirbt.', bow: 'Triff die fünf Puppen mit dem Bogen (oder einer anderen Fernwaffe). 40 Sekunden.', stab: 'Drei Meuchelstiche an den Übungspuppen: nur der Meuchelstich (oder ein Hieb aus dem Schattenschritt) zählt. 60 Sekunden.', hold: 'Halte den Platz 50 Sekunden. Sie kommen in Wellen. Wer fällt, hat verloren — niemand stirbt.' }[kind], 'quest');
 }
 function endTrial(won) {
   const T = S.trial; if (!T) return; S.trial = null;
   for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => !T.ids.includes(e.id));
   if (won == null) return;
+  if (T.qk) return clsTrialEnd(T, won);                               /* Klassen-Prüfung beim Lehrer */
   if (T.kind === 'ilvar') { const p = S.player;                       // S15 P6: Endprüfung des Nachtglases
     if (!won) { if (p.downed) { p.downed = false; p.downTimer = 0; B.heal(p, p.maxHp * 0.3); } UI.toast('ILVAR FÄNGT DICH AUF', 2600); log('„Nicht heute.“ Ilvar hebt die Hand, und die Geister verblassen.', 'quest'); return; }
     learnSpell(p, 'sp_nachtglas'); SIM.H.title('Schüler des Nachtglases'); gainXp(p, 300); chronicle(`${p.name} besteht Ilvars Endprüfung`, 'legend'); return; }
@@ -13732,7 +13880,14 @@ function endTrial(won) {
 function trialTick() {
   const T = S.trial, p = S.player; if (!T) return;
   if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false);
-  if (T.kind === 'aim' && T.n >= 5) return endTrial(true);
+  if ((T.kind === 'aim' || T.kind === 'bow') && T.n >= 5) return endTrial(true);
+  if (T.kind === 'stab' && T.n >= 3) return endTrial(true);
+  if (T.need === 'shield' && !hasShield(p)) { log('Ohne Schild in der Hand zählt das Duell nicht.', 'quest'); return endTrial(false); }
+  if (T.kind === 'hold') {                                              /* Klassen-Prüfung Ritter: einen Platz gegen einen Überfall halten */
+    if (clock() >= T.until) return endTrial(true);
+    if (clock() >= T.next && clock() < T.until - 8) { T.next = clock() + 10; for (let i = 0; i < 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('bandit', p.map, (T.x + Math.cos(a) * 180) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(3, p.level - 1) });
+      if (e) { e.trial = 'hold'; e.questFoe = 'hold'; e.transient = true; e.aggroId = p.id; e.name = 'Übungsräuber'; T.ids.push(e.id); } } }
+    return; }
   if (T.kind === 'ilvar') {
     if (clock() >= T.until) return endTrial(true);
     if (clock() >= T.next) { T.next = clock() + 9; for (let i = 0; i < 2 + (T.wave = (T.wave || 0) + 1) % 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('wraith', p.map, (T.x + Math.cos(a) * 200) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(6, p.level) });
@@ -13834,10 +13989,12 @@ function teach(npc, cls = teachable(npc)) {
       [{ text: 'Ich komme wieder.', fn: () => UI.closeDialogue() }]);
   }
   if (rel < (npc.key === 'rook' ? 40 : 20)) return teacherTrial(npc, cls, (npc.key === 'rook' ? 40 : 20) - rel);   /* Nutzer: vorher kam nur „Hilf mir erst“ ohne Weg dahin */
+  if (p.knownClasses.includes(cls) && clsTrialOf(cls).length && !p.clsPass?.[cls]) return trialOffer(npc, cls, true);   /* alte Stände: Prüfung nachholbar (Talentpunkt) */
   if (p.knownClasses.includes(cls))
     return UI.dialogue(npc, '„Du kannst das bereits. Übe es.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (clsTrialOf(cls).length) return trialOffer(npc, cls);                     /* Klassen-Prüfung: erst die Aufträge, dann die Aufnahme */
   UI.dialogue(npc, `„Gut. Ich zeige dir, wie ${CLASSES[cls].name} kämpfen. Danach liegt es an dir.“`, [
-    { text: `Ausbildung annehmen (${CLASSES[cls].name})`, fn: () => { unlockClass(cls); addRel(npc.key, 5); UI.closeDialogue(); save(); } },
+    { text: `Ausbildung annehmen (${CLASSES[cls].name})`, fn: () => { UI.closeDialogue(); unlockClass(cls, npc); addRel(npc.key, 5); save(); } },
     { text: 'Später.', fn: () => UI.closeDialogue() },
   ]);
 }
@@ -15595,7 +15752,7 @@ function useAbility(key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
     case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1) * (dkGear(p) >= 2 ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
     case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'heal', 10); break;
-    case 'backstab': p.abilityMult = 3; p.atkCd = 0; attack(p); break;
+    case 'backstab': p.abilityMult = 3; p.atkCd = 0; p.stabAt = performance.now(); attack(p); break;
     case 'aimed_shot': {
       S.projectiles.push({ id: uid(), kind:'arrow', map: p.map, x: p.x + Math.cos(p.aim) * 14, y: p.y - 12 + Math.sin(p.aim) * 8,
         vx: Math.cos(p.aim) * 9, vy: Math.sin(p.aim) * 9, owner: p.id, dmg: damageOf(p) * 2.2, life: 1800, team:'player' });
@@ -16759,6 +16916,7 @@ function debugSections() {
         ['frage', 'ausruf', 'zorn', 'angst', 'freude', 'trauer'].forEach((k, i) => setTimeout(() => emote(n, k, 1300), i * 1400)); },
       'NPC: Reaktion mit Geste (nächste Figur, alle Anlässe nacheinander)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
         [['trauern', 'trauer'], ['jubeln', 'freude'], ['salutieren'], ['knien'], ['abwehren', 'angst'], ['zeigen', 'ausruf']].forEach((G, i) => setTimeout(() => reactPlay(n, G, S.player), i * 1900)); },
+      'NPC: Warnkette am nächsten Gegner (Entdecken)': () => { const p = S.player, e = S.ents[S.map].filter(o => o.kind === 'enemy' && o.alive).sort((x, y) => dist(x, p) - dist(y, p))[0]; if (!e) return UI.toast('Kein Gegner in der Nähe.'); e.spotted = false; spotChain(e); },
       'NPC: Kerzen am nächsten Grab (Trauer, 2 Tage)': () => { const p = S.player, g = S.ents[S.map].filter(e => e.kind === 'grave').sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!g) return UI.toast('Kein Grab in der Nähe.'); g.mournUntil = (S.day | 0) + 2; UI.toast(`Kerzen an: ${g.label}`); },
       'NPC: Schreck und Wachenruf vorführen (ohne Folgen)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); emote(n, 'ausruf', 900); setTimeout(() => { bubble(n, '„Halt! Wache!“', 2000); emote(n, 'zorn', 1500); sfx('whistle', 0.6); }, 1000); },
       'Dialog: verängstigte Figur ansprechen (nur Blase)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); n.afraid = clock() + 30; talk(n); },
@@ -16798,6 +16956,13 @@ function debugSections() {
       'Klassen: Talentpunkte nach Regel auffüllen': () => { const n = talentTopUp(P()); UI.refreshHUD(); UI.toast(n ? `+${n} Talentpunkte (Regel)` : `Soll erreicht: ${talentTotal(P())} (frei ${P().skillPoints}, gelernt ${talentSpent(P())})`, 3600); },
       'Klassen: Punkte-Rechnung zeigen': () => { const c = P(); UI.toast(`Stufe ${c.level}: 1 + ${Math.floor(c.level / TALENT_EVERY)} (jede ${TALENT_EVERY}. Stufe) + ${talentPass(c)} Prüfung(en) = ${talentTotal(c)} · frei ${c.skillPoints || 0} · gelernt ${talentSpent(c)}`, 5000); },
       'Klassen: Stufe +2 (zeigt den Talentpunkt)': () => { for (let i = 0; i < 2; i++) { P().xp = P().xpNext; levelUp(P()); } UI.refreshHUD(); },
+      'Klassen: Prüfung beim nächsten Lehrer anbieten': () => { const c = P(), n = S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && [].concat(e.teaches || []).some(k => clsTrialOf(k).length)).sort((a, b) => dist(a, c) - dist(b, c))[0];
+        if (!n) return UI.toast('Kein Lehrer mit Prüfung auf dieser Karte.'); const k = [].concat(n.teaches).find(x => clsTrialOf(x).length && !c.clsPass?.[x]) || [].concat(n.teaches)[0]; S.relations[n.key] = Math.max(S.relations[n.key] || 0, 40); trialOffer(n, k, c.knownClasses.includes(k)); },
+      'Klassen: laufende Prüfungsziele erfüllen': () => { let n = 0; for (const [k, st] of Object.entries(S.quests)) if (QUESTS[k]?.clsTrial && st.state === 'active') { st.progress = QUESTS[k].objectives.map(o => o.count || 1); n++; } UI.toast(n ? `${n} Prüfungsauftrag erfüllt — beim Lehrer abgeben` : 'Keine laufende Prüfung.'); },
+      'Klassen: Meisterprüfung hier (Duell, Krieger)': () => { if (S.quests.kt_warrior2?.state !== 'active') startQuest('kt_warrior2'); startTrial('duel', { x: P().x, y: P().y }, { qk: 'kt_warrior2', oi: 0, cls: 'warrior', title: 'Der Kreis' }); },
+      'Klassen: Prüfungen dieser Figur zurücksetzen': () => { const c = P(); c.ktSteps = {}; for (const k of Object.keys(S.quests)) if (QUESTS[k]?.clsTrial) delete S.quests[k]; UI.toast('Prüfungsschritte zurückgesetzt (bestandene Prüfungen und Punkte bleiben).'); },
+      ...Object.fromEntries(['warrior', 'paladin', 'deathknight', 'darkpaladin', 'knight', 'mage'].map(k => [`Klassen: Aufnahmeszene ansehen (${CLASSES[k].name}, ohne Folgen)`, () => { const c = P(), n = S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && e !== c && !S.party.includes(e.id)).sort((a, b) => dist(a, c) - dist(b, c))[0];
+        if (!n || dist(n, c) > 400) return UI.toast('Niemand in der Nähe, der dich aufnehmen könnte.'); const q0 = S._quiet; S._quiet = false; try { classRite(n, k); } finally { S._quiet = q0; } }])),
     }],
     ['Skilltree: Knoten-Icons und Linien (Visueller Umbau, 02.10.)', '', {
       'Talentpunkt geben': () => { p.skillPoints = (p.skillPoints || 0) + 1; UI.refreshHUD(); UI.toast('+1 Talentpunkt'); },
@@ -17230,7 +17395,7 @@ export function selftest() {
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
   ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly', 'q_undraid', 'q_undarmy'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu
+    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || QUESTS[k].clsTrial || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly', 'q_undraid', 'q_undarmy'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu   /* Klassen-Prüfung (clsTrial): jeder Lehrer der Klasse nimmt ab, Feldprüfungen gelten überall — ortlos wie classQ */
   ok('Erreichbarkeit (Audit A-04): kein Rohstoff, kein Kraut steht auf Fels, Wasser oder Mauer', MAP_KEYS.every(m => (S.ents[m] || []).every(e => !(e.kind === 'prop' && e.harvest) || !SOLID.has(tileAt(m, e.x / TS | 0, e.y / TS | 0)))));
   ok('Karte (Visueller Umbau, Scheibe 1): mapPick liefert bei einem bekannten Ort das LOCATIONS-Objekt fürs Bild-Panel', (() => {
     const l = LOCATIONS.find(o => (S.flags.seen || {})[o.key]); if (!l) return true;   // kein bekannter Ort im Stand: Probe entfällt, kein Fehlschlag
@@ -19023,6 +19188,28 @@ export function selftest() {
     const heir = h.skillPoints === 7 && !Object.keys(h.tree).length && !talentPass(h);   /* Stufe 12: 1 + 6 */
     if (!(rule && noCut && guest && heir)) console.warn('Scheibe 0', { got, sp: p.skillPoints, guest: [g.level, g.skillPoints, g.attrPoints], heir: h.skillPoints });
     return rule && noCut && guest && heir;
+  }));  ok('Klassen Scheibe 1: Prüfung des Kriegers (Banditen, dann Duell beim Lehrer), Scheitern wiederholbar, Aufnahme gibt Klasse und Talentpunkt; nachholen für alte Stände; eigene Wege zählen; Szene ~5,5 s mit Pause', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const data = Object.values(QUESTS).filter(q => q.clsTrial).every(q => { const L = clsTrialOf(q.clsTrial[0]), last = QUESTS[L[L.length - 1]]; return last.reward?.unlock === q.clsTrial[0] && q.objectives.length && NPCS.some(n => [].concat(n.teaches || []).includes(q.clsTrial[0])); })
+        && Object.keys(CLASSES).filter(k => k !== 'wanderer').every(k => RITE[k]) && clsTrialOf('warrior').length === 2;
+      const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.level = 1; p.skillPoints = 1; p.clsPass = {}; p.ktSteps = {};
+      for (const k of clsTrialOf('warrior')) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_teacher'; t.teaches = ['warrior']; S.relations.kt_probe_teacher = 40;
+      teach(t, 'warrior'); const offered = /prüfe ich dich/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
+      startQuest('kt_warrior1'); for (let i = 0; i < 3; i++) onKill('bandit_archer'); const notYet = !questComplete('kt_warrior1'); onKill('bandit'); const four = questComplete('kt_warrior1');
+      turnIn(t, 'kt_warrior1'); UI.closeDialogue(); const step1 = p.ktSteps.kt_warrior1 && !p.knownClasses.includes('warrior') && ktNext(p, 'warrior') === 'kt_warrior2';
+      startQuest('kt_warrior2'); startClsTrial(t, 'kt_warrior2'); const foe = S.ents.__a.find(e => e.duelist), isDrill = foe?.mtype === 'drill_fighter';
+      if (p.body) B.fullHeal(p); hurt(p, p.maxHp * 0.95, foe, 'Duell'); const lost = !S.trial && !questComplete('kt_warrior2') && p.hp > 0 && !p.knownClasses.includes('warrior');
+      startClsTrial(t, 'kt_warrior2'); const foe2 = S.ents.__a.find(e => e.duelist); hurt(foe2, foe2.maxHp * 0.95, p, 'Duell'); const won = !S.trial && questComplete('kt_warrior2');
+      turnIn(t, 'kt_warrior2'); UI.closeDialogue(); const passed = p.knownClasses.includes('warrior') && p.currentClass === 'warrior' && p.clsPass.warrior === 1 && talentTopUp(p) === 0 && p.skillPoints === talentTotal(p);
+      const q = stage(); q.knownClasses = ['wanderer', 'warrior']; q.currentClass = 'warrior'; q.clsPass = {}; q.ktSteps = {}; q.skillPoints = 0; for (const k of clsTrialOf('warrior')) delete S.quests[k];
+      teach(t, 'warrior'); const redo = /Talentpunkt/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
+      q.knownClasses = ['wanderer', 'cleric']; S.ranks.chain = 2; unlockClass('darkpriest'); const own = q.clsPass.darkpriest === 1 && q.skillPoints === 1;
+      const n2 = actor(340, 300); S._quiet = false; const rite = classRite(n2, 'warrior'), C = S.cine, dur = C ? C.shots.reduce((a, s) => a + s.dur, 0) : 0, pause = !!C?.pause; cineEnd(); S._quiet = true;
+      if (!(data && offered && notYet && four && step1 && isDrill && lost && won && passed && redo && own && rite && dur >= 5000 && dur <= 6000 && pause && !S.cine)) console.warn('Scheibe 1', { data, offered, notYet, four, step1, isDrill, lost, won, passed, redo, own, rite, dur, pause });
+      return data && offered && notYet && four && step1 && isDrill && lost && won && passed && redo && own && rite && dur >= 5000 && dur <= 6000 && pause && !S.cine;
+    } finally { S.quests = Q0; S.trial = T0; cineEnd(); delete S.relations.kt_probe_teacher; }
   }));  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (Nutzer: jede dritte, gut ein Drittel der Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
     while (p.level < MAX_LEVEL) { sum += p.xpNext; p.xp = p.xpNext; levelUp(p); }
@@ -20077,6 +20264,23 @@ export function selftest() {
       provoke(v, p); const cries = S.floats.filter(f => f.bubble && (f.who === g1.id || f.who === g2.id)).length;
       return v.emote?.k === 'ausruf' && cries === 1 && z.emote?.k === 'angst';
     } finally { for (const k of Object.keys(S.relations)) if (!(k in R0)) delete S.relations[k]; Object.assign(S.relations, R0); S.floats = []; }
+  }));
+  ok('Visuell N9-7: Warnkette — wer den Helden entdeckt, zeigt „!“ und zeigt auf ihn; seine Gruppe (gleiche Fraktion, nah, ohne Ziel) wird reihum markiert, Fremde nicht; nur einmal', sandbox(() => {
+    const p = stage(), a = actor(p.x + 200, p.y, { kind: 'enemy', mtype: 'bandit' }), b = actor(p.x + 260, p.y, { kind: 'enemy', mtype: 'bandit' }), c = actor(p.x + 230, p.y + 40, { kind: 'enemy', mtype: 'skeleton' });
+    a.faction = b.faction = 'bandit'; c.faction = 'undead'; spotChain(a);
+    const once = (() => { const k = a.emote; spotChain.length; return a.spotted && k?.k === 'ausruf'; })();
+    return once && b.spotted && !c.spotted && a.act?.pose === 'zeigen';
+  }));
+  ok('GUI Tierhändler: Fenster zeigt 3 Begleittiere mit Bild und Werten; Kauf zieht Gold ab und macht das Tier zum Begleiter; danach keine zweite Kaufmöglichkeit; Freilassen gibt frei', sandbox(() => {
+    const p = stage(), pet0 = S.pet, M = document.getElementById('modal');
+    try {
+      S.pet = null; S.gold = 500; const n = actor(p.x + 30, p.y, { name: 'Tierhändler' }); n.map = '__a';
+      UI.openModal('beasts', n); const cards = M.querySelectorAll('.bst-card canvas[data-m]').length === 3 && M.querySelectorAll('[data-buy]:not([disabled])').length === 3;
+      M.querySelector('[data-buy="wild_dog"]').click(); const bought = !!petOf() && S.gold === 440 && petOf().mtype === 'wild_dog';
+      UI.openModal('beasts', n); const locked = M.querySelectorAll('[data-buy]:not([disabled])').length === 0 && !!document.getElementById('bst-free');
+      document.getElementById('bst-free').click(); const freed = !petOf();
+      return cards && bought && locked && freed;
+    } finally { UI.closeModal(); S.pet = pet0; }
   }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
@@ -21283,7 +21487,7 @@ export function selftest() {
     for (let i = 0; i < 6; i++) QUESTS['__pt' + i] = { name: 'Probe ' + i, objectives: [{ type: 'kill', target: 'wolf', count: 2, text: 'x' }], reward: {} };
     try { S.quests = {}; for (let i = 0; i < 6; i++) S.quests['__pt' + i] = { state: 'active', progress: [0] }; S.track = '__pt4';
       let I = trackerInfo(); const shape = I.list.length === 4 && I.list[0].k === '__pt4' && I.list[0].big && I.list.slice(1).every(o => !o.big) && !I.fight && I.list[0].ico?.mt === 'wolf';
-      const w = spawnEnemy('wolf', '__a', 12, 11); if (w) w.aggroId = p.id; I = trackerInfo(); const fight = !!w && I.fight;
+      const w = spawnEnemy('wolf', '__a', (p.x / TS | 0) + 1, p.y / TS | 0); if (w) w.aggroId = p.id; I = trackerInfo(); const fight = !!w && I.fight;   /* Lead: direkt neben dem Helden — die Bildgröße (Hintergrund-Tab) darf die Probe nicht entscheiden */
       S.difficulty = 'schwer'; sealT = 0; sealTick(0); const marked = SEALS.get(w)?.k === 'target';
       S.track = '__pt9'; sealT = 0; sealTick(0); const onlyTracked = !SEALS.get(w); S.track = '__pt4';
       S.difficulty = 'sehr_schwer'; sealT = 0; sealTick(0); const hard = !SEALS.get(w);
@@ -21540,7 +21744,7 @@ function boot() {
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
-    stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
@@ -21581,6 +21785,7 @@ function boot() {
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
+    classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
   if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */

@@ -83,6 +83,26 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [P] Pferde: Gang und Grundform nicht neu gezeichnet (Agent: „bereits brauchbar“). Prüfen, ob dem Entwickler das reicht.
 - Läuft: UI-Agent (Pergament, Docks, Spacing aller Menüs, Betriebe-Reiter mit Kasse, Schmiede-GUI, GUI-Prüfung aller Systeme), Despawn-Agent (Verfolger verschwinden).
 
+## 03.10. nachts
+- Erledigt:
+  - UI-Agent: Meldungen, Q-1..Q-4, Pergament, Docks, Spacing, Betriebe-Kasse, Schmiede- und Reise-Dock.
+  - Klassen Scheibe 0.
+  - Verfolger: Spur verlieren statt verschwinden, aber nur, wenn sie den Helden, seine Gruppe oder einen Koop-Helden jagen.
+  - Lead: NPC N2/N6/N7/N8/N9-7 (Gesten, Schreck, Wachenruf, Trauer mit Glocke und Kerzen, Grüßen und Rivalen, Warnkette).
+- [E] UI:
+  1. Bewohner-Siegel nur in Ansprech-Nähe oder auf Sichtweite?
+  2. Was nimmt ein Überfall aus der Betriebskasse?
+  3. Verlusttage: erst die Kasse, dann das Gold — bestätigen.
+  4. Abholen direkt am Haus braucht eine Zuordnung Betrieb → Haus.
+  5. „Schmieden lassen“ und „Verbessern“ beim Schmied: neue Regeln (Preis, Dauer, Wirkung).
+  6. Bewohner rufen den Helden (Q-OE8), Szene bei Story-Abschlüssen (Q-OE3), Hinweis auf seltene Beute (I-6).
+  7. Kartenausschnitt im Auftragsbrief.
+- [B] GUI-Reihenfolge laut UI-Agent: Tierhändler → Prothesen-Werkbank → Kontor (Bewertung in visual/ui_menues.md).
+- [P] Nach jedem Selbsttest stehen fremde Probe-Aufträge („Die Auftraggeberin: Probe“ …) im Tab-Zustand. Sie werden nicht gespeichert; eine Probe räumt nicht auf.
+- [P] Die Q-4-Probe war im isolierten Commit 56e4f02 rot (beim UI-Agenten grün). Wird geprüft.
+- [P] Der Selbsttest dauert jetzt ~2,5–3 min statt ~1 min. Prüfen, ob die Verfolger-Änderung (heiße Verfolger) oder neue Proben die Ursache sind.
+- Läuft: Klassen-Agent, Scheiben 1–10 und Gefährtenbaum.
+
 ## Ältere offene Punkte
 - [E] Hunt-Bericht `hunt/BERICHT.md` HB-01…HB-47: der Entwickler wählt die Fixes. Am dringendsten:
   - HB-01: gespeicherter Tod bietet nach dem Laden keine Erbenwahl.

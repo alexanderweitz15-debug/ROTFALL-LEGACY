@@ -1257,3 +1257,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Debug:** Abschnitt „Klassen: Talentpunkte, Prüfungen, Aufnahme“ (Gruppe „Klassen & Talente“): Punkte nach Regel auffüllen, Punkte-Rechnung zeigen, Stufe +2.
 
 - **Verfolger verschwinden nicht mehr (02.10.):** Wer dich, deine Gruppe oder einen Koop-Helden jagt, bleibt aktiv, auch fern vom Bildrand, und wird nicht mehr aufgeräumt. Erst ab 1600 px Abstand verliert er die Spur. Dann erscheint ein „?“, im Protokoll steht „… verliert deine Spur und kehrt zurück“, und er geht zu seinem Ausgangspunkt zurück. Reise-Begegnungen und Heer-Soldaten räumen sich erst danach auf, außer Sicht.
+- **Begegnungen (N8):** Freunde, die ein Gespräch beginnen, begrüßen sich mit einer kurzen Geste. Wird über einen Rivalen gelästert, zeigt der Sprecher auf ihn, und der Rivale wehrt ab, wenn er in Hörweite steht.
+- **Warnkette (N9):** Der erste Gegner, der dich entdeckt, zeigt ein „!“ und deutet auf dich. Das Zeichen springt dann kurz nacheinander durch seine Gruppe (gleiche Fraktion, in der Nähe). Das ist nur eine Anzeige: Wer angreift, entscheidet die KI wie bisher.
+- **Tierhändler als Fenster (03.10.):** Der Tierhändler öffnet ein Fenster mit vier Bereichen:
+  - **Begleittiere:** Karten mit Bild, Leben, Biss und Tempo; zu teure Tiere sind rot markiert.
+  - **Dein Begleiter:** Leben und Freilassen.
+  - **Reittiere:** Weiter zum Stall; das Messingross warten.
+  - **Für deinen Hof:** Kuh und Schaf, mit Belegung der Weide.
+
+  Die Regeln bleiben gleich: ein Begleiter gleichzeitig, gleiche Preise. Koop-Gäste nutzen weiter das Gespräch.

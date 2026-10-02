@@ -271,6 +271,27 @@ function codexUI(body) {
 
 // ---------------- Stall (S15) ----------------
 // Pferde als Karten: Bild, Werte als Balken, Preis; mit eigenem Pferd wird eingetauscht (40 % Anrechnung).
+// ---------------- Tierhändler (GUI, 03.10.2026) ----------------
+function beastsUI(body, npc) {
+  const I = A.beastInfo(), bar = (v, max, col) => `<div class="bst-bar"><i style="width:${Math.min(100, v / max * 100)}%;background:${col}"></i></div>`;
+  const card = w => `<div class="bst-card${I.pet ? ' off' : ''}"><canvas data-m="${w.m}" width="96" height="72"></canvas><b>${w.name}</b>
+    <div class="ledger">Leben ${w.hp}${bar(w.hp, 60, '#b0453a')}Biss ${w.dmg}${bar(w.dmg, 12, '#c9a45a')}Tempo ${w.speed.toFixed(2)}${bar(w.speed - 1, 0.8, '#7fae6e')}</div>
+    <button data-buy="${w.m}" ${I.pet || I.gold < w.price ? 'disabled' : ''} class="${I.gold < w.price ? 'poor' : ''}">${w.price} Gold</button></div>`;
+  body.innerHTML = `<div class="ledger">${npc?.name || 'Tierhändler'}: ${I.pet ? `„${I.pet.name} sieht gut aus. Ein zweites Tier? Das hält niemand lange durch.“` : '„Treu, ehrlich, beißt nur, wen du willst. Welches?“'} · Dein Gold: ${I.gold}</div>
+    ${I.pet ? `<div class="tr-sec">Dein Begleiter</div><div class="bst-own"><canvas data-m="${I.pet.mtype}" width="96" height="72"></canvas><div><b>${I.pet.name}</b><div class="ledger">Leben ${I.pet.hp}/${I.pet.maxHp}${bar(I.pet.hp, I.pet.maxHp, '#b0453a')}</div>
+      <button id="bst-free" class="txtbtn">${I.pet.name} freilassen</button></div></div>` : ''}
+    <div class="tr-sec">Begleittiere${I.pet ? ' — erst, wenn dein Tier fort ist' : ''}</div><div class="bst-grid">${I.wares.map(card).join('')}</div>
+    <div class="tr-sec">Reittiere</div><div class="ctx-actions"><button id="bst-stable">${I.mount ? `Reittiere ansehen (${I.mount.name} eintauschen)` : 'Reittiere ansehen'}</button>${I.mount?.mech ? `<button id="bst-oil">${I.mount.name} warten (1 Automatenkern)</button>` : ''}</div>
+    ${I.farm ? `<div class="tr-sec">Für deinen Hof (${I.farm.cow + I.farm.sheep}/${I.farm.cap} Tiere auf der Weide)</div><div class="bst-grid">
+      <div class="bst-card"><canvas data-m="cow" width="96" height="72"></canvas><b>Kuh</b><div class="ledger">Milch und Fleisch für die Siedlung</div><button data-farm="cow">70 Gold</button></div>
+      <div class="bst-card"><canvas data-m="sheep" width="96" height="72"></canvas><b>Schaf</b><div class="ledger">Wolle und Fleisch für die Siedlung</div><button data-farm="sheep">40 Gold</button></div></div>` : ''}`;
+  body.querySelectorAll('canvas[data-m]').forEach(cv => drawMonsterTo(cv, cv.dataset.m, 1));
+  body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyBeast(b.dataset.buy)) { sfx?.('coin'); closeModal(); } else beastsUI(body, npc); });
+  body.querySelectorAll('[data-farm]').forEach(b => b.onclick = () => { A.buyFarmAnimal(b.dataset.farm); beastsUI(body, npc); });
+  if ($('bst-free')) $('bst-free').onclick = () => { A.releasePet(); beastsUI(body, npc); };
+  if ($('bst-oil')) $('bst-oil').onclick = () => { A.oilMount(); beastsUI(body, npc); };
+  $('bst-stable').onclick = () => openModal('stable', npc);
+}
 function stableUI(body, npc) {
   const offers = A.stableOffers(npc), cur = S.mount && A.mountStats(), credit = cur ? Math.round(A.horseValue(cur) * 0.4) : 0;
   const bar = (v, max, col) => `<div style="height:5px;background:#2a2418;margin:2px 0 6px"><div style="height:100%;width:${Math.min(100, v / max * 100)}%;background:${col}"></div></div>`;
@@ -793,7 +814,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);

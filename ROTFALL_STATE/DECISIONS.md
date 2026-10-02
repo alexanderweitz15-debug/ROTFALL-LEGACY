@@ -209,3 +209,10 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   14. Koop: jeder macht seine Prüfungen selbst; Gäste bekommen beim Aufstieg Talentpunkte (Fehler beheben).
   15. Vergessen: alles bei jedem Lehrer, gegen Gold wie heute.
   16. Die Prüfungsaufträge werden wie in Tabelle 2.2 übernommen.
+- **Klassen (03.10., nachts):**
+  - Sterne einer Klasse wirken weiter, solange eine ihrer Folgeklassen aktiv ist.
+  - Eigene Wege (Paladin, Todesritter, Hochpaladin, dunkle Klassen) zählen als bestandene Prüfung: +1 Talentpunkt, auch rückwirkend.
+  - Gefährtenbaum wie vorgeschlagen: 7 Sterne, 6 davon lernbar, nur Werte, Punkte = 1 + Stufe/5.
+  - Prüfungszahlen schwerer:
+    - Barde: 5 Siege unter dem Kriegslied mit 2 Gefährten.
+    - Waldläufer: eine ganze Nacht (10 Stunden am Stück) draußen.
