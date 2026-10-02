@@ -127,3 +127,8 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Geheime Orte (PROPOSALS/geheime_orte.md): gleiche Lage in jeder Welt; Seelen-Ernte darf Morvaths Heerzug näher bringen (mit Warnung). Geisterschiff gratis: NICHT gewählt → kein Gratis-Transport.
 - Erste Spielstunde (Scout R8): „Hinweise führen hin“ (proaktive Hinweise) bauen. Vorverfolgter erster Auftrag: nicht gewählt.
 - Mittelspiel (Scout R9): alle vier bauen — Siedlung geht an Erben; Gold-Sog (Ausbau kostet auch Gold); Rang bremst Blutkult; Aurelion-Bionik wirkt im Kriegsgraphen.
+
+## 02.10.2026 — Visueller Umbau und Feature Readiness Gate
+- Neuer Grundsatzauftrag: ROTFALL_STATE/VISUAL.md (weg vom Text; 10 Varianten je Element; Priorität Dialoge → Quests → NPC → Kampf → Items → Inventar → Shops → Skilltree → Karte → Städte → Welt → UI → Animationen).
+- Neue Arbeitsregel: ROTFALL_STATE/GATE.md (Feature Readiness Gate) — gilt für alle Features und Agenten: erst Analyse + Impact Report + offene Entscheidungen, keine erfundenen Regeln/Zahlen.
+- Werkzeuge: Sperre bleibt (kein SpriteCook, keine bezahlten Bildgeneratoren, kein pixel-plugin, kein Aseprite).
