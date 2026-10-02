@@ -37,11 +37,11 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
   ['char', 'Charakter', 'C', ['character', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
-  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement']], ['map', 'Karte', 'M', ['map']],
+  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
 const NAV_SHORT = { char: 'Charakter', inv: 'Inventar', party: 'Gruppe', build: 'Siedlung', map: 'Karte', quest: 'Aufträge', powers: 'Mächte', codex: 'Kodex', options: 'Optionen' };
-const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
 // Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
@@ -771,11 +771,12 @@ export function setPrompt(text) {
 export let modalOpen = null;
 // Fenster neu zeichnen, ohne es umzuschalten (openModal schließt bei gleichem Namen).
 export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOpen = null; openModal(n, arg); }
+const DOCKED = new Set(['trade', 'settlement', 'business', 'party', 'craft', 'smith']);
 function leaveWin(next) {                                     /* P6/P7: Fenster verlassen — Inventar-Takt stoppen, Kontor-Besuch beenden, Dock lösen */
   if (modalOpen === 'inventory' && next !== 'inventory') { clearInterval(invTimer); figPrev = null; DRAG = null; }
   if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
   if (next === 'inventory') { const b = navBtn('inv'); if (b) { b.classList.remove('badge'); b.title = 'Gepäck (I)'; } }   /* Aufnahme-Stapel: Punkt bis das Gepäck offen war */
-  $('modal')?.classList.toggle('dock', next === 'trade');
+  $('modal')?.classList.toggle('dock', DOCKED.has(next)); if ($('modal')) $('modal').dataset.win = next || '';   /* UI-Scheibe 3: Handel, Siedlung, Gruppe, Handwerk angedockt — die Welt bleibt sichtbar */
   $('modal')?.classList.toggle('parch', ['codex', 'chronicle', 'quests'].includes(next));   /* UI-Scheibe 5: Pergament nur für die Lesefenster */
   document.body.classList.toggle('nomotion', S.settings?.motion === false);   /* „Reduzierte Bewegung“: kein Glanz, kein Pulsieren */
 }
@@ -792,7 +793,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1759,6 +1760,100 @@ function trSell(objs, n, ok = false) {
 // UI-Scheibe 5 + quests.md Q11 (Entscheidung 01.10.: Pergament für das Auftragsbuch): Doppelseite — links die Liste mit Siegeln (offen, bereit
 // zur Abgabe, erfüllt, zerrissen), rechts der Brief des gewählten Auftrags: Geber mit Bild (Bewohner auf „Sehr schwer“ ohne), Ziel-Piktogramme mit
 // Kerben, Ort, Frist, Lohn (feste Aufträge vor dem Abschluss nur als Symbol). Ordnen nach Stand oder Entfernung (nur Anzeige).
+// ---- Handwerk als Dock (UI-Scheibe 3, ui_redesign §5 „Handwerk“) ----
+// Rezeptkarten statt Gesprächszeilen: Bild des Ergebnisses, Material als Piktogramm + Zahl (rot, wenn es fehlt), Schloss bei zu niedriger Fertigkeit.
+// Rechts die Bildkarte des Ergebnisses, die Güte-Chancen als Balken (exakt aus der Regel des Spiels), Herstellen / mit Königseisen / Ausbessern.
+let crSel = null, crArg = null;
+const RES_ICO = { wood: 'res_wood', stone: 'res_stone', iron: 'res_iron', herb: 'res_herb', food: 'res_food' };
+function matPic(m) {
+  const nm = ITEMS[m.key]?.name || RES_NAME[m.key] || m.key, ic = RES_ICO[m.key] ? icoImg(RES_ICO[m.key], 1, 'ico') : `<canvas class="cr-mi" data-ico="${m.key}"></canvas>`;
+  return `<span class="bcost${m.have < m.n ? ' miss' : ''}" title="${qa(nm)}: ${m.n} nötig, ${Math.floor(m.have)} vorhanden">${ic}${m.n}</span>`;
+}
+function craftUI(body, arg) {
+  if (arg) crArg = arg; if (!crArg) return; const V = A.craftView?.(crArg.st); if (!V) return;
+  $('modal-title').textContent = V.name; body.className = 'cr-body';
+  if (!V.list.some(r => r.key === crSel)) crSel = (V.list.find(r => r.ok) || V.list[0])?.key || null;
+  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}</div>
+    <div class="cr-cols"><div><div class="cr-grid">${V.list.map(r => `<button class="cr-card${r.ok ? '' : ' cant'}${r.key === crSel ? ' sel' : ''}" data-k="${r.key}"><canvas class="cr-ic" data-ico="${r.key}"></canvas><span class="cr-n"></span>${r.n > 1 ? `<b class="cr-x">×${r.n}</b>` : ''}<span class="cr-need">${r.need.map(matPic).join('')}</span>${r.min && V.skill < r.min ? `<span class="cr-lock" title="Braucht ${qa(V.skillName)} ${r.min}">${LOCK_SVG}${r.min}</span>` : ''}</button>`).join('') || '<div class="ledger">Hier lässt sich nichts herstellen.</div>'}</div>
+      <div class="ledger cr-hint">Klick: ansehen · Doppelklick: herstellen. Rote Zahl = Material fehlt, Schloss = Fertigkeit zu niedrig.</div></div>
+      <div class="cr-detail" id="cr-det"></div></div>`;
+  body.querySelectorAll('.cr-card').forEach(b => { const r = V.list.find(x => x.key === b.dataset.k); b.querySelector('.cr-n').textContent = ITEMS[r.key].name;
+    b.onclick = () => { crSel = r.key; craftUI(body); }; b.ondblclick = () => crDo(body, r, false); });
+  if ($('cr-mend')) $('cr-mend').onclick = () => { const t = crArg.t; closeModal(); A.craftMend?.(t); };
+  const r = V.list.find(x => x.key === crSel), d = $('cr-det');
+  if (r) { const bar = (ch, lab) => `<div class="cr-q" title="${lab}: ${V.quals.map((q, i) => `${q} ${Math.round(ch[i] * 100)} %`).filter((_, i) => ch[i] > 0.004).join(' · ')}"><small>${lab}</small><div class="cr-qbar">${ch.map((c, i) => c > 0.004 ? `<i class="q${i}" style="width:${(c * 100).toFixed(1)}%">${c > 0.14 ? V.quals[i] : ''}</i>` : '').join('')}</div></div>`;
+    d.innerHTML = itemCardHTML({ key: r.key }, { short: true }) + `<div class="cr-needl">${r.need.map(matPic).join('')}</div>` + bar(V.chances, 'Erwartete Güte')
+      + (V.ke ? bar(V.chancesKE, 'Mit Königseisen') : '')
+      + `<div class="tr-box"><button id="cr-do" class="big"${r.ok ? '' : ' disabled'}>${r.ok ? 'Herstellen' : r.min && V.skill < r.min ? `Braucht ${qa(V.skillName)} ${r.min}` : 'Material fehlt'}</button>${V.ke ? `<button id="cr-ke"${r.ok ? '' : ' disabled'}>Mit Königseisen (eine Güte höher)</button>` : ''}</div>`;
+    $('cr-do').onclick = () => crDo(body, r, false); if ($('cr-ke')) $('cr-ke').onclick = () => crDo(body, r, true); }
+  else d.innerHTML = '';
+  paintIcons(body);
+}
+function crDo(body, r, ke) {
+  const before = S.player.inv.length; A.craftDo?.(r.key, ke); craftUI(body);
+  const c = body.querySelector(`.cr-card[data-k="${r.key}"]`); if (c && S.settings?.motion !== false) { c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); }
+  if (S.player.inv.length !== before) sfx('metal', 0.3, 0.3);
+}
+// ---- Betriebe (Reiter unter Siedlung, Entwickler 02.10.2026) ----
+// Links die eigenen Betriebe als Karten mit dem Bild ihres Hauses und der Kasse; rechts der gewählte: Haus groß, Ertrag gestern und im Schnitt,
+// Arbeiter (Stadt + angeworben), Vorprodukte und Ware mit dem Vorrat der Stadt, Stufe, Kasse mit „Abholen“ (nur vor Ort).
+let bzSel = null;
+function houseTo(cv, h) {
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.fillStyle = '#14110d'; c.fillRect(0, 0, cv.width, cv.height);
+  let im = null; try { im = h && A.houseSprite?.(h, false); } catch (e) { im = null; }
+  if (!im) { c.fillStyle = '#3b3227'; c.fillRect(cv.width / 2 - 14, cv.height / 2 - 6, 28, 18); c.beginPath(); c.moveTo(cv.width / 2 - 18, cv.height / 2 - 6); c.lineTo(cv.width / 2, cv.height / 2 - 20); c.lineTo(cv.width / 2 + 18, cv.height / 2 - 6); c.fill(); return; }
+  const k = Math.min((cv.width - 4) / im.width, (cv.height - 4) / im.height); c.drawImage(im, Math.round((cv.width - im.width * k) / 2), Math.round(cv.height - 2 - im.height * k), Math.round(im.width * k), Math.round(im.height * k));
+}
+const goodPic = (x, extra) => `<span class="bz-g" title="${qa(ITEMS[x.g]?.name || x.g)}: ${extra}"><canvas data-ico="${x.g}"></canvas><b>${x.n}</b><small>${x.stock}</small></span>`;
+function bizUI(body) {
+  const L = A.bizView?.() || []; body.className = 'bz-body';
+  if (!L.length) { body.innerHTML = `<div class="ledger">Dir gehört noch kein Betrieb. Im Handelskontor einer Stadt (beim Markthändler: „Handelskontor … Betriebe“) kannst du Werkstätten, Höfe und Webereien kaufen. Der Gewinn sammelt sich dann hier in ihrer Kasse.</div>`; return; }
+  if (!L.some(b => b.id === bzSel)) bzSel = L[0].id;
+  const sum = L.reduce((n, b) => n + b.kasse, 0);
+  body.innerHTML = `<div class="bz-top">${icoImg('res_gold', 1, 'ico')} In allen Kassen <b>${sum}</b> Gold</div><div class="bz"><div class="bz-list">${L.map(b => `<button class="bz-card${b.id === bzSel ? ' sel' : ''}${b.lost ? ' lost' : ''}" data-b="${b.id}"><canvas class="bz-pic" width="96" height="64"></canvas><span class="bz-n"></span><span class="bz-k">${icoImg('res_gold', 1, 'ico')}${b.kasse}</span></button>`).join('')}</div><div class="bz-det" id="bz-det"></div></div>`;
+  body.querySelectorAll('.bz-card').forEach((c, i) => { const b = L[i]; c.querySelector('.bz-n').textContent = b.name; houseTo(c.querySelector('canvas'), b.house); c.onclick = () => { bzSel = b.id; bizUI(body); }; });
+  const b = L.find(x => x.id === bzSel), d = $('bz-det'), sg = v => v == null ? '—' : (v > 0 ? '+' : '') + v;
+  d.innerHTML = `<canvas class="bz-big" width="240" height="150"></canvas><h3 class="bz-h"></h3><div class="ledger bz-sub">${qa(b.trade)} · ${qa(b.town)} · Stufe ${b.level}${b.lost ? ' · <span class="bad">die Stadt ist verloren</span>' : ''}</div>
+    <div class="statline" title="Dein Anteil (gut ein Drittel des Warenwerts) abzüglich Lohn der Angeworbenen"><span>Ertrag gestern</span><b class="${(b.last || 0) < 0 ? 'bad' : ''}">${sg(b.last)} Gold</b></div>
+    <div class="statline" title="Schnitt über ${b.days} Tag(e), seit der Betrieb dir gehört"><span>Schnitt je Tag</span><b>${sg(b.avg)} Gold</b></div>
+    <div class="statline" title="Bewohner, die in diesem Gewerbe arbeiten, und von dir angeworbene Hände (je 3 Gold Lohn am Tag)"><span>Arbeiter</span><b>${b.folk} aus der Stadt · ${b.hired} angeworben</b></div>
+    <div class="statline" title="Warenwert, den der Betrieb gestern gemacht hat"><span>Ware gestern</span><b>${b.made} Gold</b></div>
+    ${b.inp.length ? `<div class="bz-row"><small>Vorprodukte je Arbeiter</small>${b.inp.map(x => goodPic(x, `${x.n} je Arbeiter und Tag · Vorrat der Stadt ${x.stock}`)).join('')}</div>` : ''}
+    <div class="bz-row"><small>Ware je Arbeiter</small>${b.out.map(x => goodPic(x, `${x.n} je Arbeiter und Tag · Vorrat der Stadt ${x.stock}`)).join('') || '<span class="ledger">—</span>'}</div>
+    <div class="bz-kasse"><span>${icoImg('res_gold', 2, 'gold-ico')}<b>${b.kasse}</b> Gold in der Kasse</span><button id="bz-take" class="big"${b.here && b.kasse > 0 ? '' : ' disabled'} title="${b.here ? 'In die eigene Tasche' : 'Nur vor Ort — in ' + qa(b.town)}">${b.here ? 'Abholen' : 'Nur vor Ort'}</button></div>
+    <div class="ledger bz-hint">Der Gewinn sammelt sich jeden Tag in der Kasse. Abholen kannst du ihn in ${qa(b.town)} — hier oder im Handelskontor. Fällt die Stadt an die Toten oder wird zerstört, ist die Kasse verloren.</div>`;
+  d.querySelector('.bz-h').textContent = b.name; houseTo(d.querySelector('.bz-big'), b.house); paintIcons(d);
+  $('bz-take').onclick = () => { const g0 = S.gold, r = A.bizCollect?.(b.id); if (r) toast(r); else sfx('coin', Math.min(1, (S.gold - g0) / 250), 0.8); bizUI(body); refreshHUD(); };
+}
+// ---- Schmiede als Dock (Entwickler 02.10.2026) ----
+// Links alle abgenutzten Teile (angelegte zuerst) mit Zustandsbalken, Klick wählt ab/an (alle sind gewählt); rechts Auswahl, Preis nach der alten
+// Regel des Schmieds, „Ausbessern“. Dazu: Waren des Schmieds (Handels-Dock) und — steht eine Esse oder ein Amboss nahe — selbst schmieden.
+let smNpc = null, smOff = new Set();
+function smithUI(body, npc) {
+  if (npc && npc !== smNpc) { smNpc = npc; smOff = new Set(); } npc = smNpc; if (!npc) return;
+  body.className = 'tr-body sm-body'; $('modal-title').textContent = 'Schmiede';
+  const L = A.smithItems?.() || [], sel = L.filter(x => !smOff.has(x.o)), cost = A.smithPrice?.(sel.map(x => x.o)) || 0, forge = A.smithForge?.(npc);
+  body.innerHTML = `<div class="tr"><div class="tr-head"><canvas id="tr-por" width="56" height="56"></canvas><div class="tr-who"><div class="tr-name"></div><div class="tr-prof">${icoImg('nav_build', 1, 'kpi-ico')} ${qa(npc.prof || 'Schmied')}</div></div>
+      <div class="tr-gold" title="Dein Gold">${icoImg('res_gold', 2, 'gold-ico')}<b>${S.gold}</b></div></div>
+    <div class="sm-tabs">${npc.shop ? '<button id="sm-shop" class="mini">Waren ansehen</button>' : ''}${forge ? '<button id="sm-forge" class="mini" title="Selbst schmieden an der Esse nebenan (Rezeptkarten)">An der Esse selbst schmieden</button>' : ''}</div>
+    <div class="tr-cols"><div class="tr-main"><div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Ausbessern</div>
+      <div class="sm-grid" id="sm-grid">${L.length ? '' : '<div class="ledger">„Nichts davon braucht mich.“ — alles ist heil.</div>'}</div></div>
+      <div class="tr-deal" id="sm-deal"></div></div></div>`;
+  body.querySelector('.tr-name').textContent = npc.name; drawPortraitTo($('tr-por'), npc);
+  const g = $('sm-grid');
+  for (const x of L) { const c = el('div', 'cell'); c.dataset.card = '1'; c._card = () => itemCardHTML(x.o, { short: true, equipped: !!x.eq }); g.appendChild(c);
+    paintCell(c, x.o, { mk: !smOff.has(x.o), tag: x.eq ? '<span class="sm-eq" title="angelegt">●</span>' : '' });
+    c.onclick = () => { if (smOff.has(x.o)) smOff.delete(x.o); else smOff.add(x.o); smithUI(body); }; }
+  $('sm-deal').innerHTML = L.length ? `<div class="ledger">${sel.length} von ${L.length} Stücken gewählt. Klick auf ein Teil wählt es ab oder wieder an.</div>
+      <div class="tr-box"><div class="tr-sum">${icoImg('res_gold', 1, 'kpi-ico')} Preis <b class="tot">${cost}</b> Gold${S.gold < cost ? ' · <span class="bad">zu wenig Gold</span>' : ''}</div>
+      <button id="sm-do" class="big"${sel.length && S.gold >= cost ? '' : ' disabled'}>Ausbessern${sel.length ? ` (${sel.length})` : ''}</button>
+      <button id="sm-all" class="mini">${smOff.size ? 'Alle wählen' : 'Keins wählen'}</button></div>
+      <div class="ledger tr-help">Der Schmied macht jedes Stück wieder ganz (100 %). Preis: der Schaden am Stück mal halber Wert, zusammen mindestens 5 Gold. Selbst ausbessern geht an Esse, Amboss oder Werkbank nur bis 80 %.</div>` : '';
+  if ($('sm-do')) $('sm-do').onclick = () => { const g0 = S.gold, r = A.smithRepair?.(npc, sel.map(x => x.o)); if (r) { toast(r); return; } sfx('metal', 0.5, 0.5); sfx('coin', Math.min(1, (g0 - S.gold) / 250), 0.6); A.shopBark?.(npc, 'buy'); smOff = new Set(); smithUI(body); };
+  if ($('sm-all')) $('sm-all').onclick = () => { smOff = smOff.size ? new Set() : new Set(L.map(x => x.o)); smithUI(body); };
+  if ($('sm-shop')) $('sm-shop').onclick = () => openModal('trade', npc);
+  if ($('sm-forge')) $('sm-forge').onclick = () => { closeModal(); A.openForge?.(forge); };
+}
 let qbSel = null;
 const QB_WORD = { active: 'offen', ready: 'bereit', done: 'erfüllt', failed: 'gescheitert' };
 function questUI(body) {

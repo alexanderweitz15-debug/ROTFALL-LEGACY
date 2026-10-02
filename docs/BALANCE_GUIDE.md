@@ -101,8 +101,13 @@ Faustregeln:
 
 ## 7. Talente und Statpunkte
 
-- `TALENT_EVERY = 2`: 1 Punkt zum Start + 1 je gerader Stufe = 31 bei Stufe 60. Ziel: 50–70 % der lernbaren Knoten.
-  Neue Knoten senken den Anteil — ab ~62 lernbaren Knoten `TALENT_EVERY` prüfen (Probe „Höchststufe 60“ schlägt an).
+- `TALENT_EVERY = 2` (Entwickler 02.10.2026): 1 Punkt zum Start + 1 je gerader Stufe + 1 je bestandener Klassenprüfung
+  (`clsPass`), rückwirkend für alte Stände (`talentTopUp`, nie weniger als vorher) = 31 + Prüfungen bei Stufe 60.
+  Ziel: 50–70 % der Sterne, die **eine typische Figur erreichen kann** (Wanderer + eine Klassenlinie mit Folgeklasse + ein
+  Titel, ohne ausgeschlossene Schlüsselsterne) — nicht aller Sterne aller Klassen. Probe „Höchststufe 60“ misst genau das.
+- Klassen-Sternbilder: Wertesterne wirken immer und bleiben klein (unten); Schlüssel- und Fähigkeitssterne wirken nur bei
+  aktiver Klasse. Machtgrenze je Sternbild: höchstens so viel Dauerleistung wie heute der volle Kampfzweig (mit `RF.simFight`
+  messen, Option `tree`/`cls`/`useAb`).
 - Kleine Knoten: +5–8 % (Schaden, Leben), +2 Rüstung, +10–15 Ausdauer. Schlüsselknoten: stark, aber mit Preis
   (Berserker: +15 % eingesteckt) oder Ausschluss (`excl`).
 - Statpunkte: 1 je Stufe + 1 je 5 Stufen (71 bis 60). Ein Punkt ist ≈ 0,35 Schaden je Hieb bzw. 4 Leben.

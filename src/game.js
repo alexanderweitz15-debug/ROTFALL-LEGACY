@@ -772,13 +772,17 @@ const worldActs = () => S.ents.world ? actorsOf('world').list : [];   /* PERF-U2
    Zufallsaufrufe (chance/pick) laufen nur in hot und dort in derselben Reihenfolge. Kleine Karten (Selbsttest, Höhlen) bleiben beim alten Weg. */
 const TIER_MIN = 600, COLD_K = 16, MID_K = 3;
 let TIER = { act: null, t: -1e9, n: 0, px: 0, py: 0, hot: [], cold: [], mid: [], pool: [], esc: new Map(), ph: 0 };
+/* Entwickler 02.10. (Despawn-Fehlersuche, Lead-Hinweis Leistung): nur Verfolger des Helden, seiner Gruppe oder eines Koop-Helden
+   bleiben wegen aggroId heiß — Heer-gegen-Heer- oder sonstige Gegner-gegen-Gegner-Kämpfe (aggroId zeigt auf keinen von denen)
+   frieren wie bisher ein. */
+const huntsHero = (id, party) => id === S.player.id || party.includes(id) || !!byId(id)?.coopHero;
 /* PERF-U2 (02.10.): Einsortieren einer Figur (vorher Schleifenrumpf von tierOf; Regeln unverändert). */
 function tierPut(T, e, px, py, party) {
   const dx = Math.abs(e.x - px), dy = Math.abs(e.y - py), k = e.kind;
   if (k === 'npc' && e.escort) { const l = T.esc.get(e.escort); if (l) l.push(e); else T.esc.set(e.escort, [e]); }
   if (dx < 1950 && dy < 1950) T.pool.push(e);
   if (!e.alive) { if (k !== 'npc' && k !== 'enemy') T.hot.push(e); return; }   /* Tote denken nicht (think kehrt sofort um) */
-  const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
+  const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0) && !(e.aggroId && huntsHero(e.aggroId, party));   /* wer den Helden/seine Gruppe/einen Koop-Helden jagt, bleibt heiß — Tiering darf das nicht einfrieren */
   if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) return;
   if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? T.cold : T.mid).push(e); return; }
   T.hot.push(e);
@@ -2114,7 +2118,7 @@ export function newGame(cfg) {
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
     origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
   p.attributes = Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
-  p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {};   // ein Talentpunkt zum Start, danach einer auf jeder zweiten Stufe (levelUp)
+  p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {}; p.clsPass = {}; p.skyV = 1;   /* ein Talentpunkt zum Start, danach einer auf jeder zweiten Stufe (levelUp) und je bestandener Klassenprüfung */
   S.gold = o.gold;
   o.gear.forEach(k => { const it = mkItem(k); if (ITEMS[k].slot === 'weapon' && !p.equip.weapon) p.equip.weapon = it;
     else if (ITEMS[k].slot === 'chest' && !p.equip.chest) p.equip.chest = it;
@@ -2350,7 +2354,8 @@ export function continueGame(given = null, retried = false) {                   
   ensureBoards();
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
-  if (S.player.skillPoints == null) { S.player.skillPoints = Math.max(0, S.player.level - 1); S.player.tree ||= {}; recalc(S.player); }   // Skill-Baum für alte Stände: Punkte rückwirkend
+  { const got = talentTopUp(S.player); if (got) { recalc(S.player); log(`Die Talentregel hat sich geändert (ein Punkt auf jeder zweiten Stufe und je bestandener Klassenprüfung): ${got} Talentpunkt${got > 1 ? 'e' : ''} nachgereicht.`, 'party'); } }   /* Scheibe 0: Punkte rückwirkend nach der neuen Regel (nie weniger als vorher) */
+  for (const h of [...Object.values(S.coopHeroes || {}), ...Object.values(S.ents).flat().filter(e => e?.coopHero)]) talentTopUp(h);   /* Koop-Gastfiguren bekamen bisher keine Talentpunkte */
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
   for (const arr of Object.values(S.ents)) for (const e of arr || []) if (bossScaled(e) && e.alive && !e.bossV) {   /* Balance-Runde: Bosse alter Stände bekommen das neue Leben (BOSS.hp), sonst wären sie mit der geringeren Wucht nur leichter */
     const f = e.hp / (e.maxHp || 1), rb = bossOf(e); e.bossV = 1; if (rb?.dmg) e.dmgMul = rb.dmg;
@@ -2555,19 +2560,23 @@ function ambMinstrels(town, near) {                                     // Spiel
   for (const m of partyMembers()) m.morale = Math.min(100, (m.morale || 50) + 4);
 }
 let reactT = 0;
+/* Visuell N2-S1 (02.10.2026): Anlass → Geste/Emote. reactLine setzt reactGest; reactTick spielt sie (keine Zufallszüge, nur Darstellung).
+   Arbeitende Figuren (act.kind 'work') werden nicht unterbrochen (Empfehlung N2-1). */
+let reactGest = null;
 function reactLine(e) {
+  reactGest = null;
   const p = S.player, h = hourNow(), rel = S.relations[e.key] ?? 0, fr = e.faction && S.factions[e.faction], rn = e.faction && rankName(e.faction), g = !!e.guard;
   const bleeding = (p.status || []).some(s => s.key === 'bleeding');
   if (p.hp < p.maxHp * 0.4 || bleeding) return pick(['Du blutest ja!', 'Such dir einen Heiler, schnell.', 'Bei den Göttern — was ist dir passiert?']);
-  if (fearedBy(e)) return pick(['Bitte … keinen Ärger.', 'Nicht hinsehen. Nicht hinsehen.', '…']);
-  const M = S.mourn?.[e.homeTown]; if (M && M.until >= (S.day | 0) && M.name !== e.name && chance(0.6)) return pick([`${M.name} ist tot. Ich kann es nicht glauben.`, `Hast du gehört? ${M.name} …`, `Ohne ${M.name} ist es still hier.`]);
-  if (bountyTotal() >= 100) return g ? pick(['Ich kenne dein Gesicht. Vom Aushang.', 'Ein falscher Schritt, und du sitzt.']) : pick(['Das ist der vom Aushang …', 'Geh weiter. Bitte.']);
-  if (rn && (S.ranks[e.faction] ?? -1) >= 1) return g ? `Zu Befehl, ${rn}.` : `Ehre, ${rn}.`;
-  if (S.flags.garmadonSlain && chance(0.3)) return pick(['Der Königsmörder! Die Toten schlafen wieder.', 'Danke. Für Garmadon.']);
-  if (S.flags.chainsBroken && chance(0.3) && !e.faction) return 'Du hast die Ketten gebrochen. Ich hab es gesehen.';
+  if (fearedBy(e)) { reactGest = ['abwehren', 'angst']; } if (fearedBy(e)) return pick(['Bitte … keinen Ärger.', 'Nicht hinsehen. Nicht hinsehen.', '…']);
+  const M = S.mourn?.[e.homeTown]; if (M && M.until >= (S.day | 0) && M.name !== e.name && chance(0.6) && (reactGest = ['trauern', 'trauer'])) return pick([`${M.name} ist tot. Ich kann es nicht glauben.`, `Hast du gehört? ${M.name} …`, `Ohne ${M.name} ist es still hier.`]);
+  if (bountyTotal() >= 100 && (reactGest = g ? ['zeigen', 'ausruf'] : ['abwehren', 'angst'])) return g ? pick(['Ich kenne dein Gesicht. Vom Aushang.', 'Ein falscher Schritt, und du sitzt.']) : pick(['Das ist der vom Aushang …', 'Geh weiter. Bitte.']);
+  if (rn && (S.ranks[e.faction] ?? -1) >= 1 && (reactGest = [g ? 'salutieren' : (S.ranks[e.faction] ?? -1) >= 3 ? 'knien' : 'salutieren'])) return g ? `Zu Befehl, ${rn}.` : `Ehre, ${rn}.`;
+  if (S.flags.garmadonSlain && chance(0.3) && (reactGest = ['jubeln', 'freude'])) return pick(['Der Königsmörder! Die Toten schlafen wieder.', 'Danke. Für Garmadon.']);
+  if (S.flags.chainsBroken && chance(0.3) && !e.faction && (reactGest = ['jubeln', 'freude'])) return 'Du hast die Ketten gebrochen. Ich hab es gesehen.';
   if (p.titles?.length && chance(0.25)) return `Da ist ${p.titles[p.titles.length - 1]}!`;
-  if (rel >= 30) return pick([`Grüß dich, ${p.name}!`, `${p.name}! Schön, dich zu sehen.`]);
-  if (rel <= -30 || (fr != null && fr <= -30)) return pick(['Du schon wieder.', 'Geh weiter.', 'Dich will hier keiner.']);
+  if (rel >= 30 && (reactGest = ['jubeln'])) return pick([`Grüß dich, ${p.name}!`, `${p.name}! Schön, dich zu sehen.`]);
+  if ((rel <= -30 || (fr != null && fr <= -30)) && (reactGest = ['abwehren', 'zorn'])) return pick(['Du schon wieder.', 'Geh weiter.', 'Dich will hier keiner.']);
   if (fr != null && fr >= 50) return pick(['Freund der Unseren. Willkommen.', 'Gut, dass du da bist.']);
   if (h >= 22 || h < 5) return g ? 'Nachts hat hier keiner was verloren.' : pick(['Was treibst du dich nachts herum?', 'Geh schlafen, Fremder.']);
   if (!chance(0.45)) return null;
@@ -2583,10 +2592,14 @@ function reactTick(dt) {   /* PERF-U: Figuren und Leichen aus actorsOf statt zwe
     && !(x.talk?.until > now) && !((x.reactAt || 0) > now) && Math.abs(x.x - p.x) < 110 && Math.abs(x.y - p.y) < 90);
   for (const cp of AR.dc) { if (cp.kind !== 'corpse' || Math.abs(cp.x - p.x) > 600 || Math.abs(cp.y - p.y) > 400) continue;   // S13: Leichen erschrecken
     const w = AR.list.find(x => x.kind === 'npc' && x.alive && !x.downed && !x.angry && !x.guard && !S.party.includes(x.id) && !(x.talk?.until > now) && !((x.reactAt || 0) > now) && dist(x, cp) < 80);
-    if (w) { w.reactAt = now + 60000; w.talk = { with: null, at: now, until: now + 2600, say: pick(['Bei den Göttern!', 'Schafft das weg!', 'Wer war das?', 'Nicht hinsehen …']) }; return; } }
+    if (w) { w.reactAt = now + 60000; w.talk = { with: null, at: now, until: now + 2600, say: pick(['Bei den Göttern!', 'Schafft das weg!', 'Wer war das?', 'Nicht hinsehen …']) }; reactPlay(w, ['abwehren', 'angst'], cp); return; } }
   if (!e || !chance(0.5)) return;
   e.reactAt = now + 90000; const say = reactLine(e); if (!say) return;
-  e.talk = { with: p.id, until: now + 2600, at: now, say };
+  e.talk = { with: p.id, until: now + 2600, at: now, say }; reactPlay(e, reactGest, p);
+}
+function reactPlay(e, G, toward) {   /* N2-S1: Geste (und ggf. Emote) zur Reaktion; nicht mitten in der Arbeit */
+  if (!G || e.act?.kind === 'work' || e.sitting) return;
+  gesture(e, G[0], ANIM_DEFS.gesture[G[0]]?.ms || 1200, toward); if (G[1]) emote(e, G[1], 1600);
 }
 let miniT = 0;
 function drawMini(dt) {
@@ -2790,7 +2803,7 @@ function think(e, dt, pre = false) {   /* pre: Schritt schon vom Stufenplan gest
   if (e.downed && e.kind === 'npc' && !e.brawlKO && chance(dt / 5000) && dist(e, S.player) < 520) float(e, pick(['Hilfe …', 'Bitte … helft mir …', 'Hierher …', 'Ich blute …']), 'rgba(220,160,140,ALPHA)');   /* §5f: Verletzte rufen */
   if (e.eliteKey) eliteTick(e, dt);
   if (e.kind === 'npc' && !e.eliteChecked) eliteKit(e);
-  if (e.kind === 'enemy' && !(e.status && e.status.length) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen (updateEnemy tat fern ohnehin nichts)
+  if (e.kind === 'enemy' && !(e.status && e.status.length) && !(e.aggroId && huntsHero(e.aggroId, S.party)) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen; Entwickler 02.10. (Despawn-Fehlersuche): wer den Helden/seine Gruppe/einen Koop-Helden jagt, ruht nicht — sonst erreicht ihn nie die Leinen-Prüfung in updateEnemy. Gegner-gegen-Gegner-Kämpfe (Heere etc.) ruhen weiter wie bisher (Lead-Hinweis Leistung)
   if (!pre && e.kind === 'npc' && !e.angry && !e.fleeing && !e.escort && !e.threatId && !(e.swing > 0) && S.party.indexOf(e.id) < 0) {   // außer Sicht: jedes 3. Bild, dreifacher Schritt
     const P0 = S.player, far = Math.abs(e.x - P0.x) > 520 || Math.abs(e.y - P0.y) > 420;
     if (far) { const k = Math.abs(e.x - P0.x) > 1700 || Math.abs(e.y - P0.y) > 1700 ? 8 : 3;   // AUDIT P-03: weit draußen jedes 8. Bild
@@ -4192,22 +4205,33 @@ function gainXp(c, n) {
   for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
-// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Talentpunkte nur noch auf jeder dritten Stufe
-// plus der Startpunkt — bei 60 also 21 Punkte für 64 Knoten (59 lernbar, fünf Schlüsselknoten schließen einander aus): viele,
-// nicht alle. Statpunkt je Stufe und der Meilenstein-Statpunkt alle 5 Stufen bleiben. Alte Stände behalten ihre Punkte.
+// Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Klassen und Talente (Entwickler 02.10.2026, 22:10): ein
+// Talentpunkt zum Start, einer auf jeder zweiten Stufe und einer je bestandener Klassenprüfung (c.clsPass) — rückwirkend.
+// Bei 60 also 31 + Prüfungen. Gemessen wird gegen die Sterne, die EINE Figur erreichen kann (Probe „Höchststufe 60“).
+// Statpunkt je Stufe und der Meilenstein-Statpunkt alle 5 Stufen bleiben.
 // Kurve: ab Stufe 20 nur noch ×1,04 je Stufe (vorher ×1,12: 3,1 Mio. EP bis 60, unerreichbar; jetzt ≈ 0,46 Mio.).
-export const MAX_LEVEL = 60, TALENT_EVERY = 3;   /* Nutzer: Talentpunkt jede dritte Stufe (21 bis Stufe 60, gut ein Drittel der Talente) */
+export const MAX_LEVEL = 60, TALENT_EVERY = 2;   /* Entwickler 02.10.2026: Talentpunkt jede zweite Stufe plus einer je bestandener Klassenprüfung */
 const talentAt = L => L % TALENT_EVERY === 0;
+/* Klassen und Talente, Scheibe 0: Soll-Punkte einer Figur nach der Regel. Gelernte Sterne (ohne Gefährtensterne) zählen als ausgegeben.
+   talentTopUp gleicht einmalig (idempotent) auf das Soll an — nie nach unten. Läuft beim Laden, beim Erben und für Koop-Gastfiguren. */
+const talentPass = c => Object.keys(c?.clsPass || {}).length;
+function talentTotal(c) { return 1 + Math.floor((c.level || 1) / TALENT_EVERY) + talentPass(c); }
+function talentSpent(c) { return Object.keys(c.tree || {}).filter(k => SKILL_TREE[k] && SKILL_TREE[k].branch !== 'companion').length; }
+function talentTopUp(c) {
+  if (!c) return 0; c.tree ||= {}; const have = (c.skillPoints || 0) + talentSpent(c), want = talentTotal(c);
+  if (have >= want) { c.skillPoints ||= 0; return 0; }
+  c.skillPoints = (c.skillPoints || 0) + want - have; return want - have;
+}
 function levelUp(c) {
   if (c.level >= MAX_LEVEL) { c.xp = Math.min(c.xp, c.xpNext - 0.001); return; }   /* Höchststufe: Balken bleibt voll, die Schleife in gainXp endet */
   c.xp -= c.xpNext; c.level++; c.xpNext = Math.round(c.xpNext * (c.level < 10 ? 1.35 : c.level < 20 ? 1.2 : 1.04));   // S13 (Nutzer: Level): flacher nach Stufe 10 und 20, sonst Mauer
-  const tal = c === S.player && talentAt(c.level), top = c.level >= MAX_LEVEL;
+  const tal = (c === S.player || c.coopHero) && talentAt(c.level), top = c.level >= MAX_LEVEL;   /* Scheibe 0: auch die Gastfigur bekommt Talentpunkte */
   if (top) c.xp = Math.min(c.xp, c.xpNext - 0.001);
   if (c === S.player && c.level % 5 === 0) { c.attrPoints = (c.attrPoints || 0) + 1;   // S13: Meilenstein alle 5 Stufen (Statpunkt)
     log(`Meilenstein: Stufe ${c.level}. Ein zusätzlicher Statpunkt.`, 'party'); }
   if (c.map === S.map) { fx(c.x, c.y - 10, 'heal', 18); float(c, `Stufe ${c.level}`, 'rgba(240,210,120,ALPHA)', true); if (c === S.player) sfx('heal', 0.6); }   // S13: Aufstieg sichtbar
-  if (c.coopHero) { c.attrPoints = (c.attrPoints || 0) + 1; log(`${c.name} erreicht Stufe ${c.level}. Ein Statpunkt ist frei (C).`, 'party'); }   /* Koop: der eigene Charakter des Gasts verteilt Punkte selbst */
-  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; if (tal) c.skillPoints = (c.skillPoints || 0) + 1;   // S15 (Nutzer): Statpunkte sichtbar; Talentpunkt nur auf geraden Stufen
+  if (c.coopHero) { c.attrPoints = (c.attrPoints || 0) + 1; if (tal) c.skillPoints = (c.skillPoints || 0) + 1; log(`${c.name} erreicht Stufe ${c.level}. Ein Statpunkt ist frei (C)${tal ? ' und ein Talentpunkt (T)' : ''}.`, 'party'); }   /* Koop: der eigene Charakter des Gasts verteilt Punkte selbst */
+  if (c === S.player) { c.attrPoints = (c.attrPoints || 0) + 1; if (tal) c.skillPoints = (c.skillPoints || 0) + 1;   /* Talentpunkt auf jeder zweiten Stufe (TALENT_EVERY) */
     UI.toast(`Stufe ${c.level}${top ? ' · HÖCHSTSTUFE' : ''} · +1 Statpunkt (C)${tal ? ' · +1 Talentpunkt (T)' : ''}`, 3200);
     log(`Du erreichst Stufe ${c.level}. Ein Statpunkt ist frei (Charakter, C)${tal ? ' und ein Talentpunkt (Talente, T)' : ` — der nächste Talentpunkt kommt auf Stufe ${c.level + TALENT_EVERY - c.level % TALENT_EVERY}`}.${top ? ' Höchststufe erreicht: weitere Erfahrung bringt keine Stufe mehr.' : ''}`, 'party'); }
   else log(`${c.name} erreicht Stufe ${c.level}.`, 'party');
@@ -4334,9 +4358,17 @@ function updateEnemy(e, dt) {
   if (e.prisoner) return captiveTick(e, dt);   /* T08 */
   if (S.dying && S.dying.killer === e.id) { e.vx = e.vy = 0; e.swing = 0; e.telegraph = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x);   /* T10: der Mörder bleibt stehen und zeigt auf den Toten */
     if (!S.dying.shown) { S.dying.shown = true; gesture(e, 'zeigen', 1600, p); if (HUMANOID.has(e.mtype) && MONSTERS[e.mtype].faction !== 'undead') float(e, 'Bleib liegen.', 'rgba(220,200,180,ALPHA)'); else sfx(MONSTERS[e.mtype].faction === 'undead' ? 'rattle' : 'growl', 0.8, 1); } return; }
+  const m = MONSTERS[e.mtype];
+  if (e.aggroId && !e.giveUp && huntsHero(e.aggroId, S.party)) {   /* Entwickler 02.10. (Despawn-Fehlersuche): ein Verfolger des Helden/seiner Gruppe/eines Koop-Helden verschwindet nie nur durch Abstand — erst wenn die Spur zu weit ist, gibt er auf und kehrt zum Ausgangspunkt zurück (wie BUG-088 „kein Weg“). Gegner-gegen-Gegner-Jagd (Heere etc.) nutzt diese Leine nicht (Lead-Hinweis Leistung) */
+    const ag0 = byId(e.aggroId);
+    if (ag0 && ag0.alive && !ag0.downed && ag0.map === e.map && dist(e, ag0) > 1600) {
+      e.giveUp = { id: ag0.id, until: performance.now() + 9000 }; e.aggroId = null; e.wary = clock() + 120; e.chaseT = 0; e.surging = false;
+      e.wander = { x: (e.anchor || e).x, y: (e.anchor || e).y }; e.aiTimer = 9000;
+      if (ag0 === p) { float(e, '?', 'rgba(200,190,160,ALPHA)', true); log(`${m.name} verliert deine Spur und kehrt zurück.`, 'combat'); }
+    }
+  }
   const far = dist(e, p) > 1100;
   if (far) { e.vx = e.vy = 0; return; }                       // Stufe C: außerhalb der Sicht keine Simulation
-  const m = MONSTERS[e.mtype];
   if (m.faction === 'undead') undeadAmbient(e, dt);
   if (e.ambush) {                                                              // Hinterhalt: still hinter der Deckung, bis man nah ist oder getroffen wird
     if (dist(e, p) > 230 && e.hp >= e.maxHp && p.alive) { e.vx = e.vy = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x); return; }
@@ -4975,6 +5007,7 @@ function updateNpc(e, dt) {
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
   if (e.panicT && panicStep(e, dt)) return;                            /* Folgen §5c: Panik nach Omegas Ende */
   const p = S.player;
+  if (e.act?.kind === 'gesture' && e.act.until > performance.now() && !e.angry && !e.fleeing && !e.downed && UI.dlgWith !== e) { e.vx = e.vy = 0; return; }   /* N2-S1: für die Geste kurz stehen bleiben (im Laufen zeigt poseOf keine Geste) */
   if (UI.dlgWith === e && UI.dialogueOpen() && !e.angry && !e.fleeing && !e.downed) {   /* Visuell D: im Gespräch bleibt die Figur stehen und schaut den Helden an */
     e.vx = e.vy = 0; const a = Math.atan2(p.y - e.y, p.x - e.x), ca = Math.cos(a), sa = Math.sin(a); e.aim = a;
     if (!(e.act?.until > performance.now())) e.facing = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 3 : 2) : (sa > 0 ? 0 : 1); return; }
@@ -5483,6 +5516,20 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   log(`${ST_NAME[R.st]}: ${it.name} — ${qn}${qi >= 3 ? '! Eine Arbeit, auf die man stolz sein kann.' : '.'}`, 'economy'); if (qi >= 3) UI.toast(`${qn.toUpperCase()}: ${it.name}`, 2200);
   return o;
 }
+/* UI-Scheibe 3 (ui_redesign §5 „Handwerk“, Entscheidung 01.10.: Dock): Daten für die Rezeptkarten — gleiche Regeln wie craftItem.
+   Gütechancen exakt aus craftQual (q gleichverteilt in [Fertigkeit·0,75 − 0,05, +0,35)), Königseisen hebt eine Stufe. */
+function craftChances(skill, ke) {
+  const a = skill / 100 * 0.75 - 0.05, b = a + 0.35, out = QUAL.map(() => 0); let lo = -1e9;
+  QUAL.forEach((Q, i) => { const o = Math.max(0, Math.min(b, Q[1]) - Math.max(a, lo)); out[Math.min(QUAL.length - 1, i + (ke ? 1 : 0))] += o / 0.35; lo = Q[1]; });
+  return out;
+}
+function craftView(st) {
+  const p = S.player, sk = ST_SKILL[st], skill = p.skills[sk] || 0;
+  return { st, name: ST_NAME[st], skillName: SKILL_NAMES[sk] || sk, skill: Math.round(skill), quals: QUAL.map(q => q[0]), ke: st === 'forge' && hasItem(p, 'koenigseisen'), mend: st !== 'kessel',
+    list: Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k]).map(([k, R]) => ({ key: k, n: R.n || 1, min: R.min || 0, need: Object.entries(R.need).map(([m, n]) => ({ key: m, n, have: matHave(m) })),
+      ok: Object.entries(R.need).every(([m, n]) => matHave(m) >= n) && skill >= (R.min || 0) })),
+    chances: craftChances(skill, false), chancesKE: craftChances(skill, true) };
+}
 function craftMenu(st, t) {
   const p = S.player, sk = ST_SKILL[st], skill = Math.round(p.skills[sk] || 0), list = Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k]);
   if (!S.flags.craftHint) { S.flags.craftHint = 1; log('Handwerk: Rezepte an Esse, Werkbank und Lagerfeuer (Kessel). Je höher die Fertigkeit, desto besser die Güte — Königseisen hebt eine Schmiedearbeit um eine Stufe.', 'quest'); }
@@ -5492,6 +5539,7 @@ function craftMenu(st, t) {
     ...list.map(([k, R]) => ({ text: `${ITEMS[k].name} — ${needTxt(R)} + Königseisen`, fn: () => { UI.closeDialogue(); craftItem(k, true); } })), { text: '[Zurück]', fn: () => craftMenu(st, t) }]) });
   if (st !== 'kessel') ch.push({ text: st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern (oder Prothesen warten)', fn: () => { UI.closeDialogue(); mendAt(t); } });
   ch.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
+  if (S.coop?.role !== 'guest' && UI.openModal) { UI.closeDialogue(); UI.openModal('craft', { st, t }); return; }   /* UI-Scheibe 3: Handwerk als Dock mit Rezeptkarten; die Gesprächsliste bleibt nur als Rückfall */
   UI.dialogue(p, `${ST_NAME[st]} — ${({ smithing: 'Schmieden', crafting: 'Handwerk', medicine: 'Medizin' })[sk]} ${skill}. Was stellst du her?`, ch);
 }
 function mendAt(t, skipMech = false) {
@@ -10349,7 +10397,7 @@ function camAim(p, dt) {
   R.cam.cz = (R.cam.cz || 0) + (cz - (R.cam.cz || 0)) * Math.min(1, dt / (cz ? 700 : 1400));
   R.cam.zoom = (R.cam.base || 1.3) * (1 + R.cam.cz);
   if (sd) return { x: (p.x + sd.x) / 2, y: (p.y + sd.y) / 2 - 10 };
-  if (UI.modalOpen === 'trade') { const dw = document.querySelector('#modal.dock .modal-frame')?.offsetWidth || 0, n = UI.tradeWith?.(), m2 = n && n.map === p.map && dist(n, p) < 300 ? n : p; return { x: (p.x + m2.x) / 2 + dw / 2 / (R.cam.zoom || 1), y: (p.y + m2.y) / 2 }; }   /* P7: Handels-Dock rechts — Held und Händler rücken nach links ins Freie */
+  if (UI.modalOpen && document.querySelector('#modal.dock')) { const dw = document.querySelector('#modal.dock .modal-frame')?.offsetWidth || 0, n = UI.modalOpen === 'trade' && UI.tradeWith?.(), m2 = n && n.map === p.map && dist(n, p) < 300 ? n : p; return { x: (p.x + m2.x) / 2 + dw / 2 / (R.cam.zoom || 1), y: (p.y + m2.y) / 2 }; }   /* P7: Handels-Dock rechts — Held und Händler rücken nach links ins Freie */
   const look = S.settings.motion ? 0.14 : 0;                    // Blickvorlauf zur Maus (max. ~40 px)
   return { x: p.x + clamp((mouse.wx - p.x) * look, -40, 40), y: p.y + clamp((mouse.wy - p.y) * look, -30, 30) };
 }
@@ -12436,15 +12484,23 @@ function partyInteraction() {
   }
 }
 
+/* Entwickler 02.10. (Despawn-Fehlersuche): eigene Funktionen statt Inline-Bedingungen, damit die Probe sie ohne echten Weltzustand
+   anzufassen prüfen kann. Wer gerade jagt (aggroId), räumt sich nie weg — erst nach dem Aufgeben (siehe updateEnemy, Leine 1600 px). */
+function staleArmySoldier(e, p) {
+  return e.kind === 'enemy' && e.armyId && !e.aggroId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400);
+}
+function staleEncounter(e, p) {
+  return (e.encounter || e.escortLost) && !e.follow && !e.lurk && !e.aggroId && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800);
+}
 function respawnTick() {
   ensureWallSpiders(true);   /* Entwickler 02.10.: Wächterspinnen kommen erst, wenn der Held weit genug weg ist (nie im Bild, kein Zufallszug beim Laden) */
   const p = S.player;
   const W = S.ents.world;
   for (let i = W.length - 1; i >= 0; i--) {
     const e = W[i];
-    if (e.kind === 'enemy' && e.armyId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400)) { W.splice(i, 1); continue; }
-    // Reise-Begegnungen räumen sich auf, sobald der Spieler weit weg ist
-    if ((e.encounter || e.escortLost) && !e.follow && !e.lurk && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800)) W.splice(i, 1);
+    if (staleArmySoldier(e, p)) { W.splice(i, 1); continue; }
+    // Reise-Begegnungen räumen sich auf, sobald der Spieler weit weg ist — aber erst, wenn sie nicht mehr jagen (aggroId)
+    if (staleEncounter(e, p)) W.splice(i, 1);
   }
   /* PERF-U: Gegner je Karte einmal sammeln statt je Spawngebiet (~80) die ganze Karte (~17 000 Einträge) zu filtern — das war alle 12 s
      ein Ruckler von ~80 ms. Neu Gespawnte kommen sofort dazu, damit überlappende Gebiete wie vorher zählen. */
@@ -12603,7 +12659,7 @@ function bandTick() {
   for (const b of bandsOf()) {
     const d = Math.hypot(p.x / TS - b.tx, p.y / TS - b.ty), here = S.ents.world.some(e => e.bandId === b.id && e.kind !== 'corpse' && e.alive !== false);
     if (d < 45 && !here) bandSpawn(b);
-    else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive));
+    else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && (!e.alive || e.aggroId)));   /* Entwickler 02.10. (Despawn-Fehlersuche): ein Hinterhalt-Bandit, der noch jagt (aggroId), bleibt — erst nach Aufgeben räumt respawnTick ihn weg */
     if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(styleOf() <= -40 ? 0.005 : 0.01)) {   /* T08: einen Schlächter meidet man */   /* Hinterhalt im Gebiet, nicht in der Stadt */
       const free = b.men - S.ents.world.filter(e => e.bandId === b.id && e.kind === 'enemy' && e.alive).length;   /* Fehlersuche: nie mehr Kämpfer stellen als die Bande noch hat (sonst wächst sie durchs Hin- und Herlaufen) */
       if (free > 0) { b.amb = S.minute; const a = rnd() * 6.283;
@@ -14200,11 +14256,38 @@ function bizMenu(npc, town) {
     else if (b.owner === 'player') {
       if (b.level < 3) opts.push({ text: `${ECO.bizName(b)} ausbauen (${ECO.upgradeCost(b)} Gold)`, fn: () => done(ECO.upgradeBiz(b)) });
       if (b.hired < 3) opts.push({ text: `Arbeiter für ${ECO.bizName(b)} anwerben (30 Gold, 3 Gold Lohn am Tag)`, fn: () => done(ECO.hireHand(b)) });
+      if ((b.kasse || 0) >= 1) opts.push({ text: `Kasse von ${ECO.bizName(b)} abholen (${Math.floor(b.kasse)} Gold)`, fn: () => done(bizCollect(b.id, true)) });   /* im Kontor der Stadt = vor Ort */
     }
   }
   opts.push({ text: 'Zurück', fn: () => ecoMenu(npc, town) });
   UI.dialogue({ name: `Betriebe — ${ECO.townName(town)}` }, (list.map(line).join('\n') || 'Hier arbeitet niemand in einem Gewerbe.') +
-    '\nOhne Arbeiter keine Ware. Dir gehört gut ein Drittel des Warenwerts, abzüglich Lohn.', opts);
+    '\nOhne Arbeiter keine Ware. Dir gehört gut ein Drittel des Warenwerts, abzüglich Lohn — es sammelt sich in der Kasse des Betriebs (Siedlung → Betriebe).', opts);
+}
+/* Betriebe-Reiter unter Siedlung (Entwickler 02.10.2026): eigene Betriebe mit Bild des Hauses, Ertrag (gestern, Schnitt seit Kauf), Arbeiter, Vorprodukte
+   und Ware mit Stadtvorrat, Kasse. Haus: das Gebäude des Gewerbes in der Stadt (TRADES.site), sonst das Wohnhaus eines dort arbeitenden Bewohners.
+   Abholen nur vor Ort (in der Stadt des Betriebs); erstes Abholen erklärt die Regel. */
+function bizHouse(b) {
+  const T = ECO.TRADES[b.trade]; if (!T) return null;
+  if (T.site) { const h = HOUSES.find(h => (h.map || 'world') === 'world' && T.site.includes(h.type) && townAt(h.x, h.y) === b.town); if (h) return h; }
+  const w = actorsOf('world').list.find(e => e.kind === 'npc' && e.alive && e.homeId && T.profs.includes(e.prof) && (e.homeTown === b.town));
+  return w ? HOUSES.find(h => h.id === w.homeId) || null : null;
+}
+const bizHere = () => { const p = S.player; return p && p.map === 'world' ? townAt(p.x / TS | 0, p.y / TS | 0, 4) : null; };
+function bizView() {
+  const C = ECO.census(), here = bizHere();
+  return (S.eco?.biz || []).filter(b => b.owner === 'player').map(b => { const T = ECO.TRADES[b.trade], t = S.towns?.[b.town] || { stock: {} };
+    return { id: b.id, name: ECO.bizName(b), trade: T.name, town: ECO.townName(b.town), level: b.level, hired: b.hired, folk: Math.round((C[b.town]?.work[b.trade] || 0) * 10) / 10,
+      made: b.made || 0, last: b.lastPr ?? null, avg: b.daysPr ? Math.round((b.sumPr || 0) / b.daysPr) : null, days: b.daysPr || 0, kasse: Math.floor(b.kasse || 0), here: here === b.town,
+      lost: S.war?.nodes?.[b.town]?.owner === 'undead' || !!S.razed?.[b.town], house: bizHouse(b),
+      inp: Object.entries(T.in || {}).map(([g, n]) => ({ g, n, stock: Math.floor(t.stock?.[g] || 0) })), out: Object.entries(T.out || {}).map(([g, n]) => ({ g, n, stock: Math.floor(t.stock?.[g] || 0) })) }; });
+}
+function bizCollect(id, force = false) {
+  const b = (S.eco?.biz || []).find(x => x.id === id && x.owner === 'player'); if (!b) return 'Kein eigener Betrieb.';
+  if (!force && bizHere() !== b.town) return `Abholen nur vor Ort — in ${ECO.townName(b.town)}.`;
+  const n = Math.floor(b.kasse || 0); if (n <= 0) return 'Die Kasse ist leer.';
+  b.kasse = (b.kasse || 0) - n; S.gold += n; log(`${ECO.bizName(b)}: Kasse abgeholt — ${n} Gold.`, 'economy');
+  if (!S.flags.kasseTaken) { S.flags.kasseTaken = 1; log('Die Kasse füllt sich jeden Tag mit dem Gewinn. Lass sie nicht zu voll werden: Fällt die Stadt, ist alles darin verloren.', 'quest'); }
+  return null;
 }
 function ordersMenu(npc, town) {
   const O = S.eco.orders, back = () => ordersMenu(npc, town);
@@ -14213,7 +14296,16 @@ function ordersMenu(npc, town) {
   opts.push({ text: 'Zurück', fn: () => ecoMenu(npc, town) });
   UI.dialogue({ name: 'Lieferaufträge' }, O.map(o => `${ECO.townName(o.town)} braucht ${o.n} ${ITEMS[o.good].name} bis Tag ${o.until}: ${o.reward} Gold`).join('\n') || 'Gerade fehlt nirgends etwas.', opts);
 }
+/* Schmiede-Dock (Entwickler 02.10.2026: „Schmiede bekommt eine richtige GUI“): dieselbe Regel wie bisher — Preis je Stück (1 − Zustand) × Wert × 0,5,
+   zusammen mindestens 5 Gold, Zustand danach 100 %, Beziehung +3 —, nur wählbar je Stück statt alles oder nichts. */
+const smithItems = () => { const p = S.player; return [...Object.entries(p.equip).filter(([, i]) => i).map(([k, i]) => ({ o: i, eq: k })), ...p.inv.map(i => ({ o: i }))].filter(x => x.o.cond != null && x.o.cond < 1 && ITEMS[x.o.key]); };
+const smithPrice = list => list.length ? Math.max(5, Math.round(list.reduce((n, i) => n + (1 - i.cond) * ITEMS[i.key].value * 0.5, 0))) : 0;
+function smithRepair(npc, list) {
+  const cost = smithPrice(list); if (!list.length) return 'Nichts gewählt.'; if (S.gold < cost) return 'Zu wenig Gold';
+  S.gold -= cost; list.forEach(i => i.cond = 1); if (npc?.key) addRel(npc.key, 3); log(`Ausrüstung instand gesetzt (${list.length} Stück, ${cost} Gold).`, 'economy'); UI.refreshHUD(); return null;
+}
 function repairAll(npc) {
+  if (S.coop?.role !== 'guest' && UI.openModal && npc?.kind === 'npc') { UI.closeDialogue(); UI.openModal('smith', npc); return; }   /* Schmiede-Dock; die Gesprächsfassung bleibt als Rückfall */
   const p = S.player;
   const items = [...Object.values(p.equip).filter(Boolean), ...p.inv].filter(i => i.cond != null && i.cond < 1);
   if (!items.length) return UI.dialogue(npc, '„Nichts davon braucht mich.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -15431,7 +15523,7 @@ function nodeState(c, k) {
 function learnNode(k) {
   const p = S.player, N = SKILL_TREE[k], st = nodeState(p, k);
   if (st !== 'open') return UI.toast(st === 'learned' ? 'Schon gelernt.' : st === 'barred' ? 'Du hast den anderen Schlüsselknoten dieses Zweigs gewählt.' : st === 'sealed' ? 'Dieser Zweig gehört einer Titelklasse, die du nicht hast.' : 'Erst einen Knoten davor lernen.');
-  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt auf jeder dritten Stufe.');
+  if ((p.skillPoints || 0) < 1) return UI.toast('Kein Talentpunkt frei. Einer kommt auf jeder zweiten Stufe und je bestandener Klassenprüfung.');
   (p.tree ||= {})[k] = 1; p.skillPoints--;
   const m0 = p.body ? Object.fromEntries(B.PARTS.map(k => [k, p.body[k].max || 1])) : null; recalc(p); if (N.fx.hp && m0) { for (const part of B.PARTS) p.body[part].hp = Math.min(p.body[part].max, p.body[part].hp * p.body[part].max / m0[part]); B.syncHp(p); }   // S15 Fehlersuche: je Körperteil skalieren
   if (N.grants) { syncHotbar(); log(`Neue Fähigkeit: ${ABILITIES[N.grants].name} (Leiste).`, 'party'); }   // aktiver Knoten
@@ -15710,13 +15802,16 @@ function chooseSuccessor() {
   coopHooks.heirCount?.(cands.length);   /* Koop: Mitspieler bekommen genau so viele Erben zur Wahl */
   UI.showSuccessors(cands, c => adoptSuccessor(c));
 }
-function adoptSuccessor(c) {
+/* Klassen und Talente, Scheibe 0: der Erbe ist ein neuer Mensch — eigene Sterne (Gefährtensterne fallen weg), keine fremden Prüfungen,
+   Punkte nach seiner Stufe. */
+function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.skyV = 1; talentTopUp(c); }function adoptSuccessor(c) {
   setTimeout(() => nemesisHeir(), 1500);   /* T10: der Erbe erfährt vom Ahnenfeind */
   const old = S.player; for (const k in S.fameStyle || {}) S.fameStyle[k] = Math.round(S.fameStyle[k] / 2);   /* T08: der Ruf der Klinge verblasst mit dem Erben */
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
   c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
+  heirTalents(c);   /* Scheibe 0: der Erbe hat sofort seine Talentpunkte nach der Regel (vorher 0 bis zum Neuladen, danach Stufe − 1) */
   c.knownClasses = [...new Set([c.currentClass, ...(c.knownClasses || [])])];
   c.abilities = [...(CLASSES[c.currentClass].abilities || [])];
   // Erbe: Gold, Lager, halber Ruf, Siedlung. Persönliche Waffen bleiben am Grab.
@@ -16640,6 +16735,8 @@ function debugSections() {
         storyNext = true; UI.dialogue(n, '„Hör gut zu. Was ich dir jetzt sage, erzähle ich nur einmal — und nur dir.“', [{ text: 'Ich mache es.', fn: () => UI.closeDialogue() }, { text: 'Was springt für mich heraus?', fn: () => UI.closeDialogue() }, { text: '50 Gold, und wir sind quitt.', fn: () => UI.closeDialogue() }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); },
       'Dialog: alle Emotes nacheinander über nächster Figur': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
         ['frage', 'ausruf', 'zorn', 'angst', 'freude', 'trauer'].forEach((k, i) => setTimeout(() => emote(n, k, 1300), i * 1400)); },
+      'NPC: Reaktion mit Geste (nächste Figur, alle Anlässe nacheinander)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
+        [['trauern', 'trauer'], ['jubeln', 'freude'], ['salutieren'], ['knien'], ['abwehren', 'angst'], ['zeigen', 'ausruf']].forEach((G, i) => setTimeout(() => reactPlay(n, G, S.player), i * 1900)); },
       'Dialog: verängstigte Figur ansprechen (nur Blase)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); n.afraid = clock() + 30; talk(n); },
     }],
     ['Animation', `${sel('dbDc', DEATH_KINDS.map(k => [k, ANIM_DEFS.death[k].name]))} ${sel('dbGest', Object.entries(ANIM_DEFS.gesture).map(([k, g]) => [k, g.name]))}`, {   /* Roadmap P8 */
@@ -16672,6 +16769,11 @@ function debugSections() {
       'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
       'Ankunftskarten zurücksetzen': () => { S.flags.seenTowns = {}; UI.toast('Städte zeigen ihre Karte wieder'); },
+    }],
+    ['Klassen: Talentpunkte, Prüfungen, Aufnahme (Scheibe 0 ff.)', '', {
+      'Klassen: Talentpunkte nach Regel auffüllen': () => { const n = talentTopUp(P()); UI.refreshHUD(); UI.toast(n ? `+${n} Talentpunkte (Regel)` : `Soll erreicht: ${talentTotal(P())} (frei ${P().skillPoints}, gelernt ${talentSpent(P())})`, 3600); },
+      'Klassen: Punkte-Rechnung zeigen': () => { const c = P(); UI.toast(`Stufe ${c.level}: 1 + ${Math.floor(c.level / TALENT_EVERY)} (jede ${TALENT_EVERY}. Stufe) + ${talentPass(c)} Prüfung(en) = ${talentTotal(c)} · frei ${c.skillPoints || 0} · gelernt ${talentSpent(c)}`, 5000); },
+      'Klassen: Stufe +2 (zeigt den Talentpunkt)': () => { for (let i = 0; i < 2; i++) { P().xp = P().xpNext; levelUp(P()); } UI.refreshHUD(); },
     }],
     ['Skilltree: Knoten-Icons und Linien (Visueller Umbau, 02.10.)', '', {
       'Talentpunkt geben': () => { p.skillPoints = (p.skillPoints || 0) + 1; UI.refreshHUD(); UI.toast('+1 Talentpunkt'); },
@@ -16712,7 +16814,7 @@ function debugSections() {
 // Suche über alle Einträge, Gruppen links, Abschnitte als Karten mit Knopf-Kacheln, „Zuletzt benutzt“. Datenquelle bleibt debugSections().
 const DBG_GROUPS = [['Welt & Reisen', /Bewegung|^Welt|Kerker|Turm|Luftschiff|Kamera|Eisenfeste/], ['Spieler & Ausrüstung', /Spieler|Gegenstände|Bionik|Kampf|Magie/],
   ['Blutkult & Varonheim', /Blutkult|Varonheim/], ['Ereignisse & Aufträge', /Ereignisse|Folgen|Krieg|Aufträge|Ahnen|Gefangene|Läden/],
-  ['Darstellung & Regie', /Grafik|Animation|Regie|Klang|Dialog/], ['Spielstand & Test', /Spielstand|Test/]];
+  ['Darstellung & Regie', /Grafik|Animation|Regie|Klang|Dialog/], ['Spielstand & Test', /Spielstand|Test/], ['Klassen & Talente', /^Klassen|^Sterne|^Skilltree/]];
 const dbgGroup = t => (DBG_GROUPS.find(([, re]) => re.test(t)) || ['Sonstiges'])[0];
 /* Einträge, die im Lauf der Zeit in fremde Abschnitte gerutscht sind, bekommen nach ihrem Präfix eine eigene Karte */
 const DBG_MOVE = [[/^Siedlung|^Gold-Sog/, 'Siedlung', 'Ereignisse & Aufträge'], [/^Geheime Orte/, 'Geheime Orte', 'Welt & Reisen'], [/^E[1-4]:/, 'Emergente Quests (E1–E4)', 'Ereignisse & Aufträge'],
@@ -17024,6 +17126,39 @@ export function selftest() {
     arrivePursuit('__a');
     return left && !early && came && lurked && !w2.aggroId && w2.wary > clock();
   }));
+  // Entwickler 02.10. (Despawn-Fehlersuche §„Gegner despawnen beim Weglaufen“): ein Verfolger darf nie allein durch Abstand
+  // verschwinden. Er bleibt heiß (Tiering) und jagt weiter, solange die Spur unter der Leine (1600 px) bleibt; jenseits davon
+  // gibt er auf (kehrt zum Anker zurück, wie BUG-088 „kein Weg“) — erst danach darf eine außer Sicht geratene Begegnung aufräumen.
+  ok('Despawn-Fehlersuche: Tiering friert einen jagenden Gegner nicht ein, auch weit weg; ein ruhiger friert dort ein', sandbox(() => {
+    const p = stage();
+    const hunter = spawnEnemy('bandit', '__a', 9, 9); hunter.aggroId = p.id;
+    const idle = spawnEnemy('bandit', '__a', 9, 10);
+    const T = { pool: [], hot: [], cold: [], mid: [], esc: new Map() };
+    tierPut(T, hunter, hunter.x + 1500, hunter.y, S.party);
+    tierPut(T, idle, idle.x + 1500, idle.y, S.party);
+    return T.hot.includes(hunter) && !T.hot.includes(idle) && !T.cold.includes(hunter) && !T.mid.includes(hunter);
+  }));
+  ok('Despawn-Fehlersuche: Verfolger innerhalb der Leine bleibt an der Jagd, jenseits davon gibt er auf und kehrt zum Anker zurück', sandbox(() => {
+    const p = stage();
+    const near = spawnEnemy('bandit', '__a', 9, 9); Object.assign(near, { aggroId: p.id, anchor: { x: near.x - 500, y: near.y + 40 } });
+    const far = spawnEnemy('bandit', '__a', 9, 10); Object.assign(far, { aggroId: p.id, anchor: { x: far.x - 500, y: far.y + 40 } });
+    p.x = near.x + 1500; p.y = near.y;      // innerhalb der Leine (1600 px)
+    combat = S.ents.__a.filter(e => e.alive); think(near, 16);
+    const staysHunting = near.aggroId === p.id && !near.giveUp && dist(near, p) > 1100;   // noch dran, auch wenn fern genug zum Stillstehen (BUG-108/1100)
+    p.x = far.x + 1700; p.y = far.y;         // jenseits der Leine
+    combat = S.ents.__a.filter(e => e.alive); think(far, 16);
+    const gaveUp = !far.aggroId && far.giveUp && far.giveUp.id === p.id && far.wary > clock()
+      && far.wander && far.wander.x === far.anchor.x && far.wander.y === far.anchor.y;
+    return staysHunting && gaveUp;
+  }));
+  ok('Despawn-Fehlersuche: eine aufgegebene Reise-Begegnung räumt sich außer Sicht auf, eine noch jagende nicht', (() => {
+    const pw = { map: 'world', x: 0, y: 0 };
+    const hunting = { kind: 'enemy', encounter: true, aggroId: 'held', x: 20000, y: 0 };
+    const given = { kind: 'enemy', encounter: true, aggroId: null, x: 20000, y: 0 };
+    const armyHunting = { kind: 'enemy', armyId: 'g:test', aggroId: 'held', x: 20000, y: 0 };
+    const armyGiven = { kind: 'enemy', armyId: 'g:test', aggroId: null, x: 20000, y: 0 };
+    return !staleEncounter(hunting, pw) && staleEncounter(given, pw) && !staleArmySoldier(armyHunting, pw) && staleArmySoldier(armyGiven, pw);
+  })());
   const guard = (x, y) => { const g = actor(x, y, { faction: 'valen' }); g.guard = true; g.equip.weapon = mkItem('spear'); return g; };
   const frames = (n, list) => { for (let i = 0; i < n; i++) { combat = S.ents.__a.filter(e => e.alive); for (const e of list) think(e, 16); } };
   ok('Reaktion: kämpfende Wache ruft Wachen im Umkreis herbei', sandbox(() => {
@@ -17732,7 +17867,7 @@ export function selftest() {
       ECO.sendWagon('kreuzweg', 4); E.my.raided = true; const g0 = S.gold; for (let d = 0; d < 6 && E.my.to; d++) { S.day++; ECO.ecoDay(); }
       const wagon = r.got === 10 && !E.my.to && E.my.at === 'kreuzweg' && S.gold > g0 && ECO.cargoOf(E.my) === 0;
       // 6. Betrieb kaufen: Einnahmen am nächsten Tag
-      const wb = E.biz.find(b => b.trade === 'weaver' && free(b) && ECO.bizWorkers(b, ECO.census()) > 0 && !b.owner); ECO.buyBiz(wb, ECO.census()); const g1 = S.gold; ECO.ecoDay(); const owned = wb.owner === 'player' && S.gold > g1;
+      const wb = E.biz.find(b => b.trade === 'weaver' && free(b) && ECO.bizWorkers(b, ECO.census()) > 0 && !b.owner); ECO.buyBiz(wb, ECO.census()); const g1 = S.gold, k1 = wb.kasse || 0; ECO.ecoDay(); const owned = wb.owner === 'player' && (wb.kasse || 0) > k1 && S.gold === g1;   /* Entwickler 02.10.2026: Gewinn geht in die Kasse des Betriebs, nicht ins Gold */
       // 7. Lieferauftrag erfüllen
       const o = { id: 'x', town: 'kreuzweg', good: 'salt', n: 3, reward: 50, until: (S.day | 0) + 3 }; E.orders = [o];
       const fail = !!ECO.deliver(o, 1, () => {}); let took = 0; const g2 = S.gold, okD = !ECO.deliver(o, 3, (g, n) => { took = n; });
@@ -18848,7 +18983,17 @@ export function selftest() {
     const z = ZONE[clamp(zoneTier('world', 10, 10), 0, 5)];
     return n10 && n11 && z[0] <= z[1];
   }));
-  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (Nutzer: jede dritte, gut ein Drittel der Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
+  ok('Klassen Scheibe 0: Talentpunkte = 1 + jede 2. Stufe + 1 je bestandener Prüfung, rückwirkend und nie weniger; Gastfigur bekommt beim Aufstieg Punkte; Erbe hat sofort Punkte nach der Regel', sandbox(() => {
+    const p = stage(); p.level = 20; p.tree = { c_tough: 1, c_strike: 1 }; p.skillPoints = 3; p.clsPass = { warrior: 1 };
+    const got = talentTopUp(p), rule = got === 7 && p.skillPoints === 10 && talentTopUp(p) === 0;   /* Soll 1 + 10 + 1 = 12, vorher 3 frei + 2 gelernt */
+    p.skillPoints = 40; const noCut = talentTopUp(p) === 0 && p.skillPoints === 40;
+    const g = actor(340, 300); g.coopHero = true; g.level = 3; g.xpNext = 100; g.xp = 100; g.skillPoints = 0; g.attrPoints = 0; g.tree = {}; levelUp(g);
+    const guest = g.level === 4 && g.skillPoints === 1 && g.attrPoints === 1;
+    const h = actor(360, 300); h.level = 12; h.tree = { g_tough: 1 }; h.skillPoints = 0; h.clsPass = { archer: 1 }; heirTalents(h);
+    const heir = h.skillPoints === 7 && !Object.keys(h.tree).length && !talentPass(h);   /* Stufe 12: 1 + 6 */
+    if (!(rule && noCut && guest && heir)) console.warn('Scheibe 0', { got, sp: p.skillPoints, guest: [g.level, g.skillPoints, g.attrPoints], heir: h.skillPoints });
+    return rule && noCut && guest && heir;
+  }));  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (Nutzer: jede dritte, gut ein Drittel der Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
     while (p.level < MAX_LEVEL) { sum += p.xpNext; p.xp = p.xpNext; levelUp(p); }
     const pts = p.skillPoints, attr = p.attrPoints, learnable = Object.keys(SKILL_TREE).length - Object.values(SKILL_TREE).filter(n => n.excl).length;
@@ -19880,6 +20025,18 @@ export function selftest() {
       UI.dialogue(n, 'y', [{ text: '[Gehen]' }]); const plain = !box.classList.contains('story') && document.querySelector('#dlg-choices button').dataset.k === 'leave';
       return still && full && shun && story && plain;
     } finally { UI.closeDialogue(); storyNext = false; }
+  }));
+  ok('Visuell N2-S1: Reaktionen zeigen Körpersprache — Freund jubelt, Verfeindeter wehrt ab; die Figur bleibt für die Geste stehen; Arbeitende werden nicht unterbrochen', sandbox(() => {
+    const p = stage(), R0 = { ...S.relations };
+    try {
+      p.titles = []; S.flags.garmadonSlain = false; S.flags.chainsBroken = false; S.bounty = {};   /* sandbox stellt Titel, Flaggen und Kopfgeld wieder her */
+      const n = actor(p.x + 40, p.y, { name: 'Freund' }); Object.assign(n, { map: '__a', key: 'probe_n2', prof: 'Bauer' }); S.relations.probe_n2 = 40;
+      reactLine(n); const joy = reactGest?.[0] === 'jubeln'; reactPlay(n, reactGest, p); n.vx = 3; updateNpc(n, 16);
+      const shown = n.act?.pose === 'jubeln' && n.vx === 0;
+      S.relations.probe_n2 = -40; reactLine(n); const foe = reactGest?.[0] === 'abwehren';
+      const w = actor(p.x - 40, p.y, { name: 'Schmied' }); Object.assign(w, { map: '__a' }); w.act = { kind: 'work', until: performance.now() + 5000 }; reactPlay(w, ['jubeln'], p);
+      return joy && shown && foe && w.act.kind === 'work';
+    } finally { for (const k of Object.keys(S.relations)) if (!(k in R0)) delete S.relations[k]; Object.assign(S.relations, R0); }
   }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
@@ -21103,6 +21260,29 @@ export function selftest() {
       S.difficulty = 'schwer'; QUESTS.c_pk = questOf(C); UI.openModal('quests'); const named = /Hanna/.test(document.getElementById('modal-body').textContent); UI.closeModal();
       return cod && chr && inv && parch && list && letter && hidden && named;
     } finally { delete QUESTS.c_pk; S.quests = q0; S.contracts = C0; if (d0 === undefined) delete S.difficulty; else S.difficulty = d0; UI.closeModal(); } }));
+  ok('UI-Scheibe 3: Siedlung, Gruppe und Handwerk angedockt (Charakter, Karte, Kodex, Chronik, Gepäck bleiben Vollbild); Handwerk = eine Karte je Rezept, Gütechancen ergeben zusammen 1, fehlendes Material sperrt den Knopf', sandbox(() => {
+    const p = stage(), M = document.getElementById('modal'), r0 = { ...S.res };
+    try { const dock = n => { UI.openModal(n); const d = M.classList.contains('dock'); UI.closeModal(); return d; };
+      const docks = ['settlement', 'party'].every(dock) && !['character', 'map', 'codex', 'chronicle', 'inventory'].some(dock);
+      S.res.iron = 10; S.res.wood = 10; p.skills.smithing = 20; craftMenu('forge', p);
+      const open = UI.modalOpen === 'craft' && M.classList.contains('dock'), cards = document.querySelectorAll('#modal-body .cr-card').length === Object.entries(RECIPES).filter(([k, R]) => R.st === 'forge' && ITEMS[k]).length;
+      const V = craftView('forge'), sum = Math.abs(V.chances.reduce((a, b) => a + b, 0) - 1) < 1e-9 && Math.abs(V.chancesKE.reduce((a, b) => a + b, 0) - 1) < 1e-9;
+      document.querySelector('#modal-body .cr-card[data-k="dagger"]')?.click(); const can = document.getElementById('cr-do') && !document.getElementById('cr-do').disabled;
+      S.res.iron = 0; UI.refreshModal(); const lock = document.getElementById('cr-do')?.disabled === true; UI.closeModal();
+      return docks && open && cards && sum && can && lock; } finally { Object.assign(S.res, r0); UI.closeModal(); } }));
+  ok('Betriebe: Gewinn sammelt sich in der Kasse (nicht im Gold), Verlust zahlt erst die Kasse; Abholen nur vor Ort; Besetzung leert die Kasse; alter Betrieb ohne Kasse = 0; Reiter zeigt den Betrieb', sandbox(() => {
+    const p = stage(), biz0 = (S.eco.biz || []).slice(), gold0 = S.gold, stock0 = { ...S.towns.eren.stock }, halt0 = S.halt?.['eren:smithy'], owner0 = S.war?.nodes?.eren?.owner, f0 = { ...S.flags };
+    try { if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen'; (S.halt ||= {}); delete S.halt['eren:smithy']; S.towns.eren.stock.ingot = 200;
+      const b = { id: '__pbz', town: 'eren', trade: 'smithy', level: 3, owner: 'player', hired: 3, made: 0 }; S.eco.biz = [...biz0.filter(x => x.owner !== 'player'), b]; S.gold = 100;
+      const zero = bizView().find(x => x.id === '__pbz')?.kasse === 0;
+      ECO.ecoDay(); const filled = b.lastPr > 0 && b.kasse === b.lastPr && S.gold === 100 && b.daysPr === 1;
+      const far = !!bizCollect('__pbz') && S.gold === 100; const k = Math.floor(b.kasse); const took = !bizCollect('__pbz', true) && S.gold === 100 + k && b.kasse < 1;
+      b.kasse = 5; S.towns.eren.stock.ingot = 0; ECO.ecoDay(); const lossK = b.kasse === 0 && S.gold === 100 + k - 4;
+      b.kasse = 40; if (S.war?.nodes?.eren) { S.war.nodes.eren.owner = 'undead'; ECO.ecoDay(); } const occ = !S.war?.nodes?.eren || b.kasse === 0;
+      if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen';
+      UI.openModal('business'); const tab = !!document.querySelector('#modal-body .bz-card') && !!document.getElementById('bz-take') && document.getElementById('modal').classList.contains('dock'); UI.closeModal();
+      return zero && filled && far && took && lossK && occ && tab;
+    } finally { S.eco.biz = biz0; S.gold = gold0; S.towns.eren.stock = stock0; if (halt0 != null) S.halt['eren:smithy'] = halt0; else delete S.halt['eren:smithy']; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = owner0; Object.keys(S.flags).forEach(x => { if (!(x in f0)) delete S.flags[x]; }); UI.closeModal(); } }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -21223,14 +21403,14 @@ function makeGuestHero(cfg, owner) {
   Object.assign(h, { prof: o.name, coopHero: true, coopOwner: owner, coopGold: o.gold, morale: 100, hotbar: GUEST_BAR.map(key => ({ type: 'item', key })), transient: false, visitor: false });
   h.xpNext = Math.round(60 * Math.pow(1.35, Math.min(9, h.level - 1)) * Math.pow(1.2, Math.max(0, h.level - 10)));
   o.gear.forEach(k => { const it = mkItem(k), sl = ITEMS[k].slot; if (['weapon', 'chest', 'offhand'].includes(sl) && !h.equip[sl]) h.equip[sl] = it; else addItem(h, k); });
-  addItem(h, 'bandage', 2); recalc(h); B.fullHeal(h); h.mana = h.maxMana;
+  addItem(h, 'bandage', 2); h.tree = {}; h.skillPoints = 0; h.clsPass = {}; h.skyV = 1; talentTopUp(h); recalc(h); B.fullHeal(h); h.mana = h.maxMana;   /* Scheibe 0: Talentpunkte nach Stufe */
   S.ents[h.map].push(h); S.party.push(h.id); return h;
 }
 // Koop: Gastcharaktere ohne verbundenen Gast warten in S.coopHeroes (gespeichert), nicht in der Welt oder Gruppe.
 function parkCoopHero(h) { if (!h) return; for (const k of Object.keys(S.ents)) S.ents[k] = S.ents[k].filter(e => e !== h); S.party = S.party.filter(id => id !== h.id);
   h.coopPilot = null; h.coopName = null; h.vx = h.vy = 0; h.dodge = null; (S.coopHeroes ||= {})[h.coopOwner] = h; }
 function unparkCoopHero(owner) { const h = S.coopHeroes?.[owner]; if (!h) return null; delete S.coopHeroes[owner]; const p0 = S.player, q = { x: p0.x + (solidTile(p0.map, p0.x + 28, p0.y) ? -28 : 28), y: p0.y }   /* direkt neben den Helden (freeSpotNear sucht in Städten große freie Flächen und landete weit weg) */;
-  Object.assign(h, { map: p0.map, x: q.x, y: q.y }); if (!h.alive) return null; S.ents[h.map].push(h); S.party.push(h.id); return h; }
+  Object.assign(h, { map: p0.map, x: q.x, y: q.y }); if (!h.alive) return null; talentTopUp(h); S.ents[h.map].push(h); S.party.push(h.id); return h; }
 function el2(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
 function titleLoop(t) {
@@ -21315,6 +21495,8 @@ function boot() {
     questReward,   /* Q-3: Lohnleiste im Abschluss-Brief */
     questGiver, bookBrief,   /* Scheibe 5: Auftragsbuch als Brief */
     tracker: trackerInfo,   /* Q-4: Tracker über dem Spielfeld */
+    craftView, craftDo: (k, ke) => craftItem(k, ke), craftMend: t => mendAt(t),   /* UI-Scheibe 3: Handwerk-Dock */
+    bizView, bizCollect, houseSprite: (h, lit) => HB.houseSprite(h, lit),   /* Betriebe-Reiter */
   });
   // Titelbildschirm
   $('legacy-summary').innerHTML = hasSave() ? (() => {
@@ -21347,6 +21529,10 @@ function boot() {
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
   if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
+}
+await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
+boot();
+ance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
 }
 await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

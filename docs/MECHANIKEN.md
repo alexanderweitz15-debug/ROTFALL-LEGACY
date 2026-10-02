@@ -1215,3 +1215,26 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kodex (H), Chronik (K) und Auftragsbuch (J)** sind jetzt Pergamentseiten mit dunkler Tinte; alle anderen Fenster bleiben dunkles Eisen. Die **Erbenwahl** nach dem Tod zeigt die Erben als Pergamentkarten.
 - **Auftragsbuch als Doppelseite:** Links die Liste mit Siegeln — gold = offen, leuchtend = bereit zur Abgabe, rot = erfüllt, schwarz zerbrochen und durchgestrichen = gescheitert; die rote Raute markiert den verfolgten Auftrag. „Ordnen“ nach Stand oder nach Entfernung (offene Aufträge; ändert nur die Anzeige). Rechts der Brief des gewählten Auftrags: Auftraggeber mit Bild (Bewohner-Aufträge auf „Sehr schwer“ ohne Namen und Bild), Stempel des Stands, Beschreibung, jedes Ziel mit Bild und Kerben, Ort mit Entfernung (Suchaufträge: kein Ziel auf der Karte), Frist oder Angriffszeit, Lohn (feste Aufträge bis zum Abschluss nur als Symbole), Knöpfe „Verfolgen“ und „Abbrechen“.
 - **Debug:** „UI: Pergament — Auftragsbuch/Kodex/Chronik öffnen“.
+
+## Angedockte Fenster und Handwerk mit Rezeptkarten (UI-Scheibe 3)
+- **Siedlung (B), Gruppe (G) und Handwerk** öffnen sich wie der Handel als Tafel am rechten Rand; die Welt bleibt links sichtbar, der Held rückt ins Freie. Ein Klick in die Welt oder Esc schließt die Tafel. Charakter, Gepäck, Karte, Kodex und Chronik bleiben Vollbild.
+- **Handwerk an Esse, Werkbank und Kessel:** Statt einer Liste von Sätzen erscheinen Rezeptkarten mit dem Bild des Ergebnisses und dem Material als Zeichen mit Zahl — rot, wenn es fehlt; ein Schloss mit Zahl zeigt die nötige Fertigkeit. Rechts die Bildkarte des Ergebnisses und die **erwartete Güte** als Balken (Grob, Solide, Gut, Meisterlich, Meisterstück — die Anteile sind die echten Chancen bei deiner Fertigkeit; die Maus zeigt die Prozente). Mit Königseisen erscheint ein zweiter Balken (eine Güte höher). Knöpfe: Herstellen, Mit Königseisen, Ausbessern. Doppelklick auf eine Karte stellt sofort her.
+- **Debug:** „Handwerk: Esse/Werkbank/Kessel hier öffnen“ öffnen jetzt die Tafel.
+
+## Körpersprache der Bewohner (Visuell N2)
+- Wenn dich jemand im Vorbeigehen anspricht, zeigt seine Figur das jetzt auch:
+  - **Trauer im Ort:** trauern, mit Tränen-Zeichen.
+  - **Freund, Garmadons Sturz, gebrochene Ketten:** jubeln.
+  - **Dein Rang in ihrer Fraktion:** Wachen salutieren; einfache Leute salutieren, ab Rang 3 knien sie.
+  - **Angst vor dir oder Kopfgeld auf dich:** abwehren.
+  - **Verfeindet:** abwehren, mit Zornzeichen.
+  - **Leiche in der Nähe:** Erschrecken.
+- Für die Geste bleibt die Figur kurz stehen. Wer gerade arbeitet oder sitzt, macht keine Geste.
+- Debug-Eintrag: „NPC: Reaktion mit Geste“.
+
+## Betriebe: Kasse und Reiter „Betriebe“ (02.10.2026)
+- **Kasse:** Der tägliche Gewinn eines eigenen Betriebs (gut ein Drittel des Warenwerts, abzüglich 3 Gold Lohn je angeworbener Hand) geht nicht mehr direkt in dein Gold, sondern in die **Kasse des Betriebs**. Macht ein Betrieb Verlust, zahlt zuerst die Kasse, den Rest dein Beutel.
+- **Abholen nur vor Ort:** in der Stadt des Betriebs über Siedlung (B) → Reiter **Betriebe** („Abholen“) oder im Handelskontor der Stadt („Kasse … abholen“). Anderswo zeigt der Knopf „Nur vor Ort“.
+- **Gefahr:** Fällt die Stadt an die Toten oder wird sie zerstört, ist die ganze Kasse verloren (Protokollzeile).
+- **Reiter Betriebe:** links jeder eigene Betrieb mit dem Bild seines Hauses und dem Stand der Kasse, oben die Summe aller Kassen; rechts der gewählte Betrieb: Haus groß, Ertrag gestern und Schnitt je Tag seit dem Kauf, Arbeiter (aus der Stadt / angeworben), Ware gestern, Vorprodukte und Ware je Arbeiter mit dem Vorrat der Stadt, Kasse mit Abholen.
+- **Hinweise:** Beim ersten gefüllten Tag erklärt das Protokoll die Kasse; beim ersten Abholen die Gefahr. Alte Stände: Betriebe beginnen mit leerer Kasse.

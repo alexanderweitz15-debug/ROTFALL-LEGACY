@@ -192,3 +192,20 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - **Spacing:** falsch im Siedlungsfenster, in Charakter/Inventar und in allen Menüs, die man oben öffnen kann. Alle überarbeiten.
 - **Gegner-Despawn:** Verfolger verschwinden, wenn man wegrennt. Das soll nicht so sein.
 - **Talentpunkte:** jede 2. Stufe plus 1 je bestandener Klassenprüfung, rückwirkend für alte Stände. Die anderen Klassen-Entscheidungen sind noch offen (PROPOSALS/klassen_talente.md §5).
+- **Klassen und Talente (22:10, Antworten auf PROPOSALS/klassen_talente.md §5):**
+  1. Punkte: jede 2. Stufe plus 1 je bestandener Prüfung, rückwirkend.
+  2. Ein eigenes Sternbild je Klasse (19), nicht je Grundlinie.
+  3. Mehrere Klassen: Wertesterne wirken immer, Schlüssel- und Fähigkeitssterne nur bei der aktiven Klasse.
+  4. Prüfung für Grund- und Folgeklassen. Paladin, Todesritter, Hochpaladin und die dunklen Klassen behalten ihre eigenen Aufträge und bekommen nur die Szene.
+  5. Scheitern: beliebig oft wiederholbar.
+  6. Kosten wie heute (Vertrauen bzw. Lehrgeld) plus Prüfung.
+  7. Aufnahme-Szene 5–6 s, die Welt pausiert, ESC überspringt.
+  8. Alte Stände behalten ihre Klassen; die Prüfung ist für den Bonuspunkt nachholbar.
+  9. Gelernte Knoten bleiben; einmal kostenlos neu verteilen.
+  10. Titelklassen: Szene bei Erwerb und Grad-Weihe plus eigenes Sternbild.
+  11. Vampir und Grubenhäuptling bekommen ein eigenes Sternbild.
+  12. Machtgrenze: höchstens so viel wie heute ein voller Kampfzweig (mit simFight gemessen).
+  13. Gefährten bekommen einen KLEINEN EIGENEN BAUM. Umfang und Punktequelle schlägt der Agent vor.
+  14. Koop: jeder macht seine Prüfungen selbst; Gäste bekommen beim Aufstieg Talentpunkte (Fehler beheben).
+  15. Vergessen: alles bei jedem Lehrer, gegen Gold wie heute.
+  16. Die Prüfungsaufträge werden wie in Tabelle 2.2 übernommen.

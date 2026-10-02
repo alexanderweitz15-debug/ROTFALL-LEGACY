@@ -32,3 +32,24 @@ Schmal (< 820 px): Protokoll ist ausgeblendet → der Meldungsfluss ist dort die
 - Aufträge Q-2 grün um 17:01 (Geber-Siegel, Ansprech-Zeile, Karte/Minikarte).
 - Aufträge Q-3 grün um 17:01 (Auftragsbrief im Gespräch, Annahme-Brief fliegt zum Reiter, Steckbrief mit Gesicht, Lohnleiste mit Anteil-Kreis).
 - Aufträge Q-4 grün um 17:08 (Tracker groß + 3 klein, klappt im Kampf ein, Zielmarker nur verfolgt/nicht Sehr schwer, Wegmarken, Karte: Gebietskreis, gefüllt/hohl). Selbsttest 436/437, rot nur „Ratgeber …“ (fremd: Talent-Tipp seit heute aus).
+- Scheibe 5 grün um 22:06 (Pergament: Kodex, Chronik, Auftragsbuch als Doppelseite mit Siegeln + Brief, Erbenkarten). Selbsttest 438/438. Nicht gebaut: Kartenausschnitt im Brief (Q11-2) — drawAtlas zentriert nur auf den Helden (atlas.js, Karte-Agent).
+- Scheibe 3 (Docks) grün um 22:09: Siedlung, Gruppe, Handwerk angedockt; Handwerk mit Rezeptkarten und Güte-Balken. Selbsttest 439/439.
+
+## Spacing-Durchgang (Entwickler 02.10.2026) — Befunde (eigener Tab, 1280×720, 1024×700, 760×640)
+- **Alle Fenster mit Unterreitern (Charakter, Mächte):** Die Reiter „Werte (C) / Zauber (Z) / Effekte (X)“ bzw. „Fraktionen (F) / Chronik (K)“ liegen übereinander und über dem Titel. Ursache: die Regel für den Schließen-Knopf (`.modal-head button{width:28px;height:28px}`) traf auch die Reiter. → Reiter eigene Breite, kein Umbruch.
+- **Gepäck:** Bei ≤ 1180 px und < 820 px blieb das Drei-Spalten-Raster (`.inv2` überschrieb die Schmal-Regel) — bei 760 px war die Taschenspalte 78 px breit (eine Zelle). → 1180: Tasche + Figur nebeneinander, Detail darunter; < 820: alles untereinander. Traglast-Zähler bricht um → bleibt in einer Zeile.
+- **Charakter:** ≤ 1180 px steht die Körpertafel zuerst und füllt das ganze erste Bild (Körperbild bis 460 px hoch). → Körperbild dort höchstens 260 px.
+- **Siedlung (Dock):** einspaltig ist der Bauplan einer gewählten Karte weit unten (Scrollen nach jedem Klick). → im Dock zwei Spalten: Baukarten links, Lage/Bauplan/Prioritäten rechts, Bestand darunter über volle Breite.
+- **Optionen:** jede Wahl (Blut, Stil, Schadenszahlen, Ton, Textgröße) als volle Zeile untereinander → lange Liste. → Wahlknöpfe nebeneinander (umbrechend).
+- **Mächte:** Rangtabelle: Spalte mit dem Rangnamen zu schmal („→ Rekrut“ bricht). → Mindestbreite.
+- **Kein Überlauf** (horizontal) in irgendeinem Fenster bei 760 px gemessen (Gepäck, Charakter, Siedlung, Gruppe, Karte, Aufträge, Mächte, Chronik, Kodex, Optionen, Handwerk).
+- **Raster:** Abstände waren frei gewählt (6, 8, 10, 12, 14, 16, 18, 20, 22 px). → Tokens `--sp1..--sp6` (4/8/12/16/24/32 px) in `:root`; Kopf, Körper, Abschnitte, Knopfreihen und Raster der Fenster laufen darüber.
+- Spacing-Durchgang grün um 22:21 (Tokens --sp1..6, Reiter-Überlappung behoben, Gepäck/Charakter schmal, Siedlungs-Dock zweispaltig, Optionen-Knopfreihen, Rangtabelle). Selbsttest 444/444.
+- Betriebe-Reiter grün um 22:21 (Kasse statt Gold, Abholen vor Ort im Reiter oder im Kontor, Besetzung/Zerstörung leert die Kasse, Verlust erst aus der Kasse dann aus dem Gold). Selbsttest 444/444.
+
+## Betriebe-Reiter — Gate
+- **Bestand:** economy.js ecoDay (Ertrag 35 % des Warenwerts − 3 Gold je Angeworbenem), bizMenu im Kontor (kaufen, ausbauen, anwerben), Effekt „Besitz“, HB-18 (Verlust trifft das Gold).
+- **Entschieden (Entwickler):** Gewinn in die Kasse, Abholen vor Ort oder im Reiter, Besetzung/Zerstörung (vorläufig) ganze Kasse weg; alte Stände ohne Feld = 0.
+- **Abgeleitet:** „vor Ort“ = der Held steht in der Stadt des Betriebs (townAt mit 4 Feldern Rand) oder spricht im Kontor dieser Stadt. Schnitt = über alle Tage seit Kauf (kein erfundenes Fenster). Haus-Bild: Gebäude des Gewerbes (TRADES.site), sonst Wohnhaus eines dort arbeitenden Bewohners.
+- **Regeländerung an einer Probe:** „Nutzer S13 Wirtschaft … 6. Betrieb kaufen“ prüfte „Gold steigt am nächsten Tag“ → jetzt „Kasse steigt, Gold bleibt“ (Entwicklerentscheidung, nicht aufgeweicht).
+- **OFFEN:** (1) Was nimmt ein Überfall auf die Stadt (raidDamage, Verteidigung gescheitert) aus der Kasse? — nicht ableitbar, nicht gebaut. (2) Verlusttage: zahlt die Kasse zuerst, Rest das Gold — so gebaut, weil HB-18 Verluste echt haben will; bitte bestätigen. (3) Abholen direkt am Haus (E an der Tür) nicht gebaut: ein Betrieb kennt sein Haus nicht fest (bei Gewerben ohne eigenes Gebäude nur über einen Bewohner ableitbar) — braucht eine Zuordnung Betrieb → Haus.
