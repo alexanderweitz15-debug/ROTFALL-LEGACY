@@ -918,6 +918,8 @@ function settleUI(body) {
     <div><h3>${st.name}</h3>
       <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()}</div>
+      ${st.stage === 2 ? '<div class="ledger" style="color:#d0563f">Schutzlos: Niemand arbeitet, Fremde meiden das Lager. Wirb in einer Schenke Lagerwachen an (beim Wirt, 80 Gold).</div>' : st.stage === 1 ? '<div class="ledger" style="color:#c9a24a">Geschwächt: Viele Schützer sind gefallen.</div>' : ''}
+      ${A.campGuards?.() ? `<div class="ledger">Lagerwachen: ${A.campGuards()} (je 5 Gold Sold am Tag)</div>` : ''}
       ${(() => { const I = A.raidInfo?.(); if (!I) return ''; return `<div class="ledger" title="Reichtum lockt an, wer in der Nähe ist. Schutzgeld an eine Bande schützt auch das Lager.">Bedrohung · Reichtum ${I.W} · Überfallgefahr je Nacht <b>${Math.round(I.ch * 100)} %</b><br><small>${I.L.length ? I.L.map(x => `◆ ${x.label} — ${x.dist} Felder`).join(' · ') : 'Keine Macht in der Nähe, nur Wölfe.'}</small></div>`; })()}
       ${(() => { const m = Math.round(st.morale ?? 60), B = A.moraleBand ? A.moraleBand(m) : { name: '', mul: 1 }, col = m >= 70 ? '#89a05a' : m >= 40 ? '#c9a24a' : m >= 20 ? '#c07a3a' : '#b0412e';
         return `<div class="ledger" title="Moral wirkt auf Ertrag und Zuzug. Ursachen: Brunnen, Ruhe, Anführer da, Hunger, Überbelegung, Tote.">Moral <b>${m}</b> · ${B.name}

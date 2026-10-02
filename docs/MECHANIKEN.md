@@ -988,3 +988,16 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Abgewehrt ohne Tote: Moral +6.
   - Bist du nicht auf der Karte, wird abgewogen: Siedler, Palisaden, Tor, Wachturm und Dodon gegen die Angreifer.
 - Debug: „Siedlung: Reichtum und Quellen anzeigen“, „Überfall jetzt“, „Überfall abstrakt auswürfeln“.
+
+## Die Siedlung wird schutzlos (Siedlung M4)
+- **Schützer** sind Siedler, Lagerwachen und Dodon. Ab 3 Schützern zählt das Lager seine Verluste: Tod oder Verschleppung zählen, Weggang nicht.
+- **Stufen:**
+  - ab 50 % Verlust: geschwächt;
+  - ab 80 % Verlust oder ohne Schützer: schutzlos. Dann gibt es Moral −15, und niemand arbeitet oder baut. Es kommt kein Zuzug, und täglich flieht mit 30 % ein Siedler, außer die Moral liegt bei 50 oder mehr. Überfälle werden 1,5-mal so wahrscheinlich.
+- Die Siedlung wird nie übernommen, nur geplündert.
+- **Ersatz kommt nur durch dich:**
+  - Beim Wirt wirbst du Lagerwachen an (80 Gold, dann 5 Gold Sold am Tag). Sie kommen am nächsten Morgen, höchstens 1 + Bauten/4. Ohne Sold gehen sie.
+  - Neue Siedler zählen ebenfalls.
+  - Jeder Ersatz senkt den Verlust um 1. Ist genug Ersatz da, fasst das Lager wieder Mut (Moral +5).
+- Das Siedlungsfenster zeigt die Stufe in Rot oder Gelb und nennt den Ausweg.
+- Debug: „Siedlung: Lagerwache sofort“, „Siedler töten bis schutzlos“, „Schutz-Status“.
