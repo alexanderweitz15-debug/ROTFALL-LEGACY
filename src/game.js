@@ -463,7 +463,7 @@ function buyFarmAnimal(a) {
   S.gold -= price; H[a]++; ensureFarmAnimals(); log(`${a === 'cow' ? 'Eine Kuh' : 'Ein Schaf'} für ${S.settlement.name}. Der Händler treibt es dir hin.`, 'economy'); UI.refreshHUD();
 }
 function beastMenu(npc) {
-  const back = () => talk(npc);
+  const back = () => beastMenu(npc);   /* Entwickler 02.10.: „Zurück“ landete über talk() wieder hier — das Menü ging nie zu */
   UI.dialogue(npc, petOf() ? `„${petOf().petName} sieht gut aus. Ein zweites Tier? Das hält niemand lange durch.“` : '„Treu, ehrlich, beißt nur, wen du willst. Welches?“',
     [...(petOf() ? [] : BEAST_WARES.map(([m, n, g]) => ({ text: `${n} — ${g} Gold`, fn: () => {
       if (S.gold < g) return UI.toast('Dafür reicht dein Gold nicht.');
@@ -472,7 +472,7 @@ function beastMenu(npc) {
     ...(S.mount?.kind === 'mech_horse' ? [{ text: `${S.mount.name} warten (1 Automatenkern)`, fn: () => { oilMount(); back(); } }] : []),
     ...(farmCap() ? [{ text: 'Kuh für deinen Hof — 70 Gold', fn: () => { buyFarmAnimal('cow'); back(); } }, { text: 'Schaf für deinen Hof — 40 Gold', fn: () => { buyFarmAnimal('sheep'); back(); } }] : []),   // S14: eigener Hof
     ...(petOf() ? [{ text: `${petOf().petName} freilassen`, fn: () => { const e = petOf(); e.servant = null; e.pet = false; e.transient = true; e.anchor = { x: e.x + 600, y: e.y }; S.pet = null; log(`${e.petName} trottet davon.`, 'party'); back(); } }] : []),
-    { text: 'Zurück', fn: back }]);
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
 function ensureBeastTraders() {
   for (const town of ['kreuzweg', 'northcity', 'kupferhafen']) {
@@ -2102,7 +2102,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureWallSpiders(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin], cap = cfg.start === 'varonheim' && !!TOWN_PLAN.varonheim;
@@ -2326,7 +2326,7 @@ export function continueGame(given = null, retried = false) {                   
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureWallSpiders(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
@@ -2597,6 +2597,7 @@ function drawMini(dt) {
   const tp = S.track && S.quests[S.track]?.state === 'active' ? questPoint(S.track) : null;
   if (tp && tp.x != null) { let x = cv.width / 2 + (tp.x - p.x / TS) * sc, y = cv.height / 2 + (tp.y - p.y / TS) * sc; x = clamp(x, 6, cv.width - 6); y = clamp(y, 6, cv.height - 6);
     c.fillStyle = '#e0b75a'; c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x + 5, y); c.lineTo(x, y + 6); c.lineTo(x - 5, y); c.fill(); }
+  for (const [g, m] of SEALS) if ((g.map || 'world') === 'world' && !(m.near)) mapSeal(c, cv.width / 2 + (g.x - p.x) / TS * sc, cv.height / 2 + (g.y - p.y) / TS * sc, m.k, 0.8);   /* Visuell Q6-6: Geber in der Nähe */
   for (const mm of partyMembers()) { c.fillStyle = '#9fb0c0'; c.fillRect(cv.width / 2 + (mm.x - p.x) / TS * sc - 1.5, cv.height / 2 + (mm.y - p.y) / TS * sc - 1.5, 3, 3); }
   c.fillStyle = '#1a140c'; c.fillRect(cv.width / 2 - 3, cv.height / 2 - 3, 6, 6); c.fillStyle = '#f2d27a'; c.fillRect(cv.width / 2 - 2, cv.height / 2 - 2, 4, 4);
   c.strokeStyle = '#4d4227'; c.lineWidth = 2; c.strokeRect(1, 1, cv.width - 2, cv.height - 2);
@@ -4871,13 +4872,13 @@ function spiderBurst(c) {
 function spiderWalls() {
   return HOUSES.filter(b => b.map === 'world' && ((b.type === 'smithy' && b.town === 'aurelheim_land') || (b.type === 'factoryhall' && !townAt(b.x + (b.w >> 1), b.y + (b.h >> 1), 0))));
 }
-function ensureWallSpiders() {
-  if (globalThis.__noSpider) return;   /* TEMP-BISECT */
-  const dead = S.spidersDead || {}, day = S.day | 0;
+function ensureWallSpiders(hidden = false) {
+  const dead = S.spidersDead || {}, day = S.day | 0, p = S.player;
   for (const b of spiderWalls()) {
     if (S.ents.world.some(e => e.wallOf === b.id && e.alive) || (dead[b.id] != null && day < dead[b.id] + 7)) continue;
+    if (hidden && p?.map === 'world' && (Math.hypot((b.x + b.w / 2) * TS - p.x, (b.y + b.h) * TS - p.y) < 700 || inView('world', (b.x + b.w / 2) * TS, (b.y + b.h) * TS))) continue;
     const tx = b.x + Math.max(1, (b.w >> 1) + ((b.seed | 0) % 3) - 1), ty = b.y + b.h - 1;
-    const e = spawnEnemy('waechterspinne', 'world', tx, ty + 1, { noVariant: true }); if (!e) continue;
+    const e = spawnEnemy('waechterspinne', 'world', tx, ty + 1, { noVariant: true, level: zoneLevel('world', tx, ty + 1, MONSTERS.waechterspinne) }); if (!e) continue;
     e.x = tx * TS + TS / 2; e.y = (ty + 1) * TS + 2;   // Fuß der Wand; gezeichnet hängt sie 24 px höher an der Wand (render.js)
     Object.assign(e, { cling: true, wallOf: b.id, transient: true, anchor: { x: e.x, y: e.y } });
   }
@@ -4894,18 +4895,18 @@ function netCatch(t, src) {
 /* Blutschöpfer: sucht Wehrlose (am Boden) unter seinen Feinden und trinkt — 1,2 s, Taumeln bricht ab. Das Opfer blutet schneller aus
    (−4 s bis zum Tod) und ist ausgezehrt; er selbst heilt 30 %, jeder Kultist (Blutkult) bis 140 px um ihn 20 %. Ein Treffer (oder Taumeln)
    bricht das Trinken ab. Werte vorläufig. */
-const vitOf = c => c.body ? B.vital(c) : c.hp;
+const bodyHp = c => c.body ? B.PARTS.reduce((a, k) => a + Math.max(0, c.body[k].hp), 0) : c.hp;   /* jeder Treffer, auch an Gliedern */
 const DRINK = { t: 1200, cd: 6000, bleed: 4000, self: 0.3, ally: 0.2, R: 140 };
 function drinkerAI(e, tgt, sp, dt) {
   if (e.drink) { const v = byId(e.drink.id); e.vx = e.vy = 0;
-    if (!v || !v.alive || !v.downed || dist(e, v) > 50 || e.stagger > 0 || vitOf(e) < e.drink.hp - 0.5) { e.drink = null; if (dist(e, S.player) < 600) float(e, 'abgebrochen', 'rgba(200,190,160,ALPHA)'); return false; }
+    if (!v || !v.alive || !v.downed || dist(e, v) > 50 || e.stagger > 0 || bodyHp(e) < e.drink.hp - 0.01) { e.drink = null; if (dist(e, S.player) < 600) float(e, 'abgebrochen', 'rgba(200,190,160,ALPHA)'); return false; }
     e.drink.t -= dt; if (e.drink.t > 0) return true;
     e.drink = null; e.drinkCd = performance.now() + DRINK.cd; drinkFrom(e, v); return true; }
   if ((e.drinkCd || 0) > performance.now()) return false;
   const v = S.ents[e.map].filter(t => t !== e && t.alive && t.downed && (t.kind === 'player' || t.kind === 'npc') && isHostile(e, t) && dist(e, t) < 260).sort((a, b) => dist(e, a) - dist(e, b))[0];
   if (!v) return false;
   if (dist(e, v) > 30) { seek(e, Math.atan2(v.y - e.y, v.x - e.x), sp, dt, v); return true; }
-  e.drink = { id: v.id, t: DRINK.t, hp: vitOf(e) }; e.aim = Math.atan2(v.y - e.y, v.x - e.x); e.vx = e.vy = 0; float(e, 'trinkt!', 'rgba(220,60,60,ALPHA)'); fx(v.x, v.y - 6, 'blood', 6);
+  e.drink = { id: v.id, t: DRINK.t, hp: bodyHp(e) }; e.aim = Math.atan2(v.y - e.y, v.x - e.x); e.vx = e.vy = 0; float(e, 'trinkt!', 'rgba(220,60,60,ALPHA)'); fx(v.x, v.y - 6, 'blood', 6);
   if (!S._quiet && !S.flags.drinkHint && (v === S.player || S.party.includes(v.id))) { S.flags.drinkHint = 1; log('Ein Blutschöpfer trinkt von einem, der am Boden liegt! Das Opfer blutet schneller aus, der Kult um ihn heilt sich. Schlag ihn — jeder Treffer bricht das Trinken ab.', 'combat'); UI.toast('ER TRINKT', 2000); }
   return true;
 }
@@ -7648,6 +7649,12 @@ function giverMark(npc) {
   return offer ? { k: 'offer' } : null;
 }
 const sealWord = t => { const m = SEALS.get(t); return m ? ` · <b>${m.k === 'turnin' ? 'Abgabe' : 'Auftrag'}</b>` : ''; };   /* Q1-9: Hinweis in der Ansprech-Zeile */
+function mapSeal(c, x, y, k, s = 1) {                                  /* kleines Wachssiegel für Welt- und Minikarte */
+  c.fillStyle = '#9a3226'; c.fillRect(x - 3 * s, y + 2 * s, 2 * s, 4 * s); c.fillRect(x + 1 * s, y + 2 * s, 2 * s, 4 * s);
+  c.fillStyle = '#140f08'; c.beginPath(); c.arc(x, y, 5.2 * s, 0, 7); c.fill();
+  c.fillStyle = k === 'turnin' ? '#f3d77a' : '#c9a24a'; c.beginPath(); c.arc(x, y, 4 * s, 0, 7); c.fill();
+  c.fillStyle = k === 'turnin' ? '#3a2a10' : '#6e4f1c'; if (k === 'turnin') { c.fillRect(x - 2 * s, y, s, s); c.fillRect(x - s, y + s, s, s); c.fillRect(x, y, s, s); c.fillRect(x + s, y - s, s, s); c.fillRect(x + 2 * s, y - 2 * s, s, s); } else c.fillRect(x - s, y - s, 2 * s, 2 * s);
+}
 function boardMark(b) { const town = boardTown(b); if (!town) return null;
   if ((S.contracts || []).some(C => C.town === town && C.giver === 'board' && conReady(C))) return { k: 'turnin' };
   return boardShut(town) ? null : { k: 'offer' }; }
@@ -8386,7 +8393,7 @@ let arrT = 0, keepT = 0, guideT = 0, guideLast = -1e9;
 // (Debug „Ratgeber an/aus“, S.settings.tips === false). Läuft nicht in Zwischenszenen, Dialogen oder im Koop als Gast.
 const GUIDE = [
   ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
-  ['talent', p => (p.skillPoints || 0) > 0 && (S.flags.playMin || 0) >= 4, 'Du hast einen Talentpunkt frei. T öffnet die Talente.'],
+  ['talent', () => false, 'Du hast einen Talentpunkt frei. T öffnet die Talente.'],   /* Talentbäume versteckt (02.10.2026) */
   ['attr', p => (p.attrPoints || 0) > 0, 'Freie Attributpunkte: C öffnet deinen Charakter.'],
   ['board', p => p.map === 'world' && !activeCons().length && S.ents.world.some(e => e.type === 'board' && dist(e, p) < 200), 'Am Anschlagbrett (E) hängen Aufträge. J zeigt dein Tagebuch; der Pfeil am Bildrand zeigt das Ziel des verfolgten Auftrags.'],
   ['fight', p => S.ents[p.map]?.some(e => e.kind === 'enemy' && e.alive && e.aggroId === p.id && dist(e, p) < 250), 'Kampf: Q weicht aus. Drei Schläge ohne Pause ergeben einen Wuchtschlag. Wo du triffst, zählt — Arme, Beine, Kopf.'],
@@ -12363,6 +12370,7 @@ function partyInteraction() {
 }
 
 function respawnTick() {
+  ensureWallSpiders(true);   /* Entwickler 02.10.: Wächterspinnen kommen erst, wenn der Held weit genug weg ist (nie im Bild, kein Zufallszug beim Laden) */
   const p = S.player;
   const W = S.ents.world;
   for (let i = W.length - 1; i >= 0; i--) {
@@ -15750,6 +15758,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
     c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6);
     const at = place(`${t.name.split(' ')[0]}: ${cls}`, x, y, '10px Spectral, serif'); if (at) { c.fillStyle = '#e8c070'; c.font = '10px Spectral, serif'; c.textAlign = 'center'; c.fillText(`${t.name.split(' ')[0]}: ${cls}`, at[0], at[1]); }
   }
+  for (const g of actorsOf('world').list) { if (g.kind !== 'npc' || !g.key || !S.codex?.met?.[g.key]) continue; const m = giverMark(g); if (m) mapSeal(c, ox + g.x / TS * sc, oy + g.y / TS * sc, m.k); }   /* Visuell Q6-3: bekannte Auftraggeber */
   // Karte Scheibe 2 (02.10.2026, Entscheidung: Pins nur in entdeckten Gebieten): laufendes Weltereignis (S.big) als pulsierender Pin.
   if (S.big) { const bl = S.big.town ? LOCATIONS.find(l => l.key === S.big.town) : (S.big.x != null ? { x: S.big.x, y: S.big.y } : null);
     if (bl && explored(bl.x, bl.y)) {   // explored() erwartet Kachel-Einheiten (wie revealAround: p.x/TS, nicht p.x)
@@ -15769,7 +15778,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.fillStyle = '#e7dcc2'; c.beginPath(); c.arc(px, py, 4, 0, 7); c.fill();
   c.strokeStyle = 'rgba(231,220,194,.5)'; c.beginPath(); c.arc(px, py, 8, 0, 7); c.stroke();
   c.textAlign = 'left'; c.font = '10px Spectral, serif';
-  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['teacher', 'Lehrer (Kodex H: Liste)'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['big', 'Großes Ereignis'], ['you', 'Du']];
+  const LEG = [['town', 'Siedlung'], ['dungeon', 'Höhle, Grube'], ['ruin', 'Ruine, Friedhof'], ['wild', 'Gebiet, Lager, Schrein'], ['quest', 'Auftragsziel'], ['caravan', 'Karawane'], ['teacher', 'Lehrer (Kodex H: Liste)'], ['giver', 'Auftraggeber (Siegel hell: Abgabe)'], ['valen', 'Valen halten den Ort'], ['undead', 'Untote halten den Ort'], ['army', 'Heer (Stärke)'], ['big', 'Großes Ereignis'], ['you', 'Du']];
   const lx = 8, ly = h - LEG.length * 14 - 12;
   c.fillStyle = 'rgba(11,10,8,.82)'; c.fillRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10); c.strokeStyle = '#3b3227'; c.strokeRect(lx - 4, ly - 6, 150, LEG.length * 14 + 10);
   LEG.forEach(([k, t], i) => { const x = lx + 6, y = ly + i * 14 + 4;
@@ -15780,6 +15789,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
     else if (k === 'wild') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 4, y + 4); c.lineTo(x - 4, y + 4); c.fill(); }
     else if (k === 'quest') { c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 5, y); c.lineTo(x, y + 5); c.lineTo(x - 5, y); c.closePath(); c.stroke(); }
     else if (k === 'caravan') c.fillRect(x - 3, y - 3, 6, 6);
+    else if (k === 'giver') mapSeal(c, x, y, 'offer');
     else if (k === 'teacher') { c.fillStyle = '#1a1510'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.strokeStyle = '#e8c070'; c.stroke(); c.fillStyle = '#e8c070'; c.fillRect(x - 1, y - 3, 2, 6); }
     else if (k === 'valen' || k === 'undead') { c.strokeStyle = k === 'undead' ? 'rgba(78,143,122,.9)' : 'rgba(111,139,184,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 5, 0, 7); c.stroke(); }
     else if (k === 'army') { c.fillStyle = '#2b2419'; c.fillRect(x - 3, y - 6, 2, 12); c.fillStyle = '#6f8bb8'; c.fillRect(x - 1, y - 6, 8, 5); }
@@ -15866,7 +15876,7 @@ function bindInput() {
     if (k === 'k') UI.openModal('chronicle');
     if (k === 'm') UI.openModal('map');
     if (k === 'j') UI.openModal('quests');
-    if (k === 't') UI.openModal('skills');
+    if (k === 't') UI.toast('Die Talentbäume werden neu gepflanzt — jede Klasse bekommt ihren eigenen. Deine Punkte bleiben dir.', 3200);   /* Entwickler 02.10.2026: Talentbäume versteckt */
     if (k === 'x') UI.openModal('effects');                   // S13: aktive Effekte
     if (k === 'h') UI.openModal('codex');                     // S13: Kodex/Handbuch
     if (k === 'z') UI.openModal('spells');                    // S15 P4: Zauberbuch
@@ -18077,7 +18087,9 @@ export function selftest() {
     for (let i = 0; i < 20; i++) think(e, 16); const stays = e.cling && Math.abs(e.x - (p.x + 300)) < 1;
     e.x = p.x + 100; for (let i = 0; i < 3; i++) think(e, 16); const drops = !e.cling;
     const h0 = p.hp; e.x = p.x + 20; spiderBurst(e); const burst = p.hp < h0;
-    const walls = spiderWalls(), inWorld = walls.length >= 1 && walls.every(b => b.type === 'smithy' || b.type === 'factoryhall') && S.ents.world.some(x => x.mtype === 'waechterspinne' && x.wallOf && walls.some(b => b.id === x.wallOf));
+    const walls = spiderWalls(), n0 = S.ents.world.length; ensureWallSpiders(); const made = S.ents.world.slice(n0);
+    const inWorld = walls.length >= 1 && walls.every(b => b.type === 'smithy' || b.type === 'factoryhall') && (made.length ? made : S.ents.world.filter(x => x.wallOf)).every(x => x.mtype === 'waechterspinne' && x.cling && walls.some(b => b.id === x.wallOf));
+    S.ents.world = S.ents.world.filter(x => !made.includes(x));
     return stays && drops && burst && inWorld;
   }));
   ok('Gegner (02.10.): Dampframme rammt aus der Entfernung mit langer roter Linie (≥ 1 s), nicht blockbar, zerschlägt Fass, Kiste, Zaun im Weg, ist danach 1,5 s offen; Abart des Automaten', sandbox(() => {
@@ -20830,6 +20842,19 @@ export function selftest() {
       const C = { id: 'pq', state: 'active', kind: 'hunt', have: 3, need: 3, title: 'Probe-Vertrag', town: 'eren', giver: 'board', reward: { gold: 10, xp: 5, rep: 1 } }; S.contracts = [C]; QUESTS.c_pq = questOf(C); S.quests = { c_pq: { state: 'active', progress: [3] } }; UI.questSnap();
       claimContract(C, null); UI.questWatch(); claimContract(C, null); UI.questWatch(); const con = UI.letterCount === n0 + 3;
       return pipsOk && one && guest && con; } finally { delete QUESTS.__pq; delete QUESTS.c_pq; S.quests = q0; S.contracts = C0; S.track = tr0; UI.questSnap(); } }));
+  ok('Aufträge Q-2: Geber-Siegel — fester Auftrag frei/fertig, Bewohner-Auftrag nur nah und nie auf Sehr schwer, Wache immer, Brett zu = kein Siegel; Siegel ändert keine Angebote', sandbox(() => {
+    const p = stage(), q0 = S.quests, C0 = S.contracts, d0 = S.difficulty, rz0 = S.razed, cd0 = JSON.stringify(S.conDay || {});
+    QUESTS.__pg = { name: 'Probe', giver: 'probe_geber', objectives: [{ type: 'kill', target: 'wolf', count: 1, text: 'x' }], reward: {} };
+    try { const g = actor(320, 300, { name: 'Geber' }); g.key = 'probe_geber'; S.quests = {}; const off = giverMark(g)?.k === 'offer' && !giverMark(g).near;
+      S.quests.__pg = { state: 'active', progress: [0] }; const wait = giverMark(g) === null; S.quests.__pg.progress = [1]; const done = giverMark(g)?.k === 'turnin';
+      const town = Object.keys(TOWN_PLAN).find(t => TOWN_PLAN[t].square && !boardShut(t)), prof = Object.keys(PROF_CON)[0];
+      const b = actor(330, 300, { name: 'Bewohner', prof }); b.prof = prof; b.key = 'probe_bew'; b.homeTown = town; S.contracts = [];
+      S.difficulty = 'schwer'; const res = giverMark(b)?.k === 'offer' && giverMark(b).near === true; S.difficulty = 'sehr_schwer'; const hard = giverMark(b) === null;
+      const vm = actor(340, 300, { name: 'VM' }); vm.vm = town; const vmOk = giverMark(vm)?.k === 'offer';
+      const brett = { kind: 'prop', type: 'board', x: TOWN_PLAN[town].square[0] * TS, y: TOWN_PLAN[town].square[1] * TS }; const open = boardMark(brett)?.k === 'offer';
+      S.razed = { ...(rz0 || {}), [town]: true }; const shut = boardMark(brett) === null;
+      return off && wait && done && res && hard && vmOk && open && shut && !S.contracts.length && JSON.stringify(S.conDay || {}) === cd0;
+    } finally { delete QUESTS.__pg; S.quests = q0; S.contracts = C0; if (d0 === undefined) delete S.difficulty; else S.difficulty = d0; if (rz0 === undefined) delete S.razed; else S.razed = rz0; } }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;

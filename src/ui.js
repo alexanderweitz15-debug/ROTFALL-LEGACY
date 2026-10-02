@@ -36,7 +36,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']], ['inv', 'Gepäck', 'I', ['inventory']],
+  ['char', 'Charakter', 'C', ['character', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
   ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
