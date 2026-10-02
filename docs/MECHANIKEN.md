@@ -988,3 +988,80 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Abgewehrt ohne Tote: Moral +6.
   - Bist du nicht auf der Karte, wird abgewogen: Siedler, Palisaden, Tor, Wachturm und Dodon gegen die Angreifer.
 - Debug: „Siedlung: Reichtum und Quellen anzeigen“, „Überfall jetzt“, „Überfall abstrakt auswürfeln“.
+
+## Die Siedlung wird schutzlos (Siedlung M4)
+- **Schützer** sind Siedler, Lagerwachen und Dodon. Ab 3 Schützern zählt das Lager seine Verluste: Tod oder Verschleppung zählen, Weggang nicht.
+- **Stufen:**
+  - ab 50 % Verlust: geschwächt;
+  - ab 80 % Verlust oder ohne Schützer: schutzlos. Dann gibt es Moral −15, und niemand arbeitet oder baut. Es kommt kein Zuzug, und täglich flieht mit 30 % ein Siedler, außer die Moral liegt bei 50 oder mehr. Überfälle werden 1,5-mal so wahrscheinlich.
+- Die Siedlung wird nie übernommen, nur geplündert.
+- **Ersatz kommt nur durch dich:**
+  - Beim Wirt wirbst du Lagerwachen an (80 Gold, dann 5 Gold Sold am Tag). Sie kommen am nächsten Morgen, höchstens 1 + Bauten/4. Ohne Sold gehen sie.
+  - Neue Siedler zählen ebenfalls.
+  - Jeder Ersatz senkt den Verlust um 1. Ist genug Ersatz da, fasst das Lager wieder Mut (Moral +5).
+- Das Siedlungsfenster zeigt die Stufe in Rot oder Gelb und nennt den Ausweg.
+- Debug: „Siedlung: Lagerwache sofort“, „Siedler töten bis schutzlos“, „Schutz-Status“.
+
+## Varonheim gefallen: die Burg ist besetzt (Belagerung S3a)
+- Fällt Varonheim, ist die Varonsburg sofort leer, und der Hof ist im Exil. Zwei Knochenwachen halten das Burgtor, vier Untote den Burghof, und auf dem Thron liegt ein Leichnam. Burgfrieden gibt es keinen.
+- Wird die Stadt befreit, steht der Hof wieder in der Burg, mit Gerold am Tor.
+- Hof-Figuren nehmen nur Schaden von dir, deiner Gruppe, Koop-Mitspielern und Belagerern. Weltereignisse töten den König nicht nebenbei.
+
+## Burgtor: nur mit Grund — oder mit Gewalt
+- Das Burgtor ist jetzt fünf Felder breit, zwischen zwei Tortürmen mit Bannern und Fackeln.
+- Hinein kommt nur, wer einen Grund hat: Rang in der Armee (ab Soldat), Ritterwürde, eine gewährte Audienz, einen Königsauftrag oder Ermittlungen im Blutkult. Sonst reichst du an der Torwache eine Bittschrift ein (25 Gold, gilt für den Tag).
+- Danach folgt die Durchsuchung wie gewohnt.
+- Ohne Grund bleiben die Bittschrift, die Bestechung oder Gewalt. Mit Gewalt gibt es Alarm, die Garde greift an, Valen −20 und Kopfgeld.
+- Debug: „Burgtor: Grund prüfen“.
+
+## Alarm in der Burg: Späher und Verstärkung
+- Brichst du mit Gewalt ins Burgtor, ziehst du drinnen die Waffe oder greifst du den König an, schlägt die Burg Alarm (Valen −20, Kopfgeld). Zwei Späher reiten zu den Stadttoren.
+- Erreichen sie die Tore (nach etwa einer Minute), marschieren aus den nächsten Valen-Städten je 4–6 Soldaten der Krone zur Burg; dort sinkt die Besatzung. Nach einer weiteren Minute sind sie da und suchen dich.
+- **Fängst du die Späher ab, kommt keine Verstärkung.**
+- Debug: „Burg-Alarm: Späher jetzt“, „Burg-Alarm: Späher kommen an (Verstärkung)“.
+
+## Geheime Orte (Scheibe 1): das Glockenmoor
+- Manche Orte stehen auf keiner Karte. Erst wenn du sie findest, erscheinen sie im Atlas; der Ort liegt in jeder Welt an derselben Stelle. Das Log zählt: „Geheimnisse gefunden: x von 8“.
+- **Glockenmoor:** Nachts bei Nebel oder Regen schlägt im Moorland eine Glocke, obwohl es dort keine Kirche gibt. Drei schiefe Glockenpfähle heißen Taufe, Hochzeit und Tod.
+- Läutest du sie in der richtigen Reihenfolge (erst die Taufe, dann die Hochzeit, zuletzt der Tod), steigt die versunkene Kapelle von Moorbach auf. Darin liegt eine Truhe mit der Glocke von Moorbach (Talisman, +3 Rüstung), dazu Orden +5. An der Wand verrät ein Blutzeichen, dass der Kult älter ist als das Königshaus.
+- Falsche Reihenfolge weckt drei Ertrunkene.
+- Ein Tipp des Ratgebers weist auf geheime Orte hin.
+- Debug: „Geheime Orte: zum Glockenmoor“, „Nebelnacht jetzt“, „zurücksetzen“.
+
+## Neue Umhänge und Kapuzen
+- **Umhangformen:** zerfetzt, Pelzkragen, Schulterumhang, Langmantel, Halbmantel, Wappenmantel. Dazu kommen Futter, Borte, Fibel, Fransen und Pelz. Lange und zerfetzte Umhänge schwingen beim Laufen nach.
+- **Kapuzenformen:** rund, spitz, weit, Kettenhaube, Maske, Gugel. Jede Kapuze schützt Vampire vor der Sonne, auch die an einen Umhang angesetzte.
+- **Neue Stücke:**
+
+| Stück | Wo |
+|---|---|
+| Wanderkapuze, Fetzenmantel, Pilgerkapuze | gewöhnliche Händler; Wanderkapuze auch bei Banditen, Fetzenmantel bei Kultisten und Wiedergängern |
+| Zaddelgugel, Wolfspelzmantel, Wappenmantel von Valen | Hagen, Kronschmiede |
+| Kettenhaube | Kettenknechte |
+| Maskenkapuze der Stillen | Basar Karak-Atar, Banditen, Blutkultisten |
+| Ölzeug-Pelerine | Plünderer der Sturmklinge |
+| Brokat-Halbmantel | Basar Karak-Atar |
+| Grabtuchmantel | selten bei Geistern |
+
+- NPCs und Gegner tragen die Formen gemischt.
+
+## Geheimer Ort: Die Verlorenen Hundert
+- Am Rand des Hundertfelds steckt eine Lanze mit verblichenem Valen-Wimpel im Hügel. Darunter klingt es hohl. Kommst du in die Nähe, nennt das Log sie.
+- **Graben** dauert eine Stunde. Darunter liegt das verschüttete Heerlager: der Feldherr der Hundert mit Knochenwächtern und eine Feldkiste.
+- **Der Kriegsvorrat** ist deine Wahl:
+  - Garnison der nächsten Valen-Stadt: +8 Besatzung, Valen +5.
+  - An die Kette verkaufen: 300 Gold, Kette +5, Valen −5.
+  - In die eigene Siedlung: +20 Eisen, +10 Holz.
+- Debug: „Geheime Orte: zum Hundertfeld (Lanze)“.
+
+## Geheimer Ort: Der Ausbrecherstollen
+- Zwischen Steinbruch und Westgebirge stehen drei Kreidezeichen: ein durchgestrichenes Kettenglied. Lesen kann sie, wer Wahrnehmung 12 hat oder einen Goblin dabei.
+- Das dritte Zeichen führt zum Spalt: ein geheimes Gewölbe mit einer Ebene, bewacht vom Pferchmeister. Danach steht der Stollen auf der Karte.
+- Im Hort liegt der Grubenplan der Eisenfeste. Du gibst ihn den Grubenstämmen (Goblins +10) oder verkaufst ihn an die Kette (150 Gold, Kette +8, Goblins −20).
+- Debug: „Geheime Orte: zu den Kreidezeichen (Stollen)“.
+
+## Geheimer Ort: Der Brunnen der Durstigen
+- Nur nach einem Sandsturm legt der Wind bei den Sandruinen eine Treppe frei, bis zum nächsten Tag. Bist du in der Nähe, sagt es das Log.
+- Unten liegt eine versunkene Karawanserei: Verdurstete und Wüstenräuber, die auch gegraben haben, dazu eine Truhe mit einem Dornensäbel.
+- **Das Wasserrecht der Sandfürsten** ist deine Wahl. Gibst du es den Sandfürsten zurück, zahlst du in Karak-Atar nie wieder Zoll (Händler +10). Verkaufst du es an die Räuber, bekommst du 250 Gold (Händler −10).
+- Debug: „Geheime Orte: Sandsturm endet (Brunnen frei)“.

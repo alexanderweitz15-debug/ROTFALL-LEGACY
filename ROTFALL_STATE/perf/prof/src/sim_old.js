@@ -173,42 +173,30 @@ export function roadPath(ax, ay, bx, by, wgt = 1) {
 const roadQueue = [];
 export function roadAsync(ax, ay, bx, by, wgt = 1) {
   const key = rkey(ax, ay, bx, by, wgt); if (roadCache.has(key)) return roadCache.get(key);
-  if (!roadQueue.some(j => j.key === key)) { roadQueue.push({ key, args: [ax, ay, bx, by, wgt, key], it: null }); idleRoads(); }
+  if (!roadQueue.some(j => j.key === key)) roadQueue.push({ key, args: [ax, ay, bx, by, wgt, key], it: null });
   return undefined;                                                                   // noch in Arbeit
 }
-const roadStep = () => { const J = roadQueue[0]; J.it ||= roadSearch(...J.args); if (J.it.next().done) roadQueue.shift(); };
 export function pumpRoads(ms = 1.5) {
   const t0 = performance.now();
-  while (roadQueue.length && performance.now() - t0 < ms) roadStep();
+  while (roadQueue.length && performance.now() - t0 < ms) { const J = roadQueue[0]; J.it ||= roadSearch(...J.args); if (J.it.next().done) roadQueue.shift(); }
 }
-/* PERF-S: Wegsuche zusätzlich im Leerlauf zwischen den Bildern (requestIdleCallback) — meist ist die Warteschlange dann leer,
-   bevor das Bild sie anfasst; pumpRoads im Bild bleibt als Untergrenze (Hintergrund-Tick, Browser ohne Leerlauf-Rückruf). */
-let idleOn = false;
-function idleRoads() {
-  if (idleOn || typeof requestIdleCallback !== 'function') return; idleOn = true;
-  requestIdleCallback(dl => { idleOn = false; while (roadQueue.length && dl.timeRemaining() > 1) roadStep(); if (roadQueue.length) idleRoads(); }, { timeout: 1000 });
-}
-const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 function* roadSearch(ax, ay, bx, by, wgt, key) {
   const G = (RG ||= roadGrid()), { w, h, blk, cost, dist, prev, seen } = G, gen = ++G.gen;
   const ok = (x, y) => x >= 0 && y >= 0 && x < w && y < h, start = ay * w + ax, goal = by * w + bx;
   if (!ok(ax, ay) || !ok(bx, by)) { roadCache.set(key, null); return null; }
   const free = i => !blk[i] || i === start || i === goal;
   const hh = (x, y) => { const dx = Math.abs(x - bx), dy = Math.abs(y - by); return (Math.max(dx, dy) + 0.414 * Math.min(dx, dy)) * wgt; };   // wgt 1 zulässig: jede Kachel kostet ≥ 1
-  /* PERF-S: Heap als zwei parallele Zahlenlisten (vorher ein [f, i]-Paar je Eintrag = viel Müll, GC-Spitzen bis 15 ms); gleiche Vergleiche, gleiche Reihenfolge, gleicher Weg */
-  const HF = [], HI = [];
-  const swap = (a, b) => { const f = HF[a], i = HI[a]; HF[a] = HF[b]; HI[a] = HI[b]; HF[b] = f; HI[b] = i; };
-  const push = (f, i) => { HF.push(f); HI.push(i); let k = HF.length - 1; while (k) { const q = (k - 1) >> 1; if (HF[q] <= HF[k]) break; swap(q, k); k = q; } };
-  let topF = 0;
-  const pop = () => { const top = HI[0]; topF = HF[0]; const lf = HF.pop(), li = HI.pop(); if (HF.length) { HF[0] = lf; HI[0] = li; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k;
-    if (l < HF.length && HF[l] < HF[m]) m = l; if (r < HF.length && HF[r] < HF[m]) m = r; if (m === k) break; swap(m, k); k = m; } } return top; };
+  const heap = [];
+  const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k;
+    if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
   seen[start] = gen; dist[start] = 0; prev[start] = -1; push(hh(ax, ay), start);
   let found = false, steps = 0;
-  while (HF.length && steps++ < 600000) {
-    if ((steps & 63) === 0) yield;                                                    /* PERF-S: feiner portioniert (vorher 512 Schritte = bis 7 ms am Stück trotz 0,8-ms-Budget) */
-    const i = pop(), f = topF; if (i === goal) { found = true; break; }
+  while (heap.length && steps++ < 600000) {
+    if ((steps & 511) === 0) yield;
+    const [f, i] = pop(); if (i === goal) { found = true; break; }
     const x = i % w, y = i / w | 0; if (f - hh(x, y) > dist[i] + 1e-9) continue;
-    for (let d = 0; d < 8; d++) { const dx = DIRS8[d][0], dy = DIRS8[d][1];   /* PERF-S: keine neue Richtungsliste je Schritt */
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const n = ny * w + nx; if (!free(n)) continue;
       if (dx && dy && (blk[y * w + nx] || blk[ny * w + x])) continue;                  // keine Ecke schneiden
       const nd = dist[i] + (cost[n] || 8) * (dx && dy ? 1.414 : 1);

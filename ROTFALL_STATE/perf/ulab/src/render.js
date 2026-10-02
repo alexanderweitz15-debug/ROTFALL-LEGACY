@@ -108,7 +108,6 @@ export function drawFrame(now) {
   tk('water'); /*PERFTMP*/
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
-  prefetchHouses();
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
   if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
@@ -244,13 +243,10 @@ function prefetchChunk(m, cx0, cy0, cx1, cy1) {
   pfArgs = [m, S.map, cx0, cy0, cx1, cy1];
   if (pfQueued) return;
   pfQueued = true;
-  /* PERF-R: im laufenden Spiel blieb selten > 8 ms Leerlauf — der Ring wurde nie gebacken und neue Chunks kamen gebündelt
-     mitten im Bild (Ruckler). Jetzt spätestens nach 300 ms ein Chunk, weitere nur bei viel Leerlauf. */
   idle(dl => {
     pfQueued = false;
-    let n = 0;
-    while ((n ? dl.timeRemaining() > 8 : dl.didTimeout || dl.timeRemaining() > 4) && prefetchOne()) n++;
-  }, { timeout: 300 });
+    while (dl.timeRemaining() > 8 && prefetchOne()) {}
+  });
 }
 function prefetchOne() {
   const [m, map, cx0, cy0, cx1, cy1] = pfArgs || [];
@@ -350,26 +346,6 @@ function texel(t, v, kind) {
   if (!d) { const c = SP.tileTexture(t, v, TILE_COL[t] || TILE_COL[T.GRASS], kind); d = c.getContext('2d').getImageData(0, 0, 16, 16).data; texData.set(key, d); }
   return d;
 }
-/* PERF-R: fehlende Texeldaten eines Chunks gesammelt holen — alle Kacheltexturen auf ein Blatt, ein einziges getImageData
-   (jedes einzelne Zurücklesen wartet auf die Grafikkarte, ~1 ms je Textur beim ersten Backen) */
-const texAtlas = document.createElement('canvas');
-function warmTexels(keys) {
-  if (!keys.length) return;
-  texAtlas.width = keys.length * 16; texAtlas.height = 16;
-  const g = texAtlas.getContext('2d');
-  keys.forEach(([t, v, kind], n) => g.drawImage(SP.tileTexture(t, v, TILE_COL[t] || TILE_COL[T.GRASS], kind), n * 16, 0));
-  const all = g.getImageData(0, 0, keys.length * 16, 16).data, RW = keys.length * 64;
-  keys.forEach(([t, v, kind], n) => { const d = new Uint8ClampedArray(1024); for (let y = 0; y < 16; y++) d.set(all.subarray(y * RW + n * 64, y * RW + n * 64 + 64), y * 64); texData.set(t + '|' + v + '|' + kind, d); });
-}
-let texWarm = false;                                     // einmal nach dem Start in Leerlaufzeit: alle üblichen Bodentexturen auf einmal
-function prewarmTexels() {
-  if (texWarm) return; texWarm = true;
-  idle(() => { const keys = [], nv = SP.drawnOn() ? 8 : 4;
-    for (const t of Object.keys(TILE_KIND).map(Number)) { if (t === T.ROCK || t === T.WATER || t === T.DWALL) continue;
-      const kinds = [TILE_KIND[t]]; if (t === T.DFLOOR || t === T.STONE) kinds.push('scree');
-      for (const kind of kinds) for (let v = 0; v < nv; v++) if (!texData.has(t + '|' + v + '|' + kind)) keys.push([t, v, kind]); }
-    warmTexels(keys); });
-}
 const TINT_RGBA = {};                                    // 'rgba(r,g,b,a)' → [r,g,b,a]
 const tintOf = str => TINT_RGBA[str] || (TINT_RGBA[str] = str.match(/[\d.]+/g).map(Number));
 const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
@@ -399,9 +375,7 @@ function bakeGround(o, m, cx, cy) {
   /* PERF-R: Grundtexturen direkt in einen Pixelpuffer (dieselben Texel wie tileTexture) statt 256 drawImage; die Grenzpixel
      schreiben danach in denselben Puffer, ein putImageData am Ende — gleiches Bild, Backen ~1,5 ms schneller */
   const img = new ImageData(SZ, SZ), D = img.data;
-  const tc = [], miss = [], seen = new Set();             // Texeldaten je Quellkachel
-  for (let k = 0; k < TW * TW; k++) { const key = typ[k] + '|' + vari[k] + '|' + kin[k]; if (!texData.has(key) && !seen.has(key)) { seen.add(key); miss.push([typ[k], vari[k], kin[k]]); } }
-  warmTexels(miss); prewarmTexels();
+  const tc = [];                                          // Texeldaten je Quellkachel
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {     // Grundtexturen
     const k = (j + 1) * TW + i + 1, T0 = tc[k] || (tc[k] = texel(typ[k], vari[k], kin[k]));
     for (let y = 0; y < 16; y++) D.set(T0.subarray(y * 64, y * 64 + 64), ((j * 16 + y) * SZ + i * 16) * 4);
@@ -697,17 +671,15 @@ function paintWater(o, m, cx, cy) {
   const W = (x, y) => mask[y * AW + x] === 1;
   const img = new ImageData(SZ, SZ), D = img.data;
   const set = (o4, c, a = 255) => { D[o4] = c[0]; D[o4 + 1] = c[1]; D[o4 + 2] = c[2]; D[o4 + 3] = a; };
-  const isW = m === MAPS.world, sea = new Int32Array(CH), SHORE = [8, 10, 8];   /* PERF-R: Küstenlinie je Kachelspalte einmal statt je Pixel */
-  if (isW) for (let i = 0; i < CH; i++) sea[i] = seaLine(F.x0t + i) - 2;
   for (let y = M; y < M + SZ; y++) for (let x = M; x < M + SZ; x++) {
     const X = gx0 + x, Y = gy0 + y, o4 = ((y - M) * SZ + (x - M)) * 4, q = y * AW + x;
+    const rg = m === MAPS.world && (Y >> 4) >= seaLine(X >> 4) - 2 ? 'sea' : regAt(X, Y), P = WATER_RGB[rg] || WATER_RGB.greenmark;
+    const r1 = !W(x - 1, y) || !W(x + 1, y) || !W(x, y - 1) || !W(x, y + 1);
     if (!mask[q]) {                                      // Ufer: nasser, dunkler Saum auf dem Boden
-      if (W(x - 1, y) || W(x + 1, y) || W(x, y - 1) || W(x, y + 1)) set(o4, SHORE, 90);
-      else if (W(x - 2, y) || W(x + 2, y) || W(x, y - 2) || W(x, y + 2)) set(o4, SHORE, 45);
+      if (W(x - 1, y) || W(x + 1, y) || W(x, y - 1) || W(x, y + 1)) set(o4, [8, 10, 8], 90);
+      else if (W(x - 2, y) || W(x + 2, y) || W(x, y - 2) || W(x, y + 2)) set(o4, [8, 10, 8], 45);
       continue;
     }
-    const rg = isW && (Y >> 4) >= sea[(X >> 4) - F.x0t] ? 'sea' : regAt(X, Y), P = WATER_RGB[rg] || WATER_RGB.greenmark;
-    const r1 = !W(x - 1, y) || !W(x + 1, y) || !W(x, y - 1) || !W(x, y + 1);
     if (r1) { set(o4, h2(X * 5, Y * 3) < 0.65 ? P[4] : P[3]); continue; }   // Schaumkante
     const r2 = !W(x - 2, y) || !W(x + 2, y) || !W(x, y - 2) || !W(x, y + 2) || !W(x - 3, y) || !W(x, y - 3) || !W(x + 3, y) || !W(x, y + 3);
     const t = r2 ? 2 : (1 - depAt(X, Y)) * 2.4, k = Math.min(2, Math.floor(t) + (t % 1 > BAYER[(Y & 3) * 4 + (X & 3)] ? 1 : 0));
@@ -912,36 +884,15 @@ export function playerInside(b, p = S.player) {
   return (tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1) || (tx === b.doorTile[0] && ty === b.doorTile[1]);
 }
 const isNight = () => { const h = S.minute / 60; return h >= 19 || h < 6; };
-const houseLit = (b, min = S.minute) => { const h = (min % 1440) / 60; return (h >= 19 || h < 6) && (b.type !== 'kontor' || h < 22); };
-function houseCanvas(b, lit) {                                       // Verfall (auch Kriegsschäden) im Schlüssel
-  const key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b); let cv = houseCache.get(key);
-  if (cv) { houseCache.delete(key); houseCache.set(key, cv); return cv; }   /* PERF-R: zuletzt benutzt bleibt (LRU) */
-  trimCache(houseCache, 220); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); return cv;
-}
-/* PERF-R (02.10.2026): ein Hausbild zu backen kostet 10–40 ms. Beim Betreten einer Stadt kamen viele auf einmal (Ruckler), um 19 und
-   6 Uhr wurden alle sichtbaren Häuser zugleich neu gebacken. Jetzt in Leerlaufzeit vorbacken: Häuser bis ~700 px um das Bild,
-   und 20 Spielminuten vor dem Wechsel schon das Nacht- bzw. Tagbild. Höchstens ein Haus je Leerlaufaufruf. */
-const HPF = { t: 0, q: [], queued: false };
-function prefetchHouses() {
-  const now = performance.now(); if (now - HPF.t < 300) return; HPF.t = now;
-  const vx0 = cam.x - 700, vy0 = cam.y - 700, vx1 = cam.x + W / cam.zoom + 700, vy1 = cam.y + H / cam.zoom + 700, soon = S.minute + 20;
-  HPF.q.length = 0;
-  for (const b of HOUSES) { if (b.map !== S.map || (b.x + b.w) * TS < vx0 || b.x * TS > vx1 || (b.y + b.h) * TS < vy0 || b.y * TS > vy1) continue;
-    const w = HB.wearOf(b), l0 = houseLit(b), l1 = houseLit(b, soon);
-    if (!houseCache.has(b.id + (l0 ? 'n' : 'd') + w)) HPF.q.push([b, l0]);
-    if (l1 !== l0 && !houseCache.has(b.id + (l1 ? 'n' : 'd') + w)) HPF.q.push([b, l1]); }
-  if (!HPF.q.length || HPF.queued) return;
-  HPF.queued = true;
-  idle(dl => { HPF.queued = false; let n = 0;
-    while (HPF.q.length && (n ? dl.timeRemaining() > 12 : dl.didTimeout || dl.timeRemaining() > 6)) { const [b, lit] = HPF.q.pop(); if (b.map === S.map) { houseCanvas(b, lit); n++; } } }, { timeout: 500 });
-}
 const HOUSE_ATLAS = false;   // Nutzer S13: Blatt-Gebäude wirken aufgeblasen zu verpixelt; an, sobald große Gebäudebilder kommen
 function drawHouse(b, now) {
   if (HOUSE_ATLAS && SP.atlasOn()) { const src = SP.atlasSprite(SP.houseAtlas(b)); if (src) {   // Gebäude aus dem Blatt — aus: im Blatt zu klein, aufgeblasen zu grob (Nutzer S13)
     const target = playerInside(b) ? 0.14 : 1, a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15; roofAlpha.set(b, a);
     const dw = b.w * TS + 12, dh = dw * src.height / src.width, x0 = b.x * TS - 6, y0 = (b.y + b.h) * TS + 6 - dh;
     ctx.globalAlpha = a * (HB.wearOf(b) === 2 ? 0.75 : 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(src, x0, y0, dw, dh); ctx.globalAlpha = 1; return; } }
-  const cv = houseCanvas(b, houseLit(b));
+  const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b);   // Verfall (auch Kriegsschäden) im Schlüssel
+  let cv = houseCache.get(key);
+  if (!cv) { trimCache(houseCache, 120); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
   const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
   const a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15;
   roofAlpha.set(b, a);
