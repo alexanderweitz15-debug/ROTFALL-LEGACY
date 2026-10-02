@@ -165,6 +165,9 @@ Stand: Session 15 (2026-09-29).
 ## 11. Reisen
 - **Stall und Pferdehof (S15):** Tierhändler und der Züchter Hadubrand (Mühlbach, Koppel) zeigen ihre Pferde als Karten mit Werten
   und Preis; das Angebot wechselt wöchentlich, ein eigenes Pferd wird zu 40 % angerechnet. Todesritter bekommen ein Totenross.
+- **Fellfarben (02.10.2026):** Normale Pferde haben eine von sechs festen Fellfarben — Rappe, Fuchs, Brauner, Schimmel, Falbe,
+  Schecke (gescheckt) —, die beim Kauf fest an das Tier gebunden ist (Stall-Angebot, Koppel und das Pferd in der Welt zeigen
+  immer dieselbe Farbe). Der Kaufhinweis nennt die Farbe. Messingross und Totenross behalten ihre eigene feste Farbe.
 - **Kodex füllt sich (S15):** Lehrer, Ränge und Zustände erscheinen erst, wenn man sie kennt; Kapitel zu Verbrechen, großen
   Ereignissen, Aurelion und dem Seevolk öffnen sich im Spiel. Der Code NACHTGLAS schaltet alles frei.
 - **Reittier-Werte (S15):** Jedes Pferd hat eigenes Tempo, Ausdauer (sinkt beim Reiten, erschöpft = langsamer) und Mut
@@ -1175,3 +1178,40 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - „Reduzierte Bewegung“: Brief und Siegel erscheinen ohne Stempel- und Reißbewegung, Gold springt.
 - **Debug:** „Aufträge: Brief ‚Erfüllt‘ zeigen“, „Aufträge: Brief zerreißt“, „Aufträge: Zählkerbe über dem Helden“, „Aufträge: verfolgten Auftrag abschließen (mit Effekt)“.
 - **Kampfhaltung:** Sind Feinde nah, hält der Held die Waffe bereit und steht breiter — auch im Gehen; rückwärts gehend läuft der Schritt rückwärts. Deckung sieht je Waffe anders aus (Dolch quer vor dem Gesicht, Zweihand-Schaft quer, Speer mit Spitze vorn). Großäxte haben eigene Hack- und Spaltbewegungen. Im Test Room zeigt Pack B beim Ausweichen einen Ausfallsprung, Pack C einen Dash mit Nachbildern (nur Darstellung).
+
+## Aufträge sichtbar, Teil 2: Siegel über Auftraggebern (Visuell Q-2)
+- **Wachssiegel über dem Kopf:** Wer einen Auftrag zu vergeben hat, trägt ein goldenes Siegel mit rotem Band; wer auf deine Abgabe wartet, ein helles Siegel mit Haken. Es gelten dieselben Regeln wie im Gespräch: Ein fester Auftrag zeigt sein Siegel nur, wenn er dir angeboten würde; wer dich wegen des Stigmas abweist oder als Orden den Paktgebundenen nicht anhört, zeigt keins.
+- **Wer ein Siegel bekommt:** Geber fester Aufträge, Verteidigungsmeister und der Tributoffizier (immer), das Anschlagbrett (solange es offen ist; Erledigtes abgeben geht auch am geschlossenen Brett) und Bewohner, die nach ihrem Beruf Arbeit haben. **Bewohner-Siegel** erscheinen erst, wenn du nah genug zum Ansprechen bist oder die Maus auf der Person ist — sonst stünde über jedem Bauern eins. Auf **„Sehr schwer“** tragen Bewohner nie ein Siegel (dort musst du dir merken, wer dir Arbeit gab).
+- **Ansprech-Zeile:** „E Sprechen — Name · Auftrag“ bzw. „· Abgabe“, ebenso am Anschlagbrett.
+- **Karte und Minikarte:** Auftraggeber, die du schon kennst, stehen als kleines Siegel auf der Weltkarte (Legende „Auftraggeber“); die Minikarte zeigt Geber in deiner Nähe (ohne Bewohner).
+- Das Siegel wippt leicht; „Reduzierte Bewegung“ hält es still. Zeigt eine Figur gerade ein Gefühl (Emote), hat das Vorrang.
+
+## Fünf weitere Gegner (Top 5 aus gegner_ideen.md, Entscheidungen 02.10.2026)
+- **Wächterspinne** (Aurelion, Gefahr 1): kleiner Messingkörper auf acht Beinen. Hängt sichtbar an bestimmten Wänden — an den Werkstätten im Land um Aurelheim und an Werkhallen außerhalb der Stadtmauern, je Wand eine. Kommt ein Feind auf 140 px heran oder trifft sie jemand, fällt sie herab („fällt herab!“) und sticht schnell und oft, aber schwach. Beim Tod zerspringt sie in Splitter (Fläche 44 px, nur ihre Feinde, Rolle weicht aus). Zerstört: nach 7 Tagen hängt wieder eine dort; neue Spinnen erscheinen nur, wenn du weit weg bist.
+- **Dampframme** (Aurelion, Gefahr 3, Abart des Kriegsautomaten, 20 %: Maschinenruinen, Uhrwerkhalle, Schlund): Kessel mit Schloten und Rammschild. Aus bis zu 170 px baut sie eine lange rote Linie auf (1,2 s), dann rammt sie die Linie entlang bis an Mauer oder Fels: nicht blockbar, Rückstoß; Fässer, Kisten, Säcke und Zäune im Weg zerbrechen (Inhalt fällt heraus; Hort- und Ritualbehälter bleiben). Danach ist sie 1,5 s offen (+25 % Schaden) und muss wenden.
+- **Blutschöpfer** (Blutkult, Katakomben von Varonheim): kämpft kaum, sucht Wehrlose (am Boden) unter seinen Feinden — dich, Gefährten, Verbündete — und trinkt 1,2 s. Das Opfer blutet 4 s schneller aus und ist ausgezehrt; er heilt 30 %, jeder Kultist bis 140 px um ihn 20 %. Jeder Treffer (oder Taumeln) bricht das Trinken ab. Hinweis beim ersten Mal.
+- **Netzwerferin** (Seevolk: Entern, Gischtinseln): hält Abstand und wirft langsame Netze. Gleiche Regel wie das Fangnetz des Spielers: normale Figuren hängen 3 s fest (danach 6 s frei — vorläufig, sonst hielte sie dich dauerhaft), Große (Boss, sehr große Arten) und Elite taumeln nur. Ausweichen oder Deckung hilft. Hinweis beim ersten Netz.
+- **Hofspion** (Himmelsinsel): drei „Diener des Hofes“ stehen harmlos (neutral) im Hof. Bricht dort jemand eine Regel (jedes neue Kopfgeld auf der Insel), lassen sie die Maske fallen: Diebstahl einer, Gewalt zwei, Mord drei. Sie gehen dir in den Rücken; der erste Stich von hinten trifft dreifach („Meuchelstich!“, Formel des Schleichangriffs). Dreh dich zu ihnen um. Die Sonnenlegion greift sie nicht an (Hof).
+- Alle fünf haben einen Kodex-Text und einen Ruf beim Entdecken.
+- Debug: Karte „Kampf: Neue Gegner (02.10.)“ → „Gegner: … vor dir“, „Gegner: Wächterspinne — zur nächsten Werkstattwand“, „Gegner: Dampframme mit Fässern und Kisten im Weg“, „Gegner: Blutschöpfer trinkt (du gehst zu Boden)“, „Gegner: Netzwerferin mit zwei Plünderern“, „Gegner: Hofspione — Regelbruch am Hof (Diebstahl/Gewalt/Mord)“ (nur auf der Insel).
+
+## Aufträge sichtbar, Teil 3: Auftragsbrief und Lohn (Visuell Q-3)
+- **Auftragsbrief im Gespräch:** Unter dem Angebot steht ein Streifen mit dem Ziel als Bild (der Gegner, der Gegenstand, ein Auge für Suchaufträge, sonst das Zeichen der Auftragsart) samt Anzahl, bei Verträgen die Frist als Sanduhr (Tage ab Annahme), rechts der Lohn.
+- **Lohn vor der Annahme:** Feste Aufträge zeigen nur die **Art** des Lohns als Symbol — Münzen (Gold), Stern (Erfahrung), Beutel (Gegenstand), Wappen der Macht mit Pfeil (Ansehen steigt ▲ oder sinkt ▼), Herz (Beziehung), Buch (Ausbildung), Wappen (Beförderung). Wie viel, zeigt die Maus. Verträge nennen ihr Gold wie bisher offen.
+- **Steckbrief mit Gesicht:** Jedes Kopfgeld zeigt das Gesicht des Gesuchten — auch gewöhnliche Anführer. Der Anführer, der später erscheint, sieht genau so aus.
+- **Annahme:** Ein Pergament „Angenommen“ mit goldenem Siegel erscheint oben im Spielfeld und fliegt dann in den Reiter „Aufträge“, der kurz aufleuchtet (ohne Bewegung: es verschwindet einfach).
+- **Lohnleiste beim Abschluss:** Der Brief „Erfüllt“ zeigt den Lohn mit Zahlen. Hat jemand anderes einen Großteil der Arbeit getan (z. B. die Wachen beim Kopfgeld), zeigt ein Anteil-Kreis, auf wie viel Prozent der Lohn gekürzt wurde; die Maus erklärt den Anteil.
+
+## Aufträge sichtbar, Teil 4: Tracker und Ziele (Visuell Q-4)
+- **Tracker oben rechts im Spielfeld** (unter der Minikarte): Der **verfolgte** Auftrag steht groß da — Siegel, Name, Ziel als Bild, Kerben, ein Pfeil in Richtung des Ziels mit Entfernung (nur in der Oberwelt, wie der Kompass), bei Verträgen die Frist als Sanduhr (am letzten Tag rot und pulsierend), bei Verteidigungen die Zeit bis zum Angriff. Darunter bis zu **drei weitere** Aufträge klein. Klick auf den großen öffnet das Auftragsbuch (J), Klick auf einen kleinen verfolgt ihn.
+- **Im Kampf** (ein Feind in der Nähe) klappt der Tracker ein: nur Siegel und Kerben, damit das Bild frei bleibt.
+- **Ziele markiert:** Gegner, die für den **verfolgten** Auftrag zählen, tragen eine kleine goldene Raute über dem Kopf — auf „Sehr schwer“ nie.
+- **Wegmarken:** Bei Patrouillen und Spurensuchen steht an jedem schon erreichten Punkt eine kleine Fahne, solange der Auftrag läuft.
+- **Weltkarte:** Aufträge, die in einem Gebiet spielen, zeigen das Gebiet als gestrichelten Kreis; die Raute ist hohl, solange das Ziel offen ist, und gefüllt, wenn du zurück zum Auftraggeber musst.
+- Neu angenommene Aufträge lassen den Tracker kurz aufleuchten. Unter 820 px Breite zeigt er nur den verfolgten Auftrag.
+- **Debug:** „Aufträge: nächsten Auftrag verfolgen (Tracker)“, „Aufträge: bis zu 4 Jagdaufträge starten (Tracker ansehen)“.
+
+## Pergament-Lesefenster (UI-Scheibe 5)
+- **Kodex (H), Chronik (K) und Auftragsbuch (J)** sind jetzt Pergamentseiten mit dunkler Tinte; alle anderen Fenster bleiben dunkles Eisen. Die **Erbenwahl** nach dem Tod zeigt die Erben als Pergamentkarten.
+- **Auftragsbuch als Doppelseite:** Links die Liste mit Siegeln — gold = offen, leuchtend = bereit zur Abgabe, rot = erfüllt, schwarz zerbrochen und durchgestrichen = gescheitert; die rote Raute markiert den verfolgten Auftrag. „Ordnen“ nach Stand oder nach Entfernung (offene Aufträge; ändert nur die Anzeige). Rechts der Brief des gewählten Auftrags: Auftraggeber mit Bild (Bewohner-Aufträge auf „Sehr schwer“ ohne Namen und Bild), Stempel des Stands, Beschreibung, jedes Ziel mit Bild und Kerben, Ort mit Entfernung (Suchaufträge: kein Ziel auf der Karte), Frist oder Angriffszeit, Lohn (feste Aufträge bis zum Abschluss nur als Symbole), Knöpfe „Verfolgen“ und „Abbrechen“.
+- **Debug:** „UI: Pergament — Auftragsbuch/Kodex/Chronik öffnen“.

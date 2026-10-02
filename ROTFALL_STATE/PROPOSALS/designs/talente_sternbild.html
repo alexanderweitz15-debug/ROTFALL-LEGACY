@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sternbild-Talente</title>
+<!-- ROTFALL: LEGACY — Entwurf (02.10.2026), nur Darstellung. Kein Spielcode. Sterne der Klassen sind Platzhalter im Band
+     von BALANCE_GUIDE §7; die Sterne des Wanderers und des Todesritters sind die echten Knoten aus data.js (Schlüssel bleiben). -->
+<style>
+  :root { --bg:#07060a; --ink:#e7dcc2; --mut:#8d836e; --gold:#c9a24a; --line:#3a3226; --panel:rgba(16,13,10,.92); }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 Spectral, Georgia, serif; overflow:hidden; }
+  #sky { position:fixed; inset:0; width:100%; height:100%; cursor:grab; display:block; }
+  #sky.drag { cursor:grabbing; }
+  .bar { position:fixed; left:0; right:0; top:0; display:flex; gap:14px; align-items:center; padding:10px 16px;
+    background:linear-gradient(#0c0a08ee, #0c0a0800); pointer-events:none; }
+  .bar > * { pointer-events:auto; }
+  h1 { font:700 17px Cinzel, Georgia, serif; letter-spacing:.16em; margin:0; color:#e8d6a8; }
+  .crumb { color:var(--mut); font-style:italic; }
+  .pts { margin-left:auto; font:600 15px Cinzel, Georgia, serif; color:var(--gold); }
+  button { background:#1a150f; color:var(--ink); border:1px solid #5a4a30; padding:5px 10px; font:13px Spectral, Georgia, serif; cursor:pointer; border-radius:2px; }
+  button:hover { border-color:var(--gold); color:#fff3cf; }
+  button.gold { border-color:var(--gold); color:#f3e2b0; }
+  .side { position:fixed; left:12px; top:56px; width:230px; background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
+  .side h3 { font:600 12px Cinzel, Georgia, serif; letter-spacing:.12em; color:#cdb98a; margin:6px 0 6px; }
+  .side label { display:flex; gap:6px; align-items:center; font-size:13px; margin:2px 0; cursor:pointer; }
+  .side .hint { color:var(--mut); font-size:12px; margin-top:8px; }
+  .legend { position:fixed; right:12px; bottom:12px; background:var(--panel); border:1px solid var(--line); padding:8px 12px; font-size:12px; color:var(--mut); max-width:300px; }
+  .legend b { color:var(--ink); font-weight:600; }
+  #card { position:fixed; width:270px; background:#120f0b; border:1px solid #6a5634; box-shadow:0 6px 24px #000c; padding:10px 12px; display:none; z-index:5; }
+  #card .n { font:700 15px Cinzel, Georgia, serif; color:#f0dfb0; letter-spacing:.05em; }
+  #card .s { color:var(--mut); font-size:12px; margin-bottom:6px; }
+  #card .d { margin:4px 0; }
+  #card .i { color:#8d836e; font-size:12px; margin-top:4px; }
+  #card .r { color:#b09a6e; font-size:12px; margin-top:4px; }
+  #card .rest { color:#9ab0c8; font-size:12px; margin-top:4px; }
+  #card .act { display:flex; gap:8px; margin-top:10px; }
+  #rite { position:fixed; inset:0; display:none; pointer-events:none; z-index:8; }
+  #rite .bars::before, #rite .bars::after { content:''; position:fixed; left:0; right:0; height:11vh; background:#000; }
+  #rite .bars::before { top:0; } #rite .bars::after { bottom:0; }
+  #rite .card { position:fixed; left:0; right:0; top:30vh; text-align:center; text-shadow:0 2px 8px #000; opacity:0; }
+  #rite .card .t { font:700 34px Cinzel, Georgia, serif; letter-spacing:.2em; color:#e8d6a8; }
+  #rite .card .u { font:italic 16px Spectral, Georgia, serif; color:#b9a888; margin-top:4px; }
+  #rite .card .l { width:240px; height:1px; margin:9px auto 0; background:linear-gradient(90deg, transparent, #a8874f, transparent); }
+  #rite .say { position:fixed; left:50%; top:58vh; transform:translateX(-50%); background:#e7dcc2; color:#1a140c; padding:6px 12px; border-radius:10px; font-style:italic; opacity:0; }
+  @media (max-width:700px) { .side { width:auto; right:12px; top:auto; bottom:12px; max-height:38vh; overflow:auto; } .legend { display:none; } }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div class="bar">
+  <h1>TALENTE</h1><span class="crumb" id="crumb">Sternenhimmel</span>
+  <button id="back" style="display:none">◂ Zum Himmel</button>
+  <span class="pts" id="pts"></span>
+  <button id="lvl" title="Wie beim Stufenaufstieg">+1 Punkt</button>
+</div>
+<div class="side">
+  <h3>BEKANNTE KLASSEN</h3>
+  <div id="known"></div>
+  <h3>AKTIVE KLASSE</h3>
+  <div id="active"></div>
+  <h3>SZENE</h3>
+  <button class="gold" id="riteBtn" style="width:100%">Aufnahme als Ritter ansehen</button>
+  <div class="hint">Ziehen = schwenken · Mausrad = zoomen · Klick auf ein Sternbild = hinein · Klick auf einen Stern = Karte mit „Lernen“. ESC = zurück.</div>
+</div>
+<div class="legend">
+  <b>Kleiner Stern</b> Talent · <b>mittlerer</b> Merkmal · <b>großer mit Goldring</b> Schlüssel · <b>Raute</b> aktive Fähigkeit.<br>
+  <b>Gold</b> gelernt · <b>pulsierend</b> lernbar · <b>dunkel</b> gesperrt · <b>Riss</b> ausgeschlossen · <b>Umriss</b> versiegelt · <b>bläulich</b> ruht (Klasse nicht aktiv).<br>
+  Gestrichelte Linie = Anker eines Arms (alte Knoten behalten ihre Voraussetzungen).
+</div>
+<div id="card"></div>
+<div id="rite"><div class="bars"></div><div class="card"><div class="t" id="riteT"></div><div class="u" id="riteU"></div><div class="l"></div></div><div class="say" id="riteSay"></div></div>
+
+<script>
+'use strict';
+/* ---------- Daten (Entwurf) ---------- */
+const CLS = { warrior:'Krieger', knight:'Ritter', paladin:'Paladin', berserker:'Berserker', deathknight:'Todesritter', darkpaladin:'Dunkler Hochpaladin', mage:'Magier', darkpriest:'Dunkler Priester' };
+const LINE = { warrior:['warrior','knight','paladin','berserker','deathknight','darkpaladin'], mage:['mage','darkpriest'] };
+// Sternbilder: Mitte in Himmelskoordinaten, Farbe, Klasse des Stamms (null = immer offen)
+const SKIES = {
+  wanderer: { name:'Der Wanderer', sub:'für alle · die alten Zweige Kampf, Magie, Überleben', x:0, y:0, col:'#d8c08a', cls:null },
+  schild:   { name:'Der Schild', sub:'Krieger · Arme: Ritter → Paladin, Berserker, Todesritter, Hochpaladin', x:-1150, y:-120, col:'#d0784a', cls:'warrior' },
+  flamme:   { name:'Die Flamme', sub:'Magier · Arm: Dunkler Priester', x:1150, y:-120, col:'#e8903a', cls:'mage' },
+};
+const SEALED = [   // nur Umrisse: was es noch gibt und wo man es lernt
+  { name:'Der Falke', sub:'Schütze — Tomas (Eren), Wenzel (Weidenau)', x:-640, y:720, n:8 },
+  { name:'Der Dolch', sub:'Schurke — Rook, Nix (Salzhafen), Kaelis Vey', x:640, y:720, n:8 },
+  { name:'Die Lampe', sub:'Kleriker — Elena (Eren), Schwester Adela', x:0, y:-860, n:8 },
+  { name:'Die Laute', sub:'Barde — Lioba (Kreuzweg), Jasper', x:-1350, y:760, n:7 },
+  { name:'Der Kessel', sub:'Alchemist — Quirin, Orrin (Mühlbach)', x:1350, y:760, n:7 },
+  { name:'Nekromant', sub:'Titel — durch eine Tat (Pakt der Stillen Schar)', x:-1450, y:-980, n:7, title:true },
+  { name:'Hexenmeister', sub:'Titel — Urne zu Vhal', x:-760, y:-1120, n:7, title:true },
+  { name:'Druide', sub:'Titel — Ruf des Hains (Mira)', x:760, y:-1120, n:7, title:true },
+  { name:'Mönch', sub:'Titel — Probe der Stillen Hand (Ilva)', x:1450, y:-980, n:7, title:true },
+];
+// Knoten: sky, x/y relativ zur Mitte, t: '' Talent | notable | keystone | active, req (einer genügt), excl, cls (Stamm/Arm), anchor (nur gezeichnet)
+const N = {};
+const add = (k, o) => { N[k] = Object.assign({ t:'', req:[] }, o); };
+/* Wanderer — echte Knoten aus data.js (SKILL_TREE), unverändert; nur neu angeordnet */
+const WAND = {
+  combat:  { a:-2.45, col:'#b2503a', rows:[[['c_tough','Zähigkeit','Leben +8 %.'],['c_strike','Kraftschlag','Waffenschaden +6 %.']],
+    [['c_skin','Eiserne Haut','Rüstung +2.',['c_tough']],['c_breath','Kampfatem','Ausdauer +15.',['c_tough','c_strike']],['c_edge','Klingenmeister','Kritische Treffer +4 %.',['c_strike']]],
+    [['c_wall','Schildwall','Rüstung +4, Leben +5 %.',['c_skin'],'notable'],['c_cry','Kampfschrei','Aktiv: Gegner taumeln, schlagen schwächer.',['c_breath'],'active'],['c_butcher','Schlächter','Waffenschaden +10 %, Krit +3 %.',['c_edge'],'notable']],
+    [['k_bulwark','Bollwerk','Rüstung +30 %. Dafür 10 % langsamer.',['c_wall'],'keystone'],['k_berserk','Berserker','Unter 30 % Leben: Schaden +25 %. Dafür nimmst du immer 15 % mehr Schaden.',['c_butcher'],'keystone']]] },
+  magic:   { a:-0.69, col:'#5a8ec0', rows:[[['m_vein','Arkane Ader','Mana +15 (wer Mana hat).'],['m_quick','Gedankenschnelle','Abklingzeiten −5 %.']],
+    [['m_power','Zauberkraft','Zauberschaden +8 %.',['m_vein']],['m_focus','Sammlung','Mana kehrt 50 % schneller zurück.',['m_vein']]],
+    [['m_soul','Feuerseele','Zauberschaden +12 %.',['m_power'],'notable'],['m_flow','Fluss','Abklingzeiten −8 %.',['m_quick','m_focus'],'notable'],['m_blink','Blinzeln','Aktiv: kurzer Sprung, Mana.',['m_quick'],'active']],
+    [['k_glass','Glaskanone','Zauberschaden +30 %. Leben −15 %.',['m_soul'],'keystone'],['k_scholar','Gelehrter Geist','Abklingzeiten −15 %. Waffenschaden −15 %.',['m_flow'],'keystone']]] },
+  survival:{ a:1.57, col:'#6a9a4a', rows:[[['s_life','Lebenskraft','Leben +6 %.'],['s_light','Leichtfüßig','Tempo +4 %.']],
+    [['s_medic','Feldscher','Heilung durch Kräuter, Verbände, Tränke +20 %.',['s_life']],['s_endure','Ausdauernd','Ausdauer kehrt 25 % schneller zurück.',['s_light']],['s_pack','Packesel','6 Plätze mehr im Gepäck.',['s_light']]],
+    [['s_wound','Wundheiler','Heilung +25 %, Leben +5 %.',['s_medic'],'notable'],['s_aid','Feldverband','Aktiv: sofort 15 % Leben, stillt Blutung.',['s_medic'],'active'],['s_dodge','Ausweichkünstler','Ausweichen kostet 30 % weniger Ausdauer, Tempo +3 %.',['s_endure'],'notable']],
+    [['k_second','Zweiter Atem','Unter 25 % Leben kommen 30 % zurück (alle 3 Minuten). Leben −5 %.',['s_wound'],'keystone'],['k_wild','Wildnisläufer','Draußen Tempo +10 %, Ausdauer schneller. In Siedlungen Tempo −5 %.',['s_dodge'],'keystone']]] },
+};
+for (const [b, W] of Object.entries(WAND)) W.rows.forEach((row, r) => row.forEach((d, i) => {
+  const rad = 80 + r * 78, lat = (i - (row.length - 1) / 2) * 62, ca = Math.cos(W.a), sa = Math.sin(W.a);
+  add(d[0], { sky:'wanderer', x: ca * rad - sa * lat, y: sa * rad + ca * lat, name:d[1], desc:d[2], req:d[3] || [], t:d[4] || '', col:W.col, real:true });
+}));
+/* Der Schild — Stamm Krieger (Platzhalter-Wirkungen, BALANCE_GUIDE §7) */
+const S1 = (k, x, y, name, desc, o = {}) => add(k, Object.assign({ sky:'schild', x, y, name, desc, cls:'warrior' }, o));
+S1('kr_stand', -70, 190, 'Fester Stand', 'Wuchtschlag: Betäubung +0,3 s.');
+S1('kr_grip', 70, 190, 'Eiserner Griff', 'Ausdauer +12.');
+S1('kr_drill', -125, 90, 'Drill', 'Leben +6 %.', { req:['kr_stand'] });
+S1('kr_crush', 0, 100, 'Schädelspalter', 'Wuchtschlag +20 % Schaden.', { req:['kr_stand','kr_grip'], t:'notable' });
+S1('kr_hold', 125, 90, 'Standhalten', 'Aktiv: 4 s kein Taumeln, Rüstung +4.', { req:['kr_grip'], t:'active' });
+S1('kr_core', 0, 0, 'Herz des Schilds', 'Rüstung +2. Verbindungsstern: von hier gehen die Arme der Folgeklassen aus.', { req:['kr_crush'] });
+S1('k_kr_wall', -60, -95, 'Unerschütterlich', 'Kein Rückstoß, kein Taumeln. Dafür kostet Ausweichen 30 % mehr Ausdauer.', { req:['kr_core'], t:'keystone', excl:'k_kr_storm', intent:'Stehen, nicht tanzen — der Krieger als Fels.' });
+S1('k_kr_storm', 60, -95, 'Sturmangriff', 'Wuchtschlag nach einem Sprint betäubt doppelt so lang. Dafür Rüstung −3.', { req:['kr_core'], t:'keystone', excl:'k_kr_wall', intent:'Hinein, bevor sie stehen.' });
+// Arm Ritter → Paladin
+S1('rt_oath', -150, -55, 'Eid', 'Segen hält 5 s länger.', { req:['kr_core'], cls:'knight' });
+S1('rt_shield', -235, -110, 'Schildhand', 'Blocken mit Schild +10 %.', { req:['rt_oath'], cls:'knight' });
+S1('rt_guard', -300, -190, 'Beschützer', 'Gefährten in deiner Nähe: Rüstung +2.', { req:['rt_shield'], cls:'knight', t:'notable' });
+S1('k_rt_vow', -250, -290, 'Schwur des Ritters', 'Wer einen Gefährten neben dir trifft, wird von dir 2 s markiert (+25 % Schaden). Dafür kein Fliehen-Bonus beim Ausweichen.', { req:['rt_guard'], cls:'knight', t:'keystone', intent:'Ein Eid mit Rüstung: der Ritter kämpft für die anderen.' });
+S1('pa_light', -400, -205, 'Morgenlicht', 'Heiliger Schlag +20 % gegen Untote.', { req:['rt_guard'], cls:'paladin' });
+S1('pa_ward', -480, -270, 'Schrein im Herzen', 'Heiliges Heilen heilt auch einen Gefährten.', { req:['pa_light'], cls:'paladin', t:'notable' });
+S1('k_pa_dawn', -520, -370, 'Dämmerungsklinge', 'Jeder dritte Treffer gegen Untote brennt heilig. Dafür Schattenzauber unmöglich.', { req:['pa_ward'], cls:'paladin', t:'keystone', intent:'Was du beschützt, macht dich stark — und bindet dich ans Licht.' });
+// Arm Berserker
+S1('bs_scar', 150, -55, 'Narben', 'Leben +5 %.', { req:['kr_core'], cls:'berserker' });
+S1('bs_rage', 235, -110, 'Rote Sicht', 'Raserei hält 2 s länger.', { req:['bs_scar'], cls:'berserker' });
+S1('bs_blood', 300, -190, 'Blutrausch', 'Ein Kill in der Raserei füllt 15 Ausdauer.', { req:['bs_rage'], cls:'berserker', t:'notable' });
+S1('k_bs_red', 330, -300, 'Nichts mehr fühlen', 'In der Raserei kein Taumeln. Danach 4 s erschöpft.', { req:['bs_blood'], cls:'berserker', t:'keystone', intent:'Wut als Rüstung — bis sie reißt.' });
+// Arm Todesritter — echte Knoten dk_* (Schlüssel und Voraussetzungen bleiben; nur Anker gezeichnet)
+const DK = (k, x, y, name, desc, req, t, o = {}) => add(k, Object.assign({ sky:'schild', x, y, name, desc, req, t, cls:'deathknight', real:true }, o));
+DK('dk_frost', -230, 170, 'Frostklinge', 'Grabhieb legt eine Stufe Frost auf das Ziel.', [], '', { anchor:'kr_drill' });
+DK('dk_blood', -360, 175, 'Blutdurst', 'Lebensentzug und Grabhieb heilen 50 % mehr.', [], '');
+DK('dk_grip', -300, 110, 'Todesgriff', 'Aktiv: zieht einen Feind vor deine Klinge.', ['dk_frost','dk_blood'], 'active');
+DK('dk_rune', -250, 270, 'Runenklinge', 'Grabhieb +25 % Schaden.', ['dk_frost'], 'notable');
+DK('dk_plate', -380, 275, 'Totenpanzer', 'Rüstung +3, Leben +5 %.', ['dk_blood'], '');
+DK('k_frostborn', -265, 375, 'Frostgeboren', 'Jeder dritte Nahkampftreffer legt Frost auf. Dafür trifft dich Feuer 30 % härter.', ['dk_rune'], 'keystone', { excl:'k_bloodlord', intent:'Kälte als Waffe.' });
+DK('k_bloodlord', -395, 380, 'Blutritter', 'Jeder Nahkampftreffer heilt 8 % des Schadens. Dafür heilen Tränke nur halb.', ['dk_plate'], 'keystone', { excl:'k_frostborn', intent:'Leben nimmt man sich vom Feind.' });
+// Arm Dunkler Hochpaladin (nur mit der Weihe der Kette)
+S1('hp_chain', 220, 170, 'Kettenglied', 'Kettenschlag fesselt 0,5 s länger.', { anchor:'kr_hold', cls:'darkpaladin' });
+S1('hp_fear', 320, 215, 'Furchtbar', 'Furcht-Aura +30 px.', { req:['hp_chain'], cls:'darkpaladin' });
+S1('hp_cmd', 360, 120, 'Befehlston', 'Befehl der Kette ruft eine Wache mehr.', { req:['hp_chain'], cls:'darkpaladin', t:'notable' });
+S1('k_hp_iron', 420, 260, 'Eiserne Ordnung', 'Eingeschüchterte nehmen 20 % mehr Schaden. Dafür handeln freie Dörfer gar nicht mehr.', { req:['hp_fear'], cls:'darkpaladin', t:'keystone', intent:'Wer kniet, lebt.' });
+/* Die Flamme — Stamm Magier */
+const F1 = (k, x, y, name, desc, o = {}) => add(k, Object.assign({ sky:'flamme', x, y, name, desc, cls:'mage' }, o));
+F1('mg_spark', -70, 190, 'Funkenflug', 'Feuerball: Einschlag +15 % Umkreis.');
+F1('mg_ink', 70, 190, 'Tinte und Asche', 'Mana +12.');
+F1('mg_kindle', -125, 85, 'Glut', 'Brand durch Feuerzauber hält 1 s länger.', { req:['mg_spark'] });
+F1('mg_heart', 0, 95, 'Herdfeuer', 'Feuerball +20 % Schaden.', { req:['mg_spark','mg_ink'], t:'notable' });
+F1('mg_focus', 125, 85, 'Ruhige Hand', 'Sammelzeit der Zauber −10 %.', { req:['mg_ink'] });
+F1('mg_core', 0, -10, 'Kern der Flamme', 'Zauberschaden +5 %. Verbindungsstern.', { req:['mg_heart'] });
+F1('k_mg_pyre', -60, -110, 'Scheiterhaufen', 'Brennende Feinde zünden ihre Nachbarn an. Dafür kehrt Mana 30 % langsamer zurück.', { req:['mg_core'], t:'keystone', excl:'k_mg_cold', intent:'Feuer gehorcht — kurz, dann frisst es weiter.' });
+F1('k_mg_cold', 60, -110, 'Kalte Flamme', 'Feuerball setzt nie in Brand, lädt aber halb so lange. Dafür Feuerball −15 % Schaden.', { req:['mg_core'], t:'keystone', excl:'k_mg_pyre', intent:'Kontrolle statt Brand.' });
+F1('dp_brand', 155, -50, 'Brandmal', 'Brandmal Omegas hält 4 s länger.', { req:['mg_core'], cls:'darkpriest' });
+F1('dp_prayer', 235, -105, 'Kettengebet', 'Kettengebet heilt 20 % mehr.', { req:['dp_brand'], cls:'darkpriest' });
+F1('dp_offer', 300, -185, 'Opferschale', 'Opferblut kostet 8 % statt 12 % Leben.', { req:['dp_prayer'], cls:'darkpriest', t:'notable' });
+F1('k_dp_omega', 330, -295, 'Omegas Auge', 'Gebrandmarkte nehmen auch von Gefährten +25 %. Dafür Heilzauber des Ordens unmöglich.', { req:['dp_offer'], cls:'darkpriest', t:'keystone', intent:'Omegas Wort, mit Blut geschrieben.' });
+
+/* ---------- Zustand ---------- */
+const st = { pts:6, learned:new Set(['c_tough','c_strike','c_skin','s_life','kr_stand']), known:new Set(['warrior','mage']), active:'warrior' };
+const lineOf = c => Object.keys(LINE).find(l => LINE[l].includes(c));
+const skyOpen = s => !SKIES[s].cls || st.known.has(SKIES[s].cls);
+function state(k) {
+  const n = N[k];
+  if (st.learned.has(k)) return 'learned';
+  if (n.cls && !st.known.has(n.cls)) return 'sealed';
+  if (n.excl && st.learned.has(n.excl)) return 'barred';
+  return !n.req.length || n.req.some(r => st.learned.has(r)) ? 'open' : 'locked';
+}
+// Entscheidung 3b: Wertesterne immer; Schlüssel- und Fähigkeitssterne nur, wenn die Klasse aktiv ist (Stamm: jede Klasse der Linie).
+function resting(k) {
+  const n = N[k]; if (!n.cls) return false;
+  const stem = SKIES[n.sky].cls === n.cls;
+  const on = stem ? LINE[lineOf(n.cls)].includes(st.active) : st.active === n.cls;
+  return !on;
+}
+const effRest = k => resting(k) && (N[k].t === 'keystone' || N[k].t === 'active' || /^(Wuchtschlag|Feuerball|Raserei|Segen|Heiliger|Grabhieb|Lebensentzug|Kettenschlag|Furcht|Befehl|Brandmal|Kettengebet|Opferblut|Brand)/.test(N[k].desc));
+
+/* ---------- Himmel ---------- */
+const cv = document.getElementById('sky'), cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const cam = { x:0, y:-60, z:0.3, tx:0, ty:-60, tz:0.3 };
+let focus = null, hover = null, picked = null, t0 = performance.now();
+const sparks = [], rings = [], reveal = new Map();
+function resize() { DPR = Math.min(2, window.devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; if (!focus) fitAll(true); }
+function fitAll(now) { const z = Math.min(W / 3500, H / 2500); Object.assign(cam, { tx:0, ty:-120, tz:z }); if (now) Object.assign(cam, { x:0, y:-120, z }); }
+const wpos = k => { const n = N[k], s = SKIES[n.sky]; return { x: s.x + n.x, y: s.y + n.y }; };
+const toS = (x, y) => ({ x: (x - cam.x) * cam.z + W / 2, y: (y - cam.y) * cam.z + H / 2 });
+const toW = (x, y) => ({ x: (x - W / 2) / cam.z + cam.x, y: (y - H / 2) / cam.z + cam.y });
+// Hintergrundsterne (fester Zufall)
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const BG = Array.from({ length: 900 }, () => ({ x: (rnd() - 0.5) * 6000, y: (rnd() - 0.5) * 4400, r: rnd() * 1.3 + 0.2, a: rnd() * 0.6 + 0.15, p: rnd() * 6 }));
+const SEALPTS = SEALED.map((s, i) => { seed = 101 + i * 37; return Array.from({ length: s.n }, (_, j) => ({ x: Math.cos(j / s.n * 6.28 + rnd()) * (60 + rnd() * 90), y: Math.sin(j / s.n * 6.28 + rnd()) * (60 + rnd() * 90) })); });
+
+function rad(n) { return n.t === 'keystone' ? 13 : n.t === 'notable' ? 9.5 : n.t === 'active' ? 9 : 6.5; }
+function draw(now) {
+  const t = (now - t0) / 1000;
+  cam.x += (cam.tx - cam.x) * 0.12; cam.y += (cam.ty - cam.y) * 0.12; cam.z += (cam.tz - cam.z) * 0.12;
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = cx.createRadialGradient(W * 0.5, H * 0.55, 50, W * 0.5, H * 0.55, Math.max(W, H) * 0.8);
+  g.addColorStop(0, '#141022'); g.addColorStop(0.55, '#0a0812'); g.addColorStop(1, '#040306');
+  cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+  // Nebelschleier
+  for (const [nx, ny, c] of [[-1150, -120, 'rgba(160,70,40,.07)'], [1150, -120, 'rgba(200,110,40,.07)'], [0, 0, 'rgba(120,110,160,.06)']]) {
+    const p = toS(nx, ny), r = 620 * cam.z, gg = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    gg.addColorStop(0, c); gg.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = gg; cx.fillRect(p.x - r, p.y - r, r * 2, r * 2); }
+  // Hintergrundsterne (leichte Parallaxe)
+  for (const b of BG) { const x = (b.x - cam.x * 0.6) * cam.z * 0.6 + W / 2, y = (b.y - cam.y * 0.6) * cam.z * 0.6 + H / 2;
+    if (x < -2 || y < -2 || x > W + 2 || y > H + 2) continue;
+    cx.globalAlpha = b.a * (0.75 + 0.25 * Math.sin(t * 1.3 + b.p)); cx.fillStyle = '#dcd6f0'; cx.fillRect(x, y, b.r, b.r); }
+  cx.globalAlpha = 1;
+  // versiegelte Sternbilder: Umrisse
+  SEALED.forEach((s, i) => { const pts = SEALPTS[i].map(p => toS(s.x + p.x, s.y + p.y));
+    cx.strokeStyle = 'rgba(140,128,110,.18)'; cx.setLineDash([3, 5]); cx.beginPath(); pts.forEach((p, j) => j ? cx.lineTo(p.x, p.y) : cx.moveTo(p.x, p.y)); cx.closePath(); cx.stroke(); cx.setLineDash([]);
+    for (const p of pts) { cx.strokeStyle = 'rgba(160,148,130,.35)'; cx.beginPath(); cx.arc(p.x, p.y, Math.max(2, 5 * cam.z), 0, 7); cx.stroke(); }
+    const c = toS(s.x, s.y + 200); label(s.name, s.title ? 'Titel · versiegelt' : 'versiegelt', c.x, c.y, 'rgba(170,158,135,.55)', s); });
+  // Linien
+  for (const [k, n] of Object.entries(N)) {
+    const to = wpos(k), b = toS(to.x, to.y), sealed = state(k) === 'sealed', rv = reveal.get(k);
+    const srcs = [...n.req.map(r => [r, false]), ...(n.anchor ? [[n.anchor, true]] : [])];
+    for (const [r, anc] of srcs) { const fr = wpos(r), a = toS(fr.x, fr.y);
+      const lit = st.learned.has(r) && st.learned.has(k), half = st.learned.has(r) && !sealed;
+      cx.strokeStyle = lit ? 'rgba(232,196,110,.85)' : half ? 'rgba(200,170,110,.38)' : sealed ? 'rgba(120,110,95,.14)' : 'rgba(150,135,110,.22)';
+      cx.lineWidth = lit ? 2.2 : 1.2; if (anc) cx.setLineDash([4, 5]);
+      if (lit) { cx.shadowColor = '#e8c46e'; cx.shadowBlur = 8; }
+      cx.globalAlpha = rv != null ? Math.min(1, rv) : 1;
+      cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
+      cx.shadowBlur = 0; cx.setLineDash([]); cx.globalAlpha = 1; }
+  }
+  // Ausschluss-Risse
+  for (const [k, n] of Object.entries(N)) if (n.excl && k < n.excl) { const a = toS(wpos(k).x, wpos(k).y), b = toS(wpos(n.excl).x, wpos(n.excl).y);
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, s = 7 * cam.z + 3;
+    cx.strokeStyle = st.learned.has(k) || st.learned.has(n.excl) ? 'rgba(200,80,60,.7)' : 'rgba(160,120,90,.35)'; cx.lineWidth = 1.2;
+    cx.beginPath(); cx.moveTo(m.x - s * 0.4, m.y - s); cx.lineTo(m.x + s * 0.3, m.y - s * 0.2); cx.lineTo(m.x - s * 0.3, m.y + s * 0.2); cx.lineTo(m.x + s * 0.4, m.y + s); cx.stroke(); }
+  // Sterne
+  for (const [k, n] of Object.entries(N)) {
+    const p = wpos(k), s = toS(p.x, p.y), S_ = state(k), rest = resting(k), rv = reveal.get(k);
+    if (s.x < -40 || s.y < -40 || s.x > W + 40 || s.y > H + 40) continue;
+    const r = rad(n) * Math.max(0.28, cam.z) * (hover === k ? 1.25 : 1);
+    const col = n.col || SKIES[n.sky].col;
+    cx.globalAlpha = rv != null ? Math.min(1, rv) : 1;
+    if (S_ === 'learned') {
+      const gl = cx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3.2); gl.addColorStop(0, rest ? 'rgba(150,180,220,.55)' : 'rgba(255,225,150,.75)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = gl; cx.fillRect(s.x - r * 3.2, s.y - r * 3.2, r * 6.4, r * 6.4);
+      starShape(s.x, s.y, r, n.t, rest ? '#b8cce4' : '#ffe9b0');
+    } else if (S_ === 'open') {
+      const pu = 0.55 + 0.45 * Math.sin(t * 3 + p.x * 0.01);
+      cx.shadowColor = col; cx.shadowBlur = 10 * pu; starShape(s.x, s.y, r, n.t, col); cx.shadowBlur = 0;
+      cx.strokeStyle = `rgba(232,200,120,${0.35 + 0.4 * pu})`; cx.lineWidth = 1; cx.beginPath(); cx.arc(s.x, s.y, r * 1.5 + 2 * pu, 0, 7); cx.stroke();
+    } else if (S_ === 'sealed') {
+      cx.strokeStyle = 'rgba(150,138,118,.4)'; cx.lineWidth = 1; cx.beginPath(); cx.arc(s.x, s.y, r * 0.8, 0, 7); cx.stroke();
+    } else if (S_ === 'barred') {
+      starShape(s.x, s.y, r * 0.8, n.t, '#4a2a24'); cx.strokeStyle = 'rgba(200,80,60,.6)'; cx.beginPath(); cx.moveTo(s.x - r, s.y - r); cx.lineTo(s.x + r, s.y + r); cx.stroke();
+    } else starShape(s.x, s.y, r * 0.85, n.t, '#3e3628');
+    if (n.t === 'keystone') { cx.strokeStyle = S_ === 'sealed' ? 'rgba(150,130,90,.3)' : 'rgba(201,162,74,.9)'; cx.lineWidth = 1.4; cx.beginPath(); cx.arc(s.x, s.y, r * 1.3, 0, 7); cx.stroke(); }
+    if (cam.z > 0.62 && (focus === n.sky || cam.z > 0.9)) { cx.font = `${Math.round(11 * Math.min(1.3, cam.z))}px Spectral, Georgia, serif`; cx.textAlign = 'center';
+      cx.fillStyle = S_ === 'learned' ? (rest ? '#a9bcd6' : '#f3e2b0') : S_ === 'open' ? '#d8c8a0' : S_ === 'sealed' ? 'rgba(150,138,118,.55)' : '#8d836e';
+      cx.fillText(n.name, s.x, s.y + r + 14 * Math.min(1.2, cam.z)); }
+    cx.globalAlpha = 1;
+  }
+  // Sternbild-Namen
+  for (const [k, s] of Object.entries(SKIES)) { const c = toS(s.x, s.y + (k === 'wanderer' ? 360 : 470)), open = skyOpen(k);
+    label(s.name, open ? (k === 'wanderer' ? 'für alle' : 'Klasse ' + CLS[s.cls] + (lineOf(st.active) === s.cls ? ' · aktiv' : ' · ruht')) : 'versiegelt', c.x, c.y, open ? s.col : 'rgba(170,158,135,.55)', s); }
+  // Funken
+  for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.u += 0.028; if (s.u >= 1) { sparks.splice(i, 1); continue; }
+    const a = toS(s.a.x, s.a.y), b = toS(s.b.x, s.b.y), x = a.x + (b.x - a.x) * s.u, y = a.y + (b.y - a.y) * s.u;
+    const gl = cx.createRadialGradient(x, y, 0, x, y, 12); gl.addColorStop(0, 'rgba(255,240,190,1)'); gl.addColorStop(1, 'rgba(255,200,90,0)'); cx.fillStyle = gl; cx.fillRect(x - 12, y - 12, 24, 24); }
+  for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.u += 0.02; if (r.u >= 1) { rings.splice(i, 1); continue; }
+    if (r.wait > 0) { r.wait -= 0.02; r.u -= 0.02; continue; }
+    const p = toS(r.x, r.y); cx.strokeStyle = `rgba(255,220,140,${1 - r.u})`; cx.lineWidth = 2; cx.beginPath(); cx.arc(p.x, p.y, 8 + r.u * 46 * Math.max(0.6, cam.z), 0, 7); cx.stroke();
+    for (const d of r.dots) { const q = r.u * d.v * Math.max(0.6, cam.z); cx.fillStyle = `rgba(255,230,160,${1 - r.u})`; cx.fillRect(p.x + Math.cos(d.a) * q, p.y + Math.sin(d.a) * q, 2, 2); } }
+  for (const [k, v] of reveal) { if (v >= 1.2) reveal.delete(k); else reveal.set(k, v + 0.025); }
+  requestAnimationFrame(draw);
+}
+function starShape(x, y, r, t, col) {
+  cx.fillStyle = col; cx.beginPath();
+  if (t === 'active') { cx.moveTo(x, y - r); cx.lineTo(x + r, y); cx.lineTo(x, y + r); cx.lineTo(x - r, y); }
+  else { const sp = t === 'keystone' ? 8 : 4; for (let i = 0; i < sp * 2; i++) { const a = i * Math.PI / sp - Math.PI / 2, rr = i % 2 ? r * (t === 'keystone' ? 0.45 : 0.38) : r; cx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } }
+  cx.closePath(); cx.fill();
+}
+function label(name, sub, x, y, col, ref) {
+  const z = Math.max(0.55, Math.min(1.3, cam.z * 2.2));
+  cx.textAlign = 'center'; cx.font = `700 ${Math.round(16 * z)}px Cinzel, Georgia, serif`; cx.fillStyle = col; cx.fillText(name.toUpperCase(), x, y);
+  cx.font = `italic ${Math.round(11.5 * z)}px Spectral, Georgia, serif`; cx.fillStyle = 'rgba(185,170,140,.75)'; cx.fillText(sub, x, y + 16 * z);
+  ref._lab = { x, y: y - 8 * z, w: Math.max(name.length * 11 * z, 120), h: 30 * z };
+}
+
+/* ---------- Bedienung ---------- */
+let drag = null, moved = false;
+cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty }; moved = false; cv.classList.add('drag'); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => {
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    if (moved) { cam.tx = drag.cx - dx / cam.z; cam.ty = drag.cy - dy / cam.z; cam.x = cam.tx; cam.y = cam.ty; } return; }
+  hover = hit(e.clientX, e.clientY); cv.style.cursor = hover ? 'pointer' : 'grab';
+  if (hover && !picked) showCard(hover, e.clientX, e.clientY, false); else if (!picked) hideCard();
+});
+cv.addEventListener('pointerup', e => { cv.classList.remove('drag'); const was = drag; drag = null; if (!was || moved) return;
+  const k = hit(e.clientX, e.clientY);
+  if (k && (focus || cam.z > 0.55)) { picked = k; showCard(k, e.clientX, e.clientY, true); return; }
+  picked = null; hideCard();
+  const sk = skyAt(e.clientX, e.clientY); if (sk) zoomTo(sk);
+});
+cv.addEventListener('wheel', e => { e.preventDefault(); const f = Math.exp(-e.deltaY * 0.0012), before = toW(e.clientX, e.clientY);
+  cam.tz = Math.max(0.12, Math.min(2.4, cam.tz * f)); cam.z = cam.tz; const after = toW(e.clientX, e.clientY);
+  cam.tx += before.x - after.x; cam.ty += before.y - after.y; cam.x = cam.tx; cam.y = cam.ty; }, { passive: false });
+addEventListener('keydown', e => { if (e.key === 'Escape') { if (picked) { picked = null; hideCard(); } else back(); } });
+function hit(mx, my) { let best = null, bd = 1e9; for (const k of Object.keys(N)) { const p = wpos(k), s = toS(p.x, p.y), d = Math.hypot(s.x - mx, s.y - my), r = rad(N[k]) * Math.max(0.28, cam.z) + 6;
+  if (d < r && d < bd) { bd = d; best = k; } } return best; }
+function skyAt(mx, my) { const w = toW(mx, my); let best = null, bd = 1e9;
+  for (const [k, s] of Object.entries(SKIES)) { const d = Math.hypot(w.x - s.x, w.y - s.y); if (d < 620 && d < bd) { bd = d; best = k; } } return best; }
+function zoomTo(k) { focus = k; const s = SKIES[k]; Object.assign(cam, { tx: s.x + (k === 'schild' ? -60 : k === 'flamme' ? 120 : 0), ty: s.y + (k === 'wanderer' ? 0 : 20), tz: Math.min(W / 1250, H / 1050, 1.5) });
+  document.getElementById('crumb').textContent = 'Sternenhimmel › ' + s.name; document.getElementById('back').style.display = ''; }
+function back() { focus = null; picked = null; hideCard(); fitAll(false); document.getElementById('crumb').textContent = 'Sternenhimmel'; document.getElementById('back').style.display = 'none'; }
+document.getElementById('back').onclick = back;
+
+const TYPE = { keystone: 'Schlüsselstern', notable: 'Merkmal', active: 'Aktive Fähigkeit', '': 'Talent' };
+const STX = { learned: 'gelernt', open: 'lernbar', locked: 'gesperrt', sealed: 'versiegelt', barred: 'ausgeschlossen' };
+function showCard(k, mx, my, pin) {
+  const n = N[k], S_ = state(k), el = document.getElementById('card'), rest = resting(k);
+  const req = n.req.map(r => N[r].name).join(' oder ');
+  el.innerHTML = `<div class="n">${n.name}</div><div class="s">${TYPE[n.t]} · ${STX[S_]}${n.cls ? ' · ' + CLS[n.cls] : ' · Wanderer'}${n.real ? ' · <i>vorhandener Knoten</i>' : ' · <i>Platzhalter</i>'}</div>
+    <div class="d">${n.desc}</div>${n.intent ? `<div class="i">Absicht: ${n.intent}</div>` : ''}
+    ${req ? `<div class="r">Braucht: ${req}</div>` : ''}${n.excl ? `<div class="r">Schließt aus: ${N[n.excl].name}</div>` : ''}
+    ${S_ === 'sealed' ? `<div class="r">Öffnet sich, wenn du ${CLS[n.cls]} lernst (Prüfung beim Lehrer).</div>` : ''}
+    ${rest && S_ !== 'sealed' ? `<div class="rest">${effRest(k) ? 'Ruht' : 'Wirkt'}, solange du nicht ${CLS[n.cls]} bist${effRest(k) ? '.' : ' (Wertestern: wirkt immer).'}</div>` : ''}
+    ${pin ? `<div class="act">${S_ === 'open' ? `<button class="gold" id="learn" ${st.pts < 1 ? 'disabled' : ''}>Lernen (1 Punkt)</button>` : ''}<button id="close">Schließen</button></div>` : ''}`;
+  el.style.display = 'block'; const w = 270, h = el.offsetHeight;
+  el.style.left = Math.min(W - w - 8, mx + 18) + 'px'; el.style.top = Math.max(50, Math.min(H - h - 8, my - 20)) + 'px';
+  if (pin) { const l = document.getElementById('learn'); if (l) l.onclick = () => learn(k); document.getElementById('close').onclick = () => { picked = null; hideCard(); }; }
+}
+function hideCard() { document.getElementById('card').style.display = 'none'; }
+function learn(k) {
+  if (state(k) !== 'open' || st.pts < 1) return;
+  st.pts--; st.learned.add(k); picked = null; hideCard(); ui();
+  const to = wpos(k); const from = N[k].req.filter(r => st.learned.has(r));
+  for (const r of from) sparks.push({ a: wpos(r), b: to, u: 0 });
+  rings.push({ x: to.x, y: to.y, u: 0, wait: from.length ? 0.7 : 0, dots: Array.from({ length: 14 }, (_, i) => ({ a: i / 14 * 6.28, v: 30 + Math.random() * 30 })) });
+}
+document.getElementById('lvl').onclick = () => { st.pts++; ui(); };
+
+function ui() {
+  document.getElementById('pts').textContent = `Talentpunkte frei: ${st.pts}`;
+  document.getElementById('known').innerHTML = Object.entries(CLS).map(([k, n]) => `<label><input type="checkbox" data-k="${k}" ${st.known.has(k) ? 'checked' : ''} ${k === 'warrior' || k === 'mage' ? 'disabled' : ''}>${n}</label>`).join('');
+  document.getElementById('active').innerHTML = [...st.known].map(k => `<label><input type="radio" name="ac" value="${k}" ${st.active === k ? 'checked' : ''}>${CLS[k]}</label>`).join('');
+  document.querySelectorAll('#known input').forEach(i => i.onchange = () => { const k = i.dataset.k;
+    if (i.checked) { st.known.add(k); revealCls(k); } else { st.known.delete(k); if (st.active === k) st.active = 'warrior'; for (const [nk, n] of Object.entries(N)) if (n.cls === k) st.learned.delete(nk); } ui(); });
+  document.querySelectorAll('#active input').forEach(i => i.onchange = () => { st.active = i.value; ui(); });
+}
+function revealCls(c) { let i = 0; for (const [k, n] of Object.entries(N)) if (n.cls === c) reveal.set(k, -0.25 * i++); }
+
+/* ---------- Aufnahme-Szene (Skizze von classRite) ---------- */
+document.getElementById('riteBtn').onclick = () => {
+  if (st.known.has('knight')) { st.known.delete('knight'); for (const [k, n] of Object.entries(N)) if (n.cls === 'knight') st.learned.delete(k); }
+  const R = document.getElementById('rite'), card = R.querySelector('.card'), say = document.getElementById('riteSay');
+  document.getElementById('riteT').textContent = 'RITTER'; document.getElementById('riteU').textContent = 'Ein Eid mit Rüstung.';
+  say.textContent = '„Knie. Steh auf als einer, der etwas beschützt.“ — Kelan der Graue';
+  R.style.display = 'block'; back();
+  say.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 2600 });
+  setTimeout(() => card.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none', offset: 0.12 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 2800 }), 1800);
+  setTimeout(() => { R.style.display = 'none'; st.known.add('knight'); st.pts++; ui(); zoomTo('schild'); setTimeout(() => revealCls('knight'), 500); }, 4700);
+};
+
+addEventListener('resize', resize); resize(); ui(); requestAnimationFrame(draw);
+if (location.hash === '#shot') { zoomTo('schild'); for (const k of ['kr_grip', 'kr_crush', 'kr_core', 'kr_drill', 'k_kr_wall']) st.learned.add(k); st.known.add('knight'); st.known.add('deathknight');
+  for (const k of ['rt_oath', 'dk_frost', 'dk_rune']) st.learned.add(k); st.pts = 3; ui(); }
+</script>
+</body>
+</html>

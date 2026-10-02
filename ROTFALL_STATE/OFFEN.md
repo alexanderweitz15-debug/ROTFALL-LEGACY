@@ -55,6 +55,34 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [E] Aufträge an Fraktionsorten ohne Eintrag in TOWN_PLAN/GUARD_POSTS (Grubenhort ohne Aufstand, Karak-Atar, Dünenwacht …) zählen weiter für Valen. Für wen sollen sie zählen?
 - [P] PR #8: claude-arbeit enthält main als Vorfahr. Stand c86c3d3 wurde isoliert getestet: 404/404. Vorher war a49d302 kaputt (Syntaxfehler aus einem Agenten-Zwischenstand), deshalb vor jedem Merge den Kopf des PR so prüfen.
 
+## Abends (02.10.)
+- Erledigt: HB-03, HB-04, Talentbäume versteckt, Tierhändler-„Zurück“, Umhänge in Läden und Beute, Koop special/eigene Zahlen, Skilltree-Linien/Icons, Karte (Ortsbild, Ereignis-Pins, Grenzen), Kampfanimation §17 für 5 Waffen.
+- [B] Koop-Gast-Handel im Dock: Agent hat es als BLOCKIERT gemeldet (das Dock braucht einen lebenden NPC, der Gast hat nur shopData). Ein eigener Adapter ist nötig.
+- [E] Skilltree Scheibe 3 (Freischalt-Animation) und 4 (Titelzweig-Siegel): durch den Sternbild-Umbau vermutlich überholt.
+- [E] Kampfanimation: Packs A/B/C im Test Room vergleichen → Stil festlegen → auf alle Waffen ausrollen.
+- [P] Kampf-Lauf-Bilder nicht vorgebacken (einmalig ~4 ms je neuer Blickrichtung).
+- Läuft: Klassen-Prüfung + Sternbild-Talentbäume (Analyse), Pferde-Sprites, Gegner, Menüs/Quests, Hunt-Fixes HB-06..23.
+
+## Nacht (02.10., 22:00)
+- Erledigt (Agenten): neue Gegner (Bomben-/Groß-Skelett, Mutanten, Wächterspinne, Dampframme, Blutschöpfer, Netzwerferin, Hofspion, 6 Varianten für 8 bisher eintönige Arten); HB-06..HB-23 außer HB-10/HB-20; Pferde-Fellfarben (Stall-Bild = echtes Pferd); Klassen/Talente-Analyse (PROPOSALS/klassen_talente.md, Entwurf designs/talente_sternbild.html). Lead: Brot zählt zum Proviant, Ratgeber-Probe.
+- [E] Gegner (gegner_neu.md):
+  1. Explosion, wenn das Bomben-Skelett während der Zündung stirbt?
+  2. Fraktion der Mutanten.
+  3. Spinnen auch in Werkhallen der Städte? Feinde auch für Bürger mit Schein?
+  4. Soll die Dampframme Städte verteidigen?
+  5. Blutschöpfer ohne die Regel „zweites Trinken tötet“.
+  6. Alle Werte.
+  7. Mutanten als Reise-Hinterhalt?
+- [E] HB-10: Welche Belohnung zahlt die Rotfall/Omega-Reihe aus? HB-20: Was übernimmt ein Erbe an Ehe und Bindungen?
+- [E] Klassen/Talente: Entscheidungen 2–16 aus klassen_talente.md §5 sind offen. Punkte sind entschieden: jede 2. Stufe plus 1 je Prüfung.
+- [B] Fehler aus der Klassen-Analyse:
+  - Koop-Gäste bekommen beim Aufstieg keine Talentpunkte.
+  - Der Erbe hat bis zum Neuladen 0 Punkte.
+  - Vampir und Grubenhäuptling haben keinen Zweig.
+  - BALANCE_GUIDE §7 (jede 2. Stufe) passt nicht zum Code (jede 3.).
+- [P] Pferde: Gang und Grundform nicht neu gezeichnet (Agent: „bereits brauchbar“). Prüfen, ob dem Entwickler das reicht.
+- Läuft: UI-Agent (Pergament, Docks, Spacing aller Menüs, Betriebe-Reiter mit Kasse, Schmiede-GUI, GUI-Prüfung aller Systeme), Despawn-Agent (Verfolger verschwinden).
+
 ## Ältere offene Punkte
 - [E] Hunt-Bericht `hunt/BERICHT.md` HB-01…HB-47: der Entwickler wählt die Fixes. Am dringendsten:
   - HB-01: gespeicherter Tod bietet nach dem Laden keine Erbenwahl.

@@ -25,3 +25,10 @@ Schmal (< 820 px): Protokoll ist ausgeblendet → der Meldungsfluss ist dort die
 - **Nicht gebaut (offen):** I-6 „seltene Beute im Protokoll ankündigen“ (nicht entschieden); Herold-Banner/Randbriefe für Weltereignisse (Q-6, Q-OE7 offen) — der Fluss ist die Grundlage dafür.
 - **Speichern:** nichts Neues im Spielstand (Fluss, Karte, Chip flüchtig).
 - **Proben:** keine bestehende Probe liest `#toast`; Toasts sind unter `S._quiet` stumm (bleibt so).
+
+## Stand
+- Scheibe 4 grün um 17:01 (Meldungsfluss, Aufnahme-Stapel, Fund-Karte, Warnchip; Proben „UI-Scheibe 4: …“ grün). Fremde rote Proben im selben Lauf: „Ratgeber …“ (Talent-Tipp ist seit heute abgeschaltet), „HB-07“, „HB-18“ (neue Proben anderer) — nicht aus dieser Scheibe.
+- Aufträge Q-1 grün um 17:01 (Kerben, Zählkerbe, Brief mit Siegel/zerrissen, Geste, Goldzähler).
+- Aufträge Q-2 grün um 17:01 (Geber-Siegel, Ansprech-Zeile, Karte/Minikarte).
+- Aufträge Q-3 grün um 17:01 (Auftragsbrief im Gespräch, Annahme-Brief fliegt zum Reiter, Steckbrief mit Gesicht, Lohnleiste mit Anteil-Kreis).
+- Aufträge Q-4 grün um 17:08 (Tracker groß + 3 klein, klappt im Kampf ein, Zielmarker nur verfolgt/nicht Sehr schwer, Wegmarken, Karte: Gebietskreis, gefüllt/hohl). Selbsttest 436/437, rot nur „Ratgeber …“ (fremd: Talent-Tipp seit heute aus).

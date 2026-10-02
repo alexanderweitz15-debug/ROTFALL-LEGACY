@@ -180,6 +180,11 @@ function drawSeals(now) {
   const z = cam.zoom, px = Math.max(2, Math.round(z * 1.5)), P = S.player, motion = S.settings?.motion !== false;
   for (const [e, m] of SEAL_LIST) {
     if ((e.map || 'world') !== S.map || e.alive === false) continue;
+    if (m.k === 'target') { const sc = MONSTERS[e.mtype]?.scale || 1, tx = Math.round((e.x - cam.x) * z), ty = Math.round((e.y - 78 * sc - cam.y) * z) + (motion ? Math.round(Math.sin(now / 260) * px * 0.5) : 0);   /* Q-OE5: zählt für den verfolgten Auftrag */
+      ctx.fillStyle = 'rgba(10,8,6,.8)'; ctx.fillRect(tx - 2 * px, ty - 2 * px, 4 * px, 4 * px); ctx.fillStyle = '#e0b75a'; ctx.fillRect(tx - px, ty - 2 * px, 2 * px, 4 * px); ctx.fillRect(tx - 2 * px, ty - px, 4 * px, 2 * px); ctx.fillStyle = '#9a3226'; ctx.fillRect(tx - px / 2, ty - px / 2, px, px); continue; }
+    if (m.k === 'flag') { const fx0 = Math.round((e.x - cam.x) * z), fy0 = Math.round((e.y - cam.y) * z);   /* Q5-7: gesetzte Wegmarke (Fahne) */
+      if (fx0 < -30 || fy0 < -40 || fx0 > W + 30 || fy0 > H + 40) continue;
+      ctx.fillStyle = '#2b2116'; ctx.fillRect(fx0 - px / 2, fy0 - 14 * px, px, 14 * px); ctx.fillStyle = '#a4402c'; ctx.fillRect(fx0 + px / 2, fy0 - 14 * px, 6 * px, 4 * px); ctx.fillStyle = '#c9a24a'; ctx.fillRect(fx0 + px / 2, fy0 - 14 * px, 6 * px, px); continue; }
     if (m.near && e !== SEAL_HOV && Math.hypot(e.x - P.x, e.y - P.y) > 62) continue;
     if (e.emote && now < e.emote.until) continue;
     const sx = Math.round((e.x - cam.x) * z - 4.5 * px), bob = motion ? Math.round(Math.sin(now / 420 + (e.x % 7)) * px * 0.6) : 0;
@@ -885,7 +890,22 @@ function drawGoblinNpc(e, now) {
   if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
 }
 // S13 (Nutzer: Reittiere, Kampf vom Pferd): das Reittier unter dem Helden, der Reiter 14 px höher
-const MOUNT_PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+// Pferde-Überarbeitung (02.10.2026, Entwickler: „Pferde-Sprites müssen überarbeitet werden“): sechs Fellfarben für normale
+// Pferde (Rappe/Fuchs/Brauner/Schimmel/Falbe/Schecke), fest an H.coat bzw. e.coat gebunden — damit bleibt jedes Pferd auf
+// der Koppel/im Stall immer gleich gefärbt. Messingross und Totenross bleiben bei ihrer festen Farbe.
+export const HORSE_COATS = ['rappe', 'fuchs', 'brauner', 'schimmel', 'falbe', 'schecke'];
+const HORSE_COAT_LABEL = { rappe: 'Rappe', fuchs: 'Fuchs', brauner: 'Brauner', schimmel: 'Schimmel', falbe: 'Falbe', schecke: 'Schecke' };
+export const horseCoatLabel = c => HORSE_COAT_LABEL[c] || HORSE_COAT_LABEL.brauner;
+const HORSE_COAT_PAL = {
+  rappe:    { body: '#241f1c', dark: '#0c0a08', eye: '#1a1512' },                               // fast schwarz, dunkle Mähne
+  fuchs:    { body: '#8a4a24', dark: '#4a2614', eye: '#2a1810' },                                // rotbraun, dunkle Mähne
+  brauner:  { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' },                                // Grundfarbe seit S13
+  schimmel: { body: '#c8c0b0', dark: '#8a8278', eye: '#2a2420' },                                // helles Grau, graue Mähne
+  falbe:    { body: '#b89a5c', dark: '#3a2e1c', eye: '#241c14' },                                // sandfarben, dunkle Beine/Mähne
+  schecke:  { body: '#cfc3ab', dark: '#5a4030', eye: '#241c14', patches: true },                 // hell mit braunen Platten
+};
+const MOUNT_PAL = { horse: HORSE_COAT_PAL.brauner, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+export const mountPalOf = (kind, coat) => kind === 'horse' ? (HORSE_COAT_PAL[coat] || HORSE_COAT_PAL.brauner) : (MOUNT_PAL[kind] || MOUNT_PAL.horse);
 // S15 (Nutzer): Das Pferd schaut in die Laufrichtung (auch nach oben und unten); im Stand behält es die letzte Richtung.
 // Nur Stil R hat Vorder- und Rückansicht, die anderen Stile bleiben seitlich.
 function horseDir(e) {
@@ -894,7 +914,8 @@ function horseDir(e) {
   return e.hDir || side;
 }
 function drawHorse(e, now, kind, rider) {
-  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = MOUNT_PAL[kind] || MOUNT_PAL.horse, dir = horseDir(e);
+  const coat = e.coat ?? e.mounted?.coat ?? S.mount?.coat;                                      // Fellfarbe: am Reittier selbst oder am Reiter gemerkt
+  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = mountPalOf(kind, coat), dir = horseDir(e);
   const blit = f => { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore(); };
   const ns = dir === 'N' || dir === 'S', ride = () => { ctx.save(); ctx.translate(0, ns ? -17 : -14); drawHumanoid(e, now); ctx.restore(); };
   shadow(e.x, e.y + 3, 19, .35);

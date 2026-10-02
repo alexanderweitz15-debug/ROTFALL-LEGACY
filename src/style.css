@@ -892,3 +892,114 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .ql-rew{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;padding-top:4px;border-top:1px solid rgba(90,74,54,.45);font-size:12px;color:var(--inkt)}
 .nomotion #qletter{transition:none}.nomotion #qletter .ql-seal,.nomotion #qletter .ql-half{animation:none!important}
 @media (max-width:820px){#qletter{top:8px}.ql-paper{min-width:0;padding-right:28px}.ql-title{font-size:13px}}
+/* ===== Aufträge Q-3 (02.10.2026): Auftragsbrief im Gespräch, Lohnleiste, Anteil-Kreis ===== */
+.dlg-brief{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:-4px 0 10px;padding:6px 10px;background:linear-gradient(180deg,rgba(214,195,154,.10),rgba(214,195,154,.04));border:1px solid #4a3d2b;border-left:3px solid #a8843e}
+.br-objs{display:flex;gap:6px;align-items:center}
+.br-obj{position:relative;display:inline-flex;align-items:flex-end;gap:2px}
+.br-obj b{font:12px "Cinzel",serif;color:#e0c070}
+.br-mon{width:36px;height:36px;background:#14110d;border:1px solid #3b3227;image-rendering:pixelated}
+.br-itm{width:30px;height:30px;background:#100d09;border:1px solid #3b3227;image-rendering:pixelated}
+.br-ico,.rw-i{width:24px;height:24px;image-rendering:pixelated}
+.br-eye{display:block;width:26px;height:16px;border-radius:50%;background:radial-gradient(circle,#1a140c 0 3px,#e0c070 3.5px 6px,#d8cdb6 6.5px);border:1px solid #6b5630}
+.br-days{display:inline-flex;align-items:center;gap:3px;font:12px "Cinzel",serif;color:#d8cdb6}
+.br-rew{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-left:auto}
+.rw{display:inline-flex;align-items:center;gap:3px;font-size:13px;color:#e7dcc2}.rw b{font-weight:400}
+.rw em{font-style:normal;font-size:10px}.rw.up em{color:#9ac08a}.rw.dn em{color:#d0705a}
+.rw-ban{display:block;width:12px;height:16px;border:2px solid;clip-path:polygon(0 0,100% 0,100% 78%,50% 100%,0 78%)}
+.rw-itm{width:26px;height:26px;background:#100d09;border:1px solid #6b5630;image-rendering:pixelated}
+.rw-pie{display:block;width:18px;height:18px;border-radius:50%;background:conic-gradient(#e0b75a 0 var(--p),#3a2e1c var(--p) 100%);border:1px solid #6b5630}
+.ql-rew .rw{color:var(--inkt)}.ql-rew .rw.up em{color:#3e6a2a}.ql-rew .rw.dn em{color:#8a2a1a}.ql-rew .rw-i{width:20px;height:20px}
+.ql-rew .rw-pie{border-color:var(--inkd);background:conic-gradient(#a8701e 0 var(--p),rgba(90,74,54,.3) var(--p) 100%)}
+@media (max-width:820px){.br-rew{margin-left:0}.dlg-brief{gap:4px 10px}}
+/* ===== Aufträge Q-4 (02.10.2026): Tracker oben rechts, klappt im Kampf ein ===== */
+.trk{position:absolute;right:10px;top:10px;width:236px;z-index:5;display:flex;flex-direction:column;gap:3px;font-size:12px;pointer-events:auto}
+.trk>div{background:rgba(14,11,9,.84);border:1px solid #3b3227;box-shadow:0 3px 10px rgba(0,0,0,.45);cursor:pointer}
+.trk>div:hover{border-color:#7a6232}
+.tk-main{padding:5px 8px 6px;border-left:3px solid #a8843e!important}
+.tk-r1{display:flex;align-items:center;gap:6px;min-width:0}
+.tk-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px "Cinzel",serif;letter-spacing:.04em;color:#e7dcc2}
+.tk-small .tk-name{font:12px "Spectral",serif;color:#b3a78e}
+.tk-seal{flex:none;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e8c070,#a47a2c 60%,#5a3e12);box-shadow:0 1px 0 #1a1208}
+.tk-seal.s{width:8px;height:8px;opacity:.75}
+.tk-dir{flex:none;display:inline-flex;align-items:center;gap:4px;color:#e0c070;font-size:11px}.tk-dir b{font-weight:400}
+.tk-arrow{display:block;width:14px;height:10px;background:#e0b75a;clip-path:polygon(0 30%,55% 30%,55% 0,100% 50%,55% 100%,55% 70%,0 70%)}
+.tk-r2{display:flex;align-items:center;gap:7px;margin-top:4px;flex-wrap:wrap}
+.tk-r2 .br-mon{width:28px;height:28px}.tk-r2 .br-itm{width:24px;height:24px}.tk-r2 .br-ico{width:20px;height:20px}.tk-r2 .br-eye{width:22px;height:13px}
+.tk-time{margin-left:auto;display:inline-flex}.tk-glass{display:block;width:10px;height:16px;--f:1;background:linear-gradient(180deg,#2a2318 0 calc((1 - var(--f)) * 100%),#e0b75a calc((1 - var(--f)) * 100%));clip-path:polygon(0 0,100% 0,100% 12%,62% 50%,100% 88%,100% 100%,0 100%,0 88%,38% 50%,0 12%);outline:1px solid #6b5630}
+.tk-time.late .tk-glass{background:linear-gradient(180deg,#2a1210 0 calc((1 - var(--f)) * 100%),#d0503a calc((1 - var(--f)) * 100%));animation:warnp 1.2s ease-in-out infinite}
+.tk-att{margin-left:auto;display:inline-flex;align-items:center;gap:3px;color:#e08a70;font-size:11px}.tk-att b{font-weight:400}.tk-i{width:16px;height:16px;image-rendering:pixelated}
+.tk-small{display:flex;align-items:center;gap:6px;padding:3px 8px}
+.trk.fight{width:auto;align-items:flex-end}.trk.fight .tk-small,.trk.fight .tk-name,.trk.fight .tk-dir,.trk.fight .tk-time,.trk.fight .tk-att,.trk.fight .br-mon,.trk.fight .br-itm,.trk.fight .br-ico,.trk.fight .br-eye{display:none}
+.trk.fight .tk-main{display:flex;align-items:center;gap:6px;padding:4px 7px}.trk.fight .tk-r2{margin:0}
+.trk.flash .tk-main{animation:flbump .5s ease-out 2}
+.nomotion .trk.flash .tk-main,.nomotion .tk-time.late .tk-glass{animation:none}
+@media (max-width:820px){.trk{width:190px}.tk-small{display:none}}
+/* ===== UI-Scheibe 5 (02.10.2026): Pergament-Lesefenster — Kodex, Chronik, Auftragsbuch, Erbe (Variante A, nur diese) ===== */
+.modal.parch .modal-frame{--paper:#d6c39a;--paper2:#c7b184;--paper-dk:#a8926a;--inkt:#2b2015;--inkd:#5a4a36;--sealr:#7a2c22;color:var(--inkt);
+  background:radial-gradient(ellipse at 50% 38%,#e4d4ac,#d2bd90 62%,#b59e70);border:1px solid #6b5630;
+  box-shadow:inset 0 0 70px rgba(90,60,30,.45),inset 0 0 0 6px rgba(120,96,60,.18),0 0 0 1px #0b0907,0 24px 70px rgba(0,0,0,.8)}
+.modal.parch .modal-head{color:var(--inkt);border-bottom:1px solid rgba(90,74,54,.45)}
+.modal.parch .modal-head button{color:var(--inkd)}.modal.parch .modal-head button:hover{color:var(--sealr)}
+.modal.parch #modal-tabs button{color:var(--inkd)}.modal.parch #modal-tabs button.on{color:var(--sealr);border-bottom-color:var(--sealr)}
+.modal.parch #modal-body{color:var(--inkt)}
+.modal.parch #modal-body::-webkit-scrollbar-track,.modal.parch .timeline::-webkit-scrollbar-track,.modal.parch .qb-list::-webkit-scrollbar-track{background:#c7b184}
+.modal.parch #modal-body::-webkit-scrollbar-thumb,.modal.parch .timeline::-webkit-scrollbar-thumb,.modal.parch .qb-list::-webkit-scrollbar-thumb{background:#8a7450;border-color:#c7b184}
+.modal.parch .ledger,.modal.parch .codex,.modal.parch .chron-detail{color:#3e3222}
+.modal.parch h2,.modal.parch h3,.modal.parch h4{color:#2b2015}
+.modal.parch .codex h2{color:var(--sealr)}.modal.parch .codex code{background:rgba(90,74,54,.14)}.modal.parch .codex hr{border-top-color:rgba(90,74,54,.4)}
+.modal.parch .codex i,.modal.parch .ledger i{color:#5a4a36}
+.modal.parch .txtbtn{background:rgba(255,248,230,.28);border-color:#8a7450;color:var(--inkt)}.modal.parch .txtbtn:hover{border-color:var(--sealr);color:var(--sealr)}
+.modal.parch .codex-top .txtbtn.active{border-color:var(--sealr);color:var(--sealr);background:rgba(255,248,230,.5)}
+.modal.parch input{background:rgba(255,248,230,.5)!important;border-color:#8a7450!important;color:var(--inkt)!important}
+.modal.parch .rank-tab td{color:#3e3222;border-bottom-color:rgba(90,74,54,.3)}.modal.parch .rank-tab tr.r-done td{color:#2e4a1e}.modal.parch .rank-tab tr.r-next td{color:var(--sealr)}
+.modal.parch .fx-row b{color:var(--inkt)}.modal.parch .beast-pic{border-color:#8a7450}
+.modal.parch .panel{background:rgba(255,248,230,.2);border-color:rgba(90,74,54,.45);box-shadow:none}.modal.parch .panel::before,.modal.parch .panel::after{display:none}
+.modal.parch .statline{border-bottom-color:rgba(90,74,54,.3);color:#4a3c2a}.modal.parch .statline b{color:var(--inkt)}
+.modal.parch .timeline{border-right-color:rgba(90,74,54,.4)}.modal.parch .tl-year{color:var(--sealr)}
+.modal.parch .tl-ev{color:#4a3c2a}.modal.parch .tl-ev:hover{color:#000}.modal.parch .tl-ev.sel{color:var(--sealr)}.modal.parch .tl-ev .dot{background:#8a7450}.modal.parch .tl-ev.death{color:#8a2a1a}
+.modal.parch .chron-detail h2{color:var(--inkt)}.modal.parch .s-key{color:#6a5a40}
+.modal.parch .epitaph{background:rgba(255,248,230,.25);border-color:#8a5a3a;color:#3a2a1a}
+/* Auftragsbuch als Doppelseite */
+#modal-body.qb-body{padding:10px 14px}
+.qb{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:18px;height:100%}
+.qb-empty{grid-column:1/-1;font-style:italic;color:#4a3c2a;padding:20px}
+.qb-left{display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(90,74,54,.4);padding-right:12px}
+.qb-sort{font-size:11px;color:#5a4a36;display:flex;gap:4px;align-items:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em}
+.qb-sort button{background:none;border:1px solid transparent;color:#5a4a36;font:11px "Cinzel",serif;padding:1px 6px}.qb-sort button.on{border-color:#8a7450;color:var(--sealr)}
+.qb-list{overflow:auto;display:flex;flex-direction:column;gap:2px;min-height:0}
+.qb-it{display:flex;align-items:center;gap:7px;text-align:left;background:none;border:none;border-bottom:1px dashed rgba(90,74,54,.35);padding:6px 4px;color:var(--inkt);font:13px "Spectral",serif}
+.qb-it:hover{background:rgba(255,248,230,.25)}.qb-it.sel{background:rgba(255,248,230,.42);box-shadow:inset 3px 0 0 var(--sealr)}
+.qb-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qb-seal{flex:none;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#d8b060,#a47a2c 60%,#5a3e12)}
+.qb-it.st-ready .qb-seal{background:radial-gradient(circle at 40% 35%,#fff0b8,#e0b75a 55%,#8a6a22);box-shadow:0 0 6px rgba(224,183,90,.8)}
+.qb-it.st-done .qb-seal{background:radial-gradient(circle at 40% 35%,#c4503a,#8c2a1e 60%,#5a160e)}.qb-it.st-done{color:#6a5a40}
+.qb-it.st-failed .qb-seal{background:radial-gradient(circle at 40% 35%,#4a4440,#1e1a18 60%);clip-path:polygon(0 0,46% 0,58% 40%,44% 62%,58% 100%,0 100%,0 0,100% 0,100% 100%,64% 100%,50% 62%,64% 40%,54% 0)}.qb-it.st-failed .qb-n{text-decoration:line-through;color:#7a6a50}
+.qb-trk{flex:none;width:8px;height:8px;background:var(--sealr);transform:rotate(45deg)}
+.qb-it .pips i,.qb-obj .pips i{border-color:#8a7450;background:rgba(90,74,54,.18)}.qb-it .pips i.on,.qb-obj .pips i.on{background:#a8701e;border-color:#a8701e;box-shadow:none}
+.qb-it .pips.full i.on,.qb-obj .pips.full i.on{background:#4e7a32;border-color:#4e7a32}
+.qb-obj .pips.bar{background:rgba(90,74,54,.18);border-color:#8a7450}.qb-obj .pips.bar u{background:#a8701e}
+.qb-page{overflow:auto;min-height:0}
+.qb-letter{position:relative;padding:14px 20px 16px;background:linear-gradient(180deg,rgba(255,250,232,.35),rgba(255,248,230,.15));border:1px solid rgba(90,74,54,.4);box-shadow:inset 0 0 26px rgba(120,90,50,.22)}
+.qb-head{display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(90,74,54,.35);padding-bottom:10px;margin-bottom:10px}
+#qb-por,.qb-por0{width:56px;height:56px;flex:none;border:2px solid #8a7450;background:#2a2116;image-rendering:pixelated;display:flex;align-items:center;justify-content:center}
+.qb-pi{width:40px;height:40px;image-rendering:pixelated}
+.qb-ttl{flex:1;min-width:0}.qb-ttl h2{margin:0;font:700 20px "Cinzel",serif;letter-spacing:.06em}.qb-giver{font-style:italic;color:#5a4a36;font-size:13px;margin-top:2px}
+.qb-stamp{flex:none;font:700 11px "Cinzel",serif;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;border:2px solid currentColor;color:#8a6a22;transform:rotate(-6deg);opacity:.85}
+.st-ready .qb-stamp{color:#7a5a12}.st-done .qb-stamp{color:var(--sealr)}.st-failed .qb-stamp{color:#2a2420}
+.qb-desc{font-size:14px;line-height:1.65;color:#2b2015;margin:4px 0 12px;white-space:pre-line}
+.qb-objs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.qb-obj{display:flex;align-items:center;gap:9px;font-size:13px}.qb-obj .br-mon,.qb-obj .br-itm{background:#2a2116;border-color:#8a7450}
+.qb-line{display:flex;align-items:center;gap:6px;font-size:13px;color:#3e3222;margin:3px 0}.qb-li{width:16px;height:16px;image-rendering:pixelated}
+.qb-out{font-style:italic;color:#5a3a22;border-left:3px solid #8a5a3a;padding-left:8px}
+.qb-rew{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:12px;padding-top:8px;border-top:1px solid rgba(90,74,54,.35)}
+.qb-rew>span:first-child{font:11px "Cinzel",serif;letter-spacing:.14em;text-transform:uppercase;color:#5a4a36}
+.qb-rew .rw{color:var(--inkt)}.qb-rew .rw.up em{color:#3e6a2a}.qb-rew .rw.dn em{color:#8a2a1a}.qb-rew .rw-itm{background:#2a2116}
+.qb-act{display:flex;gap:8px;margin-top:14px}
+.qb-act button{background:rgba(255,248,230,.3);border:1px solid #8a7450;color:var(--inkt);font:12px "Cinzel",serif;letter-spacing:.08em;padding:6px 12px}.qb-act button:hover{border-color:var(--sealr);color:var(--sealr)}
+@media (max-width:820px){.qb{grid-template-columns:1fr}.qb-left{border-right:none;border-bottom:1px solid rgba(90,74,54,.4);padding:0 0 8px;max-height:38vh}}
+/* Erbe (Nachfolger-Wahl) als Pergamentkarten */
+#successor .succ-card{background:radial-gradient(ellipse at 50% 30%,#e4d4ac,#cdb789 70%,#b59e70);border:1px solid #6b5630;color:#2b2015;box-shadow:inset 0 0 30px rgba(90,60,30,.4),0 10px 30px rgba(0,0,0,.6)}
+#successor .succ-card:hover{border-color:#7a2c22}
+#successor .succ-card h3{color:#2b2015}#successor .succ-card .rel{color:#7a2c22}
+#successor .succ-card .row{color:#4a3c2a;border-bottom-color:rgba(90,74,54,.35)}#successor .succ-card .row b{color:#2b2015}
+#successor .succ-card canvas{border-color:#8a7450;background:#2a2116}

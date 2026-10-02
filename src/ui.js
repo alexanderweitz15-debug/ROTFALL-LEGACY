@@ -2,7 +2,7 @@
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=24';
 import * as CS from './cloudsave.js?v=24';
 import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=24';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=24';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=24';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=24';
 import { wearOf } from './buildings.js?v=24';
 import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
@@ -155,7 +155,7 @@ export function refreshHUD() {
     drawPortraitTo(cv, m);
   } }
   hudSet('res-list', [['wood', 'Holz', S.res.wood], ['stone', 'Stein', S.res.stone], ['iron', 'Eisen', S.res.iron],
-    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', S.res.food], ['gold', 'Gold', S.gold]]
+    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', A.provisions ? Math.round(A.provisions() * 10) / 10 : S.res.food], ['gold', 'Gold', S.gold]]
     .map(([i, k, v]) => { const im = icoImg('res_' + i, 2, 'resico'); return `<span title="${k}" class="${im ? 'hasico' : ''}">${im || k}<b>${Math.floor(v)}</b></span>`; }).join(''), true);   /* UI-Umbau: Piktogramm + Zahl */
   // Kopfzeile
   hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
@@ -164,6 +164,7 @@ export function refreshHUD() {
   goldShow(S.gold);   /* Q8-5: Gold zählt hoch */
   paintWarn();   /* UI-Scheibe 4: Warnchip */
   questWatch();   /* Q-1: Brief mit Siegel bei Abschluss/Scheitern */
+  paintTracker();   /* Q-4: Tracker */
   renderHotbar();
 }
 
@@ -278,8 +279,8 @@ function stableUI(body, npc) {
       <canvas data-h="${H.id}" width="150" height="100" style="width:150px;height:100px;image-rendering:pixelated;display:block;margin:0 auto"></canvas>
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
-  const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  // Pferde-Überarbeitung (02.10.2026): echte Fellfarbe (H.coat) statt zufälliger Namenslänge — das Porträt zeigt dasselbe Pferd wie draußen im Spiel.
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -528,8 +529,10 @@ export const uiHooks = {};                                           /* Koop: Ge
 const DLG_K = [['leave', /^\[?(Gehen|Nicht jetzt|Abbrechen|Zurück|Lass|Später|Nein)/i], ['fight', /angreif|kämpf|herausforder|Duell|töte|stirb|Klinge/i],
   ['gold', /\d+\s*Gold|bezahl|besteche|Bestechung|zahle/i], ['quest', /Was liegt an|Erledigt\.|Ich mache es|Auftrag|Abgeben/], ['trade', /Handel|Waren|Zeig mir|kaufen|verkaufen/i], ['ask', /\?/]];
 let dlgTyper = 0;
-export function dialogue(npc, text, choices) {
+export function dialogue(npc, text, choices, opt = null) {   /* opt.brief: Auftragsbrief (Q-3) unter dem Text */
   if (uiHooks.dialogue?.(npc, text, choices)) return;
+  { let bx = $('dlg-brief'); if (!bx) { bx = el('div', 'dlg-brief'); bx.id = 'dlg-brief'; $('dlg-text').after(bx); }
+    bx.innerHTML = opt?.brief ? briefHTML(opt.brief) : ''; bx.classList.toggle('hidden', !opt?.brief); if (opt?.brief) paintBrief(bx); }
   const box = $('dialogue'), opening = box.classList.contains('hidden') || dlgWith !== npc;
   box.classList.remove('hidden'); dlgWith = npc;
   const story = !!A.dlgStory?.(npc, choices);
@@ -658,6 +661,32 @@ export function pips(h, n) {
   return n <= 8 ? `<span class="pips${h >= n ? ' full' : ''}" title="${t}">${'<i class="on"></i>'.repeat(h)}${'<i></i>'.repeat(n - h)}</span>`
     : `<span class="pips bar${h >= n ? ' full' : ''}" title="${t}"><u style="width:${Math.round(h / n * 100)}%"></u></span>`;
 }
+// Q-3 (quests.md Q2-1, Q8-1/4; Entscheidung 02.10.2026): Auftragsbrief — Ziel-Piktogramme (Gegnerbild, Gegenstand, Auge für Suche, Zeichen der Auftragsart)
+// und Lohn. nums = false: nur die Lohnart als Symbol, die Zahl im Tooltip (feste Aufträge vor der Annahme); Ruf als Wappen + Richtung.
+function objIco(o) {
+  if (o.t === 'kill') return MONSTERS[o.mt] ? `<canvas class="br-mon" data-mt="${o.mt}" width="36" height="36"></canvas>` : icoImg('log_death', 2, 'br-ico');
+  if (o.t === 'item') return ITEMS[o.key] ? `<canvas class="br-itm" data-ico="${o.key}"></canvas>` : icoImg('log_economy', 2, 'br-ico');
+  if (o.t === 'find') return '<i class="br-eye"></i>';
+  return icoImg(o.ico || 'log_quest', 2, 'br-ico');
+}
+const qa = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+export function rewardHTML(R, nums) {
+  if (!R) return ''; const out = [], sg = v => (v > 0 ? '+' : '') + v;
+  if (R.gold) out.push(`<span class="rw" title="Gold: ${R.gold}">${icoImg('res_gold', 2, 'rw-i')}${nums ? `<b>${R.gold}</b>` : ''}</span>`);
+  if (R.xp) out.push(`<span class="rw" title="Erfahrung: ${R.xp}">${icoImg('bar_xp', 2, 'rw-i')}${nums ? `<b>${R.xp}</b>` : ''}</span>`);
+  for (const k of R.items || []) out.push(`<span class="rw" title="Gegenstand: ${qa(ITEMS[k]?.name || k)}">${nums ? `<canvas class="rw-itm" data-ico="${k}"></canvas>` : icoImg('log_economy', 2, 'rw-i')}</span>`);
+  for (const [f, v] of R.rep || []) { const F = FACTIONS[f]; out.push(`<span class="rw ${v >= 0 ? 'up' : 'dn'}" title="${qa(F?.name || f)}: ${sg(v)} Ansehen"><i class="rw-ban" style="background:${F?.colors?.[0] || '#555'};border-color:${F?.colors?.[1] || '#999'}"></i><em>${v >= 0 ? '▲' : '▼'}</em>${nums ? `<b>${sg(v)}</b>` : ''}</span>`); }
+  for (const [who, v] of R.rel || []) out.push(`<span class="rw ${v >= 0 ? 'up' : 'dn'}" title="Beziehung zu ${qa(who)}: ${sg(v)}">${icoImg('bar_hp', 2, 'rw-i')}<em>${v >= 0 ? '▲' : '▼'}</em>${nums ? `<b>${sg(v)}</b>` : ''}</span>`);
+  if (R.unlock) out.push(`<span class="rw" title="Ausbildung: ${qa(R.unlock)}">${icoImg('nav_codex', 2, 'rw-i')}</span>`);
+  if (R.promote) out.push(`<span class="rw" title="Beförderung: ${qa(R.promote)}">${icoImg('set_level', 2, 'rw-i')}</span>`);
+  if (R.share != null) out.push(`<span class="rw" title="Dein Anteil an der Arbeit: ${Math.round((R.work || 0) * 100)} % — der Lohn ist auf ${Math.round(R.share * 100)} % gekürzt. Wer die Wachen kämpfen lässt, bekommt weniger."><i class="rw-pie" style="--p:${Math.round(R.share * 100)}%"></i></span>`);
+  return out.join('');
+}
+function briefHTML(B) {
+  const objs = (B.objs || []).map(o => `<span class="br-obj" title="${qa(o.text || '')}">${objIco(o)}${o.n > 1 ? `<b>×${o.n}</b>` : ''}</span>`).join('');
+  return `<div class="br-objs">${objs}</div>${B.days ? `<span class="br-days" title="Frist: ${B.days} Tage ab Annahme">${icoImg('time', 2, 'rw-i')}<b>${B.days}</b></span>` : ''}<div class="br-rew" title="${B.nums ? 'Lohn' : 'Lohn — die Maus zeigt, wie viel'}">${rewardHTML(B.rew, B.nums)}</div>`;
+}
+function paintBrief(root) { paintIcons(root); root.querySelectorAll('canvas[data-mt]').forEach(c => drawMonsterTo(c, c.dataset.mt)); }
 // Brief mit Siegel (Q7-1, Q9-1): erfüllt = Stempel, gescheitert = der Brief reißt, das Siegel bricht schwarz. Oben Mitte im Spielfeld, einer nach
 // dem anderen. Ausgelöst vom Zustandswechsel des Auftrags (aktiv → erledigt/gescheitert) — gleich wo im Spiel er passiert, im Einzelspiel wie beim
 // Koop-Gast (dessen S.quests kommt vom Host): genau ein Brief je Wechsel. Neuer Held (Erbe) oder Proben (S._quiet): nur still neu merken.
@@ -666,7 +695,9 @@ export let letterCount = 0;                                       /* Proben: aus
 export function questSnap() { qSnap = new Map(Object.entries(S.quests || {}).map(([k, v]) => [k, v?.state])); qSnapP = S.player; }
 export function questWatch() {
   if (!qSnap || qSnapP !== S.player || !S.player) return questSnap();   /* unter S._quiet zählt questLetter nur (keine Anzeige) */
-  for (const [k, v] of Object.entries(S.quests || {})) { const o = qSnap.get(k); if (o === 'active' && (v?.state === 'done' || v?.state === 'failed')) questLetter(v.state, k); }
+  for (const [k, v] of Object.entries(S.quests || {})) { const o = qSnap.get(k);
+    if (o === 'active' && (v?.state === 'done' || v?.state === 'failed')) questLetter(v.state, k, v.state === 'done' ? { rew: `<div class="ql-rew">${rewardHTML(A.questReward?.(k), true)}</div>` } : {});
+    else if (o !== 'active' && v?.state === 'active') questLetter('accept', k);   /* Q2-2: Annahme = Brief mit Stempel, fliegt zum Reiter */ }
   questSnap();
 }
 export function questLetter(kind, k, o = {}) {
@@ -680,11 +711,16 @@ function letterNext() {
   const paper = `<div class="ql-paper"><div class="ql-head">Auftrag</div><div class="ql-title"></div>${L.rew || ''}</div>`;
   d.className = 'ql-' + L.kind; document.body.classList.toggle('nomotion', S.settings?.motion === false);
   d.innerHTML = (L.kind === 'failed' ? `<div class="ql-half l">${paper}</div><div class="ql-half r">${paper}</div>` : paper) + `<div class="ql-seal"><b>${word}</b></div>`;
-  d.querySelectorAll('.ql-title').forEach(t => { t.textContent = L.name; });
+  d.querySelectorAll('.ql-title').forEach(t => { t.textContent = L.name; }); paintBrief(d);
   d.title = (L.kind === 'failed' ? 'Auftrag gescheitert' : L.kind === 'done' ? 'Auftrag erfüllt' : 'Auftrag angenommen') + ' — Klick: weg. Alles steht im Protokoll und im Auftragsbuch (J).';
   void d.offsetWidth; d.classList.add('on');
   sfx(L.kind === 'failed' ? 'crack' : L.kind === 'done' ? 'bell' : 'ui', 0, L.kind === 'done' ? 0.35 : 0.5);
-  clearTimeout(letterT); letterT = setTimeout(letterEnd, L.kind === 'failed' ? 2700 : 2400);
+  clearTimeout(letterT); letterT = setTimeout(L.kind === 'accept' ? letterFly : letterEnd, L.kind === 'failed' ? 2700 : L.kind === 'accept' ? 1500 : 2600);
+}
+function letterFly() {                                           /* Q2-2: der angenommene Brief fliegt zum Reiter „Aufträge“, der kurz aufleuchtet */
+  const d = $('qletter'), b = navBtn('quest'), pp = d?.querySelector('.ql-paper'); if (!d || !b || !pp || S.settings?.motion === false || !pp.animate) return letterEnd();
+  const a = pp.getBoundingClientRect(), z = b.getBoundingClientRect(), an = d.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.round(z.left + z.width / 2 - (a.left + a.width / 2))}px),${Math.round(z.top - a.top)}px) scale(.12)`, opacity: .2 }], { duration: 620, easing: 'cubic-bezier(.5,0,.8,.5)' });
+  an.onfinish = () => { d.classList.remove('on'); an.cancel(); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); trackerFlash(); clearTimeout(letterT); letterT = setTimeout(letterNext, 200); };
 }
 function letterEnd() { const d = $('qletter'); if (!d) return; clearTimeout(letterT); d.classList.remove('on'); letterT = setTimeout(letterNext, 320); }
 // Goldzähler in der Kopfleiste zählt hoch (Q8-5); weniger Gold springt sofort. Ohne Bildtakt (verdecktes Fenster): Endstand nach 0,9 s.
@@ -698,6 +734,33 @@ function goldShow(v) {
   const step = now => { const k = Math.min(1, (now - goldT0) / 600); goldShown = Math.round(goldFrom + (goldTo - goldFrom) * (1 - Math.pow(1 - k, 3))); g.textContent = String(goldShown); if (k < 1) goldRaf = requestAnimationFrame(step); else fin(); };
   cancelAnimationFrame(goldRaf); goldRaf = requestAnimationFrame(step);
 }
+// ---------------- Auftrags-Tracker (Visuell Q-4, Entscheidung 02.10.2026) ----------------
+// Oben rechts im Spielfeld (unter der Minikarte): verfolgter Auftrag groß — Ziel-Bild, Kerben, Richtungspfeil + Entfernung, Frist-Sanduhr bzw.
+// Zeit bis zum Angriff; bis zu 3 weitere klein (Klick = verfolgen). Im Kampf klappt er auf Siegel + Kerben ein. Klick auf den großen: Auftragsbuch.
+// Neu gebaut wird nur, wenn sich Inhalt ändert (Signatur); Pfeil, Entfernung, Sanduhr und Angriffszeit werden je Takt nur gesetzt.
+let trkSig = '';
+function paintTracker() {
+  const vp = $('viewport'); if (!vp) return;
+  let t = $('trk');
+  if (!t) { t = el('div', 'trk hidden'); t.id = 'trk'; vp.appendChild(t);
+    t.onclick = e => { const r = e.target.closest('[data-k]'); if (!r) return; if (r.classList.contains('tk-main')) openModal('quests'); else { A.trackQuest?.(r.dataset.k); trkSig = ''; paintTracker(); } }; }
+  const I = A.tracker?.();
+  if (!I?.list?.length || S.cine) { if (!t.classList.contains('hidden')) { t.classList.add('hidden'); trkSig = ''; } return; }
+  const mm = $('minimap'); t.style.top = mm && mm.style.display !== 'none' ? (mm.offsetTop + mm.offsetHeight + 8) + 'px' : '';
+  const sig = [I.fight ? 1 : 0, ...I.list.map(o => [o.k, o.name, o.objs.join(';'), o.late ? 1 : 0, o.attack ? 1 : 0, o.frac != null ? 1 : 0, o.ico ? JSON.stringify(o.ico) : ''].join('|'))].join('#');
+  if (sig !== trkSig) { trkSig = sig; t.classList.remove('hidden'); t.classList.toggle('fight', !!I.fight);
+    t.innerHTML = I.list.map(o => o.big ? `<div class="tk-main" data-k="${o.k}" title="Verfolgter Auftrag — Klick öffnet das Auftragsbuch (J). Im Kampf klappt er ein.">
+      <div class="tk-r1"><i class="tk-seal"></i><span class="tk-name"></span><span class="tk-dir hidden"><i class="tk-arrow"></i><b class="tk-d"></b></span></div>
+      <div class="tk-r2">${o.ico ? objIco(o.ico) : ''}${o.objs.map(([h, n]) => pips(h, n)).join('')}${o.frac != null ? `<span class="tk-time${o.late ? ' late' : ''}" title="${o.late ? 'Die Frist endet heute.' : 'Frist: so viel Zeit bleibt noch.'}"><i class="tk-glass"></i></span>` : ''}${o.attack ? `<span class="tk-att">${icoImg('log_combat', 1, 'tk-i')}<b></b></span>` : ''}</div></div>`
+      : `<div class="tk-small" data-k="${o.k}" title="Klick: diesen Auftrag verfolgen"><i class="tk-seal s"></i><span class="tk-name"></span>${o.objs.map(([h, n]) => pips(h, n)).join('')}</div>`).join('');
+    [...t.querySelectorAll('[data-k]')].forEach((r, i) => { r.querySelector('.tk-name').textContent = I.list[i].name; }); paintBrief(t); }
+  const B = I.list[0]; if (!B?.big) return;
+  const ar = t.querySelector('.tk-dir'); if (ar) { const has = B.ang != null; ar.classList.toggle('hidden', !has);
+    if (has) { ar.firstChild.style.transform = `rotate(${B.ang.toFixed(2)}rad)`; ar.lastChild.textContent = B.d > 999 ? (B.d / 1000).toFixed(1) + ' km' : Math.round(B.d) + ' m'; ar.title = B.where || ''; } }
+  const g = t.querySelector('.tk-glass'); if (g) g.style.setProperty('--f', (B.frac ?? 0).toFixed(2));
+  const at = t.querySelector('.tk-att'); if (at && B.attack) { at.lastChild.textContent = B.attack.replace(/^Angriff in /, ''); at.title = B.attack; }
+}
+function trackerFlash() { const t = $('trk'); if (!t || S.settings?.motion === false) return; t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash'); }
 export function setPrompt(text) {
   const p = $('prompt');
   if (!text) { p.classList.add('hidden'); return; }
@@ -713,6 +776,7 @@ function leaveWin(next) {                                     /* P6/P7: Fenster 
   if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
   if (next === 'inventory') { const b = navBtn('inv'); if (b) { b.classList.remove('badge'); b.title = 'Gepäck (I)'; } }   /* Aufnahme-Stapel: Punkt bis das Gepäck offen war */
   $('modal')?.classList.toggle('dock', next === 'trade');
+  $('modal')?.classList.toggle('parch', ['codex', 'chronicle', 'quests'].includes(next));   /* UI-Scheibe 5: Pergament nur für die Lesefenster */
   document.body.classList.toggle('nomotion', S.settings?.motion === false);   /* „Reduzierte Bewegung“: kein Glanz, kein Pulsieren */
 }
 export function closeModal() { leaveWin(null); $('modal').classList.add('hidden'); modalOpen = null; [...$('nav').children].forEach(b => b.classList.remove('active')); S.paused = false; }
@@ -1692,19 +1756,40 @@ function trSell(objs, n, ok = false) {
   trPaint();
 }
 
+// UI-Scheibe 5 + quests.md Q11 (Entscheidung 01.10.: Pergament für das Auftragsbuch): Doppelseite — links die Liste mit Siegeln (offen, bereit
+// zur Abgabe, erfüllt, zerrissen), rechts der Brief des gewählten Auftrags: Geber mit Bild (Bewohner auf „Sehr schwer“ ohne), Ziel-Piktogramme mit
+// Kerben, Ort, Frist, Lohn (feste Aufträge vor dem Abschluss nur als Symbol). Ordnen nach Stand oder Entfernung (nur Anzeige).
+let qbSel = null;
+const QB_WORD = { active: 'offen', ready: 'bereit', done: 'erfüllt', failed: 'gescheitert' };
 function questUI(body) {
-  const order = { active: 0, done: 1, failed: 2 };                 // S13: offene zuerst; Verfolgen, Abbrechen, Ziel und Frist sichtbar
-  const list = Object.entries(S.quests).filter(([k]) => QUESTS[k]).sort((a, b) => order[a[1].state] - order[b[1].state]);
-  body.innerHTML = list.map(([k, v]) => {
-    const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
-    return `<div class="panel" style="padding:12px;margin-bottom:8px${v.state !== 'active' ? ';opacity:.6' : ''}"><h3>${I.tracked ? '◆ ' : ''}${Q.name} <span style="float:right;color:#8d836e">${
-      { active:'offen', done:'abgeschlossen', failed:'gescheitert' }[v.state]}</span></h3>
-      <div class="ledger">${Q.desc}<br>${Q.objectives.map((o, i) => `· ${o.text} ${pips(v.progress[i] || 0, o.count || 1)}`).join('<br>')}
-      ${I.where ? `<br>Ziel: ${I.where}` : ''}${I.timer ? `<br>${I.timer}` : ''}${v.outcome ? `<br><i>${v.outcome}</i>` : ''}</div>
-      ${v.state === 'active' ? `<div class="ctx-actions" style="margin-top:6px"><button data-track="${k}">${I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${I.cancel ? `<button data-cancel="${k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
-  }).join('') || '<div class="ledger">Keine Aufträge. Frag im Dorf nach.</div>';
-  body.querySelectorAll('[data-track]').forEach(b => b.onclick = () => { A.trackQuest(b.dataset.track); questUI(body); });
-  body.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { if (b.dataset.sure) { A.cancelQuest(b.dataset.cancel); questUI(body); } else { b.dataset.sure = 1; b.textContent = 'Wirklich abbrechen?'; } });
+  body.className = 'qb-body';
+  const ord = { active: 0, done: 1, failed: 2 }, byDist = S.settings?.qSort === 'dist';
+  const L = Object.entries(S.quests).filter(([k]) => QUESTS[k]).map(([k, v]) => { const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
+    const ready = v.state === 'active' && Q.objectives.every((o, i) => (v.progress?.[i] || 0) >= (o.count || 1)); return { k, v, Q, I, st: ready ? 'ready' : v.state }; })
+    .sort((a, b) => ord[a.v.state] - ord[b.v.state] || (b.I.tracked ? 1 : 0) - (a.I.tracked ? 1 : 0) || (byDist && a.v.state === 'active' ? (a.I.dist ?? 1e12) - (b.I.dist ?? 1e12) : 0));
+  if (!L.length) { body.innerHTML = '<div class="qb"><div class="qb-empty">Keine Aufträge. Frag im Dorf nach — wer Arbeit hat, trägt ein Siegel über dem Kopf; am Anschlagbrett hängen Zettel.</div></div>'; return; }
+  if (!L.some(x => x.k === qbSel)) qbSel = (L.find(x => x.I.tracked) || L[0]).k;
+  body.innerHTML = `<div class="qb"><div class="qb-left"><div class="qb-sort">Ordnen <button data-s="state" class="${byDist ? '' : 'on'}">Stand</button><button data-s="dist" class="${byDist ? 'on' : ''}" title="Offene Aufträge nach Entfernung">Entfernung</button></div>
+    <div class="qb-list">${L.map(x => `<button class="qb-it st-${x.st}${x.k === qbSel ? ' sel' : ''}" data-q="${x.k}" title="${QB_WORD[x.st]}${x.I.tracked ? ' · wird verfolgt' : ''}"><i class="qb-seal"></i><span class="qb-n"></span>${x.v.state === 'active' ? x.Q.objectives.map((o, i) => pips(x.v.progress?.[i] || 0, o.count || 1)).join('') : ''}${x.I.tracked ? '<i class="qb-trk"></i>' : ''}</button>`).join('')}</div></div>
+    <div class="qb-page" id="qb-page"></div></div>`;
+  body.querySelectorAll('.qb-it').forEach((b, i) => { b.querySelector('.qb-n').textContent = L[i].Q.name; b.onclick = () => { qbSel = b.dataset.q; questUI(body); }; });
+  body.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { S.settings.qSort = b.dataset.s; questUI(body); });
+  const x = L.find(y => y.k === qbSel), pg = $('qb-page'), G = A.questGiver?.(x.k) || { label: '' }, B = A.bookBrief?.(x.k), active = x.v.state === 'active';
+  pg.innerHTML = `<div class="qb-letter st-${x.st}"><div class="qb-head">${G.npc ? '<canvas id="qb-por" width="56" height="56"></canvas>' : `<span class="qb-por0">${icoImg(G.label.startsWith('Anschlag') ? 'log_quest' : 'set_level', 3, 'qb-pi')}</span>`}
+      <div class="qb-ttl"><h2></h2><div class="qb-giver"></div></div><div class="qb-stamp">${QB_WORD[x.st]}</div></div>
+    <p class="qb-desc"></p>
+    <div class="qb-objs">${x.Q.objectives.map((o, i) => `<div class="qb-obj">${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`).join('')}</div>
+    ${x.I.where ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>${qa(x.I.where)}</span></div>` : active && x.Q.objectives.some(o => o.type === 'find') ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>Kein Ziel auf der Karte — die Suche ist der Auftrag.</span></div>` : ''}
+    ${x.I.timer ? `<div class="qb-line">${icoImg('time', 1, 'qb-li')}<span>${qa(x.I.timer)}</span></div>` : ''}
+    ${x.v.outcome ? `<p class="qb-out"></p>` : ''}
+    ${B?.rew ? `<div class="qb-rew"><span>Lohn</span>${rewardHTML(B.rew, B.nums)}</div>` : ''}
+    ${active ? `<div class="qb-act"><button data-track="${x.k}">${x.I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${x.I.cancel ? `<button data-cancel="${x.k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
+  pg.querySelector('h2').textContent = x.Q.name; pg.querySelector('.qb-giver').textContent = G.label ? 'Auftraggeber: ' + G.label : '';
+  pg.querySelector('.qb-desc').textContent = x.Q.desc || ''; pg.querySelectorAll('.qb-ot').forEach((t, i) => { t.textContent = x.Q.objectives[i].text; });
+  if (x.v.outcome) pg.querySelector('.qb-out').textContent = x.v.outcome;
+  if (G.npc && $('qb-por')) drawPortraitTo($('qb-por'), G.npc); paintBrief(pg);
+  pg.querySelectorAll('[data-track]').forEach(b => b.onclick = () => { A.trackQuest(b.dataset.track); questUI(body); });
+  pg.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { if (b.dataset.sure) { A.cancelQuest(b.dataset.cancel); questUI(body); } else { b.dataset.sure = 1; b.textContent = 'Wirklich abbrechen?'; } });
 }
 
 function settingsUI(body) {

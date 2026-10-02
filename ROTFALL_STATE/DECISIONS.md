@@ -177,3 +177,18 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Der aufgeladene schwere Hieb des Spielers ist nicht blockbar; dafür bestehendes `heavyHit`/UNBLOCK nutzen.
   - Der Dolch behält seinen Vorteil (+17 % Schaden je Sekunde gegen Banditen): „Dolch ist schnell“.
 - **Hunt-Fehler:** Der Entwickler hat das Beheben der Hunt-Fehler freigegeben.
+- **Klassen und Talente (Wunsch 02.10.2026, abends):**
+  - Klasse lernen heißt: bezahlen und 1–2 Prüfungsaufträge, danach eine Aufnahme-Animation und eine kurze Szene.
+  - Es gibt mehr Talentpunkte.
+  - Jede Klasse bekommt einen eigenen Talentbaum im Sternbild-Stil (wie Skyrim).
+  - Bis dahin sind alle Talentbäume versteckt.
+  - Analyse läuft (PROPOSALS/klassen_talente.md); die offenen Fragen kommen danach.
+- **Pferde-Sprites:** werden überarbeitet (Artist-Agent).
+- **Betriebe (22:00):**
+  - Der Gewinn eigener Betriebe sammelt sich in der Kasse des Betriebs. Abholen geht vor Ort oder im Siedlungs-Reiter.
+  - Ein Überfall oder eine Besatzung kann die Kasse leeren.
+  - Unter Siedlung kommt ein eigener Reiter mit Betriebsliste, Auswahl, Bild des Hauses, Ertrag pro Tag und Kasse.
+- **Schmiede:** bekommt eine richtige GUI. Jedes System prüfen, das eine eigene GUI vertragen könnte, und dort eine bauen.
+- **Spacing:** falsch im Siedlungsfenster, in Charakter/Inventar und in allen Menüs, die man oben öffnen kann. Alle überarbeiten.
+- **Gegner-Despawn:** Verfolger verschwinden, wenn man wegrennt. Das soll nicht so sein.
+- **Talentpunkte:** jede 2. Stufe plus 1 je bestandener Klassenprüfung, rückwirkend für alte Stände. Die anderen Klassen-Entscheidungen sind noch offen (PROPOSALS/klassen_talente.md §5).
