@@ -8,6 +8,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Varonheim: erschlagene Hofleute bleiben tot, Kanzlertod beendet den Kult, Reichsverweser rückt nach; Thronwirren lassen die Hauptstadt ohne König zerfallen und übernehmen.
 - Menüs: Reiter in Charakter- und Fraktionsfenster nicht mehr zusammengequetscht; Stylesheet mit Cache-Schlüssel.
 - Ereignisfiguren laufen von außerhalb ins Bild statt aufzuploppen; Angst geht vor Ereignissen (kein Fest, andere Orte, Neuankömmlinge fürchten sich mit).
+- Reliquien: Endgame-Fortschritt mit drei Fassungen, 24 Reliquien (11 Spielweisen, 9 Boss-/Regionalboss-Stücke), Stufen I–VIII mit Pfaden, Synergien und Verwandlung, Seelenglut und Sternsplitter, Beute bei Bossen, Elite und Dungeon-Enden, Fenster „Reliquien (V)“; am Grab vererbt, beim Erben schlummernd bis zur Erweckung.
 - Omega: eigene Sternenklinge (Goldschwingen, Sternknauf, glimmende Hohlkehle), Todesszene, Klinge garantiert; danach im Westen verhasst, im Osten gefeiert. In Szenen nimmt die Gruppe keinen Schaden.
 
 ## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)

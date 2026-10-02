@@ -1,6 +1,6 @@
 # Plan: Reliquien (Trinket-System, Endgame-Macht)
 
-Stand 02.10.2026. Status: **Entwurf, wartet auf Designentscheidungen (Abschnitt 9).** Noch kein Code.
+Stand 02.10.2026. Status: **gebaut (Version 24).** Entscheidungen des Nutzers: E1 b (am Grab, Erweckung neu), E2 drei eigene Fassungen, E4 stark mit Deckeln, E5 „Reliquien“. E3 wie vorgeschlagen (Gold, Seelenglut, Sternsplitter, Trophäe). E6 nach Bestand: Boss-Reliquien einmal je Welt, danach Sternsplitter. Spieler-Regeln: docs/MECHANIKEN.md, Zahlen: docs/BALANCE.md.
 
 Arbeitsname im Spiel: **Reliquien**. Kollision: `RELICS` (game.js) heißt schon ein einzelnes Weltstück („Die letzte Wache“). Alternativen stehen in Entscheidung E5.
 

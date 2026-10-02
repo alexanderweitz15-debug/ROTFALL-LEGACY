@@ -2,7 +2,7 @@
 import { S, clamp, seasonOf } from './state.js?v=24';
 import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=24';
 import * as HB from './buildings.js?v=24';
-import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=24';
+import { ITEMS, MONSTERS, FACTIONS, RELIQ } from './data.js?v=24';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=24';
 import * as SP from './sprites.js?v=24';
 import { trailPt, WAGON_GAP } from './sim.js?v=24';
@@ -3172,10 +3172,33 @@ function iconR(c, it, key, w, h) {
   const k0 = Math.min((w - 2) / src.width, (h - 2) / src.height), k = k0 >= 2 ? Math.floor(k0) : k0, dw = Math.round(src.width * k), dh = Math.round(src.height * k);   // ab 2× ganzzahlig
   c.imageSmoothingEnabled = false; c.drawImage(src, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh); return true;
 }
+/* Reliquien (Nutzer 02.10.2026): Medaillon im 16er-Raster — Öse, Goldfassung, Stein in der Farbe der Reliquie, Zeichen der Spielweise. */
+const RGLYPH = {
+  heart: ['.x.x.', 'xxxxx', 'xxxxx', '.xxx.', '..x..'], thread: ['...x.', '..x..', '.x...', '..x..', '...x.'], ring: ['.xxx.', 'x...x', 'x...x', 'x...x', '.xxx.'],
+  cauldron: ['x...x', 'xxxxx', 'xxxxx', 'xxxxx', '.x.x.'], bell: ['..x..', '.xxx.', '.xxx.', 'xxxxx', '..x..'], gear: ['x.x.x', '.xxx.', 'xx.xx', '.xxx.', 'x.x.x'],
+  noose: ['.xxx.', 'x...x', '.xxx.', '..x..', '..x..'], thorn: ['..x..', '..x..', '.xxx.', '.xxx.', 'xxxxx'], mark: ['x...x', '.x.x.', '..x..', '.x.x.', 'x...x'],
+  star: ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..'], fang: ['xxxxx', 'xxxxx', '.xxx.', '.xx..', '.x...'], eye: ['.....', '.xxx.', 'xx.xx', '.xxx.', '.....'],
+  chain: ['xx...', 'x.x..', '.xxx.', '..x.x', '...xx'], crystal: ['..x..', '.xxx.', '.x.x.', '.xxx.', '..x..'], drum: ['xxxxx', 'x.x.x', 'x.x.x', 'x.x.x', 'xxxxx'],
+  compass: ['..x..', '..x..', 'xx.xx', '..x..', '..x..'], hourglass: ['xxxxx', '.xxx.', '..x..', '.xxx.', 'xxxxx'],
+};
+const rShade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, Math.round(v * k))); return `rgb(${f(n >> 16 & 255)},${f(n >> 8 & 255)},${f(n & 255)})`; };
+function relicIcon(c, key, w, h) {
+  const d = RELIQ[key] || {}, it = ITEMS[key], col = d.col || '#a08060', myth = it.rarity === 'mythic' || it.rarity === 'legendary';
+  const t = document.createElement('canvas'); t.width = t.height = 16; const g = t.getContext('2d'), px = (x, y, cl) => { g.fillStyle = cl; g.fillRect(x, y, 1, 1); };
+  const metal = myth ? ['#f0d080', '#c8a048', '#8a6a28', '#4a3814'] : ['#c8c0b0', '#9a9080', '#6a6458', '#2a2620'];
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const dx = x - 7.5, dy = y - 8.5, r = Math.hypot(dx, dy);
+    if (r <= 7.2) px(x, y, r > 5.6 ? (dy < -dx * 0.3 ? metal[0] : r > 6.6 ? metal[3] : metal[1]) : r > 5 ? metal[2] : rShade(col, 0.55 + 0.45 * Math.max(0, 1 - Math.hypot(dx + 1.5, dy + 1.5) / 6))); }
+  px(7, 0, metal[1]); px(8, 0, metal[1]); px(6, 1, metal[2]); px(9, 1, metal[2]);   /* Öse */
+  const G = RGLYPH[d.glyph] || RGLYPH.star; G.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === 'x') px(5 + i, 6 + j, rShade(col, 1.9)); }));
+  px(5, 5, 'rgba(255,255,255,.75)'); px(4, 6, 'rgba(255,255,255,.4)');                 /* Glanz */
+  if (myth) { px(1, 8, '#fff2c0'); px(14, 8, '#fff2c0'); px(7, 15, '#fff2c0'); }        /* Funken der Boss-Reliquien */
+  c.imageSmoothingEnabled = false; const s = Math.floor(Math.min(w, h) / 16) || 1, o = [(w - 16 * s) / 2, (h - 16 * s) / 2]; c.drawImage(t, o[0], o[1], 16 * s, 16 * s);
+}
 export function drawItemIconTo(canvas, key, raw) {
   const it = ITEMS[key]; const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
   c.clearRect(0, 0, w, h); if (!it) return;
+  if (it.slot === 'relic') return relicIcon(c, key, w, h);
   if (SP.drawnOn() && iconR(c, it, key, w, h)) return;               // S14 Stil R: Symbol aus dem echten Sprite
   if (raw) return drawItemVec(c, it, key, w, h);
   const A = SP.itemAtlas(key, it); if (A) { const s = Math.min((w - 4) / A.width, (h - 4) / A.height), dw = A.width * s, dh = A.height * s; c.imageSmoothingEnabled = false; c.drawImage(A, (w - dw) / 2, (h - dh) / 2, dw, dh); return; }   // Stil F: Symbol aus dem Blatt

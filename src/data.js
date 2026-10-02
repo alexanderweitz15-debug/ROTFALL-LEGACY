@@ -1443,3 +1443,78 @@ export const ELITES = {
   harpunenhexe:{ name: 'Harpunen-Hella', base: 'sea_harpooner', crew: 'sea_raider', where: ['bandit_spear', 'bandit'], hp: 1.7, dmg: 1.4, power: 'charge', drop: 'spear', look: { helm: 'scarf', helmCol: '#2a4a6a', sash: '#8a2a20' }, say: 'wirft ihre Harpune weiter, als andere schießen. Sie zieht ihre Opfer an Land wie Fische.' },
   messingwolf: { name: 'Das Messingungetüm', base: 'automat', crew: 'bandit', where: ['bandit', 'bandit_spear', 'bandit_archer'], regions: ['aurel'], hp: 2.2, dmg: 1.3, armor: 4, power: 'shock', drop: 'ersatzteile', look: { glow: '#ff4020', ge: '#ff4020', armorCol: '#6a3a2a' }, say: 'ist ein Automat, der seinen Herrn erschlagen hat und nun durch die Felder stampft. Blitze knistern um ihn.' },
 };
+/* ================= Reliquien (Nutzer 02.10.2026, docs/PLAN_TRINKETS.md) =================
+   Fundstücke mit Geschichte, eigene Fassungen (bis 3, nicht in GEAR), Stufen I–VIII mit neuen Mechaniken statt nur Zahlen.
+   eng = Spielweise (Logik in game.js RELIC_ENG), twist = Sonderregel einer Boss-Reliquie, col = Farbe des Steins, glyph = Bild im Symbol.
+   Stufe VI: Pfadwahl (a/b), VII: Synergien, VIII: Verwandlung (trans). Kosten je Schritt in RELIQ_COST (Index = Zielstufe − 1). */
+export const RELIQ_TIER = ['Roh', 'Geweiht', 'Gehärtet', 'Geschmiedet', 'Erwacht', 'Entfesselt', 'Sternberührt', 'Rotfall'];
+export const RELIQ_MAX = { common: 4, uncommon: 4, rare: 6, epic: 6, legendary: 7, mythic: 8 };
+export const RELIQ_START = { common: 1, uncommon: 1, rare: 1, epic: 2, legendary: 3, mythic: 3 };
+export const RELIQ_COST = [null, { gold: 150 }, { gold: 400, glut: 2 }, { gold: 900, glut: 5 }, { gold: 1500, glut: 9, trophy: 1 }, { glut: 15, stern: 1 }, { glut: 20, stern: 3 }, { stern: 6, end: 1 }];
+export const RELIQ = {
+  schlaechterherz: { eng: 'berserk', col: '#b0302a', glyph: 'heart', paths: { a: ['Raserei', 'Unter 35 % Leben läufst du schneller.'], b: ['Aderlass', 'Unter 50 % Leben heilt dich jeder Treffer.'] }, trans: 'Herz, das nicht stehen bleibt' },
+  schattenfaden:   { eng: 'shadow', col: '#4a4a6a', glyph: 'thread', paths: { a: ['Nachbild', 'Nach dem Ausweichen schlägt dein Schatten den ersten Hieb mit.'], b: ['Schwerelos', 'Ausweichen kostet keine Ausdauer.'] }, trans: 'Faden ohne Ende' },
+  blutkranz:       { eng: 'streak', col: '#8a1a24', glyph: 'ring', paths: { a: ['Zäher Kranz', 'Die Serie verfällt Stück für Stück statt auf einmal.'], b: ['Blutfontäne', 'Endet eine Serie ab 5, platzt Blut um dich und trifft alle nahen Feinde.'] }, trans: 'Kranz des Gemetzels' },
+  seelenkessel:    { eng: 'souls', col: '#5a8a7a', glyph: 'cauldron', paths: { a: ['Knochenwall', 'Jede Seele gibt Rüstung.'], b: ['Seelenhunger', 'Jede Seele stärkt auch deine Hiebe.'] }, trans: 'Kessel der Wiederkehr' },
+  sturmglocke:     { eng: 'storm', col: '#6aa0c8', glyph: 'bell', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Glocke im Sturm' },
+  uhrwerksherz:    { eng: 'clock', col: '#c8a050', glyph: 'gear', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben ein Fünftel ihres Manas zurück.'] }, trans: 'Herz aus Aurelion' },
+  henkerschlinge:  { eng: 'exec', col: '#6a5a3a', glyph: 'noose', paths: { a: ['Richtblock', 'Die Hinrichtungsschwelle steigt um 5 Punkte.'], b: ['Schreckensurteil', 'Jede Hinrichtung jagt den nahen Feinden Angst ein.'] }, trans: 'Schlinge des Richters' },
+  rotdorn:         { eng: 'crit', col: '#c83a3a', glyph: 'thorn', paths: { a: ['Tiefer Dorn', 'Kritische Treffer schlagen härter zu.'], b: ['Dornenhecke', 'Mehr kritische Treffer.'] }, trans: 'Dorn des Sterns' },
+  eisenmal:        { eng: 'iron', col: '#7a7a80', glyph: 'mark', paths: { a: ['Bollwerk', 'Der Schild nach Parade und Block hält mehr aus.'], b: ['Stachelhaut', 'Stärkere Dornen.'] }, trans: 'Mal des Unbeugsamen' },
+  sternfunke:      { eng: 'spell', col: '#8fd0ff', glyph: 'star', paths: { a: ['Weite', 'Mehr Zauberkraft.'], b: ['Quelle', 'Mana kehrt schneller zurück.'] }, trans: 'Sternregen' },
+  wolfsfang:       { eng: 'pack', col: '#9a8a6a', glyph: 'fang', paths: { a: ['Rudel', 'Deine Gefährten halten mehr aus.'], b: ['Leitwolf', 'Gefährten schlagen härter zu.'] }, trans: 'Herz des Rudels' },
+  gluecksnagel:    { eng: 'crit', col: '#a08060', glyph: 'thorn' },
+  botenfeder:      { eng: 'shadow', col: '#b8b0a0', glyph: 'thread' },
+  rostglied:       { eng: 'iron', col: '#7a5a40', glyph: 'mark' },
+  /* Boss-Reliquien (mythisch, einmal je Welt; nochmal erschlagen gibt Sternsplitter) */
+  herz_blutfuerst: { eng: 'streak', twist: 'blood', col: '#d02030', glyph: 'heart', boss: 'aldhelm', paths: { a: ['Zäher Kranz', 'Die Serie verfällt Stück für Stück.'], b: ['Blutfontäne', 'Endet eine Serie ab 5, platzt Blut um dich.'] }, trans: 'Herz des Kelchs' },
+  kessel_koenig:   { eng: 'souls', twist: 'king', col: '#3aa070', glyph: 'cauldron', boss: 'garmadon', paths: { a: ['Knochenwall', 'Jede Seele gibt Rüstung.'], b: ['Seelenhunger', 'Jede Seele stärkt deine Hiebe.'] }, trans: 'Kessel des Toten Königs' },
+  auge_gefallenen: { eng: 'clock', twist: 'timebreak', col: '#f0e0a0', glyph: 'eye', boss: 'omega', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben Mana zurück.'] }, trans: 'Auge, das nicht schläft' },
+  vargs_glied:     { eng: 'iron', twist: 'chain', col: '#5a5a62', glyph: 'chain', boss: 'chain_master', paths: { a: ['Bollwerk', 'Stärkerer Schild.'], b: ['Stachelhaut', 'Stärkere Dornen.'] }, trans: 'Letztes Glied der Kette' },
+  eiskern:         { eng: 'shadow', twist: 'frost', col: '#a8e0ff', glyph: 'crystal', boss: 'hrodvar', paths: { a: ['Nachbild', 'Dein Schatten schlägt mit.'], b: ['Schwerelos', 'Ausweichen kostet keine Ausdauer.'] }, trans: 'Herz des Winters' },
+  kriegstrommel:   { eng: 'berserk', twist: 'drum', col: '#8a5a2a', glyph: 'drum', boss: 'gorak', paths: { a: ['Raserei', 'Unter 35 % Leben schneller.'], b: ['Aderlass', 'Unter 50 % Leben heilt jeder Treffer.'] }, trans: 'Trommel der tausend Schädel' },
+  kompassrose:     { eng: 'storm', twist: 'sea', col: '#2a7a9a', glyph: 'compass', boss: 'whitebeard', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Rose der sieben Winde' },
+  graumaehnenfang: { eng: 'pack', twist: 'wolf', col: '#8a8a8a', glyph: 'fang', region: 'alpha', paths: { a: ['Rudel', 'Gefährten halten mehr aus.'], b: ['Leitwolf', 'Gefährten schlagen härter zu.'] }, trans: 'Fang der Graumähne' },
+  sandglas:        { eng: 'storm', twist: 'sand', col: '#d0b070', glyph: 'hourglass', region: 'sandlord', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Glas des Sandfürsten' },
+  nachtglasuhr:    { eng: 'clock', col: '#4a3a7a', glyph: 'hourglass', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben Mana zurück.'] }, trans: 'Uhr der letzten Nacht' },
+};
+/* Synergien (ab Stufe VII einer der beiden): [Spielweise A, Spielweise B, Name, Wirkung] */
+export const RELIQ_SYN = [
+  ['shadow', 'storm', 'Sturmläufer', 'Jedes Ausweichen lädt eine Sturm-Ladung.'],
+  ['streak', 'berserk', 'Blutrausch', 'Unter 35 % Leben zählt die Kill-Serie doppelt.'],
+  ['crit', 'exec', 'Gnadenstoß', 'Kritische Treffer richten Feinde schon 5 Punkte früher hin.'],
+  ['clock', 'spell', 'Uhrwerk der Sterne', 'Zauber-Kills kürzen alle Abklingzeiten um 1 s.'],
+  ['iron', 'pack', 'Schildwall', 'Der Schild nach Parade und Block ist halb so stark noch einmal da.'],
+  ['souls', 'exec', 'Seelenernte', 'Hinrichtungen geben 2 Seelen.'],
+  ['shadow', 'clock', 'Zeitfaden', 'Perfektes Ausweichen kürzt alle Abklingzeiten um 2 s.'],
+  ['streak', 'storm', 'Gewitterrausch', 'Jeder Kill lädt eine Sturm-Ladung.'],
+];
+/* Gegenstände: Reliquien liegen im Gepäck wie alles andere; die Stufe trägt das Exemplar (o.tier). */
+Object.assign(ITEMS, {
+  schlaechterherz: { name: 'Schlächterherz', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Berserker: je weniger Leben, desto härter.', lore: 'Ein vertrocknetes Herz in einem Eisenkäfig. Es schlägt, wenn du blutest.' },
+  schattenfaden:   { name: 'Schattenfaden', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Tempo: Ausweichen macht schnell.', lore: 'Ein Faden, der keinen Schatten wirft. Man sagt, er sei aus dem Schatten eines Diebes gesponnen.' },
+  blutkranz:       { name: 'Blutkranz', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Kill-Serie: jeder Kill macht dich schneller.', lore: 'Dornen aus geronnenem Blut. Wer ihn trägt, hört auf zu zählen.' },
+  seelenkessel:    { name: 'Seelenkessel', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Seelen: Tote stärken deine Fähigkeiten.', lore: 'Ein Kesselchen aus Grabbronze, kaum größer als eine Faust. Drinnen flüstert es.' },
+  sturmglocke:     { name: 'Sturmglocke', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Bewegung: wer läuft, lädt Blitze.', lore: 'Sie läutet nur im Lauf. Die Glöckner von Tickmar wollten sie einschmelzen.' },
+  uhrwerksherz:    { name: 'Uhrwerksherz', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Abklingzeiten: Krit und Parade spannen die Feder.', lore: 'Aurelischer Messingschlag, der nie stehen bleibt. Ein Ratsherr ließ es aus seiner Brust bauen.' },
+  henkerschlinge:  { name: 'Henkerschlinge', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Hinrichtung: Angeschlagene sterben schneller.', lore: 'Ein Stück Seil vom Galgen in Kreuzweg. Es knotet sich selbst.' },
+  rotdorn:         { name: 'Rotdorn', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Krit: Treffer laden den nächsten kritischen.', lore: 'Ein Dorn vom Rand des Kraters, rot wie der Himmel vor dem Fall.' },
+  eisenmal:        { name: 'Eisenmal', slot: 'relic', rarity: 'uncommon', value: 160, sdesc: 'Tank: Rüstung, Schild nach Parade, Dornen.', lore: 'Das Brandeisen eines Kettenaufsehers. Wer es trägt, steht.' },
+  sternfunke:      { name: 'Sternfunke', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Magie: Zauberkraft, Mana aus Zauber-Kills.', lore: 'Ein Splitter vom Rotfall, in Glas gefasst. Er ist warm.' },
+  wolfsfang:       { name: 'Wolfsfang', slot: 'relic', rarity: 'uncommon', value: 160, sdesc: 'Gruppe: deine Gefährten werden stärker.', lore: 'Der Eckzahn eines Leitwolfs, mit Sehne umwickelt.' },
+  gluecksnagel:    { name: 'Glücksnagel', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Krit: ein bisschen Glück.', lore: 'Ein krummer Sargnagel. Wer ihn findet, lebt angeblich länger.' },
+  botenfeder:      { name: 'Botenfeder', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Tempo: kurz schneller nach dem Ausweichen.', lore: 'Die Feder eines Brieftaubenträgers aus Nordfurt.' },
+  rostglied:       { name: 'Rostiges Kettenglied', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Tank: etwas Rüstung.', lore: 'Ein Glied aus einer gesprengten Kette. Es erinnert sich an Gewicht.' },
+  herz_blutfuerst: { name: 'Herz des Blutfürsten', slot: 'relic', rarity: 'mythic', unique: true, value: 1800, sdesc: 'Boss-Reliquie (Aldhelm): Kill-Serie mit Lebensraub.', lore: 'Aldhelms Herz, in Wachs aus dem Kelch gegossen. Es trinkt mit dir.' },
+  kessel_koenig:   { name: 'Seelenkessel des Toten Königs', slot: 'relic', rarity: 'mythic', unique: true, value: 1800, sdesc: 'Boss-Reliquie (Garmadon): Seelen, die mit dir kämpfen.', lore: 'Garmadons Krönungskessel. Die Seelen darin haben ihn gekrönt — und ihn nie losgelassen.' },
+  auge_gefallenen: { name: 'Auge des Gefallenen', slot: 'relic', rarity: 'mythic', unique: true, value: 2200, sdesc: 'Boss-Reliquie (Omega): Zeitbruch nach perfektem Ausweichen.', lore: 'Ein Splitter von Omegas Auge. Wer hineinsieht, sieht eine Sekunde in die Zukunft.' },
+  vargs_glied:     { name: 'Vargs letztes Glied', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Varg): Ketten ziehen Feinde heran.', lore: 'Das letzte Glied der großen Kette der Eisenmark. Es zieht noch immer.' },
+  eiskern:         { name: 'Eiskern', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Hrodvar): Frost nach perfektem Ausweichen.', lore: 'Hrodvars Herz ist nie geschmolzen. Jetzt ist es deins.' },
+  kriegstrommel:   { name: 'Goraks Kriegstrommel', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Gorak): Berserker, Kills schlagen den Takt.', lore: 'Bespannt mit der Haut von Goraks erstem Feind. Sie schlägt von selbst, wenn Blut fließt.' },
+  kompassrose:     { name: 'Weißbarts Kompassrose', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Weißbart): Sturm und Tempo.', lore: 'Die Nadel zeigt nicht nach Norden, sondern zum nächsten Kampf.' },
+  graumaehnenfang: { name: 'Fang der Graumähne', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Regionalboss (Graumähne): Rudel.', lore: 'Der größte Zahn des alten Leitwolfs. Die Wölfe im Grenzland erkennen ihn.' },
+  sandglas:        { name: 'Karraks Sandglas', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Regionalboss (Karrak): Sturm im Sand.', lore: 'Der Sand darin läuft nach oben, wenn du rennst.' },
+  nachtglasuhr:    { name: 'Nachtglasuhr', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Turm des Nachtglases: Abklingzeiten.', lore: 'Ilvars Uhr zeigt die Stunde, die noch nicht war.' },
+});
+export const RELIQ_BOSS = Object.fromEntries(Object.entries(RELIQ).filter(([, d]) => d.boss).map(([k, d]) => [d.boss, k]));
+export const RELIQ_REGION = Object.fromEntries(Object.entries(RELIQ).filter(([, d]) => d.region).map(([k, d]) => [d.region, k]));

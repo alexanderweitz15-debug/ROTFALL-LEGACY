@@ -152,3 +152,14 @@ Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, 
 - ~~Grundleben 560~~ (Messfehler: `ehp` setzt das Leben ohne den Boss-Faktor ×2 — die „560“ entsprachen etwa Grundleben 280).
 - **Grundleben 340, Schaden 21 (gewählt, Nachmessung mit 8 Seeds, ohne `ehp`):** Stufe 16 (Kette + Schild): 4/8 Siege, ⌀ 24 s, Verlust ⌀ 80 %; Stufe 17: 6/8, ⌀ 23 s, 60 %; Stufe 18 (Platte + Schild): 5/8, ⌀ 45 s, 63 %. `simFight` streut bei Phasenbossen stark (Hunter 4); im Spiel machen Fesseln den Kampf länger, Licht und Verbündete kürzer.
 - Fesseln (je Gefangenem +0,4 %/s) machen ihn schwerer, Lichtschächte (bis −25 %) und Marschall Brandt leichter — die Vorgeschichte entscheidet. Empfohlene Stufe 16–18.
+## Reliquien (Version 24)
+Bewusste Endgame-Ausnahme von den Ausrüstungsgrenzen (Nutzerentscheid „stark, mit Deckeln“). Ein Topf je Wert, Deckel je Phase:
+
+| Phase | Schaden | Angriffstempo | Lauftempo | Abklingzeit | Krit | Lebensraub | Rüstung | Treffer-Multiplikator |
+|---|---|---|---|---|---|---|---|---|
+| früh (1–2 Fassungen) | +25 % | +20 % | +20 % | −20 % | +8 % | 5 % | +6 | ×1,35 |
+| drei Fassungen | +50 % | +40 % | +35 % | −40 % | +15 % | 10 % | +12 | ×1,8 |
+| mit Stufe VIII | +120 % | +100 % | +70 % | −70 % | +30 % | 20 % | +25 | ×3 |
+
+Untergrenzen: Schwung ≥ 180 ms, Ausweich-Abklingzeit ≥ 250 ms. Stufenfaktor der Zahlen: 1 / 1,25 / 1,5 / 1,8 / 2,1 / 2,5 / 3 / 3,6.
+Gemessen (Stufe 30, Schlächterherz + Blutkranz + Rotdorn auf VIII, 30 % Leben, volle Serie): Schaden ×1,7–1,8, Angriffstempo +100 % (gedeckelt), Lebensraub 14 %.
