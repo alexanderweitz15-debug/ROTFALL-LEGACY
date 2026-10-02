@@ -1760,7 +1760,7 @@ function arenaEnter(weapon) {
   S.ents[p.map] = S.ents[p.map].filter(e => e !== p);
   p.map = ARENA; p.x = 13 * TS; p.y = 10 * TS; p.vx = p.vy = 0; p.swing = 0; p.mounted = null; S.map = ARENA; S.party = []; S.ents[ARENA].push(p);
   S._quiet = true; (S.dbg ||= {}).god = true; S.dbg.pack = 'A';
-  arenaWeapon(weapon); arenaFoe('acad_dummy', 3, 0, true);
+  arenaWeapon(weapon); arenaFoe('acad_dummy', 3, 0, true); camStep(p, 1000);   /* Kamera sofort auf den Kampfplatz */
   log('Combat Test Room: Leihwaffe und Pack (A Grounded, B Heroic, C Endgame) im Debug-Menü „Kampfanimation“ wählen. Hier wird nichts gespeichert; beim Verlassen ist alles wie vorher.', 'combat');
   return true;
 }
@@ -1775,6 +1775,7 @@ function arenaLeave() {
   S._quiet = K.quiet; if (S.dbg) { S.dbg.god = K.god; delete S.dbg.pack; }
   S.projectiles = S.projectiles.filter(q => q.map !== ARENA); S.fx = [];
   delete MAPS[ARENA]; delete S.ents[ARENA]; delete solidIndex[ARENA];
+  camStep(p, 1000);   /* Kamera sofort zurück zum Helden */
   return true;
 }
 function arenaWeapon(key) {
@@ -4225,7 +4226,8 @@ function dmgFloat(t, dmg, src, crit, kind, cause) {
   const color = `rgba(${crit && dk === 'physical' ? '212,175,55' : DMG_COL[dk]},ALPHA)`, n = Math.round(dmg);
   if (!src) { const o = S.floats.find(f => f.tid === t.id && f.dot && f.color === color && f.life > 300); if (o) { o.text = String(+o.text + n); o.life = Math.max(o.life, 700); return; } }
   S.floats.push({ x: t.x + Math.round(vrnd() * 12 - 6), y: t.y - 26, rise: 0, text: String(n), color, big: !!crit, life: 900, maxLife: 900, num: 1, tid: t.id, dot: !src,
-    mine: !!src && (src === S.player || (S.player && src.ownerId === S.player.id)), inc: t === S.player });
+    mine: !!src && (src === S.player || (S.player && src.ownerId === S.player.id)), inc: t === S.player, srcId: src ? src.id : null });   /* Koop: srcId erlaubt dem Host, „mine“ je Gast-Held neu zu berechnen (eigener Schaden statt immer der des Hosts) */
+
 }
 /* Kampf-Feedback (VISUAL K4): Zustände sichtbar am Körper — Flammen steigen, Eiskristalle, Giftbläschen, Funken. Gedrosselt (~2–3 je Sekunde),
    nur in Spielernähe, Darstellungszufall vrnd (ändert nie den Spielzufall). Den Frost-Eisrand an den Füßen zeichnet render.js. */
@@ -12121,7 +12123,7 @@ function dayTick() {
   else {
     S.res.food = 0;
     for (const m of mem) { m.morale -= 10; remember(m, 'starved'); }
-    if (S.player.body) { S.player.body.torso.hp = Math.max(1, S.player.body.torso.hp - 4); B.syncHp(S.player); }
+    if (S.player.body) { const T = S.player.body.torso; T.hp = Math.min(T.hp, Math.max(1, T.hp - 4)); B.syncHp(S.player); }   /* Behoben HB-14: Math.max(1,…) hob einen am Boden liegenden (negativen) Rumpf auf 1 an — Hunger weckte Bewusstlose auf */
     log('Die Gruppe hungert. Moral sinkt.', 'party');
   }
   // Desertion
@@ -12382,7 +12384,7 @@ const woundOwner = c => c && (c === S.player || S.party.includes(c.id)) && c.bod
 function woundSet(c, part, severed) {
   if (!woundOwner(c)) return; const P = c.body[part];
   if (!severed && !P.mech && !P.broken && chance(0.6)) { P.broken = 4; P.splint = false; if (c === S.player) { log(`${B.PART_NAME[part]} gebrochen! Heilt nur bis 40 %, bis der Bruch in ein paar Tagen verheilt. Eine Heilerin kann schienen.`, 'combat'); UI.toast(`${B.PART_NAME[part].toUpperCase()} GEBROCHEN`, 2400); } }
-  if (!stat(c, 'infektion') && chance(severed ? 0.6 : 0.25)) { addStatus(c, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Jeden Tag Rumpf-Schaden und halbe Ausdauer. Heilerin, Medica oder Feldscher reinigen sie (25 Gold); nach sechs Tagen klingt sie ab.' }); if (c === S.player) log('Die Wunde ist schmutzig. Sie wird sich entzünden, wenn niemand sie reinigt.', 'combat'); }
+  if (!P.mech && !stat(c, 'infektion') && chance(severed ? 0.6 : 0.25)) { addStatus(c, { key: 'infektion', name: 'Entzündete Wunde', left: 1e12, since: S.day | 0, desc: 'Jeden Tag Rumpf-Schaden und halbe Ausdauer. Heilerin, Medica oder Feldscher reinigen sie (25 Gold); nach sechs Tagen klingt sie ab.' }); if (c === S.player) log('Die Wunde ist schmutzig. Sie wird sich entzünden, wenn niemand sie reinigt.', 'combat'); }   /* Behoben HB-16: ein Treffer auf eine Prothese entzuendet sich nicht — da ist kein Fleisch */
 }
 function woundDay() {
   for (const c of [S.player, ...partyMembers()]) { if (!c?.alive || !c.body) continue; const me = c === S.player ? 'Dein' : `${c.name}s`;
@@ -12390,7 +12392,7 @@ function woundDay() {
       if (P.broken <= 0) { delete P.broken; delete P.splint; c.scars = (c.scars || 0) + 1; addStatus(c, { key: 'narben', name: `Narben (${c.scars})`, good: true, left: 1e12, desc: `Verheilte Brüche: +${Math.min(5, c.scars)} Rüstung.` }); log(`${me} Bruch (${B.PART_NAME[k]}) ist verheilt. Eine Narbe bleibt — und härtet ab.`, 'party'); } }
     const s = c.status?.find(q => q.key === 'infektion'); if (!s) continue; const d = (S.day | 0) - (s.since ?? (S.day | 0));
     if (d >= 6) { c.status = c.status.filter(q => q !== s); log(`${me} Entzündung klingt ab.`, 'party'); continue; }
-    c.body.torso.hp = Math.max(1, c.body.torso.hp - 4 * Math.max(1, d)); B.syncHp(c); c.stamina = Math.min(c.stamina, c.maxStamina * 0.5);
+    c.body.torso.hp = Math.min(c.body.torso.hp, Math.max(1, c.body.torso.hp - 4 * Math.max(1, d))); B.syncHp(c); c.stamina = Math.min(c.stamina, c.maxStamina * 0.5);   /* Behoben HB-14: gleiches Muster — sonst weckt die Entzündung Bewusstlose */
     if (c === S.player) log(`Die Wunde pocht und eitert (Rumpf −${4 * Math.max(1, d)}). Eine Heilerin sollte sie reinigen.`, 'party');
   }
 }
@@ -15137,7 +15139,7 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
     case 'pact_knight': {                                    // Nutzer (S13): ein großer Diener gegen Leben
       if (S.ents[p.map].some(e => e.servant === p.id && e.alive && e.pactKnight)) { UI.toast('Dein Paktritter steht noch.'); return false; }
       const cost = p.maxHp * 0.2; if (p.hp <= cost * 1.5) { UI.toast('Zu schwach — der Pakt nähme dir den Rest.'); return false; }
-      if (p.body) for (const k of B.PARTS) if (!p.body[k].lost) p.body[k].hp = Math.max(1, p.body[k].hp - p.body[k].max * 0.2);
+      if (p.body) for (const k of B.PARTS) if (!p.body[k].lost) { const P = p.body[k]; P.hp = Math.min(P.hp, Math.max(1, P.hp - P.max * 0.2)); }   /* Behoben HB-14: gleiches Muster — sonst heilt der Paktritter-Preis ein bereits lahmes Glied auf 1 LP */
       if (p.body) B.syncHp(p); else p.hp -= cost;
       const d = spawnEnemy('bone_knight', p.map, (p.x / TS | 0) + 1, p.y / TS | 0, { level: p.level + 2 });
       Object.assign(d, { name: 'Paktritter', anchor: { x: d.x, y: d.y }, servant: p.id, transient: true, pactKnight: true, until: performance.now() + 45000, glow: T.glow });
@@ -15560,7 +15562,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   }
   // Karte Scheibe 2 (02.10.2026, Entscheidung: Pins nur in entdeckten Gebieten): laufendes Weltereignis (S.big) als pulsierender Pin.
   if (S.big) { const bl = S.big.town ? LOCATIONS.find(l => l.key === S.big.town) : (S.big.x != null ? { x: S.big.x, y: S.big.y } : null);
-    if (bl && explored(bl.x * TS, bl.y * TS)) {
+    if (bl && explored(bl.x, bl.y)) {   // explored() erwartet Kachel-Einheiten (wie revealAround: p.x/TS, nicht p.x)
       const x = ox + bl.x * sc, y = oy + bl.y * sc, pulse = 0.7 + Math.sin(performance.now() / 260) * 0.3;
       c.strokeStyle = `rgba(224,60,48,${0.55 * pulse})`; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 9 + pulse * 2, 0, 7); c.stroke();
       c.fillStyle = '#e04a3a'; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 6, y + 5); c.lineTo(x - 6, y + 5); c.closePath(); c.fill();
@@ -16246,7 +16248,7 @@ function debugSections() {
     }],
     ['Kampf & Körper', `${sel('dbPart', [['rarm', 'rechter Arm'], ['larm', 'linker Arm'], ['rleg', 'rechtes Bein'], ['lleg', 'linkes Bein']])}`, {
       'Glied ausfallen': () => { p.body[v('dbPart')].hp = 0; B.syncHp(p); limbLost(p, v('dbPart')); },
-      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; delete P2.mechCond; delete P2.mechUp; delete P2.mod; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
+      'Glied abtrennen': () => { const P2 = p.body[v('dbPart')]; P2.lost = true; P2.mech = 0; delete P2.mechCond; delete P2.mechUp; delete P2.mod; delete P2.broken; delete P2.splint; P2.hp = B.LIMB_CUT; B.syncHp(p); limbLost(p, v('dbPart'), true); },
       ...Object.fromEntries([1, 2, 3, 4].map(t => [`Prothese anlegen (Stufe ${t} ${B.MECH_Q[t].name})`, () => { const k = v('dbPart'); if (!/arm|leg/.test(k)) return UI.toast('Nur Arm oder Bein.'); B.attachProsthesis(p, k, t); recalc(p); UI.toast(`${k}: Prothese Stufe ${t}`); }])),   /* Roadmap P1 */
       'Prothesen −30 % Zustand': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) if (p.body[k].mech) p.body[k].mechCond = Math.max(0, (p.body[k].mechCond ?? 100) - 30); UI.toast('Prothesen abgenutzt'); },
       'Alle Glieder zurück': () => { for (const k of ['rarm', 'larm', 'rleg', 'lleg', 'head', 'torso']) if (p.body[k]) { p.body[k].lost = false; p.body[k].hp = p.body[k].max; } B.syncHp(p); p.status = (p.status || []).filter(s => s.key !== 'bleeding'); },

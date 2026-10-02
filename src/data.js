@@ -445,6 +445,8 @@ export const LOOT = {
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
   skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05],['knochenumhang',0.02]],
   skel_bomb: [['bone',0.6],['grave_seal',0.04]], skel_brute:[['bone',1],['bone',0.6],['legionaersplatte',0.08],['iron',0.3],['grave_seal',0.08]],   /* Entwickler 02.10.: vorläufig, aus dem Skelett abgeleitet */
+  waechterspinne:[['iron',0.4],['automatenkern',0.1]], dampframme:[['automatenkern',0.6],['iron',0.8],['iron',0.4],['schrottbein',0.04]],   /* Entwickler 02.10.: vorläufig, aus dem Automaten abgeleitet */
+  blutschoepfer:[['blutphiole',0.5],['dagger',0.08]], netzwerferin:[['dried_meat',0.3],['potion',0.15],['seemantel',0.05]], hofspion:[['dagger',0.2],['potion',0.2]],
   mutant:    [['bone',0.3],['bandage',0.15],['fetzenmantel',0.03]], mutant_brute:[['bone',0.5],['dried_meat',0.15],['bandage',0.2],['fetzenmantel',0.05]],
   dodon:     [['potion',1],['potion',1],['talisman_waechter',0.5]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
@@ -520,6 +522,22 @@ export const MONSTERS = {
   skel_brute:{ name:'Großes Skelett', heavy:{ kind:'slam', every:2, wind:800, mul:1.8, r:85 }, abart:{ of:'skeleton', p:0.06 }, hp:130, dmg:15, speed:0.85, reach:44, atk:1400, telegraph:500, xp:75, sight:250, r:14, threat:3, faction:'undead', interiors:true, role:'Brecher', scale:1.38,
                lore:'Die Knochen eines Riesen, zusammengehalten von altem Eisen. Langsam, aber jeder zweite Hieb ist ein Erdschlag: nicht blockbar, wirft dich zurück. Rot am Boden heißt rollen.',
                pal:{skin:'#d0c6ac',cloth:'#1e2024',metal:'#4a4640',glow:'#6fb04a'} },
+  /* Entwickler 02.10. (Top 5 aus ROTFALL_STATE/visual/gegner_ideen.md, Entscheidungen DECISIONS.md): Werte vorläufig, aus BALANCE_GUIDE §4 abgeleitet */
+  waechterspinne:{ name:'Wächterspinne', hp:24, dmg:6, speed:1.8, reach:24, atk:600, xp:12, sight:220, r:9, threat:1, faction:'aurel', interiors:true, role:'Hetzer',
+               lore:'Ein Messingkörper auf acht dünnen Beinen. Hängt reglos an den Wänden der Werkstätten und Werkhallen Aurelions, bis jemand nahe kommt — dann fällt sie herab und sticht schnell und oft. Zerbricht sie, fliegen Splitter: nicht daneben stehen.',
+               pal:{body:'#8a7040',dark:'#3a3026',eye:'#ff9a3a'} },
+  dampframme:{ name:'Dampframme', heavy:{ kind:'charge', ram:1, every:1, wind:1200, mul:1.8, r:180 }, abart:{ of:'automat', p:0.2 }, hp:150, dmg:15, speed:0.8, reach:40, atk:1500, telegraph:600, xp:80, sight:280, r:15, threat:3, faction:'aurel', interiors:true, scale:1.3,
+               lore:'Ein Kessel auf Beinen mit einem Rammschild davor. Lange rote Linie am Boden heißt: gleich kommt sie geradeaus — nicht blockbar, zur Seite rollen. Was im Weg steht, Fass, Kiste, Zaun, geht zu Bruch. Danach muss sie erst wenden: jetzt zuschlagen.',
+               pal:{skin:'#8a8272',cloth:'#3a3530',metal:'#7a6038'} },
+  blutschoepfer:{ name:'Blutschöpfer', hp:40, dmg:9, speed:1.3, reach:30, atk:1000, xp:30, sight:280, r:11, threat:2, faction:'blut', interiors:true, role:'Heiler',
+               lore:'Ein Kultist mit Schöpfkelle und Phiolengürtel. Er kämpft kaum — er sucht, wer am Boden liegt, und trinkt. Das Blut heilt ihn und jeden Kultisten um ihn. Wer fällt, muss schnell wieder hoch oder geschützt werden.',
+               pal:{skin:'#d0bcb0',cloth:'#3a1014',metal:'#7a2228',glow:'#c0303a'} },
+  netzwerferin:{ name:'Netzwerferin', hp:42, dmg:9, speed:1.35, reach:240, atk:2600, ranged:true, missile:'net', xp:30, sight:320, r:11, threat:2, faction:'pirate', interiors:true, role:'Fernkampf',
+               lore:'Sturmklinge mit schwerem Wurfnetz. Wen es trifft, der hängt drei Sekunden fest, während die Plünderer kommen; Große und Anführer taumeln nur. Netze fliegen langsam: ausweichen oder hinter Deckung.',
+               pal:{skin:'#a8805e',cloth:'#2c3a44',metal:'#7a7466'} },
+  hofspion:  { name:'Hofspion', hp:44, dmg:11, speed:1.5, reach:30, atk:900, xp:34, sight:320, r:11, threat:2, faction:'aurel', interiors:true, role:'Meuchler',
+               lore:'Sieht aus wie ein Diener des Hofes auf der Himmelsinsel. Bricht jemand dort die Regeln, fällt die Maske: Diebstahl ruft einen, Gewalt zwei, Mord drei. Sie gehen dir in den Rücken — der erste Stich von hinten trifft dreifach. Dreh dich um.',
+               pal:{skin:'#d8b89a',cloth:'#c8b888',metal:'#8a7a50'} },
   /* Entwickler 02.10.: Mutierte Menschen am Totenland-Rand — der Fluch verdirbt die Lebenden. Fraktion wie der Kultist der Asche (lebend, aber den Toten verfallen). */
   mutant:    { name:'Verdorbener', armor:0, hp:44, dmg:11, speed:1.6, reach:36, atk:850, xp:26, sight:270, r:11, threat:2, faction:'undead', interiors:true, role:'Hetzer',
                lore:'Ein Mensch vom Rand des Totenlands, vom Fluch zerfressen: Wucherungen, zu lange Arme, kein Verstand mehr. Schnell und ohne Rüstung — er stirbt leicht, aber er kommt nie allein.',

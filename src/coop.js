@@ -377,11 +377,12 @@ function hostTick(dt) {
       for (const k of DYN) { let v = e[k]; if (v && typeof v === 'object') v = v.kind || true; if (typeof v === 'number') v = Math.round(v * 100) / 100; if (L[k] !== v) { L[k] = v; u[k] = v; n++; } }
       const st = (e.status || []).map(s => s.key).join(','); if (L._st !== st) { L._st = st; u.status = st; n++; }
       const eq = e.equip ? Object.values(e.equip).map(x => x?.key || '').join(',') : ''; if (L._eq !== eq) { L._eq = eq; u.equip = e.equip; n++; }   /* neue Waffe oder Rüstung sieht der Gast sofort */
+      const sp = e.special ? JSON.stringify(e.special) : ''; if (L._sp !== sp) { L._sp = sp; u.special = e.special || null; n++; }   /* Koop: Bodenmarke/Warnzeichen schwerer Angriffe (special ist ein Objekt, DYN reduziert Objekte auf einen Namen) */
       if (n) upd.push(u);
     }
     const del = [...g.known].filter(id => !seen.has(id)); for (const id of del) { g.known.delete(id); delete g.last[id]; }
     const fx = S.fx.filter(f => f.maxLife - f.life < 60 && Math.hypot(f.x - m.x, f.y - m.y) < NEAR).slice(0, 40).map(f => [Math.round(f.x), Math.round(f.y), f.type]);
-    const fl = S.floats.filter(f => (f.maxLife || 900) - f.life < 60 && Math.hypot(f.x - m.x, f.y - m.y) < NEAR).slice(0, 12).map(f => ({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big }));
+    const fl = S.floats.filter(f => (f.maxLife || 900) - f.life < 60 && Math.hypot(f.x - m.x, f.y - m.y) < NEAR).slice(0, 12).map(f => ({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big, num: f.num, mine: f.num ? f.srcId === m.id : f.mine }));   /* Koop: „mine“ je Gast-Held neu berechnet (eigener Schaden statt immer der des Hosts), sonst zeigt „Reduziert“ beim Gast nur Krits */
     const pr = S.projectiles.filter(p => p.map === m.map && Math.hypot(p.x - m.x, p.y - m.y) < NEAR).map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, kind: p.kind, map: p.map }));
     if (upd.length || add.length || del.length || fx.length || fl.length || pr.length) sendTo(g, { t: 'ents', map: m.map, upd, add, del, fx, fl, pr });
     if (now() - (g.selfAt || 0) > 200) { g.selfAt = now(); sendTo(g, { t: 'self', inv: m.inv, equip: m.equip, stamina: m.stamina, maxStamina: m.maxStamina, mana: m.mana, maxMana: m.maxMana, morale: m.morale, body: m.body, hp: m.hp, maxHp: m.maxHp, hotbar: m.hotbar, level: m.level, xp: m.xp, xpNext: m.xpNext, dodgeCd: m.dodgeCd, coopGold: m.coopGold || 0, attributes: m.attributes, attrPoints: m.attrPoints || 0, skills: m.skills, currentClass: m.currentClass, knownClasses: m.knownClasses, titleClass: m.titleClass, titleClasses: m.titleClasses, tgrade: m.tgrade, tree: m.tree, skillPoints: m.skillPoints || 0, abilities: m.abilities, spells: m.spells, ranks: m.ranks || null, titles: m.titles }); }
@@ -474,7 +475,7 @@ function applyEnts(d) {
       if (k === 'x' || k === 'y') { (T[e.id] ||= {})[k] = u[k]; if (Math.abs(e[k] - u[k]) > 160) e[k] = u[k]; continue; } e[k] = u[k]; } }
   for (const id of d.del) { const i = arr.findIndex(x => x.id === id); if (i >= 0 && arr[i] !== me && arr[i] !== S.player) arr.splice(i, 1); delete T[id]; }
   for (const [x, y, type] of d.fx) A.fx(x, y, type, 3);
-  for (const f of d.fl) S.floats.push({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big, life: 900, maxLife: 900 });
+  for (const f of d.fl) S.floats.push({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big, num: f.num, mine: f.mine, life: 900, maxLife: 900 });   /* Koop: num/mine übernehmen, sonst greift die Einstellung „Reduziert“ beim Gast nie */
   S.projectiles = d.pr.map(p => ({ ...p, life: 200 }));
 }
 function guestKey(k, e) {

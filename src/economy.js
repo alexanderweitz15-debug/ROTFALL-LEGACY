@@ -275,7 +275,7 @@ export function ecoDay() {
     t.bought = {};
     if (t.hunger && t.pop > 5) { t.pop -= 1; if (chance(0.3)) log(`${t.name} hungert. Menschen wandern ab.`, 'economy'); }
   }
-  if (income) { S.gold += Math.max(0, income); S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute.`, 'economy'); }
+  if (income) { S.gold = Math.max(0, S.gold + income); S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute.`, 'economy'); }   /* Behoben HB-18: Verlust wurde angezeigt, aber Math.max(0, income) hat ihn nie abgezogen */
   caravanDay(); myCaravanDay(); ordersDay();
 }
 

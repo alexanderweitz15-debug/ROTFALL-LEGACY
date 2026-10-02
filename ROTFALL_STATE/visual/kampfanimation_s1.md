@@ -8,6 +8,48 @@ Bilder: `visual/img/kampf_s1_langschwert_phasen.png` (Blick Ost, Pack A/B/C × S
 (Entscheidung Entwickler 02.10.), Selbsttest 395/395 grün inkl. „Balancing (§82)“ (Probe unverändert). Vollständigkeit §17 je Waffe nicht erfüllt (Liste §5).
 Weitere Bilder: `visual/img/kampf_s2_zweihaender.png`, `kampf_s2_dolch.png`, `kampf_s2_speer.png`, `kampf_s2_hammer.png`.
 
+## 00. Nachtrag 2 (02.10.) — Ganzkörperposen, schwerer Hieb, Seitschritt
+Bilder: `visual/img/kampf_s3_langschwert.png`, `kampf_s3_zweihaender.png`, `kampf_s3_dolch.png`, `kampf_s3_speer.png`, `kampf_s3_hammer.png`
+(je Pack A/B/C: 3 Angriffe × 11 Stützstellen + Zeile „Kombo komplett“ = Schlag 1 u .27/.4/.5/.7 · Schlag 2 u .27/.4/.5/.7 · Wucht u .4/.5/.7; rot = Einschlag)
+und `kampf_s3_aufladen.png` (schwerer Hieb: Ruhe, halb, voll geladen).
+
+**Was das R-Figurensystem kann (geprüft):** Rig je Ansicht mit Gelenkpunkten für Beine (Hüfte–Knie–Fuß), Arme (Schulter–Ellbogen–Hand per IK),
+Rumpfhöhe `by` (Kopf, Rumpf, Rock folgen), Rumpfversatz `lean` (nur Seitenansicht: Oberkörper, Kopf, Arme gegen die Hüfte), Kopf `hx/hy`, Umhang-/Rockschwung,
+zweite Hand am Griff (`W.two`). Kein Drehen des Rumpfs, keine Neigung von vorn — Gewicht von vorn/hinten nur über Kniebeuge und Beinstellung.
+**Erweitert (kein zweites System):** `anim.js BODY` = Schlüsselbilder je Form (b0 = Endlage des Vorgängers, w Ausholen, i Einschlag, f Nachschwung, dann
+zurück in die Kampfhaltung) mit `by` (Kniebeuge), `ln` (Rumpf vor/zurück), `st` (Ausfallschritt), `hy` (Kopf), `hr/hd` (Hand vor/tiefer). `fig5.paintR`
+liest sie (`atkBody`) und setzt Beine per IK (vorderer Fuß vor, hinterer zurück, Knie gebeugt), Rumpf und Arme mit. Die Pose hängt nur an Form × Stützstelle —
+beides steht schon im Cache-Schlüssel. Hand bleibt in Armreichweite (Rest des Stoßes trägt der Ausfallschritt); die Waffe sitzt an der gemalten Hand (vorher 1 px Versatz bei Rumpfneigung).
+- **Einschlag je Angriff verschieden:** Vorhand waagrecht mit Ausfallschritt; Rückhand Hand hoch quer vor der Brust; Überkopf/Spalter tief vor dem Körper
+  mit Kniebeuge; Hammer-Bodenschlag tiefe Hocke, Kopf am Boden, bleibt „hängen“ (Nachschwung kurz); Stöße mit langem Ausfallschritt.
+- **Zweihand:** Zweihänder, Hammer, Großäxte (twohand) und jetzt auch Speer/Stangen mit beiden Händen eng am Griff (6 statt 9 px).
+- **Bewegungsumfang je Pack:** B und C haben eigene, größere Formen (Körperwerte ×1,5 / ×2, gedeckelt) — andere Pose, nicht nur Effekte; dazu B/C Absprung im
+  Finisher (5 / 9 px), C Vorstoß + Nachbilder. Pack ist weiter kein Cache-Schlüssel; es sind eigene Formnummern.
+- **Schleier:** im schnellsten Bild (u 0,38–0,53) eine halbtransparente Fläche über dem eben überstrichenen Klingenbogen (alle Packs, nicht bei Stößen).
+- **Zielreaktion (nur Bild):** Getroffene zucken weg (leicht 1,6 px), Krit und schwere Waffen/Wucht kippen zurück (kb-Bild 160 ms, 3–5 px).
+- **Leistung:** Test Room, Held haut 200 Bilder je Waffe×Pack nach Vorbacken: Median 0,5–1,5 ms, p95 1,3–3,7 ms; 0–1 neue Figurenbilder (1 = neue Puppe;
+  Speer hatte 26 durch falsches Vorbacken ohne Zweihand — behoben). Alle 5 Waffen × 3 Packs zusammen ≈ 4000 Bilder = Cache-Deckel (3 Räumungen im Test);
+  im Spiel braucht ein Held nur eine Waffe × ein Pack (≈ 270–530 Bilder).
+
+**Schwerer Hieb = Maustaste halten (Entscheidung Entwickler), Regel:**
+1. Aufladen beginnt nur bei einem **frischen** Druck der linken Maustaste (mousedown), mit Nahkampfwaffe, ohne Deckung/Rolle, und wenn **keine Kombo läuft**
+   (kein Schwung und 0,6 s Kombo-Fenster vorbei).
+2. Bis **180 ms** (= Paradefenster) gilt es als Klick: Loslassen = normaler Schlag 1 der Kombo. Danach lädt es sichtbar (Figur im Ausholen des Wuchtschlags,
+   Ring am Boden füllt sich); voll nach **800 ms** (= übliche Ansage schwerer Gegnerangriffe, 650–900 ms). Voll losgelassen = schwerer Hieb, vorher = normaler Schlag.
+3. Schwerer Hieb = Werte des Wuchtschlags (+30 % Schaden, Taumeln 700 ms, +15 % Dauer, Wucht-Form/Finisher-Optik des Packs). Halten nach „voll“ hält die Ladung.
+4. Läuft schon eine Kombo, schlägt jeder Klick und Halten wie bisher sofort weiter (Dauer-Kombo bleibt). RF.duel/simFight/Proben setzen nur `mouse.down`
+   (kein frischer Druck) und laufen unverändert; §82 grün.
+5. Abbruch: Rolle, Deckung, am Boden, Waffenwechsel. Beim Aufladen geht man langsam (×0,55 wie beim Zuschlagen). Gegner-Seitschritt reagiert auch aufs Aufladen.
+6. Hinweis im Spiel: Log beim ersten Aufladen. Koop: `chargeK` wird übertragen (Gäste sehen Pose und Ring); Gäste selbst können (noch) nicht aufladen.
+**Offen (melden, nicht entschieden):** Ist der schwere Hieb des Spielers blockbar? (jetzt: wie jeder Hieb blockbar) · eigener Schadens-Faktor statt Wucht-Werten? ·
+Ladezeit je Waffe (jetzt fest 800 ms) · Ausdauerkosten (jetzt normal) · Leertaste/Touch (jetzt nur Maus).
+
+**Seitschritt der Gegner (Entscheidung Entwickler):** Bandit weicht aus, solange der Angreifer sichtbar ausholt (`swing < atkW` des Schwungplans, bei der
+Kette mit verlängertem Ausholen) oder auflädt — statt fester 35 %-Grenze; für alle Waffen gleich.
+**Melden:** Das sichtbare Ausholen des Dolchs ist sehr kurz (A: 60 ms statt bisher 105 ms Reaktionsfenster) — der Dolch-Vorteil fällt dadurch NICHT weg:
+simFight gegen Banditen (16 Seeds) Dolch 31,4 gegen 26,9 Schaden/s im Vergleichsmodus (+17 %), Langschwert 28,6 gegen 30,3. Möglich: Mindest-Reaktionsfenster
+(z. B. wie bisher 0,35 des Takts, falls länger als das Ausholen) oder Dolch-Ausholen länger — Entscheidung Entwickler.
+
 ## 0. Nachtrag 02.10. — Entscheidung §4 umgesetzt, Scheibe 2
 - **Takt-neutral abbrechen** (`game.attack`): bricht der nächste Kombo-Schlag die Erholung ab, wird der Rest `rem = (1 − swing) × Dauer` vorn an das Ausholen
   des neuen Schlags gehängt (Dauer + rem; w, h, Abbruchpunkt umgerechnet, `c.atkRem`). Die Bewegung fließt, Treffer kommen exakt im alten Takt
@@ -123,10 +165,10 @@ Bis zur Entscheidung: Code wie beschlossen; `S.dbg.atkOld = 'cancel'` schaltet n
 | Save/Load | ✓ neue Felder tolerant, Test Room nie gespeichert |
 | Idle (Kampf-Idle) | ✗ |
 | Bewegung (Kampfbewegung, Sprint, rückwärts, Wenden) | ✗ |
-| Schwerer Angriff (halten) | ✗ — offene Frage: Taste/Regel |
+| Schwerer Angriff (halten) | ✓ Regel siehe §00 (Blockbarkeit, eigener Faktor offen) |
 | Block/Parade mit waffeneigener Haltung | ✗ |
 | Ausweichen je Pack | ✗ |
-| Trefferreaktion leicht/schwer/krit, Gegnerreaktion | ✗ |
+| Trefferreaktion leicht/schwer/krit, Gegnerreaktion | teilweise — Zucken/Zurückkippen (Bild); keine eigenen Posen je Waffe |
 | Tod | ✓ vorhanden (9 Todesarten) |
 | Stilbruch-Suche | teilweise — Stil D/Arbeitsschwung umgestellt; Reitkampf, Nebenhand nicht geprüft |
 | Großaxt eigene Bewegung | ✗ teilt das Zweihänder-Profil (wtype great) |

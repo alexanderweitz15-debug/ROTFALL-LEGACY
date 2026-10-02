@@ -41,6 +41,12 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - Skilltree/Karte-Agent: Linien, Icons, Vorschaukarte; Ortskarte, Ereignis-Pins, Fraktionsgrenzen.
 - [B] Danach nach VISUAL.md-Priorität: NPC-Visuals (visual/npcs.md, P3), Städte, Welt-Events, allgemeine UI.
 
+## Lead 02.10. abends
+- Behoben: HB-01 (gespeicherter Tod führt nach dem Laden zur Erbenwahl), HB-02 (alle performance.now-Felder, auch verschachtelte, verfallen beim Laden; Liste PERF_KEYS), HB-05 (Abbruch trifft nur das beorderte Heer), Ansehen der Eisenfeste zählt für die Kette statt für Valen.
+- [B] HB-03 (Zeitsprünge überspringen Stunden-Haken) und HB-04 (applySave leert S nicht) macht der Lead als Nächstes.
+- [E] Aufträge an Fraktionsorten ohne Eintrag in TOWN_PLAN/GUARD_POSTS (Grubenhort ohne Aufstand, Karak-Atar, Dünenwacht …) zählen weiter für Valen. Für wen sollen sie zählen?
+- [P] PR #8: claude-arbeit enthält main als Vorfahr. Stand c86c3d3 wurde isoliert getestet: 404/404. Vorher war a49d302 kaputt (Syntaxfehler aus einem Agenten-Zwischenstand), deshalb vor jedem Merge den Kopf des PR so prüfen.
+
 ## Ältere offene Punkte
 - [E] Hunt-Bericht `hunt/BERICHT.md` HB-01…HB-47: der Entwickler wählt die Fixes. Am dringendsten:
   - HB-01: gespeicherter Tod bietet nach dem Laden keine Erbenwahl.
