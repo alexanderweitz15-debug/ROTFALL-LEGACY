@@ -1044,3 +1044,12 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 | Grabtuchmantel | selten bei Geistern |
 
 - NPCs und Gegner tragen die Formen gemischt.
+
+## Geheimer Ort: Die Verlorenen Hundert
+- Am Rand des Hundertfelds steckt eine Lanze mit verblichenem Valen-Wimpel im Hügel. Darunter klingt es hohl. Kommst du in die Nähe, nennt das Log sie.
+- **Graben** dauert eine Stunde. Darunter liegt das verschüttete Heerlager: der Feldherr der Hundert mit Knochenwächtern und eine Feldkiste.
+- **Der Kriegsvorrat** ist deine Wahl:
+  - Garnison der nächsten Valen-Stadt: +8 Besatzung, Valen +5.
+  - An die Kette verkaufen: 300 Gold, Kette +5, Valen −5.
+  - In die eigene Siedlung: +20 Eisen, +10 Holz.
+- Debug: „Geheime Orte: zum Hundertfeld (Lanze)“.

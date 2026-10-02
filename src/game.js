@@ -2437,6 +2437,7 @@ function stepHidden() {
   while (dt > 0) { update(Math.min(50, dt), performance.now()); dt -= 50; }
   last = performance.now();
 }
+let hudHalf = true;                                                /* PERF-S: siehe HUD-Takt in update */
 const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
 function update(dt, now) {
   if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
@@ -2457,7 +2458,7 @@ function update(dt, now) {
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
-  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); }  /* Ratgeber; Geheime Orte */
+  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); }  /* Ratgeber; Geheime Orte */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -2525,10 +2526,12 @@ function update(dt, now) {
 
   drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
   hudTimer += dt;
+  if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
   if (hudTimer > 180) {
+    hudHalf = true;
     const gone = e => e && (!e.alive || e.map !== S.map || !S.ents[S.map].includes(e) || dist(e, S.player) > 900);   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
-    hudTimer = 0; UI.refreshHUD(); UI.renderContext(selected || hovered); updatePrompt();
+    hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
     if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
     if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
@@ -5129,6 +5132,7 @@ function doInteract(target = null) {
     act(p, 'work', 500, t); douse(F, 14, p); p.carry = null; return UI.toast(`Zisch! Die Flammen weichen (Hitze ${Math.round(F.heat)}).`); }
   if (t.type === 'well' && (S.fires || []).some(f => f.well && Math.hypot(f.well.x - t.x, f.well.y - 20 - t.y) < 40) && p.carry !== 'wassereimer') { act(p, 'kneel', 500, t); p.carry = 'wassereimer'; return UI.toast('Eimer voll. Zum brennenden Haus!'); }
   if (t.secretBell != null) return secretBell(t);                   /* Geheime Orte: Glockenpfähle */
+  if (t.secretDig) return secretDig(t);                              /* Geheime Orte S2: Lanze auf dem Hundertfeld */
   if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
@@ -13838,7 +13842,7 @@ function vanishDay() {
 // sie findet; Lage = fester Anker aus LOCATIONS + fester Versatz, Platz per deterministischer Spiralsuche (kein Zufall, die Welt bleibt
 // gleich). Gespeichert wird nur S.secrets. Erster Ort: das Glockenmoor — nachts bei Nebel oder Regen schlägt im Moor eine Glocke; drei
 // Glockenpfähle (Taufe, Hochzeit, Tod) in der richtigen Reihenfolge läuten öffnet die versunkene Kapelle, falsch weckt Ertrunkene.
-const SECRETS = { glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 } };
+const SECRETS = { glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
 const SECRET_N = 8;
 function detSpot(map, tx, ty, R = 12) { for (let r = 0; r <= R; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (!SOLID.has(tileAt(map, x, y))) return [x, y]; } return null; }
 function secretAt(k) { const D = SECRETS[k], L = LOCATIONS.find(l => l.key === D.at); return L ? [L.x + D.dx, L.y + D.dy] : null; }
@@ -13847,6 +13851,8 @@ function ensureSecrets() {
   const G = secretAt('glockenmoor'); if (G && !S.secrets.glockenmoor?.found) {
     [['Tod', -3, 0], ['Taufe', 0, -2], ['Hochzeit', 3, 1]].forEach(([nm, dx, dy]) => { const q = detSpot('world', G[0] + dx, G[1] + dy, 14); if (!q) return;
       S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'glockenmoor', secretBell: ['Taufe', 'Hochzeit', 'Tod'].indexOf(nm), label: `Schiefer Glockenpfahl: „${nm}“` }); }); }
+  const H2 = secretAt('hundert'); if (H2 && !S.secrets.hundert?.found) { const q = detSpot('world', H2[0], H2[1], 10); if (q)   /* Geheime Orte S2: die Lanze auf dem Hügel */
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'hundert', secretDig: true, label: 'Eine Lanze mit Valen-Wimpel, tief im Hügel — darunter klingt es hohl (E: graben)' }); }
   for (const [k, D] of Object.entries(SECRETS)) if (S.secrets[k]?.found && !LOCATIONS.some(l => l.key === 'sec_' + k)) { const P = secretAt(k); if (P) LOCATIONS.push({ key: 'sec_' + k, name: D.name, x: P[0], y: P[1], r: 6, kind: 'ruin', threat: 2, secret: true }); }
 }
 let bellSeq = [], bellT = 0;
@@ -13861,6 +13867,22 @@ function secretBell(t) {
   S.factions.order = clamp((S.factions.order || 0) + 5, -100, 100);
   log('Erst die Taufe, dann die Hochzeit, zuletzt der Tod: Das Wasser weicht, und aus dem Schlamm steigt die versunkene Kapelle von Moorbach. An der Wand ein Blutzeichen — der Kult ist älter als das Königshaus. (Orden +5)', 'quest');
 }
+// Geheime Orte S2 — Die Verlorenen Hundert: Auf dem Hundertfeld steckt eine Lanze mit Valen-Wimpel im Hügel. Wer eine Stunde gräbt,
+// stößt auf das verschüttete Heerlager: Knochenwächter, eine Truhe und der Kriegsvorrat — und die Wahl, wem er gehört.
+function secretDig(t) {
+  const p = S.player; if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  act(p, 'work', 1500, t); passTime(60); secretFound('hundert'); const tx = t.x / TS | 0, ty = t.y / TS | 0, lv = Math.max(8, p.level);
+  for (let i = 0; i < 4; i++) { const e = spawnEnemy(i ? 'skeleton' : 'bone_knight', 'world', tx + ri(-4, 4), ty + ri(2, 5), { level: lv }); if (e) Object.assign(e, { transient: true, name: i ? 'Knochenwächter' : 'Feldherr der Hundert', aggroId: p.id }); }
+  const q = detSpot('world', tx + 2, ty + 1, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Feldkiste der Hundert', loot: ['longsword', 'chain_hauberk', 'potion'], lootBonus: 2 });
+  log('Unter dem Hügel: das Lager, das sie nie geräumt haben. Die Toten darin stehen noch Wache. Im Feldherrenzelt liegt ein Brief — und der Kriegsvorrat der Hundert.', 'quest');
+  const near = Object.keys(S.war?.nodes || {}).filter(k => TOWN_PLAN[k] && S.war.nodes[k].owner === 'valen').sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[b].square[0] - tx, TOWN_PLAN[b].square[1] - ty))[0];
+  const done = txt => { S.secrets.hundert.choice = txt; UI.closeDialogue(); };
+  UI.dialogue({ ...p, name: 'Kriegsvorrat der Hundert' }, 'Fässer mit Pfeilen, Kisten mit Eisen, gepökeltes Fleisch, noch versiegelt. Wem gehört das jetzt?', [
+    ...(near ? [{ text: `Der Garnison von ${townName(near)} (+8 Besatzung, Valen +5)`, fn: () => { S.war.nodes[near].garrison += 8; S.factions.valen = clamp((S.factions.valen || 0) + 5, -100, 100); log(`Der Kriegsvorrat geht nach ${townName(near)}. Die Garnison ist stärker (+8), Valen dankt (+5).`, 'faction'); done('valen'); } }] : []),
+    { text: 'An die Kette verkaufen (300 Gold, Kette +5, Valen −5)', fn: () => { S.gold += 300; S.factions.chain = clamp((S.factions.chain || 0) + 5, -100, 100); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100); log('Kettenkarren holen den Vorrat ab. 300 Gold. Valen wird davon hören (−5).', 'faction'); done('chain'); } },
+    ...(S.settlement ? [{ text: `In die eigene Siedlung ${S.settlement.name} (+20 Eisen, +10 Holz)`, fn: () => { S.res.iron = (S.res.iron || 0) + 20; S.res.wood = (S.res.wood || 0) + 10; log('Der Vorrat geht in deine Siedlung: +20 Eisen, +10 Holz.', 'economy'); done('settle'); } }] : []),
+    { text: 'Später entscheiden', fn: () => UI.closeDialogue() }]);
+}
 function secretFound(k) {
   const D = SECRETS[k]; (S.secrets ||= {})[k] = { found: S.day | 0 }; ensureSecrets(); UI.toast(`GEHEIMNIS: ${D.name.toUpperCase()}`, 3200);
   chronicle(`${D.name} entdeckt`, 'legend', 'Ein Ort, der auf keiner Karte stand.'); const n = Object.values(S.secrets).filter(s => s.found).length; log(`Geheimnisse gefunden: ${n} von ${SECRET_N}.`, 'quest');
@@ -13871,6 +13893,7 @@ function secretTick() {                                              /* Umgebung
   if (!night || !wet || Math.hypot(p.x / TS - G[0], p.y / TS - G[1]) > 40 || (bellT += 3) < 39) return; bellT = 0; sfx('bell', 0, 0.25);
   if (!S.flags.bellHeard) { S.flags.bellHeard = 1; log('Irgendwo im Moor schlägt eine Glocke. Es gibt dort keine Kirche.', 'world'); }
 }
+function secretTick2() { const p = S.player, H = secretAt('hundert'); if (p.map !== 'world' || !H || S.secrets?.hundert?.found || S.flags.lanceSeen || Math.hypot(p.x / TS - H[0], p.y / TS - H[1]) > 20) return; S.flags.lanceSeen = 1; log('Auf einem Hügel am Rand des Hundertfelds steckt eine Lanze mit einem verblichenen Valen-Wimpel. Niemand hat hier je aufgeräumt.', 'world'); }
 function cultProps() {
   S.ents.world = S.ents.world.filter(e => !e.cultProp); const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
   for (const m of C.missing) if (!m.freed && !m.seen) S.ents.world.push({ id: uid(), kind: 'prop', type: 'blood', map: 'world', x: m.mark.x, y: m.mark.y, r: 8, solid: false, transient: true, cultProp: true, rite: 'cultmark', label: 'Blutzeichen', mid: m.ent.id });
@@ -15479,6 +15502,7 @@ function debugSections() {
       'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
       'Geheime Orte: zum Glockenmoor': () => { const G = secretAt('glockenmoor'); if (G) tp(G[0], G[1] + 3); },
       'Geheime Orte: Nebelnacht jetzt': () => { S.minute = 23 * 60; S.weather = 'fog'; bellT = 99; UI.toast('Nacht und Nebel'); },
+      'Geheime Orte: zum Hundertfeld (Lanze)': () => { const H = secretAt('hundert'); if (H) tp(H[0], H[1] + 3); },
       'Geheime Orte: zurücksetzen': () => { S.secrets = {}; for (let i = LOCATIONS.length - 1; i >= 0; i--) if (LOCATIONS[i].secret) LOCATIONS.splice(i, 1); ensureSecrets(); UI.toast('Geheimnisse zurückgesetzt'); },
       'Ratgeber an/aus': () => { S.settings.tips = S.settings.tips === false; UI.toast(S.settings.tips === false ? 'Ratgeber aus' : 'Ratgeber an'); },
       'Ratgeber: alle Tipps zurücksetzen': () => { S.flags.tips = {}; guideLast = -1e9; UI.toast('Tipps kommen wieder'); },
@@ -19545,6 +19569,15 @@ export function selftest() {
       if (!(det && wrong && found)) console.log('Geheim-Probe', JSON.stringify({ det, n: posts.length, wrong, found }));
       return det && wrong && found;
     } finally { S.ents.world = W0; S.secrets = s0; S.factions.order = o0; LOCATIONS.length = L0; bellSeq = []; }
+  }));
+  ok('Geheime Orte S2: Lanze auf dem Hundertfeld — graben öffnet das Lager (Wächter, Truhe), Kriegsvorrat stärkt auf Wunsch die Garnison', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, WAR = structuredClone(S.war), v0 = S.factions.valen, m0 = S.minute, d0 = S.day;
+    try { S.ents.world = W0.slice(); S.secrets = {}; ensureSecrets(); const lance = S.ents.world.find(e => e.secretDig); if (!lance) return false;
+      secretDig(lance); const found = !!S.secrets.hundert?.found && S.ents.world.some(e => e.name === 'Feldherr der Hundert') && S.ents.world.some(e => e.label === 'Feldkiste der Hundert');
+      const near = Object.keys(S.war.nodes).filter(k => TOWN_PLAN[k] && S.war.nodes[k].owner === 'valen'); const g0 = Object.fromEntries(near.map(k => [k, S.war.nodes[k].garrison]));
+      [...document.querySelectorAll('#dlg-choices button')][0].click(); const gar = near.some(k => S.war.nodes[k].garrison === g0[k] + 8) && S.secrets.hundert.choice === 'valen';
+      return found && gar && !S.ents.world.some(e => e.secretDig);
+    } finally { S.ents.world = W0; S.secrets = s0; LOCATIONS.length = L0; S.war = WAR; S.factions.valen = v0; S.minute = m0; S.day = d0; UI.closeDialogue(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

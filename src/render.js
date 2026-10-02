@@ -346,6 +346,17 @@ function texel(t, v, kind) {
   if (!d) { const c = SP.tileTexture(t, v, TILE_COL[t] || TILE_COL[T.GRASS], kind); d = c.getContext('2d').getImageData(0, 0, 16, 16).data; texData.set(key, d); }
   return d;
 }
+/* PERF-R: fehlende Texeldaten eines Chunks gesammelt holen — alle Kacheltexturen auf ein Blatt, ein einziges getImageData
+   (jedes einzelne Zurücklesen wartet auf die Grafikkarte, ~1 ms je Textur beim ersten Backen) */
+const texAtlas = document.createElement('canvas');
+function warmTexels(keys) {
+  if (!keys.length) return;
+  texAtlas.width = keys.length * 16; texAtlas.height = 16;
+  const g = texAtlas.getContext('2d');
+  keys.forEach(([t, v, kind], n) => g.drawImage(SP.tileTexture(t, v, TILE_COL[t] || TILE_COL[T.GRASS], kind), n * 16, 0));
+  const all = g.getImageData(0, 0, keys.length * 16, 16).data, RW = keys.length * 64;
+  keys.forEach(([t, v, kind], n) => { const d = new Uint8ClampedArray(1024); for (let y = 0; y < 16; y++) d.set(all.subarray(y * RW + n * 64, y * RW + n * 64 + 64), y * 64); texData.set(t + '|' + v + '|' + kind, d); });
+}
 const TINT_RGBA = {};                                    // 'rgba(r,g,b,a)' → [r,g,b,a]
 const tintOf = str => TINT_RGBA[str] || (TINT_RGBA[str] = str.match(/[\d.]+/g).map(Number));
 const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
@@ -375,7 +386,9 @@ function bakeGround(o, m, cx, cy) {
   /* PERF-R: Grundtexturen direkt in einen Pixelpuffer (dieselben Texel wie tileTexture) statt 256 drawImage; die Grenzpixel
      schreiben danach in denselben Puffer, ein putImageData am Ende — gleiches Bild, Backen ~1,5 ms schneller */
   const img = new ImageData(SZ, SZ), D = img.data;
-  const tc = [];                                          // Texeldaten je Quellkachel
+  const tc = [], miss = [], seen = new Set();             // Texeldaten je Quellkachel
+  for (let k = 0; k < TW * TW; k++) { const key = typ[k] + '|' + vari[k] + '|' + kin[k]; if (!texData.has(key) && !seen.has(key)) { seen.add(key); miss.push([typ[k], vari[k], kin[k]]); } }
+  warmTexels(miss);
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {     // Grundtexturen
     const k = (j + 1) * TW + i + 1, T0 = tc[k] || (tc[k] = texel(typ[k], vari[k], kin[k]));
     for (let y = 0; y < 16; y++) D.set(T0.subarray(y * 64, y * 64 + 64), ((j * 16 + y) * SZ + i * 16) * 4);
