@@ -2390,6 +2390,7 @@ function update(dt, now) {
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); }      /* Umbau S3: Burgfrieden */
+  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); }  /* Ratgeber */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -7799,7 +7800,32 @@ function stormScene(v, d) {
   return true;
 }
 // T17: Ankunft — beim ersten Betreten jeder Siedlung (je Spielstand) Namenskarte mit Herrschaft; besetzt/belagert erneut einmal.
-let arrT = 0, keepT = 0;
+let arrT = 0, keepT = 0, guideT = 0, guideLast = -1e9;
+// Ratgeber (Scout R8, Entwickler 02.10.2026: „Hinweise führen hin“): statt erst zu erklären, wenn der Spieler eine Mechanik zufällig
+// auslöst, weist ein Tipp aktiv darauf hin — passend zur Lage, jeder genau einmal, höchstens einer alle 90 Sekunden. Abschaltbar
+// (Debug „Ratgeber an/aus“, S.settings.tips === false). Läuft nicht in Zwischenszenen, Dialogen oder im Koop als Gast.
+const GUIDE = [
+  ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
+  ['talent', p => (p.skillPoints || 0) > 0 && (S.flags.playMin || 0) >= 4, 'Du hast einen Talentpunkt frei. T öffnet die Talente.'],
+  ['attr', p => (p.attrPoints || 0) > 0, 'Freie Attributpunkte: C öffnet deinen Charakter.'],
+  ['board', p => p.map === 'world' && !activeCons().length && S.ents.world.some(e => e.type === 'board' && dist(e, p) < 200), 'Am Anschlagbrett (E) hängen Aufträge. J zeigt dein Tagebuch; der Pfeil am Bildrand zeigt das Ziel des verfolgten Auftrags.'],
+  ['fight', p => S.ents[p.map]?.some(e => e.kind === 'enemy' && e.alive && e.aggroId === p.id && dist(e, p) < 250), 'Kampf: Q weicht aus. Drei Schläge ohne Pause ergeben einen Wuchtschlag. Wo du triffst, zählt — Arme, Beine, Kopf.'],
+  ['bleed', p => !p.downed && p.hp < p.maxHp * 0.5 && (hasItem(p, 'bandage') || hasItem(p, 'potion')), 'Du bist schwer verletzt. Im Inventar (I) kannst du Verband oder Trank benutzen — oder lege sie in die Schnellleiste.'],
+  ['limb', p => !p.downed && ['larm', 'rarm', 'lleg', 'rleg'].some(k => p.body?.[k] && !p.body[k].lost && p.body[k].hp <= 0), 'Ein Glied ist ausgefallen. Verbände helfen unterwegs, Heiler in Städten richten Brüche.'],
+  ['map', p => p.map === 'world' && (S.flags.playMin || 0) >= 6, 'M öffnet die Weltkarte, N schaltet die Minikarte. Ein Klick auf einen Ort zeigt, was du über ihn weißt.'],
+  ['tavern', p => inTavern(p) && !S.party.length, 'In Schenken findet man Leute, die für Gold mitziehen. Deine Gruppe verwaltest du mit G.'],
+  ['night', p => p.map === 'world' && S.minute >= 21 * 60, 'Die Nacht bricht an: Mehr Feinde ziehen umher, und es wird dunkel. In der Stadt bist du sicherer.'],
+  ['craft', p => S.ents[p.map]?.some(e => e.kind === 'prop' && ['workbench', 'forge', 'anvil', 'workbench_int'].includes(e.type) && dist(e, p) < 120), 'Werkbank oder Esse in der Nähe: Mit E stellst du hier Dinge her.'],
+  ['wanted', p => bountyTotal() > 0, 'Auf dich ist Kopfgeld ausgesetzt. Wachen halten dich an — zahlen, mitkommen oder Widerstand. Kopfgeldjäger kommen, wenn es hoch ist.'],
+  ['settle', p => !S.settlement && S.gold >= 300 && (S.flags.playMin || 0) >= 20, 'Mit genug Gold und Vorrat kannst du eine eigene Siedlung gründen. B öffnet das Bauen.'],
+];
+function guideTick() {
+  const p = S.player; if (!p?.alive || S.settings?.tips === false || S.coop?.role === 'guest' || UI.dialogueOpen() || S.cine || S.paused) return;
+  S.flags.playMin = (S.flags.playMin || 0) + 0.05;                     /* grob: Spielminuten in Echtzeit (alle 3 s) */
+  const now = performance.now(); if (now - guideLast < 90000) return; const T = (S.flags.tips ||= ((S.day | 0) >= 5 ? { codex: 1, map: 1, board: 1, fight: 1, tavern: 1, night: 1, craft: 1 } : {}));   /* alte Stände: Grundtipps gelten als bekannt */
+  for (const [k, cond, text] of GUIDE) { if (T[k]) continue; let hit = false; try { hit = cond(p); } catch (e) { hit = false; } if (!hit) continue;
+    T[k] = 1; guideLast = now; log(`Tipp: ${text}`, 'quest'); UI.toast('TIPP — siehe Protokoll', 1800); return k; }
+}
 const ARRIVE_SAY = ['Willkommen. Halt dich an die Gesetze.', 'Der Platz ist dort drüben.', 'Fremd hier? Der Markt liegt in der Mitte.', 'Waffen bleiben in der Scheide.'];
 function arrivalTick() {
   const p = S.player; if (!p || p.map !== 'world' || S.cine || S.dying || S._quiet || S.coop?.role === 'guest') return;
@@ -13559,18 +13585,22 @@ function cultMasks(h) {                                        /* Maskierte gehe
   const [cx, cy] = TOWN_PLAN.varonheim.square, e = spawnEnemy('blood_cultist', 'world', cx + ri(-10, 10), cy + ri(-8, 8), { level: 8 }); if (!e) return;
   Object.assign(e, { cultNight: true, disguised: true, transient: true, name: 'Maskierter' });
 }
+// Scout R9 (Entwickler 02.10.2026): Rang bremst den Blutkult. Ritter der Garde (Valen-Rang ≥ 3) oder ein hoher Ordensrang (≥ 3):
+// der Kult wagt sich seltener heraus (Entführung jede dritte statt jede zweite Nacht) und die Rote Krönung braucht zehn Tage länger.
+const cultBrake = () => (S.ranks?.valen ?? -1) >= 3 || (S.ranks?.order ?? -1) >= 3;
 function cultHour(h) {
   const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
+  if (C.stage && !C.brakeSaid && cultBrake()) { C.brakeSaid = 1; log('Der Kult hat deinen Rang bemerkt: Er wagt sich seltener heraus, und die Pläne am Hof brauchen länger.', 'quest'); }
   const p = S.player, here = p.map === 'world' && townAt(p.x / TS | 0, p.y / TS | 0) === 'varonheim', day = S.day | 0;
   if (C.end === 'player') return cultLordHour(h);
   if (C.end === 'destroyed') return;
-  if (C.stage && !C.crown && !C.crowned && (C.stage >= 3 || day >= 45 - (S.difficulty === 'sehr_schwer' ? 15 : 0)) && !afterHeals()) {   /* Entwickler: Sehr schwer 15 Tage früher, Angsthase ohne Krönung */ C.crown = day + 20; log(`Am Hof flüstert man von einer „Roten Krönung“. Was immer das ist — es soll in zwanzig Tagen geschehen (Tag ${C.crown}).`, 'quest'); }
+  if (C.stage && !C.crown && !C.crowned && (C.stage >= 3 || day >= 45 - (S.difficulty === 'sehr_schwer' ? 15 : 0)) && !afterHeals()) {   /* Entwickler: Sehr schwer 15 Tage früher, Angsthase ohne Krönung */ C.crown = day + 20 + (cultBrake() ? 10 : 0); log(`Am Hof flüstert man von einer „Roten Krönung“. Was immer das ist — es soll in zwanzig Tagen geschehen (Tag ${C.crown}).`, 'quest'); }
   if (C.crown && day >= C.crown && h === 3 && C.end !== 'ruling' && !C.crowned && !SIM.capitalFallen()) cultCrown();   /* RB-043 */
   if (C.end === 'hidden' || C.end === 'ruling') { if (h === 23 && day % 5 === 0) cultTake(); return; }   /* Scheibe 5: der Kult arbeitet weiter, leiser */
   const capD = S.flags.startCap ? (S.player.level >= 5 ? 10 : 16) : 3;   /* Umbau S5: wer in Varonheim beginnt, hat erst Ruhe */
   if (!C.stage) { if (here && day >= capD) cultStart('Du bist in Varonheim.'); else if (S.flags.varonAudience) cultStart('Nach der Audienz beim König hört man es überall:'); else if (day >= Math.max(12, S.flags.startCap ? 16 : 0)) cultStart('Aus der Hauptstadt kommen Gerüchte.'); return; }
   if (C.stage >= 4) return;                                    /* ab der Enthüllung (Scheibe 4) wartet der Kult in der Krypta */
-  if (h === 23 && (day % 2 === 0 || C.extraTake)) { C.extraTake = false; cultTake(); }
+  if (h === 23 && (day % (cultBrake() ? 3 : 2) === 0 || C.extraTake)) { C.extraTake = false; cultTake(); }   /* Scout R9: Rang bremst */
   { const caged = C.missing.filter(m => !m.freed && !m.thrall && !m.dead);   /* Scheibe 3: nach sechs Tagen (oder ab dem fünften im Pferch) wird ein Gefangener zum Blutknecht */
     for (const m of caged) if (day - m.day > 6 || caged.filter(x => !x.thrall).length > 4 && m === caged.find(x => !x.thrall)) { m.thrall = true; log(`${m.ent.name} aus Varonheim kommt nicht mehr zurück. Nicht als Mensch.`, 'world'); } }
   cultMasks(h);
@@ -14588,6 +14618,8 @@ function adoptSuccessor(c) {
   chronicle(`${c.name} übernimmt Haus ${S.legacy.house}`, 'legacy',
     `Generation ${S.legacy.gen}. ${old.name} liegt in ${old.map === 'mine' ? 'der Grube' : old.map === 'deep' ? 'der Tiefhall' : 'der Erde von Greenmark'}.`);
   log(`${c.name} führt Haus ${S.legacy.house} weiter. Generation ${S.legacy.gen}.`, 'death');
+  if (S.settlement) { S.settlement.morale = clamp((S.settlement.morale ?? 60) - 10, 0, 100); S.settlement.lord = c.name;   /* Scout R9: die Siedlung geht ans Haus */
+    log(`${S.settlement.name} geht an ${c.name} über. Die Siedler trauern um ${old.name} (Moral −10) — und warten, was der Neue taugt.`, 'quest'); }
   log(`Am Grab von ${old.name} (${S.legacy.ancestors[S.legacy.ancestors.length - 1]?.location || 'wo er fiel'}) kannst du hören, was von ${old.name} bleibt — und entscheiden, ob die Geschichte gleich weitergeht oder zwanzig Jahre später.`, 'quest');   /* Nutzer §5e.10 */
   S.paused = false;
   coopHooks.afterHeir?.();   /* Koop: Erben der Mitspieler kommen jetzt dazu */
@@ -15118,6 +15150,9 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
+      'Ratgeber an/aus': () => { S.settings.tips = S.settings.tips === false; UI.toast(S.settings.tips === false ? 'Ratgeber aus' : 'Ratgeber an'); },
+      'Ratgeber: alle Tipps zurücksetzen': () => { S.flags.tips = {}; guideLast = -1e9; UI.toast('Tipps kommen wieder'); },
       'E3: Groll — nächster Bewohner trauert (sofort angeworben)': () => { const v = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.homeId && !e.transient && !e.guard && S.ents.world.some(o => o !== e && o.alive && o.homeId === e.homeId)).sort((a, b) => dist(a, p) - dist(b, p))[0];
         if (!v) return UI.toast('Kein Bewohner mit Hausgenossen in der Nähe.'); const G = grudgeFrom(v, true, true); if (!G) return UI.toast('Kein Groll möglich (schon zwei offen?)'); G.at = S.day | 0; grudgeDay(); UI.toast(`${G.whoName} heuert einen Mörder (Opfer: ${v.name}, lebt noch — nur Probe)`); },
       'E3: Gedungener Mörder jetzt': () => { if (!grudgeDue()) return UI.toast('Kein angeworbener Groll.'); spawnChoiceEncounter((p.x / TS | 0) + 8, p.y / TS | 0, 'hired'); },
@@ -19074,6 +19109,19 @@ export function selftest() {
       if (!(none && mk && hired && note && paid)) console.log('E3-Probe', JSON.stringify({ none, mk, hired, note, paid }));
       return none && mk && hired && note && paid;
     } finally { S.grudges = G0; S.contracts = C0; S.ents.world = W0; S.gold = g0; registerContracts(); UI.closeDialogue(); }
+  }));
+  ok('Ratgeber: ein Tipp je Lage, jeder nur einmal, höchstens einer je 90 s, abschaltbar', sandbox(() => {
+    const p = stage(), T0 = structuredClone(S.flags.tips || {}), pm = S.flags.playMin, tp = S.settings.tips, sp = p.skillPoints;
+    try { S.flags.tips = {}; S.flags.playMin = 5; S.settings.tips = true; guideLast = -1e9; p.skillPoints = 1; const a = guideTick();
+      const b = guideTick(); guideLast = -1e9; const c = guideTick(); guideLast = -1e9; S.settings.tips = false; const d = guideTick();
+      return a === 'codex' && b === undefined && c === 'talent' && d === undefined;
+    } finally { S.flags.tips = T0; S.flags.playMin = pm; S.settings.tips = tp; p.skillPoints = sp; guideLast = -1e9; }
+  }));
+  ok('Scout R9: Rang bremst den Blutkult (Krönung +10 Tage) — ohne Rang nicht', sandbox(() => {
+    const C0 = S.cult ? structuredClone(S.cult) : null, rv = S.ranks.valen, ro = S.ranks.order, d0 = S.difficulty;
+    try { S.difficulty = 'schwer'; const day = S.day | 0, run = rk => { S.ranks.valen = rk; S.ranks.order = -1; S.cult = { stage: 3, clues: {}, missing: [], taken: 99, heat: 0, gone: [] }; cultHour(12); return S.cult.crown - day; };
+      const slow = run(3), fast = run(0); return slow === 30 && fast === 20;
+    } finally { S.cult = C0; S.ranks.valen = rv; S.ranks.order = ro; S.difficulty = d0; }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

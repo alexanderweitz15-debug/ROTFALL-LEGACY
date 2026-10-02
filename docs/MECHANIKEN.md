@@ -939,3 +939,16 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Sie töten: ein zweiter Mord mit allen Folgen.
 - **Ohne dein Zutun:** Nach zwei gefallenen Mördern hat sie nichts mehr zum Bezahlen.
 - Debug: „E3: Groll — nächster Bewohner trauert“, „E3: Gedungener Mörder jetzt“.
+
+## Ratgeber (aktive Tipps)
+- Tipps erscheinen passend zur Lage, jeder genau einmal und höchstens einer alle 90 Sekunden. Sie stehen im Protokoll mit „Tipp:“, dazu kurz „TIPP“ als Einblendung.
+- **Themen:** Kodex (H), freier Talentpunkt (T), freie Attributpunkte (C), Anschlagbrett und Kompass, erster Kampf (Q ausweichen, Wuchtschlag, Trefferzonen), schwere Verletzung (Verband, Trank), ausgefallenes Glied, Weltkarte (M, N), Gefährten in Schenken (G), Nacht, Werkbank in der Nähe, Kopfgeld, Siedlung gründen (B).
+- Alte Spielstände ab Tag 5 überspringen die Grundtipps.
+- Debug: „Ratgeber an/aus“, „Ratgeber: alle Tipps zurücksetzen“.
+
+## Rang bremst den Blutkult
+- Bist du Ritter der Garde (Valen-Rang 3 oder höher) oder stehst du hoch im Orden (Rang 3 oder höher), wagt sich der Kult seltener heraus: Entführungen gibt es nur jede dritte statt jede zweite Nacht. Außerdem braucht die Rote Krönung 10 Tage länger. Das Log sagt es dir einmal.
+- Debug: „Rang bremst Kult: Valen-Rang 3 setzen“.
+
+## Die Siedlung geht ans Haus
+- Stirbt dein Held, übernimmt der Erbe die Siedlung. Die Siedler trauern (Moral −10), das Log meldet den Übergang.
