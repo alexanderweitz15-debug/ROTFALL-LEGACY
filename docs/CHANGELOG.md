@@ -7,6 +7,8 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Schwere Verbrechen ab 2000 Gold: kein Freikaufen, Bußgeld und Haft bis 120 Spielstunden (200 000 Gold); Haftanzeige in Stunden statt fälschlich Minuten.
 - Varonheim: erschlagene Hofleute bleiben tot, Kanzlertod beendet den Kult, Reichsverweser rückt nach; Thronwirren lassen die Hauptstadt ohne König zerfallen und übernehmen.
 - Menüs: Reiter in Charakter- und Fraktionsfenster nicht mehr zusammengequetscht; Stylesheet mit Cache-Schlüssel.
+- Ereignisfiguren laufen von außerhalb ins Bild statt aufzuploppen; Angst geht vor Ereignissen (kein Fest, andere Orte, Neuankömmlinge fürchten sich mit).
+- Omega: eigene Sternenklinge (Goldschwingen, Sternknauf, glimmende Hohlkehle), Todesszene, Klinge garantiert; danach im Westen verhasst, im Osten gefeiert. In Szenen nimmt die Gruppe keinen Schaden.
 
 ## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)
 - Varonsburg in der Welt begehbar (Thronsaal, Adelsflügel, Kanzlei, Verlies, Kronschmiede), Viertel-Architektur in Varonheim, Karawanen-Absturz bei alter Route behoben.

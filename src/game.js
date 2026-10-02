@@ -3490,6 +3490,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
   if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */
   if (S.dying && (target === S.player || S.party.includes(target.id))) return;   /* T10: im Todesmoment stirbt niemand von der Gruppe */
+  if (cineSafe(target)) return;   /* Nutzer 02.10.: in einer Szene (und 1,5 s danach) greift niemand den Helden und seine Gruppe an */
   if (target.disguised && !target.unmasked && source) { target.unmasked = true; float(target, 'Maskierter!', 'rgba(200,60,60,ALPHA)'); }   /* §5g.2: gestellt */   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
@@ -3677,7 +3678,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.mtype === 'dodon') dodonSlain(c, source);
   if (c.amok && source && (source === S.player || S.party.includes(source.id))) { S.factions.aurel = clamp((S.factions.aurel || 0) + 2, -100, 100); float(c, 'Aurelion +2', 'rgba(230,200,120,ALPHA)'); }   // S14: Amok-Automat gestoppt
   if (c.mtype === 'garmadon') garmadonSlain();
-  if (c.mtype === 'omega') omegaEnd('slain');
+  if (c.mtype === 'omega') omegaEnd('slain', c);
   c.alive = false; c.downed = false;
   if (c.kind === 'npc' && c.homeTown) ruinCheck(c, source, cause);      /* Folgen §5c: letzter Bewohner tot = Dorf ausgelöscht */
   if (c.vaultFoe && c.map === 'vault' && S.vaultAt && S.vaults?.[S.vaultAt.site] && !S.ents.vault.some(e => e.vaultFoe && e.alive && !e.surrendered)) S.vaults[S.vaultAt.site].cleared[S.vaultAt.floor] = S.day | 0;   // S15 Fehlersuche: Ebene gesäubert (auch ohne Abstieg) — 7 Tage Ruhe, der Boss steht nicht wieder auf
@@ -4024,6 +4025,7 @@ function dropLoot(e) {
   const table = LOOT[e.mtype] || [], tier = lootTier(e), BP = tier === 2 && BOSS_LOOT[e.mtype];
   const bonus = Math.max(0, (MONSTERS[e.mtype]?.threat || 1) - 1) + (e.boss ? 1 : 0) + (e.elite ? 1 : 0);   // gefährlicher Gegner (Veteran §71), bessere Chancen
   const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }));
+  if (e.mtype === 'omega') { drop('sternenklinge'); drop('potion'); return; }   /* Nutzer 02.10.: Omegas Klinge liegt immer da (die Szene erzählt davon) */
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
     if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p) * diffOf().loot)) drop(key); }   // S15 P12
   if (BP) { if (BP.weapons.length && chance(0.9)) drop(pick(BP.weapons)); if (BP.armor.length && chance(0.6)) drop(pick(BP.armor));
@@ -9711,7 +9713,11 @@ function omegaFight(g) { const O = om(); O.fight = true; g.parley = false; g.agg
 function omegaEnd(kind, g) {
   const O = om(); if (O.ending) return; O.ending = kind; O.endDay = Math.max(1, S.day | 0); O.cat = null; O.fight = false;
   const p = S.player, add = (fs, n) => fs.forEach(f => { if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + n, -100, 100); }), LIV = ['valen', 'order', 'merch', 'aurel', 'goblin'];
-  if (kind === 'slain') { add(LIV, 20); add(['chain'], -40); grantLegend('omega', 'Gottestöter', 'Omega ist gefallen — diesmal für immer.'); chronicle('Der Gott stirbt', 'war', `${p.name} erschlägt Omega im Krater des Gefallenen Sterns. Der rote Himmel verblasst.`); }
+  if (kind === 'slain') { add(LIV, 20); grantLegend('omega', 'Gottestöter', 'Omega ist gefallen — diesmal für immer.'); chronicle('Der Gott stirbt', 'war', `${p.name} erschlägt Omega im Krater des Gefallenen Sterns. Der rote Himmel verblasst.`);
+    /* Nutzer 02.10.: der Westen betete Omega an — dort bist du verhasst; der Osten, wo seine Toten aufstanden, feiert dich */
+    S.factions.chain = -100; S.flags.godslayer = S.day | 0; addBounty('chain', 2500, 'Gottesmord'); addFame(30, 'ost', 'Gottestöter');
+    log('Im Westen bist du verhasst: Die Kette hat dich geächtet, die Gläubigen reden nicht mehr mit dir und ihre Wachen greifen an. Im Osten feiert man dich.', 'faction');
+    if (g) omegaDeathCine(g); }
   if (kind === 'avatar') { p.omegaAvatar = true; add(LIV, -50); add(['chain'], 100); S.ranks.chain = FACTIONS.chain.ranks.length - 1; grantLegend('omega', 'Avatar Omegas', 'Du bist seine Hand. Die Lebenden fürchten dich.'); chronicle('Die Hand des Gottes', 'war', `${p.name} kniet vor Omega und steht als sein Avatar wieder auf.`); }
   if (kind === 'sleep') { O.faith = 100; add(LIV, 15); add(['chain'], 30); grantLegend('omega', 'Hüter des Schlafs', 'Omega schläft wieder — weil du es wolltest.'); chronicle('Der Gott schläft', 'war', `${p.name} legt Omega zurück in den Schlaf. Niemand weiß, wie lange.`); }
   if (g && g.alive && kind !== 'slain') { fx(g.x, g.y - 40, 'heal', 30); g.alive = false; const a = S.ents[g.map], i = a.indexOf(g); if (i >= 0) a.splice(i, 1); }
@@ -9719,6 +9725,20 @@ function omegaEnd(kind, g) {
   if (S.weather === 'bloodrain') S.weatherLeft = 0;
   omegaAftermath(kind);                                               /* Folgen §5c: Panik im Osten, Jubel im Westen */
   UI.toast(kind === 'slain' ? 'OMEGA IST TOT' : kind === 'avatar' ? 'AVATAR OMEGAS' : 'OMEGA SCHLÄFT', 4600); camShake(10, 800);
+}
+// Nutzer 02.10.2026: Omegas Tod als Szene (Welt steht): das Auge bricht, Lichtsäule, der rote Himmel reißt auf, die Sternenklinge bleibt,
+// dann der Held. Fällt in eine laufende Szene, kommt sie danach.
+function omegaDeathCine(g) {
+  if (S._quiet || S.coop?.role === 'guest' || S.dying) return;
+  const body = { x: g.x, y: g.y }, p = S.player;
+  const run = () => cinematic([
+    { dur: 2800, zoom: 1.5, focus: body, text: '„Ich war einmal wie du …“', beats: [{ t: 0, duck: 0.25, ms: 300 }, { t: 0, flash: '#ffffff', ms: 420 }, { t: 0.02, sfx: 'magic' }, { t: 0.05, shake: 12, ms: 1400 },
+      { t: 0.1, fx: 'heal', at: body, n: 30, dy: 40 }, { t: 0.35, fx: 'spark', at: body, n: 24, dy: 60 }, { t: 0.6, fx: 'heal', at: body, n: 30, dy: 90 }, { t: 0.8, sfx: 'bell' }] },
+    { dur: 3200, zoom: 1.25, focus: body, text: 'Das Auge schließt sich. Über dem Krater reißt der rote Himmel auf.', beats: [{ t: 0, card: { title: 'OMEGA IST TOT', sub: 'Der Gefallene fällt ein letztes Mal', ms: 3800 } }, { t: 0.05, sfx: 'bell' },
+      { t: 0.3, fx: 'spark', at: body, n: 16, dy: 20 }, { t: 0.55, flash: '#cfe8ff', ms: 600 }, { t: 0.6, fx: 'heal', at: body, n: 20, dy: 8 }] },
+    { dur: 2600, zoom: 1.1, focus: p.id, text: 'Wo sein Herz war, liegt eine Klinge aus Sternenlicht. Im Osten läuten die Glocken. Im Westen verflucht man deinen Namen.', beats: [{ t: 0.1, gesture: 'zeigen', who: p, toward: body, ms: 1400 }, { t: 0.85, duck: 1, ms: 600 }] },
+  ], null, { pause: true, stay: true });
+  if (S.cine) cineLater(run, 1200); else run();
 }
 function omegaCatHour() {                                          // Weltkatastrophe: Tote stehen überall auf, Dörfer werden angegriffen
   const p = S.player;
@@ -10070,8 +10090,10 @@ function cineNext() {
 function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t); cineBeats(s, C.t, false);   /* T17: Zeitachse */
   if (s?.to && s.x != null) { const k = Math.min(1, C.t / (s.dur || 3000)), e = k * k * (3 - 2 * k); S.player.x = s.x + (s.to.x - s.x) * e; S.player.y = s.y + (s.to.y - s.y) * e; }   // S15: sanfte Kamerafahrt
   if (C.t >= (s?.dur || 3000)) cineNext(); }
+let cineSafeUntil = 0;
+const cineSafe = t => !S._quiet && (!!S.cine || performance.now() < cineSafeUntil) && !!t && (t === S.player || S.party.includes(t.id) || !!t.coopHero || !!t.coopPilot);
 function cineEnd() {
-  const C = S.cine; if (!C) return; S.cine = null;
+  const C = S.cine; if (!C) return; S.cine = null; if (!S._quiet) cineSafeUntil = performance.now() + 1500;   /* Proben laufen ohne Nachfrist */
   for (const s of C.shots.slice(C.i + 1)) if (!s.done && !s.showOnly) try { s.setup?.(); } catch (err) { console.error(err); }   // S15 Fehlersuche: wer überspringt, verpasst keine Folgen (Befreiung, Überfall …)
   for (const s of C.shots.slice(Math.max(0, C.i))) cineBeats(s, Infinity, true);   /* T17: übersprungene Beats — nur die Folgen */
   document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel());
@@ -11538,10 +11560,11 @@ function witchWaveTalk(npc) {
 // dieselben Reaktionen mit anderen Rufen (der Westen feiert die Hand des Gottes, der Osten fürchtet sie). Schlaf: der Westen betet still,
 // im Osten bleibt es ruhig. Dauer vier Tage; je näher die Leute beim Spieler und je frischer das Ereignis, desto mehr machen mit.
 const OMEGA_CRY = { slain: ['Der Gott ist tot!', 'Wer hält jetzt die Toten?', 'Lauft!', 'Es ist aus!'], avatar: ['Seine Hand geht um!', 'Versteckt euch!', 'Omega hat einen Diener!'] };
-const OMEGA_CHEER = { slain: ['Der Stern ist gefallen!', 'Seht, der Himmel!', 'Zum Altar!', 'Frei!'], avatar: ['Die Hand Omegas!', 'Er hat einen Erwählten!', 'Heil dem Avatar!'] };
+const OMEGA_HATE = ['Gottesmörder!', 'Du hast ihn erschlagen!', 'Fluch über dich!', 'Verschwinde aus unserem Land!'];
+const OMEGA_CHEER = { slain: ['Der Gottestöter!', 'Der Stern ist erloschen!', 'Seht, der Himmel!', 'Frei!', 'Heil dir!'], avatar: ['Die Hand Omegas!', 'Er hat einen Erwählten!', 'Heil dem Avatar!'] };
 function omegaAftermath(kind) {
   if (!afterLive()) return; const A = AF(), day = S.day | 0; A.omega = { kind, day, until: day + 4 };
-  const T = { slain: ['Omega ist tot: Panik im Osten, Jubel im Westen', 'Im Osten, wo die Toten aus Omegas Blut aufstanden, bricht Panik aus: Leute rennen durch die Gassen, Läden bleiben zu, manche fliehen. Im Westen jubelt man, und Pilgerzüge brechen zum Altar in der Eisenfeste auf.'],
+  const T = { slain: ['Omega ist tot: Jubel im Osten, Hass im Westen', 'Im Osten, wo die Toten aus Omegas Blut aufstanden, feiert man dich: Die Leute jubeln auf den Plätzen und rufen deinen Namen. Im Westen, wo man Omega anbetete, bist du verhasst: Die Gläubigen verfluchen dich, verstecken sich vor dir und reden nicht mehr mit dir, die Kette hat dich geächtet. Trauerzüge ziehen zum Altar in der Eisenfeste.'],
     avatar: ['Omega hat eine Hand: Furcht im Osten, Taumel im Westen', 'Im Osten verriegeln die Leute ihre Türen und fliehen vor dem Avatar des Gottes. Im Westen feiert man die Hand Omegas, Pilger ziehen zum Altar.'],
     sleep: ['Omega schläft: der Westen betet', 'Im Westen knien die Gläubigen auf den Plätzen und beten für den Schlaf ihres Gottes. Im Osten merkt man kaum etwas.'] }[kind];
   if (T) afterSay(T[0], T[1], 'war');
@@ -11554,7 +11577,9 @@ function omegaSecond(force = false) {
   const near = S.ents.world.filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.angry && !e.guard && !e.robot && !S.party.includes(e.id) && dist(e, p) < 700).sort((a, b) => dist(a, p) - dist(b, p));
   const n = Math.max(1, Math.round(near.length * 0.5 * fade));
   for (const e of near.slice(0, n)) {
-    if (r === 'ost') { e.panicT = clock() + ri(12, 25); if (chance(0.3)) float(e, pick(OMEGA_CRY[k]), 'rgba(230,150,120,ALPHA)'); }
+    if (k === 'slain' && r === 'west') { gesture(e, 'abwehren', 1400, p); if (chance(0.3)) float(e, pick(OMEGA_HATE), 'rgba(230,120,100,ALPHA)'); if (chance(0.5)) { e.fear = Math.max(fearOf(e), 55); e.fearBy = p.id; e.fearSeen = clock(); } }   /* Hass und Furcht */
+    else if (k === 'slain') { gesture(e, 'zeigen', 1400); e.cheerT = clock() + 10; if (chance(0.3)) float(e, pick(OMEGA_CHEER.slain), 'rgba(240,210,120,ALPHA)'); if (chance(0.15)) fx(e.x, e.y - 30, 'spark', 6); }   /* der Osten feiert */
+    else if (r === 'ost') { e.panicT = clock() + ri(12, 25); if (chance(0.3)) float(e, pick(OMEGA_CRY[k]), 'rgba(230,150,120,ALPHA)'); }
     else if (k === 'sleep') { act(e, 'kneel', 1500); if (chance(0.2)) float(e, 'Schlaf, Omega …', 'rgba(200,190,230,ALPHA)'); }
     else { gesture(e, 'zeigen', 1400); e.cheerT = clock() + 10; if (chance(0.3)) float(e, pick(OMEGA_CHEER[k]), 'rgba(240,210,120,ALPHA)'); if (chance(0.15)) fx(e.x, e.y - 30, 'spark', 6); }
   }
@@ -11568,16 +11593,18 @@ function omegaDay() {
   const O = S.after?.omega; if (!O) return; const day = S.day | 0;
   if (day > O.until) { S.ents.world = S.ents.world.filter(e => !e.omegaPil); for (const e of S.ents.world) if (e.omegaShut) { e.shopClosed = 0; delete e.omegaShut; } delete S.after.omega;
     return log('Die Aufregung um Omega legt sich. Die Läden im Osten öffnen wieder, die Pilger sind heimgekehrt.', 'world'); }
-  if (O.kind !== 'sleep') {
+  if (O.kind === 'avatar') {   /* Nutzer 02.10.: nach Omegas Tod flieht der Osten nicht mehr, er feiert */
     for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && e.shop && e.map !== 'sky' && e.x / TS > 770 && !e.omegaShut && !(e.shopClosed > clock())) { e.shopClosed = (O.until + 1) * 1440; e.omegaShut = true; }
     for (const k of Object.keys(TOWN_PLAN).filter(t => TOWN_PLAN[t].square[0] > 770 && !S.razed?.[t])) { if (!chance(0.35)) continue;
       const vs = villagersOf(k), v = vs.length > 3 && vs.find(c => !KEY_ROLE(c) && !c.shop && !c.teaches); if (!v) continue;
-      S.ents.world = S.ents.world.filter(e => e !== v); log(`${v.name} flieht aus ${townName(k)}: „Der Gott ist fort — jetzt holen sie uns alle.“`, 'world'); }
+      S.ents.world = S.ents.world.filter(e => e !== v); log(`${v.name} flieht aus ${townName(k)}: „Seine Hand geht um. Wir warten nicht, bis sie hier ist.“`, 'world'); }
+  }
+  if (O.kind !== 'sleep') {   /* Pilgerzug (Avatar) bzw. Trauerzug (erschlagen) aus einem Westdorf */
     const V = pick(tribVillages()), alt = S.ents.world.find(e => e.omegaAltar);
     if (V && alt && TOWN_PLAN[V.key]) { const P = TOWN_PLAN[V.key];
       for (let i = 0; i < 3; i++) { const s = freeSpotNear('world', P.square[0] + ri(-2, 2), P.square[1] + ri(-2, 2), 2), c = makeChar({ name: pick(i % 2 ? FIRST_F : FIRST_M), prof: 'Pilger', x: s.x, y: s.y, level: 1 });
-        const g = { x: alt.x + ri(-70, 70), y: alt.y + ri(60, 120) }; Object.assign(c, { omegaPil: true, transient: true, visitor: true, anchor: g, schedulePos: g, greet: O.kind === 'slain' ? '„Wir gehen zum Altar, wo der Stern fiel. Sehen, was bleibt.“' : '„Zum Altar! Seine Hand wandelt unter uns!“' }); S.ents.world.push(c); }
-      log(`Ein Pilgerzug bricht von ${V.name} zum Altar in der Eisenfeste auf.`, 'world'); }
+        const g = { x: alt.x + ri(-70, 70), y: alt.y + ri(60, 120) }; Object.assign(c, { omegaPil: true, transient: true, visitor: true, anchor: g, schedulePos: g, greet: O.kind === 'slain' ? '„Wir gehen zum Altar und trauern. Und wir beten, dass der Gottesmörder verreckt.“' : '„Zum Altar! Seine Hand wandelt unter uns!“' }); S.ents.world.push(c); }
+      log(`Ein ${O.kind === 'slain' ? 'Trauerzug' : 'Pilgerzug'} bricht von ${V.name} zum Altar in der Eisenfeste auf.`, 'world'); }
   }
 }
 
@@ -12402,6 +12429,8 @@ function talk(npc) {
   if ((npc.prof === 'Richterin' || npc.prof === 'Gerichtsschreiber') && npc.homeTown === 'aurelheim') return holyCourt(npc);   // Nutzer S13: Heiliges Gericht
   if (npc.skyRuler === 'rat' && ((S.ranks.aurel ?? 0) >= 6 || isCouncillor())) return corvanTalk(npc);   // Nutzer S13: Hoher Rat
   if (npc.fleeing || npc.afraid > now) return UI.dialogue(npc, '„Bleib weg von mir!“', leave);
+  if (S.flags.godslayer && !npc.guard && !npc.goblin && npc.faction !== 'goblin' && !S.party.includes(npc.id) && fameRegion(npc) === 'west' && repTier('chain')?.name === 'Verhasst')   /* Nutzer 02.10.: Gottesmörder im Westen */
+    return UI.dialogue(npc, pick(['„Gottesmörder. Hier bekommst du nichts.“', '„Du hast ihn erschlagen. Geh, bevor ich die Kette rufe.“', '„Omega sieht dich nicht mehr. Wir schon. Verschwinde.“']), leave);
   if (!npc.guard && npc.fear && !S.party.includes(npc.id)) { const f = fearOf(npc), byP = fearByPlayer(npc);   /* Angst */
     if (f >= 75 || (f >= 50 && byP)) return UI.dialogue(npc, byP ? (f >= 75 ? '„Nein! Nein, bitte! Ich hab Kinder! Bleib weg!“' : '„Ich … ich hab nichts gesehen. Lass mich. Bitte.“') + ` (${npc.name} ist ${FEAR_NAME[fearStage(f)]}.)` : '„Nicht jetzt! Da draußen … hast du nicht gesehen, was passiert ist?“', leave); }
   if (npc.threatId && byId(npc.threatId)?.alive) return UI.dialogue(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', leave);
@@ -19923,16 +19952,18 @@ export function selftest() {
     let burned = false; if (acc) { S.day = acc.burnDay; witchWaveDay(); burned = !acc.alive; }
     return fear && !!acc && saved && burned;
   }));
-  ok('Folgen §5c/7: Omegas Ende — im Osten Panik (rennen, rufen), im Westen Jubel und Pilgerzüge zum Altar; Schlaf: Gebet; nach vier Tagen vorbei', afterBox(() => {
+  ok('Folgen §5c/7: Omegas Ende — erschlagen: der Osten jubelt, der Westen verflucht den Helden (Abwehr), Trauerzüge zum Altar; Avatar: Panik im Osten; Schlaf: Gebet; nach vier Tagen vorbei', afterBox(() => {
     const p = stage(); S.after = {}; const d0 = S.day | 0; omegaAftermath('slain');
     const mk = x => { const c = makeChar({ name: 'Probe', prof: 'Bauer', map: 'world', x: x * TS, y: 600 * TS }); c.anchor = { x: c.x, y: c.y }; S.ents.world.push(c); return c; };
     const east = mk(900), west = mk(OX - 60);
-    p.map = 'world'; p.x = east.x + 40; p.y = east.y; omegaSecond(true); const panic = east.panicT > clock() && panicStep(east, 16) === true;
-    p.x = west.x + 40; p.y = west.y; omegaSecond(true); const cheer = west.cheerT > clock();
+    p.map = 'world'; p.x = east.x + 40; p.y = east.y; omegaSecond(true); const cheer = east.cheerT > clock() && !(east.panicT > clock());
+    p.x = west.x + 40; p.y = west.y; west.act = null; omegaSecond(true); const hate = west.act?.pose === 'abwehren' && !(west.cheerT > clock());
+    S.after.omega.kind = 'avatar'; p.x = east.x + 40; p.y = east.y; east.panicT = 0; omegaSecond(true); const panic = east.panicT > clock() && panicStep(east, 16) === true; S.after.omega.kind = 'slain';
     omegaDay(); const pilgrims = !S.ents.world.some(e => e.omegaAltar) || S.ents.world.some(e => e.omegaPil);
-    S.after.omega.kind = 'sleep'; west.act = null; omegaSecond(true); const pray = !!west.act;
+    S.after.omega.kind = 'sleep'; p.x = west.x + 40; p.y = west.y; west.act = null; omegaSecond(true); const pray = !!west.act;
     S.day = d0 + 5; omegaDay(); const over = !S.after.omega && !S.ents.world.some(e => e.omegaPil);
-    return panic && cheer && pilgrims && pray && over;
+    if (!(panic && cheer && hate && pilgrims && pray && over)) console.log('Omega-Folgen-Probe', JSON.stringify({ panic, cheer, hate, pilgrims, pray, over }));
+    return panic && cheer && hate && pilgrims && pray && over;
   }));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
   ok('Audit T04 (C3/C5, RB-005): Effekte und Schwebetexte ziehen nicht aus dem Spielzufall; Partikeldeckel 900; Nachbild bleibt am Ort', (() => {

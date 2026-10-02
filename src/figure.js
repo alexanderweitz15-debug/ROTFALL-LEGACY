@@ -822,6 +822,28 @@ const WDES = {
       for (const [x, y] of throat) set(x, y, '#ff3a30');
       for (const [x, y] of dense(T.edge).slice(1, -1)) set(x, y, '#efe6cc');
       } }; }],
+  /* Nutzer 02.10.: Sternenklinge (Omegas Waffe) — edel statt Standard-Langschwert. Sternknauf aus Gold, Elfenbeingriff mit Goldringen,
+     Parierstange als geschwungene Engelsschwingen, Omegas Auge (Himmelsstein) in der Mitte, blasse Sternenstahl-Klinge in Blattform
+     mit leuchtender Hohlkehle und Sternfunken, die langsam glimmen (pulse, blau-gold). */
+  sternenklinge: [66, 24, (C, M) => {
+    const Au = C.partR('gold', ramp('#d8b25a')), Iv = C.partR('ivory', ramp('#e6dcc6'));
+    const Bl = C.partR('dark', ramp('#c4d2e6'), true), Gm = C.partR('gem', ramp('#7fd8ff'));
+    C.poly(Au, [[3.5, 7], [4.6, 10.4], [8, 12], [4.6, 13.6], [3.5, 17], [2.4, 13.6], [-1, 12], [2.4, 10.4]]);                       /* Sternknauf */
+    C.poly(Iv, [[6.5, 10.2], [16, 10.4], [16, 13.6], [6.5, 13.8]]);                                                                 /* Griff */
+    for (const x of [7, 11, 15]) C.poly(Au, [[x, 9.9], [x + 1.2, 9.9], [x + 1.2, 14.1], [x, 14.1]]);                                  /* Goldringe */
+    C.poly(Au, [[16, 10], [18.5, 7], [17.5, 3], [20.5, 0.5], [21.5, 4.5], [20.5, 9.5], [21, 12], [20.5, 14.5], [21.5, 19.5], [20.5, 23.5], [17.5, 21], [18.5, 17], [16, 14]]);   /* Schwingen */
+    C.poly(Au, [[21, 10], [24, 9.2], [24, 14.8], [21, 14]]);                                                                         /* Fehlschärfe in Gold */
+    C.poly(Bl, [[24, 9.8], [32, 9.2], [46, 8.2], [56, 9.4], [65.5, 12], [56, 14.6], [46, 15.8], [32, 14.8], [24, 14.2]]);           /* Blattklinge */
+    C.ell(Gm, 20.6, 12, 1.7, 1.9);                                                                                                  /* Omegas Auge */
+    const fuller = []; for (let x = 26; x <= 55; x++) fuller.push([x, 12]);
+    const stars = [[30, 12], [38, 12], [46, 12], [53, 12]], pulse = [...fuller, ...stars.flatMap(([x, y]) => [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y]]), [20.6, 12]];
+    return { gx: 11, gy: 12, blade: null, pulse, pulseCol: '120,200,255', after: (set) => {
+      for (let x = 25; x <= 56; x++) set(x, 12, x % 7 === 0 ? '#ffffff' : '#9fdcff');                                               /* leuchtende Hohlkehle */
+      for (let x = 26; x <= 60; x++) set(x, x < 30 ? 10 : x < 52 ? 9 : x < 58 ? 10 : 11, '#f4f8ff');                               /* Lichtkante oben */
+      for (const [x, y] of stars) { set(x, y, '#ffffff'); set(x, y - 1, '#ffe6a0'); set(x, y + 1, '#ffe6a0'); set(x - 1, y, '#ffe6a0'); set(x + 1, y, '#ffe6a0'); }
+      set(63, 12, '#ffffff'); set(3.5, 12, '#8fe8ff'); set(20.6, 12, '#ffffff'); set(20, 11.5, '#bff0ff');                          /* Spitze, Knaufstein, Glanz im Auge */
+      for (const [x, y] of [[20.5, 1], [20.5, 23]]) set(x, y, '#fff2c0');
+      } }; }],
   kriegssichel: [40, 20, (C, M) => { C.poly(M.wr, [[0, 9], [14, 9], [14, 12], [0, 12]]); C.ell(M.ir, 1.5, 10.5, 1.6, 1.6);
     C.poly(M.st, [[14, 8.5], [22, 4.5], [31, 3.5], [38, 7], [39, 11], [34, 8], [25, 8], [19, 11.5], [14, 12]]); return { gx: 6, gy: 10, blade: [18, 34, 7] }; }],
   doppelklinge: [64, 12, (C, M) => { C.poly(M.wr, [[26, 4.8], [38, 4.8], [38, 7.2], [26, 7.2]]); C.poly(M.ir, [[24, 3.5], [26, 3.5], [26, 8.5], [24, 8.5]]); C.poly(M.ir, [[38, 3.5], [40, 3.5], [40, 8.5], [38, 8.5]]);
@@ -1046,6 +1068,7 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '',
     const up = y > 0 ? C.id[i - w] : -1, dn = y < h - 1 ? C.id[i + w] : -1;
     if (up < 0) C.col[i] = mix(C.col[i], '#e2ddd2', 0.5); else if (dn < 0) C.col[i] = mix(C.col[i], '#0c0b0a', 0.45); }
   if (info.str) info.str = info.str.map(v => v * sc);
+  const pulseCol = info.pulseCol;
   if (info.pulse) { const seen = new Set(); info.pulse = info.pulse.map(([x, y]) => [Math.floor(x * sc), Math.floor(y * sc)]).filter(([x, y]) => { const k = x + ',' + y; if (seen.has(k) || x < 0 || y < 0 || x >= w || y >= h) return false; seen.add(k); return true; }); }   /* Runde 9: pulsierende Adern (Blutkult-Sense), Bildpixel */
   if (info.after && !(bare && info.str)) info.after((x, y, c) => { x = Math.floor(x * sc); y = Math.floor(y * sc); if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.wr && (x % 3 === 0)) C.col[y * w + x] = Wrap.dk;   // Wicklung
@@ -1062,7 +1085,7 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '',
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) { const i = y * w + x; if ((C.id[i] === M.st || C.id[i] === M.ir) && C.col[i]) { const n = h2(x + ks, y * 5 + ks);
     if (sc !== 1) continue;   // S15 Stil R: keine Einzelpixel-Scharten (Rauschen)
     if (n < 0.03) C.col[i] = mix(C.col[i], '#6a3a1e', 0.35); else if (n > 0.98) C.col[i] = mix(C.col[i], '#0c0b0a', 0.4); } }
-  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb, str: info.str, pulse: info.pulse };
+  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb, str: info.str, pulse: info.pulse, pulseCol };
 }
 
 // =====================================================================================================================

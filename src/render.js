@@ -2143,8 +2143,8 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
 /* Runde 9 (Artist): Blutkult-Sense — Adern pulsieren im Herzschlag (ba-dumm), nur Darstellung. Im gedrehten Waffen-Kontext aufrufen. */
 function weaponPulse(c, Wsp, WP, now, seed) {
   if (!Wsp.pulse || !Wsp.pulse.length) return;
-  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));
-  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(210,24,30,${k.toFixed(3)})`;
+  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = Wsp.pulseCol ? 0.18 + 0.32 * (0.5 + 0.5 * Math.sin(now / 520 + (seed || 0))) : 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));   /* Sternenklinge: ruhiges Glimmen statt Herzschlag */
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(${Wsp.pulseCol || '210,24,30'},${k.toFixed(3)})`;
   for (const [px, py] of Wsp.pulse) c.fillRect((px - Wsp.gx) * WP, (py - Wsp.gy) * WP, WP, WP);
   c.globalCompositeOperation = 'source-over';
 }
