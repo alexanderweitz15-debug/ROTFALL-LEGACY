@@ -2596,6 +2596,7 @@ function drawBuildingVec(e, now) {
       ctx.fillStyle = '#231b12'; ctx.fillRect(e.x - 6, y + h - 16, 12, 16);
       if (e.type === 'smithy') { ctx.fillStyle = `rgba(230,120,50,${.4 + .2 * Math.sin(now / 200)})`; ctx.fillRect(x + 4, y + h * 0.55, 8, 8); }
       if (e.type === 'watchtower') { ctx.fillStyle = '#3a3128'; ctx.fillRect(x + 4, y - 18, w - 8, 14); }
+      if (e.type === 'healer') { for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#6f8a3e' : '#8aa04e'; ctx.fillRect(x + 6 + i * (w - 16) / 3, y + h * 0.38, 4, 7); } ctx.fillStyle = '#d8d0b8'; ctx.fillRect(e.x - 2, y + h * 0.5, 4, 10); ctx.fillRect(e.x - 5, y + h * 0.5 + 3, 10, 4); }   /* Siedlung M3: Kräuterbündel und Zeichen */
     }
     if (dmg < 0.99) { ctx.fillStyle = `rgba(0,0,0,${(1 - dmg) * 0.45})`; ctx.fillRect(x, y, w, h); }
   }

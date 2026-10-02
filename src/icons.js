@@ -914,6 +914,7 @@ const BLD = {
   campfire: [['b_campfire', 1, 1]],
   tent: [['b_tent', 1, 1]],
   hut: [['b_hut', 1, 1]],
+  healer: [['b_hut', 1, 1], ['kraut', 3, 1], ['kraut', 13, 1]],   /* Siedlung M3: Hütte mit Kräuterbündeln */
   storage: [['b_storage', 1, 1]],
   workbench: [['b_workbench', 1, 1]],
   smithy: [['b_smithy', 1, 1]],

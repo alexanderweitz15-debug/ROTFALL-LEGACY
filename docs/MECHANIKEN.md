@@ -966,3 +966,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Verzweifelt (unter 20): Ertrag ×0,5, kein Zuzug, täglich geht mit 30 % ein Siedler.
 - Das Siedlungsfenster zeigt einen Balken, die Stufe und die letzten drei Ursachen. Ein Stufenwechsel steht im Log.
 - Debug: „Siedlung: Moral −20 / +20“.
+
+## Heilerhütte (Siedlung M3)
+- Neuer Bau „Heilerhütte“ (Versorgung; 18 Holz, 6 Stein).
+- **Pflegen:** Das dauert 2 Stunden und kostet 1 Kraut je Person mit Befund. Du und deine Gefährten in der Nähe erhalten +35 % LP, Brüche werden geschient (heilen doppelt so schnell), Entzündung und Blutung verschwinden. Wer am Boden liegt, muss erst aufgerichtet werden. Ohne Kräuter ist es nur ein Dach.
+- **Pfleger:** Steht „Verwundete versorgen“ ganz oben in den Prioritäten, wird ein Siedler Heiler oder Heilerin. Er bietet dieselben Dienste wie Heiler in der Stadt und heilt verletzte Siedler über Nacht (Moral +1).
+- Debug: „Siedlung: Heilerhütte hier (fertig) + 5 Kräuter“, „Siedlung: alle Siedler verletzen“.

@@ -1081,6 +1081,7 @@ export const BUILDINGS = {
   smithy:    { name:'Schmiede', cat:'Produktion', cost:{wood:20,stone:15,iron:10}, time:30, w:3, h:2, desc:'Waffen aus Eisen, Reparatur ohne Meister.', pop:0 },
   farm:      { name:'Ackerfläche', cat:'Versorgung', cost:{wood:10}, time:16, w:3, h:3, desc:'Bringt jede Stunde etwas Nahrung (12 am Tag). Siedler beim Nahrung sammeln bringen doppelt so viel.', pop:0 },
   pasture:   { name:'Weide mit Stall', cat:'Versorgung', cost:{wood:16,stone:4}, time:18, w:3, h:3, desc:'Platz für sechs Kühe oder Schafe (Tierhändler). Täglich Fleisch, Wolle, Felle — Wölfe haben auch Hunger.', pop:0 },
+  healer:    { name:'Heilerhütte', cat:'Versorgung', cost:{wood:18,stone:6}, time:16, w:2, h:2, desc:'Pflege mit Kräutern: schient Brüche, brennt Wunden aus, heilt in zwei Stunden ein Drittel. Mit Priorität „Verwundete versorgen“ wird ein Siedler Heiler und pflegt die Kranken.', pop:0 },   /* Siedlung M3 */
   well:      { name:'Brunnen', cat:'Versorgung', cost:{stone:18}, time:18, w:1, h:1, desc:'Moral der Siedlung steigt.', pop:0 },
   palisade:  { name:'Palisade', cat:'Verteidigung', cost:{wood:6}, time:5, w:1, h:1, desc:'Ein Abschnitt Wehrzaun. Blockiert Bewegung.', pop:0 },
   gate:      { name:'Tor', cat:'Verteidigung', cost:{wood:12,iron:4}, time:12, w:2, h:1, desc:'Durchlass in der Palisade.', pop:0 },

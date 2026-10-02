@@ -10286,7 +10286,7 @@ function placeBuilding(type, x, y, free) {
   if (!free && !canAfford(def.cost) && !buyMissing(def.cost)) { UI.toast(`Zu wenig Material — Zukauf kostet ${missGold(def.cost)} Gold`); return null; }
   if (!free) payCost(def.cost);
   const b = { id: uid(), kind:'building', type, def, map: S.map, x, y, r: Math.max(def.w, def.h) * TS / 2,
-    built: 0.02, cond: 1, solid: ['palisade', 'hut', 'smithy', 'watchtower', 'storage'].includes(type), workers: 0 };
+    built: 0.02, cond: 1, solid: ['palisade', 'hut', 'smithy', 'watchtower', 'storage', 'healer'].includes(type), workers: 0 };
   S.ents[S.map].push(b);
   if (b.solid) addSolid(b);
   S.settlement.buildings.push(b);
@@ -11309,7 +11309,7 @@ function afterChoices(npc, choices) {
 // Lagerfeuer = eine Stunde Rast (Ausdauer, etwas Heilung für die Gruppe), Brunnen = Wasser, Lager öffnet das Gepäck (Knopf „Ins Lager“),
 // Wachturm warnt vor Angriffen. Siedler sind Figuren: je Unterkunftsplatz einer; sie kommen zu Fuß an, arbeiten nach den Prioritäten
 // und bringen täglich Holz, Stein und Nahrung; ziehen weg, wenn Plätze fehlen.
-const BUILD_USE = { workbench: 'Ausbessern', smithy: 'Schmieden', campfire: 'Rasten', well: 'Trinken', storage: 'Lager', watchtower: 'Ausschau halten', pasture: 'Hofvorrat holen' };
+const BUILD_USE = { healer: 'Pflegen', workbench: 'Ausbessern', smithy: 'Schmieden', campfire: 'Rasten', well: 'Trinken', storage: 'Lager', watchtower: 'Ausschau halten', pasture: 'Hofvorrat holen' };
 function useBuilding(b) {
   const p = S.player, st = S.settlement;
   if (b.type === 'pasture') {                                          // S14: eigener Hof
@@ -11331,6 +11331,7 @@ function useBuilding(b) {
     log('Eine Stunde am Feuer. Die Wunden brennen weniger.', 'party'); return UI.refreshHUD();
   }
   if (b.type === 'well') { act(p, 'kneel', 700, b); p.stamina = p.maxStamina; return UI.toast('Kaltes Wasser.'); }
+  if (b.type === 'healer') return healHut(b);
   if (b.type === 'storage') return UI.openModal('inventory');
   if (b.type === 'watchtower') return UI.toast(st?.raidAt ? 'Späher melden Bewegung — sie kommen bald!' : 'Ruhig. Der Turm sieht weit.', 2600);
 }
@@ -11346,11 +11347,27 @@ function settlersHour() {
   c.anchor = { x: st.x + ri(-60, 60), y: st.y + ri(-40, 40) }; settlerJob(c); arr.push(c);
   log(`${c.name} kommt nach ${st.name} und bleibt.`, 'world'); chronicle(`${c.name} siedelt in ${st.name}`, 'news');
 }
+// Siedlung M3 (Entwickler 01.10.2026): Heilerhütte. Pflegen: 2 Stunden, 1 Kraut je Person mit Befund — +35 % LP, Brüche geschient,
+// Entzündung und Blutung weg. Wer am Boden liegt, muss erst aufgerichtet werden. Mit oberster Priorität „Verwundete versorgen“ wird
+// ein Siedler Heiler (Heiler-Dialoge wie in der Stadt) und heilt verletzte Siedler über Nacht (Moral +1).
+const hurtOf = c => c?.alive && (c.hp < c.maxHp - 0.5 || B.PARTS.some(k => c.body?.[k] && !c.body[k].lost && (c.body[k].hp < c.body[k].max || (c.body[k].broken && !c.body[k].splint))) || (c.status || []).some(q => q.key === 'infektion' || q.key === 'bleeding'));
+function healHut(b) {
+  const p = S.player; if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  const near = [p, ...partyMembers().filter(m => m.alive && m.map === p.map && dist(m, p) < 300)], down = near.find(c => c.downed); if (down) return UI.toast(`${down.name} muss erst aufgerichtet werden.`);
+  const who = near.filter(hurtOf); if (!who.length) return UI.toast('Hier ist niemand, der Pflege braucht.');
+  const herbs = p.inv.filter(i => i.key === 'herb').reduce((n, i) => n + (i.count || 1), 0); if (!herbs) return UI.toast('Ohne Kräuter ist das nur ein Dach.');
+  const cared = who.slice(0, herbs); removeItem(p, 'herb', cared.length); act(p, 'kneel', 900, b); passTime(120);
+  for (const c of cared) { B.heal(c, c.maxHp * 0.35); for (const k of B.PARTS) if (c.body?.[k]?.broken) c.body[k].splint = true; c.status = (c.status || []).filter(q => q.key !== 'infektion' && q.key !== 'bleeding'); }
+  log(`Zwei Stunden in der Heilerhütte. Brüche geschient, Wunden sauber (${cared.length} Kraut).${cared.length < who.length ? ` Für ${who.length - cared.length} reichten die Kräuter nicht.` : ''}`, 'party'); UI.refreshHUD();
+}
 function settlerJob(c) {                                          // Arbeitsplatz nach der obersten Priorität
   const st = S.settlement, top = st.priorities[0], B0 = st.buildings.filter(b => b.built >= 1);
   const at = t => B0.find(b => b.type === t), tree = S.ents[st.map || 'world'].find(e => e.kind === 'prop' && e.type === 'tree' && Math.hypot(e.x - st.x, e.y - st.y) < 640);
-  const spot = top === 'Holz schlagen' ? tree : top === 'Nahrung sammeln' ? at('farm') : top === 'Handwerk' ? at('workbench') || at('smithy') : top === 'Verteidigung ausbessern' ? at('palisade') || at('gate') : at('campfire');
+  const spot = top === 'Verwundete versorgen' && at('healer') ? at('healer') : top === 'Holz schlagen' ? tree : top === 'Nahrung sammeln' ? at('farm') : top === 'Handwerk' ? at('workbench') || at('smithy') : top === 'Verteidigung ausbessern' ? at('palisade') || at('gate') : at('campfire');
   const s = spot || at('campfire') || st; c.schedulePos = { x: s.x + ri(-20, 20), y: s.y + 24 }; c.job = top;
+  if (top === 'Verwundete versorgen' && at('healer') && !S.ents[st.map || 'world'].some(e => e.settler && e.alive && e.hutHealer)) {   /* M3: der erste Pfleger wird Heiler */
+    c.hutHealer = true; c.prof = FIRST_F.includes(c.name) ? 'Heilerin' : 'Heiler'; c.greet = '„Zeig her. Halt still — das brennt jetzt.“';
+    log(`${c.name} kümmert sich jetzt um die Verwundeten von ${st.name}. Sprich mit ${FIRST_F.includes(c.name) ? 'ihr' : 'ihm'}, wenn du Hilfe brauchst.`, 'quest'); }
 }
 // Siedlung M1 (Entwickler 01.10.2026, PROPOSALS/siedlung_ausbau.md): Moral hat Ursachen und Wirkung. Täglich: Brunnen +2, Siedler auf
 // Ruhe +1 je Kopf (höchstens +4), Anführer da +1, Hunger −6, überbelegt −3, sonst Drift 1 Richtung 50; getötete Siedler −4.
@@ -11377,6 +11394,8 @@ function settlersDay() {
   const m0 = st.morale ?? 60; if (m0 !== 50) moraleAdd(m0 > 50 ? -1 : 1, 'Alltag');
   if (st.buildings.some(b => b.type === 'well' && b.built >= 1)) moraleAdd(2, 'Brunnen');
   if (rest) moraleAdd(Math.min(4, rest), 'Ruhe');
+  if (st.buildings.some(b => b.type === 'healer' && b.built >= 1) && ss.some(c => c.hutHealer)) { const sick = ss.filter(hurtOf); for (const c of sick) { B.fullHeal(c); for (const k of B.PARTS) if (c.body?.[k]?.broken) c.body[k].splint = true; }   /* M3 */
+    if (sick.length) moraleAdd(1, 'Gepflegt'); }
   const p = S.player; if (p.map === (st.map || 'world') && Math.hypot(p.x - st.x, p.y - st.y) < 30 * TS) moraleAdd(1, 'Anführer da');
   if (ss.length && S.res.food < 1) moraleAdd(-6, 'Hunger');
   if (ss.length > settlerCap()) moraleAdd(-3, 'Überbelegt');
@@ -11809,7 +11828,7 @@ function woundCare(npc, choices) {
     S.gold -= 25; for (const c of who) { for (const k of B.PARTS) if (c.body[k].broken) c.body[k].splint = true; c.status = c.status.filter(q => q.key !== 'infektion'); }
     UI.closeDialogue(); log('Die Brüche sind geschient (heilen doppelt so schnell), die Wunden ausgebrannt und verbunden.', 'party'); } });
 }
-const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Medica' || n.prof === 'Feldscher' || n.key === 'elena';   // §5d.1: Feldscher der Eisenfeste
+const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Heiler' || n.prof === 'Medica' || n.prof === 'Feldscher' || n.key === 'elena';   // §5d.1: Feldscher der Eisenfeste
 const woundedGroup = () => [S.player, ...partyMembers().filter(m => m.alive && !m.downed && dist(m, S.player) < 200)].filter(c => c.hp < c.maxHp || (c.status || []).some(s => SLEEP_CURES.has(s.key)));
 const healCost = () => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0)));
 function healerTreat(npc) {
@@ -15182,6 +15201,8 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Siedlung: Heilerhütte hier (fertig) + 5 Kräuter': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen.'); const b = placeBuilding('healer', p.x + 60, p.y, true); if (b) b.built = 1; addItem(p, 'herb', 5); UI.toast('Heilerhütte steht'); },
+      'Siedlung: alle Siedler verletzen': () => { for (const c of S.ents[S.map].filter(e => e.settler && e.alive)) B.damagePart(c, 'torso', c.maxHp * 0.5); UI.toast('Siedler verletzt'); },
       'Siedlung: Moral −20': () => moraleAdd(-20, 'Debug'),
       'Siedlung: Moral +20': () => moraleAdd(20, 'Debug'),
       'Gold-Sog: Material auf 0 (Zukauf testen)': () => { for (const k of Object.keys(BUY_RES)) S.res[k] = 0; S.gold = Math.max(S.gold, 500); UI.toast('Vorrat leer, 500 Gold'); },
@@ -19173,6 +19194,14 @@ export function selftest() {
       const w50 = run(50), log0 = S.settlement.moraleLog.find(x => x.why === 'Hunger'), w15 = run(15);
       return !!log0 && log0.v === -6 && w50 > 0 && w15 === Math.floor(w50 * 0.5) && moraleBand(15).name === 'Verzweifelt';
     } finally { S.settlement = st0; Object.assign(S.res, r0); S.ents.world = W0; }
+  }));
+  ok('Siedlung M3: Heilerhütte schient, reinigt und heilt gegen ein Kraut je Person; ohne Kraut nichts', sandbox(() => {
+    const p = stage(), i0 = p.inv.slice(), pt = S.party, m0 = S.minute, d0 = S.day; S.party = [];
+    try { p.inv = []; B.damagePart(p, 'torso', p.maxHp * 0.5); p.body.larm.broken = 3; p.body.larm.splint = false; (p.status ||= []).push({ key: 'infektion', name: 'Entzündung', left: 1e9 });
+      const hp0 = p.hp; healHut({ x: p.x, y: p.y }); const none = p.hp === hp0 && !p.body.larm.splint;
+      addItem(p, 'herb', 2); healHut({ x: p.x, y: p.y }); const ok2 = p.body.larm.splint && !p.status.some(q => q.key === 'infektion') && p.hp > hp0 && hasItem(p, 'herb', 1) && !hasItem(p, 'herb', 2);
+      return none && ok2 && isHealer({ prof: 'Heiler' });
+    } finally { p.inv = i0; S.party = pt; S.minute = m0; S.day = d0; B.fullHeal(p); p.body.larm.broken = 0; p.status = (p.status || []).filter(q => q.key !== 'infektion'); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
