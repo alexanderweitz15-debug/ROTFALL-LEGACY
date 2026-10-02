@@ -10386,6 +10386,10 @@ function evTaxman() {                                                   // Steue
 function evDeserters() {                                                 // Deserteure bilden eine Bande — Aushang folgt
   const t = pick(Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === 'valen')); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
   const [bx, by] = pushOut('world', sx + ri(-40, 40), sy + ri(25, 45));
+  if (bandsOf().length < 3) { const b = bandFound(t, [bx, by]); if (b) {   /* E1: eine Bande mit Namen — und einem Bruder bei der Wache */
+    b.origin = 'deserter'; if (!bandsOf().some(x => x !== b && x.name === 'Die Zerrissenen Röcke')) b.name = 'Die Zerrissenen Röcke';
+    const g = deserterKin(b); chronicle('Deserteure werden zu Räubern', 'news', `Bei ${townName(t)} lauern Männer in zerrissenen Valen-Röcken.`);
+    log(`Deserteure unter ${b.lead} lagern bei ${b.where}.${g ? ` In ${townName(g.post)} fragt eine Wache nach dir.` : ''}`, 'faction'); return t; } }
   for (let i = 0; i < 3; i++) { const e = spawnEnemy(i ? 'bandit' : 'bandit_spear', 'world', bx + ri(-2, 2), by + ri(-2, 2)); if (e) Object.assign(e, { encounter: true, name: 'Deserteur' }); }
   const C = postContract('valen', 'bounty'); chronicle('Deserteure werden zu Räubern', 'news', `Bei ${townName(t)} lauern Männer in zerrissenen Valen-Röcken.`);
   log(`Deserteure plündern bei ${townName(t)}.${C ? ` Aushang in ${townName(C.town)}.` : ''}`, 'faction'); return t;
@@ -11573,11 +11577,41 @@ function bandFound(town, at = null) {
     town, tx, ty, born: S.day | 0, men: ri(4, 6), paid: -1, amb: -999, where: locAt(tx, ty)?.name || `dem Umland von ${townName(town)}` };
   (S.bands ||= []).push(B0); log(`Gerücht: ${B0.name} unter ${B0.lead} haben bei ${B0.where} ein Lager aufgeschlagen und fordern Schutzgeld von allen, die vorbeiziehen.`, 'world'); return B0;
 }
+// Emergente Quest E1 (Entwickler 01.10.2026): Der Anführer einer Deserteurbande hat ein Geschwister bei der Valen-Wache der nächsten
+// Stadt (nie Varonheim). Die Wache bittet: „Bring ihn heim. Nicht tot.“ Am Lager: heimholen (Valen-Ruf ≥ 0, Ruf der Klinge ≥ 40
+// oder 60 Gold Sold, den die Krone schuldet) — die Bande löst sich auf, er füllt einen leeren Posten; erschlagen — die Wache vergisst
+// es nicht (Beziehung −40, vielleicht ein Rächer); liegen lassen — die Bande zerstreut sich irgendwann. Heimholen gibt kein Kopfgeld.
+const KIN_FEM = new Set(['Berit', 'Dagna', 'Frida', 'Hedda', 'Jutta']);
+function deserterKin(b) {
+  const g = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.guard && e.post && e.post !== 'varonheim' && GUARD_POSTS[e.post]?.faction === 'valen' && !e.robot && !e.kinBand && guardTownOf(e))
+    .sort((a, c) => Math.hypot(a.x / TS - b.tx, a.y / TS - b.ty) - Math.hypot(c.x / TS - b.tx, c.y / TS - b.ty))[0];
+  if (!g) return null; g.kinBand = b.id; b.kin = { guardId: g.id, guard: g.name, post: g.post, state: 'open' }; return g;
+}
+const kinFirst = b => b.lead.split(' ')[0];
+function kinChoices(npc, choices) {
+  if (!npc.kinBand) return; const b = (S.bands || []).find(x => x.id === npc.kinBand), K = b?.kin; if (!K) return; const day = S.day | 0, nm = kinFirst(b), say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (K.state === 'killed') return choices.unshift({ text: `Über ${nm} …`, fn: () => say('„Du hast ihn erschlagen. Geh mir aus den Augen.“') });
+  if (K.state === 'lost') return choices.unshift({ text: `Hast du von ${nm} gehört?`, fn: () => say('„Er ist fort. Vielleicht ist das besser so.“') });
+  if (K.state === 'home') return choices.unshift({ text: `Wie geht es ${nm}?`, fn: () => say(`„Er steht wieder in Reih und Glied. Ich schulde dir etwas.“`) });
+  if (K.state !== 'open' || b.gone || npc.kinAsked === day) return;
+  choices.unshift({ text: `Du siehst aus, als wolltest du mich etwas fragen.`, fn: () => UI.dialogue(npc, `„${nm} ist mein Bruder. Er ist gegangen, als sie uns ohne Sold an die Furt schickten. Jetzt raubt er — ${b.name}, bei ${b.where}. Ich kann meinen Posten nicht verlassen. Bring ihn heim. Nicht tot.“`, [
+    { text: 'Ich rede mit ihm.', fn: () => { npc.kinAsked = day; const C = { id: uid(), town: K.post, kind: 'rumor', rk: 'band', bandRef: b.id, kin: true, giver: 'board', giverName: npc.name, have: 0, need: 1, state: 'offer', day, tx: b.tx, ty: b.ty, lie: false,
+      x: b.tx + ri(-4, 4), y: b.ty + ri(-4, 4), reward: { gold: 0, xp: 50 + S.player.level * 8, rep: 0 }, title: `${nm} heimholen`, desc: `${npc.name} von der Wache in ${townName(K.post)} bittet dich, ${nm} von ${b.name} heimzuholen — lebend. Sprich am Lager mit dem Unterhändler.` };
+      (S.contracts ||= []).push(C); if (acceptContract(C) === false) S.contracts.pop(); else log(`Auftrag: ${nm} heimholen. Sprich am Lager von ${b.name} mit dem Unterhändler.`, 'quest'); UI.closeDialogue(); } },
+    { text: 'Er hat sich entschieden.', fn: () => { npc.kinAsked = day; UI.closeDialogue(); } }]) });
+}
+function kinHome(b) {                                                /* heimgeholt: die Bande löst sich auf */
+  const K = b.kin, g = byId(K.guardId), nm = kinFirst(b); K.state = 'home'; S.factions.valen = clamp((S.factions.valen || 0) - 2, -100, 100);
+  if (g?.alive) { addRel(g.key || g.id, 30); S.gold += 40; }
+  const Z = S.schutz?.[K.post]; if (Z?.lost > 0 && !Z.taker) { Z.lost -= 1; Z.byP = Math.min(Z.byP, Z.lost); schutzCheck(K.post); log(`${nm} steht wieder am Tor von ${townName(K.post)}.`, 'world'); }
+  bandGone(b, `${nm} legt die Waffe nieder und geht mit der Hälfte seiner Leute heim; der Rest von ${b.name} zerstreut sich.${g?.alive ? ` ${g.name} gibt dir 40 Gold Erspartes.` : ''} (Valen −2: Fahnenflucht bleibt ungestraft.)`);
+  chronicle(`${nm} kehrt heim`, 'news', `Ein Deserteur kehrt nach ${townName(K.post)} zurück. Sein Bruder hat ihn nicht vergessen.`);
+}
 function bandGone(b, msg) { b.gone = true; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive)); if (msg) log(msg, 'world'); }
 function bandDay() {
   const act = bandsOf(), day = S.day | 0;
   for (const b of act) {
-    if (!b.rules && day - b.born > 12 && chance(0.25)) { bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
+    if (!b.rules && day - b.born > 12 && chance(0.25)) { if (b.kin?.state === 'open') b.kin.state = 'lost'; bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
     if (b.paid < day && chance(0.5)) { b.men = Math.min(9, b.men + 1); log(`${b.name} haben bei ${b.where} Reisende ausgeraubt. Die Bande wächst (${b.men} Mann).`, 'world'); }
   }
   if (act.length < 3 && chance(0.2)) { const ts = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && S.war?.nodes?.[k]?.owner !== 'undead'); if (ts.length) bandFound(pick(ts)); }
@@ -11612,12 +11646,20 @@ function bandKill(c) {
   const b = (S.bands || []).find(x => x.id === c.bandId); if (!b || b.gone) return; b.men = Math.max(0, b.men - 1);
   if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10; S.gold += g; addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
     bandLootChest(b);   /* E2: geraubte Ladung */
+    if (b.kin?.state === 'open') { b.kin.state = 'killed'; const g = byId(b.kin.guardId); if (g) addRel(g.key || g.id, -40); if (chance(0.35)) S.avenge = { day: (S.day | 0) + ri(2, 4), name: b.lead };   /* E1 */
+      log(`${b.kin.guard} in ${townName(b.kin.post)} wird erfahren, wer ${kinFirst(b)} erschlagen hat.`, 'faction'); }
     bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600);
     if (b.rules) schutzFreed(b.rules, 'player'); }   /* S2: die Stadt ist frei */
 }
 function bandChoices(npc, choices) {
   if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = Math.round((20 + b.men * 8) * (styleOf() >= 40 ? 0.7 : 1)), day = S.day | 0;   /* T08: mit Barmherzigen verhandelt man */
   if (b.paid >= day) return choices.unshift({ text: 'Gilt unsere Abmachung noch?', fn: () => UI.dialogue(npc, `„Bis Tag ${b.paid + 1}. Dann reden wir wieder.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if (b.kin?.state === 'open') { const nm = kinFirst(b), ok = (S.factions.valen || 0) >= 0 || styleOf() >= 40;
+    choices.unshift({ text: `${b.kin.guard} schickt mich. Sag ${nm}, sein Bruder wartet.`, fn: () => UI.dialogue(npc, `Ein Mann in einem zerrissenen Valen-Rock tritt vor. „${b.kin.guard}? … Was will der Kerl noch von mir?“`, [
+      ...(ok ? [{ text: 'Er will dich heimholen. Die Krone schuldet dir mehr als du ihr.', fn: () => { UI.closeDialogue(); kinHome(b); } }] : []),
+      ...(S.gold >= 60 ? [{ text: 'Hier ist der Sold, den die Krone dir schuldet. (60 Gold)', fn: () => { S.gold -= 60; UI.closeDialogue(); kinHome(b); } }] : []),
+      ...(!ok ? [{ text: 'Komm mit, oder ich hole dich.', fn: () => { UI.closeDialogue(); log(`${nm} lacht. „Für eine Krone, die nicht zahlt?“`, 'combat'); } }] : []),
+      { text: '[Gehen]', fn: () => UI.closeDialogue() }]) }); }
   choices.unshift({ text: `Schutzgeld zahlen (${cost} Gold, 5 Tage Ruhe)`, fn: () => {
     if (S.gold < cost) return UI.dialogue(npc, '„Das reicht nicht. Komm wieder, wenn deine Taschen schwerer sind — oder lauf schnell.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     S.gold -= cost; b.paid = day + 5; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || e.kind !== 'enemy' || !e.alive);
@@ -11864,7 +11906,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -14943,6 +14985,8 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'E1: Deserteure mit Bruder': () => { const t = evDeserters(), b = bandsOf().find(x => x.kin && x.kin.state === 'open'); UI.toast(b ? `${b.name} · ${b.lead} · Wache ${b.kin.guard} in ${townName(b.kin.post)}` : `Deserteure bei ${t ? townName(t) : '—'} (ohne Bruder)`, 3000); },
+      'E1: Anführer heimholen (sofort)': () => { const b = bandsOf().find(x => x.kin?.state === 'open'); if (b) kinHome(b); else UI.toast('Keine Bande mit offenem Bruder-Auftrag.'); },
       'E2: Karawane stirbt jetzt (Täterbande)': () => { const c = S.ents.world.find(e => e.kind === 'caravan' && e.alive); if (!c) return UI.toast('Keine Karawane unterwegs.'); const k = S.ents.world.find(e => e.kind === 'enemy' && e.alive && /bandit/.test(e.mtype)) || null; die(c, 'Räuber', k); },
       'E2: Kutscher gerettet (Folgeauftrag)': () => { const C = (S.contracts || []).find(c => c.kind === 'missing' && c.bandRef && c.state !== 'claimed'); if (!C) return UI.toast('Kein Kutscher-Auftrag mit Täterbande.'); caravanLootQuest(C); },
       'Blutkult-Sense geben': () => { addItem(P(), 'blutsense'); UI.toast('Blutkult-Sense im Gepäck'); },
@@ -17204,7 +17248,8 @@ export function selftest() {
     const keep = JSON.stringify({ g: S.growth, p: S.prices, c: S.contracts, tw: S.towns }), W0 = S.ents.world; S.ents.world = W0.slice();
     try {
       const t = evTaxman(), tax = !t || S.ents.world.some(e => e.prof === 'Steuereintreiber');
-      const n0 = S.ents.world.filter(e => e.kind === 'enemy').length, c0 = (S.contracts || []).length; evDeserters(); const des = S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3 && S.contracts.length === c0 + 1;
+      const n0 = S.ents.world.filter(e => e.kind === 'enemy').length, c0 = (S.contracts || []).length, BA = structuredClone(S.bands || []), nb = bandsOf().length; evDeserters();   /* E1: mit freiem Bandenplatz entsteht eine Deserteurbande statt loser Räuber */
+      const des = nb < 3 ? bandsOf().some(b => b.origin === 'deserter') : S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3 && S.contracts.length === c0 + 1; for (const e of S.ents.world) if (e.kinBand && !BA.some(b => b.id === e.kinBand)) delete e.kinBand; S.bands = BA;
       const gr0 = Object.fromEntries(Object.keys(S.towns).map(k => [k, S.towns[k].stock.grain])), h = evFailedHarvest(), harvest = !h || !S.towns[h] || S.towns[h].stock.grain <= Math.floor((gr0[h] || 0) / 2);   /* T09: Missernte halbiert das Korn statt eines Weltpreises */
       const C = makeContract('eren', 'bounty', 'board'); const g0 = growthOf('eren').prosper; ignoredContract(C); const ignored = growthOf('eren').prosper < g0 || g0 <= -20;
       return tax && des && harvest && ignored && EVENTS.length >= 13;
@@ -18855,6 +18900,17 @@ export function selftest() {
       if (!(band && quest && chest && none)) console.log('E2-Probe', JSON.stringify({ band, quest, chest: !!chest, none }));
       return band && quest && !!chest && none;
     } finally { S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.flags = f0; S.gold = g0; registerContracts(); UI.closeDialogue(); }
+  }));
+  ok('E1: Deserteure bilden eine Bande mit Bruder bei der Valen-Wache (nie Varonheim); heimholen löst die Bande auf (Valen −2, +40 Gold); Tod des Anführers kränkt die Wache (−40)', sandbox(() => {
+    const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, R0 = structuredClone(S.relations), g0 = S.gold, av0 = S.avenge, Z0 = structuredClone(S.schutz || {}); S.ents.world = W0.slice();
+    const marked = []; try { S.bands = []; evDeserters(); const b = S.bands[0], g = b && byId(b.kin?.guardId); if (g) marked.push(g);
+      const built = !!b && b.origin === 'deserter' && !!g && g.kinBand === b.id && g.post !== 'varonheim' && GUARD_POSTS[g.post].faction === 'valen';
+      const v0 = S.factions.valen || 0; S.gold = 0; kinHome(b); const home = b.gone && b.kin.state === 'home' && S.gold === 40 && (S.factions.valen || 0) === Math.max(-100, v0 - 2);
+      S.bands = []; evDeserters(); const b2 = S.bands[0], g2 = byId(b2.kin.guardId); if (g2) marked.push(g2); const r0 = S.relations[g2.key || g2.id] || 0; bandKill({ bandId: b2.id, bandLead: true });
+      const hurt = b2.kin.state === 'killed' && (S.relations[g2.key || g2.id] || 0) === Math.max(-100, r0 - 40);
+      if (!(built && home && hurt)) console.log('E1-Probe', JSON.stringify({ built, home, hurt }));
+      return built && home && hurt;
+    } finally { for (const m of marked) delete m.kinBand; S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.relations = R0; S.gold = g0; S.avenge = av0; S.schutz = Z0; }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

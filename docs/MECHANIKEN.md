@@ -908,3 +908,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Fällt der Anführer, steht am Lagerfeuer die geraubte Ladung (höchstens 20 Stück). Du gibst sie ans Kontor zurück (4 Gold Finderlohn je Stück, Händler +4) oder behältst sie.
 - Überfällst du die Karawane selbst, gibt es keinen Auftrag; die Händler wissen es (Händler −10).
 - Debug: „E2: Karawane stirbt jetzt (Täterbande)“, „E2: Kutscher gerettet (Folgeauftrag)“.
+
+## Der Deserteur und sein Bruder (Emergente Quest E1)
+- Ist Platz für eine weitere Bande, werden Deserteure zu einer Bande mit Namen (oft „Die Zerrissenen Röcke“). Ihr Anführer hat ein Geschwister bei der Valen-Wache der nächsten Stadt, nie in Varonheim. Das Log sagt: „In … fragt eine Wache nach dir.“
+- Die Wache bittet: „Bring ihn heim. Nicht tot.“ Nimmst du an, zeigt die Karte das Lager.
+- **Am Lager** sprichst du mit dem Unterhändler. Heimholen klappt mit Valen-Ruf ab 0, mit Ruf der Klinge ab 40 oder mit 60 Gold Sold, den die Krone schuldet. Dann löst sich die Bande auf, und die Wache gibt dir 40 Gold. Fahnenflucht bleibt ungestraft (Valen −2). Ist am Tor ein Posten frei, füllt er ihn. Kopfgeld gibt es fürs Heimholen nicht.
+- **Erschlägst du ihn**, vergisst die Wache es nicht (Beziehung −40). Manchmal kommt ein Rächer.
+- **Lässt du die Sache liegen**, zerstreut sich die Bande irgendwann von selbst.
+- Debug: „E1: Deserteure mit Bruder“, „E1: Anführer heimholen (sofort)“.

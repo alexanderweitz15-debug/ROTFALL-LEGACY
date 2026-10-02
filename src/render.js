@@ -2055,6 +2055,28 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.carry && pz.dir !== 'N') { const ic = groundIcon(e.carry), bob = moving ? ((now / 180 | 0) & 1) : 0; c.drawImage(ic, Math.round(x - 8 + (pz.dir === 'E' ? 5 : pz.dir === 'W' ? -5 : 0)), Math.round(y - 24 - bob), 16, 16); }
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 58, 4, 0, 7); c.stroke(); }
 }
+/* Runde 9 (Artist): Blutkult-Sense — Adern pulsieren im Herzschlag (ba-dumm), nur Darstellung. Im gedrehten Waffen-Kontext aufrufen. */
+function weaponPulse(c, Wsp, WP, now, seed) {
+  if (!Wsp.pulse || !Wsp.pulse.length) return;
+  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(210,24,30,${k.toFixed(3)})`;
+  for (const [px, py] of Wsp.pulse) c.fillRect((px - Wsp.gx) * WP, (py - Wsp.gy) * WP, WP, WP);
+  c.globalCompositeOperation = 'source-over';
+}
+/* Runde 9 (Artist): roter Schimmer am Träger, wenn eine Lebensraub-Waffe beim Schlag heilt. Erkennung rein optisch: LP steigen, während er schwingt
+   (kein Haken im Spielcode). Merker je Figuren-id, nicht am Objekt (Gegner werden über Kopien gezeichnet). */
+const LEECH_FX = new Map();
+function leechGlow(c, e, now, it) {
+  if (!it || !it.leech || e.id == null) return;
+  let m = LEECH_FX.get(e.id); if (!m) { if (LEECH_FX.size > 400) LEECH_FX.clear(); LEECH_FX.set(e.id, m = { hp: e.hp, t: -1e9 }); }
+  if (e.hp > m.hp + 0.05 && e.swing > 0) m.t = now; m.hp = e.hp;
+  const k = 1 - (now - m.t) / 520; if (k <= 0) return;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.fillStyle = `rgba(200,20,30,${(0.22 * k).toFixed(3)})`; c.beginPath(); c.ellipse(e.x, e.y - 14, 9 + 3 * (1 - k), 16 + 3 * (1 - k), 0, 0, 7); c.fill();
+  c.fillStyle = `rgba(255,70,60,${(0.8 * k).toFixed(3)})`;
+  for (let i = 0; i < 5; i++) { const a = i * 1.257 + (e.seed || 0), r = 10 * k + 2; c.fillRect(Math.round(e.x + Math.cos(a) * r), Math.round(e.y - 14 + Math.sin(a) * r * 1.4 - (1 - k) * 6), 2, 2); }   /* Bluttropfen ziehen zum Träger */
+  c.restore();
+}
 function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
   const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
   if (W.mode === 'swing' && !RANGED_W.has(wt)) {                  // Klingenspur: frühere Winkel derselben Kurve um die Hand
@@ -2078,7 +2100,8 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
   c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
   if (Wsp.orb) { const f = ((now / 90 + (e.seed || 0)) | 0) % 5; c.fillStyle = f === 0 ? '#e8f4ff' : f < 3 ? '#8fb7e8' : '#5f8fd0'; c.fillRect((Wsp.orb[0] - Wsp.gx) * WP, (Wsp.orb[1] - Wsp.gy - 2) * WP, 2, 2); }
   if (Wsp.runes && ((now / 140 + (e.seed || 0)) | 0) % 6 === 0) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
-  c.restore();
+  weaponPulse(c, Wsp, WP, now, e.seed);
+  c.restore(); leechGlow(c, e, now, it);
 }
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
@@ -2185,7 +2208,8 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
     c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
     c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   }
-  c.restore();
+  weaponPulse(c, W, WP, now, e.seed);
+  c.restore(); leechGlow(c, e, now, it);
 }
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
