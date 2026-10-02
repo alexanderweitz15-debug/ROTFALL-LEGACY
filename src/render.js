@@ -1,18 +1,19 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=24';
-import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=24';
-import * as HB from './buildings.js?v=24';
-import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=24';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=24';
-import * as SP from './sprites.js?v=24';
-import { trailPt, WAGON_GAP } from './sim.js?v=24';
-import { ICON_R } from './iconsR.js?v=24';
-import { airPos, airPt } from './economy.js?v=24';
-import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=23';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
+import * as HB from './buildings.js?v=23';
+import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
+import * as SP from './sprites.js?v=23';
+import { trailPt, WAGON_GAP } from './sim.js?v=23';
+import { ICON_R } from './iconsR.js?v=23';
+import { airPos, airPt } from './economy.js?v=23';
+import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=23';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
 export const cam = { x: 0, y: 0, zoom: 1 };
+export const focus = { sel: null };   /* Kampf-Feedback: gewähltes Ziel (game.js selected, Rechtsklick) — nur dort ein Lebensbalken */
 let cv, ctx, W = 0, H = 0, dpr = 1;
 const dark = document.createElement('canvas');
 const dctx = dark.getContext('2d');
@@ -54,16 +55,27 @@ const TILE_COL = {
 
 // ---------------- Hauptbild ----------------
 // Sichtliste (S12): alle Props je Bild zu filtern kostete bei ~14 000 Props ~0,4 ms. Props bewegen sich nicht: Raster (256 px)
-// je Karte, neu gebaut, wenn sich die Objektzahl ändert (spätestens alle 1,5 s); Bewegliches (Figuren, Gegner, Beute) als kurze Liste.
-const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0, dg: null, dt: 0, keep: [], boss: [] }, GC = 256, DG = 512, DMG = 160;
+// je Karte, neu gebaut, wenn sich die Objektzahl ändert (spätestens alle 4 s); Bewegliches (Figuren, Gegner, Beute) als kurze Liste.
+const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0, dg: null, dt: 0, keep: [], boss: [], lights: null, houses: [], ln: -1, last: null }, GC = 256, DG = 512, DMG = 160;
 /* PERF-R (02.10.2026): auch die ~2000 beweglichen Figuren der Welt nicht mehr jedes Bild einzeln prüfen (~0,25 ms) — alle 150 ms
    in ein grobes Raster (512 px) einsortieren, abgefragt mit 160 px Rand (so weit läuft niemand in 150 ms). Spieler und Gefolge
    immer einzeln geprüft (Sprung beim Reisen). Bosse für den Lebensbalken nebenbei gesammelt statt 17 000 Objekte je Bild. */
+function visAdd(e) {
+  if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e);
+  lightOf(e, VIS.lights);
+}
 function visibleEnts(arr, xa, ya, xb, yb) {
   const now = performance.now();
-  if (VIS.arr !== arr || VIS.n !== arr.length || now - VIS.t > 1500) {
-    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = []; VIS.dt = 0;
-    for (const e of arr) { if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e); }
+  /* PERF-R: nur angehängt (push, ohne Entfernen davor: das bisher letzte Objekt steht noch an seiner Stelle) — nur die neuen einsortieren
+     statt alle ~17 000 Objekte (~3–12 ms Spitze). Volle Neusortierung bei Entfernen, anderer Liste oder spätestens alle 4 s. */
+  if (VIS.arr === arr && arr.length > VIS.n && VIS.n > 0 && arr[VIS.n - 1] === VIS.last && now - VIS.t <= 4000) {
+    for (let i = VIS.n; i < arr.length; i++) visAdd(arr[i]);
+    VIS.n = arr.length; VIS.last = arr[arr.length - 1]; VIS.dt = 0;
+  }
+  if (VIS.arr !== arr || VIS.n !== arr.length || arr[arr.length - 1] !== VIS.last || now - VIS.t > 4000) {
+    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = []; VIS.dt = 0; VIS.lights = []; VIS.last = arr[arr.length - 1];
+    for (const e of arr) visAdd(e);
+    VIS.houses = houseLights(S.map);
   }
   if (now - VIS.dt > 150) {
     VIS.dt = now; VIS.dg = new Map(); VIS.keep = []; VIS.boss = [];
@@ -80,9 +92,8 @@ function visibleEnts(arr, xa, ya, xb, yb) {
   for (const e of VIS.keep) if (e.x > xa && e.x < xb && e.y > ya && e.y < yb) out.push(e);
   return out;
 }
-const PT = window.__PT = {}; let _pt = 0; const tk = n => { const t = performance.now(); PT[n] = (PT[n] || 0) + t - _pt; _pt = t; }; /*PERFTMP*/
 export function drawFrame(now) {
-  if (!ctx) return; _pt = performance.now(); /*PERFTMP*/
+  if (!ctx) return;
   const m = MAPS[S.map]; if (!m) return;
   curRegion = S.map === 'world' && S.player ? regionAt(S.player.x / TS | 0, S.player.y / TS | 0) : 'greenmark';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -99,13 +110,11 @@ export function drawFrame(now) {
   for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++)
     for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++)
       ctx.drawImage(chunkCanvas(m, cx, cy), cx * CH * TS, cy * CH * TS, CH * TS + 0.5, CH * TS + 0.5);
-  tk('chunks'); /*PERFTMP*/
   prefetchChunk(m, Math.floor(x0 / CH), Math.floor(y0 / CH), Math.floor(x1 / CH), Math.floor(y1 / CH));
   const isW = (tx, ty) => tileAt(S.map, tx, ty) === T.WATER;
   if (S.map === 'deck' && S.voyage?.air) drawSkyDeck(m, x0, y0, x1, y1, now);   /* Roadmap P7: an Bord eines Luftschiffs — Himmel statt Wasser */
   else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
 
-  tk('water'); /*PERFTMP*/
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
   prefetchHouses();
@@ -113,16 +122,16 @@ export function drawFrame(now) {
     list.push(houseEnt(b));
   if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
     const MT = TOWER_AT.e; if (MT && !list.includes(MT) && MT.x > cam.x - 220 && MT.x < cam.x + W / cam.zoom + 220 && MT.y > cam.y && MT.y < cam.y + H / cam.zoom + 900) list.push(MT); }
-  tk('cull'); /*PERFTMP*/
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
   for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
     const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 150, a - 0.7, a + 0.7); ctx.closePath(); ctx.fill(); }
-  tk('sort'); /*PERFTMP*/
-  for (const e of list) { const t0 = performance.now(); drawEntity(e, now); const k = 'E_' + (e.kind === 'prop' ? 'prop' : e.kind); PT[k] = (PT[k] || 0) + performance.now() - t0; PT['n_' + k] = (PT['n_' + k] || 0) + 1; } tk('ents'); /*PERFTMP*/
+  drawStatusGround(list);   /* Kampf-Feedback: Frost-Eisrand an den Füßen */
+  for (const e of list) drawEntity(e, now);
   shown = list;
   for (const p of S.projectiles) drawProjectile(p);
   drawFx(now);
+  drawTargetBar();          /* Kampf-Feedback: Lebensbalken nur beim gewählten Ziel */
   const ch = S.player && S.player.channel;
   if (ch) {
     const t = S.ents[S.map].find(e => e.id === ch.targetId) || S.player, k = Math.min(1, ch.t / ch.dur);
@@ -136,19 +145,19 @@ export function drawFrame(now) {
     ctx.fillStyle = 'rgba(12,10,8,.7)'; ctx.fillRect(e.x - w / 2, y - 9, w, 12);
     ctx.fillStyle = e.kind === 'player' ? '#e8c070' : '#9fd0f0'; ctx.fillText(t, e.x, y); ctx.textAlign = 'left';
   }
-  tk('fxmisc'); /*PERFTMP*/
-  drawAmbience(now, list, m, x0, y0, x1, y1); tk('amb'); /*PERFTMP*/   /* Artist Runde 7: Umgebungsleben */
+  drawAmbience(now, list, m, x0, y0, x1, y1);   /* Artist Runde 7: Umgebungsleben */
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   drawFires(now);     // S14: Brand in der Stadt
-  ctx.restore(); tk('sky'); /*PERFTMP*/
-  drawLight(now); tk('light'); /*PERFTMP*/
-  drawAmbienceGlow(); tk('ambglow'); /*PERFTMP*/
-  drawWeather(now); tk('weather'); /*PERFTMP*/
-  drawPlaceGuide(shown || [], now); tk('guide'); /*PERFTMP*/
-  drawFloats(); tk('floats'); /*PERFTMP*/
-  drawBubbles(performance.now()); tk('bubbles'); /*PERFTMP*/
-  drawBossBar(); tk('boss'); /*PERFTMP*/
-  drawTrack(now); tk('ui'); /*PERFTMP*/
+  ctx.restore();
+  drawLight(now);
+  drawAmbienceGlow();   /* Artist Runde 7 */
+  drawLootBeams(now);   /* Visueller Umbau P5: Lichtstrahl über seltener Beute, über dem Nachtschleier */
+  drawWeather(now);
+  drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
+  drawFloats();
+  drawBubbles(performance.now());
+  drawBossBar();
+  drawTrack(now);
 }
 // S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
 let track = null;
@@ -192,6 +201,27 @@ function drawBubbles(now) {
     ctx.fillStyle = '#eadcc0'; ctx.fillText(t.say, sx, sy - h / 2 + 4);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  for (const e of shown) if (e.emote && now < e.emote.until && e.emote.until - now < 6000) drawEmote(e, now);
+}
+// Visuell D (02.10.2026): Emotes als kleine Pixelzeichen (7×7) über dem Kopf, hüpfen beim Erscheinen kurz an
+const EMOTE = {
+  frage: ['#e8dcb8', ['.###...', '#...#..', '....#..', '..##...', '..#....', '.......', '..#....']],
+  ausruf: ['#f0c040', ['..##...', '..##...', '..##...', '..##...', '..##...', '.......', '..##...']],
+  zorn: ['#d8402c', ['.#...#.', '##...##', '.......', '.......', '.......', '##...##', '.#...#.']],
+  angst: ['#7fb0e0', ['...#...', '..###..', '..###..', '.#####.', '.#####.', '.#####.', '..###..']],
+  freude: ['#e06a7a', ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...', '.......']],
+  trauer: ['#7fa0c8', ['.#####.', '#######', '.#####.', '.......', '.#..#..', '...#..#', '.#..#..']],
+};
+function drawEmote(e, now) {
+  const E = EMOTE[e.emote.k]; if (!E) return;
+  const z = cam.zoom, px = Math.max(2, Math.round(z * 1.6)), left = e.emote.until - now, age = now - (e.emote.at || now);
+  const hop = age < 220 ? Math.round(Math.sin(age / 220 * Math.PI) * 4 * z) : 0;
+  const sx = Math.round((e.x - cam.x) * z - 3.5 * px), sy = Math.round((e.y - 70 - cam.y) * z) - 7 * px - hop;
+  ctx.globalAlpha = Math.min(1, left / 250);
+  ctx.fillStyle = 'rgba(14,11,8,.85)'; ctx.fillRect(sx - px, sy - px, 9 * px, 9 * px);
+  ctx.fillStyle = E[0];
+  E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(sx + x * px, sy + y * px, px, px); });
+  ctx.globalAlpha = 1;
 }
 function drawBossBar() {
   const p = S.player; if (!p) return;
@@ -263,7 +293,6 @@ function prefetchOne() {
   }
   return false;
 }
-window.__chunkHash = (cx, cy) => { const m = MAPS[S.map], key = S.map + ':' + cx + ',' + cy; chunkCache.delete(key); const cv = chunkCanvas(m, cx, cy), d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let h = 0; for (let i = 0; i < d.length; i++) h = (Math.imul(h, 31) + d[i]) | 0; return h; }; /*PERFTMP*/
 function chunkCanvas(m, cx, cy) {
   const ref = chunkRef[S.map];
   if (!ref || ref.tiles !== m.tiles || ref.ver !== (m.ver || 0)) {
@@ -273,12 +302,9 @@ function chunkCanvas(m, cx, cy) {
   const key = S.map + ':' + cx + ',' + cy;
   let cv = chunkCache.get(key);
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
-  PT.n_chunkMiss = (PT.n_chunkMiss || 0) + 1; /*PERFTMP*/
-  const _cb = performance.now(); /*PERFTMP*/
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
-  const BT = window.__BT ||= {}; let _b = performance.now(); const bk = n => { const t = performance.now(); BT[n] = (BT[n] || 0) + t - _b; _b = t; }; /*PERFTMP*/
-  bakeGround(o, m, cx, cy); bk('ground'); /*PERFTMP*/
+  bakeGround(o, m, cx, cy);
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Nahdetails
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx], X = i * 16, Y = j * 16;
@@ -294,11 +320,10 @@ function chunkCanvas(m, cx, cy) {
     } else if ((t === T.DIRT || t === T.ROAD) && r < 0.12) { o.fillStyle = '#6a6252'; o.fillRect(px, py, 2, 1); o.fillStyle = '#2a241c'; o.fillRect(px, py + 1, 2, 1); }
     else if (t === T.ASH && r < 0.05) { o.fillStyle = '#cfc6b0'; o.fillRect(px, py, 3, 1); o.fillRect(px + 1, py - 1, 1, 3); }
   }
-  bk('decor'); /*PERFTMP*/
-  paintWater(o, m, cx, cy); bk('water'); /*PERFTMP*/
-  paintRock(o, m, cx, cy); bk('rock'); /*PERFTMP*/
+  paintWater(o, m, cx, cy);
+  paintRock(o, m, cx, cy);
   paintRock(o, m, cx, cy, T.DWALL);
-  paintWalls(o, m, cx, cy); bk('walls'); /*PERFTMP*/
+  paintWalls(o, m, cx, cy);
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Mauerfuß: Schatten nur, wo unten keine Mauer anschließt
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx];
@@ -306,7 +331,6 @@ function chunkCanvas(m, cx, cy) {
     const below = ty + 1 < m.h ? m.tiles[(ty + 1) * m.w + tx] : t;
     if (!SOLID_T.has(below)) { o.fillStyle = 'rgba(0,0,0,.38)'; o.fillRect(i * 16, j * 16 + 14, 16, 2); o.fillStyle = 'rgba(0,0,0,.2)'; o.fillRect(i * 16, j * 16 + 16, 16, 2); }
   }
-  bk('shadow'); (window.__CB ||= []).push(performance.now() - _cb); /*PERFTMP*/
   chunkCache.set(key, cv);
   if (chunkCache.size > CHUNK_MAX) chunkCache.delete(chunkCache.keys().next().value);
   return cv;
@@ -395,7 +419,6 @@ function bakeGround(o, m, cx, cy) {
     const reg = world ? REGION[regionAt(tx, ty)] : REGION.greenmark;
     if (reg.tint && !(SOLID_T.has(raw) && raw !== T.ROCK)) { const c = tintOf(reg.tint); td.data.set([c[0], c[1], c[2], c[3] * 255], k * 4); }
   }
-  const BT = window.__BT ||= {}; let _g = performance.now(); const gk = n => { const t = performance.now(); BT[n] = (BT[n] || 0) + t - _g; _g = t; }; gk('g_prep'); /*PERFTMP*/
   /* PERF-R: Grundtexturen direkt in einen Pixelpuffer (dieselben Texel wie tileTexture) statt 256 drawImage; die Grenzpixel
      schreiben danach in denselben Puffer, ein putImageData am Ende — gleiches Bild, Backen ~1,5 ms schneller */
   const img = new ImageData(SZ, SZ), D = img.data;
@@ -406,7 +429,6 @@ function bakeGround(o, m, cx, cy) {
     const k = (j + 1) * TW + i + 1, T0 = tc[k] || (tc[k] = texel(typ[k], vari[k], kin[k]));
     for (let y = 0; y < 16; y++) D.set(T0.subarray(y * 64, y * 64 + 64), ((j * 16 + y) * SZ + i * 16) * 4);
   }
-  gk('g_tex'); /*PERFTMP*/
   // Grenzen natürlicher Böden pro Pixel: nur Kacheln, deren 3×3-Umfeld gemischt ist
   const noise = [], G0x = x0t * 16 - 2, G0y = y0t * 16 - 2, AWn = SZ + 4;
   const nz = t => noise[t] || (noise[t] = ((A, B) => (X, Y) => A(X, Y) * 0.75 + B(X, Y) * 0.25)(latNoise(G0x, G0y, AWn, 5, t * 37, 0), latNoise(G0x, G0y, AWn, 3, t * 11, 40)));
@@ -454,13 +476,13 @@ function bakeGround(o, m, cx, cy) {
       D[o4] = T0[ti] + (lip ? 22 : 0); D[o4 + 1] = T0[ti + 1] + (lip ? 26 : 0); D[o4 + 2] = T0[ti + 2] + (lip ? 10 : 0); D[o4 + 3] = 255;
     }
   }
-  gk('g_edges'); o.putImageData(img, 0, 0); gk('g_put'); /*PERFTMP*/
-  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW); gk('g_mottle'); /*PERFTMP*/
+  o.putImageData(img, 0, 0);
+  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW);
   // Helligkeit und Regionstönung: 1 Pixel je Kachelmitte, bilinear hochskaliert — weiche Verläufe statt Kachelrechtecke
   shadeCtx.putImageData(sd, 0, 0); tctx.putImageData(td, 0, 0);
   o.save(); o.imageSmoothingEnabled = true;
   o.drawImage(shadeCv, -16, -16, TW * 16, TW * 16); o.drawImage(tintCv, -16, -16, TW * 16, TW * 16);   // Pixelmitte i ↔ Kachelmitte
-  o.restore(); gk('g_shade'); /*PERFTMP*/
+  o.restore();
 }
 /* Artist Runde 2 (Stil R): Flecken im Maßstab von ein bis drei Kacheln über Gras, Erde, Weg und Sumpf — trockene helle und satte
    dunkle Inseln mit organischem Rand, dazu Büschel an Weltpositionen (nicht je Kachel). Bricht das Kachelraster, ohne Rauschen. */
@@ -2043,8 +2065,8 @@ function drawHumanoidAt(e, now, override) {
   const c = override || ctx;
   c.imageSmoothingEnabled = false;
   const x = e.x, y = e.y;
-  const spec = e.spec || SP.humanSpec(e);
-  c.fillStyle = `rgba(0,0,0,${e.downed ? .2 : .38})`;
+  const spec = e.spec || SP.humanSpecOf(e);   /* PERF-U3: je Figur gemerkt statt je Bild neu gebaut */
+  c.fillStyle = e.downed ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.38)';
   c.beginPath(); c.ellipse(x, y + 5, 10, 4, 0, 0, 7); c.fill();
   if (e.casting && !e.downed) {                                          // S15 P4: Rune in der Schulfarbe, solange der Zauber sammelt
     const r0 = 14, a0 = now / 450; c.globalAlpha = 0.75; c.strokeStyle = c.fillStyle = e.casting.col || '#b88af0'; c.lineWidth = 1;
@@ -2299,7 +2321,15 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
 const monsterSpecs = new WeakMap();
-function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || s.ms !== SP.msOf(e)) { s = SP.monsterSpec(e, m); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben
+function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || !SP.msEq(e, s.ms)) { s = SP.pinSpec(SP.monsterSpec(e, m)); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben   /* PERF-U3: Gliedervergleich ohne neue Liste, Schlüssel gemerkt */
+/* PERF-U3: humanoide Gegner wurden je Bild über eine volle Kopie ({ ...e }, ~60 Felder) gezeichnet. Jetzt ein bleibender Stellvertreter je Gegner,
+   der alles vom Gegner liest (Prototyp) und nur spec/equip selbst trägt; die Zeichenwege schreiben nichts in die Figur. */
+const monsterProxy = new WeakMap();
+function proxyOf(e, m) {
+  let P = monsterProxy.get(e); if (!P) monsterProxy.set(e, P = { p: Object.create(e), wk: monsterProxy });   /* wk: Merker „noch nie gesetzt“ */
+  if (P.wk !== e.weaponKey) { P.wk = e.weaponKey; P.p.equip = { weapon: e.weaponKey ? { key: e.weaponKey } : null }; }
+  P.p.spec = monsterSpecOf(e, m); return P.p;
+}
 function sideDir(e) {
   if (e.swing > 0 && e.aim != null) return Math.cos(e.aim) < 0 ? 'W' : 'E';
   if (e.facing === 2) e._side = 'W'; else if (e.facing === 3) e._side = 'E';
@@ -2390,13 +2420,15 @@ function drawCreature(e, now) {
     for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; ctx.fillRect(Math.round(e.x + Math.cos(a) * R) - 2, Math.round(e.y + Math.sin(a) * Ry) - 2, 4, 4); }
     ctx.fillStyle = `rgba(160,215,245,${0.08 + 0.12 * k})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, R, Ry, 0, 0, 7); ctx.fill();
   }
-  if (e.special?.kind === 'beam' && e.special.t > 0) dottedLine(e.x, e.y - 20, e.special.a, 420, now);   // Phase 7: Omegas Strahl
+  if (e.special?.kind === 'beam' && e.special.t > 0) dottedLine(e.x, e.y - 20, e.special.a, e.special.L || 420, now, true, e.special.T ? 1 - e.special.t / e.special.T : -1);   // Phase 7: Omegas Strahl; Kampf-Feedback: schwerer Stoß füllt sich bis zum Einschlag
   if (e.special && ['stomp', 'bloodrain', 'meteor', 'nova'].includes(e.special.kind) && e.special.t > 0) {   // Phase 6: Stampfen des Kolosses, Omegas Blut (Garmadon)
     const st = e.special.kind === 'stomp', k = 1 - e.special.t / (e.special.T || (st ? 900 : 1000)), R = e.special.R || (st ? 95 : 48), col = `rgba(200,40,30,${0.35 + 0.45 * k})`;
     for (const s of e.special.spots || [{ x: e.x, y: e.y }]) {
       ctx.fillStyle = col; for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2; ctx.fillRect(Math.round(s.x + Math.cos(a) * R) - 2, Math.round(s.y + Math.sin(a) * R * 0.63) - 2, 4, 4); }
-      ctx.fillStyle = `rgba(160,20,20,${0.08 + 0.15 * k})`; ctx.beginPath(); ctx.ellipse(s.x, s.y, R, R * 0.63, 0, 0, 7); ctx.fill(); }
+      ctx.fillStyle = `rgba(160,20,20,${0.08 + 0.15 * k})`; ctx.beginPath(); ctx.ellipse(s.x, s.y, R, R * 0.63, 0, 0, 7); ctx.fill();
+      if (e.special.heavy) { ctx.fillStyle = `rgba(200,36,26,${0.22 + 0.2 * k})`; ctx.beginPath(); ctx.ellipse(s.x, s.y, R * k, R * k * 0.63, 0, 0, 7); ctx.fill(); } }   /* Kampf-Feedback: Fläche füllt sich, voll = Einschlag */
   }
+  if (e.special?.heavy && e.special.t > 0) heavyWarn(e, now);   /* Warnzeichen: nicht blockbar, nur ausweichen */
   if (e.mtype === 'carrion_wing') return drawWing(e, now, p);
   if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
   if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
@@ -2410,6 +2442,9 @@ function drawCreature(e, now) {
     SP.blit(ctx, f, e.x, e.y + 5);
     const fw = flashAlpha(e, now);
     if (fw > 0) { ctx.globalAlpha = fw; SP.blit(ctx, Object.assign(SP.flashOf(f), { px: f.px, ox: f.ox, oy: f.oy }), e.x, e.y + 5); ctx.globalAlpha = 1; }
+    const bl = SP.bloodOf(e);   /* Kampf-Feedback (K12): auch Tiere zeigen Wunden — Blutflecken ab 50 % / 25 % Leben, fest je Tier (Seed) */
+    if (bl && S.settings.violence !== 'low') { const sd = ((e.seed || 1) * 977) | 0; ctx.fillStyle = '#6a1410';
+      for (let i = 0; i < bl * 3; i++) ctx.fillRect(Math.round(e.x + ((sd >>> (i * 3)) & 15) - 8), Math.round(e.y - 11 + ((sd >>> (i * 2 + 5)) & 7)), 2, 2); }
     if (K2 !== 1) ctx.restore();
     if (e.mtype === 'bear' && e.telegraph > 0) dottedLine(e.x, e.y - 8, e.aim ?? 0, 200, now);   // Ansage des Sturmlaufs
     return;
@@ -2438,7 +2473,7 @@ function drawCreature(e, now) {
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
   const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1) * ({ veteran: 1.06, armored: 1.08, leader: 1.1, starved: 0.94 }[e.variant] || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
-  const proxy = { ...e, spec: monsterSpecOf(e, m), equip: { weapon: e.weaponKey ? { key: e.weaponKey } : null } };
+  const proxy = proxyOf(e, m);
   if (e.mtype === 'zombie') { ctx.fillStyle = 'rgba(140,170,70,.13)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, 26, 14, 0, 0, 7); ctx.fill(); }   // Seuchendunst
   if (e.shadowServ) { ctx.fillStyle = 'rgba(120,80,190,.18)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, 18, 8, 0, 0, 7); ctx.fill(); }   // Schattenskelett des Hexenmeisters
   const lean = e.mtype === 'zombie' ? (sideDir(e) === 'E' ? 0.16 : -0.16) : 0, sx = e.mtype === 'flesh_golem' ? 1.22 : m.angel ? 1.16 : 1, sy = e.mtype === 'zombie' ? 0.9 : 1, lift = e.mtype === 'shade' ? 5 + Math.sin(now / 260) * 3 : 0;   // Silhouetten: gebückt, massig, schwebend
@@ -2459,17 +2494,27 @@ function drawCreature(e, now) {
   if (e.mtype === 'garmadon') crownOf(e, top);
   if (e.mtype === 'omega') { const f = 0.5 + 0.5 * Math.sin(now / 300); ctx.strokeStyle = `rgba(255,210,120,${0.55 + 0.35 * f})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(e.x, top + 4, 22, 7, 0, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }   // Phase 7: Heiligenschein
   if (m.faction === 'undead' && !e.servant) roleBadge(e, m, top - (e.mtype === 'garmadon' ? 10 : 0));
-  if (e.telegraph > 0) telegraphArc(e, m.reach + 10, 0.9, now);   // Ansage: gepunkteter Pixelbogen in Schlagrichtung
+  if (e.telegraph > 0 && !e.special?.heavy) telegraphArc(e, m.reach + 10, 0.9, now);   // Ansage: gepunkteter Pixelbogen in Schlagrichtung (Bernstein = blockbar)
   if (e.draw > 0) dottedLine(e.x, e.y - 14, e.aim ?? 0, 70 + (520 - e.draw) / 3, now);
 }
 
-function dottedLine(x, y, a, len, now) {                    // Ansage als Pixel-Punktlinie (Schuss, Sturmangriff)
-  ctx.fillStyle = `rgba(210,70,48,${0.45 + 0.35 * Math.sin(now / 60)})`;
-  for (let r = 18; r < len; r += 10) ctx.fillRect(Math.round(x + Math.cos(a) * r) - 2, Math.round(y + Math.sin(a) * r) - 2, 4, 4);
+/* Kampf-Feedback Farbcode (Entscheidung 02.10.): ROT = nicht blockbar (schwere Angriffe, Flächen) — nur ausweichen;
+   BERNSTEIN = normaler Hieb/Schuss/Sturmlauf — Deckung, Parade und Schild wirken. */
+const TELE_RED = '210,50,38', TELE_AMBER = '226,160,62';
+function dottedLine(x, y, a, len, now, red = false, fill = -1) {   // Ansage als Pixel-Punktlinie (Schuss, Sturmangriff); fill 0..1: bis hierhin hell gefüllt
+  const pulse = 0.45 + 0.35 * Math.sin(now / 60), col = red ? TELE_RED : TELE_AMBER;
+  for (let r = 18; r < len; r += 10) { const lit = fill >= 0 && r <= 18 + (len - 18) * fill;
+    ctx.fillStyle = `rgba(${col},${lit ? 0.95 : pulse})`; const q = lit ? 6 : 4; ctx.fillRect(Math.round(x + Math.cos(a) * r) - q / 2, Math.round(y + Math.sin(a) * r) - q / 2, q, q); }
+}
+function heavyWarn(e, now) {                                   /* rotes Warnzeichen über dem Kopf, blinkt schneller kurz vor dem Einschlag */
+  const sp = e.special, k = sp.T ? 1 - sp.t / sp.T : 0.5, on = k < 0.75 || ((now / 70) | 0) % 2 === 0;
+  if (!on) return;
+  const sx = (e.x - cam.x) * cam.zoom, sy = (e.y - 58 * ((MONSTERS[e.mtype]?.scale) || 1) - cam.y) * cam.zoom;
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawGlyphAt('warn', TELE_RED, true, sx, sy, Math.max(2, Math.round(2.4 * cam.zoom * 0.85))); ctx.restore();
 }
 function telegraphArc(e, R, half, now) {
   const a0 = (e.aim ?? 0) - half, n = Math.round(half * R / 5);
-  ctx.fillStyle = `rgba(210,70,48,${0.45 + 0.35 * Math.sin(now / 60)})`;
+  ctx.fillStyle = `rgba(${TELE_AMBER},${0.45 + 0.35 * Math.sin(now / 60)})`;
   for (let i = 0; i <= n; i++) { const a = a0 + (2 * half) * i / n; ctx.fillRect(Math.round(e.x + Math.cos(a) * R) - 2, Math.round(e.y - 10 + Math.sin(a) * R * 0.8) - 2, 4, 4); }
 }
 
@@ -2561,17 +2606,48 @@ function groundIcon(key) {
   const o = cv.getContext('2d', { willReadFrequently: true }); o.imageSmoothingEnabled = true; o.drawImage(tmp, 0, 0, 16, 16);
   SP.pixelize(o, 16, 16); groundIcons.set(key + false, cv); return cv;
 }
+/* Visueller Umbau P5 (IMPL-ITEMS, Entwickler 02.10.: Lichtstrahl ab Selten): Bodenbeute liegt auf einer Pixel-Raute in Seltenheitsfarbe;
+   ab Selten steht ein schmaler Lichtstrahl darüber, nachts heller (nach dem Licht-Durchgang gemalt, drawLootBeams). Frisch Gefallenes
+   fliegt im Bogen vom Körper (e._drop aus dropItemAt, nicht gespeichert). Reine Darstellung, kein Zufall aus state.js. */
+const RAR_RGB = { common:'183,171,146', uncommon:'137,160,90', rare:'95,146,189', epic:'160,119,187', legendary:'189,148,51', mythic:'150,215,240' };
+const RAR_LV = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+const LOOT_BEAM = [];
 function drawGroundItem(e, now) {
-  const f = Math.round(Math.sin(now / 400 + e.seed) * 1.5) * 2;
-  shadow(e.x, e.y + 2, 7, .3);
-  const it = ITEMS[e.item.key] || {}, rar = e.item.rar || it.rarity;
-  if (rar && rar !== 'common') {
-    const col = { uncommon:'137,160,90', rare:'95,146,189', epic:'160,119,187', legendary:'189,148,51', mythic:'150,215,240' }[rar] || '183,171,146';
-    ctx.fillStyle = `rgba(${col},${.16 + .08 * Math.sin(now / 300)})`;
-    ctx.beginPath(); ctx.arc(e.x, e.y - 7 + f, 12, 0, 7); ctx.fill();
+  let f = Math.round(Math.sin(now / 400 + e.seed) * 1.5) * 2, ox = 0, oy = 0, fly = false;
+  const D = e._drop;
+  if (D) { const k = (now - D.t) / 420; if (k >= 0 && k < 1 && S.settings.motion !== false) { fly = true; ox = D.dx * (1 - k); oy = D.dy * (1 - k) - Math.sin(k * Math.PI) * (16 + Math.abs(D.dx) * 0.4); f = 0; } else e._drop = null; }
+  const it = ITEMS[e.item.key] || {}, rar = e.item.rar || it.rarity || 'common', lv = RAR_LV[rar] ?? 0, col = RAR_RGB[rar] || RAR_RGB.common;
+  shadow(e.x, e.y + 2, fly ? 4 : 7, .3);
+  if (!fly) {                                                   /* Raute am Boden: Form gleich, Farbe und Stärke nach Seltenheit */
+    const a = (lv ? .34 + .1 * lv : .2) + .08 * Math.sin(now / 300 + e.seed), w = 9 + lv, h = 4 + (lv >> 1);
+    ctx.fillStyle = `rgba(${col},${Math.min(.85, a)})`;
+    ctx.beginPath(); ctx.moveTo(e.x - w, e.y + 1); ctx.lineTo(e.x, e.y + 1 - h); ctx.lineTo(e.x + w, e.y + 1); ctx.lineTo(e.x, e.y + 1 + h); ctx.closePath(); ctx.fill();
+    if (lv >= 2) { ctx.fillStyle = `rgba(${col},.95)`; ctx.fillRect(Math.round(e.x - w), Math.round(e.y), 2, 2); ctx.fillRect(Math.round(e.x + w - 2), Math.round(e.y), 2, 2); }
+    if (lv >= 2 && LOOT_BEAM.length < 40) LOOT_BEAM.push(e);
   }
-  const A = SP.itemAtlas(e.item.key, it); if (A) { const s = 26 / Math.max(A.width, A.height); ctx.drawImage(A, e.x - A.width * s / 2, e.y - 4 + f - A.height * s, A.width * s, A.height * s); return; }   // Stil F
-  ctx.drawImage(groundIcon(e.item.key), e.x - 12, e.y - 20 + f, 24, 24);
+  const A = SP.itemAtlas(e.item.key, it); if (A) { const s = 26 / Math.max(A.width, A.height); ctx.drawImage(A, e.x + ox - A.width * s / 2, e.y + oy - 4 + f - A.height * s, A.width * s, A.height * s); return; }   // Stil F
+  ctx.drawImage(groundIcon(e.item.key), Math.round(e.x + ox - 12), Math.round(e.y + oy - 20 + f), 24, 24);
+}
+const beamImg = new Map();
+function beamOf(rar) {                                          /* senkrechter Strahl, einmal je Seltenheit gebacken */
+  let c = beamImg.get(rar); if (c) return c;
+  c = document.createElement('canvas'); c.width = 10; c.height = 96; const g = c.getContext('2d'), col = RAR_RGB[rar];
+  const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, `rgba(${col},0)`); gr.addColorStop(0.55, `rgba(${col},.35)`); gr.addColorStop(1, `rgba(${col},.9)`);
+  g.fillStyle = gr; g.fillRect(3, 0, 4, 96); g.globalAlpha = 0.45; g.fillRect(1, 30, 1, 66); g.fillRect(8, 30, 1, 66);
+  beamImg.set(rar, c); return c;
+}
+function drawLootBeams(now) {
+  if (!LOOT_BEAM.length) return;
+  const a = ambient(), k = 0.35 + a * 0.9;                       /* nachts (oder im Gewölbe) deutlich heller */
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const e of LOOT_BEAM) {
+    const rar = e.item.rar || ITEMS[e.item.key]?.rarity || 'common', lv = RAR_LV[rar] ?? 0, sx = (e.x - cam.x) * cam.zoom, sy = (e.y - cam.y) * cam.zoom;
+    if (sx < -20 || sx > W + 20 || sy < -20 || sy > H + 120) continue;
+    const h = (48 + lv * 10) * cam.zoom, w = 10 * cam.zoom * (lv >= 4 ? 1.3 : 1);
+    ctx.globalAlpha = Math.min(1, k * (0.55 + 0.12 * lv) * (0.85 + 0.15 * Math.sin(now / 420 + e.seed)));
+    ctx.drawImage(beamOf(rar), Math.round(sx - w / 2), Math.round(sy - h), w, h);
+  }
+  ctx.restore(); LOOT_BEAM.length = 0;
 }
 
 // Gebäude und Gräber laufen durch dieselbe Pixelisierung wie Props (gecacht je Typ/Zustand).
@@ -2593,7 +2669,7 @@ function drawBaked(key, e, box, fn) {
    Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
 const PLACE_RANGE = 400;
 let BLDICO = null, bldImgs = {};
-import('./icons.js?v=24').then(m => { BLDICO = m; }).catch(() => {});
+import('./icons.js?v=23').then(m => { BLDICO = m; }).catch(() => {});
 function bldImage(type) {
   if (!BLDICO?.bldURL) return null;
   let im = bldImgs[type];
@@ -2779,23 +2855,29 @@ export function ambient() {
 // Lichtquellen stehen still: einmal je Karte sammeln statt jedes Bild alle ~6500 Objekte zu prüfen.
 // Neu gesammelt, wenn sich die Objektzahl der Karte ändert (Bau, Abriss, Laden) oder die Karte wechselt.
 let lightCache = { map: null, n: -1, list: [] };
+const LIGHT_T = new Set(['street_lamp', 'torch', 'campfire_static', 'lantern', 'campfire', 'smithy', 'shrine', 'candles', 'hearth', 'forge']);
+function lightOf(e, list) {                                  // Lichtquellen eines Objekts (Lampen, Feuer, Schreine, fertige Bauten)
+  if (!LIGHT_T.has(e.type)) return;
+  if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
+  if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
+  if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
+  if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });
+  if (e.kind === 'prop' && e.type === 'shrine') list.push({ x: e.x, y: e.y, r: 90 });
+  if (e.kind === 'prop' && e.type === 'candles') list.push({ x: e.x, y: e.y - 8, r: 60 });
+  if (e.kind === 'prop' && (e.type === 'hearth' || e.type === 'forge')) list.push({ x: e.x, y: e.y - 8, r: 80 });
+}
+function houseLights(map) { const houses = []; for (const b of HOUSES) if (b.map === map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2) houses.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 }); return houses; }
 function staticLights() {
   const arr = S.ents[S.map], n = S.settlement ? S.settlement.buildings.reduce((k, b) => k + (b.built >= 1), 0) : 0, now = performance.now();   // fertige Bauten
+  /* PERF-R: die Sichtliste geht ohnehin alle Objekte durch (≤ 4 s, bei Änderung sofort) — sie sammelt die Lichter mit; kein eigener Lauf über ~17 000
+     Objekte alle 3 s mehr (Spitze ~5–10 ms). Neuer fertiger Bau: Sichtliste sofort neu. */
+  if (VIS.arr === arr && VIS.lights) { if (VIS.ln !== n) { VIS.ln = n; VIS.t = 0; } lightCache.houses = VIS.houses; return VIS.lights; }
   // Phase 20: früher Schlüssel = Objektzahl — jede verschwundene Blutspur ließ alle ~9000 Objekte neu prüfen (~0,5 ms).
   // Jetzt: Kartenwechsel, neuer Bau, sonst höchstens alle 3 s (neue Fackeln, z. B. Fest, leuchten spätestens dann).
   if (lightCache.map === S.map && lightCache.n === n && now - (lightCache.t || 0) < 3000) return lightCache.list;
   const list = [];
-  for (const e of arr) {
-    if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
-    if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
-    if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
-    if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });
-    if (e.kind === 'prop' && e.type === 'shrine') list.push({ x: e.x, y: e.y, r: 90 });
-    if (e.kind === 'prop' && e.type === 'candles') list.push({ x: e.x, y: e.y - 8, r: 60 });
-    if (e.kind === 'prop' && (e.type === 'hearth' || e.type === 'forge')) list.push({ x: e.x, y: e.y - 8, r: 80 });
-  }
-  const houses = [];   /* PERF-R: Fensterlicht der Häuser mitgesammelt (vorher je Bild alle Häuser samt Verfall geprüft) */
-  for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2) houses.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
+  for (const e of arr) lightOf(e, list);
+  const houses = houseLights(S.map);   /* PERF-R: Fensterlicht der Häuser mitgesammelt (vorher je Bild alle Häuser samt Verfall geprüft) */
   lightCache = { map: S.map, n, list, t: now, houses };
   return list;
 }
@@ -2808,7 +2890,7 @@ const LIT = [], PL_LIGHT = { x: 0, y: 0, r: 0 };
 function drawLight(now) {
   HOLE ||= stamp([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,.72)'], [1, 'rgba(0,0,0,0)']]); WARM ||= stamp([[0, 'rgba(210,140,60,.10)'], [1, 'rgba(0,0,0,0)']]);
   const a = ambient();
-  if (a < 0.06) return; tk('L_amb'); /*PERFTMP*/
+  if (a < 0.06) return;
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.clearRect(0, 0, dark.width, dark.height);          // sonst summiert sich die Dunkelheit jeden Frame
   dctx.setTransform(dpr / 2, 0, 0, dpr / 2, 0, 0);
@@ -2816,14 +2898,13 @@ function drawLight(now) {
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = `rgba(${night},${a})`;
   dctx.fillRect(0, 0, W, H);
-  dctx.globalCompositeOperation = 'destination-out'; tk('L_fill'); /*PERFTMP*/
+  dctx.globalCompositeOperation = 'destination-out';
   const pl = S.player;
   const lights = LIT; lights.length = 0;   /* PERF-R: nur Lichter im Bild sammeln, ohne Kopie aller Lichter der Karte je Bild */
   const inV = l => { const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom; return !(sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260); };
   for (const l of staticLights()) if (inV(l)) lights.push(l);
   if (pl && pl.map === S.map) { PL_LIGHT.x = pl.x; PL_LIGHT.y = pl.y; PL_LIGHT.r = lightR(pl, DUNGEONS[S.map] ? 150 : 120); lights.push(PL_LIGHT); }   /* Roadmap P2: Nachtsicht des Roboterauges */
   if (isNight()) for (const l of lightCache.houses) if (inV(l)) lights.push(l);   // erleuchtete Fenster werfen warmes Licht auf die Straße
-  tk('L_collect'); PT.n_lights = (PT.n_lights || 0) + lights.length; /*PERFTMP*/
   for (const l of lights) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260) continue;
@@ -2831,11 +2912,10 @@ function drawLight(now) {
     dctx.drawImage(HOLE, sx - r, sy - r, r * 2, r * 2);
   }
  
-  dctx.globalCompositeOperation = 'source-over'; tk('L_holes'); /*PERFTMP*/
+  dctx.globalCompositeOperation = 'source-over';
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true; ctx.drawImage(dark, 0, 0, dark.width * 2, dark.height * 2); ctx.imageSmoothingEnabled = false;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  tk('L_comp'); /*PERFTMP*/
   // warmer Lichtstich
   ctx.globalCompositeOperation = 'lighter';
   for (const l of lights) {
@@ -3102,12 +3182,86 @@ function drawBubble(f) {
   ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.beginPath(); ctx.moveTo(sx - 5, sy + h); ctx.lineTo(sx + 5, sy + h); ctx.lineTo(sx, sy + h + 6); ctx.fill();
   ctx.fillStyle = '#e7dcc2'; ctx.fillText(f.text, sx, sy + h - 7); ctx.globalAlpha = 1;
 }
+// Kampf-Feedback (K4/K12): Zustand am Körper statt Text. Gewähltes Ziel: schmaler Lebensbalken + Statuszeichen; sonst zeigt der Körper (Blut, Partikel, Eis) den Zustand.
+const ST_GLYPH = { burning: ['fire', '240,140,60'], frost: ['frost', '150,205,245'], chilled: ['frost', '175,190,205'], poisoned: ['drop', '130,200,90'], bleeding: ['drop', '200,48,40'], shocked: ['bolt', '240,224,112'] };
+function drawTargetBar() {
+  const e = focus.sel; if (!e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss) return;
+  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 60 * sc), k = clamp(e.hp / e.maxHp, 0, 1);
+  ctx.fillStyle = 'rgba(10,8,6,.85)'; ctx.fillRect(x - 1, y - 1, 34, 6);
+  ctx.fillStyle = '#3a1410'; ctx.fillRect(x, y, 32, 4);
+  ctx.fillStyle = k > 0.5 ? '#9a2a20' : k > 0.25 ? '#b8461e' : '#d8641a'; ctx.fillRect(x, y, Math.round(32 * k), 4);
+  let gx = x; for (const st of e.status || []) { const G = ST_GLYPH[st.key]; if (!G) continue; const c = glyphImg(G[0], G[1], true); ctx.drawImage(c, gx, y - 11, c.width * 1.5, c.height * 1.5); gx += 11; }
+  if (e.rooted > performance.now()) { const c = glyphImg('frost', '230,245,255', true); ctx.drawImage(c, gx, y - 11, c.width * 1.5, c.height * 1.5); }
+}
+function drawStatusGround(list) {                           /* Frost-Stapel 1–3 als Eisrand, eingefroren = voller Kranz */
+  for (const e of list) {
+    if (!e.alive || !e.status) continue;
+    const fr = e.status.length ? e.status.find(q => q.key === 'frost') : null, frozen = e.rooted > performance.now();
+    if (!fr && !frozen) continue;
+    const n = frozen ? 4 : Math.min(3, fr.stacks || 1), R = 8 + n * 2, cnt = 4 + n * 3;
+    ctx.fillStyle = `rgba(170,215,240,${0.1 + 0.06 * n})`; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, R, R * 0.45, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = n >= 3 ? '#e8f6ff' : '#bfe3f5';
+    for (let i = 0; i < cnt; i++) { const a = i / cnt * Math.PI * 2, px = Math.round(e.x + Math.cos(a) * R), py = Math.round(e.y + 2 + Math.sin(a) * R * 0.45);
+      ctx.fillRect(px - 1, py - (i % 2 ? 3 : 2) - (n >= 3 ? 1 : 0), 2, (i % 2 ? 3 : 2) + (n >= 3 ? 1 : 0)); }
+  }
+}
+// ---------------- Kampf-Feedback: Pixelziffern und Zeichen (VISUAL K1/K4/K5/K9, Entscheidung 02.10.) ----------------
+// Zahlen als 3×5-Pixelziffern, wiederkehrende Kampfwörter als 7×7-Zeichen. Einmal je Farbe gebacken (Cache), je Bild nur drawImage.
+const DIG = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111',
+  6: '111100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001111', '+': '000010111010000', '-': '000000111000000' };
+const GLYPH = {
+  shield: ['#######', '#.....#', '#..#..#', '#.###.#', '.#.#.#.', '..#.#..', '...#...'],            /* Block, Schild */
+  parry:  ['#.....#', '.#...#.', '..#.#..', '...#...', '..#.#..', '##...##', '##...##'],            /* Parade: gekreuzte Klingen */
+  deflect:['......#', '.....#.', '#...#..', '.#.#...', '..#....', '.#.#...', '#......'],            /* Abgewehrt: Klinge lenkt ab */
+  dodge:  ['....#..', '##...#.', '...####', '##...#.', '....#..'],                                  /* Ausgewichen: Windlinien + Pfeil */
+  broken: ['...#...', '..#....', '.###...', '...#...', '..###..', '...#...', '..#....'],            /* Unterbrochen: Riss */
+  tired:  ['.#...#.', '.#...#.', '###.###', '###.###', '.#...#.'],                                  /* erschöpft: Schweißtropfen */
+  immune: ['..###..', '.#...#.', '#...#.#', '#..#..#', '#.#...#', '.#...#.', '..###..'],            /* wirkt nicht: körperlos, feuerfest, daneben */
+  star:   ['...#...', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '...#...'],            /* Wucht, Riposte */
+  warn:   ['...#...', '..#.#..', '..#.#..', '.#.#.#.', '.#.#.#.', '#.....#', '###.###'],            /* schwerer Angriff: nicht blockbar */
+  fire:   ['..#..', '.##..', '.###.', '#####', '.###.'], frost: ['#.#.#', '.###.', '#####', '.###.', '#.#.#'],
+  drop:   ['..#..', '.###.', '#####', '#####', '.###.'], bolt: ['..##.', '.##..', '####.', '..##.', '.##..'] };
+const WORD_GLYPH = { Block: 'shield', Schild: 'shield', 'Parade!': 'parry', Abgewehrt: 'deflect', Ausgewichen: 'dodge', Unterbrochen: 'broken', unterbrochen: 'broken',
+  'erschöpft': 'tired', 'körperlos': 'immune', feuerfest: 'immune', 'nur Zauber': 'immune', daneben: 'immune', 'Wucht!': 'star', Riposte: 'star' };
+const GCACHE = new Map();
+function bakeRows(rows, rgb, frame) {                       /* rows: '#'/'1' = Farbe; frame: dunkler Rand ringsum (Krit, Zeichen), sonst Schatten rechts unten */
+  const w = rows[0].length, h = rows.length, c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
+  const g = c.getContext('2d'), on = (x, y) => y >= 0 && y < h && x >= 0 && x < w && (rows[y][x] === '#' || rows[y][x] === '1');
+  g.fillStyle = 'rgba(8,6,4,.85)';
+  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) if (!on(x, y) && (frame ? on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1) || on(x - 1, y - 1) || on(x + 1, y + 1) || on(x - 1, y + 1) || on(x + 1, y - 1) : on(x - 1, y - 1))) g.fillRect(x + 1, y + 1, 1, 1);
+  g.fillStyle = `rgb(${rgb})`; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (on(x, y)) g.fillRect(x + 1, y + 1, 1, 1);
+  return c;
+}
+function glyphImg(key, rgb, frame) {
+  const k = key + '|' + rgb + '|' + (frame ? 1 : 0); let c = GCACHE.get(k); if (c) return c;
+  if (GCACHE.size > 320) GCACHE.clear();
+  let rows;
+  if (GLYPH[key]) rows = GLYPH[key];
+  else { rows = ['', '', '', '', '']; for (let i = 0; i < key.length; i++) { const d = DIG[key[i]] || '000000000000000'; for (let r = 0; r < 5; r++) rows[r] += (i ? '0' : '') + d.slice(r * 3, r * 3 + 3); } }
+  c = bakeRows(rows, rgb, frame); GCACHE.set(k, c); return c;
+}
+export const glyphStats = () => ({ cached: GCACHE.size });   /* Debug/Probe */
+const rgbStr = col => (/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(col) || [0, 228, 220, 200]).slice(1, 4).join(',');
+export function numMode() { return S.settings?.dmgNums || 'full'; }   /* Einstellung Schadenszahlen: off / reduced / full (fehlt = Voll) */
+export const floatShown = f => !f.num || (numMode() === 'full' ? true : numMode() === 'reduced' ? !!(f.mine || f.big) : false);   /* Reduziert: eigener Schaden und Krits */
+function drawGlyphAt(key, rgb, frame, sx, sy, k) {          /* sx/sy: Bildschirm, Mitte unten */
+  const c = glyphImg(key, rgb, frame), w = c.width * k, h = c.height * k;
+  ctx.drawImage(c, Math.round(sx - w / 2), Math.round(sy - h), Math.round(w), Math.round(h));
+}
 function drawFloats() {
   ctx.textAlign = 'center';
+  const z = cam.zoom;
   for (const f of S.floats) {
     if (f.bubble) { drawBubble(f); continue; }
     const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - f.rise - cam.y) * cam.zoom;
     const a = clamp(f.life / f.maxLife, 0, 1);
+    const gk = WORD_GLYPH[f.text], isNum = f.num || /^[+-]?\d+$/.test(f.text);   /* Koop-Gäste bekommen nur Text: Ziffernfolgen werden trotzdem Pixelziffern */
+    if (gk || isNum) {
+      if (isNum && !floatShown(f)) continue;
+      ctx.globalAlpha = a;
+      drawGlyphAt(gk || f.text, rgbStr(f.color), !!(gk || f.big), sx, sy + 4, Math.max(2, Math.round((gk ? 2.4 : f.big ? 3.4 : 2.4) * z * 0.85)));   /* ganzzahlig: scharfe Pixel */
+      ctx.globalAlpha = 1; continue;
+    }
     ctx.font = `${f.big ? 700 : 400} ${(f.big ? 20 : 15) * cam.zoom * 0.85}px Cinzel, serif`;
     ctx.fillStyle = `rgba(0,0,0,${a * .6})`; ctx.fillText(f.text, sx + 1, sy + 1);
     ctx.fillStyle = f.color.replace('ALPHA', a);

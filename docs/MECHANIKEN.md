@@ -1066,32 +1066,27 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Das Wasserrecht der Sandfürsten** ist deine Wahl. Gibst du es den Sandfürsten zurück, zahlst du in Karak-Atar nie wieder Zoll (Händler +10). Verkaufst du es an die Räuber, bekommst du 250 Gold (Händler −10).
 - Debug: „Geheime Orte: Sandsturm endet (Brunnen frei)“.
 
-## Angst (Version 24)
-- Jeder Bürger hat einen Angstwert von 0 bis 100. Jeder Tote, den er sieht, bringt +18, wer es nur hört (gleicher Ort), +6. Tapfere und grausame Leute fürchten sich halb so stark. Wachen fürchten sich nicht.
-- **Ab 25 unruhig:** hält Abstand zum Täter, Gespräche drehen sich um die Toten.
-- **Ab 50 verängstigt:** versteckt sich im Haus, plaudert nicht mehr und redet nicht mit dem Täter.
-- **Ab 75 Panik:** rennt schreiend davon, sobald die Gefahr näher als etwa 20 Schritte kommt; redet mit niemandem.
-- Die Angst bleibt, solange die Gefahr (du oder ein Feind) lebt und in der Nähe ist. Erst wenn sie fort ist, sinkt sie um 12 je Spielstunde.
-- Wer einen Angreifer erschlägt, macht niemandem Angst; tote Tiere und Monster auch nicht.
-- Das Log meldet, wenn ein Ort Angst vor dir hat oder in Panik gerät; im Gespräch steht der Zustand dabei.
-- Debug: „Angst: Zeugen ringsum +25 (vor dir)“, „Angst: alle beruhigen“.
+## Noch mehr Umhänge und Kapuzen (Runde 11)
+- **Neue Umhangformen:** Rabenumhang mit Federkragen, Kettenumhang mit Schulterplatten, Wüstenburnus, Kapitänsrock/Öljacke (offene Schöße, Messingknöpfe), Knochenumhang mit Schädel auf der Schulter, Doppelumhang (Pelerine über langem Mantel), Fell mit Tierkopf (ohne Helm sitzt der Kopf als Haube auf). Umhänge tragen jetzt auch Muster: Streifen, Querbänder, Karo.
+- **Neue Kopfbedeckungen:** Henkerskapuze (nur Augenlöcher), tiefe Kutte, Turban/Kopftuch (Gesicht frei), Kapuze mit Widderhörnern, Pestmaske mit Schnabel. Alle zählen als Kapuze: Die Sonne brennt Vampire nur halb so stark. Das gilt auch für Burnus-Kopftuch und Knochenumhang-Kutte.
+- **Neue Stücke:** Teermantel, Rabenmantel, Wüstenburnus, Doppelmantel, Kettenumhang der Kette, Kapitänsrock, Knochenumhang, Bärenfell mit Kopf, Mantel des Rabenfürsten (legendär), Ordenskutte, Tiefe Kuttenkapuze, Henkerskapuze, Wüstenhaube, Widderkapuze, Pestkapuze mit Schnabel. Manche tragen feste Werte (Härte, Lebenskraft, Zähigkeit, Leichtfuß); der Tooltip zeigt sie.
+- **NPCs:** Die Form folgt Region und Stand. Die Kette trägt Kettenumhänge, Aurelion Burnus und Turban, Valens Wachen blaue Wappenmäntel, Tote und Kultisten Knochen, Kutten und Hörner, das Seevolk Öljacken und Kapitänsröcke, Bettler und Flüchtlinge Fetzen. Räuber tragen manchmal Bärenfell oder Rabenfedern.
 
-## Schwere Verbrechen (Version 24)
-- Ab 2000 Gold Kopfgeld kauft man sich bei der Festnahme nicht mehr frei. Die Wache zieht ein Bußgeld ein (10 % des Kopfgelds, mindestens 200), so weit dein Gold reicht, und du kommst in den Kerker.
-- Die Haft wächst mit dem Kopfgeld: 2000 Gold 20–40 Stunden, 20 000 Gold 40–80, 200 000 Gold 60–120 Stunden. Ganz bezahlt sitzt du die untere Zahl, ohne Gold die obere. Eine Spielstunde dauert eine Minute: 200 000 Gold heißt 1–2 Stunden Echtzeit.
-- Keine Kaution. Bestechen kostet 400 Gold und klappt nur in 20 % der Fälle. Schloss knacken und Ausbruch gehen wie immer.
-- Unter 2000 Gold bleibt alles wie bisher (zahlen oder 10–20 Stunden).
-- Die Haftanzeige sagt jetzt richtig „Stunden“ (vorher stand dort fälschlich „Minuten“).
-- Debug: „Kopfgeld Valen = 200 000“, „Ins Gefängnis (200 000, Bußgeld voll bezahlt / ohne Gold)“.
+## Geheimer Ort: Die Kammer der Namen
+- Unter dem Seelenhügel im Totenland liegt eine niedrige Tür aus Knochen. Trägst du eine Seelenphiole, summt sie in der Nähe.
+- Drinnen stehen die Namen aller Toten an den Wänden, auch deine Ahnen und, halb geschrieben, du selbst. Schatten bewachen die Kammer, dazu gibt es einen Hort.
+- **Wahl:**
+  - Die Ahnen ruhen lassen: Willenskraft +1 je Ahn, höchstens +3; Tote −5.
+  - Die Seelen ernten: 3 Seelenphiolen, Tote +10. Morvaths Heerzug kommt dadurch früher; die Wahl warnt dich davor.
+  - Nichts anrühren.
+- Debug: „Geheime Orte: zur Kammer der Namen“.
 
-## Hof ohne Wiederkehr und Zerfall der Hauptstadt (Version 24)
-- Erschlagene Hofleute (Kanzler Aldhelm, Marschall Brandt, Ysmay, Grimm, die drei Adligen, Hagen, Hofmar) bleiben tot, auch nach dem Laden.
-- Kanzler Aldhelm war der Blutfürst. Stirbt er als Kanzler, endet der Kult. Die Blutkult-Sense gibt es dann nicht, sie liegt nur beim Blutfürsten in der Krypta.
-- **Reichsverweser** nach König Varon: Kanzler Aldhelm, sonst Marschall Brandt, sonst der erste lebende Adlige. Ist keiner mehr da, ist die Krone kopflos.
-- **Thronwirren:** In den 7 Tagen nach dem Königsmord schickt niemand Ersatz für die Garde von Varonheim (ist die Krone kopflos, nie mehr). Fällt die Garde, wird die Hauptstadt schutzlos, nach der Frist gesetzlos und dann übernommen: von einem Totenheer in der Nähe oder einer Bande. Wer den Bandenführer erschlägt, befreit die Stadt.
-- Lebt der König, bleibt es beim alten Entscheid: Varonheim wird nie von einer Bande übernommen, der Fall kommt nur über Morvath.
-- Kein Stadtfest in einer schutzlosen Stadt und in Varonheim in den 7 Tagen nach dem Königsmord.
-- Debug: „Varonheim: König, Kanzler und Garde töten“, „Varonheim: Hof wiederbeleben“.
-
-## Menüs (Version 24)
-- Die Reiter oben in den Fenstern (Werte, Talente, Zauber, Effekte; Fraktionen, Chronik) haben wieder Platz und brechen nicht mehr um.
+## Dialoge: Story-Fenster, Emotes, Gesprächshaltung (Visuell D)
+- **Gesprächspartner bleibt stehen** und dreht sich zum Helden, solange das Fenster offen ist. Wer mehr als 170 px weggeht, beendet das Gespräch wie bisher.
+- **Text läuft ein.** Ein Klick auf den Text zeigt ihn sofort ganz. Bei „Reduzierte Bewegung“ steht der Text sofort da, ohne Einblenden.
+- **Antwortzeichen** vor jeder Wahl zeigen die Art: ↩ gehen, ⚔ Kampf, ◉ Gold, ✦ Auftrag, ⚖ Handel, ? Frage. Die Reihenfolge der Antworten ändert sich nicht.
+- **Story-Fenster:** Auftragsangebot und -abgabe bei benannten Figuren, Bosse im Gespräch, Hoher Rat, Hof und Heiliges Gericht. Die Leiste wird breiter, das Bild größer, und unter dem Namen stehen Beruf und Fraktion. Die Kamera rückt leicht heran und zielt zwischen dich und die Figur. Bei reduzierter Bewegung gibt es keinen Zoom.
+- **Stimmung am Bildrahmen:** grün = mag dich (Beziehung ab 30), blau = kühl (ab −20 oder Stigma-Abweisung), rot = wütend oder feindlich.
+- **Emotes** (kleine Zeichen über dem Kopf): ! bei einem Auftragsangebot, Herz bei Abgabe oder bei steigender Beziehung im Gespräch, rote Zornzeichen bei sinkender Beziehung, Tropfen bei Angst. Emotes erscheinen nur im Gespräch und bei Reaktionen.
+- **Kein Fenster bei Wut oder Angst:** Wütende, fliehende oder bedrohte Figuren antworten nur mit Sprechblase, Abwehrgeste und Emote.
+- Debug-Gruppe „Darstellung & Regie“ → „Dialoge“: Story-Fenster, alle Emotes, verängstigte Figur ansprechen.
