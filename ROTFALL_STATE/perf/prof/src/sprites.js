@@ -679,7 +679,7 @@ function varyDrape(s, seed, t) {
   const h = mixH(seed, 0x5a17), dead = s.sp === 'skeleton' || s.face === 'skull', gob = s.sp === 'goblin';
   if (s.hooded && !s.hd) s.hd = (dead || gob ? ['', 'spitz', 'weit', ''] : ['', 'spitz', 'weit', 'gugel', ''])[h % (dead || gob ? 4 : 5)];
   if (s.cloak && !s.cw && !s.capeL) { const P = (s.wear | 0) >= 2 || dead ? ['zerfetzt', 'zerfetzt', '', 'lang'] : ['', 'schulter', 'halb', 'lang', 'zerfetzt', ''];
-    s.cw = P[(h >> 5) % P.length]; if (s.cw === 'zerfetzt' && (h >> 9) % 2) s.cfr = 1; }
+    s.cw = P[(h >>> 5) % P.length]; if (s.cw === 'zerfetzt' && (h >>> 9) % 2) s.cfr = 1; }
 }
 
 // S14 (Nutzer: „wer große Waffen trägt, soll auch so aussehen“): Zweihänder, Hämmer, große Äxte, Stangenwaffen → breiter, muskulöser

@@ -318,10 +318,16 @@ function renderLog() {
 // ---------------- Kontextpanel ----------------
 // Einwohner = wer tatsächlich dort lebt (Bewohner, Wachen, Figuren mit Namen) — nicht mehr die abstrakte Marktgröße,
 // die in Nordfurt 90 zeigte, während 22 Menschen zu sehen waren.
-function townHeads(key) {
-  let n = 0;
+/* PERF-S: das Infofeld läuft alle 180 ms; teure Zählungen über alle ~17 000 Einträge der Welt höchstens alle 1,5 s neu */
+const CTX_MEMO = new Map();
+const ctxMemo = (k, ms, f) => { const t = performance.now(), m = CTX_MEMO.get(k); if (m && t - m[0] < ms && t >= m[0]) return m[1]; const v = f(); CTX_MEMO.set(k, [t, v]); return v; };
+function townHeads(key) { return ctxMemo('heads:' + key, 1500, () => townHeadsNow(key)); }
+function townHeadsNow(key) {
+  let n = 0; const ar = TOWN_PLAN[key]?.area;
+  /* PERF-S: townAt nur, wenn der Anker im Gebiet dieser Stadt liegt (sonst kann townAt nie key liefern) — gleiches Ergebnis, ohne 1000× alle Städte durchzugehen */
+  const inA = (x, y) => !ar || (x >= ar[0] && x <= ar[2] && y >= ar[1] && y <= ar[3]);
   for (const c of S.ents.world) if (c.kind === 'npc' && c.alive && !S.party.includes(c.id)
-    && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && !c.escort && !c.escortLost && c.anchor && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;   // Karawanenwachen sind Reisende
+    && (c.homeTown === key || c.post === key || (!c.villager && !c.guard && !c.escort && !c.escortLost && c.anchor && inA(c.anchor.x / TS | 0, c.anchor.y / TS | 0) && townAt(c.anchor.x / TS | 0, c.anchor.y / TS | 0) === key))) n++;   // Karawanenwachen sind Reisende
   return n;
 }
 // S14: Haus, in dem oder direkt vor dessen Tür der Held steht — Name und Zweck je Typ
@@ -366,7 +372,7 @@ export function renderContext(target) {
     }
     const hb = houseHere(tx, ty);                                        // S14 (Nutzer, §20/§47): Gebäude-Infos im Infofeld
     if (hb) {
-      const [nm, what] = HOUSE_INFO[hb.type] || ['Gebäude', ''], who = S.ents[hb.map || 'world'].filter(e => e.kind === 'npc' && e.alive && e.homeId === hb.id);
+      const [nm, what] = HOUSE_INFO[hb.type] || ['Gebäude', ''], who = ctxMemo('who:' + hb.id, 1500, () => S.ents[hb.map || 'world'].filter(e => e.kind === 'npc' && e.alive && e.homeId === hb.id));
       h += `<div class="ctx-block"><div class="ctx-sub">Gebäude</div><div class="ctx-line"><span>${nm}</span><b>${['gepflegt', 'abgenutzt', 'verlassen'][wearOf(hb)] || ''}</b></div>`
         + (what ? `<div class="ctx-line q-sub"><span>${what}</span></div>` : '')
         + (who.length ? `<div class="ctx-line"><span>Hier wohnen</span><b>${who.slice(0, 3).map(e => e.name).join(', ')}${who.length > 3 ? ` +${who.length - 3}` : ''}</b></div>` : '') + '</div>';
@@ -385,9 +391,10 @@ export function renderContext(target) {
           + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
-    box.innerHTML = h;
+    if (box.__h !== h) { box.innerHTML = h; box.__h = h; }   /* PERF-S: DOM nur bei Änderung schreiben */
     return;
   }
+  box.__h = null;
   if (target.kind === 'caravan') {
     box.innerHTML = `<div class="ctx-head">${target.name}</div><div class="ctx-sub">Eren — Nordfurt</div>
       ${bar('Zustand', target.hp, target.maxHp, 'hp')}
@@ -536,7 +543,7 @@ export function toast(text, ms = 2200) {
 export function setPrompt(text) {
   const p = $('prompt');
   if (!text) { p.classList.add('hidden'); return; }
-  p.innerHTML = text; p.classList.remove('hidden');
+  if (p.__t !== text) { p.innerHTML = text; p.__t = text; } p.classList.remove('hidden');   /* PERF-S: DOM nur bei Änderung */
 }
 
 // ---------------- Modale ----------------

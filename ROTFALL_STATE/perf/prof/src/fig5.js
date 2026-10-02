@@ -365,7 +365,7 @@ function looks(L) {
   const hemRow = L.robe ? 44 : ({ 35: 28, 39: 32, 44: 37 }[L.hem] ?? (L.cloak || L.hooded ? 33 : 29));
   const helmet = L.helm === 'great' || L.helm === 'bascinet' || XHELM.has(L.helm);
   const hood = !!L.hooded && !helmet && L.helm !== 'wide' && L.helm !== 'hat' && L.helm !== 'toque';
-  return { bone, gob, coat, sleeve: metalArm ? L.armorR : coat, sleeveMat: metalArm ? 'metal' : 'cloth', hand: L.glove || L.skin,
+  return { bone, gob, coat, cw: L.cloak ? L.cw || '' : '', hd: hood ? L.hd || '' : '', sleeve: metalArm ? L.armorR : coat, sleeveMat: metalArm ? 'metal' : 'cloth', hand: L.glove || L.skin,
     pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
 }
 
@@ -391,6 +391,49 @@ function bootS(C, pid, [fx, fy], out, bare) {
   C.poly(pid, [[fx - 2 - b, fy - 1 - b * 2], [fx + 2 + b, fy - 1 - b * 2], [fx + 2 + b + (out > 0 ? 1 : 0), fy + 5], [fx - 2 - b - (out < 0 ? 1 : 0), fy + 5]]);
 }
 
+// ---- Umhänge und Kapuzen (Artist 02.10., Entwickler: „coolere Umhänge und Kapuzen, nur eine Form ist lahm“) ----
+// X.cw Umhangform: '' Standard, zerfetzt, pelzkragen, schulter (Pelerine), lang, halb (über eine Schulter), wappen (Rückenwappen).
+// R.cs ist der Schwung der Laufpose (Sekundärbewegung): lange und zerfetzte Umhänge schwingen stärker nach. Kein Zufall, nur Pose und Hash.
+const CSW = { lang: 1.8, wappen: 1.6, zerfetzt: 2, halb: 1.4, schulter: 1, pelzkragen: 1.3 };
+function cloakSN(C, L, X, R, top, by, back) {
+  const cw = X.cw, cs = R.cs * (CSW[cw] || 1), sh = X.sh, base = L.capeL ? 46 : Math.min(46, Math.max(X.hemRow + 4, 38) + by);
+  const p = C.part(L.cloak, 'cloth', { grp: 'cloak', folds: back || cw === 'lang' || cw === 'wappen' });
+  const std = (x0, x1, hem, seed, depth, fl) => [[x0 + 1, top], [x1 - 1, top], [x1 + 1, top + 7], [x1 + 1 + fl + cs * 0.5, hem], ...rag(x1 + 1 + fl + cs, x0 - fl - cs * 0.5, hem, seed, depth), [x0 - fl - cs * 0.5, hem], [x0, top + 7]];
+  const xl = 9 - sh, xr = (back ? 22 : 23) + sh;
+  if (cw === 'lang' || cw === 'wappen') C.poly(p, std(xl - 1, xr + 1, cw === 'lang' ? 46 : 45, 7, cw === 'lang' ? 1 : 0.6, 1.5));
+  else if (cw === 'zerfetzt') C.poly(p, std(xl, xr, Math.min(46, base + 2), 31, 5, 0.5));
+  else if (cw === 'schulter') { const hem = top + 12 + (back ? 1 : 0); C.poly(p, [[xl + 1, top - 1], [xr - 1, top - 1], [xr + 1.5, top + 3], [xr + 2 + cs * 0.3, hem], ...rag(xr + 2 + cs * 0.5, xl - 2 - cs * 0.3, hem, 19, 1.2), [xl - 2 - cs * 0.3, hem], [xl - 1.5, top + 3]]); }
+  else if (cw === 'halb') { if (back) C.poly(p, [[xl + 1, top], [xr - 1, top], [xr + 1, top + 7], [xr + 1 + cs * 0.5, base], ...rag(xr + 1 + cs * 0.5, 16, base, 41, 1.5), [16, base - 1], [xl, top + 10], [xl, top + 3]]);
+    else C.poly(p, [[xl + 1, top], [14, top], [13, top + 7], [12.5, base - 1], [xl - cs * 0.5, base], [xl, top + 7]]); }
+  else C.poly(p, std(xl - (cw === 'pelzkragen' ? 0.5 : 0), xr + (cw === 'pelzkragen' ? 0.5 : 0), base, 7, 2, 0));
+  return p;
+}
+// Teile über den Armen: Pelerine (schulter), Überwurf (halb, vorn über die rechte Schulter)
+function cloakFrontSN(C, L, X, R, top, back) {
+  const sh = X.sh, cs = R.cs;
+  if (X.cw === 'schulter') { const m = C.part(L.cloak, 'cloth', { grp: 'cloakF' }); C.poly(m, [[11, top - 1], [21, top - 1], [23.5 + sh, top + 2], [24 + sh + cs * 0.3, top + 7], ...rag(24 + sh, 8 - sh, top + 7, 29, 1.4), [8 - sh - cs * 0.3, top + 7], [8.5 - sh, top + 2]]); return m; }
+  if (X.cw === 'halb') { const m = C.part(L.cloak, 'cloth', { grp: 'cloakF' });
+    if (back) C.poly(m, [[16, top - 1], [21, top - 1], [23.5 + sh, top + 2], [24 + sh + cs * 0.3, top + 9], [19, top + 5]]);
+    else C.poly(m, [[11, top - 1], [16.5, top - 1], [15, top + 3], [11.5, top + 8], [8 - sh - cs * 0.3, top + 9], [8.5 - sh, top + 2]]); return m; }
+  return -1;
+}
+// Kapuzenkragen (über den Schultern) je Kapuzenform
+function hoodMantleSN(C, L, X, R, top) {
+  const sh = X.sh, hd = X.hd, m = C.part(L.hood, hd === 'kette' ? 'metal' : 'cloth', { grp: 'hood' });
+  if (hd === 'weit') C.poly(m, [[11, top - 1], [21, top - 1], [24 + sh, top + 3], ...rag(24 + sh, 8 - sh, top + 4, 5, 1.4), [8 - sh, top + 3]]);
+  else if (hd === 'gugel') C.poly(m, [[12, top - 1], [20, top - 1], [23 + sh, top + 2], [23.5 + sh + R.cs * 0.3, top + 5], ...dag(23.5 + sh, 8.5 - sh, top + 5, 2), [8.5 - sh - R.cs * 0.3, top + 5], [9 - sh, top + 2]]);
+  else if (hd === 'kette') C.poly(m, [[12, top - 1], [20, top - 1], [22 + sh, top + 2], [22 + sh, top + 3], [10 - sh, top + 3], [10 - sh, top + 2]]);
+  else if (hd === 'maske') C.poly(m, [[12, top - 1], [20, top - 1], [21.5 + sh, top + 1.5], ...rag(21.5 + sh, 10.5 - sh, top + 2, 5, 1), [10.5 - sh, top + 1.5]]);
+  else C.poly(m, [[12, top - 1], [20, top - 1], [22.5 + sh, top + 2], ...rag(22.5 + sh, 9.5 - sh, top + 3, 5, 1.2), [9.5 - sh, top + 2]]);
+  return m;
+}
+// Zaddeln: Rechteckzacken (Gugel)
+function dag(xa, xb, y, d) {
+  const pts = [], n = Math.max(2, Math.round(Math.abs(xb - xa) / 2));
+  for (let i = 0; i < n; i++) { const a = xa + (xb - xa) * i / n, b = xa + (xb - xa) * (i + 1) / n; if (i % 2 === 0) pts.push([a, y + d], [b, y + d]); else pts.push([a, y], [b, y]); }
+  return pts;
+}
+
 // ---- Vorder- und Rückansicht ----
 function paintSN(C, L, R, back, plan, W, pose) {
   const X = looks(L), by = R.by, hy = R.hy + by, hx = R.hx, top = 13 + by, waist = 24 + by, meta = { behind: false, limbs: {} };
@@ -414,10 +457,10 @@ function paintSN(C, L, R, back, plan, W, pose) {
   // 1 Umhang hinten (vorn sichtbar an den Seiten)
   const cloakHem = L.capeL ? 46 : Math.min(46, Math.max(X.hemRow + 4, 38) + by);
   const cloakPts = (x0, x1) => [[x0 + 1, top], [x1 - 1, top], [x1 + 1, top + 7], [x1 + 1 + R.cs * 0.5, cloakHem], ...rag(x1 + 1 + R.cs, x0 - R.cs * 0.5, cloakHem, 7, 2), [x0 - R.cs * 0.5, cloakHem], [x0, top + 7]];
-  if (L.cloak && !back) C.poly(C.part(L.cloak, 'cloth', { grp: 'cloak' }), L.capeL ? cloakPts(7 - X.sh, 25 + X.sh) : cloakPts(9 - X.sh, 23 + X.sh));
+  const ids = {};
+  if (L.cloak && !back) { if (L.capeL && !X.cw) C.poly(ids.cloak = C.part(L.cloak, 'cloth', { grp: 'cloak' }), cloakPts(7 - X.sh, 25 + X.sh)); else ids.cloak = cloakSN(C, L, X, R, top, by, false); }
   if (L.quiver && !back) { const q = C.part(L.leather, 'leather'); C.poly(q, [[20, 6 + by], [22, 5 + by], [23.5, 13 + by], [21.5, 14 + by]]); meta.quiverTop = [21, 5 + by]; }
   if (L.pack && !back) C.rect(C.part(L.wood ? dimR(L.leather, 0.1) : L.leather, 'cloth'), 11, 10 + by, 20, 12 + by);
-  const ids = {};
   for (const [k, a] of [['L', aL], ['R', aR]]) if (armBehind(a)) { const M3 = mechArm(L, (k === 'L') !== back ? 'rarm' : 'larm', X); ids['arm' + k] = C.part(dimR(M3.s, 0.2), M3.m, { grp: 'arm' + k }); ids['hand' + k] = C.part(dimR(M3.h, 0.2), M3.hm); arm(C, ids['arm' + k], ids['hand' + k], a, X.bone ? 2 : 3, M3.h, X.bone); }
   // 2 Beine und Stiefel
   const walkBack = R.lL[2]?.[1] < 40.5 ? 'L' : R.lR[2]?.[1] < 40.5 ? 'R' : '';
@@ -459,7 +502,7 @@ function paintSN(C, L, R, back, plan, W, pose) {
     ids.tassets = [tl, tr]; }
   if (X.ab >= 3 && !back) { const pk = C.part(L.leather, 'leather'); C.rect(pk, 11 - X.wa, waist, 12 - X.wa, waist + 2); C.rect(pk, 19 + X.wa, waist, 20 + X.wa, waist + 2); }
   // Rückansicht: Umhang über dem Rücken, Köcher, Rucksack
-  if (back && L.cloak) C.poly(C.part(L.cloak, 'cloth', { folds: true }), cloakPts(9 - X.sh, 22 + X.sh));
+  if (back && L.cloak) ids.cloak = cloakSN(C, L, X, R, top, by, true);
   if (back && L.quiver) { const q = C.part(L.leather, 'leather'); C.poly(q, [[19, 6 + by], [21, 5 + by], [14, 27 + by], [12, 26 + by]]); meta.quiverTop = [20, 5 + by]; }
   if (hasSil(L, 'boiler') && back) boiler(C, L, top, 'N');
   if (back && L.pack) { const pk = C.part(L.leather, 'leather'); C.rect(pk, 11, top + 1, 20, top + 11); C.rect(C.part(dimR(L.cloth, 0.05), 'cloth'), 11, top - 1, 20, top); ids.pack = pk; }
@@ -475,10 +518,11 @@ function paintSN(C, L, R, back, plan, W, pose) {
     const nL = L.asy ? (back ? 0 : PB) : PB, nR = L.asy ? (back ? PB : 0) : PB;   // asymmetrisch: eine riesige, eine kleine Schulter
     const po = Math.min(X.sh, 5); C.rows(pl, top - 1 - nL, shape(nL), -po); C.rows(pr, top - 1 - nR, shape(nR).map(([a, b]) => [31 - b, 31 - a]), po); ids.pauld = [pl, pr]; }
   if (!L.furR && X.ab >= 4 && L.cloak && !X.hood) { const m = C.part(L.cloak, 'cloth', { grp: 'mantleC' }); C.poly(m, [[10 - X.sh, top + 1], [12, top - 2], [20, top - 2], [22 + X.sh, top + 1], ...rag(22 + X.sh, 10 - X.sh, top + 3, 23, 1.8), [10 - X.sh, top + 3]]); }   // S15 P1: schwerer Stoffkragen über den Schultern (Referenz 6)
-  if (L.furR) { const f = C.part(L.furR, 'cloth', { grp: 'fur' }); C.poly(f, [[10 - X.sh, top + 1], [12, top - 2], [20, top - 2], [22 + X.sh, top + 1], ...rag(22 + X.sh, 10 - X.sh, top + 2, 17, 1.6), [10 - X.sh, top + 2]]); ids.fur = f; }   // Pelzkragen
+  if (L.cloak && !X.hood) { const m = cloakFrontSN(C, L, X, R, top, back); if (m >= 0) ids.cloakF = m; }
+  if (L.furR) { const f = C.part(L.furR, 'cloth', { grp: 'fur' }), fd = X.cw === 'pelzkragen' ? 1.5 : 0; C.poly(f, [[10 - X.sh - fd, top + 1], [12 - fd * 0.5, top - 2 - fd * 0.5], [20 + fd * 0.5, top - 2 - fd * 0.5], [22 + X.sh + fd, top + 1], ...rag(22 + X.sh + fd, 10 - X.sh - fd, top + 2 + fd, 17, 1.6 + fd), [10 - X.sh - fd, top + 2 + fd]]); ids.fur = f; }   // Pelzkragen (Pelzmantel: breiter, zottiger)
   if (L.gg && !X.hood) { const g = C.part(L.armorR || L.metal, 'metal'); C.rows(g, top - 2, X.ab >= 3 ? [[12, 19], [11, 20], [11, 20]] : [[13, 18], [12, 19]]); ids.gorget = g; }   // Halsberge
   // 9 Kapuzenkragen / Schulterumhang / Halstuch
-  if (X.hood) { const m = C.part(L.hood, 'cloth', { grp: 'hood' }); C.poly(m, [[12, top - 1], [20, top - 1], [22.5 + X.sh, top + 2], ...rag(22.5 + X.sh, 9.5 - X.sh, top + 3, 5, 1.2), [9.5 - X.sh, top + 2]]); ids.mantle = m; }
+  if (X.hood) { if (L.cloak) { const m = cloakFrontSN(C, L, X, R, top, back); if (m >= 0) ids.cloakF = m; } ids.mantle = hoodMantleSN(C, L, X, R, top); }
   else if (L.capeR && !X.helmet) { const m = C.part(L.capeR, 'cloth'); C.poly(m, [[11, top - 1], [21, top - 1], [23 + X.sh, top + 3], [23 + X.sh + R.cs * 0.3, top + 6], ...rag(23 + X.sh, 9 - X.sh, top + 6, 13, 1.5), [9 - X.sh - R.cs * 0.3, top + 6], [9 - X.sh, top + 3]]); ids.mantle = m; }
   else if (L.scarf && L.face !== 'cloth') { const m = C.part(L.scarf, 'cloth'); C.rows(m, top - 1, [[13, 18], [12, 19]]); ids.collar = m; }
   // 10 Kopf
@@ -506,10 +550,26 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
   const y0 = 5 + hy, gob = X.gob;
   meta.eyeY = y0 + 4;
   C.rect(C.part(L.skin, 'skin', { grp: 'head' }), 15 + hx, y0 + 7, 16 + hx, y0 + 8);          // Hals
+  if (X.hood && X.hd === 'kette') {                                  /* Artist 02.10.: Kettenhaube — Gesicht frei, Ringgeflecht um Kopf, Kinn und Hals */
+    const sk = C.part(L.skin, 'skin', { grp: 'head' }); C.rows(sk, y0, [[14, 17], [13, 18], [13, 18], [13, 18], [13, 18], [13, 18], [14, 17], [14, 17]], hx);
+    const hd = C.part(L.hood, 'metal', { grp: 'hood' });
+    if (back) C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
+    else { C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19]], hx); for (let y = y0 + 1; y <= y0 + 6; y++) { C.rect(hd, 12 + hx, y, 13 + hx, y); C.rect(hd, 18 + hx, y, 19 + hx, y); }
+      C.rows(hd, y0 + 7, [[12, 19], [12, 19], [13, 18]], hx); }
+    ids.head = sk; ids.hood = hd; return;
+  }
   if (X.hood) {
-    const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
-    C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
-    if (!back) { const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[14, 17], [13, 18], [13, 18], [13, 18], [14, 17]], hx); ids.face = f; }
+    const hd = C.part(L.hood, 'cloth', { grp: 'hood' }), H = X.hd;
+    if (H === 'weit') C.rows(hd, y0 - 2, [[13, 18], [12, 19], [11, 20], [11, 20], [11, 20], [11, 20], [11, 20], [11, 20], [11, 20], [11, 20], [12, 19], [12, 19]], hx);
+    else if (H === 'maske') C.rows(hd, y0 - 2, [[14, 17], [13, 18], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
+    else C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
+    if (H === 'spitz') C.rows(hd, y0 - 6, [[15, 16], [15, 16], [14, 17], [14, 17]], hx);                       /* Zipfel steht auf */
+    if (H === 'gugel' && back) { C.rows(hd, y0 + 9, [[15, 16], [15, 16], [15, 16], [15, 16], [15, 16], [15, 16], [15, 16], [15, 16], [15, 16], [16, 16], [16, 16], [16, 16], [16, 16], [16, 16], [15, 16]], hx); }   /* langer Zipfel den Rücken hinab */
+    if (H === 'gugel' && !back) C.rows(hd, y0 + 9, [[19, 20], [20, 21], [20, 21], [20, 21], [20, 21], [20, 21], [21, 21], [21, 21], [21, 21], [20, 21]], hx);   /* Zipfel über die Schulter nach vorn */
+    if (!back) { const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true });
+      if (H === 'weit') C.rows(f, y0 + 3, [[14, 17], [13, 18], [13, 18], [13, 18], [14, 17]], hx);             /* tiefer Schatten, Gesicht weiter hinten */
+      else C.rows(f, y0 + 2, [[14, 17], [13, 18], [13, 18], [13, 18], [14, 17]], hx);
+      ids.face = f; }
     if (gob) { const ear = C.part(L.skin, 'skin'); C.poly(ear, [[12.5 + hx, y0 + 3], [8 + hx, y0 + 1], [9 + hx, y0 + 3], [12.5 + hx, y0 + 5]]); C.poly(ear, [[19.5 + hx, y0 + 3], [24 + hx, y0 + 1], [23 + hx, y0 + 3], [19.5 + hx, y0 + 5]]); }   /* Artist Runde 2: Goblinohren ragen aus der Kapuze (Silhouette) */
     ids.hood = hd; return;
   }
@@ -558,6 +618,17 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
   if (L.face === 'cloth' && L.scarf && !back) ids.mouth = true;
 }
 
+// Umhang seitlich hinter dem Körper, schwingt nach (R.cs); Formen wie vorn
+function cloakW(C, L, X, R, top, ln, hem0) {
+  const cw = X.cw, cs = R.cs * (1 + ((CSW[cw] || 1) - 1) * 0.6), p = C.part(L.cloak, 'cloth', { grp: 'cloak', folds: true });
+  if (cw === 'lang' || cw === 'wappen') C.poly(p, [[16 + ln, top - 1], [19 + ln, top], [21.5 + ln + cs * 0.6, top + 8], [23 + cs, 46], ...rag(23 + cs, 12.5 + cs * 0.5, 46, 9, cw === 'lang' ? 1 : 0.6), [12.5 + cs * 0.5, 45], [15 + ln, top + 10]]);
+  else if (cw === 'zerfetzt') { const h = Math.min(46, hem0 + 2); C.poly(p, [[16 + ln, top - 1], [19 + ln, top], [21 + ln + cs * 0.5, top + 8], [22 + cs, h], ...rag(22 + cs, 13 + cs * 0.5, h, 33, 5), [13 + cs * 0.5, h - 1], [15 + ln, top + 10]]); }
+  else if (cw === 'schulter') C.poly(p, [[15 + ln, top - 1], [19 + ln, top - 1], [21 + ln + cs * 0.4, top + 5], [21.5 + ln + cs * 0.6, top + 12], ...rag(21.5 + ln + cs * 0.6, 13 + ln, top + 12, 19, 1.2), [13 + ln, top + 10]]);
+  else if (cw === 'halb') C.poly(p, [[16 + ln, top - 1], [19 + ln, top], [21 + ln + cs * 0.5, top + 8], [22 + cs, hem0], ...rag(22 + cs, 17.5 + cs * 0.5, hem0, 9, 2), [16 + cs * 0.3, top + 15], [15 + ln, top + 10]]);
+  else C.poly(p, [[16 + ln, top - 1], [19 + ln, top], [21 + ln + cs * 0.5, top + 8], [22 + cs, hem0], ...rag(22 + cs, 13 + cs * 0.5, hem0, 9, 2), [13 + cs * 0.5, hem0 - 1], [15 + ln, top + 10]]);
+  return p;
+}
+
 // ---- Seitenansicht (Blick nach links; E wird gespiegelt) ----
 function paintW(C, L, R, plan, W, pose) {
   const X = looks(L), by = R.by, ln = R.lean, top = 13 + by, waist = 24 + by, meta = { behind: false, limbs: {} };
@@ -572,7 +643,7 @@ function paintW(C, L, R, plan, W, pose) {
   if (hasSil(L, 'boiler')) boiler(C, L, top, 'W');
   // 1 Umhang hinten, schwingt nach
   const cloakHem = L.capeL ? 46 : Math.min(46, Math.max(X.hemRow + 4, 38) + by), cs = R.cs;
-  if (L.cloak) C.poly(C.part(L.cloak, 'cloth', { grp: 'cloak', folds: true }), [[16 + ln, top - 1], [19 + ln, top], [21 + ln + cs * 0.5, top + 8], [22 + cs, cloakHem], ...rag(22 + cs, 13 + cs * 0.5, cloakHem, 9, 2), [13 + cs * 0.5, cloakHem - 1], [15 + ln, top + 10]]);
+  if (L.cloak) ids.cloak = cloakW(C, L, X, R, top, ln, cloakHem);
   // 2 ferner Arm, fernes Bein
   const far = 0.28, MF = mechArm(L, 'larm', X), farArm = C.part(dimR(MF.s, far), MF.m, { grp: 'armF' }), farHand = C.part(dimR(MF.h, far), MF.hm);
   arm(C, farArm, farHand, sh(aF, ln), X.aw, MF.h, X.bone); meta.limbs.larm = aF[1];
@@ -613,10 +684,15 @@ function paintW(C, L, R, plan, W, pose) {
   arm(C, nArm, nHand, sh(aN, ln), X.aw, MN.h, X.bone); ids.armL = nArm; ids.handL = nHand; meta.limbs.rarm = aN[1]; meta.arms = [[nArm, sh(aN, ln)]];
   if (L.pauldR || L.armor === 'plate' || L.pb) { const PB = L.asy ? 0 : L.pb | 0, pp = C.part(L.pauldR || L.armorR, 'metal');
     C.rows(pp, top - 1 - PB, (PB === 2 ? [[14, 18], [12, 19], [11, 19], [11, 19], [12, 19], [12, 18], [13, 17]] : PB === 1 ? [[14, 17], [12, 19], [12, 19], [12, 18], [13, 17]] : [[14, 17], [13, 18], [13, 18], [14, 17]]).map(([a, b]) => [a - (X.sh >> 1), b + (X.sh >> 1)]), ln); ids.pauld = [pp]; }
-  if (L.furR) { const f = C.part(L.furR, 'cloth', { grp: 'fur' }); C.rows(f, top - 2, [[13, 19], [12, 20], [12, 20]], ln); ids.fur = f; }
+  if (L.cloak && X.cw === 'schulter') { const m = C.part(L.cloak, 'cloth', { grp: 'cloakF' }); C.poly(m, [[13 + ln, top - 1], [19 + ln, top - 1], [20.5 + ln + cs * 0.4, top + 5], [20.5 + ln + cs * 0.5, top + 8], ...rag(20.5 + ln + cs * 0.5, 12 + ln, top + 8, 29, 1.2), [12 + ln, top + 6], [12.5 + ln, top + 1]]); ids.cloakF = m; }   /* Artist 02.10.: Pelerine über dem nahen Arm */
+  if (L.furR) { const f = C.part(L.furR, 'cloth', { grp: 'fur' }); C.rows(f, top - 2, X.cw === 'pelzkragen' ? [[13, 19], [12, 20], [11, 21], [11, 21], [12, 20]] : [[13, 19], [12, 20], [12, 20]], ln); ids.fur = f; }
   if (L.gg && !X.hood) C.rows(C.part(L.armorR || L.metal, 'metal'), top - 2, [[14, 17]], ln);
   // 8 Kragen/Umhang
-  if (X.hood) C.poly(C.part(L.hood, 'cloth', { grp: 'hood' }), [[14 + ln, top - 1], [19 + ln, top - 1], [21 + ln + cs * 0.3, top + 3], ...rag(21 + ln + cs * 0.3, 12.5 + ln, top + 3, 5, 1.2), [12.5 + ln, top + 1]]);
+  if (X.hood) { const H = X.hd, m = C.part(L.hood, H === 'kette' ? 'metal' : 'cloth', { grp: 'hood' }); ids.mantle = m;
+    if (H === 'weit') C.poly(m, [[13.5 + ln, top - 1], [19.5 + ln, top - 1], [22 + ln + cs * 0.3, top + 4], ...rag(22 + ln + cs * 0.3, 11.5 + ln, top + 4, 5, 1.4), [11.5 + ln, top + 1]]);
+    else if (H === 'gugel') C.poly(m, [[14 + ln, top - 1], [19 + ln, top - 1], [21.5 + ln + cs * 0.3, top + 5], ...dag(21.5 + ln + cs * 0.3, 12 + ln, top + 5, 2), [12 + ln, top + 1]]);
+    else if (H === 'kette') C.poly(m, [[14 + ln, top - 1], [19 + ln, top - 1], [20.5 + ln, top + 3], [12.5 + ln, top + 3], [12.5 + ln, top + 1]]);
+    else C.poly(m, [[14 + ln, top - 1], [19 + ln, top - 1], [21 + ln + cs * 0.3, top + 3], ...rag(21 + ln + cs * 0.3, 12.5 + ln, top + 3, 5, 1.2), [12.5 + ln, top + 1]]); }
   else if (L.capeR && !X.helmet) C.poly(C.part(L.capeR, 'cloth'), [[14 + ln, top - 1], [19 + ln, top - 1], [21.5 + cs * 0.6, top + 6], ...rag(21.5 + cs * 0.6, 13 + ln, top + 6, 13, 1.5), [13 + ln, top + 2]]);
   else if (L.scarf && L.face !== 'cloth') C.rows(C.part(L.scarf, 'cloth'), top - 1, [[14, 18], [13, 18]], ln);
   // 9 Kopf
@@ -638,10 +714,20 @@ function headW(C, L, X, hx, hy, ids, meta) {
   const y0 = 5 + hy, gob = X.gob;
   meta.eyeY = y0 + 4;
   C.rect(C.part(L.skin, 'skin', { grp: 'head' }), 15 + hx, y0 + 7, 16 + hx, y0 + 8);
+  if (X.hood && X.hd === 'kette') {                                  /* Artist 02.10.: Kettenhaube seitlich, Gesicht frei */
+    const sk = C.part(L.skin, 'skin', { grp: 'head' }); C.rows(sk, y0, [[14, 17], [13, 18], [13, 18], [13, 18], [12, 18], [13, 18], [13, 17], [14, 17]], hx);
+    const hd = C.part(L.hood, 'metal', { grp: 'hood' }); C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [16, 19], [16, 19], [16, 19], [16, 19], [16, 19], [16, 19], [12, 19], [12, 19], [13, 19]], hx);
+    ids.head = sk; ids.hood = hd; return;
+  }
   if (X.hood) {
-    const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
-    C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 19], [13, 19], [14, 18]], hx);
-    const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[12, 14], [12, 15], [12, 15], [12, 14], [13, 14]], hx);
+    const hd = C.part(L.hood, 'cloth', { grp: 'hood' }), H = X.hd;
+    if (H === 'weit') C.rows(hd, y0 - 2, [[14, 18], [12, 19], [11, 19], [10, 19], [10, 19], [10, 19], [11, 19], [11, 19], [11, 19], [12, 19], [13, 19], [14, 18]], hx);
+    else C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 19], [13, 19], [14, 18]], hx);
+    if (H === 'spitz') C.rows(hd, y0 - 6, [[18, 19], [17, 19], [15, 18], [14, 18]], hx);                    /* Zipfel kippt nach hinten */
+    if (H === 'gugel') C.rows(hd, y0 + 5, [[19, 20], [19, 20], [20, 21], [20, 21], [20, 21], [20, 21], [20, 21], [21, 22], [21, 22], [21, 22], [21, 22], [22, 22], [22, 22], [22, 22], [22, 23]], hx);   /* Zipfel hängt den Rücken hinab */
+    const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true });
+    if (H === 'weit') C.rows(f, y0 + 3, [[11, 13], [11, 14], [11, 14], [12, 14], [12, 13]], hx);
+    else C.rows(f, y0 + 2, [[12, 14], [12, 15], [12, 15], [12, 14], [13, 14]], hx);
     if (gob) C.poly(C.part(L.skin, 'skin'), [[18.5 + hx, y0 + 3], [23 + hx, y0], [22 + hx, y0 + 3], [18.5 + hx, y0 + 5]]);   /* Artist Runde 2: Goblinohr aus der Kapuze */
     ids.face = f; ids.hood = hd; return;
   }
@@ -803,6 +889,7 @@ function details(C, L, R, view, M, pose) {
       if ((x + (L.wseed | 0)) % 3 !== 0) continue; const len = 3 + ((hsh(x, pid) * 4) | 0);
       for (let k = 1; k <= len; k++) { const i = (y - k) * C.w + x; if (C.id[i] !== pid) break; C.col[i] = Rr.sh; if (k === len && C.id[i - 1] === pid) C.col[i - 1] = mix(Rr.b, Rr.hi, 0.5); } }
   }
+  drape(C, L, M, view);
   // Rippen (Skelett ohne Rüstung)
   if (I.ribs) for (let y = M.top + 1; y <= M.top + 7; y += 2) for (let x = side ? 14 : 12; x <= (side ? 17 : 19); x++) C.on(I.torso, x, y, VOID);
   // Beinwickel, Stiefelstulpe
@@ -815,6 +902,39 @@ function details(C, L, R, view, M, pose) {
   variants(C, L, M, view);
   endgame(C, L, M, view);
   for (const [x, y] of STUMPS) { C.set(x, y, '#6e1410'); C.set(x - 1, y, '#4a0c0a'); C.set(x, y + 1, '#8a1c14'); C.set(x + 1, y + 1, '#3a0a08'); }
+}
+
+// Artist 02.10. (Entwickler: „coolere Umhänge und Kapuzen“): Futter an der Innenkante, Borte am Saum, Fransen, Löcher im Fetzenmantel,
+// Rückenwappen, Fibel an der Brust, Ringgeflecht der Kettenhaube, Zaddelborte der Gugel. Alles fest aus Form und Hash, kein Zufall.
+function drape(C, L, M, view) {
+  const I = M.ids, X = M.X, side = view === 'W', back = view === 'N', W = C.w, top = M.top, cl = L.cloak;
+  const each = (pid, fn) => { if (pid === undefined || pid < 0) return; for (let i = 0; i < C.col.length; i++) if (C.id[i] === pid) fn(i % W - C.dx, ((i / W) | 0) - C.dy, i); };
+  const lowOf = pid => { const low = new Map(); each(pid, (x, y) => { if (!low.has(x) || y > low.get(x)) low.set(x, y); }); return low; };
+  const free = (x, y) => C.at(x, y) < 0, put = (x, y, c) => { if (free(x, y)) C.set(x, y, c); };
+  if (cl && I.cloak !== undefined && I.cloak >= 0) {
+    const pid = I.cloak, low = lowOf(pid);
+    if (L.clnR && !back) { const F = L.clnR;                                            // Futter: Innenkante, seitlich auch der hochschlagende Saum
+      each(pid, (x, y, i) => { if (y < top + 8) return; const inn = side ? C.id[i - 1] !== pid : x < 16 ? C.id[i + 1] !== pid : C.id[i - 1] !== pid;
+        if (inn) C.col[i] = y % 3 ? F.b : F.sh; else if (side && y >= low.get(x) - 1 && x < 17 + M.hx) C.col[i] = F.sh; }); }
+    if (L.ctrR) { const T = L.ctrR;                                                     // Borte am Saum, hinten auch an den Kanten
+      for (const [x, y] of low) { C.on(pid, x, y, x % 2 ? T.b : T.hi); if (X.cw === 'wappen') C.on(pid, x, y - 1, T.sh); }
+      if (back) { const rows = new Map(); each(pid, (x, y) => { const r = rows.get(y); if (!r) rows.set(y, [x, x]); else { r[0] = Math.min(r[0], x); r[1] = Math.max(r[1], x); } });
+        for (const [y, [a, b]] of rows) if (y > top + 2) { C.on(pid, a, y, T.sh); C.on(pid, b, y, T.sh); } } }
+    if (back && X.cw === 'wappen') { const T = L.ctrR || L.gold, y = top + 4;              // Rückenwappen: Schild mit Winkel
+      [[13, 18], [13, 18], [13, 18], [13, 18], [14, 17], [15, 16]].forEach(([a, b], k) => { for (let x = a; x <= b; x++) C.on(pid, x, y + k, x === a ? T.hi : x === b ? T.sh : T.b); });
+      for (const [x, yy] of [[14, y + 3], [15, y + 2], [16, y + 2], [17, y + 3], [14, y + 4], [17, y + 4]]) C.on(pid, x, yy, cl.dk); }
+    if (X.cw === 'zerfetzt') { const px = []; each(pid, (x, y, i) => { if (y > top + 9 && C.id[i - 1] === pid && C.id[i + 1] === pid && C.id[i + W] === pid) px.push(i); });   // Löcher und Risse
+      for (let k = 0; k < (back ? 4 : 2) && px.length; k++) { const i = px[(hsh(k + 5, L.wseed | 0) * px.length) | 0]; C.col[i] = mix(cl.dk, '#050404', 0.4); if (C.id[i + W] === pid) C.col[i + W] = cl.dk; if (k % 2 && C.id[i + 1] === pid) C.col[i + 1] = cl.dk; } }
+    if (L.cfr) for (const [x, y] of low) if (((x + (L.wseed | 0)) & 1) === 0) { put(x, y + 1, cl.sh); if (hsh(x, 77) > 0.45) put(x, y + 2, cl.dk); }   // Fransen
+  }
+  if (I.cloakF !== undefined && L.ctrR) for (const [x, y] of lowOf(I.cloakF)) C.on(I.cloakF, x, y, x % 2 ? L.ctrR.b : L.ctrR.hi);
+  if (L.cfbR && cl && !back) { const F = L.cfbR, y = I.mantle !== undefined ? top + 1 : top;   // Fibel
+    if (side) { C.set(14 + M.hx, y, F.hi); C.set(14 + M.hx, y + 1, F.sh); }
+    else { C.set(15, y, F.hi); C.set(16, y, F.b); C.set(15, y + 1, F.b); C.set(16, y + 1, F.dk); } }
+  if (X.hd === 'kette' && L.hood) { const Mm = L.hood;                                    // Ringgeflecht
+    for (const pid of [I.hood, I.mantle]) each(pid, (x, y, i) => { const c = C.col[i]; if (c === Mm.dk || c === mix(Mm.dk, '#070506', 0.3)) return;
+      C.col[i] = ((x >> 1) + (y >> 1)) % 2 ? (y % 2 ? Mm.sh : Mm.b) : (y % 2 ? Mm.b : mix(Mm.b, Mm.hi, 0.5)); }); }
+  if (X.hd === 'gugel' && I.mantle !== undefined && L.ctrR) for (const [x, y] of lowOf(I.mantle)) C.on(I.mantle, x, y, L.ctrR.b);   // Zaddeln mit Borte
 }
 
 // S14 (Nutzer: „nicht jeder mit gleich aussehender Rüstung“): Varianten je Person (L.vs 0–7), fest aus der Spec.
@@ -847,7 +967,7 @@ function variants(C, L, M, view) {
   if (!L.armor && !L.robe && I.skirt !== undefined && v % 4 === 2) { const R = L.cloth, [x0, x1, , y1] = span(I.skirt);                         // Saumborte, Knopfleiste
     each(I.skirt, (x, y, i) => { if (y === y1 - 1) C.col[i] = mix(R.hi, R.b, 0.3); });
     if (!side && !back) for (let y = M.top + 2; y < M.waist; y += 2) C.on(I.torso, 16, y, y % 4 ? L.gold.sh : L.leather.dk); }
-  if (L.cloak && !back && !side && I.mantle === undefined) C.set(16, M.top, L.gold.hi);
+  if (L.cloak && !L.cfbR && !back && !side && I.mantle === undefined) C.set(16, M.top, L.gold.hi);
   if (L.star && !back) { const cx = side ? 14 + M.hx : 16, cy = M.top + 3, G = L.gold;                                  // Stern Omegas
     C.set(cx, cy, G.hi); for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) C.set(cx + dx, cy + dy, G.b); if (!side) { C.set(cx - 1, cy - 1, G.dk); C.set(cx + 1, cy + 1, G.dk); } }
   if (L.charm && !back) { const cx = side ? 15 + M.hx : 18; C.set(cx, M.waist + 2, '#d8d0bc'); C.set(cx, M.waist + 3, '#a89e88'); C.set(cx + 1, M.waist + 2, '#0c0a08'); }   // Knochenamulett

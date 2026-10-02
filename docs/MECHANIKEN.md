@@ -1019,3 +1019,28 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Erreichen sie die Tore (nach etwa einer Minute), marschieren aus den nächsten Valen-Städten je 4–6 Soldaten der Krone zur Burg; dort sinkt die Besatzung. Nach einer weiteren Minute sind sie da und suchen dich.
 - **Fängst du die Späher ab, kommt keine Verstärkung.**
 - Debug: „Burg-Alarm: Späher jetzt“, „Burg-Alarm: Späher kommen an (Verstärkung)“.
+
+## Geheime Orte (Scheibe 1): das Glockenmoor
+- Manche Orte stehen auf keiner Karte. Erst wenn du sie findest, erscheinen sie im Atlas; der Ort liegt in jeder Welt an derselben Stelle. Das Log zählt: „Geheimnisse gefunden: x von 8“.
+- **Glockenmoor:** Nachts bei Nebel oder Regen schlägt im Moorland eine Glocke, obwohl es dort keine Kirche gibt. Drei schiefe Glockenpfähle heißen Taufe, Hochzeit und Tod.
+- Läutest du sie in der richtigen Reihenfolge (erst die Taufe, dann die Hochzeit, zuletzt der Tod), steigt die versunkene Kapelle von Moorbach auf. Darin liegt eine Truhe mit der Glocke von Moorbach (Talisman, +3 Rüstung), dazu Orden +5. An der Wand verrät ein Blutzeichen, dass der Kult älter ist als das Königshaus.
+- Falsche Reihenfolge weckt drei Ertrunkene.
+- Ein Tipp des Ratgebers weist auf geheime Orte hin.
+- Debug: „Geheime Orte: zum Glockenmoor“, „Nebelnacht jetzt“, „zurücksetzen“.
+
+## Neue Umhänge und Kapuzen
+- **Umhangformen:** zerfetzt, Pelzkragen, Schulterumhang, Langmantel, Halbmantel, Wappenmantel. Dazu kommen Futter, Borte, Fibel, Fransen und Pelz. Lange und zerfetzte Umhänge schwingen beim Laufen nach.
+- **Kapuzenformen:** rund, spitz, weit, Kettenhaube, Maske, Gugel. Jede Kapuze schützt Vampire vor der Sonne, auch die an einen Umhang angesetzte.
+- **Neue Stücke:**
+
+| Stück | Wo |
+|---|---|
+| Wanderkapuze, Fetzenmantel, Pilgerkapuze | gewöhnliche Händler; Wanderkapuze auch bei Banditen, Fetzenmantel bei Kultisten und Wiedergängern |
+| Zaddelgugel, Wolfspelzmantel, Wappenmantel von Valen | Hagen, Kronschmiede |
+| Kettenhaube | Kettenknechte |
+| Maskenkapuze der Stillen | Basar Karak-Atar, Banditen, Blutkultisten |
+| Ölzeug-Pelerine | Plünderer der Sturmklinge |
+| Brokat-Halbmantel | Basar Karak-Atar |
+| Grabtuchmantel | selten bei Geistern |
+
+- NPCs und Gegner tragen die Formen gemischt.

@@ -173,20 +173,12 @@ export function roadPath(ax, ay, bx, by, wgt = 1) {
 const roadQueue = [];
 export function roadAsync(ax, ay, bx, by, wgt = 1) {
   const key = rkey(ax, ay, bx, by, wgt); if (roadCache.has(key)) return roadCache.get(key);
-  if (!roadQueue.some(j => j.key === key)) { roadQueue.push({ key, args: [ax, ay, bx, by, wgt, key], it: null }); idleRoads(); }
+  if (!roadQueue.some(j => j.key === key)) roadQueue.push({ key, args: [ax, ay, bx, by, wgt, key], it: null });
   return undefined;                                                                   // noch in Arbeit
 }
-const roadStep = () => { const J = roadQueue[0]; J.it ||= roadSearch(...J.args); if (J.it.next().done) roadQueue.shift(); };
 export function pumpRoads(ms = 1.5) {
   const t0 = performance.now();
-  while (roadQueue.length && performance.now() - t0 < ms) roadStep();
-}
-/* PERF-S: Wegsuche zusätzlich im Leerlauf zwischen den Bildern (requestIdleCallback) — meist ist die Warteschlange dann leer,
-   bevor das Bild sie anfasst; pumpRoads im Bild bleibt als Untergrenze (Hintergrund-Tick, Browser ohne Leerlauf-Rückruf). */
-let idleOn = false;
-function idleRoads() {
-  if (idleOn || typeof requestIdleCallback !== 'function') return; idleOn = true;
-  requestIdleCallback(dl => { idleOn = false; while (roadQueue.length && dl.timeRemaining() > 1) roadStep(); if (roadQueue.length) idleRoads(); }, { timeout: 1000 });
+  while (roadQueue.length && performance.now() - t0 < ms) { const J = roadQueue[0]; J.it ||= roadSearch(...J.args); if (J.it.next().done) roadQueue.shift(); }
 }
 const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 function* roadSearch(ax, ay, bx, by, wgt, key) {

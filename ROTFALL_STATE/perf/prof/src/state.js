@@ -149,7 +149,15 @@ const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quie
 const PROP_BASE = {};                                        // je Karte: gk → Signatur
 const r2 = (k, v) => typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;   // Positionen/Timer: 2 Nachkommastellen genügen
 const sig = p => { const { id, ...rest } = p; return JSON.stringify(rest); };   /* Audit D6: ohne Replacer 4× schneller (14 000 Props je Speichern); Props tragen nur ganze Zahlen, Grundzustand und Stand rechnen gleich */
-export function setPropBase(map, list) { const B = new Map(); for (const p of list) B.set(p.gk, sig(p)); PROP_BASE[map] = B; }
+export function setPropBase(map, list) { const B = new Map(), O = new Map(); for (const p of list) { B.set(p.gk, sig(p)); const { id, ...rest } = p; O.set(p.gk, [Object.keys(rest), rest]); } PROP_BASE[map] = B; PROP_OBJ[map] = O; }
+/* PERF-S: Schnellprüfung vor sig(): gleiche Schlüssel in gleicher Reihenfolge und lauter gleiche einfache Werte ⇒ gleiches JSON ⇒ unverändert.
+   Sonst (anderer Wert, verschachteltes Objekt, andere Reihenfolge) entscheidet wie bisher der volle Textvergleich. Spart ~25 ms je Speichern. */
+const PROP_OBJ = {};
+function sameAsBase(e, b) {
+  if (!b) return false; const [ks, o] = b; let n = 0;
+  for (const k in e) { if (k === 'id') continue; const v = e[k]; if (ks[n] !== k || o[k] !== v || (v !== null && typeof v === 'object')) return false; n++; }
+  return n === ks.length;
+}
 export function saveData() {
   const out = {}; out.ents = {}; out.propsGone = {};
   for (const k of Object.keys(S)) if (!SKIP.has(k) && k !== 'ents') out[k] = S[k];
@@ -157,8 +165,8 @@ export function saveData() {
     if (m.startsWith('__')) continue;                  // Test-/Stilkarten
     const B = PROP_BASE[m], list = S.ents[m].filter(e => !e.transient).map(e => e.coopPilot ? { ...e, coopPilot: null, coopName: null } : e);   /* Koop K2: keine Gastzuordnung im Stand */
     if (!B || !B.size) { out.ents[m] = list; continue; }       // ohne Grundzustand (sollte nicht vorkommen): alles speichern
-    const have = new Set();
-    out.ents[m] = list.filter(e => { if (e.kind !== 'prop' || !e.gk || !B.has(e.gk) || have.has(e.gk)) return true; have.add(e.gk); return sig(e) !== B.get(e.gk); });
+    const have = new Set(), O = PROP_OBJ[m];
+    out.ents[m] = list.filter(e => { if (e.kind !== 'prop' || !e.gk || !B.has(e.gk) || have.has(e.gk)) return true; have.add(e.gk); return !sameAsBase(e, O?.get(e.gk)) && sig(e) !== B.get(e.gk); });
     out.propsGone[m] = [...B.keys()].filter(k => !have.has(k));
   }
   return JSON.stringify(out, r2);

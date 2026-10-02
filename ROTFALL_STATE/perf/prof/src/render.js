@@ -55,16 +55,29 @@ const TILE_COL = {
 // ---------------- Hauptbild ----------------
 // Sichtliste (S12): alle Props je Bild zu filtern kostete bei ~14 000 Props ~0,4 ms. Props bewegen sich nicht: Raster (256 px)
 // je Karte, neu gebaut, wenn sich die Objektzahl ändert (spätestens alle 1,5 s); Bewegliches (Figuren, Gegner, Beute) als kurze Liste.
-const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0 }, GC = 256;
+const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0, dg: null, dt: 0, keep: [], boss: [] }, GC = 256, DG = 512, DMG = 160;
+/* PERF-R (02.10.2026): auch die ~2000 beweglichen Figuren der Welt nicht mehr jedes Bild einzeln prüfen (~0,25 ms) — alle 150 ms
+   in ein grobes Raster (512 px) einsortieren, abgefragt mit 160 px Rand (so weit läuft niemand in 150 ms). Spieler und Gefolge
+   immer einzeln geprüft (Sprung beim Reisen). Bosse für den Lebensbalken nebenbei gesammelt statt 17 000 Objekte je Bild. */
 function visibleEnts(arr, xa, ya, xb, yb) {
   const now = performance.now();
   if (VIS.arr !== arr || VIS.n !== arr.length || now - VIS.t > 1500) {
-    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = [];
+    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = []; VIS.dt = 0;
     for (const e of arr) { if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e); }
   }
-  const out = [], inView = e => e.x > xa && e.x < xb && e.y > ya && e.y < yb;
-  for (let gy = Math.floor(ya / GC); gy <= Math.floor(yb / GC); gy++) for (let gx = Math.floor(xa / GC); gx <= Math.floor(xb / GC); gx++) { const c = VIS.grid.get(gx * 4096 + gy); if (c) for (const e of c) if (inView(e)) out.push(e); }
-  for (const e of VIS.dyn) if (inView(e)) out.push(e);
+  if (now - VIS.dt > 150) {
+    VIS.dt = now; VIS.dg = new Map(); VIS.keep = []; VIS.boss = [];
+    const party = S.party || [];
+    for (const e of VIS.dyn) {
+      if (e.boss) VIS.boss.push(e);
+      if (e.kind === 'player' || (e.id != null && party.includes(e.id))) { VIS.keep.push(e); continue; }
+      const k = ((e.x / DG) | 0) * 4096 + ((e.y / DG) | 0); let c = VIS.dg.get(k); if (!c) VIS.dg.set(k, c = []); c.push(e);
+    }
+  }
+  const out = [];
+  for (let gy = Math.floor(ya / GC); gy <= Math.floor(yb / GC); gy++) for (let gx = Math.floor(xa / GC); gx <= Math.floor(xb / GC); gx++) { const c = VIS.grid.get(gx * 4096 + gy); if (c) for (const e of c) if (e.x > xa && e.x < xb && e.y > ya && e.y < yb) out.push(e); }
+  for (let gy = Math.floor((ya - DMG) / DG); gy <= Math.floor((yb + DMG) / DG); gy++) for (let gx = Math.floor((xa - DMG) / DG); gx <= Math.floor((xb + DMG) / DG); gx++) { const c = VIS.dg.get(gx * 4096 + gy); if (c) for (const e of c) if (e.x > xa && e.x < xb && e.y > ya && e.y < yb) out.push(e); }
+  for (const e of VIS.keep) if (e.x > xa && e.x < xb && e.y > ya && e.y < yb) out.push(e);
   return out;
 }
 const PT = window.__PT = {}; let _pt = 0; const tk = n => { const t = performance.now(); PT[n] = (PT[n] || 0) + t - _pt; _pt = t; }; /*PERFTMP*/
@@ -128,12 +141,12 @@ export function drawFrame(now) {
   drawFires(now);     // S14: Brand in der Stadt
   ctx.restore(); tk('sky'); /*PERFTMP*/
   drawLight(now); tk('light'); /*PERFTMP*/
-  drawAmbienceGlow();   /* Artist Runde 7 */
+  drawAmbienceGlow(); tk('ambglow'); /*PERFTMP*/
   drawWeather(now); tk('weather'); /*PERFTMP*/
-  drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
-  drawFloats();
-  drawBubbles(performance.now());
-  drawBossBar();
+  drawPlaceGuide(shown || [], now); tk('guide'); /*PERFTMP*/
+  drawFloats(); tk('floats'); /*PERFTMP*/
+  drawBubbles(performance.now()); tk('bubbles'); /*PERFTMP*/
+  drawBossBar(); tk('boss'); /*PERFTMP*/
   drawTrack(now); tk('ui'); /*PERFTMP*/
 }
 // S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
@@ -181,7 +194,7 @@ function drawBubbles(now) {
 }
 function drawBossBar() {
   const p = S.player; if (!p) return;
-  const b = S.ents[S.map].find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);
+  const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */
   if (!b) return;
   const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(b.hp / b.maxHp, 0, 1);
   ctx.fillStyle = '#0c0a08'; ctx.fillRect(x - 3, y - 3, w + 6, 16);
@@ -246,6 +259,7 @@ function prefetchOne() {
   }
   return false;
 }
+window.__chunkHash = (cx, cy) => { const m = MAPS[S.map], key = S.map + ':' + cx + ',' + cy; chunkCache.delete(key); const cv = chunkCanvas(m, cx, cy), d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let h = 0; for (let i = 0; i < d.length; i++) h = (Math.imul(h, 31) + d[i]) | 0; return h; }; /*PERFTMP*/
 function chunkCanvas(m, cx, cy) {
   const ref = chunkRef[S.map];
   if (!ref || ref.tiles !== m.tiles || ref.ver !== (m.ver || 0)) {
@@ -255,9 +269,12 @@ function chunkCanvas(m, cx, cy) {
   const key = S.map + ':' + cx + ',' + cy;
   let cv = chunkCache.get(key);
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
+  PT.n_chunkMiss = (PT.n_chunkMiss || 0) + 1; /*PERFTMP*/
+  const _cb = performance.now(); /*PERFTMP*/
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
-  bakeGround(o, m, cx, cy);
+  const BT = window.__BT ||= {}; let _b = performance.now(); const bk = n => { const t = performance.now(); BT[n] = (BT[n] || 0) + t - _b; _b = t; }; /*PERFTMP*/
+  bakeGround(o, m, cx, cy); bk('ground'); /*PERFTMP*/
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Nahdetails
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx], X = i * 16, Y = j * 16;
@@ -273,10 +290,11 @@ function chunkCanvas(m, cx, cy) {
     } else if ((t === T.DIRT || t === T.ROAD) && r < 0.12) { o.fillStyle = '#6a6252'; o.fillRect(px, py, 2, 1); o.fillStyle = '#2a241c'; o.fillRect(px, py + 1, 2, 1); }
     else if (t === T.ASH && r < 0.05) { o.fillStyle = '#cfc6b0'; o.fillRect(px, py, 3, 1); o.fillRect(px + 1, py - 1, 1, 3); }
   }
-  paintWater(o, m, cx, cy);
-  paintRock(o, m, cx, cy);
+  bk('decor'); /*PERFTMP*/
+  paintWater(o, m, cx, cy); bk('water'); /*PERFTMP*/
+  paintRock(o, m, cx, cy); bk('rock'); /*PERFTMP*/
   paintRock(o, m, cx, cy, T.DWALL);
-  paintWalls(o, m, cx, cy);
+  paintWalls(o, m, cx, cy); bk('walls'); /*PERFTMP*/
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {      // Mauerfuß: Schatten nur, wo unten keine Mauer anschließt
     const tx = cx * CH + i, ty = cy * CH + j; if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) continue;
     const t = m.tiles[ty * m.w + tx];
@@ -284,6 +302,7 @@ function chunkCanvas(m, cx, cy) {
     const below = ty + 1 < m.h ? m.tiles[(ty + 1) * m.w + tx] : t;
     if (!SOLID_T.has(below)) { o.fillStyle = 'rgba(0,0,0,.38)'; o.fillRect(i * 16, j * 16 + 14, 16, 2); o.fillStyle = 'rgba(0,0,0,.2)'; o.fillRect(i * 16, j * 16 + 16, 16, 2); }
   }
+  bk('shadow'); (window.__CB ||= []).push(performance.now() - _cb); /*PERFTMP*/
   chunkCache.set(key, cv);
   if (chunkCache.size > CHUNK_MAX) chunkCache.delete(chunkCache.keys().next().value);
   return cv;
@@ -352,10 +371,12 @@ function bakeGround(o, m, cx, cy) {
     const reg = world ? REGION[regionAt(tx, ty)] : REGION.greenmark;
     if (reg.tint && !(SOLID_T.has(raw) && raw !== T.ROCK)) { const c = tintOf(reg.tint); td.data.set([c[0], c[1], c[2], c[3] * 255], k * 4); }
   }
+  const BT = window.__BT ||= {}; let _g = performance.now(); const gk = n => { const t = performance.now(); BT[n] = (BT[n] || 0) + t - _g; _g = t; }; gk('g_prep'); /*PERFTMP*/
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {     // Grundtexturen
     const k = (j + 1) * TW + i + 1;
     o.drawImage(SP.tileTexture(typ[k], vari[k], TILE_COL[typ[k]] || TILE_COL[T.GRASS], kin[k]), i * 16, j * 16);
   }
+  gk('g_tex'); /*PERFTMP*/
   // Grenzen natürlicher Böden pro Pixel: nur Kacheln, deren 3×3-Umfeld gemischt ist
   const noise = [], G0x = x0t * 16 - 2, G0y = y0t * 16 - 2, AWn = SZ + 4;
   const nz = t => noise[t] || (noise[t] = ((A, B) => (X, Y) => A(X, Y) * 0.75 + B(X, Y) * 0.25)(latNoise(G0x, G0y, AWn, 5, t * 37, 0), latNoise(G0x, G0y, AWn, 3, t * 11, 40)));
@@ -398,13 +419,13 @@ function bakeGround(o, m, cx, cy) {
       D[o4] = T0[ti] + (lip ? 22 : 0); D[o4 + 1] = T0[ti + 1] + (lip ? 26 : 0); D[o4 + 2] = T0[ti + 2] + (lip ? 10 : 0); D[o4 + 3] = 255;
     }
   }
-  if (img) putLayer(o, img);
-  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW);
+  gk('g_edges'); if (img) putLayer(o, img); gk('g_put'); /*PERFTMP*/
+  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW); gk('g_mottle'); /*PERFTMP*/
   // Helligkeit und Regionstönung: 1 Pixel je Kachelmitte, bilinear hochskaliert — weiche Verläufe statt Kachelrechtecke
   shadeCtx.putImageData(sd, 0, 0); tctx.putImageData(td, 0, 0);
   o.save(); o.imageSmoothingEnabled = true;
   o.drawImage(shadeCv, -16, -16, TW * 16, TW * 16); o.drawImage(tintCv, -16, -16, TW * 16, TW * 16);   // Pixelmitte i ↔ Kachelmitte
-  o.restore();
+  o.restore(); gk('g_shade'); /*PERFTMP*/
 }
 /* Artist Runde 2 (Stil R): Flecken im Maßstab von ein bis drei Kacheln über Gras, Erde, Weg und Sumpf — trockene helle und satte
    dunkle Inseln mit organischem Rand, dazu Büschel an Weltpositionen (nicht je Kachel). Bricht das Kachelraster, ohne Rauschen. */
@@ -2715,7 +2736,9 @@ function staticLights() {
     if (e.kind === 'prop' && e.type === 'candles') list.push({ x: e.x, y: e.y - 8, r: 60 });
     if (e.kind === 'prop' && (e.type === 'hearth' || e.type === 'forge')) list.push({ x: e.x, y: e.y - 8, r: 80 });
   }
-  lightCache = { map: S.map, n, list, t: now };
+  const houses = [];   /* PERF-R: Fensterlicht der Häuser mitgesammelt (vorher je Bild alle Häuser samt Verfall geprüft) */
+  for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2) houses.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
+  lightCache = { map: S.map, n, list, t: now, houses };
   return list;
 }
 // Licht als vorgemalte Stempel (Radialverlauf einmal gebacken, danach nur drawImage) — vorher zwei createRadialGradient
@@ -2723,10 +2746,11 @@ function staticLights() {
 const stamp = stops => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   for (const [o, col] of stops) gr.addColorStop(o, col); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return c; };
 let HOLE = null, WARM = null;
+const LIT = [], PL_LIGHT = { x: 0, y: 0, r: 0 };
 function drawLight(now) {
   HOLE ||= stamp([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,.72)'], [1, 'rgba(0,0,0,0)']]); WARM ||= stamp([[0, 'rgba(210,140,60,.10)'], [1, 'rgba(0,0,0,0)']]);
   const a = ambient();
-  if (a < 0.06) return;
+  if (a < 0.06) return; tk('L_amb'); /*PERFTMP*/
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.clearRect(0, 0, dark.width, dark.height);          // sonst summiert sich die Dunkelheit jeden Frame
   dctx.setTransform(dpr / 2, 0, 0, dpr / 2, 0, 0);
@@ -2734,12 +2758,14 @@ function drawLight(now) {
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = `rgba(${night},${a})`;
   dctx.fillRect(0, 0, W, H);
-  dctx.globalCompositeOperation = 'destination-out';
+  dctx.globalCompositeOperation = 'destination-out'; tk('L_fill'); /*PERFTMP*/
   const pl = S.player;
-  const lights = [...staticLights()];
-  if (pl && pl.map === S.map) lights.push({ x: pl.x, y: pl.y, r: lightR(pl, DUNGEONS[S.map] ? 150 : 120) });   /* Roadmap P2: Nachtsicht des Roboterauges */
-  if (isNight()) for (const b of HOUSES) if (b.map === S.map && !HB.BTYPES[b.type]?.noWin && HB.wearOf(b) < 2)   // erleuchtete Fenster werfen warmes Licht auf die Straße
-    lights.push({ x: (b.x + b.w / 2) * TS, y: (b.y + b.h) * TS + 6, r: b.type === 'tavern' ? 110 : 70 });
+  const lights = LIT; lights.length = 0;   /* PERF-R: nur Lichter im Bild sammeln, ohne Kopie aller Lichter der Karte je Bild */
+  const inV = l => { const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom; return !(sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260); };
+  for (const l of staticLights()) if (inV(l)) lights.push(l);
+  if (pl && pl.map === S.map) { PL_LIGHT.x = pl.x; PL_LIGHT.y = pl.y; PL_LIGHT.r = lightR(pl, DUNGEONS[S.map] ? 150 : 120); lights.push(PL_LIGHT); }   /* Roadmap P2: Nachtsicht des Roboterauges */
+  if (isNight()) for (const l of lightCache.houses) if (inV(l)) lights.push(l);   // erleuchtete Fenster werfen warmes Licht auf die Straße
+  tk('L_collect'); PT.n_lights = (PT.n_lights || 0) + lights.length; /*PERFTMP*/
   for (const l of lights) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -260 || sy < -260 || sx > W + 260 || sy > H + 260) continue;
@@ -2747,10 +2773,11 @@ function drawLight(now) {
     dctx.drawImage(HOLE, sx - r, sy - r, r * 2, r * 2);
   }
  
-  dctx.globalCompositeOperation = 'source-over';
+  dctx.globalCompositeOperation = 'source-over'; tk('L_holes'); /*PERFTMP*/
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true; ctx.drawImage(dark, 0, 0, dark.width * 2, dark.height * 2); ctx.imageSmoothingEnabled = false;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  tk('L_comp'); /*PERFTMP*/
   // warmer Lichtstich
   ctx.globalCompositeOperation = 'lighter';
   for (const l of lights) {
@@ -2762,7 +2789,7 @@ function drawLight(now) {
   ctx.globalCompositeOperation = 'source-over';
   if (pl && pl.map === S.map && a > 0.25 && eyeOf(pl)?.heat) {   /* Roadmap P2: Wärmesicht (Auge Stufe 4) — Gegner als glühender Umriss im Dunkeln, nur Anzeige */
     ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(255,110,60,${Math.min(0.8, a) * (0.75 + 0.25 * Math.sin(now / 240))})`;
-    for (const e of S.ents[S.map] || []) { if (e.kind !== 'enemy' || !e.alive || Math.hypot(e.x - pl.x, e.y - pl.y) > 560) continue;
+    for (const e of (VIS.arr === S.ents[S.map] && VIS.dyn) || S.ents[S.map] || []) { if (e.kind !== 'enemy' || !e.alive || Math.hypot(e.x - pl.x, e.y - pl.y) > 560) continue;
       const sx = (e.x - cam.x) * cam.zoom, sy = (e.y - 14 - cam.y) * cam.zoom; if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
       ctx.beginPath(); ctx.ellipse(sx, sy, 9 * cam.zoom, 17 * cam.zoom, 0, 0, Math.PI * 2); ctx.stroke(); }
     ctx.restore(); }
@@ -3075,8 +3102,8 @@ function iconR(c, it, key, w, h) {
     src = document.createElement('canvas'); src.width = src.height = n; const t = src.getContext('2d'); t.imageSmoothingEnabled = false;
     t.translate(n / 2, n / 2); t.rotate(it.wtype === 'bow' ? -0.35 : -Math.PI / 4); t.drawImage(W.cv, -W.cv.width / 2, -W.cv.height / 2); }
   else if (['chest', 'head', 'offhand', 'cloak'].includes(it.slot)) {
-    const f = SP.humanFrameR(SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }), it.slot === 'offhand' ? 'W' : 'S', it.slot === 'offhand' ? 'guard' : 'i0');
-    const [y0, y1] = it.slot === 'head' ? [0, 12] : it.slot === 'offhand' ? [12, 30] : it.slot === 'cloak' ? [3, 46] : [11, 38];
+    const f = SP.humanFrameR(SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }), it.slot === 'offhand' ? 'W' : it.slot === 'cloak' ? 'N' : 'S', it.slot === 'offhand' ? 'guard' : 'i0');   /* Artist 02.10.: Umhang von hinten, dort sieht man Form, Borte und Wappen */
+    const [y0, y1] = it.slot === 'head' ? (it.look?.hood ? [4, 26] : [0, 12]) : it.slot === 'offhand' ? [12, 30] : it.slot === 'cloak' ? [3, 46] : [11, 38];
     const band = document.createElement('canvas'); band.width = f.width; band.height = y1 - y0; const bc = band.getContext('2d', { willReadFrequently: true }); bc.drawImage(f, 0, -y0);
     const d = bc.getImageData(0, 0, band.width, band.height).data; let x0 = band.width, x1 = 0;   // S14: Zuschnitt nach Inhalt (Rahmen 40, breite Rüstung)
     for (let i = 3; i < d.length; i += 4) if (d[i]) { const x = (i >> 2) % band.width; if (x < x0) x0 = x; if (x > x1) x1 = x; }
