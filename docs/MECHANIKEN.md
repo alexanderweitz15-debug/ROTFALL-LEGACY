@@ -1080,3 +1080,13 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Die Seelen ernten: 3 Seelenphiolen, Tote +10. Morvaths Heerzug kommt dadurch früher; die Wahl warnt dich davor.
   - Nichts anrühren.
 - Debug: „Geheime Orte: zur Kammer der Namen“.
+
+## Dialoge: Story-Fenster, Emotes, Gesprächshaltung (Visuell D)
+- **Gesprächspartner bleibt stehen** und dreht sich zum Helden, solange das Fenster offen ist. Wer mehr als 170 px weggeht, beendet das Gespräch wie bisher.
+- **Text läuft ein.** Ein Klick auf den Text zeigt ihn sofort ganz. Bei „Reduzierte Bewegung“ steht der Text sofort da, ohne Einblenden.
+- **Antwortzeichen** vor jeder Wahl zeigen die Art: ↩ gehen, ⚔ Kampf, ◉ Gold, ✦ Auftrag, ⚖ Handel, ? Frage. Die Reihenfolge der Antworten ändert sich nicht.
+- **Story-Fenster:** Auftragsangebot und -abgabe bei benannten Figuren, Bosse im Gespräch, Hoher Rat, Hof und Heiliges Gericht. Die Leiste wird breiter, das Bild größer, und unter dem Namen stehen Beruf und Fraktion. Die Kamera rückt leicht heran und zielt zwischen dich und die Figur. Bei reduzierter Bewegung gibt es keinen Zoom.
+- **Stimmung am Bildrahmen:** grün = mag dich (Beziehung ab 30), blau = kühl (ab −20 oder Stigma-Abweisung), rot = wütend oder feindlich.
+- **Emotes** (kleine Zeichen über dem Kopf): ! bei einem Auftragsangebot, Herz bei Abgabe oder bei steigender Beziehung im Gespräch, rote Zornzeichen bei sinkender Beziehung, Tropfen bei Angst. Emotes erscheinen nur im Gespräch und bei Reaktionen.
+- **Kein Fenster bei Wut oder Angst:** Wütende, fliehende oder bedrohte Figuren antworten nur mit Sprechblase, Abwehrgeste und Emote.
+- Debug-Gruppe „Darstellung & Regie“ → „Dialoge“: Story-Fenster, alle Emotes, verängstigte Figur ansprechen.

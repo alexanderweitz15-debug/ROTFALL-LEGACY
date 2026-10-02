@@ -510,21 +510,33 @@ function countItem(key) { return S.player.inv.filter(x => x && x.key === key).re
 // ---------------- Dialog ----------------
 export let dlgWith = null;
 export const uiHooks = {};                                           /* Koop: Gespräche eines Gasts laufen beim Host, das Fenster erscheint beim Gast (coop.js) */
+// Visuell D (02.10.2026): Antwortart als Zeichen vor der Wahl (Reihenfolge bleibt — Proben klicken [0]); c.k setzt sie ausdrücklich.
+const DLG_K = [['leave', /^\[?(Gehen|Nicht jetzt|Abbrechen|Zurück|Lass|Später|Nein)/i], ['fight', /angreif|kämpf|herausforder|Duell|töte|stirb|Klinge/i],
+  ['gold', /\d+\s*Gold|bezahl|besteche|Bestechung|zahle/i], ['quest', /Was liegt an|Erledigt\.|Ich mache es|Auftrag|Abgeben/], ['trade', /Handel|Waren|Zeig mir|kaufen|verkaufen/i], ['ask', /\?/]];
+let dlgTyper = 0;
 export function dialogue(npc, text, choices) {
   if (uiHooks.dialogue?.(npc, text, choices)) return;
-  const box = $('dialogue');
-  box.classList.remove('hidden'); dlgWith = npc;   // S13: wer weggeht, beendet das Gespräch (game.js updatePrompt)
+  const box = $('dialogue'), opening = box.classList.contains('hidden') || dlgWith !== npc;
+  box.classList.remove('hidden'); dlgWith = npc;
+  const story = !!A.dlgStory?.(npc, choices);
+  box.classList.toggle('story', story); box.dataset.mood = A.dlgMood?.(npc) || '';
+  if (opening && S.settings.motion) { box.classList.remove('dlg-in'); void box.offsetWidth; box.classList.add('dlg-in'); }
   $('dlg-name').textContent = npc.name;
-  $('dlg-text').textContent = text; $('dlg-text').style.whiteSpace = 'pre-line';   // Anschlagbrett: mehrere Zeilen
+  let sub = $('dlg-sub'); if (!sub) { sub = el('div', 'dlg-sub'); sub.id = 'dlg-sub'; $('dlg-name').after(sub); }
+  sub.textContent = story ? [npc.title && npc.title !== npc.name ? npc.title : npc.prof, FACTIONS[npc.faction]?.name].filter(Boolean).join(' · ') : '';
+  // Text läuft ein (Klick vervollständigt; aus bei reduzierter Bewegung). textContent bleibt immer der volle Text.
+  const t = $('dlg-text'); t.style.whiteSpace = 'pre-line'; clearInterval(dlgTyper); t.onclick = null;
+  if (S.settings.motion && text && text.length > 12) {
+    const a = el('span'), r = el('span', 'dlg-rest'); a.textContent = ''; r.textContent = text; t.replaceChildren(a, r);
+    let i = 0; const done = () => { clearInterval(dlgTyper); a.textContent = text; r.textContent = ''; t.onclick = null; };
+    dlgTyper = setInterval(() => { i += 2; if (i >= text.length) return done(); a.textContent = text.slice(0, i); r.textContent = text.slice(i); }, 18);
+    t.onclick = done;
+  } else t.textContent = text;
   drawPortraitTo($('dlg-portrait'), npc);
   const cc = $('dlg-choices'); cc.innerHTML = '';
-  choices.forEach(c => {
-    const b = el('button', '', c.text);
-    b.onclick = () => { if (c.fn) c.fn(); else closeDialogue(); };
-    cc.appendChild(b);
-  });
+  choices.forEach(c => { const b = el('button', '', c.text); b.dataset.k = c.k || (DLG_K.find(([, re]) => re.test(b.textContent)) || [''])[0]; b.onclick = () => { if (c.fn) c.fn(); else closeDialogue(); }; cc.appendChild(b); });
 }
-export function closeDialogue() { if (uiHooks.close?.()) return; $('dialogue').classList.add('hidden'); }
+export function closeDialogue() { if (uiHooks.close?.()) return; clearInterval(dlgTyper); $('dialogue').classList.add('hidden'); }
 export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
 let toastTimer = 0;
@@ -1147,6 +1159,9 @@ function settingsUI(body) {
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Grafikstil</h3>
       <div class="ctx-actions"><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Neu (gezeichnet)</button></div>
+      <h3 style="margin-top:14px">Schadenszahlen</h3>
+      <div class="ctx-actions" title="Reduziert: nur dein eigener Schaden und kritische Treffer. Die Farbe zeigt die Schadensart (hell Hieb, orange Feuer, blau Frost, grün Gift, dunkelrot Blutung, violett Magie/Schatten, gold Krit).">${[['off', 'Aus'], ['reduced', 'Reduziert'], ['full', 'Voll']].map(([k, n]) =>
+        `<button data-dn="${k}" class="${(S.settings.dmgNums || 'full') === k ? 'on' : ''}" aria-pressed="${(S.settings.dmgNums || 'full') === k}">${n}</button>`).join('')}</div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>
@@ -1175,6 +1190,7 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
+  [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = async () => { const ok = await A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)

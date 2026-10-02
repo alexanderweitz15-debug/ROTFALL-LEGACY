@@ -214,6 +214,25 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   text-align:left;font-size:13px;color:#a79b83}
 .dlg-choices button:hover,.dlg-choices button:focus-visible{color:#f0e6cd;background:#1d1812;outline:none}
 .dlg-choices button::before{content:"— "}
+/* Visuell D (02.10.2026): Antwortzeichen, Story-Dialog, Stimmungsrahmen, Einblenden, Tippeffekt */
+.dlg-choices button[data-k=leave]::before{content:"↩ ";color:#8a7d66}
+.dlg-choices button[data-k=fight]::before{content:"⚔ ";color:#c0503a}
+.dlg-choices button[data-k=gold]::before{content:"◉ ";color:#d9b04a}
+.dlg-choices button[data-k=quest]::before{content:"✦ ";color:#e0b75a}
+.dlg-choices button[data-k=trade]::before{content:"⚖ ";color:#9fb0a0}
+.dlg-choices button[data-k=ask]::before{content:"? ";color:#8fa6c0;font-weight:bold}
+.dlg-sub{font-size:11px;color:#a8977a;letter-spacing:.1em;margin-top:2px}
+.dlg-sub:empty{display:none}
+.dlg-rest{color:transparent}
+.dialogue.dlg-in{animation:dlgIn .22s ease-out}
+@keyframes dlgIn{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+.dialogue.story{left:2%;right:2%;padding:18px 22px;border-top:2px solid #a8843e;background:linear-gradient(#18120c,#0e0b08)}
+.dialogue.story .dlg-portrait canvas{width:112px;height:112px;image-rendering:pixelated;border-color:#a8843e}
+.dialogue.story .dlg-name{font-size:18px}
+.dialogue.story .dlg-text{font-size:15px}
+.dialogue[data-mood=warm] .dlg-portrait canvas{box-shadow:0 0 0 2px #6a8a4a}
+.dialogue[data-mood=kalt] .dlg-portrait canvas{box-shadow:0 0 0 2px #4a5a72}
+.dialogue[data-mood=zorn] .dlg-portrait canvas{box-shadow:0 0 0 2px #9a3226}
 
 .toast{position:absolute;top:18px;left:50%;transform:translateX(-50%);padding:10px 22px;
   background:rgba(14,11,9,.94);border:1px solid #6b5630;box-shadow:0 8px 24px rgba(0,0,0,.6);
