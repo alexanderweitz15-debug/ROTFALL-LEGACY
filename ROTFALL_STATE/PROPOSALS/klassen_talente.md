@@ -425,3 +425,15 @@ Jede Scheibe ist vollständig: Daten, Logik, Hinweis, Debug, Probe und MECHANIKE
 
 ## Stand (Umsetzung, Klassen-Agent)
 - Scheibe 0 grün um 22:28 (Talentpunkte jede 2. Stufe + 1 je Prüfung, rückwirkend über `talentTopUp`; Koop-Gast bekommt Punkte; Erbe sofort nach Regel; BALANCE_GUIDE §7 angepasst; Selbsttest 446/446).
+- Scheibe 1 grün (Selbsttestlauf 450/450 vor Beginn von Scheibe 2; Uhrzeit nicht notiert, eingetragen um 00:52): Prüfungsgerüst (`clsTrial`, jeder Lehrer der Klasse, Fortschritt je Figur `ktSteps`), Krieger komplett (4 Banditen, Duell im Kreis beim Lehrer mit Übungsfechter `drill_fighter`), Aufnahmeszene `classRite` (5,5 s, Welt steht, ESC überspringt), Szenen für Paladin, Todesweihe, Ritus der Kette und dunkle Klassen; eigene Wege +1 Punkt (auch rückwirkend); Prüfung für alte Stände nachholbar.
+- Scheibe 2 grün um 00:51 (Sternenhimmel `src/sky.js`: Wanderer, Todesritter und die vier Titel als Sternbilder, `sky`/`pos` für jeden Stern, Reiter „Talente“ und Taste T wieder an, Ratgeber-Tipp wieder an, einmal kostenlos neu ordnen). **Zwischenstand-Bilder:** `ROTFALL_STATE/visual/img/sterne_himmel_s2.png` (Übersicht), `sterne_wanderer_s2.png` (Wanderer aufgezoomt).
+- Scheibe 3 grün um 00:56 (Krieger-Linie: Amboss, Schild, Morgenröte, Eber, Kette — je 8 Sterne; Fähigkeitssterne `ab` allgemein über `abMod`/`abBegin`/`abEnd`; Schlüsselsterne ruhen ohne aktive Klasse/Folgeklasse; Prüfungen Ritter (Platz halten, Duell mit Schild) und Berserker (5 Feinde, Grube unter 30 %); Probe „Höchststufe 60“ misst jetzt die typische Figur: 33 Punkte / 49 Sterne = 67 %). Einziger roter Punkt im Lauf: „Schmied (03.10.)“ — fremde, neue Probe des Leads, nicht aus dieser Scheibe.
+  - **Messwerte (RF.simFight, Bär-Attrappe 4000 Leben, Langschwert, 3 Seeds, 30 s, Fähigkeiten genutzt; Zuwachs gegen „ohne Sterne“):**
+    | Klasse | St. 15: Kampfzweig / Sternbild | St. 30: Kampfzweig / Sternbild | St. 30 viel Ausdauer: Kampfzweig / Sternbild |
+    |---|---|---|---|
+    | Krieger | +34 % / +8 % | +33 % / +10 % | +21 % / +1 % |
+    | Ritter | +41 % / +11 % | +33 % / +10 % | +21 % / +3 % |
+    | Paladin | +32 % / +4 % | +41 % / +15 % | +19 % / +3 % |
+    | Berserker | +41 % / +22 % | +33 % / +12 % | +24 % / +2 % |
+    | Dunkler Hochpaladin | +11 % / +6 % | +38 % / +6 % | +22 % / +5 % |
+- Scheibe 4 grün um 01:00 (Schütze-Linie: Falke, Hirsch, Netz; Prüfungen Schütze — 3 Wölfe + 3 Wolfsfelle, Bogenübung beim Lehrer (nur Fernwaffen zählen) — und Waldläufer — Bär, eine ganze Nacht draußen: 10 Stunden am Stück 20–6 Uhr, Dach oder Tag setzt zurück; allgemeine Zielarten `questEvent` für steal/tavern/craft/contract/songkill/night). Roter Punkt nur „Schmied (03.10.)“ (Lead).

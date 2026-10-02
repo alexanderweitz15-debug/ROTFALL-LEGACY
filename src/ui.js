@@ -11,6 +11,7 @@ import { GOODS } from './data.js?v=24';
 import { target as ecoTarget } from './economy.js?v=24';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
 import { sfx, ambience } from './sfx.js?v=24';
+import * as SKY from './sky.js?v=24';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
 import * as ATL from './atlas.js?v=24';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
 
 export let A = {};
@@ -36,7 +37,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
+  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
   ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
@@ -1355,7 +1356,8 @@ function drawTreeLines(branchEl, p) {
     }
   });
 }
-function skillUI(body) {
+function skillUI(body) { SKY.skyUI(body, A, { refresh: refreshModal }); }   /* Scheibe 2: Sternenhimmel statt Spaltenraster (das alte Raster bleibt als skillUIOld) */
+function skillUIOld(body) {
   const p = S.player, pts = p.skillPoints || 0;
   const col = b => {
     const N = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === b), rows = Math.max(...N.map(([, n]) => n.row)) + 1, B_ = SKILL_BRANCHES[b];
@@ -1874,6 +1876,17 @@ function smithUI(body, npc) {
   if ($('sm-all')) $('sm-all').onclick = () => { smOff = smOff.size ? new Set() : new Set(L.map(x => x.o)); smithUI(body); };
   if ($('sm-shop')) $('sm-shop').onclick = () => openModal('trade', npc);
   if ($('sm-forge')) $('sm-forge').onclick = () => { closeModal(); A.openForge?.(forge); };
+  /* Verbessern und Schmieden lassen (03.10.2026) */
+  const U = A.smithUpgList?.() || [], O = A.smithOrders?.() || [], main = body.querySelector('.tr-main');
+  const sec = document.createElement('div'); sec.innerHTML = `<div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Verbessern <span class="ledger">— eine Gütestufe höher, bis „Meisterlich“</span></div>
+    <div class="sm-rows">${U.length ? U.map((x, i) => `<div class="sm-row"><span class="sm-cell" data-u="${i}"></span><span class="sm-txt"><b>${qa(ITEMS[x.o.key].name)}</b>${x.eq ? ' <span class="sm-eq">●</span>' : ''}<br><span class="ledger">${x.u.from} → <b>${x.u.to}</b> · ${x.u.gold} Gold · ${x.u.iron} Eisen</span></span><button class="mini" data-up="${i}"${S.gold < x.u.gold ? ' disabled' : ''}>Verbessern</button></div>`).join('') : '<div class="ledger">Nichts, was sich verbessern lässt.</div>'}</div>
+    <div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Schmieden lassen <span class="ledger">— aus deinem Material, gegen Lohn</span></div>
+    <div class="sm-rows">${O.map((x, i) => `<div class="sm-row${x.ok ? '' : ' off'}"><span class="sm-cell" data-o="${i}"></span><span class="sm-txt"><b>${qa(x.name)}</b><br><span class="ledger">${Object.entries(x.need).map(([m, n]) => `${n} ${qa(ITEMS[m]?.name || m)}`).join(', ')} · Lohn ${x.fee} Gold</span></span><button class="mini" data-or="${i}"${x.ok && S.gold >= x.fee ? '' : ' disabled'}>Schmieden</button></div>`).join('')}</div>`;
+  main?.appendChild(sec);
+  sec.querySelectorAll('[data-u]').forEach(c => { const x = U[+c.dataset.u]; paintCell(c, x.o, {}); });
+  sec.querySelectorAll('[data-o]').forEach(c => { const x = O[+c.dataset.o]; paintCell(c, { key: x.key }, {}); });
+  sec.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const r = A.smithUpgrade(npc, U[+b.dataset.up].o); if (r) toast(r); else { sfx('metal', 0.6, 0.7); sfx('coin', 0.4, 0.6); } smithUI(body); });
+  sec.querySelectorAll('[data-or]').forEach(b => b.onclick = () => { const r = A.smithCommission(npc, O[+b.dataset.or].key); if (r) toast(r); else { sfx('metal', 0.6, 0.5); sfx('coin', 0.4, 0.6); } smithUI(body); });
 }
 // ---- Kutsche und Fähre als Dock (Entwickler 02.10.2026: Dialog-Listen mit GUI) ----
 // Oben die Weltkarte (dieselbe gemalte Karte wie M, mit Nebel) mit Abfahrt und Zielen; darunter je Ziel eine Karte: Name, Preis, Dauer,

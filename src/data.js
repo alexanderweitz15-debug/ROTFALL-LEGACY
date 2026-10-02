@@ -908,6 +908,17 @@ export const SKILL_BRANCHES = {
   druid:  { name:'Hainkunde', title:'druid', desc:'Nur für Druiden.' },
   monk:   { name:'Stille Hand', title:'monk', desc:'Nur für Mönche.' },
   deathknight:{ name:'Todesritter', cls:'deathknight', desc:'Frost und Blut. Nur für Todesritter.' },   // S15 (Nutzer: „beim Todesritter gibt es keine Talentfähigkeiten“)
+  rogue: {name:'Der Dolch', cls:'rogue', desc:'Schurke: der erste Schlag zählt doppelt.'},
+  assassin: {name:'Die Natter', cls:'assassin', desc:'Assassine: nicht da sein, dann dort.'},
+  torturer: {name:'Die Zange', cls:'torturer', desc:'Folterknecht: jeder Wille bricht.'},
+  archer: {name:'Der Falke', cls:'archer', desc:'Schütze: Abstand ist eine Waffe.'},
+  ranger: {name:'Der Hirsch', cls:'ranger', desc:'Waldläufer: der Wald ist eine Karte, die nur du liest.'},
+  chainhunter: {name:'Das Netz', cls:'chainhunter', desc:'Kettenjäger: wer läuft, wird gefangen.'},
+  warrior: {name:'Der Amboss', cls:'warrior', desc:'Krieger: Stahl und Standhaftigkeit.'},
+  knight: {name:'Der Schild', cls:'knight', desc:'Ritter: ein Eid mit Rüstung.'},
+  paladin: {name:'Die Morgenröte', cls:'paladin', desc:'Paladin: was du beschützt, macht dich zum Ritter.'},
+  berserker: {name:'Der Eber', cls:'berserker', desc:'Berserker: Wut als Rüstung — bis sie reißt.'},
+  darkpaladin: {name:'Die Kette', cls:'darkpaladin', desc:'Dunkler Hochpaladin: Ordnung durch Furcht.'},
 };
 export const SKILL_TREE = {
   // Kampf
@@ -998,8 +1009,163 @@ export const SKILL_TREE = {
     desc:'Jeder Nahkampftreffer heilt dich um 8 % des Schadens. Dafür heilen Tränke, Verbände und Kräuter dich nur halb. Schließt Frostgeboren aus.', designIntent:'Leben nimmt man sich vom Feind, nicht aus der Flasche.' },
   k_storm:  { branch:'monk', row:2, type:'keystone', name:'Sturmhand', fx:{}, requires:['o_counter'], excl:'k_stillness',
     desc:'Jeder dritte Treffer gibt +1 Fokus. Dafür gibt Ausweichen keinen Fokus mehr. Schließt Vollkommene Stille aus.', designIntent:'Angriff statt Leere: der Mönch holt sich den Fokus aus dem Schlagen.' },
+  // Klassen und Talente (Scheibe 3 ff.): Sternbilder der Klassen, Titel Vampir und Grubenhäuptling, Gefährten. ab = Fähigkeitsstern
+  // [{k: Fähigkeit, mult: Schaden/Heilung, cd: Abklingzeit, cost: Kosten, dur: Dauer}] — wirkt wie Schlüsselsterne nur bei aktiver Klasse.
+  // Der Amboss (warrior)
+  kr_grip: {branch:'warrior', row:0, name:'Eiserner Griff', fx:{stam:12}, requires:[], desc:'Ausdauer +12.'},
+  kr_stand: {branch:'warrior', row:0, name:'Fester Stand', fx:{}, ab:[{k:'power_strike', cost:-0.25}], requires:[], desc:'Wuchtschlag kostet 25 % weniger Ausdauer.'},
+  kr_drill: {branch:'warrior', row:1, name:'Drill', fx:{hp:0.05}, requires:['kr_grip'], desc:'Leben +5 %.'},
+  kr_crush: {branch:'warrior', row:1, type:'notable', name:'Schädelspalter', fx:{}, ab:[{k:'power_strike', mult:0.2}], requires:['kr_grip', 'kr_stand'], desc:'Wuchtschlag +20 % Schaden.'},
+  kr_tempo: {branch:'warrior', row:1, name:'Schlagfolge', fx:{}, ab:[{k:'power_strike', cd:-0.15}], requires:['kr_stand'], desc:'Wuchtschlag lädt 15 % schneller.'},
+  kr_core: {branch:'warrior', row:2, name:'Herz des Ambosses', fx:{armor:2}, requires:['kr_drill', 'kr_crush', 'kr_tempo'], desc:'Rüstung +2.'},
+  k_kr_wall: {branch:'warrior', row:3, type:'keystone', name:'Unerschütterlich', fx:{armor:3, speed:-0.05}, ab:[{k:'power_strike', mult:0.15}], requires:['kr_core'], desc:'Rüstung +3, Wuchtschlag +15 % Schaden. Dafür 5 % langsamer.', designIntent:'Stehen, nicht tanzen — der Krieger als Fels.'},
+  k_kr_storm: {branch:'warrior', row:3, type:'keystone', name:'Sturmangriff', fx:{armor:-2}, ab:[{k:'power_strike', cd:-0.3}], requires:['kr_core'], excl:'k_kr_wall', desc:'Wuchtschlag lädt 30 % schneller. Dafür Rüstung −2.', designIntent:'Hinein, bevor sie stehen.'},
+  // Der Schild (knight)
+  rt_oath: {branch:'knight', row:0, name:'Eid', fx:{}, ab:[{k:'blessing', dur:0.25}], requires:[], desc:'Segen hält 25 % länger.'},
+  rt_mail: {branch:'knight', row:0, name:'Kettendrill', fx:{armor:2}, requires:[], desc:'Rüstung +2.'},
+  rt_guard: {branch:'knight', row:1, type:'notable', name:'Beschützer', fx:{}, ab:[{k:'blessing', cd:-0.25}], requires:['rt_oath'], desc:'Segen lädt 25 % schneller.'},
+  rt_lance: {branch:'knight', row:1, name:'Lanzenstoß', fx:{}, ab:[{k:'power_strike', mult:0.15}], requires:['rt_oath', 'rt_mail'], desc:'Wuchtschlag +15 % Schaden.'},
+  rt_shield: {branch:'knight', row:1, name:'Schildhand', fx:{hp:0.05}, requires:['rt_mail'], desc:'Leben +5 %.'},
+  rt_core: {branch:'knight', row:2, name:'Herz des Schilds', fx:{}, ab:[{k:'blessing', cost:-0.3}], requires:['rt_guard', 'rt_lance', 'rt_shield'], desc:'Segen kostet 30 % weniger.'},
+  k_rt_vow: {branch:'knight', row:3, type:'keystone', name:'Schwur des Ritters', fx:{stam:-10}, ab:[{k:'blessing', dur:0.5}, {k:'power_strike', mult:0.1}], requires:['rt_core'], desc:'Segen hält 50 % länger, Wuchtschlag +10 %. Dafür Ausdauer −10.', designIntent:'Der Ritter kämpft für die anderen.'},
+  k_rt_iron: {branch:'knight', row:3, type:'keystone', name:'Eisenwand', fx:{armor:4, speed:-0.06}, requires:['rt_core'], excl:'k_rt_vow', desc:'Rüstung +4. Dafür 6 % langsamer.', designIntent:'Wer steht, schützt.'},
+  // Die Morgenröte (paladin)
+  pa_light: {branch:'paladin', row:0, name:'Morgenlicht', fx:{}, ab:[{k:'holy_strike', mult:0.2}], requires:[], desc:'Heiliger Schlag +20 % Schaden.'},
+  pa_faith: {branch:'paladin', row:0, name:'Glaubensstärke', fx:{mana:12}, requires:[], desc:'Mana +12.'},
+  pa_ward: {branch:'paladin', row:1, type:'notable', name:'Schrein im Herzen', fx:{}, ab:[{k:'holy_heal', mult:0.25}], requires:['pa_light'], desc:'Heiliges Heilen heilt 25 % mehr.'},
+  pa_vigil: {branch:'paladin', row:1, name:'Wachsamkeit', fx:{}, ab:[{k:'holy_strike', cd:-0.15}], requires:['pa_light', 'pa_faith'], desc:'Heiliger Schlag lädt 15 % schneller.'},
+  pa_halo: {branch:'paladin', row:1, name:'Heiligenschein', fx:{hp:0.05}, requires:['pa_faith'], desc:'Leben +5 %.'},
+  pa_core: {branch:'paladin', row:2, name:'Herz der Morgenröte', fx:{}, ab:[{k:'blessing', dur:0.3}], requires:['pa_ward', 'pa_vigil', 'pa_halo'], desc:'Segen hält 30 % länger.'},
+  k_pa_dawn: {branch:'paladin', row:3, type:'keystone', name:'Dämmerungsklinge', fx:{mana:-15}, ab:[{k:'holy_strike', mult:0.3}], requires:['pa_core'], desc:'Heiliger Schlag +30 % Schaden. Dafür Mana −15.', designIntent:'Was du beschützt, macht dich stark — und bindet dich ans Licht.'},
+  k_pa_martyr: {branch:'paladin', row:3, type:'keystone', name:'Märtyrer', fx:{hp:-0.05}, ab:[{k:'holy_heal', cd:-0.3}], requires:['pa_core'], excl:'k_pa_dawn', desc:'Heiliges Heilen lädt 30 % schneller. Dafür Leben −5 %.', designIntent:'Wer andere hält, fällt selbst leichter.'},
+  // Der Eber (berserker)
+  bs_scar: {branch:'berserker', row:0, name:'Narben', fx:{hp:0.05}, requires:[], desc:'Leben +5 %.'},
+  bs_rage: {branch:'berserker', row:0, name:'Rote Sicht', fx:{}, ab:[{k:'frenzy', dur:0.25}], requires:[], desc:'Raserei hält 25 % länger.'},
+  bs_blood: {branch:'berserker', row:1, type:'notable', name:'Blutrausch', fx:{}, ab:[{k:'frenzy', cd:-0.2}], requires:['bs_rage'], desc:'Raserei lädt 20 % schneller.'},
+  bs_cleave: {branch:'berserker', row:1, name:'Axtschwinger', fx:{}, ab:[{k:'power_strike', mult:0.15}], requires:['bs_scar', 'bs_rage'], desc:'Wuchtschlag +15 % Schaden.'},
+  bs_hide: {branch:'berserker', row:1, name:'Dickes Fell', fx:{stam:10}, requires:['bs_scar'], desc:'Ausdauer +10.'},
+  bs_core: {branch:'berserker', row:2, name:'Herz des Ebers', fx:{}, ab:[{k:'frenzy', cost:-0.3}], requires:['bs_blood', 'bs_cleave', 'bs_hide'], desc:'Raserei kostet 30 % weniger Ausdauer.'},
+  k_bs_red: {branch:'berserker', row:3, type:'keystone', name:'Nichts mehr fühlen', fx:{armor:-3}, ab:[{k:'frenzy', dur:0.5}], requires:['bs_core'], desc:'Raserei hält 50 % länger. Dafür Rüstung −3.', designIntent:'Wut als Rüstung — bis sie reißt.'},
+  k_bs_whole: {branch:'berserker', row:3, type:'keystone', name:'Ungebrochen', fx:{hp:0.06, speed:-0.04}, ab:[{k:'frenzy', cost:-0.5}], requires:['bs_core'], excl:'k_bs_red', desc:'Leben +6 %, Raserei kostet die Hälfte. Dafür 4 % langsamer.', designIntent:'Länger stehen statt härter schlagen.'},
+  // Die Kette (darkpaladin)
+  hp_chain: {branch:'darkpaladin', row:0, name:'Kettenglied', fx:{}, ab:[{k:'chain_strike', dur:0.3}], requires:[], desc:'Kettenschlag fesselt 30 % länger.'},
+  hp_iron: {branch:'darkpaladin', row:0, name:'Eisenhaut', fx:{armor:2}, requires:[], desc:'Rüstung +2.'},
+  hp_fear: {branch:'darkpaladin', row:1, name:'Furchtbar', fx:{}, ab:[{k:'fear_aura', dur:0.25}], requires:['hp_chain'], desc:'Furcht-Aura wirkt 25 % länger.'},
+  hp_price: {branch:'darkpaladin', row:1, type:'notable', name:'Blutzoll', fx:{}, ab:[{k:'blood_price', mult:0.2}], requires:['hp_chain', 'hp_iron'], desc:'Blutpreis +20 % Schaden.'},
+  hp_cmd: {branch:'darkpaladin', row:1, name:'Befehlston', fx:{}, ab:[{k:'chain_command', cd:-0.25}], requires:['hp_iron'], desc:'Befehl der Kette lädt 25 % schneller.'},
+  hp_core: {branch:'darkpaladin', row:2, name:'Herz der Kette', fx:{stam:10}, requires:['hp_fear', 'hp_price', 'hp_cmd'], desc:'Ausdauer +10.'},
+  k_hp_order: {branch:'darkpaladin', row:3, type:'keystone', name:'Eiserne Ordnung', fx:{hp:-0.05}, ab:[{k:'chain_strike', mult:0.3}, {k:'fear_aura', cd:-0.2}], requires:['hp_core'], desc:'Kettenschlag +30 % Schaden, Furcht-Aura lädt 20 % schneller. Dafür Leben −5 %.', designIntent:'Wer kniet, lebt.'},
+  k_hp_blood: {branch:'darkpaladin', row:3, type:'keystone', name:'Blutherr', fx:{armor:-2}, ab:[{k:'blood_price', mult:0.4, cd:-0.2}], requires:['hp_core'], excl:'k_hp_order', desc:'Blutpreis +40 % Schaden und lädt 20 % schneller. Dafür Rüstung −2.', designIntent:'Die Kette nimmt, was ihr gehört.'},
+  // Der Falke (archer)
+  sc_eye: {branch:'archer', row:0, name:'Falkenauge', fx:{crit:0.03}, requires:[], desc:'Kritische Treffer +3 %.'},
+  sc_draw: {branch:'archer', row:0, name:'Ruhiger Zug', fx:{}, ab:[{k:'aimed_shot', cost:-0.25}], requires:[], desc:'Gezielter Schuss kostet 25 % weniger Ausdauer.'},
+  sc_wind: {branch:'archer', row:1, name:'Wind lesen', fx:{stam:10}, requires:['sc_eye'], desc:'Ausdauer +10.'},
+  sc_pierce: {branch:'archer', row:1, type:'notable', name:'Durchschlag', fx:{}, ab:[{k:'aimed_shot', mult:0.2}], requires:['sc_eye', 'sc_draw'], desc:'Gezielter Schuss +20 % Schaden.'},
+  sc_quick: {branch:'archer', row:1, name:'Schnelle Sehne', fx:{}, ab:[{k:'aimed_shot', cd:-0.15}], requires:['sc_draw'], desc:'Gezielter Schuss lädt 15 % schneller.'},
+  sc_core: {branch:'archer', row:2, name:'Herz des Falken', fx:{hp:0.05}, requires:['sc_wind', 'sc_pierce', 'sc_quick'], desc:'Leben +5 %.'},
+  k_sc_still: {branch:'archer', row:3, type:'keystone', name:'Stillstand', fx:{speed:-0.05}, ab:[{k:'aimed_shot', mult:0.3}], requires:['sc_core'], desc:'Gezielter Schuss +30 % Schaden. Dafür 5 % langsamer.', designIntent:'Wer steht, trifft.'},
+  k_sc_run: {branch:'archer', row:3, type:'keystone', name:'Laufender Schütze', fx:{hp:-0.05}, ab:[{k:'aimed_shot', cd:-0.3}], requires:['sc_core'], excl:'k_sc_still', desc:'Gezielter Schuss lädt 30 % schneller. Dafür Leben −5 %.', designIntent:'Schießen und weiter.'},
+  // Der Hirsch (ranger)
+  wl_track: {branch:'ranger', row:0, name:'Fährte', fx:{}, ab:[{k:'mark_target', dur:0.3}], requires:[], desc:'Ziel markieren hält 30 % länger.'},
+  wl_hide: {branch:'ranger', row:0, name:'Waldhaut', fx:{hp:0.05}, requires:[], desc:'Leben +5 %.'},
+  wl_hunt: {branch:'ranger', row:1, type:'notable', name:'Jagdruf', fx:{}, ab:[{k:'mark_target', cd:-0.3}], requires:['wl_track'], desc:'Ziel markieren lädt 30 % schneller.'},
+  wl_arrow: {branch:'ranger', row:1, name:'Breitkopfpfeil', fx:{}, ab:[{k:'aimed_shot', mult:0.15}], requires:['wl_track', 'wl_hide'], desc:'Gezielter Schuss +15 % Schaden.'},
+  wl_bark: {branch:'ranger', row:1, name:'Rindenhaut', fx:{armor:2}, requires:['wl_hide'], desc:'Rüstung +2.'},
+  wl_core: {branch:'ranger', row:2, name:'Herz des Hirschs', fx:{}, ab:[{k:'aimed_shot', cd:-0.15}], requires:['wl_hunt', 'wl_arrow', 'wl_bark'], desc:'Gezielter Schuss lädt 15 % schneller.'},
+  k_wl_pack: {branch:'ranger', row:3, type:'keystone', name:'Meute', fx:{armor:-2}, ab:[{k:'mark_target', cost:-1, cd:-0.3}], requires:['wl_core'], desc:'Ziel markieren kostet nichts und lädt 30 % schneller. Dafür Rüstung −2.', designIntent:'Der Waldläufer zeigt, die anderen beißen.'},
+  k_wl_lone: {branch:'ranger', row:3, type:'keystone', name:'Einzelgänger', fx:{stam:-10}, ab:[{k:'aimed_shot', mult:0.25}], requires:['wl_core'], excl:'k_wl_pack', desc:'Gezielter Schuss +25 % Schaden. Dafür Ausdauer −10.', designIntent:'Allein im Wald zählt jeder Pfeil.'},
+  // Das Netz (chainhunter)
+  kj_net: {branch:'chainhunter', row:0, name:'Schweres Netz', fx:{}, ab:[{k:'net_shot', dur:0.3}], requires:[], desc:'Fangnetz hält 30 % länger.'},
+  kj_boots: {branch:'chainhunter', row:0, name:'Grenzreiterstiefel', fx:{stam:12}, requires:[], desc:'Ausdauer +12.'},
+  kj_hound: {branch:'chainhunter', row:1, type:'notable', name:'Abgerichtet', fx:{}, ab:[{k:'hound_call', dur:0.5}], requires:['kj_net'], desc:'Der Kettenhund bleibt 50 % länger.'},
+  kj_barb: {branch:'chainhunter', row:1, name:'Widerhaken', fx:{}, ab:[{k:'net_shot', mult:0.3}], requires:['kj_net', 'kj_boots'], desc:'Fangnetz +30 % Schaden.'},
+  kj_hide: {branch:'chainhunter', row:1, name:'Lederwams', fx:{armor:2}, requires:['kj_boots'], desc:'Rüstung +2.'},
+  kj_core: {branch:'chainhunter', row:2, name:'Herz des Netzes', fx:{}, ab:[{k:'aimed_shot', mult:0.15}], requires:['kj_hound', 'kj_barb', 'kj_hide'], desc:'Gezielter Schuss +15 % Schaden.'},
+  k_kj_catch: {branch:'chainhunter', row:3, type:'keystone', name:'Fänger', fx:{hp:-0.05}, ab:[{k:'net_shot', cd:-0.3}], requires:['kj_core'], desc:'Fangnetz lädt 30 % schneller. Dafür Leben −5 %.', designIntent:'Keiner entkommt zweimal.'},
+  k_kj_pack: {branch:'chainhunter', row:3, type:'keystone', name:'Hundeführer', fx:{stam:-10}, ab:[{k:'hound_call', cd:-0.4}], requires:['kj_core'], excl:'k_kj_catch', desc:'Kettenhund lädt 40 % schneller. Dafür Ausdauer −10.', designIntent:'Der Hund läuft, du nicht.'},
+  // Der Dolch (rogue)
+  su_soft: {branch:'rogue', row:0, name:'Leise Sohlen', fx:{stam:10}, requires:[], desc:'Ausdauer +10.'},
+  su_edge: {branch:'rogue', row:0, name:'Feine Klinge', fx:{}, ab:[{k:'backstab', mult:0.15}], requires:[], desc:'Meuchelstich +15 % Schaden.'},
+  su_lung: {branch:'rogue', row:1, name:'Zähe Lunge', fx:{hp:0.05}, requires:['su_soft'], desc:'Leben +5 %.'},
+  su_cheap: {branch:'rogue', row:1, name:'Billiger Trick', fx:{}, ab:[{k:'backstab', cost:-0.3}], requires:['su_soft', 'su_edge'], desc:'Meuchelstich kostet 30 % weniger Ausdauer.'},
+  su_vein: {branch:'rogue', row:1, type:'notable', name:'Halsschlagader', fx:{}, ab:[{k:'backstab', cd:-0.2}], requires:['su_edge'], desc:'Meuchelstich lädt 20 % schneller.'},
+  su_core: {branch:'rogue', row:2, name:'Herz des Dolchs', fx:{crit:0.02}, requires:['su_lung', 'su_cheap', 'su_vein'], desc:'Kritische Treffer +2 %.'},
+  k_su_shadow: {branch:'rogue', row:3, type:'keystone', name:'Aus dem Nichts', fx:{hp:-0.06}, ab:[{k:'backstab', mult:0.3}], requires:['su_core'], desc:'Meuchelstich +30 % Schaden. Dafür Leben −6 %.', designIntent:'Ein Stich, kein zweiter.'},
+  k_su_brawl: {branch:'rogue', row:3, type:'keystone', name:'Straßenkämpfer', fx:{}, ab:[{k:'backstab', cd:-0.3, mult:-0.15}], requires:['su_core'], excl:'k_su_shadow', desc:'Meuchelstich lädt 30 % schneller. Dafür −15 % Schaden.', designIntent:'Öfter, dafür flacher.'},
+  // Die Natter (assassin)
+  as_veil: {branch:'assassin', row:0, name:'Schleier', fx:{}, ab:[{k:'shadowstep', cd:-0.2}], requires:[], desc:'Schattenschritt lädt 20 % schneller.'},
+  as_poise: {branch:'assassin', row:0, name:'Gleichgewicht', fx:{stam:10}, requires:[], desc:'Ausdauer +10.'},
+  as_mark: {branch:'assassin', row:1, type:'notable', name:'Todeszeichen', fx:{}, ab:[{k:'backstab', mult:0.2}], requires:['as_veil'], desc:'Meuchelstich +20 % Schaden.'},
+  as_step: {branch:'assassin', row:1, name:'Leichter Schritt', fx:{}, ab:[{k:'shadowstep', cost:-0.3}], requires:['as_veil', 'as_poise'], desc:'Schattenschritt kostet 30 % weniger Ausdauer.'},
+  as_skin: {branch:'assassin', row:1, name:'Schattenhaut', fx:{hp:0.05}, requires:['as_poise'], desc:'Leben +5 %.'},
+  as_core: {branch:'assassin', row:2, name:'Herz der Natter', fx:{}, ab:[{k:'backstab', cd:-0.15}], requires:['as_mark', 'as_step', 'as_skin'], desc:'Meuchelstich lädt 15 % schneller.'},
+  k_as_one: {branch:'assassin', row:3, type:'keystone', name:'Ein Stich', fx:{hp:-0.08}, ab:[{k:'backstab', mult:0.35}], requires:['as_core'], desc:'Meuchelstich +35 % Schaden. Dafür Leben −8 %.', designIntent:'Wer trifft, muss nicht stehen.'},
+  k_as_ghost: {branch:'assassin', row:3, type:'keystone', name:'Geist', fx:{armor:-3}, ab:[{k:'shadowstep', cd:-0.4}], requires:['as_core'], excl:'k_as_one', desc:'Schattenschritt lädt 40 % schneller. Dafür Rüstung −3.', designIntent:'Nie dort, wo der Hieb hinfällt.'},
+  // Die Zange (torturer)
+  fk_hook: {branch:'torturer', row:0, name:'Haken', fx:{}, ab:[{k:'break_will', dur:0.3}], requires:[], desc:'Wille brechen hält 30 % länger.'},
+  fk_apron: {branch:'torturer', row:0, name:'Lederschürze', fx:{armor:2}, requires:[], desc:'Rüstung +2.'},
+  fk_axe: {branch:'torturer', row:1, type:'notable', name:'Henkersbeil', fx:{}, ab:[{k:'execute', mult:0.2}], requires:['fk_hook'], desc:'Henkersstreich +20 % Schaden.'},
+  fk_screw: {branch:'torturer', row:1, name:'Daumenschraube', fx:{}, ab:[{k:'break_will', cd:-0.25}], requires:['fk_hook', 'fk_apron'], desc:'Wille brechen lädt 25 % schneller.'},
+  fk_night: {branch:'torturer', row:1, name:'Lange Nacht', fx:{stam:12}, requires:['fk_apron'], desc:'Ausdauer +12.'},
+  fk_core: {branch:'torturer', row:2, name:'Herz der Zange', fx:{}, ab:[{k:'execute', cost:-0.25}], requires:['fk_axe', 'fk_screw', 'fk_night'], desc:'Henkersstreich kostet 25 % weniger Ausdauer.'},
+  k_fk_judge: {branch:'torturer', row:3, type:'keystone', name:'Urteil', fx:{hp:-0.05}, ab:[{k:'execute', mult:0.3}], requires:['fk_core'], desc:'Henkersstreich +30 % Schaden. Dafür Leben −5 %.', designIntent:'Das Urteil fällt einmal.'},
+  k_fk_fear: {branch:'torturer', row:3, type:'keystone', name:'Schrecken', fx:{armor:-2}, ab:[{k:'break_will', dur:0.5, cd:-0.2}], requires:['fk_core'], excl:'k_fk_judge', desc:'Wille brechen hält 50 % länger und lädt 20 % schneller. Dafür Rüstung −2.', designIntent:'Angst arbeitet länger als die Klinge.'},
+  // ==== Ende der Sterne (Anker Klassen und Talente) ====
 };
 
+// ---- Sternenhimmel (Klassen und Talente, Scheibe 2; Entwickler 02.10.2026: ein Sternbild je Klasse, je Titel, Gefährten) ----
+// Jeder Knoten bekommt sky (Sternbild) und pos (Lage im Sternbild, Himmelseinheiten). Die alten Zweige Kampf, Magie, Überleben bilden
+// den Wanderer (drei Arme), alle anderen Zweige sind ihr eigenes Sternbild. Schlüssel und branch bleiben, wie sie sind (46 Codestellen
+// fragen Schlüssel ab). at = Mitte am Himmel (Linien liegen beieinander: Krieger links, Schütze und Schurke unten, Licht und Feuer oben,
+// Lied und Kessel rechts, Titel am äußeren Rand). Sternbilder ohne Sterne bleiben unsichtbar.
+export const SKIES = {
+  wanderer:    { name:'Der Wanderer', at:[0, 0], col:'#d8c08a', lab:18, size:780 },
+  warrior:     { name:'Der Amboss', cls:'warrior', at:[-900, -170], col:'#c87848' },
+  knight:      { name:'Der Schild', cls:'knight', at:[-1380, -470], col:'#c8c8d8' },
+  paladin:     { name:'Die Morgenröte', cls:'paladin', at:[-1880, -720], col:'#ffe0a0' },
+  berserker:   { name:'Der Eber', cls:'berserker', at:[-1400, 80], col:'#c03a2a' },
+  deathknight: { name:'Die Totenkrone', cls:'deathknight', at:[-1780, 420], col:'#8ac0d8' },
+  darkpaladin: { name:'Die Kette', cls:'darkpaladin', at:[-1150, 520], col:'#a8463a' },
+  archer:      { name:'Der Falke', cls:'archer', at:[-560, 640], col:'#9ab868' },
+  ranger:      { name:'Der Hirsch', cls:'ranger', at:[-880, 1060], col:'#6a9a4a' },
+  chainhunter: { name:'Das Netz', cls:'chainhunter', at:[-330, 1120], col:'#9a8a5a' },
+  rogue:       { name:'Der Dolch', cls:'rogue', at:[560, 640], col:'#9a8ab8' },
+  assassin:    { name:'Die Natter', cls:'assassin', at:[880, 1060], col:'#7a6aa8' },
+  torturer:    { name:'Die Zange', cls:'torturer', at:[330, 1120], col:'#9a4a40' },
+  cleric:      { name:'Die Lampe', cls:'cleric', at:[-330, -720], col:'#f0e0a0' },
+  darkpriest:  { name:'Das Auge', cls:'darkpriest', at:[0, -1080], col:'#c04a34' },
+  mage:        { name:'Die Flamme', cls:'mage', at:[330, -720], col:'#e8903a' },
+  bard:        { name:'Die Laute', cls:'bard', at:[900, -170], col:'#d8a0c8' },
+  chainbard:   { name:'Die Trommel', cls:'chainbard', at:[1400, 80], col:'#b09a6a' },
+  alchemist:   { name:'Der Kessel', cls:'alchemist', at:[1380, -470], col:'#88c070' },
+  necromancer: { name:'Der Schädel', title:'necromancer', at:[-1450, -1220], col:'#8fd9b0' },
+  warlock:     { name:'Der Obelisk', title:'warlock', at:[-780, -1420], col:'#b07ae0' },
+  druid:       { name:'Die Eiche', title:'druid', at:[780, -1420], col:'#b7d86a' },
+  monk:        { name:'Der Stille Kreis', title:'monk', at:[1450, -1220], col:'#e6cf8a' },
+  vampire:     { name:'Der Kelch', title:'vampire', at:[1950, -620], col:'#c0303a' },
+  goblinlord:  { name:'Die Grube', title:'goblinlord', at:[1880, 520], col:'#9ad05a' },
+  companion:   { name:'Die Gefährten', comp:true, at:[0, 1500], col:'#c8b48a' },
+};
+const WAND_ARM = { combat: -2.45, magic: -0.69, survival: 1.57 };   /* Wanderer: Klinge links oben, Stern rechts oben, Blatt unten */
+export function skyLayout() {                                     /* idempotent: neue Knoten bekommen Lage, alte behalten sie */
+  const bySky = {};
+  for (const [k, n] of Object.entries(SKILL_TREE)) { n.sky ||= WAND_ARM[n.branch] != null ? 'wanderer' : n.branch; (bySky[n.sky] ||= []).push(k); }
+  // Zeilen nach Tiefe; innerhalb einer Zeile nach der mittleren Lage der Voraussetzungen sortiert (wenige gekreuzte Linien)
+  const lanes = L => { const R = {}, lat = {}; for (const k of L) (R[SKILL_TREE[k].row] ||= []).push(k);
+    for (const r of Object.keys(R).map(Number).sort((a, b) => a - b)) { const row = R[r];
+      const bc = k => { const q = SKILL_TREE[k].requires.filter(x => lat[x] != null); return q.length ? q.reduce((a, x) => a + lat[x], 0) / q.length : 0; };
+      if (r > 0) row.sort((a, b) => bc(a) - bc(b));
+      row.forEach((k, i) => { lat[k] = i - (row.length - 1) / 2; }); }
+    return { R, lat }; };
+  for (const [s, keys] of Object.entries(bySky)) {
+    if (s === 'wanderer') { for (const [b, a] of Object.entries(WAND_ARM)) { const ca = Math.cos(a), sa = Math.sin(a), { R, lat } = lanes(keys.filter(k => SKILL_TREE[k].branch === b));
+      for (const [r, L] of Object.entries(R)) for (const k of L) { const rd = 78 + r * 70, l = lat[k] * 82; SKILL_TREE[k].pos ||= [Math.round(ca * rd - sa * l), Math.round(sa * rd + ca * l)]; } } continue; }
+    const { R, lat } = lanes(keys), top = Math.max(...Object.keys(R).map(Number));
+    for (const [r, L] of Object.entries(R)) for (const k of L) { const h = [...k].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+      SKILL_TREE[k].pos ||= [Math.round(lat[k] * 96 + ((h & 15) - 7) * 2), Math.round((top / 2 - r) * 98 + (((h >> 4) & 15) - 7) * 2)]; }
+  }
+}
+skyLayout();
 export const FACTIONS = {
   valen: { name:'Königreich Valen', colors:['#2f4260','#b9c3d2'], desc:'Ordnung, Steuern, Garnisonen. Was davon übrig ist.',
            ranks:['Rekrut','Soldat','Veteran','Ritter','Offizier'] },
@@ -1198,7 +1364,40 @@ export const QUESTS = {
     objectives:[{type:'kill',target:'bandit',targets:['bandit','bandit_archer','bandit_spear'],count:4,text:'Banditen besiegen'}], reward:{xp:80} },
   kt_warrior2:{ name:'Prüfung des Kriegers: Der Kreis', giver:null, clsTrial:['warrior', 2],
     desc:'„Jetzt der Kreis. Mein Übungsfechter wartet. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt. Sag Bescheid, wenn du bereit bist.“',
-    objectives:[{type:'trial',target:'duel',count:1,text:'Das Duell im Kreis gewinnen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'warrior'} },  q_paladin1:{ name:'Prüfung: Wachsamkeit', giver:'kelan', desc:'Kelan verlangt Beweise, nicht Absichten. Tote Untote zählen als Beweis.',
+    objectives:[{type:'trial',target:'duel',count:1,text:'Das Duell im Kreis gewinnen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'warrior'} },  kt_knight1:{ name:'Prüfung des Ritters: Ein Eid mit Rüstung', giver:null, clsTrial:['knight', 1],
+    desc:'„Ein Ritter hält, was er verspricht — auch einen Platz. Hier, vor mir: Räuber kommen in Wellen. Halte stand, bis es vorbei ist. Niemand stirbt.“',
+    objectives:[{type:'trial',target:'hold',count:1,text:'Den Platz gegen den Überfall halten (beim Lehrer antreten)'}], reward:{xp:80} },
+  kt_knight2:{ name:'Prüfung des Ritters: Duell in Rüstung', giver:null, clsTrial:['knight', 2],
+    desc:'„Jetzt mit Schild. Ein Duell bis ein Fünftel. Legst du den Schild ab, ist es vorbei.“',
+    objectives:[{type:'trial',target:'duel',need:'shield',count:1,text:'Das Duell mit Schild gewinnen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'knight'} },
+  kt_berserker1:{ name:'Prüfung des Berserkers: Narben', giver:null, clsTrial:['berserker', 1],
+    desc:'„Fünf. Egal wer, egal wo — solange sie dich töten wollten. Komm mit Narben zurück.“',
+    objectives:[{type:'kill',target:'*',count:5,text:'Feinde besiegen'}], reward:{xp:80} },
+  kt_berserker2:{ name:'Prüfung des Berserkers: Schmerz lehrt', giver:null, clsTrial:['berserker', 2],
+    desc:'„Die Grube. Du gewinnst erst, wenn du selbst am Abgrund stehst — unter einem Drittel deines Lebens, wenn er fällt. Niemand stirbt.“',
+    objectives:[{type:'trial',target:'pit',count:1,text:'Den Grubenkampf gewinnen, selbst unter 30 % Leben (beim Lehrer antreten)'}], reward:{xp:110,unlock:'berserker'} },
+  kt_archer1:{ name:'Prüfung des Schützen: Wölfe an der Hürde', giver:null, clsTrial:['archer', 1],
+    desc:'„Drei Wölfe, drei Felle. Wer Wölfe auf Abstand erlegt, hat verstanden, wofür ein Bogen da ist.“',
+    objectives:[{type:'kill',target:'wolf',count:3,text:'Wölfe erlegen'},{type:'item',target:'pelt',count:3,text:'Wolfsfelle mitbringen'}], reward:{xp:80,take:'pelt',takeCount:3} },
+  kt_archer2:{ name:'Prüfung des Schützen: Zehn, zwanzig, dreißig Schritt', giver:null, clsTrial:['archer', 2],
+    desc:'„Fünf Puppen, nah und weit. Mit dem Bogen. Du hast vierzig Atemzüge.“',
+    objectives:[{type:'trial',target:'bow',need:'bow',count:1,text:'Fünf Puppen mit dem Bogen treffen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'archer'} },
+  kt_ranger1:{ name:'Prüfung des Waldläufers: Der Bär im Revier', giver:null, clsTrial:['ranger', 1],
+    desc:'„Im Revier steht ein Bär, der zu nah an die Höfe kommt. Bring ihn zur Strecke.“',
+    objectives:[{type:'kill',target:'bear',count:1,text:'Einen Bären erlegen'}], reward:{xp:80} },
+  kt_ranger2:{ name:'Prüfung des Waldläufers: Eine Nacht draußen', giver:null, clsTrial:['ranger', 2],
+    desc:'„Eine ganze Nacht draußen. Kein Dach, kein Dorf — von acht Uhr abends bis sechs Uhr früh, zehn Stunden am Stück. Ein Feuer darfst du machen.“',
+    objectives:[{type:'night',count:1,text:'Eine ganze Nacht draußen bleiben (10 Stunden am Stück, 20–6 Uhr, außerhalb von Siedlungen)'}], reward:{xp:110,unlock:'ranger'} },
+  kt_rogue1:{ name:'Prüfung des Schurken: Leichte Finger', giver:null, clsTrial:['rogue', 1],
+    desc:'„Nimm etwas, das dir nicht gehört — aus einem Regal, einer Kiste, einem Schreibtisch in einem bewohnten Haus. Wenn dich jemand sieht, zählt es nicht. Dann zahlst du nur.“',
+    objectives:[{type:'steal',count:1,text:'Aus fremdem Besitz stehlen, ohne gesehen zu werden'}], reward:{xp:80} },
+  kt_rogue2:{ name:'Prüfung des Schurken: Von hinten', giver:null, clsTrial:['rogue', 2],
+    desc:'„Drei Puppen. Drei Meuchelstiche. Nur der Stich zählt, nicht das Hacken.“',
+    objectives:[{type:'trial',target:'stab',count:1,text:'Drei Meuchelstiche an Übungspuppen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'rogue'} },
+  kt_assassin1:{ name:'Prüfung der Assassine: Ein Name auf dem Brett', giver:null, clsTrial:['assassin', 1],
+    desc:'„Am Anschlagbrett hängen Steckbriefe. Nimm einen, bring es zu Ende und hol dir den Lohn. Dann reden wir.“',
+    objectives:[{type:'contract',count:1,text:'Einen Kopfgeldauftrag (Steckbrief) vom Anschlagbrett erfüllen und abgeben'}], reward:{xp:120,unlock:'assassin'} },
+  q_paladin1:{ name:'Prüfung: Wachsamkeit', giver:'kelan', desc:'Kelan verlangt Beweise, nicht Absichten. Tote Untote zählen als Beweis.',
     objectives:[{type:'kill',target:'skeleton',count:4,text:'Untote vernichten'}],
     reward:{xp:80,rep:{order:10}}, turnin:'kelan' },
   q_paladin2:{ name:'Prüfung: Das Siegel', giver:'kelan', desc:'Ein Ordenssiegel blieb in der Grube zurück. Hol es.',

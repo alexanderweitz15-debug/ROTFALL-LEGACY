@@ -216,3 +216,7 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Prüfungszahlen schwerer:
     - Barde: 5 Siege unter dem Kriegslied mit 2 Gefährten.
     - Waldläufer: eine ganze Nacht (10 Stunden am Stück) draußen.
+- **03.10. (früh):**
+  - Ein Überfall nimmt die Hälfte der Betriebskasse.
+  - Bewohner-Siegel bleiben nur in der Nähe sichtbar (Lead, Entwickler: „kp“).
+  - Schmied „Verbessern“ und „Schmieden lassen“: die Regeln hat der Lead festgelegt (Entwickler: „entscheidest du“), beschrieben in MECHANIKEN.

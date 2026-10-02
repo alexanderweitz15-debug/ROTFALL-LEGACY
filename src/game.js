@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=24';
-import { BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
+import { BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=24';
 import * as R from './render.js?v=24';
 import * as HB from './buildings.js?v=24';
@@ -61,7 +61,27 @@ export function makeChar(o = {}) {
 // ---- Skill-Baum: Summe der Knoteneffekte (nur wer Knoten hat) und besondere Regeln je Schlüsselknoten ----
 const node = (c, k) => !!(c && c.tree && c.tree[k]);
 const dkNode = (c, k) => node(c, k) && c.currentClass === 'deathknight';   // S15: Todesritter-Schlüsselknoten nur als aktive Klasse
-function treeFx(c) { const f = {}; for (const k of Object.keys(c.tree || {})) for (const [a, v] of Object.entries(SKILL_TREE[k]?.fx || {})) f[a] = (f[a] || 0) + v; return f; }
+/* Klassen und Talente (Entscheidung 3 + Lead 03.10.): Wertesterne wirken immer; Schlüssel- und Fähigkeitssterne nur, solange ihre Klasse
+   aktiv ist — oder eine Folgeklasse davon (Krieger-Sterne wirken auch als Ritter) — bzw. solange der Titel getragen wird. */
+function clsLine(c) { const s = new Set(); let k = c?.currentClass; while (k && !s.has(k) && CLASSES[k]) { s.add(k); k = parentFor(k, c); } return s; }
+/* Fähigkeitssterne (ab): Summe je Fähigkeit, nur wenn ihr Sternbild wirkt. abBegin/abEnd klammern eine Fähigkeit: Schaden (hurt, Geschosse,
+   aufgeladener Hieb), Dauer (Zustände, Fesseln, Furcht, Diener). Allgemein — keine Regel je Stern. */
+function abMod(c, key) { const m = { mult: 0, cd: 0, cost: 0, dur: 0 }; for (const k of Object.keys(c?.tree || {})) { const N = SKILL_TREE[k]; if (!N?.ab || !skyActive(c, N.branch)) continue; for (const a of N.ab) if (a.k === key) for (const f of ['mult', 'cd', 'cost', 'dur']) m[f] += a[f] || 0; } return m; }
+let abNow = null;
+const AB_TIMERS = ['cowed', 'rooted', 'confused', 'hexed', 'until', 'cmdUntil'];
+function abBegin(c, M) {
+  if (!M || (!M.mult && !M.dur)) { abNow = null; return; }
+  const snap = M.dur ? new Map((S.ents[c.map] || []).filter(e => Math.abs(e.x - c.x) < 900 && Math.abs(e.y - c.y) < 900).map(e => [e, AB_TIMERS.map(f => e[f] || 0)])) : null;
+  abNow = { c, mult: 1 + M.mult, dur: Math.max(0.2, 1 + M.dur), n0: S.projectiles.length, am0: c.abilityMult, snap };
+}
+function abEnd(c) {
+  const N = abNow; abNow = null; if (!N || N.c !== c) return;
+  if (N.mult !== 1) { for (const pr of S.projectiles.slice(N.n0)) if (pr.owner === c.id && pr.dmg) pr.dmg *= N.mult; if (c.abilityMult && c.abilityMult !== N.am0) c.abilityMult *= N.mult; }
+  if (N.dur !== 1) { const now = performance.now();
+    for (const e of (S.ents[c.map] || [])) { const old = N.snap?.get(e); AB_TIMERS.forEach((f, i) => { const v = e[f]; if (typeof v === 'number' && v > now && v > (old ? old[i] : 0) + 1) e[f] = now + (v - now) * N.dur; }); } }
+}
+function skyActive(c, b) { const B_ = SKILL_BRANCHES[b]; if (!B_ || !c) return true; if (B_.cls) return clsLine(c).has(B_.cls); if (B_.title) return c.titleClass === B_.title; return true; }
+function treeFx(c) { const f = {}; for (const k of Object.keys(c.tree || {})) { const N = SKILL_TREE[k]; if (!N || (N.type === 'keystone' && !skyActive(c, N.branch))) continue; for (const [a, v] of Object.entries(N.fx || {})) f[a] = (f[a] || 0) + v; } return f; }
 const tfx = (c, k) => (c && c.tfx && c.tfx[k]) || 0;
 const inNature = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0) && [T.GRASS, T.MARSH, T.DIRT].includes(tileAt('world', c.x / TS | 0, c.y / TS | 0));
 const outside = c => c.map === 'world' && !townAt(c.x / TS | 0, c.y / TS | 0);
@@ -2372,6 +2392,7 @@ export function continueGame(given = null, retried = false) {                   
   S.player = byId(S.player.id) || S.player;
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   for (const c of S.player.knownClasses || []) if (OWN_PATH.has(c)) (S.player.clsPass ||= {})[c] = 1;   /* Entwickler: eigene Wege zählen rückwirkend als bestandene Prüfung */
+  if (S.player.skyV == null) { if (talentSpent(S.player)) { S.player.freeRespec = 1; log('Die Talente stehen jetzt als Sternenhimmel am Himmel (T): der Wanderer für alle, je Klasse und je Titel ein Sternbild. Deine Sterne bleiben — einmal darfst du sie kostenlos neu ordnen (im Talentfenster oder bei jedem Lehrer).', 'party'); } S.player.skyV = 1; }   /* Entscheidung 9 */
   { const got = talentTopUp(S.player); if (got) { recalc(S.player); log(`Die Talentregel hat sich geändert (ein Punkt auf jeder zweiten Stufe und je bestandener Klassenprüfung): ${got} Talentpunkt${got > 1 ? 'e' : ''} nachgereicht.`, 'party'); } }   /* Scheibe 0: Punkte rückwirkend nach der neuen Regel (nie weniger als vorher) */
   for (const h of [...Object.values(S.coopHeroes || {}), ...Object.values(S.ents).flat().filter(e => e?.coopHero)]) talentTopUp(h);   /* Koop-Gastfiguren bekamen bisher keine Talentpunkte */
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
@@ -3771,6 +3792,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
   if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
   if (S.trial && (target.trial || target === S.player) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
+  if (abNow && source === abNow.c && abNow.mult !== 1 && dmg > 0) dmg *= abNow.mult;   /* Fähigkeitssterne: Schaden der laufenden Fähigkeit */
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
     float(target, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); fx(target.x, target.y + 2, 'dust', 5); setTres(target, tres(target) + 1); titleDeed(target); return; }
@@ -5507,6 +5529,7 @@ function rummage(t, b) {
   for (const [k, n] of pool) if (ITEMS[k] && rnd() < 0.5 && addItem(p, k, n)) got.push(ITEMS[k].name);
   const g = t.type === 'desk' ? ri(3, 15) : rnd() < 0.3 ? ri(1, 6) : 0; S.gold += g;
   log(got.length || g ? `Gefunden: ${[...got, g ? g + ' Gold' : ''].filter(Boolean).join(', ')}.${owned ? ' Niemand hat es gesehen.' : ''}` : 'Nichts Brauchbares.', 'world');
+  if (owned && (got.length || g)) questEvent('steal');                 /* Klassen-Prüfung Schurke: Leichte Finger */
 }
 // Roadmap P4: Selbstwartung von Prothesen und Auge an Werkbank oder Amboss — Feinwerkzeug (bleibt) und je Teil 1 Magitech oder 2 Ersatzteile.
 // Obergrenze 70 %, Schmiedekunst hebt sie (bis 95 %), die Greifhand +10. Mehr schafft nur der Kybernetiker.
@@ -5542,6 +5565,7 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   p.skills[sk] = Math.min(100, skill + 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0);
     if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
+    questEvent('craft', key, n);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
     log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
   const o = mkItem(key); o.cond = qi === 0 ? 0.6 : 1; o.qual = qn; o.maker = p.name;
   if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(it.rarity || 'common')) rollRarity(o, it, 0, tier);
@@ -6801,9 +6825,15 @@ function raidTick() {
     return raidEnd(R, chance(defPower(R.v) / (defPower(R.v) + foes)));
   }
 }
+/* Entwickler 03.10.2026: Ein Überfall auf einen Ort nimmt die Hälfte aus den Kassen deiner Betriebe dort (Besetzung/Zerstörung: alles, s. economy.js). */
+function bizRaid(town, why) {
+  for (const b of S.eco?.biz || []) if (b.owner === 'player' && b.town === town && (b.kasse || 0) >= 2) {
+    const n = Math.floor(b.kasse / 2); b.kasse -= n; log(`${ECO.bizName(b)}: ${why} — ${n} Gold aus der Kasse geraubt (die Hälfte).`, 'economy'); }
+}
 function raidEnd(R, won) {
   const V = VILLAGES.find(v => v.key === R.v);
   S.ents.world = S.ents.world.filter(e => e.raidOf !== R.v && e.raidDef !== R.v); S.deadRaid = null;
+  if (!won && !S.razed?.[R.v]) bizRaid(R.v, 'Die Toten haben den Ort überfallen');
   if (won && R.live && R.pk) {                                        // S15 (Nutzer): wer das Dorf verteidigt, gewinnt Ruf
     const f = townFac(R.v), g = Math.min(15, 3 + R.pk * 2); S.factions[f] = clamp((S.factions[f] || 0) + g, -100, 100);
     for (const c of villagersOf(R.v)) if (c.key) addRel(c.key, 6);
@@ -7631,7 +7661,7 @@ function claimContract(C, npc) {
   const share = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + share * 1.5);   // S14 (Nutzer): wer die Wachen kämpfen lässt, bekommt weniger
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
-  C.state = 'claimed'; S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] += C.reward.rep;
+  C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract'); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] += C.reward.rep;
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
   if (npc?.kind === 'npc' && npc.alive !== false) gesture(npc, npc.guard || C.giver === 'vm' ? 'salutieren' : 'jubeln', 0, S.player);   /* Q7-3 */
@@ -8538,7 +8568,7 @@ let arrT = 0, keepT = 0, guideT = 0, guideLast = -1e9;
 // (Debug „Ratgeber an/aus“, S.settings.tips === false). Läuft nicht in Zwischenszenen, Dialogen oder im Koop als Gast.
 const GUIDE = [
   ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
-  ['talent', () => false, 'Du hast einen Talentpunkt frei. T öffnet die Talente.'],   /* Talentbäume versteckt (02.10.2026) */
+  ['talent', p => (p.skillPoints || 0) > 0, 'Du hast einen Talentpunkt frei. T öffnet den Sternenhimmel: Wanderer, deine Klassen, deine Titel.'],   /* Scheibe 2: wieder an */
   ['attr', p => (p.attrPoints || 0) > 0, 'Freie Attributpunkte: C öffnet deinen Charakter.'],
   ['board', p => p.map === 'world' && !activeCons().length && S.ents.world.some(e => e.type === 'board' && dist(e, p) < 200), 'Am Anschlagbrett (E) hängen Aufträge. J zeigt dein Tagebuch; der Pfeil am Bildrand zeigt das Ziel des verfolgten Auftrags.'],
   ['fight', p => S.ents[p.map]?.some(e => e.kind === 'enemy' && e.alive && e.aggroId === p.id && dist(e, p) < 250), 'Kampf: Q weicht aus. Drei Schläge ohne Pause ergeben einen Wuchtschlag. Wo du triffst, zählt — Arme, Beine, Kopf.'],
@@ -9360,7 +9390,7 @@ function lawlessHour(h) {
     for (let i = 0, n = ri(2, 4); i < n; i++) { const q = freeSpotNear('world', sq[0] + ri(-6, 6), sq[1] + ri(-4, 4), 3); if (!q) continue;
       const b = spawnEnemy(i ? 'bandit' : 'bandit_archer', 'world', q.x / TS | 0, q.y / TS | 0, { transient: true }); b.lawless = k; b.anchor = { x: sq[0] * TS, y: sq[1] * TS }; b.name = 'Plünderer';
       const v = S.ents.world.filter(e => e.kind === 'npc' && e.alive && !e.guard && e.homeTown === k).sort((a, c) => dist(a, b) - dist(c, b))[0]; if (v) b.aggroId = v.id; }
-    log(`Plünderer ziehen durch ${townName(k)}. Wer sie vertreibt, dem danken es die Bürger.`, 'combat');
+    log(`Plünderer ziehen durch ${townName(k)}. Wer sie vertreibt, dem danken es die Bürger.`, 'combat'); bizRaid(k, 'Plünderer');
   }
 }
 // Burgwache der Varonsburg (S2 §5): tote Burgwachen bleiben tot (S.schutzBurg), Ersatz kommt erst, wenn die Stadtwache vollzählig ist.
@@ -11288,6 +11318,7 @@ function deplOf(map) {
 function deplMark(e) { const m = e.map || S.map, D = DEPL.get(m); if (D && D.arr === S.ents[m] && !D.list.includes(e)) D.list.push(e); }
 function hourTick(h) {
   wxHour(h);   /* Roadmap C.12 */
+  nightWatch(h);                                                             /* Klassen-Prüfung Waldläufer */
   aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
   afterHour();                                                               /* Folgen §5c: Rachezüge, Ansteckung */
   cultHour(h);                                                               /* §5g.2 Blutkult */
@@ -12975,7 +13006,7 @@ function talk(npc) {
   if (tcls) choices.push({ text: `Kannst du mich ausbilden? (${CLASSES[tcls].name})`, fn: () => teach(npc, tcls) });
   for (const c of [].concat(npc.teaches || [])) if (c !== tcls && clsTrialOf(c).length && S.player.knownClasses.includes(c) && !S.player.clsPass?.[c] && !npc.hostile)
     choices.push({ text: `Ich will die Prüfung als ${CLASSES[c].name} nachholen. (Talentpunkt)`, fn: () => teach(npc, c) });   /* alte Stände (Entscheidung 8) */
-  if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
+  if (npc.teaches && S.player.freeRespec && talentSpent(S.player)) choices.push({ text: 'Die Sterne neu ordnen. (Talente einmal kostenlos neu verteilen)', fn: () => { UI.closeDialogue(); freeRespec(); } });   /* Scheibe 2: alte Stände */  if (npc.teaches && Object.keys(S.player.tree || {}).length) choices.push({ text: `Hilf mir, anders zu kämpfen. (Talente vergessen, ${respecCost()} Gold)`, fn: () => respec(npc) });
   if (npc.faction && S.ranks[npc.faction] === -1 && (['valen', 'order', 'undead', 'merch', 'bandit'].includes(npc.faction) || (npc.faction === 'chain' && !S.flags.chainsBroken)))
     choices.push({ text: `Wie tritt man bei — ${FACTIONS[npc.faction].name}?`, fn: () => joinFaction(npc) });
   const occupied = npc.town && S.war.nodes[npc.town]?.owner === 'undead';
@@ -13194,7 +13225,7 @@ const d6 = () => ri(1, 6);
 function dice(npc, g) {
   if (S.gold < g) return UI.closeDialogue(); const cheat = (npc.traits || []).includes('hinterhältig') || chance(0.12), a = d6() + d6(), b = cheat ? Math.max(d6() + d6(), 9) : d6() + d6();
   const spot = cheat && chance(0.25 + (S.player.attributes?.perception || 10) * 0.025);
-  const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') S.gold += g; else if (res === 'lose') S.gold -= g;
+  const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') { S.gold += g; questEvent('tavern'); } else if (res === 'lose') S.gold -= g;
   log(`Würfeln gegen ${npc.name}: ${a} zu ${b}. ${res === 'win' ? `+${g} Gold.` : res === 'lose' ? `−${g} Gold.` : 'Gleichstand.'}`, 'economy');   /* Schenke: Ergebnis auch im Protokoll, falls der Dialog zu schnell weg ist */
   UI.dialogue(npc, `Du wirfst ${a}, ${npc.name} wirft ${b}. ${res === 'win' ? `Du gewinnst ${g} Gold.` : res === 'lose' ? `Du verlierst ${g} Gold.` : 'Gleichstand — nochmal.'}${spot ? '\n(Dir fällt auf: seine Würfel rollen immer auf dieselbe Seite …)' : ''}`, [
     ...(spot && res === 'lose' ? [{ text: '„Falschspieler!“', fn: () => { S.gold += g * 2; addRel(npc.key, -15); log(`Falschspieler entlarvt: ${npc.name} zahlt den Einsatz doppelt zurück (+${g * 2} Gold).`, 'economy'); UI.dialogue(npc, '„Schon gut, schon gut! Hier, nimm und schrei nicht so.“ (Einsatz doppelt zurück)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }] : []),
@@ -13208,14 +13239,14 @@ function cards(npc, g, hand) {
   UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Noch eine?`, [
     { text: 'Karte', fn: () => cards(npc, g, [...hand, drawCard()]) },
     { text: 'Ich bleibe', fn: () => { const h = [drawCard(), drawCard()]; while (handSum(h) < 16) h.push(drawCard()); const n = handSum(h), win = n > 21 || sum > n, draw = n === sum;
-      if (win) S.gold += g; else if (!draw) S.gold -= g;
+      if (win) { S.gold += g; questEvent('tavern'); } else if (!draw) S.gold -= g;
       log(`Siebzehn und Vier gegen ${npc.name}: ${sum} zu ${n}${n > 21 ? ' (überkauft)' : ''}. ${win ? `+${g} Gold.` : draw ? 'Gleichstand.' : `−${g} Gold.`}`, 'economy');
       UI.dialogue(npc, `${npc.name}: ${h.join(' + ')} = ${n}${n > 21 ? ' — überkauft' : ''}. ${win ? `Du gewinnst ${g} Gold.` : draw ? 'Gleichstand.' : `Du verlierst ${g} Gold.`}`, [...(S.gold >= g ? [{ text: 'Neues Spiel', fn: () => cards(npc, g, [drawCard(), drawCard()]) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]); } }]);
 }
 function armWrestle(npc, g) {
   if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold, auch nicht bei "Nochmal" */
   const me = (S.player.attributes?.strength || 10) + d6() + d6(), him = (npc.attributes?.strength || 10) + d6() + d6(), win = me >= him;
-  if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); } else S.gold = Math.max(0, S.gold - g);
+  if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); questEvent('tavern'); } else S.gold = Math.max(0, S.gold - g);
   S.player.stamina = Math.max(0, S.player.stamina - 20);
   log(`Armdrücken gegen ${npc.name}: ${win ? `gewonnen (+${g} Gold)` : `verloren (−${g} Gold)`}.`, 'economy');
   UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [...(S.gold >= g ? [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
@@ -13226,7 +13257,7 @@ function drinkBet(npc, g, round) {
   addStatus(p, { key: 'rausch', name: `Rausch ${Math.min(3, st)}`, stacks: Math.min(3, st), left: 240000, desc: 'Die Welt schwankt: die Steuerung zieht zur Seite. Etwas mutiger (+5 % Schaden je Stufe).' });
   const meOut = chance(0.08 + round * 0.12 - (p.attributes?.endurance || 10) * 0.006), himOut = chance(0.1 + round * 0.12);
   if (meOut && !himOut) { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: verloren (−${g} Gold).`, 'economy'); return UI.dialogue(npc, `Beim ${round + 1}. Krug wird dir schwarz vor Augen. ${npc.name} lacht. (−${g} Gold)`, [{ text: '[Wankend gehen]', fn: () => UI.closeDialogue() }]); }
-  if (himOut && !meOut) { S.gold += g; addFame(1, undefined, 'Trinkwette'); log(`Trinkwette gegen ${npc.name}: gewonnen (+${g} Gold).`, 'economy'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
+  if (himOut && !meOut) { questEvent('tavern'); S.gold += g; addFame(1, undefined, 'Trinkwette'); log(`Trinkwette gegen ${npc.name}: gewonnen (+${g} Gold).`, 'economy'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
   UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: aufgegeben (−${g} Gold).`, 'economy'); UI.closeDialogue(); } }]);
 }
 function fistStart(npc, g) {
@@ -13240,7 +13271,7 @@ function fistEnd(win) {
   const F = S.fist, p = S.player, npc = byId(F.npc); S.fist = null;
   p.brawl = false; p.brawlSide = null; p.brawlV = null; if (!p.equip.weapon) p.equip.weapon = F.pw; recalc(p);
   if (npc) { npc.brawl = false; npc.brawlSide = null; npc.brawlV = null; npc.angry = false; npc.aggroId = null; if (!npc.equip.weapon) npc.equip.weapon = F.nw; recalc(npc); }
-  if (win) { S.gold += F.g; addFame(2, undefined, 'Faustkampf'); if (npc) addRel(npc.key, 5); log(`Du gewinnst den Faustkampf. +${F.g} Gold, und die Schenke kennt jetzt deinen Namen.`, 'combat'); }
+  if (win) { questEvent('tavern'); S.gold += F.g; addFame(2, undefined, 'Faustkampf'); if (npc) addRel(npc.key, 5); log(`Du gewinnst den Faustkampf. +${F.g} Gold, und die Schenke kennt jetzt deinen Namen.`, 'combat'); }
   else { S.gold = Math.max(0, S.gold - F.g); log(`Du gehst zu Boden. −${F.g} Gold. Man hilft dir auf und schiebt dir einen Krug hin.`, 'combat'); }
 }
 function fistTick() {
@@ -13543,6 +13574,7 @@ function onKill(mtype, e) {
   if (e?.chainRest) mtype = 'chain_rest';                         // S12 A4: Kettenreste zählen für Grisk
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
   if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
+  if (e?.kind === 'enemy' && !e.trial && S.player.status?.some(s => s.key === 'song') && partyMembers().filter(m => m.alive && !m.downed && m.map === S.player.map && dist(m, S.player) < 400).length >= 2) questEvent('songkill');   /* Klassen-Prüfung Barde: Das Lied trägt */
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
@@ -13763,6 +13795,21 @@ function trialOffer(npc, cls, redo = false) {
   UI.dialogue(npc, `${intro}\n(Danach: die Aufnahme, ein Talentpunkt und ein eigenes Sternbild für ${C.name}.)`, [
     { text: 'Ich höre.', fn: () => offerQuest(npc, k) }, { text: 'Später.', fn: () => UI.closeDialogue() }]);
 }
+/* Klassen-Prüfung: allgemeine Zielarten (steal, tavern, craft, contract, songkill, night) — zählt jedes laufende Auftragsziel dieser Art */
+function questEvent(type, target = null, n = 1) {
+  for (const [k, st] of Object.entries(S.quests || {})) { if (st.state !== 'active' || !QUESTS[k]) continue;
+    QUESTS[k].objectives.forEach((o, i) => { if (o.type !== type || (o.target && target && o.target !== target)) return; const c = o.count || 1; if ((st.progress[i] || 0) >= c) return;
+      st.progress[i] = Math.min(c, (st.progress[i] || 0) + n); log(`${QUESTS[k].name}: ${st.progress[i]}/${c}${st.progress[i] >= c ? ' — erfüllt' : ''}`, 'quest'); }); }
+}
+/* Waldläufer: eine ganze Nacht (Entwickler 03.10.: 10 Stunden am Stück) draußen — außerhalb von Siedlungen, in der Oberwelt, nicht am Boden */
+function nightWatch(h) {
+  const p = S.player, wants = Object.entries(S.quests || {}).some(([k, st]) => st.state === 'active' && QUESTS[k]?.objectives.some((o, i) => o.type === 'night' && (st.progress[i] || 0) < 1));
+  if (!wants) { if (p.nightRun) p.nightRun = 0; return; }
+  const out = p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0) && p.alive && !p.downed, night = h >= 20 || h < 6;
+  if (!out || !night) { if (p.nightRun) log(out ? 'Die Nacht ist vorbei, bevor sie ganz war — noch einmal, ab 20 Uhr.' : 'Unter einem Dach zählt die Nacht nicht. Die Prüfung beginnt von vorn.', 'quest'); p.nightRun = 0; return; }
+  p.nightRun = (p.nightRun || 0) + 1; if (p.nightRun === 1) log('Die Nacht beginnt. Bleib draußen, zehn Stunden am Stück (bis 6 Uhr).', 'quest');
+  if (p.nightRun >= 10) { p.nightRun = 0; questEvent('night'); }
+}
 function clsTrialChoices(npc, k, Q, choices) {                         /* aus talk(): nur Lehrer dieser Klasse, nur laufende Prüfungen der Figur */
   if (npc.hostile || ![].concat(npc.teaches || []).includes(Q.clsTrial[0]) || S.quests[k]?.state !== 'active' || S.player.ktSteps?.[k]) return;
   if (questComplete(k)) return choices.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
@@ -13828,7 +13875,7 @@ const RITE = {
 };
 function classRite(npc, cls, o = {}) {
   const p = S.player, R0 = RITE[cls] || o.rite || { col: '#e8d6a8', say: 'Steh auf.', fx: 'spark', sfx: 'bell' }, C = o.title ? { name: o.title, desc: o.sub || '' } : CLASSES[cls];
-  const sky = o.sky || SKILL_BRANCHES[cls]?.sky, hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
+  const sky = o.sky || (SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : ''), hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
   const after = () => { if (hint) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } };
   if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || !npc || npc.map !== p.map || S.cine) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
   const ab = ABILITIES[(CLASSES[cls]?.abilities || [])[0]], seen = S.ents[p.map].filter(c => c.kind === 'npc' && c.alive && !c.downed && c !== npc && !S.party.includes(c.id) && dist(c, p) < 240).slice(0, 6);
@@ -13841,7 +13888,8 @@ function classRite(npc, cls, o = {}) {
       { t: 0.85, duck: 1, ms: 400 }] },
   ], after, { pause: true, stay: true });
   return true;
-}function startTrial(kind, at = acadSpot(), o = {}) {
+}
+function startTrial(kind, at = acadSpot(), o = {}) {
   endTrial(null);
   const T = S.trial = { kind, until: clock() + ({ aim: 30, shield: 25, heal: 60, duel: 90, pit: 120, bow: 40, stab: 60, hold: 50 }[kind] || 60), n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2, ...o }, m = S.player.map;
   const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy;
@@ -13855,10 +13903,10 @@ function classRite(npc, cls, o = {}) {
   if (kind === 'hold') { T.next = clock() + 1; }
   if (kind === 'duel' || kind === 'pit') { const e = put(T.qk ? 'drill_fighter' : 'acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; if (T.npcName) e.name = `Übungsfechter von ${T.npcName}`;
     if (kind === 'pit') { e.maxHp = e.hp = e.maxHp * 2; if (e.body) B.initBody(e, e.maxHp); e.dmgMul = 1.6; } e.aggroId = S.player.id; } }   /* Grube: zäher und härter, damit man unter 30 % kommt */
-  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
+  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: T.qk ? 'Verletzte' : 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
     c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
   UI.toast(`PRÜFUNG: ${(T.title || TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
-  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: `${T.qk ? 'Der Patient' : 'Die Studentin'} hat sich das Bein zertrümmert. Stabilisiere ${T.qk ? 'ihn' : 'sie'}: Verband, Kräuter oder Heilzauber.`, duel: `Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.${T.need === 'shield' ? ' Mit Schild in der Hand — legst du ihn ab, ist die Prüfung vorbei.' : ''}`, ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.',
+  log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: `Die ${T.qk ? 'Verletzte' : 'Studentin'} hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.`, duel: `Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.${T.need === 'shield' ? ' Mit Schild in der Hand — legst du ihn ab, ist die Prüfung vorbei.' : ''}`, ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.',
     pit: 'Grubenkampf. Gewonnen ist erst, wenn du selbst unter 30 % Leben bist, wenn der Gegner fällt — Schmerz lehrt. Niemand stirbt.', bow: 'Triff die fünf Puppen mit dem Bogen (oder einer anderen Fernwaffe). 40 Sekunden.', stab: 'Drei Meuchelstiche an den Übungspuppen: nur der Meuchelstich (oder ein Hieb aus dem Schattenschritt) zählt. 60 Sekunden.', hold: 'Halte den Platz 50 Sekunden. Sie kommen in Wellen. Wer fällt, hat verloren — niemand stirbt.' }[kind], 'quest');
 }
 function endTrial(won) {
@@ -14479,6 +14527,37 @@ function ordersMenu(npc, town) {
    zusammen mindestens 5 Gold, Zustand danach 100 %, Beziehung +3 —, nur wählbar je Stück statt alles oder nichts. */
 const smithItems = () => { const p = S.player; return [...Object.entries(p.equip).filter(([, i]) => i).map(([k, i]) => ({ o: i, eq: k })), ...p.inv.map(i => ({ o: i }))].filter(x => x.o.cond != null && x.o.cond < 1 && ITEMS[x.o.key]); };
 const smithPrice = list => list.length ? Math.max(5, Math.round(list.reduce((n, i) => n + (1 - i.cond) * ITEMS[i.key].value * 0.5, 0))) : 0;
+/* Schmied: Verbessern und Schmieden lassen (Entwickler 03.10.2026: „entscheidest du“ — Regeln vom Lead, in MECHANIKEN beschrieben).
+   Verbessern: eine Gütestufe hoch wie beim eigenen Schmieden (Grob → Solide → Gut → Meisterlich; Meisterstück nur aus eigener Hand).
+   Ohne Güte-Angabe (gekauft, gefunden) gilt ein Stück als „Solide“. Preis: halber Grundwert je Stufe, mindestens 20 Gold; dazu Eisen = Stufe.
+   Ab „Gut“ hebt die Güte die Seltenheit wie beim Handwerk (rollRarity mit fester Stufe), nie nach unten.
+   Schmieden lassen: der Schmied fertigt ein Esse-Rezept aus deinem Material; Lohn 30 % des Werts (mind. 10 Gold); er arbeitet mit
+   Schmiedekunst 60 (oder deiner, wenn höher); deine Fertigkeit steigt dabei nicht. */
+const SMITH_SKILL = 60, UPG_TOP = 3;
+const qualIdx = o => { const i = QUAL.findIndex(q => q[0] === o.qual); return i < 0 ? 1 : i; };
+function smithUpgInfo(o) {
+  const it = ITEMS[o?.key]; if (!it || !GEAR.has(it.slot) || it.unique || it.stack) return null;
+  const qi = qualIdx(o); if (qi >= UPG_TOP) return null;
+  return { from: QUAL[qi][0], to: QUAL[qi + 1][0], gold: Math.max(20, Math.round((it.value || 10) * 0.5 * (qi + 1))), iron: qi + 1 };
+}
+const smithUpgList = () => { const p = S.player; return [...Object.entries(p.equip).filter(([, i]) => i).map(([k, i]) => ({ o: i, eq: k })), ...p.inv.map(i => ({ o: i }))].map(x => ({ ...x, u: smithUpgInfo(x.o) })).filter(x => x.u); };
+function smithUpgrade(npc, o) {
+  const U = smithUpgInfo(o); if (!U) return 'Daran gibt es nichts mehr zu verbessern.';
+  if (S.gold < U.gold) return 'Zu wenig Gold.'; if (matHave('iron') < U.iron) return `Dafür braucht es ${U.iron} Eisen.`;
+  S.gold -= U.gold; matTake('iron', U.iron); const it = ITEMS[o.key], tier = QUAL[qualIdx(o) + 1][2];
+  o.qual = U.to; if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(o.rar || it.rarity || 'common')) rollRarity(o, it, 0, tier);
+  if (S.player.equip && Object.values(S.player.equip).includes(o)) recalc(S.player);
+  log(`${npc?.name || 'Der Schmied'} verbessert ${it.name}: ${U.from} → ${U.to} (${U.gold} Gold, ${U.iron} Eisen).`, 'economy'); UI.refreshHUD(); return null;
+}
+const smithOrders = () => Object.entries(RECIPES).filter(([k, R]) => R.st === 'forge' && ITEMS[k]).map(([k, R]) => ({ key: k, name: ITEMS[k].name, need: R.need,
+  ok: Object.entries(R.need).every(([m, n]) => matHave(m) >= n), fee: Math.max(10, Math.round((ITEMS[k].value || 10) * 0.3 * (R.n || 1))) }));
+function smithCommission(npc, key) {
+  const O = smithOrders().find(x => x.key === key); if (!O) return 'Das schmiede ich nicht.'; if (!O.ok) return 'Dir fehlt Material.'; if (S.gold < O.fee) return 'Zu wenig Gold.';
+  const p = S.player, s0 = p.skills.smithing || 0; S.gold -= O.fee; p.skills.smithing = Math.max(s0, SMITH_SKILL);
+  let o; try { o = craftItem(key, false, true); } finally { p.skills.smithing = s0; }
+  if (!o) { S.gold += O.fee; return 'Das ging schief.'; }
+  if (o.key) o.maker = npc?.name || 'Schmied'; log(`${npc?.name || 'Der Schmied'} schmiedet dir ${O.name} (Lohn ${O.fee} Gold).`, 'economy'); UI.refreshHUD(); return null;
+}
 function smithRepair(npc, list) {
   const cost = smithPrice(list); if (!list.length) return 'Nichts gewählt.'; if (S.gold < cost) return 'Zu wenig Gold';
   S.gold -= cost; list.forEach(i => i.cond = 1); if (npc?.key) addRel(npc.key, 3); log(`Ausrüstung instand gesetzt (${list.length} Stück, ${cost} Gold).`, 'economy'); UI.refreshHUD(); return null;
@@ -15691,7 +15770,7 @@ function titleAbility(p, key, ab) {                          // true = gewirkt; 
 
 // ================= Skill-Baum =================
 // Zustand je Knoten: 'learned', 'open' (lernbar), 'locked' (Voraussetzung fehlt), 'sealed' (Zweig einer nicht erworbenen Titelklasse).
-function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; return B_.cls ? (c.knownClasses || []).includes(B_.cls) : !B_.title || (c.titleClasses || []).includes(B_.title); }   // S15: Klassen-Zweig (Todesritter)
+function branchOpen(c, b) { const B_ = SKILL_BRANCHES[b]; if (!B_ || B_.comp) return false; return B_.cls ? (c.knownClasses || []).includes(B_.cls) : !B_.title || (c.titleClasses || []).includes(B_.title); }   // S15: Klassen-Zweig (Todesritter)
 function nodeState(c, k) {
   const N = SKILL_TREE[k]; if (!N) return 'locked';
   if (node(c, k)) return 'learned';
@@ -15723,30 +15802,33 @@ function useAbility(key) {
     p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); magicSeen(p, key); return UI.refreshHUD();
   }
   if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
+  const M = abMod(p, key);                                   /* Klassen und Talente: Fähigkeitssterne (nur bei aktiver Klasse) */
   if (ab.title) {                                            // Titelfähigkeit: nur die eigene Ressource zählt
-    const R = TITLE_CLASSES[ab.title].resource, v = tres(p), cost = key === 'wolf_form' && node(p, 'k_beast') && ab.cost !== 'all' ? Math.min(30, ab.cost) : ab.cost;   /* S15 Fehlersuche: Tier im Herzen — Wolfsgestalt kostet nur 30 */
+    const R = TITLE_CLASSES[ab.title].resource, v = tres(p), cost = key === 'wolf_form' && node(p, 'k_beast') && ab.cost !== 'all' ? Math.min(30, ab.cost) : typeof ab.cost === 'number' ? Math.max(0, Math.round(ab.cost * (1 + M.cost))) : ab.cost;   /* S15 Fehlersuche: Tier im Herzen — Wolfsgestalt kostet nur 30; Sterne senken Kosten */
     if (cost === 'all' ? v < (ab.min || 1) : cost && v < cost) return UI.toast(`Zu wenig ${R.name}${ab.min ? ` (mindestens ${ab.min})` : ''}`);
-    if (!titleAbility(p, key, ab)) return;
+    abBegin(p, M); let tOk = false; try { tOk = titleAbility(p, key, ab); } finally { abEnd(p); } if (!tOk) return;
     magicSeen(p, key);                                        // S15 P7: Totenmagie vor Zeugen
-    p.cooldowns[key] = ab.cd * cdMul(p); p.castT = p.lastCast = performance.now(); sfx('magic');
+    p.cooldowns[key] = ab.cd * cdMul(p) * (1 + M.cd); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (cost === 'all') setTres(p, 0); else if (cost) setTres(p, v - cost);
     if (ab.gain) { if (ab.title === 'vampire') setBlood(p, bloodOf(p) + ab.gain); else corrupt(p, ab.gain); }
     if (ab.title !== 'vampire' || nightNow()) titleDeed(p);   /* Vampir: Taten zählen nur nachts */
     return UI.refreshHUD();
   }
-  if (ab.mana && p.mana < ab.mana) return UI.toast(p.maxMana ? 'Zu wenig Mana' : 'Das braucht Mana — nur Zauberkundige haben welches.');
-  if (ab.stam && p.stamina < ab.stam) return UI.toast('Zu erschöpft');
+  const manaC = (ab.mana || 0) * Math.max(0, 1 + M.cost), stamC = (ab.stam || 0) * Math.max(0, 1 + M.cost);   /* Sterne senken Kosten */
+  if (ab.mana && p.mana < manaC) return UI.toast(p.maxMana ? 'Zu wenig Mana' : 'Das braucht Mana — nur Zauberkundige haben welches.');
+  if (ab.stam && p.stamina < stamC) return UI.toast('Zu erschöpft');
   if (ab.herb && !hasItem(p, 'herb', ab.herb)) return UI.toast(`Zu wenig Heilkraut (${ab.herb} nötig)`);   // Alchemist: Kraut ist die Ressource
   if (key === 'shadowstep' && ['chain_hauberk', 'plate_cuirass'].includes(p.equip.chest?.key)) return UI.toast('In Eisen wirft niemand einen Schatten.');
-  if (!classAbility(p, key)) return;                                  // neue Klassen/Talente (Session 7); false = kein Ziel, nichts verbraucht
+  abBegin(p, M);
+  if (!classAbility(p, key)) return abEnd(p);                         // neue Klassen/Talente (Session 7); false = kein Ziel, nichts verbraucht
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b));
-  if (key === 'aimed_shot' && !ITEMS[p.equip.weapon?.key]?.ranged) return UI.toast('Dafür brauchst du einen Bogen');   // S15 Fehlersuche: abgebrochen = nichts verbraucht
-  if (key === 'life_drain' && (!foes[0] || dist(p, foes[0]) > 180)) return UI.toast('Kein Ziel in Reichweite');
-  if (key === 'mark_target' && !foes[0]) return UI.toast('Kein Ziel');
-  p.cooldowns[key] = ab.cd * cdMul(p);
+  if (key === 'aimed_shot' && !ITEMS[p.equip.weapon?.key]?.ranged) { abEnd(p); return UI.toast('Dafür brauchst du einen Bogen'); }   // S15 Fehlersuche: abgebrochen = nichts verbraucht
+  if (key === 'life_drain' && (!foes[0] || dist(p, foes[0]) > 180)) { abEnd(p); return UI.toast('Kein Ziel in Reichweite'); }
+  if (key === 'mark_target' && !foes[0]) { abEnd(p); return UI.toast('Kein Ziel'); }
+  p.cooldowns[key] = ab.cd * cdMul(p) * Math.max(0.2, 1 + M.cd);
   if (ab.herb) removeItem(p, 'herb', ab.herb);
-  if (ab.mana) p.mana -= ab.mana;
-  if (ab.stam) p.stamina -= ab.stam;
+  if (ab.mana) p.mana -= manaC;
+  if (ab.stam) p.stamina -= stamC;
   if (ab.mana) { p.castT = performance.now(); sfx('magic'); }   // Zauber-Pose (render: 'cast')
   switch (key) {
     case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
@@ -15773,20 +15855,21 @@ function useAbility(key) {
       break; }
     case 'holy_heal': {
       const t = [p, ...partyMembers()].filter(a => a.alive).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
-      const amt = (26 + p.attributes.intelligence * 1.6) * (t.titleClass === 'necromancer' ? 0.5 : 1);   // Makel des Nekromanten
+      const amt = (26 + p.attributes.intelligence * 1.6) * (t.titleClass === 'necromancer' ? 0.5 : 1) * (abNow?.mult || 1);   // Makel des Nekromanten; Sterne
       B.heal(t, amt);
       fx(t.x, t.y - 14, 'heal', 16); float(t, '+' + Math.round(amt), 'rgba(120,170,90,ALPHA)');
       break; }
     case 'blessing': {
-      for (const a of [p, ...partyMembers()]) { (a.status ||= []).push({ key:'blessing', name:'Gesegnet', good:true, left: 20000 }); fx(a.x, a.y - 14, 'heal', 10); }
+      for (const a of [p, ...partyMembers()]) { (a.status ||= []).push({ key:'blessing', name:'Gesegnet', good:true, left: 20000 * (abNow?.dur || 1) }); fx(a.x, a.y - 14, 'heal', 10); }
       log('Segen liegt auf der Gruppe.', 'party');
       break; }
     case 'mark_target': {
       const f = foes[0];
-      f.marked = true; setTimeout(() => { f.marked = false; }, 15000);
+      f.marked = true; setTimeout(() => { f.marked = false; }, 15000 * (abNow?.dur || 1));
       S.fx.push({ x: f.x, y: f.y - 20, vx:0, vy:0, type:'ring', s:2, life:600, maxLife:600 });
       break; }
   }
+  abEnd(p);
   UI.refreshHUD();
 }
 let hbOffSig = '';                                           // S15 Fehlersuche: zuletzt gemeldete Fähigkeiten ohne Leistenplatz
@@ -15983,7 +16066,50 @@ function chooseSuccessor() {
 }
 /* Klassen und Talente, Scheibe 0: der Erbe ist ein neuer Mensch — eigene Sterne (Gefährtensterne fallen weg), keine fremden Prüfungen,
    Punkte nach seiner Stufe. */
-function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.skyV = 1; talentTopUp(c); }function adoptSuccessor(c) {
+function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.skyV = 1; talentTopUp(c); }
+/* Scheibe 2: einmal kostenlos neu ordnen (alte Stände, Entscheidung 9) — wie das Vergessen beim Lehrer, nur ohne Gold */
+function freeRespec() {
+  const p = S.player, n = talentSpent(p); if (!p.freeRespec) return UI.toast('Das kostenlose Neuordnen ist schon verbraucht. Lehrer helfen gegen Gold.');
+  p.freeRespec = 0; p.skillPoints = (p.skillPoints || 0) + n; for (const k of Object.keys(p.tree || {})) if (SKILL_TREE[k]?.branch !== 'companion') delete p.tree[k];
+  const m0 = p.body ? Object.fromEntries(B.PARTS.map(k => [k, p.body[k].max || 1])) : null; recalc(p); if (m0) { for (const k of B.PARTS) p.body[k].hp = Math.min(p.body[k].max, p.body[k].hp * p.body[k].max / m0[k]); B.syncHp(p); }
+  syncHotbar(); log(`Die Sterne ordnen sich neu: ${n} Talentpunkte sind wieder frei.`, 'party'); UI.refreshHUD(); if (UI.modalOpen === 'skills') UI.refreshModal(); save();
+}
+/* Sternenhimmel: was über ein Sternbild zu sagen ist (offen, ruht, wo man es lernt) */
+function clsWhere(cls) {
+  if (cls === 'deathknight') return 'Todesweihe bei Sael oder Ysra (Rang „Todesritter“ bei den Untoten, Krieger gelernt).';
+  if (cls === 'darkpaladin') return 'Weihe der Kette bei einem Dunklen Paladin der Eisenfeste (Kettenrang Aufseher, Krieger gelernt).';
+  if (cls === 'paladin') return 'Kelans drei Prüfungen am Schrein (Ritter gelernt).';
+  const L = NPCS.filter(n => [].concat(n.teaches || []).includes(cls)).map(n => { const e = S.ents.world.find(x => x.key === n.key) || n, l = e.x != null ? LOCATIONS.reduce((b, o) => !b || Math.hypot(o.x - e.x / TS, o.y - e.y / TS) < Math.hypot(b.x - e.x / TS, b.y - e.y / TS) ? o : b, null) : null; return `${n.name}${l ? ` (${l.name})` : ''}`; });
+  const C = CLASSES[cls], need = C.chainRank != null ? ` Kettenrang ${FACTIONS.chain.ranks[C.chainRank]}.` : '', par = C.parent && C.parent !== 'wanderer' ? ` Vorher: ${[C.parent, ...(C.alt || [])].map(k => CLASSES[k].name).join(' oder ')}.` : '';
+  return `Lehrer: ${L.join(', ') || '—'}.${par}${need}${clsTrialOf(cls).length ? ' Prüfung, dann Aufnahme.' : ''}`;
+}
+function skyInfo(c, s) {
+  const K = SKIES[s]; if (!K || !c) return { open: false, sub: '' };
+  if (K.comp) return { open: true, sub: 'für Gefährten' };
+  if (!K.cls && !K.title) return { open: true, sub: 'für alle · Kampf, Magie, Überleben' };
+  if (K.cls) { const open = (c.knownClasses || []).includes(K.cls), act = skyActive(c, K.cls);
+    return { open, act, sub: open ? `Klasse ${CLASSES[K.cls].name}${act ? ' · wirkt' : ' · ruht'}` : `versiegelt · ${CLASSES[K.cls].name}`, where: open ? '' : clsWhere(K.cls) }; }
+  const T0 = TITLE_CLASSES[K.title], open = (c.titleClasses || []).includes(K.title), act = c.titleClass === K.title;
+  return { open, act, titleName: T0.name, sub: open ? `Titel ${T0.name}${act ? ' · getragen' : ' · ruht'}` : `Titel · versiegelt`, where: open ? '' : `öffnet sich mit der Titelklasse ${T0.name}. ${T0.unlock}` };
+}
+/* Gefährten (Entwickler 03.10.: kleiner eigener Baum, nur Werte; Punkte 1 + Stufe / 5, aus der Stufe gerechnet) */
+const compSpent = m => Object.keys(m?.tree || {}).filter(k => SKILL_TREE[k]?.branch === 'companion').length;
+const compPoints = m => Math.max(0, 1 + Math.floor((m?.level || 1) / 5) - compSpent(m));
+function compNodeState(m, k) {
+  const N = SKILL_TREE[k]; if (!N || N.branch !== 'companion' || !m) return 'sealed';
+  if (node(m, k)) return 'learned';
+  if (N.excl && node(m, N.excl) || Object.entries(SKILL_TREE).some(([k2, n2]) => n2.excl === k && node(m, k2))) return 'barred';
+  return !N.requires.length || N.requires.some(r => node(m, r)) ? 'open' : 'locked';
+}
+function learnCompNode(id, k) {
+  const m = byId(id), N = SKILL_TREE[k]; if (!m || !S.party.includes(m.id) || m.coopHero) return;
+  const st = compNodeState(m, k); if (st !== 'open') return UI.toast(st === 'learned' ? 'Schon gelernt.' : st === 'barred' ? 'Der andere Schlüsselstern ist schon gewählt.' : 'Erst einen Stern davor lernen.');
+  if (compPoints(m) < 1) return UI.toast(`${m.name} hat keinen Punkt frei — einer zum Start, dann alle fünf Stufen.`);
+  const m0 = m.body ? Object.fromEntries(B.PARTS.map(q => [q, m.body[q].max || 1])) : null; (m.tree ||= {})[k] = 1; recalc(m);
+  if (m0) { for (const q of B.PARTS) m.body[q].hp = Math.min(m.body[q].max, m.body[q].hp * m.body[q].max / m0[q]); B.syncHp(m); }
+  log(`${m.name} lernt: ${N.name}.`, 'party'); UI.refreshHUD(); save();
+}
+function adoptSuccessor(c) {
   setTimeout(() => nemesisHeir(), 1500);   /* T10: der Erbe erfährt vom Ahnenfeind */
   const old = S.player; for (const k in S.fameStyle || {}) S.fameStyle[k] = Math.round(S.fameStyle[k] / 2);   /* T08: der Ruf der Klinge verblasst mit dem Erben */
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
@@ -16222,7 +16348,7 @@ function bindInput() {
     if (k === 'k') UI.openModal('chronicle');
     if (k === 'm') UI.openModal('map');
     if (k === 'j') UI.openModal('quests');
-    if (k === 't') UI.toast('Die Talentbäume werden neu gepflanzt — jede Klasse bekommt ihren eigenen. Deine Punkte bleiben dir.', 3200);   /* Entwickler 02.10.2026: Talentbäume versteckt */
+    if (k === 't') UI.openModal('skills');                    /* Klassen und Talente, Scheibe 2: der Sternenhimmel ist wieder offen */
     if (k === 'x') UI.openModal('effects');                   // S13: aktive Effekte
     if (k === 'h') UI.openModal('codex');                     // S13: Kodex/Handbuch
     if (k === 'z') UI.openModal('spells');                    // S15 P4: Zauberbuch
@@ -16350,7 +16476,7 @@ function guarded(attacker, target, dmg) {
   return true;
 }
 const stat = (c, k) => !!(c.status && c.status.some(s => s.key === k));
-function addStatus(c, o) { c.status = (c.status || []).filter(s => s.key !== o.key); c.status.push(o); }
+function addStatus(c, o) { if (abNow && abNow.dur !== 1 && o.left && o.left < 1e9) o = { ...o, left: o.left * abNow.dur }; c.status = (c.status || []).filter(s => s.key !== o.key); c.status.push(o); }   /* Sterne: Dauer */
 // Fähigkeiten der Klassen aus Session 7 und der aktiven Talentknoten. true = gewirkt; false = abgebrochen (keine Kosten).
 function classAbility(p, key) {
   const foes = hostilesOf(p).sort((a, b) => dist(p, a) - dist(p, b)), now = performance.now();
@@ -16375,7 +16501,7 @@ function classAbility(p, key) {
         owner: p.id, dmg: 18 + p.attributes.intelligence * 0.8, life: Math.max(200, d / 5 * 16), team: 'player', splash: 60, burst: true });
       return true; }
     case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
-    case 'brew': if (!addItem(p, 'potion')) return false; log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'brew': if (!addItem(p, 'potion')) return false; questEvent('craft', 'potion'); log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
     case 'death_coil': {                                            // S15 P19: Todesmahr
       const f = foes.filter(o => dist(p, o) < 240 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.6 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
       if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
@@ -16427,10 +16553,10 @@ function classAbility(p, key) {
       const f = foes.filter(o => dist(p, o) < 260 && clearLine(p, o)).sort((a, b) => Math.abs(normAng(Math.atan2(a.y - p.y, a.x - p.x) - p.aim)) - Math.abs(normAng(Math.atan2(b.y - p.y, b.x - p.x) - p.aim)))[0];
       if (!f) { UI.toast('Kein Feind in Sicht.'); return false; }
       const d = (10 + (p.attributes.intelligence || 8) * 0.9) * spellMul(p); hurt(f, d, p, 'Brandmal Omegas', false, 'magic');
-      f.marked = true; setTimeout(() => { f.marked = false; }, 12000); addStatus(f, { key: 'burning', name: 'Brennt', left: 4000 });
+      f.marked = true; setTimeout(() => { f.marked = false; }, 12000 * (abNow?.dur || 1)); addStatus(f, { key: 'burning', name: 'Brennt', left: 4000 });
       for (let k = 0; k <= 6; k++) fx(p.x + (f.x - p.x) * k / 6, p.y - 12 + (f.y - p.y) * k / 6, 'fire', 1); float(f, 'gebrandmarkt', 'rgba(210,60,40,ALPHA)'); return true; }
     case 'chain_prayer': {
-      const amt = 18 + (p.attributes.intelligence || 8) * 1.2;
+      const amt = (18 + (p.attributes.intelligence || 8) * 1.2) * (abNow?.mult || 1);   /* Sterne */
       for (const a of [p, ...partyMembers()].filter(a => a.alive && a.map === p.map && !a.downed)) { B.heal(a, amt); fx(a.x, a.y - 14, 'heal', 8); }   /* Behoben HB-22: wie partyCare — am Boden richtet kein Zauber sofort auf, nur schrittweise */
       for (const f of foes.filter(o => dist(p, o) < 150)) { const und = f.undead || MONSTERS[f.mtype]?.faction === 'undead'; hurt(f, (8 + (p.attributes.willpower || 8) * 0.8) * (und ? 2 : 1), p, 'Kettengebet', false, 'magic'); fx(f.x, f.y - 12, 'fire', 4); }
       S.fx.push({ x: p.x, y: p.y - 8, vx: 0, vy: 0, type: 'ring', s: 2.6, life: 600, maxLife: 600 }); sfx('magic', 0.4); return true; }
@@ -16956,6 +17082,12 @@ function debugSections() {
       'Klassen: Talentpunkte nach Regel auffüllen': () => { const n = talentTopUp(P()); UI.refreshHUD(); UI.toast(n ? `+${n} Talentpunkte (Regel)` : `Soll erreicht: ${talentTotal(P())} (frei ${P().skillPoints}, gelernt ${talentSpent(P())})`, 3600); },
       'Klassen: Punkte-Rechnung zeigen': () => { const c = P(); UI.toast(`Stufe ${c.level}: 1 + ${Math.floor(c.level / TALENT_EVERY)} (jede ${TALENT_EVERY}. Stufe) + ${talentPass(c)} Prüfung(en) = ${talentTotal(c)} · frei ${c.skillPoints || 0} · gelernt ${talentSpent(c)}`, 5000); },
       'Klassen: Stufe +2 (zeigt den Talentpunkt)': () => { for (let i = 0; i < 2; i++) { P().xp = P().xpNext; levelUp(P()); } UI.refreshHUD(); },
+      'Sterne: Himmel öffnen (T)': () => UI.openModal('skills'),
+      'Sterne: alle Klassen bekannt (alle Sternbilder offen)': () => { const c = P(); for (const k of Object.keys(CLASSES)) if (!c.knownClasses.includes(k)) c.knownClasses.push(k); UI.toast('Alle Klassen bekannt (nur Debug)'); },
+      'Sterne: +10 Talentpunkte': () => { P().skillPoints = (P().skillPoints || 0) + 10; UI.refreshHUD(); },
+      'Sterne: Wirkung der Fähigkeitssterne (aktive Klasse)': () => { const c = P(), L = (c.abilities || []).map(k => { const M = abMod(c, k); return `${ABILITIES[k].name}: Schaden ${M.mult >= 0 ? '+' : ''}${Math.round(M.mult * 100)} %, Abklingzeit ${Math.round(M.cd * 100)} %, Kosten ${Math.round(M.cost * 100)} %, Dauer +${Math.round(M.dur * 100)} %`; }); log(`Fähigkeitssterne (${CLASSES[c.currentClass]?.name}): ${L.join(' · ') || '—'}`, 'party'); UI.toast(L[0] || 'Keine Fähigkeit', 5000); },
+      'Sterne: Machtgrenze messen (aktive Klasse, St. 15, Protokoll)': () => { const c = P(), cls = c.currentClass, w = c.equip.weapon?.key || 'longsword', run = tree => [1, 2, 3].reduce((a, seed) => a + simFight('bear', { level: 15, weapon: w, elvl: 15, ehp: 4000, eopt: { dmgMul: 0.01, provoked: true }, maxT: 30000, seed, cls, tree, useAb: true }).dealt / 30, 0) / 3;
+        const b = run(null), k = run(['combat']), s = run([cls]); log(`Machtgrenze ${CLASSES[cls].name} (St. 15, ${w}): ohne Sterne ${b.toFixed(1)}/s, voller Kampfzweig +${((k / b - 1) * 100).toFixed(1)} %, volles Sternbild +${((s / b - 1) * 100).toFixed(1)} %.`, 'world'); },
       'Klassen: Prüfung beim nächsten Lehrer anbieten': () => { const c = P(), n = S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && [].concat(e.teaches || []).some(k => clsTrialOf(k).length)).sort((a, b) => dist(a, c) - dist(b, c))[0];
         if (!n) return UI.toast('Kein Lehrer mit Prüfung auf dieser Karte.'); const k = [].concat(n.teaches).find(x => clsTrialOf(x).length && !c.clsPass?.[x]) || [].concat(n.teaches)[0]; S.relations[n.key] = Math.max(S.relations[n.key] || 0, 40); trialOffer(n, k, c.knownClasses.includes(k)); },
       'Klassen: laufende Prüfungsziele erfüllen': () => { let n = 0; for (const [k, st] of Object.entries(S.quests)) if (QUESTS[k]?.clsTrial && st.state === 'active') { st.progress = QUESTS[k].objectives.map(o => o.count || 1); n++; } UI.toast(n ? `${n} Prüfungsauftrag erfüllt — beim Lehrer abgeben` : 'Keine laufende Prüfung.'); },
@@ -17120,7 +17252,9 @@ export function simFight(mtype, o = {}) {
     const p = makeChar({ name: 'Held', map: '__d', x: 40 * TS, y: 20 * TS, level, attrs: A, build: 'ausgewogen', skills: { [it?.skill || 'unarmed']: skill ?? Math.min(100, 5 + level * 3), defense: Math.min(100, level * 1.5) } });
     p.kind = 'player'; p.equip.weapon = it ? { key: weapon, cond: 1, charge: 100 } : null;
     for (const [s, k] of Object.entries(gear)) p.equip[s] = k ? { key: k, cond: 1 } : null;
-    recalc(p); B.fullHeal(p); p.stamina = p.maxStamina;
+    if (o.cls) { const L = []; let k = o.cls; while (k && CLASSES[k] && !L.includes(k)) { L.unshift(k); k = CLASSES[k].parent; } p.knownClasses = L; p.currentClass = o.cls; p.abilities = [...(CLASSES[o.cls].abilities || [])]; }   /* Klassen und Talente: Messung mit Klasse */
+    if (o.tree) p.tree = Array.isArray(o.tree) ? Object.fromEntries(Object.keys(SKILL_TREE).filter(k => o.tree.includes(SKILL_TREE[k].branch) && !SKILL_TREE[k].excl).map(k => [k, 1])) : { ...o.tree };   /* ganze Zweige (ohne den zweiten Schlüsselstern) oder Liste */
+    recalc(p); B.fullHeal(p); p.stamina = p.maxStamina; p.mana = p.maxMana;
     S.player = p; S.map = '__d'; S.ents.__d.push(p);
     const eo = { ...eopt }; if (elvl != null) eo.level = elvl;
     const e = spawnEnemy(mtype, '__d', 34, 20, eo);
@@ -17144,6 +17278,9 @@ export function simFight(mtype, o = {}) {
         if (ranged) { if (d < 170) keys.add(e.x < p.x ? 'd' : 'a'); }
         else if (far && (!threat || e.draw > 0)) toward();   /* Nahkämpfer gehen auf Schlagweite */
       }
+      if (o.useAb && !(p.swing > 0) && !p.dodge) for (const k of p.abilities || []) { const A0 = ABILITIES[k], d = dist(p, e);   /* Klassen und Talente: Fähigkeiten, sobald bereit und in Reichweite */
+        if ((p.cooldowns[k] || 0) > 0 || (A0.stam && p.stamina < A0.stam) || (A0.mana && (p.mana || 0) < A0.mana) || d > (ranged ? 320 : (it?.reach || 30) + 40)) continue;
+        const cd0 = p.cooldowns[k] || 0; useAbility(k); if ((p.cooldowns[k] || 0) > cd0) st.ab = (st.ab || 0) + 1; break; }
       if (potsUsed < pots && B.vital(p) < hp0 * 0.35) { potsUsed++; B.heal(p, ITEMS.potion.heal); }
       if (it?.energy && p.equip.weapon && (p.equip.weapon.charge ?? 100) < it.energy && st.cells < (o.cells || 0)) { p.equip.weapon.charge = 100; st.cells++; }   /* Energiezellen */
       const sw0 = p.swing, eh0 = e.body ? B.vital(e) : e.hp;
@@ -17151,7 +17288,7 @@ export function simFight(mtype, o = {}) {
       if (!(sw0 > 0) && p.swing > 0) st.sw++; if ((e.body ? B.vital(e) : e.hp) < eh0) st.hits++; if (p.stamina < 5) st.tired += 16; if (dist(p, e) > 120) st.far += 16;
     }
     return { mtype, level, weapon, elvl: e.level, win: !e.alive, dead: !p.alive || !!p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100), rolls, potsUsed,
-      ehp: eMax, ehpLeft: e.alive ? Math.round(Math.max(0, e.body ? B.vital(e) : e.hp) / ev0 * 100) : 0, dealt: Math.round(ev0 - Math.max(0, e.alive ? (e.body ? B.vital(e) : e.hp) : 0)), pdmg: Math.round(damageOf(p)), parmor: armorOf(p), php: Math.round(hp0), swings: st.sw, landed: st.hits, tiredS: +(st.tired / 1000).toFixed(1), farS: +(st.far / 1000).toFixed(1), cells: st.cells };
+      ehp: eMax, ehpLeft: e.alive ? Math.round(Math.max(0, e.body ? B.vital(e) : e.hp) / ev0 * 100) : 0, dealt: Math.round(ev0 - Math.max(0, e.alive ? (e.body ? B.vital(e) : e.hp) : 0)), pdmg: Math.round(damageOf(p)), parmor: armorOf(p), php: Math.round(hp0), swings: st.sw, landed: st.hits, tiredS: +(st.tired / 1000).toFixed(1), farS: +(st.far / 1000).toFixed(1), cells: st.cells, abil: st.ab || 0 };
   } finally {
     performance.now = pnow; Object.assign(BOSS, boss0); keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms;
     for (const [k, v] of Object.entries(snap)) { let same = false; try { same = JSON.stringify(S[k]) === snapJ[k]; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
@@ -19188,7 +19325,8 @@ export function selftest() {
     const heir = h.skillPoints === 7 && !Object.keys(h.tree).length && !talentPass(h);   /* Stufe 12: 1 + 6 */
     if (!(rule && noCut && guest && heir)) console.warn('Scheibe 0', { got, sp: p.skillPoints, guest: [g.level, g.skillPoints, g.attrPoints], heir: h.skillPoints });
     return rule && noCut && guest && heir;
-  }));  ok('Klassen Scheibe 1: Prüfung des Kriegers (Banditen, dann Duell beim Lehrer), Scheitern wiederholbar, Aufnahme gibt Klasse und Talentpunkt; nachholen für alte Stände; eigene Wege zählen; Szene ~5,5 s mit Pause', sandbox(() => {
+  }));
+  ok('Klassen Scheibe 1: Prüfung des Kriegers (Banditen, dann Duell beim Lehrer), Scheitern wiederholbar, Aufnahme gibt Klasse und Talentpunkt; nachholen für alte Stände; eigene Wege zählen; Szene ~5,5 s mit Pause', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial;
     try {
       const data = Object.values(QUESTS).filter(q => q.clsTrial).every(q => { const L = clsTrialOf(q.clsTrial[0]), last = QUESTS[L[L.length - 1]]; return last.reward?.unlock === q.clsTrial[0] && q.objectives.length && NPCS.some(n => [].concat(n.teaches || []).includes(q.clsTrial[0])); })
@@ -19210,16 +19348,96 @@ export function selftest() {
       if (!(data && offered && notYet && four && step1 && isDrill && lost && won && passed && redo && own && rite && dur >= 5000 && dur <= 6000 && pause && !S.cine)) console.warn('Scheibe 1', { data, offered, notYet, four, step1, isDrill, lost, won, passed, redo, own, rite, dur, pause });
       return data && offered && notYet && four && step1 && isDrill && lost && won && passed && redo && own && rite && dur >= 5000 && dur <= 6000 && pause && !S.cine;
     } finally { S.quests = Q0; S.trial = T0; cineEnd(); delete S.relations.kt_probe_teacher; }
-  }));  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (Nutzer: jede dritte, gut ein Drittel der Knoten), darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
+  }));
+  ok('Sterne Scheibe 2: jeder Stern hat Sternbild und Lage (keine Überlappung), die alten Schlüssel stehen im Wanderer/Titel/Todesritter; Talente wieder im Charakterfenster; Schlüsselsterne ruhen ohne aktive Klasse; einmal kostenlos neu ordnen', sandbox(() => {
+    const keys = Object.keys(SKILL_TREE), lay = keys.every(k => { const n = SKILL_TREE[k]; return SKIES[n.sky] && Array.isArray(n.pos) && n.pos.every(Number.isFinite) && Math.hypot(n.pos[0], n.pos[1]) < (n.sky === 'wanderer' ? 360 : 280); });
+    const gap = Object.keys(SKIES).every(s => { const L = keys.filter(k => SKILL_TREE[k].sky === s); return L.every((a, i) => L.slice(i + 1).every(b => Math.hypot(SKILL_TREE[a].pos[0] - SKILL_TREE[b].pos[0], SKILL_TREE[a].pos[1] - SKILL_TREE[b].pos[1]) >= 30)); });
+    const wand = keys.filter(k => SKILL_TREE[k].sky === 'wanderer').length === 29 && ['c_tough', 'k_berserk', 'm_blink', 'k_wild', 'n_bind', 'k_legion', 'w_eye', 'd_roots', 'o_edge', 'dk_frost', 'k_bloodlord'].every(k => SKILL_TREE[k]) && SKILL_TREE.k_legion.sky === 'necromancer' && SKILL_TREE.dk_grip.sky === 'deathknight';
+    const skies = Object.values(SKIES).every((a, i, A) => A.slice(i + 1).every(b => Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1]) >= 480));
+    const p = stage(); p.knownClasses = ['wanderer', 'warrior', 'deathknight']; p.currentClass = 'warrior';
+    SKILL_TREE.__kt = { branch: 'deathknight', row: 0, type: 'keystone', name: 'Probe', fx: { armor: 5 }, requires: [], desc: '' }; p.tree = { __kt: 1 };
+    let gate; try { recalc(p); const a0 = armorOf(p); p.currentClass = 'deathknight'; recalc(p); gate = armorOf(p) === a0 + 5 && skyActive(p, 'deathknight') && !skyActive(p, 'necromancer'); p.currentClass = 'warrior'; } finally { delete SKILL_TREE.__kt; p.tree = {}; recalc(p); }
+    p.tree = { c_tough: 1, c_strike: 1 }; p.skillPoints = 0; p.freeRespec = 1; freeRespec(); const free = p.skillPoints === 2 && !Object.keys(p.tree).length && !p.freeRespec; p.tree = { c_tough: 1 }; freeRespec(); const once = !!p.tree.c_tough;
+    const m = actor(340, 300); m.level = 10; const cp = compPoints(m) === 3 && !branchOpen(p, 'companion');
+    const info = skyInfo(p, 'necromancer'), sealed = !info.open && /Titelklasse/.test(info.where) && skyInfo(p, 'wanderer').open;
+    UI.openModal('skills'); const ui = !!document.querySelector('#modal-body #sky-cv') && !!document.querySelector('#modal-tabs [data-sub="skills"]'); UI.closeModal();
+    if (!(lay && gap && wand && skies && gate && free && once && cp && sealed && ui)) console.warn('Scheibe 2', { lay, gap, wand, skies, gate, free, once, cp, sealed, ui });
+    return lay && gap && wand && skies && gate && free && once && cp && sealed && ui;
+  }));
+  ok('Sterne Scheibe 3: Sternbilder der Krieger-Linie (je 8 Sterne, zwei Schlüssel schließen einander aus); Fähigkeitssterne wirken nur bei aktiver Klasse oder Folgeklasse (Schaden, Kosten, Abklingzeit, Dauer); Prüfungen Ritter (Platz halten, Duell mit Schild) und Berserker (Grube unter 30 %)', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const CL = Object.keys(SKILL_BRANCHES).filter(b => SKILL_BRANCHES[b].cls && b !== 'deathknight');
+      const data = ['warrior', 'knight', 'paladin', 'berserker', 'darkpaladin'].every(b => CL.includes(b)) && CL.every(b => { const L = Object.values(SKILL_TREE).filter(n => n.branch === b), ks = L.filter(n => n.type === 'keystone');
+        return L.length === 8 && ks.length === 2 && ks.some(n => n.excl) && L.every(n => !n.ab || n.ab.every(a => ABILITIES[a.k] && CLASSES[b].abilities.includes(a.k))) && SKIES[b]; });
+      const p = stage(); p.knownClasses = ['wanderer', 'warrior', 'knight', 'archer']; p.currentClass = 'warrior'; p.abilities = ['power_strike']; p.tree = { kr_stand: 1, kr_crush: 1, kr_tempo: 1, kr_grip: 1, kr_core: 1, k_kr_wall: 1 }; recalc(p); p.stamina = p.maxStamina = 200;
+      const M = abMod(p, 'power_strike'), mods = Math.abs(M.mult - 0.35) < 1e-9 && Math.abs(M.cost + 0.25) < 1e-9 && Math.abs(M.cd + 0.15) < 1e-9;
+      const s0 = p.stamina; p.cooldowns = {}; useAbility('power_strike'); const am = p.abilityMult, d1 = s0 - p.stamina; p.swing = 0; p.abilityMult = 0; p.cooldowns = {}; delete p.tree.kr_stand; p.stamina = 200; useAbility('power_strike'); const paid = Math.abs((200 - p.stamina) - d1 - 22 * 0.25) < 1e-6; p.tree.kr_stand = 1; const cd = Math.abs(p.cooldowns.power_strike - 6000 * cdMul(p) * 0.85) < 1e-6, mult = Math.abs(am - 2.1 * 1.35) < 1e-6;
+      const a0 = armorOf(p); p.currentClass = 'knight'; recalc(p); const line = abMod(p, 'power_strike').mult > 0.3 && armorOf(p) === a0;
+      p.currentClass = 'archer'; recalc(p); const rest = abMod(p, 'power_strike').mult === 0 && armorOf(p) === a0 - 3; p.currentClass = 'warrior'; recalc(p);
+      const b = stage(); b.knownClasses = ['wanderer', 'warrior', 'berserker']; b.currentClass = 'berserker'; b.abilities = ['power_strike', 'frenzy']; b.tree = { bs_rage: 1 }; recalc(b); b.stamina = 100; b.cooldowns = {}; useAbility('frenzy');
+      const dur = Math.abs((b.status.find(s => s.key === 'frenzy')?.left || 0) - 10000) < 1;
+      for (const k of [...clsTrialOf('knight'), ...clsTrialOf('berserker')]) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_t3'; t.teaches = ['knight', 'berserker']; const k = stage(); k.knownClasses = ['wanderer', 'warrior']; k.currentClass = 'warrior'; k.ktSteps = {}; k.clsPass = {};
+      startQuest('kt_knight1'); startClsTrial(t, 'kt_knight1'); const holdOn = S.trial?.kind === 'hold'; S.trial.next = 0; trialTick(); const waves = S.ents.__a.filter(e => e.trial === 'hold').length >= 2; S.trial.until = clock() - 1; trialTick(); const held = questComplete('kt_knight1');
+      startQuest('kt_knight2'); k.equip.offhand = null; startClsTrial(t, 'kt_knight2'); const noShield = !S.trial; UI.closeDialogue(); k.equip.offhand = mkItem('wooden_shield'); startClsTrial(t, 'kt_knight2'); const shieldDuel = S.trial?.need === 'shield'; endTrial(null);
+      startQuest('kt_berserker2'); startClsTrial(t, 'kt_berserker2'); const pf = S.ents.__a.find(e => e.duelist && e.trial === 'pit'); if (k.body) B.fullHeal(k); hurt(pf, pf.maxHp * 0.95, k, 'Grube'); const tooEarly = !S.trial && !questComplete('kt_berserker2');
+      startClsTrial(t, 'kt_berserker2'); const pf2 = S.ents.__a.find(e => e.duelist && e.trial === 'pit'); if (k.body) { B.fullHeal(k); k.body.torso.hp = k.body.torso.max * 0.2; k.body.head.hp = k.body.head.max * 0.2; B.syncHp(k); } const low = k.hp < k.maxHp * 0.3; hurt(pf2, pf2.maxHp * 0.95, k, 'Grube'); const pit = low && questComplete('kt_berserker2');
+      startQuest('kt_berserker1'); for (let i = 0; i < 5; i++) onKill('wolf', { kind: 'enemy' }); const any = questComplete('kt_berserker1');
+      if (!(data && mods && paid && cd && mult && line && rest && dur && holdOn && waves && held && noShield && shieldDuel && tooEarly && pit && any)) console.warn('Scheibe 3', { data, mods, paid, cd, mult, am, line, rest, dur, holdOn, waves, held, noShield, shieldDuel, tooEarly, pit, low, any });
+      return data && mods && paid && cd && mult && line && rest && dur && holdOn && waves && held && noShield && shieldDuel && tooEarly && pit && any;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Sterne Scheibe 3: Machtgrenze — das volle Sternbild des Kriegers bringt weniger Dauerleistung als der volle Kampfzweig (RF.simFight, Stufe 15, Fähigkeiten genutzt)', (() => {
+    const run = tree => [1, 2, 3].reduce((a, seed) => a + simFight('bear', { level: 15, weapon: 'longsword', elvl: 15, ehp: 4000, eopt: { dmgMul: 0.01, provoked: true }, maxT: 20000, seed, cls: 'warrior', tree, useAb: true }).dealt, 0);
+    const base = run(null), kampf = run(['combat']), sky = run(['warrior']);
+    if (!(sky - base <= kampf - base)) console.warn('Machtgrenze', { base, kampf, sky });
+    return sky - base <= kampf - base;
+  })());
+  ok('Sterne Scheibe 4: Schütze-Linie (Falke, Hirsch, Netz); Prüfungen Schütze (3 Wölfe + 3 Felle, Bogenübung zählt nur Fernwaffen) und Waldläufer (Bär, eine ganze Nacht draußen — 10 Stunden am Stück, ein Dach setzt zurück)', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const data = ['archer', 'ranger', 'chainhunter'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('archer').length === 2 && clsTrialOf('ranger').length === 2;
+      for (const k of [...clsTrialOf('archer'), ...clsTrialOf('ranger')]) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_t4'; t.teaches = ['archer', 'ranger']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_archer1'); for (let i = 0; i < 3; i++) onKill('wolf', { kind: 'enemy' }); const noPelt = !questComplete('kt_archer1'); addItem(p, 'pelt', 3); const pelts = questComplete('kt_archer1');
+      startQuest('kt_archer2'); p.equip.weapon = mkItem('longsword'); startClsTrial(t, 'kt_archer2'); const needBow = !S.trial; UI.closeDialogue();
+      p.equip.weapon = mkItem('shortbow'); startClsTrial(t, 'kt_archer2'); const dummies = S.ents.__a.filter(e => e.trial === 'bow'); for (const d of dummies) hurt(d, 5, p, 'Pfeil'); trialTick(); const bow = dummies.length === 5 && questComplete('kt_archer2');
+      startQuest('kt_ranger2'); const map0 = p.map; p.map = 'world'; p.x = 20 * TS; p.y = 20 * TS; p.nightRun = 0;
+      for (const h of [20, 21, 22, 23, 0, 1]) nightWatch(h); nightWatch(12); const broke = !questComplete('kt_ranger2') && !p.nightRun;
+      for (const h of [20, 21, 22, 23, 0, 1, 2, 3, 4, 5]) nightWatch(h); const night = questComplete('kt_ranger2'); p.map = map0;
+      if (!(data && noPelt && pelts && needBow && bow && broke && night)) console.warn('Scheibe 4', { data, noPelt, pelts, needBow, bow, broke, night });
+      return data && noPelt && pelts && needBow && bow && broke && night;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Sterne Scheibe 5: Schurke-Linie (Dolch, Natter, Zange); Prüfungen Schurke (Diebstahl ungesehen, drei Meuchelstiche — Hacken zählt nicht) und Assassine (ein Steckbrief)', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const data = ['rogue', 'assassin', 'torturer'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('rogue').length === 2 && clsTrialOf('assassin').length === 1;
+      for (const k of [...clsTrialOf('rogue'), ...clsTrialOf('assassin')]) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_t5'; t.teaches = ['rogue', 'assassin']; const p = stage(); p.knownClasses = ['wanderer', 'rogue']; p.currentClass = 'rogue'; p.abilities = ['backstab']; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_rogue1'); questEvent('steal'); const steal = questComplete('kt_rogue1');
+      startQuest('kt_rogue2'); startClsTrial(t, 'kt_rogue2'); const d = S.ents.__a.filter(e => e.trial === 'stab'); hurt(d[0], 5, p, 'Hieb'); const hack = S.trial?.n === 0 && d[0].alive;
+      for (const x of d) { p.stabAt = performance.now(); hurt(x, 5, p, 'Meuchelstich'); } trialTick(); const stab = questComplete('kt_rogue2');
+      startQuest('kt_assassin1'); const C = { id: 'kt_c', kind: 'bounty', spared: true, state: 'active', have: 1, need: 1, reward: { gold: 10, xp: 1, rep: 0 }, town: 'eren', title: 'Probe' }; const c0 = S.contracts, tr0 = structuredClone(S.trust || {}), av0 = S.avenge; S.contracts = [C]; try { claimContract(C, null); } finally { S.contracts = c0; S.trust = tr0; S.avenge = av0; } UI.closeDialogue(); const con = questComplete('kt_assassin1');
+      if (!(data && steal && hack && stab && con)) console.warn('Scheibe 5', { data, steal, hack, stab, con });
+      return data && steal && hack && stab && con;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (+1 je Klassenprüfung) für 50–70 % der Sterne, die eine typische Figur erreichen kann (Wanderer + Krieger + Ritter + ein Titel, BALANCE_GUIDE §7); darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
     while (p.level < MAX_LEVEL) { sum += p.xpNext; p.xp = p.xpNext; levelUp(p); }
-    const pts = p.skillPoints, attr = p.attrPoints, learnable = Object.keys(SKILL_TREE).length - Object.values(SKILL_TREE).filter(n => n.excl).length;
+    /* Klassen und Talente: Mit Sternbildern je Klasse misst die Probe, was EINE Figur erreichen kann — nicht alle Sterne aller Klassen.
+       Typisch: Wanderer, eine Klassenlinie mit Folgeklasse (zwei bestandene Prüfungen) und ein Titel; ausgeschlossene Schlüsselsterne zählen nicht. */
+    const reach = b => Object.values(SKILL_TREE).filter(n => n.branch === b).length - Object.values(SKILL_TREE).filter(n => n.branch === b && n.excl).length;
+    const typical = ['combat', 'magic', 'survival', 'warrior', 'knight', 'necromancer'];
+    const pts = p.skillPoints + 2, attr = p.attrPoints, learnable = typical.reduce((a, b) => a + reach(b), 0);
     p.xp = p.xpNext * 5; while (p.xp >= p.xpNext) levelUp(p); const capped = p.level === MAX_LEVEL && p.xp < p.xpNext && Math.ceil(p.xp) === p.xpNext;
     const g = actor(340, 300); g.coopHero = true; g.level = MAX_LEVEL; g.xp = 0; g.xpNext = 999; g.attrPoints = 0; g.xp = 5000; while (g.xp >= g.xpNext) levelUp(g);
     const ratio = pts / learnable;
     const want = 1 + Array.from({ length: MAX_LEVEL - 1 }, (_, i) => i + 2).filter(talentAt).length;
-    if (!(pts === want && attr === 59 + 12 && capped && ratio >= 0.3 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, sum, g.level, g.attrPoints);
-    return pts === want && attr === 59 + 12 && capped && ratio >= 0.3 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
+    if (!(pts === want + 2 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints)) console.warn('Höchststufe', pts, attr, capped, ratio, learnable, sum, g.level, g.attrPoints);
+    return pts === want + 2 && attr === 59 + 12 && capped && ratio >= 0.5 && ratio <= 0.7 && sum < 6e5 && g.level === MAX_LEVEL && !g.attrPoints;
   }));
   ok('Balance-Runde (docs/BALANCE.md): Bosse ×2 Leben und ×0,6 Wucht (Omega ausgenommen); fester Schadensanteil wächst mit der Schwungdauer; Geist bleibt nicht dauerhaft körperlos; RF.simFight ändert die Welt nicht', sandbox(() => {
     const p = stage(); p.level = 20; recalc(p);
@@ -20282,6 +20500,19 @@ export function selftest() {
       return cards && bought && locked && freed;
     } finally { UI.closeModal(); S.pet = pet0; }
   }));
+  ok('Schmied (03.10.): Verbessern hebt eine Gütestufe (ohne Angabe = Solide → Gut, Seltenheit mind. ungewöhnlich) gegen Gold und Eisen, nie über Meisterlich; Schmieden lassen fertigt ohne eigenen Fertigkeitsgewinn; Überfall nimmt die Hälfte der Betriebskasse', sandbox(() => {
+    const p = stage(), r0 = { ...S.res }, inv0 = p.inv, biz0 = S.eco?.biz;
+    try {
+      p.inv = []; S.gold = 1000; S.res.iron = 20; const o = mkItem('longsword'); delete o.qual; delete o.rar; p.inv.push(o);
+      const up = !smithUpgrade(null, o) && o.qual === 'Gut' && RARITY_ORDER.indexOf(o.rar || ITEMS.longsword.rarity || 'common') >= 1 && S.gold < 1000 && S.res.iron === 18;
+      smithUpgrade(null, o); const top = o.qual === 'Meisterlich' && smithUpgInfo(o) === null && !!smithUpgrade(null, o);
+      const R = Object.entries(RECIPES).find(([, R]) => R.st === 'forge' && Object.keys(R.need).every(m => m === 'iron' || m === 'wood'));
+      let made = true; if (R) { S.res.iron = 50; S.res.wood = 50; const s0 = p.skills.smithing || 0, n0 = p.inv.length; made = !smithCommission({ name: 'Probe-Schmied' }, R[0]) && (p.skills.smithing || 0) === s0 && (p.inv.length > n0 || ITEMS[R[0]].stack); }
+      if (S.eco) S.eco.biz = [{ id: '__pr', owner: 'player', town: 'eren', trade: 'weaver', kasse: 101 }]; if (S.eco) bizRaid('eren', 'Probe');
+      const raid = !S.eco || S.eco.biz[0].kasse === 51;
+      return up && top && made && raid;
+    } finally { p.inv = inv0; Object.assign(S.res, r0); if (S.eco) S.eco.biz = biz0; }
+  }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
@@ -21041,7 +21272,7 @@ export function selftest() {
     const p = stage(), T0 = structuredClone(S.flags.tips || {}), pm = S.flags.playMin, tp = S.settings.tips, sp = p.skillPoints, ap = p.attrPoints;
     try { S.flags.tips = {}; S.flags.playMin = 5; S.settings.tips = true; guideLast = -1e9; p.skillPoints = 1; p.attrPoints = 1; const a = guideTick();
       const b = guideTick(); guideLast = -1e9; const c = guideTick(); guideLast = -1e9; S.settings.tips = false; const d = guideTick();
-      return a === 'codex' && b === undefined && c === 'attr' && d === undefined;   /* Talent-Tipp ruht, solange die Talentbäume versteckt sind (02.10.2026) */
+      return a === 'codex' && b === undefined && c === 'talent' && d === undefined;   /* Scheibe 2: Talent-Tipp wieder an (vor Attributen) */
     } finally { S.flags.tips = T0; S.flags.playMin = pm; S.settings.tips = tp; p.skillPoints = sp; p.attrPoints = ap; guideLast = -1e9; }
   }));
   ok('Scout R9: Rang bremst den Blutkult (Krönung +10 Tage) — ohne Rang nicht', sandbox(() => {
@@ -21722,7 +21953,7 @@ function boot() {
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
+    dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
@@ -21754,7 +21985,7 @@ function boot() {
     tracker: trackerInfo,   /* Q-4: Tracker über dem Spielfeld */
     craftView, craftDo: (k, ke) => craftItem(k, ke), craftMend: t => mendAt(t),   /* UI-Scheibe 3: Handwerk-Dock */
     bizView, bizCollect, houseSprite: (h, lit) => HB.houseSprite(h, lit),   /* Betriebe-Reiter */
-    smithItems, smithPrice, smithRepair, smithForge: npc => S.ents[npc.map || S.map]?.find(e => e.kind === 'prop' && (e.type === 'forge' || e.type === 'anvil') && dist(e, npc) < 200) || null, openForge: t => craftMenu('forge', t),   /* Schmiede-Dock */
+    smithUpgList, smithUpgrade, smithOrders, smithCommission, smithItems, smithPrice, smithRepair, smithForge: npc => S.ents[npc.map || S.map]?.find(e => e.kind === 'prop' && (e.type === 'forge' || e.type === 'anvil') && dist(e, npc) < 200) || null, openForge: t => craftMenu('forge', t),   /* Schmiede-Dock */
     coachView, coachGo, drawAtlas: (cv, z) => drawAtlas(cv, z),   /* Reise-Dock */
   });
   // Titelbildschirm
