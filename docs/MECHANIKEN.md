@@ -879,4 +879,25 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Burgwache:** Getötete Burgwachen der Varonsburg kommen beim Laden nicht wieder. Erst wenn die Stadtwache vollzählig ist, ziehen täglich zwei neue ein.
 - **Der König flieht:** Hast du mindestens 3 der Burgwachen erschlagen, und sind 5 tot, während Varonheim schutzlos ist, flieht König Varon mit dem Hof ins Exil. Die Stadt bleibt der Krone. Die Rote Krönung ruht, solange er fort ist. Stehen Stadt- und Burgwache 3 Tage lang wieder, kehrt er zurück.
 - Debug: „Stadt ohne Schutz: Frist vorspulen“, „Plünderer jetzt“, „Burgwache töten“, „König-Flucht zurücksetzen“.
-- Die Übernahme durch Tote, Banden oder die Kette folgt in Scheibe 2b.
+
+## Baumodus visuell (UI-Scheibe 2)
+- **Baukarten:** Das Fenster Siedlung (B) zeigt jeden Bau als Karte mit Bild, Kosten als Piktogramm + Zahl (rot, wenn es fehlt) und Bauzeit. Klick öffnet den Bauplan, Doppelklick setzt den Bau sofort zum Platzieren.
+- **Bauplan:** großes Bild, Beschreibung, Grundriss von oben (Felder, Tür, ein Punkt = ein Mensch als Maßstab), Kosten mit Vorrat, Bauzeit, Fläche, Schlafplätze.
+- **Geist in der Welt:** Beim Platzieren liegt über jedem Feld ein Raster: grün frei, rot belegt (feste Kachel oder anderer Bau). Ein gestrichelter Kreis um den Helden zeigt die Reichweite (400); außerhalb wird er rot, eine Linie zeigt die Richtung. Ein Schild nennt den Grund („Kein Platz“, „Zu weit weg“) oder „Linksklick: bauen“. Die Regeln sind unverändert.
+- **Arbeitsprioritäten als Karten:** mit der Maus ziehen, um die Reihenfolge zu ändern; ▲ schiebt eine Stufe höher. Die oberste Karte („jetzt“) arbeiten alle Siedler ab.
+
+## Stadt ohne Schutz — Übernahme (Scheibe 2b)
+- Bleibt eine gesetzlose Stadt eine weitere Frist ohne Ersatz, nimmt sie sich jemand. Es greift die erste passende Regel:
+  1. Steht ein freies Heer der Toten höchstens zwei Wege entfernt (nur Orte im Kriegsgraphen), marschiert es auf die Stadt.
+  2. Lagert eine Bande höchstens 80 Felder entfernt, herrscht sie.
+  3. Valen-Dörfer am Westrand (bis 160 Felder vom nächsten Tributdorf) nimmt die Kette als Tributdorf (Valen −5).
+  4. Sonst bildet sich eine neue Bande.
+- **Bandenherrschaft:** Am Tor wird Schutzgeld verlangt, Kaufen kostet das Anderthalbfache, die Läden haben wieder offen, und der Wohlstand sinkt um 3 je Tag. Die Bande zerfällt nicht von selbst.
+- **Befreien:** Erschlägst du den Anführer, ist die Stadt frei. Der Herr schickt sofort Ersatz und dankt dir (+10), außer du hast selbst die Wache erschlagen. Ohne dich schwächen Streifen des Herrn die Bande alle 5 Tage um 35 %, bis sie abzieht. Kettendörfer werden frei, wenn die Kette fällt.
+- Varonheim und Vharnholm werden nie übernommen.
+- Debug: „Übernahme erzwingen (Bande/Tote/Kette)“, „Streife jetzt“.
+
+## Blutkult-Sense (mythisch)
+- Am Ende der Blutkult-Questreihe liegt Aldhelms Sense in seiner Krypta. Du bekommst sie, wenn Aldhelm tot ist oder du selbst Blutfürst wirst. Es gibt sie nur einmal.
+- Sie ist eine zweihändige Stangenwaffe mit weitem Bogen und Blutung. Ihr **Lebensraub** heilt dich um 12 % des Schadens, für jeden Getroffenen im Bogen.
+- Debug: „Blutkult-Sense geben“.

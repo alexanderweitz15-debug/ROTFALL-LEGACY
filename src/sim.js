@@ -104,7 +104,12 @@ function siegeTick(und, val) {                                     // ein Zug (6
   if (nearPlayer(CAPK)) return materialize(CAPK, und, def);
   battleAbstract(CAPK, und, def, CAP_SIEGE.inner);
 }
-export const captureNode = (k, f) => { capture(k, f); cleanupArmies(); };   /* Debug und Proben */
+export const captureNode = (k, f) => { capture(k, f); cleanupArmies(); };
+export function armyNear(k, fac, hops = 2) {                       /* Stadt ohne Schutz S2: freies Heer höchstens hops Kanten entfernt */
+  const seen = new Set([k]); let front = [k];
+  for (let i = 0; i < hops; i++) { const nx = []; for (const n of front) for (const m of NEIGH[n] || []) if (!seen.has(m)) { seen.add(m); nx.push(m); } front = nx; }
+  return (S.war?.armies || []).filter(a => a.faction === fac && !a.host && !a.order && seen.has(a.at)).sort((a, b) => b.strength - a.strength)[0] || null;
+}   /* Debug und Proben */
 
 function newArmy(faction, at, strength) {
   return { id: uid(), faction, at, prev: at, strength,
@@ -417,7 +422,7 @@ function capture(node, faction) {
   const was = n.owner;
   n.owner = faction; n.garrison = faction === 'undead' ? (node === CAPK ? CAP_SIEGE.occ : 10) : (node === CAPK ? 20 : 8); n.wave = 0; n.waves = 0;   // neu besetzt: Befreiung beginnt wieder bei Welle 1
   if (node === CAPK) { n.siege = null; n.walls = faction === 'undead' ? 0 : 30; }
-  if (faction === 'undead') for (const a of S.war.armies) if (a.order === node) { a.order = null; if (!a.host) H.heldTaken?.(node); }   // S15 P20: Befehl erfüllt (der Heerzug ist kein Befehl des Spielers)
+  if (faction === 'undead') for (const a of S.war.armies) if (a.order === node) { a.order = null; if (!a.host && !a.lawOrder) H.heldTaken?.(node); delete a.lawOrder; }   // S15 P20: Befehl erfüllt (der Heerzug ist kein Befehl des Spielers)
   const L = LOC[node];
   log(`${L.name} fällt an ${FACTIONS[faction].name}.`, 'faction');
   if (S.towns[node]) {

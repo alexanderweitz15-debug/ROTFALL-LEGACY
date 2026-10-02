@@ -1,6 +1,6 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp, seasonOf } from './state.js?v=23';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
 import * as HB from './buildings.js?v=23';
 import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
@@ -124,6 +124,7 @@ export function drawFrame(now) {
   drawLight(now);
   drawAmbienceGlow();   /* Artist Runde 7 */
   drawWeather(now);
+  drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
   drawFloats();
   drawBubbles(performance.now());
   drawBossBar();
@@ -2478,6 +2479,52 @@ function drawBaked(key, e, box, fn) {
     bakeCache.set(key, cv);
   }
   ctx.drawImage(cv, e.x - box / 2, e.y - box * 0.73, box, box);
+}
+/* UI-Scheibe 2 (Artist R8): Bau-Geist mit Feldraster (grün frei / rot belegt), Reichweitenkreis 400 um den Helden und Bild der Baukarte.
+   Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
+const PLACE_RANGE = 400;
+let BLDICO = null, bldImgs = {};
+import('./icons.js?v=23').then(m => { BLDICO = m; }).catch(() => {});
+function bldImage(type) {
+  if (!BLDICO?.bldURL) return null;
+  let im = bldImgs[type];
+  if (!im) { const u = BLDICO.bldURL(type, 4); if (!u) return null; im = bldImgs[type] = new Image(); im.src = u; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function drawPlaceGuide(list, now) {
+  const g = list.find(e => e.ghost && e.kind === 'building' && e.def), p = S.player;
+  if (!g || !p) return;
+  const def = g.def, w = def.w * TS, h = def.h * TS, x0 = g.x - w / 2, y0 = g.y - h / 2;
+  const tx0 = (x0 / TS) | 0, ty0 = (y0 / TS) | 0, far = Math.hypot(g.x - p.x, g.y - p.y) > PLACE_RANGE;
+  const others = list.filter(e => e.kind === 'building' && !e.ghost && e.def);
+  const pulse = 0.5 + 0.5 * Math.sin(now / 260);
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-cam.x, -cam.y);
+  ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -now / 60;
+  ctx.strokeStyle = far ? 'rgba(210,70,50,.75)' : 'rgba(189,148,51,.45)';
+  ctx.beginPath(); ctx.arc(p.x, p.y, PLACE_RANGE, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  const im = g.type !== 'wohnzone' && bldImage(g.type);
+  if (im) { const iw = Math.max(w, 48), ih = iw * im.naturalHeight / im.naturalWidth; ctx.globalAlpha = .55; ctx.imageSmoothingEnabled = false; ctx.drawImage(im, g.x - iw / 2, y0 + h - ih, iw, ih); ctx.globalAlpha = 1; }
+  let bad = 0;
+  for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) {
+    const tx = tx0 + i, ty = ty0 + j, cx = (tx + .5) * TS, cy = (ty + .5) * TS;
+    const blocked = SOLID.has(tileAt(S.map, tx, ty)) || others.some(e => Math.abs(e.x - cx) < e.def.w * TS / 2 && Math.abs(e.y - cy) < e.def.h * TS / 2);
+    if (blocked) bad++;
+    ctx.fillStyle = blocked ? 'rgba(200,50,35,.42)' : `rgba(90,170,70,${.18 + .1 * pulse})`;
+    ctx.fillRect(tx * TS + 1, ty * TS + 1, TS - 2, TS - 2);
+    ctx.strokeStyle = blocked ? 'rgba(240,90,60,.85)' : 'rgba(140,220,110,.6)'; ctx.lineWidth = 1;
+    ctx.strokeRect(tx * TS + 1.5, ty * TS + 1.5, TS - 3, TS - 3);
+  }
+  const ok = !g.blocked && !far;
+  ctx.strokeStyle = ok ? 'rgba(150,230,120,.95)' : 'rgba(235,80,55,.95)'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, w, h);
+  const msg = far ? 'Zu weit weg — näher heran' : g.blocked ? (bad ? 'Kein Platz — rote Felder belegt' : 'Kein Platz — zu dicht am Nachbarbau') : 'Linksklick: bauen';
+  const t = `${def.name} · ${msg}`;
+  ctx.font = 'bold 10px Spectral, serif'; ctx.textAlign = 'center';
+  const tw = ctx.measureText(t).width + 10, ty = Math.max(y0 - 8, cam.y + 16), lx = Math.min(Math.max(g.x, cam.x + tw / 2 + 4), cam.x + W / cam.zoom - tw / 2 - 4);   /* Schild bleibt im Bild */
+  ctx.fillStyle = 'rgba(12,10,8,.78)'; ctx.fillRect(lx - tw / 2, ty - 11, tw, 15);
+  ctx.fillStyle = ok ? '#cfe8b0' : '#f0a08a'; ctx.fillText(t, lx, ty);
+  ctx.textAlign = 'left';
+  if (far) { ctx.strokeStyle = 'rgba(235,80,55,.5)'; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(g.x, g.y); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
 }
 function drawBuilding(e, now) {
   if (e.type === 'wohnzone') { const w = e.def.w * TS, h = e.def.h * TS, x = e.x - w / 2, y = e.y - h / 2;   /* Nutzer §5d.3: Wohnzone als abgesteckter Grund */

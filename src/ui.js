@@ -910,42 +910,94 @@ function settleUI(body) {
   }
   const cats = {};
   for (const [k, b] of Object.entries(BUILDINGS)) (cats[b.cat] ||= []).push([k, b]);
+  /* UI-Scheibe 2 (Artist R8): Baukarten mit Bild, Kosten-Piktogrammen und Bauzeit; Detail mit Grundriss; Prioritäten als ziehbare Karten */
   body.innerHTML = `<div class="build-layout">
-    <div>${Object.entries(cats).map(([c, list]) => `<div class="build-cat">${c}</div>` +
-      list.map(([k, b]) => {
-        const can = A.canAfford(b.cost);
-        return `<button class="build-item ${can ? '' : 'cant'}" data-b="${k}">${b.name}<small>${costStr(b.cost)}</small></button>`;
-      }).join('')).join('')}</div>
+    <div class="bcards-col">${Object.entries(cats).map(([c, list]) => `<div class="build-cat">${c}</div><div class="bcards">` +
+      list.map(([k, b]) => bldCard(k, b)).join('') + '</div>').join('')}
+      <div class="ledger bhint">Klick: Bauplan ansehen · Doppelklick: sofort platzieren. Rote Zahl = es fehlt Material.</div></div>
     <div><h3>${st.name}</h3>
       <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()} · Moral ${Math.round(st.morale)}</div>
-      <div id="detail" class="ledger" style="margin-top:12px">Wähle ein Gebäude links, dann platziere es in der Welt mit Linksklick.</div>
+      <div id="detail" class="bdetail ledger">Wähle links eine Baukarte. Der Bauplan zeigt Bild, Kosten und Grundriss; „Platzieren“ setzt einen Geist in die Welt.</div>
       <h3 style="margin-top:16px">Arbeitsprioritäten</h3>
-      <div id="prio"></div>
-      <div class="ledger" style="margin-top:6px">Alle Siedler arbeiten an der obersten Aufgabe. Siedler kommen nur, wenn es ein Dach (Hütten) und Nahrung gibt; jeder isst täglich. Nachts kommen Angreifer — ein Wachturm warnt eine Stunde vorher.</div>
+      <div id="prio" class="prio-list"></div>
+      <div class="ledger" style="margin-top:6px">Karten mit der Maus ziehen, um die Reihenfolge zu ändern (oben = zuerst); ▲ schiebt eine Stufe höher. Alle Siedler arbeiten an der obersten Aufgabe. Siedler kommen nur, wenn es ein Dach (Hütten) und Nahrung gibt; jeder isst täglich. Nachts kommen Angreifer — ein Wachturm warnt eine Stunde vorher.</div>
       <h3 style="margin-top:16px">Ortsgedächtnis</h3>
       <div class="ledger">${(st.history || []).map(h => `${h.text} — Jahr ${h.year}`).join('<br>') || 'Noch keine Geschichte.'}</div>
     </div>
     <div><h3>Bestand</h3>
       ${['wood:Holz', 'stone:Stein', 'iron:Eisen', 'food:Nahrung', 'herb:Kraut'].map(s => { const [k, n] = s.split(':');
-        return `<div class="statline"><span>${n}</span><b>${Math.floor(S.res[k])}</b></div>`; }).join('')}
+        return `<div class="statline"><span>${icoImg('res_' + k, 1, 'ico bres')}${n}</span><b>${Math.floor(S.res[k])}</b></div>`; }).join('')}
       <h3 style="margin-top:14px">Gebäude</h3>
       ${st.buildings.map(b => `<div class="statline"><span>${BUILDINGS[b.type].name}</span><b>${b.built < 1 ? Math.round(b.built * 100) + '% Bau' : Math.round(b.cond * 100) + '%'}</b></div>`).join('') || '<div class="ledger">Nichts gebaut.</div>'}
     </div></div>`;
-  const prio = $('prio');
-  (st.priorities || []).forEach((p, i) => {
-    const row = el('div', 'statline', `<span>${i + 1}. ${p}</span><b>${i ? `<button class="txtbtn" data-up="${i}">höher</button>` : ''}</b>`);
-    prio.appendChild(row);
-  });
-  [...body.querySelectorAll('[data-up]')].forEach(b => b.onclick = () => { A.raisePriority(+b.dataset.up); refreshModal(); });
-  [...body.querySelectorAll('[data-b]')].forEach(b => b.onclick = () => {
-    const k = b.dataset.b, def = BUILDINGS[k];
-    $('detail').innerHTML = `<h3>${def.name}</h3>${def.desc}<br><br>Kosten: ${costStr(def.cost)}<br>Bauzeit: ${def.time}s
-      <div class="ctx-actions"><button id="place">Platzieren</button></div>`;
-    $('place').onclick = () => { A.startPlacing(k); closeModal(); };
-  });
+  prioCards($('prio'), st);
+  const place = k => { A.startPlacing(k); closeModal(); };
+  const show = k => { selBld = k; [...body.querySelectorAll('[data-b]')].forEach(c => c.classList.toggle('sel', c.dataset.b === k)); bldDetail($('detail'), k, place); };
+  [...body.querySelectorAll('[data-b]')].forEach(b => { b.onclick = () => show(b.dataset.b); b.ondblclick = () => place(b.dataset.b); });
+  if (selBld && BUILDINGS[selBld]) show(selBld);
 }
-const costStr = c => Object.entries(c).map(([k, v]) => `${v} ${({ wood:'Holz', stone:'Stein', iron:'Eisen' })[k]}`).join(', ');
+let selBld = null;
+const RES_NAME = { wood:'Holz', stone:'Stein', iron:'Eisen' };
+const bldImg = (k, s, cls) => { let u = ''; try { u = ICO?.bldURL?.(k, s) || ''; } catch (e) {} return u ? `<img class="${cls}" src="${u}" alt="">` : `<span class="${cls} bimg-none"></span>`; };
+function costPics(cost, big) {                                          /* je Rohstoff: Piktogramm + Zahl, rot wenn es fehlt */
+  return Object.entries(cost).map(([k, v]) => { const have = Math.floor(S.res[k] || 0), miss = have < v;
+    return `<span class="bcost${miss ? ' miss' : ''}" title="${v} ${RES_NAME[k] || k} — vorhanden ${have}">${icoImg('res_' + k, 1, 'ico') || (RES_NAME[k] || k) + ' '}${v}${big && miss ? ` <small>(${have})</small>` : ''}</span>`; }).join('');
+}
+function bldCard(k, b) {
+  const can = A.canAfford(b.cost);
+  return `<button class="bcard${can ? '' : ' cant'}" data-b="${k}" title="${b.name}: ${b.desc}">
+    ${bldImg(k, 3, 'bimg')}<span class="bname">${b.name}</span>
+    <span class="bfoot">${costPics(b.cost)}<span class="btime" title="Bauzeit">${icoImg('time', 1, 'ico')}${b.time}s</span></span></button>`;
+}
+function bldDetail(box, k, place) {
+  const def = BUILDINGS[k], can = A.canAfford(def.cost);
+  box.innerHTML = `<div class="bd-head">${bldImg(k, 5, 'bimg-big')}<div><h3>${def.name}</h3><div>${def.desc}</div></div></div>
+    <div class="bd-row"><div class="bd-plan"><canvas id="bdplan"></canvas><small>Grundriss ${def.w}×${def.h} Felder · Punkt = ein Mensch</small></div>
+      <div class="bd-facts"><div class="statline"><span>Kosten</span><b>${costPics(def.cost, true)}</b></div>
+        <div class="statline" title="Mit einem Helfer in der Nähe; jeder weitere Helfer (Gefährten) baut mit."><span>Bauzeit</span><b>${def.time} s</b></div>
+        <div class="statline"><span>Fläche</span><b>${def.w}×${def.h}</b></div>
+        ${def.pop ? `<div class="statline"><span>Schlafplätze</span><b>${def.pop}</b></div>` : ''}</div></div>
+    <div class="ctx-actions"><button id="place"${can ? '' : ' class="cant"'}>Platzieren</button></div>
+    <div class="bd-hint">${can ? 'In der Welt: grüne Felder sind frei, rote belegt. Der Kreis um dich ist die Reichweite. Linksklick baut, Rechtsklick oder Esc bricht ab.' : 'Es fehlt Material (rot markiert). Holz, Stein und Eisen kommen aus Sammeln und Siedlerarbeit.'}</div>`;
+  $('place').onclick = () => place(k);
+  drawPlan($('bdplan'), k, def);
+}
+function drawPlan(cv, k, def) {                                          /* Grundriss von oben: Bauland, Mauern, Tür, ein Mensch als Maßstab */
+  if (!cv) return;
+  const m = 1, cw = def.w + m * 2, ch = def.h + m * 2, c = Math.max(8, Math.min(18, Math.floor(130 / Math.max(cw, ch))));
+  cv.width = cw * c; cv.height = ch * c;
+  const g = cv.getContext('2d'), x0 = m * c, y0 = m * c, W = def.w * c, H = def.h * c;
+  g.fillStyle = '#1b2014'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = 'rgba(255,255,255,.035)'; for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) if ((i + j) % 2) g.fillRect(i * c, j * c, c, c);
+  const fill = { Unterkunft:'#5a4630', Produktion:'#4b3f33', Versorgung:'#4f5a2c', Verteidigung:'#5a4a36', Grundlage:'#3a2f24', Zonen:'rgba(120,160,80,.15)' }[def.cat] || '#4b3f33';
+  g.fillStyle = fill; g.fillRect(x0, y0, W, H);
+  if (k === 'farm') { g.fillStyle = '#3a2c1c'; for (let y = y0 + 2; y < y0 + H; y += 4) g.fillRect(x0 + 2, y, W - 4, 2); }
+  else if (k === 'pasture') { g.strokeStyle = '#8a6a40'; g.lineWidth = 2; g.strokeRect(x0 + 2, y0 + 2, W - 4, H - 4); g.fillStyle = '#5a4630'; g.fillRect(x0 + W - c - 2, y0 + 2, c, c); }
+  else if (k === 'campfire' || k === 'well') { g.fillStyle = k === 'well' ? '#5c6a78' : '#c86a28'; g.beginPath(); g.arc(x0 + W / 2, y0 + H / 2, c * .36, 0, 7); g.fill(); }
+  else if (k === 'wohnzone') { g.strokeStyle = 'rgba(150,190,110,.8)'; g.setLineDash([4, 3]); g.strokeRect(x0 + .5, y0 + .5, W - 1, H - 1); g.setLineDash([]); g.fillStyle = '#6a5030'; for (const [px, py] of [[x0, y0], [x0 + W, y0], [x0, y0 + H], [x0 + W, y0 + H]]) g.fillRect(px - 2, py - 2, 4, 4); }
+  else { g.strokeStyle = '#a08458'; g.lineWidth = 2; g.strokeRect(x0 + 1, y0 + 1, W - 2, H - 2);
+    if (['hut', 'tent', 'storage', 'smithy', 'watchtower', 'gate'].includes(k)) { g.fillStyle = '#1b2014'; g.fillRect(x0 + W / 2 - c * .35, y0 + H - 3, c * .7, 3); } }
+  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
+  for (let i = 0; i <= def.w; i++) { g.beginPath(); g.moveTo(x0 + i * c + .5, y0); g.lineTo(x0 + i * c + .5, y0 + H); g.stroke(); }
+  for (let j = 0; j <= def.h; j++) { g.beginPath(); g.moveTo(x0, y0 + j * c + .5); g.lineTo(x0 + W, y0 + j * c + .5); g.stroke(); }
+  g.fillStyle = '#e8c070'; g.beginPath(); g.arc(c / 2, ch * c - c / 2, Math.max(2, c * .22), 0, 7); g.fill();   /* Mensch als Maßstab: ein Feld */
+}
+function prioCards(box, st) {                                           /* ziehbare Karten; Umsortieren nur über raisePriority (gleiche Regel wie „höher“) */
+  const pr = st.priorities || [];
+  const move = (from, to) => { if (to < from) for (let k = from; k > to; k--) A.raisePriority(k); else for (let k = from + 1; k <= to; k++) A.raisePriority(k); refreshModal(); };
+  let drag = -1;
+  pr.forEach((p, i) => {
+    const card = el('div', 'prio-card' + (i ? '' : ' top'), `<span class="pgrip">⠿</span><b>${i + 1}</b><span class="pname">${p}</span>${i ? `<button class="txtbtn" data-up="${i}" title="Eine Stufe höher">▲</button>` : '<small>jetzt</small>'}`);
+    card.draggable = true; card.title = 'Ziehen zum Umsortieren';
+    card.ondragstart = ev => { drag = i; card.classList.add('drag'); try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(i)); } catch (e) {} };
+    card.ondragend = () => { card.classList.remove('drag'); [...box.children].forEach(c => c.classList.remove('over')); };
+    card.ondragover = ev => { ev.preventDefault(); [...box.children].forEach(c => c.classList.toggle('over', c === card)); };
+    card.ondrop = ev => { ev.preventDefault(); if (drag >= 0 && drag !== i) move(drag, i); drag = -1; };
+    box.appendChild(card);
+  });
+  [...box.querySelectorAll('[data-up]')].forEach(b => b.onclick = () => move(+b.dataset.up, +b.dataset.up - 1));
+}
 function settleTier(st) {
   const n = st.buildings.filter(b => b.built >= 1).length;
   return n >= 12 ? 'Befestigte Siedlung' : n >= 7 ? 'Dorf' : n >= 3 ? 'Befestigtes Lager' : 'Lager';

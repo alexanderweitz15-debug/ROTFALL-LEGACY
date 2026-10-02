@@ -1168,7 +1168,7 @@ function dayTarget(e) {
 function dayTargetRaw(e) {
   const P = e.plan, h = S.minute / 60 - P.o, alt = ((S.day | 0) + P.n) % 3;
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
-  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || (S.schutz?.[e.homeTown]?.stage || 0) >= 2) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
+  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
   if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
   if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
     const rings = Math.max(6, Math.ceil((FEST_POP[e.homeTown] || 24) / 14)), r = 80 + (P.n % rings) * 22;   // BUG (Nutzer: Aurelion-Klumpen): Ringe wachsen mit der Einwohnerzahl, sonst quetscht sich eine Metropole auf 6 Ringe wie ein Dorf
@@ -3365,7 +3365,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker === S.player && node(attacker, 'k_storm') && attacker.titleClass === 'monk' && (attacker.stormN = (attacker.stormN || 0) + 1) % 3 === 0) setTres(attacker, tres(attacker) + 1);   // S15 Sturmhand
   if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
     target.status = (target.status || []).filter(q => q.key !== 'poisoned'); target.status.push({ key: 'poisoned', name: 'Vergiftet', left: 5000, src: attacker.id }); fx(target.x, target.y - 12, 'necro', 4); }
-  const lee = afx(attacker, 'leech') + (setOf(attacker)?.bonus.leech || 0); if (lee && attacker.alive && !attacker.downed) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
+  const lee = afx(attacker, 'leech') + (setOf(attacker)?.bonus.leech || 0) + (ITEMS[attacker.equip?.weapon?.key]?.leech || 0); if (lee && attacker.alive && !attacker.downed) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
   if (afx(attacker, 'rend') && target.alive && chance(afx(attacker, 'rend')) && !(target.status || []).some(s => s.key === 'bleeding')) (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000, src: attacker.id });
   const wIt = (attacker.equip?.weapon && ITEMS[attacker.equip.weapon.key]) || (attacker.weaponKey && ITEMS[attacker.weaponKey]);   // Session 11: Waffeneigenschaften Fesseln/Blutung (auch Gegnerwaffen)
   if (wIt?.pull && target.alive && !target.boss && !MONSTERS[target.mtype]?.boss && dist(attacker, target) > 40) { const a = Math.atan2(attacker.y - target.y, attacker.x - target.x), k = Math.min(wIt.pull, dist(attacker, target) - 34); moveEnt(target, Math.cos(a) * k, Math.sin(a) * k); target.stagger = Math.max(target.stagger || 0, 350); float(target, 'herangezogen', 'rgba(220,200,150,ALPHA)'); }   /* Nutzer §5f: Peitsche zieht heran */
@@ -5711,7 +5711,7 @@ function ensureAurelion() {
 // Nach einer Niederlage kommt die Kette härter wieder (doppelter Tribut, Dunkle Paladine). Banditen gegen ein Tributdorf:
 // die Kette stellt für einige Tage Krieger ins Dorf.
 const TRIB_EVERY = 5, TRIB_TAKE = 25;
-const tribVillages = () => VILLAGES.filter(V => V.tribute && TOWN_PLAN[V.key] && !S.razed?.[V.key]);
+const tribVillages = () => VILLAGES.filter(V => (V.tribute || S.schutz?.[V.key]?.taker?.by === 'chain') && TOWN_PLAN[V.key] && !S.razed?.[V.key]);   /* S2: von der Kette übernommene Dörfer zahlen mit */
 function tribState(k) {
   S.tribute ||= {};
   return S.tribute[k] ||= { vorrat: 60, next: (S.day | 0) + 2 + tribVillages().findIndex(V => V.key === k), harsh: 0, rep: 0, hunger: 0, garrison: 0 };
@@ -6782,7 +6782,7 @@ const CON = {
 const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meisterschmiedin: 'supply', Priester: 'monster', Wirt: 'deliver', Kaufmann: 'escort', 'Händlerin': 'deliver', Kontorhändler: 'escort',
   Heilerin: 'herbs', Kräuterfrau: 'herbs', Fischer: 'missing', Graf: 'trail', 'Gräfin': 'deliver', Edelmann: 'bounty', Edelfrau: 'deliver', Hofbeamter: 'trail', Richterin: 'trail',
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
-const townFac = town => TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
+const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
 const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
@@ -6995,7 +6995,7 @@ function growTown(town, type) {
 function growthDay() {
   for (const t of Object.keys(TOWN_PLAN)) { if (!growable(t)) continue;
     const G = growthOf(t), fac = townFac(t), occ = S.war?.nodes[t]?.owner === 'undead', raided = S.deadRaid?.v === t;
-    G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25 - (({ 2: 4, 3: 8 })[S.schutz?.[t]?.stage] || 0), -20, 100);   /* S2: schutzlos −4, gesetzlos −8 */
+    G.prosper = clamp(G.prosper + 3 + ((S.factions[fac] || 0) > 30 ? 1 : 0) - (occ ? 12 : 0) - (raided ? 5 : 0) - (S.omega?.cat && !S.omega.ending ? 4 : 0) - G.built.length * 0.25 - (({ 2: 4, 3: 8, 4: 3 })[S.schutz?.[t]?.stage] || 0), -20, 100);   /* S2: schutzlos −4, gesetzlos −8 */
     if (G.prosper >= 100) growNow(t);
     const last = G.built.filter(s => !s.ruin).pop();
     if (G.prosper <= -20 && last) { last.ruin = true; const b = HOUSES.find(h => h.id === 'g' + t + '_' + last.x + '_' + last.y); if (b) b.wear = 2; G.prosper = 0; log(`${townName(t)} schrumpft: ein neues Haus steht leer und verfällt.`, 'world'); }
@@ -8423,6 +8423,50 @@ function schutzLawless(k) {
   if (near) UI.toast(`${name.toUpperCase()} IST GESETZLOS`, 3000);
   if (k === 'varonheim' && S.war?.nodes?.varonheim?.owner === 'valen') SIM.threatBump(2);
 }
+// S2b — Übernahme: Nach einer weiteren Frist nimmt sich jemand die gesetzlose Stadt. Erste passende Regel: ein freies Totenheer
+// höchstens zwei Wege entfernt (nur Kriegsknoten), eine Bande in der Nähe (80 Felder), die Kette (Valen-Dörfer bis 160 Felder vom
+// nächsten Tributdorf), sonst eine neue Bande. Bandenherrschaft: Schutzgeld, Preise ×1,5; fällt der Anführer, ist die Stadt frei und der
+// Herr schickt sofort Ersatz; sonst schwächen seine Streifen die Bande alle 5 Tage um 35 %. Varonheim und Vharnholm nie.
+function westRim(k) { return townFac(k) === 'valen' && VILLAGES.some(V => V.key === k) && VILLAGES.some(V => V.tribute && V.key !== k && TOWN_PLAN[V.key] && townGap(k, V.key) <= 160); }
+function schutzOpen(k) { for (const e of S.ents.world) if (e.schutzShut === k) { e.shopClosed = 0; delete e.schutzShut; } S.ents.world = S.ents.world.filter(e => e.milizOf !== k && e.lawless !== k); }
+function schutzTake(k, force) {
+  const Z = schutzOf(k), day = S.day | 0, name = townName(k), sq = TOWN_PLAN[k]?.square; if (!sq || k === 'varonheim' || k === 'vharnholm' || TOWN_PLAN[k]?.lord === 'undead') return null;
+  const node = S.war?.nodes?.[k], a = (!force || force === 'undead') && node && node.owner !== 'undead' && SIM.armyNear(k, 'undead', 2);
+  if (a) { a.order = k; a.lawOrder = true; Z.taker = { by: 'undead', id: a.id, day }; Z.stage = 4; const cut = Math.round(node.garrison * 0.7); node.garrison -= cut; Z.gcut = cut;
+    afterSay(`Die Toten wenden sich gegen ${name}`, `Die Toten wittern die offenen Tore von ${name}. ${a.name || 'Ein Heer der Toten'} wendet sich dorthin.`, 'war'); return 'undead'; }
+  let b = (!force || force === 'band') && bandsOf().find(x => !x.rules && Math.hypot(x.tx - sq[0], x.ty - sq[1]) <= 80);
+  if (!b && (!force || force === 'chain') && !S.flags.chainsBroken && westRim(k)) {
+    Z.taker = { by: 'chain', day }; Z.stage = 4; schutzOpen(k); tribState(k); S.factions.valen = clamp((S.factions.valen || 0) - 5, -100, 100);
+    afterSay(`Die Kette nimmt ${name}`, `Die Kette legt ${name} in Eisen. Ab jetzt wird Tribut gezahlt (Valen −5). Fällt die Kette, ist das Dorf wieder frei.`, 'war'); return 'chain'; }
+  if (!b && (!force || force === 'band')) b = bandFound(k, [sq[0], sq[1] + 6]);
+  if (!b) { Z.noTake = (Z.noTake || 0) + 1; return null; }
+  const q = freeSpotNear('world', sq[0], sq[1] + 6, 4); if (q) { b.tx = q.x / TS | 0; b.ty = q.y / TS | 0; }
+  b.rules = k; b.patrolAt = day + 5; b.where = name; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive));
+  Z.taker = { by: 'band', id: b.id, day }; Z.stage = 4; schutzOpen(k);
+  afterSay(`${b.name} herrschen über ${name}`, `${b.name} unter ${b.lead} herrschen jetzt über ${name}. Am Tor wird Schutzgeld verlangt, die Preise steigen. Wer ${b.lead} erschlägt, befreit die Stadt.`, 'war');
+  return 'band';
+}
+function schutzFreed(k, who) {
+  const Z = S.schutz?.[k]; if (!Z) return; const T0 = Z.taker, day = S.day | 0, f = townFac(k) === 'chain' ? 'valen' : townFac(k);
+  if (T0?.by === 'band') { const b = (S.bands || []).find(x => x.id === T0.id); if (b) delete b.rules; }
+  if (T0?.by === 'chain' && S.tribute) delete S.tribute[k];
+  Z.taker = null; Z.stage = 2; Z.since = day; schutzLift(k);
+  if (who === 'player') { const R = SCHUTZ_REINF[f]; if (R && !schutzBlocked(k, f)) { const n = Math.min(Z.lost, R[1]); Z.lost -= n; Z.reinf = day; Z.byP = Math.min(Z.byP, Z.lost); if (afterLive()) spawnGuardPosts(); }
+    const clean = Z.byP / Math.max(1, Z.lost + 1) < 0.5; if (clean && S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + 10, -100, 100);
+    log(clean ? `${townName(k)} ist frei. ${FACTIONS[f]?.name || 'Der Herr'} dankt dir (+10) und schickt sofort Ersatz.` : `${townName(k)} ist frei. Man dankt dir — leise. Man weiß, wer die Wache erschlug.`, 'faction'); UI.toast(`${townName(k).toUpperCase()} BEFREIT`, 2600); chronicle(`${townName(k)} befreit`, 'battle', 'Die Herrschaft der Räuber ist vorbei.'); }
+  else log(`${townName(k)} ist wieder frei. ${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz.`, 'world');
+  schutzCheck(k);
+}
+function schutzTakerDay(k, Z) {                                       /* täglich: was wird aus der Übernahme? */
+  const day = S.day | 0, T0 = Z.taker;
+  if (T0.by === 'undead') { if (heldBy(k)) { delete S.schutz[k]; return; }
+    if (!(S.war?.armies || []).some(a => a.id === T0.id)) { Z.taker = null; Z.stage = 3; Z.since = day; log(`Das Heer der Toten, das gegen ${townName(k)} zog, ist zerschlagen. Die Stadt bleibt gesetzlos.`, 'world'); } return; }
+  if (T0.by === 'chain') { if (S.flags.chainsBroken) schutzFreed(k, 'lord'); return; }
+  const b = (S.bands || []).find(x => x.id === T0.id); if (!b || b.gone) return schutzFreed(k, 'lord');
+  if (day >= (b.patrolAt || 0) && !schutzBlocked(k, townFac(k))) { b.patrolAt = day + 5; b.men = Math.floor(b.men * 0.65);
+    if (b.men <= 1) { bandGone(b, `Streifen von ${FACTIONS[townFac(k)]?.name || 'des Herrn'} haben ${b.name} aus ${townName(k)} vertrieben.`); schutzFreed(k, 'lord'); }
+    else log(`Eine Streife von ${FACTIONS[townFac(k)]?.name || 'des Herrn'} schlägt sich mit ${b.name} in ${townName(k)}. Die Bande hat noch ${b.men} Mann.`, 'world'); }
+}
 function schutzLift(k) {
   S.ents.world = S.ents.world.filter(e => e.lawless !== k);
   log(`In ${townName(k)} herrscht wieder Gesetz.`, 'world');
@@ -8477,7 +8521,7 @@ function schutzLoss(c, byP) {
 function schutzCheck(k) {
   const Z = schutzOf(k), soll = schutzSoll(k), r = soll ? Z.lost / soll : 0, was = Z.stage;
   const s0 = r >= 0.8 || (Z.lost > 0 && !schutzAlive(k)) ? 2 : r >= 0.5 ? 1 : 0;
-  Z.stage = s0 === 2 && was >= 3 ? was : s0;                         /* S2: gesetzlos/übernommen bleibt, solange die Wache fehlt */
+  Z.stage = (s0 === 2 && was >= 3) || Z.taker ? was : s0;                         /* S2: gesetzlos/übernommen bleibt, solange die Wache fehlt */
   if (Z.stage >= 2 && was < 2) schutzAlarm(k);
   if (Z.stage < 2 && was >= 3) schutzLift(k);
   if (Z.stage < 2 && was >= 2) schutzCalm(k);
@@ -8507,7 +8551,10 @@ function schutzCalm(k) {
 }
 function ensureSchutz() {                                             /* Läden zu und Miliz für schutzlose Städte (flüchtig, nach jedem Laden neu) */
   for (const [k, Z] of Object.entries(S.schutz || {})) {
-    if ((Z.stage || 0) < 2) continue;
+    if ((Z.stage || 0) >= 2 && Z.since == null) Z.since = S.day | 0;   /* S2: alte Stände */
+    if (Z.taker?.by === 'band' && !(S.bands || []).some(b => b.id === Z.taker.id && !b.gone)) { Z.taker = null; Z.stage = 3; }
+    if (Z.taker?.by === 'undead' && heldBy(k)) { delete S.schutz[k]; continue; }
+    if ((Z.stage || 0) < 2 || Z.stage >= 4) continue;
     for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && e.shop && !e.fallShut && (e.homeTown === k || e.town === k)) { e.shopClosed = 1e12; e.schutzShut = k; }
     if (!afterLive() || S.ents.world.some(e => e.milizOf === k) || !TOWN_PLAN[k]) continue;
     const [cx, cy] = TOWN_PLAN[k].square, guilty = Z.byP / Math.max(1, Z.lost) >= 0.5;
@@ -8529,9 +8576,11 @@ function schutzDay() {
   const day = S.day | 0; burgDay();
   for (const [k, Z] of Object.entries(S.schutz || {})) {
     if (!Z.lost) { schutzCheck(k); continue; }
+    if (Z.taker) { schutzTakerDay(k, Z); continue; }                 /* S2b: wer herrscht, lässt keinen Ersatz durch */
     const f = townFac(k), R = SCHUTZ_REINF[f];
     if (!R || day - (Z.at || 0) < R[0] || day - (Z.reinf || 0) < R[0] || schutzBlocked(k, f)) {   /* S2: kein Ersatz — die Frist läuft */
-      if ((Z.stage || 0) >= 2) { Z.since ??= day; if (Z.stage === 2 && day - Z.since >= schutzWait()) schutzLawless(k); }
+      if ((Z.stage || 0) >= 2) { Z.since ??= day; if (Z.stage === 2 && day - Z.since >= schutzWait()) schutzLawless(k);
+        else if (Z.stage === 3 && day - Z.since >= schutzWait() && !schutzTake(k) && Z.noTake && chance(0.15 * Z.noTake)) schutzTake(k, 'band'); }
       continue; }
     const n = Math.min(Z.lost, R[1]); Z.reinf = day; Z.since = day; Z.lost -= n; Z.byP = Math.max(0, Math.min(Z.byP, Z.lost));
     if (f === 'merch') growthOf(k).prosper -= 5 * n;
@@ -11485,7 +11534,7 @@ function bandGone(b, msg) { b.gone = true; S.ents.world = S.ents.world.filter(e 
 function bandDay() {
   const act = bandsOf(), day = S.day | 0;
   for (const b of act) {
-    if (day - b.born > 12 && chance(0.25)) { bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
+    if (!b.rules && day - b.born > 12 && chance(0.25)) { bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
     if (b.paid < day && chance(0.5)) { b.men = Math.min(9, b.men + 1); log(`${b.name} haben bei ${b.where} Reisende ausgeraubt. Die Bande wächst (${b.men} Mann).`, 'world'); }
   }
   if (act.length < 3 && chance(0.2)) { const ts = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && S.war?.nodes?.[k]?.owner !== 'undead'); if (ts.length) bandFound(pick(ts)); }
@@ -11519,7 +11568,8 @@ function bandTick() {
 function bandKill(c) {
   const b = (S.bands || []).find(x => x.id === c.bandId); if (!b || b.gone) return; b.men = Math.max(0, b.men - 1);
   if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10; S.gold += g; addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
-    bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600); }
+    bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600);
+    if (b.rules) schutzFreed(b.rules, 'player'); }   /* S2: die Stadt ist frei */
 }
 function bandChoices(npc, choices) {
   if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = Math.round((20 + b.men * 8) * (styleOf() >= 40 ? 0.7 : 1)), day = S.day | 0;   /* T08: mit Barmherzigen verhandelt man */
@@ -13503,6 +13553,8 @@ function aldhelmAI(e, tgt, d, reach, sp, dt, m) {
 }
 function cultEnd(kind) {
   const C = S.cult; if (!C || C.end === kind || C.end === 'destroyed' || C.end === 'player') return; C.end = kind; C.stage = 5; cultAfter(kind);   /* aus 'hidden'/'ruling' kann der Kult noch fallen */
+  if ((kind === 'destroyed' || kind === 'player') && !S.flags.blutsense) { S.flags.blutsense = 1; const it = mkItem('blutsense'); if (S.player.inv.length < S.player.invCap) S.player.inv.push(it); else dropItemAt(S.player.map, S.player.x, S.player.y, it);   /* Entwickler 02.10.: mythische Belohnung */
+    log('In Aldhelms Krypta liegt seine Sense: die Blutkult-Sense (mythisch). Sie trinkt, was sie schneidet — 12 % des Schadens heilen dich.', 'quest'); UI.toast('MYTHISCH: BLUTKULT-SENSE', 3200); }
   if (kind === 'player') { C.lord = S.player.name; C.challenge = false; S.factions.valen = (S.factions.valen || 0) + 10; S.factions.order = (S.factions.order || 0) - 30;
     afterSay('Ein neuer Blutfürst', `${S.player.name} hat Aldhelm getrunken und trägt den Kelch. König Varon lebt und weiß von nichts. Der Orden weiß es.`, 'legend');
     log('Du bist Blutfürst von Varonheim: Täglich bringt die Kanzlei Tribut (2 Blutphiolen, 30 Gold). Bei Hedda bestimmst du den Zehnt. Der Orden jagt dich jetzt alle sieben Tage.', 'quest'); return; }
@@ -14847,6 +14899,7 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Blutkult-Sense geben': () => { addItem(P(), 'blutsense'); UI.toast('Blutkult-Sense im Gepäck'); },
       'Kult starten (Stufe 1)': () => { ensureBloodCult(); cultStart('Debug:'); },
       'Entführung jetzt': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); const v2 = cultTake(); UI.toast(v2 ? `${v2.name} verschwunden` : 'Niemand (Deckel 8?)'); },
       'Maskierte jetzt (Nacht)': () => { ensureBloodCult(); if (!S.cult.stage) cultStart('Debug:'); S.minute = 23 * 60; cultMasks(23); },
@@ -15135,6 +15188,10 @@ function debugSections() {
       'Stadt ohne Schutz: alle Wachen hier töten (als Spieler)': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); for (const g of S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.guard && guardTownOf(e) === k)) die(g, 'Debug', p); },
       'Stadt ohne Schutz: Tag vorspulen (Ersatz)': () => { for (const Z of Object.values(S.schutz || {})) { Z.at -= 3; Z.reinf = (Z.reinf || 0) - 3; } schutzDay(); },
       'Stadt ohne Schutz: Frist vorspulen (alle)': () => { for (const Z of Object.values(S.schutz || {})) Z.since = (Z.since ?? S.day) - 5; schutzDay(); UI.toast('Frist vorgespult'); },
+      'Stadt ohne Schutz: Übernahme erzwingen (Bande)': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!k || !S.schutz?.[k]) return UI.toast('Hier ist keine schutzlose Stadt.'); UI.toast(schutzTake(k, 'band') || 'keine Bande möglich'); },
+      'Stadt ohne Schutz: Übernahme erzwingen (Tote)': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!k || !S.schutz?.[k]) return UI.toast('Hier ist keine schutzlose Stadt.'); UI.toast(schutzTake(k, 'undead') || 'kein freies Totenheer in 2 Wegen'); },
+      'Stadt ohne Schutz: Übernahme erzwingen (Kette)': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4); if (!k || !S.schutz?.[k]) return UI.toast('Hier ist keine schutzlose Stadt.'); UI.toast(westRim(k) ? schutzTake(k, 'chain') || '—' : 'Kein Valen-Dorf am Westrand.'); },
+      'Stadt ohne Schutz: Streife jetzt': () => { for (const [k, Z] of Object.entries(S.schutz || {})) { const b = Z.taker?.by === 'band' && (S.bands || []).find(x => x.id === Z.taker.id); if (b) { b.patrolAt = 0; schutzTakerDay(k, Z); } } },
       'Stadt ohne Schutz: Plünderer jetzt': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4), Z = k && S.schutz?.[k]; if (!Z || Z.stage !== 3) return UI.toast('Keine gesetzlose Stadt hier.'); delete Z.lawN; lawlessHour(23); },
       'Burgwache töten (als Spieler)': () => { for (const g of courtEnts().filter(e => e.guard && e.alive)) die(g, 'Debug', p); UI.toast(`Burgwache: ${S.schutzBurg?.lost || 0} tot${S.flags.varonFled ? ', König geflohen' : ''}`); },
       'König-Flucht zurücksetzen': () => { if (S.flags.varonFled) { S.flags.varonEvac = S.flags.varonFled.evac0; delete S.flags.varonFled; } S.schutzBurg = { lost: 0, byP: 0 }; ensureVaronExile(); ensureVaronCourt(); UI.toast('Hof wieder in der Burg'); },
@@ -18716,6 +18773,31 @@ export function selftest() {
       if (!(law && cheap && none && free && slow && fled && guards && home)) console.log('Schutz-S2-Probe', { k, law, pr, none, free, slow, fled, guards, home });
       return law && cheap && none && free && slow && fled && guards && home;
     } finally { S.ents.world = W0; S.schutz = Z0; S.schutzBurg = B0; S.flags = f0; S.difficulty = d0; S.contracts = C0; S.conDay = CD; [p.map, p.x, p.y] = m0; S.bounty = b0; Object.assign(S.factions, fa0); ensureVaronCourt(); ensureVaronExile(); }
+  }));
+  ok('Stadt ohne Schutz S2b: Übernahme — Bande in der Nähe herrscht (Preise ×1,5, zerfällt nicht), Anführer tot → frei + Ersatz + Ruf; Streifen brechen die Bande; Totenheer nur bei Kriegsknoten; Kette nur am Westrand', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, Z0 = structuredClone(S.schutz || {}), BA = structuredClone(S.bands || []), f0 = structuredClone(S.flags), TR = structuredClone(S.tribute || {}), WAR = structuredClone(S.war), fa0 = { ...S.factions }, g0 = S.gold; S.ents.world = W0.slice();
+    try { const day = S.day | 0, prep = k => { S.schutz = { [k]: { lost: schutzSoll(k), byP: 0, stage: 3, since: day, at: day, reinf: day } }; };
+      const k = Object.keys(GUARD_POSTS).find(x => !['varonheim', 'vharnholm'].includes(x) && TOWN_PLAN[x] && townFac(x) === 'valen' && !westRim(x) && !heldBy(x) && S.war?.nodes?.[x]?.owner !== 'undead'); S.war.armies = [];
+      const sq = TOWN_PLAN[k].square; prep(k); S.bands = [{ id: 'bx', name: 'Probe-Bande', lead: 'Probe Einauge', town: k, tx: sq[0] + 30, ty: sq[1], born: day - 30, men: 6, paid: -1, amb: -999, where: 'x' }];
+      const Zs = S.schutz; S.schutz = {}; const pr0 = ECO.ecoPrice(k, 'grain', true); S.schutz = Zs; const how = schutzTake(k), b = S.bands[0], band = how === 'band' && b.rules === k && S.schutz[k].stage === 4 && S.schutz[k].taker.by === 'band';
+      const dear = ECO.ecoPrice(k, 'grain', true) / pr0 > 1.4; for (let i = 0; i < 20; i++) { S.day = day + i; bandDay(); } S.day = day; const stays = !b.gone;
+      const f = townFac(k), r0 = S.factions[f]; bandKill({ bandId: 'bx', bandLead: true }); const freed = !S.schutz[k]?.taker && S.schutz[k]?.stage <= 2 && S.factions[f] === r0 + 3 + 10;
+      prep(k); S.bands = [{ id: 'by', name: 'Probe-Bande 2', lead: 'X', town: k, tx: sq[0] + 30, ty: sq[1], born: day, men: 6, paid: -1, amb: -999, where: 'x' }]; schutzTake(k); const Z = S.schutz[k];
+      for (let i = 0; i < 3; i++) if (Z.taker) { S.bands[0].patrolAt = 0; schutzTakerDay(k, Z); } const patrol = S.bands[0].gone && !Z.taker;
+      const node = Object.keys(S.war.nodes).find(x => x !== 'varonheim' && TOWN_PLAN[x] && S.war.nodes[x].owner === 'valen'), nb = Object.keys(S.war.nodes).find(x => SIM.warGraph().edges.some(([a, c]) => (a === node && c === x) || (c === node && a === x)));
+      S.war.armies = [{ id: 'ax', faction: 'undead', at: nb, prev: nb, strength: 40, name: 'Probeheer' }]; prep(node); S.bands = []; const dead = schutzTake(node) === 'undead' && S.war.armies[0].order === node && S.war.armies[0].lawOrder;
+      const wk = VILLAGES.map(V => V.key).find(x => westRim(x)), chain = !wk || (prep(wk), S.bands = [], schutzTake(wk, 'chain') === 'chain' && townFac(wk) === 'chain' && tribVillages().some(V => V.key === wk) && townFac('eren') !== 'chain');
+      if (!(band && dear && stays && freed && patrol && dead && chain)) console.log('Schutz-S2b-Probe', JSON.stringify({ k, band, dear, stays, freed, patrol, dead, chain, node, nb, wk }));
+      return band && dear && stays && freed && patrol && dead && chain;
+    } finally { S.ents.world = W0; S.schutz = Z0; S.bands = BA; S.flags = f0; S.tribute = TR; S.war = WAR; Object.assign(S.factions, fa0); S.gold = g0; }
+  }));
+  ok('Blutkult-Sense (Entwickler 02.10.): mythisch, nur einmal am Ende der Questreihe (Aldhelm tot oder Blutfürst), Lebensraub heilt beim Treffer', sandbox(() => {
+    const p = stage(), C0 = S.cult ? structuredClone(S.cult) : null, f0 = structuredClone(S.flags), fa0 = { ...S.factions }, W0 = S.ents.world; S.ents.world = W0.slice();
+    try { delete S.flags.blutsense; p.inv = []; S.cult = { stage: 4, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; cultEnd('destroyed'); S.cult.end = 'hidden'; cultEnd('destroyed');
+      const once = p.inv.filter(i => i.key === 'blutsense').length === 1 && ITEMS.blutsense.rarity === 'mythic';
+      p.equip.weapon = mkItem('blutsense'); p.equip.weapon.afx = null; const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 20; w.y = p.y; B.damagePart(p, 'torso', 20); const hb = p.hp; seedRng(3); hit(p, w, 1); const healed = p.hp > hb;
+      return once && healed;
+    } finally { S.cult = C0; S.flags = f0; Object.assign(S.factions, fa0); S.ents.world = W0; }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

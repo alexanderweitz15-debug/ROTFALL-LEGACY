@@ -362,6 +362,7 @@ export const ITEMS = {
   arms:      { name:'Waffenkiste', slot:'material', good:true, stack:20, rarity:'uncommon', value:45 },
   magitech:  { name:'Magitech-Teile', slot:'material', good:true, stack:20, rarity:'uncommon', value:60 },
 
+  blutsense:    { name:'Blutkult-Sense', slot:'weapon', wtype:'polearm', dmg:28, reach:62, arc:2.6, speed:960, stam:17, sweep:true, bleed:0.2, leech:0.12, rarity:'mythic', unique:true, value:1500, skill:'polearms', twohand:true, sdesc:'Lebensraub: 12 % des Schadens heilen dich (jeder Getroffene im Bogen zählt).', lore:'Aldhelms Erntewerkzeug aus der Krypta unter Varonheim. Die Klinge trinkt, was sie schneidet — und gibt dem Träger davon ab.' },   /* Entwickler 02.10.: mythische Belohnung am Ende der Blutkult-Questreihe */
   nachtfrost:   { name:'Nachtfrost', slot:'weapon', wtype:'great', dmg:27, reach:58, arc:2.4, speed:1000, stam:18, rarity:'mythic', unique:true, value:900, skill:'twohanded', twohand:true, frost:true,
                   lore:'Hrodvars Klinge. Wo sie trifft, gefriert der Atem: Getroffene werden langsam. Es gibt nur eine.' },
   gorak_cleaver:{ name:'Goraks Hackmesser', slot:'weapon', wtype:'axe', dmg:18, reach:44, arc:1.5, speed:760, stam:13, ap:0.3,
