@@ -4015,9 +4015,14 @@ function die(c, cause = 'Wunden', source) {
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
-  if (c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith)) (S.mourn ||= {})[c.homeTown] = { name: c.name, until: (S.day | 0) + 2 };   // S13: der Ort trauert
+  const mourned = c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith);
+  if (mourned) (S.mourn ||= {})[c.homeTown] = { name: c.name, until: (S.day | 0) + 2 };   // S13: der Ort trauert
   chronicle(`${c.name} gefallen`, 'death', `${cause}. Jahr ${year()}, Tag ${S.day}.`);
   makeGrave(c, cause); personCorpse(c);   /* Roadmap P8: Personen fallen sichtbar, das Grab erscheint danach */
+  /* Visuell N7 (02.10.2026): Glockenschlag in Hörweite, Kerzen am Grab solange der Ort trauert, Gefährten knien beim Gefallenen */
+  if (mourned) { const gv = S.ents[c.map]?.findLast(g => g.kind === 'grave' && g.charKey === c.key); if (gv) gv.mournUntil = (S.day | 0) + 2;
+    if (c.map === S.map && dist(c, S.player) < 900 && !S._quiet) sfx('bell', 0.35 + 0.4 * earVol(c), 0.8); }
+  if (isParty) for (const m of partyMembers()) if (m !== c && m.alive && !m.downed && m.map === c.map && dist(m, c) < 500) { gesture(m, 'knien', 2600, c); emote(m, 'trauer', 2400); }
   for (const m of partyMembers()) if (m !== c) { remember(m, 'friend_died', c.name); m.morale -= 14; }
   if (isParty) S.party = S.party.filter(id => id !== c.id);
   const ci = arr.indexOf(c); if (ci >= 0) arr.splice(ci, 1);
@@ -5284,18 +5289,18 @@ function provoke(target, attacker) {
   target.provoked = true; target.provokedAt = clock(); target.lastHurt = performance.now(); target.sawPlayer = clock();
   // Rolle bestimmt die Reaktion
   if (GUARDISH(target)) { target.angry = true; target.brave = true; target.aggroId = attacker.id; }
-  else { target.fleeing = true; if (target.shop) target.shopClosed = clock() + 1440; }   // Zivilisten und Händler fliehen; Laden bis morgen zu
+  else { target.fleeing = true; if (target.shop) target.shopClosed = clock() + 1440; emote(target, 'ausruf', 900); }   // Zivilisten und Händler fliehen; Laden bis morgen zu   /* N6: Schreck-Zeichen */
   if (!firstTime) return;                                                       // Ruf/Alarm nur einmal je Tat
   const critic = partyMembers().find(m => !(m.traits || []).includes('grausam'));   // die Gruppe sieht es
   for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) { m.morale -= 5; loyAdd(m, (m.traits || []).includes('gütig') ? -6 : -2); }   /* §5e.1: Loyalität */
   if (critic) log(`${critic.name}: „Was tust du da?!“`, 'party');
   // Zeugen im Umkreis (Distanz = Kern des Alarms; Wände zählen grob über Distanz)
-  const witnesses = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e !== target && !S.party.includes(e.id) && dist(e, target) < 240);
+  const witnesses = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e !== target && !S.party.includes(e.id) && dist(e, target) < 240); let guardCried = false;
   for (const w of witnesses) {
     w.alarmed = true;
     const ally = GUARDISH(w) || (w.faction && w.faction === target.faction) || w.kin;
-    if (ally && GUARDISH(w)) { w.angry = true; w.brave = true; w.aggroId = S.player.id; w.sawPlayer = clock(); }   // Wachen/Krieger greifen ein
-    else { w.fleeing = true; }                                                               // Übrige fliehen/schreien
+    if (ally && GUARDISH(w)) { w.angry = true; w.brave = true; w.aggroId = S.player.id; w.sawPlayer = clock(); if (!guardCried) { guardCried = true; bubble(w, w.guard ? '„Halt! Wache!“' : '„Zu den Waffen!“', 2000); emote(w, 'zorn', 1500); sfx('whistle', earVol(w) * 0.8); } }   // Wachen/Krieger greifen ein   /* N6: Wachenruf, einmal je Tat */
+    else { w.fleeing = true; emote(w, 'angst', 1200); }                                     // Übrige fliehen/schreien
   }
   addRel(target.key, -35);
   const seen = witnesses.length;
@@ -7931,7 +7936,7 @@ function escortStep(e, dt) {
   const C = (S.contracts || []).find(c => c.id === e.contract && c.state === 'active'); if (!C) return false;
   const p = S.player, dp = dist(e, p), now = performance.now();
   const foe = foesNow().find(f => dist(f, e) < 240);
-  if (foe) { if (!(e._cry > now)) { e._cry = now + 6000; float(e, 'Hilfe!', 'rgba(230,120,100,ALPHA)'); } seek(e, Math.atan2(p.y - e.y, p.x - e.x), 1.7 * dt / 16, dt, p); return true; }
+  if (foe) { if (!(e._cry > now)) { e._cry = now + 6000; bubble(e, '„Hilfe!“', 1800); emote(e, 'angst', 1500); }   /* N6-9: Hilferuf als Blase statt aufsteigendem Text */ seek(e, Math.atan2(p.y - e.y, p.x - e.x), 1.7 * dt / 16, dt, p); return true; }
   if (dp > 280) { e.vx = e.vy = 0; e.facing = p.y > e.y ? 0 : 1; if (!(e._cry > now)) { e._cry = now + 8000; float(e, pick(['Warte auf mich!', 'Nicht so schnell!', 'Wo bist du?']), 'rgba(220,210,180,ALPHA)'); } return true; }
   const [sx, sy] = conSq(C.town);
   const route = e.route ||= SIM.roadAsync(sx | 0, sy | 0, C.tx | 0, C.ty | 0, 1.5) || null;
@@ -8738,7 +8743,22 @@ function tripOf(from, to, ferry) {
   const threat = ferry ? 0 : regionThreat((ax + bx) / 2 | 0, (ay + by) / 2 | 0);
   return { to, price: Math.max(10, Math.round(d * (ferry ? 0.18 : 0.25))), min: Math.round(d * (ferry ? 1.6 : 2.2)), risk: ferry ? 0 : Math.min(0.35, 0.08 + threat * 0.05) };
 }
+/* Reise-Dock (Entwickler 02.10.2026: Dialog-Listen mit GUI): dieselben Ziele, Preise, Dauer, Gefahr und Schein-Regel wie die Gesprächsliste */
+function coachView(npc) {
+  const from = npc.coach || npc.ferry, ferry = !!npc.ferry, [sx, sy] = TOWN_PLAN[from].square;
+  const dests = ferry ? [FERRY[from]] : Object.keys(TOWN_PLAN).filter(k => k !== from && coachTown(k)).sort((a, b) =>
+    Math.hypot(TOWN_PLAN[a].square[0] - sx, TOWN_PLAN[a].square[1] - sy) - Math.hypot(TOWN_PLAN[b].square[0] - sx, TOWN_PLAN[b].square[1] - sy)).slice(0, 5);
+  return { from, fromName: townName(from), ferry, sx, sy, greet: ferry ? '„Über die Bucht nach Kupferhafen oder zurück. Zahlen, einsteigen, nicht über Bord fallen.“' : '„Wohin soll es gehen? Bezahlt wird vorher.“',
+    dests: dests.map(k => { const T = tripOf(from, k, ferry), [x, y] = TOWN_PLAN[k].square; return { k, name: townName(k), price: T.price, hours: Math.max(1, Math.round(T.min / 60)), risky: T.risk >= 0.15, x, y,
+      locked: TOWN_PLAN[k].lord === 'aurel' && TOWN_PLAN[from].lord !== 'aurel' && !hasPermit() && !ferry }; }) };
+}
+function coachGo(npc, k) {
+  const V = coachView(npc), d = V.dests.find(x => x.k === k); if (!d) return 'Kein Ziel.';
+  if (d.locked) return 'Ins Hochreich nur mit Aufenthaltsschein.';
+  UI.closeModal(); journey(tripOf(V.from, k, V.ferry), V.ferry ? 'Die Fähre' : 'Die Kutsche'); return null;
+}
 function coachTalk(npc) {
+  if (S.coop?.role !== 'guest' && UI.openModal) { UI.closeDialogue(); UI.openModal('travel', npc); return; }   /* Reise-Dock; Gesprächsfassung als Rückfall */
   const from = npc.coach || npc.ferry, ferry = !!npc.ferry, [sx, sy] = TOWN_PLAN[from].square;
   const dests = ferry ? [FERRY[from]] : Object.keys(TOWN_PLAN).filter(k => k !== from && coachTown(k)).sort((a, b) =>
     Math.hypot(TOWN_PLAN[a].square[0] - sx, TOWN_PLAN[a].square[1] - sy) - Math.hypot(TOWN_PLAN[b].square[0] - sx, TOWN_PLAN[b].square[1] - sy)).slice(0, 5);
@@ -12485,12 +12505,14 @@ function partyInteraction() {
 }
 
 /* Entwickler 02.10. (Despawn-Fehlersuche): eigene Funktionen statt Inline-Bedingungen, damit die Probe sie ohne echten Weltzustand
-   anzufassen prüfen kann. Wer gerade jagt (aggroId), räumt sich nie weg — erst nach dem Aufgeben (siehe updateEnemy, Leine 1600 px). */
+   anzufassen prüfen kann. Wer gerade den Helden/seine Gruppe/einen Koop-Helden jagt (aggroId), räumt sich nie weg — erst nach dem
+   Aufgeben (siehe updateEnemy, Leine 1600 px). Jagt ein Soldat/eine Begegnung nur einen anderen Gegner (Heerkampf etc.), zählt das
+   wie bisher nicht als Ausnahme (Lead-Hinweis Leistung: keine unbegrenzte Sonderbehandlung für heldenfremde Kämpfe). */
 function staleArmySoldier(e, p) {
-  return e.kind === 'enemy' && e.armyId && !e.aggroId && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400);
+  return e.kind === 'enemy' && e.armyId && !(e.aggroId && huntsHero(e.aggroId, S.party)) && !S.war.battles.some(b => b.sides.includes(e.armyId)) && (p.map !== 'world' || dist(e, p) > 1400);
 }
 function staleEncounter(e, p) {
-  return (e.encounter || e.escortLost) && !e.follow && !e.lurk && !e.aggroId && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800);
+  return (e.encounter || e.escortLost) && !e.follow && !e.lurk && !(e.aggroId && huntsHero(e.aggroId, S.party)) && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800);
 }
 function respawnTick() {
   ensureWallSpiders(true);   /* Entwickler 02.10.: Wächterspinnen kommen erst, wenn der Held weit genug weg ist (nie im Bild, kein Zufallszug beim Laden) */
@@ -12659,7 +12681,7 @@ function bandTick() {
   for (const b of bandsOf()) {
     const d = Math.hypot(p.x / TS - b.tx, p.y / TS - b.ty), here = S.ents.world.some(e => e.bandId === b.id && e.kind !== 'corpse' && e.alive !== false);
     if (d < 45 && !here) bandSpawn(b);
-    else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && (!e.alive || e.aggroId)));   /* Entwickler 02.10. (Despawn-Fehlersuche): ein Hinterhalt-Bandit, der noch jagt (aggroId), bleibt — erst nach Aufgeben räumt respawnTick ihn weg */
+    else if (d > 80 && here) S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && (!e.alive || (e.aggroId && huntsHero(e.aggroId, S.party)))));   /* Entwickler 02.10. (Despawn-Fehlersuche): ein Hinterhalt-Bandit, der noch den Helden/seine Gruppe jagt (aggroId), bleibt — erst nach Aufgeben räumt respawnTick ihn weg */
     if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(styleOf() <= -40 ? 0.005 : 0.01)) {   /* T08: einen Schlächter meidet man */   /* Hinterhalt im Gebiet, nicht in der Stadt */
       const free = b.men - S.ents.world.filter(e => e.bandId === b.id && e.kind === 'enemy' && e.alive).length;   /* Fehlersuche: nie mehr Kämpfer stellen als die Bande noch hat (sonst wächst sie durchs Hin- und Herlaufen) */
       if (free > 0) { b.amb = S.minute; const a = rnd() * 6.283;
@@ -16737,6 +16759,8 @@ function debugSections() {
         ['frage', 'ausruf', 'zorn', 'angst', 'freude', 'trauer'].forEach((k, i) => setTimeout(() => emote(n, k, 1300), i * 1400)); },
       'NPC: Reaktion mit Geste (nächste Figur, alle Anlässe nacheinander)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
         [['trauern', 'trauer'], ['jubeln', 'freude'], ['salutieren'], ['knien'], ['abwehren', 'angst'], ['zeigen', 'ausruf']].forEach((G, i) => setTimeout(() => reactPlay(n, G, S.player), i * 1900)); },
+      'NPC: Kerzen am nächsten Grab (Trauer, 2 Tage)': () => { const p = S.player, g = S.ents[S.map].filter(e => e.kind === 'grave').sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!g) return UI.toast('Kein Grab in der Nähe.'); g.mournUntil = (S.day | 0) + 2; UI.toast(`Kerzen an: ${g.label}`); },
+      'NPC: Schreck und Wachenruf vorführen (ohne Folgen)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); emote(n, 'ausruf', 900); setTimeout(() => { bubble(n, '„Halt! Wache!“', 2000); emote(n, 'zorn', 1500); sfx('whistle', 0.6); }, 1000); },
       'Dialog: verängstigte Figur ansprechen (nur Blase)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); n.afraid = clock() + 30; talk(n); },
     }],
     ['Animation', `${sel('dbDc', DEATH_KINDS.map(k => [k, ANIM_DEFS.death[k].name]))} ${sel('dbGest', Object.entries(ANIM_DEFS.gesture).map(([k, g]) => [k, g.name]))}`, {   /* Roadmap P8 */
@@ -16798,6 +16822,9 @@ function debugSections() {
       'UI: Fund-Karte Legendär': () => { const k = Object.keys(ITEMS).find(q => ITEMS[q].rarity === 'legendary') || 'longsword'; UI.findCard({ key: k, rar: 'legendary' }); },
       'UI: Fund-Karte Mythisch': () => { const k = Object.keys(ITEMS).find(q => ITEMS[q].rarity === 'mythic') || 'longsword'; UI.findCard({ key: k, rar: 'mythic' }); },
       'UI: Pergament — Auftragsbuch öffnen': () => UI.openModal('quests'), 'UI: Pergament — Kodex öffnen': () => UI.openModal('codex'), 'UI: Pergament — Chronik öffnen': () => UI.openModal('chronicle'),
+      'UI: Schmiede-Dock (nächster Schmied)': () => { const n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.smith).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return UI.toast('Kein Schmied auf dieser Karte.'); UI.openModal('smith', n); },
+      'UI: Kutsche-Dock (nächster Kutscher)': () => { const n = S.ents.world.filter(e => e.alive && (e.coach || e.ferry)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return UI.toast('Kein Kutscher.'); UI.openModal('travel', n); },
+      'UI: Betriebe-Reiter öffnen': () => UI.openModal('business'),
       'UI: Warnchip-Probe (20 s)': () => { (S.dbg ||= {}).warnTest = clock() + 20; UI.refreshHUD(); },
       'Aufträge: Brief „Erfüllt“ zeigen (ohne Folgen)': () => UI.questLetter('done', 'probe', { name: 'Wölfe vor Eren' }),
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
@@ -17151,13 +17178,16 @@ export function selftest() {
       && far.wander && far.wander.x === far.anchor.x && far.wander.y === far.anchor.y;
     return staysHunting && gaveUp;
   }));
-  ok('Despawn-Fehlersuche: eine aufgegebene Reise-Begegnung räumt sich außer Sicht auf, eine noch jagende nicht', (() => {
-    const pw = { map: 'world', x: 0, y: 0 };
-    const hunting = { kind: 'enemy', encounter: true, aggroId: 'held', x: 20000, y: 0 };
+  ok('Despawn-Fehlersuche: eine aufgegebene Reise-Begegnung räumt sich außer Sicht auf, eine noch den Helden jagende nicht — ein heldenfremder Jäger (Heerkampf) zählt nicht als Ausnahme', (() => {
+    const pw = { map: 'world', x: 0, y: 0 }, heroId = S.player.id;
+    const hunting = { kind: 'enemy', encounter: true, aggroId: heroId, x: 20000, y: 0 };
     const given = { kind: 'enemy', encounter: true, aggroId: null, x: 20000, y: 0 };
-    const armyHunting = { kind: 'enemy', armyId: 'g:test', aggroId: 'held', x: 20000, y: 0 };
+    const otherFoe = { kind: 'enemy', encounter: true, aggroId: 'kein-held', x: 20000, y: 0 };   // jagt keinen Helden/keine Gruppe/keinen Koop-Helden
+    const armyHunting = { kind: 'enemy', armyId: 'g:test', aggroId: heroId, x: 20000, y: 0 };
     const armyGiven = { kind: 'enemy', armyId: 'g:test', aggroId: null, x: 20000, y: 0 };
-    return !staleEncounter(hunting, pw) && staleEncounter(given, pw) && !staleArmySoldier(armyHunting, pw) && staleArmySoldier(armyGiven, pw);
+    const armyOther = { kind: 'enemy', armyId: 'g:test', aggroId: 'kein-held', x: 20000, y: 0 };
+    return !staleEncounter(hunting, pw) && staleEncounter(given, pw) && staleEncounter(otherFoe, pw)
+      && !staleArmySoldier(armyHunting, pw) && staleArmySoldier(armyGiven, pw) && staleArmySoldier(armyOther, pw);
   })());
   const guard = (x, y) => { const g = actor(x, y, { faction: 'valen' }); g.guard = true; g.equip.weapon = mkItem('spear'); return g; };
   const frames = (n, list) => { for (let i = 0; i < n; i++) { combat = S.ents.__a.filter(e => e.alive); for (const e of list) think(e, 16); } };
@@ -20038,6 +20068,16 @@ export function selftest() {
       return joy && shown && foe && w.act.kind === 'work';
     } finally { for (const k of Object.keys(S.relations)) if (!(k in R0)) delete S.relations[k]; Object.assign(S.relations, R0); }
   }));
+  ok('Visuell N6: Überfall — das Opfer erschrickt (!), genau eine Wache ruft „Halt! Wache!“, Zuschauer zeigen Angst', sandbox(() => {
+    const p = stage(), R0 = { ...S.relations };
+    try {
+      const v = actor(p.x + 40, p.y, { name: 'Opfer' }); Object.assign(v, { map: '__a', key: 'probe_n6v', prof: 'Bauer' });
+      const g1 = actor(p.x + 80, p.y + 20, { name: 'Wache A' }), g2 = actor(p.x + 90, p.y - 20, { name: 'Wache B' }), z = actor(p.x + 60, p.y + 60, { name: 'Zuschauer' });
+      for (const g of [g1, g2]) Object.assign(g, { map: '__a', guard: true, prof: 'Wache' }); Object.assign(z, { map: '__a', prof: 'Bauer' });
+      provoke(v, p); const cries = S.floats.filter(f => f.bubble && (f.who === g1.id || f.who === g2.id)).length;
+      return v.emote?.k === 'ausruf' && cries === 1 && z.emote?.k === 'angst';
+    } finally { for (const k of Object.keys(S.relations)) if (!(k in R0)) delete S.relations[k]; Object.assign(S.relations, R0); S.floats = []; }
+  }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
@@ -21283,6 +21323,19 @@ export function selftest() {
       UI.openModal('business'); const tab = !!document.querySelector('#modal-body .bz-card') && !!document.getElementById('bz-take') && document.getElementById('modal').classList.contains('dock'); UI.closeModal();
       return zero && filled && far && took && lossK && occ && tab;
     } finally { S.eco.biz = biz0; S.gold = gold0; S.towns.eren.stock = stock0; if (halt0 != null) S.halt['eren:smithy'] = halt0; else delete S.halt['eren:smithy']; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = owner0; Object.keys(S.flags).forEach(x => { if (!(x in f0)) delete S.flags[x]; }); UI.closeModal(); } }));
+  ok('Schmiede-Dock: Ausbessern je Stück nach der alten Preisregel (Schaden × halber Wert, mindestens 5), nur Gewähltes wird heil, Gold wie berechnet', sandbox(() => {
+    const p = stage(), sm = actor(330, 300, { name: 'Probe-Schmied', prof: 'Schmied' }); sm.smith = true;
+    try { for (const k of Object.keys(p.equip)) if (p.equip[k]) p.equip[k].cond = 1;
+      const a = mkItem('axe', 1), b = mkItem('spear', 1); a.cond = 0.5; b.cond = 0.2; p.inv = [a, b]; S.gold = 1000;
+      const want = Math.max(5, Math.round(0.5 * ITEMS.axe.value * 0.5)), both = Math.max(5, Math.round(0.5 * ITEMS.axe.value * 0.5 + 0.8 * ITEMS.spear.value * 0.5));
+      repairAll(sm); const cells = document.querySelectorAll('#sm-grid .cell'), open = UI.modalOpen === 'smith' && document.getElementById('modal').classList.contains('dock') && cells.length === 2 && smithPrice([a, b]) === both;
+      cells[1].click(); document.getElementById('sm-do')?.click(); const done = a.cond === 1 && b.cond === 0.2 && S.gold === 1000 - want; UI.closeModal();
+      return open && done; } finally { UI.closeModal(); } }));
+  ok('Reise-Dock: der Kutscher öffnet Zielkarten mit denselben Zielen und Preisen wie bisher; Hochreich ohne Schein gesperrt und kostet nichts', (() => {
+    const c = S.ents.world.find(e => e.coach && e.alive); if (!c) return true; const g0 = S.gold;
+    try { coachTalk(c); const V = coachView(c), cards = UI.modalOpen === 'travel' && document.querySelectorAll('#modal-body .tv-card').length === V.dests.length;
+      const same = V.dests.every(d => d.price === tripOf(V.from, d.k, V.ferry).price), lk = V.dests.find(d => d.locked), lockOk = !lk || (!!coachGo(c, lk.k) && S.gold === g0);
+      UI.closeModal(); return cards && same && lockOk; } finally { S.gold = g0; UI.closeModal(); } })());
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -21497,6 +21550,8 @@ function boot() {
     tracker: trackerInfo,   /* Q-4: Tracker über dem Spielfeld */
     craftView, craftDo: (k, ke) => craftItem(k, ke), craftMend: t => mendAt(t),   /* UI-Scheibe 3: Handwerk-Dock */
     bizView, bizCollect, houseSprite: (h, lit) => HB.houseSprite(h, lit),   /* Betriebe-Reiter */
+    smithItems, smithPrice, smithRepair, smithForge: npc => S.ents[npc.map || S.map]?.find(e => e.kind === 'prop' && (e.type === 'forge' || e.type === 'anvil') && dist(e, npc) < 200) || null, openForge: t => craftMenu('forge', t),   /* Schmiede-Dock */
+    coachView, coachGo, drawAtlas: (cv, z) => drawAtlas(cv, z),   /* Reise-Dock */
   });
   // Titelbildschirm
   $('legacy-summary').innerHTML = hasSave() ? (() => {
@@ -21529,10 +21584,6 @@ function boot() {
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
   if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
-}
-await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
-boot();
-ance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
 }
 await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

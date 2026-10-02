@@ -771,7 +771,7 @@ export function setPrompt(text) {
 export let modalOpen = null;
 // Fenster neu zeichnen, ohne es umzuschalten (openModal schließt bei gleichem Namen).
 export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOpen = null; openModal(n, arg); }
-const DOCKED = new Set(['trade', 'settlement', 'business', 'party', 'craft', 'smith']);
+const DOCKED = new Set(['trade', 'settlement', 'business', 'party', 'craft', 'smith', 'travel']);
 function leaveWin(next) {                                     /* P6/P7: Fenster verlassen — Inventar-Takt stoppen, Kontor-Besuch beenden, Dock lösen */
   if (modalOpen === 'inventory' && next !== 'inventory') { clearInterval(invTimer); figPrev = null; DRAG = null; }
   if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
@@ -793,7 +793,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1853,6 +1853,30 @@ function smithUI(body, npc) {
   if ($('sm-all')) $('sm-all').onclick = () => { smOff = smOff.size ? new Set() : new Set(L.map(x => x.o)); smithUI(body); };
   if ($('sm-shop')) $('sm-shop').onclick = () => openModal('trade', npc);
   if ($('sm-forge')) $('sm-forge').onclick = () => { closeModal(); A.openForge?.(forge); };
+}
+// ---- Kutsche und Fähre als Dock (Entwickler 02.10.2026: Dialog-Listen mit GUI) ----
+// Oben die Weltkarte (dieselbe gemalte Karte wie M, mit Nebel) mit Abfahrt und Zielen; darunter je Ziel eine Karte: Name, Preis, Dauer,
+// „unsichere Strecke“, Schloss ohne Aufenthaltsschein. Klick auf Karte oder Kartenpunkt = abfahren.
+let tvNpc = null;
+function travelUI(body, npc) {
+  if (npc) tvNpc = npc; npc = tvNpc; if (!npc) return; const V = A.coachView?.(npc); if (!V) return;
+  body.className = 'tr-body tv-body'; $('modal-title').textContent = V.ferry ? 'Fähre' : 'Kutsche';
+  body.innerHTML = `<div class="tr-head"><canvas id="tr-por" width="56" height="56"></canvas><div class="tr-who"><div class="tr-name"></div><div class="tr-prof"></div></div>
+      <div class="tr-gold" title="Dein Gold">${icoImg('res_gold', 2, 'gold-ico')}<b>${S.gold}</b></div></div>
+    <canvas id="tv-map" class="tv-map" width="560" height="300" title="Klick auf ein Ziel: abfahren"></canvas>
+    <div class="tv-list">${V.dests.map(d => `<button class="tv-card${d.locked || S.gold < d.price ? ' cant' : ''}${d.risky ? ' risky' : ''}" data-k="${d.k}"><span class="tv-n"></span>
+      <span class="tv-f"><span title="Preis">${icoImg('res_gold', 1, 'kpi-ico')}${d.price}</span><span title="Dauer der Fahrt">${icoImg('time', 1, 'kpi-ico')}~${d.hours} Std</span>${d.risky ? `<span class="bad" title="Auf dieser Strecke wird öfter überfallen">${icoImg('warn', 1, 'kpi-ico')}unsicher</span>` : ''}${d.locked ? `<span class="bad" title="Ins Hochreich nur mit Aufenthaltsschein">${LOCK_SVG}Schein</span>` : ''}</span></button>`).join('')}</div>
+    <div class="ledger tr-help">Die Zeit vergeht unterwegs. Auf unsicheren Strecken hält ein Überfall die Fahrt auf halber Strecke an — dann musst du dich durchschlagen.</div>`;
+  body.querySelector('.tr-name').textContent = npc.name; body.querySelector('.tr-prof').textContent = `${npc.prof || ''} · ${V.fromName}`; drawPortraitTo($('tr-por'), npc);
+  body.querySelectorAll('.tv-card').forEach((b, i) => { b.querySelector('.tv-n').textContent = V.dests[i].name; b.onclick = () => { const r = A.coachGo?.(npc, b.dataset.k); if (r) toast(r); }; });
+  const cv = $('tv-map'); let X = null; try { X = A.drawAtlas?.(cv, 1); } catch (e) { X = null; }
+  if (X) { const c = cv.getContext('2d'), P = (x, y) => [X.ox + x * X.sc, X.oy + y * X.sc], [fx, fy] = P(V.sx, V.sy);
+    for (const d of V.dests) { const [x, y] = P(d.x, d.y); c.strokeStyle = d.risky ? 'rgba(208,96,63,.85)' : 'rgba(224,183,90,.85)'; c.lineWidth = 2; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(fx, fy); c.lineTo(x, y); c.stroke(); c.setLineDash([]);
+      c.fillStyle = d.locked ? '#6d6454' : '#e0b75a'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.fillStyle = '#e7dcc2'; c.font = '11px Spectral, serif'; c.textAlign = 'center'; c.fillText(d.name, x, y - 9); }
+    c.fillStyle = '#c0503a'; c.beginPath(); c.arc(fx, fy, 6, 0, 7); c.fill(); c.strokeStyle = '#1a140c'; c.lineWidth = 2; c.stroke();
+    cv.onclick = e => { const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
+      const d = V.dests.map(d => [d, Math.hypot(P(d.x, d.y)[0] - mx, P(d.x, d.y)[1] - my)]).sort((a, b) => a[1] - b[1])[0]; if (d && d[1] < 18) { const m = A.coachGo?.(npc, d[0].k); if (m) toast(m); } }; }
+  else cv.remove();
 }
 let qbSel = null;
 const QB_WORD = { active: 'offen', ready: 'bereit', done: 'erfüllt', failed: 'gescheitert' };

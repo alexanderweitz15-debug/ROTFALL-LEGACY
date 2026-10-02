@@ -370,7 +370,7 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 
 ## Runde: Balance — Bosse, Waffen, Stufen (Version 21, docs/BALANCE.md)
 - **Höchststufe 60** (Held und Koop-Gastfiguren). Darüber bringt Erfahrung keine Stufe mehr, der Balken bleibt voll („Höchststufe“ in der Kopfzeile, Meldung beim Erreichen). EP-Kurve ab Stufe 20 nur noch ×1,04 je Stufe (≈ 0,42 Mio. EP bis 60 statt 3,1 Mio.).
-- **Talentpunkte** nur noch 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60 von 59 lernbaren Knoten; Nutzer wollte „viele, aber nicht alle“ und wählte jede dritte). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
+- *(Überholt am 02.10.2026, siehe „Klassen-Prüfung und Sternbild-Talente“ am Ende.)* **Talentpunkte** nur noch 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60 von 59 lernbaren Knoten; Nutzer wollte „viele, aber nicht alle“ und wählte jede dritte). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
 - **Bosse** haben doppeltes Leben und teilen 60 % aus (`BOSS`; gilt für Hieb, Fläche und Geschoss). Omega bleibt, wie er ist (Heeresschlacht). Bosse alter Stände werden beim Laden einmal angepasst. Sandfürst 340 Leben und ×1,8 Wucht, Varg 360 Leben, Hrodvar 220, Dodon 620 Grundleben.
 - **Fester Schadensanteil** (Attribut, Übung, Stufe) wächst mit der Schwungdauer: 600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2; Fernwaffen ×1. Vorher war der Dolch rechnerisch doppelt so stark wie der Zweihänder.
 - **Rückenstich** (Dolch, Hakenmesser, Rapier: Krit-Chance 50 %) und **Hinterhalt ×3** gelten jetzt wirklich nur von hinten (vorher durch einen Richtungsfehler von vorn).
@@ -1238,3 +1238,22 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Gefahr:** Fällt die Stadt an die Toten oder wird sie zerstört, ist die ganze Kasse verloren (Protokollzeile).
 - **Reiter Betriebe:** links jeder eigene Betrieb mit dem Bild seines Hauses und dem Stand der Kasse, oben die Summe aller Kassen; rechts der gewählte Betrieb: Haus groß, Ertrag gestern und Schnitt je Tag seit dem Kauf, Arbeiter (aus der Stadt / angeworben), Ware gestern, Vorprodukte und Ware je Arbeiter mit dem Vorrat der Stadt, Kasse mit Abholen.
 - **Hinweise:** Beim ersten gefüllten Tag erklärt das Protokoll die Kasse; beim ersten Abholen die Gefahr. Alte Stände: Betriebe beginnen mit leerer Kasse.
+- **Schreck und Wachenruf (N6):** Wer überfallen wird, erschrickt (!). Zuschauer zeigen Angst und fliehen. Eine Wache ruft „Halt! Wache!“ mit Pfiff, nur einmal je Tat. Verletzte rufen „Hilfe!“ jetzt als Sprechblase.
+- **Trauer (N7):**
+  - Stirbt eine bekannte Person in deiner Hörweite, schlägt eine Glocke.
+  - Solange ihr Ort trauert (2 Tage), brennen zwei Kerzen an ihrem Grab.
+  - Fällt ein Gefährte, knien die anderen Gefährten bei ihm nieder.
+  - Debug: „NPC: Kerzen am nächsten Grab“, „NPC: Schreck und Wachenruf vorführen“.
+
+## Schmiede und Kutsche als Tafel (02.10.2026)
+- **Schmiede:** „Kannst du das ausbessern?“ (oder Rechtsklick → Reparieren) öffnet am rechten Rand die Schmiede-Tafel: alle abgenutzten Teile (angelegte mit Punkt) mit Zustandsbalken; ein Klick wählt ein Teil ab oder wieder an. Der Preis folgt der alten Regel (Schaden am Stück × halber Wert, zusammen mindestens 5 Gold) und gilt nur für die gewählten Teile; „Ausbessern“ macht sie wieder ganz (100 %), der Schmied mag dich danach etwas mehr. Dazu „Waren ansehen“ (Handel) und — wenn eine Esse oder ein Amboss nahe steht — „An der Esse selbst schmieden“.
+- **Kutsche und Fähre:** Der Kutscher zeigt eine Weltkarte mit gestrichelten Strecken zu den Zielen (rot = unsichere Strecke) und je Ziel eine Karte mit Preis, Dauer und Warnung; ohne Aufenthaltsschein sind Ziele im Hochreich mit Schloss gesperrt. Klick auf Karte oder Kartenpunkt fährt ab. Regeln wie bisher.
+- **Debug:** „UI: Schmiede-Dock (nächster Schmied)“, „UI: Kutsche-Dock (nächster Kutscher)“, „UI: Betriebe-Reiter öffnen“.
+
+## Klassen-Prüfung und Sternbild-Talente (02.10.2026)
+- **Talentpunkte (Scheibe 0):** 1 zum Start, 1 auf jeder zweiten Stufe und 1 je bestandener Klassenprüfung (31 + Prüfungen bei Stufe 60). Die Regel gilt rückwirkend: Beim Laden wird auf das Soll aufgefüllt, nie gekürzt (Protokollzeile „… Talentpunkte nachgereicht“). Die Stufenmeldung nennt den Talentpunkt oder die Stufe des nächsten.
+- **Koop:** Die eigene Figur eines Gasts bekommt beim Aufstieg jetzt auch Talentpunkte; bestehende Gastfiguren werden beim Laden und beim Wiederkommen aufgefüllt.
+- **Erbe:** Der Erbe hat sofort Talentpunkte nach seiner Stufe (vorher 0 bis zum Neuladen, danach Stufe − 1). Er beginnt ohne gelernte Sterne und ohne Prüfungen seines Vorgängers.
+- **Debug:** Abschnitt „Klassen: Talentpunkte, Prüfungen, Aufnahme“ (Gruppe „Klassen & Talente“): Punkte nach Regel auffüllen, Punkte-Rechnung zeigen, Stufe +2.
+
+- **Verfolger verschwinden nicht mehr (02.10.):** Wer dich, deine Gruppe oder einen Koop-Helden jagt, bleibt aktiv, auch fern vom Bildrand, und wird nicht mehr aufgeräumt. Erst ab 1600 px Abstand verliert er die Spur. Dann erscheint ein „?“, im Protokoll steht „… verliert deine Spur und kehrt zurück“, und er geht zu seinem Ausgangspunkt zurück. Reise-Begegnungen und Heer-Soldaten räumen sich erst danach auf, außer Sicht.

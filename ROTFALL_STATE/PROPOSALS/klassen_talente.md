@@ -420,3 +420,8 @@ Jede Scheibe ist vollständig: Daten, Logik, Hinweis, Debug, Probe und MECHANIKE
 | **3** | Sternbild **Der Schild** (Krieger-Stamm, Arme Ritter/Paladin, Berserker, Todesritter, Hochpaladin) mit simFight-Messung |
 | **4–9** | je eine Linie mit Prüfung und Sternbild: Schütze, Schurke, Kleriker, Magier, Barde, Alchemist; zuletzt die dunklen Arme |
 | **10** | Titel-Sternbilder Vampir und Grubenhäuptling (falls Entscheidung 11a); Szenen bei der Grad-Weihe |
+
+---
+
+## Stand (Umsetzung, Klassen-Agent)
+- Scheibe 0 grün um 22:28 (Talentpunkte jede 2. Stufe + 1 je Prüfung, rückwirkend über `talentTopUp`; Koop-Gast bekommt Punkte; Erbe sofort nach Regel; BALANCE_GUIDE §7 angepasst; Selbsttest 446/446).

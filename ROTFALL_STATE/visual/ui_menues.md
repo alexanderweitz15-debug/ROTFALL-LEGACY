@@ -53,3 +53,36 @@ Schmal (< 820 px): Protokoll ist ausgeblendet → der Meldungsfluss ist dort die
 - **Abgeleitet:** „vor Ort“ = der Held steht in der Stadt des Betriebs (townAt mit 4 Feldern Rand) oder spricht im Kontor dieser Stadt. Schnitt = über alle Tage seit Kauf (kein erfundenes Fenster). Haus-Bild: Gebäude des Gewerbes (TRADES.site), sonst Wohnhaus eines dort arbeitenden Bewohners.
 - **Regeländerung an einer Probe:** „Nutzer S13 Wirtschaft … 6. Betrieb kaufen“ prüfte „Gold steigt am nächsten Tag“ → jetzt „Kasse steigt, Gold bleibt“ (Entwicklerentscheidung, nicht aufgeweicht).
 - **OFFEN:** (1) Was nimmt ein Überfall auf die Stadt (raidDamage, Verteidigung gescheitert) aus der Kasse? — nicht ableitbar, nicht gebaut. (2) Verlusttage: zahlt die Kasse zuerst, Rest das Gold — so gebaut, weil HB-18 Verluste echt haben will; bitte bestätigen. (3) Abholen direkt am Haus (E an der Tür) nicht gebaut: ein Betrieb kennt sein Haus nicht fest (bei Gewerben ohne eigenes Gebäude nur über einen Bewohner ableitbar) — braucht eine Zuordnung Betrieb → Haus.
+
+## Schmiede-GUI und Dialog-Listen mit GUI (Entwickler 02.10.2026)
+**Schmiede heute (Gate):** Ein Schmied kann (1) handeln (Laden → Handels-Dock, gab es), (2) „Kannst du das ausbessern?“ = alles oder nichts zum Preis Σ (1 − Zustand) × Wert × 0,5, mindestens 5 Gold, Beziehung +3. **Schmieden lassen** oder **Verbessern** (Aufwerten, Schärfen) gibt es heute nicht — selbst schmieden geht nur an Esse/Amboss/Werkbank (Handwerk). → gebaut: Schmiede-Dock mit Ausbessern **je Stück** (gleiche Preisregel), Knopf zu den Waren, Knopf „An der Esse selbst schmieden“, wenn Esse/Amboss in 200 Px steht.
+**OFFEN:** „Schmieden lassen“ (Auftragsarbeit beim Schmied: Preis, Dauer, Güte?) und „Verbessern“ (was steigt, um wie viel, wie oft, Kosten?) sind neue Regeln — nicht erfunden, nicht gebaut.
+
+**Systeme, die heute nur als Gesprächsliste laufen — Nutzen / Aufwand**
+| System | Funktion (game.js) | Nutzen | Aufwand | Stand |
+|---|---|---|---|---|
+| Kutsche / Fähre | `coachTalk` | hoch (Ziele auf einer Karte statt Zeilen, Preis/Dauer/Gefahr als Zeichen) | klein | **gebaut** (Reise-Dock mit Weltkarte) |
+| Schmied Ausbessern | `repairAll` | hoch | klein | **gebaut** |
+| Handwerk Esse/Werkbank/Kessel | `craftMenu` | hoch | mittel | **gebaut** (Scheibe 3) |
+| Prothesen-Werkbank | `mechMenu` | hoch (Teile, Stufen, Module als Karten mit Körperbild) | mittel–groß | Liste |
+| Kontor (Markt, Wagen, Betriebe, Lieferungen) | `ecoMenu`, `bizMenu`, `ordersMenu` | hoch (Betriebe kaufen als Karten neben dem neuen Reiter) | groß | Liste |
+| Lehrer / Zauber lernen | `teach`, `spellMenu` | mittel (Zauberkarten mit Kosten, Schule) | mittel | Liste |
+| Schwarzmarkt | `blackMarket` | mittel (Raster wie Handel; items.md hat es schon als [B]) | mittel | Liste |
+| Tierhändler | `beastMenu` | mittel (Karten wie der Stall) | klein–mittel | Liste |
+| Luftschiff-Hafen | `harborTalk` | mittel (Ziele auf der Karte wie Kutsche) | mittel | Liste |
+| Frachtschiff | `cargoMenu` | mittel | mittel | Liste |
+| Heiler | `healerTreat` | gering (ein Knopf, ein Preis) | klein | Liste — lohnt kaum |
+| In die Stadt investieren | `investMenu` | gering–mittel | klein | Liste |
+| Akademie-Prüfung | `trialMenu` | gering | klein | Liste |
+| Schuldknechtschaft | `bondMenu` | gering | mittel | Liste |
+Empfehlung für die nächste Runde: Tierhändler (wie Stall, klein) und Prothesen-Werkbank (größter Nutzen), dann Kontor.
+- Schmiede-Dock und Reise-Dock (Kutsche/Fähre) grün um 00:21. Selbsttest 448/448.
+
+## Aufträge Q-1..Q-4 — Gate-Notizen
+- **Auslöser der Briefe:** Zustandswechsel in S.quests (aktiv → erledigt/gescheitert, neu aktiv), geprüft im HUD-Takt — ein Brief je Wechsel, gleich wo im Code er passiert; Koop-Gäste sehen ihn über den übertragenen Auftragsstand. Proben/Erbe/Laden merken still neu (Selbsttest ruft am Ende `UI.questSnap()`).
+- **Toasts ersetzt:** „AUFTRAG GESCHEITERT“ (failContract) und „Auftrag: …“ (offerQuest) → Brief; Log und Chronik unverändert.
+- **Siegel-Sichtbarkeit (Deutung):** Wahl Q1 = 1+5: feste Geber, Wache, Brett im Bild sichtbar; **Bewohner-Siegel nur in Ansprech-Nähe (62, wie interactables) oder unter der Maus** (Variante 5 gegen den Symbolwald). → bitte bestätigen, ob Bewohner-Siegel auch auf Sichtweite gewünscht sind.
+- **Geste beim Abschluss (Deutung):** Wachen/Verteidigungsmeister salutieren, alle anderen jubeln; „trauern“ für Trauer-Aufträge nicht gebaut (keine Auftragsart markiert Trauer).
+- **Frist-Sanduhr:** Anteil der Vertragsfrist (CON_DAYS); rot am letzten Tag (wie Warnchip/conTick) — keine neue Schwelle.
+- **Nicht gebaut / OFFEN:** Q-OE8 Bewohner rufen den Helden (Häufigkeit offen); Q-OE3 Szene bei Story-Abschluss (Brief läuft ohne Pause); Q2-3/Q11-2 Kartenausschnitt (atlas.js zentriert nur auf den Helden); Q-OE6 Aurelion-Messingbrett und Q-5 Brettansicht, Q-6 Herold-Banner (nicht Teil dieses Auftrags); I-6 seltene Beute im Protokoll.
+- **Fremdbefund:** Nach dem Selbsttest stehen im (stummen) Tab-Zustand Probe-Aufträge „Die Auftraggeberin: Probe“ und „Die Ladung zurückholen: …“ in S.quests — kommen aus fremden Proben (E-Quests), nicht aus diesen; wird nie gespeichert (S._quiet), fällt aber im Auftragsbuch nach einem Selbsttest auf.

@@ -2713,7 +2713,18 @@ export function deathFrameProbe(e, P) {                              /* Roadmap 
   const m = e.mtype && MONSTERS[e.mtype], spec = e.spec || SP.monsterSpec(e, m), f = SP.humanFrame(spec, P.dir, P.frame === 'die1' && !SP.drawnOn() ? 'kneel' : P.frame);
   return P.tint ? tinted(f, P.tint) : f;
 }
-function drawGrave(e) { if (e.hidden) return; const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec); }
+function drawGrave(e) { if (e.hidden) return; const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec);
+  if (e.mournUntil >= (S.day | 0)) graveCandles(e); }
+/* Visuell N7 (02.10.2026): zwei Kerzen am Grab, solange der Ort trauert — flackern leicht, nachts mit kleinem Lichthof */
+function graveCandles(e) {
+  const t = performance.now() / 140, night = S.minute < 6 * 60 || S.minute > 20 * 60;
+  for (const [dx, ph] of [[-8, 0], [7, 2.1]]) {
+    const x = Math.round(e.x + dx), y = Math.round(e.y + 6), fl = Math.sin(t + ph) * 0.5 + Math.sin(t * 2.3 + ph) * 0.3;
+    if (night) { ctx.fillStyle = 'rgba(255,190,90,.10)'; ctx.beginPath(); ctx.arc(x, y - 6, 9 + fl, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#d9cfb8'; ctx.fillRect(x - 1, y - 4, 2, 4); ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 1, y, 2, 1);
+    ctx.fillStyle = '#ffcf6a'; ctx.fillRect(x - 1, y - 6 - (fl > 0.3 ? 1 : 0), 2, 2); ctx.fillStyle = '#fff3c0'; ctx.fillRect(x, y - 6, 1, 1);
+  }
+}
 // Referenz 4 (Friedhof): Rundstein, Kreuz, Stele, schiefer Stein — Kante im Licht, Riss, Moos am Fuß
 function graveShape(x, y, v, k = 1) {
   shadow(x, y + 2, 9 * k, .35);
