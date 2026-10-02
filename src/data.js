@@ -432,18 +432,18 @@ export const LOOT = {
   boar:      [['dried_meat',0.8],['pelt',0.3]],
   goblin:    [['bone',0.4],['rusty_sword',0.12],['schrottklinge',0.05],['bread',0.3],['iron',0.2],['bandage',0.15]],
   goblin_warrior:[['schleuder',0.12],['schrottkeule',0.1],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
-  bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35],['maskenkapuze',0.03],['wanderkapuze',0.06]],
+  bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35],['maskenkapuze',0.03],['wanderkapuze',0.06],['rabenmantel',0.03],['baerenfell',0.015],['rabenfuerst',0.0015]],
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   bounty_hunter:[['dornensaebel',0.15],['grenzlaeufer',0.1],['bandage',0.6],['potion',0.3],['chain_hauberk',0.12],['crossbow',0.08]],
-  chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5],['kettenhaube',0.08]],
+  chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5],['kettenhaube',0.08],['henkerskapuze',0.05]],
   rotgardist:[['rotgardist',0.2],['rotgardistenhelm',0.25],['rotklaue',0.12],['schwarzzahn',0.04],['mauerbrecher',0.03],['potion',0.4]],
   kettenschuetze:[['crossbow',0.2],['eisenwache',0.15],['eisenfalke',0.05],['bergmannshelm',0.2],['bandage',0.4]],
   automat:[['messingpistole',0.03],['automatenkern',0.8],['schrottarm',0.06],['schrottbein',0.06],['iron',0.6]],
-  sea_raider:[['entermesser',0.18],['seemantel',0.08],['dried_meat',0.3],['potion',0.15],['oelzeugumhang',0.06]], sea_harpooner:[['harpune',0.15],['dreispitz',0.05],['potion',0.15]],
+  sea_raider:[['entermesser',0.18],['seemantel',0.08],['dried_meat',0.3],['potion',0.15],['oelzeugumhang',0.06],['teermantel',0.08]], sea_harpooner:[['harpune',0.15],['dreispitz',0.05],['potion',0.15]],
   whitebeard:[['sturmanker',1],['seekarte',1],['dreispitz',1],['potion',1],['potion',1]],
   chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['blutkette',0.5],['blutkettenhelm',0.5],['potion',1]],
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
-  skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
+  skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05],['knochenumhang',0.02]],
   skel_bomb: [['bone',0.6],['grave_seal',0.04]], skel_brute:[['bone',1],['bone',0.6],['legionaersplatte',0.08],['iron',0.3],['grave_seal',0.08]],   /* Entwickler 02.10.: vorläufig, aus dem Skelett abgeleitet */
   mutant:    [['bone',0.3],['bandage',0.15],['fetzenmantel',0.03]], mutant_brute:[['bone',0.5],['dried_meat',0.15],['bandage',0.2],['fetzenmantel',0.05]],
   dodon:     [['potion',1],['potion',1],['talisman_waechter',0.5]],
@@ -455,7 +455,7 @@ export const LOOT = {
   thrall:     [['bread',0.2],['bandage',0.2]],
   chalice_guard: [['blutphiole',0.6],['kite_shield',0.1],['chain_hauberk',0.06]],
   blood_cultist: [['blutmaske',1],['blutphiole',0.3],['dagger',0.15],['maskenkapuze',0.05]],
-  cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1],['fetzenmantel',0.08]],
+  cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1],['fetzenmantel',0.08],['widderkapuze',0.04]],
   ghoul:     [['bone',0.6],['dried_meat',0.15],['fetzenmantel',0.04]],
   wraith:    [['seelenhaken',0.05],['soul_vial',0.4],['grave_seal',0.08],['grabtuchmantel',0.02]],
   bear:      [['pelt',1],['pelt',0.5],['dried_meat',1],['bone',0.4]],
@@ -475,8 +475,8 @@ export const LOOT = {
 // Waffen und Rüstung aus LOOT[boss] zählen bei Bossen nicht mehr einzeln, alles andere (Tränke, Schlüssel, Karten) schon.
 export const BOSS_LOOT = {
   aldhelm:      { weapons:['kanzlerdegen'], armor:['kanzlerrobe'], unique:['kanzlerdegen'] },   /* §5g.2 */
-  whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel'], unique:['sturmanker'] },
-  chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen'], unique:['roter_henker'] },
+  whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel', 'kapitaensrock'], unique:['sturmanker'] },
+  chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen', 'kettenumhang'], unique:['roter_henker'] },
   gorak:        { weapons:['gorak_cleaver', 'mauerbrecher'], armor:['grubenkoenig', 'schrotthelm'], unique:['gorak_cleaver'] },
   hrodvar:      { weapons:['nachtfrost', 'knochenspalter'], armor:['plate_cuirass', 'iron_helm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], unique:['nachtfrost'] },
   garmadon:     { weapons:['garmadons_reue', 'knochenspalter', 'totenglocke'], armor:['totenkrone', 'schaedelhelm', 'toten_handschuhe', 'toten_beinschienen'], unique:['garmadons_reue'] },
@@ -1061,7 +1061,7 @@ export const NPCS = [
     greet:'„Nichts anfassen. Das Grüne da ist Heilung. Das Grüne dort ist das Gegenteil.“', teaches:['alchemist'] },
   { key:'sael', name:'Sael', prof:'Totenschreiber', faction:'undead', age:0, home:'vharnholm', undead:true,
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
-    pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak'],
+    pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak','ordenskutte'],
     greet:'„Vharnholm schreibt jeden Namen auf, der durch das Tor kommt. Deinen auch.“' },
   // S15 (Nutzer: „mehr NPCs auf der Welt, die einen z. B. zum Krieger ausbilden“): Lehrer in den Städten außerhalb von Eren.
   // atTown: steht am Platz dieser Stadt (Weltkoordinaten), off: Versatz in Kacheln. Gleiche Regel wie überall: erst Beziehung 20.

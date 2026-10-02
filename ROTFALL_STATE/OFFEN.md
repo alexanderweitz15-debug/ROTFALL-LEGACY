@@ -24,7 +24,9 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - Neue Lichter ohne Listenänderung erscheinen jetzt nach ≤ 4–8 s statt ≤ 4 s.
 - [B] Offene Hebel: `paintR` in fig5.js (Schwall neuer Figuren bei Stadtankunft); Spitzen bei `nearEnts`, `tierOf` und den Sekunden-Haken.
 
-## Kampfanimation (Agent läuft: schwerer Hieb, Seitschritt, §17-Rest)
+## Kampfanimation (Agent läuft — Priorität 16:45: Ganzkörper-Posen, Entwickler „noch nicht ausgearbeitet genug“)
+- [B] Lead-Befund: Körper starr, Einschlag-Pose bei allen Hieben gleich, Packs nur VFX, Zweihand wie Einhand → Ganzkörper-Posen je Phase und Angriff, Zweihandgriff, Umfang je Pack, Smear, Zielreaktion; neue Raster kampf_s3_*.
+- [B] Danach: schwerer Hieb per Halten, Seitschritt aufs Ausholen, §17-Rest.
 - [E] Ist der schwere Hieb des SPIELERS nicht blockbar wie der der Gegner? Der Agent meldet das, entscheidet es aber nicht.
 - [P] §82 knapp grün (Ø 12,7 % gegen Grenze 12).
 - [P] Koop nicht live getestet; Klänge nur aus dem bestehenden System.

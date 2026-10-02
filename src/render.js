@@ -2142,11 +2142,12 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
     const sw = work ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
-    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 ? 'swing' : 'rest';
+    const chg = !work && !ranged && !(sw > 0) && !e.cover && e.chargeK > 0 ? e.chargeK : 0;   /* Kampfanimation: schwerer Hieb lädt — Figur steht im Ausholen des Wuchtschlags */
+    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : 'rest';
     const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
     /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
-    const tm = mode === 'swing' ? atkTiming(e, wt, sw) : null, LT = work ? legacyTiming(wt) : null, u = tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
-    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: tm ? tm.s : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low, pull, u, tm, sw };
+    const tm = chg ? null : mode === 'swing' ? atkTiming(e, wt, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
+    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(wt, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw };   /* Kampfanimation: Stangen beidhändig */
   }
   /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
      Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
@@ -2159,10 +2160,14 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
     if (atkSpin(W.wt, W.v) && u > 0.32 && u < 0.72) { const th = dir + SP.swingOf(W.wt, u, W.arc, W.v, 0).a * (Math.cos(dir) < -1e-9 ? -1 : 1), ca = Math.cos(th), sa = Math.sin(th);
       pz = { ...pz, dir: Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N') }; }
     if (AF.after && u >= 0.4 && u < 0.75) ghost = AF.push * (fin ? 2 : 1);
+    if (fin && AF.jump && S.settings.motion !== false && u > 0.25 && u < 0.62) y -= AF.jump * Math.sin((u - 0.25) / 0.37 * Math.PI);   /* B/C: Absprung beim Finisher */
   }
   let pose = pz.pose;
+  const RX = e.rx && now - e.rx.t < 240 && now >= e.rx.t ? e.rx : null;   /* Kampfanimation: Trefferreaktion — zuckt/kippt weg, schwer und krit stärker (nur Bild) */
+  if (RX) { const k = 1 - (now - RX.t) / 240, d = RX.k * 1.6 * k; x += Math.cos(RX.a) * d; y += Math.sin(RX.a) * d * 0.5; }
   if (/^a[123]$/.test(pose) || (pose === 'cast' && W && W.mode === 'aim')) pose = moving && W && W.mode !== 'work' ? walkP : 'i0';
   if (e.kb && e.kb.t > 0 && !e.cover) pose = 'kb';
+  else if (RX && RX.k >= 2 && !(e.swing > 0) && now - RX.t < 160 && /^(i[01]|w[0-3]|hit)$/.test(pose)) pose = 'kb';   /* schwerer/krit. Treffer: kippt zurück */
   else if (e.stagger > 300 && pose === 'hit') pose = ((now / 140) | 0) & 1 ? 'kb' : 'hit';   // S14: langes Taumeln wankt vor und zurück
   if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
   if (e.mounted) pose = (/^w[0-3]$/.test(pose) ? 'i0' : pose) + '~r';   // S15 (Nutzer: „soll drauf sitzen, nicht stehen“): Reitsitz
@@ -2184,6 +2189,10 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (!behind) weapon();
   if (e.carry && pz.dir !== 'N') { const ic = groundIcon(e.carry), bob = moving ? ((now / 180 | 0) & 1) : 0; c.drawImage(ic, Math.round(x - 8 + (pz.dir === 'E' ? 5 : pz.dir === 'W' ? -5 : 0)), Math.round(y - 24 - bob), 16, 16); }
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 58, 4, 0, 7); c.stroke(); }
+  if (e.chargeK > 0 && !(e.swing > 0)) {   /* Kampfanimation: Aufladering am Boden — füllt sich im Uhrzeigersinn, voll = hell und pulsierend */
+    const k = e.chargeK, full = k >= 1, n = Math.round(24 * k), pul = full ? 0.6 + 0.4 * Math.sin(now / 70) : 0.8;
+    c.fillStyle = full ? `rgba(255,236,170,${pul.toFixed(2)})` : 'rgba(214,190,130,0.8)';
+    for (let i = 0; i < n; i++) { const an = -Math.PI / 2 + i / 24 * Math.PI * 2; c.fillRect(Math.round(e.x + Math.cos(an) * 15) - 1, Math.round(e.y + 4 + Math.sin(an) * 7) - 1, 2, 2); } }
 }
 /* Runde 9 (Artist): Blutkult-Sense — Adern pulsieren im Herzschlag (ba-dumm), nur Darstellung. Im gedrehten Waffen-Kontext aufrufen. */
 function weaponPulse(c, Wsp, WP, now, seed) {
@@ -2225,6 +2234,10 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
     if (!fresh) { const tx = hx + ax * 6, ty = hy + ay * 6;
       c.strokeStyle = '#b8a47e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(Math.round(sx), Math.round(sy)); c.lineTo(Math.round(tx), Math.round(ty)); c.stroke();
       c.fillStyle = '#d8d0c0'; c.fillRect(Math.round(tx - 1), Math.round(ty - 1), 2, 2); c.fillStyle = '#8a2a20'; c.fillRect(Math.round(sx - 1), Math.round(sy - 1), 2, 2); } }
+  if (W.tm && !RANGED_W.has(wt) && W.u >= 0.38 && W.u <= 0.53) {   /* Kampfanimation: Schleier im schnellsten Bild — Fläche, die die Klinge eben überstrichen hat */
+    const pa = SP.weaponAngle({ ...W, q: atkU(W.tm.w, W.tm.h, Math.max(0.001, W.sw - 0.05)) }, dir), L2 = len * 0.95;
+    if (Math.abs(pa - a) > 0.15) { c.fillStyle = 'rgba(236,228,206,0.32)'; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(pa) * L2, hy + Math.sin(pa) * L2);
+      for (let k = 1; k <= 6; k++) { const t = pa + (a - pa) * k / 6; c.lineTo(hx + Math.cos(t) * L2, hy + Math.sin(t) * L2); } c.closePath(); c.fill(); } }
   c.save(); c.translate(Math.round(hx), Math.round(hy)); c.rotate(a);
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);
   c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
@@ -2527,6 +2540,8 @@ function drawCreature(e, now) {
   if (e.mtype === 'shade') ctx.globalAlpha = S.player && Math.hypot(e.x - S.player.x, e.y - S.player.y) > 150 ? 0.2 : 0.85;   // Phase 6: aus der Ferne kaum zu sehen
   if (e.mtype === 'omega') { ctx.fillStyle = `rgba(200,30,30,${0.1 + 0.05 * Math.sin(now / 200)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 90 / scale, 50 / scale, 0, 0, 7); ctx.fill(); }   // Phase 7: rote Aura
   if (e.mtype === 'ash_demon') { ctx.fillStyle = `rgba(255,110,40,${0.1 + 0.05 * Math.sin(now / 160)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 56 / scale, 35 / scale, 0, 0, 7); ctx.fill(); }   // Glutaura
+  if (e.mtype === 'skel_bomb') { const k = e.heavy?.kind === 'blast' ? 1 - e.heavy.t / (e.heavy.T || 900) : -1, pulse = k < 0 ? 0.06 + 0.03 * Math.sin(now / 300) : 0.14 + 0.3 * k * (0.6 + 0.4 * Math.sin(now / (70 - 50 * k)));   /* Entwickler 02.10.: Glut im Brustkorb, beim Zünden immer heller und schneller */
+    ctx.fillStyle = `rgba(255,130,40,${pulse})`; ctx.beginPath(); ctx.ellipse(e.x, e.y - 22, (k < 0 ? 10 : 14 + 10 * k) / scale, (k < 0 ? 8 : 11 + 8 * k) / scale, 0, 0, 7); ctx.fill(); }
   if (e.shadowServ) ctx.globalAlpha = 0.72;
   if (m.angel) drawWings(e, now, 1);
   if (e.variant === 'frenzied') { ctx.fillStyle = `rgba(190,40,30,${0.12 + 0.06 * Math.sin(now / 140)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 20, 10, 0, 0, 7); ctx.fill(); }   // S13: Raserei

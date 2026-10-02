@@ -9,7 +9,7 @@
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
 import { mix } from './sprites.js?v=24';
-import { atkShape, legacySw } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
+import { atkShape, legacySw, atkBody } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)
@@ -288,6 +288,18 @@ function legacySwing(wt, sw, arc, v = 0, j = 0) {
 export const octOf = a => ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
 export const upright = wt => wt === 'spear' || wt === 'polearm';
 export const onShoulder = wt => wt === 'great' || wt === 'hammer';
+let CUR_BP = null; const BP0 = { by: 0, ln: 0, st: 0, hy: 0, hr: 0, hd: 0 };
+const legIK = (hip, foot, side) => [hip, ik(hip, foot, 7.6, 7.6, e => side * e[0]), foot];   // Knie: side −1 = nach links (vorn in der Seitenansicht)
+/* Kampfanimation (Lead 02.10.): Gewicht verlagern, Ausfallschritt, Rumpf kippt in den Schlag, Kniebeuge — als Gelenkpunkte im bestehenden Rig */
+function bodyPose(R, view, B, pose) {
+  const by = Math.round(B.by), ln = Math.round(B.ln), hy = Math.round(B.hy), st = B.st, stand = pose === 'i0' || pose === 'i1' || pose === 'guard';
+  R.by += by; R.hy += hy;
+  for (const k of ['aN', 'aF', 'aL', 'aR']) if (R[k]) R[k] = R[k].map(([x, y]) => [x, y + by]);
+  if (view === 'W') {
+    R.lean += ln; R.cs = ln < 0 ? 3 : ln > 0 ? 1 : R.cs; R.sw = ln < 0 ? 2 : R.sw;
+    if (stand) { const h0 = 26 + by; R.lN = legIK([15.5, h0], [15.5 - st, 41], -1); R.lF = legIK([16.5, h0], [16.5 + st * 0.7, 41], -1); }
+  } else if (stand) { const sp = Math.min(3, Math.abs(st) * 0.35), h0 = 26 + by; R.lL = legIK([13.5, h0], [13.5 - sp, 41], -1); R.lR = legIK([18.5, h0], [18.5 + sp, 41], 1); }
+}
 export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
   return W.q < 0.4 ? 'wind' : W.q <= 0.5 ? 'strike' : W.q < 0.82 ? 'follow' : null;   /* Kampfanimation: q = Formzeit u (gleiche Anker für alle Klassen) */
@@ -310,11 +322,14 @@ function armPlan(view, R, W) {
   else if (W.mode === 'rest') h = upright(wt) ? [S[0] + ca * 6 * K, S[1] + (11 + low) * K] : onShoulder(wt) ? [S[0] + ca * 3 * K, S[1] + (9 + low) * K]
     : [S[0] + ca * 5 * K, S[1] + (16 + low + Math.max(0, sa) * 2) * K];
   else { const sv = svOf(W);
-    if (THRUST.has(wt)) { const r = 11 + sv.ext * 0.8; h = [S[0] + ca * r * K, S[1] + (6 + low + sa * r * 0.8) * K]; }
-    else { const ha = a + Math.atan2(Math.sin(sv.a), Math.cos(sv.a)) * sgn * 0.55, r = 13 + sv.ext * 0.5;   /* Kampfanimation: Wirbel drehen über 2π — die Hand folgt dem Winkel modulo 2π */ h = [S[0] + Math.cos(ha) * r * K, S[1] + (5 + low - (W.mode === 'cover' ? 4 : 0) + Math.sin(ha) * r * 0.75) * K]; } }
+    const bp = CUR_BP || BP0;   /* Kampfanimation: Hand weiter vor/zurück (hr) und tiefer/höher (hd) je Form und Phase */
+    if (THRUST.has(wt)) { const r = 11 + sv.ext * 0.8 + bp.hr; h = [S[0] + ca * r * K, S[1] + (6 + low + sa * r * 0.8 + bp.hd) * K]; }
+    else { const ha = a + Math.atan2(Math.sin(sv.a), Math.cos(sv.a)) * sgn * 0.55, r = 13 + sv.ext * 0.5 + bp.hr;   /* Kampfanimation: Wirbel drehen über 2π — die Hand folgt dem Winkel modulo 2π */ h = [S[0] + Math.cos(ha) * r * K, S[1] + (5 + low - (W.mode === 'cover' ? 4 : 0) + Math.sin(ha) * r * 0.75 + bp.hd) * K]; } }
+  if (W.mode === 'swing' || W.mode === 'work') { const dx = h[0] - S[0], dy = h[1] - S[1], d = Math.hypot(dx, dy), M = 13.5;   /* Kampfanimation: Hand bleibt in Armreichweite — den Rest des Stoßes trägt der Ausfallschritt */
+    if (d > M) h = [S[0] + dx / d * M, S[1] + dy / d * M]; }
   const aw = weaponAngle(W, a);
   let off = null;
-  if (W.two && !RANGED.has(wt)) off = [h[0] + Math.cos(aw) * 9 * K, h[1] + Math.sin(aw) * 9 * K];
+  if (W.two && !RANGED.has(wt)) off = [h[0] + Math.cos(aw) * 6 * K, h[1] + Math.sin(aw) * 6 * K];   /* Kampfanimation: beide Hände eng am Griff */
   else if (wt === 'bow' && W.mode === 'aim') { const pl = W.pull || 0; off = [h[0] - ca * (2.5 + 9 * pl), h[1] - sa * 3 - 1 - pl * 1.5]; }   // S15 (Nutzer: „man soll sehen, wie der Bogen gespannt wird“): Zughand wandert mit dem Spannen bis ans Kinn
   else if (wt === 'crossbow' && W.mode === 'aim') off = [h[0] - ca * 3.5, h[1] - sa * 2 + 1];
   return { h, off, left, aw };
@@ -335,9 +350,13 @@ export function paintR(L, dir, pose, W = null) {
   if (extra) { const A = view === 'W' ? rigW(extra) : rigS(extra), dy = R.by - A.by;   // Mischpose: Beine der Grundpose, Arme der Zusatzpose
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
   pose = base;
+  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
+  if (BP) bodyPose(R, view, BP, base);
+  else {
   if (ph === 'wind') { R.by -= 1; if (view === 'W') { R.lean += 1; R.cs = 1; } }
   if (ph === 'strike' || ph === 'follow') { R.by += 1; if (view === 'W') { R.lean -= 1; R.cs = 3; R.sw = 2; R.lN = [[15.5, 26], [13.5, 33.5], [12, 41]]; R.lF = [[16.5, 26], [18, 33.5], [19.5, 41]]; }
     else { R.lL = [[13.5, 26], [13, 34], [12.5, 41]]; R.lR = [[18.5, 26], [19, 34], [19.5, 41]]; } }
+  }
   { const X0 = looks(L); AB = X0.ab; const mv = (a, dx) => a && a.map(([x, y]) => [x + dx, y + X0.by]);
     R.by += X0.by; R.hy += 0; if (view === 'W') { R.aN = mv(R.aN, 0); R.aF = mv(R.aF, 0); } else { R.aL = mv(R.aL, -X0.sh); R.aR = mv(R.aR, X0.sh); } }
   if (L.ag === 2) { R.hy += 1; if (view === 'W') R.hx -= 1; }   /* Artist Runde 4: Alte gehen gebeugt, Kopf tiefer und vor */
@@ -353,7 +372,8 @@ export function paintR(L, dir, pose, W = null) {
   const meta = view === 'W' ? paintW(C, L, R, plan, W, pose) : paintSN(C, L, R, view === 'N', plan, W, pose);
   C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); C.outline(); silGlow(C, L, meta, view);
   const sx = q => q && [q[0] + DX, q[1] + DY], limbs = {}; for (const k in meta.limbs) limbs[k] = sx(meta.limbs[k]);   // Bildkoordinaten (Rahmen 40)
-  return { g: C.toG(), hand: plan ? sx(plan.h) : null, off: plan ? sx(plan.off) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
+  const lnX = view === 'W' ? R.lean : 0, shL = q => q && [q[0] + lnX, q[1]];   /* Arme werden mit der Rumpfneigung verschoben gemalt — Waffe sitzt an der gemalten Hand */
+  return { g: C.toG(), hand: plan ? sx(shL(plan.h)) : null, off: plan ? sx(shL(plan.off)) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
 }
 
 // S14 (Nutzer: „verschiedene Breiten, dick, breites Schlüsselbein“): Körperbau aus body.js BUILDS als Maß, nicht als Streckung —

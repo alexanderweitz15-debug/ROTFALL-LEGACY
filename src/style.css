@@ -115,6 +115,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #log-new{position:absolute;right:16px;bottom:10px;background:#2a2116;border:1px solid var(--rust);color:var(--gold);font-size:10px;letter-spacing:.08em;padding:2px 9px;border-radius:9px;cursor:pointer}
 #log-new.hidden{display:none}
 .map-card{position:absolute;width:250px;background:rgba(18,15,11,.96);border:1px solid var(--iron);box-shadow:0 4px 14px rgba(0,0,0,.6);padding:8px 10px;font-size:12px;z-index:5;cursor:pointer}
+.map-card-head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.map-card-ico{width:40px;height:40px;flex:0 0 40px;image-rendering:pixelated;border:1px solid #2b2419}
 .beast-row{display:flex;gap:10px;align-items:flex-start}
 .beast-pic{width:72px;height:72px;image-rendering:pixelated;border:1px solid #2b2419;flex:0 0 72px}
 .worldclock{display:flex;align-items:center;gap:14px;font-size:12px;color:#b8ac93;white-space:nowrap}
@@ -578,14 +580,16 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .tip::before,.tip::after{content:"";position:absolute;top:3px;width:3px;height:3px;background:#8a7448}
 .tip::before{left:3px} .tip::after{right:3px}
 
-/* Skill-Baum */
+/* Skill-Baum (Visueller Umbau, Scheibe 1+2: Linien, Icons, Hover-Vorschaukarte) */
 .tree-wrap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
-.tree-branch{background:#14110c;border:1px solid #2f271d;padding:8px}
-.tree-branch h3{margin:0 0 2px;font-size:13px;color:var(--bone)}
+.tree-branch{background:#14110c;border:1px solid #2f271d;padding:8px;position:relative}
+.tree-branch h3{margin:0 0 2px;font-size:13px;color:var(--bone);position:relative}
 .tree-branch.sealed{opacity:.55}
-.tree-row{display:flex;gap:6px;margin-top:8px;justify-content:center;flex-wrap:wrap}
-.tree-node{flex:1 1 0;min-width:0;background:#191510;border:1px solid #3b3227;color:var(--dim);padding:6px 4px;font-size:11px;line-height:1.2;cursor:pointer;text-align:center}
+.tree-lines{position:absolute;inset:0;z-index:0;pointer-events:none}
+.tree-row{display:flex;gap:6px;margin-top:8px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+.tree-node{flex:1 1 0;min-width:0;background:#191510;border:1px solid #3b3227;color:var(--dim);padding:6px 4px 4px;font-size:11px;line-height:1.2;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
 .tree-node small{display:block;font-size:9px;letter-spacing:.06em;text-transform:uppercase;margin-top:2px;color:#6f6552}
+.tree-ico{width:18px;height:18px;image-rendering:pixelated}
 .tree-node.notable{border-color:#6b5a3a}
 .tree-node.keystone{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(189,148,51,.25)}
 .tree-node.active{border-style:dashed;border-color:#6f8bb8}.tree-node.active.learned{border-style:solid}
@@ -807,3 +811,54 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .tr-multi{display:flex;gap:8px;align-items:center;font-size:12px;margin-top:2px;flex-wrap:wrap}.tr-multi b{color:var(--gold)}
 .tr-empty,.tr-help{grid-column:1/-1;font-size:12px}
 @media (max-width:820px){.tr-cols{grid-template-columns:1fr}.tr-deal{border-left:none;padding-left:0;position:static}.modal.dock .modal-frame{margin:60px 4px 8px}}
+/* ===== UI-Scheibe 4 (02.10.2026): Meldungsfluss unten links, Aufnahme-Stapel, Fund-Karte, Warnchip ===== */
+#flow{position:absolute;left:12px;bottom:66px;width:min(400px,calc(100% - 24px));z-index:7;display:flex;flex-direction:column;align-items:flex-start;gap:3px;pointer-events:none;transition:bottom .18s ease-out}
+.fl-row{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:7px;max-width:100%;padding:3px 10px 3px 7px;background:rgba(14,11,9,.86);border:1px solid #3b3227;border-left:2px solid #6b5630;
+  font-size:12px;line-height:1.35;color:#ddd1b6;box-shadow:0 3px 10px rgba(0,0,0,.45);animation:flin .2s ease-out;transition:opacity .4s,transform .4s}
+.fl-row .fl-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fl-row:nth-last-child(4){opacity:.45}.fl-row:nth-last-child(3){opacity:.68}.fl-row:nth-last-child(2){opacity:.86}
+.fl-row.out{opacity:0!important;transform:translateX(-14px)}
+.fl-row.loud{font-family:"Cinzel",serif;letter-spacing:.12em;font-size:12px;color:#f0e2bc;border-color:#6b5630;border-left:3px solid var(--gold);background:rgba(24,18,11,.92);padding:4px 12px 4px 8px}
+.fl-row.bump{animation:flbump .3s ease-out}
+.fl-n{font-weight:400;color:var(--gold);font-size:11px;margin-left:2px}.fl-n:empty{display:none}
+.fl-g{width:7px;height:7px;flex:none;display:block;background:#8d836e;transform:rotate(45deg)}
+.fl-g.g-loud{background:var(--gold);box-shadow:0 0 5px rgba(189,148,51,.6)}
+.fl-g.g-quest{background:#c9a94e;transform:none;clip-path:polygon(0 0,100% 0,100% 62%,50% 100%,0 62%);width:8px;height:9px}
+.fl-g.g-fail{background:#b0402e;transform:none;clip-path:polygon(0 0,100% 0,100% 62%,50% 100%,0 62%);width:8px;height:9px}
+.fl-ico{width:20px;height:20px;flex:none;image-rendering:pixelated;background:#100d09;border:1px solid #2b2419}
+.fl-row.loot.r-uncommon{border-left-color:#89a05a}.fl-row.loot.r-rare{border-left-color:#5f92bd}.fl-row.loot.r-epic{border-left-color:#a077bb}
+.fl-row.loot.r-legendary{border-left-color:var(--gold)}.fl-row.loot.r-mythic{border-left-color:#9fd3ea}
+.fl-row.loot .fl-t{color:inherit}
+@keyframes flin{from{opacity:0;transform:translateX(-12px)}}
+@keyframes flbump{0%{filter:brightness(1.8)}100%{filter:none}}
+.fl-fly{position:fixed;width:32px;height:32px;z-index:70;pointer-events:none;image-rendering:pixelated}
+#nav button.bump{animation:flbump .4s ease-out}
+.nomotion .fl-row,.nomotion .fl-row.bump,.nomotion #nav button.bump{animation:none}.nomotion .fl-row{transition:none}.nomotion #flow{transition:none}
+/* Fund-Karte Legendär/Mythisch: Höhe der Namenskarte, Welt läuft weiter */
+#findcard{position:fixed;left:50%;top:21vh;transform:translate(-50%,10px);z-index:62;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+#findcard.on{opacity:1;transform:translate(-50%,0);pointer-events:auto;cursor:pointer}
+.fc-in{position:relative;min-width:250px;max-width:86vw;padding:16px 26px 12px;text-align:center;background:linear-gradient(180deg,rgba(28,22,14,.97),rgba(14,11,8,.97));
+  border:2px solid #0c0a08;box-shadow:inset 2px 2px 0 #5a4a2e,inset -2px -2px 0 #0a0806,0 0 0 1px var(--gold),0 0 30px rgba(189,148,51,.35),0 14px 40px rgba(0,0,0,.7);overflow:hidden}
+.fc-mythic .fc-in{box-shadow:inset 2px 2px 0 #4a6a78,inset -2px -2px 0 #0a0806,0 0 0 1px #9fd3ea,0 0 30px rgba(150,215,240,.35),0 14px 40px rgba(0,0,0,.7)}
+.fc-ray{position:absolute;left:50%;top:-30px;width:90px;height:150px;transform:translateX(-50%);background:linear-gradient(180deg,rgba(255,226,150,.0),rgba(255,226,150,.28) 45%,rgba(255,226,150,0));pointer-events:none;animation:fcray 2.6s ease-in-out infinite alternate}
+.fc-mythic .fc-ray{background:linear-gradient(180deg,rgba(180,230,255,0),rgba(180,230,255,.3) 45%,rgba(180,230,255,0))}
+@keyframes fcray{from{opacity:.5;width:70px}to{opacity:1;width:110px}}
+.fc-ico{position:relative;width:96px;height:96px;image-rendering:pixelated;display:block;margin:0 auto 6px;background:#100d09;border:1px solid #6b5630}
+.fc-rar{position:relative;font:11px "Cinzel",serif;letter-spacing:.2em;text-transform:uppercase;color:#cdbf9c}
+.fc-rar .rm{position:relative;display:inline-block;top:0;left:0;margin-right:6px}
+.fc-name{position:relative;font:700 22px "Cinzel",serif;letter-spacing:.1em;margin:2px 0}
+.fc-leg{position:relative;font:italic 14px "Spectral",serif;color:var(--gold)}
+.fc-in small{position:relative;display:block;margin-top:6px;font-size:10px;color:#8d836e;letter-spacing:.06em}
+.nomotion #findcard{transition:none}.nomotion .fc-ray{animation:none}
+/* Warnchip in der Kopfleiste (vor der Uhr) */
+#warnchip{display:flex;align-items:center;gap:6px;max-width:300px;flex:0 1 auto;min-width:0;border:1px solid #5a2a22;background:#1d120e;color:#e08a70;padding:3px 9px;font-size:11px;letter-spacing:.04em;white-space:nowrap;cursor:pointer}
+#warnchip span{overflow:hidden;text-overflow:ellipsis}
+#warnchip i{width:9px;height:9px;flex:none;background:#c05236;clip-path:polygon(50% 0,100% 100%,0 100%)}
+#warnchip b{font-weight:400;color:#c9a94e;font-size:10px}
+#warnchip.w-raid{animation:warnp 1.6s ease-in-out infinite}
+#warnchip.w-time{border-color:#6b5630;background:#1b160e;color:#e0c070}#warnchip.w-time i{background:#c9a94e;clip-path:polygon(0 0,100% 0,60% 50%,100% 100%,0 100%,40% 50%)}
+#warnchip.w-hurt{border-color:#6a2a2a;color:#e07a6a}#warnchip.w-hurt i{background:#b0402e;clip-path:polygon(35% 0,65% 0,65% 35%,100% 35%,100% 65%,65% 65%,65% 100%,35% 100%,35% 65%,0 65%,0 35%,35% 35%)}
+#warnchip:hover{border-color:var(--gold)}
+@keyframes warnp{50%{box-shadow:0 0 8px rgba(192,82,54,.55)}}
+.nomotion #warnchip{animation:none}
+@media (max-width:820px){#flow{bottom:56px;width:calc(100% - 20px);left:10px}#warnchip{max-width:46vw;padding:2px 6px}body.touch #flow{bottom:150px}}

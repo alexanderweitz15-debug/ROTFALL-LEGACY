@@ -37,7 +37,7 @@ export const ANIM_DEFS = {
       shapes: [                                                      // Index = W.v im Figuren-Cache
         { name: 'Vorhand', a0: 0.6, from: 2.0, hit: -0.12, end: -1.05, a1: -0.6, eW: 0, eS: 2 },   // holt tief/hinten aus, quert die Zielachse erst im Einschlag
         { name: 'Rückhand', a0: -1.05, from: -2.0, hit: 0.12, end: 1.05, a1: 0.6, eW: 0, eS: 2 },   // läuft aus der Endlage der Vorhand weiter
-        { name: 'Überkopf', a0: 1.05, from: -2.3, hit: 0.2, end: 0.8, a1: 0.6, eW: -4, eS: 4 },
+        { name: 'Überkopf', a0: 1.05, from: -2.3, hit: 0.35, end: 0.95, a1: 0.6, eW: -4, eS: 4 },   // endet tief vor dem Körper
         { name: 'Wirbel', a0: 1.05, from: 1.8, hit: 2 * Math.PI - 0.12, end: 2 * Math.PI + 0.9, a1: 2 * Math.PI + 0.6, eW: -2, eS: 3, spin: true },
         { name: 'Doppelwirbel', a0: 1.05, from: 1.9, hit: 4 * Math.PI - 0.12, end: 4 * Math.PI + 0.9, a1: 4 * Math.PI + 0.6, eW: -3, eS: 4, spin: true },
       ],
@@ -55,7 +55,7 @@ export const ANIM_DEFS = {
       shapes: [
         { name: 'Schräghieb', a0: 0.6, from: 2.3, hit: -0.12, end: -1.3, a1: -0.8, eW: -3, eS: 3 },
         { name: 'Rückschwung', a0: -1.3, from: -2.3, hit: 0.12, end: 1.3, a1: 0.6, eW: -2, eS: 3 },
-        { name: 'Überkopf-Spalter', a0: 1.3, from: -2.7, hit: 0.25, end: 0.9, a1: 0.6, eW: -5, eS: 5 },
+        { name: 'Überkopf-Spalter', a0: 1.3, from: -2.7, hit: 0.55, end: 1.0, a1: 0.6, eW: -5, eS: 5 },
       ],
       A: { name: 'A Grounded', steps: [{ s: 0, w: 0.388, h: 0.5 }, { s: 1, w: 0.265, h: 0.378 }, { s: 2, w: 0.373, h: 0.479 }],
         fx: { stop: 1, shake: 1, trail: 6, push: 2, slash: 0, after: 0, fin: 0 } },
@@ -95,9 +95,9 @@ export const ANIM_DEFS = {
     hammer: {                                                        // sehr langsam, starkes Ausholen, schlägt ein
       name: 'Kriegshammer',
       shapes: [
-        { name: 'Überkopf', a0: 0.6, from: -2.6, hit: 0.25, end: 0.9, a1: 0.6, eW: -4, eS: 5 },
-        { name: 'Seitwärts', a0: 0.9, from: 2.3, hit: -0.12, end: -1.2, a1: -0.6, eW: -2, eS: 3 },
-        { name: 'Bodenschlag', a0: -1.2, from: -2.8, hit: 0.35, end: 0.7, a1: 0.6, eW: -6, eS: 6 },
+        { name: 'Überkopf', a0: 0.6, from: -2.6, hit: 0.45, end: 0.6, a1: 0.6, eW: -4, eS: 5 },   // Kopf „hängt“ nach dem Einschlag
+        { name: 'Seitwärts', a0: 0.6, from: 2.3, hit: -0.12, end: -0.5, a1: -0.6, eW: -2, eS: 3 },
+        { name: 'Bodenschlag', a0: -0.6, from: -2.8, hit: 0.9, end: 1.0, a1: 0.6, eW: -6, eS: 6 },   // Kopf schlägt auf den Boden
       ],
       A: { name: 'A Grounded', steps: [{ s: 0, w: 0.487, h: 0.565 }, { s: 1, w: 0.365, h: 0.452 }, { s: 2, w: 0.454, h: 0.53 }],
         fx: { stop: 1, shake: 1, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
@@ -108,6 +108,54 @@ export const ANIM_DEFS = {
     },
   },
 };
+/* Kampfanimation (Lead 02.10.: „Körper starr“): Ganzkörperpose je Form und Phase. Schlüsselbilder b0 (u 0, = Endlage des Vorgängers in der
+   Kette), w (Ende Ausholen u 0,4), i (Einschlag u 0,5), f (Ende Nachschwung u 0,7), danach zurück in die Kampfhaltung (u 1 = 0).
+   by Rumpf tiefer (Knie beugen), ln Rumpf vor (−) / zurück (+) gegen die Hüfte (nur Seitenansicht), st Schrittweite (vorderer Fuß vor, hinterer
+   zurück), hy Kopf, hr Hand weiter vor (+) / näher am Körper (−), hd Hand tiefer (+) / höher (−). Pixel im Figurenraster.
+   Packs: B und C bekommen eigene, größere Formen (Umfang ×1,5 bzw. ×2, gedeckelt) — eigene Bilder, aber kein Pack-Schlüssel im Cache. */
+const BODY = {
+  sword: [
+    { w: { by: 1, ln: 2, st: 2, hr: -2, hd: 1 }, i: { by: 1, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -2, st: 5, hr: 2, hd: 1 } },
+    { w: { ln: 1, st: 3, hr: -3, hd: -3 }, i: { by: 1, ln: -1, st: 4, hr: -1, hd: -2 }, f: { ln: -1, st: 4, hd: -1 } },
+    { w: { by: -1, ln: 2, st: 2, hy: -1, hr: -2, hd: -4 }, i: { by: 3, ln: -3, st: 6, hy: 1, hr: 2, hd: 5 }, f: { by: 3, ln: -3, st: 6, hy: 1, hd: 6 } },
+    { w: { by: 1, ln: 1, st: 2, hr: -1 }, i: { by: 2, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -1, st: 4, hr: 1 } },
+    { w: { by: 2, ln: 2, st: 2, hr: -1 }, i: { by: 3, ln: -3, st: 6, hr: 4 }, f: { by: 2, ln: -2, st: 5, hr: 2 } },
+  ],
+  great: [
+    { w: { by: 1, ln: 3, st: 3, hr: -3, hd: -2 }, i: { by: 2, ln: -3, st: 6, hr: 3, hd: 2 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 3 } },
+    { w: { by: 1, ln: 2, st: 3, hr: -3, hd: -3 }, i: { by: 2, ln: -2, st: 5, hd: -1 }, f: { by: 2, ln: -2, st: 5 } },
+    { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 4, ln: -4, st: 7, hy: 1, hr: 2, hd: 7 }, f: { by: 4, ln: -4, st: 7, hy: 1, hd: 8 } },
+  ],
+  dagger: [
+    { w: { by: 1, ln: 2, st: 1, hr: -2 }, i: { by: 1, ln: -3, st: 6, hr: 4 }, f: { ln: -2, st: 5, hr: 2 } },
+    { w: { ln: 1, st: 2, hr: -1, hd: -2 }, i: { by: 1, ln: -2, st: 4, hr: 2, hd: -1 }, f: { ln: -1, st: 4 } },
+    { w: { by: 2, ln: 3, st: 1, hr: -3 }, i: { by: 2, ln: -4, st: 8, hr: 5 }, f: { by: 1, ln: -3, st: 7, hr: 3 } },
+  ],
+  spear: [
+    { w: { by: 1, ln: 3, st: 2, hr: -3 }, i: { by: 2, ln: -3, st: 8, hr: 5 }, f: { by: 2, ln: -3, st: 8, hr: 4 } },
+    { w: { by: 2, ln: 2, st: 2, hr: -2, hd: 2 }, i: { by: 3, ln: -3, st: 8, hr: 5, hd: 4 }, f: { by: 3, ln: -3, st: 7, hd: 4 } },
+    { w: { by: 1, ln: 2, st: 3, hr: -2 }, i: { by: 2, ln: -2, st: 5, hr: 2 }, f: { by: 1, ln: -1, st: 4 } },
+  ],
+  hammer: [
+    { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 3, ln: -3, st: 6, hr: 2, hd: 6 }, f: { by: 3, ln: -3, st: 6, hr: 2, hd: 7 } },
+    { w: { by: 1, ln: 3, st: 3, hr: -3 }, i: { by: 2, ln: -3, st: 6, hr: 3, hd: 1 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 2 } },
+    { w: { by: -2, ln: 3, st: 2, hy: -1, hr: -3, hd: -7 }, i: { by: 6, ln: -4, st: 6, hy: 2, hr: 2, hd: 10 }, f: { by: 6, ln: -4, st: 6, hy: 2, hd: 10 } },
+  ],
+};
+const PACK_AMP = { A: 1, B: 1.5, C: 2 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 7, hd: 11 };
+const scaleBody = (k, a) => { const o = {}; for (const [n, v] of Object.entries(k || {})) o[n] = Math.max(-BODY_MAX[n], Math.min(BODY_MAX[n], v * a)); return o; };
+for (const [wt, list] of Object.entries(BODY)) {
+  const P = ANIM_DEFS.attack[wt]; if (!P) continue; const n = P.shapes.length;
+  list.forEach((B, i) => { const F = P.shapes[i]; F.body = B; });
+  for (const F of P.shapes) if (F.body && !F.body.b0) { const prev = P.shapes[P.shapes.indexOf(F) - 1]; F.body.b0 = F.spin ? P.shapes[1]?.body?.f : prev?.body?.f || {}; }
+  P.shapes[0].body.b0 = {};
+  P.nBase = n;
+  for (const [k, amp] of [['B', PACK_AMP.B], ['C', PACK_AMP.C]]) {   // größere Formen je Pack, angehängt (Index + n bzw. + 2n)
+    for (let i = 0; i < n; i++) { const F = P.shapes[i], b = F.body || {}; P.shapes.push({ ...F, name: F.name + ' (' + k + ')', body: { b0: scaleBody(b.b0, amp), w: scaleBody(b.w, amp), i: scaleBody(b.i, amp), f: scaleBody(b.f, amp) } }); }
+    for (const st of P[k].steps) st.s += n * (k === 'B' ? 1 : 2);
+  }
+  P.A.fx.jump ??= 0; P.B.fx.jump ??= 5; P.C.fx.jump ??= 9;   // Absprung beim Finisher (px, nur Bild)
+}
 /* ---- Kampfanimation: Rechenhilfen (rein rechnend; game.js, render.js, fig5.js und die Proben lesen dasselbe) ---- */
 export const ATK_U = [0, 0.13, 0.27, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1];   // Stützstellen der Figurenbilder (Formzeit u)
 export const ATK_PACKS = ['A', 'B', 'C'];
@@ -154,6 +202,13 @@ export function atkShape(wt, s, u) {
 }
 export const atkSpin = (wt, s) => !!atkProfile(wt)?.shapes[s]?.spin;
 export const atkThrust = (wt, s) => atkProfile(wt)?.shapes[s]?.kind === 'thrust';
+// Ganzkörperpose einer Form zur Formzeit u (null = Klasse ohne Daten): by, ln, st, hy, hr, hd (Pixel, siehe BODY)
+const BK = ['by', 'ln', 'st', 'hy', 'hr', 'hd'];
+export function atkBody(wt, s, u) {
+  const F = atkProfile(wt)?.shapes[s], B = F?.body; if (!B) return null;
+  const seg = u < 0.4 ? [B.b0, B.w, eo(u / 0.4)] : u <= 0.5 ? [B.w, B.i, ei((u - 0.4) / 0.1)] : u < 0.7 ? [B.i, B.f, eo((u - 0.5) / 0.2)] : [B.f, null, eo(Math.min(1, (u - 0.7) / 0.3))];
+  const [a, b, k] = seg, o = {}; for (const n of BK) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; } return o;
+}
 export const DEATH_KINDS = Object.keys(ANIM_DEFS.death);
 // Ereignisse zwischen t0 (ausschließlich) und t1 (einschließlich); t0 < 0 heißt „von Anfang an“
 export function animEvents(def, t0, t1) { return (def?.ev || []).filter(e => e.t > t0 && e.t <= t1); }

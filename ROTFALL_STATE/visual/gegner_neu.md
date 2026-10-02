@@ -77,5 +77,12 @@ Häufigkeit (vorläufig): Bomben-Skelett 8 %, Großes Skelett 6 % der Skelett-Sp
 5. render.js: Glühen während der Zündung.
 6. MECHANIKEN.md, Rasterbild.
 
-## 8. Ergebnis (nach dem Bau)
-siehe unten.
+## 8. Ergebnis Teil 1 (Zwischenbericht)
+- Gebaut wie Plan §7. Werte wie §4 (alle **vorläufig**, Messung unten). Bild: `img/gegner_neu.png` (14 Arten × 8 Seeds, Stil R).
+- Nebenfix: `die()` löscht jetzt auch `e.heavy` (vorher blieb ein angesagter schwerer Angriff am Toten hängen).
+- simFight (Stufe 15, Zweihänder, Schuppenpanzer, „schwer“):
+  - Bomben-Skelett: geschickt 1–2 Treffer, 0 % Verlust (stirbt vor dem Knall oder Rolle). Nur Explosion (ehp 4000, steht, rollt nicht): 0/42/42 % des Balkens (≤ 60 %).
+  - Großes Skelett: geschickt 4–7 Treffer, 0 % Verlust; stehend 42/100/6 % — gleich wie Knochenritter (44/100/11/28) und Hauptmann der Toten (39/100/21/39); Seed 2 tötet bei allen dreien (Messartefakt). Stufe 10 Langschwert geschickt: 0/0/39 %.
+  - Verdorbener: 1–2 Treffer, 3–24 % (geschickt). Wucherer: 4–8 Treffer, 0–26 % (geschickt), stehend 0–26 %.
+- Selbsttest: 400/400 PASS (4 neue Proben). Echter Spielstand = Sicherung (geprüft).
+- Leistung: neue Varianten sind normale Spec-Stufen; Frame-Cache bleibt bei ≤ 4000 gedeckelt (Probe). Explosion/Glut nur bei vorhandenen Bomben-Skeletten.
