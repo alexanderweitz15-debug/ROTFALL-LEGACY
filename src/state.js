@@ -75,6 +75,7 @@ export const S = {
   // transient (nicht gespeichert)
   fx: [], floats: [], projectiles: [], paused: false, uiDirty: true,
 };
+export const S_INIT = JSON.parse(JSON.stringify(S));   /* RB-055: Urzustand — ein neues Spiel erbt nichts aus einem vorher geladenen Stand */
 
 // ---- deterministischer RNG (mulberry32) ----
 let rngState = 1;

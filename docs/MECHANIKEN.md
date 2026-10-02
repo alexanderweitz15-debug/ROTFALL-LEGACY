@@ -785,3 +785,206 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Ortskarte:** Klick auf einen Ort der Weltkarte (M) zeigt Art, Herrschaft, Zustand, Gefahr, zuletzt gesehene Warenpreise und deine Aufträge dort.
 - **Steckbrief mit Gesicht:** Am Anschlagbrett sind Kopfgelder auf benannte Mini-Bosse mit ☠ markiert; beim Lesen siehst du das Gesicht des Gesuchten.
 - **Bestiarium:** Kodex → Gegner zeigt jedes erschlagene Wesen als Bild.
+
+## Runde: Feinde unter sich, Varons Tod, Startpreise (Entwickler 01.10.2026)
+- **Feinde verschiedener Mächte bekämpfen sich:** Tote gegen alles Lebende (Banden, Kette, Goblins, Piraten, Orden, Valen, Händler, Kelch, Aurelion), die Kette gegen Banden und Goblins, Orden gegen Kelch. Wer einen Feind deutlich näher hat (unter 60 % deiner Entfernung), kämpft lieber gegen den als gegen dich. Tiere, Diener, Ergebene und Gesprächspartner bleiben außen vor.
+- **Varons Tod:** Stirbt König Varon, steht die Welt kurz still — Glocken, der Hof weicht zurück oder trauert, Namenskarte „KÖNIG VARON IST TOT“, Marschall Brandt ruft. Reichsverweser wird Kanzler Aldhelm (solange der Kult nicht zerschlagen ist), sonst Marschall Brandt. Hast du ihn erschlagen: Kopfgeld 1500 bei der Krone, die Garde in Sichtweite greift an. Debug: „Regie (T17)“ → „Varons Tod vorspielen“.
+- **Startpreise:** Ein neues Spiel beginnt mit Stadtlagern von mindestens 80 % des Bedarfs (vorher lagen Tuch und Leder in Eren am Höchstpreis); Nordfurts Kornmangel bleibt.
+- **Erpressung des Kanzlers:** Die Wahl sagt jetzt vorher, dass das Rote Siegel danach für immer fort ist.
+
+## Runde: Stadt ohne Schutz, Scheibe 1 (Entwickler 01.10.2026)
+- **Jede Stadt merkt sich ihre toten Wachen** — auch über das Laden hinweg (vorher stand nach dem Neuladen eine volle Garde da). Fehlt die Hälfte, ist sie *geschwächt*; fehlen 80 % (oder lebt keine mehr), ist sie *schutzlos*.
+- **Schutzlos:** Die Sturmglocke läutet, ein Bürger ruft „Die Wache ist tot! Lauft!“, Bewohner fliehen sichtbar in die nächste Stadt ihres Herrn (ein Fünftel der Bevölkerung zieht weg), wer bleibt, versteckt sich im Haus, die Läden schließen, eine Miliz sammelt sich am Platz. War es deine Hand: Ruf −4 je Wache, Kopfgeld 300 (Varonheim 800), Steckbrief-Chronik und ein Strafzug des Stadtherrn; die Miliz greift dich an.
+- **Ersatz:** Valen schickt 3 Mann alle 2 Tage aus dem nächsten eigenen Ort (dessen Besatzung sinkt) — nicht, wenn die Krone gebunden ist (Kult, besetzte Hauptstadt, Bedrohung 15+). Aurelion 2 Automaten täglich (nicht ohne Gelenkhall oder im Thronstreit), die Kette 2 alle 2 Tage, Händlerstädte 1 Söldner täglich aus dem Wohlstand, der Orden 2 alle 3 Tage. Ist die Wache wieder da, öffnen die Läden.
+- **Varonheim:** Jeder tote Königsgardist kostet die Hauptstadt 4 Besatzung; solange Gardisten fehlen, füllt sie sich nicht auf, und Morvaths Späher sehen offene Tore (Bedrohung +3 beim Alarm, dann +0,5 am Tag). Der Heerzug kommt früher und trifft eine ausgeblutete Stadt — der Fall selbst kommt weiter über die Belagerung.
+- **Kommt in Scheibe 2:** Gesetzlosigkeit (Plünderer, keine Verhaftungen, Wohlstand stürzt) und die Übernahme nach 2 + 2 Tagen (Totenheer bei Kriegsknoten, sonst eine Bande; die Kette nur im Westen).
+- **Debug:** „Regie (T17)“ → „Stadt ohne Schutz: Status / alle Wachen hier töten / Tag vorspulen / zurücksetzen“. Probe „Stadt ohne Schutz“.
+
+## Runde: Weltereignisse passen zusammen (Abgleich 01.10.2026)
+- **Rote Krönung** kommt genau einmal, nie während Varonheim besetzt ist, und nur mit lebendem Aldhelm. Auf Sehr schwer flüstert der Hof schon ab Tag 30 davon (sonst 45); auf Angsthase gibt es keine Krönung.
+- **Morvaths Heerzug:** Die Bedrohung zählt auf Sehr schwer schon ab Tag 5 (sonst 20).
+- **Varons Tod** wird einmal erzählt; Reichsverweser ist nur ein lebender Aldhelm, sonst Marschall Brandt; im Exil „gefallen im Exil“; Glocken nur, wenn die Stadt nicht besetzt ist.
+- **Nach Garmadons Tod** wird Varonheim richtig befreit (Hof, Läden, Garde kehren zurück). Die Toten überfallen nur noch mit kleinen Trupps (2–4) und löschen keine Dörfer mehr aus.
+- **Kult zerschlagen:** Kanzlerin Ysmay — die Audienz beim König ist frei.
+- **Goblinsturm:** Fliehst du vor Varg oder lädst neu, ist der Sturm vorbei (Morrgrund überlebt); nur ein Heldentod mitten im laufenden Sturm vernichtet Morrgrund.
+- **Feste:** kein Adelsball im Häuserkrieg oder Thronstreit, kein Streik im besetzten Tickmar.
+- **Exil:** Fällt die Exilstadt, zieht der Hof sofort weiter.
+- **Stadt ohne Schutz:** Der Blutkult allein hält Valens Ersatz nicht auf (nur eine besetzte Hauptstadt oder hohe Bedrohung).
+
+## Runde: Varonheim auf dem Kronfels, Scheibe 1 (Entwickler 01.10.2026)
+- **Die Hauptstadt ist umgezogen und gewachsen:** Varonheim liegt jetzt auf dem Kronfels östlich von Nordfurt, dreimal so groß (117 × 87 Kacheln, rund 90 Häuser). Die Königsstraße läuft als Hauptachse von Nordfurt durch das West- und Osttor nach Aschfurt; der Kronweg führt vom Südtor zur alten Stelle (Königsfelder).
+- **Viertel:** Tempel und Friedhof (NW), Adel (NO), Händler (W), Markt mit Galgen und Standbild (Mitte), Gilden (O), Armenviertel (SW), Handwerk und Garnison (SO); im Norden auf dem Fels der Burgbezirk mit Wallplatz vor dem Burgtor.
+- **Alte Spielstände:** Beim ersten Laden ziehen die Bewohner in die neuen Häuser, alte Spuren verschwinden; wer auf der alten Fläche stand, steht auf dem neuen Markt. Ein Logeintrag erklärt es.
+- **Noch nicht:** Die Burg ist weiter ein eigener Ort (Tor am Bergfried); begehbare Burg, Torkontrolle (Waffen abgeben, Bestechung 5000 Gold zu 30 %) und Start in Varonheim folgen in den nächsten Scheiben.
+- **Kopfleiste:** größere Symbole mit kurzer Beschriftung darunter (Charakter, Inventar, Gruppe, Siedlung, Karte, Aufträge, Mächte, Kodex, Optionen), die Taste klein in der Ecke.
+
+## Runde: Mächte unter sich nutzen (Scout Runde 4, 01.10.2026)
+- **Zeichen der Macht:** Über Feinden, die mit anderen Mächten verfeindet sind (Tote, Banden, Kette, Goblins, Orden, Kelch, Piraten), sitzt eine kleine Raute in der Farbe ihrer Macht — so siehst du, wen du gegeneinander hetzen kannst.
+- **Kampfbericht:** Gehen zwei Mächte in deiner Nähe aufeinander los, meldet es das Protokoll (beim ersten Mal ein Hinweis „MÄCHTE UNTER SICH“).
+- **Schwache Flanke:** Wer einen Feind einer anderen Macht erschlägt, ist 6 Sekunden außer Atem (seine Raute blinkt): du und deine Gruppe trefft ihn um 35 % härter („Flanke!“).
+- **Köderpfeife** (Händler, 45 Gold, wird nicht verbraucht): Der nächste Verfolger wendet sich einem Feind seiner Feinde in der Nähe zu. 30 Sekunden Pause; ohne passenden Feind nur 5 Sekunden.
+- **Leute:** Gesichter mit Brauen, Alter, Bartarten und Narben; Kleidung je Region (Valen blaugrau, Aurelion Seide mit Messingborte, Kette Schwarz und Eisen, Goblins Lumpen); Wachen mit Helmkamm in der Stadtfarbe.
+
+## Runde: Lebendige Hauptstadt (Scout Runde 5, 01.10.2026)
+- **Königsturnier:** Das große Turnier kann jetzt auch in Varonheim stattfinden (doppelt so oft wie anderswo), solange die Stadt frei und nicht belagert ist.
+- **Gildenstreik (neues großes Ereignis):** Die Gilden der Hauptstadt streiken, weil die Kanzlei Kriegsaufträge in Schuldscheinen zahlt — drei Tage keine Werkzeuge, Waffen und Tuch aus Varonheim. Meister Odo im Gildenviertel: Schuld begleichen (200 Gold, Händler +5) oder die Meister an die Esse treiben (Valen +3, Händler −5, Wohlstand −5). Debug: „Großes Ereignis: Gildenstreik“.
+- **Hamsterkäufe:** Ab Bedrohung 10 (Gerücht über Morvaths Heerzug) steigen in Varonheim Korn, Fleisch, Salz und Waffen im Einkauf um bis zu 30 %.
+- **Flüchtlinge:** Fällt eine Stadt Valens, fliehen die Leute in die Hauptstadt (solange sie Valen hält) und drängen sich im Armenviertel im Südwesten.
+
+## Runde: Bedrohung der Hauptstadt neu eingestellt (Entwickler 01.10.2026)
+- **Quellen der Bedrohung (je Tag, höchstens +1,5; Sehr schwer +2):** verlorene Front (6+ Orte der Toten im Kriegsgraphen; Aurelions Städte zählen nicht) +1, sonst −0,75; kein Valen-Feldheer +0,5; Wachen fehlen in Varonheim +0,5; Blutkult (herrschend +1, versteckt +0,5); leerer Thron +0,5.
+- **Morvaths Heerzug:** frühestens an Tag 75 (Sehr schwer 60), Stärke 100 (Sehr schwer 110); vorher bleibt die Bedrohung höchstens bei 19 („Morvath sammelt noch“). Einmalige Stöße (z. B. der Wachen-Alarm) heben sie nie über 19.
+- **Belagerung:** Das Heer verliert vor den Mauern weniger (0,4 je Zug) — der Sturm ist ernst. Wer den Kult laufen lässt, verliert die Hauptstadt auf Schwer etwa um Tag 120–150, auf Sehr schwer um Tag 100. Wer den Kult zerschlägt und die Front hält, sieht keinen Heerzug.
+- **Ersatzwachen** bringen der Hauptstadt je Mann 4 Besatzung zurück.
+- **Karawanen** laden nur, was über 80 % des Bedarfs einer Stadt liegt (neue Spiele beginnen nicht mehr mit leeren Lagern).
+
+## Die Varonsburg ist begehbar (Varonheim-Umbau, Scheibe 2)
+- Die Burg steht jetzt mitten in Varonheim in der Weltkarte — kein Portal, kein Ladebildschirm. Durch das offene Burgtor im Norden der Stadt kommst du in den Burghof.
+- **Bauten:** Thronsaal (König Varon, Kanzler Aldhelm, Marschall Brandt), Adelsflügel (die drei Adligen), Kanzlei (Spitzelmeisterin Ysmay; mit dem zweiten Katakombenschlüssel führt hier die Kellertreppe hinab), Verlies (Kerkermeister Grimm, Gefangene aus Aurelion), Kronschmiede (Hagen). Im Hof verkauft Hoflieferant Hofmar Proviant.
+- Fällt Varonheim, steht die Burg leer — der Hof ist im Exil. Wird die Stadt befreit, kehrt er zurück.
+- Wer in einem alten Spielstand in der Burgkarte stand, steht nach dem Laden vor dem Burgtor.
+- Debug: „Varon: in den Thronsaal“.
+
+## Burgfrieden am Tor der Varonsburg (Varonheim-Umbau, Scheibe 3)
+- Wer den Burgbezirk betritt, wird von Torwache Gerold angehalten. Ein Schild am Tor und eine Meldung beim ersten Nähern weisen darauf hin.
+- **Durchsuchen lassen:** Waffen (auch die Zweitwaffe und Waffen im Gepäck), Dietriche, Stricke und Giftöl gehen in die Waffenkammer. Während der Kultkrise auch Blutphiolen. Schilde, Rüstung, Tränke und Essen bleiben. Gefährten in der Nähe werden mit durchsucht.
+- **Zurück:** Beim Hinausgehen durchs Burgtor kommt alles automatisch zurück, mit Zustand und Geschichte. Wer anders hinausgeht, holt es bei Gerold ab („Meine Waffen zurück“). Erben holen das Lager des Hauses ab. Fällt die Stadt, bringt ein Bote die Sachen.
+- **Bestechen:** 5000 Gold, fest 30 % Chance, höchstens einmal am Tag. Gelingt es, darfst du bewaffnet hinein. Scheitert es: Gold weg, Valen −10, Kopfgeld 250, drei Tage Verdacht (keine Bestechung). Dann Kerker oder Flucht.
+- **Rang:** Offizier (Rang 4) geht ohne Durchsuchung durch. Ritter (Rang 3) oder „Ritter Varons“ behält die angelegte Klinge. Bei Valen „Verhasst“ kein Zutritt. Mit Kopfgeld bei Valen folgt die Festnahme.
+- **Drinnen zuschlagen:** Sieht die Garde es, gibt es erst die Warnung „Waffe weg!“. Ein zweiter Schlag binnen 20 s löst Alarm aus: die Garde greift an, Valen −20, Kopfgeld 200.
+- Debug: Abschnitt Varonheim, Einträge „Burgfrieden: …“ und „Varon: ans Burgtor“.
+
+## Schmuggel in die Varonsburg (Varonheim-Umbau, Scheibe 4)
+- **Verstecken:** Hast du eine Kleinwaffe (Dolch, Hakenmesser, Katar, Wurfmesser, Wurfbeil, Dietrich), bietet die Torwache „Durchsuchen lassen und … verstecken“ an. Die Chance steht dabei: 15 % + Schleichen × 1,5 (höchstens +45). Dazu: Ruf „Gnädig/Barmherzig“ +10, „Gnadenlos“ −20, Aurelion-Ruf ab 25 −15, Valen-Rang Veteran +25, Stiefelscheide +30, Verdacht −20. Begrenzt auf 5–90 %.
+- **Erwischt:** Die Waffe geht in die Waffenkammer, 150 Gold Strafe, Valen −5, drei Tage Verdacht. Wer im Verdacht erneut erwischt wird, kommt in den Kerker.
+- **Stiefelscheide:** Gibt es bei Yusuf im Basar von Karak-Atar (160 Gold).
+- **Diener:** Die Diener im Burghof holen für 300 Gold eine Waffe aus deiner Waffenkammer. Am nächsten Tag fragst du nach deiner Ware. In 15 % der Fälle verraten sie dich: die Waffe liegt wieder in der Kammer, Valen −5, ein Tag Verdacht.
+- **Kellerweg:** Wer mit dem zweiten Katakombenschlüssel über den Kanzleikeller kommt, wird nicht kontrolliert, bis ihn eine Wache sieht. Dann: 150 Gold Strafe und Durchsuchung oder Flucht (Alarm).
+- **Halle bleibt gefährlich:** Wer drinnen eine Waffe zieht, löst Warnung und dann Alarm aus.
+- **Schlächter** (Ruf der Klinge ≤ −60) kommen ohne Ritterwürde nicht hinein.
+
+## Start in Varonheim (Varonheim-Umbau, Scheibe 5)
+- Im Erstellungsbildschirm wählst du den **Startort**: Varonheim (Vorgabe) oder das klassische Grenzland vor Eren.
+- In Varonheim beginnst du im Viertel deiner Herkunft. Feldknecht: Königsfelder vor dem Südtor. Jäger: Westtor. Lehrling: Tempelviertel. Ehemaliger Soldat: Garnison. Wanderer: Taverne am Markt.
+- Am Anschlagbrett hängen drei leichte Aufträge: Wegmarken der Stadtwache, Botengang nach Nordfurt, Wolfsfelle für den Kürschner.
+- Die ersten Log-Zeilen nennen Brett, Burgtor und Straße nach Nordfurt. Sie weisen auch auf den Kodex (H) und deinen ersten Talentpunkt hin.
+- Der Blutkult beginnt für Hauptstädter erst ab Tag 10, wenn du Stufe 5 hast; sonst ab Tag 16.
+
+## Stadt ohne Schutz — gesetzlos, Burgwache und Flucht des Königs (Scheibe 2a)
+- **Gesetzlos:** Kommt zu einer schutzlosen Stadt kein Ersatz, wird sie nach einer Frist gesetzlos. Die Frist beträgt auf Angsthase 4 Tage, auf Schwer 2, auf Sehr schwer 1. Jede Ankunft von Ersatz setzt die Frist zurück.
+- **Was dann gilt:** Niemand verhaftet mehr; das Kopfgeld bleibt aber stehen. Es gibt keine neuen Aushänge, Kaufen kostet ein Viertel mehr, und der Wohlstand sinkt um 8 je Tag (schutzlos: −4).
+- **Plünderer:** Nachts ziehen 2–4 Plünderer durch die Gassen. Jeder, den du erschlägst, bringt +3 Ruf beim Stadtherrn, höchstens +12 je Nacht.
+- Stehen genug Wachen wieder, herrscht wieder Gesetz.
+- **Varonheim** wird gesetzlos, aber nie übernommen. Die Gesetzlosigkeit treibt Morvaths Bedrohung etwas an.
+- **Burgwache:** Getötete Burgwachen der Varonsburg kommen beim Laden nicht wieder. Erst wenn die Stadtwache vollzählig ist, ziehen täglich zwei neue ein.
+- **Der König flieht:** Hast du mindestens 3 der Burgwachen erschlagen, und sind 5 tot, während Varonheim schutzlos ist, flieht König Varon mit dem Hof ins Exil. Die Stadt bleibt der Krone. Die Rote Krönung ruht, solange er fort ist. Stehen Stadt- und Burgwache 3 Tage lang wieder, kehrt er zurück.
+- Debug: „Stadt ohne Schutz: Frist vorspulen“, „Plünderer jetzt“, „Burgwache töten“, „König-Flucht zurücksetzen“.
+
+## Baumodus visuell (UI-Scheibe 2)
+- **Baukarten:** Das Fenster Siedlung (B) zeigt jeden Bau als Karte mit Bild, Kosten als Piktogramm + Zahl (rot, wenn es fehlt) und Bauzeit. Klick öffnet den Bauplan, Doppelklick setzt den Bau sofort zum Platzieren.
+- **Bauplan:** großes Bild, Beschreibung, Grundriss von oben (Felder, Tür, ein Punkt = ein Mensch als Maßstab), Kosten mit Vorrat, Bauzeit, Fläche, Schlafplätze.
+- **Geist in der Welt:** Beim Platzieren liegt über jedem Feld ein Raster: grün frei, rot belegt (feste Kachel oder anderer Bau). Ein gestrichelter Kreis um den Helden zeigt die Reichweite (400); außerhalb wird er rot, eine Linie zeigt die Richtung. Ein Schild nennt den Grund („Kein Platz“, „Zu weit weg“) oder „Linksklick: bauen“. Die Regeln sind unverändert.
+- **Arbeitsprioritäten als Karten:** mit der Maus ziehen, um die Reihenfolge zu ändern; ▲ schiebt eine Stufe höher. Die oberste Karte („jetzt“) arbeiten alle Siedler ab.
+
+## Stadt ohne Schutz — Übernahme (Scheibe 2b)
+- Bleibt eine gesetzlose Stadt eine weitere Frist ohne Ersatz, nimmt sie sich jemand. Es greift die erste passende Regel:
+  1. Steht ein freies Heer der Toten höchstens zwei Wege entfernt (nur Orte im Kriegsgraphen), marschiert es auf die Stadt.
+  2. Lagert eine Bande höchstens 80 Felder entfernt, herrscht sie.
+  3. Valen-Dörfer am Westrand (bis 160 Felder vom nächsten Tributdorf) nimmt die Kette als Tributdorf (Valen −5).
+  4. Sonst bildet sich eine neue Bande.
+- **Bandenherrschaft:** Am Tor wird Schutzgeld verlangt, Kaufen kostet das Anderthalbfache, die Läden haben wieder offen, und der Wohlstand sinkt um 3 je Tag. Die Bande zerfällt nicht von selbst.
+- **Befreien:** Erschlägst du den Anführer, ist die Stadt frei. Der Herr schickt sofort Ersatz und dankt dir (+10), außer du hast selbst die Wache erschlagen. Ohne dich schwächen Streifen des Herrn die Bande alle 5 Tage um 35 %, bis sie abzieht. Kettendörfer werden frei, wenn die Kette fällt.
+- Varonheim und Vharnholm werden nie übernommen.
+- Debug: „Übernahme erzwingen (Bande/Tote/Kette)“, „Streife jetzt“.
+
+## Blutkult-Sense (mythisch)
+- Am Ende der Blutkult-Questreihe liegt Aldhelms Sense in seiner Krypta. Du bekommst sie, wenn Aldhelm tot ist oder du selbst Blutfürst wirst. Es gibt sie nur einmal.
+- Sie ist eine zweihändige Stangenwaffe mit weitem Bogen und Blutung. Ihr **Lebensraub** heilt dich um 12 % des Schadens, für jeden Getroffenen im Bogen.
+- Debug: „Blutkult-Sense geben“.
+
+## Karawanenräuber verfolgen (Emergente Quest E2)
+- Stirbt die große Karawane, waren es bestimmte Räuber: die Bande dessen, der sie erschlug, sonst die nächste Bande im Umkreis von 60 Feldern, sonst bildet sich eine neue Bande abseits der Straße. Die halbe Ladung geht an die Bande, Räuber in der Nähe ziehen mit der Beute ins Lager.
+- Der Aushang „Überlebende der Karawane“ nennt die Bande. Schickst du den Kutscher heim, zeigt er dir das Lager auf der Karte (Auftrag „Die Ladung zurückholen“).
+- Fällt der Anführer, steht am Lagerfeuer die geraubte Ladung (höchstens 20 Stück). Du gibst sie ans Kontor zurück (4 Gold Finderlohn je Stück, Händler +4) oder behältst sie.
+- Überfällst du die Karawane selbst, gibt es keinen Auftrag; die Händler wissen es (Händler −10).
+- Debug: „E2: Karawane stirbt jetzt (Täterbande)“, „E2: Kutscher gerettet (Folgeauftrag)“.
+
+## Der Deserteur und sein Bruder (Emergente Quest E1)
+- Ist Platz für eine weitere Bande, werden Deserteure zu einer Bande mit Namen (oft „Die Zerrissenen Röcke“). Ihr Anführer hat ein Geschwister bei der Valen-Wache der nächsten Stadt, nie in Varonheim. Das Log sagt: „In … fragt eine Wache nach dir.“
+- Die Wache bittet: „Bring ihn heim. Nicht tot.“ Nimmst du an, zeigt die Karte das Lager.
+- **Am Lager** sprichst du mit dem Unterhändler. Heimholen klappt mit Valen-Ruf ab 0, mit Ruf der Klinge ab 40 oder mit 60 Gold Sold, den die Krone schuldet. Dann löst sich die Bande auf, und die Wache gibt dir 40 Gold. Fahnenflucht bleibt ungestraft (Valen −2). Ist am Tor ein Posten frei, füllt er ihn. Kopfgeld gibt es fürs Heimholen nicht.
+- **Erschlägst du ihn**, vergisst die Wache es nicht (Beziehung −40). Manchmal kommt ein Rächer.
+- **Lässt du die Sache liegen**, zerstreut sich die Bande irgendwann von selbst.
+- Debug: „E1: Deserteure mit Bruder“, „E1: Anführer heimholen (sofort)“.
+
+## Vermisstenwelle (Emergente Quest E4)
+- Ab Tag 15 kann in einem Dorf eine Vermisstenwelle beginnen (3 % am Tag, danach 20 Tage Ruhe). Das ist kein Kult. Täter sind Ghule aus dem Totenland, Goblins aus dem Gebirge oder Menschenfänger. Sie hausen in einer echten Ruine, Wildnis oder einem Dungeon 30–90 Felder vom Dorf. Varonheim (dort ist es der Blutkult) und die Kette sind ausgenommen.
+- Jede zweite Nacht um 2 Uhr verschwindet jemand, höchstens vier Menschen. An der Haustür bleibt eine Spur, je nach Täter Schleifspur, kleine rußige Fußabdrücke oder Seilfasern. Am Platz hängt die Vermisstenliste.
+- Am Brett hängt „Die Verschwundenen von …“. Drei Spuren führen zum Unterschlupf, dort warten die Täter mit einem Anführer.
+- **Frist:** Wer höchstens 5 Tage fort ist, sitzt gefesselt im Unterschlupf. „Geh heim. Du bist frei.“ bringt dir 30 Gold und dem Dorf Wohlstand +3. Wer länger fort ist, kommt nicht wieder: Grab, verkauft oder in den Stollen.
+- **Nichts tun:** Nach 4 Opfern oder 12 Tagen endet die Welle, und das Dorf verliert Wohlstand (−8).
+- Debug: „E4: Vermisstenwelle im nächsten Dorf“, „E4: … 3 Tage vorspulen“.
+
+## Sensen sehen aus wie Sensen
+- Alle sieben Sensen haben ein eigenes, gebogenes Blatt. Die Blutkult-Sense hat ein lebendes Klauenblatt mit Adern, Knochendornen und einem Maul am Ansatz; die Adern pulsieren. Heilt ihr Lebensraub den Träger, schimmert er kurz rot (bei jeder Waffe mit Lebensraub).
+
+## Die Witwe heuert einen Mörder (Emergente Quest E3)
+- Ermordest du einen Bewohner, der verheiratet war oder mit jemandem lebte, kann die Hinterbliebene Groll fassen. Bei Ehepartnern liegt die Chance bei 70 %, bei Hausgenossen bei 40 %; ohne Zeugen halbiert. Mit Zeugen meldet das Log: „… hat gesehen, wer … erschlagen hat.“ Höchstens zwei offene Fälle gibt es zugleich.
+- Nach 3–6 Tagen Trauer kauft sie einen Mörder; ein Gerücht warnt dich. Unterwegs triffst du den **Gedungenen** („Nichts Persönliches.“). Du kannst kämpfen, ihn mit 100 Gold überbieten (dann kommt später ein anderer) oder sagen „Ich komme selbst.“
+- Fällt er, trägt er einen Zettel mit ihrem Namen bei sich. Daraus wird der Auftrag „Die Auftraggeberin“, und die Karte zeigt sie.
+- **Bei ihr:**
+  - Wergeld zahlen (50–150 Gold, steigt mit deiner Stufe).
+  - Mit ihr reden, ab Wahrnehmung 12; das klappt zu 40 %.
+  - Sie der Wache melden: Ihr Haus steht danach leer, deine Gefährten murren.
+  - Sie töten: ein zweiter Mord mit allen Folgen.
+- **Ohne dein Zutun:** Nach zwei gefallenen Mördern hat sie nichts mehr zum Bezahlen.
+- Debug: „E3: Groll — nächster Bewohner trauert“, „E3: Gedungener Mörder jetzt“.
+
+## Ratgeber (aktive Tipps)
+- Tipps erscheinen passend zur Lage, jeder genau einmal und höchstens einer alle 90 Sekunden. Sie stehen im Protokoll mit „Tipp:“, dazu kurz „TIPP“ als Einblendung.
+- **Themen:** Kodex (H), freier Talentpunkt (T), freie Attributpunkte (C), Anschlagbrett und Kompass, erster Kampf (Q ausweichen, Wuchtschlag, Trefferzonen), schwere Verletzung (Verband, Trank), ausgefallenes Glied, Weltkarte (M, N), Gefährten in Schenken (G), Nacht, Werkbank in der Nähe, Kopfgeld, Siedlung gründen (B).
+- Alte Spielstände ab Tag 5 überspringen die Grundtipps.
+- Debug: „Ratgeber an/aus“, „Ratgeber: alle Tipps zurücksetzen“.
+
+## Rang bremst den Blutkult
+- Bist du Ritter der Garde (Valen-Rang 3 oder höher) oder stehst du hoch im Orden (Rang 3 oder höher), wagt sich der Kult seltener heraus: Entführungen gibt es nur jede dritte statt jede zweite Nacht. Außerdem braucht die Rote Krönung 10 Tage länger. Das Log sagt es dir einmal.
+- Debug: „Rang bremst Kult: Valen-Rang 3 setzen“.
+
+## Die Siedlung geht ans Haus
+- Stirbt dein Held, übernimmt der Erbe die Siedlung. Die Siedler trauern (Moral −10), das Log meldet den Übergang.
+
+## Gold-Sog: Baumaterial zukaufen
+- Fehlt dir Material für einen Bau, kaufen Fuhrleute es für Gold zu: Holz 4, Stein 5, Eisen 12 Gold je Einheit, Lieferung eingerechnet. Der Bauplan zeigt den Preis an. Wer reich ist, baut schneller; wer arm ist, sammelt.
+- Debug: „Gold-Sog: Material auf 0 (Zukauf testen)“.
+
+## Siedlungsmoral mit Ursache und Wirkung (Siedlung M1)
+- Täglich wirken: Brunnen +2, Siedler auf „Ruhe“ +1 je Kopf (höchstens +4), du selbst in der Nähe +1, Hunger −6, Überbelegung −3. Ohne Anlass driftet die Moral um 1 Richtung 50. Jeder getötete Siedler kostet −4.
+- **Stufen:**
+  - Zuversichtlich (ab 70): Ertrag ×1,25, mehr Zuzug.
+  - Ruhig (40–69): normal.
+  - Mürrisch (20–39): Ertrag ×0,75, weniger Zuzug.
+  - Verzweifelt (unter 20): Ertrag ×0,5, kein Zuzug, täglich geht mit 30 % ein Siedler.
+- Das Siedlungsfenster zeigt einen Balken, die Stufe und die letzten drei Ursachen. Ein Stufenwechsel steht im Log.
+- Debug: „Siedlung: Moral −20 / +20“.
+
+## Heilerhütte (Siedlung M3)
+- Neuer Bau „Heilerhütte“ (Versorgung; 18 Holz, 6 Stein).
+- **Pflegen:** Das dauert 2 Stunden und kostet 1 Kraut je Person mit Befund. Du und deine Gefährten in der Nähe erhalten +35 % LP, Brüche werden geschient (heilen doppelt so schnell), Entzündung und Blutung verschwinden. Wer am Boden liegt, muss erst aufgerichtet werden. Ohne Kräuter ist es nur ein Dach.
+- **Pfleger:** Steht „Verwundete versorgen“ ganz oben in den Prioritäten, wird ein Siedler Heiler oder Heilerin. Er bietet dieselben Dienste wie Heiler in der Stadt und heilt verletzte Siedler über Nacht (Moral +1).
+- Debug: „Siedlung: Heilerhütte hier (fertig) + 5 Kräuter“, „Siedlung: alle Siedler verletzen“.
+
+## Überfälle auf die Siedlung haben eine Ursache (Siedlung M2)
+- **Reichtum:** 4 je fertigem Bau, 3 je Siedler, 2 je Nutztier und 1 je 25 Vorrat. Er lockt an, wer in der Nähe ist.
+- **Quellen in der Nähe:**
+  - eine Bande bis 120 Felder, die du nicht bezahlt hast; sie schickt ihre eigenen Männer, Schutzgeld schützt also auch das Lager;
+  - Orte der Toten bis 150 Felder;
+  - die Kette, wenn ein Tributdorf bis 160 Felder entfernt ist und du bei ihr schlecht stehst; sie verschleppt Siedler, statt sie zu töten;
+  - Goblins vom Grubenhort bis 140 Felder;
+  - sonst Wölfe.
+- **Gefahr je Nacht:** 6 % plus Reichtum/300, höchstens 45 %; mit nur Wölfen in der Nähe 6 %. Größe des Überfalls: 2 plus Reichtum/15 Angreifer, höchstens 9.
+- **Ansage:** Der Wachturm meldet, wer kommt. Benutzt du ihn, nennt er die größte Gefahr und die Überfallgefahr je Nacht. Das Siedlungsfenster zeigt einen Block „Bedrohung“.
+- **Ausgang:**
+  - Bleiben Angreifer 10 Minuten unbehelligt, plündern sie: Vorrat −30 %, ein Bau beschädigt, Moral −10. Eine Bande wächst davon.
+  - Abgewehrt ohne Tote: Moral +6.
+  - Bist du nicht auf der Karte, wird abgewogen: Siedler, Palisaden, Tor, Wachturm und Dodon gegen die Angreifer.
+- Debug: „Siedlung: Reichtum und Quellen anzeigen“, „Überfall jetzt“, „Überfall abstrakt auswürfeln“.

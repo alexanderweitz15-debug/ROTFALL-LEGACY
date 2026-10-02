@@ -1,6 +1,6 @@
 # T11 + A14 — „Brot, Schlaf und Sturm“: Überleben, Schwierigkeit, Wetter im Menschenland
 
-**Status:** APPROVED im Grundsatz (DECISIONS 01.10.: A14 komplett mit `DIFF.survival`, Angsthase nur Hinweise) → hier umsetzungsreif.
+**Status:** APPROVED (Antworten 01.10.2026 in DECISIONS.md)
 **Autor:** Designer (Opus) · **Stand:** 01.10.2026 · Kennzeichnung: **FAKT** (Datei:Zeile), **VORSCHLAG**, **ANNAHME**.
 Umfasst: A14 (Hunger, Müdigkeit, Rast), §5g.6 (Sehr schwer = mehr Überfälle, Angsthase erwacht beim Heiler), §5g.21 (eigene Wetterlagen der mittleren Länder). Aufgabentext: `docs/audit/TASKS.md` T11.
 

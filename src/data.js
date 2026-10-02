@@ -330,6 +330,8 @@ export const ITEMS = {
   strick:     { name:'Strick', slot:'material', stack:10, rarity:'common', value:6, lore:'Hält einen Gefangenen. Meistens.' },   /* T08: zum Fesseln Ergebener und Bewusstloser */
   rotes_siegel: { name:'Rotes Siegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Ein Siegelring aus dunklem Gold, rotes Wachs in den Rillen. Das Wappen der Kanzlei von Varonheim. Wer damit siegelt, spricht für den Kanzler.' },   /* §5g.2 Beweis */
   blutmaske:  { name:'Blutmaske', slot:'material', stack:9, rarity:'uncommon', value:15, lore:'Wachs, rot gefärbt, mit Augenlöchern. Sie riecht nach Kerzen und Eisen.' },   /* §5g.2 Spur */
+  stiefelscheide: { name:'Stiefelscheide', slot:'material', stack:1, rarity:'uncommon', value:160, lore:'Ein Lederfach im Stiefelschaft, gerade lang genug für einen Dolch. Wer durchsucht wird, hat bessere Karten (+30 % beim Verstecken).' },   /* Umbau S4: Schmuggel */
+  koederpfeife: { name:'Köderpfeife', slot:'consumable', use:'lure', stack:1, rarity:'uncommon', value:45, lore:'Ein schriller Ruf, den nur Feinde hören wollen. Wer dich jagt, sieht sich plötzlich nach einem anderen um.' },   /* Scout R4 */
   blutphiole: { name:'Blutphiole', slot:'consumable', use:'blood', stack:5, rarity:'uncommon', value:40, lore:'Dunkel, dick, noch warm. Für die einen ein Beweis, für die anderen ein Mahl.' },   /* §5g.2 */
   potion:     { name:'Trank der Genesung', slot:'consumable', use:'heal', heal:40, stack:5, rarity:'uncommon', value:55 },
   // S13: Werkzeuge der Arbeiter (nur Bild und Bewegung bei der Arbeit; nicht im Handel, keine Beute)
@@ -360,6 +362,7 @@ export const ITEMS = {
   arms:      { name:'Waffenkiste', slot:'material', good:true, stack:20, rarity:'uncommon', value:45 },
   magitech:  { name:'Magitech-Teile', slot:'material', good:true, stack:20, rarity:'uncommon', value:60 },
 
+  blutsense:    { name:'Blutkult-Sense', slot:'weapon', wtype:'polearm', dmg:28, reach:62, arc:2.6, speed:960, stam:17, sweep:true, bleed:0.2, leech:0.12, rarity:'mythic', unique:true, value:1500, skill:'polearms', twohand:true, sdesc:'Lebensraub: 12 % des Schadens heilen dich (jeder Getroffene im Bogen zählt).', lore:'Aldhelms Erntewerkzeug aus der Krypta unter Varonheim. Die Klinge trinkt, was sie schneidet — und gibt dem Träger davon ab.' },   /* Entwickler 02.10.: mythische Belohnung am Ende der Blutkult-Questreihe */
   nachtfrost:   { name:'Nachtfrost', slot:'weapon', wtype:'great', dmg:27, reach:58, arc:2.4, speed:1000, stam:18, rarity:'mythic', unique:true, value:900, skill:'twohanded', twohand:true, frost:true,
                   lore:'Hrodvars Klinge. Wo sie trifft, gefriert der Atem: Getroffene werden langsam. Es gibt nur eine.' },
   gorak_cleaver:{ name:'Goraks Hackmesser', slot:'weapon', wtype:'axe', dmg:18, reach:44, arc:1.5, speed:760, stam:13, ap:0.3,
@@ -1078,6 +1081,7 @@ export const BUILDINGS = {
   smithy:    { name:'Schmiede', cat:'Produktion', cost:{wood:20,stone:15,iron:10}, time:30, w:3, h:2, desc:'Waffen aus Eisen, Reparatur ohne Meister.', pop:0 },
   farm:      { name:'Ackerfläche', cat:'Versorgung', cost:{wood:10}, time:16, w:3, h:3, desc:'Bringt jede Stunde etwas Nahrung (12 am Tag). Siedler beim Nahrung sammeln bringen doppelt so viel.', pop:0 },
   pasture:   { name:'Weide mit Stall', cat:'Versorgung', cost:{wood:16,stone:4}, time:18, w:3, h:3, desc:'Platz für sechs Kühe oder Schafe (Tierhändler). Täglich Fleisch, Wolle, Felle — Wölfe haben auch Hunger.', pop:0 },
+  healer:    { name:'Heilerhütte', cat:'Versorgung', cost:{wood:18,stone:6}, time:16, w:2, h:2, desc:'Pflege mit Kräutern: schient Brüche, brennt Wunden aus, heilt in zwei Stunden ein Drittel. Mit Priorität „Verwundete versorgen“ wird ein Siedler Heiler und pflegt die Kranken.', pop:0 },   /* Siedlung M3 */
   well:      { name:'Brunnen', cat:'Versorgung', cost:{stone:18}, time:18, w:1, h:1, desc:'Moral der Siedlung steigt.', pop:0 },
   palisade:  { name:'Palisade', cat:'Verteidigung', cost:{wood:6}, time:5, w:1, h:1, desc:'Ein Abschnitt Wehrzaun. Blockiert Bewegung.', pop:0 },
   gate:      { name:'Tor', cat:'Verteidigung', cost:{wood:12,iron:4}, time:12, w:2, h:1, desc:'Durchlass in der Palisade.', pop:0 },

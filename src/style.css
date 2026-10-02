@@ -81,7 +81,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .cr-appearance label{font-size:10px;color:var(--dim);text-transform:uppercase;grid-column:1/-1}
 
 /* ================= GAME SHELL ================= */
-#game{display:grid;grid-template-rows:42px 1fr 130px;background:var(--ink)}   /* UI-Umbau: schlanke Kopfleiste, höheres Protokoll */
+#game{display:grid;grid-template-rows:64px 1fr 130px;background:var(--ink)}   /* UI-Umbau: Kopfleiste mit großen Symbolen und Beschriftung (Entwickler), höheres Protokoll */
 #topbar{display:flex;align-items:center;gap:14px;padding:0 12px;
   background:linear-gradient(180deg,#221c15,#14110d);border-bottom:1px solid var(--iron)}
 .brand{font-family:"Cinzel",serif;font-size:16px;letter-spacing:.2em;color:#d9cdb2;display:flex;align-items:center;gap:8px}
@@ -97,10 +97,11 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #nav button.active{color:var(--gold);border-bottom-color:var(--rust)}
 #nav button i{font-style:normal;opacity:.55;font-size:9px;margin-left:5px}
 /* UI-Umbau Scheibe 1: Reiter als Piktogramm + Taste, Goldpunkt bei freien Punkten, Unterreiter im Fenster */
-#nav button{position:relative;display:flex;align-items:center;gap:2px;padding:4px 9px;text-transform:none}
-#nav .navico{width:24px;height:24px;image-rendering:pixelated;opacity:.82}
+#nav button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 10px 2px;text-transform:none;min-width:62px}
+#nav .navico{width:36px;height:36px;image-rendering:pixelated;opacity:.85}
 #nav button:hover .navico,#nav button.active .navico{opacity:1;filter:drop-shadow(0 0 3px rgba(201,169,78,.45))}
-#nav .navlbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+#nav .navlbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;line-height:1.1}
+#nav button i{position:absolute;top:2px;left:4px;margin:0;font-size:9px}
 #nav .dot{display:none;position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 4px var(--gold)}
 #nav button.badge .dot{display:block}
 #modal-tabs{display:flex;gap:2px;margin-left:18px;flex:1}
@@ -281,6 +282,47 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .build-item:hover{border-color:var(--gold)}
 .build-item.cant{opacity:.45}
 .build-item small{float:right;color:var(--dim);font-size:10px}
+/* UI-Scheibe 2 (Artist R8): Baukarten, Bauplan mit Grundriss, ziehbare Prioritäten */
+.build-layout{grid-template-columns:minmax(330px,1.15fr) 1fr 230px}
+.bcards-col{overflow:auto;padding-right:4px}
+.bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:5px}
+.bcard{display:flex;flex-direction:column;align-items:center;gap:3px;background:#161209;border:1px solid #2f271d;padding:5px 4px 4px;font-size:11px;text-align:center;position:relative}
+.bcard:hover{border-color:#7a6232;background:#1d1810}
+.bcard.sel{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(189,148,51,.35)}
+.bcard.cant .bimg{opacity:.5;filter:grayscale(.6)}
+.bcard .bimg{width:72px;height:54px;image-rendering:pixelated;background:#0f0d0a;border:1px solid #241e17}
+.bimg-none{display:block}
+.bcard .bname{font-family:"Cinzel",serif;letter-spacing:.04em;color:#e7dcc2;line-height:1.15;min-height:2.3em;display:flex;align-items:center}
+.bfoot{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 6px;font-size:10px;color:var(--dim)}
+.bcost,.btime{display:inline-flex;align-items:center;gap:1px;white-space:nowrap}
+.bcost .ico,.btime .ico,.bres{width:13px;height:13px;image-rendering:pixelated;vertical-align:-2px}
+.bres{margin-right:5px}
+.bcost{color:#d8cdb6}
+.bcost.miss{color:#d0533d}
+.bcost.miss .ico{filter:sepia(1) saturate(4) hue-rotate(-30deg)}
+.bhint{margin-top:8px;font-style:italic}
+.bdetail{margin-top:12px;border:1px solid #2b2419;background:#120f0b;padding:10px}
+.bd-head{display:flex;gap:12px;align-items:flex-start}
+.bd-head h3{margin:0 0 4px}
+.bimg-big{width:120px;height:90px;image-rendering:pixelated;background:#0f0d0a;border:1px solid #2f271d;flex:none}
+.bd-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;align-items:flex-start}
+.bd-plan{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none}
+.bd-plan canvas{image-rendering:pixelated;border:1px solid #2f271d}
+.bd-plan small{font-size:10px;color:var(--dim)}
+.bd-facts{flex:1;min-width:0}
+.bd-facts .bcost{margin-left:6px}
+.bdetail .ctx-actions button.cant{opacity:.5}
+.bd-hint{font-size:11px;color:#8f846d;line-height:1.5;margin-top:4px}
+.prio-list{display:flex;flex-direction:column;gap:3px}
+.prio-card{display:flex;align-items:center;gap:8px;background:#161209;border:1px solid #2f271d;padding:4px 8px;font-size:12px;cursor:grab;user-select:none}
+.prio-card.top{border-color:#7a6232;background:#1d1810}
+.prio-card.drag{opacity:.4}
+.prio-card.over{border-color:var(--gold);box-shadow:0 -2px 0 var(--gold)}
+.prio-card b{font-weight:400;color:var(--gold);min-width:12px}
+.prio-card .pgrip{color:#5a4d38}
+.prio-card .pname{flex:1}
+.prio-card small{color:var(--dim);font-size:10px}
+.prio-card .txtbtn{padding:1px 6px;font-size:10px}
 .settle-map{border:1px solid #2b2419;background:#0c0a08;position:relative}
 .ledger{font-size:12px;line-height:1.8;color:#a79b83}
 

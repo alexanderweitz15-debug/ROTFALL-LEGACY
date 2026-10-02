@@ -1,40 +1,39 @@
-# STATE — ROTFALL (01.10.2026)
+# STATE — ROTFALL (01.10.2026, abends)
 
 Zuerst lesen. Team und Projektfakten: `TEAM.md`. Kurz halten (unter 100 Zeilen).
 
 ## Stand
-- Version 23 (`?v=23`). Selbsttest 349/349 bei Commit `06c16fe`. Git: `--git-dir=../_rf_backup.git --work-tree=.`.
-- Der öffentliche `main` bekommt nur Commits mit [VERIFIED]. Der letzte Push auf `main` liegt vor dem Audit, denn Control hat den Push blockiert, solange ungeprüfte Teile im Baum stecken.
+- Version 23 (`?v=23`). Selbsttest 357/357 bei Commit `7d3a384`. Git: `--git-dir=../_rf_backup.git --work-tree=.`.
+- Der öffentliche `main` bekommt nur Commits mit [VERIFIED]. Letzter Push auf `main` liegt vor dem Audit.
 
 ## Fertig (VERIFIED)
-- Audit T01, T02, T03, T04, T06; Blutkult Scheibe 1.
-- Bugfixes RB-001…006, RB-008, RB-009, RB-013 (Sonne), RB-014, RB-015, RB-017, RB-018, RB-022, RB-024, RB-025.
-- (Verifier, 01.10.) T17 Regiebuch Scheiben 1+2, RB-038, RB-039, RB-027, RB-029, RB-030, RB-032; T05 (JOIN_FOES bewusst unverändert).
+- Audit T01–T04, T06, T08; Blutkult S1; T17 Regiebuch S1+S2; Control-2-Fixes.
+- RB-001…006, 008, 009, 013–015, 017–020, 022, 024–027, 029, 030, 032, 038, 039, 041, 043–056.
+- (Verifier 02.10.) Varonheim-Umbau S2 (Burg begehbar), S3 (Burgfrieden), S4 (Schmuggel, Kern), S5 (Start, Jäger live, Rest per Code), Stadt ohne Schutz S2a.
+- Feinde unter sich (FOE_FAC), Königstod, Stadt ohne Schutz S1, Kampf-Ideen (Scout R4), Lebendige Hauptstadt (Scout R5), Varonheim S1 (Kronfels).
 
-## Gebaut, ungeprüft (IMPLEMENTED/TESTING)
-- T05 Kleinkram.
-- Blutkult Scheiben 2–5.
-- T08 Gefangene und Ruf der Klinge.
-- T09 Läden am Stadtlager.
-- T10 Heldentod und Ahnenfeind, mit den Hunter-6-Fixes RB-034…037.
-- Varonheim-Belagerung Scheiben 1 und 2: Kriegsknoten, Heerzug, Belagerung, Exil, Rückeroberung, RB-023. Der Verifier (Hunter 7) prüft gerade.
-- Control-2-Fixes RB-027, RB-029, RB-030, RB-032.
-- T17 Regiebuch Scheiben 1 und 2:
-  - Zeitachse (beats), Namenskarte, Sprechblasen
-  - Boss-Auftritte mit stehender Welt
-  - Szenen zu Varonheim und zum Goblinsturm, Ankunftskarten, Musterung
-  - neue Gesten und Klänge
-  - Log bleibt unten
+## Gebaut, ungeprüft
+- Stadt ohne Schutz S2b (Übernahme), Blutkult-Sense, UI-Scheibe 2 (Baumodus), Artist R6/R7 (nur teilweise gesehen).
+- Artist R5 (Viertel-Architektur, neue Props: market_stall, fountain_grand, street_lamp, banner_pole, barrel_stack, cargo_pile, grave_cross, tomb — noch nicht platziert), Artist R6 (Figurenvielfalt).
+- Fixes: Karawanen-Wegpunkt geklemmt, WEAR_BIAS für Burg, BTYPES der Burgbauten.
+- T05, Blutkult S2–5, T09, T10, Belagerung S1/S2 (Teile verifiziert).
 
 ## In Arbeit
-- Verifier (Sonnet): Belagerung S1 und S2 samt Fixes.
-- Artist/Designer (lief noch auf Fable, im alten System gestartet): UI-Umbau mit 3 Varianten in `ROTFALL_AGENT_STATE/designs/` sowie ein Ausbau-Check alter Features (Bausystem u. a.). Die Ergebnisse kommen in `PROPOSALS/`.
-- Hauptsitzung: T15 Messing (Stigma und Schwächen der Bionik) wird vorbereitet.
+- Verifier: RB-059 (Bedrohung fällt zu früh, Tag 81 statt ~129) mit voller Tageskette neu messen; RB-060 (flaky Eisenfeste-Probe).
+- Artist R7: Umgebungsanimationen (render.js).
+- Scout R9: Mittelspiel-Ziele.
+- Hauptsitzung: nächste Bauscheiben (s. u.).
 
-## Blockiert / offen beim Entwickler
-- Wahl der UI-Variante (kommt mit dem Fable-Bericht).
-- RB-033 (Schaden über Zeit kommt nur zu etwa 60 % an): Systementscheid offen.
+## Nächste Bauscheiben (vom Entwickler freigegeben)
+1. Stadt ohne Wachen S2 (PROPOSALS/stadt_ohne_wachen_s2.md; Fristen je Schritt).
+2. Emergente Quests E2 → E1 → E4 → E3 (PROPOSALS/emergente_quests.md).
+3. Siedlung M1–M4 (siedlung_ausbau.md; Siedlung nie übernommen).
+4. Backlog: T15 Messing + Feldreparatur, T11/A14 Hunger, T12 Straßen, T23, NPC-Ziele, Luftbrücke/Verwundete, Belagerung S3, Regiebuch S3/4, UI-Scheiben 2–5, T20-Rest, RB-028/010/012/033/053.
+
+## Offen beim Entwickler
+- Geheime Orte (PROPOSALS/geheime_orte.md): 3 Fragen.
+- Scout R8 (erste Spielstunde): Auswahl offen (Kodex- und Talenthinweis schon in S5 gebaut).
+- RB-033 (Schaden über Zeit ~60 %): Systementscheid.
 
 ## Archiv
-- `ROTFALL_AGENT_STATE/` (12-Rollen-System) mit ausführlichen Hunter- und Control-Berichten.
-- Audit: `docs/audit/` (TASKS T01–T40).
+- `ROTFALL_AGENT_STATE/` (altes 12-Rollen-System). Audit: `docs/audit/`.

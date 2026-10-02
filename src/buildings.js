@@ -25,7 +25,7 @@ export const TOWN_STYLE = {
   // Hochreich Aurelion (S12): heller Stein, Schiefer und Ziegel — sichtbar reicher als der Norden
   aurelheim: { roof: 'slate', wall: 'palestone', alt: 'tile' }, kupferhafen: { roof: 'tile', wall: 'plaster', alt: 'slate' }, gelenkhall: { roof: 'tile', wall: 'stone', alt: 'slate' },
   tickmar: { roof: 'slate', wall: 'blackstone', alt: 'tile' }, sanktserin: { roof: 'slate', wall: 'palestone' }, aurelheim_land: { roof: 'slate', wall: 'palestone', alt: 'tile' },           // S12 Karak-Atar: Lehmputz, Ziegel
-  kettenfeste: { roof: 'slate', wall: 'blackstone' }, varonheim: { roof: 'slate', wall: 'blackstone', alt: 'shingle' },   /* Nutzer §5g.1: Varons Hauptstadt */ // Eiserne Kette (Session 11): Schiefer, schwarzer Stein
+  kettenfeste: { roof: 'slate', wall: 'blackstone' }, varonheim: { roof: 'slate', wall: 'blackstone', alt: 'shingle' }, varonburg: { roof: 'slate', wall: 'blackstone' },   /* Nutzer §5g.1: Varons Hauptstadt */ // Eiserne Kette (Session 11): Schiefer, schwarzer Stein
   // Dörfer (Session 12): Bauweise nach Herrschaft — Valen Stroh/Fachwerk, Orden Schiefer/heller Stein, Händler Holz, Tributdörfer ärmlich
   haselbrueck: { roof: 'thatch', wall: 'timber', alt: 'shingle' }, muehlbach: { roof: 'thatch', wall: 'timber', alt: 'tile' }, weidenau: { roof: 'thatch', wall: 'wood', alt: 'shingle' },
   rastfurt: { roof: 'shingle', wall: 'wood', alt: 'tile' }, lichtenrain: { roof: 'slate', wall: 'palestone', alt: 'tile' },
@@ -45,6 +45,17 @@ const varOf = (tab, kind, b, salt) => { const R = drawnOn(), a = (R && tab === R
   return tab === WALL_VAR && DIM[kind] ? mix(c, '#2a221a', DIM[kind] * (R ? 0.55 : 1)) : c; };
 const BEAM = '#3e2e20', DOORW = '#4a3322', IRON = '#35332f';
 const SHUTTER = ['#4a5a3a', '#5a3a2a', '#3a4a5a', '#5a5030'];
+/* Artist Runde 5 (Varonheim): Viertel der Hauptstadt auf dem Kronfels. Spiegel von CAPITAL und district() in world.js — fester Wert
+   statt Import, denn world.js lädt buildings.js (ein Rückimport wäre ein Ladezyklus). Nur Optik; Würfel aus der Lage, nie rnd(). */
+const VQ = { x: 558, y: 107, hh: 43 };
+export function quarterOf(b) {
+  if (!b || b.map !== 'world') return null;
+  if (b.town === 'varonburg') return 'castle';                     // Burgbauten auf dem Fels (Thronsaal, Flügel, Verlies …)
+  if (b.town !== 'varonheim') return null;
+  const gy = VQ.y - 11, west = b.x < VQ.x;
+  return b.y < gy ? (west ? 'temple' : 'noble') : b.y < VQ.y + 7 ? (west ? 'merchant' : 'guild') : (west ? 'slum' : 'craft');
+}
+const isNoble = b => quarterOf(b) === 'noble' && b.type !== 'cottage';   /* Adelshäuser: zwei Geschosse, höher, Schiefer, zwei Schornsteine */
 
 // Funktion → Merkmale. label: was man beim Anschauen liest.
 export const BTYPES = {
@@ -71,6 +82,8 @@ export const BTYPES = {
   academy:     { label: 'Akademie von Aurelion',       mono: 1, columns: 1, towers: 1, emblem: 'book' },
   observatory: { label: 'Aurelionisches Observatorium', mono: 1, dome: 1, emblem: 'star' },
   library:     { label: 'Große Bibliothek',            mono: 1, arches: 1, emblem: 'book' },
+  thronsaal:    { label: 'Thronsaal der Varonsburg' }, adelsfluegel: { label: 'Adelsflügel' }, kanzlei: { label: 'Kanzlei' },   /* Varonheim-Umbau S2: Burg in der Welt */
+  verlies:      { label: 'Verlies' }, kronschmiede: { label: 'Kronschmiede', chimney: 1, sign: 'hammer', forge: 1 },
   court:       { label: 'Hoher Gerichtshof',           mono: 1, columns: 1, emblem: 'scales' },
   hospital:    { label: 'Hospital der Kaiserin',       mono: 1, arches: 1, emblem: 'cross' },
   bathhouse:   { label: 'Badehaus',                    mono: 1, dome: 1, arches: 1, emblem: 'wave' },
@@ -81,6 +94,7 @@ export const BTYPES = {
 
 // 5×4-Symbole für Schilder ('#' = Farbe, '+' = Licht)
 const ICON = {
+  key:     ['##...', '#####', '##.#.', '.....'],   /* Artist Runde 5: Schlossergilde */
   tankard: ['.###.', '+##.#', '.##.#', '.###.'],
   hammer:  ['####.', '####.', '..#..', '..#..'],
   herb:    ['.#.#.', '##.##', '.###.', '..#..'],
@@ -92,7 +106,7 @@ const ICON = {
 // Zustand je Haus (dystopische Welt): 0 bewohnt/gepflegt, 1 heruntergekommen, 2 verlassen/zerstört (kein Licht, keine
 // Bewohner). Je Ort unterschiedlich stark: die Grenzorte verfallen, die Ordensfeste hält ihre Häuser instand.
 // Betriebe (Taverne, Schmiede …) werden nie ganz aufgegeben — sonst fehlt der Ort, der sie braucht.
-const WEAR_BIAS = { aurelheim: 0.02, kupferhafen: 0.06, gelenkhall: 0.08, tickmar: 0.1, sanktserin: 0.04, aurelheim_land: 0.05, grauwasser: 0.6, hohlstein: 0.6, eisenried: 0.6, eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
+const WEAR_BIAS = { varonburg: 0, varonheim: 0.1, aurelheim: 0.02, kupferhafen: 0.06, gelenkhall: 0.08, tickmar: 0.1, sanktserin: 0.04, aurelheim_land: 0.05, grauwasser: 0.6, hohlstein: 0.6, eisenried: 0.6, eren: 0.38, northcity: 0.22, saltport: 0.32, kreuzweg: 0.48, ashford: 0.62, sonnwacht: 0.12, vharnholm: 0.5 };
 const KEEP = new Set(['tavern', 'smithy', 'healer', 'hall', 'kontor', 'barracks', 'chapel', 'merc', 'bakery', 'manor', 'store', 'palace', 'markethall', 'bank', 'academy', 'observatory', 'library', 'court', 'hospital', 'bathhouse', 'magitech', 'factoryhall', 'legion']);
 export function wearOf(b) {
   if (b.wear != null) return b.wear;
@@ -106,7 +120,7 @@ const styleOf = b => ({ pitch: 0.34 + hh(b.hx ?? b.x, b.hy ?? b.y, 61) * 0.17, d
 // Wandhöhe FH: höher als eine Figur (25 Texel inkl. Kopf ≈ Tür 16). Firsthöhe RISE wächst mit der Tiefe.
 // Session 10: Fassade höher (Tür ≈ Figurenhöhe, Figuren sind seit v2 größer); das Dach behält mindestens 24 Texel.
 export function houseDims(b) { const T = BTYPES[b.type] || {}; if (T.mono) { const RISE = 12 + b.h * 2 + (T.dome ? 30 : T.towers ? 16 : 0), FH = Math.min(52, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 }; }
-  const RISE = 10 + b.h * 2, FH = Math.min(T.floors === 2 ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
+  const RISE = 10 + b.h * 2 + (isNoble(b) ? 8 : b.type === 'chapel' && quarterOf(b) === 'temple' ? 34 : 0), FH = Math.min(T.floors === 2 || isNoble(b) ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
 // Giebel nach vorn: über der Vorderwand ein Giebeldreieck (Höhe GH), dahinter zwei Dachflächen, die nach hinten laufen.
 export function gableOf(b) {
   const { OV, RISE, FH, W } = houseDims(b), yF = RISE + b.h * 16 - FH, halfW = (b.w * 16) / 2;
@@ -118,7 +132,7 @@ export function gableOf(b) {
 export function chimneyOf(b) {
   if (BTYPES[b.type]?.mono && !BTYPES[b.type].dark) return null;   // Prachtbauten rauchen nicht (Werkhalle schon)
   const T = BTYPES[b.type] || BTYPES.house, { RISE, FH, W } = houseDims(b);
-  const on = T.forge || (T.chimney && (T.chimney >= 1 || hh(b.hx ?? b.x, b.hy ?? b.y, 7 + 'chimney'.length) < T.chimney));
+  const on = T.forge || isNoble(b) || (T.chimney && (T.chimney >= 1 || hh(b.hx ?? b.x, b.hy ?? b.y, 7 + 'chimney'.length) < T.chimney));
   if (!on || wearOf(b) === 2) return null;                           // verlassen: Schornstein eingestürzt, kein Rauch
   const G = gableOf(b), side = hh(4, 4, b.seed || 1) > 0.5 ? 1 : -1;
   return { x: Math.round(G.cx + side * G.halfW * 0.5) + 1, y: Math.max(2, G.apexY - 14) - 2, soot: !!T.forge };
@@ -180,9 +194,13 @@ function monumentSprite(b, lit) {
 export function houseSprite(b, lit) {
   if (BTYPES[b.type]?.mono) return monumentSprite(b, lit);
   const T = BTYPES[b.type] || BTYPES.house, st = TOWN_STYLE[b.town] || TOWN_STYLE.eren;
-  const wear = wearOf(b), sty = styleOf(b);
+  const wear = wearOf(b), sty = styleOf(b), q = quarterOf(b), qh = k => hh(b.x, b.y, 300 + k), noble = isNoble(b);
   if (wear === 2) lit = false;                                      // verlassen: nachts dunkel
-  const roofKind = b.roof || (st.alt && hh(b.hx ?? b.x, b.hy ?? b.y, 71) < 0.3 ? st.alt : st.roof), wallKind = b.wall || T.wall || st.wall;   // Referenz 4: gemischte Dächer im Ort
+  /* Artist Runde 5: Varonheims Viertel — Adel, Tempel und Gilden unter dunklem Schiefer, die Elendsgasse unter Stroh und Flickschindeln
+     mit Bretterwänden, die Händler im Fachwerk. */
+  const qRoof = q === 'noble' || q === 'temple' || q === 'guild' || q === 'castle' ? 'slate' : q === 'slum' ? (qh(1) < 0.45 ? 'thatch' : 'shingle') : null;
+  const qWall = q === 'slum' && qh(2) < 0.55 ? 'wood' : q === 'merchant' && qh(2) < 0.4 ? 'timber' : q === 'guild' && qh(2) < 0.45 ? 'stone' : null;
+  const roofKind = b.roof || qRoof || (st.alt && hh(b.hx ?? b.x, b.hy ?? b.y, 71) < 0.3 ? st.alt : st.roof), wallKind = b.wall || T.wall || qWall || st.wall;   // Referenz 4: gemischte Dächer im Ort
   const { OV, RISE, FH, W, H } = houseDims(b), s = b.seed || 1, RR = drawnOn();
   const g = new G(W, H);
   const n = (x, y) => hh(x, y, s);
@@ -214,7 +232,7 @@ export function houseSprite(b, lit) {
   for (let x = fx0; x <= fx1; x++) g.p(x, yF, mix(g.at(x, yF) || Wr.b, '#120e0c', 0.45));   // Schatten unter der Traufe
 
   // ---- Tür & Fenster ----
-  const floors2 = T.floors === 2;
+  const floors2 = T.floors === 2 || noble;
   if (floors2) for (let x = fx0; x <= fx1; x++) { g.p(x, yB - 20, wallKind === 'timber' ? Br.b : mix(Wr.sh, '#120e0c', 0.3)); g.p(x, yB - 19, mix(Wr.b, '#120e0c', 0.25)); }   // Geschossgesims
   const midT = b.w >> 1, big = has('bigDoor');
   const dw = T.barnDoor ? 20 : big ? 14 : 10, dh = floors2 ? 26 : FH - 6, dx = fx0 + midT * 16 + ((16 - dw) >> 1), dy = yB - 2 - dh;
@@ -262,14 +280,19 @@ export function houseSprite(b, lit) {
   // ---- Dach: Giebel nach vorn ----
   // Über der Vorderwand das Giebeldreieck (Wandmaterial, Lüftungsluke), gerahmt von Windbrettern. Dahinter laufen
   // zwei Dachflächen nach hinten: West im Licht, Ost im Schatten (Licht von Nordwest). Lagen parallel zum First.
-  const R = ramp(mix(varOf(ROOF_VAR, roofKind, b, 91), '#6a5a48', (n(1, 2) - 0.5) * 0.25));
+  const R = ramp(mix(mix(varOf(ROOF_VAR, roofKind, b, 91), '#1e222a', q && roofKind === 'slate' ? (q === 'castle' ? 0.42 : 0.32) : 0), '#6a5a48', (n(1, 2) - 0.5) * 0.25));   /* Varonheim: dunkler Schiefer */
   const { cx, halfW, apexY, GH } = gableOf(b);
   const inGable = (x, y) => y >= apexY && y < yF && Math.abs(x - cx) <= halfW * (y - apexY) / GH;
+  /* Artist Runde 2 (Stil R): Fachwerk- und Putzhäuser tragen im Giebel eine senkrechte Bretterschalung statt einer hellen Putzfläche —
+     das große helle Dreieck verschwindet, Dach und Giebel trennen sich im Wert. Je Brett eigener Ton, helle Kante links, Fuge dunkel. */
+  const boards = RR && (wallKind === 'timber' || wallKind === 'plaster'), Gw = ramp(mix('#5e4630', '#6a5a48', n(6, 6) * 0.5));
+  const boardAt = (x, y) => { const bx = Math.floor((x + 1) / 3), xo = (x + 1) - bx * 3, tn = hh(bx, 17, s); if (xo === 2) return Gw.dk;
+    let c = tn > 0.7 ? mix(Gw.b, Gw.hi, 0.35) : tn < 0.25 ? mix(Gw.b, Gw.sh, 0.4) : Gw.b; if (xo === 0) c = mix(c, Gw.hi, 0.3); if (n(x, y + 300) > 0.93) c = mix(c, Gw.dk, 0.4); return c; };
   const cw = roofKind === 'thatch' ? 3 : 4;                               // Lagenbreite (Texel)
-  const patches = T.patch ? [0, 1].map(i => ({ x: Math.round(cx + (i ? 1 : -1) * halfW * (0.3 + hh(i, 3, s) * 0.45)) - 3, y: 3 + Math.round(hh(i, 4, s) * Math.max(1, apexY - 6)) })) : [];
+  const patches = T.patch || q === 'slum' ? [0, 1].map(i => ({ x: Math.round(cx + (i ? 1 : -1) * halfW * (0.3 + hh(i, 3, s) * 0.45)) - 3, y: 3 + Math.round(hh(i, 4, s) * Math.max(1, apexY - 6)) })) : [];
   for (let y = 0; y < yF; y++) for (let x = 0; x < W; x++) {
     if (inGable(x, y)) {                                                   // Giebelfeld in Wandmaterial
-      if (y < yF) g.p(x, y, mix(wallAt(x, y), '#1a1510', 0.12 + 0.1 * (1 - (y - apexY) / GH)));   // Giebelfeld liegt im Schatten des Dachs
+      if (y < yF) g.p(x, y, mix(boards ? boardAt(x, y) : wallAt(x, y), '#1a1510', 0.12 + 0.1 * (1 - (y - apexY) / GH)));   // Giebelfeld liegt im Schatten des Dachs
       continue;
     }
     const k = Math.abs(x - cx), west = x < cx, depth = 1 - y / (yF + 2);
@@ -352,16 +375,17 @@ export function houseSprite(b, lit) {
 
   // ---- Funktion von außen ----
   const ch = chimneyOf(b);
-  if (ch) {                                                                 // gemauerter Schornstein mit Schlagschatten
-    const C = ramp('#6c665c'), x0 = ch.x - 3, top = ch.y + 2, bot = Math.min(apexY + 2, top + 16);
+  const chim = (chx, chy, forge) => {                                       // gemauerter Schornstein mit Schlagschatten
+    const C = ramp('#6c665c'), x0 = chx - 3, top = chy + 2, bot = Math.min(apexY + 2, top + 16);
     for (let y = top + 3; y < bot + 3; y++) for (let x = x0 + 7; x < x0 + 10; x++) if (g.at(x, y)) g.p(x, y, mix(g.at(x, y), '#0c0a08', 0.45));
     for (let y = top; y < bot; y++) for (let x = x0; x < x0 + 7; x++) {
       const row = (y - top) >> 1, xo = (x - x0 + (row & 1) * 2) % 4;
       g.p(x, y, x === x0 ? C.hi : x === x0 + 6 ? C.sh : (y - top) % 2 === 1 || xo === 0 ? mix(C.b, C.sh, 0.5) : C.b);
     }
     g.r(x0 - 1, top - 2, 9, 2, C.dk); g.r(x0 - 1, top - 2, 9, 1, C.sh); g.r(x0 + 1, top - 2, 5, 1, '#0e0c0a');
-    if (T.forge) for (let x = x0 - 4; x < x0 + 11; x++) for (let y = bot; y < bot + 6; y++) if (g.at(x, y) && n(x, y + 90) > 0.5) g.p(x, y, mix(g.at(x, y), '#16120e', 0.45));   // Ruß
-  }
+    if (forge) for (let x = x0 - 4; x < x0 + 11; x++) for (let y = bot; y < bot + 6; y++) if (g.at(x, y) && n(x, y + 90) > 0.5) g.p(x, y, mix(g.at(x, y), '#16120e', 0.45));   // Ruß
+  };
+  if (ch) { chim(ch.x, ch.y, T.forge); if (noble) chim(Math.round(2 * cx - ch.x), ch.y, 0); }   /* Adelshaus: zweiter Schornstein gespiegelt */
   const signAt = (icon) => {                                        // Ausleger mit hängendem Schild an der Fassadenecke
     const sx = b.door === 'S' ? Math.min(fx1 - 10, dx + dw + 3) : fx1 - 10, sy = yF + 2;
     g.r(sx, sy, 7, 1, IRON); g.p(sx + 1, sy + 1, IRON); g.p(sx + 6, sy + 1, IRON);
@@ -370,7 +394,7 @@ export function houseSprite(b, lit) {
     const I = ICON[icon];
     for (let j = 0; j < 4; j++) for (let i = 0; i < 5; i++) { const ch = I[j][i]; if (ch !== '.') g.p(sx + 1 + i + 1, sy + 3 + j + 1, ch === '+' ? '#e8dcb8' : '#1c1612'); }
   };
-  if (sty.dormer && wear < 2 && apexY > 12) {                       // Dachgaube auf der Seite ohne Schornstein
+  if (sty.dormer && !noble && wear < 2 && apexY > 12) {                       // Dachgaube auf der Seite ohne Schornstein
     const side = ch ? (ch.x > cx ? -1 : 1) : 1, gx0 = Math.round(cx + side * halfW * 0.55) - 4, gy0 = Math.max(4, apexY - 13);
     for (let j = 0; j < 4; j++) for (let i = 4 - j; i <= 4 + j; i++) g.p(gx0 + i, gy0 + j, j === 0 ? R.dk : i < 4 ? mix(R.hi, R.b, 0.3) : mix(R.sh, R.dk, 0.2));   // Gaubendach
     g.r(gx0, gy0 + 4, 9, 6, wallAt(gx0, gy0 + 20)); g.r(gx0 + 2, gy0 + 5, 5, 4, Br.dk);
@@ -381,6 +405,7 @@ export function houseSprite(b, lit) {
     for (let x = ax0; x <= ax1; x++) { g.p(x, ay, R.dk); g.p(x, ay + 1, x % 3 ? R.b : R.sh); g.p(x, ay + 2, R.sh); g.p(x, ay + 3, mix(g.at(x, ay + 3) || Wr.b, '#0c0a08', 0.45)); }
     g.p(ax0, ay + 3, Br.b); g.p(ax1, ay + 3, Br.b); g.p(ax0, ay + 4, Br.sh); g.p(ax1, ay + 4, Br.sh);
   }
+  if (q) quarterFront();
   if (T.sign) signAt(T.sign);
   if (T.forge) {                                                    // offene Esse in der Wand, Glut
     const ex = fx0 + 3, ey = yB - 10;
@@ -409,10 +434,10 @@ export function houseSprite(b, lit) {
   }
   if (T.herbs) for (let i = 0; i < 4; i++) { const hx = fx0 + 6 + i * Math.floor((b.w * 16 - 12) / 4);   // Kräuterbündel unter der Traufe
     g.p(hx, yF + 1, BEAM); for (let k = 0; k < 3; k++) g.p(hx + (k === 1 ? 1 : 0), yF + 2 + k, k === 2 ? '#8a7a44' : '#5a7a3a'); }
-  const bannerKind = T.banner && (({ sonnwacht: 'order', kreuzweg: 'merch', ashford: 'merch' })[b.town] || T.banner);   // wer hier herrscht
+  const bannerKind = q && (T.banner || noble || q === 'castle') ? 'varon' : T.banner && (({ sonnwacht: 'order', kreuzweg: 'merch', ashford: 'merch' })[b.town] || T.banner);   // wer hier herrscht
   if (bannerKind) {                                                 // Banner an der Wand
-    const col = bannerKind === 'valen' ? ['#2f4260', '#b9c3d2'] : bannerKind === 'order' ? ['#d9d2c0', '#9b2e26'] : ['#5a4630', '#bd9433'];
-    for (const bx of [fx0 + 4, fx1 - 9]) { if (b.door === 'S' && bx + 6 > dx - 1 && bx < dx + dw + 1) continue;
+    const col = bannerKind === 'varon' ? ['#5a1618', '#c9a24a'] : bannerKind === 'valen' ? ['#2f4260', '#b9c3d2'] : bannerKind === 'order' ? ['#d9d2c0', '#9b2e26'] : ['#5a4630', '#bd9433'];
+    for (const bx of q === 'castle' && b.w >= 6 ? [fx0 + 14, fx1 - 19] : [fx0 + 4, fx1 - 9]) { if (b.door === 'S' && bx + 6 > dx - 1 && bx < dx + dw + 1) continue;
       const Bn = ramp(col[0]); g.r(bx - 1, yF + 1, 8, 1, BEAM);
       for (let y = yF + 2; y < yF + 11; y++) for (let x = bx; x < bx + 6; x++) g.p(x, y, x === bx ? Bn.hi : x === bx + 5 ? Bn.sh : Bn.b);
       g.p(bx + 1, yF + 11, Bn.b); g.p(bx + 4, yF + 11, Bn.b);
@@ -420,6 +445,7 @@ export function houseSprite(b, lit) {
   }
   if (T.crest && b.door === 'S') { const cx = dx + (dw >> 1) - 3, cy = dy - 7; const Cr = ramp('#8a8f98'); g.r(cx, cy, 6, 5, Cr.b); g.r(cx, cy, 6, 1, Cr.hi); g.r(cx + 1, cy + 5, 4, 1, Cr.sh); g.r(cx + 2, cy + 1, 2, 3, '#2f4260'); }
   if (T.cross) { const x0 = Math.round(gableOf(b).cx) - 1, y0 = Math.max(0, gableOf(b).apexY - 11); g.r(x0, y0, 2, 9, '#d9d2c0'); g.r(x0 - 2, y0 + 2, 6, 2, '#d9d2c0'); g.p(x0, y0, '#f2ead6'); }
+  if (q) quarterTop();
   if (has('flowers') && wins.length) { const [wx, wy] = wins[(n(8, 8) * wins.length) | 0]; g.r(wx - 1, wy + 6, 8, 2, '#4a3322');
     for (let i = 0; i < 6; i++) g.p(wx + i, wy + 5, n(i, 3) > 0.5 ? '#b04a3a' : '#c9a84a'); }
   if (has('woodpile')) { const wx = b.door === 'E' ? fx0 + 1 : fx1 - 7, wy = yB - 6;
@@ -428,6 +454,81 @@ export function houseSprite(b, lit) {
     g.r(sx, sy + 1, 4, 5, Sk.b); g.r(sx + 1, sy, 2, 1, Sk.sh); g.p(sx, sy + 1, Sk.hi); g.r(sx + 3, sy + 2, 1, 4, Sk.sh); }
   for (let y = yB - 12; y < yB - 2; y++) for (let x = fx0; x <= fx1; x++) { const c = g.at(x, y), t = (y - yB + 12) / 10;   // Spritzwasser, Feuchte
     if (c && n(x, y + 200) < t * 0.55) g.p(x, y, mix(c, '#1b1812', 0.3)); }
+  /* Artist Runde 5 (Varonheim): Merkmale je Viertel, an der Fassade (vor dem Schild) und über dem Dach (nach dem Kreuz) */
+  function quarterFront() {
+    if (q === 'castle') {                                           // Burg: Zinnenkranz vor dem Dach, Ecktürmchen mit Kegelhelm, Scharten
+      const St = ramp(mix(Wr.b, '#1a1820', 0.2)), Sl = ramp('#262c36');
+      for (let x = fx0; x <= fx1; x++) { for (let y = yF - 2; y < yF + 2; y++) g.p(x, y, y === yF - 2 ? St.hi : St.b);
+        if ((x - fx0) % 8 < 5) for (let y = Math.max(0, yF - 6); y < yF - 2; y++) g.p(x, y, y === yF - 6 ? St.hi : (x - fx0) % 8 === 4 ? St.dk : St.b); }
+      if (b.w >= 6) for (const tx0 of [fx0, fx1 - 9]) {
+        const t0 = Math.max(16, yF - 12);
+        for (let y = t0; y < yB - 1; y++) for (let x = tx0; x < tx0 + 10; x++) g.p(x, y, x === tx0 ? St.hi : x >= tx0 + 8 ? St.dk : (y - t0) % 4 === 3 || ((x - tx0 + ((y - t0) >> 2) * 3) % 5 === 0) ? St.sh : St.b);
+        for (const sy of [t0 + 6, yF + 10]) if (sy + 6 < yB - 4) { g.r(tx0 + 4, sy, 2, 6, '#08080a'); if (lit) g.p(tx0 + 4, sy + 3, '#b07a3a'); }
+        for (let j = 0; j < 14; j++) { const hw = Math.round(6 * (j + 1) / 14), y = t0 - 14 + j; if (y < 0) continue;
+          for (let i = -hw; i <= hw; i++) g.p(tx0 + 5 + i, y, i < 0 ? (j % 3 ? Sl.hi : Sl.b) : (j % 3 ? Sl.sh : Sl.dk)); }
+        g.r(tx0 + 5, Math.max(0, t0 - 18), 1, 4, IRON);
+      }
+    }
+    if (noble) {                                                    // Eckquader aus hellem Stein, eiserne Firstspitze
+      for (let y = yF + 3; y < yB - 3; y++) { const row = ((y - yF - 3) / 4) | 0, w = row & 1 ? 3 : 5;
+        for (const [x0, sg] of [[fx0, 1], [fx1, -1]]) for (let i = 0; i < w; i++) { const x = x0 + sg * i, yy = (y - yF - 3) % 4;
+          g.p(x, y, yy === 3 ? '#2a2724' : i === 0 && sg > 0 ? '#9a948a' : i === w - 1 ? '#5e5952' : '#7d776d'); } }
+      g.r(Math.round(cx) - 1, apexY - 9, 1, 6, IRON); g.p(Math.round(cx) - 2, apexY - 7, IRON); g.p(Math.round(cx), apexY - 7, IRON); g.p(Math.round(cx) - 1, apexY - 10, '#6a6660');
+    }
+    if (q === 'merchant') {                                         // gestreifte Markise über der ganzen Front, Ware darunter
+      const AW = [['#7d3b2c', '#c9b98a'], ['#2f5034', '#c9b98a'], ['#2f4260', '#b8973e'], ['#6a5020', '#d9cfb0']][(qh(8) * 4) | 0], ay = yF + 3;
+      for (let x = fx0 + 1; x < fx1; x++) { const c = ((x - fx0) >> 2) & 1 ? AW[1] : AW[0], C = ramp(c);
+        for (let y = ay; y < ay + 5; y++) g.p(x, y, y === ay ? C.hi : y === ay + 4 ? C.sh : C.b);
+        if ((x - fx0) % 4 < 2) g.p(x, ay + 5, C.sh);                                                     // gezackter Saum
+        for (let d = 0; d < 3; d++) { const y = ay + 6 + d, c0 = g.at(x, y); if (c0) g.p(x, y, mix(c0, '#0c0a08', 0.45 - d * 0.13)); } }
+      for (const x of [fx0 + 1, fx1 - 1]) for (let y = ay; y < ay + 10; y++) g.p(x, y, BEAM);           // Stangen
+      const gx0 = b.door === 'E' || (b.door === 'S' && dx - fx0 < 24) ? fx1 - 16 : fx0 + 3;               // Körbe mit Ware an der Wand
+      for (let i = 0; i < 2; i++) { const kx = gx0 + i * 7, ky = yB - 7, ware = ['#a04a2a', '#c9a84a', '#6a8a3a', '#8a5a8a'][(qh(9 + i) * 4) | 0];
+        g.r(kx, ky + 2, 6, 4, '#6a4a2a'); g.r(kx, ky + 2, 6, 1, '#8a6a3a'); for (let k = 0; k < 5; k++) g.p(kx + (k % 3) * 2, ky + 1 - (k > 2 ? 1 : 0), k % 2 ? mix(ware, '#ffffff', 0.25) : ware); }
+    }
+    if (q === 'guild') {                                            // Zunftwappen im Giebel, Wimpel unter der Traufe, Zunftschild
+      const GU = [['hammer', '#2f4260'], ['scales', '#5a1618'], ['tankard', '#2f5034'], ['swords', '#4a3458'], ['key', '#6a5020'], ['bread', '#6a3a1a']], [gi, gc] = GU[(qh(6) * GU.length) | 0];
+      if (!T.sign) signAt(gi);
+      if (GH > 22) { const sy = gy - 6, Gc = ramp(gc), I = ICON[gi];
+        for (let j = 0; j < 12; j++) { const hw = j < 7 ? 5 : 11 - j; for (let i = -hw; i <= hw; i++) g.p(gx + i, sy + j, Math.abs(i) === hw || j === 0 ? '#b8973e' : i < 0 ? Gc.hi : Gc.b); }
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 5; i++) if (I[j][i] !== '.') g.p(gx - 2 + i, sy + 2 + j, '#e8dcb8'); }
+      for (let k = 0, x = fx0 + 5; x < fx1 - 6; x += 12, k++) { if (b.door === 'S' && x + 5 > dx - 2 && x < dx + dw + 2) continue;
+        for (let j = 0; j < 7; j++) for (let i = 0; i < 5 - ((j * 5 / 7) | 0); i++) g.p(x + i, yF + 2 + j, k % 2 ? '#c9b98a' : gc); g.r(x - 1, yF + 1, 7, 1, IRON); }
+    }
+    if (q === 'slum') {                                             // angelehnter Bretterverschlag mit Pultdach, Lumpenvorhang
+      const left = b.door === 'W' ? false : b.door === 'E' ? true : qh(3) < 0.5, lw = 15 + ((qh(4) * 6) | 0), lx0 = left ? fx0 : fx1 - lw + 1;
+      const Pl = ramp(mix('#3e3228', '#2a231c', qh(5) * 0.6)), Rf = ramp(qh(13) < 0.5 ? '#8a7a5a' : '#6e7068');   /* Verschlag hebt sich ab: dunkle Bretter, helles Altholz- oder Blechdach */
+      for (let i = 0; i < lw; i++) { const x = lx0 + i, outer = left ? i : lw - 1 - i, top = yB - 18 - Math.round(outer * 7 / lw);
+        g.p(x, top - 1, '#1a1510');   /* Kontur über dem Pultdach */
+        for (let y = top; y < top + 3; y++) g.p(x, y, y === top ? Rf.hi : y === top + 2 ? Rf.dk : (x + y) % 3 ? Rf.b : Rf.sh);
+        for (let y = top + 3; y < yB - 1; y++) g.p(x, y, (x - lx0) % 4 === 0 ? Pl.dk : n(x, y + 40) > 0.9 ? Pl.hi : y === top + 3 ? Pl.sh : Pl.b); }
+      const ox = lx0 + (lw >> 1) - 3;
+      for (let y = yB - 13; y < yB - 1; y++) for (let x = ox; x < ox + 6; x++) g.p(x, y, y < yB - 11 ? '#120f0c' : (x + (y >> 1)) % 3 ? '#5a4a3a' : '#463a2e');
+      if (qh(12) < 0.6) for (let x = fx0 + 6; x < fx1 - 6; x++) { const y = yF + 6 + Math.round(Math.sin((x - fx0) / (fx1 - fx0) * Math.PI) * 3);   // Wäscheleine
+        g.p(x, y, '#2a241e'); if ((x * 7) % 11 < 4) for (let k = 1; k < 5; k++) g.p(x, y + k, ['#8a7a64', '#6a4a3a', '#7a7a6a'][(x >> 2) % 3]); }
+    }
+    if (q === 'craft' && !T.forge && !T.stalls) {                  // Fässer und Kisten an der Wand
+      const bx = b.door === 'W' || (b.door !== 'E' && qh(7) < 0.5) ? fx1 - 21 : fx0 + 2, Bf = ramp('#6a4a2c'), Kc = ramp('#7a5a35');
+      for (let k = 0; k < 2; k++) { const x0 = bx + k * 7, y0 = yB - 11;
+        for (let y = y0; y < yB - 1; y++) for (let x = x0; x < x0 + 6; x++) { const e = x === x0 || x === x0 + 5;
+          g.p(x, y, y - y0 === 2 || y - y0 === 7 ? IRON : y === y0 ? Bf.hi : e ? Bf.dk : (x - x0) % 2 ? Bf.b : Bf.sh); } }
+      const kx = bx + 14; for (let y = yB - 8; y < yB - 1; y++) for (let x = kx; x < kx + 7; x++)
+        g.p(x, y, y === yB - 8 ? Kc.hi : x === kx || x === kx + 6 || y === yB - 2 ? Kc.dk : x - kx === y - yB + 8 ? Kc.sh : Kc.b);
+    }
+  }
+  function quarterTop() {
+    if (!(q === 'temple' && b.type === 'chapel')) return;           // Tempel: Turm mit Spitzhelm aus Schiefer über dem Giebel
+    const tx = Math.round(cx), tw = 8, base = apexY + 8, top = Math.max(32, apexY - 16), St = ramp(mix(Wr.b, '#2a2830', 0.15)), Sl = ramp('#2c3440');
+    for (let y = top; y < base; y++) for (let x = tx - tw; x <= tx + tw; x++) { const row = ((y - top) / 3) | 0, xo = (x - tx + 40 + (row & 1) * 2) % 5;
+      g.p(x, y, x === tx - tw ? St.hi : x >= tx + tw - 1 ? St.dk : (y - top) % 3 === 2 || xo === 0 ? St.sh : St.b); }
+    for (const ox of [-5, 2]) { g.r(tx + ox, top + 5, 3, 8, '#0e0c10'); g.p(tx + ox + 1, top + 4, '#0e0c10'); if (lit) g.r(tx + ox, top + 9, 3, 3, '#b07a3a'); }   // Schallarkaden
+    for (let y = base; y < base + 3; y++) for (let x = tx - tw; x <= tx + tw; x++) { const c0 = g.at(x, y); if (c0) g.p(x, y, mix(c0, '#0c0a08', 0.4)); }
+    g.r(tx - tw - 1, top - 2, tw * 2 + 3, 2, St.dk); g.r(tx - tw - 1, top - 2, tw * 2 + 3, 1, St.hi);   // Gesims
+    const sh = Math.min(30, top - 10), tip = top - 2 - sh;
+    for (let j = 0; j < sh; j++) { const hw = Math.round((tw + 1) * (j + 1) / sh), y = tip + j;
+      for (let i = -hw; i <= hw; i++) g.p(tx + i, y, i < 0 ? (j % 3 === 0 ? Sl.b : Sl.hi) : i === 0 ? Sl.b : (j % 3 === 0 ? Sl.dk : Sl.sh)); }
+    g.r(tx, tip - 8, 1, 8, '#b8973e'); g.r(tx - 2, tip - 6, 5, 1, '#b8973e'); g.p(tx, tip - 8, '#e8d8a0');   // goldenes Kreuz
+  }
   if (wear) weather(g, { b, wear, n, W, yF, yB, fx0, fx1, cx, halfW, apexY, GH, inGable, R, Wr, Br, wins, dx, dy, dw, dh, wallKind, roofKind, door: b.door });
   return toCanvas(g);
 }

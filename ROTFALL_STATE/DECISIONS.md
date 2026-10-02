@@ -82,3 +82,48 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 
 ## 01.10.2026 — Gespräche
 - Entwickler: „Reduziere die Anzahl der NPCs, mit denen man reden kann. Man soll nicht alle nach der Geschichte etc. fragen können.“ Umsetzung: einfache Bewohner nur Sprechblase; Plauder- und Wissensfragen nur bei gesprächigen Rollen (Namen, Wachen, Wirte, Reisende, Lehrer, Gelehrte, Priester, Vorsteher, Gefährten); Dienste bleiben.
+
+## 01.10.2026 — Antworten zu T11/A14 und T12
+- **Verhungern:** auf **Schwer und Sehr schwer** möglich (ab Tag 5 ohne Essen, zwei Warnungen vorher) — Abweichung von der Empfehlung (nur Sehr schwer).
+- **Lager:** am Feuer und mit Schlafrolle; neue Wetter im Menschenland: Gewitter und Schlamm.
+- **Angsthase:** statt Tod Erwachen beim Heiler, −30 % Gold, 12 Stunden.
+- **T12:** Rooks Hauptmann darf eine Straße melken (25 % der Beute); Rook-Ruf −10 für Bandenführer-Mord ab Rang Klinge; Schutzgeld deckt den eigenen Wagen; Patrouillen schwächen Banden (35 % je Durchgang).
+- **Scout Runde 3** gewählt: Händler wechselt Route, Deserteure werden Banden, Bewohner wandert ab, Wachhauptmann desertiert → Designer (npc_eigene_ziele.md).
+
+## 01.10.2026 — Stadt ohne Schutz, Varonheim-Umbau, Feinde unter sich, Varons Tod
+- **Stadt ohne Schutz** (PROPOSALS/stadt_ohne_wachen.md): Übernahme je nach Lage (Totenheer nur bei Kriegsknoten, sonst Bande; Kette nur am Westrand); Tempo 2 + 2 Tage (Angsthase +2, Sehr schwer −1); Spieler wird Stadtherr zuerst nur über Tote/Blutfürst; Varonheim fällt nicht direkt, nur beschleunigt (Burgwache tot → König flieht vorzeitig).
+- **Varonheim-Umbau** (PROPOSALS/varonheim_umbau.md): Faktor 3 (117×87), Lage Kronfels (Mitte 558/107), alte Stelle = Königsfelder; Startort-Wahl mit Varonheim als Vorgabe; Burg in der Weltkarte (nur Katakomben eigene Karte); Tor mit Durchsuchung, Bestechung 5000 Gold bei 30 %.
+- **Feinde verschiedener Mächte** bekämpfen sich; näherer Feind wird bevorzugt (Entwickler).
+- **Varons Tod** ist ein Ereignis mit Szene, Reichsverweser und Kopfgeld (Entwickler: „es fehlt noch ein Event, wenn Varon stirbt“).
+- Entwickler: „Guck, ob alle Weltevents zusammenpassen“ → Designer-Abgleich (PROPOSALS/weltereignisse_abgleich.md).
+
+## 01.10.2026 — Weltereignis-Abgleich (PROPOSALS/weltereignisse_abgleich.md)
+- König vor dem Fall fortbringen: **ja**, im Gespräch mit Gero/Brandt während der Belagerung (Belagerung S3).
+- Tod der Kaiserin: **Häuserkrieg zuerst**, Aurelions gefallene Städte treiben Morvaths Heerzug **nicht** an.
+- Krisen-Takt: **Sehr schwer −15 Tage** (Krönung, Heerzug), **Angsthase ohne** Rote Krönung.
+- Nach Garmadons Tod: **kleine Trupps** der Toten überfallen weiter, löschen aber keine Dörfer mehr aus.
+
+## 01.10.2026 — Kampf-Ideen (Scout Runde 4) und UI
+- Gewählt: Fraktionszeichen am Gegner, Kampfbericht nach Dreieckskämpfen, Köder-Pfeife, Schwache Flanke (alle klein).
+- Kopfleiste: größere Symbole mit kurzer Beschriftung darunter (Entwickler: „Symbole sehr klein, kleine Beschriftung unter dem Symbol“).
+- Varonheim-Umbau Scheibe 1 gebaut (Kronfels, Faktor 3).
+
+## 01.10.2026 — Bedrohung gesamt (PROPOSALS/bedrohung_gesamt.md) und lebendige Hauptstadt
+- Varonheim soll auf **Schwer bei Nichtstun (Kult ignoriert) gegen Tag 120–150 fallen**; Sehr schwer früher.
+- Die verlorene Front allein darf den Heerzug auslösen, **frühestens Tag 75** (mit Deckeln gegen Krisen-Stapel).
+- Ersatzwachen bringen die Besatzung zurück (**+4 je Mann**).
+- Scout Runde 5 gewählt: Turnier in Varonheim, Gildenstreik, Markt reagiert auf Bedrohung, Flüchtlinge ins Armenviertel.
+- Scout Runde 6 gewählt: Überfälle mit Ursache, Heilerhütte, Siedlung wird schutzlos, Moral sichtbar.
+
+## 01.10.2026 — Emergente Quests, Stadt ohne Wachen S2, Siedlung
+- Emergente Quests (PROPOSALS/emergente_quests.md): alle vier bauen, Reihenfolge E2 → E1 → E4 → E3.
+- Heimgeholter Deserteur darf einen verlorenen Wachposten füllen, nie in Varonheim.
+- Groll der Witwe trifft auch den Erben, höchstens noch ein Mörder.
+- Stadt ohne Wachen S2: Fristen je Schritt — Angsthase 4+4, Schwer 2+2, Sehr schwer 1+1 Tage.
+- Eigene Siedlung wird ohne Wachen nie übernommen, nur geplündert.
+
+## 02.10.2026 — Belagerung S3, Geheime Orte, Start, Mittelspiel
+- Belagerung S3 (PROPOSALS/varonheim_belagerung_s3.md): Burgfrieden fällt erst bei Mauern 0. Kellerweg-Frage und Varons Strenge NICHT beantwortet → offen lassen / beim Bau erneut fragen.
+- Geheime Orte (PROPOSALS/geheime_orte.md): gleiche Lage in jeder Welt; Seelen-Ernte darf Morvaths Heerzug näher bringen (mit Warnung). Geisterschiff gratis: NICHT gewählt → kein Gratis-Transport.
+- Erste Spielstunde (Scout R8): „Hinweise führen hin“ (proaktive Hinweise) bauen. Vorverfolgter erster Auftrag: nicht gewählt.
+- Mittelspiel (Scout R9): alle vier bauen — Siedlung geht an Erben; Gold-Sog (Ausbau kostet auch Gold); Rang bremst Blutkult; Aurelion-Bionik wirkt im Kriegsgraphen.

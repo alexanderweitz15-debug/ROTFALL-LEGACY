@@ -165,14 +165,14 @@ function house(map, x, y, w, h, doorSide = 'S', meta = {}) {
   }
   // Säle der Monumentalbauten (Phase 5): Möbel in Reihen mit Gängen, Türachse frei, Obergrenze wie oben
   const HALL = { palace: ['column', 'column', 'bench'], markethall: ['stall', 'stall', 'counter'], bank: ['counter', 'chest', 'desk'], academy: ['desk', 'shelf', 'desk'], library: ['shelf', 'shelf', 'desk'],
-    court: ['bench', 'bench', 'desk'], hospital: ['bed', 'bed', 'shelf'], bathhouse: ['trough', 'barrel', 'trough'], observatory: ['desk', 'shelf', 'workbench'], magitech: ['workbench', 'gearpile', 'machine'],
+    thronsaal: ['column', 'column', 'bench'], court: ['bench', 'bench', 'desk'], hospital: ['bed', 'bed', 'shelf'], bathhouse: ['trough', 'barrel', 'trough'], observatory: ['desk', 'shelf', 'workbench'], magitech: ['workbench', 'gearpile', 'machine'],
     factoryhall: ['machine', 'machine', 'gearpile'], legion: ['bunk', 'bunk', 'weapon_rack'] }[b.type];
   if (HALL && !ruin) { const HC = Math.floor((w - 2) * (h - 2) / 2); let k = 0;
     for (let j = y + 2; j <= y + h - 3; j += 3) for (let i = x + 2; i <= x + w - 3; i += 3) {
       if (Math.abs(i - door[0]) <= 1 || used.has(i + ',' + j) || used.size - 1 >= HC) continue;
       used.add(i + ',' + j); prop(HALL[k++ % HALL.length], i, j, { map, gen: 2, house: b.id, solid: true, r: 12 }); }
-    if (b.type === 'palace' || b.type === 'court') prop('throne', x + (w >> 1), y + 1, { map, gen: 2, house: b.id, solid: true, r: 12, label: b.type === 'palace' ? 'Thron im Regierungspalais' : 'Richterstuhl' });
-    if (b.type === 'palace') for (const i of [x + 2, x + w - 3]) prop('banner_torn', i, y + 1, { map, gen: 2, house: b.id, label: 'Banner des Hochreichs' });
+    if (b.type === 'palace' || b.type === 'court' || b.type === 'thronsaal') prop('throne', x + (w >> 1), y + 1, { map, gen: 2, house: b.id, solid: true, r: 12, label: b.type === 'thronsaal' ? 'Thron König Varons' : b.type === 'palace' ? 'Thron im Regierungspalais' : 'Richterstuhl' });
+    if (b.type === 'palace' || b.type === 'thronsaal') for (const i of [x + 2, x + w - 3]) prop('banner_torn', i, y + 1, { map, gen: 2, house: b.id, label: b.type === 'thronsaal' ? 'Schwarzes Banner Valens' : 'Banner des Hochreichs' });
   }
   // Große Schenke (Session 10, gewachsene Häuser): weitere Tische mit Bank in der hinteren Reihe, Türachse ± 1 bleibt frei
   if (!ruin && b.type === 'tavern' && w >= 8 && h >= 6) for (let i = x + 2; i <= x + w - 3; i += 3) {
@@ -229,6 +229,7 @@ export const regionAt = (tx, ty) => { if (phase === 'design') return rawRegion(t
   if (SHIFT && tx < SHIFT) { if (westMtnAt(tx, ty)) return 'mountain'; if (tx >= FORT[0] && tx <= FORT[2] && ty >= FORT[1] && ty <= FORT[3]) return 'eisen';
     const [sx, sy] = westSrc(tx, ty); return rawRegion(dT(sx - SHIFT), dT(sy)); }           // S12: Westen — Land setzt sich fort
   if (tx >= SHIFT + 768) { if (tx - SHIFT - 768 > deadBorder(ty)) return 'deadland'; const [sx, sy] = eastSrc(tx - SHIFT, ty); return rawRegion(dT(sx), dT(sy)); }   // S12: Osten
+  if (Math.abs(tx - CAPITAL.x) <= CAPITAL.hw + 8 && Math.abs(ty - CAPITAL.y) <= CAPITAL.hh + 8 && TOWN_PLAN.northcity) return regionAt(...TOWN_PLAN.northcity.square);   /* Varonheim-Umbau: die Hauptstadt auf dem Kronfels ist Menschenland */
   const k = townAt(tx, ty); return k && !TOWN_PLAN[k].village ? rawRegion(...TOWN_PLAN[k].spread.a) : rawRegion(dT(tx - SHIFT), dT(ty)); };
 const westMtn = x => 118 + (vnE(x, 3, 24) - 0.5) * 50;                                 // Südrand des Westgebirges
 
@@ -1174,7 +1175,7 @@ export function genWorld() {
   shiftWest();                                             // Session 12: Karte wächst nach Westen, alles rückt um OX
   buildWest();                                             // Session 12: Westgebirge, Eisenfeste, Steinbruch, Grubenhort
   extendSouth();                                           // Session 12: Wüstensporn, Südinseln, Nekrosinsel
-  coastline(); lakes(); totenbruecke();                    // Session 12: zerklüftete Küste, Buchten, Binnenseen, Brücke zur Nekrosinsel
+  coastline(); buildCapital(); lakes(); totenbruecke();    // Session 12: zerklüftete Küste, Buchten, Binnenseen, Brücke zur Nekrosinsel; Varonheim-Umbau: Hauptstadt nach der Küste (ohne rnd())
   buildVillages();                                         // Session 12: Dörfer in allen Einflussgebieten
   scatterPOIs();                                           // Session 12: Dichte — überall kleine Orte mit Geschichte
   tidyTowns(); clearDoors(); ensureReach();                              // Session 12: gilt für jeden Seed (neue Spiele haben neue Welten)
@@ -1319,8 +1320,7 @@ function extendSouth() {
   lay(250, 700, 250, 790, T.DIRT); lay(250, 790, 404, 900, T.DIRT);                   // Karawanenweg durch den Sporn
   for (let i = 0; i < 1400; i++) { const x = 480 + Math.floor(nz(i, 71) * 840), y = 760 + Math.floor(nz(71, i) * 440);   // Aurelion: Haine und Alleen
     if (t[y * W + x] === T.GRASS && spornAt(x, y) > 8 && vnE(x + 1200, y, 26) > 0.56) prop('tree', x, y, { solid: true, r: 12, hp: 3 }); }
-  for (const C of AUREL_CITIES) buildAurelCity(C);
-  buildCapital();   /* Nutzer §5g.1: Varons Hauptstadt */
+  for (const C of AUREL_CITIES) buildAurelCity(C);   /* Varons Hauptstadt entsteht jetzt in genWorld nach coastline() (Kronfels) */
   const G = k => AUREL_CITIES.find(c => c.key === k), gate = (c, s) => s === 'W' ? [c.x - c.hw, c.y] : s === 'E' ? [c.x + c.hw, c.y] : s === 'N' ? [c.x, c.y - c.hh] : [c.x, c.y + c.hh];
   for (const [a, sa, b, sb] of [['aurelheim', 'N', 'kupferhafen', 'S'], ['aurelheim', 'E', 'gelenkhall', 'W'], ['gelenkhall', 'E', 'tickmar', 'W'], ['aurelheim', 'S', 'sanktserin', 'N']]) {
     const [x0, y0] = gate(G(a), sa), [x1, y1] = gate(G(b), sb); lay(x0, y0, x1, y1); }
@@ -1351,48 +1351,61 @@ export const AUREL_CITIES = [
   { key: 'sanktserin',  name: 'Sankt Serin', x: 820,  y: 1110, hw: 22, hh: 16, types: ['chapel', 'manor', 'house', 'healer', 'manor', 'house'] },
 ];
 // ================= Varonheim, Hauptstadt König Varons (Nutzer §5g.1, 01.10.2026) =================
-// Südlich von Nordfurt (nördlich ist nur Meer): Ringmauer mit Türmen und vier Toren (alte Straßen behalten einen Durchlass), im Norden
-// der Burgbezirk mit eigener Mauer und dem Bergfried — sein Tor führt in den Thronsaal (Karte 'varonburg'). Viertel: Tempel (NW),
-// Adel (NO), Markt mit Galgen (Mitte), Armenviertel (SW), Handwerk und Garnison (SO). Schwarzer Stein und Schiefer.
-export const CAPITAL = { key: 'varonheim', name: 'Varonheim', x: 475, y: 147, hw: 35, hh: 23 };
-CAPITAL.keep = [CAPITAL.x, CAPITAL.y - CAPITAL.hh + 13];
-LOCATIONS.push({ key: CAPITAL.key, name: CAPITAL.name, x: CAPITAL.x, y: CAPITAL.y, r: 36, kind: 'city', threat: 0, faction: 'valen', town: true, fin: true });
+// Varonheim-Umbau (Entwickler 01.10.2026): die Hauptstadt liegt auf dem Kronfels östlich von Nordfurt, dreimal so groß (117 × 87).
+// Ringmauer mit Türmen und drei Toren (W und O auf der Königsstraße, S zum Kronweg), im Norden auf dem Fels der Burgbezirk mit
+// eigener Mauer und dem Bergfried — sein Tor führt (noch) in den Thronsaal (Karte 'varonburg'). Viertel: Tempel und Friedhof (NW),
+// Adel (NO), Händler (W), Markt mit Galgen (Mitte), Gilden (O), Armenviertel (SW), Handwerk und Garnison (SO). Kein rnd().
+export const CAPITAL = { key: 'varonheim', name: 'Varonheim', x: 558, y: 107, hw: 58, hh: 43 };
+CAPITAL.keep = [CAPITAL.x, CAPITAL.y - CAPITAL.hh + 22];   /* Burgtor (Scheibe 2: die Burg ist begehbar, kein Portal mehr) */
+CAPITAL.old = { x: 475, y: 147, hw: 35, hh: 23 };   /* alte Fläche (Migration alter Stände) */
+LOCATIONS.push({ key: CAPITAL.key, name: CAPITAL.name, x: CAPITAL.x, y: CAPITAL.y, r: 62, kind: 'city', threat: 0, faction: 'valen', town: true, fin: true });
 const CAP_SIZE = { chapel: [7, 6], manor: [6, 5], barracks: [6, 5], cottage: [5, 4], house: [5, 4], store: [6, 5], tavern: [6, 5], bakery: [5, 4], smithy: [5, 4], stable: [6, 5], healer: [5, 4] };
 function buildCapital() {
   const C = CAPITAL, m = MAPS.world, W = m.w, t = m.tiles, cx = C.x, cy = C.y, x0 = cx - C.hw, x1 = cx + C.hw, y0 = cy - C.hh, y1 = cy + C.hh;
   for (let i = props.length - 1; i >= 0; i--) { const q = props[i], qx = q.x / TS | 0, qy = q.y / TS | 0; if ((q.map || 'world') === 'world' && qx >= x0 - 3 && qx <= x1 + 3 && qy >= y0 - 3 && qy <= y1 + 3) props.splice(i, 1); }
-  const gate = (x, y) => (Math.abs(y - cy) <= 1 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 1 && (y === y0 || y === y1));
+  const gy = cy - 11, gate = (x, y) => (Math.abs(y - gy) <= 1 && (x === x0 || x === x1)) || (Math.abs(x - cx) <= 1 && y === y1);   /* Königsstraße W–O, Kronweg S; im Norden die Burg */
   for (let y = y0 - 3; y <= y1 + 3; y++) for (let x = x0 - 3; x <= x1 + 3; x++) {
     const i = y * W + x, was = t[i], edge = x === x0 || x === x1 || y === y0 || y === y1, inside = x > x0 && x < x1 && y > y0 && y < y1;
     t[i] = edge ? (gate(x, y) || was === T.ROAD ? T.STONE : T.WALL) : inside ? T.GRASS : (was === T.WATER || was === T.ROCK ? T.DIRT : was);
   }
   const block = (ax, ay, bx, by) => { for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) t[y * W + x] = T.WALL; };
-  for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [cx - 18, y0], [cx + 18, y0], [cx - 18, y1], [cx + 18, y1], [x0, cy - 12], [x0, cy + 12], [x1, cy - 12], [x1, cy + 12]]) block(x - 1, y - 1, x + 1, y + 1);   // Türme
+  for (let x = x0; x <= x1; x += 14) for (const y of [y0, y1]) if (Math.abs(x - cx) > 3) block(x - 1, y - 1, x + 1, y + 1);   // Türme alle 14 Kacheln
+  for (let y = y0; y <= y1; y += 14) for (const x of [x0, x1]) if (Math.abs(y - gy) > 3) block(x - 1, y - 1, x + 1, y + 1);
+  for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) block(x - 1, y - 1, x + 1, y + 1);
   const street = (ax, ay, bx, by) => { for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) t[y * W + x] = T.STONE; };
-  // Burgbezirk: eigene Mauer, Innenhof, Bergfried (massiv), Tor nach Süden
-  const bx0 = cx - 15, bx1 = cx + 15, by0 = y0 + 1, by1 = y0 + 17;
+  // Burgbezirk auf dem Fels (x 528–588, y 65–86): eigene Mauer, Innenhof, Bergfried (massiv bis Scheibe 2), Burgtor nach Süden
+  const bx0 = cx - 30, bx1 = cx + 30, by0 = y0 + 1, by1 = y0 + 22;
   for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) t[y * W + x] = (x === bx0 || x === bx1 || y === by0 || y === by1) && !(y === by1 && Math.abs(x - cx) <= 1) ? T.WALL : T.STONE;
-  block(cx - 8, y0 + 3, cx + 8, y0 + 11); block(cx - 10, y0 + 2, cx - 8, y0 + 4); block(cx + 8, y0 + 2, cx + 10, y0 + 4); block(bx0 - 1, by1 - 1, bx0 + 1, by1 + 1); block(bx1 - 1, by1 - 1, bx1 + 1, by1 + 1);
-  street(x0 + 1, cy - 1, x1 - 1, cy + 1); street(cx - 1, by1, cx + 1, y1 - 1); street(cx - 1, y0 + 1, cx + 1, by0);   // Hauptstraßen
-  street(x0 + 1, by1 + 2, x1 - 1, by1 + 2);                                                                         // Wallstraße vor der Burg
+  for (const [x, y] of [[bx0, by0], [bx1, by0], [bx0, by1], [bx1, by1]]) block(x - 1, y - 1, x + 1, y + 1);
+  // Burg in der Welt (Scheibe 2): Thronsaal, Adelsflügel, Kanzlei, Verlies, Kronschmiede — begehbar wie der Palast in Aurelheim
+  const castle = (x, y, w, h, door, type, id, floor) => { house('world', x, y, w, h, door, { type, town: 'varonburg', id }); if (floor) for (let j = y + 1; j < y + h - 1; j++) for (let i = x + 1; i < x + w - 1; i++) t[j * W + i] = floor; };
+  castle(cx - 15, y0 + 3, 30, 14, 'S', 'thronsaal', 'varon_throne', T.DFLOOR);
+  castle(bx0 + 2, y0 + 3, 12, 10, 'E', 'adelsfluegel', 'varon_nobles');
+  castle(bx1 - 13, y0 + 3, 12, 10, 'W', 'kanzlei', 'varon_kanzlei');
+  castle(bx0 + 2, y0 + 14, 10, 7, 'E', 'verlies', 'varon_verlies', T.DFLOOR);
+  castle(bx1 - 11, y0 + 14, 10, 7, 'W', 'kronschmiede', 'varon_schmiede');
+  street(x0 + 1, gy - 1, x1 - 1, gy + 1); street(cx - 1, by1, cx + 1, y1 - 1);                                     // Königsstraße, Kronweg
+  street(x0 + 1, by1 + 2, x1 - 1, by1 + 2); street(cx - 13, by1 + 1, cx + 13, by1 + 6);                             // Wallstraße, Wallplatz vor dem Burgtor
+  street(cx - 13, gy + 3, cx + 13, cy + 5);                                                                         // Markt (vor den Häusern: dort wird nicht gebaut)
   const hs = [], at = (x, y) => t[y * W + x];
   const fits = (hx, hy, w, h) => hx > x0 + 1 && hx + w < x1 - 1 && hy > y0 + 1 && hy + h < y1 - 1 && hs.every(([a, b, c, d]) => hx + w + 2 <= a || a + c + 2 <= hx || hy + h + 2 <= b || b + d + 2 <= hy)
     && [...Array(w * h).keys()].every(k => at(hx + (k % w), hy + ((k / w) | 0)) === T.GRASS);
   const put = (hx, hy, type, door) => { const [w, h] = CAP_SIZE[type] || [5, 4]; if (!fits(hx, hy, w, h)) return false; house('world', hx, hy, w, h, door, { type, town: C.key }); hs.push([hx, hy, w, h]); return true; };
-  const district = (hx, hy, k) => hy < cy - 2 ? (hx < cx ? ['chapel', 'healer', 'house', 'house'][k % 4] : ['manor', 'manor', 'house'][k % 3])
+  for (const [hx, hy, tp] of [[cx - 22, gy + 4, 'store'], [cx + 16, gy + 4, 'tavern'], [cx - 22, cy, 'bakery'], [cx + 16, cy, 'store']]) put(hx, hy, tp, hx < cx ? 'E' : 'W');   /* Läden am Markt */
+  const district = (hx, hy, k) => hy < gy ? (hx < cx ? ['chapel', 'healer', 'house', 'house'][k % 4] : ['manor', 'manor', 'house'][k % 3])
+    : hy < cy + 7 ? (hx < cx ? ['store', 'tavern', 'bakery', 'house'][k % 4] : ['store', 'house', 'manor', 'house'][k % 4])
     : hx < cx ? ['cottage', 'cottage', 'house', 'tavern', 'cottage'][k % 5] : ['smithy', 'barracks', 'stable', 'store', 'house'][k % 5];
   let k = 0;
-  for (let hy = y0 + 2; hy < y1 - 3; hy += 6) for (let hx = x0 + 2; hx < x1 - 3; hx += 7) for (const tp of [district(hx, hy, k), 'house', 'cottage']) if (put(hx, hy, tp, hy < cy ? 'S' : 'N')) { k++; break; }   /* dicht bebaut; passt der große Bau nicht, ein kleinerer */
-  for (const [hx, hy, tp] of [[cx - 16, cy + 3, 'store'], [cx + 10, cy + 3, 'tavern'], [cx - 16, cy + 10, 'bakery'], [cx + 10, cy + 10, 'store']]) put(hx, hy, tp, hx < cx ? 'E' : 'W');
-  street(cx - 8, cy + 2, cx + 8, cy + 10);                                                                          // Markt
+  for (let hy = y0 + 2; hy < y1 - 3; hy += 6) for (let hx = x0 + 2; hx < x1 - 3; hx += 7) for (const tp of [district(hx, hy, k), 'house', 'cottage']) if (put(hx, hy, tp, hy < gy ? 'S' : hy < cy + 7 ? (hy < cy - 4 ? 'N' : 'S') : 'N')) { k++; break; }   /* dicht bebaut; passt der große Bau nicht, ein kleinerer */
   const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && at(x, y) !== T.WATER && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, { planned: true, ...o }); };
-  P('well', cx - 4, cy + 6, { solid: true }); P('chain_post', cx + 4, cy + 6, { solid: true, label: 'Galgen des Königs' }); P('statue', cx, cy + 9, { solid: true, r: 10, label: 'Standbild König Varons' });
-  for (const [x, y] of [[x0 - 1, cy - 3], [x0 - 1, cy + 3], [x1 + 1, cy - 3], [x1 + 1, cy + 3], [cx - 3, y1 + 1], [cx + 3, y1 + 1], [cx - 3, by1 + 1], [cx + 3, by1 + 1]]) P('banner_torn', x, y, { label: 'Schwarzes Banner Valens' });
-  for (let x = x0 + 4; x < x1 - 2; x += 6) { P('lantern', x, cy - 2); P('lantern', x + 3, cy + 2); }
-  for (const [x, y] of [[cx - 12, y0 + 6], [cx + 12, y0 + 6], [cx - 12, y0 + 14], [cx + 12, y0 + 14]]) P('tent_prop', x, y, { solid: true, label: 'Zelt der Königsgarde' });
-  lay(cx, y0 - 1, 467, 113);                                                                                        // Straße nach Nordfurt
-  TOWN_PLAN[C.key] = { village: true, lord: 'valen', capital: true, area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy + 6], perHead: 45, fields: [],
-    plazas: [[T.STONE, cx - 8, cy + 2, cx + 8, cy + 10]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+  P('well', cx - 5, cy - 1, { solid: true }); P('chain_post', cx + 5, cy - 1, { solid: true, label: 'Galgen des Königs' }); P('statue', cx, cy + 2, { solid: true, r: 10, label: 'Standbild König Varons' });
+  for (const [x, y] of [[x0 - 1, gy - 3], [x0 - 1, gy + 3], [x1 + 1, gy - 3], [x1 + 1, gy + 3], [cx - 3, y1 + 1], [cx + 3, y1 + 1], [cx - 3, by1 + 1], [cx + 3, by1 + 1]]) P('banner_torn', x, y, { label: 'Schwarzes Banner Valens' });
+  for (let x = x0 + 4; x < x1 - 2; x += 6) { P('lantern', x, gy - 2); P('lantern', x + 3, gy + 2); }
+  for (let y = by1 + 4; y < y1 - 2; y += 7) { P('lantern', cx - 2, y); P('lantern', cx + 2, y + 3); }
+  for (const [x, y] of [[cx - 24, y0 + 8], [cx + 24, y0 + 8], [cx - 24, y0 + 17], [cx + 24, y0 + 17]]) P('tent_prop', x, y, { solid: true, label: 'Zelt der Königsgarde' });
+  lay(cx, y1 + 1, CAPITAL.old.x, CAPITAL.old.y);                                                                     // Kronweg nach Süden (alte Stelle: Königsfelder)
+  TOWN_PLAN[C.key] = { village: true, lord: 'valen', capital: true, area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy - 3], perHead: 60, fields: [],
+    plazas: [[T.STONE, cx - 13, gy + 3, cx + 13, cy + 5]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
 }
 for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
 // Nutzer §5d.10 (01.10.2026): eigene Grundrisse der Nebenstädte. Tore bleiben an den vier Seiten (Straßen draußen), innen hat

@@ -690,6 +690,23 @@ function humanDetails(C, L, P, side, back, b, hood) {
 // G3: Waffen im feinen Raster (1 Welt-Einheit je Pixel). Liegend, Spitze nach +x, Griff bei (gx, gy). Formen mit Volumen
 // (liegende Teile: Licht oben), danach Details (Wicklung, Hohlkehle, Nieten, Rost, Scharten). Jede Waffe eigene Form.
 // =====================================================================================================================
+/* Runde 9 (Artist): Sensenblatt quer zum Schaft. Mittellinie = quadratische Kurve Wurzel (x0,y0) → Kontrollpunkt (cx,cy) → Spitze (tx,ty),
+   Breite w an der Wurzel, zur Spitze schmal (Exponent pw). Rücken (außen, konvex) bekommt den Anteil bk der Breite, die Schneide den Rest.
+   s = -1 spiegelt die Seiten (Blatt zur anderen Schaftseite). Liefert Rücken- und Schneidenlinie für die Details. +y = vorn, wenn die Sense aufrecht steht. */
+const qpt = (x0, y0, cx, cy, tx, ty, t) => { const u = 1 - t; return [u * u * x0 + 2 * u * t * cx + t * t * tx, u * u * y0 + 2 * u * t * cy + t * t * ty]; };
+function sickle(C, pid, x0, y0, cx, cy, tx, ty, w, pw = 0.9, bk = 0.4, s = 1, n = 20) {
+  const Bk = [], Ed = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t, [x, y] = qpt(x0, y0, cx, cy, tx, ty, t);
+    const dx = 2 * u * (cx - x0) + 2 * t * (tx - cx), dy = 2 * u * (cy - y0) + 2 * t * (ty - cy), l = Math.hypot(dx, dy) || 1, nx = s * dy / l, ny = -s * dx / l;
+    const hw = Math.max(0.3, w * Math.pow(1 - t, pw));
+    Bk.push([x + nx * hw * bk, y + ny * hw * bk]); Ed.push([x - nx * hw * (1 - bk), y - ny * hw * (1 - bk)]);
+  }
+  C.poly(pid, [...Bk, ...Ed.slice().reverse()]);
+  return { back: Bk, edge: Ed };
+}
+const dense = P => P.flatMap((p, i) => i + 1 < P.length ? [p, [(p[0] + P[i + 1][0]) / 2, (p[1] + P[i + 1][1]) / 2]] : [p]);   /* dichtere Linie für Einzelpixel */
+const inset = (A, B, k) => A.map(([x, y], i) => [x + (B[i][0] - x) * k, y + (B[i][1] - y) * k]);   /* Linie zwischen Schneide (k=0) und Rücken (k=1) */
 const WDES = {
   rusty_sword: [40, 12, (C, M) => { const { St } = M;
     C.ell(M.ir, 2.5, 6, 2.3, 2.3); C.poly(M.wr, [[4, 4.6], [11, 4.6], [11, 7.4], [4, 7.4]]); C.poly(M.ir, [[11, 1.5], [13, 1.5], [13, 10.5], [11, 10.5]]);
@@ -740,10 +757,71 @@ const WDES = {
     C.ell(M.ir, 50.5, 15, 3.6, 3.6); C.poly(M.st, [[50, 13], [54, 9], [55, 4], [51, 0.5], [45, 2.5], [48.5, 5], [49.5, 9], [47, 12]]); C.poly(M.st, [[50, 17], [54, 21], [55, 26], [51, 29.5], [45, 27.5], [48.5, 25], [49.5, 21], [47, 18]]);
     return { gx: 11, gy: 15, blade: null }; }],
   // S13: neue Waffenarten (Nutzer)
-  kriegssense: [70, 24, (C, M) => { C.poly(M.wd, [[0, 10.5], [60, 10.5], [60, 13], [0, 13]]); C.poly(M.ir, [[57, 9], [61, 9], [61, 14], [57, 14]]);
-    C.poly(M.st, [[59, 12], [66, 11], [69, 14], [66, 19], [56, 22], [44, 23], [52, 19], [60, 16]]); return { gx: 20, gy: 12, blade: [46, 64, 18] }; }],
-  sturmsense: [72, 24, (C, M) => { C.poly(M.wd, [[0, 10.5], [62, 10.5], [62, 13], [0, 13]]); for (const x of [8, 20, 34]) C.poly(M.wr, [[x, 10], [x + 3, 10], [x + 3, 13.5], [x, 13.5]]);
-    C.poly(M.ir, [[59, 8.5], [63, 8.5], [63, 14.5], [59, 14.5]]); C.poly(M.st, [[61, 12], [68, 10.5], [71, 14], [68, 20], [57, 23], [42, 23.5], [52, 19], [61, 16]]); return { gx: 22, gy: 12, blade: [44, 66, 19] }; }],
+  /* Runde 9 (Artist): Sensen — langes, gebogenes Blatt quer zum Schaft (+y = vorn, wenn sie aufrecht steht), je Sense eigene Form.
+     Grassense: Hofsense mit Griffbügel und Rost. Erntesense/Kriegssense: halb gerade geschmiedet (Bürgerwehr), Blatt steiler nach vorn.
+     Doppelsense: zwei Blätter Rücken an Rücken. Mondsense: Halbmond aus Mondsilber, schwarzer Stiel. Sturmsense: große Bauernsense mit rotem Band.
+     Blutkult-Sense: eigenes Dark-Fantasy-Design (Aldhelms Erntewerkzeug) — Klauenblatt mit Adern, Knochendornen, Maul am Blattansatz, Sehnenwicklung. */
+  grassense: [66, 34, (C, M) => { C.poly(M.wd, [[0, 4.6], [58, 4.6], [58, 7.2], [0, 7.2]]);
+    C.poly(M.wd, [[25, 6.5], [27.6, 6.5], [28.2, 13], [25.6, 13]]); C.poly(M.wr, [[25.2, 11], [28.4, 11], [28.6, 14.2], [25.2, 14.2]]);   /* Griffbügel */
+    C.poly(M.ir, [[54, 3.6], [59, 3.6], [59, 8.4], [54, 8.4]]);
+    const Bl = C.partR('blade', M.St), B = sickle(C, Bl, 57, 6, 66, 20, 42, 31, 7, 0.85, 0.35);
+    return { gx: 18, gy: 6, blade: null, after: (set) => { for (const [x, y] of dense(inset(B.edge, B.back, 0.15)).slice(2, -3)) set(x, y, '#cfc8b8');
+      for (const i of [5, 6, 11, 15]) { const [x, y] = inset(B.edge, B.back, 0.6)[i]; set(x, y, i % 2 ? '#7a4a2a' : '#8c5a30'); } } }; }],
+  erntesense: [66, 34, (C, M) => { C.poly(M.wd, [[0, 4.6], [58, 4.6], [58, 7.2], [0, 7.2]]);
+    C.poly(M.wd, [[27, 6.5], [29.6, 6.5], [30.2, 13], [27.6, 13]]); C.poly(M.wr, [[27.2, 11], [30.4, 11], [30.6, 14.2], [27.2, 14.2]]);
+    for (const x of [13, 40]) C.poly(M.ir, [[x, 4], [x + 2, 4], [x + 2, 7.8], [x, 7.8]]);                                       /* Eisenbänder der Bürgerwehr */
+    C.poly(M.ir, [[53, 3.4], [59, 3.4], [59, 8.6], [53, 8.6]]);
+    const Bl = C.partR('blade', M.St), B = sickle(C, Bl, 57, 6, 67, 17, 61, 31, 6.5, 0.8, 0.35);
+    return { gx: 18, gy: 6, blade: null, after: (set, S) => { for (const [x, y] of dense(inset(B.edge, B.back, 0.15)).slice(2, -3)) set(x, y, '#d8d2c4');
+      for (const [x, y] of dense(inset(B.edge, B.back, 0.8)).slice(3, -6)) set(x, y, S.dk); set(55, 4.5, '#d8d0c0'); set(55, 7.5, '#d8d0c0'); } }; }],
+  doppelsense: [66, 40, (C, M) => { C.poly(M.wd, [[0, 18.7], [57, 18.7], [57, 21.3], [0, 21.3]]); C.poly(M.wr, [[4, 18.4], [14, 18.4], [14, 21.6], [4, 21.6]]);
+    C.poly(M.ir, [[52, 16.4], [59, 16.4], [59, 23.6], [52, 23.6]]);
+    const Bl = C.partR('blade', M.St), A = sickle(C, Bl, 57, 22, 65, 33, 45, 39, 6.5, 0.9, 0.35), B = sickle(C, Bl, 57, 18, 65, 7, 45, 1, 6.5, 0.9, 0.35, -1);
+    return { gx: 9, gy: 20, blade: null, after: (set) => { for (const P of [A, B]) { for (const [x, y] of dense(inset(P.edge, P.back, 0.15)).slice(2, -3)) set(x, y, '#d8d2c4');
+      for (const i of [7, 12]) { const [x, y] = inset(P.edge, P.back, 0.3)[i]; set(x, y, '#5a1416'); } } set(55, 20, '#1b1411'); } }; }],
+  mondsense: [70, 38, (C, M) => { const Dk = C.partR('ebony', ramp('#2c2a32'), true); C.poly(Dk, [[0, 4.6], [58, 4.6], [58, 7.2], [0, 7.2]]);
+    C.poly(M.wr, [[6, 4.3], [16, 4.3], [16, 7.5], [6, 7.5]]);
+    const Mo = C.partR('blade', ramp('#9aa6b8')), B = sickle(C, Mo, 57, 6.5, 79, 31, 38, 35, 8.5, 1, 0.4);
+    const Pa = C.partR('moon', ramp('#dfe6ee')); C.ell(Pa, 55.5, 5.9, 3, 3);                                                     /* Mondscheibe am Ansatz */
+    return { gx: 18, gy: 6, blade: null, after: (set) => { for (const [x, y] of dense(inset(B.edge, B.back, 0.12)).slice(1, -2)) set(x, y, '#f2f6ff');
+      for (const [x, y] of inset(B.edge, B.back, 0.7).slice(2, -5).filter((p, i) => i % 3 === 0)) set(x, y, '#9fd8ff');
+      for (const [x, y] of [[56.5, 4.2], [57.2, 5.6], [56.5, 7]]) set(x, y, '#2c2a32'); } }; }],
+  kriegssense: [74, 34, (C, M) => { C.poly(M.wd, [[0, 4.6], [60, 4.6], [60, 7.2], [0, 7.2]]); C.poly(M.wr, [[4, 4.3], [13, 4.3], [13, 7.5], [4, 7.5]]);
+    for (const y of [3.6, 6.8]) C.poly(M.ir, [[45, y], [60, y], [60, y + 1.6], [45, y + 1.6]]);                                    /* Schaftfedern */
+    C.poly(M.ir, [[57, 3], [62, 3], [62, 8.8], [57, 8.8]]);
+    const Bl = C.partR('blade', M.St), B = sickle(C, Bl, 60, 6.5, 62, 20, 72, 31, 7, 0.85, 0.4, -1);
+    C.poly(Bl, [[58, 8], [53, 12.5], [57, 9.5]]);                                                                                   /* Bartdorn nach hinten */
+    return { gx: 18, gy: 6, blade: null, after: (set) => { for (const [x, y] of dense(inset(B.edge, B.back, 0.15)).slice(2, -3)) set(x, y, '#d8d2c4');
+      for (const x of [48, 54]) { set(x, 4, '#d8d0c0'); set(x, 7.5, '#d8d0c0'); } } }; }],
+  sturmsense: [76, 38, (C, M) => { C.poly(M.wd, [[0, 4.6], [62, 4.6], [62, 7.2], [0, 7.2]]); for (const x of [8, 20, 36]) C.poly(M.wr, [[x, 4.1], [x + 3, 4.1], [x + 3, 7.6], [x, 7.6]]);
+    C.poly(M.wd, [[28, 6.5], [30.6, 6.5], [31.2, 13], [28.6, 13]]); C.poly(M.wr, [[28.2, 11], [31.4, 11], [31.6, 14.2], [28.2, 14.2]]);
+    C.poly(M.ir, [[58, 3.2], [63, 3.2], [63, 8.8], [58, 8.8]]);
+    const Bl = C.partR('blade', M.St), B = sickle(C, Bl, 61, 6.5, 72, 24, 42, 36, 8.5, 0.85, 0.38);
+    const Rd = C.partR('red', ramp('#7a2024')); C.poly(Rd, [[56.5, 7], [58.5, 7], [55, 15], [52, 17.5], [53.5, 13]]); C.poly(Rd, [[56, 7], [57.6, 7.6], [51, 12.5], [48.5, 12]]);   /* rotes Band der Bäuerin */
+    return { gx: 20, gy: 6, blade: null, after: (set) => { for (const [x, y] of dense(inset(B.edge, B.back, 0.13)).slice(2, -3)) set(x, y, '#eef0f4');
+      for (const [x, y] of dense(inset(B.edge, B.back, 0.78)).slice(3, -8).filter((p, i) => i % 3 === 0)) set(x, y, '#ffd27a'); } }; }],
+  blutsense: [84, 50, (C, M) => {
+    const Dk = C.partR('ebony', ramp('#241a1c'), true); C.poly(Dk, [[3, 6.6], [64, 6.6], [64, 9.4], [3, 9.4]]);                       /* schwarzer Schaft */
+    const Bo = C.partR('bone', ramp('#cbbf9f')); C.poly(Bo, [[0, 8], [4, 6.2], [4, 9.8]]);                                          /* Knochendorn am Fuß */
+    const Fl = C.partR('flesh', ramp('#6e1a1c')); for (const x0 of [7, 36]) for (let x = x0; x < x0 + 12; x += 3) C.poly(Fl, [[x, 6.2], [x + 1.6, 6.2], [x + 2.6, 9.8], [x + 1, 9.8]]);   /* Sehnenwicklung */
+    for (const x of [25, 30, 50, 55]) C.ell(Bo, x, 8, 1.2, 1.8);                                                                     /* Wirbelknoten */
+    const T = sickle(C, Bo, 63, 6, 69, 0.6, 57, 1.2, 2.6, 0.9, 0.5, -1);                                                         /* Rückendorn, nach hinten gekrallt */
+    const Bd = C.partR('blood', ramp('#4a0c10')), B = sickle(C, Bd, 64, 11, 86, 36, 38, 48, 12, 1, 0.42);                         /* Klauenblatt */
+    [4, 8, 12, 15].forEach(i => { const [bx, by] = B.back[i], [ex, ey] = B.edge[i], l = Math.hypot(bx - ex, by - ey) || 1, ux = (bx - ex) / l, uy = (by - ey) / l;
+      const [ax, ay] = B.back[i - 1], [cx, cy] = B.back[i + 1], lt = Math.hypot(cx - ax, cy - ay) || 1, tx = (cx - ax) / lt, ty = (cy - ay) / lt, k = i === 15 ? 3 : 5;
+      C.poly(Bo, [[bx - tx * 2.2 - ux, by - ty * 2.2 - uy], [bx + ux * k + tx * 2.4, by + uy * k + ty * 2.4], [bx + tx * 1.8 - ux, by + ty * 1.8 - uy]]); });
+    const Mw = C.partR('maw', ramp('#4a1014')); C.ell(Mw, 64, 8.5, 5.4, 5.2);                                                     /* Maul am Blattansatz */
+    const veins = dense(inset(B.edge, B.back, 0.5)).slice(2, -8);
+    for (const i of [5, 9, 13]) { const [x0, y0] = inset(B.edge, B.back, 0.48)[i], [x1, y1] = inset(B.edge, B.back, 0.2)[i + 1]; veins.push([x0, y0], [(x0 + x1) / 2, (y0 + y1) / 2]); }   /* Seitenadern zur Schneide */
+    const throat = [[64, 8.5], [64.8, 8.5]], pulse = [...veins, ...throat];
+    return { gx: 14, gy: 8, blade: null, pulse, after: (set) => {
+      dense(inset(B.edge, B.back, 0.14)).slice(2, -2).forEach(([x, y], i) => set(x, y, i % 4 === 3 ? '#2a0608' : i > 30 ? '#ff7a66' : '#d43a3a'));   /* gezahnte, nasse Schneide */
+      for (const [x, y] of veins) set(x, y, '#8e1820');
+      for (let x = 60; x <= 68; x += 1.5) set(x, 8.5, '#120506');                                                               /* Maulspalt quer, kein Auge */
+      for (const x of [60.5, 63.5, 66.5]) { set(x, 7, '#e8dfc6'); set(x + 1.5, 10, '#e8dfc6'); }                                  /* Zähne oben/unten versetzt */
+      for (const [x, y] of throat) set(x, y, '#ff3a30');
+      for (const [x, y] of dense(T.edge).slice(1, -1)) set(x, y, '#efe6cc');
+      } }; }],
   kriegssichel: [40, 20, (C, M) => { C.poly(M.wr, [[0, 9], [14, 9], [14, 12], [0, 12]]); C.ell(M.ir, 1.5, 10.5, 1.6, 1.6);
     C.poly(M.st, [[14, 8.5], [22, 4.5], [31, 3.5], [38, 7], [39, 11], [34, 8], [25, 8], [19, 11.5], [14, 12]]); return { gx: 6, gy: 10, blade: [18, 34, 7] }; }],
   doppelklinge: [64, 12, (C, M) => { C.poly(M.wr, [[26, 4.8], [38, 4.8], [38, 7.2], [26, 7.2]]); C.poly(M.ir, [[24, 3.5], [26, 3.5], [26, 8.5], [24, 8.5]]); C.poly(M.ir, [[38, 3.5], [40, 3.5], [40, 8.5], [38, 8.5]]);
@@ -968,6 +1046,7 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '',
     const up = y > 0 ? C.id[i - w] : -1, dn = y < h - 1 ? C.id[i + w] : -1;
     if (up < 0) C.col[i] = mix(C.col[i], '#e2ddd2', 0.5); else if (dn < 0) C.col[i] = mix(C.col[i], '#0c0b0a', 0.45); }
   if (info.str) info.str = info.str.map(v => v * sc);
+  if (info.pulse) { const seen = new Set(); info.pulse = info.pulse.map(([x, y]) => [Math.floor(x * sc), Math.floor(y * sc)]).filter(([x, y]) => { const k = x + ',' + y; if (seen.has(k) || x < 0 || y < 0 || x >= w || y >= h) return false; seen.add(k); return true; }); }   /* Runde 9: pulsierende Adern (Blutkult-Sense), Bildpixel */
   if (info.after && !(bare && info.str)) info.after((x, y, c) => { x = Math.floor(x * sc); y = Math.floor(y * sc); if (x < 0 || y < 0 || x >= w || y >= h) return; if (c === null) { C.col[y * w + x] = null; C.id[y * w + x] = -1; } else C.col[y * w + x] = c; }, St);
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (C.id[y * w + x] === M.wr && (x % 3 === 0)) C.col[y * w + x] = Wrap.dk;   // Wicklung
   if (sc !== 1) {                                                   // S14 Stil R (Nutzer: „Waffen hübscher“): Hohlkehle und Schliff, Messing/Gold und Stein nach Rarität, Wickel schräg
@@ -983,7 +1062,7 @@ export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '',
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) { const i = y * w + x; if ((C.id[i] === M.st || C.id[i] === M.ir) && C.col[i]) { const n = h2(x + ks, y * 5 + ks);
     if (sc !== 1) continue;   // S15 Stil R: keine Einzelpixel-Scharten (Rauschen)
     if (n < 0.03) C.col[i] = mix(C.col[i], '#6a3a1e', 0.35); else if (n > 0.98) C.col[i] = mix(C.col[i], '#0c0b0a', 0.4); } }
-  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb, str: info.str };
+  return { g: { w, h, a: C.col.slice(), at: (x, y) => x < 0 || y < 0 || x >= w || y >= h ? null : C.col[y * w + x] }, gx: info.gx, gy: info.gy, blade: info.blade, orb: info.orb, str: info.str, pulse: info.pulse };
 }
 
 // =====================================================================================================================

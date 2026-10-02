@@ -326,6 +326,7 @@ export function paintR(L, dir, pose, W = null) {
     else { R.lL = [[13.5, 26], [13, 34], [12.5, 41]]; R.lR = [[18.5, 26], [19, 34], [19.5, 41]]; } }
   { const X0 = looks(L); AB = X0.ab; const mv = (a, dx) => a && a.map(([x, y]) => [x + dx, y + X0.by]);
     R.by += X0.by; R.hy += 0; if (view === 'W') { R.aN = mv(R.aN, 0); R.aF = mv(R.aF, 0); } else { R.aL = mv(R.aL, -X0.sh); R.aR = mv(R.aR, X0.sh); } }
+  if (L.ag === 2) { R.hy += 1; if (view === 'W') R.hx -= 1; }   /* Artist Runde 4: Alte gehen gebeugt, Kopf tiefer und vor */
   if (view !== 'W' && (AB >= 2 || L.stance) && (pose === 'i0' || pose === 'i1' || pose === 'guard')) { const sp = AB >= 3 ? 1.5 : 1;   // S15: Gewicht im Stand
     R.lL = R.lL.map(([x, y], i) => [x - sp * i / 2, y]); R.lR = R.lR.map(([x, y], i) => [x + sp * i / 2, y]); }
   if (ride) { if (view === 'W') { R.lN = [[15.5, 26], [11, 29.5], [12.5, 36]]; R.lF = [[16.5, 26], [12, 30], [13.5, 36.5]]; }   // S15 Reitsitz: Knie nach vorn, Unterschenkel am Pferd
@@ -363,7 +364,7 @@ function looks(L) {
   const coat = L.robe || L.cloth, metalArm = L.armor === 'plate' || L.armor === 'chain';
   const hemRow = L.robe ? 44 : ({ 35: 28, 39: 32, 44: 37 }[L.hem] ?? (L.cloak || L.hooded ? 33 : 29));
   const helmet = L.helm === 'great' || L.helm === 'bascinet' || XHELM.has(L.helm);
-  const hood = !!L.hooded && !helmet && L.helm !== 'wide' && L.helm !== 'hat';
+  const hood = !!L.hooded && !helmet && L.helm !== 'wide' && L.helm !== 'hat' && L.helm !== 'toque';
   return { bone, gob, coat, sleeve: metalArm ? L.armorR : coat, sleeveMat: metalArm ? 'metal' : 'cloth', hand: L.glove || L.skin,
     pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
 }
@@ -509,6 +510,7 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
     C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     if (!back) { const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[14, 17], [13, 18], [13, 18], [13, 18], [14, 17]], hx); ids.face = f; }
+    if (gob) { const ear = C.part(L.skin, 'skin'); C.poly(ear, [[12.5 + hx, y0 + 3], [8 + hx, y0 + 1], [9 + hx, y0 + 3], [12.5 + hx, y0 + 5]]); C.poly(ear, [[19.5 + hx, y0 + 3], [24 + hx, y0 + 1], [23 + hx, y0 + 3], [19.5 + hx, y0 + 5]]); }   /* Artist Runde 2: Goblinohren ragen aus der Kapuze (Silhouette) */
     ids.hood = hd; return;
   }
   const hd = C.part(L.skin, gob ? 'skin' : X.bone ? 'bone' : 'skin', { grp: 'head' });
@@ -525,9 +527,9 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     if (L.hs === 3 && back) C.rect(hr, 15 + hx, y0 + 6, 16 + hx, y0 + 12);
     ids.hair = hr;
   }
-  if (L.beard && !back && !X.helmet && !X.bone) { const bd = C.part(L.hair, 'cloth'); C.rows(bd, y0 + 5, [[13, 18], [13, 18], [14, 17], [15, 16]], hx); ids.beard = bd; }
+  if (L.beard === 1 && !back && !X.helmet && !X.bone) { const bd = C.part(L.hair, 'cloth'); C.rows(bd, y0 + 5, L.ag === 2 ? [[13, 18], [13, 18], [13, 18], [14, 17], [14, 17], [15, 16]] : [[13, 18], [13, 18], [14, 17], [15, 16]], hx); ids.beard = bd; }   /* Artist Runde 4: Alte tragen den Bart lang */
   if (t) {
-    const hm = C.part(L.helmR, ['cap', 'scarf', 'wide', 'hat'].includes(t) ? 'cloth' : 'metal', { grp: 'helm' });
+    const hm = C.part(L.helmR, ['cap', 'scarf', 'wide', 'hat', 'toque'].includes(t) ? 'cloth' : 'metal', { grp: 'helm' });
     if (XHELM.has(t)) {                                              // S14 Endgame-Helme: Hörner, Krone, Federbusch, Visier, Magitech, Schädel
       const base = t === 'visor' ? [[14, 17], [13, 18], [12, 19], [12, 19], [11, 20], [11, 20], [12, 19], [12, 19], [12, 19], [13, 18], [13, 18]]
         : t === 'mech' ? [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18], [13, 18], [14, 17]]
@@ -547,6 +549,7 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); if (!back) C.rect(hm, 15 + hx, y0 + 2, 16 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }
+    else if (t === 'toque') C.rows(hm, y0 - 5, [[13, 18], [13, 18], [13, 18], [13, 18], [12, 19], [12, 19]], hx);   /* Artist Runde 4: hoher Hut des Hochreichs, Messingband */
     else if (t === 'scarf') { C.rows(hm, y0 - 1, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); C.rect(hm, 12 + hx, y0 + 3, 12 + hx, y0 + 8); C.rect(hm, 19 + hx, y0 + 3, 19 + hx, y0 + 8); if (back) C.rect(hm, 13 + hx, y0 + 3, 18 + hx, y0 + 8); }
     else C.rows(hm, y0 - 1, [[14, 17], [13, 18], [13, 18], [12, 19]], gob ? hx : hx);    // Kappe
     ids.helm = hm;
@@ -639,6 +642,7 @@ function headW(C, L, X, hx, hy, ids, meta) {
     const hd = C.part(L.hood, 'cloth', { grp: 'hood' });
     C.rows(hd, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 19], [13, 19], [14, 18]], hx);
     const f = C.part(flatR(VOID), 'cloth', { flat: true, noLine: true }); C.rows(f, y0 + 2, [[12, 14], [12, 15], [12, 15], [12, 14], [13, 14]], hx);
+    if (gob) C.poly(C.part(L.skin, 'skin'), [[18.5 + hx, y0 + 3], [23 + hx, y0], [22 + hx, y0 + 3], [18.5 + hx, y0 + 5]]);   /* Artist Runde 2: Goblinohr aus der Kapuze */
     ids.face = f; ids.hood = hd; return;
   }
   const hd = C.part(L.skin, X.bone ? 'bone' : 'skin', { grp: 'head' });
@@ -654,9 +658,9 @@ function headW(C, L, X, hx, hy, ids, meta) {
     if (L.hs === 3) C.rect(hr, 19 + hx, y0 + 4, 19 + hx, y0 + 10);
     ids.hair = hr;
   }
-  if (L.beard && !X.helmet && !X.bone) { const bd = C.part(L.hair, 'cloth'); C.rows(bd, y0 + 5, [[13, 16], [13, 16], [14, 15]], hx); ids.beard = bd; }
+  if (L.beard === 1 && !X.helmet && !X.bone) { const bd = C.part(L.hair, 'cloth'); C.rows(bd, y0 + 5, L.ag === 2 ? [[13, 16], [13, 16], [13, 16], [14, 15], [14, 15]] : [[13, 16], [13, 16], [14, 15]], hx); ids.beard = bd; }
   if (t) {
-    const hm = C.part(L.helmR, ['cap', 'scarf', 'wide', 'hat'].includes(t) ? 'cloth' : 'metal', { grp: 'helm' });
+    const hm = C.part(L.helmR, ['cap', 'scarf', 'wide', 'hat', 'toque'].includes(t) ? 'cloth' : 'metal', { grp: 'helm' });
     if (XHELM.has(t)) {                                              // S14 Endgame-Helme: Hörner, Krone, Federbusch, Visier, Magitech, Schädel
       const base = t === 'visor' ? [[14, 17], [13, 18], [12, 19], [12, 19], [11, 20], [11, 20], [12, 19], [12, 19], [12, 19], [13, 18], [13, 18]]
         : t === 'mech' ? [[14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18], [13, 18], [14, 17]]
@@ -676,6 +680,7 @@ function headW(C, L, X, hx, hy, ids, meta) {
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); C.rect(hm, 12 + hx, y0 + 2, 12 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }
+    else if (t === 'toque') C.rows(hm, y0 - 5, [[13, 18], [13, 18], [13, 18], [13, 18], [12, 19], [12, 19]], hx);
     else if (t === 'scarf') { C.rows(hm, y0 - 1, [[14, 17], [13, 18], [13, 19], [14, 19]], hx); C.rect(hm, 16 + hx, y0 + 3, 19 + hx, y0 + 8); }
     else C.rows(hm, y0 - 1, [[14, 17], [13, 18], [13, 18], [12, 19]], hx);
     ids.helm = hm;
@@ -684,6 +689,28 @@ function headW(C, L, X, hx, hy, ids, meta) {
   if (L.face === 'cloth' && L.scarf) ids.mouth = true;
 }
 
+// Artist Runde 4 (Nutzer: Gesichter bei 1× lesbar): Brauen je Person (fc), Alter (ag: graue Schläfen, Tränensäcke, Stirnfalte),
+// Bartarten (2 Stoppeln, 3 Schnurrbart, 4 Kinnbart), Narben (sc 1 Wange, 2 über dem Auge, 3 Augenklappe). Nur auf Kopfpixeln (C.on).
+function faceR(C, L, I, h, hx, y0, ey, side, Hd) {
+  const S = L.skin, Hb = L.hair || S, o = (x, y, c) => C.on(h, x + hx, y, c), put = (x, y, c) => { if (C.at(x + hx, y) >= 0) C.set(x + hx, y, c); };
+  const brim = L.helm === 'wide' || L.helm === 'hat' || L.helm === 'kettle';
+  if (!brim && L.fc === 1) { if (side) { o(13, ey - 1, Hd); o(14, ey - 1, Hd); o(15, ey - 1, S.dk); } else { o(15, ey - 1, S.dk); o(16, ey - 1, S.dk); } }   // finster: Brauen zur Nasenwurzel
+  else if (!brim && L.fc === 2 && !side) { o(13, ey - 1, S.sh); o(18, ey - 1, S.sh); }                                           // schmale Brauen: jünger, offener
+  if (L.ag >= 1 && I.hair !== undefined && L.hs !== 2) { const g = mix(Hb.b, '#c8c4bc', 0.6);                                   // graue Schläfen
+    for (const [x, y] of side ? [[16, y0 + 2], [16, y0 + 3]] : [[13, y0 + 2], [18, y0 + 2], [13, y0 + 3]]) C.on(I.hair, x + hx, y, g); }
+  if (L.ag === 2) { if (side) { o(15, ey + 1, S.sh); o(14, ey + 2, S.sh); } else { o(14, ey + 1, S.sh); o(17, ey + 1, S.dk); o(13, ey + 2, S.sh); }   // Tränensäcke, eingefallene Wange
+    if (L.hs === 2 && !L.helm) { if (side) { o(14, ey - 2, S.sh); o(15, ey - 2, S.sh); } else { o(15, ey - 2, S.sh); o(16, ey - 2, S.sh); o(14, ey - 3, S.sh); o(17, ey - 3, S.sh); } } }   // Stirnfalten
+  const bd = L.beard | 0, mu = Hb.b, ms = Hb.sh;
+  if (bd === 2) { const st = mix(S.sh, Hb.dk, 0.5), sd = mix(S.dk, Hb.dk, 0.5);                                                  // Stoppeln: Raster auf Kinn und Wangen
+    for (let y = ey + 2; y <= y0 + 7; y++) for (let x = side ? 12 : 13; x <= (side ? 16 : 18); x++) if ((x + y) % 2 === 0 && !(y === ey + 3 && (side ? x === 13 : x === 15 || x === 16))) o(x, y, x >= (side ? 16 : 17) ? sd : st); }
+  if (bd === 3 || bd === 4) { if (side) { o(12, ey + 2, mu); o(13, ey + 2, ms); } else { o(14, ey + 2, mu); o(15, ey + 2, mu); o(16, ey + 2, ms); o(17, ey + 2, ms); } }   // Schnurrbart
+  if (bd === 4) { if (side) { o(13, y0 + 7, mu); o(14, y0 + 7, ms); put(13, y0 + 8, ms); } else { o(15, y0 + 7, mu); o(16, y0 + 7, ms); put(15, y0 + 8, ms); put(16, y0 + 8, Hb.dk); } }   // Kinnbart
+  const pale = mix(S.hi, '#f4d8cc', 0.7), patch = '#141010', band = '#2a2420';
+  if (L.sc === 1) { if (side) { o(15, ey + 1, pale); o(14, ey + 2, pale); } else { o(16, ey, pale); o(17, ey + 1, pale); o(18, ey + 2, pale); o(17, ey + 2, mix(S.sh, '#6a2a20', 0.4)); } }   // Hiebnarbe über die Wange
+  else if (L.sc === 2) { const x = 14; o(x, ey - 1, pale); o(x, ey + 1, pale); o(x, ey, mix(S.sh, '#9a9a9a', 0.5)); if (!side) o(13, ey + 2, pale); }   // milchiges Auge                    // Narbe durchs Auge
+  else if (L.sc === 3) { o(13, ey, patch); o(14, ey, patch); o(14, ey + 1, patch);                                                     // Augenklappe mit Band
+    for (const [x, y] of side ? [[15, ey - 1], [16, ey - 1], [17, ey - 2]] : [[15, ey - 1], [16, ey - 2], [17, ey - 2], [18, ey - 3]]) put(x, y, band); }
+}
 // ---- Details nach der Schattierung: Gesicht, Augen, Schnalle, Zeichen, Kette, Nieten, Falten, Wickel, Stulpen ----
 function details(C, L, R, view, M, pose) {
   const I = M.ids, X = M.X, side = view === 'W', back = view === 'N', hx = M.hx, y0 = 5 + M.hy, S = L.skin, G1 = L.glow;
@@ -692,7 +719,12 @@ function details(C, L, R, view, M, pose) {
   if (!back) {
     if (I.face !== undefined) {                                      // Kapuze: Gesicht im Schatten, Augen als Akzent
       const ex = side ? [13] : [14, 17], ey = y0 + 4;
-      if (L.face === 'skull') { for (const x of ex) { C.set(x + hx, ey - 1, L.bone.sh); C.set(x + hx, ey, G1 || '#0a0808'); } for (let x = side ? 12 : 15; x <= (side ? 14 : 16); x++) C.set(x + hx, ey + 2, x % 2 ? L.bone.b : L.bone.sh); }
+      if (L.face === 'skull') {                                      /* Artist Runde 2: Schädel unter der Kapuze lesbar — Knochenstirn, Augenhöhlen mit Glimmen, Nasenloch, Zähne */
+        const Bn = L.bone, f = I.face, o = (x, y, c) => C.on(f, x + hx, y, c);
+        if (!side) { for (let x = 14; x <= 17; x++) { o(x, ey - 2, x === 14 ? Bn.hi : Bn.b); o(x, ey - 1, x === 17 ? Bn.sh : Bn.b); o(x, ey + 1, x === 17 ? Bn.sh : Bn.b); o(x, ey + 2, x % 2 ? VOID : Bn.hi); }
+          o(14, ey, G1 || VOID); o(15, ey, Bn.b); o(16, ey, Bn.sh); o(17, ey, G1 || VOID); o(15, ey + 1, VOID); }
+        else { for (let x = 12; x <= 14; x++) { o(x, ey - 2, x === 12 ? Bn.hi : Bn.b); o(x, ey - 1, x === 14 ? Bn.sh : Bn.b); }
+          o(12, ey, Bn.b); o(13, ey, G1 || VOID); o(14, ey, Bn.sh); o(12, ey + 1, VOID); o(13, ey + 1, Bn.b); o(14, ey + 1, Bn.sh); o(13, ey + 2, Bn.hi); o(14, ey + 2, VOID); } }
       else if (L.face === 'mask') { const Mk = L.metal; for (let y = ey - 1; y <= ey + 2; y++) for (let x = side ? 12 : 14; x <= (side ? 14 : 17); x++) C.on(I.face, x + hx, y, y === ey - 1 ? Mk.hi : Mk.b); for (const x of ex) C.set(x + hx, ey, G1 || '#0a0808'); }
       else if (L.face === 'cloth' && L.scarf) { for (const x of ex) C.set(x + hx, ey, G1 || '#d09048'); for (let y = ey + 1; y <= ey + 3; y++) for (let x = side ? 12 : 13; x <= (side ? 15 : 18); x++) C.on(I.face, x + hx, y, y === ey + 1 ? L.scarf.hi : L.scarf.b); }
       else { for (let x = side ? 12 : 14; x <= (side ? 14 : 17); x++) C.on(I.face, x + hx, ey + 1, mix(S.dk, VOID, 0.35)); for (const x of ex) C.set(x + hx, ey, G1 || '#c89048'); }
@@ -719,11 +751,17 @@ function details(C, L, R, view, M, pose) {
         for (const x of exs) C.on(h, x + hx, ey, eye);
         const Hd = L.hs === 2 || !L.hair ? S.dk : L.hair.dk;                                // S14: Gesicht detaillierter
         if (!side) { for (const x of [13, 14, 17, 18]) C.on(h, x + hx, ey - 1, Hd); C.on(h, 13 + hx, ey + 1, S.hi); C.on(h, 15 + hx, ey, S.hi); C.on(h, 15 + hx, ey + 1, S.b); C.on(h, 16 + hx, ey + 2, S.dk);
-          if (!L.beard) { C.on(h, 15 + hx, ey + 3, mix(S.dk, '#5a2020', 0.3)); C.on(h, 16 + hx, ey + 3, mix(S.dk, '#5a2020', 0.3)); } for (let x = 14; x <= 17; x++) C.on(h, x + hx, y0 + 7, S.sh); C.set(12 + hx, ey + 1, S.sh); C.set(19 + hx, ey + 1, S.dk); }
+          if (L.beard !== 1) { C.on(h, 15 + hx, ey + 3, mix(S.dk, '#5a2020', 0.3)); C.on(h, 16 + hx, ey + 3, mix(S.dk, '#5a2020', 0.3)); } for (let x = 14; x <= 17; x++) C.on(h, x + hx, y0 + 7, S.sh); C.set(12 + hx, ey + 1, S.sh); C.set(19 + hx, ey + 1, S.dk); }
         else { C.on(h, 13 + hx, ey - 1, Hd); C.on(h, 14 + hx, ey - 1, Hd); C.on(h, 13 + hx, ey + 1, S.hi); C.set(11 + hx, ey + 1, S.b); C.set(11 + hx, ey + 2, S.sh); C.on(h, 16 + hx, ey + 1, S.dk); C.on(h, 17 + hx, ey + 1, S.sh); }
         if (!side) C.on(h, 16 + hx, ey + 1, S.sh);                                       // Nase (seitlich: Kopfkontur)
-        if (!L.beard) { if (!side) { C.on(h, 15 + hx, ey + 3, S.sh); C.on(h, 16 + hx, ey + 3, S.dk); } else C.on(h, 13 + hx, ey + 3, S.sh); }
+        if (L.beard !== 1) { if (!side) { C.on(h, 15 + hx, ey + 3, S.sh); C.on(h, 16 + hx, ey + 3, S.dk); } else C.on(h, 13 + hx, ey + 3, S.sh); }
         if (L.helm === 'wide' || L.helm === 'hat' || L.helm === 'kettle') for (let x = 13; x <= 18; x++) C.on(h, x + hx, ey - 1, S.dk);   // Krempe wirft Schatten
+        if (L.face !== 'rot') faceR(C, L, I, h, hx, y0, ey, side, Hd);   /* Artist Runde 4 */
+        if (L.face === 'rot') {                                      /* Artist Runde 2: Seuchenleiche — eingesunkene Augen mit trübem Glimmen, offener Kiefer, Faulfleck */
+          const Gr = G1 || '#c8c070', rot = mix(S.dk, '#3a2a1a', 0.5);
+          for (const x of exs) { C.on(h, x + hx, ey - 1, VOID); C.on(h, x + hx, ey, Gr); }
+          if (!side) { C.on(h, 15 + hx, ey + 3, '#2a0a08'); C.on(h, 16 + hx, ey + 3, '#2a0a08'); C.on(h, 15 + hx, y0 + 7, VOID); C.on(h, 16 + hx, y0 + 7, VOID); C.on(h, 13 + hx, ey + 1, rot); C.on(h, 13 + hx, ey + 2, rot); C.on(h, 18 + hx, ey - 1, rot); }
+          else { C.on(h, 12 + hx, ey + 3, '#2a0a08'); C.on(h, 13 + hx, ey + 3, '#2a0a08'); C.on(h, 13 + hx, y0 + 7, VOID); C.on(h, 15 + hx, ey + 1, rot); } }
       }
       if (L.face === 'cloth' && L.scarf) for (let y = ey + 1; y <= ey + 3; y++) for (let x = side ? 11 : 13; x <= (side ? 15 : 18); x++) C.set(x + hx, y, y === ey + 1 ? L.scarf.hi : L.scarf.b);
     }
@@ -732,6 +770,13 @@ function details(C, L, R, view, M, pose) {
   if (I.hood !== undefined && !side) C.set(15.5 + hx, y0 - 1, L.hood.sh);
   // Gürtelschnalle, Tasche
   if (!back && I.belt !== undefined) { const bx = side ? 13 + hx : 15; C.set(bx, M.waist, L.gold.hi); C.set(bx + 1, M.waist, L.gold.b); C.set(bx, M.waist + 1, L.gold.b); C.set(bx + 1, M.waist + 1, L.gold.sh); }
+  if (L.trimR && !back) { const T = L.trimR, low = new Map();                                                                     /* Artist Runde 4: Messingborte (Hochreich) an Saum, Halsausschnitt, Ärmeln */
+    for (let i = 0; i < C.col.length; i++) if (C.id[i] === I.skirt) { const x = i % C.w, y = (i / C.w) | 0; if (!low.has(x) || y > low.get(x)) low.set(x, y); }
+    for (const [x, y] of low) C.col[y * C.w + x] = x % 2 ? T.b : T.hi;
+    if (!side && I.torso !== undefined) for (let x = 14; x <= 17; x++) C.on(I.torso, x, M.top, x === 14 || x === 17 ? T.b : T.hi);
+    if (M.arms) for (const [pid, a] of M.arms) { if (a.length < 3) continue; const [ex, ey] = a[1], [ax, ay] = a[2];
+      for (let i = 0; i < C.col.length; i++) if (C.id[i] === pid) { const x = i % C.w - C.dx + 0.5, y = ((i / C.w) | 0) - C.dy + 0.5, t = ((x - ex) * (ax - ex) + (y - ey) * (ay - ey)) / ((ax - ex) ** 2 + (ay - ey) ** 2 || 1); if (t > 0.72 && t < 0.86) C.col[i] = T.b; } } }
+  if (L.helm === 'toque' && I.helm !== undefined) for (let x = 11; x <= 20; x++) C.on(I.helm, x + hx, y0 - 1, (L.trimR || L.gold).b);
   // Kettenhemd: versetzte Ringreihen auf Rumpf, Ärmeln, Kettenrock
   if (L.armor === 'chain') { const Mm = L.armorR, ok = new Set([I.torso, I.chainSkirt, I.armL, I.armR].filter(v => v !== undefined));
     for (let y = 0; y < C.h; y++) for (let x = 0; x < C.w; x++) { const i = y * C.w + x; if (!ok.has(C.id[i])) continue; const c = C.col[i]; if (c === Mm.dk || c === mix(Mm.dk, '#070506', 0.3)) continue;
@@ -979,6 +1024,10 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   if (T.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, x + y < 0 ? '#ece4d4' : '#c8c0b0');   // Kuh: weiße Flecken
   if (type === 'horse') { for (let y = hy - 1; y <= hy + 2; y += 1.25) set(hx - 1, y, '#e8e0d0'); }                                   // Blesse
   if (T.rump) for (let y = -2; y <= 2; y += 1.3) set(cx + brx - 1.5, cy + y, '#e0d4bc');
+  if (type === 'wolf' || type === 'wild_dog') {                     /* Artist Runde 2: dunkler Sattel auf dem Rücken, Brauenschatten — Wolf hebt sich vom Boden ab */
+    const W0 = Cx.w; for (let x = 0; x < W0; x++) { let y = 0; while (y < Cx.h && Cx.id[y * W0 + x] !== P.body) y++; if (y >= Cx.h - 2) continue;
+      for (let d = 1; d <= 2; d++) { const i = (y + d) * W0 + x; if (Cx.id[i] === P.body) Cx.col[i] = d === 1 ? mix(D.b, F.sh, 0.3) : mix(F.sh, D.b, 0.4); } }
+    set(hx - hrx * 0.35, hy - 2.2, D.dk); set(hx - hrx * 0.35 + 1.3, hy - 2.2, D.sh); set(hx - hrx * 0.35, hy - 1, eye); }
   if (type === 'wolf') for (let i = 0; i < 4; i++) set(cx - 6 + i * 4, cy - bry + 1.3, F.hi);
   Cx.outline(); return Cx.toG();
 }

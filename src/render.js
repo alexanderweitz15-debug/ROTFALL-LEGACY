@@ -1,8 +1,8 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
 import { S, clamp, seasonOf } from './state.js?v=23';
-import { MAPS, T, TS, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS } from './world.js?v=23';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
 import * as HB from './buildings.js?v=23';
-import { ITEMS, MONSTERS } from './data.js?v=23';
+import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
 import * as SP from './sprites.js?v=23';
 import { trailPt, WAGON_GAP } from './sim.js?v=23';
@@ -117,11 +117,14 @@ export function drawFrame(now) {
     ctx.fillStyle = 'rgba(12,10,8,.7)'; ctx.fillRect(e.x - w / 2, y - 9, w, 12);
     ctx.fillStyle = e.kind === 'player' ? '#e8c070' : '#9fd0f0'; ctx.fillText(t, e.x, y); ctx.textAlign = 'left';
   }
+  drawAmbience(now, list, m, x0, y0, x1, y1);   /* Artist Runde 7: Umgebungsleben */
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   drawFires(now);     // S14: Brand in der Stadt
   ctx.restore();
   drawLight(now);
+  drawAmbienceGlow();   /* Artist Runde 7 */
   drawWeather(now);
+  drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
   drawFloats();
   drawBubbles(performance.now());
   drawBossBar();
@@ -334,7 +337,7 @@ function bakeGround(o, m, cx, cy) {
     let kind = TILE_KIND[t] || 'grass';
     if (t === T.DFLOOR && DUNGEONS[S.map]?.floor === 'scree') kind = 'scree';   // Minenboden: Geröll, kein Pflaster (Tiefhall: gebaute Halle, Pflaster)
     if (t === T.STONE && world && !townAt(tx, ty, 2) && regionAt(tx, ty) === 'mountain') kind = 'scree';   // Hochgebirge: Geröll, kein Pflaster
-    typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * 4) | 0;
+    typ[k] = t; kin[k] = kind; vari[k] = (h2(tx, ty) * (SP.drawnOn() ? 8 : 4)) | 0;   /* Artist Runde 2: Stil R acht Kachelvarianten (weniger Wiederholung) */
     if (t === T.GRASS || t === T.DIRT) {                  // Wiesen hell, Senken dunkel
       const n = vnoise(tx / 11, ty / 11) * 0.7 + vnoise(tx / 4, ty / 4) * 0.3;
       if (n > 0.58) { sd.data[k * 4] = 150; sd.data[k * 4 + 1] = 160; sd.data[k * 4 + 2] = 90; sd.data[k * 4 + 3] = (n - 0.58) * 0.35 * 255; }
@@ -390,11 +393,39 @@ function bakeGround(o, m, cx, cy) {
     }
   }
   if (img) putLayer(o, img);
+  if (SP.drawnOn()) mottleR(o, x0t, y0t, typ, TW);
   // Helligkeit und Regionstönung: 1 Pixel je Kachelmitte, bilinear hochskaliert — weiche Verläufe statt Kachelrechtecke
   shadeCtx.putImageData(sd, 0, 0); tctx.putImageData(td, 0, 0);
   o.save(); o.imageSmoothingEnabled = true;
   o.drawImage(shadeCv, -16, -16, TW * 16, TW * 16); o.drawImage(tintCv, -16, -16, TW * 16, TW * 16);   // Pixelmitte i ↔ Kachelmitte
   o.restore();
+}
+/* Artist Runde 2 (Stil R): Flecken im Maßstab von ein bis drei Kacheln über Gras, Erde, Weg und Sumpf — trockene helle und satte
+   dunkle Inseln mit organischem Rand, dazu Büschel an Weltpositionen (nicht je Kachel). Bricht das Kachelraster, ohne Rauschen. */
+const MOTT = new Uint8Array(32); MOTT[T.GRASS] = 1; MOTT[T.DIRT] = 2; MOTT[T.ROAD] = 3; MOTT[T.MARSH] = 4;
+let motImg = null;
+function mottleR(o, x0t, y0t, typ, TW) {
+  const SZ = CH * 16; motImg ||= new ImageData(SZ, SZ); const D = motImg.data; D.fill(0);
+  const A = latNoise(x0t * 16, y0t * 16, SZ, 22, 311, 7), B = latNoise(x0t * 16, y0t * 16, SZ, 7, 977, 3);
+  let any = false;
+  const put = (o4, r, g, b, a) => { D[o4] = r; D[o4 + 1] = g; D[o4 + 2] = b; D[o4 + 3] = a; };
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+    const m = MOTT[typ[(j + 1) * TW + i + 1]]; if (!m) continue; any = true;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const X = (x0t + i) * 16 + x, Y = (y0t + j) * 16 + y, a = A(X, Y) * 0.72 + B(X, Y) * 0.28, o4 = ((j * 16 + y) * SZ + i * 16 + x) * 4;
+      if (m === 1) {
+        if (a > 0.63) put(o4, 140, 132, 64, a > 0.7 ? 52 : 34);              /* trockene, helle Stellen */
+        else if (a < 0.34) put(o4, 8, 20, 6, a < 0.27 ? 78 : 50);            /* sattes, dunkles Gras */
+        const q = h2(X * 3 + 11, Y * 7 + 5);
+        if (q > 0.9965 && x < 14 && y > 1) { const b = ((j * 16 + y) * SZ + i * 16 + x) * 4;   /* Büschel: Fuß dunkel, Spitzen hell */
+          put(b, 14, 22, 10, 150); put(b + 4, 14, 22, 10, 150); put(b + 8, 14, 22, 10, 120); put(b - SZ * 4 + 4, 120, 140, 70, 110); put(b - SZ * 4, 90, 110, 50, 90); put(b - SZ * 8 + 4, 150, 160, 90, 70); }
+      } else if (m === 2 || m === 3) {
+        if (a < 0.33) put(o4, 18, 12, 6, a < 0.27 ? 70 : 44);              /* feuchte, dunkle Erde */
+        else if (a > 0.66) put(o4, 150, 130, 96, 30);                        /* staubig */
+      } else if (a < 0.36) put(o4, 4, 14, 10, 60);                           /* Sumpf: tiefere Stellen */
+    }
+  }
+  if (any) putLayer(o, motImg);
 }
 // Wertrauschen mit vorab gehashten Gitterpunkten für ein Quadrat [gx0, gx0+AW) — gleiches Ergebnis wie
 // vnoise(X/sc+ox, Y/scy+oy), aber ~50× weniger Hashes (Backen der Chunks bleibt billig).
@@ -495,8 +526,25 @@ function paintRock(o, m, cx, cy, kind = T.ROCK) {      // auch Höhlenwände (DW
 // ---------------- Mauern mit Höhe: Wehrgang oben, Quaderfront nach Süden, Zinnen an offenen Seiten ----------------
 // Mauerkacheln sahen von oben wie Pflaster aus. Freistehende Mauern (Stadtmauer, Feste) bekommen Zinnen; Hauswände
 // nur die Front (innen sichtbar, wenn das Dach ausblendet).
+/* Artist Runde 5: die Burg auf dem Kronfels (Varonheim) liest sich als Burg — dunklerer Stein, breitere Zinnen, Bergfried mit
+   Schieferdach und First, Ecktürme mit Kegeldach. Grenzen wie buildCapital() in world.js (Burgbezirk cx±30, y0+1…y0+22). */
+const CASTLE = (() => { const C = CAPITAL, y0 = C.y - C.hh; return { x0: C.x - 31, x1: C.x + 31, y0: y0, y1: y0 + 23, kx0: C.x - 14, kx1: C.x + 14, ky0: y0 + 3, ky1: y0 + 15,
+  towers: [[C.x - 30, y0 + 1], [C.x + 30, y0 + 1], [C.x - 30, y0 + 22], [C.x + 30, y0 + 22]].map(([x, y]) => [x * 16 + 8, y * 16 + 6, 20])        /* Mitte in Texeln, Radius */
+    .concat([[C.x - 14, y0 + 3, 12, 12], [C.x + 14, y0 + 3, 4, 12], [C.x - 14, y0 + 15, 12, 4], [C.x + 14, y0 + 15, 4, 4]].map(([x, y, ox, oy]) => [x * 16 + ox, y * 16 + oy, 11])) }; })();
+const SLATE_C = ['#181c23', '#272d37', '#333b47', '#414b59', '#55616f'];
+function castleCone(P, tx, ty, X, Y) {                    // Kegeldach: je Pixel aus dem Abstand zur Turmmitte (über Chunkgrenzen hinweg stimmig)
+  for (const [mx, my, R] of CASTLE.towers) {
+    if (Math.abs(tx * 16 + 8 - mx) > R + 8 || Math.abs(ty * 16 + 8 - my) > R + 8) continue;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const dx = tx * 16 + x - mx, dy = ty * 16 + y - my, d = Math.hypot(dx, dy); if (d > R) continue;
+      const lit = d < 0.5 ? 1 : -(dx + dy) / (d * 1.414), ring = Math.floor(d / 3) % 2, k = Math.max(0, Math.min(4, Math.round(2 + lit * 1.6 * (d / R) + (ring ? -0.4 : 0))));
+      P(d > R - 1.2 ? '#0c0d10' : d < 1.6 ? '#8a8270' : SLATE_C[k], X + x, Y + y);
+    }
+  }
+}
 function paintWalls(o, m, cx, cy) {
   const x0t = cx * CH, y0t = cy * CH, isW = (tx, ty) => tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && m.tiles[ty * m.w + tx] === T.WALL;
+  const K = CASTLE, castleAt = (tx, ty) => m === MAPS.world && tx >= K.x0 && tx <= K.x1 && ty >= K.y0 && ty <= K.y1;
   let houses = null;
   const inHouse = (tx, ty) => (houses ||= HOUSES.filter(b => b.map === S.map && b.x < x0t + CH + 1 && b.x + b.w > x0t - 1 && b.y < y0t + CH + 1 && b.y + b.h > y0t - 1))
     .some(b => tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h);
@@ -504,6 +552,7 @@ function paintWalls(o, m, cx, cy) {
   for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
     const tx = x0t + i, ty = y0t + j; if (!isW(tx, ty)) continue;
     const X = i * 16, Y = j * 16, N = isW(tx, ty - 1), Sd = isW(tx, ty + 1), Wd = isW(tx - 1, ty), E = isW(tx + 1, ty), house = inHouse(tx, ty);
+    if (castleAt(tx, ty) && !house) { paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E); continue; }
     if (!N) P('#6a6258', X, Y, 16, 1);                    // Kantenlicht oben/links, Schatten rechts
     if (!Wd) P('#5e574d', X, Y, 1, 16);
     if (!E) P('#1e1b17', X + 15, Y, 1, 16);
@@ -522,6 +571,37 @@ function paintWalls(o, m, cx, cy) {
     if (!Wd) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 1, Y + k, 2, 3);
     if (!E) for (let k = 2; k < (Sd ? 16 : 7); k += 5) merlon(X + 12, Y + k, 2, 3);
   }
+}
+function paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E) {
+  const K = CASTLE, keep = tx >= K.kx0 && tx <= K.kx1 && ty >= K.ky0 && ty <= K.ky1;
+  if (keep && N && Wd && E && (Sd || ty < K.ky1)) {        // Bergfried: Walmdach aus Schiefer — Nord- und Westfläche im Licht, Grate hell, First
+    const L = (K.kx0 + 1) * 16, Rr = K.kx1 * 16, Tp = (K.ky0 + 1) * 16, B = K.ky1 * 16;
+    for (let y = 0; y < 16; y++) { const WY = ty * 16 + y, row = Math.floor(WY / 4), off = (row & 1) * 3, dy = Math.min(WY - Tp, B - 1 - WY);
+      for (let x = 0; x < 16; x++) { const WX = tx * 16 + x, dx = Math.min(WX - L, Rr - 1 - WX), joint = WY % 4 === 3 || (WX + off) % 6 === 0, r = h2(WX, WY);
+        const face = dy <= dx ? (WY - Tp < B - 1 - WY ? 4 : 1) : (WX - L < Rr - 1 - WX ? 3 : 2), edge = Math.abs(dx - dy) < 1 || (dy <= dx && Math.abs((WY - Tp) - (B - 1 - WY)) < 2);
+        P(edge ? '#6a7686' : joint ? SP.mix(SLATE_C[face], SLATE_C[0], 0.6) : r < 0.12 ? SP.mix(SLATE_C[face], '#7a8696', 0.18) : SLATE_C[face], X + x, Y + y); } }
+    castleCone(P, tx, ty, X, Y); return;
+  }
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {   // Wehrgang: dunkle Platten aus Basalt
+    const WX = tx * 16 + x, WY = ty * 16 + y, joint = WY % 8 === 7 || (WX + ((WY >> 3) & 1) * 4) % 8 === 0, r = h2(WX, WY);
+    P(joint ? '#17161a' : r < 0.1 ? '#36343a' : r > 0.92 ? '#222026' : '#2b2a30', X + x, Y + y);
+  }
+  if (!N) P('#55525a', X, Y, 16, 1);
+  if (!Wd) P('#4a4850', X, Y, 1, 16);
+  if (!E) P('#0c0b0e', X + 15, Y, 1, 16);
+  if (!Sd) {                                              // Front: hohe dunkle Quader, Schießscharten
+    for (let r = 0; r < 9; r++) for (let x = 0; x < 16; x++) {
+      const joint = r === 4 || r === 8 || (x + (r < 4 ? 0 : 4) + (tx * 5 % 8)) % 8 === 0;
+      P(r === 0 ? '#4a4850' : joint ? '#100f12' : h2(tx * 16 + x, ty * 16 + r) < 0.1 ? '#2e2c32' : r > 5 ? '#1c1b20' : '#25242a', X + x, Y + 7 + r);
+    }
+    if (tx % 3 === 0) { P('#08080a', X + 7, Y + 9, 2, 5); P('#08080a', X + 6, Y + 11, 4, 1); }
+  }
+  const merlon = (x, y, w, h) => { P('#45434b', x, y, w, h); P('#5e5b64', x, y, w, 1); P('#0c0b0e', x + w, y + 1, 1, h); P('#0c0b0e', x, y + h, w + 1, 1); };
+  if (!N) for (let k = 1; k < 16; k += 8) merlon(X + k, Y + 1, 5, 3);   // breite Zinnen, weite Scharten
+  if (!Sd) for (let k = 1; k < 16; k += 8) merlon(X + k, Y + 3, 5, 3);
+  if (!Wd) for (let k = 2; k < (Sd ? 16 : 7); k += 8) merlon(X + 1, Y + k, 3, 5);
+  if (!E) for (let k = 2; k < (Sd ? 16 : 7); k += 8) merlon(X + 11, Y + k, 3, 5);
+  castleCone(P, tx, ty, X, Y);
 }
 // ---------------- Wasser: weiche Ufer, Tiefe, Schaum, Schilf (statt Kachelquadrate) ----------------
 const WATER_PAL = {            // tief, mittel, flach, Licht, Schaum
@@ -746,7 +826,7 @@ function drawEntity(e, now) {
     case 'item': return drawGroundItem(e, now);
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
-    case 'enemy': return e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now);   // S15 P5: Übungspuppe der Akademie
+    case 'enemy': { const r = e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now); facPip(e); return r; }   // S15 P5: Übungspuppe der Akademie; Scout R4: Zeichen der Macht
     case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
     case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
@@ -795,6 +875,16 @@ function drawHouse(b, now) {
   }
 }
 
+// Scout R4 (Entwickler 01.10.2026): kleines Rautenzeichen in der Farbe der Macht über Feinden, die mit anderen Mächten verfeindet sind
+// (Tote, Banden, Kette, Goblins, Orden, Kelch, Piraten) — so sieht man, wen man gegeneinander hetzen kann. Erschöpfte Sieger blinken.
+const PIP_FAC = new Set(['undead', 'bandit', 'chain', 'goblin', 'order', 'blut', 'pirate']);
+function facPip(e) {
+  if (!e.alive || e.boss) return; const f = e.faction || MONSTERS[e.mtype]?.faction; if (!PIP_FAC.has(f)) return;
+  const col = FACTIONS[f]?.colors?.[1] || '#888', y = e.y - 64 * (MONSTERS[e.mtype]?.scale || 1), spent = e.spent > performance.now();
+  if (spent && ((performance.now() / 180) | 0) % 2) return;
+  ctx.fillStyle = '#100d0a'; ctx.beginPath(); ctx.moveTo(e.x, y - 5); ctx.lineTo(e.x + 4, y); ctx.lineTo(e.x, y + 5); ctx.lineTo(e.x - 4, y); ctx.fill();
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(e.x, y - 3.5); ctx.lineTo(e.x + 2.5, y); ctx.lineTo(e.x, y + 3.5); ctx.lineTo(e.x - 2.5, y); ctx.fill();
+}
 // Karawane (BUG-011): Leitwagen mit Plane, Kutscher und Ochsengespann; Beiwagen (offene Ladefläche, ein Maultier) folgt der Spur.
 function drawCaravan(e, now) {
   const moving = !!(e.vx || e.vy), f = e.facing === 2 ? -1 : 1;
@@ -883,18 +973,18 @@ function drawDecal(e) {
 
 // Props werden einmal als Vektor gezeichnet, dann pixelisiert (harte Kanten, Kontur, Randlicht) und gecacht.
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
-const VARIANTS = { crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
-const PROP_PERIOD = { machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
-const PROP_BOX = { star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
+const VARIANTS = { market_stall: 4, grave_cross: 3, tomb: 2, cargo_pile: 2, crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
+const PROP_PERIOD = { fountain_grand: 900, banner_pole: 5030, machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+const PROP_BOX = { fountain_grand: 160, banner_pole: 128, street_lamp: 128, star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 // Session 13 (Nutzer): Möbel und Stände in Menschengröße — gezeichnet wie bisher, um den Fußpunkt vergrößert
-const PROP_SCALE = { bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
+const PROP_SCALE = { market_stall: 1.6, bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
 const PROP_FLAT = new Set(['blood', 'flowers_prop']);  // Bodenflecken: keine Kontur
 const PROP_ORGANIC = new Set(['tree', 'bush', 'dead_tree', 'fallen_tree', 'rock_node', 'ore_node', 'rubble', 'camp_ruin', 'standing_stone']);
 const propCache = new Map();
 SP.onArtChange(() => { propCache.clear(); houseCache.clear(); wagonCache.clear(); bakeCache.clear(); iconCache.clear(); groundIcons.clear(); chunkCache.clear(); });   // Stil gewechselt: alles neu backen
 const PROP_RES = 1 / SP.COARSE;                           // Pixel je Welt-Einheit — Stil D: gleiches Raster wie die Figuren (1,5 Welt je Pixel)
 const marketOpen = () => { const h = S.minute / 60; return h >= 7 && h < 18; };   // Markt: 7–18 Uhr
-export const stallShut = e => e.type === 'stall' && !e.fest && !marketOpen();
+export const stallShut = e => (e.type === 'stall' || e.type === 'market_stall') && !e.fest && !marketOpen();
 // S15 P6: Turm des Nachtglases — ein Wahrzeichen: schmaler, sehr hoher Schaft aus dunklem Stein über breitem Sockel, Strebepfeiler,
 // Galerie, Dornenkrone mit Seelenfeuer. Das Bild wird einmal gemalt (Pixelraster 2 × 2), darüber leben die Fenster und die Funken.
 let TOWER_CV = null, TOWER_AT = { arr: null, e: null };
@@ -995,13 +1085,84 @@ function crown(cx, cy, R, pal, seed, n) {
     ctx.fillStyle = sn < -0.2 ? (cs < 0.2 ? pal[3] : pal[2]) : sn < 0.35 ? pal[1] : pal[0];
     ctx.beginPath(); ctx.arc(cx + cs * rr * 1.05, cy + sn * rr * 0.75, R * 0.1 + 1, 0, 7); ctx.fill(); }
 }
+/* Artist Runde 2 (Stil R): Tanne, Birke, Weide und toter Baum im Maßstab der neuen Eiche. Gleiche Regeln: Licht von oben links,
+   Schatten unten rechts, gebrochene Silhouette (Nadelspitzen, Strähnen, Zweige), klare Wertstufen. Wird nur beim Backen gerufen. */
+const PINE_R = ['#0e1912', '#192a1d', '#233a27', '#325035', '#476a45'];
+const WILLOW_R = ['#131c15', '#22302a', '#334535', '#4e6244'];
+function treeR(sp, x, y, v) {
+  const seed = (v * 997) | 0, P = c => { ctx.fillStyle = c; };
+  const poly = pts => { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
+  if (sp === 'pine' || sp === 'snowpine') {                 // Tanne: sechs hängende Astetagen mit Nadelsaum, oben spitz
+    const snow = sp === 'snowpine', G = PINE_R, top = y - 62 - (v - 0.5) * 10, N = 6;
+    P('#24190f'); ctx.fillRect(x - 2.5, y - 10, 5, 16); P('#46341f'); ctx.fillRect(x - 2.5, y - 10, 1.5, 16);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1), yb = y - 1 - (y - 1 - (top + 15)) * t, hgt = 17 - t * 4, w = (20 - t * 13) * (0.92 + h2(seed, i) * 0.16), ap = yb - hgt;
+      P(G[1]); poly([x, ap, x + w, yb, x - w, yb]);
+      for (let k = -w + 1.5; k <= w - 1.5; k += 3.2) { const d = 1.8 + h2(seed + i, (k * 3) | 0) * 2.6;   /* Nadelspitzen hängen über die Etage darunter */
+        P(k < -w * 0.2 ? G[2] : k < w * 0.35 ? G[1] : G[0]); poly([x + k - 1.7, yb - 0.6, x + k + 1.7, yb - 0.6, x + k + 0.4, yb + d]); }
+      P(G[2]); poly([x, ap, x - w * 0.1, yb - 1.5, x - w + 1, yb - 0.5]);
+      P(G[3]); poly([x - 0.3, ap + 1, x - w * 0.42, yb - hgt * 0.38, x - w * 0.86, yb - 1.2, x - w * 0.5, yb - 2.5]);
+      P(G[0]); poly([x + 1.5, ap + hgt * 0.45, x + w - 0.5, yb - 0.2, x + w * 0.25, yb - 0.2]);
+      if (i < N - 1) { P(G[4]); ctx.fillRect(x - w * 0.55, yb - hgt * 0.42, 1.6, 1.2); }
+      if (snow) { P('#cdd6dd'); poly([x, ap - 0.6, x - w * 0.82, yb - 2.2, x - w * 0.5, yb - 1.2, x + w * 0.15, ap + hgt * 0.55]);
+        P('#f2f6f8'); poly([x, ap - 0.6, x - w * 0.45, ap + hgt * 0.5, x - w * 0.1, ap + hgt * 0.42]); }
+    }
+    P(G[3]); poly([x, top - 5, x + 1.6, top + 3, x - 1.6, top + 3]);
+    if (snow) { P('#f2f6f8'); poly([x, top - 5, x - 1.2, top, x + 0.4, top]); }
+    return true;
+  }
+  if (sp === 'birch') {                                     // Birke: schlanker, leicht geneigter weißer Stamm, Kerben, lockere hängende Krone
+    const lean = (v - 0.5) * 7, at = yy => x + lean * (y - yy) / 52;
+    P('#7e776a'); poly([x - 3, y + 5, x + 3, y + 5, at(y - 48) + 1.5, y - 48, at(y - 48) - 1.5, y - 48]);
+    P('#d6d0c0'); poly([x - 3, y + 5, x - 0.4, y + 5, at(y - 48) - 0.2, y - 48, at(y - 48) - 1.5, y - 48]);
+    P('#28221c'); for (let i = 0; i < 8; i++) { const yy = y + 1 - i * 6 - (h2(seed, i) * 2 | 0); ctx.fillRect(at(yy) - 2.8 + (i % 2) * 2.2, yy, 2 + (i % 3) * 0.8, 1.3); }
+    ctx.strokeStyle = '#3e3830'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(at(y - 30), y - 30); ctx.lineTo(at(y - 30) - 9, y - 40); ctx.moveTo(at(y - 36), y - 36); ctx.lineTo(at(y - 36) + 9, y - 45); ctx.stroke(); ctx.lineCap = 'butt';
+    const cx = at(y - 46);
+    crown(cx - 8, y - 41, 10, LEAF.birch, 31 + seed, 8);
+    crown(cx + 8, y - 46, 10, LEAF.birch, 57 + seed, 8);
+    crown(cx - 1, y - 56, 11, LEAF.birch, 83 + seed, 9);
+    for (let i = 0; i < 9; i++) { const sx = cx - 17 + i * 4.2, sy = y - 40 + Math.abs(i - 4) * 1.2 + h2(seed, i + 9) * 3, len = 4 + h2(i, seed) * 6;   /* hängende Zweigspitzen */
+      P(i < 4 ? LEAF.birch[2] : LEAF.birch[1]); ctx.fillRect(sx, sy, 1.6, len); P(LEAF.birch[0]); ctx.fillRect(sx, sy + len - 1.5, 1.6, 1.5); }
+    return true;
+  }
+  if (sp === 'willow') {                                    // Weide: knorriger Stamm, runde Kuppel, Vorhang aus hängenden Strähnen
+    const W = WILLOW_R;
+    P('#251c14'); poly([x - 8, y + 5, x - 3, y - 2, x - 5, y - 20, x - 1, y - 28, x + 4, y - 24, x + 4, y - 2, x + 9, y + 5]);
+    P('#4a3a28'); poly([x - 8, y + 5, x - 5, y + 5, x - 2.5, y - 2, x - 3.5, y - 20, x - 5, y - 20, x - 3, y - 2]);
+    crown(x, y - 38, 20, W, 11 + seed, 13);
+    for (let i = 0; i < 17; i++) { const t = i / 16, sx = x - 22 + t * 44, dx = (sx - x) / 23,
+      sy = y - 40 + 15 * Math.sqrt(Math.max(0, 1 - dx * dx)) - 4 + h2(seed, i) * 3, len = 12 + h2(i, seed + 2) * 12 + (1 - Math.abs(dx)) * 4;
+      P(t < 0.35 ? W[2] : t < 0.7 ? W[1] : W[0]); ctx.fillRect(sx, sy, 2.2, len);
+      if (t < 0.45) { P(W[3]); ctx.fillRect(sx, sy + 1, 1, len * 0.5); }
+      P(W[0]); ctx.fillRect(sx + 0.4, sy + len - 2.5, 1.6, 2.5); }
+    for (let i = 0; i < 7; i++) { const sx = x - 12 + i * 4 + h2(i, seed + 5) * 2, sy = y - 50 + h2(seed + 5, i) * 6;   /* Strähnen schon in der Kuppel */
+      P(i < 3 ? W[2] : W[1]); ctx.fillRect(sx, sy, 1.6, 9 + h2(i, 3) * 5); }
+    return true;
+  }
+  if (sp === 'dead') {                                      // toter Baum: Wurzelfuß, dicker Stamm, verjüngte Äste, Zweige; Licht oben links
+    const k = (v * 3) | 0, D = '#2a2018', L = '#5c4b37';
+    const limb = (w, c, pts) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.stroke(); };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    P(D); poly([x - 9, y + 5, x - 3, y - 4, x + 3, y - 4, x + 10, y + 5, x + 3, y + 3, x - 2, y + 3]);
+    const B = k === 0 ? [[7, [0, 4, -1, -26, 1, -46]], [4, [0, -26, 13, -34, 20, -32]], [3, [-1, -18, -12, -27, -16, -39]], [2.5, [1, -40, 7, -52]], [2, [20, -32, 24, -38]], [1.6, [-12, -27, -19, -29]], [1.6, [13, -34, 15, -42]]]
+      : k === 1 ? [[7, [0, 4, 0, -16]], [5, [0, -16, -9, -34, -12, -48]], [5, [0, -16, 8, -32, 13, -44]], [2.4, [-9, -34, -18, -38]], [2.4, [8, -32, 16, -30]], [2, [13, -44, 18, -52]], [2, [-12, -48, -9, -55]], [1.6, [-18, -38, -21, -45]]]
+      : [[8, [0, 4, 3, -14, 9, -28]], [3.5, [3, -14, -9, -21, -15, -19]], [3.5, [9, -28, 5, -38]], [2.5, [9, -28, 17, -32]], [1.8, [5, -38, 1, -44]], [1.8, [17, -32, 21, -40]], [1.6, [-15, -19, -19, -25]]];
+    for (const [w, pts] of B) limb(w, D, pts);
+    for (const [w, pts] of B) if (w >= 3) limb(Math.max(1.2, w * 0.3), L, pts.map((q, i) => q + (i % 2 ? -0.6 : -w * 0.28)));
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    return true;
+  }
+  return false;
+}
 function drawProp(e, now) {
   const x = e.x, y = e.y;
   switch (e.type) {
     case 'tree': {                                        // drei Arten: Eiche, Tanne, knorrige Birke
       const v = e._v ?? h2(x | 0, y | 0), sp = e._sp || ['oak', 'pine', 'birch'][(v * 3) | 0];
       shadow(x, y + 6, 14, .4);
-      if (sp === 'dead') {                                // toter Baum: kahle, gekrümmte Äste
+      if (sp !== 'oak' && SP.drawnOn() && treeR(sp, x, y, v)) { if (e.hp < 3) { ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3); } break; }   /* Artist Runde 2: eigene Baumformen im Stil R */
+      if (sp === 'dead') {                              // toter Baum: kahle, gekrümmte Äste
         ctx.strokeStyle = '#3a2e22'; ctx.lineWidth = 4; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x - 1, y - 26); ctx.moveTo(x, y - 12); ctx.lineTo(x - 12, y - 24); ctx.lineTo(x - 16, y - 34);
         ctx.moveTo(x - 1, y - 20); ctx.lineTo(x + 10, y - 32); ctx.moveTo(x - 1, y - 26); ctx.lineTo(x + 3, y - 40); ctx.stroke();
@@ -1643,6 +1804,95 @@ function drawProp(e, now) {
       ctx.fillStyle = '#5a452b'; ctx.fillRect(x - 5, y - 44, 10, 8);
       ctx.fillStyle = 'rgba(20,14,8,.6)'; ctx.fillRect(x + 2, y - 31, 10, 1.5); ctx.fillRect(x - 12, y - 19, 10, 1.5); ctx.fillRect(x - 3, y - 41, 6, 1.5);
       break;
+    /* ---- Artist Runde 5 (Varonheim): Straßenmöbel der Hauptstadt. Platzieren macht der Engineer (world.js prop()). ---- */
+    case 'market_stall': {                                // Marktstand mit gestreifter Markise; Varianten: Obst, Tuch, Töpfe, Fisch
+      const v = e._var || 0, AW = [['#7d3b2c', '#c9b98a'], ['#2f5034', '#c9b98a'], ['#2f4260', '#b8973e'], ['#5a1618', '#c9a24a']][v];
+      shadow(x, y + 5, 16, .3);
+      ctx.fillStyle = '#3d2f1f'; ctx.fillRect(x - 15, y - 26, 2.5, 28); ctx.fillRect(x + 12.5, y - 26, 2.5, 28);
+      ctx.fillStyle = '#5a4128'; ctx.fillRect(x - 14, y - 7, 28, 9); ctx.fillStyle = '#6e5033'; ctx.fillRect(x - 14, y - 7, 28, 2); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 14, y + 1, 28, 1);
+      if (e._shut) {                                      // zu: Plane über der Theke, Markise eingerollt
+        ctx.fillStyle = AW[0]; ctx.fillRect(x - 17, y - 28, 34, 3); ctx.fillStyle = AW[1]; for (let i = 0; i < 34; i += 6) ctx.fillRect(x - 17 + i, y - 28, 2, 3);
+        ctx.fillStyle = '#5c5343'; ctx.fillRect(x - 15, y - 12, 30, 13); ctx.fillStyle = '#4a4336'; ctx.fillRect(x - 15, y - 6, 30, 1.5); ctx.fillRect(x - 5, y - 12, 1.5, 13); break;
+      }
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = AW[i & 1];
+        ctx.beginPath(); ctx.moveTo(x - 17 + i * 34 / 6, y - 29); ctx.lineTo(x - 17 + (i + 1) * 34 / 6, y - 29); ctx.lineTo(x - 18 + (i + 1) * 6, y - 18); ctx.lineTo(x - 18 + i * 6, y - 18); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x - 18 + i * 6, y - 18); ctx.lineTo(x - 15 + i * 6, y - 15); ctx.lineTo(x - 12 + i * 6, y - 18); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,240,210,.18)'; ctx.fillRect(x - 17, y - 29, 34, 1.5); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x - 14, y - 14, 28, 3);
+      if (v === 0) { const F = ['#a83a2a', '#c9a84a', '#6a8a3a', '#b85a2a']; for (let k = 0; k < 9; k++) { ctx.fillStyle = F[k % 4]; ctx.beginPath(); ctx.arc(x - 11 + (k % 5) * 5 + (k > 4 ? 2.5 : 0), y - 8 - (k > 4 ? 2.5 : 0), 2, 0, 7); ctx.fill(); } }
+      else if (v === 1) { const F = ['#6a3a5a', '#3a5a6a', '#8a6a3a', '#7a2a24', '#c9b98a']; for (let k = 0; k < 5; k++) { ctx.fillStyle = F[k]; ctx.fillRect(x - 12 + k * 5, y - 12 + (k & 1), 4, 6); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(x - 12 + k * 5, y - 12 + (k & 1), 1, 6); } }
+      else if (v === 2) { for (let k = 0; k < 4; k++) { ctx.fillStyle = k & 1 ? '#8a5a3a' : '#6a4a32'; ctx.beginPath(); ctx.ellipse(x - 9 + k * 6, y - 10, 2.8, 3.5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a1e14'; ctx.fillRect(x - 10 + k * 6, y - 14, 2, 1.2); } }
+      else { ctx.fillStyle = '#2a241e'; ctx.fillRect(x - 13, y - 17, 26, 1); for (let k = 0; k < 4; k++) { ctx.fillStyle = k & 1 ? '#8a9aa0' : '#6a7a80'; ctx.beginPath(); ctx.ellipse(x - 9 + k * 6, y - 13, 1.8, 3.5, 0, 0, 7); ctx.fill(); }
+        ctx.fillStyle = '#9aa8ae'; ctx.fillRect(x - 10, y - 9, 20, 2); }
+      break; }
+    case 'fountain_grand': {                              // großer Prunkbrunnen: Becken, zwei Schalen, Krone Varons, Wasserschleier
+      shadow(x, y + 4, 40, .35);
+      ctx.fillStyle = '#3e3c40'; ctx.beginPath(); ctx.ellipse(x, y - 3, 38, 15, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 6, 38, 15, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1e3a4e'; ctx.beginPath(); ctx.ellipse(x, y - 7, 33, 12, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2c5268'; ctx.beginPath(); ctx.ellipse(x - 4, y - 9, 22, 7, 0, 0, 7); ctx.fill();
+      const f = now / 900 * 6.283;
+      ctx.strokeStyle = 'rgba(160,200,220,.45)'; ctx.lineWidth = 1; for (let k = 0; k < 3; k++) { const rr = 8 + ((k * 7 + now / 120) % 22); ctx.beginPath(); ctx.ellipse(x, y - 7, rr, rr * 0.36, 0, 0, 7); ctx.stroke(); }
+      ctx.fillStyle = '#4a4850'; ctx.fillRect(x - 4, y - 30, 8, 24); ctx.fillStyle = '#6a6870'; ctx.fillRect(x - 4, y - 30, 2, 24);
+      ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 30, 16, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2c5268'; ctx.beginPath(); ctx.ellipse(x, y - 31, 13, 3.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#4a4850'; ctx.fillRect(x - 2.5, y - 46, 5, 16); ctx.fillStyle = '#5a5860'; ctx.beginPath(); ctx.ellipse(x, y - 46, 8, 3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#b8973e'; ctx.fillRect(x - 4, y - 53, 8, 4); ctx.fillRect(x - 4, y - 56, 2, 3); ctx.fillRect(x - 1, y - 57, 2, 4); ctx.fillRect(x + 2, y - 56, 2, 3);   /* Krone Varons */
+      ctx.fillStyle = 'rgba(190,225,240,.55)';
+      for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283, s = Math.abs(Math.sin(f + k)); ctx.fillRect(x + Math.cos(a) * 14, y - 30 + s * 20 + Math.sin(a) * 4, 1.5, 3); }
+      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; ctx.fillRect(x + Math.cos(a) * 7, y - 46 + Math.abs(Math.sin(f * 1.3 + k)) * 14, 1.2, 2.5); }
+      ctx.fillStyle = 'rgba(220,240,250,.4)'; ctx.fillRect(x - 0.8, y - 50 - Math.abs(Math.sin(f)) * 3, 1.6, 5);
+      break; }
+    case 'street_lamp': {                                 // Kandelaber der Königsstraße: Steinsockel, eiserner Mast, zwei Laternen
+      shadow(x, y + 3, 7, .3);
+      ctx.fillStyle = '#3a383e'; ctx.fillRect(x - 5, y - 6, 10, 8); ctx.fillStyle = '#55525a'; ctx.fillRect(x - 5, y - 6, 10, 2);
+      ctx.fillStyle = '#1e1c1f'; ctx.fillRect(x - 1.5, y - 52, 3, 47); ctx.fillStyle = '#3a373c'; ctx.fillRect(x - 1.5, y - 52, 1, 47);
+      ctx.fillRect(x - 12, y - 50, 24, 2); ctx.fillStyle = '#1e1c1f'; ctx.beginPath(); ctx.moveTo(x - 2, y - 52); ctx.lineTo(x, y - 58); ctx.lineTo(x + 2, y - 52); ctx.fill();
+      for (const s of [-1, 1]) { const lx = x + s * 11;
+        ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 48, 1, 3); ctx.fillRect(lx - 4, y - 45, 8, 2); ctx.fillRect(lx - 3, y - 35, 6, 2);
+        ctx.fillStyle = '#e2a95a'; ctx.fillRect(lx - 3, y - 43, 6, 8); ctx.fillStyle = '#f6d896'; ctx.fillRect(lx - 1, y - 41, 2, 4);
+        ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 43, 1, 8); }
+      break; }
+    case 'banner_pole': {                                 // Königsbanner (heil): hoher Mast mit Kronenknauf, langes Tuch mit goldener Krone
+      const s = Math.sin(now / 800 + x) * 2;
+      shadow(x, y + 3, 6, .3);
+      ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 1.5, y - 62, 3, 64); ctx.fillStyle = '#4a3a28'; ctx.fillRect(x - 1.5, y - 62, 1, 64);
+      ctx.fillStyle = '#b8973e'; ctx.fillRect(x - 3, y - 66, 6, 3); ctx.fillRect(x - 3, y - 68, 1.5, 2); ctx.fillRect(x - 0.75, y - 69, 1.5, 3); ctx.fillRect(x + 1.5, y - 68, 1.5, 2);
+      ctx.fillStyle = '#2a1a14'; ctx.fillRect(x - 12, y - 60, 24, 2);
+      ctx.fillStyle = '#5a1618'; ctx.beginPath(); ctx.moveTo(x - 11, y - 58); ctx.lineTo(x + 11, y - 58); ctx.lineTo(x + 11 + s, y - 22); ctx.lineTo(x + s * 0.8, y - 15); ctx.lineTo(x - 11 + s, y - 22); ctx.fill();
+      ctx.fillStyle = '#7a2224'; ctx.fillRect(x - 11, y - 58, 3, 35); ctx.fillStyle = '#3a0e10'; ctx.fillRect(x + 7 + s * 0.6, y - 57, 3, 34);
+      ctx.fillStyle = '#c9a24a'; ctx.fillRect(x - 11, y - 55, 22, 1.5); ctx.fillRect(x - 11 + s * 0.6, y - 26, 22, 1.5);   /* Goldborten */
+      ctx.fillRect(x - 5 + s * 0.4, y - 42, 10, 5); ctx.fillRect(x - 5 + s * 0.4, y - 46, 2, 4); ctx.fillRect(x - 1 + s * 0.4, y - 48, 2, 6); ctx.fillRect(x + 3 + s * 0.4, y - 46, 2, 4);   /* Krone */
+      ctx.fillStyle = '#5a1618'; ctx.fillRect(x - 3 + s * 0.4, y - 41, 1.5, 2); ctx.fillRect(x + 1.5 + s * 0.4, y - 41, 1.5, 2);
+      break; }
+    case 'barrel_stack': {                                // Fasspyramide im Handwerkerviertel
+      shadow(x, y + 4, 16, .35);
+      const fass = (bx, by) => { ctx.fillStyle = '#5b412a'; ctx.beginPath(); ctx.moveTo(bx - 7, by - 16); ctx.quadraticCurveTo(bx - 9.5, by - 7, bx - 7, by + 2); ctx.lineTo(bx + 7, by + 2); ctx.quadraticCurveTo(bx + 9.5, by - 7, bx + 7, by - 16); ctx.fill();
+        ctx.fillStyle = '#6e5033'; ctx.fillRect(bx - 6, by - 15, 3.5, 16); ctx.fillStyle = '#3a3834'; ctx.fillRect(bx - 8, by - 12, 16, 2); ctx.fillRect(bx - 8, by - 3, 16, 2);
+        ctx.fillStyle = '#4a3522'; ctx.beginPath(); ctx.ellipse(bx, by - 16, 7, 2.5, 0, 0, 7); ctx.fill(); };
+      fass(x - 8, y); fass(x + 8, y); fass(x, y - 15); break; }
+    case 'cargo_pile': {                                  // Ladegut: Kisten, Säcke, ein Fass
+      const v = e._var || 0; shadow(x, y + 4, 18, .35);
+      const kiste = (bx, by, w, h) => { ctx.fillStyle = '#6f5130'; ctx.fillRect(bx, by - h, w, h); ctx.fillStyle = '#8a6a40'; ctx.fillRect(bx, by - h, w, 2); ctx.fillStyle = '#4a3420'; ctx.fillRect(bx, by - h, 1.5, h); ctx.fillRect(bx + w - 1.5, by - h, 1.5, h);
+        ctx.strokeStyle = '#4a3420'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(bx + 1, by - 1); ctx.lineTo(bx + w - 1, by - h + 2); ctx.stroke(); };
+      kiste(x - 16, y + 2, 14, 12); kiste(x - 14, y - 10, 11, 9);
+      for (const [sx, sy] of v ? [[x + 4, y], [x + 11, y + 1]] : [[x + 5, y]]) { ctx.fillStyle = '#9a8a66'; ctx.beginPath(); ctx.ellipse(sx, sy - 5, 5, 6, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#7a6a4a'; ctx.fillRect(sx - 1, sy - 12, 2, 2); }
+      if (!v) { ctx.fillStyle = '#5b412a'; ctx.fillRect(x + 9, y - 14, 10, 16); ctx.fillStyle = '#3a3834'; ctx.fillRect(x + 8, y - 11, 12, 1.5); ctx.fillRect(x + 8, y - 3, 12, 1.5); ctx.fillStyle = '#4a3522'; ctx.beginPath(); ctx.ellipse(x + 14, y - 14, 5, 2, 0, 0, 7); ctx.fill(); }
+      break; }
+    case 'grave_cross': {                                 // Grabhügel mit Kreuz: Holz, Stein, Eisen
+      const v = e._var || 0, C = ['#4a3a28', '#6a665e', '#2a282c'][v], L = ['#6a5438', '#8a857a', '#4a474e'][v];
+      ctx.fillStyle = '#2a2418'; ctx.beginPath(); ctx.ellipse(x, y, 11, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3a3222'; ctx.beginPath(); ctx.ellipse(x - 1, y - 1, 9, 3.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#4a5a32'; ctx.fillRect(x - 6, y - 2, 2, 1); ctx.fillRect(x + 3, y, 2, 1);
+      ctx.fillStyle = C; ctx.fillRect(x - 1.5, y - 22, 3.5, 20); ctx.fillRect(x - 6, y - 17, 12, 3); ctx.fillStyle = L; ctx.fillRect(x - 1.5, y - 22, 1, 20); ctx.fillRect(x - 6, y - 17, 12, 1);
+      if (v === 2) { ctx.strokeStyle = '#4a474e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.2, y - 15.5, 4, 0, 7); ctx.stroke(); }
+      if (v === 0) { ctx.fillStyle = '#7a6a4a'; ctx.fillRect(x + 2, y - 12, 1, 4); ctx.fillStyle = '#6a2a24'; ctx.fillRect(x + 1.5, y - 8, 2, 2); }   /* Bändchen */
+      break; }
+    case 'tomb': {                                        // Steinsarg mit eingehauenem Kreuz, Moos; Variante mit Kopfstein
+      const v = e._var || 0; shadow(x, y + 3, 15, .35);
+      ctx.fillStyle = '#3e3c40'; ctx.fillRect(x - 13, y - 8, 26, 10); ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 13, y - 1, 26, 3);
+      ctx.fillStyle = v ? '#6a665e' : '#5a5860'; ctx.fillRect(x - 14, y - 13, 28, 6); ctx.fillStyle = v ? '#8a857a' : '#76747c'; ctx.fillRect(x - 14, y - 13, 28, 1.5);
+      ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 1, y - 12.5, 2, 5); ctx.fillRect(x - 4, y - 11, 8, 1.5);
+      ctx.fillStyle = '#4a5a32'; ctx.fillRect(x + 7, y - 9, 5, 2); ctx.fillRect(x - 12, y - 2, 4, 2); ctx.fillStyle = '#3a4a2a'; ctx.fillRect(x + 9, y - 7, 3, 3);
+      if (v) { ctx.fillStyle = '#5a5860'; ctx.fillRect(x - 3, y - 22, 6, 9); ctx.beginPath(); ctx.arc(x, y - 22, 3, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#2a282c'; ctx.fillRect(x - 0.5, y - 21, 1, 5); }
+      break; }
     case 'barrel': {                                      // Fass: Dauben, Eisenreifen; Varianten: Deckel / offen mit Wasser / Deckel mit Kelle
       const v = e._var || 0;
       shadow(x, y + 4, 9, .35);
@@ -1805,6 +2055,28 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.carry && pz.dir !== 'N') { const ic = groundIcon(e.carry), bob = moving ? ((now / 180 | 0) & 1) : 0; c.drawImage(ic, Math.round(x - 8 + (pz.dir === 'E' ? 5 : pz.dir === 'W' ? -5 : 0)), Math.round(y - 24 - bob), 16, 16); }
   if (e.marked) { c.strokeStyle = 'rgba(200,80,60,.8)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 58, 4, 0, 7); c.stroke(); }
 }
+/* Runde 9 (Artist): Blutkult-Sense — Adern pulsieren im Herzschlag (ba-dumm), nur Darstellung. Im gedrehten Waffen-Kontext aufrufen. */
+function weaponPulse(c, Wsp, WP, now, seed) {
+  if (!Wsp.pulse || !Wsp.pulse.length) return;
+  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(210,24,30,${k.toFixed(3)})`;
+  for (const [px, py] of Wsp.pulse) c.fillRect((px - Wsp.gx) * WP, (py - Wsp.gy) * WP, WP, WP);
+  c.globalCompositeOperation = 'source-over';
+}
+/* Runde 9 (Artist): roter Schimmer am Träger, wenn eine Lebensraub-Waffe beim Schlag heilt. Erkennung rein optisch: LP steigen, während er schwingt
+   (kein Haken im Spielcode). Merker je Figuren-id, nicht am Objekt (Gegner werden über Kopien gezeichnet). */
+const LEECH_FX = new Map();
+function leechGlow(c, e, now, it) {
+  if (!it || !it.leech || e.id == null) return;
+  let m = LEECH_FX.get(e.id); if (!m) { if (LEECH_FX.size > 400) LEECH_FX.clear(); LEECH_FX.set(e.id, m = { hp: e.hp, t: -1e9 }); }
+  if (e.hp > m.hp + 0.05 && e.swing > 0) m.t = now; m.hp = e.hp;
+  const k = 1 - (now - m.t) / 520; if (k <= 0) return;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.fillStyle = `rgba(200,20,30,${(0.22 * k).toFixed(3)})`; c.beginPath(); c.ellipse(e.x, e.y - 14, 9 + 3 * (1 - k), 16 + 3 * (1 - k), 0, 0, 7); c.fill();
+  c.fillStyle = `rgba(255,70,60,${(0.8 * k).toFixed(3)})`;
+  for (let i = 0; i < 5; i++) { const a = i * 1.257 + (e.seed || 0), r = 10 * k + 2; c.fillRect(Math.round(e.x + Math.cos(a) * r), Math.round(e.y - 14 + Math.sin(a) * r * 1.4 - (1 - k) * 6), 2, 2); }   /* Bluttropfen ziehen zum Träger */
+  c.restore();
+}
 function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
   const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
   if (W.mode === 'swing' && !RANGED_W.has(wt)) {                  // Klingenspur: frühere Winkel derselben Kurve um die Hand
@@ -1828,7 +2100,8 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
   c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
   if (Wsp.orb) { const f = ((now / 90 + (e.seed || 0)) | 0) % 5; c.fillStyle = f === 0 ? '#e8f4ff' : f < 3 ? '#8fb7e8' : '#5f8fd0'; c.fillRect((Wsp.orb[0] - Wsp.gx) * WP, (Wsp.orb[1] - Wsp.gy - 2) * WP, 2, 2); }
   if (Wsp.runes && ((now / 140 + (e.seed || 0)) | 0) % 6 === 0) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
-  c.restore();
+  weaponPulse(c, Wsp, WP, now, e.seed);
+  c.restore(); leechGlow(c, e, now, it);
 }
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
@@ -1935,7 +2208,8 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
     c.drawImage(W.cv, -W.gx * WP, -W.gy * WP, W.cv.width * WP, W.cv.height * WP);
     c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   }
-  c.restore();
+  weaponPulse(c, W, WP, now, e.seed);
+  c.restore(); leechGlow(c, e, now, it);
 }
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
@@ -2230,6 +2504,52 @@ function drawBaked(key, e, box, fn) {
   }
   ctx.drawImage(cv, e.x - box / 2, e.y - box * 0.73, box, box);
 }
+/* UI-Scheibe 2 (Artist R8): Bau-Geist mit Feldraster (grün frei / rot belegt), Reichweitenkreis 400 um den Helden und Bild der Baukarte.
+   Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
+const PLACE_RANGE = 400;
+let BLDICO = null, bldImgs = {};
+import('./icons.js?v=23').then(m => { BLDICO = m; }).catch(() => {});
+function bldImage(type) {
+  if (!BLDICO?.bldURL) return null;
+  let im = bldImgs[type];
+  if (!im) { const u = BLDICO.bldURL(type, 4); if (!u) return null; im = bldImgs[type] = new Image(); im.src = u; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function drawPlaceGuide(list, now) {
+  const g = list.find(e => e.ghost && e.kind === 'building' && e.def), p = S.player;
+  if (!g || !p) return;
+  const def = g.def, w = def.w * TS, h = def.h * TS, x0 = g.x - w / 2, y0 = g.y - h / 2;
+  const tx0 = (x0 / TS) | 0, ty0 = (y0 / TS) | 0, far = Math.hypot(g.x - p.x, g.y - p.y) > PLACE_RANGE;
+  const others = list.filter(e => e.kind === 'building' && !e.ghost && e.def);
+  const pulse = 0.5 + 0.5 * Math.sin(now / 260);
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-cam.x, -cam.y);
+  ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -now / 60;
+  ctx.strokeStyle = far ? 'rgba(210,70,50,.75)' : 'rgba(189,148,51,.45)';
+  ctx.beginPath(); ctx.arc(p.x, p.y, PLACE_RANGE, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  const im = g.type !== 'wohnzone' && bldImage(g.type);
+  if (im) { const iw = Math.max(w, 48), ih = iw * im.naturalHeight / im.naturalWidth; ctx.globalAlpha = .55; ctx.imageSmoothingEnabled = false; ctx.drawImage(im, g.x - iw / 2, y0 + h - ih, iw, ih); ctx.globalAlpha = 1; }
+  let bad = 0;
+  for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) {
+    const tx = tx0 + i, ty = ty0 + j, cx = (tx + .5) * TS, cy = (ty + .5) * TS;
+    const blocked = SOLID.has(tileAt(S.map, tx, ty)) || others.some(e => Math.abs(e.x - cx) < e.def.w * TS / 2 && Math.abs(e.y - cy) < e.def.h * TS / 2);
+    if (blocked) bad++;
+    ctx.fillStyle = blocked ? 'rgba(200,50,35,.42)' : `rgba(90,170,70,${.18 + .1 * pulse})`;
+    ctx.fillRect(tx * TS + 1, ty * TS + 1, TS - 2, TS - 2);
+    ctx.strokeStyle = blocked ? 'rgba(240,90,60,.85)' : 'rgba(140,220,110,.6)'; ctx.lineWidth = 1;
+    ctx.strokeRect(tx * TS + 1.5, ty * TS + 1.5, TS - 3, TS - 3);
+  }
+  const ok = !g.blocked && !far;
+  ctx.strokeStyle = ok ? 'rgba(150,230,120,.95)' : 'rgba(235,80,55,.95)'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, w, h);
+  const msg = far ? 'Zu weit weg — näher heran' : g.blocked ? (bad ? 'Kein Platz — rote Felder belegt' : 'Kein Platz — zu dicht am Nachbarbau') : 'Linksklick: bauen';
+  const t = `${def.name} · ${msg}`;
+  ctx.font = 'bold 10px Spectral, serif'; ctx.textAlign = 'center';
+  const tw = ctx.measureText(t).width + 10, ty = Math.max(y0 - 8, cam.y + 16), lx = Math.min(Math.max(g.x, cam.x + tw / 2 + 4), cam.x + W / cam.zoom - tw / 2 - 4);   /* Schild bleibt im Bild */
+  ctx.fillStyle = 'rgba(12,10,8,.78)'; ctx.fillRect(lx - tw / 2, ty - 11, tw, 15);
+  ctx.fillStyle = ok ? '#cfe8b0' : '#f0a08a'; ctx.fillText(t, lx, ty);
+  ctx.textAlign = 'left';
+  if (far) { ctx.strokeStyle = 'rgba(235,80,55,.5)'; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(g.x, g.y); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+}
 function drawBuilding(e, now) {
   if (e.type === 'wohnzone') { const w = e.def.w * TS, h = e.def.h * TS, x = e.x - w / 2, y = e.y - h / 2;   /* Nutzer §5d.3: Wohnzone als abgesteckter Grund */
     ctx.save(); if (e.ghost) ctx.globalAlpha = .5; ctx.fillStyle = 'rgba(120,160,80,.08)'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(150,190,110,.55)'; ctx.setLineDash([6, 5]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
@@ -2276,6 +2596,7 @@ function drawBuildingVec(e, now) {
       ctx.fillStyle = '#231b12'; ctx.fillRect(e.x - 6, y + h - 16, 12, 16);
       if (e.type === 'smithy') { ctx.fillStyle = `rgba(230,120,50,${.4 + .2 * Math.sin(now / 200)})`; ctx.fillRect(x + 4, y + h * 0.55, 8, 8); }
       if (e.type === 'watchtower') { ctx.fillStyle = '#3a3128'; ctx.fillRect(x + 4, y - 18, w - 8, 14); }
+      if (e.type === 'healer') { for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#6f8a3e' : '#8aa04e'; ctx.fillRect(x + 6 + i * (w - 16) / 3, y + h * 0.38, 4, 7); } ctx.fillStyle = '#d8d0b8'; ctx.fillRect(e.x - 2, y + h * 0.5, 4, 10); ctx.fillRect(e.x - 5, y + h * 0.5 + 3, 10, 4); }   /* Siedlung M3: Kräuterbündel und Zeichen */
     }
     if (dmg < 0.99) { ctx.fillStyle = `rgba(0,0,0,${(1 - dmg) * 0.45})`; ctx.fillRect(x, y, w, h); }
   }
@@ -2380,6 +2701,7 @@ function staticLights() {
   if (lightCache.map === S.map && lightCache.n === n && now - (lightCache.t || 0) < 3000) return lightCache.list;
   const list = [];
   for (const e of arr) {
+    if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
     if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
     if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
     if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });
@@ -2441,6 +2763,124 @@ function drawLight(now) {
 }
 
 const rainDrops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() }));
+/* Artist Runde 7 (Entwickler: „Umgebungsanimationen“): Umgebungsleben — reine Bildkosmetik, keine Spielregel.
+   Lagerfeuerrauch, fallendes Laub, Glühwürmchen, Krähen/Möwen, Küstengischt und Fischsprung, Fledermäuse, Fliegen, Morgennebel.
+   Zufall nur aus Kachel-Hash h2 und Zeit (nie rnd()/chance() aus state.js), kein Feld in S, nichts im Spielstand, kein Koop-Verkehr.
+   Aus bei „Reduzierte Bewegung“, außerhalb der Weltkarte und im Haus. Budget: höchstens AMB_CAP Rechtecke je Frame. */
+const AMB = { on: true, ms: 0, n: 0, crow: new Map(), regC: new Map(), glow: [] }, AMB_CAP = 200;
+export function ambientStats() { return { on: AMB.on, ms: +AMB.ms.toFixed(3), rects: AMB.n }; }   /* Konsole/Debug: RF.R.ambientStats() */
+export function setAmbient(v) { AMB.on = !!v; }                                                    /* Konsole/Debug: RF.R.setAmbient(false) zum Messen */
+const ambReg = (tx, ty) => { const k = tx * 65536 + ty; let r = AMB.regC.get(k); if (r === undefined) { if (AMB.regC.size > 3000) AMB.regC.clear(); r = regionAt(tx, ty); AMB.regC.set(k, r); } return r; };
+const ambMod = (a, n) => ((a % n) + n) % n;
+function ambRect(x, y, w, h) { if (AMB.n >= AMB_CAP) return; AMB.n++; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function drawAmbience(now, list, m, x0, y0, x1, y1) {
+  AMB.n = 0; AMB.glow.length = 0;
+  if (!AMB.on || !S.settings?.motion || S.map !== 'world' || !S.player || !m.tiles) return;
+  const P = S.player, ptx = P.x / TS | 0, pty = P.y / TS | 0;
+  for (const b of HOUSES) if (b.map === 'world' && ptx >= b.x && ptx < b.x + b.w && pty >= b.y && pty < b.y + b.h && playerInside(b)) return;   /* im Haus: draußen ruht alles */
+  const t0 = performance.now(), h = S.minute / 60, sn = seasonOf(), wx = S.weather, wet = wx === 'rain' || wx === 'bloodrain' || wx === 'snow' || wx === 'sandstorm';
+  const night = h >= 19.5 || h < 5, VW = W / cam.zoom, VH = H / cam.zoom, town = !!townAt(ptx, pty, 2);   /* in Städten kein Laub, keine Glühwürmchen */
+  ctx.save();
+  /* 1. Lagerfeuer: vier Rauchwölkchen, zwei Funken; 7. Fliegen über Leichen und Blut; Anker für Krähen und Fledermäuse */
+  let fires = 0, swarms = 0; const crows = [], caves = [];
+  for (const e of list) {
+    if ((e.kind === 'prop' && (e.type === 'campfire_static' || e.type === 'campfire')) || (e.kind === 'building' && e.type === 'campfire' && e.built >= 1)) {
+      if (fires >= 8) continue; fires++;
+      const sd = h2(e.x | 0, e.y | 0);
+      ctx.fillStyle = '#a8a298';
+      for (let i = 0; i < 4; i++) { const k = (now / 2600 + i / 4 + sd) % 1, s = 4 + (k * 9 | 0);
+        ctx.globalAlpha = (1 - k) * (k < 0.12 ? k * 5 : 0.6); ambRect(e.x + Math.sin(k * 4 + i + sd * 9) * 4 + k * 14 - s / 2, e.y - 18 - k * 56 - s / 2, s, s); }
+      ctx.fillStyle = '#f0b050';
+      for (let j = 0; j < 2; j++) { const k = (now / 950 + j * 0.5 + sd) % 1; if (k > 0.8) continue;
+        ctx.globalAlpha = 1 - k; ambRect(e.x + Math.sin(now / 160 + j * 3 + sd * 7) * 4, e.y - 10 - k * 32, 1.5, 1.5); }
+    } else if (e.kind === 'corpse' || (e.kind === 'prop' && (e.type === 'blood' || e.type === 'bones'))) {
+      if (e.kind === 'corpse' || e.type === 'bones' || h2(e.x | 0, (e.y | 0) + 3) < 0.5) crows.push(e);
+      if (swarms >= 4 || wet || sn === 3 || e.type === 'bones') continue; swarms++;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = '#141210';
+      for (let i = 0; i < 4; i++) { const a = now / (260 + i * 37) + i * 1.7; ambRect(e.x + Math.cos(a) * (6 + i * 2), e.y - 8 + Math.sin(a * 1.3) * 4 - i, 1.5, 1.5); }
+    } else if (night && e.kind === 'prop' && e.type === 'mine_entrance') caves.push(e);
+  }
+  /* Kacheldurchlauf im Bild: Gischt an der Küste, Fischsprung, Krähen auf Feldern (und im Totenland), Möwen am Strand */
+  const tl = m.tiles, mw = m.w, isWt = (tx, ty) => tx < 0 || ty < 0 || tx >= mw || ty >= m.h || tl[ty * mw + tx] === T.WATER;
+  const slot = Math.floor(now / 5200); let fish = null, fishH = 2, spray = 0, water = 0; const gulls = [];
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const t = tl[ty * mw + tx];
+    if (t === T.WATER) { water++;
+      const n = !isWt(tx, ty - 1), s = !isWt(tx, ty + 1), w = !isWt(tx - 1, ty), e = !isWt(tx + 1, ty);
+      if (n || s || w || e) { const hv = h2(tx * 3 + 1, ty * 7 + 2); if (hv > 0.7 || spray >= 60) continue;
+        const k = (now / 1100 + hv * 9) % 1; if (k > 0.55) continue; spray++;
+        ctx.globalAlpha = Math.min(0.85, (0.55 - k) * 2); ctx.fillStyle = '#e8f0f2';
+        const px = tx * TS + (w ? 2 : e ? TS - 5 : 6 + hv * 36 % 20), py = ty * TS + (n ? 2 : s ? TS - 4 : 6 + hv * 52 % 20);
+        const gx = px + k * (w ? 13 : e ? -13 : 0), gy = py + k * (n ? 11 : s ? -11 : 0); ambRect(gx, gy, n || s ? 6 : 2, n || s ? 2 : 6); if (k < 0.3) ambRect(gx + (n || s ? 2 : 3) + k * 6, gy + (n || s ? 3 + k * 4 : 2), 1, 1);
+      } else { const f = h2(tx * 31 + slot, ty * 17 - slot); if (f < fishH) { fishH = f; fish = [tx, ty]; } }
+    } else if (t === T.FIELD) { if (crows.length < 8 && h2(tx * 5 + 3, ty * 11 + 7) < 0.012) crows.push({ x: tx * TS + 16, y: ty * TS + 20 }); }
+    else if (t === T.SAND) { if (gulls.length < 4 && h2(tx * 13 + 5, ty * 3 + 9) < 0.04 && (isWt(tx + 1, ty) || isWt(tx - 1, ty) || isWt(tx, ty + 1) || isWt(tx, ty - 1))) gulls.push({ x: tx * TS + 16, y: ty * TS + 18, gull: 1 }); }
+    else if (t !== T.WALL && t !== T.ROCK && crows.length < 8 && h2(tx * 7 + 11, ty * 5 + 13) < 0.004 && ambReg(tx >> 3 << 3, ty >> 3 << 3) === 'deadland') crows.push({ x: tx * TS + 16, y: ty * TS + 20 });
+  }
+  if (fish) { const p = (now % 5200) / 1000, fx = fish[0] * TS + 16, fy = fish[1] * TS + 18;   /* höchstens ein Fisch zugleich, alle 5 s ein anderer Ort */
+    if (p < 1.25) { ctx.globalAlpha = 0.9;
+      if (p < 1) { ctx.fillStyle = '#9aa8b0'; ambRect(fx - 8 + p * 16, fy - Math.sin(p * Math.PI) * 15, 3, 2); }
+      if (p < 0.22 || p > 0.9) { const r = p < 0.22 ? p * 30 : (p - 0.9) * 30, sx = p < 0.22 ? fx - 8 : fx + 8; ctx.fillStyle = '#d8e4e8'; ambRect(sx - r - 1, fy, 2, 1); ambRect(sx + r, fy, 2, 1); }
+    } }
+  /* 4. Krähen und Möwen: sitzen, picken; flattern auf, wenn der Spieler näher als 90 px kommt (Zustand nur hier im Renderer) */
+  if (AMB.crow.size > 80) for (const [k, v] of AMB.crow) if (now - v.t > 6000) AMB.crow.delete(k);
+  for (const c of crows.slice(0, 8).concat(gulls)) {
+    const key = ((c.x | 0) << 16) ^ (c.y | 0), d = Math.hypot(c.x - P.x, c.y - P.y); let st = AMB.crow.get(key);
+    if (!st && d < 90) AMB.crow.set(key, st = { t: now, dir: c.x >= P.x ? 1 : -1 });
+    if (st && d > 260 && now - st.t > 1800) { AMB.crow.delete(key); st = null; }
+    const sd = h2(c.x | 0, c.y | 0), ox = (sd - 0.5) * 18, col = c.gull ? '#d8d4c8' : '#100e0e';
+    ctx.globalAlpha = 1; ctx.fillStyle = col;
+    if (!st) { const peck = Math.sin(now / 400 + sd * 20) > 0.85 ? 2 : 0, f = sd > 0.5 ? 1 : -1;
+      ambRect(c.x + ox - 3, c.y - 5, 7, 4); ambRect(c.x + ox + (f > 0 ? 3 : -5), c.y - 8 + peck, 3, 3); ambRect(c.x + ox + (f > 0 ? -5 : 4), c.y - 6, 2, 2); }
+    else { const p = (now - st.t) / 1500; if (p > 1) continue;
+      const bx = c.x + ox + st.dir * p * 170, by = c.y - 5 - p * 130 - Math.sin(p * 9) * 3, fl = Math.sin(now / 55 + sd * 9) > 0 ? -2 : 1;
+      ambRect(bx - 2, by, 5, 3); ambRect(bx - 8, by + fl, 6, 2); ambRect(bx + 3, by + fl, 6, 2); }
+  }
+  /* 2. Fallendes Laub: Wald und Grünmark, viel im Herbst; Seitenschwung per Sinus; weltfest (Fenster-Umbruch um die Kamera) */
+  if (!town && (curRegion === 'forest' || curRegion === 'greenmark') && sn !== 3 && wx !== 'snow') {
+    const n = sn === 2 ? 26 : curRegion === 'forest' ? 8 : 0, pal = sn === 2 ? ['#c8802c', '#e0a038', '#b04a1c', '#5a2c12'] : ['#7e9a40', '#6e8a38', '#9ab450', '#3a5024'];
+    for (let i = 0; i < n; i++) { const d = rainDrops[100 + i], sw = Math.sin(now / 650 * d.s + i * 2.1);
+      const lx = cam.x + ambMod(d.x * 9000 + now / 120 * d.s + sw * 16, VW), ly = cam.y + ambMod(d.y * 9000 + now / 55 * d.s, VH);
+      ctx.globalAlpha = 0.95; ctx.fillStyle = pal[i % 3]; const flat = Math.abs(sw) < 0.5; ambRect(lx, ly, flat ? 5 : 3, flat ? 2 : 4); ctx.fillStyle = pal[3]; ambRect(lx + (flat ? 1 : 0), ly + (flat ? 2 : 1), flat ? 3 : 1, 1); }
+  }
+  /* 3. Glühwürmchen: nachts 21–4 Uhr im Moor und im Wald (im Sommer auch in der Grünmark), blinkend, weltfest je 160-px-Zelle */
+  if (!town && (h >= 21 || h < 4) && !wet && sn !== 3) {
+    const ok = r => r === 'marsh' || r === 'forest' || (sn === 1 && r === 'greenmark'); let nf = 0;
+    if (ok(curRegion)) for (let cy = Math.floor(cam.y / 160); cy <= Math.floor((cam.y + VH) / 160) && nf < 24; cy++) for (let cx = Math.floor(cam.x / 160); cx <= Math.floor((cam.x + VW) / 160) && nf < 24; cx++) {
+      const hv = h2(cx * 19 + 3, cy * 23 + 1); if (hv > 0.75 || !ok(ambReg((cx * 5) >> 3 << 3, (cy * 5) >> 3 << 3))) continue;
+      for (let j = 0; j < 2 && nf < 24; j++) { const ph = hv * 40 + j * 2.3, bl = Math.sin(now / (380 + j * 90) + ph); if (bl < 0.1) continue; nf++;
+        const fx = cx * 160 + 40 + hv * 80 + Math.sin(now / 2300 + ph) * 26, fy = cy * 160 + 50 + j * 50 + Math.cos(now / 1900 + ph * 1.3) * 18;
+        AMB.glow.push(fx - 2, fy - 2, 6, 6, bl * 0.25, '#c8e860', fx, fy, 2, 2, bl, '#f0ffa0'); }
+    }
+  }
+  /* 6. Fledermäuse: nachts vor Mineneingängen und im Totenland, zackiger Flug, höchstens zwei Schwärme (5 Tiere) */
+  if (night && !wet) { const seen = q => q.x > cam.x - 90 && q.x < cam.x + VW + 90 && q.y > cam.y - 60 && q.y < cam.y + VH + 60;
+    const swarm = caves.slice(0, 1).map(e => ({ x: e.x, y: e.y - 30, n: 3 }));
+    if (curRegion === 'deadland' || curRegion === 'blight')   /* je 500-px-Feld der Welt verankert, nur Schwärme im Bild */
+      for (let gy = Math.floor(cam.y / 500) - 1; gy <= Math.floor((cam.y + VH) / 500) && swarm.length < 2; gy++) for (let gx = Math.floor(cam.x / 500) - 1; gx <= Math.floor((cam.x + VW) / 500) && swarm.length < 2; gx++) {
+        if (h2(gx * 7 + 1, gy * 3 + 5) > 0.6) continue;
+        const q = { x: gx * 500 + 100 + h2(gx, gy) * 300, y: gy * 500 + 100 + h2(gy + 9, gx) * 300, n: swarm.length ? 2 : 3 }; if (seen(q)) swarm.push(q); }
+    for (const sw of swarm) if (seen(sw)) for (let i = 0; i < sw.n; i++) { const a = now / (520 + i * 60) + i * 2.4, r = 34 + i * 9;
+      const bx = sw.x + Math.cos(a) * r + Math.sin(now / 70 + i) * 3, by = sw.y + Math.sin(a * 1.7) * r * 0.45 + Math.sin(now / 53 + i * 2) * 2, fl = Math.sin(now / 45 + i) > 0 ? -1 : 1;
+      AMB.glow.push(bx - 5, by + fl, 4, 2, 1, '#3e3846', bx + 2, by + fl, 4, 2, 1, '#3e3846', bx - 1, by, 3, 3, 1, '#1e1a22'); }   /* Schwingen etwas heller als der Nachtboden, sonst unsichtbar */
+  }
+  /* 8. Morgennebel 5–8 Uhr über Moor und Wasser: wenige große, halb durchsichtige Schwaden, die langsam treiben */
+  if (h >= 5 && h < 8 && wx !== 'fog' && wx !== 'sandstorm' && (curRegion === 'marsh' || water > 60) && !['desert', 'badland', 'deadland', 'mountain'].includes(curRegion)) {
+    const k = 1 - Math.abs(h - 6.5) / 1.5; ctx.fillStyle = '#c8ccc6';
+    for (let i = 0; i < 6; i++) { const w = 260 + i * 30, hh = 34 + (i % 3) * 10;
+      const fx = cam.x - w + ambMod(i * 977 + now / (90 + i * 14), VW + w), fy = cam.y + ambMod(i * 0.173 * VH + 60, VH);
+      ctx.globalAlpha = 0.04 * k; ambRect(fx, fy, w, hh); ambRect(fx + w * 0.12, fy - hh * 0.35, w * 0.76, hh * 1.7); ambRect(fx + w * 0.3, fy - hh * 0.6, w * 0.4, hh * 2.2); }
+  }
+  ctx.restore();
+  AMB.ms = AMB.ms * 0.9 + (performance.now() - t0) * 0.1;
+}
+/* Nach dem Nachtlicht: Glühwürmchen leuchten, Fledermäuse heben sich als Schatten ab (sonst schluckt die Dunkelheit beide) */
+function drawAmbienceGlow() {
+  const G = AMB.glow; if (!G.length) return;
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-cam.x, -cam.y);
+  for (let i = 0; i < G.length; i += 6) { ctx.globalAlpha = G[i + 4]; ctx.fillStyle = G[i + 5]; ambRect(G[i], G[i + 1], G[i + 2], G[i + 3]); }
+  ctx.restore(); G.length = 0;
+}
 // Nutzer S13: kleine Animationen am Himmel — Luftschiffe über dem Hochreich (mit Schatten), Vogelschwärme am Tag im Freien
 function drawSkyLife(now) {
   if (S.map !== 'world' || !S.player) return;
@@ -2484,7 +2924,7 @@ function drawAirship(x, y, s, dir, now, h, smoke) {
 // S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
 // Nutzer §5f: Tier-Varianten aus dem Seed — wenige Stufen je Art, damit der Bild-Cache klein bleibt (Schlüssel: pal.body)
 const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), Bc = p(b); return '#' + A.map((v, i) => Math.round(v + (Bc[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
-const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'] };
+const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'], bone_hound: ['#d8d0b0', '#a8a498', '#8a7a5a', '#c8b890'] };   /* Artist Runde 6: Knochenhunde vergilbt, grau, erdig */
 function beastVar(e, p) {
   if (e.epal) return { pal: { ...p, ...e.epal }, k: 1.2 };   /* Elite-Tier: eigenes Fell, größer */
   const T = BEAST_TINT[e.mtype]; if (!T || e.alpha || e.rboss || !p.body || !/^#[0-9a-f]{6}$/i.test(p.body)) return { pal: p, k: 1 };
