@@ -10,7 +10,7 @@ import * as SIM from './sim.js?v=24';
 import * as B from './body.js?v=24';
 import * as SP from './sprites.js?v=24';
 import * as ECO from './economy.js?v=24';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=24';   /* Roadmap P8 */
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS } from './anim.js?v=24';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=24';
 import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=24';
 
@@ -184,6 +184,7 @@ function giveItem(c, inst) {                                   // ein gefundenes
   const it = ITEMS[inst.key]; if (!it) return false;
   if (it.res || it.stack) return addItem(c, inst.key, inst.count || 1);
   if (c.inv.length >= c.invCap) { if (c === S.player) UI.toast('Tasche voll'); return false; }
+  if (c === S.player) inst.nw = 1;   /* Visueller Umbau P6: „Neu“-Marke im Gepäck, bis man es ansieht (fehlt bei alten Ständen = gesehen) */
   c.inv.push(inst); return true;
 }
 function addItem(c, key, count = 1) {
@@ -195,7 +196,8 @@ function addItem(c, key, count = 1) {
       s.count = it.stack; return addItem(c, key, count - room); }
   }
   if (c.inv.length >= c.invCap) { if (c === S.player) UI.toast('Tasche voll'); return false; }
-  c.inv.push(mkItem(key, count));
+  const o = mkItem(key, count); if (c === S.player) o.nw = 1;   /* P6: „Neu“-Marke */
+  c.inv.push(o);
   return true;
 }
 function removeItem(c, key, count = 1) {                   // über alle Stapel hinweg (vorher nur der erste — 1+9 Kraut kostete nur 1)
@@ -210,14 +212,20 @@ function removeItem(c, key, count = 1) {                   // über alle Stapel 
 function hasItem(c, key, count = 1) {
   return c.inv.filter(x => x.key === key).reduce((n, x) => n + (x.count || 1), 0) >= count;
 }
+// Visueller Umbau P6 (IMPL-ITEMS): Sperren beim Anlegen als Lesefunktion — equip() und das Ziel-Leuchten im Inventar nutzen dieselbe.
+function equipBlock(c, it) {
+  if (!it || it.slot === 'consumable') return '';
+  if (c === S.player && S.bond && (it.slot === 'weapon' || it.slot === 'offhand')) return 'In Ketten: keine Waffe, bis die Schuld getilgt ist.';   // S12: Nutzer
+  if (it.slot === 'material') return 'Material lässt sich nicht anlegen.';
+  if (it.slot === 'weapon' && B.isDisabled(c, 'rarm')) return 'Der rechte Arm trägt keine Waffe.';
+  if ((it.slot === 'offhand' || it.twohand) && B.isDisabled(c, 'larm')) return 'Der linke Arm ist ausgefallen.';
+  return '';
+}
 function equip(c, idx) {
   const slot = c.inv[idx]; if (!slot) return;
   const it = ITEMS[slot.key];
   if (it.slot === 'consumable') return useConsumable(c, idx);
-  if (c === S.player && S.bond && (it.slot === 'weapon' || it.slot === 'offhand')) return UI.toast('In Ketten: keine Waffe, bis die Schuld getilgt ist.');   // S12: Nutzer
-  if (it.slot === 'material') return UI.toast('Material lässt sich nicht anlegen.');
-  if (it.slot === 'weapon' && B.isDisabled(c, 'rarm')) return UI.toast('Der rechte Arm trägt keine Waffe.');
-  if ((it.slot === 'offhand' || it.twohand) && B.isDisabled(c, 'larm')) return UI.toast('Der linke Arm ist ausgefallen.');
+  { const no = equipBlock(c, it); if (no) return UI.toast(no); }   /* P6: dieselben Sperren liest das Inventar für das Ziel-Leuchten */
   if (it.slot === 'weapon' && !it.twohand && DUAL_CLASSES.has(c.currentClass) && c.equip.weapon && !ITEMS[c.equip.weapon.key]?.twohand && (!c.equip.offhand || ITEMS[c.equip.offhand.key]?.slot === 'weapon')) {
     const prevOff = c.equip.offhand; c.equip.offhand = slot; c.inv.splice(idx, 1); if (prevOff) c.inv.push(prevOff); recalc(c);   /* Nutzer §5f: Zweiwaffen */
     if (c === S.player && !S.flags.dualHint) { S.flags.dualHint = true; log('Zwei Waffen: deine Schläge wechseln die Hand und kommen 15 % schneller. Keine Schildparade. Die Nebenhand-Waffe legst du im Inventar ab.', 'party'); }
@@ -727,16 +735,28 @@ function guardChar(faction, pos, prof, level = ri(4, 7)) {
 const ESCORT_SLOTS = 2;
 // BUG-108: Handelnde (Figuren, Gegner, Wagen, Fallen) je Karte gecacht — neu, sobald Karte, Liste oder Anzahl sich ändern,
 // sonst spätestens alle 250 ms. Vorher liefen mehrere Suchen und die Denk-Schleife je Bild über alle ~16 000 Einträge (Props).
-let ACT = { arr: null, len: -1, t: -1e9, list: [], hz: [], cars: [] };
+/* PERF-U2 (02.10.): je Karte ein eigener Eintrag (vorher einer für alle: actorsOf('world') aus einer Höhle baute die Welt und danach die
+   Höhle neu). Geprüft werden Liste, Länge und letzter Eintrag. Große Karten (≥ 2000 Einträge): nur angehängt (push) → alte Listen
+   kopieren und nur die neuen Einträge einsortieren (base/from merken, damit tierOf nachziehen kann); Komplett-Neubau sonst nur bei
+   echter Änderung oder spätestens nach 2 s (vorher alle 250 ms ~17 000 Einträge). Kleine Karten (Selbsttest, Höhlen) wie bisher (250 ms). */
+const ACTS = new Map();
+const actPut = (A, e) => { const k = e.kind; if (k === 'npc' || k === 'enemy' || k === 'player' || k === 'caravan') { A.list.push(e); if (k === 'caravan') A.cars.push(e); } else if (e.hazard) A.hz.push(e); else if (k === 'decal' || k === 'corpse') A.dc.push(e); };
 function actorsOf(map = S.map, now = performance.now()) {
-  const arr = S.ents[map];
-  if (ACT.arr !== arr || ACT.len !== arr.length || now - ACT.t > 250) {
-    const list = [], hz = [], cars = [], dc = [];
-    for (const e of arr) { if (e.kind === 'npc' || e.kind === 'enemy' || e.kind === 'player' || e.kind === 'caravan') { list.push(e); if (e.kind === 'caravan') cars.push(e); } else if (e.hazard) hz.push(e); else if (e.kind === 'decal' || e.kind === 'corpse') dc.push(e); }
-    ACT = { arr, len: arr.length, t: now, list, hz, cars, dc };
+  const arr = S.ents[map], n = arr.length, A0 = ACTS.get(map), big = n >= 2000;
+  if (A0 && A0.arr === arr && now - A0.t <= (big ? 2000 : 250)) {
+    if (A0.len === n && arr[n - 1] === A0.last) return A0;
+    if (big && n > A0.len && (A0.len === 0 || arr[A0.len - 1] === A0.last)) {
+      const A = { arr, len: n, last: arr[n - 1], t: A0.t, list: A0.list.slice(), hz: A0.hz.slice(), cars: A0.cars.slice(), dc: A0.dc.slice(), base: A0, from: A0.list.length };
+      for (let i = A0.len; i < n; i++) actPut(A, arr[i]);
+      ACTS.set(map, A); return A;
+    }
   }
-  return ACT;
+  const A = { arr, len: n, last: arr[n - 1], t: now, list: [], hz: [], cars: [], dc: [], base: null, from: 0 };
+  for (const e of arr) actPut(A, e);
+  if (ACTS.size > 12) for (const [k, B] of ACTS) if (S.ents[k] !== B.arr) ACTS.delete(k);   /* weggeworfene Karten (Proben, Duelle) */
+  ACTS.set(map, A); return A;
 }
+const worldActs = () => S.ents.world ? actorsOf('world').list : [];   /* PERF-U2: Figuren der Welt (für Stunden-Haken, die nach Figuren-Merkmalen suchen) */
 /* PERF-U (Leistung, 02.10.): Stufenplan der Denk-Schleife. Auf der Welt stehen ~2000 Handelnde in ACT.list; jedes Bild alle anzufassen
    kostete ~2 ms, obwohl fast alle weit weg sind und nichts tun. Einmal je Neubau von ACT (≤ 250 ms), nach 15 Bildern (2 Abfragen je Bild) oder wenn der
    Held 160 px weiterzieht, wird sortiert:
@@ -750,22 +770,41 @@ function actorsOf(map = S.map, now = performance.now()) {
    Zufallsaufrufe (chance/pick) laufen nur in hot und dort in derselben Reihenfolge. Kleine Karten (Selbsttest, Höhlen) bleiben beim alten Weg. */
 const TIER_MIN = 600, COLD_K = 16, MID_K = 3;
 let TIER = { act: null, t: -1e9, n: 0, px: 0, py: 0, hot: [], cold: [], mid: [], pool: [], esc: new Map(), ph: 0 };
+/* PERF-U2 (02.10.): Einsortieren einer Figur (vorher Schleifenrumpf von tierOf; Regeln unverändert). */
+function tierPut(T, e, px, py, party) {
+  const dx = Math.abs(e.x - px), dy = Math.abs(e.y - py), k = e.kind;
+  if (k === 'npc' && e.escort) { const l = T.esc.get(e.escort); if (l) l.push(e); else T.esc.set(e.escort, [e]); }
+  if (dx < 1950 && dy < 1950) T.pool.push(e);
+  if (!e.alive) { if (k !== 'npc' && k !== 'enemy') T.hot.push(e); return; }   /* Tote denken nicht (think kehrt sofort um) */
+  const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
+  if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) return;
+  if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? T.cold : T.mid).push(e); return; }
+  T.hot.push(e);
+}
+/* PERF-U2 (02.10.): Der regelmäßige Neubau (~2000 Figuren, ~1 ms, alle 15 Bilder / 250 ms / 160 px) läuft in Etappen zu TIER_STEP
+   Figuren je Aufruf (2 Aufrufe je Bild → fertig nach ~2 Bildern); bis dahin gilt der alte Stand. Kamen nur Figuren hinzu (actorsOf
+   hängte an), werden nur die neuen sofort einsortiert. Sofort komplett wie bisher: erste Liste, Liste geändert (entfernt/ersetzt),
+   Held mehr als 1000 px versetzt (Reise, Teleport). */
+let TB = null;
+const TIER_STEP = 600;
+const actFrom = (A, B) => { let C = A; while (C && C !== B) C = C.base; return C ? C.list.length : -1; };   /* A ist B plus Angehängtes? → ab hier neu */
 function tierOf(A, now) {
-  const p = S.player, T0 = TIER;
-  if (T0.act === A && T0.n < 30 && now - T0.t < 250 && Math.abs(p.x - T0.px) < 160 && Math.abs(p.y - T0.py) < 160) { T0.n++; return T0; }
-  const hot = [], cold = [], mid = [], pool = [], esc = new Map(), party = S.party;
-  for (const e of A.list) {
-    const dx = Math.abs(e.x - p.x), dy = Math.abs(e.y - p.y), k = e.kind;
-    if (k === 'npc' && e.escort) { const l = esc.get(e.escort); if (l) l.push(e); else esc.set(e.escort, [e]); }
-    if (dx < 1950 && dy < 1950) pool.push(e);
-    if (!e.alive) { if (k !== 'npc' && k !== 'enemy') hot.push(e); continue; }   /* Tote denken nicht (think kehrt sofort um) */
-    const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
-    if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) continue;
-    if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? cold : mid).push(e); continue; }
-    hot.push(e);
+  const p = S.player, T0 = TIER, party = S.party;
+  if (T0.act !== A && T0.act) { const f = actFrom(A, T0.act); if (f >= 0) { for (let i = f; i < A.list.length; i++) tierPut(T0, A.list[i], T0.px, T0.py, party); T0.act = A; } }
+  if (TB && TB.act !== A) { if (actFrom(A, TB.act) >= 0) TB.act = A; else TB = null; }
+  const jump = Math.abs(p.x - T0.px) > 1000 || Math.abs(p.y - T0.py) > 1000;
+  if (T0.act !== A || jump) {
+    TB = null; const T = { act: A, t: now, n: 0, px: p.x, py: p.y, hot: [], cold: [], mid: [], pool: [], esc: new Map(), ph: T0.ph };
+    for (const e of A.list) tierPut(T, e, p.x, p.y, party);
+    return (TIER = T);
   }
-  TIER = { act: A, t: now, n: 0, px: p.x, py: p.y, hot, cold, mid, pool, esc, ph: T0.ph };
-  return TIER;
+  if (!TB && T0.n < 30 && now - T0.t < 250 && Math.abs(p.x - T0.px) < 160 && Math.abs(p.y - T0.py) < 160) { T0.n++; return T0; }
+  TB ||= { act: A, i: 0, px: p.x, py: p.y, hot: [], cold: [], mid: [], pool: [], esc: new Map() };
+  const L = A.list, end = Math.min(L.length, TB.i + TIER_STEP);
+  for (; TB.i < end; TB.i++) tierPut(TB, L[TB.i], TB.px, TB.py, party);
+  if (TB.i < L.length) { T0.n++; return T0; }
+  const B = TB; TB = null;
+  return (TIER = { act: A, t: now, n: 0, px: B.px, py: B.py, hot: B.hot, cold: B.cold, mid: B.mid, pool: B.pool, esc: B.esc, ph: T0.ph });
 }
 /* Karawanen und ihre Wachen außerhalb der Welt-Karte (Höhle, Haus): vorher je Bild zwei Suchen über alle ~17 000 Welt-Einträge. */
 let WCAR = { arr: null, len: -1, t: -1e9, cars: [], esc: new Map() };
@@ -951,8 +990,8 @@ function spawnResidents() {
 // Bewohner stehen im Kreis ums Feuer und reden übers Fest; an der Festtafel gibt es einmal je Fest ein Festmahl.
 const FEST_DAYS = 6, FEST_BUILT = new Set(), FEST_POP = {};   // BUG (Nutzer: „in Aurelion versammeln sich locker 1000 Leute auf einem Fleck“): Ringzahl je Einwohnerzahl, sonst quetscht sich eine Metropole auf denselben schmalen Kreis wie ein Dorf
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
-const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && !(town === 'varonheim' && S.flags?.varonDead && d >= S.flags.varonDead && d - S.flags.varonDead < CROWN_TURMOIL) &&   /* nach dem Königsmord kein Fest (endlich: Proben suchen den nächsten Festtag) */ (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
-const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
+const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
+const festNow = town => !!town && festDay(town) && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
 const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x + 0.5) * TS, y: (y + 0.5) * TS }; };
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
@@ -1075,12 +1114,22 @@ const CYCLE = {
   Kesselflicker: { tool: 'tool_hammer', reps: 99, rate: 3 }, Feinmechaniker: { tool: 'tool_hammer', reps: 99, rate: 4 }, Stallmeister: { tool: 'tool_fork', reps: 99, rate: 2 },
 };
 let CYC_PROPS = null;                                             // je Stadt die Orte, einmal aus der Welt gelesen
+/* PERF-U3 (02.10.2026): jede Längenänderung der Weltliste (Leiche, Beute, Bote …) baute das hier neu — mit townAt (Schleife über alle Städte)
+   für ~14 000 Props: 20–80 ms in einem Bild, sobald ein Bewohner zum ersten Mal seinen Arbeitskreislauf beginnt (im Kampf ständig).
+   Die Stadt eines Props wird jetzt je Prop gemerkt (gleiche Kachel, gleiche Stadtgebiete → gleiches Ergebnis); wachsen Stadtgebiete, gilt nichts mehr. */
+let CYC_TOWN = new WeakMap(), CYC_SIG = '';
+function cycTownAt(p) {
+  const tx = p.x / TS | 0, ty = p.y / TS | 0, m = CYC_TOWN.get(p); if (m && m.tx === tx && m.ty === ty) return m.t;
+  const t = townAt(tx, ty, 0); CYC_TOWN.set(p, { tx, ty, t }); return t;
+}
 function cycProps() {
   if (CYC_PROPS && CYC_PROPS.w === S.ents.world.length) return CYC_PROPS;
+  let sig = ''; for (const k in TOWN_PLAN) sig += k + ':' + TOWN_PLAN[k].area + ';';
+  if (sig !== CYC_SIG) { CYC_SIG = sig; CYC_TOWN = new WeakMap(); }
   const H = new Map(HOUSES.map(h => [h.id, h])), T = {};
   for (const p of S.ents.world) {
     if (p.kind !== 'prop') continue;
-    const town = p.house ? H.get(p.house)?.town : townAt(p.x / TS | 0, p.y / TS | 0, 0); if (!town) continue;
+    const town = p.house ? H.get(p.house)?.town : cycTownAt(p); if (!town) continue;
     const L = (T[town] ||= { store: [], barn: [], stall: [], rack: [] }), ht = p.house && H.get(p.house)?.type;
     if (p.type === 'stall') L.stall.push(p);
     else if (p.type === 'weapon_rack') L.rack.push(p);
@@ -1237,7 +1286,7 @@ function dayTarget(e) {
 function dayTargetRaw(e) {
   const P = e.plan, h = S.minute / 60 - P.o, alt = ((S.day | 0) + P.n) % 3;
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
-  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage) || (e.fear && fearOf(e) >= 50)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   /* Angst: verstecken */   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
+  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
   if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
   if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
     const rings = Math.max(6, Math.ceil((FEST_POP[e.homeTown] || 24) / 14)), r = 80 + (P.n % rings) * 22;   // BUG (Nutzer: Aurelion-Klumpen): Ringe wachsen mit der Einwohnerzahl, sonst quetscht sich eine Metropole auf 6 Ringe wie ein Dorf
@@ -1277,8 +1326,6 @@ function startTalk(e) {
     e.talk = { with: o.id, until, at: now, say: line[0].replace('%', foe.name) }; o.talk = { with: e.id, until, at: now + 2600, say: line[1] };
     return true;
   }
-  { const fe = fearOf(e), fo = fearOf(o); if (fe >= 50 || fo >= 50) return false;   /* Angst: wer sich fürchtet, plaudert nicht — wer unruhig ist, redet über die Toten */
-    if (fe >= 25 || fo >= 25) { const line = FEAR_TALK[(e.plan.n + o.plan.n) % FEAR_TALK.length], until = now + 5200; e.talk = { with: o.id, until, at: now, say: line[0] }; o.talk = { with: e.id, until, at: now + 2600, say: line[1] }; return true; } }
   const k = e.plan.n + o.plan.n + (S.day | 0), news = !festNow(e.homeTown) && k % 2 ? newsTalk(k) : null;   // jedes zweite Gespräch: Neuigkeiten, wenn es welche gibt
   const pool = festNow(e.homeTown) ? FEST_TALK : festDay(e.homeTown, (S.day | 0) + 1) && k % 3 === 0 ? PRE_FEST : TALK;
   const warm = e.rel?.friend === o.id || o.rel?.friend === e.id, line = news || (warm && k % 2 === 0 ? FRIEND_TALK[k % FRIEND_TALK.length] : pool[k % pool.length]), until = now + 5200;
@@ -1485,7 +1532,7 @@ let TRAV_PEND = [];
 function travelHour() {
   const h = S.minute / 60; if (h < 6 || h >= 19) return;                         // aufgebrochen wird am Tag
   TRAV_PEND = TRAV_PEND.filter(q => spawnTraveler(q.K, q.from, q.to) === 'wait');
-  const n = S.ents.world.reduce((k, e) => k + (e.traveler && !e.gone ? 1 : 0), 0);
+  const n = worldActs().reduce((k, e) => k + (e.traveler && !e.gone ? 1 : 0), 0);   /* PERF-U2: Reisende sind Figuren */
   for (let i = 0; i < (n < TRAVEL_MAX / 2 ? 3 : 1) && n + i < TRAVEL_MAX; i++) if (chance(0.7)) spawnTraveler();
 }
 function travelTalk(npc) {
@@ -1691,6 +1738,96 @@ function styleArea(on = true) {
   S.paused = true;                                     // Schaubild: Zeit steht, Gegner greifen nicht an
   for (const e of S.ents[K]) if (e.solid) addSolid(e);
   return true;
+}
+/* ================= Kampfanimation Scheibe 1: Combat Test Room (nur Debug-Menü „Kampfanimation“) =================
+   Flüchtige Karte __arena nach dem Muster von styleArea/duel/simFight. Nichts davon gelangt in den Spielstand: guardSave sperrt alle
+   __-Karten, dazu S._quiet; beim Verlassen werden der Held (Waffe, Leben, Körper, Fertigkeiten, Status) und alle geänderten Zustandsschlüssel
+   (Flaggen, Statistik …) auf den Stand beim Betreten zurückgesetzt. Die Welt steht still (eigene kleine Schleife arenaUpdate).
+   Der Held ist unverwundbar (S.dbg.god); Puppen sind simDummy (ihr Tod hat keine Weltfolgen). Das Pack (A/B/C) gilt nur hier. */
+const ARENA = '__arena', ARENA_WEAPONS = [['longsword', 'Langschwert'], ['greatsword', 'Zweihänder'], ['dagger', 'Dolch'], ['spear', 'Speer'], ['warhammer', 'Kriegshammer']];
+const ARENA_SKIP = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings', 'dbg', '_quiet', 'paused', 'uiDirty', 'dying', 'cine', 'coop']);
+let arenaKeep = null;
+const inArena = () => !!arenaKeep && S.map === ARENA;
+function arenaEnter(weapon) {
+  const p = S.player; if (!p || arenaKeep) return false;
+  if (S.cine || S.dying || S.coop?.role || S.map.startsWith('__')) { UI.toast('Test Room geht gerade nicht (Szene, Koop oder Testkarte).'); return false; }
+  const snap = {}; for (const k of Object.keys(S)) if (!ARENA_SKIP.has(k)) { try { snap[k] = [JSON.stringify(S[k]), structuredClone(S[k])]; } catch (err) { /* nicht klonbar: bleibt */ } }
+  let hero = null; try { hero = structuredClone(p); } catch (err) { hero = null; }
+  arenaKeep = { map: S.map, x: p.x, y: p.y, quiet: S._quiet, god: S.dbg?.god, party: S.party, snap, keys: new Set(Object.keys(S)), hero, weapon: p.equip.weapon, slow: false };
+  const w = 30, h = 20, tiles = new Uint8Array(w * h).fill(T.GRASS);
+  for (let y = 5; y <= 14; y++) for (let x = 8; x <= 21; x++) tiles[y * w + x] = T.STONE;   /* Kampfplatz */
+  MAPS[ARENA] = { w, h, tiles }; S.ents[ARENA] = []; solidIndex[ARENA] = new Map();
+  S.ents[p.map] = S.ents[p.map].filter(e => e !== p);
+  p.map = ARENA; p.x = 13 * TS; p.y = 10 * TS; p.vx = p.vy = 0; p.swing = 0; p.mounted = null; S.map = ARENA; S.party = []; S.ents[ARENA].push(p);
+  S._quiet = true; (S.dbg ||= {}).god = true; S.dbg.pack = 'A';
+  arenaWeapon(weapon); arenaFoe('acad_dummy', 3, 0, true);
+  log('Combat Test Room: Leihwaffe und Pack (A Grounded, B Heroic, C Endgame) im Debug-Menü „Kampfanimation“ wählen. Hier wird nichts gespeichert; beim Verlassen ist alles wie vorher.', 'combat');
+  return true;
+}
+function arenaLeave() {
+  if (!arenaKeep) return false;
+  const K = arenaKeep, p = S.player; arenaKeep = null;
+  S.ents[ARENA] = (S.ents[ARENA] || []).filter(e => e !== p);
+  if (K.hero) { for (const k of Object.keys(p)) if (!(k in K.hero)) delete p[k]; Object.assign(p, K.hero); } else p.equip.weapon = K.weapon;
+  p.map = K.map; p.x = K.x; p.y = K.y; p.swing = 0; p.vx = p.vy = 0; S.map = K.map; S.party = K.party; S.ents[K.map].push(p);
+  for (const [k, [j, v]] of Object.entries(K.snap)) { let same = false; try { same = JSON.stringify(S[k]) === j; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
+  for (const k of Object.keys(S)) if (!ARENA_SKIP.has(k) && !K.keys.has(k)) delete S[k];
+  S._quiet = K.quiet; if (S.dbg) { S.dbg.god = K.god; delete S.dbg.pack; }
+  S.projectiles = S.projectiles.filter(q => q.map !== ARENA); S.fx = [];
+  delete MAPS[ARENA]; delete S.ents[ARENA]; delete solidIndex[ARENA];
+  return true;
+}
+function arenaWeapon(key) {
+  const p = S.player; if (!inArena()) return;
+  if (key && ITEMS[key]) p.equip.weapon = { key, cond: 1 }; else p.equip.weapon = arenaKeep.weapon;
+  p.swing = 0; p.combo = 0; p.comboFin = false; recalc(p); arenaWarm();
+}
+function arenaFoe(mt, dx, dy, still) {
+  const p = S.player; if (!inArena()) return null;
+  const e = spawnEnemy(mt, ARENA, (p.x / TS | 0) + dx, (p.y / TS | 0) + dy); if (!e) return null;
+  Object.assign(e, { simDummy: true, parley: false, transient: true }); e.maxHp = e.hp = 99999; if (e.body) B.initBody(e, e.maxHp);
+  if (still) { e.aiState = 'idle'; e.stat = true; } else { e.aggroId = p.id; e.aiState = 'pursue'; }
+  return e;
+}
+/* Schwungbilder des Helden für die Waffe und das Pack in Browser-Pausen vorbacken (alle 8 Zielachtel, Stand) — kein neues Figurenbild mitten im Hieb */
+function arenaWarm() {
+  const p = S.player, w = p?.equip.weapon, it = w && ITEMS[w.key]; if (!it || it.ranged) return 0;
+  const shapes = new Set([0, 1, 2].map(k => atkPlan(it.wtype, S.dbg?.pack || 'A', k).s)), list = [];
+  for (let o = 0; o < 8; o++) { const a = o * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a), d = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N');
+    for (const v of shapes) { const W = { mode: 'swing', wt: it.wtype, arc: it.arc || 1.4, v, oct: o, two: !!it.twohand, low: 0, pull: 0 };
+      for (const d2 of atkSpin(it.wtype, v) ? 'SNWE' : d) list.push([d2, 'i0', W]); } }
+  return SP.warmSwingR(SP.humanSpecOf ? SP.humanSpecOf(p) : SP.humanSpec(p), list);
+}
+function arenaUpdate(dt, now) {
+  const p = S.player; combat = S.ents[ARENA].filter(e => e.alive);
+  deathTick(); if (p.alive) controlPlayer(dt);
+  for (const e of [...S.ents[ARENA]]) think(e, dt);
+  separate(); updateProjectiles(dt); updateFx(dt); camStep(p, dt);
+  if ((hudTimer += dt) > 180) { hudTimer = 0; UI.refreshHUD(); }
+}
+function arenaPlanText() {
+  const p = S.player, w = p?.equip.weapon, it = w && ITEMS[w.key]; if (!it || it.ranged) return 'Keine Nahkampfwaffe.';
+  const pk = S.dbg?.pack || 'A', P = atkProfile(it.wtype);
+  return `${it.name} · Pack ${pk}${P ? '' : ' (noch ohne eigenes Profil, alte Kurve)'}: ` + [0, 1, 2].map(k => { const q = atkPlan(it.wtype, pk, k), T = it.speed * (k === 2 ? 1.15 : 1);
+    return `${k === 2 ? 'Wucht' : 'Schlag ' + (k + 1)} ${Math.round(q.w * T)}/${Math.round(q.h * T)}/${Math.round(T)} ms (abbrechbar ab ${Math.round(q.c * T)})`; }).join(' · ');
+}
+function animDebug() {
+  const sel = (id, opts) => `<select id="${id}">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`, v = id => $(id).value;
+  const need = () => { if (inArena()) return true; UI.toast('Erst den Test Room betreten.'); return false; };
+  return ['Kampfanimation (Combat Test Room)', `${sel('dbAtkW', [...ARENA_WEAPONS, ['', 'eigene Waffe']])} ${sel('dbAtkPk', ATK_PACKS.map(k => [k, ANIM_DEFS.attack.sword[k].name]))}`, {
+    'Kampfanimation: Test Room betreten': () => { if (arenaEnter(v('dbAtkW'))) UI.toast('Test Room — nichts wird gespeichert'); },
+    'Kampfanimation: Test Room verlassen': () => { if (arenaLeave()) UI.toast('Zurück, alles wie vorher'); },
+    'Kampfanimation: Waffe wechseln': () => { if (need()) { arenaWeapon(v('dbAtkW')); UI.toast(arenaPlanText(), 5000); } },
+    'Kampfanimation: Pack setzen': () => { if (!need()) return; S.dbg.pack = v('dbAtkPk'); arenaWarm(); UI.toast(arenaPlanText(), 5000); },
+    'Kampfanimation: Zeitplan anzeigen': () => UI.toast(arenaPlanText(), 6000),
+    'Kampfanimation: Übungspuppe (steht)': () => { if (need()) arenaFoe('acad_dummy', 3, (Math.random() * 4 | 0) - 2, true); },
+    'Kampfanimation: Puppe schlägt zurück': () => { if (need()) arenaFoe('bandit', 4, 1, false); },
+    'Kampfanimation: Gruppe (3 Gegner)': () => { if (need()) for (let i = 0; i < 3; i++) arenaFoe(['bandit', 'skeleton', 'goblin_warrior'][i], 4 + i, i - 1, false); },
+    'Kampfanimation: Puppen entfernen': () => { if (need()) S.ents[ARENA] = S.ents[ARENA].filter(e => e === S.player); },
+    'Kampfanimation: Zeitlupe an/aus': () => { if (need()) { arenaKeep.slow = !arenaKeep.slow; UI.toast(arenaKeep.slow ? 'Zeitlupe ×0,25' : 'Normale Zeit'); } },
+    'Kampfanimation: Schwungbilder vorbacken': () => UI.toast(`${arenaWarm()} Bilder in der Warteschlange`),
+    'Kampfanimation: alte Taktung zum Vergleich an/aus': () => { (S.dbg ||= {}).atkOld = !S.dbg.atkOld; UI.toast(S.dbg.atkOld ? 'Vorher: Treffer bei 42 %, kein Abbrechen, Wucht ohne +15 % (nur Vergleich)' : 'Neue Taktung: Treffer im Einschlag'); },
+  }];
 }
 // §82 Balancing: Gegner-Grundwerte. Messung S11 (RF.duel): Stufe-3-Held besiegte Gefahr-1-Gegner in 2,5–4,4 s mit 8–10 %
 // Verlust — zu leicht. Ziel ~6–8 s / 20–30 %. Das ist die Stufe „Schwer (Standard)“; die Schwierigkeitsstufen setzen hier an.
@@ -2074,7 +2211,7 @@ export function continueGame(given = null, retried = false) {                   
   if (!S.flags.artOffS13) { S.flags.artOffS13 = true; S.settings.art = 'D'; }   // Nutzer S13: Stil F vorerst abgeschaltet (einmalig, danach zählt die eigene Wahl)
   if (!S.flags.artR_S15) { S.flags.artR_S15 = true; S.settings.art = 'R'; }
   if (S.settings.art === 'F') S.settings.art = 'R';   /* Audit T05: Stil F gibt es nicht mehr */   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
-  SP.setArt(S.settings?.art || 'D');   // Nutzer S13: gewählter Grafikstil
+  if (S.settings.art !== 'D') S.settings.art = 'R'; SP.setArt(S.settings.art);   /* Nutzer S13: gewählter Grafikstil; alles außer ausdrücklich Klassisch ist R (02.10.2026) */
   seedRng(S.seed);
   const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [], varonburg: [], katakomben: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
@@ -2158,6 +2295,7 @@ export function continueGame(given = null, retried = false) {                   
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
+  for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
@@ -2246,7 +2384,8 @@ function loop(now) {
   try {
     if (hitStop > 0) hitStop -= dt;                             // Hit-Stop: Welt steht kurz, Bild läuft weiter
     else if (S.coop?.role === 'guest') coopHooks.guestTick?.(dt, now);   /* Koop K2: der Gast rechnet keine Welt, nur Bild und Eingabe */
-    else if (!S.paused) update(S.dying ? dt * 0.25 : dt, now);   /* T10: Heldentod in Zeitlupe */
+    else if (!S.paused) { if (inArena()) arenaUpdate(arenaKeep.slow ? dt * 0.25 : dt, now); else update(S.dying ? dt * 0.25 : dt, now); }   /* T10: Heldentod in Zeitlupe */   /* Kampfanimation: Test Room mit eigener Schleife */
+    R.focus.sel = selected;   /* Kampf-Feedback: Lebensbalken nur beim gewählten Ziel (Rechtsklick) */
     R.drawFrame(now);
   }
   catch (err) { if (!loop.failed) { loop.failed = true; console.error(err); log('Interner Fehler: ' + err.message, 'world'); } }
@@ -2462,7 +2601,7 @@ function update(dt, now) {
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
-  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); }  /* Ratgeber; Geheime Orte */
+  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -2535,7 +2674,7 @@ function update(dt, now) {
   if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
   if (hudTimer > 180) {
     hudHalf = true;
-    const gone = e => e && (!e.alive || e.map !== S.map || !S.ents[S.map].includes(e) || dist(e, S.player) > 900);   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
+    const gone = e => e && (!e.alive || e.map !== S.map || byId(e.id) !== e || dist(e, S.player) > 900);   /* PERF-U2: byId statt includes() über ~17 000 Einträge */   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
     hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
@@ -2851,11 +2990,14 @@ function tickCombatant(c, dt) {
   }
   if (c.stagger > 0) c.stagger -= dt;
   if (c.swing > 0 && !c.downed) {
-    c.swing += dt / (c.swingDur || 500);
-    if (!c.hitDone && c.swing >= swingHit(c)) {
+    const s0 = c.swing, hAt = swingHit(c); c.swing += dt / (c.swingDur || 500);
+    const L = feelOf(c).lunge, lungeOk = L && !c.downed && c.mtype !== 'wolf' && c.mtype !== 'boar';   // Ausfallschritt: der Schlag hat Gewicht
+    if (lungeOk && c.atkH > 0 && !atkOld() && !c.hitDone) {                  /* Kampfanimation: Ausfallschritt gleitet über die Schlagphase (gleiche Strecke, fertig im Einschlag) statt zu springen */
+      const w = Math.min(c.atkW || 0, hAt - 0.01), k0 = clamp((s0 - w) / (hAt - w), 0, 1), k1 = clamp((c.swing - w) / (hAt - w), 0, 1), f = c.facing;
+      if (k1 > k0) { const vx = c.vx, vy = c.vy; moveEnt(c, Math.cos(c.aim) * L * (k1 - k0), Math.sin(c.aim) * L * (k1 - k0)); c.facing = f; c.vx = vx; c.vy = vy; } }   /* der Schritt ist kein Gehen: Lauf-Bild und Kombo bleiben unberührt */
+    if (!c.hitDone && c.swing >= hAt) {
       c.hitDone = true;
-      const L = feelOf(c).lunge, f = c.facing;                  // Ausfallschritt: der Schlag hat Gewicht
-      if (L && !c.downed && c.mtype !== 'wolf' && c.mtype !== 'boar') { moveEnt(c, Math.cos(c.aim) * L, Math.sin(c.aim) * L); c.facing = f; }
+      if (lungeOk && !(c.atkH > 0 && !atkOld())) { const f = c.facing; moveEnt(c, Math.cos(c.aim) * L, Math.sin(c.aim) * L); c.facing = f; }
       resolveSwing(c);
     }
     if (c.swing >= 1) { c.swing = 0; c.hitDone = false; }
@@ -2871,7 +3013,9 @@ function tickCombatant(c, dt) {
   // Statuszeiten
   if (c.status && c.status.length) {
     if (c === S.player) for (const s of c.status) ((S.codex ||= {}).states ||= {})[s.key] = 1;   // S15 Kodex: erlebte Zustände
-    for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && (c.vx || c.vy) && chance(dt / 450) && dist(c, S.player) < 700) fx(c.x + ri(-4, 4), c.y + 6, 'blood', 1);   /* §5f: Blutspur */
+    const near = !!S.player && c.map === S.map && dist(c, S.player) < 700;
+    for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && (c.vx || c.vy) && near && vrnd() < dt / 450) fx(c.x + vrnd() * 8 - 4, c.y + 6, 'blood', 1);   /* §5f: Blutspur — Kampf-Feedback: Darstellungszufall vrnd statt Spielzufall */
+      if (near) statusFx(c, s, dt);
       if (s.key === 'bleeding' && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }
       if (s.key === 'regrowth' && !(c.downed && c !== S.player)) B.heal(c, s.heal * dt / 1000);   // S15 (Nutzer): am Boden heilt sich kein NPC selbst
       if (s.key === 'burning') { s.acc = (s.acc || 0) + dt / 1000 * (S.weather === 'rain' ? 1.5 : 3); if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Feuer', false, 'fire'); credit(c, byId(s.src), n); } }   // S15 P4
@@ -3081,30 +3225,44 @@ const earVol = e => clamp(1 - dist(S.player, e) / 650, 0, 1);    // Lautstärke 
 function comboStep(c, it) {
   if (c !== S.player && !c.coopPilot) return; if (it?.ranged || c.vx || c.vy) { c.combo = 0; c.comboFin = false; return; }   /* nur im Stand: Wegrennen und Zuschlagen baut keine Kombo auf */
   const now = performance.now(); c.combo = now < (c.comboT || 0) + 600 ? (c.combo || 0) + 1 : 1; c.comboFin = c.combo >= 3; c.comboShown = false;
-  if (c.comboFin) { c.combo = 0; if (!S.flags.comboHint) { S.flags.comboHint = 1; log('Kombo: Drei Schläge ohne Pause — der dritte ist ein Wuchtschlag (+30 % Schaden, der Gegner taumelt).', 'combat'); } }
+  if (c.comboFin) { c.combo = 0; if (!S.flags.comboHint) { S.flags.comboHint = 1; log('Kombo: Drei Schläge ohne Pause — der dritte ist ein Wuchtschlag (+30 % Schaden, der Gegner taumelt, dauert 15 % länger). Nach dem Einschlag lässt sich die Erholung mit dem nächsten Kombo-Schlag abbrechen.', 'combat'); } }
   c.comboT = now + (it ? it.speed : 450) * (c.comboFin ? 1.15 : 1);
 }
 function limpMul(c, now = performance.now()) {
   if (!c.body || !(c.vx || c.vy) && c !== S.player) return 1; const l = c.body.lleg.hp <= 0, r = c.body.rleg.hp <= 0;
   return l !== r ? 0.7 + 0.3 * Math.abs(Math.sin(now / 170)) : 1;
 }
+/* Kampfanimation Scheibe 1 (DECISIONS 02.10.): Pack der Optik/Trefferzeit — Spieler und Koop-Helden nach Test-Room-Wahl (S.dbg.pack, nie
+   gespeichert), alle anderen fest Pack A. Erholung abbrechen: nur in der Kombo-Kette (im Stand, Schritt 1 und 2), ab Treffer + 40 % der Erholung. */
+const atkPackOf = c => (c === S.player || c.coopPilot || c.coopHero) && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A';
+const atkOld = () => S.dbg?.atkOld === true;   /* nur Debug-Vergleich „vorher“: alte Taktung (Treffer 0,42, kein Abbruch, Wucht ohne +15 %); 'cancel' = nur das Abbrechen aus */
+const atkCancel = c => !S.dbg?.atkOld && (c === S.player || !!c.coopPilot) && c.hitDone && c.atkC > 0 && (c.atkStep || 0) < 2 && c.swing >= c.atkC && !c.vx && !c.vy && !c.downed;
+const atkWt = c => { const w = c?.equip?.weapon, it = w && ITEMS[w.key]; return it && !it.ranged ? it.wtype : null; };
 function attack(c, forceDir) {
-  if (c.swing > 0 || c.atkCd > 0 || c.downed || !c.alive) return;
+  const chain = c.swing > 0 && atkCancel(c), rem = chain ? (1 - c.swing) * (c.swingDur || 0) : 0;   /* Kampfanimation: der nächste Kombo-Schlag bricht die Erholung ab (rem = abgebrochener Rest in ms) */
+  if ((c.swing > 0 && !chain) || (c.atkCd > 0 && !chain) || c.downed || !c.alive) return;
   if (c === S.player && S.map === 'world') keepDraw(c);              /* Umbau S3: Burgfrieden */
   if (dualOn(c)) c.dualTurn = !c.dualTurn; else c.dualTurn = false;   /* Zweiwaffen: abwechselnd rechts und links */
   if (B.armless(c)) { if (c === S.player && !(c.armWarn > performance.now())) { c.armWarn = performance.now() + 2000; UI.toast('Ohne Arme kannst du nicht zuschlagen.'); } return; }   // S14
   if (B.isDisabled(c, 'rarm') && c.equip.weapon) { c.equip.weapon = null; }   // S14: die Waffenhand trägt nichts mehr
   const w = wpnOf(c), it = w ? ITEMS[w.key] : null;
   const cost = (it ? it.stam : 4) * (1 - Math.min(0.6, afx(c, 'vigor') + elx(c, 'vigor')));
-  if (c.stamina < cost) { if (c === S.player && chance(0.02)) UI.toast('Zu erschöpft'); return; }
+  if (c.stamina < cost) { if (c === S.player && !(stamWarnAt > performance.now())) { stamWarnAt = performance.now() + 1200; float(c, 'erschöpft', 'rgba(200,190,160,ALPHA)'); } return; }   /* Kampf-Feedback: immer sichtbar (Zeichen über dem Kopf), ohne Spielzufall */
   if (it && it.reload && c.reloadUntil > performance.now()) return;   // Armbrust wird gespannt
   if (it && it.energy && cellUser(c) && (w.charge ?? 100) < it.energy) { if (c === S.player && !(c.cellWarn > performance.now())) { c.cellWarn = performance.now() + 1500; UI.toast('Energie leer — Energiezelle benutzen (Inventar oder Leiste)', 2600); } return; }   /* Roadmap C.10 */
   if (it && it.manaShot) { if ((c.mana || 0) < it.manaShot) { if (c === S.player && !(c.manaWarn > performance.now())) { c.manaWarn = performance.now() + 1500; UI.toast(c.maxMana ? 'Zu wenig Mana für den Zauberstab' : 'Den Zauberstab führt nur, wer Magie gelernt hat (Magier, Kleriker, Paladin).'); } return; } c.mana -= it.manaShot; }
   c.stamina -= cost;
   comboStep(c, it);   /* Nutzer §5f: Kombos */
   c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift'))) * (1 - Math.min(0.25, (it && c.skills ? c.skills[it.skill] || 0 : 0) * 0.0025));   // S13 (Kenshi): geübte Hand schlägt schneller
+  if (c.comboFin && !atkOld()) c.swingDur *= 1.15;   /* Kampfanimation (DECISIONS 02.10.): der Wuchtschlag dauert wirklich 15 % länger, wie in MECHANIKEN beschrieben */
+  { const wt = it && !it.ranged ? it.wtype : null, pk = atkPackOf(c);   /* Kampfanimation: Schwungplan aus anim.js — Form, Ausholen, Treffer (= sichtbarer Einschlag), Abbruchpunkt */
+    c.atkStep = c.comboFin ? 2 : c.combo >= 1 ? Math.min(1, c.combo - 1) : c.atkStep === 0 ? 1 : 0;
+    if (wt) { const P = atkPlan(wt, pk, c.atkStep); c.atkS = P.s; c.atkW = P.w; c.atkH = P.h; c.atkC = P.c; c.atkPk = pk; } else { c.atkS = 0; c.atkW = 0; c.atkH = 0; c.atkC = 0; c.atkPk = null; }
+    c.atkFx = false; }
   if (it && it.wtype === 'bow') c.swingDur *= 1.15;                   // S15 (Nutzer): Spannen dauert sichtbar — der Schuss fällt erst bei 75 % (swingHit)
   if (dualOn(c)) { c.swingDur *= 0.85; }   /* Zweiwaffen: schneller */
+  c.atkRem = 0;   /* Kampfanimation (Entwickler 02.10., takt-neutral): der abgebrochene Rest verlängert das Ausholen des nächsten Schlags — die Kette fließt, Treffer kommen im alten Takt */
+  if (chain && rem > 0 && c.atkH > 0) { const D = c.swingDur, D2 = D + rem, f = x => (x * D + rem) / D2; c.atkW = f(c.atkW); c.atkH = f(c.atkH); c.atkC = f(c.atkC); c.swingDur = D2; c.atkRem = rem; }
   c.atkCd = c.swingDur * 0.55;
   c.swing = 0.001; c.hitDone = false;
   if (forceDir != null) c.aim = forceDir;
@@ -3112,7 +3270,7 @@ function attack(c, forceDir) {
   if (it && it.ranged) { c.hitDone = false; }
 }
 
-const swingHit = c => c.equip?.weapon && ITEMS[c.equip.weapon.key]?.wtype === 'bow' ? 0.75 : 0.42;   // S15: Bogen spannt länger
+const swingHit = c => c.equip?.weapon && ITEMS[c.equip.weapon.key]?.wtype === 'bow' ? 0.75 : c.atkH > 0 && !atkOld() ? c.atkH : 0.42;   // S15: Bogen spannt länger   /* Kampfanimation: Nahkampf trifft im Einschlag-Bild (anim.js atkPlan), Gegner/Unbewaffnete wie bisher 0,42 */
 function resolveSwing(c) {
   if (c.kind === 'enemy') return resolveSwingEnemy(c);
   const mult = c.abilityMult || 1, kind = c.abilityKind || 'physical';
@@ -3392,7 +3550,12 @@ function weaponMult(it, t, armor0) {
 let AREA = false;
 const EYE_ZAP = new Set(['magic', 'shadow']);   /* Audit T05: nur Arten, die hurt() wirklich erreicht (Blitz- und Arkanzauber kommen als 'magic') */   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
+/* Kampf-Feedback (Entwickler 02.10.): schwere (angesagte) Angriffe sind NICHT blockbar — Deckung, Parade, Schild, Nahkampfabwehr und
+   Gegenstrom greifen nicht, nur Ausweichen (Rolle/Unverwundbarkeit) oder Hinausgehen hilft. Dornen und Klassenknoten wirken weiter. */
+let UNBLOCK = false, stamWarnAt = 0;
+const heavyHit = (e, t, mult) => { UNBLOCK = true; try { hit(e, t, mult); } finally { UNBLOCK = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
+  if (attacker === S.player && target !== S.player) { R.focus.last = target; R.focus.lastAt = performance.now(); }   /* Entwickler 02.10.: ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Balken */
   if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;
   if (target.varonKing && !target.exile && attacker && (attacker === S.player || S.party.includes(attacker.id) || attacker.coopPilot)) keepAlarm(attacker, 'Angriff auf den König');   /* Entwickler 02.10.: Späher und Verstärkung */   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null, poised0 = target.poiseUntil > performance.now();   /* Control-Befund A1: vor hurt() lesen — hurt setzt selbst Standfestigkeit */
@@ -3430,16 +3593,16 @@ function hit(attacker, target, mult, kind = 'physical') {
   const off = target.equip && target.equip.offhand;
   // Aktive Deckung / Parade (nur der Spieler; eigenes Feld cover — guard ist das Flag der Stadtwachen). Rüstung wirkt vor dem Block.
   const crush = it && it.crush;                                      // Kriegshammer: kein Schild hält ihn, Deckung kostet doppelt
-  const cov = target.cover && !AREA ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
+  const cov = target.cover && !AREA && !UNBLOCK ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
   if (cov === true) return;
-  if (off && !crush && !AREA && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7 + (setOf(target)?.bonus.block || 0)) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
+  if (off && !crush && !AREA && !UNBLOCK && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7 + (setOf(target)?.bonus.block || 0)) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
     fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
   if (target.skills && !target.downed && !target.cover && !AREA && kind === 'physical') {       // S13 (Nutzer, Kenshi): Nahkampfabwehr
     const df = target.skills.defense || 0, front = Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim ?? 0))) < 1.2;
-    if (front && chance(Math.min(0.3, df * 0.003))) { dmg *= 0.35; float(target, 'Abgewehrt', 'rgba(200,196,170,ALPHA)'); fx(target.x, target.y - 12, 'spark', 4); target.skills.defense = Math.min(100, df + 0.3);
+    if (front && !UNBLOCK && chance(Math.min(0.3, df * 0.003))) { dmg *= 0.35; float(target, 'Abgewehrt', 'rgba(200,196,170,ALPHA)'); fx(target.x, target.y - 12, 'spark', 4); target.skills.defense = Math.min(100, df + 0.3);
       if (df >= 40 && attacker.alive) hurt(attacker, (target.equip?.weapon ? damageOf(target) : 3) * (0.2 + df * 0.003), target, target.name);   // Parade mit Gegenhieb
     } else target.skills.defense = Math.min(100, df + 0.05);       // man lernt auch, indem man getroffen wird
     target.skills.toughness = Math.min(100, (target.skills.toughness || 0) + 0.04);   // Zähigkeit wächst mit jedem Treffer
@@ -3475,13 +3638,25 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (crush && target.alive && !target.downed && !poised0) { const st = MONSTERS[target.mtype]?.boss ? 300 : 650; target.stagger = Math.max(target.stagger || 0, st); target.swing = 0; target.telegraph = 0; target.windup = false; if (target.kind === 'enemy') target.poiseUntil = performance.now() + st + 1200; }   /* Audit A1: Wucht öffnet ein Fenster, sperrt aber nicht dauerhaft (Standfestigkeit) */   // Wucht: niemand bleibt stehen, wie er stand
   // Fertigkeit steigern
   if (attacker.skills && it) attacker.skills[it.skill] = Math.min(100, (attacker.skills[it.skill] || 0) + 0.12);
-  const fl = feelOf(attacker), mine = attacker === S.player;
-  if (mine || target === S.player) hitStop = Math.max(hitStop, (mine ? fl.stop : 40) + (crit ? 40 : 0));
-  if (mine) { camShake(fl.shake * (crit ? 1.8 : 1), 90 + fl.w * 90); if (crit && S.settings.motion) R.cam.punch = 0.04; }
+  const fl = feelOf(attacker), mine = attacker === S.player, PF = atkPackFx(attacker);   /* Kampfanimation: Pack-Faktor für Hit-Stop und Wackeln (A = 1) */
+  if (mine || target === S.player) hitStop = Math.max(hitStop, (mine ? fl.stop * PF.stop : 40) + (crit ? 40 : 0));
+  if (mine) { camShake(fl.shake * PF.shake * (crit ? 1.8 : 1), 90 + fl.w * 90); if (crit && S.settings.motion) R.cam.punch = 0.04; }
   else if (target === S.player) camShake(4, 120);
   const a = Math.atan2(target.y - attacker.y, target.x - attacker.x);
   const ix = target.x - Math.cos(a) * 6, iy = target.y - 14 - Math.sin(a) * 3;
   S.fx.push({ x: ix, y: iy, vx: 0, vy: 0, type: crit ? 'crit' : 'impact', a, s: 1 + fl.w, life: crit ? 260 : 170, maxLife: crit ? 260 : 170 });
+  atkImpact(attacker, target);   /* Kampfanimation: Schlageffekte des Packs im selben Bild wie Schaden, Hit-Stop und Klang */
+}
+/* Kampfanimation Scheibe 1: Effekte des Packs beim Einschlag — nur Optik, einmal je Schwung (Fegen trifft mehrere). A: nichts Neues
+   (Klingenspur, Stern, Wackeln wie bisher); B: Finisher mit Ring; C: Finisher mit Druckwelle und Kamerastoß. Sichelbogen, Vorschub und
+   Nachbilder zeichnet render.js selbst aus dem Schwungzustand (so sieht auch ein Koop-Gast sie, Optik lokal). */
+const ATK_FX0 = { stop: 1, shake: 1, trail: 6, push: 0, slash: 0, after: 0, fin: 0 };
+function atkPackFx(c) { if (!c || !(c.atkH > 0) || !c.atkPk || !(c.swing > 0)) return ATK_FX0; return atkFx(atkWt(c), c.atkPk); }
+function atkImpact(c, target) {
+  if (!c || c.atkFx || !(c.atkH > 0) || !c.atkPk || !(c.swing > 0) || !c.hitDone) return;
+  c.atkFx = true; const F = atkPackFx(c), fin = c.atkStep === 2;
+  if (fin && F.fin >= 1) S.fx.push({ x: c.x, y: c.y, vx: 0, vy: 0, type: 'ring', s: 1.5, life: 420, maxLife: 420 });
+  if (fin && F.fin >= 2) { S.fx.push({ x: target.x, y: target.y, vx: 0, vy: 0, type: 'shock', s: 1, life: 520, maxLife: 520 }); if (S.settings.motion) R.cam.punch = 0.05; sfx('crit', 1, earVol(c)); }
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
@@ -3567,7 +3742,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   }
   if (target.aiState === 'idle' || target.aiState === 'patrol') target.aiState = 'pursue';
   if (target.variant === 'leader') rallyCall(target, attacker);
-  float(target, (crit ? '' : '') + Math.round(dmg), crit ? 'rgba(212,175,55,ALPHA)' : 'rgba(228,220,200,ALPHA)', crit);
+  dmgFloat(target, dmg, source, crit, kind, cause);   /* Kampf-Feedback: Pixelziffern in Schadensfarbe */
   const lvl = S.settings.violence;
   const bony = target.mtype === 'skeleton';
   if (bony) fx(target.x, target.y - 14, 'bone', crit ? 8 : 5);
@@ -3756,11 +3931,9 @@ function die(c, cause = 'Wunden', source) {
   { const byP = source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id;
     if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
     if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP);
-    if (c.kind === 'npc' && c.varonCourt) courtDeath(c, byP);   /* Hof: Tote bleiben tot, Reichsverweser rückt nach */
     if (c.hiredBy) grudgeNote(c);   /* E3 */
     if (c.settler || c.campGuard) { moraleAdd(-4, `${c.name} getötet`); S.flags.settlerDeaths = (S.flags.settlerDeaths || 0) + 1; if (S.settlement) campLoss(S.settlement); } }   /* Siedlung M1/M2/M4 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
-  if (c.kind === 'npc' && !isParty) fearWitness(c, source, wasFoe);   /* Angst der Zeugen */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   if (c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith)) (S.mourn ||= {})[c.homeTown] = { name: c.name, until: (S.day | 0) + 2 };   // S13: der Ort trauert
@@ -3846,66 +4019,6 @@ function bloodshed(victim, wasFoe) {
   if (m) log(`${m.name}: „${victim.name} hat dir nichts getan.“`, 'party');
 }
 
-// ================= Angst (Nutzer 02.10.2026: „10 Leute vor Zivilisten getötet — die rennen kurz weg und reden normal weiter“) =================
-// Jeder Bürger hat einen Angstwert (e.fear 0–100) und weiß, vor wem (e.fearBy). Jeder Tote, den er sieht (380 px), +18; wer es nur
-// hört (gleicher Ort, 1100 px), +6 — tapfere und grausame Leute halb so viel. Stufen: ab 25 unruhig (Abstand halten, reden über die
-// Toten), ab 50 verängstigt (verstecken sich im Haus, reden nicht mit dem Täter, kein Plausch), ab 75 Panik (rennen schreiend vor
-// der Gefahr davon). Solange die Gefahr da ist (lebt, gleiche Karte, näher als 700 px), bleibt die Angst; erst wenn sie fort ist,
-// sinkt sie um 12 je Spielstunde. Wer einen Angreifer (Feind) erschlägt, macht niemandem Angst; Wachen fürchten sich nicht.
-const FEAR_SEE = 380, FEAR_HEAR = 1100, FEAR_DECAY = 12 / 60, FEAR_NEAR = 700;
-const FEAR_CRY = ['Hilfe!', 'Lauft!', 'Nicht ich! Bitte!', 'Mörder!', 'Weg hier!', 'Verriegelt die Türen!'];
-const FEAR_TALK = [['Hast du gesehen, was da passiert ist?', 'Leise. Vielleicht hört es jemand.'], ['Ich hab das Blut noch vor Augen.', 'Geh nach Hause. Schließ ab.'],
-  ['Wer macht so was?', 'Jemand, dem alles egal ist.'], ['Wo ist die Wache, wenn man sie braucht?', 'Frag nicht.'], ['Ich schlafe heute nicht.', 'Keiner schläft heute.']];
-const FEAR_NAME = ['ruhig', 'unruhig', 'verängstigt', 'in Panik'];
-function fearOf(e) {                                           /* Angst jetzt: gespeicherter Wert minus Abklingen seit die Gefahr fort ist */
-  if (!e?.fear) return 0;
-  const v = e.fear - FEAR_DECAY * Math.max(0, clock() - (e.fearSeen || 0));
-  if (v <= 0) { e.fear = 0; e.fearBy = null; return 0; }
-  return v;
-}
-const fearStage = f => f >= 75 ? 3 : f >= 50 ? 2 : f >= 25 ? 1 : 0;
-const fearByPlayer = e => { const T = byId(e.fearBy); return !!T && (T === S.player || !!T.coopHero || !!T.coopPilot || S.party.includes(T.id)); };
-function fearWitness(victim, source, wasFoe) {
-  let src = typeof source === 'string' ? byId(source) : source; if (!src && victim.lastKiller) src = byId(victim.lastKiller);
-  if (!src || src === victim || !src.id || src.kind === 'prop') return;
-  const isP = src === S.player || !!src.coopHero || !!src.coopPilot || S.party.includes(src.id) || src.servant === S.player.id;
-  if (isP && wasFoe) return;                                         /* wer einen Angreifer erschlägt, schützt — er erschreckt nicht */
-  if (!isP && src.kind === 'npc' && (src.guard || !src.angry)) return;   /* die Wache richtet einen Verbrecher: Ordnung, keine Gefahr */
-  const threat = src.servant === S.player.id ? S.player : src, now = clock(), town = victim.map === 'world' ? townAt(victim.x / TS | 0, victim.y / TS | 0) : null;
-  let panic = 0, scared = 0;
-  for (const w of S.ents[victim.map] || []) {
-    if (w.kind !== 'npc' || !w.alive || w.downed || w === victim || w === src || w.guard || w.robot || S.party.includes(w.id) || w.coopHero || w.coopPilot || w.captive || w.inmate || w.prisoner) continue;
-    const d = dist(w, victim), sees = d < FEAR_SEE, hears = !sees && d < FEAR_HEAR && (!town || w.homeTown === town || w.town === town);
-    if (!sees && !hears) continue;
-    const f0 = fearOf(w), g = (sees ? 18 : 6) * (w.brave || (w.traits || []).includes('grausam') ? 0.5 : 1);
-    w.fear = Math.min(100, f0 + g); w.fearBy = threat.id; w.fearSeen = now;
-    const s0 = fearStage(f0), s1 = fearStage(w.fear);
-    if (s1 >= 3 && s0 < 3) { panic++; if (sees && chance(0.6)) bubble(w, pick(FEAR_CRY), 2200); }
-    if (s1 >= 2 && s0 < 2) scared++;
-  }
-  if (!isP || !(panic + scared) || S._quiet) return;
-  const k = town || victim.map, H = (S.flags.fearHint ||= {});
-  if (panic && H[k] !== 'p' + (S.day | 0)) { H[k] = 'p' + (S.day | 0); log(`Panik${town ? ` in ${townName(town)}` : ''}: Die Leute rennen schreiend vor dir davon. Solange du in der Nähe bist, kommt keiner aus seinem Haus.`, 'world'); }
-  else if (scared && !H[k]) { H[k] = 's' + (S.day | 0); log(`Die Leute${town ? ` von ${townName(town)}` : ''} haben Angst vor dir. Sie verstecken sich und reden nicht mehr mit dir — bis du fort bist.`, 'world'); }
-}
-function fearStep(e, dt) {                                            /* aus updateNpc: Abstand halten, fliehen, verstecken */
-  const f0 = fearOf(e); if (f0 < 25) return false;
-  const T = byId(e.fearBy), here = !!T && T.alive !== false && !T.downed && T.map === e.map, d = here ? dist(e, T) : 1e9, now = clock();
-  if (here && d < FEAR_NEAR) { if (now - (e.fearSeen || 0) > 30) e.fear = f0; e.fearSeen = now; }   /* die Gefahr ist da: die Angst bleibt (war sie länger fort, gilt der abgeklungene Wert) */
-  const st = fearStage(f0), keep = st >= 3 ? 620 : st >= 2 ? 420 : 200;
-  if (d < keep) {
-    e.talk = null; e.sitting = false;
-    seek(e, Math.atan2(e.y - T.y, e.x - T.x), (st >= 3 ? 1.7 : st >= 2 ? 1.4 : 1.0) * dt / 16, dt);
-    if (st >= 2 && !(e.fearCry > performance.now())) { e.fearCry = performance.now() + 4000 + Math.random() * 5000; if (chance(st >= 3 ? 0.6 : 0.25)) bubble(e, pick(FEAR_CRY), 1800); }
-    return true;
-  }
-  if (st < 2 || (e.plan && e.map === 'world')) return false;          /* Bewohner mit Tagesablauf: dayTargetRaw schickt sie ins Haus */
-  const a = e.anchor; if (!a) return false;
-  const da = Math.hypot(a.x - e.x, a.y - e.y);
-  if (da > 10) { seek(e, Math.atan2(a.y - e.y, a.x - e.x), 1.2 * dt / 16, dt, a); return true; }
-  e.vx = e.vy = 0; return true;
-}
-
 // Hoher Stand: Adel und Geweihte. Blutbann (Wachen der Fraktion greifen fünf Tage lang ohne Anruf an, keine Festnahme mehr),
 // Kopfgeldjäger sofort, Chronik; bei Geweihten zusätzlich der Kirchenbann: sieben Tage hilft dir niemand auf, der Orden ist Feind.
 const HIGH_RANK = { Graf: 'adel', 'Gräfin': 'adel', Edelmann: 'adel', Edelfrau: 'adel', Ratsherr: 'adel', Dorfvorsteher: 'adel', 'Alter Paladin': 'klerus', Priester: 'klerus', Heilerin: 'klerus', Priesterin: 'klerus' };
@@ -3972,16 +4085,24 @@ function lootTier(e) { return e.boss || MONSTERS[e.mtype]?.boss ? 2 : e.elite ||
 function dropLoot(e) {
   const table = LOOT[e.mtype] || [], tier = lootTier(e), BP = tier === 2 && BOSS_LOOT[e.mtype];
   const bonus = Math.max(0, (MONSTERS[e.mtype]?.threat || 1) - 1) + (e.boss ? 1 : 0) + (e.elite ? 1 : 0);   // gefährlicher Gegner (Veteran §71), bessere Chancen
-  const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }));
+  const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }), e);   /* P5: Bogen vom Körper */
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
     if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p) * diffOf().loot)) drop(key); }   // S15 P12
   if (BP) { if (BP.weapons.length && chance(0.9)) drop(pick(BP.weapons)); if (BP.armor.length && chance(0.6)) drop(pick(BP.armor));
     if (BP.unique.length && chance(0.25)) drop(pick(BP.unique)); }
   if (chance(0.5)) { const g = ri(1, 6) + e.level; S.gold += g; float(e, `+${g} Gold`, 'rgba(189,148,51,ALPHA)'); }
 }
-function dropItemAt(map, x, y, item) {
+function dropItemAt(map, x, y, item, from = null) {
   if (!item) return;
-  S.ents[map].push({ id: uid(), kind:'item', map, x, y, r: 8, item, seed: rnd() * 100 });
+  const e = { id: uid(), kind:'item', map, x, y, r: 8, item, seed: rnd() * 100 };
+  /* Visueller Umbau P5: Beute fällt im Bogen vom Körper, landet mit Staub und Klang (Klang nach Seltenheit). Nur Darstellung:
+     _drop ist nicht aufzählbar (nie im Spielstand, nie im Koop-Delta), die Position gilt sofort; kein rnd(). */
+  if (from && map === S.map && !S._quiet) {
+    Object.defineProperty(e, '_drop', { value: { t: performance.now(), dx: from.x - x, dy: from.y - 14 - y }, enumerable: false, writable: true });
+    const lv = Math.max(0, RARITY_ORDER.indexOf(rarOf(item)));
+    setTimeout(() => { if (S.map !== map || !S.player || !S.ents[map]?.includes(e)) return; const v = clamp(1 - Math.hypot(S.player.x - x, S.player.y - y) / 650, 0, 1); if (v > 0.05) { sfx('loot', lv, v); fx(x, y, 'dust', 3 + lv); } }, 430);
+  }
+  S.ents[map].push(e);
 }
 
 // XP nach Beitrag (Master-Prompt 2 §17): Schaden je Verursacher am Ziel; Diener zählen für ihren Herrn, Gift und Blutung
@@ -4043,10 +4164,27 @@ function fx(x, y, type, n = 6) {
 function float(e, text, color, big = false) {
   S.floats.push({ x: e.x + Math.round(vrnd() * 12 - 6), y: e.y - 26, rise: 0, text, color, big, life: 900, maxLife: 900 });
 }
+/* Kampf-Feedback (VISUAL K1, Entscheidung 02.10.): Schadenszahl in der Farbe der Schadensart, als Pixelziffern gezeichnet (render.js drawFloats).
+   mine = vom Spieler (oder seinen Beschwörungen), inc = trifft den Spieler. Brand/Gift/Blutung (ohne Quelle) addieren sich auf die laufende Zahl. */
+const DMG_COL = { physical: '228,220,200', fire: '240,140,60', frost: '150,205,245', holy: '245,232,170', sun: '245,232,170', shadow: '170,120,210', magic: '184,138,240', poison: '130,200,90', bleed: '200,48,40' };
+function dmgFloat(t, dmg, src, crit, kind, cause) {
+  const dk = cause === 'Gift' || cause === 'Seuche' ? 'poison' : cause === 'Blutung' ? 'bleed' : DMG_COL[kind] ? kind : 'physical';
+  const color = `rgba(${crit && dk === 'physical' ? '212,175,55' : DMG_COL[dk]},ALPHA)`, n = Math.round(dmg);
+  if (!src) { const o = S.floats.find(f => f.tid === t.id && f.dot && f.color === color && f.life > 300); if (o) { o.text = String(+o.text + n); o.life = Math.max(o.life, 700); return; } }
+  S.floats.push({ x: t.x + Math.round(vrnd() * 12 - 6), y: t.y - 26, rise: 0, text: String(n), color, big: !!crit, life: 900, maxLife: 900, num: 1, tid: t.id, dot: !src,
+    mine: !!src && (src === S.player || (S.player && src.ownerId === S.player.id)), inc: t === S.player });
+}
+/* Kampf-Feedback (VISUAL K4): Zustände sichtbar am Körper — Flammen steigen, Eiskristalle, Giftbläschen, Funken. Gedrosselt (~2–3 je Sekunde),
+   nur in Spielernähe, Darstellungszufall vrnd (ändert nie den Spielzufall). Den Frost-Eisrand an den Füßen zeichnet render.js. */
+const STATUS_FX = { burning: 'fire', frost: 'frost', poisoned: 'necro', shocked: 'spark' };
+function statusFx(c, s, dt) {
+  const ty = STATUS_FX[s.key]; if (!ty || vrnd() > dt / (s.key === 'burning' ? 260 : 420) || S.fx.length > FX_CAP) return;
+  S.fx.push({ x: c.x + (vrnd() * 14 - 7), y: c.y - 6 - vrnd() * 24, vx: (vrnd() - 0.5) * 0.3, vy: ty === 'fire' ? -1.1 : ty === 'necro' ? -0.5 : -0.2, type: ty, up: 1, s: 2 + vrnd() * 1.5, life: 420 + vrnd() * 260, maxLife: 680 });
+}
 const RISING = new Set(['heal', 'necro', 'shadow']);           // Magie steigt auf, Blut und Splitter fallen
 const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock', 'afterimage']);     // bleiben am Ort
 function updateFx(dt) {
-  for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
+  for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) || f.up ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   for (const f of S.floats) { if (!f.bubble) f.rise += dt / 22; f.life -= dt; }
   S.floats = S.floats.filter(f => f.life > 0);
@@ -4584,8 +4722,8 @@ function startHeavy(e, tgt, m) {
   const wind = H.wind * diffOf().tele;                                 // S15 P12: Angsthase sieht es länger kommen
   e.heavy = { kind: H.kind, t: wind, T: wind, a, c };
   e.telegraph = wind; e.windup = true;
-  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: wind, a } : { kind: 'stomp', t: wind, T: wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c] };
-  float(e, H.kind === 'sweep' ? 'holt weit aus' : H.kind === 'thrust' ? 'zielt' : 'hebt die Waffe', 'rgba(230,120,90,ALPHA)'); sfx('swing', 0.2, earVol(e));
+  e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: wind, T: wind, L: H.r, a, heavy: 1 } : { kind: 'stomp', t: wind, T: wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c], heavy: 1 };
+  sfx('swing', 0.2, earVol(e));   /* Kampf-Feedback: statt Wort-Float füllt sich die rote Bodenmarke bis zum Einschlag, darüber das Warnzeichen „nicht blockbar“ (render.js) */
 }
 function heavyTick(e, dt, m) {
   const Hv = e.heavy, H = m.heavy; e.vx = e.vy = 0; Hv.t -= dt; if (e.special) e.special.t = Hv.t; e.telegraph = Math.max(0, Hv.t);
@@ -4599,7 +4737,7 @@ function heavyTick(e, dt, m) {
     else inside = Math.hypot(t.x - Hv.c.x, t.y - Hv.c.y) < (Hv.kind === 'slam' ? H.r * 0.55 : H.r) + (t.r || 10);
     if (!inside) continue;
     if (t.invuln) { evaded(t); continue; }
-    hit(e, t, H.mul); const ka = Math.atan2(t.y - e.y, t.x - e.x); if (t.alive) { moveEnt(t, Math.cos(ka) * 22, Math.sin(ka) * 22); t.stagger = Math.max(t.stagger || 0, 450); }
+    heavyHit(e, t, H.mul); const ka = Math.atan2(t.y - e.y, t.x - e.x); if (t.alive) { moveEnt(t, Math.cos(ka) * 22, Math.sin(ka) * 22); t.stagger = Math.max(t.stagger || 0, 450); }
   }
   if (Hv.kind === 'thrust' || Hv.kind === 'charge') moveEnt(e, Math.cos(Hv.a) * 40, Math.sin(Hv.a) * 40);
   fx(Hv.c.x, Hv.c.y, 'dust', 14); S.fx.push({ x: Hv.c.x, y: Hv.c.y, vx: 0, vy: 0, type: 'shock', s: H.r / 70, life: 400, maxLife: 400 });
@@ -4634,6 +4772,9 @@ function updateNpc(e, dt) {
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
   if (e.panicT && panicStep(e, dt)) return;                            /* Folgen §5c: Panik nach Omegas Ende */
   const p = S.player;
+  if (UI.dlgWith === e && UI.dialogueOpen() && !e.angry && !e.fleeing && !e.downed) {   /* Visuell D: im Gespräch bleibt die Figur stehen und schaut den Helden an */
+    e.vx = e.vy = 0; const a = Math.atan2(p.y - e.y, p.x - e.x), ca = Math.cos(a), sa = Math.sin(a); e.aim = a;
+    if (!(e.act?.until > performance.now())) e.facing = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 3 : 2) : (sa > 0 ? 0 : 1); return; }
   if ((e.traveler || e.travLead) && dist(e, p) > 900) return;   // S13: fern bewegt roadTick
   if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.fleeing) e.fleeing = false; if (e.angry && !e.guard) calmDown(e, 'lost'); if (e.plan && e.map === 'world' && !e.fleeing && !e.angry && (e._pa = (e._pa || 0) - dt) <= 0) { e._pa = 800 + (e.plan.n % 400); placeAway(e); } return; }   // BUG-108: fern nur ~1× je Sekunde (vorher jedes Bild, 2,9 ms)
   if (e.fireJob && fireJobStep(e, dt)) return;   // S14: Löschkette
@@ -4713,7 +4854,6 @@ function updateNpc(e, dt) {
   } else e.calledHelp = false;
   // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
   if (!e.guard && !e.shop && fearLvl() >= 2 && fearedBy(e) && dist(e, p) < 80) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.2 * dt / 16, dt); return; }   // S12: man weicht dem Hochpaladin aus
-  if (!e.guard && e.fear && fearStep(e, dt)) return;                    /* Angst: fliehen, Abstand, verstecken */
   if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
   if (arrestCheck(e, p, dt)) return;                   // §44: Wache stellt einen Gesuchten
   if (e.bondGuard && bondGuardStep(e, dt)) return;              // MP2 §25: Wächter des Versklavten
@@ -4890,6 +5030,7 @@ function partyAI(m, dt) {
 function addRel(key, n) {
   if (!key) return;
   S.relations[key] = clamp((S.relations[key] || 0) + n, -100, 100);
+  const D = UI.dlgWith; if (n && D && D.key === key && D.kind === 'npc' && UI.dialogueOpen()) emote(D, n > 0 ? 'freude' : 'zorn', 1500);   /* Visuell D: Reaktion im Gespräch */
 }
 function remember(c, key, about) {
   (c.memories ||= []).push({ key, about, year: year(), day: S.day });
@@ -5203,6 +5344,7 @@ function doInteract(target = null) {
   if (t.secretBell != null) return secretBell(t);                   /* Geheime Orte: Glockenpfähle */
   if (t.secretDig) return secretDig(t);                              /* Geheime Orte S2: Lanze auf dem Hundertfeld */
   if (t.chalk != null) return chalkRead(t);                          /* Geheime Orte S2: Kreidezeichen */
+  if (t.secretNames) return secretNames(t);                          /* Geheime Orte S4: Kammer der Namen */
   if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
@@ -5255,7 +5397,7 @@ function doInteract(target = null) {
   }
   if (t.harvest) {
     if (t.depleted) return UI.toast('Erschöpft.');
-    t.depleted = true; t.respawn = S.day + 2;
+    t.depleted = true; t.respawn = S.day + 2; deplMark(t);
     const n = ri(1, 3);
     if (t.harvest === 'herb') { addItem(p, 'herb', n); S.res.herb += 0; }
     else S.res[t.harvest] += n;
@@ -5390,12 +5532,11 @@ function arrestCheck(g, p, dt) {
   if (dist(g, p) > 44) { seek(g, Math.atan2(p.y - g.y, p.x - g.x), 1.3 * dt / 16, dt, p); return true; }
   S.flags.arrestCd = clock() + 90; g.vx = g.vy = 0;
   const pay = () => { S.gold -= b; delete S.bounty[fac]; S.resist = null; log(`Du zahlst ${b} Gold. Die Sache ist erledigt.`, 'faction'); UI.closeDialogue(); };
-  const heavy = b >= HEAVY_CRIME, fine = crimeFine(b), H = jailHours(b);   /* Nutzer 02.10.: ab 2000 Gold kein Freikaufen — Bußgeld und Haft */
   const chainB = g.faction === 'chain' && !S.flags.chainsBroken;   // S15 Fehlersuche: die Kette hat keinen Kerker (Eisenfeste fehlt in TOWN_PLAN → landete in Eren) — sie legt in Ketten
   const jail = () => { UI.closeDialogue(); if (chainB && enslave('chain', b)) return; goToJail(fac, b, g.post && TOWN_PLAN[g.post] ? g.post : townAt(g.x / TS | 0, g.y / TS | 0) || 'eren'); };   // Phase 2: echter Kerker statt „ein Tag später“
   const fight = () => { g.angry = true; g.brave = true; g.aggroId = p.id; S.bounty[fac] += 100; S.resist = { fac, until: clock() + 600 }; log('Du widersetzt dich der Festnahme. Kopfgeld +100. Die Wachen verhandeln nicht mehr — zehn Minuten lang wird gekämpft, bis du fliehst oder fällst.', 'faction'); UI.closeDialogue(); };
-  UI.dialogue(g, heavy ? `„Halt! ${b} Gold auf deinem Kopf. Dafür kauft man sich nicht frei. ${fine} Gold Bußgeld, und du sitzt — ${jailSpan(H[0])} bis ${jailSpan(H[1])}, je nachdem, was du zahlen kannst.“` : `„Halt! Auf deinen Kopf sind ${b} Gold ausgesetzt. Zahl, oder du kommst mit.“`, [
-    ...(S.gold >= b && !heavy ? [{ text: `Zahlen (${b} Gold)`, fn: pay }] : []), { text: chainB ? `Mitkommen (in Ketten, Schuld ${b})` : heavy ? `Mitkommen (Bußgeld ${fine} Gold, Kerker ${jailSpan(jailHoursPaid(b, Math.min(S.gold, fine)))})` : `Mitkommen (Kerker, etwa ${jailSpan(H[1])})`, fn: jail }, { text: 'Widerstand leisten', fn: fight }]);
+  UI.dialogue(g, `„Halt! Auf deinen Kopf sind ${b} Gold ausgesetzt. Zahl, oder du kommst mit.“`, [
+    ...(S.gold >= b ? [{ text: `Zahlen (${b} Gold)`, fn: pay }] : []), { text: chainB ? `Mitkommen (in Ketten, Schuld ${b})` : `Mitkommen (Kerker, etwa ${jailMinutes(b)} Minuten)`, fn: jail }, { text: 'Widerstand leisten', fn: fight }]);
   return true;
 }
 // ================= Die Eisenmark (Session 11, Endgame) =================
@@ -5705,12 +5846,12 @@ function flogStep(z, dt) {
   if ((z._lash || 0) < now) { z._lash = now + 1700; act(z, 'work', 700, v); act(v, 'kneel', 1500); fx(v.x, v.y - 14, 'blood', 3); if (dist(z, S.player) < 420) sfx('hit', 0.25, 0.6); }
   flBark(z, 'flog', 4200);
 }
-const flogVictimNow = () => S.ents.world.find(e => e.flogVictim);
+const flogVictimNow = () => worldActs().find(e => e.flogVictim);   /* PERF-U2: Figuren statt ~17 000 Einträge */
 function fortLifeHour() {
   if (!MAPS.world || S.map == null) return;
   const F = fortState(), h = S.minute / 60, d = S.day | 0;
   if (S.flags.chainsBroken) { fortAfterFall(); if (!F.heir && F.people) fortHint('heir', 'Die Eisenfeste ist herrenlos. Quartiermeister Bodo (oder Grisk) fragt dich: Wer soll die Feste halten — Goblins, Valen oder die Flüchtlinge?'); return; }
-  const on = h >= 17 && h < 18.5 && F.flogStop !== d && S.ents.world.some(e => e.fl === 'zucht' && e.alive);
+  const on = h >= 17 && h < 18.5 && F.flogStop !== d && worldActs().some(e => e.fl === 'zucht' && e.alive);
   const v = flogVictimNow();
   if (on && !v) {
     const post = S.ents.world.find(e => e.flogPost); if (!post) return;
@@ -5721,7 +5862,7 @@ function fortLifeHour() {
       fortHint('flog', 'Auspeitschung am Schandpfahl: Sprich mit Zuchtmeister Grot — befehlen (ab Grenzreiter), freikaufen oder selbst die Peitsche nehmen.'); }
   } else if (!on && v) S.ents.world = S.ents.world.filter(e => !e.flogVictim);
   // Versteigerung: Käufer stehen um den Block (transient)
-  const buyers = S.ents.world.filter(e => e.buyer);
+  const buyers = worldActs().filter(e => e.buyer);   /* PERF-U2: Käufer sind Figuren */
   if (auctionNow() && !buyers.length) {
     for (let i = 0; i < 4; i++) { const b = flChar('buyer', FL_AT.block[0] - 4 + i * 3, FL_AT.block[1] + 4, { prof: i % 2 ? 'Käuferin' : 'Käufer', fem: i % 2 === 1, faction: null,
       greet: pick(['„Ich brauche Hände für die Mine. Billige Hände.“', '„Goblins halten länger als Menschen. Und fressen weniger.“', '„Schau nicht so. Du bist doch auch hier.“']), extra: { transient: true, buyer: true, eisen: false } }); b.anchor = { x: b.x, y: b.y }; }
@@ -6298,7 +6439,7 @@ function openGate(t) {
 const RIDE = [[214, 350], [214, 470], [70, 470], [122, 560], [70, 630], [214, 600], [214, 350]];
 function riders(night) {
   if (S.flags.chainsBroken) return;
-  const have = S.ents.world.filter(e => e.rider);
+  const have = worldActs().filter(e => e.rider);   /* PERF-U2: Reiter sind Figuren */
   if (night) { if (have.length) S.ents.world = S.ents.world.filter(e => !e.rider); return; }
   for (let i = have.length; i < 2; i++) {
     const [x, y] = RIDE[i * 3], g = guardChar('chain', freeSpotNear('world', x, y, 2), 'Grenzreiter');
@@ -7989,7 +8130,7 @@ function arrivalTick() {
   const n = S.war?.nodes?.[k], occ = n?.owner === 'undead', sg = !!n?.siege && !occ, key = k + (occ ? ':occ' : sg ? ':siege' : '');
   const seen = (S.flags.seenTowns ||= {}); if (seen[key] != null) return; seen[key] = S.day | 0;
   const P = TOWN_PLAN[k], lord = n?.owner || P.lord;
-  const sub = occ ? 'Besetzt von den Toten' : sg ? 'Belagert' : k === 'varonheim' ? `Hauptstadt Valens · ${S.flags.varonDead ? (S.flags.varonRegent === 'niemand' ? 'Die Krone ist kopflos' : `Reichsverweser ${S.flags.varonRegent || 'Aldhelm'}`) : 'Sitz König Varons'}` : `${P.metro ? 'Metropole' : P.village ? 'Dorf' : 'Stadt'} · ${FACTIONS[lord]?.name || 'frei'}`;
+  const sub = occ ? 'Besetzt von den Toten' : sg ? 'Belagert' : k === 'varonheim' ? `Hauptstadt Valens · ${S.flags.varonDead ? `Reichsverweser ${S.flags.varonRegent || 'Aldhelm'}` : 'Sitz König Varons'}` : `${P.metro ? 'Metropole' : P.village ? 'Dorf' : 'Stadt'} · ${FACTIONS[lord]?.name || 'frei'}`;
   nameCard(townName(k).toUpperCase(), sub, 3200); sfx(occ || k === 'varonheim' ? 'bell' : 'ui', 0, k === 'varonheim' ? 0.35 : 0.6);
   const g = !occ && S.ents.world.find(e => e.kind === 'npc' && e.alive && e.guard && dist(e, p) < 260);
   if (g) { gesture(g, 'zeigen', 1400, P.square ? { x: P.square[0] * TS, y: P.square[1] * TS } : p); bubble(g, ARRIVE_SAY[(vrnd() * ARRIVE_SAY.length) | 0], 2600); }
@@ -8326,30 +8467,20 @@ function ensureDefenseMasters() {
 // Verhaftet: 10–20 Minuten Haft je nach Kopfgeld (Spielzeit läuft normal weiter). Waffe wird verwahrt. Zweimal am Tag Essen.
 // Reden mit Mitgefangenen; Kaution beim Wärter; Bestechung (Glück); Schloss knacken (Beweglichkeit, Dietrich) und ungesehen
 // zum Ausgang — wer gesehen wird, sitzt länger. Nur im Kerker von Salzhafen sitzen Leute mit Aufträgen (Diebesgilde, Rask).
-const jailMinutes = b => clamp(Math.round(10 + b / 40), 10, 20);   /* Haft in Spielstunden (1 Spielstunde = 1 Minute Echtzeit) */
-// Schwere Verbrechen (Nutzer 02.10.2026): ab 2000 Gold Kopfgeld kauft man sich nicht mehr frei. Bei der Festnahme wird ein Bußgeld
-// (10 % des Kopfgelds, mindestens 200) eingezogen, so weit das Gold reicht, und man sitzt: die Haft wächst logarithmisch mit dem
-// Kopfgeld — 2000 Gold: 20–40 Stunden, 20 000: 40–80, 200 000: 60–120 Stunden (also 1–2 Stunden Echtzeit). Wer das Bußgeld ganz
-// zahlt, sitzt die untere Zahl, wer nichts zahlt, die obere. Keine Kaution; Bestechen kostet mehr und klappt seltener.
-const HEAVY_CRIME = 2000;
-const crimeFine = b => b >= HEAVY_CRIME ? Math.max(200, Math.round(b * 0.1)) : 0;
-const jailHours = b => { if (b < HEAVY_CRIME) { const h = jailMinutes(b); return [h, h]; } const hi = clamp(Math.round(40 + 40 * Math.log10(b / HEAVY_CRIME)), 40, 120); return [Math.round(hi / 2), hi]; };
-const jailHoursPaid = (b, paid) => { const [lo, hi] = jailHours(b), f = crimeFine(b); return f ? Math.round(hi - (hi - lo) * clamp(paid / f, 0, 1)) : hi; };
-const jailSpan = h => h >= 48 ? `${h} Stunden (${String(Math.round(h / 24 * 10) / 10).replace('.', ',')} Tage)` : `${h} Stunden`;
+const jailMinutes = b => clamp(Math.round(10 + b / 40), 10, 20);
 const JAIL_LINES = ['„Was hast du angestellt? Ich hab nur ein Brot genommen.“', '„Zähl die Steine an der Decke. Es sind hundertzwölf. Ich hab dreimal gezählt.“', '„Der Wärter mit der Narbe schläft nach dem Essen.“',
   '„Die sagen, keiner kommt hier raus. Die lügen. Aber nicht oft.“', '„Wenn du rauskommst, grüß meine Frau. Oder besser nicht.“', '„Das Brot ist hart, aber es ist Brot.“'];
 // S15 Fehlersuche: wer in den Kerker oder in Ketten kommt, wird nicht weiter verfolgt (sonst kamen Kopfgeldjäger mit in die Zelle)
 function dropPursuit() { const p = S.player; for (const e of S.ents[S.map] || []) if (e.aggroId === p.id) { e.aggroId = null; e.aiState = 'idle'; e.follow = null; e.angry = false; } S.ents[S.map] = (S.ents[S.map] || []).filter(e => !(e.encounter && e.kind === 'enemy')); }
 function goToJail(fac, bounty, town) {
-  const p = S.player, heavy = bounty >= HEAVY_CRIME, fine = crimeFine(bounty), paid = Math.max(0, Math.min(S.gold, fine)), min = jailHoursPaid(bounty, paid); S.resist = null;   /* Widerstand endet mit der Zelle */
+  const p = S.player, min = jailMinutes(bounty); S.resist = null;   /* Widerstand endet mit der Zelle */
   delete (S.bounty ||= {})[fac];
-  if (heavy) { S.gold -= paid; log(paid >= fine ? `Bußgeld: ${paid} Gold. Bezahlt — die Haft fällt kürzer aus.` : `Bußgeld: ${fine} Gold. Du hast nur ${paid}. Die Schuld sitzt du ab.`, 'faction'); }
-  S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3, heavy: heavy ? bounty : 0 };   // S14: drei Dietriche im Stiefel
+  S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3 };   // S14: drei Dietriche im Stiefel
   S.jailTown = town; p.equip.weapon = null; recalc(p); dropPursuit();
   for (const o of S.ents[S.map]) if (o.angry) { o.angry = false; o.aggroId = null; }
   travel('kerker'); ensureJail(); closeCells();
   p.x = MAPS.kerker.cells[0].spot.x; p.y = MAPS.kerker.cells[0].spot.y;
-  log(`Kerker von ${townName(town)}: ${jailSpan(min)}${min >= 30 ? ` (etwa ${min} Minuten Echtzeit)` : ''}. ${heavy ? 'Schweres Verbrechen: keine Kaution.' : `Kaution ${S.jail.bail} Gold.`} Deine Waffe liegt beim Wärter. Im Stiefel: drei Dietriche.`, 'faction'); UI.toast(`KERKER — ${min} STUNDEN`, 3000);
+  log(`Kerker von ${townName(town)}: ${min} Minuten. Kaution ${S.jail.bail} Gold. Deine Waffe liegt beim Wärter. Im Stiefel: drei Dietriche.`, 'faction'); UI.toast(`KERKER — ${min} MINUTEN`, 3000);
   chronicle(`${p.name} im Kerker von ${townName(town)}`, 'crime');
 }
 function closeCells() {
@@ -8377,11 +8508,9 @@ function ensureJail() {
 function jailChoices(npc, choices) {
   const J = S.jail;
   if (npc.warden && J) {
-    if (J.heavy) choices.unshift({ text: 'Kaution? (schweres Verbrechen)', fn: () => UI.dialogue(npc, `„Kaution? Bei ${J.heavy} Gold auf deinem Kopf? Du sitzt, bis die Zeit um ist.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
-    else choices.unshift({ text: `Kaution zahlen (${J.bail} Gold)`, fn: () => { if (S.gold < J.bail) return UI.dialogue(npc, '„Mit leeren Taschen kauft man sich nicht frei.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); S.gold -= J.bail; UI.closeDialogue(); releaseJail('Kaution bezahlt.'); } });
-    const bc = J.heavy ? 400 : 50;   /* schwere Verbrechen: teurer, seltener */
-    choices.unshift({ text: `Bestechen (${bc} Gold)`, fn: () => { UI.closeDialogue(); if (S.gold < bc) return log('Der Wärter lacht dich aus.', 'faction'); S.gold -= bc;
-      if (chance(J.heavy ? 0.2 : 0.45)) { S.ents.kerker = S.ents.kerker.filter(e => e.cellDoor !== J.cell); indexSolids('kerker'); J.blind = clock() + 60; log('Der Wärter steckt das Gold ein und vergisst, abzuschließen. Eine Stunde lang sieht er weg.', 'world'); }
+    choices.unshift({ text: `Kaution zahlen (${J.bail} Gold)`, fn: () => { if (S.gold < J.bail) return UI.dialogue(npc, '„Mit leeren Taschen kauft man sich nicht frei.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); S.gold -= J.bail; UI.closeDialogue(); releaseJail('Kaution bezahlt.'); } });
+    choices.unshift({ text: 'Bestechen (50 Gold)', fn: () => { UI.closeDialogue(); if (S.gold < 50) return log('Der Wärter lacht dich aus.', 'faction'); S.gold -= 50;
+      if (chance(0.45)) { S.ents.kerker = S.ents.kerker.filter(e => e.cellDoor !== J.cell); indexSolids('kerker'); J.blind = clock() + 60; log('Der Wärter steckt das Gold ein und vergisst, abzuschließen. Eine Stunde lang sieht er weg.', 'world'); }
       else { J.until += 60; log('Der Wärter nimmt das Gold — und meldet dich. Eine Stunde mehr.', 'faction'); } } });
     choices.unshift({ text: 'Wie lange noch?', fn: () => UI.dialogue(npc, `„Noch ${Math.max(1, Math.round((J.until - clock()) / 60))} Stunden. Dann bist du wieder draußen. Oder tot, wenn du Ärger machst.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   }
@@ -8669,7 +8798,7 @@ function ensureVaronExile() {
   let k; if (FL) { k = S.war?.nodes?.[FL.to]?.owner === 'valen' ? FL.to : (FL.to = SIM.exileOf()); } else { k = A.exile && S.war.nodes[A.exile]?.owner === 'valen' ? A.exile : SIM.exileOf(); A.exile = k; A.kingLost = !k; }
   if (!k || !TOWN_PLAN[k]) return;
   const [sx, sy] = TOWN_PLAN[k].square;
-  const put = (name, prof, dx, dy, o = {}) => { if (courtGone(o, name)) return null; const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
+  const put = (name, prof, dx, dy, o = {}) => { const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
     Object.assign(c, { exileCourt: true, varonCourt: true, exile: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.world.push(c); return c; };
   if (!S.flags.varonDead) { const v = put('Varon', 'König im Exil', 0, -3, { varonKing: true, level: 26, greet: '„Ein König ohne Stadt. Sieh mich nicht so an.“' }); if (v) { v.equip.weapon = mkItem('longsword'); v.equip.chest = mkItem('plate_cuirass'); recalc(v); B.fullHeal(v); } }
   put('Brandt', 'Marschall', 3, -2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Ich führe, was vom Hof übrig ist. Viel ist es nicht.“' : '„Wir sind in einem Kontor untergekommen. Ein Kontor! Für den König!“' });
@@ -8677,48 +8806,15 @@ function ensureVaronExile() {
   put('Hagen', 'Schmied', 5, 1, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Den Amboss haben wir gerettet. Die Esse nicht.“' });
   for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3, sy + 2, 3); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { exileCourt: true, guard: true, transient: true, visitor: true, post: k }); S.ents.world.push(g); }
 }
-// Hof ohne Wiederkehr (Nutzer 02.10.2026: „Aldhelm und Varon getötet, aber nichts passiert“): Der Hof ist flüchtig und wurde bei jedem
-// Laden neu gebaut — erschlagene Hofleute standen wieder da, und der tote Kanzler blieb Reichsverweser. Jetzt merkt sich S.flags.courtDead,
-// wer tot ist. Der Kanzler war Aldhelm: Sein Tod beendet den Kult (wie in der Krypta). Reichsverweser nach dem König: Kanzler Aldhelm,
-// sonst Marschall Brandt, sonst der erste lebende Adlige; ist keiner mehr da, ist die Krone kopflos. Thronwirren: In den ersten
-// 7 Tagen nach dem Königsmord (kopflos: für immer) schickt niemand Ersatz für die Garde der Hauptstadt — eine schutzlose Hauptstadt
-// wird gesetzlos und dann übernommen (Totenheer in der Nähe oder eine Bande), wie jede andere Stadt. Mit lebendem König bleibt es beim
-// alten Entscheid: der Fall der Hauptstadt kommt nur über Morvath.
-const CROWN_TURMOIL = 7;
-const courtKey = (o, name) => o.varonChancellor ? 'aldhelm' : o.varonMarshal ? 'brandt' : o.varonSpy ? 'ysmay' : o.varonJailer ? 'grimm' : o.varonNoble != null ? 'noble' + o.varonNoble : o.smith ? 'hagen' : o.shop ? 'hofmar' : null;
-const courtGone = (o, name) => { const k = courtKey(o, name); return !!k && (S.flags.courtDead || []).includes(k); };
-function capRegent() {
-  const D = S.flags.courtDead || [], C = S.cult;
-  if (!D.includes('aldhelm') && !C?.aldhelmDead && C?.end !== 'destroyed' && C?.end !== 'player') return 'Kanzler Aldhelm';
-  if (!D.includes('brandt')) return 'Marschall Brandt';
-  const i = VARON_NOBLES.findIndex((_, j) => !D.includes('noble' + j) && !(S.flags.varonExecuted || []).includes(j) && !(S.flags.varonScattered || []).includes(j));
-  return i >= 0 ? VARON_NOBLES[i][0] : null;
-}
-const capCrownless = () => !!S.flags.varonDead && (!capRegent() || (S.day | 0) - S.flags.varonDead < CROWN_TURMOIL);
-function courtDeath(c, byP) {
-  const k = courtKey(c, c.name); if (!k) return; const D = (S.flags.courtDead ||= []); if (D.includes(k)) return; D.push(k);
-  if (k === 'aldhelm') {
-    log(`Kanzler Aldhelm ist tot.${byP ? ' In seinem Gemach findet man Blutphiolen und eine rote Maske.' : ''}`, 'quest');
-    if (S.cult && !S.cult.aldhelmDead) { S.cult.aldhelmDead = S.day | 0; if (S.cult.end !== 'player') { S.flags.blutsense ??= 'kanzler'; cultEnd('destroyed'); } }   /* die Sense liegt nur in der Krypta beim Blutfürsten */
-    if (byP) { S.factions.valen = clamp((S.factions.valen || 0) - 15, -100, 100); if (!S.flags.varonDead) addBounty('valen', 600, 'Mord am Kanzler'); }
-  }
-  if (!S.flags.varonDead) return;
-  const was = S.flags.varonRegent, now = capRegent() || 'niemand';
-  if (was === now) return;
-  S.flags.varonRegent = now;
-  if (now === 'niemand') afterSay('Die Krone ist kopflos', `${c.name} ist tot. Nach König Varon gibt es niemanden mehr, der das Reich führt. Kein Ersatz für die Garde, kein Befehl, kein Gesetz — Varonheim zerfällt, wenn die Wache fällt.`, 'war');
-  else afterSay(`${now} führt das Reich`, `${c.name} ist tot. ${now} führt jetzt als Reichsverweser. ${capCrownless() ? `Bis Tag ${S.flags.varonDead + CROWN_TURMOIL} herrschen Thronwirren: Die Hauptstadt bekommt keinen Ersatz für ihre Garde.` : ''}`, 'war');
-  if (S.schutz?.varonheim) schutzCheck('varonheim');
-}
 const varonBound = () => cultWar() || SIM.capitalFallen();   /* §5g.8 (Nutzer): Kult aktiv/herrschend oder Hauptstadt besetzt = Valen gebunden; ein toter König bindet nicht (Brandt führt) — wirkt ab T40 */
 // Varons Tod (Entwickler 01.10.2026, Scout #31): Szene mit stehender Welt (Glocken, Namenskarte, der Hof reagiert), dann Folgen —
 // Reichsverweser (Aldhelm, wenn der Kult nicht zerschlagen ist, sonst Marschall Brandt), Trauer in Varonheim, und wer den König
 // erschlug, wird gejagt: Kopfgeld der Krone, die Garde in Sichtweite greift an.
 function kingDeath(k, byP) {
-  const regent = capRegent() || 'niemand';   /* RB-044: nur ein lebender Aldhelm regiert; Nutzer 02.10.: tote Hofleute regieren nicht */
+  const regent = S.cult?.end === 'destroyed' || S.cult?.end === 'player' || S.cult?.aldhelmDead ? 'Marschall Brandt' : 'Kanzler Aldhelm';   /* RB-044: nur ein lebender Aldhelm regiert */
   S.flags.varonRegent = regent;
   if (byP) { addBounty('valen', 1500, 'Königsmord'); for (const g of S.ents[k.map] || []) if (g.kind === 'npc' && g.alive && g.guard && dist(g, k) < 600) { g.angry = true; g.aggroId = S.player.id; } }
-  afterSay(byP ? 'König Varon ist tot' : 'König Varon ist gefallen', `König Varon ist tot${k.exile ? ', gefallen im Exil' : ''}${byP ? ' — erschlagen von deiner Hand' : ''}. ${regent} führt ${k.exile ? 'was vom Hof übrig ist' : 'das Reich als Reichsverweser'}.${SIM.capitalFallen() ? '' : ` In Varonheim läuten die Glocken. Thronwirren: ${CROWN_TURMOIL} Tage lang schickt niemand Ersatz für die Garde der Hauptstadt — fällt die Wache, zerfällt die Stadt.`}${byP ? ' Die Krone setzt 1500 Gold auf deinen Kopf.' : ''}`, 'legend', false);   /* RB-045: eine Erzählung */
+  afterSay(byP ? 'König Varon ist tot' : 'König Varon ist gefallen', `König Varon ist tot${k.exile ? ', gefallen im Exil' : ''}${byP ? ' — erschlagen von deiner Hand' : ''}. ${regent} führt ${k.exile ? 'was vom Hof übrig ist' : 'das Reich als Reichsverweser'}.${SIM.capitalFallen() ? '' : ' In Varonheim läuten die Glocken.'}${byP ? ' Die Krone setzt 1500 Gold auf deinen Kopf.' : ''}`, 'legend', false);   /* RB-045: eine Erzählung */
   if (S._quiet || S.coop?.role === 'guest' || S.dying) return;
   const court = (S.ents[k.map] || []).filter(e => e.kind === 'npc' && e.alive && e !== k && dist(e, k) < 420).slice(0, 6), marshal = court.find(e => e.varonMarshal), body = { x: k.x, y: k.y };
   const run = () => cinematic([
@@ -8760,8 +8856,7 @@ function schutzLawless(k) {
 function westRim(k) { return townFac(k) === 'valen' && VILLAGES.some(V => V.key === k) && VILLAGES.some(V => V.tribute && V.key !== k && TOWN_PLAN[V.key] && townGap(k, V.key) <= 160); }
 function schutzOpen(k) { for (const e of S.ents.world) if (e.schutzShut === k) { e.shopClosed = 0; delete e.schutzShut; } S.ents.world = S.ents.world.filter(e => e.milizOf !== k && e.lawless !== k); }
 function schutzTake(k, force) {
-  const Z = schutzOf(k), day = S.day | 0, name = townName(k), sq = TOWN_PLAN[k]?.square; if (!sq || (k === 'varonheim' && !capCrownless()) || k === 'vharnholm' || TOWN_PLAN[k]?.lord === 'undead') return null;   /* Nutzer 02.10.: ohne König zerfällt auch die Hauptstadt */
-  if (k === 'varonheim' && !Z.decayTold) { Z.decayTold = 1; chronicle('Varonheim zerfällt', 'war', 'Kein König, keine Garde, kein Gesetz. Die Hauptstadt gehört dem, der sie nimmt.'); }
+  const Z = schutzOf(k), day = S.day | 0, name = townName(k), sq = TOWN_PLAN[k]?.square; if (!sq || k === 'varonheim' || k === 'vharnholm' || TOWN_PLAN[k]?.lord === 'undead') return null;
   const node = S.war?.nodes?.[k], a = (!force || force === 'undead') && node && node.owner !== 'undead' && SIM.armyNear(k, 'undead', 2);
   if (a) { a.order = k; a.lawOrder = true; Z.taker = { by: 'undead', id: a.id, day }; Z.stage = 4; const cut = Math.round(node.garrison * 0.7); node.garrison -= cut; Z.gcut = cut;
     afterSay(`Die Toten wenden sich gegen ${name}`, `Die Toten wittern die offenen Tore von ${name}. ${a.name || 'Ein Heer der Toten'} wendet sich dorthin.`, 'war'); return 'undead'; }
@@ -8807,7 +8902,7 @@ function lawlessHour(h) {
   for (const [k, Z] of Object.entries(S.schutz || {})) {
     const sq = TOWN_PLAN[k]?.square; if (!sq) continue;
     const d = p.map === 'world' ? Math.hypot(p.x / TS - sq[0], p.y / TS - sq[1]) : 999;
-    if ((Z.stage || 0) !== 3 || d > 90) { if (S.ents.world.some(e => e.lawless === k)) S.ents.world = S.ents.world.filter(e => e.lawless !== k); continue; }
+    if ((Z.stage || 0) !== 3 || d > 90) { if (worldActs().some(e => e.lawless === k)) S.ents.world = S.ents.world.filter(e => e.lawless !== k); continue; }   /* PERF-U2: Plünderer sind Gegner → Liste der Handelnden */
     if (!night || d > 60 || Z.lawN === (h >= 22 ? S.day | 0 : (S.day | 0) - 1)) continue;
     Z.lawN = h >= 22 ? S.day | 0 : (S.day | 0) - 1; Z.lawThx = 0;
     for (let i = 0, n = ri(2, 4); i < n; i++) { const q = freeSpotNear('world', sq[0] + ri(-6, 6), sq[1] + ri(-4, 4), 3); if (!q) continue;
@@ -8895,16 +8990,14 @@ function ensureSchutz() {                                             /* Läden 
 }
 const SCHUTZ_REINF = { valen: [2, 3], aurel: [1, 2], chain: [2, 2], merch: [1, 1], order: [3, 2], undead: [1, 99] };   /* [Takt in Tagen, Mann] */
 function schutzBlocked(k, f) {
-  if (f === 'valen') return SIM.capitalFallen() || (S.war?.capThreat || 0) >= 15 || heldBy(k) || (k === 'varonheim' && capCrownless());   /* Nutzer 02.10.: Thronwirren */   /* RB-054: der Kult allein bindet den Nachschub nicht */
+  if (f === 'valen') return SIM.capitalFallen() || (S.war?.capThreat || 0) >= 15 || heldBy(k);   /* RB-054: der Kult allein bindet den Nachschub nicht */
   if (f === 'aurel') return heldBy('gelenkhall') || !!(S.after?.throne && !S.after.throne.until);
   if (f === 'chain') return !!S.flags.chainsBroken;
   if (f === 'merch') return growthOf(k).prosper < 0;
   if (f === 'order') return heldBy('sonnwacht');
   return false;
 }
-function schutzReinfText(k) { const f = townFac(k), R = SCHUTZ_REINF[f];
-  if (k === 'varonheim' && f === 'valen' && capCrownless()) { const rg = capRegent(); return rg ? `Thronwirren: Bis ${rg} die Macht gesichert hat (Tag ${S.flags.varonDead + CROWN_TURMOIL}), schickt niemand Ersatz in die Hauptstadt.` : 'Ohne König und ohne Reichsverweser schickt niemand Ersatz. Die Hauptstadt zerfällt.'; }
-  return !R ? 'Ersatz kommt nicht.' : schutzBlocked(k, f) ? `${FACTIONS[f]?.name || 'Der Herr'} schickt vorerst keinen Ersatz.` : `${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz (${R[1] >= 99 ? 'alle' : R[1]} Mann alle ${R[0] > 1 ? R[0] + ' Tage' : 'Tage'}).`; }
+function schutzReinfText(k) { const f = townFac(k), R = SCHUTZ_REINF[f]; return !R ? 'Ersatz kommt nicht.' : schutzBlocked(k, f) ? `${FACTIONS[f]?.name || 'Der Herr'} schickt vorerst keinen Ersatz.` : `${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz (${R[1] >= 99 ? 'alle' : R[1]} Mann alle ${R[0] > 1 ? R[0] + ' Tage' : 'Tage'}).`; }
 function schutzDay() {
   const day = S.day | 0; burgDay();
   for (const [k, Z] of Object.entries(S.schutz || {})) {
@@ -8974,13 +9067,13 @@ function ensureVaronCourt() {
   if (S.cult?.keyB) prop('portcullis', kan.x + kan.w - 3, kan.y + kan.h - 3, { portal: 'katakomben', cellarStair: true, r: 12, label: 'Treppe im Kanzleikeller — hinab' });   /* §5g.2 Eingang B */
   const [cx] = CAPITAL.keep, yard = CAPITAL.keep[1] - 3;
   prop('stall', cx - 10, yard, { solid: true, r: 12 }); prop('well', cx + 10, yard, { solid: true, r: 12 });
-  const put = (name, prof, tx, ty, o = {}) => { if (courtGone(o, name)) return null; const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
+  const put = (name, prof, tx, ty, o = {}) => { const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
     pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; W.push(c); return c; };
   const tx = thr.x + (thr.w >> 1), ty = thr.y + 3;
   const fled = !!S.flags.varonFled;   /* S2: der König ist vorzeitig geflohen — der Hof mit ihm */
   if (!S.flags.varonDead && !fled) { const k = put('Varon', 'König', tx, ty, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
   if ((S.cult?.stage || 0) < 4 && !fled) put('Aldhelm', 'Kanzler', tx + 3, ty + 1, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
-  if (!fled) { const b = put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Der König ist tot. Ich halte zusammen, was noch steht.“' : '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }); if (b) b.equip.weapon = mkItem('longsword'); }
+  if (!fled) put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
   if (!fled) put('Ysmay', 'Spitzelmeisterin', kan.x + 3, kan.y + 5, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
   VARON_NOBLES.forEach(([n, pr], i) => { if (fled || (S.flags.varonExecuted || []).includes(i) || (S.flags.varonScattered || []).includes(i)) return;
     put(n, pr, nob.x + 2 + i * 3, nob.y + 4 + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }); });
@@ -9566,13 +9659,15 @@ function rotfallCheck() {                                          // Bruchstüc
 const omegaInsight = () => { const f = om().frags; return Object.keys(f).length >= OMEGA_NEED && !!f.garmadon && !!f.priest && (!!f.brother || !!S.flags.goblinsFreed) && playHours() >= OMEGA_HOURS; };
 // Altar und Priesterin Omegas in der Kernburg der Eisenfeste (religiöses Zentrum der Kette)
 const FAITH_SPELLS = ['sp_holyflame', 'sp_blessing', 'sp_ray', 'sp_inquisition'];
+let OMEGA_ALT = null;   /* PERF-U2: zuletzt gefundener Altar; gilt, solange byId ihn noch auf der Welt findet */
 function ensureOmegaShrine() {
-  let hasAlt = false;   /* PERF-S: ein Durchlauf statt zwei (läuft jede Spielstunde über ~17 000 Einträge) */
-  for (const e of S.ents.world) { if (e.omegaPriest) Object.assign(e, { spellsTaught: FAITH_SPELLS, spellRule: 'faith', key: e.key || 'irmgard' }); if (e.omegaAltar) hasAlt = true; }   // S15 P7: Irmgard lehrt Glaubensmagie
-  if (hasAlt) return;
+  /* PERF-U2: Priester sind Figuren → Liste der Handelnden (~2000) statt jede Spielstunde ~17 000 Einträge; der Altar wird gemerkt */
+  for (const e of worldActs()) if (e.omegaPriest) Object.assign(e, { spellsTaught: FAITH_SPELLS, spellRule: 'faith', key: e.key || 'irmgard' });   /* S15 P7: Irmgard lehrt Glaubensmagie */
+  if (OMEGA_ALT && byId(OMEGA_ALT.id) === OMEGA_ALT && OMEGA_ALT.map === 'world') return;
+  OMEGA_ALT = S.ents.world.find(e => e.omegaAltar) || null; if (OMEGA_ALT) return;
   const [bx, by] = EM(946, 384), a = freeSpotNear('world', bx - 3, by + 6, 3);
   const alt = { id: uid(), kind: 'prop', type: 'omega_altar', map: 'world', x: a.x, y: a.y, r: 14, solid: true, omegaAltar: true, label: 'Altar Omegas' };
-  S.ents.world.push(alt); if (solidIndex.world) addSolid(alt);
+  S.ents.world.push(alt); if (solidIndex.world) addSolid(alt); OMEGA_ALT = alt;
   const pos = freeSpotNear('world', (a.x / TS | 0) + 2, (a.y / TS | 0) + 1, 2);
   const c = makeChar({ name: 'Irmgard', prof: 'Priesterin Omegas', x: pos.x, y: pos.y, level: 8, faction: 'chain', pal: { skin: SKIN[0], hair: '#2a1a14', cloth: '#3a0e10' } });
   Object.assign(c, { omegaPriest: true, key: 'irmgard', spellsTaught: FAITH_SPELLS, spellRule: 'faith', anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
@@ -9893,8 +9988,12 @@ function camAim(p, dt) {
   R.cam.cineZ = 1;
   // Kampf-Zoom: rückt sanft ~8 % heran, solange ein Feind nahe und auf den Spieler aus ist; langsam zurück.
   const engaged = S.settings.motion && combat.some(e => e.kind === 'enemy' && e.alive && isHostile(p, e) && dist(p, e) < 240 && (e.aggroId === p.id || e.aiState === 'pursue'));
-  R.cam.cz = (R.cam.cz || 0) + ((engaged ? 0.08 : 0) - (R.cam.cz || 0)) * Math.min(1, dt / (engaged ? 700 : 1400));
+  const D = UI.dialogueOpen() && UI.dlgWith, sd = S.settings.motion && dlgStoryCur && D && D !== p && D.x != null && D.map === p.map ? D : null;   /* Visuell D: Story-Dialog rückt heran */
+  const cz = engaged ? 0.08 : sd ? 0.14 : 0;
+  R.cam.cz = (R.cam.cz || 0) + (cz - (R.cam.cz || 0)) * Math.min(1, dt / (cz ? 700 : 1400));
   R.cam.zoom = (R.cam.base || 1.3) * (1 + R.cam.cz);
+  if (sd) return { x: (p.x + sd.x) / 2, y: (p.y + sd.y) / 2 - 10 };
+  if (UI.modalOpen === 'trade') { const dw = document.querySelector('#modal.dock .modal-frame')?.offsetWidth || 0, n = UI.tradeWith?.(), m2 = n && n.map === p.map && dist(n, p) < 300 ? n : p; return { x: (p.x + m2.x) / 2 + dw / 2 / (R.cam.zoom || 1), y: (p.y + m2.y) / 2 }; }   /* P7: Handels-Dock rechts — Held und Händler rücken nach links ins Freie */
   const look = S.settings.motion ? 0.14 : 0;                    // Blickvorlauf zur Maus (max. ~40 px)
   return { x: p.x + clamp((mouse.wx - p.x) * look, -40, 40), y: p.y + clamp((mouse.wy - p.y) * look, -30, 30) };
 }
@@ -9927,6 +10026,23 @@ function cineBeat(b, s, skip) {
   if (b.flash) document.getElementById('cineFade')?.animate?.([{ opacity: 0.85, background: b.flash }, { opacity: 0, background: b.flash }], { duration: b.ms || 220, easing: 'ease-out' });
 }
 function cineBeats(s, t, skip) { for (const b of s?.beats || []) { if (b.fired || (!skip && (b.t || 0) * (s.dur || 3000) > t)) continue; b.fired = true; try { cineBeat(b, s, skip); } catch (err) { console.error(err); } } }
+// Visuell D (02.10.2026): Emotes über dem Kopf — nur im Gespräch und bei Reaktionen. k: frage, ausruf, zorn, angst, freude, trauer.
+function emote(e, k, ms = 1800) { if (e) { const n = performance.now(); e.emote = { k, at: n, until: n + ms }; } }
+// Wütende, fliehende oder bedrohte Figuren ohne Angebote öffnen kein Fenster mehr: Sprechblase, Abwehrgeste, Emote.
+function npcShun(npc, text, k) { UI.closeDialogue(); bubble(npc, text, 2400); emote(npc, k, 2000); if (!npc.robot) gesture(npc, 'abwehren', 900, S.player); }
+// Story-Dialog (Entscheidung 02.10.): Quest-Angebot/-Abgabe benannter Figuren, Bosse im Gespräch, Rat und Gericht — breitere Leiste,
+// Namensschild mit Beruf/Fraktion, sanfter Kamerazoom. storyNext setzen offerQuest/turnIn für das nächste Fenster.
+let storyNext = false, dlgStoryCur = false;
+function dlgStory(npc, choices) {
+  const s = storyNext || !!npc?.parley || npc?.skyRuler === 'rat' || !!npc?.courtFolk || /^(Richterin|Gerichtsschreiber)$/.test(npc?.prof || '');
+  storyNext = false; return dlgStoryCur = s;
+}
+function dlgMood(npc) {
+  if (!npc || npc === S.player) return '';
+  if (npc.angry || npc.hostile) return 'zorn';
+  if (npc.kind === 'npc' && stigmaOf(npc)?.deny) return 'kalt';
+  const r = S.relations[npc.key] ?? 0; return r >= 30 ? 'warm' : r <= -20 ? 'kalt' : '';
+}
 function bubble(e, text, ms = 2600) { if (!e || !text) return; S.floats = S.floats.filter(f => !(f.bubble && f.who === e.id)); S.floats.push({ x: e.x, y: e.y - 44, rise: 0, text, color: '#e7dcc2', life: ms, maxLife: ms, bubble: true, who: e.id }); }
 function nameCard(title, sub = '', ms = 3000) {                       /* T17: Namenskarte (Cinzel), nie zwei zugleich */
   let el = document.getElementById('nameCard');
@@ -9944,7 +10060,7 @@ function camStep(p, dt) {                                              /* Kamera
   const m = MAPS[S.map];
   R.cam.x = clamp(R.cam.x, 0, Math.max(0, m.w * TS - V.W / R.cam.zoom));
   R.cam.y = clamp(R.cam.y, 0, Math.max(0, m.h * TS - V.H / R.cam.zoom));
-  if (shakeT > 0) { shakeT -= dt; R.cam.x += (rnd() - .5) * shake; R.cam.y += (rnd() - .5) * shake; }
+  if (shakeT > 0) { shakeT -= dt; R.cam.x += (vrnd() - .5) * shake; R.cam.y += (vrnd() - .5) * shake; }   /* Kampf-Feedback: Wackeln würfelt mit dem Darstellungszufall */
 }
 // T17: Boss-Auftritt — einmal je Held (Generation), 4,9 s, die Welt steht (Nutzer). preview: Debug, die Figur verschwindet danach.
 function introDue(mtype) { const seen = (S.flags.introSeen ||= {}); if (seen[mtype] === S.legacy.gen) return false; seen[mtype] = S.legacy.gen; return true; }
@@ -10436,6 +10552,7 @@ function ensureBoards() {
   indexSolids('world');
 }
 function travel(to) {
+  if (arenaKeep) { arenaLeave(); if (to === S.map) return; }   /* Kampfanimation: aus dem Test Room erst sauber zurück, dann reisen */
   if (to === 'varonburg') { if (S.map !== 'world') travel('world'); const q = buildVaronburg(); if (q) { S.player.x = q.x; S.player.y = q.y; } return; }   /* Varonheim-Umbau S2: die Burg liegt in der Welt */
   const p = S.player, from = S.map;
   leavePursuit(from, to);
@@ -10707,6 +10824,15 @@ function vaultTick() {
     s.found = true; MAPS.vault.tiles[s.y * MAPS.vault.w + s.x] = T.DFLOOR; MAPS.vault.ver = (MAPS.vault.ver || 0) + 1;
     fx(s.x * TS + 16, s.y * TS + 16, 'dust', 14); log('Ein Luftzug aus der Wand — du drückst dagegen, und ein Stein gibt nach. Eine Geheimkammer!', 'quest'); UI.toast('GEHEIMKAMMER', 2200); }
 }
+/* PERF-U2 (02.10.): Abgeerntetes je Karte gemerkt, statt jede Spielstunde alle Karten (~22 000 Einträge) zu durchlaufen. depleted wird nur
+   beim Ernten gesetzt (dort deplMark); wurde die Liste einer Karte ausgetauscht (Laden, Zusammenführen, Filter), sucht deplOf sie einmal neu ab. */
+const DEPL = new Map();
+function deplOf(map) {
+  const a = S.ents[map]; let D = DEPL.get(map);
+  if (!D || D.arr !== a) { D = { arr: a, list: a.filter(e => e.depleted) }; DEPL.set(map, D); } else D.list = D.list.filter(e => e.depleted);
+  return D.list;
+}
+function deplMark(e) { const m = e.map || S.map, D = DEPL.get(m); if (D && D.arr === S.ents[m] && !D.list.includes(e)) D.list.push(e); }
 function hourTick(h) {
   wxHour(h);   /* Roadmap C.12 */
   aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
@@ -10726,7 +10852,7 @@ function hourTick(h) {
     /* Siedlung M1: der Brunnen wirkt jetzt einmal am Tag (+2) in settlersDay */
   }
   // Nachwachsen
-  for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
+  for (const map of MAP_KEYS) for (const e of deplOf(map)) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
   if (S.settlement) settlersHour();                                          // AUDIT S-02: Siedler kommen und gehen
   if (h === 2 && S.settlement && !S.settlement.raidAt && !S.settlement.raid && chance(raidChance(S.settlement))) { S.settlement.raidAt = clock() + 60; S.settlement.raid = raidPlan(S.settlement);   // AUDIT: Angriff angesagt — mit Wachturm gewarnt (M2: mit Ursache)
     if (S.settlement.buildings.some(b => b.type === 'watchtower' && b.built >= 1)) { log(`Der Wachturm von ${S.settlement.name} meldet Fackeln am Waldrand — ${S.settlement.raid.label} (${S.settlement.raid.n}).`, 'combat'); UI.toast('WACHTURM: ANGRIFF NAHT', 3600); } }
@@ -11928,7 +12054,7 @@ function dayTick() {
   if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01) : Math.min(1, S.tollMul + 0.01);   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
   save();
   log(`Tag ${S.day} bricht an.`, 'world');
-  for (const town of Object.keys(TOWN_PLAN)) if (festDay(town) && (S.schutz?.[town]?.stage || 0) < 2) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
+  for (const town of Object.keys(TOWN_PLAN)) if (festDay(town)) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town, (S.day | 0) + 1)) log(`Morgen feiert ${townName(town)} sein Stadtfest.`, 'world');
 }
 
@@ -12333,7 +12459,7 @@ function talk(npc) {
   if (npc.kind === 'npc' && !npc.robot && !(npc.act?.until > performance.now())) gesture(npc, rel < -20 ? 'abwehren' : pick(['zeigen', 'achsel', 'zeigen']), 1200, p);   /* §5f: Gesten im Gespräch */
   const leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   // Wer gerade kämpft, flieht oder sich fürchtet, plaudert nicht
-  if (npc.angry) return UI.dialogue(npc, '„Waffe runter! Sofort!“', leave);
+  if (npc.angry) return npcShun(npc, '„Waffe runter! Sofort!“', 'zorn');
   { const sg = stigmaOf(npc); if (sg?.deny && !npc.guard && npc.key !== 'aldis') return UI.dialogue(npc, `${sg.greet} (Hier bekommst du nichts — keinen Handel, kein Bett, keine Heilung.)`, leave); }   /* §5g.2 Stigma: Abweisung; Mutter Aldis hört dich an (Heilung) */
   if (npc.enc) return encTalk(npc);                                     // S13: Begegnung mit Entscheidung
   if (npc.horseBreeder) return UI.dialogue(npc, npc.greet, [{ text: 'Zeig mir deine Pferde.', fn: () => { UI.closeDialogue(); UI.openModal('stable', npc); } }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);   // S15 Pferdehof
@@ -12350,10 +12476,9 @@ function talk(npc) {
   if (npc.vharnVoice) return vharnVoiceTalk(npc);
   if ((npc.prof === 'Richterin' || npc.prof === 'Gerichtsschreiber') && npc.homeTown === 'aurelheim') return holyCourt(npc);   // Nutzer S13: Heiliges Gericht
   if (npc.skyRuler === 'rat' && ((S.ranks.aurel ?? 0) >= 6 || isCouncillor())) return corvanTalk(npc);   // Nutzer S13: Hoher Rat
-  if (npc.fleeing || npc.afraid > now) return UI.dialogue(npc, '„Bleib weg von mir!“', leave);
-  if (!npc.guard && npc.fear && !S.party.includes(npc.id)) { const f = fearOf(npc), byP = fearByPlayer(npc);   /* Angst */
-    if (f >= 75 || (f >= 50 && byP)) return UI.dialogue(npc, byP ? (f >= 75 ? '„Nein! Nein, bitte! Ich hab Kinder! Bleib weg!“' : '„Ich … ich hab nichts gesehen. Lass mich. Bitte.“') + ` (${npc.name} ist ${FEAR_NAME[fearStage(f)]}.)` : '„Nicht jetzt! Da draußen … hast du nicht gesehen, was passiert ist?“', leave); }
-  if (npc.threatId && byId(npc.threatId)?.alive) return UI.dialogue(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', leave);
+  if (npc.fleeing || npc.afraid > now) return npcShun(npc, '„Bleib weg von mir!“', 'angst');
+  if (npc.threatId && byId(npc.threatId)?.alive) return npcShun(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', 'ausruf');
+  if (npc.kind === 'npc' && !npc.robot) { if (rel >= 30) emote(npc, 'freude', 1400); else if (rel <= -20) emote(npc, 'zorn', 1400); }
   if (pactBound() && npc.faction === 'order')                // Folge des Paktes: der Orden spricht nicht mit den Toten
     return UI.dialogue(npc, npc.key === 'kelan' ? '„Ich habe Männer begraben, die ehrlicher gestorben sind, als du lebst. Geh.“'
       : '„Weiche, Paktgebundener. Der Orden spricht nicht mit denen, die den Toten gehören.“', leave);
@@ -12889,6 +13014,7 @@ function startQuest(k) {
 }
 function offerQuest(npc, k) {
   const Q = QUESTS[k];
+  storyNext = NAMED_NPC.has(npc.key); emote(npc, 'ausruf', 1600);
   UI.dialogue(npc, Q.desc, [
     { text: 'Ich mache es.', fn: () => {
       startQuest(k);
@@ -12928,6 +13054,7 @@ function turnIn(npc, k) {
   addFame(2);                                                          // S15 P8
   log(`Auftrag abgeschlossen: ${Q.name}`, 'quest');
   chronicle(`${Q.name} abgeschlossen`, 'quest');
+  storyNext = NAMED_NPC.has(npc.key); emote(npc, 'freude', 1800);
   UI.dialogue(npc, '„Das war mehr, als ich erwartet habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   save();
 }
@@ -13512,14 +13639,14 @@ function shopStock(npc) {
   const goods = GOODS.filter(g => town.stock[g] >= 1).map(g => ({ key: g, count: Math.floor(town.stock[g]) }));
   return [...goods, ...npc._stock];
 }
-function buy(npc, key) {
+function buy(npc, key, quiet = false) {
   const c = price(key, true, npc);
   if (S.gold < c) return UI.toast('Zu wenig Gold');
   if (ITEMS[key].good) {                                   // Waren gehen ins Gepäck, der Markt wird leerer
     const town = S.towns[ecoTown(npc)];
     if (!town || town.stock[key] < 1 || !addItem(S.player, key, 1)) return;
     town.stock[key] -= 1; S.gold -= c;
-    log(`Gekauft: ${ITEMS[key].name} für ${c} Gold.`, 'economy');
+    if (!quiet) log(`Gekauft: ${ITEMS[key].name} für ${c} Gold.`, 'economy');
     return;
   }
   if (!addItem(S.player, key, 1)) return;
@@ -13528,18 +13655,118 @@ function buy(npc, key) {
   const s = npc._stock.find(x => x.key === key);
   if (s) { s.count--; if (s.count <= 0) npc._stock.splice(npc._stock.indexOf(s), 1); }
   S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3);
-  log(`Gekauft: ${ITEMS[key].name} für ${c} Gold.`, 'economy');
+  if (!quiet) log(`Gekauft: ${ITEMS[key].name} für ${c} Gold.`, 'economy');
   onItemGained(key);
 }
-function sell(idx, npc) {
+function sell(idx, npc, quiet = false) {
   const slot = S.player.inv[idx]; if (!slot) return;
   if (ITEMS[slot.key]?.bound) return UI.toast('Das ist an dich gebunden. Das verkauft man nicht.');   // S15: Klassen-Rüstung
+  if (slot.lock) return UI.toast('Gesperrt. Erst im Gepäck entsperren, dann verkaufen.');   /* P6/P7 (Entwickler 02.10.): Sperre schützt vor Verkauf und Ablegen */
   const c = price(slot.key, false, npc, slot);
   S.gold += c; if ((slot.count || 1) > 1) slot.count--; else S.player.inv.splice(idx, 1);   // genau dieses Exemplar
   if (ITEMS[slot.key].good && npc && ecoTown(npc)) S.towns[ecoTown(npc)].stock[slot.key] += 1;
   else { const b = baseOf(slot.key), tk = npc && ecoTown(npc), T = tk && S.towns[tk]; if (b && T?.stock[b] != null) T.stock[b] += 0.5; }   /* RB-029: ein Verkauf füllt das Stadtlager (Gegenstück zum Kauf) */
   S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3);
-  log(`Verkauft: ${ITEMS[slot.key].name} für ${c} Gold.`, 'economy');
+  if (!quiet) log(`Verkauft: ${ITEMS[slot.key].name} für ${c} Gold.`, 'economy');
+}
+/* ================= Visueller Umbau P5–P7 (IMPL-ITEMS, 02.10.2026): Lese- und Handelshilfen für Gepäck und Handelsfenster =================
+   Keine neue Regel: jede Zahl kommt aus price/buy/sell/armorOf/damageOf. Angebot und Vorschau rechnen an einer Kopie (Stadtlager,
+   Handel-Fertigkeit, Ausrüstung) und stellen alles zurück. Mengenkauf = Schleife über buy(), Mehrfachverkauf = Schleife über sell(). */
+const tradeTown = npc => { const tk = npc && ecoTown(npc); return tk ? S.towns[tk] : null; };
+function tradeSim(npc, fn) {                                   /* fn läuft an einer Kopie von Stadtlager und Handel-Fertigkeit */
+  const T = tradeTown(npc), st0 = T ? { ...T.stock } : null, tr0 = S.player.skills.trading, b0 = T?.bought ? { ...T.bought } : undefined;
+  try { return fn(T); } finally { if (T) { T.stock = st0; if (b0 === undefined) delete T.bought; else T.bought = b0; } S.player.skills.trading = tr0; }
+}
+function roomFor(c, key) {                                     /* wie viele Stück passen noch ins Gepäck (Stapel aufgefüllt wie addItem) */
+  const it = ITEMS[key]; if (!it) return 0; if (it.res) return 9999;
+  const free = Math.max(0, c.invCap - c.inv.length); if (!it.stack) return free;
+  return free * it.stack + c.inv.filter(x => x.key === key).reduce((n, x) => n + Math.max(0, it.stack - (x.count || 1)), 0);
+}
+function buyQuote(npc, key, n = 1) {                           /* Preis je Stück und gesamt für n Stück, ohne etwas zu ändern */
+  const it = ITEMS[key]; if (!it) return { each: [], total: 0, avail: 0, room: 0, one: 0 };
+  const T = tradeTown(npc), avail = it.good ? Math.floor(T?.stock[key] || 0) : (npc._stock?.find(x => x.key === key)?.count || 0), room = roomFor(S.player, key);
+  return tradeSim(npc, T2 => { const one = price(key, true, npc), each = []; let gold = S.gold;
+    for (let i = 0; i < Math.min(n, avail, room); i++) { const c = price(key, true, npc); if (gold < c) break; each.push(c); gold -= c;
+      if (it.good) { if (T2) T2.stock[key] -= 1; continue; }
+      const b = baseOf(key); if (b && T2?.stock[b] != null) T2.stock[b] = Math.max(0, T2.stock[b] - 0.5);
+      S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3); }
+    return { each, total: each.reduce((a, c) => a + c, 0), avail, room, one }; });
+}
+function buyMany(npc, key, n) {                                /* Mengenkauf: n-mal buy(), eine Protokollzeile */
+  let got = 0, spent = 0; const can = buyQuote(npc, key, n).each.length;
+  for (let i = 0; i < can; i++) { const g0 = S.gold; buy(npc, key, true); if (S.gold === g0) break; got++; spent += g0 - S.gold; }
+  if (got) log(`Gekauft: ${got > 1 ? got + '× ' : ''}${ITEMS[key].name} für ${spent} Gold.`, 'economy');
+  return { got, spent };
+}
+function sellQuote(npc, list) {                                /* list: [{ idx, n }] — Erlös je Stück in Verkaufsreihenfolge */
+  return tradeSim(npc, T2 => { const each = [];
+    for (const { idx, n } of list) { const s = S.player.inv[idx]; if (!s || ITEMS[s.key]?.bound || s.lock) continue;
+      for (let i = 0; i < Math.min(n, s.count || 1); i++) { each.push(price(s.key, false, npc, s));
+        if (ITEMS[s.key].good && T2) T2.stock[s.key] += 1; else { const b = baseOf(s.key); if (b && T2?.stock[b] != null) T2.stock[b] += 0.5; }
+        S.player.skills.trading = Math.min(100, (S.player.skills.trading || 0) + 0.3); } }
+    return { each, total: each.reduce((a, c) => a + c, 0) }; });
+}
+function sellMany(npc, list) {                                 /* Mehrfachverkauf markierter Teile: gleicher Preis je Stück wie einzeln */
+  const objs = list.map(({ idx, n }) => ({ o: S.player.inv[idx], n })).filter(x => x.o);
+  let sold = 0, got = 0, rare = false;
+  for (const { o, n } of objs) for (let i = 0; i < n; i++) { const idx = S.player.inv.indexOf(o); if (idx < 0) break; const g0 = S.gold; sell(idx, npc, true); if (S.gold === g0) break; sold++; got += S.gold - g0; if (RARITY_ORDER.indexOf(rarOf(o)) >= 2) rare = true; }
+  if (sold) log(`Verkauft: ${sold} Stück für ${got} Gold.`, 'economy');
+  return { sold, got, rare };
+}
+function armorParts(c) {                                       /* Aufschlüsselung von armorOf: Teile (mit Verschleiß), Härte, Set, Rest */
+  const total = armorOf(c), pieces = [];
+  for (const k of Object.keys(c.equip || {})) { const s = c.equip[k]; if (s && ITEMS[s.key]?.armor) pieces.push({ slot: k, key: s.key, full: ITEMS[s.key].armor, v: ITEMS[s.key].armor * (0.4 + 0.6 * (s.cond ?? 1)) }); }
+  const sum = pieces.reduce((n, x) => n + x.v, 0), so = setOf(c), set = so?.bonus.armor || 0, sturdy = c.equip ? afx(c, 'sturdy') : 0;
+  return { total, pieces, sum, wear: pieces.reduce((n, x) => n + x.full - x.v, 0), sturdy, set, setName: so?.name || '', rest: total - sum - sturdy - set };
+}
+function previewEquip(c, inst) {                               /* Werte nach dem Anlegen — an einer Kopie der Ausrüstung, mit armorOf/damageOf */
+  const it = inst && ITEMS[inst.key]; if (!it || !GEAR.has(it.slot) || !c.equip) return null;
+  const eq0 = c.equip, a0 = armorOf(c), d0 = damageOf(c), eq = { ...eq0 };
+  const dual = it.slot === 'weapon' && !it.twohand && DUAL_CLASSES.has(c.currentClass) && eq0.weapon && !ITEMS[eq0.weapon.key]?.twohand && (!eq0.offhand || ITEMS[eq0.offhand.key]?.slot === 'weapon');
+  const slot = dual ? 'offhand' : it.slot; eq[slot] = inst; if (it.twohand) eq.offhand = null;
+  try { c.equip = eq; return { slot, armor: [a0, armorOf(c)], dmg: [d0, damageOf(c)] }; } finally { c.equip = eq0; }
+}
+/* Händler-Reaktion (Entwickler 02.10.: Sprechblase + Geste, 3–4 Sprüche je Ladenart). Auswahl mit Math.random (nie rnd()), höchstens alle 3 s. */
+function shopKind(npc) {
+  const p = String(npc?.prof || '');
+  if (npc?.smith || /schmied|waffen|rüst/i.test(p)) return 'smith';
+  if (npc?.tavernStaff || /schank|wirt|koch/i.test(p)) return 'tavern';
+  if (/heiler|alchem|kräuter|apothek|schwester|priester/i.test(p)) return 'heal';
+  if (/ingenieur|mechan|bionik|magitech|gelenk|feinwerk/i.test(p)) return 'tech';
+  if (/hehler|schmugg|schwarz/i.test(p)) return 'black';
+  return 'market';
+}
+const SHOP_BARK = {
+  smith:  ['Gutes Eisen. Bring es nicht zerbrochen zurück.', 'Halt die Schneide trocken, dann hält sie dich.', 'Rost und Blut. Das schmelz ich ein.', 'Hat schon einen Mann überlebt. Den nächsten nicht.'],
+  tavern: ['Iss, solange du noch kauen kannst.', 'Für den Weg. Draußen gibt’s nur Krähen.', 'Landet im Eintopf. Frag nicht.', 'Wer das vorher hatte? Ich frag auch nicht.'],
+  heal:   ['Sparsam. Wunden kommen schneller als Nachschub.', 'Zwei Schluck. Mehr, und die Hände zittern.', 'Kräuter welken. Gold nicht.', 'Ich nehm’s. Irgendwer blutet immer.'],
+  tech:   ['Aurelische Präzision. Nicht fallen lassen.', 'Läuft. Meistens.', 'Schrott. Aber guter Schrott.', 'Die Teile kenn ich. Der Vorbesitzer lebt wohl nicht mehr.'],
+  black:  ['Hast es nicht von mir.', 'Kein Name, keine Fragen.', 'Woher? Will ich nicht wissen.', 'Das verschwindet heute Nacht.'],
+  market: ['Gute Wahl. Die Straßen werden nicht sicherer.', 'Nimm. Morgen ist’s vielleicht weg.', 'Nehm ich. Irgendwer zahlt immer.', 'Wiegt nichts, bringt wenig. Trotzdem.'],
+  poor:   ['Gold zuerst. Dann reden wir.', 'Das reicht nicht mal für einen Strick.', 'Komm wieder, wenn dein Beutel klimpert.'],
+  rare:   ['… Woher hast du das?', 'So was sieht man nicht oft. Nicht bei Lebenden.', 'Heilige Asche. Das ist echt.'],
+};
+const BARK_T = new Map();
+function shopBark(npc, ev) {
+  if (!npc || !npc.alive || npc.map !== S.map || S._quiet) return '';
+  const now = performance.now(); if (now - (BARK_T.get(npc.id) || -1e9) < 3000 && ev !== 'poor') return ''; BARK_T.set(npc.id, now);
+  const L = ev === 'poor' || ev === 'rare' ? SHOP_BARK[ev] : SHOP_BARK[shopKind(npc)].slice(ev === 'sell' ? 2 : 0, ev === 'sell' ? 4 : 2);
+  const line = L[Math.floor(Math.random() * L.length)]; bubble(npc, line, 2800);
+  if (ev === 'poor') gesture(npc, 'achsel', 0, S.player); else if (ev === 'rare') gesture(npc, 'zeigen', 0, S.player); else act(npc, 'trade', 1100, S.player);
+  return line;
+}
+const tradeEnd = npc => { if (npc && npc._kontor) { delete npc.goodsOnly; delete npc._kontor; } };   /* Fehler (Analyse shops.md): Kontor-Waren nur für diesen Besuch */
+function itemsDebug() {                                        /* Debug-Menü: Items und Handel (Visueller Umbau P5–P7) */
+  const P = () => S.player, nearShop = () => S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.shop).sort((a, b) => dist(a, P()) - dist(b, P()))[0];
+  return ['Gegenstände & Handel (Visueller Umbau P5–P7)', '', {
+    'Items: Beute regnen lassen (je Seltenheit ein Teil, im Bogen)': () => { const p = P(), src = { x: p.x, y: p.y - 40 };
+      RARITY_ORDER.forEach((r, i) => { const o = mkItem(['longsword', 'axe', 'spear', 'iron_helm', 'chain_hauberk', 'longsword'][i], 1); if (r !== 'common') rollRarity(o, ITEMS[o.key], 0, r); dropItemAt(S.map, p.x - 75 + i * 30, p.y + 40, o, src); }); },
+    'Items: Gepäck füllen (je Art ein Teil)': () => { const p = P(); for (const k of ['longsword', 'iron_helm', 'leather_jerkin', 'bread', 'potion', 'grain', 'herb', 'scout_report']) if (ITEMS[k]) { const o = mkItem(k, 1, { bonus: 2 }); if (!giveItem(p, o)) break; } UI.refreshModal(); },
+    'Items: Neu-Marken und Sperren löschen': () => { for (const s of P().inv) { delete s.nw; delete s.lock; } UI.refreshModal(); },
+    'Handel: nächsten Händler öffnen (Dock)': () => { const m = nearShop(); if (!m) return UI.toast('Kein Händler auf dieser Karte.'); UI.closeDialogue(); UI.openModal('trade', m); },
+    'Handel: Händlerspruch (Kauf/Verkauf/Pleite/Selten)': () => { const m = nearShop(); if (!m) return; BARK_T.delete(m.id); const ev = ['buy', 'sell', 'poor', 'rare'][(Math.random() * 4) | 0]; BARK_T.delete(m.id); UI.toast(`${shopKind(m)} · ${ev}: ${shopBark(m, ev) || '(zu weit / still)'}`); },
+    'Handel: +500 Gold': () => { S.gold += 500; UI.refreshHUD(); },
+  }];
 }
 // ================= Handelskontor (S13 Wirtschaft, economy.js) =================
 // Jede Stadt hat einen Markt: Händler, Kaufleute, sonst der erste Einwohner aus der Liste in economy.js (Wirt, Vorsteher, Bauer …).
@@ -13555,7 +13782,7 @@ function ecoMenu(npc, town) {
   UI.dialogue(me, `Knapp und teuer: ${list(g => (t.use[g] || 0) > 0.1 && t.stock[g] < ECO.target(t, g) * 0.5)}\n` +
     `Reichlich und billig: ${list(g => t.stock[g] > ECO.target(t, g) * 1.5)}\n` +
     (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
-    { text: 'Waren kaufen und verkaufen', fn: () => { npc.goodsOnly = true; UI.closeDialogue(); UI.openModal('trade', npc); } },
+    { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
     { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
     { text: my ? `Dein Handelswagen (${my.to ? 'unterwegs nach ' + ECO.townName(my.to) : 'in ' + ECO.townName(my.at)})` : `Handelswagen kaufen (${ECO.WAGON_COST} Gold)`, fn: () => wagonMenu(npc, town) },
     { text: `Betriebe in ${ECO.townName(town)} (${biz})`, fn: () => bizMenu(npc, town) },
@@ -13968,7 +14195,7 @@ function vanishDay() {
 // sie findet; Lage = fester Anker aus LOCATIONS + fester Versatz, Platz per deterministischer Spiralsuche (kein Zufall, die Welt bleibt
 // gleich). Gespeichert wird nur S.secrets. Erster Ort: das Glockenmoor — nachts bei Nebel oder Regen schlägt im Moor eine Glocke; drei
 // Glockenpfähle (Taufe, Hochzeit, Tod) in der richtigen Reihenfolge läuten öffnet die versunkene Kapelle, falsch weckt Ertrunkene.
-const SECRETS = { brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
+const SECRETS = { kammer: { name: 'Die Kammer der Namen', at: 'seelenhuegel', dx: 0, dy: 6 }, brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
 const SECRET_N = 8;
 function detSpot(map, tx, ty, R = 12) { for (let r = 0; r <= R; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (!SOLID.has(tileAt(map, x, y))) return [x, y]; } return null; }
 function secretAt(k) { const D = SECRETS[k], L = LOCATIONS.find(l => l.key === D.at); return L ? [L.x + D.dx, L.y + D.dy] : null; }
@@ -13981,6 +14208,8 @@ function ensureSecrets() {
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'sign', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'stollen', chalk: i, label: 'Kreidezeichen am Fels' }); });
   const Bw = secretAt('brunnen'); if (Bw && !S.secrets.brunnen?.found && (S.flags.wellOpen ?? -9) >= (S.day | 0)) { const q = detSpot('world', Bw[0], Bw[1], 8); if (q)   /* nur am Tag nach einem Sandsturm */
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 12, solid: false, transient: true, secret: 'brunnen', secretWell: true, label: 'Eine Treppe, vom Sturm freigelegt — sie führt unter die Säulen' }); }
+  const Km = secretAt('kammer'); if (Km && !S.secrets.kammer?.found) { const q = detSpot('world', Km[0], Km[1], 10); if (q)   /* Geheime Orte S4: Ossarium-Tür im Seelenhügel */
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 12, solid: false, transient: true, secret: 'kammer', secretNames: true, label: 'Eine niedrige Tür aus Knochen im Hang' }); }
   const H2 = secretAt('hundert'); if (H2 && !S.secrets.hundert?.found) { const q = detSpot('world', H2[0], H2[1], 10); if (q)   /* Geheime Orte S2: die Lanze auf dem Hügel */
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'hundert', secretDig: true, label: 'Eine Lanze mit Valen-Wimpel, tief im Hügel — darunter klingt es hohl (E: graben)' }); }
   for (const [k, D] of Object.entries(SECRETS)) if (S.secrets[k]?.found && !LOCATIONS.some(l => l.key === 'sec_' + k)) { const P = secretAt(k); if (P) LOCATIONS.push({ key: 'sec_' + k, name: D.name, x: P[0], y: P[1], r: 6, kind: 'ruin', threat: 2, secret: true }); }
@@ -14041,6 +14270,23 @@ function secretWell(t) {
     { text: 'Den Sandfürsten in Karak-Atar (Zoll entfällt für immer, Händler +10)', fn: () => { S.flags.waterRight = 1; S.factions.merch = clamp((S.factions.merch || 0) + 10, -100, 100); S.secrets.brunnen.choice = 'karak'; log('Ein Bote bringt die Urkunde nach Karak-Atar. Am Tor zahlst du nie wieder Zoll (Händler +10).', 'faction'); UI.closeDialogue(); } },
     { text: 'An die Wüstenräuber verkaufen (250 Gold, Händler −10)', fn: () => { S.gold += 250; S.factions.merch = clamp((S.factions.merch || 0) - 10, -100, 100); S.secrets.brunnen.choice = 'raider'; log('Die Räuber zahlen 250 Gold. Die Sandfürsten werden erfahren, wo ihr Wasser blieb (Händler −10).', 'faction'); UI.closeDialogue(); } }]);
 }
+// Geheime Orte S4 — Die Kammer der Namen (Entwickler: Seelen-Ernte darf Morvaths Heerzug näher bringen, mit Warnung): Unter dem
+// Seelenhügel schreibt jemand die Namen aller Toten — auch die deiner Ahnen, und deinen, halb geschrieben. Wächter: Schatten. Wahl:
+// die Ahnen ruhen lassen (+1 Willenskraft je Ahn, höchstens +3; Tote −5), die Seelen ernten (3 Seelenphiolen, Tote +10, aber Morvaths
+// Bedrohung steigt deutlich), oder nichts anrühren. Dazu ein Hort. Eine Seelenphiole im Gepäck summt in der Nähe der Tür.
+function secretNames(t) {
+  const p = S.player; if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.'); secretFound('kammer'); const tx = t.x / TS | 0, ty = t.y / TS | 0, lv = Math.max(20, p.level);
+  for (let i = 0; i < 3; i++) { const e = spawnEnemy('shade', 'world', tx + ri(-4, 4), ty + ri(2, 5), { level: lv }); if (e) Object.assign(e, { transient: true, aggroId: p.id, name: 'Schreiber der Namen' }); }
+  const q = detSpot('world', tx + 2, ty + 2, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Hort der Kammer', loot: vaultLoot(4), lootBonus: 3 });
+  const A = S.legacy?.ancestors || [], names = A.slice(-3).map(a => `${a.name}${a.location ? ` (gefallen bei ${a.location})` : ''}`);
+  log(`Wände voller Namen, Tausende. ${names.length ? `Darunter deine Ahnen: ${names.join(', ')}. ` : ''}Und ganz unten, halb geschrieben: ${p.name}.`, 'quest');
+  const n = Math.min(3, A.length);
+  UI.dialogue({ ...p, name: 'Die Kammer der Namen' }, 'Die Namen leuchten schwach. Man könnte sie auslöschen — dann ruhen sie. Oder man nimmt, was in ihnen steckt.', [
+    ...(n ? [{ text: `Die Ahnen auslöschen, damit sie ruhen (Willenskraft +${n}, Tote −5)`, fn: () => { p.attributes.willpower = (p.attributes.willpower || 10) + n; recalc(p); S.factions.undead = clamp((S.factions.undead || 0) - 5, -100, 100); S.secrets.kammer.choice = 'rest'; log(`Du wischst ${n === 1 ? 'einen Namen' : n + ' Namen'} aus der Wand. Etwas in dir wird ruhiger (Willenskraft +${n}).`, 'quest'); UI.closeDialogue(); } }] : []),
+    { text: 'Die Seelen ernten (3 Seelenphiolen, Tote +10) — WARNUNG: Morvaths Heerzug kommt dadurch früher', fn: () => { addItem(p, 'soul_vial', 3); S.factions.undead = clamp((S.factions.undead || 0) + 10, -100, 100); SIM.threatBump(4); S.secrets.kammer.choice = 'harvest';
+      log('Die Namen erlöschen, die Phiolen füllen sich. Im Osten richtet sich etwas auf — Morvaths Heerzug wird früher kommen.', 'faction'); UI.closeDialogue(); } },
+    { text: 'Nichts anrühren', fn: () => { S.secrets.kammer.choice = 'none'; chronicle(`${p.name} las die Namen und ging`, 'legend'); UI.closeDialogue(); } }]);
+}
 function secretFound(k) {
   const D = SECRETS[k]; (S.secrets ||= {})[k] = { found: S.day | 0 }; ensureSecrets(); UI.toast(`GEHEIMNIS: ${D.name.toUpperCase()}`, 3200);
   chronicle(`${D.name} entdeckt`, 'legend', 'Ein Ort, der auf keiner Karte stand.'); const n = Object.values(S.secrets).filter(s => s.found).length; log(`Geheimnisse gefunden: ${n} von ${SECRET_N}.`, 'quest');
@@ -14051,6 +14297,7 @@ function secretTick() {                                              /* Umgebung
   if (!night || !wet || Math.hypot(p.x / TS - G[0], p.y / TS - G[1]) > 40 || (bellT += 3) < 39) return; bellT = 0; sfx('bell', 0, 0.25);
   if (!S.flags.bellHeard) { S.flags.bellHeard = 1; log('Irgendwo im Moor schlägt eine Glocke. Es gibt dort keine Kirche.', 'world'); }
 }
+function secretTick3() { const p = S.player, K = secretAt('kammer'); if (p.map !== 'world' || !K || S.secrets?.kammer?.found || S.flags.vialHum === (S.day | 0) || !hasItem(p, 'soul_vial') || Math.hypot(p.x / TS - K[0], p.y / TS - K[1]) > 25) return; S.flags.vialHum = S.day | 0; log('Die Seelenphiole in deinem Gepäck summt. Irgendwo unter dem Seelenhügel antwortet etwas.', 'world'); }
 function secretTick2() { const p = S.player, H = secretAt('hundert'); if (p.map !== 'world' || !H || S.secrets?.hundert?.found || S.flags.lanceSeen || Math.hypot(p.x / TS - H[0], p.y / TS - H[1]) > 20) return; S.flags.lanceSeen = 1; log('Auf einem Hügel am Rand des Hundertfelds steckt eine Lanze mit einem verblichenen Valen-Wimpel. Niemand hat hier je aufgeräumt.', 'world'); }
 function cultProps() {
   S.ents.world = S.ents.world.filter(e => !e.cultProp); const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
@@ -14075,8 +14322,9 @@ function cultTake() {                                          /* ein Bewohner v
 }
 function cultMasks(h) {                                        /* Maskierte gehen nachts (22–4 Uhr) verkleidet durch Varonheim */
   const night = h >= 22 || h < 4;
-  if (!night) { S.ents.world = S.ents.world.filter(e => !(e.cultNight && e.disguised && !e.unmasked)); return; }
-  const n = S.ents.world.filter(e => e.cultNight && e.alive).length; if (n >= 2) return;
+  const M = e => e.cultNight && e.disguised && !e.unmasked;   /* PERF-U2: vorher jede Tagesstunde eine neue Weltliste (alle Zwischenspeicher neu) — jetzt nur, wenn ein Maskierter da ist */
+  if (!night) { if (worldActs().some(M)) S.ents.world = S.ents.world.filter(e => !M(e)); return; }
+  const n = worldActs().filter(e => e.cultNight && e.alive).length; if (n >= 2) return;
   const [cx, cy] = TOWN_PLAN.varonheim.square, e = spawnEnemy('blood_cultist', 'world', cx + ri(-10, 10), cy + ri(-8, 8), { level: 8 }); if (!e) return;
   Object.assign(e, { cultNight: true, disguised: true, transient: true, name: 'Maskierter' });
 }
@@ -15603,6 +15851,23 @@ function tryPlace() {
 
 // ================= Debug =================
 // ================= Debug (MP2 §70–§73): Bereiche, Dropdowns, Teleport, Ereignisse =================
+const dbgNearNpc = () => { const p = S.player; return S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && !S.party.includes(e.id) && dist(e, p) < 400).sort((a, b) => dist(a, p) - dist(b, p))[0]; };
+/* Kampf-Feedback: Debug-Abschnitt (alle Einträge mit Präfix „Kampf-Feedback:“) */
+function fbDebug() {
+  const p = S.player, near = () => S.ents[S.map].filter(e => e.kind === 'enemy' && e.alive && !e.downed).sort((a, b) => dist(a, p) - dist(b, p))[0];
+  const foe = type => { let e = near(); if (!e || dist(e, p) > 300 || (type && e.mtype !== type)) { e = spawnEnemy(type || 'bandit', S.map, (p.x + 90) / TS | 0, p.y / TS | 0); } return e; };
+  return ['Kampf-Feedback (Prio 4)', '', {
+    'Kampf-Feedback: Schadenszahlen und Zeichen vorführen': () => { const k = ['physical', 'fire', 'frost', 'magic', 'shadow', 'holy'];
+      k.forEach((t, i) => setTimeout(() => dmgFloat(p, 7 + i * 3, i ? null : p, false, t, 'Debug'), i * 160)); setTimeout(() => dmgFloat(p, 42, p, true, 'physical', 'Debug'), 1000);
+      setTimeout(() => { dmgFloat(p, 3, null, false, 'physical', 'Gift'); dmgFloat(p, 2, null, false, 'physical', 'Blutung'); }, 1150);
+      ['Block', 'Parade!', 'Ausgewichen', 'Abgewehrt', 'Unterbrochen', 'erschöpft', 'körperlos', 'Wucht!'].forEach((w, i) => setTimeout(() => float(p, w, 'rgba(230,220,190,ALPHA)'), 1400 + i * 200)); },
+    'Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll': () => { const o = ['full', 'reduced', 'off'], n = o[(o.indexOf(S.settings.dmgNums || 'full') + 1) % 3]; S.settings.dmgNums = n; UI.toast('Schadenszahlen: ' + { full: 'Voll', reduced: 'Reduziert', off: 'Aus' }[n]); },
+    'Kampf-Feedback: schwerer Angriff jetzt (Kettenknecht)': () => { const e = foe('chain_brute'); e.x = p.x + 60; e.y = p.y; startHeavy(e, p, MONSTERS.chain_brute); },
+    'Kampf-Feedback: nächsten Gegner wählen (Lebensbalken), auf 40 %': () => { const e = foe(); e.hp = e.maxHp * 0.4; selected = e; UI.renderContext(e); },
+    'Kampf-Feedback: Status am nächsten Gegner (Brand, Frost 3, Gift, Blutung)': () => { const e = foe(); selected = e; e.aiState = 'idle';
+      e.status = [{ key: 'burning', name: 'Brennt', left: 8000 }, { key: 'frost', name: 'Frost 3', left: 8000, stacks: 3 }, { key: 'poisoned', name: 'Vergiftet', left: 8000 }, { key: 'bleeding', name: 'Blutend', left: 8000 }]; },
+  }];
+}
 function debugSections() {
   const p = S.player, P = () => S.player, TS2 = TS;
   const sel = (id, opts) => `<select id="${id}">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
@@ -15632,6 +15897,9 @@ function debugSections() {
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
     }],
     fortDebug(tp),   /* §5d.1 Eisenfeste: Festungsleben, Sklavenmarkt, Übernahme */
+    itemsDebug(),   /* Visueller Umbau P5–P7: Beute, Gepäck, Handel */
+    fbDebug(),       /* Kampf-Feedback (VISUAL Prio 4): Pixelzahlen, Zeichen, schwere Angriffe, Ziel-Lebensbalken, Status am Körper */
+    animDebug(),     /* Kampfanimation Scheibe 1: Combat Test Room, Pack A/B/C, Waffenwahl */
     ['Blutkult: Vampir (§5g.2, Scheibe 1)', `<input id="dbBlood" placeholder="Blutdurst 0–100" size="10">`, {
       'Vampir werden': () => { if (!unlockTitle('vampire', 'Debug')) UI.toast('Geht nicht (Mönch? zwei Titel?)'); },
       'Blutdurst setzen': () => { if (!isVamp(p)) return UI.toast('Erst Vampir werden.'); setBlood(p, +v('dbBlood') || 0); UI.refreshHUD(); },
@@ -15660,6 +15928,7 @@ function debugSections() {
       'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
       'Geheime Orte: zum Glockenmoor': () => { const G = secretAt('glockenmoor'); if (G) tp(G[0], G[1] + 3); },
       'Geheime Orte: Nebelnacht jetzt': () => { S.minute = 23 * 60; S.weather = 'fog'; bellT = 99; UI.toast('Nacht und Nebel'); },
+      'Geheime Orte: zur Kammer der Namen': () => { const K = secretAt('kammer'); if (K) tp(K[0], K[1] + 3); },
       'Geheime Orte: Sandsturm endet (Brunnen frei)': () => { S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); const B = secretAt('brunnen'); if (B) tp(B[0], B[1] + 4); },
       'Geheime Orte: zu den Kreidezeichen (Stollen)': () => { const St = secretAt('stollen'); if (St) tp(St[0] + 14, St[1] + 5); },
       'Geheime Orte: zum Hundertfeld (Lanze)': () => { const H = secretAt('hundert'); if (H) tp(H[0], H[1] + 3); },
@@ -15945,14 +16214,16 @@ function debugSections() {
     }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
-      'Kopfgeld Valen = 200 000 (schweres Verbrechen)': () => { (S.bounty ||= {}).valen = 200000; UI.toast('Kopfgeld 200 000 — eine Wache ansprechen lassen'); },
-      'Ins Gefängnis (200 000, Bußgeld voll bezahlt)': () => { toWorld(); S.gold = Math.max(S.gold, crimeFine(200000)); goToJail('valen', 200000, nearTown()); },
-      'Ins Gefängnis (200 000, ohne Gold)': () => { toWorld(); S.gold = 0; goToJail('valen', 200000, nearTown()); },
-      'Angst: Zeugen ringsum +25 (vor dir)': () => { for (const w of S.ents[S.map]) if (w.kind === 'npc' && w.alive && !w.guard && !S.party.includes(w.id) && dist(w, p) < 600) { w.fear = Math.min(100, fearOf(w) + 25); w.fearBy = p.id; w.fearSeen = clock(); } UI.toast('Angst +25'); },
-      'Angst: alle beruhigen': () => { for (const w of Object.values(S.ents).flat()) if (w.fear) { w.fear = 0; w.fearBy = null; } UI.toast('Alle ruhig'); },
       'Dietriche = 3': () => { if (S.jail) S.jail.picks = 3; else UI.toast('Nicht im Kerker'); },
       'Schloss knacken (nächste Tür)': () => { const d0 = S.ents[S.map].filter(x => x.cellDoor != null).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (d0 && S.jail) pickCell(d0); else UI.toast('Keine Zellentür / nicht im Kerker'); },
       'Freilassen': () => { if (S.jail) { S.jail.until = clock(); jailTick(); } },
+    }],
+    ['Dialoge', '', {   /* Visuell D (02.10.2026) */
+      'Dialog: Story-Fenster mit nächster Figur': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
+        storyNext = true; UI.dialogue(n, '„Hör gut zu. Was ich dir jetzt sage, erzähle ich nur einmal — und nur dir.“', [{ text: 'Ich mache es.', fn: () => UI.closeDialogue() }, { text: 'Was springt für mich heraus?', fn: () => UI.closeDialogue() }, { text: '50 Gold, und wir sind quitt.', fn: () => UI.closeDialogue() }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); },
+      'Dialog: alle Emotes nacheinander über nächster Figur': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.');
+        ['frage', 'ausruf', 'zorn', 'angst', 'freude', 'trauer'].forEach((k, i) => setTimeout(() => emote(n, k, 1300), i * 1400)); },
+      'Dialog: verängstigte Figur ansprechen (nur Blase)': () => { const n = dbgNearNpc(); if (!n) return UI.toast('Keine Figur in der Nähe.'); n.afraid = clock() + 30; talk(n); },
     }],
     ['Animation', `${sel('dbDc', DEATH_KINDS.map(k => [k, ANIM_DEFS.death[k].name]))} ${sel('dbGest', Object.entries(ANIM_DEFS.gesture).map(([k, g]) => [k, g.name]))}`, {   /* Roadmap P8 */
       'Tod erzwingen (nächster Gegner)': () => { const e = S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive).sort((a, b) => dist(a, p) - dist(b, p))[0] || spawnEnemy('bandit', S.map, (p.x / TS2 | 0) + 3, p.y / TS2 | 0); if (!e) return; e.forceDc = v('dbDc'); die(e, 'Debug', p); UI.toast(ANIM_DEFS.death[v('dbDc')].name); },
@@ -15980,8 +16251,6 @@ function debugSections() {
       'Stadt ohne Schutz: Plünderer jetzt': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4), Z = k && S.schutz?.[k]; if (!Z || Z.stage !== 3) return UI.toast('Keine gesetzlose Stadt hier.'); delete Z.lawN; lawlessHour(23); },
       'Burgwache töten (als Spieler)': () => { for (const g of courtEnts().filter(e => e.guard && e.alive)) die(g, 'Debug', p); UI.toast(`Burgwache: ${S.schutzBurg?.lost || 0} tot${S.flags.varonFled ? ', König geflohen' : ''}`); },
       'König-Flucht zurücksetzen': () => { if (S.flags.varonFled) { S.flags.varonEvac = S.flags.varonFled.evac0; delete S.flags.varonFled; } S.schutzBurg = { lost: 0, byP: 0 }; ensureVaronExile(); ensureVaronCourt(); UI.toast('Hof wieder in der Burg'); },
-      'Varonheim: König, Kanzler und Garde töten': () => { const W = S.ents.world; for (const e of W.filter(e => e.kind === 'npc' && e.alive && ((e.guard && e.post === 'varonheim' && !e.varonCourt) || (e.varonCourt && (e.varonKing || e.varonChancellor))))) die(e, 'Debug', p); UI.toast(`Reichsverweser: ${S.flags.varonRegent || '—'}`); },
-      'Varonheim: Hof wiederbeleben (courtDead leeren)': () => { delete S.flags.courtDead; delete S.flags.varonDead; delete S.flags.varonRegent; ensureVaronCourt(); UI.toast('Hof steht wieder'); },
       'Stadt ohne Schutz: zurücksetzen (alle)': () => { for (const k of Object.keys(S.schutz || {})) { S.schutz[k].lost = 0; schutzCheck(k); } S.schutz = {}; },
       'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
@@ -15996,7 +16265,58 @@ function debugSections() {
     ['Test', '', { 'Laden prüfen': () => { const r = loadProbe(); UI.toast(r.ok ? `LADEN OK (${Math.round(r.bytes / 1024)} KB)` : 'LADEN: ' + r.diff.join(' · '), 5000); log(`Ladeprobe: ${r.ok ? 'gleich' : r.diff.join('; ')}`, 'world'); }, 'Selbsttest': () => { const r = selftest(); log(`Selbsttest: ${r.filter(x => x.startsWith('PASS')).length}/${r.length}`, 'world'); }, 'Spieler töten': () => { p.body.torso.hp = 0; B.syncHp(p); downed(p, 'Debug'); p.downTimer = 1; } }],
   ];
 }
+// Debug-GUI (Entwickler 02.10.2026: „das wird immer unübersichtlicher — mach ein richtiges GUI, das sich öffnet“): Fenster mit
+// Suche über alle Einträge, Gruppen links, Abschnitte als Karten mit Knopf-Kacheln, „Zuletzt benutzt“. Datenquelle bleibt debugSections().
+const DBG_GROUPS = [['Welt & Reisen', /Bewegung|^Welt|Kerker|Turm|Luftschiff|Kamera|Eisenfeste/], ['Spieler & Ausrüstung', /Spieler|Gegenstände|Bionik|Kampf|Magie/],
+  ['Blutkult & Varonheim', /Blutkult|Varonheim/], ['Ereignisse & Aufträge', /Ereignisse|Folgen|Krieg|Aufträge|Ahnen|Gefangene|Läden/],
+  ['Darstellung & Regie', /Grafik|Animation|Regie|Klang|Dialog/], ['Spielstand & Test', /Spielstand|Test/]];
+const dbgGroup = t => (DBG_GROUPS.find(([, re]) => re.test(t)) || ['Sonstiges'])[0];
+/* Einträge, die im Lauf der Zeit in fremde Abschnitte gerutscht sind, bekommen nach ihrem Präfix eine eigene Karte */
+const DBG_MOVE = [[/^Siedlung|^Gold-Sog/, 'Siedlung', 'Ereignisse & Aufträge'], [/^Geheime Orte/, 'Geheime Orte', 'Welt & Reisen'], [/^E[1-4]:/, 'Emergente Quests (E1–E4)', 'Ereignisse & Aufträge'],
+  [/^Ratgeber/, 'Ratgeber (Tipps)', 'Darstellung & Regie'], [/^Stadt ohne Schutz|^Burgwache|^König-Flucht/, 'Stadt ohne Schutz', 'Ereignisse & Aufträge'],
+  [/^Burgfrieden|^Burgtor|^Burg-Alarm|^Schmuggel|^Varon:/, 'Varonsburg: Tor, Burgfrieden, Alarm', 'Blutkult & Varonheim'], [/^Rang bremst|^Blutkult-Sense/, 'Blutkult: Extras', 'Blutkult & Varonheim']];
+const dbgRecent = () => { try { return JSON.parse(localStorage.getItem('rotfall.dbg.recent') || '[]'); } catch (e) { return []; } };
+function dbgRun(sec, label, fn) {
+  try { fn(); UI.refreshHUD?.(); } catch (err) { console.error(err); UI.toast('Fehler: ' + err.message); return; }
+  try { const R = dbgRecent().filter(r => !(r[0] === sec && r[1] === label)); R.unshift([sec, label]); localStorage.setItem('rotfall.dbg.recent', JSON.stringify(R.slice(0, 10))); } catch (e) { /* privat: ohne Verlauf */ }
+  const rc = $('dbg-recent'); if (rc) dbgRecentDraw();
+}
+function dbgRecentDraw() {
+  const box = $('dbg-recent'); if (!box) return; box.innerHTML = '';
+  for (const [sec, label] of dbgRecent()) { const b = document.createElement('button'); b.className = 'dbg-chip'; b.textContent = label; b.title = sec;
+    b.onclick = () => { const S0 = debugSections().find(s => s[0] === sec), fn = S0?.[2]?.[label]; if (fn) dbgRun(sec, label, fn); else UI.toast('Eintrag gibt es nicht mehr.'); }; box.appendChild(b); }
+  if (!box.children.length) box.innerHTML = '<span class="dbg-hint">Noch nichts benutzt.</span>';
+}
 function toggleDebug() {
+  let d = $('debugpanel');
+  if (d) { d.remove(); return; }
+  d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel dbg-gui';
+  const secs = debugSections(), used = new Set(secs.map(s => dbgGroup(s[0]))), groups = [...DBG_GROUPS.map(g => g[0]), 'Sonstiges'].filter(g => used.has(g)), n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
+  d.innerHTML = `<div class="dbg-head"><span class="panel-title">DEBUG</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen … (z. B. „Kult“, „Teleport“, „Siedlung“)" autocomplete="off"><button id="dbg-close" title="Schließen (Strg+Umschalt+D)">✕</button></div>
+    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"></div></div><div class="dbg-foot"><b>Zuletzt:</b> <span id="dbg-recent"></span></div>`;
+  document.body.appendChild(d);
+  const nav = $('dbg-nav'), main = $('dbg-main'), cards = [];
+  const mk = (title, html, group) => { const sec = document.createElement('section'); sec.className = 'dbg-card'; sec.dataset.group = group;
+    sec.innerHTML = `<h4>${title}</h4>${html ? `<div class="dbg-in">${html}</div>` : ''}<div class="dbg-grid"></div>`; main.appendChild(sec); cards.push(sec); return sec.querySelector('.dbg-grid'); };
+  const moved = new Map();
+  for (const [title, html, acts] of secs) {
+    const grid = mk(title, html, dbgGroup(title));
+    for (const [label, fn] of Object.entries(acts)) { const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.dataset.q = label.toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
+      const M = DBG_MOVE.find(([re]) => re.test(label)); if (M) { if (!moved.has(M[1])) moved.set(M[1], mk(M[1], '', M[2])); moved.get(M[1]).appendChild(b); } else grid.appendChild(b); }
+  }
+  for (const c of [...cards]) if (!c.querySelector('.dbg-btn') && !c.querySelector('.dbg-in')) { c.remove(); cards.splice(cards.indexOf(c), 1); }
+  let cur = (() => { try { return localStorage.getItem('rotfall.dbg.group'); } catch (e) { return null; } })(); if (!groups.includes(cur)) cur = groups[0];
+  const show = () => { const q = $('dbg-search').value.trim().toLowerCase();
+    for (const c of cards) { let hits = 0; for (const b of c.querySelectorAll('.dbg-btn')) { const ok = !q || b.dataset.q.includes(q); b.style.display = ok ? '' : 'none'; if (ok) hits++; }
+      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; }
+    for (const b of nav.children) b.classList.toggle('on', !q && b.dataset.g === cur); };
+  for (const g of groups) { const b = document.createElement('button'); b.dataset.g = g; b.textContent = `${g} (${cards.filter(c => c.dataset.group === g).length})`;
+    b.onclick = () => { cur = g; $('dbg-search').value = ''; try { localStorage.setItem('rotfall.dbg.group', g); } catch (e) { /* ohne Merken */ } show(); main.scrollTop = 0; }; nav.appendChild(b); }
+  $('dbg-search').oninput = show; $('dbg-search').onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') toggleDebug(); };
+  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); show(); $('dbg-search').focus();
+  for (const el of d.querySelectorAll('input,select')) if (el.id !== 'dbg-search') el.addEventListener('keydown', e => e.stopPropagation());
+}
+function toggleDebugOld() {
   let d = $('debugpanel');
   if (d) { d.remove(); return; }
   d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel';
@@ -16013,7 +16333,7 @@ function toggleDebug() {
 // ================= Selbsttest (ponytail: eine laufbare Prüfung) =================
 // §82 Balancing-Messung (nur ?dev): Standard-Held (Stufe, Waffe, Rüstung) gegen einen Gegner auf leerer Karte.
 // mode 'stand' = stehen und hauen, 'kite' = rückwärts gehen und hauen. Ergebnis: Sieg?, Sekunden, verlorenes Leben (%).
-export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', level = 3, mode = 'stand', seed = 1, trace = false } = {}) {
+export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', level = 3, mode = 'stand', seed = 1, trace = false, vclock = false } = {}) {
   const keep = { player: S.player, map: S.map, party: S.party, combat, gold: S.gold, kills: S.kills, quiet: S._quiet, projectiles: S.projectiles, rising: S.rising };
   S.projectiles = []; S.rising = [];              // Geschosse/Auferstehungen gehören zum Duell, nicht zur Welt
   MAPS.__d = { w: 60, h: 40, tiles: new Uint8Array(2400).fill(T.GRASS) }; S.ents.__d = []; solidIndex.__d = new Map(); S._quiet = true;
@@ -16024,16 +16344,16 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
     S.player = p; S.map = '__d'; S.party = []; S.ents.__d.push(p);
     const e = spawnEnemy(mtype, '__d', 34, 20); e.aggroId = p.id; const hp0 = B.vital(p);
     const kb = new Set(keys), md = mouse.down, ms = mouse.seen; keys.clear(); mouse.seen = false; mouse.down = true; if (mode === 'kite') keys.add('d');
-    let t = 0; const tr = [], sw0 = { n: 0, last: 0 };
+    let t = 0; const tr = [], sw0 = { n: 0, last: 0 }, pnow = performance.now; let vt = pnow.call(performance); if (vclock) performance.now = () => vt;   /* vclock: Kampfzeit statt Rechenzeit (wie simFight) */
     try {
       for (; t < 60000 && e.alive && p.alive && !p.downed; t += 16) {
-        if (e.swing > 0 && !(sw0.last > 0)) sw0.n++; sw0.last = e.swing;
-        if (trace && t % 480 === 0) tr.push(`${t / 1000 | 0}s d${dist(p, e) | 0}${e.surging ? '!' : ''}${e.stagger > 0 ? ' st' : ''} sw${sw0.n} sta${e.sta | 0} hp${e.hp | 0}`);
+        vt += 16; if (e.swing > 0 && !(sw0.last > 0)) sw0.n++; sw0.last = e.swing;
+        if (trace && (t % 480 === 0 || trace === 2)) { const v = Math.round(B.vital(p)); if (trace !== 2 || v !== tr.pv) { tr.pv = v; tr.push(`${t}ms d${dist(p, e) | 0}${e.surging ? '!' : ''}${e.stagger > 0 ? ' st' : ''} sw${sw0.n} sta${e.sta | 0} hp${e.hp | 0} P${v}${p.stagger > 0 ? ' Pst' : ''}${e.swing > 0 ? ' esw' + e.swing.toFixed(2) : ''}${e.special ? ' sp:' + (e.special.kind || 1) : ''}`); } }   /* trace 2: jede Änderung am Leben des Helden */
         mouse.wx = e.x; mouse.wy = e.y - 12; combat = S.ents.__d.filter(x => x.alive);
         if (mode === 'kite' && p.x > 56 * TS) { p.x = 20 * TS; e.x = p.x - 70; }   // Endlosband: rechts raus, links wieder rein
         controlPlayer(16); for (const x of [...S.ents.__d]) think(x, 16); updateProjectiles(16);
       }
-    } finally { keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms; }
+    } finally { performance.now = pnow; keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms; }
     return { tr: trace ? tr : undefined, swings: sw0.n, mtype, mode, weapon, level, win: !e.alive, dead: !p.alive || p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100) };
   } finally {
     Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, gold: keep.gold, kills: keep.kills, _quiet: keep.quiet, projectiles: keep.projectiles, rising: keep.rising }); combat = keep.combat;
@@ -18604,6 +18924,51 @@ export function selftest() {
     const n = actor(p.x + 40, p.y, { kind: 'npc', name: 'Gesprächspartner' }); n.key = 'probe_talk'; talk(n); const gest = n.act?.kind === 'gesture'; UI.closeDialogue();
     return two && fin && d2 > d1 * 1.1 && limp && gest;
   }));
+  ok('Kampfanimation Scheibe 1: Schaden fällt im Einschlag-Bild, nie davor (Langschwert A/B/C, Dolch, Speer, Kriegshammer); Bild und Treffer lesen dasselbe hitAt', sandbox(() => {
+    const p = stage(); (S.dbg ||= {}); const pk0 = S.dbg.pack, god0 = S.dbg.god; let good = true; const bad = [];
+    try {
+      for (const [wk, pk] of [['longsword', 'A'], ['longsword', 'B'], ['longsword', 'C'], ['dagger', 'A'], ['spear', 'A'], ['warhammer', 'A']]) {
+        S.dbg.pack = pk; p.equip.weapon = mkItem(wk); p.stamina = p.maxStamina; p.swing = 0; p.atkCd = 0; p.combo = 0; p.comboT = -1e9; p.vx = p.vy = 0; p.x = 300; p.y = 300; p.aim = 0;
+        S.ents.__a = S.ents.__a.filter(e => e === p); const f = spawnEnemy('bear', '__a', 10, 9); f.x = p.x + 30; f.y = p.y; f.maxHp = f.hp = 99999; if (f.body) B.initBody(f, f.maxHp); f.aiState = 'idle';
+        const vit = () => f.body ? B.vital(f) : f.hp, h0 = vit(); attack(p); const H = swingHit(p), plan = atkPlan(ITEMS[wk].wtype, pk, 0);
+        let early = false, uHit = -1, uBefore = -1;
+        for (let i = 0; i < 600 && p.swing > 0 && uHit < 0; i++) { const s0 = p.swing; tickCombatant(p, 4);
+          if (vit() < h0) { if (p.swing < H) early = true; uHit = snapU(atkU(p.atkW, p.atkH, p.swing)); uBefore = snapU(atkU(p.atkW, p.atkH, s0)); } }
+        const ok1 = !early && uHit === 0.5 && uBefore < 0.5 && Math.abs(H - plan.h) < 1e-9 && p.atkS === plan.s;
+        if (!ok1) bad.push(`${wk}/${pk} H${H} u${uHit}/${uBefore}`); good = good && ok1;
+      }
+    } finally { S.dbg.pack = pk0; S.dbg.god = god0; }
+    if (!good) console.warn('Kampfanimation Impact', bad);
+    const side = (v, sg) => [0.05, 0.13, 0.27, 0.4, 0.45].every(u => sg * R.swingOf('sword', u, 1.6, v, 0).a > 0) && sg * R.swingOf('sword', 0.5, 1.6, v, 0).a < 0;   /* Vorhand/Rückhand: Klinge quert die Zielachse erst im Einschlag-Bild */
+    return good && side(0, 1) && side(1, -1);
+  }));
+  ok('Kampfanimation Scheibe 1: Kombo-Kette — Schritt 1 → 2 → Wuchtschlag; der Wuchtschlag dauert 15 % länger; Erholung erst ab Treffer + 40 % abbrechbar (takt-neutral: der Rest verlängert das nächste Ausholen, Treffer im alten Takt), der Wuchtschlag nicht; Pack ändert den Abbruchpunkt nicht', sandbox(() => {
+    const p = stage(); p.equip.weapon = mkItem('longsword'); p.vx = p.vy = 0; p.comboT = -1e9; p.combo = 0; p.swing = 0; p.atkCd = 0; p.aim = 0; p.stamina = p.maxStamina;
+    attack(p); const s1 = p.atkStep, d1 = p.swingDur, C = p.atkC, H = p.atkH;
+    while (p.swing > 0 && p.swing < C - 0.03) tickCombatant(p, 4); p.atkCd = 0; p.stamina = p.maxStamina; const sw0 = p.swing; attack(p); const blocked = p.swing === sw0 && p.atkStep === 0;
+    while (p.swing > 0 && p.swing < C) tickCombatant(p, 4); p.atkCd = 0; p.stamina = p.maxStamina; attack(p); const chained = p.swing < 0.01 && p.atkStep === 1 && !p.comboFin && p.atkRem > 0 && Math.abs(p.swingDur - p.atkRem - d1) < 1e-6 && Math.abs(p.atkH * p.swingDur - p.atkRem - atkPlan('sword', 'A', 1).h * d1) < 1e-6;
+    while (p.swing > 0 && p.swing < p.atkC) tickCombatant(p, 4); p.atkCd = 0; p.stamina = p.maxStamina; attack(p); const fin = p.atkStep === 2 && p.comboFin && Math.abs((p.swingDur - p.atkRem) / d1 - 1.15) < 1e-6;
+    while (p.swing > 0 && p.swing < 0.92) tickCombatant(p, 4); p.atkCd = 0; p.stamina = p.maxStamina; const sw2 = p.swing; attack(p); const finFull = p.swing === sw2;
+    const samePt = ['B', 'C'].every(k => [0, 1].every(i => atkPlan('sword', k, i).c === atkPlan('sword', 'A', i).c)) && atkPlan('sword', 'C', 0).h < atkPlan('sword', 'A', 0).h;
+    const all = s1 === 0 && Math.abs(C - (H + 0.4 * (1 - H))) < 0.002 && blocked && chained && fin && finFull && samePt;
+    if (!all) { console.warn('Kampfanimation Kombo', { s1, C, H, blocked, chained, fin, finFull, samePt, d1 }); }
+    return all;
+  }));
+  ok('Kampfanimation Scheibe 1: Combat Test Room — eigene Karte, nie gespeichert, beim Verlassen ist der Held wie vorher (Waffe, Fertigkeit, Ort), Karte weg; Pack nur dort', sandbox(() => {
+    const p = S.player, map0 = S.map; if (!p || map0.startsWith('__')) return false;
+    const x0 = p.x, w0 = JSON.stringify(p.equip.weapon), sk0 = JSON.stringify(p.skills || {}), raw0 = localStorage.getItem(SAVE_KEY), ent0 = S.ents[map0].length;
+    let entered = false, inside = false, packOk = false, warm = 0, saved = null;
+    try {
+      entered = arenaEnter('greatsword'); inside = entered && S.map === '__arena' && p.map === '__arena' && ITEMS[p.equip.weapon.key].wtype === 'great' && !!S.dbg.god;
+      if (inside) {
+        S.dbg.pack = 'C'; packOk = atkPackOf(p) === 'C'; warm = arenaWarm();
+        const q0 = S._quiet; S._quiet = false; saved = save(); S._quiet = q0;   /* auch ohne Stumm-Schalter: __-Karten speichern nie */
+        p.stamina = p.maxStamina; attack(p); for (let i = 0; i < 40; i++) tickCombatant(p, 16); if (p.skills) p.skills.twohanded = (p.skills.twohanded || 0) + 5;
+      }
+    } finally { arenaLeave(); }
+    const back = S.map === map0 && p.map === map0 && p.x === x0 && JSON.stringify(p.equip.weapon) === w0 && JSON.stringify(p.skills || {}) === sk0 && S.ents[map0].includes(p) && S.ents[map0].length === ent0;
+    return inside && packOk && warm > 0 && saved === false && back && !MAPS.__arena && !S.ents.__arena && atkPackOf(p) === 'A' && localStorage.getItem(SAVE_KEY) === raw0;
+  }));
   ok('Nebenstädte (Nutzer §5d.10): jede der vier Städte hat eigene Bauten, Leute und einen Dienst (Segen, Werft, Fabrikladen, Prothesenpflege)', sandbox(() => {
     const p = stage(), sh = S.ship, fd = S.flags.serinDay; S.gold = 500;
     try { ensureCityCharacter(); const ks = Object.keys(CITY_FACE).filter(k => TOWN_PLAN[k]); const ok1 = ks.every(k => S.ents.world.filter(e => e.cityFace === k && e.kind === 'prop').length >= 6 && S.ents.world.some(e => e.cityFace === k && e.cityRole));
@@ -18932,6 +19297,19 @@ export function selftest() {
       talk(g); const chat = UI.dialogueOpen() && [...document.querySelectorAll('#dlg-choices button')].some(b => b.textContent.startsWith('Was gibt es Neues')); UI.closeDialogue();
       return quiet && chat;
     } finally { S.flags.allTalk = a0; UI.closeDialogue(); }
+  }));
+  ok('Visuell D: Gesprächspartner bleibt stehen und schaut zum Helden; Verängstigte antworten mit Blase + Emote statt Fenster; Story-Fenster und Antwortzeichen', sandbox(() => {
+    const p = stage(), box = document.getElementById('dialogue');
+    try {
+      const n = actor(p.x + 40, p.y, { name: 'Probe' }); Object.assign(n, { map: '__a', prof: 'Schmied', key: 'probe_d' }); UI.closeDialogue();
+      const txt = '„Ein ganzer Satz, der einläuft.“'; UI.dialogue(n, txt, [{ text: '[Gehen]' }]);
+      n.vx = 2; n.facing = 1; updateNpc(n, 16); const still = n.vx === 0 && n.facing === 2, full = document.getElementById('dlg-text').textContent === txt;
+      UI.closeDialogue(); n.afraid = clock() + 99; talk(n);
+      const shun = !UI.dialogueOpen() && S.floats.some(f => f.bubble && f.who === n.id) && n.emote?.k === 'angst'; n.afraid = 0;
+      storyNext = true; UI.dialogue(n, 'x', [{ text: 'Ich mache es.' }]); const story = box.classList.contains('story') && document.querySelector('#dlg-choices button').dataset.k === 'quest';
+      UI.dialogue(n, 'y', [{ text: '[Gehen]' }]); const plain = !box.classList.contains('story') && document.querySelector('#dlg-choices button').dataset.k === 'leave';
+      return still && full && shun && story && plain;
+    } finally { UI.closeDialogue(); storyNext = false; }
   }));
   ok('RB-042: Ein neues Spiel beginnt nicht mit Höchstpreisen in Eren (Tuch, Leder, Korn unter ×1,5); Nordfurts Kornmangel bleibt (Kriegsentwurf)', sandbox(() => {
     const T0 = S.towns, E0 = S.eco, A0 = S.after, own = S.war?.nodes?.eren?.owner;
@@ -19406,6 +19784,43 @@ export function selftest() {
     const w = spawnEnemy('wolf', '__a', 11, 9), b = spawnEnemy('bandit', '__a', 11, 9), pet = spawnEnemy('wolf', '__a', 11, 9); pet.pet = true;
     return winds && marked && hurtBig && dodged && isHostile(w, b) && !isHostile(pet, b);
   }));
+  ok('Kampf-Feedback: schwere Angriffe sind nicht blockbar — Deckung hält normale Hiebe (Block), den schweren Schlag nicht; Bodenmarke füllt sich', sandbox(() => {
+    const p = stage(), e = spawnEnemy('chain_brute', '__a', 11, 9); e.x = p.x + 40; e.y = p.y; S.flags.chainAlarm = (S.day | 0) + 2; combat = S.ents.__a.filter(x => x.alive);
+    p.aim = 0; p.stamina = p.maxStamina; p.cover = { since: performance.now() - 5000 };
+    try {
+      S.floats.length = 0; const st0 = p.stamina; e.swing = 0; hit(e, p, 1); const blocked = p.stamina < st0 && S.floats.some(f => f.text === 'Block');
+      if (p.body) B.fullHeal(p); p.hp = p.maxHp; p.stamina = p.maxStamina; S.floats.length = 0; const st1 = p.stamina, h1 = p.hp;
+      startHeavy(e, p, MONSTERS.chain_brute); const fills = !!(e.special?.heavy && e.special.T > 0); heavyTick(e, 900, MONSTERS.chain_brute);
+      const through = p.stamina === st1 && p.hp < h1 && !S.floats.some(f => f.text === 'Block' || f.text === 'Parade!') && !UNBLOCK;
+      return blocked && fills && through;
+    } finally { p.cover = null; S.floats.length = 0; }
+  }));
+  ok('Kampf-Feedback: Schadenszahlen in Schadensfarbe (Pixelziffern), Gift/Brand addieren sich, Einstellung Aus/Reduziert/Voll im Optionen-Fenster', sandbox(() => {
+    const p = stage(), t = actor(330, 300); t.kind = 'enemy'; const dn0 = S.settings.dmgNums;
+    try {
+      S.floats.length = 0; dmgFloat(t, 5, p, false, 'fire', 'x'); const f1 = S.floats[S.floats.length - 1], fire = f1.num && f1.mine && f1.color.includes('240,140,60');
+      dmgFloat(t, 2, null, false, 'physical', 'Gift'); dmgFloat(t, 3, null, false, 'physical', 'Gift'); const g = S.floats.filter(f => f.dot), merged = g.length === 1 && g[0].text === '5';
+      dmgFloat(t, 9, p, true, 'physical', 'x'); const crit = S.floats[S.floats.length - 1].big && S.floats[S.floats.length - 1].color.includes('212,175,55');
+      delete S.settings.dmgNums; const full = R.floatShown(f1) && R.floatShown(g[0]);
+      S.settings.dmgNums = 'reduced'; const red = R.floatShown(f1) && !R.floatShown(g[0]);
+      S.settings.dmgNums = 'off'; const off = !R.floatShown(f1) && R.floatShown({ text: 'Block' });
+      UI.openModal('settings'); const ui = document.querySelectorAll('#modal-body [data-dn]').length === 3; UI.closeModal();
+      return fire && merged && crit && full && red && off && ui;
+    } finally { if (dn0 === undefined) delete S.settings.dmgNums; else S.settings.dmgNums = dn0; S.floats.length = 0; }
+  }));
+  ok('Kampf-Feedback: Lebensbalken nur beim gewählten Ziel, Status als Partikel am Körper; Set-Hände/-Beine behalten die Set-Farbe, 7 Stücke mit Aussehen', sandbox(() => {
+    const p = stage(), t = actor(330, 300); t.kind = 'enemy'; const sel0 = R.focus.sel;
+    try {
+      R.focus.sel = null; R.focus.last = null; const none = R.barTarget() === null; R.focus.sel = t; const bar = R.barTarget() === t; R.focus.sel = p; const notSelf = R.barTarget() === null;
+      S.fx.length = 0; t.status = [{ key: 'burning', name: 'Brennt', left: 5000 }]; for (let i = 0; i < 40; i++) tickCombatant(t, 50); const flames = S.fx.some(f => f.type === 'fire' && f.up);
+      const H = k => SP.humanSpec({ kind: 'npc', pal: {}, seed: 1, equip: k });
+      const thr = H({ chest: { key: 'thronharnisch' }, hands: { key: 'thron_handschuhe' }, legs: { key: 'thron_beinschienen' } }), lea = H({ hands: { key: 'lederhandschuhe' } });
+      const set = thr.glove === '#c8a040' && thr.pants === '#2a3e6a' && thr.kn === 1 && lea.glove === '#5a4030';
+      const looks = H({ head: { key: 'dreispitz' } }).helm === 'hat' && H({ head: { key: 'garmadon_krone' } }).helm === 'crown' && !!H({ chest: { key: 'kanzlerrobe' } }).robe
+        && H({ chest: { key: 'seemantel' } }).armor === 'leather' && H({ feet: { key: 'iron_boots' } }).boots === '#4a4844' && H({ feet: { key: 'leather_boots' } }).boots === '#3a2a1c' && H({ chest: { key: 'cloth_shirt' } }).hem === 39;
+      return none && bar && notSelf && flames && set && looks;
+    } finally { R.focus.sel = sel0; S.fx.length = 0; }
+  }));
   ok('Magie-Kern (S15 P4): Zauber lernen gibt Mana; Sammelzeit, Treffer bricht ab (halbes Mana zurück); Geschoss endet an der Wand; Frost ×3 friert ein; Kette nur mit Sichtlinie; Teleport nie in die Mauer; Übung hebt den Rang', sandbox(() => {
     const p = stage(); p.spells = {}; recalc(p); const noMana = !p.maxMana; learnSpell(p, 'sp_firebolt', true); learnSpell(p, 'sp_froststrike', true); learnSpell(p, 'sp_chain', true); learnSpell(p, 'sp_teleport', true);
     const mana = p.maxMana > 0; p.mana = p.maxMana; p.cooldowns = {};
@@ -19587,50 +20002,6 @@ export function selftest() {
       return once && healed;
     } finally { S.cult = C0; S.flags = f0; Object.assign(S.factions, fa0); S.ents.world = W0; }
   }));
-  ok('Angst (Nutzer 02.10.): Zeugen sammeln Angst je Toten (gesehen 18, gehört 6), ab 50 kein Gespräch mit dem Täter, ab 75 Flucht; bleibt, solange die Gefahr da ist, klingt danach 12/Stunde ab; tote Bestien erschrecken niemanden', sandbox(() => {
-    const p = stage(), w = actor(400, 300, { faction: null }), far = actor(300, 900, { faction: null }), killer = spawnEnemy('bandit', '__a', 12, 10);
-    for (const c of [w, far]) { c.traits = []; c.brave = false; c.fear = 0; }
-    const kill = () => { const v = actor(380, 320, { faction: null }); die(v, 'Probe', killer); };
-    kill(); const one = Math.round(fearOf(w)) === 18 && Math.round(fearOf(far)) === 6 && w.fearBy === killer.id;
-    const wolf = spawnEnemy('wolf', '__a', 12, 11); const f0 = fearOf(w); die(wolf, 'Probe', p); const beast = fearOf(w) === f0;
-    kill(); kill(); kill(); kill(); const panic = fearOf(w) >= 75 && fearStage(fearOf(w)) === 3;
-    UI.closeDialogue(); w.afraid = 0; w.fleeing = false; talk(w); const refuse = /Nicht jetzt/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
-    killer.x = w.x - 40; killer.y = w.y; const d0 = dist(w, killer); for (let i = 0; i < 20; i++) updateNpc(w, 16); const flees = dist(w, killer) > d0 + 10;
-    const f1 = fearOf(w); for (let i = 0; i < 10; i++) { S.minute += 6; updateNpc(w, 16); } const stays = fearOf(w) >= f1 - 0.5;
-    killer.map = '__b'; const f2 = fearOf(w); S.minute += 120; const fades = Math.abs(f2 - fearOf(w) - 24) < 0.5;
-    w.fear = 60; w.fearBy = p.id; w.fearSeen = clock(); talk(w); const byP = /nichts gesehen/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
-    if (!(one && beast && panic && refuse && flees && stays && fades && byP)) console.log('Angst-Probe', JSON.stringify({ one, beast, panic, refuse, flees, stays, fades, byP, w: fearOf(w), far: fearOf(far) }));
-    return one && beast && panic && refuse && flees && stays && fades && byP;
-  }));
-  ok('Schwere Verbrechen (Nutzer 02.10.): ab 2000 Gold kein Freikaufen — Bußgeld 10 %, Haft 20–40 h (2000) bis 60–120 h (200 000, 1–2 h Echtzeit), je nach gezahltem Bußgeld; darunter wie bisher', sandbox(() => {
-    const p = stage(), r0 = S.resist, g = guardChar('valen', { x: 330, y: 300 }, 'Wache', 5); g.map = '__a'; g.guard = true; S.ents.__a.push(g);
-    try { S.resist = null; S.flags.bann = {}; S.bounty = { valen: 200000 }; S.gold = 300000; S.flags.arrestCd = 0; arrestCheck(g, p, 16);
-      const btn = [...document.querySelectorAll('#dlg-choices button')].map(b => b.textContent); UI.closeDialogue();
-      const noBuy = !btn.some(t => /^Zahlen/.test(t)) && btn.some(t => /Bußgeld 20000/.test(t) && /60 Stunden/.test(t));
-      S.bounty = { valen: 500 }; S.flags.arrestCd = 0; arrestCheck(g, p, 16); const buy = [...document.querySelectorAll('#dlg-choices button')].some(b => /^Zahlen \(500/.test(b.textContent)); UI.closeDialogue();
-      const [a0, a1] = jailHours(1999), [b0, b1] = jailHours(2000), [c0, c1] = jailHours(200000);
-      const math = a1 === 20 && b0 === 20 && b1 === 40 && c0 === 60 && c1 === 120 && jailHours(20000)[1] === 80 && crimeFine(1999) === 0 && crimeFine(200000) === 20000
-        && jailHoursPaid(200000, 20000) === 60 && jailHoursPaid(200000, 0) === 120 && jailHoursPaid(200000, 10000) === 90 && jailHoursPaid(400, 0) === 20;
-      if (!(noBuy && buy && math)) console.log('Verbrechen-Probe', JSON.stringify({ noBuy, buy, math, btn }));
-      return noBuy && buy && math;
-    } finally { S.resist = r0; }
-  }));
-  ok('Hof ohne Wiederkehr (Nutzer 02.10.): tote Hofleute bleiben tot; Kanzlertod beendet den Kult (ohne Sense); Reichsverweser Aldhelm → Brandt → Adel → niemand; Thronwirren 7 Tage; ohne König wird die schutzlose Hauptstadt übernommen, mit König nie; kein Fest nach dem Königsmord', sandbox(() => {
-    const p = stage(), f0 = structuredClone(S.flags), C0 = S.cult ? structuredClone(S.cult) : null, Z0 = structuredClone(S.schutz || {}), W0 = S.ents.world, BA = structuredClone(S.bands || []), WAR = structuredClone(S.war), fa0 = { ...S.factions }; S.ents.world = W0.slice();
-    try { const day = S.day | 0; S.cult = { stage: 0, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; delete S.flags.courtDead; delete S.flags.varonFled; delete S.flags.blutsense; delete S.flags.varonExecuted; delete S.flags.varonScattered;
-      S.flags.varonDead = day; S.flags.varonRegent = 'Kanzler Aldhelm'; p.inv = [];
-      courtDeath({ varonChancellor: true, name: 'Aldhelm' }, true); const kanz = S.flags.varonRegent === 'Marschall Brandt' && S.cult.end === 'destroyed' && !p.inv.some(i => i?.key === 'blutsense');
-      courtDeath({ varonMarshal: true, name: 'Brandt' }, true); const noble = S.flags.varonRegent === VARON_NOBLES[0][0];
-      ensureVaronCourt(); const gone = !courtEnts().some(e => e.varonMarshal || e.varonChancellor);
-      for (const j of [0, 1, 2]) courtDeath({ varonNoble: j, name: 'x' }, true); S.day = day + 30; const headless = S.flags.varonRegent === 'niemand' && capCrownless();
-      S.flags.courtDead = ['aldhelm']; S.day = day + 3; const turm = capCrownless() && !festDay('varonheim', day + 3); S.day = day + 8; const over = !capCrownless();
-      S.day = day + 3; S.war.armies = []; S.bands = []; const prep = () => { S.schutz = { varonheim: { lost: 10, byP: 0, stage: 3, since: day, at: day, reinf: day } }; };
-      prep(); const taken = schutzTake('varonheim') === 'band' && S.schutz.varonheim.stage === 4;
-      delete S.flags.varonDead; S.bands = []; prep(); const kingSafe = schutzTake('varonheim') === null;
-      if (!(kanz && noble && gone && headless && turm && over && taken && kingSafe)) console.log('Hof-Probe', JSON.stringify({ kanz, noble, gone, headless, turm, over, taken, kingSafe, rg: S.flags.varonRegent }));
-      return kanz && noble && gone && headless && turm && over && taken && kingSafe;
-    } finally { S.flags = f0; S.cult = C0; S.schutz = Z0; S.ents.world = W0; S.bands = BA; S.war = WAR; Object.assign(S.factions, fa0); ensureVaronCourt(); ensureVaronExile(); }
-  }));
   ok('E2: Karawanentod legt eine Täterbande mit Beute an, der Kutscher nennt sie, Anführer tot → Kiste mit der Ladung; die Karawane selbst überfallen → keine Bande, Händler −10', sandbox(() => {
     const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, f0 = structuredClone(S.flags), g0 = S.gold; S.ents.world = W0.slice();
     try { S.bands = []; S.contracts = []; const [ex, ey] = TOWN_PLAN.eren.square, car = { x: (ex + 20) * TS, y: ey * TS, cargo: { salt: 8 } };
@@ -19807,6 +20178,14 @@ export function selftest() {
       return closed && free;
     } finally { S.ents.world = W0; S.secrets = s0; S.flags = f0; LOCATIONS.length = L0; S.factions.merch = m0; UI.closeDialogue(); }
   }));
+  ok('Geheime Orte S4: Kammer der Namen — Seelen-Ernte gibt Phiolen und treibt die Bedrohung, Ahnen ruhen lassen gibt Willenskraft', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, WAR = structuredClone(S.war), fu = S.factions.undead, wp = p.attributes.willpower, i0 = p.inv.slice();
+    try { S.ents.world = W0.slice(); S.secrets = {}; ensureSecrets(); const door = S.ents.world.find(e => e.secretNames); if (!door) return false; S.war.capThreat = 0; const t0 = 0;
+      secretNames(door); const bs = [...document.querySelectorAll('#dlg-choices button')], harvest = bs.find(b => /Seelen ernten/.test(b.textContent)); harvest.click();
+      const ok1 = hasItem(p, 'soul_vial', 3) && (S.war.capThreat || 0) > t0 && S.secrets.kammer.choice === 'harvest';
+      return ok1 && !S.ents.world.some(e => e.secretNames);
+    } finally { S.ents.world = W0; S.secrets = s0; LOCATIONS.length = L0; S.war = WAR; S.factions.undead = fu; p.attributes.willpower = wp; p.inv = i0; UI.closeDialogue(); }
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -19891,6 +20270,46 @@ export function selftest() {
       return a === b && cap && FIXED.has('afterimage') && FIXED.has('ghost');
     } finally { S.fx = fx0; S.floats.length = fl0; seedRng(S.seed); }
   })());
+  /* Visueller Umbau P5–P7 (IMPL-ITEMS, 02.10.2026): Fehler aus den Analysen, Handel, Gepäck, Bodenbeute. Städte und Preise werden zurückgesetzt. */
+  {
+    const TK = 'northcity', town0 = S.towns?.[TK] ? structuredClone(S.towns[TK]) : null, ps0 = structuredClone(S.priceSeen || {}), sort0 = S.settings.invSort, tr0 = S.player?.skills?.trading;
+    const shopNpc = (o = {}) => { const n = actor(330, 300, { kind: 'npc', prof: 'Händlerin', shop: true, town: TK, ...o }); n.homeTown = TK; return n; };
+    const done = () => { if (town0) { const T = S.towns[TK]; for (const k of Object.keys(T)) if (!(k in town0)) delete T[k]; Object.assign(T, structuredClone(town0)); } S.priceSeen = structuredClone(ps0); S.settings.invSort = sort0; if (UI.modalOpen) UI.closeModal(); };
+    try {
+      ok('Visuell P7 (Fehler): Verkaufspreis im Handel = gezahlter Preis, auch für seltene Teile (mit Exemplar gerechnet)', !town0 || sandbox(() => { const p = stage(); p.skills.trading = 0; const n = shopNpc(), o = mkItem('longsword', 1); rollRarity(o, ITEMS.longsword, 0, 'epic'); p.inv = [o];
+        UI.openModal('trade', n); const tag = +document.querySelector('#tr-sell .cell .ptag')?.textContent; const want = price('longsword', false, n, o), base = price('longsword', false, n);
+        const g0 = S.gold; sell(0, n, true); const paid = S.gold - g0; UI.closeModal(); return tag === want && paid === want && want > base; }));
+      ok('Visuell P5 (Fehler): Platznamen Hände, Beine und Talisman stehen deutsch in der Karte', ['thron_handschuhe', 'thron_beinschienen', 'glocke_moorbach'].every(k => !ITEMS[k] || /Hände|Beine|Talisman/.test(UI.itemCardHTML({ key: k }))));
+      ok('Visuell P7 (Fehler): Kontor-Handel setzt goodsOnly nur für diesen Besuch (Schließen räumt es weg)', !town0 || sandbox(() => { stage(); const n = shopNpc({ prof: 'Bauer', shop: false });
+        ecoMenu(n, TK); const b = [...document.querySelectorAll('#dlg-choices button')].find(x => /Waren kaufen/.test(x.textContent)); b?.click();
+        const during = n.goodsOnly === true && UI.modalOpen === 'trade'; UI.closeModal(); UI.closeDialogue(); return !!b && during && n.goodsOnly === undefined && !n._kontor; }));
+      ok('Visuell P7: Mengenkauf — Preis je Stück und Gesamt vorher stimmen mit dem Kauf überein; das Angebot ändert nichts', !town0 || sandbox(() => { const p = stage(); p.skills.trading = 0; p.inv = []; const n = shopNpc();
+        const g = GOODS.find(k => S.towns[TK].stock[k] >= 4); if (!g) return true; S.gold = 5000; const st0 = S.towns[TK].stock[g];
+        const q = buyQuote(n, g, 3), same = S.towns[TK].stock[g] === st0 && S.gold === 5000 && p.skills.trading === 0;
+        const r = buyMany(n, g, 3); return same && q.each.length === 3 && r.got === 3 && r.spent === q.total && S.towns[TK].stock[g] === st0 - 3; }));
+      ok('Visuell P7: Mehrfachverkauf (Erlös = Angebot), Sperre schützt vor Verkauf, kein Rückkauf nötig', !town0 || sandbox(() => { const p = stage(); p.skills.trading = 0; const n = shopNpc();
+        const a = mkItem('axe', 1), b = mkItem('spear', 1), c = mkItem('dagger', 1); c.lock = true; p.inv = [a, b, c]; S.gold = 0;
+        const q = sellQuote(n, [{ idx: 0, n: 1 }, { idx: 1, n: 1 }, { idx: 2, n: 1 }]), r = sellMany(n, [{ idx: 0, n: 1 }, { idx: 1, n: 1 }, { idx: 2, n: 1 }]);
+        return q.each.length === 2 && r.sold === 2 && r.got === q.total && S.gold === q.total && p.inv.length === 1 && p.inv[0] === c; }));
+      ok('Visuell P6: Rüstungsaufschlüsselung ergibt armorOf; Werte-Vorschau = Werte nach echtem Anlegen; Vorschau ändert nichts', sandbox(() => { const p = stage();
+        p.equip.chest = { key: 'chain_hauberk', cond: 0.7 }; p.equip.weapon = { key: 'longsword', cond: 1 }; const h = { key: 'iron_helm', cond: 0.8 }, w = { key: 'axe', cond: 0.9 }; p.inv = [h, w];
+        const ap = armorParts(p), sumOk = Math.abs(ap.sum + ap.sturdy + ap.set + ap.rest - ap.total) < 1e-6 && ap.total === armorOf(p) && ap.wear > 0;
+        const eq0 = JSON.stringify(p.equip), pv = previewEquip(p, h), pw = previewEquip(p, w), unchanged = JSON.stringify(p.equip) === eq0;
+        equip(p, 0); const a1 = armorOf(p); equip(p, p.inv.indexOf(w)); const d1 = damageOf(p);
+        return sumOk && unchanged && pv.slot === 'head' && Math.abs(pv.armor[1] - a1) < 1e-6 && Math.abs(pw.dmg[1] - d1) < 1e-6; }));
+      ok('Visuell P6: Gepäck — Klick auf Ausrüstungsplatz zeigt nur (legt nicht ab), Ordnen ändert p.inv nicht, Neu-Marke nur an neuen Teilen', sandbox(() => { const p = stage();
+        p.equip.weapon = { key: 'longsword', cond: 1 }; p.inv = [mkItem('bread', 2), mkItem('axe', 1)]; addItem(p, 'spear', 1); const nw = p.inv[2].nw === 1 && !p.inv[1].nw;
+        UI.openModal('inventory'); const slot = document.querySelector('#doll .dslot[data-k="weapon"]'); slot?.click(); const kept = p.equip.weapon?.key === 'longsword';
+        const order = p.inv.map(s => s.key).join(), sel = document.getElementById('inv-sort'); if (sel) { sel.value = 'rar'; sel.onchange({ target: sel }); }
+        const same = p.inv.map(s => s.key).join() === order, cells = document.querySelectorAll('#ig .cell').length === p.invCap, doll = document.querySelectorAll('#doll .dslot').length === 9;
+        UI.closeModal(); return !!slot && kept && same && cells && doll && nw; }));
+      ok('Visuell P5: Beute fällt im Bogen — das Darstellungsfeld _drop steht nie im Spielstand oder Koop-Delta', sandbox(() => { stage(); const q0 = S._quiet; S._quiet = false;
+        try { dropItemAt('__a', 320, 330, mkItem('axe', 1), { x: 300, y: 300 }); } finally { S._quiet = q0; }
+        const e = S.ents.__a.find(x => x.kind === 'item'); return !!e?._drop && !JSON.stringify(e).includes('_drop') && !Object.keys(e).includes('_drop'); }));
+      ok('Visuell P7: Händler-Sprüche — jede Ladenart hat 4, Pleite und Seltenes je 3; Auswahl zieht kein rnd()', ['smith', 'tavern', 'heal', 'tech', 'black', 'market'].every(k => SHOP_BARK[k]?.length === 4) && SHOP_BARK.poor.length === 3 && SHOP_BARK.rare.length === 3
+        && shopKind({ prof: 'Meisterschmiedin' }) === 'smith' && shopKind({ prof: 'Kontorhändler' }) === 'market');
+    } finally { done(); if (tr0 != null && S.player?.skills) S.player.skills.trading = tr0; }
+  }
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -20068,18 +20487,19 @@ function boot() {
     openCoop: () => import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
-    dropItem: i => { if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
+    dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
     toStash: i => { if (coopHooks.cmd) return UI.toast('Das Lager gehört dem Host.'); const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
+    dlgStory, dlgMood, setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
     questInfo, cancelQuest, trackQuest: k => { S.track = k; },
     shopStock, price, buy, sell, craftBandage, bandageFrom: k => BANDAGE_FROM[k] || 0,
+    buyQuote, buyMany, sellQuote, sellMany, shopBark, shopKind, tradeEnd, armorParts, ecoTownOf: npc => ecoTown(npc), previewEquip: inst => previewEquip(S.player, inst), equipBlock: it => equipBlock(S.player, it), setOf: () => setOf(S.player),   /* Visueller Umbau P5–P7 */
     bandage: (target, part) => {
       const idx = S.player.inv.findIndex(x => x.key === 'bandage');
       if (idx < 0) return UI.toast('Keine Verbände. Kaufen, finden oder aus Stoff herstellen.');
@@ -20129,6 +20549,7 @@ function boot() {
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
+  if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
 }
 await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

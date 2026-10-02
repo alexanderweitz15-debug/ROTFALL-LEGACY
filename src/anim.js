@@ -22,7 +22,73 @@ export const ANIM_DEFS = {
     zeigen: { name: 'Zeigen', ms: 1400 }, abwehren: { name: 'Abwehren', ms: 1200 }, achsel: { name: 'Achselzucken', ms: 1100 },
     salutieren: { name: 'Salutieren', ms: 900 }, jubeln: { name: 'Jubeln', ms: 1000 }, trauern: { name: 'Trauern', ms: 1800 }, knien: { name: 'Knien', ms: 1600 },   /* T17 */
   },
+  /* Kampfanimation Scheibe 1 (COMBAT_ANIM, DECISIONS 02.10.): Angriffe als Daten je Animationsklasse (heute = wtype) und Pack.
+     Zwei Ebenen, damit der Figuren-Cache nicht je Pack wächst:
+     - shapes: Bewegungsform (Klingenwinkel a relativ zur Zielrichtung, Handvorschub ext) über der Formzeit u 0..1 mit festen Ankern:
+       u 0–0,4 Ausholen, 0,4–0,5 Schlag, u = 0,5 Einschlag (Impact-Bild = Schaden), 0,5–0,7 Nachschwung, 0,7–1 Erholung.
+       Figurenbilder gibt es nur an den 11 Stützstellen ATK_U — gleich für alle Packs (Pack ist kein Cache-Schlüssel).
+     - Pack (A Grounded, B Heroic, C Endgame): welche Form je Kombo-Schritt, wann im Takt ausgeholt (w) und getroffen (h) wird,
+       Körper-Transform (push: Vorschub in px, nur Bild) und Effekte. Packs ändern nur die Optik und die Verteilung im gleichen Takt;
+       der Abbruchpunkt der Erholung (Treffer + 40 %) kommt immer aus Pack A, damit kein Pack mehr Schaden je Sekunde macht.
+     Kombo: Schritt 0 und 1 normal, Schritt 2 = Wuchtschlag (+15 % Dauer, in B/C als Finisher-Animation). */
+  attack: {
+    sword: {                                                         // Langschwert (alle wtype 'sword'): kontrolliert, klare Bögen
+      name: 'Langschwert',
+      shapes: [                                                      // Index = W.v im Figuren-Cache
+        { name: 'Vorhand', a0: 0.6, from: 2.0, hit: -0.12, end: -1.05, a1: -0.6, eW: 0, eS: 2 },   // holt tief/hinten aus, quert die Zielachse erst im Einschlag
+        { name: 'Rückhand', a0: -1.05, from: -2.0, hit: 0.12, end: 1.05, a1: 0.6, eW: 0, eS: 2 },   // läuft aus der Endlage der Vorhand weiter
+        { name: 'Überkopf', a0: 1.05, from: -2.3, hit: 0.2, end: 0.8, a1: 0.6, eW: -4, eS: 4 },
+        { name: 'Wirbel', a0: 1.05, from: 1.8, hit: 2 * Math.PI - 0.12, end: 2 * Math.PI + 0.9, a1: 2 * Math.PI + 0.6, eW: -2, eS: 3, spin: true },
+        { name: 'Doppelwirbel', a0: 1.05, from: 1.9, hit: 4 * Math.PI - 0.12, end: 4 * Math.PI + 0.9, a1: 4 * Math.PI + 0.6, eW: -3, eS: 4, spin: true },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.30, h: 0.446 }, { s: 1, w: 0.232, h: 0.375 }, { s: 2, w: 0.357, h: 0.497 }],
+        fx: { stop: 1, shake: 1, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.268, h: 0.375 }, { s: 1, w: 0.196, h: 0.304 }, { s: 3, w: 0.311, h: 0.497 }],
+        fx: { stop: 1.4, shake: 1.33, trail: 8, push: 3, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.196, h: 0.286 }, { s: 1, w: 0.143, h: 0.232 }, { s: 4, w: 0.30, h: 0.45 }],
+        fx: { stop: 1.8, shake: 1.67, trail: 10, push: 7, slash: 2, after: 1, fin: 2 } },
+    },
+  },
 };
+/* ---- Kampfanimation: Rechenhilfen (rein rechnend; game.js, render.js, fig5.js und die Proben lesen dasselbe) ---- */
+export const ATK_U = [0, 0.13, 0.27, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1];   // Stützstellen der Figurenbilder (Formzeit u)
+export const ATK_PACKS = ['A', 'B', 'C'];
+export const atkProfile = wt => ANIM_DEFS.attack[wt] || null;
+// Klassen ohne eigenes Profil (Scheibe 2 folgt): heutige Kurven aus fig5.swingOf, Schaden am Ende des Schlags (Stoß: volle Streckung)
+const THRUST_W = new Set(['spear', 'dagger', 'rapier']), HEAVY_W = new Set(['great', 'axe', 'mace', 'hammer', 'polearm']);
+export function legacyTiming(wt) {
+  if (THRUST_W.has(wt)) return { w: 0.3, h: 0.45 };
+  return { w: wt === 'hammer' ? 0.44 : HEAVY_W.has(wt) ? 0.36 : 0.28, h: 0.5 };
+}
+const cancelOf = h => Math.round((h + 0.4 * (1 - h)) * 1000) / 1000;   // Erholung ab Treffer + 40 % abbrechbar
+// Plan eines Schwungs: s = Form, w = Ausholen bis, h = Treffer (Schaden) bei, c = Erholung abbrechbar ab (alles Anteile des Takts)
+export function atkPlan(wt, pack = 'A', step = 0) {
+  const P = atkProfile(wt), k = Math.max(0, Math.min(2, step | 0));
+  if (P) { const st = (P[pack] || P.A).steps[k], A = P.A.steps[k]; return { s: st.s, w: st.w, h: st.h, c: cancelOf(A.h) }; }
+  const T = legacyTiming(wt); return { s: k, w: T.w, h: T.h, c: cancelOf(T.h) };
+}
+export const atkFx = (wt, pack = 'A') => { const P = atkProfile(wt); return (P && (P[pack] || P.A).fx) || ANIM_DEFS.attack.sword.A.fx; };
+// Takt → Formzeit: Ausholen [0, w] → u [0, 0,4], Schlag [w, h] → [0,4, 0,5], Rest → [0,5, 1]
+export function atkU(w, h, sw) {
+  if (!(sw > 0)) return 0; if (sw >= 1) return 1;
+  w = Math.max(0.01, Math.min(w, h - 0.01));
+  return sw < w ? 0.4 * sw / w : sw < h ? 0.4 + 0.1 * (sw - w) / (h - w) : 0.5 + 0.5 * (sw - h) / (1 - h);
+}
+// Formzeit → Takt für die alten Kurven (Umkehrung von atkU mit legacyTiming)
+export function legacySw(wt, u) { const T = legacyTiming(wt); return u < 0.4 ? u / 0.4 * T.w : u < 0.5 ? T.w + (u - 0.4) / 0.1 * (T.h - T.w) : T.h + (u - 0.5) / 0.5 * (1 - T.h); }
+// Bild-Stützstelle: die größte ≤ u — das Impact-Bild (u 0,5) erscheint nie vor dem Schaden
+export function snapU(u) { let r = 0; for (const x of ATK_U) { if (x <= u + 1e-9) r = x; else break; } return r; }
+const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
+// Klingenwinkel/Handvorschub einer Form zur Formzeit u (null = Klasse ohne Daten)
+export function atkShape(wt, s, u) {
+  const P = atkProfile(wt); if (!P) return null; const F = P.shapes[s] || P.shapes[0];
+  if (u <= 0) return { a: F.a0, ext: 0 };
+  if (u < 0.4) { const k = eo(u / 0.4); return { a: F.a0 + (F.from - F.a0) * k, ext: F.eW * k }; }
+  if (u <= 0.5) return { a: F.from + (F.hit - F.from) * ei((u - 0.4) / 0.1), ext: F.eS };
+  if (u < 0.7) { const k = (u - 0.5) / 0.2; return { a: F.hit + (F.end - F.hit) * eo(k), ext: F.eS * (1 - k * 0.5) }; }
+  const k = Math.min(1, (u - 0.7) / 0.3); return { a: F.end + (F.a1 - F.end) * eo(k), ext: F.eS * 0.5 * (1 - k) };
+}
+export const atkSpin = (wt, s) => !!atkProfile(wt)?.shapes[s]?.spin;
 export const DEATH_KINDS = Object.keys(ANIM_DEFS.death);
 // Ereignisse zwischen t0 (ausschließlich) und t1 (einschließlich); t0 < 0 heißt „von Anfang an“
 export function animEvents(def, t0, t1) { return (def?.ev || []).filter(e => e.t > t0 && e.t <= t1); }

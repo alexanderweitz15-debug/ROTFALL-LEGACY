@@ -27,8 +27,10 @@ Stand: Session 15 (2026-09-29).
 - **Nachsetzen:** Wer rückwärts läuft und zuschlägt, wird von Nahkämpfern eingeholt („!“ und Staubwolke).
 - **Parade im Takt, Riposte mit dem Rapier, Schleichangriff** auf Ahnungslose (×1,5, von hinten ×3).
 - **Flächenangriffe** (Ringe, Einschläge, Strahlen) lassen sich nicht blocken, nur ausweichen (S14).
-- **Schwere Angriffe (S15):** Sieben Gegnerarten holen manchmal lange aus. Eine rote Bodenmarkierung zeigt Kreis, Ring oder
-  Linie. Wer ausweicht oder hinausgeht, bleibt heil. Danach ist der Gegner 0,6 s offen (+25 % Schaden).
+- **Schwere Angriffe (S15, Regel seit 02.10.):** Sieben Gegnerarten holen manchmal lange aus. Eine rote Bodenmarkierung zeigt Kreis, Ring oder
+  Linie; die Fläche füllt sich bis zum Einschlag, über dem Kopf blinkt ein rotes Warnzeichen. **Schwere Angriffe sind nicht blockbar:**
+  Deckung, Parade, Schild und Nahkampfabwehr halten sie nicht — nur Ausweichen (Rolle), Hinausgehen oder der Gegenstrom des Mönchs hilft.
+  Danach ist der Gegner 0,6 s offen (+25 % Schaden).
 - **Raubtiere gegen Banditen (S15):** Wölfe, Bären und Wildschweine greifen auch Banditen an.
 - **Fernkampf braucht freie Sicht.** Pfeile prallen an Wänden ab und fliegen über Liegende hinweg.
 - **Bogen spannen (S15):** Man sieht die Zughand die Sehne bis ans Kinn ziehen; nach dem Schuss schnellt die Sehne leer zurück.
@@ -1066,32 +1068,66 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Das Wasserrecht der Sandfürsten** ist deine Wahl. Gibst du es den Sandfürsten zurück, zahlst du in Karak-Atar nie wieder Zoll (Händler +10). Verkaufst du es an die Räuber, bekommst du 250 Gold (Händler −10).
 - Debug: „Geheime Orte: Sandsturm endet (Brunnen frei)“.
 
-## Angst (Version 24)
-- Jeder Bürger hat einen Angstwert von 0 bis 100. Jeder Tote, den er sieht, bringt +18, wer es nur hört (gleicher Ort), +6. Tapfere und grausame Leute fürchten sich halb so stark. Wachen fürchten sich nicht.
-- **Ab 25 unruhig:** hält Abstand zum Täter, Gespräche drehen sich um die Toten.
-- **Ab 50 verängstigt:** versteckt sich im Haus, plaudert nicht mehr und redet nicht mit dem Täter.
-- **Ab 75 Panik:** rennt schreiend davon, sobald die Gefahr näher als etwa 20 Schritte kommt; redet mit niemandem.
-- Die Angst bleibt, solange die Gefahr (du oder ein Feind) lebt und in der Nähe ist. Erst wenn sie fort ist, sinkt sie um 12 je Spielstunde.
-- Wer einen Angreifer erschlägt, macht niemandem Angst; tote Tiere und Monster auch nicht.
-- Das Log meldet, wenn ein Ort Angst vor dir hat oder in Panik gerät; im Gespräch steht der Zustand dabei.
-- Debug: „Angst: Zeugen ringsum +25 (vor dir)“, „Angst: alle beruhigen“.
+## Noch mehr Umhänge und Kapuzen (Runde 11)
+- **Neue Umhangformen:** Rabenumhang mit Federkragen, Kettenumhang mit Schulterplatten, Wüstenburnus, Kapitänsrock/Öljacke (offene Schöße, Messingknöpfe), Knochenumhang mit Schädel auf der Schulter, Doppelumhang (Pelerine über langem Mantel), Fell mit Tierkopf (ohne Helm sitzt der Kopf als Haube auf). Umhänge tragen jetzt auch Muster: Streifen, Querbänder, Karo.
+- **Neue Kopfbedeckungen:** Henkerskapuze (nur Augenlöcher), tiefe Kutte, Turban/Kopftuch (Gesicht frei), Kapuze mit Widderhörnern, Pestmaske mit Schnabel. Alle zählen als Kapuze: Die Sonne brennt Vampire nur halb so stark. Das gilt auch für Burnus-Kopftuch und Knochenumhang-Kutte.
+- **Neue Stücke:** Teermantel, Rabenmantel, Wüstenburnus, Doppelmantel, Kettenumhang der Kette, Kapitänsrock, Knochenumhang, Bärenfell mit Kopf, Mantel des Rabenfürsten (legendär), Ordenskutte, Tiefe Kuttenkapuze, Henkerskapuze, Wüstenhaube, Widderkapuze, Pestkapuze mit Schnabel. Manche tragen feste Werte (Härte, Lebenskraft, Zähigkeit, Leichtfuß); der Tooltip zeigt sie.
+- **NPCs:** Die Form folgt Region und Stand. Die Kette trägt Kettenumhänge, Aurelion Burnus und Turban, Valens Wachen blaue Wappenmäntel, Tote und Kultisten Knochen, Kutten und Hörner, das Seevolk Öljacken und Kapitänsröcke, Bettler und Flüchtlinge Fetzen. Räuber tragen manchmal Bärenfell oder Rabenfedern.
 
-## Schwere Verbrechen (Version 24)
-- Ab 2000 Gold Kopfgeld kauft man sich bei der Festnahme nicht mehr frei. Die Wache zieht ein Bußgeld ein (10 % des Kopfgelds, mindestens 200), so weit dein Gold reicht, und du kommst in den Kerker.
-- Die Haft wächst mit dem Kopfgeld: 2000 Gold 20–40 Stunden, 20 000 Gold 40–80, 200 000 Gold 60–120 Stunden. Ganz bezahlt sitzt du die untere Zahl, ohne Gold die obere. Eine Spielstunde dauert eine Minute: 200 000 Gold heißt 1–2 Stunden Echtzeit.
-- Keine Kaution. Bestechen kostet 400 Gold und klappt nur in 20 % der Fälle. Schloss knacken und Ausbruch gehen wie immer.
-- Unter 2000 Gold bleibt alles wie bisher (zahlen oder 10–20 Stunden).
-- Die Haftanzeige sagt jetzt richtig „Stunden“ (vorher stand dort fälschlich „Minuten“).
-- Debug: „Kopfgeld Valen = 200 000“, „Ins Gefängnis (200 000, Bußgeld voll bezahlt / ohne Gold)“.
+## Geheimer Ort: Die Kammer der Namen
+- Unter dem Seelenhügel im Totenland liegt eine niedrige Tür aus Knochen. Trägst du eine Seelenphiole, summt sie in der Nähe.
+- Drinnen stehen die Namen aller Toten an den Wänden, auch deine Ahnen und, halb geschrieben, du selbst. Schatten bewachen die Kammer, dazu gibt es einen Hort.
+- **Wahl:**
+  - Die Ahnen ruhen lassen: Willenskraft +1 je Ahn, höchstens +3; Tote −5.
+  - Die Seelen ernten: 3 Seelenphiolen, Tote +10. Morvaths Heerzug kommt dadurch früher; die Wahl warnt dich davor.
+  - Nichts anrühren.
+- Debug: „Geheime Orte: zur Kammer der Namen“.
 
-## Hof ohne Wiederkehr und Zerfall der Hauptstadt (Version 24)
-- Erschlagene Hofleute (Kanzler Aldhelm, Marschall Brandt, Ysmay, Grimm, die drei Adligen, Hagen, Hofmar) bleiben tot, auch nach dem Laden.
-- Kanzler Aldhelm war der Blutfürst. Stirbt er als Kanzler, endet der Kult. Die Blutkult-Sense gibt es dann nicht, sie liegt nur beim Blutfürsten in der Krypta.
-- **Reichsverweser** nach König Varon: Kanzler Aldhelm, sonst Marschall Brandt, sonst der erste lebende Adlige. Ist keiner mehr da, ist die Krone kopflos.
-- **Thronwirren:** In den 7 Tagen nach dem Königsmord schickt niemand Ersatz für die Garde von Varonheim (ist die Krone kopflos, nie mehr). Fällt die Garde, wird die Hauptstadt schutzlos, nach der Frist gesetzlos und dann übernommen: von einem Totenheer in der Nähe oder einer Bande. Wer den Bandenführer erschlägt, befreit die Stadt.
-- Lebt der König, bleibt es beim alten Entscheid: Varonheim wird nie von einer Bande übernommen, der Fall kommt nur über Morvath.
-- Kein Stadtfest in einer schutzlosen Stadt und in Varonheim in den 7 Tagen nach dem Königsmord.
-- Debug: „Varonheim: König, Kanzler und Garde töten“, „Varonheim: Hof wiederbeleben“.
+## Dialoge: Story-Fenster, Emotes, Gesprächshaltung (Visuell D)
+- **Gesprächspartner bleibt stehen** und dreht sich zum Helden, solange das Fenster offen ist. Wer mehr als 170 px weggeht, beendet das Gespräch wie bisher.
+- **Text läuft ein.** Ein Klick auf den Text zeigt ihn sofort ganz. Bei „Reduzierte Bewegung“ steht der Text sofort da, ohne Einblenden.
+- **Antwortzeichen** vor jeder Wahl zeigen die Art: ↩ gehen, ⚔ Kampf, ◉ Gold, ✦ Auftrag, ⚖ Handel, ? Frage. Die Reihenfolge der Antworten ändert sich nicht.
+- **Story-Fenster:** Auftragsangebot und -abgabe bei benannten Figuren, Bosse im Gespräch, Hoher Rat, Hof und Heiliges Gericht. Die Leiste wird breiter, das Bild größer, und unter dem Namen stehen Beruf und Fraktion. Die Kamera rückt leicht heran und zielt zwischen dich und die Figur. Bei reduzierter Bewegung gibt es keinen Zoom.
+- **Stimmung am Bildrahmen:** grün = mag dich (Beziehung ab 30), blau = kühl (ab −20 oder Stigma-Abweisung), rot = wütend oder feindlich.
+- **Emotes** (kleine Zeichen über dem Kopf): ! bei einem Auftragsangebot, Herz bei Abgabe oder bei steigender Beziehung im Gespräch, rote Zornzeichen bei sinkender Beziehung, Tropfen bei Angst. Emotes erscheinen nur im Gespräch und bei Reaktionen.
+- **Kein Fenster bei Wut oder Angst:** Wütende, fliehende oder bedrohte Figuren antworten nur mit Sprechblase, Abwehrgeste und Emote.
+- Debug-Gruppe „Darstellung & Regie“ → „Dialoge“: Story-Fenster, alle Emotes, verängstigte Figur ansprechen.
 
-## Menüs (Version 24)
-- Die Reiter oben in den Fenstern (Werte, Talente, Zauber, Effekte; Fraktionen, Chronik) haben wieder Platz und brechen nicht mehr um.
+## Kampf-Feedback ohne Text (Visueller Umbau, Prio 4)
+- **Farbcode der Ansagen:** Rot = nicht blockbar (schwere Angriffe, Flächen) — ausweichen. Bernstein = normaler Hieb, Schuss oder Sturmlauf — Deckung, Parade und Schild wirken.
+- **Schadenszahlen** sind Pixelziffern in der Farbe der Schadensart: hell Hieb, orange Feuer, blau Frost, violett Magie/Schatten, gold-weiß Heilig, grün Gift, dunkelrot Blutung; Krit gold, groß, mit Rand. Brand-, Gift- und Blutungsschaden zählen auf einer Zahl hoch.
+- **Einstellung** (Optionen → Schadenszahlen): Aus / Reduziert (nur dein eigener Schaden und Krits) / Voll (Standard).
+- **Zeichen statt Wörter:** Schild = Block, gekreuzte Klingen = Parade, Pfeil mit Windlinien = Ausgewichen, Klinge = Abgewehrt, Riss = Unterbrochen, Tropfen = erschöpft (kommt jetzt immer, wenn die Ausdauer für einen Hieb fehlt), durchgestrichener Kreis = wirkt nicht (körperlos, feuerfest, daneben), Stern = Wucht/Riposte. Ereignisnamen bleiben Text.
+- **Lebensbalken** gibt es beim gewählten Ziel (Rechtsklick auf eine Figur, Esc hebt auf) und ohne Auswahl 5 s lang beim zuletzt getroffenen Gegner, mit Statuszeichen daneben. Sonst zeigt der Körper den Zustand: Blut ab 50 %/25 % Leben (jetzt auch bei Tieren), ausgefallene Glieder.
+- **Status am Körper:** Brennende Figuren tragen aufsteigende Flammen, Vergiftete grüne Bläschen, Frost legt einen Eisrand um die Füße (1–3 Stufen, eingefroren = voller Kranz), Schock sprüht Funken.
+- **Rüstung:** Set-Handschuhe und -Beinschienen (Thron, Blutkette, Totenkrone, Hochritter) tragen die Farbe ihres Sets mit Kniebuckeln; Kanzlerrobe, Seemantel, Leinenkittel, Krone des Toten Königs, Kapitänshut, Eisenschuhe und Lederstiefel haben ein eigenes Aussehen.
+- Debug: „Kampf-Feedback: …“ (Zahlen und Zeichen vorführen, Einstellung umschalten, schwerer Angriff jetzt, Ziel wählen, Status am nächsten Gegner).
+
+## Gegenstände, Gepäck und Handel ohne Text (Visueller Umbau, Prio 5–7)
+- **Bildkarte:** Überfahren (am Handy: lange drücken) zeigt eine Karte mit großem Bild, Name in Seltenheitsfarbe und Kennzahlen als Zeichen: gekreuzte Klingen = Schaden, Wappen = Rüstung, Sanduhr = Angriffszeit, Stiefel = Ausdauer je Hieb, Herz = Heilung, Hammer = Zustand. ▲/▼ vergleicht mit dem, was du am selben Platz trägst. „Mehr“ klappt Zweck, Herkunft und alle Werte auf.
+- **Werte-Vorschau:** Unter den Kennzahlen steht „Rüstung 23 → 27“ und „Schaden 16 → 18“ — gerechnet mit denselben Formeln wie im Kampf (Zustand, Talente, Set, Stufe). Bei Ladenware steht eine Spanne, weil gekaufte Ausrüstung mit 55–100 % Zustand kommt. Bricht ein Teil ein getragenes Set, steht es rot da. Affixe zeigen mit einem Balken, wo ihr Wert in der möglichen Spanne liegt; Sets zeigen alle Teile, getragene hell.
+- **Seltenheit an Form, Marke und Farbe:** Ungewöhnlich = Eckwinkel und kleines Quadrat, Selten = Doppellinie und Raute, Episch = Nieten und Raute mit Kern, Legendär = Zierrahmen, Stern und Glanz, Mythisch = Splitter und Glanz. So bleibt es auch ohne Farbsehen lesbar.
+- **Beute am Boden:** Jedes Teil liegt auf einer Raute in Seltenheitsfarbe. Ab Selten steht ein Lichtstrahl darüber, nachts und in Gewölben heller. Beute von Gegnern fällt im Bogen aus dem Körper und landet mit Staub; der Klang verrät die Stufe (dumpf, ab Selten ein heller Ton, Legendär/Mythisch dazu eine Glocke). Aufheben bleibt wie bisher (E).
+- **Gepäck:** Papierpuppe mit großer Figur, die trägt, was du anlegst (Klick auf die Figur dreht sie). Verweilst du auf einem Ausrüstungsteil, trägt die Figur es probeweise. Klick = ansehen, auch auf Ausrüstungsplätzen und im Lager (vorher legte ein Klick sofort ab oder nahm heraus). Doppelklick legt an bzw. ab, Ziehen geht auf die Figur, ins Lager und zurück in die Tasche. Antippen: Teil wählen, dann den grün leuchtenden Platz tippen; rot heißt gesperrt (Ketten, ausgefallener Arm).
+- **Filter und Ordnen:** Zeichen oben filtern nach Waffen, Rüstung, Verbrauch, Handelswaren, Material und Auftragsstücken. „Ordnen“ (Fund, Art, Seltenheit, Wert) ändert nur die Anzeige, nicht die Reihenfolge im Gepäck.
+- **Rüstung aufgeschlüsselt:** Wappen und Zahl unter der Figur, darunter ein Balken: Teile, Verschleiß (rot gestreift, so viel kostet dich der Zustand), Härte, Set, Rest (Stufe, Talente, Narben, Segen). Ein Hammer erscheint, wenn ein Teil unter 50 % Zustand ist.
+- **„NEU“ und Sperre:** Neu gefundene oder gekaufte Teile tragen „NEU“, bis du sie ansiehst. Ein Schloss (Knopf „Sperren“) schützt ein Teil vor Verkauf, Mehrfachverkauf und Ablegen.
+- **Rückfrage ab Selten:** Wer ein Teil ab Selten verkauft, einzeln oder im Mehrfachverkauf, muss es erst bestätigen („Verkaufen“ oder „Behalten“). Einen Rückkauf gibt es nicht. Alte Spielstände: alles gilt als gesehen und ungesperrt.
+- **Handel als Seitenfenster:** Der Laden dockt rechts an, die Welt bleibt sichtbar; Held und Händler rücken ins Bild. Oben Porträt, Ladenart als Zeichen, Schließzeit und dein Gold.
+- **Ware:** Raster mit Preisschild; rote Preise kannst du dir nicht leisten. Stadtwaren stehen auf einer Kreidetafel mit Bestand, Preis und ▲/▼ gegen den zuletzt gesehenen Preis in einer anderen Stadt (Tooltip: alle bekannten Städte mit Alter der Angabe).
+- **Kaufen und Verkaufen:** Klick = ansehen; Knopf, Doppelklick oder Ziehen (Ware in dein Gepäck, eigenes Teil auf die Ware) handelt. Bei Stapeln und Stadtwaren wählt ein Schieber die Menge; vorher stehen Preis je Stück und Gesamtpreis — jedes Stück zieht wie bisher Ware aus dem Stadtlager, darum kann der Preis je Stück steigen. „Mehrere wählen“ verkauft markierte Teile zusammen, zum selben Preis je Stück wie einzeln. Einen Rückkauf gibt es nicht.
+- **Preise sind ehrlich:** Der angezeigte Verkaufspreis ist der gezahlte, auch für seltene Teile (vorher zeigte der Handel bei Seltenem den Preis der Grundware).
+- **Gold und Händler:** Der Goldzähler rollt mit Münzklang und zeigt den Betrag; bei zu wenig Gold blinkt er rot. Der Händler antwortet mit einer Sprechblase und Geste: Schmied, Schenke, Heilkunde, Feinwerk (Aurelion), Hehler und Markt haben je eigene Sprüche; bei Geldmangel zuckt er mit den Schultern, bei Seltenem zeigt er darauf.
+- **Kontor:** „Waren kaufen und verkaufen“ im Handelskontor gilt nur für diesen Besuch (vorher verkaufte die Figur danach dauerhaft Stadtwaren).
+- Debug: Gruppe „Spieler & Ausrüstung“ → Karte „Gegenstände & Handel“ → „Items: …“ (Beute regnen lassen, Gepäck füllen, Marken löschen) und „Handel: …“ (nächsten Händler öffnen, Händlerspruch, +500 Gold).
+
+## Kampfanimation, Scheibe 1 (COMBAT_ANIM, Entscheidungen 02.10.2026)
+- **Schaden im sichtbaren Einschlag:** Jeder Nahkampfhieb besteht aus Ausholen → Schlag → Einschlag → Nachschwung → Erholung. Schaden, Hit-Stop, Wackeln, Trefferstern und Klang fallen genau in dem Bild, in dem die Klinge das Ziel erreicht — nie schon im Ausholen. Der Takt der Waffe (Angriffstempo) bleibt gleich; schwere Waffen treffen dadurch etwas später als vorher (Kriegshammer 575 statt 483 ms, Zweihänder 490 statt 412 ms, Langschwert 250 statt 235 ms). Gegner treffen wie bisher; ihr Bild folgt ihrem Treffer.
+- **Kombo-Kette:** Schlag 1 (Vorhand) → Schlag 2 (Rückhand, beginnt aus der Endlage von Schlag 1) → Wuchtschlag (Überkopf). Der Wuchtschlag dauert jetzt wirklich 15 % länger (+30 % Schaden, Taumeln wie bisher).
+- **Erholung abbrechen:** Ab Einschlag + 40 % der Erholung bricht der nächste Kombo-Schlag (im Stand, Schlag 1 und 2) die Erholung ab — die Kette wird flüssiger und schneller. Der Wuchtschlag selbst wird immer ganz ausgeführt. Ausweichen bricht wie bisher jederzeit ab.
+- **Ausfallschritt gleitet:** Der Schritt nach vorn verteilt sich über die Schlagphase (gleiche Strecke wie vorher, fertig im Einschlag) statt im Trefferbild zu springen.
+- **Hiebvarianten ohne Zufall:** Die Bewegung folgt dem Kombo-Schritt; Gegner und NPCs wechseln Vorhand, Rückhand, Überkopf der Reihe nach (im Koop sehen alle dasselbe).
+- **Langschwert-Profil:** eigene Bewegungsformen (Vorhand, Rückhand, Überkopf, Wirbel, Doppelwirbel). Alle übrigen Nahkampfwaffen behalten ihre Kurven, treffen aber ebenfalls im Einschlag (Scheibe 2: Zweihänder, Dolch, Speer, Hammer).
+- **Combat Test Room (nur Debug):** eigene Testkarte mit Leihwaffe (Langschwert, Zweihänder, Dolch, Speer, Kriegshammer), Übungspuppe, zurückschlagender Puppe, Gruppe, Zeitlupe. Dort ist das Pack wählbar: **A Grounded** (Standard, wenig Effekte, Körper und Gewicht), **B Heroic** (größere Bewegung, Sichelbogen, Wirbel-Finisher mit Ring, Hit-Stop ×1,4), **C Endgame** (sehr schnelle Ausholbewegung, Vorstoß mit Nachbildern, Doppelwirbel-Finisher mit Druckwelle und Kamerastoß, Hit-Stop ×1,8). Packs ändern nur Optik und Verteilung im gleichen Takt; der Abbruchpunkt der Erholung ist in allen Packs gleich. Im Test Room wird nie gespeichert; beim Verlassen sind Held, Waffe, Fertigkeiten, Ort und Welt wie vorher, das Pack steht wieder auf A. Gegner und NPCs zeigen immer Pack A. Koop: Trefferzeitpunkte nach dem Pack des Hosts, Kombo-Schritt wird übertragen.
+- **Hinweis im Spiel:** Log beim ersten Wuchtschlag (Abbrechen erklärt), Log beim Betreten des Test Rooms.
+- **Debug:** Abschnitt „Kampfanimation (Combat Test Room)“: „Kampfanimation: Test Room betreten/verlassen“, „… Waffe wechseln“, „… Pack setzen“, „… Zeitplan anzeigen“, „… Übungspuppe“, „… Puppe schlägt zurück“, „… Gruppe“, „… Puppen entfernen“, „… Zeitlupe“, „… Schwungbilder vorbacken“. Proben „Kampfanimation Scheibe 1: …“ (Schaden im Einschlag, Kombo-Kette, Test Room).

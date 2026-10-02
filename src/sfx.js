@@ -26,6 +26,7 @@ function tone(t, dur, type, f0, f1, peak) {
   const g = ac.createGain(); env(g, t, peak, dur);
   o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
 }
+const clampW = w => Math.max(0, Math.min(1, +w || 0));
 
 // weight: 0 (Dolch) … 1 (Zweihänder). vol: 0..1 (Entfernung)
 // mat (Treffer): 'blade' schneidet (heller Zisch), 'blunt' dröhnt (tiefer Schlag + Knacken), 'pierce' sticht (kurz, trocken);
@@ -68,6 +69,11 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
       case 'heartbeat': tone(t, 0.18, 'sine', 55, 40, 0.55 * v); tone(t + 0.16, 0.2, 'sine', 50, 36, 0.45 * v); break;
       case 'crack':  noise(t, 0.12, 'bandpass', 2600, 1400, 0.35 * v, 4); tone(t, 0.1, 'triangle', 420, 160, 0.12 * v); noise(t + 0.06, 0.18, 'lowpass', 900, 150, 0.2 * v); break;
       case 'shout':  noise(t, 0.22, 'bandpass', 700, 400, 0.3 * v, 1.2); tone(t, 0.2, 'sawtooth', 190, 150, 0.05 * v); break;
+      /* Visueller Umbau P5/P7 (IMPL-ITEMS): Münzen (weight 0..1 = Betrag) und Beute-Landung (weight = Seltenheitsstufe 0..5) */
+      case 'coin': { const n = 1 + Math.round(clampW(weight) * 3); for (let i = 0; i < n; i++) { tone(t + i * 0.055, 0.09, 'triangle', 2350 + i * 140, 2200, 0.05 * v); tone(t + i * 0.055, 0.12, 'sine', 3520 + i * 90, 3400, 0.025 * v); } noise(t, 0.05, 'highpass', 5200, 6000, 0.05 * v); break; }
+      case 'loot': { const lv = Math.round(weight) || 0; noise(t, 0.07, 'lowpass', 700, 180, 0.22 * v, 0.8); tone(t, 0.08, 'sine', 120, 70, 0.18 * v);
+        if (lv >= 2) { const f = 520 * Math.pow(1.26, lv - 2); tone(t + 0.04, 0.5 + lv * 0.15, 'sine', f, f, 0.05 * v); tone(t + 0.1, 0.45 + lv * 0.15, 'sine', f * 1.5, f * 1.5, 0.03 * v); }
+        if (lv >= 4) tone(t + 0.18, 1.4, 'sine', 196, 194, 0.08 * v); break; }   /* Legendär/Mythisch: tiefe Glocke dazu */
     }
   } catch (e) { /* Audio optional (z. B. ohne Nutzergeste) */ }
 }

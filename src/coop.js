@@ -10,7 +10,7 @@ let peer = null, conn = null, muteLog = false;   /* muteLog: Chatzeilen gehen al
 const VER = 24;                                 // muss zu ?v= in index.html passen; Host und Gast müssen gleich sein
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
 const NEAR = 1400;                              // px um die Gastfigur, die der Host schickt
-const DYN = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'maxHp', 'downed', 'alive', 'swing', 'swingDur', 'act', 'stagger', 'cover', 'telegraph', 'mounted', 'fleeing', 'angry', 'aiState', 'hDir', 'come'];
+const DYN = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'maxHp', 'downed', 'alive', 'swing', 'swingDur', 'atkS', 'atkW', 'atkH', 'atkPk', 'atkStep', 'act', 'stagger', 'cover', 'telegraph', 'mounted', 'fleeing', 'angry', 'aiState', 'hDir', 'come'];
 const SENT = new Set(['enemy', 'npc', 'player', 'caravan', 'mount', 'item', 'grave']);   /* Props entstehen beim Gast aus derselben Generierung */
 const HEAVY = new Set(['inv', 'memories', 'plan', 'path', 'schedule', 'dmgBy', 'rel', 'talk', 'lastInput', 'hitIds', 'cooldowns', 'tree', 'spells', 'spellUse', 'hotbar']);
 const rnd6 = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
