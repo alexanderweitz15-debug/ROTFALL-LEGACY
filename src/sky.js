@@ -53,7 +53,7 @@ function nodesOf(v) { const L = new Set(skyList(v)); return Object.keys(SKILL_TR
 export function skyUI(body, A, { refresh } = {}) {
   css(); if (V) stop();
   body.className = 'sky-body';
-  const mem = (partyMembers?.() || []).filter(m => !m.coopPilot && !m.coopHero && m.alive);
+  const mem = S.coop?.role === 'guest' ? [] : (partyMembers?.() || []).filter(m => !m.coopPilot && !m.coopHero && m.alive);   /* Gefährten verteilt der Host */
   const v = V = { A, body, who: S.player, comp: false, focus: null, hover: null, picked: null, t0: performance.now(), sparks: [], rings: [], reveal: new Map(),
     cam: { x: 0, y: 150, z: 0.2, tx: 0, ty: 150, tz: 0.2 }, W: 0, H: 0, DPR: 1, alive: true, refresh };
   const prev = S.flags?.skyWho && mem.find(m => m.id === S.flags.skyWho);
@@ -113,7 +113,7 @@ function back(v) { v.focus = null; v.picked = null; hideCard(v); fit(v, false); 
 let seed = 7; const prng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const BG = Array.from({ length: 1100 }, () => ({ x: (prng() - 0.5) * 7000, y: (prng() - 0.5) * 5200, r: prng() * 1.3 + 0.2, a: prng() * 0.6 + 0.15, p: prng() * 6 }));
 
-function draw(v, now) {
+function draw(v, now, once = false) {
   if (!v.alive || !v.cv.isConnected) { if (V === v) stop(); return; }
   const cx = v.cx, t = (now - v.t0) / 1000, motion = S.settings?.motion !== false, cam = v.cam;
   cam.x += (cam.tx - cam.x) * 0.14; cam.y += (cam.ty - cam.y) * 0.14; cam.z += (cam.tz - cam.z) * 0.14;
@@ -161,7 +161,7 @@ function draw(v, now) {
     const p = toS(v, r.x, r.y); cx.strokeStyle = `rgba(255,220,140,${1 - r.u})`; cx.lineWidth = 2; cx.beginPath(); cx.arc(p.x, p.y, 8 + r.u * 46 * Math.max(0.6, cam.z), 0, 7); cx.stroke();
     for (const d of r.dots) { const q = r.u * d.v * Math.max(0.6, cam.z); cx.fillStyle = `rgba(255,230,160,${1 - r.u})`; cx.fillRect(p.x + Math.cos(d.a) * q, p.y + Math.sin(d.a) * q, 2, 2); } }
   for (const [k, x] of v.reveal) { if (x >= 1.2) v.reveal.delete(k); else v.reveal.set(k, x + 0.03); }
-  requestAnimationFrame(t2 => draw(v, t2));
+  if (!once) requestAnimationFrame(t2 => draw(v, t2));
 }
 function star(cx, x, y, r, t, col) {
   cx.fillStyle = col; cx.beginPath();
@@ -232,5 +232,8 @@ function learn(v, k) {
 // Neu erschienene Sterne einer Klasse blenden ein (nach der Aufnahme)
 export function skyReveal(cls) { const v = V; if (!v) return; let i = 0; for (const [k, n] of Object.entries(SKILL_TREE)) if (n.sky === cls) v.reveal.set(k, -0.2 * i++); }
 // Probe: Zahlen der laufenden Ansicht (für den Selbsttest)
+// Ein Bild sofort zeichnen (Kamera am Ziel) — für Bilder und Proben, auch wenn der Tab im Hintergrund steht
+export function skyFrame() { const v = V; if (!v) return false; Object.assign(v.cam, { x: v.cam.tx, y: v.cam.ty, z: v.cam.tz }); draw(v, performance.now(), true); return true; }
+export function skyBack() { if (V) back(V); }
 export const skyDebug = () => V ? { focus: V.focus, z: V.cam.tz, comp: V.comp, skies: skyList(V).length, nodes: nodesOf(V).length } : null;
 export { skyList as _skyList };

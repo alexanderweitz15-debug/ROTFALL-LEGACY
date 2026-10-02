@@ -13873,11 +13873,24 @@ const RITE = {
   torturer: { col: '#6a2a2a', say: 'Jeder Wille bricht. Du weißt jetzt, wo.', fx: 'blood', sfx: 'chains' },
   chainbard: { col: '#a08a5a', say: 'Schlag die Trommel. Sie marschieren.', fx: 'spark', sfx: 'drum' },
 };
+/* Klassen und Talente, Scheibe 10: Titelklassen bekommen dieselbe Szene beim Erwerb und bei der Grad-Weihe (Entscheidung 10).
+   Ist der Meister in der Nähe, spricht er; sonst gehört die Szene dem Helden allein. */
+const TITLE_RITE = { necromancer: 'Die Stille Schar nimmt dich auf. Ruf, und sie stehen auf.', warlock: 'Der Obelisk hat dich gehört. Er vergisst nie.',
+  druid: 'Der Hain kennt deinen Namen. Geh barfuß, wenn du kannst.', monk: 'Stille. Dann der Schlag. So lebt die Stille Hand.',
+  goblinlord: 'Einer von uns! Die Gruben folgen dir, Häuptling!', vampire: 'Trink. Die Nacht gehört jetzt dir — und du ihr.' };
+function titleRite(key, grade = 0, then = null) {
+  const T = TITLE_CLASSES[key], p = S.player; if (!T) { then?.(); return false; }
+  const m = (S.ents[p.map] || []).filter(e => e.alive && e !== p && (e.key === T.mentor || (e.kind === 'npc' && NAMED_NPC.has(e.key))) && dist(e, p) < 420).sort((a, b) => (a.key === T.mentor ? -1 : 0) - (b.key === T.mentor ? -1 : 0) || dist(a, p) - dist(b, p))[0] || null;
+  const say = grade ? `Steh auf als ${T.gradeNames[grade - 1]}.` : TITLE_RITE[key] || 'Steh auf.';
+  return classRite(m, key, { title: grade ? `${T.name} · Grad ${grade}` : T.name, sub: grade ? T.gradeNames[grade - 1] : T.desc, rite: { col: T.glow, say, fx: 'magic', sfx: 'bell' }, then });
+}
 function classRite(npc, cls, o = {}) {
+  if (o.title && !o.sky) o.sky = SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : '';
   const p = S.player, R0 = RITE[cls] || o.rite || { col: '#e8d6a8', say: 'Steh auf.', fx: 'spark', sfx: 'bell' }, C = o.title ? { name: o.title, desc: o.sub || '' } : CLASSES[cls];
   const sky = o.sky || (SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : ''), hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
-  const after = () => { if (hint) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } };
-  if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || !npc || npc.map !== p.map || S.cine) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
+  const after = () => { if (hint) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } o.then?.(); };
+  if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || S.cine || (npc && npc.map !== p.map)) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
+  if (!npc) npc = p;                                                   /* Titel ohne Meister in der Nähe: die Szene gehört dem Helden allein */
   const ab = ABILITIES[(CLASSES[cls]?.abilities || [])[0]], seen = S.ents[p.map].filter(c => c.kind === 'npc' && c.alive && !c.downed && c !== npc && !S.party.includes(c.id) && dist(c, p) < 240).slice(0, 6);
   cinematic([
     { dur: 1800, zoom: 1.3, focus: npc.id, beats: [{ t: 0, sfx: R0.sfx, duck: 0.5, ms: 300 }, { t: 0.05, gesture: 'zeigen', who: npc, toward: p, ms: 1500 }, { t: 0.1, say: `„${R0.say}“`, who: npc, ms: 3200 }] },
@@ -14184,6 +14197,7 @@ function mercDay() {                                                // Löhne; w
 }
 function recruit(npc) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
+  if (!S.flags.compSkyHint && !npc.coopHero && !S._quiet) setTimeout(() => { if (S.party.includes(npc.id) && !S.flags.compSkyHint) { S.flags.compSkyHint = 1; log('Gefährten haben ein eigenes kleines Sternbild: Talente (T), oben „Für:“ den Gefährten wählen. Ein Punkt zum Start, dann einer alle fünf Stufen — nur Werte, keine Fähigkeiten.', 'party'); } }, 1500);   /* Scheibe 10 */
   if (S.party.length >= p.partyCap) return UI.dialogue(npc, '„Deine Gruppe ist groß genug. Zu viele Münder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   if (npc.retainer) { S.party.push(npc.id); npc.morale = Math.max(npc.morale || 50, 55); log(`${npc.name} kommt wieder mit.`, 'party'); UI.dialogue(npc, '„Endlich. Ich hab gewartet.“', [{ text: '[Weiter]', fn: () => UI.closeDialogue() }]); return UI.refreshHUD(); }
   if (rel < npc.recruitRel)
@@ -14626,7 +14640,8 @@ function gradeTalk(npc) {
     chronicle(`${p.name} wird ${T.gradeNames[r.g]}`, 'class', `${npc.name} weiht zum Grad ${r.g + 1} der ${T.name}.`);
     UI.toast(`${T.name.toUpperCase()} · GRAD ${r.g + 1}`, 4200); fx(p.x, p.y - 14, 'heal', 16);
     log(`Neu: ${neu.map(k => ABILITIES[k].name).join(', ')}.`, 'party'); if (p.titleClass === key) syncHotbar();
-    UI.dialogue(npc, GRADE_LORE[key][r.g - 1], [{ text: '[Gehen]', fn: () => { UI.closeDialogue(); save(); } }]); } };
+    UI.closeDialogue(); const lore = () => UI.dialogue(npc, GRADE_LORE[key][r.g - 1], [{ text: '[Gehen]', fn: () => { UI.closeDialogue(); save(); } }]);
+    titleRite(key, r.g + 1, lore); } };                                 /* Scheibe 10: Szene bei der Grad-Weihe, danach die Worte des Meisters */
 }
 const treeAbilities = c => Object.keys(c.tree || {}).map(k => SKILL_TREE[k]?.grants).filter(Boolean);   // aktive Talentknoten
 const titleFull = (c = S.player) => (c?.titleClasses || []).length >= MAX_TITLES;
@@ -14647,6 +14662,7 @@ function unlockTitle(key, where) {
   UI.toast(`TITELKLASSE: ${T.name.toUpperCase()}`, 4600);
   log(T.cost.desc, 'party');
   setTitleClass(key, true);
+  titleRite(key);                                                      /* Scheibe 10: Szene beim Erwerb */
   return true;
 }
 function forsakeTitle(key) {
@@ -17085,6 +17101,9 @@ function debugSections() {
       'Sterne: Himmel öffnen (T)': () => UI.openModal('skills'),
       'Sterne: alle Klassen bekannt (alle Sternbilder offen)': () => { const c = P(); for (const k of Object.keys(CLASSES)) if (!c.knownClasses.includes(k)) c.knownClasses.push(k); UI.toast('Alle Klassen bekannt (nur Debug)'); },
       'Sterne: +10 Talentpunkte': () => { P().skillPoints = (P().skillPoints || 0) + 10; UI.refreshHUD(); },
+      'Sterne: Gefährten-Sternbild (nächster Gefährte, +2 Stufen)': () => { const m = partyMembers().find(x => !x.coopHero); if (!m) return UI.toast('Kein Gefährte in der Gruppe.'); m.level += 2; (S.flags ||= {}).skyWho = m.id; UI.openModal('skills'); },
+      ...Object.fromEntries(['vampire', 'goblinlord', 'necromancer'].map(k => [`Sterne: Titelszene ansehen (${TITLE_CLASSES[k].name}, ohne Folgen)`, () => { const q0 = S._quiet; S._quiet = false; try { titleRite(k, 0); } finally { S._quiet = q0; } }])),
+      'Sterne: Grad-Weihe-Szene ansehen (Vampir Grad 2, ohne Folgen)': () => { const q0 = S._quiet; S._quiet = false; try { titleRite('vampire', 2, () => log('(Danach spräche der Meister.)', 'party')); } finally { S._quiet = q0; } },
       'Sterne: Wirkung der Fähigkeitssterne (aktive Klasse)': () => { const c = P(), L = (c.abilities || []).map(k => { const M = abMod(c, k); return `${ABILITIES[k].name}: Schaden ${M.mult >= 0 ? '+' : ''}${Math.round(M.mult * 100)} %, Abklingzeit ${Math.round(M.cd * 100)} %, Kosten ${Math.round(M.cost * 100)} %, Dauer +${Math.round(M.dur * 100)} %`; }); log(`Fähigkeitssterne (${CLASSES[c.currentClass]?.name}): ${L.join(' · ') || '—'}`, 'party'); UI.toast(L[0] || 'Keine Fähigkeit', 5000); },
       'Sterne: Machtgrenze messen (aktive Klasse, St. 15, Protokoll)': () => { const c = P(), cls = c.currentClass, w = c.equip.weapon?.key || 'longsword', run = tree => [1, 2, 3].reduce((a, seed) => a + simFight('bear', { level: 15, weapon: w, elvl: 15, ehp: 4000, eopt: { dmgMul: 0.01, provoked: true }, maxT: 30000, seed, cls, tree, useAb: true }).dealt / 30, 0) / 3;
         const b = run(null), k = run(['combat']), s = run([cls]); log(`Machtgrenze ${CLASSES[cls].name} (St. 15, ${w}): ohne Sterne ${b.toFixed(1)}/s, voller Kampfzweig +${((k / b - 1) * 100).toFixed(1)} %, volles Sternbild +${((s / b - 1) * 100).toFixed(1)} %.`, 'world'); },
@@ -19423,6 +19442,77 @@ export function selftest() {
       if (!(data && steal && hack && stab && con)) console.warn('Scheibe 5', { data, steal, hack, stab, con });
       return data && steal && hack && stab && con;
     } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Sterne Scheibe 6: Lampe (Kleriker) und Auge (Dunkler Priester); Prüfung Kleriker (5 Heilkraut + 4 Tote, Heilprüfung beim Lehrer); Heiliges Heilen heilt mit Stern mehr', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const data = ['cleric', 'darkpriest'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('cleric').length === 2;
+      for (const k of clsTrialOf('cleric')) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_t6'; t.teaches = ['cleric']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_cleric1'); addItem(p, 'herb', 5); for (let i = 0; i < 4; i++) onKill(i % 2 ? 'zombie' : 'skeleton', { kind: 'enemy' }); const field = questComplete('kt_cleric1');
+      startQuest('kt_cleric2'); startClsTrial(t, 'kt_cleric2'); const pat = byId(S.trial?.patient); learnSpell(p, 'sp_heal', true); for (let i = 0; i < 4; i++) castSpell(p, 'sp_heal'); trialTick(); const heal = !!pat && questComplete('kt_cleric2');
+      const h = stage(); h.level = 40; h.attributes.endurance = 40; h.knownClasses = ['wanderer', 'cleric']; h.currentClass = 'cleric'; h.abilities = ['holy_heal']; recalc(h); h.mana = h.maxMana; const hurtBy = () => { B.fullHeal(h); h.body.torso.hp = 5; B.syncHp(h); };
+      hurtBy(); let v0 = h.hp; h.cooldowns = {}; useAbility('holy_heal'); const plain = h.hp - v0; h.tree = { kl_hands: 1 }; recalc(h); h.mana = h.maxMana; hurtBy(); v0 = h.hp; h.cooldowns = {}; useAbility('holy_heal'); const more = h.hp - v0;
+      const star = plain > 0 && more > plain * 1.1;
+      if (!(data && field && heal && star)) console.warn('Scheibe 6', { data, field, heal, star, plain, more });
+      return data && field && heal && star;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Sterne Scheibe 7: Flamme (Magier); Prüfung Magier (Grabsiegel, fünf Puppen nur mit Zaubern beim Lehrer); Feuerball-Stern macht das Geschoss stärker', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial;
+    try {
+      const data = SKILL_BRANCHES.mage?.cls === 'mage' && Object.values(SKILL_TREE).filter(n => n.branch === 'mage').length === 8 && clsTrialOf('mage').length === 2;
+      for (const k of clsTrialOf('mage')) delete S.quests[k];
+      const t = actor(330, 300); t.key = 'kt_probe_t7'; t.teaches = ['mage']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_mage1'); addItem(p, 'grave_seal', 1); const seal = questComplete('kt_mage1');
+      startQuest('kt_mage2'); startClsTrial(t, 'kt_mage2'); const d = S.ents.__a.filter(e => e.trial === 'aim'); hurt(d[0], 5, p, 'Schwert'); const blade = S.trial?.n === 0; for (const x of d) hurt(x, 5, p, 'Zauber', false, 'magic'); trialTick(); const aim = questComplete('kt_mage2');
+      const m = stage(); m.knownClasses = ['wanderer', 'mage']; m.currentClass = 'mage'; m.abilities = ['fireball']; recalc(m); const shot = () => { m.mana = m.maxMana; m.cooldowns = {}; const n0 = S.projectiles.length; useAbility('fireball'); return S.projectiles.slice(n0).find(x => x.owner === m.id)?.dmg || 0; };
+      const d0 = shot(); m.tree = { mg_heart: 1 }; recalc(m); const d1 = shot(); const star = d0 > 0 && Math.abs(d1 - d0 * 1.2) < 1e-6;
+      if (!(data && seal && blade && aim && star)) console.warn('Scheibe 7', { data, seal, blade, aim, star, d0, d1 });
+      return data && seal && blade && aim && star;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; }
+  }));
+  ok('Sterne Scheibe 8: Laute (Barde) und Trommel (Kettenbarde); Prüfung Barde (ein Schenkenspiel gewinnen; fünf Siege unter dem Kriegslied mit zwei Gefährten — ohne Lied oder Gefährten zählt es nicht); Kriegslied hält mit Stern länger', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial, g0 = S.gold;
+    try {
+      const data = ['bard', 'chainbard'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('bard').length === 2;
+      for (const k of clsTrialOf('bard')) delete S.quests[k];
+      const p = stage(); p.knownClasses = ['wanderer', 'bard']; p.currentClass = 'bard'; p.abilities = ['war_song', 'discord']; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_bard1'); const g = actor(330, 300); g.key = 'kt_probe_gamer'; S.gold = 500; let n = 0; while (!questComplete('kt_bard1') && n++ < 60) armWrestle(g, 10); UI.closeDialogue(); const tav = questComplete('kt_bard1');
+      startQuest('kt_bard2'); onKill('wolf', { kind: 'enemy' }); const noSong = (S.quests.kt_bard2.progress[0] || 0) === 0;
+      recalc(p); p.stamina = 100; p.cooldowns = {}; useAbility('war_song'); onKill('wolf', { kind: 'enemy' }); const alone = (S.quests.kt_bard2.progress[0] || 0) === 0;
+      const a = actor(320, 310), b = actor(310, 290); S.party = [a.id, b.id]; for (let i = 0; i < 5; i++) onKill('wolf', { kind: 'enemy' }); const song = questComplete('kt_bard2');
+      const l0 = p.status.find(s => s.key === 'song')?.left; p.tree = { ba_voice: 1 }; recalc(p); p.stamina = 100; p.cooldowns = {}; useAbility('war_song'); const l1 = p.status.find(s => s.key === 'song')?.left; const star = Math.abs(l1 - 12000 * 1.25) < 1 && l0 <= 12000;
+      if (!(data && tav && noSong && alone && song && star)) console.warn('Scheibe 8', { data, tav, noSong, alone, song, star, l0, l1 });
+      return data && tav && noSong && alone && song && star;
+    } finally { S.quests = Q0; S.trial = T0; S.gold = g0; }
+  }));
+  ok('Sterne Scheibe 9: Kessel (Alchemist); Prüfung Alchemist (8 Heilkraut + Seelenphiole, drei Heiltränke brauen — Fähigkeit oder Kessel); alle 18 Klassen haben ein Sternbild mit 8 Sternen (Todesritter: die alten 7)', sandbox(() => {
+    const Q0 = structuredClone(S.quests);
+    try {
+      const data = SKILL_BRANCHES.alchemist?.cls === 'alchemist' && clsTrialOf('alchemist').length === 2;
+      const all = Object.keys(CLASSES).filter(k => k !== 'wanderer').every(k => SKILL_BRANCHES[k]?.cls === k && SKIES[k] && Object.values(SKILL_TREE).filter(n => n.branch === k).length === (k === 'deathknight' ? 7 : 8));
+      const trials = ['warrior', 'archer', 'rogue', 'cleric', 'mage', 'bard', 'alchemist', 'knight', 'ranger', 'berserker', 'assassin'].every(k => clsTrialOf(k).length) && [...OWN_PATH].every(k => !clsTrialOf(k).length);
+      for (const k of clsTrialOf('alchemist')) delete S.quests[k];
+      const p = stage(); p.knownClasses = ['wanderer', 'alchemist']; p.currentClass = 'alchemist'; p.abilities = ['fire_flask', 'poison_coat', 'brew']; p.ktSteps = {}; p.clsPass = {};
+      startQuest('kt_alchemist1'); addItem(p, 'herb', 8); const half = !questComplete('kt_alchemist1'); addItem(p, 'soul_vial', 1); const kessel = questComplete('kt_alchemist1');
+      startQuest('kt_alchemist2'); p.inv = p.inv.filter(x => x.key !== 'herb'); addItem(p, 'herb', 9); for (let i = 0; i < 3; i++) { p.cooldowns = {}; useAbility('brew'); } const brewed = questComplete('kt_alchemist2');
+      if (!(data && all && trials && half && kessel && brewed)) console.warn('Scheibe 9', { data, all, trials, half, kessel, brewed });
+      return data && all && trials && half && kessel && brewed;
+    } finally { S.quests = Q0; }
+  }));
+  ok('Sterne Scheibe 10: Kelch (Vampir) und Grube (Grubenhäuptling) mit je 7 Sternen, wirken nur mit getragenem Titel; Szene bei Titel-Erwerb und Grad-Weihe; Gefährten-Sternbild (7 Sterne, 6 lernbar, nur Werte, Punkte 1 + Stufe/5), der Held kann es nicht lernen, der Erbe verliert es', sandbox(() => {
+    const data = ['vampire', 'goblinlord'].every(b => SKILL_BRANCHES[b]?.title === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 7 && Object.values(SKILL_TREE).filter(n => n.branch === b).every(n => !n.ab || n.ab.every(a => ABILITIES[a.k]?.title === b)));
+    const C = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === 'companion'), comp = C.length === 7 && C.filter(([, n]) => n.excl).length === 1 && C.every(([, n]) => !n.ab && !n.grants);
+    const p = stage(); p.titleClasses = ['goblinlord']; p.titleClass = null; p.tree = { gb_scrap: 1 }; const worn0 = abMod(p, 'scrap_bomb').mult; p.titleClass = 'goblinlord'; const worn = abMod(p, 'scrap_bomb').mult === 0.2 && worn0 === 0;
+    const hero = nodeState(p, 'g_tough') === 'sealed';
+    const m = actor(330, 300); m.level = 10; m.tree = {}; S.party = [m.id]; recalc(m); const hp0 = m.maxHp; learnCompNode(m.id, 'g_tough'); const learned = !!m.tree.g_tough && m.maxHp > hp0 && compPoints(m) === 2;
+    learnCompNode(m.id, 'g_steady'); learnCompNode(m.id, 'g_skin'); const none = compPoints(m) === 0; learnCompNode(m.id, 'k_g_guard'); const noPts = !m.tree.k_g_guard;
+    heirTalents(m); const heir = !Object.keys(m.tree).length;
+    const n = actor(340, 300); S._quiet = false; let rite = false, dur = 0, then = false; try { rite = classRite(n, 'vampire', { title: 'Vampir · Grad 2', sub: 'Kind der Nacht', rite: { col: '#c0303a', say: 'Steh auf.', fx: 'magic', sfx: 'bell' }, then: () => { then = true; } }); dur = S.cine ? S.cine.shots.reduce((a, s) => a + s.dur, 0) : 0; cineEnd(); } finally { S._quiet = true; }
+    const solo = (() => { S._quiet = false; try { const ok2 = classRite(null, 'monk', { title: 'Mönch', rite: { col: '#e6cf8a', say: 'Stille.', fx: 'magic', sfx: 'bell' } }); cineEnd(); return ok2; } finally { S._quiet = true; } })();
+    if (!(data && comp && worn && hero && learned && none && noPts && heir && rite && then && dur >= 5000 && solo)) console.warn('Scheibe 10', { data, comp, worn, hero, learned, none, noPts, heir, rite, then, dur, solo });
+    return data && comp && worn && hero && learned && none && noPts && heir && rite && then && dur >= 5000 && solo && !S.cine;
   }));
   ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (+1 je Klassenprüfung) für 50–70 % der Sterne, die eine typische Figur erreichen kann (Wanderer + Krieger + Ritter + ein Titel, BALANCE_GUIDE §7); darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;

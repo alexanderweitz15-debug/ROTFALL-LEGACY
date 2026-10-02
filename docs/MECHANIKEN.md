@@ -1286,3 +1286,19 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - **Verbessern:** Der Schmied hebt Waffe oder Rüstung um eine Gütestufe: Grob → Solide → Gut → Meisterlich. Gekaufte oder gefundene Stücke ohne Güte-Angabe gelten als „Solide“. Ab „Gut“ steigt die Seltenheit wie beim eigenen Schmieden (ungewöhnlich, dann selten), nie nach unten.
   - **Kosten fürs Verbessern:** halber Grundwert je Stufe, mindestens 20 Gold, dazu Eisen in Höhe der Stufe. „Meisterstück“ gelingt nur aus eigener Hand.
   - **Schmieden lassen:** Der Schmied fertigt ein Esse-Rezept aus deinem Material. Lohn: 30 % des Werts, mindestens 10 Gold. Er arbeitet mit Schmiedekunst 60, oder mit deiner, wenn sie höher ist. Deine Fertigkeit steigt dabei nicht.
+- **Schütze-Linie (Scheibe 4):** Der Falke (Schütze, Gezielter Schuss), Der Hirsch (Waldläufer, Ziel markieren), Das Netz (Kettenjäger, Fangnetz und Kettenhund).
+  - **Schützen-Prüfung:** 3 Wölfe erlegen und 3 Wolfsfelle mitbringen; dann „Zehn, zwanzig, dreißig Schritt“: fünf Puppen beim Lehrer — nur Treffer mit einer Fernwaffe zählen.
+  - **Waldläufer-Prüfung:** einen Bären erlegen; dann eine ganze Nacht draußen: 10 Stunden am Stück von 20 bis 6 Uhr in der Oberwelt, außerhalb von Siedlungen. Ein Dach, eine Stadt oder der Tagesanbruch vor dem Ende setzt zurück (Protokoll sagt es). Ein Lagerfeuer ist erlaubt.
+- **Schurke-Linie (Scheibe 5):** Der Dolch (Schurke, Meuchelstich), Die Natter (Assassine, Schattenschritt), Die Zange (Folterknecht).
+  - **Schurken-Prüfung:** etwas aus fremdem Besitz stehlen (Regal, Kiste, Schreibtisch in einem bewohnten Haus), ohne gesehen zu werden; dann drei Meuchelstiche an Puppen — Hacken zählt nicht, der Hieb aus dem Schattenschritt schon.
+  - **Assassinen-Prüfung:** einen Steckbrief (Kopfgeld) vom Anschlagbrett erfüllen und abgeben.
+- **Kleriker und Magier (Scheiben 6, 7):** Die Lampe (Kleriker, Heiliges Heilen), Das Auge (Dunkler Priester), Die Flamme (Magier, Feuerball).
+  - **Kleriker-Prüfung:** 5 Heilkraut bringen und 4 Tote zur Ruhe bringen; dann die Heilprüfung beim Lehrer (eine Verletzte stabilisieren).
+  - **Magier-Prüfung:** ein Grabsiegel bergen (Gewölbe, Geister); dann fünf Puppen nur mit Zaubern treffen.
+- **Barde und Alchemist (Scheiben 8, 9):** Die Laute (Barde), Die Trommel (Kettenbarde), Der Kessel (Alchemist).
+  - **Barden-Prüfung:** ein Schenkenspiel gewinnen (Würfel, Karten, Armdrücken, Trinkwette, Faustkampf); dann 5 Siege, während dein Kriegslied wirkt und zwei Gefährten in der Nähe mitkämpfen.
+  - **Alchemisten-Prüfung:** 8 Heilkraut und eine Seelenphiole bringen; dann drei Heiltränke brauen (Kessel oder „Trank brauen“).
+- **Titel (Scheibe 10):** Der Kelch (Vampir) und Die Grube (Grubenhäuptling) haben jetzt eigene Sternbilder (7 Sterne, wirken nur mit getragenem Titel). Beim Erwerb einer Titelklasse und bei jeder Grad-Weihe läuft die Aufnahmeszene; ist der Meister nicht in der Nähe, gehört sie dem Helden allein. Bei der Grad-Weihe spricht der Meister danach.
+- **Gefährten-Sternbild (Scheibe 10):** Jeder Gefährte hat ein kleines eigenes Sternbild „Die Gefährten“ (7 Sterne, 6 lernbar, nur Werte: Leben, Schaden, Rüstung, Ausdauer; zwei Schlüsselsterne Leibwache oder Klinge der Gruppe). Punkte: 1 zum Start, dann einer alle fünf Stufen des Gefährten. Im Sternenhimmel oben „Für:“ den Gefährten wählen. Der Held kann diese Sterne nicht lernen; wird ein Gefährte zum Erben, beginnt er ohne sie. Ein Protokollhinweis erklärt es beim ersten Gefährten.
+- **Debug „Sterne: …“ (Scheibe 10):** Gefährten-Sternbild (+2 Stufen), Titelszenen ansehen, Grad-Weihe-Szene ansehen.
+
