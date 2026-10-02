@@ -1001,3 +1001,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Jeder Ersatz senkt den Verlust um 1. Ist genug Ersatz da, fasst das Lager wieder Mut (Moral +5).
 - Das Siedlungsfenster zeigt die Stufe in Rot oder Gelb und nennt den Ausweg.
 - Debug: „Siedlung: Lagerwache sofort“, „Siedler töten bis schutzlos“, „Schutz-Status“.
+
+## Varonheim gefallen: die Burg ist besetzt (Belagerung S3a)
+- Fällt Varonheim, ist die Varonsburg sofort leer, und der Hof ist im Exil. Zwei Knochenwachen halten das Burgtor, vier Untote den Burghof, und auf dem Thron liegt ein Leichnam. Burgfrieden gibt es keinen.
+- Wird die Stadt befreit, steht der Hof wieder in der Burg, mit Gerold am Tor.
+- Hof-Figuren nehmen nur Schaden von dir, deiner Gruppe, Koop-Mitspielern und Belagerern. Weltereignisse töten den König nicht nebenbei.

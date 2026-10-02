@@ -3311,6 +3311,7 @@ let AREA = false;
 const EYE_ZAP = new Set(['magic', 'shadow']);   /* Audit T05: nur Arten, die hurt() wirklich erreicht (Blitz- und Arkanzauber kommen als 'magic') */   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
+  if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null, poised0 = target.poiseUntil > performance.now();   /* Control-Befund A1: vor hurt() lesen — hurt setzt selbst Standfestigkeit */
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * BAL.lvl) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
@@ -8457,7 +8458,7 @@ function dwarfChoices(npc, choices) {
 const VARON_NOBLES = [['Herzog Emmerich', 'Graf'], ['Gräfin Adelheid', 'Gräfin'], ['Baron Lothar', 'Graf']];
 function ensureVaronGate() {   /* §5g.1: das Tor zum Thronsaal ist jetzt der Eingang des Bergfrieds in Varonheim */
   const [kx, ky] = CAPITAL.keep; S.ents.world = S.ents.world.filter(e => e.portal !== 'varonburg');   /* Varonheim-Umbau S2: kein Portal mehr — die Burg ist begehbar */
-  if (!S.ents.world.some(e => e.castleGate)) S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: kx * TS + TS / 2, y: ky * TS + TS / 2 - 8, r: 8, solid: false, castleGate: true, transient: true, label: 'Burgtor der Varonsburg (offen)' });
+  S.ents.world = S.ents.world.filter(e => !e.castleGate); S.ents.world.push({ id: uid(), kind: 'prop', type: 'portcullis', map: 'world', x: kx * TS + TS / 2, y: ky * TS + TS / 2 - 8, r: 8, solid: false, castleGate: true, transient: true, label: SIM.capitalFallen() ? 'Burgtor (Knochenwachen)' : 'Burgtor der Varonsburg (offen)' });
   capitalMigrate();
 }
 function capitalMigrate() {                                        /* §5g.1: Varonheim besiedeln (neue und alte Stände), Garde am Tor */
@@ -8756,9 +8757,10 @@ const courtEnts = () => S.ents.world.filter(e => e.varonCourt && !e.exileCourt);
 const courtDrop = pred => { S.ents.world = S.ents.world.filter(e => !(e.varonCourt && !e.exileCourt && pred(e))); };
 let viaB = 0;                                                         /* Kellertreppe B (Kanzlei ↔ Katakomben) */
 function ensureVaronCourt() {
-  S.ents.world = S.ents.world.filter(e => !((e.varonCourt && !e.exileCourt) || e.courtProp)); S.ents.varonburg = [];
+  S.ents.world = S.ents.world.filter(e => !((e.varonCourt && !e.exileCourt) || e.courtProp || e.keepGate)); S.ents.varonburg = [];
   const H = id => HOUSES.find(h => h.id === id), thr = H('varon_throne'), nob = H('varon_nobles'), kan = H('varon_kanzlei'), ver = H('varon_verlies'), smi = H('varon_schmiede');
-  if (!thr || !nob || !kan || !ver || !smi || SIM.capitalFallen()) return;
+  if (!thr || !nob || !kan || !ver || !smi) return;
+  if (SIM.capitalFallen()) return ensureCapitalOccupied(thr);   /* Belagerung S3a: die Toten halten die Burg */
   const W = S.ents.world, prop = (type, tx, ty, o = {}) => { W.push({ id: uid(), kind: 'prop', type, map: 'world', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, courtProp: true, ...o }); };
   for (const [x, y] of [[ver.x + 2, ver.y + ver.h - 2], [ver.x + 5, ver.y + ver.h - 2]]) prop('cage', x, y, { solid: true, r: 12 }); prop('chain_post', ver.x + 7, ver.y + 2, { solid: true });
   prop('forge', smi.x + 3, smi.y + 2, { solid: true, r: 14 }); prop('anvil', smi.x + 6, smi.y + 3, { solid: true });
@@ -8912,6 +8914,14 @@ function keepDraw(c) {                                               /* drinnen 
   const now = performance.now();
   if (now - keepWarnAt > 20000) { keepWarnAt = now; float(c, 'Waffe weg!', 'rgba(230,120,90,ALPHA)'); UI.toast('„WAFFE WEG!“ — noch einmal, und die Garde greift an', 2400); return; }
   keepWarnAt = 0; keepAlarm(c, 'Waffe gezogen im Burgfrieden');
+}
+// Belagerung S3a (PROPOSALS/varonheim_belagerung_s3.md §4.1): Fällt Varonheim, halten zwei Knochenwachen das Burgtor und vier Untote
+// den Burghof; auf dem Thron liegt ein Leichnam. Kein Burgfrieden. Flüchtig — nach jedem Laden, beim Fall und nach der Befreiung neu.
+function ensureCapitalOccupied(thr) {
+  const [kx, ky] = CAPITAL.keep, W = S.ents.world;
+  for (const dx of [-2, 2]) { const e = spawnEnemy('bone_knight', 'world', kx + dx, ky + 1, { level: 10 }); if (e) Object.assign(e, { keepGate: true, transient: true, heldGuard: 'varonheim', anchor: { x: e.x, y: e.y } }); }
+  for (let i = 0; i < 4; i++) { const e = spawnEnemy(pick(['skeleton', 'zombie', 'ghoul']), 'world', kx + ri(-12, 12), ky - ri(2, 5), { level: 8 }); if (e) Object.assign(e, { keepGate: true, transient: true, anchor: { x: e.x, y: e.y } }); }
+  if (thr) W.push({ id: uid(), kind: 'prop', type: 'bones', map: 'world', x: (thr.x + (thr.w >> 1)) * TS + TS / 2, y: (thr.y + 2) * TS + 4, r: 8, solid: false, transient: true, courtProp: true, label: 'Ein Leichnam auf dem Thron' });
 }
 function buildVaronburg() { ensureVaronCourt(); return freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 2); }   /* Rückfall für alte Aufrufe: die Burg liegt in der Welt */
 function buildVaronburgOld() {
@@ -19319,6 +19329,16 @@ export function selftest() {
       campGuardDay(st); const paid = S.gold === 95;
       return lost && hired && paid;
     } finally { S.settlement = st0; S.ents.world = W0; S.gold = g0; Object.assign(S.res, r0); if (dh) S.flags.dodonHome = dh; }
+  }));
+  ok('Belagerung S3a: Nach dem Fall ist die Burg leer bis auf Knochenwachen und Untote (genau ein Varon in der Welt: im Exil); nach der Befreiung steht der Hof wieder, keine Knochenwachen; Fremde können den Hof nicht verletzen', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, WAR = structuredClone(S.war), A0 = structuredClone(S.after || {}), f0 = structuredClone(S.flags);
+    try { S.ents.world = W0.slice(); delete S.flags.varonDead; delete S.flags.varonFled; S.war.nodes.varonheim.owner = 'undead'; S.after ||= {}; S.after.capital = { fell: S.day | 0, retaken: null, exile: null };
+      ensureVaronCourt(); ensureVaronExile(); const fell = !courtEnts().length && S.ents.world.filter(e => e.keepGate && e.mtype === 'bone_knight').length === 2 && S.ents.world.filter(e => e.varonKing && e.alive !== false).length <= 1;
+      S.war.nodes.varonheim.owner = 'valen'; S.after.capital.retaken = S.day | 0; ensureVaronExile(); ensureVaronCourt(); const back = courtEnts().some(e => e.varonKing) && courtEnts().some(e => e.keepWarden) && !S.ents.world.some(e => e.keepGate);
+      const k = courtEnts().find(e => e.varonKing), wolf = spawnEnemy('wolf', '__a', 10, 10), h0 = k.hp; hit(wolf, k, 1); const safe = k.hp === h0;
+      if (!(fell && back && safe)) console.log('S3a-Probe', JSON.stringify({ fell, back, safe }));
+      return fell && back && safe;
+    } finally { S.ents.world = W0; S.war = WAR; S.after = A0; S.flags = f0; ensureVaronCourt(); ensureVaronExile(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
