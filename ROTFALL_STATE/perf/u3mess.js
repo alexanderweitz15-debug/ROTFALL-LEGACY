@@ -2,9 +2,9 @@
    const M = await import('/ROTFALL_STATE/perf/u3mess.js?x=' + Date.now()); window.__r = null; setTimeout(async () => window.__r = await M.run(), 50); */
 const st = a => { const b = [...a].sort((x, y) => x - y), f = q => +b[Math.min(b.length - 1, Math.floor(b.length * q))].toFixed(2); return { n: b.length, med: f(0.5), p95: f(0.95), p99: f(0.99), max: +b[b.length - 1].toFixed(1) }; };
 const desc = e => !e ? null : [e.kind, e.mtype || e.prof || e.type || '', e.id ?? '', e.downed ? 'downed' : '', e.alive === false ? 'dead' : '', e.talk ? 'talk' : '', e.act ? 'act:' + e.act.kind : '', e.mounted ? 'mount' : '', e.swing > 0 ? 'swing' : ''].filter(Boolean).join(' ');
-export async function run({ frames = 300, thr = 8, scenes = null, combat = true } = {}) {
+export async function run({ frames = 300, thr = 8, scenes = null, combat = true, paced = false } = {}) {
   const RF = window.RF, S = RF.S, p = S.player, PF = window.__PF, home = { x: p.x, y: p.y }, m0 = S.minute, out = { scenes: [], spikes: [] };
-  const { TOWN_PLAN } = await import(location.pathname.includes('/u3') ? '/ROTFALL_STATE/perf/u3/src/world.js?v=23' : '/src/world.js?v=23');
+  const { TOWN_PLAN } = await import(location.pathname.includes('/u3') ? location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') + '/src/world.js?v=23' : '/src/world.js?v=23');
   S._quiet = true;
   const at = n => { const P = TOWN_PLAN[n]; return [P.square[0], P.square[1] + 3]; };
   const SC = scenes || [['varonheim', at('varonheim'), 12 * 60 + 5], ['varonheim-n', at('varonheim'), 23 * 60 + 5], ['nordfurt', at('northcity'), 12 * 60 + 5], ['nordfurt-n', at('northcity'), 23 * 60 + 5],
@@ -27,7 +27,8 @@ export async function run({ frames = 300, thr = 8, scenes = null, combat = true 
           rec.think = PF.tmax > 0.7 ? desc(PF.twho) + ' ' + PF.tmax.toFixed(1) : ''; rec.hs = PF.hs; rec.lk = PF.lk; }
         out.spikes.push(rec);
       }
-      if (i % 50 === 49) await new Promise(r => setTimeout(r, 0));
+      if (paced) await new Promise(r => setTimeout(r, Math.max(1, 16 - (performance.now() - a))));   /* Takt wie im Spiel: Pausen für Leerlauf-Arbeit */
+      else if (i % 50 === 49) await new Promise(r => setTimeout(r, 0));
     }
     all.push(...tot);
     out.scenes.push({ name, ents: S.ents[S.map].length, up: st(up), dr: st(dr), tot: st(tot), over8: tot.filter(x => x > 8).length, gcN, gcAvg: gcN ? +(gcT / gcN).toFixed(1) : 0 });

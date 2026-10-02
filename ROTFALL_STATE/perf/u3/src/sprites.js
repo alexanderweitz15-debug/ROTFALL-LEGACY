@@ -574,7 +574,8 @@ const NAMED_LOOK = {
   sael: { hair: '#2a2622', hs: 1, cloth: '#232a28', robe: '#232a28', stole: '#5fb39a' },
   lila: { hair: '#c89a4a', hs: 3, helm: '', cloth: '#8a7a5a' },
 };
-export function humanSpec(e) { __PF.hs++;
+export function humanSpec(e) { __PF.hs++; const __t0 = performance.now(), __s = humanSpec0(e); __PF.hsT = (__PF.hsT || 0) + performance.now() - __t0; return __s; }
+function humanSpec0(e) {
   const p = e.pal || {}, eq = e.equip || {}, s = baseSpec();
   const prof = e.prof || '', key = e.key || '';
   s.skin = p.skin || s.skin; s.hair = p.hair || s.hair; s.cloth = p.cloth || s.cloth; s.glow = p.glow || '';
@@ -1235,7 +1236,7 @@ function cacheGet(k, make) {
   let f = frameCache.get(k); if (f) return f;
   if (frameCache.size > 4000) { let n = 400; for (const key of frameCache.keys()) { frameCache.delete(key); if (--n <= 0) break; } cacheStat.clears++; }   /* Audit D7: älteste 10 % verwerfen statt alles (kein Spitzenruckler), warmed bleibt */
   cacheStat.miss++;
-  __PF.miss++; const __a = performance.now(); f = make(); const __d = performance.now() - __a; __PF.mkT += __d; if (__d > __PF.mkMax) { __PF.mkMax = __d; __PF.mkKey = k; } frameCache.set(k, f); return f;
+  __PF.miss++; if (__PF.keys) __PF.keys.push([k, __PF.cur?.id, __PF.cur?.prof || __PF.cur?.mtype]); const __a = performance.now(); f = make(); const __d = performance.now() - __a; __PF.mkT += __d; if (__d > __PF.mkMax) { __PF.mkMax = __d; __PF.mkKey = k; } frameCache.set(k, f); return f;
 }
 // BUG-093: ein neues Bild (Figur × Richtung × Pose) kostet beim ersten Zeichnen ~10 ms (Malen + Vergröbern) — mitten im Frame
 // ein Ruckler. Sichtbare Figuren melden sich hier; Stand- und Laufposen aller vier Richtungen werden in Browser-Pausen vorgebacken.
@@ -1285,8 +1286,9 @@ export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waff
 // W = { mode, wt, q, v, oct, two, low } aus render.js; Osten = gespiegelter Westen (Zielwinkel gespiegelt).
 const asG = o => { const g = new G(o.w, o.h); g.a = o.a; return g; };
 export function humanFrameR(spec, dir, pose, W = null) {
-  const sk = specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
-  return cacheGet('R|' + sk + dir + pose + '|' + wk, () => {
+  const __k0 = performance.now(); const sk = specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
+  const __kk = 'R|' + sk + dir + pose + '|' + wk; __PF.keyT = (__PF.keyT || 0) + performance.now() - __k0;
+  return cacheGet(__kk, () => {
     const __r0 = performance.now(); const L = resolve(spec, 'R' + sk, 0.35); __PF.resT = (__PF.resT || 0) + performance.now() - __r0;
     if (pose === 'tuck') return meta(toCanvas(asG(paintTuckR(L)), false), RPX, 10, 10);
     if (pose === 'down' || pose === 'dead') { const o = paintR(pose === 'dead' ? { ...L, glow: '' } : L, 'W', 'i0'); return meta(toCanvas(asG(o.g).rotCW(), false), RPX, 25, 26 + DX); }

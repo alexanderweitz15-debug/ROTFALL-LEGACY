@@ -141,3 +141,14 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Pack nur im Test Room (Debug) wählbar, danach legt der Entwickler den finalen Stil fest.
 - Koop: Schadenszeitpunkte nach Pack des Hosts, Optik lokal, Kombo-Schritt an Gäste übertragen.
 - Zusätzlich: Debug-Menü wird unübersichtlich → richtiges aufklappbares Debug-GUI.
+
+## 02.10.2026 — Visueller Umbau: Entscheidungen zu den Analysen (ROTFALL_STATE/visual/*.md)
+- **Quest-Geber-Siegel:** feste Aufträge, Verteidigungsmeister und Brett immer; Bewohner-Aufträge auf „Sehr schwer“ nie.
+- **Story-Dialog** (Zoom, Namensschild, breite Leiste, Welt läuft weiter): Quest-Angebot/-Abgabe benannter Figuren, Bosse vor dem Kampf (Varg, Garmadon, Weißbart, Dodon), Rat und Gericht.
+- **Lohn/Folgen im Dialog:** vor Annahme fester Aufträge nur Lohnart als Symbol ohne Zahl; Folgen als Wappen + Richtung, genaue Zahl im Tooltip.
+- **Tracker:** verfolgter Auftrag groß, bis 3 weitere klein, im Kampf eingeklappt; Zählkerbe nach jedem Kill; Ziele vorher markiert nur beim verfolgten Auftrag und nicht auf Sehr schwer.
+- **Schwere (angesagte) Angriffe: NICHT blockbar, nur ausweichen** (Regeländerung; Code anpassen, MECHANIKEN ergänzen).
+- **Lebensbalken** nur beim gewählten Ziel; **Schadenszahlen** als Pixelziffern, Einstellung Aus/Reduziert/Voll (Standard Voll für eigenen Schaden).
+- **NPCs:** Dienstzeichen über Händlern/Lehrern nur in der Nähe; Bosse tragen eigene Rüstung + ihr Unikat sichtbar; Rangabzeichen am Spieler automatisch.
+- **Items/Inventar/Shops:** Klick = ansehen; Lichtstrahl ab Selten, große Karte nur Legendär/Mythisch ohne Pause; Mengenkauf mit Preis je Stück und Gesamtpreis vorher; Sperre/„Neu“-Marke + Mehrfachverkauf, kein Rückkauf; Ladenware-Zustand bleibt 55–100 %; Händler-Sprüche als Sprechblase (3–4 je Ladenart).
+- **Welt-Ereignisse:** Namenskarte + Signalton nebenbei, Pause nur bei Kriegsereignissen. Karte: Ereignis-Pins nur in entdeckten Gebieten; Fraktionsgrenzen dezent einfärben. Skilltree-Knoten bekommen eigene Pixel-Icons (im Code gezeichnet).

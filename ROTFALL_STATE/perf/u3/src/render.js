@@ -126,7 +126,7 @@ export function drawFrame(now) {
   for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
     const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 150, a - 0.7, a + 0.7); ctx.closePath(); ctx.fill(); }
-  __PF.m('d_sort_cone'); for (const e of list) { const __a = performance.now(), __mi = __PF.miss; drawEntity(e, now); const __d = performance.now() - __a; __PF.ek(e.kind, __d); if (__d > __PF.emax) { __PF.emax = __d; __PF.ewho = e; __PF.emiss = __PF.miss - __mi; } } __PF.m('d_ents');
+  __PF.m('d_sort_cone'); for (const e of list) { __PF.cur = e; const __a = performance.now(), __mi = __PF.miss; drawEntity(e, now); const __d = performance.now() - __a; __PF.ek(e.kind, __d); if (__d > __PF.emax) { __PF.emax = __d; __PF.ewho = e; __PF.emiss = __PF.miss - __mi; } } __PF.m('d_ents');
   shown = list;
   for (const p of S.projectiles) drawProjectile(p);
   drawFx(now); __PF.m('d_proj_fx');
@@ -2102,7 +2102,8 @@ function drawHumanoidAt(e, now, override) {
 
 // S14 Stil R: Waffenzustand → Bild mit Armen (sprites.humanFrameR); die Waffe sitzt an der Hand, die im Bild steht.
 // Schwung in Zehntelschritten (Ausholen → Schlag → Nachschwung als echte Einzelbilder), Ziel in Achteln.
-function drawHumanoidR(e, now, c, spec, pz, w, wit) {
+function drawHumanoidR(e, now, c, spec, pz, w, wit) { const __t0 = performance.now(); try { return drawHumanoidR0(e, now, c, spec, pz, w, wit); } finally { __PF.hrT = (__PF.hrT || 0) + performance.now() - __t0; } }
+function drawHumanoidR0(e, now, c, spec, pz, w, wit) {
   const x = e.x, y = e.y, moving = e.vx || e.vy, walkP = 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3);
   let W = null, dir = e.aim ?? 0;
   if (w && !e.sitting) {
