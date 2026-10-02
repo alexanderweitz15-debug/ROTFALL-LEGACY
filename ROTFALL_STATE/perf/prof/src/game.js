@@ -6648,7 +6648,7 @@ function ensureRefugees() {
       Object.assign(c, { refugee: true, visitor: true, transient: true, anchor: { x: q.x, y: q.y }, greet: pick(['„Drei Tage warten wir schon. Sie lassen nur rein, wer zahlt.“', '„Die Feste ist gefallen. Wohin sollen wir denn noch?“', '„Die Automaten sehen durch uns hindurch.“']) }); S.ents.world.push(c); } }
   log('Vor den Toren Aurelions stauen sich die Flüchtlinge. Das Hochreich macht die Tore enger.', 'world');
 }
-function aurelTick() { bondTick(); intrigueTick(); ensureRefugees(); huntTick(); ensureSaltportContacts(); }
+function aurelTick() { __T('aurelTick.bondTick',()=>bondTick()); __T('aurelTick.intrigueTick',()=>intrigueTick()); __T('aurelTick.ensureRefugees',()=>ensureRefugees()); __T('aurelTick.huntTick',()=>huntTick()); __T('aurelTick.ensureSaltportContacts',()=>ensureSaltportContacts()); }
 function aurelDay() {
   if (S.aurelJob && S.aurelJob.until >= (S.day | 0)) { S.gold += S.aurelJob.pay; S.houses[S.aurelJob.house] = favor(S.aurelJob.house) + 2; log(`Lohn von ${AUREL_HOUSES.find(h => h.key === S.aurelJob.house).name}: ${S.aurelJob.pay} Gold.`, 'economy'); }
   if (S.flags.marriedHouse) { S.gold += 25; }
@@ -7253,7 +7253,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  __T('conTick.rumorTick',()=>rumorTick()); __T('conTick.fistTick',()=>fistTick()); __T('conTick.tavernHint',()=>tavernHint()); __T('conTick.bandTick',()=>bandTick()); __T('conTick.compTick',()=>compTick()); __T('conTick.vaultTick',()=>vaultTick()); __T('conTick.royalTick',()=>royalTick()); __T('conTick.nemesisTick',()=>nemesisTick());   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -10473,17 +10473,17 @@ function vaultTick() {
     fx(s.x * TS + 16, s.y * TS + 16, 'dust', 14); log('Ein Luftzug aus der Wand — du drückst dagegen, und ein Stein gibt nach. Eine Geheimkammer!', 'quest'); UI.toast('GEHEIMKAMMER', 2200); }
 }
 function hourTick(h) {
-  wxHour(h);   /* Roadmap C.12 */
-  aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
-  afterHour();                                                               /* Folgen §5c: Rachezüge, Ansteckung */
-  cultHour(h);                                                               /* §5g.2 Blutkult */
-  lawlessHour(h);                                                            /* Stadt ohne Schutz S2: Plünderer */
-  vanishHour(h);                                                             /* E4: Vermisstenwelle */
-  fortressHour();                                                            // S12: Tore der Eisenfeste
-  travelHour();                                                              // S13: Reisende
-  if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
-  if (chance(0.10) && !S._quiet) worldEvent();   /* BUG-123: Proben lösen keine Weltereignisse aus (sie verändern sonst Märkte) */
-  checkRankUp();
+  __T('hourTick.wxHour',()=>wxHour(h));   /* Roadmap C.12 */
+  __T('hourTick.aurelParade',()=>aurelParade(h)); __T('hourTick.rotfallCheck',()=>rotfallCheck()); __T('hourTick.ensureOmegaShrine',()=>ensureOmegaShrine()); __T('hourTick.pilgrimTick',()=>pilgrimTick()); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) __T('hourTick.omegaCatHour',()=>omegaCatHour());   // Phase 7
+  __T('hourTick.afterHour',()=>afterHour());                                                               /* Folgen §5c: Rachezüge, Ansteckung */
+  __T('hourTick.cultHour',()=>cultHour(h));                                                               /* §5g.2 Blutkult */
+  __T('hourTick.lawlessHour',()=>lawlessHour(h));                                                            /* Stadt ohne Schutz S2: Plünderer */
+  __T('hourTick.vanishHour',()=>vanishHour(h));                                                             /* E4: Vermisstenwelle */
+  __T('hourTick.fortressHour',()=>fortressHour());                                                            // S12: Tore der Eisenfeste
+  __T('hourTick.travelHour',()=>travelHour());                                                              // S13: Reisende
+  if (h % 6 === 0 && !S._frozenWar) __T('hourTick.SIM.warTick',()=>SIM.warTick());                          // Heere ziehen, Schlachten, Eroberungen
+  if (chance(0.10) && !S._quiet) __T('hourTick.worldEvent',()=>worldEvent());   /* BUG-123: Proben lösen keine Weltereignisse aus (sie verändern sonst Märkte) */
+  __T('hourTick.checkRankUp',()=>checkRankUp());
   // Siedlung produziert
   if (S.settlement) {
     const farms = S.settlement.buildings.filter(b => b.type === 'farm' && b.built >= 1).length;
@@ -10492,13 +10492,13 @@ function hourTick(h) {
   }
   // Nachwachsen
   for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
-  if (S.settlement) settlersHour();                                          // AUDIT S-02: Siedler kommen und gehen
+  if (S.settlement) __T('hourTick.settlersHour',()=>settlersHour());                                          // AUDIT S-02: Siedler kommen und gehen
   if (h === 2 && S.settlement && !S.settlement.raidAt && !S.settlement.raid && chance(raidChance(S.settlement))) { S.settlement.raidAt = clock() + 60; S.settlement.raid = raidPlan(S.settlement);   // AUDIT: Angriff angesagt — mit Wachturm gewarnt (M2: mit Ursache)
     if (S.settlement.buildings.some(b => b.type === 'watchtower' && b.built >= 1)) { log(`Der Wachturm von ${S.settlement.name} meldet Fackeln am Waldrand — ${S.settlement.raid.label} (${S.settlement.raid.n}).`, 'combat'); UI.toast('WACHTURM: ANGRIFF NAHT', 3600); } }
   if (S.settlement?.raid?.at) campRaidTick();
   if (S.settlement?.raidAt && clock() >= S.settlement.raidAt) raidSettlement();
   // Gruppengeschehen
-  if (chance(0.25)) partyInteraction();
+  if (chance(0.25)) __T('hourTick.partyInteraction',()=>partyInteraction());
 }
 
 // S13 (WELT_EVENTS_S13 §2, direkt umsetzbar): echte Ereignisse an echten Orten statt fester Meldungen.
@@ -11647,15 +11647,15 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay(); nemesisDay();   /* T08, T10 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
-  keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
-  seasonDay(); successorDay(); anomalyDay();
-  rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
-  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); grudgeDay(); factionAgenda();                                             // S12: Tribut der Kette
-  bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
-  SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
-  herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
-  if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) SIM.initSim();   // S15: Straßen nicht täglich neu bauen
+  __T('dayTick.woundDay',()=>woundDay()); __T('dayTick.bandDay',()=>bandDay()); __T('dayTick.loyDay',()=>loyDay()); __T('dayTick.familyDay',()=>familyDay()); __T('dayTick.gobDay',()=>gobDay()); __T('dayTick.informantDay',()=>informantDay()); __T('dayTick.nemesisDay',()=>nemesisDay());   /* T08, T10 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  __T('dayTick.keepSiegeDay',()=>keepSiegeDay());   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
+  __T('dayTick.seasonDay',()=>seasonDay()); __T('dayTick.successorDay',()=>successorDay()); __T('dayTick.anomalyDay',()=>anomalyDay());
+  __T('dayTick.rebuildTick',()=>rebuildTick()); __T('dayTick.growthDay',()=>growthDay()); __T('dayTick.faithDay',()=>faithDay()); __T('dayTick.undeadFallDay',()=>undeadFallDay()); __T('dayTick.refugeeWave',()=>refugeeWave()); __T('dayTick.migrationDay',()=>migrationDay()); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
+  __T('dayTick.tributeDay',()=>tributeDay()); __T('dayTick.campaignDay',()=>campaignDay()); __T('dayTick.raidDay',()=>raidDay()); __T('dayTick.undeadHeldDay',()=>undeadHeldDay()); __T('dayTick.bigDay',()=>bigDay()); __T('dayTick.pruneDay',()=>pruneDay()); __T('dayTick.rebuildRazed',()=>rebuildRazed()); __T('dayTick.aurelDay',()=>aurelDay()); __T('dayTick.ECO.airDay',()=>ECO.airDay(S.voyage?.air ? S.voyage.ship : null)); __T('dayTick.mercDay',()=>mercDay()); __T('dayTick.conEchoDay',()=>conEchoDay()); __T('dayTick.vanishDay',()=>vanishDay()); __T('dayTick.grudgeDay',()=>grudgeDay()); __T('dayTick.factionAgenda',()=>factionAgenda());                                             // S12: Tribut der Kette
+  __T('dayTick.bountyDay',()=>bountyDay()); __T('dayTick.afterDay',()=>afterDay()); __T('dayTick.capitalDay',()=>capitalDay()); __T('dayTick.schutzDay',()=>schutzDay());                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
+  __T('dayTick.SIM.warDay',()=>SIM.warDay());                                             // Märkte, Heeresversorgung, Nachschub
+  __T('dayTick.herdEvents',()=>herdEvents()); __T('dayTick.farmDay',()=>farmDay());                                  // S14: Nutztiere (Städte und eigener Hof)
+  if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) __T('dayTick.SIM.initSim',()=>SIM.initSim());   // S15: Straßen nicht täglich neu bauen
   // Nahrung
   const mem = partyMembers();
   const need = Math.ceil((mem.length + 1) * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));   /* Roadmap C.12: Schnee und Winter kosten mehr Nahrung */
@@ -11690,7 +11690,7 @@ function dayTick() {
     UI.toast(`${w.name}`, 4000);
   }
   if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01) : Math.min(1, S.tollMul + 0.01);   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
-  save();
+  __T('dayTick.save',()=>save());
   log(`Tag ${S.day} bricht an.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town)) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town, (S.day | 0) + 1)) log(`Morgen feiert ${townName(town)} sein Stadtfest.`, 'world');

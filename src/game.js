@@ -2389,7 +2389,7 @@ function update(dt, now) {
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
-  if ((keepT += dt) > 250) { keepT = 0; keepTick(); }      /* Umbau S3: Burgfrieden */
+  if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); }  /* Ratgeber */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -3311,7 +3311,8 @@ let AREA = false;
 const EYE_ZAP = new Set(['magic', 'shadow']);   /* Audit T05: nur Arten, die hurt() wirklich erreicht (Blitz- und Arkanzauber kommen als 'magic') */   /* Roadmap P2: diese Schadensarten stören das Roboterauge */
 const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally { AREA = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
-  if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
+  if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;
+  if (target.varonKing && !target.exile && attacker && (attacker === S.player || S.party.includes(attacker.id) || attacker.coopPilot)) keepAlarm(attacker, 'Angriff auf den König');   /* Entwickler 02.10.: Späher und Verstärkung */   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null, poised0 = target.poiseUntil > performance.now();   /* Control-Befund A1: vor hurt() lesen — hurt setzt selbst Standfestigkeit */
   let dmg = (attacker.kind === 'enemy' ? MONSTERS[attacker.mtype].dmg * (1 + attacker.level * BAL.lvl) * BAL.dmg * (attacker.disarmed ? 0.4 : 1) * (attacker.dmgMul || 1) : damageOf(attacker)) * mult;
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
@@ -8901,7 +8902,35 @@ function keepHide(it, force) {
 }
 function keepAlarm(c, why) {
   for (const g of courtEnts().filter(e => e.guard && e.alive)) { g.angry = true; g.brave = true; g.aggroId = c.id; g.sawPlayer = clock(); }
+  if (castleAlarm.at && performance.now() - castleAlarm.at < 120000) return;   /* ein Alarm, nicht einer je Schlag */
   S.factions.valen = clamp((S.factions.valen || 0) - 20, -100, 100); addBounty('valen', 200, why); log('Alarm in der Varonsburg! Die Königsgarde greift an (Valen −20).', 'combat');
+  castleAlarmStart(why);
+}
+// Entwickler 02.10.2026: Bei Gewalt in der Burg oder einem Angriff auf den König reiten Späher aus. Erreichen sie das Stadttor (60 s),
+// marschieren Soldaten aus den nächsten Valen-Städten zur Burg (nach weiteren 60 s, 4–6 Mann je Stadt, die Besatzung dort sinkt).
+// Wer die Späher abfängt, hält die Verstärkung auf. Flüchtig (nach dem Laden ist der Alarm vorbei, das Kopfgeld bleibt).
+const castleAlarm = { at: 0, scoutsAt: 0, sent: false, arrive: 0, waves: [] };
+function castleAlarmStart(why) {
+  const p = S.player, [kx, ky] = CAPITAL.keep, now = performance.now(); Object.assign(castleAlarm, { at: now, scoutsAt: now + 60000, sent: false, arrive: 0, waves: [] });
+  const gates = TOWN_PLAN.varonheim ? [[TOWN_PLAN.varonheim.area[0] - 2, CAPITAL.y - 11], [TOWN_PLAN.varonheim.area[2] + 2, CAPITAL.y - 11]] : [];
+  gates.forEach(([gx, gy], i) => { const q = freeSpotNear('world', kx + (i ? 2 : -2), ky + 3, 2); if (!q) return;
+    const s = makeChar({ name: pick(FIRST_M), prof: 'Späher der Krone', x: q.x, y: q.y, level: 6, faction: 'valen', traits: ['diszipliniert'] });
+    Object.assign(s, { castleScout: true, transient: true, visitor: true, anchor: { x: gx * TS, y: gy * TS }, schedulePos: { x: gx * TS, y: gy * TS }, speedMul: 1.6, greet: '„Aus dem Weg!“' }); S.ents.world.push(s); });
+  log(`${why}: Späher reiten aus der Varonsburg zu den Stadttoren. Erreichen sie die Tore, schickt die Krone Soldaten aus den Nachbarstädten. Fang sie ab — oder sei schnell.`, 'combat');
+  UI.toast('SPÄHER REITEN AUS', 2600); if (S.player.map === 'world') sfx('bell', 0, 0.8);
+}
+function castleAlarmTick() {
+  const A = castleAlarm, now = performance.now(); if (!A.at) return;
+  if (!A.sent && now >= A.scoutsAt) { A.sent = true; const alive = S.ents.world.filter(e => e.castleScout && e.alive); S.ents.world = S.ents.world.filter(e => !e.castleScout || !e.alive);
+    if (!alive.length) { log('Keiner der Späher hat die Tore erreicht. Die Nachbarstädte wissen nichts — vorerst.', 'combat'); A.at = 0; return; }
+    const src = Object.keys(S.war?.nodes || {}).filter(k => k !== 'varonheim' && TOWN_PLAN[k] && S.war.nodes[k].owner === 'valen' && S.war.nodes[k].garrison > 10).sort((a, b) => townGap('varonheim', a) - townGap('varonheim', b)).slice(0, alive.length);
+    A.waves = src.map(k => ({ k, n: ri(4, 6) })); for (const w of A.waves) S.war.nodes[w.k].garrison = Math.max(5, S.war.nodes[w.k].garrison - w.n); A.arrive = now + 60000;
+    log(`Die Späher haben die Tore erreicht. Soldaten aus ${A.waves.map(w => townName(w.k)).join(' und ') || 'der Umgebung'} sind auf dem Weg zur Burg.`, 'combat'); UI.toast('VERSTÄRKUNG DER KRONE UNTERWEGS', 3000); return; }
+  if (A.sent && A.arrive && now >= A.arrive) { const p = S.player, [kx, ky] = CAPITAL.keep;
+    for (const w of A.waves) { const [sx, sy] = TOWN_PLAN[w.k].square, ang = Math.atan2(sy - ky, sx - kx);
+      for (let i = 0; i < w.n; i++) { const [tx, ty] = pushOut('world', Math.round(kx + Math.cos(ang) * 30) + ri(-3, 3), Math.round(ky + 12 + Math.sin(ang) * 30) + ri(-3, 3)), q = freeSpotNear('world', tx, ty, 3); if (!q) continue;
+        const g = guardChar('valen', q, 'Soldat der Krone', ri(9, 12)); Object.assign(g, { castleRelief: true, transient: true, visitor: true, angry: true, brave: true, aggroId: p.id, sawPlayer: clock(), anchor: { x: kx * TS, y: (ky + 2) * TS } }); S.ents.world.push(g); } }
+    log(`Soldaten der Krone aus ${A.waves.map(w => townName(w.k)).join(' und ')} erreichen Varonheim. Sie suchen dich.`, 'combat'); UI.toast('VERSTÄRKUNG ERREICHT DIE BURG', 2600); A.at = 0; A.arrive = 0; }
 }
 function servantSmuggle(npc, choices) {                            /* Diener holen eine Waffe aus der Waffenkammer */
   const p = S.player, D = S.keepDepot?.[p.id], J = S.keepStash;
@@ -15557,6 +15586,8 @@ function debugSections() {
       'Burgfrieden: Verdacht aus, Pass weg': () => { delete S.flags.keepSusp; delete S.flags.keepBribeDay; S.keepPass = {}; UI.toast('Verdacht und Pass gelöscht'); },
       'Schmuggel: Chance anzeigen': () => UI.toast(`Verstecken: ${keepSmuggleOdds()} %`),
       'Schmuggel: Dienerware jetzt fällig': () => { if (S.keepStash) { S.keepStash.day = S.day | 0; UI.toast('Ware liegt bereit'); } else UI.toast('Keine Bestellung'); },
+      'Burg-Alarm: Späher jetzt': () => { castleAlarm.at = 0; keepAlarm(p, 'Debug'); },
+      'Burg-Alarm: Späher kommen an (Verstärkung)': () => { castleAlarm.scoutsAt = 0; castleAlarmTick(); castleAlarm.arrive = 1; castleAlarmTick(); },
       'Burgtor: Grund prüfen': () => UI.toast(`Grund für die Burg: ${keepReason() || 'keiner'}`),
       'Burgfrieden: Valen-Rang Offizier': () => { S.ranks.valen = 4; UI.toast('Rang Offizier'); },
       'Varon: ans Burgtor': () => { if (S.map !== 'world') travel('world'); tp(CAPITAL.keep[0], CAPITAL.keep[1] + 3); },
@@ -19371,6 +19402,16 @@ export function selftest() {
       S.flags.keepPetition = S.day | 0; const pet = keepReason() === 'Bittschrift'; S.flags.keepPetition = -1; S.ranks.valen = 1; const rank = keepReason() === 'Rang';
       return none && ask && pet && rank;
     } finally { S.flags = f0; S.ranks.valen = r0; S.cult = C0; S.bounty = b0; S.factions.valen = v0; [p.map, p.x, p.y] = m0; UI.closeDialogue(); }
+  }));
+  ok('Burg-Alarm: Späher reiten aus; erreichen sie die Tore, kommt Verstärkung aus Nachbarstädten (Besatzung dort sinkt); abgefangene Späher = keine Verstärkung', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, WAR = structuredClone(S.war), fa = S.factions.valen, b0 = structuredClone(S.bounty || {}), A0 = { ...castleAlarm };
+    try { S.ents.world = W0.slice(); castleAlarm.at = 0; keepAlarm(p, 'Probe'); const scouts = S.ents.world.filter(e => e.castleScout).length;
+      const g0 = Object.fromEntries(Object.entries(S.war.nodes).map(([k, n]) => [k, n.garrison])); castleAlarm.scoutsAt = 0; castleAlarmTick(); const sent = castleAlarm.waves.length > 0 && castleAlarm.waves.every(w => S.war.nodes[w.k].garrison < g0[w.k]);
+      castleAlarm.arrive = 1; castleAlarmTick(); const came = S.ents.world.filter(e => e.castleRelief && e.angry).length >= 4;
+      castleAlarm.at = 0; keepAlarm(p, 'Probe'); for (const s of S.ents.world.filter(e => e.castleScout)) s.alive = false; castleAlarm.scoutsAt = 0; castleAlarmTick(); const stopped = !castleAlarm.waves.length && !castleAlarm.at;
+      if (!(scouts === 2 && sent && came && stopped)) console.log('Alarm-Probe', JSON.stringify({ scouts, sent, came, stopped }));
+      return scouts === 2 && sent && came && stopped;
+    } finally { S.ents.world = W0; S.war = WAR; S.factions.valen = fa; S.bounty = b0; Object.assign(castleAlarm, A0); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

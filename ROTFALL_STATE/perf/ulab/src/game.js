@@ -892,7 +892,8 @@ const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
 let festMin = -1;
-function festTick() {
+const festTick = __W('festTick', festTick0);
+function festTick0() {
   if ((S.minute | 0) === festMin) return; festMin = S.minute | 0;          // höchstens einmal je Spielminute prüfen
   for (const town of Object.keys(TOWN_PLAN)) {
     const on = festNow(town);
@@ -1252,7 +1253,8 @@ function villagerDay(e, t, dt) {
 }
 // Außer Sicht: nicht einfrieren (sonst standen Hausgenossen stundenlang pixelgleich übereinander), sondern je Block einmal
 // an den Zielort setzen — billiger als Wegsuche, und wer näher kommt, trifft die Leute dort, wo sie um diese Zeit sind.
-function placeAway(e) {
+const placeAway = __W('placeAway', placeAway0);
+function placeAway0(e) {
   const t = dayTarget(e); if (e.blk === t.k) return;
   e.blk = t.k; e.talk = null; e.wander = null;
   if (t.deliver) deliverGame(e);
@@ -1403,7 +1405,8 @@ function travelerStep(e, dt, far) {
 }
 // Jedes Bild: Reisende fern vom Spieler (oder wenn er unter der Erde ist) rücken auf ihrer Route vor; Abgereiste verschwinden.
 let TRAV = [], TRAV_W = null;
-function roadTick(dt) {
+const roadTick = __W('roadTick', roadTick0);
+function roadTick0(dt) {
   SIM.pumpRoads(0.8);                                                  // Wegsuche der Reisenden: höchstens ~1 ms je Bild, nur wenn etwas ansteht
   if (TRAV_W !== S.ents.world) { TRAV_W = S.ents.world; TRAV = S.ents.world.filter(e => e.traveler || e.travLead); }
   const p = S.player, onW = S.map === 'world'; let gone = false;
@@ -1739,7 +1742,8 @@ function eliteHit(src, tgt) {
   const P = ELITES[src.eliteKey]?.power, key = { burn: 'burning', frost: 'frost', shock: 'shocked' }[P];
   if (key && tgt.alive && chance(0.35)) applySpellStatus(tgt, { key, chance: 1 }, src);
 }
-function eliteTick(e, dt) {
+const eliteTick = __W('eliteTick', eliteTick0);
+function eliteTick0(e, dt) {
   const E = ELITES[e.eliteKey]; if (!E || e.downed) return;
   if (E.power === 'regen' && e.hp < e.maxHp) { const h = e.maxHp * 0.01 * dt / 1000; if (e.body) B.heal(e, h); else e.hp = Math.min(e.maxHp, e.hp + h); }
   if (E.power === 'summon' && !e.summoned && e.hp < e.maxHp * 0.5) { e.summoned = true; float(e, 'Zu mir!', 'rgba(230,120,90,ALPHA)', true);
@@ -2259,7 +2263,8 @@ function sceneTick() {
     const [w, say] = s.lines[s.i++], e = s.who[w]; if (e?.talk) { e.talk.say = say; e.talk.at = now; } s.t = now + s.gap; }
 }
 let sceneT = 30000;
-function ambientTick(dt) {
+const ambientTick = __W('ambientTick', ambientTick0);
+function ambientTick0(dt) {
   if ((sceneT -= dt) > 0 || S.map !== 'world' || S.cine) return; sceneT = ri(45, 90) * 1000;
   const p = S.player, town = townAt(p.x / TS | 0, p.y / TS | 0), h = hourNow(); if (!town || !TOWN_PLAN[town] || h < 7 || h >= 23) return;
   const now = performance.now(), idle = e => e.alive && !e.downed && !e.angry && !e.fleeing && !(e.talk?.until > now) && !S.party.includes(e.id) && e.homeTown === town;
@@ -2338,7 +2343,8 @@ function reactLine(e) {
   if (e.smith) return 'Stumpfe Klinge? Ich mach sie scharf.';
   return pick(['Tag.', 'Guten Weg.', 'Hm.', 'Fremder.', 'Pass auf dich auf.']);
 }
-function reactTick(dt) {
+const reactTick = __W('reactTick', reactTick0);
+function reactTick0(dt) {
   if ((reactT -= dt) > 0 || S.cine || UI.dialogueOpen()) return; reactT = 1200;
   const p = S.player, now = performance.now(); if (!p?.alive || p.downed) return;
   const e = S.ents[S.map].find(x => x.kind === 'npc' && x.alive && !x.downed && !x.angry && !x.fleeing && !x.enc && !x.robot && !S.party.includes(x.id)
@@ -2351,7 +2357,8 @@ function reactTick(dt) {
   e.talk = { with: p.id, until: now + 2600, at: now, say };
 }
 let miniT = 0;
-function drawMini(dt) {
+const drawMini = __W('drawMini', drawMini0);
+function drawMini0(dt) {
   let cv = document.getElementById('minimap');
   if (!S.settings.minimap || S.map !== 'world') { if (cv) cv.style.display = 'none'; return; }
   if (!cv) { cv = document.createElement('canvas'); cv.id = 'minimap'; cv.width = cv.height = 180; cv.title = 'Minikarte (N)'; cv.onclick = () => UI.openModal('map'); document.getElementById('viewport')?.appendChild(cv); }
@@ -2549,7 +2556,8 @@ function nudge(e, dx, dy) {
   if (dx && !solidTile(e.map, e.x + dx + Math.sign(dx) * r, e.y) && !solidPropAt(e.map, e.x + dx, e.y, r)) e.x += dx;
   if (dy && !solidTile(e.map, e.x, e.y + dy + Math.sign(dy) * r) && !solidPropAt(e.map, e.x, e.y + dy, r)) e.y += dy;
 }
-function separate() {
+const separate = __W('separate', separate0);
+function separate0() {
   const grid = new Map(), C = 48;
   const P0 = S.player;
   for (const e of combat) if (e.alive && !e.downed && e.map === S.map && e.kind !== 'caravan' && Math.abs(e.x - P0.x) < 700 && Math.abs(e.y - P0.y) < 520) { const k = (e.x / C | 0) + ',' + (e.y / C | 0); (grid.get(k) || grid.set(k, []).get(k)).push(e); }   // BUG-108: nur im Sichtbereich
@@ -2804,7 +2812,8 @@ function camShake(amount, ms) { if (!S.settings.motion) return; shake = amount; 
 // §28 Gegner-Ausdauer: Maximum 120 % des Spielers (beim ersten Kontakt), Hieb 26, Sprung 30; Erholung 14/s (Elite/Boss 20/s). Leer: kurz
 // erschöpft (wankt, offene Deckung). Nur Angreifen kostet — wer bloß wartet, zermürbt niemanden.
 const ESTA = { rel: 1.2, swing: 26, leap: 30, regen: 14, eliteRegen: 20 };
-function enemyStamina(c, dt) {
+const enemyStamina = __W('enemyStamina', enemyStamina0);
+function enemyStamina0(c, dt) {
   const m = MONSTERS[c.mtype]; if (!m || m.prey) return;
   if (c.sta == null) c.sta = c.maxSta = Math.round((S.player?.maxStamina || 110) * ESTA.rel);
   const sw = c.swing || 0;
@@ -2818,7 +2827,8 @@ function enemyStamina(c, dt) {
   }
   c.sta = Math.min(c.maxSta, c.sta + dt / 1000 * ((m.threat || 1) >= 3 || c.boss ? ESTA.eliteRegen : ESTA.regen));
 }
-function tickCombatant(c, dt) {
+const tickCombatant = __W('tickCombatant', tickCombatant0);
+function tickCombatant0(c, dt) {
   if (!c.alive) return;
   if (B.armless(c)) { c.swing = 0; c.telegraph = 0; c.windup = false; c.special = null; }   // S14: ohne Arme kein Hieb (gilt für alle Figuren mit Körper)
   if (c.kind === 'enemy') enemyStamina(c, dt);
@@ -2905,7 +2915,8 @@ function moveEnt(e, dx, dy) {
 // Zielgerichtetes Gehen: geradeaus, solange es geht (billig, sieht natürlich aus). Blockiert eine Mauer/ein Baum und ist
 // ein Ziel bekannt, sucht A* auf dem Kachelraster einen Weg (gecacht, max. 3 s bzw. bis das Ziel 2 Kacheln weiterzieht).
 // Ohne Ziel (Flucht, Seitschritt) wird seitlich in 35°-Schritten getastet und die gefundene Seite kurz beibehalten.
-function seek(e, a, sp, dt = 16, goal = null) {
+const seek = __W('seek', seek0);
+function seek0(e, a, sp, dt = 16, goal = null) {
   if (e.path && (!goal || (e.path.t -= dt) <= 0 || Math.hypot(goal.x - e.path.gx, goal.y - e.path.gy) > 64 || e.path.i >= e.path.pts.length)) e.path = null;
   if (e.path) {
     const wp = e.path.pts[e.path.i];
@@ -2979,7 +2990,8 @@ function findPath(map, x0, y0, x1, y1) {
   return null;
 }
 
-function controlPlayer(dt) {
+const controlPlayer = __W('controlPlayer', controlPlayer0);
+function controlPlayer0(dt) {
   const p = S.player;
   if (S.cine) { p.vx = p.vy = 0; return; }   // Kamerafahrt: keine Steuerung
   if (p.downed) { p.vx = p.vy = 0; return; }
@@ -3851,7 +3863,8 @@ function deathKind(c) {
 }
 function dying(c) { const d = deathKind(c); c.lastDc = d; return d; }
 const DYING = [];                                                     // flüchtige Leichen mit laufendem Ablauf (nie gespeichert)
-function deathTick() {                                                // feuert die fx-Ereignisse der Todesabläufe (je Bild)
+const deathTick = __W('deathTick', deathTick0);
+function deathTick0() {                                                // feuert die fx-Ereignisse der Todesabläufe (je Bild)
   if (!DYING.length) return; const now = performance.now();
   for (let i = DYING.length - 1; i >= 0; i--) { const e = DYING[i], D = ANIM_DEFS.death[e.dc];
     const unhide = () => { if (e.graveOf) { const g = S.ents[e.map]?.find(x => x.id === e.graveOf); if (g) delete g.hidden; } };
@@ -3960,7 +3973,8 @@ function float(e, text, color, big = false) {
 }
 const RISING = new Set(['heal', 'necro', 'shadow']);           // Magie steigt auf, Blut und Splitter fallen
 const FIXED = new Set(['impact', 'crit', 'ring', 'ghost', 'shock', 'afterimage']);     // bleiben am Ort
-function updateFx(dt) {
+const updateFx = __W('updateFx', updateFx0);
+function updateFx0(dt) {
   for (const f of S.fx) { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += dt / 16 * (RISING.has(f.type) ? -0.04 : FIXED.has(f.type) ? 0 : 0.14); f.life -= dt; }
   S.fx = S.fx.filter(f => f.life > 0);
   for (const f of S.floats) { if (!f.bubble) f.rise += dt / 22; f.life -= dt; }
@@ -3977,7 +3991,8 @@ function splashAt(p, skip) {
     hurt(e, p.dmg * 0.6, own, own.name, false, 'fire');
   p.splash = 0;
 }
-function updateProjectiles(dt) {
+const updateProjectiles = __W('updateProjectiles', updateProjectiles0);
+function updateProjectiles0(dt) {
   for (const p of S.projectiles) {
     const n = Math.max(1, Math.ceil(Math.hypot(p.vx, p.vy) * dt / 16 / 8));   // Phase 1: Teilschritte ≤ 8 px, sonst tunnelt der Pfeil
     p.life -= dt; let wall = false;
@@ -7785,7 +7800,8 @@ function ensureMorrgrund() {
   if (d) { d.anchor = { x: d.x, y: d.y }; d.title = 'Dodon'; d.name = 'Dodon'; d.key = 'dodon'; d.parley = true; }
 }
 const dodonOf = () => S.ents.world.find(e => e.mtype === 'dodon' && e.alive);
-function morrTick() {
+const morrTick = __W('morrTick', morrTick0);
+function morrTick0() {
   if (S.flags.morrDead || !S.flags.morrBuilt) return;
   const p = S.player, C = morrC(), d = Math.hypot(p.x - C.x, p.y - C.y), dod = dodonOf(), now = performance.now();
   if (!S.flags.morrSeen && d < 18 * TS && !S.flags.chainsBroken) {                 // erster Anblick: Flucht und Ruf
@@ -7892,7 +7908,8 @@ function guideTick() {
     T[k] = 1; guideLast = now; log(`Tipp: ${text}`, 'quest'); UI.toast('TIPP — siehe Protokoll', 1800); return k; }
 }
 const ARRIVE_SAY = ['Willkommen. Halt dich an die Gesetze.', 'Der Platz ist dort drüben.', 'Fremd hier? Der Markt liegt in der Mitte.', 'Waffen bleiben in der Scheide.'];
-function arrivalTick() {
+const arrivalTick = __W('arrivalTick', arrivalTick0);
+function arrivalTick0() {
   const p = S.player; if (!p || p.map !== 'world' || S.cine || S.dying || S._quiet || S.coop?.role === 'guest') return;
   const k = townAt(p.x / TS | 0, p.y / TS | 0); if (!k || !TOWN_PLAN[k]) return;
   const n = S.war?.nodes?.[k], occ = n?.owner === 'undead', sg = !!n?.siege && !occ, key = k + (occ ? ':occ' : sg ? ':siege' : '');
@@ -8983,7 +9000,8 @@ function servantSmuggle(npc, choices) {                            /* Diener hol
     log(`${npc.name} nimmt 300 Gold: Morgen liegt ${keepItName(it)} in der Gesindekammer. Frag dann nach deiner Ware.`, 'world'); UI.dialogue(npc, '„Morgen. Nicht vorher. Und nicht hier.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
 }
 let keepWas = false, keepWarnAt = 0;
-function keepTick() {
+const keepTick = __W('keepTick', keepTick0);
+function keepTick0() {
   const p = S.player; if (!CAPITAL || !p.alive) return;
   if (S.keepDepot?.[p.id] && SIM.capitalFallen()) { const b = keepReturn(p); if (b.length) log(`Hagen hat die Waffenkammer der Burg ins Exil gerettet; ein Bote bringt dir deine Sachen: ${b.map(keepItName).join(', ')}.`, 'world'); }
   if (p.map !== 'world' || SIM.capitalFallen() || p.cineGhost) { keepWas = false; return; }
@@ -9767,7 +9785,8 @@ function nameCard(title, sub = '', ms = 3000) {                       /* T17: Na
   el.getAnimations?.().forEach(a => a.cancel());
   el.animate?.([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none', offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: ms, easing: 'ease-out' });
 }
-function camStep(p, dt) {                                              /* Kamera folgt dem Blickpunkt (aus update; im Boss-Auftritt auch bei stehender Welt) */
+const camStep = __W('camStep', camStep0);
+function camStep0(p, dt) {                                              /* Kamera folgt dem Blickpunkt (aus update; im Boss-Auftritt auch bei stehender Welt) */
   const V = R.view(), tx0 = camAim(p, dt), tx = tx0.x - V.W / (2 * R.cam.zoom), ty = tx0.y - V.H / (2 * R.cam.zoom);
   R.cam.punch = Math.max(0, (R.cam.punch || 0) - dt * 0.00025);
   R.cam.x += (tx - R.cam.x) * Math.min(1, dt / 120);
@@ -10218,7 +10237,8 @@ function aurelParade(h) {
 }
 // Kleine Arbeits-Animationen (Nutzer: überall): wer bei der Arbeit steht, arbeitet sichtbar — Funken am Amboss, Staub am Feld
 const WORK_FX = { Siedler: 'dust', Schmied: 'spark', Schmiedin: 'spark', 'Goblin-Schmied': 'spark', Waffenschmied: 'spark', Bauer: 'dust', Bäuerin: 'dust', Magd: 'dust', 'Goblin-Bergmann': 'dust', 'Goblin-Holzfäller': 'dust', Holzfäller: 'dust', Werkmeister: 'spark', Fabrikarbeiter: 'spark', 'Magitech-Ingenieurin': 'spark', Bäcker: 'fire', Koch: 'fire' };
-function workAnim(e, dt) {
+const workAnim = __W('workAnim', workAnim0);
+function workAnim0(e, dt) {
   const k = WORK_FX[e.prof?.replace(' (versklavt)', '')]; if (!k || e.vx || e.vy || e.angry || e.fleeing) return;
   const h = S.minute / 60; if (h < 8 || h > 18) return;
   e._wk = (e._wk ?? 1500 + (e.seed | 0) % 1500) - dt; if (e._wk > 0) return; e._wk = 2200 + (e.seed | 0) % 900;
@@ -10302,7 +10322,8 @@ function leavePursuit(from, to) {
     else e.lurk = { until: now + 90 };
   }
 }
-function arrivingPursuers() {                                   // alle 250 ms: wer die Tür erreicht hat, kommt herein
+const arrivingPursuers = __W('arrivingPursuers', arrivingPursuers0);
+function arrivingPursuers0() {                                   // alle 250 ms: wer die Tür erreicht hat, kommt herein
   const now = clock(), p = S.player; let came = 0;
   for (const k of Object.keys(S.ents)) {
     if (k === S.map) continue;
@@ -10388,7 +10409,8 @@ function placeBuilding(type, x, y, free) {
   log(`${def.name} wird errichtet.`, 'world');
   return b;
 }
-function updateBuildings(dt) {
+const updateBuildings = __W('updateBuildings', updateBuildings0);
+function updateBuildings0(dt) {
   if (!S.settlement) return;
   for (const b of S.settlement.buildings) {
     if (b.built >= 1) continue;
@@ -13472,7 +13494,8 @@ const titleAbilities = c => { const T = TC(c); if (!T) return []; const a = T.gr
 // S15 Klassen-Rüstung (Nutzer: „nur über eine Questline, wie in WoW; getragen verstärkt sie die Fähigkeiten und gibt weitere“).
 // Zählt die getragenen Teile der Rüstung des aktiven Titels. Ab 2 Teilen: Titelzauber +25 % und eine neue Fähigkeit, ab 3 mehr.
 const GEAR_ABILITY = { necromancer: 'grave_host', warlock: 'dark_pact', druid: 'pack_call', monk: 'flurry' };
-function dkAuraTick(p, dt) { if (dkGear(p) >= 3 && (S._dkAura = (S._dkAura || 0) + dt) > 3000) { S._dkAura = 0; for (const t of hostilesOf(p)) if (dist(p, t) < 90) applySpellStatus(t, { key: 'frost', chance: 1 }, p); } }
+const dkAuraTick = __W('dkAuraTick', dkAuraTick0);
+function dkAuraTick0(p, dt) { if (dkGear(p) >= 3 && (S._dkAura = (S._dkAura || 0) + dt) > 3000) { S._dkAura = 0; for (const t of hostilesOf(p)) if (dist(p, t) < 90) applySpellStatus(t, { key: 'frost', chance: 1 }, p); } }
 const dkGear = c => c?.currentClass === 'deathknight' ? gearOf(c, 'deathknight') : 0;   // S15 P19: Rüstung der Eidwacht
 function gearOf(c, key = c?.titleClass) { return key && c?.equip ? Object.values(c.equip).filter(it => it && ITEMS[it.key]?.classSet === key).length : 0; }
 const classQDone = (c, key) => Object.entries(QUESTS).some(([k, Q]) => Q.classQ?.[0] === key && S.quests[k]?.state === 'done');

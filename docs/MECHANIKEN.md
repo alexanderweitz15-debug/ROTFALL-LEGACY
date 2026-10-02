@@ -1013,3 +1013,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Danach folgt die Durchsuchung wie gewohnt.
 - Ohne Grund bleiben die Bittschrift, die Bestechung oder Gewalt. Mit Gewalt gibt es Alarm, die Garde greift an, Valen −20 und Kopfgeld.
 - Debug: „Burgtor: Grund prüfen“.
+
+## Alarm in der Burg: Späher und Verstärkung
+- Brichst du mit Gewalt ins Burgtor, ziehst du drinnen die Waffe oder greifst du den König an, schlägt die Burg Alarm (Valen −20, Kopfgeld). Zwei Späher reiten zu den Stadttoren.
+- Erreichen sie die Tore (nach etwa einer Minute), marschieren aus den nächsten Valen-Städten je 4–6 Soldaten der Krone zur Burg; dort sinkt die Besatzung. Nach einer weiteren Minute sind sie da und suchen dich.
+- **Fängst du die Späher ab, kommt keine Verstärkung.**
+- Debug: „Burg-Alarm: Späher jetzt“, „Burg-Alarm: Späher kommen an (Verstärkung)“.

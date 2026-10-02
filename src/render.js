@@ -59,6 +59,7 @@ const VIS = { arr: null, n: -1, grid: null, dyn: null, t: 0 }, GC = 256;
 function visibleEnts(arr, xa, ya, xb, yb) {
   const now = performance.now();
   if (VIS.arr !== arr || VIS.n !== arr.length || now - VIS.t > 1500) {
+    PT.n_visRebuild = (PT.n_visRebuild || 0) + 1; /*PERFTMP*/
     VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = [];
     for (const e of arr) { if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e); }
   }
@@ -128,12 +129,12 @@ export function drawFrame(now) {
   drawFires(now);     // S14: Brand in der Stadt
   ctx.restore(); tk('sky'); /*PERFTMP*/
   drawLight(now); tk('light'); /*PERFTMP*/
-  drawAmbienceGlow();   /* Artist Runde 7 */
+  drawAmbienceGlow(); tk('ambglow'); /*PERFTMP*/
   drawWeather(now); tk('weather'); /*PERFTMP*/
-  drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
-  drawFloats();
-  drawBubbles(performance.now());
-  drawBossBar();
+  drawPlaceGuide(shown || [], now); tk('guide'); /*PERFTMP*/
+  drawFloats(); tk('floats'); /*PERFTMP*/
+  drawBubbles(performance.now()); tk('bubbles'); /*PERFTMP*/
+  drawBossBar(); tk('boss'); /*PERFTMP*/
   drawTrack(now); tk('ui'); /*PERFTMP*/
 }
 // S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
@@ -256,6 +257,7 @@ function chunkCanvas(m, cx, cy) {
   let cv = chunkCache.get(key);
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
   PT.n_chunkMiss = (PT.n_chunkMiss || 0) + 1; /*PERFTMP*/
+  const _cb = performance.now(); /*PERFTMP*/
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
   bakeGround(o, m, cx, cy);
@@ -285,6 +287,7 @@ function chunkCanvas(m, cx, cy) {
     const below = ty + 1 < m.h ? m.tiles[(ty + 1) * m.w + tx] : t;
     if (!SOLID_T.has(below)) { o.fillStyle = 'rgba(0,0,0,.38)'; o.fillRect(i * 16, j * 16 + 14, 16, 2); o.fillStyle = 'rgba(0,0,0,.2)'; o.fillRect(i * 16, j * 16 + 16, 16, 2); }
   }
+  (window.__CB ||= []).push(performance.now() - _cb); /*PERFTMP*/
   chunkCache.set(key, cv);
   if (chunkCache.size > CHUNK_MAX) chunkCache.delete(chunkCache.keys().next().value);
   return cv;
