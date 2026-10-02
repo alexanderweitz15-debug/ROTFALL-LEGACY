@@ -130,6 +130,11 @@ function silHead(C, L, X, hx, y0, view) {
   if (hasSil(L, 'spikes')) { const sp = C.part(dimR(L.bone, 0.2), 'bone');
     const xs = side ? [12, 14, 16, 18] : [12, 13.5, 15.5, 17.5, 19];
     xs.forEach((x, i) => { const tall = side ? 6 + (i % 2) * 4 : [6, 9, 12, 9, 6][i]; C.poly(sp, [[x - 0.8 + hx, y0 - 1], [x + 0.8 + hx, y0 - 1], [x + hx, y0 - 1 - tall]]); }); }
+  /* Entwickler 02.10.: growth — Wucherungen der Mutierten (Fleischbeulen an Schulter, Hals, Schädel; Lage aus der Variante vs) */
+  if (hasSil(L, 'growth')) { const S0 = L.skin, G = { hi: mix(S0.hi, '#d89a8a', 0.35), b: mix(S0.b, '#b0706a', 0.4), sh: mix(S0.sh, '#7a4048', 0.45), dk: mix(S0.dk, '#3a1820', 0.5) }, g = C.part(G, 'skin', { grp: 'growth' }), v = L.vs | 0, sg = v % 2 ? 1 : -1, sw = X.sh || 0;
+    if (side) { C.ell(g, 18 + hx, top - 1, 2.6, 2.2); C.ell(g, 13.5 + hx, y0 + 1.5, 1.6, 1.4); if (v % 3 === 0) C.ell(g, 19.5 + hx, top + 4, 1.6, 2); }
+    else { const xs = sg > 0 ? 22 + sw : 9 - sw; C.ell(g, xs + sg * 0.5, top - 1, 2.8, 2.4); C.ell(g, xs + sg * 1.8, top + 1.5, 1.8, 1.7); C.ell(g, (sg > 0 ? 18.5 : 12.5) + hx, y0 + 1, 1.7, 1.5);
+      if (v % 3 === 0) C.ell(g, 16 + hx - sg * 3, top + 6, 1.6, 1.4); if (v % 4 === 1) C.ell(g, (sg > 0 ? 12 : 20) + hx, y0 - 0.5, 1.4, 1.3); } }
 }
 function boiler(C, L, top, view) {
   const k = C.part(dimR(L.metal, 0.15), 'metal'), band = C.part(L.gold, 'metal');
@@ -143,6 +148,8 @@ function silGlow(C, L, M, view) {
     const x = cx + i - 1, h = 3 + ((hsh(x, sd) * 3) | 0) + (i === 1 ? 2 : 0); let y0 = top + 2; while (y0 > -C.dy && C.at(x, y0 - 1) >= 0) y0--;   // über dem höchsten Teil der Schulter
     for (let k = 0; k < h; k++) C.set(x, y0 - 1 - k, k === 0 ? dk : k < h - 1 ? (i === 1 ? hi : g) : dk); }
   if (hasSil(L, 'motes')) for (const [x, y] of [[5, top + 2], [27, top - 1], [4, top + 12], [28, top + 9], [7, top - 5]]) if (C.at(x, y) < 0) { C.set(x, y, hi); if (C.at(x, y + 1) < 0) C.set(x, y + 1, dk); }
+  if (hasSil(L, 'ember') && view !== 'N') { const e = L.glow || g, h2 = mix(e, '#fff2c0', 0.55), cx = view === 'W' ? 15 + (M.hx || 0) : 15.5;   /* Entwickler 02.10.: Bomben-Skelett — Grabglut im Brustkorb */
+    for (let y = top + 3; y <= top + 8; y++) for (let x = Math.floor(cx - 1.5); x <= Math.ceil(cx + 1.5); x++) if (C.at(x, y) >= 0 && (x + y) % 2 === 0) C.set(x, y, y === top + 5 || y === top + 6 ? h2 : e); }
 }
 // S15 Politur: je größeres Metallteil ein Glanzpunkt aus zwei Pixeln an der ersten Innenstelle oben links
 function glint(C) {
@@ -339,6 +346,7 @@ export function paintR(L, dir, pose, W = null) {
   if (ride) { if (view === 'W') { R.lN = [[15.5, 26], [11, 29.5], [12.5, 36]]; R.lF = [[16.5, 26], [12, 30], [13.5, 36.5]]; }   // S15 Reitsitz: Knie nach vorn, Unterschenkel am Pferd
     else { R.lL = [[13.5, 26], [10, 31], [10.5, 37]]; R.lR = [[18.5, 26], [22, 31], [21.5, 37]]; } }   // von vorn/hinten: Beine gespreizt um den Rumpf
   const plan = W ? armPlan(view, R, W) : null;
+  if (L.la) for (const k of ['aL', 'aR', 'aN', 'aF']) { const a = R[k]; if (a && a.length === 3) { const [s0, e0, h0] = a, f = (q, k2) => [s0[0] + (q[0] - s0[0]) * k2, s0[1] + (q[1] - s0[1]) * k2]; R[k] = [s0, f(e0, 1.3), f(h0, 1.38)]; } }   /* Entwickler 02.10.: Mutierte — zu lange Arme (Glieder ohne Waffe; der Waffenarm folgt der Hand) */
   const C = new Px(RW, RH, DX, DY); STUMPS = [];
   if (view === 'W') { if (limbSt(L, 'rleg') === 2) R.lN = stumpOf(R.lN); if (limbSt(L, 'lleg') === 2) R.lF = stumpOf(R.lF); }
   else { const b = view === 'N'; if (limbSt(L, b ? 'lleg' : 'rleg') === 2) R.lL = stumpOf(R.lL); if (limbSt(L, b ? 'rleg' : 'lleg') === 2) R.lR = stumpOf(R.lR); }

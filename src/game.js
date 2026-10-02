@@ -1691,7 +1691,7 @@ SPAWN_AREAS.push(
   { map:'world', x:1300, y:520, r:70, types:['skeleton', 'ghoul', 'wraith', 'cultist', 'bone_archer', 'necromancer', 'zombie', 'carrion_wing'], cap:12 },
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
-const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard']);
+const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute']);
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -1890,9 +1890,9 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
   const e = {
     id: uid(), kind:'enemy', mtype, map, x: pos.x, y: pos.y, vx:0, vy:0, facing:0, aim:0,
     level: opts.level || Math.max(1, ri(1, 3) + (m.threat || 1) * 2),
-    hp: m.hp, maxHp: m.hp, r: m.r, armor: m.threat, alive:true, seed: rnd() * 100,
+    hp: m.hp, maxHp: m.hp, r: m.r, armor: m.armor ?? m.threat, alive:true, seed: rnd() * 100,
     swing:0, atkCd:0, telegraph:0, aiState:'idle', aiTimer:0, anchor:{ x: pos.x, y: pos.y },
-    weaponKey: { goblin:'dagger', goblin_warrior:'axe', dodon:'mauerbrecher', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', blood_cultist:'dagger', aldhelm:'longsword', blood_mage:'staff', thrall:'dagger', chalice_guard:'longsword', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff', bone_knight:'longsword', bone_archer:'shortbow', necromancer:'staff', ash_demon:'axe', shade:'dagger', death_knight:'greatsword', garmadon:'greatsword', angel_blade:'longsword', angel_archer:'shortbow', sea_raider:'entermesser', sea_harpooner:'harpune', whitebeard:'sturmanker' }[mtype] || null,
+    weaponKey: { goblin:'dagger', goblin_warrior:'axe', dodon:'mauerbrecher', bandit:'rusty_sword', bandit_archer:'shortbow', bandit_spear:'spear', blood_cultist:'dagger', aldhelm:'longsword', blood_mage:'staff', thrall:'dagger', chalice_guard:'longsword', bounty_hunter:'longsword', chain_brute:'flail', automat:'halberd', rotgardist:'rotklaue', kettenschuetze:'crossbow', chain_master:'roter_henker', skeleton:'rusty_sword', crypt_warden:'longsword', death_captain:'greatsword', hrodvar:'greatsword', valen_soldier:'spear', cultist:'staff', bone_knight:'longsword', bone_archer:'shortbow', necromancer:'staff', ash_demon:'axe', shade:'dagger', death_knight:'greatsword', garmadon:'greatsword', angel_blade:'longsword', angel_archer:'shortbow', sea_raider:'entermesser', sea_harpooner:'harpune', whitebeard:'sturmanker', skel_brute:'greataxe' }[mtype] || null,
     shield: mtype === 'goblin_warrior' ? { key:'wooden_shield' } : mtype === 'bone_knight' ? { key:'kite_shield' } : null,
     faction: m.faction, boss: !!m.boss, ...opts,
   };
@@ -2001,8 +2001,12 @@ function spawnType(a) {                                             // Machtvaku
   if (S.flags.goblinsFreed && a.map === 'world' && (t === 'goblin' || t === 'goblin_warrior')) return null;   // befreit: Goblins sind kein Feind mehr
   for (const b of REGION_BOSSES) if (t === b.from && S.flags[b.flag] && b.area(a) && chance(0.6)) return b.to;
   if (S.flags.chainsBroken && a.eisen && (t === 'rotgardist' || t === 'kettenschuetze')) return 'bandit';   // S12: ohne Varg keine Elite mehr
-  return t;
+  return abartOf(t);
 }
+/* Entwickler 02.10. (Neue Gegner): Abarten (MONSTERS.x.abart = { of, p }) ersetzen gelegentlich ihre Grundart, überall wo diese aus Spawngebieten,
+   Tiefhall und Gewölben kommt. Eigener Zufall wie applyVariant: die Weltfolge (rnd) bleibt stabil. */
+const ABART = Object.entries(MONSTERS).filter(([, m]) => m.abart).map(([k, m]) => [k, m.abart]);
+function abartOf(t, roll = Math.random()) { for (const [k, A] of ABART) { if (A.of !== t) continue; if (roll < A.p) return k; roll -= A.p; } return t; }
 // §71 Gefahr ist eine Eigenschaft des Ortes: Gegner, die in Gefahr-3/4-Gebieten entstehen, sind stärker (+2/+4 Stufen) und
 // oft Veteranen (+30 % Leben, größer, bessere Beute). Die Welt skaliert nicht zum Spieler — der Ort bestimmt die Gefahr.
 // Gegner-Skalierung (Master-Prompt 2 §20/§21): Jedes Gebiet hat eine Levelspanne nach seiner Gefahr. Innerhalb dieser
@@ -2031,6 +2035,21 @@ const capOf = a => REGION_BOSSES.some(b => S.flags[b.flag] && b.area(a)) ? Math.
 function poiSpawns() {
   for (let i = SPAWN_AREAS.length - 1; i >= 0; i--) if (SPAWN_AREAS[i].poi) SPAWN_AREAS.splice(i, 1);
   for (const l of LOCATIONS) if (l.spawn) SPAWN_AREAS.push({ map: 'world', x: l.x, y: l.y, r: 6, types: l.spawn, cap: 3, poi: true });
+  for (const a of deadEdgeAreas()) SPAWN_AREAS.push(a);
+}
+/* Entwickler 02.10. (Neue Gegner): Totenland-Rand — wo der Fluch die Lebenden verdirbt, leben Mutierte. Die Grenze ist die der Region
+   (regionAt → 'deadland', world.js deadBorder, ohne Zufall); je 80 Zeilen ein Gebiet knapp diesseits der Grenze, nicht im Wasser, nicht in Orten. */
+const EDGE_TYPES = ['mutant', 'mutant', 'mutant', 'mutant_brute'];
+let dbgEdgeI = 0;
+function deadEdgeAreas() {
+  const out = [], W = MAPS.world; if (!W) return out;
+  for (let y = 48; y < Math.min(W.h - 8, 700); y += 80) {
+    let bx = -1; for (let x = OX + 768; x < Math.min(W.w - 4, OX + 768 + 140); x++) if (regionAt(x, y) === 'deadland') { bx = x; break; }
+    if (bx < 0) continue; const cx = bx - 12, t = tileAt('world', cx, y);
+    if (t === T.WATER || t === T.ROCK || townAt(cx, y, 8)) continue;
+    out.push({ map: 'world', x: cx, y, r: 12, types: EDGE_TYPES, cap: 5, poi: true, deadEdge: true });
+  }
+  return out;
 }
 function initialSpawns() {
   for (const a of SPAWN_AREAS) for (let i = 0; i < a.cap * 0.7; i++) {
@@ -2279,7 +2298,7 @@ export function continueGame(given = null, retried = false) {                   
     S.ents.deep = FRESH.deep.slice(); indexSolids('deep');
     S.ents.world = S.ents.world.filter(e => !(e.kind === 'prop' && e.type === 'chest' && e.label === 'Tiefhall-Hort' && !e.opened));   // der Hort lag draußen; ungeöffnet zieht er hinein
     for (const e of S.ents.world) if (e.kind === 'prop' && e.type === 'mine_entrance' && e.label === 'Tiefhall') e.portal = 'deep';
-    for (const a of SPAWN_AREAS) if (a.map === 'deep') for (let i = 0; i < a.cap * 0.7; i++) spawnEnemy(pick(a.types), 'deep', a.x + ri(-a.r, a.r), a.y + ri(-a.r, a.r));
+    for (const a of SPAWN_AREAS) if (a.map === 'deep') for (let i = 0; i < a.cap * 0.7; i++) spawnEnemy(abartOf(pick(a.types)), 'deep', a.x + ri(-a.r, a.r), a.y + ri(-a.r, a.r));
     deepBoss(); S.flags.deep1 = true;
   }
   for (const m of MAP_KEYS) for (const e of S.ents[m]) {
@@ -4253,9 +4272,9 @@ function nearestTarget(e, list, maxD) {
 
 const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
-  bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek' };   // Phase 6
+  bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek', skel_bomb: 'rattle', skel_brute: 'rattle', mutant: 'shriek', mutant_brute: 'growl' };   // Phase 6
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
-const UNDEAD_FX = { necromancer: 'necro', zombie: 'necro', ash_demon: 'fire', shade: 'shadow', death_knight: 'frost', garmadon: 'blood', wraith: 'ghost', flesh_golem: 'blood', cultist: 'shadow' };
+const UNDEAD_FX = { necromancer: 'necro', zombie: 'necro', ash_demon: 'fire', shade: 'shadow', death_knight: 'frost', garmadon: 'blood', wraith: 'ghost', flesh_golem: 'blood', cultist: 'shadow', skel_bomb: 'fire' };
 function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt / (e.mtype === 'ash_demon' || e.mtype === 'garmadon' ? 220 : 420))) fx(e.x + ri(-8, 8), e.y - ri(4, 30), k, 1); }
 function updateEnemy(e, dt) {
   if (!e.alive) return;
@@ -4724,12 +4743,15 @@ function startHeavy(e, tgt, m) {
   e.telegraph = wind; e.windup = true;
   e.special = H.kind === 'thrust' || H.kind === 'charge' ? { kind: 'beam', t: wind, T: wind, L: H.r, a, heavy: 1 } : { kind: 'stomp', t: wind, T: wind, R: H.kind === 'slam' ? H.r * 0.55 : H.r, spots: [c], heavy: 1 };
   sfx('swing', 0.2, earVol(e));   /* Kampf-Feedback: statt Wort-Float füllt sich die rote Bodenmarke bis zum Einschlag, darüber das Warnzeichen „nicht blockbar“ (render.js) */
+  if (H.kind === 'blast') { float(e, 'zischt!', 'rgba(255,150,60,ALPHA)'); fx(e.x, e.y - 18, 'fire', 6);   /* Entwickler 02.10.: Bomben-Skelett zündet — einmal je Spielstand erklärt */
+    if (!S._quiet && !S.flags.blastHint && dist(e, S.player) < 600) { S.flags.blastHint = 1; log('Ein Bomben-Skelett zündet! Die rote Fläche fliegt gleich in die Luft — raus oder rollen. Die Explosion trifft jeden darin, auch die Toten. Wer es vorher erschlägt, löscht die Glut.', 'combat'); UI.toast('ZÜNDUNG — RAUS AUS DER FLÄCHE', 2400); } }
 }
 function heavyTick(e, dt, m) {
   const Hv = e.heavy, H = m.heavy; e.vx = e.vy = 0; Hv.t -= dt; if (e.special) e.special.t = Hv.t; e.telegraph = Math.max(0, Hv.t);
   if (e.stagger > 0 && Hv.t > 150) { e.heavy = null; e.special = null; e.windup = false; return; }   // unterbrochen (Handkante, Wucht)
   if (Hv.t > 0) return;
   e.heavy = null; e.special = null; e.windup = false; e.telegraph = 0;
+  if (Hv.kind === 'blast') return blastEnd(e, Hv, H);                    /* Entwickler 02.10.: Bomben-Skelett */
   for (const t of combat) {
     if (!t.alive || t.downed || t === e || !isHostile(e, t)) continue;
     let inside;
@@ -4744,7 +4766,21 @@ function heavyTick(e, dt, m) {
   if (dist(e, S.player) < 500) { camShake(6, 220); hitStop = Math.max(hitStop, 60); }
   e.exposed = performance.now() + 600; e.atkCd = m.atk + 600;
 }
-function resolveSwingEnemy(e) {
+/* Entwickler 02.10. (Neue Gegner): Explosion des Bomben-Skeletts — Fläche um sich (Ansage war die rote Bodenmarke), trifft JEDEN darin
+   (auch andere Gegner und Untote), nicht blockbar und ohne Deckung (AREA + UNBLOCK). Wer rollt (Unverwundbarkeit), weicht aus. Danach zerfällt es. */
+function blastEnd(e, Hv, H) {
+  for (const t of [...combat]) {
+    if (!t.alive || t.downed || t === e || t.kind === 'caravan' && !isHostile(e, t)) continue;
+    if (Math.hypot(t.x - Hv.c.x, t.y - Hv.c.y) >= H.r + (t.r || 10)) continue;
+    if (t.invuln) { evaded(t); continue; }
+    AREA = UNBLOCK = true; try { hit(e, t, H.mul, 'fire'); } finally { AREA = UNBLOCK = false; }
+    const ka = Math.atan2(t.y - Hv.c.y, t.x - Hv.c.x); if (t.alive) { moveEnt(t, Math.cos(ka) * 26, Math.sin(ka) * 26); t.stagger = Math.max(t.stagger || 0, 450); }
+  }
+  fx(Hv.c.x, Hv.c.y - 10, 'fire', 18); fx(Hv.c.x, Hv.c.y - 12, 'bone', 10); fx(Hv.c.x, Hv.c.y, 'dust', 14);
+  S.fx.push({ x: Hv.c.x, y: Hv.c.y, vx: 0, vy: 0, type: 'shock', s: H.r / 60, life: 450, maxLife: 450 }); sfx('crit', 1, earVol(e));
+  if (dist(e, S.player) < 500) { camShake(8, 260); hitStop = Math.max(hitStop, 70); }
+  e.blasted = true; die(e, 'Explosion', e);
+}
   const m = MONSTERS[e.mtype];
   // §82 Ausfallschritt: wer beim Treffer knapp (≤ 30 px) außer Reichweite zurückgewichen ist, wird trotzdem erreicht —
   // der Gegner setzt nach (bis 20 px) und führt den Hieb aufs Ziel. Das Ausholen war sichtbar; Rückwärtslaufen allein reicht nicht.
@@ -10778,7 +10814,7 @@ function buildVault(site, floor) {
   MAPS.vault.entry = { x: first.cx * TS + TS / 2, y: (first.y + first.h - 3) * TS };
   S.ents.vault = P; indexSolids('vault');
   if (!cleared) for (const o of rooms.slice(1)) for (let i = 0, n = R(1, 2 + (V.tier >= 3 ? 1 : 0)); i < n; i++) {
-    const e = spawnEnemy(V.pool[R(0, V.pool.length - 1)], 'vault', R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { level: 1 + V.tier * 3 + floor * 2 + (mod === 'verflucht' ? 2 : 0) });
+    const e = spawnEnemy(abartOf(V.pool[R(0, V.pool.length - 1)]), 'vault', R(o.x + 1, o.x + o.w - 2), R(o.y + 1, o.y + o.h - 2), { level: 1 + V.tier * 3 + floor * 2 + (mod === 'verflucht' ? 2 : 0) });
     Object.assign(e, { transient: true, vaultFoe: true }); if (mod === 'verflucht') { e.maxHp = e.hp = Math.round(e.maxHp * 1.25); e.dmgMul = (e.dmgMul || 1) * 1.15; if (e.body) B.initBody(e, e.maxHp); }
   }
   if (!cleared && (floor === V.floors || endBoss)) { const b = spawnEnemy(V.boss, 'vault', last.cx, last.cy + 1, { level: 3 + V.tier * 3 + floor * 2, noVariant: true });
@@ -13067,7 +13103,7 @@ function onKill(mtype, e) {
   for (const [k, st] of Object.entries(S.quests)) {
     if (st.state !== 'active') continue;
     QUESTS[k].objectives.forEach((o, i) => {
-      if (o.type === 'kill' && (o.target === mtype || (o.target === 'bandit_rival' && mtype === 'bandit'))) {
+      if (o.type === 'kill' && (o.target === mtype || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
         st.progress[i] = (st.progress[i] || 0) + 1;
         if (st.progress[i] <= (o.count || 1)) log(`${QUESTS[k].name}: ${st.progress[i]}/${o.count}`, 'quest');
       }
@@ -16136,6 +16172,18 @@ function debugSections() {
       'Gegner im Umkreis töten': () => { for (const e of S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive && dist(x, p) < 600)) die(e, 'Debug', p); },
       'Gegner taumeln lassen': () => { for (const e of S.ents[S.map].filter(x => x.kind === 'enemy' && x.alive && dist(x, p) < 600)) e.stagger = 1500; },
     }],
+    ['Kampf: Neue Gegner (02.10.)', '', {   /* Entwickler 02.10.: Bomben-Skelett, Großes Skelett, Mutierte, Varianten */
+      ...Object.fromEntries([['skel_bomb', 'Bomben-Skelett'], ['skel_brute', 'Großes Skelett'], ['mutant', 'Verdorbener (Mutant)'], ['mutant_brute', 'Wucherer (Mutant)']].map(([k, n]) => [`Gegner: ${n} vor dir`, () => {
+        const e = spawnEnemy(k, S.map, (p.x / TS2 | 0) + 6, p.y / TS2 | 0, { level: Math.max(1, p.level) }); e.aggroId = p.id; e.aiState = 'pursue'; UI.toast(`${MONSTERS[k].name} (Stufe ${e.level})`); }])),
+      'Gegner: Skelett-Rotte mit Bomben-Skelett (Explosion trifft die Toten)': () => { const tx = (p.x / TS2 | 0) + 7, ty = p.y / TS2 | 0;
+        for (let i = 0; i < 3; i++) spawnEnemy('skeleton', S.map, tx + 1, ty - 1 + i, { level: Math.max(1, p.level) });
+        const b = spawnEnemy('skel_bomb', S.map, tx, ty, { level: Math.max(1, p.level) }); b.aggroId = p.id; b.aiState = 'pursue'; },
+      'Gegner: Bomben-Skelett sofort zünden': () => { const e = S.ents[S.map].filter(x => x.alive && x.mtype === 'skel_bomb').sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!e) return UI.toast('Kein Bomben-Skelett in der Nähe.'); startHeavy(e, p, MONSTERS.skel_bomb); },
+      'Gegner: zum Totenland-Rand (Mutierte)': () => { const A = SPAWN_AREAS.filter(a => a.deadEdge); if (!A.length) return UI.toast('Kein Randgebiet.'); toWorld(); const a = A[(dbgEdgeI++) % A.length], q = freeSpotNear('world', a.x - 8, a.y, 4); P().x = q.x; P().y = q.y; UI.toast(`Totenland-Rand ${a.x}/${a.y} (${A.length} Gebiete)`); },
+      'Gegner: Varianten-Schau (je Art 6 Seeds)': () => { const T0 = ['skel_bomb', 'skel_brute', 'mutant', 'mutant_brute', 'cultist', 'blood_mage', 'chalice_guard', 'blood_cultist', 'thrall', 'sea_raider', 'sea_harpooner', 'death_captain', 'ash_demon', 'death_knight'];
+        T0.forEach((k, j) => { for (let i = 0; i < 6; i++) { const e = spawnEnemy(k, S.map, (p.x / TS2 | 0) - 8 + i * 3, (p.y / TS2 | 0) - 14 + j * 2, { noVariant: true }); e.seed = 1 + i * 7.3 + j; e.aiState = 'idle'; e.dbgShow = true; e.surrendered = true; e.spdMul = 0; e.transient = true; e.anchor = { x: e.x, y: e.y }; } }); UI.toast('Varianten-Schau: Reihen je Art, Spalten je Seed'); },
+      'Gegner: Varianten-Schau entfernen': () => { for (const k of Object.keys(S.ents)) S.ents[k] = S.ents[k].filter(e => !e.dbgShow); },
+    }],
     ['Bionik', '', {   /* Roadmap P2–P5: Bionik-Tests */
       ...Object.fromEntries([1, 2, 3, 4].map(q => [`Auge Stufe ${q} (${B.EYE_Q[q].name})`, () => { B.attachEye(p, q); UI.toast(`Roboterauge Stufe ${q}`); }])),
       'Auge entfernen': () => { p.eye = null; p.lens = false; UI.toast('Kein Roboterauge'); },
@@ -18924,10 +18972,10 @@ export function selftest() {
     const n = actor(p.x + 40, p.y, { kind: 'npc', name: 'Gesprächspartner' }); n.key = 'probe_talk'; talk(n); const gest = n.act?.kind === 'gesture'; UI.closeDialogue();
     return two && fin && d2 > d1 * 1.1 && limp && gest;
   }));
-  ok('Kampfanimation Scheibe 1: Schaden fällt im Einschlag-Bild, nie davor (Langschwert A/B/C, Dolch, Speer, Kriegshammer); Bild und Treffer lesen dasselbe hitAt', sandbox(() => {
+  ok('Kampfanimation Scheibe 1+2: Schaden fällt im Einschlag-Bild, nie davor (Langschwert, Zweihänder, Dolch, Speer, Kriegshammer in A/B/C); Bild und Treffer lesen dasselbe hitAt; Hiebe queren die Zielachse erst im Einschlag, Stöße sind dort am weitesten vorn', sandbox(() => {
     const p = stage(); (S.dbg ||= {}); const pk0 = S.dbg.pack, god0 = S.dbg.god; let good = true; const bad = [];
     try {
-      for (const [wk, pk] of [['longsword', 'A'], ['longsword', 'B'], ['longsword', 'C'], ['dagger', 'A'], ['spear', 'A'], ['warhammer', 'A']]) {
+      for (const [wk, pk] of [['longsword', 'A'], ['longsword', 'B'], ['longsword', 'C'], ['dagger', 'A'], ['spear', 'A'], ['warhammer', 'A'], ['greatsword', 'A'], ['greatsword', 'C'], ['dagger', 'C'], ['spear', 'B'], ['warhammer', 'C']]) {
         S.dbg.pack = pk; p.equip.weapon = mkItem(wk); p.stamina = p.maxStamina; p.swing = 0; p.atkCd = 0; p.combo = 0; p.comboT = -1e9; p.vx = p.vy = 0; p.x = 300; p.y = 300; p.aim = 0;
         S.ents.__a = S.ents.__a.filter(e => e === p); const f = spawnEnemy('bear', '__a', 10, 9); f.x = p.x + 30; f.y = p.y; f.maxHp = f.hp = 99999; if (f.body) B.initBody(f, f.maxHp); f.aiState = 'idle';
         const vit = () => f.body ? B.vital(f) : f.hp, h0 = vit(); attack(p); const H = swingHit(p), plan = atkPlan(ITEMS[wk].wtype, pk, 0);
@@ -18940,7 +18988,11 @@ export function selftest() {
     } finally { S.dbg.pack = pk0; S.dbg.god = god0; }
     if (!good) console.warn('Kampfanimation Impact', bad);
     const side = (v, sg) => [0.05, 0.13, 0.27, 0.4, 0.45].every(u => sg * R.swingOf('sword', u, 1.6, v, 0).a > 0) && sg * R.swingOf('sword', 0.5, 1.6, v, 0).a < 0;   /* Vorhand/Rückhand: Klinge quert die Zielachse erst im Einschlag-Bild */
-    return good && side(0, 1) && side(1, -1);
+    const side2 = (wt, v, sg) => [0.05, 0.13, 0.27, 0.4, 0.45].every(u => sg * R.swingOf(wt, u, 1.6, v, 0).a > 0) && sg * R.swingOf(wt, 0.5, 1.6, v, 0).a < 0;
+    const thrustPeak = (wt, v) => [0.13, 0.27, 0.4, 0.45, 0.6, 0.8].every(u => R.swingOf(wt, u, 1, v, 0).ext < R.swingOf(wt, 0.5, 1, v, 0).ext);   /* Scheibe 2: Stoß ist im Einschlag am weitesten vorn */
+    const s2 = side2('great', 0, 1) && side2('great', 1, -1) && side2('hammer', 1, 1) && side2('dagger', 1, 1) && side2('spear', 2, -1) && thrustPeak('dagger', 0) && thrustPeak('dagger', 2) && thrustPeak('spear', 0) && thrustPeak('spear', 1);
+    if (!s2) console.warn('Kampfanimation Scheibe 2 Formen');
+    return good && side(0, 1) && side(1, -1) && s2;
   }));
   ok('Kampfanimation Scheibe 1: Kombo-Kette — Schritt 1 → 2 → Wuchtschlag; der Wuchtschlag dauert 15 % länger; Erholung erst ab Treffer + 40 % abbrechbar (takt-neutral: der Rest verlängert das nächste Ausholen, Treffer im alten Takt), der Wuchtschlag nicht; Pack ändert den Abbruchpunkt nicht', sandbox(() => {
     const p = stage(); p.equip.weapon = mkItem('longsword'); p.vx = p.vy = 0; p.comboT = -1e9; p.combo = 0; p.swing = 0; p.atkCd = 0; p.aim = 0; p.stamina = p.maxStamina;

@@ -8,7 +8,7 @@ import * as SP from './sprites.js?v=24';
 import { trailPt, WAGON_GAP } from './sim.js?v=24';
 import { ICON_R } from './iconsR.js?v=24';
 import { airPos, airPt } from './economy.js?v=24';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, legacyTiming, ATK_PACKS } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -2261,7 +2261,7 @@ function atkTiming(e, wt, sw) {
 /* Kampfanimation B/C: Sichelbogen — helle Pixelpunkte auf dem Weg der Klingenspitze vom Schlagbeginn bis jetzt, verblasst nach dem Einschlag.
    Wirbel-Finisher: ganzer Kreis. Nur Optik, aus dem Schwungzustand gerechnet (kein Eintrag in S.fx). */
 function drawSlash(c, e, W, AF, hx, hy, dir, it) {
-  const u = W.u; if (!(u >= 0.42 && u < 0.72)) return;
+  const u = W.u; if (!(u >= 0.42 && u < 0.72) || atkThrust(W.wt, W.v)) return;   /* Stoß: kein Bogen */
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.22, R = (it.reach || 40) * 0.62, big = AF.slash + (e.atkStep === 2 ? 1 : 0);
   const a1 = SP.swingOf(W.wt, Math.min(u, 0.6), W.arc, W.v, 0).a, a0 = SP.swingOf(W.wt, 0.4, W.arc, W.v, 0).a, span = Math.min(Math.abs(a1 - a0), atkSpin(W.wt, W.v) ? 6.3 : 2.4), st = a1 > a0 ? -1 : 1;
   const cx = e.x + (hx - e.x) * 0.25, cy = hy - 2;

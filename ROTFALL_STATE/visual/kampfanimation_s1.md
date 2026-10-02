@@ -4,9 +4,30 @@ Auftrag: COMBAT_ANIM.md, Analyse `visual/kampfanimation.md` §5/§6, Entscheidun
 Bilder: `visual/img/kampf_s1_langschwert_phasen.png` (Blick Ost, Pack A/B/C × Schlag 1/2/Wucht × 11 Stützstellen, rot = Einschlag-Bild = Schaden),
 `visual/img/kampf_s1_langschwert_sued.png` (Blick Süd).
 
-**STATUS: TEILWEISE** — Infrastruktur, Schaden im Einschlag, Kombo-Kette, Test Room und Langschwert A/B/C laufen; Vollständigkeitsprüfung §17 für das
-Langschwert ist nicht erfüllt (Liste unten), Scheibe 2 nicht begonnen. **STOPP-Punkt (COMBAT_ANIM §19):** das beschlossene Abbrechen der Erholung
-hebt den Schaden je Sekunde im Stand um ~20–50 % und macht die Probe „Balancing (§82)“ rot — Entwickler muss entscheiden (siehe §4).
+**STATUS: TEILWEISE** — Scheibe 1 und 2 gebaut (Langschwert, Zweihänder, Dolch, Speer, Kriegshammer je A/B/C), Abbrechen takt-neutral
+(Entscheidung Entwickler 02.10.), Selbsttest 395/395 grün inkl. „Balancing (§82)“ (Probe unverändert). Vollständigkeit §17 je Waffe nicht erfüllt (Liste §5).
+Weitere Bilder: `visual/img/kampf_s2_zweihaender.png`, `kampf_s2_dolch.png`, `kampf_s2_speer.png`, `kampf_s2_hammer.png`.
+
+## 0. Nachtrag 02.10. — Entscheidung §4 umgesetzt, Scheibe 2
+- **Takt-neutral abbrechen** (`game.attack`): bricht der nächste Kombo-Schlag die Erholung ab, wird der Rest `rem = (1 − swing) × Dauer` vorn an das Ausholen
+  des neuen Schlags gehängt (Dauer + rem; w, h, Abbruchpunkt umgerechnet, `c.atkRem`). Die Bewegung fließt, Treffer kommen exakt im alten Takt
+  (Probe „Kombo-Kette“ prüft: Dauer − rem = Takt, Trefferzeit = rem + h × Takt).
+- **Scheibe 2** (`anim.js ANIM_DEFS.attack.great/dagger/spear/hammer`): Formen + Pack-Zeiten aus Analyse §4.2; neue Formart `thrust` (Stoß: zurückziehen →
+  volle Streckung im Einschlag → halten → einholen). Zweihänder-Profil gilt für alle wtype `great` (auch Großäxte). Effekte je Pack (Hit-Stop B/C:
+  Zweihänder 120/150, Dolch 35/40, Speer 60/80, Hammer 140/180 ms; Vorschub/Nachbilder; Sichelbogen nur bei Hieben, nicht bei Stößen).
+- Zeitplan Treffer (A / B / C, ms; Wucht 1,15 × Takt): Zweihänder 490/420/320 · 370/320/240 · Spalter 540/540/507; Dolch 100/85/70 · 90/75/60 ·
+  Doppelstich 121/104/93; Speer 270/230/170 · 230/200/154 · Schaftschwung 340/324/309; Hammer 650/570/440 · 520/480/380 · Bodenschlag 701/674/622.
+  Vorher (0,42): Zweihänder 412, Dolch 126, Speer 269, Hammer 483.
+- **Proben**: „Kampfanimation Scheibe 1+2: Schaden im Einschlag-Bild …“ jetzt mit Zweihänder A/C, Dolch A/C, Speer A/B, Hammer A/C; Hiebe aller Profile queren
+  die Zielachse erst im Einschlag, Stöße sind dort am weitesten vorn. „Hiebvarianten (S12)“ grün (Rückschwung spiegelt den Schräghieb, Speer-Stoß tief/Schaftschwung hoch).
+- **duel §82** jetzt: Seeds ✓1,4/7 · ✓5,6/10 · ✓6,8/21 → Ø 12,7 % Stand / 45 % rückwärts → grün.
+- **simFight Schaden/s** (Bandit St.10, 2500 LP, smart; Referenz vor dem Umbau → nachher, 8 Seeds; in Klammern 20 Seeds gegen „vorher“ im selben Code):
+  Langschwert 30 → 29,7 (−8 %), Zweihänder 29 → 29,0, Dolch 26 → 29,9 (**+8 %**), Speer 22 → 26,2 (−4 %), Hammer 32 → 30,8.
+  Streuung bei 8 Seeds ±15–20 % (Krits, Taumeln); gegen Skelette: Langschwert 23,3, Zweihänder 18,0, Dolch 24,1, Speer 25,5, Hammer 18,0 (vorher 19,7/25,6/22,5/27,0/17,0).
+  Taktbedingt rechnerisch: −4,8 % je Kette durch den beschlossenen 15 % längeren Wuchtschlag, sonst neutral.
+  **Melden:** Der Dolch trifft jetzt früher (100 statt 126 ms) — vor dem Seitschritt des Banditen (reagiert auf swing < 0,35); dadurch gegen Banditen
+  +8 % (20 Seeds), gegen Skelette ohne diesen Ausweichschritt +7 %/−4 % im Rauschen. Nicht ausgeglichen.
+- **Leistung Scheibe 2** (Test Room, Held haut 200 Bilder, nach Vorbacken): Median 1,9–2,7 ms, p95 3,7–5,5 ms (Umgebung lauter als bei Scheibe 1), 0 neue Figurenbilder je Hieb (1 = neu gespawnte Puppe).
 
 ## 1. Gebaut (bestehendes System erweitert, kein zweites Animationssystem)
 | Teil | Ort | Was |
@@ -79,7 +100,7 @@ duel läuft ohne Kampfzeit-Uhr; mit `vclock: true` gewinnt nachher jeder Seed, a
 Die Weltwerte sind in dieser Umgebung (versteckter Bereich, parallele Tabs) über 3 ms und streuen ±1 ms ohne Bezug zum Kampf — keine Aussage über Scheibe 1.
 Pack C kostet ~0,2–0,3 ms (zwei Nachbilder). Cache-Größe: 11 Stützstellen × Form × Achtel wie bisher 11 Zehntel × Variante; Packs teilen alle Bilder.
 
-## 4. STOPP: Abbrechen der Erholung (DECISIONS „Erholung ab Treffer + 40 % abbrechbar“)
+## 4. (erledigt, siehe §0) STOPP: Abbrechen der Erholung — Entwickler wählte Lösung 2 „takt-neutral“
 Problem: Wer im Stand die Taste hält (wie RF.duel/simFight und die meisten Spieler), bricht jede Erholung bei 0,67–0,70 des Takts ab → +18–21 % Hiebe, im
 Kampf durch mehr Wuchtschläge/Taumeln +20–50 % Schaden je Sekunde und deutlich weniger verlorenes Leben. E3 sagt: Abweichung > 5 % → Entwickler entscheidet.
 Systeme: Balance aller Nahkampfwaffen, Probe §82, BALANCE_GUIDE, Ausdauer (mehr Hiebe = mehr Verbrauch — gemessen kein Erschöpfen im Test).
@@ -90,29 +111,29 @@ Lösungen (architekturverträglich, je eine Zeile in `attack()`/`atkCancel`):
 4. Abbrechen nur bei erneutem Drücken im Fenster (nicht beim Halten) — Können statt Dauerfeuer; bleibt ein DPS-Plus für geübte Spieler.
 Bis zur Entscheidung: Code wie beschlossen; `S.dbg.atkOld = 'cancel'` schaltet nur das Abbrechen zum Vergleich ab (Debug-Knopf „alte Taktung zum Vergleich“ schaltet alles).
 
-## 5. Vollständigkeitsprüfung COMBAT_ANIM §17 — Langschwert
+## 5. Vollständigkeitsprüfung COMBAT_ANIM §17 — je Waffe (Langschwert, Zweihänder, Dolch, Speer, Kriegshammer gleich)
 | Punkt | Stand |
 |---|---|
-| Angriff 1/2, Wucht, Finisher (B/C), Combo als Kette | ✓ |
-| Schadenszeitpunkt = Einschlag-Bild, Hitbox | ✓ (Hitbox/Reichweite/Bogen unverändert aus resolveSwing) |
+| Angriff 1/2, Wucht, Finisher (B/C), Combo als Kette (takt-neutral) | ✓ alle 5 |
+| Schadenszeitpunkt = Einschlag-Bild, Hitbox (resolveSwing unverändert) | ✓ alle 5 (Probe) |
 | Animationszeit (Takt gleich, Wucht +15 %) | ✓ |
-| VFX (Spur je Pack, Sichel B/C, Nachbilder C, Ring/Druckwelle Finisher) | ✓ |
-| Klang | teilweise — vorhandenes System (Schwung beim Start, Treffer im Einschlag, C-Finisher Krit-Klang); keine Pack-eigenen Klänge |
-| Koop/Gruppe | teilweise — Felder übertragen, Optik lokal; nicht im echten Koop getestet |
-| Save/Load | ✓ neue Felder tolerant (fehlen = alte Kurve/0,42), Test Room nie gespeichert |
-| Idle (Kampf-Idle, seltene Bewegungen) | ✗ unverändert i0/i1 |
+| VFX (Spur, Vorschub, Nachbilder C, Sichel B/C bei Hieben, Ring/Druckwelle Finisher) | ✓ |
+| Klang | teilweise — vorhandenes System (Gewicht aus FEEL), keine Pack-eigenen Klänge |
+| Koop/Gruppe | teilweise — Felder übertragen, Optik lokal; nicht live getestet |
+| Save/Load | ✓ neue Felder tolerant, Test Room nie gespeichert |
+| Idle (Kampf-Idle) | ✗ |
 | Bewegung (Kampfbewegung, Sprint, rückwärts, Wenden) | ✗ |
-| Schwerer Angriff (halten) | ✗ — offene Frage: Taste/Halten-Regel |
-| Block/Parade mit Waffenhaltung | ✗ (allgemeine guard-Pose) |
-| Ausweichen je Pack (B Ausfallsprung, C Dash) | ✗ (Rolle wie bisher) |
-| Trefferreaktion leicht/schwer/krit als eigene Pose | ✗ (hit/kb wie bisher) |
-| Gegnerreaktion | ✗ (unverändert über hurt) |
-| Tod | ✓ vorhanden (9 Todesarten), unverändert |
-| Alte stilbrechende Animationen | teilweise — Stil D und Arbeitsschwung auf u umgestellt; Reitkampf, Zweiwaffen-Nebenhand nicht geprüft |
+| Schwerer Angriff (halten) | ✗ — offene Frage: Taste/Regel |
+| Block/Parade mit waffeneigener Haltung | ✗ |
+| Ausweichen je Pack | ✗ |
+| Trefferreaktion leicht/schwer/krit, Gegnerreaktion | ✗ |
+| Tod | ✓ vorhanden (9 Todesarten) |
+| Stilbruch-Suche | teilweise — Stil D/Arbeitsschwung umgestellt; Reitkampf, Nebenhand nicht geprüft |
+| Großaxt eigene Bewegung | ✗ teilt das Zweihänder-Profil (wtype great) |
 
 ## 6. Offen
-- Entscheidung §4 (Abbrechen) → danach Probe §82 grün oder neu eingestellt.
-- Scheibe 2 (Zweihänder, Dolch, Speer, Hammer je A/B/C) nicht begonnen; ihre Daten kommen als weitere Profile in `ANIM_DEFS.attack` (gleiche Formstruktur, Stoßform für Dolch/Speer fehlt noch).
+- Dolch +8 % gegen Banditen (frühere Trefferzeit vor deren Seitschritt) — Entwickler entscheidet, ob der Seitschritt auf das sichtbare Ausholen (`atkW`) statt swing < 0,35 hören soll.
+- Packs nach Auswertung festlegen (COMBAT_ANIM §10), danach übrige Klassen (Axt, Kolben, Stange, Sense, Rapier, Peitsche, Stab …).
 - Überkopf-Ausholen hebt die Klinge vor dem Körper durch die Zielachse (wie die alte Kurve) — Wirbel/Vorhand/Rückhand queren sie erst im Einschlag.
 - Wirbel-Körperdrehung nutzt die 4 Richtungsbilder; Hand springt zwischen Stützstellen — für den Vergleich ausreichend, für den finalen Stil eigene Wirbelbilder prüfen.
 - Pack C: Hit-Stop 90 ms × bis 3 Treffer/s friert die Welt bis ~25 % ein (Risiko aus der Analyse) — Deckel je Sekunde fehlt noch.
