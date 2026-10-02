@@ -1095,3 +1095,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Menüs (Version 24)
 - Die Reiter oben in den Fenstern (Werte, Talente, Zauber, Effekte; Fraktionen, Chronik) haben wieder Platz und brechen nicht mehr um.
+
+## Anmarsch und Angst vor Ereignissen (Version 24)
+- Figuren, die ein Ereignis erzeugt (Stunden- und Tagestakt, Weltereignisse, Burgalarm, Überfälle, Miliz, Ersatzwachen), erscheinen nicht mehr im Bild. Sie starten außerhalb und laufen zu ihrem Platz (höchstens 3 Spielstunden). Gegner brechen den Anmarsch ab, wenn sie getroffen werden oder der Held nah ist.
+- Angst geht vor Ereignissen: Hat ein Ort Angst (ab 50), fällt das Stadtfest aus. Wallfahrt, Ketzerjagd, Steuereintreiber und Flüchtlinge wählen einen anderen Ort. Wer neu in einen verängstigten Ort kommt, übernimmt 80 % der Angst.

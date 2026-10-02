@@ -760,6 +760,7 @@ function tierOf(A, now) {
     if (dx < 1950 && dy < 1950) pool.push(e);
     if (!e.alive) { if (k !== 'npc' && k !== 'enemy') hot.push(e); continue; }   /* Tote denken nicht (think kehrt sofort um) */
     const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
+    if (e.walkIn) { hot.push(e); continue; }                         /* Anmarsch: läuft auch fern von außerhalb des Bildes heran */
     if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) continue;
     if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? cold : mid).push(e); continue; }
     hot.push(e);
@@ -952,7 +953,7 @@ function spawnResidents() {
 const FEST_DAYS = 6, FEST_BUILT = new Set(), FEST_POP = {};   // BUG (Nutzer: „in Aurelion versammeln sich locker 1000 Leute auf einem Fleck“): Ringzahl je Einwohnerzahl, sonst quetscht sich eine Metropole auf denselben schmalen Kreis wie ein Dorf
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
 const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && !(town === 'varonheim' && S.flags?.varonDead && d >= S.flags.varonDead && d - S.flags.varonDead < CROWN_TURMOIL) &&   /* nach dem Königsmord kein Fest (endlich: Proben suchen den nächsten Festtag) */ (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
-const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
+const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && calmTown(town) && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
 const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x + 0.5) * TS, y: (y + 0.5) * TS }; };
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
@@ -2461,7 +2462,7 @@ function update(dt, now) {
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
-  if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
+  if ((keepT += dt) > 250) { keepT = 0; keepTick(); walkInNew(castleAlarmTick); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); }  /* Ratgeber; Geheime Orte */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -2476,8 +2477,8 @@ function update(dt, now) {
   }
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
   const hour = Math.floor(S.minute / 60);
-  if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
-  if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
+  if (hour !== lastHour) { lastHour = hour; walkInNew(() => hourTick(hour)); }   /* Anmarsch: was Ereignisse erzeugen, läuft ins Bild */
+  if (S.day !== lastDay) { lastDay = S.day; walkInNew(dayTick); }
   festTick(); roadTick(dt);
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
@@ -2540,7 +2541,7 @@ function update(dt, now) {
     hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
     if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
-    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
+    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); walkInNew(raidTick); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
     else if (tribT === 360) { myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); }
     else if (tribT === 720) { conTick(); jailTick(); }
     if (S.map === 'world') for (const l of LOCATIONS)
@@ -2617,6 +2618,7 @@ function think(e, dt, pre = false) {   /* pre: Schritt schon vom Stufenplan gest
   if (e.downed && e.kind === 'npc' && !e.brawlKO && chance(dt / 5000) && dist(e, S.player) < 520) float(e, pick(['Hilfe …', 'Bitte … helft mir …', 'Hierher …', 'Ich blute …']), 'rgba(220,160,140,ALPHA)');   /* §5f: Verletzte rufen */
   if (e.eliteKey) eliteTick(e, dt);
   if (e.kind === 'npc' && !e.eliteChecked) eliteKit(e);
+  if (e.walkIn && !e.downed && walkInStep(e, dt)) return;           /* Anmarsch */
   if (e.kind === 'enemy' && !(e.status && e.status.length) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen (updateEnemy tat fern ohnehin nichts)
   if (!pre && e.kind === 'npc' && !e.angry && !e.fleeing && !e.escort && !e.threatId && !(e.swing > 0) && S.party.indexOf(e.id) < 0) {   // außer Sicht: jedes 3. Bild, dreifacher Schritt
     const P0 = S.player, far = Math.abs(e.x - P0.x) > 520 || Math.abs(e.y - P0.y) > 420;
@@ -3906,6 +3908,55 @@ function fearStep(e, dt) {                                            /* aus upd
   e.vx = e.vy = 0; return true;
 }
 
+// Angst des Ortes (Nutzer 02.10.2026: „Events sollen das nicht einfach überschreiben“): höchste Angst unter den Bewohnern, je Sekunde
+// zwischengespeichert. Ab 50 fällt das Stadtfest aus, Wallfahrt, Ketzerjagd, Steuereintreiber und Flüchtlinge wählen einen anderen Ort,
+// und wer neu in den Ort kommt (Ereignisfiguren, Ersatz), übernimmt 80 % der Angst.
+let DREAD = new Map();
+function townDread(k) {
+  if (!k) return { v: 0, by: null }; const now = performance.now(), c = DREAD.get(k); if (c && now - c.t < 1000) return c;
+  let v = 0, by = null; for (const e of VILLAGERS) if (e.fear && e.homeTown === k && e.alive) { const f = fearOf(e); if (f > v) { v = f; by = e.fearBy; } }
+  const r = { t: now, v, by }; DREAD.set(k, r); return r;
+}
+const calmTown = k => townDread(k).v < 50;
+function dreadArrive(e) {                                             /* Neuankömmling übernimmt die Angst des Ortes */
+  if (e.kind !== 'npc' || e.guard || e.map !== 'world' || S.party.includes(e.id)) return;
+  const D = townDread(townAt(e.x / TS | 0, e.y / TS | 0) || e.homeTown); if (D.v < 25) return;
+  e.fear = Math.max(e.fear || 0, D.v * 0.8); e.fearBy = D.by; e.fearSeen = clock();
+}
+// Anmarsch (Nutzer 02.10.2026: „Leute sind aufeinmal gespawnt, als ein Event gestartet hat — man soll sehen, wie sie hinlaufen“):
+// walkInNew(fn) merkt sich die Figuren der aktuellen Karte, führt fn aus (Stunden-/Tagestakt mit allen Weltereignissen, Burgalarm,
+// Überfälle, Miliz) und setzt jede neue Figur, die im Bild entstanden wäre, außerhalb des Bildes ab; sie läuft zu ihrem Platz
+// (e.walkIn, höchstens 3 Spielstunden). Was nur neu aufgebaut wurde (an derselben Stelle stand vorher schon eine Figur), bleibt stehen.
+// Gefangene, Diener, Gruppe und Mitspieler laufen nie heran. Gegner brechen den Anmarsch ab, wenn sie getroffen werden oder der Held nah ist.
+function walkIn(e) {
+  if (e.captive || e.inmate || e.prisoner || e.servant || e.eisen || e.coopHero || e.coopPilot || e.noWalkIn || e.downed || S.party.includes(e.id)) return false;
+  if (!inView(e.map, e.x, e.y, 0)) return false;
+  const goal = { x: e.x, y: e.y }, [tx, ty] = pushOut(e.map, e.x / TS | 0, e.y / TS | 0), q = freeSpotNear(e.map, tx, ty, 4);
+  if (!q || inView(e.map, q.x, q.y, 0)) return false;
+  e.x = q.x; e.y = q.y; e.vx = e.vy = 0; e.path = null; e.walkIn = { x: goal.x, y: goal.y, until: clock() + 180 };
+  return true;
+}
+function walkInStep(e, dt) {
+  const W = e.walkIn, p = S.player;
+  if (clock() > W.until || (e.kind === 'npc' && (e.angry || e.fleeing)) || (e.kind === 'enemy' && ((e.hp ?? 1) < (e.maxHp ?? 1) || (p.map === e.map && dist(e, p) < 260)))
+    || Math.hypot(W.x - e.x, W.y - e.y) < 16) { delete e.walkIn; return false; }
+  seek(e, Math.atan2(W.y - e.y, W.x - e.x), 1.15 * dt / 16, dt, W); return true;
+}
+function walkInNew(fn) {
+  if (S._quiet || S.coop?.role === 'guest' || !S.player) return fn();
+  const old = new Map(); for (const e of S.ents[S.map] || []) if (e.kind === 'npc' || e.kind === 'enemy') old.set(e.id, e);
+  const r = fn(), arr = S.ents[S.map] || [], gone = [];
+  const now = new Set(); for (const e of arr) if (e.kind === 'npc' || e.kind === 'enemy') now.add(e.id);
+  for (const [id, e] of old) if (!now.has(id)) gone.push(e);
+  for (const e of arr) {
+    if ((e.kind !== 'npc' && e.kind !== 'enemy') || !e.alive || old.has(e.id)) continue;
+    dreadArrive(e);
+    if (gone.some(o => o.kind === e.kind && Math.abs(o.x - e.x) < 48 && Math.abs(o.y - e.y) < 48)) continue;   /* nur neu aufgebaut: bleibt */
+    walkIn(e);
+  }
+  return r;
+}
+
 // Hoher Stand: Adel und Geweihte. Blutbann (Wachen der Fraktion greifen fünf Tage lang ohne Anruf an, keine Festnahme mehr),
 // Kopfgeldjäger sofort, Chronik; bei Geweihten zusätzlich der Kirchenbann: sieben Tage hilft dir niemand auf, der Orden ist Feind.
 const HIGH_RANK = { Graf: 'adel', 'Gräfin': 'adel', Edelmann: 'adel', Edelfrau: 'adel', Ratsherr: 'adel', Dorfvorsteher: 'adel', 'Alter Paladin': 'klerus', Priester: 'klerus', Heilerin: 'klerus', Priesterin: 'klerus' };
@@ -4636,6 +4687,7 @@ function updateNpc(e, dt) {
   const p = S.player;
   if ((e.traveler || e.travLead) && dist(e, p) > 900) return;   // S13: fern bewegt roadTick
   if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.fleeing) e.fleeing = false; if (e.angry && !e.guard) calmDown(e, 'lost'); if (e.plan && e.map === 'world' && !e.fleeing && !e.angry && (e._pa = (e._pa || 0) - dt) <= 0) { e._pa = 800 + (e.plan.n % 400); placeAway(e); } return; }   // BUG-108: fern nur ~1× je Sekunde (vorher jedes Bild, 2,9 ms)
+  if (!e.guard && e.fear && !e.angry && fearStep(e, dt)) return;      /* Angst geht vor Ereignissen (Nutzer 02.10.: Events überschreiben sie nicht) */
   if (e.fireJob && fireJobStep(e, dt)) return;   // S14: Löschkette
   if (e.palKind === 'star') starHeal(e, dt);   // Nutzer S13: Paladine
   if ((e.villager && !(e.plan?.job && (CYCLE[e.prof] || e.plan.work.stall))) || e.goblin || e.settler) workAnim(e, dt);   // S13: wer im Kreislauf arbeitet, bewegt sich dort
@@ -4713,7 +4765,6 @@ function updateNpc(e, dt) {
   } else e.calledHelp = false;
   // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
   if (!e.guard && !e.shop && fearLvl() >= 2 && fearedBy(e) && dist(e, p) < 80) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.2 * dt / 16, dt); return; }   // S12: man weicht dem Hochpaladin aus
-  if (!e.guard && e.fear && fearStep(e, dt)) return;                    /* Angst: fliehen, Abstand, verstecken */
   if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
   if (arrestCheck(e, p, dt)) return;                   // §44: Wache stellt einen Gesuchten
   if (e.bondGuard && bondGuardStep(e, dt)) return;              // MP2 §25: Wächter des Versklavten
@@ -8868,7 +8919,7 @@ function schutzAlarm(k) {
   const T = S.towns?.[k]; if (T && to && S.towns[to]) { const m = Math.round(T.pop * 0.2); T.pop -= m; S.towns[to].pop += Math.round(m * 0.7); }
   if (guilty && !Z.wanted) { Z.wanted = true; addBounty(f, k === 'varonheim' ? 800 : 300, `Wachmord in ${name}`); afterAvenge(f, Math.min(8, 3 + (Z.byP / 3 | 0)), `Strafzug für ${name}`, ri(1, 2), { valen: 'valen', aurel: 'aurel', chain: 'chainx', order: 'order' }[f] || 'valen');
     chronicle(`Wachmord in ${name}`, 'crime', `${p.name} hat die Wache von ${name} erschlagen.`); }
-  ensureSchutz();
+  walkInNew(ensureSchutz);   /* die Miliz kommt aus den Gassen, sie ploppt nicht auf */
   if (near && afterLive()) { sfx('bell', 0, 0.8); cineLater(() => sfx('bell', 0, 0.8), 800); cineLater(() => sfx('bell', 0, 0.8), 1600);
     const cr = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.homeTown === k && !e.guard && dist(e, p) < 500);
     if (cr) { bubble(cr, 'Die Wache ist tot! Lauft!', 2600); gesture(cr, 'zeigen', 1400, p); }
@@ -9780,7 +9831,7 @@ function opferfest() {
 }
 // Ketzerjagd (Mechthild): in einem Westdorf steht ein Scheiterhaufen, eine Beschuldigte, zwei Inquisitoren. Befreien oder zusehen.
 function ketzerjagd() {
-  const V = pick(tribVillages()); if (!V) return;
+  const V = pick(tribVillages().filter(V => calmTown(V.key))); if (!V) return;
   const P = TOWN_PLAN[V.key], s = freeSpotNear('world', P.square[0] + 4, P.square[1] + 3, 3);
   const stake = { id: uid(), kind: 'prop', type: 'chain_post', map: 'world', x: s.x, y: s.y, r: 8, solid: false, huntProp: true, label: 'Scheiterhaufen der Inquisition' };   // nicht fest: stand er auf dem Platz, war das Dorf zu (Test „jede Haustür erreichbar“)
   const pyre = { id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x: s.x, y: s.y + 20, r: 10, huntProp: true, label: 'Reisig' };
@@ -9812,7 +9863,7 @@ function huntEnd(freed, how) {
 }
 // Wallfahrt (Aldebrand): vier Pilger ziehen aus einem Westdorf zum Altar. Unterwegs lauern Räuber. Wer sie begleitet, gewinnt Glauben.
 function wallfahrt() {
-  const V = pick(tribVillages()), alt = S.ents.world.find(e => e.omegaAltar); if (!V || !alt) return;
+  const V = pick(tribVillages().filter(V => calmTown(V.key))), alt = S.ents.world.find(e => e.omegaAltar); if (!V || !alt) return;
   const P = TOWN_PLAN[V.key], ids = [];
   for (let i = 0; i < 4; i++) { const s = freeSpotNear('world', P.square[0] + ri(-2, 2), P.square[1] + ri(-2, 2), 2), c = makeChar({ name: pick(['Adda', 'Bero', 'Ceno', 'Dietlind', 'Evert', 'Folkmar']), prof: 'Pilger', x: s.x, y: s.y, level: 2 });
     Object.assign(c, { pilgrim: true, anchor: { x: alt.x + ri(-60, 60), y: alt.y + ri(60, 110) }, greet: '„Zum Auge! Zum Altar! Omega sieht, wer den Weg geht.“' }); c.schedulePos = c.anchor; S.ents.world.push(c); ids.push(c.id); }
@@ -10231,7 +10282,7 @@ function refugeeLaw(key) {
 // Wer nach dem Fall der Eisenfeste flieht: kleine Gruppen ziehen aus dem Westen zu den Toren Aurelions (bis zum Beschluss)
 function refugeeWave() {
   if (!S.flags.chainsBroken || S.laws?.refugees === 'reject' || S.ents.world.filter(e => e.refugee).length >= 18) return;
-  const P = TOWN_PLAN.aurelheim, V = pick(tribVillages()); if (!P || !V) return;
+  const P = TOWN_PLAN.aurelheim, V = pick(tribVillages().filter(V => calmTown(V.key))); if (!P || !V) return;
   for (let i = 0; i < 3; i++) { const Q = TOWN_PLAN[V.key], s = freeSpotNear('world', Q.square[0] + ri(-3, 3), Q.square[1] + ri(-3, 3), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Flüchtling', x: s.x, y: s.y, level: 1, traits: ['furchtsam'] });
     const g = S.laws?.refugees === 'city' ? freeSpotNear('world', P.square[0] + ri(-8, 8), P.square[1] + ri(-6, 6), 3) : freeSpotNear('world', P.area[0] - 6 - ri(0, 6), P.square[1] + ri(-5, 5), 2);
     Object.assign(c, { refugee: true, visitor: true, anchor: g, schedulePos: g, greet: pick(['„Die Toten kamen nachts. Wir sind nur gerannt.“', '„Ist das der Weg nach Aurelion? Sag, dass es der Weg ist.“']) }); S.ents.world.push(c); }
@@ -10739,7 +10790,7 @@ function hourTick(h) {
 // S13 (WELT_EVENTS_S13 §2, direkt umsetzbar): echte Ereignisse an echten Orten statt fester Meldungen.
 const villOf = f => Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === f && TOWN_PLAN[k].village && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead');
 function evTaxman() {                                                   // Steuereintreiber Valens mit zwei Wachen
-  const t = pick(villOf('valen')); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
+  const t = pick(villOf('valen').filter(calmTown)); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
   const q = freeSpotNear('world', sx + 2, sy - 2, 3), c = makeChar({ name: pick(FIRST_M), prof: 'Steuereintreiber', x: q.x, y: q.y, level: 4, faction: 'valen' });
   Object.assign(c, { transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, greet: '„Im Namen der Krone. Jeder zahlt. Auch du, wenn du hier wohnst.“' }); S.ents.world.push(c);
   for (let i = 0; i < 2; i++) { const g = guardChar('valen', freeSpotNear('world', sx + 3 + i, sy - 1, 3), 'Torwache', 6); Object.assign(g, { transient: true, anchor: { x: g.x, y: g.y } }); S.ents.world.push(g); }
@@ -20124,7 +20175,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, walkInNew, fearOf, townDread, guardChar, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
