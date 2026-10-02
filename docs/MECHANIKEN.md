@@ -916,3 +916,14 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Erschlägst du ihn**, vergisst die Wache es nicht (Beziehung −40). Manchmal kommt ein Rächer.
 - **Lässt du die Sache liegen**, zerstreut sich die Bande irgendwann von selbst.
 - Debug: „E1: Deserteure mit Bruder“, „E1: Anführer heimholen (sofort)“.
+
+## Vermisstenwelle (Emergente Quest E4)
+- Ab Tag 15 kann in einem Dorf eine Vermisstenwelle beginnen (3 % am Tag, danach 20 Tage Ruhe). Das ist kein Kult. Täter sind Ghule aus dem Totenland, Goblins aus dem Gebirge oder Menschenfänger. Sie hausen in einer echten Ruine, Wildnis oder einem Dungeon 30–90 Felder vom Dorf. Varonheim (dort ist es der Blutkult) und die Kette sind ausgenommen.
+- Jede zweite Nacht um 2 Uhr verschwindet jemand, höchstens vier Menschen. An der Haustür bleibt eine Spur, je nach Täter Schleifspur, kleine rußige Fußabdrücke oder Seilfasern. Am Platz hängt die Vermisstenliste.
+- Am Brett hängt „Die Verschwundenen von …“. Drei Spuren führen zum Unterschlupf, dort warten die Täter mit einem Anführer.
+- **Frist:** Wer höchstens 5 Tage fort ist, sitzt gefesselt im Unterschlupf. „Geh heim. Du bist frei.“ bringt dir 30 Gold und dem Dorf Wohlstand +3. Wer länger fort ist, kommt nicht wieder: Grab, verkauft oder in den Stollen.
+- **Nichts tun:** Nach 4 Opfern oder 12 Tagen endet die Welle, und das Dorf verliert Wohlstand (−8).
+- Debug: „E4: Vermisstenwelle im nächsten Dorf“, „E4: … 3 Tage vorspulen“.
+
+## Sensen sehen aus wie Sensen
+- Alle sieben Sensen haben ein eigenes, gebogenes Blatt. Die Blutkult-Sense hat ein lebendes Klauenblatt mit Adern, Knochendornen und einem Maul am Ansatz; die Adern pulsieren. Heilt ihr Lebensraub den Träger, schimmert er kurz rot (bei jeder Waffe mit Lebensraub).

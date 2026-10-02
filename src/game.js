@@ -1871,7 +1871,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin], cap = cfg.start === 'varonheim' && !!TOWN_PLAN.varonheim;
@@ -2088,7 +2088,7 @@ export function continueGame(given = null, retried = false) {                   
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); S.ents.varonburg = []; S.map = 'world';   /* Varonheim-Umbau S2: die Burg liegt in der Welt — wer in der alten Burgkarte stand, steht vor dem Burgtor */
@@ -6885,7 +6885,7 @@ function townContracts(town, giver) {
   const key = town + ':' + giver;
   if ((S.conDay[key] ?? -99) + 3 <= (S.day | 0)) {                    // alle 3 Tage neu: offene Angebote verfallen, laufende bleiben
     for (const c of S.contracts) if (c.town === town && c.giver === giver && c.state === 'offer' && c.day < (S.day | 0) - 2) ignoredContract(c);   // S13: niemand hat es erledigt
-    S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer'));
+    S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer' && !c.vanish));
     const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : TOWN_PLAN[town]?.village ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
     for (let i = 0; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
     if (giver === 'board' && n) { const C = smuggleContract(town); if (C) S.contracts.push(C); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine)
@@ -7099,9 +7099,10 @@ function trailStep(C, p, alive) {
   if (C.have < 3 && !S.ents.world.some(e => e.contract === C.id && e.trailClue === C.have)) { const [x, y] = C.pts[C.have];
     S.ents.world.push({ id: uid(), kind: 'prop', type: C.have === 2 ? 'campfire_static' : 'blood', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 8, solid: false, transient: true, contract: C.id, trailClue: C.have, label: 'Spur' }); }
   if (C.have < 3) { const [x, y] = C.pts[C.have]; if (Math.hypot(p.x / TS - x, p.y / TS - y) < 3) {
-      log(`Spur ${C.have + 1}/3: ${TRAIL_CLUES[C.have]}`, 'quest'); UI.toast(`SPUR ${C.have + 1}/3`, 1800);
+      log(`Spur ${C.have + 1}/3: ${(C.clues || TRAIL_CLUES)[C.have]}`, 'quest'); UI.toast(`SPUR ${C.have + 1}/3`, 1800);
       S.ents.world = S.ents.world.filter(e => !(e.contract === C.id && e.trailClue === C.have)); conProgress(C); [C.x, C.y] = C.pts[C.have]; }
     return; }
+  if (C.vanish && C.have === 3 && !alive.length && Math.hypot(p.x / TS - C.x, p.y / TS - C.y) < 90) return vanishLair(C, p);   /* E4 */
   if (C.have === 3 && !alive.length && Math.hypot(p.x / TS - C.x, p.y / TS - C.y) < 90) {   // das Lager (flüchtig, nachgesetzt)
     const pool = conPool(C.x, C.y).filter(m => m.startsWith('bandit')), L = spawnEnemy(pool[0] || 'bandit', 'world', C.x, C.y, { level: Math.max(3, (p.level || 1) + 1) });
     Object.assign(L, { contract: C.id, transient: true, elite: true, name: C.name, title: C.name, anchor: { x: L.x, y: L.y } });
@@ -10352,6 +10353,7 @@ function hourTick(h) {
   afterHour();                                                               /* Folgen §5c: Rachezüge, Ansteckung */
   cultHour(h);                                                               /* §5g.2 Blutkult */
   lawlessHour(h);                                                            /* Stadt ohne Schutz S2: Plünderer */
+  vanishHour(h);                                                             /* E4: Vermisstenwelle */
   fortressHour();                                                            // S12: Tore der Eisenfeste
   travelHour();                                                              // S13: Reisende
   if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
@@ -11405,7 +11407,7 @@ function dayTick() {
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
-  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); factionAgenda();                                             // S12: Tribut der Kette
+  tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
   herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
@@ -11906,7 +11908,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -13397,6 +13399,81 @@ function ensureBloodCult() {
     S.ents.world.push(c);
   }
   cultProps();
+}
+// Emergente Quest E4 (Entwickler 01.10.2026): Vermisstenwelle außerhalb Varonheims — kein Kult. Ghule (Totenland), Goblins (Gebirge)
+// oder Menschenfänger holen nachts Dorfbewohner in einen echten Ort der Karte (Ruine/Wildnis/Dungeon, Gefahr ≥ 2, 30–90 Felder).
+// Spuren an den Türen, Vermisstenliste am Platz, Aushang „Die Verschwundenen von …“ mit Spur bis zum Unterschlupf. Wer binnen 5 Tagen
+// kommt, findet sie lebend (30 Gold und Wohlstand +3 je Heimkehrer). Nach 4 Opfern oder 12 Tagen endet die Welle von selbst
+// (Wohlstand −8). Danach 20 Tage Ruhe. Nie Varonheim (dort ist es der Blutkult), nie die Kette.
+const VANISH = {
+  ghoul: { name: 'Ghule', mobs: ['ghoul', 'ghoul', 'zombie'], lead: 'ghoul', boss: 'Alter Fresser', mark: 'Schleifspur', say: 'Eine Schleifspur führt aus dem Haus, über die Schwelle, ins Feld.', fate: n => `${n} liegt in einem flachen Grab am Unterschlupf.`,
+    clues: ['Eine Schleifspur im Gras, nass und dunkel.', 'Ein Schuh im Graben. Der Fuß fehlt nicht — noch nicht.', 'Knochen, sauber abgenagt. Tierknochen. Hoffentlich.'] },
+  goblin: { name: 'Goblins', mobs: ['goblin', 'goblin', 'goblin_warrior'], lead: 'goblin_warrior', boss: 'Fängerhäuptling', mark: 'Kleine Fußabdrücke, Ruß', say: 'Kleine, nackte Fußabdrücke und Ruß am Fensterladen.', fate: n => `${n} ist in die Stollen verschleppt worden und nicht mehr herausgekommen.`,
+    clues: ['Rußige Kinderhände an einem Felsen. Keine Kinder.', 'Ein zerrissenes Seil aus Pflanzenfasern.', 'Rauch aus einem Erdloch, und Gekicher.'] },
+  slaver: { name: 'Menschenfänger', mobs: ['bandit', 'bandit_spear', 'bandit'], lead: 'bandit', boss: 'Menschenfänger', mark: 'Seilfasern am Fensterladen', say: 'Seilfasern am Fensterladen, Stiefelabdrücke darunter.', fate: n => `${n} wurde nach Süden verkauft.`,
+    clues: ['Wagenspuren, tief eingedrückt. Schwere Fracht.', 'Ein Knebel, ausgespuckt. Blut daran.', 'Ein Pferch aus Pfählen. Leer, aber nicht lange.'] },
+};
+function vanishCause(L) { const r = regionAt(L.x, L.y); return r === 'deadland' || L.faction === 'undead' ? 'ghoul' : r === 'mountain' || r === 'eisen' ? 'goblin' : 'slaver'; }
+function vanishSpot(k) {
+  const [sx, sy] = TOWN_PLAN[k].square;
+  return LOCATIONS.filter(l => ['ruin', 'wild', 'dungeon'].includes(l.kind) && (l.threat || 0) >= 2 && l.faction !== 'chain').map(l => [l, Math.hypot(l.x - sx, l.y - sy)]).filter(([, d]) => d >= 30 && d <= 90).sort((a, b) => a[1] - b[1])[0]?.[0] || null;
+}
+function vanishStart(k) {
+  const P = TOWN_PLAN[k]; if (!P?.village || k === 'varonheim' || k === 'vharnholm' || S.razed?.[k] || heldBy(k) || hasBigAt(k) || S.vanish?.state === 'on' || villagersOf(k).length < 3) return null;
+  const L = vanishSpot(k); if (!L) return null;
+  S.vanish = { town: k, cause: vanishCause(L), loc: L.key, tx: L.x, ty: L.y, day0: S.day | 0, taken: [], state: 'on', last: -9 }; return S.vanish;
+}
+function vanishTake() {
+  const V = S.vanish; if (V?.state !== 'on' || V.taken.length >= 4) return null; const k = V.town, D = VANISH[V.cause];
+  const vs = villagersOf(k).filter(c => !NAMED_NPC.has(c.key) && !c.shop && !c.guard && !c.downed && !c.captive); if (vs.length < 2) return null;
+  const v = pick(vs), i = S.ents.world.indexOf(v); if (i < 0) return null; S.ents.world.splice(i, 1);
+  const home = HOUSES.find(b => b.id === v.homeId), mark = home ? { x: (home.x + home.w / 2) * TS, y: (home.y + home.h) * TS + 12 } : { x: v.x, y: v.y + 20 };
+  V.taken.push({ ent: v, day: S.day | 0, mark }); V.last = S.day | 0; const G = growthOf(k); if (G) G.prosper = Math.max(-20, G.prosper - 2);
+  log(`In ${townName(k)} fehlt seit heute Nacht ${v.name} (${v.prof}). ${D.say}`, 'world'); chronicle(`${v.name} aus ${townName(k)} verschwunden`, 'news', D.say);
+  if (V.taken.length === 1) { UI.toast(`VERMISST IN ${townName(k).toUpperCase()}`, 2600); vanishPost(); } else vanishText();
+  vanishProps(); return v;
+}
+function vanishText() { const V = S.vanish, C = (S.contracts || []).find(c => c.id === V?.cid); if (!C) return; const n = V.taken.filter(t => !t.freed && !t.lost).length;
+  C.desc = `In ${townName(V.town)} sind ${n} Menschen verschwunden. Die Spuren führen fort aus dem Dorf. „Wer länger als fünf Tage fort ist, kommt nicht wieder. Sagt der Jäger.“ Folge der Spur bis zum Unterschlupf.`; registerContracts(); }
+function vanishPost() {
+  const V = S.vanish, k = V.town, [sx, sy] = TOWN_PLAN[k].square, D = VANISH[V.cause]; townContracts(k, 'board');
+  const C = makeContract(k, 'trail', 'board'); C.pts = [0.25, 0.5, 0.75].map(f => { const q = freeSpotNear('world', Math.round(sx + (V.tx - sx) * f), Math.round(sy + (V.ty - sy) * f), 4); return q ? [q.x / TS | 0, q.y / TS | 0] : [Math.round(sx + (V.tx - sx) * f), Math.round(sy + (V.ty - sy) * f)]; });
+  const end = freeSpotNear('world', V.tx, V.ty, 4); C.pts.push(end ? [end.x / TS | 0, end.y / TS | 0] : [V.tx, V.ty]); [C.x, C.y] = C.pts[0];
+  Object.assign(C, { vanish: true, name: D.boss, title: `Die Verschwundenen von ${townName(k)}`, clues: D.clues }); C.reward.gold += 70; V.cid = C.id; (S.contracts ||= []).push(C); vanishText();
+  log(`Aushang in ${townName(k)}: Die Verschwundenen von ${townName(k)}.`, 'quest');
+}
+function vanishProps() {
+  S.ents.world = S.ents.world.filter(e => !e.vanishProp); const V = S.vanish; if (!V || V.state !== 'on' || !TOWN_PLAN[V.town]) return; const D = VANISH[V.cause];
+  for (const t of V.taken) if (!t.freed && !t.lost) S.ents.world.push({ id: uid(), kind: 'prop', type: V.cause === 'slaver' ? 'sign' : 'blood', map: 'world', x: t.mark.x, y: t.mark.y, r: 8, solid: false, transient: true, vanishProp: true, label: `${D.mark} (${t.ent.name})` });
+  const [cx, cy] = TOWN_PLAN[V.town].square, q = freeSpotNear('world', cx + 2, cy - 2, 2), names = V.taken.filter(t => !t.freed && !t.lost).map(t => `${t.ent.name} (Tag ${t.day})`).join(', ');
+  if (q && names) S.ents.world.push({ id: uid(), kind: 'prop', type: 'sign', map: 'world', x: q.x, y: q.y, r: 8, solid: true, transient: true, vanishProp: true, label: `Vermisstenliste: ${names}` });
+}
+function vanishLair(C, p) {                                          /* der Unterschlupf: Täter und Gefangene */
+  const V = S.vanish, D = VANISH[V?.cause] || VANISH.slaver, lv = Math.max(3, (p.level || 1) + 1);
+  const L = spawnEnemy(D.lead, 'world', C.x, C.y, { level: lv + (V?.cause === 'ghoul' ? 2 : 0) }); Object.assign(L, { contract: C.id, transient: true, elite: true, name: C.name, title: C.name, anchor: { x: L.x, y: L.y } }); L.maxHp = L.hp = Math.round(L.maxHp * 1.5); if (L.body) B.initBody(L, L.maxHp);
+  for (let i = 0, n = ri(3, 5); i < n; i++) { const e = spawnEnemy(pick(D.mobs), 'world', C.x + ri(-4, 4), C.y + ri(-4, 4), { level: lv }); Object.assign(e, { contract: C.id, transient: true, anchor: { x: e.x, y: e.y } }); }
+  if (!V) return; const day = S.day | 0;
+  for (const t of V.taken) { if (t.freed || t.lost || t.atLair) continue;
+    if (day - t.day <= 5) { t.atLair = true; const q = freeSpotNear('world', C.x + ri(-3, 3), C.y + 3, 3), E = t.ent; Object.assign(E, { map: 'world', alive: true, downed: false, x: q.x, y: q.y, vanishCaptive: true, captive: true }); S.ents.world.push(E); }
+    else { t.lost = true; log(D.fate(t.ent.name), 'death'); if (V.cause === 'ghoul') S.ents.world.push({ id: uid(), kind: 'prop', type: 'blood', map: 'world', x: C.x * TS + ri(-40, 40), y: C.y * TS + 50, r: 8, solid: false, label: `Grab: ${t.ent.name}` }); } }
+}
+function vanishFree(npc) {
+  const V = S.vanish, t = V?.taken.find(x => x.ent === npc || x.ent.id === npc.id); delete npc.vanishCaptive; delete npc.captive;
+  const home = npc.anchor || { x: TOWN_PLAN[V?.town || 'eren'].square[0] * TS, y: TOWN_PLAN[V?.town || 'eren'].square[1] * TS }; npc.x = home.x; npc.y = home.y;
+  if (t) t.freed = true; S.gold += 30; const G = V && growthOf(V.town); if (G) G.prosper = Math.min(100, G.prosper + 3);
+  log(`${npc.name} geht heim nach ${townName(V?.town || npc.homeTown)}. Die Familie wird dir das nicht vergessen (+30 Gold).`, 'quest'); vanishProps(); vanishText();
+}
+function vanishChoices(npc, choices) { if (npc.vanishCaptive) choices.unshift({ text: 'Geh heim. Du bist frei.', fn: () => { vanishFree(npc); UI.closeDialogue(); } }); }
+function vanishHour(h) { const V = S.vanish; if (h !== 2 || V?.state !== 'on' || (S.day | 0) - (V.last ?? -9) < 2) return; vanishTake(); }
+function vanishDay() {
+  const V = S.vanish, day = S.day | 0;
+  if (V?.state === 'on') { const C = (S.contracts || []).find(c => c.id === V.cid);
+    if (C && (C.state === 'done' || C.state === 'claimed' || (C.kind === 'trail' && C.have >= 4))) { V.state = 'done'; S.vanishCd = day + 20; vanishProps(); log(`Die Verschwundenen von ${townName(V.town)}: Der Unterschlupf ist ausgehoben.`, 'quest'); return; }
+    if (V.taken.length >= 4 || day - V.day0 >= 12) { V.state = 'fed'; S.vanishCd = day + 20; const G = growthOf(V.town); if (G) G.prosper = Math.max(-20, G.prosper - 8); vanishProps();
+      chronicle(`${townName(V.town)} hat ${V.taken.length} Menschen verloren`, 'news', 'Niemand kam.'); log(`In ${townName(V.town)} verschwindet niemand mehr. ${V.taken.length} sind fort. Niemand kam.`, 'world'); }
+    return; }
+  if (day < 15 || day < (S.vanishCd || 0) || !chance(0.03)) return;
+  const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village); for (const k of ks.sort(() => rnd() - 0.5)) if (vanishStart(k)) return;
 }
 function cultProps() {
   S.ents.world = S.ents.world.filter(e => !e.cultProp); const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
@@ -14985,6 +15062,9 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'E4: Vermisstenwelle im nächsten Dorf (sofort ein Opfer)': () => { const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS));
+        if (S.vanish?.state === 'on') return UI.toast('Eine Welle läuft schon.'); const k = ks.find(x => vanishStart(x)); if (!k) return UI.toast('Kein Dorf mit Unterschlupf in Reichweite.'); vanishTake(); UI.toast(`${townName(k)}: ${VANISH[S.vanish.cause].name} · ${S.vanish.loc}`, 3000); },
+      'E4: Vermisstenwelle 3 Tage vorspulen (Opfer altern)': () => { for (const t of S.vanish?.taken || []) t.day -= 3; if (S.vanish) { S.vanish.day0 -= 3; S.vanish.last -= 3; } UI.toast('Opfer 3 Tage älter'); },
       'E1: Deserteure mit Bruder': () => { const t = evDeserters(), b = bandsOf().find(x => x.kin && x.kin.state === 'open'); UI.toast(b ? `${b.name} · ${b.lead} · Wache ${b.kin.guard} in ${townName(b.kin.post)}` : `Deserteure bei ${t ? townName(t) : '—'} (ohne Bruder)`, 3000); },
       'E1: Anführer heimholen (sofort)': () => { const b = bandsOf().find(x => x.kin?.state === 'open'); if (b) kinHome(b); else UI.toast('Keine Bande mit offenem Bruder-Auftrag.'); },
       'E2: Karawane stirbt jetzt (Täterbande)': () => { const c = S.ents.world.find(e => e.kind === 'caravan' && e.alive); if (!c) return UI.toast('Keine Karawane unterwegs.'); const k = S.ents.world.find(e => e.kind === 'enemy' && e.alive && /bandit/.test(e.mtype)) || null; die(c, 'Räuber', k); },
@@ -18911,6 +18991,19 @@ export function selftest() {
       if (!(built && home && hurt)) console.log('E1-Probe', JSON.stringify({ built, home, hurt }));
       return built && home && hurt;
     } finally { for (const m of marked) delete m.kinBand; S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.relations = R0; S.gold = g0; S.avenge = av0; S.schutz = Z0; }
+  }));
+  ok('E4: Vermisstenwelle — Dorf mit Unterschlupf, Opfer mit Spur, Liste und Aushang (Ziel = echter Ort); nie Varonheim; rechtzeitig gefunden kehrt heim, zu spät nicht', sandbox(() => {
+    const p = stage(), V0 = S.vanish, C0 = S.contracts, CD = structuredClone(S.conDay || {}), W0 = S.ents.world, g0 = S.gold; S.ents.world = W0.slice();
+    try { S.vanish = null; S.contracts = []; const no = vanishStart('varonheim') === null;
+      const k = Object.keys(TOWN_PLAN).find(x => TOWN_PLAN[x].village && !heldBy(x) && !S.razed?.[x] && villagersOf(x).length >= 4 && vanishSpot(x)); if (!k) return no;
+      vanishStart(k); const n0 = villagersOf(k).length, v1 = vanishTake(), V = S.vanish, C = S.contracts.find(c => c.id === V.cid);
+      const one = !!v1 && villagersOf(k).length === n0 - 1 && V.taken.length === 1 && S.ents.world.some(e => e.vanishProp && e.type !== 'sign' || (e.vanishProp && V.cause === 'slaver')) && !!C && C.vanish && LOCATIONS.some(l => l.key === V.loc);
+      V.last = -9; const v2 = vanishTake(); V.taken[0].day = (S.day | 0) - 7; C.have = 3; [C.x, C.y] = C.pts[3]; vanishLair(C, p);
+      const cap = S.ents.world.filter(e => e.vanishCaptive); const right = cap.length === 1 && cap[0] === v2 && V.taken[0].lost;
+      vanishFree(cap[0]); const home = V.taken[1].freed && !cap[0].captive && S.gold === g0 + 30;
+      if (!(no && one && right && home)) console.log('E4-Probe', JSON.stringify({ k, no, one, right, home, cause: V.cause }));
+      return no && one && right && home;
+    } finally { S.vanish = V0; S.contracts = C0; S.conDay = CD; S.ents.world = W0; S.gold = g0; registerContracts(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
