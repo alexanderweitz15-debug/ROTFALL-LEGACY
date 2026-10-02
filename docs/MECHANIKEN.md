@@ -956,3 +956,13 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Gold-Sog: Baumaterial zukaufen
 - Fehlt dir Material für einen Bau, kaufen Fuhrleute es für Gold zu: Holz 4, Stein 5, Eisen 12 Gold je Einheit, Lieferung eingerechnet. Der Bauplan zeigt den Preis an. Wer reich ist, baut schneller; wer arm ist, sammelt.
 - Debug: „Gold-Sog: Material auf 0 (Zukauf testen)“.
+
+## Siedlungsmoral mit Ursache und Wirkung (Siedlung M1)
+- Täglich wirken: Brunnen +2, Siedler auf „Ruhe“ +1 je Kopf (höchstens +4), du selbst in der Nähe +1, Hunger −6, Überbelegung −3. Ohne Anlass driftet die Moral um 1 Richtung 50. Jeder getötete Siedler kostet −4.
+- **Stufen:**
+  - Zuversichtlich (ab 70): Ertrag ×1,25, mehr Zuzug.
+  - Ruhig (40–69): normal.
+  - Mürrisch (20–39): Ertrag ×0,75, weniger Zuzug.
+  - Verzweifelt (unter 20): Ertrag ×0,5, kein Zuzug, täglich geht mit 30 % ein Siedler.
+- Das Siedlungsfenster zeigt einen Balken, die Stufe und die letzten drei Ursachen. Ein Stufenwechsel steht im Log.
+- Debug: „Siedlung: Moral −20 / +20“.

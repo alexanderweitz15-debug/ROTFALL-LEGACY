@@ -917,7 +917,11 @@ function settleUI(body) {
       <div class="ledger bhint">Klick: Bauplan ansehen · Doppelklick: sofort platzieren. Rote Zahl = es fehlt Material.</div></div>
     <div><h3>${st.name}</h3>
       <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
-        · Bevölkerung ${A.population()} · Moral ${Math.round(st.morale)}</div>
+        · Bevölkerung ${A.population()}</div>
+      ${(() => { const m = Math.round(st.morale ?? 60), B = A.moraleBand ? A.moraleBand(m) : { name: '', mul: 1 }, col = m >= 70 ? '#89a05a' : m >= 40 ? '#c9a24a' : m >= 20 ? '#c07a3a' : '#b0412e';
+        return `<div class="ledger" title="Moral wirkt auf Ertrag und Zuzug. Ursachen: Brunnen, Ruhe, Anführer da, Hunger, Überbelegung, Tote.">Moral <b>${m}</b> · ${B.name}
+          <div style="height:7px;background:#2a241c;margin:4px 0;border:1px solid #4a3f30"><div style="height:100%;width:${m}%;background:${col}"></div></div>
+          <small>${B.mul !== 1 ? `Ertrag ×${B.mul}. ` : ''}${(st.moraleLog || []).slice(0, 3).map(x => `${x.v > 0 ? '+' : ''}${x.v} ${x.why} (Tag ${x.d})`).join(' · ') || 'Noch keine Ursachen.'}</small></div>`; })()}
       <div id="detail" class="bdetail ledger">Wähle links eine Baukarte. Der Bauplan zeigt Bild, Kosten und Grundriss; „Platzieren“ setzt einen Geist in die Welt.</div>
       <h3 style="margin-top:16px">Arbeitsprioritäten</h3>
       <div id="prio" class="prio-list"></div>

@@ -3672,7 +3672,8 @@ function die(c, cause = 'Wunden', source) {
   { const byP = source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id;
     if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
     if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP);
-    if (c.hiredBy) grudgeNote(c); }   /* E3 */   /* S2: Burgwache bleibt tot */
+    if (c.hiredBy) grudgeNote(c);   /* E3 */
+    if (c.settler) moraleAdd(-4, `${c.name} getötet`); }   /* Siedlung M1 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
@@ -10454,7 +10455,7 @@ function hourTick(h) {
   if (S.settlement) {
     const farms = S.settlement.buildings.filter(b => b.type === 'farm' && b.built >= 1).length;
     S.res.food += farms * 0.5;
-    if (S.settlement.buildings.some(b => b.type === 'well' && b.built >= 1)) S.settlement.morale = Math.min(100, S.settlement.morale + 0.2);
+    /* Siedlung M1: der Brunnen wirkt jetzt einmal am Tag (+2) in settlersDay */
   }
   // Nachwachsen
   for (const map of MAP_KEYS) for (const e of S.ents[map]) if (e.depleted && e.respawn <= S.day) { e.depleted = false; }
@@ -11338,7 +11339,7 @@ function settlersHour() {
   const st = S.settlement; if (!st) return;
   const arr = S.ents[st.map || 'world'], have = arr.filter(e => e.settler && e.alive), want = Math.min(settlerCap(), 12);
   if (have.length > want) { const s = have[have.length - 1]; arr.splice(arr.indexOf(s), 1); log(`${s.name} verlässt ${st.name}: kein Dach über dem Kopf.`, 'world'); return; }
-  if (have.length >= want || S.res.food < 1 || !chance(0.5)) return;
+  if (have.length >= want || S.res.food < 1 || !chance(moraleBand(st.morale ?? 60).join)) return;   /* M1: Stimmung bestimmt den Zuzug */
   const [tx, ty] = pushOut(st.map || 'world', (st.x / TS | 0) + ri(-6, 6), (st.y / TS | 0) + 22), q = freeSpotNear(st.map || 'world', tx, ty, 3);
   const c = makeChar({ name: pick(chance(0.5) ? FIRST_F : FIRST_M), prof: 'Siedler', x: q.x, y: q.y, map: st.map || 'world', level: ri(1, 3), traits: [pick(['fleißig', 'mürrisch', 'gütig', 'furchtsam'])] });
   Object.assign(c, { settler: true, greet: pick(['„Ein Dach, ein Feuer, Arbeit. Mehr wollte ich nie.“', '„Sag, was zu tun ist. Ich pack an.“', '„Hier ist es besser als da, wo ich herkomme.“']) });
@@ -11351,15 +11352,35 @@ function settlerJob(c) {                                          // Arbeitsplat
   const spot = top === 'Holz schlagen' ? tree : top === 'Nahrung sammeln' ? at('farm') : top === 'Handwerk' ? at('workbench') || at('smithy') : top === 'Verteidigung ausbessern' ? at('palisade') || at('gate') : at('campfire');
   const s = spot || at('campfire') || st; c.schedulePos = { x: s.x + ri(-20, 20), y: s.y + 24 }; c.job = top;
 }
+// Siedlung M1 (Entwickler 01.10.2026, PROPOSALS/siedlung_ausbau.md): Moral hat Ursachen und Wirkung. Täglich: Brunnen +2, Siedler auf
+// Ruhe +1 je Kopf (höchstens +4), Anführer da +1, Hunger −6, überbelegt −3, sonst Drift 1 Richtung 50; getötete Siedler −4.
+// Stufen: Zuversichtlich (≥ 70) Ertrag ×1,25 und mehr Zuzug · Ruhig · Mürrisch (< 40) ×0,75 · Verzweifelt (< 20) ×0,5, kein Zuzug,
+// täglich 30 %, dass einer geht. Das Siedlungsfenster zeigt Balken, Stufe und die letzten Ursachen.
+function moraleBand(m) { return m >= 70 ? { name: 'Zuversichtlich', mul: 1.25, join: 0.7, k: 3 } : m >= 40 ? { name: 'Ruhig', mul: 1, join: 0.5, k: 2 } : m >= 20 ? { name: 'Mürrisch', mul: 0.75, join: 0.3, k: 1 } : { name: 'Verzweifelt', mul: 0.5, join: 0, k: 0 }; }
+function moraleAdd(v, why) {
+  const st = S.settlement; if (!st || !v) return; const b0 = moraleBand(st.morale ?? 60).k;
+  st.morale = clamp((st.morale ?? 60) + v, 0, 100); (st.moraleLog ||= []).unshift({ d: S.day | 0, why, v: Math.round(v * 10) / 10 }); st.moraleLog.length = Math.min(8, st.moraleLog.length);
+  if (Math.abs(v) >= 5) log(`${st.name}: Moral ${v > 0 ? '+' : ''}${Math.round(v)} (${why}).`, 'world');
+  const B2 = moraleBand(st.morale); if (B2.k !== b0) { log(`Die Stimmung in ${st.name} ${B2.k > b0 ? 'hebt sich' : 'kippt'}: ${B2.name.toLowerCase()}.`, 'world'); if (B2.k === 0) UI.toast(`MORAL IN ${st.name.toUpperCase()} BRICHT`, 2600); }
+}
 function settlersDay() {
   const st = S.settlement; if (!st) return;
-  const ss = S.ents[st.map || 'world'].filter(e => e.settler && e.alive); let wood = 0, food = 0, stone = 0;
+  const ss = S.ents[st.map || 'world'].filter(e => e.settler && e.alive); let wood = 0, food = 0, stone = 0, rest = 0;
+  const mul = moraleBand(st.morale ?? 60).mul;
   for (const c of ss) { settlerJob(c);
     if (c.job === 'Holz schlagen') wood += 2; else if (c.job === 'Nahrung sammeln') food += st.buildings.some(b => b.type === 'farm' && b.built >= 1) ? 2 : 1;
     else if (c.job === 'Verteidigung ausbessern') for (const b of st.buildings) b.cond = Math.min(1, b.cond + 0.05);
-    else if (c.job === 'Handwerk') stone += 1; else st.morale = Math.min(100, st.morale + 1); }
+    else if (c.job === 'Handwerk') stone += 1; else rest++; }
+  wood = Math.floor(wood * mul); food = Math.floor(food * mul); stone = Math.floor(stone * mul);
   S.res.wood += wood; S.res.food += food - ss.length * 0.5; S.res.stone += stone; S.res.food = Math.max(0, S.res.food);
-  if (ss.length) log(`${st.name}: ${ss.length} Siedler — Holz +${wood}, Nahrung +${food}, Stein +${stone}.`, 'world');
+  if (ss.length) log(`${st.name}: ${ss.length} Siedler — Holz +${wood}, Nahrung +${food}, Stein +${stone}${mul !== 1 ? ` (Stimmung ×${mul})` : ''}.`, 'world');
+  const m0 = st.morale ?? 60; if (m0 !== 50) moraleAdd(m0 > 50 ? -1 : 1, 'Alltag');
+  if (st.buildings.some(b => b.type === 'well' && b.built >= 1)) moraleAdd(2, 'Brunnen');
+  if (rest) moraleAdd(Math.min(4, rest), 'Ruhe');
+  const p = S.player; if (p.map === (st.map || 'world') && Math.hypot(p.x - st.x, p.y - st.y) < 30 * TS) moraleAdd(1, 'Anführer da');
+  if (ss.length && S.res.food < 1) moraleAdd(-6, 'Hunger');
+  if (ss.length > settlerCap()) moraleAdd(-3, 'Überbelegt');
+  if ((st.morale ?? 60) < 20 && ss.length && chance(0.3)) { const s = ss[ss.length - 1], arr = S.ents[st.map || 'world']; arr.splice(arr.indexOf(s), 1); log(`${s.name} verlässt ${st.name}: Hier ist keine Hoffnung.`, 'world'); }
   zoneBuild(ss.length);   /* Nutzer §5d.3: Siedler bauen in Wohnzonen */
 }
 // ================= Wohnzonen (Nutzer §5d.3) =================
@@ -15161,6 +15182,8 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Siedlung: Moral −20': () => moraleAdd(-20, 'Debug'),
+      'Siedlung: Moral +20': () => moraleAdd(20, 'Debug'),
       'Gold-Sog: Material auf 0 (Zukauf testen)': () => { for (const k of Object.keys(BUY_RES)) S.res[k] = 0; S.gold = Math.max(S.gold, 500); UI.toast('Vorrat leer, 500 Gold'); },
       'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
       'Ratgeber an/aus': () => { S.settings.tips = S.settings.tips === false; UI.toast(S.settings.tips === false ? 'Ratgeber aus' : 'Ratgeber an'); },
@@ -19142,6 +19165,15 @@ export function selftest() {
       return need === 120 && ok1 && no;
     } finally { Object.assign(S.res, r0); S.gold = g0; S.flags.buyResHint = f0; }
   }));
+  ok('Siedlung M1: Hunger senkt die Moral mit Ursache; verzweifelte Siedler schaffen halb so viel', sandbox(() => {
+    const st0 = S.settlement, r0 = { ...S.res }, W0 = S.ents.world;
+    try { S.ents.world = W0.slice(); S.settlement = { name: 'Probehof', x: 999999, y: 999999, map: 'world', buildings: [], morale: 50, priorities: ['Holz schlagen', 'Holz schlagen', 'Holz schlagen', 'Holz schlagen', 'Holz schlagen', 'Holz schlagen'] };
+      for (let i = 0; i < 3; i++) { const c = makeChar({ name: 'S' + i, prof: 'Siedler', x: 999999, y: 999999 }); c.settler = true; S.ents.world.push(c); }
+      const run = m => { S.settlement.morale = m; S.res.food = 0; S.res.wood = 0; settlersDay(); return S.res.wood; };
+      const w50 = run(50), log0 = S.settlement.moraleLog.find(x => x.why === 'Hunger'), w15 = run(15);
+      return !!log0 && log0.v === -6 && w50 > 0 && w15 === Math.floor(w50 * 0.5) && moraleBand(15).name === 'Verzweifelt';
+    } finally { S.settlement = st0; Object.assign(S.res, r0); S.ents.world = W0; }
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -19408,7 +19440,7 @@ function boot() {
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold,
+    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold, moraleBand,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
