@@ -2469,6 +2469,7 @@ function update(dt, now) {
   if (S.weatherLeft <= 0) {
     const w0 = S.weather; S.weather = pick(weatherPool(p));
     S.weatherLeft = ri(120, 420);
+    if (w0 === 'sandstorm' && S.weather !== 'sandstorm' && !S.secrets?.brunnen?.found) { const Bw = secretAt('brunnen'); if (Bw && p.map === 'world' && Math.hypot(p.x / TS - Bw[0], p.y / TS - Bw[1]) < 220) { S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); log('Der Sturm hat bei den Sandruinen etwas freigelegt.', 'world'); } }   /* Geheime Orte: Brunnen */
     if (S.weather !== w0 && WX[S.weather] && S.map === 'world') log(WX[S.weather].txt, 'world');   /* Roadmap C.12: Wirkung erklären */
   }
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
@@ -8217,8 +8218,9 @@ function keepChoices(npc, choices) {
     UI.closeDialogue(); log('Die Phiole zerspringt auf dem Altar. Kälte kriecht in deine Knochen — und bleibt als Schutz. Ruf bei den Toten +3.', 'faction'); } });
   if (npc.keepMarshalV) choices.unshift({ text: 'Wie steht die Belagerung?', fn: () => UI.dialogue(npc, `„Noch ${S.war?.nodes?.blackkeep?.garrison ?? '?'} Tote in der Feste. Jeden Tag weniger. Komm mit ans Tor, dann brechen wir sie in Wellen.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
 }
-const karakToll = () => S.flags.sandlordSlain ? 8 : 15;
+const karakToll = () => S.flags.waterRight ? 0 : S.flags.sandlordSlain ? 8 : 15;   /* Geheime Orte: Wasserrecht */
 function karakChoices(npc, choices) {
+  if (npc.karakToll && S.flags.waterRight) return choices.unshift({ text: 'Zoll?', fn: () => UI.dialogue(npc, '„Du trägst das Wasserrecht zurück. Für dich ist das Tor immer offen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   if (npc.karakToll && (S.flags.karakPaid || -1) !== (S.day | 0)) choices.unshift(
     { text: `Wegzoll zahlen (${karakToll()} Gold)`, fn: () => { if (S.gold < karakToll()) return UI.dialogue(npc, '„Kein Gold, kein Durchgang. Aber ich bin kein Unmensch — heute lass ich dich.“', [{ text: 'Danke.', fn: () => UI.closeDialogue() }]); S.gold -= karakToll(); S.flags.karakPaid = S.day | 0; S.flags.karakRefused = false; UI.closeDialogue(); log('Du zahlst den Wegzoll. Der Basar behandelt dich heute wie einen Gast.', 'economy'); } },
     { text: 'Zoll verweigern', fn: () => { S.flags.karakRefused = true; UI.closeDialogue(); log('Du verweigerst den Zoll. Die Sandfürsten merken sich das: im Basar zahlst du mehr, bis du zahlst.', 'faction'); } });
@@ -13850,7 +13852,7 @@ function vanishDay() {
 // sie findet; Lage = fester Anker aus LOCATIONS + fester Versatz, Platz per deterministischer Spiralsuche (kein Zufall, die Welt bleibt
 // gleich). Gespeichert wird nur S.secrets. Erster Ort: das Glockenmoor — nachts bei Nebel oder Regen schlägt im Moor eine Glocke; drei
 // Glockenpfähle (Taufe, Hochzeit, Tod) in der richtigen Reihenfolge läuten öffnet die versunkene Kapelle, falsch weckt Ertrunkene.
-const SECRETS = { stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
+const SECRETS = { brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
 const SECRET_N = 8;
 function detSpot(map, tx, ty, R = 12) { for (let r = 0; r <= R; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (!SOLID.has(tileAt(map, x, y))) return [x, y]; } return null; }
 function secretAt(k) { const D = SECRETS[k], L = LOCATIONS.find(l => l.key === D.at); return L ? [L.x + D.dx, L.y + D.dy] : null; }
@@ -13861,6 +13863,8 @@ function ensureSecrets() {
       S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'glockenmoor', secretBell: ['Taufe', 'Hochzeit', 'Tod'].indexOf(nm), label: `Schiefer Glockenpfahl: „${nm}“` }); }); }
   const St = secretAt('stollen'); if (St && !S.flags.vaultHint_ausbrecherstollen) [[14, 3], [8, -2], [3, 1]].forEach(([dx, dy], i) => { const q = detSpot('world', St[0] + dx, St[1] + dy, 6); if (q)   /* drei Kreidezeichen zeigen den Weg */
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'sign', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'stollen', chalk: i, label: 'Kreidezeichen am Fels' }); });
+  const Bw = secretAt('brunnen'); if (Bw && !S.secrets.brunnen?.found && (S.flags.wellOpen ?? -9) >= (S.day | 0)) { const q = detSpot('world', Bw[0], Bw[1], 8); if (q)   /* nur am Tag nach einem Sandsturm */
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 12, solid: false, transient: true, secret: 'brunnen', secretWell: true, label: 'Eine Treppe, vom Sturm freigelegt — sie führt unter die Säulen' }); }
   const H2 = secretAt('hundert'); if (H2 && !S.secrets.hundert?.found) { const q = detSpot('world', H2[0], H2[1], 10); if (q)   /* Geheime Orte S2: die Lanze auf dem Hügel */
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'hundert', secretDig: true, label: 'Eine Lanze mit Valen-Wimpel, tief im Hügel — darunter klingt es hohl (E: graben)' }); }
   for (const [k, D] of Object.entries(SECRETS)) if (S.secrets[k]?.found && !LOCATIONS.some(l => l.key === 'sec_' + k)) { const P = secretAt(k); if (P) LOCATIONS.push({ key: 'sec_' + k, name: D.name, x: P[0], y: P[1], r: 6, kind: 'ruin', threat: 2, secret: true }); }
@@ -13908,6 +13912,18 @@ function stollenChoice() {
     { text: 'Den Grubenstämmen bringen lassen (Goblins +10)', fn: () => { S.factions.goblin = clamp((S.factions.goblin || 0) + 10, -100, 100); S.secrets.stollen = { ...(S.secrets.stollen || {}), choice: 'goblin' }; log('Ein Goblin-Läufer nimmt den Plan mit nach Morrgrund. Sie vergessen das nicht (Grubenstämme +10).', 'faction'); UI.closeDialogue(); } },
     { text: 'An die Kette verkaufen (150 Gold, Kette +8, Goblins −20)', fn: () => { S.gold += 150; S.factions.chain = clamp((S.factions.chain || 0) + 8, -100, 100); S.factions.goblin = clamp((S.factions.goblin || 0) - 20, -100, 100); S.secrets.stollen = { ...(S.secrets.stollen || {}), choice: 'chain' };
       log('Die Kette zahlt 150 Gold und mauert den Stollen zu. Die Goblins werden erfahren, wer es war (−20).', 'faction'); UI.closeDialogue(); } }]);
+}
+// Geheime Orte S3 — Brunnen der Durstigen: Nur nach einem Sandsturm liegt bei den Sandruinen eine Treppe frei (bis zum nächsten Tag).
+// Unten: versunkene Karawanserei, Skelette und Wüstenräuber, die auch gegraben haben, eine Truhe — und das Wasserrecht der Sandfürsten.
+// Den Sandfürsten zurückgeben: Zoll in Karak-Atar entfällt für immer, Händler +10. An die Wüstenräuber verkaufen: 250 Gold, Händler −10.
+function secretWell(t) {
+  const p = S.player; if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.'); secretFound('brunnen'); const tx = t.x / TS | 0, ty = t.y / TS | 0, lv = Math.max(10, p.level);
+  for (let i = 0; i < 5; i++) { const e = spawnEnemy(i < 2 ? 'skeleton' : pick(['bandit', 'bandit_archer']), 'world', tx + ri(-5, 5), ty + ri(2, 6), { level: lv }); if (e) Object.assign(e, { transient: true, aggroId: p.id, name: i < 2 ? 'Verdursteter' : 'Wüstenräuber' }); }
+  const q = detSpot('world', tx + 2, ty + 2, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Truhe der Karawanserei', loot: ['dornensaebel', 'wasserschlauch', 'potion'], lootBonus: 2 });
+  log('Unter den Säulen: eine versunkene Karawanserei mit einer Zisterne, die noch Wasser hält. Andere waren schneller — und sind noch da. In einer Nische: eine versiegelte Urkunde.', 'quest');
+  UI.dialogue({ ...p, name: 'Wasserrecht der Sandfürsten' }, 'Das Siegel der Sandfürsten, das Recht an diesem Wasser. Wem gibst du es?', [
+    { text: 'Den Sandfürsten in Karak-Atar (Zoll entfällt für immer, Händler +10)', fn: () => { S.flags.waterRight = 1; S.factions.merch = clamp((S.factions.merch || 0) + 10, -100, 100); S.secrets.brunnen.choice = 'karak'; log('Ein Bote bringt die Urkunde nach Karak-Atar. Am Tor zahlst du nie wieder Zoll (Händler +10).', 'faction'); UI.closeDialogue(); } },
+    { text: 'An die Wüstenräuber verkaufen (250 Gold, Händler −10)', fn: () => { S.gold += 250; S.factions.merch = clamp((S.factions.merch || 0) - 10, -100, 100); S.secrets.brunnen.choice = 'raider'; log('Die Räuber zahlen 250 Gold. Die Sandfürsten werden erfahren, wo ihr Wasser blieb (Händler −10).', 'faction'); UI.closeDialogue(); } }]);
 }
 function secretFound(k) {
   const D = SECRETS[k]; (S.secrets ||= {})[k] = { found: S.day | 0 }; ensureSecrets(); UI.toast(`GEHEIMNIS: ${D.name.toUpperCase()}`, 3200);
@@ -15528,6 +15544,7 @@ function debugSections() {
       'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
       'Geheime Orte: zum Glockenmoor': () => { const G = secretAt('glockenmoor'); if (G) tp(G[0], G[1] + 3); },
       'Geheime Orte: Nebelnacht jetzt': () => { S.minute = 23 * 60; S.weather = 'fog'; bellT = 99; UI.toast('Nacht und Nebel'); },
+      'Geheime Orte: Sandsturm endet (Brunnen frei)': () => { S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); const B = secretAt('brunnen'); if (B) tp(B[0], B[1] + 4); },
       'Geheime Orte: zu den Kreidezeichen (Stollen)': () => { const St = secretAt('stollen'); if (St) tp(St[0] + 14, St[1] + 5); },
       'Geheime Orte: zum Hundertfeld (Lanze)': () => { const H = secretAt('hundert'); if (H) tp(H[0], H[1] + 3); },
       'Geheime Orte: zurücksetzen': () => { S.secrets = {}; for (let i = LOCATIONS.length - 1; i >= 0; i--) if (LOCATIONS[i].secret) LOCATIONS.splice(i, 1); ensureSecrets(); UI.toast('Geheimnisse zurückgesetzt'); },
@@ -19614,6 +19631,14 @@ export function selftest() {
       const g0 = S.factions.goblin || 0; stollenChoice(); [...document.querySelectorAll('#dlg-choices button')][0].click(); const plan = (S.factions.goblin || 0) === Math.min(100, g0 + 10);
       return blind && open && plan;
     } finally { S.ents.world = W0; S.secrets = s0; S.flags = f0; LOCATIONS.length = L0; p.attributes.perception = pc; Object.assign(S.factions, fa); UI.closeDialogue(); }
+  }));
+  ok('Geheime Orte S3: Brunnen nur nach Sandsturm offen; Wasserrecht an Karak = kein Zoll mehr', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), f0 = structuredClone(S.flags), L0 = LOCATIONS.length, m0 = S.factions.merch;
+    try { S.ents.world = W0.slice(); S.secrets = {}; delete S.flags.wellOpen; ensureSecrets(); const closed = !S.ents.world.some(e => e.secretWell);
+      S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); const st = S.ents.world.find(e => e.secretWell); if (!st) return false;
+      secretWell(st); [...document.querySelectorAll('#dlg-choices button')][0].click(); const free = karakToll() === 0 && S.secrets.brunnen.choice === 'karak';
+      return closed && free;
+    } finally { S.ents.world = W0; S.secrets = s0; S.flags = f0; LOCATIONS.length = L0; S.factions.merch = m0; UI.closeDialogue(); }
   }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;

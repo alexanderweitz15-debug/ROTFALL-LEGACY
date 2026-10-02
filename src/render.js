@@ -108,6 +108,7 @@ export function drawFrame(now) {
   tk('water'); /*PERFTMP*/
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
+  prefetchHouses();
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
   if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
@@ -911,15 +912,36 @@ export function playerInside(b, p = S.player) {
   return (tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1) || (tx === b.doorTile[0] && ty === b.doorTile[1]);
 }
 const isNight = () => { const h = S.minute / 60; return h >= 19 || h < 6; };
+const houseLit = (b, min = S.minute) => { const h = (min % 1440) / 60; return (h >= 19 || h < 6) && (b.type !== 'kontor' || h < 22); };
+function houseCanvas(b, lit) {                                       // Verfall (auch Kriegsschäden) im Schlüssel
+  const key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b); let cv = houseCache.get(key);
+  if (cv) { houseCache.delete(key); houseCache.set(key, cv); return cv; }   /* PERF-R: zuletzt benutzt bleibt (LRU) */
+  trimCache(houseCache, 220); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); return cv;
+}
+/* PERF-R (02.10.2026): ein Hausbild zu backen kostet 10–40 ms. Beim Betreten einer Stadt kamen viele auf einmal (Ruckler), um 19 und
+   6 Uhr wurden alle sichtbaren Häuser zugleich neu gebacken. Jetzt in Leerlaufzeit vorbacken: Häuser bis ~700 px um das Bild,
+   und 20 Spielminuten vor dem Wechsel schon das Nacht- bzw. Tagbild. Höchstens ein Haus je Leerlaufaufruf. */
+const HPF = { t: 0, q: [], queued: false };
+function prefetchHouses() {
+  const now = performance.now(); if (now - HPF.t < 300) return; HPF.t = now;
+  const vx0 = cam.x - 700, vy0 = cam.y - 700, vx1 = cam.x + W / cam.zoom + 700, vy1 = cam.y + H / cam.zoom + 700, soon = S.minute + 20;
+  HPF.q.length = 0;
+  for (const b of HOUSES) { if (b.map !== S.map || (b.x + b.w) * TS < vx0 || b.x * TS > vx1 || (b.y + b.h) * TS < vy0 || b.y * TS > vy1) continue;
+    const w = HB.wearOf(b), l0 = houseLit(b), l1 = houseLit(b, soon);
+    if (!houseCache.has(b.id + (l0 ? 'n' : 'd') + w)) HPF.q.push([b, l0]);
+    if (l1 !== l0 && !houseCache.has(b.id + (l1 ? 'n' : 'd') + w)) HPF.q.push([b, l1]); }
+  if (!HPF.q.length || HPF.queued) return;
+  HPF.queued = true;
+  idle(dl => { HPF.queued = false; let n = 0;
+    while (HPF.q.length && (n ? dl.timeRemaining() > 12 : dl.didTimeout || dl.timeRemaining() > 6)) { const [b, lit] = HPF.q.pop(); if (b.map === S.map) { houseCanvas(b, lit); n++; } } }, { timeout: 500 });
+}
 const HOUSE_ATLAS = false;   // Nutzer S13: Blatt-Gebäude wirken aufgeblasen zu verpixelt; an, sobald große Gebäudebilder kommen
 function drawHouse(b, now) {
   if (HOUSE_ATLAS && SP.atlasOn()) { const src = SP.atlasSprite(SP.houseAtlas(b)); if (src) {   // Gebäude aus dem Blatt — aus: im Blatt zu klein, aufgeblasen zu grob (Nutzer S13)
     const target = playerInside(b) ? 0.14 : 1, a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15; roofAlpha.set(b, a);
     const dw = b.w * TS + 12, dh = dw * src.height / src.width, x0 = b.x * TS - 6, y0 = (b.y + b.h) * TS + 6 - dh;
     ctx.globalAlpha = a * (HB.wearOf(b) === 2 ? 0.75 : 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(src, x0, y0, dw, dh); ctx.globalAlpha = 1; return; } }
-  const lit = isNight() && (b.type !== 'kontor' || S.minute / 60 < 22), key = b.id + (lit ? 'n' : 'd') + HB.wearOf(b);   // Verfall (auch Kriegsschäden) im Schlüssel
-  let cv = houseCache.get(key);
-  if (!cv) { trimCache(houseCache, 120); cv = HB.houseSprite(b, lit); houseCache.set(key, cv); }
+  const cv = houseCanvas(b, houseLit(b));
   const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
   const a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15;
   roofAlpha.set(b, a);

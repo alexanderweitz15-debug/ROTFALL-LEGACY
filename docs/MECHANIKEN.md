@@ -1059,3 +1059,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Das dritte Zeichen führt zum Spalt: ein geheimes Gewölbe mit einer Ebene, bewacht vom Pferchmeister. Danach steht der Stollen auf der Karte.
 - Im Hort liegt der Grubenplan der Eisenfeste. Du gibst ihn den Grubenstämmen (Goblins +10) oder verkaufst ihn an die Kette (150 Gold, Kette +8, Goblins −20).
 - Debug: „Geheime Orte: zu den Kreidezeichen (Stollen)“.
+
+## Geheimer Ort: Der Brunnen der Durstigen
+- Nur nach einem Sandsturm legt der Wind bei den Sandruinen eine Treppe frei, bis zum nächsten Tag. Bist du in der Nähe, sagt es das Log.
+- Unten liegt eine versunkene Karawanserei: Verdurstete und Wüstenräuber, die auch gegraben haben, dazu eine Truhe mit einem Dornensäbel.
+- **Das Wasserrecht der Sandfürsten** ist deine Wahl. Gibst du es den Sandfürsten zurück, zahlst du in Karak-Atar nie wieder Zoll (Händler +10). Verkaufst du es an die Räuber, bekommst du 250 Gold (Händler −10).
+- Debug: „Geheime Orte: Sandsturm endet (Brunnen frei)“.
