@@ -26,7 +26,7 @@ sub(SP,"export function humanSpec(e) {\n","export function humanSpec(e) { __PF.h
 sub(SP,"  let L = lookCache.get(k); if (L) return L;\n","  let L = lookCache.get(k); if (L) return L; __PF.lk++;\n")
 # game.js update
 G=B+'game.js'
-def gs(old,new,cnt=1): sub(G,old.replace('\n','\r\n'),new.replace('\n','\r\n'),cnt)
+def gs(old,new,cnt=1): sub(G,old,new,cnt)
 gs("  const p = S.player;\n  coopHooks.hostTick?.(dt);\n","  const p = S.player; __PF.s();\n  coopHooks.hostTick?.(dt);\n")
 gs("morrTick(); }   // S15 Morrgrund\n","morrTick(); }   // S15 Morrgrund\n __PF.m('u_pre');\n")
 gs("  if (hour !== lastHour) { lastHour = hour; hourTick(hour); }\n","  __PF.m('u_clock'); if (hour !== lastHour) { lastHour = hour; hourTick(hour); }  __PF.m('u_hour');\n")

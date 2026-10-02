@@ -8,7 +8,8 @@
 // Metall getrennt schattiert; Details nur in Clustern (kein Einzelpixel-Rauschen).
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
-import { mix } from './sprites.js?v=23';
+import { mix } from './sprites.js?v=24';
+import { atkShape, legacySw } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)
@@ -247,7 +248,13 @@ function rigW(pose) {
 const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
 // S12 (Nutzer: „neue Animations-Sets je Waffe, immer etwas Variation“): v 0 Vorhand, 1 Rückhand, 2 Überkopfhieb (schwere Waffen,
 // Schwerter) bzw. Stoß tief/hoch (Stoßwaffen); j = kleine Abweichung je Hieb. Treffer bleiben unabhängig davon (resolveSwing).
-export function swingOf(wt, sw, arc, v = 0, j = 0) {
+/* Kampfanimation Scheibe 1: swingOf rechnet in der Formzeit u (anim.js atkU/ATK_U; u 0,5 = Einschlag). Klassen mit Daten (anim.js
+   ANIM_DEFS.attack, z. B. sword) lesen ihre Form, alle anderen die alten Kurven unten, auf dieselben Anker umgerechnet. */
+export function swingOf(wt, u, arc, v = 0, j = 0) {
+  const D = atkShape(wt, v, u); if (D) { if (j && u > 0) D.a += j * Math.sin(Math.min(1, u) * Math.PI); return D; }
+  return legacySwing(wt, u > 0 ? legacySw(wt, u) : 0, arc, v, j);
+}
+function legacySwing(wt, sw, arc, v = 0, j = 0) {
   if (sw <= 0) return { a: 0.6, ext: 0 };
   const wob = j * Math.sin(Math.min(1, sw) * Math.PI);
   if (wt === 'spear' || wt === 'dagger' || wt === 'rapier') {       // Stoß: zurückziehen, vorschnellen, einholen
@@ -276,8 +283,7 @@ export const upright = wt => wt === 'spear' || wt === 'polearm';
 export const onShoulder = wt => wt === 'great' || wt === 'hammer';
 export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
-  const w0 = W.wt === 'hammer' ? 0.44 : HEAVY.has(W.wt) ? 0.36 : 0.28;
-  return W.q < w0 ? 'wind' : W.q < 0.5 ? 'strike' : W.q < 0.82 ? 'follow' : null;
+  return W.q < 0.4 ? 'wind' : W.q <= 0.5 ? 'strike' : W.q < 0.82 ? 'follow' : null;   /* Kampfanimation: q = Formzeit u (gleiche Anker für alle Klassen) */
 }
 function svOf(W) { return RANGED.has(W.wt) ? { a: 0, ext: 0 } : W.mode === 'cover' ? { a: -1.15, ext: -2 } : swingOf(W.wt, W.q, W.arc, W.v, 0); }
 // Winkel der Waffe (Welt, Kanvas-Winkel) — gleich der Regel in render.js weaponPose
@@ -298,7 +304,7 @@ function armPlan(view, R, W) {
     : [S[0] + ca * 5 * K, S[1] + (16 + low + Math.max(0, sa) * 2) * K];
   else { const sv = svOf(W);
     if (THRUST.has(wt)) { const r = 11 + sv.ext * 0.8; h = [S[0] + ca * r * K, S[1] + (6 + low + sa * r * 0.8) * K]; }
-    else { const ha = a + sv.a * sgn * 0.55, r = 13 + sv.ext * 0.5; h = [S[0] + Math.cos(ha) * r * K, S[1] + (5 + low - (W.mode === 'cover' ? 4 : 0) + Math.sin(ha) * r * 0.75) * K]; } }
+    else { const ha = a + Math.atan2(Math.sin(sv.a), Math.cos(sv.a)) * sgn * 0.55, r = 13 + sv.ext * 0.5;   /* Kampfanimation: Wirbel drehen über 2π — die Hand folgt dem Winkel modulo 2π */ h = [S[0] + Math.cos(ha) * r * K, S[1] + (5 + low - (W.mode === 'cover' ? 4 : 0) + Math.sin(ha) * r * 0.75) * K]; } }
   const aw = weaponAngle(W, a);
   let off = null;
   if (W.two && !RANGED.has(wt)) off = [h[0] + Math.cos(aw) * 9 * K, h[1] + Math.sin(aw) * 9 * K];

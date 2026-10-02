@@ -1,16 +1,16 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=23';
-import * as CS from './cloudsave.js?v=23';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=23';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=23';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=23';
-import { wearOf } from './buildings.js?v=23';
-import * as SP from './sprites.js?v=23';   /* Bestiarium: Gegnerbilder */
-import { townState, townPrice } from './sim.js?v=23';
-import { GOODS } from './data.js?v=23';
-import { target as ecoTarget } from './economy.js?v=23';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=23';
-import { sfx, ambience } from './sfx.js?v=23';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=24';
+import * as CS from './cloudsave.js?v=24';
+import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=24';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=24';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=24';
+import { wearOf } from './buildings.js?v=24';
+import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
+import { townState, townPrice } from './sim.js?v=24';
+import { GOODS } from './data.js?v=24';
+import { target as ecoTarget } from './economy.js?v=24';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
+import { sfx, ambience } from './sfx.js?v=24';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -45,7 +45,7 @@ const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber 
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
 const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
-function loadIcons() { import('./icons.js?v=23').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function loadIcons() { import('./icons.js?v=24').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
 function paintNav() {
   for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 3);
     b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : '') + `<span class="navlbl">${NAV_SHORT[G[0]] || G[1]}</span>` + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }   /* Entwickler: größere Symbole, Beschriftung darunter */
@@ -80,15 +80,25 @@ export function initUI() {
   const tip = el('div', 'tip'); tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip);
   const tipText = t => { const n = t.closest && t.closest('[title],[data-tip]');
     if (n && n.hasAttribute('title')) { n.dataset.tip = n.getAttribute('title'); n.removeAttribute('title'); } return n; };
+  let cardFor = null;                                          /* P5: Gegenstände zeigen ihre Bildkarte (data-card + _card) statt einer Textzeile */
+  const showCard = (c, x, y) => { const h = c._card?.(); if (!h) return false; if (cardFor !== c || !tip.classList.contains('on')) { tip.innerHTML = h; cardFor = c; }
+    tip.classList.add('on', 'card'); paintIcons(tip); if (x != null) tip.style.transform = `translate(${Math.round(Math.max(6, Math.min(x - tip.offsetWidth / 2, innerWidth - tip.offsetWidth - 6)))}px,${Math.round(Math.max(6, y - tip.offsetHeight - 24))}px)`; return true; };
   document.addEventListener('mouseover', e => {
+    const c = e.target.closest && e.target.closest('[data-card]');
+    if (c && showCard(c)) return;
+    cardFor = null; tip.classList.remove('card');
     const n = tipText(e.target), text = n && n.dataset.tip;
     if (!text) { tip.classList.remove('on'); return; }
     tip.textContent = text; tip.classList.add('on');
   });
+  let lpT = 0;                                                 /* Touch: langes Drücken zeigt die Karte, Loslassen schließt sie */
+  document.addEventListener('pointerdown', e => { tip.classList.remove('on'); cardFor = null; if (e.pointerType !== 'touch') return; const c = e.target.closest && e.target.closest('[data-card]'); if (!c) return;
+    clearTimeout(lpT); lpT = setTimeout(() => showCard(c, e.clientX, e.clientY), 420); });
+  document.addEventListener('pointerup', e => { clearTimeout(lpT); if (e.pointerType === 'touch') setTimeout(() => tip.classList.remove('on'), 900); });
   document.addEventListener('mousemove', e => { if (!tip.classList.contains('on')) return;
     const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 6), y = Math.min(e.clientY + 18, innerHeight - tip.offsetHeight - 6);
     tip.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; });
-  document.addEventListener('mouseout', e => { if (!e.relatedTarget || !tipText(e.relatedTarget)) tip.classList.remove('on'); });
+  document.addEventListener('mouseout', e => { const r = e.relatedTarget; if (!r || !(tipText(r) || (r.closest && r.closest('[data-card]')))) { tip.classList.remove('on'); cardFor = null; } });
   renderHotbar();
 }
 
@@ -265,7 +275,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=23').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -562,13 +572,20 @@ export function setPrompt(text) {
 export let modalOpen = null;
 // Fenster neu zeichnen, ohne es umzuschalten (openModal schließt bei gleichem Namen).
 export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOpen = null; openModal(n, arg); }
-export function closeModal() { $('modal').classList.add('hidden'); modalOpen = null; [...$('nav').children].forEach(b => b.classList.remove('active')); S.paused = false; }
+function leaveWin(next) {                                     /* P6/P7: Fenster verlassen — Inventar-Takt stoppen, Kontor-Besuch beenden, Dock lösen */
+  if (modalOpen === 'inventory' && next !== 'inventory') { clearInterval(invTimer); figPrev = null; DRAG = null; }
+  if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
+  $('modal')?.classList.toggle('dock', next === 'trade');
+  document.body.classList.toggle('nomotion', S.settings?.motion === false);   /* „Reduzierte Bewegung“: kein Glanz, kein Pulsieren */
+}
+export function closeModal() { leaveWin(null); $('modal').classList.add('hidden'); modalOpen = null; [...$('nav').children].forEach(b => b.classList.remove('active')); S.paused = false; }
 export function openModal(name, arg) {
   if (uiHooks.modal?.(name, arg)) return;
   if (modalOpen === name) return closeModal();
+  leaveWin(name);
   modalOpen = name;
   const m = $('modal'); m.classList.remove('hidden');
-  const body = $('modal-body'); body.innerHTML = '';
+  const body = $('modal-body'); body.innerHTML = ''; body.className = '';
   const grp = NAV.find(n => n[3].includes(name));
   [...$('nav').children].forEach(b => b.classList.toggle('active', b.dataset.g === grp?.[0]));
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
@@ -583,60 +600,225 @@ export function openModal(name, arg) {
   if (R) R[1](body, arg);
 }
 
-// ---- Inventar ----
-let selIdx = -1;
+// ---- Inventar (Visueller Umbau P6, IMPL-ITEMS 02.10.2026) ----
+// Papierpuppe mit großer, laufend aktualisierter Figur; Filter als Piktogramme; „Ordnen“ ändert nur die Anzeige (p.inv bleibt wie es ist);
+// Klick = ansehen (Entwickler 02.10.), Doppelklick, Ziehen oder Knopf = handeln; Antippen: Teil wählen, dann den leuchtenden Platz tippen.
+// Das Fenster wird einmal gebaut; danach malt invPaint nur, was sich geändert hat (Signatur je Zelle, wie renderHotbar).
+const RAR_ORD = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+const GEAR_SL = new Set(['weapon', 'offhand', 'head', 'chest', 'feet', 'cloak', 'hands', 'legs', 'talisman']);
+const rarOfS = s => (s && (s.rar || ITEMS[s.key]?.rarity)) || 'common';
+const rarLv = s => Math.max(0, RAR_ORD.indexOf(rarOfS(s)));
+const rarMark = r => r && r !== 'common' ? `<i class="rm rm-${r}"></i>` : '';
+const LOCK_SVG = '<svg class="lk" viewBox="0 0 8 9" width="9" height="10" aria-hidden="true"><path d="M2 4V2.6a2 2 0 0 1 4 0V4" stroke="#d8cdb6" stroke-width="1.2" fill="none"/><rect x="1" y="4" width="6" height="5" fill="#bd9433"/><rect x="3.5" y="5.6" width="1" height="1.6" fill="#3b2a12"/></svg>';
+const DOLL = [['head', 'Kopf', 1, 1], ['chest', 'Rumpf', 1, 2], ['hands', 'Hände', 1, 3], ['legs', 'Beine', 1, 4], ['talisman', 'Talisman', 3, 1], ['cloak', 'Umhang', 3, 2], ['feet', 'Füße', 3, 4], ['weapon', 'Waffe', 1, 5], ['offhand', 'Nebenhand', 3, 5]];
+const DOLL_ICO = { head: 'nav_char', weapon: 'log_combat', offhand: 'set_level', feet: 'bar_st', talisman: 'bar_xp' };
+const INV_CAT = [['all', 'nav_inv', 'Alles'], ['weapon', 'log_combat', 'Waffen'], ['armor', 'nav_char', 'Rüstung und Schmuck'], ['use', 'res_food', 'Verbrauch'], ['good', 'log_economy', 'Handelswaren'], ['mat', 'res_stone', 'Material'], ['quest', 'nav_quest', 'Auftrags- und Schlüsselstücke']];
+const CAT_ORDER = ['weapon', 'armor', 'use', 'good', 'mat', 'quest'];
+const catOf = it => !it ? 'mat' : it.slot === 'weapon' ? 'weapon' : GEAR_SL.has(it.slot) ? 'armor' : it.slot === 'consumable' ? 'use' : it.good ? 'good' : it.slot === 'material' && !it.value ? 'quest' : 'mat';
+const INV_SORT = [['found', 'Fund'], ['cat', 'Art'], ['rar', 'Seltenheit'], ['val', 'Wert']];
+const FIG_DIRS = ['S', 'W', 'N', 'E'];
+let invSel = null, invFilter = 'all', figDir = 0, figPrev = null, figT = 0, invTimer = 0, DRAG = null, moreOpen = false;
+const icoTag = (k, s = 1, cls = 'kpi-ico') => icoImg(k, s, cls);
+function paintIcons(root) { root?.querySelectorAll?.('canvas[data-ico]').forEach(cv => drawItemIconTo(cv, cv.dataset.ico)); }
+function chipBar(box, list, cur, on) {
+  if (!box) return;
+  box.innerHTML = list.map(([k, ico, name]) => `<button class="chip${k === cur ? ' on' : ''}" data-k="${k}" title="${name}">${icoTag(ico, 2, 'chip-ico') || name.slice(0, 4)}</button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => on(b.dataset.k));
+}
+function invView(p) {                                        /* Anzeige-Reihenfolge: Indizes in p.inv (Daten bleiben unberührt) */
+  const idx = []; p.inv.forEach((s, i) => { if (s) idx.push(i); });
+  const m = S.settings?.invSort || 'found'; if (m === 'found') return idx;
+  const k = i => { const s = p.inv[i], it = ITEMS[s.key] || {}, c = CAT_ORDER.indexOf(catOf(it));
+    return m === 'cat' ? c * 100 - rarLv(s) : m === 'rar' ? -rarLv(s) * 100 + c : -(it.value || 0) * (RARITY_VALUE[rarOfS(s)] || 1) * (s.count || 1); };
+  return idx.sort((a, b) => k(a) - k(b) || a - b);
+}
+function cmpArrow(s) {                                       /* Pfeil nur, wo das Spiel selbst vergleicht: Schaden (Waffe) und Rüstung (gleicher Platz) */
+  const it = ITEMS[s.key], p = S.player; if (!it || !GEAR_SL.has(it.slot)) return '';
+  const cur = p.equip?.[it.slot], ci = cur && ITEMS[cur.key];
+  if (it.dmg) return ci?.dmg ? (it.dmg > ci.dmg ? 'up' : it.dmg < ci.dmg ? 'dn' : '') : 'up';
+  if (it.armor) return !ci ? 'up' : it.armor > (ci.armor || 0) ? 'up' : it.armor < (ci.armor || 0) ? 'dn' : '';
+  return '';
+}
+function paintCell(c, s, o = {}) {
+  const sig = s ? [s.key, s.count || 1, Math.round((s.cond ?? 1) * 40), rarOfS(s), s.lock ? 1 : 0, s.nw ? 1 : 0, o.dim ? 1 : 0, o.sel ? 1 : 0, o.cmp || '', o.tag || '', o.mk ? 1 : 0, o.cls || ''].join('|') : 'leer|' + (o.empty || '') + (o.cls || '');
+  if (c._sig === sig) return; c._sig = sig;
+  const base = c.dataset.base || 'cell';
+  if (!s) { c.className = base + ' empty' + (o.cls ? ' ' + o.cls : ''); c.innerHTML = o.empty || ''; return; }
+  const r = rarOfS(s);
+  c.className = `${base} r-${r}${o.dim ? ' dim' : ''}${o.sel ? ' sel' : ''}${s.lock ? ' locked' : ''}${o.mk ? ' mk' : ''}${o.cls ? ' ' + o.cls : ''}`;
+  c.innerHTML = `<canvas></canvas>${rarMark(r)}${(s.count || 1) > 1 ? `<span class="cnt">${s.count}</span>` : ''}` +
+    (s.cond != null && s.cond < 1 ? `<span class="cond"><i style="width:${s.cond * 100}%;background:${s.cond > .5 ? '#5c6b3c' : '#8c3b2a'}"></i></span>` : '') +
+    (s.nw ? '<span class="nwm">NEU</span>' : '') + (s.lock ? LOCK_SVG : '') + (o.cmp ? `<span class="cmpa ${o.cmp}">${o.cmp === 'up' ? '▲' : '▼'}</span>` : '') +
+    (o.tag || '') + (o.mk ? '<span class="mkm">✓</span>' : '');
+  drawItemIconTo(c.firstChild, s.key);
+}
+function invStateSig() { const p = S.player; return p.inv.map(s => s ? s.key + ':' + (s.count || 1) + (s.lock ? 'L' : '') : '-').join(',') + '#' + [...GEAR_SL].map(k => p.equip?.[k]?.key || '').join(',') + '#' + (S.stash?.length || 0); }
+function hasStore() { return !!S.settlement?.buildings?.some(b => b.type === 'storage' && b.built >= 1); }
+function fitsSlot(k, s) {                                    /* passt das Teil auf diesen Platz? (Zweiwaffen: zweite Einhandwaffe auf die Nebenhand) */
+  const it = s && ITEMS[s.key]; if (!it || !GEAR_SL.has(it.slot)) return false;
+  return k === it.slot || A.previewEquip?.(s)?.slot === k;
+}
+function markTargets(s) {
+  for (const d of document.querySelectorAll('#doll .dslot')) { const k = d.dataset.k, f = !!s && fitsSlot(k, s), no = f && !!A.equipBlock?.(ITEMS[s.key]);
+    d.classList.toggle('can', f && !no); d.classList.toggle('no', no); }
+}
+function invAct(fn, flash) {                                  /* Aktion ausführen, gezielt neu malen, Rückmeldung: Einrasten oder Wackeln */
+  const p = S.player, sig0 = invStateSig(), o = invSel?.o; fn(); const changed = invStateSig() !== sig0;
+  if (invSel?.src === 'inv' && o && !p.inv.includes(o)) { const k = Object.keys(p.equip || {}).find(k2 => p.equip[k2] === o); invSel = k ? { src: 'eq', k } : null; }
+  if (invSel?.src === 'stash' && !S.stash.includes(invSel.o)) invSel = null;
+  if (invSel?.src === 'eq' && !p.equip?.[invSel.k]) invSel = null;
+  if (modalOpen !== 'inventory') return changed;
+  invPaint(true);
+  const tgt = typeof flash === 'function' ? flash() : flash;
+  if (tgt && S.settings.motion !== false) { const cls = changed ? 'flash' : 'shake'; tgt.classList.remove('flash', 'shake'); void tgt.offsetWidth; tgt.classList.add(cls); setTimeout(() => tgt.classList.remove(cls), 520); }
+  if (changed) sfx('metal', 0.3, 0.22);
+  return changed;
+}
+const dollEl = k => document.querySelector(`#doll .dslot[data-k="${k}"]`);
 function invUI(body) {
   const p = S.player;
   body.className = '';
-  body.innerHTML = `<div class="inv-layout">
-      <div><div class="panel-title" style="margin-left:0">Tasche ${p.inv.length}/${p.invCap}</div><div class="inv-grid" id="ig"></div>
-        <div class="panel-title" style="margin-left:0;margin-top:14px">Lagerbestand</div><div class="inv-grid" id="sg"></div></div>
-      <div><div class="panel-title" style="margin-left:0">Ausrüstung</div><div class="eq-list" id="eq"></div>
-        <div class="ledger" style="margin-top:12px">Rüstung gesamt <b>${A.armorOf(p)}</b><br>Traglast ${p.inv.length}/${p.invCap}</div></div>
-      <div class="item-detail" id="det">Ein Gegenstand, der zählt, wiegt mehr als zehn, die es nicht tun.</div></div>`;
-  const grid = $('ig');
-  for (let i = 0; i < p.invCap; i++) {
-    const slot = p.inv[i];
-    const c = el('div', 'cell' + (slot ? ' r-' + (slot.rar || ITEMS[slot.key]?.rarity || 'common') : ''));   // Rarität des Exemplars
-    if (slot) {
-      const it = ITEMS[slot.key];
-      const cv = el('canvas'); cv.width = cv.height = 52; c.appendChild(cv);
-      if (slot.count > 1) c.insertAdjacentHTML('beforeend', `<span class="cnt">${slot.count}</span>`);
-      if (slot.cond != null && slot.cond < 1) c.insertAdjacentHTML('beforeend', `<span class="cond"><i style="width:${slot.cond * 100}%;background:${slot.cond > .5 ? '#5c6b3c' : '#8c3b2a'}"></i></span>`);
-      c.title = it.name;
-      setTimeout(() => drawItemIconTo(cv, slot.key), 0);
-      c.onclick = () => { selIdx = i; showDetail(slot, i); };
-      c.ondblclick = () => { A.useOrEquip(i); refreshModal(); };
-    }
-    grid.appendChild(c);
+  body.innerHTML = `<div class="inv-layout inv2">
+      <div class="inv-left"><div class="inv-bar"><div class="chips" id="inv-f"></div>
+          <label class="inv-sort" title="Ordnen ändert nur die Anzeige. Die Reihenfolge im Gepäck bleibt.">Ordnen <select id="inv-sort">${INV_SORT.map(([k, n]) => `<option value="${k}"${(S.settings.invSort || 'found') === k ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+          <span class="inv-cnt" id="inv-cnt" title="Traglast: Plätze in der Tasche"></span></div>
+        <div class="inv-grid" id="ig"></div>
+        <div class="panel-title" style="margin-left:0;margin-top:12px">Lagerbestand</div><div class="inv-grid" id="sg"></div></div>
+      <div class="inv-mid"><div class="doll" id="doll"><canvas id="doll-fig" width="150" height="214" title="Klick: Figur drehen"></canvas></div>
+        <div class="doll-kpi" id="doll-kpi"></div></div>
+      <div class="item-detail" id="det"></div></div>`;
+  const onF = k => { invFilter = k; chipBar($('inv-f'), INV_CAT, invFilter, onF); invPaint(); }; chipBar($('inv-f'), INV_CAT, invFilter, onF);
+  $('inv-sort').onchange = e => { S.settings.invSort = e.target.value; invPaint(); };
+  const doll = $('doll');
+  for (const [k, label, col, row] of DOLL) {
+    const d = el('div', 'cell dslot'); d.dataset.k = k; d.dataset.base = 'cell dslot'; d.style.gridColumn = col; d.style.gridRow = row; d.dataset.card = '1';
+    d._card = () => p.equip?.[k] ? itemCardHTML(p.equip[k], { short: true, equipped: true }) : `<div class="icard"><div class="ic-sub">${label}: leer</div></div>`;
+    d.onclick = () => { const sel = invSel?.src === 'inv' ? invSel.o : null;
+      if (sel && d.classList.contains('can')) return invAct(() => A.useOrEquip(p.inv.indexOf(sel)), () => dollEl(k));
+      if (sel && d.classList.contains('no')) { toast(A.equipBlock(ITEMS[sel.key])); return invAct(() => {}, d); }
+      invSel = p.equip?.[k] ? { src: 'eq', k } : null; invPaint(true); };
+    d.ondblclick = () => { if (p.equip?.[k]) invAct(() => A.unequip(k), () => $('ig')); };
+    d.draggable = true;
+    d.ondragstart = e => { if (!p.equip?.[k]) return e.preventDefault(); DRAG = { src: 'eq', k }; e.dataTransfer.setData('text/plain', 'rf'); };
+    d.ondragend = () => { DRAG = null; markTargets(invSel?.src === 'inv' ? invSel.o : null); };
+    d.ondragover = e => { if (DRAG?.src === 'inv' && fitsSlot(k, DRAG.o)) e.preventDefault(); };
+    d.ondrop = e => { e.preventDefault(); const o = DRAG?.o; DRAG = null; if (!o) return; const no = A.equipBlock?.(ITEMS[o.key]); if (no) { toast(no); return invAct(() => {}, d); }
+      invAct(() => A.useOrEquip(p.inv.indexOf(o)), () => dollEl(k)); };
+    doll.appendChild(d);
   }
+  $('doll-fig').onclick = () => { figDir = (figDir + 1) % 4; paintFig(true); };
+  const ig = $('ig');
+  ig.ondragover = e => { if (DRAG && DRAG.src !== 'inv') e.preventDefault(); };
+  ig.ondrop = e => { e.preventDefault(); const D = DRAG; DRAG = null; if (D?.src === 'eq') invAct(() => A.unequip(D.k), ig); else if (D?.src === 'stash') invAct(() => A.takeFromStash(S.stash.indexOf(D.o)), ig); };
   const sg = $('sg');
-  if (!S.settlement || !S.settlement.buildings.some(b => b.type === 'storage' && b.built >= 1)) {
-    sg.outerHTML = '<div class="ledger">Ohne Lagergebäude gibt es keinen gemeinsamen Vorrat.</div>';
-  } else {
-    for (let i = 0; i < 24; i++) {
-      const slot = S.stash[i];
-      const c = el('div', 'cell');
-      if (slot) {
-        const cv = el('canvas'); cv.width = cv.height = 52; c.appendChild(cv);
-        if (slot.count > 1) c.insertAdjacentHTML('beforeend', `<span class="cnt">${slot.count}</span>`);
-        setTimeout(() => drawItemIconTo(cv, slot.key), 0);
-        c.title = ITEMS[slot.key].name + ' (Klick: entnehmen)';
-        c.onclick = () => { A.takeFromStash(i); refreshModal(); };
-      }
-      sg.appendChild(c);
-    }
+  if (hasStore()) { sg.ondragover = e => { if (DRAG?.src === 'inv') e.preventDefault(); }; sg.ondrop = e => { e.preventDefault(); const o = DRAG?.o; DRAG = null; if (o) invAct(() => A.toStash(p.inv.indexOf(o)), sg); }; }
+  else sg.outerHTML = '<div class="ledger">Ohne Lagergebäude gibt es keinen gemeinsamen Vorrat.</div>';
+  clearInterval(invTimer); invTimer = setInterval(() => { if (modalOpen !== 'inventory' || !$('ig')) return clearInterval(invTimer); invPaint(); }, 1000);   /* Figur und Rüstung laufend (Zustand, Verbündete nah) */
+  invPaint(true);
+}
+function invCell(pos) {
+  const c = el('div', 'cell'); c.dataset.card = '1';
+  const at = () => { const i = $('ig')?._view?.[pos]; return i == null ? null : { i, s: S.player.inv[i] }; };
+  c._card = () => { const r = at(); return r?.s ? itemCardHTML(r.s, { short: true }) : ''; };
+  c.onclick = () => { const r = at(); if (!r?.s) { invSel = null; return invPaint(true); } delete r.s.nw; invSel = { src: 'inv', o: r.s }; invPaint(true); };
+  c.ondblclick = () => { const r = at(); if (!r?.s) return; const sl = ITEMS[r.s.key]?.slot; invAct(() => A.useOrEquip(r.i), () => GEAR_SL.has(sl) ? dollEl(A.previewEquip?.(r.s)?.slot || sl) : c); };
+  c.onmouseenter = () => { const r = at(); if (r?.s?.nw) { delete r.s.nw; setTimeout(invPaint, 0); } figHover(r?.s); };
+  c.onmouseleave = () => figHover(null);
+  c.draggable = true;
+  c.ondragstart = e => { const r = at(); if (!r?.s) return e.preventDefault(); DRAG = { src: 'inv', o: r.s }; e.dataTransfer.setData('text/plain', 'rf'); markTargets(r.s); };
+  c.ondragend = () => { DRAG = null; markTargets(invSel?.src === 'inv' ? invSel.o : null); };
+  return c;
+}
+function stashCell(i) {
+  const c = el('div', 'cell'); c.dataset.card = '1';
+  c._card = () => S.stash[i] ? itemCardHTML(S.stash[i], { short: true }) : '';
+  c.onclick = () => { invSel = S.stash[i] ? { src: 'stash', o: S.stash[i] } : null; invPaint(true); };
+  c.ondblclick = () => { if (S.stash[i]) invAct(() => A.takeFromStash(i), () => $('ig')); };
+  c.draggable = true;
+  c.ondragstart = e => { if (!S.stash[i]) return e.preventDefault(); DRAG = { src: 'stash', o: S.stash[i] }; e.dataTransfer.setData('text/plain', 'rf'); };
+  c.ondragend = () => { DRAG = null; };
+  return c;
+}
+function invPaint(force = false) {
+  const p = S.player, ig = $('ig'); if (!ig || !p) return;
+  if (ig.childElementCount !== p.invCap) { ig.innerHTML = ''; for (let i = 0; i < p.invCap; i++) ig.appendChild(invCell(i)); }
+  const view = invView(p); ig._view = view;
+  [...ig.children].forEach((c, pos) => { const i = view[pos], s = i != null ? p.inv[i] : null;
+    paintCell(c, s, { dim: !!s && invFilter !== 'all' && catOf(ITEMS[s.key]) !== invFilter, sel: !!s && invSel?.src === 'inv' && invSel.o === s, cmp: s ? cmpArrow(s) : '' }); });
+  const cnt = $('inv-cnt'); if (cnt) { const k = p.inv.length / Math.max(1, p.invCap); cnt.innerHTML = `${icoTag('nav_inv', 1)} <b>${p.inv.length}/${p.invCap}</b><i class="bagbar"><u style="width:${Math.round(k * 100)}%" class="${k >= 1 ? 'full' : k > .8 ? 'high' : ''}"></u></i>`; }
+  const sg = $('sg');
+  if (sg) { if (sg.childElementCount !== 24) { sg.innerHTML = ''; for (let i = 0; i < 24; i++) sg.appendChild(stashCell(i)); }
+    [...sg.children].forEach((c, i) => paintCell(c, S.stash[i] || null, { sel: !!S.stash[i] && invSel?.src === 'stash' && invSel.o === S.stash[i] })); }
+  for (const [k, label] of DOLL) { const d = dollEl(k); if (!d) continue; const s = p.equip?.[k];
+    paintCell(d, s || null, { sel: invSel?.src === 'eq' && invSel.k === k, cls: s && s.cond != null && s.cond < .5 ? 'worn' : '', empty: `${DOLL_ICO[k] ? icoTag(DOLL_ICO[k], 2, 'ghost-ico') : ''}<span class="dlab">${label}</span>` }); }
+  if (!DRAG) markTargets(invSel?.src === 'inv' ? invSel.o : null);
+  paintFig(); paintKpi(); invDetail(force);
+}
+function figHover(s) {
+  clearTimeout(figT);
+  if (!s || !GEAR_SL.has(ITEMS[s.key]?.slot)) { if (figPrev) { figPrev = null; paintFig(); } return; }
+  figT = setTimeout(() => { if (modalOpen !== 'inventory') return; figPrev = s; paintFig(); }, 350);   /* gedrosselt: Vorschau erst nach kurzem Verweilen (Bildcache) */
+}
+function paintFig(force = false) {
+  const cv = $('doll-fig'), p = S.player; if (!cv || !p) return;
+  let spec;
+  try { if (figPrev) { const pv = A.previewEquip?.(figPrev), eq = { ...p.equip }; if (pv) { eq[pv.slot] = figPrev; if (ITEMS[figPrev.key]?.twohand) eq.offhand = null; } spec = SP.humanSpec({ ...p, spec: null, equip: eq }); }
+    else spec = SP.humanSpec(p); } catch (e) { return; }
+  const sig = JSON.stringify(spec) + figDir; if (!force && cv._sig === sig) return; cv._sig = sig;
+  const c = cv.getContext('2d'), f = SP.humanFrame(spec, FIG_DIRS[figDir], 'i0'); if (!f) return;
+  c.imageSmoothingEnabled = false; c.clearRect(0, 0, cv.width, cv.height);
+  const s = Math.max(1, Math.floor(Math.min((cv.width - 8) / f.width, (cv.height - 12) / f.height)));
+  c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(cv.width / 2, cv.height - 9, 13 * s, 3 * s, 0, 0, 7); c.fill();
+  c.drawImage(f, Math.round((cv.width - f.width * s) / 2), Math.round(cv.height - 8 - f.height * s), f.width * s, f.height * s);
+  cv.classList.toggle('prev', !!figPrev);
+}
+const r1 = v => Math.round(v * 10) / 10;
+function paintKpi() {
+  const box = $('doll-kpi'), p = S.player; if (!box) return;
+  const ap = A.armorParts?.(p) || { total: A.armorOf(p), pieces: [], sum: A.armorOf(p), wear: 0, sturdy: 0, set: 0, rest: 0, setName: '' }, dmg = Math.round(A.damageOf?.(p) || 0);
+  const worn = Object.values(p.equip || {}).some(s => s && s.cond != null && s.cond < .5);
+  const tip = `Rüstung ${ap.total} — Teile ${r1(ap.sum)}${ap.wear >= 0.5 ? ` (Verschleiß kostet ${r1(ap.wear)})` : ''}${ap.sturdy ? ` · Härte +${r1(ap.sturdy)}` : ''}${ap.set ? ` · Set ${ap.setName} +${ap.set}` : ''}${Math.abs(ap.rest) >= 0.5 ? ` · Stufe, Talente, Narben, Segen ${ap.rest > 0 ? '+' : ''}${r1(ap.rest)}` : ''}. Rüstung mindert jeden Treffer.`;
+  const all = Math.max(1, ap.total + ap.wear), seg = (v, cls, t) => v > 0.05 ? `<i class="${cls}" style="width:${(v / all * 100).toFixed(1)}%" title="${t}"></i>` : '';
+  const h = `<div class="kpi-row"><span class="kpi big" title="${tip}">${icoTag('set_level', 2)}<b>${ap.total}</b></span>
+      <span class="kpi" title="Schaden je Hieb mit Waffe, Zustand, Fertigkeit, Stufe und Talenten">${icoTag('log_combat', 2)}<b>${dmg}</b></span>
+      ${worn ? `<span class="kpi warn" title="Abgenutzt (unter 50 %): ein Schmied bessert aus — „Kannst du das ausbessern?“">${icoTag('nav_build', 2)}</span>` : ''}
+      ${ap.setName ? `<span class="kpi set" title="Set aktiv: ${ap.setName}">${icoTag('bar_xp', 2)}</span>` : ''}</div>
+    <div class="abar" title="${tip}">${seg(ap.sum, 'a-piece', 'Teile')}${seg(ap.wear, 'a-wear', 'Verschleiß')}${seg(ap.sturdy, 'a-sturdy', 'Härte')}${seg(ap.set, 'a-set', 'Set')}${seg(Math.max(0, ap.rest), 'a-rest', 'Stufe, Talente, Narben, Segen')}</div>`;
+  if (box._h !== h) { box._h = h; box.innerHTML = h; }
+}
+function invDetail(force) {
+  const d = $('det'), p = S.player; if (!d) return;
+  const sig = (invSel ? invSel.src + (invSel.k || '') + (invSel.o ? (p.inv.indexOf(invSel.o) + '/' + S.stash.indexOf(invSel.o)) : '') : '-') + '#' + invStateSig() + (invSel?.o?.lock ? 'L' : '');
+  if (!force && d._sig === sig) return; d._sig = sig;
+  if (!invSel) { d.innerHTML = `<div class="inv-help"><p class="lore">Ein Gegenstand, der zählt, wiegt mehr als zehn, die es nicht tun.</p>
+    <div class="ledger">Klick: ansehen · Doppelklick: anlegen oder benutzen · Ziehen: auf die Figur, ins Lager, zurück in die Tasche.<br>Antippen: Teil wählen, dann den leuchtenden Platz an der Figur tippen.<br>${LOCK_SVG} Gesperrtes lässt sich nicht verkaufen und nicht ablegen. <span class="nwm inl">NEU</span> verschwindet, wenn du es ansiehst.</div></div>`; return; }
+  const wire = (id, f) => { const b = $(id); if (b) b.onclick = f; };
+  if (invSel.src === 'eq') { const k = invSel.k, s = p.equip[k];
+    d.innerHTML = itemCardHTML(s, { equipped: true, more: true }) + `<div class="ctx-actions"><button id="d-off">Ablegen (in die Tasche)</button></div>`;
+    wire('d-off', () => invAct(() => A.unequip(k), () => $('ig')));
+  } else if (invSel.src === 'stash') { const i = S.stash.indexOf(invSel.o);
+    d.innerHTML = itemCardHTML(invSel.o, { more: true }) + `<div class="ctx-actions"><button id="d-take">Entnehmen</button></div>`;
+    wire('d-take', () => invAct(() => A.takeFromStash(i), () => $('ig')));
+  } else { const slot = invSel.o, i = p.inv.indexOf(slot), it = ITEMS[slot.key]; if (i < 0) { invSel = null; return invDetail(true); }
+    d.innerHTML = itemCardHTML(slot, { more: true }) + `<div class="ctx-actions">
+      ${it.slot === 'consumable' ? `<button id="d-use">${it.use === 'bandage' ? 'Anlegen' : 'Benutzen'}</button>` : it.slot !== 'material' ? '<button id="d-use">Anlegen</button>' : ''}
+      ${it.slot === 'consumable' || it.slot === 'weapon' ? '<button id="d-hot">Auf Leiste legen</button>' : ''}
+      ${A.bandageFrom(slot.key) ? `<button id="d-craft">${A.bandageFrom(slot.key)} Verbände schneiden</button>` : ''}
+      ${slot.key === 'magiekern' ? '<button id="d-smash">Zerschlagen</button>' : ''}
+      <button id="d-lock" class="${slot.lock ? 'on' : ''}" title="Gesperrtes lässt sich nicht verkaufen und nicht ablegen.">${LOCK_SVG} ${slot.lock ? 'Entsperren' : 'Sperren'}</button>
+      <button id="d-drop"${slot.lock ? ' disabled title="Gesperrt"' : ''}>Ablegen</button>
+      ${hasStore() ? '<button id="d-stash">Ins Lager</button>' : ''}</div>`;
+    const sl = it.slot;
+    wire('d-use', () => invAct(() => A.useOrEquip(p.inv.indexOf(slot)), () => GEAR_SL.has(sl) ? dollEl(A.previewEquip?.(slot)?.slot || sl) : null));
+    wire('d-hot', () => { if (A.toHotbar(slot.key) !== false) toast('Auf Leiste gelegt'); });
+    wire('d-craft', () => invAct(() => A.craftBandage(p.inv.indexOf(slot))));
+    wire('d-smash', () => invAct(() => A.coreSmash?.()));   // S15 P7: Magiekern zerschlagen
+    wire('d-lock', () => { if (slot.lock) delete slot.lock; else slot.lock = true; invPaint(true); });
+    wire('d-drop', () => invAct(() => A.dropItem(p.inv.indexOf(slot))));
+    wire('d-stash', () => invAct(() => A.toStash(p.inv.indexOf(slot)), () => $('sg')));
   }
-  const eq = $('eq');
-  [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['hands', 'Hände'], ['legs', 'Beine'], ['feet', 'Füße'], ['cloak', 'Umhang'], ['talisman', 'Talisman']].forEach(([k, label]) => {
-    const item = p.equip[k];
-    const d = el('div', 'eq-slot');
-    const cv = el('canvas'); cv.width = cv.height = 34; d.appendChild(cv);
-    d.appendChild(el('div', '', `<div class="s-key">${label}</div><div class="s-name">${item ? ITEMS[item.key].name : '—'}</div>`));
-    if (item) { setTimeout(() => drawItemIconTo(cv, item.key), 0); d.onclick = () => { A.unequip(k); refreshModal(); }; }
-    eq.appendChild(d);
-  });
-  if (selIdx >= 0 && p.inv[selIdx]) showDetail(p.inv[selIdx], selIdx);
+  const det = d.querySelector('details.ic-more'); if (det) det.ontoggle = () => { moreOpen = det.open; };
+  paintIcons(d);
 }
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
@@ -655,19 +837,19 @@ function itemPurpose(it) {
   if (it.slot === 'material') return 'Material: für Aufträge, Handwerk oder zum Verkauf.';
   return '';
 }
-export function itemInfoHTML(slot, cmpWith = true) {
-  const it = ITEMS[slot.key], p = S.player, cur = cmpWith && it.slot && p.equip[it.slot];
+export function itemInfoHTML(slot, cmpWith = true, lite = false) {   /* lite: ohne Kopf und Affixe (stehen schon in der Bildkarte) */
+  const it = ITEMS[slot.key], p = S.player, cur = cmpWith && it.slot && p.equip?.[it.slot];
   const cmp = (a, b) => a === b ? '' : a > b ? `<span class="better">+${+(a - b).toFixed(1)}</span>` : `<span class="worse">${+(a - b).toFixed(1)}</span>`;
   const rar = slot.rar || it.rarity || 'common', leg = slot.leg || it.leg;
-  let h = `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
+  let h = lite ? '' : `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
   if (it.sdesc) h += `<div class="ledger" style="margin:4px 0">${it.sdesc}</div>`;   /* Schildart erklären */
   if (slot.qual) h += `<div class="ledger" style="margin:4px 0">Güte: ${slot.qual}${slot.maker ? ` · gefertigt von ${slot.maker}` : ''}</div>`;   /* Nutzer §5d.8: Handwerk */
   if (it.energy) h += `<div class="ledger" style="margin:4px 0">Magitech · Energie ${slot.charge ?? 100}/100 · ${it.energy} je Schuss${it.splash ? ' · Streuung' : ''}${it.pierce ? ' · durchschlägt einen Gegner' : ''}${it.mstatus ? ` · ${it.mstatus.key === 'shocked' ? 'lähmt' : 'setzt in Brand'} (${Math.round(it.mstatus.chance * 100)} %)` : ''}. Leer schießt sie nicht — Energiezelle benutzen.</div>`;   /* Roadmap C.10 */
   if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
   if (slot.used) h += `<div class="stat" title="Gebraucht vom Schwarzmarkt: kommt beim Einsetzen mit weniger Zustand."><span>Gebraucht</span><b>${slot.used} % Zustand</b></div>`;
-  for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;
-  if (leg && LEGENDS[leg]) h += `<div class="legend-fx">«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
+  if (!lite) for (const [k, v] of Object.entries(slot.afx || {})) h += `<div class="affix${AFFIXES[k]?.major ? ' major' : ''}">${AFFIXES[k]?.name}: ${AFFIXES[k]?.fmt(v)}</div>`;
+  if (!lite && leg && LEGENDS[leg]) h += `<div class="legend-fx">«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
   if (it.lore || slot.lore) h += `<div class="lore">${slot.lore || it.lore}</div>`;
   if (slot.history) h += `<div class="lore">${slot.history.join('<br>')}</div>`;
   if (it.dmg) h += `<div class="stat"><span>Schaden</span><b>${it.dmg} ${cur && ITEMS[cur.key].dmg ? cmp(it.dmg, ITEMS[cur.key].dmg) : ''}</b></div>`;
@@ -683,27 +865,50 @@ export function itemInfoHTML(slot, cmpWith = true) {
   h += `<div class="stat"><span>Grundwert</span><b>${Math.round(it.value * (RARITY_VALUE[rar] || 1))} Gold</b></div>`;
   return h;
 }
-function showDetail(slot, i) {
-  const it = ITEMS[slot.key], p = S.player, d = $('det');
-  let h = itemInfoHTML(slot);                                       // S13: gemeinsame Beschreibung (Inventar und Handel)
-  h += `<div class="ctx-actions">
-      ${it.slot === 'consumable' ? `<button id="d-use">${it.use === 'bandage' ? 'Anlegen' : 'Benutzen'}</button>` : it.slot !== 'material' ? '<button id="d-use">Anlegen</button>' : ''}
-      ${it.slot === 'consumable' || it.slot === 'weapon' ? '<button id="d-hot">Auf Leiste legen</button>' : ''}
-      ${A.bandageFrom(slot.key) ? `<button id="d-craft">${A.bandageFrom(slot.key)} Verbände schneiden</button>` : ''}
-      ${slot.key === 'magiekern' ? '<button id="d-smash">Zerschlagen</button>' : ''}
-      <button id="d-drop">Ablegen</button>
-      ${S.settlement && S.settlement.buildings.some(b => b.type === 'storage' && b.built >= 1) ? '<button id="d-stash">Ins Lager</button>' : ''}
-    </div>`;
-  d.innerHTML = h;
-  const refresh = () => { refreshModal(); };
-  if ($('d-use')) $('d-use').onclick = () => { A.useOrEquip(i); refresh(); };
-  if ($('d-hot')) $('d-hot').onclick = () => { if (A.toHotbar(slot.key) !== false) toast('Auf Leiste gelegt'); };
-  if ($('d-craft')) $('d-craft').onclick = () => { A.craftBandage(i); refresh(); };
-  if ($('d-drop')) $('d-drop').onclick = () => { A.dropItem(i); refresh(); };
-  if ($('d-smash')) $('d-smash').onclick = () => { A.coreSmash?.(); refresh(); };   // S15 P7: Magiekern zerschlagen
-  if ($('d-stash')) $('d-stash').onclick = () => { A.toStash(i); refresh(); };
+/* Visueller Umbau P5 (IMPL-ITEMS): Bildkarte — großes Pixel-Icon, Name in Seltenheitsfarbe mit Marke (Form zuerst, dann Farbe),
+   Kennzahlen als Piktogramme mit Vergleichspfeil, Werte-Vorschau aus armorOf/damageOf (previewEquip), Affixe mit Spanne,
+   Set-Liste; der Rest (Zweck, Lore, alle Werte) aufklappbar. o.short = Kurzform für den schwebenden Tooltip. */
+const KP = (ico, val, tip, d = '', cls = '') => `<span class="kp${cls ? ' ' + cls : ''}" title="${tip}">${icoTag(ico, 2)}<b>${val}</b>${d}</span>`;
+const dlt = (a, b, dig = 1) => { const d = +(a - b).toFixed(dig); return !d ? '' : `<em class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</em>`; };
+export function itemCardHTML(slot, o = {}) {
+  const it = slot && ITEMS[slot.key]; if (!it) return '';
+  const p = S.player, rar = rarOfS(slot), gear = GEAR_SL.has(it.slot), leg = slot.leg || it.leg;
+  const curS = !o.equipped && gear ? p?.equip?.[it.slot] : null, cur = curS && ITEMS[curS.key];
+  const k = [];
+  if (it.dmg) k.push(KP('log_combat', it.dmg, 'Schaden der Waffe', cur?.dmg ? dlt(it.dmg, cur.dmg) : ''));
+  if (it.armor) k.push(KP('set_level', it.armor, 'Rüstung des Teils', gear && !o.equipped ? dlt(it.armor, cur?.armor || 0) : ''));
+  if (it.block) k.push(KP('set_level', Math.round(it.block * 100) + '%', 'Block (Schild)'));
+  if (it.speed) k.push(KP('time', (it.speed / 1000).toFixed(2) + ' s', 'Angriffszeit — kürzer ist schneller', cur?.speed ? dlt(cur.speed / 1000, it.speed / 1000, 2) : ''));
+  if (it.stam) k.push(KP('bar_st', it.stam, 'Ausdauer je Hieb'));
+  if (it.heal) k.push(KP('bar_hp', it.heal, 'Heilung'));
+  if (slot.cond != null) k.push(KP('nav_build', Math.round(slot.cond * 100) + '%', 'Zustand — abgenutzt wirkt es schwächer; ein Schmied bessert aus.', '', slot.cond > .5 ? '' : 'bad'));
+  else if (o.shop && gear) k.push(KP('nav_build', '55–100%', 'Ladenware kommt gebraucht: Zustand 55 bis 100 %.'));
+  if ((slot.count || 1) > 1) k.push(KP('nav_inv', '×' + slot.count, 'Anzahl im Stapel'));
+  let h = `<div class="icard ic-${rar}"><div class="ic-head"><canvas class="ic-ico" data-ico="${slot.key}"></canvas>
+    <div class="ic-ttl"><div class="ic-name r-${rar}">${slot.name || it.name}</div><div class="ic-sub">${rarMark(rar)}${RARITY[rar]} · ${slotLabel(it.slot)}${slot.lock ? ' · ' + LOCK_SVG + ' gesperrt' : ''}${o.equipped ? ' · angelegt' : ''}</div></div></div>`;
+  if (k.length) h += `<div class="ic-kpi">${k.join('')}</div>`;
+  if (gear && !o.equipped && !o.short && A.previewEquip) {          /* Werte-Vorschau nur mit den Formeln des Spiels */
+    const pv = A.previewEquip(o.shop ? { ...slot, cond: 1 } : slot), pl = o.shop ? A.previewEquip({ ...slot, cond: 0.55 }) : null;
+    const row = (ico, name, a, b, lo) => { const d = +(b - a).toFixed(1); if (Math.abs(d) < 0.05 && (!lo || Math.abs(lo - a) < 0.05)) return '';
+      return `<span class="pv" title="${name} gesamt nach dem Anlegen${lo != null ? ' (je nach Zustand der Ware)' : ''}">${icoTag(ico, 1)} ${r1(a)} → <b>${lo != null && Math.abs(lo - b) >= 0.05 ? r1(lo) + '–' : ''}${r1(b)}</b>${dlt(b, a)}</span>`; };
+    if (pv) { const s = row('set_level', 'Rüstung', pv.armor[0], pv.armor[1], pl?.armor[1]) + row('log_combat', 'Schaden je Hieb', pv.dmg[0], pv.dmg[1], pl?.dmg[1]);
+      if (s) h += `<div class="ic-prev">${s}</div>`; }
+    const set0 = A.setOf?.(); if (set0 && curS && (ARMOR_SETS[set0.key]?.pieces || []).includes(curS.key) && !(ARMOR_SETS[set0.key]?.pieces || []).includes(slot.key)) h += `<div class="ic-warn">Bricht das Set „${set0.name}“</div>`;
+  }
+  const afx = Object.entries(slot.afx || {});
+  if (afx.length) h += `<div class="ic-afx">${afx.map(([ak, v]) => { const Af = AFFIXES[ak]; if (!Af) return ''; const [a, b] = Af.v || [v, v], q = b > a ? Math.max(0, Math.min(1, (v - a) / (b - a))) : 1;
+    return `<div class="affix${Af.major ? ' major' : ''}" title="${Af.v ? 'Spanne ' + Af.fmt(a) + ' bis ' + Af.fmt(b) : ''}">${Af.major ? '<i class="rune"></i>' : '<i class="afd"></i>'}${Af.name}: ${Af.fmt(v)}<span class="afr"><u style="width:${Math.round(q * 100)}%"></u></span></div>`; }).join('')}</div>`;
+  if (leg && LEGENDS[leg]) h += `<div class="legend-fx"><i class="rune leg"></i>«${LEGENDS[leg].name}» — ${LEGENDS[leg].desc}</div>`;
+  const SET = Object.values(ARMOR_SETS).find(St => St.pieces.includes(slot.key) || (St.extra || []).includes(slot.key));
+  if (SET) { const all = [...SET.pieces, ...(SET.extra || [])], worn = pk => Object.values(p?.equip || {}).some(s => s && s.key === pk), n = all.filter(worn).length;
+    h += `<div class="ic-set"><div><b>Set ${SET.name}</b> <span class="setn">${n}/${all.length}</span></div><div class="setp">${all.map(pk => `<span class="${worn(pk) ? 'on' : ''}">${ITEMS[pk]?.name || pk}</span>`).join('')}</div>
+      <small>Alle Grundteile (${SET.pieces.length}): ${SET.desc}${SET.tdesc ? ' · ' + SET.tdesc : ''}</small></div>`; }
+  if (o.price) h += o.price;
+  if (!o.short) h += `<details class="ic-more"${moreOpen || o.open ? ' open' : ''}><summary>Mehr: Zweck, Herkunft, alle Werte</summary>${itemInfoHTML(slot, !o.equipped, true)}</details>`;
+  else if (it.lore || slot.lore) h += `<div class="lore ic-lore">${slot.lore || it.lore}</div>`;
+  return h + '</div>';
 }
-const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', chest:'Rumpf', feet:'Füße', cloak:'Umhang', consumable:'Verbrauch', material:'Material' }[s] || s);
+const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', chest:'Rumpf', hands:'Hände', legs:'Beine', feet:'Füße', cloak:'Umhang', talisman:'Talisman', consumable:'Verbrauch', material:'Material' }[s] || s || 'Gegenstand');   /* P5-Fehler: Hände, Beine, Talisman fehlten */
 
 // ---- Körpertafel (Trefferzonen) ----
 // Vorderansicht wie auf einer Feldschertafel: die rechte Körperseite liegt im Bild links.
@@ -1111,30 +1316,173 @@ function mapUI(body) {
   [...body.querySelectorAll('[data-z]')].forEach(b => b.onclick = () => { S.settings.mapZoom = +b.dataset.z; mapUI(body); });
 }
 
-// ---- Handel ----
+// ---- Handel (Visueller Umbau P7, IMPL-ITEMS 02.10.2026) ----
+// Angedocktes Seitenfenster rechts (die Welt bleibt sichtbar), Händlerporträt, Warenraster mit Preisschild, Stadtwaren als Kreidetafel,
+// Klick = ansehen; Kaufen und Verkaufen per Knopf, Doppelklick oder Ziehen; Mengenschieber mit Preis je Stück und Gesamtpreis vorher
+// (buyQuote rechnet wie buy, an einer Kopie); Mehrfachverkauf markierter Teile (gleicher Preis je Stück wie einzeln, kein Rückkauf);
+// Preisvergleich gegen S.priceSeen; Goldzähler rollt mit Münzklang; Händler antwortet mit Sprechblase und Geste (shopBark).
+// Angezeigter Preis = gezahlter Preis: Verkauf immer mit dem Exemplar (Rarität), wie sell() rechnet (vorher ohne — Fehler aus shops.md).
+const SHOP_ICO = { smith: 'nav_build', tavern: 'set_morale', heal: 'res_herb', tech: 'nav_options', black: 'log_death', market: 'log_economy' };
+const SHOP_NAME = { smith: 'Schmiede', tavern: 'Schenke', heal: 'Heilkunde', tech: 'Feinwerk', black: 'Hehlerware', market: 'Markt' };
+const TR_CAT = [['all', 'nav_inv', 'Alles'], ['weapon', 'log_combat', 'Waffen'], ['armor', 'nav_char', 'Rüstung und Schmuck'], ['use', 'res_food', 'Vorrat'], ['good', 'log_economy', 'Stadtwaren'], ['mat', 'res_stone', 'Material']];
+export const tradeWith = () => trNpc;                       /* Kamera (game.js): Held und Händler links neben dem Dock */
+let trNpc = null, trSel = null, trCat = 'all', trQty = 1, trMarks = new Set(), trMark = false, TRD = null;
+const catIn = (it, cat) => cat === 'all' || catOf(it) === cat || (cat === 'mat' && catOf(it) === 'quest');
+function seenOther(npc, key) {                                  /* zuletzt gesehene Preise dieser Ware in anderen Städten (S.priceSeen) */
+  const here = A.ecoTownOf?.(npc) || npc.homeTown || npc.town;
+  return Object.entries(S.priceSeen || {}).filter(([k, v]) => k !== here && S.towns?.[k] && v.p?.[key] != null).map(([k, v]) => ({ k, name: S.towns[k].name || k, p: v.p[key], day: v.day })).sort((a, b) => b.day - a.day);
+}
 function tradeUI(body, npc) {
-  const p = S.player;
-  const stock = A.shopStock(npc);
-  body.innerHTML = `<div class="inv-layout" style="grid-template-columns:1fr 1fr 1fr">
-    <div><h3>${npc.name} bietet</h3><div id="buy"></div></div>
-    <div><h3>Du bietest (Gold: ${S.gold})</h3><div id="sell"></div></div>
-    <div><h3>Info</h3><div id="trade-info" class="ledger">Fahr mit der Maus über eine Ware: hier steht, was sie ist und was sie tut.</div></div></div>`;   // S13 (Nutzer): Info beim Kauf
-  const mk = (list, box, isBuy) => list.forEach((slot, i) => {
-    const it = ITEMS[slot.key];
-    const price = A.price(slot.key, isBuy, npc);
-    const row = el('div', 'eq-slot');
-    const cv = el('canvas'); cv.width = cv.height = 34; row.appendChild(cv);
-    row.appendChild(el('div', '', `<div class="s-name">${it.name}${slot.count > 1 ? ' ×' + slot.count : ''}</div><div class="s-key">${price} Gold</div>`));
-    setTimeout(() => drawItemIconTo(cv, slot.key), 0);
-    row.onmouseenter = () => { $('trade-info').innerHTML = itemInfoHTML(slot) + `<div class="stat"><span>${isBuy ? 'Kaufpreis' : 'Verkaufspreis'}</span><b>${price} Gold</b></div>${A.priceNote?.(slot.key, npc) ? `<div class="ledger" style="color:${/^Teuer/.test(A.priceNote(slot.key, npc)) ? '#d08a6a' : '#9ac08a'}">${A.priceNote(slot.key, npc)}</div>` : ''}<div class="s-key">Klick: ${isBuy ? 'kaufen' : 'verkaufen'}</div>`; };
-    row.onclick = () => { isBuy ? A.buy(npc, slot.key) : A.sell(i, npc); refreshModal(npc); };
-    box.appendChild(row);
+  npc = npc || trNpc; if (!npc) return;
+  if (trNpc !== npc) { trSel = null; trCat = 'all'; trMarks = new Set(); trMark = false; trQty = 1; }
+  trNpc = npc;
+  const kind = A.shopKind?.(npc) || 'market';
+  body.className = 'tr-body';
+  body.innerHTML = `<div class="tr">
+    <div class="tr-head"><canvas id="tr-por" width="56" height="56"></canvas>
+      <div class="tr-who"><div class="tr-name">${npc.name}</div><div class="tr-prof">${icoTag(SHOP_ICO[kind], 1)} ${npc.prof || SHOP_NAME[kind]}${npc.till ? ` · ${icoTag('time', 1)} bis ${npc.till} Uhr` : ''}</div></div>
+      <div class="tr-gold" id="tr-gold" title="Dein Gold">${icoTag('res_gold', 2, 'gold-ico')}<b id="trg">${S.gold}</b><span id="tr-dl"></span></div></div>
+    <div class="tr-cols"><div class="tr-main">
+      <div class="chips" id="tr-f"></div>
+      <div id="tr-chalk"></div>
+      <div class="tr-sec">${icoTag(SHOP_ICO[kind], 1)} Ware</div><div class="tr-grid" id="tr-buy"></div>
+      <div class="tr-sec">${icoTag('nav_inv', 1)} Dein Gepäck <button id="tr-mark" class="mini${trMark ? ' on' : ''}" title="Mehrere Teile antippen und zusammen verkaufen">Mehrere wählen</button></div><div class="tr-grid" id="tr-sell"></div>
+      <div id="tr-multi"></div>
+    </div><div class="tr-deal" id="tr-deal"></div></div></div>`;
+  drawPortraitTo($('tr-por'), npc);
+  const onC = k => { trCat = k; chipBar($('tr-f'), TR_CAT, trCat, onC); trPaint(); }; chipBar($('tr-f'), TR_CAT, trCat, onC);
+  $('tr-mark').onclick = () => { trMark = !trMark; if (!trMark) trMarks.clear(); $('tr-mark').classList.toggle('on', trMark); trPaint(); };
+  const bz = $('tr-buy'), sz = $('tr-sell');
+  bz.ondragover = e => { if (TRD?.side === 'sell') e.preventDefault(); };
+  bz.ondrop = e => { e.preventDefault(); const D = TRD; TRD = null; if (D?.side === 'sell') trSell([D.o], 1); };
+  sz.ondragover = e => { if (TRD?.side === 'buy') e.preventDefault(); };
+  sz.ondrop = e => { e.preventDefault(); const D = TRD; TRD = null; if (D?.side === 'buy') trBuy(D.key, 1); };
+  trPaint();
+}
+function trTag(v, cls = '') { return `<span class="ptag${cls ? ' ' + cls : ''}">${v}</span>`; }
+function trPaint() {
+  const npc = trNpc, p = S.player; if (!npc || !$('tr-buy')) return;
+  const stock = A.shopStock(npc), goods = stock.filter(s => ITEMS[s.key]?.good && s.count >= 1), wares = stock.filter(s => !ITEMS[s.key]?.good);
+  if (trSel?.side === 'buy' && !stock.some(s => s.key === trSel.key && s.count >= 1)) trSel = null;
+  if (trSel?.side === 'sell' && !p.inv.includes(trSel.o)) trSel = null;
+  for (const o of [...trMarks]) if (!p.inv.includes(o)) trMarks.delete(o);
+  /* Kreidetafel: Stadtwaren mit Bestand, Preis und Pfeil gegen den zuletzt gesehenen Preis anderswo */
+  const ch = $('tr-chalk');
+  if (goods.length && (trCat === 'all' || trCat === 'good')) {
+    const here = S.towns?.[A.ecoTownOf?.(npc)]?.name || 'hier';
+    ch.innerHTML = `<div class="chalk"><div class="chalk-h">Stadtwaren · ${here}</div>${goods.map(s => { const pr = A.price(s.key, true, npc), so = seenOther(npc, s.key), last = so[0];
+      const ar = last ? (pr > last.p ? `<span class="cmpa dn" title="Teurer als zuletzt in ${last.name} (${last.p}, Tag ${last.day})">▲</span>` : pr < last.p ? `<span class="cmpa up" title="Billiger als zuletzt in ${last.name} (${last.p}, Tag ${last.day})">▼</span>` : '<span class="cmpa">=</span>') : '<span class="cmpa" title="Noch keine Preise anderer Städte gesehen">·</span>';
+      const tip = so.length ? 'Zuletzt gesehen (Kaufpreis): ' + so.map(x => `${x.name} ${x.p} (vor ${Math.max(0, (S.day | 0) - x.day)} T.)`).join(' · ') : 'Andere Städte: noch nicht gesehen.';
+      const have = p.inv.filter(x => x.key === s.key).reduce((n, x) => n + (x.count || 1), 0);
+      return `<div class="ch-row${trSel?.side === 'buy' && trSel.key === s.key ? ' sel' : ''}${S.gold < pr ? ' poor' : ''}" data-k="${s.key}" title="${tip}" draggable="true"><canvas data-ico="${s.key}"></canvas><span class="nm">${ITEMS[s.key].name}</span><span class="st">×${s.count}</span><span class="pr">${pr}</span>${ar}${have ? `<span class="hv" title="Davon trägst du">${have}</span>` : ''}</div>`; }).join('')}</div>`;
+    ch.querySelectorAll('.ch-row').forEach(r => { const key = r.dataset.k;
+      r.onclick = () => { trSel = { side: 'buy', key }; trQty = 1; trPaint(); };
+      r.ondblclick = () => trBuy(key, 1);
+      r.ondragstart = e => { TRD = { side: 'buy', key }; e.dataTransfer.setData('text/plain', 'rf'); };
+      r.ondragend = () => { TRD = null; };
+      r.ondragover = e => { if (TRD?.side === 'sell') e.preventDefault(); }; r.ondrop = e => { e.preventDefault(); const D = TRD; TRD = null; if (D?.side === 'sell') trSell([D.o], 1); }; });
+    paintIcons(ch);
+  } else ch.innerHTML = '';
+  /* Warenraster */
+  const bz = $('tr-buy'); bz.innerHTML = '';
+  const shown = wares.filter(s => catIn(ITEMS[s.key], trCat));
+  if (!shown.length) bz.innerHTML = `<div class="ledger tr-empty">${wares.length ? 'Nichts in dieser Auswahl.' : goods.length ? 'Nur Stadtwaren.' : 'Heute nichts mehr. Morgen kommt neue Ware.'}</div>`;
+  for (const s of shown) {
+    const pr = A.price(s.key, true, npc), poor = S.gold < pr, full = !A.buyQuote?.(npc, s.key, 1)?.room;
+    const c = el('div', 'cell'); bz.appendChild(c); c.dataset.card = '1';
+    c._card = () => itemCardHTML(s, { short: true, shop: true, price: `<div class="ic-price">${icoTag('res_gold', 1)} <b>${pr}</b> Gold je Stück${poor ? ' · <span class="bad">zu teuer</span>' : ''}</div>` });
+    paintCell(c, s, { sel: trSel?.side === 'buy' && trSel.key === s.key, cls: (poor ? 'poor' : '') + (full ? ' full' : ''), tag: trTag(pr, poor ? 'bad' : ''), cmp: cmpArrow(s) });
+    c.onclick = () => { trSel = { side: 'buy', key: s.key }; trQty = 1; trPaint(); };
+    c.ondblclick = () => trBuy(s.key, 1);
+    c.draggable = true; c.ondragstart = e => { TRD = { side: 'buy', key: s.key }; e.dataTransfer.setData('text/plain', 'rf'); }; c.ondragend = () => { TRD = null; };
+  }
+  /* Gepäck mit Verkaufspreis des Exemplars */
+  const sz = $('tr-sell'); sz.innerHTML = '';
+  p.inv.forEach((s, i) => { if (!s) return;
+    const it = ITEMS[s.key], no = it?.bound || s.lock, pr = no ? 0 : A.price(s.key, false, npc, s);
+    const c = el('div', 'cell'); sz.appendChild(c); c.dataset.card = '1';
+    c._card = () => itemCardHTML(s, { short: true, price: no ? `<div class="ic-price bad">${it?.bound ? 'An dich gebunden — unverkäuflich.' : 'Gesperrt — erst im Gepäck entsperren.'}</div>` : `<div class="ic-price">${icoTag('res_gold', 1)} Erlös <b>${pr}</b> Gold${(s.count || 1) > 1 ? ' je Stück' : ''}</div>` });
+    paintCell(c, s, { dim: !catIn(it, trCat), sel: trSel?.side === 'sell' && trSel.o === s, mk: trMarks.has(s), tag: no ? trTag(it?.bound ? 'gebunden' : '—', 'no') : trTag(pr) });
+    c.onclick = () => { delete s.nw; if (trMark) { if (!no) { if (trMarks.has(s)) trMarks.delete(s); else trMarks.add(s); } else toast(it?.bound ? 'An dich gebunden. Das verkauft man nicht.' : 'Gesperrt.'); } else { trSel = { side: 'sell', o: s }; trQty = 1; } trPaint(); };
+    c.ondblclick = () => { if (!trMark) trSell([s], 1); };
+    c.draggable = true; c.ondragstart = e => { TRD = { side: 'sell', o: s }; e.dataTransfer.setData('text/plain', 'rf'); }; c.ondragend = () => { TRD = null; };
   });
-  const here = npc.homeTown || npc.town, last = Object.entries(S.priceSeen || {}).filter(([k]) => k !== here && S.towns?.[k]).sort((a, b) => b[1].day - a[1].day)[0];
-  if (last && stock.some(s => ITEMS[s.key].good)) $('buy').appendChild(el('div', 'ledger', `Zuletzt in ${S.towns[last[0]].name} (Tag ${last[1].day}): ` +
-    Object.entries(last[1].p).filter(([g]) => stock.some(s => s.key === g)).map(([g, v]) => `${ITEMS[g].name} ${v}`).join(' · ')));
-  mk(stock, $('buy'), true);
-  mk(p.inv.filter(s => s), $('sell'), false);
+  /* Mehrfachverkauf */
+  const mu = $('tr-multi');
+  if (trMark) { const list = [...trMarks].map(o => ({ idx: p.inv.indexOf(o), n: o.count || 1 })), q = A.sellQuote?.(npc, list) || { each: [], total: 0 };
+    mu.innerHTML = `<div class="tr-multi"><span>${trMarks.size} gewählt · ${q.each.length} Stück · Erlös <b>${q.total}</b> Gold</span><button id="tr-msell"${q.each.length ? '' : ' disabled'}>Gewählte verkaufen</button><button id="tr-mclr" class="mini">Leeren</button></div>`;
+    $('tr-msell').onclick = () => { const objs = [...trMarks]; trMarks.clear(); trSell(objs, Infinity); };
+    $('tr-mclr').onclick = () => { trMarks.clear(); trPaint(); };
+  } else mu.innerHTML = '';
+  trDeal();
+}
+function trDeal() {
+  const d = $('tr-deal'), npc = trNpc, p = S.player; if (!d) return;
+  if (!trSel) { d.innerHTML = `<div class="ledger tr-help">Klick: ansehen. Doppelklick, Knopf oder Ziehen: kaufen oder verkaufen.<br>Rote Preise kannst du dir nicht leisten.<br>▲▼ an Stadtwaren: Preis gegen den zuletzt gesehenen in einer anderen Stadt.</div>`; return; }
+  if (trSel.side === 'buy') {
+    const key = trSel.key, st = A.shopStock(npc).find(s => s.key === key), it = ITEMS[key]; if (!st) { trSel = null; return trDeal(); }
+    const full = A.buyQuote(npc, key, st.count), max = Math.max(1, full.each.length); trQty = Math.max(1, Math.min(trQty, max));
+    const q = A.buyQuote(npc, key, trQty), lo = Math.min(...(q.each.length ? q.each : [q.one])), hi = Math.max(...(q.each.length ? q.each : [q.one]));
+    const note = A.priceNote?.(key, npc);
+    d.innerHTML = itemCardHTML({ key }, { shop: true }) +
+      `<div class="tr-box">${max > 1 ? `<label class="qty">${icoTag('nav_inv', 1)} <input type="range" id="tr-q" min="1" max="${max}" value="${trQty}"> <b id="tr-qn">${trQty}</b></label>` : ''}
+        <div class="tr-sum" id="tr-sum">${trSum(q, lo, hi, true)}</div>
+        ${note ? `<div class="ledger" style="color:${/^Teuer/.test(note) ? '#d08a6a' : '#9ac08a'}">${note}</div>` : ''}
+        ${!full.room ? '<div class="bad">Tasche voll.</div>' : ''}
+        <button id="tr-do" class="big">Kaufen${trQty > 1 ? ` (${trQty})` : ''}</button></div>`;
+    const r = $('tr-q'); if (r) r.oninput = () => { trQty = +r.value; const q2 = A.buyQuote(npc, key, trQty), e = q2.each.length ? q2.each : [q2.one];
+      $('tr-qn').textContent = trQty; $('tr-sum').innerHTML = trSum(q2, Math.min(...e), Math.max(...e), true); $('tr-do').textContent = `Kaufen${trQty > 1 ? ` (${trQty})` : ''}`; };
+    $('tr-do').onclick = () => trBuy(key, trQty);
+  } else {
+    const s = trSel.o, i = p.inv.indexOf(s), it = ITEMS[s.key], no = it?.bound || s.lock, n0 = s.count || 1; trQty = Math.max(1, Math.min(trQty, n0));
+    const q = no ? { each: [], total: 0 } : A.sellQuote(npc, [{ idx: i, n: trQty }]);
+    d.innerHTML = itemCardHTML(s, {}) + `<div class="tr-box">${n0 > 1 && !no ? `<label class="qty">${icoTag('nav_inv', 1)} <input type="range" id="tr-q" min="1" max="${n0}" value="${trQty}"> <b id="tr-qn">${trQty}</b></label>` : ''}
+      ${no ? `<div class="bad">${it?.bound ? 'An dich gebunden — unverkäuflich.' : 'Gesperrt — erst entsperren.'}</div>` : `<div class="tr-sum" id="tr-sum">${trSum(q, Math.min(...q.each), Math.max(...q.each), false)}</div>`}
+      <div class="ctx-actions">${no && it?.bound ? '' : `<button id="tr-lock" class="${s.lock ? 'on' : ''}">${LOCK_SVG} ${s.lock ? 'Entsperren' : 'Sperren'}</button>`}${no ? '' : `<button id="tr-do" class="big">Verkaufen${trQty > 1 ? ` (${trQty})` : ''}</button>`}</div></div>`;
+    const r = $('tr-q'); if (r) r.oninput = () => { trQty = +r.value; const q2 = A.sellQuote(npc, [{ idx: p.inv.indexOf(s), n: trQty }]);
+      $('tr-qn').textContent = trQty; $('tr-sum').innerHTML = trSum(q2, Math.min(...q2.each), Math.max(...q2.each), false); $('tr-do').textContent = `Verkaufen${trQty > 1 ? ` (${trQty})` : ''}`; };
+    if ($('tr-do')) $('tr-do').onclick = () => trSell([s], trQty);
+    if ($('tr-lock')) $('tr-lock').onclick = () => { if (s.lock) delete s.lock; else { s.lock = true; trMarks.delete(s); } trPaint(); };
+  }
+  paintIcons(d);
+}
+function trSum(q, lo, hi, buy) {
+  if (!q.each.length) return buy ? `<span class="bad">${S.gold < (q.one || 0) ? 'Zu wenig Gold' : 'Nicht verfügbar'}</span> · ${icoTag('res_gold', 1)} ${q.one || 0} je Stück` : '—';
+  return `${icoTag('res_gold', 1)} je Stück <b>${lo === hi ? lo : lo + '–' + hi}</b> · Gesamt <b class="tot">${q.total}</b> Gold${buy && q.each.length < trQty ? ` <span class="bad">(nur ${q.each.length} bezahlbar)</span>` : ''}`;
+}
+function trGold(a, b) {                                          /* rollender Goldzähler + Münzklang + Betrag; ohne Bewegung springt er */
+  const g = $('trg'), dl = $('tr-dl'); if (!g || a === b) return;
+  sfx('coin', Math.min(1, Math.abs(b - a) / 250), 0.8);
+  if (dl) { dl.textContent = (b > a ? '+' : '−') + Math.abs(b - a); dl.className = 'on ' + (b > a ? 'up' : 'dn'); clearTimeout(dl._t); dl._t = setTimeout(() => { dl.className = ''; }, 1400); }
+  if (S.settings.motion === false) { g.textContent = b; return; }
+  const t0 = performance.now(), D = 480, step = now => { const k = Math.min(1, (now - t0) / D); if ($('trg') !== g) return; g.textContent = Math.round(a + (b - a) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step); clearTimeout(g._t); g._t = setTimeout(() => { if ($('trg') === g) g.textContent = S.gold; }, D + 80);   /* ohne Bildtakt (Fenster verdeckt): Endstand sicher */
+}
+function trFail() { const g = $('tr-gold'); if (!g) return; g.classList.remove('fail'); void g.offsetWidth; g.classList.add('fail'); }
+function trBuy(key, n) {
+  const npc = trNpc, g0 = S.gold, q = A.buyQuote(npc, key, n);
+  if (!q.each.length) { if (S.gold < q.one) { trFail(); toast('Zu wenig Gold'); A.shopBark?.(npc, 'poor'); } else if (!q.room) toast('Tasche voll'); else toast('Ausverkauft.'); return trPaint(); }
+  A.buyMany(npc, key, n);
+  if (S.gold !== g0) { trGold(g0, S.gold); A.shopBark?.(npc, rarLv({ key }) >= 2 ? 'rare' : 'buy'); }
+  trPaint();
+}
+// Entwickler 02.10.2026: Verkauf ab Selten nur nach Rückfrage (kein Rückkauf). ok = schon bestätigt.
+function trSell(objs, n, ok = false) {
+  const rare = objs.filter(o => rarLv(o) >= 2 && !o.lock);
+  if (!ok && rare.length) {
+    document.querySelector('.tr-ask')?.remove();
+    const names = rare.slice(0, 3).map(o => `<b>${o.name || ITEMS[o.key]?.name || o.key}</b>`).join(', ') + (rare.length > 3 ? ` und ${rare.length - 3} weitere` : '');
+    const d = el('div', 'tr-ask', `<div>${names} wirklich verkaufen?<br><small>Einen Rückkauf gibt es nicht.</small></div><div class="tr-ask-b"><button class="yes">Verkaufen</button><button class="no">Behalten</button></div>`);
+    document.body.appendChild(d);
+    d.querySelector('.yes').onclick = () => { d.remove(); trSell(objs, n, true); };
+    d.querySelector('.no').onclick = () => { d.remove(); trPaint(); };
+    return;
+  }
+  const npc = trNpc, p = S.player, g0 = S.gold, list = objs.map(o => ({ idx: p.inv.indexOf(o), n: Math.min(n, o.count || 1) })).filter(x => x.idx >= 0);
+  if (objs.some(o => o.lock) && objs.length === 1) { toast('Gesperrt. Erst entsperren, dann verkaufen.'); return trPaint(); }
+  const r = A.sellMany(npc, list);
+  if (S.gold !== g0) { trGold(g0, S.gold); A.shopBark?.(npc, r.rare ? 'rare' : 'sell'); }
+  trPaint();
 }
 
 function questUI(body) {

@@ -152,3 +152,18 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - **NPCs:** Dienstzeichen über Händlern/Lehrern nur in der Nähe; Bosse tragen eigene Rüstung + ihr Unikat sichtbar; Rangabzeichen am Spieler automatisch.
 - **Items/Inventar/Shops:** Klick = ansehen; Lichtstrahl ab Selten, große Karte nur Legendär/Mythisch ohne Pause; Mengenkauf mit Preis je Stück und Gesamtpreis vorher; Sperre/„Neu“-Marke + Mehrfachverkauf, kein Rückkauf; Ladenware-Zustand bleibt 55–100 %; Händler-Sprüche als Sprechblase (3–4 je Ladenart).
 - **Welt-Ereignisse:** Namenskarte + Signalton nebenbei, Pause nur bei Kriegsereignissen. Karte: Ereignis-Pins nur in entdeckten Gebieten; Fraktionsgrenzen dezent einfärben. Skilltree-Knoten bekommen eigene Pixel-Icons (im Code gezeichnet).
+- **Dialoge (Nachtrag):** Welt läuft in Gesprächen weiter (wie heute). Text läuft ein, Klick vervollständigt, aus bei reduzierter Bewegung; keine Seiten. Emotes (Frage, Ausruf, Zorn, Angst, Freude, Trauer) nur im Gespräch und bei Reaktionen. Ängstliche/wütende NPCs ohne Angebote: nur Sprechblase statt Fenster. Mimik-Porträts später.
+
+## 02.10.2026 (Nachmittag)
+- **Kampf-Feedback:**
+  - Der Gegenstrom des Mönchs fängt schwere Angriffe weiterhin ab.
+  - „Reduziert“ zeigt den eigenen Schaden und Krits.
+  - Ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Lebensbalken (5 s, Zahl vom Lead gesetzt, nicht bestätigt).
+- **Handel:** Vor dem Verkauf ab Selten kommt eine Rückfrage.
+- **Grafikstil:** Das Spiel darf nie von selbst auf „Klassisch“ wechseln. Der Ausgangsstil ist R; D gilt nur, wenn der Spieler ihn ausdrücklich wählt.
+- **Kampfanimation:** Das Abbrechen der Erholung ist takt-neutral. Die Combo fließt optisch, aber das Ausholen des nächsten Hiebs verlängert sich um den abgebrochenen Rest. Der Schaden je Sekunde bleibt gleich.
+- **Neue Gegner:**
+  - Mehr Sprites und Varianten für alle Gegner.
+  - Bomben-Skelett: läuft auf dich zu und explodiert. Die Explosion macht Flächenschaden, auch an anderen Gegnern. Sie wird vorher sichtbar angesagt, Ausweichen ist möglich.
+  - Großes Skelett: mehr Leben, langsamer, schwere (nicht blockbare) Hiebe, Rückstoß.
+  - Mutierte Menschen: entstellt, schnell, wild, wenig Rüstung. Sie kommen am Totenland-Rand vor, wo der Fluch die Lebenden verdirbt.

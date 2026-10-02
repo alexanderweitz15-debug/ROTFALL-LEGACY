@@ -39,7 +39,7 @@ There is no linter. After editing a file, at least parse-check it (e.g. with aco
 
 - **Never put code after a `//` comment on the same line.** Scripted edits that append to a line have swallowed code several times. Use `/* … */` for inline comments.
 - `src/game.js` is ~16k lines. Make targeted edits with unique anchors; re-read the region first.
-- **Cache key:** every import and `index.html` use `?v=N` (currently `v=23`). When shipping, bump it everywhere (index.html + all `import … from './x.js?v=N'` + `import('./coop.js?v=N')`), plus the visible version label in `index.html`. `src/coop.js` also has `VER`, which must match.
+- **Cache key:** every import and `index.html` use `?v=N` (currently `v=24`). When shipping, bump it everywhere (index.html + all `import … from './x.js?v=N'` + `import('./coop.js?v=N')`), plus the visible version label in `index.html`. `src/coop.js` also has `VER`, which must match.
 - New save fields must tolerate being missing (old saves). Migrations go into `continueGame()` / the `ensure*()` functions it calls.
 - Keep world generation deterministic: `world.js` uses the seeded `rnd()` from state.js; adding RNG calls there shifts the whole world.
 - Every new mechanic needs an in-game hint for the player (log, toast, tooltip or dialogue) and a debug entry. Also add it to `docs/MECHANIKEN.md`.

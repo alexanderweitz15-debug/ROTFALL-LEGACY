@@ -12,11 +12,12 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=23';
-import { ITEMS } from './data.js?v=23';   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=23';
+import { ATLAS } from './ref5_atlas.js?v=24';
+import { ITEMS } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=24';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=23';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { ATK_U } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=24';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -86,7 +87,7 @@ export class G {
 export function toCanvas(g, outline = true) {
   const cv = document.createElement('canvas'); cv.width = g.w; cv.height = g.h;
   const c = cv.getContext('2d');
-  const a = g.a.slice();
+  const a = outline ? g.a.slice() : g.a;   /* PERF-U3: ohne Kontur wird nichts verändert, keine Kopie nötig */
   if (outline) for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
     const i = y * g.w + x;
     if (!g.a[i] && (g.at(x - 1, y) || g.at(x + 1, y) || g.at(x, y - 1) || g.at(x, y + 1))) a[i] = OUT;
@@ -109,12 +110,12 @@ function rgbaOf(col) {                                               // Farbstri
 // ---------------- Stil F (Nutzer S13, Referenz 5: docs/reference/ref5-hauptstil-sprites.png) ----------------
 // Neuer Hauptstil: die Sprites aus dem Blatt des Nutzers, 1:1 ausgeschnitten (assets/ref5_atlas.png, Tabelle ref5_atlas.js).
 // Der bisherige, im Code gemalte Stil („D“) bleibt in den Optionen wählbar. ART steht in S.settings.art; setArt leert die Caches.
-export let ART = 'D';
+export let ART = 'R';   /* Entwickler 02.10.2026: Stil R ist immer der Ausgang — Klassisch nur, wenn ausdrücklich gewählt */
 const artHooks = [];
 export const onArtChange = fn => artHooks.push(fn);
 export const drawnOn = () => ART === 'R';                          // S14: Stil R (Nutzer: erst nur optional wählbar)
 export function setArt(v) {
-  v = v === 'R' || v === 'F' ? 'R' : 'D'; if (v === ART) return; ART = v;   /* Audit T05: Stil F (Referenzblatt) abgeschaltet — gespeichertes F wird R; Code bleibt eingefroren */
+  v = v === 'D' ? 'D' : 'R'; if (v === ART) return; ART = v;   /* Audit T05: Stil F (Referenzblatt) abgeschaltet — gespeichertes F wird R; Code bleibt eingefroren */
   frameCache.clear(); lookCache.clear(); WPN.clear(); warmed.clear();
   for (const f of artHooks) f();
 }
@@ -270,7 +271,18 @@ const CIVIC = {
 const ROBOT_LOOK = { skin: '#8a8272', hair: '#8a8272', hs: 2, beard: 0, face: 'mask', glow: '#8a5420', armor: 'plate', armorCol: '#7a6038', pauld: '#8a7040', helm: 'great', helmCol: '#8a7a58',
   crest: '', hooded: 0, cloak: '', robe: '', cape: '', glove: '#5a5248', boots: '#3a3630', pants: '#4a4640', tabard: '#2a2a30', mark: 'chevron', markCol: '#c8a050', wraps: 0, pouch: 0, strap: 0, sil: 'boiler' };
 // S12: Rüstungsbild je Teil (Material, Farbe, Schulterstücke, Schärpe, Helm). Neue Rüstung = eine Zeile hier.
+/* Hände/Beine je Stück; Set-Teile in den Farben ihres Sets (Thron gold, Blutkette schwarz, Totenkrone knochengrau, Hochritter blanker Stahl) */
+const HAND_LOOK = { lederhandschuhe: '#5a4030', kettenhandschuhe: '#7a7870', panzerhandschuhe: '#6a6660',
+  thron_handschuhe: '#c8a040', blut_handschuhe: '#2a2426', toten_handschuhe: '#3a3a34', hochritter_handschuhe: '#9aa6b8' };
+const LEG_LOOK = { lederbeinlinge: ['#4a3626', 0], kettenbeinlinge: ['#6e6c66', 0], beinschienen: ['#6a6660', 1],
+  thron_beinschienen: ['#2a3e6a', 1], blut_beinschienen: ['#1a1a1e', 1], toten_beinschienen: ['#2a2e2a', 1], hochritter_beinschienen: ['#8a94a4', 1] };
 const ARMOR_LOOK = {
+  /* R7-Lücken: Stücke, die bisher kein eigenes Aussehen hatten (Beschreibung aus data.js) */
+  seemantel: { armor: 'leather', armorCol: '#2a2a24', hem: 44 },                            /* geteertes Leder, langer Schoß */
+  kanzlerrobe: { robe: '#16121a', cloth: '#16121a', stole: '#7a1418', sash: '#5a1014' },    /* schwarzer Samt, rotes Futter */
+  garmadon_krone: { helm: 'crown', helmCol: '#1c1a1e', ge: '#e03a2a' },                     /* schwarzes Eisen, rot glimmend */
+  dreispitz: { helm: 'hat', helmCol: '#1e1a18' },                                           /* Kapitänshut, breite Krempe */
+  iron_boots: { boots: '#4a4844' }, leather_boots: { boots: '#3a2a1c' },
   eisenwache: { armor: 'chain', armorCol: '#2a2a2e', sash: '#5a1a1c', pb: 1 },
   rotgardist: { armor: 'plate', armorCol: '#26272b', pauld: '#4a1418', pb: 2, gg: 1, kn: 1 },
   aufsehermantel: { armor: 'leather', armorCol: '#1e1a18', glove: '#4a1418', scarf: '#4a4640', hem: 44 },
@@ -533,6 +545,9 @@ function varyChain(s, seed) {
 // Referenz 3 (Session 12): Zustand sichtbar — Abnutzung 0 neu … 3 zerschlissen, Blut 0/1/2 nach Leben. Diskrete Stufen halten den Frame-Cache klein.
 // S14: Zustand der Glieder (larm rarm lleg rleg): 0 heil, 1 ausgefallen, 2 verloren (Prothese = heil) — für den Stil R sichtbar
 export const msOf = e => !e?.body ? '' : ['larm', 'rarm', 'lleg', 'rleg'].map(k => { const P = e.body[k]; return P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0; }).join('');   /* Roadmap P3: 3 = Prothese (Messingglied in Stil R) */
+export const msEq = (e, ms) => { if (!e?.body) return ms === ''; if (typeof ms !== 'string' || ms.length !== 4) return false;   /* PERF-U3: msOf(e) === ms, ohne neue Liste */
+  for (let i = 0; i < 4; i++) { const P = e.body[MS_LIMB[i]]; if (ms.charCodeAt(i) - 48 !== (P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0)) return false; } return true; };
+const MS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
 const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
 const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };
@@ -591,6 +606,7 @@ export function humanSpec(e) {
   else if (chest === 'chain_hauberk') { s.armor = 'chain'; s.armorCol = '#64635e'; }
   else if (chest === 'plate_cuirass') { s.armor = 'plate'; s.armorCol = p.armor || '#5e5a52'; }
   else if (p.armor) { s.armor = 'chain'; s.armorCol = p.armor; }
+  if (chest === 'cloth_shirt' && !s.armor && !s.hem) s.hem = 39;   /* R7-Lücke: Leinenkittel bekommt den Kittelsaum */
   if (HL) {}
   else if (head === 'leather_cap') { s.helm = 'cap'; s.helmCol = '#5a4030'; }
   else if (head === 'iron_helm') { s.helm = 'nasal'; s.helmCol = '#5a5852'; }
@@ -604,8 +620,9 @@ export function humanSpec(e) {
     s.hood = p.hood || s.cloak;
   }
   const hk = eq.hands?.key, lk = eq.legs?.key;   // S15 P2: Handschuhe und Beinschutz färben Hände und Beine, Beinschienen mit Kniebuckeln
-  if (hk) s.glove = hk === 'panzerhandschuhe' ? '#6a6660' : hk === 'kettenhandschuhe' ? '#7a7870' : '#5a4030';
-  if (lk) { s.pants = lk === 'beinschienen' ? '#6a6660' : lk === 'kettenbeinlinge' ? '#6e6c66' : '#4a3626'; if (lk === 'beinschienen') s.kn = 1; }
+  /* Kampf-Feedback/R7-Fehler: Set-Handschuhe und -Beinschienen behalten die Set-Farbe (vorher wurde jedes unbekannte Paar lederbraun, ohne Kniebuckel) */
+  if (hk) s.glove = HAND_LOOK[hk] || s.glove || '#5a4030';
+  if (lk) { const L = LEG_LOOK[lk]; s.pants = L ? L[0] : '#4a3626'; if (L?.[1]) s.kn = 1; }
   const CL = ARMOR_LOOK[eq.cloak?.key], FL = ARMOR_LOOK[eq.feet?.key];   // S15 Klassen-Rüstung: auch Umhang und Füße haben ein Bild
   if (CL || FL) { Object.assign(s, CL, FL); if (CL && !HL?.hooded && !e.hooded) s.hooded = 0; if (HL?.hooded) s.hooded = 1; }
   const sils = [AL, HL, CL, FL].map(x => x?.sil).filter(Boolean); if (sils.length) s.sil = [...new Set(sils.join(' ').split(' '))].join(' ');
@@ -657,6 +674,31 @@ export function humanSpec(e) {
   s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
   if (e.kind === 'npc' && !e.robot) varyDrape(s, e.seed || 0, '', e, prof);
   return s;
+}
+/* PERF-U3 (02.10.2026): humanSpec je Figur gemerkt (render.js zeichnet damit). Vorher je Bild und Figur neu gebaut — ~80 Felder, Regex,
+   Hilfslisten; in Varonheim ~120 Aufrufe je Bild, 2–4 ms und viel Müll (Müllsammel-Spitzen). Gilt, solange jede Eingabe gleich ist, die
+   humanSpec und seine Helfer lesen: Felder der Figur, Palette, Ausrüstung (Stück, Schlüssel, Zustand), Blutstufe, Glieder, Gegend (regionOf/
+   regionFarmer). Ändert sich eine davon, wird neu gebaut — das Bild ist dasselbe wie mit humanSpec. */
+const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build'];
+const HS_PAL = ['skin', 'hair', 'cloth', 'glow', 'hs', 'armor', 'helm', 'crest', 'hood', 'cloak', 'shield', 'shieldBoss'], HS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
+const hsMemo = new WeakMap(), hsSig = [];
+function hsInputs(e) {
+  const v = hsSig; let n = 0;
+  for (let i = 0; i < HS_ENT.length; i++) v[n++] = e[HS_ENT[i]];
+  const p = e.pal; if (p) for (let i = 0; i < HS_PAL.length; i++) v[n++] = p[HS_PAL[i]];
+  v[n++] = bloodOf(e);
+  const b = e.body; if (b) for (let i = 0; i < 4; i++) { const P = b[HS_LIMB[i]]; v[n++] = P ? (P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0) : -1; }
+  const tx = ((e.anchor?.x ?? e.x) || 0) / 32, ty = ((e.anchor?.y ?? e.y) || 0) / 32;   /* dieselben Grenzen wie regionOf und regionFarmer */
+  v[n++] = (ty > 780 && tx > 560 ? 1 : 0) | (tx > 0 && tx < 200 ? 2 : 0) | (tx < 330 ? 4 : 0) | (tx > 700 ? 8 : 0);
+  const eq = e.equip; if (eq) for (const k in eq) { const it = eq[k]; v[n++] = k; v[n++] = it; if (it) { v[n++] = it.key; v[n++] = it.cond; v[n++] = it.rar; } }
+  return n;
+}
+export function humanSpecOf(e) {
+  const n = hsInputs(e); let m = hsMemo.get(e);
+  if (m && m.n === n) { const v = m.v; let i = 0; while (i < n && v[i] === hsSig[i]) i++; if (i === n) return m.s; }
+  if (!m) hsMemo.set(e, m = { v: [], n: 0, s: null });
+  for (let i = 0; i < n; i++) m.v[i] = hsSig[i];
+  m.v.length = n; m.n = n; m.s = pinSpec(humanSpec(e)); return m.s;
 }
 /* Artist 02.10. (Entwickler: „coolere Umhänge und Kapuzen, nur eine Form ist lahm“): Aussehen aus ITEMS[k].look.
    Umhang: cape → cw (Form), col, lin → cln (Futter), trim → ctr (Saum), fib → cfb (Fibel), fr → cfr (Fransen), fur (Pelzkragen), hood (angesetzte Kapuze).
@@ -1283,10 +1325,47 @@ export function humanFrame(spec, dir, pose, noArm = null) {       // noArm: Waff
 
 // S14 Stil R: ein Bild je Spec × Richtung × Pose × Waffenzustand (Arme gehören zum Bild, die Hand steht im Frame: f.hand/f.off).
 // W = { mode, wt, q, v, oct, two, low } aus render.js; Osten = gespiegelter Westen (Zielwinkel gespiegelt).
-const asG = o => { const g = new G(o.w, o.h); g.a = o.a; return g; };
+const asG = o => { const g = Object.create(G.prototype); g.w = o.w; g.h = o.h; g.oy = 0; g.ox = 0; g.a = o.a; return g; };   /* PERF-U3: wie new G, ohne das sofort verworfene leere Pixelfeld */
+/* PERF-U3 (02.10.2026): Schlüssel je Spec gemerkt und auf eine kurze Nummer abgebildet. Vorher je Bild und Figur specKey (~80 Felder → Text mit
+   ~200 Zeichen) und daraus ein neuer, langer Cache-Schlüssel, dessen Hash jedes Mal neu berechnet wurde. Gemerkt wird nur für Specs aus
+   humanSpecOf/pinSpec (werden nach dem Bau nicht mehr verändert); fremde Specs (Proben, Vorschau) rechnen wie bisher. */
+const skMemo = new WeakMap(), SID = new Map();
+export function pinSpec(s) { if (s && !skMemo.has(s)) skMemo.set(s, specKey(s)); return s; }
+const sidOf = sk => { let i = SID.get(sk); if (i === undefined) SID.set(sk, i = SID.size); return i; };
+/* PERF-U3: fehlt ein Bild, werden die Geschwister derselben Bewegung (Lauf w0–w3, Stand i0/i1; gleiche Richtung, gleiche Waffenhaltung) in
+   Browser-Pausen vorgebacken — sie werden in den nächsten ~0,5 s gebraucht und kosteten sonst je 1–4 ms mitten im Bild (BUG-093 für Stil R). */
+const WALK4 = ['w0', 'w1', 'w2', 'w3'], IDLE2 = ['i0', 'i1'], warmRQ = [];
+let warmROn = false, warmingR = false;
+function warmRSiblings(spec, dir, pose, W) {
+  if (W && W.mode === 'swing') {   /* Kampfanimation: fehlt ein Schwungbild, die übrigen Stützstellen desselben Hiebs in Pausen nachbacken */
+    for (const q of ATK_U) if (q !== W.q) warmRQ.push([spec, dir, pose, { ...W, q }]);
+    if (warmRQ.length > 1600) warmRQ.splice(0, warmRQ.length - 1600);
+    if (!warmROn) { warmROn = true; idleCb(warmRRun); } return;
+  }
+  const fam = pose.length === 2 && pose[0] === 'w' ? WALK4 : pose === 'i0' || pose === 'i1' ? IDLE2 : null; if (!fam) return;
+  for (const p of fam) if (p !== pose) warmRQ.push([spec, dir, p, W]);
+  if (warmRQ.length > 240) warmRQ.splice(0, warmRQ.length - 240);
+  if (!warmROn) { warmROn = true; idleCb(warmRRun); }
+}
+/* Kampfanimation (Test Room): Schwungbilder einer Figur vorbacken — list = [[dir, pose, W], …], je W alle Stützstellen ATK_U. */
+export function warmSwingR(spec, list) {
+  for (const [d, p, W] of list) for (const q of ATK_U) warmRQ.push([spec, d, p, { ...W, q }]);
+  if (warmRQ.length > 1600) warmRQ.splice(0, warmRQ.length - 1600);
+  if (!warmROn) { warmROn = true; idleCb(warmRRun); }
+  return warmRQ.length;
+}
+export const warmRPending = () => warmRQ.length;
+export function warmRNow(ms = 50) { const t0 = performance.now(); warmRRun({ timeRemaining: () => Math.max(0, ms - (performance.now() - t0)) }); return warmRQ.length; }   /* Messung/Test: Warteschlange sofort abarbeiten */
+function warmRRun(dl) {
+  warmROn = false; warmingR = true;
+  try { while (warmRQ.length && dl.timeRemaining() > 4) { const [sp, d, p, W] = warmRQ.shift(); humanFrameR(sp, d, p, W); } } finally { warmingR = false; }
+  if (warmRQ.length) { warmROn = true; idleCb(warmRRun); }
+}
 export function humanFrameR(spec, dir, pose, W = null) {
-  const sk = specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
-  return cacheGet('R|' + sk + dir + pose + '|' + wk, () => {
+  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
+  const key = 'R|' + sidOf(sk) + '|' + dir + pose + '|' + wk, hit = frameCache.get(key); if (hit) return hit;
+  if (!warmingR) warmRSiblings(spec, dir, pose, W);
+  return cacheGet(key, () => {
     const L = resolve(spec, 'R' + sk, 0.35);
     if (pose === 'tuck') return meta(toCanvas(asG(paintTuckR(L)), false), RPX, 10, 10);
     if (pose === 'down' || pose === 'dead') { const o = paintR(pose === 'dead' ? { ...L, glow: '' } : L, 'W', 'i0'); return meta(toCanvas(asG(o.g).rotCW(), false), RPX, 25, 26 + DX); }

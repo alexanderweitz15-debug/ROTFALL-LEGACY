@@ -1,14 +1,14 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=23';
-import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=23';
-import * as HB from './buildings.js?v=23';
-import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=23';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=23';
-import * as SP from './sprites.js?v=23';
-import { trailPt, WAGON_GAP } from './sim.js?v=23';
-import { ICON_R } from './iconsR.js?v=23';
-import { airPos, airPt } from './economy.js?v=23';
-import { ANIM_DEFS, deathPose, tinted } from './anim.js?v=23';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=24';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=24';
+import * as HB from './buildings.js?v=24';
+import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=24';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=24';
+import * as SP from './sprites.js?v=24';
+import { trailPt, WAGON_GAP } from './sim.js?v=24';
+import { ICON_R } from './iconsR.js?v=24';
+import { airPos, airPt } from './economy.js?v=24';
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, legacyTiming, ATK_PACKS } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -64,19 +64,25 @@ function visAdd(e) {
   if (e.kind === 'prop' || e.kind === 'grave') { const k = ((e.x / GC) | 0) * 4096 + ((e.y / GC) | 0); let c = VIS.grid.get(k); if (!c) VIS.grid.set(k, c = []); c.push(e); } else VIS.dyn.push(e);
   lightOf(e, VIS.lights);
 }
+function visRebuild(arr, now) {
+  VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = []; VIS.dt = 0; VIS.lights = []; VIS.last = arr[arr.length - 1];
+  for (const e of arr) visAdd(e);
+  VIS.houses = houseLights(S.map);
+}
 function visibleEnts(arr, xa, ya, xb, yb) {
   const now = performance.now();
   /* PERF-R: nur angehängt (push, ohne Entfernen davor: das bisher letzte Objekt steht noch an seiner Stelle) — nur die neuen einsortieren
      statt alle ~17 000 Objekte (~3–12 ms Spitze). Volle Neusortierung bei Entfernen, anderer Liste oder spätestens alle 4 s. */
-  if (VIS.arr === arr && arr.length > VIS.n && VIS.n > 0 && arr[VIS.n - 1] === VIS.last && now - VIS.t <= 4000) {
+  /* PERF-U3: die Sicherheits-Neusortierung nach 4 s (3–12 ms) läuft in einer Browser-Pause; im Bild erst, wenn bis 8 s keine Pause kam.
+     Entfernen und andere Liste sortieren weiter sofort neu. */
+  const age = now - VIS.t;
+  if (VIS.arr === arr && arr.length > VIS.n && VIS.n > 0 && arr[VIS.n - 1] === VIS.last && age <= 8000) {
     for (let i = VIS.n; i < arr.length; i++) visAdd(arr[i]);
     VIS.n = arr.length; VIS.last = arr[arr.length - 1]; VIS.dt = 0;
   }
-  if (VIS.arr !== arr || VIS.n !== arr.length || arr[arr.length - 1] !== VIS.last || now - VIS.t > 4000) {
-    VIS.arr = arr; VIS.n = arr.length; VIS.t = now; VIS.grid = new Map(); VIS.dyn = []; VIS.dt = 0; VIS.lights = []; VIS.last = arr[arr.length - 1];
-    for (const e of arr) visAdd(e);
-    VIS.houses = houseLights(S.map);
-  }
+  if (VIS.arr !== arr || VIS.n !== arr.length || arr[arr.length - 1] !== VIS.last || age > 8000) visRebuild(arr, now);
+  else if (age > 4000 && !VIS.idle) { VIS.idle = true;
+    idle(dl => { VIS.idle = false; if (VIS.arr === arr && S.ents[S.map] === arr && VIS.n === arr.length && arr[arr.length - 1] === VIS.last && performance.now() - VIS.t > 4000 && dl.timeRemaining() > 8) visRebuild(arr, performance.now()); }); }
   if (now - VIS.dt > 150) {
     VIS.dt = now; VIS.dg = new Map(); VIS.keep = []; VIS.boss = [];
     const party = S.party || [];
@@ -2127,7 +2133,7 @@ function drawHumanoidAt(e, now, override) {
 // S14 Stil R: Waffenzustand → Bild mit Armen (sprites.humanFrameR); die Waffe sitzt an der Hand, die im Bild steht.
 // Schwung in Zehntelschritten (Ausholen → Schlag → Nachschwung als echte Einzelbilder), Ziel in Achteln.
 function drawHumanoidR(e, now, c, spec, pz, w, wit) {
-  const x = e.x, y = e.y, moving = e.vx || e.vy, walkP = 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3);
+  let x = e.x, y = e.y; const moving = e.vx || e.vy, walkP = 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3);
   let W = null, dir = e.aim ?? 0;
   if (w && !e.sitting) {
     const wt = wit.wtype || 'sword', ranged = RANGED_W.has(wt);
@@ -2136,9 +2142,23 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
     const sw = work ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
-    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 ? 'swing' : 'rest', vv = swingVar(e, sw);
+    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 ? 'swing' : 'rest';
     const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
-    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? Math.round(sw * 10) / 10 : 0, v: mode === 'swing' ? vv.v : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low, pull };
+    /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
+    const tm = mode === 'swing' ? atkTiming(e, wt, sw) : null, LT = work ? legacyTiming(wt) : null, u = tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
+    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: tm ? tm.s : 0, oct: SP.octOf(dir), two: !!wit.twohand && !ranged, low, pull, u, tm, sw };
+  }
+  /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
+     Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
+  let AF = null, ghost = 0;
+  if (W && W.mode === 'swing' && !RANGED_W.has(W.wt)) {
+    const own = e === S.player || e.coopHero || e.coopPilot, pk = own && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A', u = W.u;
+    AF = atkFx(W.wt, pk); W.trail = AF.trail;
+    const fin = e.atkStep === 2 && e.atkH > 0, k = u < 0.4 ? -0.3 * u / 0.4 : u <= 0.5 ? -0.3 + 1.3 * (u - 0.4) / 0.1 : 1 - (u - 0.5) / 0.5, push = AF.push * (fin ? 2 : 1) * k;
+    if (S.settings.motion !== false) { x += Math.cos(dir) * push; y += Math.sin(dir) * push * 0.6; }
+    if (atkSpin(W.wt, W.v) && u > 0.32 && u < 0.72) { const th = dir + SP.swingOf(W.wt, u, W.arc, W.v, 0).a * (Math.cos(dir) < -1e-9 ? -1 : 1), ca = Math.cos(th), sa = Math.sin(th);
+      pz = { ...pz, dir: Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N') }; }
+    if (AF.after && u >= 0.4 && u < 0.75) ghost = AF.push * (fin ? 2 : 1);
   }
   let pose = pz.pose;
   if (/^a[123]$/.test(pose) || (pose === 'cast' && W && W.mode === 'aim')) pose = moving && W && W.mode !== 'work' ? walkP : 'i0';
@@ -2148,7 +2168,10 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit) {
   if (e.mounted) pose = (/^w[0-3]$/.test(pose) ? 'i0' : pose) + '~r';   // S15 (Nutzer: „soll drauf sitzen, nicht stehen“): Reitsitz
   const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
   const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
-  const weapon = () => { if (!W || !f.hand) return; drawWeaponR(c, e, now, wit, w, W, x + (f.hand[0] - f.ox) * f.px * bsx, y + 6 + (f.hand[1] - f.oy) * f.px * bsy, dir); };
+  const weapon = () => { if (!W || !f.hand) return; const hx = x + (f.hand[0] - f.ox) * f.px * bsx, hy = y + 6 + (f.hand[1] - f.oy) * f.px * bsy;
+    if (AF && AF.slash) drawSlash(c, e, W, AF, hx, hy, dir, wit); drawWeaponR(c, e, now, wit, w, W, hx, hy, dir); };
+  if (ghost) { const g = SP.flashOf(f); Object.assign(g, { px: f.px, ox: f.ox, oy: f.oy });   /* Kampfanimation C: zwei Nachbilder hinter dem Vorstoß */
+    for (const k of [2, 1]) { c.globalAlpha = 0.12 * (3 - k); SP.blit(c, g, x - Math.cos(dir) * ghost * k, y + 6 - Math.sin(dir) * ghost * k * 0.6); } c.globalAlpha = 1; }
   if (behind) weapon();
   c.save(); c.translate(x, y + 6); c.scale(bsx, bsy); SP.blit(c, f, 0, 0);
   const bd = e.body;                                                // verlorene Gliedmaßen: blutige Stelle am Gelenk
@@ -2185,10 +2208,10 @@ function leechGlow(c, e, now, it) {
   c.restore();
 }
 function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
-  const wt = W.wt, a = SP.weaponAngle(W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;
-  if (W.mode === 'swing' && !RANGED_W.has(wt)) {                  // Klingenspur: frühere Winkel derselben Kurve um die Hand
-    const col = Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210', sw = e.swing || W.q;
-    for (let k = 1; k <= 6; k++) { const past = sw - k * 0.03; if (past <= 0) break; const pa = SP.weaponAngle({ ...W, q: past }, dir), t = 1 - k / 7;
+  const wt = W.wt, a = SP.weaponAngle(W.tm ? { ...W, q: W.u } : W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;   /* Kampfanimation: Klinge fließend in u, Hand an der Bild-Stützstelle */
+  if (W.mode === 'swing' && !RANGED_W.has(wt) && W.tm) {           // Klingenspur: frühere Winkel derselben Kurve um die Hand (Länge je Pack)
+    const col = Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210', sw = W.sw, n = W.trail || 6;
+    for (let k = 1; k <= n; k++) { const past = sw - k * 0.03; if (past <= 0) break; const pa = SP.weaponAngle({ ...W, q: atkU(W.tm.w, W.tm.h, past) }, dir), t = 1 - k / (n + 1);
       const bx = hx + Math.cos(pa) * len * 0.9, by = hy + Math.sin(pa) * len * 0.9, s2 = Math.round(2 * t + 1);
       c.fillStyle = `rgba(${col},${0.6 * t})`; c.fillRect(Math.round(bx - s2), Math.round(by - s2), s2 * 2, s2 * 2); }
   }
@@ -2214,16 +2237,37 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
 // S14: swingOf wohnt in fig5.js (eine Quelle für Stil D und R, kein Import-Zyklus)
 export const swingOf = SP.swingOf;
-// Hiebvariante je Schlag: beim Beginn eines Schwungs gewählt (Kombo mit Zufall), je Figur gemerkt (Gegner zeichnen über Kopien → id)
+// Hiebvariante je Schlag: beim Beginn eines Schwungs gewählt, je Figur gemerkt (Gegner zeichnen über Kopien → id).
+// Kampfanimation Scheibe 1: ohne Zufall — Vorhand, Rückhand, Überkopf im Wechsel (gleich bei Host und Koop-Gast); wer über attack()
+// schlägt, bringt seinen Kombo-Schritt selbst mit (atkTiming).
 // Audit D7: voller Cache verwirft die ältesten 10 % (Einfügereihenfolge) statt alles — sonst baut ein Bild alle Häuser/Props neu.
 function trimCache(m, max) { if (m.size <= max) return; let n = Math.ceil(max / 10); for (const k of m.keys()) { m.delete(k); if (--n <= 0) break; } }
 const SWING_V = new Map();
 function swingVar(e, sw) {
   if (SWING_V.size > 3000) SWING_V.clear();                          // ponytail: grobe Aufräumung, reicht bei ein paar hundert Kämpfern
   let st = SWING_V.get(e.id); if (!st) SWING_V.set(e.id, st = { v: 0, j: 0, live: false });
-  if (sw > 0 && !st.live) { st.live = true; st.v = (st.v + 1 + (Math.random() < 0.35 ? 1 : 0)) % 3; st.j = (Math.random() - 0.5) * 0.35; }
+  if (sw > 0 && !st.live) { st.live = true; st.v = (st.v + 1) % 3; st.n = (st.n || 0) + 1; st.j = (((st.n * 7 + (e.seed || 0) * 13) % 5) - 2) * 0.08; }
   if (!(sw > 0)) st.live = false;
   return st;
+}
+/* Kampfanimation Scheibe 1: Zeitplan des laufenden Schwungs { s Form, w Ausholen bis, h Einschlag bei } (Anteile des Takts).
+   Wer über attack() schlägt, trägt ihn mit (atkS/atkW/atkH, im Koop übertragen). Gegner treffen weiter bei 0,42 — dann folgt das Bild
+   ihrem Treffer (Einschlag-Bild = Schaden), Form im Wechsel, Pack A. */
+function atkTiming(e, wt, sw) {
+  if (e.atkH > 0 && sw > 0) return { s: e.atkS || 0, w: e.atkW || 0.3, h: e.atkH };
+  const v = swingVar(e, sw).v, P = atkPlan(wt, 'A', v), h = 0.42;
+  return { s: P.s, w: Math.min(P.w, h * 0.8), h };
+}
+/* Kampfanimation B/C: Sichelbogen — helle Pixelpunkte auf dem Weg der Klingenspitze vom Schlagbeginn bis jetzt, verblasst nach dem Einschlag.
+   Wirbel-Finisher: ganzer Kreis. Nur Optik, aus dem Schwungzustand gerechnet (kein Eintrag in S.fx). */
+function drawSlash(c, e, W, AF, hx, hy, dir, it) {
+  const u = W.u; if (!(u >= 0.42 && u < 0.72)) return;
+  const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.22, R = (it.reach || 40) * 0.62, big = AF.slash + (e.atkStep === 2 ? 1 : 0);
+  const a1 = SP.swingOf(W.wt, Math.min(u, 0.6), W.arc, W.v, 0).a, a0 = SP.swingOf(W.wt, 0.4, W.arc, W.v, 0).a, span = Math.min(Math.abs(a1 - a0), atkSpin(W.wt, W.v) ? 6.3 : 2.4), st = a1 > a0 ? -1 : 1;
+  const cx = e.x + (hx - e.x) * 0.25, cy = hy - 2;
+  for (let t = 0; t <= span; t += 0.09) { const an = dir + (a1 + st * t) * sgn, k = 1 - t / span, al = 0.7 * fade * k; if (al <= 0.03) continue;
+    const s2 = Math.max(1, Math.round((big + 1) * k)); c.fillStyle = k > 0.75 ? `rgba(255,252,236,${al})` : `rgba(236,214,160,${al})`;
+    c.fillRect(Math.round(cx + Math.cos(an) * R - s2 / 2), Math.round(cy + Math.sin(an) * R * 0.7 - s2 / 2), s2, s2); }
 }
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
@@ -2245,10 +2289,11 @@ function weaponPose(e, now, it, pz) {
     if (!active) return upright ? [shx + Math.cos(dir) * 6, shy + 11 + low] : onShoulder ? [shx + Math.cos(dir) * 3, shy + 9 + low]
       : [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
     if (thrust) { const r = 11 + sv.ext * 0.8; return [shx + Math.cos(dir) * r, shy + 6 + low + Math.sin(dir) * r * 0.8]; }
-    const ha = dir + sv.a * sgn * 0.55, r = 13 + sv.ext * 0.5;       // Hand läuft mit der Klinge um die Schulter
+    const ha = dir + Math.atan2(Math.sin(sv.a), Math.cos(sv.a)) * sgn * 0.55, r = 13 + sv.ext * 0.5;   /* Kampfanimation: Winkel modulo 2π (Wirbel) */       // Hand läuft mit der Klinge um die Schulter
     return [shx + Math.cos(ha) * r, shy + 5 + low - (e.cover ? 4 : 0) + Math.sin(ha) * r * 0.75];
   };
-  const vv = swingVar(e, sw), sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, sw, arc, vv.v, vv.j);   // Deckung: Klinge schräg hoch vor dem Körper
+  const vv = swingVar(e, sw), tm = A && A.kind === 'work' ? { s: 0, ...legacyTiming(wt) } : atkTiming(e, wt, sw), uOf = s0 => atkU(tm.w, tm.h, s0);   /* Kampfanimation: Stil D liest dieselbe Formzeit wie R */
+  const sv = ranged ? { a: 0, ext: 0 } : e.cover ? { a: -1.15, ext: -2 } : swingOf(wt, uOf(sw), arc, tm.s, vv.j);   // Deckung: Klinge schräg hoch vor dem Körper
   const [hx, hy] = hand(sw, sv);
   // In Ruhe getragen, nicht gezielt: Klinge gesenkt zur Blickseite (sonst zeigte sie wie ein Zeiger zur Maus und kreiste um die Figur)
   const rest = !ranged && !(sw > 0) && !e.cover && !(A && A.kind === 'work');
@@ -2257,7 +2302,7 @@ function weaponPose(e, now, it, pz) {
   const bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
   const a = wt === 'bow' ? bowA : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
     : rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
-  return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv };
+  return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv, tm, uOf };
 }
 // Zweite Hand am Schaft (Zweihänder): von der anderen Schulter zu einem Punkt 9 Welt-Einheiten weiter oben auf der Waffenachse —
 // dreht mit Schwung und Blickrichtung mit, weil sie an der Waffe hängt, nicht am Körper.
@@ -2293,7 +2338,7 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
     const col = W.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210';
     for (let k = 1; k <= 7; k++) {
       const past = sw - k * 0.022; if (past <= 0) break;
-      const pv = swingOf(wt, past, arc, wp.vv.v, wp.vv.j), t = 1 - k / 8;
+      const pv = swingOf(wt, wp.uOf(past), arc, wp.tm.s, wp.vv.j), t = 1 - k / 8;
       if (Math.abs(pv.a - sv.a) < 0.02 && Math.abs(pv.ext - sv.ext) < 0.5) continue;   // keine Bewegung, keine Spur
       const ph = wp.hand(past, pv), pa = wp.thrust ? dir : dir + pv.a * sgn, r = len * 0.9;
       const bx = ph[0] + Math.cos(pa) * r, by = ph[1] + Math.sin(pa) * r;
@@ -2638,7 +2683,7 @@ function beamOf(rar) {                                          /* senkrechter S
 }
 function drawLootBeams(now) {
   if (!LOOT_BEAM.length) return;
-  const a = ambient(), k = 0.35 + a * 0.9;                       /* nachts (oder im Gewölbe) deutlich heller */
+  const a = ambient(), k = 0.62 + a * 0.6;                       /* nachts (oder im Gewölbe) deutlich heller */
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const e of LOOT_BEAM) {
     const rar = e.item.rar || ITEMS[e.item.key]?.rarity || 'common', lv = RAR_LV[rar] ?? 0, sx = (e.x - cam.x) * cam.zoom, sy = (e.y - cam.y) * cam.zoom;
@@ -2669,7 +2714,7 @@ function drawBaked(key, e, box, fn) {
    Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
 const PLACE_RANGE = 400;
 let BLDICO = null, bldImgs = {};
-import('./icons.js?v=23').then(m => { BLDICO = m; }).catch(() => {});
+import('./icons.js?v=24').then(m => { BLDICO = m; }).catch(() => {});
 function bldImage(type) {
   if (!BLDICO?.bldURL) return null;
   let im = bldImgs[type];
@@ -3184,9 +3229,11 @@ function drawBubble(f) {
 }
 // Kampf-Feedback (K4/K12): Zustand am Körper statt Text. Gewähltes Ziel: schmaler Lebensbalken + Statuszeichen; sonst zeigt der Körper (Blut, Partikel, Eis) den Zustand.
 const ST_GLYPH = { burning: ['fire', '240,140,60'], frost: ['frost', '150,205,245'], chilled: ['frost', '175,190,205'], poisoned: ['drop', '130,200,90'], bleeding: ['drop', '200,48,40'], shocked: ['bolt', '240,224,112'] };
+export const barTarget = () => { const e = focus.sel || (focus.last && performance.now() - focus.lastAt < 5000 ? focus.last : null);   /* sonst der zuletzt getroffene Gegner, 5 s */
+   return !e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss ? null : e; };   /* Boss: eigene Leiste unten */
 function drawTargetBar() {
-  const e = focus.sel; if (!e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss) return;
-  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 60 * sc), k = clamp(e.hp / e.maxHp, 0, 1);
+  const e = barTarget(); if (!e) return;
+  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(e.hp / e.maxHp, 0, 1);
   ctx.fillStyle = 'rgba(10,8,6,.85)'; ctx.fillRect(x - 1, y - 1, 34, 6);
   ctx.fillStyle = '#3a1410'; ctx.fillRect(x, y, 32, 4);
   ctx.fillStyle = k > 0.5 ? '#9a2a20' : k > 0.25 ? '#b8461e' : '#d8641a'; ctx.fillRect(x, y, Math.round(32 * k), 4);
