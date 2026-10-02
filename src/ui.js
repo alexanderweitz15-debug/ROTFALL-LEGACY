@@ -11,6 +11,7 @@ import { GOODS } from './data.js?v=24';
 import { target as ecoTarget } from './economy.js?v=24';
 import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
 import { sfx, ambience } from './sfx.js?v=24';
+import * as ATL from './atlas.js?v=24';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -99,6 +100,7 @@ export function initUI() {
     const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 6), y = Math.min(e.clientY + 18, innerHeight - tip.offsetHeight - 6);
     tip.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; });
   document.addEventListener('mouseout', e => { const r = e.relatedTarget; if (!r || !(tipText(r) || (r.closest && r.closest('[data-card]')))) { tip.classList.remove('on'); cardFor = null; } });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && $('findcard')?.classList.contains('on')) { closeFind(); e.stopImmediatePropagation(); e.preventDefault(); } }, true);   /* Fund-Karte: Esc schließt nur sie */
   renderHotbar();
 }
 
@@ -160,6 +162,7 @@ export function refreshHUD() {
   if ($('clock-time').title !== `Jahr ${year()}`) $('clock-time').title = `Jahr ${year()}`;   /* UI-Umbau: Zeit, Wetter, Jahr stehen nur noch oben */
   if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = icoImg('w_' + (S.weather === 'sandstorm' ? 'heat' : S.weather), 2, 'wico') || WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
   hudSet('clock-gold', String(S.gold));
+  paintWarn();   /* UI-Scheibe 4: Warnchip */
   renderHotbar();
 }
 
@@ -545,11 +548,11 @@ export function dialogue(npc, text, choices) {
   drawPortraitTo($('dlg-portrait'), npc);
   const cc = $('dlg-choices'); cc.innerHTML = '';
   choices.forEach(c => { const b = el('button', '', c.text); b.dataset.k = c.k || (DLG_K.find(([, re]) => re.test(b.textContent)) || [''])[0]; b.onclick = () => { if (c.fn) c.fn(); else closeDialogue(); }; cc.appendChild(b); });
+  flowLift();
 }
-export function closeDialogue() { if (uiHooks.close?.()) return; clearInterval(dlgTyper); $('dialogue').classList.add('hidden'); }
+export function closeDialogue() { if (uiHooks.close?.()) return; clearInterval(dlgTyper); $('dialogue').classList.add('hidden'); flowLift(); }
 export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
-let toastTimer = 0;
 // S13: Schlafen — das Bild blendet ab, Text, Mond, dann langsam wieder auf (rein sichtbar; die Zeit ist schon vergangen)
 export function sleepFade(text) {
   let d = $('sleep-fade'); if (!d) { d = document.createElement('div'); d.id = 'sleep-fade'; document.getElementById('viewport')?.appendChild(d); }
@@ -558,9 +561,94 @@ export function sleepFade(text) {
 }
 export function toast(text, ms = 2200) {
   if (S._quiet) return;                                   // Selbsttest-Sandbox: keine Einblendungen
-  const t = $('toast'); t.textContent = text; t.classList.remove('hidden');
-  t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), ms);
+  notify({ text: String(text), ms, loud: isLoud(String(text)) });   /* UI-Scheibe 4: jede Meldung wird eine Zeile im Meldungsfluss */
+}
+// ---------------- Meldungsfluss (UI-Scheibe 4, Entwickler 01.10.2026: mehrere verblassende Meldungen zugleich statt Einzel-Toast) ----------------
+// Unten links im Spielfeld, neueste unten, ältere blasser. Gleiche Meldung zählt hoch (×2) statt zu stapeln. Mehr als FLOW_MAX zugleich:
+// die älteste, die schon FLOW_MIN zu sehen war, geht früher; sonst wartet die neue in flowQ — nichts geht verloren. Großbuchstaben-Toasts
+// (bisher die lauten: Angriff, Stufe, Ereignis) bekommen die laute Form. Aufnahme-Stapel (items.md §6) und Aufträge nutzen dieselbe Zeile.
+const FLOW_MIN = 900, flowMax = () => innerWidth < 820 ? 3 : 4;   /* schmal: 3 Zeilen */
+let flowQ = [], flowQT = 0;
+export const flowQueue = () => flowQ.length;
+export function flowReset() { flowQ = []; clearTimeout(flowQT); $('flow')?.replaceChildren(); }   /* Proben */
+const isLoud = t => t.length > 3 && /[A-ZÄÖÜ]/.test(t) && t === t.toUpperCase();
+function flowBox() {
+  let b = $('flow'); if (b) return b; const vp = $('viewport'); if (!vp) return null;
+  b = el('div', ''); b.id = 'flow'; b.setAttribute('aria-live', 'polite'); vp.appendChild(b); return b;
+}
+const flowLive = box => [...box.children].filter(r => !r.classList.contains('out'));
+function flowOut(r, fast) {
+  if (!r || r.classList.contains('out')) return; clearTimeout(r._tm); r.classList.add('out');
+  setTimeout(() => { r.remove(); flowNext(); }, fast || S.settings?.motion === false ? 60 : 420);
+}
+function flowNext() { const box = $('flow'); while (box && flowQ.length && flowLive(box).length < flowMax()) notify(flowQ.shift()); }
+function flowDrain() {                                            /* Warteschlange: die älteste Zeile geht, sobald sie FLOW_MIN zu sehen war */
+  clearTimeout(flowQT); const box = $('flow'); if (!box || !flowQ.length) return; flowNext(); if (!flowQ.length) return;
+  const old = flowLive(box).find(r => performance.now() - r._t0 >= FLOW_MIN); if (old) flowOut(old, true); flowQT = setTimeout(flowDrain, 250);
+}
+function flowCount(r) { const c = r.querySelector('.fl-n'); if (c) c.textContent = r._n > 1 ? (r._plus ? '+' : '×') + r._n : ''; }
+/* o: { text, ms, loud, key (Zusammenzählen), add (Menge), ico (Gegenstand), cls, glyph } — ohne Sperre durch S._quiet (die prüft toast/pickup) */
+export function notify(o) {
+  const box = flowBox(); if (!box || !o) return null;
+  document.body.classList.toggle('nomotion', S.settings?.motion === false);
+  const key = o.key || o.text, ms = Math.max(1200, o.ms || 2200), live = flowLive(box);
+  const same = live.find(r => r._key === key);
+  if (same) { same._n += o.add || 1; flowCount(same); clearTimeout(same._tm); same._tm = setTimeout(() => flowOut(same), ms);
+    same.classList.remove('bump'); void same.offsetWidth; same.classList.add('bump'); return same; }
+  if (live.length >= flowMax()) { const old = live.find(r => performance.now() - r._t0 >= FLOW_MIN); if (old) flowOut(old, true); else { flowQ.push(o); clearTimeout(flowQT); flowQT = setTimeout(flowDrain, 250); return null; } }
+  const r = el('div', `fl-row${o.loud ? ' loud' : ''}${o.cls ? ' ' + o.cls : ''}`);
+  r._key = key; r._n = o.add || 1; r._plus = !!o.ico; r._t0 = performance.now();
+  const ic = o.ico ? '<canvas class="fl-ico" width="20" height="20"></canvas>' : `<i class="fl-g ${o.glyph || (o.loud ? 'g-loud' : 'g-info')}"></i>`;
+  r.innerHTML = `${ic}<span class="fl-t"></span><b class="fl-n"></b>`; r.querySelector('.fl-t').textContent = o.text; flowCount(r);
+  r.onclick = () => flowOut(r, true); r.title = 'Klick: ausblenden · alles steht im Protokoll unten';
+  box.appendChild(r); if (o.ico) drawItemIconTo(r.firstChild, o.ico); r._tm = setTimeout(() => flowOut(r), ms);
+  return r;
+}
+/* Gesprächsfenster offen: der Fluss rückt darüber (sonst verdeckt) */
+function flowLift() { const b = $('flow'), d = $('dialogue'); if (!b || !d) return; b.style.bottom = d.classList.contains('hidden') ? '' : (d.offsetHeight + 26) + 'px'; }
+// Aufnahme-Stapel (items.md §6 Wahl 10): Icon + Name in Seltenheitsfarbe, gleiche Teile zählen hoch, Icon fliegt zum Reiter „Gepäck“,
+// Punkt am Reiter bis das Gepäck geöffnet wird. Legendär/Mythisch: große Fund-Karte (Entwickler 02.10.: ohne Pause).
+export function pickup(s) {
+  if (S._quiet || !s || !ITEMS[s.key]) return;
+  const it = ITEMS[s.key], r = rarOfS(s), n = s.count || 1;
+  const row = notify({ key: 'loot:' + s.key + ':' + r + ':' + (s.name || ''), text: s.name || it.name, add: n, ico: s.key, cls: 'loot r-' + r, ms: 2600 });
+  if (!it.res) { const b = navBtn('inv'); if (b) { b.classList.add('badge'); b.title = 'Gepäck (I) — Neues im Gepäck'; } if (row) flyTo(row.firstChild, s.key); }
+  if (r === 'legendary' || r === 'mythic') findCard(s);
+}
+const navBtn = g => $('nav')?.querySelector(`[data-g="${g}"]`);
+function flyTo(src, key) {
+  const b = navBtn('inv'); if (S.settings?.motion === false || !b || !src?.getBoundingClientRect || !document.body.animate) return;
+  const a = src.getBoundingClientRect(), z = b.getBoundingClientRect(); if (!a.width || !z.width) return;
+  const cv = el('canvas', 'fl-fly'); cv.width = cv.height = 32; drawItemIconTo(cv, key); cv.style.left = a.left - 6 + 'px'; cv.style.top = a.top - 6 + 'px'; document.body.appendChild(cv);
+  const an = cv.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${z.left + z.width / 2 - a.left - 10}px,${z.top + z.height / 2 - a.top - 10}px) scale(.45)`, opacity: .35 }], { duration: 700, easing: 'cubic-bezier(.5,0,.75,.35)' });
+  an.onfinish = () => { cv.remove(); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); };
+}
+// Fund-Karte: mittig oben (Höhe der Namenskarte, nie zugleich), 2,8 s, Klick oder Esc schließt. Die Welt läuft weiter.
+let findQ = [], findT = 0;
+export function findCard(s) { if (S._quiet || !s) return; findQ.push(s); if (!$('findcard')?.classList.contains('on')) findNext(); }
+function findNext() {
+  const s = findQ.shift(); if (!s) return;
+  const nc = document.getElementById('nameCard'); if (nc?.getAnimations?.().some(a => a.playState === 'running')) { findQ.unshift(s); clearTimeout(findT); findT = setTimeout(findNext, 400); return; }
+  let d = $('findcard'); if (!d) { d = el('div', ''); d.id = 'findcard'; d.onclick = closeFind; document.body.appendChild(d); }
+  const it = ITEMS[s.key], r = rarOfS(s), leg = s.leg || it.leg;
+  d.className = 'fc-' + r; document.body.classList.toggle('nomotion', S.settings?.motion === false);
+  d.innerHTML = `<div class="fc-in"><i class="fc-ray"></i><canvas class="fc-ico" width="64" height="64"></canvas><div class="fc-rar">${rarMark(r)}${RARITY[r]}</div>
+    <div class="fc-name r-${r}"></div>${leg && LEGENDS[leg] ? `<div class="fc-leg">«${LEGENDS[leg].name}»</div>` : ''}<small>Im Gepäck (I) · Klick oder Esc schließt</small></div>`;
+  d.querySelector('.fc-name').textContent = s.name || it.name; drawItemIconTo(d.querySelector('canvas'), s.key);
+  void d.offsetWidth; d.classList.add('on'); sfx('loot', RAR_ORD.indexOf(r), 0.7);
+  clearTimeout(findT); findT = setTimeout(closeFind, 2800);
+}
+export function closeFind() { const d = $('findcard'); if (!d?.classList.contains('on')) return; clearTimeout(findT); d.classList.remove('on'); findT = setTimeout(findNext, 350); }
+// Warnchip (ui_redesign §5): das Wichtigste in der Kopfleiste, klickbar. Inhalt liefert game.js (A.warnings) — nur, was das Spiel schon ansagt.
+let warnSig = null;
+function paintWarn() {
+  let c = $('warnchip');
+  if (!c) { const wc = document.querySelector('#topbar .worldclock'); if (!wc) return; c = el('button', 'hidden'); c.id = 'warnchip'; wc.before(c); c.onclick = () => { if (c._w?.open) openModal(c._w.open); }; }
+  const L = A.warnings?.() || [], sig = L.map(w => w.k + w.text).join('|'); if (sig === warnSig) return; warnSig = sig;
+  if (!L.length) { c.className = 'hidden'; c._w = null; return; }
+  const w = L[0]; c._w = w; c.className = 'w-' + w.k;
+  c.innerHTML = `<i></i><span></span>${L.length > 1 ? `<b>+${L.length - 1}</b>` : ''}`; c.querySelector('span').textContent = w.text;
+  c.title = L.map(x => '• ' + x.text).join('\n') + `\nKlick: ${{ settlement: 'Siedlung', quests: 'Aufträge', party: 'Gruppe' }[w.open] || 'öffnen'}`;
 }
 export function setPrompt(text) {
   const p = $('prompt');
@@ -575,6 +663,7 @@ export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOp
 function leaveWin(next) {                                     /* P6/P7: Fenster verlassen — Inventar-Takt stoppen, Kontor-Besuch beenden, Dock lösen */
   if (modalOpen === 'inventory' && next !== 'inventory') { clearInterval(invTimer); figPrev = null; DRAG = null; }
   if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
+  if (next === 'inventory') { const b = navBtn('inv'); if (b) { b.classList.remove('badge'); b.title = 'Gepäck (I)'; } }   /* Aufnahme-Stapel: Punkt bis das Gepäck offen war */
   $('modal')?.classList.toggle('dock', next === 'trade');
   document.body.classList.toggle('nomotion', S.settings?.motion === false);   /* „Reduzierte Bewegung“: kein Glanz, kein Pulsieren */
 }
@@ -619,7 +708,7 @@ const INV_SORT = [['found', 'Fund'], ['cat', 'Art'], ['rar', 'Seltenheit'], ['va
 const FIG_DIRS = ['S', 'W', 'N', 'E'];
 let invSel = null, invFilter = 'all', figDir = 0, figPrev = null, figT = 0, invTimer = 0, DRAG = null, moreOpen = false;
 const icoTag = (k, s = 1, cls = 'kpi-ico') => icoImg(k, s, cls);
-function paintIcons(root) { root?.querySelectorAll?.('canvas[data-ico]').forEach(cv => drawItemIconTo(cv, cv.dataset.ico)); }
+function paintIcons(root) { root?.querySelectorAll?.('canvas[data-ico]').forEach(cv => drawItemIconTo(cv, cv.dataset.ico)); root?.querySelectorAll?.('canvas[data-skbr]').forEach(cv => drawSkillIconTo(cv, cv.dataset.skbr, cv.dataset.sktype)); }
 function chipBar(box, list, cur, on) {
   if (!box) return;
   box.innerHTML = list.map(([k, ico, name]) => `<button class="chip${k === cur ? ' on' : ''}" data-k="${k}" title="${name}">${icoTag(ico, 2, 'chip-ico') || name.slice(0, 4)}</button>`).join('');
@@ -1067,19 +1156,80 @@ function classUI(body) {
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { A.setTitleClass(b.dataset.t === p.titleClass ? null : b.dataset.t); closeModal(); });
 }
 
-// ---- Skill-Baum ----
+// ---- Skill-Baum (Visueller Umbau 02.10.2026, Scheibe 1+2: Linien zwischen Knoten, Icons je Zweig, Hover-Vorschaukarte) ----
 // Spalten je Zweig, Zeilen = Tiefe. Titelzweige stehen darunter; solange die Titelklasse fehlt, versiegelt (sichtbar, damit man
-// weiß, wofür sich der Weg lohnt). Tooltip zeigt Wirkung und — bei Schlüsselknoten — die Absicht.
+// weiß, wofür sich der Weg lohnt). Zustandsmaschine (nodeState/learnNode) und Datenquelle (SKILL_TREE) bleiben unverändert —
+// nur die Darstellung ändert sich: ein <canvas> hinter den Knöpfen zeichnet die Voraussetzungs-Linien (read-only, pro Zweig,
+// da requires laut Datenmodell nie den Zweig verlassen), und die Hover-Vorschaukarte nutzt dieselbe Textquelle wie der frühere
+// Browser-Tooltip, nur über das vorhandene data-card/_card-System (wie bei Gegenständen) statt title.
+const ST_LABEL = { learned: 'gelernt', open: 'lernen', sealed: 'versiegelt', barred: 'ausgeschlossen', locked: 'gesperrt' };
+function treeCardHTML(n, st, req, pts) {
+  const stTxt = st === 'open' ? (pts ? 'lernen' : 'offen') : ST_LABEL[st] || st;
+  const typeTxt = n.type === 'keystone' ? 'Schlüsselknoten' : n.type === 'active' ? 'Aktive Fähigkeit' : n.type === 'notable' ? 'Merkmal' : 'Talent';
+  return `<div class="icard"><div class="ic-head"><canvas class="ic-ico" data-skbr="${n.branch}" data-sktype="${n.type || ''}"></canvas>
+    <div class="ic-ttl"><div class="ic-name">${n.name}</div><div class="ic-sub">${typeTxt} · ${stTxt}</div></div></div>
+    <div class="ledger" style="margin:6px 0 0">${n.desc}</div>
+    ${n.designIntent ? `<div class="ledger" style="color:#8d836e;margin-top:4px">Absicht: ${n.designIntent}</div>` : ''}
+    ${req ? `<div class="ledger" style="margin-top:4px">Braucht: ${req}</div>` : ''}</div>`;
+}
+// Zweigfarbe und Umriss je Zweig — ein einfaches, gezeichnetes Symbol (keine Fremdwerkzeuge), damit man Zweige auf einen Blick erkennt.
+const TREE_COL = { combat: '#b2503a', magic: '#5a8ec0', survival: '#6a9a4a', necromancer: '#8ab0a0', warlock: '#a860c8', druid: '#7aa850', monk: '#c8a860', deathknight: '#8ac0d8' };
+function drawSkillIconTo(cv, branch, type) {
+  const c = cv.getContext('2d'), w = cv.width = cv.clientWidth || 18, h = cv.height = cv.clientHeight || 18;
+  c.clearRect(0, 0, w, h); c.save(); c.translate(w / 2, h / 2); const s = w / 18; c.scale(s, s);
+  c.shadowColor = 'rgba(6,5,4,.85)'; c.shadowBlur = 1; c.shadowOffsetY = 0.6;
+  const col = TREE_COL[branch] || '#b8ac93';
+  switch (branch) {
+    case 'combat': c.strokeStyle = col; c.lineWidth = 2; c.beginPath(); c.moveTo(-5, 5); c.lineTo(4, -5); c.stroke();
+      c.fillStyle = '#6a5a3a'; c.fillRect(-7, 2.5, 4, 4); break;                                  // Klinge und Griff
+    case 'magic': c.fillStyle = col; c.beginPath(); c.moveTo(0, -6); c.lineTo(1.7, -1.7); c.lineTo(6, 0); c.lineTo(1.7, 1.7);
+      c.lineTo(0, 6); c.lineTo(-1.7, 1.7); c.lineTo(-6, 0); c.lineTo(-1.7, -1.7); c.closePath(); c.fill(); break;   // Stern
+    case 'survival': c.fillStyle = col; c.beginPath(); c.moveTo(0, -6); c.quadraticCurveTo(6, -1, 0, 6); c.quadraticCurveTo(-6, -1, 0, -6); c.fill();
+      c.strokeStyle = 'rgba(10,8,6,.7)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(0, -4.5); c.lineTo(0, 4.5); c.stroke(); break;   // Blatt
+    case 'necromancer': c.fillStyle = '#d8cdb6'; c.beginPath(); c.arc(0, -1, 5, 0, 7); c.fill();
+      c.fillStyle = '#1a1510'; c.fillRect(-2.6, -2.2, 1.8, 1.8); c.fillRect(0.8, -2.2, 1.8, 1.8); c.fillRect(-2.6, 2, 2, 2.6); c.fillRect(0.6, 2, 2, 2.6); break;   // Schädel
+    case 'warlock': c.strokeStyle = col; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-6, 0); c.quadraticCurveTo(0, -5, 6, 0); c.quadraticCurveTo(0, 5, -6, 0); c.stroke();
+      c.fillStyle = col; c.beginPath(); c.arc(0, 0, 2, 0, 7); c.fill(); break;                     // Auge
+    case 'druid': c.fillStyle = col; c.beginPath(); c.arc(0, 1.6, 3.4, 0, 7); c.fill();
+      for (const [dx, dy] of [[-3, -3], [0, -4.6], [3, -3]]) { c.beginPath(); c.arc(dx, dy, 1.3, 0, 7); c.fill(); } break;   // Pranke
+    case 'monk': c.strokeStyle = col; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 0, 5.4, 0, Math.PI * 2); c.stroke();
+      c.fillStyle = col; c.beginPath(); c.arc(0, -2.6, 1.5, 0, 7); c.fill(); break;                // Stiller Kreis
+    case 'deathknight': c.fillStyle = col; c.beginPath(); c.moveTo(0, -6); c.lineTo(3, 0); c.lineTo(0, 6); c.lineTo(-3, 0); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.moveTo(0, -5); c.lineTo(1, 0); c.lineTo(0, 1.6); c.lineTo(-1, 0); c.closePath(); c.fill(); break;   // Frostsplitter
+    default: c.fillStyle = col; c.fillRect(-4, -4, 8, 8);
+  }
+  if (type === 'keystone') { c.strokeStyle = 'rgba(189,148,51,.9)'; c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 7.6, 0, 7); c.stroke(); }
+  c.restore();
+}
+// Linien zwischen einem Knoten und seinen Voraussetzungen, auf ein Canvas hinter den Knöpfen gezeichnet (Positionen aus dem
+// echten Layout, nicht neu berechnet — läuft nur beim Öffnen/Lernen, nicht in der Spielschleife). Mehrere requires (= „oder“)
+// bekommen alle ihre Linie; die von einem bereits gelernten Knoten leuchtet, die anderen bleiben blass (offene Entscheidung 2
+// aus visual/skilltree.md: hier so gelöst, da es immer korrekt bleibt, unabhängig vom Spielstand).
+function drawTreeLines(branchEl, p) {
+  const cv = branchEl.querySelector('.tree-lines'); if (!cv) return;
+  const r0 = branchEl.getBoundingClientRect();
+  const w = cv.width = branchEl.clientWidth, h = cv.height = branchEl.clientHeight;
+  const c = cv.getContext('2d'); c.clearRect(0, 0, w, h);
+  const rectOf = k => { const b = branchEl.querySelector(`[data-k="${k}"]`); if (!b) return null; const r = b.getBoundingClientRect();
+    return { cx: r.left - r0.left + r.width / 2, top: r.top - r0.top, bot: r.top - r0.top + r.height }; };
+  branchEl.querySelectorAll('[data-k]').forEach(btn => {
+    const k = btn.dataset.k, n = SKILL_TREE[k], to = rectOf(k); if (!to || !n.requires.length) return;
+    for (const rk of n.requires) { const from = rectOf(rk); if (!from) continue;
+      const lit = A.nodeState(p, rk) === 'learned';
+      c.strokeStyle = lit ? 'rgba(189,148,51,.75)' : 'rgba(110,98,76,.4)'; c.lineWidth = lit ? 2 : 1.3;
+      c.beginPath(); c.moveTo(from.cx, from.bot); c.lineTo(to.cx, to.top); c.stroke();
+    }
+  });
+}
 function skillUI(body) {
   const p = S.player, pts = p.skillPoints || 0;
   const col = b => {
     const N = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === b), rows = Math.max(...N.map(([, n]) => n.row)) + 1, B_ = SKILL_BRANCHES[b];
     const sealed = B_.cls ? !(p.knownClasses || []).includes(B_.cls) : B_.title && !(p.titleClasses || []).includes(B_.title);
-    return `<div class="tree-branch${sealed ? ' sealed' : ''}"><h3>${B_.name}</h3><p class="ledger">${sealed ? (B_.cls ? `Versiegelt — öffnet sich mit der Klasse ${CLASSES[B_.cls]?.name || B_.cls} (Todesweihe bei Sael oder Ysra).` : `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.`) : B_.desc}</p>
+    return `<div class="tree-branch${sealed ? ' sealed' : ''}" data-b="${b}"><canvas class="tree-lines"></canvas><h3>${B_.name}</h3><p class="ledger">${sealed ? (B_.cls ? `Versiegelt — öffnet sich mit der Klasse ${CLASSES[B_.cls]?.name || B_.cls} (Todesweihe bei Sael oder Ysra).` : `Versiegelt — öffnet sich mit der Titelklasse ${TITLE_CLASSES[B_.title]?.name || B_.title}.`) : B_.desc}</p>
       ${Array.from({ length: rows }, (_, r) => `<div class="tree-row">${N.filter(([, n]) => n.row === r).map(([k, n]) => {
-        const st = A.nodeState(p, k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
-        const tip = `${n.name}${n.type === 'keystone' ? ' — Schlüsselknoten' : n.type === 'active' ? ' — aktive Fähigkeit' : ''}: ${n.desc}${n.designIntent ? ' · Absicht: ' + n.designIntent : ''}${req ? ' · Braucht: ' + req : ''}`;
-        return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" title="${tip.replace(/"/g, '&quot;')}">${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : st === 'barred' ? 'ausgeschlossen' : 'gesperrt'}</small></button>`;
+        const st = A.nodeState(p, k);
+        return `<button class="tree-node ${st} ${n.type || 'minor'}" data-k="${k}" data-card="1"><canvas class="tree-ico" data-skbr="${n.branch}" data-sktype="${n.type || ''}"></canvas>${n.name}<small>${st === 'learned' ? 'gelernt' : st === 'open' ? (pts ? 'lernen' : 'offen') : st === 'sealed' ? 'versiegelt' : st === 'barred' ? 'ausgeschlossen' : 'gesperrt'}</small></button>`;
       }).join('')}</div>`).join('')}</div>`;
   };
   const base = ['combat', 'magic', 'survival'], titles = Object.keys(SKILL_BRANCHES).filter(b => !base.includes(b));
@@ -1088,7 +1238,13 @@ function skillUI(body) {
     <div class="tree-wrap">${base.map(col).join('')}</div>
     <div class="ledger" style="margin-top:12px">Zweige der Titelklassen</div>
     <div class="tree-wrap">${titles.map(col).join('')}</div>`;
-  body.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { A.learnNode(b.dataset.k); refreshModal(); });
+  body.querySelectorAll('[data-k]').forEach(b => {
+    b.onclick = () => { A.learnNode(b.dataset.k); refreshModal(); };
+    const n = SKILL_TREE[b.dataset.k], st = A.nodeState(p, b.dataset.k), req = n.requires.map(x => SKILL_TREE[x].name).join(' oder ');
+    b._card = () => treeCardHTML(n, st, req, pts);                         // Hover-Vorschaukarte statt Browser-title (gleiche Textquelle)
+  });
+  paintIcons(body);
+  body.querySelectorAll('.tree-branch').forEach(el2 => drawTreeLines(el2, p));
 }
 
 // ---- Gruppe ----
@@ -1311,8 +1467,11 @@ function mapUI(body) {
   A.drawWorldmap(cv, z);
   cv.style.cursor = 'pointer'; body.style.position = 'relative';
   cv.onclick = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * cv.width / r.width, y = (e.clientY - r.top) * cv.height / r.height, P = A.mapPick?.(x, y);   /* Scout #5: Ortskarte */
-    $('map-card')?.remove(); if (!P) return; const d = el('div', 'map-card', `<div class="ctx-head">${P.title}</div>${P.html}`); d.id = 'map-card';
-    d.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; d.style.top = Math.max(4, Math.min(e.clientY - r.top - 20, r.height - 180)) + 'px'; d.onclick = () => d.remove(); body.appendChild(d); };
+    $('map-card')?.remove(); if (!P) return;
+    // Karte Scheibe 1 (02.10.2026): Bild-Panel statt reinem Text — kleines Icon-Canvas (dieselbe Zeichnung wie auf der Weltkarte, atlas.drawLocIcon).
+    const d = el('div', 'map-card', `<div class="map-card-head">${P.loc ? '<canvas class="map-card-ico"></canvas>' : ''}<div class="ctx-head">${P.title}</div></div>${P.html}`); d.id = 'map-card';
+    d.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; d.style.top = Math.max(4, Math.min(e.clientY - r.top - 20, r.height - 180)) + 'px'; d.onclick = () => d.remove(); body.appendChild(d);
+    if (P.loc) ATL.drawLocIcon(d.querySelector('.map-card-ico'), P.loc); };
   [...body.querySelectorAll('[data-z]')].forEach(b => b.onclick = () => { S.settings.mapZoom = +b.dataset.z; mapUI(body); });
 }
 

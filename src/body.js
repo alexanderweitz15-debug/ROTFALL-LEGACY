@@ -55,6 +55,7 @@ export const crawling = c => !!c.body && c.body.lleg.hp <= 0 && c.body.rleg.hp <
 // Seite aus der Geometrie: trifft der Angreifer von links, sind die linken Glieder näher.
 export function pickPart(attacker, target, crit) {
   const w = { ...HIT_W };
+  for (const p of LIMBS) if (target.body[p].lost) w[p] = 0;   /* Behoben HB-17: ein abgetrenntes Glied fing noch Treffer — es ist nicht mehr da */
   w.head *= buildOf(target).headHit * (crit ? 2.5 : 1);
   if (attacker) {
     const a = Math.atan2(attacker.y - target.y, attacker.x - target.x);
@@ -84,7 +85,7 @@ export function damagePart(c, part, dmg, crit) {
     const spill = Math.min(-P.hp, dmg) * 0.5;           // Überschuss geht halb in den Rumpf
     c.body.torso.hp -= spill;
     const cut = cutOf();
-    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; delete P.mechCond; delete P.mechUp; delete P.mod; P.hp = cut; result = 'severed'; }   /* Roadmap P1: kein alter Prothesenzustand am Stumpf */   // erst ab −200 ab (Sehr schwer −100)
+    if (!P.lost && P.hp <= cut) { P.lost = true; P.mech = 0; delete P.mechCond; delete P.mechUp; delete P.mod; delete P.broken; delete P.splint; P.hp = cut; result = 'severed'; }   /* Roadmap P1: kein alter Prothesenzustand am Stumpf; Behoben HB-15: ein Bruch ueberlebte das Abtrennen und deckelte die naechste Prothese auf 40 % */   // erst ab −200 ab (Sehr schwer −100)
     else if (wasUp) result = 'disabled';
     P.hp = Math.max(P.hp, cut === -Infinity ? LIMB_CUT : cut);
   } else if (part !== 'torso' && part !== 'head' && P.hp === 0 && wasUp) result = 'disabled';
@@ -97,7 +98,7 @@ export function damagePart(c, part, dmg, crit) {
 export const topOf = P => P.broken ? Math.round(P.max * 0.4) : P.max;
 export function healPart(c, part, amount) {
   const P = c.body[part], was = P.hp;
-  if (P.lost) return { restored: false, gained: 0 };
+  if (P.lost || P.mech) return { restored: false, gained: 0 };   /* Behoben HB-16: „Medizin heilt Fleisch, Werkzeug repariert Maschine“ (docs/MECHANIKEN.md) — Verbände/Heiler wirkten bisher auch auf Prothesen */
   P.hp = Math.max(P.hp, Math.min(topOf(P), P.hp + amount));
   syncHp(c);
   return { restored: was <= 0 && P.hp > 0, gained: P.hp - was };
@@ -112,7 +113,7 @@ export function heal(c, amount) {
   }
   syncHp(c);
 }
-export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost) c.body[p].hp = Math.max(c.body[p].hp, topOf(c.body[p])); syncHp(c); }
+export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost && !c.body[p].mech) c.body[p].hp = Math.max(c.body[p].hp, topOf(c.body[p])); syncHp(c); }   /* Behoben HB-16: Medizin heilt kein Messing */
 // Roadmap P1 (Bionik-Qualität): Stufe 1 Schrott ist schlechter als ein echtes Glied, 2 Aurelion gleichwertig, 3 Meisterstück besser,
 // 4 Prototyp selten und am besten. wear = wie schnell sie sich abnutzt (×), name für Anzeige und Händler.
 export const MECH_Q = {
@@ -122,7 +123,7 @@ export const MECH_Q = {
   4: { name: 'Prototyp',     arm: 0.15,  leg: 0.10,  wear: 0.5 },
 };
 // S12: Prothese an ein verlorenes Glied. Sie kommt immer frisch: voller Zustand, keine Aufrüstung (vorher erbte sie den alten Stumpf).
-export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; delete P.mod; P.hp = P.max; syncHp(c); }
+export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; delete P.mod; delete P.broken; delete P.splint; P.hp = P.max; syncHp(c); }   /* Behoben HB-15: ein alter Bruch deckelte sonst auch die frische Prothese auf 40 % */
 // Roadmap P3: Hand- und Fußmodule auf einer Prothese (c.body[k].mod). Nur auf Gliedern mit mech; wirken nur, solange die Prothese ≥ 30 % hat.
 export const MECH_MOD = {
   greifhand:   { part: 'arm', name: 'Greifhand',   arm: 0,    desc: 'Schwere Rüstung und Schild bremsen 30 % weniger; selbst ausbessern bis 90 %.' },
@@ -163,7 +164,7 @@ export function setBionicCond(c, k, v) { v = Math.max(0, Math.min(100, v)); if (
 export function bionicDefaults(c) { if (!c) return c; if (c.lens && !c.eye) c.eye = { q: 2, cond: 100 }; if (c.eye) c.eye.cond ??= 100; return c; }
 export function worstPart(c, room = false) {   /* room: nur Teile, die noch heilen können (Bruch) */
   let best = null, br = 1;
-  for (const p of PARTS) { if (c.body[p].lost || (room && c.body[p].hp >= topOf(c.body[p]) - 1e-6)) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }
+  for (const p of PARTS) { if (c.body[p].lost || c.body[p].mech || (room && c.body[p].hp >= topOf(c.body[p]) - 1e-6)) continue; const r = c.body[p].hp / c.body[p].max; if (r < br - 1e-6) { br = r; best = p; } }   /* Behoben HB-16: Medizin waehlt keine Prothese als Ziel */
   return best;
 }
 export function speedFactor(c) {

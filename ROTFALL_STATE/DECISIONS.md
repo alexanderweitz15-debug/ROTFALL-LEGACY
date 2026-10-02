@@ -167,3 +167,9 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Bomben-Skelett: läuft auf dich zu und explodiert. Die Explosion macht Flächenschaden, auch an anderen Gegnern. Sie wird vorher sichtbar angesagt, Ausweichen ist möglich.
   - Großes Skelett: mehr Leben, langsamer, schwere (nicht blockbare) Hiebe, Rückstoß.
   - Mutierte Menschen: entstellt, schnell, wild, wenig Rüstung. Sie kommen am Totenland-Rand vor, wo der Fluch die Lebenden verdirbt.
+- **Gegner Top 5 aus gegner_ideen.md werden gebaut:**
+  - Wächterspinne: lauert sichtbar an bestimmten Werkstatt- und Fabrikwänden in Aurelion.
+  - Dampframme: der Rammstoß zerstört Hindernisse (Fässer, Zäune, Kisten), wie der Leichenkoloss.
+  - Blutschöpfer: das Trinken von Wehrlosen heilt auch Kultisten in der Nähe.
+  - Netzwerferin: gleiche Regel wie das Spieler-Fangnetz; normale Figuren hängen fest, große und Elite taumeln nur.
+  - Hofspion: die Zahl richtet sich nach der Schwere des Regelbruchs (Diebstahl: einer; Gewalt oder Mord: zwei bis drei).

@@ -99,6 +99,32 @@ function label(c, text, x, y, size, col, italic = false) {
 
 // ---------------- Karte zeichnen ----------------
 const FACCOL = { aurel: '#e8c878', chain: '#e0a040', goblin: '#b8a050', undead: '#e04a3a', valen: '#e8d070', order: '#f0e6c8', merch: '#e8c060', bandit: '#b86a40' };
+// Ortssymbol: ein Ort, eine Zeichenfunktion — dieselbe, die auf der Weltkarte und im Ortskarte-Panel (ui.js, Scheibe 1 „Karte“) steht.
+function locIcon(c, l, x, y, s) {
+  const col = FACCOL[l.faction] || '#e8d070';
+  if (l.kind === 'city') castle(c, x, y, s * (l.faction === 'chain' || l.faction === 'undead' ? 1.2 : 1), l.faction === 'chain' || l.faction === 'undead', col);
+  else if (l.kind === 'village') hamlet(c, x, y, s * 0.9, l.tribute ? '#4a3a2a' : l.faction === 'order' ? '#3e4a5e' : '#8a3a2a');
+  else if (l.kind === 'ruin') ruin(c, x, y, s * 0.8, l.faction === 'undead');
+  else if (l.kind === 'dungeon') { c.fillStyle = '#1a1614'; c.beginPath(); c.arc(x, y, s * 0.5, Math.PI, 0); c.lineTo(x + s * 0.5, y + s * 0.2); c.lineTo(x - s * 0.5, y + s * 0.2); c.fill(); }
+  else if (l.kind === 'camp') { c.fillStyle = l.faction === 'goblin' ? '#6a7a3a' : l.faction === 'bandit' ? '#8a2a1a' : '#7a5a3a'; c.beginPath(); c.moveTo(x - s * 0.5, y + s * 0.3); c.lineTo(x, y - s * 0.5); c.lineTo(x + s * 0.5, y + s * 0.3); c.fill();
+    if (l.poi === 'bandits') { c.strokeStyle = '#e0c080'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 3, y - 6); c.lineTo(x + 3, y); c.moveTo(x + 3, y - 6); c.lineTo(x - 3, y); c.stroke(); } }
+  else if (l.kind === 'farm') hamlet(c, x, y, s * 0.55, '#7a5a30');
+  else if (l.kind === 'tower') { c.fillStyle = '#4a4440'; c.fillRect(x - s * 0.18, y - s * 0.9, s * 0.36, s * 0.9); c.fillRect(x - s * 0.28, y - s * 1.05, s * 0.56, s * 0.2); c.strokeStyle = '#0c0a08'; c.lineWidth = 1; c.strokeRect(x - s * 0.18, y - s * 0.9, s * 0.36, s * 0.9); }
+  else if (l.kind === 'mine') { c.strokeStyle = '#c8b890'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 4, y - 4); c.lineTo(x + 4, y + 4); c.moveTo(x + 4, y - 4); c.lineTo(x - 4, y + 4); c.stroke(); c.fillStyle = '#1a1614'; c.fillRect(x - 2, y + 2, 4, 3); }
+  else if (l.kind === 'wreck') { c.strokeStyle = '#6a4a2a'; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 1, s * 0.45, 0.2, Math.PI - 0.2); c.stroke(); c.fillStyle = '#6a4a2a'; c.fillRect(x - 0.5, y - s * 0.7, 1.5, s * 0.6); }
+  else if (l.kind === 'shrine') { c.fillStyle = l.faction === 'undead' ? '#5a2a2a' : '#8a8478'; c.fillRect(x - 1.5, y - s * 0.7, 3, s * 0.7); c.fillRect(x - 3, y - s * 0.5, 6, 1.5); }
+  else { c.fillStyle = col; c.beginPath(); c.arc(x, y, s * 0.4, 0, 7); c.fill(); }
+}
+// Karte Scheibe 1 (02.10.2026): Ortskarte als Bild-Panel statt reinem Text — dasselbe Symbol wie auf der Weltkarte,
+// auf ein eigenes kleines Canvas im mapPick-Panel (ui.js) gezeichnet. Kein neuer Zeichenstil, keine doppelte Pflege.
+export function drawLocIcon(cv, l) {
+  const c = cv.getContext('2d'), w = cv.width = cv.clientWidth || 56, h = cv.height = cv.clientHeight || 56;
+  c.clearRect(0, 0, w, h);
+  c.fillStyle = '#1a1510'; c.fillRect(0, 0, w, h);
+  const col = FACCOL[l.faction] || '#8a7448';
+  c.strokeStyle = col; c.lineWidth = 2; c.strokeRect(1, 1, w - 2, h - 2);
+  locIcon(c, l, w / 2, h * 0.62, Math.min(w, h) * 0.3);
+}
 // Debug-Karte (MP2 §71): alle Lebenden und Ziele — Gegner rot, Bosse groß, wichtige NPCs gold, Verteidigungsmeister blau,
 // Karawanen weiß, Auftragsziele gelb, Heere (Feldzug) schwarz-rot, Spieler grün. Unabhängig vom Nebel.
 function debugMarks(c, SX, SY, sc, w, h) {
@@ -132,8 +158,13 @@ export function drawAtlas(cv, zoom, extra = { place: () => true }) {   // S15 Fe
       const b = bloc(B.reg[((y + dy) >> 2) * B.RW + ((x + dx) >> 2)]); if (a === b || a === 'mtn' || b === 'mtn') continue;
       if (m.tiles[y * m.w + x] === T.WATER || m.tiles[(y + dy) * m.w + x + dx] === T.WATER) continue;   // keine Grenze übers Wasser
       const u = a === 'undead' || b === 'undead', au = a === 'aurel' || b === 'aurel';
-      c.strokeStyle = u ? 'rgba(224,60,48,.55)' : au ? 'rgba(236,210,140,.5)' : 'rgba(230,180,80,.5)'; c.beginPath();
-      if (dx) { c.moveTo(SX(x + g), SY(y)); c.lineTo(SX(x + g), SY(y + g)); } else { c.moveTo(SX(x), SY(y + g)); c.lineTo(SX(x + g), SY(y + g)); } c.stroke(); }
+      const p0 = dx ? [SX(x + g), SY(y)] : [SX(x), SY(y + g)], p1 = [SX(x + g), SY(y + g)];
+      // Entscheidung 02.10. (Nachmittag): Fraktionsgrenzen dezent einfärben — ein breiter, blasser Schein unter der
+      // bestehenden scharfen Linie, keine volle Gebietsfüllung (bliebe sonst wie eine moderne Territoriumskarte).
+      c.lineWidth = Math.max(5, sc * 7); c.strokeStyle = u ? 'rgba(224,60,48,.09)' : au ? 'rgba(236,210,140,.08)' : 'rgba(230,180,80,.08)';
+      c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke();
+      c.lineWidth = Math.max(1.5, sc * 2.2); c.strokeStyle = u ? 'rgba(224,60,48,.55)' : au ? 'rgba(236,210,140,.5)' : 'rgba(230,180,80,.5)';
+      c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke(); }
   }
   // Gipfel und Wälder (Raster, versetzt; Größe folgt dem Maßstab)
   const step = Math.max(4, Math.round(10 / Math.max(0.5, sc)));
@@ -149,20 +180,10 @@ export function drawAtlas(cv, zoom, extra = { place: () => true }) {   // S15 Fe
   // Orte
   const seen = S.flags.seen || {};
   for (const l of LOCATIONS) {
-    const x = SX(l.x), y = SY(l.y), k = seen[l.key], s = Math.max(4, Math.min(12, 5 * sc + 3)), col = FACCOL[l.faction] || '#e8d070';
+    const x = SX(l.x), y = SY(l.y), k = seen[l.key], s = Math.max(4, Math.min(12, 5 * sc + 3));
     if (x < -40 || y < -40 || x > w + 40 || y > h + 40) continue;
     if (l.poi && zoom < 2) continue;                                           // Weltansicht: keine Symbolflut (Nutzer)
-    if (l.kind === 'city') castle(c, x, y, s * (l.faction === 'chain' || l.faction === 'undead' ? 1.2 : 1), l.faction === 'chain' || l.faction === 'undead', col);
-    else if (l.kind === 'village') hamlet(c, x, y, s * 0.9, l.tribute ? '#4a3a2a' : l.faction === 'order' ? '#3e4a5e' : '#8a3a2a');
-    else if (l.kind === 'ruin') ruin(c, x, y, s * 0.8, l.faction === 'undead');
-    else if (l.kind === 'dungeon') { c.fillStyle = '#1a1614'; c.beginPath(); c.arc(x, y, s * 0.5, Math.PI, 0); c.lineTo(x + s * 0.5, y + s * 0.2); c.lineTo(x - s * 0.5, y + s * 0.2); c.fill(); }
-    else if (l.kind === 'camp') { c.fillStyle = l.faction === 'goblin' ? '#6a7a3a' : l.faction === 'bandit' ? '#8a2a1a' : '#7a5a3a'; c.beginPath(); c.moveTo(x - s * 0.5, y + s * 0.3); c.lineTo(x, y - s * 0.5); c.lineTo(x + s * 0.5, y + s * 0.3); c.fill();
-      if (l.poi === 'bandits') { c.strokeStyle = '#e0c080'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 3, y - 6); c.lineTo(x + 3, y); c.moveTo(x + 3, y - 6); c.lineTo(x - 3, y); c.stroke(); } }
-    else if (l.kind === 'farm') hamlet(c, x, y, s * 0.55, '#7a5a30');
-    else if (l.kind === 'tower') { c.fillStyle = '#4a4440'; c.fillRect(x - s * 0.18, y - s * 0.9, s * 0.36, s * 0.9); c.fillRect(x - s * 0.28, y - s * 1.05, s * 0.56, s * 0.2); c.strokeStyle = '#0c0a08'; c.lineWidth = 1; c.strokeRect(x - s * 0.18, y - s * 0.9, s * 0.36, s * 0.9); }
-    else if (l.kind === 'mine') { c.strokeStyle = '#c8b890'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 4, y - 4); c.lineTo(x + 4, y + 4); c.moveTo(x + 4, y - 4); c.lineTo(x - 4, y + 4); c.stroke(); c.fillStyle = '#1a1614'; c.fillRect(x - 2, y + 2, 4, 3); }
-    else if (l.kind === 'wreck') { c.strokeStyle = '#6a4a2a'; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 1, s * 0.45, 0.2, Math.PI - 0.2); c.stroke(); c.fillStyle = '#6a4a2a'; c.fillRect(x - 0.5, y - s * 0.7, 1.5, s * 0.6); }
-    else if (l.kind === 'shrine') { c.fillStyle = l.faction === 'undead' ? '#5a2a2a' : '#8a8478'; c.fillRect(x - 1.5, y - s * 0.7, 3, s * 0.7); c.fillRect(x - 3, y - s * 0.5, 6, 1.5); }
+    locIcon(c, l, x, y, s);
   }
   // Nebel: weiche Kante (kleine Maske, geglättet hochskaliert) — im Debug „ganze Welt“ aus, dafür alle Lebenden als Punkte
   if (S.dbg?.reveal) debugMarks(c, SX, SY, sc, w, h);

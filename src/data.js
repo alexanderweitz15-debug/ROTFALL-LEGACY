@@ -432,18 +432,22 @@ export const LOOT = {
   boar:      [['dried_meat',0.8],['pelt',0.3]],
   goblin:    [['bone',0.4],['rusty_sword',0.12],['schrottklinge',0.05],['bread',0.3],['iron',0.2],['bandage',0.15]],
   goblin_warrior:[['schleuder',0.12],['schrottkeule',0.1],['wurfbeil',0.06],['iron',0.5],['axe',0.2],['leather_cap',0.15],['spear',0.12]],
-  bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35],['maskenkapuze',0.03],['wanderkapuze',0.06]],
+  bandit:    [['elixier_wut',0.03],['lederhandschuhe',0.06],['lederbeinlinge',0.05],['talisman_leichtfuss',0.02],['wurfmesser',0.08],['kriegssichel',0.05],['grabraeuber',0.12],['rabenbeil',0.06],['pluendererharnisch',0.06],['rusty_sword',0.2],['leather_jerkin',0.15],['bread',0.4],['dagger',0.2],['bandage',0.35],['maskenkapuze',0.03],['wanderkapuze',0.06],['rabenmantel',0.03],['baerenfell',0.015],['rabenfuerst',0.0015]],
   bandit_archer:[['shortbow',0.25],['leather_cap',0.2],['dried_meat',0.3]],
   bounty_hunter:[['dornensaebel',0.15],['grenzlaeufer',0.1],['bandage',0.6],['potion',0.3],['chain_hauberk',0.12],['crossbow',0.08]],
-  chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5],['kettenhaube',0.08]],
+  chain_brute:[['brigandine',0.2],['eisenwache',0.2],['kettle_hat',0.3],['flail',0.1],['henkersaxt',0.06],['kettenbrecher',0.04],['aufsehermantel',0.1],['bandage',0.5],['kettenhaube',0.08],['henkerskapuze',0.05]],
   rotgardist:[['rotgardist',0.2],['rotgardistenhelm',0.25],['rotklaue',0.12],['schwarzzahn',0.04],['mauerbrecher',0.03],['potion',0.4]],
   kettenschuetze:[['crossbow',0.2],['eisenwache',0.15],['eisenfalke',0.05],['bergmannshelm',0.2],['bandage',0.4]],
   automat:[['messingpistole',0.03],['automatenkern',0.8],['schrottarm',0.06],['schrottbein',0.06],['iron',0.6]],
-  sea_raider:[['entermesser',0.18],['seemantel',0.08],['dried_meat',0.3],['potion',0.15],['oelzeugumhang',0.06]], sea_harpooner:[['harpune',0.15],['dreispitz',0.05],['potion',0.15]],
+  sea_raider:[['entermesser',0.18],['seemantel',0.08],['dried_meat',0.3],['potion',0.15],['oelzeugumhang',0.06],['teermantel',0.08]], sea_harpooner:[['harpune',0.15],['dreispitz',0.05],['potion',0.15]],
   whitebeard:[['sturmanker',1],['seekarte',1],['dreispitz',1],['potion',1],['potion',1]],
   chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['blutkette',0.5],['blutkettenhelm',0.5],['potion',1]],
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
-  skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05]],
+  skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05],['knochenumhang',0.02]],
+  skel_bomb: [['bone',0.6],['grave_seal',0.04]], skel_brute:[['bone',1],['bone',0.6],['legionaersplatte',0.08],['iron',0.3],['grave_seal',0.08]],   /* Entwickler 02.10.: vorläufig, aus dem Skelett abgeleitet */
+  waechterspinne:[['iron',0.4],['automatenkern',0.1]], dampframme:[['automatenkern',0.6],['iron',0.8],['iron',0.4],['schrottbein',0.04]],   /* Entwickler 02.10.: vorläufig, aus dem Automaten abgeleitet */
+  blutschoepfer:[['blutphiole',0.5],['dagger',0.08]], netzwerferin:[['dried_meat',0.3],['potion',0.15],['seemantel',0.05]], hofspion:[['dagger',0.2],['potion',0.2]],
+  mutant:    [['bone',0.3],['bandage',0.15],['fetzenmantel',0.03]], mutant_brute:[['bone',0.5],['dried_meat',0.15],['bandage',0.2],['fetzenmantel',0.05]],
   dodon:     [['potion',1],['potion',1],['talisman_waechter',0.5]],
   gorak:     [['gorak_cleaver',1],['iron',1],['iron',1],['potion',0.6]],
   crypt_warden:[['kettenbeinlinge',0.15],['talisman_waechter',0.08],['knochenspalter',0.3],['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
@@ -453,7 +457,7 @@ export const LOOT = {
   thrall:     [['bread',0.2],['bandage',0.2]],
   chalice_guard: [['blutphiole',0.6],['kite_shield',0.1],['chain_hauberk',0.06]],
   blood_cultist: [['blutmaske',1],['blutphiole',0.3],['dagger',0.15],['maskenkapuze',0.05]],
-  cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1],['fetzenmantel',0.08]],
+  cultist:   [['soul_vial',0.25],['bandage',0.3],['staff',0.08],['wand',0.05],['traveler_cloak',0.1],['fetzenmantel',0.08],['widderkapuze',0.04]],
   ghoul:     [['bone',0.6],['dried_meat',0.15],['fetzenmantel',0.04]],
   wraith:    [['seelenhaken',0.05],['soul_vial',0.4],['grave_seal',0.08],['grabtuchmantel',0.02]],
   bear:      [['pelt',1],['pelt',0.5],['dried_meat',1],['bone',0.4]],
@@ -473,8 +477,8 @@ export const LOOT = {
 // Waffen und Rüstung aus LOOT[boss] zählen bei Bossen nicht mehr einzeln, alles andere (Tränke, Schlüssel, Karten) schon.
 export const BOSS_LOOT = {
   aldhelm:      { weapons:['kanzlerdegen'], armor:['kanzlerrobe'], unique:['kanzlerdegen'] },   /* §5g.2 */
-  whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel'], unique:['sturmanker'] },
-  chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen'], unique:['roter_henker'] },
+  whitebeard:   { weapons:['sturmanker', 'entermesser', 'harpune'], armor:['dreispitz', 'seemantel', 'kapitaensrock'], unique:['sturmanker'] },
+  chain_master: { weapons:['roter_henker', 'chain_whip', 'kettenbrecher'], armor:['eisenfuerst', 'eisenfuersthelm', 'blutkette', 'blutkettenhelm', 'blut_handschuhe', 'blut_beinschienen', 'kettenumhang'], unique:['roter_henker'] },
   gorak:        { weapons:['gorak_cleaver', 'mauerbrecher'], armor:['grubenkoenig', 'schrotthelm'], unique:['gorak_cleaver'] },
   hrodvar:      { weapons:['nachtfrost', 'knochenspalter'], armor:['plate_cuirass', 'iron_helm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], unique:['nachtfrost'] },
   garmadon:     { weapons:['garmadons_reue', 'knochenspalter', 'totenglocke'], armor:['totenkrone', 'schaedelhelm', 'toten_handschuhe', 'toten_beinschienen'], unique:['garmadons_reue'] },
@@ -510,6 +514,37 @@ export const MONSTERS = {
   chain_master:{ name:'Varg, Kettenmeister', hp:260, dmg:18, speed:1.25, reach:70, atk:1300, telegraph:520, xp:320, sight:300, r:14, boss:true, threat:4, faction:'chain', interiors:true,   // S11 Endgame
                pal:{skin:'#a88a6a',cloth:'#141210',metal:'#8a8278'} },
   skeleton:  { name:'Untoter Krieger', hp:44, dmg:10, speed:1.15, reach:32, atk:1000, telegraph:380, xp:28, sight:240, r:11, threat:2, faction:'undead', interiors:true, role:'Nahkampf', pal:{skin:'#cfc8b4',cloth:'#22252a',metal:'#3f4b46',glow:'#4e8f7a'} },
+  /* Entwickler 02.10. (Neue Gegner): Abarten des Skeletts. abart = { of: Grundart, p: Anteil an deren Spawns } — erscheinen überall, wo die
+     Grundart aus Spawngebieten und Gewölben kommt, und zählen für Aufträge der Grundart. Werte vorläufig (ROTFALL_STATE/visual/gegner_neu.md). */
+  skel_bomb: { name:'Bomben-Skelett', heavy:{ kind:'blast', every:1, wind:900, mul:1.6, r:72 }, abart:{ of:'skeleton', p:0.08 }, hp:36, dmg:12, speed:1.55, reach:28, atk:1000, xp:24, sight:260, r:10, threat:2, faction:'undead', interiors:true, role:'Brecher',
+               lore:'Im Brustkorb glimmt Grabglut. Läuft auf dich zu und zündet — rote Fläche am Boden: raus oder rollen. Die Explosion trifft jeden, auch die Toten neben ihm. Wer es vorher erschlägt, löscht die Glut.',
+               pal:{skin:'#c8bca0',cloth:'#2a1e18',metal:'#4a3a2c',glow:'#ff8a2a'} },
+  skel_brute:{ name:'Großes Skelett', heavy:{ kind:'slam', every:2, wind:800, mul:1.8, r:85 }, abart:{ of:'skeleton', p:0.06 }, hp:130, dmg:15, speed:0.85, reach:44, atk:1400, telegraph:500, xp:75, sight:250, r:14, threat:3, faction:'undead', interiors:true, role:'Brecher', scale:1.38,
+               lore:'Die Knochen eines Riesen, zusammengehalten von altem Eisen. Langsam, aber jeder zweite Hieb ist ein Erdschlag: nicht blockbar, wirft dich zurück. Rot am Boden heißt rollen.',
+               pal:{skin:'#d0c6ac',cloth:'#1e2024',metal:'#4a4640',glow:'#6fb04a'} },
+  /* Entwickler 02.10. (Top 5 aus ROTFALL_STATE/visual/gegner_ideen.md, Entscheidungen DECISIONS.md): Werte vorläufig, aus BALANCE_GUIDE §4 abgeleitet */
+  waechterspinne:{ name:'Wächterspinne', hp:24, dmg:6, speed:1.8, reach:24, atk:600, xp:12, sight:220, r:9, threat:1, faction:'aurel', interiors:true, role:'Hetzer',
+               lore:'Ein Messingkörper auf acht dünnen Beinen. Hängt reglos an den Wänden der Werkstätten und Werkhallen Aurelions, bis jemand nahe kommt — dann fällt sie herab und sticht schnell und oft. Zerbricht sie, fliegen Splitter: nicht daneben stehen.',
+               pal:{body:'#8a7040',dark:'#3a3026',eye:'#ff9a3a'} },
+  dampframme:{ name:'Dampframme', heavy:{ kind:'charge', ram:1, every:1, wind:1200, mul:1.8, r:180 }, abart:{ of:'automat', p:0.2 }, hp:150, dmg:15, speed:0.8, reach:40, atk:1500, telegraph:600, xp:80, sight:280, r:15, threat:3, faction:'aurel', interiors:true, scale:1.3,
+               lore:'Ein Kessel auf Beinen mit einem Rammschild davor. Lange rote Linie am Boden heißt: gleich kommt sie geradeaus — nicht blockbar, zur Seite rollen. Was im Weg steht, Fass, Kiste, Zaun, geht zu Bruch. Danach muss sie erst wenden: jetzt zuschlagen.',
+               pal:{skin:'#8a8272',cloth:'#3a3530',metal:'#7a6038'} },
+  blutschoepfer:{ name:'Blutschöpfer', hp:40, dmg:9, speed:1.3, reach:30, atk:1000, xp:30, sight:280, r:11, threat:2, faction:'blut', interiors:true, role:'Heiler',
+               lore:'Ein Kultist mit Schöpfkelle und Phiolengürtel. Er kämpft kaum — er sucht, wer am Boden liegt, und trinkt. Das Blut heilt ihn und jeden Kultisten um ihn. Wer fällt, muss schnell wieder hoch oder geschützt werden.',
+               pal:{skin:'#d0bcb0',cloth:'#3a1014',metal:'#7a2228',glow:'#c0303a'} },
+  netzwerferin:{ name:'Netzwerferin', hp:42, dmg:9, speed:1.35, reach:240, atk:2600, ranged:true, missile:'net', xp:30, sight:320, r:11, threat:2, faction:'pirate', interiors:true, role:'Fernkampf',
+               lore:'Sturmklinge mit schwerem Wurfnetz. Wen es trifft, der hängt drei Sekunden fest, während die Plünderer kommen; Große und Anführer taumeln nur. Netze fliegen langsam: ausweichen oder hinter Deckung.',
+               pal:{skin:'#a8805e',cloth:'#2c3a44',metal:'#7a7466'} },
+  hofspion:  { name:'Hofspion', hp:44, dmg:11, speed:1.5, reach:30, atk:900, xp:34, sight:320, r:11, threat:2, faction:'aurel', interiors:true, role:'Meuchler',
+               lore:'Sieht aus wie ein Diener des Hofes auf der Himmelsinsel. Bricht jemand dort die Regeln, fällt die Maske: Diebstahl ruft einen, Gewalt zwei, Mord drei. Sie gehen dir in den Rücken — der erste Stich von hinten trifft dreifach. Dreh dich um.',
+               pal:{skin:'#d8b89a',cloth:'#c8b888',metal:'#8a7a50'} },
+  /* Entwickler 02.10.: Mutierte Menschen am Totenland-Rand — der Fluch verdirbt die Lebenden. Fraktion wie der Kultist der Asche (lebend, aber den Toten verfallen). */
+  mutant:    { name:'Verdorbener', armor:0, hp:44, dmg:11, speed:1.6, reach:36, atk:850, xp:26, sight:270, r:11, threat:2, faction:'undead', interiors:true, role:'Hetzer',
+               lore:'Ein Mensch vom Rand des Totenlands, vom Fluch zerfressen: Wucherungen, zu lange Arme, kein Verstand mehr. Schnell und ohne Rüstung — er stirbt leicht, aber er kommt nie allein.',
+               pal:{skin:'#b8a888',cloth:'#3a3228',metal:'#4a4238',glow:'#c8d050'} },
+  mutant_brute:{ name:'Wucherer', armor:1, hp:95, dmg:14, speed:1.35, reach:42, atk:1300, telegraph:420, xp:55, sight:260, r:13, threat:3, faction:'undead', interiors:true, role:'Brecher', scale:1.18,
+               lore:'Was aus einem Holzfäller wird, wenn der Fluch nicht aufhört: Fleisch über Fleisch, ein Arm bis zum Knie. Holt weit aus — gut zu sehen, schwer zu überleben.',
+               pal:{skin:'#a89880',cloth:'#2e2820',metal:'#4a4238',glow:'#c8d050'} },
   crypt_warden:{ name:'Wächter der Nekropole', hp:150, dmg:15, speed:1.1, reach:40, atk:1300, telegraph:520, xp:90, sight:260, r:13, threat:3, faction:'undead', interiors:true, role:'Schildwall',
                pal:{skin:'#d8d0ba',cloth:'#1c1f24',metal:'#4a4f55',glow:'#7fd0b8'} },
   death_captain:{ name:'Hauptmann der Toten', heavy:{ kind:'slam', every:3, wind:750, mul:1.9, r:75 }, hp:170, dmg:16, speed:1.1, reach:42, atk:1250, telegraph:500, xp:110, sight:280, r:13, threat:3, faction:'undead', interiors:true, role:'Elite',   // §81: führt die letzte Befreiungswelle
@@ -1044,7 +1079,7 @@ export const NPCS = [
     greet:'„Nichts anfassen. Das Grüne da ist Heilung. Das Grüne dort ist das Gegenteil.“', teaches:['alchemist'] },
   { key:'sael', name:'Sael', prof:'Totenschreiber', faction:'undead', age:0, home:'vharnholm', undead:true,
     traits:['geduldig','genau'], attrs:{intelligence:14}, cls:'wanderer', recruit:false, shop:true, town:'vharnholm',
-    pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak'],
+    pool:['soul_vial','soul_vial','bone','bandage','herb','dried_meat','chain_hauberk','staff','wand','dagger','traveler_cloak','ordenskutte'],
     greet:'„Vharnholm schreibt jeden Namen auf, der durch das Tor kommt. Deinen auch.“' },
   // S15 (Nutzer: „mehr NPCs auf der Welt, die einen z. B. zum Krieger ausbilden“): Lehrer in den Städten außerhalb von Eren.
   // atTown: steht am Platz dieser Stadt (Weltkoordinaten), off: Versatz in Kacheln. Gleiche Regel wie überall: erst Beziehung 20.

@@ -1,39 +1,28 @@
-# STATE — ROTFALL (01.10.2026, abends)
+# STATE — ROTFALL (02.10.2026, 16:40)
 
-Zuerst lesen. Team und Projektfakten: `TEAM.md`. Kurz halten (unter 100 Zeilen).
+Zuerst lesen. Kurz halten (unter 100 Zeilen). **Alles Offene steht in `OFFEN.md`.** Regeln: `GATE.md` (vor jedem Feature), `VISUAL.md`, `COMBAT_ANIM.md`, Entscheidungen in `DECISIONS.md`.
 
 ## Stand
-- Version 23 (`?v=23`). Selbsttest 357/357 bei Commit `7d3a384`. Git: `--git-dir=../_rf_backup.git --work-tree=.`.
-- Der öffentliche `main` bekommt nur Commits mit [VERIFIED]. Letzter Push auf `main` liegt vor dem Audit.
+- Version 24 (`?v=24`, coop `VER = 24`). Git: `GIT_DIR=../_rf_backup.git GIT_WORK_TREE=.`.
+- main (öffentliche Seite) = `d7199bb`, live geprüft. Selbsttest dort 395/395.
+- Letzter Backup-Commit `20f6ad5` (Kampfanimation Scheibe 2, laut Agent 395/395).
+- Regel für main: ganzer Arbeitsbaum committet, keine halben Agenten-Stände, committeten Stand separat laden + Selbsttest, nach Push live prüfen.
 
-## Fertig (VERIFIED)
-- Audit T01–T04, T06, T08; Blutkult S1; T17 Regiebuch S1+S2; Control-2-Fixes.
-- RB-001…006, 008, 009, 013–015, 017–020, 022, 024–027, 029, 030, 032, 038, 039, 041, 043–056.
-- (Verifier 02.10.) Varonheim-Umbau S2 (Burg begehbar), S3 (Burgfrieden), S4 (Schmuggel, Kern), S5 (Start, Jäger live, Rest per Code), Stadt ohne Schutz S2a.
-- Feinde unter sich (FOE_FAC), Königstod, Stadt ohne Schutz S1, Kampf-Ideen (Scout R4), Lebendige Hauptstadt (Scout R5), Varonheim S1 (Kronfels).
+## Heute gebaut (02.10.)
+- Dialoge (Story-Fenster, Tippeffekt, Antwortzeichen, Emotes, Gesprächshaltung, Blase bei Wut/Angst).
+- Kampf-Feedback (schwere Angriffe nicht blockbar außer Gegenstrom, Pixel-Schadenszahlen, Ziel-Lebensbalken, Status am Körper).
+- Items/Inventar/Läden (Item-Karten, Bodenbeute, Papierpuppe, Handels-Dock, Rückfrage ab Selten).
+- PERF-U3 (Spitzen: Spec-Cache, Vorbacken, cycProps).
+- Kampfanimation Scheibe 1+2 (Schaden im Einschlag, Combo, takt-neutrales Abbrechen, Test Room `__arena`, 5 Waffen × Pack A/B/C).
+- Debug-GUI; Stil bleibt immer R.
 
-## Gebaut, ungeprüft
-- Stadt ohne Schutz S2b (Übernahme), Blutkult-Sense, UI-Scheibe 2 (Baumodus), Artist R6/R7 (nur teilweise gesehen).
-- Artist R5 (Viertel-Architektur, neue Props: market_stall, fountain_grand, street_lamp, banner_pole, barrel_stack, cargo_pile, grave_cross, tomb — noch nicht platziert), Artist R6 (Figurenvielfalt).
-- Fixes: Karawanen-Wegpunkt geklemmt, WEAR_BIAS für Burg, BTYPES der Burgbauten.
-- T05, Blutkult S2–5, T09, T10, Belagerung S1/S2 (Teile verifiziert).
+## Laufende Agenten (16:40)
+- Kampfanimation: schwerer Hieb per Halten, Seitschritt aufs Ausholen, §17-Rest.
+- Gegner: Varianten, Bomben-/Groß-Skelett, Mutanten, dann Top 5 aus `visual/gegner_ideen.md`.
+- UI-Menüs: Meldungsfluss, Quests Q-1..Q-4, Pergament, Docks.
+- Skilltree + Karte (Sonnet).
 
-## In Arbeit
-- Verifier: RB-059 (Bedrohung fällt zu früh, Tag 81 statt ~129) mit voller Tageskette neu messen; RB-060 (flaky Eisenfeste-Probe).
-- Artist R7: Umgebungsanimationen (render.js).
-- Scout R9: Mittelspiel-Ziele.
-- Hauptsitzung: nächste Bauscheiben (s. u.).
-
-## Nächste Bauscheiben (vom Entwickler freigegeben)
-1. Stadt ohne Wachen S2 (PROPOSALS/stadt_ohne_wachen_s2.md; Fristen je Schritt).
-2. Emergente Quests E2 → E1 → E4 → E3 (PROPOSALS/emergente_quests.md).
-3. Siedlung M1–M4 (siedlung_ausbau.md; Siedlung nie übernommen).
-4. Backlog: T15 Messing + Feldreparatur, T11/A14 Hunger, T12 Straßen, T23, NPC-Ziele, Luftbrücke/Verwundete, Belagerung S3, Regiebuch S3/4, UI-Scheiben 2–5, T20-Rest, RB-028/010/012/033/053.
-
-## Offen beim Entwickler
-- Geheime Orte (PROPOSALS/geheime_orte.md): 3 Fragen.
-- Scout R8 (erste Spielstunde): Auswahl offen (Kodex- und Talenthinweis schon in S5 gebaut).
-- RB-033 (Schaden über Zeit ~60 %): Systementscheid.
-
-## Archiv
-- `ROTFALL_AGENT_STATE/` (altes 12-Rollen-System). Audit: `docs/audit/`.
+## Nächstes für den Lead
+- Ergebnisse prüfen, Selbsttest, committen.
+- Wenn alle fertig sind: ganzer Stand auf main (Regel oben).
+- Danach NPC-Visuals (P3) und die Punkte aus OFFEN.md mit [B].
