@@ -132,3 +132,12 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
 - Neuer Grundsatzauftrag: ROTFALL_STATE/VISUAL.md (weg vom Text; 10 Varianten je Element; Priorität Dialoge → Quests → NPC → Kampf → Items → Inventar → Shops → Skilltree → Karte → Städte → Welt → UI → Animationen).
 - Neue Arbeitsregel: ROTFALL_STATE/GATE.md (Feature Readiness Gate) — gilt für alle Features und Agenten: erst Analyse + Impact Report + offene Entscheidungen, keine erfundenen Regeln/Zahlen.
 - Werkzeuge: Sperre bleibt (kein SpriteCook, keine bezahlten Bildgeneratoren, kein pixel-plugin, kein Aseprite).
+
+## 02.10.2026 — Kampfanimation (Entscheidungen zu visual/kampfanimation.md)
+- Packs A/B/C ändern NUR die Optik (Verteilung im gleichen Takt); schnelleres Tempo für C höchstens später als eigener, gemessener Endgame-Effekt.
+- Schaden fällt künftig im sichtbaren Einschlag (Takt bleibt gleich), danach Balance-Nachmessung der 5 Testwaffen mit simFight.
+- Kombo: 3 Schläge + Finisher; der in MECHANIKEN beschriebene 15 % längere Wuchtschlag wird wirklich eingebaut; in A drei Schläge, in B/C vierter als Finisher-Animation; Erholung ab Treffer + 40 % abbrechbar.
+- Gegner: neue Bewegungen ja, fest Pack A; Waffengewicht der Gegner erst in eigener Balance-Runde.
+- Pack nur im Test Room (Debug) wählbar, danach legt der Entwickler den finalen Stil fest.
+- Koop: Schadenszeitpunkte nach Pack des Hosts, Optik lokal, Kombo-Schritt an Gäste übertragen.
+- Zusätzlich: Debug-Menü wird unübersichtlich → richtiges aufklappbares Debug-GUI.

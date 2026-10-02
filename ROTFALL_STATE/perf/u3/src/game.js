@@ -2474,7 +2474,7 @@ let hudHalf = true;                                                /* PERF-S: si
 const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
 function update(dt, now) {
   if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
-  const p = S.player;
+  const p = S.player; __PF.s();
   coopHooks.hostTick?.(dt);
   if (S.cine?.pause) { cineTick(dt); updateFx(dt); camStep(p, dt); return; }   /* T17 (Nutzer): Boss-Auftritt — die Welt steht, Bild und Szene laufen */
   // Zeit
@@ -2493,6 +2493,7 @@ function update(dt, now) {
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
+ __PF.m('u_pre');
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
@@ -2505,13 +2506,14 @@ function update(dt, now) {
   }
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
   const hour = Math.floor(S.minute / 60);
-  if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
-  if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
-  festTick(); roadTick(dt);
+  __PF.m('u_clock'); if (hour !== lastHour) { lastHour = hour; hourTick(hour); }  __PF.m('u_hour');
+  if (S.day !== lastDay) { lastDay = S.day; dayTick(); } __PF.m('u_day');
+  festTick(); __PF.m('u_fest'); roadTick(dt); __PF.m('u_road');
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
   // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
   const A = actorsOf(S.map, now), TT = A.list.length > TIER_MIN ? tierOf(A, now) : null;   /* PERF-U: Stufenplan (siehe tierOf) */
+ __PF.m('u_actors_tier');
   combat = (TT ? TT.pool : A.list).filter(e => e.alive && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
   const WC = S.map === 'world' ? null : worldCars(now), escOf = c => ((S.map === 'world' ? TT?.esc : WC.esc)?.get(c.id) || (TT || WC ? [] : escortsOf(c))).filter(e => e.kind === 'npc' && e.alive && e.escort === c.id);   /* PERF-U: Wachen aus dem Stufenplan statt Suche je Bild */
   for (const c of (S.map === 'world' ? A.cars : WC.cars)) if (c.kind === 'caravan' && c.alive) {
@@ -2526,13 +2528,13 @@ function update(dt, now) {
       e.anchor = { x: q.x, y: q.y }; e.vx = e.vy = 0; e.wander = null; e.threatId = null;
     }
   }
-  if (p.alive) controlPlayer(dt);
+ __PF.m('u_combat_cars'); if (p.alive) controlPlayer(dt); __PF.m('u_control');
   { const A2 = actorsOf(S.map, now);   /* BUG-108: nur Handelnde, nicht 14 000 Props; PERF-U: auf großen Karten nur hot je Bild, cold gestaffelt */
-    if (A2.list.length > TIER_MIN) { const T2 = tierOf(A2, now); for (const e of T2.hot) think(e, dt);
+    if (A2.list.length > TIER_MIN) { const T2 = tierOf(A2, now); for (const e of T2.hot) { const __a = performance.now(); think(e, dt); const __d = performance.now() - __a; if (__d > __PF.tmax) { __PF.tmax = __d; __PF.twho = e; } }
       for (let j = T2.ph % MID_K; j < T2.mid.length; j += MID_K) think(T2.mid[j], dt * MID_K, true);
       for (let j = T2.ph % COLD_K; j < T2.cold.length; j += COLD_K) think(T2.cold[j], dt * COLD_K, true); T2.ph = (T2.ph + 1) % (COLD_K * MID_K); }
     else for (const e of [...A2.list]) think(e, dt); }
-  separate();                                                     // S12: niemand steht im anderen
+  __PF.m('u_think'); separate(); __PF.m('u_separate');
   if (S.rising && S.rising.length) {                              // Wiedergänger: Zucken als Ansage, nach 6 Spielminuten steht er auf
     const now = clock();
     for (let i = S.rising.length - 1; i >= 0; i--) { const r = S.rising[i];
@@ -2547,10 +2549,10 @@ function update(dt, now) {
   }
   pursuitT = (pursuitT || 0) + dt;
   if (pursuitT > 250) { pursuitT = 0; arrivingPursuers(); }
-  updateProjectiles(dt);
-  updateFx(dt);
-  updateBuildings(dt);
-  camStep(p, dt);
+  __PF.m('u_rise_pursuit'); updateProjectiles(dt); __PF.m('u_proj');
+  updateFx(dt); __PF.m('u_fx');
+  updateBuildings(dt); __PF.m('u_bld');
+  camStep(p, dt); __PF.m('u_cam');
 
   // Platzieren
   if (placing) {
@@ -2559,36 +2561,37 @@ function update(dt, now) {
     placing.ghost.blocked = !canPlace(placing.ghost);
   }
 
-  drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
+  __PF.m('u_place'); drawMini(dt); __PF.m('u_mini'); reactTick(dt); __PF.m('u_react'); ambientTick(dt); __PF.m('u_ambientTick'); sceneTick(); __PF.m('u_scene');
   hudTimer += dt;
-  if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
+  if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); __PF.m('u_refreshHUD'); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
   if (hudTimer > 180) {
     hudHalf = true;
     const gone = e => e && (!e.alive || e.map !== S.map || byId(e.id) !== e || dist(e, S.player) > 900);   /* PERF-U2: byId statt includes() über ~17 000 Einträge */   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
-    hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
+    hudTimer = 0; __PF.m('u_hud0'); UI.renderContext(selected || hovered); __PF.m('u_renderContext'); updatePrompt(); __PF.m('u_prompt');
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
-    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
-    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
+   __PF.m('u_track'); if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
+   __PF.m('u_reveal'); if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
     else if (tribT === 360) { myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); }
     else if (tribT === 720) { conTick(); jailTick(); }
+  __PF.m('u_sec' + tribT);
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }
     if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
     if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
   }
-  ambT = (ambT || 0) + dt;
+  __PF.m('u_hudrest'); ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
     ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright);
   }
-  respawnTimer += dt;
+  __PF.m('u_ambsound'); respawnTimer += dt;
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
   simTimer += dt;
   if (simTimer > 4000) { simTimer = 0; questCheck(); if (S.map === 'world' && !S._frozenWar) SIM.battleCheck(); }   // _frozenWar: Selbsttest-Proben
   travelTimer += dt;
-  if (travelTimer > 6000) { travelTimer = 0; travelTick(); }
+  if (travelTimer > 6000) { travelTimer = 0; travelTick(); } __PF.m('u_tail');
 }
 
 // Eine Entität einen Schritt denken lassen. Einziger Einstieg in die KI: wer am Boden liegt oder tot ist, entscheidet nichts.
@@ -15938,58 +15941,7 @@ function debugSections() {
     ['Test', '', { 'Laden prüfen': () => { const r = loadProbe(); UI.toast(r.ok ? `LADEN OK (${Math.round(r.bytes / 1024)} KB)` : 'LADEN: ' + r.diff.join(' · '), 5000); log(`Ladeprobe: ${r.ok ? 'gleich' : r.diff.join('; ')}`, 'world'); }, 'Selbsttest': () => { const r = selftest(); log(`Selbsttest: ${r.filter(x => x.startsWith('PASS')).length}/${r.length}`, 'world'); }, 'Spieler töten': () => { p.body.torso.hp = 0; B.syncHp(p); downed(p, 'Debug'); p.downTimer = 1; } }],
   ];
 }
-// Debug-GUI (Entwickler 02.10.2026: „das wird immer unübersichtlicher — mach ein richtiges GUI, das sich öffnet“): Fenster mit
-// Suche über alle Einträge, Gruppen links, Abschnitte als Karten mit Knopf-Kacheln, „Zuletzt benutzt“. Datenquelle bleibt debugSections().
-const DBG_GROUPS = [['Welt & Reisen', /Bewegung|^Welt|Kerker|Turm|Luftschiff|Kamera|Eisenfeste/], ['Spieler & Ausrüstung', /Spieler|Gegenstände|Bionik|Kampf|Magie/],
-  ['Blutkult & Varonheim', /Blutkult|Varonheim/], ['Ereignisse & Aufträge', /Ereignisse|Folgen|Krieg|Aufträge|Ahnen|Gefangene|Läden/],
-  ['Darstellung & Regie', /Grafik|Animation|Regie|Klang/], ['Spielstand & Test', /Spielstand|Test/]];
-const dbgGroup = t => (DBG_GROUPS.find(([, re]) => re.test(t)) || ['Sonstiges'])[0];
-/* Einträge, die im Lauf der Zeit in fremde Abschnitte gerutscht sind, bekommen nach ihrem Präfix eine eigene Karte */
-const DBG_MOVE = [[/^Siedlung|^Gold-Sog/, 'Siedlung', 'Ereignisse & Aufträge'], [/^Geheime Orte/, 'Geheime Orte', 'Welt & Reisen'], [/^E[1-4]:/, 'Emergente Quests (E1–E4)', 'Ereignisse & Aufträge'],
-  [/^Ratgeber/, 'Ratgeber (Tipps)', 'Darstellung & Regie'], [/^Stadt ohne Schutz|^Burgwache|^König-Flucht/, 'Stadt ohne Schutz', 'Ereignisse & Aufträge'],
-  [/^Burgfrieden|^Burgtor|^Burg-Alarm|^Schmuggel|^Varon:/, 'Varonsburg: Tor, Burgfrieden, Alarm', 'Blutkult & Varonheim'], [/^Rang bremst|^Blutkult-Sense/, 'Blutkult: Extras', 'Blutkult & Varonheim']];
-const dbgRecent = () => { try { return JSON.parse(localStorage.getItem('rotfall.dbg.recent') || '[]'); } catch (e) { return []; } };
-function dbgRun(sec, label, fn) {
-  try { fn(); UI.refreshHUD?.(); } catch (err) { console.error(err); UI.toast('Fehler: ' + err.message); return; }
-  try { const R = dbgRecent().filter(r => !(r[0] === sec && r[1] === label)); R.unshift([sec, label]); localStorage.setItem('rotfall.dbg.recent', JSON.stringify(R.slice(0, 10))); } catch (e) { /* privat: ohne Verlauf */ }
-  const rc = $('dbg-recent'); if (rc) dbgRecentDraw();
-}
-function dbgRecentDraw() {
-  const box = $('dbg-recent'); if (!box) return; box.innerHTML = '';
-  for (const [sec, label] of dbgRecent()) { const b = document.createElement('button'); b.className = 'dbg-chip'; b.textContent = label; b.title = sec;
-    b.onclick = () => { const S0 = debugSections().find(s => s[0] === sec), fn = S0?.[2]?.[label]; if (fn) dbgRun(sec, label, fn); else UI.toast('Eintrag gibt es nicht mehr.'); }; box.appendChild(b); }
-  if (!box.children.length) box.innerHTML = '<span class="dbg-hint">Noch nichts benutzt.</span>';
-}
 function toggleDebug() {
-  let d = $('debugpanel');
-  if (d) { d.remove(); return; }
-  d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel dbg-gui';
-  const secs = debugSections(), used = new Set(secs.map(s => dbgGroup(s[0]))), groups = [...DBG_GROUPS.map(g => g[0]), 'Sonstiges'].filter(g => used.has(g)), n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
-  d.innerHTML = `<div class="dbg-head"><span class="panel-title">DEBUG</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen … (z. B. „Kult“, „Teleport“, „Siedlung“)" autocomplete="off"><button id="dbg-close" title="Schließen (Strg+Umschalt+D)">✕</button></div>
-    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"></div></div><div class="dbg-foot"><b>Zuletzt:</b> <span id="dbg-recent"></span></div>`;
-  document.body.appendChild(d);
-  const nav = $('dbg-nav'), main = $('dbg-main'), cards = [];
-  const mk = (title, html, group) => { const sec = document.createElement('section'); sec.className = 'dbg-card'; sec.dataset.group = group;
-    sec.innerHTML = `<h4>${title}</h4>${html ? `<div class="dbg-in">${html}</div>` : ''}<div class="dbg-grid"></div>`; main.appendChild(sec); cards.push(sec); return sec.querySelector('.dbg-grid'); };
-  const moved = new Map();
-  for (const [title, html, acts] of secs) {
-    const grid = mk(title, html, dbgGroup(title));
-    for (const [label, fn] of Object.entries(acts)) { const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.dataset.q = label.toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
-      const M = DBG_MOVE.find(([re]) => re.test(label)); if (M) { if (!moved.has(M[1])) moved.set(M[1], mk(M[1], '', M[2])); moved.get(M[1]).appendChild(b); } else grid.appendChild(b); }
-  }
-  for (const c of [...cards]) if (!c.querySelector('.dbg-btn') && !c.querySelector('.dbg-in')) { c.remove(); cards.splice(cards.indexOf(c), 1); }
-  let cur = (() => { try { return localStorage.getItem('rotfall.dbg.group'); } catch (e) { return null; } })(); if (!groups.includes(cur)) cur = groups[0];
-  const show = () => { const q = $('dbg-search').value.trim().toLowerCase();
-    for (const c of cards) { let hits = 0; for (const b of c.querySelectorAll('.dbg-btn')) { const ok = !q || b.dataset.q.includes(q); b.style.display = ok ? '' : 'none'; if (ok) hits++; }
-      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; }
-    for (const b of nav.children) b.classList.toggle('on', !q && b.dataset.g === cur); };
-  for (const g of groups) { const b = document.createElement('button'); b.dataset.g = g; b.textContent = `${g} (${cards.filter(c => c.dataset.group === g).length})`;
-    b.onclick = () => { cur = g; $('dbg-search').value = ''; try { localStorage.setItem('rotfall.dbg.group', g); } catch (e) { /* ohne Merken */ } show(); main.scrollTop = 0; }; nav.appendChild(b); }
-  $('dbg-search').oninput = show; $('dbg-search').onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') toggleDebug(); };
-  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); show(); $('dbg-search').focus();
-  for (const el of d.querySelectorAll('input,select')) if (el.id !== 'dbg-search') el.addEventListener('keydown', e => e.stopPropagation());
-}
-function toggleDebugOld() {
   let d = $('debugpanel');
   if (d) { d.remove(); return; }
   d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel';

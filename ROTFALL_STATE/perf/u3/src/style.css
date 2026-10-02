@@ -374,27 +374,6 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* debug */
 #debugpanel{position:fixed;right:8px;top:64px;width:210px;z-index:30;padding:8px;font-size:12px}
-/* Debug-GUI (02.10.2026): Fenster mit Suche, Gruppen, Kacheln */
-#debugpanel.dbg-gui{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:min(980px,96vw);height:min(720px,88vh);display:flex;flex-direction:column;padding:0;z-index:60;box-shadow:0 12px 40px rgba(0,0,0,.7)}
-.dbg-head{display:flex;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #3a3024;background:#120e09}
-.dbg-head .panel-title{margin:0;white-space:nowrap}
-#dbg-search{flex:1;background:#0c0906;border:1px solid #4a3d2c;color:#e8dcb8;padding:7px 10px;font-size:13px}
-#dbg-close{background:#2a1c14;border:1px solid #5a3a28;color:#e8dcb8;width:34px;height:32px;cursor:pointer}
-.dbg-body{flex:1;display:flex;min-height:0}
-#dbg-nav{width:200px;border-right:1px solid #3a3024;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:4px;background:#0f0b07}
-#dbg-nav button{text-align:left;background:#17120c;border:1px solid #2f271d;color:#cdbf9c;padding:7px 9px;font-size:12px;cursor:pointer}
-#dbg-nav button.on{background:#3a2a16;border-color:#a8843e;color:#f3e2b4}
-#dbg-main{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
-.dbg-card{border:1px solid #33291e;background:#14100b;padding:8px 10px}
-.dbg-card h4{margin:0 0 6px;font-size:13px;color:#e0b75a;letter-spacing:.03em}
-.dbg-card .dbg-in{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-.dbg-card .dbg-in select,.dbg-card .dbg-in input{background:#0c0906;border:1px solid #3a3024;color:#e8dcb8;padding:3px 5px;font-size:12px;max-width:220px}
-.dbg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:5px}
-#debugpanel .dbg-btn{display:block;width:100%;text-align:left;background:#1b150e;border:1px solid #33291e;margin:0;padding:6px 8px;font-size:12px;color:#e2d5b4;cursor:pointer;line-height:1.25}
-#debugpanel .dbg-btn:hover{background:#2c2114;border-color:#8a6a34}
-.dbg-foot{border-top:1px solid #3a3024;padding:7px 12px;background:#120e09;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-#debugpanel .dbg-chip{display:inline-block;width:auto;background:#22190f;border:1px solid #4a3a26;padding:3px 8px;margin:0;font-size:11px;color:#e8dcb8;cursor:pointer}
-.dbg-hint{opacity:.6}
 #debugpanel button{display:block;width:100%;text-align:left;background:#161209;border:1px solid #2f271d;
   margin-bottom:2px;padding:4px 6px;font-size:12px}
 
