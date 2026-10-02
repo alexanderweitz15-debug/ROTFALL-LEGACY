@@ -173,3 +173,7 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Blutschöpfer: das Trinken von Wehrlosen heilt auch Kultisten in der Nähe.
   - Netzwerferin: gleiche Regel wie das Spieler-Fangnetz; normale Figuren hängen fest, große und Elite taumeln nur.
   - Hofspion: die Zahl richtet sich nach der Schwere des Regelbruchs (Diebstahl: einer; Gewalt oder Mord: zwei bis drei).
+- **Kampfanimation (17:30):**
+  - Der aufgeladene schwere Hieb des Spielers ist nicht blockbar; dafür bestehendes `heavyHit`/UNBLOCK nutzen.
+  - Der Dolch behält seinen Vorteil (+17 % Schaden je Sekunde gegen Banditen): „Dolch ist schnell“.
+- **Hunt-Fehler:** Der Entwickler hat das Beheben der Hunt-Fehler freigegeben.

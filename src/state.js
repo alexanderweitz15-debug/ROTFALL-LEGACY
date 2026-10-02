@@ -292,6 +292,12 @@ function migrate(data) {
   data.ver = SAVE_VERSION; return data;
 }
 export function applySave(data) {
+  /* HB-04: vorher blieb alles aus dem laufenden Spiel stehen, was im geladenen Stand fehlt (Koop-Hosten aus laufendem Spiel, Slot-Wechsel).
+     Jetzt erst auf den Urzustand zurück; nur Verbindung, Proben-Stummschaltung, Debug-Schalter und (falls der Stand keine hat) Einstellungen bleiben. */
+  const keep = { coop: S.coop, _quiet: S._quiet, dbg: S.dbg, _frozenWar: S._frozenWar, settings: S.settings };
+  for (const k of Object.keys(S)) delete S[k];
+  Object.assign(S, JSON.parse(JSON.stringify(S_INIT)));
+  for (const [k, v] of Object.entries(keep)) if (v !== undefined) S[k] = v;
   for (const k of Object.keys(data)) S[k] = data[k];
   S.fx = []; S.floats = []; S.projectiles = []; S.paused = false;
 }

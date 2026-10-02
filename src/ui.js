@@ -161,8 +161,9 @@ export function refreshHUD() {
   hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
   if ($('clock-time').title !== `Jahr ${year()}`) $('clock-time').title = `Jahr ${year()}`;   /* UI-Umbau: Zeit, Wetter, Jahr stehen nur noch oben */
   if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = icoImg('w_' + (S.weather === 'sandstorm' ? 'heat' : S.weather), 2, 'wico') || WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
-  hudSet('clock-gold', String(S.gold));
+  goldShow(S.gold);   /* Q8-5: Gold zählt hoch */
   paintWarn();   /* UI-Scheibe 4: Warnchip */
+  questWatch();   /* Q-1: Brief mit Siegel bei Abschluss/Scheitern */
   renderHotbar();
 }
 
@@ -400,7 +401,7 @@ export function renderContext(target) {
       h += `<div class="ctx-block"><div class="ctx-sub">Aufträge</div>` + q.map(([k, v]) => {
         const Q = QUESTS[k];
         const I = A.questInfo ? A.questInfo(k) : {};   // S13: Ziel, Entfernung, Frist/Angriff
-        return `<div class="ctx-line${I.tracked ? ' tracked' : ''}"><span>${I.tracked ? '◆ ' : ''}${Q.name}</span><b>${Q.objectives.map((o, i) => `${v.progress[i] || 0}/${o.count || 1}`).join(' ')}</b></div>`
+        return `<div class="ctx-line${I.tracked ? ' tracked' : ''}"><span>${I.tracked ? '◆ ' : ''}${Q.name}</span><b>${Q.objectives.map((o, i) => pips(v.progress[i] || 0, o.count || 1)).join(' ')}</b></div>`
           + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
@@ -649,6 +650,53 @@ function paintWarn() {
   const w = L[0]; c._w = w; c.className = 'w-' + w.k;
   c.innerHTML = `<i></i><span></span>${L.length > 1 ? `<b>+${L.length - 1}</b>` : ''}`; c.querySelector('span').textContent = w.text;
   c.title = L.map(x => '• ' + x.text).join('\n') + `\nKlick: ${{ settlement: 'Siedlung', quests: 'Aufträge', party: 'Gruppe' }[w.open] || 'öffnen'}`;
+}
+// ---------------- Aufträge sichtbar (visual/quests.md Q-1, Entscheidungen 02.10.2026) ----------------
+// Fortschritt als Kerben statt „2/3“ (die Zahl steht im Tooltip); ab 9 Zielen ein Balken.
+export function pips(h, n) {
+  n = Math.max(1, n | 0); h = Math.max(0, Math.min(h | 0, n)); const t = `${h}/${n}`;
+  return n <= 8 ? `<span class="pips${h >= n ? ' full' : ''}" title="${t}">${'<i class="on"></i>'.repeat(h)}${'<i></i>'.repeat(n - h)}</span>`
+    : `<span class="pips bar${h >= n ? ' full' : ''}" title="${t}"><u style="width:${Math.round(h / n * 100)}%"></u></span>`;
+}
+// Brief mit Siegel (Q7-1, Q9-1): erfüllt = Stempel, gescheitert = der Brief reißt, das Siegel bricht schwarz. Oben Mitte im Spielfeld, einer nach
+// dem anderen. Ausgelöst vom Zustandswechsel des Auftrags (aktiv → erledigt/gescheitert) — gleich wo im Spiel er passiert, im Einzelspiel wie beim
+// Koop-Gast (dessen S.quests kommt vom Host): genau ein Brief je Wechsel. Neuer Held (Erbe) oder Proben (S._quiet): nur still neu merken.
+let qSnap = null, qSnapP = null, letterQ = [], letterT = 0;
+export let letterCount = 0;                                       /* Proben: ausgelöste Briefe */
+export function questSnap() { qSnap = new Map(Object.entries(S.quests || {}).map(([k, v]) => [k, v?.state])); qSnapP = S.player; }
+export function questWatch() {
+  if (!qSnap || qSnapP !== S.player || !S.player) return questSnap();   /* unter S._quiet zählt questLetter nur (keine Anzeige) */
+  for (const [k, v] of Object.entries(S.quests || {})) { const o = qSnap.get(k); if (o === 'active' && (v?.state === 'done' || v?.state === 'failed')) questLetter(v.state, k); }
+  questSnap();
+}
+export function questLetter(kind, k, o = {}) {
+  letterCount++; if (S._quiet) return;
+  letterQ.push({ kind, k, name: o.name || QUESTS[k]?.name || String(k), ...o }); if (!$('qletter')?.classList.contains('on')) letterNext();
+}
+function letterNext() {
+  const L = letterQ.shift(), vp = $('viewport'); if (!L || !vp) return;
+  let d = $('qletter'); if (!d) { d = el('div', ''); d.id = 'qletter'; d.onclick = () => letterEnd(); vp.appendChild(d); }
+  const word = { done: 'Erfüllt', failed: 'Gescheitert', accept: 'Angenommen' }[L.kind] || '';
+  const paper = `<div class="ql-paper"><div class="ql-head">Auftrag</div><div class="ql-title"></div>${L.rew || ''}</div>`;
+  d.className = 'ql-' + L.kind; document.body.classList.toggle('nomotion', S.settings?.motion === false);
+  d.innerHTML = (L.kind === 'failed' ? `<div class="ql-half l">${paper}</div><div class="ql-half r">${paper}</div>` : paper) + `<div class="ql-seal"><b>${word}</b></div>`;
+  d.querySelectorAll('.ql-title').forEach(t => { t.textContent = L.name; });
+  d.title = (L.kind === 'failed' ? 'Auftrag gescheitert' : L.kind === 'done' ? 'Auftrag erfüllt' : 'Auftrag angenommen') + ' — Klick: weg. Alles steht im Protokoll und im Auftragsbuch (J).';
+  void d.offsetWidth; d.classList.add('on');
+  sfx(L.kind === 'failed' ? 'crack' : L.kind === 'done' ? 'bell' : 'ui', 0, L.kind === 'done' ? 0.35 : 0.5);
+  clearTimeout(letterT); letterT = setTimeout(letterEnd, L.kind === 'failed' ? 2700 : 2400);
+}
+function letterEnd() { const d = $('qletter'); if (!d) return; clearTimeout(letterT); d.classList.remove('on'); letterT = setTimeout(letterNext, 320); }
+// Goldzähler in der Kopfleiste zählt hoch (Q8-5); weniger Gold springt sofort. Ohne Bildtakt (verdecktes Fenster): Endstand nach 0,9 s.
+let goldShown = null, goldTo = 0, goldFrom = 0, goldT0 = 0, goldRaf = 0;
+function goldShow(v) {
+  const g = $('clock-gold'); if (!g) return;
+  const fin = () => { cancelAnimationFrame(goldRaf); goldRaf = 0; goldShown = v; g.textContent = String(v); g.classList.remove('up'); };
+  if (goldShown === null || v <= goldShown || S.settings?.motion === false) { if (goldShown !== v || goldRaf) fin(); return; }
+  if (goldRaf && goldTo === v) { if (performance.now() - goldT0 > 900) fin(); return; }
+  goldFrom = goldShown; goldTo = v; goldT0 = performance.now(); g.classList.add('up');
+  const step = now => { const k = Math.min(1, (now - goldT0) / 600); goldShown = Math.round(goldFrom + (goldTo - goldFrom) * (1 - Math.pow(1 - k, 3))); g.textContent = String(goldShown); if (k < 1) goldRaf = requestAnimationFrame(step); else fin(); };
+  cancelAnimationFrame(goldRaf); goldRaf = requestAnimationFrame(step);
 }
 export function setPrompt(text) {
   const p = $('prompt');
@@ -1651,7 +1699,7 @@ function questUI(body) {
     const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
     return `<div class="panel" style="padding:12px;margin-bottom:8px${v.state !== 'active' ? ';opacity:.6' : ''}"><h3>${I.tracked ? '◆ ' : ''}${Q.name} <span style="float:right;color:#8d836e">${
       { active:'offen', done:'abgeschlossen', failed:'gescheitert' }[v.state]}</span></h3>
-      <div class="ledger">${Q.desc}<br>${Q.objectives.map((o, i) => `· ${o.text} ${v.progress[i] || 0}/${o.count || 1}`).join('<br>')}
+      <div class="ledger">${Q.desc}<br>${Q.objectives.map((o, i) => `· ${o.text} ${pips(v.progress[i] || 0, o.count || 1)}`).join('<br>')}
       ${I.where ? `<br>Ziel: ${I.where}` : ''}${I.timer ? `<br>${I.timer}` : ''}${v.outcome ? `<br><i>${v.outcome}</i>` : ''}</div>
       ${v.state === 'active' ? `<div class="ctx-actions" style="margin-top:6px"><button data-track="${k}">${I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${I.cancel ? `<button data-cancel="${k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
   }).join('') || '<div class="ledger">Keine Aufträge. Frag im Dorf nach.</div>';

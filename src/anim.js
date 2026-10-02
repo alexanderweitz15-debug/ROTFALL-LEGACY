@@ -92,6 +92,20 @@ export const ANIM_DEFS = {
       C: { name: 'C Endgame', steps: [{ s: 0, w: 0.188, h: 0.266 }, { s: 1, w: 0.15, h: 0.24 }, { s: 2, w: 0.28, h: 0.42 }],
         fx: { stop: 1.78, shake: 1.6, trail: 10, push: 12, slash: 1, after: 1, fin: 2 } },
     },
+    greataxe: {                                                      // Großaxt (wtype great mit Axtkopf): hacken und spalten, Klinge bleibt kurz stecken
+      name: 'Großaxt',
+      shapes: [
+        { name: 'Hackschlag', a0: 0.6, from: -2.6, hit: 0.5, end: 0.62, a1: 0.6, eW: -4, eS: 4 },   // von oben, steckt (kurzer Nachschwung)
+        { name: 'Querhack', a0: 0.6, from: 2.4, hit: -0.12, end: -0.35, a1: -0.6, eW: -2, eS: 3 },
+        { name: 'Spalter', a0: -0.6, from: -2.9, hit: 0.8, end: 0.9, a1: 0.6, eW: -6, eS: 6 },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.42, h: 0.5 }, { s: 1, w: 0.3, h: 0.4 }, { s: 2, w: 0.4, h: 0.49 }],
+        fx: { stop: 1, shake: 1, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.36, h: 0.44 }, { s: 1, w: 0.26, h: 0.35 }, { s: 2, w: 0.37, h: 0.47 }],
+        fx: { stop: 1.2, shake: 1.15, trail: 8, push: 4, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.28, h: 0.36 }, { s: 1, w: 0.2, h: 0.28 }, { s: 2, w: 0.33, h: 0.44 }],
+        fx: { stop: 1.5, shake: 1.45, trail: 10, push: 8, slash: 2, after: 1, fin: 2 } },
+    },
     hammer: {                                                        // sehr langsam, starkes Ausholen, schlägt ein
       name: 'Kriegshammer',
       shapes: [
@@ -136,12 +150,30 @@ const BODY = {
     { w: { by: 2, ln: 2, st: 2, hr: -2, hd: 2 }, i: { by: 3, ln: -3, st: 8, hr: 5, hd: 4 }, f: { by: 3, ln: -3, st: 7, hd: 4 } },
     { w: { by: 1, ln: 2, st: 3, hr: -2 }, i: { by: 2, ln: -2, st: 5, hr: 2 }, f: { by: 1, ln: -1, st: 4 } },
   ],
+  greataxe: [
+    { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 3, ln: -3, st: 6, hr: 1, hd: 6 }, f: { by: 3, ln: -3, st: 6, hr: 1, hd: 6 } },
+    { w: { by: 1, ln: 3, st: 3, hr: -3, hd: -1 }, i: { by: 2, ln: -3, st: 6, hr: 2, hd: 1 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 1 } },
+    { w: { by: -2, ln: 3, st: 2, hy: -1, hr: -3, hd: -7 }, i: { by: 5, ln: -4, st: 7, hy: 2, hr: 2, hd: 9 }, f: { by: 5, ln: -4, st: 7, hy: 2, hd: 9 } },
+  ],
   hammer: [
     { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 3, ln: -3, st: 6, hr: 2, hd: 6 }, f: { by: 3, ln: -3, st: 6, hr: 2, hd: 7 } },
     { w: { by: 1, ln: 3, st: 3, hr: -3 }, i: { by: 2, ln: -3, st: 6, hr: 3, hd: 1 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 2 } },
     { w: { by: -2, ln: 3, st: 2, hy: -1, hr: -3, hd: -7 }, i: { by: 6, ln: -4, st: 6, hy: 2, hr: 2, hd: 10 }, f: { by: 6, ln: -4, st: 6, hy: 2, hd: 10 } },
   ],
 };
+/* Kampfhaltung (Waffe bereit, im Kampf ohne Schwung) und Deckung je Klasse: a/ext wie eine Form, body wie ein Schlüsselbild. */
+const STANCE = {
+  sword:    { ready: { a: -0.35, ext: 1, body: { by: 1, st: 2, ln: 0 } },  guard: { a: -1.15, ext: -2, body: { by: 1, st: 2 } } },
+  great:    { ready: { a: -0.7, ext: 0, body: { by: 1, st: 3, ln: 1 } },   guard: { a: -1.45, ext: -3, body: { by: 2, st: 3 } } },
+  greataxe: { ready: { a: -0.6, ext: 0, body: { by: 1, st: 3, ln: 1 } },   guard: { a: -1.4, ext: -3, body: { by: 2, st: 3 } } },
+  dagger:   { ready: { a: 0.2, ext: 2, body: { by: 2, st: 2, ln: -1 } },   guard: { a: -1.7, ext: 0, body: { by: 2, st: 1 } } },
+  spear:    { ready: { a: 0.1, ext: 4, body: { by: 1, st: 3, ln: 0 } },    guard: { a: -0.5, ext: 3, body: { by: 1, st: 3 } } },
+  hammer:   { ready: { a: -0.9, ext: -1, body: { by: 1, st: 3, ln: 1 } },  guard: { a: -1.5, ext: -3, body: { by: 2, st: 3 } } },
+};
+export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
+// Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
+const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
+export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;
 const PACK_AMP = { A: 1, B: 1.5, C: 2 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 7, hd: 11 };
 const scaleBody = (k, a) => { const o = {}; for (const [n, v] of Object.entries(k || {})) o[n] = Math.max(-BODY_MAX[n], Math.min(BODY_MAX[n], v * a)); return o; };
 for (const [wt, list] of Object.entries(BODY)) {

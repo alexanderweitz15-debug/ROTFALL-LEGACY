@@ -176,7 +176,7 @@ function humanAtlas(e) {
 const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
   cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
-  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese' };
+  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
 const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
@@ -486,7 +486,7 @@ function varyDead(s, t, seed, own) {
 }
 /* Entwickler 02.10. (Neue Gegner, „mehr Sprites und Variation für Gegner“): Arten, die bis hier ein einziges Aussehen hatten, und die neuen
    Arten. Je Art 6 Formen aus dem Seed (Rüstung sauber/beschädigt/improvisiert, Kopf, Körperbau, Farben) — wenige Stufen, der Frame-Cache bleibt klein. */
-const FOE_VARY = new Set(['cultist', 'blood_mage', 'chalice_guard', 'blood_cultist', 'thrall', 'sea_raider', 'sea_harpooner', 'death_captain', 'ash_demon', 'death_knight', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute']);
+const FOE_VARY = new Set(['netzwerferin', 'blutschoepfer', 'cultist', 'blood_mage', 'chalice_guard', 'blood_cultist', 'thrall', 'sea_raider', 'sea_harpooner', 'death_captain', 'ash_demon', 'death_knight', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute']);
 const NEW_WEAR = { skel_bomb: 2, skel_brute: 2, mutant: 3, mutant_brute: 3, thrall: 3 };
 function varyFoe(s, t, seed) {
   const h = mixH(seed, 0x2c1), look = h % 6, P = (arr, k) => arr[(h >>> (4 + k * 3)) % arr.length];
@@ -497,7 +497,7 @@ function varyFoe(s, t, seed) {
     else if (look === 3) Object.assign(s, { face: 'mask', chn: 1 });                                     /* Wachsmaske, Opferkette */
     else if (look === 4) Object.assign(s, { charm: 1, sil: 'motes', mc: s.glow || '#b07ae0' });          /* Funken der Asche */
     else if (look === 5) Object.assign(s, { robe: '', bare: 1, cloth: '#2a1f2e', wraps: 1, markCol: '#8a2a20' });   /* Büßer: Aschezeichen auf nackter Brust */
-  } else if (t === 'blood_mage') {
+  } else if (t === 'blood_mage' || t === 'blutschoepfer') {
     s.robe = P(['#4a0e14', '#3a0a10', '#2a0a14', '#4a1a1a'], 1);
     if (look === 1) s.sil = 'collar';                                                                    /* hoher Blutkragen */
     else if (look === 2) Object.assign(s, { hooded: 0, hs: 1, hair: P(['#1a1612', '#c8b8a0', '#5a2a1e'], 2), stole: '#7a2228' });   /* offenes Haar, Stola */
@@ -523,7 +523,7 @@ function varyFoe(s, t, seed) {
     else if (look === 3) Object.assign(s, { bare: 1, wraps: 1 });
     else if (look === 4) Object.assign(s, { helm: 'wide', helmCol: '#4a3a26' });                         /* war Bauer */
     else if (look === 5) Object.assign(s, { chn: 1, hs: 1 });                                            /* in Ketten */
-  } else if (t === 'sea_raider' || t === 'sea_harpooner') {
+  } else if (t === 'sea_raider' || t === 'sea_harpooner' || t === 'netzwerferin') {
     s.skin = P(['#a8805e', '#c8a07a', '#8d6644', '#6d4a30', '#d6b089'], 1);
     if (look === 1) Object.assign(s, { helm: '', hs: 2, sc: 1 + (h >>> 9) % 3, beard: 2 });              /* kahl, Narbe */
     else if (look === 2) Object.assign(s, { fur: '#4a3a2a', helm: 'hat', helmCol: '#1e1a18' });          /* Dreispitz und Pelzkragen */
@@ -951,6 +951,15 @@ export function monsterSpec(e, m) {
   } else if (t === 'mutant' || t === 'mutant_brute') {                  /* Entwickler 02.10.: Mutierte — fahle, fleckige Haut, Wucherungen, zu lange Arme, Lumpen, barfuß */
     Object.assign(s, { hooded: 0, face: 'human', boots: '', pants: '#2e2820', glow: '', la: 1, sil: 'growth', wraps: 1, hs: 2, beard: 0 });
     if (t === 'mutant_brute') Object.assign(s, { bare: 1, strap: 1 });
+  } else if (t === 'dampframme') {                                     /* Entwickler 02.10.: Dampframme — Kessel mit Schloten, Rammschild vorn, gedrungen */
+    Object.assign(s, ROBOT_LOOK, { tabard: '', bd: 'gedrungen', shield: 'kite', shieldCol: '#6a5a3a', pb: 2, armorCol: '#6a5434', helmCol: '#7a6a48' });
+  } else if (t === 'blutschoepfer') {                                  /* Blutschöpfer: Kapuze, Schürze, Phiolengürtel quer über der Brust */
+    Object.assign(s, { hooded: 1, hood: '#2a0a0e', robe: '#3a1014', face: 'skin', glow: '#c0303a', apron: 1, apronCol: '#4a1a1a', pouch: 1, strap: 1, charm: 1, chn: 1 });
+  } else if (t === 'netzwerferin') {                                   /* Netzwerferin: Seevolk, Kopftuch, Netz als Bündel auf dem Rücken */
+    Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: '#2c3a44', pants: '#3a3226', sash: '#8a2a20', helm: 'scarf', helmCol: '#2a4a6a', pack: 1, strap: 1, hs: 1 });
+  } else if (t === 'hofspion') {                                       /* Hofspion: Livree des Hofes, bis die Maske fällt */
+    if (!e.unmasked) Object.assign(s, { cloth: '#c8b888', pants: '#3a3026', tabard: '#e0d4a8', mark: 'chevron', markCol: '#c8a050', hs: 0 });
+    else Object.assign(s, { hooded: 1, hood: '#1a1616', cloak: '#141212', cloth: '#2a2420', face: 'mask', strap: 1 });
   } else if (t === 'valen_soldier') {
     s.armor = 'chain'; s.armorCol = '#8a8f98'; s.helm = 'great'; s.helmCol = '#9aa3b0'; s.crest = '#39599c';
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
@@ -978,6 +987,7 @@ export function monsterSpec(e, m) {
   s.bd = m?.angel ? 'bullig' : e.build || s.bd || '';   /* Artist Runde 6: Körperbau aus den Varianten nicht mehr überschreiben */ s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
   if (!e.boss && !e.rboss && t !== 'garmadon' && t !== 'omega') varyDrape(s, e.seed || 0, t, e, '');
   if (t === 'mutant_brute' || t === 'skel_brute') s.bd = 'bullig';   /* Entwickler 02.10.: die Großen bleiben breit */
+  s.unm = !!e.unmasked;   /* Entwickler 02.10.: Hofspion — Bild wechselt, wenn die Maske fällt (render.js monsterSpecOf) */
   if (e.elook) Object.assign(s, e.elook);   /* Nutzer: Elite-Mini-Bosse haben ihr eigenes Aussehen */   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
@@ -1450,7 +1460,7 @@ function warmRSiblings(spec, dir, pose, W) {
 }
 /* Kampfanimation (Test Room): Schwungbilder einer Figur vorbacken — list = [[dir, pose, W], …], je W alle Stützstellen ATK_U. */
 export function warmSwingR(spec, list) {
-  for (const [d, p, W] of list) for (const q of ATK_U) warmRQ.push([spec, d, p, { ...W, q }]);
+  for (const [d, p, W] of list) if (W.mode !== 'swing') warmRQ.push([spec, d, p, W]); else for (const q of ATK_U) warmRQ.push([spec, d, p, { ...W, q }]);
   if (warmRQ.length > 1600) warmRQ.splice(0, warmRQ.length - 1600);
   if (!warmROn) { warmROn = true; idleCb(warmRRun); }
   return warmRQ.length;
@@ -1463,7 +1473,7 @@ function warmRRun(dl) {
   if (warmRQ.length) { warmROn = true; idleCb(warmRRun); }
 }
 export function humanFrameR(spec, dir, pose, W = null) {
-  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
+  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.ac || W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
   const key = 'R|' + sidOf(sk) + '|' + dir + pose + '|' + wk, hit = frameCache.get(key); if (hit) return hit;
   if (!warmingR) warmRSiblings(spec, dir, pose, W);
   return cacheGet(key, () => {

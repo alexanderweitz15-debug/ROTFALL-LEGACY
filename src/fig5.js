@@ -9,7 +9,7 @@
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
 import { mix } from './sprites.js?v=24';
-import { atkShape, legacySw, atkBody } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
+import { atkShape, legacySw, atkBody, atkStance } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)
@@ -289,6 +289,7 @@ export const octOf = a => ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
 export const upright = wt => wt === 'spear' || wt === 'polearm';
 export const onShoulder = wt => wt === 'great' || wt === 'hammer';
 let CUR_BP = null; const BP0 = { by: 0, ln: 0, st: 0, hy: 0, hr: 0, hd: 0 };
+const stanceBody = W => { const st = atkStance(W.ac || W.wt, W.mode === 'cover' ? 'guard' : 'ready'); return st ? { ...BP0, ...st.body } : null; };   /* Kampfhaltung/Deckung: breiter Stand, Knie gebeugt */
 const legIK = (hip, foot, side) => [hip, ik(hip, foot, 7.6, 7.6, e => side * e[0]), foot];   // Knie: side −1 = nach links (vorn in der Seitenansicht)
 /* Kampfanimation (Lead 02.10.): Gewicht verlagern, Ausfallschritt, Rumpf kippt in den Schlag, Kniebeuge — als Gelenkpunkte im bestehenden Rig */
 function bodyPose(R, view, B, pose) {
@@ -304,7 +305,12 @@ export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
   return W.q < 0.4 ? 'wind' : W.q <= 0.5 ? 'strike' : W.q < 0.82 ? 'follow' : null;   /* Kampfanimation: q = Formzeit u (gleiche Anker für alle Klassen) */
 }
-function svOf(W) { return RANGED.has(W.wt) ? { a: 0, ext: 0 } : W.mode === 'cover' ? { a: -1.15, ext: -2 } : swingOf(W.wt, W.q, W.arc, W.v, 0); }
+function svOf(W) {
+  if (RANGED.has(W.wt)) return { a: 0, ext: 0 }; const ac = W.ac || W.wt;
+  if (W.mode === 'cover' || W.mode === 'ready') { const st = atkStance(ac, W.mode === 'cover' ? 'guard' : 'ready');   /* Kampfanimation: Deckung/Kampfhaltung je Waffenklasse */
+    return st ? { a: st.a, ext: st.ext } : W.mode === 'cover' ? { a: -1.15, ext: -2 } : { a: 0.6, ext: 0 }; }
+  return swingOf(ac, W.q, W.arc, W.v, 0);
+}
 // Winkel der Waffe (Welt, Kanvas-Winkel) — gleich der Regel in render.js weaponPose
 export function weaponAngle(W, dir) {
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, wt = W.wt, bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
@@ -350,7 +356,7 @@ export function paintR(L, dir, pose, W = null) {
   if (extra) { const A = view === 'W' ? rigW(extra) : rigS(extra), dy = R.by - A.by;   // Mischpose: Beine der Grundpose, Arme der Zusatzpose
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
   pose = base;
-  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
+  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : W && (W.mode === 'ready' || W.mode === 'cover') ? stanceBody(W) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
   if (BP) bodyPose(R, view, BP, base);
   else {
   if (ph === 'wind') { R.by -= 1; if (view === 'W') { R.lean += 1; R.cs = 1; } }
