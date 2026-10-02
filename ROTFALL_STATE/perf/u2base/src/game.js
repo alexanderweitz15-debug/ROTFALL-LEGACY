@@ -727,28 +727,17 @@ function guardChar(faction, pos, prof, level = ri(4, 7)) {
 const ESCORT_SLOTS = 2;
 // BUG-108: Handelnde (Figuren, Gegner, Wagen, Fallen) je Karte gecacht — neu, sobald Karte, Liste oder Anzahl sich ändern,
 // sonst spätestens alle 250 ms. Vorher liefen mehrere Suchen und die Denk-Schleife je Bild über alle ~16 000 Einträge (Props).
-/* PERF-U2 (02.10.): je Karte ein eigener Eintrag (vorher einer für alle: actorsOf('world') aus einer Höhle baute die Welt und danach die
-   Höhle neu). Geprüft werden Liste, Länge und letzter Eintrag. Große Karten (≥ 2000 Einträge): nur angehängt (push) → alte Listen
-   kopieren und nur die neuen Einträge einsortieren (base/from merken, damit tierOf nachziehen kann); Komplett-Neubau sonst nur bei
-   echter Änderung oder spätestens nach 2 s (vorher alle 250 ms ~17 000 Einträge). Kleine Karten (Selbsttest, Höhlen) wie bisher (250 ms). */
-const ACTS = new Map();
-const actPut = (A, e) => { const k = e.kind; if (k === 'npc' || k === 'enemy' || k === 'player' || k === 'caravan') { A.list.push(e); if (k === 'caravan') A.cars.push(e); } else if (e.hazard) A.hz.push(e); else if (k === 'decal' || k === 'corpse') A.dc.push(e); };
+let ACT = { arr: null, len: -1, t: -1e9, list: [], hz: [], cars: [] };
 function actorsOf(map = S.map, now = performance.now()) {
-  const arr = S.ents[map], n = arr.length, A0 = ACTS.get(map), big = n >= 2000;
-  if (A0 && A0.arr === arr && now - A0.t <= (big ? 2000 : 250)) {
-    if (A0.len === n && arr[n - 1] === A0.last) return A0;
-    if (big && n > A0.len && (A0.len === 0 || arr[A0.len - 1] === A0.last)) {
-      const A = { arr, len: n, last: arr[n - 1], t: A0.t, list: A0.list.slice(), hz: A0.hz.slice(), cars: A0.cars.slice(), dc: A0.dc.slice(), base: A0, from: A0.list.length };
-      for (let i = A0.len; i < n; i++) actPut(A, arr[i]);
-      ACTS.set(map, A); return A;
-    }
+  const arr = S.ents[map];
+  if (ACT.arr !== arr || ACT.len !== arr.length || now - ACT.t > 250) {
+    const list = [], hz = [], cars = [], dc = [];
+    for (const e of arr) { if (e.kind === 'npc' || e.kind === 'enemy' || e.kind === 'player' || e.kind === 'caravan') { list.push(e); if (e.kind === 'caravan') cars.push(e); } else if (e.hazard) hz.push(e); else if (e.kind === 'decal' || e.kind === 'corpse') dc.push(e); }
+    ACT = { arr, len: arr.length, t: now, list, hz, cars, dc };
   }
-  const A = { arr, len: n, last: arr[n - 1], t: now, list: [], hz: [], cars: [], dc: [], base: null, from: 0 };
-  for (const e of arr) actPut(A, e);
-  if (ACTS.size > 12) for (const [k, B] of ACTS) if (S.ents[k] !== B.arr) ACTS.delete(k);   /* weggeworfene Karten (Proben, Duelle) */
-  ACTS.set(map, A); return A;
+  return ACT;
 }
-const worldActs = () => S.ents.world ? actorsOf('world').list : [];   /* PERF-U2: Figuren der Welt (für Stunden-Haken, die nach Figuren-Merkmalen suchen) */
+const worldActs = () => S.ents.world || [];   /* PERF-U2: Figuren der Welt (für Stunden-Haken, die nach Figuren-Merkmalen suchen) */
 /* PERF-U (Leistung, 02.10.): Stufenplan der Denk-Schleife. Auf der Welt stehen ~2000 Handelnde in ACT.list; jedes Bild alle anzufassen
    kostete ~2 ms, obwohl fast alle weit weg sind und nichts tun. Einmal je Neubau von ACT (≤ 250 ms), nach 15 Bildern (2 Abfragen je Bild) oder wenn der
    Held 160 px weiterzieht, wird sortiert:
@@ -762,41 +751,22 @@ const worldActs = () => S.ents.world ? actorsOf('world').list : [];   /* PERF-U2
    Zufallsaufrufe (chance/pick) laufen nur in hot und dort in derselben Reihenfolge. Kleine Karten (Selbsttest, Höhlen) bleiben beim alten Weg. */
 const TIER_MIN = 600, COLD_K = 16, MID_K = 3;
 let TIER = { act: null, t: -1e9, n: 0, px: 0, py: 0, hot: [], cold: [], mid: [], pool: [], esc: new Map(), ph: 0 };
-/* PERF-U2 (02.10.): Einsortieren einer Figur (vorher Schleifenrumpf von tierOf; Regeln unverändert). */
-function tierPut(T, e, px, py, party) {
-  const dx = Math.abs(e.x - px), dy = Math.abs(e.y - py), k = e.kind;
-  if (k === 'npc' && e.escort) { const l = T.esc.get(e.escort); if (l) l.push(e); else T.esc.set(e.escort, [e]); }
-  if (dx < 1950 && dy < 1950) T.pool.push(e);
-  if (!e.alive) { if (k !== 'npc' && k !== 'enemy') T.hot.push(e); return; }   /* Tote denken nicht (think kehrt sofort um) */
-  const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
-  if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) return;
-  if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? T.cold : T.mid).push(e); return; }
-  T.hot.push(e);
-}
-/* PERF-U2 (02.10.): Der regelmäßige Neubau (~2000 Figuren, ~1 ms, alle 15 Bilder / 250 ms / 160 px) läuft in Etappen zu TIER_STEP
-   Figuren je Aufruf (2 Aufrufe je Bild → fertig nach ~2 Bildern); bis dahin gilt der alte Stand. Kamen nur Figuren hinzu (actorsOf
-   hängte an), werden nur die neuen sofort einsortiert. Sofort komplett wie bisher: erste Liste, Liste geändert (entfernt/ersetzt),
-   Held mehr als 1000 px versetzt (Reise, Teleport). */
-let TB = null;
-const TIER_STEP = 600;
-const actFrom = (A, B) => { let C = A; while (C && C !== B) C = C.base; return C ? C.list.length : -1; };   /* A ist B plus Angehängtes? → ab hier neu */
 function tierOf(A, now) {
-  const p = S.player, T0 = TIER, party = S.party;
-  if (T0.act !== A && T0.act) { const f = actFrom(A, T0.act); if (f >= 0) { for (let i = f; i < A.list.length; i++) tierPut(T0, A.list[i], T0.px, T0.py, party); T0.act = A; } }
-  if (TB && TB.act !== A) { if (actFrom(A, TB.act) >= 0) TB.act = A; else TB = null; }
-  const jump = Math.abs(p.x - T0.px) > 1000 || Math.abs(p.y - T0.py) > 1000;
-  if (T0.act !== A || jump) {
-    TB = null; const T = { act: A, t: now, n: 0, px: p.x, py: p.y, hot: [], cold: [], mid: [], pool: [], esc: new Map(), ph: T0.ph };
-    for (const e of A.list) tierPut(T, e, p.x, p.y, party);
-    return (TIER = T);
+  const p = S.player, T0 = TIER;
+  if (T0.act === A && T0.n < 30 && now - T0.t < 250 && Math.abs(p.x - T0.px) < 160 && Math.abs(p.y - T0.py) < 160) { T0.n++; return T0; }
+  const hot = [], cold = [], mid = [], pool = [], esc = new Map(), party = S.party;
+  for (const e of A.list) {
+    const dx = Math.abs(e.x - p.x), dy = Math.abs(e.y - p.y), k = e.kind;
+    if (k === 'npc' && e.escort) { const l = esc.get(e.escort); if (l) l.push(e); else esc.set(e.escort, [e]); }
+    if (dx < 1950 && dy < 1950) pool.push(e);
+    if (!e.alive) { if (k !== 'npc' && k !== 'enemy') hot.push(e); continue; }
+    const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0);
+    if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) continue;
+    if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? cold : mid).push(e); continue; }
+    hot.push(e);
   }
-  if (!TB && T0.n < 30 && now - T0.t < 250 && Math.abs(p.x - T0.px) < 160 && Math.abs(p.y - T0.py) < 160) { T0.n++; return T0; }
-  TB ||= { act: A, i: 0, px: p.x, py: p.y, hot: [], cold: [], mid: [], pool: [], esc: new Map() };
-  const L = A.list, end = Math.min(L.length, TB.i + TIER_STEP);
-  for (; TB.i < end; TB.i++) tierPut(TB, L[TB.i], TB.px, TB.py, party);
-  if (TB.i < L.length) { T0.n++; return T0; }
-  const B = TB; TB = null;
-  return (TIER = { act: A, t: now, n: 0, px: B.px, py: B.py, hot: B.hot, cold: B.cold, mid: B.mid, pool: B.pool, esc: B.esc, ph: T0.ph });
+  TIER = { act: A, t: now, n: 0, px: p.x, py: p.y, hot, cold, mid, pool, esc, ph: T0.ph };
+  return TIER;
 }
 /* Karawanen und ihre Wachen außerhalb der Welt-Karte (Höhle, Haus): vorher je Bild zwei Suchen über alle ~17 000 Welt-Einträge. */
 let WCAR = { arr: null, len: -1, t: -1e9, cars: [], esc: new Map() };

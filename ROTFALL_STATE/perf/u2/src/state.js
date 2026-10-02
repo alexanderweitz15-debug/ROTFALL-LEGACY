@@ -129,7 +129,7 @@ export function ents(map = S.map) { return S.ents[map]; }
 let idIndex = new Map(), idStamp = -1e9, idCheck = -1e9, idEnts = null, idWorld = null, idMiss = new Set(), idSig = [];
 function idRebuild(now) {
   idIndex = new Map(); idMiss = new Set(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world; idSig = [];
-  for (const m of Object.keys(S.ents)) { const a = S.ents[m]; for (const e of a) idIndex.set(e.id, e); idSig.push(m, a, a.length, a[a.length - 1]); }
+  for (const m of Object.keys(S.ents)) { const a = S.ents[m]; for (const e of a) idIndex.set(e.id, e); idSig.push(m, a, a.length, a[a.length - 1]); } { const P = window.__PF; if (P) { P.acc.byIdRebuild = (P.acc.byIdRebuild || 0) + performance.now() - now; P.n.byIdRebuild = (P.n.byIdRebuild || 0) + 1; } }
 }
 function idSync(now) {
   idCheck = now;

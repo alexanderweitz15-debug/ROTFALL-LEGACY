@@ -1065,3 +1065,18 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Unten liegt eine versunkene Karawanserei: Verdurstete und Wüstenräuber, die auch gegraben haben, dazu eine Truhe mit einem Dornensäbel.
 - **Das Wasserrecht der Sandfürsten** ist deine Wahl. Gibst du es den Sandfürsten zurück, zahlst du in Karak-Atar nie wieder Zoll (Händler +10). Verkaufst du es an die Räuber, bekommst du 250 Gold (Händler −10).
 - Debug: „Geheime Orte: Sandsturm endet (Brunnen frei)“.
+
+## Noch mehr Umhänge und Kapuzen (Runde 11)
+- **Neue Umhangformen:** Rabenumhang mit Federkragen, Kettenumhang mit Schulterplatten, Wüstenburnus, Kapitänsrock/Öljacke (offene Schöße, Messingknöpfe), Knochenumhang mit Schädel auf der Schulter, Doppelumhang (Pelerine über langem Mantel), Fell mit Tierkopf (ohne Helm sitzt der Kopf als Haube auf). Umhänge tragen jetzt auch Muster: Streifen, Querbänder, Karo.
+- **Neue Kopfbedeckungen:** Henkerskapuze (nur Augenlöcher), tiefe Kutte, Turban/Kopftuch (Gesicht frei), Kapuze mit Widderhörnern, Pestmaske mit Schnabel. Alle zählen als Kapuze: Die Sonne brennt Vampire nur halb so stark. Das gilt auch für Burnus-Kopftuch und Knochenumhang-Kutte.
+- **Neue Stücke:** Teermantel, Rabenmantel, Wüstenburnus, Doppelmantel, Kettenumhang der Kette, Kapitänsrock, Knochenumhang, Bärenfell mit Kopf, Mantel des Rabenfürsten (legendär), Ordenskutte, Tiefe Kuttenkapuze, Henkerskapuze, Wüstenhaube, Widderkapuze, Pestkapuze mit Schnabel. Manche tragen feste Werte (Härte, Lebenskraft, Zähigkeit, Leichtfuß); der Tooltip zeigt sie.
+- **NPCs:** Die Form folgt Region und Stand. Die Kette trägt Kettenumhänge, Aurelion Burnus und Turban, Valens Wachen blaue Wappenmäntel, Tote und Kultisten Knochen, Kutten und Hörner, das Seevolk Öljacken und Kapitänsröcke, Bettler und Flüchtlinge Fetzen. Räuber tragen manchmal Bärenfell oder Rabenfedern.
+
+## Geheimer Ort: Die Kammer der Namen
+- Unter dem Seelenhügel im Totenland liegt eine niedrige Tür aus Knochen. Trägst du eine Seelenphiole, summt sie in der Nähe.
+- Drinnen stehen die Namen aller Toten an den Wänden, auch deine Ahnen und, halb geschrieben, du selbst. Schatten bewachen die Kammer, dazu gibt es einen Hort.
+- **Wahl:**
+  - Die Ahnen ruhen lassen: Willenskraft +1 je Ahn, höchstens +3; Tote −5.
+  - Die Seelen ernten: 3 Seelenphiolen, Tote +10. Morvaths Heerzug kommt dadurch früher; die Wahl warnt dich davor.
+  - Nichts anrühren.
+- Debug: „Geheime Orte: zur Kammer der Namen“.
