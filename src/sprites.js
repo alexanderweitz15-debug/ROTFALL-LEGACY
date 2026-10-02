@@ -12,11 +12,11 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=23';
-import { ITEMS } from './data.js?v=23';   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=23';
+import { ATLAS } from './ref5_atlas.js?v=24';
+import { ITEMS } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=24';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=23';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=24';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -207,11 +207,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2'];   /* Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr'];   /* Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen */
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '' };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0 };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -655,61 +655,31 @@ export function humanSpec(e) {
   s.hv = heavyOf(w); s.ms = msOf(e);
   s.atlas = humanAtlas(e);   // Stil F
   s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
-  if (e.kind === 'npc' && !e.robot) varyDrape(s, e.seed || 0, '', e, prof);
+  if (e.kind === 'npc' && !e.robot) varyDrape(s, e.seed || 0, '');
   return s;
 }
 /* Artist 02.10. (Entwickler: „coolere Umhänge und Kapuzen, nur eine Form ist lahm“): Aussehen aus ITEMS[k].look.
    Umhang: cape → cw (Form), col, lin → cln (Futter), trim → ctr (Saum), fib → cfb (Fibel), fr → cfr (Fransen), fur (Pelzkragen), hood (angesetzte Kapuze).
-   Kopf: hood → hd (rund | spitz | weit | kette | maske | gugel), col, mask (Gesichtstuch). Ohne look bleibt alles wie bisher.
-   Artist R11: Umhang auch feder | kette | burnus | kapitaen | knochen | doppel | tierkopf, pat → cpm (streif | quer | karo);
-   Kopf auch henker | kutte | tuch (Turban, Gesicht frei) | horn (Widderhörner) | pest (Schnabelmaske), col2 → hc2 (Hörner, Maske, Turbanstreifen). */
+   Kopf: hood → hd (rund | spitz | weit | kette | maske | gugel), col, mask (Gesichtstuch). Ohne look bleibt alles wie bisher. */
 const HOOD_OF = h => h === 'rund' ? '' : h || '';
 function itemLook(s, eq, keepHood) {
   const C = eq.cloak && ITEMS[eq.cloak.key]?.look, H = eq.head && ITEMS[eq.head.key]?.look;
   if (C) {
     if (C.col) s.cloak = C.col;
-    s.cw = C.cape || ''; if (C.lin) s.cln = C.lin; if (C.trim) s.ctr = C.trim; if (C.fib) s.cfb = C.fib; if (C.fr) s.cfr = 1; if (C.fur) s.fur = C.fur; if (C.pat) s.cpm = C.pat;
-    if (C.hood) { s.hooded = 1; s.hd = HOOD_OF(C.hood); s.hood = C.hoodCol || s.cloak; if (C.col2) s.hc2 = C.col2; }
+    s.cw = C.cape || ''; if (C.lin) s.cln = C.lin; if (C.trim) s.ctr = C.trim; if (C.fib) s.cfb = C.fib; if (C.fr) s.cfr = 1; if (C.fur) s.fur = C.fur;
+    if (C.hood) { s.hooded = 1; s.hd = HOOD_OF(C.hood); s.hood = C.hoodCol || s.cloak; }
     else if (!keepHood) s.hooded = 0;
   }
   if (H && H.hood) { s.hooded = 1; s.hd = HOOD_OF(H.hood); s.hood = H.col || s.hood || s.cloak; s.helm = ''; s.crest = '';
     if (H.mask) { s.face = 'cloth'; s.scarf = H.mask; }
-    if (H.col2) s.hc2 = H.col2;
     if (H.trim && !s.ctr) s.ctr = H.trim; }
 }
 // Leute und Gegner mit Umhang/Kapuze bekommen eine Form aus dem Seed (fest je Figur, wenige Stufen für den Frame-Cache)
-// Artist R11 (Entwickler: „mehr Vielfalt“): Region und Fraktion wählen die Formen — Valen Wappenmantel, Kette Kettenumhang mit
-// Schulterplatten, Aurelion Burnus/Brokat mit Turban, Tote Knochen/Fetzen, Kult Kutte/Hörner/Henker, Seevolk Öljacke und Kapitänsrock,
-// Bettler und Flüchtlinge Fetzen, Räuber Fell mit Tierkopf oder Rabenfedern.
-const SEA_PROF = new Set(['Fischer', 'Netzflickerin', 'Hafenarbeiter', 'Kapitän', 'Kapitänin', 'Fährmann', 'Matrose', 'Hafenmeister']), POOR_PROF = new Set(['Bettler', 'Bettlerin', 'Flüchtling', 'Aussätziger']);
-const MON_DRAPE = { sea_raider: 'see', sea_harpooner: 'see', blood_cultist: 'kult', cultist: 'kult', necromancer: 'tot', wraith: 'tot', shade: 'tot', skeleton: 'tot', bone_archer: 'tot', bone_knight: 'tot', ghoul: 'tot',
-  chain_brute: 'kette', kettenschuetze: 'kette', chainhunter: 'kette', chainbard: 'kette', bandit: 'wild', bandit_archer: 'wild', bounty_hunter: 'wild' };
-const DRAPE_HD = { tot: ['', 'spitz', 'weit', 'kutte', ''], kult: ['kutte', 'horn', 'henker', 'spitz'], kette: ['', 'spitz', 'henker', 'kutte'], aurel: ['tuch', 'tuch', 'weit', ''],
-  wild: ['', 'spitz', 'weit', 'gugel', 'horn', ''], see: ['weit', '', 'tuch'], arm: ['', 'weit', 'spitz'], pest: ['pest'] };
-const DRAPE_CW = { tot: ['knochen', 'zerfetzt', 'zerfetzt', 'lang', 'feder'], kult: ['knochen', 'lang', 'zerfetzt', 'doppel'], kette: ['kette', 'kette', 'pelzkragen', 'schulter', ''],
-  aurel: ['burnus', 'burnus', 'halb', 'doppel', ''], valen: ['wappen', '', 'schulter', 'lang', 'doppel', ''], see: ['schulter', 'kapitaen', 'kapitaen', ''], arm: ['zerfetzt', 'zerfetzt', 'zerfetzt', ''],
-  wild: ['zerfetzt', '', 'tierkopf', 'feder', 'schulter', 'halb'] };
-function varyDrape(s, seed, t, e, prof) {
+function varyDrape(s, seed, t) {
   const h = mixH(seed, 0x5a17), dead = s.sp === 'skeleton' || s.face === 'skull', gob = s.sp === 'goblin';
-  const grp = gob ? '' : t ? MON_DRAPE[t] || (dead ? 'tot' : '') : !e ? '' : prof === 'Quarantänewache' || prof === 'Seuchenarzt' ? 'pest' : POOR_PROF.has(prof) || e.refugee ? 'arm'
-    : SEA_PROF.has(prof) ? 'see' : e.undead || e.faction === 'undead' ? 'tot' : /Kult|Henker/.test(prof) ? 'kult' : regionOf(e);
-  if (s.hooded && !s.hd) { const H = DRAPE_HD[grp] || (dead || gob ? ['', 'spitz', 'weit', ''] : ['', 'spitz', 'weit', 'gugel', '', 'kutte']); s.hd = H[h % H.length];
-    if (dead && (s.hd === 'tuch' || s.hd === 'pest')) s.hd = '';
-    if (s.hd === 'tuch') s.hc2 = s.hc2 || ['#8a2a20', '#2a4a6a', '#c8a050'][(h >>> 3) % 3];
-    if (s.hd === 'horn') s.hc2 = s.hc2 || ['#b8ac94', '#5a4a3a', '#2a2422'][(h >>> 3) % 3];
-    if (s.hd === 'pest') s.hc2 = s.hc2 || '#5a4630'; }
-  if (!s.cloak && grp === 'valen' && e && (GUARD_PROF.has(prof) || e.guard) && h % 3 === 0) { s.cloak = '#26385a'; s.ctr = '#b9c3d2'; }   /* Valener Wache: blauer Mantel mit Silberborte */
-  if (s.cloak && !s.cw && !s.capeL) { const P = DRAPE_CW[grp] || ((s.wear | 0) >= 2 || dead ? ['zerfetzt', 'zerfetzt', '', 'lang'] : ['', 'schulter', 'halb', 'lang', 'zerfetzt', '', 'doppel']);
-    s.cw = P[(h >>> 5) % P.length]; if (s.cw === 'zerfetzt' && (h >>> 9) % 2) s.cfr = 1;
-    const k = (h >>> 11) % 3;
-    if (s.cw === 'kette') Object.assign(s, { cloak: ['#4a4844', '#3e3c3a', '#4e4640'][k], ctr: s.ctr || '#8a8478' });                          /* Eisenringe, helle Schulterplatten */
-    else if (s.cw === 'burnus') { s.cloak = ['#c8b48a', '#a89068', '#e0d4b8'][k]; s.ctr = s.ctr || ['#8a2a20', '#2a4a6a', '#5a3a1a'][k]; s.cpm = (h >>> 15) % 2 ? 'quer' : 'streif'; }
-    else if (s.cw === 'tierkopf') s.cloak = ['#4a3a26', '#5a5048', '#3a3430'][k];                                                              /* Bär, Wolf, Dachs */
-    else if (s.cw === 'feder') { s.cloak = '#16141a'; s.cln = s.cln || '#2a3450'; }
-    else if (s.cw === 'kapitaen') s.ctr = s.ctr || (grp === 'see' && k ? '' : '#c8a050');
-    else if (s.cw === 'knochen') s.cloak = mix(s.cloak, '#1e1c1a', 0.5);
-    else if (s.cw === 'wappen' && grp === 'valen') s.ctr = s.ctr || '#b9c3d2';
-    if (!s.cpm && ['', 'lang', 'halb', 'doppel', 'schulter'].includes(s.cw) && (h >>> 13) % 5 === 0) s.cpm = ['streif', 'quer', 'karo'][(h >>> 15) % 3]; }
+  if (s.hooded && !s.hd) s.hd = (dead || gob ? ['', 'spitz', 'weit', ''] : ['', 'spitz', 'weit', 'gugel', ''])[h % (dead || gob ? 4 : 5)];
+  if (s.cloak && !s.cw && !s.capeL) { const P = (s.wear | 0) >= 2 || dead ? ['zerfetzt', 'zerfetzt', '', 'lang'] : ['', 'schulter', 'halb', 'lang', 'zerfetzt', ''];
+    s.cw = P[(h >>> 5) % P.length]; if (s.cw === 'zerfetzt' && (h >>> 9) % 2) s.cfr = 1; }
 }
 
 // S14 (Nutzer: „wer große Waffen trägt, soll auch so aussehen“): Zweihänder, Hämmer, große Äxte, Stangenwaffen → breiter, muskulöser
@@ -834,7 +804,7 @@ export function monsterSpec(e, m) {
   s.ms = msOf(e); s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
   s.bd = m?.angel ? 'bullig' : e.build || s.bd || '';   /* Artist Runde 6: Körperbau aus den Varianten nicht mehr überschreiben */ s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
-  if (!e.boss && !e.rboss && t !== 'garmadon' && t !== 'omega') varyDrape(s, e.seed || 0, t, e, '');
+  if (!e.boss && !e.rboss && t !== 'garmadon' && t !== 'omega') varyDrape(s, e.seed || 0, t);
   if (e.elook) Object.assign(s, e.elook);   /* Nutzer: Elite-Mini-Bosse haben ihr eigenes Aussehen */   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
@@ -857,7 +827,7 @@ function resolve(s, k, soft = 1) {                                  // soft < 1:
     skin: ramp(s.skin), hair: ramp(dk(s.hair, 0.15)), cloth: ramp(dk(s.cloth)), pants: ramp(dk(pants)), boots: s.boots ? ramp(s.boots) : null,
     belt: ramp(s.belt), leather: ramp('#5a4030'), apronR: s.apronCol ? ramp(s.apronCol) : null, hood: s.hooded ? ramp(dk(s.hood || darkOf(s.cloth))) : null, cloak: s.cloak ? ramp(dk(s.cloak)) : null,
     armorR: s.armor ? ramp(dk(s.armorCol, 0.2)) : null, furR: s.fur ? ramp(s.fur) : null, pauldR: s.pauld ? ramp(s.pauld) : null, capeR: s.cape ? ramp(dk(s.cape, 0.1)) : null, stoleR: s.stole ? ramp(s.stole) : null, sashR: s.sash ? ramp(s.sash) : null, helmR: s.helm ? ramp(dk(s.helmCol || '#5a5852', 0.2)) : null, crest: s.crest ? ramp(s.crest) : null, trimR: s.trim ? ramp(s.trim) : null,
-    clnR: s.cln ? ramp(s.cln) : null, ctrR: s.ctr ? ramp(s.ctr) : null, cfbR: s.cfb ? ramp(s.cfb) : null, hc2R: s.hc2 ? ramp(s.hc2) : null,
+    clnR: s.cln ? ramp(s.cln) : null, ctrR: s.ctr ? ramp(s.ctr) : null, cfbR: s.cfb ? ramp(s.cfb) : null,
     robe: s.robe ? ramp(dk(s.robe, 0.22)) : null, tabard: s.tabard ? ramp(dk(s.tabard, 0.15)) : null, markR: s.markCol ? ramp(s.markCol) : null,
     scarf: s.scarf ? ramp(s.scarf) : null, shieldR: s.shield ? ramp(s.shieldCol) : null, glove: s.glove ? ramp(s.glove) : null,
     bone: ramp('#cfc6b0'), metal: ramp('#5a5852'), gold: ramp('#b8963e'), wood: ramp('#5b452a'),

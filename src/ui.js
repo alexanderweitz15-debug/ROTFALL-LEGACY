@@ -1,16 +1,16 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=23';
-import * as CS from './cloudsave.js?v=23';
-import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=23';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=23';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=23';
-import { wearOf } from './buildings.js?v=23';
-import * as SP from './sprites.js?v=23';   /* Bestiarium: Gegnerbilder */
-import { townState, townPrice } from './sim.js?v=23';
-import { GOODS } from './data.js?v=23';
-import { target as ecoTarget } from './economy.js?v=23';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=23';
-import { sfx, ambience } from './sfx.js?v=23';
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=24';
+import * as CS from './cloudsave.js?v=24';
+import { ITEMS, RARITY, RARITY_VALUE, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=24';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=24';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=24';
+import { wearOf } from './buildings.js?v=24';
+import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
+import { townState, townPrice } from './sim.js?v=24';
+import { GOODS } from './data.js?v=24';
+import { target as ecoTarget } from './economy.js?v=24';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
+import { sfx, ambience } from './sfx.js?v=24';
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -45,7 +45,7 @@ const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber 
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
 const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
-function loadIcons() { import('./icons.js?v=23').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function loadIcons() { import('./icons.js?v=24').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
 function paintNav() {
   for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 3);
     b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : '') + `<span class="navlbl">${NAV_SHORT[G[0]] || G[1]}</span>` + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }   /* Entwickler: größere Symbole, Beschriftung darunter */
@@ -265,7 +265,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=23').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -510,33 +510,21 @@ function countItem(key) { return S.player.inv.filter(x => x && x.key === key).re
 // ---------------- Dialog ----------------
 export let dlgWith = null;
 export const uiHooks = {};                                           /* Koop: Gespräche eines Gasts laufen beim Host, das Fenster erscheint beim Gast (coop.js) */
-// Visuell D (02.10.2026): Antwortart als Zeichen vor der Wahl (Reihenfolge bleibt — Proben klicken [0]); c.k setzt sie ausdrücklich.
-const DLG_K = [['leave', /^\[?(Gehen|Nicht jetzt|Abbrechen|Zurück|Lass|Später|Nein)/i], ['fight', /angreif|kämpf|herausforder|Duell|töte|stirb|Klinge/i],
-  ['gold', /\d+\s*Gold|bezahl|besteche|Bestechung|zahle/i], ['quest', /Was liegt an|Erledigt\.|Ich mache es|Auftrag|Abgeben/], ['trade', /Handel|Waren|Zeig mir|kaufen|verkaufen/i], ['ask', /\?/]];
-let dlgTyper = 0;
 export function dialogue(npc, text, choices) {
   if (uiHooks.dialogue?.(npc, text, choices)) return;
-  const box = $('dialogue'), opening = box.classList.contains('hidden') || dlgWith !== npc;
-  box.classList.remove('hidden'); dlgWith = npc;
-  const story = !!A.dlgStory?.(npc, choices);
-  box.classList.toggle('story', story); box.dataset.mood = A.dlgMood?.(npc) || '';
-  if (opening && S.settings.motion) { box.classList.remove('dlg-in'); void box.offsetWidth; box.classList.add('dlg-in'); }
+  const box = $('dialogue');
+  box.classList.remove('hidden'); dlgWith = npc;   // S13: wer weggeht, beendet das Gespräch (game.js updatePrompt)
   $('dlg-name').textContent = npc.name;
-  let sub = $('dlg-sub'); if (!sub) { sub = el('div', 'dlg-sub'); sub.id = 'dlg-sub'; $('dlg-name').after(sub); }
-  sub.textContent = story ? [npc.title && npc.title !== npc.name ? npc.title : npc.prof, FACTIONS[npc.faction]?.name].filter(Boolean).join(' · ') : '';
-  // Text läuft ein (Klick vervollständigt; aus bei reduzierter Bewegung). textContent bleibt immer der volle Text.
-  const t = $('dlg-text'); t.style.whiteSpace = 'pre-line'; clearInterval(dlgTyper); t.onclick = null;
-  if (S.settings.motion && text && text.length > 12) {
-    const a = el('span'), r = el('span', 'dlg-rest'); a.textContent = ''; r.textContent = text; t.replaceChildren(a, r);
-    let i = 0; const done = () => { clearInterval(dlgTyper); a.textContent = text; r.textContent = ''; t.onclick = null; };
-    dlgTyper = setInterval(() => { i += 2; if (i >= text.length) return done(); a.textContent = text.slice(0, i); r.textContent = text.slice(i); }, 18);
-    t.onclick = done;
-  } else t.textContent = text;
+  $('dlg-text').textContent = text; $('dlg-text').style.whiteSpace = 'pre-line';   // Anschlagbrett: mehrere Zeilen
   drawPortraitTo($('dlg-portrait'), npc);
   const cc = $('dlg-choices'); cc.innerHTML = '';
-  choices.forEach(c => { const b = el('button', '', c.text); b.dataset.k = c.k || (DLG_K.find(([, re]) => re.test(b.textContent)) || [''])[0]; b.onclick = () => { if (c.fn) c.fn(); else closeDialogue(); }; cc.appendChild(b); });
+  choices.forEach(c => {
+    const b = el('button', '', c.text);
+    b.onclick = () => { if (c.fn) c.fn(); else closeDialogue(); };
+    cc.appendChild(b);
+  });
 }
-export function closeDialogue() { if (uiHooks.close?.()) return; clearInterval(dlgTyper); $('dialogue').classList.add('hidden'); }
+export function closeDialogue() { if (uiHooks.close?.()) return; $('dialogue').classList.add('hidden'); }
 export const dialogueOpen = () => !$('dialogue').classList.contains('hidden');
 
 let toastTimer = 0;
@@ -1042,7 +1030,7 @@ function facUI(body) {
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
-      ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
+      ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab rank-fac">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
       <h3 style="margin-top:14px">Krieg</h3>
       <canvas class="warmap" id="warmap" width="260" height="180"></canvas>
       <div class="ledger">${A.warStatus()}</div>
@@ -1159,9 +1147,6 @@ function settingsUI(body) {
         return `<button data-v="${k}" class="${S.settings.violence === k ? 'on' : ''}" aria-pressed="${S.settings.violence === k}">${n}</button>`; }).join('')}</div>
       <h3 style="margin-top:14px">Grafikstil</h3>
       <div class="ctx-actions"><button data-art="D" class="${S.settings.art === 'D' ? 'on' : ''}">Klassisch</button><button data-art="R" class="${S.settings.art === 'R' ? 'on' : ''}">Neu (gezeichnet)</button></div>
-      <h3 style="margin-top:14px">Schadenszahlen</h3>
-      <div class="ctx-actions" title="Reduziert: nur dein eigener Schaden und kritische Treffer. Die Farbe zeigt die Schadensart (hell Hieb, orange Feuer, blau Frost, grün Gift, dunkelrot Blutung, violett Magie/Schatten, gold Krit).">${[['off', 'Aus'], ['reduced', 'Reduziert'], ['full', 'Voll']].map(([k, n]) =>
-        `<button data-dn="${k}" class="${(S.settings.dmgNums || 'full') === k ? 'on' : ''}" aria-pressed="${(S.settings.dmgNums || 'full') === k}">${n}</button>`).join('')}</div>
       <h3 style="margin-top:14px">Bewegung</h3>
       <div class="ctx-actions"><button id="mot">Reduzierte Bewegung: ${S.settings.motion ? 'aus' : 'an'}</button></div>
       <h3 style="margin-top:14px">Ton</h3>
@@ -1190,7 +1175,6 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
   [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
-  [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
   $('sv').onclick = async () => { const ok = await A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)

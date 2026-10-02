@@ -121,33 +121,15 @@ export function chronicle(text, kind = 'event', detail = '') {
 
 export function ents(map = S.map) { return S.ents[map]; }
 // id → Entity. Index statt linearer Suche über ~3500 Entities (wird pro Frame vielfach gerufen: Aggro, Gruppe, Bedrohung).
-// Nachgeführt (siehe PERF-U2) und sofort neu bei neuem Weltstand; ein Treffer wird geprüft (gleiche Karte, noch dort), ein Fehlgriff sucht linear nach.
-/* PERF-U2 (02.10.): kein Komplett-Neubau mehr alle 250 ms (~17 000 Einträge, 1–3 ms Spitze, 4× je Sekunde). Je Karte merkt sich der
-   Index Liste, Länge und letzten Eintrag; höchstens alle 8 ms wird verglichen: unverändert → nichts; nur angehängt (push) → nur die
-   neuen Einträge eintragen; sonst (entfernt, ersetzt, neue Karte) → Neubau wie bisher, höchstens alle 250 ms (bis dahin gelten Treffer
-   wie bisher bis zu 250 ms weiter). Neuer Weltstand (S.ents oder S.ents.world ausgetauscht) baut sofort neu; spätestens nach 5 s ohnehin. */
-let idIndex = new Map(), idStamp = -1e9, idCheck = -1e9, idEnts = null, idWorld = null, idMiss = new Set(), idSig = [];
-function idRebuild(now) {
-  idIndex = new Map(); idMiss = new Set(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world; idSig = [];
-  for (const m of Object.keys(S.ents)) { const a = S.ents[m]; for (const e of a) idIndex.set(e.id, e); idSig.push(m, a, a.length, a[a.length - 1]); }
-}
-function idSync(now) {
-  idCheck = now;
-  if (idEnts !== S.ents || idWorld !== S.ents.world || now - idStamp > 5000) return idRebuild(now);
-  const ks = Object.keys(S.ents); let dirty = ks.length * 4 !== idSig.length;
-  for (let i = 0; !dirty && i < ks.length; i++) {
-    const j = i * 4, a = S.ents[ks[i]], n0 = idSig[j + 2], n = a.length;
-    if (idSig[j] !== ks[i] || idSig[j + 1] !== a) dirty = true;
-    else if (n === n0 && a[n - 1] === idSig[j + 3]) continue;
-    else if (n > n0 && (n0 === 0 || a[n0 - 1] === idSig[j + 3])) { for (let k = n0; k < n; k++) { const e = a[k]; idIndex.set(e.id, e); idMiss.delete(e.id); } idSig[j + 2] = n; idSig[j + 3] = a[n - 1]; }
-    else dirty = true;
-  }
-  if (dirty && now - idStamp > 250) idRebuild(now);
-}
+// Alle 250 ms neu aufgebaut und sofort bei neuem Weltstand; ein Treffer wird geprüft (gleiche Karte, noch dort), ein Fehlgriff sucht linear nach.
+let idIndex = new Map(), idStamp = 0, idEnts = null, idWorld = null, idMiss = new Set();
 export function byId(id) {
   if (id == null) return null;
   const now = performance.now();
-  if (idEnts !== S.ents || idWorld !== S.ents.world || now - idCheck > 8) idSync(now);
+  if (idEnts !== S.ents || idWorld !== S.ents.world || now - idStamp > 250) {
+    idIndex = new Map(); idMiss = new Set(); idStamp = now; idEnts = S.ents; idWorld = S.ents.world;
+    for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) idIndex.set(e.id, e);
+  }
   // AUDIT P-03: vorher prüfte jeder Treffer auf eine Tote per includes() über ~17 000 Einträge, und jeder Fehlgriff (Beziehung zu
   // einer Weggezogenen, Ziel eines Toten) suchte jedes Mal linear. Jetzt: Treffer gilt bis zum nächsten Neubau (≤ 250 ms), Fehlgriffe
   // werden bis dahin gemerkt.
