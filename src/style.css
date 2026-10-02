@@ -104,8 +104,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #nav button i{position:absolute;top:2px;left:4px;margin:0;font-size:9px}
 #nav .dot{display:none;position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 4px var(--gold)}
 #nav button.badge .dot{display:block}
-#modal-tabs{display:flex;gap:2px;margin-left:18px;flex:1}
-#modal-tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-family:"Cinzel",serif;font-size:11px;letter-spacing:.08em;padding:3px 9px}
+#modal-tabs{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 12px 0 24px;flex:1;min-width:0}
+#modal-tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-family:"Cinzel",serif;font-size:11px;letter-spacing:.08em;padding:4px 10px;white-space:nowrap;flex:0 0 auto}
 #modal-tabs button.on{color:var(--gold);border-bottom-color:var(--rust)}
 #modal-tabs button:hover{color:#e5daBF}
 .resico{width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:3px}
@@ -233,8 +233,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   box-shadow:0 0 0 1px #0b0907,0 24px 70px rgba(0,0,0,.8)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
   border-bottom:1px solid var(--iron);font-family:"Cinzel",serif;letter-spacing:.2em;color:#e7dcc2;font-size:15px}
-.modal-head button{background:none;border:none;color:#7d7362;font-size:16px}
-.modal-head button:hover{color:var(--rust)}
+.modal-head>button{background:none;border:none;color:#7d7362;font-size:16px}
+.modal-head>button:hover{color:var(--rust)}
 #modal-body{flex:1;overflow:auto;padding:16px}
 
 /* inventory */
@@ -413,7 +413,7 @@ body.touch #game-canvas{touch-action:none}
 :focus-visible{outline:1px solid var(--gold);outline-offset:2px}
 input{caret-color:var(--gold)}
 .wicon svg,.modal-head svg{display:block}
-.modal-head button{display:flex;align-items:center;justify-content:center;width:28px;height:28px}
+.modal-head>button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex:0 0 auto}   /* nur der Schließen-Knopf, nicht die Reiter */
 
 /* ---- Körpertafel ---- */
 .bodychart{width:44px;height:80px;flex:0 0 auto}
@@ -557,7 +557,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #fx-tip .k-bad{color:#d0705c}#fx-tip .k-good{color:#cbbf8a}#fx-tip .k-info{color:#9fb0c0}
 .fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.fx-row{display:flex;gap:8px;margin:6px 0}.fx-row b{color:#d8ccb0}
 .ctx-line.q-sub{font-size:11px;color:#8d836e;margin-top:-4px}.ctx-line.tracked span{color:#e0b75a}
-.rank-tab{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}.rank-tab td{padding:3px 6px;border-bottom:1px solid #2a241c;vertical-align:top;color:#9a8f78}.rank-tab tr.r-done td{color:#cbbf8a}.rank-tab tr.r-next td{color:#e0b75a}
+.rank-tab{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}.rank-tab td{padding:3px 6px;border-bottom:1px solid #2a241c;vertical-align:top;color:#9a8f78}.rank-tab tr.r-done td{color:#cbbf8a}.rank-tab tr.r-next td{color:#e0b75a}.rank-fac td:first-child{white-space:nowrap}
 .save-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0 18px}
 #minimap{position:absolute;top:10px;right:10px;width:180px;height:180px;z-index:5;cursor:pointer;box-shadow:0 2px 10px #000c;opacity:.95}
 #sleep-fade{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050403;color:#d8ccb0;pointer-events:none;opacity:0;transition:opacity .9s}#sleep-fade.on{opacity:1}#sleep-fade.off{opacity:0;transition:opacity 1.6s}#sleep-fade div{font-size:42px;color:#e0b75a}#sleep-fade small{color:#8d836e;letter-spacing:.2em}
