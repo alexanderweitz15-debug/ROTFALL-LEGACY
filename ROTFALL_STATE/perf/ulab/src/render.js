@@ -67,9 +67,8 @@ function visibleEnts(arr, xa, ya, xb, yb) {
   for (const e of VIS.dyn) if (inView(e)) out.push(e);
   return out;
 }
-const PT = window.__PT = {}; let _pt = 0; const tk = n => { const t = performance.now(); PT[n] = (PT[n] || 0) + t - _pt; _pt = t; }; /*PERFTMP*/
 export function drawFrame(now) {
-  if (!ctx) return; _pt = performance.now(); /*PERFTMP*/
+  if (!ctx) return;
   const m = MAPS[S.map]; if (!m) return;
   curRegion = S.map === 'world' && S.player ? regionAt(S.player.x / TS | 0, S.player.y / TS | 0) : 'greenmark';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -86,26 +85,22 @@ export function drawFrame(now) {
   for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++)
     for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++)
       ctx.drawImage(chunkCanvas(m, cx, cy), cx * CH * TS, cy * CH * TS, CH * TS + 0.5, CH * TS + 0.5);
-  tk('chunks'); /*PERFTMP*/
   prefetchChunk(m, Math.floor(x0 / CH), Math.floor(y0 / CH), Math.floor(x1 / CH), Math.floor(y1 / CH));
   const isW = (tx, ty) => tileAt(S.map, tx, ty) === T.WATER;
   if (S.map === 'deck' && S.voyage?.air) drawSkyDeck(m, x0, y0, x1, y1, now);   /* Roadmap P7: an Bord eines Luftschiffs — Himmel statt Wasser */
   else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (m.tiles[ty * m.w + tx] === T.WATER && isW(tx - 1, ty) && isW(tx + 1, ty) && isW(tx, ty - 1) && isW(tx, ty + 1)) drawWater(tx, ty, now);
 
-  tk('water'); /*PERFTMP*/
   // Objekte nach y sortiert; Gebäude sortieren an ihrer Grundlinie (was dahinter steht, verdeckt das Dach)
   const list = visibleEnts(S.ents[S.map], cam.x - 80, cam.y - 100, cam.x + W / cam.zoom + 80, cam.y + H / cam.zoom + 120);   // S12: Raster statt 14 000 Prüfungen
   for (const b of HOUSES) if (b.map === S.map && (b.x + b.w) * TS > cam.x - 40 && b.x * TS < cam.x + W / cam.zoom + 40 && (b.y + b.h) * TS > cam.y && b.y * TS - 60 < cam.y + H / cam.zoom)
     list.push(houseEnt(b));
   if (S.map === 'world') { if (TOWER_AT.arr !== S.ents.world) TOWER_AT = { arr: S.ents.world, e: S.ents.world.find(e => e.type === 'mage_tower') };   // S15 P6: der hohe Turm bleibt sichtbar, auch wenn sein Fuß unter dem Bildrand liegt
     const MT = TOWER_AT.e; if (MT && !list.includes(MT) && MT.x > cam.x - 220 && MT.x < cam.x + W / cam.zoom + 220 && MT.y > cam.y && MT.y < cam.y + H / cam.zoom + 900) list.push(MT); }
-  tk('cull'); /*PERFTMP*/
   list.sort((a, b) => (a.y + (a.kind === 'corpse' ? -999 : 0)) - (b.y + (b.kind === 'corpse' ? -999 : 0)));
   for (const e of list) if (e.cone && e.alive && !e.downed) {        // S12 E: Sichtkegel der Automaten (nur ohne Aufenthaltsschein)
     const a = e.aim || 0; ctx.fillStyle = e.cone === 2 ? 'rgba(220,60,40,.16)' : 'rgba(240,200,90,.10)';
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 150, a - 0.7, a + 0.7); ctx.closePath(); ctx.fill(); }
-  tk('sort'); /*PERFTMP*/
-  for (const e of list) { const t0 = performance.now(); drawEntity(e, now); const k = 'E_' + (e.kind === 'prop' ? 'prop' : e.kind); PT[k] = (PT[k] || 0) + performance.now() - t0; PT['n_' + k] = (PT['n_' + k] || 0) + 1; } tk('ents'); /*PERFTMP*/
+  for (const e of list) drawEntity(e, now);
   shown = list;
   for (const p of S.projectiles) drawProjectile(p);
   drawFx(now);
@@ -122,19 +117,18 @@ export function drawFrame(now) {
     ctx.fillStyle = 'rgba(12,10,8,.7)'; ctx.fillRect(e.x - w / 2, y - 9, w, 12);
     ctx.fillStyle = e.kind === 'player' ? '#e8c070' : '#9fd0f0'; ctx.fillText(t, e.x, y); ctx.textAlign = 'left';
   }
-  tk('fxmisc'); /*PERFTMP*/
-  drawAmbience(now, list, m, x0, y0, x1, y1); tk('amb'); /*PERFTMP*/   /* Artist Runde 7: Umgebungsleben */
+  drawAmbience(now, list, m, x0, y0, x1, y1);   /* Artist Runde 7: Umgebungsleben */
   drawSkyLife(now);   // Nutzer S13: Luftschiffe über Aurelion, Vögel über dem Land
   drawFires(now);     // S14: Brand in der Stadt
-  ctx.restore(); tk('sky'); /*PERFTMP*/
-  drawLight(now); tk('light'); /*PERFTMP*/
+  ctx.restore();
+  drawLight(now);
   drawAmbienceGlow();   /* Artist Runde 7 */
-  drawWeather(now); tk('weather'); /*PERFTMP*/
+  drawWeather(now);
   drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
   drawFloats();
   drawBubbles(performance.now());
   drawBossBar();
-  drawTrack(now); tk('ui'); /*PERFTMP*/
+  drawTrack(now);
 }
 // S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
 let track = null;
@@ -255,7 +249,6 @@ function chunkCanvas(m, cx, cy) {
   const key = S.map + ':' + cx + ',' + cy;
   let cv = chunkCache.get(key);
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
-  PT.n_chunkMiss = (PT.n_chunkMiss || 0) + 1; /*PERFTMP*/
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
   bakeGround(o, m, cx, cy);

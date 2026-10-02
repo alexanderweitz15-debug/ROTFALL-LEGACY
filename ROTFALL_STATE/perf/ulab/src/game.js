@@ -13,6 +13,10 @@ import * as ECO from './economy.js?v=23';
 import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo } from './anim.js?v=23';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=23';
 import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=23';
+const __PR = (window.__PR = {}); let __t0 = 0, __lab = '';
+function __T(l){ const n = performance.now(); if (__lab) __PR[__lab] = (__PR[__lab]||0) + n - __t0; __lab = l; __t0 = n; }
+const __W = (name, f) => function(...a){ const n = performance.now(); try { return f.apply(this, a); } finally { const k = name + ':' + (a[0]?.kind||''); __PR[k] = (__PR[k]||0) + performance.now() - n; } };
+
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -2372,45 +2376,77 @@ function stepHidden() {
 }
 const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
 function update(dt, now) {
+  __T('L2375');
   if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
+  __T('L2376');
   const p = S.player;
+  __T('L2377');
   coopHooks.hostTick?.(dt);
+  __T('L2378');
   if (S.cine?.pause) { cineTick(dt); updateFx(dt); camStep(p, dt); return; }   /* T17 (Nutzer): Boss-Auftritt — die Welt steht, Bild und Szene laufen */
   // Zeit
+  __T('L2380');
   if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
+  __T('L2381');
   deathTick();                 /* Roadmap P8: Todesabläufe */
+  __T('L2382');
   if (S.voyage) seaTick(dt);  // S14: Überfahrt an Deck
+  __T('L2383');
   if (S.fires?.length) fireTick(dt);   // S14: Brand in der Stadt
+  __T('L2384');
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
+  __T('L2385');
   if (S.player?.casting) castTick(S.player);   // S15 P4
+  __T('L2386');
   mountTick(dt);                               // S15: gerufenes Pferd läuft heran
+  __T('L2387');
   if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
+  __T('L2388');
   dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
+  __T('L2389');
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
+  __T('L2390');
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
+  __T('L2391');
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
+  __T('L2392');
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); }      /* Umbau S3: Burgfrieden */
+  __T('L2393');
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); }  /* Ratgeber */
+  __T('L2394');
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
+  __T('L2395');
   S.minute += dt / 1000;
+  __T('L2396');
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
+  __T('L2397');
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
+  __T('L2398');
   S.weatherLeft -= dt / 1000;
+  __T('L2399');
   if (S.weatherLeft <= 0) {
     const w0 = S.weather; S.weather = pick(weatherPool(p));
     S.weatherLeft = ri(120, 420);
     if (S.weather !== w0 && WX[S.weather] && S.map === 'world') log(WX[S.weather].txt, 'world');   /* Roadmap C.12: Wirkung erklären */
   }
+  __T('L2404');
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
+  __T('L2405');
   const hour = Math.floor(S.minute / 60);
+  __T('L2406');
   if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
+  __T('L2407');
   if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
+  __T('L2408');
   festTick(); roadTick(dt);
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
   // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
+  __T('L2412');
   const A = actorsOf(S.map, now);
+  __T('L2413');
   combat = A.list.filter(e => e.alive && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
+  __T('L2414');
   for (const c of (S.map === 'world' ? A.cars : S.ents.world.filter(e => e.kind === 'caravan'))) if (c.kind === 'caravan' && c.alive) {
     const near = performance.now() - (c.lastHurt || -1e9) < 4000;          // hält nur, solange sie angegriffen wird
     SIM.caravanFrame(c, dt, p, near);
@@ -2423,9 +2459,13 @@ function update(dt, now) {
       e.anchor = { x: q.x, y: q.y }; e.vx = e.vy = 0; e.wander = null; e.threatId = null;
     }
   }
+  __T('L2426');
   if (p.alive) controlPlayer(dt);
+  __T('L2427');
   for (const e of [...actorsOf(S.map, now).list]) think(e, dt);   // BUG-108: nur Handelnde, nicht 14 000 Props
+  __T('L2428');
   separate();                                                     // S12: niemand steht im anderen
+  __T('L2429');
   if (S.rising && S.rising.length) {                              // Wiedergänger: Zucken als Ansage, nach 6 Spielminuten steht er auf
     const now = clock();
     for (let i = S.rising.length - 1; i >= 0; i--) { const r = S.rising[i];
@@ -2438,22 +2478,32 @@ function update(dt, now) {
       if (r.map === S.map && dist(g, S.player) < 600) log('Der Wiedergänger steht wieder auf.', 'combat');
     }
   }
+  __T('L2441');
   pursuitT = (pursuitT || 0) + dt;
+  __T('L2442');
   if (pursuitT > 250) { pursuitT = 0; arrivingPursuers(); }
+  __T('L2443');
   updateProjectiles(dt);
+  __T('L2444');
   updateFx(dt);
+  __T('L2445');
   updateBuildings(dt);
+  __T('L2446');
   camStep(p, dt);
 
   // Platzieren
+  __T('L2449');
   if (placing) {
     placing.ghost.x = Math.floor(mouse.wx / TS) * TS + placing.def.w * TS / 2;
     placing.ghost.y = Math.floor(mouse.wy / TS) * TS + placing.def.h * TS / 2;
     placing.ghost.blocked = !canPlace(placing.ghost);
   }
 
+  __T('L2455');
   drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
+  __T('L2456');
   hudTimer += dt;
+  __T('L2457');
   if (hudTimer > 180) {
     const gone = e => e && (!e.alive || e.map !== S.map || !S.ents[S.map].includes(e) || dist(e, S.player) > 900);   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
@@ -2467,17 +2517,26 @@ function update(dt, now) {
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
     if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
   }
+  __T('L2470');
   ambT = (ambT || 0) + dt;
+  __T('L2471');
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
     ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright);
   }
+  __T('L2475');
   respawnTimer += dt;
+  __T('L2476');
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
+  __T('L2477');
   simTimer += dt;
+  __T('L2478');
   if (simTimer > 4000) { simTimer = 0; questCheck(); if (S.map === 'world' && !S._frozenWar) SIM.battleCheck(); }   // _frozenWar: Selbsttest-Proben
+  __T('L2479');
   travelTimer += dt;
+  __T('L2480');
   if (travelTimer > 6000) { travelTimer = 0; travelTick(); }
+  __T('');
 }
 
 // Eine Entität einen Schritt denken lassen. Einziger Einstieg in die KI: wer am Boden liegt oder tot ist, entscheidet nichts.
@@ -2530,7 +2589,8 @@ function eliteKit(e) {
   for (const k of set.pieces) { const sl = ITEMS[k].slot; if (!e.equip[sl] || (ITEMS[e.equip[sl].key]?.armor || 0) < ITEMS[k].armor) e.equip[sl] = mkItem(k); }
   recalc(e);
 }
-function think(e, dt) {
+const think = __W('think', think0);
+function think0(e, dt) {
   if (!e.alive) return;
   if (e.downed && e.kind === 'npc' && !e.brawlKO && chance(dt / 5000) && dist(e, S.player) < 520) float(e, pick(['Hilfe …', 'Bitte … helft mir …', 'Hierher …', 'Ich blute …']), 'rgba(220,160,140,ALPHA)');   /* §5f: Verletzte rufen */
   if (e.eliteKey) eliteTick(e, dt);
@@ -3974,7 +4034,8 @@ const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', t
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
 const UNDEAD_FX = { necromancer: 'necro', zombie: 'necro', ash_demon: 'fire', shade: 'shadow', death_knight: 'frost', garmadon: 'blood', wraith: 'ghost', flesh_golem: 'blood', cultist: 'shadow' };
 function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt / (e.mtype === 'ash_demon' || e.mtype === 'garmadon' ? 220 : 420))) fx(e.x + ri(-8, 8), e.y - ri(4, 30), k, 1); }
-function updateEnemy(e, dt) {
+const updateEnemy = __W('updateEnemy', updateEnemy0);
+function updateEnemy0(e, dt) {
   if (!e.alive) return;
   const p = S.player;
   if (e.mageHunter) mageHunterTick(e, dt);                           // S15 P7
@@ -4483,7 +4544,8 @@ function resolveSwingEnemy(e) {
 
 let FOES = [], FOES_OF = null;
 const foesNow = () => { if (FOES_OF !== combat) { FOES_OF = combat; FOES = combat.filter(x => x.kind === 'enemy' && x.alive && teamOf(x) === 'foe'); } return FOES; };   // AUDIT P-03: vorher suchte jede Figur in allen ~120 Kämpfern (1,8 ms je Bild)
-function updateNpc(e, dt) {
+const updateNpc = __W('updateNpc', updateNpc0);
+function updateNpc0(e, dt) {
   if (!e.alive) return;
   if (S.party.includes(e.id)) return partyAI(e, dt);
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
@@ -4697,7 +4759,8 @@ function partyCare(m, dt) {                                  // true = kümmert 
   }
   return false;
 }
-function partyAI(m, dt) {
+const partyAI = __W('partyAI', partyAI0);
+function partyAI0(m, dt) {
   const p = S.player;
   if (m.coopPilot && m.map === S.map && coopHooks.remote?.(m, dt)) return;   /* Koop K2: ein Gast steuert diese Figur; ohne Eingabe seit 1 s folgt sie wieder der KI */
   if (m.downed) { m.vx = m.vy = 0; return; }

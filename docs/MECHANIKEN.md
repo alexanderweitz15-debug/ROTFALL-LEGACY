@@ -1006,3 +1006,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Fällt Varonheim, ist die Varonsburg sofort leer, und der Hof ist im Exil. Zwei Knochenwachen halten das Burgtor, vier Untote den Burghof, und auf dem Thron liegt ein Leichnam. Burgfrieden gibt es keinen.
 - Wird die Stadt befreit, steht der Hof wieder in der Burg, mit Gerold am Tor.
 - Hof-Figuren nehmen nur Schaden von dir, deiner Gruppe, Koop-Mitspielern und Belagerern. Weltereignisse töten den König nicht nebenbei.
+
+## Burgtor: nur mit Grund — oder mit Gewalt
+- Das Burgtor ist jetzt fünf Felder breit, zwischen zwei Tortürmen mit Bannern und Fackeln.
+- Hinein kommt nur, wer einen Grund hat: Rang in der Armee (ab Soldat), Ritterwürde, eine gewährte Audienz, einen Königsauftrag oder Ermittlungen im Blutkult. Sonst reichst du an der Torwache eine Bittschrift ein (25 Gold, gilt für den Tag).
+- Danach folgt die Durchsuchung wie gewohnt.
+- Ohne Grund bleiben die Bittschrift, die Bestechung oder Gewalt. Mit Gewalt gibt es Alarm, die Garde greift an, Valen −20 und Kopfgeld.
+- Debug: „Burgtor: Grund prüfen“.

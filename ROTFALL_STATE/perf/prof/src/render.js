@@ -255,7 +255,6 @@ function chunkCanvas(m, cx, cy) {
   const key = S.map + ':' + cx + ',' + cy;
   let cv = chunkCache.get(key);
   if (cv) { chunkCache.delete(key); chunkCache.set(key, cv); return cv; }
-  PT.n_chunkMiss = (PT.n_chunkMiss || 0) + 1; /*PERFTMP*/
   cv = document.createElement('canvas'); cv.width = cv.height = CH * 16;
   const o = cv.getContext('2d');
   bakeGround(o, m, cx, cy);

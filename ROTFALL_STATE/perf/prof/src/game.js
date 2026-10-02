@@ -2371,27 +2371,28 @@ function stepHidden() {
   last = performance.now();
 }
 const coopHooks = {};                                              /* Koop K2: src/coop.js hängt sich hier ein (hostTick, remote, guestTick, key) */
+const __T=(k,f)=>{const a=performance.now(); const r=f(); __acc(k,a); return r;}; const __acc=(k,a)=>{const W=window.__PT||(window.__PT={}); W[k]=(W[k]||0)+performance.now()-a;};
 function update(dt, now) {
   if (S.dying && performance.now() - S.dying.t0 > 3000) return dyingEnd();   /* T10: nach 3 s Echtzeit der Todesbildschirm (auch im Hintergrund-Tick) */
   const p = S.player;
   coopHooks.hostTick?.(dt);
-  if (S.cine?.pause) { cineTick(dt); updateFx(dt); camStep(p, dt); return; }   /* T17 (Nutzer): Boss-Auftritt — die Welt steht, Bild und Szene laufen */
+  if (S.cine?.pause) { cineTick(dt); __T('updateFx',()=>updateFx(dt)); __T('camStep',()=>camStep(p, dt)); return; }   /* T17 (Nutzer): Boss-Auftritt — die Welt steht, Bild und Szene laufen */
   // Zeit
   if (S.cine) cineTick(dt);   // Nutzer S13: Kamerafahrt läuft
-  deathTick();                 /* Roadmap P8: Todesabläufe */
+  __T('deathTick',()=>deathTick());                 /* Roadmap P8: Todesabläufe */
   if (S.voyage) seaTick(dt);  // S14: Überfahrt an Deck
   if (S.fires?.length) fireTick(dt);   // S14: Brand in der Stadt
   if (VOIDS.length) voidTick(dt);      // S15 Hexenmeister: Obeliskentor
   if (S.player?.casting) castTick(S.player);   // S15 P4
-  mountTick(dt);                               // S15: gerufenes Pferd läuft heran
+  __T('mountTick',()=>mountTick(dt));                               // S15: gerufenes Pferd läuft heran
   if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
-  dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
+  __T('dkAuraTick',()=>dkAuraTick(p, dt));                           // S15 P19: Frostaura der Eidwacht
   if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
-  if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
-  if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
-  if ((keepT += dt) > 250) { keepT = 0; keepTick(); }      /* Umbau S3: Burgfrieden */
-  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); }  /* Ratgeber */
-  if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
+  if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; __T('questTargetTick',()=>questTargetTick()); }   // S15: Auftragsziele nachschieben
+  if ((arrT += dt) > 900) { arrT = 0; __T('arrivalTick',()=>arrivalTick()); }   /* T17: Ankunft in einer Siedlung */
+  if ((keepT += dt) > 250) { keepT = 0; __T('keepTick',()=>keepTick()); }      /* Umbau S3: Burgfrieden */
+  if ((guideT += dt) > 3000) { guideT = 0; __T('guideTick',()=>guideTick()); }  /* Ratgeber */
+  if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; __T('morrTick',()=>morrTick()); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
@@ -2403,13 +2404,13 @@ function update(dt, now) {
   }
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
   const hour = Math.floor(S.minute / 60);
-  if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
-  if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
-  festTick(); roadTick(dt);
+  if (hour !== lastHour) { lastHour = hour; __T('hourTick',()=>hourTick(hour)); }
+  if (S.day !== lastDay) { lastDay = S.day; __T('dayTick',()=>dayTick()); }
+  __T('festTick',()=>festTick()); __T('roadTick',()=>roadTick(dt));
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
   // Einmal je Frame statt je NPC/Gegner über alle ~300 Kämpfer der Welt zu suchen.
-  const A = actorsOf(S.map, now);
+  const _a0=performance.now(); const A = actorsOf(S.map, now); __acc('actorsOf',_a0);
   combat = A.list.filter(e => e.alive && Math.abs(e.x - p.x) < 1700 && Math.abs(e.y - p.y) < 1700);
   for (const c of (S.map === 'world' ? A.cars : S.ents.world.filter(e => e.kind === 'caravan'))) if (c.kind === 'caravan' && c.alive) {
     const near = performance.now() - (c.lastHurt || -1e9) < 4000;          // hält nur, solange sie angegriffen wird
@@ -2423,9 +2424,9 @@ function update(dt, now) {
       e.anchor = { x: q.x, y: q.y }; e.vx = e.vy = 0; e.wander = null; e.threatId = null;
     }
   }
-  if (p.alive) controlPlayer(dt);
-  for (const e of [...actorsOf(S.map, now).list]) think(e, dt);   // BUG-108: nur Handelnde, nicht 14 000 Props
-  separate();                                                     // S12: niemand steht im anderen
+  if (p.alive) __T('controlPlayer',()=>controlPlayer(dt));
+  {const _a=performance.now(); for (const e of [...actorsOf(S.map, now).list]) think(e, dt); __acc('think',_a);}   // BUG-108: nur Handelnde, nicht 14 000 Props
+  __T('separate',()=>separate());                                                     // S12: niemand steht im anderen
   if (S.rising && S.rising.length) {                              // Wiedergänger: Zucken als Ansage, nach 6 Spielminuten steht er auf
     const now = clock();
     for (let i = S.rising.length - 1; i >= 0; i--) { const r = S.rising[i];
@@ -2439,11 +2440,11 @@ function update(dt, now) {
     }
   }
   pursuitT = (pursuitT || 0) + dt;
-  if (pursuitT > 250) { pursuitT = 0; arrivingPursuers(); }
-  updateProjectiles(dt);
-  updateFx(dt);
-  updateBuildings(dt);
-  camStep(p, dt);
+  if (pursuitT > 250) { pursuitT = 0; __T('arrivingPursuers',()=>arrivingPursuers()); }
+  __T('updateProjectiles',()=>updateProjectiles(dt));
+  __T('updateFx',()=>updateFx(dt));
+  __T('updateBuildings',()=>updateBuildings(dt));
+  __T('camStep',()=>camStep(p, dt));
 
   // Platzieren
   if (placing) {
@@ -2452,15 +2453,15 @@ function update(dt, now) {
     placing.ghost.blocked = !canPlace(placing.ghost);
   }
 
-  drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
+  __T('drawMini',()=>drawMini(dt)); __T('reactTick',()=>reactTick(dt)); __T('ambientTick',()=>ambientTick(dt)); __T('sceneTick',()=>sceneTick());
   hudTimer += dt;
   if (hudTimer > 180) {
     const gone = e => e && (!e.alive || e.map !== S.map || !S.ents[S.map].includes(e) || dist(e, S.player) > 900);   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
-    hudTimer = 0; UI.refreshHUD(); UI.renderContext(selected || hovered); updatePrompt();
-    { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
-    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
-    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); conTick(); jailTick(); }
+    hudTimer = 0; __T('UI.refreshHUD',()=>UI.refreshHUD()); __T('UI.renderContext',()=>UI.renderContext(selected || hovered)); __T('updatePrompt',()=>updatePrompt());
+    { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); __T('R.setTrack',()=>R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null)); }   // S13: Kompass
+    if (S.map === 'world') __T('revealAround',()=>revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1))));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
+    if ((tribT += 180) >= 1000) { tribT = 0; __T('tribTick',()=>tribTick()); __T('campTick',()=>campTick()); __T('chainTick',()=>chainTick()); __T('raidTick',()=>raidTick()); __T('myRaidTick',()=>myRaidTick()); __T('bigSecond',()=>bigSecond()); __T('afterSecond',()=>afterSecond()); __T('lostGobTick',()=>lostGobTick()); __T('aurelTick',()=>aurelTick()); __T('conTick',()=>conTick()); __T('jailTick',()=>jailTick()); }
     if (S.map === 'world') for (const l of LOCATIONS)
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }
     if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
@@ -2470,14 +2471,14 @@ function update(dt, now) {
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
-    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright);
+    __T('ambienceTick',()=>ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright));
   }
   respawnTimer += dt;
-  if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
+  if (respawnTimer > 12000) { respawnTimer = 0; __T('respawnTick',()=>respawnTick()); }
   simTimer += dt;
-  if (simTimer > 4000) { simTimer = 0; questCheck(); if (S.map === 'world' && !S._frozenWar) SIM.battleCheck(); }   // _frozenWar: Selbsttest-Proben
+  if (simTimer > 4000) { simTimer = 0; __T('questCheck',()=>questCheck()); if (S.map === 'world' && !S._frozenWar) __T('SIM.battleCheck',()=>SIM.battleCheck()); }   // _frozenWar: Selbsttest-Proben
   travelTimer += dt;
-  if (travelTimer > 6000) { travelTimer = 0; travelTick(); }
+  if (travelTimer > 6000) { travelTimer = 0; __T('travelTick',()=>travelTick()); }
 }
 
 // Eine Entität einen Schritt denken lassen. Einziger Einstieg in die KI: wer am Boden liegt oder tot ist, entscheidet nichts.
