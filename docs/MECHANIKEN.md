@@ -952,3 +952,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Die Siedlung geht ans Haus
 - Stirbt dein Held, übernimmt der Erbe die Siedlung. Die Siedler trauern (Moral −10), das Log meldet den Übergang.
+
+## Gold-Sog: Baumaterial zukaufen
+- Fehlt dir Material für einen Bau, kaufen Fuhrleute es für Gold zu: Holz 4, Stein 5, Eisen 12 Gold je Einheit, Lieferung eingerechnet. Der Bauplan zeigt den Preis an. Wer reich ist, baut schneller; wer arm ist, sammelt.
+- Debug: „Gold-Sog: Material auf 0 (Zukauf testen)“.

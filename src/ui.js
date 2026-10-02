@@ -951,7 +951,7 @@ function bldCard(k, b) {
     <span class="bfoot">${costPics(b.cost)}<span class="btime" title="Bauzeit">${icoImg('time', 1, 'ico')}${b.time}s</span></span></button>`;
 }
 function bldDetail(box, k, place) {
-  const def = BUILDINGS[k], can = A.canAfford(def.cost);
+  const def = BUILDINGS[k], can0 = A.canAfford(def.cost), mg = can0 ? 0 : (A.missGold?.(def.cost) || 0), buy = !can0 && mg > 0 && S.gold >= mg, can = can0 || buy;   /* Gold-Sog: Zukauf */
   box.innerHTML = `<div class="bd-head">${bldImg(k, 5, 'bimg-big')}<div><h3>${def.name}</h3><div>${def.desc}</div></div></div>
     <div class="bd-row"><div class="bd-plan"><canvas id="bdplan"></canvas><small>Grundriss ${def.w}×${def.h} Felder · Punkt = ein Mensch</small></div>
       <div class="bd-facts"><div class="statline"><span>Kosten</span><b>${costPics(def.cost, true)}</b></div>
@@ -959,7 +959,7 @@ function bldDetail(box, k, place) {
         <div class="statline"><span>Fläche</span><b>${def.w}×${def.h}</b></div>
         ${def.pop ? `<div class="statline"><span>Schlafplätze</span><b>${def.pop}</b></div>` : ''}</div></div>
     <div class="ctx-actions"><button id="place"${can ? '' : ' class="cant"'}>Platzieren</button></div>
-    <div class="bd-hint">${can ? 'In der Welt: grüne Felder sind frei, rote belegt. Der Kreis um dich ist die Reichweite. Linksklick baut, Rechtsklick oder Esc bricht ab.' : 'Es fehlt Material (rot markiert). Holz, Stein und Eisen kommen aus Sammeln und Siedlerarbeit.'}</div>`;
+    <div class="bd-hint">${can ? 'In der Welt: grüne Felder sind frei, rote belegt. Der Kreis um dich ist die Reichweite. Linksklick baut, Rechtsklick oder Esc bricht ab.' : 'Es fehlt Material (rot markiert). Holz, Stein und Eisen kommen aus Sammeln und Siedlerarbeit.'}${buy ? ` Fehlendes Material kaufen Fuhrleute zu: <b>${mg} Gold</b>.` : !can0 && mg ? ` Zukauf möglich ab ${mg} Gold.` : ''}</div>`;
   $('place').onclick = () => place(k);
   drawPlan($('bdplan'), k, def);
 }

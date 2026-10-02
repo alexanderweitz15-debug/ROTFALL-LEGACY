@@ -10261,6 +10261,16 @@ function foundCamp(x, y, name) {
   recalc(p); save();
 }
 function canAfford(cost) { return Object.entries(cost).every(([k, v]) => S.res[k] >= v); }
+// Scout R9 (Entwickler 02.10.2026): Gold-Sog — fehlt Baumaterial, kaufen Fuhrleute es zu: Holz 4, Stein 5, Eisen 12 Gold je Einheit
+// (Lieferaufschlag eingerechnet). Ab dem Mittelspiel wird Gold so zu Bauland: wer reich ist, baut schneller, wer arm ist, sammelt.
+const BUY_RES = { wood: 4, stone: 5, iron: 12, food: 3 };
+const missGold = cost => Object.entries(cost).reduce((g, [k, v]) => g + Math.max(0, v - (S.res[k] || 0)) * (BUY_RES[k] || 10), 0);
+function buyMissing(cost) {                                          /* fehlendes Material mit Gold zukaufen; true, wenn danach bezahlbar */
+  const g = missGold(cost); if (!g) return true; if (S.gold < g) return false;
+  S.gold -= g; for (const [k, v] of Object.entries(cost)) S.res[k] = Math.max(S.res[k] || 0, v);
+  log(`Fuhrleute bringen das fehlende Material: ${g} Gold.`, 'economy'); if (!S.flags.buyResHint) { S.flags.buyResHint = 1; log('Tipp: Fehlt dir Holz, Stein oder Eisen, kaufen Fuhrleute es für Gold zu (Holz 4, Stein 5, Eisen 12 je Einheit).', 'quest'); }
+  return true;
+}
 function payCost(cost) { for (const [k, v] of Object.entries(cost)) S.res[k] -= v; }
 function canPlace(g) {
   const def = g.def;
@@ -10272,7 +10282,7 @@ function canPlace(g) {
 }
 function placeBuilding(type, x, y, free) {
   const def = BUILDINGS[type];
-  if (!free && !canAfford(def.cost)) { UI.toast('Zu wenig Material'); return null; }
+  if (!free && !canAfford(def.cost) && !buyMissing(def.cost)) { UI.toast(`Zu wenig Material — Zukauf kostet ${missGold(def.cost)} Gold`); return null; }
   if (!free) payCost(def.cost);
   const b = { id: uid(), kind:'building', type, def, map: S.map, x, y, r: Math.max(def.w, def.h) * TS / 2,
     built: 0.02, cond: 1, solid: ['palisade', 'hut', 'smithy', 'watchtower', 'storage'].includes(type), workers: 0 };
@@ -15084,7 +15094,8 @@ function dodge() {
 }
 function startPlacing(type) {
   const def = BUILDINGS[type];
-  if (!canAfford(def.cost)) return UI.toast('Zu wenig Material');
+  if (!canAfford(def.cost) && S.gold < missGold(def.cost)) return UI.toast(`Zu wenig Material — Zukauf kostet ${missGold(def.cost)} Gold`);
+  if (!canAfford(def.cost)) UI.toast(`Fehlendes Material wird beim Bauen zugekauft: ${missGold(def.cost)} Gold`, 2200);
   placing = { type, def, ghost: { id:'ghost', kind:'building', type, def, map: S.map, x: S.player.x, y: S.player.y, built: 0, ghost: true, cond: 1, transient: true } };
   S.ents[S.map].push(placing.ghost);
   UI.toast(`${def.name} platzieren — Linksklick`);
@@ -15150,6 +15161,7 @@ function debugSections() {
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
+      'Gold-Sog: Material auf 0 (Zukauf testen)': () => { for (const k of Object.keys(BUY_RES)) S.res[k] = 0; S.gold = Math.max(S.gold, 500); UI.toast('Vorrat leer, 500 Gold'); },
       'Rang bremst Kult: Valen-Rang 3 setzen': () => { S.ranks.valen = 3; UI.toast(`Kultbremse: ${cultBrake() ? 'an' : 'aus'}`); },
       'Ratgeber an/aus': () => { S.settings.tips = S.settings.tips === false; UI.toast(S.settings.tips === false ? 'Ratgeber aus' : 'Ratgeber an'); },
       'Ratgeber: alle Tipps zurücksetzen': () => { S.flags.tips = {}; guideLast = -1e9; UI.toast('Tipps kommen wieder'); },
@@ -19123,6 +19135,13 @@ export function selftest() {
       const slow = run(3), fast = run(0); return slow === 30 && fast === 20;
     } finally { S.cult = C0; S.ranks.valen = rv; S.ranks.order = ro; S.difficulty = d0; }
   }));
+  ok('Gold-Sog: fehlendes Baumaterial wird mit Gold zugekauft (Hütte ohne Vorrat = 20×4 + 8×5 = 120 Gold); ohne Gold nicht', sandbox(() => {
+    const r0 = { ...S.res }, g0 = S.gold, f0 = S.flags.buyResHint;
+    try { S.res.wood = 0; S.res.stone = 0; S.gold = 120; const need = missGold(BUILDINGS.hut.cost), ok1 = buyMissing(BUILDINGS.hut.cost) && S.gold === 0 && canAfford(BUILDINGS.hut.cost);
+      S.res.wood = 0; S.res.stone = 0; const no = !buyMissing(BUILDINGS.hut.cost) && S.res.wood === 0;
+      return need === 120 && ok1 && no;
+    } finally { Object.assign(S.res, r0); S.gold = g0; S.flags.buyResHint = f0; }
+  }));
   ok('Folgen §5c/1: Dorf ausgelöscht — Ruine mit Gräbern; war es der Spieler: Kopfgeld, Rachezug; Spuk- und Nestauftrag; Schwer: Neubesiedlung erst nach beiden Taten; Angsthase: Heimkehr in Stufen', afterBox(() => {
     const V = VILLAGES.find(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && villagersOf(V.key).length >= 2 && livingTowns(V.key).length); if (!V) return false;
     const p = stage(), k = V.key; S.difficulty = 'schwer'; S.razed = {}; S.after = {}; const f = townFac(k), b0 = S.bounty?.[f] || 0;
@@ -19389,7 +19408,7 @@ function boot() {
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford,
+    setClass, setTitleClass, tres, resMax, learnNode, nodeState, armorOf, damageOf, population, canAfford, missGold,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
