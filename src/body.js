@@ -45,7 +45,10 @@ export function syncHp(c) {
   for (const p of PARTS) { const P = c.body[p]; if (LIMBS.has(p)) { if (P.max < LIMB_HP * 0.8) { const r = P.hp / P.max; P.max = maxOf(c, p, 0); P.hp = P.lost ? LIMB_CUT : r * P.max; } continue; }   // alte Spielstände: Glieder auf 100
     hp += Math.max(0, P.hp); max += P.max; }   // Balken und KI-Schwellen: Kopf und Rumpf; Glieder zeigt die Körperanzeige
   c.hp = hp; c.maxHp = max;
+  c.barHp = Math.max(0, c.body.torso.hp); c.barMax = c.body.torso.max;   /* HB2-01 (Entwickler 03.10.: „Balken = Rumpf“): Lebensbalken zeigen den Rumpf — leer heißt tot bzw. am Boden. hp/maxHp (Kopf+Rumpf) bleiben für Heilung, KI und Balance */
 }
+/* Anzeige-Leben (Balken, HUD, Gruppe, Ziel, Boss): Rumpf bei Figuren mit Körper, sonst hp/maxHp */
+export const barOf = c => c && c.barMax ? [c.barHp, c.barMax] : [c?.hp || 0, c?.maxHp || 1];
 export const vital = c => c.body ? c.body.torso.hp : c.hp;            // > 0 heißt: nicht am Boden
 export const isDisabled = (c, p) => !!c.body && c.body[p].hp <= 0;
 // S14 (Nutzer): ohne Arme kein Hieb, ohne Beine kein Gehen — nur Kriechen

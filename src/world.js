@@ -39,7 +39,7 @@ export const LOCATIONS = [
   { key:'saltport',  name:'Salzhafen',          x:150,y:450,r:16, kind:'city',    threat:0, faction:'valen' },
   { key:'sunkentemple',name:'Versunkener Tempel',x:140,y:410,r:11,kind:'ruin',    threat:3 },
   { key:'kreuzweg',  name:'Kreuzweg',           x:250,y:250,r:14, kind:'village', threat:1, faction:'merch' },
-  { key:'deephall',  name:'Tiefhall',           x:250,y:36, r:10, kind:'dungeon', threat:3 },
+  { key:'deephall',  name:'Tiefhall',           x:250,y:36, r:10, kind:'dungeon', threat:3, faction:'zwerge' },   /* 03.10.: darunter die Königsstadt der Zwerge */
   { key:'frostpeak', name:'Frostkamm',          x:330,y:30, r:34, kind:'wild',    threat:2 },
   { key:'ashford',   name:'Aschfurt',           x:380,y:92, r:12, kind:'village', threat:1, faction:'merch' },
   { key:'redwaste',  name:'Rote Wüste',         x:440,y:155,r:48, kind:'wild',    threat:2 },
@@ -556,8 +556,8 @@ LOCATIONS.push(
 // Wüstensporn (Session 12, Referenzkarte „Valoris“): Halbinsel im Südwesten — Wüste, Dünen, Felsödland, Ruinen, Banditen.
 LOCATIONS.push(
   { key:'wuestensporn', name:'Der Wüstensporn', x:470, y:880, r:220, kind:'wild', threat:3, fin:true },
-  { key:'karak_atar',   name:'Karak-Atar',      x:430, y:900, r:26, kind:'city', threat:3, faction:'bandit', fin:true },
-  { key:'duenenwacht',  name:'Dünenwacht',      x:330, y:800, r:14, kind:'camp', threat:3, faction:'bandit', fin:true },
+  { key:'karak_atar',   name:'Karak-Atar',      x:430, y:900, r:26, kind:'city', threat:3, faction:'wuest', fin:true },   /* 03.10.: Wüstenbund */
+  { key:'duenenwacht',  name:'Dünenwacht',      x:330, y:800, r:14, kind:'camp', threat:3, faction:'wuest', fin:true },
   { key:'sandruinen',   name:'Sandruinen',      x:250, y:860, r:16, kind:'ruin', threat:3, fin:true },
   { key:'aurelion',     name:'Das Hochreich Aurelion', x:860, y:1010, r:300, kind:'wild', threat:1, faction:'aurel', fin:true },
   { key:'nekrosinsel',  name:'Nekrosinsel',     x:1390, y:800, r:30, kind:'ruin', threat:5, faction:'undead', fin:true });
@@ -1329,7 +1329,7 @@ function extendSouth() {
   // Dünenwacht, Sandruinen, Nekrosinsel
   for (const [x, y] of [[322, 792], [338, 792], [322, 808], [338, 808]]) prop('watchtower_ruin', x, y, { solid: true, r: 14 });
   for (let i = -6; i <= 6; i++) { prop('palisade_prop', 330 + i, 790, { solid: true }); prop('palisade_prop', 330 + i, 810, { solid: true }); }
-  prop('tent_prop', 328, 800, { solid: true, label: 'Zelt der Wüstenräuber' }); prop('campfire_static', 333, 801, { solid: true, r: 10 });
+  prop('tent_prop', 328, 800, { solid: true, label: 'Posten der Sandreiter' });   /* Fragemenü 03.10.: Posten des Wüstenbunds */ prop('campfire_static', 333, 801, { solid: true, r: 10 });
   for (let k = 0; k < 12; k++) prop(k % 3 ? 'broken_pillar' : 'rubble', Math.round(250 + Math.cos(k * 0.52) * 11), Math.round(860 + Math.sin(k * 0.52) * 8), { solid: k % 3 !== 0, r: 10 });
   prop('tower_ruin', 1390, 796, { solid: true, r: 18, label: 'Turm der Nekrosinsel' }); for (let k = 0; k < 8; k++) prop('bone_spire', Math.round(1390 + Math.cos(k * 0.8) * 22), Math.round(800 + Math.sin(k * 0.8) * 16), { solid: true, r: 8 });
   prop('sign', 1392, 700, { label: 'Totenbrücke — zur Nekrosinsel' });

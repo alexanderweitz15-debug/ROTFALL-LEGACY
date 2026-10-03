@@ -239,7 +239,11 @@ export function airDay(skipId) {                                     // skipId: 
 export function ecoDay() {
   if (!S.eco) initEco();
   const C = census(); syncBiz(C);
-  let income = 0;
+  let income = 0, loss = 0;
+  /* Betriebe-Kasse (Entwickler 02.10.2026): der Tagesgewinn eigener Betriebe sammelt sich in b.kasse (abholen vor Ort); Verlust zahlt zuerst
+     die Kasse, den Rest das Gold (HB-18 bleibt). Besetzung oder Zerstörung der Stadt: die ganze Kasse ist verloren (vorläufig, Lead). */
+  const idle = b => { if (b.owner !== 'player') return; b.lastPr = 0; b.daysPr = (b.daysPr || 0) + 1;
+    if ((occupied(b.town) || razed(b.town)) && (b.kasse || 0) > 0) { log(`${bizName(b)}: ${razed(b.town) ? 'Die Stadt liegt in Trümmern' : 'Die Toten halten die Stadt'} — die Kasse (${Math.floor(b.kasse)} Gold) ist verloren.`, 'economy'); b.kasse = 0; } };
   for (const [town, t] of Object.entries(S.towns)) {
     if (!C[town]) continue;
     t.use = useOf(town, C[town]); t.prod = {};
@@ -253,16 +257,17 @@ export function ecoDay() {
   // Produktion mit Vorprodukten
   for (const b of S.eco.biz) {
     const t = S.towns[b.town], T = TRADES[b.trade];
-    if (!t || occupied(b.town) || razed(b.town) || (S.halt?.[b.town + ':' + b.trade] || 0) > S.day) { b.made = 0; continue; }   // S14: Unfall legt still
+    if (!t || occupied(b.town) || razed(b.town) || (S.halt?.[b.town + ':' + b.trade] || 0) > S.day) { b.made = 0; idle(b); continue; }   // S14: Unfall legt still
     const e = bizWorkers(b, C) * (1 + 0.5 * (b.level - 1)) * (t.hunger ? 0.5 : 1) * (b.trade === 'farm' ? SEASON_FARM[seasonOf()] : 1);   // S14: Ernte nach Jahreszeit
-    if (e <= 0) { b.made = 0; continue; }
+    if (e <= 0) { b.made = 0; idle(b); continue; }
     let frac = 1;
     for (const [g, n] of Object.entries(T.in || {})) frac = Math.min(frac, (t.stock[g] || 0) / (n * e));
     for (const [g, n] of Object.entries(T.in || {})) t.stock[g] -= n * e * frac;
     let val = 0;
     for (const [g, n] of Object.entries(T.out)) { const q = n * e * frac; t.stock[g] = (t.stock[g] || 0) + q; t.prod[g] = (t.prod[g] || 0) + q; val += q * ecoPrice(b.town, g, false); }
     b.made = Math.round(val);
-    if (b.owner === 'player') { const pr = Math.round(val * 0.35 - b.hired * 3); income += pr; }
+    if (b.owner === 'player') { const pr = Math.round(val * 0.35 - b.hired * 3); income += pr; b.lastPr = pr; b.sumPr = (b.sumPr || 0) + pr; b.daysPr = (b.daysPr || 0) + 1;
+      b.kasse = (b.kasse || 0) + pr; if (b.kasse < 0) { loss -= b.kasse; b.kasse = 0; } }
   }
   // Verbrauch, Lagergrenze, Hunger
   for (const [town, t] of Object.entries(S.towns)) {
@@ -275,7 +280,8 @@ export function ecoDay() {
     t.bought = {};
     if (t.hunger && t.pop > 5) { t.pop -= 1; if (chance(0.3)) log(`${t.name} hungert. Menschen wandern ab.`, 'economy'); }
   }
-  if (income) { S.gold = Math.max(0, S.gold + income); S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute.`, 'economy'); }   /* Behoben HB-18: Verlust wurde angezeigt, aber Math.max(0, income) hat ihn nie abgezogen */
+  if (income || loss) { if (loss) S.gold = Math.max(0, S.gold - loss);   /* HB2-10: auch wenn sich die Tagessumme genau aufhebt */ S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute${income > 0 ? ' — in den Kassen der Betriebe' : ''}${loss ? `, ${loss} Gold Lohn aus deinem Beutel` : ''}.`, 'economy');
+    if (!S.flags?.kasseHint && S.eco.biz.some(b => b.owner === 'player' && b.kasse > 0)) { (S.flags ||= {}).kasseHint = 1; log('Betriebe: Der Gewinn sammelt sich in der Kasse des Betriebs. Abholen kannst du ihn vor Ort in der Stadt (Siedlung → Reiter Betriebe). Fällt die Stadt an die Toten oder wird zerstört, ist die Kasse verloren.', 'quest'); } }   /* Behoben HB-18: Verlust wurde angezeigt, aber Math.max(0, income) hat ihn nie abgezogen */
   caravanDay(); myCaravanDay(); ordersDay();
 }
 
@@ -400,11 +406,11 @@ function ordersDay() {
     }
   }
 }
-export function deliver(o, have, take) {
+export function deliver(o, have, take, fac = 'merch') {
   if (have < o.n) return `Du brauchst ${o.n} ${ITEMS[o.good].name} (du hast ${have}).`;
   take(o.good, o.n); S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
   S.eco.orders.splice(S.eco.orders.indexOf(o), 1);
-  S.factions.merch = clamp((S.factions.merch || 0) + 2, -100, 100);
+  if (S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 2, -100, 100);   /* Entwickler 03.10.: Ruf bei der Macht der Zielstadt (vorher immer Händlergilde) */
   log(`Lieferung nach ${townName(o.town)}: ${o.n} ${ITEMS[o.good].name}, ${o.reward} Gold.`, 'economy'); return null;
 }
 

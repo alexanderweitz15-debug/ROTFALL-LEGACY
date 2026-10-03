@@ -165,6 +165,9 @@ Stand: Session 15 (2026-09-29).
 ## 11. Reisen
 - **Stall und Pferdehof (S15):** Tierhändler und der Züchter Hadubrand (Mühlbach, Koppel) zeigen ihre Pferde als Karten mit Werten
   und Preis; das Angebot wechselt wöchentlich, ein eigenes Pferd wird zu 40 % angerechnet. Todesritter bekommen ein Totenross.
+- **Fellfarben (02.10.2026):** Normale Pferde haben eine von sechs festen Fellfarben — Rappe, Fuchs, Brauner, Schimmel, Falbe,
+  Schecke (gescheckt) —, die beim Kauf fest an das Tier gebunden ist (Stall-Angebot, Koppel und das Pferd in der Welt zeigen
+  immer dieselbe Farbe). Der Kaufhinweis nennt die Farbe. Messingross und Totenross behalten ihre eigene feste Farbe.
 - **Kodex füllt sich (S15):** Lehrer, Ränge und Zustände erscheinen erst, wenn man sie kennt; Kapitel zu Verbrechen, großen
   Ereignissen, Aurelion und dem Seevolk öffnen sich im Spiel. Der Code NACHTGLAS schaltet alles frei.
 - **Reittier-Werte (S15):** Jedes Pferd hat eigenes Tempo, Ausdauer (sinkt beim Reiten, erschöpft = langsamer) und Mut
@@ -367,7 +370,7 @@ Regel: Was der Spieler nicht erklärt bekommt, weiß er nicht. Neue Hinweise im 
 
 ## Runde: Balance — Bosse, Waffen, Stufen (Version 21, docs/BALANCE.md)
 - **Höchststufe 60** (Held und Koop-Gastfiguren). Darüber bringt Erfahrung keine Stufe mehr, der Balken bleibt voll („Höchststufe“ in der Kopfzeile, Meldung beim Erreichen). EP-Kurve ab Stufe 20 nur noch ×1,04 je Stufe (≈ 0,42 Mio. EP bis 60 statt 3,1 Mio.).
-- **Talentpunkte** nur noch 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60 von 59 lernbaren Knoten; Nutzer wollte „viele, aber nicht alle“ und wählte jede dritte). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
+- *(Überholt am 02.10.2026, siehe „Klassen-Prüfung und Sternbild-Talente“ am Ende.)* **Talentpunkte** nur noch 1 zum Start und 1 auf jeder dritten Stufe (21 bei Stufe 60 von 59 lernbaren Knoten; Nutzer wollte „viele, aber nicht alle“ und wählte jede dritte). Statpunkte unverändert (1 je Stufe, +1 alle 5). Die Stufenmeldung nennt den Talentpunkt nur, wenn es einen gab, sonst die Stufe des nächsten. Alte Stände behalten ihre Punkte.
 - **Bosse** haben doppeltes Leben und teilen 60 % aus (`BOSS`; gilt für Hieb, Fläche und Geschoss). Omega bleibt, wie er ist (Heeresschlacht). Bosse alter Stände werden beim Laden einmal angepasst. Sandfürst 340 Leben und ×1,8 Wucht, Varg 360 Leben, Hrodvar 220, Dodon 620 Grundleben.
 - **Fester Schadensanteil** (Attribut, Übung, Stufe) wächst mit der Schwungdauer: 600 ms = ×1, Dolch/Rapier ×0,6, Zweihänder ×1,6, Hammer bis ×2; Fernwaffen ×1. Vorher war der Dolch rechnerisch doppelt so stark wie der Zweihänder.
 - **Rückenstich** (Dolch, Hakenmesser, Rapier: Krit-Chance 50 %) und **Hinterhalt ×3** gelten jetzt wirklich nur von hinten (vorher durch einen Richtungsfehler von vorn).
@@ -1073,6 +1076,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Neue Kopfbedeckungen:** Henkerskapuze (nur Augenlöcher), tiefe Kutte, Turban/Kopftuch (Gesicht frei), Kapuze mit Widderhörnern, Pestmaske mit Schnabel. Alle zählen als Kapuze: Die Sonne brennt Vampire nur halb so stark. Das gilt auch für Burnus-Kopftuch und Knochenumhang-Kutte.
 - **Neue Stücke:** Teermantel, Rabenmantel, Wüstenburnus, Doppelmantel, Kettenumhang der Kette, Kapitänsrock, Knochenumhang, Bärenfell mit Kopf, Mantel des Rabenfürsten (legendär), Ordenskutte, Tiefe Kuttenkapuze, Henkerskapuze, Wüstenhaube, Widderkapuze, Pestkapuze mit Schnabel. Manche tragen feste Werte (Härte, Lebenskraft, Zähigkeit, Leichtfuß); der Tooltip zeigt sie.
 - **NPCs:** Die Form folgt Region und Stand. Die Kette trägt Kettenumhänge, Aurelion Burnus und Turban, Valens Wachen blaue Wappenmäntel, Tote und Kultisten Knochen, Kutten und Hörner, das Seevolk Öljacken und Kapitänsröcke, Bettler und Flüchtlinge Fetzen. Räuber tragen manchmal Bärenfell oder Rabenfedern.
+- **Wo es die neuen Umhänge gibt (Runde 11, nachgetragen):** Teermantel und Kapitänsrock bei der Sturmklinge (Beute Plünderer, Kapitänsrock zusätzlich seltene Beute bei Weißbart); Wüstenburnus und Wüstenhaube bei Yusufs Basar in Karak-Atar; Doppelmantel bei Hagen in der Kronschmiede; Kettenumhang der Kette als seltene Beute bei Kettenknechten und beim Kettenmeister; Henkerskapuze seltene Beute bei Kettenknechten; Knochenumhang seltene Beute bei Untoten Kriegern; Widderkapuze seltene Beute bei Kultisten der Asche; Bärenfell und Rabenmantel seltene Beute bei Banditen (dort auch, sehr selten, der Mantel des Rabenfürsten — legendär, kein Laden führt ihn); Ordenskutte bei Sael in Vharnholm; Tiefe Kuttenkapuze im Sortiment gewöhnlicher Händler (Standardbestand); Pestkapuze in der Truhe der versunkenen Kapelle von Moorbach (Geheimer Ort Glockenmoor).
 
 ## Geheimer Ort: Die Kammer der Namen
 - Unter dem Seelenhügel im Totenland liegt eine niedrige Tür aus Knochen. Trägst du eine Seelenphiole, summt sie in der Nähe.
@@ -1147,6 +1151,251 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kodex:** alle vier haben einen Bestiariumstext (Konter: rollen, vorher erschlagen, Fläche verlassen).
 - **Mehr Aussehen:** Kultist, Blutmagier, Kelchwächter, Maskierter, Blutknecht, Plünderer, Harpunier, Hauptmann der Toten, Aschdämon, Todesritter und die neuen Arten haben je 6 Formen aus dem Seed (Kopf, Rüstung sauber/beschädigt/improvisiert, Farben, Körperbau); dieselbe Figur sieht nach dem Laden gleich aus.
 - Debug: Gruppe „Spieler & Ausrüstung“ → Karte „Kampf: Neue Gegner (02.10.)“ → „Gegner: … vor dir“, „Gegner: Skelett-Rotte mit Bomben-Skelett“, „Gegner: Bomben-Skelett sofort zünden“, „Gegner: zum Totenland-Rand (Mutierte)“, „Gegner: Varianten-Schau“ / „… entfernen“.
-- **Schwerer Hieb (Maustaste halten):** Aus der Ruhe (keine Kombo läuft) die linke Maustaste gedrückt halten: ab 0,18 s hebt die Figur die Waffe, ein Ring am Boden füllt sich; nach 0,8 s ist er voll. Voll losgelassen = schwerer Hieb mit den Werten des Wuchtschlags (+30 % Schaden, Gegner taumelt, 15 % länger); früher losgelassen oder kurz geklickt = normaler Schlag. Läuft eine Kombo, schlägt Halten wie bisher weiter. Rolle, Deckung oder Waffenwechsel brechen ab. Das Log erklärt es beim ersten Aufladen. Debug/Test Room wie oben; Probe „Kampfanimation: schwerer Hieb“.
+- **Schwerer Hieb (Maustaste halten):** Aus der Ruhe (keine Kombo läuft) die linke Maustaste gedrückt halten: ab 0,18 s hebt die Figur die Waffe, ein Ring am Boden füllt sich; nach 0,8 s ist er voll. Voll losgelassen = schwerer Hieb mit den Werten des Wuchtschlags (+30 % Schaden, Gegner taumelt, 15 % länger) — **nicht blockbar** (Deckung, Parade, Schild helfen nicht; nur Ausweichen; der Gegenstrom des Mönchs wirkt weiter); früher losgelassen oder kurz geklickt = normaler Schlag. Läuft eine Kombo, schlägt Halten wie bisher weiter. Rolle, Deckung oder Waffenwechsel brechen ab. Das Log erklärt es beim ersten Aufladen. Debug/Test Room wie oben; Probe „Kampfanimation: schwerer Hieb“.
 - **Ganzkörper im Kampf:** Ausholen verlagert das Gewicht nach hinten, der Schlag setzt mit Ausfallschritt nach vorn, Überkopf und Bodenschlag gehen in die Knie; jede Angriffsart hat im Einschlag ihre eigene Haltung. Zweihandwaffen und Speere mit beiden Händen. Getroffene zucken weg, schwere Treffer und Krits lassen sie zurückkippen (nur Darstellung).
 - **Gegner weichen dem Ausholen aus:** Banditen machen ihren Seitschritt, solange man sichtbar ausholt oder auflädt (für alle Waffen gleich).
+
+## Talentbaum: Linien, Zweig-Zeichen und Vorschaukarte (Visueller Umbau, Scheibe 1+2, 02.10.2026)
+- **Verbindungslinien:** Hinter den Talentknöpfen zeichnet ein Canvas je Zweig die Voraussetzungs-Linien zu den Knoten darüber. Eine Linie von einem bereits gelernten Knoten leuchtet golden, alle anderen (auch bei „oder“-Voraussetzungen mit mehreren möglichen Vorknoten) bleiben blass sichtbar. Reine Darstellung — welcher Knoten lernbar ist, entscheidet weiter `nodeState`.
+- **Zweig-Zeichen:** Jeder Knoten trägt ein kleines, im Code gezeichnetes Symbol seines Zweigs (Klinge für Kampf, Stern für Magie, Blatt für Überleben, Schädel für Nekromantie, Auge für Hexerei, Pranke für Hainkunde, stiller Kreis für die Stille Hand, Frostsplitter für den Todesritter); Schlüsselknoten bekommen zusätzlich einen goldenen Ring ums Zeichen.
+- **Hover-Vorschaukarte:** Ein Zeigen auf einen Knoten öffnet dieselbe Bildkarte wie bei Gegenständen (Zeichen, Name, Art, Zustand, Wirkungstext, bei Schlüsselknoten die Absicht, bei Voraussetzungen „Braucht: …“) statt des alten Browser-Tooltips. Gleiche Textquelle wie vorher, keine Änderung an `nodeState`/`learnNode`.
+- Offen (siehe `ROTFALL_STATE/visual/skilltree.md`): eine eigene Freischalt-Animation (Scheibe 3) wartet auf die Designentscheidung „echtes Partikel-Canvas im Modal oder CSS-Übergang“; das Siegel-Bild der Titelzweige (Scheibe 4) ebenso.
+- Debug: Gruppe „Darstellung & Regie“ → Karte „Skilltree: Knoten-Icons und Linien (Visueller Umbau, 02.10.)“.
+
+## Karte: Ortsbild, Ereignis-Pins, weiche Fraktionsgrenzen (Visueller Umbau, Scheibe 1–3, 02.10.2026)
+- **Ortskarte als Bild:** Ein Klick auf einen entdeckten Ort zeigt im Textpanel zusätzlich oben links das gezeichnete Symbol des Ortes (dasselbe wie auf der Weltkarte: Burg, Weiler, Ruine, Turm, Mine, Lager, Schrein …) mit einem Rahmen in der Farbe seiner Fraktion.
+- **Ereignis-Pin:** Läuft gerade ein großes Weltereignis (Seuche, Turnier, Hexenprozess, Luftschiffabsturz …), erscheint auf der Weltkarte ein pulsierendes rotes Warnzeichen mit dem Namen des Ereignisses — **nur dort, wo der Nebel des Unentdeckten schon gelüftet ist**; in unerkundeten Gebieten bleibt es wie der Ort selbst verborgen. Ein Eintrag „Großes Ereignis“ steht in der Kartenlegende.
+- **Fraktionsgrenzen dezent eingefärbt:** Die bestehende scharfe Grenzlinie zwischen den Großregionen (Kette, Menschen, Totenland, Aurelion) bekommt einen breiten, blassen Schein in derselben Farbe darunter — spürbar, ohne die gemalte Karte wie eine moderne Territoriumskarte wirken zu lassen.
+- Offen (siehe `ROTFALL_STATE/visual/karte.md`): ob das Ortssymbol im Panel größer/eigenständig werden soll statt die Weltkarten-Symbolik zu wiederholen; wie breit die Grenze stilistisch höchstens werden darf (Bildentscheidung des Entwicklers).
+- Debug: Gruppe „Darstellung & Regie“ → Karte „Karte: Bild-Panel, Ereignis-Pins, Fraktionsgrenzen (Visueller Umbau, 02.10.)“.
+
+## Aufträge sichtbar, Teil 1 (Visuell Q-1)
+- **Kerben statt Zahlen:** Fortschritt steht in der rechten Spalte und im Auftragsbuch als Kerben (gefüllt = erledigt, grün = Ziel erreicht); ab neun Zielen als Balken. Die genaue Zahl zeigt die Maus.
+- **Zählkerbe am Ort:** Fällt ein Gegner, der für einen Auftrag zählt, steigt über ihm ein kleines Siegel mit Kerben auf, dazu ein leiser Ton; beim letzten ein tieferer.
+- **Brief mit Siegel:** Wird ein Auftrag erfüllt, erscheint oben im Spielfeld ein Pergament mit seinem Namen, und ein rotes Siegel „Erfüllt“ wird daraufgestempelt (leise Glocke). Scheitert ein Auftrag (Frist, Auftraggeber tot, abgebrochen, nicht da beim Angriff), reißt der Brief in zwei Hälften und das Siegel bricht schwarz. Ein Klick nimmt den Brief weg; mehrere kommen nacheinander. Gilt für feste Aufträge und Verträge, auch für Koop-Gäste.
+- **Auftraggeber reagiert:** Bei der Abgabe jubelt der Auftraggeber; Wachen und Verteidigungsmeister salutieren.
+- **Gold zählt hoch:** Mehr Gold rollt in der Kopfleiste hoch und leuchtet kurz; weniger Gold springt sofort.
+- „Reduzierte Bewegung“: Brief und Siegel erscheinen ohne Stempel- und Reißbewegung, Gold springt.
+- **Debug:** „Aufträge: Brief ‚Erfüllt‘ zeigen“, „Aufträge: Brief zerreißt“, „Aufträge: Zählkerbe über dem Helden“, „Aufträge: verfolgten Auftrag abschließen (mit Effekt)“.
+- **Kampfhaltung:** Sind Feinde nah, hält der Held die Waffe bereit und steht breiter — auch im Gehen; rückwärts gehend läuft der Schritt rückwärts. Deckung sieht je Waffe anders aus (Dolch quer vor dem Gesicht, Zweihand-Schaft quer, Speer mit Spitze vorn). Großäxte haben eigene Hack- und Spaltbewegungen. Im Test Room zeigt Pack B beim Ausweichen einen Ausfallsprung, Pack C einen Dash mit Nachbildern (nur Darstellung).
+
+## Aufträge sichtbar, Teil 2: Siegel über Auftraggebern (Visuell Q-2)
+- **Wachssiegel über dem Kopf:** Wer einen Auftrag zu vergeben hat, trägt ein goldenes Siegel mit rotem Band; wer auf deine Abgabe wartet, ein helles Siegel mit Haken. Es gelten dieselben Regeln wie im Gespräch: Ein fester Auftrag zeigt sein Siegel nur, wenn er dir angeboten würde; wer dich wegen des Stigmas abweist oder als Orden den Paktgebundenen nicht anhört, zeigt keins.
+- **Wer ein Siegel bekommt:** Geber fester Aufträge, Verteidigungsmeister und der Tributoffizier (immer), das Anschlagbrett (solange es offen ist; Erledigtes abgeben geht auch am geschlossenen Brett) und Bewohner, die nach ihrem Beruf Arbeit haben. **Bewohner-Siegel** erscheinen erst, wenn du nah genug zum Ansprechen bist oder die Maus auf der Person ist — sonst stünde über jedem Bauern eins. Auf **„Sehr schwer“** tragen Bewohner nie ein Siegel (dort musst du dir merken, wer dir Arbeit gab).
+- **Ansprech-Zeile:** „E Sprechen — Name · Auftrag“ bzw. „· Abgabe“, ebenso am Anschlagbrett.
+- **Karte und Minikarte:** Auftraggeber, die du schon kennst, stehen als kleines Siegel auf der Weltkarte (Legende „Auftraggeber“); die Minikarte zeigt Geber in deiner Nähe (ohne Bewohner).
+- Das Siegel wippt leicht; „Reduzierte Bewegung“ hält es still. Zeigt eine Figur gerade ein Gefühl (Emote), hat das Vorrang.
+
+## Fünf weitere Gegner (Top 5 aus gegner_ideen.md, Entscheidungen 02.10.2026)
+- **Wächterspinne** (Aurelion, Gefahr 1): kleiner Messingkörper auf acht Beinen. Hängt sichtbar an bestimmten Wänden — an den Werkstätten im Land um Aurelheim und an Werkhallen außerhalb der Stadtmauern, je Wand eine. Kommt ein Feind auf 140 px heran oder trifft sie jemand, fällt sie herab („fällt herab!“) und sticht schnell und oft, aber schwach. Beim Tod zerspringt sie in Splitter (Fläche 44 px, nur ihre Feinde, Rolle weicht aus). Zerstört: nach 7 Tagen hängt wieder eine dort; neue Spinnen erscheinen nur, wenn du weit weg bist.
+- **Dampframme** (Aurelion, Gefahr 3, Abart des Kriegsautomaten, 20 %: Maschinenruinen, Uhrwerkhalle, Schlund): Kessel mit Schloten und Rammschild. Aus bis zu 170 px baut sie eine lange rote Linie auf (1,2 s), dann rammt sie die Linie entlang bis an Mauer oder Fels: nicht blockbar, Rückstoß; Fässer, Kisten, Säcke und Zäune im Weg zerbrechen (Inhalt fällt heraus; Hort- und Ritualbehälter bleiben). Danach ist sie 1,5 s offen (+25 % Schaden) und muss wenden.
+- **Blutschöpfer** (Blutkult, Katakomben von Varonheim): kämpft kaum, sucht Wehrlose (am Boden) unter seinen Feinden — dich, Gefährten, Verbündete — und trinkt 1,2 s. Das Opfer blutet 4 s schneller aus und ist ausgezehrt; er heilt 30 %, jeder Kultist bis 140 px um ihn 20 %. Jeder Treffer (oder Taumeln) bricht das Trinken ab. Hinweis beim ersten Mal.
+- **Netzwerferin** (Seevolk: Entern, Gischtinseln): hält Abstand und wirft langsame Netze. Gleiche Regel wie das Fangnetz des Spielers: normale Figuren hängen 3 s fest (danach 6 s frei — vorläufig, sonst hielte sie dich dauerhaft), Große (Boss, sehr große Arten) und Elite taumeln nur. Ausweichen oder Deckung hilft. Hinweis beim ersten Netz.
+- **Hofspion** (Himmelsinsel): drei „Diener des Hofes“ stehen harmlos (neutral) im Hof. Bricht dort jemand eine Regel (jedes neue Kopfgeld auf der Insel), lassen sie die Maske fallen: Diebstahl einer, Gewalt zwei, Mord drei. Sie gehen dir in den Rücken; der erste Stich von hinten trifft dreifach („Meuchelstich!“, Formel des Schleichangriffs). Dreh dich zu ihnen um. Die Sonnenlegion greift sie nicht an (Hof).
+- Alle fünf haben einen Kodex-Text und einen Ruf beim Entdecken.
+- Debug: Karte „Kampf: Neue Gegner (02.10.)“ → „Gegner: … vor dir“, „Gegner: Wächterspinne — zur nächsten Werkstattwand“, „Gegner: Dampframme mit Fässern und Kisten im Weg“, „Gegner: Blutschöpfer trinkt (du gehst zu Boden)“, „Gegner: Netzwerferin mit zwei Plünderern“, „Gegner: Hofspione — Regelbruch am Hof (Diebstahl/Gewalt/Mord)“ (nur auf der Insel).
+
+## Aufträge sichtbar, Teil 3: Auftragsbrief und Lohn (Visuell Q-3)
+- **Auftragsbrief im Gespräch:** Unter dem Angebot steht ein Streifen mit dem Ziel als Bild (der Gegner, der Gegenstand, ein Auge für Suchaufträge, sonst das Zeichen der Auftragsart) samt Anzahl, bei Verträgen die Frist als Sanduhr (Tage ab Annahme), rechts der Lohn.
+- **Lohn vor der Annahme:** Feste Aufträge zeigen nur die **Art** des Lohns als Symbol — Münzen (Gold), Stern (Erfahrung), Beutel (Gegenstand), Wappen der Macht mit Pfeil (Ansehen steigt ▲ oder sinkt ▼), Herz (Beziehung), Buch (Ausbildung), Wappen (Beförderung). Wie viel, zeigt die Maus. Verträge nennen ihr Gold wie bisher offen.
+- **Steckbrief mit Gesicht:** Jedes Kopfgeld zeigt das Gesicht des Gesuchten — auch gewöhnliche Anführer. Der Anführer, der später erscheint, sieht genau so aus.
+- **Annahme:** Ein Pergament „Angenommen“ mit goldenem Siegel erscheint oben im Spielfeld und fliegt dann in den Reiter „Aufträge“, der kurz aufleuchtet (ohne Bewegung: es verschwindet einfach).
+- **Lohnleiste beim Abschluss:** Der Brief „Erfüllt“ zeigt den Lohn mit Zahlen. Hat jemand anderes einen Großteil der Arbeit getan (z. B. die Wachen beim Kopfgeld), zeigt ein Anteil-Kreis, auf wie viel Prozent der Lohn gekürzt wurde; die Maus erklärt den Anteil.
+
+## Aufträge sichtbar, Teil 4: Tracker und Ziele (Visuell Q-4)
+- **Tracker oben rechts im Spielfeld** (unter der Minikarte): Der **verfolgte** Auftrag steht groß da — Siegel, Name, Ziel als Bild, Kerben, ein Pfeil in Richtung des Ziels mit Entfernung (nur in der Oberwelt, wie der Kompass), bei Verträgen die Frist als Sanduhr (am letzten Tag rot und pulsierend), bei Verteidigungen die Zeit bis zum Angriff. Darunter bis zu **drei weitere** Aufträge klein. Klick auf den großen öffnet das Auftragsbuch (J), Klick auf einen kleinen verfolgt ihn.
+- **Im Kampf** (ein Feind in der Nähe) klappt der Tracker ein: nur Siegel und Kerben, damit das Bild frei bleibt.
+- **Ziele markiert:** Gegner, die für den **verfolgten** Auftrag zählen, tragen eine kleine goldene Raute über dem Kopf — auf „Sehr schwer“ nie.
+- **Wegmarken:** Bei Patrouillen und Spurensuchen steht an jedem schon erreichten Punkt eine kleine Fahne, solange der Auftrag läuft.
+- **Weltkarte:** Aufträge, die in einem Gebiet spielen, zeigen das Gebiet als gestrichelten Kreis; die Raute ist hohl, solange das Ziel offen ist, und gefüllt, wenn du zurück zum Auftraggeber musst.
+- Neu angenommene Aufträge lassen den Tracker kurz aufleuchten. Unter 820 px Breite zeigt er nur den verfolgten Auftrag.
+- **Debug:** „Aufträge: nächsten Auftrag verfolgen (Tracker)“, „Aufträge: bis zu 4 Jagdaufträge starten (Tracker ansehen)“.
+
+## Pergament-Lesefenster (UI-Scheibe 5)
+- **Kodex (H), Chronik (K) und Auftragsbuch (J)** sind jetzt Pergamentseiten mit dunkler Tinte; alle anderen Fenster bleiben dunkles Eisen. Die **Erbenwahl** nach dem Tod zeigt die Erben als Pergamentkarten.
+- **Auftragsbuch als Doppelseite:** Links die Liste mit Siegeln — gold = offen, leuchtend = bereit zur Abgabe, rot = erfüllt, schwarz zerbrochen und durchgestrichen = gescheitert; die rote Raute markiert den verfolgten Auftrag. „Ordnen“ nach Stand oder nach Entfernung (offene Aufträge; ändert nur die Anzeige). Rechts der Brief des gewählten Auftrags: Auftraggeber mit Bild (Bewohner-Aufträge auf „Sehr schwer“ ohne Namen und Bild), Stempel des Stands, Beschreibung, jedes Ziel mit Bild und Kerben, Ort mit Entfernung (Suchaufträge: kein Ziel auf der Karte), Frist oder Angriffszeit, Lohn (feste Aufträge bis zum Abschluss nur als Symbole), Knöpfe „Verfolgen“ und „Abbrechen“.
+- **Debug:** „UI: Pergament — Auftragsbuch/Kodex/Chronik öffnen“.
+
+## Angedockte Fenster und Handwerk mit Rezeptkarten (UI-Scheibe 3)
+- **Siedlung (B), Gruppe (G) und Handwerk** öffnen sich wie der Handel als Tafel am rechten Rand; die Welt bleibt links sichtbar, der Held rückt ins Freie. Ein Klick in die Welt oder Esc schließt die Tafel. Charakter, Gepäck, Karte, Kodex und Chronik bleiben Vollbild.
+- **Handwerk an Esse, Werkbank und Kessel:** Statt einer Liste von Sätzen erscheinen Rezeptkarten mit dem Bild des Ergebnisses und dem Material als Zeichen mit Zahl — rot, wenn es fehlt; ein Schloss mit Zahl zeigt die nötige Fertigkeit. Rechts die Bildkarte des Ergebnisses und die **erwartete Güte** als Balken (Grob, Solide, Gut, Meisterlich, Meisterstück — die Anteile sind die echten Chancen bei deiner Fertigkeit; die Maus zeigt die Prozente). Mit Königseisen erscheint ein zweiter Balken (eine Güte höher). Knöpfe: Herstellen, Mit Königseisen, Ausbessern. Doppelklick auf eine Karte stellt sofort her.
+- **Debug:** „Handwerk: Esse/Werkbank/Kessel hier öffnen“ öffnen jetzt die Tafel.
+
+## Körpersprache der Bewohner (Visuell N2)
+- Wenn dich jemand im Vorbeigehen anspricht, zeigt seine Figur das jetzt auch:
+  - **Trauer im Ort:** trauern, mit Tränen-Zeichen.
+  - **Freund, Garmadons Sturz, gebrochene Ketten:** jubeln.
+  - **Dein Rang in ihrer Fraktion:** Wachen salutieren; einfache Leute salutieren, ab Rang 3 knien sie.
+  - **Angst vor dir oder Kopfgeld auf dich:** abwehren.
+  - **Verfeindet:** abwehren, mit Zornzeichen.
+  - **Leiche in der Nähe:** Erschrecken.
+- Für die Geste bleibt die Figur kurz stehen. Wer gerade arbeitet oder sitzt, macht keine Geste.
+- Debug-Eintrag: „NPC: Reaktion mit Geste“.
+
+## Betriebe: Kasse und Reiter „Betriebe“ (02.10.2026)
+- **Kasse:** Der tägliche Gewinn eines eigenen Betriebs (gut ein Drittel des Warenwerts, abzüglich 3 Gold Lohn je angeworbener Hand) geht nicht mehr direkt in dein Gold, sondern in die **Kasse des Betriebs**. Macht ein Betrieb Verlust, zahlt zuerst die Kasse, den Rest dein Beutel.
+- **Abholen nur vor Ort:** in der Stadt des Betriebs über Siedlung (B) → Reiter **Betriebe** („Abholen“) oder im Handelskontor der Stadt („Kasse … abholen“). Anderswo zeigt der Knopf „Nur vor Ort“.
+- **Gefahr:** Fällt die Stadt an die Toten oder wird sie zerstört, ist die ganze Kasse verloren (Protokollzeile).
+- **Reiter Betriebe:** links jeder eigene Betrieb mit dem Bild seines Hauses und dem Stand der Kasse, oben die Summe aller Kassen; rechts der gewählte Betrieb: Haus groß, Ertrag gestern und Schnitt je Tag seit dem Kauf, Arbeiter (aus der Stadt / angeworben), Ware gestern, Vorprodukte und Ware je Arbeiter mit dem Vorrat der Stadt, Kasse mit Abholen.
+- **Hinweise:** Beim ersten gefüllten Tag erklärt das Protokoll die Kasse; beim ersten Abholen die Gefahr. Alte Stände: Betriebe beginnen mit leerer Kasse.
+- **Schreck und Wachenruf (N6):** Wer überfallen wird, erschrickt (!). Zuschauer zeigen Angst und fliehen. Eine Wache ruft „Halt! Wache!“ mit Pfiff, nur einmal je Tat. Verletzte rufen „Hilfe!“ jetzt als Sprechblase.
+- **Trauer (N7):**
+  - Stirbt eine bekannte Person in deiner Hörweite, schlägt eine Glocke.
+  - Solange ihr Ort trauert (2 Tage), brennen zwei Kerzen an ihrem Grab.
+  - Fällt ein Gefährte, knien die anderen Gefährten bei ihm nieder.
+  - Debug: „NPC: Kerzen am nächsten Grab“, „NPC: Schreck und Wachenruf vorführen“.
+
+## Schmiede und Kutsche als Tafel (02.10.2026)
+- **Schmiede:** „Kannst du das ausbessern?“ (oder Rechtsklick → Reparieren) öffnet am rechten Rand die Schmiede-Tafel: alle abgenutzten Teile (angelegte mit Punkt) mit Zustandsbalken; ein Klick wählt ein Teil ab oder wieder an. Der Preis folgt der alten Regel (Schaden am Stück × halber Wert, zusammen mindestens 5 Gold) und gilt nur für die gewählten Teile; „Ausbessern“ macht sie wieder ganz (100 %), der Schmied mag dich danach etwas mehr. Dazu „Waren ansehen“ (Handel) und — wenn eine Esse oder ein Amboss nahe steht — „An der Esse selbst schmieden“.
+- **Kutsche und Fähre:** Der Kutscher zeigt eine Weltkarte mit gestrichelten Strecken zu den Zielen (rot = unsichere Strecke) und je Ziel eine Karte mit Preis, Dauer und Warnung; ohne Aufenthaltsschein sind Ziele im Hochreich mit Schloss gesperrt. Klick auf Karte oder Kartenpunkt fährt ab. Regeln wie bisher.
+- **Debug:** „UI: Schmiede-Dock (nächster Schmied)“, „UI: Kutsche-Dock (nächster Kutscher)“, „UI: Betriebe-Reiter öffnen“.
+
+## Klassen-Prüfung und Sternbild-Talente (02.10.2026)
+- **Talentpunkte (Scheibe 0):** 1 zum Start, 1 auf jeder zweiten Stufe und 1 je bestandener Klassenprüfung (31 + Prüfungen bei Stufe 60). Die Regel gilt rückwirkend: Beim Laden wird auf das Soll aufgefüllt, nie gekürzt (Protokollzeile „… Talentpunkte nachgereicht“). Die Stufenmeldung nennt den Talentpunkt oder die Stufe des nächsten.
+- **Koop:** Die eigene Figur eines Gasts bekommt beim Aufstieg jetzt auch Talentpunkte; bestehende Gastfiguren werden beim Laden und beim Wiederkommen aufgefüllt.
+- **Erbe:** Der Erbe hat sofort Talentpunkte nach seiner Stufe (vorher 0 bis zum Neuladen, danach Stufe − 1). Er beginnt ohne gelernte Sterne und ohne Prüfungen seines Vorgängers.
+- **Debug:** Abschnitt „Klassen: Talentpunkte, Prüfungen, Aufnahme“ (Gruppe „Klassen & Talente“): Punkte nach Regel auffüllen, Punkte-Rechnung zeigen, Stufe +2.
+- **Klassen-Prüfung (Scheibe 1):** „Kannst du mich ausbilden?“ verlangt wie bisher Vertrauen (Bewährung oder Lehrgeld). Danach prüft der Lehrer: meist ein Feldauftrag und eine Meisterprüfung bei ihm (Auftragsbuch J zeigt beide). **Jeder Lehrer derselben Klasse** nimmt ab; der Fortschritt gehört deiner Figur (im Koop macht jeder seine Prüfung selbst — wer abgibt, dem zählt sie). Die Meisterprüfung startet mit „Ich bin bereit.“ direkt beim Lehrer; scheitern darfst du beliebig oft, niemand stirbt (wer zu Boden geht, wird aufgefangen). Laden mitten in einer Meisterprüfung bricht sie ab; der Auftrag bleibt.
+  - **Krieger:** 4 Banditen besiegen, dann „Der Kreis“: Duell gegen den Übungsfechter des Lehrers bis ein Fünftel des Lebens.
+- **Aufnahme:** Bestanden gibt Klasse, **+1 Talentpunkt** und eine Szene (~5,5 s, die Welt steht, Esc überspringt — die Folgen gelten trotzdem): Der Lehrer zeigt auf dich und spricht, du kniest, ein Lichtblitz in der Farbe der Klasse, Namenskarte, Wachen salutieren, andere jubeln, du zeigst die erste Fähigkeit (nur im Bild). Danach: Hinweis auf das neue Sternbild (T).
+- **Eigene Wege:** Paladin (Kelans drei Prüfungen), Todesritter (Todesweihe), Dunkler Hochpaladin (Ritus der Kette) und die dunklen Klassen der Kette behalten ihre Aufträge; sie bekommen die Szene, und ihre Freischaltung zählt als bestandene Prüfung (+1 Punkt, für alte Stände rückwirkend).
+- **Alte Stände:** Bekannte Klassen bleiben. Beim Lehrer steht „Ich will die Prüfung als X nachholen. (Talentpunkt)“.
+- **Sternenhimmel (Scheibe 2):** T (oder Charakter → Talente) öffnet den Himmel. Der **Wanderer** (die alten Zweige Kampf, Magie, Überleben, für alle) steht in der Mitte, rundum ein Sternbild je Klasse, am Rand die Titel. Unbekannte Sternbilder stehen als blasse Umrisse da; die Karte nennt Lehrer und Weg. Ziehen = schwenken, Mausrad oder ± = zoomen, Klick aufs Sternbild = hinein, Klick auf einen Stern = Karte mit „Lernen“ (Bestätigen nötig). Beim Lernen läuft ein Lichtfunke vom Vorstern, die Linie leuchtet. Esc geht erst zurück zum Himmel, dann zu.
+  - Sterne: klein = Talent, mittel = Merkmal, Goldring = Schlüsselstern, Raute = aktive Fähigkeit. Gold = gelernt, pulsierend = lernbar, dunkel = gesperrt, Riss = ausgeschlossen, bläulich = ruht.
+  - **Einmal kostenlos neu ordnen** (alte Stände mit gelernten Sternen): Knopf im Himmel oder „Die Sterne neu ordnen“ bei jedem Lehrer. Danach wie bisher gegen Gold beim Lehrer.
+- **Was wirkt (Scheibe 3):** Wertesterne (Leben, Rüstung, Ausdauer …) wirken immer. Schlüsselsterne und Fähigkeitssterne wirken nur, solange die Klasse aktiv ist **oder eine ihrer Folgeklassen** (Krieger-Sterne auch als Ritter, Berserker, Todesritter …); Titelsterne, solange der Titel getragen wird. Ruhende Sterne sind bläulich, die Karte sagt warum.
+- **Fähigkeitssterne:** verändern eine Fähigkeit der Klasse — Schaden, Abklingzeit, Kosten oder Dauer (Zustände, Fesseln, Furcht, Diener). Jedes Klassen-Sternbild hat 8 Sterne: 2 Einstieg, 3 in der Mitte, ein Herzstern, zwei Schlüsselsterne, die einander ausschließen.
+- **Krieger-Linie:** Der Amboss (Krieger, Wuchtschlag), Der Schild (Ritter, Segen), Die Morgenröte (Paladin), Der Eber (Berserker, Raserei), Die Kette (Dunkler Hochpaladin), Die Totenkrone (Todesritter, die alten Sterne).
+  - **Ritter-Prüfung:** einen Platz beim Lehrer 50 s gegen Räuberwellen halten; dann Duell mit Schild in der Nebenhand.
+  - **Berserker-Prüfung:** 5 Feinde besiegen; dann die Grube — gewonnen nur, wenn du selbst unter 30 % Leben bist, wenn der Gegner fällt.
+- **Machtgrenze:** Ein volles Klassen-Sternbild bringt höchstens so viel Dauerleistung wie der volle Kampfzweig (Messwerte in PROPOSALS/klassen_talente.md, Probe im Selbsttest).
+- **Debug „Sterne: …“:** Himmel öffnen, alle Klassen bekannt, +10 Punkte, Wirkung der Fähigkeitssterne, Machtgrenze messen. „Klassen: …“: Prüfung beim nächsten Lehrer, Prüfungsziele erfüllen, Meisterprüfung hier, Prüfungen zurücksetzen, Aufnahmeszenen ansehen.
+
+- **Verfolger verschwinden nicht mehr (02.10.):** Wer dich, deine Gruppe oder einen Koop-Helden jagt, bleibt aktiv, auch fern vom Bildrand, und wird nicht mehr aufgeräumt. Erst ab 1600 px Abstand verliert er die Spur. Dann erscheint ein „?“, im Protokoll steht „… verliert deine Spur und kehrt zurück“, und er geht zu seinem Ausgangspunkt zurück. Reise-Begegnungen und Heer-Soldaten räumen sich erst danach auf, außer Sicht.
+- **Begegnungen (N8):** Freunde, die ein Gespräch beginnen, begrüßen sich mit einer kurzen Geste. Wird über einen Rivalen gelästert, zeigt der Sprecher auf ihn, und der Rivale wehrt ab, wenn er in Hörweite steht.
+- **Warnkette (N9):** Der erste Gegner, der dich entdeckt, zeigt ein „!“ und deutet auf dich. Das Zeichen springt dann kurz nacheinander durch seine Gruppe (gleiche Fraktion, in der Nähe). Das ist nur eine Anzeige: Wer angreift, entscheidet die KI wie bisher.
+- **Tierhändler als Fenster (03.10.):** Der Tierhändler öffnet ein Fenster mit vier Bereichen:
+  - **Begleittiere:** Karten mit Bild, Leben, Biss und Tempo; zu teure Tiere sind rot markiert.
+  - **Dein Begleiter:** Leben und Freilassen.
+  - **Reittiere:** Weiter zum Stall; das Messingross warten.
+  - **Für deinen Hof:** Kuh und Schaf, mit Belegung der Weide.
+
+  Die Regeln bleiben gleich: ein Begleiter gleichzeitig, gleiche Preise. Koop-Gäste nutzen weiter das Gespräch.
+- **Betriebskasse und Überfall (03.10.):** Wird ein Ort überfallen, nehmen die Angreifer die Hälfte aus den Kassen deiner Betriebe dort. Das gilt, wenn die Toten den Ort überfallen und nicht zurückgeschlagen werden, und wenn nachts Plünderer durch eine schutzlose Stadt ziehen. Bei Besetzung oder Zerstörung der Stadt ist die ganze Kasse verloren.
+- **Schmied: Verbessern und Schmieden lassen (03.10.):**
+  - **Verbessern:** Der Schmied hebt Waffe oder Rüstung um eine Gütestufe: Grob → Solide → Gut → Meisterlich. Gekaufte oder gefundene Stücke ohne Güte-Angabe gelten als „Solide“. Ab „Gut“ steigt die Seltenheit wie beim eigenen Schmieden (ungewöhnlich, dann selten), nie nach unten.
+  - **Kosten fürs Verbessern:** halber Grundwert je Stufe, mindestens 20 Gold, dazu Eisen in Höhe der Stufe. „Meisterstück“ gelingt nur aus eigener Hand.
+  - **Schmieden lassen:** Der Schmied fertigt ein Esse-Rezept aus deinem Material. Lohn: 30 % des Werts, mindestens 10 Gold. Er arbeitet mit Schmiedekunst 60, oder mit deiner, wenn sie höher ist. Deine Fertigkeit steigt dabei nicht.
+- **Schütze-Linie (Scheibe 4):** Der Falke (Schütze, Gezielter Schuss), Der Hirsch (Waldläufer, Ziel markieren), Das Netz (Kettenjäger, Fangnetz und Kettenhund).
+  - **Schützen-Prüfung:** 3 Wölfe erlegen und 3 Wolfsfelle mitbringen; dann „Zehn, zwanzig, dreißig Schritt“: fünf Puppen beim Lehrer — nur Treffer mit einer Fernwaffe zählen.
+  - **Waldläufer-Prüfung:** einen Bären erlegen; dann eine ganze Nacht draußen: 10 Stunden am Stück von 20 bis 6 Uhr in der Oberwelt, außerhalb von Siedlungen. Ein Dach, eine Stadt oder der Tagesanbruch vor dem Ende setzt zurück (Protokoll sagt es). Ein Lagerfeuer ist erlaubt.
+- **Schurke-Linie (Scheibe 5):** Der Dolch (Schurke, Meuchelstich), Die Natter (Assassine, Schattenschritt), Die Zange (Folterknecht).
+  - **Schurken-Prüfung:** etwas aus fremdem Besitz stehlen (Regal, Kiste, Schreibtisch in einem bewohnten Haus), ohne gesehen zu werden; dann drei Meuchelstiche an Puppen — Hacken zählt nicht, der Hieb aus dem Schattenschritt schon.
+  - **Assassinen-Prüfung:** einen Steckbrief (Kopfgeld) vom Anschlagbrett erfüllen und abgeben.
+- **Kleriker und Magier (Scheiben 6, 7):** Die Lampe (Kleriker, Heiliges Heilen), Das Auge (Dunkler Priester), Die Flamme (Magier, Feuerball).
+  - **Kleriker-Prüfung:** 5 Heilkraut bringen und 4 Tote zur Ruhe bringen; dann die Heilprüfung beim Lehrer (eine Verletzte stabilisieren).
+  - **Magier-Prüfung:** ein Grabsiegel bergen (Gewölbe, Geister); dann fünf Puppen nur mit Zaubern treffen.
+- **Barde und Alchemist (Scheiben 8, 9):** Die Laute (Barde), Die Trommel (Kettenbarde), Der Kessel (Alchemist).
+  - **Barden-Prüfung:** ein Schenkenspiel gewinnen (Würfel, Karten, Armdrücken, Trinkwette, Faustkampf); dann 5 Siege, während dein Kriegslied wirkt und zwei Gefährten in der Nähe mitkämpfen.
+  - **Alchemisten-Prüfung:** 8 Heilkraut und eine Seelenphiole bringen; dann drei Heiltränke brauen (Kessel oder „Trank brauen“).
+- **Titel (Scheibe 10):** Der Kelch (Vampir) und Die Grube (Grubenhäuptling) haben jetzt eigene Sternbilder (7 Sterne, wirken nur mit getragenem Titel). Beim Erwerb einer Titelklasse und bei jeder Grad-Weihe läuft die Aufnahmeszene; ist der Meister nicht in der Nähe, gehört sie dem Helden allein. Bei der Grad-Weihe spricht der Meister danach.
+- **Gefährten-Sternbild (Scheibe 10):** Jeder Gefährte hat ein kleines eigenes Sternbild „Die Gefährten“ (7 Sterne, 6 lernbar, nur Werte: Leben, Schaden, Rüstung, Ausdauer; zwei Schlüsselsterne Leibwache oder Klinge der Gruppe). Punkte: 1 zum Start, dann einer alle fünf Stufen des Gefährten. Im Sternenhimmel oben „Für:“ den Gefährten wählen. Der Held kann diese Sterne nicht lernen; wird ein Gefährte zum Erben, beginnt er ohne sie. Ein Protokollhinweis erklärt es beim ersten Gefährten.
+- **Debug „Sterne: …“ (Scheibe 10):** Gefährten-Sternbild (+2 Stufen), Titelszenen ansehen, Grad-Weihe-Szene ansehen.
+
+- **Kampfstil nach Waffe (03.10.):** Wie wuchtig und auffällig deine Hiebe aussehen, hängt von der Seltenheit deiner Waffe ab:
+  - **Gewöhnlich und ungewöhnlich:** bodenständig (Grounded).
+  - **Selten und episch:** heroisch, mit größeren Bewegungen und Effekten.
+  - **Legendär und mythisch:** flashy, mit Nachbildern, Dash und großen Einschlägen.
+
+  Das ist nur Optik: Schaden und Takt bleiben gleich. Gegner kämpfen immer bodenständig. Im Test Room kann man jeden Stil zum Vergleich erzwingen.
+- **Segen kostet Ausdauer (03.10.):** Segen (Ritter, Paladin) kostet jetzt 20 Ausdauer statt 16 Mana. Er ist ein Eid, keine Magie: Der Ritter kann ihn ohne gelernten Zauber nutzen, und der Bann der Magierjäger hält ihn nicht auf. Die Segen-Sterne des Ritters wirken dadurch auch ohne Mana.
+- **Erbe und Bindungen (HB-20, 03.10.):** Stirbt dein Held und ein Kind erbt, bleibt sein Ehepartner als Witwe oder Witwer im Haus. Mit dem Erben ist er nicht verheiratet: Es gibt keine weiteren Geburten und keine Ehe-Gespräche. Gefangene des Toten kommen frei. Was dir ein Diener aus der Burg geschmuggelt hat, liegt am Grab des Toten.
+- **Spur des Rotfalls abgeschlossen (HB-10, 03.10.):** Sobald du genug Spuren des Rotfalls gefunden hast (9), ist der Auftrag erledigt. Du bekommst die Erfahrung und das Unikat „Rotfall“: ein legendäres Langschwert, dessen Wunden bluten. Wer die Spur schon vorher vollständig hatte, bekommt beides innerhalb einer Spielstunde.
+- **Aurelions Automaten (03.10.):**
+  - Wächterspinnen lauern jetzt auch an den Werkhallen in den Städten Aurelions. Dort greifen sie nur Unbefugte an, also wer keinen Aufenthaltsschein, kein Bürgerrecht und keine Stellung hat; wer sie angreift, macht sie trotzdem zum Feind.
+  - Kommt es zur Schlacht um eine Stadt Aurelions, steht eine Dampframme bei den Verteidigern.
+- **Prothesen-Werkbank als Fenster (03.10.):** Werkbank, Kybernetiker und Medica öffnen ein Fenster:
+  - **Links:** ein Körperschema mit den vier Gliedern und dem Auge. Grau heißt Fleisch, Gold heißt Prothese, Rot heißt beschädigt.
+  - **Rechts:** Zustand und Aufrüstung jedes Glieds, dazu der Preis-Hinweis der Wartung.
+  - **Unten:** alle Aktionen als Knöpfe: instand setzen, aufrüsten, ersetzen, Auge.
+
+  Aktionen mit Rückfrage öffnen weiter das Gespräch. Koop-Gäste nutzen das Gespräch.
+- **Lebensbalken = Rumpf (03.10.):** Alle Lebensanzeigen zeigen jetzt das Leben des Rumpfes: HUD, Gruppe, Ziel, Boss, Gegnerbalken und Koop. Ist der Balken leer, ist die Figur tot oder liegt am Boden. Vorher zeigten die Balken Kopf und Rumpf zusammen, deshalb starb ein Gegner schon bei „40 %“. Kopftreffer bleiben gefährlich (K.o.); die einzelnen Glieder zeigt die Körperanzeige im Charakterfenster.
+- **Koop „jeder für sich“ (HB2-02/HB2-09 behoben):** Prüfungsaufträge und laufende Meisterprüfung gehören der Figur. Der Held führt seine im Auftragsbuch, eine Gastfigur ihre eigenen (an der Figur gespeichert); Held und Gast können gleichzeitig verschiedene oder dieselbe Prüfung ablegen, ohne einander zurückzusetzen. Puppen, Übungsfechter und Räuber einer Prüfung kämpfen nur gegen ihren Prüfling und zählen nur seine Treffer. Getötete Feinde zählen für die Prüfungsaufträge aller Mitspieler (wie sonst auch); Diebstahl, Schenkenspiele, Brauen, Steckbriefe und das Kriegslied zählen nur für die Figur, die es tut. Meldungen der Gastfigur tragen ihren Namen.
+- **Schurken-Prüfung, genauer:** Es zählen drei Stiche von hinten — Meuchelstich, Hieb aus dem Schattenschritt oder in den Rücken (die Puppen schauen den Prüfling an). So kann auch eine Koop-Gastfigur ohne Fähigkeiten bestehen.
+
+
+## Entscheidungen aus dem Ist-Zustand (03.10.)
+- **Tributdörfer:** Grauwasser, Hohlstein und Eisenried gehören sich selbst. Hilfe dort (Verbinden, Seuche, Brett-Aufträge) zählt für die **Freien**, vor und nach Vargs Fall. Aufträge des Tributoffiziers bleiben Kettengeschäft.
+- **Lieferaufträge** aus dem Kontor geben jetzt Ruf bei der Macht der **Zielstadt**, statt immer bei der Händlergilde.
+- **Tickmar-Arbeiterrat:** Seine Aufträge zählen für die **Freien**, nicht für Aurelion.
+- **Feste Aufträge ohne eigenen Ruf** (z. B. Quirin, Lioba, Todesritter, Varons erster Auftrag) geben jetzt +4 Ruf bei der Macht des Gebers. Klassenprüfungen geben keinen Ruf.
+- **Lager:** Das Lager liegt in deiner Siedlung (bis 500 Schritt um ihre Mitte). Woanders ist es im Inventar ausgegraut, Ein- und Auslagern geht dann nicht.
+- **Kopfgeld bei der Ortsmacht (03.10.):** Ein Verbrechen kostet Ruf und bringt Kopfgeld bei der Macht des Opfers. Hat das Opfer keine Fraktion, zählt sein Heimatort, sonst der Ort der Tat. In der Wildnis, wo niemand herrscht, gibt es kein Kopfgeld.
+- **Krieg (03.10.):**
+  - Zurückeroberte Städte gehen an ihre eigene Macht zurück: Sonnwacht an den Orden, Kreuzweg und Aschfurt an die Händler, Aurelions Städte ans Hochreich. Aschfurt gehört von Anfang an den Händlern.
+  - Wer bei einer gewonnenen Feldschlacht dabei ist, bekommt +5 Ruf bei der Macht des Ortes; wer eine Stadt befreit, +10 (vorläufige Werte).
+- **Boss-Beute (03.10.):** Jeder Boss lässt genau eines seiner Stücke fallen: mit 25 % sein Unikat, sonst eine seiner Waffen oder Rüstungen. Nie doppelt, nie gar nichts.
+- **Titelbild (03.10.):** Goldener Schriftzug, Leitsatz „Dein Charakter kann sterben. Deine Geschichte nicht.“, gravierte Tafeln mit Akzentleiste. „Fortsetzen“ ist hervorgehoben.
+- **Seevolk-Ränge (03.10.):** Landratte ab Ruf 10 beim Seevolk. Deckhand bekommst du mit der Wahl einer Seite (Salzbund oder Sturmklinge), Maat ab Ruf 50 nach der Seitenwahl. Steuermann gibt es wie bisher über die Aufträge, Kapitän ab Ruf 100.
+- **Schurken-Prüfung (03.10.):** Es zählen nur Meuchelstiche. Der Lehrer leiht dir den Meuchelstich für die Prüfung, er liegt dann auf deiner Leiste.
+- **Siedlungsschmiede (03.10.):** Sie hat eine Esse mit allen Schmiede-Rezepten (Handwerks-Fenster) und bessert wie bisher mit Eisenerz auf 100 % aus.
+- **Jagd (03.10.):** Die Fertigkeit wächst, wenn du Tiere erlegst. Sie bringt bis +60 % Chance auf Felle, Fleisch und Knochen, und Tiere bemerken dich später (bis 40 % kürzere Sicht).
+- **Neue Bezugsquellen (03.10.):**
+  - Lederstiefel bei der Tuchhändlerin.
+  - Talisman des Jägers und Arkaner Trank beim Juwelier.
+  - Donnerwort selten auf dem Schwarzmarkt.
+  - Sturmsense als Lohn für Liobas „Ein Lied für die Toten“.
+  - Blutstein von Blutmagiern (4 %).
+  - Splitter des Rotfalls von Nekromanten (4 %).
+
+## Wüstenbund und Zwerge der Tiefhall (03.10.)
+- **Zwei neue Fraktionen:** Der **Wüstenbund** (Karak-Atar und Dünenwacht) und **die Zwerge der Tiefhall** (Königsstadt unter der alten Tiefhall). Beide starten bei Ruf 0. Bewohner, Zöllner, Sandreiter und Zwergenwachen gehören zu ihrer Fraktion.
+- **Anschlagbrett:** In Karak-Atar (am Markt), in Dünenwacht (im Lager) und in der Zwergenstadt (in der großen Halle) hängt ein Brett. Erfüllte Aufträge geben Ruf beim Wüstenbund bzw. bei den Zwergen. Karak-Atar: Eskorte, Lieferung, Steckbrief, Lager ausheben, Vermisst, Patrouille, Spurensuche, Verteidigung. Dünenwacht: Patrouille, Steckbrief, Lager ausheben, Spurensuche. Zwerge: Monsterjagd, Steckbrief, Jagd, Vermisst. Das Brett der Zwerge öffnet sich erst, wenn König Durgrim dich als Freund der Halle anerkennt (wie ihr Handel).
+- **Beitritt:** Ab Ansehen 10 bei einem Mitglied („Wie tritt man bei?“). Bei den Zwergen nur als Freund der Halle. Wer bei den Toten Rang hat, wird bei den Zwergen nicht aufgenommen, und umgekehrt (die Toten nahmen den Zwergen die obere Halle).
+- **Ränge (vorläufige Namen):** Wüstenbund: Karawanengast → Karawanenwächter → Sandreiter. Zwerge: Hallengast → Hallenbruder → Schildträger des Königs. Aufstieg wie bei den anderen Mächten: Ansehen 25 bzw. 50, dann zwei Rangaufträge — beim Wüstenbund bei der Stammesältesten Amina in Karak-Atar, bei den Zwergen bei König Durgrim.
+- **Verbrechen:** Wer dort jemanden angreift oder tötet, verliert Ruf bei dieser Fraktion und bekommt Kopfgeld bei ihr (nicht mehr bei Valen). Zöllner, Sandreiter und Zwergenwachen halten Gesuchte an: zahlen, mitkommen (Kerker, danach wirst du vor Karak-Atar bzw. vor dem Eingang der Tiefhall entlassen) oder Widerstand.
+- **Hinweis:** Beim ersten Betreten von Karak-Atar/Dünenwacht bzw. der Zwergenstadt erklärt eine Meldung die Fraktion. Ränge stehen im Kodex (H, Reiter „Ränge“) und im Fraktionsfenster.
+- **Dünenwacht** ist ein Posten des Wüstenbunds: vier Sandreiter halten dort Wache (sie sind Wachen des Bunds), das Zelt heißt „Posten der Sandreiter“. Die Wüstenräuber beim Wasserrecht-Geheimnis sind weiter Räuber, nicht der Bund.
+- **Karraks Tod** gibt +10 Ruf beim Wüstenbund (Karrak raubt auch den Bund aus).
+- **Rangvorteile:** Bei beiden Fraktionen Nachlass bei ihren Händlern wie bei allen Mächten (3 % je Rang). Wüstenbund: schon als Mitglied (Karawanengast) kein Wegzoll in Karak-Atar; ab Karawanenwächter zahlen Eskorten des Bunds 25 % mehr (vorläufiger Wert). Zwerge: als Schildträger des Königs (Rang 2) verbessert Hilda Eisenfaust Ausrüstung eine Stufe weiter, bis „Meisterstück“ (sonst endet jeder Schmied bei „Meisterlich“). Hilda bessert erst aus, wenn du Freund der Halle bist.
+- **Eigene Kerker:** Wer von Wachen des Wüstenbunds bzw. der Zwerge festgenommen wird, sitzt im Kerker von Karak-Atar bzw. im Kerker der Tiefhall — mit eigenem Kerkermeister (Sandfürsten bzw. Zwerge), eigenen Bannern und eigenem Ankunftstext. Regeln wie in jedem Kerker (Zeit, Kaution, Bestechung, Schlossknacken). Entlassen wird vor Ort: vor Karak-Atar bzw. in der Zwergenstadt; wer ausbricht, landet dort auch.
+- **Debug:** Abschnitt „Fraktionen: Wüstenbund und Zwerge“ (Ansehen, Rang, Reisen, Kopfgeld, Kerker von Karak-Atar/Tiefhall, Karrak fällt, Hinweise zurücksetzen).
+- **Asservatenkammer (03.10.):** Brichst du aus dem Kerker aus oder fliehst aus der Schuldknechtschaft, liegt deine Waffe in der Asservatenkammer der Macht, die dich festhielt. Jede Wache dieser Macht gibt sie dir gegen eine Buße heraus: 50 Gold plus ein Viertel ihres Werts (vorläufig). Es ist dein Exemplar, mit Seltenheit und Zustand. Solange dort ein Kopfgeld auf dich offen ist, gibt die Wache sie nicht heraus.
+- **Legendäre Sets als Lohn (03.10.):** Wer den höchsten Rang erreicht, bekommt das Set des Anführers geschenkt, ohne ihn zu töten:
+  - bei Valen den Hochritter;
+  - beim Orden Ordensmeister und Sternwacht;
+  - bei Rooks Bande Rooks General.
+- **Varonheim als volle Hauptstadt (03.10.):** Varonheim bekommt jetzt alles, was eine Stadt hat: Kutsche, Schankpersonal (mit Söldnern), Boten und Spielleute, 5 Aushänge am Brett. Steuereintreiber und Missernte treffen nur noch Dörfer. Die Karte ändert sich dadurch nicht.
+- **Schleichmodus (03.10.):** Mit der Taste V schleichst du. Du bist dann halb so schnell und halb durchsichtig.
+  - **Später entdeckt:** Gegner, die dich noch nicht jagen, bemerken dich erst auf 55 % ihrer Sichtweite, mit Schleichen 100 sogar erst auf 30 %.
+  - **Hinterhalt:** Greifst du aus dem Schleichen einen ahnungslosen Gegner an, ist das ein Hinterhalt: ×1,5 Schaden, von hinten ×3. Danach bist du entdeckt, und das Schleichen endet.
+  - **Übung:** Die Fertigkeit Schleichen wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst.
+  - **Kein Schleichen auf dem Pferd.** Alle Werte sind vorläufig.
+
+- **Wanderautomaten (03.10.):** Wie die Skelette in Kenshi ziehen Roboter ohne Herrn als Reisende von Stadt zu Stadt.
+  - **Aussehen:** Sie sind hagere Metallgestalten ohne Rüstung, mit kahlem Maskenkopf und leuchtenden Augen. Das Metall ist Stahl, Rost oder Schwarzguss; manche tragen Lumpen oder eine Schrottklinge.
+  - **Anwerben:** Sprich sie an. Etwa 2 von 5 kommen auf „Willst du mit mir kommen?“ kostenlos mit, solange in deiner Gruppe Platz ist (wie Beep). Die anderen lehnen freundlich ab.
+  - **Hinweis:** Beim ersten Gespräch erklärt eine Meldung die Regel. Debug-Abschnitt „Wanderautomaten“. Häufigkeit und Anteil sind vorläufig.
+
+- **Zauber lernen (Fenster, 03.10.):** Fragst du einen Zauberlehrer nach Magie, öffnet sich ein Fenster mit allen seinen Formeln (Schulfarbe, Stufe, Mana, Preis). Was dir noch fehlt (Gold, Intelligenz, Beziehung, Rang), steht rot darunter; der Knopf ist dann gesperrt. Gelernte Zauber legst du im Zauberbuch (Z) auf die Leiste. Debug: „Fenster: Zauber lernen“.
+
+## Runde: Fraktions-Starts, Rassen, Anwerben bei Fraktionen (Entwickler 03.10.2026, vorläufig)
+
+- **Freischalten:** Wer den höchsten Rang einer Fraktion mit eigenem Gebiet erreicht (Valen, Orden, Untote, Kette, Aurelion, Seevolk, Händler, Grubenstämme, Wüstenbund, Zwerge), schaltet sie dauerhaft als Start frei — für alle Spielstände (eigener Speicher `rotfall.starts`, nicht im Spielstand). Auch Abkürzungen zählen (Held der Untoten, Weihe der Kette, Avatar Omegas). Meldung, Toast und Chronik sagen es. Alte Stände mit höchstem Rang schalten beim nächsten Stundenwechsel frei.
+- **Erstellung:** Reihe „Fraktions-Start“ unter dem Startort. Gesperrte Starts sind gestrichelt und sagen, welcher Rang fehlt. Ein Fraktions-Start legt den Startort fest (der Startort-Knopf wird blass); die Herkunft (Werte, Fertigkeiten, Gold) bleibt wählbar.
+- **Ein Fraktions-Start bringt:** Start im Fraktionsgebiet (an einem Platz ohne Feinde in der Nähe), Mitgliedschaft (unterster Rang, Ansehen 20; Aurelion: Bürgerrecht; Grubenstämme und Seevolk: Rang über das Ansehen), dieselben Feindschaften wie ein Beitritt (Tote: Orden −30, Valen −20; Orden: Tote −20; Kette: Grubenstämme −20, Orden −10, Valen −5), eigene Ausrüstung und Kleiderfarbe statt der Ausrüstung der Herkunft, einen kleinen Goldzuschlag und ein **Haus**: eine eigene Siedlung neben dem Ort mit fertigem Lagerfeuer und fertiger Hütte (Siedler ziehen zu, Bauen mit B).
+- **Orte:** Valen Varonheim (mit den Anfängeraufträgen der Hauptstadt), Orden Sonnwacht, Untote Vharnholm, Kette Eisenfeste, Aurelion Aurelheim, Seevolk Tangkron (Gischtinseln, das Haus steht auf der Insel), Händler Kreuzweg, Grubenstämme Morrgrund, Wüstenbund Karak-Atar, Zwerge an der Tiefhall (Oberfläche).
+- **Rassen (Boni einmalig beim Start, wie die Herkunft):** Mensch keine Boni (Valen, Orden, Kette, Händler; alle freien Starts) · Aurelianer Intelligenz +1, Wahrnehmung +1, Handel +3 · Inselvolk Beweglichkeit +1, Ausdauer +1, Überleben +3 · Wüstenvolk Ausdauer +2, Überleben +3 · Zwerg Ausdauer +2, Stärke +1, Beweglichkeit −1, Schmieden +5, Körperbau immer „Gedrungen“ · Goblin Beweglichkeit +2, Wahrnehmung +1, Stärke −1, Handwerk +3, kleiner gezeichnet · Skelett Ausdauer +1, Willenskraft +1, Zähigkeit +5.
+- **Goblin-Held:** Goblins (auch die Krieger in Gruben und Lagern) sind friedlich, solange du einen Rang bei den Grubenstämmen hast — das gilt jetzt für jeden Grubenstamm-Rang, nicht nur nach der Befreiung.
+- **Skelett-Held:** isst nicht (auch untote Gefährten nicht; der Gruppenproviant zählt nur Lebende), heiliger Schaden trifft doppelt, die Toten sind Verbündete. **Stigma „Knochen“:** Ohne Kapuze (Kapuze, Haube, Kutte oder Umhang mit Kapuze) erkennt dich jeder in 120 px. Wer dich sah, weiß es 10 Tage. Orden, Kette und Zwerge verweigern Handel, Bett und Heiler; Valen und Kette melden es der Wache (Kopfgeld 60, einmal am Tag — dann gilt das Gesetz); der Orden schickt Totenjäger; Aurelion, Händler, Goblins, Seevolk, Wüstenbund, Freie verlangen 20 % mehr; Tote 10 % weniger. Startausrüstung: Kuttenkapuze und Fetzenmantel.
+- **Haus eines Totenmitglieds:** Die Toten überfallen es nicht (sie sind Verbündete). Häuser auf den Gischtinseln werden nur von Wölfen heimgesucht.
+- **Anwerben bei Fraktionen:** Ab Ansehen 40 bieten Wachen und Kämpfer einer Fraktion im Gespräch an: „Einen Kämpfer anwerben“ (Gefährte zu Söldnerbedingungen: Handgeld 50 + 12 × Stufe, Lohn 3 + Stufe am Tag, ohne Lohn geht er) und mit eigener Siedlung „Eine Lagerwache anwerben“ (80 Gold, dann 5 Gold am Tag, gleiche Obergrenze wie beim Wirt; die Wache kommt am nächsten Morgen). Darunter sagt die Wache, ab welchem Ansehen es geht. Angeworbene tragen Farben, Ausrüstung und Rasse ihrer Fraktion (Goblins, Zwerge, Wüstenvolk …).
+- **Erbe:** Der Erbe behält seine eigene Rasse; Rassenboni gibt es nur beim Start.
+- **Koop:** Gäste beginnen frei (Mensch); die Reihe „Fraktions-Start“ ist für sie ausgeblendet.
+- **Debug:** Abschnitt „Starts: …“ (Freischaltungen zeigen, verdient, freischalten, alle freischalten, alle löschen, Start testen in neuem Spielstand, Rasse am Helden, Skelett erkennen lassen, Knochen-Stigma vergessen, Fraktionskämpfer gratis, Fraktions-Lagerwache sofort, Ansehen 40). Proben „Fraktions-Starts (a)–(d)“.
+- Vorschlag und offene Entscheidungen: `ROTFALL_STATE/PROPOSALS/fraktions_starts.md`.
+
+- **Heiler (Fenster, 03.10.):** „Versorg meine Wunden“ öffnet ein Fenster: jede Person deiner Gruppe mit Leben, sechs Gliedern (grün heil, rot gebrochen, gelb geschient, grau fehlend) und Zuständen. Zwei Knöpfe: Wunden versorgen (Preis nach Verletzung, dauert ein paar Herzschläge) und Brüche schienen/Wunden reinigen (25 Gold). Prothesen zählen nicht als Wunde — die repariert nur die Werkbank. Debug: „Fenster: Heiler“.
+
+- **Zwerge (Aussehen, 03.10.):** Zwerge — der Zwergen-Held und alle Leute der Tiefhall — sind kleine, breite Gestalten: 80 % Höhe, breitere Schultern, Bauch, dicke Arme, meist Bart.

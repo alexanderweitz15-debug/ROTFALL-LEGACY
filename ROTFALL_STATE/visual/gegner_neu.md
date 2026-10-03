@@ -86,3 +86,40 @@ Häufigkeit (vorläufig): Bomben-Skelett 8 %, Großes Skelett 6 % der Skelett-Sp
   - Verdorbener: 1–2 Treffer, 3–24 % (geschickt). Wucherer: 4–8 Treffer, 0–26 % (geschickt), stehend 0–26 %.
 - Selbsttest: 400/400 PASS (4 neue Proben). Echter Spielstand = Sicherung (geprüft).
 - Leistung: neue Varianten sind normale Spec-Stufen; Frame-Cache bleibt bei ≤ 4000 gedeckelt (Probe). Explosion/Glut nur bei vorhandenen Bomben-Skeletten.
+
+---
+# Teil 2: Top 5 aus gegner_ideen.md (Zusatzauftrag 02.10.) — FEATURE IMPACT REPORT + Ergebnis
+
+Entscheidungen: DECISIONS.md letzter Abschnitt (Wächterspinne an bestimmten Werkstatt-/Fabrikwänden, Ramme zerstört Hindernisse, Blutschöpfer heilt Kultisten, Netz = Spielerregel, Hofspione nach Schwere).
+
+| Gegner | Bestehende Systeme | Neu (klein) |
+|---|---|---|
+| Wächterspinne (aurel, Gefahr 1: hp 24, dmg 6, Tempo 1,8, atk 600, xp 12) | Fraktion aurel (wie Automat), Flächentreffer `areaHit`, Respawn-Takt `respawnTick`, „7 Tage geräumt“ wie Gewölbe | `e.cling` (hängt, bis Feind ≤ 140 px / Treffer), Splitter beim Tod, eigenes Pixelbild (render.js `drawSpider`, Leiche) |
+| Dampframme (aurel, Gefahr 3: hp 150, dmg 15, Tempo 0,8, xp 80; Abart des Automaten 20 %) | `m.heavy` Art `charge` (rote Linie, nicht blockbar, Rückstoß), Abart-Regel, Prop-Entfernung wie Baumfällen (→ `propsGone` im Spielstand) | `ram`: Lauf über die ganze Linie, Fässer/Kisten/Säcke/Zäune zerbrechen, 1,5 s offen |
+| Blutschöpfer (blut, Gefahr 2: hp 40, dmg 9, xp 30) | Status „Ausgezehrt“ (Trinkregel §5g.2), Ausblut-Timer `downTimer`, Heilung `B.heal`, Katakomben-Besatzung | KI: Wehrlose suchen, 1,2 s trinken, Treffer bricht ab |
+| Netzwerferin (pirate, Schütze: hp 42, dmg 9, atk 2600, xp 30) | `archerAI`, Geschosse, Regel von `net_shot` | Geschossart `net` (langsamer), danach 6 s frei |
+| Hofspion (aurel, Gefahr 2: hp 44, dmg 11, Tempo 1,5, xp 34) | Verkleidung wie Maskierte (`teamOf` neutral), Kopfgeld `addBounty` als Regelbruch-Signal, Schleichangriff-Faktor ×3 | `spyCover` → entlarvt nach Schwere (Dieb 1, Gewalt 2, Mord 3), Rückenstich-KI |
+
+Hinweise im Spiel: Kodex-Text je Art, erste Begegnung je Mechanik als Log + Hinweis (Spinne, Trinken, Netz, Hofspione). Debug: „Gegner: …“ (Karte „Kampf: Neue Gegner (02.10.)“). MECHANIKEN.md ergänzt. Bild: `img/gegner_top5.png` (Spinne nicht im Raster: eigener Zeichenweg in render.js).
+
+simFight (vorläufige Werte, „schwer“, Zweihänder + Schuppenpanzer, gleiche Stufe; geschickt | stehend):
+- Wächterspinne St. 10: 2–3 Treffer, 0–3 % (Schwarm-Band < 10 % ✓).
+- Dampframme St. 15: geschickt 9/57/19 %, stehend 50/142/9 % — Kriegsautomat 0/0/0 | 6/41/39. Ramme ×1,8 war zu hart (13/78/26), jetzt ×1,4.
+- Blutschöpfer St. 13: 1–2 Treffer, 0–11 % (sein Wert liegt im Trinken, nicht im Hieb).
+- Netzwerferin St. 13: geschickt 80/13/28 % — Harpunier 82/11/17, Banditenschütze 66/8/18. Ohne „danach frei“ hielt sie das Ziel dauerhaft fest (Spieler verlor 3/3) → 6 s frei (vorläufig).
+- Hofspion St. 16: 1–2 Treffer, 0–18 % (offen); der Rückenstich ×3 kommt dazu.
+
+Proben (alle PASS): „Gegner (02.10.): Wächterspinne …“, „… Dampframme …“, „… Blutschöpfer …“, „… Netzwerferin …“, „… Hofspion …“.
+Selbsttest: alle eigenen Proben grün. Rot sind drei fremde Proben aus laufender Arbeit anderer Agenten: „Ratgeber“ (Tipp „talent“ wurde auf `() => false` gesetzt, „Talentbäume versteckt 02.10.“), „HB-07“, „HB-18“ (neue Bugjäger-Proben). Zwischenstand vorher: 400/400 grün.
+Nebenbefund: Wächterspinnen entstehen jetzt erst im Nachschub-Takt (wenn der Held weit weg ist) — beim Laden gespawnt verschob ihr Zufallszug die Weltfolge und ließ vier zufallsabhängige Stadt-Proben kippen.
+
+## OFFENE DESIGNENTSCHEIDUNGEN (Teil 2)
+1. Wächterspinne: nur Wände **außerhalb** der Städte (Werkstatt-Streuorte, Werkhallen vor der Mauer) — im Spiel derzeit nur eine Wand (Werkstatt bei Aurelheim). Sollen Werkhallen **in** Städten (Industrieviertel) auch Spinnen haben? Dann greifen sie mitten in der Stadt an (Wachen der Fraktion aurel helfen dem Spieler nicht). Gilt sie für Bürger mit Aufenthaltsschein auch als Feind?
+2. Dampframme: Herkunft vorläufig als Abart des Automaten (Maschinenruinen, Uhrwerkhalle, Schlund). Soll sie auch Fabriktore/Städte Aurelions verteidigen (dann wäre sie dort verbündet mit den Wachen)?
+3. Werte aller fünf vorläufig (Trinkheilung 30/20 %, −4 s Ausbluten, Netz 6 s frei, Splitter ×0,8 in 44 px, Ramme ×1,4).
+4. Blutschöpfer: zweites Trinken am selben Tag tötet beim Spieler-Vampir — beim Gegner nicht übernommen (er beschleunigt nur das Ausbluten).
+5. Hofspion: jedes neue Kopfgeld auf der Insel zählt als Regelbruch; Spione kommen nach dem Laden wieder (Hofpersonal ist flüchtig, wie der Hof selbst).
+6. Koop: Bodenmarken schwerer Angriffe (Ramme, Bombe) sieht der Gast nicht (bestehende Lücke, `special` nicht in DYN).
+
+## Geänderte Dateien
+src/data.js, src/game.js, src/sprites.js, src/fig5.js, src/render.js, docs/MECHANIKEN.md, ROTFALL_STATE/visual/gegner_neu.md, ROTFALL_STATE/visual/img/gegner_neu.png, ROTFALL_STATE/visual/img/gegner_top5.png (+ Kopien in docs/screenshots).

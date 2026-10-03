@@ -9,7 +9,7 @@
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
 import { mix } from './sprites.js?v=24';
-import { atkShape, legacySw, atkBody } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
+import { atkShape, legacySw, atkBody, atkStance } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)
@@ -289,6 +289,7 @@ export const octOf = a => ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
 export const upright = wt => wt === 'spear' || wt === 'polearm';
 export const onShoulder = wt => wt === 'great' || wt === 'hammer';
 let CUR_BP = null; const BP0 = { by: 0, ln: 0, st: 0, hy: 0, hr: 0, hd: 0 };
+const stanceBody = W => { const st = atkStance(W.ac || W.wt, W.mode === 'cover' ? 'guard' : 'ready'); return st ? { ...BP0, ...st.body } : null; };   /* Kampfhaltung/Deckung: breiter Stand, Knie gebeugt */
 const legIK = (hip, foot, side) => [hip, ik(hip, foot, 7.6, 7.6, e => side * e[0]), foot];   // Knie: side −1 = nach links (vorn in der Seitenansicht)
 /* Kampfanimation (Lead 02.10.): Gewicht verlagern, Ausfallschritt, Rumpf kippt in den Schlag, Kniebeuge — als Gelenkpunkte im bestehenden Rig */
 function bodyPose(R, view, B, pose) {
@@ -304,7 +305,12 @@ export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
   return W.q < 0.4 ? 'wind' : W.q <= 0.5 ? 'strike' : W.q < 0.82 ? 'follow' : null;   /* Kampfanimation: q = Formzeit u (gleiche Anker für alle Klassen) */
 }
-function svOf(W) { return RANGED.has(W.wt) ? { a: 0, ext: 0 } : W.mode === 'cover' ? { a: -1.15, ext: -2 } : swingOf(W.wt, W.q, W.arc, W.v, 0); }
+function svOf(W) {
+  if (RANGED.has(W.wt)) return { a: 0, ext: 0 }; const ac = W.ac || W.wt;
+  if (W.mode === 'cover' || W.mode === 'ready') { const st = atkStance(ac, W.mode === 'cover' ? 'guard' : 'ready');   /* Kampfanimation: Deckung/Kampfhaltung je Waffenklasse */
+    return st ? { a: st.a, ext: st.ext } : W.mode === 'cover' ? { a: -1.15, ext: -2 } : { a: 0.6, ext: 0 }; }
+  return swingOf(ac, W.q, W.arc, W.v, 0);
+}
 // Winkel der Waffe (Welt, Kanvas-Winkel) — gleich der Regel in render.js weaponPose
 export function weaponAngle(W, dir) {
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, wt = W.wt, bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
@@ -350,7 +356,7 @@ export function paintR(L, dir, pose, W = null) {
   if (extra) { const A = view === 'W' ? rigW(extra) : rigS(extra), dy = R.by - A.by;   // Mischpose: Beine der Grundpose, Arme der Zusatzpose
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
   pose = base;
-  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
+  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : W && (W.mode === 'ready' || W.mode === 'cover') ? stanceBody(W) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
   if (BP) bodyPose(R, view, BP, base);
   else {
   if (ph === 'wind') { R.by -= 1; if (view === 'W') { R.lean += 1; R.cs = 1; } }
@@ -378,10 +384,10 @@ export function paintR(L, dir, pose, W = null) {
 
 // S14 (Nutzer: „verschiedene Breiten, dick, breites Schlüsselbein“): Körperbau aus body.js BUILDS als Maß, nicht als Streckung —
 // sh Schultern, wa Taille, by Höhe (− = größer), aw Armdicke; Bauch (be) je Person aus der Variante, nicht bei Drahtigen und Platte.
-const BUILD_R = { drahtig: { sh: -1, wa: -1, by: 0, aw: 2.6 }, bullig: { sh: 1, wa: 1, by: 0, aw: 3.6 }, hochgewachsen: { sh: 0, wa: 0, by: -2, aw: 3 }, gedrungen: { sh: 0, wa: 1, by: 2, aw: 3.2 } };
+const BUILD_R = { drahtig: { sh: -1, wa: -1, by: 0, aw: 2.6 }, bullig: { sh: 1, wa: 1, by: 0, aw: 3.6 }, hochgewachsen: { sh: 0, wa: 0, by: -2, aw: 3 }, gedrungen: { sh: 0, wa: 1, by: 2, aw: 3.2 }, zwerg: { sh: 2, wa: 2, by: 2, aw: 3.8 } };   /* Entwickler 03.10.: Zwerge klein, aber breit (dazu render.js: 0,8 hoch, 1,12 breit) */
 function buildR(L, bone, gob) {
   const B = BUILD_R[L.bd] || { sh: 0, wa: 0, by: 0, aw: 3 }, v = L.vs | 0;
-  const be = bone || gob || L.bd === 'drahtig' || L.armor === 'plate' ? 0 : (L.bd === 'bullig' || L.bd === 'gedrungen') && v % 2 === 0 ? 2 : v % 5 === 1 ? 1 : 0;
+  const be = bone || gob || L.bd === 'drahtig' || L.armor === 'plate' ? 0 : (L.bd === 'bullig' || L.bd === 'gedrungen' || L.bd === 'zwerg') && (v % 2 === 0 || L.bd === 'zwerg') ? 2 : v % 5 === 1 ? 1 : 0;
   const sh = B.sh + (!L.bd || L.bd === 'ausgewogen' ? (v === 6 ? 1 : 0) : 0);          // manche Ausgewogene: breites Schlüsselbein
   const hv = L.hv && !bone ? 1 : 0;                                    // schwere Waffe: breite Schultern, dicke Arme, Nacken
   // S14b (Nutzer: „nicht imposant genug, breiter, Schlüsselbein, Push-up“): V-Form — Schultern weit über die Hüfte, Eisen trägt auf
@@ -401,7 +407,7 @@ function looks(L) {
   const helmet = L.helm === 'great' || L.helm === 'bascinet' || XHELM.has(L.helm);
   const hood = !!L.hooded && !helmet && L.helm !== 'wide' && L.helm !== 'hat' && L.helm !== 'toque';
   return { bone, gob, coat, cw: L.cloak ? L.cw || '' : '', hd: hood ? L.hd || '' : '', sleeve: metalArm ? L.armorR : coat, sleeveMat: metalArm ? 'metal' : 'cloth', hand: L.glove || L.skin,
-    pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
+    pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'zwerg' ? 5.6 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
 }
 
 let STUMPS = [], AB = 0;   // AB: Rüstungswucht der gerade gemalten Figur (Handschuhe, Stiefel)                                                    // Enden abgetrennter Glieder (Blut, nach der Schattierung)
@@ -1317,7 +1323,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   if (T.spots) for (const [dx, dy] of [[-5, -3], [4, -2], [7, 1]]) { set(cx + dx, cy + dy, D.b); set(cx + dx + 1.3, cy + dy, D.b); }
   if (T.wool) for (let i = 0; i < 14; i++) { const x = cx - brx + 2 + (i % 7) * brx * 0.3, y = cy - bry * 0.4 + (i / 7 | 0) * bry * 0.8; set(x, y, F.hi); set(x + 1.3, y + 1.2, F.sh); }   // Locken
   if (T.hoof) for (const [fx, fy] of feet) { set(fx - 1, fy + 1, '#141010'); set(fx + 0.3, fy + 1, '#141010'); set(fx + 1.4, fy + 1, '#141010'); }   // Hufe
-  if (T.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, x + y < 0 ? '#ece4d4' : '#c8c0b0');   // Kuh: weiße Flecken
+  if (T.patches || pal.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, pal.patches ? (x + y < 0 ? D.sh : D.b) : (x + y < 0 ? '#ece4d4' : '#c8c0b0'));   // Kuh: weiße Flecken / Schecke (pal.patches): braune Platten
   if (type === 'horse') { for (let y = hy - 1; y <= hy + 2; y += 1.25) set(hx - 1, y, '#e8e0d0'); }                                   // Blesse
   if (T.rump) for (let y = -2; y <= 2; y += 1.3) set(cx + brx - 1.5, cy + y, '#e0d4bc');
   if (type === 'wolf' || type === 'wild_dog') {                     /* Artist Runde 2: dunkler Sattel auf dem Rücken, Brauenschatten — Wolf hebt sich vom Boden ab */

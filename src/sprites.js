@@ -13,7 +13,7 @@
 
 export const PX = 2;
 import { ATLAS } from './ref5_atlas.js?v=24';
-import { ITEMS } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { ITEMS, RACES } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=24';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 import { ATK_U } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
@@ -173,10 +173,10 @@ function humanAtlas(e) {
   if (e.guard) return e.faction === 'chain' ? 'krieger' : e.faction === 'order' ? 'paladin' : e.faction === 'aurel' ? 'infanterist' : 'waechter';
   return CIV_ATLAS[((((e.seed || 0) * 7919) | 0) >>> 0) % CIV_ATLAS.length];
 }
-const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
+const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', drill_fighter: 'krieger', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
   cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
-  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese' };
+  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
 const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
@@ -335,6 +335,14 @@ const pickH = (arr, h, k) => arr[Math.abs((h >> (k * 3)) | 0) % arr.length];
 const mixH = (seed, salt) => { let n = Math.imul(((seed * 1000) | 0) ^ salt, 2654435761); n ^= n >>> 15; n = Math.imul(n, 2246822519); return (n ^ (n >>> 13)) >>> 0; };
 // Nutzer §5f: Varianten für alle. Automaten: Metall (Messing, Stahl, Kupfer, geschwärzt), Verschleiß, Leuchtfarbe. Engel: Goldtöne,
 // Mantel, Lichtfarbe. Bewohner: graues Haar im Alter, Hut/Kappe/Tuch, geflickte Kleidung. Wachen: Wappenfarbe je Stadt.
+/* Wanderautomaten (Entwickler 03.10.2026, „wie die Skelette in Kenshi“): hagere Metallgestalt ohne Plattenpanzer, kahler Kuppelkopf mit Sehschlitz,
+   Metallhaut in Stahl, Rost oder Schwarzguss, leuchtende Augen; manche mit Lumpen. */
+function wanderLook(s, seed) {
+  const h = (seed * 977) | 0, M = pickH(['#7a7a74', '#8a6a4e', '#5a5a5e', '#9a9488', '#6e5a48'], h, 0);
+  const D = pickH(['#4a4a46', '#3e342a', '#2e2e32'], h, 4), rag = pickH(['', '', '#4a3a2a', '#3a3226'], h, 2);
+  Object.assign(s, { armor: '', helm: '', skin: M, hair: M, hs: 0, beard: 0, face: 'mask', armorCol: M, helmCol: M, pauld: '', sil: '', tabard: '', mark: '', markCol: '',
+    glow: pickH(['#7fd6e6', '#e6c46a', '#d65a4a', '#9ae07a'], h, 1), cloth: M, pants: D, boots: D, glove: M, belt: D, scarf: rag, wraps: rag ? 1 : 0, wear: pickH([1, 2, 2], h, 3) });
+}
 function varyMachine(s, seed) {
   const h = (seed * 1231) | 0, M = pickH([['#7a6038', '#8a7a58', '#8a7040'], ['#6a6a70', '#7a7a82', '#5a5a62'], ['#8a5436', '#9a6a44', '#7a4a2e'], ['#2e2c2a', '#3a3834', '#4a4238']], h, 0);
   Object.assign(s, { armorCol: M[0], helmCol: M[1], pauld: M[2], glow: pickH(['#8a5420', '#3a9ad8', '#9ad05a', '#d8b03a', '#c85a3a'], h, 1), wear: pickH([0, 0, 1, 2], h, 2), markCol: pickH(['#c8a050', '#b9c3d2', '#8a2a2a'], h, 3) });
@@ -486,7 +494,7 @@ function varyDead(s, t, seed, own) {
 }
 /* Entwickler 02.10. (Neue Gegner, „mehr Sprites und Variation für Gegner“): Arten, die bis hier ein einziges Aussehen hatten, und die neuen
    Arten. Je Art 6 Formen aus dem Seed (Rüstung sauber/beschädigt/improvisiert, Kopf, Körperbau, Farben) — wenige Stufen, der Frame-Cache bleibt klein. */
-const FOE_VARY = new Set(['cultist', 'blood_mage', 'chalice_guard', 'blood_cultist', 'thrall', 'sea_raider', 'sea_harpooner', 'death_captain', 'ash_demon', 'death_knight', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute']);
+const FOE_VARY = new Set(['netzwerferin', 'blutschoepfer', 'cultist', 'blood_mage', 'chalice_guard', 'blood_cultist', 'thrall', 'sea_raider', 'sea_harpooner', 'death_captain', 'ash_demon', 'death_knight', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute']);
 const NEW_WEAR = { skel_bomb: 2, skel_brute: 2, mutant: 3, mutant_brute: 3, thrall: 3 };
 function varyFoe(s, t, seed) {
   const h = mixH(seed, 0x2c1), look = h % 6, P = (arr, k) => arr[(h >>> (4 + k * 3)) % arr.length];
@@ -497,7 +505,7 @@ function varyFoe(s, t, seed) {
     else if (look === 3) Object.assign(s, { face: 'mask', chn: 1 });                                     /* Wachsmaske, Opferkette */
     else if (look === 4) Object.assign(s, { charm: 1, sil: 'motes', mc: s.glow || '#b07ae0' });          /* Funken der Asche */
     else if (look === 5) Object.assign(s, { robe: '', bare: 1, cloth: '#2a1f2e', wraps: 1, markCol: '#8a2a20' });   /* Büßer: Aschezeichen auf nackter Brust */
-  } else if (t === 'blood_mage') {
+  } else if (t === 'blood_mage' || t === 'blutschoepfer') {
     s.robe = P(['#4a0e14', '#3a0a10', '#2a0a14', '#4a1a1a'], 1);
     if (look === 1) s.sil = 'collar';                                                                    /* hoher Blutkragen */
     else if (look === 2) Object.assign(s, { hooded: 0, hs: 1, hair: P(['#1a1612', '#c8b8a0', '#5a2a1e'], 2), stole: '#7a2228' });   /* offenes Haar, Stola */
@@ -523,7 +531,7 @@ function varyFoe(s, t, seed) {
     else if (look === 3) Object.assign(s, { bare: 1, wraps: 1 });
     else if (look === 4) Object.assign(s, { helm: 'wide', helmCol: '#4a3a26' });                         /* war Bauer */
     else if (look === 5) Object.assign(s, { chn: 1, hs: 1 });                                            /* in Ketten */
-  } else if (t === 'sea_raider' || t === 'sea_harpooner') {
+  } else if (t === 'sea_raider' || t === 'sea_harpooner' || t === 'netzwerferin') {
     s.skin = P(['#a8805e', '#c8a07a', '#8d6644', '#6d4a30', '#d6b089'], 1);
     if (look === 1) Object.assign(s, { helm: '', hs: 2, sc: 1 + (h >>> 9) % 3, beard: 2 });              /* kahl, Narbe */
     else if (look === 2) Object.assign(s, { fur: '#4a3a2a', helm: 'hat', helmCol: '#1e1a18' });          /* Dreispitz und Pelzkragen */
@@ -754,24 +762,29 @@ export function humanSpec(e) {
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
   const NL = NAMED_LOOK[key]; if (NL) Object.assign(s, NL);
   condition(s, e, eq);
-  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); }   /* §5f */
+  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); if (e.wanderBot) wanderLook(s, e.seed || 0); }   /* §5f; Wanderautomaten (03.10.) */
   else if (e.kind === 'npc' && !NAMED_LOOK[key] && !e.undead) varyCivil(s, e, prof);
   if (e.kind === 'npc' && !e.robot && !e.undead) varyPeople(s, e, prof, !!NAMED_LOOK[key]);
   else if (e.kind === 'player' && (e.scars | 0) > 0) s.sc = 1;   /* Artist Runde 4: Narben des Helden sieht man */
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
   regionFarmer(s, e, prof, key);
+  const RL = e.race && RACES[e.race]?.look;   /* Fraktions-Starts: Rasse (Skelett, Goblin, Zwerg …) — nur SPEC_KEYS-Felder (sp, face, glow, beard, skin, hs) */
+  if (RL) { if (RL.sp) { s.sp = RL.sp; s.boots = ''; s.skin = e.pal?.skin || RL.skin; if (RL.sp === 'goblin') s.hs = 2; } if (RL.face) s.face = RL.face; if (RL.glow) s.glow = s.glow || RL.glow; if (RL.beard) s.beard = s.beard || 1; }
   s.hv = heavyOf(w); s.ms = msOf(e);
   s.atlas = humanAtlas(e);   // Stil F
-  s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
+  if (isDwarf(e)) { s.bd = 'zwerg'; if (!e.hooded) s.beard = s.beard || 1 + ((e.seed | 0) % 2); } else s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
   if (e.kind === 'npc' && !e.robot) varyDrape(s, e.seed || 0, '', e, prof);
   return s;
 }
+/* Zwerge (Entwickler 03.10.2026: „kleine Typen, die aber breit sind“): Rasse Zwerg oder Zwergenvolk der Tiefhall → Körperbau 'zwerg' (breite Schultern,
+   Bauch, dicke Arme), gezeichnet in render.js auf 80 % Höhe und 112 % Breite. Gilt für Held, Erben und alle Zwergen-NPCs. */
+export const isDwarf = e => !!e && (e.race === 'zwerg' || (e.kind === 'npc' && e.faction === 'zwerge' && !e.goblin && !e.undead && !e.robot));
 /* PERF-U3 (02.10.2026): humanSpec je Figur gemerkt (render.js zeichnet damit). Vorher je Bild und Figur neu gebaut — ~80 Felder, Regex,
    Hilfslisten; in Varonheim ~120 Aufrufe je Bild, 2–4 ms und viel Müll (Müllsammel-Spitzen). Gilt, solange jede Eingabe gleich ist, die
    humanSpec und seine Helfer lesen: Felder der Figur, Palette, Ausrüstung (Stück, Schlüssel, Zustand), Blutstufe, Glieder, Gegend (regionOf/
    regionFarmer). Ändert sich eine davon, wird neu gebaut — das Bild ist dasselbe wie mit humanSpec. */
-const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build'];
+const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'wanderBot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build', 'race'];
 const HS_PAL = ['skin', 'hair', 'cloth', 'glow', 'hs', 'armor', 'helm', 'crest', 'hood', 'cloak', 'shield', 'shieldBoss'], HS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 const hsMemo = new WeakMap(), hsSig = [];
 function hsInputs(e) {
@@ -951,6 +964,15 @@ export function monsterSpec(e, m) {
   } else if (t === 'mutant' || t === 'mutant_brute') {                  /* Entwickler 02.10.: Mutierte — fahle, fleckige Haut, Wucherungen, zu lange Arme, Lumpen, barfuß */
     Object.assign(s, { hooded: 0, face: 'human', boots: '', pants: '#2e2820', glow: '', la: 1, sil: 'growth', wraps: 1, hs: 2, beard: 0 });
     if (t === 'mutant_brute') Object.assign(s, { bare: 1, strap: 1 });
+  } else if (t === 'dampframme') {                                     /* Entwickler 02.10.: Dampframme — Kessel mit Schloten, Rammschild vorn, gedrungen */
+    Object.assign(s, ROBOT_LOOK, { tabard: '', bd: 'gedrungen', shield: 'kite', shieldCol: '#6a5a3a', pb: 2, armorCol: '#6a5434', helmCol: '#7a6a48' });
+  } else if (t === 'blutschoepfer') {                                  /* Blutschöpfer: Kapuze, Schürze, Phiolengürtel quer über der Brust */
+    Object.assign(s, { hooded: 1, hood: '#2a0a0e', robe: '#3a1014', face: 'skin', glow: '#c0303a', apron: 1, apronCol: '#4a1a1a', pouch: 1, strap: 1, charm: 1, chn: 1 });
+  } else if (t === 'netzwerferin') {                                   /* Netzwerferin: Seevolk, Kopftuch, Netz als Bündel auf dem Rücken */
+    Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: '#2c3a44', pants: '#3a3226', sash: '#8a2a20', helm: 'scarf', helmCol: '#2a4a6a', pack: 1, strap: 1, hs: 1 });
+  } else if (t === 'hofspion') {                                       /* Hofspion: Livree des Hofes, bis die Maske fällt */
+    if (!e.unmasked) Object.assign(s, { cloth: '#c8b888', pants: '#3a3026', tabard: '#e0d4a8', mark: 'chevron', markCol: '#c8a050', hs: 0 });
+    else Object.assign(s, { hooded: 1, hood: '#1a1616', cloak: '#141212', cloth: '#2a2420', face: 'mask', strap: 1 });
   } else if (t === 'valen_soldier') {
     s.armor = 'chain'; s.armorCol = '#8a8f98'; s.helm = 'great'; s.helmCol = '#9aa3b0'; s.crest = '#39599c';
     s.tabard = '#2f4260'; s.mark = 'chevron'; s.markCol = '#b9c3d2'; s.shield = 'heater'; s.shieldCol = '#2f4260'; s.glove = '#5a5d63';
@@ -978,6 +1000,7 @@ export function monsterSpec(e, m) {
   s.bd = m?.angel ? 'bullig' : e.build || s.bd || '';   /* Artist Runde 6: Körperbau aus den Varianten nicht mehr überschreiben */ s.vs = Math.abs(((e.seed || 0) * 131) | 0) % 8;
   if (!e.boss && !e.rboss && t !== 'garmadon' && t !== 'omega') varyDrape(s, e.seed || 0, t, e, '');
   if (t === 'mutant_brute' || t === 'skel_brute') s.bd = 'bullig';   /* Entwickler 02.10.: die Großen bleiben breit */
+  s.unm = !!e.unmasked;   /* Entwickler 02.10.: Hofspion — Bild wechselt, wenn die Maske fällt (render.js monsterSpecOf) */
   if (e.elook) Object.assign(s, e.elook);   /* Nutzer: Elite-Mini-Bosse haben ihr eigenes Aussehen */   // S14 Stil R: Körperbau und Variante je Person
   return s;
 }
@@ -1450,7 +1473,7 @@ function warmRSiblings(spec, dir, pose, W) {
 }
 /* Kampfanimation (Test Room): Schwungbilder einer Figur vorbacken — list = [[dir, pose, W], …], je W alle Stützstellen ATK_U. */
 export function warmSwingR(spec, list) {
-  for (const [d, p, W] of list) for (const q of ATK_U) warmRQ.push([spec, d, p, { ...W, q }]);
+  for (const [d, p, W] of list) if (W.mode !== 'swing') warmRQ.push([spec, d, p, W]); else for (const q of ATK_U) warmRQ.push([spec, d, p, { ...W, q }]);
   if (warmRQ.length > 1600) warmRQ.splice(0, warmRQ.length - 1600);
   if (!warmROn) { warmROn = true; idleCb(warmRRun); }
   return warmRQ.length;
@@ -1463,7 +1486,7 @@ function warmRRun(dl) {
   if (warmRQ.length) { warmROn = true; idleCb(warmRRun); }
 }
 export function humanFrameR(spec, dir, pose, W = null) {
-  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
+  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.ac || W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
   const key = 'R|' + sidOf(sk) + '|' + dir + pose + '|' + wk, hit = frameCache.get(key); if (hit) return hit;
   if (!warmingR) warmRSiblings(spec, dir, pose, W);
   return cacheGet(key, () => {

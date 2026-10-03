@@ -41,32 +41,50 @@ Quellen: `system_hunter.md`, `interaction_hunter.md`, `sweeper.md`, `quest_agent
 
 **HB-06 · Klassenaufträge Mönch c_mon1–3 unerfüllbar** (QA-02) — *Code*
 - Ursache: `evaded()` schreibt Ausweich-Fortschritt nur in `q_monk`. Die Rüstung der Stillen Hand ist dadurch unerreichbar.
+- → behoben (Probe: „HB-06: Ausweichen zählt für alle aktiven Aufträge mit dodge-Ziel …“). `evaded()` aktualisiert jetzt wie `onKill()` generisch alle aktiven Aufträge mit `type:'dodge'`-Ziel statt nur `q_monk`.
 
 **HB-07 · Weißbart nach „Ich fordere dich heraus“ nie wieder ansprechbar** (QA-04) — *Code*
 - Wer flieht, kann q_wb_nebel nicht abgeben, Salzfrieden unmöglich. Ursache: `w.parley = false`, kein Weg zurück.
+- → behoben (Probe: „HB-07: Weißbart … werden nach Entkommen über die Kartengrenze wieder ansprechbar“). `leavePursuit()` setzt beim Boss-Abbruch über die Kartengrenze `parley = true` für Weißbart zurück (wie Dodon es nach dem Sturm schon tut).
 
 **HB-08 · Königsauftrag abgebrochen = ganze Varon-Reihe tot** (QA-05) — *Code*
 - Ursache: `failContract` setzt `S.flags.varonQ` nicht zurück; `royalStart` bietet nur bei `Q === 0` an.
+- → behoben (Probe: „HB-08: Ein abgebrochener Königsauftrag setzt varonQ zurück …“). `failContract()` setzt `S.flags.varonQ` bei einem `kind:'royal'`-Auftrag auf 0 zurück, der König bietet den Auftrag erneut an.
 
 **HB-09 · Eisenmark: Pferch-Auftrag hängt nach dem Fall der Kette; Tribut-Raub zählt Nähe statt Täter** (QA-08, QA-07) — *Code*
 - `openPen()` bricht bei `chainsBroken` vor dem Abschluss ab; `tribTick` zählt Spieler-Nähe < 220 px als „geraubt“.
+- → behoben (Proben: „HB-09a: Ein überfallener Tributzug zählt den Täter …“, „HB-09b: Vargs Fall schließt eine noch offene Pferch-Quest ab …“). `liberate()` schließt eine noch aktive `q_pferch` beim Fall der Kette gleich mit ab; `tribTick()` wertet nur noch `lastKiller` (Spieler oder Gruppe) statt der bloßen Nähe.
 
 **HB-10 · Rotfall/Omega: Questreihe wird nie abgeschlossen, Belohnung nie ausgezahlt** (QA-09) — *Code*
+- → ausgelassen: OFFENE DESIGNENTSCHEIDUNG (siehe Bericht unten) — welche Belohnung genau ausgezahlt wird, ist nirgends definiert.
 
 ### 3 — Mittel (live bestätigt)
 - **HB-11 · Befreier-Dank trotz Wachmord** (SH-01): `schutzFreed` zieht den Ersatz vor der Schuldprüfung ab → Wachmörder bekommt +10. Ursache: Reihenfolge der Zuweisungen.
+  - → behoben (Probe: „HB-11: Die Schuldprüfung bei befreiten Städten zählt Wachmorde vor dem Ersatz …“). Die `clean`-Schuldprüfung in `schutzFreed()` läuft jetzt vor der Ersatz-Zuweisung, nicht danach.
 - **HB-12 · Wohlstand bei Stadt ohne Schutz falsch** (SH-02): Grundzuwachs +3 hebt die Abzüge auf (schutzlos ±0, gesetzlos −5 statt −8, Bandenherrschaft sogar +). Ursache: Abzüge wurden auf den Grundzuwachs addiert statt netto gerechnet.
+  - → behoben (Probe: „HB-12: Wohlstand … ist ein fester Tageswert …“). `growthDay()` setzt bei `schutz.stage` 2/3/4 die festen Tageswerte −4/−8/−3 (laut `docs/MECHANIKEN.md`), statt sie vom Grundzuwachs abzuziehen.
 - **HB-13 · Heiler sieht verletzte Glieder nicht** (SH-03): `syncHp` zählt nur Kopf/Rumpf → „Dir fehlt nichts“ bei lahmem Bein.
+  - → behoben (Probe: „HB-13: Der Heiler findet ein lahmes Bein …“). `woundedGroup()` prüft zusätzlich jedes Körperteil (`limbHurt()`), nicht nur `c.hp`.
 - **HB-14 · Heilung durch Schaden: `Math.max(1, …)`-Böden heben negative Teile auf 1** (SH-05 live, SH-06 Code): Entzündung weckt Bewusstlose auf; Paktritter heilt lahme Glieder. Gleicher Fehler anderswo: ja, Muster suchen.
+  - → behoben (Proben: „HB-14a: Schadens-Böden … heben einen bereits am Boden liegenden Rumpf nicht an …“, „HB-14b: Der Paktritter-Preis heilt kein bereits ausgefallenes Glied …“). Alle drei Stellen (Entzündung, Hunger, Paktritter-Preis) nehmen jetzt `Math.min(aktuellerWert, Math.max(1, …))`, sodass der Boden nie über den vorherigen (ggf. negativen) Wert hinaus anhebt.
 - **HB-15 · Bruch überlebt Abtrennen: neue Prothese bei 40 % gedeckelt, Narbe am Messing** (SH-07 = IH-11): Abtrennen/`attachProsthesis` löschen `broken`/`splint` nicht.
+  - → behoben (Probe: „HB-15: Abtrennen und eine neue Prothese löschen einen alten Bruch …“). `damagePart()` (Abtrennen) und `attachProsthesis()` löschen jetzt `broken`/`splint`; dasselbe im Debug-Menü „Glied abtrennen“.
 - **HB-16 · Medizin heilt Prothesen, Prothesen bluten/entzünden sich** (SH-08): `healPart`/`woundSet` ohne `mech`-Prüfung; widerspricht MECHANIKEN („Medizin heilt Fleisch“).
+  - → behoben (Proben: „HB-16a: Medizin heilt keine Prothese …“, „HB-16b: Ein Treffer auf eine Prothese entzündet sich nicht …“). `healPart()`, `worstPart()` und `fullHeal()` lassen `P.mech`-Glieder jetzt aus; `woundSet()` löst auf einer Prothese keine Entzündung mehr aus (der Bruch-Zweig hatte die `!P.mech`-Prüfung schon).
 - **HB-17 · Abgetrennte Glieder fangen Treffer** (SH-09): `pickPart` gewichtet `lost` unverändert → Amputierte nehmen weniger Rumpfschaden.
+  - → behoben (Probe: „HB-17: Ein abgetrenntes Glied fängt keine Treffer mehr“). `pickPart()` setzt die Trefferwahrscheinlichkeit verlorener Glieder auf 0.
 - **HB-18 · Betriebsverlust angezeigt, nie abgezogen** (SH-15): `S.gold += Math.max(0, income)`.
+  - → behoben (Probe: „HB-18: Betriebsverlust wird vom Gold abgezogen …“). `ecoDay()` rechnet jetzt `S.gold = Math.max(0, S.gold + income)`.
 - **HB-19 · Vom Kult Entführte werden beim Laden durch Doppelgänger ersetzt** (IH-05): `spawnResidents` füllt das leere Haus neu; nach Befreiung gibt es zwei.
+  - → behoben (Probe: „HB-19: spawnResidents() baut keinen Doppelgänger …“). `spawnResidents()` überspringt Häuser, deren Bewohner in `S.cult.missing` als entführt vermerkt ist.
 - **HB-20 · Erbe übernimmt Bindungen des alten Helden falsch** (IH-06): Ehepartner/Bindungen hängen am Vorgänger.
+  - → ausgelassen: OFFENE DESIGNENTSCHEIDUNG (siehe Bericht unten) — was genau ein Erbe an Bindungen/Ehe übernehmen soll, ist nicht definiert.
 - **HB-21 · Zweiwaffen trotz ausgefallenem linkem Arm** (IH-07).
+  - → behoben (Probe: „HB-21: Keine Zweitwaffe im linken Arm, wenn der Arm ausgefallen ist“). `dualOn()` prüft zusätzlich `!B.isDisabled(c, 'larm')`.
 - **HB-22 · Am Boden heilt sich der Held selbst** (IH-08 live; IH-09 Lebensraub fliegender Geschosse, IH-10 Gruppenheilung richtet Gefallene auf — Code): verletzt die Entscheidung „Downed: keine Selbstheilung“. Gleiches Muster an drei Stellen.
+  - → behoben (Proben: „HB-22a: Lebensraub eines Geschosses heilt keinen am Boden liegenden Schützen“, „HB-22b: Ein Gruppenheilzauber heilt keinen am Boden liegenden Verbündeten …“, „HB-22c: Kettengebet heilt keinen am Boden liegenden Verbündeten …“). `hurtFromProjectile()` prüft jetzt `!attacker.downed` vor dem Lebensraub; der `group`-Zauber-Zweig in `castSpell()` und `chain_prayer` lassen `downed`-Ziele aus (wie schon `partyCare`).
 - **HB-23 · Rang bei Kette und Grubenstämmen gleichzeitig** (IH-17).
+  - → behoben (Probe: „HB-23: Kein Rang bei der Kette und bei den Grubenstämmen zugleich …“). `autoRanks()` vergibt den Grubenstamm-Rang nur noch, wenn kein Kettenrang besteht; `JOIN_FOES.goblin = ['chain']` ergänzt das fehlende Gegenstück.
 
 ### 3 — Mittel (nur Code)
 - HB-24 Burgtor schiebt Gesuchte in gesetzloser Hauptstadt stumm zurück (SH-10) · HB-25 Totenheer-Übernahme hängt, wenn das Heer den Befehl verliert (SH-12) · HB-26 Läden bleiben nach Toten-Übernahme für immer zu (SH-13) · HB-27 Übernahme kürzt Besatzung dauerhaft (`gcut` nie zurückgebucht) (IH-18) · HB-28 „Handeln“ im Kontextmenü umgeht Ladensperren (IH-12) · HB-29 Kauf/Verkauf prüfen den Händler nicht, Handel pausiert die Welt nicht (IH-13) · HB-30 Koop-Gast: Handel ohne Lagerbuchung und Auftragsauslöser (IH-19) · HB-31 Kultkrypta nach Tod des Spieler-Blutfürsten (QA-11) · HB-32 Grisk-Rache nach Abbruch neu annehmbar (QA-12) · HB-33 Rangziele nach Fall der Kette/Goblin-Befreiung unerfüllbar (QA-13) · HB-34 c_nec2 braucht Wächter, den es nur im Pakt gibt (QA-14) · HB-35 Kills durch Verbündete zählen nicht für Bosse/Quests (QA-15) · HB-36 Questgegenstände verkaufbar (QA-16) · HB-37 Ratssitz zahlt 600 EP nie aus (QA-17) · HB-38 Gerichtsklage beliebig oft wiederholbar (QA-18) · HB-39 Entführtes Kind wird nie zurückgeführt (QA-19) · HB-40 Gewölbe-Geheimtruhe beliebig oft (QA-20) · HB-41 Dodon nach Sturm-Abbruch nicht ansprechbar (QA-10) · HB-42 Gorak einmalig — q_mine bricht, wenn er vorher stirbt (QA-06).

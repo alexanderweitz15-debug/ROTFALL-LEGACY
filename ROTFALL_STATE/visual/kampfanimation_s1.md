@@ -8,6 +8,22 @@ Bilder: `visual/img/kampf_s1_langschwert_phasen.png` (Blick Ost, Pack A/B/C × S
 (Entscheidung Entwickler 02.10.), Selbsttest 395/395 grün inkl. „Balancing (§82)“ (Probe unverändert). Vollständigkeit §17 je Waffe nicht erfüllt (Liste §5).
 Weitere Bilder: `visual/img/kampf_s2_zweihaender.png`, `kampf_s2_dolch.png`, `kampf_s2_speer.png`, `kampf_s2_hammer.png`.
 
+## 000. Nachtrag 3 (02.10.) — §17-Rest, schwerer Hieb nicht blockbar
+Bilder: `visual/img/kampf_s4_haltungen.png` (je Waffe: Ruhe, Kampfhaltung, Kampf-Lauf, rückwärts, Deckung, Ausweichen B/C, Treffer leicht/krit/schwer),
+`visual/img/kampf_s4_grossaxt.png` (Großaxt A/B/C, gleiches Format wie kampf_s3).
+- **Schwerer Hieb nicht blockbar** (Entscheidung): der voll geladene Hieb trifft über `UNBLOCK` wie `heavyHit` der Gegner — Deckung, Parade, Schild,
+  Nahkampfabwehr greifen nicht; Gegenstrom des Mönchs bleibt die Ausnahme (dort schon so geregelt). Probe: Deckung hält den normalen Hieb, den geladenen nicht.
+- **Kampf-Idle / Kampfbewegung:** Sind Feinde nah (300 px, `p.combatT`), hält der Held die Waffe bereit (`W.mode 'ready'`: Waffenwinkel und breiter Stand je Klasse)
+  — auch im Gehen; wer zum Ziel gewandt rückwärts geht, läuft den Schrittzyklus rückwärts. Nur eigene Figur/Koop-Helden. Sprint gibt es im Spiel nicht.
+- **Block/Parade-Haltung je Waffe** (`anim.js STANCE.guard`): Langschwert schräg hoch, Zweihänder/Großaxt/Hammer Schaft quer und breitbeinig, Dolch quer vor dem
+  Gesicht, Speer schräg mit Spitze vorn; Parade nutzt dieselbe Haltung (Funken/Hit-Stop wie bisher).
+- **Ausweichen je Pack** (nur Bild; Rolle, Weg, Unverwundbarkeit unverändert): A Rolle wie bisher, B Ausfallsprung (Sprungbogen 10 px), C Dash mit drei Nachbildern.
+- **Trefferreaktion:** leicht = Trefferbild + 1,6 px Zucken; Krit = zurückkippen (kb-Bild 160 ms) + 3,2 px + Aufblitzen; schwer (Waffengewicht ≥ 0,6 oder Wucht) = kb + 4,8 px.
+  Eigene Trefferposen je Waffe gibt es nicht (offen).
+- **Großaxt eigene Bewegung:** Animationsklasse `greataxe` (wtype great + Axtkopf: Große Axt, Henkersaxt, Knochenspalter, Der Rote Henker, oder „Axt“ im Namen) mit
+  Hackschlag (steckt kurz), Querhack, Spalter; eigene Zeiten A/B/C, Körperposen, Haltungen. Balance, Reichweite, Bogen, FEEL bleiben die von wtype great.
+  Cache-Schlüssel enthält die Animationsklasse (`W.ac`).
+
 ## 00. Nachtrag 2 (02.10.) — Ganzkörperposen, schwerer Hieb, Seitschritt
 Bilder: `visual/img/kampf_s3_langschwert.png`, `kampf_s3_zweihaender.png`, `kampf_s3_dolch.png`, `kampf_s3_speer.png`, `kampf_s3_hammer.png`
 (je Pack A/B/C: 3 Angriffe × 11 Stützstellen + Zeile „Kombo komplett“ = Schlag 1 u .27/.4/.5/.7 · Schlag 2 u .27/.4/.5/.7 · Wucht u .4/.5/.7; rot = Einschlag)
@@ -41,7 +57,7 @@ beides steht schon im Cache-Schlüssel. Hand bleibt in Armreichweite (Rest des S
    (kein frischer Druck) und laufen unverändert; §82 grün.
 5. Abbruch: Rolle, Deckung, am Boden, Waffenwechsel. Beim Aufladen geht man langsam (×0,55 wie beim Zuschlagen). Gegner-Seitschritt reagiert auch aufs Aufladen.
 6. Hinweis im Spiel: Log beim ersten Aufladen. Koop: `chargeK` wird übertragen (Gäste sehen Pose und Ring); Gäste selbst können (noch) nicht aufladen.
-**Offen (melden, nicht entschieden):** Ist der schwere Hieb des Spielers blockbar? (jetzt: wie jeder Hieb blockbar) · eigener Schadens-Faktor statt Wucht-Werten? ·
+**Offen (melden, nicht entschieden):** ~~blockbar~~ entschieden: nicht blockbar (§000) · eigener Schadens-Faktor statt Wucht-Werten? ·
 Ladezeit je Waffe (jetzt fest 800 ms) · Ausdauerkosten (jetzt normal) · Leertaste/Touch (jetzt nur Maus).
 
 **Seitschritt der Gegner (Entscheidung Entwickler):** Bandit weicht aus, solange der Angreifer sichtbar ausholt (`swing < atkW` des Schwungplans, bei der
@@ -163,15 +179,15 @@ Bis zur Entscheidung: Code wie beschlossen; `S.dbg.atkOld = 'cancel'` schaltet n
 | Klang | teilweise — vorhandenes System (Gewicht aus FEEL), keine Pack-eigenen Klänge |
 | Koop/Gruppe | teilweise — Felder übertragen, Optik lokal; nicht live getestet |
 | Save/Load | ✓ neue Felder tolerant, Test Room nie gespeichert |
-| Idle (Kampf-Idle) | ✗ |
-| Bewegung (Kampfbewegung, Sprint, rückwärts, Wenden) | ✗ |
+| Idle (Kampf-Idle) | ✓ Kampfhaltung je Klasse (§000) |
+| Bewegung (Kampfbewegung, Sprint, rückwärts, Wenden) | teilweise — Kampf-Lauf mit bereiter Waffe, rückwärts; Sprint gibt es nicht; Wenden ✗ |
 | Schwerer Angriff (halten) | ✓ Regel siehe §00 (Blockbarkeit, eigener Faktor offen) |
-| Block/Parade mit waffeneigener Haltung | ✗ |
-| Ausweichen je Pack | ✗ |
-| Trefferreaktion leicht/schwer/krit, Gegnerreaktion | teilweise — Zucken/Zurückkippen (Bild); keine eigenen Posen je Waffe |
+| Block/Parade mit waffeneigener Haltung | ✓ |
+| Ausweichen je Pack | ✓ (Bild) |
+| Trefferreaktion leicht/schwer/krit, Gegnerreaktion | ✓ drei Stufen (Bild); keine eigenen Posen je Waffe |
 | Tod | ✓ vorhanden (9 Todesarten) |
 | Stilbruch-Suche | teilweise — Stil D/Arbeitsschwung umgestellt; Reitkampf, Nebenhand nicht geprüft |
-| Großaxt eigene Bewegung | ✗ teilt das Zweihänder-Profil (wtype great) |
+| Großaxt eigene Bewegung | ✓ Klasse greataxe |
 
 ## 6. Offen
 - Dolch +8 % gegen Banditen (frühere Trefferzeit vor deren Seitschritt) — Entwickler entscheidet, ob der Seitschritt auf das sichtbare Ausholen (`atkW`) statt swing < 0,35 hören soll.

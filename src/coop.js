@@ -10,7 +10,7 @@ let peer = null, conn = null, muteLog = false;   /* muteLog: Chatzeilen gehen al
 const VER = 24;                                 // muss zu ?v= in index.html passen; Host und Gast müssen gleich sein
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
 const NEAR = 1400;                              // px um die Gastfigur, die der Host schickt
-const DYN = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'maxHp', 'downed', 'alive', 'swing', 'swingDur', 'atkS', 'atkW', 'atkH', 'atkPk', 'atkStep', 'chargeK', 'act', 'stagger', 'cover', 'telegraph', 'mounted', 'fleeing', 'angry', 'aiState', 'hDir', 'come'];
+const DYN = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'maxHp', 'barHp', 'barMax', 'downed', 'alive', 'swing', 'swingDur', 'atkS', 'atkW', 'atkH', 'atkPk', 'atkStep', 'chargeK', 'act', 'stagger', 'cover', 'telegraph', 'mounted', 'fleeing', 'angry', 'aiState', 'hDir', 'come'];
 const SENT = new Set(['enemy', 'npc', 'player', 'caravan', 'mount', 'item', 'grave']);   /* Props entstehen beim Gast aus derselben Generierung */
 const HEAVY = new Set(['inv', 'memories', 'plan', 'path', 'schedule', 'dmgBy', 'rel', 'talk', 'lastInput', 'hitIds', 'cooldowns', 'tree', 'spells', 'spellUse', 'hotbar']);
 const rnd6 = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
@@ -272,9 +272,9 @@ function runAs(m, g, fn) {
   H.dialogue = (npc, text, choices) => { g.dlg = choices; sendTo(g, { t: 'dlg', name: npc.name, npcId: npc.id, text, opts: choices.map(c => c.text) }); return true; };
   H.close = () => { g.dlg = null; sendTo(g, { t: 'dlg', close: 1 }); return true; };
   H.modal = (name, arg) => { if (name === 'trade' && arg?.shop) sendShop(m, g, arg); else sendTo(g, { t: 'modal', name }); return true; };
-  S.player = m; S.ranks = m.ranks;
+  S.player = m; S.ranks = m.ranks; S._hostHero = P;   /* HB2-08: gainXp gibt dem Helden seinen Anteil */
   try { fn(); } catch (e) { console.error(e); sendTo(g, { t: 'toast', text: 'Das ging nicht: ' + e.message }); }
-  finally { m.ranks = S.ranks; S.player = P; S.ranks = Rk; H.dialogue = H.close = H.modal = null; }
+  finally { m.ranks = S.ranks; S.player = P; S.ranks = Rk; delete S._hostHero; H.dialogue = H.close = H.modal = null; }
   g.selfAt = 0;
   const after = JSON.stringify([S.quests, S.contracts || []]); if (after !== before) askHostQuest(g, m, before, after);
 }

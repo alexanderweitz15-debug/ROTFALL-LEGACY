@@ -1,6 +1,6 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=24';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=24';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS } from './data.js?v=24';
 import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=24';
 import * as ECO from './economy.js?v=24';
 
@@ -428,7 +428,15 @@ function afterBattle(node, win, lose) {
   capture(node, win.faction);
   cleanupArmies();
 }
+/* Ruf für Feldschlacht und Befreiung bei der Macht, der der Ort (jetzt) gehört — vorläufige Werte: Schlacht +5, Befreiung +10 (Lead, 03.10.) */
+function warRep(node, n, why) {
+  const f = S.war.nodes[node]?.owner || LOC[node]?.faction; if (!f || f === 'undead' || S.factions[f] == null) return;
+  S.factions[f] = clamp(S.factions[f] + n, -100, 100); log(`${why} bei ${LOC[node]?.name || node}: ${FACTIONS[f]?.name || f} +${n}.`, 'faction');
+}
 function capture(node, faction) {
+  /* Entwickler 03.10.2026: Was die Lebenden zurückerobern oder besetzen, geht an die Macht des Ortes zurück (Sonnwacht an den Orden,
+     Kreuzweg/Aschfurt an die Händler, Aurelions Städte ans Hochreich) — nicht automatisch an Valen. */
+  if (faction === 'valen' && ['order', 'merch', 'aurel'].includes(LOC[node]?.faction)) faction = LOC[node].faction;
   const n = S.war.nodes[node];
   if (n.owner === faction) return;
   const was = n.owner;
@@ -516,7 +524,7 @@ function materialize(node, att, def) {
     for (let i = 0; i < n; i++) {
       let [qx, qy] = [Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3))];
       if (H.inView?.('world', qx * TS, qy * TS)) { if (at) [qx, qy] = H.pushOut('world', qx, qy); else { const hs = HOUSES.filter(h => h.town === node && h.map === 'world'); const h = hs[(i * 7) % Math.max(1, hs.length)]; if (h) [qx, qy] = h.doorTile; } }   // AUDIT: Angreifer von außerhalb, Verteidiger aus den Häusern
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', qx, qy,
+      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
         { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }
@@ -582,6 +590,7 @@ export function battleCheck() {                              // alle paar Sekund
       log(`Die Schlacht bei ${LOC[b.node].name} ist entschieden: ${win.name} hält das Feld.`, 'faction');
       if (win.faction !== 'undead' && lose.faction === 'undead') { const d = S.day | 0; if (W.cutDay !== d) { W.cutDay = d; W.cutN = 0; } const c = Math.min(3, CAP_SIEGE.cutDay - W.cutN); if (c > 0) { W.cutN += c; threatCut(c); } }   /* gewonnene Feldschlacht senkt die Bedrohung der Hauptstadt (höchstens 6 am Tag) */
       chronicle(`Schlacht bei ${LOC[b.node].name}`, 'battle', `${win.name} siegt. ${S.player.name} war dabei.`);
+      if (win.faction !== 'undead' && nearPlayer(b.node, 30) && S.ranks.undead < 0) warRep(b.node, 5, 'Sieg in der Schlacht');   /* Entwickler 03.10.: Feldschlachten geben Ruf (nur wer dabei ist) */
       afterBattle(b.node, win, lose);
     }
   }
@@ -613,8 +622,8 @@ export function battleCheck() {                              // alle paar Sekund
   for (const [node, n] of Object.entries(W.nodes)) {
     if (n.owner !== 'undead' || n.garrison > 0.5 || node === 'graveyard' || (n.waves && n.wave < n.waves)) continue;   // §81: kein Sieg ohne letzte Welle
     if (W.armies.some(a => a.faction === 'undead' && a.at === node) || W.battles.some(b => b.node === node)) continue;
-    capture(node, LOC[node]?.faction === 'aurel' ? 'aurel' : 'valen');   /* Folgen §5c: befreite Städte Aurelions fallen ans Hochreich zurück */
-    if (nearPlayer(node, 22) && S.ranks.undead < 0) { H.title(`Befreier von ${LOC[node].name}`); threatCut(10); }
+    capture(node, 'valen');   /* capture() gibt an die Macht des Ortes */   /* Folgen §5c: befreite Städte Aurelions fallen ans Hochreich zurück */
+    if (nearPlayer(node, 22) && S.ranks.undead < 0) { H.title(`Befreier von ${LOC[node].name}`); threatCut(10); warRep(node, 10, 'Befreiung'); }   /* Entwickler 03.10.: Befreiung gibt Ruf bei der befreiten Macht */
   }
 }
 export function warSummary() {

@@ -173,3 +173,96 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Blutschöpfer: das Trinken von Wehrlosen heilt auch Kultisten in der Nähe.
   - Netzwerferin: gleiche Regel wie das Spieler-Fangnetz; normale Figuren hängen fest, große und Elite taumeln nur.
   - Hofspion: die Zahl richtet sich nach der Schwere des Regelbruchs (Diebstahl: einer; Gewalt oder Mord: zwei bis drei).
+- **Kampfanimation (17:30):**
+  - Der aufgeladene schwere Hieb des Spielers ist nicht blockbar; dafür bestehendes `heavyHit`/UNBLOCK nutzen.
+  - Der Dolch behält seinen Vorteil (+17 % Schaden je Sekunde gegen Banditen): „Dolch ist schnell“.
+- **Hunt-Fehler:** Der Entwickler hat das Beheben der Hunt-Fehler freigegeben.
+- **Klassen und Talente (Wunsch 02.10.2026, abends):**
+  - Klasse lernen heißt: bezahlen und 1–2 Prüfungsaufträge, danach eine Aufnahme-Animation und eine kurze Szene.
+  - Es gibt mehr Talentpunkte.
+  - Jede Klasse bekommt einen eigenen Talentbaum im Sternbild-Stil (wie Skyrim).
+  - Bis dahin sind alle Talentbäume versteckt.
+  - Analyse läuft (PROPOSALS/klassen_talente.md); die offenen Fragen kommen danach.
+- **Pferde-Sprites:** werden überarbeitet (Artist-Agent).
+- **Betriebe (22:00):**
+  - Der Gewinn eigener Betriebe sammelt sich in der Kasse des Betriebs. Abholen geht vor Ort oder im Siedlungs-Reiter.
+  - Ein Überfall oder eine Besatzung kann die Kasse leeren.
+  - Unter Siedlung kommt ein eigener Reiter mit Betriebsliste, Auswahl, Bild des Hauses, Ertrag pro Tag und Kasse.
+- **Schmiede:** bekommt eine richtige GUI. Jedes System prüfen, das eine eigene GUI vertragen könnte, und dort eine bauen.
+- **Spacing:** falsch im Siedlungsfenster, in Charakter/Inventar und in allen Menüs, die man oben öffnen kann. Alle überarbeiten.
+- **Gegner-Despawn:** Verfolger verschwinden, wenn man wegrennt. Das soll nicht so sein.
+- **Talentpunkte:** jede 2. Stufe plus 1 je bestandener Klassenprüfung, rückwirkend für alte Stände. Die anderen Klassen-Entscheidungen sind noch offen (PROPOSALS/klassen_talente.md §5).
+- **Klassen und Talente (22:10, Antworten auf PROPOSALS/klassen_talente.md §5):**
+  1. Punkte: jede 2. Stufe plus 1 je bestandener Prüfung, rückwirkend.
+  2. Ein eigenes Sternbild je Klasse (19), nicht je Grundlinie.
+  3. Mehrere Klassen: Wertesterne wirken immer, Schlüssel- und Fähigkeitssterne nur bei der aktiven Klasse.
+  4. Prüfung für Grund- und Folgeklassen. Paladin, Todesritter, Hochpaladin und die dunklen Klassen behalten ihre eigenen Aufträge und bekommen nur die Szene.
+  5. Scheitern: beliebig oft wiederholbar.
+  6. Kosten wie heute (Vertrauen bzw. Lehrgeld) plus Prüfung.
+  7. Aufnahme-Szene 5–6 s, die Welt pausiert, ESC überspringt.
+  8. Alte Stände behalten ihre Klassen; die Prüfung ist für den Bonuspunkt nachholbar.
+  9. Gelernte Knoten bleiben; einmal kostenlos neu verteilen.
+  10. Titelklassen: Szene bei Erwerb und Grad-Weihe plus eigenes Sternbild.
+  11. Vampir und Grubenhäuptling bekommen ein eigenes Sternbild.
+  12. Machtgrenze: höchstens so viel wie heute ein voller Kampfzweig (mit simFight gemessen).
+  13. Gefährten bekommen einen KLEINEN EIGENEN BAUM. Umfang und Punktequelle schlägt der Agent vor.
+  14. Koop: jeder macht seine Prüfungen selbst; Gäste bekommen beim Aufstieg Talentpunkte (Fehler beheben).
+  15. Vergessen: alles bei jedem Lehrer, gegen Gold wie heute.
+  16. Die Prüfungsaufträge werden wie in Tabelle 2.2 übernommen.
+- **Klassen (03.10., nachts):**
+  - Sterne einer Klasse wirken weiter, solange eine ihrer Folgeklassen aktiv ist.
+  - Eigene Wege (Paladin, Todesritter, Hochpaladin, dunkle Klassen) zählen als bestandene Prüfung: +1 Talentpunkt, auch rückwirkend.
+  - Gefährtenbaum wie vorgeschlagen: 7 Sterne, 6 davon lernbar, nur Werte, Punkte = 1 + Stufe/5.
+  - Prüfungszahlen schwerer:
+    - Barde: 5 Siege unter dem Kriegslied mit 2 Gefährten.
+    - Waldläufer: eine ganze Nacht (10 Stunden am Stück) draußen.
+- **03.10. (früh):**
+  - Ein Überfall nimmt die Hälfte der Betriebskasse.
+  - Bewohner-Siegel bleiben nur in der Nähe sichtbar (Lead, Entwickler: „kp“).
+  - Schmied „Verbessern“ und „Schmieden lassen“: die Regeln hat der Lead festgelegt (Entwickler: „entscheidest du“), beschrieben in MECHANIKEN.
+- **03.10. Fragemenü:**
+  - Ritter-Segen kostet Ausdauer statt Mana.
+  - Bomben-Skelett: Wer es während der Zündung erschlägt, löscht die Glut (keine Explosion).
+  - Mutanten gehören zur Fraktion der Toten.
+  - Wächterspinnen lauern auch in Werkhallen der Städte Aurelions (nur gegen Unbefugte); die Dampframme verteidigt Aurelions Städte mit den Wachen.
+  - Lebensbalken allgemein prüfen (Verdacht: Werte werden nicht richtig übertragen) → Bug-Agent.
+  - HB-10: Am Ende der Rotfall/Omega-Reihe gibt es eine EINZIGARTIGE WAFFE.
+  - HB-20: Witwe/Witwer bleibt im Haus (mit dem Erben nicht verheiratet); Bindungen des Toten enden.
+  - Prüfwerte der Klassen bleiben vorläufig; der Entwickler testet.
+  - **Kampfanimation:** eine Mischung der Packs nach Spielfortschritt — frühe Waffen Grounded (A), Midgame Heroic (B), Endgame-Waffen flashy (C).
+- **Lebensbalken (03.10.):** Der Balken zeigt den Rumpf: leer heißt tot bzw. am Boden. hp/maxHp (Kopf + Rumpf) bleiben für Heilung, KI und Balance.
+- **Ist-Zustand-Fragen (03.10.):**
+  - Tributdörfer (Grauwasser, Hohlstein, Eisenried) gehören nach Vargs Fall den **Freien**. Hilfe dort zählt schon vor dem Fall für Dorf und Freie, nicht für die Kette.
+  - Waffe nach Kerkerausbruch bzw. Flucht aus der Schuldknechtschaft: liegt in der **Asservatenkammer**, zurückholbar (Truhe in der Wache, Diebstahl oder Buße).
+  - Verbrechen an Leuten ohne Fraktion: Kopfgeld bei der **Macht, die den Ort beherrscht**; in der Wildnis ohne Zeugen keins.
+  - Kriegsgraph: Befreite bzw. eroberte Städte gehen an ihre Macht zurück (Sonnwacht an den Orden, Kreuzweg und Aschfurt an die Händler), auch am Start.
+  - Feldschlachten und Befreiungen geben Ruf bei der befreiten Macht (nur, wenn man mitkämpft).
+  - Aufträge ohne Fraktionsruf (Todesritter, Quirin, Lioba, Varons Auftrag 1) geben kleinen Ruf bei der Macht des Gebers. Klassenprüfungen bleiben ohne Ruf.
+  - Seevolk-Ränge werden über Ruf vergeben (wie bei anderen Mächten).
+  - 7 Gegenstände ohne Quelle bekommen eine; der Lead verteilt sie passend.
+  - Die 4 legendären Sets gibt es zusätzlich als Lohn am Ende der jeweiligen Rangreihe (höchster Rang).
+  - Lieferaufträge geben Ruf bei der Macht der Zielstadt.
+  - Das Lager ist nur in der Siedlung bzw. im eigenen Haus nutzbar.
+  - Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge werden eigene Fraktionen mit Ruf und Brett-Aufträgen.
+  - Der Tickmar-Arbeiterrat gibt Ruf bei den Freien.
+  - Varonheim wird volle Hauptstadt: Kutsche, Schankpersonal, Söldner, volles Brett, ohne die Weltform zu ändern.
+  - Die Siedlungsschmiede bekommt die Esse (Handwerks-Fenster).
+  - Schurken-Prüfung zurück auf Meuchelstich; der Lehrer leiht ihn für die Prüfung (wie das Kriegslied beim Barden).
+  - Jagd: wächst beim Erlegen von Tieren; mehr Felle und Fleisch; Tiere bemerken dich später.
+  - Schleichmodus bauen: eine Taste, langsamer, schwerer zu sehen; Schleichen wächst dabei; Hinterhalt-Bonus.
+  - Boss-Beute: jeder Boss lässt garantiert genau eines seiner Stücke fallen (nie doppelt). Graumähne und Karrak bekommen eigene Stücke.
+- **Fragemenü 03.10. (abends):**
+  - Dünenwacht wird ein Posten des Wüstenbunds mit Sandreitern und Brett; das Zelt heißt „Posten der Sandreiter“.
+  - Karraks Tod gibt Wüstenbund +10.
+  - Rangvorteile:
+    - Rabatt bei den Händlern beider Fraktionen.
+    - Wüstenbund: freier Durchzug ohne Wegzoll in Karak-Atar, Eskorten zahlen besser.
+    - Zwerge: ab Rang 2 verbessert die Zwergenschmiede bis „Meisterstück“.
+  - Karak-Atar und die Tiefhall bekommen eigene Kerker mit eigenem Wärter.
+  - **NEU, großes Paket „Fraktions-Starts“:**
+    - Wer den höchsten Rang einer Fraktion erreicht, schaltet sie dauerhaft (über alle Spielstände) als Start für neue Geschichten frei.
+    - Freischaltbar sind alle Fraktionen mit eigenem Gebiet: Valen, Orden, Kette, Untote, Aurelion, Seevolk, Händler, Grubenstämme, Wüstenbund, Zwerge.
+    - Ein Fraktions-Start bringt: Start im Fraktionsgebiet, Mitglied ab Start, eigene Ausrüstung und eigenes Aussehen, ein eigenes Haus bzw. Gebiet und **Boni je Rasse**.
+    - Alle Starts bekommen ein eigenes Aussehen; man soll auch als **Skelett** starten können.
+    - Rekrutieren: bei gutem Ruf Fraktionsmitglieder als Gefährten UND als Siedlungswachen.
+  - **NEU: Roboter wie in Kenshi:** Überall in der Welt streifen Roboter frei umher (Aussehen ähnlich den Skeletten aus Kenshi). Manche kann man rekrutieren, ähnlich wie Beep. Dazu weitere Charaktere in der Welt.

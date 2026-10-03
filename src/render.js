@@ -8,7 +8,7 @@ import * as SP from './sprites.js?v=24';
 import { trailPt, WAGON_GAP } from './sim.js?v=24';
 import { ICON_R } from './iconsR.js?v=24';
 import { airPos, airPt } from './economy.js?v=24';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -162,8 +162,40 @@ export function drawFrame(now) {
   drawPlaceGuide(shown || [], now);   /* Artist R8: über Licht und Wetter, damit Raster und Kreis nachts lesbar bleiben */
   drawFloats();
   drawBubbles(performance.now());
+  drawSeals(now);   /* Visuell Q-2: Siegel über Auftraggebern */
   drawBossBar();
   drawTrack(now);
+}
+/* Visuell Q-2 (quests.md Q1): Wachssiegel über dem Kopf — Gold = Auftrag frei, hell mit Haken = Abgabe bereit. Die Liste kommt aus game.js
+   (sealTick, alle 0,6 s); near = Bewohner-Auftrag: nur in Ansprech-Nähe (62, wie interactables) oder unter der Maus. Emote hat Vorrang. */
+let SEAL_LIST = null, SEAL_HOV = null;
+export function setSeals(m, hov) { SEAL_LIST = m; SEAL_HOV = hov; }
+const SEAL_PX = {
+  offer: ['...###...', '.#######.', '.##+++##.', '###+#+###', '###+++###', '###+#+###', '.##+++##.', '.#######.', '...###...', '..r...r..', '.r.....r.'],
+  turnin: ['...###...', '.#######.', '.######+.', '######+##', '#+###+###', '##+#+####', '.##+####.', '.#######.', '...###...', '..r...r..', '.r.....r.'],
+};
+const SEAL_COL = { offer: { '#': '#c9a24a', '+': '#6e4f1c', r: '#9a3226' }, turnin: { '#': '#f3d77a', '+': '#3a2a10', r: '#9a3226' } };
+function drawSeals(now) {
+  if (!SEAL_LIST?.size || !S.player) return;
+  const z = cam.zoom, px = Math.max(2, Math.round(z * 1.5)), P = S.player, motion = S.settings?.motion !== false;
+  for (const [e, m] of SEAL_LIST) {
+    if ((e.map || 'world') !== S.map || e.alive === false) continue;
+    if (m.k === 'target') { const sc = MONSTERS[e.mtype]?.scale || 1, tx = Math.round((e.x - cam.x) * z), ty = Math.round((e.y - 78 * sc - cam.y) * z) + (motion ? Math.round(Math.sin(now / 260) * px * 0.5) : 0);   /* Q-OE5: zählt für den verfolgten Auftrag */
+      ctx.fillStyle = 'rgba(10,8,6,.8)'; ctx.fillRect(tx - 2 * px, ty - 2 * px, 4 * px, 4 * px); ctx.fillStyle = '#e0b75a'; ctx.fillRect(tx - px, ty - 2 * px, 2 * px, 4 * px); ctx.fillRect(tx - 2 * px, ty - px, 4 * px, 2 * px); ctx.fillStyle = '#9a3226'; ctx.fillRect(tx - px / 2, ty - px / 2, px, px); continue; }
+    if (m.k === 'flag') { const fx0 = Math.round((e.x - cam.x) * z), fy0 = Math.round((e.y - cam.y) * z);   /* Q5-7: gesetzte Wegmarke (Fahne) */
+      if (fx0 < -30 || fy0 < -40 || fx0 > W + 30 || fy0 > H + 40) continue;
+      ctx.fillStyle = '#2b2116'; ctx.fillRect(fx0 - px / 2, fy0 - 14 * px, px, 14 * px); ctx.fillStyle = '#a4402c'; ctx.fillRect(fx0 + px / 2, fy0 - 14 * px, 6 * px, 4 * px); ctx.fillStyle = '#c9a24a'; ctx.fillRect(fx0 + px / 2, fy0 - 14 * px, 6 * px, px); continue; }
+    if (m.near && e !== SEAL_HOV && Math.hypot(e.x - P.x, e.y - P.y) > 62) continue;
+    if (e.emote && now < e.emote.until) continue;
+    const sx = Math.round((e.x - cam.x) * z - 4.5 * px), bob = motion ? Math.round(Math.sin(now / 420 + (e.x % 7)) * px * 0.6) : 0;
+    const sy = Math.round((e.y - (e.kind === 'prop' ? 46 : 70) - cam.y) * z) - 11 * px + bob;
+    if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+    const rows = SEAL_PX[m.k] || SEAL_PX.offer, col = SEAL_COL[m.k] || SEAL_COL.offer;
+    ctx.fillStyle = 'rgba(10,8,6,.75)';
+    rows.forEach((r, y) => { for (let x = 0; x < 9; x++) if (r[x] !== '.') ctx.fillRect(sx + x * px + px / 2, sy + y * px + px / 2, px, px); });
+    rows.forEach((r, y) => { for (let x = 0; x < 9; x++) { const c = col[r[x]]; if (c) { ctx.fillStyle = c; ctx.fillRect(sx + x * px, sy + y * px, px, px); } } });
+    if (m.k === 'turnin') { ctx.fillStyle = 'rgba(255,240,180,.85)'; ctx.fillRect(sx + 3 * px, sy + px, px, px); }
+  }
 }
 // S13 (Nutzer: „man weiß nicht wohin“): Kompass zum verfolgten Auftrag — Pfeil am Bildrand mit Entfernung, im Bild eine Raute über dem Ziel
 let track = null;
@@ -229,11 +261,12 @@ function drawEmote(e, now) {
   E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(sx + x * px, sy + y * px, px, px); });
   ctx.globalAlpha = 1;
 }
+const barK = e => e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1);   /* HB2-01: Balken = Rumpf */
 function drawBossBar() {
   const p = S.player; if (!p) return;
   const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */
   if (!b) return;
-  const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(b.hp / b.maxHp, 0, 1);
+  const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(barK(b), 0, 1);
   ctx.fillStyle = '#0c0a08'; ctx.fillRect(x - 3, y - 3, w + 6, 16);
   ctx.fillStyle = '#2a1512'; ctx.fillRect(x, y, w, 10);
   ctx.fillStyle = '#8c2a22'; ctx.fillRect(x, y, Math.round(w * k), 10);
@@ -853,12 +886,30 @@ function drawChain(e) {
 function drawChildNpc(e, now) {                                        // §5d.1: Kinder der Eisenfeste — kleiner gezeichnet
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.7, 0.7); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
 }
+function drawDwarf(e, now) {   /* Zwerge: klein, breit (03.10.) */
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.12, 0.8); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
+}
 function drawGoblinNpc(e, now) {
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.82, 0.82); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
   if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
 }
 // S13 (Nutzer: Reittiere, Kampf vom Pferd): das Reittier unter dem Helden, der Reiter 14 px höher
-const MOUNT_PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+// Pferde-Überarbeitung (02.10.2026, Entwickler: „Pferde-Sprites müssen überarbeitet werden“): sechs Fellfarben für normale
+// Pferde (Rappe/Fuchs/Brauner/Schimmel/Falbe/Schecke), fest an H.coat bzw. e.coat gebunden — damit bleibt jedes Pferd auf
+// der Koppel/im Stall immer gleich gefärbt. Messingross und Totenross bleiben bei ihrer festen Farbe.
+export const HORSE_COATS = ['rappe', 'fuchs', 'brauner', 'schimmel', 'falbe', 'schecke'];
+const HORSE_COAT_LABEL = { rappe: 'Rappe', fuchs: 'Fuchs', brauner: 'Brauner', schimmel: 'Schimmel', falbe: 'Falbe', schecke: 'Schecke' };
+export const horseCoatLabel = c => HORSE_COAT_LABEL[c] || HORSE_COAT_LABEL.brauner;
+const HORSE_COAT_PAL = {
+  rappe:    { body: '#241f1c', dark: '#0c0a08', eye: '#1a1512' },                               // fast schwarz, dunkle Mähne
+  fuchs:    { body: '#8a4a24', dark: '#4a2614', eye: '#2a1810' },                                // rotbraun, dunkle Mähne
+  brauner:  { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' },                                // Grundfarbe seit S13
+  schimmel: { body: '#c8c0b0', dark: '#8a8278', eye: '#2a2420' },                                // helles Grau, graue Mähne
+  falbe:    { body: '#b89a5c', dark: '#3a2e1c', eye: '#241c14' },                                // sandfarben, dunkle Beine/Mähne
+  schecke:  { body: '#cfc3ab', dark: '#5a4030', eye: '#241c14', patches: true },                 // hell mit braunen Platten
+};
+const MOUNT_PAL = { horse: HORSE_COAT_PAL.brauner, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
+export const mountPalOf = (kind, coat) => kind === 'horse' ? (HORSE_COAT_PAL[coat] || HORSE_COAT_PAL.brauner) : (MOUNT_PAL[kind] || MOUNT_PAL.horse);
 // S15 (Nutzer): Das Pferd schaut in die Laufrichtung (auch nach oben und unten); im Stand behält es die letzte Richtung.
 // Nur Stil R hat Vorder- und Rückansicht, die anderen Stile bleiben seitlich.
 function horseDir(e) {
@@ -867,7 +918,8 @@ function horseDir(e) {
   return e.hDir || side;
 }
 function drawHorse(e, now, kind, rider) {
-  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = MOUNT_PAL[kind] || MOUNT_PAL.horse, dir = horseDir(e);
+  const coat = e.coat ?? e.mounted?.coat ?? S.mount?.coat;                                      // Fellfarbe: am Reittier selbst oder am Reiter gemerkt
+  const moving = e.vx || e.vy, fr = moving ? ((now / 70) | 0) & 3 : 1, pal = mountPalOf(kind, coat), dir = horseDir(e);
   const blit = f => { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.35, 1.35); ctx.translate(-e.x, -e.y); SP.blit(ctx, f, e.x, e.y + 5); ctx.restore(); };
   const ns = dir === 'N' || dir === 'S', ride = () => { ctx.save(); ctx.translate(0, ns ? -17 : -14); drawHumanoid(e, now); ctx.restore(); };
   shadow(e.x, e.y + 3, 19, .35);
@@ -912,6 +964,10 @@ function drawWolfForm(e, now) {
   if (((now / 180) | 0) % 3 === 0) { ctx.fillStyle = 'rgba(183,216,106,0.5)'; ctx.fillRect(Math.round(e.x + Math.sin(now / 300) * 10), Math.round(e.y - 16 - (now / 30) % 12), 2, 2); }
 }
 function drawEntity(e, now) {
+  if (e.sneak && e.kind === 'player') { ctx.save(); ctx.globalAlpha = 0.6; try { return drawEntityInner(e, now); } finally { ctx.restore(); } }   /* Schleichen: halb durchsichtig */
+  return drawEntityInner(e, now);
+}
+function drawEntityInner(e, now) {
   switch (e.kind) {
     case 'prop': return drawPropPixel(e, now);
     case 'building': return drawBuilding(e, now);
@@ -919,8 +975,8 @@ function drawEntity(e, now) {
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
     case 'enemy': { const r = e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now); facPip(e); return r; }   // S15 P5: Übungspuppe der Akademie; Scout R4: Zeichen der Macht
-    case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
-    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
+    case 'npc': if (e.chainedTo) drawChain(e); if ((e.goblin && e.spec) || e.race === 'goblin') return drawGoblinNpc(e, now); if (SP.isDwarf(e)) return drawDwarf(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
+    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); if (e.race === 'goblin') return drawGoblinNpc(e, now); if (SP.isDwarf(e)) return drawDwarf(e, now); return drawHumanoid(e, now);   /* Fraktions-Starts: Goblin-Held kleiner wie die Goblins der Welt */   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd
@@ -1005,7 +1061,7 @@ function drawCaravan(e, now) {
   if (q.y <= e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);   // weiter hinten im Bild zuerst
   drawWagon(e.x, e.y, f, now, moving, true, e);
   if (q.y > e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);
-  if (e.hp < e.maxHp) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, e.hp / e.maxHp), 4); }
+  if (barK(e) < 1) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, barK(e)), 4); }
 }
 function drawDraft(x, y, f, now, moving, big, ph) {       // Ochse (big) oder Maultier, Seitenansicht
   if (SP.drawnOn()) {                                        // S14 Stil R: gezeichnete Zugtiere (Ochse, Maultier) mit Laufbild
@@ -2091,6 +2147,13 @@ function drawHumanoidAt(e, now, override) {
   const tool = e.act && e.act.tool && now >= e.act.at && now < e.act.until ? { key: e.act.tool } : null;   // S13: bei der Arbeit das Werkzeug statt der Waffe
   const w = tool || (e.equip && e.equip.weapon), wit = w ? ITEMS[w.key] || {} : null;
   const pz = SP.poseOf(e, now, wit && ['bow', 'crossbow', 'wand'].includes(wit.wtype));   // Fernwaffen: Zielhaltung statt Schwung
+  if (pz.pose === 'tuck' && e.dodge && SP.drawnOn() && (e === S.player || e.coopHero || e.coopPilot) && (S.dbg?.pack === 'B' || S.dbg?.pack === 'C')) {
+    /* Kampfanimation (§17 Ausweichen je Pack, nur Bild — Rolle, Weg und Unverwundbarkeit unverändert): B Ausfallsprung (Sprungbogen), C Dash mit Nachbildern */
+    const k = clamp((e.dodge.t || 0) / 240, 0, 1), ax = e.dodge.ax || 0, ay = e.dodge.ay || 0, pz2 = { dir: pz.dir, pose: 'w1' };
+    if (S.dbg.pack === 'B') return drawHumanoidR(e, now, c, spec, pz2, w, wit, 0, -Math.sin(k * Math.PI) * 10);
+    for (const g of [3, 2, 1]) { c.globalAlpha = 0.14 * (4 - g); drawHumanoidR(e, now, c, spec, pz2, w, wit, -ax * g * 9, -ay * g * 5); } c.globalAlpha = 1;
+    return drawHumanoidR(e, now, c, spec, pz2, w, wit);
+  }
   if (pz.pose === 'tuck') {                                         // Ausweichrolle: Kugel in 90°-Schritten gedreht
     const f = SP.humanFrame(spec, 'S', 'tuck'), sgn = e.dodge && e.dodge.ax < 0 ? -1 : 1;
     c.save(); c.translate(Math.round(x), Math.round(y - 8)); c.rotate(pz.rot * Math.PI / 2 * sgn);
@@ -2132,32 +2195,35 @@ function drawHumanoidAt(e, now, override) {
 
 // S14 Stil R: Waffenzustand → Bild mit Armen (sprites.humanFrameR); die Waffe sitzt an der Hand, die im Bild steht.
 // Schwung in Zehntelschritten (Ausholen → Schlag → Nachschwung als echte Einzelbilder), Ziel in Achteln.
-function drawHumanoidR(e, now, c, spec, pz, w, wit) {
-  let x = e.x, y = e.y; const moving = e.vx || e.vy, walkP = 'w' + (((now / 115 + (e.seed || 0) * 3) | 0) & 3);
+function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
+  let x = e.x + ox, y = e.y + oy; const moving = e.vx || e.vy, own = e === S.player || e.coopHero || e.coopPilot;
+  /* Kampfanimation (§17 Kampfbewegung): wer im Kampf rückwärts geht, läuft den Schrittzyklus rückwärts */
+  const wi0 = ((now / 115 + (e.seed || 0) * 3) | 0) & 3, back = own && moving && e.aim != null && (e.vx || 0) * Math.cos(e.aim) + (e.vy || 0) * Math.sin(e.aim) < -0.1, walkP = 'w' + (back ? 3 - wi0 : wi0);
   let W = null, dir = e.aim ?? 0;
   if (w && !e.sitting) {
-    const wt = wit.wtype || 'sword', ranged = RANGED_W.has(wt);
+    const wt = wit.wtype || 'sword', ranged = RANGED_W.has(wt), ac = animClassOf(w.key, wit) || wt;   /* Animationsklasse (Großaxt eigene Bewegung) */
     const A = e.act && now >= e.act.at && now < e.act.until && !moving && !(e.swing > 0) ? e.act : null;
     const ak = A ? (now - A.at) / (A.until - A.at) : 0, work = A && A.kind === 'work', low = A && !work && A.kind !== 'gesture' ? (A.kind === 'rise' ? Math.round(7 * (1 - ak)) : 7) : 0;
     const sw = work ? 0.05 + ((ak * (A.rate || 2)) % 1) * 0.6 : e.swing || 0;
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
     const chg = !work && !ranged && !(sw > 0) && !e.cover && e.chargeK > 0 ? e.chargeK : 0;   /* Kampfanimation: schwerer Hieb lädt — Figur steht im Ausholen des Wuchtschlags */
-    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : 'rest';
+    const ready = own && !A && !e.mounted && e.combatT && now >= e.combatT && now - e.combatT < 2500 && !!atkStance(ac, 'ready');   /* Kampfanimation (§17 Kampf-Idle/-Bewegung): Waffe bereit, breiter Stand */
+    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : ready ? 'ready' : 'rest';
     const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
     /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
-    const tm = chg ? null : mode === 'swing' ? atkTiming(e, wt, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
-    W = { mode, wt, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(wt, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw };   /* Kampfanimation: Stangen beidhändig */
+    const tm = chg ? null : mode === 'swing' ? atkTiming(e, ac, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
+    W = { mode, wt, ac, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(ac, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw };   /* Kampfanimation: Stangen beidhändig */
   }
   /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
      Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
   let AF = null, ghost = 0;
   if (W && W.mode === 'swing' && !RANGED_W.has(W.wt)) {
-    const own = e === S.player || e.coopHero || e.coopPilot, pk = own && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A', u = W.u;
-    AF = atkFx(W.wt, pk); W.trail = AF.trail;
+    const pk = own && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A', u = W.u;
+    AF = atkFx(W.ac, pk); W.trail = AF.trail;
     const fin = e.atkStep === 2 && e.atkH > 0, k = u < 0.4 ? -0.3 * u / 0.4 : u <= 0.5 ? -0.3 + 1.3 * (u - 0.4) / 0.1 : 1 - (u - 0.5) / 0.5, push = AF.push * (fin ? 2 : 1) * k;
     if (S.settings.motion !== false) { x += Math.cos(dir) * push; y += Math.sin(dir) * push * 0.6; }
-    if (atkSpin(W.wt, W.v) && u > 0.32 && u < 0.72) { const th = dir + SP.swingOf(W.wt, u, W.arc, W.v, 0).a * (Math.cos(dir) < -1e-9 ? -1 : 1), ca = Math.cos(th), sa = Math.sin(th);
+    if (atkSpin(W.ac, W.v) && u > 0.32 && u < 0.72) { const th = dir + SP.swingOf(W.ac, u, W.arc, W.v, 0).a * (Math.cos(dir) < -1e-9 ? -1 : 1), ca = Math.cos(th), sa = Math.sin(th);
       pz = { ...pz, dir: Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 'E' : 'W') : (sa > 0 ? 'S' : 'N') }; }
     if (AF.after && u >= 0.4 && u < 0.75) ghost = AF.push * (fin ? 2 : 1);
     if (fin && AF.jump && S.settings.motion !== false && u > 0.25 && u < 0.62) y -= AF.jump * Math.sin((u - 0.25) / 0.37 * Math.PI);   /* B/C: Absprung beim Finisher */
@@ -2274,9 +2340,9 @@ function atkTiming(e, wt, sw) {
 /* Kampfanimation B/C: Sichelbogen — helle Pixelpunkte auf dem Weg der Klingenspitze vom Schlagbeginn bis jetzt, verblasst nach dem Einschlag.
    Wirbel-Finisher: ganzer Kreis. Nur Optik, aus dem Schwungzustand gerechnet (kein Eintrag in S.fx). */
 function drawSlash(c, e, W, AF, hx, hy, dir, it) {
-  const u = W.u; if (!(u >= 0.42 && u < 0.72) || atkThrust(W.wt, W.v)) return;   /* Stoß: kein Bogen */
+  const u = W.u; if (!(u >= 0.42 && u < 0.72) || atkThrust(W.ac, W.v)) return;   /* Stoß: kein Bogen */
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.22, R = (it.reach || 40) * 0.62, big = AF.slash + (e.atkStep === 2 ? 1 : 0);
-  const a1 = SP.swingOf(W.wt, Math.min(u, 0.6), W.arc, W.v, 0).a, a0 = SP.swingOf(W.wt, 0.4, W.arc, W.v, 0).a, span = Math.min(Math.abs(a1 - a0), atkSpin(W.wt, W.v) ? 6.3 : 2.4), st = a1 > a0 ? -1 : 1;
+  const a1 = SP.swingOf(W.ac, Math.min(u, 0.6), W.arc, W.v, 0).a, a0 = SP.swingOf(W.ac, 0.4, W.arc, W.v, 0).a, span = Math.min(Math.abs(a1 - a0), atkSpin(W.ac, W.v) ? 6.3 : 2.4), st = a1 > a0 ? -1 : 1;
   const cx = e.x + (hx - e.x) * 0.25, cy = hy - 2;
   for (let t = 0; t <= span; t += 0.09) { const an = dir + (a1 + st * t) * sgn, k = 1 - t / span, al = 0.7 * fade * k; if (al <= 0.03) continue;
     const s2 = Math.max(1, Math.round((big + 1) * k)); c.fillStyle = k > 0.75 ? `rgba(255,252,236,${al})` : `rgba(236,214,160,${al})`;
@@ -2379,7 +2445,7 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
 const monsterSpecs = new WeakMap();
-function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || !SP.msEq(e, s.ms)) { s = SP.pinSpec(SP.monsterSpec(e, m)); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben   /* PERF-U3: Gliedervergleich ohne neue Liste, Schlüssel gemerkt */
+function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || !SP.msEq(e, s.ms) || s.unm !== !!e.unmasked) { s = SP.pinSpec(SP.monsterSpec(e, m)); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben   /* PERF-U3: Gliedervergleich ohne neue Liste, Schlüssel gemerkt */
 /* PERF-U3: humanoide Gegner wurden je Bild über eine volle Kopie ({ ...e }, ~60 Felder) gezeichnet. Jetzt ein bleibender Stellvertreter je Gegner,
    der alles vom Gegner liest (Prototyp) und nur spec/equip selbst trägt; die Zeichenwege schreiben nichts in die Figur. */
 const monsterProxy = new WeakMap();
@@ -2453,6 +2519,21 @@ function drawEye(e, now, R) {
   if (e.mtype === 'omega') { ctx.fillStyle = 'rgba(150,10,10,.8)'; for (const dx of [-0.5, 0.35]) { const t = ((now / 900 + dx * 3) % 1); ctx.fillRect(cx + R * dx, cy + R * 0.55 + t * R * 0.9, Math.max(2, R / 25), Math.max(4, R / 10)); } }   // Bluttränen
   const fw = flashAlpha(e, now); if (fw > 0) { ctx.globalAlpha = fw * 0.7; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.62, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
 }
+/* Entwickler 02.10.: Wächterspinne — kleiner Messingkörper auf acht dünnen Beinen (Pixel). An der Wand (e.cling) hängt sie 24 px höher,
+   Beine gespreizt, Augen glimmen; am Boden läuft sie mit wechselnden Beinpaaren. Ansage (telegraph): Vorderbeine hoch. */
+function drawSpider(e, now, p) {
+  const k = SP.FIGK, cl = !!e.cling, x = Math.round(e.x), y = Math.round(e.y - (cl ? 24 : 4)), mv = e.vx || e.vy, ph = mv ? (((now / 70) | 0) & 1) : 0, up = e.telegraph > 0 || e.swing > 0;
+  if (!cl) shadow(e.x, e.y + 2, 10, .35); else { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 1, y + 4, 2, 24); }   // Faden zur Erde
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+  const body = (p.body || '#8a7040'), dk = p.dark || '#3a3026', eye = p.eye || '#ff9a3a';
+  ctx.fillStyle = OUT_COL; for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const bend = (i + ph) % 2 ? 1 : 0, lx = s * (5 + i * 2), ly = -3 + i * 2, lift = up && i === 0 ? -5 : 0;
+    ctx.fillRect(s > 0 ? 3 : lx, ly + lift, Math.abs(lx) - 2, 2); ctx.fillRect(lx + (s > 0 ? 0 : -1), ly + lift, 2, cl ? 2 : 6 + bend); }
+  ctx.fillStyle = dk; for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const lx = s * (5 + i * 2), ly = -3 + i * 2, lift = up && i === 0 ? -5 : 0; ctx.fillRect(lx, ly + lift + 1, 1, cl ? 1 : 5); }
+  ctx.fillStyle = OUT_COL; ctx.fillRect(-5, -6, 10, 10); ctx.fillStyle = body; ctx.fillRect(-4, -5, 8, 8); ctx.fillStyle = '#c8a860'; ctx.fillRect(-3, -5, 3, 2); ctx.fillStyle = dk; ctx.fillRect(-4, 1, 8, 2);
+  ctx.fillStyle = eye; ctx.fillRect(-2, -2, 1, 1); ctx.fillRect(1, -2, 1, 1); if (cl || up) { ctx.fillStyle = 'rgba(255,160,60,.35)'; ctx.fillRect(-3, -3, 6, 3); }
+  ctx.restore();
+  const fw = flashAlpha(e, now); if (fw > 0) { ctx.globalAlpha = fw * 0.7; ctx.fillStyle = '#fff1d6'; ctx.fillRect(x - 6 * k, y - 6 * k, 12 * k, 10 * k); ctx.globalAlpha = 1; }
+}
 // Engel (Nutzer S13): zwei Flügel hinter der Figur, weiß-golden, schlagen langsam
 function drawWings(e, now, scale) {
   scale *= 1.35; const f = Math.sin(now / 260 + (e.seed || 0)) * 0.25, y0 = e.y - 37 * scale;   // S14: größer, an den Schultern
@@ -2488,6 +2569,7 @@ function drawCreature(e, now) {
   }
   if (e.special?.heavy && e.special.t > 0) heavyWarn(e, now);   /* Warnzeichen: nicht blockbar, nur ausweichen */
   if (e.mtype === 'carrion_wing') return drawWing(e, now, p);
+  if (e.mtype === 'waechterspinne') return drawSpider(e, now, p);   /* Entwickler 02.10. */
   if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
   if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
     const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : e.mtype === 'horse' ? 1.35 : e.mtype === 'cow' ? 1.3 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
@@ -2540,6 +2622,7 @@ function drawCreature(e, now) {
   if (e.mtype === 'shade') ctx.globalAlpha = S.player && Math.hypot(e.x - S.player.x, e.y - S.player.y) > 150 ? 0.2 : 0.85;   // Phase 6: aus der Ferne kaum zu sehen
   if (e.mtype === 'omega') { ctx.fillStyle = `rgba(200,30,30,${0.1 + 0.05 * Math.sin(now / 200)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 90 / scale, 50 / scale, 0, 0, 7); ctx.fill(); }   // Phase 7: rote Aura
   if (e.mtype === 'ash_demon') { ctx.fillStyle = `rgba(255,110,40,${0.1 + 0.05 * Math.sin(now / 160)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 56 / scale, 35 / scale, 0, 0, 7); ctx.fill(); }   // Glutaura
+  if (e.mtype === 'dampframme' && ((now / 260 + (e.seed || 0)) | 0) % 3 === 0) { ctx.fillStyle = 'rgba(220,220,210,.35)'; for (const dx of [-9, 9]) ctx.fillRect(e.x + dx - 2, e.y - 50 - ((now / 40) % 8), 4, 4); }   /* Entwickler 02.10.: Dampf aus den Schloten */
   if (e.mtype === 'skel_bomb') { const k = e.heavy?.kind === 'blast' ? 1 - e.heavy.t / (e.heavy.T || 900) : -1, pulse = k < 0 ? 0.06 + 0.03 * Math.sin(now / 300) : 0.14 + 0.3 * k * (0.6 + 0.4 * Math.sin(now / (70 - 50 * k)));   /* Entwickler 02.10.: Glut im Brustkorb, beim Zünden immer heller und schneller */
     ctx.fillStyle = `rgba(255,130,40,${pulse})`; ctx.beginPath(); ctx.ellipse(e.x, e.y - 22, (k < 0 ? 10 : 14 + 10 * k) / scale, (k < 0 ? 8 : 11 + 8 * k) / scale, 0, 0, 7); ctx.fill(); }
   if (e.shadowServ) ctx.globalAlpha = 0.72;
@@ -2586,12 +2669,15 @@ function drawCorpse(e, now) {
   if (!D || D.pool) { const pool = Math.min(14, 5 + age / 70);
     ctx.fillStyle = 'rgba(90,18,14,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 3, pool, pool * 0.45, 0, 0, 7); ctx.fill(); }
   const m = e.mtype && MONSTERS[e.mtype];
-  if (e.spec || (D && m && !m.eye && !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'gorak', 'carrion_wing'].includes(e.mtype))) drawDeath(e, age, e.spec || SP.monsterSpec(e, m), SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m?.scale || 1));   /* Roadmap P8: Personen und Menschenähnliche mit Todesart */
+  if (e.spec || (D && m && !m.eye && !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'gorak', 'carrion_wing', 'waechterspinne'].includes(e.mtype))) drawDeath(e, age, e.spec || SP.monsterSpec(e, m), SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m?.scale || 1));   /* Roadmap P8: Personen und Menschenähnliche mit Todesart */
   else if (!m) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
   } else if (m.eye) {                                         // Nutzer S13: das Auge schließt sich und sinkt
     ctx.fillStyle = '#4a1414'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 6, 70 * m.eye, 12 * m.eye + 4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a0a0a'; ctx.fillRect(e.x - 60 * m.eye, e.y - 7, 120 * m.eye, 2);
+  } else if (e.mtype === 'waechterspinne') {                   /* Entwickler 02.10.: zerbrochene Spinne — Rumpf, abgeknickte Beine */
+    ctx.fillStyle = '#2a2018'; ctx.fillRect(e.x - 5, e.y - 3, 10, 5); ctx.fillStyle = '#8a7040'; ctx.fillRect(e.x - 4, e.y - 3, 8, 3);
+    ctx.fillStyle = '#4a3a26'; for (const [dx, dy] of [[-11, -1], [-9, 3], [8, -2], [10, 2], [-6, 5], [5, 5]]) ctx.fillRect(e.x + dx, e.y + dy, 4, 1);
   } else if (e.mtype === 'carrion_wing') {                     // Phase 6: gefallene Schwinge
     ctx.fillStyle = '#141012'; ctx.fillRect(e.x - 11, e.y - 1, 22, 3); ctx.fillStyle = '#2a2426'; ctx.fillRect(e.x - 3, e.y - 3, 6, 5);
   } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
@@ -2635,7 +2721,18 @@ export function deathFrameProbe(e, P) {                              /* Roadmap 
   const m = e.mtype && MONSTERS[e.mtype], spec = e.spec || SP.monsterSpec(e, m), f = SP.humanFrame(spec, P.dir, P.frame === 'die1' && !SP.drawnOn() ? 'kneel' : P.frame);
   return P.tint ? tinted(f, P.tint) : f;
 }
-function drawGrave(e) { if (e.hidden) return; const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec); }
+function drawGrave(e) { if (e.hidden) return; const v = (h2(e.x | 0, e.y | 0) * 4) | 0; drawBaked('grave' + v, { ...e, _gv: v }, 96, drawGraveVec);
+  if (e.mournUntil >= (S.day | 0)) graveCandles(e); }
+/* Visuell N7 (02.10.2026): zwei Kerzen am Grab, solange der Ort trauert — flackern leicht, nachts mit kleinem Lichthof */
+function graveCandles(e) {
+  const t = performance.now() / 140, night = S.minute < 6 * 60 || S.minute > 20 * 60;
+  for (const [dx, ph] of [[-8, 0], [7, 2.1]]) {
+    const x = Math.round(e.x + dx), y = Math.round(e.y + 6), fl = Math.sin(t + ph) * 0.5 + Math.sin(t * 2.3 + ph) * 0.3;
+    if (night) { ctx.fillStyle = 'rgba(255,190,90,.10)'; ctx.beginPath(); ctx.arc(x, y - 6, 9 + fl, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#d9cfb8'; ctx.fillRect(x - 1, y - 4, 2, 4); ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 1, y, 2, 1);
+    ctx.fillStyle = '#ffcf6a'; ctx.fillRect(x - 1, y - 6 - (fl > 0.3 ? 1 : 0), 2, 2); ctx.fillStyle = '#fff3c0'; ctx.fillRect(x, y - 6, 1, 1);
+  }
+}
 // Referenz 4 (Friedhof): Rundstein, Kreuz, Stele, schiefer Stein — Kante im Licht, Riss, Moos am Fuß
 function graveShape(x, y, v, k = 1) {
   shadow(x, y + 2, 9 * k, .35);
@@ -2826,7 +2923,9 @@ function drawBuildingVec(e, now) {
 
 function drawProjectile(p) {
   ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.atan2(p.vy, p.vx));
-  if (p.kind === 'arrow') { ctx.fillStyle = OUT_COL; ctx.fillRect(-11, -2, 24, 4); ctx.fillStyle = '#b8ab8e'; ctx.fillRect(-8, -1, 16, 2);
+  if (p.kind === 'net') { ctx.rotate(-Math.atan2(p.vy, p.vx) + (p.life || 0) / 90); ctx.fillStyle = OUT_COL; ctx.fillRect(-7, -7, 14, 14); ctx.fillStyle = '#b8a888';   /* Entwickler 02.10.: Wurfnetz, dreht sich im Flug */
+    for (let i = -6; i <= 6; i += 3) { ctx.fillRect(i, -6, 1, 12); ctx.fillRect(-6, i, 12, 1); } ctx.fillStyle = '#5a5048'; for (const [x, y] of [[-7, -7], [6, -7], [-7, 6], [6, 6]]) ctx.fillRect(x, y, 2, 2); }
+  else if (p.kind === 'arrow') { ctx.fillStyle = OUT_COL; ctx.fillRect(-11, -2, 24, 4); ctx.fillStyle = '#b8ab8e'; ctx.fillRect(-8, -1, 16, 2);
     ctx.fillStyle = '#9a9488'; ctx.fillRect(8, -2, 4, 4); ctx.fillStyle = '#7a2a20'; ctx.fillRect(-10, -1, 4, 2); }
   else if (p.kind === 'fire') {                                      // Pixel-Feuerball mit Schweif
     ctx.fillStyle = 'rgba(140,50,20,.7)'; ctx.fillRect(-14, -2, 6, 4); ctx.fillRect(-10, -4, 4, 8);
@@ -3248,7 +3347,7 @@ export const barTarget = () => { const e = focus.sel || (focus.last && performan
    return !e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss ? null : e; };   /* Boss: eigene Leiste unten */
 function drawTargetBar() {
   const e = barTarget(); if (!e) return;
-  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(e.hp / e.maxHp, 0, 1);
+  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(barK(e), 0, 1);
   ctx.fillStyle = 'rgba(10,8,6,.85)'; ctx.fillRect(x - 1, y - 1, 34, 6);
   ctx.fillStyle = '#3a1410'; ctx.fillRect(x, y, 32, 4);
   ctx.fillStyle = k > 0.5 ? '#9a2a20' : k > 0.25 ? '#b8461e' : '#d8641a'; ctx.fillRect(x, y, Math.round(32 * k), 4);
@@ -3310,6 +3409,18 @@ function drawGlyphAt(key, rgb, frame, sx, sy, k) {          /* sx/sy: Bildschirm
   const c = glyphImg(key, rgb, frame), w = c.width * k, h = c.height * k;
   ctx.drawImage(c, Math.round(sx - w / 2), Math.round(sy - h), Math.round(w), Math.round(h));
 }
+/* Aufträge Q5-1 (quests.md, 02.10.2026): Siegel-Raute + Kerben (gefüllt = erledigt) in Pixeln; ab 9 Zielen ein Balken. */
+function drawNotch([h, n], sx, sy, a, z) {
+  const u = Math.max(2, Math.round(2.2 * z)), cells = n <= 8 ? n : 0, w = (cells ? cells * 4 * u : 18 * u) + 6 * u, x0 = Math.round(sx - w / 2), y0 = Math.round(sy - 6 * u);
+  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(12,10,8,.82)'; ctx.fillRect(x0 - u, y0 - u, w + 2 * u, 7 * u);
+  ctx.fillStyle = '#e0b75a'; const dx = x0 + 2 * u, dy = y0 + 2.5 * u;   /* Siegel-Raute */
+  ctx.fillRect(dx - u / 2, dy - 2 * u, u, 4 * u); ctx.fillRect(dx - 1.5 * u, dy - u, 3 * u, 2 * u);
+  const px = x0 + 5 * u;
+  if (cells) for (let i = 0; i < n; i++) { const x = px + i * 4 * u; if (i < h) { ctx.fillStyle = '#e0b75a'; ctx.fillRect(x, y0 + u, 3 * u, 3 * u); ctx.fillStyle = '#fff1c0'; ctx.fillRect(x, y0 + u, 3 * u, u); }
+    else { ctx.fillStyle = '#6b5630'; ctx.fillRect(x, y0 + u, 3 * u, 3 * u); ctx.fillStyle = '#1a140c'; ctx.fillRect(x + u, y0 + 2 * u, u, u); } }
+  else { ctx.fillStyle = '#3a2e1c'; ctx.fillRect(px, y0 + 1.5 * u, 18 * u, 2 * u); ctx.fillStyle = '#e0b75a'; ctx.fillRect(px, y0 + 1.5 * u, Math.round(18 * u * h / n), 2 * u); }
+  ctx.globalAlpha = 1;
+}
 function drawFloats() {
   ctx.textAlign = 'center';
   const z = cam.zoom;
@@ -3317,6 +3428,7 @@ function drawFloats() {
     if (f.bubble) { drawBubble(f); continue; }
     const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - f.rise - cam.y) * cam.zoom;
     const a = clamp(f.life / f.maxLife, 0, 1);
+    if (f.notch) { drawNotch(f.notch, sx, sy, a, z); continue; }   /* Aufträge Q5-1: Zählkerbe */
     const gk = WORD_GLYPH[f.text], isNum = f.num || /^[+-]?\d+$/.test(f.text);   /* Koop-Gäste bekommen nur Text: Ziffernfolgen werden trotzdem Pixelziffern */
     if (gk || isNum) {
       if (isNum && !floatShown(f)) continue;

@@ -19,6 +19,14 @@ export function slotIndex() {
 function saveIndex(idx) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(idx)); } catch (e) { /* Übersicht ist nur Komfort */ } }
 export function newSlot(mode) { const id = (mode === 'coop' ? 'c' : 's') + Date.now().toString(36); const idx = slotIndex(); idx[id] = { id, mode, at: Date.now() }; saveIndex(idx); return id; }
 export function deleteSlot(id) { localStorage.removeItem(slotKey(id)); UNZ.delete(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
+/* Entwickler 03.10. (Fraktions-Starts): Wer den höchsten Rang einer Fraktion erreicht, schaltet sie für ALLE Spielstände als Start frei.
+   Eigener Schlüssel neben dem Slot-Index, nie im Spielstand. key nur für Proben (Wegwerf-Schlüssel). */
+export const STARTS_KEY = 'rotfall.starts';
+export function startUnlocks(key = STARTS_KEY) { try { const o = JSON.parse(localStorage.getItem(key) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+export function unlockStart(f, info = {}, key = STARTS_KEY) {
+  const o = startUnlocks(key); if (o[f]) return false; o[f] = { at: Date.now(), ...info };
+  try { localStorage.setItem(key, JSON.stringify(o)); } catch (e) { return false; } return true;
+}
 // Kurzbeschreibung eines Stands für die Liste: Held, Haus, Stufe, Tag, Generation und Erfolge als Symbole
 export const ACHIEVE = [
   ['garm', '💀', 'Garmadon ist tot', d => d.flags?.garmadonSlain],
@@ -160,7 +168,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying', '_hostHero']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
@@ -292,6 +300,12 @@ function migrate(data) {
   data.ver = SAVE_VERSION; return data;
 }
 export function applySave(data) {
+  /* HB-04: vorher blieb alles aus dem laufenden Spiel stehen, was im geladenen Stand fehlt (Koop-Hosten aus laufendem Spiel, Slot-Wechsel).
+     Jetzt erst auf den Urzustand zurück; nur Verbindung, Proben-Stummschaltung, Debug-Schalter und (falls der Stand keine hat) Einstellungen bleiben. */
+  const keep = { coop: S.coop, _quiet: S._quiet, dbg: S.dbg, _frozenWar: S._frozenWar, settings: S.settings };
+  for (const k of Object.keys(S)) delete S[k];
+  Object.assign(S, JSON.parse(JSON.stringify(S_INIT)));
+  for (const [k, v] of Object.entries(keep)) if (v !== undefined) S[k] = v;
   for (const k of Object.keys(data)) S[k] = data[k];
   S.fx = []; S.floats = []; S.projectiles = []; S.paused = false;
 }

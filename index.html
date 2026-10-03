@@ -14,10 +14,11 @@
 <!-- ============ TITLE SCREEN ============ -->
 <div id="titlescreen" class="screen">
   <canvas id="titlecanvas"></canvas>
+  <div class="title-vignette"></div>
   <div class="title-content">
     <h1 class="game-title">ROTFALL</h1>
-    <h2 class="game-sub">LEGACY</h2>
-    <div class="game-ver" style="font:12px Spectral,serif;color:#8a7d66;letter-spacing:.08em;margin:-4px 0 10px">Version 23 · S15 · 01.10.2026</div>
+    <div class="game-sub-row"><span class="tl-line"></span><h2 class="game-sub">LEGACY</h2><span class="tl-line r"></span></div>
+    <p class="game-tag">Dein Charakter kann sterben. Deine Geschichte nicht.</p>
     <div class="menu-plaques">
       <button class="plaque" data-act="continue">Fortsetzen</button>
       <button class="plaque" data-act="new">Neue Geschichte</button>
@@ -28,6 +29,7 @@
     </div>
     <div id="legacy-summary" class="legacy-summary"></div>
   </div>
+  <div class="title-foot game-ver">Version 24 · 03.10.2026</div>
 </div>
 
 <!-- ============ CHARACTER CREATION ============ -->
@@ -52,6 +54,9 @@
       <div class="panel-title">Startort</div>
       <div class="cr-builds" id="cr-start"></div>
       <div class="cr-build-desc" id="cr-start-desc"></div>
+      <div id="cr-fac-wrap"><div class="panel-title">Fraktions-Start</div>
+      <div class="cr-builds" id="cr-fac"></div>
+      <div class="cr-build-desc" id="cr-fac-desc"></div></div>
       <div class="cr-origins" id="cr-origins"></div>
       <div id="cr-origin-desc" class="cr-desc"></div>
       <div class="panel-title">Körperbau</div>

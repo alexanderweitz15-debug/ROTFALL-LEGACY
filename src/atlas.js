@@ -98,7 +98,7 @@ function label(c, text, x, y, size, col, italic = false) {
 }
 
 // ---------------- Karte zeichnen ----------------
-const FACCOL = { aurel: '#e8c878', chain: '#e0a040', goblin: '#b8a050', undead: '#e04a3a', valen: '#e8d070', order: '#f0e6c8', merch: '#e8c060', bandit: '#b86a40' };
+const FACCOL = { aurel: '#e8c878', chain: '#e0a040', goblin: '#b8a050', undead: '#e04a3a', valen: '#e8d070', order: '#f0e6c8', merch: '#e8c060', bandit: '#b86a40', wuest: '#d8b070', zwerge: '#c87a3a' };
 // Ortssymbol: ein Ort, eine Zeichenfunktion — dieselbe, die auf der Weltkarte und im Ortskarte-Panel (ui.js, Scheibe 1 „Karte“) steht.
 function locIcon(c, l, x, y, s) {
   const col = FACCOL[l.faction] || '#e8d070';

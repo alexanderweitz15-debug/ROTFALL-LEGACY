@@ -2,15 +2,16 @@
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=24';
 import * as CS from './cloudsave.js?v=24';
 import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=24';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam } from './render.js?v=24';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=24';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=24';
 import { wearOf } from './buildings.js?v=24';
 import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
 import { townState, townPrice } from './sim.js?v=24';
 import { GOODS } from './data.js?v=24';
 import { target as ecoTarget } from './economy.js?v=24';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=24';
 import { sfx, ambience } from './sfx.js?v=24';
+import * as SKY from './sky.js?v=24';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
 import * as ATL from './atlas.js?v=24';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
 
 export let A = {};
@@ -36,12 +37,12 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']], ['inv', 'Gepäck', 'I', ['inventory']],
-  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement']], ['map', 'Karte', 'M', ['map']],
+  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
+  ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
 const NAV_SHORT = { char: 'Charakter', inv: 'Inventar', party: 'Gruppe', build: 'Siedlung', map: 'Karte', quest: 'Aufträge', powers: 'Mächte', codex: 'Kodex', options: 'Optionen' };
-const SUBTAB = { character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
 // Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
@@ -125,7 +126,7 @@ export function refreshHUD() {
   const fr = topRank(p);
   hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
-  let html = bar('Leben', p.hp, p.maxHp, 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
+  let html = bar('Leben', ...barOf(p), 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
   if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp', p.level >= 60 ? ' · Höchststufe' : '');   // Balance-Runde: Höchststufe 60 (game.js MAX_LEVEL)
@@ -149,20 +150,22 @@ export function refreshHUD() {
     d.appendChild(cv);
     d.appendChild(el('div', '', `<div class="m-name">${m.name}</div>
       <div class="m-sub">St. ${m.level} ${CLASSES[m.currentClass].name} · Moral ${Math.round(m.morale)}${m.coopHero ? '' : ` · Loyalität ${Math.round(m.loyal ?? 50)}${m.friend ? ' ♥' : ''}`}</div>
-      <div class="m-bar"><div style="width:${clamp(m.hp / m.maxHp * 100, 0, 100)}%"></div></div>`));
+      <div class="m-bar"><div style="width:${clamp(barOf(m)[0] / barOf(m)[1] * 100, 0, 100)}%"></div></div>`));
     d.onclick = () => { A.select(m); };
     list.appendChild(d);
     drawPortraitTo(cv, m);
   } }
   hudSet('res-list', [['wood', 'Holz', S.res.wood], ['stone', 'Stein', S.res.stone], ['iron', 'Eisen', S.res.iron],
-    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', S.res.food], ['gold', 'Gold', S.gold]]
+    ['herb', 'Kraut', S.res.herb], ['food', 'Nahrung', A.provisions ? Math.round(A.provisions() * 10) / 10 : S.res.food], ['gold', 'Gold', S.gold]]
     .map(([i, k, v]) => { const im = icoImg('res_' + i, 2, 'resico'); return `<span title="${k}" class="${im ? 'hasico' : ''}">${im || k}<b>${Math.floor(v)}</b></span>`; }).join(''), true);   /* UI-Umbau: Piktogramm + Zahl */
   // Kopfzeile
   hudSet('clock-time', `Tag ${S.day} · ${timeStr()} · ${SEASONS[seasonOf()]}`);   // S15 Fehlersuche: S.season blieb ewig „Später Frühling“
   if ($('clock-time').title !== `Jahr ${year()}`) $('clock-time').title = `Jahr ${year()}`;   /* UI-Umbau: Zeit, Wetter, Jahr stehen nur noch oben */
   if ($('clock-weather').dataset.w !== S.weather) { $('clock-weather').dataset.w = S.weather; $('clock-weather').innerHTML = icoImg('w_' + (S.weather === 'sandstorm' ? 'heat' : S.weather), 2, 'wico') || WEATHER_ICON[S.weather] || WEATHER_ICON.clear; $('clock-weather').title = ({ clear:'Klar', cloudy:'Bewölkt', rain:'Regen', fog:'Nebel', snow:'Schnee', sandstorm:'Sandsturm', bloodrain:'Blutregen' }[S.weather] || S.weather) + (A.wxText?.() ? ' — ' + A.wxText() : ''); }   /* Roadmap C.12: Wirkung im Tooltip */
-  hudSet('clock-gold', String(S.gold));
+  goldShow(S.gold);   /* Q8-5: Gold zählt hoch */
   paintWarn();   /* UI-Scheibe 4: Warnchip */
+  questWatch();   /* Q-1: Brief mit Siegel bei Abschluss/Scheitern */
+  paintTracker();   /* Q-4: Tracker */
   renderHotbar();
 }
 
@@ -269,7 +272,48 @@ function codexUI(body) {
 
 // ---------------- Stall (S15) ----------------
 // Pferde als Karten: Bild, Werte als Balken, Preis; mit eigenem Pferd wird eingetauscht (40 % Anrechnung).
+// ---------------- Prothesen-Werkbank (GUI, 03.10.2026) ----------------
+// Links ein Körperschema: vier Glieder und das Auge, Farbe nach Zustand (Fleisch grau, Messing gold, beschädigt rot); rechts Zustand,
+// Aufrüstung und die Aktionen (dieselben wie im Gespräch). Aktionen mit Rückfrage (Ersetzen, Auge) öffnen das Gespräch.
+function mechUI(body, npc) {
+  const V = A.mechView(npc); if (!V) return;
+  const col = q => !q.mech ? (q.lost ? '#3a2a24' : '#7a6a58') : q.cond < 30 ? '#b0453a' : q.cond < 70 ? '#c9a45a' : '#e0c27a';
+  const limb = (q, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${col(q)}" stroke="#14100b" stroke-width="2"><title>${q.name}</title></rect>`;
+  const P = Object.fromEntries(V.parts.map(q => [q.k, q]));
+  const svg = `<svg viewBox="0 0 120 200" class="mech-fig"><circle cx="60" cy="24" r="16" fill="#7a6a58" stroke="#14100b" stroke-width="2"/>
+    ${V.eye ? `<circle cx="66" cy="22" r="4" fill="${V.eye.cond < 30 ? '#b0453a' : '#7fe0ff'}"/>` : ''}<rect x="40" y="44" width="40" height="66" rx="6" fill="#6a5a4a" stroke="#14100b" stroke-width="2"/>
+    ${limb(P.larm, 20, 46, 16, 64)}${limb(P.rarm, 84, 46, 16, 64)}${limb(P.lleg, 42, 112, 16, 76)}${limb(P.rleg, 62, 112, 16, 76)}</svg>`;
+  const row = q => `<div class="mech-row"><b>${q.name}</b> ${q.lost && !q.mech ? '<span class="bad">fehlt</span>' : q.mech ? `Prothese Stufe ${q.mech}${q.up ? ` · Aufrüstung ${q.up}` : ''}` : 'Fleisch'}
+    ${q.mech ? `<div class="bst-bar"><i style="width:${q.cond}%;background:${col(q)}"></i></div><span class="ledger">Zustand ${q.cond} %${q.cond < 30 ? ' — beschädigt, wirkungslos' : ''}</span>` : ''}</div>`;
+  body.innerHTML = `<div class="ledger">${qa(V.title)} · Dein Gold: ${V.gold}</div><div class="mech-wrap">${svg}<div class="mech-info">${V.parts.map(row).join('')}
+    ${V.eye ? `<div class="mech-row"><b>Auge</b> ${qa(V.eye.name)} (Stufe ${V.eye.q})<div class="bst-bar"><i style="width:${V.eye.cond}%;background:${V.eye.cond < 30 ? '#b0453a' : '#7fe0ff'}"></i></div><span class="ledger">Zustand ${V.eye.cond} %</span></div>` : ''}
+    <div class="ledger">${qa(V.priceLine)}${V.scope ? '<br>' + qa(V.scope) : ''}</div></div></div>
+    <div class="tr-sec">Was die Werkbank kann</div><div class="mech-acts">${V.opts.map((o, i) => `<button data-mo="${i}">${qa(o.text)}</button>`).join('') || '<div class="ledger">Hier gibt es für dich gerade nichts zu tun.</div>'}</div>`;
+  body.querySelectorAll('[data-mo]').forEach(b => b.onclick = () => { const o = V.opts[+b.dataset.mo]; o.fn?.(); if (dialogueOpen()) closeModal(); else if (modalOpen === 'mech') mechUI(body, npc); });
+}
+// ---------------- Tierhändler (GUI, 03.10.2026) ----------------
+function beastsUI(body, npc) {
+  const I = A.beastInfo(), bar = (v, max, col) => `<div class="bst-bar"><i style="width:${Math.min(100, v / max * 100)}%;background:${col}"></i></div>`;
+  const card = w => `<div class="bst-card${I.pet ? ' off' : ''}"><canvas data-m="${w.m}" width="96" height="72"></canvas><b>${w.name}</b>
+    <div class="ledger">Leben ${w.hp}${bar(w.hp, 60, '#b0453a')}Biss ${w.dmg}${bar(w.dmg, 12, '#c9a45a')}Tempo ${w.speed.toFixed(2)}${bar(w.speed - 1, 0.8, '#7fae6e')}</div>
+    <button data-buy="${w.m}" ${I.pet || I.gold < w.price ? 'disabled' : ''} class="${I.gold < w.price ? 'poor' : ''}">${w.price} Gold</button></div>`;
+  body.innerHTML = `<div class="ledger">${npc?.name || 'Tierhändler'}: ${I.pet ? `„${I.pet.name} sieht gut aus. Ein zweites Tier? Das hält niemand lange durch.“` : '„Treu, ehrlich, beißt nur, wen du willst. Welches?“'} · Dein Gold: ${I.gold}</div>
+    ${I.pet ? `<div class="tr-sec">Dein Begleiter</div><div class="bst-own"><canvas data-m="${I.pet.mtype}" width="96" height="72"></canvas><div><b>${I.pet.name}</b><div class="ledger">Leben ${I.pet.hp}/${I.pet.maxHp}${bar(I.pet.hp, I.pet.maxHp, '#b0453a')}</div>
+      <button id="bst-free" class="txtbtn">${I.pet.name} freilassen</button></div></div>` : ''}
+    <div class="tr-sec">Begleittiere${I.pet ? ' — erst, wenn dein Tier fort ist' : ''}</div><div class="bst-grid">${I.wares.map(card).join('')}</div>
+    <div class="tr-sec">Reittiere</div><div class="ctx-actions"><button id="bst-stable">${I.mount ? `Reittiere ansehen (${I.mount.name} eintauschen)` : 'Reittiere ansehen'}</button>${I.mount?.mech ? `<button id="bst-oil">${I.mount.name} warten (1 Automatenkern)</button>` : ''}</div>
+    ${I.farm ? `<div class="tr-sec">Für deinen Hof (${I.farm.cow + I.farm.sheep}/${I.farm.cap} Tiere auf der Weide)</div><div class="bst-grid">
+      <div class="bst-card"><canvas data-m="cow" width="96" height="72"></canvas><b>Kuh</b><div class="ledger">Milch und Fleisch für die Siedlung</div><button data-farm="cow">70 Gold</button></div>
+      <div class="bst-card"><canvas data-m="sheep" width="96" height="72"></canvas><b>Schaf</b><div class="ledger">Wolle und Fleisch für die Siedlung</div><button data-farm="sheep">40 Gold</button></div></div>` : ''}`;
+  body.querySelectorAll('canvas[data-m]').forEach(cv => drawMonsterTo(cv, cv.dataset.m, 1));
+  body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyBeast(b.dataset.buy)) { sfx?.('coin'); closeModal(); } else beastsUI(body, npc); });
+  body.querySelectorAll('[data-farm]').forEach(b => b.onclick = () => { A.buyFarmAnimal(b.dataset.farm); beastsUI(body, npc); });
+  if ($('bst-free')) $('bst-free').onclick = () => { A.releasePet(); beastsUI(body, npc); };
+  if ($('bst-oil')) $('bst-oil').onclick = () => { A.oilMount(); beastsUI(body, npc); };
+  $('bst-stable').onclick = () => openModal('stable', npc);
+}
 function stableUI(body, npc) {
+  if (!npc) { body.innerHTML = '<div class="ledger">Hier steht kein Stall.</div>'; return; }   /* HB2-11 */
   const offers = A.stableOffers(npc), cur = S.mount && A.mountStats(), credit = cur ? Math.round(A.horseValue(cur) * 0.4) : 0;
   const bar = (v, max, col) => `<div style="height:5px;background:#2a2418;margin:2px 0 6px"><div style="height:100%;width:${Math.min(100, v / max * 100)}%;background:${col}"></div></div>`;
   body.innerHTML = `<div class="ledger">${npc.name}: ${offers.length ? 'Das hier steht diese Woche im Stall.' : 'Diese Woche ist alles verkauft. Komm nächste Woche wieder.'} Dein Gold: ${S.gold}.${cur ? ` Dein ${cur.name} wird mit ${credit} Gold angerechnet.` : ''}</div>
@@ -277,12 +321,41 @@ function stableUI(body, npc) {
       <canvas data-h="${H.id}" width="150" height="100" style="width:150px;height:100px;image-rendering:pixelated;display:block;margin:0 auto"></canvas>
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
-  const PAL = { horse: { body: '#6a4a30', dark: '#2a1e14', eye: '#1a120c' }, mech_horse: { body: '#a8843a', dark: '#4a3a1e', eye: '#e8a040' }, dead_horse: { body: '#b8b2a0', dark: '#2a2a26', eye: '#5fb39a' } };
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', { ...PAL[H.kind], body: H.kind === 'horse' ? ['#6a4a30', '#3a2a20', '#8a6a4a', '#2a2420', '#a08060'][H.name.length % 5] : PAL[H.kind].body }, 'W', '', 1);
+  // Pferde-Überarbeitung (02.10.2026): echte Fellfarbe (H.coat) statt zufälliger Namenslänge — das Porträt zeigt dasselbe Pferd wie draußen im Spiel.
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
+// ---------------- Heiler (GUI, 03.10.2026) ----------------
+// Je Gruppenmitglied eine Karte: Leben, sechs Glieder als Balken (gebrochen rot, geschient gelb, fehlend grau), Zustände; unten die beiden
+// Behandlungen als Knöpfe. Heilen läuft wie im Gespräch als Kanal (3,5 s) und schließt das Fenster.
+function healerUI(body, npc) {
+  const V = A.healerView?.(npc); if (!V) return;
+  const col = q => q.lost ? '#3a3230' : q.mech ? '#c9a45a' : q.broken ? (q.splinted ? '#c9a45a' : '#b0453a') : q.hp < q.max * 0.5 ? '#c07040' : '#7fae6e';
+  const card = c => `<div class="hl-card${c.hurt || c.splint ? '' : ' off'}"><b>${qa(c.name)}</b> <span class="ledger">Leben ${c.hp}/${c.max}</span><div class="bst-bar"><i style="width:${c.max ? c.hp / c.max * 100 : 0}%;background:#b0453a"></i></div>
+    <div class="hl-parts">${c.parts.map(q => `<div title="${qa(q.name)}: ${q.lost ? 'fehlt' : q.mech ? 'Prothese (Werkbank)' : q.broken ? (q.splinted ? 'gebrochen, geschient' : 'GEBROCHEN') : `${q.hp}/${q.max}`}"><span class="ledger">${qa(q.name.replace('Linker ', 'L. ').replace('Rechter ', 'R. ').replace('Linkes ', 'L. ').replace('Rechtes ', 'R. '))}</span><div class="bst-bar"><i style="width:${q.max ? q.hp / q.max * 100 : 0}%;background:${col(q)}"></i></div></div>`).join('')}</div>
+    ${c.status.length ? `<div class="ledger">Zustand: ${qa(c.status.join(', '))}</div>` : ''}</div>`;
+  body.innerHTML = `<div class="ledger">${qa(V.title)}: „${V.wounded ? 'Zeig her. Das wird teuer, aber du behältst alles dran.' : 'Dir fehlt nichts. Komm wieder, wenn es blutet.'}“ · Dein Gold: ${V.gold}</div>
+    <div class="hl-grid">${V.group.map(card).join('')}</div>
+    <div class="tr-sec">Behandlung</div><div class="ctx-actions">
+      <button id="hl-heal"${V.wounded && V.gold >= V.cost && !V.busy ? '' : ' disabled'}>Wunden versorgen — ${V.cost} Gold${V.wounded ? '' : ' (niemand verletzt)'}</button>
+      <button id="hl-splint"${V.splint && V.gold >= V.splintCost ? '' : ' disabled'}>Brüche schienen, Wunden reinigen — ${V.splintCost} Gold${V.splint ? '' : ' (nichts zu schienen)'}</button></div>
+    <div class="ledger">Heilen dauert ein paar Herzschläge; geschiente Brüche heilen doppelt so schnell. Fehlende Glieder ersetzt nur die Prothesenmacherin.</div>`;
+  $('hl-heal').onclick = () => { const r = A.healerAct(npc, 'heal'); if (r) toast(r); else closeModal(); };
+  $('hl-splint').onclick = () => { const r = A.healerAct(npc, 'splint'); if (r) toast(r); else sfx('coin', 0.4, 0.6); healerUI(body, npc); };
+}
+// ---------------- Zauber lernen (GUI, 03.10.2026) ----------------
+// Fenster des Zauberlehrers: alle Formeln des Lehrers in Schulfarbe, Stufe, Mana, Preis; was fehlt, steht rot darunter; „Lehren“ ruft learnFrom.
+function learnUI(body, npc) {
+  const V = A.spellLearnView?.(npc); if (!V) return;
+  const SC = A.schools || {};
+  body.innerHTML = `<div class="ledger">${qa(V.title)}: „Welche Formel? Ein Zauber sitzt erst, wenn du ihn oft wirkst.“ · Gold ${V.gold} · Intelligenz ${V.int} · Beziehung ${V.rel}</div>
+    <div class="codex-list">${V.list.map((s, i) => `<div class="fx-row spell-row${s.have ? ' off' : ''}"><div><b style="color:${SC[s.school]?.col || '#e0c27a'}">${qa(s.name)}</b> · Stufe ${['', 'I', 'II', 'III'][s.tier] || s.tier} · ${s.mana} Mana
+      <div class="ledger">${qa(s.desc)}${s.have ? '' : s.lack.length ? `<br><span class="bad">Fehlt: ${qa(s.lack.join(', '))}</span>` : ''}</div></div>
+      ${s.have ? '<span class="ledger">✓ kannst du</span>' : `<button data-learn="${i}"${s.lack.length ? ' disabled' : ''}>${s.price} Gold</button>`}</div>`).join('')}</div>`;
+  body.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { const s = V.list[+b.dataset.learn]; if (A.learnFrom(npc, s.key)) { sfx('magic', 0.5, 0.7); toast(`${s.name} gelernt — im Zauberbuch (Taste Z) auf die Leiste legen.`, 3000); } learnUI(body, npc); });
+}
 // ---------------- Zauberbuch (S15 P4) ----------------
 // Reiter je Schule. Bekannte Zauber: Rang, Kosten, Wirkung, Übung bis zum nächsten Rang, „Auf Leiste“. Unbekannte: wo man sie lernt.
 let spellTab = 'fire';
@@ -400,7 +473,7 @@ export function renderContext(target) {
       h += `<div class="ctx-block"><div class="ctx-sub">Aufträge</div>` + q.map(([k, v]) => {
         const Q = QUESTS[k];
         const I = A.questInfo ? A.questInfo(k) : {};   // S13: Ziel, Entfernung, Frist/Angriff
-        return `<div class="ctx-line${I.tracked ? ' tracked' : ''}"><span>${I.tracked ? '◆ ' : ''}${Q.name}</span><b>${Q.objectives.map((o, i) => `${v.progress[i] || 0}/${o.count || 1}`).join(' ')}</b></div>`
+        return `<div class="ctx-line${I.tracked ? ' tracked' : ''}"><span>${I.tracked ? '◆ ' : ''}${Q.name}</span><b>${Q.objectives.map((o, i) => pips(v.progress[i] || 0, o.count || 1)).join(' ')}</b></div>`
           + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
@@ -420,7 +493,7 @@ export function renderContext(target) {
     const m = MONSTERS[target.mtype];
     box.innerHTML = `<div class="ctx-head">${target.title || (target.vname ? target.vname + ' ' : target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
       <div class="ctx-line"><span>Stufe</span><b>${target.level}</b></div>
-      ${bar('Leben', target.hp, target.maxHp, 'hp')}
+      ${bar('Leben', ...barOf(target), 'hp')}
       <div class="ctx-line"><span>Gefahr</span><b class="${m.threat >= 3 ? 'threat-high' : m.threat === 2 ? 'threat-med' : 'threat-low'}">${['','Gering','Mittel','Hoch','Tödlich'][m.threat]}</b></div>
       <div class="ctx-line"><span>Rüstung</span><b>${target.armor || 0}</b></div>
       <div class="ctx-line"><span>Fraktion</span><b>${FACTIONS[m.faction] ? FACTIONS[m.faction].name : 'Wild'}</b></div>`;
@@ -527,8 +600,10 @@ export const uiHooks = {};                                           /* Koop: Ge
 const DLG_K = [['leave', /^\[?(Gehen|Nicht jetzt|Abbrechen|Zurück|Lass|Später|Nein)/i], ['fight', /angreif|kämpf|herausforder|Duell|töte|stirb|Klinge/i],
   ['gold', /\d+\s*Gold|bezahl|besteche|Bestechung|zahle/i], ['quest', /Was liegt an|Erledigt\.|Ich mache es|Auftrag|Abgeben/], ['trade', /Handel|Waren|Zeig mir|kaufen|verkaufen/i], ['ask', /\?/]];
 let dlgTyper = 0;
-export function dialogue(npc, text, choices) {
+export function dialogue(npc, text, choices, opt = null) {   /* opt.brief: Auftragsbrief (Q-3) unter dem Text */
   if (uiHooks.dialogue?.(npc, text, choices)) return;
+  { let bx = $('dlg-brief'); if (!bx) { bx = el('div', 'dlg-brief'); bx.id = 'dlg-brief'; $('dlg-text').after(bx); }
+    bx.innerHTML = opt?.brief ? briefHTML(opt.brief) : ''; bx.classList.toggle('hidden', !opt?.brief); if (opt?.brief) paintBrief(bx); }
   const box = $('dialogue'), opening = box.classList.contains('hidden') || dlgWith !== npc;
   box.classList.remove('hidden'); dlgWith = npc;
   const story = !!A.dlgStory?.(npc, choices);
@@ -650,6 +725,113 @@ function paintWarn() {
   c.innerHTML = `<i></i><span></span>${L.length > 1 ? `<b>+${L.length - 1}</b>` : ''}`; c.querySelector('span').textContent = w.text;
   c.title = L.map(x => '• ' + x.text).join('\n') + `\nKlick: ${{ settlement: 'Siedlung', quests: 'Aufträge', party: 'Gruppe' }[w.open] || 'öffnen'}`;
 }
+// ---------------- Aufträge sichtbar (visual/quests.md Q-1, Entscheidungen 02.10.2026) ----------------
+// Fortschritt als Kerben statt „2/3“ (die Zahl steht im Tooltip); ab 9 Zielen ein Balken.
+export function pips(h, n) {
+  n = Math.max(1, n | 0); h = Math.max(0, Math.min(h | 0, n)); const t = `${h}/${n}`;
+  return n <= 8 ? `<span class="pips${h >= n ? ' full' : ''}" title="${t}">${'<i class="on"></i>'.repeat(h)}${'<i></i>'.repeat(n - h)}</span>`
+    : `<span class="pips bar${h >= n ? ' full' : ''}" title="${t}"><u style="width:${Math.round(h / n * 100)}%"></u></span>`;
+}
+// Q-3 (quests.md Q2-1, Q8-1/4; Entscheidung 02.10.2026): Auftragsbrief — Ziel-Piktogramme (Gegnerbild, Gegenstand, Auge für Suche, Zeichen der Auftragsart)
+// und Lohn. nums = false: nur die Lohnart als Symbol, die Zahl im Tooltip (feste Aufträge vor der Annahme); Ruf als Wappen + Richtung.
+function objIco(o) {
+  if (o.t === 'kill') return MONSTERS[o.mt] ? `<canvas class="br-mon" data-mt="${o.mt}" width="36" height="36"></canvas>` : icoImg('log_death', 2, 'br-ico');
+  if (o.t === 'item') return ITEMS[o.key] ? `<canvas class="br-itm" data-ico="${o.key}"></canvas>` : icoImg('log_economy', 2, 'br-ico');
+  if (o.t === 'find') return '<i class="br-eye"></i>';
+  return icoImg(o.ico || 'log_quest', 2, 'br-ico');
+}
+const qa = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+export function rewardHTML(R, nums) {
+  if (!R) return ''; const out = [], sg = v => (v > 0 ? '+' : '') + v;
+  if (R.gold) out.push(`<span class="rw" title="Gold: ${R.gold}">${icoImg('res_gold', 2, 'rw-i')}${nums ? `<b>${R.gold}</b>` : ''}</span>`);
+  if (R.xp) out.push(`<span class="rw" title="Erfahrung: ${R.xp}">${icoImg('bar_xp', 2, 'rw-i')}${nums ? `<b>${R.xp}</b>` : ''}</span>`);
+  for (const k of R.items || []) out.push(`<span class="rw" title="Gegenstand: ${qa(ITEMS[k]?.name || k)}">${nums ? `<canvas class="rw-itm" data-ico="${k}"></canvas>` : icoImg('log_economy', 2, 'rw-i')}</span>`);
+  for (const [f, v] of R.rep || []) { const F = FACTIONS[f]; out.push(`<span class="rw ${v >= 0 ? 'up' : 'dn'}" title="${qa(F?.name || f)}: ${sg(v)} Ansehen"><i class="rw-ban" style="background:${F?.colors?.[0] || '#555'};border-color:${F?.colors?.[1] || '#999'}"></i><em>${v >= 0 ? '▲' : '▼'}</em>${nums ? `<b>${sg(v)}</b>` : ''}</span>`); }
+  for (const [who, v] of R.rel || []) out.push(`<span class="rw ${v >= 0 ? 'up' : 'dn'}" title="Beziehung zu ${qa(who)}: ${sg(v)}">${icoImg('bar_hp', 2, 'rw-i')}<em>${v >= 0 ? '▲' : '▼'}</em>${nums ? `<b>${sg(v)}</b>` : ''}</span>`);
+  if (R.unlock) out.push(`<span class="rw" title="Ausbildung: ${qa(R.unlock)}">${icoImg('nav_codex', 2, 'rw-i')}</span>`);
+  if (R.promote) out.push(`<span class="rw" title="Beförderung: ${qa(R.promote)}">${icoImg('set_level', 2, 'rw-i')}</span>`);
+  if (R.share != null) out.push(`<span class="rw" title="Dein Anteil an der Arbeit: ${Math.round((R.work || 0) * 100)} % — der Lohn ist auf ${Math.round(R.share * 100)} % gekürzt. Wer die Wachen kämpfen lässt, bekommt weniger."><i class="rw-pie" style="--p:${Math.round(R.share * 100)}%"></i></span>`);
+  return out.join('');
+}
+function briefHTML(B) {
+  const objs = (B.objs || []).map(o => `<span class="br-obj" title="${qa(o.text || '')}">${objIco(o)}${o.n > 1 ? `<b>×${o.n}</b>` : ''}</span>`).join('');
+  return `<div class="br-objs">${objs}</div>${B.days ? `<span class="br-days" title="Frist: ${B.days} Tage ab Annahme">${icoImg('time', 2, 'rw-i')}<b>${B.days}</b></span>` : ''}<div class="br-rew" title="${B.nums ? 'Lohn' : 'Lohn — die Maus zeigt, wie viel'}">${rewardHTML(B.rew, B.nums)}</div>`;
+}
+function paintBrief(root) { paintIcons(root); root.querySelectorAll('canvas[data-mt]').forEach(c => drawMonsterTo(c, c.dataset.mt)); }
+// Brief mit Siegel (Q7-1, Q9-1): erfüllt = Stempel, gescheitert = der Brief reißt, das Siegel bricht schwarz. Oben Mitte im Spielfeld, einer nach
+// dem anderen. Ausgelöst vom Zustandswechsel des Auftrags (aktiv → erledigt/gescheitert) — gleich wo im Spiel er passiert, im Einzelspiel wie beim
+// Koop-Gast (dessen S.quests kommt vom Host): genau ein Brief je Wechsel. Neuer Held (Erbe) oder Proben (S._quiet): nur still neu merken.
+let qSnap = null, qSnapP = null, letterQ = [], letterT = 0;
+export let letterCount = 0;                                       /* Proben: ausgelöste Briefe */
+export function questSnap() { qSnap = new Map(Object.entries(S.quests || {}).map(([k, v]) => [k, v?.state])); qSnapP = S.player; }
+export function questWatch() {
+  if (!qSnap || qSnapP !== S.player || !S.player) return questSnap();   /* unter S._quiet zählt questLetter nur (keine Anzeige) */
+  for (const [k, v] of Object.entries(S.quests || {})) { const o = qSnap.get(k);
+    if (o === 'active' && (v?.state === 'done' || v?.state === 'failed')) questLetter(v.state, k, v.state === 'done' ? { rew: `<div class="ql-rew">${rewardHTML(A.questReward?.(k), true)}</div>` } : {});
+    else if (o !== 'active' && v?.state === 'active') questLetter('accept', k);   /* Q2-2: Annahme = Brief mit Stempel, fliegt zum Reiter */ }
+  questSnap();
+}
+export function questLetter(kind, k, o = {}) {
+  letterCount++; if (S._quiet) return;
+  letterQ.push({ kind, k, name: o.name || QUESTS[k]?.name || String(k), ...o }); if (!$('qletter')?.classList.contains('on')) letterNext();
+}
+function letterNext() {
+  const L = letterQ.shift(), vp = $('viewport'); if (!L || !vp) return;
+  let d = $('qletter'); if (!d) { d = el('div', ''); d.id = 'qletter'; d.onclick = () => letterEnd(); vp.appendChild(d); }
+  const word = { done: 'Erfüllt', failed: 'Gescheitert', accept: 'Angenommen' }[L.kind] || '';
+  const paper = `<div class="ql-paper"><div class="ql-head">Auftrag</div><div class="ql-title"></div>${L.rew || ''}</div>`;
+  d.className = 'ql-' + L.kind; document.body.classList.toggle('nomotion', S.settings?.motion === false);
+  d.innerHTML = (L.kind === 'failed' ? `<div class="ql-half l">${paper}</div><div class="ql-half r">${paper}</div>` : paper) + `<div class="ql-seal"><b>${word}</b></div>`;
+  d.querySelectorAll('.ql-title').forEach(t => { t.textContent = L.name; }); paintBrief(d);
+  d.title = (L.kind === 'failed' ? 'Auftrag gescheitert' : L.kind === 'done' ? 'Auftrag erfüllt' : 'Auftrag angenommen') + ' — Klick: weg. Alles steht im Protokoll und im Auftragsbuch (J).';
+  void d.offsetWidth; d.classList.add('on');
+  sfx(L.kind === 'failed' ? 'crack' : L.kind === 'done' ? 'bell' : 'ui', 0, L.kind === 'done' ? 0.35 : 0.5);
+  clearTimeout(letterT); letterT = setTimeout(L.kind === 'accept' ? letterFly : letterEnd, L.kind === 'failed' ? 2700 : L.kind === 'accept' ? 1500 : 2600);
+}
+function letterFly() {                                           /* Q2-2: der angenommene Brief fliegt zum Reiter „Aufträge“, der kurz aufleuchtet */
+  const d = $('qletter'), b = navBtn('quest'), pp = d?.querySelector('.ql-paper'); if (!d || !b || !pp || S.settings?.motion === false || !pp.animate) return letterEnd();
+  const a = pp.getBoundingClientRect(), z = b.getBoundingClientRect(), an = d.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.round(z.left + z.width / 2 - (a.left + a.width / 2))}px),${Math.round(z.top - a.top)}px) scale(.12)`, opacity: .2 }], { duration: 620, easing: 'cubic-bezier(.5,0,.8,.5)' });
+  an.onfinish = () => { d.classList.remove('on'); an.cancel(); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); trackerFlash(); clearTimeout(letterT); letterT = setTimeout(letterNext, 200); };
+}
+function letterEnd() { const d = $('qletter'); if (!d) return; clearTimeout(letterT); d.classList.remove('on'); letterT = setTimeout(letterNext, 320); }
+// Goldzähler in der Kopfleiste zählt hoch (Q8-5); weniger Gold springt sofort. Ohne Bildtakt (verdecktes Fenster): Endstand nach 0,9 s.
+let goldShown = null, goldTo = 0, goldFrom = 0, goldT0 = 0, goldRaf = 0;
+function goldShow(v) {
+  const g = $('clock-gold'); if (!g) return;
+  const fin = () => { cancelAnimationFrame(goldRaf); goldRaf = 0; goldShown = v; g.textContent = String(v); g.classList.remove('up'); };
+  if (goldShown === null || v <= goldShown || S.settings?.motion === false) { if (goldShown !== v || goldRaf) fin(); return; }
+  if (goldRaf && goldTo === v) { if (performance.now() - goldT0 > 900) fin(); return; }
+  goldFrom = goldShown; goldTo = v; goldT0 = performance.now(); g.classList.add('up');
+  const step = now => { const k = Math.min(1, (now - goldT0) / 600); goldShown = Math.round(goldFrom + (goldTo - goldFrom) * (1 - Math.pow(1 - k, 3))); g.textContent = String(goldShown); if (k < 1) goldRaf = requestAnimationFrame(step); else fin(); };
+  cancelAnimationFrame(goldRaf); goldRaf = requestAnimationFrame(step);
+}
+// ---------------- Auftrags-Tracker (Visuell Q-4, Entscheidung 02.10.2026) ----------------
+// Oben rechts im Spielfeld (unter der Minikarte): verfolgter Auftrag groß — Ziel-Bild, Kerben, Richtungspfeil + Entfernung, Frist-Sanduhr bzw.
+// Zeit bis zum Angriff; bis zu 3 weitere klein (Klick = verfolgen). Im Kampf klappt er auf Siegel + Kerben ein. Klick auf den großen: Auftragsbuch.
+// Neu gebaut wird nur, wenn sich Inhalt ändert (Signatur); Pfeil, Entfernung, Sanduhr und Angriffszeit werden je Takt nur gesetzt.
+let trkSig = '';
+function paintTracker() {
+  const vp = $('viewport'); if (!vp) return;
+  let t = $('trk');
+  if (!t) { t = el('div', 'trk hidden'); t.id = 'trk'; vp.appendChild(t);
+    t.onclick = e => { const r = e.target.closest('[data-k]'); if (!r) return; if (r.classList.contains('tk-main')) openModal('quests'); else { A.trackQuest?.(r.dataset.k); trkSig = ''; paintTracker(); } }; }
+  const I = A.tracker?.();
+  if (!I?.list?.length || S.cine) { if (!t.classList.contains('hidden')) { t.classList.add('hidden'); trkSig = ''; } return; }
+  const mm = $('minimap'); t.style.top = mm && mm.style.display !== 'none' ? (mm.offsetTop + mm.offsetHeight + 8) + 'px' : '';
+  const sig = [I.fight ? 1 : 0, ...I.list.map(o => [o.k, o.name, o.objs.join(';'), o.late ? 1 : 0, o.attack ? 1 : 0, o.frac != null ? 1 : 0, o.ico ? JSON.stringify(o.ico) : ''].join('|'))].join('#');
+  if (sig !== trkSig) { trkSig = sig; t.classList.remove('hidden'); t.classList.toggle('fight', !!I.fight);
+    t.innerHTML = I.list.map(o => o.big ? `<div class="tk-main" data-k="${o.k}" title="Verfolgter Auftrag — Klick öffnet das Auftragsbuch (J). Im Kampf klappt er ein.">
+      <div class="tk-r1"><i class="tk-seal"></i><span class="tk-name"></span><span class="tk-dir hidden"><i class="tk-arrow"></i><b class="tk-d"></b></span></div>
+      <div class="tk-r2">${o.ico ? objIco(o.ico) : ''}${o.objs.map(([h, n]) => pips(h, n)).join('')}${o.frac != null ? `<span class="tk-time${o.late ? ' late' : ''}" title="${o.late ? 'Die Frist endet heute.' : 'Frist: so viel Zeit bleibt noch.'}"><i class="tk-glass"></i></span>` : ''}${o.attack ? `<span class="tk-att">${icoImg('log_combat', 1, 'tk-i')}<b></b></span>` : ''}</div></div>`
+      : `<div class="tk-small" data-k="${o.k}" title="Klick: diesen Auftrag verfolgen"><i class="tk-seal s"></i><span class="tk-name"></span>${o.objs.map(([h, n]) => pips(h, n)).join('')}</div>`).join('');
+    [...t.querySelectorAll('[data-k]')].forEach((r, i) => { r.querySelector('.tk-name').textContent = I.list[i].name; }); paintBrief(t); }
+  const B = I.list[0]; if (!B?.big) return;
+  const ar = t.querySelector('.tk-dir'); if (ar) { const has = B.ang != null; ar.classList.toggle('hidden', !has);
+    if (has) { ar.firstChild.style.transform = `rotate(${B.ang.toFixed(2)}rad)`; ar.lastChild.textContent = B.d > 999 ? (B.d / 1000).toFixed(1) + ' km' : Math.round(B.d) + ' m'; ar.title = B.where || ''; } }
+  const g = t.querySelector('.tk-glass'); if (g) g.style.setProperty('--f', (B.frac ?? 0).toFixed(2));
+  const at = t.querySelector('.tk-att'); if (at && B.attack) { at.lastChild.textContent = B.attack.replace(/^Angriff in /, ''); at.title = B.attack; }
+}
+function trackerFlash() { const t = $('trk'); if (!t || S.settings?.motion === false) return; t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash'); }
 export function setPrompt(text) {
   const p = $('prompt');
   if (!text) { p.classList.add('hidden'); return; }
@@ -660,11 +842,13 @@ export function setPrompt(text) {
 export let modalOpen = null;
 // Fenster neu zeichnen, ohne es umzuschalten (openModal schließt bei gleichem Namen).
 export function refreshModal(arg) { const n = modalOpen; if (!n) return; modalOpen = null; openModal(n, arg); }
+const DOCKED = new Set(['trade', 'settlement', 'business', 'party', 'craft', 'smith', 'travel']);
 function leaveWin(next) {                                     /* P6/P7: Fenster verlassen — Inventar-Takt stoppen, Kontor-Besuch beenden, Dock lösen */
   if (modalOpen === 'inventory' && next !== 'inventory') { clearInterval(invTimer); figPrev = null; DRAG = null; }
   if (modalOpen === 'trade' && next !== 'trade') { A.tradeEnd?.(trNpc); trNpc = null; TRD = null; }
   if (next === 'inventory') { const b = navBtn('inv'); if (b) { b.classList.remove('badge'); b.title = 'Gepäck (I)'; } }   /* Aufnahme-Stapel: Punkt bis das Gepäck offen war */
-  $('modal')?.classList.toggle('dock', next === 'trade');
+  $('modal')?.classList.toggle('dock', DOCKED.has(next)); if ($('modal')) $('modal').dataset.win = next || '';   /* UI-Scheibe 3: Handel, Siedlung, Gruppe, Handwerk angedockt — die Welt bleibt sichtbar */
+  $('modal')?.classList.toggle('parch', ['codex', 'chronicle', 'quests'].includes(next));   /* UI-Scheibe 5: Pergament nur für die Lesefenster */
   document.body.classList.toggle('nomotion', S.settings?.motion === false);   /* „Reduzierte Bewegung“: kein Glanz, kein Pulsieren */
 }
 export function closeModal() { leaveWin(null); $('modal').classList.add('hidden'); modalOpen = null; [...$('nav').children].forEach(b => b.classList.remove('active')); S.paused = false; }
@@ -680,7 +864,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -836,7 +1020,9 @@ function invPaint(force = false) {
     paintCell(c, s, { dim: !!s && invFilter !== 'all' && catOf(ITEMS[s.key]) !== invFilter, sel: !!s && invSel?.src === 'inv' && invSel.o === s, cmp: s ? cmpArrow(s) : '' }); });
   const cnt = $('inv-cnt'); if (cnt) { const k = p.inv.length / Math.max(1, p.invCap); cnt.innerHTML = `${icoTag('nav_inv', 1)} <b>${p.inv.length}/${p.invCap}</b><i class="bagbar"><u style="width:${Math.round(k * 100)}%" class="${k >= 1 ? 'full' : k > .8 ? 'high' : ''}"></u></i>`; }
   const sg = $('sg');
-  if (sg) { if (sg.childElementCount !== 24) { sg.innerHTML = ''; for (let i = 0; i < 24; i++) sg.appendChild(stashCell(i)); }
+  const here = A.stashHere ? A.stashHere() : true; if (sg) sg.classList.toggle('stash-far', !here); if (sg) sg.title = here ? '' : 'Das Lager liegt in deiner Siedlung — dort kannst du ein- und auslagern.';
+  const nS = Math.max(24, Math.ceil((S.stash.length + 1) / 6) * 6);   /* D-7: das Lager zeigt alle Teile (vorher fest 24 Felder, der Rest war unsichtbar) */
+  if (sg) { if (sg.childElementCount !== nS) { sg.innerHTML = ''; for (let i = 0; i < nS; i++) sg.appendChild(stashCell(i)); }
     [...sg.children].forEach((c, i) => paintCell(c, S.stash[i] || null, { sel: !!S.stash[i] && invSel?.src === 'stash' && invSel.o === S.stash[i] })); }
   for (const [k, label] of DOLL) { const d = dollEl(k); if (!d) continue; const s = p.equip?.[k];
     paintCell(d, s || null, { sel: invSel?.src === 'eq' && invSel.k === k, cls: s && s.cond != null && s.cond < .5 ? 'worn' : '', empty: `${DOLL_ICO[k] ? icoTag(DOLL_ICO[k], 2, 'ghost-ico') : ''}<span class="dlab">${label}</span>` }); }
@@ -1064,9 +1250,9 @@ function charUI(body, who) {
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
     leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
-    hunting: 'Noch ohne Wirkung — bekommt sie mit „Jagd und Wildnis“ (Fährten, Fallen, Häuten).',
+    hunting: 'Steigt beim Erlegen von Tieren. Mehr Felle, Fleisch und Knochen (bis +60 %); Tiere bemerken dich später (bis 40 % kürzere Sicht).',
     crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
-    stealth: 'Hilft beim Hineinschleichen und Stehlen. Wächst noch nicht durch Übung — das kommt mit dem Schleich-System.' };
+    stealth: 'Schleichen (Taste V): Gegner bemerken dich später (bis nur noch 30 % ihrer Sicht). Wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst. Hilft auch beim Hineinschleichen und Stehlen.' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
@@ -1221,7 +1407,8 @@ function drawTreeLines(branchEl, p) {
     }
   });
 }
-function skillUI(body) {
+function skillUI(body) { SKY.skyUI(body, A, { refresh: refreshModal }); }   /* Scheibe 2: Sternenhimmel statt Spaltenraster (das alte Raster bleibt als skillUIOld) */
+function skillUIOld(body) {
   const p = S.player, pts = p.skillPoints || 0;
   const col = b => {
     const N = Object.entries(SKILL_TREE).filter(([, n]) => n.branch === b), rows = Math.max(...N.map(([, n]) => n.row)) + 1, B_ = SKILL_BRANCHES[b];
@@ -1644,19 +1831,169 @@ function trSell(objs, n, ok = false) {
   trPaint();
 }
 
+// UI-Scheibe 5 + quests.md Q11 (Entscheidung 01.10.: Pergament für das Auftragsbuch): Doppelseite — links die Liste mit Siegeln (offen, bereit
+// zur Abgabe, erfüllt, zerrissen), rechts der Brief des gewählten Auftrags: Geber mit Bild (Bewohner auf „Sehr schwer“ ohne), Ziel-Piktogramme mit
+// Kerben, Ort, Frist, Lohn (feste Aufträge vor dem Abschluss nur als Symbol). Ordnen nach Stand oder Entfernung (nur Anzeige).
+// ---- Handwerk als Dock (UI-Scheibe 3, ui_redesign §5 „Handwerk“) ----
+// Rezeptkarten statt Gesprächszeilen: Bild des Ergebnisses, Material als Piktogramm + Zahl (rot, wenn es fehlt), Schloss bei zu niedriger Fertigkeit.
+// Rechts die Bildkarte des Ergebnisses, die Güte-Chancen als Balken (exakt aus der Regel des Spiels), Herstellen / mit Königseisen / Ausbessern.
+let crSel = null, crArg = null;
+const RES_ICO = { wood: 'res_wood', stone: 'res_stone', iron: 'res_iron', herb: 'res_herb', food: 'res_food' };
+function matPic(m) {
+  const nm = ITEMS[m.key]?.name || RES_NAME[m.key] || m.key, ic = RES_ICO[m.key] ? icoImg(RES_ICO[m.key], 1, 'ico') : `<canvas class="cr-mi" data-ico="${m.key}"></canvas>`;
+  return `<span class="bcost${m.have < m.n ? ' miss' : ''}" title="${qa(nm)}: ${m.n} nötig, ${Math.floor(m.have)} vorhanden">${ic}${m.n}</span>`;
+}
+function craftUI(body, arg) {
+  if (arg) crArg = arg; if (!crArg) return; const V = A.craftView?.(crArg.st); if (!V) return;
+  $('modal-title').textContent = V.name; body.className = 'cr-body';
+  if (!V.list.some(r => r.key === crSel)) crSel = (V.list.find(r => r.ok) || V.list[0])?.key || null;
+  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}</div>
+    <div class="cr-cols"><div><div class="cr-grid">${V.list.map(r => `<button class="cr-card${r.ok ? '' : ' cant'}${r.key === crSel ? ' sel' : ''}" data-k="${r.key}"><canvas class="cr-ic" data-ico="${r.key}"></canvas><span class="cr-n"></span>${r.n > 1 ? `<b class="cr-x">×${r.n}</b>` : ''}<span class="cr-need">${r.need.map(matPic).join('')}</span>${r.min && V.skill < r.min ? `<span class="cr-lock" title="Braucht ${qa(V.skillName)} ${r.min}">${LOCK_SVG}${r.min}</span>` : ''}</button>`).join('') || '<div class="ledger">Hier lässt sich nichts herstellen.</div>'}</div>
+      <div class="ledger cr-hint">Klick: ansehen · Doppelklick: herstellen. Rote Zahl = Material fehlt, Schloss = Fertigkeit zu niedrig.</div></div>
+      <div class="cr-detail" id="cr-det"></div></div>`;
+  body.querySelectorAll('.cr-card').forEach(b => { const r = V.list.find(x => x.key === b.dataset.k); b.querySelector('.cr-n').textContent = ITEMS[r.key].name;
+    b.onclick = () => { crSel = r.key; craftUI(body); }; b.ondblclick = () => crDo(body, r, false); });
+  if ($('cr-mend')) $('cr-mend').onclick = () => { const t = crArg.t; closeModal(); A.craftMend?.(t); };
+  const r = V.list.find(x => x.key === crSel), d = $('cr-det');
+  if (r) { const bar = (ch, lab) => `<div class="cr-q" title="${lab}: ${V.quals.map((q, i) => `${q} ${Math.round(ch[i] * 100)} %`).filter((_, i) => ch[i] > 0.004).join(' · ')}"><small>${lab}</small><div class="cr-qbar">${ch.map((c, i) => c > 0.004 ? `<i class="q${i}" style="width:${(c * 100).toFixed(1)}%">${c > 0.14 ? V.quals[i] : ''}</i>` : '').join('')}</div></div>`;
+    d.innerHTML = itemCardHTML({ key: r.key }, { short: true }) + `<div class="cr-needl">${r.need.map(matPic).join('')}</div>` + bar(V.chances, 'Erwartete Güte')
+      + (V.ke ? bar(V.chancesKE, 'Mit Königseisen') : '')
+      + `<div class="tr-box"><button id="cr-do" class="big"${r.ok ? '' : ' disabled'}>${r.ok ? 'Herstellen' : r.min && V.skill < r.min ? `Braucht ${qa(V.skillName)} ${r.min}` : 'Material fehlt'}</button>${V.ke ? `<button id="cr-ke"${r.ok ? '' : ' disabled'}>Mit Königseisen (eine Güte höher)</button>` : ''}</div>`;
+    $('cr-do').onclick = () => crDo(body, r, false); if ($('cr-ke')) $('cr-ke').onclick = () => crDo(body, r, true); }
+  else d.innerHTML = '';
+  paintIcons(body);
+}
+function crDo(body, r, ke) {
+  const before = S.player.inv.length; A.craftDo?.(r.key, ke); craftUI(body);
+  const c = body.querySelector(`.cr-card[data-k="${r.key}"]`); if (c && S.settings?.motion !== false) { c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); }
+  if (S.player.inv.length !== before) sfx('metal', 0.3, 0.3);
+}
+// ---- Betriebe (Reiter unter Siedlung, Entwickler 02.10.2026) ----
+// Links die eigenen Betriebe als Karten mit dem Bild ihres Hauses und der Kasse; rechts der gewählte: Haus groß, Ertrag gestern und im Schnitt,
+// Arbeiter (Stadt + angeworben), Vorprodukte und Ware mit dem Vorrat der Stadt, Stufe, Kasse mit „Abholen“ (nur vor Ort).
+let bzSel = null;
+function houseTo(cv, h) {
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.fillStyle = '#14110d'; c.fillRect(0, 0, cv.width, cv.height);
+  let im = null; try { im = h && A.houseSprite?.(h, false); } catch (e) { im = null; }
+  if (!im) { c.fillStyle = '#3b3227'; c.fillRect(cv.width / 2 - 14, cv.height / 2 - 6, 28, 18); c.beginPath(); c.moveTo(cv.width / 2 - 18, cv.height / 2 - 6); c.lineTo(cv.width / 2, cv.height / 2 - 20); c.lineTo(cv.width / 2 + 18, cv.height / 2 - 6); c.fill(); return; }
+  const k = Math.min((cv.width - 4) / im.width, (cv.height - 4) / im.height); c.drawImage(im, Math.round((cv.width - im.width * k) / 2), Math.round(cv.height - 2 - im.height * k), Math.round(im.width * k), Math.round(im.height * k));
+}
+const goodPic = (x, extra) => `<span class="bz-g" title="${qa(ITEMS[x.g]?.name || x.g)}: ${extra}"><canvas data-ico="${x.g}"></canvas><b>${x.n}</b><small>${x.stock}</small></span>`;
+function bizUI(body) {
+  const L = A.bizView?.() || []; body.className = 'bz-body';
+  if (!L.length) { body.innerHTML = `<div class="ledger">Dir gehört noch kein Betrieb. Im Handelskontor einer Stadt (beim Markthändler: „Handelskontor … Betriebe“) kannst du Werkstätten, Höfe und Webereien kaufen. Der Gewinn sammelt sich dann hier in ihrer Kasse.</div>`; return; }
+  if (!L.some(b => b.id === bzSel)) bzSel = L[0].id;
+  const sum = L.reduce((n, b) => n + b.kasse, 0);
+  body.innerHTML = `<div class="bz-top">${icoImg('res_gold', 1, 'ico')} In allen Kassen <b>${sum}</b> Gold</div><div class="bz"><div class="bz-list">${L.map(b => `<button class="bz-card${b.id === bzSel ? ' sel' : ''}${b.lost ? ' lost' : ''}" data-b="${b.id}"><canvas class="bz-pic" width="96" height="64"></canvas><span class="bz-n"></span><span class="bz-k">${icoImg('res_gold', 1, 'ico')}${b.kasse}</span></button>`).join('')}</div><div class="bz-det" id="bz-det"></div></div>`;
+  body.querySelectorAll('.bz-card').forEach((c, i) => { const b = L[i]; c.querySelector('.bz-n').textContent = b.name; houseTo(c.querySelector('canvas'), b.house); c.onclick = () => { bzSel = b.id; bizUI(body); }; });
+  const b = L.find(x => x.id === bzSel), d = $('bz-det'), sg = v => v == null ? '—' : (v > 0 ? '+' : '') + v;
+  d.innerHTML = `<canvas class="bz-big" width="240" height="150"></canvas><h3 class="bz-h"></h3><div class="ledger bz-sub">${qa(b.trade)} · ${qa(b.town)} · Stufe ${b.level}${b.lost ? ' · <span class="bad">die Stadt ist verloren</span>' : ''}</div>
+    <div class="statline" title="Dein Anteil (gut ein Drittel des Warenwerts) abzüglich Lohn der Angeworbenen"><span>Ertrag gestern</span><b class="${(b.last || 0) < 0 ? 'bad' : ''}">${sg(b.last)} Gold</b></div>
+    <div class="statline" title="Schnitt über ${b.days} Tag(e), seit der Betrieb dir gehört"><span>Schnitt je Tag</span><b>${sg(b.avg)} Gold</b></div>
+    <div class="statline" title="Bewohner, die in diesem Gewerbe arbeiten, und von dir angeworbene Hände (je 3 Gold Lohn am Tag)"><span>Arbeiter</span><b>${b.folk} aus der Stadt · ${b.hired} angeworben</b></div>
+    <div class="statline" title="Warenwert, den der Betrieb gestern gemacht hat"><span>Ware gestern</span><b>${b.made} Gold</b></div>
+    ${b.inp.length ? `<div class="bz-row"><small>Vorprodukte je Arbeiter</small>${b.inp.map(x => goodPic(x, `${x.n} je Arbeiter und Tag · Vorrat der Stadt ${x.stock}`)).join('')}</div>` : ''}
+    <div class="bz-row"><small>Ware je Arbeiter</small>${b.out.map(x => goodPic(x, `${x.n} je Arbeiter und Tag · Vorrat der Stadt ${x.stock}`)).join('') || '<span class="ledger">—</span>'}</div>
+    <div class="bz-kasse"><span>${icoImg('res_gold', 2, 'gold-ico')}<b>${b.kasse}</b> Gold in der Kasse</span><button id="bz-take" class="big"${b.here && b.kasse > 0 ? '' : ' disabled'} title="${b.here ? 'In die eigene Tasche' : 'Nur vor Ort — in ' + qa(b.town)}">${b.here ? 'Abholen' : 'Nur vor Ort'}</button></div>
+    <div class="ledger bz-hint">Der Gewinn sammelt sich jeden Tag in der Kasse. Abholen kannst du ihn in ${qa(b.town)} — hier oder im Handelskontor. Fällt die Stadt an die Toten oder wird zerstört, ist die Kasse verloren.</div>`;
+  d.querySelector('.bz-h').textContent = b.name; houseTo(d.querySelector('.bz-big'), b.house); paintIcons(d);
+  $('bz-take').onclick = () => { const g0 = S.gold, r = A.bizCollect?.(b.id); if (r) toast(r); else sfx('coin', Math.min(1, (S.gold - g0) / 250), 0.8); bizUI(body); refreshHUD(); };
+}
+// ---- Schmiede als Dock (Entwickler 02.10.2026) ----
+// Links alle abgenutzten Teile (angelegte zuerst) mit Zustandsbalken, Klick wählt ab/an (alle sind gewählt); rechts Auswahl, Preis nach der alten
+// Regel des Schmieds, „Ausbessern“. Dazu: Waren des Schmieds (Handels-Dock) und — steht eine Esse oder ein Amboss nahe — selbst schmieden.
+let smNpc = null, smOff = new Set();
+function smithUI(body, npc) {
+  if (npc && npc !== smNpc) { smNpc = npc; smOff = new Set(); } npc = smNpc; if (!npc) return;
+  body.className = 'tr-body sm-body'; $('modal-title').textContent = 'Schmiede';
+  const L = A.smithItems?.() || [], sel = L.filter(x => !smOff.has(x.o)), cost = A.smithPrice?.(sel.map(x => x.o)) || 0, forge = A.smithForge?.(npc);
+  body.innerHTML = `<div class="tr"><div class="tr-head"><canvas id="tr-por" width="56" height="56"></canvas><div class="tr-who"><div class="tr-name"></div><div class="tr-prof">${icoImg('nav_build', 1, 'kpi-ico')} ${qa(npc.prof || 'Schmied')}</div></div>
+      <div class="tr-gold" title="Dein Gold">${icoImg('res_gold', 2, 'gold-ico')}<b>${S.gold}</b></div></div>
+    <div class="sm-tabs">${npc.shop ? '<button id="sm-shop" class="mini">Waren ansehen</button>' : ''}${forge ? '<button id="sm-forge" class="mini" title="Selbst schmieden an der Esse nebenan (Rezeptkarten)">An der Esse selbst schmieden</button>' : ''}</div>
+    <div class="tr-cols"><div class="tr-main"><div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Ausbessern</div>
+      <div class="sm-grid" id="sm-grid">${L.length ? '' : '<div class="ledger">„Nichts davon braucht mich.“ — alles ist heil.</div>'}</div></div>
+      <div class="tr-deal" id="sm-deal"></div></div></div>`;
+  body.querySelector('.tr-name').textContent = npc.name; drawPortraitTo($('tr-por'), npc);
+  const g = $('sm-grid');
+  for (const x of L) { const c = el('div', 'cell'); c.dataset.card = '1'; c._card = () => itemCardHTML(x.o, { short: true, equipped: !!x.eq }); g.appendChild(c);
+    paintCell(c, x.o, { mk: !smOff.has(x.o), tag: x.eq ? '<span class="sm-eq" title="angelegt">●</span>' : '' });
+    c.onclick = () => { if (smOff.has(x.o)) smOff.delete(x.o); else smOff.add(x.o); smithUI(body); }; }
+  $('sm-deal').innerHTML = L.length ? `<div class="ledger">${sel.length} von ${L.length} Stücken gewählt. Klick auf ein Teil wählt es ab oder wieder an.</div>
+      <div class="tr-box"><div class="tr-sum">${icoImg('res_gold', 1, 'kpi-ico')} Preis <b class="tot">${cost}</b> Gold${S.gold < cost ? ' · <span class="bad">zu wenig Gold</span>' : ''}</div>
+      <button id="sm-do" class="big"${sel.length && S.gold >= cost ? '' : ' disabled'}>Ausbessern${sel.length ? ` (${sel.length})` : ''}</button>
+      <button id="sm-all" class="mini">${smOff.size ? 'Alle wählen' : 'Keins wählen'}</button></div>
+      <div class="ledger tr-help">Der Schmied macht jedes Stück wieder ganz (100 %). Preis: der Schaden am Stück mal halber Wert, zusammen mindestens 5 Gold. Selbst ausbessern geht an Esse, Amboss oder Werkbank nur bis 80 %.</div>` : '';
+  if ($('sm-do')) $('sm-do').onclick = () => { const g0 = S.gold, r = A.smithRepair?.(npc, sel.map(x => x.o)); if (r) { toast(r); return; } sfx('metal', 0.5, 0.5); sfx('coin', Math.min(1, (g0 - S.gold) / 250), 0.6); A.shopBark?.(npc, 'buy'); smOff = new Set(); smithUI(body); };
+  if ($('sm-all')) $('sm-all').onclick = () => { smOff = smOff.size ? new Set() : new Set(L.map(x => x.o)); smithUI(body); };
+  if ($('sm-shop')) $('sm-shop').onclick = () => openModal('trade', npc);
+  if ($('sm-forge')) $('sm-forge').onclick = () => { closeModal(); A.openForge?.(forge); };
+  /* Verbessern und Schmieden lassen (03.10.2026) */
+  const U = A.smithUpgList?.(npc) || [], O = A.smithOrders?.() || [], main = body.querySelector('.tr-main');
+  const sec = document.createElement('div'); sec.innerHTML = `<div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Verbessern <span class="ledger">— eine Gütestufe höher, bis „Meisterlich“</span></div>
+    <div class="sm-rows">${U.length ? U.map((x, i) => `<div class="sm-row"><span class="sm-cell" data-u="${i}"></span><span class="sm-txt"><b>${qa(ITEMS[x.o.key].name)}</b>${x.eq ? ' <span class="sm-eq">●</span>' : ''}<br><span class="ledger">${x.u.from} → <b>${x.u.to}</b> · ${x.u.gold} Gold · ${x.u.iron} Eisen</span></span><button class="mini" data-up="${i}"${S.gold < x.u.gold ? ' disabled' : ''}>Verbessern</button></div>`).join('') : '<div class="ledger">Nichts, was sich verbessern lässt.</div>'}</div>
+    <div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Schmieden lassen <span class="ledger">— aus deinem Material, gegen Lohn</span></div>
+    <div class="sm-rows">${O.map((x, i) => `<div class="sm-row${x.ok ? '' : ' off'}"><span class="sm-cell" data-o="${i}"></span><span class="sm-txt"><b>${qa(x.name)}</b><br><span class="ledger">${Object.entries(x.need).map(([m, n]) => `${n} ${qa(ITEMS[m]?.name || m)}`).join(', ')} · Lohn ${x.fee} Gold</span></span><button class="mini" data-or="${i}"${x.ok && S.gold >= x.fee ? '' : ' disabled'}>Schmieden</button></div>`).join('')}</div>`;
+  main?.appendChild(sec);
+  sec.querySelectorAll('[data-u]').forEach(c => { const x = U[+c.dataset.u]; paintCell(c, x.o, {}); });
+  sec.querySelectorAll('[data-o]').forEach(c => { const x = O[+c.dataset.o]; paintCell(c, { key: x.key }, {}); });
+  sec.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const r = A.smithUpgrade(npc, U[+b.dataset.up].o); if (r) toast(r); else { sfx('metal', 0.6, 0.7); sfx('coin', 0.4, 0.6); } smithUI(body); });
+  sec.querySelectorAll('[data-or]').forEach(b => b.onclick = () => { const r = A.smithCommission(npc, O[+b.dataset.or].key); if (r) toast(r); else { sfx('metal', 0.6, 0.5); sfx('coin', 0.4, 0.6); } smithUI(body); });
+}
+// ---- Kutsche und Fähre als Dock (Entwickler 02.10.2026: Dialog-Listen mit GUI) ----
+// Oben die Weltkarte (dieselbe gemalte Karte wie M, mit Nebel) mit Abfahrt und Zielen; darunter je Ziel eine Karte: Name, Preis, Dauer,
+// „unsichere Strecke“, Schloss ohne Aufenthaltsschein. Klick auf Karte oder Kartenpunkt = abfahren.
+let tvNpc = null;
+function travelUI(body, npc) {
+  if (npc) tvNpc = npc; npc = tvNpc; if (!npc) return; const V = A.coachView?.(npc); if (!V) return;
+  body.className = 'tr-body tv-body'; $('modal-title').textContent = V.ferry ? 'Fähre' : 'Kutsche';
+  body.innerHTML = `<div class="tr-head"><canvas id="tr-por" width="56" height="56"></canvas><div class="tr-who"><div class="tr-name"></div><div class="tr-prof"></div></div>
+      <div class="tr-gold" title="Dein Gold">${icoImg('res_gold', 2, 'gold-ico')}<b>${S.gold}</b></div></div>
+    <canvas id="tv-map" class="tv-map" width="560" height="300" title="Klick auf ein Ziel: abfahren"></canvas>
+    <div class="tv-list">${V.dests.map(d => `<button class="tv-card${d.locked || S.gold < d.price ? ' cant' : ''}${d.risky ? ' risky' : ''}" data-k="${d.k}"><span class="tv-n"></span>
+      <span class="tv-f"><span title="Preis">${icoImg('res_gold', 1, 'kpi-ico')}${d.price}</span><span title="Dauer der Fahrt">${icoImg('time', 1, 'kpi-ico')}~${d.hours} Std</span>${d.risky ? `<span class="bad" title="Auf dieser Strecke wird öfter überfallen">${icoImg('warn', 1, 'kpi-ico')}unsicher</span>` : ''}${d.locked ? `<span class="bad" title="Ins Hochreich nur mit Aufenthaltsschein">${LOCK_SVG}Schein</span>` : ''}</span></button>`).join('')}</div>
+    <div class="ledger tr-help">Die Zeit vergeht unterwegs. Auf unsicheren Strecken hält ein Überfall die Fahrt auf halber Strecke an — dann musst du dich durchschlagen.</div>`;
+  body.querySelector('.tr-name').textContent = npc.name; body.querySelector('.tr-prof').textContent = `${npc.prof || ''} · ${V.fromName}`; drawPortraitTo($('tr-por'), npc);
+  body.querySelectorAll('.tv-card').forEach((b, i) => { b.querySelector('.tv-n').textContent = V.dests[i].name; b.onclick = () => { const r = A.coachGo?.(npc, b.dataset.k); if (r) toast(r); }; });
+  const cv = $('tv-map'); let X = null; try { X = A.drawAtlas?.(cv, 1); } catch (e) { X = null; }
+  if (X) { const c = cv.getContext('2d'), P = (x, y) => [X.ox + x * X.sc, X.oy + y * X.sc], [fx, fy] = P(V.sx, V.sy);
+    for (const d of V.dests) { const [x, y] = P(d.x, d.y); c.strokeStyle = d.risky ? 'rgba(208,96,63,.85)' : 'rgba(224,183,90,.85)'; c.lineWidth = 2; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(fx, fy); c.lineTo(x, y); c.stroke(); c.setLineDash([]);
+      c.fillStyle = d.locked ? '#6d6454' : '#e0b75a'; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); c.fillStyle = '#e7dcc2'; c.font = '11px Spectral, serif'; c.textAlign = 'center'; c.fillText(d.name, x, y - 9); }
+    c.fillStyle = '#c0503a'; c.beginPath(); c.arc(fx, fy, 6, 0, 7); c.fill(); c.strokeStyle = '#1a140c'; c.lineWidth = 2; c.stroke();
+    cv.onclick = e => { const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
+      const d = V.dests.map(d => [d, Math.hypot(P(d.x, d.y)[0] - mx, P(d.x, d.y)[1] - my)]).sort((a, b) => a[1] - b[1])[0]; if (d && d[1] < 18) { const m = A.coachGo?.(npc, d[0].k); if (m) toast(m); } }; }
+  else cv.remove();
+}
+let qbSel = null;
+const QB_WORD = { active: 'offen', ready: 'bereit', done: 'erfüllt', failed: 'gescheitert' };
 function questUI(body) {
-  const order = { active: 0, done: 1, failed: 2 };                 // S13: offene zuerst; Verfolgen, Abbrechen, Ziel und Frist sichtbar
-  const list = Object.entries(S.quests).filter(([k]) => QUESTS[k]).sort((a, b) => order[a[1].state] - order[b[1].state]);
-  body.innerHTML = list.map(([k, v]) => {
-    const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
-    return `<div class="panel" style="padding:12px;margin-bottom:8px${v.state !== 'active' ? ';opacity:.6' : ''}"><h3>${I.tracked ? '◆ ' : ''}${Q.name} <span style="float:right;color:#8d836e">${
-      { active:'offen', done:'abgeschlossen', failed:'gescheitert' }[v.state]}</span></h3>
-      <div class="ledger">${Q.desc}<br>${Q.objectives.map((o, i) => `· ${o.text} ${v.progress[i] || 0}/${o.count || 1}`).join('<br>')}
-      ${I.where ? `<br>Ziel: ${I.where}` : ''}${I.timer ? `<br>${I.timer}` : ''}${v.outcome ? `<br><i>${v.outcome}</i>` : ''}</div>
-      ${v.state === 'active' ? `<div class="ctx-actions" style="margin-top:6px"><button data-track="${k}">${I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${I.cancel ? `<button data-cancel="${k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
-  }).join('') || '<div class="ledger">Keine Aufträge. Frag im Dorf nach.</div>';
-  body.querySelectorAll('[data-track]').forEach(b => b.onclick = () => { A.trackQuest(b.dataset.track); questUI(body); });
-  body.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { if (b.dataset.sure) { A.cancelQuest(b.dataset.cancel); questUI(body); } else { b.dataset.sure = 1; b.textContent = 'Wirklich abbrechen?'; } });
+  body.className = 'qb-body';
+  const ord = { active: 0, done: 1, failed: 2 }, byDist = S.settings?.qSort === 'dist';
+  const L = Object.entries(S.quests).filter(([k]) => QUESTS[k]).map(([k, v]) => { const Q = QUESTS[k], I = v.state === 'active' && A.questInfo ? A.questInfo(k) : {};
+    const ready = v.state === 'active' && Q.objectives.every((o, i) => (v.progress?.[i] || 0) >= (o.count || 1)); return { k, v, Q, I, st: ready ? 'ready' : v.state }; })
+    .sort((a, b) => ord[a.v.state] - ord[b.v.state] || (b.I.tracked ? 1 : 0) - (a.I.tracked ? 1 : 0) || (byDist && a.v.state === 'active' ? (a.I.dist ?? 1e12) - (b.I.dist ?? 1e12) : 0));
+  if (!L.length) { body.innerHTML = '<div class="qb"><div class="qb-empty">Keine Aufträge. Frag im Dorf nach — wer Arbeit hat, trägt ein Siegel über dem Kopf; am Anschlagbrett hängen Zettel.</div></div>'; return; }
+  if (!L.some(x => x.k === qbSel)) qbSel = (L.find(x => x.I.tracked) || L[0]).k;
+  body.innerHTML = `<div class="qb"><div class="qb-left"><div class="qb-sort">Ordnen <button data-s="state" class="${byDist ? '' : 'on'}">Stand</button><button data-s="dist" class="${byDist ? 'on' : ''}" title="Offene Aufträge nach Entfernung">Entfernung</button></div>
+    <div class="qb-list">${L.map(x => `<button class="qb-it st-${x.st}${x.k === qbSel ? ' sel' : ''}" data-q="${x.k}" title="${QB_WORD[x.st]}${x.I.tracked ? ' · wird verfolgt' : ''}"><i class="qb-seal"></i><span class="qb-n"></span>${x.v.state === 'active' ? x.Q.objectives.map((o, i) => pips(x.v.progress?.[i] || 0, o.count || 1)).join('') : ''}${x.I.tracked ? '<i class="qb-trk"></i>' : ''}</button>`).join('')}</div></div>
+    <div class="qb-page" id="qb-page"></div></div>`;
+  body.querySelectorAll('.qb-it').forEach((b, i) => { b.querySelector('.qb-n').textContent = L[i].Q.name; b.onclick = () => { qbSel = b.dataset.q; questUI(body); }; });
+  body.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { S.settings.qSort = b.dataset.s; questUI(body); });
+  const x = L.find(y => y.k === qbSel), pg = $('qb-page'), G = A.questGiver?.(x.k) || { label: '' }, B = A.bookBrief?.(x.k), active = x.v.state === 'active';
+  pg.innerHTML = `<div class="qb-letter st-${x.st}"><div class="qb-head">${G.npc ? '<canvas id="qb-por" width="56" height="56"></canvas>' : `<span class="qb-por0">${icoImg(G.label.startsWith('Anschlag') ? 'log_quest' : 'set_level', 3, 'qb-pi')}</span>`}
+      <div class="qb-ttl"><h2></h2><div class="qb-giver"></div></div><div class="qb-stamp">${QB_WORD[x.st]}</div></div>
+    <p class="qb-desc"></p>
+    <div class="qb-objs">${x.Q.objectives.map((o, i) => `<div class="qb-obj">${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`).join('')}</div>
+    ${x.I.where ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>${qa(x.I.where)}</span></div>` : active && x.Q.objectives.some(o => o.type === 'find') ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>Kein Ziel auf der Karte — die Suche ist der Auftrag.</span></div>` : ''}
+    ${x.I.timer ? `<div class="qb-line">${icoImg('time', 1, 'qb-li')}<span>${qa(x.I.timer)}</span></div>` : ''}
+    ${x.v.outcome ? `<p class="qb-out"></p>` : ''}
+    ${B?.rew ? `<div class="qb-rew"><span>Lohn</span>${rewardHTML(B.rew, B.nums)}</div>` : ''}
+    ${active ? `<div class="qb-act"><button data-track="${x.k}">${x.I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${x.I.cancel ? `<button data-cancel="${x.k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
+  pg.querySelector('h2').textContent = x.Q.name; pg.querySelector('.qb-giver').textContent = G.label ? 'Auftraggeber: ' + G.label : '';
+  pg.querySelector('.qb-desc').textContent = x.Q.desc || ''; pg.querySelectorAll('.qb-ot').forEach((t, i) => { t.textContent = x.Q.objectives[i].text; });
+  if (x.v.outcome) pg.querySelector('.qb-out').textContent = x.v.outcome;
+  if (G.npc && $('qb-por')) drawPortraitTo($('qb-por'), G.npc); paintBrief(pg);
+  pg.querySelectorAll('[data-track]').forEach(b => b.onclick = () => { A.trackQuest(b.dataset.track); questUI(body); });
+  pg.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { if (b.dataset.sure) { A.cancelQuest(b.dataset.cancel); questUI(body); } else { b.dataset.sure = 1; b.textContent = 'Wirklich abbrechen?'; } });
 }
 
 function settingsUI(body) {
@@ -1678,7 +2015,7 @@ function settingsUI(body) {
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
-      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
+      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>V — Schleichen an/aus<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
       I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · T — Talente · Z — Zauberbuch · H — Kodex · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button><button id="coopb" title="Zu zweit über das Netz: Code erzeugen oder beitreten">Koop (Netzwerk)</button></div>
