@@ -120,6 +120,21 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [B] GUI: Prothesen-Werkbank, dann Kontor.
 - [B] NPC-Rest: N4 Stimmungs-Idle, N1 Blasen vereinheitlichen. Offene Entscheidung: Symbolsatz.
 
+## 03.10. nachmittags: Entscheidungen umgesetzt
+- Alle 21 Entscheidungen aus dem Fragemenü sind gebaut: Tributdörfer und Arbeiterrat für die Freien, Asservatenkammer, Kopfgeld bei der Ortsmacht, Kriegsgraph, Schlacht- und Befreiungsruf, Ruf beim Geber, Seevolk-Ränge, 7 Bezugsquellen, legendäre Sets als Lohn für den höchsten Rang, Lieferungen bei der Zielstadt, Lager nur in der Siedlung, Wüstenbund und Zwerge, Varonheim als Hauptstadt, Siedlungsschmiede mit Esse, Schurke mit geliehenem Meuchelstich, Jagd, Schleichmodus, Boss-Beute; dazu das Titelbild. Selbsttest 472/472, Commit 4fe4abb.
+- Die Einträge im folgenden Abschnitt sind damit überholt; sie bleiben nur zur Nachverfolgung stehen.
+- [E] Neue Fraktionen:
+  - Dünenwacht ist ein „Zelt der Wüstenräuber“ ohne Bewohner. Soll dort ein Posten mit Sandreitern stehen?
+  - Ändert Karraks Tod den Ruf beim Wüstenbund?
+  - Eigene Kerker für Karak-Atar und die Tiefhall?
+  - Wie viele Aushänge sollen Dünenwacht und die Zwerge haben?
+  - Rangvorteile der neuen Ränge?
+- [E] Vorläufige Werte bestätigen:
+  - Schlacht +5, Befreiung +10.
+  - Asservaten-Buße.
+  - Schleich-Sicht 55 % bzw. 30 %.
+  - Jagd bis +60 % Beute, bis 40 % kürzere Tiersicht.
+
 ## Ist-Zustand 03.10. (docs/IST_ZUSTAND.md) — offen nach den Behebungen
 - [E] A-01: Wem gehören die Tributdörfer (Grauwasser, Hohlstein, Eisenried) nach Vargs Fall? Valen oder frei?
 - [E] A-03: Varonheim ist als Dorf markiert (keine Kutsche, Söldner, Schankpersonal). Eine Änderung in TOWN_PLAN kann die Welterzeugung verschieben; prüfen.
