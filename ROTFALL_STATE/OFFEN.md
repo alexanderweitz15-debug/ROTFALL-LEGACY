@@ -120,6 +120,29 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [B] GUI: Prothesen-Werkbank, dann Kontor.
 - [B] NPC-Rest: N4 Stimmungs-Idle, N1 Blasen vereinheitlichen. Offene Entscheidung: Symbolsatz.
 
+## Ist-Zustand 03.10. (docs/IST_ZUSTAND.md) — offen nach den Behebungen
+- [E] A-01: Wem gehören die Tributdörfer (Grauwasser, Hohlstein, Eisenried) nach Vargs Fall? Valen oder frei?
+- [E] A-03: Varonheim ist als Dorf markiert (keine Kutsche, Söldner, Schankpersonal). Eine Änderung in TOWN_PLAN kann die Welterzeugung verschieben; prüfen.
+- [E] A-07: Ist die Waffe nach Kerkerausbruch bzw. Flucht aus der Schuldknechtschaft für immer weg (gewollt?).
+- [E] A-09: Wem gehören Sonnwacht, Kreuzweg und Aschfurt nach Befreiung bzw. Eroberung im Kriegsgraph?
+- [E] A-10: Verbrechen an Leuten ohne Fraktion geben überall Kopfgeld bei Valen.
+- [E] A-11: Hilfe in Tributdörfern stärkt die Kette, nicht das Dorf.
+- [E] A-26: Feldschlachten und Befreiungen geben keinen Ruf.
+- [E] A-34: Karak-Atar, Dünenwacht und die Zwerge haben keine Fraktion und keine Aufträge.
+- [E] Aufträge ohne Fraktionsruf: Klassen-Reihen, Todesritter, Quirin, Lioba, Varons Auftrag 1.
+- [E] Tickmar-Arbeiterrat gibt Ruf bei Aurelion (den Fabrikherren).
+- [E] Seevolk-Ränge 2 und 4 sind unerreichbar.
+- [E] Schurken-Prüfung: Regel „jeder Stich von hinten“ bestätigen.
+- [E] D: 7 Gegenstände ohne Quelle: Sturmsense, Donnerwort, Lederstiefel, Talisman des Jägers, Splitter des Rotfalls, Blutstein, Arkaner Trank.
+- [E] D: 4 legendäre Sets nur durch Mord an Konrad, Rook, Kelan und Oda.
+- [E] D: Lieferaufträge geben Ruf immer bei der Händlergilde.
+- [E] D: Das Lager ist von überall nutzbar (gewollt?).
+- [B] D: Die Siedlungsschmiede verspricht „Waffen aus Eisen“, kann aber nur ausbessern.
+- [B] D: Der Text beim Pferdetausch sagt „bleibt im Stall“, das alte Pferd ist aber weg.
+- [B] C: Die Fertigkeit Jagd wirkt nicht; Schleichen wächst nie; es gibt keinen Schleichmodus.
+- [B] C: Graumähne und Karrak haben keine Boss-Beute und kein Intro; Boss-Beute ist nicht garantiert.
+- [B] Noch Gesprächslisten statt Fenster: Kontor, Schwarzmarkt, Zauber lernen, Heiler, Seefahrt, Luftschiff, Investieren, Anschlagbrett, Rat, Passamt, Kerker.
+
 ## Vollständigkeits-Prüfung (03.10., visual/vollstaendigkeit.md)
 - [B] Zauberlehrer fehlen: sp_regen, sp_shock und sp_staunch haben keinen erreichbaren Lehrer.
 - [B] Fall Aurelions (ganzer Hoher Rat tot) löst kein Weltereignis aus (GATE §11).
