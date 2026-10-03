@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY } from './state.js?v=24';
-import { BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=24';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=24';
 import * as R from './render.js?v=24';
 import * as HB from './buildings.js?v=24';
@@ -1456,6 +1456,7 @@ const TRAVEL_MAX = 14;
 const TRAV_KINDS = [
   { k: 'wanderer', prof: 'Wanderer', w: 3, greet: ['„Nur auf der Durchreise. Wie alle.“', '„Der Weg ist das Einzige, was mir gehört.“', '„Gibt es in % eine Schenke, die nicht panscht?“'] },
   { k: 'peddler', prof: 'Hausierer', w: 2, shop: true, pool: ['bread', 'bandage', 'herb', 'dried_meat', 'potion'], greet: ['„Nadeln, Verbände, Brot — alles, was der Weg frisst.“', '„Schau ruhig. Anschauen kostet nichts.“'] },
+  { k: 'automat', prof: 'Wanderautomat', w: 1, robot: true, greet: ['„BEEP. ICH GEHE NACH %. WARUM? GUTE FRAGE.“', '„EINHEIT OHNE HERRN. EINHEIT LÄUFT.“', '„ICH SUCHE … ICH HABE VERGESSEN, WAS.“'] },   /* Entwickler 03.10.: Roboter streifen frei umher (Kenshi) */
   { k: 'pilgrim', prof: 'Pilger', w: 1, n: 2, greet: ['„Zum Altar Omegas. Der Stern wartet.“', '„Bete mit uns, Fremder. Oder geh.“'] },
   { k: 'messenger', prof: 'Bote', w: 1, speed: 1.5, greet: ['„Keine Zeit! Die Nachricht muss nach %.“', '„Briefe. Frag nicht, was drinsteht.“'] },
   { k: 'minstrel', prof: 'Spielmann', w: 1, musician: true, greet: ['„Ein Lied für ein Kupfer? Zwei, wenn es traurig sein soll.“', '„In % zahlen sie gut für Lieder. Hoffe ich.“'] },
@@ -1491,6 +1492,7 @@ function spawnTraveler(K = pickTravKind(), from = null, to = null) {
     if (!lead) { c.traveler = { kind: K.k, from, to, route, wp: 1, legs: K.k === 'pilgrim' ? 1 : ri(1, 3), speed: K.speed || 1, rest: 0 }; lead = c; }
     else c.travLead = lead.id;
     if (K.shop) Object.assign(c, { shop: true, pool: K.pool, market: false });
+    if (K.robot) wanderBotize(c);
     if (K.musician) c.musician = true;
     if (K.fac) { const G = GUARD_KIT[K.fac] || GUARD_KIT.valen; c.faction = K.fac; c.brave = true; c.patrol = K.fac;   // S13: Streife einer Macht
       c.equip.weapon = mkItem(pick([].concat(G.weapon))); c.equip.chest = mkItem(pick([].concat(G.chest))); if (G.head) c.equip.head = mkItem(pick([].concat(G.head))); c.level = ri(5, 9); recalc(c); B.fullHeal(c); }
@@ -2022,8 +2024,8 @@ const REGION_BOSSES = [
     text: 'Ohne Graumähne zerfällt das Rudel der Schlucht. Die Jäger in Eren atmen auf — und in den Westwald ziehen verwilderte Hunde.' },
   { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 340, dmg: 1.8, r: 13,   /* Balance-Runde: vorher 240 LP, Banditenhieb — in 6 s erledigt */ title: 'Karrak, der Sandfürst',
     call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
-    effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; },
-    text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf — doch in die leeren Lager ziehen Goblin-Krieger.' },
+    effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; S.factions.wuest = clamp((S.factions.wuest || 0) + 10, -100, 100); },   /* Fragemenü 03.10.: Karrak raubt auch den Bund aus — Wüstenbund +10 */
+    text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf, der Wüstenbund dankt es dir (+10) — doch in die leeren Lager ziehen Goblin-Krieger.' },
   // Endgame (Session 11): Varg in der Kernburg der Kettenfeste. Tod = Befreiung der Goblins; Reste der Kette werden zu Räubern.
   { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 360, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
     call: 'chain_brute', callText: 'lässt die Kette klirren. Knechte stürmen aus der Halle.', area: a => !!a.eisen, from: 'chain_brute', to: 'bandit',
@@ -7118,6 +7120,27 @@ function robotAlarm(rep, msg) {
   for (const r of S.ents.world) if (r.robot && r.guard && r.alive && dist(r, S.player) < 500) { r.angry = true; r.aggroId = S.player.id; r.sawPlayer = clock(); }
   log(msg, 'faction');
 }
+/* Wanderautomaten (Entwickler 03.10.2026: „überall Roboter wie in Kenshi, manche rekrutierbar wie Beep“): freundliche, etwas verwirrte Maschinen
+   ohne Herrn. Wer anwerbbar ist, kommt kostenlos mit, wenn in der Gruppe Platz ist (wie Beep). Die anderen erzählen nur. */
+const BOT_NAMES = ['Piep', 'Klonk', 'Rostling', 'Zahnrad', 'Einheit 7', 'Bolzen', 'Messingkopf', 'Summer', 'Knarz', 'Funke', 'Tick', 'Schraubner'];
+const BOT_LINES = ['„ICH WAR EINMAL EIN WÄCHTER. JETZT BIN ICH EIN SPAZIERGÄNGER.“', '„DER REGEN MACHT MICH ROSTIG. DIE SONNE MACHT MICH HEISS. ICH MAG DEN ABEND.“',
+  '„MEIN HERR IST TOT. ODER ICH HABE IHN VERLEGT. BEIDES MÖGLICH.“', '„BEEP. DAS WAR EIN GRUSS.“', '„IN TICKMAR BAUT MAN NEUE. MICH BAUT NIEMAND MEHR.“'];
+function wanderBotize(c, recruit = (c.seed | 0) % 5 < 2) {   /* 2 von 5 sind anwerbbar (vorläufig) */
+  Object.assign(c, { robot: true, wanderBot: true, recruitBot: recruit, faction: null, morale: 100, name: pick(BOT_NAMES) });
+  if ((c.seed | 0) % 2) { c.equip.weapon = mkItem('schrottklinge'); recalc(c); }
+  return c;
+}
+function wanderBotTalk(npc) {
+  const p = S.player, leave = { text: '[Gehen]', fn: () => UI.closeDialogue() }, line = BOT_LINES[(npc.seed | 0) % BOT_LINES.length];
+  if (!S.flags.botHint) { S.flags.botHint = 1; log('Wanderautomaten ziehen ohne Herrn durch das Land. Manche schließen sich dir an, wenn du sie fragst — kostenlos, solange in der Gruppe Platz ist.', 'quest'); }
+  const ch = [];
+  if (npc.recruitBot) ch.push({ text: 'Willst du mit mir kommen?', fn: () => {
+    if (S.party.length >= (p.partyCap || 3)) return UI.dialogue(npc, '„DEINE GRUPPE IST VOLL. ICH ZÄHLE GUT. DAS IST MEIN EINZIGES TALENT.“', [leave]);
+    Object.assign(npc, { transient: false, traveler: null, visitor: false, anchor: null, key: npc.key || 'bot_' + uid() }); S.party.push(npc.id); emote(npc, 'freude', 1600);
+    log(`${npc.name} schließt sich dir an. „BEEP. WIR SIND JETZT EIN TEAM.“`, 'party'); chronicle(`${npc.name} folgt ${p.name}`, 'news', 'Ein Wanderautomat ohne Herrn.'); UI.closeDialogue(); } });
+  else ch.push({ text: 'Komm mit mir.', fn: () => UI.dialogue(npc, '„NEIN DANKE. ICH HABE EINE AUFGABE. ICH WEISS NUR NICHT MEHR, WELCHE.“', [leave]) });
+  UI.dialogue(npc, `${npc.greet || ''}\n${line}`, [...ch, leave]);
+}
 function robotTalk(npc) {
   const B0 = S.bond, leave = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
   if (B0?.kind === 'aurel') return UI.dialogue(npc, `„SCHULDNER ${S.player.name.toUpperCase()}. RESTSCHULD: ${B0.debt} GOLD. ZURÜCK AN DIE WERKBANK.“`, leave);
@@ -7725,6 +7748,7 @@ function claimContract(C, npc) {
   const share = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + share * 1.5);   // S14 (Nutzer): wer die Wachen kämpfen lässt, bekommt weniger
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
+  if (C.kind === 'escort' && townFac(C.town) === 'wuest' && (S.ranks.wuest ?? -1) >= 1 && !C.wuestBonus) { C.wuestBonus = true; C.reward = { ...C.reward, gold: Math.round(C.reward.gold * WUEST_ESCORT) }; log(`Der Wüstenbund zahlt seinen Karawanenwächtern mehr: +${Math.round((WUEST_ESCORT - 1) * 100)} %.`, 'quest'); }   /* Fragemenü 03.10.: Rangvorteil */
   C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && conFac(C) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = conFac(C); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
@@ -8659,8 +8683,8 @@ function guideTick() {
 }
 const ARRIVE_SAY = ['Willkommen. Halt dich an die Gesetze.', 'Der Platz ist dort drüben.', 'Fremd hier? Der Markt liegt in der Mitte.', 'Waffen bleiben in der Scheide.'];
 /* Entscheidung 03.10.2026: beim ersten Betreten von Karak-Atar/Dünenwacht bzw. der Zwergenstadt erklärt ein Hinweis die neue Fraktion (einmal je Spielstand) */
-const FAC_HINT = { wuest: 'Karak-Atar und Dünenwacht gehören zum Wüstenbund. Aufträge am Anschlagbrett bringen Ansehen beim Wüstenbund; ab Ansehen 10 trittst du bei einem Mitglied bei, die Rangprüfungen hat die Stammesälteste Amina. Verbrechen hier bringen Kopfgeld beim Wüstenbund — Zöllner und Sandreiter halten dich an.',
-  zwerge: 'Die Königsstadt gehört den Zwergen der Tiefhall. Als Freund der Halle findest du am Anschlagbrett Aufträge (Ansehen bei den Zwergen); ab Ansehen 10 trittst du bei, die Rangprüfungen hat König Durgrim. Verbrechen hier bringen Kopfgeld bei den Zwergen — die Zwergenwachen halten dich an.' };
+const FAC_HINT = { wuest: 'Karak-Atar und Dünenwacht gehören zum Wüstenbund. Aufträge am Anschlagbrett bringen Ansehen beim Wüstenbund; ab Ansehen 10 trittst du bei einem Mitglied bei, die Rangprüfungen hat die Stammesälteste Amina. Verbrechen hier bringen Kopfgeld beim Wüstenbund — Zöllner und Sandreiter halten dich an, gesessen wird im Kerker von Karak-Atar. Mitglieder zahlen keinen Wegzoll.',
+  zwerge: 'Die Königsstadt gehört den Zwergen der Tiefhall. Als Freund der Halle findest du am Anschlagbrett Aufträge (Ansehen bei den Zwergen); ab Ansehen 10 trittst du bei, die Rangprüfungen hat König Durgrim. Verbrechen hier bringen Kopfgeld bei den Zwergen — die Zwergenwachen halten dich an, gesessen wird im Kerker der Tiefhall. Schildträger des Königs lassen bei Hilda bis „Meisterstück“ verbessern.' };
 function facHintTick() {
   const p = S.player; if (!p || S.cine || S.dying || S._quiet || S.coop?.role === 'guest') return; const H = (S.flags.facHint ||= {});
   const near = k => { const L = LOCATIONS.find(l => l.key === k); return !!L && p.map === 'world' && Math.hypot(p.x / TS - L.x, p.y / TS - L.y) < L.r; };
@@ -8946,8 +8970,19 @@ function ensureDesertBoards(c0) {   /* Anschlagbretter des Wüstenbunds in Karak
   }
   indexSolids('world');
 }
+/* Fragemenü 03.10.2026: Dünenwacht ist ein Posten des Wüstenbunds — vier Sandreiter (flüchtig, Wachen), das Zelt heißt „Posten der Sandreiter“ */
+function ensureDunePost() {
+  const D = LOCATIONS.find(l => l.key === 'duenenwacht'); if (!D) return;
+  for (const e of S.ents.world) if (e.kind === 'prop' && e.label === 'Zelt der Wüstenräuber') e.label = 'Posten der Sandreiter';   /* alte Stände */
+  if (S.ents.world.some(e => e.dunePost)) return;
+  for (const [dx, dy] of [[-3, -4], [3, -4], [-3, 5], [4, 5]]) { const q = freeSpotNear('world', D.x + dx, D.y + dy, 2); if (!q) continue;
+    const c = makeChar({ name: pick(['Nabil', 'Rashid', 'Zaid', 'Karim', 'Omar', 'Tarek']), prof: 'Sandreiter', x: q.x, y: q.y, level: 7, faction: 'wuest', traits: ['diszipliniert'], pal: { skin: pick(['#8d6644', '#b98f66', '#6d4a30']), cloth: pick(['#c8a870', '#b89060', '#8a5a2a']) } });
+    Object.assign(c, { dunePost: true, guard: true, post: 'duenenwacht', transient: true, visitor: true, hooded: true, brave: true, wanderR: 4, anchor: { x: q.x, y: q.y },
+      greet: pick(['„Dünenwacht hält die Straße nach Karak-Atar. Räuber kommen hier nicht vorbei.“', '„Am Brett hängt Arbeit für den Bund. Sand gibt es gratis.“', '„Die Wüstenräuber nennen uns Zöllner. Wir nennen sie Ziele.“']) });
+    c.equip.weapon = mkItem(pick(['kriegssichel', 'spear', 'katar'])); recalc(c); S.ents.world.push(c); }
+}
 function ensureKarak() {
-  ensureNewFactions(); const c0 = karakCenter(); if (!c0) return; ensureDesertBoards(c0); if (S.ents.world.some(e => e.karak)) return;
+  ensureNewFactions(); const c0 = karakCenter(); if (!c0) return; ensureDesertBoards(c0); ensureDunePost(); if (S.ents.world.some(e => e.karak)) return;
   const [cx, cy] = c0, at = (dx, dy) => freeSpotNear('world', cx + dx, cy + dy, 2), desert = ['#c8a870', '#b89060', '#8a5a2a', '#e0d0a8'];
   const mk = (name, prof, dx, dy, o = {}) => { const q = at(dx, dy), c = makeChar({ name, prof, x: q.x, y: q.y, level: 6, faction: 'wuest', traits: ['ehrgeizig'], pal: { skin: pick(['#8d6644', '#b98f66', '#6d4a30']), cloth: pick(desert) } });   /* 03.10.: Wüstenbund */
     Object.assign(c, { karak: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, hooded: true }, o); S.ents.world.push(c); return c; };
@@ -8998,8 +9033,11 @@ function keepChoices(npc, choices) {
     UI.closeDialogue(); log('Die Phiole zerspringt auf dem Altar. Kälte kriecht in deine Knochen — und bleibt als Schutz. Ruf bei den Toten +3.', 'faction'); } });
   if (npc.keepMarshalV) choices.unshift({ text: 'Wie steht die Belagerung?', fn: () => UI.dialogue(npc, `„Noch ${S.war?.nodes?.blackkeep?.garrison ?? '?'} Tote in der Feste. Jeden Tag weniger. Komm mit ans Tor, dann brechen wir sie in Wellen.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
 }
-const karakToll = () => S.flags.waterRight ? 0 : S.flags.sandlordSlain ? 8 : 15;   /* Geheime Orte: Wasserrecht */
+const WUEST_ESCORT = 1.25;   /* Fragemenü 03.10.: Eskorten des Wüstenbunds ab Karawanenwächter (vorläufig +25 %) */
+const wuestFree = () => (S.ranks.wuest ?? -1) >= 0;   /* Fragemenü 03.10.: Mitglieder des Wüstenbunds zahlen keinen Wegzoll */
+const karakToll = () => S.flags.waterRight || wuestFree() ? 0 : S.flags.sandlordSlain ? 8 : 15;   /* Geheime Orte: Wasserrecht */
 function karakChoices(npc, choices) {
+  if (npc.karakToll && !S.flags.waterRight && wuestFree()) return choices.unshift({ text: 'Zoll?', fn: () => UI.dialogue(npc, '„Du gehörst zum Bund. Wer zum Bund gehört, zahlt keinen Zoll. Geh durch.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   if (npc.karakToll && S.flags.waterRight) return choices.unshift({ text: 'Zoll?', fn: () => UI.dialogue(npc, '„Du trägst das Wasserrecht zurück. Für dich ist das Tor immer offen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   if (npc.karakToll && (S.flags.karakPaid || -1) !== (S.day | 0)) choices.unshift(
     { text: `Wegzoll zahlen (${karakToll()} Gold)`, fn: () => { if (S.gold < karakToll()) return UI.dialogue(npc, '„Kein Gold, kein Durchgang. Aber ich bin kein Unmensch — heute lass ich dich.“', [{ text: 'Danke.', fn: () => UI.closeDialogue() }]); S.gold -= karakToll(); S.flags.karakPaid = S.day | 0; S.flags.karakRefused = false; UI.closeDialogue(); log('Du zahlst den Wegzoll. Der Basar behandelt dich heute wie einen Gast.', 'economy'); } },
@@ -9044,12 +9082,26 @@ const jailMinutes = b => clamp(Math.round(10 + b / 40), 10, 20);
 const JAIL_LINES = ['„Was hast du angestellt? Ich hab nur ein Brot genommen.“', '„Zähl die Steine an der Decke. Es sind hundertzwölf. Ich hab dreimal gezählt.“', '„Der Wärter mit der Narbe schläft nach dem Essen.“',
   '„Die sagen, keiner kommt hier raus. Die lügen. Aber nicht oft.“', '„Wenn du rauskommst, grüß meine Frau. Oder besser nicht.“', '„Das Brot ist hart, aber es ist Brot.“'];
 // S15 Fehlersuche: wer in den Kerker oder in Ketten kommt, wird nicht weiter verfolgt (sonst kamen Kopfgeldjäger mit in die Zelle)
+/* Fragemenü 03.10.2026: Karak-Atar und die Tiefhall haben eigene Kerker mit eigenem Wärter. Dasselbe Kerkersystem (S.jail, Karte 'kerker'):
+   je Ort eigener Name, Ankunftstext, Wärter der Ortsmacht und Ausstattung; entlassen (oder ausgebrochen) wird vor Ort (out). */
+const JAIL_STYLE = {
+  karak_atar: { name: 'Kerker von Karak-Atar', fac: 'wuest', prof: 'Kerkermeister der Sandfürsten', cloth: '#b89060', skin: '#8d6644', deco: 'Zeichen der Sandfürsten',
+    enter: 'Sandsteinmauern, ein vergittertes Lichtloch, Hitze auch in der Nacht. Hier sperrt der Wüstenbund ein, wer seine Straße stört.' },
+  deephall: { name: 'Kerker der Tiefhall', fac: 'zwerge', prof: 'Kerkermeister der Halle', cloth: '#2a3a6a', skin: '#c89a78', dwarf: true, deco: 'Runenbanner der Tiefhall', out: 'zwerge',
+    enter: 'In den Fels gehauene Zellen, Runen über jeder Tür. Hier sitzt, wer den Frieden der Halle bricht.' } };
+const KERKER_DEF = { name: DUNGEONS.kerker.name, enter: DUNGEONS.kerker.enter };
+function jailLook(town) { const J0 = JAIL_STYLE[town]; DUNGEONS.kerker.name = J0?.name || KERKER_DEF.name; DUNGEONS.kerker.enter = J0?.enter || KERKER_DEF.enter; return J0 || null; }
+function jailWarden(g, J0, town) {
+  Object.assign(g, { faction: J0.fac, wardenOf: town, name: J0.dwarf ? pick(['Thrain', 'Dorna', 'Bofur', 'Gerdis']) : pick(['Malik', 'Samira', 'Yasin', 'Hakim']), greet: J0.dwarf ? '„In der Halle gilt das Gesetz des Königs. Auch für Oberirdische.“' : '„Die Sandfürsten vergessen nichts. Ich auch nicht.“' });
+  g.pal = { ...g.pal, cloth: J0.cloth, skin: J0.skin }; if (J0.dwarf) { g.build = 'gedrungen'; g.equip.weapon = mkItem('zwergenaxt'); } else { g.hooded = true; g.equip.weapon = mkItem('kriegssichel'); }
+  recalc(g); return g;
+}
 function dropPursuit() { const p = S.player; for (const e of S.ents[S.map] || []) if (e.aggroId === p.id) { e.aggroId = null; e.aiState = 'idle'; e.follow = null; e.angry = false; } S.ents[S.map] = (S.ents[S.map] || []).filter(e => !(e.encounter && e.kind === 'enemy')); }
 function goToJail(fac, bounty, town) {
   const p = S.player, min = jailMinutes(bounty); S.resist = null;   /* Widerstand endet mit der Zelle */
   delete (S.bounty ||= {})[fac];
   S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3 };   // S14: drei Dietriche im Stiefel
-  S.jailTown = town; p.equip.weapon = null; recalc(p); dropPursuit();
+  S.jailTown = town; jailLook(town); p.equip.weapon = null; recalc(p); dropPursuit();
   for (const o of S.ents[S.map]) if (o.angry) { o.angry = false; o.aggroId = null; }
   travel('kerker'); ensureJail(); closeCells();
   p.x = MAPS.kerker.cells[0].spot.x; p.y = MAPS.kerker.cells[0].spot.y;
@@ -9064,8 +9116,11 @@ function closeCells() {
 function ensureJail() {
   const K = MAPS.kerker; if (!K) return;
   S.ents.kerker = S.ents.kerker.filter(e => !(e.kind === 'npc' && e.jailer === false && e.jailTown !== S.jailTown));   // Mitgefangene je Stadt
+  { const J0 = jailLook(S.jailTown), own = J0 ? S.jailTown : null;   /* Fragemenü 03.10.: Wärter und Ausstattung gehören zum Ort des Kerkers */
+    S.ents.kerker = S.ents.kerker.filter(e => !((e.warden || e.jailDeco) && (e.wardenOf || null) !== own));
+    if (J0 && !S.ents.kerker.some(e => e.jailDeco)) for (const [x, y] of [[4, 7], [7, 7]]) S.ents.kerker.push({ id: uid(), kind: 'prop', type: 'banner_torn', map: 'kerker', x: x * TS + TS / 2, y: y * TS + 8, r: 6, solid: false, transient: true, jailDeco: true, wardenOf: own, label: J0.deco }); }
   if (!S.ents.kerker.some(e => e.warden)) for (const [x, y] of [[5, 11], [20, 10]]) {
-    const g = guardChar('valen', { x: x * TS + TS / 2, y: y * TS + TS / 2 }, 'Kerkerwärter', 8); Object.assign(g, { map: 'kerker', warden: true, transient: true, visitor: true, guard: false, patrol: [[6, 10], [33, 11]], pi: y > 10 ? 1 : 0 });
+    const J0 = JAIL_STYLE[S.jailTown], g = guardChar(J0 ? 'merch' : 'valen', { x: x * TS + TS / 2, y: y * TS + TS / 2 }, J0?.prof || 'Kerkerwärter', 8); if (J0) jailWarden(g, J0, S.jailTown); Object.assign(g, { map: 'kerker', warden: true, transient: true, visitor: true, guard: false, patrol: [[6, 10], [33, 11]], pi: y > 10 ? 1 : 0 });
     S.ents.kerker.push(g);
   }
   if (!S.ents.kerker.some(e => e.inmate)) K.cells.slice(1).forEach((c, i) => {
@@ -9163,12 +9218,12 @@ function jailExit() {
     e.inmate = false; e.jailer = undefined; e.freed = false;
     if (!S.party.includes(e.id)) { S.ents.kerker = S.ents.kerker.filter(x => x !== e); log(`${e.name} verschwindet in die Nacht. Irgendwann zahlt er es dir zurück.`, 'party'); }
     else log(`${e.name} atmet draußen tief durch: „Frei. Wohin jetzt?“`, 'party'); }
-  chronicle(`${p.name} bricht aus dem Kerker aus`, 'crime'); p.status = (p.status || []).filter(s => s.key !== 'jailed'); travel('world'); S.flags.arrestCd = clock() + 60;   // S15: kurzer Vorsprung nach dem Ausbruch
+  chronicle(`${p.name} bricht aus dem Kerker aus`, 'crime'); p.status = (p.status || []).filter(s => s.key !== 'jailed'); travel(JAIL_STYLE[S.jailTown]?.out || 'world'); S.flags.arrestCd = clock() + 60;   // S15: kurzer Vorsprung nach dem Ausbruch
 }
 function releaseJail(why) {
   const J = S.jail, p = S.player; if (!J) return;
   if (J.weapon && !p.equip.weapon) p.equip.weapon = J.weapon; else if (J.weapon) p.inv.push(J.weapon); recalc(p); S.jail = null;   // S15: die verwahrte Waffe geht nie verloren
-  log(`${why} Der Wärter gibt dir deine Waffe zurück und schiebt dich hinaus.`, 'faction'); UI.toast('FREI', 2000); travel('world'); jailOut();
+  log(`${why} Der Wärter gibt dir deine Waffe zurück und schiebt dich hinaus.`, 'faction'); UI.toast('FREI', 2000); travel(JAIL_STYLE[S.jailTown]?.out || 'world'); jailOut();
 }
 // S15 (Nutzer-Bug): Wer in Aurelion aus dem Kerker kommt, stand ohne Schein auf dem Platz und wurde sofort wieder angehalten.
 // Jetzt führen die Wärter ihn vor das Tor; die Automaten lassen ihn eine Weile in Ruhe.
@@ -9303,7 +9358,7 @@ function buildDwarfCity() {
       pal: { skin: pick(['#c89a78', '#b88a68', '#d6a888']), hair: HAIR[(tx + ty) % HAIR.length], cloth: pick(['#2a3a6a', '#4a3a2a', '#3a4a3a', '#5a2a22']) } });
     Object.assign(c, { dwarf: true, transient: true, visitor: true, build: 'gedrungen', anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.zwerge.push(c); return c; };
   dw('Durgrim', 'Zwergenkönig', king.cx, king.y + 4, { dwarfKing: true, level: 20, greet: '„Ein Oberirdischer. In meiner Halle. Das gab es seit dreihundert Jahren nicht. Sprich.“' });
-  dw('Hilda Eisenfaust', 'Runenschmiedin', forge.cx + 2, forge.cy + 2, { shop: true, market: false, pool: ['koenigseisen', 'koenigseisen', 'koenigseisen', 'zwergenaxt', 'runenhammer', 'iron_helm', 'chain_hauberk', 'ingot'], greet: '„Königseisen. Kalt geschmiedet, heiß gehärtet. Oben kostet es das Doppelte.“' });
+  dw('Hilda Eisenfaust', 'Runenschmiedin', forge.cx + 2, forge.cy + 2, { shop: true, smith: true, dwarfSmith: true, market: false, pool: ['koenigseisen', 'koenigseisen', 'koenigseisen', 'zwergenaxt', 'runenhammer', 'iron_helm', 'chain_hauberk', 'ingot'], greet: '„Königseisen. Kalt geschmiedet, heiß gehärtet. Oben kostet es das Doppelte.“' });
   dw('Balin Silberbart', 'Zwergenhändler', hall.x + 10, hall.cy + 1, { shop: true, market: false, pool: ['potion', 'potion', 'bandage', 'bread', 'dried_meat', 'ingot', 'tools', 'pickaxe', 'ersatzteile'], greet: '„Alles, was man unter dem Berg braucht. Und manches, was man oben vermisst.“' });
   dw('Orm', 'Braumeister', brew.cx, brew.y + 3, { shop: true, market: false, pool: ['bread', 'dried_meat', 'potion', 'wasserschlauch'], greet: '„Pilzbier. Das einzige Bier, das im Dunkeln besser wird.“' });
   for (const [x, y] of [[entry.x + 1, entry.y + 2], [entry.x + entry.w - 2, entry.y + 2], [king.x + 2, king.y + king.h - 2], [king.x + king.w - 3, king.y + king.h - 2]]) { const g = dw(pick(['Thrak', 'Borin', 'Gunnar', 'Dvalin', 'Kili']), 'Zwergenwache', x, y, { brave: true, guard: true, post: 'deephall', greet: '„Die Halle ist sicher. Solange wir stehen.“' }); g.equip.weapon = mkItem('zwergenaxt'); recalc(g); }
@@ -13091,6 +13146,7 @@ function talk(npc) {
   if (npc.seaFolk && seaTalkGate(npc)) return;                            // S14: Überfahrt zu den Gischtinseln
   if (npc.coach || npc.ferry) return coachTalk(npc);                   // S13: Kutschen und Fähren
   if (npc.robot && npc.guard && S.ents[npc.map]?.some(e => e.prisoner?.by === S.player.id && dist(e, npc) < 260)) { const ch = []; captiveChoices(npc, ch); if (ch.length) return UI.dialogue(npc, '„GEFANGENE? ÜBERGABE MÖGLICH.“', [...ch, { text: '[Gehen]', fn: () => UI.closeDialogue() }]); }   /* RB-026: auch Automaten-Wachen nehmen Gefangene */
+  if (npc.wanderBot && !S.party.includes(npc.id)) return wanderBotTalk(npc);   /* Wanderautomaten (03.10.) */
   if (npc.robot && !S.party.includes(npc.id)) return robotTalk(npc);   // Automaten tratschen nicht
   if (npc.omegaPriest) return priestTalk(npc);   // Phase 7
   if (npc.faithKey) return faithFigureTalk(npc);   // Nutzer S13: die fünf Köpfe der Kirche
@@ -13141,7 +13197,7 @@ function talk(npc) {
   else if (npc.shop && occupied) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Handel? Die Toten halten die Stadt. Ich verstecke, was ich habe.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   else if (npc.shop && refusesChain(npc)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Ich verkaufe nicht an Kettenleute. Nimm es dir mit Gewalt, wenn du willst — geben tu ich es nicht.“', leave) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
-  if (npc.smith) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });
+  if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
   choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
@@ -14223,6 +14279,7 @@ function joinFaction(npc) {
       if (f === 'undead') { S.factions.order -= 30; S.factions.valen -= 20; log('Der Orden erklärt dich zum Feind.', 'faction'); }
       if (f === 'order') S.factions.undead -= 20;
       if (f === 'chain') { S.factions.goblin -= 20; S.factions.order -= 10; S.factions.valen -= 5; partyReact('joined_chain'); }   // S12 A3
+      if (f === 'wuest') log('Als Mitglied des Wüstenbunds zahlst du in Karak-Atar keinen Wegzoll mehr.', 'faction');   /* Fragemenü 03.10. */
       chronicle(`Beitritt: ${FACTIONS[f].name}`, 'faction', `Als ${FACTIONS[f].ranks[0]} aufgenommen.`);
       log(`Du bist nun ${FACTIONS[f].ranks[0]} — ${FACTIONS[f].name}.`, 'faction');
       UI.closeDialogue(); UI.refreshHUD(); save();
@@ -14235,7 +14292,9 @@ function joinFaction(npc) {
 const RANK_PERKS = { undead: ['Die Toten sind dir nicht feind; Handel in Vharnholm'],
   chain: ['Tore der Eisenfeste offen, Aufträge der Kette', null, null, 'Zugang zur Weihe bei Varg', 'Kettenbrecher und Eisenfürst; man fürchtet dich'],
   aurel: ['Automaten prüfen dich', 'Aufenthalt erlaubt, Luftschiff-Passagen an jedem Mast', 'Himmelsfeste mit Siegel, Handel ohne Schein', null, null, null, 'Weg in den Hohen Rat', 'Sitzungen des Rates alle 7 Tage, Gesetze'],
-  goblin: ['Goblins sind friedlich und reden mit dir', null, null] };
+  goblin: ['Goblins sind friedlich und reden mit dir', null, null],
+  wuest: ['Kein Wegzoll in Karak-Atar', 'Eskorten des Wüstenbunds zahlen 25 % mehr', null],   /* Fragemenü 03.10. */
+  zwerge: [null, null, 'Hilda Eisenfaust verbessert bis „Meisterstück“'] };
 /* Roadmap P5: Bionik-Zugang je Aurelion-Rang (so rechnet bionicLack) */
 const AUREL_BIONIC = ['Zugang: Schrottglieder und Schrottauge (auch Schwarzmarkt)', 'Zugang: aurelionische Prothesen, Auge Stufe 2, Module', 'Zugang: Meisterstücke, Chirurgie an gesunden Gliedern (auch als Akademie-Adept)', null, 'Zugang: Prototypen'];
 function rankGuide(f) {
@@ -14310,6 +14369,8 @@ function promote(f, r) {
   const n = FACTIONS[f].ranks[r]; log(`Beförderung: ${n} — ${FACTIONS[f].name}.`, 'faction'); chronicle(`Rang ${n}`, 'faction', FACTIONS[f].name); UI.toast(n.toUpperCase(), 3600);
   /* S15 Hinweise: Weihen sagen, wo man sie bekommt */
   if (f === 'chain' && r === 3 && !S.flags.chainsBroken) log('Du kannst jetzt die Weihe der Kette empfangen — bei Varg in der Eisenfeste oder bei einem Dunklen Paladin (Klasse Dunkler Hochpaladin).', 'faction');
+  if (f === 'wuest' && r === 1) log('Als Karawanenwächter zahlen dir Eskorten des Wüstenbunds 25 % mehr.', 'faction');   /* Fragemenü 03.10. */
+  if (f === 'zwerge' && r === 2) log('Hilda Eisenfaust, die Runenschmiedin der Tiefhall, verbessert deine Ausrüstung jetzt bis „Meisterstück“.', 'faction');
   if (f === 'undead' && r === 3) log(`Du kannst jetzt die Todesweihe empfangen — bei Sael oder Ysra (Klasse Todesritter).${S.player.knownClasses.includes('warrior') ? '' : ' Vorher musst du die Klasse Krieger lernen.'}`, 'faction');
 }
 function checkRankUp() {
@@ -14707,14 +14768,15 @@ const smithPrice = list => list.length ? Math.max(5, Math.round(list.reduce((n, 
    Schmiedekunst 60 (oder deiner, wenn höher); deine Fertigkeit steigt dabei nicht. */
 const SMITH_SKILL = 60, UPG_TOP = 3;
 const qualIdx = o => { const i = QUAL.findIndex(q => q[0] === o.qual); return i < 0 ? 1 : i; };
-function smithUpgInfo(o) {
+const dwarfMaster = npc => !!npc?.dwarfSmith && (S.ranks.zwerge ?? -1) >= 2;   /* Fragemenü 03.10.: Schildträger des Königs — Hilda verbessert bis „Meisterstück“ */
+function smithUpgInfo(o, npc = null) {
   const it = ITEMS[o?.key]; if (!it || !GEAR.has(it.slot) || it.unique || it.stack) return null;
-  const qi = qualIdx(o); if (qi >= UPG_TOP) return null;
+  const qi = qualIdx(o); if (qi >= (dwarfMaster(npc) ? UPG_TOP + 1 : UPG_TOP)) return null;
   return { from: QUAL[qi][0], to: QUAL[qi + 1][0], gold: Math.max(20, Math.round((it.value || 10) * 0.5 * (qi + 1))), iron: qi + 1 };
 }
-const smithUpgList = () => { const p = S.player; return [...Object.entries(p.equip).filter(([, i]) => i).map(([k, i]) => ({ o: i, eq: k })), ...p.inv.map(i => ({ o: i }))].map(x => ({ ...x, u: smithUpgInfo(x.o) })).filter(x => x.u); };
+const smithUpgList = (npc = null) => { const p = S.player; return [...Object.entries(p.equip).filter(([, i]) => i).map(([k, i]) => ({ o: i, eq: k })), ...p.inv.map(i => ({ o: i }))].map(x => ({ ...x, u: smithUpgInfo(x.o, npc) })).filter(x => x.u); };
 function smithUpgrade(npc, o) {
-  const U = smithUpgInfo(o); if (!U) return 'Daran gibt es nichts mehr zu verbessern.';
+  const U = smithUpgInfo(o, npc); if (!U) return 'Daran gibt es nichts mehr zu verbessern.';
   if (S.gold < U.gold) return 'Zu wenig Gold.'; if (matHave('iron') < U.iron) return `Dafür braucht es ${U.iron} Eisen.`;
   S.gold -= U.gold; matTake('iron', U.iron); const it = ITEMS[o.key], tier = QUAL[qualIdx(o) + 1][2];
   o.qual = U.to; if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(o.rar || it.rarity || 'common')) rollRarity(o, it, 0, tier);
@@ -16856,6 +16918,10 @@ function facDebug(tp) {   /* Entscheidung 03.10.2026: Wüstenbund und Zwerge der
     'Fraktion: nach Karak-Atar': loc('karak_atar'), 'Fraktion: nach Dünenwacht': loc('duenenwacht'),
     'Fraktion: in die Zwergenstadt (als Freund der Halle)': () => { S.flags.dwarfFriend = 1; if (S.map !== 'deep') travel('deep'); travel('zwerge'); },
     'Fraktion: Kopfgeld beim Wüstenbund +80': () => addBounty('wuest', 80, 'Debug'), 'Fraktion: Kopfgeld bei den Zwergen +80': () => addBounty('zwerge', 80, 'Debug'),
+    'Fraktion: Kerker von Karak-Atar (Kopfgeld 100)': () => { if (S.map !== 'world') travel('world'); goToJail('wuest', 100, 'karak_atar'); },
+    'Fraktion: Kerker der Tiefhall (Kopfgeld 100)': () => { goToJail('zwerge', 100, 'deephall'); },
+    'Fraktion: Karrak fällt (Wüstenbund +10)': () => { const b = REGION_BOSSES.find(x => x.id === 'sandlord'); if (!S.flags[b.flag]) regionBossSlain(b); else UI.toast('Karrak ist schon tot.'); },
+    'Fraktion: nach Dünenwacht zum Posten': loc('duenenwacht'),
     'Fraktion: Hinweise beim Betreten zurücksetzen': () => { delete S.flags.facHint; UI.toast('Die Hinweise kommen beim nächsten Betreten wieder.'); },
   }];
 }
@@ -16886,6 +16952,11 @@ function debugSections() {
       'Teleport: Koordinaten': () => { const [x, y] = v('dbXY').split(',').map(Number); if (x >= 0 && y >= 0) tp(x, y); },
       'Teleport: Auftragsziel': () => { const k = Object.keys(S.quests).find(q => S.quests[q].state === 'active' && questPoint(q)); const q = k && questPoint(k); if (q) tp(q.x | 0, q.y | 0); else UI.toast('Kein Auftrag mit Ziel'); },
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
+    }],
+    ['Wanderautomaten (03.10.2026)', '', {
+      'Roboter: Wanderautomat hier (anwerbbar)': () => { toWorld(); const s = freeSpotNear('world', (p.x / TS | 0) + 2, p.y / TS | 0, 2); const c = wanderBotize(makeChar({ name: 'x', prof: 'Wanderautomat', x: s.x, y: s.y, level: 3 }), true);
+        Object.assign(c, { transient: true, visitor: true, anchor: { x: s.x, y: s.y }, greet: '„EINHEIT OHNE HERRN. EINHEIT LÄUFT.“' }); S.ents.world.push(c); UI.toast(`${c.name} steht neben dir — ansprechen (E).`); },
+      'Roboter: Wanderautomat als Reisender losschicken': () => { const r = spawnTraveler(TRAV_KINDS.find(k => k.k === 'automat')); UI.toast(r && r !== 'wait' ? `${r.name} wandert von Stadt zu Stadt.` : 'Gerade kein Weg frei (oder Startort im Blick).'); },
     }],
     ['Pferde (Fellfarben-Überarbeitung, 02.10.2026)', '', {                                   // Entwickler: „Pferde-Sprites müssen überarbeitet werden“ — Debug-Übersicht aller Varianten
       'Pferde: alle Varianten zeigen': () => { toWorld(); S.ents.world = S.ents.world.filter(e => !e.dbgHorseRow);
@@ -20864,6 +20935,17 @@ export function selftest() {
       const hp0 = e.hp; hit(p, e, 1); const amb = !p.sneak;
       return seen && hidden && grew && amb;
     } finally { p.skills.stealth = s0; p.sneak = false; } }));
+  ok('Wanderautomaten (03.10.): Roboter-Reisende mit eigenem Aussehen; anwerbbare schließen sich kostenlos an, andere nicht; volle Gruppe lehnt ab', sandbox(() => {
+    const p = stage(), P0 = S.party.slice(), cap = p.partyCap, op = UI.uiHooks.dialogue; let last = null;
+    try { UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+      const mk = r => { const c = wanderBotize(makeChar({ name: 'x', prof: 'Wanderautomat', x: p.x + 40, y: p.y, level: 2 }), r); c.transient = true; S.ents[p.map].push(c); return c; };
+      const a = mk(true), b = mk(false); const look = SP.humanSpecOf ? SP.humanSpecOf(a) : null;
+      S.party = []; p.partyCap = 3; talk(b); const noJoin = last && !last.some(o => o.text.includes('Willst du')); talk(a); last.find(o => o.text.includes('Willst du')).fn();
+      const joined = S.party.includes(a.id) && !a.transient && !a.traveler;
+      const c = mk(true); S.party = [1, 2, 3]; talk(c); last.find(o => o.text.includes('Willst du')).fn(); const full = !S.party.includes(c.id) && c.transient;
+      return a.robot && a.wanderBot && BOT_NAMES.includes(a.name) && TRAV_KINDS.some(k => k.robot) && noJoin && joined && full && (!look || (look.face === 'mask' && look.armor === ''));
+    } finally { UI.uiHooks.dialogue = op; S.party = P0; p.partyCap = cap; }
+  }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
@@ -21005,6 +21087,24 @@ export function selftest() {
       if (!(lords && rep && low && joined && foe && bounty && arrest && city && old && ranks)) console.warn('Fraktionsprobe', { lords, rep, low, joined, foe, bounty, arrest, city, old, ranks });
       return lords && rep && low && joined && foe && bounty && arrest && city && old && ranks;
     } finally { S.quests = q0; S.contracts = C0; S.track = tr0; S.ents.zwerge = z0; MAPS.zwerge = mz; S.resist = null; }
+  }));
+  ok('Wüstenbund und Zwerge, Folgen (Fragemenü 03.10.): Karraks Tod Bund +10, kein Wegzoll für Mitglieder, Eskorten des Bunds +25 % ab Karawanenwächter, Hilda bis Meisterstück ab Rang 2, eigener Kerker mit Wärter der Ortsmacht und Entlassung vor Ort, Posten in Dünenwacht', sandbox(() => {
+    const p = stage(), C0 = S.contracts, q0 = S.quests, kk = S.ents.kerker.slice(), jt = S.jailTown, wr = S.flags.waterRight, dn = DUNGEONS.kerker.name;
+    try {
+      S.factions.wuest = 0; REGION_BOSSES.find(b => b.id === 'sandlord').effect(); const karrak = S.factions.wuest === 10;
+      S.flags.waterRight = false; S.ranks.wuest = -1; const t1 = karakToll(); S.ranks.wuest = 0; const toll = t1 > 0 && karakToll() === 0;
+      const mk = () => ({ id: 'we' + Math.random(), state: 'active', kind: 'escort', have: 1, need: 1, title: 'Probe', town: 'karak_atar', giver: 'board', reward: { gold: 100, xp: 5, rep: 1 } });
+      const A = mk(), Bc = mk(); S.contracts = [A, Bc]; S.ranks.wuest = 0; claimContract(A, null); S.ranks.wuest = 1; claimContract(Bc, null); const escort = A.reward.gold === 100 && Bc.reward.gold === 125;
+      const o = { key: 'longsword', qual: 'Meisterlich' }, hilda = { dwarfSmith: true, dwarf: true }; S.ranks.zwerge = 1; const n1 = smithUpgInfo(o, hilda); S.ranks.zwerge = 2; const m2 = smithUpgInfo(o, hilda), other = smithUpgInfo(o, { smith: true });
+      const smith = n1 === null && m2?.to === 'Meisterstück' && other === null;
+      S.jailTown = 'karak_atar'; ensureJail(); const wk = S.ents.kerker.filter(e => e.warden), kar = wk.length === 2 && wk.every(e => e.faction === 'wuest' && e.wardenOf === 'karak_atar') && /Karak-Atar/.test(DUNGEONS.kerker.name) && S.ents.kerker.some(e => e.jailDeco);
+      const L = LOCATIONS.find(l => l.key === 'karak_atar'), out = ARRIVAL.world('kerker'), near = Math.hypot(out.x / TS - L.x, out.y / TS - L.y) < 12;
+      S.jailTown = 'deephall'; ensureJail(); const wd = S.ents.kerker.filter(e => e.warden), dwj = wd.length === 2 && wd.every(e => e.faction === 'zwerge' && e.build === 'gedrungen') && JAIL_STYLE.deephall.out === 'zwerge';
+      S.jailTown = 'saltport'; ensureJail(); const wv = S.ents.kerker.filter(e => e.warden), back = wv.length === 2 && wv.every(e => e.faction === 'valen' && !e.wardenOf) && !S.ents.kerker.some(e => e.jailDeco) && DUNGEONS.kerker.name === 'Kerker';
+      const post = S.ents.world.filter(e => e.dunePost); const dune = post.length >= 3 && post.every(e => e.faction === 'wuest' && e.guard && e.post === 'duenenwacht') && !S.ents.world.some(e => e.label === 'Zelt der Wüstenräuber');
+      if (!(karrak && toll && escort && smith && kar && near && dwj && back && dune)) console.warn('Fraktionsfolgen', { karrak, toll, escort, smith, kar, near, dwj, back, dune });
+      return karrak && toll && escort && smith && kar && near && dwj && back && dune;
+    } finally { S.contracts = C0; S.quests = q0; S.ents.kerker = kk; S.jailTown = jt; jailLook(jt); S.flags.waterRight = wr; if (wr === undefined) delete S.flags.waterRight; indexSolids('kerker'); if (DUNGEONS.kerker.name !== dn) DUNGEONS.kerker.name = dn; }
   }));
   ok('Grubenhäuptling (Nutzer §5e.9): Grisk verleiht den Titel ab Grubenstadt und Ruf 40, Mut wächst mit Goblins, Horde ruft drei Krieger, Trommel stärkt die Gruppe, Grad II vom Meister', sandbox(() => {
     const p = stage(), g0 = S.gobCity, f0 = S.flags.goblinsFreed, r0 = S.factions.goblin;
@@ -22388,7 +22488,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

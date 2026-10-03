@@ -335,6 +335,14 @@ const pickH = (arr, h, k) => arr[Math.abs((h >> (k * 3)) | 0) % arr.length];
 const mixH = (seed, salt) => { let n = Math.imul(((seed * 1000) | 0) ^ salt, 2654435761); n ^= n >>> 15; n = Math.imul(n, 2246822519); return (n ^ (n >>> 13)) >>> 0; };
 // Nutzer §5f: Varianten für alle. Automaten: Metall (Messing, Stahl, Kupfer, geschwärzt), Verschleiß, Leuchtfarbe. Engel: Goldtöne,
 // Mantel, Lichtfarbe. Bewohner: graues Haar im Alter, Hut/Kappe/Tuch, geflickte Kleidung. Wachen: Wappenfarbe je Stadt.
+/* Wanderautomaten (Entwickler 03.10.2026, „wie die Skelette in Kenshi“): hagere Metallgestalt ohne Plattenpanzer, kahler Kuppelkopf mit Sehschlitz,
+   Metallhaut in Stahl, Rost oder Schwarzguss, leuchtende Augen; manche mit Lumpen. */
+function wanderLook(s, seed) {
+  const h = (seed * 977) | 0, M = pickH(['#7a7a74', '#8a6a4e', '#5a5a5e', '#9a9488', '#6e5a48'], h, 0);
+  const D = pickH(['#4a4a46', '#3e342a', '#2e2e32'], h, 4), rag = pickH(['', '', '#4a3a2a', '#3a3226'], h, 2);
+  Object.assign(s, { armor: '', helm: '', skin: M, hair: M, hs: 0, beard: 0, face: 'mask', armorCol: M, helmCol: M, pauld: '', sil: '', tabard: '', mark: '', markCol: '',
+    glow: pickH(['#7fd6e6', '#e6c46a', '#d65a4a', '#9ae07a'], h, 1), cloth: M, pants: D, boots: D, glove: M, belt: D, scarf: rag, wraps: rag ? 1 : 0, wear: pickH([1, 2, 2], h, 3) });
+}
 function varyMachine(s, seed) {
   const h = (seed * 1231) | 0, M = pickH([['#7a6038', '#8a7a58', '#8a7040'], ['#6a6a70', '#7a7a82', '#5a5a62'], ['#8a5436', '#9a6a44', '#7a4a2e'], ['#2e2c2a', '#3a3834', '#4a4238']], h, 0);
   Object.assign(s, { armorCol: M[0], helmCol: M[1], pauld: M[2], glow: pickH(['#8a5420', '#3a9ad8', '#9ad05a', '#d8b03a', '#c85a3a'], h, 1), wear: pickH([0, 0, 1, 2], h, 2), markCol: pickH(['#c8a050', '#b9c3d2', '#8a2a2a'], h, 3) });
@@ -754,7 +762,7 @@ export function humanSpec(e) {
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
   const NL = NAMED_LOOK[key]; if (NL) Object.assign(s, NL);
   condition(s, e, eq);
-  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); }   /* §5f */
+  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); if (e.wanderBot) wanderLook(s, e.seed || 0); }   /* §5f; Wanderautomaten (03.10.) */
   else if (e.kind === 'npc' && !NAMED_LOOK[key] && !e.undead) varyCivil(s, e, prof);
   if (e.kind === 'npc' && !e.robot && !e.undead) varyPeople(s, e, prof, !!NAMED_LOOK[key]);
   else if (e.kind === 'player' && (e.scars | 0) > 0) s.sc = 1;   /* Artist Runde 4: Narben des Helden sieht man */
@@ -771,7 +779,7 @@ export function humanSpec(e) {
    Hilfslisten; in Varonheim ~120 Aufrufe je Bild, 2–4 ms und viel Müll (Müllsammel-Spitzen). Gilt, solange jede Eingabe gleich ist, die
    humanSpec und seine Helfer lesen: Felder der Figur, Palette, Ausrüstung (Stück, Schlüssel, Zustand), Blutstufe, Glieder, Gegend (regionOf/
    regionFarmer). Ändert sich eine davon, wird neu gebaut — das Bild ist dasselbe wie mit humanSpec. */
-const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build'];
+const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'wanderBot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build'];
 const HS_PAL = ['skin', 'hair', 'cloth', 'glow', 'hs', 'armor', 'helm', 'crest', 'hood', 'cloak', 'shield', 'shieldBoss'], HS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 const hsMemo = new WeakMap(), hsSig = [];
 function hsInputs(e) {

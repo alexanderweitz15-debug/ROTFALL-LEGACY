@@ -103,8 +103,8 @@ Jede Tat verändert deinen Ruf bei den Fraktionen. Der Ruf bestimmt Preise, Begr
 | Hochreich Aurelion | Fremder → Registrierter Besucher → Bürger → Anerkannter Bürger → Handelsbürger → Gildenmitglied → Hoher Beamter → Mitglied des Hohen Rates | Aufenthaltsschein, dann Bürgerrecht (Abschnitt 11) |
 | Die Eiserne Kette | Treiber → Kettenknecht → Grenzreiter → Aufseher → Dunkler Hochpaladin | ab Ansehen 10 bei jeder Kettenwache |
 | Die Grubenstämme | Fremder → Freund → Grubenbruder | nach der Befreiung, Aufträge von Grisk |
-| Der Wüstenbund | Karawanengast → Karawanenwächter → Sandreiter | Karak-Atar und Dünenwacht: Beitritt bei einem Mitglied (Ansehen 10), Aufträge am Brett, Rangprüfungen bei der Stammesältesten Amina |
-| Die Zwerge der Tiefhall | Hallengast → Hallenbruder → Schildträger des Königs | erst als Freund der Halle: Beitritt (Ansehen 10, nicht mit Rang bei den Toten), Aufträge am Brett der Halle, Rangprüfungen bei König Durgrim |
+| Der Wüstenbund | Karawanengast → Karawanenwächter → Sandreiter | Karak-Atar und Dünenwacht: Beitritt bei einem Mitglied (Ansehen 10), Aufträge am Brett, Rangprüfungen bei der Stammesältesten Amina; Mitglieder zahlen keinen Wegzoll, Karawanenwächter bekommen mehr für Eskorten |
+| Die Zwerge der Tiefhall | Hallengast → Hallenbruder → Schildträger des Königs | erst als Freund der Halle: Beitritt (Ansehen 10, nicht mit Rang bei den Toten), Aufträge am Brett der Halle, Rangprüfungen bei König Durgrim; Schildträger lassen bei Hilda bis „Meisterstück“ verbessern |
 
 **Aufstieg über Rangprüfungen (Valen, Orden, Tote, Kette):** Ruf allein befördert nicht mehr. Erreichst du das Ansehen für den
 nächsten Rang (25 je Stufe), meldet das Spiel eine **Rangprüfung**: zwei Aufträge beim Anführer — Oda (Valen), Kelan (Orden),

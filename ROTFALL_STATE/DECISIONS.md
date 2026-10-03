@@ -251,3 +251,18 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Jagd: wächst beim Erlegen von Tieren; mehr Felle und Fleisch; Tiere bemerken dich später.
   - Schleichmodus bauen: eine Taste, langsamer, schwerer zu sehen; Schleichen wächst dabei; Hinterhalt-Bonus.
   - Boss-Beute: jeder Boss lässt garantiert genau eines seiner Stücke fallen (nie doppelt). Graumähne und Karrak bekommen eigene Stücke.
+- **Fragemenü 03.10. (abends):**
+  - Dünenwacht wird ein Posten des Wüstenbunds mit Sandreitern und Brett; das Zelt heißt „Posten der Sandreiter“.
+  - Karraks Tod gibt Wüstenbund +10.
+  - Rangvorteile:
+    - Rabatt bei den Händlern beider Fraktionen.
+    - Wüstenbund: freier Durchzug ohne Wegzoll in Karak-Atar, Eskorten zahlen besser.
+    - Zwerge: ab Rang 2 verbessert die Zwergenschmiede bis „Meisterstück“.
+  - Karak-Atar und die Tiefhall bekommen eigene Kerker mit eigenem Wärter.
+  - **NEU, großes Paket „Fraktions-Starts“:**
+    - Wer den höchsten Rang einer Fraktion erreicht, schaltet sie dauerhaft (über alle Spielstände) als Start für neue Geschichten frei.
+    - Freischaltbar sind alle Fraktionen mit eigenem Gebiet: Valen, Orden, Kette, Untote, Aurelion, Seevolk, Händler, Grubenstämme, Wüstenbund, Zwerge.
+    - Ein Fraktions-Start bringt: Start im Fraktionsgebiet, Mitglied ab Start, eigene Ausrüstung und eigenes Aussehen, ein eigenes Haus bzw. Gebiet und **Boni je Rasse**.
+    - Alle Starts bekommen ein eigenes Aussehen; man soll auch als **Skelett** starten können.
+    - Rekrutieren: bei gutem Ruf Fraktionsmitglieder als Gefährten UND als Siedlungswachen.
+  - **NEU: Roboter wie in Kenshi:** Überall in der Welt streifen Roboter frei umher (Aussehen ähnlich den Skeletten aus Kenshi). Manche kann man rekrutieren, ähnlich wie Beep. Dazu weitere Charaktere in der Welt.

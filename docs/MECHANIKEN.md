@@ -1356,7 +1356,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Ränge (vorläufige Namen):** Wüstenbund: Karawanengast → Karawanenwächter → Sandreiter. Zwerge: Hallengast → Hallenbruder → Schildträger des Königs. Aufstieg wie bei den anderen Mächten: Ansehen 25 bzw. 50, dann zwei Rangaufträge — beim Wüstenbund bei der Stammesältesten Amina in Karak-Atar, bei den Zwergen bei König Durgrim.
 - **Verbrechen:** Wer dort jemanden angreift oder tötet, verliert Ruf bei dieser Fraktion und bekommt Kopfgeld bei ihr (nicht mehr bei Valen). Zöllner, Sandreiter und Zwergenwachen halten Gesuchte an: zahlen, mitkommen (Kerker, danach wirst du vor Karak-Atar bzw. vor dem Eingang der Tiefhall entlassen) oder Widerstand.
 - **Hinweis:** Beim ersten Betreten von Karak-Atar/Dünenwacht bzw. der Zwergenstadt erklärt eine Meldung die Fraktion. Ränge stehen im Kodex (H, Reiter „Ränge“) und im Fraktionsfenster.
-- **Debug:** Abschnitt „Fraktionen: Wüstenbund und Zwerge“ (Ansehen, Rang, Reisen, Kopfgeld, Hinweise zurücksetzen).
+- **Dünenwacht** ist ein Posten des Wüstenbunds: vier Sandreiter halten dort Wache (sie sind Wachen des Bunds), das Zelt heißt „Posten der Sandreiter“. Die Wüstenräuber beim Wasserrecht-Geheimnis sind weiter Räuber, nicht der Bund.
+- **Karraks Tod** gibt +10 Ruf beim Wüstenbund (Karrak raubt auch den Bund aus).
+- **Rangvorteile:** Bei beiden Fraktionen Nachlass bei ihren Händlern wie bei allen Mächten (3 % je Rang). Wüstenbund: schon als Mitglied (Karawanengast) kein Wegzoll in Karak-Atar; ab Karawanenwächter zahlen Eskorten des Bunds 25 % mehr (vorläufiger Wert). Zwerge: als Schildträger des Königs (Rang 2) verbessert Hilda Eisenfaust Ausrüstung eine Stufe weiter, bis „Meisterstück“ (sonst endet jeder Schmied bei „Meisterlich“). Hilda bessert erst aus, wenn du Freund der Halle bist.
+- **Eigene Kerker:** Wer von Wachen des Wüstenbunds bzw. der Zwerge festgenommen wird, sitzt im Kerker von Karak-Atar bzw. im Kerker der Tiefhall — mit eigenem Kerkermeister (Sandfürsten bzw. Zwerge), eigenen Bannern und eigenem Ankunftstext. Regeln wie in jedem Kerker (Zeit, Kaution, Bestechung, Schlossknacken). Entlassen wird vor Ort: vor Karak-Atar bzw. in der Zwergenstadt; wer ausbricht, landet dort auch.
+- **Debug:** Abschnitt „Fraktionen: Wüstenbund und Zwerge“ (Ansehen, Rang, Reisen, Kopfgeld, Kerker von Karak-Atar/Tiefhall, Karrak fällt, Hinweise zurücksetzen).
 - **Asservatenkammer (03.10.):** Brichst du aus dem Kerker aus oder fliehst aus der Schuldknechtschaft, liegt deine Waffe in der Asservatenkammer der Macht, die dich festhielt. Jede Wache dieser Macht gibt sie dir gegen eine Buße heraus: 50 Gold plus ein Viertel ihres Werts (vorläufig). Es ist dein Exemplar, mit Seltenheit und Zustand. Solange dort ein Kopfgeld auf dich offen ist, gibt die Wache sie nicht heraus.
 - **Legendäre Sets als Lohn (03.10.):** Wer den höchsten Rang erreicht, bekommt das Set des Anführers geschenkt, ohne ihn zu töten:
   - bei Valen den Hochritter;
@@ -1368,3 +1372,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - **Hinterhalt:** Greifst du aus dem Schleichen einen ahnungslosen Gegner an, ist das ein Hinterhalt: ×1,5 Schaden, von hinten ×3. Danach bist du entdeckt, und das Schleichen endet.
   - **Übung:** Die Fertigkeit Schleichen wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst.
   - **Kein Schleichen auf dem Pferd.** Alle Werte sind vorläufig.
+
+- **Wanderautomaten (03.10.):** Wie die Skelette in Kenshi ziehen Roboter ohne Herrn als Reisende von Stadt zu Stadt.
+  - **Aussehen:** Sie sind hagere Metallgestalten ohne Rüstung, mit kahlem Maskenkopf und leuchtenden Augen. Das Metall ist Stahl, Rost oder Schwarzguss; manche tragen Lumpen oder eine Schrottklinge.
+  - **Anwerben:** Sprich sie an. Etwa 2 von 5 kommen auf „Willst du mit mir kommen?“ kostenlos mit, solange in deiner Gruppe Platz ist (wie Beep). Die anderen lehnen freundlich ab.
+  - **Hinweis:** Beim ersten Gespräch erklärt eine Meldung die Regel. Debug-Abschnitt „Wanderautomaten“. Häufigkeit und Anteil sind vorläufig.

@@ -12,6 +12,43 @@ export const ORIGINS = {
                attrs:{agility:1,perception:1,willpower:1}, skills:{survival:4,trading:4}, gear:['rusty_sword','cloth_shirt','bread'], gold:30 },
 };
 
+/* Entwickler 03.10. (Fraktions-Starts): Rassen. Werte VORLÄUFIG (ROTFALL_STATE/PROPOSALS/fraktions_starts.md §5): kleiner als eine Herkunft
+   (Herkunft +3 Attributpunkte, Rasse netto +2, eine Fertigkeit bis +5). Einmalig beim Start addiert wie die Herkunft.
+   look: Felder für die Rassen-Schicht in sprites.js humanSpec (sp, face, glow, skin, beard, build). rule: Sonderregeln für den Hinweis. */
+export const RACES = {
+  mensch:     { name:'Mensch', attrs:{ willpower:1 }, skills:{ leadership:3 }, look:{}, rule:'Menschen führen: Führung +3.' },
+  aurelianer: { name:'Aurelianer', attrs:{ intelligence:1, perception:1 }, skills:{ trading:3 }, look:{ skin:'#c89a6a', hair:'#1e1a16' }, rule:'Händlerblut des Hochreichs: Handel +3.' },
+  inselvolk:  { name:'Inselvolk', attrs:{ agility:1, endurance:1 }, skills:{ survival:3 }, look:{ skin:'#a87a52' }, rule:'Salz und Sturm: Überleben +3.' },
+  wuestenvolk:{ name:'Wüstenvolk', attrs:{ endurance:2 }, skills:{ survival:3 }, look:{ skin:'#7a5234', hair:'#16120e' }, rule:'Hitze und Durst gewohnt: Ausdauer +2.' },
+  zwerg:      { name:'Zwerg', attrs:{ endurance:2, strength:1, agility:-1 }, skills:{ smithing:5 }, look:{ beard:1, build:'gedrungen' }, rule:'Körperbau immer „Gedrungen“; Schmieden +5.' },
+  goblin:     { name:'Goblin', attrs:{ agility:2, perception:1, strength:-1 }, skills:{ crafting:3 }, look:{ sp:'goblin', skin:'#5e7038' }, rule:'Klein und flink: kleiner gezeichnet, Goblins halten dich für ihresgleichen.' },
+  skelett:    { name:'Skelett', attrs:{ endurance:1, willpower:1 }, skills:{ toughness:5 }, look:{ sp:'skeleton', face:'skull', glow:'#4e8f7a', skin:'#cfc8b4' }, undead:true,
+                rule:'Untot: isst nicht, heilige Kraft trifft doppelt. Ohne Kapuze erkennt man die Knochen (Stigma „Knochen“).' },
+};
+/* Fraktions-Starts: Ort (LOCATIONS-Schlüssel), Karte (sonst Oberwelt), Rasse, Ruf ab Start, Ausrüstung (ersetzt die der Herkunft), Gold-Zuschlag,
+   Kleiderfarbe (Aussehen), Hausplatz (Versatz in Kacheln vom Ort). Alles VORLÄUFIG (PROPOSALS/fraktions_starts.md). */
+export const FAC_STARTS = {
+  valen:  { at:'varonheim', race:'mensch', rep:20, gear:['spear', 'leather_jerkin', 'leather_cap', 'bread'], gold:10, cloth:'#33415c',
+            desc:'Rekrut König Varons in der Hauptstadt. Am Markt hängen leichte Aufträge, vor dem Westtor steht dein Gehöft.' },
+  order:  { at:'sonnwacht', race:'mensch', rep:20, gear:['rusty_sword', 'wooden_shield', 'ordenskutte', 'bread'], gold:0, cloth:'#c7bda6',
+            desc:'Novize des Ordens in der Ordensfeste Sonnwacht. Elfenbein und Eisen — und Feinde unter den Toten.' },
+  undead: { at:'vharnholm', race:'skelett', rep:20, gear:['grabraeuber', 'kuttenkapuze', 'fetzenmantel'], gold:5, cloth:'#232a28',
+            desc:'Ein Diener der Stillen in Vharnholm — ein Skelett. Die Toten sind deine Verbündeten, Orden und Valen deine Feinde. Ohne Kapuze erkennt man dich.' },
+  chain:  { at:'kettenfeste', race:'mensch', rep:20, gear:['schrottkeule', 'leather_jerkin', 'bergmannshelm', 'bread'], gold:5, cloth:'#1a1718',
+            desc:'Treiber der Eisernen Kette in der Eisenfeste. Die Tore stehen dir offen, die Grubenstämme hassen dich.' },
+  aurel:  { at:'aurelheim', race:'aurelianer', rep:20, gear:['dagger', 'cloth_shirt', 'herb', 'herb'], gold:30, cloth:'#8a6a3a',
+            desc:'Bürger des Hochreichs in Aurelheim — ohne Schein, mit Siegel. Reich an Papieren, arm an Narben.' },
+  sea:    { at:'isle', map:'isle', race:'inselvolk', rep:20, gear:['entermesser', 'teermantel', 'dried_meat'], gold:10, cloth:'#2c3a44',
+            desc:'Landratte des Seevolks in Tangkron auf den Gischtinseln. Salzbund oder Sturmklinge — die Wahl kommt noch.' },
+  merch:  { at:'kreuzweg', race:'mensch', rep:20, gear:['dagger', 'traveler_cloak', 'bread'], gold:30, cloth:'#5a4630',
+            desc:'Kunde der Freien Händler am Marktflecken Kreuzweg. Etwas mehr Gold, etwas weniger Stahl.' },
+  goblin: { at:'morrgrund', race:'goblin', rep:20, gear:['pickaxe', 'cloth_shirt', 'dried_meat'], gold:5, cloth:'#3d4a22',
+            desc:'Ein Goblin der Grubenstämme in Morrgrund. Goblins halten dich für ihresgleichen, die Kette jagt deinesgleichen.' },
+  wuest:  { at:'karak_atar', race:'wuestenvolk', rep:20, gear:['spear', 'wuestenhaube', 'cloth_shirt', 'bread'], gold:10, cloth:'#c8b48a',
+            desc:'Karawanengast des Wüstenbunds in Karak-Atar. Wasser, Wegzoll und Karawanen.' },
+  zwerge: { at:'deephall', race:'zwerg', rep:20, gear:['axe', 'leather_jerkin', 'bergmannshelm', 'bread'], gold:10, cloth:'#2a3040',
+            desc:'Hallengast der Zwerge an der Tiefhall. Die Königsstadt liegt unter der alten Halle — und dazwischen stehen Hrodvars Tote.' },
+};
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
   medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
 
@@ -899,6 +936,21 @@ export const STIGMA = {
     bandit: { price:1,   deny:false, report:null,    greet:'„Zahnig. Gefällt mir.“' },
     undead: { price:0.9, deny:false, report:null,    greet:'„Kalt wie wir. Setz dich.“' },
     blut:   { price:0.8, deny:false, report:null,    greet:'„Kind des Kelchs.“' },
+  },
+  /* Fraktions-Starts (03.10., VORLÄUFIG, PROPOSALS/fraktions_starts.md §9): ein Skelett-Held. Sichtbar ohne Kapuze in 120 px; wer es sah, weiß es 10 Tage. */
+  skeleton: {
+    order:  { price:1,   deny:true,  report:'hunt',  greet:'„Zurück in dein Grab, Knochenmann. Das Licht sieht dich.“' },
+    valen:  { price:1.5, deny:false, report:'guard', greet:'„Bei den Göttern — ein Toter, der redet. Wache!“' },
+    chain:  { price:1,   deny:true,  report:'guard', greet:'„Omega verbrennt, was nicht atmet.“' },
+    zwerge: { price:1,   deny:true,  report:null,    greet:'„Die Toten haben uns die obere Halle genommen. Geh, bevor die Axt spricht.“' },
+    aurel:  { price:1.2, deny:false, report:null,    greet:'„Ein wandelndes Skelett. Die Akademie würde dich gern zerlegen.“' },
+    merch:  { price:1.2, deny:false, report:null,    greet:'„Gold ist Gold. Auch aus Knochenfingern.“' },
+    goblin: { price:1.2, deny:false, report:null,    greet:'„Knochen, die laufen. Die Grube hat Schlimmeres gesehen.“' },
+    sea:    { price:1.2, deny:false, report:null,    greet:'„Ein Toter an Land. Auf See wärst du Ballast.“' },
+    wuest:  { price:1.2, deny:false, report:null,    greet:'„Die Wüste bleicht Knochen. Deine sind schon weiß.“' },
+    frei:   { price:1.2, deny:false, report:null,    greet:'„Wir haben genug Herren gehabt. Auch tote.“' },
+    bandit: { price:1,   deny:false, report:null,    greet:'„Ein Skelett mit Geld. Heute ist mein Glückstag.“' },
+    undead: { price:0.9, deny:false, report:null,    greet:'„Willkommen, Stiller.“' },
   },
 };
 export const SKILL_BRANCHES = {

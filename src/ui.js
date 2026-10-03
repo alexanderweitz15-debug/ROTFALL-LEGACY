@@ -1899,7 +1899,7 @@ function smithUI(body, npc) {
   if ($('sm-shop')) $('sm-shop').onclick = () => openModal('trade', npc);
   if ($('sm-forge')) $('sm-forge').onclick = () => { closeModal(); A.openForge?.(forge); };
   /* Verbessern und Schmieden lassen (03.10.2026) */
-  const U = A.smithUpgList?.() || [], O = A.smithOrders?.() || [], main = body.querySelector('.tr-main');
+  const U = A.smithUpgList?.(npc) || [], O = A.smithOrders?.() || [], main = body.querySelector('.tr-main');
   const sec = document.createElement('div'); sec.innerHTML = `<div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Verbessern <span class="ledger">— eine Gütestufe höher, bis „Meisterlich“</span></div>
     <div class="sm-rows">${U.length ? U.map((x, i) => `<div class="sm-row"><span class="sm-cell" data-u="${i}"></span><span class="sm-txt"><b>${qa(ITEMS[x.o.key].name)}</b>${x.eq ? ' <span class="sm-eq">●</span>' : ''}<br><span class="ledger">${x.u.from} → <b>${x.u.to}</b> · ${x.u.gold} Gold · ${x.u.iron} Eisen</span></span><button class="mini" data-up="${i}"${S.gold < x.u.gold ? ' disabled' : ''}>Verbessern</button></div>`).join('') : '<div class="ledger">Nichts, was sich verbessern lässt.</div>'}</div>
     <div class="tr-sec">${icoImg('nav_build', 1, 'kpi-ico')} Schmieden lassen <span class="ledger">— aus deinem Material, gegen Lohn</span></div>

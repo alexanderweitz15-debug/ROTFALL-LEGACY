@@ -1329,7 +1329,7 @@ function extendSouth() {
   // Dünenwacht, Sandruinen, Nekrosinsel
   for (const [x, y] of [[322, 792], [338, 792], [322, 808], [338, 808]]) prop('watchtower_ruin', x, y, { solid: true, r: 14 });
   for (let i = -6; i <= 6; i++) { prop('palisade_prop', 330 + i, 790, { solid: true }); prop('palisade_prop', 330 + i, 810, { solid: true }); }
-  prop('tent_prop', 328, 800, { solid: true, label: 'Zelt der Wüstenräuber' }); prop('campfire_static', 333, 801, { solid: true, r: 10 });
+  prop('tent_prop', 328, 800, { solid: true, label: 'Posten der Sandreiter' });   /* Fragemenü 03.10.: Posten des Wüstenbunds */ prop('campfire_static', 333, 801, { solid: true, r: 10 });
   for (let k = 0; k < 12; k++) prop(k % 3 ? 'broken_pillar' : 'rubble', Math.round(250 + Math.cos(k * 0.52) * 11), Math.round(860 + Math.sin(k * 0.52) * 8), { solid: k % 3 !== 0, r: 10 });
   prop('tower_ruin', 1390, 796, { solid: true, r: 18, label: 'Turm der Nekrosinsel' }); for (let k = 0; k < 8; k++) prop('bone_spire', Math.round(1390 + Math.cos(k * 0.8) * 22), Math.round(800 + Math.sin(k * 0.8) * 16), { solid: true, r: 8 });
   prop('sign', 1392, 700, { label: 'Totenbrücke — zur Nekrosinsel' });
