@@ -961,6 +961,10 @@ function drawWolfForm(e, now) {
   if (((now / 180) | 0) % 3 === 0) { ctx.fillStyle = 'rgba(183,216,106,0.5)'; ctx.fillRect(Math.round(e.x + Math.sin(now / 300) * 10), Math.round(e.y - 16 - (now / 30) % 12), 2, 2); }
 }
 function drawEntity(e, now) {
+  if (e.sneak && e.kind === 'player') { ctx.save(); ctx.globalAlpha = 0.6; try { return drawEntityInner(e, now); } finally { ctx.restore(); } }   /* Schleichen: halb durchsichtig */
+  return drawEntityInner(e, now);
+}
+function drawEntityInner(e, now) {
   switch (e.kind) {
     case 'prop': return drawPropPixel(e, now);
     case 'building': return drawBuilding(e, now);

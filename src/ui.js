@@ -1223,7 +1223,7 @@ function charUI(body, who) {
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
     hunting: 'Steigt beim Erlegen von Tieren. Mehr Felle, Fleisch und Knochen (bis +60 %); Tiere bemerken dich später (bis 40 % kürzere Sicht).',
     crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
-    stealth: 'Hilft beim Hineinschleichen und Stehlen. Wächst noch nicht durch Übung — das kommt mit dem Schleich-System.' };
+    stealth: 'Schleichen (Taste V): Gegner bemerken dich später (bis nur noch 30 % ihrer Sicht). Wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst. Hilft auch beim Hineinschleichen und Stehlen.' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
   const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
@@ -1986,7 +1986,7 @@ function settingsUI(body) {
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
-      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
+      WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>V — Schleichen an/aus<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
       I Inventar · C Charakter · G Gruppe · B Lager · F Fraktion · K Chronik · M Karte<br>J — Aufträge · T — Talente · Z — Zauberbuch · H — Kodex · X — Effekte · N — Minikarte<br>Rechtsklick auf die Leiste — Platz leeren<br>Mausrad — Zoom<br>Esc — Schließen<br>Strg+Shift+D — Debug</div>
       <h3 style="margin-top:14px">Spielstand</h3>
       <div class="ctx-actions"><button id="sv">Jetzt speichern</button><button id="quit">Zum Hauptmenü</button><button id="coopb" title="Zu zweit über das Netz: Code erzeugen oder beitreten">Koop (Netzwerk)</button></div>

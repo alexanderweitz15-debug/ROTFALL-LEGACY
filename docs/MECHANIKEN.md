@@ -1362,3 +1362,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - bei Valen den Hochritter;
   - beim Orden Ordensmeister und Sternwacht;
   - bei Rooks Bande Rooks General.
+- **Varonheim als volle Hauptstadt (03.10.):** Varonheim bekommt jetzt alles, was eine Stadt hat: Kutsche, Schankpersonal (mit Söldnern), Boten und Spielleute, 5 Aushänge am Brett. Steuereintreiber und Missernte treffen nur noch Dörfer. Die Karte ändert sich dadurch nicht.
+- **Schleichmodus (03.10.):** Mit der Taste V schleichst du. Du bist dann halb so schnell und halb durchsichtig.
+  - **Später entdeckt:** Gegner, die dich noch nicht jagen, bemerken dich erst auf 55 % ihrer Sichtweite, mit Schleichen 100 sogar erst auf 30 %.
+  - **Hinterhalt:** Greifst du aus dem Schleichen einen ahnungslosen Gegner an, ist das ein Hinterhalt: ×1,5 Schaden, von hinten ×3. Danach bist du entdeckt, und das Schleichen endet.
+  - **Übung:** Die Fertigkeit Schleichen wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst.
+  - **Kein Schleichen auf dem Pferd.** Alle Werte sind vorläufig.

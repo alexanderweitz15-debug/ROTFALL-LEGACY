@@ -2561,12 +2561,12 @@ function ambientTick(dt) {
   if (crowd.length >= 3) kinds.push('sermon');
   const tav = HOUSES.find(b => b.town === town && b.type === 'tavern' && b.map === 'world');
   if (tav && h >= 18 && Math.hypot(tav.doorTile[0] - p.x / TS, tav.doorTile[1] - p.y / TS) < 18) kinds.push('drunk');
-  if (!TOWN_PLAN[town].village) kinds.push('messenger');
+  if (!isVil(town)) kinds.push('messenger');
   const lovers = near.map(e => [e, e.rel?.friend && byId(e.rel.friend)]).find(([e, o]) => o && idle(o) && !e.married && !o.married && dist(e, o) < 90);   // S13 (WELT_EVENTS Idee 2, 4, 6)
   if (lovers && chance(0.35)) kinds.push('wedding');
   const rivals = near.map(e => [e, (e.rel?.rival || e.rel?.foe) && byId(e.rel.rival || e.rel.foe)]).find(([e, o]) => o && idle(o) && dist(e, o) < 300);
   if (rivals && dist(rivals[0], rivals[1]) < 90) kinds.push('duel');
-  if (!TOWN_PLAN[town].village && h < 21) kinds.push('minstrels');
+  if (!isVil(town) && h < 21) kinds.push('minstrels');
   const k = pick(kinds);
   if (k === 'argue') runScene(pair, pick(TOWN_PLAN[town].metro ? AMB_ARGUE_METRO : AMB_ARGUE));
   if (k === 'drill') runScene(drill, AMB_DRILL, 2200);
@@ -2767,7 +2767,7 @@ function update(dt, now) {
     placing.ghost.blocked = !canPlace(placing.ghost);
   }
 
-  drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick();
+  drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick(); sneakTick(dt);
   sealTick(dt); R.setSeals?.(SEALS, hovered);   /* Visuell Q-2: Siegel über Gebern */
   hudTimer += dt;
   if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
@@ -3283,7 +3283,7 @@ function controlPlayer(dt) {
   updateGuard(p, keys.has('shift') || touch.guard);
   if (dx || dy) {
     const l = Math.hypot(dx, dy);
-    let sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : p.reloadUntil > performance.now() ? 0.6 : 1);   // Deckung: kleine Schritte; Armbrust spannen: langsam
+    let sp = speedOf(p) * dt / 16 * (p.cover ? 0.45 : p.reloadUntil > performance.now() ? 0.6 : 1) * (p.sneak ? 0.5 : 1);   /* Schleichen: halbe Geschwindigkeit */   // Deckung: kleine Schritte; Armbrust spannen: langsam
     // BUG-076 (§34): wer zuschlägt, steht; wer im Kampf rückwärts geht, geht langsam — Rückwärtslaufen-und-Hauen ist kein Freifahrtschein
     if (p.swing > 0 || p.chargeK > 0) sp *= 0.55;   /* Kampfanimation: Aufladen = Ausholen, man steht fast */
     if ((dx * Math.cos(p.aim) + dy * Math.sin(p.aim)) / l < -0.35 && combat.some(f => f.kind === 'enemy' && f.alive && !f.downed && dist(p, f) < 280 && isHostile(f, p))) sp *= backMul(p);
@@ -3706,7 +3706,8 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker.omegaAvatar) dmg *= 1.3;   // Phase 7: Avatar Omegas
   if (target.spent > performance.now() && (attacker === S.player || S.party.includes(attacker.id))) { dmg *= 1.35; if (!target.spentShown) { target.spentShown = 1; float(target, 'Flanke!', 'rgba(230,200,120,ALPHA)'); } }   /* Scout R4: Sieger eines Dreieckskampfs ist kurz erschöpft */
   // Kritisch
-  const ambush = attacker === S.player && target.kind === 'enemy' && teamOf(target) === 'neutral';   // S12: Schleichangriff auf Ahnungslose
+  const ambush = attacker === S.player && target.kind === 'enemy' && (teamOf(target) === 'neutral' || (attacker.sneak && target.aggroId !== attacker.id));   /* Schleichen: Hinterhalt auch gegen ahnungslose Feinde */
+  if (attacker === S.player && attacker.sneak) toggleSneak(false);   /* wer zuschlägt, ist entdeckt */   // S12: Schleichangriff auf Ahnungslose
   const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen');
   const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) > Math.PI - 1;   // Balance-Runde: vorher „< 1“ = von VORN (Dolch-Krit ×2,6 gegen jeden, der einen ansieht)
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
@@ -4416,8 +4417,23 @@ function hurtFromProjectile(attacker, target, p) {
 // ================= KI =================
 function nearestTarget(e, list, maxD) {
   let best = null, bd = maxD;
-  for (const t of list) { if (!t.alive || t.downed || t.cineGhost || t.map !== e.map) continue; const d = dist(e, t); if (d < bd) { bd = d; best = t; } }
+  for (const t of list) { if (!t.alive || t.downed || t.cineGhost || t.map !== e.map) continue; const d = dist(e, t) / (t.sneak && e.aggroId !== t.id ? sneakSight(t) : 1); if (d < bd) { bd = d; best = t; } }   /* Schleichen: wer dich noch nicht jagt, sieht dich erst viel näher */
   return best;
+}
+/* Schleichmodus (Entwickler 03.10.2026): Taste V. Halbe Geschwindigkeit; Gegner, die dich noch nicht jagen, bemerken dich erst auf 55 % ihrer
+   Sichtweite (mit Schleichen 100 nur noch 30 %). Ein Angriff aus dem Schleichen auf einen Ahnungslosen ist ein Hinterhalt (×1,5, von hinten ×3)
+   und beendet das Schleichen. Schleichen wächst, solange du nah an ahnungslosen Gegnern vorbeischleichst. Vorläufige Werte. */
+const sneakSight = c => Math.max(0.3, 0.55 - Math.min(100, c.skills?.stealth || 0) * 0.0025);
+function toggleSneak(on = !S.player.sneak) {
+  const p = S.player; if (!p || p.mounted && on) { if (on) UI.toast('Vom Pferd aus schleicht niemand.'); return; }
+  p.sneak = on; UI.toast(on ? 'SCHLEICHEN (V)' : 'Schleichen aus', 1300);
+  if (on && !S.flags.sneakHint) { S.flags.sneakHint = 1; log('Schleichen: langsamer, aber Gegner bemerken dich erst viel später. Ein Angriff aus dem Schleichen auf Ahnungslose ist ein Hinterhalt (×1,5, von hinten ×3). V schaltet um.', 'quest'); }
+}
+let sneakT = 0;
+function sneakTick(dt) {
+  const p = S.player; if (!p?.sneak || (sneakT += dt) < 1000) return; sneakT = 0;
+  const near = actorsOf(p.map).list.some(e => e.kind === 'enemy' && e.alive && e.aggroId !== p.id && isHostile(e, p) && dist(e, p) < 320);
+  if (near) { const s = p.skills.stealth || 0; p.skills.stealth = Math.min(100, s + 0.15 + 0.35 * (1 - s / 100)); }
 }
 
 const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', drill_fighter: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
@@ -7507,6 +7523,9 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 /* Entwickler 02.10.2026: „3 Aufträge für die Eisenkette, kein Ansehen“ — die Eisenfeste steht nicht in TOWN_PLAN/GUARD_POSTS, ihr Ansehen ging an Valen.
    Orte der Kette (LOCATIONS faction 'chain') zählen jetzt für die Kette. Andere Fraktionsorte (Grubenhort, Karak-Atar …) bleiben bewusst unverändert: offene Entscheidung. */
+/* Entwickler 03.10.2026: Varonheim ist volle Hauptstadt (Kutsche, Schankpersonal, Söldner, volles Brett) — das Dorf-Kennzeichen in TOWN_PLAN
+   bleibt für die Welterzeugung (world.js), die Spielregeln fragen isVil. */
+const isVil = k => !!TOWN_PLAN[k]?.village && !TOWN_PLAN[k]?.capital;
 const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.tribute ? 'frei' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin', 'wuest', 'zwerge'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
 /* Entscheidung 03.10.2026: Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge der Tiefhall haben eigene Bretter — Arten passend zum Ort (vorläufig) */
 const FAC_CON = { karak_atar: ['escort', 'deliver', 'bounty', 'camps', 'missing', 'patrol', 'trail', 'defense'], duenenwacht: ['patrol', 'bounty', 'camps', 'trail'], deephall: ['monster', 'bounty', 'hunt', 'missing'] };
@@ -7612,7 +7631,7 @@ function townContracts(town, giver) {
   if ((S.conDay[key] ?? -99) + 3 <= (S.day | 0)) {                    // alle 3 Tage neu: offene Angebote verfallen, laufende bleiben
     for (const c of S.contracts) if (c.town === town && c.giver === giver && c.state === 'offer' && c.day < (S.day | 0) - 2) ignoredContract(c);   // S13: niemand hat es erledigt
     S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer' && !c.vanish));
-    const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : TOWN_PLAN[town]?.village ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
+    const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : isVil(town) ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
     for (let i = 0; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
     if (giver === 'board' && n) { const C = smuggleContract(town); if (C) S.contracts.push(C); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine)
     S.conDay[key] = S.day | 0;
@@ -8012,7 +8031,7 @@ function bandLootOpen(t) {
 }
 function caravanSurvivors(c, src) {
   const band = caravanCulprit(c, src); if (band === 'player') return null;
-  const tx = c.x / TS | 0, ty = c.y / TS | 0, towns = Object.keys(TOWN_PLAN).filter(k => !TOWN_PLAN[k].village && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm');
+  const tx = c.x / TS | 0, ty = c.y / TS | 0, towns = Object.keys(TOWN_PLAN).filter(k => !isVil(k) && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm');
   const town = towns.sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[b].square[0] - tx, TOWN_PLAN[b].square[1] - ty))[0]; if (!town) return null;
   const C = makeContract(town, 'missing', 'board'), q = freeSpotNear('world', tx + ri(-12, 12), ty + ri(-12, 12), 4);
   Object.assign(C, { x: q.x / TS | 0, y: q.y / TS | 0, name: `${pick(FIRST_M)} der Kutscher`, twist: chance(0.5) ? 'captive' : null, title: 'Überlebende der Karawane' });
@@ -8111,7 +8130,7 @@ const MUSIC = ['„♪ Die Toten stehen auf im Tal, der König zählt sein Gold 
 const TAVERN_POOL = ['bread', 'bread', 'dried_meat', 'herb', 'bandage'];
 function ensureTavernStaff() {
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
-    if (P.village || town === 'vharnholm' || S.ents.world.some(e => e.tavernStaff === town)) continue;
+    if (isVil(town) || town === 'vharnholm' || S.ents.world.some(e => e.tavernStaff === town)) continue;
     const tav = HOUSES.find(b => b.town === town && b.type === 'tavern' && b.map === 'world'); if (!tav) continue;
     const at = (fx, fy) => { const q = { x: (tav.x + fx) * TS + TS / 2, y: (tav.y + fy) * TS + TS / 2 }; return solidPropAt('world', q.x, q.y, 6) || SOLID.has(tileAt('world', tav.x + fx, tav.y + fy)) ? freeSpotNear('world', tav.x + (tav.w >> 1), tav.y + (tav.h >> 1), 2) : q; };
     for (const [prof, fx, fy, greet] of [['Schankmagd', 2, 2, '„Bier, Brot, Eintopf. Such dir was aus, der Rest ist ausverkauft.“'], ['Koch', 1, 1, '„Raus aus meiner Küche!“'], ['Spielmann', tav.w - 2, 1, MUSIC[0]]]) {
@@ -8126,7 +8145,7 @@ function ensureTavernStaff() {
 // Kutscher stehen am Platz jeder größeren Stadt und fahren zu den nächsten Städten; ins Hochreich nur mit Aufenthaltsschein. Der Fährmann
 // am Kai von Salzhafen setzt nach Kupferhafen über (und zurück). Preis und Dauer nach Entfernung; die Zeit vergeht wirklich (Abblende).
 // Unterwegs kann die Kutsche überfallen werden (je nach Gefahr der Gegend): dann steht man mitten auf der Strecke, der Rest geht zu Fuß.
-const coachTown = k => { const P = TOWN_PLAN[k]; return P && (!P.village || P.lord === 'aurel') && !['vharnholm', 'kettenfeste'].includes(k) && S.war?.nodes?.[k]?.owner !== 'undead' && !S.razed?.[k]; };
+const coachTown = k => { const P = TOWN_PLAN[k]; return P && (!isVil(k) || P.lord === 'aurel') && !['vharnholm', 'kettenfeste'].includes(k) && S.war?.nodes?.[k]?.owner !== 'undead' && !S.razed?.[k]; };
 const FERRY = { saltport: 'kupferhafen', kupferhafen: 'saltport' };
 function ensureCoaches() {
   for (const k of Object.keys(TOWN_PLAN)) {
@@ -11440,7 +11459,7 @@ function hourTick(h) {
 }
 
 // S13 (WELT_EVENTS_S13 §2, direkt umsetzbar): echte Ereignisse an echten Orten statt fester Meldungen.
-const villOf = f => Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === f && TOWN_PLAN[k].village && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead');
+const villOf = f => Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === f && isVil(k) && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead');
 function evTaxman() {                                                   // Steuereintreiber Valens mit zwei Wachen
   const t = pick(villOf('valen')); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
   const q = freeSpotNear('world', sx + 2, sy - 2, 3), c = makeChar({ name: pick(FIRST_M), prof: 'Steuereintreiber', x: q.x, y: q.y, level: 4, faction: 'valen' });
@@ -16521,6 +16540,7 @@ function bindInput() {
     if (k === 'r') toggleMount();                             // S13: auf- und absitzen
     if (k === 'n') { S.settings.minimap = !S.settings.minimap; UI.toast(S.settings.minimap ? 'Minikarte an (N)' : 'Minikarte aus (N)', 1400); }
     if (k === 'q') dodge();
+    if (k === 'v') toggleSneak();   /* Schleichmodus (03.10.2026) */
     if (k >= '1' && k <= '9') useSlot(+k - 1);
     if (k === '0') useSlot(9);
     if (k === ' ') e.preventDefault();
@@ -20836,6 +20856,14 @@ export function selftest() {
       S.bounty = {}; ch = []; evidenceChoices(g, ch); ch[0].fn(); const back = !S.evidence.length && p.inv.includes(w) && S.gold === 500 - evidenceFee({ it: w });
       return blocked && back;
     } finally { S.evidence = ev0; S.bounty = b0; UI.closeDialogue(); } }));
+  ok('Schleichmodus (03.10.): Ahnungslose bemerken den Schleichenden erst viel näher; Angriff aus dem Schleichen = Hinterhalt und beendet das Schleichen; Schleichen wächst bei ahnungslosen Gegnern', sandbox(() => {
+    const p = stage(), s0 = p.skills.stealth;
+    try { p.skills.stealth = 0; p.sneak = false; const e = actor(p.x + 150, p.y, { kind: 'enemy', mtype: 'bandit' }); e.aggroId = null;
+      const seen = nearestTarget(e, [p], 200) === p; p.sneak = true; const hidden = nearestTarget(e, [p], 200) === null;
+      sneakT = 2000; e.faction = 'bandit'; sneakTick(16); const grew = (p.skills.stealth || 0) > 0;
+      const hp0 = e.hp; hit(p, e, 1); const amb = !p.sneak;
+      return seen && hidden && grew && amb;
+    } finally { p.skills.stealth = s0; p.sneak = false; } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
