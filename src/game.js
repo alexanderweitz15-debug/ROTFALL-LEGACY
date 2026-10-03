@@ -2130,7 +2130,7 @@ function startUnlockCheck() {
   for (const f of startsEarned()) if (!have[f] && unlockStart(f, { hero: S.player.name, house: S.legacy?.house || '' })) got.push(f);
   for (const f of got) { const F = FACTIONS[f], RC = RACES[FAC_STARTS[f].race];
     UI.toast(`NEUER START: ${F.name.toUpperCase()}`, 4200);
-    log(`Höchster Rang bei ${F.name}: Neue Geschichten können jetzt hier beginnen — als ${RC.name} (Neue Geschichte → Fraktions-Start).`, 'faction');
+    log(`Höchster Rang erreicht (${F.name}): Neue Geschichten können jetzt hier beginnen — als ${RC.name} (Neue Geschichte → Fraktions-Start).`, 'faction');
     chronicle(`Start freigeschaltet: ${F.name}`, 'legend', `${S.player.name} hat den höchsten Rang erreicht. Künftige Geschichten können hier beginnen.`); }
   return got;
 }
@@ -2186,7 +2186,7 @@ function facStartSetup(f, p) {
   autoRanks();
   const st = startHouse(f, { map: p.map, x: p.x, y: p.y });
   if (S.startFac !== 'valen') chronicle(`${p.name} beginnt bei ${F.name}`, 'birth', `${RC.name}, ${FS.desc}`);
-  if (f !== 'valen') log(`Du beginnst bei ${F.name}: ${FS.desc}`, 'world');
+  if (f !== 'valen') log(`Du beginnst in der Fraktion „${F.name}“: ${FS.desc}`, 'world');
   log(`Mitglied ab Start: ${F.ranks?.[Math.max(0, S.ranks[f] ?? 0)] || 'Mitglied'} — ${F.name} (Ansehen ${Math.round(S.factions[f])}). Den Rang findest du im Kodex (H) unter „Ränge“.`, 'faction');
   log(`Rasse ${RC.name}: ${RC.rule}`, 'party');
   if (st) log(`Dein Haus ${st.name} liegt ${map2Dir(p, st)} — eine Hütte und ein Feuer. Siedler ziehen zu; Bauen mit B.`, 'world');
@@ -13062,20 +13062,38 @@ function woundCare(npc, choices) {
   if (!isHealer(npc) || !who.length) return;
   choices.unshift({ text: `Wunden versorgen: schienen und reinigen (25 Gold)`, fn: () => {
     if (S.gold < 25) return UI.dialogue(npc, '„Fünfundzwanzig Gold. Schienen und Branntwein wachsen nicht auf Bäumen.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-    S.gold -= 25; for (const c of who) { for (const k of B.PARTS) if (c.body[k].broken) c.body[k].splint = true; c.status = c.status.filter(q => q.key !== 'infektion'); }
-    UI.closeDialogue(); log('Die Brüche sind geschient (heilen doppelt so schnell), die Wunden ausgebrannt und verbunden.', 'party'); } });
+    UI.closeDialogue(); healerAct(npc, 'splint'); } });
 }
 const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Heiler' || n.prof === 'Medica' || n.prof === 'Feldscher' || n.key === 'elena';   // §5d.1: Feldscher der Eisenfeste
 /* Behoben HB-13: c.hp/c.maxHp zaehlen laut syncHp() nur Kopf und Rumpf (siehe body.js) — ein lahmes Bein oder ein ausgefallener Arm
    aenderte c.hp nicht, der Heiler sagte „Dir fehlt nichts“. Zusaetzlich die einzelnen Koerperteile pruefen. */
-const limbHurt = c => c.body && Object.values(c.body).some(p => p.hp < p.max);
+const limbHurt = c => c.body && Object.values(c.body).some(p => !p.mech && !p.lost && p.hp < p.max);   /* 03.10.: Prothesen heilt der Heiler nicht (Werkbank), also auch nicht berechnen */
 const woundedGroup = () => [S.player, ...partyMembers().filter(m => m.alive && !m.downed && dist(m, S.player) < 200)].filter(c => c.hp < c.maxHp || limbHurt(c) || (c.status || []).some(s => SLEEP_CURES.has(s.key)));
 const healCost = () => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0)));
-function healerTreat(npc) {
+/* GUI Heiler (Entwickler 03.10.2026: „jedes System ein Fenster“): healerView liefert Gruppe (Glieder, Zustände), Heilpreis und Schienenpreis;
+   healerAct führt die zwei bisherigen Behandlungen aus (Wunden heilen = healerTreat, Schienen/Reinigen = woundCare). Proben und Koop-Gäste
+   behalten das Gespräch (healerTreat ohne Fenster). */
+const SPLINT_COST = 25;
+const splintGroup = () => [S.player, ...partyMembers()].filter(c => c?.alive && c.body && (B.PARTS.some(k => c.body[k].broken && !c.body[k].splint) || stat(c, 'infektion')));
+function healerView(npc) {
+  const grp = [S.player, ...partyMembers().filter(m => m.alive && dist(m, S.player) < 200)], w = woundedGroup(), sp = splintGroup();
+  return { title: `${npc.name} (${npc.prof})`, gold: S.gold, cost: healCost(), wounded: w.length, splint: sp.length, splintCost: SPLINT_COST, busy: !!S.player.channel,
+    group: grp.map(c => ({ name: c.name, hp: Math.round(c.hp), max: Math.round(c.maxHp), hurt: w.includes(c), splint: sp.includes(c),
+      parts: B.PARTS.map(k => { const q = c.body?.[k]; return { k, name: B.PART_NAME[k], hp: q ? Math.round(q.hp) : 0, max: q ? Math.round(q.max) : 0, broken: !!q?.broken, splinted: !!q?.splint, lost: !!q?.lost, mech: !!q?.mech }; }),
+      status: (c.status || []).map(s => s.name || s.key) })) };
+}
+function healerAct(npc, what) {
+  if (what === 'heal') { if (!woundedGroup().length) return 'Euch fehlt nichts.'; if (S.gold < healCost()) return 'Zu wenig Gold.'; healerTreat(npc, true); return null; }
+  const who = splintGroup(); if (!who.length) return 'Nichts zu schienen.'; if (S.gold < SPLINT_COST) return 'Zu wenig Gold.';
+  S.gold -= SPLINT_COST; for (const c of who) { for (const k of B.PARTS) if (c.body[k].broken) c.body[k].splint = true; c.status = c.status.filter(q => q.key !== 'infektion'); }
+  log('Die Brüche sind geschient (heilen doppelt so schnell), die Wunden ausgebrannt und verbunden.', 'party'); UI.refreshHUD(); return null;
+}
+function healerTreat(npc, fromWin = false) {
+  if (!fromWin && !S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('healer', npc); return; }
   const p = S.player, cost = healCost();
   if (!woundedGroup().length) return UI.dialogue(npc, '„Dir fehlt nichts. Komm wieder, wenn es blutet.“', [{ text: 'Weiter', fn: () => talk(npc) }]);
   if (S.gold < cost) return UI.dialogue(npc, `„${cost} Gold. Kräuter und Leinen wachsen nicht umsonst.“`, [{ text: 'Weiter', fn: () => talk(npc) }]);
-  UI.closeDialogue(); p.channel = { healer: npc.id, targetId: npc.id, t: 0, dur: HEALER_MS, cost }; p.vx = p.vy = 0;
+  UI.closeDialogue(); p.channel = { healer: npc.id ?? true, targetId: npc.id, t: 0, dur: HEALER_MS, cost }; p.vx = p.vy = 0;
   UI.toast(`${npc.name} versorgt deine Wunden …`, HEALER_MS);
 }
 function startRevive(c) {                                    // AUDIT: Aufrichten mit E dauert REVIVE_MS; Feinde (zornig, feindlich) nicht
@@ -14541,16 +14559,16 @@ function facRecruitChoices(npc, choices) {
   if (!FAC_STARTS[f] || npc.kind !== 'npc' || !npc.alive || npc.downed || npc.captive || npc.merc || npc.facRecruit || npc.campGuard || S.party.includes(npc.id)) return;
   if (!(npc.guard || /wache|wächter|krieger|sandreiter|soldat|legionär|kämpfer|maat|bootsmann|schildträger|hauptmann|offizier/i.test(npc.prof || ''))) return;
   const rep = Math.round(S.factions[f] || 0), say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-  if (rep < RECRUIT_REP) { if (rep >= 10) choices.push({ text: `Würden Leute von ${F.name} mit mir ziehen?`, fn: () => say(`„Erst, wenn ${F.name} dir vertraut.“ (Ansehen ${rep}/${RECRUIT_REP}: dann Gefährten und Lagerwachen)`) }); return; }
+  if (rep < RECRUIT_REP) { if (rep >= 10) choices.push({ text: `Würden Leute deiner Fraktion mit mir ziehen? (${F.name})`, fn: () => say(`„Erst, wenn ${F.name} dir vertraut.“ (Ansehen ${rep}/${RECRUIT_REP}: dann Gefährten und Lagerwachen)`) }); return; }
   const lv = clamp((p.level || 1), 3, 10), hire = 50 + lv * 12, wage = 3 + lv;
-  choices.push({ text: `Einen Kämpfer von ${F.name} anwerben (${hire} Gold, dann ${wage} am Tag)`, fn: () => {
+  choices.push({ text: `Einen Kämpfer anwerben — ${F.name} (${hire} Gold, dann ${wage} am Tag)`, fn: () => {
     const q = freeSpotNear(npc.map, (npc.x / TS | 0) + 1, (npc.y / TS | 0) + 1, 2) || { x: npc.x + 20, y: npc.y };
     const c = facMember(f, q, npc.map, lv); if (enlist(npc, c, hire, wage)) remember(c, 'recruited', p.name); } });
   const st = S.settlement; if (!st) return;
   const have = S.ents[st.map || 'world'].filter(e => e.campGuard && e.alive).length + (st.guardOrder || 0) + (st.facGuards || []).length;
-  if (have < campGuardCap(st)) choices.push({ text: `Eine Wache von ${F.name} für ${st.name} (80 Gold, dann 5 Gold am Tag)`, fn: () => {
+  if (have < campGuardCap(st)) choices.push({ text: `Eine Lagerwache für ${st.name} anwerben — ${F.name} (80 Gold, dann 5 Gold am Tag)`, fn: () => {
     if (S.gold < 80) return say('„Achtzig Gold. Dann schicke ich jemanden.“');
-    S.gold -= 80; (st.facGuards ||= []).push(f); UI.closeDialogue(); log(`Eine Wache von ${F.name} zieht morgen früh nach ${st.name} (Lagerwache, 5 Gold Sold am Tag).`, 'world'); } });
+    S.gold -= 80; (st.facGuards ||= []).push(f); UI.closeDialogue(); log(`Eine Wache (${F.name}) zieht morgen früh nach ${st.name} (Lagerwache, 5 Gold Sold am Tag).`, 'world'); } });
 }
 function recruit(npc) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
@@ -17120,6 +17138,7 @@ function debugSections() {
     ['Wanderautomaten (03.10.2026)', '', {
       'Roboter: Wanderautomat hier (anwerbbar)': () => { toWorld(); const s = freeSpotNear('world', (p.x / TS | 0) + 2, p.y / TS | 0, 2); const c = wanderBotize(makeChar({ name: 'x', prof: 'Wanderautomat', x: s.x, y: s.y, level: 3 }), true);
         Object.assign(c, { transient: true, visitor: true, anchor: { x: s.x, y: s.y }, greet: '„EINHEIT OHNE HERRN. EINHEIT LÄUFT.“' }); S.ents.world.push(c); UI.toast(`${c.name} steht neben dir — ansprechen (E).`); },
+      'Fenster: Heiler (Gruppe verwundet)': () => { for (const c of [p, ...partyMembers()]) { if (c.body) { c.body.larm.hp = Math.max(1, c.body.larm.hp * 0.3); c.body.lleg.broken = true; } } B.syncHp?.(p); UI.openModal('healer', { name: 'Feldscher', prof: 'Feldscher', key: 'dbg_heal' }); },
       'Fenster: Zauber lernen (Mutter Aldis)': () => { const n = S.ents.world.find(e => e.key === 'aldis') || { name: 'Mutter Aldis', prof: 'Ordenspriesterin', key: 'aldis', faction: 'order', spellRule: 'order', spellsTaught: NPCS.find(d => d.key === 'aldis').spellsTaught }; UI.openModal('learn', n); },
       'Roboter: Wanderautomat als Reisender losschicken': () => { const r = spawnTraveler(TRAV_KINDS.find(k => k.k === 'automat')); UI.toast(r && r !== 'wait' ? `${r.name} wandert von Stadt zu Stadt.` : 'Gerade kein Weg frei (oder Startort im Blick).'); },
     }],
@@ -22460,7 +22479,7 @@ export function selftest() {
       S.gold = 1000; p.partyCap = 5; offer.fn(); UI.closeDialogue(); const m = partyMembers().find(e => e.facRecruit === 'order');
       const hired = !!m && m.faction === 'order' && m.merc?.wage === 8 && S.gold === 1000 - 110;
       S.settlement = { name: 'Probeheim', x: 300, y: 300, map: '__a', buildings: [], morale: 60, history: [] };
-      ch = []; facRecruitChoices(g, ch); ch.find(c => /Wache von/.test(c.text))?.fn(); UI.closeDialogue(); const queued = S.settlement.facGuards?.[0] === 'order';
+      ch = []; facRecruitChoices(g, ch); ch.find(c => /Lagerwache für/.test(c.text))?.fn(); UI.closeDialogue(); const queued = S.settlement.facGuards?.[0] === 'order';
       campGuardDay(S.settlement); const cg = S.ents.__a.find(e => e.campGuard && e.faction === 'order');
       return low && hired && queued && !!cg; } finally { S.settlement = st0; UI.closeDialogue(); } }));
   ok('Fraktions-Starts (d): Skelett ohne Kapuze wird erkannt (Valen: Kopfgeld 60, Orden verweigert), mit Kapuze nicht; Tote überfallen das Haus eines Totenmitglieds nicht', sandbox(() => {
@@ -22541,7 +22560,7 @@ function buildCreation() {
       else b.onclick = () => { facStart = k; [...fb.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showF(); };
       fb.appendChild(b); };
     mk('', 'Frei');
-    for (const k of Object.keys(FAC_STARTS)) { const F = FACTIONS[k]; mk(k, F.name.replace(/^(Das Hochreich|Das|Die|Der) /, ''), U[k] || creation.forceFac ? null : `Gesperrt. Erreiche den höchsten Rang bei ${F.name} („${F.ranks[F.ranks.length - 1]}“) — dann steht dieser Start in allen Spielständen offen.`); }
+    for (const k of Object.keys(FAC_STARTS)) { const F = FACTIONS[k]; mk(k, F.name.replace(/^(Das Hochreich|Das|Die|Der) /, ''), U[k] || creation.forceFac ? null : `Gesperrt. Erreiche den höchsten Rang „${F.ranks[F.ranks.length - 1]}“ (${F.name}) — dann steht dieser Start in allen Spielständen offen.`); }
     showF(); };
   creation.facRow = facRow;
   const ob = $('cr-origins'); ob.innerHTML = '';
@@ -22694,7 +22713,7 @@ function boot() {
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
-    spellLearnView, learnFrom, mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    healerView, healerAct, spellLearnView, learnFrom, mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil

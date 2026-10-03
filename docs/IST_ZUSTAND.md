@@ -3856,3 +3856,14 @@ Nach Schwere sortiert. „live“ = im Spiel nachgestellt, „Code“ = nur gele
 - Tierhändler-„Zurück“.
 - Umhänge in Läden und Beute.
 - Schmiede-, Kutsche-, Tierhändler- und Werkbank-Fenster sind gebaut.
+
+---
+
+## Nachtrag 03.10.2026 (abends): Fraktions-Starts, Rassen, Anwerben bei Fraktionen
+
+- **Was es ist:** Höchster Rang einer Fraktion mit eigenem Gebiet → dauerhaft freigeschalteter Start (`rotfall.starts`, über alle Spielstände). Startpaket mit Ort, Mitgliedschaft, Ausrüstung, Aussehen, Haus (Siedlung mit Hütte) und Rasse. Regeln: `docs/MECHANIKEN.md`, Runde „Fraktions-Starts“.
+- **Code:** `data.js` `RACES`, `FAC_STARTS`, `STIGMA.skeleton`; `state.js` `startUnlocks`, `unlockStart`; `game.js` `startUnlockCheck` (in `checkRankUp`, `promote`), `applyRace`, `raceOf`, `eatsFood`, `facStartAt`, `startHouse`, `joinEffects`, `facStartSetup`, `newGame` (`cfg.facStart`), Erstellung `buildCreation` (Reihe `#cr-fac`), `facMember`, `enlist`, `facRecruitChoices`, `campGuardDay` (`st.facGuards`), `boneTick`/`boneSeen`, `stigmaOf` (beide Arten); `sprites.js` Rassen-Schicht in `humanSpec` (`race` in `HS_ENT`); `render.js` Goblin-Held verkleinert.
+- **Geändert an Bestehendem:** `autoRanks` (Grubenstamm-Rang auch beim Goblin-Start), `teamOf` (Goblins friedlich bei jedem Grubenstamm-Rang, wie `RANK_PERKS` es sagt), `raidSources` (Tote überfallen kein Haus eines Totenmitglieds; Häuser außerhalb der Oberwelt nur Wölfe), Tagesproviant (Untote essen nicht), `adoptSuccessor` (Erbe behält Rasse), `joinFaction` (Folgen über `joinEffects`).
+- **Geprüft:** live in Wegwerf-Plätzen alle zehn Starts (Ort, Karte, Rang, Ansehen, Haus mit fertigem Feuer und Hütte, Ausrüstung, Rasse), Speichern und Laden (Rasse, Start, Haus bleiben), Anwerben bei einem Sandreiter (Ansehen 45: Gefährte mit Söldnerlohn), Freischaltung über den Stundentakt (Zwerge Rang 2 → Start frei), Figuren Skelett/Goblin/Zwerg im Bild, Selbsttest 479/479. Danach Plätze gelöscht, `rotfall.starts` auf den Vorher-Wert (leer) gesetzt.
+- **Fehlversuch beim Test (behoben):** An der Tiefhall standen Goblin-Krieger der Stufe 8 fünf Kacheln neben dem Startpunkt; im ersten Wurf lag das Haus der Kette innerhalb der Eisenfeste. Jetzt: Start und Haus nur, wo in 22 Kacheln kein Feind steht, Haus außerhalb des Fraktionsorts.
+- **Offen:** siehe `ROTFALL_STATE/PROPOSALS/fraktions_starts.md` (Rang ab Start, Rassenwerte, Heilung beim Skelett, Reaktion auf Goblins/Zwerge in Menschenstädten, Kinder eines Skeletts, Koop-Gäste, Rabatt beim Anwerben, Zwergenstart oben statt in der Königsstadt).

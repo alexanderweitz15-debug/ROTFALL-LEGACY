@@ -327,6 +327,24 @@ function stableUI(body, npc) {
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
+// ---------------- Heiler (GUI, 03.10.2026) ----------------
+// Je Gruppenmitglied eine Karte: Leben, sechs Glieder als Balken (gebrochen rot, geschient gelb, fehlend grau), Zustände; unten die beiden
+// Behandlungen als Knöpfe. Heilen läuft wie im Gespräch als Kanal (3,5 s) und schließt das Fenster.
+function healerUI(body, npc) {
+  const V = A.healerView?.(npc); if (!V) return;
+  const col = q => q.lost ? '#3a3230' : q.mech ? '#c9a45a' : q.broken ? (q.splinted ? '#c9a45a' : '#b0453a') : q.hp < q.max * 0.5 ? '#c07040' : '#7fae6e';
+  const card = c => `<div class="hl-card${c.hurt || c.splint ? '' : ' off'}"><b>${qa(c.name)}</b> <span class="ledger">Leben ${c.hp}/${c.max}</span><div class="bst-bar"><i style="width:${c.max ? c.hp / c.max * 100 : 0}%;background:#b0453a"></i></div>
+    <div class="hl-parts">${c.parts.map(q => `<div title="${qa(q.name)}: ${q.lost ? 'fehlt' : q.mech ? 'Prothese (Werkbank)' : q.broken ? (q.splinted ? 'gebrochen, geschient' : 'GEBROCHEN') : `${q.hp}/${q.max}`}"><span class="ledger">${qa(q.name.replace('Linker ', 'L. ').replace('Rechter ', 'R. ').replace('Linkes ', 'L. ').replace('Rechtes ', 'R. '))}</span><div class="bst-bar"><i style="width:${q.max ? q.hp / q.max * 100 : 0}%;background:${col(q)}"></i></div></div>`).join('')}</div>
+    ${c.status.length ? `<div class="ledger">Zustand: ${qa(c.status.join(', '))}</div>` : ''}</div>`;
+  body.innerHTML = `<div class="ledger">${qa(V.title)}: „${V.wounded ? 'Zeig her. Das wird teuer, aber du behältst alles dran.' : 'Dir fehlt nichts. Komm wieder, wenn es blutet.'}“ · Dein Gold: ${V.gold}</div>
+    <div class="hl-grid">${V.group.map(card).join('')}</div>
+    <div class="tr-sec">Behandlung</div><div class="ctx-actions">
+      <button id="hl-heal"${V.wounded && V.gold >= V.cost && !V.busy ? '' : ' disabled'}>Wunden versorgen — ${V.cost} Gold${V.wounded ? '' : ' (niemand verletzt)'}</button>
+      <button id="hl-splint"${V.splint && V.gold >= V.splintCost ? '' : ' disabled'}>Brüche schienen, Wunden reinigen — ${V.splintCost} Gold${V.splint ? '' : ' (nichts zu schienen)'}</button></div>
+    <div class="ledger">Heilen dauert ein paar Herzschläge; geschiente Brüche heilen doppelt so schnell. Fehlende Glieder ersetzt nur die Prothesenmacherin.</div>`;
+  $('hl-heal').onclick = () => { const r = A.healerAct(npc, 'heal'); if (r) toast(r); else closeModal(); };
+  $('hl-splint').onclick = () => { const r = A.healerAct(npc, 'splint'); if (r) toast(r); else sfx('coin', 0.4, 0.6); healerUI(body, npc); };
+}
 // ---------------- Zauber lernen (GUI, 03.10.2026) ----------------
 // Fenster des Zauberlehrers: alle Formeln des Lehrers in Schulfarbe, Stufe, Mana, Preis; was fehlt, steht rot darunter; „Lehren“ ruft learnFrom.
 function learnUI(body, npc) {
@@ -846,7 +864,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);

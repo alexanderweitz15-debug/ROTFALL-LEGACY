@@ -71,3 +71,10 @@ Wer den höchsten Rang einer Fraktion erreicht, schaltet sie dauerhaft (über al
 - **(c)** `facRecruitChoices` (Gefährte, Lagerwache) mit `facMember` und `enlist`; `campGuardDay` nimmt Fraktionswachen aus `st.guardFacs`.
 - **(d)** `STIGMA.skeleton`, `stigmaOf` für beide Arten, `boneTick` (Erkennen), Nahrung, heilig ×2 über `undead`, `raidSources`.
 - Debug „Starts: …“, Hinweise im Spiel, Proben, MECHANIKEN.md, IST_ZUSTAND.md.
+
+## Stand nach dem Bau (03.10.2026 abends)
+
+- Alle vier Scheiben gebaut; Selbsttest 479/479 grün (fünf neue Proben „Fraktions-Starts (a)–(d)“).
+- Beim Test gefunden und behoben: Start an der Tiefhall neben Goblin-Kriegern Stufe 8; Haus der Kette in der Eisenfeste. Regel jetzt: Start und Haus nur ohne Feind in 22 Kacheln, Haus außerhalb des Fraktionsorts (vorläufig, Zahl 22 gewählt).
+- Mensch ohne Rassenboni (statt Willenskraft +1 / Führung +3), damit die freien Starts unverändert bleiben.
+- **STATUS: TEILWEISE DEFINIERT** — gebaut mit den Empfehlungen oben; die Punkte 1, 3 (Zwerge), 5, 7, 8, 9, 10, 11, 12, 13 warten auf die Entscheidung des Entwicklers.

@@ -156,7 +156,7 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [B] D: Der Text beim Pferdetausch sagt „bleibt im Stall“, das alte Pferd ist aber weg.
 - [B] C: Die Fertigkeit Jagd wirkt nicht; Schleichen wächst nie; es gibt keinen Schleichmodus.
 - [B] C: Graumähne und Karrak haben keine Boss-Beute und kein Intro; Boss-Beute ist nicht garantiert.
-- [B] Noch Gesprächslisten statt Fenster: Kontor, Schwarzmarkt, Heiler, (Zauber lernen: Fenster 03.10.) Seefahrt, Luftschiff, Investieren, Anschlagbrett, Rat, Passamt, Kerker.
+- [B] Noch Gesprächslisten statt Fenster: Kontor, Schwarzmarkt, (Heiler + Zauber lernen: Fenster 03.10.) Seefahrt, Luftschiff, Investieren, Anschlagbrett, Rat, Passamt, Kerker.
 
 ## Vollständigkeits-Prüfung (03.10., visual/vollstaendigkeit.md)
 - [x] Zauberlehrer fehlen: sp_regen, sp_shock und sp_staunch — geprüft 03.10.: Aldis lehrt staunch/regen, Corvinus shock; Kodex-Texte stimmen; Probe sichert es.
@@ -190,3 +190,10 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - Wanderautomaten: Häufigkeit (Gewicht 1 unter den Reisenden), 2 von 5 anwerbbar, kostenlos.
 - Wüstenbund: Eskorten +25 % ab Karawanenwächter; kein Wegzoll schon ab Rang 0.
 - Kerker Karak-Atar/Tiefhall nutzen die gemeinsame Kerkerkarte (eigener Wärter/Name/Entlassort) — eigene Karte gewünscht?
+
+## 03.10. Fraktions-Starts + Rassen (Agent, PROPOSALS/fraktions_starts.md) — 14 vorläufige Entscheidungen, bestätigen
+- Rang ab Start = unterster Rang + Ruf 20; Aurelion Bürgerrecht. Zwerge starten an der Tiefhall (Weg durch Hrodvars Halle, Skelette Stufe 8).
+- Rasse je Start fest; Mensch ohne Boni; Rassenwerte vorläufig. Haus = Siedlung mit fertiger Hütte (Alternative: Zelt).
+- Anwerben ab Ruf 40 ohne Rangrabatt. Skelett: Wache verhaftet statt angreifen; Kapuze verbirgt; heilt wie Lebende. Goblin/Zwerg ohne Stadt-Reaktion.
+- Offen: Kinder eines Skeletts; Koop-Gäste immer Mensch; Roboter-Gefährten essen weiter.
+- Prüfen: Zwergen-Held sieht im Bild noch wie Mensch aus (Körperbau „gedrungen“ greift nicht?).
