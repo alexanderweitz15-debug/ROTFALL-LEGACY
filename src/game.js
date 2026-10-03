@@ -3329,7 +3329,11 @@ function limpMul(c, now = performance.now()) {
 }
 /* Kampfanimation Scheibe 1 (DECISIONS 02.10.): Pack der Optik/Trefferzeit — Spieler und Koop-Helden nach Test-Room-Wahl (S.dbg.pack, nie
    gespeichert), alle anderen fest Pack A. Erholung abbrechen: nur in der Kombo-Kette (im Stand, Schritt 1 und 2), ab Treffer + 40 % der Erholung. */
-const atkPackOf = c => (c === S.player || c.coopPilot || c.coopHero) && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A';
+/* Entwickler 03.10.2026: Mischung der Packs nach Spielfortschritt der WAFFE — früh (gewöhnlich/ungewöhnlich) Grounded A, Midgame
+   (selten/episch) Heroic B, Endgame (legendär/mythisch) flashy C. Gilt für Held, Koop-Helden und gesteuerte Gefährten; Gegner bleiben A.
+   Der Test Room (S.dbg.pack) überschreibt zum Vergleich. Waffen ohne eigenes B/C-Profil fallen in anim.js auf A zurück. */
+const packOfTier = w => { const i = RARITY_ORDER.indexOf(rarOf(w)); return i >= 4 ? 'C' : i >= 2 ? 'B' : 'A'; };
+const atkPackOf = c => !(c === S.player || c.coopPilot || c.coopHero) ? 'A' : ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : packOfTier(c.equip?.weapon);
 const atkOld = () => S.dbg?.atkOld === true;   /* nur Debug-Vergleich „vorher“: alte Taktung (Treffer 0,42, kein Abbruch, Wucht ohne +15 %); 'cancel' = nur das Abbrechen aus */
 const atkCancel = c => !S.dbg?.atkOld && (c === S.player || !!c.coopPilot) && c.hitDone && c.atkC > 0 && (c.atkStep || 0) < 2 && c.swing >= c.atkC && !c.vx && !c.vy && !c.downed;
 const atkWt = c => { const w = c?.equip?.weapon, it = w && ITEMS[w.key]; return it && !it.ranged ? animClassOf(w.key, it) : null; };   /* Animationsklasse (Großaxt eigene) */
@@ -3461,6 +3465,8 @@ function teamOf(c) {
   if (c.kind === 'enemy') {
     if (c.surrendered) return 'neutral';                               // S13: ergeben
     if (c.questFoe) return 'foe';
+    if (c.townSpider && !c.provoked && hasPermit()) return 'neutral';   /* Entwickler 03.10.: Wächterspinnen in Stadt-Werkhallen greifen nur Unbefugte an (ohne Aufenthaltsschein/Bürgerrecht) */
+    if (c.armyId && c.faction === 'aurel' && c.mtype === 'dampframme') return 'player';   /* Entwickler 03.10.: Dampframme als Verteidigerin einer Stadt Aurelions steht auf Seiten der Wachen */
     if (c.spyCover && !c.unmasked) return 'neutral';                   /* Entwickler 02.10.: Hofspion wirkt wie Hofpersonal, bis die Maske fällt */                                      // S15: Auftragsziel aus dem Nachschub ist immer Feind
     if (MONSTERS[c.mtype]?.prey) return 'prey';
     if ((c.mtype === 'garmadon' || c.gCourt) && !S.flags.garmFight) return 'neutral';   // Phase 6: Garmadon redet erst
@@ -4959,7 +4965,7 @@ function spiderBurst(c) {
 /* Wächterspinnen an bestimmten Wänden: Werkstätten im Land Aurelions (Streuorte) und Werkhallen außerhalb der Stadtmauern. Je Wand eine,
    fest aus der Lage (kein Zufall). Zerstört: kommt nach 7 Tagen wieder (S.spidersDead), wie geräumte Gewölbe. */
 function spiderWalls() {
-  return HOUSES.filter(b => b.map === 'world' && ((b.type === 'smithy' && b.town === 'aurelheim_land') || (b.type === 'factoryhall' && !townAt(b.x + (b.w >> 1), b.y + (b.h >> 1), 0))));
+  return HOUSES.filter(b => b.map === 'world' && ((b.type === 'smithy' && b.town === 'aurelheim_land') || b.type === 'factoryhall'));   /* Entwickler 03.10.: auch Werkhallen in den Städten */
 }
 function ensureWallSpiders(hidden = false) {
   const dead = S.spidersDead || {}, day = S.day | 0, p = S.player;
@@ -4969,7 +4975,7 @@ function ensureWallSpiders(hidden = false) {
     const tx = b.x + Math.max(1, (b.w >> 1) + ((b.seed | 0) % 3) - 1), ty = b.y + b.h - 1;
     const e = spawnEnemy('waechterspinne', 'world', tx, ty + 1, { noVariant: true, level: zoneLevel('world', tx, ty + 1, MONSTERS.waechterspinne) }); if (!e) continue;
     e.x = tx * TS + TS / 2; e.y = (ty + 1) * TS + 2;   // Fuß der Wand; gezeichnet hängt sie 24 px höher an der Wand (render.js)
-    Object.assign(e, { cling: true, wallOf: b.id, transient: true, anchor: { x: e.x, y: e.y } });
+    Object.assign(e, { cling: true, wallOf: b.id, transient: true, anchor: { x: e.x, y: e.y }, townSpider: !!townAt(tx, ty, 0) || undefined });
   }
 }
 /* Netzwerferin: dieselbe Regel wie das Fangnetz des Spielers (net_shot) — normale Figuren hängen 3 s fest, Große (Boss, Maßstab > 1,4)
@@ -10124,7 +10130,17 @@ function omegaFrag(k) {
   if (!S.quests.q_rotfall) S.quests.q_rotfall = { state: 'active', progress: [0] };
   S.quests.q_rotfall.progress = [Math.min(n, OMEGA_NEED)]; QUESTS.q_rotfall.desc = rotfallDesc();
   log(`Spur des Rotfalls (${n}/${N}): ${ROTFALL[k][0]} — ${ROTFALL[k][1]}`, 'quest'); chronicle(`Spur des Rotfalls: ${ROTFALL[k][0]}`, 'legend', ROTFALL[k][1]);
-  UI.toast(`SPUR DES ROTFALLS ${n}/${N}`, 2600);
+  UI.toast(`SPUR DES ROTFALLS ${n}/${N}`, 2600); rotfallDone();
+}
+/* HB-10 (Entwickler 03.10.2026): Wer genug Spuren hat (OMEGA_NEED), schließt „Die Spur des Rotfalls“ ab: Erfahrung aus data.js und das Unikat
+   „Rotfall“ (vorher blieb der Auftrag ewig offen und zahlte nichts). Läuft auch rückwirkend über rotfallCheck. Die Omega-Reihe danach bleibt unberührt. */
+function rotfallDone() {
+  const st = S.quests.q_rotfall; if (!st || st.state !== 'active' || (st.progress[0] || 0) < OMEGA_NEED) return;
+  st.state = 'done'; st.outcome = 'Die Wahrheit über den Rotfall liegt vor dir. Aus seinem Eisen wurde eine Klinge.';
+  if (QUESTS.q_rotfall.reward?.xp) gainXp(S.player, QUESTS.q_rotfall.reward.xp);
+  const o = mkItem('rotfallklinge'); if (!addItem(S.player, 'rotfallklinge')) dropItemAt(S.player.map, S.player.x, S.player.y + 12, o);
+  log('Die Spur des Rotfalls ist vollständig. Ein Schmied in den Ruinen hat aus dem Eisen, auf das Omegas Blut regnete, eine Klinge geschlagen: „Rotfall“.', 'quest');
+  chronicle('Die Spur des Rotfalls ist gelesen', 'legend', `${S.player.name} trägt nun die Klinge „Rotfall“.`); UI.toast('RELIKT: ROTFALL', 3000);
 }
 function rotfallCheck() {                                          // Bruchstücke, die an erledigten Handlungen hängen (auch rückwirkend)
   const Q = k => S.quests[k]?.state === 'done';
@@ -10136,7 +10152,7 @@ function rotfallCheck() {                                          // Bruchstüc
   if ((S.ranks.order ?? -1) >= 1 || S.legend?.order) omegaFrag('order');
   if ((S.stats?.valenDefense || 0) >= 5 || S.flags.garmadonSlain) omegaFrag('war');
   if (S.map === 'sky') omegaFrag('oracle');
-  if (S.quests.q_rotfall) QUESTS.q_rotfall.desc = rotfallDesc();
+  if (S.quests.q_rotfall) { QUESTS.q_rotfall.desc = rotfallDesc(); rotfallDone(); }   /* HB-10: auch alte Stände mit vollständiger Spur */
 }
 const omegaInsight = () => { const f = om().frags; return Object.keys(f).length >= OMEGA_NEED && !!f.garmadon && !!f.priest && (!!f.brother || !!S.flags.goblinsFreed) && playHours() >= OMEGA_HOURS; };
 // Altar und Priesterin Omegas in der Kernburg der Eisenfeste (religiöses Zentrum der Kette)
@@ -16125,10 +16141,20 @@ function learnCompNode(id, k) {
   if (m0) { for (const q of B.PARTS) m.body[q].hp = Math.min(m.body[q].max, m.body[q].hp * m.body[q].max / m0[q]); B.syncHp(m); }
   log(`${m.name} lernt: ${N.name}.`, 'party'); UI.refreshHUD(); save();
 }
+/* HB-20 (Entwickler 03.10.2026): Was am Toten hängt, endet mit ihm. Der Ehepartner bleibt als Witwe/Witwer im Haus (mit dem Erben nicht
+   verheiratet — keine Geburten mehr, keine Ehe-Gespräche); Gefangene des Toten kommen frei; geschmuggelte Ware des Dieners bleibt beim Grab
+   (wie „persönliche Waffen bleiben am Grab“). Ränge, Ruf und Kopfgeld regelt adoptSuccessor wie bisher (nicht Teil dieser Entscheidung). */
+function heirBonds(old, heir) {
+  const sp = S.legacy?.spouse && byId(S.legacy.spouse);
+  if (sp && sp !== heir) { sp.spouse = false; sp.widowOf = old.name; S.legacy.spouse = null; if (sp.alive) log(`${sp.name} bleibt als ${sp.female ? 'Witwe' : 'Witwer'} von ${old.name} im Haus.`, 'party'); }
+  for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) if (e.prisoner && e.prisoner.by === old.id) { e.prisoner = null; e.fleeing = true; }
+  if (S.keepStash?.item) { const g = [...(S.ents[old.map] || [])].reverse().find(e => e.kind === 'grave' && e.charKey === 'player'); if (g) (g.loot ||= []).push(S.keepStash.item); S.keepStash = null; }
+}
 function adoptSuccessor(c) {
   setTimeout(() => nemesisHeir(), 1500);   /* T10: der Erbe erfährt vom Ahnenfeind */
   const old = S.player; for (const k in S.fameStyle || {}) S.fameStyle[k] = Math.round(S.fameStyle[k] / 2);   /* T08: der Ruf der Klinge verblasst mit dem Erben */
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
+  heirBonds(old, c);   /* HB-20 (Entwickler 03.10.): Witwe/Witwer bleibt im Haus, Bindungen des Toten enden */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
   c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
@@ -20207,7 +20233,7 @@ export function selftest() {
       }
     } finally { arenaLeave(); }
     const back = S.map === map0 && p.map === map0 && p.x === x0 && JSON.stringify(p.equip.weapon) === w0 && JSON.stringify(p.skills || {}) === sk0 && S.ents[map0].includes(p) && S.ents[map0].length === ent0;
-    return inside && packOk && warm > 0 && saved === false && back && !MAPS.__arena && !S.ents.__arena && atkPackOf(p) === 'A' && localStorage.getItem(SAVE_KEY) === raw0;
+    return inside && packOk && warm > 0 && saved === false && back && !MAPS.__arena && !S.ents.__arena && atkPackOf(p) === packOfTier(p.equip?.weapon) && localStorage.getItem(SAVE_KEY) === raw0;
   }));
   ok('Nebenstädte (Nutzer §5d.10): jede der vier Städte hat eigene Bauten, Leute und einen Dienst (Segen, Werft, Fabrikladen, Prothesenpflege)', sandbox(() => {
     const p = stage(), sh = S.ship, fd = S.flags.serinDay; S.gold = 500;
@@ -20603,6 +20629,28 @@ export function selftest() {
       return up && top && made && raid;
     } finally { p.inv = inv0; Object.assign(S.res, r0); if (S.eco) S.eco.biz = biz0; }
   }));
+  ok('Kampfanimation (03.10.): Pack folgt der Waffe — gewöhnlich/ungewöhnlich A, selten/episch B, legendär/mythisch C; Gegner immer A; Test Room überschreibt', sandbox(() => {
+    const p = stage(), w0 = p.equip.weapon, d0 = S.dbg?.pack, e = actor(p.x + 50, p.y, { kind: 'enemy', mtype: 'bandit' });
+    try { (S.dbg ||= {}).pack = undefined; const pk = r => { const o = mkItem('longsword'); o.rar = r; p.equip.weapon = o; return atkPackOf(p); };
+      const ok1 = pk('common') === (RARITY_ORDER.indexOf(ITEMS.longsword.rarity) >= 2 ? 'B' : 'A') && pk('rare') === 'B' && pk('epic') === 'B' && pk('legendary') === 'C' && pk('mythic') === 'C';
+      e.equip = { weapon: p.equip.weapon }; const foe = atkPackOf(e) === 'A'; S.dbg.pack = 'A'; const over = atkPackOf(p) === 'A';
+      return ok1 && foe && over;
+    } finally { p.equip.weapon = w0; if (S.dbg) S.dbg.pack = d0; } }));
+  ok('HB-20: Erbt der Sohn, bleibt die Mutter Witwe im Haus (nicht mehr Ehepartnerin), Gefangene des Toten kommen frei, Dienerware liegt am Grab', sandbox(() => {
+    const p = stage(), L0 = S.legacy.spouse, K0 = S.keepStash;
+    try {
+      const sp = actor(p.x + 30, p.y, { name: 'Mutter' }); Object.assign(sp, { map: '__a', spouse: true, female: true }); S.legacy.spouse = sp.id;
+      const pr = actor(p.x - 30, p.y, { kind: 'enemy', mtype: 'bandit' }); pr.prisoner = { by: p.id }; const g = { id: 'g_hb20', kind: 'grave', map: '__a', x: p.x, y: p.y, charKey: 'player', loot: [] }; S.ents.__a.push(g);
+      S.keepStash = { item: mkItem('dagger'), day: 0 }; const heir = actor(p.x, p.y + 30, { name: 'Sohn' }); heirBonds(p, heir);
+      return S.legacy.spouse === null && sp.spouse === false && sp.widowOf === p.name && pr.prisoner === null && g.loot.some(i => i.key === 'dagger') && S.keepStash === null;
+    } finally { S.legacy.spouse = L0; S.keepStash = K0; }
+  }));
+  ok('HB-10: „Die Spur des Rotfalls“ schließt bei voller Spur ab — Erfahrung und das Unikat „Rotfall“, nur einmal', sandbox(() => {
+    const p = stage(), q0 = S.quests.q_rotfall;
+    try { S.quests.q_rotfall = { state: 'active', progress: [OMEGA_NEED] }; const n0 = p.inv.filter(i => i.key === 'rotfallklinge').length;
+      rotfallDone(); rotfallDone(); const n1 = p.inv.filter(i => i.key === 'rotfallklinge').length;
+      return S.quests.q_rotfall.state === 'done' && n1 === n0 + 1 && ITEMS.rotfallklinge?.unique;
+    } finally { if (q0) S.quests.q_rotfall = q0; else delete S.quests.q_rotfall; } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */

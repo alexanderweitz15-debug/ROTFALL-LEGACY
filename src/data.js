@@ -203,6 +203,7 @@ export const ITEMS = {
   // Nutzer §5f: jeder Boss hat eine eigene Legendäre (Dodon, Karrak, Leitwolf, Ilvar ergänzt)
   morrs_keule:   { name:'Morrs Keule', slot:'weapon', wtype:'mace', dmg:24, reach:40, arc:1.4, speed:880, stam:14, ap:0.45, stagger:2.2, rarity:'legendary', unique:true, value:950, skill:'onehanded', desc:'Dodons Keule aus einem Kettenpfahl. Wer getroffen wird, taumelt lange.' },
   sandfuerstenklinge:{ name:'Klinge des Sandfürsten', slot:'weapon', wtype:'sword', dmg:17, reach:46, arc:1.8, speed:500, stam:8, bleed:0.35, rarity:'legendary', unique:true, value:900, skill:'onehanded', desc:'Karraks Krummsäbel. Er schneidet tief, jede Wunde blutet.' },
+  rotfallklinge: { name:'Rotfall', slot:'weapon', wtype:'sword', dmg:18, reach:48, arc:1.7, speed:540, stam:9, bleed:0.2, rarity:'legendary', unique:true, value:950, skill:'onehanded', desc:'Geschmiedet aus dem Eisen, auf das Omegas Blut regnete. Wer die ganze Spur des Rotfalls kennt, trägt sie. Ihre Wunden bluten.' },   /* HB-10 (Entwickler 03.10.2026): Unikat am Ende der Spur des Rotfalls */
   leitwolfzahn:  { name:'Leitwolfzahn', slot:'weapon', wtype:'dagger', dmg:10, reach:28, arc:1.1, speed:300, stam:4, crit:2.8, bleed:0.3, rarity:'legendary', unique:true, value:700, skill:'onehanded', desc:'Ein Reißzahn in Knochen gefasst. Von hinten tödlich, und er lässt bluten.' },
   nachtglasstab: { name:'Nachtglasstab', slot:'weapon', wtype:'wand', dmg:15, reach:380, speed:420, stam:2, manaShot:5, rarity:'legendary', unique:true, value:1100, skill:'unarmed', ranged:true, spell:true, desc:'Ilvars Stab mit einer Kugel aus schwarzem Glas. Die Blitze fliegen weiter und treffen härter.' },
   dornensaebel:  { name:'Dornensäbel', slot:'weapon', wtype:'sword', dmg:11, reach:44, arc:1.7, speed:540, stam:8, bleed:0.2, rarity:'uncommon', value:140, skill:'onehanded',
@@ -673,7 +674,7 @@ export const ABILITIES = {
   shadow_bolt: { name:'Schattenblitz', cd:4000, mana:14, icon:'shadow', desc:'Schattenschaden auf Distanz.' },
   life_drain:  { name:'Lebensentzug', cd:11000, mana:20, icon:'drain', desc:'Schaden, der dich heilt.' },
   holy_strike: { name:'Heiliger Schlag', cd:7000, mana:14, icon:'holy', desc:'Schwerer Schaden gegen Untote und Verfluchte.' },
-  blessing:    { name:'Segen', cd:20000, mana:16, icon:'bless', desc:'Rüstung der Gruppe steigt für 20 Sekunden.' },
+  blessing:    { name:'Segen', cd:20000, stam:20, icon:'bless', desc:'Rüstung der Gruppe steigt für 20 Sekunden. Kostet Ausdauer — ein Eid, keine Magie.' },   /* Entwickler 03.10.2026: Ausdauer statt Mana (der Ritter hat ohne Zauber kein Mana) */
   mark_target: { name:'Ziel markieren', cd:12000, stam:10, icon:'mark', desc:'Markiertes Ziel nimmt 25% mehr Schaden.' },
   frenzy:      { name:'Raserei', cd:18000, stam:15, desc:'8 s: Schaden +35 %, Tempo +15 % — du nimmst 20 % mehr Schaden.' },
   shadowstep:  { name:'Schattenschritt', cd:10000, stam:18, desc:'Hinter das nächste Ziel (bis 220 px); der nächste Hieb zählt als Meuchelstich (×2,5). Nicht in Ketten/Platte.' },

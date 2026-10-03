@@ -220,3 +220,13 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Ein Überfall nimmt die Hälfte der Betriebskasse.
   - Bewohner-Siegel bleiben nur in der Nähe sichtbar (Lead, Entwickler: „kp“).
   - Schmied „Verbessern“ und „Schmieden lassen“: die Regeln hat der Lead festgelegt (Entwickler: „entscheidest du“), beschrieben in MECHANIKEN.
+- **03.10. Fragemenü:**
+  - Ritter-Segen kostet Ausdauer statt Mana.
+  - Bomben-Skelett: Wer es während der Zündung erschlägt, löscht die Glut (keine Explosion).
+  - Mutanten gehören zur Fraktion der Toten.
+  - Wächterspinnen lauern auch in Werkhallen der Städte Aurelions (nur gegen Unbefugte); die Dampframme verteidigt Aurelions Städte mit den Wachen.
+  - Lebensbalken allgemein prüfen (Verdacht: Werte werden nicht richtig übertragen) → Bug-Agent.
+  - HB-10: Am Ende der Rotfall/Omega-Reihe gibt es eine EINZIGARTIGE WAFFE.
+  - HB-20: Witwe/Witwer bleibt im Haus (mit dem Erben nicht verheiratet); Bindungen des Toten enden.
+  - Prüfwerte der Klassen bleiben vorläufig; der Entwickler testet.
+  - **Kampfanimation:** eine Mischung der Packs nach Spielfortschritt — frühe Waffen Grounded (A), Midgame Heroic (B), Endgame-Waffen flashy (C).

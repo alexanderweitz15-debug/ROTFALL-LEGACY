@@ -1,6 +1,6 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=24';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS } from './data.js?v=24';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS } from './data.js?v=24';
 import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=24';
 import * as ECO from './economy.js?v=24';
 
@@ -516,7 +516,7 @@ function materialize(node, att, def) {
     for (let i = 0; i < n; i++) {
       let [qx, qy] = [Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3))];
       if (H.inView?.('world', qx * TS, qy * TS)) { if (at) [qx, qy] = H.pushOut('world', qx, qy); else { const hs = HOUSES.filter(h => h.town === node && h.map === 'world'); const h = hs[(i * 7) % Math.max(1, hs.length)]; if (h) [qx, qy] = h.doorTile; } }   // AUDIT: Angreifer von außerhalb, Verteidiger aus den Häusern
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : 'valen_soldier', 'world', qx, qy,
+      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
         { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }

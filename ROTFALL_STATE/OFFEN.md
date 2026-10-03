@@ -103,6 +103,34 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [P] Der Selbsttest dauert jetzt ~2,5–3 min statt ~1 min. Prüfen, ob die Verfolger-Änderung (heiße Verfolger) oder neue Proben die Ursache sind.
 - Läuft: Klassen-Agent, Scheiben 1–10 und Gefährtenbaum.
 
+## 03.10. früh
+- Erledigt:
+  - Klassen-Prüfungen und Sternbild-Talente komplett (Scheiben 0–10, Gefährtenbaum).
+  - Tierhändler-Fenster.
+  - Schmied: Verbessern und Schmieden lassen.
+  - Überfall nimmt die Hälfte der Betriebskasse.
+  - NPC N2, N6, N7, N8, N9-7.
+  - Commit a4bce09 isoliert getestet: 462/462.
+- [E] Ritter: hat „Segen“, aber ohne gelernten Zauber kein Mana. Seine Segen-Sterne sind dann nutzlos.
+- [E] Klassen, vorläufige Zahlen des Agenten:
+  - Sternnamen, Werte und Szenenzitate.
+  - Ritter „Platz halten“ 50 s.
+  - Grube: Gegner mit doppeltem Leben und 1,6-fachem Schaden.
+  - Erfahrung je Prüfungsschritt 80/110.
+- [B] GUI: Prothesen-Werkbank, dann Kontor.
+- [B] NPC-Rest: N4 Stimmungs-Idle, N1 Blasen vereinheitlichen. Offene Entscheidung: Symbolsatz.
+
+## Vollständigkeits-Prüfung (03.10., visual/vollstaendigkeit.md)
+- [B] Zauberlehrer fehlen: sp_regen, sp_shock und sp_staunch haben keinen erreichbaren Lehrer.
+- [B] Fall Aurelions (ganzer Hoher Rat tot) löst kein Weltereignis aus (GATE §11).
+- [B] Boss-Intros fehlen für Varg, Hrodvar, Garmadon, Gorak, Dodon und den Kerkerausbruch; das Regiebuch ist vorhanden.
+- [B] Bossgespräche (Weißbart, Garmadon) sind reiner Text, ohne Story-Fenster und Gesten.
+- [E] Seevolk-Ränge 2 und 4 sind dauerhaft „nicht erreichbar“.
+- [B] Schleich-, Jagd- und Schmied-Fertigkeit zeigen im Charakterfenster Platzhalterwerte bzw. wirken nicht.
+- [B] Noch reine Dialoglisten: Prothesen-Werkbank, Kontor, Schwarzmarkt, Zauber lernen, Hafen/Frachtschiff, Investieren, Schuldknechtschaft.
+- [B] Koop-Handel im Dock (Adapter).
+- (Punkt 1 der Prüfung, „Talentpunkte Koop/Erbe“, ist mit Klassen Scheibe 0 schon behoben; Agent war veraltet.)
+
 ## Ältere offene Punkte
 - [E] Hunt-Bericht `hunt/BERICHT.md` HB-01…HB-47: der Entwickler wählt die Fixes. Am dringendsten:
   - HB-01: gespeicherter Tod bietet nach dem Laden keine Erbenwahl.

@@ -1302,3 +1302,15 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Gefährten-Sternbild (Scheibe 10):** Jeder Gefährte hat ein kleines eigenes Sternbild „Die Gefährten“ (7 Sterne, 6 lernbar, nur Werte: Leben, Schaden, Rüstung, Ausdauer; zwei Schlüsselsterne Leibwache oder Klinge der Gruppe). Punkte: 1 zum Start, dann einer alle fünf Stufen des Gefährten. Im Sternenhimmel oben „Für:“ den Gefährten wählen. Der Held kann diese Sterne nicht lernen; wird ein Gefährte zum Erben, beginnt er ohne sie. Ein Protokollhinweis erklärt es beim ersten Gefährten.
 - **Debug „Sterne: …“ (Scheibe 10):** Gefährten-Sternbild (+2 Stufen), Titelszenen ansehen, Grad-Weihe-Szene ansehen.
 
+- **Kampfstil nach Waffe (03.10.):** Wie wuchtig und auffällig deine Hiebe aussehen, hängt von der Seltenheit deiner Waffe ab:
+  - **Gewöhnlich und ungewöhnlich:** bodenständig (Grounded).
+  - **Selten und episch:** heroisch, mit größeren Bewegungen und Effekten.
+  - **Legendär und mythisch:** flashy, mit Nachbildern, Dash und großen Einschlägen.
+
+  Das ist nur Optik: Schaden und Takt bleiben gleich. Gegner kämpfen immer bodenständig. Im Test Room kann man jeden Stil zum Vergleich erzwingen.
+- **Segen kostet Ausdauer (03.10.):** Segen (Ritter, Paladin) kostet jetzt 20 Ausdauer statt 16 Mana. Er ist ein Eid, keine Magie: Der Ritter kann ihn ohne gelernten Zauber nutzen, und der Bann der Magierjäger hält ihn nicht auf. Die Segen-Sterne des Ritters wirken dadurch auch ohne Mana.
+- **Erbe und Bindungen (HB-20, 03.10.):** Stirbt dein Held und ein Kind erbt, bleibt sein Ehepartner als Witwe oder Witwer im Haus. Mit dem Erben ist er nicht verheiratet: Es gibt keine weiteren Geburten und keine Ehe-Gespräche. Gefangene des Toten kommen frei. Was dir ein Diener aus der Burg geschmuggelt hat, liegt am Grab des Toten.
+- **Spur des Rotfalls abgeschlossen (HB-10, 03.10.):** Sobald du genug Spuren des Rotfalls gefunden hast (9), ist der Auftrag erledigt. Du bekommst die Erfahrung und das Unikat „Rotfall“: ein legendäres Langschwert, dessen Wunden bluten. Wer die Spur schon vorher vollständig hatte, bekommt beides innerhalb einer Spielstunde.
+- **Aurelions Automaten (03.10.):**
+  - Wächterspinnen lauern jetzt auch an den Werkhallen in den Städten Aurelions. Dort greifen sie nur Unbefugte an, also wer keinen Aufenthaltsschein, kein Bürgerrecht und keine Stellung hat; wer sie angreift, macht sie trotzdem zum Feind.
+  - Kommt es zur Schlacht um eine Stadt Aurelions, steht eine Dampframme bei den Verteidigern.
