@@ -2123,7 +2123,7 @@ export function newGame(cfg) {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
     weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], varonburg: [], katakomben: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
-    factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0, frei: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1 },
+    factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0, frei: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1, merch: -1, bandit: -1 },   /* A-02: Händler und Rooks Bande brauchen −1, sonst ist der Beitritt nie möglich */
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
     settlement: null, flags: { gen2: true, gen3: true, gen4: true, pact1: true, grove1: true, dead1: true, deep1: true, border1: true }, relations: {}, kills: 0, battles: 0, log: [], partyCmd: 'follow',
     settings: keep.settings, difficulty: keep.difficulty, fx: [], floats: [], projectiles: [], _uid: 0,
@@ -2381,9 +2381,9 @@ export function continueGame(given = null, retried = false) {                   
   if (S.map === 'vault') { const keep = (S.ents.vault || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id));   /* S15 Fehlersuche: Diener und Tiere nicht verlieren */   // S13: im Gewölbe gespeichert — Ebene neu bauen
     if (S.vaultAt && VAULTS[S.vaultAt.site]) { const at = buildVault(S.vaultAt.site, S.vaultAt.floor); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.vault.push(m); } }
     else { const q = ARRIVAL.world('none'); S.ents.vault = []; S.map = 'world'; Object.assign(S.player, { map: 'world', x: q.x, y: q.y }); S.ents.world.push(S.player); } }
-  S.factions.aurel ??= 0; S.ranks.chain ??= -1; if (S.deadRaid) S.deadRaid.live = false;
+  S.factions.aurel ??= 0; S.ranks.chain ??= -1; S.ranks.merch ??= -1; S.ranks.bandit ??= -1;   /* A-02 */ if (S.deadRaid) S.deadRaid.live = false;
   FEST_BUILT.clear(); festMin = -1; for (const B0 of Object.values(S.brawls || {})) if (B0) B0.t = performance.now();   // S15 Fehlersuche: Festaufbau und Prügel-Zeit neu
-  S.trial = null;   /* S15 Fehlersuche: Prüflinge sind flüchtig, also auch die Prüfung */
+  S.trial = null; S.trialsG = {};   /* S15 Fehlersuche: Prüflinge sind flüchtig, also auch die Prüfung (auch die der Gastfiguren) */
   if (S.myRaid) S.myRaid.live = false; if (S.jail) { ensureJail(); closeCells(); }   // S15: Horde rückt neu an; Kerker mit Wärtern   // Raid-Untote sind flüchtig: nach dem Laden neu anrücken
   afterLoad();                                                        /* Folgen §5c: S.after in alten Ständen */
   assignHunters();
@@ -2692,7 +2692,7 @@ function update(dt, now) {
   mountTick(dt);                               // S15: gerufenes Pferd läuft heran
   if (GROUND.length) groundTick();             // S15 P4: Wände und Flächen aus Zaubern
   dkAuraTick(p, dt);                           // S15 P19: Frostaura der Eidwacht
-  if (S.trial) trialTick();                    // S15 P5: Akademie-Prüfung läuft
+  if (S.trial || (S.trialsG && Object.keys(S.trialsG).length)) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
@@ -3573,7 +3573,7 @@ function castSpell(c, key, a = c.aim ?? 0) {
       for (let k = 0; k <= 6; k++) fx(from.x + (cand.x - from.x) * k / 6, from.y - 12 + (cand.y - from.y) * k / 6, 'spark', 1); from = cand; last = cand; }
     if (!last && c === S.player) UI.toast('Kein sichtbares Ziel für den Blitz.'); }
   else if (S0.shape === 'self' || S0.shape === 'group') {
-    const pat = c === S.player && S.trial?.kind === 'heal' && byId(S.trial.patient);   // S15 P5: Heilprüfung — Heilzauber treffen die Patientin
+    const pat = (c === S.player || c.coopHero) && trialOf(c)?.kind === 'heal' && byId(trialOf(c).patient);   // S15 P5: Heilprüfung — Heilzauber treffen die Patientin
     const who = pat && dist(pat, c) < 90 && S0.shape === 'self' && (S0.heal || S0.staunch) ? [pat] : S0.shape === 'group' ? [c, ...S.ents[c.map].filter(o => o !== c && o.alive && !o.downed && !isHostile(c, o) && (o.kind === 'npc' || o.kind === 'player' || o.servant) && dist(o, c) < (S0.r || 150) && (c !== S.player || S.party.includes(o.id)))] : [c];   /* Behoben HB-22: wie partyCare — am Boden richtet die Gruppenheilung nicht sofort auf */
     for (const o of who) {
       if (S0.heal) { if (o.body) B.heal(o, pw); else o.hp = Math.min(o.maxHp, o.hp + pw); float(o, '+' + Math.round(pw), 'rgba(160,224,160,ALPHA)'); }
@@ -3651,7 +3651,7 @@ function lureWhistle(c) {
   c.lureCd = now + 5000; sfx('whistle', 0.4, 1); if (c === S.player) UI.toast('Kein Feind seiner Feinde in der Nähe.');
 }
 function isHostile(a, b) {
-  if (a.trial || b.trial) return (a === S.player || b === S.player) && (a.trial || b.trial) !== 'heal';   // S15 P5: Prüflinge nur gegen dich
+  if (a.trial || b.trial) { const t = a.trial ? a : b, o = t === a ? b : a; return (t.trialOwner ? o.id === t.trialOwner : o === S.player) && t.trial !== 'heal'; }   /* HB2-02: Prüflinge nur gegen ihre Figur */   // S15 P5: Prüflinge nur gegen dich
   if (a.kind === 'enemy' && b.kind === 'enemy' && (WILD_BEASTS.has(a.mtype) !== WILD_BEASTS.has(b.mtype)) && !a.servant && !b.servant && !a.pet && !b.pet && !a.spirit && !b.spirit && !a.goblinStorm && !b.goblinStorm
     && !MONSTERS[a.mtype]?.prey && !MONSTERS[b.mtype]?.prey && (MONSTERS[a.mtype]?.faction === 'bandit' || MONSTERS[b.mtype]?.faction === 'bandit')) return true;   // S15 P3 (Nutzer): Raubtiere und Banditen arbeiten nicht zusammen
   if (a.amok || b.amok) return a !== b && !(a.amok && b.amok) && !b.prey && teamOf(a.amok ? b : a) !== 'prey';   // S14 Magitech-Unfall: Amok-Automaten gegen alle
@@ -3798,9 +3798,10 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (S.dying && (target === S.player || S.party.includes(target.id))) return;   /* T10: im Todesmoment stirbt niemand von der Gruppe */
   if (target.disguised && !target.unmasked && source) { target.unmasked = true; float(target, 'Maskierter!', 'rgba(200,60,60,ALPHA)'); }   /* §5g.2: gestellt */   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
-  if (target.trial === 'aim') { if (kind !== 'physical' && source === S.player && S.trial) { S.trial.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
-  if (S.trial?.kind === 'duel' && (target.duelist || (target === S.player && source?.duelist)) && target.hp - dmg < target.maxHp * 0.2) { endTrial(target !== S.player); return; }
-  if (S.trial && (target.trial || target === S.player) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
+  if (target.trial === 'aim') { const TA = trialOf(byId(target.trialOwner) || S.player); if (kind !== 'physical' && TA && source && source.id === (TA.owner ?? S.player.id)) { TA.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
+  { const TD = target.duelist ? trialOf(byId(target.trialOwner) || S.player) : source?.duelist && (source.trialOwner === target.id || (!source.trialOwner && target === S.player)) ? trialOf(target) : null;   /* HB2-02: je Figur */
+    if (TD?.kind === 'duel' && target.hp - dmg < target.maxHp * 0.2) { endTrial(!!target.duelist, TD); return; } }
+  if ((S.trial || S.trialsG) && (target.trial || target === S.player || target.coopHero) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
   if (abNow && source === abNow.c && abNow.mult !== 1 && dmg > 0) dmg *= abNow.mult;   /* Fähigkeitssterne: Schaden der laufenden Fähigkeit */
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
@@ -3825,7 +3826,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   const th = afx(target, 'thorns');                                   // Dornen: ein Teil des Nahkampfschadens geht zurück
   if (th && source && source !== target && source.alive && !source._thorn && dist(source, target) < 90 && dmg > 0) { source._thorn = true; hurt(source, dmg * th, target, 'Dornen'); source._thorn = false; }
   const ward = target.status && target.status.find(s => s.key === 'bone_ward' && s.absorb > 0);
-  if (target === S.player && S.trial?.kind === 'shield' && source?.trial === 'shield' && ward) S.trial.n++;   // S15 P5: Schildprüfung
+  if (source?.trial === 'shield' && ward && (target === S.player || target.coopHero) && trialOf(target)?.kind === 'shield' && (!source.trialOwner || source.trialOwner === target.id)) trialOf(target).n++;   // S15 P5: Schildprüfung
   if (ward && dmg > 0) {                                              // Knochenschild fängt ab, bis er bricht
     const a = Math.min(ward.absorb, dmg); ward.absorb -= a; dmg -= a; if (ward.absorb <= 0) ward.left = 0;
     fx(target.x, target.y - 12, 'bone', 4); if (dmg <= 0) return float(target, 'Knochen', 'rgba(215,208,186,ALPHA)');
@@ -5540,7 +5541,7 @@ function rummage(t, b) {
   for (const [k, n] of pool) if (ITEMS[k] && rnd() < 0.5 && addItem(p, k, n)) got.push(ITEMS[k].name);
   const g = t.type === 'desk' ? ri(3, 15) : rnd() < 0.3 ? ri(1, 6) : 0; S.gold += g;
   log(got.length || g ? `Gefunden: ${[...got, g ? g + ' Gold' : ''].filter(Boolean).join(', ')}.${owned ? ' Niemand hat es gesehen.' : ''}` : 'Nichts Brauchbares.', 'world');
-  if (owned && (got.length || g)) questEvent('steal');                 /* Klassen-Prüfung Schurke: Leichte Finger */
+  if (owned && (got.length || g)) questEvent('steal', null, 1, S.player);                 /* Klassen-Prüfung Schurke: Leichte Finger */
 }
 // Roadmap P4: Selbstwartung von Prothesen und Auge an Werkbank oder Amboss — Feinwerkzeug (bleibt) und je Teil 1 Magitech oder 2 Ersatzteile.
 // Obergrenze 70 %, Schmiedekunst hebt sie (bis 95 %), die Greifhand +10. Mehr schafft nur der Kybernetiker.
@@ -5576,7 +5577,7 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   p.skills[sk] = Math.min(100, skill + 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0);
     if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
-    questEvent('craft', key, n);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
+    questEvent('craft', key, n, p);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
     log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
   const o = mkItem(key); o.cond = qi === 0 ? 0.6 : 1; o.qual = qn; o.maker = p.name;
   if (tier && RARITY_ORDER.indexOf(tier) > RARITY_ORDER.indexOf(it.rarity || 'common')) rollRarity(o, it, 0, tier);
@@ -5674,6 +5675,7 @@ function doInteract(target = null) {
   if (t.secretDig) return secretDig(t);                              /* Geheime Orte S2: Lanze auf dem Hundertfeld */
   if (t.chalk != null) return chalkRead(t);                          /* Geheime Orte S2: Kreidezeichen */
   if (t.secretNames) return secretNames(t);                          /* Geheime Orte S4: Kammer der Namen */
+  if (t.secretWell) return secretWell(t);                            /* A-04: die Treppe am Brunnen der Durstigen war nicht betretbar */
   if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
@@ -7475,7 +7477,7 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 /* Entwickler 02.10.2026: „3 Aufträge für die Eisenkette, kein Ansehen“ — die Eisenfeste steht nicht in TOWN_PLAN/GUARD_POSTS, ihr Ansehen ging an Valen.
    Orte der Kette (LOCATIONS faction 'chain') zählen jetzt für die Kette. Andere Fraktionsorte (Grubenhort, Karak-Atar …) bleiben bewusst unverändert: offene Entscheidung. */
-const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (LOCATIONS.find(l => l.key === town)?.faction === 'chain' ? 'chain' : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
+const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
 const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
@@ -7672,7 +7674,7 @@ function claimContract(C, npc) {
   const share = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + share * 1.5);   // S14 (Nutzer): wer die Wachen kämpfen lässt, bekommt weniger
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
-  C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract'); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] += C.reward.rep;
+  C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
   if (npc?.kind === 'npc' && npc.alive !== false) gesture(npc, npc.guard || C.giver === 'vm' ? 'salutieren' : 'jubeln', 0, S.player);   /* Q7-3 */
@@ -9822,7 +9824,7 @@ function varonChoices(npc, choices) {
   if (npc.varonKing) {
     if (npc.exile) choices.unshift({ text: 'Varonheim zurückerobern', fn: () => { S.flags.retakeAsked = 1; say('„Die Toten sitzen auf meinem Thron. Vier Wellen stehen vor den Toren, die letzte führt ein Statthalter der Toten. Brich sie — oder halte die Straßen frei, bis mein Heer stark genug ist. Bring mir Varonheim zurück, und du wartest nie wieder vor einem Kanzler.“ (Ziel: vor Varonheim die Wellen der Besatzung brechen)'); } });
     if (!npc.exile && !S.flags.varonAudience && !S.flags.ysmayChancellor && (S.ranks.valen ?? -1) < 1) return choices.unshift({ text: 'Majestät …', fn: () => say('Der König sieht durch dich hindurch. Kanzler Aldhelm tritt dazwischen: „Seine Majestät empfängt keine Bittsteller. Wende dich an mich.“') });
-    if ((S.factions.aurel || 0) >= 25) return choices.unshift({ text: 'Majestät …', fn: () => { S.factions.valen = clamp((S.factions.valen || 0) - 3, -100, 100); say('„Du riechst nach Kristall und Messing. Aurelion schickt Spione in meine Halle — und du stehst hier, als wäre nichts. Geh, bevor ich es mir anders überlege.“ (Valen −3; zu beliebt in Aurelion)'); } });
+    if ((S.factions.aurel || 0) >= 25) return choices.unshift({ text: 'Majestät …', fn: () => { if ((S.flags.kingSpyDay ?? -9) !== (S.day | 0)) { S.flags.kingSpyDay = S.day | 0; S.factions.valen = clamp((S.factions.valen || 0) - 3, -100, 100); }   /* A-16: höchstens einmal am Tag */ say('„Du riechst nach Kristall und Messing. Aurelion schickt Spione in meine Halle — und du stehst hier, als wäre nichts. Geh, bevor ich es mir anders überlege.“ (Valen −3; zu beliebt in Aurelion)'); } });
     if (Q === 0) choices.unshift({ text: 'Ich will der Krone dienen.', fn: () => { S.flags.varonQ = 1; royalStart();
       say('„Dienen. Alle wollen dienen, bis es blutet. Beweis es. Vor Nordfurt führt ein Hauptmann der Toten seine Knochen spazieren. Bring mir die Nachricht, dass er nicht mehr läuft.“ (Auftrag im Tagebuch)'); } });
     if (Q === 1 && S.flags.varonQ1done) choices.unshift({ text: 'Der Hauptmann der Toten ist gefallen.', fn: () => { S.flags.varonQ = 2; S.gold += 150; gainXp(p, 200);
@@ -10230,6 +10232,7 @@ function omegaPerform(m, roll = rnd()) {
   p.omegaScar = true; recalc(p); float(p, 'Blutzoll', 'rgba(200,60,60,ALPHA)');
   const chance0 = clamp(0.4 + O.faith / 250 + Math.max(0, S.ranks.chain ?? -1) * 0.06, 0.3, 0.9);
   O.outcome = roll < chance0 ? 'awake' : 'wrath'; O.ritualDay = S.day | 0;
+  if (S.quests.q_omega && S.quests.q_omega.state === 'active') gainXp(S.player, QUESTS.q_omega.reward?.xp || 0);   /* B-4: die 1000 EP kamen nie an */
   if (S.quests.q_omega) { S.quests.q_omega.state = 'done'; S.quests.q_omega.progress = [1]; S.quests.q_omega.outcome = O.outcome === 'awake' ? 'Omega ist erwacht und wartet im Krater.' : 'Omega erwachte im Zorn. Die Welt blutet.'; }
   const alt = S.ents.world.find(e => e.omegaAltar);
   if (alt && !S.ents.world.some(e => e.omegaRift)) { const s = freeSpotNear('world', (alt.x / TS | 0) + 1, (alt.y / TS | 0) - 2, 2);
@@ -10899,7 +10902,7 @@ function corvanTalk(n) {
     opts.push({ text: ok ? 'Drei Häuser sprechen für mich. Hier ist meine Einlage (500 Gold).' : `Wie stehen meine Fürsprecher? (${AUREL_HOUSES.filter(h => favor(h.key) >= 30).length}/3 Häuser mit Gunst ≥ 30)`, fn: () => {
       if (!ok) return UI.dialogue(n, '„Noch nicht genug Stimmen. Die Häuser müssen dich mögen — oder fürchten.“', [{ text: 'Weiter', fn: back }]);
       if (S.gold < 500) return UI.dialogue(n, '„Die Einlage, bitte. Fünfhundert. Der Rat ist nicht billig.“', [{ text: 'Weiter', fn: back }]);
-      S.gold -= 500; S.flags.councillor = true; Q.state = 'done'; Q.progress = [1, 1]; Q.outcome = 'Du bist Mitglied des Hohen Rates.'; C.next = (S.day | 0) + 1; S.skyPass = true;
+      S.gold -= 500; S.flags.councillor = true; Q.state = 'done'; Q.progress = [1, 1]; Q.outcome = 'Du bist Mitglied des Hohen Rates.'; gainXp(S.player, QUESTS.q_ratssitz.reward?.xp || 0);   /* B-3: die 600 EP kamen nie an */ C.next = (S.day | 0) + 1; S.skyPass = true;
       if (!S.legend?.aurel) grantLegend('aurel', 'Stimme im Hohen Rat', 'Aufgenommen in den Hohen Rat von Aurelion.'); autoRanks();
       UI.dialogue(n, '„Willkommen im Rat. Wir tagen jeden siebten Tag. Morgen zum ersten Mal. Bring Argumente mit — und Freunde.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); }
   if (isCouncillor()) { const due = (S.day | 0) >= (C.next || 0);
@@ -11345,6 +11348,7 @@ function deplOf(map) {
 }
 function deplMark(e) { const m = e.map || S.map, D = DEPL.get(m); if (D && D.arr === S.ents[m] && !D.list.includes(e)) D.list.push(e); }
 function hourTick(h) {
+  for (const f in S.factions) if (typeof S.factions[f] === 'number') S.factions[f] = clamp(S.factions[f], -100, 100);   /* A-06: Sicherheitsnetz — Ruf bleibt zwischen −100 und 100, auch wo eine Stelle ohne Grenze addiert */
   wxHour(h);   /* Roadmap C.12 */
   nightWatch(h);                                                             /* Klassen-Prüfung Waldläufer */
   aurelParade(h); rotfallCheck(); ensureOmegaShrine(); pilgrimTick(); if (S.flags.feastDay != null && (S.day | 0) > S.flags.feastDay) { for (const e of S.ents.world) if (e.feastBack) { e.anchor = e.feastBack; e.feastBack = null; } S.flags.feastDay = null; } if (S.omega?.cat && !S.omega.ending) omegaCatHour();   // Phase 7
@@ -11546,7 +11550,8 @@ const BIG_START = {
     for (let i = 0; i < 4; i++) { const g = guardChar('merch', freeSpotNear('world', (q.x / TS | 0) + ri(-3, 3), (q.y / TS | 0) + ri(-3, 3), 2), 'Gildenwache', 7); Object.assign(g, { bigEv: id, transient: true, treasureGuard: true, brave: true, anchor: { x: g.x, y: g.y } }); S.ents.world.push(g); }
     bigAnnounce(`Schatzwagen bei ${townName(a)}`, `Ein Schatzwagen der Handelsgilde rastet vor ${townName(a)}. Gerüchte sagen, Räuber lauern ihm heute Nacht auf. Wer ihn verteidigt, verdient sich die Gilde. Wer ihn selbst ausraubt, die Räuber.`); } },
   witch: { ok: () => bigTowns().some(k => villagersOf(k).some(c => femTrade(c.prof || '') || FIRST_F.includes(c.name))), go: () => {
-    const k = pick(bigTowns().filter(k => villagersOf(k).some(c => FIRST_F.includes(c.name)))), w = villagersOf(k).find(c => FIRST_F.includes(c.name));
+    const isW = c => femTrade(c.prof || '') || FIRST_F.includes(c.name);   /* A-08: Start und Auswahl prüfen dasselbe (vorher konnte w leer sein → Absturz) */
+    const k = pick(bigTowns().filter(k => villagersOf(k).some(isW))), w = villagersOf(k).find(isW); if (!w) return;
     S.big = { id: uid(), kind: 'witch', town: k, until: (S.day | 0) + 2, who: w.id, name: w.name }; w.accused = true;
     bigAnnounce(`Hexenprozess in ${townName(k)}`, `Die Inquisition des Ordens klagt ${w.name} aus ${townName(k)} der Hexerei an. Übermorgen soll sie brennen. Man kann für sie sprechen, schweigen, oder sie in der Nacht fortbringen.`); } },
   guildstrike: { ok: () => !!TOWN_PLAN.varonheim && !heldBy('varonheim') && !S.war?.nodes?.varonheim?.siege && (S.schutz?.varonheim?.stage || 0) < 2, go: () => {   /* Scout R5: Gildenstreik im Gildenviertel der Hauptstadt */
@@ -13255,7 +13260,7 @@ const d6 = () => ri(1, 6);
 function dice(npc, g) {
   if (S.gold < g) return UI.closeDialogue(); const cheat = (npc.traits || []).includes('hinterhältig') || chance(0.12), a = d6() + d6(), b = cheat ? Math.max(d6() + d6(), 9) : d6() + d6();
   const spot = cheat && chance(0.25 + (S.player.attributes?.perception || 10) * 0.025);
-  const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') { S.gold += g; questEvent('tavern'); } else if (res === 'lose') S.gold -= g;
+  const res = a > b ? 'win' : a < b ? 'lose' : 'draw'; if (res === 'win') { S.gold += g; questEvent('tavern', null, 1, S.player); } else if (res === 'lose') S.gold -= g;
   log(`Würfeln gegen ${npc.name}: ${a} zu ${b}. ${res === 'win' ? `+${g} Gold.` : res === 'lose' ? `−${g} Gold.` : 'Gleichstand.'}`, 'economy');   /* Schenke: Ergebnis auch im Protokoll, falls der Dialog zu schnell weg ist */
   UI.dialogue(npc, `Du wirfst ${a}, ${npc.name} wirft ${b}. ${res === 'win' ? `Du gewinnst ${g} Gold.` : res === 'lose' ? `Du verlierst ${g} Gold.` : 'Gleichstand — nochmal.'}${spot ? '\n(Dir fällt auf: seine Würfel rollen immer auf dieselbe Seite …)' : ''}`, [
     ...(spot && res === 'lose' ? [{ text: '„Falschspieler!“', fn: () => { S.gold += g * 2; addRel(npc.key, -15); log(`Falschspieler entlarvt: ${npc.name} zahlt den Einsatz doppelt zurück (+${g * 2} Gold).`, 'economy'); UI.dialogue(npc, '„Schon gut, schon gut! Hier, nimm und schrei nicht so.“ (Einsatz doppelt zurück)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }] : []),
@@ -13269,14 +13274,14 @@ function cards(npc, g, hand) {
   UI.dialogue(npc, `Deine Karten: ${hand.join(' + ')} = ${sum}. Noch eine?`, [
     { text: 'Karte', fn: () => cards(npc, g, [...hand, drawCard()]) },
     { text: 'Ich bleibe', fn: () => { const h = [drawCard(), drawCard()]; while (handSum(h) < 16) h.push(drawCard()); const n = handSum(h), win = n > 21 || sum > n, draw = n === sum;
-      if (win) { S.gold += g; questEvent('tavern'); } else if (!draw) S.gold -= g;
+      if (win) { S.gold += g; questEvent('tavern', null, 1, S.player); } else if (!draw) S.gold -= g;
       log(`Siebzehn und Vier gegen ${npc.name}: ${sum} zu ${n}${n > 21 ? ' (überkauft)' : ''}. ${win ? `+${g} Gold.` : draw ? 'Gleichstand.' : `−${g} Gold.`}`, 'economy');
       UI.dialogue(npc, `${npc.name}: ${h.join(' + ')} = ${n}${n > 21 ? ' — überkauft' : ''}. ${win ? `Du gewinnst ${g} Gold.` : draw ? 'Gleichstand.' : `Du verlierst ${g} Gold.`}`, [...(S.gold >= g ? [{ text: 'Neues Spiel', fn: () => cards(npc, g, [drawCard(), drawCard()]) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]); } }]);
 }
 function armWrestle(npc, g) {
   if (S.gold < g) return UI.closeDialogue();   /* Schenke: kein Einsatz ohne Gold, auch nicht bei "Nochmal" */
   const me = (S.player.attributes?.strength || 10) + d6() + d6(), him = (npc.attributes?.strength || 10) + d6() + d6(), win = me >= him;
-  if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); questEvent('tavern'); } else S.gold = Math.max(0, S.gold - g);
+  if (win) { S.gold += g; addRel(npc.key, 3); addFame(1, undefined, 'Armdrücken'); questEvent('tavern', null, 1, S.player); } else S.gold = Math.max(0, S.gold - g);
   S.player.stamina = Math.max(0, S.player.stamina - 20);
   log(`Armdrücken gegen ${npc.name}: ${win ? `gewonnen (+${g} Gold)` : `verloren (−${g} Gold)`}.`, 'economy');
   UI.dialogue(npc, win ? `Sein Arm gibt nach. Die Schenke johlt. (+${g} Gold)` : `Dein Handrücken knallt auf den Tisch. (−${g} Gold)`, [...(S.gold >= g ? [{ text: 'Nochmal', fn: () => armWrestle(npc, g) }] : []), { text: 'Genug.', fn: () => UI.closeDialogue() }]);
@@ -13287,7 +13292,7 @@ function drinkBet(npc, g, round) {
   addStatus(p, { key: 'rausch', name: `Rausch ${Math.min(3, st)}`, stacks: Math.min(3, st), left: 240000, desc: 'Die Welt schwankt: die Steuerung zieht zur Seite. Etwas mutiger (+5 % Schaden je Stufe).' });
   const meOut = chance(0.08 + round * 0.12 - (p.attributes?.endurance || 10) * 0.006), himOut = chance(0.1 + round * 0.12);
   if (meOut && !himOut) { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: verloren (−${g} Gold).`, 'economy'); return UI.dialogue(npc, `Beim ${round + 1}. Krug wird dir schwarz vor Augen. ${npc.name} lacht. (−${g} Gold)`, [{ text: '[Wankend gehen]', fn: () => UI.closeDialogue() }]); }
-  if (himOut && !meOut) { questEvent('tavern'); S.gold += g; addFame(1, undefined, 'Trinkwette'); log(`Trinkwette gegen ${npc.name}: gewonnen (+${g} Gold).`, 'economy'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
+  if (himOut && !meOut) { questEvent('tavern', null, 1, S.player); S.gold += g; addFame(1, undefined, 'Trinkwette'); log(`Trinkwette gegen ${npc.name}: gewonnen (+${g} Gold).`, 'economy'); return UI.dialogue(npc, `${npc.name} rutscht vom Hocker. Du stehst noch — irgendwie. (+${g} Gold)`, [{ text: '[Siegreich wanken]', fn: () => UI.closeDialogue() }]); }
   UI.dialogue(npc, `Krug ${round + 1} ist leer. Ihr starrt euch an.`, [{ text: 'Noch einen!', fn: () => drinkBet(npc, g, round + 1) }, { text: 'Ich gebe auf. (−' + g + ' Gold)', fn: () => { S.gold = Math.max(0, S.gold - g); log(`Trinkwette gegen ${npc.name}: aufgegeben (−${g} Gold).`, 'economy'); UI.closeDialogue(); } }]);
 }
 function fistStart(npc, g) {
@@ -13301,7 +13306,7 @@ function fistEnd(win) {
   const F = S.fist, p = S.player, npc = byId(F.npc); S.fist = null;
   p.brawl = false; p.brawlSide = null; p.brawlV = null; if (!p.equip.weapon) p.equip.weapon = F.pw; recalc(p);
   if (npc) { npc.brawl = false; npc.brawlSide = null; npc.brawlV = null; npc.angry = false; npc.aggroId = null; if (!npc.equip.weapon) npc.equip.weapon = F.nw; recalc(npc); }
-  if (win) { questEvent('tavern'); S.gold += F.g; addFame(2, undefined, 'Faustkampf'); if (npc) addRel(npc.key, 5); log(`Du gewinnst den Faustkampf. +${F.g} Gold, und die Schenke kennt jetzt deinen Namen.`, 'combat'); }
+  if (win) { questEvent('tavern', null, 1, S.player); S.gold += F.g; addFame(2, undefined, 'Faustkampf'); if (npc) addRel(npc.key, 5); log(`Du gewinnst den Faustkampf. +${F.g} Gold, und die Schenke kennt jetzt deinen Namen.`, 'combat'); }
   else { S.gold = Math.max(0, S.gold - F.g); log(`Du gehst zu Boden. −${F.g} Gold. Man hilft dir auf und schiebt dir einen Krug hin.`, 'combat'); }
 }
 function fistTick() {
@@ -13543,7 +13548,7 @@ function questAvailable(k) {
 function startQuest(k) {
   if (QUESTS[k]?.sea && k !== 'q_wb_nebel') seaQuestStart(k);   // S14: Lager, Grube
   if (k === 'q_grisk_lost') planLostGoblins(); if (k === 'q_grisk_rache') spawnChainRest();   // S12 A4                                   // was schon erledigt ist, zählt (Boss vorher erschlagen, Gegenstand dabei)
-  S.quests[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
+  (QUESTS[k]?.clsTrial ? qStore() : S.quests)[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
     o.type === 'item' ? S.player.inv.filter(x => x.key === o.target).reduce((n, x) => n + (x.count || 1), 0)
     : o.type === 'kill' && o.target === 'hrodvar' && S.flags.hrodvarSlain ? 1
     : o.type === 'kill' && REGION_BOSSES.some(b => b.id === o.target && S.flags[b.flag]) ? 1 : 0) };   // Regionalboss schon erlegt: zählt
@@ -13567,21 +13572,23 @@ function offerQuest(npc, k) {
   ], { brief: questBrief(k) });
 }
 function questComplete(k) {
-  const st = S.quests[k], Q = QUESTS[k]; if (!st) return false;
-  Q.objectives.forEach((o, i) => { if (o.type === 'item') st.progress[i] = S.player.inv.filter(x => x.key === o.target).reduce((n, x) => n + (x.count || 1), 0); });   // S14: Gekauftes zählt auch (vorher nur Aufgehobenes)
+  const st = qSt(k), Q = QUESTS[k]; if (!st) return false;
+  Q.objectives.forEach((o, i) => { if (o.type === 'item') st.progress[i] = matHave(o.target) + Object.values(S.player.equip || {}).filter(it => it?.key === o.target).length; });   /* B-5: auch Angelegtes zählt (Siegel des Ordens ist ein Umhang) */   /* B-1: Rohstoffe (Eisen, Holz …) liegen im Vorrat S.res, nicht im Gepäck — beides zählt (g_dod2 war nie abschließbar) */   // S14: Gekauftes zählt auch (vorher nur Aufgehobenes)
   return Q.objectives.every((o, i) => (st.progress[i] || 0) >= (o.count || 1));
 }
 function turnIn(npc, k) {
-  const Q = QUESTS[k], st = S.quests[k];
+  const Q = QUESTS[k], st = qSt(k);
   if (!st || st.state !== 'active') return;                          // S15: nie zweimal abgeben
   st.state = 'done';
   const r = Q.reward || {};
   if (r.gold) { S.gold += questGold(r.gold); log(`${r.gold} Gold erhalten.`, 'economy'); }
   if (r.xp) gainXp(S.player, r.xp);
-  if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] += v; log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
+  if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
-  if (r.take) removeItem(S.player, r.take, r.takeCount || 1);
-  if (r.item) { addItem(S.player, r.item); log(`Erhalten: ${ITEMS[r.item].name}.`, 'economy'); }
+  if (r.take) { const n = r.takeCount || 1, P = S.player;   /* B-1/B-5: aus Vorrat, Gepäck oder notfalls vom Leib */
+    for (const [sl, it] of Object.entries(P.equip || {})) if (it?.key === r.take && matHave(r.take) < n) { P.equip[sl] = null; P.inv.push(it); recalc(P); }
+    matTake(r.take, n); }
+  if (r.item) { if (!addItem(S.player, r.item)) { dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(r.item)); log(`Erhalten: ${ITEMS[r.item].name} — das Gepäck ist voll, es liegt vor deinen Füßen.`, 'economy'); } else log(`Erhalten: ${ITEMS[r.item].name}.`, 'economy'); }   /* B-2: volle Tasche verlor die Belohnung */
   if (Q.clsTrial) (S.player.ktSteps ||= {})[k] = 1;                    /* Klassen-Prüfung: Schritt gehört der Figur, die abgibt (Koop: jeder für sich) */
   let rited = false;
   if (r.unlock) rited = Q.clsTrial ? classPassed(r.unlock, npc) : unlockClass(r.unlock, npc);   /* Aufnahme mit Szene */
@@ -13604,9 +13611,9 @@ function onKill(mtype, e) {
   if (e?.chainRest) mtype = 'chain_rest';                         // S12 A4: Kettenreste zählen für Grisk
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
   if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
-  if (e?.kind === 'enemy' && !e.trial && S.player.status?.some(s => s.key === 'song') && partyMembers().filter(m => m.alive && !m.downed && m.map === S.player.map && dist(m, S.player) < 400).length >= 2) questEvent('songkill');   /* Klassen-Prüfung Barde: Das Lied trägt */
-  for (const [k, st] of Object.entries(S.quests)) {
-    if (st.state !== 'active') continue;
+  if (e?.kind === 'enemy' && !e.trial) for (const h of ktHeroes()) if (h.status?.some(x => x.key === 'song') && [...new Set([S._hostHero || S.player, ...partyMembers()])].filter(m => m !== h && m.alive && !m.downed && m.map === h.map && dist(m, h) < 400).length >= 2) questEvent('songkill', null, 1, h);   /* Klassen-Prüfung Barde: Das Lied trägt (je Figur) */
+  for (const [k, st] of questEntries()) {                             /* Koop: auch die Prüfungsaufträge der Gastfiguren */
+    if (st.state !== 'active' || !QUESTS[k]) continue;
     QUESTS[k].objectives.forEach((o, i) => {
       if (o.type === 'kill' && (o.target === mtype || o.targets?.includes(mtype) || (o.target === '*' && e?.kind === 'enemy' && !e.trial) || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Klassen-Prüfung: targets (Liste), * = jeder Feind */   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
         st.progress[i] = (st.progress[i] || 0) + 1;
@@ -13671,7 +13678,7 @@ function finishLila(outcome, r) {
   const st = S.quests.q_lila; st.state = 'done'; st.outcome = outcome;
   if (r.gold) S.gold += questGold(r.gold);
   if (r.xp) gainXp(S.player, r.xp);
-  if (r.rep) for (const [f, v] of Object.entries(r.rep)) S.factions[f] += v;
+  if (r.rep) for (const [f, v] of Object.entries(r.rep)) S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100);   /* A-06 */
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
   log(outcome, 'quest'); chronicle('Die vermisste Tochter', 'quest', outcome);
   UI.closeDialogue(); save();
@@ -13805,6 +13812,15 @@ function acadSpot() { const h = HOUSES.find(b => b.type === 'academy' && b.map =
 // Jeder Lehrer der Klasse nimmt ab; der Fortschritt gehört der Figur (p.ktSteps), im Koop also jedem selbst. Bestanden = +1 Talentpunkt
 // (p.clsPass). Paladin, Todesritter, Hochpaladin und die dunklen Klassen behalten ihre eigenen Wege (OWN_PATH); ihre Freischaltung
 // zählt als bestandene Prüfung. Meisterprüfungen laufen über startTrial am Lehrerort; scheitern darf man beliebig oft.
+/* HB2-02/HB2-09 (Koop: jeder für sich): Prüfungsaufträge des Helden stehen in S.quests (Auftragsbuch), die einer Koop-Gastfigur in m.ktQ.
+   Die laufende Meisterprüfung des Helden ist S.trial, die einer Gastfigur S.trialsG[id] (beides flüchtig). Gegner und Puppen tragen trialOwner. */
+const ktHeroes = () => { const h = S._hostHero || S.player; return [h, ...partyMembers().filter(m => m.coopHero && m !== h)]; };
+const qStore = (c = S.player) => c?.coopHero ? (c.ktQ ||= {}) : S.quests;
+const qSt = (k, c = S.player) => QUESTS[k]?.clsTrial ? qStore(c)[k] : S.quests[k];
+const questEntries = () => [...Object.entries(S.quests), ...ktHeroes().filter(h => h.coopHero).flatMap(h => Object.entries(h.ktQ || {}))];
+const trialOf = c => c?.coopHero ? (S.trialsG?.[c.id] || null) : S.trial;
+function setTrialOf(c, T) { if (c?.coopHero) (S.trialsG ||= {})[c.id] = T; else S.trial = T; }
+function clearTrial(T) { if (S.trial === T) S.trial = null; for (const [id, x] of Object.entries(S.trialsG || {})) if (x === T) delete S.trialsG[id]; }
 const OWN_PATH = new Set(['paladin', 'deathknight', 'darkpaladin', 'darkpriest', 'chainhunter', 'torturer', 'chainbard']);
 const clsTrialOf = cls => Object.keys(QUESTS).filter(k => QUESTS[k].clsTrial?.[0] === cls).sort((a, b) => QUESTS[a].clsTrial[1] - QUESTS[b].clsTrial[1]);
 const ktNext = (p, cls) => clsTrialOf(cls).find(k => !p.ktSteps?.[k]) || null;
@@ -13812,7 +13828,7 @@ const hasShield = p => ITEMS[p.equip?.offhand?.key]?.block > 0 || /schild|shield
 function trialOffer(npc, cls, redo = false) {
   const p = S.player, k = ktNext(p, cls), C = CLASSES[cls];
   if (!k) return classPassed(cls, npc);                                 /* alle Schritte schon erledigt (z. B. Lehrer gewechselt) */
-  const st = S.quests[k], Q = QUESTS[k], i = Q.objectives.findIndex(o => o.type === 'trial'), steps = clsTrialOf(cls).length;
+  const st = qSt(k), Q = QUESTS[k], i = Q.objectives.findIndex(o => o.type === 'trial'), steps = clsTrialOf(cls).length;
   if (st?.state === 'active') {
     const ch = [];
     if (questComplete(k)) ch.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
@@ -13826,51 +13842,54 @@ function trialOffer(npc, cls, redo = false) {
     { text: 'Ich höre.', fn: () => offerQuest(npc, k) }, { text: 'Später.', fn: () => UI.closeDialogue() }]);
 }
 /* Klassen-Prüfung: allgemeine Zielarten (steal, tavern, craft, contract, songkill, night) — zählt jedes laufende Auftragsziel dieser Art */
-function questEvent(type, target = null, n = 1) {
-  for (const [k, st] of Object.entries(S.quests || {})) { if (st.state !== 'active' || !QUESTS[k]) continue;
+function questEvent(type, target = null, n = 1, who = null) {         /* who: nur diese Figur (Koop: jeder für sich); sonst alle Helden */
+  for (const h of who ? [who] : ktHeroes()) for (const [k, st] of Object.entries(qStore(h) || {})) { if (st.state !== 'active' || !QUESTS[k]) continue;
     QUESTS[k].objectives.forEach((o, i) => { if (o.type !== type || (o.target && target && o.target !== target)) return; const c = o.count || 1; if ((st.progress[i] || 0) >= c) return;
-      st.progress[i] = Math.min(c, (st.progress[i] || 0) + n); log(`${QUESTS[k].name}: ${st.progress[i]}/${c}${st.progress[i] >= c ? ' — erfüllt' : ''}`, 'quest'); }); }
+      st.progress[i] = Math.min(c, (st.progress[i] || 0) + n); log(`${h.coopHero ? h.name + ': ' : ''}${QUESTS[k].name}: ${st.progress[i]}/${c}${st.progress[i] >= c ? ' — erfüllt' : ''}`, 'quest'); }); }
 }
 /* Waldläufer: eine ganze Nacht (Entwickler 03.10.: 10 Stunden am Stück) draußen — außerhalb von Siedlungen, in der Oberwelt, nicht am Boden */
-function nightWatch(h) {
-  const p = S.player, wants = Object.entries(S.quests || {}).some(([k, st]) => st.state === 'active' && QUESTS[k]?.objectives.some((o, i) => o.type === 'night' && (st.progress[i] || 0) < 1));
+function nightWatch(h) { for (const p of ktHeroes()) nightWatchOne(p, h); }
+function nightWatchOne(p, h) {
+  const wants = Object.entries(qStore(p) || {}).some(([k, st]) => st.state === 'active' && QUESTS[k]?.objectives.some((o, i) => o.type === 'night' && (st.progress[i] || 0) < 1));
   if (!wants) { if (p.nightRun) p.nightRun = 0; return; }
-  const out = p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0) && p.alive && !p.downed, night = h >= 20 || h < 6;
-  if (!out || !night) { if (p.nightRun) log(out ? 'Die Nacht ist vorbei, bevor sie ganz war — noch einmal, ab 20 Uhr.' : 'Unter einem Dach zählt die Nacht nicht. Die Prüfung beginnt von vorn.', 'quest'); p.nightRun = 0; return; }
-  p.nightRun = (p.nightRun || 0) + 1; if (p.nightRun === 1) log('Die Nacht beginnt. Bleib draußen, zehn Stunden am Stück (bis 6 Uhr).', 'quest');
-  if (p.nightRun >= 10) { p.nightRun = 0; questEvent('night'); }
+  const out = p.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0) && p.alive && !p.downed, night = h >= 20 || h < 6, who = p.coopHero ? p.name + ': ' : '';
+  if (!out || !night) { if (p.nightRun) log(who + (out ? 'Die Nacht ist vorbei, bevor sie ganz war — noch einmal, ab 20 Uhr.' : 'Unter einem Dach zählt die Nacht nicht. Die Prüfung beginnt von vorn.'), 'quest'); p.nightRun = 0; return; }
+  p.nightRun = (p.nightRun || 0) + 1; if (p.nightRun === 1) log(who + 'Die Nacht beginnt. Bleib draußen, zehn Stunden am Stück (bis 6 Uhr).', 'quest');
+  if (p.nightRun >= 10) { p.nightRun = 0; questEvent('night', null, 1, p); }
 }
 function clsTrialChoices(npc, k, Q, choices) {                         /* aus talk(): nur Lehrer dieser Klasse, nur laufende Prüfungen der Figur */
-  if (npc.hostile || ![].concat(npc.teaches || []).includes(Q.clsTrial[0]) || S.quests[k]?.state !== 'active' || S.player.ktSteps?.[k]) return;
+  if (npc.hostile || ![].concat(npc.teaches || []).includes(Q.clsTrial[0]) || qSt(k)?.state !== 'active' || S.player.ktSteps?.[k]) return;
   if (questComplete(k)) return choices.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
   const i = Q.objectives.findIndex(o => o.type === 'trial');
-  if (i >= 0 && (S.quests[k].progress[i] || 0) < 1) choices.push({ text: `Ich bin bereit. (${Q.objectives[i].text.replace(/ \(.*\)$/, '')})`, fn: () => startClsTrial(npc, k) });
+  if (i >= 0 && (qSt(k).progress[i] || 0) < 1) choices.push({ text: `Ich bin bereit. (${Q.objectives[i].text.replace(/ \(.*\)$/, '')})`, fn: () => startClsTrial(npc, k) });
 }
 function startClsTrial(npc, k) {
   const Q = QUESTS[k], i = Q.objectives.findIndex(o => o.type === 'trial'), o = Q.objectives[i], p = S.player;
-  if (S.trial) return UI.toast('Eine Prüfung läuft schon.');
+  if (trialOf(p)) return UI.toast('Eine Prüfung läuft schon.');
   if (o.need === 'shield' && !hasShield(p)) return UI.dialogue(npc, '„Mit Schild. Ein Ritter, der seinen Schild vergisst, beschützt niemanden.“ (Lege einen Schild in die Nebenhand.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   if (o.need === 'bow' && !ITEMS[p.equip?.weapon?.key]?.ranged) return UI.dialogue(npc, '„Mit einem Bogen. Oder willst du die Puppen anschreien?“ (Lege eine Fernwaffe an.)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   UI.closeDialogue(); gesture(npc, 'zeigen', 1200, p);
   startTrial(o.target, { x: p.x, y: p.y }, { qk: k, oi: i, cls: Q.clsTrial[0], npc: npc.id, npcName: npc.name, title: o.text.replace(/ \(.*\)$/, ''), need: o.need || null });
 }
 function clsTrialEnd(T, won) {
-  const p = S.player, st = S.quests[T.qk], who = byId(T.npc)?.name || 'der Lehrer';
+  const p = byId(T.owner) || S.player, st = qSt(T.qk, p), who = byId(T.npc)?.name || 'der Lehrer', pre = p.coopHero ? p.name + ': ' : '';
   if (!won) { if (p.downed) { p.downed = false; p.downTimer = 0; B.heal(p, p.maxHp * 0.3); }   /* niemand stirbt in einer Prüfung */
-    UI.toast(`${T.title.toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${T.title}: nicht bestanden. ${who} lässt dich es noch einmal versuchen — sprich ihn an, wenn du bereit bist.`, 'quest'); return; }
+    UI.toast(`${pre}${T.title.toUpperCase()}: NICHT BESTANDEN`, 2600); log(`${pre}${T.title}: nicht bestanden. ${who} lässt dich es noch einmal versuchen — sprich ihn an, wenn du bereit bist.`, 'quest'); return; }
   if (st?.state === 'active') st.progress[T.oi] = QUESTS[T.qk].objectives[T.oi].count || 1;
-  UI.toast(`${T.title.toUpperCase()}: BESTANDEN`, 2600); log(`${T.title}: bestanden. Sprich mit ${who}, um die Prüfung abzuschließen.`, 'quest');
+  UI.toast(`${pre}${T.title.toUpperCase()}: BESTANDEN`, 2600); log(`${pre}${T.title}: bestanden. Sprich mit ${who}, um die Prüfung abzuschließen.`, 'quest');
 }
 // Treffer in einer Prüfung: true = der Treffer ist erledigt (zählt oder zählt nicht), hurt() endet.
 function ktTrialHurt(target, dmg, source, kind) {
-  const T = S.trial, p = S.player;
+  const T = target.trialOwner ? trialOf(byId(target.trialOwner)) : (target === S.player || target.coopHero) ? trialOf(target) : null; if (!T) return false;
+  const p = byId(T.owner) || S.player;
   if (target.trial === 'bow' && T.kind === 'bow') { if (source === p && ITEMS[p.equip?.weapon?.key]?.ranged) { T.n++; float(target, 'Treffer', 'rgba(200,220,140,ALPHA)'); die(target, 'Pfeil', p); } else if (source === p) float(target, 'nur mit dem Bogen', 'rgba(200,190,160,ALPHA)'); return true; }
-  if (target.trial === 'stab' && T.kind === 'stab') { if (source === p && (performance.now() - (p.stabAt || 0) < 1500 || p.shadowNext > performance.now())) { T.n++; float(target, 'Meuchelstich', 'rgba(170,150,220,ALPHA)'); die(target, 'Meuchelstich', p); } else if (source === p) float(target, 'nur der Meuchelstich zählt', 'rgba(200,190,160,ALPHA)'); return true; }
+  if (target.trial === 'stab' && T.kind === 'stab') { const behind = source && Math.abs(normAng(Math.atan2(source.y - target.y, source.x - target.x) - (target.faceA ?? 0))) > 1.9;   /* in den Rücken (die Puppe schaut zum Prüfling) */
+    if (source === p && (performance.now() - (p.stabAt || 0) < 1500 || p.shadowNext > performance.now() || behind)) { T.n++; float(target, 'Meuchelstich', 'rgba(170,150,220,ALPHA)'); die(target, 'Meuchelstich', p); } else if (source === p) float(target, 'nur von hinten', 'rgba(200,190,160,ALPHA)'); return true; }
   if (T.kind === 'pit') {
-    if (target.duelist && target.hp - dmg < target.maxHp * 0.2) { const low = p.hp < p.maxHp * 0.3; if (!low) log('„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).', 'quest'); endTrial(low); return true; }
-    if (target === p && source?.duelist && p.hp - dmg < p.maxHp * 0.1) { endTrial(false); return true; }
+    if (target.duelist && target.hp - dmg < target.maxHp * 0.2) { const low = p.hp < p.maxHp * 0.3; if (!low) log(`${p.coopHero ? p.name + ': ' : ''}„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).`, 'quest'); endTrial(low, T); return true; }
+    if (target === p && source?.duelist && p.hp - dmg < p.maxHp * 0.1) { endTrial(false, T); return true; }
   }
-  if (T.kind === 'hold' && target === p && p.hp - dmg < p.maxHp * 0.1 && source?.trial === 'hold') { endTrial(false); return true; }
+  if (T.kind === 'hold' && target === p && p.hp - dmg < p.maxHp * 0.1 && source?.trial === 'hold') { endTrial(false, T); return true; }
   return false;
 }
 // Bestanden: Talentpunkt, Klasse (falls neu), Aufnahmeszene. Rückgabe true = eine Szene läuft.
@@ -13918,7 +13937,7 @@ function classRite(npc, cls, o = {}) {
   if (o.title && !o.sky) o.sky = SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : '';
   const p = S.player, R0 = RITE[cls] || o.rite || { col: '#e8d6a8', say: 'Steh auf.', fx: 'spark', sfx: 'bell' }, C = o.title ? { name: o.title, desc: o.sub || '' } : CLASSES[cls];
   const sky = o.sky || (SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : ''), hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
-  const after = () => { if (hint) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } o.then?.(); };
+  const after = () => { if (hint && !S._quiet) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } o.then?.(); };
   if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || S.cine || (npc && npc.map !== p.map)) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
   if (!npc) npc = p;                                                   /* Titel ohne Meister in der Nähe: die Szene gehört dem Helden allein */
   const ab = ABILITIES[(CLASSES[cls]?.abilities || [])[0]], seen = S.ents[p.map].filter(c => c.kind === 'npc' && c.alive && !c.downed && c !== npc && !S.party.includes(c.id) && dist(c, p) < 240).slice(0, 6);
@@ -13933,11 +13952,11 @@ function classRite(npc, cls, o = {}) {
   return true;
 }
 function startTrial(kind, at = acadSpot(), o = {}) {
-  endTrial(null);
-  const T = S.trial = { kind, until: clock() + ({ aim: 30, shield: 25, heal: 60, duel: 90, pit: 120, bow: 40, stab: 60, hold: 50 }[kind] || 60), n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2, ...o }, m = S.player.map;
+  const P0 = S.player; endTrial(null, trialOf(P0));                    /* HB2-02: je Figur — eine Gast-Prüfung beendet die des Helden nicht */
+  const T = { kind, until: clock() + ({ aim: 30, shield: 25, heal: 60, duel: 90, pit: 120, bow: 40, stab: 60, hold: 50 }[kind] || 60), n: 0, ids: [], x: at.x, y: at.y, next: clock() + 2, ...o, owner: P0.id }, m = P0.map; setTrialOf(P0, T);
   const put = (mt, dx, dy) => { const e = spawnEnemy(mt, m, (at.x + dx) / TS | 0, (at.y + dy) / TS | 0, { level: 3, noVariant: true }); if (!e) return null; e.x = at.x + dx; e.y = at.y + dy;
     if (T.qk && m !== '__a' && m !== '__d' && solidTile(m, e.x, e.y)) { const q = freeSpotNear(m, e.x / TS | 0, e.y / TS | 0, 2); e.x = q.x; e.y = q.y; }   /* Klassen-Prüfung beim Lehrer: nicht in der Wand */
-    e.trial = kind; e.transient = true; T.ids.push(e.id); return e; };
+    e.trial = kind; e.trialOwner = P0.id; e.faceA = Math.atan2(at.y - e.y, at.x - e.x); e.transient = true; T.ids.push(e.id); return e; };
   if (kind === 'aim') for (let i = 0; i < 5; i++) put('acad_dummy', -120 + i * 60, -60 - (i % 2) * 40);
   if (kind === 'bow') for (let i = 0; i < 5; i++) put('acad_dummy', -160 + i * 80, -170 - (i % 2) * 50);   /* Schütze: zehn, zwanzig, dreißig Schritt */
   if (kind === 'stab') for (let i = 0; i < 3; i++) put('acad_dummy', -70 + i * 70, -70);
@@ -13945,15 +13964,15 @@ function startTrial(kind, at = acadSpot(), o = {}) {
   if (kind === 'ilvar') { T.until = clock() + 45; T.next = clock() + 1; }   // S15 P6: Wellen von Geistern, siehe trialTick
   if (kind === 'hold') { T.next = clock() + 1; }
   if (kind === 'duel' || kind === 'pit') { const e = put(T.qk ? 'drill_fighter' : 'acad_student', 0, -120); if (e) { e.questFoe = 'duel'; e.duelist = true; if (T.npcName) e.name = `Übungsfechter von ${T.npcName}`;
-    if (kind === 'pit') { e.maxHp = e.hp = e.maxHp * 2; if (e.body) B.initBody(e, e.maxHp); e.dmgMul = 1.6; } e.aggroId = S.player.id; } }   /* Grube: zäher und härter, damit man unter 30 % kommt */
-  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: T.qk ? 'Verletzte' : 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.transient = true; c.homeTown = null;
+    if (kind === 'pit') { e.maxHp = e.hp = e.maxHp * 2; if (e.body) B.initBody(e, e.maxHp); e.dmgMul = 1.6; } e.aggroId = P0.id; } }   /* Grube: zäher und härter, damit man unter 30 % kommt */
+  if (kind === 'heal') { const c = makeChar({ name: pick(FIRST_F), prof: T.qk ? 'Verletzte' : 'Studentin der Akademie', x: at.x + 30, y: at.y - 20, map: m, level: 2 }); c.trial = 'heal'; c.trialOwner = P0.id; c.transient = true; c.homeTown = null;
     c.anchor = { x: c.x, y: c.y }; if (c.body) { c.body.lleg.hp = c.body.lleg.max * 0.1; c.body.rarm.hp = c.body.rarm.max * 0.3; B.syncHp(c); } S.ents[m].push(c); T.ids.push(c.id); T.patient = c.id; }
   UI.toast(`PRÜFUNG: ${(T.title || TRIALS[kind] || TRIAL_EXTRA[kind]).toUpperCase()}`, 2600);
   log({ aim: 'Triff die fünf Puppen mit Zaubern. Du hast 30 Sekunden.', shield: 'Gleich fliegen zehn Übungsgeschosse. Fang acht mit einem Schildzauber ab.', heal: `Die ${T.qk ? 'Verletzte' : 'Studentin'} hat sich das Bein zertrümmert. Stabilisiere sie: Verband, Kräuter oder Heilzauber.`, duel: `Ein Duell. Wer zuerst unter ein Fünftel seines Lebens fällt, hat verloren. Niemand stirbt.${T.need === 'shield' ? ' Mit Schild in der Hand — legst du ihn ab, ist die Prüfung vorbei.' : ''}`, ilvar: 'Halte 45 Sekunden stand. Die Geister kommen in Wellen.',
-    pit: 'Grubenkampf. Gewonnen ist erst, wenn du selbst unter 30 % Leben bist, wenn der Gegner fällt — Schmerz lehrt. Niemand stirbt.', bow: 'Triff die fünf Puppen mit dem Bogen (oder einer anderen Fernwaffe). 40 Sekunden.', stab: 'Drei Meuchelstiche an den Übungspuppen: nur der Meuchelstich (oder ein Hieb aus dem Schattenschritt) zählt. 60 Sekunden.', hold: 'Halte den Platz 50 Sekunden. Sie kommen in Wellen. Wer fällt, hat verloren — niemand stirbt.' }[kind], 'quest');
+    pit: 'Grubenkampf. Gewonnen ist erst, wenn du selbst unter 30 % Leben bist, wenn der Gegner fällt — Schmerz lehrt. Niemand stirbt.', bow: 'Triff die fünf Puppen mit dem Bogen (oder einer anderen Fernwaffe). 40 Sekunden.', stab: 'Drei Stiche von hinten an den Übungspuppen: Meuchelstich, Hieb aus dem Schattenschritt oder in den Rücken (die Puppen schauen dich an). 60 Sekunden.', hold: 'Halte den Platz 50 Sekunden. Sie kommen in Wellen. Wer fällt, hat verloren — niemand stirbt.' }[kind], 'quest');
 }
-function endTrial(won) {
-  const T = S.trial; if (!T) return; S.trial = null;
+function endTrial(won, T = S.trial) {
+  if (!T) return; clearTrial(T);
   for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => !T.ids.includes(e.id));
   if (won == null) return;
   if (T.qk) return clsTrialEnd(T, won);                               /* Klassen-Prüfung beim Lehrer */
@@ -13968,29 +13987,32 @@ function endTrial(won) {
   if (first) { S.factions.aurel = clamp((S.factions.aurel || 0) + 3, -100, 100); gainXp(S.player, 60); }
   if (S.acadRank > r0) { UI.toast(`AKADEMIE: ${ACAD_RANKS[S.acadRank].toUpperCase()}`, 3200); chronicle(`${S.player.name} wird ${ACAD_RANKS[S.acadRank]} der Akademie`, 'news'); if (S.acadRank >= 2) log('Als Adept darfst du die dritte Stufe lernen.', 'quest'); }
 }
-function trialTick() {
-  const T = S.trial, p = S.player; if (!T) return;
-  if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false);
-  if ((T.kind === 'aim' || T.kind === 'bow') && T.n >= 5) return endTrial(true);
-  if (T.kind === 'stab' && T.n >= 3) return endTrial(true);
-  if (T.need === 'shield' && !hasShield(p)) { log('Ohne Schild in der Hand zählt das Duell nicht.', 'quest'); return endTrial(false); }
+function trialTick() {                                                 /* HB2-02: jede laufende Prüfung mit ihrer eigenen Figur */
+  if (S.trial) trialTickOne(S.trial, (S.trial.owner && byId(S.trial.owner)) || S._hostHero || S.player);
+  for (const [id, T] of Object.entries(S.trialsG || {})) { const p = byId(id); if (!p || !p.alive || !S.party.includes(p.id)) { endTrial(null, T); continue; } trialTickOne(T, p); }
+}
+function trialTickOne(T, p) {
+  if (p.downed || Math.hypot(p.x - T.x, p.y - T.y) > 900) return endTrial(false, T);
+  if ((T.kind === 'aim' || T.kind === 'bow') && T.n >= 5) return endTrial(true, T);
+  if (T.kind === 'stab' && T.n >= 3) return endTrial(true, T);
+  if (T.need === 'shield' && !hasShield(p)) { log('Ohne Schild in der Hand zählt das Duell nicht.', 'quest'); return endTrial(false, T); }
   if (T.kind === 'hold') {                                              /* Klassen-Prüfung Ritter: einen Platz gegen einen Überfall halten */
-    if (clock() >= T.until) return endTrial(true);
+    if (clock() >= T.until) return endTrial(true, T);
     if (clock() >= T.next && clock() < T.until - 8) { T.next = clock() + 10; for (let i = 0; i < 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('bandit', p.map, (T.x + Math.cos(a) * 180) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(3, p.level - 1) });
       if (e) { e.trial = 'hold'; e.questFoe = 'hold'; e.transient = true; e.aggroId = p.id; e.name = 'Übungsräuber'; T.ids.push(e.id); } } }
     return; }
   if (T.kind === 'ilvar') {
-    if (clock() >= T.until) return endTrial(true);
+    if (clock() >= T.until) return endTrial(true, T);
     if (clock() >= T.next) { T.next = clock() + 9; for (let i = 0; i < 2 + (T.wave = (T.wave || 0) + 1) % 2; i++) { const a = rnd() * 6.283, e = spawnEnemy('wraith', p.map, (T.x + Math.cos(a) * 200) / TS | 0, (T.y + Math.sin(a) * 120) / TS | 0, { level: Math.max(6, p.level) });
       if (e) { e.trial = 'ilvar'; e.questFoe = 'ilvar'; e.transient = true; e.aggroId = p.id; T.ids.push(e.id); } } }
     return; }
   if (T.kind === 'shield') {
     if ((T.shot || 0) < 10 && clock() >= T.next) { T.next = clock() + 2.2; T.shot = (T.shot || 0) + 1; const a = Math.atan2(p.y - (T.y - 160), p.x - T.x);
       S.projectiles.push({ id: uid(), kind: 'spark', map: p.map, x: T.x, y: T.y - 150, vx: Math.cos(a) * 4.5, vy: Math.sin(a) * 4.5, owner: T.shooter, dmg: 3, life: 2600, team: 'foe' }); }
-    if (T.shot >= 10 && clock() >= T.next) return endTrial(T.n >= 8);
+    if (T.shot >= 10 && clock() >= T.next) return endTrial(T.n >= 8, T);
   }
-  if (T.kind === 'heal') { const c = byId(T.patient); if (c && c.body && ['lleg', 'rleg', 'larm', 'rarm', 'torso', 'head'].every(k => c.body[k].lost || c.body[k].hp >= c.body[k].max * 0.5)) return endTrial(true); }
-  if (clock() > T.until) return endTrial(false);
+  if (T.kind === 'heal') { const c = byId(T.patient); if (c && c.body && ['lleg', 'rleg', 'larm', 'rarm', 'torso', 'head'].every(k => c.body[k].lost || c.body[k].hp >= c.body[k].max * 0.5)) return endTrial(true, T); }
+  if (clock() > T.until) return endTrial(false, T);
 }
 // ================= Akademie: Student sein (Nutzer §5e.8) =================
 // Einschreiben bei Corvinus oder einem Magister (Aufenthaltsschein + 100 Gold Semestergeld). Vorlesungen morgens (8–14 Uhr) bei
@@ -14958,7 +14980,7 @@ function vanishDay() {
 // gleich). Gespeichert wird nur S.secrets. Erster Ort: das Glockenmoor — nachts bei Nebel oder Regen schlägt im Moor eine Glocke; drei
 // Glockenpfähle (Taufe, Hochzeit, Tod) in der richtigen Reihenfolge läuten öffnet die versunkene Kapelle, falsch weckt Ertrunkene.
 const SECRETS = { kammer: { name: 'Die Kammer der Namen', at: 'seelenhuegel', dx: 0, dy: 6 }, brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
-const SECRET_N = 8;
+const SECRET_N = Object.keys(SECRETS).length;   /* A-20: zählt die gebauten Geheimnisse (vorher fest 8, es gibt weniger) */
 function detSpot(map, tx, ty, R = 12) { for (let r = 0; r <= R; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (!SOLID.has(tileAt(map, x, y))) return [x, y]; } return null; }
 function secretAt(k) { const D = SECRETS[k], L = LOCATIONS.find(l => l.key === D.at); return L ? [L.x + D.dx, L.y + D.dy] : null; }
 function ensureSecrets() {
@@ -16112,7 +16134,7 @@ function chooseSuccessor() {
 }
 /* Klassen und Talente, Scheibe 0: der Erbe ist ein neuer Mensch — eigene Sterne (Gefährtensterne fallen weg), keine fremden Prüfungen,
    Punkte nach seiner Stufe. */
-function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.skyV = 1; talentTopUp(c); }
+function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.ktSteps = {}; c.ktQ = {}; c.skyV = 1; talentTopUp(c); }
 /* Scheibe 2: einmal kostenlos neu ordnen (alte Stände, Entscheidung 9) — wie das Vergessen beim Lehrer, nur ohne Gold */
 function freeRespec() {
   const p = S.player, n = talentSpent(p); if (!p.freeRespec) return UI.toast('Das kostenlose Neuordnen ist schon verbraucht. Lehrer helfen gegen Gold.');
@@ -16172,6 +16194,7 @@ function adoptSuccessor(c) {
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
   c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
+  for (const k of Object.keys(S.quests)) if (QUESTS[k]?.clsTrial && S.quests[k].state === 'active') delete S.quests[k];   /* Prüfungen gehören dem Vorgänger */
   heirTalents(c);   /* Scheibe 0: der Erbe hat sofort seine Talentpunkte nach der Regel (vorher 0 bis zum Neuladen, danach Stufe − 1) */
   c.knownClasses = [...new Set([c.currentClass, ...(c.knownClasses || [])])];
   c.abilities = [...(CLASSES[c.currentClass].abilities || [])];
@@ -16557,7 +16580,7 @@ function classAbility(p, key) {
         owner: p.id, dmg: 18 + p.attributes.intelligence * 0.8, life: Math.max(200, d / 5 * 16), team: 'player', splash: 60, burst: true });
       return true; }
     case 'poison_coat': addStatus(p, { key: 'poison_coat', name: 'Giftöl', good: true, left: 20000, desc: 'Treffer vergiften.' }); fx(p.x + 10, p.y - 10, 'necro', 6); return true;
-    case 'brew': if (!addItem(p, 'potion')) return false; questEvent('craft', 'potion'); log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
+    case 'brew': if (!addItem(p, 'potion')) return false; questEvent('craft', 'potion', 1, p); log('Aus drei Handvoll Kraut wird ein Heiltrank.', 'party'); fx(p.x, p.y - 12, 'heal', 8); return true;
     case 'death_coil': {                                            // S15 P19: Todesmahr
       const f = foes.filter(o => dist(p, o) < 240 && Math.abs(normAng(Math.atan2(o.y - p.y, o.x - p.x) - p.aim)) < 0.6 && clearLine(p, o)).sort((a, b) => dist(p, a) - dist(p, b))[0];
       if (!f) { UI.toast('Kein Feind vor dir.'); return false; }
@@ -18199,7 +18222,7 @@ export function selftest() {
     const O0 = structuredClone(S.omega || null), q0 = S.quests.q_omega, w0 = S.ents.world.length, wea = [S.weather, S.weatherLeft];
     try {
       S.omega = { faith: 0, frags: {} }; S.quests.q_omega = { state: 'active', progress: [0] };
-      const p = stage(); const hp0 = p.maxHp, m = actor(330, 300, { name: 'Gefährte' }); S.party = [m.id];
+      const p = stage(); p.xpNext = 1e9;   /* B-4: q_omega zahlt jetzt 1000 EP — ohne Stufenaufstieg, damit der Lebenspreis messbar bleibt */ const hp0 = p.maxHp, m = actor(330, 300, { name: 'Gefährte' }); S.party = [m.id];
       for (const k of ['garmadon_krone', 'vargs_kette', 'himmelssplitter']) addItem(p, k, 1); addItem(p, 'soul_vial', 10);
       omegaPerform(m, 0);
       const paid = ['garmadon_krone', 'vargs_kette', 'himmelssplitter', 'soul_vial'].every(k => !hasItem(p, k, 1)) && !m.alive && !S.party.length && p.omegaScar && p.maxHp < hp0 * 0.85;
@@ -19475,7 +19498,7 @@ export function selftest() {
       const data = ['rogue', 'assassin', 'torturer'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('rogue').length === 2 && clsTrialOf('assassin').length === 1;
       for (const k of [...clsTrialOf('rogue'), ...clsTrialOf('assassin')]) delete S.quests[k];
       const t = actor(330, 300); t.key = 'kt_probe_t5'; t.teaches = ['rogue', 'assassin']; const p = stage(); p.knownClasses = ['wanderer', 'rogue']; p.currentClass = 'rogue'; p.abilities = ['backstab']; p.ktSteps = {}; p.clsPass = {};
-      startQuest('kt_rogue1'); questEvent('steal'); const steal = questComplete('kt_rogue1');
+      startQuest('kt_rogue1'); questEvent('steal', null, 1, S.player); const steal = questComplete('kt_rogue1');
       startQuest('kt_rogue2'); startClsTrial(t, 'kt_rogue2'); const d = S.ents.__a.filter(e => e.trial === 'stab'); hurt(d[0], 5, p, 'Hieb'); const hack = S.trial?.n === 0 && d[0].alive;
       for (const x of d) { p.stabAt = performance.now(); hurt(x, 5, p, 'Meuchelstich'); } trialTick(); const stab = questComplete('kt_rogue2');
       startQuest('kt_assassin1'); const C = { id: 'kt_c', kind: 'bounty', spared: true, state: 'active', have: 1, need: 1, reward: { gold: 10, xp: 1, rep: 0 }, town: 'eren', title: 'Probe' }; const c0 = S.contracts, tr0 = structuredClone(S.trust || {}), av0 = S.avenge; S.contracts = [C]; try { claimContract(C, null); } finally { S.contracts = c0; S.trust = tr0; S.avenge = av0; } UI.closeDialogue(); const con = questComplete('kt_assassin1');
@@ -19553,6 +19576,25 @@ export function selftest() {
     const solo = (() => { S._quiet = false; try { const ok2 = classRite(null, 'monk', { title: 'Mönch', rite: { col: '#e6cf8a', say: 'Stille.', fx: 'magic', sfx: 'bell' } }); cineEnd(); return ok2; } finally { S._quiet = true; } })();
     if (!(data && comp && worn && hero && learned && none && noPts && heir && rite && then && dur >= 5000 && solo)) console.warn('Scheibe 10', { data, comp, worn, hero, learned, none, noPts, heir, rite, then, dur, solo });
     return data && comp && worn && hero && learned && none && noPts && heir && rite && then && dur >= 5000 && solo && !S.cine;
+  }));
+  ok('Klassen-Prüfung im Koop (HB2-02/HB2-09): Held und Gastfigur prüfen parallel — eigene laufende Prüfung, eigener Auftragsstand; der Gast besteht die Bogenübung, die Prüfung des Helden läuft weiter, Abgabe des Gasts ändert den Stand des Helden nicht', sandbox(() => {
+    const Q0 = structuredClone(S.quests), T0 = S.trial, G0 = S.trialsG, H0 = S._hostHero;
+    try {
+      for (const k of clsTrialOf('archer')) delete S.quests[k]; S.trialsG = {};
+      const t = actor(330, 300); t.key = 'kt_probe_coop'; t.teaches = ['archer']; const h = stage(); h.knownClasses = ['wanderer']; h.ktSteps = {}; h.clsPass = {};
+      const g = actor(300, 330); g.coopHero = true; g.knownClasses = ['wanderer']; g.currentClass = 'wanderer'; g.ktSteps = { kt_archer1: 1 }; g.ktQ = {}; g.clsPass = {}; g.equip.weapon = mkItem('shortbow'); S.party = [g.id];
+      startQuest('kt_archer2'); startClsTrial(t, 'kt_archer2'); UI.closeDialogue(); const hostNoBow = !S.trial;   /* Held ohne Bogen: Hinweis, keine Prüfung */
+      h.equip.weapon = mkItem('shortbow'); h.ktSteps.kt_archer1 = 1; startClsTrial(t, 'kt_archer2'); const hostOn = S.trial?.kind === 'bow' && S.trial.owner === h.id;
+      S._hostHero = h; S.player = g; startQuest('kt_archer2'); startClsTrial(t, 'kt_archer2'); S.player = h; delete S._hostHero;
+      const TG = S.trialsG[g.id], both = !!TG && S.trial?.owner === h.id && TG.owner === g.id && g.ktQ.kt_archer2?.state === 'active' && S.quests.kt_archer2.state === 'active';
+      const gd = S.ents.__a.filter(e => e.trial === 'bow' && e.trialOwner === g.id); for (const d of gd) hurt(d, 8, g, 'Pfeil'); trialTick();
+      const guestPass = gd.length === 5 && !S.trialsG[g.id] && (g.ktQ.kt_archer2.progress[0] || 0) >= 1 && (S.quests.kt_archer2.progress[0] || 0) === 0 && S.trial?.owner === h.id;
+      S._hostHero = h; S.player = g; turnIn(t, 'kt_archer2'); UI.closeDialogue(); S.player = h; delete S._hostHero;
+      const own = g.clsPass.archer === 1 && g.knownClasses.includes('archer') && g.ktQ.kt_archer2.state === 'done' && S.quests.kt_archer2.state === 'active' && !h.knownClasses.includes('archer');
+      const hd = S.ents.__a.filter(e => e.trial === 'bow' && e.trialOwner === h.id); hurt(hd[0], 8, g, 'Pfeil'); const notMine = S.trial.n === 0;
+      if (!(hostNoBow && hostOn && both && guestPass && own && notMine)) console.warn('Koop-Prüfung', { hostNoBow, hostOn, both, guestPass, own, notMine });
+      return hostNoBow && hostOn && both && guestPass && own && notMine;
+    } finally { S.quests = Q0; endTrial(null); S.trial = T0; S.trialsG = G0 || {}; if (H0) S._hostHero = H0; else delete S._hostHero; }
   }));
   ok('Balance-Runde: Höchststufe 60 — Talentpunkte 1 + je TALENT_EVERY Stufen bis 60 (+1 je Klassenprüfung) für 50–70 % der Sterne, die eine typische Figur erreichen kann (Wanderer + Krieger + Ritter + ein Titel, BALANCE_GUIDE §7); darüber keine Stufe; EP-Summe bis 60 unter 0,6 Mio.; Gastfigur ebenso gedeckelt', sandbox(() => {
     const p = stage(); p.level = 1; p.xp = 0; p.xpNext = 60; p.attrPoints = 0; p.skillPoints = 1; let sum = 0;
@@ -20672,6 +20714,13 @@ export function selftest() {
       UI.closeModal(); const dlg = Array.isArray(mechMenu()); UI.closeDialogue();
       return ok1 && dlg && V.parts.length === 4;
     } finally { UI.closeModal(); UI.closeDialogue(); } }));
+  ok('Ist-Zustand A (03.10.): Morrgrund zählt für die Grubenstämme, Grubenhort bleibt wie bisher; Händler/Bande haben Rang −1 (Beitritt möglich); Geheimnis-Zähler = gebaute Orte; Brunnen-Treppe ansprechbar; Ruf bleibt in −100…100', sandbox(() => {
+    const f0 = S.factions.valen;
+    try { const fac = townFac('morrgrund') === 'goblin' && townFac('kettenfeste') === 'chain' && townFac('eren') === 'valen' && townFac('grubenhort') === (S.after?.revolt ? 'frei' : 'valen');
+      const ranks = S.ranks.merch === -1 || S.ranks.merch >= 0; const sec = SECRET_N === Object.keys(SECRETS).length;
+      S.factions.valen = 250; hourTick(25); const cl = S.factions.valen === 100;
+      return fac && ranks && sec && cl;
+    } finally { S.factions.valen = f0; } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
