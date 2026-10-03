@@ -9136,11 +9136,15 @@ function ensureSaltportContacts() {
 const mechRate = town => clamp(ECO.ecoPrice(S.towns?.[town] ? town : 'tickmar', 'magitech', true) / (ITEMS.magitech.value * 1.12 * 1.15), 0.6, 2.5);
 // Roadmap P5: Leistungsumfang je Beruf — Vell und die Werkbank können alles, Kybernetiker warten und rüsten auf, die Medica operiert (Chirurgie, Auge).
 const MECH_SCOPE = { Kybernetiker: { repair: 1, up: 1, eyeCare: 1 }, Medica: { swap: 1, eye: 1, eyeCare: 1 } };
-function mechMenu(npc = null) {
+/* GUI Prothesen-Werkbank (Entwickler 03.10.2026: „die Schmiede etc. soll ein GUI haben“): ohne mode öffnet sich das Fenster (Körperbild mit
+   Gliedern und Auge, Zustand, Aufrüstung, Aktionen als Knöpfe); mode 'data' liefert dem Fenster die Daten und dieselben Aktionen.
+   Proben (S._quiet) und Koop-Gäste behalten das Gespräch. Aktionen, die selbst ein Gespräch öffnen (Ersetzen, Auge), laufen dort weiter. */
+function mechMenu(npc = null, mode = null) {
+  if (!mode && !S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('mech', npc); return []; }
   const p = S.player, parts = ['larm', 'rarm', 'lleg', 'rleg'].filter(k => p.body[k].mech), NAME = { larm: 'linker Arm', rarm: 'rechter Arm', lleg: 'linkes Bein', rleg: 'rechtes Bein' };
   const role = npc && npc.key !== 'vell' ? npc.prof : null, can = role ? MECH_SCOPE[role] || {} : { repair: 1, up: 1, swap: 1, eye: 1, eyeCare: 1 };
   const town = npc?.homeTown || npc?.town || (p.map === 'world' && townAt(p.x / TS | 0, p.y / TS | 0)) || 'gelenkhall', rate = mechRate(town);
-  const back = () => mechMenu(npc), say = t => UI.dialogue(npc || p, t, [{ text: 'Weiter', fn: back }]);
+  const back = mode === 'data' ? () => UI.refreshModal(npc) : () => mechMenu(npc), say = mode === 'data' ? t => { UI.toast(t, 2600); UI.refreshModal(npc); } : t => UI.dialogue(npc || p, t, [{ text: 'Weiter', fn: back }]);
   const repair = Math.round(parts.reduce((a, k) => a + (100 - (p.body[k].mechCond ?? 100)) * 2, 0) * rate);
   const opts = [];
   if (can.repair && repair > 0) opts.push({ text: `Alle Prothesen instand setzen (${repair} Gold)`, fn: () => { if (S.gold < repair) return say('Zu wenig Gold.'); S.gold -= repair; for (const k of parts) p.body[k].mechCond = 100; say('Gefettet, gerichtet, gespannt. Wie neu.'); } });
@@ -9152,6 +9156,9 @@ function mechMenu(npc = null) {
   const state = (parts.length ? parts.map(k => `${NAME[k]}: Stufe ${p.body[k].mech}, Zustand ${Math.round(p.body[k].mechCond ?? 100)} %${(p.body[k].mechCond ?? 100) < 30 ? ' (BESCHÄDIGT — wirkungslos)' : ''}${p.body[k].mechUp ? `, Aufrüstung ${p.body[k].mechUp}` : ''}`).join('\n') : 'Du trägst keine Prothese. Meisterin Vell verkauft welche.') + eyeLine;
   const halt = (S.halt?.['tickmar:magitech'] || 0) > S.day, priceLine = `\nWartung: ×${rate.toFixed(2)} (Magitech in ${townName(town)} ${ECO.ecoPrice(S.towns?.[town] ? town : 'tickmar', 'magitech', true)} Gold)${halt ? ' — Tickmars Fabrik steht still, Teile sind knapp.' : ''}`;   /* Roadmap P4 */
   const scope = role === 'Kybernetiker' ? '\nKybernetiker warten und rüsten auf; operieren tut die Medica.' : role === 'Medica' ? '\nDie Medica ersetzt Glieder und setzt Augen ein; warten tun die Kybernetiker.' : '';   /* Roadmap P5 */
+  if (mode === 'data') return { title: npc && npc.key !== 'vell' ? `${npc.name} (${npc.prof})` : 'Werkbank der Prothesenmacherin', opts, priceLine: priceLine.trim(), scope: scope.trim(), gold: S.gold,
+    parts: ['larm', 'rarm', 'lleg', 'rleg'].map(k => ({ k, name: NAME[k], mech: p.body[k].mech || 0, cond: Math.round(p.body[k].mechCond ?? 100), up: p.body[k].mechUp || 0, lost: !!p.body[k].lost, hp: Math.round(p.body[k].hp), max: Math.round(p.body[k].max) })),
+    eye: p.eye?.q ? { name: B.EYE_Q[p.eye.q]?.name || '?', q: p.eye.q, cond: Math.round(p.eye.cond ?? 100) } : null };
   UI.dialogue(npc || p, `${npc && npc.key !== 'vell' ? `${npc.name} (${npc.prof})` : 'Werkbank der Prothesenmacherin'}\n${state}${priceLine}${scope}`, [...opts, ...(npc ? [{ text: 'Zurück', fn: () => talk(npc) }] : []), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   return opts;   /* Roadmap P5: für Selbsttest und Debug */
 }
@@ -20651,6 +20658,13 @@ export function selftest() {
       rotfallDone(); rotfallDone(); const n1 = p.inv.filter(i => i.key === 'rotfallklinge').length;
       return S.quests.q_rotfall.state === 'done' && n1 === n0 + 1 && ITEMS.rotfallklinge?.unique;
     } finally { if (q0) S.quests.q_rotfall = q0; else delete S.quests.q_rotfall; } }));
+  ok('GUI Prothesen-Werkbank: Fenster zeigt Körperschema mit 4 Gliedern und dieselben Aktionen wie das Gespräch; Proben behalten das Gespräch', sandbox(() => {
+    const p = stage(), M = document.getElementById('modal');
+    try { const V = mechMenu(null, 'data'); UI.openModal('mech', null);
+      const ok1 = !!M.querySelector('.mech-fig') && M.querySelectorAll('.mech-fig rect').length >= 5 && M.querySelectorAll('[data-mo]').length === V.opts.length;
+      UI.closeModal(); const dlg = Array.isArray(mechMenu()); UI.closeDialogue();
+      return ok1 && dlg && V.parts.length === 4;
+    } finally { UI.closeModal(); UI.closeDialogue(); } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
@@ -22113,7 +22127,7 @@ function boot() {
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
-    beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil

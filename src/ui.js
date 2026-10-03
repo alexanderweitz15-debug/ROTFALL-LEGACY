@@ -272,6 +272,25 @@ function codexUI(body) {
 
 // ---------------- Stall (S15) ----------------
 // Pferde als Karten: Bild, Werte als Balken, Preis; mit eigenem Pferd wird eingetauscht (40 % Anrechnung).
+// ---------------- Prothesen-Werkbank (GUI, 03.10.2026) ----------------
+// Links ein Körperschema: vier Glieder und das Auge, Farbe nach Zustand (Fleisch grau, Messing gold, beschädigt rot); rechts Zustand,
+// Aufrüstung und die Aktionen (dieselben wie im Gespräch). Aktionen mit Rückfrage (Ersetzen, Auge) öffnen das Gespräch.
+function mechUI(body, npc) {
+  const V = A.mechView(npc); if (!V) return;
+  const col = q => !q.mech ? (q.lost ? '#3a2a24' : '#7a6a58') : q.cond < 30 ? '#b0453a' : q.cond < 70 ? '#c9a45a' : '#e0c27a';
+  const limb = (q, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${col(q)}" stroke="#14100b" stroke-width="2"><title>${q.name}</title></rect>`;
+  const P = Object.fromEntries(V.parts.map(q => [q.k, q]));
+  const svg = `<svg viewBox="0 0 120 200" class="mech-fig"><circle cx="60" cy="24" r="16" fill="#7a6a58" stroke="#14100b" stroke-width="2"/>
+    ${V.eye ? `<circle cx="66" cy="22" r="4" fill="${V.eye.cond < 30 ? '#b0453a' : '#7fe0ff'}"/>` : ''}<rect x="40" y="44" width="40" height="66" rx="6" fill="#6a5a4a" stroke="#14100b" stroke-width="2"/>
+    ${limb(P.larm, 20, 46, 16, 64)}${limb(P.rarm, 84, 46, 16, 64)}${limb(P.lleg, 42, 112, 16, 76)}${limb(P.rleg, 62, 112, 16, 76)}</svg>`;
+  const row = q => `<div class="mech-row"><b>${q.name}</b> ${q.lost && !q.mech ? '<span class="bad">fehlt</span>' : q.mech ? `Prothese Stufe ${q.mech}${q.up ? ` · Aufrüstung ${q.up}` : ''}` : 'Fleisch'}
+    ${q.mech ? `<div class="bst-bar"><i style="width:${q.cond}%;background:${col(q)}"></i></div><span class="ledger">Zustand ${q.cond} %${q.cond < 30 ? ' — beschädigt, wirkungslos' : ''}</span>` : ''}</div>`;
+  body.innerHTML = `<div class="ledger">${qa(V.title)} · Dein Gold: ${V.gold}</div><div class="mech-wrap">${svg}<div class="mech-info">${V.parts.map(row).join('')}
+    ${V.eye ? `<div class="mech-row"><b>Auge</b> ${qa(V.eye.name)} (Stufe ${V.eye.q})<div class="bst-bar"><i style="width:${V.eye.cond}%;background:${V.eye.cond < 30 ? '#b0453a' : '#7fe0ff'}"></i></div><span class="ledger">Zustand ${V.eye.cond} %</span></div>` : ''}
+    <div class="ledger">${qa(V.priceLine)}${V.scope ? '<br>' + qa(V.scope) : ''}</div></div></div>
+    <div class="tr-sec">Was die Werkbank kann</div><div class="mech-acts">${V.opts.map((o, i) => `<button data-mo="${i}">${qa(o.text)}</button>`).join('') || '<div class="ledger">Hier gibt es für dich gerade nichts zu tun.</div>'}</div>`;
+  body.querySelectorAll('[data-mo]').forEach(b => b.onclick = () => { const o = V.opts[+b.dataset.mo]; o.fn?.(); if (dialogueOpen()) closeModal(); else if (modalOpen === 'mech') mechUI(body, npc); });
+}
 // ---------------- Tierhändler (GUI, 03.10.2026) ----------------
 function beastsUI(body, npc) {
   const I = A.beastInfo(), bar = (v, max, col) => `<div class="bst-bar"><i style="width:${Math.min(100, v / max * 100)}%;background:${col}"></i></div>`;
@@ -815,7 +834,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);

@@ -1314,3 +1314,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Aurelions Automaten (03.10.):**
   - Wächterspinnen lauern jetzt auch an den Werkhallen in den Städten Aurelions. Dort greifen sie nur Unbefugte an, also wer keinen Aufenthaltsschein, kein Bürgerrecht und keine Stellung hat; wer sie angreift, macht sie trotzdem zum Feind.
   - Kommt es zur Schlacht um eine Stadt Aurelions, steht eine Dampframme bei den Verteidigern.
+- **Prothesen-Werkbank als Fenster (03.10.):** Werkbank, Kybernetiker und Medica öffnen ein Fenster:
+  - **Links:** ein Körperschema mit den vier Gliedern und dem Auge. Grau heißt Fleisch, Gold heißt Prothese, Rot heißt beschädigt.
+  - **Rechts:** Zustand und Aufrüstung jedes Glieds, dazu der Preis-Hinweis der Wartung.
+  - **Unten:** alle Aktionen als Knöpfe: instand setzen, aufrüsten, ersetzen, Auge.
+
+  Aktionen mit Rückfrage öffnen weiter das Gespräch. Koop-Gäste nutzen das Gespräch.
