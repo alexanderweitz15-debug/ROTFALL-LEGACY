@@ -773,10 +773,13 @@ export function humanSpec(e) {
   if (RL) { if (RL.sp) { s.sp = RL.sp; s.boots = ''; s.skin = e.pal?.skin || RL.skin; if (RL.sp === 'goblin') s.hs = 2; } if (RL.face) s.face = RL.face; if (RL.glow) s.glow = s.glow || RL.glow; if (RL.beard) s.beard = s.beard || 1; }
   s.hv = heavyOf(w); s.ms = msOf(e);
   s.atlas = humanAtlas(e);   // Stil F
-  s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
+  if (isDwarf(e)) { s.bd = 'zwerg'; if (!e.hooded) s.beard = s.beard || 1 + ((e.seed | 0) % 2); } else s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
   if (e.kind === 'npc' && !e.robot) varyDrape(s, e.seed || 0, '', e, prof);
   return s;
 }
+/* Zwerge (Entwickler 03.10.2026: „kleine Typen, die aber breit sind“): Rasse Zwerg oder Zwergenvolk der Tiefhall → Körperbau 'zwerg' (breite Schultern,
+   Bauch, dicke Arme), gezeichnet in render.js auf 80 % Höhe und 112 % Breite. Gilt für Held, Erben und alle Zwergen-NPCs. */
+export const isDwarf = e => !!e && (e.race === 'zwerg' || (e.kind === 'npc' && e.faction === 'zwerge' && !e.goblin && !e.undead && !e.robot));
 /* PERF-U3 (02.10.2026): humanSpec je Figur gemerkt (render.js zeichnet damit). Vorher je Bild und Figur neu gebaut — ~80 Felder, Regex,
    Hilfslisten; in Varonheim ~120 Aufrufe je Bild, 2–4 ms und viel Müll (Müllsammel-Spitzen). Gilt, solange jede Eingabe gleich ist, die
    humanSpec und seine Helfer lesen: Felder der Figur, Palette, Ausrüstung (Stück, Schlüssel, Zustand), Blutstufe, Glieder, Gegend (regionOf/

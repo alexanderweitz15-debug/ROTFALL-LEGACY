@@ -384,10 +384,10 @@ export function paintR(L, dir, pose, W = null) {
 
 // S14 (Nutzer: „verschiedene Breiten, dick, breites Schlüsselbein“): Körperbau aus body.js BUILDS als Maß, nicht als Streckung —
 // sh Schultern, wa Taille, by Höhe (− = größer), aw Armdicke; Bauch (be) je Person aus der Variante, nicht bei Drahtigen und Platte.
-const BUILD_R = { drahtig: { sh: -1, wa: -1, by: 0, aw: 2.6 }, bullig: { sh: 1, wa: 1, by: 0, aw: 3.6 }, hochgewachsen: { sh: 0, wa: 0, by: -2, aw: 3 }, gedrungen: { sh: 0, wa: 1, by: 2, aw: 3.2 } };
+const BUILD_R = { drahtig: { sh: -1, wa: -1, by: 0, aw: 2.6 }, bullig: { sh: 1, wa: 1, by: 0, aw: 3.6 }, hochgewachsen: { sh: 0, wa: 0, by: -2, aw: 3 }, gedrungen: { sh: 0, wa: 1, by: 2, aw: 3.2 }, zwerg: { sh: 2, wa: 2, by: 2, aw: 3.8 } };   /* Entwickler 03.10.: Zwerge klein, aber breit (dazu render.js: 0,8 hoch, 1,12 breit) */
 function buildR(L, bone, gob) {
   const B = BUILD_R[L.bd] || { sh: 0, wa: 0, by: 0, aw: 3 }, v = L.vs | 0;
-  const be = bone || gob || L.bd === 'drahtig' || L.armor === 'plate' ? 0 : (L.bd === 'bullig' || L.bd === 'gedrungen') && v % 2 === 0 ? 2 : v % 5 === 1 ? 1 : 0;
+  const be = bone || gob || L.bd === 'drahtig' || L.armor === 'plate' ? 0 : (L.bd === 'bullig' || L.bd === 'gedrungen' || L.bd === 'zwerg') && (v % 2 === 0 || L.bd === 'zwerg') ? 2 : v % 5 === 1 ? 1 : 0;
   const sh = B.sh + (!L.bd || L.bd === 'ausgewogen' ? (v === 6 ? 1 : 0) : 0);          // manche Ausgewogene: breites Schlüsselbein
   const hv = L.hv && !bone ? 1 : 0;                                    // schwere Waffe: breite Schultern, dicke Arme, Nacken
   // S14b (Nutzer: „nicht imposant genug, breiter, Schlüsselbein, Push-up“): V-Form — Schultern weit über die Hüfte, Eisen trägt auf
@@ -407,7 +407,7 @@ function looks(L) {
   const helmet = L.helm === 'great' || L.helm === 'bascinet' || XHELM.has(L.helm);
   const hood = !!L.hooded && !helmet && L.helm !== 'wide' && L.helm !== 'hat' && L.helm !== 'toque';
   return { bone, gob, coat, cw: L.cloak ? L.cw || '' : '', hd: hood ? L.hd || '' : '', sleeve: metalArm ? L.armorR : coat, sleeveMat: metalArm ? 'metal' : 'cloth', hand: L.glove || L.skin,
-    pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
+    pants: bone ? L.skin : L.pants, boots: bone ? null : L.boots, hemRow, helmet, hood, legW: (buildR(L, bone, gob).ab >= 3 ? 0.8 : 0) + (bone ? 2.5 : L.bd === 'zwerg' ? 5.6 : L.bd === 'bullig' || L.hv ? 5 : L.bd === 'drahtig' ? 4 : 4.6) + (L.armor === 'plate' || L.armor === 'chain' ? 0.5 + (L.pb | 0) * 0.4 : 0), ...buildR(L, bone, gob) };
 }
 
 let STUMPS = [], AB = 0;   // AB: Rüstungswucht der gerade gemalten Figur (Handschuhe, Stiefel)                                                    // Enden abgetrennter Glieder (Blut, nach der Schattierung)

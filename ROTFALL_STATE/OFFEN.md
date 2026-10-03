@@ -196,4 +196,4 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - Rasse je Start fest; Mensch ohne Boni; Rassenwerte vorläufig. Haus = Siedlung mit fertiger Hütte (Alternative: Zelt).
 - Anwerben ab Ruf 40 ohne Rangrabatt. Skelett: Wache verhaftet statt angreifen; Kapuze verbirgt; heilt wie Lebende. Goblin/Zwerg ohne Stadt-Reaktion.
 - Offen: Kinder eines Skeletts; Koop-Gäste immer Mensch; Roboter-Gefährten essen weiter.
-- Prüfen: Zwergen-Held sieht im Bild noch wie Mensch aus (Körperbau „gedrungen“ greift nicht?).
+- [x] Zwerge klein und breit (03.10., Entwickler).

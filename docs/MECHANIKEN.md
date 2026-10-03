@@ -1397,3 +1397,5 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Vorschlag und offene Entscheidungen: `ROTFALL_STATE/PROPOSALS/fraktions_starts.md`.
 
 - **Heiler (Fenster, 03.10.):** „Versorg meine Wunden“ öffnet ein Fenster: jede Person deiner Gruppe mit Leben, sechs Gliedern (grün heil, rot gebrochen, gelb geschient, grau fehlend) und Zuständen. Zwei Knöpfe: Wunden versorgen (Preis nach Verletzung, dauert ein paar Herzschläge) und Brüche schienen/Wunden reinigen (25 Gold). Prothesen zählen nicht als Wunde — die repariert nur die Werkbank. Debug: „Fenster: Heiler“.
+
+- **Zwerge (Aussehen, 03.10.):** Zwerge — der Zwergen-Held und alle Leute der Tiefhall — sind kleine, breite Gestalten: 80 % Höhe, breitere Schultern, Bauch, dicke Arme, meist Bart.

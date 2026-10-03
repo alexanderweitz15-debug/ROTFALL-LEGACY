@@ -886,6 +886,9 @@ function drawChain(e) {
 function drawChildNpc(e, now) {                                        // §5d.1: Kinder der Eisenfeste — kleiner gezeichnet
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.7, 0.7); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
 }
+function drawDwarf(e, now) {   /* Zwerge: klein, breit (03.10.) */
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.12, 0.8); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
+}
 function drawGoblinNpc(e, now) {
   ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.82, 0.82); ctx.translate(-e.x, -e.y); drawHumanoid(e, now); ctx.restore();
   if (e.captive) { ctx.fillStyle = '#6e6a64'; ctx.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 19, 6, 2); }   // Eisenkragen
@@ -972,8 +975,8 @@ function drawEntityInner(e, now) {
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
     case 'enemy': { const r = e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now); facPip(e); return r; }   // S15 P5: Übungspuppe der Akademie; Scout R4: Zeichen der Macht
-    case 'npc': if (e.chainedTo) drawChain(e); if ((e.goblin && e.spec) || e.race === 'goblin') return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
-    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); if (e.race === 'goblin') return drawGoblinNpc(e, now); return drawHumanoid(e, now);   /* Fraktions-Starts: Goblin-Held kleiner wie die Goblins der Welt */   // S15 Druide   // Kamerafahrt: unsichtbar
+    case 'npc': if (e.chainedTo) drawChain(e); if ((e.goblin && e.spec) || e.race === 'goblin') return drawGoblinNpc(e, now); if (SP.isDwarf(e)) return drawDwarf(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
+    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); if (e.race === 'goblin') return drawGoblinNpc(e, now); if (SP.isDwarf(e)) return drawDwarf(e, now); return drawHumanoid(e, now);   /* Fraktions-Starts: Goblin-Held kleiner wie die Goblins der Welt */   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd
