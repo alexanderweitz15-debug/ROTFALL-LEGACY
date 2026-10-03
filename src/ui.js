@@ -327,6 +327,17 @@ function stableUI(body, npc) {
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
+// ---------------- Zauber lernen (GUI, 03.10.2026) ----------------
+// Fenster des Zauberlehrers: alle Formeln des Lehrers in Schulfarbe, Stufe, Mana, Preis; was fehlt, steht rot darunter; „Lehren“ ruft learnFrom.
+function learnUI(body, npc) {
+  const V = A.spellLearnView?.(npc); if (!V) return;
+  const SC = A.schools || {};
+  body.innerHTML = `<div class="ledger">${qa(V.title)}: „Welche Formel? Ein Zauber sitzt erst, wenn du ihn oft wirkst.“ · Gold ${V.gold} · Intelligenz ${V.int} · Beziehung ${V.rel}</div>
+    <div class="codex-list">${V.list.map((s, i) => `<div class="fx-row spell-row${s.have ? ' off' : ''}"><div><b style="color:${SC[s.school]?.col || '#e0c27a'}">${qa(s.name)}</b> · Stufe ${['', 'I', 'II', 'III'][s.tier] || s.tier} · ${s.mana} Mana
+      <div class="ledger">${qa(s.desc)}${s.have ? '' : s.lack.length ? `<br><span class="bad">Fehlt: ${qa(s.lack.join(', '))}</span>` : ''}</div></div>
+      ${s.have ? '<span class="ledger">✓ kannst du</span>' : `<button data-learn="${i}"${s.lack.length ? ' disabled' : ''}>${s.price} Gold</button>`}</div>`).join('')}</div>`;
+  body.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { const s = V.list[+b.dataset.learn]; if (A.learnFrom(npc, s.key)) { sfx('magic', 0.5, 0.7); toast(`${s.name} gelernt — im Zauberbuch (Taste Z) auf die Leiste legen.`, 3000); } learnUI(body, npc); });
+}
 // ---------------- Zauberbuch (S15 P4) ----------------
 // Reiter je Schule. Bekannte Zauber: Rang, Kosten, Wirkung, Übung bis zum nächsten Rang, „Auf Leiste“. Unbekannte: wo man sie lernt.
 let spellTab = 'fire';
@@ -835,7 +846,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);

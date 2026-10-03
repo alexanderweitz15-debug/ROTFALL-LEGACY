@@ -16,7 +16,7 @@ export const ORIGINS = {
    (Herkunft +3 Attributpunkte, Rasse netto +2, eine Fertigkeit bis +5). Einmalig beim Start addiert wie die Herkunft.
    look: Felder für die Rassen-Schicht in sprites.js humanSpec (sp, face, glow, skin, beard, build). rule: Sonderregeln für den Hinweis. */
 export const RACES = {
-  mensch:     { name:'Mensch', attrs:{ willpower:1 }, skills:{ leadership:3 }, look:{}, rule:'Menschen führen: Führung +3.' },
+  mensch:     { name:'Mensch', attrs:{}, skills:{}, look:{}, rule:'Vergleichsmaß: keine Rassenboni (die freien Starts bleiben unverändert).' },
   aurelianer: { name:'Aurelianer', attrs:{ intelligence:1, perception:1 }, skills:{ trading:3 }, look:{ skin:'#c89a6a', hair:'#1e1a16' }, rule:'Händlerblut des Hochreichs: Handel +3.' },
   inselvolk:  { name:'Inselvolk', attrs:{ agility:1, endurance:1 }, skills:{ survival:3 }, look:{ skin:'#a87a52' }, rule:'Salz und Sturm: Überleben +3.' },
   wuestenvolk:{ name:'Wüstenvolk', attrs:{ endurance:2 }, skills:{ survival:3 }, look:{ skin:'#7a5234', hair:'#16120e' }, rule:'Hitze und Durst gewohnt: Ausdauer +2.' },

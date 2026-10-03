@@ -972,8 +972,8 @@ function drawEntityInner(e, now) {
     case 'corpse': return drawCorpse(e, now);
     case 'grave': return drawGrave(e);
     case 'enemy': { const r = e.mtype === 'acad_dummy' ? drawDummy(e) : drawCreature(e, now); facPip(e); return r; }   // S15 P5: Übungspuppe der Akademie; Scout R4: Zeichen der Macht
-    case 'npc': if (e.chainedTo) drawChain(e); if (e.goblin && e.spec) return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
-    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); return drawHumanoid(e, now);   // S15 Druide   // Kamerafahrt: unsichtbar
+    case 'npc': if (e.chainedTo) drawChain(e); if ((e.goblin && e.spec) || e.race === 'goblin') return drawGoblinNpc(e, now); if (e.child) return drawChildNpc(e, now); return drawHumanoid(e, now);
+    case 'player': if (e.cineGhost) return null; if (e.mounted) return drawRider(e, now); if (e.status?.some(s => s.key === 'wolf_form')) return drawWolfForm(e, now); if (e.race === 'goblin') return drawGoblinNpc(e, now); return drawHumanoid(e, now);   /* Fraktions-Starts: Goblin-Held kleiner wie die Goblins der Welt */   // S15 Druide   // Kamerafahrt: unsichtbar
     case 'decal': return drawDecal(e);
     case 'caravan': return drawCaravan(e, now);
     case 'mount': return drawHorse(e, now, e.mkind, false);            // S15: gerufenes oder wartendes Pferd

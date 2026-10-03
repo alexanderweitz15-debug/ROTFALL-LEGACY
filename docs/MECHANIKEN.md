@@ -1377,3 +1377,5 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - **Aussehen:** Sie sind hagere Metallgestalten ohne Rüstung, mit kahlem Maskenkopf und leuchtenden Augen. Das Metall ist Stahl, Rost oder Schwarzguss; manche tragen Lumpen oder eine Schrottklinge.
   - **Anwerben:** Sprich sie an. Etwa 2 von 5 kommen auf „Willst du mit mir kommen?“ kostenlos mit, solange in deiner Gruppe Platz ist (wie Beep). Die anderen lehnen freundlich ab.
   - **Hinweis:** Beim ersten Gespräch erklärt eine Meldung die Regel. Debug-Abschnitt „Wanderautomaten“. Häufigkeit und Anteil sind vorläufig.
+
+- **Zauber lernen (Fenster, 03.10.):** Fragst du einen Zauberlehrer nach Magie, öffnet sich ein Fenster mit allen seinen Formeln (Schulfarbe, Stufe, Mana, Preis). Was dir noch fehlt (Gold, Intelligenz, Beziehung, Rang), steht rot darunter; der Knopf ist dann gesperrt. Gelernte Zauber legst du im Zauberbuch (Z) auf die Leiste. Debug: „Fenster: Zauber lernen“.

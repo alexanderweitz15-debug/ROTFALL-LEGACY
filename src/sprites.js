@@ -13,7 +13,7 @@
 
 export const PX = 2;
 import { ATLAS } from './ref5_atlas.js?v=24';
-import { ITEMS } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { ITEMS, RACES } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=24';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 import { ATK_U } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
@@ -769,6 +769,8 @@ export function humanSpec(e) {
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
   regionFarmer(s, e, prof, key);
+  const RL = e.race && RACES[e.race]?.look;   /* Fraktions-Starts: Rasse (Skelett, Goblin, Zwerg …) — nur SPEC_KEYS-Felder (sp, face, glow, beard, skin, hs) */
+  if (RL) { if (RL.sp) { s.sp = RL.sp; s.boots = ''; s.skin = e.pal?.skin || RL.skin; if (RL.sp === 'goblin') s.hs = 2; } if (RL.face) s.face = RL.face; if (RL.glow) s.glow = s.glow || RL.glow; if (RL.beard) s.beard = s.beard || 1; }
   s.hv = heavyOf(w); s.ms = msOf(e);
   s.atlas = humanAtlas(e);   // Stil F
   s.bd = e.build || ''; s.vs = NL || e.kind === 'player' ? 0 : Math.abs(((e.seed || 0) * 131) | 0) % 8;   // S14 Stil R: Körperbau und Variante je Person
@@ -779,7 +781,7 @@ export function humanSpec(e) {
    Hilfslisten; in Varonheim ~120 Aufrufe je Bild, 2–4 ms und viel Müll (Müllsammel-Spitzen). Gilt, solange jede Eingabe gleich ist, die
    humanSpec und seine Helfer lesen: Felder der Figur, Palette, Ausrüstung (Stück, Schlüssel, Zustand), Blutstufe, Glieder, Gegend (regionOf/
    regionFarmer). Ändert sich eine davon, wird neu gebaut — das Bild ist dasselbe wie mit humanSpec. */
-const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'wanderBot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build'];
+const HS_ENT = ['pal', 'equip', 'prof', 'key', 'seed', 'kind', 'faction', 'captive', 'hooded', 'currentClass', 'undead', 'robot', 'wanderBot', 'scars', 'age', 'guard', 'goblin', 'homeTown', 'post', 'eisen', 'refugee', 'build', 'race'];
 const HS_PAL = ['skin', 'hair', 'cloth', 'glow', 'hs', 'armor', 'helm', 'crest', 'hood', 'cloak', 'shield', 'shieldBoss'], HS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 const hsMemo = new WeakMap(), hsSig = [];
 function hsInputs(e) {

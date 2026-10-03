@@ -38,7 +38,7 @@ Wer den höchsten Rang einer Fraktion erreicht, schaltet sie dauerhaft (über al
 
    | Rasse | Attribute | Fertigkeit | Sonderregel |
    |---|---|---|---|
-   | Mensch | Willenskraft +1 | Führung +3 | – |
+   | Mensch | – | – | Vergleichsmaß ohne Boni, damit die freien Starts (Herkunft) unverändert bleiben |
    | Aurelianer | Intelligenz +1, Wahrnehmung +1 | Handel +3 | – |
    | Inselvolk | Beweglichkeit +1, Ausdauer +1 | Überleben +3 | – |
    | Wüstenvolk | Ausdauer +2 | Überleben +3 | – |

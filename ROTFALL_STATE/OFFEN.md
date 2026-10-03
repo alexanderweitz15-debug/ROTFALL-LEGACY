@@ -156,10 +156,10 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [B] D: Der Text beim Pferdetausch sagt „bleibt im Stall“, das alte Pferd ist aber weg.
 - [B] C: Die Fertigkeit Jagd wirkt nicht; Schleichen wächst nie; es gibt keinen Schleichmodus.
 - [B] C: Graumähne und Karrak haben keine Boss-Beute und kein Intro; Boss-Beute ist nicht garantiert.
-- [B] Noch Gesprächslisten statt Fenster: Kontor, Schwarzmarkt, Zauber lernen, Heiler, Seefahrt, Luftschiff, Investieren, Anschlagbrett, Rat, Passamt, Kerker.
+- [B] Noch Gesprächslisten statt Fenster: Kontor, Schwarzmarkt, Heiler, (Zauber lernen: Fenster 03.10.) Seefahrt, Luftschiff, Investieren, Anschlagbrett, Rat, Passamt, Kerker.
 
 ## Vollständigkeits-Prüfung (03.10., visual/vollstaendigkeit.md)
-- [B] Zauberlehrer fehlen: sp_regen, sp_shock und sp_staunch haben keinen erreichbaren Lehrer.
+- [x] Zauberlehrer fehlen: sp_regen, sp_shock und sp_staunch — geprüft 03.10.: Aldis lehrt staunch/regen, Corvinus shock; Kodex-Texte stimmen; Probe sichert es.
 - [B] Fall Aurelions (ganzer Hoher Rat tot) löst kein Weltereignis aus (GATE §11).
 - [B] Boss-Intros fehlen für Varg, Hrodvar, Garmadon, Gorak, Dodon und den Kerkerausbruch; das Regiebuch ist vorhanden.
 - [B] Bossgespräche (Weißbart, Garmadon) sind reiner Text, ohne Story-Fenster und Gesten.
@@ -185,3 +185,8 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 ## Erledigt heute (nur Merkliste)
 - Dialoge (Story-Fenster, Emotes …), Rückfrage beim Verkauf ab Selten, Stil bleibt R, Cache v24, main live (d7199bb), Gegenstrom gegen schwere Angriffe, Ersatz-Lebensbalken.
 - Parade: gibt es seit S14. Deckung (Umschalt) in den ersten 180 ms vor dem Treffer heben → „Parade!“, der Angreifer taumelt, kein Schaden. Buckler +60 % Fenster, Turmschild kaum Parade.
+
+## 03.10. Wanderautomaten + Wüstenbund/Zwerge (51ed0d7) — vorläufig, bestätigen
+- Wanderautomaten: Häufigkeit (Gewicht 1 unter den Reisenden), 2 von 5 anwerbbar, kostenlos.
+- Wüstenbund: Eskorten +25 % ab Karawanenwächter; kein Wegzoll schon ab Rang 0.
+- Kerker Karak-Atar/Tiefhall nutzen die gemeinsame Kerkerkarte (eigener Wärter/Name/Entlassort) — eigene Karte gewünscht?

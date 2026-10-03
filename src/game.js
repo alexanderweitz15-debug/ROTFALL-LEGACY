@@ -2118,6 +2118,82 @@ function deepBoss() {                                         // Tiefhall: Hrodv
   for (const dx of [-3, 3]) spawnEnemy('skeleton', 'deep', t.cx + dx, t.y + 6, { level: 7 });
 }
 
+// ================= Fraktions-Starts (Entwickler 03.10.2026, PROPOSALS/fraktions_starts.md) =================
+// Höchster Rang einer Fraktion → dauerhaft (rotfall.starts, über alle Spielstände) als Start frei. Ein Start bringt Ort, Mitgliedschaft,
+// Ausrüstung, Aussehen, Haus (Siedlung) und Rasse mit Boni (RACES, vorläufig). Nie aus Proben (S._quiet) oder als Koop-Gast.
+const START_FACS = Object.keys(FAC_STARTS);
+const topRank = f => (FACTIONS[f]?.ranks?.length || 0) - 1;
+function startsEarned() { return START_FACS.filter(f => FACTIONS[f]?.ranks && (S.ranks?.[f] ?? -1) >= topRank(f)); }
+function startUnlockCheck() {
+  if (S._quiet || S.coop?.role === 'guest' || !S.player || String(S.map || '').startsWith('__')) return [];
+  const have = startUnlocks(), got = [];
+  for (const f of startsEarned()) if (!have[f] && unlockStart(f, { hero: S.player.name, house: S.legacy?.house || '' })) got.push(f);
+  for (const f of got) { const F = FACTIONS[f], RC = RACES[FAC_STARTS[f].race];
+    UI.toast(`NEUER START: ${F.name.toUpperCase()}`, 4200);
+    log(`Höchster Rang bei ${F.name}: Neue Geschichten können jetzt hier beginnen — als ${RC.name} (Neue Geschichte → Fraktions-Start).`, 'faction');
+    chronicle(`Start freigeschaltet: ${F.name}`, 'legend', `${S.player.name} hat den höchsten Rang erreicht. Künftige Geschichten können hier beginnen.`); }
+  return got;
+}
+/* Rasse einer Figur: gesetzt (race) oder aus dem Aussehen der Welt abgeleitet (Untote, Goblins, Zwerge) — für Erben, Gefährten, Proben */
+const raceOf = c => c?.race && RACES[c.race] ? c.race : c?.undead ? 'skelett' : c?.goblin ? 'goblin' : c?.dwarf ? 'zwerg' : 'mensch';
+const eatsFood = c => !!c && raceOf(c) !== 'skelett' && !c.undead;   /* Fraktions-Starts (d): Untote essen nicht (wie Vharnholm, das nie hungert) */
+function applyRace(c, r) {                                           /* einmalig beim Start, wie die Herkunft */
+  const RC = RACES[r] || RACES.mensch; c.race = RACES[r] ? r : 'mensch';
+  for (const [k, v] of Object.entries(RC.attrs || {})) c.attributes[k] = Math.max(1, (c.attributes[k] || 8) + v);
+  for (const [k, v] of Object.entries(RC.skills || {})) c.skills[k] = (c.skills[k] || 0) + v;
+  if (RC.look?.skin) c.pal = { ...(c.pal || {}), skin: RC.look.skin };
+  if (RC.look?.hair) c.pal = { ...(c.pal || {}), hair: RC.look.hair };
+  if (RC.undead) { c.undead = true; c.pal = { ...(c.pal || {}), glow: RC.look.glow }; }
+  return c;
+}
+/* Kein Stufe-1-Held neben Gegnern: Start und Haus nur, wo in 22 Kacheln kein Feind steht (Verbündete der Fraktion zählen nicht).
+   Gefunden beim Test: an der Tiefhall standen Goblin-Krieger der Stufe 8 fünf Kacheln neben dem Startpunkt. */
+const startFoe = f => e => e.kind === 'enemy' && e.alive && !MONSTERS[e.mtype]?.prey && MONSTERS[e.mtype]?.faction !== f && !(f === 'goblin' && /^goblin/.test(e.mtype));
+const startSafe = (f, map, x, y) => !S.ents[map].some(e => startFoe(f)(e) && Math.hypot(e.x - x, e.y - y) < 22 * TS);
+function facStartAt(FS, f) {                                         /* Startpunkt: Karte des Starts (Gischtinseln) oder Stadtplatz bzw. Ortsmitte — der nächste sichere Platz */
+  if (FS.map && FS.map !== 'world' && ARRIVAL[FS.map]) return { map: FS.map, ...ARRIVAL[FS.map]('world') };
+  const P = TOWN_PLAN[FS.at], L = LOCATIONS.find(l => l.key === FS.at), [tx, ty] = P?.square || (L ? [L.x, L.y] : TOWN_PLAN.eren.square);
+  for (let r = 0; r <= 60; r += 4) for (let k = 0; k < (r ? 8 : 1); k++) { const a = k * Math.PI / 4, q = freeSpotNear('world', tx + Math.round(Math.cos(a) * r), ty + 3 + Math.round(Math.sin(a) * r), 3);
+    if (q && startSafe(f, 'world', q.x, q.y)) return { map: 'world', ...q }; }
+  return { map: 'world', ...(freeSpotNear('world', tx, ty + 3, 4) || freeSpotNear('world', tx, ty, 8)) };
+}
+const HOUSE_PRIO = ['Verwundete versorgen', 'Nahrung sammeln', 'Verteidigung ausbessern', 'Holz schlagen', 'Handwerk', 'Ruhe'];
+function startHouse(f, at) {                                         /* Haus ab Start = eigene Siedlung (bestehendes System) mit fertigem Feuer und fertiger Hütte, außerhalb des Orts */
+  const L = map0 => map0 === 'world' && LOCATIONS.find(l => l.key === FAC_STARTS[f]?.at), Lo = L(at.map || 'world'), outLoc = c => !Lo || Math.hypot(c.x / TS - Lo.x, c.y / TS - Lo.y) > (Lo.r || 10) + 4;   /* nicht in den Mauern des Fraktionsorts (Eisenfeste, Morrgrund …) */
+  const m0 = S.map, q0 = S._quiet, map = at.map || 'world', cx = at.x / TS | 0, cy = at.y / TS | 0, fits = (x, y) => ['campfire', 'hut'].every((t, i) => canPlace({ def: BUILDINGS[t], x, y: y - i * 3 * TS }));
+  S.map = map; let q = null;
+  try {
+    for (let r = 10; r <= 70 && !q; r += 5) for (let k = 0; k < 8 && !q; k++) { const a = k * Math.PI / 4 + r * 0.1, c = freeSpotNear(map, cx + Math.round(Math.cos(a) * r), cy + Math.round(Math.sin(a) * r), 2);
+      if (c && fits(c.x, c.y) && outLoc(c) && startSafe(f, map, c.x, c.y) && (map !== 'world' || !townAt(c.x / TS | 0, c.y / TS | 0, 3))) q = c; }
+    if (!q) return null;
+    S.settlement = { name: `${S.legacy.house}heim`, x: q.x, y: q.y, map, buildings: [], morale: 60, priorities: [...HOUSE_PRIO], facStart: f,
+      history: [{ text: `Bezogen von ${S.player.name} (${FACTIONS[f].name})`, year: year() }] };
+    S._quiet = true; for (const [t, dy] of [['campfire', 0], ['hut', -3 * TS]]) { const b = placeBuilding(t, q.x, q.y + dy, true); if (b) b.built = 1; }
+  } finally { S._quiet = q0; S.map = m0; }
+  return S.settlement;
+}
+/* Folgen eines Beitritts (wie joinFaction) — auch für Fraktions-Starts */
+function joinEffects(f, start) {
+  if (f === 'undead') { S.factions.order -= 30; S.factions.valen -= 20; if (!start) log('Der Orden erklärt dich zum Feind.', 'faction'); }
+  if (f === 'order') S.factions.undead -= 20;
+  if (f === 'chain') { S.factions.goblin -= 20; S.factions.order -= 10; S.factions.valen -= 5; if (!start) partyReact('joined_chain'); }   // S12 A3
+}
+function facStartSetup(f, p) {
+  const FS = FAC_STARTS[f], F = FACTIONS[f], RC = RACES[FS.race]; S.startFac = f;
+  S.factions[f] = Math.max(S.factions[f] || 0, FS.rep); joinEffects(f, true);
+  if (f === 'aurel') S.flags.aurelCitizen = true;                   /* Aurelianer von Geburt: Bürgerrecht (Rang 2) — vorläufig */
+  else if (f !== 'goblin' && f !== 'sea') S.ranks[f] = Math.max(0, S.ranks[f] ?? -1);   /* Grubenstämme und Seevolk: Rang über den Ruf (autoRanks) */
+  autoRanks();
+  const st = startHouse(f, { map: p.map, x: p.x, y: p.y });
+  if (S.startFac !== 'valen') chronicle(`${p.name} beginnt bei ${F.name}`, 'birth', `${RC.name}, ${FS.desc}`);
+  if (f !== 'valen') log(`Du beginnst bei ${F.name}: ${FS.desc}`, 'world');
+  log(`Mitglied ab Start: ${F.ranks?.[Math.max(0, S.ranks[f] ?? 0)] || 'Mitglied'} — ${F.name} (Ansehen ${Math.round(S.factions[f])}). Den Rang findest du im Kodex (H) unter „Ränge“.`, 'faction');
+  log(`Rasse ${RC.name}: ${RC.rule}`, 'party');
+  if (st) log(`Dein Haus ${st.name} liegt ${map2Dir(p, st)} — eine Hütte und ein Feuer. Siedler ziehen zu; Bauen mit B.`, 'world');
+  if (FS.race === 'skelett') log('Tipp: Behalte die Kapuze auf. Ohne Kapuze erkennt jeder deine Knochen — der Orden und die Kette weisen dich ab, Valen ruft die Wache.', 'quest');
+  log('Ab Ansehen 40 werben dir Wachen deiner Fraktion Gefährten und Lagerwachen an.', 'quest');
+}
+function map2Dir(a, b) { const dx = b.x - a.x, dy = b.y - a.y; if (Math.hypot(dx, dy) < 6 * TS) return 'gleich nebenan'; return 'im ' + ['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8]; }
 // ================= Neues Spiel =================
 export function newGame(cfg) {
   const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
@@ -2152,26 +2228,28 @@ export function newGame(cfg) {
   aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
-  const o = ORIGINS[cfg.origin], cap = cfg.start === 'varonheim' && !!TOWN_PLAN.varonheim;
-  const start = cap ? capStartSpot(cfg.origin) : freeSpotNear('world', ...worldPt(66, 70), 3);
+  const o = ORIGINS[cfg.origin], FS = FAC_STARTS[cfg.facStart] || null, race = FS ? FS.race : 'mensch';   /* Fraktions-Starts: Ort, Rasse, Paket */
+  const cap = (FS ? FS.at === 'varonheim' : cfg.start === 'varonheim') && !!TOWN_PLAN.varonheim, at = FS && !cap ? facStartAt(FS, cfg.facStart) : null;
+  const start = at || (cap ? capStartSpot(cfg.origin) : freeSpotNear('world', ...worldPt(66, 70), 3));
   const p = makeChar({ kind:'player', key:'player', name: cfg.name, age: ri(19, 26), x: start.x, y: start.y,
     attrs: baseAttrs(), skills: { ...o.skills },            // Herkunftsbonus wird unten addiert, nicht überschrieben
     traits: [pick(['mutig', 'neugierig', 'diszipliniert', 'ehrgeizig'])],
-    origin: o.name, pal: cfg.pal, build: cfg.build || 'ausgewogen' });
+    origin: o.name, pal: FS ? { ...cfg.pal, cloth: FS.cloth } : cfg.pal, build: RACES[race].look?.build || cfg.build || 'ausgewogen' });
   p.attributes = Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, v + (o.attrs[k] || 0)]));
+  applyRace(p, race);
   p.invCap = 24; p.attrPoints = 0; p.hotbar = []; p.skillPoints = 1; p.tree = {}; p.clsPass = {}; p.skyV = 1;   /* ein Talentpunkt zum Start, danach einer auf jeder zweiten Stufe (levelUp) und je bestandener Klassenprüfung */
-  S.gold = o.gold;
-  o.gear.forEach(k => { const it = mkItem(k); if (ITEMS[k].slot === 'weapon' && !p.equip.weapon) p.equip.weapon = it;
-    else if (ITEMS[k].slot === 'chest' && !p.equip.chest) p.equip.chest = it;
-    else if (ITEMS[k].slot === 'offhand' && !p.equip.offhand) p.equip.offhand = it;
+  S.gold = o.gold + (FS?.gold || 0);
+  (FS ? FS.gear : o.gear).forEach(k => { const it = mkItem(k), sl = ITEMS[k].slot; if (['weapon', 'chest', 'offhand'].includes(sl) && !p.equip[sl]) p.equip[sl] = it;
+    else if (FS && ['head', 'cloak'].includes(sl) && !p.equip[sl]) p.equip[sl] = it;   /* Fraktions-Start: Kapuze und Umhang gehören zum Aussehen */
     else addItem(p, k); });
   if (o.rep) for (const [k, v] of Object.entries(o.rep)) S.factions[k] += v;
   recalc(p); B.fullHeal(p); p.mana = p.maxMana;
   addItem(p, 'bandage', 2);
-  S.player = p; S.ents.world.push(p);
+  S.player = p; if (at && at.map !== 'world') { p.map = S.map = at.map; S.ents[at.map].push(p); } else S.ents.world.push(p);
   syncHotbar();
 
-  if (cap) { capStart(p, o, cfg.origin); startGame(); coopHooks.afterNew?.(); return; }
+  if (cap) { capStart(p, o, cfg.origin); if (FS) facStartSetup(cfg.facStart, p); startGame(); coopHooks.afterNew?.(); return; }
+  if (FS) { facStartSetup(cfg.facStart, p); startGame(); coopHooks.afterNew?.(); return; }
   chronicle(`${p.name} bricht auf`, 'birth', `${o.name}. Kein Name, kein Land, keine Schulden. Noch nicht.`);
   log('Du erreichst das Grenzland von Greenmark.', 'world');
   { const [ex, ey] = TOWN_PLAN.eren.square, dx = ex - p.x / TS, dy = ey - p.y / TS;   // BUG-089: Richtung aus der echten Lage, nicht fest „Norden“
@@ -3110,7 +3188,8 @@ function tickCombatant(c, dt) {
   if (!c.cover) c.stamina = Math.min(c.maxStamina, c.stamina + dt / 1000 * (resting ? 12 : 5) * (wxOf(c).stam || 1) * (1 + (c.attributes?.endurance || 10) * 0.02 - 0.2 + tfx(c, 'regen') + (node(c, 'k_wild') && outside(c) ? 0.5 : 0) + (stat(c, 'song') || stat(c, 'march') ? 0.5 : 0)));
   if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')) * (inAnomaly(c) ? 2 : 1));   // S15 P7: Anomalie
   if (c === S.player && c.titleClass) titleTick(c, dt);
-  if ((c === S.player || c.coopHero) && isVamp(c)) vampTick(c, dt);   /* §5g.2: der Fluch gilt auch ungetragen und auch für Koop-Helden */
+  if ((c === S.player || c.coopHero) && isVamp(c)) vampTick(c, dt);
+  if (c === S.player && raceOf(c) === 'skelett') boneTick(c, dt);   /* Fraktions-Starts (d): Stigma „Knochen“ */   /* §5g.2: der Fluch gilt auch ungetragen und auch für Koop-Helden */
   // Statuszeiten
   if (c.status && c.status.length) {
     if (c === S.player) for (const s of c.status) ((S.codex ||= {}).states ||= {})[s.key] = 1;   // S15 Kodex: erlebte Zustände
@@ -3481,7 +3560,7 @@ function teamOf(c) {
     if (c.mtype === 'whitebeard' && c.parley) return 'neutral';       // S14: Weißbart redet, bis man ihn herausfordert
     if (c.goblinStorm) return 'player';                                // S15: die Grubenstämme stürmen mit dir
     if (c.mtype === 'dodon') return S.flags.morrHostile ? 'foe' : 'neutral';   // S15: Dodon redet zuerst
-    if (S.flags.goblinsFreed && !c.boss && !c.provoked && (c.mtype === 'goblin' || c.mtype === 'goblin_warrior')) return 'neutral';   // Nutzer: befreite Grubenstämme sind friedlich
+    if ((S.flags.goblinsFreed || (S.ranks.goblin ?? -1) >= 0) && !c.boss && !c.provoked && (c.mtype === 'goblin' || c.mtype === 'goblin_warrior')) return 'neutral';   /* Fraktions-Starts: RANK_PERKS.goblin[0] „Goblins sind friedlich“ gilt für jeden Grubenstamm-Rang */   // Nutzer: befreite Grubenstämme sind friedlich
     if (c.faction === 'chain' && !chainAtWar()) return 'neutral';     // S12: in der Eisenfeste wird erst geredet (Nutzerwunsch)                  // Wild: kein Gegner, aber jagdbar (Spieler, Wölfe)
     if (c.faction === 'undead') return S.ranks.undead >= 0 ? 'player' : 'foe';
     if (c.faction === 'valen') return valenHostile() ? 'foe' : 'player';
@@ -12487,7 +12566,8 @@ function campWealth(st) {
 function raidSources(st) {
   const sx = st.x / TS, sy = st.y / TS, day = S.day | 0, d = (x, y) => Math.round(Math.hypot(x - sx, y - sy)), out = [];
   for (const b of bandsOf()) if (!b.rules && b.paid < day && b.men > 0 && d(b.tx, b.ty) <= 120) out.push({ src: 'band', w: 3 + b.men / 2, f: 'bandit', label: `${b.name} (${b.men} Mann)`, dist: d(b.tx, b.ty), bandId: b.id });
-  const und = LOCATIONS.filter(l => (S.war?.nodes?.[l.key]?.owner === 'undead' || heldBy(l.key)) && d(l.x, l.y) <= 150).sort((a, c) => d(a.x, a.y) - d(c.x, c.y))[0];
+  if ((st.map || 'world') !== 'world') return [{ src: 'wolf', w: 1, f: null, label: 'Wölfe', dist: 0 }];   /* Fraktions-Starts: Häuser auf anderen Karten (Gischtinseln) — die Ortsliste gilt nur für die Oberwelt */
+  const und = (S.ranks.undead ?? -1) < 0 && LOCATIONS.filter(l => (S.war?.nodes?.[l.key]?.owner === 'undead' || heldBy(l.key)) && d(l.x, l.y) <= 150).sort((a, c) => d(a.x, a.y) - d(c.x, c.y))[0];
   if (und) out.push({ src: 'undead', w: 4, f: 'undead', label: `Die Toten (${und.name})`, dist: d(und.x, und.y) });
   const tv = !S.flags.chainsBroken && (S.factions.chain || 0) < 0 && tribVillages().map(V => TOWN_PLAN[V.key]?.square).filter(Boolean).map(([x, y]) => d(x, y)).sort((a, b) => a - b)[0];
   if (tv && tv <= 160) out.push({ src: 'chain', w: 2, f: 'chain', label: 'Die Kette', dist: tv });
@@ -12529,6 +12609,10 @@ function campGuardDay(st) {
     const q = freeSpotNear(st.map || 'world', (st.x / TS | 0) + ri(-3, 3), (st.y / TS | 0) + ri(2, 4), 3); if (!q) break; const g = guardChar('merch', q, 'Lagerwache', 5);
     Object.assign(g, { campGuard: true, guard: false, map: st.map || 'world', anchor: { x: st.x + ri(-40, 40), y: st.y + ri(-30, 30) }, greet: '„Fünf Gold am Tag, und ich halte den Kopf hin. Abgemacht.“' }); arr.push(g);
     st.lost = Math.max(0, (st.lost || 0) - 1); log(`${g.name} ist als Lagerwache in ${st.name} angekommen.`, 'world'); }
+  while ((st.facGuards || []).length) {   /* Fraktions-Starts (c): Lagerwachen aus einer Fraktion — gleiche Obergrenze, gleicher Sold */
+    const f = st.facGuards.shift(), q = arr.filter(e => e.campGuard && e.alive).length < campGuardCap(st) && freeSpotNear(st.map || 'world', (st.x / TS | 0) + ri(-3, 3), (st.y / TS | 0) + ri(2, 4), 3); if (!q || !FACTIONS[f]) continue;
+    const g = facMember(f, q, st.map || 'world', 5); Object.assign(g, { campGuard: true, guard: false, merc: null, anchor: { x: st.x + ri(-40, 40), y: st.y + ri(-30, 30) }, greet: `„${FACTIONS[f].name} schickt mich. Fünf Gold am Tag, und ich halte die Wacht.“` }); arr.push(g);
+    st.lost = Math.max(0, (st.lost || 0) - 1); log(`${g.name} (${FACTIONS[f].name}) ist als Lagerwache in ${st.name} angekommen.`, 'world'); }
   const D = campDefenders(st); st.peak = (st.lostAt ?? -9) === (S.day | 0) ? Math.max(st.peak || 0, D) : Math.max(D, (st.peak || 0) - 1); campCheck(st);
 }
 function campTake(st, n, why) {                                      /* Siedler sterben oder werden verschleppt */
@@ -12678,17 +12762,18 @@ function dayTick() {
   if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) SIM.initSim();   // S15: Straßen nicht täglich neu bauen
   // Nahrung (Entwickler 02.10.: „Brot geht nicht mit in den Proviant ein“ — fehlt Vorrat, isst die Gruppe Nahrung aus dem Gepäck: Brot, Trockenfleisch …)
   const mem = partyMembers();
-  { const want = Math.ceil((mem.length + 1) * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));
+  const mouths = mem.filter(eatsFood).length + (eatsFood(S.player) ? 1 : 0);   /* Fraktions-Starts (d): Untote (Skelett-Held, untote Gefährten) essen nicht */
+  { const want = Math.ceil(mouths * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));
     for (const s of [...S.player.inv]) { if (S.res.food >= want) break; const F = s && ITEMS[s.key]?.food; if (!F || s.lock) continue;
       const nm = ITEMS[s.key].name; let ate = 0;
       while (S.res.food < want) { S.res.food += F; ate++; if ((s.count || 1) > 1) s.count--; else { S.player.inv.splice(S.player.inv.indexOf(s), 1); break; } }
       if (ate && !S._quiet) log(`Proviant: ${ate}× ${nm} aus dem Gepäck gegessen.`, 'party'); } }   /* HB2-14: nicht mehr stumm */
-  const need = Math.ceil((mem.length + 1) * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));   /* Roadmap C.12: Schnee und Winter kosten mehr Nahrung */
+  const need = Math.ceil(mouths * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));   /* Roadmap C.12: Schnee und Winter kosten mehr Nahrung */
   if (S.res.food >= need) { S.res.food -= need; for (const m of mem) m.morale = Math.min(100, m.morale + 2); }
   else {
     S.res.food = 0;
     for (const m of mem) { m.morale -= 10; remember(m, 'starved'); }
-    if (S.player.body) { const T = S.player.body.torso; T.hp = Math.min(T.hp, Math.max(1, T.hp - 4)); B.syncHp(S.player); }   /* Behoben HB-14: Math.max(1,…) hob einen am Boden liegenden (negativen) Rumpf auf 1 an — Hunger weckte Bewusstlose auf */
+    if (S.player.body && eatsFood(S.player)) { const T = S.player.body.torso; T.hp = Math.min(T.hp, Math.max(1, T.hp - 4)); B.syncHp(S.player); }   /* Behoben HB-14: Math.max(1,…) hob einen am Boden liegenden (negativen) Rumpf auf 1 an — Hunger weckte Bewusstlose auf */
     log('Die Gruppe hungert. Moral sinkt.', 'party');
   }
   // Desertion
@@ -13199,7 +13284,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -13320,7 +13405,7 @@ function autoRanks() {
   S.ranks.aurel = S.flags.councillor ? 7 : S.flags.aurelCitizen ? Math.min(7, 2 + Math.max(0, Math.floor((a - 40) / 12)) + (S.flags.marriedHouse && a >= 90 ? 1 : 0)) : hasPermit() ? 1 : 0;
   /* Behoben HB-23: „Erzfeinde schließen einander aus“ (JOIN_FOES) galt bisher nicht für den ranglosen Grubenstamm-Rang —
      wer der Kette angehörte und die Goblins befreite, hatte beide Ränge zugleich. */
-  S.ranks.goblin = S.flags.goblinsFreed && (S.ranks.chain ?? -1) < 0 ? ((S.factions.goblin || 0) >= 60 ? 2 : (S.factions.goblin || 0) >= 20 ? 1 : 0) : -1;
+  S.ranks.goblin = (S.flags.goblinsFreed || S.startFac === 'goblin') && (S.ranks.chain ?? -1) < 0 ?   /* Fraktions-Starts: ein Goblin des Stammes hat seinen Rang auch ohne Befreiung */ ((S.factions.goblin || 0) >= 60 ? 2 : (S.factions.goblin || 0) >= 20 ? 1 : 0) : -1;
   { const rep = S.factions.sea || 0;   /* Entwickler 03.10.2026: Seevolk-Ränge auch über Ruf — Landratte ab Ruf 10, Maat (2) ab 50 nach der Seitenwahl, Kapitän (4) ab 100 nach Rang 3 */
     if ((S.ranks.sea ?? -1) < 0 && rep >= 10) promote('sea', 0);
     if (S.seaSide) for (const k of [2, 4]) if ((S.ranks.sea ?? -1) === k - 1 && rep >= k * 25) promote('sea', k); }
@@ -13390,7 +13475,7 @@ const STAKES = [10, 25, 50];
 function tavernHint() { if (!S.flags.tavernHint && S.player && inTavern(S.player)) { S.flags.tavernHint = 1; log('Schenke: Sprich Gäste oder den Wirt an — „Lust auf ein Spiel?“ Würfeln, Karten, Armdrücken, Trinkwette, Faustkampf.', 'quest'); } }
 function tavernChoices(npc, choices) {
   if (!npc.alive || npc.guard || npc.kind !== 'npc' || S.party.includes(npc.id) || !(inTavern(npc) || npc.prof === 'Wirt' || npc.prof === 'Schankmagd') || !inTavern(S.player)) return;
-  if (S.settlement && (npc.prof === 'Wirt' || npc.prof === 'Schankmagd')) { const st = S.settlement, have = S.ents[st.map || 'world'].filter(e => e.campGuard && e.alive).length + (st.guardOrder || 0);
+  if (S.settlement && (npc.prof === 'Wirt' || npc.prof === 'Schankmagd')) { const st = S.settlement, have = S.ents[st.map || 'world'].filter(e => e.campGuard && e.alive).length + (st.guardOrder || 0) + (st.facGuards || []).length;
     if (have < campGuardCap(st)) choices.push({ text: `Söldner für mein Lager ${st.name} (80 Gold, dann 5 Gold am Tag)`, fn: () => { if (S.gold < 80) return UI.dialogue(npc, '„Achtzig. Für weniger hält keiner den Kopf hin.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
       S.gold -= 80; st.guardOrder = (st.guardOrder || 0) + 1; UI.closeDialogue(); log(`Ein Söldner zieht morgen früh nach ${st.name} (Lagerwache, 5 Gold Sold am Tag).`, 'world'); } }); }   /* Siedlung M4 */
   choices.push({ text: 'Lust auf ein Spiel?', fn: () => UI.dialogue(npc, `„${pick(['Immer. Was soll es sein?', 'Wenn du verlierst, zahlst du die nächste Runde.', 'Ich spiele nicht um Ehre. Nur um Gold.'])}“`, [
@@ -13939,7 +14024,16 @@ function learnFrom(npc, key) {
   const lack = spellLack(npc, key); if (lack.length) return false;
   S.gold -= spellPrice(npc, key); learnSpell(S.player, key); addRel(npc.key, 3); UI.refreshHUD(); return true;
 }
+/* GUI Zauberlehrer (Entwickler 03.10.2026: „jedes System ein Fenster“): spellMenu öffnet das Fenster 'learn'; Proben und Koop-Gäste
+   behalten das Gespräch. spellLearnView liefert dem Fenster die Daten, learnFrom bleibt die einzige Lernfunktion. */
+function spellLearnView(npc) {
+  const p = S.player;
+  return { title: `${npc.name} (${npc.prof})`, gold: S.gold, int: p.attributes.intelligence, rel: S.relations[npc.key] || 0,
+    list: npc.spellsTaught.filter(k => ABILITIES[k]).map(k => ({ key: k, name: ABILITIES[k].name, tier: ABILITIES[k].tier, school: ABILITIES[k].school, desc: ABILITIES[k].desc, mana: ABILITIES[k].mana,
+      price: spellPrice(npc, k), have: !!p.spells?.[k], lack: spellLack(npc, k) })) };
+}
 function spellMenu(npc) {
+  if (!S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('learn', npc); return; }
   const p = S.player, back = () => spellMenu(npc), list = npc.spellsTaught.filter(k => ABILITIES[k]);
   UI.dialogue(npc, `„Welche Formel? Ein Zauber sitzt erst, wenn du ihn oft wirkst.“ (Gold: ${S.gold}, Intelligenz: ${p.attributes.intelligence})`, [
     ...list.map(k => { const A0 = ABILITIES[k], lack = spellLack(npc, k), have = p.spells?.[k];
@@ -14276,9 +14370,7 @@ function joinFaction(npc) {
   UI.dialogue(npc, `„Dann tritt ein. Du bist ${FACTIONS[f].ranks[0]}. Alles andere musst du verdienen.“`, [
     { text: 'Ich trete bei.', fn: () => {
       S.ranks[f] = 0;
-      if (f === 'undead') { S.factions.order -= 30; S.factions.valen -= 20; log('Der Orden erklärt dich zum Feind.', 'faction'); }
-      if (f === 'order') S.factions.undead -= 20;
-      if (f === 'chain') { S.factions.goblin -= 20; S.factions.order -= 10; S.factions.valen -= 5; partyReact('joined_chain'); }   // S12 A3
+      joinEffects(f);   /* Fraktions-Starts: dieselben Folgen wie beim Start in der Fraktion */
       if (f === 'wuest') log('Als Mitglied des Wüstenbunds zahlst du in Karak-Atar keinen Wegzoll mehr.', 'faction');   /* Fragemenü 03.10. */
       chronicle(`Beitritt: ${FACTIONS[f].name}`, 'faction', `Als ${FACTIONS[f].ranks[0]} aufgenommen.`);
       log(`Du bist nun ${FACTIONS[f].ranks[0]} — ${FACTIONS[f].name}.`, 'faction');
@@ -14366,7 +14458,7 @@ function promote(f, r) {
   if (TOP_SETS[f] && r === (FACTIONS[f]?.ranks?.length || 0) - 1 && !S.flags['topSet_' + f]) { S.flags['topSet_' + f] = 1;
     for (const k of TOP_SETS[f]) for (const it of ARMOR_SETS[k]?.pieces || []) if (ITEMS[it]) { if (!addItem(S.player, it)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(it)); }
     log(`Für den höchsten Rang bei ${FACTIONS[f].name}: ${TOP_SETS[f].map(k => ARMOR_SETS[k].name).join(' und ')} — als Geschenk.`, 'faction'); }
-  const n = FACTIONS[f].ranks[r]; log(`Beförderung: ${n} — ${FACTIONS[f].name}.`, 'faction'); chronicle(`Rang ${n}`, 'faction', FACTIONS[f].name); UI.toast(n.toUpperCase(), 3600);
+  const n = FACTIONS[f].ranks[r]; log(`Beförderung: ${n} — ${FACTIONS[f].name}.`, 'faction'); if (r >= topRank(f)) setTimeout(startUnlockCheck, 0);   /* Fraktions-Starts */ chronicle(`Rang ${n}`, 'faction', FACTIONS[f].name); UI.toast(n.toUpperCase(), 3600);
   /* S15 Hinweise: Weihen sagen, wo man sie bekommt */
   if (f === 'chain' && r === 3 && !S.flags.chainsBroken) log('Du kannst jetzt die Weihe der Kette empfangen — bei Varg in der Eisenfeste oder bei einem Dunklen Paladin (Klasse Dunkler Hochpaladin).', 'faction');
   if (f === 'wuest' && r === 1) log('Als Karawanenwächter zahlen dir Eskorten des Wüstenbunds 25 % mehr.', 'faction');   /* Fragemenü 03.10. */
@@ -14374,7 +14466,7 @@ function promote(f, r) {
   if (f === 'undead' && r === 3) log(`Du kannst jetzt die Todesweihe empfangen — bei Sael oder Ysra (Klasse Todesritter).${S.player.knownClasses.includes('warrior') ? '' : ' Vorher musst du die Klasse Krieger lernen.'}`, 'faction');
 }
 function checkRankUp() {
-  autoRanks();
+  autoRanks(); startUnlockCheck();   /* Fraktions-Starts: höchster Rang → Start frei (auch rückwirkend für alte Stände) */
   for (const f of ['valen', 'order', 'undead', 'chain', 'merch', 'bandit', 'wuest', 'zwerge']) {   /* 03.10.: Wüstenbund, Zwerge */   // S15 P8: Händler und Bande
     if (S.ranks[f] < 0 || S.ranks[f] == null || (f === 'chain' && S.ranks.chain >= 3)) continue;   // Hochpaladin nur durch die Weihe
     const r = S.ranks[f] + 1; if (r >= FACTIONS[f].ranks.length || !rankReady(f, r) || (S.rankNote ||= {})[f] === r) continue;
@@ -14413,6 +14505,52 @@ function mercDay() {                                                // Löhne; w
   for (const m of partyMembers()) { if (!m.merc) continue;
     if (S.gold >= m.merc.wage) { S.gold -= m.merc.wage; continue; }
     S.party = S.party.filter(id => id !== m.id); m.merc = null; m.retainer = false; sendHome(m); log(`${m.name}: „Kein Gold, kein Schwert.“ — und geht.`, 'party'); }   // S15 Fehlersuche: nicht im Dungeon stehen lassen
+}
+/* Fraktions-Starts (c), vorläufig: Ab Ansehen 40 („Verbündet“) werben Wachen und Kämpfer einer Fraktion Mitglieder an — als Gefährten zu
+   Söldnerbedingungen (Handgeld 50 + 12 × Stufe, Lohn 3 + Stufe am Tag, mercDay) und als Lagerwache zu Wirtsbedingungen (80 Gold, dann 5 Gold
+   am Tag, campGuardDay). Allgemein nutzbar: facMember (Figur bauen) und enlist (gegen Handgeld und Lohn in die Gruppe). */
+const RECRUIT_KIT = {
+  valen: { prof: 'Soldat Valens' }, order: { prof: 'Ordensbruder' }, undead: { prof: 'Stiller Krieger' }, chain: { prof: 'Kettenknecht' }, merch: { prof: 'Söldner der Händler' },
+  aurel: { prof: 'Sonnenlegionär', kit: 'valen', weapon: 'halberd', chest: 'chain_hauberk', head: 'iron_helm', cloth: '#8a6a3a', race: 'aurelianer' },
+  sea: { prof: 'Maat des Seevolks', kit: 'merch', weapon: 'entermesser', chest: 'leather_jerkin', head: null, cloth: '#2c3a44', race: 'inselvolk' },
+  goblin: { prof: 'Goblin-Krieger', kit: 'merch', weapon: 'schrottkeule', chest: 'pit_leather', head: 'bergmannshelm', cloth: '#3d4a22', race: 'goblin', names: GOBLIN_NAMES },
+  wuest: { prof: 'Sandreiter', kit: 'merch', weapon: 'spear', chest: 'leather_jerkin', head: 'wuestenhaube', cloth: '#c8b48a', race: 'wuestenvolk' },
+  zwerge: { prof: 'Schildträger der Halle', kit: 'valen', weapon: 'axe', chest: 'chain_hauberk', head: 'iron_helm', offhand: 'wooden_shield', cloth: '#2a3040', race: 'zwerg' },
+};
+const RECRUIT_REP = 40;
+const facOfNpc = npc => npc.seaFolk ? 'sea' : npc.faction || (npc.goblin ? 'goblin' : npc.dwarf ? 'zwerge' : null);
+function facMember(f, pos, map = 'world', lv = 5) {
+  const K = RECRUIT_KIT[f] || {}, kit = K.kit || (GUARD_KIT[f] && !GUARD_KIT[f].robot ? f : 'merch');
+  const c = guardChar(kit, pos, K.prof, lv); c.faction = f; c.map = map; c.facRecruit = f; c.guard = false; c.post = null;
+  if (K.names) c.name = pick(K.names);
+  for (const sl of ['weapon', 'chest', 'head', 'offhand']) if (K[sl] !== undefined) { c.equip[sl] = K[sl] && ITEMS[K[sl]] ? mkItem(K[sl]) : null; }
+  if (K.cloth) c.pal = { ...c.pal, cloth: K.cloth };
+  if (K.race) { const RC = RACES[K.race]; c.race = K.race; if (RC.look?.skin) c.pal = { ...c.pal, skin: RC.look.skin }; if (RC.look?.build) c.build = RC.look.build; if (K.race === 'goblin') c.goblin = true; if (K.race === 'zwerg') c.dwarf = true; }
+  recalc(c); B.fullHeal(c); return c;
+}
+function enlist(npc, c, hire, wage) {                                 /* c in die Gruppe: Handgeld, Tageslohn (mercDay zahlt, ohne Lohn geht er) */
+  const p = S.player, say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (S.party.length >= p.partyCap) return say('„Deine Gruppe ist voll. Mehr Leute gebe ich dir nicht mit.“'), false;
+  if (S.gold < hire) return say(`„${hire} Gold Handgeld. Für weniger zieht keiner von uns mit.“`), false;
+  S.gold -= hire; Object.assign(c, { merc: { hire, wage }, transient: false, visitor: false, morale: 60, anchor: { x: npc.x, y: npc.y } });
+  if (!S.ents[c.map].includes(c)) S.ents[c.map].push(c); S.party.push(c.id);
+  log(`${c.name} (${c.prof}) zieht mit dir: ${hire} Gold Handgeld, ${wage} Gold am Tag. Ohne Lohn geht er heim.`, 'party'); UI.closeDialogue(); UI.refreshHUD(); return true;
+}
+function facRecruitChoices(npc, choices) {
+  const f = facOfNpc(npc), F = FACTIONS[f], p = S.player;
+  if (!FAC_STARTS[f] || npc.kind !== 'npc' || !npc.alive || npc.downed || npc.captive || npc.merc || npc.facRecruit || npc.campGuard || S.party.includes(npc.id)) return;
+  if (!(npc.guard || /wache|wächter|krieger|sandreiter|soldat|legionär|kämpfer|maat|bootsmann|schildträger|hauptmann|offizier/i.test(npc.prof || ''))) return;
+  const rep = Math.round(S.factions[f] || 0), say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (rep < RECRUIT_REP) { if (rep >= 10) choices.push({ text: `Würden Leute von ${F.name} mit mir ziehen?`, fn: () => say(`„Erst, wenn ${F.name} dir vertraut.“ (Ansehen ${rep}/${RECRUIT_REP}: dann Gefährten und Lagerwachen)`) }); return; }
+  const lv = clamp((p.level || 1), 3, 10), hire = 50 + lv * 12, wage = 3 + lv;
+  choices.push({ text: `Einen Kämpfer von ${F.name} anwerben (${hire} Gold, dann ${wage} am Tag)`, fn: () => {
+    const q = freeSpotNear(npc.map, (npc.x / TS | 0) + 1, (npc.y / TS | 0) + 1, 2) || { x: npc.x + 20, y: npc.y };
+    const c = facMember(f, q, npc.map, lv); if (enlist(npc, c, hire, wage)) remember(c, 'recruited', p.name); } });
+  const st = S.settlement; if (!st) return;
+  const have = S.ents[st.map || 'world'].filter(e => e.campGuard && e.alive).length + (st.guardOrder || 0) + (st.facGuards || []).length;
+  if (have < campGuardCap(st)) choices.push({ text: `Eine Wache von ${F.name} für ${st.name} (80 Gold, dann 5 Gold am Tag)`, fn: () => {
+    if (S.gold < 80) return say('„Achtzig Gold. Dann schicke ich jemanden.“');
+    S.gold -= 80; (st.facGuards ||= []).push(f); UI.closeDialogue(); log(`Eine Wache von ${F.name} zieht morgen früh nach ${st.name} (Lagerwache, 5 Gold Sold am Tag).`, 'world'); } });
 }
 function recruit(npc) {
   const p = S.player, rel = S.relations[npc.key] ?? 0;
@@ -15006,11 +15144,37 @@ function bloodSeen(p, v) {                                     /* Zeugen: diese 
   for (const w of ws) { w.alarmed = true; if (!GUARDISH(w)) w.fleeing = true; }
   float(p, 'Blutsauger!', 'rgba(200,60,60,ALPHA)'); return facs.size;
 }
+/* Fraktions-Starts (d), vorläufig: Ein Skelett ohne Kapuze wird erkannt. Zeugen in 120 px mit freier Sicht; ihre Macht weiß es 10 Tage.
+   Valen und Kette melden es der Wache (Kopfgeld 60, einmal am Tag — dann gilt das bestehende Gesetz), der Orden schickt Jäger. */
+let boneAcc = 0;
+function boneTick(c, dt) {
+  boneAcc += dt; if (boneAcc < 1500) return; boneAcc = 0;
+  if (S._quiet || S.coop?.role === 'guest' || S.cine || hooded(c) || String(c.map).startsWith('__')) return;
+  boneSeen(c);
+}
+function boneSeen(p) {
+  if (hooded(p)) return 0;   /* die Kapuze verbirgt den Schädel */
+  const ws = S.ents[p.map].filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.undead && e.faction !== 'undead' && !S.party.includes(e.id) && !e.captive && dist(e, p) <= 120 && clearLine(e, p));
+  const facs = new Set(); for (const w of ws) { const f = w.faction || (w.homeTown && townFac(w.homeTown)) || null; if (f && STIGMA.skeleton[f]) facs.add(f); }
+  if (!facs.size) return 0;
+  const day = S.day | 0, K = ((p.stigma ||= {}).skeleton ||= {}), R = (p.boneRep ||= {});
+  for (const f of facs) { const row = STIGMA.skeleton[f];
+    if (K[f] == null || day - K[f] >= 10) log(`${FACTIONS[f]?.name || f}: Man hat deine Knochen gesehen.`, 'faction'); K[f] = day;
+    if (row.report === 'guard' && R[f] !== day) { R[f] = day; addBounty(f, 60, 'Wandelnder Toter'); }
+    if (row.report === 'hunt' && R[f] !== day) { R[f] = day; const n = S.flags.boneOrderHeat = (S.flags.boneOrderHeat || 0) + 1;
+      if (n === 2 || n % 4 === 0) { afterAvenge('order', 3, 'Totenjäger des Ordens', ri(1, 2), 'order', 'Totenjäger'); log('Der Orden hat von dem wandelnden Toten gehört. Jäger werden kommen.', 'faction'); } } }
+  for (const w of ws) { const f = w.faction || (w.homeTown && townFac(w.homeTown)); const row = STIGMA.skeleton[f]; if (!row || !(row.report || row.deny)) continue; w.alarmed = true; if (!GUARDISH(w)) w.fleeing = true; }
+  if (!S.flags.boneHint) { S.flags.boneHint = 1; log('Man hat dich erkannt: Ohne Kapuze sieht jeder die Knochen. Eine Kapuze (oder ein Umhang mit Kapuze) verbirgt dich; nach 10 Tagen vergisst eine Macht.', 'quest'); }
+  float(p, 'Ein Toter!', 'rgba(200,200,180,ALPHA)'); return facs.size;
+}
 // Stigma: Wer weiß es (bezeugt) — oder sieht es gerade (Sonnenbrand, rote Augen ab 70, ohne Kapuze, ganz nah)? Nach der Heilung
 // erinnert man sich noch 10 Tage.
-function stigmaOf(npc, kind = 'vampire') {
+function stigmaOf(npc, kind) {
+  if (!kind) return stigmaOf(npc, 'vampire') || stigmaOf(npc, 'skeleton');   /* Fraktions-Starts (d): zweite Art „Knochen“ (Skelett-Held) */
   const p = S.player; if (!p || !npc || npc.kind !== 'npc') return null;
   const f = npc.faction || (npc.homeTown && townFac(npc.homeTown)) || null, row = f && STIGMA[kind]?.[f]; if (!row) return null;
+  if (kind === 'skeleton') { if (raceOf(p) !== 'skelett') return null; const t = p.stigma?.skeleton?.[f];
+    return (t != null && (S.day | 0) - t < 10) || (dist(npc, p) <= 120 && !hooded(p)) ? row : null; }   /* ohne Kapuze in 120 px, oder die Macht hat es in den letzten 10 Tagen gesehen */
   const vamp = isVamp(p), knew = p.stigma?.[kind]?.[f] != null, cured = p.vamp?.cured != null && (S.day | 0) - p.vamp.cured < 10;
   if (knew && (vamp || cured)) return row;
   if (vamp && dist(npc, p) <= 120 && (stat(p, 'sunburn') || bloodOf(p) >= 70) && !hooded(p)) return row;
@@ -16360,7 +16524,7 @@ function adoptSuccessor(c) {
   S.party = S.party.filter(id => id !== c.id); if (c.childId) S.legacy.children = (S.legacy.children || []).filter(k => k.id !== c.childId); if (c.spouse) { S.legacy.spouse = null; c.spouse = false; }   /* §5e.2 */
   heirBonds(old, c);   /* HB-20 (Entwickler 03.10.): Witwe/Witwer bleibt im Haus, Bindungen des Toten enden */
   S.bond = null; S.hunt = null; S.jail = null; const pet = S.ents[old.map]?.find(e => e.pet && e.servant === old.id) || Object.values(S.ents).flat().find(e => e.pet && e.servant === old.id); if (pet) pet.servant = c.id;   // S15 Fehlersuche: Ketten, Jagd und Kerker gehen nicht aufs Erbe über; das Tier folgt dem Erben
-  c.kind = 'player'; c.key = 'player'; c.bornDay = S.day;
+  c.kind = 'player'; c.key = 'player'; c.bornDay = S.day; c.race = raceOf(c);   /* Fraktions-Starts: der Erbe behält seine eigene Rasse */
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
   for (const k of Object.keys(S.quests)) if (QUESTS[k]?.clsTrial && S.quests[k].state === 'active') delete S.quests[k];   /* Prüfungen gehören dem Vorgänger */
   heirTalents(c);   /* Scheibe 0: der Erbe hat sofort seine Talentpunkte nach der Regel (vorher 0 bis zum Neuladen, danach Stufe − 1) */
@@ -16956,6 +17120,7 @@ function debugSections() {
     ['Wanderautomaten (03.10.2026)', '', {
       'Roboter: Wanderautomat hier (anwerbbar)': () => { toWorld(); const s = freeSpotNear('world', (p.x / TS | 0) + 2, p.y / TS | 0, 2); const c = wanderBotize(makeChar({ name: 'x', prof: 'Wanderautomat', x: s.x, y: s.y, level: 3 }), true);
         Object.assign(c, { transient: true, visitor: true, anchor: { x: s.x, y: s.y }, greet: '„EINHEIT OHNE HERRN. EINHEIT LÄUFT.“' }); S.ents.world.push(c); UI.toast(`${c.name} steht neben dir — ansprechen (E).`); },
+      'Fenster: Zauber lernen (Mutter Aldis)': () => { const n = S.ents.world.find(e => e.key === 'aldis') || { name: 'Mutter Aldis', prof: 'Ordenspriesterin', key: 'aldis', faction: 'order', spellRule: 'order', spellsTaught: NPCS.find(d => d.key === 'aldis').spellsTaught }; UI.openModal('learn', n); },
       'Roboter: Wanderautomat als Reisender losschicken': () => { const r = spawnTraveler(TRAV_KINDS.find(k => k.k === 'automat')); UI.toast(r && r !== 'wait' ? `${r.name} wandert von Stadt zu Stadt.` : 'Gerade kein Weg frei (oder Startort im Blick).'); },
     }],
     ['Pferde (Fellfarben-Überarbeitung, 02.10.2026)', '', {                                   // Entwickler: „Pferde-Sprites müssen überarbeitet werden“ — Debug-Übersicht aller Varianten
@@ -16981,6 +17146,20 @@ function debugSections() {
       'Heilen (wie Orden)': () => { if (isVamp(p)) cureTitle('vampire', 'Debug'); },
       'Stigma zeigen': () => { const K = p.stigma?.vampire || {}; UI.toast(Object.keys(K).length ? 'Wissen es: ' + Object.keys(K).map(f => FACTIONS[f]?.name || f).join(', ') : 'Niemand weiß es.', 4000); },
       'Stigma vergessen': () => { if (p.stigma) delete p.stigma.vampire; },
+    }],
+    ['Starts: Fraktions-Starts, Rassen, Anwerben (03.10.)', `${sel('dbFacStart', Object.keys(FAC_STARTS).map(k => [k, FACTIONS[k].name]))} ${sel('dbRace', Object.entries(RACES).map(([k, r]) => [k, r.name]))}`, {
+      'Starts: Freischaltungen zeigen': () => { const U = startUnlocks(); UI.toast(Object.keys(U).length ? 'Frei: ' + Object.keys(U).map(f => FACTIONS[f]?.name || f).join(', ') : 'Kein Fraktions-Start frei.', 4000); },
+      'Starts: verdient in diesem Stand': () => UI.toast(startsEarned().map(f => FACTIONS[f].name).join(', ') || 'Kein höchster Rang erreicht.', 3600),
+      'Starts: gewählten freischalten': () => { unlockStart(v('dbFacStart'), { hero: 'Debug' }); UI.toast('Frei: ' + FACTIONS[v('dbFacStart')].name); },
+      'Starts: alle freischalten': () => { for (const f of Object.keys(FAC_STARTS)) unlockStart(f, { hero: 'Debug' }); UI.toast('Alle Fraktions-Starts frei (gilt für alle Spielstände).', 3600); },
+      'Starts: alle Freischaltungen löschen': () => { localStorage.removeItem('rotfall.starts'); UI.toast('Fraktions-Starts wieder gesperrt.', 3000); },
+      'Starts: gewählten Start testen (neuer Spielstand)': () => { const f = v('dbFacStart'); setSlot(newSlot('single')); UI.closeModal?.(); newGame({ name: 'Probe', house: 'Probe', origin: 'wanderer', pal: { skin: SKIN[0], hair: HAIR[0], cloth: CLOTH[0], hs: 0 }, build: 'ausgewogen', difficulty: S.difficulty || 'schwer', facStart: f }); UI.toast(`Neuer Spielstand: Start ${FACTIONS[f].name}`, 3600); },
+      'Starts: Rasse am Helden (nur Aussehen)': () => { const r = v('dbRace'); p.race = r; p.undead = !!RACES[r].undead; if (RACES[r].look?.skin) p.pal = { ...p.pal, skin: RACES[r].look.skin }; UI.toast(`Rasse: ${RACES[r].name}`); },
+      'Starts: Skelett jetzt erkennen lassen': () => UI.toast(`Erkannt von ${boneSeen(p)} Mächten.`),
+      'Starts: Knochen-Stigma vergessen': () => { if (p.stigma) delete p.stigma.skeleton; p.boneRep = {}; },
+      'Starts: Fraktionskämpfer gratis anwerben': () => { const f = v('dbFacStart'), q = freeSpotNear(p.map, (p.x / TS | 0) + 2, p.y / TS | 0, 3), c = facMember(f, q, p.map, clamp(p.level || 1, 3, 10)); S.gold += 50 + c.level * 12; enlist(p, c, 50 + c.level * 12, 3 + c.level); },
+      'Starts: Fraktions-Lagerwache sofort': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); (st.facGuards ||= []).push(v('dbFacStart')); const g0 = S.gold; campGuardDay(st); S.gold = g0; },
+      'Starts: Ansehen 40 bei gewählter Fraktion': () => { S.factions[v('dbFacStart')] = Math.max(40, S.factions[v('dbFacStart')] || 0); UI.toast('Ansehen 40 — Wachen werben jetzt an.'); },
     }],
     ['Blutkult: Unterwanderung (§5g.2, Scheibe 2)', sel('dbClue', Object.entries(CLUE_NAME)), {
       'Nach Varonheim': () => { const [x, y] = TOWN_PLAN.varonheim.square; tp(x, y + 2); },
@@ -20182,7 +20361,9 @@ export function selftest() {
       S.permit = -1; const noPermit = spellLack(prof, 'sp_icespear').some(x => x.includes('Aufenthaltsschein'));
       S.permit = (S.day | 0) + 3; p.attributes.intelligence = 14; S.acadRank = 0; const t3 = spellLack(prof, 'sp_firewall').some(x => x.includes('Adept')), t2ok = !spellLack(prof, 'sp_icespear').length;
       S.acadRank = 2; const t3ok = !spellLack(prof, 'sp_firewall').length;
-      return poor && learned && noPermit && t3 && t2ok && t3ok && NPCS.filter(d => d.spellsTaught).length >= 5;
+      const V = spellLearnView(sera), view = V.list.length === 1 && V.list[0].have && V.title.includes('Serafine');   /* GUI 03.10.: Fensterdaten */
+      const taught = new Set(NPCS.flatMap(d => d.spellsTaught || [])), allTaught = ['sp_regen', 'sp_shock', 'sp_staunch'].every(k => taught.has(k));   /* H7: jeder Zauber hat einen Lehrer */
+      return poor && learned && noPermit && t3 && t2ok && t3ok && view && allTaught && NPCS.filter(d => d.spellsTaught).length >= 5;
     } finally { S.gold = g0; S.relations.serafine = rel0; S.permit = perm0; S.acadRank = acad0; }
   }));
   ok('Rangwege (S15 P8): Händler und Bande haben Beitritt und zwei Rangprüfungen; der Kodex nennt für jede Fraktion den nächsten Schritt', (() => {
@@ -22245,6 +22426,51 @@ export function selftest() {
     try { coachTalk(c); const V = coachView(c), cards = UI.modalOpen === 'travel' && document.querySelectorAll('#modal-body .tv-card').length === V.dests.length;
       const same = V.dests.every(d => d.price === tripOf(V.from, d.k, V.ferry).price), lk = V.dests.find(d => d.locked), lockOk = !lk || (!!coachGo(c, lk.k) && S.gold === g0);
       UI.closeModal(); return cards && same && lockOk; } finally { S.gold = g0; UI.closeModal(); } })());
+  ok('Fraktions-Starts (a): höchster Rang zählt; Freischaltung in eigenem Schlüssel, einmal; nie aus Proben; zehn Starts mit gültiger Rasse und Ausrüstung', sandbox(() => {
+    const K = 'rotfall.starts.__probe'; localStorage.removeItem(K); const real0 = localStorage.getItem('rotfall.starts');
+    try { for (const f of Object.keys(FAC_STARTS)) S.ranks[f] = -1; S.ranks.order = topRank('order'); S.ranks.valen = 2;
+      const earned = startsEarned(), e1 = earned.includes('order') && !earned.includes('valen');
+      const w = unlockStart('order', { hero: 'P' }, K) && !unlockStart('order', {}, K) && !!startUnlocks(K).order;
+      const none = startUnlockCheck().length === 0 && localStorage.getItem('rotfall.starts') === real0;
+      const all = Object.keys(FAC_STARTS).length === 10 && Object.keys(FAC_STARTS).every(f => FACTIONS[f]?.ranks && RACES[FAC_STARTS[f].race] && FAC_STARTS[f].gear.every(g => !!ITEMS[g]));
+      return e1 && w && none && all; } finally { localStorage.removeItem(K); } }));
+  ok('Fraktions-Starts (b): Rasse gibt Werte und Aussehen (Skelett, Goblin, Zwerg); Untote essen nicht; Mensch ohne Boni', sandbox(() => {
+    const p = stage(), a0 = { ...p.attributes }; applyRace(p, 'skelett'); const H = SP.humanSpec(p);
+    const sk = p.undead && p.attributes.endurance === a0.endurance + 1 && H.sp === 'skeleton' && H.face === 'skull' && !eatsFood(p) && raceOf(p) === 'skelett';
+    const g = actor(320, 300, {}), s0 = g.attributes.strength; applyRace(g, 'goblin'); const gb = SP.humanSpec(g).sp === 'goblin' && g.attributes.strength === s0 - 1;
+    const d = actor(340, 300, { build: 'gedrungen' }); applyRace(d, 'zwerg'); const dw = SP.humanSpec(d).beard >= 1 && d.skills.smithing >= 5 && raceOf(d) === 'zwerg';
+    const h = actor(360, 300, {}), h0 = JSON.stringify(h.attributes); applyRace(h, 'mensch'); const hum = eatsFood(h) && JSON.stringify(h.attributes) === h0;
+    return sk && gb && dw && hum; }));
+  ok('Fraktions-Starts (b): Startpaket — Mitglied, Folgen wie beim Beitritt, Haus mit fertiger Hütte; Grubenstamm-Start: Goblins friedlich, sonst Feinde', sandbox(() => {
+    const p = stage(), st0 = S.settlement, sf0 = S.startFac;
+    try { S.settlement = null; S.factions.undead = -100; S.factions.order = 0; S.factions.valen = 0; S.ranks.undead = -1;
+      facStartSetup('undead', p);
+      const mem = S.ranks.undead === 0 && S.factions.undead >= 20 && S.factions.order === -30 && S.factions.valen === -20 && S.startFac === 'undead';
+      const st = S.settlement, house = !!st && st.map === '__a' && st.buildings.some(b => b.type === 'hut' && b.built >= 1) && st.buildings.some(b => b.type === 'campfire');
+      if (st) S.ents.__a = S.ents.__a.filter(e => !st.buildings.includes(e));
+      S.settlement = null; S.ranks.goblin = -1; S.flags.goblinsFreed = false; S.ranks.chain = -1; S.startFac = 'goblin'; S.factions.goblin = 20; autoRanks();
+      const gob = spawnEnemy('goblin', '__a', 12, 12), peace = S.ranks.goblin >= 0 && teamOf(gob) === 'neutral';
+      S.startFac = null; autoRanks(); const war = teamOf(gob) === 'foe';
+      return mem && house && peace && war; } finally { S.settlement = st0; S.startFac = sf0; if (sf0 === undefined) delete S.startFac; } }));
+  ok('Fraktions-Starts (c): Wache wirbt ab Ansehen 40 an — Gefährte zu Söldnerbedingungen, Lagerwache der Fraktion; darunter nur ein Hinweis', sandbox(() => {
+    const p = stage(), st0 = S.settlement; p.level = 5;
+    try { S.settlement = null; const g = actor(330, 300, { faction: 'order', prof: 'Ordenswache' }); g.guard = true;
+      S.factions.order = 20; let ch = []; facRecruitChoices(g, ch); const low = ch.length === 1 && /mit mir ziehen/.test(ch[0].text);
+      S.factions.order = 45; ch = []; facRecruitChoices(g, ch); const offer = ch.find(c => /anwerben/.test(c.text));
+      S.gold = 1000; p.partyCap = 5; offer.fn(); UI.closeDialogue(); const m = partyMembers().find(e => e.facRecruit === 'order');
+      const hired = !!m && m.faction === 'order' && m.merc?.wage === 8 && S.gold === 1000 - 110;
+      S.settlement = { name: 'Probeheim', x: 300, y: 300, map: '__a', buildings: [], morale: 60, history: [] };
+      ch = []; facRecruitChoices(g, ch); ch.find(c => /Wache von/.test(c.text))?.fn(); UI.closeDialogue(); const queued = S.settlement.facGuards?.[0] === 'order';
+      campGuardDay(S.settlement); const cg = S.ents.__a.find(e => e.campGuard && e.faction === 'order');
+      return low && hired && queued && !!cg; } finally { S.settlement = st0; UI.closeDialogue(); } }));
+  ok('Fraktions-Starts (d): Skelett ohne Kapuze wird erkannt (Valen: Kopfgeld 60, Orden verweigert), mit Kapuze nicht; Tote überfallen das Haus eines Totenmitglieds nicht', sandbox(() => {
+    const p = stage(); applyRace(p, 'skelett'); p.equip.head = null; p.equip.cloak = null; S.bounty = {};
+    const w = actor(340, 300, { faction: 'valen', prof: 'Torwache' }); w.guard = true; const o = actor(300, 340, { faction: 'order', name: 'Bruder' });
+    const seen = stigmaOf(w)?.report === 'guard' && stigmaOf(o)?.deny === true && !stigmaOf(w, 'vampire');
+    const n = boneSeen(p), rep = n >= 1 && (S.bounty.valen || 0) === 60 && p.stigma?.skeleton?.valen === (S.day | 0);
+    p.stigma = {}; p.boneRep = {}; p.equip.head = mkItem('kuttenkapuze'); const hidden = !stigmaOf(w) && boneSeen(p) === 0;
+    S.ranks.undead = 0; const raid = !raidSources({ x: 487 * TS, y: 443 * TS, map: 'world' }).some(x => x.src === 'undead');
+    return seen && rep && hidden && raid; }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -22303,6 +22529,21 @@ function buildCreation() {
   if (sb) { sb.innerHTML = ''; const showS = () => { $('cr-start-desc').textContent = START_AT[startAt].desc; };
     for (const [k, D] of Object.entries(START_AT)) { const b = el2('button', 'build' + (k === startAt ? ' sel' : ''), D.name); b.onclick = () => { startAt = k; [...sb.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showS(); }; sb.appendChild(b); }
     showS(); }
+  /* Fraktions-Starts (a): freigeschaltet über alle Spielstände (rotfall.starts); gesperrte Knöpfe sagen, wie man sie freischaltet */
+  let facStart = ''; const fb = $('cr-fac');
+  const facRow = () => { if (!fb) return; fb.innerHTML = ''; const U = startUnlocks(); if (facStart && !U[facStart] && !creation.forceFac) facStart = '';
+    const showF = () => { const FS = FAC_STARTS[facStart], RC = FS && RACES[FS.race];
+      $('cr-fac-desc').innerHTML = !FS ? 'Freier Start: Startort und Herkunft wie gewählt. Erreichst du den höchsten Rang einer Fraktion, kannst du künftig dort beginnen — in allen Spielständen.'
+        : `<b>${FACTIONS[facStart].name}</b> · ${RC.name}<br>${FS.desc}<br>Mitglied ab Start, eigenes Haus. ${RC.rule}`;
+      if (sb) { sb.style.opacity = FS ? 0.35 : 1; sb.style.pointerEvents = FS ? 'none' : ''; } renderOrigin(); };
+    const mk = (k, label, lock) => { const b = el2('button', 'build' + (k === facStart ? ' sel' : '') + (lock ? ' locked' : ''), label);
+      if (lock) { b.title = lock; b.onclick = () => { $('cr-fac-desc').textContent = lock; }; }
+      else b.onclick = () => { facStart = k; [...fb.children].forEach(x => x.classList.remove('sel')); b.classList.add('sel'); showF(); };
+      fb.appendChild(b); };
+    mk('', 'Frei');
+    for (const k of Object.keys(FAC_STARTS)) { const F = FACTIONS[k]; mk(k, F.name.replace(/^(Das Hochreich|Das|Die|Der) /, ''), U[k] || creation.forceFac ? null : `Gesperrt. Erreiche den höchsten Rang bei ${F.name} („${F.ranks[F.ranks.length - 1]}“) — dann steht dieser Start in allen Spielständen offen.`); }
+    showF(); };
+  creation.facRow = facRow;
   const ob = $('cr-origins'); ob.innerHTML = '';
   for (const [k, o] of Object.entries(ORIGINS)) {
     const b = el2('button', 'origin' + (k === origin ? ' sel' : ''), `${o.name}<small>${Object.keys(o.skills).slice(0, 2).map(s => SKILL_NAMES[s] || s).join(', ')}</small>`);
@@ -22310,13 +22551,14 @@ function buildCreation() {
     ob.appendChild(b);
   }
   function renderOrigin() {
-    const o = ORIGINS[origin];
+    const o = ORIGINS[origin], FS = FAC_STARTS[facStart], ra = (FS && RACES[FS.race].attrs) || {};   /* Fraktions-Starts: Rasse und Startpaket in der Vorschau */
     $('cr-origin-desc').textContent = o.desc;
-    const base = baseAttrs();
+    const base = baseAttrs(), sgn = v => `<span style="color:${v > 0 ? '#89a05a' : '#b0604a'}">${v > 0 ? '+' : ''}${v}</span>`;
     $('cr-attrs').innerHTML = Object.entries({ strength:'Stärke', agility:'Beweglichkeit', endurance:'Ausdauer',
       intelligence:'Intelligenz', perception:'Wahrnehmung', willpower:'Willenskraft' })
-      .map(([k, n]) => `<div class="attr-row"><span>${n}</span><b>${base[k] + (o.attrs[k] || 0)}${o.attrs[k] ? ` <span style="color:#89a05a">+${o.attrs[k]}</span>` : ''}</b></div>`).join('');
-    $('cr-start-gear').innerHTML = `<b>Ausrüstung</b><br>${o.gear.map(g => ITEMS[g].name).join('<br>')}<br><br><b>Gold</b> ${o.gold}`;
+      .map(([k, n]) => `<div class="attr-row"><span>${n}</span><b>${base[k] + (o.attrs[k] || 0) + (ra[k] || 0)}${o.attrs[k] ? ' ' + sgn(o.attrs[k]) : ''}${ra[k] ? ' ' + sgn(ra[k]) : ''}</b></div>`).join('');
+    $('cr-start-gear').innerHTML = `<b>Ausrüstung</b><br>${(FS ? FS.gear : o.gear).map(g => ITEMS[g].name).join('<br>')}<br><br><b>Gold</b> ${o.gold + (FS?.gold || 0)}` +
+      (FS ? `<br><br><b>Rasse ${RACES[FS.race].name}</b><br>${Object.entries(RACES[FS.race].skills || {}).map(([k, v]) => `${SKILL_NAMES[k] || k} +${v}`).join(', ') || '—'}` : '');
     drawPreview();
   }
   function drawPreview() {
@@ -22327,20 +22569,23 @@ function buildCreation() {
     g.addColorStop(0, 'rgba(120,95,60,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g; c.fillRect(0, 0, cv.width, cv.height);
     c.save(); c.translate(80, 200); c.scale(3.4, 3.4);
-    const eq = {};                                                    // Vorschau trägt die Startausrüstung der Herkunft
-    for (const k of ORIGINS[origin].gear) { const sl = ITEMS[k].slot; if (['weapon', 'offhand', 'head', 'chest', 'cloak'].includes(sl) && !eq[sl]) eq[sl] = { key: k }; }
+    const eq = {}, FS = FAC_STARTS[facStart], RC = FS && RACES[FS.race];   // Vorschau trägt die Startausrüstung der Herkunft (Fraktions-Start: die des Starts, mit Rasse)
+    for (const k of (FS ? FS.gear : ORIGINS[origin].gear)) { const sl = ITEMS[k].slot; if (['weapon', 'offhand', 'head', 'chest', 'cloak'].includes(sl) && !eq[sl]) eq[sl] = { key: k }; }
     if (!eq.weapon) eq.weapon = { key: 'rusty_sword' };
-    R.drawHumanoid({ kind:'player', x:0, y:0, pal, facing:0, seed:1, build, equip: eq, aim: Math.PI / 2 - 0.35 }, performance.now(), c);   // Phase 1: 3/4-Ansicht von vorn (vorher 0.5 = Seitenprofil)
+    const pv = { ...pal, ...(FS ? { cloth: FS.cloth } : {}), ...(RC?.look?.skin ? { skin: RC.look.skin } : {}), ...(RC?.look?.hair ? { hair: RC.look.hair } : {}), ...(RC?.undead ? { glow: RC.look.glow } : {}) };
+    const fig = { kind:'player', x:0, y:0, pal: pv, facing:0, seed:1, build: RC?.look?.build || build, equip: eq, aim: Math.PI / 2 - 0.35, race: FS ? FS.race : null, undead: !!RC?.undead };
+    if (FS?.race === 'goblin') c.scale(0.82, 0.82);
+    R.drawHumanoid(fig, performance.now(), c);   // Phase 1: 3/4-Ansicht von vorn (vorher 0.5 = Seitenprofil)
     c.restore();
   }
-  renderOrigin(); renderBuild();
+  renderOrigin(); renderBuild(); facRow();
   setInterval(() => { if ($('creation') && !$('creation').classList.contains('hidden')) drawPreview(); }, 200);   /* RB-056 */
   $('cr-begin').onclick = () => {
     const name = ($('cr-name').value || 'Namenlos').slice(0, 18);
     const house = ($('cr-house').value || name).slice(0, 18);
     if (creation.hook) { const h = creation.hook; creation.hook = creation.back = null; $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); return h({ name, house, origin, pal: { ...pal }, build }); }   /* Koop: der Gast erstellt seinen eigenen Charakter */
     bindInput();
-    newGame({ name, house, origin, pal, build, difficulty: diff, start: startAt });
+    newGame({ name, house, origin, pal, build, difficulty: diff, start: startAt, facStart: facStart || null });
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); const b = creation.back; creation.hook = creation.back = null; b?.(); };
 }
@@ -22354,7 +22599,7 @@ function coopHold(c) {
 // Koop: Charaktererstellung für einen Gast öffnen. done(cfg) bekommt Name, Herkunft, Aussehen, Körperbau; back() beim Zurück.
 const creation = { hook: null, back: null };
 const GUEST_BAR = ['bandage', 'potion', 'herb', 'bread', 'dried_meat'];   /* Koop: Leiste der Gastfigur (nur Verbrauchsgüter; Fähigkeiten löst nur der Held aus) */
-function openCreation(done, back, name) { creation.hook = done; creation.back = back; if (name) $('cr-name').value = name; $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
+function openCreation(done, back, name) { creation.hook = done; creation.back = back; if (name) $('cr-name').value = name; $('cr-fac-wrap')?.classList.add('hidden'); $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }   /* Fraktions-Starts: Koop-Gäste beginnen frei (Mensch) */
 // Koop: der eigene Charakter eines Gasts. Gebaut wie der Held in newGame (Herkunft: Werte, Fertigkeiten, Ausrüstung, Gold als Beutel),
 // aber als Gruppenmitglied. Er fängt zwei Stufen unter dem Helden an, damit er mithalten kann. coopOwner = Name des Gasts.
 function makeGuestHero(cfg, owner) {
@@ -22449,7 +22694,7 @@ function boot() {
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
-    mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    spellLearnView, learnFrom, mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil
@@ -22477,7 +22722,7 @@ function boot() {
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
       else if (act === 'coop') { import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
-      else if (act === 'new') { setSlot(newSlot('single'));   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
+      else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
       else if (act === 'settings') { UI.openModal('settings'); }
