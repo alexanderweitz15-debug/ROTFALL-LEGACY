@@ -1740,7 +1740,7 @@ export const WAR_NODES = {
   // Südost-Front: das Totenreich gegen Ostmark und Mittelland
   blackkeep: { owner:'undead', garrison:40 }, necropolis: { owner:'undead', garrison:22 },
   altvharn: { owner:'undead', garrison:16 }, sonnwacht: { owner:'order', garrison:20 },
-  kreuzweg: { owner:null, garrison:0 }, ashford: { owner:'valen', garrison:8 },
+  kreuzweg: { owner:null, garrison:0 }, ashford: { owner:'merch', garrison:8 },   /* Entwickler 03.10.: Aschfurt gehört den Händlern */
   saltport: { owner:'valen', garrison:14 }, oldbridge: { owner:null, garrison:0 },
   varonheim: { owner:'valen', garrison:60, walls:100 },   /* Varonheim-Belagerung (Nutzer 01.10.2026): Hauptstadt mit Mauern */
 };

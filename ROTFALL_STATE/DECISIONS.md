@@ -231,3 +231,23 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - Prüfwerte der Klassen bleiben vorläufig; der Entwickler testet.
   - **Kampfanimation:** eine Mischung der Packs nach Spielfortschritt — frühe Waffen Grounded (A), Midgame Heroic (B), Endgame-Waffen flashy (C).
 - **Lebensbalken (03.10.):** Der Balken zeigt den Rumpf: leer heißt tot bzw. am Boden. hp/maxHp (Kopf + Rumpf) bleiben für Heilung, KI und Balance.
+- **Ist-Zustand-Fragen (03.10.):**
+  - Tributdörfer (Grauwasser, Hohlstein, Eisenried) gehören nach Vargs Fall den **Freien**. Hilfe dort zählt schon vor dem Fall für Dorf und Freie, nicht für die Kette.
+  - Waffe nach Kerkerausbruch bzw. Flucht aus der Schuldknechtschaft: liegt in der **Asservatenkammer**, zurückholbar (Truhe in der Wache, Diebstahl oder Buße).
+  - Verbrechen an Leuten ohne Fraktion: Kopfgeld bei der **Macht, die den Ort beherrscht**; in der Wildnis ohne Zeugen keins.
+  - Kriegsgraph: Befreite bzw. eroberte Städte gehen an ihre Macht zurück (Sonnwacht an den Orden, Kreuzweg und Aschfurt an die Händler), auch am Start.
+  - Feldschlachten und Befreiungen geben Ruf bei der befreiten Macht (nur, wenn man mitkämpft).
+  - Aufträge ohne Fraktionsruf (Todesritter, Quirin, Lioba, Varons Auftrag 1) geben kleinen Ruf bei der Macht des Gebers. Klassenprüfungen bleiben ohne Ruf.
+  - Seevolk-Ränge werden über Ruf vergeben (wie bei anderen Mächten).
+  - 7 Gegenstände ohne Quelle bekommen eine; der Lead verteilt sie passend.
+  - Die 4 legendären Sets gibt es zusätzlich als Lohn am Ende der jeweiligen Rangreihe (höchster Rang).
+  - Lieferaufträge geben Ruf bei der Macht der Zielstadt.
+  - Das Lager ist nur in der Siedlung bzw. im eigenen Haus nutzbar.
+  - Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge werden eigene Fraktionen mit Ruf und Brett-Aufträgen.
+  - Der Tickmar-Arbeiterrat gibt Ruf bei den Freien.
+  - Varonheim wird volle Hauptstadt: Kutsche, Schankpersonal, Söldner, volles Brett, ohne die Weltform zu ändern.
+  - Die Siedlungsschmiede bekommt die Esse (Handwerks-Fenster).
+  - Schurken-Prüfung zurück auf Meuchelstich; der Lehrer leiht ihn für die Prüfung (wie das Kriegslied beim Barden).
+  - Jagd: wächst beim Erlegen von Tieren; mehr Felle und Fleisch; Tiere bemerken dich später.
+  - Schleichmodus bauen: eine Taste, langsamer, schwerer zu sehen; Schleichen wächst dabei; Hinterhalt-Bonus.
+  - Boss-Beute: jeder Boss lässt garantiert genau eines seiner Stücke fallen (nie doppelt). Graumähne und Karrak bekommen eigene Stücke.

@@ -406,11 +406,11 @@ function ordersDay() {
     }
   }
 }
-export function deliver(o, have, take) {
+export function deliver(o, have, take, fac = 'merch') {
   if (have < o.n) return `Du brauchst ${o.n} ${ITEMS[o.good].name} (du hast ${have}).`;
   take(o.good, o.n); S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
   S.eco.orders.splice(S.eco.orders.indexOf(o), 1);
-  S.factions.merch = clamp((S.factions.merch || 0) + 2, -100, 100);
+  if (S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 2, -100, 100);   /* Entwickler 03.10.: Ruf bei der Macht der Zielstadt (vorher immer Händlergilde) */
   log(`Lieferung nach ${townName(o.town)}: ${o.n} ${ITEMS[o.good].name}, ${o.reward} Gold.`, 'economy'); return null;
 }
 

@@ -639,7 +639,9 @@ function helpedVillager(t, p) {
 }
 // Verbände herstellen: aus Stoff, nicht aus dem Nichts
 const BANDAGE_FROM = { cloth: 3, cloth_shirt: 2 };
-function takeFromStash(i) { const s = S.stash[i]; if (!s) return; if (giveItem(S.player, s)) S.stash.splice(i, 1); }   // AUDIT H-04: das Exemplar selbst (Rarität, Affixe, Zustand), nicht ein neues
+/* Entwickler 03.10.2026: Das Lager liegt in deiner Siedlung — nutzbar nur dort (bis 500 px um ihre Mitte, auf ihrer Karte). Ohne Siedlung kein Lager. */
+const stashHere = () => { const p = S.player, T = S.settlement; return !!T && p?.map === (T.map || 'world') && Math.hypot(p.x - T.x, p.y - T.y) < 500; };
+function takeFromStash(i) { const s = S.stash[i]; if (!s) return; if (!stashHere()) return UI.toast('Das Lager liegt in deiner Siedlung.'); if (giveItem(S.player, s)) S.stash.splice(i, 1); }   // AUDIT H-04: das Exemplar selbst (Rarität, Affixe, Zustand), nicht ein neues
 function craftBandage(idx) {
   const p = S.player, slot = p.inv[idx]; if (!slot || !BANDAGE_FROM[slot.key]) return;
   const n = BANDAGE_FROM[slot.key], name = ITEMS[slot.key].name;
@@ -4151,8 +4153,8 @@ function bloodshed(victim, wasFoe) {
   const fac = crimeFaction(victim), rank = HIGH_RANK[victim.prof] || HIGH_RANK[victim.key];
   // S12 (Nutzer: „mehr Ruf-Verlust, krassere Konsequenzen für Mord an Adel oder Priester“): jeder Mord kostet Ruf — Gerüchte auch ohne Zeugen
   const loss = rank ? (seen ? 35 : 18) : (seen ? 10 : 3);
-  S.factions[fac] -= loss; if (rank === 'klerus' && fac !== 'order') S.factions.order -= seen ? 30 : 15;
-  log(`Ruf bei ${FACTIONS[fac]?.name || fac} −${loss}${rank === 'klerus' && fac !== 'order' ? ', beim Orden ebenso' : ''}.`, 'faction');
+  if (fac) S.factions[fac] = clamp(S.factions[fac] - loss, -100, 100); if (rank === 'klerus' && fac !== 'order') S.factions.order = clamp(S.factions.order - (seen ? 30 : 15), -100, 100);   /* Wildnis ohne Herrn: kein Ruf (03.10.) */
+  if (fac) log(`Ruf bei ${FACTIONS[fac]?.name || fac} −${loss}${rank === 'klerus' && fac !== 'order' ? ', beim Orden ebenso' : ''}.`, 'faction');
   if (seen) addBounty(fac, rank ? 800 : 250, rank === 'adel' ? 'Mord am Adel' : rank === 'klerus' ? 'Mord an einem Geweihten' : 'Mord');
   if (rank) murderOfRank(victim, fac, rank, seen);
   for (const m of partyMembers()) {
@@ -4232,8 +4234,9 @@ function dropLoot(e) {
   const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }), e);   /* P5: Bogen vom Körper */
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
     if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p) * diffOf().loot)) drop(key); }   // S15 P12
-  if (BP) { if (BP.weapons.length && chance(0.9)) drop(pick(BP.weapons)); if (BP.armor.length && chance(0.6)) drop(pick(BP.armor));
-    if (BP.unique.length && chance(0.25)) drop(pick(BP.unique)); }
+  if (BP) {   /* Entwickler 03.10.2026: jeder Boss lässt garantiert GENAU EINES seiner Stücke fallen (Unikat zu 25 %, sonst Waffe/Rüstung) — nie doppelt, nie leer */
+    const rest = [...BP.weapons, ...BP.armor].filter(k => !BP.unique.includes(k));
+    const k = BP.unique.length && (!rest.length || chance(0.25)) ? pick(BP.unique) : rest.length ? pick(rest) : null; if (k) drop(k); }
   if (chance(0.5)) { const g = ri(1, 6) + e.level; S.gold += g; float(e, `+${g} Gold`, 'rgba(189,148,51,ALPHA)'); }
 }
 function dropItemAt(map, x, y, item, from = null) {
@@ -5827,9 +5830,14 @@ function rebuildTick() {                                              // je Tag:
 // §44 Verbrechen & Kopfgeld: bezeugter Angriff +25, bezeugter Mord +75 Gold bei der Fraktion des Opfers; je Tag −5.
 // Eine Wache, die einen Gesuchten sieht, stellt ihn: zahlen, Kerker (ein Tag, ein Zehntel des Goldes) oder Widerstand.
 // Ab 150 Gold Gesamt-Kopfgeld jagen Kopfgeldjäger den Spieler draußen (§72: skalierend nach Spieler-Stufe, gedeckelt).
-const crimeFaction = c => (c.faction && S.factions[c.faction] != null ? c.faction : c.homeTown && TOWN_PLAN[c.homeTown] ? townFac(c.homeTown) : 'valen');   // S15 Fehlersuche: Taten an Bewohnern zählen beim Herrn des Ortes
+/* Entwickler 03.10.2026: Kopfgeld bei der Macht, die den Ort beherrscht (Fraktion des Opfers, sonst sein Heimatort, sonst der Ort der Tat);
+   in der Wildnis, wo niemand herrscht: kein Kopfgeld (null). Vorher ging alles ohne Fraktion an Valen. */
+const crimeFaction = c => { if (c.faction && S.factions[c.faction] != null) return c.faction; if (c.homeTown && TOWN_PLAN[c.homeTown]) return townFac(c.homeTown);
+  if (c.map !== 'world') return 'valen';   /* Innenkarten und Kerker: wie bisher */
+  const t = townAt(c.x / TS | 0, c.y / TS | 0, 4); return t ? townFac(t) : null; };   // S15 Fehlersuche: Taten an Bewohnern zählen beim Herrn des Ortes
 const bountyTotal = () => Object.values(S.bounty || {}).reduce((n, v) => n + v, 0);
 function addBounty(fac, g, why) {
+  if (!fac || S.factions[fac] == null) return;   /* niemand herrscht hier — keine Macht, die ein Kopfgeld aussetzt */
   S.flags.crimeSeen = true;                                          // S15 Kodex: Kapitel Verbrechen
   S.bounty ||= {}; S.bounty[fac] = (S.bounty[fac] || 0) + g;
   log(`${why}: Kopfgeld bei ${FACTIONS[fac]?.name || fac} steigt auf ${S.bounty[fac]} Gold.`, 'faction');
@@ -7478,7 +7486,7 @@ const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meistersc
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
 /* Entwickler 02.10.2026: „3 Aufträge für die Eisenkette, kein Ansehen“ — die Eisenfeste steht nicht in TOWN_PLAN/GUARD_POSTS, ihr Ansehen ging an Valen.
    Orte der Kette (LOCATIONS faction 'chain') zählen jetzt für die Kette. Andere Fraktionsorte (Grubenhort, Karak-Atar …) bleiben bewusst unverändert: offene Entscheidung. */
-const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
+const townFac = town => S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.tribute ? 'frei' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen');   /* Folgen §5c: Aufträge der Freien */
 const conKinds = town => town === 'vharnholm' ? [] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
@@ -7600,7 +7608,7 @@ function failContract(C, why, rep = 0, talkAbout = false) {
   S.ents.world = S.ents.world.filter(e => e.contract !== C.id || e.kind === 'enemy');
   if (C.kind === 'deliver') removeItem(S.player, 'auftragspaket', 1);
   if (C.kind === 'royal' && S.flags.varonQ === 1) S.flags.varonQ = 0;   /* Behoben HB-08: Abbruch/Scheitern sonst für immer: der König bot den Auftrag nie wieder an */
-  const f = townFac(C.town); if (rep && S.factions[f] != null) S.factions[f] = clamp(S.factions[f] - rep, -100, 100);
+  const f = conFac(C); if (rep && S.factions[f] != null) S.factions[f] = clamp(S.factions[f] - rep, -100, 100);
   if (talkAbout) { (S.trust ||= {})[C.town] = (S.trust[C.town] || 0) - 1; chronicle(`${townName(C.town)}: ${why}`, 'news', `${S.player.name} hat den Auftrag „${C.title}“ nicht erfüllt.`); }
   log(`Auftrag gescheitert: ${C.title}. ${why}${rep ? ` ${FACTIONS[f]?.name || f} −${rep}.` : ''}`, 'quest');   /* Q9-1: statt Toast reißt der Brief (ui.js questWatch) */
 }
@@ -7675,7 +7683,7 @@ function claimContract(C, npc) {
   const share = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + share * 1.5);   // S14 (Nutzer): wer die Wachen kämpfen lässt, bekommt weniger
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
-  C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && townFac(C.town) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = townFac(C.town); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
+  C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && conFac(C) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = conFac(C); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
   if (npc?.kind === 'npc' && npc.alive !== false) gesture(npc, npc.guard || C.giver === 'vm' ? 'salutieren' : 'jubeln', 0, S.player);   /* Q7-3 */
@@ -7760,6 +7768,9 @@ const boardShut = town => { const lord = townFac(town);
   if (S.war?.nodes?.[town]?.owner === 'undead' || S.razed?.[town]) return 'Die Zettel sind abgerissen. Unter den Toten schreibt niemand Aushänge.';
   if (repTier(lord)?.price === null || (lord === 'order' && pactBound())) return 'Jemand hat deinen Namen auf einen Zettel geschrieben und durchgestrichen. Für dich hängt hier nichts.';
   return null; };
+/* Entwickler 03.10.2026: Tributdörfer (Grauwasser, Hohlstein, Eisenried) gehören sich selbst — Hilfe und Aufträge zählen für die Freien,
+   vor und nach Vargs Fall. Verträge eines Tributoffiziers sind Kettengeschäft (C.fac = 'chain'). conFac: Fraktion eines Vertrags. */
+const conFac = C => C.fac || (C.giver === 'rat' ? 'frei' : townFac(C.town));   /* Entwickler 03.10.: Aufträge des Tickmar-Arbeiterrats zählen für die Freien, nicht für die Fabrikherren */
 function boardMenu(town) { const shut = boardShut(town);   // S14 Mechanik-Check: das Brett folgt Besatzung und Ruf wie die Geber selbst
   const mine = (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active');   // S15 Fehlersuche: Erledigtes kann man trotzdem abgeben
   if (shut) return UI.dialogue({ name: `Anschlagbrett — ${townName(town)}` }, shut, [...mine.filter(c => c.have >= c.need).map(c => ({ text: `Abgeben: ${c.title}`, fn: () => { claimContract(c); boardMenu(town); } })), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
@@ -7805,7 +7816,7 @@ function questRew(k) {
 }
 const CON_ICO = { supply: 'res_wood', herbs: 'res_herb', deliver: 'log_economy', escort: 'bar_st', missing: 'nav_map', patrol: 'log_world', trail: 'bar_st', camps: 'nav_powers', rumor: 'log_quest', royal: 'set_level', comp: 'bar_hp', defense: 'log_combat' };   /* Schlüssel aus icons.js ICONS */
 function conRew(C) {
-  const f = townFac(C.town), work = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + work * 1.5);
+  const f = conFac(C), work = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + work * 1.5);
   return { gold: C.reward?.gold || 0, xp: C.reward?.xp || 0, rep: C.reward?.rep ? [[f, C.reward.rep]] : [], share: C.state === 'claimed' && !C.failed && C.kills && pay < 1 ? pay : null, work };
 }
 function questBrief(k) {
@@ -7873,7 +7884,7 @@ function conChoices(npc, choices) {
   if (!(C && C.state === 'active') && (!town || !kind || !TOWN_PLAN[town] || S.party.includes(npc.id) || boardShut(town))) return;   // S15 Fehlersuche: Abgeben geht immer, neue Arbeit nur, wo das Brett offen ist
   if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => { claimContract(C, npc); if (C.state === 'claimed') UI.dialogue(npc, '„Gute Arbeit. Hier, dein Lohn.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); return; }
   choices.unshift({ text: 'Hast du Arbeit für mich?', fn: () => {
-    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); } C.giverName = npc.name;
+    if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); } C.giverName = npc.name; if (npc.prof === 'Tributoffizier') C.fac = 'chain';
     UI.dialogue(npc, `„${C.desc}“\nLohn: ${C.reward.gold} Gold${CON_DAYS[C.kind] ? ` · Frist ${CON_DAYS[C.kind]} Tage` : ''}.`, [{ text: 'Ich mach das.', fn: () => { if (acceptContract(C) !== false) UI.closeDialogue(); } }, { text: 'Später.', fn: () => UI.closeDialogue() }], { brief: conBrief(C) }); } });
 }
 // S13 (Nutzer: „neue Quest-Variationen, Ketten, Konsequenzen“). Wendungen werden beim Anlegen gewürfelt und nicht verraten:
@@ -13585,6 +13596,8 @@ function turnIn(npc, k) {
   const r = Q.reward || {};
   if (r.gold) { S.gold += questGold(r.gold); log(`${r.gold} Gold erhalten.`, 'economy'); }
   if (r.xp) gainXp(S.player, r.xp);
+  if (!r.rep && !Q.clsTrial && npc?.kind === 'npc') { const f = npc.faction && S.factions[npc.faction] != null ? npc.faction : townFac(npc.homeTown || npc.post);   /* Entwickler 03.10.: Aufträge ohne eigenen Ruf geben kleinen Ruf bei der Macht des Gebers (wie Verträge, 4); Klassenprüfungen nicht */
+    if (f && S.factions[f] != null) { S.factions[f] = clamp(S.factions[f] + 4, -100, 100); log(`${FACTIONS[f]?.name || f}: +4 Ansehen.`, 'faction'); } }
   if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
   if (r.take) { const n = r.takeCount || 1, P = S.player;   /* B-1/B-5: aus Vorrat, Gepäck oder notfalls vom Leib */
@@ -14587,7 +14600,7 @@ function bizCollect(id, force = false) {
 function ordersMenu(npc, town) {
   const O = S.eco.orders, back = () => ordersMenu(npc, town);
   const opts = O.filter(o => o.town === town).map(o => ({ text: `Liefern: ${o.n} ${ITEMS[o.good].name} (${o.reward} Gold)`,
-    fn: () => { const r = ECO.deliver(o, goodsHave(o.good), (g, n) => removeItem(S.player, g, n)); if (r) UI.toast(r); UI.refreshHUD(); back(); } }));
+    fn: () => { const r = ECO.deliver(o, goodsHave(o.good), (g, n) => removeItem(S.player, g, n), townFac(o.town)); if (r) UI.toast(r); UI.refreshHUD(); back(); } }));   /* Entwickler 03.10.: Ruf bei der Macht der Zielstadt */
   opts.push({ text: 'Zurück', fn: () => ecoMenu(npc, town) });
   UI.dialogue({ name: 'Lieferaufträge' }, O.map(o => `${ECO.townName(o.town)} braucht ${o.n} ${ITEMS[o.good].name} bis Tag ${o.until}: ${o.reward} Gold`).join('\n') || 'Gerade fehlt nirgends etwas.', opts);
 }
@@ -18353,9 +18366,10 @@ export function selftest() {
     return !bad.length;
   }));
   ok('Audit S13 (H-01/02/04/06, P-05): Lager gibt das Exemplar zurück (Rarität, Affixe, Zustand); Schlaf stillt Blutung und Gift bei Held und Gruppe; Stapel bleiben unter der Grenze', sandbox(() => {
-    const st0 = S.stash; S.stash = [];
+    const st0 = S.stash, se0 = S.settlement; S.stash = [];
     try {
       const p = stage(); p.inv = []; const sw = mkItem('longsword'); Object.assign(sw, { rarity: 'legendary', affixes: ['keen'], cond: 0.63 }); S.stash.push(sw);
+      S.settlement = { ...(se0 || {}), map: '__a', x: p.x, y: p.y };   /* das Lager liegt in der Siedlung (03.10.) */ const far = (() => { const s = S.settlement; S.settlement = null; takeFromStash(0); const r = S.stash.length === 1; S.settlement = s; return r; })();
       takeFromStash(0); const back = p.inv[0] === sw && p.inv[0].rarity === 'legendary' && p.inv[0].cond === 0.63 && !S.stash.length;
       const m = actor(320, 300, { faction: 'valen' }); m.kind = 'npc'; S.party = [m.id];
       for (const c of [p, m]) c.status = [{ key: 'bleeding', name: 'Blutend', left: 60000 }, { key: 'poisoned', name: 'Vergiftet', left: 60000 }];
@@ -18363,8 +18377,8 @@ export function selftest() {
       const cured = [p, m].every(c => !(c.status || []).some(s => s.key === 'bleeding' || s.key === 'poisoned')) && m.body.larm.hp === m.body.larm.max;
       p.inv = []; addItem(p, 'bandage', 9); addItem(p, 'bandage', 5); const stacks = p.inv.filter(s => s.key === 'bandage');
       const capped = stacks.every(s => s.count <= ITEMS.bandage.stack) && stacks.reduce((n, s) => n + s.count, 0) === 14;
-      return back && cured && capped;
-    } finally { S.stash = st0; }
+      return back && cured && capped && far;
+    } finally { S.stash = st0; S.settlement = se0; }
   }));
   ok('Audit S13 (Nutzer: Hinterhalte nicht sichtbar erscheinen; Arbeitsplätze): Spawnpunkte werden aus dem Bild geschoben, Kopfgeldjäger kommen von außerhalb; Schmiede arbeiten in der Schmiede und verkaufen, Händler stehen hinter dem Stand', sandbox(() => {
     const p = S.player, keep = { x: p.x, y: p.y, map: S.map }, W0 = S.ents.world.slice();
@@ -22164,7 +22178,7 @@ function boot() {
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
-    toStash: i => { if (coopHooks.cmd) return UI.toast('Das Lager gehört dem Host.'); const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
+    stashHere, toStash: i => { if (coopHooks.cmd) return UI.toast('Das Lager gehört dem Host.'); if (!stashHere()) return UI.toast('Das Lager liegt in deiner Siedlung.'); const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); },
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },

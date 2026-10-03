@@ -1324,3 +1324,16 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Koop „jeder für sich“ (HB2-02/HB2-09 behoben):** Prüfungsaufträge und laufende Meisterprüfung gehören der Figur. Der Held führt seine im Auftragsbuch, eine Gastfigur ihre eigenen (an der Figur gespeichert); Held und Gast können gleichzeitig verschiedene oder dieselbe Prüfung ablegen, ohne einander zurückzusetzen. Puppen, Übungsfechter und Räuber einer Prüfung kämpfen nur gegen ihren Prüfling und zählen nur seine Treffer. Getötete Feinde zählen für die Prüfungsaufträge aller Mitspieler (wie sonst auch); Diebstahl, Schenkenspiele, Brauen, Steckbriefe und das Kriegslied zählen nur für die Figur, die es tut. Meldungen der Gastfigur tragen ihren Namen.
 - **Schurken-Prüfung, genauer:** Es zählen drei Stiche von hinten — Meuchelstich, Hieb aus dem Schattenschritt oder in den Rücken (die Puppen schauen den Prüfling an). So kann auch eine Koop-Gastfigur ohne Fähigkeiten bestehen.
 
+
+## Entscheidungen aus dem Ist-Zustand (03.10.)
+- **Tributdörfer:** Grauwasser, Hohlstein und Eisenried gehören sich selbst. Hilfe dort (Verbinden, Seuche, Brett-Aufträge) zählt für die **Freien**, vor und nach Vargs Fall. Aufträge des Tributoffiziers bleiben Kettengeschäft.
+- **Lieferaufträge** aus dem Kontor geben jetzt Ruf bei der Macht der **Zielstadt**, statt immer bei der Händlergilde.
+- **Tickmar-Arbeiterrat:** Seine Aufträge zählen für die **Freien**, nicht für Aurelion.
+- **Feste Aufträge ohne eigenen Ruf** (z. B. Quirin, Lioba, Todesritter, Varons erster Auftrag) geben jetzt +4 Ruf bei der Macht des Gebers. Klassenprüfungen geben keinen Ruf.
+- **Lager:** Das Lager liegt in deiner Siedlung (bis 500 Schritt um ihre Mitte). Woanders ist es im Inventar ausgegraut, Ein- und Auslagern geht dann nicht.
+- **Kopfgeld bei der Ortsmacht (03.10.):** Ein Verbrechen kostet Ruf und bringt Kopfgeld bei der Macht des Opfers. Hat das Opfer keine Fraktion, zählt sein Heimatort, sonst der Ort der Tat. In der Wildnis, wo niemand herrscht, gibt es kein Kopfgeld.
+- **Krieg (03.10.):**
+  - Zurückeroberte Städte gehen an ihre eigene Macht zurück: Sonnwacht an den Orden, Kreuzweg und Aschfurt an die Händler, Aurelions Städte ans Hochreich. Aschfurt gehört von Anfang an den Händlern.
+  - Wer bei einer gewonnenen Feldschlacht dabei ist, bekommt +5 Ruf bei der Macht des Ortes; wer eine Stadt befreit, +10 (vorläufige Werte).
+- **Boss-Beute (03.10.):** Jeder Boss lässt genau eines seiner Stücke fallen: mit 25 % sein Unikat, sonst eine seiner Waffen oder Rüstungen. Nie doppelt, nie gar nichts.
+- **Titelbild (03.10.):** Goldener Schriftzug, Leitsatz „Dein Charakter kann sterben. Deine Geschichte nicht.“, gravierte Tafeln mit Akzentleiste. „Fortsetzen“ ist hervorgehoben.
