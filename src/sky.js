@@ -77,12 +77,15 @@ export function skyUI(body, A, { refresh } = {}) {
   if (v.comp) zoomTo(v, 'companion');
   else { const cur = v.who.currentClass; if (cur && SKIES[cur] && skyList(v).includes(cur) && !S.flags?.skyOverview) zoomTo(v, cur); }
   v.onResize = () => resize(v); addEventListener('resize', v.onResize);
-  v.onKey = e => { if (!v.cv.isConnected) return stop(); const k = e.key;
+  v.onKey = e => { if (gone(v)) return stop(); const k = e.key;
     if (k === 'Escape' && (v.picked || v.focus)) { e.preventDefault(); e.stopImmediatePropagation(); if (v.picked) { v.picked = null; hideCard(v); } else back(v); }
     else if (k === '+' || k === '=') { zoomBy(v, 1.25); e.stopImmediatePropagation(); } else if (k === '-') { zoomBy(v, 0.8); e.stopImmediatePropagation(); } };
   addEventListener('keydown', v.onKey, true);
   requestAnimationFrame(t => draw(v, t));
 }
+/* HB2-07: closeModal versteckt das Fenster nur (Canvas bleibt im DOM) — „weg“ heißt auch: nicht mehr sichtbar. Sonst zeichnete der Himmel
+   unsichtbar weiter und schluckte das nächste Esc. */
+const gone = v => !v.cv.isConnected || !v.cv.offsetParent;
 function stop() { const v = V; if (!v) return; v.alive = false; removeEventListener('resize', v.onResize); removeEventListener('keydown', v.onKey, true); V = null; }
 
 // Zustand eines Sterns für die gewählte Figur
@@ -114,7 +117,7 @@ let seed = 7; const prng = () => (seed = (seed * 16807) % 2147483647) / 21474836
 const BG = Array.from({ length: 1100 }, () => ({ x: (prng() - 0.5) * 7000, y: (prng() - 0.5) * 5200, r: prng() * 1.3 + 0.2, a: prng() * 0.6 + 0.15, p: prng() * 6 }));
 
 function draw(v, now, once = false) {
-  if (!v.alive || !v.cv.isConnected) { if (V === v) stop(); return; }
+  if (!v.alive || gone(v)) { if (V === v) stop(); return; }
   const cx = v.cx, t = (now - v.t0) / 1000, motion = S.settings?.motion !== false, cam = v.cam;
   cam.x += (cam.tx - cam.x) * 0.14; cam.y += (cam.ty - cam.y) * 0.14; cam.z += (cam.tz - cam.z) * 0.14;
   cx.setTransform(v.DPR, 0, 0, v.DPR, 0, 0);

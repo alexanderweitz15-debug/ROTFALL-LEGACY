@@ -9,7 +9,7 @@ import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
 import { townState, townPrice } from './sim.js?v=24';
 import { GOODS } from './data.js?v=24';
 import { target as ecoTarget } from './economy.js?v=24';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q } from './body.js?v=24';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=24';
 import { sfx, ambience } from './sfx.js?v=24';
 import * as SKY from './sky.js?v=24';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
 import * as ATL from './atlas.js?v=24';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
@@ -126,7 +126,7 @@ export function refreshHUD() {
   const fr = topRank(p);
   hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
-  let html = bar('Leben', p.hp, p.maxHp, 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
+  let html = bar('Leben', ...barOf(p), 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
   if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp', p.level >= 60 ? ' · Höchststufe' : '');   // Balance-Runde: Höchststufe 60 (game.js MAX_LEVEL)
@@ -150,7 +150,7 @@ export function refreshHUD() {
     d.appendChild(cv);
     d.appendChild(el('div', '', `<div class="m-name">${m.name}</div>
       <div class="m-sub">St. ${m.level} ${CLASSES[m.currentClass].name} · Moral ${Math.round(m.morale)}${m.coopHero ? '' : ` · Loyalität ${Math.round(m.loyal ?? 50)}${m.friend ? ' ♥' : ''}`}</div>
-      <div class="m-bar"><div style="width:${clamp(m.hp / m.maxHp * 100, 0, 100)}%"></div></div>`));
+      <div class="m-bar"><div style="width:${clamp(barOf(m)[0] / barOf(m)[1] * 100, 0, 100)}%"></div></div>`));
     d.onclick = () => { A.select(m); };
     list.appendChild(d);
     drawPortraitTo(cv, m);
@@ -313,6 +313,7 @@ function beastsUI(body, npc) {
   $('bst-stable').onclick = () => openModal('stable', npc);
 }
 function stableUI(body, npc) {
+  if (!npc) { body.innerHTML = '<div class="ledger">Hier steht kein Stall.</div>'; return; }   /* HB2-11 */
   const offers = A.stableOffers(npc), cur = S.mount && A.mountStats(), credit = cur ? Math.round(A.horseValue(cur) * 0.4) : 0;
   const bar = (v, max, col) => `<div style="height:5px;background:#2a2418;margin:2px 0 6px"><div style="height:100%;width:${Math.min(100, v / max * 100)}%;background:${col}"></div></div>`;
   body.innerHTML = `<div class="ledger">${npc.name}: ${offers.length ? 'Das hier steht diese Woche im Stall.' : 'Diese Woche ist alles verkauft. Komm nächste Woche wieder.'} Dein Gold: ${S.gold}.${cur ? ` Dein ${cur.name} wird mit ${credit} Gold angerechnet.` : ''}</div>
@@ -463,7 +464,7 @@ export function renderContext(target) {
     const m = MONSTERS[target.mtype];
     box.innerHTML = `<div class="ctx-head">${target.title || (target.vname ? target.vname + ' ' : target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
       <div class="ctx-line"><span>Stufe</span><b>${target.level}</b></div>
-      ${bar('Leben', target.hp, target.maxHp, 'hp')}
+      ${bar('Leben', ...barOf(target), 'hp')}
       <div class="ctx-line"><span>Gefahr</span><b class="${m.threat >= 3 ? 'threat-high' : m.threat === 2 ? 'threat-med' : 'threat-low'}">${['','Gering','Mittel','Hoch','Tödlich'][m.threat]}</b></div>
       <div class="ctx-line"><span>Rüstung</span><b>${target.armor || 0}</b></div>
       <div class="ctx-line"><span>Fraktion</span><b>${FACTIONS[m.faction] ? FACTIONS[m.faction].name : 'Wild'}</b></div>`;

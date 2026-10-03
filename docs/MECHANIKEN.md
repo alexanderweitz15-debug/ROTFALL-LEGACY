@@ -1320,3 +1320,4 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - **Unten:** alle Aktionen als Knöpfe: instand setzen, aufrüsten, ersetzen, Auge.
 
   Aktionen mit Rückfrage öffnen weiter das Gespräch. Koop-Gäste nutzen das Gespräch.
+- **Lebensbalken = Rumpf (03.10.):** Alle Lebensanzeigen zeigen jetzt das Leben des Rumpfes: HUD, Gruppe, Ziel, Boss, Gegnerbalken und Koop. Ist der Balken leer, ist die Figur tot oder liegt am Boden. Vorher zeigten die Balken Kopf und Rumpf zusammen, deshalb starb ein Gegner schon bei „40 %“. Kopftreffer bleiben gefährlich (K.o.); die einzelnen Glieder zeigt die Körperanzeige im Charakterfenster.

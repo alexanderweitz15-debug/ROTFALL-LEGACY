@@ -2269,7 +2269,8 @@ function rescaleSave(fresh) {
    Wer ein neues Feld mit performance.now() speichert, trägt es hier ein (Probe „HB-02“ prüft die Liste gegen den Quelltext). */
 const PERF_KEYS = ['silenced', 'voidRage', 'darkPact', 'timeSlow', 'soulBound', 'exposed', 'cowed', 'shockImm', 'tended', 'cmdUntil', 'pathFail', 'tradeT', 'reactAt',
   'armWarn', 'castT', 'cellWarn', 'chopCd', 'comboT', 'coverOff', 'frenzyT', 'landT', 'lastCast', 'lastHit', 'lastHurt', 'lastShot', 'manaWarn', 'mistUntil', 'phased',
-  'poiseUntil', 'pressT', 'reloadUntil', 'revealed', 'riposteUntil', 'spent', 'lureCd', 'guardBroken', 'shadowNext', 'momT', 'lightT'];
+  'poiseUntil', 'pressT', 'reloadUntil', 'revealed', 'riposteUntil', 'spent', 'lureCd', 'guardBroken', 'shadowNext', 'momT', 'lightT',
+  'netFree', 'stabAt', 'thrallUntil'];   /* HB2-06: nachgetragen. drinkCd nur bei Gegnern (Blutschöpfer, performance.now) — beim Helden zählt die Spieluhr (Brunnen) */
 const stalePerf = o => { for (const k of PERF_KEYS) if (typeof o[k] === 'number' && o[k] > 0) o[k] = 0; };
 export function continueGame(given = null, retried = false) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
   if (!given && !retried && readRaw() == null && localStorage.getItem(SAVE_KEY)) return void unpackAll().then(() => continueGame(null, true));   /* RB-009: in einem anderen Tab gepackt */
@@ -2358,7 +2359,8 @@ export function continueGame(given = null, retried = false) {                   
     if (e.kind === 'prop') { delete e.act; delete e.hexed; delete e.rooted; continue; }
     if (e.kind === 'grave') { delete e.hidden; continue; }   /* Roadmap P8: im Tod gespeichert — Grab sofort sichtbar */   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
-    stalePerf(e); for (const v of Object.values(e)) if (v && typeof v === 'object' && !Array.isArray(v) && v.constructor === Object) stalePerf(v);   /* HB-02: alle performance.now-Felder, auch verschachtelte (vamp.frenzyT) */
+    stalePerf(e); for (const v of Object.values(e)) if (v && typeof v === 'object' && !Array.isArray(v) && v.constructor === Object) stalePerf(v);
+    if (e.giveUp) e.giveUp = null; if (e.kind === 'enemy' && e.drinkCd) e.drinkCd = 0; if (e.body) B.syncHp(e);   /* HB2-06: aufgegebene Jagd und Trink-Pause gelten nur in der Sitzung; HB2-03: Leben nach dem Laden neu aus dem Körper */   /* HB-02: alle performance.now-Felder, auch verschachtelte (vamp.frenzyT) */
     if (e.brawlKO) e.brawlKO = 1; if (e.talk?.until) e.talk = null;   // S15 Fehlersuche: performance.now-Werte gelten nach dem Laden nicht mehr   // S15 Fehlersuche: Bann, Pakt, Verlangsamung usw. überdauerten das Laden
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
     if (e.kind === 'enemy' && !e.body && HUMANOID.has(e.mtype)) { e.build = 'ausgewogen'; B.initBody(e, e.maxHp); }
@@ -3683,7 +3685,7 @@ const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally 
 let UNBLOCK = false, stamWarnAt = 0;
 const heavyHit = (e, t, mult) => { UNBLOCK = true; try { hit(e, t, mult); } finally { UNBLOCK = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
-  if (attacker === S.player && target !== S.player) { R.focus.last = target; R.focus.lastAt = performance.now(); }   /* Entwickler 02.10.: ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Balken */
+  /* Ersatz-Lebensbalken „zuletzt getroffen“: jetzt in hurt() gesetzt (HB2-04: auch Pfeile und Zauber) */   /* Entwickler 02.10.: ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Balken */
   if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;
   if (target.varonKing && !target.exile && attacker && (attacker === S.player || S.party.includes(attacker.id) || attacker.coopPilot)) keepAlarm(attacker, 'Angriff auf den König');   /* Entwickler 02.10.: Späher und Verstärkung */   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
   const w = attacker.equip && wpnOf(attacker), it = w ? ITEMS[w.key] : null, poised0 = target.poiseUntil > performance.now();   /* Control-Befund A1: vor hurt() lesen — hurt setzt selbst Standfestigkeit */
@@ -3790,6 +3792,7 @@ function atkImpact(c, target) {
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
+  if ((source === S.player || source === S.player?.id) && target !== S.player && target?.kind !== 'player') { R.focus.last = target; R.focus.lastAt = performance.now(); }   /* HB2-04: Nahkampf, Pfeil, Zauber */
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
   if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */
   if (S.dying && (target === S.player || S.party.includes(target.id))) return;   /* T10: im Todesmoment stirbt niemand von der Gruppe */
@@ -4262,7 +4265,8 @@ function questGold(n) {
 function gainXp(c, n) {
   if (!c || !c.alive) return;
   c.xp += (c === S.player && (c.status || []).some(s => s.key === 'rested') ? n * 1.1 : n) * (1 + elx(c, 'xp'));   // S15 P2: Trank der Lehre   // Session 13: ausgeschlafen
-  for (const m of partyMembers()) { m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held */
+  for (const m of partyMembers()) { if (m === c) continue; m.xp += n * (m.coopPilot ? 1 : 0.6); while (m.xp >= m.xpNext) levelUp(m); }   /* Koop (Nutzer): die Gastfigur bekommt dieselbe Erfahrung wie der Held; HB2-08: nie doppelt an sich selbst */
+  const H0 = S._hostHero; if (H0 && H0 !== c && H0.alive) { H0.xp += n; while (H0.xp >= H0.xpNext) levelUp(H0); }   /* HB2-08: gibt der Gast ab (runAs), bekommt der Held denselben Anteil */
   while (c.xp >= c.xpNext) levelUp(c);                     // viel Erfahrung auf einmal: mehrere Stufen (vorher nur eine, Rest hing über)
 }
 // Balance-Runde (Nutzer): Höchststufe 60 für Held und Gastfiguren. Klassen und Talente (Entwickler 02.10.2026, 22:10): ein
@@ -4322,7 +4326,7 @@ function dmgFloat(t, dmg, src, crit, kind, cause) {
   const color = `rgba(${crit && dk === 'physical' ? '212,175,55' : DMG_COL[dk]},ALPHA)`, n = Math.round(dmg);
   if (!src) { const o = S.floats.find(f => f.tid === t.id && f.dot && f.color === color && f.life > 300); if (o) { o.text = String(+o.text + n); o.life = Math.max(o.life, 700); return; } }
   S.floats.push({ x: t.x + Math.round(vrnd() * 12 - 6), y: t.y - 26, rise: 0, text: String(n), color, big: !!crit, life: 900, maxLife: 900, num: 1, tid: t.id, dot: !src,
-    mine: !!src && (src === S.player || (S.player && src.ownerId === S.player.id)), inc: t === S.player, srcId: src ? src.id : null });   /* Koop: srcId erlaubt dem Host, „mine“ je Gast-Held neu zu berechnen (eigener Schaden statt immer der des Hosts) */
+    mine: !!src && (src === S.player || (S.player && (src.ownerId === S.player.id || src.servant === S.player.id))),   /* HB2-12: auch Beschwörungen/Diener */ inc: t === S.player, srcId: src ? src.id : null });   /* Koop: srcId erlaubt dem Host, „mine“ je Gast-Held neu zu berechnen (eigener Schaden statt immer der des Hosts) */
 
 }
 /* Kampf-Feedback (VISUAL K4): Zustände sichtbar am Körper — Flammen steigen, Eiskristalle, Giftbläschen, Funken. Gedrosselt (~2–3 je Sekunde),
@@ -4419,6 +4423,7 @@ function updateEnemy(e, dt) {
   if (S.dying && S.dying.killer === e.id) { e.vx = e.vy = 0; e.swing = 0; e.telegraph = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x);   /* T10: der Mörder bleibt stehen und zeigt auf den Toten */
     if (!S.dying.shown) { S.dying.shown = true; gesture(e, 'zeigen', 1600, p); if (HUMANOID.has(e.mtype) && MONSTERS[e.mtype].faction !== 'undead') float(e, 'Bleib liegen.', 'rgba(220,200,180,ALPHA)'); else sfx(MONSTERS[e.mtype].faction === 'undead' ? 'rattle' : 'growl', 0.8, 1); } return; }
   const m = MONSTERS[e.mtype];
+  if (e.giveUp && e.giveUp.until <= performance.now()) e.giveUp = null;   /* HB2-05: nach der Pause darf er wieder jagen — und wieder aufgeben */
   if (e.aggroId && !e.giveUp && huntsHero(e.aggroId, S.party)) {   /* Entwickler 02.10. (Despawn-Fehlersuche): ein Verfolger des Helden/seiner Gruppe/eines Koop-Helden verschwindet nie nur durch Abstand — erst wenn die Spur zu weit ist, gibt er auf und kehrt zum Ausgangspunkt zurück (wie BUG-088 „kein Weg“). Gegner-gegen-Gegner-Jagd (Heere etc.) nutzt diese Leine nicht (Lead-Hinweis Leistung) */
     const ag0 = byId(e.aggroId);
     if (ag0 && ag0.alive && !ag0.downed && ag0.map === e.map && dist(e, ag0) > 1600) {
@@ -12529,7 +12534,9 @@ function dayTick() {
   const mem = partyMembers();
   { const want = Math.ceil((mem.length + 1) * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));
     for (const s of [...S.player.inv]) { if (S.res.food >= want) break; const F = s && ITEMS[s.key]?.food; if (!F || s.lock) continue;
-      while (S.res.food < want) { S.res.food += F; if ((s.count || 1) > 1) s.count--; else { S.player.inv.splice(S.player.inv.indexOf(s), 1); break; } } } }
+      const nm = ITEMS[s.key].name; let ate = 0;
+      while (S.res.food < want) { S.res.food += F; ate++; if ((s.count || 1) > 1) s.count--; else { S.player.inv.splice(S.player.inv.indexOf(s), 1); break; } }
+      if (ate && !S._quiet) log(`Proviant: ${ate}× ${nm} aus dem Gepäck gegessen.`, 'party'); } }   /* HB2-14: nicht mehr stumm */
   const need = Math.ceil((mem.length + 1) * (WX[S.weather === 'snow' ? 'snow' : '']?.food || (seasonOf() === 3 ? 1.25 : 1)));   /* Roadmap C.12: Schnee und Winter kosten mehr Nahrung */
   if (S.res.food >= need) { S.res.food -= need; for (const m of mem) m.morale = Math.min(100, m.morale + 2); }
   else {
@@ -13709,7 +13716,7 @@ function teachable(npc) {
 }
 const respecCost = () => 30 + 10 * (S.player.level || 1);
 function respec(npc) {
-  const p = S.player, n = Object.keys(p.tree || {}).length, cost = respecCost();
+  const p = S.player, n = talentSpent(p), cost = respecCost();   /* HB2-13: dieselbe Zählung wie das kostenlose Neuordnen (nur gültige Sterne) */
   UI.dialogue(npc, `„Alles, was du dir angewöhnt hast, legen wir ab. Das dauert und kostet. ${n} Talente, ${cost} Gold.“`, [
     { text: `Talente vergessen (${cost} Gold)`, fn: () => {
       if (S.gold < cost) { UI.closeDialogue(); return UI.toast('Zu wenig Gold'); }

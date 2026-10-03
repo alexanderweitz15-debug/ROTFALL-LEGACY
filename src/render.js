@@ -261,11 +261,12 @@ function drawEmote(e, now) {
   E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(sx + x * px, sy + y * px, px, px); });
   ctx.globalAlpha = 1;
 }
+const barK = e => e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1);   /* HB2-01: Balken = Rumpf */
 function drawBossBar() {
   const p = S.player; if (!p) return;
   const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */
   if (!b) return;
-  const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(b.hp / b.maxHp, 0, 1);
+  const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(barK(b), 0, 1);
   ctx.fillStyle = '#0c0a08'; ctx.fillRect(x - 3, y - 3, w + 6, 16);
   ctx.fillStyle = '#2a1512'; ctx.fillRect(x, y, w, 10);
   ctx.fillStyle = '#8c2a22'; ctx.fillRect(x, y, Math.round(w * k), 10);
@@ -1053,7 +1054,7 @@ function drawCaravan(e, now) {
   if (q.y <= e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);   // weiter hinten im Bild zuerst
   drawWagon(e.x, e.y, f, now, moving, true, e);
   if (q.y > e.y) drawWagon(q.x, q.y, fb, now, moving, false, e);
-  if (e.hp < e.maxHp) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, e.hp / e.maxHp), 4); }
+  if (barK(e) < 1) { ctx.fillStyle = '#100d0a'; ctx.fillRect(e.x - 18, e.y - 70, 36, 4); ctx.fillStyle = '#8c2a22'; ctx.fillRect(e.x - 18, e.y - 70, 36 * Math.max(0, barK(e)), 4); }
 }
 function drawDraft(x, y, f, now, moving, big, ph) {       // Ochse (big) oder Maultier, Seitenansicht
   if (SP.drawnOn()) {                                        // S14 Stil R: gezeichnete Zugtiere (Ochse, Maultier) mit Laufbild
@@ -3339,7 +3340,7 @@ export const barTarget = () => { const e = focus.sel || (focus.last && performan
    return !e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss ? null : e; };   /* Boss: eigene Leiste unten */
 function drawTargetBar() {
   const e = barTarget(); if (!e) return;
-  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(e.hp / e.maxHp, 0, 1);
+  const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(barK(e), 0, 1);
   ctx.fillStyle = 'rgba(10,8,6,.85)'; ctx.fillRect(x - 1, y - 1, 34, 6);
   ctx.fillStyle = '#3a1410'; ctx.fillRect(x, y, 32, 4);
   ctx.fillStyle = k > 0.5 ? '#9a2a20' : k > 0.25 ? '#b8461e' : '#d8641a'; ctx.fillRect(x, y, Math.round(32 * k), 4);

@@ -160,7 +160,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying', '_hostHero']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).

@@ -230,3 +230,4 @@ Getrennt von `DESIGN_DECISIONS.md` (nur Nutzer). Control darf diese Punkte jeder
   - HB-20: Witwe/Witwer bleibt im Haus (mit dem Erben nicht verheiratet); Bindungen des Toten enden.
   - Prüfwerte der Klassen bleiben vorläufig; der Entwickler testet.
   - **Kampfanimation:** eine Mischung der Packs nach Spielfortschritt — frühe Waffen Grounded (A), Midgame Heroic (B), Endgame-Waffen flashy (C).
+- **Lebensbalken (03.10.):** Der Balken zeigt den Rumpf: leer heißt tot bzw. am Boden. hp/maxHp (Kopf + Rumpf) bleiben für Heilung, KI und Balance.
