@@ -222,13 +222,13 @@ Das ist der Kern deines Wunsches („Mission für die Eisenfeste — und kein Ru
 | Grubenhort nach dem Aufstand | Sprecherin Ranna („Aufträge der Freien“, `game.js:12176`) | Die Freien | ja |
 | Grubenhort nach Vargs Fall (Goblindorf) | niemand (Grisk hat nur feste Aufträge) | — | keine Verträge |
 | Morrgrund | niemand (Dodon hat nur feste Aufträge `g_dod1–3`) | — | keine Verträge |
-| Karak-Atar | niemand | — | **Lücke:** keine Aufträge, kein Ruf, keine Fraktion „Sandfürsten“ |
-| Dünenwacht | niemand (nur Lagerort mit Gegnern) | — | **Lücke:** kein Inhalt |
+| Karak-Atar | Brett am Markt (seit 03.10.) | Wüstenbund | ja (A-34 behoben) |
+| Dünenwacht | Brett im Lager (seit 03.10.) | Wüstenbund | ja (A-34 behoben); offen: das Lager heißt noch „Zelt der Wüstenräuber“, Bewohner gibt es dort keine |
 | Vharnholm | absichtlich niemand (`conKinds` gibt eine leere Liste, `game.js:7474`) | — | gewollt |
 | Steinbruch | niemand | (wäre Kette) | — |
 | Grenzwacht | nur Oda (Rangaufträge Valen) | Valen | ja |
 | Tangkron (Gischtinseln) | nur Clan-Aufträge `q_salz1–3`, `q_klinge1–2` | Seevolk | ja |
-| Tiefhall (Zwerge) | niemand | — | Lücke: Zwerge haben keine Fraktion |
+| Tiefhall (Zwerge) | Brett in der großen Halle, erst als Freund der Halle (seit 03.10.) | Zwerge der Tiefhall | ja (A-34 behoben) |
 | Himmelsinsel | nur Rat, Gericht, `q_ratssitz` | Aurelion | ja |
 
 ### 2.3 Feste Aufträge (QUESTS) — Ruf je Auftrag
@@ -296,6 +296,8 @@ Alle festen Aufträge aus `data.js:1416` ff. mit Geber und Ruf-Lohn (`turnIn`, `
 | chain | Die Eiserne Kette | Treiber, Kettenknecht, Grenzreiter, Aufseher, Dunkler Hochpaladin | −20 |
 | sea | Das Seevolk | Landratte, Deckhand, Maat, Steuermann, Kapitän | 0 |
 | goblin | Die Grubenstämme | Fremder, Freund, Grubenbruder | −100 |
+| wuest | Der Wüstenbund (Karak-Atar, Dünenwacht; seit 03.10.) | Karawanengast, Karawanenwächter, Sandreiter (vorläufig) | 0 |
+| zwerge | Die Zwerge der Tiefhall (seit 03.10.) | Hallengast, Hallenbruder, Schildträger des Königs (vorläufig) | 0 |
 | frei | Die Freien vom Grubenhort | keine | 0 |
 | blut | Der Kelch | keine (Rangfolge über Titelgrade) | −40, gesetzt beim ersten Kult-Tick (`game.js:14864`) |
 
@@ -971,7 +973,7 @@ Nach Schwere sortiert. „Bekannt“ = steht schon in `OFFEN.md` oder `hunt/BERI
 | A-31 | q_pelts (Quirin, Händler) und q_hundred_song (Lioba, Händlerin) geben keinen Fraktionsruf. | `data.js:1619`, `data.js:1622` |
 | A-32 | Begegnungen „Hungernde Mutter“ / „Deserteur“ zählen überall für Valen/Orden. | `game.js:2974`, `game.js:2982–2984` |
 | A-33 | Arbeiterrat und Stadtverträge Aurelions geben nur „Aurelion“, nie Hausgunst. Entscheidung. | `game.js:12178`, `game.js:7670` |
-| A-34 | Karak-Atar, Dünenwacht, Zwerge: keine Fraktion, keine Aufträge. | `game.js:8863`, `world.js:560`, `game.js:9214` |
+| A-34 | ~~Karak-Atar, Dünenwacht, Zwerge: keine Fraktion, keine Aufträge.~~ **Behoben 03.10.:** Fraktionen „Der Wüstenbund“ (`wuest`) und „Die Zwerge der Tiefhall“ (`zwerge`) mit Ruf, Brett, Beitritt, Rängen und Kopfgeld (siehe 3.1, 2.2). | `data.js` FACTIONS, `game.js` FAC_CON / ensureNewFactions / ensureDesertBoards / buildDwarfCity |
 | A-35 | Kerkerwärter immer Valen; ein Kerker für alle Städte; Mo/Rask nur bei Haft in Salzhafen. | `game.js:8982`, `game.js:8986` |
 | A-36 | Befreite Menschen der Eisenfeste ziehen nach Sonnwacht statt nach Hause. | `game.js:11031` |
 | A-37 | Fehlende Debug-Einträge: Steuereintreiber, Missernte, Pilgerüberfall, 7 kleine Meldungen, Wolfswinter, Stadtfest, Kasimir; Banden/Goblins im Abschnitt „Bionik“. | `game.js:11640–11650`, `game.js:17011` |

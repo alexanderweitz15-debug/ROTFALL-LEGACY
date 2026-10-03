@@ -128,7 +128,7 @@ Legende: **[E]** = Entscheidung des Entwicklers nötig · **[B]** = bauen (entsc
 - [E] A-10: Verbrechen an Leuten ohne Fraktion geben überall Kopfgeld bei Valen.
 - [E] A-11: Hilfe in Tributdörfern stärkt die Kette, nicht das Dorf.
 - [E] A-26: Feldschlachten und Befreiungen geben keinen Ruf.
-- [E] A-34: Karak-Atar, Dünenwacht und die Zwerge haben keine Fraktion und keine Aufträge.
+- [x] A-34: Karak-Atar, Dünenwacht und die Zwerge haben keine Fraktion und keine Aufträge. — behoben 03.10. (Wüstenbund, Zwerge der Tiefhall)
 - [E] Aufträge ohne Fraktionsruf: Klassen-Reihen, Todesritter, Quirin, Lioba, Varons Auftrag 1.
 - [E] Tickmar-Arbeiterrat gibt Ruf bei Aurelion (den Fabrikherren).
 - [E] Seevolk-Ränge 2 und 4 sind unerreichbar.

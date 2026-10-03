@@ -1337,3 +1337,23 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
   - Wer bei einer gewonnenen Feldschlacht dabei ist, bekommt +5 Ruf bei der Macht des Ortes; wer eine Stadt befreit, +10 (vorläufige Werte).
 - **Boss-Beute (03.10.):** Jeder Boss lässt genau eines seiner Stücke fallen: mit 25 % sein Unikat, sonst eine seiner Waffen oder Rüstungen. Nie doppelt, nie gar nichts.
 - **Titelbild (03.10.):** Goldener Schriftzug, Leitsatz „Dein Charakter kann sterben. Deine Geschichte nicht.“, gravierte Tafeln mit Akzentleiste. „Fortsetzen“ ist hervorgehoben.
+- **Seevolk-Ränge (03.10.):** Landratte ab Ruf 10 beim Seevolk. Deckhand bekommst du mit der Wahl einer Seite (Salzbund oder Sturmklinge), Maat ab Ruf 50 nach der Seitenwahl. Steuermann gibt es wie bisher über die Aufträge, Kapitän ab Ruf 100.
+- **Schurken-Prüfung (03.10.):** Es zählen nur Meuchelstiche. Der Lehrer leiht dir den Meuchelstich für die Prüfung, er liegt dann auf deiner Leiste.
+- **Siedlungsschmiede (03.10.):** Sie hat eine Esse mit allen Schmiede-Rezepten (Handwerks-Fenster) und bessert wie bisher mit Eisenerz auf 100 % aus.
+- **Jagd (03.10.):** Die Fertigkeit wächst, wenn du Tiere erlegst. Sie bringt bis +60 % Chance auf Felle, Fleisch und Knochen, und Tiere bemerken dich später (bis 40 % kürzere Sicht).
+- **Neue Bezugsquellen (03.10.):**
+  - Lederstiefel bei der Tuchhändlerin.
+  - Talisman des Jägers und Arkaner Trank beim Juwelier.
+  - Donnerwort selten auf dem Schwarzmarkt.
+  - Sturmsense als Lohn für Liobas „Ein Lied für die Toten“.
+  - Blutstein von Blutmagiern (4 %).
+  - Splitter des Rotfalls von Nekromanten (4 %).
+
+## Wüstenbund und Zwerge der Tiefhall (03.10.)
+- **Zwei neue Fraktionen:** Der **Wüstenbund** (Karak-Atar und Dünenwacht) und **die Zwerge der Tiefhall** (Königsstadt unter der alten Tiefhall). Beide starten bei Ruf 0. Bewohner, Zöllner, Sandreiter und Zwergenwachen gehören zu ihrer Fraktion.
+- **Anschlagbrett:** In Karak-Atar (am Markt), in Dünenwacht (im Lager) und in der Zwergenstadt (in der großen Halle) hängt ein Brett. Erfüllte Aufträge geben Ruf beim Wüstenbund bzw. bei den Zwergen. Karak-Atar: Eskorte, Lieferung, Steckbrief, Lager ausheben, Vermisst, Patrouille, Spurensuche, Verteidigung. Dünenwacht: Patrouille, Steckbrief, Lager ausheben, Spurensuche. Zwerge: Monsterjagd, Steckbrief, Jagd, Vermisst. Das Brett der Zwerge öffnet sich erst, wenn König Durgrim dich als Freund der Halle anerkennt (wie ihr Handel).
+- **Beitritt:** Ab Ansehen 10 bei einem Mitglied („Wie tritt man bei?“). Bei den Zwergen nur als Freund der Halle. Wer bei den Toten Rang hat, wird bei den Zwergen nicht aufgenommen, und umgekehrt (die Toten nahmen den Zwergen die obere Halle).
+- **Ränge (vorläufige Namen):** Wüstenbund: Karawanengast → Karawanenwächter → Sandreiter. Zwerge: Hallengast → Hallenbruder → Schildträger des Königs. Aufstieg wie bei den anderen Mächten: Ansehen 25 bzw. 50, dann zwei Rangaufträge — beim Wüstenbund bei der Stammesältesten Amina in Karak-Atar, bei den Zwergen bei König Durgrim.
+- **Verbrechen:** Wer dort jemanden angreift oder tötet, verliert Ruf bei dieser Fraktion und bekommt Kopfgeld bei ihr (nicht mehr bei Valen). Zöllner, Sandreiter und Zwergenwachen halten Gesuchte an: zahlen, mitkommen (Kerker, danach wirst du vor Karak-Atar bzw. vor dem Eingang der Tiefhall entlassen) oder Widerstand.
+- **Hinweis:** Beim ersten Betreten von Karak-Atar/Dünenwacht bzw. der Zwergenstadt erklärt eine Meldung die Fraktion. Ränge stehen im Kodex (H, Reiter „Ränge“) und im Fraktionsfenster.
+- **Debug:** Abschnitt „Fraktionen: Wüstenbund und Zwerge“ (Ansehen, Rang, Reisen, Kopfgeld, Hinweise zurücksetzen).

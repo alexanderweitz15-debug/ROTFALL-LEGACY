@@ -926,7 +926,7 @@ Nach Schwere sortiert. „Bekannt“ = steht schon in `OFFEN.md` oder `hunt/BERI
 | A-31 | q_pelts (Quirin, Händler) und q_hundred_song (Lioba, Händlerin) geben keinen Fraktionsruf. | `data.js:1619`, `data.js:1622` |
 | A-32 | Begegnungen „Hungernde Mutter“ / „Deserteur“ zählen überall für Valen/Orden. | `game.js:2974`, `game.js:2982–2984` |
 | A-33 | Arbeiterrat und Stadtverträge Aurelions geben nur „Aurelion“, nie Hausgunst. Entscheidung. | `game.js:12178`, `game.js:7670` |
-| A-34 | Karak-Atar, Dünenwacht, Zwerge: keine Fraktion, keine Aufträge. | `game.js:8863`, `world.js:560`, `game.js:9214` |
+| A-34 | ~~Karak-Atar, Dünenwacht, Zwerge: keine Fraktion, keine Aufträge.~~ **Behoben 03.10.:** Fraktionen „Der Wüstenbund“ (`wuest`) und „Die Zwerge der Tiefhall“ (`zwerge`) mit Ruf, Brett, Beitritt, Rängen und Kopfgeld (siehe 3.1, 2.2). | `data.js` FACTIONS, `game.js` FAC_CON / ensureNewFactions / ensureDesertBoards / buildDwarfCity |
 | A-35 | Kerkerwärter immer Valen; ein Kerker für alle Städte; Mo/Rask nur bei Haft in Salzhafen. | `game.js:8982`, `game.js:8986` |
 | A-36 | Befreite Menschen der Eisenfeste ziehen nach Sonnwacht statt nach Hause. | `game.js:11031` |
 | A-37 | Fehlende Debug-Einträge: Steuereintreiber, Missernte, Pilgerüberfall, 7 kleine Meldungen, Wolfswinter, Stadtfest, Kasimir; Banden/Goblins im Abschnitt „Bionik“. | `game.js:11640–11650`, `game.js:17011` |

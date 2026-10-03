@@ -454,7 +454,8 @@ export const LOOT = {
   crypt_warden:[['kettenbeinlinge',0.15],['talisman_waechter',0.08],['knochenspalter',0.3],['ancestor_urn',1],['bone',1],['chain_hauberk',0.4]],
   death_captain:[['elixier_stein',0.15],['elixier_wacht',0.2],['panzerhandschuhe',0.15],['beinschienen',0.12],['talisman_toten',0.1],['totenmuenze',0.02],['totenglocke',0.3],['legionaersplatte',0.3],['bone',1],['chain_hauberk',0.5],['iron_helm',0.4],['potion',0.8],['flail',0.3]],
   aldhelm:    [['blutphiole',1],['potion',1]],
-  blood_mage: [['blutphiole',0.5],['blutmaske',0.3],['staff',0.05]],
+  blood_mage: [['blutphiole',0.5],['blutmaske',0.3],['staff',0.05],['blutstein',0.04]],   /* 03.10.: Quelle für den Blutstein */
+  necromancer: [['splitter_rotfall',0.04]],   /* 03.10.: Nekromanten tragen manchmal einen Splitter des Rotfalls */
   thrall:     [['bread',0.2],['bandage',0.2]],
   chalice_guard: [['blutphiole',0.6],['kite_shield',0.1],['chain_hauberk',0.06]],
   blood_cultist: [['blutmaske',1],['blutphiole',0.3],['dagger',0.15],['maskenkapuze',0.05]],
@@ -1269,6 +1270,9 @@ export const FACTIONS = {
   sea:   { name:'Das Seevolk', colors:['#1e2a36','#c8b890'], desc:'Salzbund und Sturmklinge: Händler und Plünderer derselben Inseln, die sich mehr hassen als jeden Fremden. Wer auf dem Wasser lebt, schuldet dem Land nichts.', ranks:['Landratte','Deckhand','Maat','Steuermann','Kapitän'] },   // S14
   blut:  { name:'Der Kelch', colors:['#3a0e12','#c0303a'], desc:'Blutmagier und Vampire unter Varonheim. Sie nehmen die, die keiner vermisst — bis jemand fragt.' },   /* §5g.2: ohne Ränge, Rangfolge über die Titelgrade */
   frei:  { name:'Die Freien vom Grubenhort', colors:['#4a3a26','#d8c890'], desc:'Befreite Sklaven der Eisenfeste, Menschen und Goblins. Kein Herr, kein Tribut — nur ein Lager am Grubenhort und die Angst, dass die Kette wiederkommt.' },   /* Folgen §5c: nach dem Sklavenaufstand */
+  // Entscheidung 03.10.2026: Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge der Tiefhall werden eigene Fraktionen (Ränge vorläufig)
+  wuest: { name:'Der Wüstenbund', colors:['#4a3420','#d8b070'], desc:'Karak-Atar und Dünenwacht: das Wüstenvolk unter dem Schutz der Sandfürsten. Wasser, Wegzoll und Karawanen — wer die Straße sichert, ist willkommen.', ranks:['Karawanengast','Karawanenwächter','Sandreiter'] },
+  zwerge:{ name:'Die Zwerge der Tiefhall', colors:['#2a3040','#c87a3a'], desc:'Die letzten der Tiefhall. Seit die Toten die obere Halle nahmen, schmieden und brauen sie unter dem Berg — und warten.', ranks:['Hallengast','Hallenbruder','Schildträger des Königs'] },
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };
 
@@ -1402,7 +1406,7 @@ export const BUILDINGS = {
   hut:       { name:'Hütte', cat:'Unterkunft', cost:{wood:20,stone:8}, time:22, w:3, h:3, desc:'Festes Dach. Zieht Siedler an.', pop:4 },
   storage:   { name:'Lager', cat:'Produktion', cost:{wood:14}, time:14, w:2, h:2, desc:'Gemeinsamer Vorrat der Siedlung.', pop:0 },
   workbench: { name:'Werkbank', cat:'Produktion', cost:{wood:12,stone:4}, time:12, w:2, h:1, desc:'Einfaches Handwerk und Reparatur.', pop:0 },
-  smithy:    { name:'Schmiede', cat:'Produktion', cost:{wood:20,stone:15,iron:10}, time:30, w:3, h:2, desc:'Waffen aus Eisen, Reparatur ohne Meister.', pop:0 },
+  smithy:    { name:'Schmiede', cat:'Produktion', cost:{wood:20,stone:15,iron:10}, time:30, w:3, h:2, desc:'Esse für Waffen und Rüstung aus Eisen (Rezepte), dazu Reparatur ohne Meister.', pop:0 },
   farm:      { name:'Ackerfläche', cat:'Versorgung', cost:{wood:10}, time:16, w:3, h:3, desc:'Bringt jede Stunde etwas Nahrung (12 am Tag). Siedler beim Nahrung sammeln bringen doppelt so viel.', pop:0 },
   pasture:   { name:'Weide mit Stall', cat:'Versorgung', cost:{wood:16,stone:4}, time:18, w:3, h:3, desc:'Platz für sechs Kühe oder Schafe (Tierhändler). Täglich Fleisch, Wolle, Felle — Wölfe haben auch Hunger.', pop:0 },
   healer:    { name:'Heilerhütte', cat:'Versorgung', cost:{wood:18,stone:6}, time:16, w:2, h:2, desc:'Pflege mit Kräutern: schient Brüche, brennt Wunden aus, heilt in zwei Stunden ein Drittel. Mit Priorität „Verwundete versorgen“ wird ein Siedler Heiler und pflegt die Kranken.', pop:0 },   /* Siedlung M3 */
@@ -1480,7 +1484,7 @@ export const QUESTS = {
     desc:'„Nimm etwas, das dir nicht gehört — aus einem Regal, einer Kiste, einem Schreibtisch in einem bewohnten Haus. Wenn dich jemand sieht, zählt es nicht. Dann zahlst du nur.“',
     objectives:[{type:'steal',count:1,text:'Aus fremdem Besitz stehlen, ohne gesehen zu werden'}], reward:{xp:80} },
   kt_rogue2:{ name:'Prüfung des Schurken: Von hinten', giver:null, clsTrial:['rogue', 2],
-    desc:'„Drei Puppen. Drei Stiche von hinten — ein Meuchelstich oder in den Rücken. Wer von vorn hackt, zählt nicht.“',
+    desc:'„Drei Puppen. Drei Meuchelstiche von hinten — ich leih dir den Stich für die Prüfung. Wer von vorn hackt, zählt nicht.“',
     objectives:[{type:'trial',target:'stab',count:1,text:'Drei Stiche von hinten an Übungspuppen (beim Lehrer antreten)'}], reward:{xp:110,unlock:'rogue'} },
   kt_assassin1:{ name:'Prüfung der Assassine: Ein Name auf dem Brett', giver:null, clsTrial:['assassin', 1],
     desc:'„Am Anschlagbrett hängen Steckbriefe. Nimm einen, bring es zu Ende und hol dir den Lohn. Dann reden wir.“',
@@ -1621,7 +1625,7 @@ export const QUESTS = {
     reward:{gold:60,xp:70,item:'potion',take:'pelt',takeCount:3}, turnin:'quirin' },
   q_hundred_song: { name:'Ein Lied für die Toten', giver:'lioba', desc:'Am Hundertfeld stehen Tote wieder auf. Ich will ein Lied darüber, aber keins aus zweiter Hand. Leg drei Wiedergänger schlafen — ich schreibe mit.',
     objectives:[{type:'kill',target:'ghoul',count:3,text:'Wiedergänger am Hundertfeld'}],
-    reward:{gold:90,xp:150,rel:{lioba:15}}, turnin:'lioba' },
+    reward:{gold:90,xp:150,rel:{lioba:15},item:'sturmsense'}, turnin:'lioba' },   /* 03.10.: Lioba schenkt die Sense der Bäuerin von Hundertfeld */
   q_rook: { name:'Rooks Angebot', giver:'rook', desc:'Rook will die Straße nach Norden unsicher machen. Er braucht Klingen.',
     objectives:[{type:'kill',target:'bandit_rival',count:2,text:'Rooks Rivalen töten'}],
     reward:{gold:120,rep:{bandit:25,valen:-20},xp:90}, turnin:'rook' },

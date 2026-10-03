@@ -1221,7 +1221,7 @@ function charUI(body, who) {
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
     leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
-    hunting: 'Noch ohne Wirkung — bekommt sie mit „Jagd und Wildnis“ (Fährten, Fallen, Häuten).',
+    hunting: 'Steigt beim Erlegen von Tieren. Mehr Felle, Fleisch und Knochen (bis +60 %); Tiere bemerken dich später (bis 40 % kürzere Sicht).',
     crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
     stealth: 'Hilft beim Hineinschleichen und Stehlen. Wächst noch nicht durch Übung — das kommt mit dem Schleich-System.' };
   const chain = classChain(p.currentClass), bld = buildOf(p);
