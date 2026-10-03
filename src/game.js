@@ -1249,7 +1249,7 @@ function planDays() {
       const J = jobFor(c, b, i, jobUse);                                 // AUDIT A-01: fester Arbeitsplatz je Beruf
       if (J) { c.plan.work = J; c.plan.job = true; c.schedulePos = J;
         if (JOB_AT[c.prof].shop === 'smith') Object.assign(c, { shop: true, smith: true, pool: SMITH_POOL.filter(k => ITEMS[k]), market: false, till: 18 });   // verkauft und bessert aus, wo er arbeitet
-        if (J.stall) Object.assign(c, { shop: true, pool: STALL_POOL.filter(k => ITEMS[k]), till: 18 });
+        if (J.stall && !MARKET_POOL[c.prof]) Object.assign(c, { shop: true, pool: STALL_POOL.filter(k => ITEMS[k]), till: 18 });   /* D-3: Gewürzhändler und Tuchhändlerin behalten ihre Ware (Elixiere) */
         if (c.prof === 'Wirt') Object.assign(c, { shop: true, pool: ['bread', 'bread', 'dried_meat', 'herb'], market: false }); }   // S13: der Wirt verkauft an der Theke
       VILLAGERS.push(c);
     });
@@ -2360,7 +2360,8 @@ export function continueGame(given = null, retried = false) {                   
     if (e.kind === 'grave') { delete e.hidden; continue; }   /* Roadmap P8: im Tod gespeichert — Grab sofort sichtbar */   // Props handeln nicht; alte Stände trugen die Felder (sonst weicht jedes Prop vom Grundzustand ab)
     e.act = null; e.hexed = 0; e.rooted = 0;       // Zeitstempel (performance.now) sind nach dem Laden wertlos
     stalePerf(e); for (const v of Object.values(e)) if (v && typeof v === 'object' && !Array.isArray(v) && v.constructor === Object) stalePerf(v);
-    if (e.giveUp) e.giveUp = null; if (e.kind === 'enemy' && e.drinkCd) e.drinkCd = 0; if (e.body) B.syncHp(e);   /* HB2-06: aufgegebene Jagd und Trink-Pause gelten nur in der Sitzung; HB2-03: Leben nach dem Laden neu aus dem Körper */   /* HB-02: alle performance.now-Felder, auch verschachtelte (vamp.frenzyT) */
+    if (e.giveUp) e.giveUp = null; if (e.kind === 'enemy' && e.drinkCd) e.drinkCd = 0; if (e.body) B.syncHp(e);
+    if (e.kind === 'npc' && e.villager && MARKET_POOL[e.prof]) Object.assign(e, { shop: true, pool: MARKET_POOL[e.prof], till: e.till ?? 20 });   /* D-2: Ladenlisten alter Stände auf den heutigen Stand (Juwelier, Rüstmeisterin, Magitech-Ingenieurin …) */   /* HB2-06: aufgegebene Jagd und Trink-Pause gelten nur in der Sitzung; HB2-03: Leben nach dem Laden neu aus dem Körper */   /* HB-02: alle performance.now-Felder, auch verschachtelte (vamp.frenzyT) */
     if (e.brawlKO) e.brawlKO = 1; if (e.talk?.until) e.talk = null;   // S15 Fehlersuche: performance.now-Werte gelten nach dem Laden nicht mehr   // S15 Fehlersuche: Bann, Pakt, Verlangsamung usw. überdauerten das Laden
     if ((e.kind === 'npc' || e.kind === 'player') && !e.body) { const r = e.hp / (e.maxHp || 1); e.build ||= 'ausgewogen'; recalc(e); for (const k of B.PARTS) e.body[k].hp = e.body[k].max * r; B.syncHp(e); }
     if (e.kind === 'enemy' && !e.body && HUMANOID.has(e.mtype)) { e.build = 'ausgewogen'; B.initBody(e, e.maxHp); }
@@ -3800,7 +3801,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { const TA = trialOf(byId(target.trialOwner) || S.player); if (kind !== 'physical' && TA && source && source.id === (TA.owner ?? S.player.id)) { TA.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
   { const TD = target.duelist ? trialOf(byId(target.trialOwner) || S.player) : source?.duelist && (source.trialOwner === target.id || (!source.trialOwner && target === S.player)) ? trialOf(target) : null;   /* HB2-02: je Figur */
-    if (TD?.kind === 'duel' && target.hp - dmg < target.maxHp * 0.2) { endTrial(!!target.duelist, TD); return; } }
+    if (TD?.kind === 'duel' && B.barOf(target)[0] - dmg < B.barOf(target)[1] * 0.2) { endTrial(!!target.duelist, TD); return; } }   /* C-1: Schwelle am Rumpf (wo gestorben wird) — vorher fiel der Gegner vor der 20-%-Marke und das Duell galt als verloren */
   if ((S.trial || S.trialsG) && (target.trial || target === S.player || target.coopHero) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
   if (abNow && source === abNow.c && abNow.mult !== 1 && dmg > 0) dmg *= abNow.mult;   /* Fähigkeitssterne: Schaden der laufenden Fähigkeit */
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
@@ -5536,7 +5537,7 @@ function rummage(t, b) {
     const w = seen[0], fac = crimeFaction(w); addRel(w.key, -10);
     log(`${w.name}: „Dieb! Leg das zurück!“`, 'combat'); addBounty(fac, 40, 'Diebstahl'); return UI.toast('ERWISCHT', 2200);
   }
-  const pool = RUMMAGE[t.type] || [], got = [];
+  const pool = [...(RUMMAGE[t.type] || [])], got = [];   /* D-1: Kopie — vorher wuchs die gemeinsame Liste mit jeder Durchsuchung (93 statt 13 Waffen) */
   if (t.type === 'weapon_rack') { const ws = Object.keys(ITEMS).filter(k => ITEMS[k].slot === 'weapon' && (ITEMS[k].value || 0) <= 60); if (ws.length && rnd() < 0.6) pool.push([pick(ws), 1]); }
   for (const [k, n] of pool) if (ITEMS[k] && rnd() < 0.5 && addItem(p, k, n)) got.push(ITEMS[k].name);
   const g = t.type === 'desk' ? ri(3, 15) : rnd() < 0.3 ? ri(1, 6) : 0; S.gold += g;
@@ -11234,7 +11235,7 @@ const VAULTS = {
   wurzelhalle: { name: 'Wurzelhalle', at: 'knochenwald', dx: 12, dy: -10, tier: 4, floors: 3, hidden: true, pool: ['wolf', 'bear', 'ghoul'], boss: 'bear', bossName: 'Die Mutter der Wurzeln',
     deco: ['bones', 'broken_pillar', 'bones', 'sack'], enter: 'Wurzeln, dick wie Männer, drücken durch die Wände. Etwas Großes atmet.' },
   /* Geheime Orte S2: der Ausbrecherstollen — gefunden über Kreidezeichen am Steinbruch, nicht über Hortkarten */
-  ausbrecherstollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0, tier: 3, floors: 1, hidden: true, secretKey: 'stollen', pool: ['chainhunter', 'kettenschuetze', 'goblin', 'wolf'], boss: 'chain_brute', bossName: 'Der Pferchmeister',
+  ausbrecherstollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0, tier: 3, floors: 1, hidden: true, secretKey: 'stollen', pool: ['rotgardist', 'kettenschuetze', 'goblin', 'wolf']   /* C-5: 'chainhunter' ist eine Klasse, kein Gegner (Absturz) */, boss: 'chain_brute', bossName: 'Der Pferchmeister',
     deco: ['bones', 'crate', 'sack', 'broken_pillar'], enter: 'Ein enger Spalt im Fels, Kreide an den Wänden: ein durchgestrichenes Kettenglied. Hier sind Vierzehn entkommen.' },
   /* Nutzer §5e.3: Endlosgewölbe — jede Ebene schwerer, alle fünf Ebenen ein Wächter und eine Truhe */
   schlund: { name: 'Der Schlund', at: 'sunkentemple', dx: -6, dy: -8, tier: 3, floors: 999, endless: true, pool: ['skeleton', 'ghoul', 'bandit', 'wraith', 'bone_knight', 'automat'], boss: 'death_knight', bossName: 'Wächter der Tiefe',
@@ -12360,7 +12361,7 @@ function raidPlan(st) {                                              /* Quelle a
   if (S0.src === 'band') n = Math.min(n, (S.bands || []).find(b => b.id === S0.bandId)?.men || n); if (S0.src === 'wolf') n = ri(2, 3);
   return { src: S0.src, f: S0.f, label: S0.label, n, bandId: S0.bandId || null };
 }
-const RAID_MOBS = { band: () => pick(['bandit', 'bandit', 'bandit_archer', 'bandit_spear']), chain: () => pick(['chainhunter', 'kettenschuetze']), goblin: () => pick(['goblin', 'goblin', 'goblin_warrior']), wolf: () => 'wolf' };
+const RAID_MOBS = { band: () => pick(['bandit', 'bandit', 'bandit_archer', 'bandit_spear']), chain: () => pick(['rotgardist', 'kettenschuetze']), goblin: () => pick(['goblin', 'goblin', 'goblin_warrior']), wolf: () => 'wolf' };
 function campPlunder(st, R) {
   for (const k of ['wood', 'stone', 'iron', 'food']) S.res[k] = Math.floor((S.res[k] || 0) * 0.7); if (st.farmStock) st.farmStock = {};
   const b = st.buildings.filter(x => x.built >= 1 && x.type !== 'palisade' && x.type !== 'wohnzone'); if (b.length) { const t = pick(b); t.cond = Math.max(0.2, (t.cond ?? 1) - 0.4); }
@@ -13546,6 +13547,7 @@ function questAvailable(k) {
   return true;
 }
 function startQuest(k) {
+  if (k === 'kt_bard2') { const p = S.player; p.hotbar ||= []; if (!p.hotbar.some(h => h?.key === 'war_song')) { const i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = { type: 'ability', key: 'war_song' }; else p.hotbar.push({ type: 'ability', key: 'war_song' }); } log('Der Lehrer leiht dir für die Prüfung das Kriegslied — es liegt auf deiner Leiste.', 'quest'); }   /* C-3: sonst war die Prüfung ohne Bardenklasse unlösbar */
   if (QUESTS[k]?.sea && k !== 'q_wb_nebel') seaQuestStart(k);   // S14: Lager, Grube
   if (k === 'q_grisk_lost') planLostGoblins(); if (k === 'q_grisk_rache') spawnChainRest();   // S12 A4                                   // was schon erledigt ist, zählt (Boss vorher erschlagen, Gegenstand dabei)
   (QUESTS[k]?.clsTrial ? qStore() : S.quests)[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
@@ -13886,7 +13888,7 @@ function ktTrialHurt(target, dmg, source, kind) {
   if (target.trial === 'stab' && T.kind === 'stab') { const behind = source && Math.abs(normAng(Math.atan2(source.y - target.y, source.x - target.x) - (target.faceA ?? 0))) > 1.9;   /* in den Rücken (die Puppe schaut zum Prüfling) */
     if (source === p && (performance.now() - (p.stabAt || 0) < 1500 || p.shadowNext > performance.now() || behind)) { T.n++; float(target, 'Meuchelstich', 'rgba(170,150,220,ALPHA)'); die(target, 'Meuchelstich', p); } else if (source === p) float(target, 'nur von hinten', 'rgba(200,190,160,ALPHA)'); return true; }
   if (T.kind === 'pit') {
-    if (target.duelist && target.hp - dmg < target.maxHp * 0.2) { const low = p.hp < p.maxHp * 0.3; if (!low) log(`${p.coopHero ? p.name + ': ' : ''}„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).`, 'quest'); endTrial(low, T); return true; }
+    if (target.duelist && B.barOf(target)[0] - dmg < B.barOf(target)[1] * 0.2) { const low = B.barOf(p)[0] < B.barOf(p)[1] * 0.3;   /* C-1 */ if (!low) log(`${p.coopHero ? p.name + ': ' : ''}„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).`, 'quest'); endTrial(low, T); return true; }
     if (target === p && source?.duelist && p.hp - dmg < p.maxHp * 0.1) { endTrial(false, T); return true; }
   }
   if (T.kind === 'hold' && target === p && p.hp - dmg < p.maxHp * 0.1 && source?.trial === 'hold') { endTrial(false, T); return true; }
@@ -15860,7 +15862,7 @@ function learnNode(k) {
 // ================= Fähigkeiten =================
 function useAbility(key) {
   const p = S.player, ab = ABILITIES[key];
-  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]) || (key === 'death_coil' && dkGear(p) >= 2))) return;
+  if (!ab || !(p.abilities.includes(key) || titleAbilities(p).includes(key) || treeAbilities(p).includes(key) || (ab.spell && p.spells?.[key]) || (key === 'death_coil' && dkGear(p) >= 2) || (key === 'war_song' && qSt('kt_bard2')?.state === 'active'))) return;   /* C-3: in der Bardenprüfung leiht der Lehrer dir das Kriegslied */
   if (p.downed) return;   // S15 Fehlersuche: am Boden keine Fähigkeiten
   if (p.silenced > performance.now() && (ab.spell || ab.title || ab.mana)) return UI.toast('Gebannt — für einen Moment keine Magie.');   // S15 P7: Bann der Magierjäger (S15 Fehlersuche: auch Mana-Fähigkeiten)
   if (ab.spell) {                                            // S15 P4: Zauber
@@ -20721,6 +20723,11 @@ export function selftest() {
       S.factions.valen = 250; hourTick(25); const cl = S.factions.valen === 100;
       return fac && ranks && sec && cl;
     } finally { S.factions.valen = f0; } }));
+  ok('Ist-Zustand C/D (03.10.): Waffenständer wächst nicht; Ausbrecherstollen ohne Klassennamen im Gegner-Pool; Duell-Schwelle am Rumpf; Kriegslied in der Bardenprüfung geliehen', sandbox(() => {
+    const n0 = RUMMAGE.weapon_rack.length; const pool = Object.values(VAULTS).every(v => (v.pool || []).every(k => MONSTERS[k]));   /* jeder Gewölbe-Pool nennt nur echte Gegner */ const rack = RUMMAGE.weapon_rack.length === n0;
+    const q0 = S.quests.kt_bard2; try { S.quests.kt_bard2 = { state: 'active', progress: [0, 0] }; const p = stage(); p.abilities = (p.abilities || []).filter(k => k !== 'war_song'); p.cooldowns = {}; p.stamina = 200;
+      const ok3 = qSt('kt_bard2')?.state === 'active'; return pool && rack && ok3;
+    } finally { if (q0) S.quests.kt_bard2 = q0; else delete S.quests.kt_bard2; } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
