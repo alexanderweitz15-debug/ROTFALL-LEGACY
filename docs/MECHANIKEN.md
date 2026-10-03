@@ -1357,3 +1357,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Verbrechen:** Wer dort jemanden angreift oder tötet, verliert Ruf bei dieser Fraktion und bekommt Kopfgeld bei ihr (nicht mehr bei Valen). Zöllner, Sandreiter und Zwergenwachen halten Gesuchte an: zahlen, mitkommen (Kerker, danach wirst du vor Karak-Atar bzw. vor dem Eingang der Tiefhall entlassen) oder Widerstand.
 - **Hinweis:** Beim ersten Betreten von Karak-Atar/Dünenwacht bzw. der Zwergenstadt erklärt eine Meldung die Fraktion. Ränge stehen im Kodex (H, Reiter „Ränge“) und im Fraktionsfenster.
 - **Debug:** Abschnitt „Fraktionen: Wüstenbund und Zwerge“ (Ansehen, Rang, Reisen, Kopfgeld, Hinweise zurücksetzen).
+- **Asservatenkammer (03.10.):** Brichst du aus dem Kerker aus oder fliehst aus der Schuldknechtschaft, liegt deine Waffe in der Asservatenkammer der Macht, die dich festhielt. Jede Wache dieser Macht gibt sie dir gegen eine Buße heraus: 50 Gold plus ein Viertel ihres Werts (vorläufig). Es ist dein Exemplar, mit Seltenheit und Zustand. Solange dort ein Kopfgeld auf dich offen ist, gibt die Wache sie nicht heraus.
+- **Legendäre Sets als Lohn (03.10.):** Wer den höchsten Rang erreicht, bekommt das Set des Anführers geschenkt, ohne ihn zu töten:
+  - bei Valen den Hochritter;
+  - beim Orden Ordensmeister und Sternwacht;
+  - bei Rooks Bande Rooks General.

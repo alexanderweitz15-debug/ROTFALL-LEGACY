@@ -7153,6 +7153,18 @@ function captureInstead(p) {                                             // Kett
   if (!k || S.flags.chainsBroken || k.faction !== 'chain') return false;   // BUG-115: stand im Kommentar — jeder Tod (auch durch Wölfe) führte in Ketten
   return chance(0.7) && enslave('chain', 200);
 }
+/* Entwickler 03.10.2026: Asservatenkammer — die Waffe nach Kerkerausbruch oder Flucht aus der Schuldknechtschaft ist nicht weg. Eine Wache der Macht,
+   die sie verwahrt, gibt sie gegen eine Buße heraus (50 Gold + ein Viertel ihres Werts; vorläufig). Gilt nur, solange dort kein Kopfgeld offen ist. */
+function evidenceKeep(it, fac) { (S.evidence ||= []).push({ it, fac, day: S.day | 0 }); }
+const evidenceFee = E => 50 + Math.round((ITEMS[E.it.key]?.value || 0) * 0.25);
+function evidenceChoices(npc, ch) {
+  if (!npc.guard || !(S.evidence || []).length) return; const fac = npc.faction || townFac(npc.homeTown || npc.post);
+  for (const E of S.evidence.filter(E => E.fac === fac)) ch.push({ text: `Meine Waffe aus der Asservatenkammer: ${ITEMS[E.it.key]?.name} (${evidenceFee(E)} Gold Buße)`, k: 'gold', fn: () => {
+    if ((S.bounty || {})[fac] > 0) return UI.dialogue(npc, '„Erst die offene Rechnung. Dann reden wir über dein Eigentum.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    if (S.gold < evidenceFee(E)) return UI.dialogue(npc, '„Die Buße zuerst. Ohne Gold bleibt die Klinge im Schrank.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= evidenceFee(E); S.evidence = S.evidence.filter(x => x !== E); if (!giveItem(S.player, E.it)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, E.it);   /* das Exemplar selbst (Seltenheit, Zustand) */
+    log(`Asservatenkammer: ${ITEMS[E.it.key]?.name} gegen ${evidenceFee(E)} Gold ausgelöst.`, 'economy'); UI.closeDialogue(); UI.refreshHUD(); } });
+}
 function freeBond(msg, back = true) {
   const B0 = S.bond, p = S.player; if (!B0) return;
   if (back && B0.weapon && !p.equip.weapon) p.equip.weapon = B0.weapon; recalc(p);
@@ -7185,7 +7197,7 @@ function bondTick() {
   if (!B0.guardDown && !(S.map === 'world' ? actorsOf('world').list : S.ents.world).some(e => e.bondGuard && e.alive)) spawnBondGuard(B0);
   const d = Math.hypot(p.x - B0.x, p.y - B0.y) / TS, tx = p.x / TS | 0, ty = p.y / TS | 0;
   const out = B0.kind === 'aurel' ? d > 30 && !inAurel(p) : (tx < FORT[0] || tx > FORT[2] || ty < FORT[1] || ty > FORT[3]);
-  if (out) { S.factions[B0.kind === 'aurel' ? 'aurel' : 'chain'] -= 15; return freeBond(`Entflohen! Deine Waffe bleibt ${B0.kind === 'aurel' ? 'beim Vogt' : 'beim Aufseher'}. Ruf −15.`, false); }
+  if (out) { S.factions[B0.kind === 'aurel' ? 'aurel' : 'chain'] -= 15; if (B0.weapon) evidenceKeep(B0.weapon, B0.kind === 'aurel' ? 'aurel' : 'chain'); return freeBond(`Entflohen! Deine Waffe liegt ${B0.kind === 'aurel' ? 'beim Vogt' : 'beim Aufseher'} in der Asservatenkammer — eine Wache gibt sie gegen eine Buße heraus. Ruf −15.`, false); }
   if (d > 14 && seenBond(B0)) {
     p.x = B0.x; p.y = B0.y + 26; B0.debt += 50; B0.loose = false; addStatus(p, { key: 'shackled', name: 'Versklavt', left: 1e12, desc: 'Fußkette: halbes Tempo, keine Waffe, ein Wächter folgt dir. Arbeit, Freikauf oder Flucht.' });
     log('Gesehen! Sie schleifen dich zurück. Die Schuld wächst um 50.', 'combat'); UI.toast('ZURÜCK IN KETTEN', 2400);
@@ -9127,7 +9139,7 @@ function lockResult(t, res) {
 function jailExit() {
   const J = S.jail, p = S.player;
   if (S.ents.kerker.some(e => e.warden && e.alive && dist(e, p) < 180 && clearLine(e, p))) return log('Der Wärter steht direkt vor dir. Nicht jetzt.', 'world');
-  S.jail = null; if (J.fac) addBounty(J.fac, 150, 'Ausbruch aus dem Kerker'); log('Du bist draußen. Ohne Waffe — und mit neuem Kopfgeld.', 'faction');
+  S.jail = null; if (J.weapon) evidenceKeep(J.weapon, J.fac || 'valen'); if (J.fac) addBounty(J.fac, 150, 'Ausbruch aus dem Kerker'); log('Du bist draußen. Ohne Waffe — und mit neuem Kopfgeld. Deine Waffe liegt in der Asservatenkammer; jede Wache kann sie gegen eine Buße herausgeben.', 'faction');
   for (const e of S.ents.kerker.filter(e => e.escapee)) {                          // S14: wer mitkam, ist frei; wer allein ging, verschwindet in der Nacht
     e.inmate = false; e.jailer = undefined; e.freed = false;
     if (!S.party.includes(e.id)) { S.ents.kerker = S.ents.kerker.filter(x => x !== e); log(`${e.name} verschwindet in die Nacht. Irgendwann zahlt er es dir zurück.`, 'party'); }
@@ -13082,7 +13094,7 @@ function talk(npc) {
     if (!st && questAvailable(k)) choices.push({ text: `Was liegt an? (${Q.name})`, fn: () => offerQuest(npc, k) });
     else if (st && st.state === 'active' && questComplete(k) && !Q.pact && k !== 'q_lila') choices.push({ text: `Erledigt. (${Q.name})`, fn: () => turnIn(npc, k) });
   }
-  pactChoices(npc, choices);
+  pactChoices(npc, choices); evidenceChoices(npc, choices);   /* Asservatenkammer (03.10.) */
   if (npc.key === 'jorun' && S.quests.q_lila?.state === 'active' && S.flags.lilaFound)
     choices.push({ text: 'Über deine Tochter …', fn: () => lilaOutcome(npc) });
   const gw = gradeTalk(npc); if (gw) choices.push(gw);                // S15 Titelgrade
@@ -14269,8 +14281,13 @@ for (const [f, L] of Object.entries(RANK_LINES)) L.lines.forEach((pair, i) => pa
     reward: { gold: 60 + i * 50, xp: 80 + i * 70, rep: { [f]: 5 }, ...(item ? { take: t, takeCount: n } : {}) }, turnin: L.giver || null, rankLine: true };   // Ziele überall: kein fester Kartenpunkt
 }));
 const rankReady = (f, r) => (S.ranks[f] ?? -1) === r - 1 && (S.factions[f] || 0) >= Math.min(100, r * 25);   // S15 Fehlersuche: Ruf endet bei 100
+/* Entwickler 03.10.2026: Die legendären Sets der Anführer gibt es nicht nur durch Mord — wer den höchsten Rang erreicht, bekommt sie geschenkt. */
+const TOP_SETS = { valen: ['hochritter'], order: ['meister', 'stern'], bandit: ['general'] };
 function promote(f, r) {
   if ((S.ranks[f] ?? -1) >= r) return; S.ranks[f] = r;
+  if (TOP_SETS[f] && r === (FACTIONS[f]?.ranks?.length || 0) - 1 && !S.flags['topSet_' + f]) { S.flags['topSet_' + f] = 1;
+    for (const k of TOP_SETS[f]) for (const it of ARMOR_SETS[k]?.pieces || []) if (ITEMS[it]) { if (!addItem(S.player, it)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(it)); }
+    log(`Für den höchsten Rang bei ${FACTIONS[f].name}: ${TOP_SETS[f].map(k => ARMOR_SETS[k].name).join(' und ')} — als Geschenk.`, 'faction'); }
   const n = FACTIONS[f].ranks[r]; log(`Beförderung: ${n} — ${FACTIONS[f].name}.`, 'faction'); chronicle(`Rang ${n}`, 'faction', FACTIONS[f].name); UI.toast(n.toUpperCase(), 3600);
   /* S15 Hinweise: Weihen sagen, wo man sie bekommt */
   if (f === 'chain' && r === 3 && !S.flags.chainsBroken) log('Du kannst jetzt die Weihe der Kette empfangen — bei Varg in der Eisenfeste oder bei einem Dunklen Paladin (Klasse Dunkler Hochpaladin).', 'faction');
@@ -20811,6 +20828,14 @@ export function selftest() {
     const q0 = S.quests.kt_bard2; try { S.quests.kt_bard2 = { state: 'active', progress: [0, 0] }; const p = stage(); p.abilities = (p.abilities || []).filter(k => k !== 'war_song'); p.cooldowns = {}; p.stamina = 200;
       const ok3 = qSt('kt_bard2')?.state === 'active'; return pool && rack && ok3;
     } finally { if (q0) S.quests.kt_bard2 = q0; else delete S.quests.kt_bard2; } }));
+  ok('Asservatenkammer (03.10.): Waffe nach Flucht verwahrt; Wache derselben Macht gibt das Exemplar gegen Buße zurück; mit offenem Kopfgeld nicht', sandbox(() => {
+    const p = stage(), ev0 = S.evidence, b0 = S.bounty;
+    try { S.evidence = []; S.bounty = {}; const w = mkItem('longsword'); w.rar = 'rare'; evidenceKeep(w, 'valen'); S.gold = 500;
+      const g = actor(p.x + 30, p.y, { name: 'Wache' }); Object.assign(g, { map: '__a', guard: true, faction: 'valen' });
+      S.bounty.valen = 40; let ch = []; evidenceChoices(g, ch); ch[0].fn(); const blocked = S.evidence.length === 1; UI.closeDialogue();
+      S.bounty = {}; ch = []; evidenceChoices(g, ch); ch[0].fn(); const back = !S.evidence.length && p.inv.includes(w) && S.gold === 500 - evidenceFee({ it: w });
+      return blocked && back;
+    } finally { S.evidence = ev0; S.bounty = b0; UI.closeDialogue(); } }));
   ok('HB-03: Schlaf/Rast/Reise arbeitet jede übersprungene volle Stunde ab (hourTick je Stunde)', sandbox(() => {
     const m0 = S.minute, d0 = S.day, lh = lastHour, ld = lastDay, fw = S._frozenWar;
     try { S._frozenWar = true; S.minute = 22 * 60 + 30; const hs = []; passTime(5 * 60, h => hs.push(h));   /* 22:30 → 3:30; Zähler statt echter Stunden (Probe verändert die Welt nicht) */
