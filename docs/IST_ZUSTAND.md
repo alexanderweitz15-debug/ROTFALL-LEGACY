@@ -1,4 +1,4 @@
-# IST-ZUSTAND — ROTFALL: LEGACY (Stand 03.10.2026, Version 24)
+# IST-ZUSTAND — ROTFALL: LEGACY (Stand 04.10.2026, Version 24)
 
 Dies ist der vollständige Ist-Zustand: jedes Feature mit Erklärung, Ort/Personen, Ablauf, Gegnern, Belohnung, Bedienung (Fenster oder Gesprächsliste), Prüfergebnis und **Fehlversuchen**. Er wurde von vier Prüf-Agenten erstellt. Sie haben dafür den Code gelesen und vieles im Spiel nachgestellt; jeder Abschnitt sagt, was im Spiel geprüft und was nur im Code gelesen wurde. Danach hat der Lead zusammengeführt.
 
@@ -35,6 +35,13 @@ Die Fehlversuche in den Teilen unten sind **so dokumentiert, wie sie bei der Pr�
 - **Bugjagd 2:**
   - HB2-01 bis HB2-14 behoben.
   - Koop-Prüfungen gelten je Figur.
+- **Nachträge 03.10. abends und 04.10.** (die Teile unten beschreiben noch den Prüfstand; hier der aktuelle Stand):
+  - **Fenster statt Gesprächsliste:** Zauber lernen (`learnUI`, alle Zauberlehrer), Heiler (`healerUI`: Gruppe mit sechs Gliedern, Zuständen, Heilen und Schienen), Prothesen-Werkbank, Tierhändler, Schmied (Verbessern, Schmieden lassen). Prothesen zählen beim Heiler nicht mehr als Wunde.
+  - **Wüstenbund und Zwerge:** Dünenwacht hat einen Sandreiter-Posten; Karraks Tod gibt Wüstenbund +10; Rangvorteile (Rabatt, kein Wegzoll in Karak-Atar, Eskorten +25 % ab Karawanenwächter, Hilda verbessert ab Rang 2 bis „Meisterstück“); Karak-Atar und die Tiefhall haben eigene Kerker (Wärter, Name, Entlassort; gemeinsame Zellenkarte).
+  - **Fraktions-Starts, Rassen, Anwerben:** siehe Nachtrag am Ende von Teil D. Zwerge (Held und Tiefhall-Volk) sind klein und breit gezeichnet.
+  - **Wanderautomaten:** Roboter ohne Herrn reisen als Reisende von Stadt zu Stadt (Kenshi-Skelette); 2 von 5 schließen sich kostenlos an.
+  - **C-1 ergänzt (04.10.):** Im Duell und in der Grube kommt der Schaden jetzt sichtbar an; der Fechter stirbt nie (Rumpf ≥ 1), das Duell endet erst, wenn ein Rumpf wirklich unter 20 % liegt. Vorher wirkte der Fechter unverwundbar („unendlich Leben“).
+  - **Kampfanimation:** Oberkörper dreht auch von vorn/hinten, Beine arbeiten im Hieb, größere Ausschläge (A ×1,4, B ×1,9, C ×2,4), Swoosh-Halbmond in allen Packs; **alle Nahkampfklassen** haben eigene Profile (Axt, Kolben, Stange, Rapier, Peitsche, Stab neu); Wirbel treffen rundum; **Gewicht je Klasse** (Dolch 0 … Hammer 1,2: Ausholen gehalten, Peitschen-Beschleunigung, Überschwingen, späte Erholung, Körper sinkt nach). GIFs in `docs/screenshots/kampfanimationen_v24*.gif`.
 - **Andere offene Punkte:** Die noch offenen Entscheidungen und Bau-Punkte stehen in `ROTFALL_STATE/OFFEN.md`.
 
 
@@ -223,7 +230,7 @@ Das ist der Kern deines Wunsches („Mission für die Eisenfeste — und kein Ru
 | Grubenhort nach Vargs Fall (Goblindorf) | niemand (Grisk hat nur feste Aufträge) | — | keine Verträge |
 | Morrgrund | niemand (Dodon hat nur feste Aufträge `g_dod1–3`) | — | keine Verträge |
 | Karak-Atar | Brett am Markt (seit 03.10.) | Wüstenbund | ja (A-34 behoben) |
-| Dünenwacht | Brett im Lager (seit 03.10.) | Wüstenbund | ja (A-34 behoben); offen: das Lager heißt noch „Zelt der Wüstenräuber“, Bewohner gibt es dort keine |
+| Dünenwacht | Brett im Lager (seit 03.10.) | Wüstenbund | ja (A-34 behoben); seit 03.10. abends „Posten der Sandreiter“ mit vier Sandreitern als Wache |
 | Vharnholm | absichtlich niemand (`conKinds` gibt eine leere Liste, `game.js:7474`) | — | gewollt |
 | Steinbruch | niemand | (wäre Kette) | — |
 | Grenzwacht | nur Oda (Rangaufträge Valen) | Valen | ja |
@@ -905,7 +912,7 @@ Alle festen Aufträge aus `data.js:1416` ff. mit Geber und Ruf-Lohn (`turnIn`, `
 | Grubenhort | vor dem Fall: Gegner/Goblins; nach Vargs Fall: Goblindorf (Grisk, Nibbel, Krak, Sill, Morr), wächst in 5 Stufen; nach Aufstand: Freie Siedlung (Ranna, Tobbe) | Goblins / Freie | q_grisk_*; Verträge der Freien → Freie |
 | Morrgrund | 8 Goblins (+6 nach Vargs Fall), Dodon | Goblins (Heimat `morrgrund`) | g_dod1–3; **Verbinden gibt Valen-Ruf** (2.4) |
 | Karak-Atar | Yusuf (Basar), Leyla (Wasser), Amina (Sternenritual), Zöllner (15 Gold, nach Karrak 8, mit Wasserrecht 0), Sandreiter, Weberin, Töpferin, Kamelhirte; nach Karraks Tod Farid | keine | **keine Aufträge, kein Ruf**; Zoll verweigern: Basar +30 %/−20 % |
-| Dünenwacht | nur Requisiten und Gegner | – | – |
+| Dünenwacht | Posten der Sandreiter (seit 03.10. abends): vier Sandreiter des Wüstenbunds, Brett; die Wüstenräuber des Wasserrecht-Geheimnisses bleiben Räuber | Wüstenbund | wie Karak-Atar |
 | Tiefhall / Zwergenstadt | Durgrim, Hilda (Königseisen, Zwergenaxt, Runenhammer), Balin, Orm, Wachen, Bergleute | keine | „Freund der Halle“: Wächter erschlagen oder 3 Barren; keine Aufträge |
 | Schwarze Feste | Hof der Stillen Schar: Veyl, Ossara (Seelen), Grimbart (Knochenwaffen), Mutter Asch (Seelenopfer: Totensegen, Tote +3); nach Garmadon Belagerung durch Valen (Marschallin Ortrun) | Tote | Handel nur mit Rang/Pakt |
 | Vharnholm | Sael, Totenberufe, Seelenobelisk; keine Verträge | Tote | q_graverobbers, dk_1–3, Überfälle (P20) |
@@ -918,7 +925,7 @@ Alle festen Aufträge aus `data.js:1416` ff. mit Geber und Ruf-Lohn (`turnIn`, `
 | Sankt Serin | Tempel, Hospitäler, Mutter Aveline (Segen 10 Gold) | Aurelion (Haus Solandre) | – |
 | Himmelsinsel | Kaiserin Aurelia, Corvan, Orakel, Magierkönig Theron, Sonnenlegion, Gericht, Rat | Aurelion | q_ratssitz |
 
-- **Lücken:** Karak-Atar, Dünenwacht und die Zwerge haben keine eigene Fraktion und keine Aufträge; Verbrechen dort gehen an Valen (2.4).
+- **Lücken:** ~~Karak-Atar, Dünenwacht und die Zwerge haben keine eigene Fraktion~~ (behoben 03.10.: Wüstenbund, Zwerge; eigene Kerker seit 03.10. abends). Verbrechen in der Wildnis fallen keiner Macht zu (`crimeFaction` gibt dort null).
 
 ---
 
@@ -944,7 +951,7 @@ Nach Schwere sortiert. „Bekannt“ = steht schon in `OFFEN.md` oder `hunt/BERI
 | # | Befund | Datei:Zeile |
 |---|---|---|
 | A-09 | Sonnwacht (Orden), Kreuzweg/Aschfurt (Händler) gehören nach Befreiung bzw. Eroberung im Kriegsgraphen Valen; Aschfurt schon am Start. | `sim.js:616`, `sim.js:394`, `game.js:10699`, `data.js` `WAR_NODES` |
-| A-10 | Verbrechen an Leuten ohne Fraktion (Karak-Atar, Zwerge, Reisende) → Kopfgeld bei Valen, überall. | `game.js:5822`, `game.js:8866`, `game.js:9215` |
+| A-10 | ~~Verbrechen an Leuten ohne Fraktion → Kopfgeld bei Valen, überall.~~ Teilweise behoben 03.10.: Karak-Atar und Zwerge haben Fraktionen; in der Wildnis gibt es kein Kopfgeld (null); nur Innenkarten und Reisende ohne Heimat fallen noch an Valen. | `game.js:5822`, `game.js:8866`, `game.js:9215` |
 | A-11 | Tributdörfer vor dem Fall: Hilfe (Verbinden, Seuche, Aufträge) gibt Ruf bei der Kette, nicht beim Dorf. Entscheidung nötig. | `game.js:637`, `game.js:11598`, `game.js:7670` |
 | A-12 | Aurelion-Rang 7 ohne Ratssitz (Ruf 100 oder Heirat + 90); Rangführer sagt anderes. | `game.js:13166`, `game.js:14122` |
 | A-13 | Schuldknecht in Aurelion zählt als Schein-Inhaber (Rang 1, Bionik Stufe 2). | `game.js:7048` |
@@ -1825,8 +1832,7 @@ Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `
 - **Bedienung:** Im Debug-Test-Room lässt sich jedes Pack erzwingen.
 - **Geprüft:** Nur Code gelesen (`atkPackFx`, `atkImpact`, ~3784).
 - **Fehlversuche / Lücken:**
-  - OFFEN.md [E]: Ausrollen auf Axt, Kolben, Stange, Doppelklingen, Sense, Bogen, Armbrust, Stab, Magie und Bosswaffen steht noch aus.
-  - Diese Waffen haben noch keine eigenen Bewegungsprofile.
+  - ~~Ausrollen auf Axt, Kolben, Stange, Sense, Stab steht aus.~~ **Erledigt 04.10.:** Axt, Kolben/Flegel, Stangenwaffe (inkl. Sense), Rapier, Peitsche, Stab haben eigene Profile, Körperposen und Haltungen; dazu Gewicht je Klasse (siehe Kopf der Datei). Offen bleiben Bogen/Armbrust (Zielhaltung), Magie und besondere Bosswaffen.
 
 ### Deckung, Parade, Schild, Nahkampfabwehr
 
@@ -2227,7 +2233,7 @@ Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `
 
   | Klasse | Schritt 1 (draußen) | Schritt 2 (beim Lehrer) | EP | Erreichbar? |
   |---|---|---|---|---|
-  | Krieger | 4 Banditen besiegen | „Der Kreis“: Duell gegen den Übungsfechter, bis einer unter 20 % fällt | 80 + 110 | **ja, aber Duell oft unverdient verloren** (siehe unten) |
+  | Krieger | 4 Banditen besiegen | „Der Kreis“: Duell gegen den Übungsfechter, bis einer unter 20 % Rumpf fällt | 80 + 110 | ja (C-1 behoben; 04.10.: Schaden kommt sichtbar an, Fechter stirbt nie) |
   | Ritter | – | Platz 50 s gegen Räuberwellen halten; Duell mit Schild | 80 + 110 | ja; Duell mit demselben Fehler |
   | Berserker | 5 Feinde besiegen | Grubenkampf: gewinnen, während man selbst unter 30 % Leben ist (Gegner mit doppeltem Leben, Schaden ×1,6) | 80 + 110 | ja; gleiche Ursache möglich (Code) |
   | Schütze | 3 Wölfe erlegen + 3 Wolfsfelle (werden abgegeben) | 5 Puppen mit Fernwaffe, 40 s | 80 + 110 | ja (Code) |
@@ -3585,11 +3591,11 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
   - **Behandeln:** Preis (fehlendes Leben × 0,5) + 8 je Schlafkrankheit, mindestens 5 Gold. Die Behandlung dauert 3,5 s; danach volle Heilung. Seit HB-13 zählen auch verletzte Glieder (behoben).
   - **Wunden versorgen:** 25 Gold. Alle Brüche werden geschient (heilen doppelt so schnell), Entzündungen gereinigt.
   - Siedlungs-Pfleger und Heilerhütte, siehe §9.
-- **Bedienung:** **nur Dialogliste.**
-- **Geprüft:** nur Code (HB-13-Probe im Selbsttest).
+- **Bedienung:** **Fenster seit 04.10.** (`healerUI`): jede Person der Gruppe mit Leben, sechs Gliedern (grün/rot/gelb/grau) und Zuständen; Knöpfe Wunden versorgen und Brüche schienen. Prothesen zählen nicht als Wunde (Werkbank).
+- **Geprüft:** Fenster im Spiel geöffnet, Heilen und Schienen ausgeführt (04.10.); HB-13-Probe im Selbsttest.
 - **Fehlversuche / Lücken:**
   - Wer nur ein verletztes Glied hat (Leben voll), zahlt den Mindestpreis von 5 Gold. Das ist sehr billig für eine volle Gliedheilung. Balance-Frage.
-  - Kein Fenster mit Körperbild, obwohl die Prothesen-Werkbank eines hat. Guter GUI-Kandidat (§16).
+  - ~~Kein Fenster mit Körperbild.~~ Erledigt 04.10.
 
 ---
 
@@ -3732,7 +3738,7 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
 
 Wunsch des Entwicklers: „die Schmiede etc. soll ein GUI haben“.
 
-**Seit dem letzten Stand ein Fenster bekommen haben:** Schmiede, Kutsche/Fähre, Tierhändler, Prothesen-Werkbank (neu), Handwerk, Betriebe-Reiter, Handel.
+**Seit dem letzten Stand ein Fenster bekommen haben:** Schmiede (inkl. Verbessern, Schmieden lassen), Kutsche/Fähre, Tierhändler, Prothesen-Werkbank, Zauber lernen (04.10.), Heiler (04.10.), Handwerk, Betriebe-Reiter, Handel.
 
 **Noch reine Dialogliste (`UI.dialogue`), mit Bewertung:**
 
@@ -3740,8 +3746,6 @@ Wunsch des Entwicklers: „die Schmiede etc. soll ein GUI haben“.
 |---|---|---|---|
 | Handelskontor (Wagen, Senden, Betriebe kaufen, Lieferaufträge, Preisvergleich) | `ecoMenu`, `wagonMenu`, `sendMenu`, `bizMenu`, `ordersMenu`, `ecoPrices` | 5 verschachtelte Listen, Zahlen im Fließtext | **sehr hoch** — Zahlen, Karte und Vergleich schreien nach Tabelle und Karte. Betriebe-Kauf gehört in den Reiter „Betriebe“. |
 | Schwarzmarkt | `blackMarket` | Liste mit 4–5 Teilen | **hoch** — einfach: Handels-Dock mit Zuschlag wiederverwenden (OFFEN: „Schwarzmarkt als Raster“). |
-| Zauber lernen | `spellMenu` | Liste mit Bedingungen im Text | **hoch** — Zauberkarten mit Kosten, Schule, Sperre. |
-| Heiler / Wunden versorgen | `healerTreat`, `woundCare` | 1–2 Zeilen | **mittel** — das Körperbild der Werkbank ließe sich wiederverwenden. |
 | Seefahrt, eigenes Schiff, Fracht | `seaTalk`, `shipChoices`, `cargoMenu` | Preistabelle als Text | **mittel–hoch** — Frachthandel braucht ein Raster wie die Kreidetafel. |
 | Luftschiff-Hafen (Passage, Reparatur, Ausbau) | `harborTalk`, `airRepairMenu`, `airUpgradeMenu` | 3 Listen | **mittel** — Flottenzustand als Balken. |
 | Investieren | `investMenu` | 4 Knöpfe | **mittel** — passt als Reiter ans Anschlagbrett. |
