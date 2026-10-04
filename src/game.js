@@ -3877,6 +3877,7 @@ function atkImpact(c, target) {
 }
 
 export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind = 'physical') {
+  let duelT = null;
   if ((source === S.player || source === S.player?.id) && target !== S.player && target?.kind !== 'player') { R.focus.last = target; R.focus.lastAt = performance.now(); }   /* HB2-04: Nahkampf, Pfeil, Zauber */
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
   if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */
@@ -3885,8 +3886,9 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { const TA = trialOf(byId(target.trialOwner) || S.player); if (kind !== 'physical' && TA && source && source.id === (TA.owner ?? S.player.id)) { TA.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
   { const TD = target.duelist ? trialOf(byId(target.trialOwner) || S.player) : source?.duelist && (source.trialOwner === target.id || (!source.trialOwner && target === S.player)) ? trialOf(target) : null;   /* HB2-02: je Figur */
-    if (TD?.kind === 'duel' && B.barOf(target)[0] - dmg < B.barOf(target)[1] * 0.2) { endTrial(!!target.duelist, TD); return; } }   /* C-1: Schwelle am Rumpf (wo gestorben wird) — vorher fiel der Gegner vor der 20-%-Marke und das Duell galt als verloren */
-  if ((S.trial || S.trialsG) && (target.trial || target === S.player || target.coopHero) && ktTrialHurt(target, dmg, source, kind)) return;   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
+    if (TD?.kind === 'duel') duelT = TD; }   /* Entwickler 04.10. („Fechter hat unendlich Leben“): der Schaden kommt jetzt erst an, dann wird gemessen (unten); vorher endete die Prüfung, sobald ein Hieb rechnerisch den Rumpf unter 20 % gebracht HÄTTE — der Fechter nahm nie sichtbar Schaden */   /* C-1: Schwelle am Rumpf (wo gestorben wird) — vorher fiel der Gegner vor der 20-%-Marke und das Duell galt als verloren */
+  pitPost = null; if ((S.trial || S.trialsG) && (target.trial || target === S.player || target.coopHero) && ktTrialHurt(target, dmg, source, kind)) return;
+  if (pitPost) { duelT = pitPost; pitPost = null; }   /* Klassen-Prüfung: Grube, Bogen, Meuchelstich */
   if (abNow && source === abNow.c && abNow.mult !== 1 && dmg > 0) dmg *= abNow.mult;   /* Fähigkeitssterne: Schaden der laufenden Fähigkeit */
   if (kind === 'fire' && dkNode(target, 'k_frostborn')) dmg *= 1.3;   // S15: Frostgeboren fürchtet Feuer
   if (target === S.player && target.titleClass === 'monk' && source && source !== target && kind === 'physical' && !target.downed && gearOf(target) >= 2 && chance(gearOf(target) >= 3 ? 0.3 : 0.2)) {   // S15 Robe der Stillen Hand
@@ -3926,6 +3928,13 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
       if (w?.broke) { if (target === S.player) UI.toast('PROTHESE BESCHÄDIGT', 2200); log(`${target === S.player ? 'Deine' : target.name + 's'} Prothese (${B.PART_NAME[part]}) ist unter 30 % abgenutzt und wirkt nicht mehr. Die Werkbank in Gelenkhall setzt sie instand.`, 'party'); }
       else if (w?.half && target === S.player) log(`Deine Prothese (${B.PART_NAME[part]}) knirscht: unter 50 % Zustand bringt sie nur noch den halben Vorteil. Spezialöl oder Feinwerkzeug an einer Werkbank helfen.`, 'party'); } }   /* Roadmap P4 */
   else target.hp -= dmg;
+  if (duelT) {   /* Duell im Kreis: niemand stirbt — der Rumpf bleibt mindestens bei 1; unter 20 % Rumpf ist das Duell entschieden */
+    if (target.body) { if (target.body.torso.hp <= 0 || target.body.head.hp <= 0) { target.body.torso.hp = Math.max(1, target.body.torso.hp); target.body.head.hp = Math.max(1, target.body.head.hp); B.syncHp(target); result = 'hit'; } }
+    else if (target.hp <= 0) target.hp = 1;
+    if (B.barOf(target)[0] < B.barOf(target)[1] * 0.2) {
+      if (duelT.kind === 'pit') { const p0 = byId(duelT.owner) || S.player, low = B.barOf(p0)[0] < B.barOf(p0)[1] * 0.3;   /* Grube: wer gewinnt, steht selbst am Abgrund */
+        if (!low) log(`${p0.coopHero ? p0.name + ': ' : ''}„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).`, 'quest'); endTrial(low, duelT); return; }
+      endTrial(!!target.duelist, duelT); return; } }
   if (target.eye?.q && dmg > 0 && EYE_ZAP.has(kind)) { const w = B.wearEye(target, Math.min(8, 1.5 + dmg * 0.15));   /* Roadmap P2: Magie-Anfälligkeit — Schatten- und Magietreffer stören das Roboterauge */
     if (target === S.player && w) { if (w.broke) { UI.toast('ROBOTERAUGE GESTÖRT', 2200); log('Dein Roboterauge flackert unter 30 % und zeigt nur noch Rauschen. Ein Kybernetiker oder die Werkbank in Gelenkhall richtet es.', 'party'); } else if (w.was - w.now >= 1 && !S.flags.eyeZapHint) { S.flags.eyeZapHint = true; log('Magie knistert im Messing deines Auges. Zauber nutzen es ab.', 'party'); } } }
   credit(target, source, dmg);                                            // Phase 1: XP nach Beitrag
@@ -14141,6 +14150,7 @@ function clsTrialEnd(T, won) {
   UI.toast(`${pre}${T.title.toUpperCase()}: BESTANDEN`, 2600); log(`${pre}${T.title}: bestanden. Sprich mit ${who}, um die Prüfung abzuschließen.`, 'quest');
 }
 // Treffer in einer Prüfung: true = der Treffer ist erledigt (zählt oder zählt nicht), hurt() endet.
+let pitPost = null;   /* Grube: Fechter-Treffer erst anwenden, dann in hurt() messen */
 function ktTrialHurt(target, dmg, source, kind) {
   const T = target.trialOwner ? trialOf(byId(target.trialOwner)) : (target === S.player || target.coopHero) ? trialOf(target) : null; if (!T) return false;
   const p = byId(T.owner) || S.player;
@@ -14148,7 +14158,7 @@ function ktTrialHurt(target, dmg, source, kind) {
   if (target.trial === 'stab' && T.kind === 'stab') { const behind = source && Math.abs(normAng(Math.atan2(source.y - target.y, source.x - target.x) - (target.faceA ?? 0))) > 1.9;   /* in den Rücken (die Puppe schaut zum Prüfling) */
     if (source === p && (performance.now() - (p.stabAt || 0) < 1500 || p.shadowNext > performance.now())) {   /* Entwickler 03.10.: zurück auf Meuchelstich (der Lehrer leiht ihn für die Prüfung) */ T.n++; float(target, 'Meuchelstich', 'rgba(170,150,220,ALPHA)'); die(target, 'Meuchelstich', p); } else if (source === p) float(target, 'nur von hinten', 'rgba(200,190,160,ALPHA)'); return true; }
   if (T.kind === 'pit') {
-    if (target.duelist && B.barOf(target)[0] - dmg < B.barOf(target)[1] * 0.2) { const low = B.barOf(p)[0] < B.barOf(p)[1] * 0.3;   /* C-1 */ if (!low) log(`${p.coopHero ? p.name + ': ' : ''}„Zu früh. Du hast noch nicht geblutet.“ Wer die Grube gewinnt, steht selbst am Abgrund (unter 30 % Leben).`, 'quest'); endTrial(low, T); return true; }
+    if (target.duelist) { pitPost = T; return false; }   /* 04.10.: erst Schaden, dann messen (wie das Duell) — siehe hurt() */
     if (target === p && source?.duelist && p.hp - dmg < p.maxHp * 0.1) { endTrial(false, T); return true; }
   }
   if (T.kind === 'hold' && target === p && p.hp - dmg < p.maxHp * 0.1 && source?.trial === 'hold') { endTrial(false, T); return true; }
@@ -21119,6 +21129,15 @@ export function selftest() {
     const q0 = S.quests.kt_bard2; try { S.quests.kt_bard2 = { state: 'active', progress: [0, 0] }; const p = stage(); p.abilities = (p.abilities || []).filter(k => k !== 'war_song'); p.cooldowns = {}; p.stamina = 200;
       const ok3 = qSt('kt_bard2')?.state === 'active'; return pool && rack && ok3;
     } finally { if (q0) S.quests.kt_bard2 = q0; else delete S.quests.kt_bard2; } }));
+  ok('Duell im Kreis (04.10.): der Fechter nimmt sichtbar Schaden, stirbt nie (Rumpf ≥ 1) und das Duell endet erst, wenn der Rumpf wirklich unter 20 % liegt', sandbox(() => {
+    const p = stage(), T0 = S.trial, q0 = S.quests.kt_warrior2;
+    try { S.quests.kt_warrior2 = { state: 'active', progress: [0] }; p.stamina = 200;
+      startTrial('duel', { x: p.x, y: p.y }, { qk: 'kt_warrior2', oi: 0, cls: 'warrior', npc: null, npcName: 'Probe', title: 'Probe' });
+      const e = S.ents[p.map].find(x => x.duelist && x.alive); if (!e) return false; const t0 = e.body.torso.hp;
+      hurt(e, 1, p, 'Probe'); const dropped = e.body.torso.hp < t0 && !!S.trial;   /* kleiner Treffer: Schaden sichtbar, Duell läuft */
+      hurt(e, 9999, p, 'Probe'); const ended = !S.trial && e.alive && e.body.torso.hp >= 1 && S.quests.kt_warrior2.progress[0] === 1;   /* Riesentreffer: Rumpf bleibt ≥ 1, Duell gewonnen */
+      return dropped && ended;
+    } finally { endTrial(null, S.trial); if (T0) S.trial = T0; if (q0) S.quests.kt_warrior2 = q0; else delete S.quests.kt_warrior2; } }));
   ok('Asservatenkammer (03.10.): Waffe nach Flucht verwahrt; Wache derselben Macht gibt das Exemplar gegen Buße zurück; mit offenem Kopfgeld nicht', sandbox(() => {
     const p = stage(), ev0 = S.evidence, b0 = S.bounty;
     try { S.evidence = []; S.bounty = {}; const w = mkItem('longsword'); w.rar = 'rare'; evidenceKeep(w, 'valen'); S.gold = 500;
@@ -22752,7 +22771,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

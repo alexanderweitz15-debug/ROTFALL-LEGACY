@@ -1399,3 +1399,5 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Heiler (Fenster, 03.10.):** „Versorg meine Wunden“ öffnet ein Fenster: jede Person deiner Gruppe mit Leben, sechs Gliedern (grün heil, rot gebrochen, gelb geschient, grau fehlend) und Zuständen. Zwei Knöpfe: Wunden versorgen (Preis nach Verletzung, dauert ein paar Herzschläge) und Brüche schienen/Wunden reinigen (25 Gold). Prothesen zählen nicht als Wunde — die repariert nur die Werkbank. Debug: „Fenster: Heiler“.
 
 - **Zwerge (Aussehen, 03.10.):** Zwerge — der Zwergen-Held und alle Leute der Tiefhall — sind kleine, breite Gestalten: 80 % Höhe, breitere Schultern, Bauch, dicke Arme, meist Bart.
+
+- **Duell im Kreis / Grube (Fix 04.10.):** Der Übungsfechter nimmt jetzt sichtbar Schaden; sein Rumpf fällt nie unter 1 (niemand stirbt). Das Duell endet, sobald sein oder dein Rumpf wirklich unter 20 % liegt. Vorher endete es schon, wenn ein Hieb den Rumpf rechnerisch darunter gebracht hätte — der Fechter schien unverwundbar.
