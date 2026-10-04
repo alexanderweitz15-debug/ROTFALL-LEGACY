@@ -1498,6 +1498,11 @@ export const QUESTS = {
   q_lila: { name:'Die vermisste Tochter', giver:'jorun', desc:'Joruns Tochter Lila ist seit zwei Tagen fort.',
     objectives:[{type:'find',target:'lila',text:'Lila finden'}],
     reward:{xp:60}, turnin:'jorun', branching:true },
+  /* Audit 04.10. Phase 4: Erbe-Aufträge — entstehen beim Antritt des Erben (adoptSuccessor), kein Geber */
+  q_erbe_schwur: { name:'Schwur des Vorfahren', giver:null, desc:'Ein Auftrag deines Vorfahren blieb offen. Schließe ihn in seinem Namen ab — wer das Wort eines Toten hält, bekommt den doppelten Lohn.',
+    objectives:[{type:'custom',count:1,text:'Den offenen Auftrag des Vorfahren abschließen'}], reward:{xp:120} },
+  q_erbe_grab: { name:'Das Ahnengrab', giver:null, desc:'Dein Vorfahr liegt, wo er fiel. Besuche das Grab: dort hörst du, was von ihm bleibt — und wer seine Waffe trägt.',
+    objectives:[{type:'custom',count:1,text:'Das Ahnengrab besuchen'}], reward:{xp:60} },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
