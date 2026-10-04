@@ -343,29 +343,48 @@ export function legacySw(wt, u) { const T = legacyTiming(wt); return u < 0.4 ? u
 // Bild-Stützstelle: die größte ≤ u — das Impact-Bild (u 0,5) erscheint nie vor dem Schaden
 export function snapU(u) { let r = 0; for (const x of ATK_U) { if (x <= u + 1e-9) r = x; else break; } return r; }
 const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
+/* Gewicht (Entwickler 04.10.2026: „die Waffen wirken leicht, ohne Gewicht“; Recherche: Anticipation-Hold, Peitschen-Beschleunigung, Overshoot,
+   länger gehaltenes Follow-through, langsame Erholung bei schweren Waffen — slynyrd Pixelblog 9, GDKeys „Anatomy of an Attack“, 12 Prinzipien).
+   WEIGHT 0…1,2 je Klasse: 0 = Dolch (nichts davon), 1,2 = Kriegshammer. Wirkung in atkShape/atkBody:
+   - Ausholen erreicht die Endlage früher und HÄLT sie (Anticipation-Hold, bis 0,1 der Formzeit);
+   - der Hieb beschleunigt wie eine Peitsche (Exponent 2 + Gewicht: lange langsam, dann schlagartig);
+   - nach dem Einschlag schwingt die Klinge ÜBER die Endlage hinaus (bis +35 %) und pendelt zurück;
+   - die Erholung beginnt später (Follow-through wird gehalten) und läuft langsamer;
+   - der Körper sinkt im Einschlag nach (Gewicht landet) und richtet sich erst spät wieder auf. Werte vorläufig. */
+const WEIGHT = { dagger: 0, rapier: 0.1, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
+export const atkWeight = wt => WEIGHT[wt] ?? 0.35;
+const windK = (u, g) => eo(Math.min(1, u / (0.4 - 0.1 * g)));                       /* Ausholen: früher fertig, dann halten */
+const whip = (t, g) => Math.pow(Math.max(0, Math.min(1, t)), 2 + g);               /* Hieb: Peitschen-Beschleunigung */
+const recovStart = g => 0.7 + 0.12 * g;                                            /* Erholung beginnt später (Follow-through gehalten) */
+const recovK = (u, g) => { const s = recovStart(g); return u <= s ? 0 : eo(Math.min(1, (u - s) / (1 - s)) ) * (1 - 0.15 * g) + 0.15 * g * Math.min(1, (u - s) / (1 - s)); };   /* langsamer, nicht ganz ausgeeast */
 // Klingenwinkel/Handvorschub einer Form zur Formzeit u (null = Klasse ohne Daten)
 export function atkShape(wt, s, u) {
-  const P = atkProfile(wt); if (!P) return null; const F = P.shapes[s] || P.shapes[0];
+  const P = atkProfile(wt); if (!P) return null; const F = P.shapes[s] || P.shapes[0], g = atkWeight(wt);
   if (u <= 0) return { a: F.a0, ext: 0 };
   if (F.kind === 'thrust') {                                         // Stoß: zurückziehen, vorschnellen (Einschlag = volle Streckung), halten, einholen
-    if (u < 0.4) { const k = eo(u / 0.4); return { a: F.a0 + (F.off - F.a0) * k, ext: F.back * k }; }
-    if (u <= 0.5) return { a: F.off, ext: F.back + (F.fwd - F.back) * ei((u - 0.4) / 0.1) };
-    if (u < 0.7) return { a: F.off, ext: F.fwd * (1 - 0.25 * (u - 0.5) / 0.2) };
-    const k = Math.min(1, (u - 0.7) / 0.3); return { a: F.off + (F.a1 - F.off) * eo(k), ext: F.fwd * 0.75 * (1 - eo(k)) };
+    if (u < 0.4) { const k = windK(u, g); return { a: F.a0 + (F.off - F.a0) * k, ext: F.back * k }; }
+    if (u <= 0.5) return { a: F.off, ext: F.back + (F.fwd - F.back) * whip((u - 0.4) / 0.1, g * 0.5) };
+    const s0 = recovStart(g);
+    if (u < s0) return { a: F.off, ext: F.fwd * (1 - 0.25 * (u - 0.5) / (s0 - 0.5)) };
+    const k = recovK(u, g); return { a: F.off + (F.a1 - F.off) * k, ext: F.fwd * 0.75 * (1 - k) };
   }
-  if (u < 0.4) { const k = eo(u / 0.4); return { a: F.a0 + (F.from - F.a0) * k, ext: F.eW * k }; }
-  if (u <= 0.5) return { a: F.from + (F.hit - F.from) * ei((u - 0.4) / 0.1), ext: F.eS };
-  if (u < 0.7) { const k = (u - 0.5) / 0.2; return { a: F.hit + (F.end - F.hit) * eo(k), ext: F.eS * (1 - k * 0.5) }; }
-  const k = Math.min(1, (u - 0.7) / 0.3); return { a: F.end + (F.a1 - F.end) * eo(k), ext: F.eS * 0.5 * (1 - k) };
+  if (u < 0.4) { const k = windK(u, g); return { a: F.a0 + (F.from - F.a0) * k, ext: F.eW * k }; }
+  if (u <= 0.5) return { a: F.from + (F.hit - F.from) * whip((u - 0.4) / 0.1, g), ext: F.eS };
+  const s0 = recovStart(g);
+  if (u < s0) { const k = (u - 0.5) / (s0 - 0.5), ov = 0.35 * g * Math.sin(Math.PI * Math.min(1, k * 1.25)) * (k < 0.8 ? 1 : (1 - k) / 0.2);   /* Overshoot: über die Endlage hinaus, zurückpendeln */
+    return { a: F.hit + (F.end - F.hit) * (eo(k) + ov), ext: F.eS * (1 - k * 0.5) }; }
+  const k = recovK(u, g); return { a: F.end + (F.a1 - F.end) * k, ext: F.eS * 0.5 * (1 - k) };
 }
 export const atkSpin = (wt, s) => !!atkProfile(wt)?.shapes[s]?.spin;
 export const atkThrust = (wt, s) => atkProfile(wt)?.shapes[s]?.kind === 'thrust';
 // Ganzkörperpose einer Form zur Formzeit u (null = Klasse ohne Daten): by, ln, st, hy, hr, hd (Pixel, siehe BODY)
 const BK = ['by', 'ln', 'st', 'hy', 'hr', 'hd'];
 export function atkBody(wt, s, u) {
-  const F = atkProfile(wt)?.shapes[s], B = F?.body; if (!B) return null;
-  const seg = u < 0.4 ? [B.b0, B.w, eo(u / 0.4)] : u <= 0.5 ? [B.w, B.i, ei((u - 0.4) / 0.1)] : u < 0.7 ? [B.i, B.f, eo((u - 0.5) / 0.2)] : [B.f, null, eo(Math.min(1, (u - 0.7) / 0.3))];
-  const [a, b, k] = seg, o = {}; for (const n of BK) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; } return o;
+  const F = atkProfile(wt)?.shapes[s], B = F?.body; if (!B) return null; const g = atkWeight(wt), s0 = recovStart(g);
+  const seg = u < 0.4 ? [B.b0, B.w, windK(u, g)] : u <= 0.5 ? [B.w, B.i, whip((u - 0.4) / 0.1, g * 0.6)] : u < s0 ? [B.i, B.f, eo((u - 0.5) / (s0 - 0.5))] : [B.f, null, recovK(u, g)];
+  const [a, b, k] = seg, o = {}; for (const n of BK) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; }
+  if (u > 0.5 && u < s0) { const k2 = (u - 0.5) / (s0 - 0.5); o.by += 2 * g * Math.sin(Math.PI * k2); o.hy += 1 * g * Math.sin(Math.PI * k2); }   /* Gewicht landet: Körper sinkt nach dem Einschlag nach, Kopf nickt */
+  return o;
 }
 export const DEATH_KINDS = Object.keys(ANIM_DEFS.death);
 // Ereignisse zwischen t0 (ausschließlich) und t1 (einschließlich); t0 < 0 heißt „von Anfang an“
