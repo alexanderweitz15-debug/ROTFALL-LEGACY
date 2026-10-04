@@ -120,6 +120,94 @@ export const ANIM_DEFS = {
       C: { name: 'C Endgame', steps: [{ s: 0, w: 0.313, h: 0.383 }, { s: 1, w: 0.25, h: 0.33 }, { s: 2, w: 0.38, h: 0.47 }],
         fx: { stop: 1.53, shake: 1.38, trail: 10, push: 6, slash: 2, after: 1, fin: 2 } },
     },
+    /* Ausrollen (Entwickler 04.10.2026: „baue für mehr Waffenarten Animationen“): die restlichen Nahkampfklassen bekommen eigene Profile statt der
+       alten Kurven. Jede Klasse ein eigener Ablauf (Ausholen → Beschleunigen → Hieb → Nachschwung → Abfangen): Axt hackt von oben und bleibt kurz
+       stecken, Kolben wuchtet, Stange fegt weit, Rapier sticht aus dem Ausfall, Peitsche knallt von oben, Stab wirbelt. Zeiten vorläufig, aus den
+       Nachbarklassen abgeleitet (Axt zwischen Schwert und Großaxt, Kolben nahe Hammer, Rapier nahe Dolch). */
+    axe: {                                                           // einhändig: hacken, kurz stecken, Querhack
+      name: 'Axt',
+      shapes: [
+        { name: 'Hack von oben', a0: 0.6, from: -2.4, hit: 0.45, end: 0.7, a1: 0.6, eW: -3, eS: 3 },
+        { name: 'Querhack', a0: 0.6, from: 2.2, hit: -0.12, end: -0.6, a1: -0.5, eW: -1, eS: 2 },
+        { name: 'Spalter', a0: -0.5, from: -2.7, hit: 0.7, end: 0.85, a1: 0.6, eW: -5, eS: 5 },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.36, h: 0.48 }, { s: 1, w: 0.27, h: 0.4 }, { s: 2, w: 0.38, h: 0.49 }],
+        fx: { stop: 1, shake: 1, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.31, h: 0.42 }, { s: 1, w: 0.23, h: 0.34 }, { s: 2, w: 0.35, h: 0.47 }],
+        fx: { stop: 1.25, shake: 1.2, trail: 8, push: 4, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.24, h: 0.34 }, { s: 1, w: 0.18, h: 0.27 }, { s: 2, w: 0.32, h: 0.44 }],
+        fx: { stop: 1.55, shake: 1.5, trail: 10, push: 8, slash: 2, after: 1, fin: 2 } },
+    },
+    mace: {                                                          // Kolben/Flegel: wuchtig, Überkopf, Kopf hängt nach
+      name: 'Streitkolben',
+      shapes: [
+        { name: 'Seitwärts', a0: 0.6, from: 2.3, hit: -0.12, end: -0.7, a1: -0.6, eW: -2, eS: 3 },
+        { name: 'Überkopf', a0: -0.6, from: -2.5, hit: 0.45, end: 0.65, a1: 0.6, eW: -3, eS: 4 },
+        { name: 'Rundum', a0: 0.6, from: 1.6, hit: 2 * Math.PI - 0.12, end: 2 * Math.PI + 0.6, a1: 2 * Math.PI + 0.6, eW: -2, eS: 3, spin: true },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.4, h: 0.51 }, { s: 1, w: 0.33, h: 0.45 }, { s: 2, w: 0.4, h: 0.5 }],
+        fx: { stop: 1.1, shake: 1.1, trail: 6, push: 2, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.35, h: 0.45 }, { s: 1, w: 0.28, h: 0.39 }, { s: 2, w: 0.37, h: 0.48 }],
+        fx: { stop: 1.3, shake: 1.3, trail: 8, push: 5, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.27, h: 0.36 }, { s: 1, w: 0.21, h: 0.3 }, { s: 2, w: 0.33, h: 0.45 }],
+        fx: { stop: 1.6, shake: 1.6, trail: 10, push: 9, slash: 2, after: 1, fin: 2 } },
+    },
+    polearm: {                                                       // Hellebarde/Sense/Glefe: weite Bögen, Stoß, Rundfegen
+      name: 'Stangenwaffe',
+      shapes: [
+        { name: 'Weiter Schwung', a0: 0.3, from: 2.4, hit: -0.12, end: -1.5, a1: -0.4, eW: -1, eS: 4 },
+        { name: 'Stoß', kind: 'thrust', a0: -0.4, off: 0, back: -8, fwd: 20, a1: 0.1 },
+        { name: 'Rundfegen', a0: 0.1, from: 1.6, hit: 2 * Math.PI - 0.12, end: 2 * Math.PI + 1.0, a1: 2 * Math.PI + 0.3, eW: -2, eS: 5, spin: true },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.36, h: 0.48 }, { s: 1, w: 0.3, h: 0.42 }, { s: 2, w: 0.38, h: 0.5 }],
+        fx: { stop: 1, shake: 1, trail: 7, push: 2, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.3, h: 0.42 }, { s: 1, w: 0.25, h: 0.36 }, { s: 2, w: 0.35, h: 0.48 }],
+        fx: { stop: 1.25, shake: 1.2, trail: 9, push: 5, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.22, h: 0.33 }, { s: 1, w: 0.18, h: 0.28 }, { s: 2, w: 0.3, h: 0.44 }],
+        fx: { stop: 1.6, shake: 1.5, trail: 11, push: 10, slash: 2, after: 1, fin: 2 } },
+    },
+    rapier: {                                                        // Ausfall, Riposte, Schnitt — schnell, lang gestreckt
+      name: 'Rapier',
+      shapes: [
+        { name: 'Ausfall', kind: 'thrust', a0: 0.2, off: 0, back: -6, fwd: 18, a1: 0.15 },
+        { name: 'Riposte', kind: 'thrust', a0: 0.15, off: -0.1, back: -4, fwd: 16, a1: 0.1 },
+        { name: 'Schnitt', a0: 0.1, from: 1.4, hit: -0.1, end: -0.9, a1: -0.3, eW: 0, eS: 2 },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.24, h: 0.36 }, { s: 1, w: 0.18, h: 0.3 }, { s: 2, w: 0.24, h: 0.38 }],
+        fx: { stop: 1, shake: 1, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.2, h: 0.31 }, { s: 1, w: 0.15, h: 0.26 }, { s: 2, w: 0.2, h: 0.33 }],
+        fx: { stop: 1.25, shake: 1.2, trail: 8, push: 3, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.15, h: 0.25 }, { s: 1, w: 0.11, h: 0.21 }, { s: 2, w: 0.17, h: 0.29 }],
+        fx: { stop: 1.45, shake: 1.35, trail: 10, push: 8, slash: 1, after: 1, fin: 2 } },
+    },
+    whip: {                                                          // Peitsche: von oben knallen, quer ziehen
+      name: 'Peitsche',
+      shapes: [
+        { name: 'Knall von oben', a0: 0.6, from: -2.4, hit: 0.4, end: 0.9, a1: 0.5, eW: -2, eS: 3 },
+        { name: 'Querzug', a0: 0.5, from: 2.2, hit: -0.1, end: -1.0, a1: -0.4, eW: -1, eS: 2 },
+        { name: 'Doppelknall', a0: -0.4, from: -2.6, hit: 0.5, end: 1.0, a1: 0.5, eW: -3, eS: 4 },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.3, h: 0.42 }, { s: 1, w: 0.24, h: 0.36 }, { s: 2, w: 0.3, h: 0.44 }],
+        fx: { stop: 0.8, shake: 0.8, trail: 8, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.26, h: 0.37 }, { s: 1, w: 0.2, h: 0.31 }, { s: 2, w: 0.27, h: 0.4 }],
+        fx: { stop: 1.1, shake: 1.0, trail: 10, push: 3, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.2, h: 0.3 }, { s: 1, w: 0.15, h: 0.25 }, { s: 2, w: 0.24, h: 0.36 }],
+        fx: { stop: 1.3, shake: 1.2, trail: 12, push: 6, slash: 2, after: 1, fin: 2 } },
+    },
+    staff: {                                                         // Kampfstab: Schwung, Stoß, Wirbel
+      name: 'Stab',
+      shapes: [
+        { name: 'Stabschwung', a0: 0.4, from: 2.0, hit: -0.12, end: -1.1, a1: -0.4, eW: 0, eS: 2 },
+        { name: 'Stabstoß', kind: 'thrust', a0: -0.4, off: 0, back: -6, fwd: 14, a1: 0.2 },
+        { name: 'Stabwirbel', a0: 0.2, from: 1.8, hit: 2 * Math.PI - 0.12, end: 2 * Math.PI + 0.8, a1: 2 * Math.PI + 0.4, eW: -1, eS: 3, spin: true },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.28, h: 0.42 }, { s: 1, w: 0.22, h: 0.35 }, { s: 2, w: 0.33, h: 0.48 }],
+        fx: { stop: 0.9, shake: 0.9, trail: 6, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.24, h: 0.36 }, { s: 1, w: 0.18, h: 0.3 }, { s: 2, w: 0.3, h: 0.46 }],
+        fx: { stop: 1.2, shake: 1.1, trail: 8, push: 3, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.18, h: 0.28 }, { s: 1, w: 0.13, h: 0.23 }, { s: 2, w: 0.27, h: 0.43 }],
+        fx: { stop: 1.5, shake: 1.4, trail: 10, push: 7, slash: 2, after: 1, fin: 2 } },
+    },
   },
 };
 /* Kampfanimation (Lead 02.10.: „Körper starr“): Ganzkörperpose je Form und Phase. Schlüsselbilder b0 (u 0, = Endlage des Vorgängers in der
@@ -160,6 +248,38 @@ const BODY = {
     { w: { by: 1, ln: 3, st: 3, hr: -3 }, i: { by: 2, ln: -3, st: 6, hr: 3, hd: 1 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 2 } },
     { w: { by: -2, ln: 3, st: 2, hy: -1, hr: -3, hd: -7 }, i: { by: 6, ln: -4, st: 6, hy: 2, hr: 2, hd: 10 }, f: { by: 6, ln: -4, st: 6, hy: 2, hd: 10 } },
   ],
+  /* Ausrollen 04.10.: Körper je neuer Klasse (Hack von oben = hoch ausholen, tief einschlagen; Querhieb = Rumpf dreht; Stoß = Ausfallschritt;
+     Wirbel = tief in den Knien, Hand weit draußen). */
+  axe: [
+    { w: { by: -1, ln: 2, st: 2, hy: -1, hr: -2, hd: -5 }, i: { by: 2, ln: -3, st: 5, hr: 2, hd: 5 }, f: { by: 2, ln: -3, st: 5, hr: 1, hd: 5 } },
+    { w: { by: 1, ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -2, st: 4, hr: 2 } },
+    { w: { by: -2, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 4, ln: -4, st: 6, hy: 2, hr: 2, hd: 8 }, f: { by: 4, ln: -4, st: 6, hy: 2, hd: 8 } },
+  ],
+  mace: [
+    { w: { by: 1, ln: 3, st: 3, hr: -3 }, i: { by: 2, ln: -3, st: 6, hr: 3, hd: 1 }, f: { by: 2, ln: -3, st: 6, hr: 2, hd: 2 } },
+    { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 3, ln: -3, st: 6, hr: 2, hd: 6 }, f: { by: 3, ln: -3, st: 6, hr: 2, hd: 6 } },
+    { w: { by: 2, ln: 2, st: 2, hr: -1 }, i: { by: 3, ln: -3, st: 6, hr: 4 }, f: { by: 2, ln: -2, st: 5, hr: 2 } },
+  ],
+  polearm: [
+    { w: { by: 1, ln: 3, st: 3, hr: -3, hd: -1 }, i: { by: 2, ln: -3, st: 7, hr: 4 }, f: { by: 2, ln: -3, st: 7, hr: 3, hd: 1 } },
+    { w: { by: 1, ln: 3, st: 2, hr: -3 }, i: { by: 2, ln: -3, st: 8, hr: 5 }, f: { by: 2, ln: -3, st: 8, hr: 4 } },
+    { w: { by: 2, ln: 2, st: 3, hr: -2 }, i: { by: 4, ln: -3, st: 7, hr: 5 }, f: { by: 3, ln: -2, st: 6, hr: 3 } },
+  ],
+  rapier: [
+    { w: { by: 1, ln: 3, st: 2, hr: -3 }, i: { by: 2, ln: -4, st: 8, hr: 5 }, f: { by: 2, ln: -3, st: 7, hr: 4 } },
+    { w: { ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -3, st: 7, hr: 4 }, f: { by: 1, ln: -2, st: 6, hr: 3 } },
+    { w: { ln: 1, st: 2, hr: -2, hd: -2 }, i: { by: 1, ln: -2, st: 4, hr: 1, hd: -1 }, f: { ln: -1, st: 4 } },
+  ],
+  whip: [
+    { w: { by: -1, ln: 2, st: 2, hy: -1, hr: -2, hd: -5 }, i: { by: 2, ln: -2, st: 5, hr: 3, hd: 3 }, f: { by: 2, ln: -2, st: 5, hr: 2, hd: 4 } },
+    { w: { by: 1, ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -1, st: 4, hr: 2 } },
+    { w: { by: -1, ln: 3, st: 2, hy: -1, hr: -3, hd: -6 }, i: { by: 3, ln: -3, st: 6, hy: 1, hr: 3, hd: 5 }, f: { by: 3, ln: -3, st: 6, hy: 1, hd: 6 } },
+  ],
+  staff: [
+    { w: { by: 1, ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -2, st: 5, hr: 2 } },
+    { w: { by: 1, ln: 2, st: 2, hr: -2 }, i: { by: 2, ln: -3, st: 7, hr: 4 }, f: { by: 2, ln: -2, st: 6, hr: 3 } },
+    { w: { by: 2, ln: 2, st: 2, hr: -1 }, i: { by: 3, ln: -3, st: 6, hr: 4 }, f: { by: 2, ln: -2, st: 5, hr: 2 } },
+  ],
 };
 /* Kampfhaltung (Waffe bereit, im Kampf ohne Schwung) und Deckung je Klasse: a/ext wie eine Form, body wie ein Schlüsselbild. */
 const STANCE = {
@@ -169,12 +289,18 @@ const STANCE = {
   dagger:   { ready: { a: 0.2, ext: 2, body: { by: 2, st: 2, ln: -1 } },   guard: { a: -1.7, ext: 0, body: { by: 2, st: 1 } } },
   spear:    { ready: { a: 0.1, ext: 4, body: { by: 1, st: 3, ln: 0 } },    guard: { a: -0.5, ext: 3, body: { by: 1, st: 3 } } },
   hammer:   { ready: { a: -0.9, ext: -1, body: { by: 1, st: 3, ln: 1 } },  guard: { a: -1.5, ext: -3, body: { by: 2, st: 3 } } },
+  axe:      { ready: { a: -0.6, ext: 0, body: { by: 1, st: 2, ln: 0 } },   guard: { a: -1.3, ext: -2, body: { by: 1, st: 2 } } },   /* Ausrollen 04.10. */
+  mace:     { ready: { a: -0.8, ext: -1, body: { by: 1, st: 3, ln: 1 } },  guard: { a: -1.4, ext: -3, body: { by: 2, st: 3 } } },
+  polearm:  { ready: { a: 0.0, ext: 3, body: { by: 1, st: 3, ln: 0 } },    guard: { a: -0.6, ext: 2, body: { by: 1, st: 3 } } },
+  rapier:   { ready: { a: 0.15, ext: 3, body: { by: 1, st: 3, ln: -1 } },  guard: { a: -1.2, ext: 0, body: { by: 1, st: 2 } } },
+  whip:     { ready: { a: 0.9, ext: 0, body: { by: 1, st: 2, ln: 0 } },    guard: { a: -1.2, ext: -1, body: { by: 1, st: 2 } } },
+  staff:    { ready: { a: -0.2, ext: 2, body: { by: 1, st: 3, ln: 0 } },   guard: { a: -0.4, ext: 2, body: { by: 1, st: 3 } } },
 };
 export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
 export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;
-const PACK_AMP = { A: 1, B: 1.5, C: 2 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 7, hd: 11 };
+const PACK_AMP = { A: 1.4, B: 1.9, C: 2.4 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 8, hd: 12 };   /* Schritt 2 (Entwickler 04.10.: „zu kleine Ausschläge“) — vorläufig: A 1,4 statt 1, B 1,9, C 2,4 */
 const scaleBody = (k, a) => { const o = {}; for (const [n, v] of Object.entries(k || {})) o[n] = Math.max(-BODY_MAX[n], Math.min(BODY_MAX[n], v * a)); return o; };
 for (const [wt, list] of Object.entries(BODY)) {
   const P = ANIM_DEFS.attack[wt]; if (!P) continue; const n = P.shapes.length;
@@ -217,29 +343,48 @@ export function legacySw(wt, u) { const T = legacyTiming(wt); return u < 0.4 ? u
 // Bild-Stützstelle: die größte ≤ u — das Impact-Bild (u 0,5) erscheint nie vor dem Schaden
 export function snapU(u) { let r = 0; for (const x of ATK_U) { if (x <= u + 1e-9) r = x; else break; } return r; }
 const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
+/* Gewicht (Entwickler 04.10.2026: „die Waffen wirken leicht, ohne Gewicht“; Recherche: Anticipation-Hold, Peitschen-Beschleunigung, Overshoot,
+   länger gehaltenes Follow-through, langsame Erholung bei schweren Waffen — slynyrd Pixelblog 9, GDKeys „Anatomy of an Attack“, 12 Prinzipien).
+   WEIGHT 0…1,2 je Klasse: 0 = Dolch (nichts davon), 1,2 = Kriegshammer. Wirkung in atkShape/atkBody:
+   - Ausholen erreicht die Endlage früher und HÄLT sie (Anticipation-Hold, bis 0,1 der Formzeit);
+   - der Hieb beschleunigt wie eine Peitsche (Exponent 2 + Gewicht: lange langsam, dann schlagartig);
+   - nach dem Einschlag schwingt die Klinge ÜBER die Endlage hinaus (bis +35 %) und pendelt zurück;
+   - die Erholung beginnt später (Follow-through wird gehalten) und läuft langsamer;
+   - der Körper sinkt im Einschlag nach (Gewicht landet) und richtet sich erst spät wieder auf. Werte vorläufig. */
+const WEIGHT = { dagger: 0, rapier: 0.1, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
+export const atkWeight = wt => WEIGHT[wt] ?? 0.35;
+const windK = (u, g) => eo(Math.min(1, u / (0.4 - 0.1 * g)));                       /* Ausholen: früher fertig, dann halten */
+const whip = (t, g) => Math.pow(Math.max(0, Math.min(1, t)), 2 + g);               /* Hieb: Peitschen-Beschleunigung */
+const recovStart = g => 0.7 + 0.12 * g;                                            /* Erholung beginnt später (Follow-through gehalten) */
+const recovK = (u, g) => { const s = recovStart(g); return u <= s ? 0 : eo(Math.min(1, (u - s) / (1 - s)) ) * (1 - 0.15 * g) + 0.15 * g * Math.min(1, (u - s) / (1 - s)); };   /* langsamer, nicht ganz ausgeeast */
 // Klingenwinkel/Handvorschub einer Form zur Formzeit u (null = Klasse ohne Daten)
 export function atkShape(wt, s, u) {
-  const P = atkProfile(wt); if (!P) return null; const F = P.shapes[s] || P.shapes[0];
+  const P = atkProfile(wt); if (!P) return null; const F = P.shapes[s] || P.shapes[0], g = atkWeight(wt);
   if (u <= 0) return { a: F.a0, ext: 0 };
   if (F.kind === 'thrust') {                                         // Stoß: zurückziehen, vorschnellen (Einschlag = volle Streckung), halten, einholen
-    if (u < 0.4) { const k = eo(u / 0.4); return { a: F.a0 + (F.off - F.a0) * k, ext: F.back * k }; }
-    if (u <= 0.5) return { a: F.off, ext: F.back + (F.fwd - F.back) * ei((u - 0.4) / 0.1) };
-    if (u < 0.7) return { a: F.off, ext: F.fwd * (1 - 0.25 * (u - 0.5) / 0.2) };
-    const k = Math.min(1, (u - 0.7) / 0.3); return { a: F.off + (F.a1 - F.off) * eo(k), ext: F.fwd * 0.75 * (1 - eo(k)) };
+    if (u < 0.4) { const k = windK(u, g); return { a: F.a0 + (F.off - F.a0) * k, ext: F.back * k }; }
+    if (u <= 0.5) return { a: F.off, ext: F.back + (F.fwd - F.back) * whip((u - 0.4) / 0.1, g * 0.5) };
+    const s0 = recovStart(g);
+    if (u < s0) return { a: F.off, ext: F.fwd * (1 - 0.25 * (u - 0.5) / (s0 - 0.5)) };
+    const k = recovK(u, g); return { a: F.off + (F.a1 - F.off) * k, ext: F.fwd * 0.75 * (1 - k) };
   }
-  if (u < 0.4) { const k = eo(u / 0.4); return { a: F.a0 + (F.from - F.a0) * k, ext: F.eW * k }; }
-  if (u <= 0.5) return { a: F.from + (F.hit - F.from) * ei((u - 0.4) / 0.1), ext: F.eS };
-  if (u < 0.7) { const k = (u - 0.5) / 0.2; return { a: F.hit + (F.end - F.hit) * eo(k), ext: F.eS * (1 - k * 0.5) }; }
-  const k = Math.min(1, (u - 0.7) / 0.3); return { a: F.end + (F.a1 - F.end) * eo(k), ext: F.eS * 0.5 * (1 - k) };
+  if (u < 0.4) { const k = windK(u, g); return { a: F.a0 + (F.from - F.a0) * k, ext: F.eW * k }; }
+  if (u <= 0.5) return { a: F.from + (F.hit - F.from) * whip((u - 0.4) / 0.1, g), ext: F.eS };
+  const s0 = recovStart(g);
+  if (u < s0) { const k = (u - 0.5) / (s0 - 0.5), ov = 0.35 * g * Math.sin(Math.PI * Math.min(1, k * 1.25)) * (k < 0.8 ? 1 : (1 - k) / 0.2);   /* Overshoot: über die Endlage hinaus, zurückpendeln */
+    return { a: F.hit + (F.end - F.hit) * (eo(k) + ov), ext: F.eS * (1 - k * 0.5) }; }
+  const k = recovK(u, g); return { a: F.end + (F.a1 - F.end) * k, ext: F.eS * 0.5 * (1 - k) };
 }
 export const atkSpin = (wt, s) => !!atkProfile(wt)?.shapes[s]?.spin;
 export const atkThrust = (wt, s) => atkProfile(wt)?.shapes[s]?.kind === 'thrust';
 // Ganzkörperpose einer Form zur Formzeit u (null = Klasse ohne Daten): by, ln, st, hy, hr, hd (Pixel, siehe BODY)
 const BK = ['by', 'ln', 'st', 'hy', 'hr', 'hd'];
 export function atkBody(wt, s, u) {
-  const F = atkProfile(wt)?.shapes[s], B = F?.body; if (!B) return null;
-  const seg = u < 0.4 ? [B.b0, B.w, eo(u / 0.4)] : u <= 0.5 ? [B.w, B.i, ei((u - 0.4) / 0.1)] : u < 0.7 ? [B.i, B.f, eo((u - 0.5) / 0.2)] : [B.f, null, eo(Math.min(1, (u - 0.7) / 0.3))];
-  const [a, b, k] = seg, o = {}; for (const n of BK) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; } return o;
+  const F = atkProfile(wt)?.shapes[s], B = F?.body; if (!B) return null; const g = atkWeight(wt), s0 = recovStart(g);
+  const seg = u < 0.4 ? [B.b0, B.w, windK(u, g)] : u <= 0.5 ? [B.w, B.i, whip((u - 0.4) / 0.1, g * 0.6)] : u < s0 ? [B.i, B.f, eo((u - 0.5) / (s0 - 0.5))] : [B.f, null, recovK(u, g)];
+  const [a, b, k] = seg, o = {}; for (const n of BK) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; }
+  if (u > 0.5 && u < s0) { const k2 = (u - 0.5) / (s0 - 0.5); o.by += 2 * g * Math.sin(Math.PI * k2); o.hy += 1 * g * Math.sin(Math.PI * k2); }   /* Gewicht landet: Körper sinkt nach dem Einschlag nach, Kopf nickt */
+  return o;
 }
 export const DEATH_KINDS = Object.keys(ANIM_DEFS.death);
 // Ereignisse zwischen t0 (ausschließlich) und t1 (einschließlich); t0 < 0 heißt „von Anfang an“

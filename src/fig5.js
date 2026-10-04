@@ -29,6 +29,15 @@ class Px {
   part(R, mat = 'cloth', o) { if (!R) return -1; this.P.push({ R, mat, ...o }); return this.P.length - 1; }
   put(p, x, y) { x = Math.floor(x + this.dx); y = Math.floor(y + this.dy); if (p >= 0 && x >= 0 && y >= 0 && x < this.w && y < this.h) this.id[y * this.w + x] = p; }
   rows(p, y0, spans, dx = 0) { spans.forEach((s, i) => { if (s) for (let x = s[0]; x <= s[1]; x++) this.put(p, x + dx, y0 + i); }); }
+  /* Kampfanimation Schritt 1 (Entwickler 04.10.: „Figuren wirken leblos“): Oberkörper von vorn/hinten in den Schlag drehen — jede Zeile oberhalb
+     der Taille rückt seitlich, oben am meisten (Kopf, Schultern, Waffenhand), an der Taille gar nicht. Zeilen in Malkoordinaten (ohne dy). */
+  shearTop(waistY, topY, amt) {
+    if (!amt) return; const w = this.w, y1 = Math.floor(waistY + this.dy), y0 = Math.floor(topY + this.dy);
+    for (let y = 0; y < y1 && y < this.h; y++) { const k = y >= y0 ? (y1 - y) / Math.max(1, y1 - y0) : 1 + (y0 - y) / Math.max(1, y1 - y0) * 0.35, dx = Math.round(amt * k); if (!dx) continue;
+      const row = this.id.subarray(y * w, (y + 1) * w), src = Int16Array.from(row); row.fill(-1);
+      for (let x = 0; x < w; x++) { const nx = x + dx; if (nx >= 0 && nx < w) row[nx] = src[x]; } }
+  }
+  shearAt(waistY, topY, amt, y) { if (!amt) return 0; const y1 = waistY, y0 = topY; if (y >= y1) return 0; const k = y >= y0 ? (y1 - y) / Math.max(1, y1 - y0) : 1 + (y0 - y) / Math.max(1, y1 - y0) * 0.35; return Math.round(amt * k); }
   rect(p, x0, y0, x1, y1) { for (let y = Math.round(y0); y <= Math.round(y1); y++) for (let x = Math.round(x0); x <= Math.round(x1); x++) this.put(p, x, y); }
   poly(p, pts) {
     if (p < 0) return;
@@ -293,13 +302,15 @@ const stanceBody = W => { const st = atkStance(W.ac || W.wt, W.mode === 'cover' 
 const legIK = (hip, foot, side) => [hip, ik(hip, foot, 7.6, 7.6, e => side * e[0]), foot];   // Knie: side −1 = nach links (vorn in der Seitenansicht)
 /* Kampfanimation (Lead 02.10.): Gewicht verlagern, Ausfallschritt, Rumpf kippt in den Schlag, Kniebeuge — als Gelenkpunkte im bestehenden Rig */
 function bodyPose(R, view, B, pose) {
-  const by = Math.round(B.by), ln = Math.round(B.ln), hy = Math.round(B.hy), st = B.st, stand = pose === 'i0' || pose === 'i1' || pose === 'guard';
+  const by = Math.round(B.by), ln = Math.round(B.ln), hy = Math.round(B.hy), st = B.st, stand = pose === 'i0' || pose === 'i1' || pose === 'guard', swing = pose === 'a1' || pose === 'a2' || pose === 'a3';
   R.by += by; R.hy += hy;
   for (const k of ['aN', 'aF', 'aL', 'aR']) if (R[k]) R[k] = R[k].map(([x, y]) => [x, y + by]);
+  /* Schritt 1 (04.10.): Beine auch im Schlag — vorher standen sie bei a1/a2/a3 wie im Stand (nur Arm und Waffe bewegten sich). Seitlich: Ausfallschritt
+     (naher Fuß vor, ferner zurück), Kniebeuge aus der Rumpfhöhe by; vorn/hinten: Grätsche nach st, Knie gebeugt. */
   if (view === 'W') {
     R.lean += ln; R.cs = ln < 0 ? 3 : ln > 0 ? 1 : R.cs; R.sw = ln < 0 ? 2 : R.sw;
-    if (stand) { const h0 = 26 + by; R.lN = legIK([15.5, h0], [15.5 - st, 41], -1); R.lF = legIK([16.5, h0], [16.5 + st * 0.7, 41], -1); }
-  } else if (stand) { const sp = Math.min(3, Math.abs(st) * 0.35), h0 = 26 + by; R.lL = legIK([13.5, h0], [13.5 - sp, 41], -1); R.lR = legIK([18.5, h0], [18.5 + sp, 41], 1); }
+    if (stand || swing) { const h0 = 26 + by, lunge = swing ? st * (ln < 0 ? 1.3 : 0.8) : st; R.lN = legIK([15.5, h0], [15.5 - lunge, 41], -1); R.lF = legIK([16.5, h0], [16.5 + lunge * 0.7, 41], -1); }
+  } else if (stand || swing) { const sp = Math.min(swing ? 4 : 3, Math.abs(st) * (swing ? 0.5 : 0.35)), h0 = 26 + by; R.lL = legIK([13.5, h0], [13.5 - sp, 41], -1); R.lR = legIK([18.5, h0], [18.5 + sp, 41], 1); }
 }
 export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
@@ -376,10 +387,14 @@ export function paintR(L, dir, pose, W = null) {
   if (view === 'W') { if (limbSt(L, 'rleg') === 2) R.lN = stumpOf(R.lN); if (limbSt(L, 'lleg') === 2) R.lF = stumpOf(R.lF); }
   else { const b = view === 'N'; if (limbSt(L, b ? 'lleg' : 'rleg') === 2) R.lL = stumpOf(R.lL); if (limbSt(L, b ? 'rleg' : 'lleg') === 2) R.lR = stumpOf(R.lR); }
   const meta = view === 'W' ? paintW(C, L, R, plan, W, pose) : paintSN(C, L, R, view === 'N', plan, W, pose);
+  /* Schritt 1 (04.10.): von vorn/hinten dreht sich der Oberkörper zur Waffenhand (Ausholen: Hand hinten → Rumpf dreht weg; Schlag: Hand vorn → Rumpf folgt). */
+  const twist = view !== 'W' && plan && W && W.mode === 'swing' ? Math.max(-4, Math.min(4, Math.round((plan.h[0] - 16) * 0.3))) : 0, waistY = 24 + R.by, topY = 13 + R.by;
+  if (twist) { C.shearTop(waistY, topY, twist); for (const k in meta.limbs) { const q = meta.limbs[k]; if (q) meta.limbs[k] = [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]]; } }
+  const twX = q => q && twist ? [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]] : q;
   C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); C.outline(); silGlow(C, L, meta, view);
   const sx = q => q && [q[0] + DX, q[1] + DY], limbs = {}; for (const k in meta.limbs) limbs[k] = sx(meta.limbs[k]);   // Bildkoordinaten (Rahmen 40)
   const lnX = view === 'W' ? R.lean : 0, shL = q => q && [q[0] + lnX, q[1]];   /* Arme werden mit der Rumpfneigung verschoben gemalt — Waffe sitzt an der gemalten Hand */
-  return { g: C.toG(), hand: plan ? sx(shL(plan.h)) : null, off: plan ? sx(shL(plan.off)) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
+  return { g: C.toG(), hand: plan ? sx(twX(shL(plan.h))) : null, off: plan ? sx(twX(shL(plan.off))) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
 }
 
 // S14 (Nutzer: „verschiedene Breiten, dick, breites Schlüsselbein“): Körperbau aus body.js BUILDS als Maß, nicht als Streckung —
