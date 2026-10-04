@@ -1401,3 +1401,5 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Zwerge (Aussehen, 03.10.):** Zwerge — der Zwergen-Held und alle Leute der Tiefhall — sind kleine, breite Gestalten: 80 % Höhe, breitere Schultern, Bauch, dicke Arme, meist Bart.
 
 - **Duell im Kreis / Grube (Fix 04.10.):** Der Übungsfechter nimmt jetzt sichtbar Schaden; sein Rumpf fällt nie unter 1 (niemand stirbt). Das Duell endet, sobald sein oder dein Rumpf wirklich unter 20 % liegt. Vorher endete es schon, wenn ein Hieb den Rumpf rechnerisch darunter gebracht hätte — der Fechter schien unverwundbar.
+
+- **Kampfanimation Schritt 1–3 (04.10., Entwickler: „Figuren wirken leblos“):** (1) Der Oberkörper dreht sich auch von vorn und hinten in den Schlag (Ausholen weg, Schlag hin), die Beine machen im Hieb einen Ausfallschritt bzw. eine Grätsche mit Kniebeuge — vorher standen sie wie im Stand. (2) Körperausschläge größer: Pack A ×1,4, B ×1,9, C ×2,4 (vorläufig). (3) Swoosh: gefüllter Halbmond vom Schlagbeginn bis zur Klinge mit heller Außenkante, verblasst nach dem Einschlag; A schmal, B breiter, C mit zweitem Mond. Stöße (Speer, Dolch, Rapier) haben weiter nur die Linienspur.

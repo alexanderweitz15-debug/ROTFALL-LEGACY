@@ -174,7 +174,7 @@ export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
 export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;
-const PACK_AMP = { A: 1, B: 1.5, C: 2 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 7, hd: 11 };
+const PACK_AMP = { A: 1.4, B: 1.9, C: 2.4 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 8, hd: 12 };   /* Schritt 2 (Entwickler 04.10.: „zu kleine Ausschläge“) — vorläufig: A 1,4 statt 1, B 1,9, C 2,4 */
 const scaleBody = (k, a) => { const o = {}; for (const [n, v] of Object.entries(k || {})) o[n] = Math.max(-BODY_MAX[n], Math.min(BODY_MAX[n], v * a)); return o; };
 for (const [wt, list] of Object.entries(BODY)) {
   const P = ANIM_DEFS.attack[wt]; if (!P) continue; const n = P.shapes.length;

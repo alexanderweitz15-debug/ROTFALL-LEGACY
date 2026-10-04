@@ -2240,7 +2240,7 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
   const f = SP.humanFrameR(spec, pz.dir, pose, W), bsx = 1, bsy = 1;   // Körperbau ist im Bild gemalt (spec.bd), nicht gestreckt
   const behind = W && (pz.dir === 'N' || Math.sin(dir) < -0.45);
   const weapon = () => { if (!W || !f.hand) return; const hx = x + (f.hand[0] - f.ox) * f.px * bsx, hy = y + 6 + (f.hand[1] - f.oy) * f.px * bsy;
-    if (AF && AF.slash) drawSlash(c, e, W, AF, hx, hy, dir, wit); drawWeaponR(c, e, now, wit, w, W, hx, hy, dir); };
+    if (AF) drawSlash(c, e, W, AF, hx, hy, dir, wit); drawWeaponR(c, e, now, wit, w, W, hx, hy, dir); };   /* Schritt 3 (04.10.): Swoosh in allen Packs */
   if (ghost) { const g = SP.flashOf(f); Object.assign(g, { px: f.px, ox: f.ox, oy: f.oy });   /* Kampfanimation C: zwei Nachbilder hinter dem Vorstoß */
     for (const k of [2, 1]) { c.globalAlpha = 0.12 * (3 - k); SP.blit(c, g, x - Math.cos(dir) * ghost * k, y + 6 - Math.sin(dir) * ghost * k * 0.6); } c.globalAlpha = 1; }
   if (behind) weapon();
@@ -2339,14 +2339,20 @@ function atkTiming(e, wt, sw) {
 }
 /* Kampfanimation B/C: Sichelbogen — helle Pixelpunkte auf dem Weg der Klingenspitze vom Schlagbeginn bis jetzt, verblasst nach dem Einschlag.
    Wirbel-Finisher: ganzer Kreis. Nur Optik, aus dem Schwungzustand gerechnet (kein Eintrag in S.fx). */
+/* Schritt 3 (Entwickler 04.10.: „kein Swoosh“): gefüllter Halbmond vom Schlagbeginn bis zur Klinge — außen hell, innen durchscheinend —,
+   wächst mit dem Hieb und verblasst nach dem Einschlag. Pack A schmal, B breiter, C breit mit heller Außenkante und zweitem, blasserem Mond. */
 function drawSlash(c, e, W, AF, hx, hy, dir, it) {
-  const u = W.u; if (!(u >= 0.42 && u < 0.72) || atkThrust(W.ac, W.v)) return;   /* Stoß: kein Bogen */
-  const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.22, R = (it.reach || 40) * 0.62, big = AF.slash + (e.atkStep === 2 ? 1 : 0);
-  const a1 = SP.swingOf(W.ac, Math.min(u, 0.6), W.arc, W.v, 0).a, a0 = SP.swingOf(W.ac, 0.4, W.arc, W.v, 0).a, span = Math.min(Math.abs(a1 - a0), atkSpin(W.ac, W.v) ? 6.3 : 2.4), st = a1 > a0 ? -1 : 1;
-  const cx = e.x + (hx - e.x) * 0.25, cy = hy - 2;
-  for (let t = 0; t <= span; t += 0.09) { const an = dir + (a1 + st * t) * sgn, k = 1 - t / span, al = 0.7 * fade * k; if (al <= 0.03) continue;
-    const s2 = Math.max(1, Math.round((big + 1) * k)); c.fillStyle = k > 0.75 ? `rgba(255,252,236,${al})` : `rgba(236,214,160,${al})`;
-    c.fillRect(Math.round(cx + Math.cos(an) * R - s2 / 2), Math.round(cy + Math.sin(an) * R * 0.7 - s2 / 2), s2, s2); }
+  const u = W.u; if (!(u >= 0.42 && u < 0.76) || atkThrust(W.ac, W.v)) return;   /* Stoß: kein Bogen */
+  const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? Math.min(1, (u - 0.42) / 0.05) : 1 - (u - 0.5) / 0.26, big = (AF.slash | 0) + (e.atkStep === 2 ? 1 : 0);
+  const a1 = SP.swingOf(W.ac, Math.min(u, 0.58), W.arc, W.v, 0).a, a0 = SP.swingOf(W.ac, 0.4, W.arc, W.v, 0).a, spin = atkSpin(W.ac, W.v);
+  let d = a1 - a0; if (!spin) d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 0.15) return; d = Math.max(-6.2, Math.min(6.2, d));
+  const from = dir + a0 * sgn, to = from + d * sgn, ccw = d * sgn < 0, L = (it.reach || 40) * 0.72 + big * 4, r2 = L, r1 = L * (0.62 - big * 0.06), cx = e.x + (hx - e.x) * 0.3, cy = hy - 2;
+  c.save(); c.translate(cx, cy); c.scale(1, 0.72);   /* leicht flach: der Bogen liegt im Raum */
+  const mond = (ra, rb, al, col) => { c.fillStyle = `rgba(${col},${al.toFixed(3)})`; c.beginPath(); c.arc(0, 0, ra, from, to, ccw); c.arc(0, 0, rb, to, from, !ccw); c.closePath(); c.fill(); };
+  mond(r2, r1, 0.34 * fade, '236,224,196');
+  mond(r2, r2 - 1.5 - big * 0.5, 0.75 * fade, '255,250,232');   /* helle Außenkante */
+  if (big >= 2) mond(r2 * 1.14, r2 * 1.04, 0.22 * fade, '255,236,190');   /* Pack C / Finisher: zweiter Mond */
+  c.restore();
 }
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
