@@ -1792,7 +1792,7 @@ function styleArea(on = true) {
    __-Karten, dazu S._quiet; beim Verlassen werden der Held (Waffe, Leben, Körper, Fertigkeiten, Status) und alle geänderten Zustandsschlüssel
    (Flaggen, Statistik …) auf den Stand beim Betreten zurückgesetzt. Die Welt steht still (eigene kleine Schleife arenaUpdate).
    Der Held ist unverwundbar (S.dbg.god); Puppen sind simDummy (ihr Tod hat keine Weltfolgen). Das Pack (A/B/C) gilt nur hier. */
-const ARENA = '__arena', ARENA_WEAPONS = [['longsword', 'Langschwert'], ['greatsword', 'Zweihänder'], ['dagger', 'Dolch'], ['spear', 'Speer'], ['warhammer', 'Kriegshammer']];
+const ARENA = '__arena', ARENA_WEAPONS = [['longsword', 'Langschwert'], ['greatsword', 'Zweihänder'], ['greataxe', 'Große Axt'], ['dagger', 'Dolch'], ['spear', 'Speer'], ['warhammer', 'Kriegshammer'], ['axe', 'Axt'], ['morgenstern', 'Morgenstern'], ['grassense', 'Sense'], ['rapier', 'Rapier'], ['lederpeitsche', 'Peitsche'], ['staff', 'Stab']];   /* Ausrollen 04.10.: alle Klassen im Test Room */
 const ARENA_SKIP = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings', 'dbg', '_quiet', 'paused', 'uiDirty', 'dying', 'cine', 'coop']);
 let arenaKeep = null;
 const inArena = () => !!arenaKeep && S.map === ARENA;
@@ -3493,6 +3493,7 @@ function resolveSwing(c) {
   // §82 Streitflegel: Schwung aus raschen Treffern (≤ 1,4 s Abstand) — +15 % je Stufe, ab Stufe 2 trifft der nächste Hieb rundum
   const now0 = performance.now(), mom = it && it.flail && now0 - (c.momT || 0) < 1400 ? c.momentum || 0 : 0;
   let multF = mult; if (mom) { multF = mult * (1 + 0.15 * mom); if (mom >= 2) arc = Math.PI * 2; }
+  if (it && c.atkPk && atkSpin(animClassOf(w.key, it), c.atkS)) arc = Math.PI * 2;   /* Ausrollen 04.10.: Wirbel-Formen (Schwert, Kolben, Stange, Stab) treffen rundum — Animation = Spiel */
   const force = c === S.player && c.forceStrike; c.forceStrike = false;   // Strg: bewusst auch Neutrale treffen
   let foes = hostilesOf(c);
   if (force) foes = foes.concat(S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && !foes.includes(e) && !S.party.includes(e.id)));
@@ -20630,10 +20631,10 @@ export function selftest() {
   ok('Kampfanimation Scheibe 1+2: Schaden fällt im Einschlag-Bild, nie davor (Langschwert, Zweihänder, Dolch, Speer, Kriegshammer in A/B/C); Bild und Treffer lesen dasselbe hitAt; Hiebe queren die Zielachse erst im Einschlag, Stöße sind dort am weitesten vorn', sandbox(() => {
     const p = stage(); (S.dbg ||= {}); const pk0 = S.dbg.pack, god0 = S.dbg.god; let good = true; const bad = [];
     try {
-      for (const [wk, pk] of [['longsword', 'A'], ['longsword', 'B'], ['longsword', 'C'], ['dagger', 'A'], ['spear', 'A'], ['warhammer', 'A'], ['greatsword', 'A'], ['greatsword', 'C'], ['dagger', 'C'], ['spear', 'B'], ['warhammer', 'C']]) {
+      for (const [wk, pk] of [['longsword', 'A'], ['longsword', 'B'], ['longsword', 'C'], ['dagger', 'A'], ['spear', 'A'], ['warhammer', 'A'], ['greatsword', 'A'], ['greatsword', 'C'], ['dagger', 'C'], ['spear', 'B'], ['warhammer', 'C'], ['axe', 'A'], ['morgenstern', 'B'], ['grassense', 'A'], ['rapier', 'C'], ['lederpeitsche', 'A'], ['staff', 'B'], ['greataxe', 'A']]) {   /* Ausrollen 04.10.: alle Klassen */
         S.dbg.pack = pk; p.equip.weapon = mkItem(wk); p.stamina = p.maxStamina; p.swing = 0; p.atkCd = 0; p.combo = 0; p.comboT = -1e9; p.vx = p.vy = 0; p.x = 300; p.y = 300; p.aim = 0;
         S.ents.__a = S.ents.__a.filter(e => e === p); const f = spawnEnemy('bear', '__a', 10, 9); f.x = p.x + 30; f.y = p.y; f.maxHp = f.hp = 99999; if (f.body) B.initBody(f, f.maxHp); f.aiState = 'idle';
-        const vit = () => f.body ? B.vital(f) : f.hp, h0 = vit(); attack(p); const H = swingHit(p), plan = atkPlan(ITEMS[wk].wtype, pk, 0);
+        const vit = () => f.body ? B.vital(f) : f.hp, h0 = vit(); attack(p); const H = swingHit(p), plan = atkPlan(animClassOf(wk, ITEMS[wk]), pk, 0);
         let early = false, uHit = -1, uBefore = -1;
         for (let i = 0; i < 600 && p.swing > 0 && uHit < 0; i++) { const s0 = p.swing; tickCombatant(p, 4);
           if (vit() < h0) { if (p.swing < H) early = true; uHit = snapU(atkU(p.atkW, p.atkH, p.swing)); uBefore = snapU(atkU(p.atkW, p.atkH, s0)); } }
@@ -20645,7 +20646,7 @@ export function selftest() {
     const side = (v, sg) => [0.05, 0.13, 0.27, 0.4, 0.45].every(u => sg * R.swingOf('sword', u, 1.6, v, 0).a > 0) && sg * R.swingOf('sword', 0.5, 1.6, v, 0).a < 0;   /* Vorhand/Rückhand: Klinge quert die Zielachse erst im Einschlag-Bild */
     const side2 = (wt, v, sg) => [0.05, 0.13, 0.27, 0.4, 0.45].every(u => sg * R.swingOf(wt, u, 1.6, v, 0).a > 0) && sg * R.swingOf(wt, 0.5, 1.6, v, 0).a < 0;
     const thrustPeak = (wt, v) => [0.13, 0.27, 0.4, 0.45, 0.6, 0.8].every(u => R.swingOf(wt, u, 1, v, 0).ext < R.swingOf(wt, 0.5, 1, v, 0).ext);   /* Scheibe 2: Stoß ist im Einschlag am weitesten vorn */
-    const s2 = side2('great', 0, 1) && side2('great', 1, -1) && side2('hammer', 1, 1) && side2('dagger', 1, 1) && side2('spear', 2, -1) && thrustPeak('dagger', 0) && thrustPeak('dagger', 2) && thrustPeak('spear', 0) && thrustPeak('spear', 1);
+    const s2 = side2('great', 0, 1) && side2('great', 1, -1) && side2('hammer', 1, 1) && side2('dagger', 1, 1) && side2('spear', 2, -1) && thrustPeak('dagger', 0) && thrustPeak('dagger', 2) && thrustPeak('spear', 0) && thrustPeak('spear', 1) && side2('axe', 1, 1) && side2('mace', 0, 1) && side2('polearm', 0, 1) && thrustPeak('rapier', 0) && thrustPeak('polearm', 1) && thrustPeak('staff', 1) && side2('whip', 1, 1) && atkSpin('mace', 2) && atkSpin('staff', 2) && ['axe', 'mace', 'polearm', 'rapier', 'whip', 'staff'].every(k => atkProfile(k) && atkStance(k, 'ready'));
     if (!s2) console.warn('Kampfanimation Scheibe 2 Formen');
     return good && side(0, 1) && side(1, -1) && s2;
   }));
