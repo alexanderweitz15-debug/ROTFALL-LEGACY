@@ -1,4 +1,5 @@
 # Rotfall: Legacy — Ist-Zustand (Feature-Inventar aus dem Code)
+> **Veraltet (Audit 04.10.2026):** Stand v19/v20. Nur noch historisch. Falsch darin u. a.: Rang-Lohn (richtig 60 + (Rang−1)×50), Talentpunkte (jede 2. Stufe), Gegnerschaden (×0,06), Karrak (340 LP), 55/36 Quests (78 fest + 48 Rangquests), Zauberlehrer (vorhanden). Referenz sind A–D und `docs/IST_ZUSTAND.md`.
 
 Stand: 29.09.2026, Code-Version 19 (`index.html` lädt `src/game.js?v=19`). Dieses Dokument beschreibt, **was im Code steht**,
 nicht was geplant ist. Es soll einer anderen KI (oder einem Menschen) zeigen, was es gibt, damit sich Lücken finden lassen.

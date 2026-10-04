@@ -851,7 +851,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Debug: „Varon: in den Thronsaal“.
 
 ## Burgfrieden am Tor der Varonsburg (Varonheim-Umbau, Scheibe 3)
-- Wer den Burgbezirk betritt, wird von Torwache Gerold angehalten. Ein Schild am Tor und eine Meldung beim ersten Nähern weisen darauf hin.
+- Wer den Burgbezirk betritt, wird von Torwache Gernot angehalten. Ein Schild am Tor und eine Meldung beim ersten Nähern weisen darauf hin.
 - **Durchsuchen lassen:** Waffen (auch die Zweitwaffe und Waffen im Gepäck), Dietriche, Stricke und Giftöl gehen in die Waffenkammer. Während der Kultkrise auch Blutphiolen. Schilde, Rüstung, Tränke und Essen bleiben. Gefährten in der Nähe werden mit durchsucht.
 - **Zurück:** Beim Hinausgehen durchs Burgtor kommt alles automatisch zurück, mit Zustand und Geschichte. Wer anders hinausgeht, holt es bei Gerold ab („Meine Waffen zurück“). Erben holen das Lager des Hauses ab. Fällt die Stadt, bringt ein Bote die Sachen.
 - **Bestechen:** 5000 Gold, fest 30 % Chance, höchstens einmal am Tag. Gelingt es, darfst du bewaffnet hinein. Scheitert es: Gold weg, Valen −10, Kopfgeld 250, drei Tage Verdacht (keine Bestechung). Dann Kerker oder Flucht.

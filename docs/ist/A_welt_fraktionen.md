@@ -1,5 +1,16 @@
 # Ist-Zustand Bereich A — Welt, Orte, Fraktionen, Simulation
 
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **Fraktionen `wuest` (Der Wüstenbund) und `zwerge` (Die Zwerge der Tiefhall)** existieren in `FACTIONS` (13 Fraktionen) mit je drei Rängen und Rangreihen in `RANK_LINES` (8 Fraktionen × 3 Ränge × 2 = 48 Rangquests). A-34 bleibt behoben. §2.2/§13.2 („Lücke“, „keine Aufträge, kein Ruf“) sind **Doku-Fehler**; `LOCATIONS.faction` ist für Karak-Atar `wuest`, Dünenwacht `wuest`, Tiefhall `zwerge` gesetzt (03.10.).
+- **A-10** teilweise behoben: `crimeFaction` nimmt Opferfraktion → Herr des Heimatorts → auf der Oberwelt den Herrn des Ortes im Umkreis, sonst **null** (kein Kopfgeld in der Wildnis); nur Innenkarten und heimatlose Reisende fallen noch an Valen.
+- **1.1 Rang-Lohn:** `60 + (Rang − 1) × 50` Gold, `80 + (Rang − 1) × 70` EP (`game.js` RANK_LINES-Schleife, `i` = Rang − 1). IST_alt war falsch.
+- **1.10 Pferdezüchter:** NPC-Schlüssel `wendel`, Anzeigename **Hadubrand** (`data.js:1434`). In Texten heißt er Hadubrand; `wendel` ist nur der Code-Schlüssel.
+- **1.14 Namensdopplungen:** Torwache der Burg heißt jetzt **Gernot** (war Gerold wie der Kontorhändler); Elite „Irmgard vom Frostgrab“ heißt jetzt **Irmhild vom Frostgrab**. Der **Nekromanten-Turm** (Vhals Schattenkreis, Kachel 392/350) steht jetzt in `LOCATIONS` (`necrotower`, Ruine, Gefahr 4, Tote, Streuort).
+- **1.15 EVENTS:** `evTaxman` und `evFailedHarvest` stehen nur noch einmal in der Liste (`game.js:11875`, war schon vor dem Audit bereinigt).
+- **1.13 Erbenreihenfolge** (`makeSuccessorCandidates`): erst eigene erwachsene Kinder und Ehepartner (`familyHeirs`), dann bis zu drei Gefährten, dann gewürfelte Verwandte (Sohn/Tochter/Eltern/Geschwister/Vetter) mit Glück `1 − (Generation − 1) × 0,12` (min 0,35). Beide Darstellungen waren je zur Hälfte richtig.
+
+
 Stand: 03.10.2026, Code-Version 24 (`?v=24`). Geschrieben vom Agenten für Bereich A. Grundlage: `src/world.js`, `src/game.js`, `src/sim.js`, `src/economy.js`, `src/data.js`, `src/state.js`, dazu `docs/IST_ZUSTAND.md` (alter Stand, hier übernommen, korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
 
 Zeilenangaben (`game.js:7473`) gelten für den Stand vom 03.10.2026 vormittags. Während dieser Prüfung haben andere Agenten parallel an `game.js` gearbeitet; die Zeilen sind dadurch schon um 5–10 gewandert (z. B. `townFac` steht jetzt bei 7479). Suche im Zweifel nach dem Funktionsnamen.
@@ -492,7 +503,7 @@ Alle festen Aufträge aus `data.js:1416` ff. mit Geber und Ruf-Lohn (`turnIn`, `
 
 ### 6.2 Hof und Königsaufträge
 
-- **Hof** (`ensureVaronCourt`, `game.js:9553`): König Varon, Kanzler Aldhelm, Marschall Brandt, Spitzelmeisterin Ysmay, drei Adlige, Kerkermeister Grimm mit drei Gefangenen aus Aurelion, Kronschmied Hagen, Hoflieferant Hofmar, sechs Gardisten, Torwache Gerold.
+- **Hof** (`ensureVaronCourt`, `game.js:9553`): König Varon, Kanzler Aldhelm, Marschall Brandt, Spitzelmeisterin Ysmay, drei Adlige, Kerkermeister Grimm mit drei Gefangenen aus Aurelion, Kronschmied Hagen, Hoflieferant Hofmar, sechs Gardisten, Torwache Gernot.
 - **Audienz:** Valen-Rang ≥ 1 oder 100 Gold beim Kanzler.
 - **Königsaufträge** (`varonQ`, `royalStart`):
 

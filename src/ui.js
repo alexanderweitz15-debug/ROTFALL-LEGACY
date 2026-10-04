@@ -1021,7 +1021,7 @@ function invPaint(force = false) {
   const cnt = $('inv-cnt'); if (cnt) { const k = p.inv.length / Math.max(1, p.invCap); cnt.innerHTML = `${icoTag('nav_inv', 1)} <b>${p.inv.length}/${p.invCap}</b><i class="bagbar"><u style="width:${Math.round(k * 100)}%" class="${k >= 1 ? 'full' : k > .8 ? 'high' : ''}"></u></i>`; }
   const sg = $('sg');
   const here = A.stashHere ? A.stashHere() : true; if (sg) sg.classList.toggle('stash-far', !here); if (sg) sg.title = here ? '' : 'Das Lager liegt in deiner Siedlung — dort kannst du ein- und auslagern.';
-  const nS = Math.max(24, Math.ceil((S.stash.length + 1) / 6) * 6);   /* D-7: das Lager zeigt alle Teile (vorher fest 24 Felder, der Rest war unsichtbar) */
+  const nS = Math.max(24, Math.ceil((S.stash.length + 1) / 6) * 6); if (sg) sg.title = (sg.title ? sg.title + ' ' : '') + `Lager ${S.stash.length}/${A.stashCap ? A.stashCap() : '∞'} (ein Lagerhaus bringt 24 Felder mehr)`;   /* Audit 3.4 */   /* D-7: das Lager zeigt alle Teile (vorher fest 24 Felder, der Rest war unsichtbar) */
   if (sg) { if (sg.childElementCount !== nS) { sg.innerHTML = ''; for (let i = 0; i < nS; i++) sg.appendChild(stashCell(i)); }
     [...sg.children].forEach((c, i) => paintCell(c, S.stash[i] || null, { sel: !!S.stash[i] && invSel?.src === 'stash' && invSel.o === S.stash[i] })); }
   for (const [k, label] of DOLL) { const d = dollEl(k); if (!d) continue; const s = p.equip?.[k];

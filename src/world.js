@@ -46,6 +46,7 @@ export const LOCATIONS = [
   { key:'sonnwacht', name:'Sonnwacht',          x:456,y:256,r:16, kind:'city',    threat:1, faction:'order' },
   { key:'altvharn',  name:'Alt-Vharn',          x:362,y:380,r:16, kind:'ruin',    threat:4, faction:'undead' },
   { key:'necropolis',name:'Große Nekropole',    x:404,y:437,r:14, kind:'ruin',    threat:4, faction:'undead' },
+  { key:'necrotower',name:'Nekromanten-Turm',   x:392,y:350,r:8,  kind:'ruin',    threat:4, faction:'undead', minor:true },   /* Audit 1.14: Vhals Schattenkreis fehlte in der Ortsliste */
   { key:'blackkeep', name:'Die Schwarze Feste', x:431,y:430,r:18, kind:'city',    threat:5, faction:'undead' },
   { key:'knochenwald',name:'Knochenwald',       x:470,y:366,r:18, kind:'wild',    threat:3, faction:'undead' },
   { key:'aschensee', name:'Aschensee',          x:318,y:438,r:12, kind:'wild',    threat:3, faction:'undead' },
@@ -2319,7 +2320,7 @@ export function genDeep() {
   for (const dx of [-5, 5]) { prop('campfire_static', throne.cx + dx, throne.y + 3, { ...o, solid: true, label: 'Kohlebecken' }); prop('banner_torn', throne.cx + dx, throne.y, o); }
   for (let i = 0; i < 4; i++) prop('broken_pillar', throne.x + 2 + i * 6, throne.y + throne.h - 3, { ...o, solid: true, r: 11, intact: true });
   // Hort und Versteck
-  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['kings_iron', 'plate_cuirass', 'iron', 'potion'], label: 'Tiefhall-Hort' });
+  prop('chest', hoard.cx, hoard.cy, { ...o, loot: ['koenigseisen', 'plate_cuirass', 'iron', 'potion'], label: 'Tiefhall-Hort' });
   for (let i = 0; i < 3; i++) prop(pick(['crate_stack', 'barrel', 'sack']), ri(hoard.x, hoard.x + hoard.w - 1), ri(hoard.y, hoard.y + hoard.h - 1), { ...o, solid: true });
   prop('chest', secret.cx, secret.cy, { ...o, loot: ['kite_shield', 'potion'], label: 'Vergessene Nische' });
   for (const r of rooms) for (let i = 0; i < 2; i++) prop('torch', ri(r.x, r.x + r.w - 1), r.y, o);   // Fackeln an den Nordwänden
