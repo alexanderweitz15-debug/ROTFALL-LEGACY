@@ -1664,7 +1664,7 @@ export function weaponSprite(key, rarity, holy, wtype, bare = false) {
   if (!OLD_WEAPONS) {                                               // G3: feines Raster (1 Welt je Pixel)
     const sc = ART === 'R' ? (['bow', 'crossbow'].includes(wtype) || key === 'longbow' || key === 'shortbow' ? 0.95 : 0.82) / RPX : 1;   // S14 Stil R: Waffen im 1,5er-Raster; S15 (Nutzer: Waffen zu groß): Nahkampf 18 % kleiner, gleiches Raster
     const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON(), sc, rarity, bare);
-    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, str: r.str, pulse: r.pulse, px: ART === 'R' ? RPX : 1 / sc };
+    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, str: r.str, pulse: r.pulse, pulseCol: r.pulseCol, px: ART === 'R' ? RPX : 1 / sc };
   } else if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
     const L = key === 'longbow' ? 12 : 8, wood = WOOD(), grip = WRAP();
     g = new G(9, L * 2 + 3); info = { gx: 2, gy: L + 1, blade: null };

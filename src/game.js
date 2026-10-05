@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=24';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=24';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=24';
 import * as R from './render.js?v=24';
 import * as HB from './buildings.js?v=24';
@@ -110,7 +110,7 @@ export function armorOf(c) {
   if (ch?.ally && S.ents[c.map]?.some(e => e !== c && e.alive && (e.kind === 'npc' || e.kind === 'player') && !e.captive && dist(e, c) < 90 && !isHostile(c, e))) v += ch.ally;
   const bless = (c.status || []).find(s => s.key === 'blessing');
   v = (v + tfx(c, 'armor') + (node(c, 'k_grove') && inNature(c) ? 3 : 0)) * (node(c, 'k_bulwark') ? 1.3 : 1);
-  return Math.round(v + (bless ? 5 : 0) + elx(c, 'armor') + (stat(c, 'wolf_form') ? 3 : 0) + (c.level || 1) * 0.25 + (setOf(c)?.bonus.armor || 0) + Math.min(5, c.scars || 0));   /* §5e.7: Narben härten ab */   // Phase 1: Stufe härtet ab
+  return Math.round(v + (bless ? 5 : 0) + elx(c, 'armor') + (stat(c, 'wolf_form') ? 3 : 0) + (c.level || 1) * 0.25 + (setOf(c)?.bonus.armor || 0) + Math.min(5, c.scars || 0) + relicFx(c, 'armor') + relicPackArmor(c));   /* §5e.7: Narben härten ab */   // Phase 1: Stufe härtet ab
 }
 const wpnOf = c => c.status?.some(s => s.key === 'wolf_form') ? null : c.dualTurn && dualOn(c) ? c.equip.offhand : c.equip?.weapon;
 // Nutzer §5f: Zweiwaffen nur für Schurke, Assassine, Berserker — zweite Einhandwaffe in der Nebenhand, die Schläge wechseln die Hand
@@ -121,7 +121,7 @@ export function damageOf(c) {
   const base = (it ? it.dmg * (0.55 + 0.45 * (w.cond ?? 1)) : stat(c, 'wolf_form') ? 10 + (c.level || 1) * 1.4 : 3) * (B.isDisabled(c, 'rarm') ? 0.3 : 1);
   const skill = it ? (c.skills[it.skill] || 0) : (c.skills.unarmed || 0);
   const attr = it && it.ranged ? c.attributes.agility : c.attributes.strength;
-  let m = 1 + tfx(c, 'dmg') + afx(c, 'sharp');
+  let m = 1 + tfx(c, 'dmg') + afx(c, 'sharp') + relicFx(c, 'dmg') + relicPackDmg(c);   /* Reliquien */
   if (node(c, 'k_berserk') && c.hp < c.maxHp * 0.3) m += 0.25;                       // Berserker: nah am Tod gefährlicher
   if (node(c, 'k_grove')) m += inNature(c) ? 0.15 : -0.10;                            // Hüter des Hains
   if (node(c, 'k_legion') && c.titleClass === 'necromancer') m -= 0.20;               // Legion: Feldherr, kein Fechter
@@ -158,7 +158,7 @@ function speedOf(c) {
   if (stat(c, 'wolf_form')) s *= 1.35;                                // S15 Druide: Wolfsgestalt
   if (stat(c, 'grabbed')) s *= 0.5;                                   // Griff des Wiedergängers
   if (stat(c, 'shackled')) s *= 0.5;                                  // S12 E: Fußkette (Schuldknecht, Steinbruch)
-  s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
+  s *= (1 + tfx(c, 'speed') + afx(c, 'fleet') + relicFx(c, 'move')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
   return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c) * limpMul(c) * (c === S.player && S.dbg?.speed ? S.dbg.speed : 1);   // Debug-Tempo
 }
 
@@ -171,6 +171,7 @@ function mkItem(key, count = 1, roll = null) {
   if (it.slot !== 'material' && it.slot !== 'consumable') o.cond = 0.55 + rnd() * 0.45;
   if (roll && GEAR.has(it.slot) && !it.unique) rollRarity(o, it, roll.bonus || 0);
   if (it.fixed) o.afx = { ...(o.afx || {}), ...it.fixed };   // S15 P2: Talisman-Werte gelten immer
+  if (it.slot === 'relic') { delete o.cond; o.tier = RELIQ_START[it.rarity] || 1; }   /* Reliquien: Stufe am Exemplar, kein Verschleiß */
   return o;
 }
 export function rollRarity(o, it, bonus = 0, force = null) {   /* force: feste Güte (Handwerk) */
@@ -246,6 +247,7 @@ function equip(c, idx) {
   const slot = c.inv[idx]; if (!slot) return;
   const it = ITEMS[slot.key];
   if (it.slot === 'consumable') return useConsumable(c, idx);
+  if (it.slot === 'relic') return relicEquip(c, idx);   /* Reliquien: eigene Fassungen */
   { const no = equipBlock(c, it); if (no) return UI.toast(no); }   /* P6: dieselben Sperren liest das Inventar für das Ziel-Leuchten */
   if (it.slot === 'weapon' && !it.twohand && DUAL_CLASSES.has(c.currentClass) && c.equip.weapon && !ITEMS[c.equip.weapon.key]?.twohand && (!c.equip.offhand || ITEMS[c.equip.offhand.key]?.slot === 'weapon')) {
     const prevOff = c.equip.offhand; c.equip.offhand = slot; c.inv.splice(idx, 1); if (prevOff) c.inv.push(prevOff); recalc(c);   /* Nutzer §5f: Zweiwaffen */
@@ -823,6 +825,7 @@ function tierPut(T, e, px, py, party) {
   if (dx < 1950 && dy < 1950) T.pool.push(e);
   if (!e.alive) { if (k !== 'npc' && k !== 'enemy') T.hot.push(e); return; }   /* Tote denken nicht (think kehrt sofort um) */
   const calm = !(e.status && e.status.length) && !e.eliteKey && !(e.swing > 0) && !(e.aggroId && huntsHero(e.aggroId, party));   /* wer den Helden/seine Gruppe/einen Koop-Helden jagt, bleibt heiß — Tiering darf das nicht einfrieren */
+  if (e.walkIn) { T.hot.push(e); return; }                         /* Anmarsch: läuft auch fern von außerhalb des Bildes heran */
   if (k === 'enemy' && calm && (dx > 1400 || dy > 1400)) return;
   if (k === 'npc' && calm && dx * dx + dy * dy > 1150 * 1150 && !e.downed && !e.angry && !e.fleeing && !e.escort && !e.threatId && !e.brawl && !e.panicT && e.eliteChecked && !(e.stagger > 0) && party.indexOf(e.id) < 0) { (dx > 1950 || dy > 1950 ? T.cold : T.mid).push(e); return; }
   T.hot.push(e);
@@ -909,7 +912,7 @@ const AUREL_TRADES = { house: ['Edelmann', 'Edelfrau', 'Kaufherr', 'Handwerker',
   palace: ['Hofbeamter', 'Kammerdiener', 'Hofdame'], markethall: ['Gewürzhändler', 'Tuchhändlerin', 'Juwelier', 'Waffenhändler', 'Rüstmeisterin'], bank: ['Bankier', 'Geldwechsler'],
   academy: ['Magister', 'Studentin', 'Gelehrter'], observatory: ['Sternkundiger'], library: ['Archivar', 'Schreiberin'], court: ['Richterin', 'Gerichtsschreiber'], hospital: ['Medica', 'Pfleger'],
   bathhouse: ['Bader'], magitech: ['Magitech-Ingenieurin', 'Kristallschleifer'], factoryhall: ['Werkmeister', 'Fabrikarbeiter'], legion: ['Sonnenlegionär', 'Offizier der Sonnenlegion'] };   // Phase 5: begehbare Prachtbauten
-const MARKET_POOL = { 'Gewürzhändler': ['herb', 'herb', 'bread', 'dried_meat', 'potion', 'elixier_staerke', 'elixier_ausdauer', 'elixier_eile', 'elixier_regen'], 'Tuchhändlerin': ['traveler_cloak', 'leather_jerkin', 'leather_cap', 'leather_boots'], Juwelier: ['potion', 'potion', 'bandage', 'talisman_ausdauer', 'talisman_leichtfuss', 'talisman_krieger', 'talisman_waechter', 'talisman_magie', 'talisman_leben', 'eulenauge', 'elixier_auge', 'elixier_lehre', 'talisman_jaeger', 'elixier_arkan'],   /* 03.10.: Lederstiefel, Talisman des Jägers, Arkaner Trank hatten keine Quelle */
+const MARKET_POOL = { 'Gewürzhändler': ['herb', 'herb', 'bread', 'dried_meat', 'potion', 'elixier_staerke', 'elixier_ausdauer', 'elixier_eile', 'elixier_regen'], 'Tuchhändlerin': ['traveler_cloak', 'leather_jerkin', 'leather_cap', 'leather_boots'], Juwelier: ['gluecksnagel', 'botenfeder', 'rostglied', 'eisenmal', 'wolfsfang', 'potion', 'potion', 'bandage', 'talisman_ausdauer', 'talisman_leichtfuss', 'talisman_krieger', 'talisman_waechter', 'talisman_magie', 'talisman_leben', 'eulenauge', 'elixier_auge', 'elixier_lehre', 'talisman_jaeger', 'elixier_arkan'],   /* 03.10.: Lederstiefel, Talisman des Jägers, Arkaner Trank hatten keine Quelle */
   Waffenhändler: ['longsword', 'spear', 'shortbow', 'halberd', 'rusty_sword', 'doppelklinge', 'wurfmesser', 'schleuder', 'buckler', 'stachelschild', 'lederpeitsche', 'grassense'], 'Magitech-Ingenieurin': ['messingpistole', 'donnerbuechse', 'potion', 'schockpistole', 'magiegewehr', 'runenarmbrust', 'kristallkanone', 'praezisionsgewehr', 'magitechschild', 'energiezelle', 'energiezelle', 'energiezelle'],
   Prothesenhändlerin: ['schrottarm', 'schrottbein', 'aurelarm', 'aurelbein', 'auge_schrott', 'auge_aurel', 'spezialoel', 'ersatzteile'],   /* Roadmap P5: Stufe 1–2 */
   Kybernetiker: ['spezialoel', 'spezialoel', 'ersatzteile', 'feinwerkzeug', 'greifhand', 'federfuss', 'ankerfuss', 'klingenhand'],   /* Roadmap P5: Wartung und Module */ 'Rüstmeisterin': ['chain_hauberk', 'plate_cuirass', 'kite_shield', 'iron_helm', 'great_helm', 'sonnenharnisch', 'sonnenhelm', 'ordensharnisch', 'ordenshelm', 'thronharnisch', 'thronhelm', 'kettenhandschuhe', 'panzerhandschuhe', 'kettenbeinlinge', 'beinschienen', 'thron_handschuhe', 'thron_beinschienen', 'hochritter_handschuhe', 'hochritter_beinschienen'] };
@@ -1038,7 +1041,7 @@ function spawnResidents() {
 const FEST_DAYS = 6, FEST_BUILT = new Set(), FEST_POP = {};   // BUG (Nutzer: „in Aurelion versammeln sich locker 1000 Leute auf einem Fleck“): Ringzahl je Einwohnerzahl, sonst quetscht sich eine Metropole auf denselben schmalen Kreis wie ein Dorf
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
 const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && !(town === 'varonheim' && S.flags?.varonDead && d >= S.flags.varonDead && d - S.flags.varonDead < CROWN_TURMOIL) &&   /* nach dem Königsmord kein Fest (endlich: Proben suchen den nächsten Festtag) */ (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
-const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
+const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && calmTown(town) && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
 const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x + 0.5) * TS, y: (y + 0.5) * TS }; };
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
@@ -2009,6 +2012,7 @@ function eliteDrop(c) {
   const E = ELITES[c.eliteKey]; if (!E) return; (S.elitesDead ||= {})[c.eliteKey] = S.day | 0;
   const it = mkItem(E.drop, 1, { bonus: 2 }); if (it) dropItemAt(c.map, c.x + 10, c.y + 6, it);
   const tr = mkItem('trophaee'); if (tr) { tr.name = `Trophäe: ${E.name}`; dropItemAt(c.map, c.x - 10, c.y + 6, tr); }
+  relicGain(2, 0, E.name); if (chance(0.08)) relicDrop(c.map, c.x, c.y + 14, pick(RELIC_POOL('mid')), `Bei ${E.name}`);   /* Reliquien */
   const g = 40 + (c.level || 1) * 6; S.gold += g; float(c, `+${g} Gold`, 'rgba(189,148,51,ALPHA)');
   log(`${E.name} ist erledigt. Er ließ ${ITEMS[E.drop]?.name || 'etwas'} und eine Trophäe fallen.`, 'combat'); chronicle(`${E.name} gefallen`, 'battle', E.say);
 }
@@ -2783,7 +2787,7 @@ function update(dt, now) {
   if (S.trial || (S.trialsG && Object.keys(S.trialsG).length)) trialTick();                    // S15 P5: Akademie-Prüfung läuft
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); facHintTick(); }   /* T17: Ankunft in einer Siedlung */
-  if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
+  if ((keepT += dt) > 250) { keepT = 0; keepTick(); walkInNew(castleAlarmTick); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -2798,8 +2802,8 @@ function update(dt, now) {
   }
   if (REGIONAL_WEATHER.has(S.weather) && !weatherPool(p).includes(S.weather)) S.weatherLeft = 0;   // Regionwetter endet, wenn man die Region verlässt
   const hour = Math.floor(S.minute / 60);
-  if (hour !== lastHour) { lastHour = hour; hourTick(hour); }
-  if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
+  if (hour !== lastHour) { lastHour = hour; walkInNew(() => hourTick(hour)); }   /* Anmarsch: was Ereignisse erzeugen, läuft ins Bild */
+  if (S.day !== lastDay) { lastDay = S.day; walkInNew(dayTick); }
   festTick(); roadTick(dt);
 
   // Kämpfer im Umkreis des Spielers (simuliert wird nur bis 1100 px, Sicht reicht höchstens ~500 px weiter).
@@ -2863,7 +2867,7 @@ function update(dt, now) {
     hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
     { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
     if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
-    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
+    if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); walkInNew(raidTick); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
     else if (tribT === 360) { myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); }
     else if (tribT === 720) { conTick(); jailTick(); }
     if (S.map === 'world') for (const l of LOCATIONS)
@@ -2940,6 +2944,7 @@ function think(e, dt, pre = false) {   /* pre: Schritt schon vom Stufenplan gest
   if (e.downed && e.kind === 'npc' && !e.brawlKO && chance(dt / 5000) && dist(e, S.player) < 520) float(e, pick(['Hilfe …', 'Bitte … helft mir …', 'Hierher …', 'Ich blute …']), 'rgba(220,160,140,ALPHA)');   /* §5f: Verletzte rufen */
   if (e.eliteKey) eliteTick(e, dt);
   if (e.kind === 'npc' && !e.eliteChecked) eliteKit(e);
+  if (e.walkIn && !e.downed && walkInStep(e, dt)) return;           /* Anmarsch */
   if (e.kind === 'enemy' && !(e.status && e.status.length) && !(e.aggroId && huntsHero(e.aggroId, S.party)) && (Math.abs(e.x - S.player.x) > 1150 || Math.abs(e.y - S.player.y) > 1150)) return;   // BUG-108: ferne Gegner ruhen; Entwickler 02.10. (Despawn-Fehlersuche): wer den Helden/seine Gruppe/einen Koop-Helden jagt, ruht nicht — sonst erreicht ihn nie die Leinen-Prüfung in updateEnemy. Gegner-gegen-Gegner-Kämpfe (Heere etc.) ruhen weiter wie bisher (Lead-Hinweis Leistung)
   if (!pre && e.kind === 'npc' && !e.angry && !e.fleeing && !e.escort && !e.threatId && !(e.swing > 0) && S.party.indexOf(e.id) < 0) {   // außer Sicht: jedes 3. Bild, dreifacher Schritt
     const P0 = S.player, far = Math.abs(e.x - P0.x) > 520 || Math.abs(e.y - P0.y) > 420;
@@ -3165,6 +3170,7 @@ function enemyStamina(c, dt) {
 }
 function tickCombatant(c, dt) {
   if (!c.alive) return;
+  if (c === S.player && c.relics) relicTick(c, dt);   /* Reliquien: Sturm, Serie, Schein */
   if (B.armless(c)) { c.swing = 0; c.telegraph = 0; c.windup = false; c.special = null; }   // S14: ohne Arme kein Hieb (gilt für alle Figuren mit Körper)
   if (c.kind === 'enemy') enemyStamina(c, dt);
   if (c.kb) {                                     // Rückstoß ausrollen (abklingend), Blickrichtung bleibt
@@ -3470,6 +3476,7 @@ function attack(c, forceDir) {
   comboStep(c, it);   /* Nutzer §5f: Kombos */
   c.atkHeavy = false; if (c.heavyNext && it && !it.ranged) { c.heavyNext = false; c.atkHeavy = true; c.combo = 0; c.comboFin = true; c.comboShown = false; c.comboT = performance.now() + it.speed * 1.15; }   /* Kampfanimation: voll geladener schwerer Hieb = Wuchtschlag aus der Ruhe */
   c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift'))) * (1 - Math.min(0.25, (it && c.skills ? c.skills[it.skill] || 0 : 0) * 0.0025));   // S13 (Kenshi): geübte Hand schlägt schneller
+  { const ra = relicFx(c, 'atk'); if (ra > 0) c.swingDur = Math.max(180, c.swingDur / (1 + ra)); }   /* Reliquien: Angriffstempo, nie unter 180 ms */   // S13 (Kenshi): geübte Hand schlägt schneller
   if (c.comboFin && !atkOld()) c.swingDur *= 1.15;   /* Kampfanimation (DECISIONS 02.10.): der Wuchtschlag dauert wirklich 15 % länger, wie in MECHANIKEN beschrieben */
   { const wt = it && !it.ranged ? animClassOf(w.key, it) : null, pk = atkPackOf(c);   /* Kampfanimation: Schwungplan aus anim.js — Form, Ausholen, Treffer (= sichtbarer Einschlag), Abbruchpunkt */
     c.atkStep = c.comboFin ? 2 : c.combo >= 1 ? Math.min(1, c.combo - 1) : c.atkStep === 0 ? 1 : 0;
@@ -3796,11 +3803,12 @@ function hit(attacker, target, mult, kind = 'physical') {
   // Kritisch
   const ambush = attacker === S.player && target.kind === 'enemy' && (teamOf(target) === 'neutral' || (attacker.sneak && target.aggroId !== attacker.id));   /* Schleichen: Hinterhalt auch gegen ahnungslose Feinde */
   if (attacker === S.player && attacker.sneak) toggleSneak(false);   /* wer zuschlägt, ist entdeckt */   // S12: Schleichangriff auf Ahnungslose
-  const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen');
+  const critChance = riposte ? 1 : 0.05 + (attacker.attributes ? attacker.attributes.perception * 0.004 : 0.01) + tfx(attacker, 'crit') + afx(attacker, 'keen') + elx(attacker, 'keen') + (attacker === S.player && attacker.relics ? relicCrit(attacker) : 0);
   const behind = attacker.aim != null && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim || 0))) > Math.PI - 1;   // Balance-Runde: vorher „< 1“ = von VORN (Dolch-Krit ×2,6 gegen jeden, der einen ansieht)
   const crit = chance(critChance) || (it && it.crit && behind && chance(0.5));
   if (crit) dmg *= (it && it.crit) || 1.8;
   if (attacker.spyStab && attacker.unmasked) { attacker.spyStab = false; if (behind) { dmg *= 3; float(target, 'Meuchelstich!', 'rgba(220,120,90,ALPHA)', true); } }   /* Entwickler 02.10.: Hofspion — erster Stich, von hinten ×3 (Formel des Schleichangriffs) */
+  if (attacker === S.player && attacker.relics) dmg *= relicHitMul(attacker, target, crit);   /* Reliquien (gedeckelt) */
   // Heilig gegen Untot
   if (kind === 'holy' && (target.mtype === 'skeleton' || target.undead || MONSTERS[target.mtype]?.faction === 'undead')) dmg *= 2.1;
   // Rüstung / Block
@@ -3835,6 +3843,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (target.mtype === 'bone_knight' && kind === 'physical' && !crush && !(target.stagger > 0) && Math.abs(normAng(Math.atan2(attacker.y - target.y, attacker.x - target.x) - (target.aim ?? 0))) < 0.9) {
     dmg *= 0.3; fx(target.x, target.y - 12, 'spark', 5); float(target, 'Schild', 'rgba(200,196,170,ALPHA)'); sfx('metal', 0.4, earVol(target)); }   // Phase 6: Knochenritter — von vorn prallt es ab
   hurt(target, dmg, attacker, attacker.name || MONSTERS[attacker.mtype]?.name, crit, kind);
+  if (attacker === S.player && attacker.relics) relicAfterHit(attacker, target, dmg, crit, kind, AREA);   /* Reliquien: Hinrichtung, Kette, Sturm */
   if (kind === 'physical' && !AREA && attacker.alive && stat(target, 'thorns') && dist(attacker, target) < 100) hurt(attacker, dmg * (node(target, 'd_thorns') || gearOf(target) >= 3 ? 0.6 : 0.4), target, 'Dornenhaut');   // S15 Druide
   if (attacker.graveFrost) { attacker.graveFrost = false; applySpellStatus(target, { key: 'frost', stacks: 1 }, attacker); }   // S15 Frostklinge
   if (kind === 'physical' && !AREA && attacker.alive && attacker.currentClass === 'deathknight') {   // S15 Todesritter-Schlüsselknoten
@@ -3844,7 +3853,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   if (attacker === S.player && node(attacker, 'k_storm') && attacker.titleClass === 'monk' && (attacker.stormN = (attacker.stormN || 0) + 1) % 3 === 0) setTres(attacker, tres(attacker) + 1);   // S15 Sturmhand
   if (stat(attacker, 'poison_coat') && target.alive && target.kind !== 'caravan') {    // Giftöl: Treffer vergiftet (erneuert)
     target.status = (target.status || []).filter(q => q.key !== 'poisoned'); target.status.push({ key: 'poisoned', name: 'Vergiftet', left: 5000, src: attacker.id }); fx(target.x, target.y - 12, 'necro', 4); }
-  const lee = afx(attacker, 'leech') + (setOf(attacker)?.bonus.leech || 0) + (ITEMS[attacker.equip?.weapon?.key]?.leech || 0); if (lee && attacker.alive && !attacker.downed) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
+  const lee = afx(attacker, 'leech') + (attacker === S.player ? relicFx(attacker, 'leech') : 0) + (setOf(attacker)?.bonus.leech || 0) + (ITEMS[attacker.equip?.weapon?.key]?.leech || 0); if (lee && attacker.alive && !attacker.downed) { if (attacker.body) B.heal(attacker, dmg * lee); else attacker.hp = Math.min(attacker.maxHp, attacker.hp + dmg * lee); }
   if (afx(attacker, 'rend') && target.alive && chance(afx(attacker, 'rend')) && !(target.status || []).some(s => s.key === 'bleeding')) (target.status ||= []).push({ key:'bleeding', name:'Blutend', left: 12000, src: attacker.id });
   const wIt = (attacker.equip?.weapon && ITEMS[attacker.equip.weapon.key]) || (attacker.weaponKey && ITEMS[attacker.weaponKey]);   // Session 11: Waffeneigenschaften Fesseln/Blutung (auch Gegnerwaffen)
   if (wIt?.pull && target.alive && !target.boss && !MONSTERS[target.mtype]?.boss && dist(attacker, target) > 40) { const a = Math.atan2(attacker.y - target.y, attacker.x - target.x), k = Math.min(wIt.pull, dist(attacker, target) - 34); moveEnt(target, Math.cos(a) * k, Math.sin(a) * k); target.stagger = Math.max(target.stagger || 0, 350); float(target, 'herangezogen', 'rgba(220,200,150,ALPHA)'); }   /* Nutzer §5f: Peitsche zieht heran */
@@ -3890,6 +3899,8 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (source?.eliteKey && source !== target && dmg > 0) eliteHit(source, target);   /* Nutzer: Kräfte der Elite-Mini-Bosse */
   if (!target.alive || target.invuln || target.mistUntil > performance.now() || (target === S.player && S.dbg?.god)) return;   /* §5g.2 Nebelschritt */
   if (S.dying && (target === S.player || S.party.includes(target.id))) return;   /* T10: im Todesmoment stirbt niemand von der Gruppe */
+  if (cineSafe(target)) return;
+  if (target === S.player && dmg > 0 && target.relics) { if (stat(target, 'r_unbeugsam') || relicHurt(target, dmg, source)) return; if (target.rs?.halve) { target.rs.halve = false; dmg *= 0.5; } }   /* Reliquien */   /* Nutzer 02.10.: in einer Szene (und 1,5 s danach) greift niemand den Helden und seine Gruppe an */
   if (target.disguised && !target.unmasked && source) { target.unmasked = true; float(target, 'Maskierter!', 'rgba(200,60,60,ALPHA)'); }   /* §5g.2: gestellt */   // Debug: Gottmodus
   if (target.tourney && tourneyYield(target, dmg)) return;   /* S15 P15: Turnierritter geben auf */
   if (target.trial === 'aim') { const TA = trialOf(byId(target.trialOwner) || S.player); if (kind !== 'physical' && TA && source && source.id === (TA.owner ?? S.player.id)) { TA.n++; float(target, 'Treffer', 'rgba(184,138,240,ALPHA)'); die(target, 'Zauber', source); } else if (source === S.player) float(target, 'nur Zauber', 'rgba(200,190,160,ALPHA)'); return; }   // S15 P5
@@ -4091,7 +4102,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.mtype === 'dodon') dodonSlain(c, source);
   if (c.amok && source && (source === S.player || S.party.includes(source.id))) { S.factions.aurel = clamp((S.factions.aurel || 0) + 2, -100, 100); float(c, 'Aurelion +2', 'rgba(230,200,120,ALPHA)'); }   // S14: Amok-Automat gestoppt
   if (c.mtype === 'garmadon') garmadonSlain();
-  if (c.mtype === 'omega') omegaEnd('slain');
+  if (c.mtype === 'omega') omegaEnd('slain', c);
   c.alive = false; c.downed = false;
   if (c.kind === 'npc' && c.homeTown) ruinCheck(c, source, cause);      /* Folgen §5c: letzter Bewohner tot = Dorf ausgelöscht */
   if (c.vaultFoe && c.map === 'vault' && S.vaultAt && S.vaults?.[S.vaultAt.site] && !S.ents.vault.some(e => e.vaultFoe && e.alive && !e.surrendered)) S.vaults[S.vaultAt.site].cleared[S.vaultAt.floor] = S.day | 0;   // S15 Fehlersuche: Ebene gesäubert (auch ohne Abstieg) — 7 Tage Ruhe, der Boss steht nicht wieder auf
@@ -4144,6 +4155,7 @@ function die(c, cause = 'Wunden', source) {
     if (px > 0) gainXp(S.player, px);
     for (const pm of partyMembers()) { if (pm.coopPilot && px > 0 && S.player.alive) continue; const q = Math.round(full * share(pm.id)); if (q > 0) { pm.xp += q; while (pm.xp >= pm.xpNext) levelUp(pm); } }   /* Koop: die Gastfigur hat ihren Anteil schon über gainXp (wie der Held), nicht doppelt */
     S.kills++;
+    if (source === S.player || source === S.player.id) relicKill(S.player, c);   /* Reliquien */
     if (S.player.alive) S.player.kills = (S.player.kills || 0) + 1;
     S.battles = Math.max(1, Math.round(S.kills / 3));
     if ((px > 0 || source === S.player || S.party.includes(source?.id)) && S.player.alive && partyMembers().some(pm => !pm.coopHero && dist(pm, S.player) < 400)) leadGrow(0.07);   /* Audit A13: Führung wächst durch Siege mit der Gruppe (~0,2 je Kampf) */
@@ -4155,7 +4167,7 @@ function die(c, cause = 'Wunden', source) {
       chronicle(`${c.title || m.name} erschlagen`, 'battle', `Gefallen bei ${where}, Jahr ${year()}.`);
       UI.toast(`${c.title || m.name} ist besiegt`, 3200);
     }
-    const rb = bossOf(c); if (rb) regionBossSlain(rb);
+    const rb = bossOf(c); if (rb) { regionBossSlain(rb); relicGain(5, 1, rb.title || 'Regionalboss'); if (RELIQ_REGION[rb.id]) relicDrop(c.map, c.x, c.y + 8, RELIQ_REGION[rb.id], `Von ${rb.title || 'einem Regionalboss'}`); }
     if (c.livestock && c.livestock !== 'player' && (source === S.player || source === S.player?.id)) { const seen = S.ents.world.some(w => w.kind === 'npc' && w.alive && dist(w, c) < 300);   // S13: Viehdiebstahl
       if (seen) addBounty(townFac(c.livestock), 20, 'Viehdiebstahl'); const G = growthOf(c.livestock); G.prosper = Math.max(-20, G.prosper - 2); }
     if (c.variant === 'leader') { let n = 0; for (const o of S.ents[c.map]) if (o.kind === 'enemy' && o.alive && o !== c && o.faction === c.faction && dist(o, c) < 420 && chance(0.5)) { o.fleeing = true; n++; }   // S13: ohne Anführer wanken sie
@@ -4177,6 +4189,7 @@ function die(c, cause = 'Wunden', source) {
     if (c.settler || c.campGuard) { moraleAdd(-4, `${c.name} getötet`); S.flags.settlerDeaths = (S.flags.settlerDeaths || 0) + 1; if (S.settlement) campLoss(S.settlement); } }   /* Siedlung M1/M2/M4 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
   if (c.kind === 'npc' && !isParty) fearWitness(c, source, wasFoe);   /* Angst der Zeugen */
+  if (c.kind === 'npc' && wasFoe && (source === S.player || source === S.player.id)) relicKill(S.player, c);   /* Reliquien: auch erschlagene Angreifer */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   const mourned = c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith);
@@ -4327,6 +4340,395 @@ function fearStep(e, dt) {                                            /* aus upd
   e.vx = e.vy = 0; return true;
 }
 
+// Angst des Ortes (Nutzer 02.10.2026: „Events sollen das nicht einfach überschreiben“): höchste Angst unter den Bewohnern, je Sekunde
+// zwischengespeichert. Ab 50 fällt das Stadtfest aus, Wallfahrt, Ketzerjagd, Steuereintreiber und Flüchtlinge wählen einen anderen Ort,
+// und wer neu in den Ort kommt (Ereignisfiguren, Ersatz), übernimmt 80 % der Angst.
+let DREAD = new Map();
+function townDread(k) {
+  if (!k) return { v: 0, by: null }; const now = performance.now(), c = DREAD.get(k); if (c && now - c.t < 1000) return c;
+  let v = 0, by = null; for (const e of VILLAGERS) if (e.fear && e.homeTown === k && e.alive) { const f = fearOf(e); if (f > v) { v = f; by = e.fearBy; } }
+  const r = { t: now, v, by }; DREAD.set(k, r); return r;
+}
+const calmTown = k => townDread(k).v < 50;
+function dreadArrive(e) {                                             /* Neuankömmling übernimmt die Angst des Ortes */
+  if (e.kind !== 'npc' || e.guard || e.map !== 'world' || S.party.includes(e.id)) return;
+  const D = townDread(townAt(e.x / TS | 0, e.y / TS | 0) || e.homeTown); if (D.v < 25) return;
+  e.fear = Math.max(e.fear || 0, D.v * 0.8); e.fearBy = D.by; e.fearSeen = clock();
+}
+// Anmarsch (Nutzer 02.10.2026: „Leute sind aufeinmal gespawnt, als ein Event gestartet hat — man soll sehen, wie sie hinlaufen“):
+// walkInNew(fn) merkt sich die Figuren der aktuellen Karte, führt fn aus (Stunden-/Tagestakt mit allen Weltereignissen, Burgalarm,
+// Überfälle, Miliz) und setzt jede neue Figur, die im Bild entstanden wäre, außerhalb des Bildes ab; sie läuft zu ihrem Platz
+// (e.walkIn, höchstens 3 Spielstunden). Was nur neu aufgebaut wurde (an derselben Stelle stand vorher schon eine Figur), bleibt stehen.
+// Gefangene, Diener, Gruppe und Mitspieler laufen nie heran. Gegner brechen den Anmarsch ab, wenn sie getroffen werden oder der Held nah ist.
+function walkIn(e) {
+  if (e.captive || e.inmate || e.prisoner || e.servant || e.eisen || e.coopHero || e.coopPilot || e.noWalkIn || e.downed || S.party.includes(e.id)) return false;
+  if (!inView(e.map, e.x, e.y, 0)) return false;
+  const goal = { x: e.x, y: e.y }, [tx, ty] = pushOut(e.map, e.x / TS | 0, e.y / TS | 0), q = freeSpotNear(e.map, tx, ty, 4);
+  if (!q || inView(e.map, q.x, q.y, 0)) return false;
+  e.x = q.x; e.y = q.y; e.vx = e.vy = 0; e.path = null; e.walkIn = { x: goal.x, y: goal.y, until: clock() + 180 };
+  return true;
+}
+function walkInStep(e, dt) {
+  const W = e.walkIn, p = S.player;
+  if (clock() > W.until || (e.kind === 'npc' && (e.angry || e.fleeing)) || (e.kind === 'enemy' && ((e.hp ?? 1) < (e.maxHp ?? 1) || (p.map === e.map && dist(e, p) < 260)))
+    || Math.hypot(W.x - e.x, W.y - e.y) < 16) { delete e.walkIn; return false; }
+  seek(e, Math.atan2(W.y - e.y, W.x - e.x), 1.15 * dt / 16, dt, W); return true;
+}
+function walkInNew(fn) {
+  if (S._quiet || S.coop?.role === 'guest' || !S.player) return fn();
+  const old = new Map(); for (const e of S.ents[S.map] || []) if (e.kind === 'npc' || e.kind === 'enemy') old.set(e.id, e);
+  const r = fn(), arr = S.ents[S.map] || [], gone = [];
+  const now = new Set(); for (const e of arr) if (e.kind === 'npc' || e.kind === 'enemy') now.add(e.id);
+  for (const [id, e] of old) if (!now.has(id)) gone.push(e);
+  for (const e of arr) {
+    if ((e.kind !== 'npc' && e.kind !== 'enemy') || !e.alive || old.has(e.id)) continue;
+    dreadArrive(e);
+    if (gone.some(o => o.kind === e.kind && Math.abs(o.x - e.x) < 48 && Math.abs(o.y - e.y) < 48)) continue;   /* nur neu aufgebaut: bleibt */
+    walkIn(e);
+  }
+  return r;
+}
+
+// ================= Reliquien (Nutzer 02.10.2026, docs/PLAN_TRINKETS.md) =================
+// Eigene Fassungen am Helden (c.relics, bis 3): die erste ab Stufe 10, die zweite nach dem ersten großen Boss (S.flags.relicSlot2), die
+// dritte nach Garmadon oder Omega (S.flags.relicSlot3). Stufe am Exemplar (it.tier), Bindung an den Helden (it.bound): ein Erbe holt die
+// Reliquie am Grab, oberhalb von Stufe V schlummert sie aber, bis er sie zum halben Preis neu erweckt (Nutzerentscheid). Währungen des
+// Hauses: S.relicCur.glut (Elite, Dungeon-Ende, Bosse, große Taten) und .stern (Bosse, Endgame). Werte addieren je Art in einen Topf,
+// der genau einmal wirkt und je Phase gedeckelt ist (früh / drei Fassungen / Stufe VIII); Treffer-Multiplikatoren ebenso gedeckelt.
+const RELIC_SCALE = [1, 1.25, 1.5, 1.8, 2.1, 2.5, 3, 3.6];
+const RELIC_CAP = {
+  mid:  { dmg: 0.25, atk: 0.2, move: 0.2, cdr: 0.2, crit: 0.08, leech: 0.05, armor: 6, spell: 0.25, hit: 1.35 },
+  late: { dmg: 0.5, atk: 0.4, move: 0.35, cdr: 0.4, crit: 0.15, leech: 0.1, armor: 12, spell: 0.5, hit: 1.8 },
+  end:  { dmg: 1.2, atk: 1.0, move: 0.7, cdr: 0.7, crit: 0.3, leech: 0.2, armor: 25, spell: 1.2, hit: 3 },
+};
+const RELIC_PHASE = { mid: 'Kontrollierte Macht', late: 'Drei Fassungen', end: 'Rotfall — entfesselt' };
+const relicCur = () => (S.relicCur ||= { glut: 0, stern: 0 });
+function relicGain(glut = 0, stern = 0, why = '') {
+  const C = relicCur(); C.glut += glut; C.stern += stern; if (!glut && !stern) return;
+  float(S.player, `${glut ? `+${glut} Glut` : ''}${glut && stern ? ' · ' : ''}${stern ? `+${stern} Sternsplitter` : ''}`, 'rgba(240,170,90,ALPHA)');
+  if (!S.flags.relicCurHint) { S.flags.relicCurHint = 1; log('Seelenglut und Sternsplitter gehören deinem Haus und bleiben über den Tod hinaus. Damit stärkst du Reliquien (Charakter → Reliquien, Taste V).', 'quest'); }
+  else if (why) log(`${why}: ${glut ? `+${glut} Seelenglut` : ''}${glut && stern ? ', ' : ''}${stern ? `+${stern} Sternsplitter` : ''}.`, 'world');
+}
+function relicSlots(c = S.player) { if (c !== S.player || (c.level || 1) < 10) return 0; return 1 + (S.flags.relicSlot2 ? 1 : 0) + (S.flags.relicSlot2 && S.flags.relicSlot3 ? 1 : 0); }
+const relicSlotNeed = i => ['Heldenstufe 10', 'einen großen Boss erschlagen (Varg, Hrodvar, Aldhelm, Weißbart, Gorak, Dodon …)', 'Garmadon oder Omega erschlagen'][i];
+const relicMax = it => RELIQ_MAX[ITEMS[it.key]?.rarity] || 4;
+const relicTierOf = it => it.tier || RELIQ_START[ITEMS[it.key]?.rarity] || 1;
+const relicT = (c, it) => it.bound === c.id ? relicTierOf(it) : Math.min(5, relicTierOf(it));   /* fremde Bindung: schlummert über V */
+function relicsOf(c) {
+  if (!c || c !== S.player || !c.relics) return [];
+  const out = [], n = relicSlots(c);
+  for (let i = 0; i < n; i++) { const it = c.relics[i]; if (!it) continue; const d = RELIQ[it.key]; if (!d) continue;
+    const T = relicT(c, it); out.push({ it, d, eng: d.eng, T, s: RELIC_SCALE[T - 1], path: T >= 6 && it.bound === c.id ? it.path : null, trans: T >= 8 }); }
+  return out;
+}
+const relicHas = (c, eng, T = 1) => relicsOf(c).find(r => r.eng === eng && r.T >= T);
+function relicPhase(c) { const R = relicsOf(c); return relicSlots(c) >= 3 ? (R.some(r => r.trans) ? 'end' : 'late') : 'mid'; }
+function relicSyn(c, name) {
+  const R = relicsOf(c); if (R.length < 2) return false; const S0 = RELIQ_SYN.find(x => x[2] === name); if (!S0) return false;
+  const a = R.find(r => r.eng === S0[0]), b = R.find(r => r.eng === S0[1]); return !!a && !!b && (a.T >= 7 || b.T >= 7);
+}
+const relicHp = c => c.maxHp ? clamp(c.hp / c.maxHp, 0, 1) : 1;
+const relicLife = t => t.body?.torso ? clamp(t.body.torso.hp / (t.body.torso.max || 1), 0, 1) : t.maxHp ? clamp(t.hp / t.maxHp, 0, 1) : 1;   /* Gegner: der Rumpf entscheidet */
+const relicRs = c => (c.rs ||= { streak: 0, souls: 0, storm: 0, thorn: 0, hitN: 0, abN: 0, abLog: [], spellN: 0, kills10: 0 });
+// Beitrag einer Reliquie zu einem Wert (Topf). k: dmg atk move cdr crit leech armor spell
+function relicStat(r, k, c, now) {
+  const { s, T, path } = r, rs = relicRs(c), hp = relicHp(c);
+  switch (r.eng) {
+    case 'berserk': if (k === 'dmg') return Math.floor((1 - hp) * 10) * 0.015 * s + (r.d.twist === 'drum' ? Math.min(10, rs.streak) * 0.01 * s : 0);
+      if (k === 'atk' && T >= 3 && hp < 0.35) return 0.1 * s; if (k === 'move' && path === 'a' && hp < 0.35) return 0.1 * s; if (k === 'leech' && path === 'b' && hp < 0.5) return 0.03 * s; return 0;
+    case 'shadow': if (k === 'move' && (rs.dodgeT || 0) > now) return 0.12 * s; return 0;
+    case 'streak': { const st = rs.streak * (relicSyn(c, 'Blutrausch') && hp < 0.35 ? 2 : 1);
+      if (k === 'atk') return Math.min(20, st) * 0.012 * s; if (k === 'leech' && T >= 5 && rs.streak >= 10) return 0.04 * s + (r.d.twist === 'blood' ? 0.02 * s : 0); return 0; }
+    case 'souls': if (k === 'spell') return rs.souls * 0.02 * s; if (k === 'armor' && path === 'a') return rs.souls * 0.5; if (k === 'dmg' && path === 'b') return rs.souls * 0.015 * s; return 0;
+    case 'storm': if (k === 'dmg' && (rs.movingT || 0) > 1000) return 0.05 * s; if (k === 'move' && r.d.twist === 'sand') return 0.04 * s; return 0;
+    case 'clock': if (k === 'cdr') return (path === 'a' ? 0.1 * s : 0) + 0.02 * s; return 0;
+    case 'crit': if (k === 'crit') return 0.03 * s + (path === 'b' ? 0.05 * s : 0); return 0;
+    case 'iron': if (k === 'armor') return 2 * s; return 0;
+    case 'spell': if (k === 'spell') return 0.06 * s + (path === 'a' ? 0.1 * s : 0); return 0;
+    case 'pack': if ((k === 'move' || k === 'atk') && T >= 5) return Math.min(3, partyMembers().filter(m => m.alive && dist(m, c) < 400).length) * 0.03 * s; return 0;
+  }
+  return 0;
+}
+export function relicFx(c, k) {
+  if (!c || c !== S.player) return 0; const R = relicsOf(c); if (!R.length) return 0;
+  const now = performance.now(); let v = 0; for (const r of R) v += relicStat(r, k, c, now);
+  return Math.min(v, RELIC_CAP[relicPhase(c)][k] ?? v);
+}
+// Gefährten mit Wolfsfang
+function relicPackDmg(c) { if (!S.party.includes(c.id)) return 0; const r = relicHas(S.player, 'pack'); return r ? 0.05 * r.s + (r.path === 'b' ? 0.1 * r.s : 0) + (r.trans ? 0.1 * r.s : 0) : 0; }
+function relicPackArmor(c) { if (!S.party.includes(c.id)) return 0; const r = relicHas(S.player, 'pack'); return r && r.path === 'a' ? Math.round(2 * r.s) : 0; }
+// Krit-Chance beim Treffer (Dornen-Stapel, jeder fünfte Treffer sicher)
+function relicCrit(c) {
+  const R = relicsOf(c); if (!R.length) return 0; const rs = relicRs(c), cr = R.find(r => r.eng === 'crit');
+  if (cr?.trans && rs.hitN % 5 === 4) return 1;
+  return relicFx(c, 'crit') + (cr && cr.T >= 3 ? rs.thorn * 0.03 : 0);
+}
+// Schaden des Treffers (nächster Hieb nach dem Ausweichen, Hinrichtung, Dornen, Krit-Schaden) — gedeckelt je Phase
+function relicHitMul(c, t, crit) {
+  const R = relicsOf(c); if (!R.length) return 1; const rs = relicRs(c), now = performance.now(); let m = 1;
+  for (const r of R) {
+    if (r.eng === 'shadow' && r.T >= 3 && (rs.nextT || 0) > now) { m *= 1 + 0.2 * r.s; rs.nextT = 0; }
+    if (r.eng === 'exec' && relicLife(t) < 0.25) m *= 1 + 0.2 * r.s;
+    if (r.eng === 'crit' && crit) { if (r.T >= 3 && rs.thorn) m *= 1 + 0.08 * rs.thorn; if (r.path === 'a') m *= 1 + 0.25 * r.s; }
+  }
+  return Math.min(m, RELIC_CAP[relicPhase(c)].hit);
+}
+function relicProc(c, txt, col = 'rgba(240,200,120,ALPHA)', fxk = 'spark') { float(c, txt, col); if (fxk) fx(c.x, c.y - 16, fxk, 8); }
+// Nach dem Treffer: Hinrichtung, Krit-Kette, Sturm-Entladung, Nachbild, Uhrwerk
+function relicAfterHit(c, t, dmg, crit, kind, area) {
+  const R = relicsOf(c); if (!R.length || !t) return; const rs = relicRs(c), now = performance.now(); rs.hitN++;
+  const boss = t.boss || MONSTERS[t.mtype]?.boss;
+  for (const r of R) {
+    if (r.eng === 'clock' && crit) { for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - 300 * r.s); }
+    if (r.eng === 'crit' && r.T >= 3) { if (crit) rs.thorn = 0; else rs.thorn = Math.min(5, rs.thorn + 1); }
+    if (r.eng === 'crit' && r.T >= 5 && crit && !area && t.alive !== undefined) { const o = hostilesOf(c).find(e => e !== t && e.alive && dist(e, t) < 90); if (o) { hurt(o, dmg * 0.4, c, c.name); fx(o.x, o.y - 14, 'crit', 4); } }
+    if (r.eng === 'storm' && r.T >= 3 && rs.storm > 0 && kind === 'physical' && t.alive) {
+      const bolt = 12 * r.s * rs.storm; rs.storm = 0; hurt(t, bolt, c, c.name, false, 'magic'); fx(t.x, t.y - 20, 'spark', 14); sfx('magic', 0.3, 0.6);
+      if (r.T >= 5) for (const o of hostilesOf(c).filter(e => e !== t && e.alive && dist(e, t) < 140).slice(0, 2)) { hurt(o, bolt * 0.6, c, c.name, false, 'magic'); fx(o.x, o.y - 20, 'spark', 8); }
+      if (!S.flags.relicStormHint) { S.flags.relicStormHint = 1; log('Sturmglocke: Im Lauf lädst du Ladungen, der nächste Hieb entlädt sie als Blitz.', 'combat'); } }
+    if (r.eng === 'shadow' && r.path === 'a' && rs.echoNext && t.alive) { rs.echoNext = false; hurt(t, dmg * 0.5, c, c.name); fx(t.x, t.y - 14, 'ghost', 6); }
+    if (r.eng === 'exec' && r.T >= 3 && t.alive && !t.downed && t.kind === 'enemy') {
+      const thr = 0.1 + 0.01 * r.T + (r.path === 'a' ? 0.05 : 0) + (crit && relicSyn(c, 'Gnadenstoß') ? 0.05 : 0);
+      if (relicLife(t) < (boss ? (r.trans ? 0.08 : 0) : thr)) {
+        relicProc(t, 'Hingerichtet', 'rgba(230,90,70,ALPHA)', 'blood'); die(t, 'Hingerichtet', c);
+        if (r.T >= 5) c.stamina = Math.min(c.maxStamina || 100, (c.stamina || 0) + 25);
+        if (r.path === 'b') for (const o of hostilesOf(c)) if (o.alive && dist(o, c) < 220 && !(o.boss || MONSTERS[o.mtype]?.boss)) o.cowed = now + 3000;
+        if (relicSyn(c, 'Seelenernte')) relicSouls(c, 2);
+        if (!S.flags.relicExecHint) { S.flags.relicExecHint = 1; log('Henkerschlinge: Angeschlagene Feinde sterben beim nächsten Treffer. Bosse widerstehen — bis zur Verwandlung.', 'combat'); }
+        return; } }
+  }
+}
+function relicSouls(c, n) {
+  const r = relicHas(c, 'souls'); if (!r) return; const rs = relicRs(c), max = r.T >= 3 ? 15 : 10;
+  rs.souls = Math.min(max, rs.souls + n);
+  addStatus(c, { key: 'r_seelen', name: 'Seelen', good: true, left: 600000, stacks: rs.souls, desc: `${rs.souls}/${max} Seelen: Fähigkeiten stärker.${r.T >= 5 ? ' Voll: die nächste Fähigkeit kostet nichts.' : ''}` });
+}
+function relicKill(c, v) {
+  if (c !== S.player) return; const R = relicsOf(c); if (!R.length) return; const rs = relicRs(c), now = performance.now();
+  for (const r of R) {
+    if (r.eng === 'berserk' && r.T >= 5) { const h = c.maxHp * 0.03; if (c.body) B.heal(c, h); else c.hp = Math.min(c.maxHp, c.hp + h); }
+    if (r.eng === 'berserk' && r.d.twist === 'drum') rs.streak = Math.min(10, rs.streak + 1);
+    if (r.eng === 'streak') {
+      rs.streak = Math.min(r.trans ? 20 : 10, rs.streak + 1); rs.streakT = now; rs.streakWin = 4000 + (r.T >= 3 ? 2000 : 0) + (r.path === 'a' ? 1000 : 0);
+      addStatus(c, { key: 'r_kranz', name: 'Kill-Serie', good: true, left: rs.streakWin, stacks: rs.streak, desc: `Serie ${rs.streak}: +${Math.round(Math.min(20, rs.streak) * 1.2 * r.s)} % Angriffstempo.` });
+      if (rs.streak === 10) relicProc(c, 'Blutkranz voll', 'rgba(220,60,60,ALPHA)', 'blood');
+      if (r.trans && ++rs.kills10 >= 10 && !((rs.healCd || 0) > now)) { rs.kills10 = 0; rs.healCd = now + 60000; if (c.body) B.fullHeal(c); else c.hp = c.maxHp; relicProc(c, 'Kranz des Gemetzels', 'rgba(240,80,80,ALPHA)', 'heal'); }
+      if (relicSyn(c, 'Gewitterrausch')) rs.storm = Math.min(5, rs.storm + 1);
+    }
+    if (r.eng === 'souls') { relicSouls(c, 1); fx(v.x, v.y - 14, 'necro', 6); }
+    if (r.eng === 'spell' && r.T >= 3 && ['magic', 'fire', 'frost', 'holy', 'shadow', 'arcane'].includes(v.lastKind)) { c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + (c.maxMana || 0) * 0.08);
+      if (relicSyn(c, 'Uhrwerk der Sterne')) for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - 1000); }
+    if (r.eng === 'pack' && r.T >= 3) for (const m of partyMembers()) if (m.alive && dist(m, c) < 500) { if (m.body) B.heal(m, m.maxHp * 0.05); }
+  }
+}
+function relicDodge(c) {
+  const R = relicsOf(c); if (!R.length) return; const rs = relicRs(c), now = performance.now();
+  for (const r of R) if (r.eng === 'shadow') {
+    rs.dodgeT = now + 1500; if (r.T >= 3) rs.nextT = now + 2000; if (r.path === 'a') rs.echoNext = true;
+    addStatus(c, { key: 'r_schatten', name: 'Schattenschritt', good: true, left: 1500, desc: 'Schneller nach dem Ausweichen.' });
+    if (r.trans) for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 70 && !(e.status || []).some(q => q.key === 'bleeding')) (e.status ||= []).push({ key: 'bleeding', name: 'Blutend', left: 6000, src: c.id });
+  }
+  if (relicSyn(c, 'Sturmläufer')) rs.storm = Math.min(5, rs.storm + 1);
+}
+function relicEvade(c) {
+  const R = relicsOf(c); if (!R.length) return; const rs = relicRs(c), now = performance.now();
+  for (const r of R) {
+    if (r.eng === 'shadow' && r.T >= 5 && !((rs.resetCd || 0) > now)) { rs.resetCd = now + 1500; c.dodgeCd = 0; relicProc(c, 'Schattenfaden', 'rgba(170,170,230,ALPHA)', 'ghost'); }
+    if (r.d.twist === 'frost' && !((rs.frostCd || 0) > now)) { rs.frostCd = now + 4000; for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 130) addStatus(e, { key: 'chilled', name: 'Durchfroren', left: 2500, desc: 'Langsamer (−40 %).' }); fx(c.x, c.y - 10, 'frost', 18); }
+    if (r.d.twist === 'timebreak' && !((rs.timeCd || 0) > now)) { rs.timeCd = now + 6000; for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 420) e.timeSlow = now + 2000 + (r.T >= 8 ? 1000 : 0); relicProc(c, 'Zeitbruch', 'rgba(240,230,170,ALPHA)', 'heal'); }
+  }
+  if (relicSyn(c, 'Zeitfaden')) for (const k of Object.keys(c.cooldowns || {})) c.cooldowns[k] = Math.max(0, c.cooldowns[k] - 2000);
+}
+function relicGuard(c, parry) {
+  const R = relicsOf(c); if (!R.length) return;
+  for (const r of R) {
+    if (r.eng === 'clock' && r.T >= 3 && parry) { const k = Object.keys(c.cooldowns || {}).sort((a, b) => c.cooldowns[b] - c.cooldowns[a])[0]; if (k && c.cooldowns[k] > 0) c.cooldowns[k] *= 0.5; }
+    if (r.eng === 'iron' && r.T >= 3) { const a = Math.round(c.maxHp * (0.08 * r.s + (r.path === 'a' ? 0.05 * r.s : 0)) * (relicSyn(c, 'Schildwall') ? 1.5 : 1));
+      addStatus(c, { key: 'bone_ward', name: 'Eisenmal-Schild', good: true, left: 6000, absorb: a, desc: `Fängt ${a} Schaden ab.` }); fx(c.x, c.y - 14, 'spark', 6); }
+  }
+}
+// Getroffen: Dornen, Kette, unbeugsames Herz, Sturm gegen Fernkampf. true = Treffer verfällt.
+function relicHurt(c, dmg, src) {
+  const R = relicsOf(c); if (!R.length) return false; const now = performance.now(), rs = relicRs(c), S0 = typeof src === 'object' ? src : byId(src);
+  for (const r of R) {
+    if (r.eng === 'storm' && r.trans && (rs.movingT || 0) > 300 && S0 && dist(S0, c) > 140) rs.halve = true;
+    if (r.eng === 'iron' && r.T >= 5 && S0 && S0.alive && S0 !== c && dist(S0, c) < 110) hurt(S0, dmg * (0.1 * r.s + (r.path === 'b' ? 0.1 * r.s : 0)), c, 'Eisenmal');
+    if ((r.eng === 'iron' && r.trans || r.d.twist === 'chain') && S0 && S0.alive && S0.kind === 'enemy') addStatus(S0, { key: 'chilled', name: 'Gekettet', left: 2000, desc: 'Langsamer (−40 %).' });
+    if (r.eng === 'berserk' && r.trans && c.hp - dmg * 1.5 <= 0 && !((rs.defyCd || 0) > now)) { rs.defyCd = now + 120000; addStatus(c, { key: 'r_unbeugsam', name: 'Unbeugsam', good: true, left: 3000, desc: 'Drei Sekunden lang kein Schaden.' }); relicProc(c, 'Das Herz schlägt weiter', 'rgba(230,60,60,ALPHA)', 'blood'); return true; }
+  }
+  return false;
+}
+function relicAbility(c, key) {
+  const R = relicsOf(c); if (!R.length) return; const rs = relicRs(c), now = performance.now(), ab = ABILITIES[key];
+  rs.abN++; rs.abLog = [...(rs.abLog || []).filter(t => now - t < 5000), now];
+  for (const r of R) {
+    if (r.eng === 'clock' && r.T >= 5 && rs.abN % 3 === 0) { c.cooldowns[key] = 0; relicProc(c, 'Uhrwerk', 'rgba(220,190,110,ALPHA)', null); }
+    if (r.eng === 'clock' && r.path === 'b' && ab?.mana) c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + ab.mana * 0.2);
+    if (r.eng === 'clock' && r.trans && rs.abLog.length >= 3 && !((rs.slowCd || 0) > now)) { rs.slowCd = now + 20000; for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 500) e.timeSlow = now + 4000; relicProc(c, 'Herz aus Aurelion', 'rgba(220,190,110,ALPHA)', 'heal'); }
+    if (r.eng === 'souls' && r.T >= 5 && rs.souls >= (r.T >= 3 ? 15 : 10)) { c.cooldowns[key] = 0; if (ab?.mana) c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + ab.mana);
+      if (r.trans || r.d.twist === 'king') { const n = rs.souls * 8 * r.s * (r.d.twist === 'king' ? 1.3 : 1); for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 160) hurt(e, n, c, c.name, false, 'shadow'); fx(c.x, c.y - 10, 'necro', 30); }
+      rs.souls = 0; c.status = (c.status || []).filter(q => q.key !== 'r_seelen'); relicProc(c, 'Seelen entfesselt', 'rgba(140,220,190,ALPHA)', 'necro'); }
+    if (r.eng === 'spell' && ab?.spell) { rs.spellN++; if (r.T >= 5 && rs.spellN % 4 === 0) { c.mana = Math.min(c.maxMana || 0, (c.mana || 0) + (ab.mana || 0)); relicProc(c, 'Sternfunke', 'rgba(150,210,255,ALPHA)', null); }
+      if (r.trans && rs.spellN % 4 === 0) { const t = hostilesOf(c).filter(e => e.alive && dist(e, c) < 420).sort((a, b) => dist(a, c) - dist(b, c))[0];
+        if (t) { for (const e of hostilesOf(c)) if (e.alive && dist(e, t) < 70) hurt(e, 30 * r.s, c, c.name, false, 'magic'); fx(t.x, t.y - 30, 'heal', 24); camShake(5, 200); } } }
+  }
+}
+function relicTick(c, dt) {
+  if (c !== S.player || !c.relics) return; const R = relicsOf(c); if (!R.length) return; const rs = relicRs(c), now = performance.now();
+  const moving = Math.hypot(c.vx || 0, c.vy || 0) > 0.05; rs.movingT = moving ? (rs.movingT || 0) + dt : 0;
+  const st = R.find(r => r.eng === 'storm' && r.T >= 3);
+  if (st && moving) { rs.stormAcc = (rs.stormAcc || 0) + dt; const every = st.path === 'a' ? 1200 : 2000, max = st.path === 'b' ? 5 : 3;
+    if (rs.stormAcc >= every) { rs.stormAcc = 0; if (rs.storm < max) { rs.storm++; addStatus(c, { key: 'r_sturm', name: 'Sturm', good: true, left: 8000, stacks: rs.storm, desc: `${rs.storm} Ladungen: der nächste Hieb entlädt einen Blitz.` }); } } }
+  if (rs.streak && now - (rs.streakT || 0) > (rs.streakWin || 4000)) {
+    const sk = R.find(r => r.eng === 'streak'); const lost = rs.streak;
+    if (sk?.path === 'a') { rs.streak--; rs.streakT = now - (rs.streakWin || 4000) + 700; } else rs.streak = 0;
+    if (sk?.path === 'b' && lost >= 5 && !rs.streak) { for (const e of hostilesOf(c)) if (e.alive && dist(e, c) < 150) hurt(e, 10 * lost * sk.s, c, c.name); fx(c.x, c.y - 10, 'blood', 24); relicProc(c, 'Blutfontäne', 'rgba(220,60,60,ALPHA)', null); }
+  }
+  if (R.some(r => r.trans) && (rs.auraT = (rs.auraT || 0) + dt) > 1500) { rs.auraT = 0; fx(c.x + ri(-8, 8), c.y - 24 - ri(0, 10), 'spark', 2); }   /* Stufe VIII: leiser Schein am Helden */
+}
+// --- Fassungen, Aufrüsten, Erwecken, Pfad ---
+function relicEquip(c, idx, slot) {
+  const it = c.inv[idx]; if (!it || ITEMS[it.key]?.slot !== 'relic') return;
+  const n = relicSlots(c); if (!n) return UI.toast(c.level < 10 ? 'Reliquien trägt erst, wer Stufe 10 erreicht hat.' : 'Keine freie Fassung.', 2600);
+  c.relics ||= [null, null, null];
+  if (c.relics.some((r, i) => r && r.key === it.key && i < n)) return UI.toast('Diese Reliquie trägst du schon.');
+  let i = slot != null && slot < n ? slot : c.relics.findIndex((r, j) => !r && j < n);
+  if (i < 0) return UI.toast('Alle Fassungen sind belegt. Lege im Reliquien-Fenster (V) erst eine ab.', 3000);
+  const old = c.relics[i]; c.relics[i] = it; c.inv.splice(idx, 1); if (old) c.inv.push(old);
+  it.tier = relicTierOf(it);
+  if (it.bound !== c.id && it.tier <= 5) relicBind(c, it);
+  if (!S.flags.relicHint) { S.flags.relicHint = 1; log('Reliquie gefasst. Im Charakterfenster unter „Reliquien“ (Taste O) siehst du ihre Stufen, Kosten und was als Nächstes kommt.', 'quest'); }
+  if (it.bound !== c.id) log(`${ITEMS[it.key].name} schlummert: Sie gehorchte ${it.boundName || 'einem anderen'}. Über Stufe V wirkt sie erst, wenn du sie neu erweckst (Reliquien-Fenster).`, 'quest');
+  sfx('ui'); UI.refreshHUD?.();
+}
+function relicBind(c, it) { it.bound = c.id; it.boundName = c.name; (it.history ||= []).push(`Gebunden an ${c.name}, Haus ${S.legacy?.house || c.name}, Jahr ${year()}.`); }
+function relicUnequip(c, i) {
+  const it = c.relics?.[i]; if (!it) return; if (c.inv.length >= c.invCap) return UI.toast('Das Gepäck ist voll.');
+  c.relics[i] = null; c.inv.push(it); relicRs(c).souls = 0; sfx('ui');
+}
+function relicCostOf(it, half) { const C = RELIQ_COST[relicTierOf(it)]; if (!C) return null; if (!half) return C; const o = {}; for (const [k, v] of Object.entries(C)) o[k] = k === 'end' ? v : Math.ceil(v / 2); return o; }
+function relicAfford(c, C) {
+  const cur = relicCur(), lack = [];
+  if (C.gold && S.gold < C.gold) lack.push(`${C.gold - S.gold} Gold`);
+  if (C.glut && cur.glut < C.glut) lack.push(`${C.glut - cur.glut} Seelenglut`);
+  if (C.stern && cur.stern < C.stern) lack.push(`${C.stern - cur.stern} Sternsplitter`);
+  if (C.trophy && countItem(c, 'trophaee') < C.trophy) lack.push(`${C.trophy} Trophäe eines Elite-Gegners`);
+  if (C.end && !S.flags.relicSlot3) lack.push('Garmadon oder Omega erschlagen');
+  return lack;
+}
+function relicPay(c, C) { const cur = relicCur(); S.gold -= C.gold || 0; cur.glut -= C.glut || 0; cur.stern -= C.stern || 0; if (C.trophy) removeItem(c, 'trophaee', C.trophy); }
+const relicAtForge = c => c.map === S.map && (S.ents[c.map] || []).some(e => e.kind === 'prop' && ['forge', 'anvil', 'omega_altar', 'shrine'].includes(e.type) && dist(e, c) < 140) || (S.ents[c.map] || []).some(e => e.kind === 'npc' && e.smith && dist(e, c) < 140);
+function relicUpgrade(c, i) {
+  const it = c.relics?.[i]; if (!it) return; const T = relicTierOf(it), max = relicMax(it), name = ITEMS[it.key].name;
+  if (it.bound !== c.id) return UI.toast('Erst neu erwecken.');
+  if (T >= max) return UI.toast(`${name} ist am Ende ihres Weges (${RELIQ_TIER[max - 1]}).`);
+  if (T >= 4 && !relicAtForge(c)) return UI.toast('Ab Stufe V braucht es eine Esse, einen Amboss, einen Schrein oder einen Schmied in der Nähe.', 3200);
+  if (T === 6 && !it.path) return UI.toast('Erst einen Pfad wählen.');
+  const C = relicCostOf(it), lack = relicAfford(c, C); if (lack.length) return UI.toast(`Es fehlt: ${lack.join(', ')}.`, 3200);
+  relicPay(c, C); it.tier = T + 1; (it.history ||= []).push(`${RELIQ_TIER[T]} durch ${c.name}, Jahr ${year()}.`);
+  sfx('magic', 0.3, 0.8); fx(c.x, c.y - 18, it.tier >= 5 ? 'heal' : 'spark', 14 + it.tier * 2);
+  if (it.tier === 8) relicTransform(c, it);
+  else { nameCard(name.toUpperCase(), `${RELIQ_TIER[it.tier - 1]} · ${relicNewText(it)}`, 3000); log(`${name} ist jetzt ${RELIQ_TIER[it.tier - 1]} (Stufe ${it.tier}). ${relicNewText(it)}`, 'quest'); }
+}
+function relicNewText(it) { const T = relicTierOf(it); return T === 3 ? 'Eine neue Kraft erwacht.' : T === 5 ? 'Sie ist erwacht: eine zweite Kraft.' : T === 6 ? 'Wähle ihren Pfad.' : T === 7 ? 'Sie sucht ihresgleichen: Synergien mit anderen Reliquien.' : 'Ihre Zahlen wachsen.'; }
+function relicTransform(c, it) {
+  const d = RELIQ[it.key], old = ITEMS[it.key].name; it.name = d.trans || `${old}, verwandelt`;
+  it.history.push(`Verwandelt zu „${it.name}“ durch ${c.name}.`); chronicle(`${old} wird zu ${it.name}`, 'legend', `${c.name} hat eine Reliquie bis zum Rotfall getrieben. Sie ist nicht mehr, was sie war.`);
+  addFame(10, fameRegion(c), 'eine Reliquie verwandelt');
+  if (!S._quiet && !S.coop?.role) cinematic([{ dur: 2600, zoom: 1.4, focus: c.id, text: `${old} bricht auf. Was darunter liegt, hat auf dich gewartet.`, beats: [{ t: 0, flash: '#fff2c8', ms: 500 }, { t: 0.05, sfx: 'magic' }, { t: 0.1, fx: 'heal', at: c, n: 30, dy: 30 }, { t: 0.4, card: { title: it.name.toUpperCase(), sub: 'Rotfall · Stufe VIII', ms: 3000 } }, { t: 0.6, fx: 'spark', at: c, n: 20, dy: 40 }] }], null, { pause: true, stay: true });
+  log(`${old} ist verwandelt: ${it.name}. ${RELIQ[it.key].trans ? 'Ihre letzte Kraft ist frei.' : ''}`, 'quest');
+}
+function relicAwakenCost(it) { const T = relicTierOf(it), o = { glut: 0, stern: 0 }; for (let t = 6; t <= T; t++) { const C = relicCostOf({ ...it, tier: t - 1 }, true); o.glut += C.glut || 0; o.stern += C.stern || 0; } return o; }
+function relicAwaken(c, i) {
+  const it = c.relics?.[i]; if (!it || it.bound === c.id) return;
+  if (relicTierOf(it) <= 5) { relicBind(c, it); return; }
+  if (!relicAtForge(c)) return UI.toast('Erwecken braucht eine Esse, einen Amboss, einen Schrein oder einen Schmied in der Nähe.', 3000);
+  const C = relicAwakenCost(it), lack = relicAfford(c, C); if (lack.length) return UI.toast(`Es fehlt: ${lack.join(', ')}.`, 3000);
+  relicPay(c, C); const prev = it.boundName; relicBind(c, it); it.path = null; it.history.push(`Neu erweckt durch ${c.name}${prev ? `, nach ${prev}` : ''}.`);
+  nameCard(ITEMS[it.key].name.toUpperCase(), `erwacht für ${c.name}`, 2800); fx(c.x, c.y - 18, 'heal', 20); sfx('magic');
+  log(`${it.name || ITEMS[it.key].name} erkennt dich. Stufe ${relicTierOf(it)} wirkt wieder${relicTierOf(it) >= 6 ? ' — der Pfad ist neu zu wählen' : ''}.`, 'quest');
+}
+function relicPath(c, i, p) {
+  const it = c.relics?.[i]; if (!it || relicTierOf(it) < 6 || it.bound !== c.id || !['a', 'b'].includes(p) || it.path === p) return;
+  if (it.path) { if (relicCur().stern < 2) return UI.toast('Pfadwechsel kostet 2 Sternsplitter.'); relicCur().stern -= 2; }
+  it.path = p; const P = RELIQ[it.key].paths?.[p]; (it.history ||= []).push(`Pfad: ${P?.[0] || p}.`); log(`${ITEMS[it.key].name}: Pfad „${P?.[0]}“. ${P?.[1] || ''}`, 'quest'); sfx('ui');
+}
+// --- Beute ---
+function relicDrop(map, x, y, key, why) {
+  const d = RELIQ[key]; if (!d) return false; const IT = ITEMS[key];
+  if (IT.unique && (S.flags.relicGot ||= {})[key]) { relicGain(0, 2, `${IT.name} gibt es nur einmal — der Boss hinterlässt Sternsplitter`); return false; }
+  if (IT.unique) S.flags.relicGot[key] = S.day | 0;
+  const o = mkItem(key); (o.history ||= []).push(`${why || 'Gefunden'}, Jahr ${year()}.`); dropItemAt(map, x, y, o);
+  log(`Eine Reliquie: ${IT.name} (${RARITY[IT.rarity]}).`, 'quest'); UI.toast(`RELIQUIE: ${IT.name.toUpperCase()}`, 3000);
+  if (map === S.map) fx(x, y - 10, 'heal', 18);
+  return true;
+}
+const RELIC_POOL = r => Object.keys(RELIQ).filter(k => !RELIQ[k].boss && !RELIQ[k].region && !ITEMS[k].unique && (r === 'low' ? ['common', 'uncommon'].includes(ITEMS[k].rarity) : r === 'mid' ? ['uncommon', 'rare'].includes(ITEMS[k].rarity) : ['rare', 'epic'].includes(ITEMS[k].rarity)));
+function relicBossLoot(e) {                                             /* aus dropLoot: Bosse geben Glut, Splitter und ihre Reliquie */
+  const end = e.mtype === 'garmadon' || e.mtype === 'omega', key = RELIQ_BOSS[e.mtype];
+  relicGain(end ? 12 : 6, end ? 4 : 1 + (chance(0.5) ? 1 : 0), `${MONSTERS[e.mtype]?.name || 'Boss'} erschlagen`);
+  if (key) relicDrop(e.map, e.x + ri(-14, 14), e.y + ri(-6, 10), key, `Aus der Hand von ${MONSTERS[e.mtype]?.name}`);
+  else if (chance(0.5)) relicDrop(e.map, e.x, e.y + 8, pick(RELIC_POOL('high')), `Bei ${MONSTERS[e.mtype]?.name}`);
+  if (!S.flags.relicSlot2) { S.flags.relicSlot2 = S.day | 0; if (S.player.level >= 10) log('Eine zweite Reliquien-Fassung ist frei.', 'quest'); }
+  if (end && !S.flags.relicSlot3) { S.flags.relicSlot3 = S.day | 0; log('Die dritte Reliquien-Fassung ist frei — und Reliquien dürfen jetzt bis zum Rotfall (Stufe VIII) wachsen.', 'quest'); UI.toast('DRITTE FASSUNG FREI', 3000); }
+}
+// Dungeon-Enden (Nutzer: „am Ende von Dungeons sollen Trinkets droppen“): Stufe 1–5 je nach Gefahr
+const RELIC_ENDS = { 'mine|Schatzkammer': 1, 'deep|Tiefhall-Hort': 2, 'sky|Schrein des Himmelssplitters': 3, 'tower|Verbotene Schriften': 4, 'garmadon|Hort des Toten Königs': 5 };
+function relicChest(t, p) {
+  let lvl = t.vaultHoard ? (VAULTS[t.vaultHoard]?.tier || 2) : RELIC_ENDS[`${t.map || p.map}|${t.label}`];
+  if (!lvl && t.map !== 'world' && /^Hort/.test(t.label || '')) lvl = 2;
+  if (!lvl) return;
+  relicGain(2 + lvl * 2, lvl >= 4 ? lvl - 2 : 0, `${t.label || 'Hort'}`);
+  const pool = RELIC_POOL(lvl <= 1 ? 'low' : lvl <= 3 ? 'mid' : 'high');
+  if (t.map === 'tower' || t.label === 'Verbotene Schriften') relicDrop(p.map, p.x + 12, p.y + 10, 'nachtglasuhr', 'Im Turm des Nachtglases');
+  else if (pool.length) relicDrop(p.map, p.x + 12, p.y + 10, pick(pool), `Im ${t.label || 'Hort'}`);
+}
+
+// --- Texte und Ansicht für das Reliquien-Fenster (ui.js relicsUI) ---
+const rN = v => String(Math.round(v * 10) / 10).replace('.', ',');
+const RELIC_TXT = {
+  berserk: (t, s, d) => ({ 1: `Je 10 % fehlendes Leben +${rN(1.5 * s)} % Schaden.${d.twist === 'drum' ? ' Boss-Gabe: Kills schlagen den Takt (+1 % Schaden je Kill, bis 10).' : ''}`, 3: `Unter 35 % Leben +${rN(10 * s)} % Angriffstempo.`, 5: 'Jeder Kill heilt 3 % Leben.', 8: 'Ein tödlicher Treffer prallt ab: 3 s unverwundbar (alle 2 Minuten).' })[t],
+  shadow: (t, s, d) => ({ 1: `Nach dem Ausweichen 1,5 s +${rN(12 * s)} % Lauftempo.${d.twist === 'frost' ? ' Boss-Gabe: perfektes Ausweichen friert die Feinde ringsum ein.' : ''}`, 3: `Der erste Hieb nach dem Ausweichen +${rN(20 * s)} % Schaden.`, 5: 'Perfektes Ausweichen (ein Treffer geht in die Rolle) setzt die Ausweichzeit zurück.', 8: 'Ausweichzeit −40 %; wer neben dir steht, wenn du rollst, blutet.' })[t],
+  streak: (t, s, d) => ({ 1: `Jeder Kill: +${rN(1.2 * s)} % Angriffstempo je Kill in Serie (bis 10, 4 s Zeit).`, 3: 'Die Serie hält 2 s länger.', 5: `Volle Serie: ${rN(4 * s + (d.twist === 'blood' ? 2 * s : 0))} % Lebensraub.`, 8: 'Serie bis 20. Jeder zehnte Kill heilt voll (einmal je Minute).' })[t],
+  souls: (t, s, d) => ({ 1: `Kills geben Seelen (bis 10). Je Seele +${rN(2 * s)} % Zauberkraft.`, 3: 'Bis 15 Seelen.', 5: `Volle Seelen: die nächste Fähigkeit kostet nichts.${d.twist === 'king' ? ' Boss-Gabe: dabei brechen die Seelen um dich los.' : ''}`, 8: 'Entfesselte Seelen treffen alle Feinde ringsum.' })[t],
+  storm: (t, s, d) => ({ 1: `Nach 1 s im Lauf +${rN(5 * s)} % Schaden.${d.twist === 'sand' ? ` Boss-Gabe: +${rN(4 * s)} % Lauftempo.` : ''}`, 3: 'Laufen lädt Sturm (alle 2 s, bis 3). Der nächste Hieb entlädt einen Blitz.', 5: 'Der Blitz springt auf zwei weitere Feinde.', 8: 'Im Lauf treffen dich Fernangriffe nur halb.' })[t],
+  clock: (t, s, d) => ({ 1: `Abklingzeiten −${rN(2 * s)} %. Jeder Krit kürzt alle um ${rN(0.3 * s)} s.${d.twist === 'timebreak' ? ' Boss-Gabe: perfektes Ausweichen bricht die Zeit (2 s Zeitlupe für alle Feinde).' : ''}`, 3: 'Eine Parade halbiert die längste Abklingzeit.', 5: 'Jede dritte Fähigkeit ohne Abklingzeit.', 8: 'Drei Fähigkeiten in 5 s: 4 s Zeitlupe für alle Feinde.' })[t],
+  exec: (t, s) => ({ 1: `+${rN(20 * s)} % Schaden gegen Feinde unter 25 % Leben.`, 3: `Feinde unter ${10 + t} % sterben beim nächsten Treffer (keine Bosse).`, 5: 'Jede Hinrichtung gibt 25 Ausdauer.', 8: 'Auch Bosse unter 8 % Leben.' })[t],
+  crit: (t, s) => ({ 1: `+${rN(3 * s)} % Krit-Chance.`, 3: 'Jeder normale Treffer +3 % Krit (bis 5 Dornen). Ein Krit verbraucht sie: +8 % Schaden je Dorn.', 5: 'Ein Krit trifft einen zweiten Feind (40 %).', 8: 'Jeder fünfte Treffer ist kritisch.' })[t],
+  iron: (t, s, d) => ({ 1: `+${rN(2 * s)} Rüstung.${d.twist === 'chain' ? ' Boss-Gabe: wer dich trifft, wird gekettet.' : ''}`, 3: `Parade und Block geben einen Schild über ${rN(8 * s)} % deines Lebens.`, 5: `Dornen: ${rN(10 * s)} % des Schadens gehen zurück.`, 8: 'Wer dich trifft, wird gekettet (langsamer).' })[t],
+  spell: (t, s) => ({ 1: `+${rN(6 * s)} % Zauberkraft.`, 3: 'Zauber-Kills geben 8 % Mana zurück.', 5: 'Jeder vierte Zauber kostet kein Mana.', 8: 'Jeder vierte Zauber ruft einen Stern auf den nächsten Feind.' })[t],
+  pack: (t, s) => ({ 1: `Gefährten +${rN(5 * s)} % Schaden.`, 3: 'Deine Kills heilen Gefährten (5 %).', 5: `Je Gefährte in der Nähe +${rN(3 * s)} % Lauf- und Angriffstempo (bis 3).`, 8: 'Gefährten schlagen noch einmal deutlich härter zu.' })[t],
+};
+function relicTierLine(key, t) {
+  const d = RELIQ[key], s = RELIC_SCALE[t - 1], f = RELIC_TXT[d.eng];
+  if (t === 6) return d.paths ? `Pfadwahl: ${d.paths.a[0]} oder ${d.paths.b[0]}.` : 'Pfadwahl.';
+  if (t === 7) return 'Synergien: verbindet sich mit anderen Reliquien.';
+  if (t === 8) return `Verwandlung zu „${d.trans || 'Unbekannt'}“: ${f(8, s, d) || ''}`;
+  return f(t, s, d) || `Alle Werte +${Math.round((s - 1) * 100)} % gegenüber Stufe I.`;
+}
+function relicCard(p, it, i) {
+  const d = RELIQ[it.key], IT = ITEMS[it.key], tier = relicTierOf(it), T = relicT(p, it), max = relicMax(it), bound = it.bound === p.id;
+  const active = [1, 3, 5].filter(t => t <= T).map(t => RELIC_TXT[d.eng](t, RELIC_SCALE[T - 1], d));   /* Zahlen der aktuellen Stufe */
+  if (T >= 6 && it.path && bound) active.push(`Pfad ${d.paths[it.path][0]}: ${d.paths[it.path][1]}`);
+  if (T >= 8) active.push(relicTierLine(it.key, 8));
+  const ladder = [];
+  for (let t = 1; t <= 8; t++) ladder.push({ t, name: RELIQ_TIER[t - 1], text: relicTierLine(it.key, t), state: t > max ? 'locked' : t <= T ? 'done' : t <= tier ? 'sleep' : t === tier + 1 ? 'next' : 'future' });
+  let next = null;
+  if (!bound && tier > 5) { const C = relicAwakenCost(it); next = { kind: 'awaken', cost: C, lack: relicAfford(p, C), forge: true }; }
+  else if (tier < max) { const C = relicCostOf(it); next = { kind: 'up', tier: tier + 1, name: RELIQ_TIER[tier], cost: C, lack: relicAfford(p, C), forge: tier >= 4, needPath: tier === 6 && !it.path }; }
+  return { i, key: it.key, name: it.name || IT.name, rar: IT.rarity, rarName: RARITY[IT.rarity], tier, T, max, tierName: RELIQ_TIER[T - 1], sdesc: IT.sdesc, lore: IT.lore, col: d.col, boss: !!(d.boss || d.region),
+    bound, boundName: it.boundName, sleeping: !bound && tier > 5, path: it.path, paths: d.paths, pathOpen: tier >= 6 && bound, active, ladder, next, history: (it.history || []).slice(-4) };
+}
+function relicView() {
+  const p = S.player, n = relicSlots(p), ph = relicPhase(p), engs = relicsOf(p).map(r => r.eng);
+  const slots = [0, 1, 2].map(i => i >= n ? { i, locked: true, need: relicSlotNeed(i) } : p.relics?.[i] ? relicCard(p, p.relics[i], i) : { i, empty: true });
+  const inv = p.inv.map((x, idx) => ({ x, idx })).filter(o => o.x && ITEMS[o.x.key]?.slot === 'relic').map(({ x, idx }) => ({ idx, key: x.key, name: x.name || ITEMS[x.key].name, rar: ITEMS[x.key].rarity, tier: relicTierOf(x), sdesc: ITEMS[x.key].sdesc, sleeping: x.bound && x.bound !== p.id && relicTierOf(x) > 5 }));
+  const syn = RELIQ_SYN.filter(s => engs.includes(s[0]) || engs.includes(s[1])).map(s => ({ name: s[2], desc: s[3], active: relicSyn(p, s[2]), have: engs.includes(s[0]) && engs.includes(s[1]),
+    need: [s[0], s[1]].filter(e => !engs.includes(e)).map(e => Object.entries(RELIQ).filter(([k, d]) => d.eng === e && !d.boss && !d.region).map(([k]) => ITEMS[k].name)[0]).join(' / ') }));
+  const pots = ['dmg', 'atk', 'move', 'cdr', 'crit', 'leech', 'armor', 'spell'].map(k => ({ k, v: relicFx(p, k), cap: RELIC_CAP[ph][k] })).filter(o => o.v > 0);
+  return { slots, inv, syn, pots, cur: { ...relicCur(), trophy: countItem(p, 'trophaee'), gold: S.gold }, phase: RELIC_PHASE[ph], phaseKey: ph, forge: relicAtForge(p), level: p.level || 1, rs: relicRs(p) };
+}
+
 // Hoher Stand: Adel und Geweihte. Blutbann (Wachen der Fraktion greifen fünf Tage lang ohne Anruf an, keine Festnahme mehr),
 // Kopfgeldjäger sofort, Chronik; bei Geweihten zusätzlich der Kirchenbann: sieben Tage hilft dir niemand auf, der Orden ist Feind.
 const HIGH_RANK = { Graf: 'adel', 'Gräfin': 'adel', Edelmann: 'adel', Edelfrau: 'adel', Ratsherr: 'adel', Dorfvorsteher: 'adel', 'Alter Paladin': 'klerus', Priester: 'klerus', Heilerin: 'klerus', Priesterin: 'klerus' };
@@ -4382,7 +4784,8 @@ function makeGrave(c, cause) {
     loot: [], charKey: c.key };
   for (const k of Object.keys(c.equip)) if (c.equip[k]) { g.loot.push(c.equip[k]); c.equip[k] = null; }
   for (const i of c.inv) g.loot.push(i);
-  c.inv = [];
+  for (const r of c.relics || []) if (r) g.loot.push(r);   /* Reliquien liegen am Grab (Nutzerentscheid); gebunden bleibt sie an den Toten */
+  c.inv = []; if (c.relics) c.relics = [null, null, null];
   S.ents[c.map].push(g);
 }
 
@@ -4402,6 +4805,8 @@ function dropLoot(e) {
   const drop = key => dropItemAt(e.map, e.x + ri(-10, 10), e.y + ri(-8, 8), mkItem(key, 1, { bonus }), e);   /* P5: Bogen vom Körper */
   const hunter = isBeast(e) && e.lastKiller === S.player?.id ? huntLoot() : 1;   /* Jagd (03.10.): mehr Felle und Fleisch von Tieren */
   if (hunter > 1) huntGain();
+  if (e.boss || MONSTERS[e.mtype]?.boss) relicBossLoot(e);   /* Reliquien: Glut, Splitter, Boss-Reliquie */
+  if (e.mtype === 'omega') { drop('sternenklinge'); drop('potion'); return; }   /* Nutzer 02.10.: Omegas Klinge liegt immer da (die Szene erzählt davon) */
   for (const [key, p] of table) { const gear = GEAR_SLOTS.has(ITEMS[key]?.slot);
     if (gear && BP) continue; if (chance((gear ? p * (tier === 0 ? 0.35 : tier === 1 ? 1.5 : 1) : p * (HUNT_GOODS.has(key) ? hunter : 1)) * diffOf().loot)) drop(key); }   // S15 P12
   if (BP) {   /* Entwickler 03.10.2026: jeder Boss lässt garantiert GENAU EINES seiner Stücke fallen (Unikat zu 25 %, sonst Waffe/Rüstung) — nie doppelt, nie leer */
@@ -5269,6 +5674,7 @@ function updateNpc(e, dt) {
     if (!(e.act?.until > performance.now())) e.facing = Math.abs(ca) > Math.abs(sa) * 0.9 ? (ca > 0 ? 3 : 2) : (sa > 0 ? 0 : 1); return; }
   if ((e.traveler || e.travLead) && dist(e, p) > 900) return;   // S13: fern bewegt roadTick
   if (dist(e, p) > 900) { e.vx = e.vy = 0; if (e.fleeing) e.fleeing = false; if (e.angry && !e.guard) calmDown(e, 'lost'); if (e.plan && e.map === 'world' && !e.fleeing && !e.angry && (e._pa = (e._pa || 0) - dt) <= 0) { e._pa = 800 + (e.plan.n % 400); placeAway(e); } return; }   // BUG-108: fern nur ~1× je Sekunde (vorher jedes Bild, 2,9 ms)
+  if (!e.guard && e.fear && !e.angry && fearStep(e, dt)) return;      /* Angst geht vor Ereignissen (Nutzer 02.10.: Events überschreiben sie nicht) */
   if (e.fireJob && fireJobStep(e, dt)) return;   // S14: Löschkette
   if (e.palKind === 'star') starHeal(e, dt);   // Nutzer S13: Paladine
   if ((e.villager && !(e.plan?.job && (CYCLE[e.prof] || e.plan.work.stall))) || e.goblin || e.settler) workAnim(e, dt);   // S13: wer im Kreislauf arbeitet, bewegt sich dort
@@ -5346,7 +5752,6 @@ function updateNpc(e, dt) {
   } else e.calledHelp = false;
   // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
   if (!e.guard && !e.shop && fearLvl() >= 2 && fearedBy(e) && dist(e, p) < 80) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.2 * dt / 16, dt); return; }   // S12: man weicht dem Hochpaladin aus
-  if (!e.guard && e.fear && fearStep(e, dt)) return;                    /* Angst: fliehen, Abstand, verstecken */
   if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
   if (arrestCheck(e, p, dt)) return;                   // §44: Wache stellt einen Gesuchten
   if (e.bondGuard && bondGuardStep(e, dt)) return;              // MP2 §25: Wächter des Versklavten
@@ -5930,6 +6335,7 @@ function doInteract(target = null) {
   if (t.loot && t.loot.length && !t.opened) {
     t.opened = true;
     if (t.vaultHoard) vaultHoardOpened(t);
+    relicChest(t, p);   /* Reliquien am Ende von Dungeons */
     if (t.schlundChest) ((S.vaults.schlund ||= { best: 0, cleared: {}, looted: false }).chests ||= {})[t.schlundChest] = S.day | 0;   /* §5e.3: jede Schlund-Truhe nur einmal */
     if (t.vaultSecret != null && S.vaults?.[t.vaultSite]) (S.vaults[t.vaultSite].secretLooted ||= {})[t.vaultSecret] = S.day | 0;   /* Audit 3.14 / HB-40 */
     for (const k of t.loot) { const o = mkItem(k, 1, { bonus: t.lootBonus ?? 1 }); if (!giveItem(p, o)) dropItemAt(p.map, p.x + ri(-12, 12), p.y + 10, o); onItemGained(k);
@@ -9816,7 +10222,7 @@ function schutzAlarm(k) {
   const T = S.towns?.[k]; if (T && to && S.towns[to]) { const m = Math.round(T.pop * 0.2); T.pop -= m; S.towns[to].pop += Math.round(m * 0.7); }
   if (guilty && !Z.wanted) { Z.wanted = true; addBounty(f, k === 'varonheim' ? 800 : 300, `Wachmord in ${name}`); afterAvenge(f, Math.min(8, 3 + (Z.byP / 3 | 0)), `Strafzug für ${name}`, ri(1, 2), { valen: 'valen', aurel: 'aurel', chain: 'chainx', order: 'order' }[f] || 'valen');
     chronicle(`Wachmord in ${name}`, 'crime', `${p.name} hat die Wache von ${name} erschlagen.`); }
-  ensureSchutz();
+  walkInNew(ensureSchutz);   /* die Miliz kommt aus den Gassen, sie ploppt nicht auf */
   if (near && afterLive()) { sfx('bell', 0, 0.8); cineLater(() => sfx('bell', 0, 0.8), 800); cineLater(() => sfx('bell', 0, 0.8), 1600);
     const cr = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.homeTown === k && !e.guard && dist(e, p) < 500);
     if (cr) { bubble(cr, 'Die Wache ist tot! Lauft!', 2600); gesture(cr, 'zeigen', 1400, p); }
@@ -10621,7 +11027,11 @@ function omegaFight(g) { const O = om(); O.fight = true; g.parley = false; g.agg
 function omegaEnd(kind, g) {
   const O = om(); if (O.ending) return; O.ending = kind; O.endDay = Math.max(1, S.day | 0); O.cat = null; O.fight = false;
   const p = S.player, add = (fs, n) => fs.forEach(f => { if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + n, -100, 100); }), LIV = ['valen', 'order', 'merch', 'aurel', 'goblin'];
-  if (kind === 'slain') { add(LIV, 20); add(['chain'], -40); grantLegend('omega', 'Gottestöter', 'Omega ist gefallen — diesmal für immer.'); chronicle('Der Gott stirbt', 'war', `${p.name} erschlägt Omega im Krater des Gefallenen Sterns. Der rote Himmel verblasst.`); }
+  if (kind === 'slain') { add(LIV, 20); grantLegend('omega', 'Gottestöter', 'Omega ist gefallen — diesmal für immer.'); chronicle('Der Gott stirbt', 'war', `${p.name} erschlägt Omega im Krater des Gefallenen Sterns. Der rote Himmel verblasst.`);
+    /* Nutzer 02.10.: der Westen betete Omega an — dort bist du verhasst; der Osten, wo seine Toten aufstanden, feiert dich */
+    S.factions.chain = -100; S.flags.godslayer = S.day | 0; addBounty('chain', 2500, 'Gottesmord'); addFame(30, 'ost', 'Gottestöter');
+    log('Im Westen bist du verhasst: Die Kette hat dich geächtet, die Gläubigen reden nicht mehr mit dir und ihre Wachen greifen an. Im Osten feiert man dich.', 'faction');
+    if (g) omegaDeathCine(g); }
   if (kind === 'avatar') { p.omegaAvatar = true; add(LIV, -50); add(['chain'], 100); S.ranks.chain = FACTIONS.chain.ranks.length - 1; grantLegend('omega', 'Avatar Omegas', 'Du bist seine Hand. Die Lebenden fürchten dich.'); chronicle('Die Hand des Gottes', 'war', `${p.name} kniet vor Omega und steht als sein Avatar wieder auf.`); }
   if (kind === 'sleep') { O.faith = 100; add(LIV, 15); add(['chain'], 30); grantLegend('omega', 'Hüter des Schlafs', 'Omega schläft wieder — weil du es wolltest.'); chronicle('Der Gott schläft', 'war', `${p.name} legt Omega zurück in den Schlaf. Niemand weiß, wie lange.`); }
   if (g && g.alive && kind !== 'slain') { fx(g.x, g.y - 40, 'heal', 30); g.alive = false; const a = S.ents[g.map], i = a.indexOf(g); if (i >= 0) a.splice(i, 1); }
@@ -10629,6 +11039,20 @@ function omegaEnd(kind, g) {
   if (S.weather === 'bloodrain') S.weatherLeft = 0;
   omegaAftermath(kind);                                               /* Folgen §5c: Panik im Osten, Jubel im Westen */
   UI.toast(kind === 'slain' ? 'OMEGA IST TOT' : kind === 'avatar' ? 'AVATAR OMEGAS' : 'OMEGA SCHLÄFT', 4600); camShake(10, 800);
+}
+// Nutzer 02.10.2026: Omegas Tod als Szene (Welt steht): das Auge bricht, Lichtsäule, der rote Himmel reißt auf, die Sternenklinge bleibt,
+// dann der Held. Fällt in eine laufende Szene, kommt sie danach.
+function omegaDeathCine(g) {
+  if (S._quiet || S.coop?.role === 'guest' || S.dying) return;
+  const body = { x: g.x, y: g.y }, p = S.player;
+  const run = () => cinematic([
+    { dur: 2800, zoom: 1.5, focus: body, text: '„Ich war einmal wie du …“', beats: [{ t: 0, duck: 0.25, ms: 300 }, { t: 0, flash: '#ffffff', ms: 420 }, { t: 0.02, sfx: 'magic' }, { t: 0.05, shake: 12, ms: 1400 },
+      { t: 0.1, fx: 'heal', at: body, n: 30, dy: 40 }, { t: 0.35, fx: 'spark', at: body, n: 24, dy: 60 }, { t: 0.6, fx: 'heal', at: body, n: 30, dy: 90 }, { t: 0.8, sfx: 'bell' }] },
+    { dur: 3200, zoom: 1.25, focus: body, text: 'Das Auge schließt sich. Über dem Krater reißt der rote Himmel auf.', beats: [{ t: 0, card: { title: 'OMEGA IST TOT', sub: 'Der Gefallene fällt ein letztes Mal', ms: 3800 } }, { t: 0.05, sfx: 'bell' },
+      { t: 0.3, fx: 'spark', at: body, n: 16, dy: 20 }, { t: 0.55, flash: '#cfe8ff', ms: 600 }, { t: 0.6, fx: 'heal', at: body, n: 20, dy: 8 }] },
+    { dur: 2600, zoom: 1.1, focus: p.id, text: 'Wo sein Herz war, liegt eine Klinge aus Sternenlicht. Im Osten läuten die Glocken. Im Westen verflucht man deinen Namen.', beats: [{ t: 0.1, gesture: 'zeigen', who: p, toward: body, ms: 1400 }, { t: 0.85, duck: 1, ms: 600 }] },
+  ], null, { pause: true, stay: true });
+  if (S.cine) cineLater(run, 1200); else run();
 }
 function omegaCatHour() {                                          // Weltkatastrophe: Tote stehen überall auf, Dörfer werden angegriffen
   const p = S.player;
@@ -10741,7 +11165,7 @@ function opferfest() {
 }
 // Ketzerjagd (Mechthild): in einem Westdorf steht ein Scheiterhaufen, eine Beschuldigte, zwei Inquisitoren. Befreien oder zusehen.
 function ketzerjagd() {
-  const V = pick(tribVillages()); if (!V) return;
+  const V = pick(tribVillages().filter(V => calmTown(V.key))); if (!V) return;
   const P = TOWN_PLAN[V.key], s = freeSpotNear('world', P.square[0] + 4, P.square[1] + 3, 3);
   const stake = { id: uid(), kind: 'prop', type: 'chain_post', map: 'world', x: s.x, y: s.y, r: 8, solid: false, huntProp: true, label: 'Scheiterhaufen der Inquisition' };   // nicht fest: stand er auf dem Platz, war das Dorf zu (Test „jede Haustür erreichbar“)
   const pyre = { id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x: s.x, y: s.y + 20, r: 10, huntProp: true, label: 'Reisig' };
@@ -10773,7 +11197,7 @@ function huntEnd(freed, how) {
 }
 // Wallfahrt (Aldebrand): vier Pilger ziehen aus einem Westdorf zum Altar. Unterwegs lauern Räuber. Wer sie begleitet, gewinnt Glauben.
 function wallfahrt() {
-  const V = pick(tribVillages()), alt = S.ents.world.find(e => e.omegaAltar); if (!V || !alt) return;
+  const V = pick(tribVillages().filter(V => calmTown(V.key))), alt = S.ents.world.find(e => e.omegaAltar); if (!V || !alt) return;
   const P = TOWN_PLAN[V.key], ids = [];
   for (let i = 0; i < 4; i++) { const s = freeSpotNear('world', P.square[0] + ri(-2, 2), P.square[1] + ri(-2, 2), 2), c = makeChar({ name: pick(['Adda', 'Bero', 'Ceno', 'Dietlind', 'Evert', 'Folkmar']), prof: 'Pilger', x: s.x, y: s.y, level: 2 });
     Object.assign(c, { pilgrim: true, anchor: { x: alt.x + ri(-60, 60), y: alt.y + ri(60, 110) }, greet: '„Zum Auge! Zum Altar! Omega sieht, wer den Weg geht.“' }); c.schedulePos = c.anchor; S.ents.world.push(c); ids.push(c.id); }
@@ -11001,8 +11425,10 @@ function cineNext() {
 function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t); cineBeats(s, C.t, false);   /* T17: Zeitachse */
   if (s?.to && s.x != null) { const k = Math.min(1, C.t / (s.dur || 3000)), e = k * k * (3 - 2 * k); S.player.x = s.x + (s.to.x - s.x) * e; S.player.y = s.y + (s.to.y - s.y) * e; }   // S15: sanfte Kamerafahrt
   if (C.t >= (s?.dur || 3000)) cineNext(); }
+let cineSafeUntil = 0;
+const cineSafe = t => !S._quiet && (!!S.cine || performance.now() < cineSafeUntil) && !!t && (t === S.player || S.party.includes(t.id) || !!t.coopHero || !!t.coopPilot);
 function cineEnd() {
-  const C = S.cine; if (!C) return; S.cine = null;
+  const C = S.cine; if (!C) return; S.cine = null; if (!S._quiet) cineSafeUntil = performance.now() + 1500;   /* Proben laufen ohne Nachfrist */
   for (const s of C.shots.slice(C.i + 1)) if (!s.done && !s.showOnly) try { s.setup?.(); } catch (err) { console.error(err); }   // S15 Fehlersuche: wer überspringt, verpasst keine Folgen (Befreiung, Überfall …)
   for (const s of C.shots.slice(Math.max(0, C.i))) cineBeats(s, Infinity, true);   /* T17: übersprungene Beats — nur die Folgen */
   document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel());
@@ -11213,7 +11639,7 @@ function refugeeLaw(key) {
 // Wer nach dem Fall der Eisenfeste flieht: kleine Gruppen ziehen aus dem Westen zu den Toren Aurelions (bis zum Beschluss)
 function refugeeWave() {
   if (!S.flags.chainsBroken || S.laws?.refugees === 'reject' || S.ents.world.filter(e => e.refugee).length >= 18) return;
-  const P = TOWN_PLAN.aurelheim, V = pick(tribVillages()); if (!P || !V) return;
+  const P = TOWN_PLAN.aurelheim, V = pick(tribVillages().filter(V => calmTown(V.key))); if (!P || !V) return;
   for (let i = 0; i < 3; i++) { const Q = TOWN_PLAN[V.key], s = freeSpotNear('world', Q.square[0] + ri(-3, 3), Q.square[1] + ri(-3, 3), 2), c = makeChar({ name: pick(FIRST_M), prof: 'Flüchtling', x: s.x, y: s.y, level: 1, traits: ['furchtsam'] });
     const g = S.laws?.refugees === 'city' ? freeSpotNear('world', P.square[0] + ri(-8, 8), P.square[1] + ri(-6, 6), 3) : freeSpotNear('world', P.area[0] - 6 - ri(0, 6), P.square[1] + ri(-5, 5), 2);
     Object.assign(c, { refugee: true, visitor: true, anchor: g, schedulePos: g, greet: pick(['„Die Toten kamen nachts. Wir sind nur gerannt.“', '„Ist das der Weg nach Aurelion? Sag, dass es der Weg ist.“']) }); S.ents.world.push(c); }
@@ -11735,7 +12161,7 @@ function hourTick(h) {
 // S13 (WELT_EVENTS_S13 §2, direkt umsetzbar): echte Ereignisse an echten Orten statt fester Meldungen.
 const villOf = f => Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === f && isVil(k) && !S.razed?.[k] && S.war?.nodes?.[k]?.owner !== 'undead');
 function evTaxman() {                                                   // Steuereintreiber Valens mit zwei Wachen
-  const t = pick(villOf('valen')); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
+  const t = pick(villOf('valen').filter(calmTown)); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
   const q = freeSpotNear('world', sx + 2, sy - 2, 3), c = makeChar({ name: pick(FIRST_M), prof: 'Steuereintreiber', x: q.x, y: q.y, level: 4, faction: 'valen' });
   Object.assign(c, { transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, greet: '„Im Namen der Krone. Jeder zahlt. Auch du, wenn du hier wohnst.“' }); S.ents.world.push(c);
   for (let i = 0; i < 2; i++) { const g = guardChar('valen', freeSpotNear('world', sx + 3 + i, sy - 1, 3), 'Torwache', 6); Object.assign(g, { transient: true, anchor: { x: g.x, y: g.y } }); S.ents.world.push(g); }
@@ -12484,10 +12910,11 @@ function witchWaveTalk(npc) {
 // dieselben Reaktionen mit anderen Rufen (der Westen feiert die Hand des Gottes, der Osten fürchtet sie). Schlaf: der Westen betet still,
 // im Osten bleibt es ruhig. Dauer vier Tage; je näher die Leute beim Spieler und je frischer das Ereignis, desto mehr machen mit.
 const OMEGA_CRY = { slain: ['Der Gott ist tot!', 'Wer hält jetzt die Toten?', 'Lauft!', 'Es ist aus!'], avatar: ['Seine Hand geht um!', 'Versteckt euch!', 'Omega hat einen Diener!'] };
-const OMEGA_CHEER = { slain: ['Der Stern ist gefallen!', 'Seht, der Himmel!', 'Zum Altar!', 'Frei!'], avatar: ['Die Hand Omegas!', 'Er hat einen Erwählten!', 'Heil dem Avatar!'] };
+const OMEGA_HATE = ['Gottesmörder!', 'Du hast ihn erschlagen!', 'Fluch über dich!', 'Verschwinde aus unserem Land!'];
+const OMEGA_CHEER = { slain: ['Der Gottestöter!', 'Der Stern ist erloschen!', 'Seht, der Himmel!', 'Frei!', 'Heil dir!'], avatar: ['Die Hand Omegas!', 'Er hat einen Erwählten!', 'Heil dem Avatar!'] };
 function omegaAftermath(kind) {
   if (!afterLive()) return; const A = AF(), day = S.day | 0; A.omega = { kind, day, until: day + 4 };
-  const T = { slain: ['Omega ist tot: Panik im Osten, Jubel im Westen', 'Im Osten, wo die Toten aus Omegas Blut aufstanden, bricht Panik aus: Leute rennen durch die Gassen, Läden bleiben zu, manche fliehen. Im Westen jubelt man, und Pilgerzüge brechen zum Altar in der Eisenfeste auf.'],
+  const T = { slain: ['Omega ist tot: Jubel im Osten, Hass im Westen', 'Im Osten, wo die Toten aus Omegas Blut aufstanden, feiert man dich: Die Leute jubeln auf den Plätzen und rufen deinen Namen. Im Westen, wo man Omega anbetete, bist du verhasst: Die Gläubigen verfluchen dich, verstecken sich vor dir und reden nicht mehr mit dir, die Kette hat dich geächtet. Trauerzüge ziehen zum Altar in der Eisenfeste.'],
     avatar: ['Omega hat eine Hand: Furcht im Osten, Taumel im Westen', 'Im Osten verriegeln die Leute ihre Türen und fliehen vor dem Avatar des Gottes. Im Westen feiert man die Hand Omegas, Pilger ziehen zum Altar.'],
     sleep: ['Omega schläft: der Westen betet', 'Im Westen knien die Gläubigen auf den Plätzen und beten für den Schlaf ihres Gottes. Im Osten merkt man kaum etwas.'] }[kind];
   if (T) afterSay(T[0], T[1], 'war');
@@ -12500,7 +12927,9 @@ function omegaSecond(force = false) {
   const near = S.ents.world.filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.angry && !e.guard && !e.robot && !S.party.includes(e.id) && dist(e, p) < 700).sort((a, b) => dist(a, p) - dist(b, p));
   const n = Math.max(1, Math.round(near.length * 0.5 * fade));
   for (const e of near.slice(0, n)) {
-    if (r === 'ost') { e.panicT = clock() + ri(12, 25); if (chance(0.3)) float(e, pick(OMEGA_CRY[k]), 'rgba(230,150,120,ALPHA)'); }
+    if (k === 'slain' && r === 'west') { gesture(e, 'abwehren', 1400, p); if (chance(0.3)) float(e, pick(OMEGA_HATE), 'rgba(230,120,100,ALPHA)'); if (chance(0.5)) { e.fear = Math.max(fearOf(e), 55); e.fearBy = p.id; e.fearSeen = clock(); } }   /* Hass und Furcht */
+    else if (k === 'slain') { gesture(e, 'zeigen', 1400); e.cheerT = clock() + 10; if (chance(0.3)) float(e, pick(OMEGA_CHEER.slain), 'rgba(240,210,120,ALPHA)'); if (chance(0.15)) fx(e.x, e.y - 30, 'spark', 6); }   /* der Osten feiert */
+    else if (r === 'ost') { e.panicT = clock() + ri(12, 25); if (chance(0.3)) float(e, pick(OMEGA_CRY[k]), 'rgba(230,150,120,ALPHA)'); }
     else if (k === 'sleep') { act(e, 'kneel', 1500); if (chance(0.2)) float(e, 'Schlaf, Omega …', 'rgba(200,190,230,ALPHA)'); }
     else { gesture(e, 'zeigen', 1400); e.cheerT = clock() + 10; if (chance(0.3)) float(e, pick(OMEGA_CHEER[k]), 'rgba(240,210,120,ALPHA)'); if (chance(0.15)) fx(e.x, e.y - 30, 'spark', 6); }
   }
@@ -12514,16 +12943,18 @@ function omegaDay() {
   const O = S.after?.omega; if (!O) return; const day = S.day | 0;
   if (day > O.until) { S.ents.world = S.ents.world.filter(e => !e.omegaPil); for (const e of S.ents.world) if (e.omegaShut) { e.shopClosed = 0; delete e.omegaShut; } delete S.after.omega;
     return log('Die Aufregung um Omega legt sich. Die Läden im Osten öffnen wieder, die Pilger sind heimgekehrt.', 'world'); }
-  if (O.kind !== 'sleep') {
+  if (O.kind === 'avatar') {   /* Nutzer 02.10.: nach Omegas Tod flieht der Osten nicht mehr, er feiert */
     for (const e of S.ents.world) if (e.kind === 'npc' && e.alive && e.shop && e.map !== 'sky' && e.x / TS > 770 && !e.omegaShut && !(e.shopClosed > clock())) { e.shopClosed = (O.until + 1) * 1440; e.omegaShut = true; }
     for (const k of Object.keys(TOWN_PLAN).filter(t => TOWN_PLAN[t].square[0] > 770 && !S.razed?.[t])) { if (!chance(0.35)) continue;
       const vs = villagersOf(k), v = vs.length > 3 && vs.find(c => !KEY_ROLE(c) && !c.shop && !c.teaches); if (!v) continue;
-      S.ents.world = S.ents.world.filter(e => e !== v); log(`${v.name} flieht aus ${townName(k)}: „Der Gott ist fort — jetzt holen sie uns alle.“`, 'world'); }
+      S.ents.world = S.ents.world.filter(e => e !== v); log(`${v.name} flieht aus ${townName(k)}: „Seine Hand geht um. Wir warten nicht, bis sie hier ist.“`, 'world'); }
+  }
+  if (O.kind !== 'sleep') {   /* Pilgerzug (Avatar) bzw. Trauerzug (erschlagen) aus einem Westdorf */
     const V = pick(tribVillages()), alt = S.ents.world.find(e => e.omegaAltar);
     if (V && alt && TOWN_PLAN[V.key]) { const P = TOWN_PLAN[V.key];
       for (let i = 0; i < 3; i++) { const s = freeSpotNear('world', P.square[0] + ri(-2, 2), P.square[1] + ri(-2, 2), 2), c = makeChar({ name: pick(i % 2 ? FIRST_F : FIRST_M), prof: 'Pilger', x: s.x, y: s.y, level: 1 });
-        const g = { x: alt.x + ri(-70, 70), y: alt.y + ri(60, 120) }; Object.assign(c, { omegaPil: true, transient: true, visitor: true, anchor: g, schedulePos: g, greet: O.kind === 'slain' ? '„Wir gehen zum Altar, wo der Stern fiel. Sehen, was bleibt.“' : '„Zum Altar! Seine Hand wandelt unter uns!“' }); S.ents.world.push(c); }
-      log(`Ein Pilgerzug bricht von ${V.name} zum Altar in der Eisenfeste auf.`, 'world'); }
+        const g = { x: alt.x + ri(-70, 70), y: alt.y + ri(60, 120) }; Object.assign(c, { omegaPil: true, transient: true, visitor: true, anchor: g, schedulePos: g, greet: O.kind === 'slain' ? '„Wir gehen zum Altar und trauern. Und wir beten, dass der Gottesmörder verreckt.“' : '„Zum Altar! Seine Hand wandelt unter uns!“' }); S.ents.world.push(c); }
+      log(`Ein ${O.kind === 'slain' ? 'Trauerzug' : 'Pilgerzug'} bricht von ${V.name} zum Altar in der Eisenfeste auf.`, 'world'); }
   }
 }
 
@@ -13002,7 +13433,7 @@ function respawnTick() {
 // Eine Liste für HUD-Symbolleiste (hud: true) und das Effekte-Fenster (X). Jeder Eintrag: Gruppe, Zeichen, Name, gut/schlecht/Info,
 // Zeilen mit der konkreten Wirkung. Rechnet mit denselben Werten wie das Spiel (Preise, Ränge, Gesetze), damit nichts versprochen wird,
 // was nicht gilt.
-const FX_ICON = { bleeding: '♦', poisoned: '☣', chilled: '❄', grabbed: '⛓', shackled: '⛓', rested: '☾', frenzy: '✦', song: '♪', blessing: '✧', omegawrath: '✹', bloodtoll: '♱', poison_coat: '☣', plague: '✚' };
+const FX_ICON = { bleeding: '♦', poisoned: '☣', chilled: '❄', grabbed: '⛓', shackled: '⛓', rested: '☾', frenzy: '✦', song: '♪', blessing: '✧', omegawrath: '✹', bloodtoll: '♱', poison_coat: '☣', plague: '✚', r_kranz: '✺', r_seelen: '☉', r_sturm: 'ϟ', r_schatten: '➶', r_unbeugsam: '♥' };
 const FX_DESC = { bleeding: 'Verliert laufend Leben. Verband, Heilerin oder Schlaf stillen die Blutung.', poisoned: 'Gift zehrt am Leben. Heilerin oder Schlaf helfen.',
   chilled: 'Durchgefroren oder gefesselt: langsamer.', grabbed: 'Gepackt: kann sich kaum bewegen.', shackled: 'Gefesselt.', rested: '+10 % Erfahrung.',
   frenzy: 'Raserei: mehr Schaden, mehr Tempo, mehr eingesteckt.', song: 'Kriegslied: die Gruppe schlägt härter zu.', omegawrath: 'Omegas Zorn: +10 % Schaden, gegen Untote +35 %.', poison_coat: 'Giftöl auf der Klinge: Treffer vergiften.' };
@@ -13013,6 +13444,7 @@ function activeEffects() {
   // Zustände
   for (const s of p.status || []) add('Zustand', FX_ICON[s.key] || '•', s.name, s.good || ['rested', 'frenzy', 'song', 'blessing', 'omegawrath', 'poison_coat'].includes(s.key) ? 'good' : 'bad',
     [s.desc || FX_DESC[s.key], s.left < 3.6e6 ? `Noch etwa ${Math.max(1, Math.round(s.left / 60000))} Min.` : null], true);
+  for (const r of relicsOf(p)) add('Reliquien', '◈', `${r.it.name || ITEMS[r.it.key].name} · ${RELIQ_TIER[r.T - 1]}`, 'good', relicCard(p, r.it, 0).active, false);   /* Reliquien */
   { const St = setOf(p); if (St) add('Ausrüstung', '⛨', `Set: ${St.name} (${St.n} Teile)`, 'good', [St.desc, ...(St.tdesc ? [St.tdesc] : [])], true); }   // S13: Fraktionsset; S15: Stufen
   if (p.stamina < p.maxStamina * 0.2) add('Zustand', '≈', 'Erschöpft', 'bad', ['Kaum Ausdauer: keine Ausweichrolle, schwache Hiebe. Stehen bleiben erholt.'], true);
   if (provisions() <= 0) add('Zustand', '◌', 'Hungrig', 'bad', ['Kein Proviant: jeden Tag sinkt die Moral der Gruppe, der Rumpf verliert Leben.', 'Nahrung kaufen oder jagen.'], true);
@@ -13398,6 +13830,8 @@ function talk(npc) {
   if ((npc.prof === 'Richterin' || npc.prof === 'Gerichtsschreiber') && npc.homeTown === 'aurelheim') return holyCourt(npc);   // Nutzer S13: Heiliges Gericht
   if (npc.skyRuler === 'rat' && ((S.ranks.aurel ?? 0) >= 6 || isCouncillor())) return corvanTalk(npc);   // Nutzer S13: Hoher Rat
   if (npc.fleeing || npc.afraid > now) return npcShun(npc, '„Bleib weg von mir!“', 'angst');
+  if (S.flags.godslayer && !npc.guard && !npc.goblin && npc.faction !== 'goblin' && !S.party.includes(npc.id) && fameRegion(npc) === 'west' && repTier('chain')?.name === 'Verhasst')   /* Nutzer 02.10.: Gottesmörder im Westen */
+    return UI.dialogue(npc, pick(['„Gottesmörder. Hier bekommst du nichts.“', '„Du hast ihn erschlagen. Geh, bevor ich die Kette rufe.“', '„Omega sieht dich nicht mehr. Wir schon. Verschwinde.“']), leave);
   if (!npc.guard && npc.fear && !S.party.includes(npc.id)) { const f = fearOf(npc), byP = fearByPlayer(npc);   /* Angst */
     if (f >= 75 || (f >= 50 && byP)) return UI.dialogue(npc, byP ? (f >= 75 ? '„Nein! Nein, bitte! Ich hab Kinder! Bleib weg!“' : '„Ich … ich hab nichts gesehen. Lass mich. Bitte.“') + ` (${npc.name} ist ${FEAR_NAME[fearStage(f)]}.)` : '„Nicht jetzt! Da draußen … hast du nicht gesehen, was passiert ist?“', leave); }
   if (npc.threatId && byId(npc.threatId)?.alive) return npcShun(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', 'ausruf');
@@ -15144,8 +15578,8 @@ function tres(c) { const T = TC(c); if (!T) return 0; c.tres ||= {}; return c.tr
 function resMax(c) { const T = TC(c); return T ? T.resource.max + (T.resource.key === 'essence' && node(c, 'n_vessel') ? 2 : 0) + (T.resource.key === 'focus' && node(c, 'o_well') ? 2 : 0) : 0; }
 function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key] = clamp(v, 0, resMax(c)); }
 const elx = (c, k) => { const s = c?.status?.find(q => q.key === 'elixir'); return s?.efx?.[k] || 0; };   // S15 P2: Wert des wirkenden Elixiers
-const spellMul = c => 1 + tfx(c, 'spell') + afx(c, 'spellp') + elx(c, 'spell');
-const cdMul = c => 1 - Math.min(0.4, tfx(c, 'cdr'));
+const spellMul = c => 1 + tfx(c, 'spell') + afx(c, 'spellp') + elx(c, 'spell') + relicFx(c, 'spell');
+const cdMul = c => 1 - Math.min(c === S.player && c.relics ? Math.max(0.4, RELIC_CAP[relicPhase(c)].cdr) : 0.4, tfx(c, 'cdr') + relicFx(c, 'cdr'));   /* Reliquien: gemeinsamer Deckel */
 const titleAbilities = c => { const T = TC(c); if (!T) return []; const a = T.grades ? T.grades.slice(0, gradeOf(c)).flat() : T.abilities; return gearOf(c) >= 2 ? a.concat(GEAR_ABILITY[c.titleClass]) : a; };
 // S15 Klassen-Rüstung (Nutzer: „nur über eine Questline, wie in WoW; getragen verstärkt sie die Fähigkeiten und gibt weitere“).
 // Zählt die getragenen Teile der Rüstung des aktiven Titels. Ab 2 Teilen: Titelzauber +25 % und eine neue Fähigkeit, ab 3 mehr.
@@ -16105,7 +16539,7 @@ function captiveGone(e) { const a = S.ents[e.map]; const i = a.indexOf(e); if (i
 // der Stillen Hand und gibt dem Mönch Fokus — nicht in Metall, mit „Vollkommener Stille“ nicht mit Schild oder Zweihänder.
 function evaded(t) {
   if (t !== S.player || !t.dodge || t.dodge.dash || t.dodge.evaded) return;
-  t.dodge.evaded = true; float(t, 'Ausgewichen', 'rgba(230,207,138,ALPHA)');
+  t.dodge.evaded = true; float(t, 'Ausgewichen', 'rgba(230,207,138,ALPHA)'); relicEvade(t);   /* Reliquien: perfektes Ausweichen */
   /* Behoben HB-06: galt nur für q_monk; jetzt wie onKill() generisch fuer alle aktiven Auftraege mit 'dodge'-Ziel (c_mon1-3 usw.) */
   for (const [qk, qst] of Object.entries(S.quests)) {
     if (qst.state !== 'active') continue;
@@ -16384,7 +16818,7 @@ function useAbility(key) {
     if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
     if (p.casting) return UI.toast('Du sammelst schon einen Zauber.');
     if ((p.mana || 0) < ab.mana) return UI.toast('Zu wenig Mana');
-    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); startCast(p, key); magicSeen(p, key); return UI.refreshHUD();
+    p.mana -= ab.mana; p.cooldowns[key] = ab.cd * cdMul(p); relicAbility(p, key); startCast(p, key); magicSeen(p, key); return UI.refreshHUD();
   }
   if ((p.cooldowns[key] || 0) > 0) return UI.toast(`${ab.name} noch nicht bereit`);
   const M = abMod(p, key);                                   /* Klassen und Talente: Fähigkeitssterne (nur bei aktiver Klasse) */
@@ -16393,7 +16827,7 @@ function useAbility(key) {
     if (cost === 'all' ? v < (ab.min || 1) : cost && v < cost) return UI.toast(`Zu wenig ${R.name}${ab.min ? ` (mindestens ${ab.min})` : ''}`);
     abBegin(p, M); let tOk = false; try { tOk = titleAbility(p, key, ab); } finally { abEnd(p); } if (!tOk) return;
     magicSeen(p, key);                                        // S15 P7: Totenmagie vor Zeugen
-    p.cooldowns[key] = ab.cd * cdMul(p) * (1 + M.cd); p.castT = p.lastCast = performance.now(); sfx('magic');
+    p.cooldowns[key] = ab.cd * cdMul(p) * (1 + M.cd); relicAbility(p, key); p.castT = p.lastCast = performance.now(); sfx('magic');
     if (cost === 'all') setTres(p, 0); else if (cost) setTres(p, v - cost);
     if (ab.gain) { if (ab.title === 'vampire') setBlood(p, bloodOf(p) + ab.gain); else corrupt(p, ab.gain); }
     if (ab.title !== 'vampire' || nightNow()) titleDeed(p);   /* Vampir: Taten zählen nur nachts */
@@ -16410,7 +16844,7 @@ function useAbility(key) {
   if (key === 'aimed_shot' && !ITEMS[p.equip.weapon?.key]?.ranged) { abEnd(p); return UI.toast('Dafür brauchst du einen Bogen'); }   // S15 Fehlersuche: abgebrochen = nichts verbraucht
   if (key === 'life_drain' && (!foes[0] || dist(p, foes[0]) > 180)) { abEnd(p); return UI.toast('Kein Ziel in Reichweite'); }
   if (key === 'mark_target' && !foes[0]) { abEnd(p); return UI.toast('Kein Ziel'); }
-  p.cooldowns[key] = ab.cd * cdMul(p) * Math.max(0.2, 1 + M.cd);
+  p.cooldowns[key] = ab.cd * cdMul(p) * Math.max(0.2, 1 + M.cd); relicAbility(p, key);
   if (ab.herb) removeItem(p, 'herb', ab.herb);
   if (ab.mana) p.mana -= manaC;
   if (ab.stam) p.stamina -= stamC;
@@ -16973,6 +17407,7 @@ function bindInput() {
     if (k === 'm') UI.openModal('map');
     if (k === 'j') UI.openModal('quests');
     if (k === 't') UI.openModal('skills');                    /* Klassen und Talente, Scheibe 2: der Sternenhimmel ist wieder offen */
+    if (k === 'o') UI.openModal('relics');                    /* Reliquien (Taste O; V ist der Schleichmodus) */
     if (k === 'x') UI.openModal('effects');                   // S13: aktive Effekte
     if (k === 'h') UI.openModal('codex');                     // S13: Kodex/Handbuch
     if (k === 'z') UI.openModal('spells');                    // S15 P4: Zauberbuch
@@ -17081,6 +17516,7 @@ function guarded(attacker, target, dmg) {
     sfx('metal', 1, 1); hitStop = Math.max(hitStop, 120); camShake(4, 120); target.stamina = Math.max(0, target.stamina - 8);   /* Audit 3.5: Parade kostet 8 Ausdauer (war 3) — keine kostenlose Parade-Schleife */
     g.since = -1e9;                                                  // eine Parade je Deckung, danach nur noch Block
     target.riposteUntil = now + 1200;                                // Rapier: der nächste Stich ist eine Riposte
+    if (target === S.player) relicGuard(target, true);   /* Reliquien */
     return true;
   }
   const shield = !B.hasMod(target, 'klingenhand') && ITEMS[target.equip?.offhand?.key]?.block, cost = dmg * (shield ? 0.8 : 1.2);   /* Roadmap P3: Klingenhand hält keinen Schild */
@@ -17096,7 +17532,7 @@ function guarded(attacker, target, dmg) {
   hurt(target, dmg * (shield ? (SH?.guardMul ?? GUARD.shield) : GUARD.weapon), attacker, attacker.name || MONSTERS[attacker.mtype]?.name);
   fx(target.x + Math.cos(target.aim) * 12, target.y - 12 + Math.sin(target.aim) * 7, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
   if (target.equip?.offhand && shield) target.equip.offhand.cond = Math.max(0.05, (target.equip.offhand.cond ?? 1) - 0.004);
-  sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50);
+  sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50); if (target === S.player) relicGuard(target, false);   /* Reliquien */
   const ba = Math.atan2(target.y - attacker.y, target.x - attacker.x); if (!B.hasMod(target, 'ankerfuss')) target.kb = { x: Math.cos(ba) * 7, y: Math.sin(ba) * 7, t: 90, T: 90 };   // S14: Block-Ruck, die Deckung gibt nach
   return true;
 }
@@ -17237,8 +17673,9 @@ function dodge() {
   const { dx, dy } = moveInput();
   const l = Math.hypot(dx, dy);
   const ax = l ? dx / l : -Math.cos(p.aim), ay = l ? dy / l : -Math.sin(p.aim);
-  p.stamina -= cost; p.dodgeCd = DODGE.cd + DODGE.dur;
+  p.stamina -= relicHas(p, 'shadow', 6)?.path === 'b' ? 0 : cost; p.dodgeCd = Math.max(250, DODGE.cd * (relicHas(p, 'shadow', 8)?.trans ? 0.6 : 1)) + DODGE.dur;   /* Reliquien: Schattenfaden */
   p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0; p.cover = null;   // Rolle beendet die Deckung
+  relicDodge(p);
   fx(p.x, p.y + 4, 'dust', 6); sfx('dodge');
   return true;
 }
@@ -17695,6 +18132,11 @@ function debugSections() {
     }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
+      'Reliquien: alle ins Gepäck + Stufe 10 + drei Fassungen': () => { p.level = Math.max(p.level, 10); S.flags.relicSlot2 = S.flags.relicSlot3 = 1; for (const k of Object.keys(RELIQ)) { const o = mkItem(k); if (o) p.inv.push(o); } p.invCap = Math.max(p.invCap, p.inv.length + 4); UI.toast('Alle Reliquien im Gepäck — Taste V'); },
+      'Reliquien: +50 Glut, +20 Sternsplitter, +5000 Gold, 3 Trophäen': () => { relicGain(50, 20); S.gold += 5000; addItem(p, 'trophaee', 3); },
+      'Reliquien: gefasste auf Stufe VIII (gebunden)': () => { for (const it of p.relics || []) if (it) { it.tier = relicMax(it); relicBind(p, it); it.path ||= 'a'; } UI.toast('Gefasste Reliquien auf Höchststufe'); },
+      'Reliquien: Kill-Serie 10, Seelen voll, Sturm 3': () => { const rs = relicRs(p); rs.streak = 10; rs.streakT = performance.now(); rs.streakWin = 8000; rs.souls = 15; rs.storm = 3; },
+      'Reliquien: Erbe simulieren (Bindung lösen)': () => { for (const it of p.relics || []) if (it) { it.bound = 'ahn'; it.boundName = 'einem Ahnen'; } UI.toast('Reliquien schlummern jetzt über Stufe V'); },
       'Kopfgeld Valen = 200 000 (schweres Verbrechen)': () => { (S.bounty ||= {}).valen = 200000; UI.toast('Kopfgeld 200 000 — eine Wache ansprechen lassen'); },
       'Ins Gefängnis (200 000, Bußgeld voll bezahlt)': () => { toWorld(); S.gold = Math.max(S.gold, crimeFine(200000)); goToJail('valen', 200000, nearTown()); },
       'Ins Gefängnis (200 000, ohne Gold)': () => { toWorld(); S.gold = 0; goToJail('valen', 200000, nearTown()); },
@@ -22169,6 +22611,52 @@ export function selftest() {
       return kanz && noble && gone && headless && turm && over && taken && kingSafe;
     } finally { S.flags = f0; S.cult = C0; S.schutz = Z0; S.ents.world = W0; S.bands = BA; S.war = WAR; Object.assign(S.factions, fa0); ensureVaronCourt(); ensureVaronExile(); }
   }));
+  ok('Reliquien (Nutzer 02.10.): Fassungen nach Stufe/Boss/Endgame; Aufrüsten kostet Gold → Glut → Splitter, ab V an der Esse, Pfad ab VI, Höchststufe je Seltenheit; Töpfe je Phase gedeckelt (3× Stufe VIII ≤ +100 % Tempo), Schwung ≥ 180 ms', sandbox(() => {
+    const p = stage(), C0 = S.relicCur ? { ...S.relicCur } : null, f0 = structuredClone(S.flags);
+    try { p.level = 9; delete S.flags.relicSlot2; delete S.flags.relicSlot3; const give = k => { const o = mkItem(k); p.inv.push(o); return o; };
+      const h = give('schlaechterherz'); relicEquip(p, p.inv.indexOf(h)); const gated = !p.relics?.some(Boolean);
+      p.level = 12; relicEquip(p, p.inv.indexOf(h)); const k = give('blutkranz'); relicEquip(p, p.inv.indexOf(k)); const one = p.relics[0] === h && !p.relics[1];
+      S.flags.relicSlot2 = 1; relicEquip(p, p.inv.indexOf(k)); const two = p.relics[1] === k && relicSlots(p) === 2;
+      S.gold = 0; S.relicCur = { glut: 0, stern: 0 }; relicUpgrade(p, 0); const poor = h.tier === 1;
+      S.gold = 1e5; relicUpgrade(p, 0); relicUpgrade(p, 0); const glutGate = h.tier === 2; S.relicCur.glut = 50; relicUpgrade(p, 0); relicUpgrade(p, 0); const four = h.tier === 4 && S.relicCur.glut === 43;
+      relicUpgrade(p, 0); const forge = h.tier === 4;
+      S.ents.__a.push({ id: uid(), kind: 'prop', type: 'anvil', map: '__a', x: p.x + 20, y: p.y, r: 8 }); addItem(p, 'trophaee', 1); relicUpgrade(p, 0); const five = h.tier === 5 && !countItem(p, 'trophaee');
+      S.relicCur.stern = 20; relicUpgrade(p, 0); relicUpgrade(p, 0); const pathGate = h.tier === 6; relicPath(p, 0, 'a'); relicUpgrade(p, 0); const maxRare = h.tier === 6 && h.path === 'a';
+      S.flags.relicSlot3 = 1; const r3 = give('rotdorn'); relicEquip(p, p.inv.indexOf(r3));
+      for (const it of p.relics) { it.tier = 8; it.bound = p.id; it.path = 'a'; } relicRs(p).streak = 20; relicRs(p).streakT = performance.now(); relicRs(p).streakWin = 1e9; p.hp = p.maxHp * 0.2;
+      const caps = relicPhase(p) === 'end' && relicFx(p, 'atk') <= 1.0001 && relicFx(p, 'cdr') <= 0.7001 && relicFx(p, 'leech') <= 0.2001 && relicHitMul(p, p, true) <= 3.0001;
+      p.equip.weapon = mkItem('dagger'); p.atkCd = 0; p.swing = 0; p.stamina = 999; p.maxStamina = 999; attack(p); const floor = p.swingDur >= 180;
+      if (!(gated && one && two && poor && glutGate && four && forge && five && pathGate && maxRare && caps && floor)) console.log('Reliquien-Probe', JSON.stringify({ gated, one, two, poor, glutGate, four, forge, five, pathGate, maxRare, caps, floor, tier: h.tier }));
+      return gated && one && two && poor && glutGate && four && forge && five && pathGate && maxRare && caps && floor;
+    } finally { S.relicCur = C0; S.flags = f0; }
+  }));
+  ok('Reliquien-Tod (Nutzerentscheid): Reliquien liegen am Grab mit voller Stufe; der Erbe trägt sie, über V schlummern sie bis zur Erweckung zum halben Preis (Pfad neu); Glut und Splitter bleiben dem Haus', sandbox(() => {
+    const p = stage(), C0 = S.relicCur ? { ...S.relicCur } : null, f0 = structuredClone(S.flags);
+    try { p.level = 30; S.flags.relicSlot2 = S.flags.relicSlot3 = 1; const it = mkItem('blutkranz'); p.inv.push(it); relicEquip(p, p.inv.indexOf(it)); it.tier = 6; it.path = 'b';
+      S.relicCur = { glut: 40, stern: 9 }; makeGrave(p, 'Probe'); const g = S.ents.__a.find(e => e.kind === 'grave'), atGrave = !!g && g.loot.includes(it) && !p.relics.some(Boolean) && it.tier === 6;
+      const heir = actor(320, 300, { kind: 'player' }); heir.level = 20; S.player = heir; heir.inv.push(it); relicEquip(heir, heir.inv.indexOf(it));
+      const sleeps = relicT(heir, it) === 5 && relicsOf(heir)[0]?.T === 5 && !relicsOf(heir)[0]?.path;
+      const need = relicAwakenCost(it); S.ents.__a.push({ id: uid(), kind: 'prop', type: 'forge', map: '__a', x: heir.x + 20, y: heir.y, r: 8 }); relicAwaken(heir, 0);
+      const woke = it.bound === heir.id && relicT(heir, it) === 6 && !it.path && need.glut === Math.ceil(RELIQ_COST[5].glut / 2) && S.relicCur.glut === 40 - need.glut;
+      const house = S.relicCur.stern === 9 - need.stern;
+      if (!(atGrave && sleeps && woke && house)) console.log('Reliquien-Tod-Probe', JSON.stringify({ atGrave, sleeps, woke, house, need }));
+      return atGrave && sleeps && woke && house;
+    } finally { S.relicCur = C0; S.flags = f0; }
+  }));
+  ok('Reliquien-Beute: Bosse geben Glut, Splitter und ihre Reliquie (einmal je Welt, danach Splitter), Dungeon-Enden eine Reliquie und Glut, Elite-Gegner Glut; Kills füllen die Serie, Hinrichtung prüft den Rumpf', sandbox(() => {
+    const p = stage(), C0 = S.relicCur ? { ...S.relicCur } : null, f0 = structuredClone(S.flags);
+    try { S.relicCur = { glut: 0, stern: 0 }; S.flags.relicGot = {}; p.level = 20;
+      const b = spawnEnemy('hrodvar', '__a', 12, 10); relicBossLoot(b); const first = S.ents.__a.some(e => e.kind === 'item' && e.item.key === 'eiskern') && S.relicCur.glut >= 6 && S.flags.relicSlot2;
+      const st = S.relicCur.stern; relicBossLoot(b); const once = S.ents.__a.filter(e => e.kind === 'item' && e.item.key === 'eiskern').length === 1 && S.relicCur.stern >= st + 2;
+      const n0 = S.ents.__a.filter(e => e.kind === 'item' && ITEMS[e.item.key]?.slot === 'relic').length, g0 = S.relicCur.glut;
+      relicChest({ map: 'deep', label: 'Tiefhall-Hort' }, p); const chest = S.ents.__a.filter(e => e.kind === 'item' && ITEMS[e.item.key]?.slot === 'relic').length === n0 + 1 && S.relicCur.glut === g0 + 6;
+      const k = mkItem('blutkranz'); p.inv.push(k); relicEquip(p, p.inv.indexOf(k)); for (let i = 0; i < 3; i++) relicKill(p, { x: p.x, y: p.y }); const streak = relicRs(p).streak === 3;
+      const e = spawnEnemy('bandit', '__a', 11, 9); const hs = mkItem('henkerschlinge'); p.inv.push(hs); relicEquip(p, p.inv.indexOf(hs)); hs.tier = 3;
+      e.body.torso.hp = Math.round(e.body.torso.max * 0.1); B.syncHp(e); relicAfterHit(p, e, 1, false, 'physical', false); const exec = !e.alive;
+      if (!(first && once && chest && streak && exec)) console.log('Reliquien-Beute-Probe', JSON.stringify({ first, once, chest, streak, exec, cur: S.relicCur }));
+      return first && once && chest && streak && exec;
+    } finally { S.relicCur = C0; S.flags = f0; }
+  }));
   ok('E2: Karawanentod legt eine Täterbande mit Beute an, der Kutscher nennt sie, Anführer tot → Kiste mit der Ladung; die Karawane selbst überfallen → keine Bande, Händler −10', sandbox(() => {
     const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, f0 = structuredClone(S.flags), g0 = S.gold; S.ents.world = W0.slice();
     try { S.bands = []; S.contracts = []; const [ex, ey] = TOWN_PLAN.eren.square, car = { x: (ex + 20) * TS, y: ey * TS, cargo: { salt: 8 } };
@@ -22418,16 +22906,18 @@ export function selftest() {
     let burned = false; if (acc) { S.day = acc.burnDay; witchWaveDay(); burned = !acc.alive; }
     return fear && !!acc && saved && burned;
   }));
-  ok('Folgen §5c/7: Omegas Ende — im Osten Panik (rennen, rufen), im Westen Jubel und Pilgerzüge zum Altar; Schlaf: Gebet; nach vier Tagen vorbei', afterBox(() => {
+  ok('Folgen §5c/7: Omegas Ende — erschlagen: der Osten jubelt, der Westen verflucht den Helden (Abwehr), Trauerzüge zum Altar; Avatar: Panik im Osten; Schlaf: Gebet; nach vier Tagen vorbei', afterBox(() => {
     const p = stage(); S.after = {}; const d0 = S.day | 0; omegaAftermath('slain');
     const mk = x => { const c = makeChar({ name: 'Probe', prof: 'Bauer', map: 'world', x: x * TS, y: 600 * TS }); c.anchor = { x: c.x, y: c.y }; S.ents.world.push(c); return c; };
     const east = mk(900), west = mk(OX - 60);
-    p.map = 'world'; p.x = east.x + 40; p.y = east.y; omegaSecond(true); const panic = east.panicT > clock() && panicStep(east, 16) === true;
-    p.x = west.x + 40; p.y = west.y; omegaSecond(true); const cheer = west.cheerT > clock();
+    p.map = 'world'; p.x = east.x + 40; p.y = east.y; omegaSecond(true); const cheer = east.cheerT > clock() && !(east.panicT > clock());
+    p.x = west.x + 40; p.y = west.y; west.act = null; omegaSecond(true); const hate = west.act?.pose === 'abwehren' && !(west.cheerT > clock());
+    S.after.omega.kind = 'avatar'; p.x = east.x + 40; p.y = east.y; east.panicT = 0; omegaSecond(true); const panic = east.panicT > clock() && panicStep(east, 16) === true; S.after.omega.kind = 'slain';
     omegaDay(); const pilgrims = !S.ents.world.some(e => e.omegaAltar) || S.ents.world.some(e => e.omegaPil);
-    S.after.omega.kind = 'sleep'; west.act = null; omegaSecond(true); const pray = !!west.act;
+    S.after.omega.kind = 'sleep'; p.x = west.x + 40; p.y = west.y; west.act = null; omegaSecond(true); const pray = !!west.act;
     S.day = d0 + 5; omegaDay(); const over = !S.after.omega && !S.ents.world.some(e => e.omegaPil);
-    return panic && cheer && pilgrims && pray && over;
+    if (!(panic && cheer && hate && pilgrims && pray && over)) console.log('Omega-Folgen-Probe', JSON.stringify({ panic, cheer, hate, pilgrims, pray, over }));
+    return panic && cheer && hate && pilgrims && pray && over;
   }));
   UI.closeDialogue();                                       // Proben öffnen Dialoge (Abgabe, Brett) — nichts davon stehen lassen
   ok('Audit T04 (C3/C5, RB-005): Effekte und Schwebetexte ziehen nicht aus dem Spielzufall; Partikeldeckel 900; Nachbild bleibt am Ort', (() => {
@@ -22958,7 +23448,8 @@ function boot() {
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
     openCoop: () => import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
-    useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
+    useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),
+    relicView, relicEquip: (idx, slot) => relicEquip(S.player, idx, slot), relicUnequip: i => relicUnequip(S.player, i), relicUpgrade: i => relicUpgrade(S.player, i), relicAwaken: i => relicAwaken(S.player, i), relicPath: (i, p) => relicPath(S.player, i, p),   /* Reliquien */   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
     stashHere, toStash: i => { if (coopHooks.cmd) return UI.toast('Das Lager gehört dem Host.'); if (!stashHere()) return UI.toast('Das Lager liegt in deiner Siedlung.'); if (S.stash.length >= stashCap()) return UI.toast(`Das Lager ist voll (${stashCap()} Felder — ein Lagerhaus bringt 24 mehr).`); const s = S.player.inv[i]; if (!s) return; S.stash.push(s); S.player.inv.splice(i, 1); }, stashCap,
@@ -23026,7 +23517,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

@@ -1141,3 +1141,74 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .hl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:8px 0}
 .hl-card{border:1px solid #2a2218;background:#120e0a;padding:6px 8px;font-size:12px}.hl-card.off{opacity:.6}
 .hl-parts{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin-top:4px}.hl-parts .ledger{font-size:11px}
+/* ---- Reliquien (Nutzer 02.10.2026): Kranz, Fassungen mit Rahmen je Stufe, Stufenleiter, Pfadkarten ---- */
+.rel{display:flex;flex-direction:column;gap:14px}
+.rel-top{display:flex;gap:18px;align-items:stretch}
+.rel-crown{display:flex;gap:14px;flex:1;justify-content:center;padding:12px;background:radial-gradient(ellipse at 50% 120%,rgba(164,64,44,.18),transparent 70%),#15120e;border:1px solid var(--iron)}
+.rel-sock{position:relative;width:150px;padding:10px 8px 8px;text-align:center;border:1px solid #3a3126;background:#100d0a;cursor:pointer;transition:transform .15s,box-shadow .2s}
+.rel-sock:hover{transform:translateY(-2px)}
+.rel-sock.sel{outline:1px solid var(--gold)}
+.rel-sock canvas{width:56px;height:56px;image-rendering:pixelated;display:block;margin:0 auto 4px;filter:drop-shadow(0 0 4px rgba(0,0,0,.8))}
+.rel-gem{width:56px;height:56px;margin:0 auto 4px;border:1px dashed #4a3f30;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#5a4f40;font-size:22px}
+.rel-sock.locked{cursor:default;opacity:.55}
+.rel-sname{font-family:"Cinzel",serif;font-size:12px;letter-spacing:.04em;line-height:1.25}
+.rel-need{font-size:10px;color:var(--dim);margin-top:2px}
+.rel-tier{position:absolute;top:6px;right:8px;font:700 12px "Cinzel",serif;color:var(--bone-dim)}
+.rel-sock.t3,.rel-sock.t4{border-color:#6a5a3e}
+.rel-sock.t5,.rel-sock.t6{border-color:var(--gold);box-shadow:0 0 10px -2px var(--rc,#bd9433)}
+.rel-sock.t7{border-color:#e0c070;box-shadow:0 0 14px 0 var(--rc,#bd9433);animation:relGlow 2.4s ease-in-out infinite}
+.rel-sock.t8{border:1px solid #fff0c0;box-shadow:0 0 20px 2px var(--rc,#bd9433),inset 0 0 18px rgba(255,220,150,.18);animation:relGlow 1.8s ease-in-out infinite;background:radial-gradient(circle at 50% 30%,rgba(255,220,160,.12),#100d0a 70%)}
+.rel-sock.t5 .rel-tier,.rel-sock.t6 .rel-tier,.rel-sock.t7 .rel-tier{color:var(--gold)}
+.rel-sock.t8 .rel-tier{color:#fff2c8;text-shadow:0 0 6px #e8a030}
+.rel-sock.sleep{filter:grayscale(.6) brightness(.8)}
+@keyframes relGlow{50%{box-shadow:0 0 24px 3px var(--rc,#bd9433)}}
+@media (prefers-reduced-motion:reduce){.rel-sock.t7,.rel-sock.t8{animation:none}}
+.rel-cur{width:190px;display:flex;flex-direction:column;gap:6px;justify-content:center;padding:10px 12px;border:1px solid var(--iron);background:#15120e;font-size:13px}
+.rel-cur b{color:#f0c070;font-size:16px;margin-right:4px}
+.rel-phase{font-family:"Cinzel",serif;font-size:11px;letter-spacing:.08em;padding:3px 6px;border:1px solid var(--iron);text-align:center}
+.rel-phase.ph-late{border-color:var(--gold);color:var(--gold)}.rel-phase.ph-end{border-color:#ffe0a0;color:#ffe9b8;box-shadow:0 0 10px rgba(232,160,48,.5)}
+.rel-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
+.rel-head h2{margin:0;font-family:"Cinzel",serif;letter-spacing:.06em;font-size:20px}
+.rel-banner{margin:8px 0;padding:8px 10px;border-left:3px solid #7a6ab0;background:rgba(90,80,140,.15);font-size:13px}
+.rel-active{margin:10px 0;font-size:13px;color:#e7dcc2;display:flex;flex-direction:column;gap:3px}
+.rel-ladder{display:flex;flex-direction:column;gap:3px;margin:10px 0}
+.rel-step{display:grid;grid-template-columns:34px 110px 1fr;gap:8px;align-items:baseline;padding:4px 8px;border-left:2px solid #2e271e;font-size:12px;color:#6d6454}
+.rel-step b{font-family:"Cinzel",serif;font-size:13px}
+.rel-step .rel-sn{font-family:"Cinzel",serif;font-size:11px;letter-spacing:.04em}
+.rel-step.done{border-left-color:var(--gold);color:#e7dcc2;background:linear-gradient(90deg,rgba(189,148,51,.12),transparent)}
+.rel-step.done b{color:var(--gold)}
+.rel-step.sleep{border-left-color:#7a6ab0;color:#a89ccc}
+.rel-step.next{border-left-color:#e0b75a;color:#cfc3a6;background:linear-gradient(90deg,rgba(224,183,90,.08),transparent);animation:relNext 2s ease-in-out infinite}
+.rel-step.future{color:#8a7f6a}
+.rel-step.locked{opacity:.35}
+@keyframes relNext{50%{background:linear-gradient(90deg,rgba(224,183,90,.18),transparent)}}
+.rel-next{padding:10px;border:1px solid var(--iron);background:#15120e;display:flex;flex-direction:column;gap:6px}
+.rel-nl{font-family:"Cinzel",serif;font-size:13px;color:var(--gold)}
+.rel-cost{display:inline-block;margin:0 10px 0 0;font-size:13px;color:#e7dcc2}
+.rel-cost i{font-style:normal;color:var(--dim);font-size:11px;margin-left:4px}
+.rel-cost i::before{content:"("}.rel-cost i::after{content:" da)"}
+.rel-cost.lack{color:#c87a5a}
+.rel-next .go{border-color:var(--gold);color:var(--gold)}
+.rel-next .cant{opacity:.55}
+.ledger.warn{color:#c8946a}
+.rel-paths{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.rel-path{padding:10px;border:1px solid var(--iron);background:#14110d;cursor:pointer;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.rel-path b{font-family:"Cinzel",serif;font-size:13px;color:#e7dcc2}
+.rel-path i{font-style:normal;color:var(--dim);font-size:11px}
+.rel-path:hover{border-color:#7a6232}
+.rel-path.on{border-color:var(--gold);box-shadow:inset 0 0 12px rgba(189,148,51,.18)}
+.rel-hist{margin-top:10px;font-size:11px;color:var(--dim);font-style:italic;display:flex;flex-direction:column;gap:2px}
+.rel-empty{padding:30px 10px;color:var(--dim);font-size:13px;text-align:center}
+.rel-side h3{font-family:"Cinzel",serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--bone-dim);margin:12px 0 6px;border-bottom:1px solid var(--iron);padding-bottom:3px}
+.rel-side h3:first-child{margin-top:0}
+.rel-inv{display:flex;gap:8px;align-items:center;padding:4px;border:1px solid transparent;cursor:pointer;font-size:12px}
+.rel-inv:hover{border-color:#5a4a33;background:#17130f}
+.rel-inv canvas{width:34px;height:34px;image-rendering:pixelated;flex:0 0 auto}
+.rel-syn{padding:6px 8px;border-left:2px solid #2e271e;margin-bottom:4px;font-size:12px}
+.rel-syn b{font-family:"Cinzel",serif;font-size:12px}
+.rel-syn i{font-style:normal;font-size:10px;color:var(--dim)}
+.rel-syn.on{border-left-color:var(--gold)}.rel-syn.on b,.rel-syn.on i{color:var(--gold)}
+.rel-pot{position:relative;display:flex;justify-content:space-between;font-size:12px;padding:3px 6px;margin-bottom:2px;background:#14110d}
+.rel-pot i{position:absolute;left:0;bottom:0;height:2px;background:var(--gold)}
+@media (max-width:900px){.rel-main{grid-template-columns:1fr}.rel-top{flex-direction:column}.rel-cur{width:auto;flex-direction:row;flex-wrap:wrap}.rel-sock{width:110px}}
+.rel-next .ctx-actions{flex-direction:row;gap:8px}.rel-next .ctx-actions button{flex:0 0 auto;min-width:130px}
