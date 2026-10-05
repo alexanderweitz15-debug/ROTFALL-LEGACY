@@ -1,18 +1,18 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=24';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=24';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=24';
-import * as R from './render.js?v=24';
-import * as HB from './buildings.js?v=24';
-import * as UI from './ui.js?v=24';
-import * as SIM from './sim.js?v=24';
-import * as B from './body.js?v=24';
-import * as SP from './sprites.js?v=24';
-import * as ECO from './economy.js?v=24';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=24';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=24';
-import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=24';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=25';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
+import * as R from './render.js?v=25';
+import * as HB from './buildings.js?v=25';
+import * as UI from './ui.js?v=25';
+import * as SIM from './sim.js?v=25';
+import * as B from './body.js?v=25';
+import * as SP from './sprites.js?v=25';
+import * as ECO from './economy.js?v=25';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
+import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=25';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -21306,10 +21306,11 @@ export function selftest() {
       chargeTick(p, t + CHARGE_FULL + 20); const full = p.chargeK === 1; const D = (ITEMS.longsword.speed) * (1 - Math.min(0.3, afx(p, 'swift'))) * (1 - Math.min(0.25, (p.skills?.onehanded || 0) * 0.0025));
       mouse.down = false; chargeTick(p, t + CHARGE_FULL + 40); const heavy = p.swing > 0 && p.comboFin && p.atkStep === 2 && p.atkHeavy && Math.abs(p.swingDur / D - 1.15) < 1e-6;
       const b = spawnEnemy('bandit', '__a', 10, 9); b.x = p.x + 30; b.y = p.y; b.aim = Math.PI; b.maxHp = b.hp = 9999; if (b.body) B.initBody(b, 9999); p.aim = 0;   /* nicht blockbar: Deckung des Ziels hält den normalen Hieb, den aufgeladenen nicht */
-      const vit = () => b.body ? B.vital(b) : b.hp; b.cover = { since: performance.now() }; let v0 = vit(); p.atkHeavy = false; p.swing = 0.5; resolveSwing(p); const blocked = vit() === v0;
+      const vit = () => b.body ? Object.values(b.body).reduce((n, q) => n + q.hp, 0) : b.hp; b.cover = { since: performance.now() };   /* Summe aller Teile: ein Gliedtreffer ändert B.vital() nicht (Zufall der Trefferzone) */ let v0 = vit(); p.atkHeavy = false; p.swing = 0.5; resolveSwing(p); const blocked = vit() === v0;
       b.cover = { since: performance.now() }; v0 = vit(); p.atkHeavy = true; p.swing = 0.5; resolveSwing(p); const through = vit() < v0 && !UNBLOCK; p.atkHeavy = false;
       press(performance.now()); const inCombo = !chargeTick(p) && !p.charge;   /* Kombo läuft: kein Aufladen */
       p.swing = 0; p.comboT = -1e9; mouse.down = true; mouse.fresh = false; const plainHold = !chargeTick(p) && !p.charge;   /* duel/simFight: nur gehalten */
+      if (!(starts && tap && mid && full && heavy && blocked && through && inCombo && plainHold)) console.warn('Wuchtschlag-Probe', JSON.stringify({ starts, tap, mid, full, heavy, blocked, through, inCombo, plainHold }));
       return starts && tap && mid && full && heavy && blocked && through && inCombo && plainHold;
     } finally { Object.assign(mouse, m0); p.charge = null; p.chargeK = 0; }
   }));
@@ -21800,10 +21801,11 @@ export function selftest() {
     } finally { S.evidence = ev0; S.bounty = b0; UI.closeDialogue(); } }));
   ok('Schleichmodus (03.10.): Ahnungslose bemerken den Schleichenden erst viel näher; Angriff aus dem Schleichen = Hinterhalt und beendet das Schleichen; Schleichen wächst bei ahnungslosen Gegnern', sandbox(() => {
     const p = stage(), s0 = p.skills.stealth;
-    try { p.skills.stealth = 0; p.sneak = false; const e = actor(p.x + 150, p.y, { kind: 'enemy', mtype: 'bandit' }); e.aggroId = null;
+    try { p.skills.stealth = 0; p.sneak = false; const e = actor(p.x + 150, p.y, { kind: 'enemy', mtype: 'bandit' }); e.aggroId = null; e.mtype = 'bandit'; e.maxHp = e.hp = 9999; if (e.body) B.initBody(e, 9999);   /* makeChar kennt kein mtype — ohne Eintrag stürzte die() beim Tod der Probe ab; sie soll den Hinterhalt ohnehin überleben */
       const seen = nearestTarget(e, [p], 200) === p; p.sneak = true; const hidden = nearestTarget(e, [p], 200) === null;
       sneakT = 2000; e.faction = 'bandit'; sneakTick(16); const grew = (p.skills.stealth || 0) > 0;
       const hp0 = e.hp; hit(p, e, 1); const amb = !p.sneak;
+      if (!(seen && hidden && grew && amb)) console.warn('Schleich-Probe', JSON.stringify({ seen, hidden, grew, amb, hp0, hp: e.hp, alive: e.alive }));
       return seen && hidden && grew && amb;
     } finally { p.skills.stealth = s0; p.sneak = false; } }));
   ok('Wanderautomaten (03.10.): Roboter-Reisende mit eigenem Aussehen; anwerbbare schließen sich kostenlos an, andere nicht; volle Gruppe lehnt ab', sandbox(() => {
@@ -23447,7 +23449,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),
     relicView, relicEquip: (idx, slot) => relicEquip(S.player, idx, slot), relicUnequip: i => relicUnequip(S.player, i), relicUpgrade: i => relicUpgrade(S.player, i), relicAwaken: i => relicAwaken(S.player, i), relicPath: (i, p) => relicPath(S.player, i, p),   /* Reliquien */   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
@@ -23505,7 +23507,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -23516,7 +23518,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */

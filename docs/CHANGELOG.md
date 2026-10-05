@@ -2,6 +2,12 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 25 — 2026-10-05 (Zusammenführung der offenen Zweige)
+- Zusammengeführt: claude-arbeit (PR #9: Audit Phase 1–4, Wüstenbund/Zwerge, Wanderautomaten, Heiler-/Zauberfenster, Schleichmodus, Kampfanimationen) und Reliquien (Endgame-Fortschritt, Anmarsch der Ereignisfiguren, Omega-Szene).
+- PR #7 zurückgeholt (war in main verloren): Angst der Bürger, schwere Verbrechen mit Bußgeld und Haft, Zerfall Varonheims ohne König.
+- Reliquien-Fenster auf Taste O (V ist der Schleichmodus). Cache-Schlüssel v=25.
+- Selbsttest: 488 Proben, 7 Fehlschläge aus dem Audit-Zweig noch offen (Karte BUG-085, Eisenmark, Stadtfest, Tagesplan, Akademie-Prüfungen, Stadt ohne Schutz, Betriebe); Proben Wuchtschlag/Schleichen gegen Zufall der Trefferzone gehärtet.
+
 ## Version 24 (in Arbeit) — Fehlerjagd Runde 1
 - Hunt-1-Fehler HB-06 bis HB-23 behoben (Mönch-Aufträge, Weißbarts Ansprechbarkeit, Varon-Königsauftrag, Eisenmark-Pferch/Tributzug, Schuldprüfung bei befreiten Städten, Wohlstand ohne Schutz, Heiler sieht Gliedverletzungen, Schadens-Böden heben Bewusstlose nicht mehr an, Bruch/Prothese, Medizin heilt kein Messing, abgetrennte Glieder, Betriebsverlust, Kult-Doppelgänger, Zweiwaffen mit ausgefallenem Arm, kein Selbstheilen am Boden, Kette/Grubenstämme-Rang). Details: `ROTFALL_STATE/hunt/BERICHT.md`.
 - Offen (keine eigenmächtige Designentscheidung): HB-10 (Rotfall/Omega-Belohnung), HB-20 (welche Bindungen ein Erbe übernimmt).
