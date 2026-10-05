@@ -1,5 +1,13 @@
 # Ist-Zustand D — Items, Spielerwirtschaft, Menüs (Stand 03.10.2026)
 
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.5 Zählung:** `AFFIXES` 15, `ITEMS` 295.
+- **1.10:** Pferdezüchter: Schlüssel `wendel`, Name **Hadubrand**. „Wendel“ als Anzeigename ist ein Doku-Fehler.
+- **1.11:** Prothesen-Werkbank: Fenster seit 03.10. (D richtig). Dazu seit 04.10. Fenster für Heiler und Zauber lernen.
+- **1.12:** Leitwolfzahn/Klinge des Sandfürsten fallen sicher in `die()` (D richtig); eigener Beutepool fehlt (siehe C).
+
+
 Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (Cache-Schlüssel `?v=24`), `docs/IST_ZUSTAND.md` (alter Stand, hier korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
 
 **So wurde geprüft.** Die Item-Tabelle ist aus dem Code erzeugt. Ein Skript hat jeden Schlüssel aus `ITEMS` (data.js) in allen Quelldateien gesucht und jede Fundstelle einer Quelle zugeordnet: Ladenliste, Beutetabelle, Bossbeute, Kopfgeld-Elite, Auftrag, Truhe, Rezept, Gewölbe-Truhe, Waffenständer, Geheimer Ort, Sonderbeute. Die Ladenlisten habe ich zusätzlich **im laufenden Spiel** nachgezählt, und zwar zweimal: im echten Spielstand des Entwicklers (nur gelesen) und in einem frisch begonnenen Wegwerfspiel (Platz `ztestD`, danach gelöscht). Läden, Schmiede, Tierhändler, Stall, Kutsche, Betriebe, Handwerk, Lager, Waffenständer und alle 22 Fenster habe ich im Browser bedient und dabei Gold, Gepäck und Fenstermaße gemessen. Der echte Spielstand ist danach nachweislich unverändert (Vergleich mit `rotfall.backup.s14c`: identisch).
@@ -136,7 +144,7 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
 |---|---|---|---|---|---|---|
 | `rusty_sword` | Rostiges Kurzschwert | Schaden 7, Reichw. 40, 520 ms | gewöhnl. | 18 | — | Startausrüstung (Herkunft); Beute: Goblin; Beute: Bandit; Beute: Untoter Krieger; Laden: Waffenhändler (Aurelheim, alte Stände: fehlt); Laden: Stadtschmiede; Laden: Standardware (Händler ohne Liste); NPC trägt es (nur über Grab nach Mord); Waffenständer durchsuchen (60 %) |
 | `longsword` | Langschwert | Schaden 12, Reichw. 46, 560 ms | ungew. | 90 | — | Laden: Brann; NPC trägt es (nur über Grab nach Mord); Kopfgeld-Elite: Hagen der Schlitzer; Laden: Waffenhändler (Aurelheim, alte Stände: fehlt); Laden: Stadtschmiede; Laden: Hagen (Schmied); Schatzgerücht → vergrabene Kiste; Laden: Standardware (Händler ohne Liste); Truhe/Kiste: Feldkiste der Hundert; Truhe/Kiste: Alte Truhe; Handwerk: Esse; Gewölbe-Truhe Stufe 1/2 |
-| `frostblade` | Frostklinge | Schaden 16, Reichw. 48, 560 ms | episch | 320 | — | Auftrag: Königseisen (q_kingsiron); Kopfgeld-Elite: Irmgard vom Frostgrab; Gewölbe-Truhe Stufe 3/4/5 |
+| `frostblade` | Frostklinge | Schaden 16, Reichw. 48, 560 ms | episch | 320 | — | Auftrag: Königseisen (q_kingsiron); Kopfgeld-Elite: Irmhild vom Frostgrab; Gewölbe-Truhe Stufe 3/4/5 |
 | `greatsword` | Zweihänder | Schaden 22, Reichw. 56, 980 ms | selten | 220 | Zweihand | Laden: Brann; Truhe/Kiste: Wüstengruft; Gewölbe-Truhe Stufe 2/3/4 |
 | `axe` | Beil | Schaden 11, Reichw. 38, 680 ms, Durchschl. 25 % | gewöhnl. | 34 | — | Startausrüstung (Herkunft); Beute: Goblin-Krieger; Laden: Brann; NPC trägt es (nur über Grab nach Mord); Kopfgeld-Elite: Otmar Brandschatz; Kopfgeld-Elite: Knarz der Grubenkönig; Laden: Stadtschmiede; Laden: Standardware (Händler ohne Liste); Handwerk: Esse; Gewölbe-Truhe Stufe 1; Waffenständer durchsuchen (60 %) |
 | `greataxe` | Große Axt | Schaden 25, Reichw. 52, 1080 ms, Durchschl. 35 % | selten | 260 | Zweihand | Laden: Brann; NPC trägt es (nur über Grab nach Mord); Gewölbe-Truhe Stufe 3/4/5 |

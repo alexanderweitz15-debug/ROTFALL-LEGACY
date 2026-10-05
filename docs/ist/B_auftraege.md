@@ -1,5 +1,12 @@
 # Ist-Zustand B — Aufträge aller Art (Stand 03.10.2026)
 
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.7 EP-Auszahlung:** `q_omega` 1000 EP (`game.js:10459`) und `q_ratssitz` 600 EP (`game.js:11129`) werden ausgezahlt — **B-3/B-4 behoben 03.10.**; HB-10/HB-37 damit erledigt.
+- **1.5 Zählung:** `QUESTS` enthält 78 feste Einträge in `data.js` (davon 12 `c_*` Titelreihen, 20 `kt_*` Klassenprüfungen, 3 `dk_*`), dazu **48 Rangquests** aus `RANK_LINES` (8 Fraktionen × 3 Ränge × 2). „55 fest / 36 Rangquests“ (IST_alt) und „40“ (B) waren falsch.
+- **1.14:** Elite „Irmgard vom Frostgrab“ heißt jetzt „Irmhild vom Frostgrab“.
+
+
 Bereich B des detaillierten Ist-Zustands: feste Aufträge (`QUESTS` in `src/data.js`), die aus `RANK_LINES` erzeugten Rangaufträge, Klassen-Prüfungen, Verträge (`CON`) mit Lohnformeln, Gerüchte, Gefährten- und Königsaufträge, emergente Aufträge E1–E4 und Geheime Orte.
 Grundlage: `docs/IST_ZUSTAND.md` §2.13 (übernommen, korrigiert, vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`, Code-Stand vom 03.10. vormittags. Andere Agenten bearbeiten `game.js` parallel; Zeilennummern können sich um einige Zeilen verschieben, deshalb steht immer der Funktionsname dabei.
 
@@ -519,7 +526,7 @@ Gemessen mit einem Steckbrief je Ort, abgegeben beim Verteidigungsmeister (Eisen
 | Banditen | Hagen der Schlitzer (Bandit, Sammeln, Langschwert) · Ruprecht Einauge (Schütze, Sammeln, Langbogen) · Wendel die Krähe (Ansturm, Doppelklinge) · Gunther Rotbart (Speer, zäh, Hellebarde) · Die Stille Mathilde (Brand, Wurfmesser) · Otmar Brandschatz (Brand, Axt) · Galgenstrick Fritz (Sammeln, Rapier) · Adelheid vom Hohlweg (Schützin, Armbrust) |
 | Wüste | Karim Sandgeist (Ansturm, Kriegssichel) · Nadira die Skorpionin (Blitz, Kurzbogen) |
 | Goblins | Knarz der Grubenkönig (Beschwören, Axt) · Mulch der Pilzschamane (Heilen, Trank) · Schrottfresser Grimm (zäh, Ersatzteile) · Flinkfinger Zick (Ansturm, Wurfmesser) |
-| Tote | Der Knochenfürst Varsk (Beschwören, Knochenspalter) · Irmgard vom Frostgrab (Frost, Frostklinge) · Seuchenmaul (Ghul, Heilen) · Der Grabschänder Egbert (Sammeln, Grabräuber) · Die Totenglocke (Blitz, Totenglocke) · Aschenkönigin Sabeth (Brand, Kriegssense) |
+| Tote | Der Knochenfürst Varsk (Beschwören, Knochenspalter) · Irmhild vom Frostgrab (Frost, Frostklinge) · Seuchenmaul (Ghul, Heilen) · Der Grabschänder Egbert (Sammeln, Grabräuber) · Die Totenglocke (Blitz, Totenglocke) · Aschenkönigin Sabeth (Brand, Kriegssense) |
 | Tiere | Graumähne (Wolf) · Schwarzfell (Wolf) · Eisenhauer (Keiler) · Der Alte vom Berg (Bär) · Der Weiße Hund (Albinowolf, Frost) — Beute Fell |
 | Kette | Brakk Kettenbrecher (zäh) · Veit mit der Peitsche (Blitz) |
 | Kult | Aschepriester Morn (Brand, Stab) · Die Schattenseherin (Heilen, Stab) |

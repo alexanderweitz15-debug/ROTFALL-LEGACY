@@ -152,3 +152,21 @@ Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, 
 - ~~Grundleben 560~~ (Messfehler: `ehp` setzt das Leben ohne den Boss-Faktor ×2 — die „560“ entsprachen etwa Grundleben 280).
 - **Grundleben 340, Schaden 21 (gewählt, Nachmessung mit 8 Seeds, ohne `ehp`):** Stufe 16 (Kette + Schild): 4/8 Siege, ⌀ 24 s, Verlust ⌀ 80 %; Stufe 17: 6/8, ⌀ 23 s, 60 %; Stufe 18 (Platte + Schild): 5/8, ⌀ 45 s, 63 %. `simFight` streut bei Phasenbossen stark (Hunter 4); im Spiel machen Fesseln den Kampf länger, Licht und Verbündete kürzer.
 - Fesseln (je Gefangenem +0,4 %/s) machen ihn schwerer, Lichtschächte (bis −25 %) und Marschall Brandt leichter — die Vorgeschichte entscheidet. Empfohlene Stufe 16–18.
+
+## Audit 04.10.2026 — Balance-Änderungen (Phase 3)
+
+| Punkt | Vorher | Nachher | Grund |
+|---|---|---|---|
+| 3.1 Eigenbau verkaufen | Verkaufspreis nach Wert (Harnisch: ~120 Material → ≥ 207 Gold) | höchstens 1,5 × Materialwert (`crafted`-Flag, `craftMatValue`) | Gold-Kreislauf übers Handwerk |
+| 3.2 Lieferaufträge | Wert × Menge × 1,6 (bis ~3,5× mit Überschuss-Einkauf) | Marktpreis der Zielstadt (Verkaufskurs) × 1,15, bei Abgabe gerechnet | Exploit; Ruf geht an die Macht der Zielstadt (F-12, 03.10.) |
+| 3.3 Königseisen | zwei Items, bei allen Stadtschmieden | ein Item `koenigseisen`; nur Tiefhall (Hilda, Hort) und Branns Auftrag | Dublette, zu leicht erreichbar |
+| 3.4 Lager | unbegrenzt | 48 Felder, +24 je fertigem Lagerhaus | F-08, Gepäckgrenze war bedeutungslos |
+| 3.5 Parade | 3 Ausdauer | 8 Ausdauer | Parade-Schleife (Taumeln 900 ms, Neu-Heben 400 ms) |
+| 3.6 Multiplikator-Deckel | Meuchelstich ×3 · Hinterhalt ×3 · Krit 1,8 = ×16,2 | höchstens ×6 des Grundschadens je Treffer | Stapel-Exploit; additive Gruppen (Spec) nicht gebaut — Deckel reicht, ist nachvollziehbar |
+| 3.7 Mindestschaden | 1 | 10 % des Rohschadens | Rüstung machte schwache Gegner wirkungslos |
+| 3.11 Frost | keine Immunität | 3 s gefeit nach dem Auftauen (wie Schock) | Dauerfrost durch Elites |
+| 3.13 Erbe-Ruf | aller Ruf × 0,5 | positiver × 0,5, negativer × 0,8 | Wegwerf-Tod als Sühne |
+| 3.15 Stiften | +3 Ruf je Zahlung | +3 höchstens einmal am Tag je Ort | Ruf kaufbar |
+| 2.5 Sühne | kein Rückweg aus Verhasst | Mittler (Nix/Grisk/Sael): Gold 6 je fehlendem Punkt (min. 150) oder 20 Eisen → Ruf −59, alle 10 Tage | Softlock Bande/Goblins/Tote |
+
+Alle Werte vorläufig; messen mit `RF.simFight` und im Spiel.

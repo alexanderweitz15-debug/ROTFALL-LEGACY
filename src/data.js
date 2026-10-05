@@ -441,7 +441,7 @@ export const ITEMS = {
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
   soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
   scout_report: { name:'Späherbericht', slot:'material', stack:1, rarity:'uncommon', value:0, lore:'Kohleschrift, halb verwischt: „Sie zählen uns. Nicht wir sie. Sie warten auf eine Zahl.“' },
-  kings_iron:   { name:'Königseisen', slot:'material', stack:1, rarity:'rare', value:0, lore:'Ein Barren mit dem Hammerzeichen der alten Bergleute. Kalt, auch in der Hand.' },
+  /* Audit 3.3: kings_iron (Questbarren) ist in koenigseisen aufgegangen; alte Stände werden beim Laden umbenannt (migrateKingsIron) */
   ancestor_urn: { name:'Ahnenurne', slot:'material', stack:1, rarity:'epic', value:0, lore:'Asche von tausend Namen. Wer sie trägt, hört sie flüstern.' },
 };
 
@@ -1410,7 +1410,7 @@ export const NPCS = [
     greet:'„Das Licht fragt nicht, wer du warst. Ich schon, aber nur ein bisschen.“', teaches:['cleric'] },
   { key:'nix', name:'Nix', prof:'Hehlerin', faction:'merch', age:29, atTown:'saltport', off:[-4, 4], weapon:'dagger',
     traits:['gierig','neugierig'], attrs:{agility:14,charisma:12}, cls:'rogue', recruit:false,
-    greet:'„Ich habe nichts gesehen, nichts gekauft und dich nie getroffen. Also: Was willst du?“', teaches:['rogue'] },
+    greet:'„Ich habe nichts gesehen, nichts gekauft und dich nie getroffen. Also: Was willst du?“', teaches:['rogue', 'assassin'] },   /* Audit 2.1: zweiter Assassinen-Lehrer neben Rook (Mönche sind bei der Bande unten durch) */
   { key:'serafine', name:'Serafine', prof:'Wandermagierin', faction:'merch', age:45, atTown:'kreuzweg', off:[5, -2], weapon:'staff',
     traits:['neugierig','klug'], attrs:{intelligence:15,willpower:13}, cls:'mage', recruit:false,
     greet:'„Feuer ist ehrlich: Es tut, was es verspricht. Menschen seltener.“', teaches:['mage'], spellsTaught:['sp_spark', 'sp_firebolt', 'sp_missile', 'sp_shield'] },
@@ -1498,6 +1498,11 @@ export const QUESTS = {
   q_lila: { name:'Die vermisste Tochter', giver:'jorun', desc:'Joruns Tochter Lila ist seit zwei Tagen fort.',
     objectives:[{type:'find',target:'lila',text:'Lila finden'}],
     reward:{xp:60}, turnin:'jorun', branching:true },
+  /* Audit 04.10. Phase 4: Erbe-Aufträge — entstehen beim Antritt des Erben (adoptSuccessor), kein Geber */
+  q_erbe_schwur: { name:'Schwur des Vorfahren', giver:null, desc:'Ein Auftrag deines Vorfahren blieb offen. Schließe ihn in seinem Namen ab — wer das Wort eines Toten hält, bekommt den doppelten Lohn.',
+    objectives:[{type:'custom',count:1,text:'Den offenen Auftrag des Vorfahren abschließen'}], reward:{xp:120} },
+  q_erbe_grab: { name:'Das Ahnengrab', giver:null, desc:'Dein Vorfahr liegt, wo er fiel. Besuche das Grab: dort hörst du, was von ihm bleibt — und wer seine Waffe trägt.',
+    objectives:[{type:'custom',count:1,text:'Das Ahnengrab besuchen'}], reward:{xp:60} },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
@@ -1588,8 +1593,8 @@ export const QUESTS = {
     objectives:[{type:'kill',target:'bandit',count:5,text:'Grabräuber töten'}],
     reward:{gold:90,xp:140,rep:{undead:15,valen:-5}}, turnin:'sael' },
   q_kingsiron: { name:'Königseisen', giver:'brann', desc:'Unter dem Frostkamm liegt die Tiefhall. Die alten Bergleute schmolzen dort Eisen nur für ihren König — und der König soll sie nie verlassen haben. Bring mir einen Barren aus seinem Hort, und ich schmiede dir eine Klinge, wie Nordfurt keine zweite hat.',
-    objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'kings_iron',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
-    reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'kings_iron'}, turnin:'brann' },
+    objectives:[{type:'kill',target:'hrodvar',count:1,text:'Den König unter dem Eis zur Ruhe legen'}, {type:'item',target:'koenigseisen',count:1,text:'Königseisen aus dem Hort der Tiefhall'}],
+    reward:{gold:80,xp:260,rep:{valen:6},item:'frostblade',take:'koenigseisen'}, turnin:'brann' },
   // S15 Klassen-Questlines: je Titelklasse drei Aufträge beim Meister (ab Grad II, der dritte ab Grad III). Belohnung: ein Teil der Klassen-Rüstung.
   // S15 P19: Questreihe des Todesritters bei Sael (dkQ = Schritt). Voraussetzung: Klasse Todesritter gelernt.
   dk_1: { name:'Der erste Schwur', giver:'sael', dkQ:1, desc:'„Ein Todesritter schwört nicht einmal, sondern dreimal. Der erste Schwur gilt den Jägern, die uns für Gold jagen. Drei von ihnen, und drei Knochen als Zeugnis.“',
@@ -1853,7 +1858,7 @@ export const ELITES = {
   schrottfresser:{ name: 'Schrottfresser Grimm', base: 'goblin_warrior', crew: 'goblin', where: ['goblin', 'goblin_warrior'], hp: 2.2, dmg: 1.2, armor: 4, power: 'tough', drop: 'ersatzteile', look: { armor: 'chain', armorCol: '#6a5a44', helm: 'nasal', helmCol: '#8a7a5a' }, say: 'hat sich eine Rüstung aus Kettenschrott zusammengenietet. Klingen prallen einfach ab.' },
   flinkfinger: { name: 'Flinkfinger Zick', base: 'goblin', crew: 'goblin', where: ['goblin'], hp: 1.4, dmg: 1.2, spd: 1.35, power: 'charge', drop: 'wurfmesser', look: { hooded: 1, hood: '#2e3a24', cloak: '#1e2a18' }, say: 'stiehlt Hühner, Kinder und Kirchenglocken. Keiner ist je schnell genug gewesen.' },
   knochenfuerst:{ name: 'Der Knochenfürst Varsk', base: 'skeleton', crew: 'skeleton', where: ['skeleton'], hp: 2.2, dmg: 1.3, armor: 2, power: 'summon', drop: 'knochenspalter', look: { hooded: 0, helm: 'great', helmCol: '#4a4f55', crest: '#7fd0b8', armor: 'plate', armorCol: '#3d4247', glow: '#7fd0b8' }, say: 'zieht mit einer Knochenschar über die Friedhöfe und reißt die Toten aus der Erde.' },
-  frostgrab:   { name: 'Irmgard vom Frostgrab', base: 'skeleton', crew: 'skeleton', where: ['skeleton'], hp: 1.9, dmg: 1.25, power: 'frost', drop: 'frostblade', look: { hood: '#1d2a36', cloak: '#16202a', glow: '#9fd8ff', skin: '#c8d8e4' }, say: 'war Priesterin, bevor sie im Eis starb. Wo sie geht, gefriert der Boden.' },
+  frostgrab:   { name: 'Irmhild vom Frostgrab', base: 'skeleton', crew: 'skeleton', where: ['skeleton'], hp: 1.9, dmg: 1.25, power: 'frost', drop: 'frostblade', look: { hood: '#1d2a36', cloak: '#16202a', glow: '#9fd8ff', skin: '#c8d8e4' }, say: 'war Priesterin, bevor sie im Eis starb. Wo sie geht, gefriert der Boden.' },
   seuchenmaul: { name: 'Seuchenmaul', base: 'ghoul', crew: 'ghoul', where: ['ghoul', 'skeleton'], hp: 2.0, dmg: 1.2, spd: 1.15, power: 'regen', drop: 'potion', look: { cloth: '#3a4a2a', glow: '#8fb04a' }, say: 'frisst Leichen und wird davon nur stärker. Der Gestank zieht bis ins Dorf.' },
   grabschaender:{ name: 'Der Grabschänder Egbert', base: 'ghoul', crew: 'skeleton', where: ['ghoul', 'skeleton'], hp: 1.8, dmg: 1.35, power: 'rally', drop: 'grabraeuber', look: { hooded: 1, hood: '#2a2620', apron: 1, apronCol: '#4a3a2a' }, say: 'gräbt die Toten aus und verkauft sie. Die Toten haben ihn dafür nicht vergessen.' },
   totenglocke: { name: 'Die Totenglocke', base: 'skeleton', crew: 'ghoul', where: ['skeleton', 'ghoul'], hp: 2.0, dmg: 1.2, power: 'shock', drop: 'totenglocke', look: { hood: '#2a1a1a', cloak: '#1a1012', glow: '#c05a3a', mark: 'chevron', markCol: '#c05a3a' }, say: 'läutet eine rostige Glocke, und jeder, der sie hört, erstarrt vor Angst.' },
