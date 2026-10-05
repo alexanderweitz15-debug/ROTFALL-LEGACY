@@ -2034,16 +2034,16 @@ function rallyCall(e, src) {                                           // Anfüh
 // Unter 50 % Leben ruft jeder Boss einmal Verstärkung (Phase 2).
 const REGION_BOSSES = [
   { id: 'alpha', flag: 'alphaSlain', mtype: 'wolf', loc: 'wolfden', level: 9, hp: 170, r: 14, title: 'Graumähne, Leitwolf der Schlucht',
-    call: 'wolf', callText: 'heult. Das Rudel antwortet.', area: a => a.map === 'world' && a.x < 130 + OX && a.y > 250 && a.types.includes('wolf'), from: 'wolf', to: 'wild_dog',
+    call: 'wolf', callText: 'heult. Das Rudel antwortet.', arena: { weather: 'fog', mins: 12, toast: 'DIE SCHLUCHT VERSINKT IM NEBEL', text: 'Nebel kriecht aus der Schlucht. Das Rudel sieht dich — du siehst kaum die Hand vor Augen.' }, area: a => a.map === 'world' && a.x < 130 + OX && a.y > 250 && a.types.includes('wolf'), from: 'wolf', to: 'wild_dog',
     effect: () => { if (S.towns.eren) S.towns.eren.stock.pelt += 8; S.factions.valen += 3; },
     text: 'Ohne Graumähne zerfällt das Rudel der Schlucht. Die Jäger in Eren atmen auf — und in den Westwald ziehen verwilderte Hunde.' },
   { id: 'sandlord', flag: 'sandlordSlain', mtype: 'bandit', loc: 'redwaste', level: 12, hp: 340, dmg: 1.8, r: 13,   /* Balance-Runde: vorher 240 LP, Banditenhieb — in 6 s erledigt */ title: 'Karrak, der Sandfürst',
-    call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
+    call: 'bandit_archer', callText: 'pfeift. Schützen steigen aus den Dünen.', arena: { weather: 'sandstorm', mins: 12, toast: 'DER SAND STEIGT', text: 'Karrak schlägt auf einen Gong. Der Sturm kommt, als hätte er auf ihn gewartet — Sand in den Augen, Pfeile aus dem Nichts.' }, area: a => a.map === 'world' && a.x > 560 + OX && a.x < 768 + OX && a.y < 300 && a.types.includes('bandit'), from: 'bandit', to: 'goblin_warrior',   // Weltmaßstab (Rote Wüste ≈ 660/232); BUG-139: from/to standen im Kommentar
     effect: () => { S.factions.merch += 8; S.factions.bandit -= 25; S.factions.wuest = clamp((S.factions.wuest || 0) + 10, -100, 100); },   /* Fragemenü 03.10.: Karrak raubt auch den Bund aus — Wüstenbund +10 */
     text: 'Ohne Karrak zerfallen die Wüstenbanden. Die Händler in Aschfurt atmen auf, der Wüstenbund dankt es dir (+10) — doch in die leeren Lager ziehen Goblin-Krieger.' },
   // Endgame (Session 11): Varg in der Kernburg der Kettenfeste. Tod = Befreiung der Goblins; Reste der Kette werden zu Räubern.
   { id: 'chainmaster', flag: 'goblinsFreed', mtype: 'chain_master', loc: 'kettenfeste', at: EM(946, 384), level: 16, hp: 360, r: 14, title: 'Varg, Kettenmeister der Eisenmark',
-    call: 'chain_brute', callText: 'lässt die Kette klirren. Knechte stürmen aus der Halle.', area: a => !!a.eisen, from: 'chain_brute', to: 'bandit',
+    call: 'chain_brute', callText: 'lässt die Kette klirren. Knechte stürmen aus der Halle.', arena: { weather: 'bloodrain', mins: 10, toast: 'DIE KETTEN BLUTEN', text: 'Die Fackeln verlöschen. Aus den Ketten über der Halle tropft es rot — Vargs Halle gehört jetzt ihm.' }, area: a => !!a.eisen, from: 'chain_brute', to: 'bandit',
     guards: 2, guardType: 'rotgardist', effect: () => liberate(),
     court: [[-4, -3, 'rotgardist'], [-4, 3, 'rotgardist'], [-9, -4, 'rotgardist'], [-9, 4, 'rotgardist'], [-12, -5, 'kettenschuetze'], [-12, 5, 'kettenschuetze']],
     text: 'Mit Varg fällt die Eiserne Kette. Wer von ihren Knechten übrig ist, zieht als Räuber durch die Mark.' },
@@ -2061,7 +2061,15 @@ function ensureRegionBosses() {
       { const g = spawnEnemy(gt, 'world', bx + dx, by + dy, { level: b.level - 4, anchor: { x: (bx + dx) * TS, y: (by + dy) * TS } }); g.court = true; g.facing = i % 2 ? 3 : 2; }   // Leibwache / Hofstaat
   }
 }
-function regionBossSlain(b) { S.flags[b.flag] = true; b.effect(); log(b.text, 'world'); }
+/* W10 Slice 1 Arena-Veränderung (Welttiefe, 05.10.2026): In Phase 2 verändert ein Regionalboss seinen Kampfplatz — das Wetter kippt (Nebel, Sandsturm,
+   Blutregen: Sicht und Stimmung aus dem vorhandenen Wettersystem) für `mins` Minuten. Fällt er, klart es auf. Datenfeld `arena` in REGION_BOSSES. */
+function bossArena(e, rb) {
+  const A = rb?.arena; if (!A || e.arenaDone) return false; e.arenaDone = true;
+  S.arenaWx = { boss: rb.id, prev: S.weather, left: S.weatherLeft }; S.weather = A.weather; S.weatherLeft = (A.mins || 10) * 60;
+  log(`${e.title || rb.title}: ${A.text}`, 'combat'); UI.toast(A.toast || 'DER KAMPFPLATZ VERÄNDERT SICH', 2800); camShake(6, 400); return true;
+}
+function arenaClear(why) { const A = S.arenaWx; if (!A) return; delete S.arenaWx; S.weather = A.prev && A.prev !== S.weather ? A.prev : 'clear'; S.weatherLeft = 30; log(why || 'Der Himmel klart auf.', 'world'); }
+function regionBossSlain(b) { S.flags[b.flag] = true; b.effect(); log(b.text, 'world'); if (S.arenaWx?.boss === b.id) arenaClear('Mit dem Boss weicht auch sein Wetter — der Himmel klart auf.'); }
 function spawnType(a) {                                             // Machtvakuum nach einem Regionalboss
   const t = pick(a.types);
   if (S.flags.goblinsFreed && a.map === 'world' && (t === 'goblin' || t === 'goblin_warrior')) return null;   // befreit: Goblins sind kein Feind mehr
@@ -2799,6 +2807,7 @@ function update(dt, now) {
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
   if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
+  if (S.arenaWx && S.weatherLeft <= 0) arenaClear('Das Wetter des Bosses verzieht sich.');   /* W10: Arena-Wetter läuft aus */
   S.weatherLeft -= dt / 1000;
   if (S.weatherLeft <= 0) {
     const w0 = S.weather; S.weather = pick(weatherPool(p));
@@ -5094,6 +5103,7 @@ function updateEnemy(e, dt) {
   if (rb && !e.howled && e.hp < e.maxHp * 0.5) {              // Regionalboss, Phase 2: ruft Verstärkung
     e.howled = true; sfx(VOICE[e.mtype] || 'shout', 0, earVol(e)); float(e, rb.call === 'wolf' ? 'heult!' : 'ruft!', 'rgba(220,200,160,ALPHA)', true); log(`${e.title} ${rb.callText}`, 'combat');
     for (let i = 0; i < 2; i++) { const w = spawnEnemy(rb.call, e.map, (e.x / TS | 0) + ri(-7, 7), (e.y / TS | 0) + ri(-7, 7)); w.aggroId = tgt.id; }
+    bossArena(e, rb);   /* W10: der Kampfplatz kippt */
   }
   if (e.mtype === 'wolf') {                                   // Wolf: duckt sich kurz (Ansage), springt dann an
     if (e.leap) { e.leap.t -= dt; moveEnt(e, e.leap.ax * sp * 3.4, e.leap.ay * sp * 3.4); if (e.leap.t <= 0) { e.leap = null; e.atkCd = 0; } return; }
@@ -23763,6 +23773,19 @@ export function selftest() {
       return okAll;
     } finally { S.war = war0; S.eco = eco0; S.bands = bands0; S.towns = stock0; S.day = d0; }
   }));
+  ok('Welttiefe W10 Slice 1: Arena-Veränderung — in Phase 2 kippt ein Regionalboss das Wetter (Graumähne Nebel, Karrak Sandsturm, Varg Blutregen) für Minuten, nur einmal; fällt er, klart es auf; jeder Regionalboss hat ein Arena-Feld', sandbox(() => {
+    const w0 = S.weather, wl0 = S.weatherLeft, ax0 = S.arenaWx, f0 = { ...S.flags }, fac0 = { ...S.factions }, st0 = structuredClone(S.towns.eren.stock); const W = {}; stage();
+    try {
+      W.data = REGION_BOSSES.every(b => b.arena?.weather && b.arena.text) && REGION_BOSSES.find(b => b.id === 'alpha').arena.weather === 'fog';
+      S.weather = 'clear'; S.weatherLeft = 100; delete S.arenaWx; const rb = REGION_BOSSES.find(b => b.id === 'alpha'), e = { title: rb.title, hp: 10, maxHp: 170 };
+      W.kipp = bossArena(e, rb) === true && S.weather === 'fog' && S.weatherLeft === 12 * 60 && S.arenaWx?.boss === 'alpha' && S.arenaWx.prev === 'clear';
+      W.once = bossArena(e, rb) === false;
+      regionBossSlain(rb); W.klar = !S.arenaWx && S.weather === 'clear';
+      bossArena({ title: 'x', hp: 1, maxHp: 2 }, rb); S.weatherLeft = 0; arenaClear(); W.ablauf = !S.arenaWx && S.weather !== 'fog';
+      const okAll = W.data && W.kipp && W.once && W.klar && W.ablauf; if (!okAll) console.warn('Arena-Probe', JSON.stringify(W), S.weather);
+      return okAll;
+    } finally { S.weather = w0; S.weatherLeft = wl0; if (ax0) S.arenaWx = ax0; else delete S.arenaWx; S.flags = f0; S.factions = fac0; S.towns.eren.stock = st0; }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -24113,7 +24136,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, trackEase, applyElite, hunterChoices, price, shopStock, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, trackEase, applyElite, hunterChoices, price, shopStock, bossArena, arenaClear, REGION_BOSSES, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
