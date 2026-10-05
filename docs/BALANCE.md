@@ -182,3 +182,17 @@ Bewusste Endgame-Ausnahme von den Ausrüstungsgrenzen (Nutzerentscheid „stark,
 
 Untergrenzen: Schwung ≥ 180 ms, Ausweich-Abklingzeit ≥ 250 ms. Stufenfaktor der Zahlen: 1 / 1,25 / 1,5 / 1,8 / 2,1 / 2,5 / 3 / 3,6.
 Gemessen (Stufe 30, Schlächterherz + Blutkranz + Rotdorn auf VIII, 30 % Leben, volle Serie): Schaden ×1,7–1,8, Angriffstempo +100 % (gedeckelt), Lebensraub 14 %.
+
+## Krieg: Schonfrist, Streifen, Entsatz (05.10.2026)
+
+Messung: neues Spiel, Schwer, Held in Tiefhall (keine Schlacht vor Ort), 30 Tage je 4 Kriegsrunden + Tagesschritt (`warTick`/`warDay`).
+
+| | vorher | nachher |
+|---|---|---|
+| Eren fällt | Tag 1 | nie (kurz Tag 2–3 in einem Lauf ohne Streifen, Rückeroberung am selben Tag) |
+| Knoten der Toten Tag 15 | 13 von 16 | 3 (Schwarze Feste, Nekropole, Alt-Vharn) |
+| Nordfurt | fällt Tag 25 | hält |
+| Sonnwacht | fällt Tag 15 | fällt Tag 5 und 15, wird jeweils binnen eines Tages zurückgeholt |
+| Valens Heere Tag 1 | marschieren zur Nekropole | halten Eren/Straße, Streife unterwegs |
+
+Stellschrauben (`sim.js`): `WAR_GRACE` 5 Tage, `PATROL` (Stärke 35, Routen, `PATROL_EVERY` 4), `RELIEF` (3 Tage Wartezeit, Stärke 40, 5 Tage Stationierung, je Stadt alle 6 Tage). Die Kettenstreife wächst bis zum Heeresdeckel (110), weil im Westen niemand mehr gegen sie steht — bewusst: solange die Eisenfeste steht, ist der Westen sicher.

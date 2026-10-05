@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=25';
+import { WAR_NODES, RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=25';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
 import * as R from './render.js?v=25';
 import * as HB from './buildings.js?v=25';
@@ -18994,7 +18994,7 @@ export function selftest() {
       const W = S.war; W.battles = [];
       for (const n of Object.values(W.nodes)) { n.owner = 'valen'; n.garrison = 99; }
       W.armies = [{ id: 'probe_u', faction: 'undead', at: 'road', prev: 'road', strength: 30, name: 'Probe-Heer' }];
-      const s0 = S.chronicle.length; S._frozenWar = false; SIM.warTick();
+      const s0 = S.chronicle.length; S._frozenWar = false; { const dG = S.day; S.day = Math.max(S.day | 0, SIM.WAR_GRACE); SIM.warTick(); S.day = dG; }   /* Schonfrist (05.10.): vor Tag 5 marschieren die Toten nicht */
       const warned = W.armies[0].warned === 'eren' && W.armies[0].at === 'road';   // gewarnt, und das Heer sammelt sich noch einen Zug
       delete S.flags.raidDamage; const before = HOUSES.filter(b => b.town === 'eren').map(b => HB.wearOf(b));
       raidDamage('eren'); const after = HOUSES.filter(b => b.town === 'eren').map(b => HB.wearOf(b));
@@ -20837,13 +20837,14 @@ export function selftest() {
     return wed && duel && mins;
   }));
   ok('S13 Krieg schreibt Aufträge: besetzte Nachbarstadt → Schmuggelauftrag; Paket bis auf den Platz der besetzten Stadt erfüllt ihn', (() => {
-    const p = S.player, keep = JSON.stringify({ c: S.contracts, q: S.quests, tr: S.track, x: p.x, y: p.y, inv: p.inv, own: S.war.nodes.ashford?.owner, g: S.gold, xp: [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints], f: S.factions, st: S.stats || null, t: S.trust || null }), qk = Object.keys(QUESTS); S.contracts = [];   /* Lieferung zahlt am Ziel (05.10.): Lohn des echten Helden zurücksetzen */
+    const p = S.player, keep = JSON.stringify({ c: S.contracts, q: S.quests, tr: S.track, x: p.x, y: p.y, inv: p.inv, own: S.war.nodes.ashford?.owner, ownE: S.war.nodes.eren?.owner, g: S.gold, xp: [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints], f: S.factions, st: S.stats || null, t: S.trust || null }), qk = Object.keys(QUESTS); S.contracts = [];   /* Lieferung zahlt am Ziel (05.10.): Lohn des echten Helden zurücksetzen */
     try {
-      S.war.nodes.ashford.owner = 'undead';
-      const C = smuggleContract('kreuzweg') || smuggleContract('northcity'); if (!C || C.target !== 'ashford' && S.war.nodes[C.target]?.owner !== 'undead') return false;
+      S.war.nodes.ashford.owner = 'undead'; S.war.nodes.eren.owner = 'undead';   /* Krieg 05.10.: Eren fällt in früheren Proben nicht mehr nebenbei — die besetzte Nachbarstadt wird hier gesetzt (Aschfurt liegt zu weit von Kreuzweg und Nordfurt) */
+      const C = smuggleContract('kreuzweg') || smuggleContract('northcity'); if (!C || S.war.nodes[C.target]?.owner !== 'undead') return false;
       S.contracts.push(C); acceptContract(C); p.x = C.tx * TS; p.y = C.ty * TS; conTick();
+      if (!(C.smuggle && C.have === C.need && !hasItem(p, 'auftragspaket'))) console.warn('Schmuggel-Probe', JSON.stringify({ smuggle: C.smuggle, have: C.have, need: C.need, state: C.state, pkg: hasItem(p, 'auftragspaket'), map: S.map, target: C.target, tx: C.tx, ty: C.ty }));
       return C.smuggle && C.have === C.need && !hasItem(p, 'auftragspaket');
-    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; p.inv = k.inv; S.war.nodes.ashford.owner = k.own; S.gold = k.g; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.factions = k.f; if (k.st) S.stats = k.st; else delete S.stats; if (k.t) S.trust = k.t; else delete S.trust; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
+    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; p.inv = k.inv; S.war.nodes.ashford.owner = k.own; S.war.nodes.eren.owner = k.ownE; S.gold = k.g; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.factions = k.f; if (k.st) S.stats = k.st; else delete S.stats; if (k.t) S.trust = k.t; else delete S.trust; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
   })());
   ok('S13 Infofeld: zeigt, was eine Figur anbietet (Handel, Ausbessern, Aufträge nach Beruf, Kutsche, Söldner)', sandbox(() => {
     const p = stage(), s = actor(p.x + 40, p.y); Object.assign(s, { shop: true, smith: true, prof: 'Schmied', homeTown: 'eren' });
@@ -21633,13 +21634,14 @@ export function selftest() {
     S.ents.world = W0.slice();
     try {
       S.cult = { stage: 3, clues: {}, missing: [], taken: 0, heat: 0, gone: [], crown: S.day | 0 }; cultHour(3); const crowned = S.cult.end === 'ruling' && !!S.flags.varonDead && S.after.cult?.end === 'ruling' && cultDrain() === 1 && cultWar();
-      const v = S.war.armies.find(a => a.faction === 'valen') || (S.war.armies.push({ id: 'pv', faction: 'valen', strength: 30, at: 'northcity', name: 'Probe' }), S.war.armies.at(-1)); v.strength = 30; SIM.warDay(); const withCult = v.strength;
-      S.cult.end = null; v.strength = 30; SIM.warDay(); const without = v.strength; const drained = Math.abs((without - withCult) - 1) < 0.01;
+      const v = S.war.armies.find(a => a.faction === 'valen') || (S.war.armies.push({ id: 'pv', faction: 'valen', strength: 30, at: 'northcity', name: 'Probe' }), S.war.armies.at(-1)); const grainN = S.towns.northcity.stock.grain; S.towns.northcity.stock.grain = 400;   /* Streifen (05.10.) essen mit: der Nachschub soll nicht am Korn hängen, sondern am Kult */ v.strength = 30; SIM.warDay(); const withCult = v.strength;
+      S.cult.end = null; v.strength = 30; SIM.warDay(); const without = v.strength; S.towns.northcity.stock.grain = grainN; const drained = Math.abs((without - withCult) - 1) < 0.01;
       S.cult = { stage: 4, clues: {}, missing: [], taken: 0, heat: 0, gone: [], reveal: S.day | 0, joined: S.day | 0, challenge: true, introSeen: true };
       buildCatacombs('world'); const a = S.ents.katakomben.find(e => e.mtype === 'aldhelm'), foeNow = !!a && teamOf(a) === 'foe';
       die(a, 'Probe', p); const lord = S.cult.end === 'player' && S.cult.lord === p.name && cultWar();   /* §5g.8: herrscht der Kult, ist Varon gebunden */
       const g0 = S.gold, ph0 = (p.inv.find(s => s.key === 'blutphiole')?.count) || 0; cultLordHour(8); const tribute = S.gold === g0 + 30 && ((p.inv.find(s => s.key === 'blutphiole')?.count) || 0) === ph0 + 2;
       S.cult.tithe = true; const tithe = cultDrain() === 0.5; cultHeroDied(); const heir = S.cult.end === 'hidden' && !S.cult.lord;
+      if (!(crowned && drained && foeNow && lord && tribute && tithe && heir)) console.warn('Blutkult-S5', JSON.stringify({ crowned, drained, withCult, without, foeNow, lord, tribute, tithe, heir, v: [v.name, v.at, v.strength, v.patrol] }));
       return crowned && drained && foeNow && lord && tribute && tithe && heir;
     } finally { S.cult = C0; S.ents.world = W0; S.ents.katakomben = K0; S.ents.varonburg = V0; S.after = A0; S.war = WAR0; S.towns = T0; if (E0) S.eco = E0; if (M0) MAPS.katakomben = M0; else delete MAPS.katakomben; }
   }));
@@ -23571,7 +23573,7 @@ export function selftest() {
     try {
       const D = makeContract('eren', 'deliver', 'board'); S.contracts.push(D); acceptContract(D); const g1 = S.gold; conProgress(D, 1, { key: 'havel', kind: 'npc', name: 'Havel' });
       W.deliver = D.state === 'claimed' && S.gold > g1 && S.quests['c_' + D.id]?.state === 'done';
-      const E = makeContract('eren', 'escort', 'board'); S.contracts.push(E); acceptContract(E); const g2 = S.gold; conProgress(E, E.need - E.have, null);
+      const E = makeContract('eren', 'escort', 'board'); E.twist = null; S.contracts.push(E); acceptContract(E);   /* Verrat-Wendung wird beim Geber abgerechnet — hier nicht gemeint */ const g2 = S.gold; conProgress(E, E.need - E.have, null);
       W.escort = E.state === 'claimed' && S.gold > g2;
       const B = makeContract('eren', 'bounty', 'board'); S.contracts.push(B); acceptContract(B); const g3 = S.gold; conProgress(B, B.need - B.have);
       W.bountyWaits = B.state === 'active' && B.have >= B.need && S.gold === g3;
@@ -23580,6 +23582,23 @@ export function selftest() {
     } finally { for (const k of Object.keys(QUESTS)) if (k.startsWith('c_') && !q0[k]) delete QUESTS[k]; S.contracts = c0; S.quests = q0; S.track = tr0; S.gold = g0; S.ents.world = W0; registerContracts(); }
   }));
   { const heroNow = JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]); if (hero0 && hero0 !== heroNow) console.warn('BUG-123 Diff', hero0, '→', heroNow); }
+  ok('Krieg (Nutzer 05.10.): Schonfrist — die Toten marschieren vor Tag 5 nicht; Streifen aus Varonheim und Eisenfeste stellen sich Untotenheeren in ihrer Zone und nehmen keine leeren Knoten; Entsatz aus Varonheim holt eine gefallene Stadt nach 3 Tagen zurück, bleibt stationiert und kehrt heim', sandbox(() => {
+    const war0 = S.war, d0 = S.day, cb0 = S.flags.chainsBroken, W = {}; const p = S.player; const m0 = p.map; p.map = 'deep';
+    try {
+      S.war = structuredClone(war0); S.flags.chainsBroken = false; const N = S.war.nodes; for (const k of Object.keys(N)) { N[k] = structuredClone(WAR_NODES[k]); }
+      /* Schonfrist */ S.day = 1; S.war.armies = [{ id: 'u1', faction: 'undead', at: 'graveyard', prev: 'graveyard', strength: 40, name: 'Probe-Toten' }]; SIM.warTick(); W.grace = S.war.armies[0].at === 'graveyard';
+      S.day = SIM.WAR_GRACE; SIM.warTick(); W.marches = S.war.armies[0].at !== 'graveyard';
+      /* Streife stellt sich */ S.day = 10; S.war.armies = [{ id: 'u2', faction: 'undead', at: 'marsh', prev: 'graveyard', strength: 30, name: 'Probe-Toten' }, { id: 'c1', faction: 'chain', at: 'road', prev: 'road', strength: 35, name: 'Kettenstreife', patrol: 'chain', ri: 0 }];
+      SIM.warTick(); const c1 = S.war.armies.find(a => a.id === 'c1'); W.intercept = !!c1 && c1.at === 'eren'; for (let i = 0; i < 4 && S.war.armies.some(a => a.id === 'u2') && c1; i++) SIM.warTick();
+      W.neutralKept = N.marsh.owner !== 'chain' && N.eren.owner === 'valen' && N.road.owner === 'valen';
+      /* Entsatz */ S.war.armies = []; S.war.relief = {}; N.eren.owner = 'undead'; N.eren.garrison = 10; N.eren.fellDay = S.day - SIM.RELIEF.days; N.varonheim.owner = 'valen'; N.varonheim.siege = null;
+      SIM.warDay(); const R = S.war.armies.find(a => a.relief && a.order === 'eren'); W.sent = !!R && R.at === 'varonheim' && R.faction === 'valen'; S.war.armies = S.war.armies.filter(a => a === R);   /* nur der Entsatz: Streifen und neue Totenheere stören die Messung nicht */
+      for (let i = 0; i < 12 && N.eren.owner === 'undead'; i++) SIM.warTick(); W.retaken = N.eren.owner === 'valen' && !!R && R.order === null && R.holdUntil === S.day + SIM.RELIEF.hold && R.at === 'eren';
+      S.day = R ? R.holdUntil : S.day; for (let i = 0; i < 8 && S.war.armies.includes(R) && R.strength > 0; i++) SIM.warTick(); W.home = !!R && R.strength === 0 && R.at === 'varonheim';
+      const okAll = W.grace && W.marches && W.intercept && W.neutralKept && W.sent && W.retaken && W.home; if (!okAll) console.warn('Kriegs-Probe', JSON.stringify(W), JSON.stringify(S.war.armies.map(a => [a.name, a.at, Math.round(a.strength), a.order, a.holdUntil])));
+      return okAll;
+    } finally { S.war = war0; S.day = d0; S.flags.chainsBroken = cb0; p.map = m0; }
+  }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
