@@ -37,12 +37,13 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W3 Slice 3 (PR #23): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
 - W4 Slice 1 (PR #24): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft.
 - W4 Slice 2 (PR #25): `REGION_CON`/`warHot` in `conKinds`; Probe grün 504/504, live geprüft.
-- W5 Slice 2 (Commit folgt): Jagd-Händler (`hunterChoices`, `huntMul`); Probe grün 507/507, live geprüft. Probe „Einwohner folgen der Fläche“ fiel einmal rot (Kopfzahl, zufallsabhängig) und lief danach grün.
+- W9 Slice 1 (Commit folgt): Unsichere Wege (`routeRisk`, `unsafe`, `tradeReturn`); Probe grün 508/508, live geprüft. Nutzerauftrag: W9, W10, W11 zuerst.
+- W5 Slice 2 (PR #28): Jagd-Händler (`hunterChoices`, `huntMul`); Probe grün 507/507, live geprüft. Probe „Einwohner folgen der Fläche“ fiel einmal rot (Kopfzahl, zufallsabhängig) und lief danach grün.
 - W5 Slice 1 (PR #27): Spuren mit Jagdkunst (`trackEase`, `clue.skill/spawn/near`), Auftrag „Der Keiler von Joruns Feld“; Probe grün 506/506, live geprüft. Zwei alte Proben (Abstand S12, Spawns) fielen einmal zufallsbedingt rot und liefen im nächsten Lauf grün.
 - W4 Slice 3 (PR #26): Knochenquelle (`ensureBonewells`, `bonewellTick`, `propHit`, Zieltyp `destroy`), Auftrag „Was aus dem Moor steigt“; Probe grün 505/505, live getestet mit Mausangriffen. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
 
 ## Nächster Schritt
-- W5 Slice 3: Fallen (Prop `trap`, Tier läuft hinein; NEW FEATURE mit Plan) — oder W6 Schleichen (Licht/Schatten, Alarmstufe). Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
+- W10 Slice 1 (Bosse/Reliquien/Geheimorte), dann W11 Slice 1 (Kampfprofile/Fenster) — Nutzerauftrag. Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.

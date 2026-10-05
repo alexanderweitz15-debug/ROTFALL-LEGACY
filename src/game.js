@@ -2312,7 +2312,7 @@ function bindSim() {
     UI.toast(t.toUpperCase(), 4200); log(`Man nennt dich nun ${t}.`, 'faction');
   };
   SIM.H.raidDamage = raidDamage;
-  SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed; SIM.H.scene = capitalScene; SIM.H.afterCapture = () => ensureVaronExile();   /* RB-052: fällt die Exilstadt, zieht der Hof weiter */   /* Varonheim-Belagerung; T17 Szenen */
+  SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed; SIM.H.scene = capitalScene; SIM.H.afterCapture = (node, faction) => { ensureVaronExile(); if (faction !== 'undead' && S.towns?.[node]) ECO.tradeReturn(node); };   /* W9: nach der Befreiung kehren die Händler zurück */   /* RB-052: fällt die Exilstadt, zieht der Hof weiter */   /* Varonheim-Belagerung; T17 Szenen */
   SIM.H.heldTaken = k => holdTown(k);   // S15 P20: Heer auf Befehl hat die Stadt genommen
   SIM.H.spawnRefugee = (tx, ty, to) => {
     const L = LOCATIONS.find(l => l.key === to), pos = freeSpotNear('world', tx + ri(-3, 3), ty + ri(-3, 3), 3);
@@ -15649,7 +15649,7 @@ function ecoMenu(npc, town) {
   const biz = E.biz.filter(b => b.town === town).length, my = E.my;
   UI.dialogue(me, `Knapp und teuer: ${list(g => (t.use[g] || 0) > 0.1 && t.stock[g] < ECO.target(t, g) * 0.5)}\n` +
     `Reichlich und billig: ${list(g => t.stock[g] > ECO.target(t, g) * 1.5)}\n` +
-    (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (ECO.tradeMul(town) > 1 ? `\nGeförderter Handel: Karawanen bringen noch ${growthOf(town).tradeUntil - (S.day | 0)} Tage 20 % mehr Ware.` : '') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
+    (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (ECO.tradeMul(town) > 1 ? `\nGeförderter Handel: Karawanen bringen noch ${growthOf(town).tradeUntil - (S.day | 0)} Tage 20 % mehr Ware.` : '') + (ECO.unsafeRoutes(town).length ? `\nUnsichere Wege: Händler meiden die Straße nach ${ECO.unsafeRoutes(town).map(k => ECO.townName(k)).join(', ')} (Tote oder Räuber an der Straße, Überfälle).` : '') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
     { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
     { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
     { text: 'Vorrat liefern (Holz, Stein, Eisen, Nahrung aus der Siedlung)', fn: () => supplyMenu(npc, town) },   /* Nutzer 05.10. */
@@ -23750,6 +23750,18 @@ export function selftest() {
     const okAll = W.offer && W.opened && W.more && W.skilled && W.buySame && W.stock; if (!okAll) console.warn('Jagd-Händler-Probe', JSON.stringify(W), base, sell);
     for (const m of Object.keys(S.ents)) S.ents[m] = S.ents[m].filter(e => e !== j && e !== b);
     return okAll;
+  }));
+  ok('Welttiefe W9 Slice 1: Unsichere Wege — ein Totenknoten an der Straße und jüngste Überfälle heben das Wegrisiko, ab 0,4 meiden Händler den Weg (Kontor zeigt es); nach der Befreiung kehren sie mit einem Zug zurück und der Weg gilt wieder als sicher', sandbox(() => {
+    const war0 = S.war, eco0 = structuredClone(S.eco), bands0 = S.bands, stock0 = structuredClone(S.towns), d0 = S.day; const W = {};
+    try {
+      S.war = structuredClone(war0); S.bands = []; S.eco.unsafe = {}; S.eco.caravans = []; for (const n of Object.values(S.war.nodes)) if (n.owner === 'undead') n.owner = 'valen';
+      const r0 = ECO.routeRisk('eren', 'northcity'); S.war.nodes.road.owner = 'undead'; const r1 = ECO.routeRisk('eren', 'northcity'); W.node = r1 > r0 + 0.1;
+      S.eco.unsafe['eren|northcity'] = { n: 3, day: S.day | 0 }; const r2 = ECO.routeRisk('eren', 'northcity'); W.raids = r2 > r1 && ECO.avoids('eren', 'northcity') && ECO.unsafeRoutes('eren').includes('northcity');
+      W.guards = ECO.routeRisk('eren', 'northcity', 2) < r2; S.day = d0 + ECO.UNSAFE_DAYS + 1; W.decays = ECO.routeRisk('eren', 'northcity') < r2; S.day = d0;
+      const c = ECO.tradeReturn('eren'); W.back = !!c && c.to === 'eren' && c.back && c.guards === 2 && !S.eco.unsafe['eren|northcity'] && S.eco.caravans.includes(c);
+      const okAll = W.node && W.raids && W.guards && W.decays && W.back; if (!okAll) console.warn('W9-Probe', JSON.stringify(W), r0, r1, r2);
+      return okAll;
+    } finally { S.war = war0; S.eco = eco0; S.bands = bands0; S.towns = stock0; S.day = d0; }
   }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;

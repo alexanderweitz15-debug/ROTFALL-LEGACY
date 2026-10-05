@@ -1535,3 +1535,9 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Jagd-Händler (Welttiefe W5 Slice 2, 05.10.2026)
 - Jeder Jäger und Jägerbursche in einem Ort nimmt im Gespräch Felle, Pökelfleisch und Trophäen ab: „Felle, Fleisch und Trophäen verkaufen (Jäger zahlen mehr)“ öffnet das Handelsfenster. Er zahlt 25 % über dem, was der Ort sonst gibt, mit Jagdkunst bis 50 % (Fertigkeit 100). Live gemessen in Eren: Wolfsfell 13 statt 8 Gold, Trophäe 51 statt 33.
 - Dazu führt er etwas Jagdzeug (Kurzbogen, Köderpfeife, Dörrfleisch). Kaufpreise sind nicht teurer als anderswo. Verkaufte Felle füllen wie bei jedem Verkauf das Stadtlager. Probe „Welttiefe W5 Slice 2“.
+
+## Unsichere Wege: Krieg, Räuber und Händler (Welttiefe W9 Slice 1, 05.10.2026)
+- **Wegrisiko an der Straße:** Ein Händlerzug ist nicht nur an den Enden in Gefahr. Ein Kriegsknoten der Toten oder ein Räuberlager nahe der Linie zwischen zwei Städten hebt das Risiko, jeder Überfall der letzten sechs Tage ebenfalls. Riskante Züge fahren mit zwei Wachen.
+- **Händler meiden den Weg:** Ab einem Risiko von 0,4 fährt kein Zug mehr. Die Zielstadt bekommt keine Ware, ihr Vorrat sinkt, die Preise steigen (wie bei jedem Mangel). Das Kontor zeigt „Unsichere Wege: Händler meiden die Straße nach …“ (Handelspartner in Reichweite). Nach dem zweiten Überfall steht es im Log und in der Chronik.
+- **Rückkehr nach der Befreiung:** Wird eine Stadt zurückerobert, gilt ihr Weg wieder als sicher, und aus der nächsten Handelsstadt bricht ein Zug mit Korn (sonst Salz) und zwei Wachen auf: „Händler kehren nach … zurück.“
+- Schmuggelaufträge in besetzte Städte gab es schon (Anschlagbrett der Nachbarstadt). Probe „Welttiefe W9 Slice 1“.
