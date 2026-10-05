@@ -15680,6 +15680,20 @@ function supplyTown(c, town, res, n) {
   S.res[res] -= n; t.stock[g] = (t.stock[g] || 0) + n; S.gold += gold; c.skills.trading = Math.min(100, (c.skills.trading || 0) + 0.3);
   log(`${n} ${RES_NAME[res]} an ${townName(town)} geliefert: +${gold} Gold. Das Lager führt jetzt ${Math.round(t.stock[g])} ${ITEMS[g].name}.`, 'economy'); return true;
 }
+/* W11 Slice 1 Stadtinfo (Welttiefe, 05.10.2026): ein Blick auf alles, was die Systeme über einen Ort wissen — Lage, Herrschaft, Besatzung, Wohlstand,
+   geförderter Handel, Markt (knapp/reichlich), Züge unterwegs, unsichere Wege, Aushänge, Betriebe, Vertrauen. Reine Anzeige (keine Spielregel, kein Schreibzugriff). */
+function townInfo(k) {
+  const t = S.towns?.[k], L = LOCATIONS.find(l => l.key === k); if (!t || !L) return null;
+  const n = S.war?.nodes?.[k], G = growthOf(k), E = S.eco || {}, fac = n?.owner || townFac(k), day = S.day | 0;
+  const scarce = GOODS.filter(g => (t.use[g] || 0) > 0.1 && t.stock[g] < ECO.target(t, g) * 0.5).map(g => ({ name: ITEMS[g].name, price: ECO.ecoPrice(k, g, true), stock: Math.floor(t.stock[g]) }));
+  const plenty = GOODS.filter(g => t.stock[g] > ECO.target(t, g) * 1.5).map(g => ({ name: ITEMS[g].name, price: ECO.ecoPrice(k, g, true), stock: Math.floor(t.stock[g]) }));
+  const cons = (S.contracts || []).filter(c => c.town === k), schutz = S.schutz?.[k]?.stage || 0;
+  return { key: k, name: townName(k), kind: L.kind === 'city' ? 'Stadt' : 'Dorf', lord: fac ? (FACTIONS[fac]?.name || fac) : 'frei', occupied: n?.owner === 'undead', state: SIM.townState(k),
+    garrison: n ? Math.round(n.garrison) : null, walls: n?.walls != null ? Math.round(n.walls) : null, siege: !!n?.siege, prosper: Math.round(G.prosper), built: G.built.filter(b => !b.ruin).length,
+    tradeDays: (G.tradeUntil || 0) > day ? G.tradeUntil - day : 0, scarce, plenty, coming: (E.caravans || []).filter(c => c.to === k).map(c => `${c.n} ${ITEMS[c.good].name} aus ${townName(c.from)}`),
+    unsafe: ECO.unsafeRoutes(k).map(townName), offers: cons.filter(c => c.state === 'offer').length, active: cons.filter(c => c.state === 'active').length, biz: (E.biz || []).filter(b => b.town === k).length, mine: (E.biz || []).filter(b => b.town === k && b.owner === 'player').length,
+    schutz: ['', 'schutzlos', 'ohne Wache', 'gesetzlos', 'Bandenherrschaft'][schutz] || '', trust: S.trust?.[k] || 0, hunger: !!t.hunger, pop: Math.round(t.pop || 0) };
+}
 function supplyMenu(npc, town) {
   const t = S.towns[town], opts = Object.keys(RES_GOOD).filter(r => (S.res[r] || 0) >= 1).map(r => { const n = Math.min(10, S.res[r] | 0), g = RES_GOOD[r], short = t.stock[g] < ECO.target(t, g) * 0.5;
     return { text: `${n} ${RES_NAME[r]} liefern → ${ITEMS[g].name} (je ${ECO.ecoPrice(town, g, false)} Gold${short ? ', gesucht' : ''})`, fn: () => { supplyTown(S.player, town, r, n); UI.refreshHUD(); supplyMenu(npc, town); } }; });
@@ -23786,6 +23800,17 @@ export function selftest() {
       return okAll;
     } finally { S.weather = w0; S.weatherLeft = wl0; if (ax0) S.arenaWx = ax0; else delete S.arenaWx; S.flags = f0; S.factions = fac0; S.towns.eren.stock = st0; }
   }));
+  ok('Welttiefe W11 Slice 1: Stadtinfo — townInfo liefert Lage, Herrschaft, Besatzung, Wohlstand, Markt, Wege und Aushänge eines Orts; das Fenster „Stadt“ zeigt sie; unsichere Wege und Besatzung erscheinen, wenn sie gelten', sandbox(() => {
+    const war0 = S.war, eco0 = structuredClone(S.eco); const W = {};
+    try {
+      const I = townInfo('eren'); W.base = !!I && I.name === 'Eren' && typeof I.prosper === 'number' && Array.isArray(I.scarce) && typeof I.state === 'string' && I.lord.length > 0 && townInfo('nirgends') === null;
+      S.war = structuredClone(war0); S.war.nodes.road.owner = 'undead'; S.eco.unsafe = { 'eren|northcity': { n: 3, day: S.day | 0 } }; S.war.nodes.eren.owner = 'undead';
+      const J = townInfo('eren'); W.live = J.occupied && J.state === 'Besetzt' && J.unsafe.includes('Nordfurt');
+      UI.openModal('town', 'eren'); const html = document.getElementById('modal-body').innerHTML; W.window = /Wohlstand/.test(html) && /Nordfurt/.test(html) && /Besetzt/.test(html); UI.closeModal();
+      const okAll = W.base && W.live && W.window; if (!okAll) console.warn('Stadtinfo-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { S.war = war0; S.eco = eco0; UI.closeModal(); }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -24076,7 +24101,7 @@ function boot() {
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
-    startPlacing, foundCamp: () => foundCamp(), dissolveSettlement: () => dissolveSettlement(),
+    startPlacing, foundCamp: () => foundCamp(), dissolveSettlement: () => dissolveSettlement(), townInfo,
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
@@ -24136,7 +24161,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, trackEase, applyElite, hunterChoices, price, shopStock, bossArena, arenaClear, REGION_BOSSES, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, trackEase, applyElite, hunterChoices, price, shopStock, bossArena, arenaClear, REGION_BOSSES, townInfo, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
