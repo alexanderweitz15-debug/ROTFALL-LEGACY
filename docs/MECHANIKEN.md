@@ -1486,3 +1486,6 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Aufträge werden täglich aufgefüllt (Nutzer 05.10.2026)
 - Hat man alle Angebote eines Bretts, einer Wache oder der Kette angenommen oder erledigt, kommen am nächsten Tag neue nach, bis wieder 3 (Dorf, Wache, Kette) bzw. 5 (Stadt) offen sind. Laufende Aufträge bleiben. Die alte 3-Tage-Rotation (liegengebliebene Aushänge verfallen, Vertrauen sinkt) bleibt daneben bestehen. Probe „Aufträge (Nutzer 05.10.)“.
+
+## Große Orte: Treffpunkte statt Gedränge (Nutzer 05.10.2026)
+- In Orten mit mehr als 15 Häusern trifft sich nur ein Teil der Bewohner auf dem Hauptplatz (etwa 15 Häuser-Anteil, in Varonheim rund 30 statt 160). Die übrigen stehen mittags und nachmittags vor Schenken, Kapellen, Läden, Bäckerei, Heilerhaus, Schmiede und Ställen ihres Orts — fester Treffpunkt je Bewohner, auf freiem Boden, sonst Platz. Dörfer und Aurelions Bezirke bleiben, wie sie sind. Probe „Hauptplatz entlastet“.
