@@ -2240,7 +2240,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureBonewells(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin], FS = FAC_STARTS[cfg.facStart] || null, race = FS ? FS.race : 'mensch';   /* Fraktions-Starts: Ort, Rasse, Paket */
@@ -2469,7 +2469,7 @@ export function continueGame(given = null, retried = false) {                   
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
-  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureBonewells(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
@@ -3516,6 +3516,8 @@ function resolveSwing(c) {
   let foes = hostilesOf(c);
   if (force) foes = foes.concat(S.ents[c.map].filter(e => e.kind === 'npc' && e.alive && !foes.includes(e) && !S.party.includes(e.id)));
   let hitAny = false;
+  if (c === S.player || c.coopPilot) for (const pr of S.ents[c.map]) { if (pr.kind !== 'prop' || !pr.breakable || !(pr.hp > 0)) continue; const d = dist(c, pr); if (d > reach + (pr.r || 10)) continue;   /* W4: Knochenquelle u. ä. */
+    if (Math.abs(normAng(Math.atan2(pr.y - c.y, pr.x - c.x) - c.aim)) > arc / 2 + 0.25) continue; hitAny = true; propHit(c, pr, damageOf(c) * multF); }
   foes.sort((a, b) => (a.downed ? 1 : 0) - (b.downed ? 1 : 0));   // Stehende zuerst, Gnadenstoß nur ohne andere Ziele im Bogen
   for (const f of foes) {
     if (!f.alive || (f.downed && !isHostile(c, f))) continue;  // gestürzte Feinde lassen sich erledigen, Neutrale nicht
@@ -8710,7 +8712,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * slow * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick(); questEscortTick(); questDeadlineTick();   /* W3 */   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick(); questEscortTick(); questDeadlineTick(); bonewellTick();   /* W3, W4 */   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -14449,7 +14451,7 @@ function startQuest(k) {
   if (k === 'kt_rogue2') lendAbility('backstab', 'Der Lehrer leiht dir für die Prüfung den Meuchelstich — er liegt auf deiner Leiste.');   /* Entwickler 03.10. */
   if (k === 'kt_bard2') { const p = S.player; p.hotbar ||= []; if (!p.hotbar.some(h => h?.key === 'war_song')) { const i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = { type: 'ability', key: 'war_song' }; else p.hotbar.push({ type: 'ability', key: 'war_song' }); } log('Der Lehrer leiht dir für die Prüfung das Kriegslied — es liegt auf deiner Leiste.', 'quest'); }   /* C-3: sonst war die Prüfung ohne Bardenklasse unlösbar */
   if (QUESTS[k]?.sea && k !== 'q_wb_nebel') seaQuestStart(k);   // S14: Lager, Grube
-  if (QUESTS[k]?.clues) setTimeout(ensureClues, 0); if (QUESTS[k]?.escorts) setTimeout(ensureEscorts, 0);   /* W3 */                 /* Welttiefe: Spuren liegen, sobald der Auftrag aktiv ist (nach dem Eintrag unten) */
+  if (QUESTS[k]?.clues) setTimeout(ensureClues, 0); if (QUESTS[k]?.escorts) setTimeout(ensureEscorts, 0); if (QUESTS[k]?.bonewell) setTimeout(ensureBonewells, 0);   /* W3, W4 */                 /* Welttiefe: Spuren liegen, sobald der Auftrag aktiv ist (nach dem Eintrag unten) */
   if (k === 'q_grisk_lost') planLostGoblins(); if (k === 'q_grisk_rache') spawnChainRest();   // S12 A4                                   // was schon erledigt ist, zählt (Boss vorher erschlagen, Gegenstand dabei)
   (QUESTS[k]?.clsTrial ? qStore() : S.quests)[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
     o.type === 'item' ? S.player.inv.filter(x => x.key === o.target).reduce((n, x) => n + (x.count || 1), 0)
@@ -14807,6 +14809,37 @@ function questEscortTick() {
       e.captiveOf = false; e.escortee = true; if (e.esc.greetFree) e.greet = e.esc.greetFree; log(`${e.name} ist frei. Bring ${e.name} nach ${townName(e.esc.to)}.`, 'quest'); UI.toast(`${e.name.toUpperCase()} IST FREI`, 2600); continue; }
     if (Math.hypot(e.x / TS - e.esc.tx, e.y / TS - e.esc.ty) < 8) { e.arrived = true; e.escortee = false; e.anchor = { x: e.x, y: e.y }; e.schedulePos = null; e.greet = '„Danke. Ich bleibe hier, bis es besser ist.“';
       log(`${e.name} ist in ${townName(e.esc.to)} in Sicherheit.`, 'quest'); chronicle(`${e.name} in Sicherheit gebracht`, 'quest', `${S.player.name} brachte ${e.name} nach ${townName(e.esc.to)}.`); questEvent('escort', e.questEscort, 1); } }
+}
+/* W4 Slice 3 „Quelle der Auferstehung“ (Welttiefe, 05.10.2026): Q.bonewell = { key, near, off, hp, every, mtype, n, cap }. Ein Obelisk im Gelände
+   (Prop mit Lebenspunkten, breakable) setzt alle `every` Spielminuten `n` Untote nach (bis `cap` in der Nähe), solange der Held in der Nähe ist. Zerschlagen
+   (normaler Angriff, resolveSwing → propHit) zählt questEvent('destroy', key). Idempotent über ensureBonewells (Aufbau, Laden, Auftragsende). */
+function ensureBonewells() {
+  const want = new Map();
+  for (const [k, st] of Object.entries(S.quests)) { const Q = QUESTS[k], B = Q?.bonewell; if (st?.state !== 'active' || !B) continue;
+    const i = Q.objectives.findIndex(o => o.type === 'destroy' && o.target === B.key); if (i >= 0 && (st.progress[i] || 0) >= (Q.objectives[i].count || 1)) continue; want.set(B.key, { B, k }); }
+  const gone = e => e.bonewell && !want.has(e.bonewell);
+  if (S.ents.world.some(gone)) { S.ents.world = S.ents.world.filter(e => !gone(e)); indexSolids('world'); }
+  for (const [key, { B, k }] of want) { if (S.ents.world.some(e => e.bonewell === key)) continue;
+    const [sx, sy] = conSq(B.near), q = freeSpotNear('world', sx + (B.off?.[0] ?? 0), sy + (B.off?.[1] ?? 0), 4);
+    const w = { id: uid(), kind: 'prop', type: 'obelisk', map: 'world', x: q.x, y: q.y, r: 14, solid: true, breakable: true, hp: B.hp || 60, maxHp: B.hp || 60, bonewell: key, quest: k, label: B.label || 'Knochenquelle', nextAt: 0 };
+    S.ents.world.push(w); if (solidIndex.world) addSolid(w); }
+}
+function bonewellTick() {
+  const p = S.player; if (S.map !== 'world' || !p) return;
+  for (const w of S.ents.world) { if (!w.bonewell || w.hp <= 0) continue; const B = QUESTS[w.quest]?.bonewell; if (!B) continue;
+    const d = dist(w, p); if (d > 60 * TS) continue;
+    if (!S.flags.bonewellHint && d < 14 * TS) { S.flags.bonewellHint = 1; log(`${w.label}: Aus dem Boden steigen Tote, solange sie steht. Zerschlag sie — jeder Hieb zählt.`, 'quest'); }
+    if (clock() < (w.nextAt || 0)) continue; w.nextAt = clock() + (B.every || 60);
+    const near = S.ents.world.filter(e => e.kind === 'enemy' && e.alive && e.bonewellOf === w.bonewell && dist(e, w) < 30 * TS).length; if (near >= (B.cap || 4)) continue;
+    for (let i = 0; i < (B.n || 2) && near + i < (B.cap || 4); i++) { const e = spawnEnemy(B.mtype || 'skeleton', 'world', (w.x / TS | 0) + ri(-3, 3), (w.y / TS | 0) + ri(-3, 3)); if (e) { Object.assign(e, { bonewellOf: w.bonewell, transient: true, anchor: { x: w.x, y: w.y } }); fx(e.x, e.y - 8, 'necro', 8); } }
+    if (near === 0) log(`${w.label}: Die Erde bricht auf — die Toten steigen wieder.`, 'combat'); }
+}
+function propHit(c, pr, dmg) {
+  pr.hp -= dmg; fx(pr.x, pr.y - 10, 'spark', 6); sfx('hit', 0, 0.6); float(pr, `-${Math.round(dmg)}`, 'rgba(180,220,200,ALPHA)');
+  if (pr.hp > 0) return;
+  S.ents.world = S.ents.world.filter(e => e !== pr); indexSolids('world'); fx(pr.x, pr.y - 10, 'necro', 20); camShake(4, 200);
+  log(`${pr.label || 'Das Gebilde'} zerbricht. ${pr.bonewell ? 'Der grüne Schein erlischt — hier steigt nichts mehr.' : ''}`, 'combat'); chronicle(`${pr.label || 'Ein Gebilde'} zerschlagen`, 'quest', `${c.name} zerschlug es.`);
+  if (pr.bonewell) questEvent('destroy', pr.bonewell, 1);
 }
 function cluePos(c) {
   const P = TOWN_PLAN[c.town]; let tx, ty;                           /* at = Plan-Koordinaten (wie die Props im TOWN_PLAN) → worldPt; P.square ist zur Laufzeit schon Weltkachel */
@@ -17527,7 +17560,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_lief_tinktur: 'eren', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_lief_tinktur: 'eren', q_quelle_moor: 'marsh', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -17545,6 +17578,7 @@ function questPoint(k) {                                          // Suchaufträ
   if (k === 'q_intrige') return S.intrigue ? (S.intrigue.done ? houseSeat(S.intrigue.from) : { x: S.intrigue.x / TS | 0, y: S.intrigue.y / TS | 0 }) : null;
   if (k === 'q_runaway') return S.runaway ? { x: S.runaway.x / TS | 0, y: S.runaway.y / TS | 0 } : null;
   if (k === 'q_tribut') { const l = LOCATIONS.find(l => l.key === (S.tributQuest?.village || 'grauwasser')); return l ? { x: l.x, y: l.y } : null; }
+  if (QUESTS[k].bonewell) { const w = S.ents.world.find(x => x.bonewell === QUESTS[k].bonewell.key); if (w) return { x: w.x / TS, y: w.y / TS }; }   /* W4: zur Quelle */
   if (QUESTS[k].escorts) { const e = S.ents.world.find(x => x.questEscort && x.quest === k && x.alive && !x.arrived); if (e) return dist(e, S.player) > 300 ? { x: e.x / TS, y: e.y / TS } : { x: e.esc.tx, y: e.esc.ty }; }   /* W3: erst zum Begleiter, dann zum Ziel */
   if (QUESTS[k].objectives.some(o => o.type === 'find')) return null;
   const l = LOCATIONS.find(l => l.key === QUEST_WHERE[k]); return l ? { x: l.x, y: l.y } : null;
@@ -18451,6 +18485,8 @@ function debugSections() {
       'Aufträge: Rettung — Entführer fallen': () => { let n = 0; for (const b of S.ents.world) if (b.captorOf && b.alive) { die(b, 'Debug', S.player); n++; } questEscortTick(); UI.toast(n ? `${n} Entführer tot.` : 'Keine Entführer.'); },
       'Aufträge: Lieferung „Die Tinktur für Elena“ starten (Quirin in Salzhafen → Elena in Eren, 48 Stunden)': () => { if (!S.quests.q_lief_tinktur) { startQuest('q_lief_tinktur'); log('Auftrag angenommen: Die Tinktur für Elena (Debug).', 'quest'); } UI.toast('Trank der Erneuerung im Gepäck; Abgabe bei Elena in Eren, Frist 48 Stunden (Sanduhr im Tracker).', 3500); },
       'Aufträge: Frist auf 5 Minuten setzen (aktiver Auftrag mit Frist)': () => { const e = Object.entries(S.quests).find(([k, st]) => st.state === 'active' && st.until); if (!e) return UI.toast('Kein Auftrag mit Frist.'); e[1].until = clock() + 5; UI.toast(`${QUESTS[e[0]].name}: noch 5 Minuten.`); },
+      'Aufträge: Quelle „Was aus dem Moor steigt“ starten (Kelan; Knochenquelle am Moorrand, Angriff zerschlägt sie)': () => { if (!S.quests.q_quelle_moor) { startQuest('q_quelle_moor'); log('Auftrag angenommen: Was aus dem Moor steigt (Debug).', 'quest'); } ensureBonewells(); const w = S.ents.world.find(e => e.bonewell); UI.toast(w ? `Knochenquelle bei Kachel ${w.x / TS | 0}/${w.y / TS | 0} — hinlaufen, Tote kommen alle 60 Minuten, zuschlagen.` : 'Keine Quelle.', 4000); },
+      'Aufträge: Quelle — Held zur Quelle, nächste Welle jetzt': () => { const w = S.ents.world.find(e => e.bonewell); if (!w) return UI.toast('Keine Quelle.'); S.player.x = w.x - 60; S.player.y = w.y; w.nextAt = 0; bonewellTick(); UI.toast('Die Toten steigen.'); },
       'Aufträge: Eskorte — Begleiter ans Ziel setzen': () => { const e = S.ents.world.find(x => x.questEscort && x.alive && !x.arrived); if (!e) return UI.toast('Keine Eskorte unterwegs.'); e.x = e.esc.tx * TS; e.y = e.esc.ty * TS; questEscortTick(); UI.toast(`${e.name} ist am Ziel.`); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
@@ -23645,6 +23681,22 @@ export function selftest() {
       return okAll;
     } finally { if (S.war?.nodes?.marsh && own0 !== undefined) S.war.nodes.marsh.owner = own0; }
   })());
+  ok('Welttiefe W4 Slice 3: Quelle der Auferstehung — der Obelisk steht am Moorrand (idempotent), setzt in Heldennähe Tote nach (Takt, Deckel), nimmt Hiebe und zerbricht; erst das zählt das Ziel, die Quelle verschwindet samt Index', sandbox(() => {
+    const q0 = S.quests.q_quelle_moor, ents0 = S.ents.world.slice(), m0 = S.map, f0 = S.flags.bonewellHint; const W = {}; const p = stage(); S.map = 'world'; p.map = 'world';
+    try {
+      delete S.quests.q_quelle_moor; startQuest('q_quelle_moor'); ensureBonewells(); ensureBonewells();
+      const ws = S.ents.world.filter(e => e.bonewell === 'moorquelle'), w = ws[0], [sx, sy] = conSq('marsh');
+      W.one = ws.length === 1 && w.breakable && w.hp === 60 && Math.hypot(w.x / TS - sx, w.y / TS - sy) < 16 && solidPropAt('world', w.x, w.y, 4);
+      p.x = w.x - 80; p.y = w.y; w.nextAt = 0; bonewellTick(); const n1 = S.ents.world.filter(e => e.bonewellOf === 'moorquelle' && e.alive).length; bonewellTick(); const n2 = S.ents.world.filter(e => e.bonewellOf === 'moorquelle' && e.alive).length;
+      W.spawn = n1 === 2 && n2 === 2 && w.nextAt > clock();   /* zwei je Welle, Takt hält */
+      w.nextAt = 0; bonewellTick(); w.nextAt = 0; bonewellTick(); W.cap = S.ents.world.filter(e => e.bonewellOf === 'moorquelle' && e.alive).length === 4;
+      p.x = w.x - 30; p.aim = 0; p.abilityMult = 0; const h0 = w.hp; resolveSwing(p); W.hit = w.hp < h0 && w.hp > 0;
+      w.hp = 1; resolveSwing(p); W.broken = !S.ents.world.includes(w) && !solidPropAt('world', w.x, w.y, 4) && S.quests.q_quelle_moor.progress[0] === 1 && questComplete('q_quelle_moor');
+      ensureBonewells(); W.stays = !S.ents.world.some(e => e.bonewell === 'moorquelle');
+      const okAll = W.one && W.spawn && W.cap && W.hit && W.broken && W.stays; if (!okAll) console.warn('W4-S3-Probe', JSON.stringify(W), n1, n2);
+      return okAll;
+    } finally { if (q0) S.quests.q_quelle_moor = q0; else delete S.quests.q_quelle_moor; S.ents.world = ents0; indexSolids('world'); S.map = m0; S.flags.bonewellHint = f0; }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23995,7 +24047,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

@@ -790,6 +790,7 @@ function objIco(o) {
   if (o.t === 'find' || o.t === 'clue') return '<i class="br-eye"></i>';   /* Welttiefe: Spur */
   if (o.t === 'talk') return icoImg('log_party', 2, 'br-ico');
   if (o.t === 'escort') return icoImg('bar_st', 2, 'br-ico');   /* W3: Begleiten */
+  if (o.t === 'destroy') return icoImg('log_combat', 2, 'br-ico');   /* W4: Zerschlagen */
   return icoImg(o.ico || 'log_quest', 2, 'br-ico');
 }
 const qa = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');

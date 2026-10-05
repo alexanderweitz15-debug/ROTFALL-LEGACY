@@ -1521,3 +1521,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Bretter mit Gegend-Thema (Welttiefe W4 Slice 2, 05.10.2026)
 - Jedes Anschlagbrett zieht seine Aushänge aus einem Pool seiner Gegend: Wald (Weidenau, Grauwasser) hängt vor allem Jagd und Spurensuche aus, Marsch und Hafen (Salzhafen, Hohlstein, Eisenried) Vermisste und Bestien, Ödland (Aschfurt) Steckbriefe und Räuberlager, Ebene (Kreuzweg, Sonnwacht) Jagd, Vorräte und Lieferungen, Aurelion Lieferungen, das Grünland (Eren, Nordfurt) die volle Mischung. Grenzt ein Kriegsknoten der Toten an den Ort, stehen Verteidigung und Monsterjagd vorn.
 - Fraktionsorte (Karak-Atar, Dünenwacht, Zwergenstadt) und Vharnholm bleiben, wie sie sind. Probe „Welttiefe W4 Slice 2“.
+
+## Quelle der Auferstehung (Welttiefe W4 Slice 3, 05.10.2026)
+- **Was es ist:** Ein Knochen-Obelisk im Gelände, der Tote nachsetzt, solange er steht: in Heldennähe alle 60 Spielminuten zwei Skelette, bis vier um ihn herum stehen. Töten allein bringt nichts.
+- **Zerschlagen:** Der Obelisk hat Lebenspunkte und nimmt normale Hiebe (ganz normal zuschlagen, Zahlen fliegen wie bei Gegnern). Bei null zerbricht er mit Nekro-Funken, der Schein erlischt, und das Auftragsziel „Zerschlagen“ zählt. Beim ersten Anblick erklärt das Log die Regel. Danach steigt dort nichts mehr; eine Rückkehr der Quelle an anderer Stelle ist offen (Vorschlag: solange Garmadon lebt).
+- **Erster Auftrag: „Was aus dem Moor steigt“** (Kelan, Waldschrein): Knochenquelle am Moorrand, 120 Gold, Orden +4, Kelan +10. Debug: „Aufträge: Quelle … starten“, „Quelle — Held zur Quelle, nächste Welle jetzt“. Probe „Welttiefe W4 Slice 3“.
