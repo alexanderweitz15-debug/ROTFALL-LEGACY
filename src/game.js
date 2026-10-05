@@ -3487,7 +3487,7 @@ function attack(c, forceDir) {
   c.atkRem = 0;   /* Kampfanimation (Entwickler 02.10., takt-neutral): der abgebrochene Rest verlängert das Ausholen des nächsten Schlags — die Kette fließt, Treffer kommen im alten Takt */
   if (chain && rem > 0 && c.atkH > 0) { const D = c.swingDur, D2 = D + rem, f = x => (x * D + rem) / D2; c.atkW = f(c.atkW); c.atkH = f(c.atkH); c.atkC = f(c.atkC); c.swingDur = D2; c.atkRem = rem; }
   c.atkCd = c.swingDur * 0.55;
-  c.swing = 0.001; c.hitDone = false;
+  c.swing = 0.001; c.hitDone = false; c.swingN = (c.swingN | 0) + 1;   /* Zähler: begonnene Schwünge (Fähigkeiten prüfen damit, ob der Hieb wirklich kam) */
   if (forceDir != null) c.aim = forceDir;
   sfx(it && it.ranged ? 'bow' : 'swing', feelOf(c).w, earVol(c));
   if (it && it.ranged) { c.hitDone = false; }
@@ -16959,11 +16959,16 @@ function useAbility(key) {
   if (ab.mana) p.mana -= manaC;
   if (ab.stam) p.stamina -= stamC;
   if (ab.mana) { p.castT = performance.now(); sfx('magic'); }   // Zauber-Pose (render: 'cast')
+  /* Nutzer 05.10.2026: Wuchtschlag mitten im Schwung — attack() tat nichts, Kosten und Abklingzeit waren trotzdem weg. Kommt kein Schwung zustande
+     (noch im Schwung, erschöpft, ohne Arme, Armbrust spannt), wird alles zurückgegeben und der Verstärker gelöscht. */
+  const strike = () => { const n0 = p.swingN | 0; attack(p); if ((p.swingN | 0) !== n0) return true;
+    delete p.cooldowns[key]; if (ab.mana) p.mana += manaC; if (ab.stam) p.stamina += stamC; if (ab.herb) addItem(p, 'herb', ab.herb); p.abilityMult = 0; p.abilityKind = null; p.drainHit = 0; p.graveFrost = false;
+    if (!(p.strikeWarn > performance.now())) { p.strikeWarn = performance.now() + 1200; UI.toast(p.swing > 0 ? `${ab.name}: noch im Schwung — gleich noch einmal.` : `${ab.name}: kein Hieb möglich.`); } return false; };
   switch (key) {
-    case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; attack(p); break;
-    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1) * (dkGear(p) >= 2 ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
-    case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; attack(p); fx(p.x, p.y - 14, 'heal', 10); break;
-    case 'backstab': p.abilityMult = 3; p.atkCd = 0; p.stabAt = performance.now(); attack(p); break;
+    case 'power_strike': p.abilityMult = 2.1; p.atkCd = 0; if (!strike()) { abEnd(p); return; } break;
+    case 'grave_strike': p.abilityMult = 1.8 * (node(p, 'dk_rune') ? 1.25 : 1) * (dkGear(p) >= 2 ? 1.25 : 1); p.abilityKind = 'shadow'; p.drainHit = 0.3 * (node(p, 'dk_blood') ? 1.5 : 1); p.graveFrost = node(p, 'dk_frost'); p.atkCd = 0; if (!strike()) { abEnd(p); return; } fx(p.x, p.y - 14, 'necro', 10); break;   // S15 Todesritter
+    case 'holy_strike': p.abilityMult = 1.7; p.abilityKind = 'holy'; p.atkCd = 0; if (!strike()) { abEnd(p); return; } fx(p.x, p.y - 14, 'heal', 10); break;
+    case 'backstab': p.abilityMult = 3; p.atkCd = 0; p.stabAt = performance.now(); if (!strike()) { abEnd(p); return; } break;
     case 'aimed_shot': {
       S.projectiles.push({ id: uid(), kind:'arrow', map: p.map, x: p.x + Math.cos(p.aim) * 14, y: p.y - 12 + Math.sin(p.aim) * 8,
         vx: Math.cos(p.aim) * 9, vy: Math.sin(p.aim) * 9, owner: p.id, dmg: damageOf(p) * 2.2, life: 1800, team:'player' });
@@ -23498,6 +23503,15 @@ export function selftest() {
       const okAll = W.noTown && W.noEdge && W.free && W.founded && W.needHere && W.dissolved && W.titled && W.stays && W.faded; if (!okAll) console.warn('Siedlungs-Probe', JSON.stringify(W));
       return okAll;
     } finally { S.settlement = se0; S.stash = st0; Object.assign(S.res, res0); S.ents.world = ents0; indexSolids('world'); S.day = d0; S.map = map0; }
+  }));
+  ok('Wuchtschlag im Schwung (Nutzer 05.10.): kommt kein Hieb zustande, bleiben Ausdauer, Abklingzeit und Verstärker unberührt; aus der Ruhe kostet er und schlägt', sandbox(() => {
+    const p = stage(); p.knownClasses = ['wanderer', 'warrior']; p.currentClass = 'warrior'; p.abilities = ['power_strike']; recalc(p); p.stamina = 100; p.cooldowns = {}; p.abilityMult = 0; const W = {};
+    p.swing = 0.5; p.hitDone = false; p.atkC = 0.9; p.swingN = 0; useAbility('power_strike');
+    W.kept = p.stamina === 100 && !p.cooldowns.power_strike && !p.abilityMult && p.swingN === 0;
+    p.swing = 0; useAbility('power_strike'); W.struck = p.stamina < 100 && p.cooldowns.power_strike > 0 && p.swingN === 1 && p.swing > 0;
+    p.swing = 0; p.cooldowns = {}; p.stamina = 1; useAbility('power_strike'); W.tired = p.stamina === 1 || !p.cooldowns.power_strike;   /* „Zu erschöpft“ vor den Kosten oder Rückgabe danach */
+    const okAll = W.kept && W.struck && W.tired; if (!okAll) console.warn('Wuchtschlag-Probe', JSON.stringify(W), p.stamina, p.cooldowns, p.abilityMult);
+    return okAll;
   }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
