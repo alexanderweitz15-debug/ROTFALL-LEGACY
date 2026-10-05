@@ -32,10 +32,11 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - Nutzerpunkte 05.10. (alle gemerged, PR #15–#18): BUG-144 Wuchtschlag im Schwung; Varonheim-Hauptplatz entlastet (Treffpunkte vor öffentlichen Häusern); Betriebe: Vorrat liefern + Handel fördern 20 % Karawanenbonus; Eskorte/Lieferung zahlen am Ziel. Selbsttest 498/498.
 
 - Krieg (PR #19, #20): Schonfrist, Streifen, Entsatz, Front lebendig; 45-Tage-Messung in BALANCE.md.
-- W3 Slice 1 (Commit folgt): Zieltyp `escort`, `turnin`, Finn-Auftrag; Probe grün 500/500, live getestet.
+- W3 Slice 1 (PR #21): Zieltyp `escort`, `turnin`, Finn-Auftrag; Probe grün 500/500, live getestet.
+- W3 Slice 2 (Commit folgt): Rettung (`captors`, `captiveOf`, `near`/`off`), Auftrag „Der verschleppte Rekrut“; Probe grün 501/501, live geprüft.
 
 ## Nächster Schritt
-- W3 Slice 2: Variante *Gefangener lebend* (Begleiter gefesselt, Flucht/Verrat) oder Lieferung bei Nacht/Zeitdruck als feste Auftragsziele; dann W4. Alternativ W1 Slice 3 nach Nutzerentscheid.
+- W3 Slice 3: Lieferung bei Nacht/Zeitdruck (Empfehlung: Frist in Stunden, Anzeige im Auftragsbuch) oder Gefangener lebend (Empfehlung: Teilbelohnung mit Rufverlust); dann W4 Kill-Varianten/Regionen. Alternativ W1 Slice 3 nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
