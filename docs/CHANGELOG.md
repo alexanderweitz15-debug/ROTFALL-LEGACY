@@ -6,7 +6,8 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Zusammengeführt: claude-arbeit (PR #9: Audit Phase 1–4, Wüstenbund/Zwerge, Wanderautomaten, Heiler-/Zauberfenster, Schleichmodus, Kampfanimationen) und Reliquien (Endgame-Fortschritt, Anmarsch der Ereignisfiguren, Omega-Szene).
 - PR #7 zurückgeholt (war in main verloren): Angst der Bürger, schwere Verbrechen mit Bußgeld und Haft, Zerfall Varonheims ohne König.
 - Reliquien-Fenster auf Taste O (V ist der Schleichmodus). Cache-Schlüssel v=25.
-- Selbsttest: 488 Proben, 7 Fehlschläge aus dem Audit-Zweig noch offen (Karte BUG-085, Eisenmark, Stadtfest, Tagesplan, Akademie-Prüfungen, Stadt ohne Schutz, Betriebe); Proben Wuchtschlag/Schleichen gegen Zufall der Trefferzone gehärtet.
+- Behoben: Eisenfeste — neue Spiele bekamen nie Kettenzug, Torwachen und Käfig-Gefangene (die Bevölkerung zählte als „schon besiedelt“); alte Stände holen den Kettenzug nach. Ersatz für die Stadtwache war in den ersten Tagen eines Spiels gesperrt (Z.reinf 0).
+- Selbsttest 488/488. Proben gegen Zufall gehärtet (Trefferzone, Krits, Bedrohung im neuen Spiel): Wuchtschlag, Schleichen, Akademie-Duell, Duell im Kreis, Knochenritter, Stadtfest/Tagesplan (peace() ohne Heere der Toten), Betriebe-Verlusttag; Erbe-Aufträge ohne festen Kartenpunkt.
 
 ## Version 24 (in Arbeit) — Fehlerjagd Runde 1
 - Hunt-1-Fehler HB-06 bis HB-23 behoben (Mönch-Aufträge, Weißbarts Ansprechbarkeit, Varon-Königsauftrag, Eisenmark-Pferch/Tributzug, Schuldprüfung bei befreiten Städten, Wohlstand ohne Schutz, Heiler sieht Gliedverletzungen, Schadens-Böden heben Bewusstlose nicht mehr an, Bruch/Prothese, Medizin heilt kein Messing, abgetrennte Glieder, Betriebsverlust, Kult-Doppelgänger, Zweiwaffen mit ausgefallenem Arm, kein Selbstheilen am Boden, Kette/Grubenstämme-Rang). Details: `ROTFALL_STATE/hunt/BERICHT.md`.

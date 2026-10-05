@@ -6498,19 +6498,20 @@ function ensureRelics() {
 function ensureEisenmark() {
   ensureFortLife();                                                     // §5d.1 Festungsleben (idempotent, auch nach Vargs Fall)
   if (S.flags.goblinsFreed) { ensureGoblinVillage(); return eisenPopulation(); }
-  eisenPopulation();
-  if (S.ents.world.some(e => e.eisen && !e.fl)) {                        // schon besiedelt (§5d.1: Festungsleben zählt nicht) (steht im Spielstand); S12: alte Einheitswachen neu einkleiden
-    for (const g of S.ents.world) if (g.eisen && g.guard && !g.kit12) { const k = GUARD_KIT.chain; g.kit12 = true; g.pal.cloth = k.cloth;
-      for (const sl of ['weapon', 'chest', 'head']) { const v = pick(k[sl]); if (v) g.equip[sl] = mkItem(v); else delete g.equip[sl]; } recalc(g); }
-    return;
-  }
   const guard = (tx, ty, o = {}) => { const g = guardChar('chain', freeSpotNear('world', tx, ty, 1)); Object.assign(g, { guard: true, post: 'kettenfeste', eisen: true }, o); S.ents.world.push(g); return g; };
+  const convoy = () => { const [cx0, cy0] = EISEN_CONVOY.start, lead = guard(cx0, cy0, { convoy: { pts: EISEN_CONVOY.pts.map(p => p.slice()), i: 0, dir: 1 }, prof: 'Treiber' });   // Kettenzug
+    for (let i = 1; i <= 3; i++) makeCaptive(cx0 + i, cy0, true, { chainedTo: lead.id, chainIdx: i }); };
+  if (S.ents.world.some(e => e.eisen && !e.fl && !e.eisen2)) {           // schon besiedelt (§5d.1: Festungsleben zählt nicht) (steht im Spielstand); S12: alte Einheitswachen neu einkleiden
+    for (const g of S.ents.world) if (g.eisen && g.guard && !g.kit12) { const k = GUARD_KIT.chain; g.pal.cloth = k.cloth; g.kit12 = true;
+      for (const sl of ['weapon', 'chest', 'head']) { const v = pick(k[sl]); if (v) g.equip[sl] = mkItem(v); else delete g.equip[sl]; } recalc(g); }
+    if (!S.ents.world.some(e => e.convoy)) convoy();                     /* Stände, in denen eisenPopulation() vor der Besiedlung lief (Fehler bis v24): der Kettenzug fehlte */
+    return eisenPopulation();
+  }
   for (const [x, y] of [[902, 379], [902, 390], [925, 384], [790, 381], [872, 233], [892, 233]]) guard(...EM(x, y));   // S12: Lage im Westen (EM)
   for (const [x, y] of [[866, 206], [874, 212], [882, 207], [890, 214], [870, 219]]) makeCaptive(...EM(x, y), true, { work: true });   // Steinbruch
   makeCaptive(...EM(886, 219), false, { work: true }); makeCaptive(...EM(878, 222), false, { work: true });
   for (const [x, y] of [[927, 372], [925, 396], [945, 393]]) makeCaptive(...EM(x, y), true);                               // bei den Käfigen
-  const [cx0, cy0] = EISEN_CONVOY.start, lead = guard(cx0, cy0, { convoy: { pts: EISEN_CONVOY.pts.map(p => p.slice()), i: 0, dir: 1 }, prof: 'Treiber' });   // Kettenzug
-  for (let i = 1; i <= 3; i++) makeCaptive(cx0 + i, cy0, true, { chainedTo: lead.id, chainIdx: i });
+  convoy(); eisenPopulation();                                          /* Bevölkerung erst nach der Grundbesiedlung — sie trägt eisen2 und zählt nicht als „schon besiedelt“ */
 }
 // Phase 4 (MP2 §54): viel mehr Leben in der Eisenfeste — Goblins mit Berufen an jedem Werkplatz (Bergleute, Schmiede, Feld-
 // arbeiter, Holzfäller, Stallknechte, Träger), dazu Aufseher und Streifenwachen. Einmal gesetzt (Flag), im Spielstand gespeichert.
@@ -6521,15 +6522,15 @@ function eisenPopulation() {
   S.flags.eisen2 = true;
   for (const [site, [prof, n]] of Object.entries(EISEN_JOBS)) {
     const [sx, sy] = EISEN_SITES[site];
-    for (let i = 0; i < n; i++) { const c = makeCaptive(sx + ri(-5, 5), sy + ri(-4, 4), true, { work: true, site });
+    for (let i = 0; i < n; i++) { const c = makeCaptive(sx + ri(-5, 5), sy + ri(-4, 4), true, { work: true, site, eisen2: true });
       c.prof = S.flags.goblinsFreed ? prof.replace('Goblin-', 'Freier ') : prof + ' (versklavt)';
       if (S.flags.goblinsFreed) Object.assign(c, { captive: false, freed: true, faction: 'goblin', greet: '„Wir arbeiten weiter. Aber jetzt für uns.“' }); }
-    if (!S.flags.goblinsFreed) { const g = guardChar('chain', freeSpotNear('world', sx + 3, sy - 3, 2), 'Aufseher'); Object.assign(g, { guard: true, post: 'kettenfeste', eisen: true, kit12: true }); S.ents.world.push(g); }
+    if (!S.flags.goblinsFreed) { const g = guardChar('chain', freeSpotNear('world', sx + 3, sy - 3, 2), 'Aufseher'); Object.assign(g, { guard: true, post: 'kettenfeste', eisen: true, eisen2: true, kit12: true }); S.ents.world.push(g); }
   }
   if (!S.flags.goblinsFreed) {                                          // Streifen zwischen den Vierteln
     const route = [EISEN_SITES.stables, EISEN_SITES.smithy, EISEN_SITES.quarters, EISEN_SITES.mine, [110, 225], EISEN_SITES.stables];
     for (let i = 0; i < 4; i++) { const g = guardChar('chain', freeSpotNear('world', ...route[i], 2), 'Streifenwache');
-      Object.assign(g, { eisen: true, kit12: true, faction: 'chain', eisenPatrol: route.map(p => p.slice()), pi: (i + 1) % route.length }); S.ents.world.push(g); }
+      Object.assign(g, { eisen: true, eisen2: true, kit12: true, faction: 'chain', eisenPatrol: route.map(p => p.slice()), pi: (i + 1) % route.length }); S.ents.world.push(g); }
   }
   log('Die Eisenfeste arbeitet: Mine, Schmieden, Felder, Holzschlag — überall Goblins, überall Aufseher.', 'world');
 }
@@ -10265,7 +10266,7 @@ function schutzDay() {
     if (!Z.lost) { schutzCheck(k); continue; }
     if (Z.taker) { schutzTakerDay(k, Z); continue; }                 /* S2b: wer herrscht, lässt keinen Ersatz durch */
     const f = townFac(k), R = SCHUTZ_REINF[f];
-    if (!R || day - (Z.at || 0) < R[0] || day - (Z.reinf || 0) < R[0] || schutzBlocked(k, f)) {   /* S2: kein Ersatz — die Frist läuft */
+    if (!R || day - (Z.at || 0) < R[0] || (Z.reinf && day - Z.reinf < R[0]) || schutzBlocked(k, f)) {   /* S2: kein Ersatz — die Frist läuft; Z.reinf 0 = noch nie Ersatz (sperrte sonst die ersten Tage eines Spiels) */
       if ((Z.stage || 0) >= 2) { Z.since ??= day; if (Z.stage === 2 && day - Z.since >= schutzWait()) schutzLawless(k);
         else if (Z.stage === 3 && day - Z.since >= schutzWait() && !schutzTake(k) && Z.noTake && chance(0.15 * Z.noTake)) schutzTake(k, 'band'); }
       continue; }
@@ -18516,7 +18517,8 @@ export function selftest() {
   const actor = (x, y, o = {}) => { const a = makeChar({ name: 'Probe', map: '__a', x, y, ...o }); a.anchor = { x, y }; S.ents.__a.push(a); return a; };
   // Kriegsstand der Welt (besetzte Städte) aus Tagesplan-Proben heraushalten — sie prüfen den Friedensalltag
   const peace = fn => { const o = {}; for (const t of Object.keys(TOWN_PLAN)) { const n = S.war.nodes[t]; if (n) { o[t] = n.owner; if (n.owner === 'undead') n.owner = 'valen'; } }
-    try { return fn(); } finally { for (const [t, v] of Object.entries(o)) S.war.nodes[t].owner = v; } };
+    const A = S.war.armies, dr = S.deadRaid; S.war.armies = A.filter(a => a.faction !== 'undead'); S.deadRaid = null;   /* ein neues Spiel beginnt mit „Bedroht“ (Heer am Friedhof): die Bewohner blieben daheim */
+    try { return fn(); } finally { S.war.armies = A; S.deadRaid = dr; for (const [t, v] of Object.entries(o)) S.war.nodes[t].owner = v; } };
   const stage = () => { const p = actor(300, 300, { kind: 'player' }); S.player = p; S.map = '__a'; S.party = []; return p; };
   const knockOut = (c, by) => { B.damagePart(c, 'torso', 999); downed(c, 'Test', by); };
   ok('KI: Boden/Tod ist terminal (keine Bewegung, kein Resthieb)', sandbox(() => {
@@ -18647,8 +18649,13 @@ export function selftest() {
     return S.ents.world.filter(c => c.villager && !c.refugee).every(c => { const k = c.homeTown + ':' + c.name, first = c.name.split(' ')[0];   // Flüchtlinge tragen eigene Namen
       const okName = !seen.has(k) && (femTrade(c.prof) ? FIRST_F : FIRST_M).includes(first) && (c.name.includes(' ') || !named.has(first)); seen.add(k); return okName; });
   })());
-  ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', Object.entries(QUEST_WHERE).every(([k, l]) => QUESTS[k] && LOCATIONS.some(o => o.key === l))
-    && Object.keys(QUESTS).every(k => QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || QUESTS[k].clsTrial || questPoint(k) || ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly', 'q_undraid', 'q_undarmy'].includes(k)));   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu   /* Klassen-Prüfung (clsTrial): jeder Lehrer der Klasse nimmt ab, Feldprüfungen gelten überall — ortlos wie classQ */
+  ok('Karte (BUG-085): jeder Auftrag mit festem Ort hat einen Kartenpunkt, jeder Zielort existiert', (() => {
+    const badWhere = Object.entries(QUEST_WHERE).filter(([k, l]) => !QUESTS[k] || !LOCATIONS.some(o => o.key === l));
+    const free = ['q_herbs', 'q_rook', 'q_lila', 'q_pelts', 'q_runaway', 'q_grisk_lost', 'q_grisk_rache', 'q_intrige', 'q_rask', 'q_rotfall', 'q_omega', 'q_ratssitz', 'q_anomaly', 'q_undraid', 'q_undarmy', 'q_erbe_schwur', 'q_erbe_grab'];   /* Erbe-Aufträge (Phase 4): Schwur und Grab liegen, wo der Vorfahr fiel */
+    const noPoint = Object.keys(QUESTS).filter(k => !(QUESTS[k].dyn || QUESTS[k].rankLine || QUESTS[k].sea || QUESTS[k].classQ || QUESTS[k].dkQ || QUESTS[k].clsTrial || questPoint(k) || free.includes(k)));
+    if (badWhere.length || noPoint.length) console.warn('Karte-Probe', JSON.stringify({ badWhere, noPoint }));
+    return !badWhere.length && !noPoint.length;
+  })());   // Kräuter/Felle überall, Rook wandert, Lila: Suche ohne Ziel, Entlaufener: Ort je Auftrag neu   /* Klassen-Prüfung (clsTrial): jeder Lehrer der Klasse nimmt ab, Feldprüfungen gelten überall — ortlos wie classQ */
   ok('Erreichbarkeit (Audit A-04): kein Rohstoff, kein Kraut steht auf Fels, Wasser oder Mauer', MAP_KEYS.every(m => (S.ents[m] || []).every(e => !(e.kind === 'prop' && e.harvest) || !SOLID.has(tileAt(m, e.x / TS | 0, e.y / TS | 0)))));
   ok('Karte (Visueller Umbau, Scheibe 1): mapPick liefert bei einem bekannten Ort das LOCATIONS-Objekt fürs Bild-Panel', (() => {
     const l = LOCATIONS.find(o => (S.flags.seen || {})[o.key]); if (!l) return true;   // kein bekannter Ort im Stand: Probe entfällt, kein Fehlschlag
@@ -19181,7 +19188,8 @@ export function selftest() {
     const n = spawnEnemy('necromancer', '__a', 12, 10); n.raiseCd = 0; necroSummon(n, p, 16);
     const mins = S.ents.__a.filter(e => e.minionOf === n.id), raised = mins.length === 1;
     n.alive = false; S.ents.__a.splice(S.ents.__a.indexOf(n), 1); updateEnemy(mins[0], 16); const fell = !S.ents.__a.includes(mins[0]);
-    const k = spawnEnemy('bone_knight', '__a', 11, 12), loss = face => { let s = 0; for (let i = 0; i < 6; i++) { B.fullHeal(k); k.stagger = 0; k.aim = face ? Math.atan2(p.y - k.y, p.x - k.x) : Math.atan2(k.y - p.y, k.x - p.x); const h0 = k.hp; hit(p, k, 1); s += h0 - k.hp; } return s; };
+    const k = spawnEnemy('bone_knight', '__a', 11, 12), tot = () => k.body ? Object.values(k.body).reduce((n, q) => n + q.hp, 0) : k.hp;   /* alle Teile: ein Gliedtreffer ändert k.hp nicht (Zufall der Trefferzone) */
+    const loss = face => { let s = 0; for (let i = 0; i < 12; i++) { B.fullHeal(k); k.stagger = 0; k.aim = face ? Math.atan2(p.y - k.y, p.x - k.x) : Math.atan2(k.y - p.y, k.x - p.x); const h0 = tot(); hit(p, k, 1); s += h0 - tot(); } return s; };   /* zwölf Hiebe: Krits streuen */
     const block = loss(true) * 2 < loss(false);
     const dm = spawnEnemy('ash_demon', '__a', 8, 8), hd = dm.hp; hurt(dm, 50, p, 'Probe', false, 'fire'); const fireproof = dm.hp === hd;
     for (let y = 0; y < 40; y++) MAPS.__a.tiles[y * 40 + 22] = T.WATER; const w = spawnEnemy('carrion_wing', '__a', 20, 20); w.x = 20 * TS + 16; const x0 = w.x; moveEnt(w, 64, 0); const flies = w.x === x0 + 64;
@@ -19617,6 +19625,7 @@ export function selftest() {
       const trader = S.ents.world.find(e => e.key === 'nibbel'), friendly = repTier('goblin').name !== 'Verhasst' && S.factions.goblin > 0;
       const hide = SPAWN_AREAS.find(a => a.goblinHide), noGob = [...Array(50)].every(() => spawnType(hide) === null);
       const noWild = !S.ents.world.some(e => e.kind === 'enemy' && e.alive && e.map === 'world' && (e.mtype === 'goblin' || e.mtype === 'goblin_warrior'));
+      if (!(region && before && freed && village && trader?.shop && trader?.pool?.includes('goblin_hook') && friendly && noGob && noWild)) console.warn('Eisenmark-Probe', JSON.stringify({ region, before, freed, village, shop: !!trader?.shop, hook: !!trader?.pool?.includes('goblin_hook'), friendly, noGob, noWild, w: m.w, caps: caps.length, chained: chained.length, goblins: goblins.length, convoy: S.ents.world.some(e => e.convoy), boss: S.ents.world.some(e => e.rboss === 'chainmaster' && e.alive), unfreed: caps.filter(e => e.captive || e.chainedTo || !e.freed).length }));
       return region && before && freed && village && trader.shop && trader.pool.includes('goblin_hook') && friendly && noGob && noWild;
     } finally {
       S.townLord = tl0; S._quiet = q; S.ents.world = ents; for (const [e, o] of snap) { for (const k of Object.keys(e)) delete e[k]; Object.assign(e, o); }
@@ -20086,13 +20095,16 @@ export function selftest() {
       S.minute = 23 * 60 + 30; festMin = -1; festTick();
       const gone = !S.ents.world.some(e => e.fest === town);
       const offRoad = props.every(e => tileAt('world', e.x / TS | 0, e.y / TS | 0) !== T.ROAD);   // Fest sperrt nie die Straße
+      if (!(props.length >= 6 && !!table && goes && saved && once && gone && offRoad)) console.warn('Stadtfest-Probe', JSON.stringify({ town, props: props.length, table: !!table, goes, v: !!v, vk: v && dayTarget(v).k, saved, once, gone, offRoad }));
       return props.length >= 6 && !!table && goes && saved && once && gone && offRoad;
     } finally { S.minute = m0; S.day = d0; S.flags.festAte = ate; S.res.food = food; festMin = -1; festTick(); }
   }));
   ok('Tagesplan (BUG-082/083): Bewohner wechseln über den Tag ≥ 4 Orte, abends niemand vor der Schenkentür, außer Sicht nie aufeinander', peace(() => {
     const V = VILLAGERS.filter(e => e.alive && e.plan), m0 = S.minute; if (!V.length) return false;
     try {
-      const blocks = V.every(e => { const k = new Set(); for (let h = 0; h < 24; h += 0.5) { S.minute = h * 60; const t = dayTarget(e); k.add(t.k + '|' + Math.round(t.x) + ',' + Math.round(t.y)); } return k.size >= 4; });
+      const kOf = e => { const k = new Set(); for (let h = 0; h < 24; h += 0.5) { S.minute = h * 60; const t = dayTarget(e); k.add(t.k + '|' + Math.round(t.x) + ',' + Math.round(t.y)); } return k; };
+      const bad = V.filter(e => kOf(e).size < 4); if (bad.length) console.warn('Tagesplan-Bewohner', JSON.stringify(bad.slice(0, 6).map(e => ({ name: e.name, prof: e.prof, town: e.homeTown, keys: [...kOf(e)] }))), bad.length);
+      const blocks = !bad.length;
       const tavs = HOUSES.filter(h => h.type === 'tavern' && h.map === 'world');
       const noCrowd = V.every(e => e.plan.eve.in || !tavs.some(t => Math.hypot(e.plan.eve.x / TS - t.doorTile[0], e.plan.eve.y / TS - t.doorTile[1]) < 3));
       S.minute = 7 * 60 + 5; const pos = V.map(e => [e, e.x, e.y, e.blk]); for (const e of V) { e.blk = null; placeAway(e); }
@@ -21010,8 +21022,9 @@ export function selftest() {
       for (const d of dummies) hurt(d, 5, p, 'Zauber', false, 'magic'); trialTick(); const aim = !!S.acad.aim && !S.trial;
       startTrial('heal', at); learnSpell(p, 'sp_heal', true); for (let i = 0; i < 4; i++) castSpell(p, 'sp_heal'); trialTick(); const heal = !!S.acad.heal && !S.trial;
       const adept = S.acadRank === 2;
-      startTrial('duel', at); const st = S.ents.__a.find(e => e.duelist); if (p.body) B.fullHeal(p); hurt(p, p.maxHp * 0.95, st, 'Duell'); const lost = !S.trial && !S.acad.duel && p.hp > 0;
-      startTrial('duel', at); const st2 = S.ents.__a.find(e => e.duelist); hurt(st2, st2.maxHp * 0.95, p, 'Duell'); const won = !!S.acad.duel && st2.hp > 0;
+      startTrial('duel', at); const st = S.ents.__a.find(e => e.duelist); if (p.body) B.fullHeal(p); for (let i = 0; i < 8 && S.trial; i++) hurt(p, p.maxHp * 0.95, st, 'Duell'); const lost = !S.trial && !S.acad.duel && p.hp > 0;   /* mehrere Hiebe: ein Gliedtreffer senkt den Rumpf nicht */
+      startTrial('duel', at); const st2 = S.ents.__a.find(e => e.duelist); for (let i = 0; i < 8 && S.trial; i++) hurt(st2, st2.maxHp * 0.95, p, 'Duell'); const won = !!S.acad.duel && st2.hp > 0;
+      if (!(noSword && aim && heal && adept && lost && won)) console.warn('Akademie-Probe', JSON.stringify({ noSword, aim, heal, adept, lost, won, rank: S.acadRank, acad: S.acad, rest: S.ents.__a.filter(e => e.trial).length, trial: S.trial }));
       return noSword && aim && heal && adept && lost && won && !S.ents.__a.some(e => e.trial);
     } finally { S.trial = null; S.acad = a0; S.acadRank = r0; S.factions.aurel = f0; }
   }));
@@ -21787,8 +21800,8 @@ export function selftest() {
     try { S.quests.kt_warrior2 = { state: 'active', progress: [0] }; p.stamina = 200;
       startTrial('duel', { x: p.x, y: p.y }, { qk: 'kt_warrior2', oi: 0, cls: 'warrior', npc: null, npcName: 'Probe', title: 'Probe' });
       const e = S.ents[p.map].find(x => x.duelist && x.alive); if (!e) return false; const t0 = e.body.torso.hp;
-      hurt(e, 1, p, 'Probe'); const dropped = e.body.torso.hp < t0 && !!S.trial;   /* kleiner Treffer: Schaden sichtbar, Duell läuft */
-      hurt(e, 9999, p, 'Probe'); const ended = !S.trial && e.alive && e.body.torso.hp >= 1 && S.quests.kt_warrior2.progress[0] === 1;   /* Riesentreffer: Rumpf bleibt ≥ 1, Duell gewonnen */
+      for (let i = 0; i < 8 && !(e.body.torso.hp < t0); i++) hurt(e, 2, p, 'Probe'); const dropped = e.body.torso.hp < t0 && !!S.trial;   /* kleiner Treffer: Schaden sichtbar, Duell läuft (bis einer den Rumpf trifft — Trefferzone ist Zufall) */
+      for (let i = 0; i < 8 && S.trial; i++) hurt(e, 9999, p, 'Probe'); const ended = !S.trial && e.alive && e.body.torso.hp >= 1 && S.quests.kt_warrior2.progress[0] === 1;   /* Riesentreffer: Rumpf bleibt ≥ 1, Duell gewonnen */
       return dropped && ended;
     } finally { endTrial(null, S.trial); if (T0) S.trial = T0; if (q0) S.quests.kt_warrior2 = q0; else delete S.quests.kt_warrior2; } }));
   ok('Asservatenkammer (03.10.): Waffe nach Flucht verwahrt; Wache derselben Macht gibt das Exemplar gegen Buße zurück; mit offenem Kopfgeld nicht', sandbox(() => {
@@ -22479,6 +22492,7 @@ export function selftest() {
       const Z = S.schutz.varonheim, shops = S.ents.world.filter(e => e.shop && e.homeTown === 'varonheim'), alarm = Z.stage === 2 && n.garrison === 20 && S.war.capThreat >= 3 && shops.every(e => e.schutzShut === 'varonheim' || e.fallShut);
       S.war.nodes.northcity.owner = 'valen'; S.war.nodes.northcity.garrison = 40; S.war.capThreat = 0; Z.at = (S.day | 0) - 3; Z.reinf = 0; schutzDay();
       const reinf = Z.lost === 7 && S.ents.world.filter(e => e.capGuard).length === 3 && S.war.nodes.northcity.garrison === 37;
+      if (!(full && after4 && reload && alarm && reinf)) console.warn('Schutz-Probe', JSON.stringify({ full, G: G.length, after4, Z4: S.schutz.varonheim, g: n.garrison, reload, alarm, Z, threat: S.war.capThreat, shut: shops.map(e => [e.name, e.schutzShut, e.fallShut]), reinf, guards: S.ents.world.filter(e => e.capGuard).length, nc: S.war.nodes.northcity.garrison }));
       return full && after4 && reload && alarm && reinf;
     } finally { S.schutz = sc0; S.war.capThreat = th0; S.cult = cu0; }
   }));
@@ -22519,12 +22533,12 @@ export function selftest() {
   ok('Varonheim-Umbau S5 (Start): jede Herkunft hat ein erreichbares Startviertel in oder an Varonheim; drei Anfängeraufträge am Brett; Kult für Hauptstädter frühestens Tag 10', sandbox(() => {
     const p = stage(), C0 = S.contracts, CD = structuredClone(S.conDay || {}), f0 = structuredClone(S.flags), cu0 = S.cult ? structuredClone(S.cult) : null;
     try { const spots = Object.keys(ORIGINS).map(capStartSpot), P = TOWN_PLAN.varonheim, [x0, y0, x1, y1] = P.area;
-      const near = spots.every(q => q && q.x / TS >= x0 - 8 && q.x / TS <= x1 + 8 && q.y / TS >= y0 - 2 && q.y / TS <= y1 + 8 && !SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)));
+      const near = spots.every(q => q && q.x / TS >= x0 - 20 && q.x / TS <= x1 + 20 && q.y / TS >= y0 - 14 && q.y / TS <= y1 + 20 && !SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)));   /* freeSpotNear weitet den Suchkreis bis Radius 16 (Zufall, volle Plätze) — „an Varonheim“ reicht */
       S.contracts = []; capStart(p, ORIGINS.wanderer, 'wanderer'); const B2 = S.contracts.filter(c => c.town === 'varonheim' && c.starter); const three = B2.length === 3 && B2.some(c => c.kind === 'deliver' && c.target === 'northcity') && B2.every(c => c.reward.gold <= 60);
       const kept = townContracts('varonheim', 'board').filter(c => c.starter).length === 3;
       S.cult = { stage: 0, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; S.flags.startCap = 1; const lv = p.level; p.level = 1; const d0 = S.day;
       S.day = 9; cultHour(12); const quiet = !S.cult.stage; p.level = lv; S.day = d0;
-      if (!(near && three && kept && quiet)) console.log('Start-Probe', { near, three, kept, quiet, spots: spots.map(q => q && [q.x / TS | 0, q.y / TS | 0]) });
+      if (!(near && three && kept && quiet)) console.warn('Start-Probe', JSON.stringify({ near, three, kept, quiet, area: P.area, spots: spots.map(q => q && [q.x / TS | 0, q.y / TS | 0, tileAt('world', q.x / TS | 0, q.y / TS | 0)]) }));
       return near && three && kept && quiet;
     } finally { S.contracts = C0; S.conDay = CD; S.flags = f0; S.cult = cu0; }
   }));
@@ -23118,9 +23132,10 @@ export function selftest() {
     return dualNormally && !dualOn(p);
   }));
   ok('HB-22a: Lebensraub eines Geschosses heilt keinen am Boden liegenden Schützen', sandbox(() => {
-    const p = stage(); const tgt = actor(p.x + 40, p.y, { kind: 'enemy', mtype: 'skeleton' });
+    const p = stage(); const tgt = actor(p.x + 40, p.y, { kind: 'enemy', mtype: 'skeleton' }); tgt.mtype = 'skeleton'; tgt.maxHp = tgt.hp = 9999; if (tgt.body) B.initBody(tgt, 9999);   /* makeChar kennt kein mtype — stürbe das Ziel, stürzte die() ab */
     p.downed = true; const hp0 = p.hp;
     hurtFromProjectile(p, tgt, { dmg: 10, leech: 1, x: p.x, y: p.y, vx: 1, vy: 0 });
+    if (p.hp !== hp0) console.warn('HB-22a-Probe', JSON.stringify({ hp0, hp: p.hp, tgt: tgt.hp }));
     return p.hp === hp0;
   }));
   ok('HB-22b: Ein Gruppenheilzauber heilt keinen am Boden liegenden Verbündeten sofort gesund', sandbox(() => {
@@ -23192,10 +23207,11 @@ export function selftest() {
       const zero = bizView().find(x => x.id === '__pbz')?.kasse === 0;
       ECO.ecoDay(); const filled = b.lastPr > 0 && b.kasse === b.lastPr && S.gold === 100 && b.daysPr === 1;
       const far = !!bizCollect('__pbz') && S.gold === 100; const k = Math.floor(b.kasse); const took = !bizCollect('__pbz', true) && S.gold === 100 + k && b.kasse < 1;
-      b.kasse = 5; S.towns.eren.stock.ingot = 0; ECO.ecoDay(); const lossK = b.kasse === 0 && S.gold === 100 + k - 4;
+      b.kasse = 5; b.hired = 12; S.towns.eren.stock.ingot = 0; ECO.ecoDay(); const lossK = b.kasse === 0 && b.lastPr < -5 && S.gold === 100 + k + 5 + b.lastPr; b.hired = 3;   /* Löhne 36: sicher ein Verlust über die Kasse hinaus (die Stadt verhüttet am selben Tag noch Barren) */
       b.kasse = 40; if (S.war?.nodes?.eren) { S.war.nodes.eren.owner = 'undead'; ECO.ecoDay(); } const occ = !S.war?.nodes?.eren || b.kasse === 0;
       if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen';
       UI.openModal('business'); const tab = !!document.querySelector('#modal-body .bz-card') && !!document.getElementById('bz-take') && document.getElementById('modal').classList.contains('dock'); UI.closeModal();
+      if (!(zero && filled && far && took && lossK && occ && tab)) console.warn('Betriebe-Probe', JSON.stringify({ zero, filled, far, took, lossK, occ, tab, b, gold: S.gold, k }));
       return zero && filled && far && took && lossK && occ && tab;
     } finally { S.eco.biz = biz0; S.gold = gold0; S.towns.eren.stock = stock0; if (halt0 != null) S.halt['eren:smithy'] = halt0; else delete S.halt['eren:smithy']; if (S.war?.nodes?.eren) S.war.nodes.eren.owner = owner0; Object.keys(S.flags).forEach(x => { if (!(x in f0)) delete S.flags[x]; }); UI.closeModal(); } }));
   ok('Schmiede-Dock: Ausbessern je Stück nach der alten Preisregel (Schaden × halber Wert, mindestens 5), nur Gewähltes wird heil, Gold wie berechnet', sandbox(() => {
