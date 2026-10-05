@@ -97,6 +97,9 @@ function useOf(town, c) {
   return u;
 }
 export const target = (t, g) => (t.use[g] || 0) * 6 + 4;
+/* Nutzer 05.10.2026: „Handel fördern“ (Stadtkasse) bringt zehn Tage lang 20 % mehr Ware je Karawane in diese Stadt (S.growth[t].tradeUntil). */
+export const TRADE_BOOST = 1.2, TRADE_BOOST_DAYS = 10;
+export const tradeMul = town => (S.growth?.[town]?.tradeUntil || 0) > (S.day | 0) ? TRADE_BOOST : 1;
 export const capOf = town => Math.min(400, 60 + 40 * siteCount(town, ['store', 'markethall', 'kontor']));
 
 // ---------------- Start / Altstände ----------------
@@ -321,7 +324,7 @@ function caravanDay() {
     }
     if (!best || best.score <= 0) break;
     S.towns[best.a].stock[best.g] -= best.n;
-    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 2), eta: (S.day | 0) + tripDays(best.a, best.b) });
+    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: Math.round(best.n * tradeMul(best.b)), guards: ri(0, 2), eta: (S.day | 0) + tripDays(best.a, best.b) });   /* geförderter Handel: 20 % mehr am Ziel */
   }
 }
 

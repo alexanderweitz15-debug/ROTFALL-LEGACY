@@ -319,7 +319,7 @@ function arrive(c, player) {
   const to = c.dir > 0 ? 'northcity' : 'eren';
   const t = S.towns[to];
   H.hireEscorts?.(c);                                            // MP2 §106: gefallene Wachen werden in der Stadt ersetzt
-  for (const [g, n] of Object.entries(c.cargo)) t.stock[g] += n;
+  const mul = ECO.tradeMul(to); for (const [g, n] of Object.entries(c.cargo)) t.stock[g] += Math.round(n * mul);   /* geförderter Handel: 20 % mehr Ware */
   const sum = Object.values(c.cargo).reduce((a, b) => a + b, 0);
   if (sum) { log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy'); chronicle(`Die Karawane ist heil in ${t.name} angekommen`, 'news'); }
   if (c.attacked && Math.hypot(player.x - c.x, player.y - c.y) < 400) {

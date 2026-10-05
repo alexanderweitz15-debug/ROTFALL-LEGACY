@@ -1489,3 +1489,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Große Orte: Treffpunkte statt Gedränge (Nutzer 05.10.2026)
 - In Orten mit mehr als 15 Häusern trifft sich nur ein Teil der Bewohner auf dem Hauptplatz (etwa 15 Häuser-Anteil, in Varonheim rund 30 statt 160). Die übrigen stehen mittags und nachmittags vor Schenken, Kapellen, Läden, Bäckerei, Heilerhaus, Schmiede und Ställen ihres Orts — fester Treffpunkt je Bewohner, auf freiem Boden, sonst Platz. Dörfer und Aurelions Bezirke bleiben, wie sie sind. Probe „Hauptplatz entlastet“.
+
+## Betriebe: Vorrat liefern und geförderter Handel (Nutzer 05.10.2026)
+- **Vorrat liefern:** Im Handelskontor jeder Stadt „Vorrat liefern“: Holz, Stein, Eisen und Nahrung aus der Siedlung wandern in Zehnerschritten als Bauholz, Steinwaren, Barren und Korn ins Stadtlager, bezahlt zum Verkaufspreis des Orts („gesucht“ markiert, was knapp ist und besser zahlt). Was im Lager liegt, nutzen die Betriebe der Stadt als Vorprodukt (auch deine eigenen: Werkstatt braucht Bauholz, Schmiede Barren). Besetzte oder zerstörte Orte nehmen nichts an.
+- **Handel fördern (Stadtkasse, 100 Gold):** Wohlstand +25 wie bisher, und zehn Tage lang bringen alle Karawanen in diese Stadt 20 % mehr Ware (Händlerzüge zwischen den Städten und der Zug auf der Alten Straße). Das Kontor zeigt die Restlaufzeit. Probe „Betriebe (Nutzer 05.10.)“.
