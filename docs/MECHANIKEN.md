@@ -1531,3 +1531,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Spuren mit Anforderung:** Manche Spuren verlangen Jagdkunst (Fertigkeit „Jagd“). Wer sie nicht hat, sieht nur „Abdrücke, nicht zu deuten“ mit der nötigen Zahl. Nach Regen oder Schnee und im Morgengrauen (5–8 Uhr) sinkt die Anforderung um 10 — frische Abdrücke sind deutlicher. Wer eine solche Spur liest, lernt dabei (Jagd steigt wie beim Erlegen).
 - **Spur treibt das Tier:** Die letzte Spur einer Fährte kann ein Elite-Tier aus der Deckung treiben (einmalig). Elite-Tiere lassen wie bisher Fell und eine Trophäe fallen und zählen als eigenes Auftragsziel.
 - **Erster Auftrag: „Der Keiler von Joruns Feld“** (Jorun, Hof bei Eren): Wühlspuren am Feld (Jagd 10), Suhle am Moorrand (Jagd 15), dort bricht Eisenhauer hervor. 100 Gold, Jorun +12, Erens Wohlstand +2 (Felder sicher). Debug: „Aufträge: Jagd … starten“, „Jagd: Jagdkunst +20“. Probe „Welttiefe W5 Slice 1“.
+
+## Jagd-Händler (Welttiefe W5 Slice 2, 05.10.2026)
+- Jeder Jäger und Jägerbursche in einem Ort nimmt im Gespräch Felle, Pökelfleisch und Trophäen ab: „Felle, Fleisch und Trophäen verkaufen (Jäger zahlen mehr)“ öffnet das Handelsfenster. Er zahlt 25 % über dem, was der Ort sonst gibt, mit Jagdkunst bis 50 % (Fertigkeit 100). Live gemessen in Eren: Wolfsfell 13 statt 8 Gold, Trophäe 51 statt 33.
+- Dazu führt er etwas Jagdzeug (Kurzbogen, Köderpfeife, Dörrfleisch). Kaufpreise sind nicht teurer als anderswo. Verkaufte Felle füllen wie bei jedem Verkauf das Stadtlager. Probe „Welttiefe W5 Slice 2“.
