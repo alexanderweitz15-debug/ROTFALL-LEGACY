@@ -8276,6 +8276,7 @@ function questInfo(k) {
   if (pt && pt.x != null) { const d = Math.hypot(pt.x - p.x / TS, pt.y - p.y / TS) * TS; out.where = `${locAt(pt.x | 0, pt.y | 0)?.name || 'Ziel'} · ${d > 999 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}`; out.dist = d; }
   if (C?.kind === 'defense' && C.at && !C.waved) { const m = Math.max(0, Math.round(C.at - clock())); out.timer = m > 0 ? `Angriff in ~${m >= 60 ? Math.floor(m / 60) + ' Std ' : ''}${m % 60} Min` : 'Angriff jetzt!'; }
   else if (C?.until) out.timer = `Frist: bis Tag ${C.until}`;
+  else if (S.quests[k]?.until && S.quests[k].state === 'active') { const m = Math.max(0, Math.round(S.quests[k].until - clock())); out.timer = m > 0 ? `Frist: noch ${m >= 60 ? Math.floor(m / 60) + ' Std ' : ''}${m % 60} Min` : 'Frist verstrichen'; }   /* W3 */
   out.cancel = !!C || !QUESTS[k]?.main; out.tracked = S.track === k;
   return out;
 }
@@ -8306,6 +8307,7 @@ function trackerInfo() {
     const C = k.startsWith('c_') && (S.contracts || []).find(c => 'c_' + c.id === k), pt = S.map === 'world' ? questPoint(k) : null;
     if (pt && pt.x != null) { o.ang = Math.atan2(pt.y - p.y / TS, pt.x - p.x / TS); o.d = Math.hypot(pt.x - p.x / TS, pt.y - p.y / TS) * TS; }
     if (C?.until && CON_DAYS[C.kind]) { o.frac = clamp(((C.until + 1) * 1440 - clock()) / (CON_DAYS[C.kind] * 1440), 0, 1); o.late = C.until <= (S.day | 0); }
+    else if (!C && st.until && Q.hours) { o.frac = clamp((st.until - clock()) / (Q.hours * 60), 0, 1); o.late = st.until - clock() <= 6 * 60; }   /* W3: Frist fester Aufträge, letzte 6 Stunden rot */
     if (C?.kind === 'defense' && C.at && !C.waved) o.attack = questInfo(k).timer;
     const ob = Q.objectives[0], kill = C ? ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind) && MONSTERS[C.mtype] : ob?.type === 'kill' && MONSTERS[ob.target];
     o.ico = kill ? { t: 'kill', mt: C ? C.mtype : ob.target } : !C && ob?.type === 'item' ? { t: 'item', key: ob.target } : !C && ob?.type === 'find' ? { t: 'find' } : { t: 'custom', ico: C ? CON_ICO[C.kind] || 'log_quest' : 'log_quest' };
@@ -8693,7 +8695,7 @@ function escortStep(e, dt) {
   seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * slow * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick(); questEscortTick();   /* W3 */   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick(); questEscortTick(); questDeadlineTick();   /* W3 */   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -14439,6 +14441,9 @@ function startQuest(k) {
     : o.type === 'kill' && o.target === 'hrodvar' && S.flags.hrodvarSlain ? 1
     : o.type === 'kill' && REGION_BOSSES.some(b => b.id === o.target && S.flags[b.flag]) ? 1
     : o.type === 'kill' && (S.bossSlain?.[o.target] || 0) > 0 ? Math.min(o.count || 1, S.bossSlain[o.target]) : 0) };   // Regionalboss oder Boss schon erlegt: zählt (HB-42)
+  { const Q = QUESTS[k], st = (Q?.clsTrial ? qStore() : S.quests)[k];   /* W3 Slice 3: Lieferung — Gegenstand bei Annahme, Frist in Spielstunden */
+    if (Q?.give && ITEMS[Q.give]) { if (!addItem(S.player, Q.give)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(Q.give)); log(`${ITEMS[Q.give].name} erhalten${S.player.inv.some(i => i.key === Q.give) ? '' : ' — das Gepäck ist voll, es liegt vor deinen Füßen'}.`, 'quest'); st.progress = Q.objectives.map((o, i) => o.type === 'item' && o.target === Q.give ? Math.min(o.count || 1, matHave(Q.give)) : st.progress[i]); }
+    if (Q?.hours) { st.until = clock() + Q.hours * 60; log(`Frist: ${Q.hours} Stunden — danach ist es zu spät.`, 'quest'); } }
 }
 function offerQuest(npc, k) {
   const Q = QUESTS[k];
@@ -14770,6 +14775,11 @@ function ensureEscorts() {
     const c = makeChar({ name: e.name, prof: e.prof || 'Reisender', x: q.x, y: q.y, level: 2, faction: null, traits: ['furchtsam'] });
     Object.assign(c, { questEscort: key, quest: k, escortee: !e.captors, captiveOf: !!e.captors, visitor: true, wounded: !!e.wounded, greet: e.greet || '„Bring mich hin. Bitte.“', anchor: { x: q.x, y: q.y }, esc: { town: e.near || e.from, to: e.to, tx, ty, ambushed: false, greetFree: e.greetFree || null } });
     S.ents.world.push(c); if (e.captors) captors(c, e); }
+}
+/* W3 Slice 3: Aufträge mit Frist (Q.hours → st.until in Spielminuten). Verstreicht sie, scheitert der Auftrag; ein mitgegebener Gegenstand verdirbt. */
+function questDeadlineTick() {
+  for (const [k, st] of Object.entries(S.quests)) { const Q = QUESTS[k]; if (!Q || st.state !== 'active' || !st.until || clock() <= st.until) continue;
+    st.state = 'failed'; st.outcome = 'Die Frist ist verstrichen.'; if (Q.give && ITEMS[Q.give]) { removeItem(S.player, Q.give, matHave(Q.give)); log(`${Q.name}: gescheitert — die Frist ist verstrichen, ${ITEMS[Q.give].name} ist verdorben.`, 'quest'); } else log(`${Q.name}: gescheitert — die Frist ist verstrichen.`, 'quest'); }
 }
 function questEscortTick() {
   if (S.map !== 'world') return;
@@ -17498,7 +17508,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_lief_tinktur: 'eren', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -18420,6 +18430,8 @@ function debugSections() {
       'Aufträge: Eskorte „Finn muss zur Heilerin“ starten (Brann in Nordfurt; Finn verwundet nach Eren zu Elena)': () => { if (!S.quests.q_esk_finn) { startQuest('q_esk_finn'); log('Auftrag angenommen: Finn muss zur Heilerin (Debug).', 'quest'); } ensureEscorts(); UI.toast('Finn wartet am Platz von Nordfurt. Er geht langsam — bleib bei ihm. Abgabe bei Elena in Eren.', 3500); },
       'Aufträge: Rettung „Der verschleppte Rekrut“ starten (Hauke in Nordfurt; Jes bei drei Räubern westlich der Stadt)': () => { if (!S.quests.q_rett_rekrut) { startQuest('q_rett_rekrut'); log('Auftrag angenommen: Der verschleppte Rekrut (Debug).', 'quest'); } ensureEscorts(); UI.toast('Jes sitzt westlich von Nordfurt bei drei Räubern. Erst die Räuber, dann folgt er dir heim.', 3500); },
       'Aufträge: Rettung — Entführer fallen': () => { let n = 0; for (const b of S.ents.world) if (b.captorOf && b.alive) { die(b, 'Debug', S.player); n++; } questEscortTick(); UI.toast(n ? `${n} Entführer tot.` : 'Keine Entführer.'); },
+      'Aufträge: Lieferung „Die Tinktur für Elena“ starten (Quirin in Salzhafen → Elena in Eren, 48 Stunden)': () => { if (!S.quests.q_lief_tinktur) { startQuest('q_lief_tinktur'); log('Auftrag angenommen: Die Tinktur für Elena (Debug).', 'quest'); } UI.toast('Trank der Erneuerung im Gepäck; Abgabe bei Elena in Eren, Frist 48 Stunden (Sanduhr im Tracker).', 3500); },
+      'Aufträge: Frist auf 5 Minuten setzen (aktiver Auftrag mit Frist)': () => { const e = Object.entries(S.quests).find(([k, st]) => st.state === 'active' && st.until); if (!e) return UI.toast('Kein Auftrag mit Frist.'); e[1].until = clock() + 5; UI.toast(`${QUESTS[e[0]].name}: noch 5 Minuten.`); },
       'Aufträge: Eskorte — Begleiter ans Ziel setzen': () => { const e = S.ents.world.find(x => x.questEscort && x.alive && !x.arrived); if (!e) return UI.toast('Keine Eskorte unterwegs.'); e.x = e.esc.tx * TS; e.y = e.esc.ty * TS; questEscortTick(); UI.toast(`${e.name} ist am Ziel.`); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
@@ -23577,6 +23589,20 @@ export function selftest() {
       return okAll;
     } finally { if (q0) S.quests.q_rett_rekrut = q0; else delete S.quests.q_rett_rekrut; S.ents.world = ents0; S.map = m0; }
   }));
+  ok('Welttiefe W3 Slice 3: Lieferung mit Frist — Gegenstand bei Annahme, Frist in Stunden (Tracker-Sanduhr, Auftragsbuch), Abgabe nur beim Empfänger; verstreicht die Frist, scheitert der Auftrag und der Gegenstand verdirbt', sandbox(() => {
+    const q0 = S.quests.q_lief_tinktur, inv0 = S.player.inv, m0 = S.map, tr0 = S.track; const W = {}; const p = stage(); S.map = 'world'; p.map = 'world'; p.inv = [];
+    const op = UI.uiHooks.dialogue; let last = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+    try {
+      delete S.quests.q_lief_tinktur; startQuest('q_lief_tinktur'); const st = S.quests.q_lief_tinktur;
+      W.given = matHave('elixier_regen') === 1 && st.until === clock() + 48 * 60 && questComplete('q_lief_tinktur');
+      S.track = 'q_lief_tinktur'; const T = trackerInfo().list.find(o => o.k === 'q_lief_tinktur'); W.tracker = !!T && Math.abs(T.frac - 1) < 0.01 && !T.late && /Frist: noch 48 Std/.test(questInfo('q_lief_tinktur').timer || '');
+      const qu = { key: 'quirin', kind: 'npc', name: 'Quirin', x: p.x, y: p.y, map: 'world', alive: true }, el = { key: 'elena', kind: 'npc', name: 'Elena', x: p.x, y: p.y, map: 'world', alive: true };
+      last = null; talk(qu); W.giverNo = !(last || []).some(c => /^Erledigt\. \(Die Tinktur/.test(c.text)); UI.closeDialogue(); last = null; talk(el); W.turnin = (last || []).some(c => /^Erledigt\. \(Die Tinktur/.test(c.text)); UI.closeDialogue();
+      st.until = clock() - 1; questDeadlineTick(); W.failed = st.state === 'failed' && /Frist/.test(st.outcome) && matHave('elixier_regen') === 0;
+      const okAll = W.given && W.tracker && W.giverNo && W.turnin && W.failed; if (!okAll) console.warn('W3-S3-Probe', JSON.stringify(W), T && [T.frac, T.late], questInfo('q_lief_tinktur').timer);
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_lief_tinktur = q0; else delete S.quests.q_lief_tinktur; S.player.inv = inv0; S.map = m0; S.track = tr0; UI.closeDialogue(); }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23927,7 +23953,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

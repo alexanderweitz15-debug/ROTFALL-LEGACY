@@ -33,10 +33,11 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 
 - Krieg (PR #19, #20): Schonfrist, Streifen, Entsatz, Front lebendig; 45-Tage-Messung in BALANCE.md.
 - W3 Slice 1 (PR #21): Zieltyp `escort`, `turnin`, Finn-Auftrag; Probe grün 500/500, live getestet.
-- W3 Slice 2 (Commit folgt): Rettung (`captors`, `captiveOf`, `near`/`off`), Auftrag „Der verschleppte Rekrut“; Probe grün 501/501, live geprüft.
+- W3 Slice 2 (PR #22): Rettung (`captors`, `captiveOf`, `near`/`off`), Auftrag „Der verschleppte Rekrut“; Probe grün 501/501, live geprüft.
+- W3 Slice 3 (Commit folgt): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
 
 ## Nächster Schritt
-- W3 Slice 3: Lieferung bei Nacht/Zeitdruck (Empfehlung: Frist in Stunden, Anzeige im Auftragsbuch) oder Gefangener lebend (Empfehlung: Teilbelohnung mit Rufverlust); dann W4 Kill-Varianten/Regionen. Alternativ W1 Slice 3 nach Nutzerentscheid.
+- W4 Kill-Varianten und Regionen (Vorlagen „Alpha, nicht das Rudel“, „Quelle der Auferstehung“, „nur Infizierte“; Themen-Pools je Region für Bretter). Offene W3-Reste (Gefangener lebend, Nacht) nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
