@@ -14497,6 +14497,7 @@ function turnIn(npc, k) {
     if (f && S.factions[f] != null) { S.factions[f] = clamp(S.factions[f] + 4, -100, 100); log(`${FACTIONS[f]?.name || f}: +4 Ansehen.`, 'faction'); } }
   if (r.rep) for (const [f, v] of Object.entries(r.rep)) { S.factions[f] = clamp((S.factions[f] || 0) + v, -100, 100); log(`${FACTIONS[f].name}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
   if (r.rel) for (const [n, v] of Object.entries(r.rel)) addRel(n, v);
+  if (r.prosper) for (const [t, n] of Object.entries(r.prosper)) growthOf(t).prosper = clamp(growthOf(t).prosper + n, -20, 100);   /* W5: Lohn kann den Wohlstand eines Orts heben */
   if (r.take) { const n = r.takeCount || 1, P = S.player;   /* B-1/B-5: aus Vorrat, Gepäck oder notfalls vom Leib */
     for (const [sl, it] of Object.entries(P.equip || {})) if (it?.key === r.take && matHave(r.take) < n) { P.equip[sl] = null; P.inv.push(it); recalc(P); }
     matTake(r.take, n); }
@@ -14531,7 +14532,7 @@ function onKill(mtype, e) {
   for (const [k, st] of questEntries()) {                             /* Koop: auch die Prüfungsaufträge der Gastfiguren */
     if (st.state !== 'active' || !QUESTS[k]) continue;
     QUESTS[k].objectives.forEach((o, i) => {
-      if (o.type === 'kill' && (o.target === mtype || o.targets?.includes(mtype) || (o.target === '*' && e?.kind === 'enemy' && !e.trial) || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Klassen-Prüfung: targets (Liste), * = jeder Feind */   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
+      if (o.type === 'kill' && (o.target === mtype || (e?.eliteKey && e.eliteKey === o.target) || o.targets?.includes(mtype) || (o.target === '*' && e?.kind === 'enemy' && !e.trial) || (o.target === 'bandit_rival' && mtype === 'bandit') || MONSTERS[mtype]?.abart?.of === o.target)) {   /* Klassen-Prüfung: targets (Liste), * = jeder Feind */   /* Entwickler 02.10.: Abarten zählen für ihre Grundart */
         st.progress[i] = (st.progress[i] || 0) + 1;
         if (st.progress[i] <= (o.count || 1)) { log(`${QUESTS[k].name}: ${st.progress[i]}/${o.count}`, 'quest'); questNotch(e, st.progress[i], o.count || 1); }   /* Q5-1: Zählkerbe über der Leiche */
       }
@@ -14842,6 +14843,7 @@ function propHit(c, pr, dmg) {
   if (pr.bonewell) questEvent('destroy', pr.bonewell, 1);
 }
 function cluePos(c) {
+  if (c.near) { const [sx, sy] = conSq(c.near); return freeSpotNear('world', sx + (c.off?.[0] ?? 0), sy + (c.off?.[1] ?? 0), 3); }   /* W5: Spur im Gelände bei einem Ort/Knoten */
   const P = TOWN_PLAN[c.town]; let tx, ty;                           /* at = Plan-Koordinaten (wie die Props im TOWN_PLAN) → worldPt; P.square ist zur Laufzeit schon Weltkachel */
   if (c.at) [tx, ty] = worldPt(c.at[0], c.at[1]);
   else if (c.square && P) { tx = P.square[0] + (c.square[0] || 0); ty = P.square[1] + (c.square[1] || 0); }
@@ -14855,10 +14857,21 @@ function ensureClues() {                                              /* idempot
     for (const c of Q.clues) { const i = Q.objectives.findIndex(o => o.type === 'clue' && o.target === c.key); if (i >= 0 && (st.progress[i] || 0) >= (Q.objectives[i].count || 1)) continue; want.set(c.key, { c, k }); } }
   for (const m of Object.keys(S.ents)) { const arr = S.ents[m]; if (arr.some(e => e.clue && !want.has(e.clue))) S.ents[m] = arr.filter(e => !(e.clue && !want.has(e.clue))); }   /* Listen nur ersetzen, wenn wirklich eine Spur verschwindet (actorsOf/byId sind inkrementell) */
   for (const [key, { c, k }] of want) { const map = c.map || 'world'; if ((S.ents[map] || []).some(e => e.clue === key)) continue; const q = cluePos(c); if (!q) continue;
-    (S.ents[map] ||= []).push({ id: uid(), kind: 'prop', type: 'sign', map, x: q.x, y: q.y, r: 8, solid: false, transient: true, clue: key, quest: k, label: c.label, text: c.text, give: c.give || null }); }
+    (S.ents[map] ||= []).push({ id: uid(), kind: 'prop', type: 'sign', map, x: q.x, y: q.y, r: 8, solid: false, transient: true, clue: key, quest: k, label: c.label, text: c.text, give: c.give || null, skill: c.skill || null, spawn: c.spawn || null }); }
 }
+/* W5 Jagd Slice 1 (Welttiefe, 05.10.2026): Spuren können Jagdkunst verlangen (clue.skill.hunting). Nach Regen oder Schnee und im Morgengrauen (5–8 Uhr)
+   sind Abdrücke deutlicher: die Anforderung sinkt um TRACK_EASE. Wer eine solche Spur liest, lernt dabei (huntGain). clue.spawn treibt beim Lesen ein
+   Elite-Tier aus der Deckung (idempotent). */
+const TRACK_EASE = 10;
+const trackEase = () => (['rain', 'snow'].includes(S.weather) || (S.minute / 60 >= 5 && S.minute / 60 < 8)) ? TRACK_EASE : 0;
 function clueRead(t) {
   const Q = QUESTS[t.quest]; if (!Q) return;
+  if (t.skill?.hunting) { const need = Math.max(0, t.skill.hunting - trackEase()), have = S.player.skills?.hunting || 0;
+    if (have < need) { log(`${t.label}: Abdrücke, nicht zu deuten. Jagdkunst ${need} nötig (du: ${Math.round(have)}) — nach Regen oder Schnee und im Morgengrauen sind Spuren leichter zu lesen.`, 'quest'); UI.toast('Spur nicht zu deuten — Jagdkunst fehlt', 2600); return; }
+    huntGain(); }
+  if (t.spawn?.elite && ELITES[t.spawn.elite] && !S.ents.world.some(e => e.kind === 'enemy' && e.alive && e.eliteKey === t.spawn.elite && e.questBeast)) {
+    const E = ELITES[t.spawn.elite], b = spawnEnemy(E.base, 'world', (t.x / TS | 0) + (t.spawn.off?.[0] ?? 6), (t.y / TS | 0) + (t.spawn.off?.[1] ?? 0));
+    if (b) { applyElite(b, t.spawn.elite); Object.assign(b, { questBeast: t.quest, aggroId: S.player.id, aiState: 'pursue', anchor: { x: b.x, y: b.y } }); fx(b.x, b.y - 6, 'dust', 10); log(`Die Spur ist frisch — und da bricht es aus dem Gebüsch: ${E.name}!`, 'combat'); UI.toast(E.name.toUpperCase(), 2600); } }
   log(`${t.label}: ${t.text}`, 'quest'); fx(t.x, t.y - 8, 'spark', 5); sfx('ui', 0.5, 1);
   if (t.give && ITEMS[t.give]) { if (!addItem(S.player, t.give)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(t.give)); log(`Beweisstück: ${ITEMS[t.give].name}${S.player.inv.some(i => i.key === t.give) ? ' im Gepäck' : ' — das Gepäck ist voll, es liegt vor deinen Füßen'}.`, 'quest'); }   /* Spur mit Fundstück */
   if (!S.flags.clueHint) { S.flags.clueHint = 1; log('Spuren gehören zu Aufträgen: Wer sie liest, zählt das Ziel; Aussagen der Befragten stehen im Protokoll (Log). Am Ende entscheidest du beim Geber, wer es war — und das Dorf merkt sich dein Urteil.', 'quest'); }
@@ -17560,7 +17573,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_lief_tinktur: 'eren', q_quelle_moor: 'marsh', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_lief_tinktur: 'eren', q_quelle_moor: 'marsh', q_jagd_eisenhauer: 'eren', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -18487,6 +18500,8 @@ function debugSections() {
       'Aufträge: Frist auf 5 Minuten setzen (aktiver Auftrag mit Frist)': () => { const e = Object.entries(S.quests).find(([k, st]) => st.state === 'active' && st.until); if (!e) return UI.toast('Kein Auftrag mit Frist.'); e[1].until = clock() + 5; UI.toast(`${QUESTS[e[0]].name}: noch 5 Minuten.`); },
       'Aufträge: Quelle „Was aus dem Moor steigt“ starten (Kelan; Knochenquelle am Moorrand, Angriff zerschlägt sie)': () => { if (!S.quests.q_quelle_moor) { startQuest('q_quelle_moor'); log('Auftrag angenommen: Was aus dem Moor steigt (Debug).', 'quest'); } ensureBonewells(); const w = S.ents.world.find(e => e.bonewell); UI.toast(w ? `Knochenquelle bei Kachel ${w.x / TS | 0}/${w.y / TS | 0} — hinlaufen, Tote kommen alle 60 Minuten, zuschlagen.` : 'Keine Quelle.', 4000); },
       'Aufträge: Quelle — Held zur Quelle, nächste Welle jetzt': () => { const w = S.ents.world.find(e => e.bonewell); if (!w) return UI.toast('Keine Quelle.'); S.player.x = w.x - 60; S.player.y = w.y; w.nextAt = 0; bonewellTick(); UI.toast('Die Toten steigen.'); },
+      'Aufträge: Jagd „Der Keiler von Joruns Feld“ starten (Jorun; Spuren brauchen Jagdkunst 10/15, Regen hilft; Eisenhauer erscheint an der Suhle)': () => { if (!S.quests.q_jagd_eisenhauer) { startQuest('q_jagd_eisenhauer'); log('Auftrag angenommen: Der Keiler von Joruns Feld (Debug).', 'quest'); } ensureClues(); UI.toast(`Spuren am Feld und an der Suhle; Jagdkunst ${Math.round(S.player.skills?.hunting || 0)}. Regen (Debug „Wetter“) oder 5–8 Uhr senken die Anforderung um ${TRACK_EASE}.`, 4000); },
+      'Jagd: Jagdkunst +20': () => { const p = S.player; p.skills.hunting = Math.min(100, (p.skills.hunting || 0) + 20); UI.toast(`Jagdkunst ${Math.round(p.skills.hunting)}`); },
       'Aufträge: Eskorte — Begleiter ans Ziel setzen': () => { const e = S.ents.world.find(x => x.questEscort && x.alive && !x.arrived); if (!e) return UI.toast('Keine Eskorte unterwegs.'); e.x = e.esc.tx * TS; e.y = e.esc.ty * TS; questEscortTick(); UI.toast(`${e.name} ist am Ziel.`); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
@@ -23697,6 +23712,23 @@ export function selftest() {
       return okAll;
     } finally { if (q0) S.quests.q_quelle_moor = q0; else delete S.quests.q_quelle_moor; S.ents.world = ents0; indexSolids('world'); S.map = m0; S.flags.bonewellHint = f0; }
   }));
+  ok('Welttiefe W5 Slice 1: Jagd — Spuren verlangen Jagdkunst (Regen und Morgengrauen erleichtern um 10), Lesen lehrt die Fertigkeit, die zweite Spur treibt den Elite-Keiler aus der Deckung, sein Tod zählt das Ziel und lässt die Trophäe fallen; der Lohn hebt Erens Wohlstand', sandbox(() => {
+    const q0 = S.quests.q_jagd_eisenhauer, ents0 = S.ents.world.slice(), w0 = S.weather, m0 = S.minute, G0 = structuredClone(S.growth || {}), ed0 = structuredClone(S.elitesDead || {}); const W = {}; const p = stage(); S.map = 'world'; p.map = 'world'; p.skills.hunting = 0; S.weather = 'clear'; S.minute = 12 * 60;
+    try {
+      delete S.quests.q_jagd_eisenhauer; startQuest('q_jagd_eisenhauer'); ensureClues(); const st = S.quests.q_jagd_eisenhauer;
+      const feld = S.ents.world.find(e => e.clue === 'keiler_feld'), suhle = S.ents.world.find(e => e.clue === 'keiler_suhle'); W.laid = !!feld && !!suhle && feld.skill?.hunting === 10 && !!suhle.spawn;
+      clueRead(feld); W.gated = st.progress[0] === 0 && S.ents.world.includes(feld) && p.skills.hunting === 0;
+      S.weather = 'rain'; clueRead(feld); W.rainReads = st.progress[0] === 1 && p.skills.hunting > 0;   /* 10 − 10 = 0 */
+      S.weather = 'clear'; p.skills.hunting = 4; clueRead(suhle); W.gated2 = st.progress[1] === 0;
+      S.minute = 6 * 60; clueRead(suhle); W.dawnFails = st.progress[1] === 0;   /* 15 − 10 = 5 > 4 */
+      p.skills.hunting = 6; clueRead(suhle); const beast = S.ents.world.find(e => e.eliteKey === 'eisenhauer' && e.questBeast === 'q_jagd_eisenhauer'); W.beast = st.progress[1] === 1 && !!beast && beast.alive && !!ELITES.eisenhauer;
+      clueRead(suhle); W.once = S.ents.world.filter(e => e.eliteKey === 'eisenhauer' && e.questBeast).length === 1;
+      p.x = beast.x - 40; p.y = beast.y; die(beast, 'Probe', p); W.killed = st.progress[2] === 1 && questComplete('q_jagd_eisenhauer') && S.ents.world.some(e => e.kind === 'item' && /Trophäe: Eisenhauer/.test(e.item?.name || e.name || ''));
+      const pr0 = growthOf('eren').prosper; turnIn({ key: 'jorun', kind: 'npc', name: 'Jorun' }, 'q_jagd_eisenhauer'); W.prosper = st.state === 'done' && growthOf('eren').prosper === Math.min(100, pr0 + 2);
+      const okAll = W.laid && W.gated && W.rainReads && W.gated2 && W.dawnFails && W.beast && W.once && W.killed && W.prosper; if (!okAll) console.warn('W5-Probe', JSON.stringify(W), st.progress, S.ents.world.filter(e => e.kind === 'item').slice(-3).map(e => e.item?.name || e.name));
+      return okAll;
+    } finally { if (q0) S.quests.q_jagd_eisenhauer = q0; else delete S.quests.q_jagd_eisenhauer; S.ents.world = ents0; S.weather = w0; S.minute = m0; S.growth = G0; S.elitesDead = ed0; }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -24047,7 +24079,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, ensureBonewells, bonewellTick, propHit, trackEase, applyElite, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

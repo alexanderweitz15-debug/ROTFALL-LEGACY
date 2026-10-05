@@ -37,10 +37,11 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W3 Slice 3 (PR #23): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
 - W4 Slice 1 (PR #24): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft.
 - W4 Slice 2 (PR #25): `REGION_CON`/`warHot` in `conKinds`; Probe grün 504/504, live geprüft.
-- W4 Slice 3 (Commit folgt): Knochenquelle (`ensureBonewells`, `bonewellTick`, `propHit`, Zieltyp `destroy`), Auftrag „Was aus dem Moor steigt“; Probe grün 505/505, live getestet mit Mausangriffen. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
+- W5 Slice 1 (Commit folgt): Spuren mit Jagdkunst (`trackEase`, `clue.skill/spawn/near`), Auftrag „Der Keiler von Joruns Feld“; Probe grün 506/506, live geprüft. Zwei alte Proben (Abstand S12, Spawns) fielen einmal zufallsbedingt rot und liefen im nächsten Lauf grün.
+- W4 Slice 3 (PR #26): Knochenquelle (`ensureBonewells`, `bonewellTick`, `propHit`, Zieltyp `destroy`), Auftrag „Was aus dem Moor steigt“; Probe grün 505/505, live getestet mit Mausangriffen. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
 
 ## Nächster Schritt
-- W5 Jagd (Spuren mit Wetter/Tageszeit, seltene Tiere, Fallen, Trophäen) — Plan §3 vor dem ersten Edit. Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
+- W5 Slice 2: Fallen (Prop `trap`, Tier läuft hinein) oder Jagd-Händler (Trophäen/Felle verkaufen, Fertigkeit als Preisfaktor) — Empfehlung Jagd-Händler (kleiner, verbindet Wirtschaft). Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
