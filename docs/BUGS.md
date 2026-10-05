@@ -2,7 +2,7 @@
 
 Nur offene Einträge, nach Priorität. Behobene: je eine Zeile in `archive/BUGS_behoben.md`, volle Texte bis S13 in
 `archive/BUGS_bis_S13.md`. Neuer Eintrag: ID · Titel · Schritte · Erwartet/Tatsächlich · Ursache · Lösung · Test · Status.
-Nächste freie ID: **BUG-144**.
+Nächste freie ID: **BUG-145**.
 
 ## HIGH
 
