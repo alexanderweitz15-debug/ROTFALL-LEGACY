@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
-import { WAR_NODES, RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=25';
+import { WAR_NODES, WAR_EDGES, RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES, RELIQ, RELIQ_TIER, RELIQ_MAX, RELIQ_START, RELIQ_COST, RELIQ_SYN, RELIQ_BOSS, RELIQ_REGION } from './data.js?v=25';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
 import * as R from './render.js?v=25';
 import * as HB from './buildings.js?v=25';
@@ -8134,7 +8134,21 @@ function setLord(town, fac, why = '') { if (S._quiet && !S._probeLord) return;  
 const townFac = town => S.townLord?.[town] || (S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.tribute ? 'frei' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin', 'wuest', 'zwerge'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen'));   /* Folgen §5c: Aufträge der Freien */
 /* Entscheidung 03.10.2026: Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge der Tiefhall haben eigene Bretter — Arten passend zum Ort (vorläufig) */
 const FAC_CON = { karak_atar: ['escort', 'deliver', 'bounty', 'camps', 'missing', 'patrol', 'trail', 'defense'], duenenwacht: ['patrol', 'bounty', 'camps', 'trail'], deephall: ['monster', 'bounty', 'hunt', 'missing'] };
-const conKinds = town => town === 'vharnholm' ? [] : FAC_CON[town] ? FAC_CON[town] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
+/* W4 Slice 2 (Welttiefe, 05.10.2026): Themen-Pools je Gegend — das Brett eines Waldorts hängt Jagd und Spuren aus, der Hafen Vermisste und Lieferungen,
+   das Ödland Steckbriefe und Lager; gewichtete Listen (Doppelte = häufiger), die Rotation in townContracts zieht daraus. Grenzt ein Kriegsknoten der
+   Toten an den Ort, kommen Verteidigung und Monsterjagd nach vorn. Fraktionsorte (FAC_CON) und Vharnholm bleiben, wie sie sind. */
+const REGION_CON = {
+  greenmark: ['bounty', 'hunt', 'deliver', 'escort', 'missing', 'supply', 'herbs', 'monster', 'patrol', 'trail'],
+  plains: ['hunt', 'hunt', 'supply', 'deliver', 'escort', 'bounty', 'patrol', 'herbs', 'camps'],
+  forest: ['hunt', 'hunt', 'trail', 'missing', 'herbs', 'monster', 'camps', 'supply'],
+  marsh: ['missing', 'missing', 'monster', 'herbs', 'deliver', 'escort', 'trail', 'bounty'],
+  badland: ['bounty', 'bounty', 'camps', 'patrol', 'escort', 'trail', 'monster', 'deliver'],
+  aurel: ['deliver', 'deliver', 'bounty', 'monster', 'missing', 'escort', 'patrol', 'supply'],
+  desert: ['escort', 'deliver', 'bounty', 'camps', 'patrol', 'missing'], mountain: ['monster', 'supply', 'hunt', 'trail', 'bounty', 'missing'] };
+const CON_ALL = () => Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');
+const warHot = town => (WAR_EDGES || []).some(([a, b]) => (a === town && S.war?.nodes?.[b]?.owner === 'undead') || (b === town && S.war?.nodes?.[a]?.owner === 'undead'));
+const conKinds = town => { if (town === 'vharnholm') return []; if (FAC_CON[town]) return FAC_CON[town];
+  const [sx, sy] = conSq(town), base = (REGION_CON[regionAt(sx, sy)] || CON_ALL()).filter(k => CON[k]); return warHot(town) ? ['defense', 'monster', ...base] : base; };   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
   return r === 'deadland' ? ['skeleton', 'ghoul', 'skeleton'] : r === 'desert' ? ['bandit', 'bandit_archer'] : r === 'eisen' || r === 'mountain' ? ['wolf', 'goblin_warrior', 'bandit']
@@ -23619,6 +23633,18 @@ export function selftest() {
       return okAll;
     } finally { if (q0) S.quests.q_greymane = q0; else delete S.quests.q_greymane; S.relations = R0; }
   }));
+  ok('Welttiefe W4 Slice 2: Themen-Pools je Gegend — Waldbrett mit Jagd und Spuren, Hafen mit Vermissten, Ödland mit Steckbriefen; ein Ort neben einem Totenknoten hängt zuerst Verteidigung und Monsterjagd aus; Fraktionsorte und Vharnholm unverändert', (() => {
+    const W = {}; const own0 = S.war?.nodes?.marsh?.owner; const cnt = (l, k) => l.filter(x => x === k).length;
+    try {
+      const wald = conKinds('weidenau'), hafen = conKinds('saltport'), oed = conKinds('ashford'), eren = conKinds('eren');
+      W.wald = cnt(wald, 'hunt') >= 2 && wald.includes('trail') && wald.every(k => CON[k]); W.hafen = cnt(hafen, 'missing') >= 2; W.oed = cnt(oed, 'bounty') >= 2;
+      W.mil = [wald, hafen, oed, eren].every(l => l.some(k => CON[k].mil));   /* Verteidigungsmeister braucht militärische Arten */
+      if (S.war?.nodes?.marsh) S.war.nodes.marsh.owner = 'valen'; W.calm = conKinds('eren')[0] !== 'defense'; if (S.war?.nodes?.marsh) S.war.nodes.marsh.owner = 'undead'; W.hot = conKinds('eren')[0] === 'defense' && conKinds('eren')[1] === 'monster';
+      W.fac = conKinds('karak_atar') === FAC_CON.karak_atar && conKinds('vharnholm').length === 0;
+      const okAll = W.wald && W.hafen && W.oed && W.mil && W.calm && W.hot && W.fac; if (!okAll) console.warn('Brett-Pools', JSON.stringify(W), JSON.stringify({ wald, hafen, oed, eren }));
+      return okAll;
+    } finally { if (S.war?.nodes?.marsh && own0 !== undefined) S.war.nodes.marsh.owner = own0; }
+  })());
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23969,7 +23995,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, conKinds, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

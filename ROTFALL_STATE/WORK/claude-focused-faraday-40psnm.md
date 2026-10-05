@@ -35,10 +35,11 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W3 Slice 1 (PR #21): Zieltyp `escort`, `turnin`, Finn-Auftrag; Probe grün 500/500, live getestet.
 - W3 Slice 2 (PR #22): Rettung (`captors`, `captiveOf`, `near`/`off`), Auftrag „Der verschleppte Rekrut“; Probe grün 501/501, live geprüft.
 - W3 Slice 3 (PR #23): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
-- W4 Slice 1 (Commit folgt): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
+- W4 Slice 1 (PR #24): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft.
+- W4 Slice 2 (Commit folgt): `REGION_CON`/`warHot` in `conKinds`; Probe grün 504/504, live geprüft. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
 
 ## Nächster Schritt
-- W4 Slice 2: Themen-Pools je Region für Bretter (`conKinds`/`CON` je Gegend) oder „Quelle der Auferstehung“ (Erzeuger-Prop, NEW FEATURE mit Plan). Offene W3-Reste (Gefangener lebend, Nacht) nach Nutzerentscheid.
+- W4 Slice 3: „Quelle der Auferstehung“ (Erzeuger-Prop, NEW FEATURE mit Plan §3) — oder W5 Jagd (Spuren mit Wetter/Tageszeit, seltene Tiere). Offene W3-Reste (Gefangener lebend, Nacht) nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.

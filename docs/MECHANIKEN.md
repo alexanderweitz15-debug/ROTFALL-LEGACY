@@ -1517,3 +1517,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Tötungsaufträge mit Regel: „Alpha, nicht das Rudel“ (Welttiefe W4 Slice 1, 05.10.2026)
 - **Schonen als Auftragsregel:** Ein Tötungsauftrag kann eine Art nennen, die geschont werden muss, mit Spielraum. Jeder Treffer zählt im Log („Wölfe des Rudels getötet 1/2“), das Auftragsbuch zeigt „Schonen: Wolf — n Spielraum“. Wird der Spielraum überschritten, scheitert der Auftrag sichtbar, mit Folgen beim Geber. Bosse und Anführer der Art zählen nicht.
 - **„Graumähne“ (Tomas, Eren) ist der erste Fall:** nur der Leitwolf; höchstens zwei Wölfe des Rudels dürfen fallen, der dritte lässt den Auftrag scheitern (Tomas −10, die Wildschweine kommen auf die Felder). Wer das Rudel ausweichen oder abschütteln kann, hat es leichter als wer alles niedermacht. Probe „Welttiefe W4 Slice 1“.
+
+## Bretter mit Gegend-Thema (Welttiefe W4 Slice 2, 05.10.2026)
+- Jedes Anschlagbrett zieht seine Aushänge aus einem Pool seiner Gegend: Wald (Weidenau, Grauwasser) hängt vor allem Jagd und Spurensuche aus, Marsch und Hafen (Salzhafen, Hohlstein, Eisenried) Vermisste und Bestien, Ödland (Aschfurt) Steckbriefe und Räuberlager, Ebene (Kreuzweg, Sonnwacht) Jagd, Vorräte und Lieferungen, Aurelion Lieferungen, das Grünland (Eren, Nordfurt) die volle Mischung. Grenzt ein Kriegsknoten der Toten an den Ort, stehen Verteidigung und Monsterjagd vorn.
+- Fraktionsorte (Karak-Atar, Dünenwacht, Zwergenstadt) und Vharnholm bleiben, wie sie sind. Probe „Welttiefe W4 Slice 2“.

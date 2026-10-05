@@ -1443,7 +1443,7 @@ Legende Prüfung: **✔** = live abgegeben, Lohn wie in den Daten angekommen · 
 
 ### 4.1 Wie Verträge funktionieren
 
-- **Was es ist:** Wiederkehrende Aufträge aus der Welt. Jede Stadt hat ein Anschlagbrett (Dorf 3, Stadt 5 Aushänge, erneuert alle 3 Tage; angenommene oder erledigte werden täglich aufgefüllt, `S.conTop`) und einen Verteidigungsmeister (3 militärische Aufträge). Dazu vergeben Bewohner nach Beruf je einen eigenen Auftrag (`PROF_CON`). Die Eisenfeste vergibt über Kettenwachen, Tributoffizier, Paladinmarschall und Eisenpaladine; nach dem Sklavenaufstand geben die Freien in Grubenhort, in Tickmar der Arbeiterrat Aufträge.
+- **Was es ist:** Wiederkehrende Aufträge aus der Welt. Jede Stadt hat ein Anschlagbrett (Dorf 3, Stadt 5 Aushänge, erneuert alle 3 Tage; angenommene oder erledigte werden täglich aufgefüllt, `S.conTop`); Arten je Gegend aus `REGION_CON` (`conKinds`, `regionAt`), Totenknoten nebenan → Verteidigung/Monsterjagd zuerst (`warHot`) und einen Verteidigungsmeister (3 militärische Aufträge). Dazu vergeben Bewohner nach Beruf je einen eigenen Auftrag (`PROF_CON`). Die Eisenfeste vergibt über Kettenwachen, Tributoffizier, Paladinmarschall und Eisenpaladine; nach dem Sklavenaufstand geben die Freien in Grubenhort, in Tickmar der Arbeiterrat Aufträge.
 - **Ablauf:**
   1. Brett / Wache / Bewohner ansprechen → Auftragsbrief (Lohn in Gold, Frist) → „Annehmen“.
   2. Ziel steht wirklich in der Welt (Gegner werden außer Sicht nachgesetzt, Bosse nie).
