@@ -1561,6 +1561,16 @@ export const QUESTS = {
     objectives:[ { type:'destroy', target:'moorquelle', count:1, text:'Die Knochenquelle am Moorrand zerschlagen (die Toten kommen wieder, solange sie steht)' } ],
     bonewell:{ key:'moorquelle', near:'marsh', off:[6, -6], hp:60, every:60, mtype:'skeleton', n:2, cap:4, label:'Knochenquelle' },
     reward:{ gold:120, xp:160, rep:{ order:4 }, rel:{ kelan:10 } } },
+  q_jagd_eisenhauer: { name:'Der Keiler von Joruns Feld', giver:'jorun', turnin:'jorun',
+    desc:'„Seit drei Nächten wühlt mir ein Keiler die Felder um — kein gewöhnlicher, ein Vieh wie ein Fass, Hauer wie Sicheln. Die Hunde trauen sich nicht ran. Lies seine Spuren: erst am Feld, dann zur Suhle am Moorrand, wo er sich wälzt. Wer Spuren lesen kann, findet ihn. Wer es nicht kann, sieht nur Dreck.“',
+    objectives:[
+      { type:'clue', target:'keiler_feld', count:1, text:'Die Wühlspuren am Feld lesen (Jagdkunst 10; nach Regen oder im Morgengrauen leichter)' },
+      { type:'clue', target:'keiler_suhle', count:1, text:'Die Spur zur Suhle am Moorrand verfolgen (Jagdkunst 15)' },
+      { type:'kill', target:'eisenhauer', count:1, text:'Eisenhauer erlegen' } ],
+    clues:[
+      { key:'keiler_feld', near:'eren', off:[-16, 14], label:'Wühlspuren am Feld', text:'Aufgerissene Furchen, Borsten an den Zaunpfählen, Abdrücke so breit wie eine Hand. Die Fährte zieht nach Süden, Richtung Moor.', skill:{ hunting:10 } },
+      { key:'keiler_suhle', near:'marsh', off:[-6, 8], label:'Suhle am Moorrand', text:'Eine frische Suhle, der Schlamm noch nass. Hier wälzt er sich — und er ist nicht weit.', skill:{ hunting:15 }, spawn:{ elite:'eisenhauer', off:[6, 0] } } ],
+    reward:{ gold:100, xp:150, rel:{ jorun:12 }, prosper:{ eren:2 } } },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
