@@ -6,7 +6,7 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Zusammengeführt: claude-arbeit (PR #9: Audit Phase 1–4, Wüstenbund/Zwerge, Wanderautomaten, Heiler-/Zauberfenster, Schleichmodus, Kampfanimationen) und Reliquien (Endgame-Fortschritt, Anmarsch der Ereignisfiguren, Omega-Szene).
 - PR #7 zurückgeholt (war in main verloren): Angst der Bürger, schwere Verbrechen mit Bußgeld und Haft, Zerfall Varonheims ohne König.
 - Reliquien-Fenster auf Taste O (V ist der Schleichmodus). Cache-Schlüssel v=25.
-- Welttiefe Slice 1 (Plan: `docs/PLAN_WELTTIEFE.md`): Auftragsziele *Spur untersuchen* und *Befragen*, Urteil mit Folgen am Auftragsende; erste Ermittlung „Blut auf dem Markt“ in Eren. Arbeitsregeln neu in `CLAUDE.md`.
+- Welttiefe Slice 1 (Plan: `docs/PLAN_WELTTIEFE.md`): Auftragsziele *Spur untersuchen* und *Befragen*, Urteil mit Folgen am Auftragsende; Ermittlungen „Blut auf dem Markt“ (Eren) und „Sechs statt zehn“ (Nordfurt: Beweisstück aus einer Spur, Urteil wirkt auf den Marktvorrat). Spuren haben im Prompt Vorrang wie benannte Figuren. Arbeitsregeln neu in `CLAUDE.md`.
 - Behoben: Eisenfeste — neue Spiele bekamen nie Kettenzug, Torwachen und Käfig-Gefangene (die Bevölkerung zählte als „schon besiedelt“); alte Stände holen den Kettenzug nach. Ersatz für die Stadtwache war in den ersten Tagen eines Spiels gesperrt (Z.reinf 0).
 - Selbsttest 488/488. Proben gegen Zufall gehärtet (Trefferzone, Krits, Bedrohung im neuen Spiel): Wuchtschlag, Schleichen, Akademie-Duell, Duell im Kreis, Knochenritter, Stadtfest/Tagesplan (peace() ohne Heere der Toten), Betriebe-Verlusttag; Erbe-Aufträge ohne festen Kartenpunkt.
 

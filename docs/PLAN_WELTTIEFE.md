@@ -59,6 +59,18 @@ Erst ein vollständiges Beispiel (ein Auftrag, ein NPC, eine Folge, eine Probe, 
 5. **Händler-Rückkehr nach Banditen:** Welche Stelle misst „Weg sicher“ (Lager auf der Straße leer, X Tage)? *Empfehlung:* `SPAWN_AREAS` an Straßen mit Zähler, 3 Tage.
 6. **Premium/Endgame-Währungen:** Bossmaterial als neue Währung oder Glut/Stern erweitern? *Empfehlung:* Glut/Stern erweitern, keine dritte Währung.
 
+## W1 — Vorschlagstabelle weiterer Ermittlungen (Stand 05.10.)
+
+| Key | Geber | Ort | Struktur (§6.3) | Belohnung/Folge | Zieltypen | Stand |
+|---|---|---|---|---|---|---|
+| `q_erm_markt` | Havel | Eren | Untersuchung, Urteil mit Folgen | Beziehungen, Wohlstand, Chronik | clue, talk, decide | **gebaut, live geprüft** |
+| `q_erm_nordfurt` | Brann | Nordfurt | Untersuchung mit Beweisstück, Urteil wirkt auf den Markt | Marktvorrat, Ruf Händler/Valen, Beziehungen | clue (give), talk, decide (stock) | **gebaut, Probe grün, live bis zum Urteil** |
+| `q_erm_graeber` | Sael | Vharnholm/Friedhof | Untersuchung im Totenland: geöffnete Gräber — Grabräuber oder Nekromantie? | Ruf Tote/Valen, Folge für den Friedhof | clue, talk, decide | Vorschlag; braucht Entscheidung: darf Vhal (Nekromant) belastet werden? |
+| `q_erm_ware` | Quirin | Salzhafen | Falsche Tränke auf dem Markt, Hehlerin Nix als Verdächtige | Schwarzmarkt/Bande, Händler, Preise | clue, talk, decide (stock) | Vorschlag; Nix ist Lehrerin der Assassinen — Folgen für die Bande sind Designfrage |
+| `q_erm_stollen` | Rulf | Eisenfeste | Sabotage im Stollen aus Sicht der Kette; alternativ den Saboteur decken (goblinfreundlich) | Rang Kette, Goblin-Ruf, Aufstand | clue, talk, decide | Vorschlag; Fraktionsfolgen = Designfrage |
+| `q_erm_wasser` | (Karak-Atar) | Wüste | Vergiftetes Wasser, Nomaden vs. Händler | Wüstenbund, Karawanen | clue, talk, decide | Vorschlag; Karak-NPCs sind flüchtig ohne feste Keys |
+
 ## Erledigt
 
-- **W1 Slice 1 (05.10.):** Zieltypen `talk` und `clue`, `ensureClues()`, `clueRead()`, `inquiryChoices()`, `questDecide()`; Auftrag „Blut auf dem Markt“ (Havel, Eren) mit zwei Spuren, zwei Befragungen, drei Urteilen; Probe, Debug-Eintrag, `MECHANIKEN.md`, `DATA_SCHEMAS.md`. Status: Probe grün (Selbsttest), Live-Test im Browser ausstehend.
+- **W1 Slice 1 (05.10.):** Zieltypen `talk` und `clue`, `ensureClues()`, `clueRead()`, `inquiryChoices()`, `questDecide()`; Auftrag „Blut auf dem Markt“ (Havel, Eren) mit zwei Spuren, zwei Befragungen, drei Urteilen; Probe, Debug-Eintrag, `MECHANIKEN.md`, `DATA_SCHEMAS.md`. Status: Probe grün, **live getestet** (echter Pfad: Prompt, E, Dialogknöpfe, Urteil).
+- **W1 Slice 2 (05.10.):** „Sechs statt zehn“ (Brann, Nordfurt) mit Beweisstück (`give`) und Marktfolge (`stock`); Spur-Props mit Prompt-Vorrang wie benannte Figuren. Status: Probe grün (490/490), live geprüft bis zum Urteil (Urteilspfad identisch mit Fall 1).

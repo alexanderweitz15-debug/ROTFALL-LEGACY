@@ -1469,5 +1469,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Neue Auftragsziele:** *Spur untersuchen* (eine markierte Stelle in der Welt mit E lesen; der Befund steht im Log) und *Befragen* (beim genannten NPC erscheint „Befragen: …“, seine Aussage steht im Log). Spuren liegen nur, solange der Auftrag läuft, und verschwinden, sobald sie gelesen sind. Der Tracker zeigt Spuren mit dem Auge, Befragungen mit dem Gruppen-Symbol.
 - **Urteil mit Folgen:** Solche Aufträge enden nicht mit „Belohnung, fertig“. Der Geber fragt, wer es war; jede Antwort hat Folgen (Beziehungen, Ansehen, Wohlstand des Orts, Chronik), auch die falsche. „Ich brauche noch Zeit“ lässt die Frage offen.
 - **Erster Fall: „Blut auf dem Markt“** (Havel, Eren): Blutspur zwischen den Ständen, Spuren am Viehtrog, Borin und Elena befragen. Drei Urteile: Borin (unschuldig — das Dorf merkt es sich), Tomas (die Wahrheit), selbst zahlen (60 Gold, niemand wird verurteilt).
-- Debug: „Aufträge: Ermittlung ‚Blut auf dem Markt‘ starten“.
+- **Zweiter Fall: „Sechs statt zehn“** (Brann, Nordfurt): Lagertor des Kontors und Wagenspuren vor dem Südtor untersuchen (dort liegt ein Beweisstück, das ins Gepäck wandert), Gerold und Hauke befragen. Urteile: Gerold (die Wahrheit: der Markt bekommt die Barren zurück, Händlergilde −3, Valen +2), der Fuhrmann (Brann glaubt dir nicht mehr), oder Schweigegeld (50 Gold, Valen −2).
+- **Spuren können Fundstücke tragen** (Beweis ins Gepäck, bei vollem Gepäck vor die Füße); **Urteile können den Marktvorrat eines Orts ändern** (Preise folgen über die Wirtschaft).
+- Debug: „Aufträge: Ermittlung ‚Blut auf dem Markt‘ starten“, „… ‚Sechs statt zehn‘ starten“.
 
