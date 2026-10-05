@@ -1507,7 +1507,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Begleiten als Auftragsziel (Welttiefe W3 Slice 1, 05.10.2026)
 - **Neues Auftragsziel „Begleiten“:** Feste Aufträge können einen Begleiter haben, der am Startort wartet, selbst den Straßenweg zum Ziel geht und bei dir bleibt (wie Vertrags-Eskorten: ruft, wenn du zu weit vorausgehst, läuft bei Gefahr zu dir, auf halber Strecke lauern Räuber). Am Ziel zählt das Ziel, der Begleiter bleibt dort wohnen. Stirbt er unterwegs, scheitert der Auftrag (Brief „gescheitert“, Grund im Auftragsbuch).
-- **Varianten:** *verwundet* — er geht nur mit 60 % Tempo, du musst dich nach ihm richten. Weitere (Gefangener lebend, bei Nacht) folgen.
+- **Varianten:** *verwundet* — er geht nur mit 60 % Tempo, du musst dich nach ihm richten. *Rettung* (Slice 2) — der Gefangene sitzt bei Entführern im Gelände und folgt erst, wenn sie tot sind; die Entführer stehen nach dem Laden wieder da, solange er nicht frei ist. Weitere (Gefangener lebend, bei Nacht) folgen.
 - **Abgabe bei einem anderen als dem Geber:** Ein Auftrag kann `turnin` auf einen anderen NPC setzen; der Geber bietet ihn an, der Genannte nimmt ihn ab (Lohn vor Ort).
+- **Zweiter Auftrag: „Der verschleppte Rekrut“** (Hauke, Nordfurt): Jes sitzt westlich der Stadt bei drei Räubern (zwei Banditen, ein Schütze). Erst die Räuber, dann folgt er dir heim; Abgabe bei Hauke, 80 Gold, Valen +3. Debug: „Aufträge: Rettung … starten“, „Rettung — Entführer fallen“.
 - **Erster Auftrag: „Finn muss zur Heilerin“** (Brann, Nordfurt): der verwundete Schmiedelehrling Finn muss zu Elena nach Eren; Abgabe bei Elena, Lohn 70 Gold, Brann und Elena merken es sich. Finn bleibt danach bei Elena.
 - Debug: „Aufträge: Eskorte ‚Finn muss zur Heilerin‘ starten“, „Aufträge: Eskorte — Begleiter ans Ziel setzen“. Probe „Welttiefe W3 Slice 1“.

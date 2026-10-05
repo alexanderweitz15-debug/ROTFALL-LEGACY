@@ -14763,15 +14763,19 @@ function ensureEscorts() {
     for (const e of Q.escorts) { const i = Q.objectives.findIndex(o => o.type === 'escort' && o.target === e.key); if (i >= 0 && (st.progress[i] || 0) >= (Q.objectives[i].count || 1)) continue; want.set(e.key, { e, k }); } }
   const gone = x => x.questEscort && !x.arrived && !want.has(x.questEscort);
   if (S.ents.world.some(gone)) S.ents.world = S.ents.world.filter(x => !gone(x));   /* Auftrag vorbei (abgebrochen, gescheitert): der Begleiter verschwindet; Angekommene bleiben */
-  for (const [key, { e, k }] of want) { if (S.ents.world.some(x => x.questEscort === key && x.alive)) continue;
-    const [sx, sy] = conSq(e.from), q = freeSpotNear('world', sx + 2, sy + 2, 2), [tx, ty] = conSq(e.to);
+  const captors = (c, e) => { const pool = e.captors.pool || ['bandit']; for (let i = 0; i < (e.captors.n || 2); i++) { const b = spawnEnemy(pool[i % pool.length], 'world', (c.x / TS | 0) + ri(-3, 3), (c.y / TS | 0) + ri(-3, 3)); if (b) Object.assign(b, { captorOf: c.questEscort, transient: true, anchor: { x: b.x, y: b.y } }); } };
+  for (const [key, { e, k }] of want) { const have = S.ents.world.find(x => x.questEscort === key && x.alive);
+    if (have) { if (have.captiveOf && e.captors && !S.ents.world.some(b => b.captorOf === key && b.alive)) captors(have, e); continue; }   /* Rettung: Entführer sind flüchtig — nach dem Laden stehen sie wieder da */
+    const [sx, sy] = e.near ? conSq(e.near) : conSq(e.from), q = freeSpotNear('world', sx + (e.off?.[0] ?? 2), sy + (e.off?.[1] ?? 2), 3), [tx, ty] = conSq(e.to);
     const c = makeChar({ name: e.name, prof: e.prof || 'Reisender', x: q.x, y: q.y, level: 2, faction: null, traits: ['furchtsam'] });
-    Object.assign(c, { questEscort: key, quest: k, escortee: true, visitor: true, wounded: !!e.wounded, greet: e.greet || '„Bring mich hin. Bitte.“', anchor: { x: q.x, y: q.y }, esc: { town: e.from, to: e.to, tx, ty, ambushed: false } });
-    S.ents.world.push(c); }
+    Object.assign(c, { questEscort: key, quest: k, escortee: !e.captors, captiveOf: !!e.captors, visitor: true, wounded: !!e.wounded, greet: e.greet || '„Bring mich hin. Bitte.“', anchor: { x: q.x, y: q.y }, esc: { town: e.near || e.from, to: e.to, tx, ty, ambushed: false, greetFree: e.greetFree || null } });
+    S.ents.world.push(c); if (e.captors) captors(c, e); }
 }
 function questEscortTick() {
   if (S.map !== 'world') return;
   for (const e of S.ents.world) { if (!e.questEscort || !e.alive || e.arrived || !e.esc) continue;
+    if (e.captiveOf) { if (S.ents.world.some(b => b.captorOf === e.questEscort && b.alive)) continue;   /* Rettung: erst die Entführer, dann folgt er */
+      e.captiveOf = false; e.escortee = true; if (e.esc.greetFree) e.greet = e.esc.greetFree; log(`${e.name} ist frei. Bring ${e.name} nach ${townName(e.esc.to)}.`, 'quest'); UI.toast(`${e.name.toUpperCase()} IST FREI`, 2600); continue; }
     if (Math.hypot(e.x / TS - e.esc.tx, e.y / TS - e.esc.ty) < 8) { e.arrived = true; e.escortee = false; e.anchor = { x: e.x, y: e.y }; e.schedulePos = null; e.greet = '„Danke. Ich bleibe hier, bis es besser ist.“';
       log(`${e.name} ist in ${townName(e.esc.to)} in Sicherheit.`, 'quest'); chronicle(`${e.name} in Sicherheit gebracht`, 'quest', `${S.player.name} brachte ${e.name} nach ${townName(e.esc.to)}.`); questEvent('escort', e.questEscort, 1); } }
 }
@@ -17494,7 +17498,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_rett_rekrut: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -18414,6 +18418,8 @@ function debugSections() {
       'Aufträge: Auftraggeber Jorun stirbt (Nachfolger nach 3 Tagen, „Die vermisste Tochter“ bleibt abgebbar)': () => { const j = npcByKey('jorun'); if (!j) return UI.toast('Jorun nicht gefunden.'); j.alive = false; j.hp = 0; successorDay(); UI.toast(`Jorun ist tot; Nachfolger am Tag ${S.succ?.jorun}.`, 3500); },
       'Aufträge: Auftraggeber Tomas stirbt (Verwandter, kein Nachfolger — „Graumähne“ scheitert im Tageswechsel)': () => { const t = npcByKey('tomas'); if (!t) return UI.toast('Tomas nicht gefunden.'); if (!S.quests.q_greymane) startQuest('q_greymane'); t.alive = false; t.hp = 0; questGiverDeadDay(); UI.toast(`Graumähne: ${S.quests.q_greymane?.state}`, 3500); },
       'Aufträge: Eskorte „Finn muss zur Heilerin“ starten (Brann in Nordfurt; Finn verwundet nach Eren zu Elena)': () => { if (!S.quests.q_esk_finn) { startQuest('q_esk_finn'); log('Auftrag angenommen: Finn muss zur Heilerin (Debug).', 'quest'); } ensureEscorts(); UI.toast('Finn wartet am Platz von Nordfurt. Er geht langsam — bleib bei ihm. Abgabe bei Elena in Eren.', 3500); },
+      'Aufträge: Rettung „Der verschleppte Rekrut“ starten (Hauke in Nordfurt; Jes bei drei Räubern westlich der Stadt)': () => { if (!S.quests.q_rett_rekrut) { startQuest('q_rett_rekrut'); log('Auftrag angenommen: Der verschleppte Rekrut (Debug).', 'quest'); } ensureEscorts(); UI.toast('Jes sitzt westlich von Nordfurt bei drei Räubern. Erst die Räuber, dann folgt er dir heim.', 3500); },
+      'Aufträge: Rettung — Entführer fallen': () => { let n = 0; for (const b of S.ents.world) if (b.captorOf && b.alive) { die(b, 'Debug', S.player); n++; } questEscortTick(); UI.toast(n ? `${n} Entführer tot.` : 'Keine Entführer.'); },
       'Aufträge: Eskorte — Begleiter ans Ziel setzen': () => { const e = S.ents.world.find(x => x.questEscort && x.alive && !x.arrived); if (!e) return UI.toast('Keine Eskorte unterwegs.'); e.x = e.esc.tx * TS; e.y = e.esc.ty * TS; questEscortTick(); UI.toast(`${e.name} ist am Ziel.`); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
@@ -23556,6 +23562,20 @@ export function selftest() {
       const okAll = W.one && W.notYet && W.arrived && W.giverNo && W.turnin && W.paid && W.failed; if (!okAll) console.warn('W3-Probe', JSON.stringify(W));
       return okAll;
     } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_esk_finn = q0; else delete S.quests.q_esk_finn; S.ents.world = ents0; S.map = m0; S.relations = R0; UI.closeDialogue(); }
+  }));
+  ok('Welttiefe W3 Slice 2: Rettung — der Gefangene sitzt bei Entführern (flüchtig, nach dem Laden wieder da) und folgt erst, wenn sie tot sind; dann zählt die Ankunft wie bei jeder Eskorte', sandbox(() => {
+    const q0 = S.quests.q_rett_rekrut, ents0 = S.ents.world.slice(), m0 = S.map; const W = {}; const p = stage(); S.map = 'world'; p.map = 'world';
+    try {
+      delete S.quests.q_rett_rekrut; startQuest('q_rett_rekrut'); ensureEscorts(); ensureEscorts();
+      const j = S.ents.world.find(e => e.questEscort === 'jes_esk'), cap = () => S.ents.world.filter(b => b.captorOf === 'jes_esk' && b.alive);
+      W.held = !!j && j.captiveOf && !j.escortee && cap().length === 3 && cap().every(b => dist(b, j) < 8 * TS);
+      questEscortTick(); W.stillHeld = j.captiveOf && !j.escortee;
+      S.ents.world = S.ents.world.filter(b => b.captorOf !== 'jes_esk'); ensureEscorts(); W.respawn = cap().length === 3;   /* flüchtige Entführer kommen nach dem Laden wieder */
+      for (const b of cap()) die(b, 'Probe', p); questEscortTick(); W.freed = !j.captiveOf && j.escortee && /Danke/.test(j.greet);
+      const [tx, ty] = conSq('northcity'); j.x = tx * TS; j.y = ty * TS; questEscortTick(); W.home = S.quests.q_rett_rekrut.progress[0] === 1 && questComplete('q_rett_rekrut');
+      const okAll = W.held && W.stillHeld && W.respawn && W.freed && W.home; if (!okAll) console.warn('W3-S2-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { if (q0) S.quests.q_rett_rekrut = q0; else delete S.quests.q_rett_rekrut; S.ents.world = ents0; S.map = m0; }
   }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
