@@ -986,6 +986,7 @@ function nameFix() {                        // Bewohner: Name passend zum Beruf 
 }
 const hsh = (a, b, c) => { let n = (a * 374761393 + b * 668265263 + c * 2246822519) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 // Orte eines Bewohners (Haus b, Index i im Haus): drinnen, vor der Tür, Platz, Nachbarhaus, Arbeitsplatz — deterministisch
+const HANGOUT_TYPES = new Set(['tavern', 'chapel', 'store', 'bakery', 'healer', 'smithy', 'stable']);   /* Treffpunkte neben dem Hauptplatz (große Orte) */
 function spotsOf(b, i, prof) {
   const P = TOWN_PLAN[b.town], [dx, dy] = b.doorTile, sx = b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0, sy = b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0;
   const inside = { x: (dx + sx) * TS + TS / 2, y: (dy + sy) * TS + TS / 2 }, front = { x: (dx - sx) * TS + TS / 2, y: (dy - sy) * TS + TS / 2 };
@@ -996,10 +997,15 @@ function spotsOf(b, i, prof) {
   // Früher standen alle Müßigen auf 5×3 Kacheln am Platz: bei mehr Einwohnern ein Gedränge — daher die ganze Platzfläche
   const r = hsh(hx, hy, i), nb = town[Math.floor(hsh(hy, hx, i + 7) * town.length)];
   const dist0 = P.metro && (METRO.districts || []).find(d => !d.outside && hx >= d.x0 && hx <= d.x1 && hy >= d.y0 && hy <= d.y1);   // Phase 5: Metropole — Treffpunkt im eigenen Bezirk
+  /* Nutzer 05.10.2026 (Varonheim: 100+ Leute auf dem Hauptplatz): in großen Orten trifft sich nur ein Teil auf dem Platz, der Rest vor Schenken,
+     Kapellen, Läden, Bäckerei, Heilerhaus, Schmiede und Ställen des Orts (HANGOUT_TYPES, fester Hash je Bewohner). Dörfer bleiben, wie sie sind. */
+  const pubs = town.length > 15 ? town.filter(h => HANGOUT_TYPES.has(h.type)) : [], hang = !dist0 && pubs.length && hsh(hx, hy, i + 13) > Math.min(1, 15 / town.length) ? pubs[Math.floor(hsh(hy, hx, i + 17) * pubs.length)] : null;
+  const hangAt = h => { const [qx, qy] = h.doorTile, ox = h.door === 'W' ? -2 : h.door === 'E' ? 2 : 0, oy = h.door === 'S' ? 2 : h.door === 'N' ? -2 : 0, lat = (hsh(hx, i, 19) - 0.5) * 4;
+    const q = { x: (qx + ox + (ox ? 0 : lat) + 0.5) * TS, y: (qy + oy + (oy ? 0 : lat) + 0.5) * TS }; return SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)) || solidPropAt('world', q.x, q.y, 6) ? null : q; };
   const sq = dist0 && hsh(hx, hy, i + 11) >= 0.45 ? {   // AUDIT V-03: knapp die Hälfte der Metropole trifft sich auf dem Hauptplatz, nicht im Bezirk
      x: (dist0.x0 + (dist0.x1 - dist0.x0) * (0.3 + hsh(hx, i, 3) * 0.4)) * TS, y: (dist0.y0 + (dist0.y1 - dist0.y0) * (0.3 + hsh(hy, i, 5) * 0.4)) * TS }
-    : plaza ? { x: (plaza[1] + hsh(hx, i, 3) * (plaza[3] - plaza[1] + 1)) * TS, y: (plaza[2] + hsh(hy, i, 5) * (plaza[4] - plaza[2] + 1)) * TS }
-    : { x: (P.square[0] + (hsh(hx, i, 3) - 0.5) * 10) * TS, y: (P.square[1] + (hsh(hy, i, 5) - 0.5) * 6) * TS };
+    : (hang && hangAt(hang)) || (plaza ? { x: (plaza[1] + hsh(hx, i, 3) * (plaza[3] - plaza[1] + 1)) * TS, y: (plaza[2] + hsh(hy, i, 5) * (plaza[4] - plaza[2] + 1)) * TS }
+    : { x: (P.square[0] + (hsh(hx, i, 3) - 0.5) * 10) * TS, y: (P.square[1] + (hsh(hy, i, 5) - 0.5) * 6) * TS });
   const visit = nb ? { x: (nb.doorTile[0] + (nb.door === 'E' ? 2 : nb.door === 'W' ? -2 : 0.5 + (i % 2 ? 1 : -1))) * TS, y: (nb.doorTile[1] + (nb.door === 'S' ? 1.5 : nb.door === 'N' ? -1.5 : 0.5)) * TS } : front;
   const job = prof === 'Fischer' && pier ? { x: (pier + 0.5) * TS, y: (P.harbor.top + 2 + (hx + hy + i) % 4) * TS }   // entlang des Stegs, nicht alle auf einem Punkt
     : b.type === 'barn' && field ? { x: ((field[0] + field[2]) / 2) * TS, y: ((field[1] + field[3]) / 2) * TS }
@@ -23513,6 +23519,16 @@ export function selftest() {
     const okAll = W.kept && W.struck && W.tired; if (!okAll) console.warn('Wuchtschlag-Probe', JSON.stringify(W), p.stamina, p.cooldowns, p.abilityMult);
     return okAll;
   }));
+  ok('Hauptplatz entlastet (Nutzer 05.10.): in Varonheim treffen sich höchstens ~40 Bewohner auf dem Platz, die übrigen vor Schenken, Kapellen, Läden; alle Treffpunkte liegen im Ort und auf freiem Boden; Dörfer unverändert', (() => {
+    const P = TOWN_PLAN.varonheim, res = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.homeTown === 'varonheim' && e.plan?.plaza); if (res.length < 60) return true;
+    const near = e => Math.hypot(e.plan.plaza.x / TS - P.square[0], e.plan.plaza.y / TS - P.square[1]) < 14, onSq = res.filter(near).length;
+    const inTown = res.every(e => { const x = e.plan.plaza.x / TS, y = e.plan.plaza.y / TS; return x >= P.area[0] - 1 && x <= P.area[2] + 1 && y >= P.area[1] - 1 && y <= P.area[3] + 1; });
+    const freeGround = res.every(e => !SOLID.has(tileAt('world', e.plan.plaza.x / TS | 0, e.plan.plaza.y / TS | 0)));
+    const spots = new Set(res.filter(e => !near(e)).map(e => `${e.plan.plaza.x / TS | 0},${e.plan.plaza.y / TS | 0}`)).size;
+    const E = TOWN_PLAN.eren, er = S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.homeTown === 'eren' && e.plan?.plaza), village = er.every(e => Math.hypot(e.plan.plaza.x / TS - E.square[0], e.plan.plaza.y / TS - E.square[1]) < 14);
+    const okAll = onSq <= 45 && onSq >= 10 && inTown && freeGround && spots >= 8 && village; if (!okAll) console.warn('Hauptplatz-Probe', JSON.stringify({ n: res.length, onSq, inTown, freeGround, spots, village }));
+    return okAll;
+  })());
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
