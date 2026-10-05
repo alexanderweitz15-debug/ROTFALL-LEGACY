@@ -1513,3 +1513,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Zweiter Auftrag: „Der verschleppte Rekrut“** (Hauke, Nordfurt): Jes sitzt westlich der Stadt bei drei Räubern (zwei Banditen, ein Schütze). Erst die Räuber, dann folgt er dir heim; Abgabe bei Hauke, 80 Gold, Valen +3. Debug: „Aufträge: Rettung … starten“, „Rettung — Entführer fallen“.
 - **Erster Auftrag: „Finn muss zur Heilerin“** (Brann, Nordfurt): der verwundete Schmiedelehrling Finn muss zu Elena nach Eren; Abgabe bei Elena, Lohn 70 Gold, Brann und Elena merken es sich. Finn bleibt danach bei Elena.
 - Debug: „Aufträge: Eskorte ‚Finn muss zur Heilerin‘ starten“, „Aufträge: Eskorte — Begleiter ans Ziel setzen“. Probe „Welttiefe W3 Slice 1“.
+
+## Tötungsaufträge mit Regel: „Alpha, nicht das Rudel“ (Welttiefe W4 Slice 1, 05.10.2026)
+- **Schonen als Auftragsregel:** Ein Tötungsauftrag kann eine Art nennen, die geschont werden muss, mit Spielraum. Jeder Treffer zählt im Log („Wölfe des Rudels getötet 1/2“), das Auftragsbuch zeigt „Schonen: Wolf — n Spielraum“. Wird der Spielraum überschritten, scheitert der Auftrag sichtbar, mit Folgen beim Geber. Bosse und Anführer der Art zählen nicht.
+- **„Graumähne“ (Tomas, Eren) ist der erste Fall:** nur der Leitwolf; höchstens zwei Wölfe des Rudels dürfen fallen, der dritte lässt den Auftrag scheitern (Tomas −10, die Wildschweine kommen auf die Felder). Wer das Rudel ausweichen oder abschütteln kann, hat es leichter als wer alles niedermacht. Probe „Welttiefe W4 Slice 1“.

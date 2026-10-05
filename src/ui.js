@@ -2045,6 +2045,7 @@ function questUI(body) {
     <div class="qb-objs">${x.Q.objectives.map((o, i) => `<div class="qb-obj">${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`).join('')}</div>
     ${x.I.where ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>${qa(x.I.where)}</span></div>` : active && x.Q.objectives.some(o => o.type === 'find') ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>Kein Ziel auf der Karte — die Suche ist der Auftrag.</span></div>` : ''}
     ${x.I.timer ? `<div class="qb-line">${icoImg('time', 1, 'qb-li')}<span>${qa(x.I.timer)}</span></div>` : ''}
+    ${x.I.spare ? `<div class="qb-line">${icoImg('log_world', 1, 'qb-li')}<span>${qa(x.I.spare)}</span></div>` : ''}
     ${x.v.outcome ? `<p class="qb-out"></p>` : ''}
     ${B?.rew ? `<div class="qb-rew"><span>Lohn</span>${rewardHTML(B.rew, B.nums)}</div>` : ''}
     ${active ? `<div class="qb-act"><button data-track="${x.k}">${x.I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${x.I.cancel ? `<button data-cancel="${x.k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
