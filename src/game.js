@@ -8226,13 +8226,17 @@ function registerContracts() {
 function townContracts(town, giver) {
   S.contracts ||= []; S.conDay ||= {};
   const key = town + ':' + giver;
+  const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : isVil(town) ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
   if ((S.conDay[key] ?? -99) + 3 <= (S.day | 0)) {                    // alle 3 Tage neu: offene Angebote verfallen, laufende bleiben
     for (const c of S.contracts) if (c.town === town && c.giver === giver && c.state === 'offer' && c.day < (S.day | 0) - 2) ignoredContract(c);   // S13: niemand hat es erledigt
     S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer' && !c.vanish));
-    const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : isVil(town) ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
     for (let i = 0; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
     if (giver === 'board' && n) { const C = smuggleContract(town); if (C) S.contracts.push(C); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine)
-    S.conDay[key] = S.day | 0;
+    S.conDay[key] = S.day | 0; (S.conTop ||= {})[key] = S.day | 0;
+  } else if (((S.conTop ||= {})[key] ?? -99) < (S.day | 0)) {         /* Nutzer 05.10.2026: angenommene oder erledigte Angebote werden täglich aufgefüllt (Kette: „alle 3 gemacht, nichts Neues“); laufende bleiben, die 3-Tage-Rotation bleibt */
+    S.conTop[key] = S.day | 0;
+    const have = S.contracts.filter(c => c.town === town && c.giver === giver && c.state === 'offer').length;
+    for (let i = have; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
   }
   return S.contracts.filter(c => c.town === town && c.giver === giver && c.state !== 'claimed');
 }
@@ -13310,7 +13314,15 @@ function seasonDay() {
 // Stirbt ein Lehrer, Händler, Schmied, Meister oder der Vorsteher, kommt nach drei Tagen ein Nachfolger an dieselbe Stelle. Er übernimmt
 // Rolle und Schlüssel (Aufträge und Questreihen laufen weiter), aber nicht die Beziehung. Verwandte kommen nicht wieder, und nach
 // Garmadons Fall keine Lehrer der Toten mehr.
-const KEY_ROLE = d => !d.kin && !!(d.teaches || d.spellsTaught || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key));
+const QUEST_GIVER_KEYS = new Set(Object.values(QUESTS).flatMap(q => [q.giver, q.turnin]).filter(Boolean));   /* W2 Slice 2: jeder Auftraggeber bekommt einen Nachfolger (außer Verwandten) */
+const KEY_ROLE = d => !d.kin && !!(d.teaches || d.spellsTaught || d.shop || d.smith || ['ysra', 'vhal', 'mira', 'ilva', 'havel'].includes(d.key) || QUEST_GIVER_KEYS.has(d.key));
+/* W2 Slice 2: Stirbt ein Auftraggeber ohne Nachfolger (Verwandte), scheitert sein offener Auftrag sichtbar statt für immer zu hängen. */
+function questGiverDeadDay() {
+  for (const [k, st] of Object.entries(S.quests)) { const Q = QUESTS[k]; if (!Q || st.state !== 'active') continue;
+    for (const key of [Q.giver, Q.turnin]) { if (!key) continue; const def = NPCS.find(d => d.key === key); if (!def || KEY_ROLE(def)) continue;
+      const e = Object.values(S.ents).flat().find(x => x.kind === 'npc' && x.key === key); if (!e || e.alive) continue;
+      st.state = 'failed'; st.outcome = `${def.name} ist tot. Niemand führt die Sache weiter.`; log(`${Q.name}: gescheitert — ${def.name} ist tot, und niemand tritt an seine Stelle.`, 'quest'); break; } }   /* Brief „gescheitert“ kommt über UI.questWatch (kein questSnap hier, sonst fehlt der Wechsel) */
+}
 function successorDay(onLoad = false) {                            // onLoad: wer ganz fehlt (alter Stand, Tod unbekannt), kommt sofort nach
   const day = S.day | 0, all = Object.values(S.ents).flat(); S.succ ||= {};
   const firstNpc = new Map(); for (const x of all) if (x.kind === 'npc' && x.key != null && !firstNpc.has(x.key)) firstNpc.set(x.key, x);   /* PERF-S: einmal nachschlagen statt je Rolle alle ~18 000 Einträge (vorher 20–28 ms je Tageswechsel); gleiches Ergebnis wie find */
@@ -13327,6 +13339,7 @@ function successorDay(onLoad = false) {                            // onLoad: we
     const used = new Set(Object.values(S.ents).flat().filter(x => x.kind === 'npc').map(x => x.name.split(' ')[0])), L = (femTrade(def.prof || '') || def.key === 'adela' ? FIRST_F : FIRST_M).filter(n => !used.has(n)), name = L.length ? pick(L) : `${def.name.split(' ')[0]} der Jüngere`;   // nie wie ein Bewohner
     spawnNpcDef({ ...def, name }); assignNpcDays(); delete S.succ[def.key]; delete S.relations[def.key];
     log(`${name} übernimmt den Platz von ${def.name} (${def.prof}).`, 'world'); chronicle(`${name} folgt auf ${def.name}`, 'news');
+    const open = Object.entries(S.quests).filter(([k, st]) => st.state === 'active' && QUESTS[k] && (QUESTS[k].giver === def.key || QUESTS[k].turnin === def.key)).map(([k]) => QUESTS[k].name); if (open.length) log(`${name} kennt die offenen Angelegenheiten: ${open.join(', ')}. Dort kannst du sie abschließen.`, 'quest');   /* W2 Slice 2 */
   }
 }
 // S15 (Nutzer: „bei den Untoten funktionieren nicht alle Missionen, es spawnen nur 3 Grabräuber statt 5“): Für jeden offenen
@@ -13357,7 +13370,7 @@ function questTargetTick(force = false) {
 function dayTick() {
   woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay(); nemesisDay(); titleDay();   /* T08, T10; Titel auf Zeit */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
-  seasonDay(); successorDay(); anomalyDay();
+  seasonDay(); successorDay(); questGiverDeadDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); grudgeDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
@@ -18342,6 +18355,8 @@ function debugSections() {
       'Aufträge: Brief „Erfüllt“ zeigen (ohne Folgen)': () => UI.questLetter('done', 'probe', { name: 'Wölfe vor Eren' }),
       'Aufträge: Ermittlung „Blut auf dem Markt“ starten (Havel in Eren; Spuren und Befragungen, Urteil am Ende)': () => { if (!S.quests.q_erm_markt) { startQuest('q_erm_markt'); log('Auftrag angenommen: Blut auf dem Markt (Debug).', 'quest'); } UI.toast('Spuren liegen auf dem Markt und am Viehtrog von Eren; Borin und Elena befragen; Urteil bei Havel.', 3500); },
       'Aufträge: Ermittlung „Sechs statt zehn“ starten (Brann in Nordfurt; Kontor, Südtor, Gerold und Hauke; Urteil bei Brann)': () => { if (!S.quests.q_erm_nordfurt) { startQuest('q_erm_nordfurt'); log('Auftrag angenommen: Sechs statt zehn (Debug).', 'quest'); } UI.toast('Spuren am Kontor-Lagertor und vor dem Südtor von Nordfurt; Gerold und Hauke befragen; Urteil bei Brann.', 3500); },
+      'Aufträge: Auftraggeber Jorun stirbt (Nachfolger nach 3 Tagen, „Die vermisste Tochter“ bleibt abgebbar)': () => { const j = npcByKey('jorun'); if (!j) return UI.toast('Jorun nicht gefunden.'); j.alive = false; j.hp = 0; successorDay(); UI.toast(`Jorun ist tot; Nachfolger am Tag ${S.succ?.jorun}.`, 3500); },
+      'Aufträge: Auftraggeber Tomas stirbt (Verwandter, kein Nachfolger — „Graumähne“ scheitert im Tageswechsel)': () => { const t = npcByKey('tomas'); if (!t) return UI.toast('Tomas nicht gefunden.'); if (!S.quests.q_greymane) startQuest('q_greymane'); t.alive = false; t.hp = 0; questGiverDeadDay(); UI.toast(`Graumähne: ${S.quests.q_greymane?.state}`, 3500); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
       'Aufträge: Zählkerbe über dem Helden (2 von 3)': () => { questNotch(p, 2, 3); setTimeout(() => questNotch(p, 3, 3), 1600); },
@@ -23437,6 +23452,32 @@ export function selftest() {
     } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_markt = q0; else delete S.quests.q_erm_markt; S.relations = R0; S.growth = G0; S.gold = g0; S.factions = f0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; S.chronicle.length = ch0; S.day = d0;
       if (bor) { if (mb) bor.memories = mb; else delete bor.memories; Object.assign(bor, bx); } if (tom) { if (mt) tom.memories = mt; else delete tom.memories; } UI.closeDialogue(); }
   }));
+  ok('Welttiefe W2 Slice 2: Nachfolger für Auftraggeber — stirbt Jorun, kommt nach drei Tagen ein neuer Jorun mit demselben Schlüssel und der offene Auftrag bleibt abgebbar; stirbt ein Verwandter (Tomas), scheitert sein Auftrag sichtbar', sandbox(() => {
+    const W0 = S.ents.world, succ0 = S.succ, relJ = S.relations.jorun, qL = S.quests.q_lila, qG = S.quests.q_greymane, d0 = S.day; S.ents.world = W0.slice(); S.succ = {};
+    const j = W0.find(e => e.key === 'jorun' && e.kind === 'npc'), t = W0.find(e => e.key === 'tomas' && e.kind === 'npc'), ja = j?.alive, ta = t?.alive; const W = { found: !!j && !!t };
+    try {
+      if (!W.found) { console.warn('W2-S2-Probe: Jorun oder Tomas fehlt'); return false; }
+      S.quests.q_lila = { state: 'active', progress: [] }; S.quests.q_greymane = { state: 'active', progress: [] };
+      j.alive = false; successorDay(); W.waiting = S.succ.jorun === (d0 | 0) + 3; questGiverDeadDay(); W.stillOpen = S.quests.q_lila.state === 'active';
+      S.day = d0 + 3; successorDay(); const neu = S.ents.world.filter(e => e.key === 'jorun' && e.kind === 'npc'); S.day = d0;
+      W.successor = neu.length === 1 && neu[0].alive && neu[0] !== j && neu[0].prof === j.prof && S.quests.q_lila.state === 'active' && questAvailable('q_lila') !== undefined;
+      t.alive = false; questGiverDeadDay(); W.kinFails = S.quests.q_greymane.state === 'failed' && /Tomas ist tot/.test(S.quests.q_greymane.outcome || '') && !S.ents.world.some(e => e.key === 'tomas' && e !== t);
+      const okAll = W.found && W.waiting && W.stillOpen && W.successor && W.kinFails; if (!okAll) console.warn('W2-S2-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { S.ents.world = W0; S.succ = succ0; if (relJ != null) S.relations.jorun = relJ; else delete S.relations.jorun; if (qL) S.quests.q_lila = qL; else delete S.quests.q_lila; if (qG) S.quests.q_greymane = qG; else delete S.quests.q_greymane; if (j) j.alive = ja; if (t) t.alive = ta; S.day = d0; }
+  }));
+  ok('Aufträge (Nutzer 05.10.): erledigte oder angenommene Angebote der Kette kommen am nächsten Tag nach (täglich aufgefüllt), laufende bleiben, am selben Tag nichts doppelt', sandbox(() => {
+    const c0 = S.contracts, cd0 = S.conDay, ct0 = S.conTop, d0 = S.day; S.contracts = []; S.conDay = {}; S.conTop = {}; const W = {};
+    try {
+      S.day = 50; const a = townContracts('kettenfeste', 'vm'); W.three = a.length === 3 && a.every(c => c.state === 'offer');
+      for (const c of a) c.state = 'claimed'; W.sameDay = townContracts('kettenfeste', 'vm').length === 0;
+      S.day = 51; const b = townContracts('kettenfeste', 'vm'); W.nextDay = b.length === 3 && b.every(c => c.state === 'offer' && c.day === 51);
+      b[0].state = 'active'; S.day = 52; const c = townContracts('kettenfeste', 'vm'); W.keepActive = c.includes(b[0]) && c.filter(x => x.state === 'offer').length === 3 && c.length === 4;
+      S.day = 52; W.again = townContracts('kettenfeste', 'vm').length === 4;
+      const okAll = W.three && W.sameDay && W.nextDay && W.keepActive && W.again; if (!okAll) console.warn('Auftrags-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { S.contracts = c0; S.conDay = cd0; if (ct0) S.conTop = ct0; else delete S.conTop; S.day = d0; registerContracts(); }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23721,7 +23762,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

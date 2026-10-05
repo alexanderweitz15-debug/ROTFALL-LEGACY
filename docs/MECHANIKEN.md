@@ -104,7 +104,7 @@ Stand: Session 15 (2026-09-29).
 - **Tagesablauf:** Arbeit am richtigen Ort, Schenke am Abend, nachts zu Hause. Freunde, Rivalen, Gerüchte über dich.
 - **Tote bleiben tot.** Leere Häuser werden später neu bezogen. Bewohner trauern und erschrecken vor Leichen.
 - **Nachfolger (S15):** Stirbt ein wichtiger NPC (Lehrer, Händler, Schmied, Meister einer Titelklasse, Vorsteher), sucht der Ort
-  einen Nachfolger. Nach drei Tagen steht jemand Neues an derselben Stelle, mit derselben Aufgabe. Die Beziehung fängt bei null an.
+  einen Nachfolger. Nach drei Tagen steht jemand Neues an derselben Stelle, mit derselben Aufgabe. Die Beziehung fängt bei null an. Seit 05.10.2026 gilt das für jeden Auftraggeber (W2 Slice 2): offene Aufträge bleiben beim Nachfolger abgebbar (das Log sagt es). Verwandte (z. B. Tomas) kommen nicht wieder; stirbt so ein Auftraggeber, scheitert sein Auftrag im nächsten Tageswechsel sichtbar (Brief „gescheitert“, Grund im Auftragsbuch).
   Verwandte kommen nicht wieder, und nach Garmadons Fall gibt es keine neuen Lehrer der Toten.
 - **Fragen nach Wissen (S15):** Du kannst nur fragen, was du weißt (Grundwissen, Chronik, Gehörtes). Jeder antwortet aus
   seiner Sicht (Fraktion, Beruf). Antworten verraten neue Themen — so findet man auch die Titelklassen.
@@ -1483,3 +1483,6 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Betroffene erinnern sich:** Wer in einer Ermittlung beschuldigt, freigesprochen, überführt oder gedeckt wurde, grüßt dich 30 Tage lang anders („Du warst das. Du hast gesagt, ich sei es gewesen …“, „Du hast für mich gesprochen, als alle schon ihr Urteil hatten …“, „Wir beide wissen, was du weißt …“). Danach bleibt nur die Beziehung. Wird so jemand später Gefährte, erzählt er es bei „Wie geht es dir?“ (Erinnerungen).
 - **Der Ort redet:** Das Urteil läuft fünf Tage als Neuigkeit durch „Was gibt es Neues?“ und die Sprechblasen auf der Straße („Hast du gehört? Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort“) und steht in der Chronik.
 - Gilt für „Blut auf dem Markt“ (Borin, Tomas) und „Sechs statt zehn“ (Gerold). Debug: „Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt“. Probe „Welttiefe W2 Slice 1“.
+
+## Aufträge werden täglich aufgefüllt (Nutzer 05.10.2026)
+- Hat man alle Angebote eines Bretts, einer Wache oder der Kette angenommen oder erledigt, kommen am nächsten Tag neue nach, bis wieder 3 (Dorf, Wache, Kette) bzw. 5 (Stadt) offen sind. Laufende Aufträge bleiben. Die alte 3-Tage-Rotation (liegengebliebene Aushänge verfallen, Vertrauen sinkt) bleibt daneben bestehen. Probe „Aufträge (Nutzer 05.10.)“.
