@@ -1496,3 +1496,11 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 
 ## Eskorte und Lieferung zahlen am Ziel (Nutzer 05.10.2026)
 - Kommt der Reisende an oder ist das Paket übergeben, ist der Auftrag sofort erfüllt: Gold, Erfahrung und Ruf gibt es am Zielort, der Rückweg zum Geber entfällt. Kürzungen, wenn die Wachen den Großteil erledigt haben, gelten weiter. Kopfgeld, Jagd, Vorräte usw. werden weiterhin beim Auftraggeber abgegeben. Probe „Aufträge (Nutzer 05.10.): Eskorte und Lieferung zahlen am Ziel“.
+
+## Krieg: Schonfrist, Streifen, Entsatz (Nutzer 05.10.2026)
+- **Befund:** Vorher fiel Eren am ersten Tag (Untotenheer 40 zwei Schritte vom Dorf, Besatzung 14) und bis Tag 15 fast jeder Ort, weil Valens Heere in die Nekropole marschierten statt zu verteidigen.
+- **Schonfrist:** Die Toten marschieren erst ab Tag 5; vorher sammeln sie sich.
+- **Valens Heere** holen zuerst eigene verlorene Städte zurück, halten dann bedrohte Städte (Untotenheer daneben) und marschieren sonst nicht mehr ins Totenland.
+- **Streifen:** Varonheim schickt eine Garde-Streife (Route Nordfurt, Straße, Eren, Kreuzweg, Aschfurt), die Eisenfeste eine Kettenstreife (Straße, Moor, Feste, Ruinen, Eren). Eine Streife stellt sich jedem Untotenheer in ihrer Zone, holt verlorene Städte der Zone zurück, nimmt aber keine leeren Knoten ein. Fällt sie, kommt nach 4 Tagen eine neue — solange Varonheim steht und nicht belagert ist bzw. die Kette nicht gebrochen ist. Fallen Varonheim und die Eisenfeste, hört das auf, und die Städte sind wieder verwundbar.
+- **Entsatz:** Fällt eine Stadt an die Toten, schickt die Krone nach 3 Tagen ein Heer (Stärke 40) mit dem Befehl, sie zurückzuholen (je Stadt frühestens alle 6 Tage). Nach der Rückeroberung bleibt es 5 Tage stationiert und kehrt dann nach Varonheim zurück (geht in der Garde auf).
+- **Messung 30 Tage ohne Spieler (Schwer):** vorher 13 von 16 Knoten bei den Toten, Eren Tag 1, Nordfurt Tag 25; nachher nur Totenreich (Schwarze Feste, Nekropole, Alt-Vharn), Sonnwacht fällt zeitweise und wird zurückgeholt. Zahlen in `docs/BALANCE.md`. Probe „Krieg (Nutzer 05.10.)“.

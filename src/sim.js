@@ -19,6 +19,7 @@ export function initSim() {
     battles: [],
   };
   migrateNodes();
+  for (const [f, P] of Object.entries(PATROL)) if (!S.war.armies.some(a => a.patrol === f) && patrolOk(f) && !(S.war.patrolDay?.[f] >= 0)) { const a = newArmy(f, P.base, P.strength); a.patrol = f; a.name = P.name; S.war.armies.push(a); (S.war.patrolDay ||= {})[f] = S.day | 0; }   /* Streifen von Anfang an, auch in alten Ständen */
   S.priceSeen ||= {};
   ECO.initEco();
   if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) spawnCaravan();
@@ -363,9 +364,13 @@ export function warTick() {                                  // alle 6 Spielstun
     let next = null;
     if (a.faction === 'undead' && a.at === CAPK && held) next = null;   /* Belagerer bleibt vor der Hauptstadt */
     else if (a.faction === 'valen' && held && C.siege) next = a.at === CAPK ? null : path(a.at, n => n === CAPK);   /* Entsatz-Vorrang */
+    else if (a.faction === 'undead' && (S.day | 0) < WAR_GRACE && !a.host) next = null;   /* Schonfrist: die Toten sammeln sich noch */
+    else if (a.patrol) next = patrolNext(a);
     else if (a.faction === 'undead') next = a.order && W.nodes[a.order] ? (a.at === a.order ? null : path(a.at, n => n === a.order)) : path(a.at, n => W.nodes[n].owner !== 'undead' && n !== CAPK);   /* RB-039: die Hauptstadt greift nur Morvaths Heerzug (oder ein Befehl) an */   // S15 P20: Befehl des Spielers
-    else next = path(a.at, n => W.nodes[n].owner === 'undead' && S.towns[n]) || path(a.at, n => W.nodes[n].owner === 'undead' || W.armies.some(b => b.faction === 'undead' && b.at === n));   /* Hunter-Befund: verlorene Städte zuerst zurückholen */
-    if (!next || (a.faction === 'valen' && a.strength < 25)) next = null;   // zu schwach: halten
+    else if (a.holdUntil != null) { if ((S.day | 0) < a.holdUntil) next = null; else { delete a.holdUntil; a.order = CAPK; log(`${a.name} zieht von ${LOC[a.at].name} zurück nach Varonheim.`, 'faction'); next = a.at === CAPK ? null : path(a.at, n => n === CAPK); } }   /* Entsatz: Stationierung vorbei */
+    else if (a.order && W.nodes[a.order]) next = a.at === a.order ? null : path(a.at, n => n === a.order);   /* Entsatz mit Befehl */
+    else next = valenTarget(a);
+    if (!next || (a.faction === 'valen' && a.strength < 25 && !a.order)) next = null;   // zu schwach: halten (ein Befehl gilt trotzdem)
     // §74 Vorwarnung: bevor ein Untotenheer auf eine Siedlung zieht, melden Späher es — das Heer sammelt sich einen Zug (6 Std.)
     const L = next && LOC[next];
     if (next && a.faction === 'undead' && L && (L.kind === 'city' || L.kind === 'village') && a.warned !== next) {
@@ -376,6 +381,7 @@ export function warTick() {                                  // alle 6 Spielstun
       continue;
     }
     if (next) { a.prev = a.at; a.at = next; }
+    if (a.relief && a.order === CAPK && a.at === CAPK) { a.strength = 0; const C2 = W.nodes[CAPK]; if (C2.owner === 'valen') C2.garrison = Math.min(CAP_SIEGE.gcap, C2.garrison + 5); log(`${a.name} ist heimgekehrt und geht in der Garde auf.`, 'faction'); }   /* Entsatz: zurück in Varonheim */
   }
   if (held && C.siege) { const rel = W.armies.filter(a => a.faction === 'valen' && a.at === CAPK);   /* RB-038: Entsatzheere vor der Hauptstadt vereinen sich */
     for (const r of rel.slice(1)) { rel[0].strength = Math.min(ARMY_CAP(), rel[0].strength + r.strength); r.strength = 0; }
@@ -385,14 +391,14 @@ export function warTick() {                                  // alle 6 Spielstun
 
 function resolveNode(node) {
   const W = S.war, here = W.armies.filter(a => a.at === node);
-  const und = here.find(a => a.faction === 'undead'), val = here.find(a => a.faction === 'valen');
+  const und = here.find(a => a.faction === 'undead'), val = here.find(a => a.faction !== 'undead');   /* Kettenstreife kämpft wie Valen */
   const owner = W.nodes[node].owner;
   if (node === CAPK && owner === 'valen' && und) return siegeTick(und, val);
   let att = null, def = null;
   if (und && val) { att = und; def = val; }
   else if (und && hostile('undead', owner)) { att = und; def = garrisonArmy(node); }
   else if (val && owner === 'undead') { att = val; def = garrisonArmy(node); }
-  else if ((und || val) && !owner) { capture(node, (und || val).faction); return; }
+  else if ((und || val) && !owner) { if ((und || val).patrol) return; capture(node, (und || val).faction); return; }   /* Streifen nehmen keine leeren Knoten */
   if (!att) return;
   if (def.strength <= 0) { capture(node, att.faction); return; }
   if (nearPlayer(node)) return materialize(node, att, def);
@@ -436,13 +442,15 @@ function warRep(node, n, why) {
 function capture(node, faction) {
   /* Entwickler 03.10.2026: Was die Lebenden zurückerobern oder besetzen, geht an die Macht des Ortes zurück (Sonnwacht an den Orden,
      Kreuzweg/Aschfurt an die Händler, Aurelions Städte ans Hochreich) — nicht automatisch an Valen. */
-  if (faction === 'valen' && ['order', 'merch', 'aurel'].includes(LOC[node]?.faction)) faction = LOC[node].faction;
+  if (faction !== 'undead') faction = ['order', 'merch', 'aurel'].includes(LOC[node]?.faction) ? LOC[node].faction : 'valen';   /* auch die Kettenstreife befreit für die Macht des Ortes */
   const n = S.war.nodes[node];
   if (n.owner === faction) return;
   const was = n.owner;
   n.owner = faction; n.garrison = faction === 'undead' ? (node === CAPK ? CAP_SIEGE.occ : 10) : (node === CAPK ? 20 : 8); n.wave = 0; n.waves = 0;   // neu besetzt: Befreiung beginnt wieder bei Welle 1
   if (node === CAPK) { n.siege = null; n.walls = faction === 'undead' ? 0 : 30; }
   if (faction === 'undead') for (const a of S.war.armies) if (a.order === node) { a.order = null; if (!a.host && !a.lawOrder) H.heldTaken?.(node); delete a.lawOrder; }   // S15 P20: Befehl erfüllt (der Heerzug ist kein Befehl des Spielers)
+  if (faction === 'undead' && S.towns[node]) n.fellDay = S.day | 0; else delete n.fellDay;   /* Entsatz: ab wann die Krone zählt */
+  if (faction !== 'undead') for (const a of S.war.armies) if (a.faction === 'valen' && a.order === node) { a.order = null; a.holdUntil = (S.day | 0) + RELIEF.hold; log(`${a.name} bleibt ${RELIEF.hold} Tage in ${LOC[node].name} stationiert.`, 'faction'); }   /* Entsatz: zurückerobert → kurz stationiert */
   const L = LOC[node];
   log(`${L.name} fällt an ${FACTIONS[faction].name}.`, 'faction');
   if (S.towns[node]) {
@@ -480,6 +488,26 @@ function cleanupArmies() {
 // Audit V1: Heeresdeckel (Schwer 110, sonst 80) — auch beim Laden, damit alte Stände mit Riesenheeren nicht weiterrollen.
 // Fehlt S.difficulty (alter Stand, noch nie gesetzt), gilt wie überall sonst (diffOf(), Debug-Umschalter) „Schwer“ als Grundstufe — sonst
 // bekäme ein frischer Spielstand versehentlich den niedrigeren Deckel.
+/* Entsatz aus Varonheim (Nutzer 05.10.2026): Fällt eine Stadt an die Toten, schickt die Krone nach `days` Tagen ein Heer (Stärke `strength`) mit
+   Befehl, sie zurückzuholen. Danach bleibt es `hold` Tage dort stationiert und kehrt dann nach Varonheim zurück (geht in die Garde auf).
+   Je Stadt frühestens alle `every` Tage, nur solange Varonheim steht und nicht belagert ist. Valens Heere schützen zuerst eigene Städte. */
+export const RELIEF = { days: 3, strength: 40, hold: 5, every: 6 };
+/* Patrouillen (Nutzer 05.10.2026): Varonheim (Valen) und die Eisenfeste (Kette) halten je ein Heer auf Streife. Es zieht seine Route ab,
+   stellt sich Untotenheeren in seiner Zone (Route plus Nachbarknoten), holt verlorene Städte der Zone zurück und nimmt sonst keine Knoten ein.
+   Fällt es, wird es nach `every` Tagen neu aufgestellt — solange Varonheim steht (Valen) bzw. die Kette nicht gebrochen ist. Die Toten
+   marschieren erst ab Tag WAR_GRACE (davor sammeln sie sich): keine Eroberung am ersten Tag. */
+export const PATROL = { valen: { base: 'varonheim', route: ['northcity', 'road', 'eren', 'kreuzweg', 'ashford'], strength: 35, name: 'Garde-Streife aus Varonheim' },
+  chain: { base: 'road', route: ['road', 'marsh', 'fortress', 'ruins', 'eren'], strength: 35, name: 'Kettenstreife aus der Eisenfeste' } }, PATROL_EVERY = 4, WAR_GRACE = 5;
+const patrolOk = f => f === 'valen' ? S.war.nodes[CAPK]?.owner === 'valen' && !S.war.nodes[CAPK].siege : !S.flags.chainsBroken;
+function patrolNext(a) { const P = PATROL[a.patrol], W = S.war, zone = new Set(P.route.concat(P.route.flatMap(n => NEIGH[n] || [])));
+  const foe = path(a.at, n => zone.has(n) && W.armies.some(b => b.faction === 'undead' && b.at === n)); if (foe) return foe;
+  const lost = path(a.at, n => zone.has(n) && W.nodes[n].owner === 'undead' && S.towns[n] && LOC[n]?.faction !== 'undead'); if (lost) return lost;
+  if (a.strength < 20) return null;   /* angeschlagen: stehen bleiben und auffüllen */
+  a.ri ??= 0; if (a.at === P.route[a.ri]) a.ri = (a.ri + 1) % P.route.length; return path(a.at, n => n === P.route[a.ri]); }   /* nächste Station der Route (Zähler, nicht Position: sonst pendelt die Streife) */
+const valenTarget = a => { const W = S.war, NB = n => NEIGH[n] || [];
+  const threatened = n => W.nodes[n].owner && W.nodes[n].owner !== 'undead' && S.towns[n] && W.armies.some(b => b.faction === 'undead' && (b.at === n || NB(b.at).includes(n)));
+  const ours = n => S.towns[n] && LOC[n]?.faction !== 'undead';   /* Vharnholm und Alt-Vharn sind keine verlorenen Städte */
+  return path(a.at, n => W.nodes[n].owner === 'undead' && ours(n)) || path(a.at, n => threatened(n)) || null; };   /* verlorene Städte zurück, bedrohte halten; sonst stehen bleiben (vorher: Marsch bis in die Nekropole) */
 export const ARMY_CAP = () => (S.difficulty || 'schwer') === 'sehr_schwer' || (S.difficulty || 'schwer') === 'schwer' ? 110 : 80;
 export function clampArmies() { for (const a of S.war?.armies || []) a.strength = Math.min(a.strength, ARMY_CAP()); }
 export function warDay() {
@@ -499,6 +527,16 @@ export function warDay() {
     W.armies.push(newArmy('undead', base, 30));   /* Audit V17c: der Friedhof wird nicht mehr stillschweigend umgefärbt — hält Valen ihn, muss das Heer ihn erst nehmen */ log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
   capThreatDay();
+  { const day = S.day | 0; W.patrolDay ||= {};   /* Patrouillen (Nutzer 05.10.) */
+    for (const [f, P] of Object.entries(PATROL)) { if (W.armies.some(a => a.patrol === f) || !patrolOk(f) || (W.patrolDay[f] ?? -99) + PATROL_EVERY > day) continue;
+      const a = newArmy(f, P.base, P.strength); a.patrol = f; a.name = P.name; W.armies.push(a); W.patrolDay[f] = day;
+      if (day > 1) log(`${P.name} zieht wieder auf Streife (Stärke ${P.strength}).`, 'faction'); } }
+  { const C = W.nodes[CAPK], day = S.day | 0; W.relief ||= {};   /* Entsatz aus Varonheim (Nutzer 05.10.) */
+    if (C?.owner === 'valen' && !C.siege) for (const [k, n] of Object.entries(W.nodes)) {
+      if (n.owner !== 'undead' || !S.towns[k] || LOC[k]?.faction === 'undead' || k === CAPK) continue; n.fellDay ??= day;
+      if (day - n.fellDay < RELIEF.days || (W.relief[k] ?? -99) + RELIEF.every > day || W.armies.some(a => a.faction === 'valen' && a.order === k)) continue;
+      const a = newArmy('valen', CAPK, RELIEF.strength); a.order = k; a.relief = true; a.name = `Entsatz nach ${LOC[k].name}`; W.armies.push(a); W.relief[k] = day;
+      log(`Varonheim schickt ein Heer, um ${LOC[k].name} zurückzuholen (Stärke ${RELIEF.strength}).`, 'faction'); chronicle(`Entsatz nach ${LOC[k].name}`, 'news', 'Die Krone will die Stadt zurück.'); } }
   const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => k !== CAPK && W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt; die Hauptstadt mustert nicht */
   if (!W.armies.some(a => a.faction === 'valen')) {
     if (muster && chance(0.3 + 0.04 * undNodes)) { W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
@@ -524,7 +562,7 @@ function materialize(node, att, def) {
     for (let i = 0; i < n; i++) {
       let [qx, qy] = [Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3))];
       if (H.inView?.('world', qx * TS, qy * TS)) { if (at) [qx, qy] = H.pushOut('world', qx, qy); else { const hs = HOUSES.filter(h => h.town === node && h.map === 'world'); const h = hs[(i * 7) % Math.max(1, hs.length)]; if (h) [qx, qy] = h.doorTile; } }   // AUDIT: Angreifer von außerhalb, Verteidiger aus den Häusern
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
+      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : side.faction === 'chain' && MONSTERS.chain_brute ? 'chain_brute' : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
         { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }
