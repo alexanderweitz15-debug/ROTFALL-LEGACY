@@ -14699,12 +14699,12 @@ function inquiryChoices(npc, choices) {
         UI.dialogue(npc, o.say || '„Ich weiß nichts davon.“', [{ text: 'Weiter', fn: () => talk(npc) }]); } }); }); }
 }
 function cluePos(c) {
-  const P = TOWN_PLAN[c.town]; let tx, ty;
-  if (c.at) [tx, ty] = c.at;
+  const P = TOWN_PLAN[c.town]; let tx, ty;                           /* at = Plan-Koordinaten (wie die Props im TOWN_PLAN) → worldPt; P.square ist zur Laufzeit schon Weltkachel */
+  if (c.at) [tx, ty] = worldPt(c.at[0], c.at[1]);
   else if (c.square && P) { tx = P.square[0] + (c.square[0] || 0); ty = P.square[1] + (c.square[1] || 0); }
   else if (c.house) { const h = HOUSES.find(b => b.town === c.town && b.type === c.house && b.map === 'world'); if (!h) return null; const f = frontOf(h); tx = f.x / TS | 0; ty = f.y / TS | 0; }
   else return null;
-  return freeSpotNear(c.map || 'world', tx, ty, 1);
+  return freeSpotNear(c.map || 'world', Math.round(tx), Math.round(ty), 1);
 }
 function ensureClues() {                                              /* idempotent: je aktivem Auftrag und ungefundener Spur genau ein Prop; sonst keins */
   const want = new Map();
@@ -23325,23 +23325,25 @@ export function selftest() {
     p.stigma = {}; p.boneRep = {}; p.equip.head = mkItem('kuttenkapuze'); const hidden = !stigmaOf(w) && boneSeen(p) === 0;
     S.ranks.undead = 0; const raid = !raidSources({ x: 487 * TS, y: 443 * TS, map: 'world' }).some(x => x.src === 'undead');
     return seen && rep && hidden && raid; }));
-  ok('Welttiefe Slice 1: Ermittlung „Blut auf dem Markt“ — Spuren liegen beim Start (idempotent), Lesen zählt das Ziel und räumt die Spur weg, Befragen erscheint nur beim richtigen NPC, Urteil wendet Folgen an (Beziehung, Wohlstand, Chronik) und schließt ab', (() => {
-    const q0 = S.quests.q_erm_markt, R0 = { ...S.relations }, G0 = structuredClone(S.growth || {}), g0 = S.gold, ch0 = S.chronicle.length, ents0 = S.ents.world.slice();
+  ok('Welttiefe Slice 1: Ermittlung „Blut auf dem Markt“ — Spuren liegen beim Start (idempotent), Lesen zählt das Ziel und räumt die Spur weg, Befragen erscheint nur beim richtigen NPC, Urteil wendet Folgen an (Beziehung, Wohlstand, Ausgang) und schließt ab; der echte Held bleibt unberührt', sandbox(() => {
+    const q0 = S.quests.q_erm_markt, R0 = { ...S.relations }, G0 = structuredClone(S.growth || {}), g0 = S.gold, f0 = { ...S.factions }, fm0 = structuredClone(S.fame || null), ents0 = S.ents.world.slice();
     const op = UI.uiHooks.dialogue; let last = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+    const p = stage(); const W = {};
     try {
       delete S.quests.q_erm_markt; S.gold = 500; startQuest('q_erm_markt'); ensureClues(); ensureClues();
-      const props = S.ents.world.filter(e => e.clue), laid = props.length === 2 && new Set(props.map(e => e.clue)).size === 2 && props.every(e => Math.abs(e.x / TS - 62) < 30 && Math.abs(e.y / TS - 66) < 30);
-      const bor = { key: 'borin', kind: 'npc', name: 'Borin' }, els = { key: 'elena', kind: 'npc', name: 'Elena' }, mar = { key: 'mara', kind: 'npc', name: 'Mara' };
-      const c1 = [], c2 = []; inquiryChoices(bor, c1); inquiryChoices(mar, c2); const onlyRight = c1.length === 1 && c2.length === 0;
-      clueRead(props.find(e => e.clue === 'markt_blut')); const read1 = S.quests.q_erm_markt.progress[0] === 1 && S.ents.world.filter(e => e.clue).length === 1;
+      const props = S.ents.world.filter(e => e.clue); W.laid = props.length === 2 && new Set(props.map(e => e.clue)).size === 2 && props.every(e => { const [cx, cy] = TOWN_PLAN.eren.square; return Math.abs(e.x / TS - cx) < 40 && Math.abs(e.y / TS - cy) < 40; });   /* beide Spuren liegen im Dorf */
+      const bor = { key: 'borin', kind: 'npc', name: 'Borin', x: p.x, y: p.y, map: p.map }, els = { key: 'elena', kind: 'npc', name: 'Elena', x: p.x, y: p.y, map: p.map }, mar = { key: 'mara', kind: 'npc', name: 'Mara', x: p.x, y: p.y, map: p.map };
+      const c1 = [], c2 = []; inquiryChoices(bor, c1); inquiryChoices(mar, c2); W.onlyRight = c1.length === 1 && c2.length === 0;
+      clueRead(props.find(e => e.clue === 'markt_blut')); W.read1 = S.quests.q_erm_markt.progress[0] === 1 && S.ents.world.filter(e => e.clue).length === 1;
       c1[0].fn(); const cE = []; inquiryChoices(els, cE); cE[0].fn(); clueRead(S.ents.world.find(e => e.clue === 'hof_spuren'));
-      const done = questComplete('q_erm_markt') && !S.ents.world.some(e => e.clue) && [].length === 0; const again = []; inquiryChoices(bor, again); const noRepeat = again.length === 0;
-      const hav = { key: 'havel', kind: 'npc', name: 'Havel', faction: 'valen' }; questDecide(hav, 'q_erm_markt'); const asked = Array.isArray(last) && last.length === 4;
-      const r1 = S.relations.tomas || 0, pr1 = growthOf('eren').prosper; last[1].fn();
-      const judged = S.quests.q_erm_markt.state === 'done' && S.quests.q_erm_markt.outcome === 'tomas' && (S.relations.tomas || 0) === r1 + 10 && growthOf('eren').prosper === Math.min(100, pr1 + 2) && S.chronicle.length > ch0;
-      return laid && onlyRight && read1 && done && noRepeat && asked && judged;
-    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_markt = q0; else delete S.quests.q_erm_markt; S.relations = R0; S.growth = G0; S.gold = g0; S.chronicle.length = ch0; S.ents.world = ents0; UI.closeDialogue(); }
-  })());
+      W.done = questComplete('q_erm_markt') && !S.ents.world.some(e => e.clue); const again = []; inquiryChoices(bor, again); W.noRepeat = again.length === 0;
+      const hav = { key: 'havel', kind: 'npc', name: 'Havel', faction: 'valen', x: p.x, y: p.y, map: p.map }; questDecide(hav, 'q_erm_markt'); W.asked = Array.isArray(last) && last.length === 4;
+      const r1 = S.relations.tomas || 0, pr1 = growthOf('eren').prosper, xp0 = p.xp; last[1].fn();
+      W.judged = S.quests.q_erm_markt.state === 'done' && S.quests.q_erm_markt.outcome === 'tomas' && (S.relations.tomas || 0) === r1 + 10 && growthOf('eren').prosper === Math.min(100, pr1 + 2) && p.xp > xp0;
+      const okAll = W.laid && W.onlyRight && W.read1 && W.done && W.noRepeat && W.asked && W.judged; if (!okAll) console.warn('Ermittlungs-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_markt = q0; else delete S.quests.q_erm_markt; S.relations = R0; S.growth = G0; S.gold = g0; S.factions = f0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; UI.closeDialogue(); }
+  }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -23605,7 +23607,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

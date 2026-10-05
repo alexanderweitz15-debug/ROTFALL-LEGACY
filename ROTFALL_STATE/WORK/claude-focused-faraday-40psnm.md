@@ -18,7 +18,7 @@ Auftrag „World Depth, Quest Variety & Gameplay Expansion“: Welt reaktiv, Auf
 Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blockiert W1.
 
 ## Erledigt
-- Slice 1 (Commit folgt): Zieltypen `talk`/`clue`, `ensureClues`, `clueRead`, `inquiryChoices`, `questDecide`; Auftrag `q_erm_markt` „Blut auf dem Markt“; Probe grün (Selbsttest 489/489 headless); Debug-Eintrag; Doku.
+- Slice 1 (Commit folgt): Zieltypen `talk`/`clue`, `ensureClues`, `clueRead`, `inquiryChoices`, `questDecide`; Auftrag `q_erm_markt` „Blut auf dem Markt“; Probe grün (Selbsttest 489/489 headless, nach Korrektur der Spur-Koordinaten); Debug-Eintrag; Doku.
 
 ## Nächster Schritt
 - Live-Test im Browser (Spur-Prop sichtbar? Prompt „Untersuchen“? Urteil-Dialog lesbar?), dann W1 Slice 2: zweite Ermittlung in einer anderen Region (Vorschlagstabelle zuerst), danach W2 Folgen-Bausteine.
