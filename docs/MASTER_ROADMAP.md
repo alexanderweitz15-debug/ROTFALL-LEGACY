@@ -6,6 +6,8 @@ Stand: 2026-09-30. Vom Nutzer als verbindliche Arbeitsgrundlage übergeben. Dies
 
 ## Teil A — Arbeitsregeln (vor jeder Implementierung)
 
+> **Abgelöst (05.10.2026):** Arbeitsregeln stehen nur noch in `CLAUDE.md`; Teil A bleibt Lesestoff. Die Schritte „Skills auflisten, Plugins prüfen“ und die Opus/Sonnet-Agentenregel gelten nicht mehr.
+
 ### A.0 Reihenfolge
 1. Verfügbare Skills auflisten, relevante Skill-Anweisungen lesen und anwenden (Repository-Analyse, Coding, Architektur, Testing, Debugging, UI, Dokumentation, Performance, Agentenarbeit).
 2. Verfügbare Plugins und Integrationen prüfen und einsetzen (Code-Analyse, Dateien, Browser-/UI-Tests, Debugging, Testing, Subagenten, Dokumentation).

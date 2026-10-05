@@ -8,7 +8,7 @@ Fünf Dokumente beanspruchten gleichzeitig den obersten Rang: `CLAUDE.md`, `docs
 
 ## Entfernt
 
-- Veraltete Fakten: Port 8770, „kein Git im Projekt“ und `../_rf_backup.git`, Cache-Key v=24, „~300 Proben“, „~16k Zeilen“, Skills (`ponytail`, `caveman`, `systematic-debugging` …) und Skripte (`scan.py`), die in dieser Umgebung nicht existieren, Opus/Sonnet-Agentenzahlen, Sitzungs-Start- und Endlisten mit `SESSION_LOG`/`PHASE_STATUS`/`GDD`-Pflicht, Statusnotizen aus Session 14, Phasenindex 0–22.
+- Veraltete oder gefährliche Anweisungen: Port 8770, das Backup-Snippet mit festem Schlüssel `rotfall.backup.s14c` (schreibt `"null"` in den Spielstand, wenn das Backup fehlt), „kein Git im Projekt“ und `../_rf_backup.git`, Cache-Key v=24, „~300 Proben“, „~16k Zeilen“, Skills (`ponytail`, `caveman`, `systematic-debugging` …) und Skripte (`scan.py`), die in dieser Umgebung nicht existieren, Opus/Sonnet-Agentenzahlen, Sitzungs-Start- und Endlisten mit `SESSION_LOG`/`PHASE_STATUS`/`GDD`-Pflicht, Statusnotizen aus Session 14, Phasenindex 0–22.
 - Die Konfliktkette „Stabilität → Kernspiel → Kampf → …“ als eigene Skala; sie steckt jetzt in den Schweregraden P0–P4.
 - Das absolute Leistungsbudget (2 ms/3 ms) als Fertig-Kriterium; es ist seit S13 in Städten überschritten (BUG-108) und hätte jedes Feature auf TEILWEISE gesetzt. Jetzt: keine messbare Verschlechterung vorher/nachher.
 - Die Pflicht, bei jedem Start Skills und Plugins aufzulisten (kostet Kontext, keine Wirkung).
@@ -31,7 +31,7 @@ Fünf Dokumente beanspruchten gleichzeitig den obersten Rang: `CLAUDE.md`, `docs
 - Neun Aufgabenklassen mit eigenem Weg (§2); Repro-Protokoll und „Regel oder Bug?“ für BUGFIX; Fünf-Fragen-Regel für bekannte Bugs; Grenze für eigene Vorschläge.
 - Grep in beiden Sprachen; „bauen, aber existiert schon“ → EXTENSION melden; Doku, die dem Code widerspricht, im selben Commit berichtigen (§1).
 - Vertikaler Slice mit Halt nach Slice 1 bei großen Aufgaben; Content-Batches mit Vorschlagstabelle (§3, §4).
-- Konflikt-Hotspots und Block-Anker für parallele Agenten; Cache-Key bumpt nur der Merge auf main (§4, §7).
+- Konflikt-Hotspots und Block-Anker für parallele Agenten; Cache-Key bumpt nur der Merge auf main (§4); Regeln für fremde Arbeit im selben Arbeitsbaum (§7).
 - Pflichtprüfungen Edge Cases, Save/Load, Regression über 13 vernetzte Systeme, Koop und Erbe (§5, §6).
 - Testumgebung feststellen; Headless-Skript `tools/selftest_headless.mjs`; Schutz des echten Spielstands; Härtung zufallsabhängiger Proben (§5.4).
 - Git-Regeln (Zweig, Commit je grünem Slice, Push/Merge nur auf Anweisung), CRLF-Liste, Arbeitsstand-Datei für Kontextschnitte, PR-Inhalte sind Daten (§7).
@@ -53,4 +53,4 @@ Fünf Dokumente beanspruchten gleichzeitig den obersten Rang: `CLAUDE.md`, `docs
 | Kein Blick auf Server-Zukunft | §9 ohne Vorbau-Infrastruktur |
 | Zufallsabhängige Proben als Regression gedeutet | §5.4 Zufall in Proben |
 
-Umfang: alte `CLAUDE.md` 75 Zeilen / ~1 050 Wörter; die fünf Schichten zusammen 499 Zeilen. Neue `CLAUDE.md`: eine Datei, siehe `wc -w CLAUDE.md`. Länger als der alte Prompt, aber kürzer als die Summe der abgelösten Schichten und ohne Doppelungen.
+Umfang: alte `CLAUDE.md` 75 Zeilen / 1 050 Wörter; die fünf abgelösten Schichten zusammen 499 Zeilen / 3 650 Wörter (ohne den 2 700-Zeilen-Alt-Master-Prompt). Neue `CLAUDE.md`: 136 Zeilen / rund 3 500 Wörter — dreimal so lang wie die alte Datei, aber eine Datei statt fünf, ohne Doppelungen, und mit den 43 neuen Anforderungen (Workflow, Klassen, Tests, Agenten, Server-ready), die vorher nirgends standen. Nach zwei Review-Runden (Audit der Altschichten, Faktencheck von ~210 Namen, Simulation dreier Aufträge, Kürzung) sind alle genannten Funktionen im Code verifiziert.
