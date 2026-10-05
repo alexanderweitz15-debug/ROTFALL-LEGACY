@@ -1546,3 +1546,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Unter 50 % Leben ruft jeder Regionalboss weiter Verstärkung — und kippt jetzt zusätzlich das Wetter seines Kampfplatzes für einige Minuten: Graumähne lässt Nebel aus der Schlucht kriechen (Sicht), Karrak ruft den Sandsturm, Varg lässt Blut aus den Ketten regnen. Einmal je Kampf, mit Ansage und Log.
 - Fällt der Boss, klart es sofort auf; läuft die Zeit ab, verzieht sich das Wetter von selbst. Alte Stände ohne das Feld sind unberührt.
 - Bossmaterial für Reliquien gibt es schon: Regionalbosse geben Seelenglut und Sternsplitter, Stufe V verlangt eine Trophäe. Probe „Welttiefe W10 Slice 1“.
+
+## Stadtinfo-Fenster (Welttiefe W11 Slice 1, 05.10.2026)
+- In einer Stadt ist der Stadtkopf im Kontextfeld rechts anklickbar und öffnet das Fenster „Stadt“: Lage (Zustand wie Ruhig/Belagert/Besetzt, Besatzung, Einwohner, Wohlstand und neue Häuser), Markt (knappe und reichliche Waren, Händlerzüge unterwegs hierher, unsichere Wege) und Arbeit (offene und angenommene Aushänge, Betriebe, eigene Betriebe, Schutz und Vertrauen).
+- Alles kommt aus den laufenden Systemen (Krieg, Wirtschaft, Aufträge); das Fenster ändert nichts und gilt auch für den Koop-Gast nur als Anzeige. Probe „Welttiefe W11 Slice 1“.

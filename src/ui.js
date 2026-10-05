@@ -496,6 +496,7 @@ export function renderContext(target) {
 `;   /* UI-Umbau: Wetter, Zeit, Jahreszeit, Jahr stehen in der Kopfleiste (vorher doppelt) */
     if (here && S.towns && S.towns[here.key]) {
       const t = S.towns[here.key], owner = S.war.nodes[here.key]?.owner;
+      h = h.replace('<div class="ctx-head">', `<div class="ctx-head ctx-click" data-town="${here.key}" title="Klick: Stadtinfo">`);   /* W11: Stadtinfo-Fenster */
       h += `<div class="ctx-block"><div class="ctx-sub">Stadt</div>
         <div class="ctx-line"><span>Lage</span><b>${townState(here.key)}</b></div>
         <div class="ctx-line"><span>Herrschaft</span><b>${owner ? FACTIONS[owner].name : 'frei'}</b></div>
@@ -527,7 +528,7 @@ export function renderContext(target) {
           + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
-    if (box.__h !== h) { box.innerHTML = h; box.__h = h; }   /* PERF-S: DOM nur bei Änderung schreiben */
+    if (box.__h !== h) { box.innerHTML = h; { const th = box.querySelector('[data-town]'); if (th) th.onclick = () => openModal('town', th.dataset.town); } box.__h = h; }   /* PERF-S: DOM nur bei Änderung schreiben */
     return;
   }
   box.__h = null;
@@ -917,7 +918,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], relics:[ 'Reliquien', relicsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    town:[ 'Stadt', townUI ], classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], relics:[ 'Reliquien', relicsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1640,6 +1641,22 @@ function settleTier(st) {
 
 // ---- Fraktionen ----
 let selFac = 'valen';
+/* W11 Slice 1: Stadtinfo-Fenster — Daten aus A.townInfo (game.js), nur Anzeige. */
+function townUI(body, k) {
+  const I = A.townInfo?.(k); if (!I) { body.innerHTML = '<div class="ledger">Kein Ort gewählt. Klick im Kontextfeld rechts auf den Ortsnamen.</div>'; return; }
+  const row = (a, b, cls = '') => `<div class="ctx-line"><span>${qa(a)}</span><b class="${cls}">${b}</b></div>`;
+  const goods = L => L.length ? L.map(g => `${qa(g.name)} ${g.price} Gold · ${g.stock}`).join('<br>') : '—';
+  body.innerHTML = `<div class="ledger"><div class="ctx-head">${qa(I.name)}</div><div class="ctx-sub">${I.kind} · ${qa(I.lord)}${I.schutz ? ' · ' + I.schutz : ''}</div>
+    <div class="ctx-block"><div class="ctx-sub">Lage</div>
+      ${row('Zustand', qa(I.state), I.occupied || I.siege ? 'threat-high' : I.state === 'Bedroht' || I.hunger ? 'threat-med' : 'threat-low')}
+      ${I.garrison != null ? row('Besatzung', I.garrison + (I.walls != null ? ` · Mauern ${I.walls} %` : '')) : ''}
+      ${row('Einwohner', townHeads(I.key))}${row('Wohlstand', `${I.prosper}/100 · ${I.built} neue Häuser`)}
+      ${I.tradeDays ? row('Geförderter Handel', `noch ${I.tradeDays} Tage, 20 % mehr Ware je Zug`) : ''}${I.trust < 0 ? row('Vertrauen', `${I.trust} (weniger Aushänge)`, 'threat-med') : ''}</div>
+    <div class="ctx-block"><div class="ctx-sub">Markt</div>${row('Knapp und teuer', goods(I.scarce))}${row('Reichlich und billig', goods(I.plenty))}
+      ${row('Unterwegs hierher', I.coming.length ? I.coming.map(qa).join('<br>') : 'kein Händlerzug')}${I.unsafe.length ? row('Unsichere Wege', 'Händler meiden die Straße nach ' + I.unsafe.map(qa).join(', '), 'threat-med') : ''}</div>
+    <div class="ctx-block"><div class="ctx-sub">Arbeit</div>${row('Aushänge', `${I.offers} offen · ${I.active} angenommen`)}${row('Betriebe', `${I.biz}${I.mine ? ` · ${I.mine} eigene` : ''}`)}</div>
+    <p style="margin-top:10px;color:#6d6454">Alles aus den laufenden Systemen: Krieg, Wirtschaft, Aufträge. Das Fenster ändert nichts.</p></div>`;
+}
 function facUI(body) {
   const f = FACTIONS[selFac], rep = S.factions[selFac], rank = S.ranks[selFac];
   body.innerHTML = `<div class="fac-grid">

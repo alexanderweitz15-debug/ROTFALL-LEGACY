@@ -44,7 +44,7 @@ Regel: zuerst das, was die meisten anderen Pakete tragen (Quest-Bausteine), dann
 | **W8 Legacy-Erinnerung** | NPCs kennen das Haus (Satz je Beziehung des Vorfahren), vererbte Beziehungen gedämpft, offene Fälle als Erbe-Auftrag, Familien-Ruf | §7 |
 | **W9 Krieg ↔ Wege ↔ Händler** (begonnen) | Unsichere Routen (Karawanen meiden, Preise), Schmuggelaufträge, Rückkehr der Händler nach Befreiung | §13, §14 |
 | **W10 Bosse, Reliquien-Upgrades, Geheimorte** (begonnen) | Arena-Veränderungen, Bossmaterial → Reliquienstufe, restliche Geheimorte | §11, §12, §16 |
-| **W11 Kampfprofile Rest, UI-Fenster** | Bogen/Armbrust/Sense/Doppelklinge/Magie/Bosswaffen; Fraktionsübersicht, Schwarzmarkt, Stadtinfo | §10, §17 |
+| **W11 Kampfprofile Rest, UI-Fenster** (begonnen) | Bogen/Armbrust/Sense/Doppelklinge/Magie/Bosswaffen; Fraktionsübersicht, Schwarzmarkt, Stadtinfo | §10, §17 |
 
 ## Slice-Regel je Paket
 
@@ -86,3 +86,4 @@ Erst ein vollständiges Beispiel (ein Auftrag, ein NPC, eine Folge, eine Probe, 
 - **W5 Slice 2 (05.10.):** Jagd-Händler ohne neuen NPC: Jäger-Berufe werden im Gespräch zum Abnehmer (`hunterChoices`, `huntTrade`, `fixedStock`), Preisaufschlag in `price()` nach Jagdkunst (`huntMul`). Status: Probe grün (507/507), live geprüft (Burkhard in Eren, Fell 13 statt 8). Offen in W5: Fallen, seltene Tiere als Weltsystem.
 - **W9 Slice 1 (05.10.):** `routeRisk` (Totenknoten/Räuberlager nahe der Linie, `S.eco.unsafe` nach Überfällen), `avoids` ab 0,4 in der Zugplanung, Wachen bei Risiko, `tradeReturn` über `H.afterCapture`, Kontor-Zeile. Status: Probe grün (508/508), live geprüft (Kontor-Text, Rückkehrzug nach Befreiung). Offen in W9: der sichtbare Zug der Alten Straße meidet noch nichts; Schmuggel in Ketten-Gebiete.
 - **W10 Slice 1 (05.10.):** Arena-Veränderung als Datenfeld `arena` an `REGION_BOSSES` (`bossArena` in Phase 2, `arenaClear` bei Tod/Ablauf, `S.arenaWx`). Bossmaterial → Reliquien existiert bereits (Glut/Stern, Trophäe ab Stufe V). Status: Probe grün (509/509), live geprüft. Offen in W10: weitere Geheimorte (keine Vorschlagsliste mehr im Repo, Lore nötig), Arenen für Garmadon/Omega haben eigene Phasen.
+- **W11 Slice 1 (05.10.):** Stadtinfo-Fenster (`townInfo` in game.js, `townUI` + Registry `town` in ui.js, Stadtkopf im Kontextfeld klickbar). Liest nur `S.war`, `S.growth`, `S.towns[k].stock`, `ECO.unsafeRoutes`, Aushänge, Betriebe; ändert nichts. Status: Probe grün (510/510), live geprüft (Eren). Offen in W11: Fernwaffen-Profile (Bogen/Armbrust), Sense/Doppelklinge/Magie/Bosswaffen, Fraktionsübersicht, Schwarzmarkt-Fenster.
