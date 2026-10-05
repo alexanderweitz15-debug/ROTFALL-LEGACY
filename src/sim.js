@@ -284,6 +284,14 @@ export function caravanFrame(c, dt, player, nearFoes) {
   if (nearFoes) c.attacked = true;                               // unter Angriff: rollt langsam weiter
   if (c.restUntil > clockMin()) { c.vx = c.vy = 0; return; }     // Ankunft: abladen, neu beladen, dann zurück
   if (c.restUntil) { c.restUntil = 0; c.trail = []; }             // Abfahrt: der Zug wendet (neue Spur)
+  /* W9 Slice 2 (Welttiefe): am Tor prüft der Zug den Weg — gilt die Alte Straße als unsicher (ECO.avoids: Totenknoten, Räuberlager, jüngste Überfälle),
+     wartet er in der Stadt und meldet es einmal am Tag; wird der Weg sicher, bricht er wieder auf. Alte Stände ohne das Feld fahren wie bisher los. */
+  if (c.wp <= 1 && !c.attacked) { const at = c.dir > 0 ? 'eren' : 'northcity', to = c.dir > 0 ? 'northcity' : 'eren';
+    if (ECO.avoids(at, to)) { c.vx = c.vy = 0; c.restUntil = clockMin() + 30;
+      if (!c.waiting) { c.waiting = true; c.waitDay = S.day | 0; log(`Die Karawane wartet in ${S.towns[at].name}: die Alte Straße gilt als unsicher.`, 'economy'); chronicle(`Die Karawane wartet in ${S.towns[at].name}, der Weg ist unsicher`, 'news'); }
+      else if (c.waitDay !== (S.day | 0)) { c.waitDay = S.day | 0; log(`Die Karawane wartet weiter in ${S.towns[at].name} — die Alte Straße ist noch unsicher.`, 'economy'); }
+      return; }
+    if (c.waiting) { c.waiting = false; log(`Die Karawane bricht wieder auf — die Alte Straße gilt als sicher.`, 'economy'); chronicle('Die Karawane fährt wieder auf der Alten Straße', 'news'); } }
   if (!(c.wp >= 0 && c.wp < ROUTE.length)) c.wp = 0;              /* Artist R5: Route neu vermessen (andere Welt) — alter Wegpunkt wäre außerhalb */
   const idx = c.dir > 0 ? c.wp : ROUTE.length - 1 - c.wp;
   const [tx, ty] = ROUTE[idx];
@@ -305,12 +313,12 @@ export function caravanFrame(c, dt, player, nearFoes) {
       if (Math.hypot(player.x - c.x, player.y - c.y) < 700 && player.map === 'world') {
         for (let i = 0; i < 3 + guards.length; i++) H.spawnEnemy('bandit', 'world', ...(H.pushOut ? H.pushOut('world', (c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6)) : [(c.x / TS | 0) + ri(-5, 5), (c.y / TS | 0) + ri(3, 6)]));   // ein bewachter Zug lockt mehr Räuber; AUDIT: von außerhalb des Bildes
         log('Banditen fallen über die Karawane her!', 'combat');
-        H.toast('KARAWANE ÜBERFALLEN');
+        H.toast('KARAWANE ÜBERFALLEN'); ECO.noteRaid('eren', 'northcity');   /* W9 S2: sichtbare Überfälle zählen ins Wegrisiko */
       } else if (guards.length && chance(0.3 + 0.15 * guards.length)) {    // außer Sicht: Wachen schlagen zurück, nicht ohne Preis
         if (chance(0.3)) { const g = pick(guards); g.alive = false; S.ents.world.splice(S.ents.world.indexOf(g), 1); }
         log('Räuber überfielen eine Karawane auf der Alten Straße — die Wachen schlugen sie zurück.', 'economy'); chronicle('Die Karawanenwachen schlugen Räuber auf der Alten Straße zurück', 'news');
       } else {
-        for (const g of Object.keys(c.cargo)) c.cargo[g] = Math.floor(c.cargo[g] / 2);
+        for (const g of Object.keys(c.cargo)) c.cargo[g] = Math.floor(c.cargo[g] / 2); ECO.noteRaid('eren', 'northcity');   /* W9 S2 */
         log('Eine Karawane wurde auf der Alten Straße ausgeraubt.', 'economy'); chronicle('Eine Karawane wurde auf der Alten Straße ausgeraubt', 'news');
       }
     }

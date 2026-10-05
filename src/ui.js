@@ -536,8 +536,9 @@ export function renderContext(target) {
     box.innerHTML = `<div class="ctx-head">${target.name}</div><div class="ctx-sub">Eren — Nordfurt</div>
       ${bar('Zustand', target.hp, target.maxHp, 'hp')}
       <div class="ctx-line"><span>Richtung</span><b>${target.dir > 0 ? 'Nordfurt' : 'Eren'}</b></div>
+      ${target.waiting ? `<div class="ctx-line"><span>Stand</span><b>wartet — Weg unsicher</b></div>` : ''}
       ${Object.entries(target.cargo || {}).map(([g, n]) => `<div class="ctx-line"><span>${ITEMS[g].name}</span><b>${n}</b></div>`).join('')}
-      <div class="ctx-block ledger">Begleite sie bis ans Ziel. Überfälle unterwegs sind häufig.</div>`;
+      <div class="ctx-block ledger">${target.waiting ? 'Die Händler warten, bis die Alte Straße wieder sicher ist: Totenknoten und Räuberlager an der Straße räumen, Überfälle verebben lassen.' : 'Begleite sie bis ans Ziel. Überfälle unterwegs sind häufig.'}</div>`;
     return;
   }
   if (target.kind === 'enemy') {
