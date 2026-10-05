@@ -23787,6 +23787,20 @@ export function selftest() {
       return okAll;
     } finally { S.war = war0; S.eco = eco0; S.bands = bands0; S.towns = stock0; S.day = d0; }
   }));
+  ok('Welttiefe W9 Slice 2: Der sichtbare Zug der Alten Straße wartet am Tor, solange der Weg als unsicher gilt (einmal am Tag gemeldet, Kontextfeld zeigt es), und bricht wieder auf, sobald er sicher ist; ein sichtbarer Überfall zählt ins Wegrisiko', sandbox(() => {
+    const war0 = S.war, eco0 = structuredClone(S.eco), bands0 = S.bands, d0 = S.day; const W = {}; const p = stage();
+    try {
+      S.war = structuredClone(war0); S.bands = []; S.eco.unsafe = {}; for (const n of Object.values(S.war.nodes)) if (n.owner === 'undead') n.owner = 'valen';
+      const [tx, ty] = SIM.ROUTE[0], c = { id: 'probe_car', kind: 'caravan', map: 'world', name: 'Händlerkarawane', faction: 'merch', x: tx * TS, y: ty * TS, hp: 140, maxHp: 140, r: 16, alive: true, dir: 1, wp: 1, cargo: {}, attacked: false, ambushChecked: true, facing: 3, trail: [], restUntil: 0 };
+      S.eco.unsafe['eren|northcity'] = { n: 4, day: S.day | 0 }; const x0 = c.x, y0 = c.y;   /* vier Überfälle: +0,4 → Weg gilt als unsicher */
+      SIM.caravanFrame(c, 16, p, false); W.wait = c.waiting === true && c.x === x0 && c.y === y0 && c.restUntil > S.day * 1440 + S.minute && c.waitDay === (S.day | 0);
+      c.restUntil = 0; SIM.caravanFrame(c, 16, p, false); W.still = c.waiting === true && c.x === x0 && c.y === y0;
+      S.eco.unsafe = {}; c.restUntil = 0; SIM.caravanFrame(c, 16, p, false); W.go = c.waiting === false && (c.x !== x0 || c.y !== y0 || c.wp > 1);
+      const n0 = S.eco.unsafe['eren|northcity']?.n || 0; ECO.noteRaid('eren', 'northcity'); W.raid = (S.eco.unsafe['eren|northcity']?.n || 0) === n0 + 1;
+      const okAll = W.wait && W.still && W.go && W.raid; if (!okAll) console.warn('W9-S2-Probe', JSON.stringify(W), c.waiting, c.x - x0, c.y - y0, ECO.routeRisk('eren', 'northcity'));
+      return okAll;
+    } finally { S.war = war0; S.eco = eco0; S.bands = bands0; S.day = d0; }
+  }));
   ok('Welttiefe W10 Slice 1: Arena-Veränderung — in Phase 2 kippt ein Regionalboss das Wetter (Graumähne Nebel, Karrak Sandsturm, Varg Blutregen) für Minuten, nur einmal; fällt er, klart es auf; jeder Regionalboss hat ein Arena-Feld', sandbox(() => {
     const w0 = S.weather, wl0 = S.weatherLeft, ax0 = S.arenaWx, f0 = { ...S.flags }, fac0 = { ...S.factions }, st0 = structuredClone(S.towns.eren.stock); const W = {}; stage();
     try {

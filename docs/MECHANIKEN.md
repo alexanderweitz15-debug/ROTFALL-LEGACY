@@ -1555,3 +1555,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Bogen: Beim Spannen tritt die Figur breiter, lehnt sich zurück und zieht die Sehne in vier Schritten bis ans Kinn; beim Lösen (Schuss bei 75 % des Takts) federt der Rumpf vor und der Kopf nickt. Gegner-Schützen nutzen dieselben Posen.
 - Armbrust, Pistole, Gewehr (alle wtype `crossbow`): Nach dem Schuss ein kurzer Rückstoß; während der Nachladezeit der Waffe senkt die Figur die Waffe vor den Bauch, beugt sich darüber und die zweite Hand spannt sichtbar. Dann zurück in die Zielhaltung.
 - Reine Darstellung: Trefferzeitpunkt, Nachladedauer und Schaden bleiben wie bisher. Werte in `RANGED_DEFS` (anim.js). Test Room (Debug „Kampfanimation“) kennt Langbogen und Armbrust. Probe „Welttiefe W11 Slice 2“.
+
+## Der sichtbare Zug meidet unsichere Wege (Welttiefe W9 Slice 2, 05.10.2026)
+- Die Händlerkarawane zwischen Eren und Nordfurt prüft am Tor, ob die Alte Straße als unsicher gilt (Totenknoten oder Räuberlager an der Straße, jüngste Überfälle; dieselbe Regel wie für die unsichtbaren Händlerzüge). Gilt sie als unsicher, wartet der Zug in der Stadt, das Log meldet es einmal am Tag, das Kontextfeld zeigt „wartet — Weg unsicher“ und nennt, was hilft.
+- Wird der Weg wieder sicher (Knoten befreit, Lager zerschlagen, Überfälle verebbt), bricht der Zug von selbst auf. Sichtbare Überfälle auf der Alten Straße zählen jetzt ins Wegrisiko. Probe „Welttiefe W9 Slice 2“.

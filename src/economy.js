@@ -316,7 +316,7 @@ export function routeRisk(a, b, guards = 0) {
 }
 export const avoids = (a, b) => routeRisk(a, b, 0) >= UNSAFE_SKIP;
 export function unsafeRoutes(town) { return tradeTowns().filter(k => k !== town && tripDays(town, k) <= 3 && avoids(town, k)); }   /* nur Handelspartner in Reichweite, keine Totenstädte */
-function noteRaid(a, b) { const E = S.eco, key = pairKey(a, b), day = S.day | 0, U = (E.unsafe ||= {})[key]; const n = U && day - U.day <= UNSAFE_DAYS ? U.n + 1 : 1; E.unsafe[key] = { n, day };
+export function noteRaid(a, b) { const E = S.eco, key = pairKey(a, b), day = S.day | 0, U = (E.unsafe ||= {})[key]; const n = U && day - U.day <= UNSAFE_DAYS ? U.n + 1 : 1; E.unsafe[key] = { n, day };
   if (n === 2) { log(`Die Straße zwischen ${townName(a)} und ${townName(b)} gilt als unsicher — Händler meiden sie, bis Ruhe einkehrt.`, 'economy'); chronicle(`Die Straße ${townName(a)}–${townName(b)} gilt als unsicher`, 'news'); } }
 export function tradeReturn(node) {
   const E = S.eco; if (!E || !S.towns[node] || !LOC[node]) return null;
