@@ -297,6 +297,43 @@ const STANCE = {
   staff:    { ready: { a: -0.2, ext: 2, body: { by: 1, st: 3, ln: 0 } },   guard: { a: -0.4, ext: 2, body: { by: 1, st: 3 } } },
 };
 export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
+/* Welttiefe W11 Slice 2: Fernwaffen-Profile. Bogen und Armbrust (dazu Pistolen/Gewehre, wtype 'crossbow') haben keine Schwungformen —
+   ihr Profil beschreibt Phasen mit Ganzkörperposen (Felder wie BODY: by, ln, st, hy, hr, hd): Bogen spannen (Rumpf zurück, Stand breit),
+   lösen (Rumpf federt vor, Kopf nickt), Armbrust zielen, Rückstoß, nachladen (gebeugt über den Schaft, Waffe gesenkt).
+   render.js/fig5.js lesen rangedPhase/rangedBody; game.js liest hit (Takt-Anteil, bei dem der Schuss fällt). Werte vorläufig. */
+export const RANGED_DEFS = {
+  bow: { name: 'Bogen', hit: 0.75, loose: 0.2, drawMs: 520,
+    body: { aim: { by: 0, st: 2 }, draw: { by: 1, ln: 2, st: 5 }, full: { by: 2, ln: 3, st: 6, hy: -1 }, loose: { by: 1, ln: -3, st: 6, hy: 1 } } },
+  crossbow: { name: 'Armbrust', kick: 180,
+    body: { aim: { by: 1, st: 3 }, kick: { by: 2, ln: 3, st: 3, hy: -1 }, reload: { by: 5, ln: -4, st: 2, hy: 2 } } },
+};
+export const rangedProfile = wt => RANGED_DEFS[wt] || null;
+const q4 = x => Math.round(Math.max(0, Math.min(1, x)) * 4) / 4;   /* Viertelschritte: begrenzt die Bilder im Figuren-Cache */
+/* Phase und Stützwert k (0…1 in Vierteln) aus dem Zustand der Figur: sw Takt des eigenen Schusses, draw Rest-Spannzeit (Gegner-Schützen),
+   reloadLeft/reloadTotal Nachladen (ms), sinceShot ms seit dem letzten Schuss. null = keine Fernwaffe mit Profil. */
+export function rangedPhase(wt, { sw = 0, draw = 0, reloadLeft = 0, reloadTotal = 0, sinceShot = Infinity } = {}) {
+  const P = rangedProfile(wt); if (!P) return null;
+  if (wt === 'bow') {
+    if (draw > 0) return { ph: 'draw', k: q4(1 - draw / P.drawMs) };
+    if (sw > 0 && sw < P.hit) return { ph: 'draw', k: q4(sw / P.hit) };
+    if (sw >= P.hit && sw < P.hit + P.loose) return { ph: 'loose', k: q4((sw - P.hit) / P.loose) };
+    return { ph: 'aim', k: 0 };
+  }
+  if (reloadLeft > 0) return { ph: 'reload', k: q4(1 - reloadLeft / Math.max(1, reloadTotal)) };
+  if (sinceShot < P.kick) return { ph: 'kick', k: q4(sinceShot / P.kick) };
+  return { ph: 'aim', k: 0 };
+}
+const lerpB = (a, b, k) => { const o = {}; for (const n of ['by', 'ln', 'st', 'hy', 'hr', 'hd']) { const x = (a && a[n]) || 0, y = (b && b[n]) || 0; o[n] = x + (y - x) * k; } return o; };
+// Ganzkörperpose einer Fernwaffen-Phase (null = kein Profil)
+export function rangedBody(wt, ph, k = 0) {
+  const P = rangedProfile(wt); if (!P) return null; const B = P.body;
+  if (ph === 'draw') return k < 0.5 ? lerpB(B.aim, B.draw, k / 0.5) : lerpB(B.draw, B.full, (k - 0.5) / 0.5);
+  if (ph === 'loose') return k < 0.5 ? lerpB(B.full, B.loose, k / 0.5) : lerpB(B.loose, B.aim, (k - 0.5) / 0.5);
+  if (ph === 'kick') return lerpB(B.kick, B.aim, k);
+  if (ph === 'reload') { const o = k < 0.25 ? lerpB(B.aim, B.reload, k / 0.25) : k < 0.75 ? { ...B.reload } : lerpB(B.reload, B.aim, (k - 0.75) / 0.25);
+    if (k >= 0.25 && k < 0.75) o.by = (o.by || 0) + (k === 0.5 ? 1 : 0); return o; }   /* Spannen: in der Mitte einmal tiefer */
+  return { ...lerpB(null, B.aim, 1) };
+}
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
 export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;
