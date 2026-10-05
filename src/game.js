@@ -11796,14 +11796,23 @@ function blackOffers(npc) {
   if (npc._black?.day !== (S.day | 0)) { const list = []; for (let g = 0; list.length < 4 && g < 40; g++) { const k = pick(BLACK_POOL); if (!list.includes(k)) list.push(k); } if (chance(0.25)) list.push(pick(BLACK_RARE)); npc._black = { day: S.day | 0, list }; }
   return npc._black.list;
 }
+/* W11 Slice 3 (Welttiefe): Schwarzmarkt als Fenster. Die Kaufregel ist eine Aktion (blackBuy: Angebot, Gold, Tasche, Gebrauchtware), Fenster und
+   Dialogliste rufen sie nur. Der Koop-Gast handelt weiter über die Dialogliste (runAs setzt S._hostHero; sein Fenster hätte kein Angebot). */
+function blackList(npc) { return blackOffers(npc).map(k => { const it = ITEMS[k]; return { key: k, name: it.name, cost: Math.round(price(k, true, npc) * 1.5), tier: bionicTier(it) || 0, rare: BLACK_RARE.includes(k), part: !!bionicTier(it) && it.use !== 'mechmod' }; }); }
+function blackBuy(c, npc, key) {
+  if (!blackOffers(npc).includes(key)) return { ok: false, say: '„Das ist schon weg.“' };
+  const cost = Math.round(price(key, true, npc) * 1.5);
+  if (S.gold < cost) return { ok: false, say: '„Kein Gold, kein Messing.“' };
+  if (!addItem(c, key, 1)) return { ok: false, say: '„Deine Tasche ist voll.“' };
+  S.gold -= cost; npc._black.list = npc._black.list.filter(x => x !== key); const worn = bionicTier(ITEMS[key]) && ITEMS[key].use !== 'mechmod' && chance(0.4);
+  if (worn) { const s = [...c.inv].reverse().find(x => x && x.key === key && !x.used); if (s) s.used = 60; }
+  log(`Schwarzmarkt: ${ITEMS[key].name} für ${cost} Gold.${worn ? ' Gebraucht — beim Einsetzen nur 60 % Zustand.' : ''}`, 'economy'); UI.refreshHUD();
+  return { ok: true, worn, cost, say: worn ? '„Hatte schon einen Besitzer. Der braucht ihn nicht mehr.“' : '„Frisch aus einer Kiste, die nie in Gelenkhall ankam.“' };
+}
 function blackMarket(npc) {
+  if (!S._hostHero) return UI.openModal('black', npc);   /* lokal: Fenster; Koop-Gast: Dialogliste */
   const back = () => blackMarket(npc), say = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
-  const opts = blackOffers(npc).map(k => { const c = Math.round(price(k, true, npc) * 1.5); return { text: `${ITEMS[k].name} (${c} Gold)`, fn: () => {
-    if (S.gold < c) return say('„Kein Gold, kein Messing.“'); if (!addItem(S.player, k, 1)) return say('„Deine Tasche ist voll.“');
-    S.gold -= c; npc._black.list = npc._black.list.filter(x => x !== k); const worn = bionicTier(ITEMS[k]) && ITEMS[k].use !== 'mechmod' && chance(0.4);
-    if (worn) { const s = [...S.player.inv].reverse().find(x => x && x.key === k && !x.used); if (s) s.used = 60; }
-    log(`Schwarzmarkt: ${ITEMS[k].name} für ${c} Gold.${worn ? ' Gebraucht — beim Einsetzen nur 60 % Zustand.' : ''}`, 'economy'); UI.refreshHUD();
-    say(worn ? '„Hatte schon einen Besitzer. Der braucht ihn nicht mehr.“' : '„Frisch aus einer Kiste, die nie in Gelenkhall ankam.“'); } }; });
+  const opts = blackList(npc).map(o => ({ text: `${o.name} (${o.cost} Gold)`, fn: () => say(blackBuy(S.player, npc, o.key).say) }));
   UI.dialogue(npc, `„Keine Fragen, keine Siegel. Dafür kostet es die Hälfte mehr, und nicht alles ist neu.“\n(Schwarzmarkt: kein Rang nötig, +50 % Preis, manche Teile gebraucht.)`, [...opts, { text: 'Zurück', fn: () => talk(npc) }, { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
 }
 // Das Heilige Gericht in Aurelheim: Ablass (Kopfgeld tilgen), Klage gegen ein Haus, einer Verhandlung beiwohnen
@@ -23801,6 +23810,20 @@ export function selftest() {
       return okAll;
     } finally { S.war = war0; S.eco = eco0; S.bands = bands0; S.day = d0; }
   }));
+  ok('Welttiefe W11 Slice 3: Schwarzmarkt — blackList liefert das Tagesangebot mit Preis (+50 %), blackBuy prüft Angebot, Gold und Tasche und bucht den Kauf; blackMarket öffnet lokal das Fenster „Schwarzmarkt“ und für den Koop-Gast (S._hostHero) die Dialogliste', sandbox(() => {
+    const g0 = S.gold, p = stage(); const rook = actor(p.x + 40, p.y, { name: 'Rook' }); rook.key = 'rook'; const W = {};
+    try {
+      const L = blackList(rook); W.list = L.length >= 4 && L.every(o => o.cost === Math.round(price(o.key, true, rook) * 1.5) && ITEMS[o.key]);
+      const k = L[0].key, w0 = blackBuy(p, rook, 'longsword'); W.notOffered = w0.ok === false && !!w0.say;
+      S.gold = 0; const w1 = blackBuy(p, rook, k); W.poor = w1.ok === false && p.inv.every(x => x.key !== k);
+      S.gold = 1000000; const inv0 = p.inv.length; const w2 = blackBuy(p, rook, k); W.buy = w2.ok === true && S.gold === 1000000 - L[0].cost && p.inv.some(x => x.key === k) && !blackOffers(rook).includes(k) && p.inv.length === inv0 + 1 && !!w2.say;
+      const k2 = blackOffers(rook)[0]; const inv1 = p.inv; p.inv = new Array(200).fill(null).map(() => mkItem('bread', 1)); const w3 = blackBuy(p, rook, k2); p.inv = inv1; W.full = w3.ok === false && blackOffers(rook).includes(k2);
+      blackMarket(rook); W.win = UI.modalOpen === 'black'; UI.closeModal();
+      S._hostHero = p; blackMarket(rook); W.dlg = UI.modalOpen !== 'black'; delete S._hostHero; UI.closeDialogue();
+      const okAll = W.list && W.notOffered && W.poor && W.buy && W.full && W.win && W.dlg; if (!okAll) console.warn('Schwarzmarkt-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { S.gold = g0; delete S._hostHero; UI.closeModal(); UI.closeDialogue(); }
+  }));
   ok('Welttiefe W10 Slice 1: Arena-Veränderung — in Phase 2 kippt ein Regionalboss das Wetter (Graumähne Nebel, Karrak Sandsturm, Varg Blutregen) für Minuten, nur einmal; fällt er, klart es auf; jeder Regionalboss hat ein Arena-Feld', sandbox(() => {
     const w0 = S.weather, wl0 = S.weatherLeft, ax0 = S.arenaWx, f0 = { ...S.flags }, fac0 = { ...S.factions }, st0 = structuredClone(S.towns.eren.stock); const W = {}; stage();
     try {
@@ -24132,7 +24155,7 @@ function boot() {
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
-    startPlacing, foundCamp: () => foundCamp(), dissolveSettlement: () => dissolveSettlement(), townInfo,
+    startPlacing, foundCamp: () => foundCamp(), dissolveSettlement: () => dissolveSettlement(), townInfo, blackList, blackBuy: (npc, key) => blackBuy(S.player, npc, key),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
