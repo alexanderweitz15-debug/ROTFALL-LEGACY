@@ -1473,3 +1473,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Spuren können Fundstücke tragen** (Beweis ins Gepäck, bei vollem Gepäck vor die Füße); **Urteile können den Marktvorrat eines Orts ändern** (Preise folgen über die Wirtschaft).
 - Debug: „Aufträge: Ermittlung ‚Blut auf dem Markt‘ starten“, „… ‚Sechs statt zehn‘ starten“.
 
+## Siedlung aufgeben, Gründung nur auf freiem Land, Titel auf Zeit (Nutzer 05.10.2026)
+- **Keine Siedlung in der Stadt:** Ein Lager lässt sich nicht im Ortsgebiet einer Stadt oder näher als sechs Felder davor gründen („Mitten in Eren gründet niemand eine Siedlung …“). Das gilt für den Knopf im Fenster Siedlung (B) ebenso wie für den Debug-Pfad.
+- **Siedlung auflösen:** Im Fenster Siedlung (B) unten „Siedlung auflösen“, zweimal klicken. Geht nur vor Ort (wie das Lager) und nicht während eines Überfalls. Gebäude werden abgetragen, Siedler, Lagerwachen und eigenes Vieh ziehen ab (Gefährten bleiben), was im Lager lag, liegt als Kiste „Aufgegebene Siedlung: …“ am alten Platz. Chronik-Eintrag, Log mit Zahlen. Danach kann man anderswo neu gründen.
+- **„Befreier von …“ nur sieben Tage:** Der Titel nach einer Befreiung verblasst nach 7 Tagen (Log: „Der Titel verblasst — die Leute reden schon von anderem“); Ruhm und Chronik bleiben. Eine spätere Befreiung vergibt ihn neu. Alte Stände: Frist läuft ab dem ersten Tageswechsel nach dem Laden. Andere Titel (Ritterschlag, Klassen, Legenden) bleiben dauerhaft.
+- Debug: „Siedlung: auflösen (auch von fern)“, „Siedlung: Gründung mitten in Eren versuchen (muss abgelehnt werden)“, „Titel: ‚Befreier von Eren‘ für 7 Tage“. Probe „Siedlung (Nutzer 05.10.)“.
