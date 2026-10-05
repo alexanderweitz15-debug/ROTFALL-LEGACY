@@ -20,11 +20,15 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 ## Erledigt
 - Slice 1 (Commit folgt): Zieltypen `talk`/`clue`, `ensureClues`, `clueRead`, `inquiryChoices`, `questDecide`; Auftrag `q_erm_markt` „Blut auf dem Markt“; Probe grün (Selbsttest 489/489 headless, nach Korrektur der Spur-Koordinaten); Debug-Eintrag; Doku.
 
+- Slice 1 live getestet (Screenshots im Scratchpad: Prompt, Dialog, Urteil); Prompt-Vorrang für Spuren.
+- Slice 2 (6e54d3a): `q_erm_nordfurt` mit `give` (Beweisstück) und `stock` (Marktfolge); Probe grün 490/490; live geprüft bis zum Urteil.
+- Nutzerpunkte 05.10. (Commit folgt): `foundCamp` lehnt Stadtgebiet + 6 Felder ab (`townAt`), `dissolveSettlement` + Knopf in `settleUI`, Titel auf Zeit (`titleDay`, `p.titleUntil`, `TITLE_DAYS = 7`); Probe grün 491/491 headless; Knopf live geprüft (B-Fenster, Doppelklick, Kiste, Log).
+
 ## Nächster Schritt
-- Live-Test im Browser (Spur-Prop sichtbar? Prompt „Untersuchen“? Urteil-Dialog lesbar?), dann W1 Slice 2: zweite Ermittlung in einer anderen Region (Vorschlagstabelle zuerst), danach W2 Folgen-Bausteine.
+- W2 Folgen-Bausteine (Erinnerung, Gerücht) und W1 Slice 3 aus der Vorschlagstabelle (`docs/PLAN_WELTTIEFE.md`) nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
-- Slice 1: `Probe grün`; `Live getestet`: nein, ausstehend.
+- Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`.
 
 ## Berührte Funktionen
-`talk` (eine Aufrufzeile), `doInteract`, `interactables`, `updatePrompt`, `startQuest`, `newGame`/`continueGame` (ensure-Kette), `QUEST_WHERE`, `debugSections`, `selftest`; neu: `inquiryChoices`, `cluePos`, `ensureClues`, `clueRead`, `questDecide`.
+`talk` (eine Aufrufzeile), `doInteract`, `interactables`, `updatePrompt`, `startQuest`, `newGame`/`continueGame` (ensure-Kette), `QUEST_WHERE`, `debugSections`, `selftest`, `foundCamp`, `dayTick`, `SIM.H.title`, `settleUI` (ui.js); neu: `inquiryChoices`, `cluePos`, `ensureClues`, `clueRead`, `questDecide`, `dissolveSettlement`, `titleDay`.

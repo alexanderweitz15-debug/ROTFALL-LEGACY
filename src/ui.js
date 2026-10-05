@@ -1520,7 +1520,7 @@ function partyUI(body) {
 function settleUI(body) {
   const st = S.settlement;
   if (!st) {
-    body.innerHTML = `<div class="ledger">Du hast noch kein Lager. Suche einen freien Platz in der Welt und gründe eins.
+    body.innerHTML = `<div class="ledger">Du hast noch kein Lager. Suche einen freien Platz in der Welt und gründe eins — nicht in einer Stadt, mindestens sechs Felder vor den Häusern.
       <div class="ctx-actions"><button id="found">Lager hier gründen (5 Holz)</button></div>
       <p style="margin-top:10px">Mit eigenem Lager darfst du einen vierten Gefährten mitnehmen (sonst bis zu drei).</p>
       <p style="margin-top:14px;color:#6d6454">Ein Lager ist kein Menü. Es steht in der Welt, es brennt, es wächst, es kann fallen.</p></div>`;
@@ -1556,14 +1556,21 @@ function settleUI(body) {
         return `<div class="statline"><span>${icoImg('res_' + k, 1, 'ico bres')}${n}</span><b>${Math.floor(S.res[k])}</b></div>`; }).join('')}
       <h3 style="margin-top:14px">Gebäude</h3>
       ${st.buildings.map(b => `<div class="statline"><span>${BUILDINGS[b.type].name}</span><b>${b.built < 1 ? Math.round(b.built * 100) + '% Bau' : Math.round(b.cond * 100) + '%'}</b></div>`).join('') || '<div class="ledger">Nichts gebaut.</div>'}
+      <h3 style="margin-top:14px">Aufgeben</h3>
+      <div class="ledger">Auflösen trägt alle Gebäude ab; Siedler, Lagerwachen und Vieh ziehen weiter. Was im Lager liegt, bleibt in einer Kiste am Platz. Nur vor Ort, nicht während eines Überfalls.</div>
+      <div class="ctx-actions"><button id="dissolve"${A.stashHere?.() && !st.raid ? '' : ' class="cant"'}>Siedlung auflösen</button></div>
     </div></div>`;
+  confirmDissolve = false;
+  $('dissolve').onclick = () => { if (!A.stashHere?.() || st.raid) { A.dissolveSettlement(); return; }   /* die Aktion erklärt, warum nicht */
+    if (!confirmDissolve) { confirmDissolve = true; $('dissolve').textContent = 'Wirklich auflösen? Noch einmal klicken.'; return; }
+    confirmDissolve = false; A.dissolveSettlement(); closeModal(); };
   prioCards($('prio'), st);
   const place = k => { A.startPlacing(k); closeModal(); };
   const show = k => { selBld = k; [...body.querySelectorAll('[data-b]')].forEach(c => c.classList.toggle('sel', c.dataset.b === k)); bldDetail($('detail'), k, place); };
   [...body.querySelectorAll('[data-b]')].forEach(b => { b.onclick = () => show(b.dataset.b); b.ondblclick = () => place(b.dataset.b); });
   if (selBld && BUILDINGS[selBld]) show(selBld);
 }
-let selBld = null;
+let selBld = null, confirmDissolve = false;
 const RES_NAME = { wood:'Holz', stone:'Stein', iron:'Eisen' };
 const bldImg = (k, s, cls) => { let u = ''; try { u = ICO?.bldURL?.(k, s) || ''; } catch (e) {} return u ? `<img class="${cls}" src="${u}" alt="">` : `<span class="${cls} bimg-none"></span>`; };
 function costPics(cost, big) {                                          /* je Rohstoff: Piktogramm + Zahl, rot wenn es fehlt */

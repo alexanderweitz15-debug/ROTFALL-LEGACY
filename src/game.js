@@ -2302,7 +2302,7 @@ function bindSim() {
   SIM.H.title = t => {
     const p = S.player; p.titles ||= [];
     if (p.titles.includes(t)) return;
-    p.titles.push(t); chronicle(`${p.name}: „${t}“`, 'legend', 'Ein Name, den andere vergeben.'); for (const r of Object.keys(FAME_REG)) addFame(10, r, t);   // S15 P8
+    p.titles.push(t); if (timedTitle(t)) (p.titleUntil ||= {})[t] = (S.day | 0) + TITLE_DAYS; chronicle(`${p.name}: „${t}“`, 'legend', timedTitle(t) ? `Ein Name, den andere vergeben — für ${TITLE_DAYS} Tage.` : 'Ein Name, den andere vergeben.'); for (const r of Object.keys(FAME_REG)) addFame(10, r, t);   // S15 P8
     UI.toast(t.toUpperCase(), 4200); log(`Man nennt dich nun ${t}.`, 'faction');
   };
   SIM.H.raidDamage = raidDamage;
@@ -5985,7 +5985,7 @@ function interactables() {
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
   function score(e) { const da = Math.abs(normAng(Math.atan2(e.y - p.y, e.x - p.x) - (p.aim ?? 0)));
-    return dist(p, e) - (e.kind === 'npc' ? 24 : 0) - (NAMED_NPC.has(e.key) ? 10 : 0) - 34 * Math.cos(Math.min(da, Math.PI)) - (e === hovered || e === selected ? 200 : 0); }   // Maus auf der Figur gewinnt
+    return dist(p, e) - (e.kind === 'npc' ? 24 : 0) - (NAMED_NPC.has(e.key) ? 10 : 0) - (e.clue ? 34 : 0) - 34 * Math.cos(Math.min(da, Math.PI)) - (e === hovered || e === selected ? 200 : 0); }   // Maus auf der Figur gewinnt; Spuren eines Auftrags zählen wie benannte Figuren (Welttiefe: am Markt gewann sonst immer der nächste NPC)
 }
 function updatePrompt() {
   if (S.cine) return UI.setPrompt('');   // Kamerafahrt: kein Hinweis
@@ -11928,6 +11928,8 @@ function claimPlace(t) {
 function foundCamp(x, y, name) {
   const p = S.player;
   if (S.settlement) return UI.toast('Du hast bereits ein Lager.');
+  { const tx = (x ?? p.x) / TS | 0, ty = (y ?? p.y) / TS | 0, t = S.map === 'world' ? townAt(tx, ty, 6) : null;   /* Nutzer 05.10.2026: nicht mitten in einer Stadt, sechs Felder Abstand zum Ortsgebiet */
+    if (t) return UI.toast(`Mitten in ${townName(t)} gründet niemand eine Siedlung. Such dir freies Land, mindestens sechs Felder vor den Häusern.`, 3500); }
   if (S.res.wood < 5) return UI.toast('Du brauchst 5 Holz.');
   S.res.wood -= 5;
   S.settlement = { name: name || `${S.legacy.house}heim`, x: x ?? p.x, y: y ?? p.y, map: S.map, buildings: [], morale: 60,
@@ -11937,6 +11939,35 @@ function foundCamp(x, y, name) {
   chronicle(`${S.settlement.name} gegründet`, 'settle', `${p.name} steckt einen Platz ab. Zuerst ist es nur ein Feuer.`);
   log(`${S.settlement.name} gegründet.`, 'world');
   recalc(p); save();
+}
+/* Siedlung auflösen (Nutzer 05.10.2026): Gebäude werden abgetragen, Siedler, Lagerwachen und Vieh ziehen ab; was im Lager lag, bleibt als Kiste
+   am alten Platz. Nur vor Ort (wie das Lager) und nicht während eines Überfalls. force: Debug/Proben. */
+function dissolveSettlement(force = false) {
+  const st = S.settlement, p = S.player; if (!st) return UI.toast('Du hast keine Siedlung.');
+  if (coopHooks.cmd) return UI.toast('Die Siedlung gehört dem Host.');
+  if (st.raid) return UI.toast('Nicht während eines Überfalls.');
+  if (!force && !stashHere()) return UI.toast('Dazu musst du in deiner Siedlung stehen.');
+  const map = st.map || 'world', gone = { b: 0, s: 0, g: 0, h: 0 };
+  S.ents[map] = (S.ents[map] || []).filter(e => {
+    if (e.kind === 'building') { gone.b++; return false; }
+    if (e.kind === 'npc' && (e.settler || e.campGuard) && !S.party.includes(e.id)) { gone[e.settler ? 's' : 'g']++; return false; }
+    if (e.livestock === 'player') { gone.h++; return false; }
+    return true; });
+  if (S.stash?.length) S.ents[map].push({ id: uid(), kind: 'prop', type: 'chest', map, x: st.x, y: st.y + 12, r: 12, solid: true, loot: S.stash.splice(0), label: `Aufgegebene Siedlung: ${st.name}` });
+  indexSolids(map);
+  const name = st.name; S.settlement = null;
+  log(`${name} aufgelöst: ${gone.b} Gebäude abgetragen, ${gone.s} Siedler und ${gone.g} Lagerwachen ziehen weiter${gone.h ? `, ${gone.h} Tiere laufen davon` : ''}. Was im Lager lag, liegt in einer Kiste am alten Platz.`, 'world');
+  chronicle(`${name} aufgegeben`, 'settle', `${p.name} gibt die Siedlung auf: ${gone.b} Gebäude, ${gone.s} Siedler.`);
+  recalc(p); UI.refreshHUD(); save();
+}
+/* Titel auf Zeit (Nutzer 05.10.2026): „Befreier von …“ verblasst nach TITLE_DAYS Tagen; der Ruhm bleibt. Eine spätere Befreiung vergibt ihn neu. */
+const TITLE_DAYS = 7;
+const timedTitle = t => /^Befreier von /.test(t);
+function titleDay() {
+  const p = S.player; if (!p) return;
+  for (const t of p.titles || []) if (timedTitle(t) && !(p.titleUntil?.[t])) (p.titleUntil ||= {})[t] = (S.day | 0) + TITLE_DAYS;   /* alte Stände: Frist läuft ab dem ersten Tageswechsel */
+  const U = p.titleUntil; if (!U) return;
+  for (const [t, d] of Object.entries(U)) if ((S.day | 0) > d) { delete U[t]; const i = (p.titles || []).indexOf(t); if (i >= 0) p.titles.splice(i, 1); log(`Der Titel „${t}“ verblasst — die Leute reden schon von anderem.`, 'faction'); }
 }
 function canAfford(cost) { return Object.entries(cost).every(([k, v]) => S.res[k] >= v); }
 // Scout R9 (Entwickler 02.10.2026): Gold-Sog — fehlt Baumaterial, kaufen Fuhrleute es zu: Holz 4, Stein 5, Eisen 12 Gold je Einheit
@@ -13324,7 +13355,7 @@ function questTargetTick(force = false) {
   }
 }
 function dayTick() {
-  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay(); nemesisDay();   /* T08, T10 */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
+  woundDay(); bandDay(); loyDay(); familyDay(); gobDay(); informantDay(); nemesisDay(); titleDay();   /* T08, T10; Titel auf Zeit */   /* Nutzer §5d.7 */   /* Nutzer §5e.7 */
   keepSiegeDay();   /* Nutzer §5d.5: Belagerung der Schwarzen Feste nach Garmadon */
   seasonDay(); successorDay(); anomalyDay();
   rebuildTick(); growthDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
@@ -14712,11 +14743,12 @@ function ensureClues() {                                              /* idempot
     for (const c of Q.clues) { const i = Q.objectives.findIndex(o => o.type === 'clue' && o.target === c.key); if (i >= 0 && (st.progress[i] || 0) >= (Q.objectives[i].count || 1)) continue; want.set(c.key, { c, k }); } }
   for (const m of Object.keys(S.ents)) { const arr = S.ents[m]; if (arr.some(e => e.clue && !want.has(e.clue))) S.ents[m] = arr.filter(e => !(e.clue && !want.has(e.clue))); }   /* Listen nur ersetzen, wenn wirklich eine Spur verschwindet (actorsOf/byId sind inkrementell) */
   for (const [key, { c, k }] of want) { const map = c.map || 'world'; if ((S.ents[map] || []).some(e => e.clue === key)) continue; const q = cluePos(c); if (!q) continue;
-    (S.ents[map] ||= []).push({ id: uid(), kind: 'prop', type: 'sign', map, x: q.x, y: q.y, r: 8, solid: false, transient: true, clue: key, quest: k, label: c.label, text: c.text }); }
+    (S.ents[map] ||= []).push({ id: uid(), kind: 'prop', type: 'sign', map, x: q.x, y: q.y, r: 8, solid: false, transient: true, clue: key, quest: k, label: c.label, text: c.text, give: c.give || null }); }
 }
 function clueRead(t) {
   const Q = QUESTS[t.quest]; if (!Q) return;
   log(`${t.label}: ${t.text}`, 'quest'); fx(t.x, t.y - 8, 'spark', 5); sfx('ui', 0.5, 1);
+  if (t.give && ITEMS[t.give]) { if (!addItem(S.player, t.give)) dropItemAt(S.player.map, S.player.x, S.player.y + 12, mkItem(t.give)); log(`Beweisstück: ${ITEMS[t.give].name}${S.player.inv.some(i => i.key === t.give) ? ' im Gepäck' : ' — das Gepäck ist voll, es liegt vor deinen Füßen'}.`, 'quest'); }   /* Spur mit Fundstück */
   if (!S.flags.clueHint) { S.flags.clueHint = 1; log('Spuren gehören zu Aufträgen: Wer sie liest, zählt das Ziel; Aussagen der Befragten stehen im Protokoll (Log). Am Ende entscheidest du beim Geber, wer es war — und das Dorf merkt sich dein Urteil.', 'quest'); }
   questEvent('clue', t.clue, 1); ensureClues();
 }
@@ -14730,6 +14762,7 @@ function questDecide(npc, k) {
     for (const [f, v] of Object.entries(E.rep || {})) if (S.factions[f] != null) { S.factions[f] = clamp(S.factions[f] + v, -100, 100); log(`${FACTIONS[f]?.name || f}: ${v > 0 ? '+' : ''}${v} Ansehen.`, 'faction'); }
     if (E.gold) S.gold += E.gold;
     for (const [t, n] of Object.entries(E.prosper || {})) growthOf(t).prosper = clamp(growthOf(t).prosper + n, -20, 100);
+    for (const [t, goods] of Object.entries(E.stock || {})) for (const [g, n] of Object.entries(goods)) if (S.towns?.[t]?.stock) { S.towns[t].stock[g] = Math.max(0, (S.towns[t].stock[g] || 0) + n); log(`${townName(t)}: ${ITEMS[g]?.name || g} ${n > 0 ? '+' : ''}${n} am Markt.`, 'economy'); }   /* Urteil wirkt auf den Markt (Preise folgen über die Wirtschaft) */
     if (E.flag) S.flags[E.flag] = 1;
     st.outcome = o.key; if (E.chron) chronicle(`${Q.name}: Urteil`, 'quest', E.chron); if (E.chron) log(E.chron, 'quest');
     turnIn(npc, k); UI.dialogue(npc, o.say, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); UI.refreshHUD(); } }));
@@ -17382,7 +17415,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -17873,6 +17906,9 @@ function debugSections() {
       'Siedlung: Reichtum und Quellen anzeigen': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); UI.toast(`Reichtum ${campWealth(st)} · Gefahr ${Math.round(raidChance(st) * 100)} % · ${raidSources(st).map(x => x.label).join(', ')}`, 4000); },
       'Siedlung: Überfall jetzt': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); st.raid = null; raidSettlement(); },
       'Siedlung: Überfall abstrakt auswürfeln': () => { const st = S.settlement; if (!st) return UI.toast('Keine Siedlung.'); UI.toast(campRaidAbstract(st, raidPlan(st))); },
+      'Siedlung: auflösen (auch von fern)': () => dissolveSettlement(true),
+      'Siedlung: Gründung mitten in Eren versuchen (muss abgelehnt werden)': () => { const [ex, ey] = TOWN_PLAN.eren.square; S.res.wood = Math.max(S.res.wood, 5); foundCamp(ex * TS + TS / 2, ey * TS + TS / 2, 'Probe'); },
+      'Titel: „Befreier von Eren“ für 7 Tage (verblasst im Tageswechsel)': () => SIM.H.title('Befreier von Eren'),
       'Siedlung: Heilerhütte hier (fertig) + 5 Kräuter': () => { if (!S.settlement) return UI.toast('Erst eine Siedlung gründen.'); const b = placeBuilding('healer', p.x + 60, p.y, true); if (b) b.built = 1; addItem(p, 'herb', 5); UI.toast('Heilerhütte steht'); },
       'Siedlung: alle Siedler verletzen': () => { for (const c of S.ents[S.map].filter(e => e.settler && e.alive)) B.damagePart(c, 'torso', c.maxHp * 0.5); UI.toast('Siedler verletzt'); },
       'Siedlung: Moral −20': () => moraleAdd(-20, 'Debug'),
@@ -18294,6 +18330,7 @@ function debugSections() {
       'UI: Warnchip-Probe (20 s)': () => { (S.dbg ||= {}).warnTest = clock() + 20; UI.refreshHUD(); },
       'Aufträge: Brief „Erfüllt“ zeigen (ohne Folgen)': () => UI.questLetter('done', 'probe', { name: 'Wölfe vor Eren' }),
       'Aufträge: Ermittlung „Blut auf dem Markt“ starten (Havel in Eren; Spuren und Befragungen, Urteil am Ende)': () => { if (!S.quests.q_erm_markt) { startQuest('q_erm_markt'); log('Auftrag angenommen: Blut auf dem Markt (Debug).', 'quest'); } UI.toast('Spuren liegen auf dem Markt und am Viehtrog von Eren; Borin und Elena befragen; Urteil bei Havel.', 3500); },
+      'Aufträge: Ermittlung „Sechs statt zehn“ starten (Brann in Nordfurt; Kontor, Südtor, Gerold und Hauke; Urteil bei Brann)': () => { if (!S.quests.q_erm_nordfurt) { startQuest('q_erm_nordfurt'); log('Auftrag angenommen: Sechs statt zehn (Debug).', 'quest'); } UI.toast('Spuren am Kontor-Lagertor und vor dem Südtor von Nordfurt; Gerold und Hauke befragen; Urteil bei Brann.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
       'Aufträge: Zählkerbe über dem Helden (2 von 3)': () => { questNotch(p, 2, 3); setTimeout(() => questNotch(p, 3, 3), 1600); },
       'Aufträge: nächsten Auftrag verfolgen (Tracker)': () => { const L = Object.keys(S.quests).filter(k => S.quests[k].state === 'active'); if (!L.length) return UI.toast('Kein offener Auftrag.'); S.track = L[(L.indexOf(S.track) + 1) % L.length]; UI.refreshHUD(); },
@@ -23344,6 +23381,47 @@ export function selftest() {
       return okAll;
     } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_markt = q0; else delete S.quests.q_erm_markt; S.relations = R0; S.growth = G0; S.gold = g0; S.factions = f0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; UI.closeDialogue(); }
   }));
+  ok('Welttiefe Slice 2: Ermittlung „Sechs statt zehn“ (Nordfurt) — Spuren liegen in der Stadt, eine Spur legt ein Beweisstück ins Gepäck, das Urteil ändert Marktvorrat, Beziehungen und Ruf', sandbox(() => {
+    const q0 = S.quests.q_erm_nordfurt, R0 = { ...S.relations }, G0 = structuredClone(S.growth || {}), st0 = { ...S.towns.northcity.stock }, f0 = { ...S.factions }, g0 = S.gold, fm0 = structuredClone(S.fame || null), ents0 = S.ents.world.slice();
+    const op = UI.uiHooks.dialogue; let last = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+    const p = stage(); const W = {};
+    try {
+      delete S.quests.q_erm_nordfurt; S.gold = 100; startQuest('q_erm_nordfurt'); ensureClues();
+      const props = S.ents.world.filter(e => e.clue && e.quest === 'q_erm_nordfurt'), [cx, cy] = TOWN_PLAN.northcity.square;
+      W.laid = props.length === 2 && props.every(e => Math.abs(e.x / TS - cx) < 40 && Math.abs(e.y / TS - cy) < 40);
+      const n0 = p.inv.filter(i => i.key === 'ingot').reduce((n, i) => n + (i.count || 1), 0); clueRead(props.find(e => e.clue === 'tor_spuren'));
+      W.gave = p.inv.filter(i => i.key === 'ingot').reduce((n, i) => n + (i.count || 1), 0) === n0 + 1;
+      clueRead(S.ents.world.find(e => e.clue === 'kontor_siegel'));
+      for (const k of ['gerold', 'hauke']) { const ch = []; inquiryChoices({ key: k, kind: 'npc', name: k, x: p.x, y: p.y, map: p.map }, ch); if (ch[0]) ch[0].fn(); }
+      W.done = questComplete('q_erm_nordfurt');
+      questDecide({ key: 'brann', kind: 'npc', name: 'Brann', faction: 'valen', x: p.x, y: p.y, map: p.map }, 'q_erm_nordfurt'); W.asked = Array.isArray(last) && last.length === 4;
+      const ing0 = S.towns.northcity.stock.ingot || 0, rg = S.relations.gerold || 0, m0 = S.factions.merch; last[0].fn();
+      W.judged = S.quests.q_erm_nordfurt.state === 'done' && S.quests.q_erm_nordfurt.outcome === 'gerold' && S.towns.northcity.stock.ingot === ing0 + 4 && (S.relations.gerold || 0) === rg - 40 && S.factions.merch === clamp(m0 - 3, -100, 100);
+      const okAll = W.laid && W.gave && W.done && W.asked && W.judged; if (!okAll) console.warn('Nordfurt-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_nordfurt = q0; else delete S.quests.q_erm_nordfurt; S.relations = R0; S.growth = G0; S.towns.northcity.stock = st0; S.factions = f0; S.gold = g0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; UI.closeDialogue(); }
+  }));
+  ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
+    const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
+    const p = stage(); const W = {};
+    try {
+      S.settlement = null; S.stash = []; S.res.wood = 50; S.map = 'world'; p.map = 'world';
+      const [ex, ey] = TOWN_PLAN.eren.square; foundCamp(ex * TS, ey * TS, 'Probe'); W.noTown = !S.settlement;
+      const [ax, ay] = TOWN_PLAN.eren.area; foundCamp((ax - 3) * TS, ((ay + ey) / 2 | 0) * TS, 'Probe'); W.noEdge = !S.settlement;   /* drei Felder vor dem Ortsgebiet: zu nah */
+      let fx = 600, fy = 300; while (townAt(fx, fy, 6) && fy < 700) fy += 20;   /* freies Land: erster Punkt außerhalb aller Ortsgebiete */
+      p.x = fx * TS; p.y = fy * TS; W.free = !townAt(fx, fy, 6); foundCamp(undefined, undefined, 'Probe'); W.founded = !!S.settlement && S.res.wood === 45;
+      if (S.settlement) { placeBuilding('tent', S.settlement.x + 90, S.settlement.y, true); S.stash.push(mkItem('bread'));
+        const sd = makeChar({ name: 'Siedler', map: 'world', x: p.x + 50, y: p.y }); sd.settler = true; S.ents.world.push(sd);
+        const gd = makeChar({ name: 'Wache', map: 'world', x: p.x - 50, y: p.y }); gd.campGuard = true; S.ents.world.push(gd);
+        p.x = S.settlement.x + 900; dissolveSettlement(); W.needHere = !!S.settlement; p.x = S.settlement.x;
+        dissolveSettlement(); const chest = S.ents.world.find(e => e.kind === 'prop' && e.type === 'chest' && /^Aufgegebene Siedlung:/.test(e.label || ''));
+        W.dissolved = !S.settlement && !S.ents.world.some(e => e.kind === 'building' || e === sd || e === gd) && !!chest && chest.loot.length === 1 && S.stash.length === 0; }
+      S.day = 10; SIM.H.title('Befreier von Eren'); W.titled = (p.titles || []).includes('Befreier von Eren') && p.titleUntil?.['Befreier von Eren'] === 17;
+      S.day = 17; titleDay(); W.stays = (p.titles || []).includes('Befreier von Eren'); S.day = 18; titleDay(); W.faded = !(p.titles || []).includes('Befreier von Eren') && !p.titleUntil['Befreier von Eren'];
+      const okAll = W.noTown && W.noEdge && W.free && W.founded && W.needHere && W.dissolved && W.titled && W.stays && W.faded; if (!okAll) console.warn('Siedlungs-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { S.settlement = se0; S.stash = st0; Object.assign(S.res, res0); S.ents.world = ents0; indexSolids('world'); S.day = d0; S.map = map0; }
+  }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -23547,7 +23625,7 @@ function boot() {
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
     dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
-    startPlacing, foundCamp: () => foundCamp(),
+    startPlacing, foundCamp: () => foundCamp(), dissolveSettlement: () => dissolveSettlement(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
@@ -23607,7 +23685,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
