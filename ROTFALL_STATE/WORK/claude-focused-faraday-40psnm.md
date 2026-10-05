@@ -37,7 +37,8 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W3 Slice 3 (PR #23): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
 - W4 Slice 1 (PR #24): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft.
 - W4 Slice 2 (PR #25): `REGION_CON`/`warHot` in `conKinds`; Probe grün 504/504, live geprüft.
-- W11 Slice 1 (Commit folgt): Stadtinfo-Fenster (`townInfo`, `townUI`); Probe grün 510/510, live geprüft (Eren, Screenshot 21_w11_stadtinfo.png).
+- W11 Slice 2 (Commit folgt): Fernwaffen-Profile (`RANGED_DEFS`, `rangedPhase`, `rangedBody`); Probe grün 511/511, live geprüft (Shots 22–24).
+- W11 Slice 1 (PR #31): Stadtinfo-Fenster (`townInfo`, `townUI`); Probe grün 510/510, live geprüft (Eren, Screenshot 21_w11_stadtinfo.png).
 - W10 Slice 1 (PR #30): Arena-Wetter der Regionalbosse (`bossArena`, `arenaClear`); Probe grün 509/509, live geprüft.
 - W9 Slice 1 (PR #29): Unsichere Wege (`routeRisk`, `unsafe`, `tradeReturn`); Probe grün 508/508, live geprüft. Nutzerauftrag: W9, W10, W11 zuerst.
 - W5 Slice 2 (PR #28): Jagd-Händler (`hunterChoices`, `huntMul`); Probe grün 507/507, live geprüft. Probe „Einwohner folgen der Fläche“ fiel einmal rot (Kopfzahl, zufallsabhängig) und lief danach grün.
@@ -45,7 +46,7 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W4 Slice 3 (PR #26): Knochenquelle (`ensureBonewells`, `bonewellTick`, `propHit`, Zieltyp `destroy`), Auftrag „Was aus dem Moor steigt“; Probe grün 505/505, live getestet mit Mausangriffen. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
 
 ## Nächster Schritt
-- W11 Slice 2: Fernwaffen-Profile (Bogen/Armbrust spannen/lösen; `shoot()` hat keinen Schwung, `ANIM_DEFS.attack` nur Nahkampf, Waffenpose `render.js` ~2216); danach W9 S2 (sichtbarer Straßenzug meidet Risiko), W10 S2, W11 Fraktionsübersicht/Schwarzmarkt. Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
+- W9 S2 (sichtbarer Straßenzug meidet Risiko), W10 S2 (Geheimort braucht Lore → Nutzer), W11 S3 (Zauberstab-Profil oder Fraktionsübersicht). Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.

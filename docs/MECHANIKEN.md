@@ -1550,3 +1550,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Stadtinfo-Fenster (Welttiefe W11 Slice 1, 05.10.2026)
 - In einer Stadt ist der Stadtkopf im Kontextfeld rechts anklickbar und öffnet das Fenster „Stadt“: Lage (Zustand wie Ruhig/Belagert/Besetzt, Besatzung, Einwohner, Wohlstand und neue Häuser), Markt (knappe und reichliche Waren, Händlerzüge unterwegs hierher, unsichere Wege) und Arbeit (offene und angenommene Aushänge, Betriebe, eigene Betriebe, Schutz und Vertrauen).
 - Alles kommt aus den laufenden Systemen (Krieg, Wirtschaft, Aufträge); das Fenster ändert nichts und gilt auch für den Koop-Gast nur als Anzeige. Probe „Welttiefe W11 Slice 1“.
+
+## Fernwaffen-Profile (Welttiefe W11 Slice 2, 05.10.2026)
+- Bogen: Beim Spannen tritt die Figur breiter, lehnt sich zurück und zieht die Sehne in vier Schritten bis ans Kinn; beim Lösen (Schuss bei 75 % des Takts) federt der Rumpf vor und der Kopf nickt. Gegner-Schützen nutzen dieselben Posen.
+- Armbrust, Pistole, Gewehr (alle wtype `crossbow`): Nach dem Schuss ein kurzer Rückstoß; während der Nachladezeit der Waffe senkt die Figur die Waffe vor den Bauch, beugt sich darüber und die zweite Hand spannt sichtbar. Dann zurück in die Zielhaltung.
+- Reine Darstellung: Trefferzeitpunkt, Nachladedauer und Schaden bleiben wie bisher. Werte in `RANGED_DEFS` (anim.js). Test Room (Debug „Kampfanimation“) kennt Langbogen und Armbrust. Probe „Welttiefe W11 Slice 2“.

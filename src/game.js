@@ -10,7 +10,7 @@ import * as SIM from './sim.js?v=25';
 import * as B from './body.js?v=25';
 import * as SP from './sprites.js?v=25';
 import * as ECO from './economy.js?v=25';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, rangedProfile, rangedPhase, rangedBody } from './anim.js?v=25';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
 import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=25';
 
@@ -1806,7 +1806,7 @@ function styleArea(on = true) {
    __-Karten, dazu S._quiet; beim Verlassen werden der Held (Waffe, Leben, Körper, Fertigkeiten, Status) und alle geänderten Zustandsschlüssel
    (Flaggen, Statistik …) auf den Stand beim Betreten zurückgesetzt. Die Welt steht still (eigene kleine Schleife arenaUpdate).
    Der Held ist unverwundbar (S.dbg.god); Puppen sind simDummy (ihr Tod hat keine Weltfolgen). Das Pack (A/B/C) gilt nur hier. */
-const ARENA = '__arena', ARENA_WEAPONS = [['longsword', 'Langschwert'], ['greatsword', 'Zweihänder'], ['greataxe', 'Große Axt'], ['dagger', 'Dolch'], ['spear', 'Speer'], ['warhammer', 'Kriegshammer'], ['axe', 'Axt'], ['morgenstern', 'Morgenstern'], ['grassense', 'Sense'], ['rapier', 'Rapier'], ['lederpeitsche', 'Peitsche'], ['staff', 'Stab']];   /* Ausrollen 04.10.: alle Klassen im Test Room */
+const ARENA = '__arena', ARENA_WEAPONS = [['longsword', 'Langschwert'], ['greatsword', 'Zweihänder'], ['greataxe', 'Große Axt'], ['dagger', 'Dolch'], ['spear', 'Speer'], ['warhammer', 'Kriegshammer'], ['axe', 'Axt'], ['morgenstern', 'Morgenstern'], ['grassense', 'Sense'], ['rapier', 'Rapier'], ['lederpeitsche', 'Peitsche'], ['staff', 'Stab'], ['longbow', 'Langbogen'], ['runenarmbrust', 'Armbrust']];   /* Ausrollen 04.10.: alle Klassen im Test Room; W11 S2: Fernwaffen */
 const ARENA_SKIP = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings', 'dbg', '_quiet', 'paused', 'uiDirty', 'dying', 'cine', 'coop']);
 let arenaKeep = null;
 const inArena = () => !!arenaKeep && S.map === ARENA;
@@ -3508,7 +3508,7 @@ function attack(c, forceDir) {
   if (it && it.ranged) { c.hitDone = false; }
 }
 
-const swingHit = c => c.equip?.weapon && ITEMS[c.equip.weapon.key]?.wtype === 'bow' ? 0.75 : c.atkH > 0 && !atkOld() ? c.atkH : 0.42;   // S15: Bogen spannt länger   /* Kampfanimation: Nahkampf trifft im Einschlag-Bild (anim.js atkPlan), Gegner/Unbewaffnete wie bisher 0,42 */
+const swingHit = c => c.equip?.weapon && ITEMS[c.equip.weapon.key]?.wtype === 'bow' ? rangedProfile('bow').hit : c.atkH > 0 && !atkOld() ? c.atkH : 0.42;   // S15: Bogen spannt länger   /* Kampfanimation: Nahkampf trifft im Einschlag-Bild (anim.js atkPlan), Gegner/Unbewaffnete wie bisher 0,42 */
 function resolveSwing(c) {
   if (c.kind === 'enemy') return resolveSwingEnemy(c);
   const mult = c.abilityMult || 1, kind = c.abilityKind || 'physical';
@@ -3568,7 +3568,7 @@ function shoot(c, it, mult = 1) {
   if (it.energy && cellUser(c) && c.equip?.weapon) { const w = c.equip.weapon, was = w.charge ?? 100; w.charge = Math.max(0, was - it.energy);   /* Roadmap C.10: Energie je Schuss */
     if (c === S.player && was >= 25 && w.charge < 25) UI.toast(`Energie niedrig: ${w.charge}/100`, 2000); }
   c.lastShot = performance.now();                                    // Phase 1: Zielhaltung kurz halten (render: Bogen vor dem Körper)
-  if (bolt) { c.reloadUntil = performance.now() + it.reload; if (c === S.player) sfx('metal', 0.3); }   // abgedrückt: jetzt spannen
+  if (bolt) { c.reloadUntil = performance.now() + it.reload; c.reloadDur = it.reload; if (c === S.player) sfx('metal', 0.3); }   // abgedrückt: jetzt spannen (reloadDur: W11 S2 Nachlade-Animation)
   if (it.proj === 'bullet') { fx(c.x + Math.cos(c.aim) * 22, c.y - 12 + Math.sin(c.aim) * 10, 'spark', 7); fx(c.x + Math.cos(c.aim) * 26, c.y - 12, 'dust', 4); sfx('magic', 0.5, earVol(c)); camShake(c === S.player ? 3 : 0, 90); }   // S13: Magitech-Mündungsblitz
   if (spark) { fx(c.x + Math.cos(c.aim) * 16, c.y - 14 + Math.sin(c.aim) * 8, 'frost', 4); sfx('magic', 0.3, earVol(c)); }
 }
@@ -23810,6 +23810,23 @@ export function selftest() {
       const okAll = W.base && W.live && W.window; if (!okAll) console.warn('Stadtinfo-Probe', JSON.stringify(W));
       return okAll;
     } finally { S.war = war0; S.eco = eco0; UI.closeModal(); }
+  }));
+  ok('Welttiefe W11 Slice 2: Fernwaffen-Profile — Bogen spannt (draw) bis zum Schuss bei 75 % und federt danach (loose), Armbrust nachladen (reload) senkt die Waffe und beugt die Figur, shoot() merkt sich die Nachladedauer; Ganzkörperposen und Cache-Schlüssel folgen der Phase', sandbox(() => {
+    const P = rangedProfile('bow'), C = rangedProfile('crossbow');
+    const d1 = rangedPhase('bow', { sw: 0.3 }), d2 = rangedPhase('bow', { sw: 0.8 }), d3 = rangedPhase('bow', { draw: 130 }), d4 = rangedPhase('bow', { sw: 0 });
+    const r1 = rangedPhase('crossbow', { reloadLeft: 500, reloadTotal: 1000 }), r2 = rangedPhase('crossbow', { sinceShot: 40 }), r3 = rangedPhase('crossbow', {}), r4 = rangedPhase('sword', { sw: 0.5 });
+    const phases = P && C && P.hit === 0.75 && d1.ph === 'draw' && d1.k === 0.5 && d2.ph === 'loose' && d3.ph === 'draw' && d3.k === 0.75 && d4.ph === 'aim' && r1.ph === 'reload' && r1.k === 0.5 && r2.ph === 'kick' && r3.ph === 'aim' && r4 === null;
+    const bAim = rangedBody('crossbow', 'aim', 0), bRel = rangedBody('crossbow', 'reload', 0.5), bFull = rangedBody('bow', 'draw', 1), bLoose = rangedBody('bow', 'loose', 0.25);
+    const body = bRel.by > bAim.by && bRel.ln < 0 && bFull.ln > 0 && bLoose.ln < bFull.ln && rangedBody('sword', 'aim', 0) === null;
+    const W0 = { mode: 'aim', wt: 'crossbow', arc: 1, q: 0, v: 0, oct: 0, rph: 'aim', rk: 0 }, W1 = { ...W0, rph: 'reload', rk: 0.5 };
+    const angle = Math.abs(SP.weaponAngle(W0, 0) - 0) < 1e-9 && Math.abs(SP.weaponAngle(W1, 0) - (Math.PI / 2 - 0.35)) < 1e-9;
+    const spec = SP.humanSpecOf(S.player), f0 = SP.humanFrameR(spec, 'E', 'i1', W0), f1 = SP.humanFrameR(spec, 'E', 'i1', W1), frames = !!f0 && !!f1 && f0 !== f1;
+    const p = stage(); p.equip.weapon = mkItem('runenarmbrust'); p.aim = 0; const n0 = S.projectiles.length; shoot(p, ITEMS.runenarmbrust);
+    const shot = S.projectiles.length === n0 + 1 && p.reloadDur === ITEMS.runenarmbrust.reload && p.reloadUntil > performance.now();
+    S.projectiles.length = n0;
+    const hit = swingHit(p) === 0.42 && (p.equip.weapon = mkItem('longbow'), swingHit(p) === 0.75);
+    const all = phases && body && angle && frames && shot && hit; if (!all) console.warn('Fernwaffen-Probe', JSON.stringify({ phases, body, angle, frames, shot, hit, d1, d2, d3, r1, r2, bRel, bAim }));
+    return all;
   }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;

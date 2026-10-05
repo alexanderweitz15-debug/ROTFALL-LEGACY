@@ -1486,7 +1486,7 @@ function warmRRun(dl) {
   if (warmRQ.length) { warmROn = true; idleCb(warmRRun); }
 }
 export function humanFrameR(spec, dir, pose, W = null) {
-  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.ac || W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0}` : '';
+  const sk = skMemo.get(spec) ?? specKey(spec), wk = W ? `${W.mode},${W.ac || W.wt},${W.q},${W.v},${W.oct},${W.two ? 1 : 0},${W.low || 0},${W.pull || 0},${W.rph || ''},${W.rk || 0}` : '';
   const key = 'R|' + sidOf(sk) + '|' + dir + pose + '|' + wk, hit = frameCache.get(key); if (hit) return hit;
   if (!warmingR) warmRSiblings(spec, dir, pose, W);
   return cacheGet(key, () => {

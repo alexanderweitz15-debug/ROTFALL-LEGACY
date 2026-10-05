@@ -8,7 +8,7 @@ import * as SP from './sprites.js?v=25';
 import { trailPt, WAGON_GAP } from './sim.js?v=25';
 import { ICON_R } from './iconsR.js?v=25';
 import { airPos, airPt } from './economy.js?v=25';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, rangedPhase } from './anim.js?v=25';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -2210,10 +2210,11 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
     const chg = !work && !ranged && !(sw > 0) && !e.cover && e.chargeK > 0 ? e.chargeK : 0;   /* Kampfanimation: schwerer Hieb lädt — Figur steht im Ausholen des Wuchtschlags */
     const ready = own && !A && !e.mounted && e.combatT && now >= e.combatT && now - e.combatT < 2500 && !!atkStance(ac, 'ready');   /* Kampfanimation (§17 Kampf-Idle/-Bewegung): Waffe bereit, breiter Stand */
     const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : ready ? 'ready' : 'rest';
-    const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
+    const rp = mode === 'aim' ? rangedPh(e, wt, sw, now) : null;   /* W11 S2: Fernwaffen-Profil */
+    const pull = wt === 'bow' && mode === 'aim' ? (rp ? (rp.ph === 'draw' ? rp.k : rp.ph === 'loose' ? 0 : 0) : Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4) : 0;   // S15: Bogen spannen, sichtbar
     /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
     const tm = chg ? null : mode === 'swing' ? atkTiming(e, ac, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
-    W = { mode, wt, ac, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(ac, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw };   /* Kampfanimation: Stangen beidhändig */
+    W = { mode, wt, ac, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(ac, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw, rph: rp ? rp.ph : '', rk: rp ? rp.k : 0 };   /* Kampfanimation: Stangen beidhändig */
   }
   /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
      Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
@@ -2357,6 +2358,8 @@ function drawSlash(c, e, W, AF, hx, hy, dir, it) {
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
 const RANGED_W = new Set(['bow', 'crossbow', 'wand', 'throw', 'sling']);
+/* W11 S2: Phase einer Fernwaffe (Bogen spannen/lösen, Armbrust Rückstoß/Nachladen) aus dem Figurenzustand; null ohne Profil */
+const rangedPh = (e, wt, sw, now) => rangedPhase(wt, { sw, draw: e.draw || 0, reloadLeft: e.reloadUntil ? e.reloadUntil - now : 0, reloadTotal: e.reloadDur || 0, sinceShot: e.lastShot ? now - e.lastShot : Infinity });
 function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' && A.kind !== 'gesture' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
@@ -2367,9 +2370,10 @@ function weaponPose(e, now, it, pz) {
   const side = pz.dir === 'W' || pz.dir === 'E', armSide = side ? 'near' : (Math.cos(dir) < 0 ? 'L' : 'R');
   const [sox, soy] = SP.shoulderOf(pz.dir, pz.pose, armSide === 'L' ? 'L' : 'R'), shx = e.x + sox, shy = e.y + 6 + soy;
   const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
+  const reloading = wt === 'crossbow' && aimingR && rangedPh(e, wt, sw, now)?.ph === 'reload';   /* W11 S2 */
   const upright = wt === 'spear' || wt === 'polearm', onShoulder = wt === 'great' || wt === 'hammer';   // S12: Stangenwaffen aufrecht, Zweihänder auf der Schulter
   const hand = (swv, sv) => {                                         // Hand für einen Schwungzustand
-    if (ranged) return aimingR ? [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5] : [shx + Math.cos(dir) * 4, shy + 14 + low];   // Phase 1: in Ruhe hängt die Fernwaffe an der Seite
+    if (ranged) return reloading ? [e.x + Math.cos(dir) * 3, e.y - 8 + Math.sin(dir) * 2] : aimingR ? [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5] : [shx + Math.cos(dir) * 4, shy + 14 + low];   // Phase 1: in Ruhe hängt die Fernwaffe an der Seite; W11 S2: Nachladen vor dem Bauch
     const active = swv > 0 || e.cover || (A && A.kind === 'work');
     if (!active) return upright ? [shx + Math.cos(dir) * 6, shy + 11 + low] : onShoulder ? [shx + Math.cos(dir) * 3, shy + 9 + low]
       : [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
@@ -2385,7 +2389,7 @@ function weaponPose(e, now, it, pz) {
   // Bogen (Phase 1): wird senkrecht gehalten — in der Draufsicht bleiben die Wurfarme senkrecht, nur leicht zur Zielseite geneigt
   // (vorher drehte er ganz mit dem Ziel und lag beim Blick nach unten waagrecht wie eine Armbrust vor dem Bauch).
   const bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
-  const a = wt === 'bow' ? bowA : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
+  const a = wt === 'bow' ? bowA : reloading ? Math.PI / 2 - sgn * 0.35 : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
     : rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
   return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv, tm, uOf };
 }
