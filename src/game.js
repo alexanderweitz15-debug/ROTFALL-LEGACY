@@ -8277,6 +8277,7 @@ function questInfo(k) {
   if (C?.kind === 'defense' && C.at && !C.waved) { const m = Math.max(0, Math.round(C.at - clock())); out.timer = m > 0 ? `Angriff in ~${m >= 60 ? Math.floor(m / 60) + ' Std ' : ''}${m % 60} Min` : 'Angriff jetzt!'; }
   else if (C?.until) out.timer = `Frist: bis Tag ${C.until}`;
   else if (S.quests[k]?.until && S.quests[k].state === 'active') { const m = Math.max(0, Math.round(S.quests[k].until - clock())); out.timer = m > 0 ? `Frist: noch ${m >= 60 ? Math.floor(m / 60) + ' Std ' : ''}${m % 60} Min` : 'Frist verstrichen'; }   /* W3 */
+  { const sp = QUESTS[k]?.spare, st = S.quests[k]; if (sp && st?.state === 'active') out.spare = `Schonen: ${MONSTERS[sp.target]?.name || sp.target} — ${Math.max(0, (sp.max ?? 0) - (st.spared || 0))} Spielraum`; }   /* W4 */
   out.cancel = !!C || !QUESTS[k]?.main; out.tracked = S.track === k;
   return out;
 }
@@ -14507,6 +14508,10 @@ function onKill(mtype, e) {
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
   if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
   if (e?.kind === 'enemy' && !e.trial) for (const h of ktHeroes()) if (h.status?.some(x => x.key === 'song') && [...new Set([S._hostHero || S.player, ...partyMembers()])].filter(m => m !== h && m.alive && !m.downed && m.map === h.map && dist(m, h) < 400).length >= 2) questEvent('songkill', null, 1, h);   /* Klassen-Prüfung Barde: Das Lied trägt (je Figur) */
+  for (const [k, st] of Object.entries(S.quests)) { const Q = QUESTS[k], sp = Q?.spare; if (!sp || st.state !== 'active' || mtype !== sp.target || e?.elite || e?.rboss || e?.boss || e?.trial) continue;   /* W4 „Alpha, nicht das Rudel“: geschonte Art — Leitwolf (Regionalboss) zählt nicht */
+    st.spared = (st.spared || 0) + 1;
+    if (st.spared > (sp.max ?? 0)) { st.state = 'failed'; st.outcome = sp.fail || 'Du hast getötet, was du schonen solltest.'; for (const [n, v] of Object.entries(sp.rel || {})) addRel(n, v); log(`${Q.name}: gescheitert — ${st.outcome}`, 'quest'); }
+    else log(`${Q.name}: ${sp.text || 'Geschonte getötet'} ${st.spared}/${sp.max} — ${st.spared === sp.max ? 'kein weiteres, sonst ist der Auftrag verloren' : 'noch ' + (sp.max - st.spared) + ' Spielraum'}.`, 'quest'); }
   for (const [k, st] of questEntries()) {                             /* Koop: auch die Prüfungsaufträge der Gastfiguren */
     if (st.state !== 'active' || !QUESTS[k]) continue;
     QUESTS[k].objectives.forEach((o, i) => {
@@ -20534,12 +20539,12 @@ export function selftest() {
     S._frozenWar = true;   /* Krieg 05.10.: Streifen und Totenheere liefern sich an der Straße Schlachten, die den Wagen anhalten würden — Probe prüft die Reise, nicht den Krieg */
     try {
       ensureCoaches(); const coaches = S.ents.world.filter(e => e.coach).length >= 4 && S.ents.world.some(e => e.ferry === 'saltport');
-      S.gold = 500; const T = tripOf('eren', 'northcity'); T.risk = 0; const m0 = S.day * 1440 + S.minute; journey(T, 'Die Kutsche');
+      S.gold = 500; const T = tripOf('eren', 'northcity'); T.risk = 0; const m0 = S.day * 1440 + S.minute; const jr = journey(T, 'Die Kutsche'); const g1 = S.gold, m1 = S.day * 1440 + S.minute, px1 = p.x / TS | 0, py1 = p.y / TS | 0;
       const [nx, ny] = TOWN_PLAN.northcity.square, arrived = Math.hypot(p.x / TS - nx, p.y / TS - ny) < 8 && S.gold === 500 - T.price && Math.abs(S.day * 1440 + S.minute - m0 - T.min) < 0.5;   // Minuten sind Gleitkomma
       const T2 = tripOf('northcity', 'eren'); T2.risk = 1; const n0 = S.ents.world.filter(e => e.kind === 'enemy').length; journey(T2, 'Die Kutsche');
       const [ex, ey] = TOWN_PLAN.eren.square, mid = Math.hypot(p.x / TS - ex, p.y / TS - ey) > 10 && S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3;
       const F = tripOf('saltport', 'kupferhafen', true);
-      if (!(coaches && arrived && mid)) console.warn('KDBG', JSON.stringify({ coaches, arrived, mid, map: S.map, pm: p.map, gold: S.gold, price: T.price, px: p.x / TS | 0, py: p.y / TS | 0, nx, ny, foes: foesNear(p), ex, ey }));
+      if (!(coaches && arrived && mid)) console.warn('KDBG', JSON.stringify({ coaches, arrived, mid, jr, g1, dt: m1 - m0, tmin: T.min, px1, py1, map: S.map, pm: p.map, gold: S.gold, price: T.price, px: p.x / TS | 0, py: p.y / TS | 0, nx, ny, foes: foesNear(p), ex, ey }));
       return coaches && arrived && mid && F.risk === 0 && F.price > 0;
     } finally { const k = JSON.parse(keep); S.gold = k.g; S.minute = k.m; S.day = k.d; p.x = k.x; p.y = k.y; S.ents.world = W0; S._frozenWar = fw0; UI.closeDialogue(); }
   })());
@@ -23603,6 +23608,17 @@ export function selftest() {
       return okAll;
     } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_lief_tinktur = q0; else delete S.quests.q_lief_tinktur; S.player.inv = inv0; S.map = m0; S.track = tr0; UI.closeDialogue(); }
   }));
+  ok('Welttiefe W4 Slice 1: „Alpha, nicht das Rudel“ — Graumähne verlangt, das Rudel zu schonen: zwei Wölfe gehen durch (Warnung, Auftragsbuch zeigt den Spielraum), der dritte lässt den Auftrag scheitern (Tomas −10); der Leitwolf selbst zählt nicht als Wolf', sandbox(() => {
+    const q0 = S.quests.q_greymane, R0 = { ...S.relations }; const W = {}; stage();
+    try {
+      delete S.quests.q_greymane; startQuest('q_greymane'); const st = S.quests.q_greymane; W.text = /Rudel/.test(QUESTS.q_greymane.desc) && QUESTS.q_greymane.spare?.target === 'wolf';
+      onKill('wolf', { kind: 'enemy', elite: 'graumaehne' }); W.eliteFree = !st.spared;
+      onKill('wolf', { kind: 'enemy' }); onKill('wolf', { kind: 'enemy' }); W.two = st.spared === 2 && st.state === 'active' && /Spielraum/.test(questInfo('q_greymane').spare || '') && /0 Spielraum/.test(questInfo('q_greymane').spare);
+      const rt = S.relations.tomas || 0; onKill('wolf', { kind: 'enemy' }); W.third = st.state === 'failed' && /Rudel/.test(st.outcome) && (S.relations.tomas || 0) === rt - 10;
+      const okAll = W.text && W.eliteFree && W.two && W.third; if (!okAll) console.warn('W4-Probe', JSON.stringify(W), questInfo('q_greymane').spare);
+      return okAll;
+    } finally { if (q0) S.quests.q_greymane = q0; else delete S.quests.q_greymane; S.relations = R0; }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23953,7 +23969,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, questDeadlineTick, trackerInfo, questInfo, onKill, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen

@@ -1700,8 +1700,9 @@ export const QUESTS = {
     objectives:[{type:'item',target:'ancestor_urn',count:1,text:'Ahnenurne aus der Großen Nekropole holen'}],
     reward:{xp:200}, turnin:'ysra', pact:true },
   // Session 11 (§45): Aufträge an die neuen Weltsysteme gebunden — Regionalbosse (§73), Wirtschaft, Hundertfeld
-  q_greymane: { name:'Graumähne', giver:'tomas', desc:'In der Wolfsschlucht führt ein grauer Leitwolf das Rudel. Solange er lebt, jagt in Eren keiner mehr im Westen. Ich hab es versucht. Ich komme nicht nah genug.',
-    objectives:[{type:'kill',target:'alpha',count:1,text:'Graumähne in der Wolfsschlucht erlegen'}],
+  q_greymane: { name:'Graumähne', giver:'tomas', desc:'In der Wolfsschlucht führt ein grauer Leitwolf das Rudel. Solange er lebt, jagt in Eren keiner mehr im Westen. Ich hab es versucht. Ich komme nicht nah genug. Und hör zu: Nur ihn. Ohne Leitwolf zerstreut sich das Rudel von selbst — und ein Rudel im Wald hält die Wildschweine von unseren Feldern. Wer mir die Wölfe ausrottet, hat nichts verdient.',
+    objectives:[{type:'kill',target:'alpha',count:1,text:'Graumähne in der Wolfsschlucht erlegen — das Rudel schonen (höchstens zwei Wölfe)'}],
+    spare:{ target:'wolf', max:2, text:'Wölfe des Rudels getötet', fail:'Das Rudel ist tot. Ohne Rudel ziehen die Wildschweine auf die Felder — Tomas will davon nichts mehr wissen.', rel:{ tomas:-10 } },
     reward:{gold:110,xp:180,rep:{valen:5},item:'longbow',rel:{tomas:15}}, turnin:'tomas' },
   q_sandlord: { name:'Die Straße nach Aschfurt', giver:'gerold', desc:'Karrak, der Sandfürst, nimmt jeden dritten Wagen durch die Rote Wüste. Das Kontor zahlt, wenn er fällt — und die Wüste wieder nur Wüste ist.',
     objectives:[{type:'kill',target:'sandlord',count:1,text:'Karrak, den Sandfürsten, erschlagen'}],
