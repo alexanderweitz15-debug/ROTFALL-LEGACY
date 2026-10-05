@@ -26,8 +26,12 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 
 - W2 Slice 1 (Commit folgt): `effects.memory` → `verdictRemember`/`remember`, Gruß `verdictGreet` in `talk()` (30 Tage), Urteil als Chronik-`news` (Gerücht 5 Tage); Probe grün 492/492; live getestet (Dialogpfad, Gruß, Gerücht, Verblassen).
 
+- W2 Slice 2 (Commit folgt): `QUEST_GIVER_KEYS` in `KEY_ROLE`, `questGiverDeadDay` im Tageswechsel, Log beim Nachfolger; Probe grün, live geprüft.
+- Nutzer 05.10. Aufträge: tägliche Auffüllung in `townContracts` (`S.conTop`); Probe grün 494/494.
+- Fremder Zweig `origin/claude/exciting-cori-m6jrms` ist verwaist (kein merge-base, 39 alte Commits): nicht lesen.
+
 ## Nächster Schritt
-- W2 Slice 2: Nachfolger für erschlagene Geber (Auftrag bleibt abgebbar) — oder W1 Slice 3 nach Nutzerentscheid (alle Vorschläge tragen eine Designfrage). Ohne Antwort: W2 Slice 2.
+- W3 Eskorte/Rettung/Lieferung mit Varianten (Plan) — oder W1 Slice 3 nach Nutzerentscheid (alle Vorschläge tragen eine Designfrage). Ohne Antwort: W3 Slice 1.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
