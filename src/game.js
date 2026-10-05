@@ -1037,8 +1037,8 @@ function spawnResidents() {
 // Bewohner stehen im Kreis ums Feuer und reden übers Fest; an der Festtafel gibt es einmal je Fest ein Festmahl.
 const FEST_DAYS = 6, FEST_BUILT = new Set(), FEST_POP = {};   // BUG (Nutzer: „in Aurelion versammeln sich locker 1000 Leute auf einem Fleck“): Ringzahl je Einwohnerzahl, sonst quetscht sich eine Metropole auf denselben schmalen Kreis wie ein Dorf
 const townName = t => LOCATIONS.find(l => l.key === t)?.name || { northcity: 'Nordfurt', saltport: 'Salzhafen', kreuzweg: 'Kreuzweg', ashford: 'Aschfurt', sonnwacht: 'Sonnwacht' }[t] || t;
-const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
-const festNow = town => !!town && festDay(town) && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
+const festDay = (town, d = S.day | 0) => town !== 'vharnholm' && !S.razed?.[town] && S.war?.nodes?.[town]?.owner !== 'undead' && !(town === 'varonheim' && S.flags?.varonDead && d >= S.flags.varonDead && d - S.flags.varonDead < CROWN_TURMOIL) &&   /* nach dem Königsmord kein Fest (endlich: Proben suchen den nächsten Festtag) */ (d + [...town].reduce((n, c) => n + c.charCodeAt(0), 0)) % FEST_DAYS === 0;
+const festNow = town => !!town && festDay(town) && (S.schutz?.[town]?.stage || 0) < 2 && S.deadRaid?.v !== town && S.myRaid?.v !== town && S.minute >= 15 * 60 && S.minute < 23 * 60;   // S14: gemeldeter Überfall — das Fest fällt aus
 const festSpot = town => { const [x, y] = TOWN_PLAN[town].square; return { x: (x + 0.5) * TS, y: (y + 0.5) * TS }; };
 const FEST_SET = [['campfire', 0, -2], ['table', -3, 3], ['bench', -3, 4], ['table', 3, 3], ['bench', 3, 4], ['cask_rack', -5, -2], ['stall', 5, -2],   // Platzmitte bleibt frei (Kreuzung)
   ['torch', -6, 2], ['torch', 6, 2], ['torch', -2, -5], ['torch', 2, -5], ['lantern', 0, 5]];
@@ -1333,7 +1333,7 @@ function dayTarget(e) {
 function dayTargetRaw(e) {
   const P = e.plan, h = S.minute / 60 - P.o, alt = ((S.day | 0) + P.n) % 3;
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
-  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
+  if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage) || (e.fear && fearOf(e) >= 50)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   /* Angst: verstecken */   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
   if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
   if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
     const rings = Math.max(6, Math.ceil((FEST_POP[e.homeTown] || 24) / 14)), r = 80 + (P.n % rings) * 22;   // BUG (Nutzer: Aurelion-Klumpen): Ringe wachsen mit der Einwohnerzahl, sonst quetscht sich eine Metropole auf 6 Ringe wie ein Dorf
@@ -1374,6 +1374,8 @@ function startTalk(e) {
     if (!S._quiet) { gesture(e, 'zeigen', 1100, foe); if (!foe.act || foe.act.kind !== 'work') gesture(foe, 'abwehren', 1300, e); }   /* Visuell N8-2: man zeigt auf den Rivalen, der wehrt ab */
     return true;
   }
+  { const fe = fearOf(e), fo = fearOf(o); if (fe >= 50 || fo >= 50) return false;   /* Angst: wer sich fürchtet, plaudert nicht — wer unruhig ist, redet über die Toten */
+    if (fe >= 25 || fo >= 25) { const line = FEAR_TALK[(e.plan.n + o.plan.n) % FEAR_TALK.length], until = now + 5200; e.talk = { with: o.id, until, at: now, say: line[0] }; o.talk = { with: e.id, until, at: now + 2600, say: line[1] }; return true; } }
   const k = e.plan.n + o.plan.n + (S.day | 0), news = !festNow(e.homeTown) && k % 2 ? newsTalk(k) : null;   // jedes zweite Gespräch: Neuigkeiten, wenn es welche gibt
   const pool = festNow(e.homeTown) ? FEST_TALK : festDay(e.homeTown, (S.day | 0) + 1) && k % 3 === 0 ? PRE_FEST : TALK;
   const warm = e.rel?.friend === o.id || o.rel?.friend === e.id, line = news || (warm && k % 2 === 0 ? FRIEND_TALK[k % FRIEND_TALK.length] : pool[k % pool.length]), until = now + 5200;
@@ -4170,9 +4172,11 @@ function die(c, cause = 'Wunden', source) {
   { const byP = source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id;
     if (c.lawless && byP) { const Z = S.schutz?.[c.lawless], f = townFac(c.lawless); if (Z && (Z.lawThx || 0) < 12 && S.factions[f] != null) { Z.lawThx = (Z.lawThx || 0) + 3; S.factions[f] = clamp(S.factions[f] + 3, -100, 100); if (Z.lawThx === 3) log(`Die Bürger von ${townName(c.lawless)} sehen, wer ihnen hilft (${FACTIONS[f]?.name || f} +3 je Plünderer).`, 'faction'); } }
     if (c.kind === 'npc' && c.guard && c.varonCourt && !c.exileCourt && c.map === 'world') burgLoss(c, byP);
+    if (c.kind === 'npc' && c.varonCourt) courtDeath(c, byP);   /* Hof: Tote bleiben tot, Reichsverweser rückt nach */
     if (c.hiredBy) grudgeNote(c);   /* E3 */
     if (c.settler || c.campGuard) { moraleAdd(-4, `${c.name} getötet`); S.flags.settlerDeaths = (S.flags.settlerDeaths || 0) + 1; if (S.settlement) campLoss(S.settlement); } }   /* Siedlung M1/M2/M4 */   /* S2: Burgwache bleibt tot */
   if (c.kind === 'npc' && c.guard && guardTownOf(c)) schutzLoss(c, source === S.player || source === S.player.id || S.party.includes(source?.id) || source?.servant === S.player.id || !!source?.coopPilot || !!byId(source)?.coopPilot);   /* Stadt ohne Schutz */
+  if (c.kind === 'npc' && !isParty) fearWitness(c, source, wasFoe);   /* Angst der Zeugen */
   if ((source === S.player || source === S.player.id || source?.coopPilot || byId(source)?.coopPilot) && c.kind === 'npc' && !isParty) bloodshed(c, wasFoe);   /* Koop: auch Morde des Mitspielers */   // auch verblutet (lastKiller = id)
   log(`${c.name} ist gestorben. (${cause})`, 'death');
   const mourned = c.homeTown && (NAMED_NPC.has(c.key) || c.title || HIGH_RANK[c.prof] || c.shop || c.smith);
@@ -4261,6 +4265,66 @@ function bloodshed(victim, wasFoe) {
   }
   const m = partyMembers().find(x => !(x.traits || []).includes('grausam'));
   if (m) log(`${m.name}: „${victim.name} hat dir nichts getan.“`, 'party');
+}
+
+// ================= Angst (Nutzer 02.10.2026: „10 Leute vor Zivilisten getötet — die rennen kurz weg und reden normal weiter“) =================
+// Jeder Bürger hat einen Angstwert (e.fear 0–100) und weiß, vor wem (e.fearBy). Jeder Tote, den er sieht (380 px), +18; wer es nur
+// hört (gleicher Ort, 1100 px), +6 — tapfere und grausame Leute halb so viel. Stufen: ab 25 unruhig (Abstand halten, reden über die
+// Toten), ab 50 verängstigt (verstecken sich im Haus, reden nicht mit dem Täter, kein Plausch), ab 75 Panik (rennen schreiend vor
+// der Gefahr davon). Solange die Gefahr da ist (lebt, gleiche Karte, näher als 700 px), bleibt die Angst; erst wenn sie fort ist,
+// sinkt sie um 12 je Spielstunde. Wer einen Angreifer (Feind) erschlägt, macht niemandem Angst; Wachen fürchten sich nicht.
+const FEAR_SEE = 380, FEAR_HEAR = 1100, FEAR_DECAY = 12 / 60, FEAR_NEAR = 700;
+const FEAR_CRY = ['Hilfe!', 'Lauft!', 'Nicht ich! Bitte!', 'Mörder!', 'Weg hier!', 'Verriegelt die Türen!'];
+const FEAR_TALK = [['Hast du gesehen, was da passiert ist?', 'Leise. Vielleicht hört es jemand.'], ['Ich hab das Blut noch vor Augen.', 'Geh nach Hause. Schließ ab.'],
+  ['Wer macht so was?', 'Jemand, dem alles egal ist.'], ['Wo ist die Wache, wenn man sie braucht?', 'Frag nicht.'], ['Ich schlafe heute nicht.', 'Keiner schläft heute.']];
+const FEAR_NAME = ['ruhig', 'unruhig', 'verängstigt', 'in Panik'];
+function fearOf(e) {                                           /* Angst jetzt: gespeicherter Wert minus Abklingen seit die Gefahr fort ist */
+  if (!e?.fear) return 0;
+  const v = e.fear - FEAR_DECAY * Math.max(0, clock() - (e.fearSeen || 0));
+  if (v <= 0) { e.fear = 0; e.fearBy = null; return 0; }
+  return v;
+}
+const fearStage = f => f >= 75 ? 3 : f >= 50 ? 2 : f >= 25 ? 1 : 0;
+const fearByPlayer = e => { const T = byId(e.fearBy); return !!T && (T === S.player || !!T.coopHero || !!T.coopPilot || S.party.includes(T.id)); };
+function fearWitness(victim, source, wasFoe) {
+  let src = typeof source === 'string' ? byId(source) : source; if (!src && victim.lastKiller) src = byId(victim.lastKiller);
+  if (!src || src === victim || !src.id || src.kind === 'prop') return;
+  const isP = src === S.player || !!src.coopHero || !!src.coopPilot || S.party.includes(src.id) || src.servant === S.player.id;
+  if (isP && wasFoe) return;                                         /* wer einen Angreifer erschlägt, schützt — er erschreckt nicht */
+  if (!isP && src.kind === 'npc' && (src.guard || !src.angry)) return;   /* die Wache richtet einen Verbrecher: Ordnung, keine Gefahr */
+  const threat = src.servant === S.player.id ? S.player : src, now = clock(), town = victim.map === 'world' ? townAt(victim.x / TS | 0, victim.y / TS | 0) : null;
+  let panic = 0, scared = 0;
+  for (const w of S.ents[victim.map] || []) {
+    if (w.kind !== 'npc' || !w.alive || w.downed || w === victim || w === src || w.guard || w.robot || S.party.includes(w.id) || w.coopHero || w.coopPilot || w.captive || w.inmate || w.prisoner) continue;
+    const d = dist(w, victim), sees = d < FEAR_SEE, hears = !sees && d < FEAR_HEAR && (!town || w.homeTown === town || w.town === town);
+    if (!sees && !hears) continue;
+    const f0 = fearOf(w), g = (sees ? 18 : 6) * (w.brave || (w.traits || []).includes('grausam') ? 0.5 : 1);
+    w.fear = Math.min(100, f0 + g); w.fearBy = threat.id; w.fearSeen = now;
+    const s0 = fearStage(f0), s1 = fearStage(w.fear);
+    if (s1 >= 3 && s0 < 3) { panic++; if (sees && chance(0.6)) bubble(w, pick(FEAR_CRY), 2200); }
+    if (s1 >= 2 && s0 < 2) scared++;
+  }
+  if (!isP || !(panic + scared) || S._quiet) return;
+  const k = town || victim.map, H = (S.flags.fearHint ||= {});
+  if (panic && H[k] !== 'p' + (S.day | 0)) { H[k] = 'p' + (S.day | 0); log(`Panik${town ? ` in ${townName(town)}` : ''}: Die Leute rennen schreiend vor dir davon. Solange du in der Nähe bist, kommt keiner aus seinem Haus.`, 'world'); }
+  else if (scared && !H[k]) { H[k] = 's' + (S.day | 0); log(`Die Leute${town ? ` von ${townName(town)}` : ''} haben Angst vor dir. Sie verstecken sich und reden nicht mehr mit dir — bis du fort bist.`, 'world'); }
+}
+function fearStep(e, dt) {                                            /* aus updateNpc: Abstand halten, fliehen, verstecken */
+  const f0 = fearOf(e); if (f0 < 25) return false;
+  const T = byId(e.fearBy), here = !!T && T.alive !== false && !T.downed && T.map === e.map, d = here ? dist(e, T) : 1e9, now = clock();
+  if (here && d < FEAR_NEAR) { if (now - (e.fearSeen || 0) > 30) e.fear = f0; e.fearSeen = now; }   /* die Gefahr ist da: die Angst bleibt (war sie länger fort, gilt der abgeklungene Wert) */
+  const st = fearStage(f0), keep = st >= 3 ? 620 : st >= 2 ? 420 : 200;
+  if (d < keep) {
+    e.talk = null; e.sitting = false;
+    seek(e, Math.atan2(e.y - T.y, e.x - T.x), (st >= 3 ? 1.7 : st >= 2 ? 1.4 : 1.0) * dt / 16, dt);
+    if (st >= 2 && !(e.fearCry > performance.now())) { e.fearCry = performance.now() + 4000 + Math.random() * 5000; if (chance(st >= 3 ? 0.6 : 0.25)) bubble(e, pick(FEAR_CRY), 1800); }
+    return true;
+  }
+  if (st < 2 || (e.plan && e.map === 'world')) return false;          /* Bewohner mit Tagesablauf: dayTargetRaw schickt sie ins Haus */
+  const a = e.anchor; if (!a) return false;
+  const da = Math.hypot(a.x - e.x, a.y - e.y);
+  if (da > 10) { seek(e, Math.atan2(a.y - e.y, a.x - e.x), 1.2 * dt / 16, dt, a); return true; }
+  e.vx = e.vy = 0; return true;
 }
 
 // Hoher Stand: Adel und Geweihte. Blutbann (Wachen der Fraktion greifen fünf Tage lang ohne Anruf an, keine Festnahme mehr),
@@ -5282,6 +5346,7 @@ function updateNpc(e, dt) {
   } else e.calledHelp = false;
   // Nach einer Bluttat meiden Zeugen den Spieler einen Tag lang
   if (!e.guard && !e.shop && fearLvl() >= 2 && fearedBy(e) && dist(e, p) < 80) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.2 * dt / 16, dt); return; }   // S12: man weicht dem Hochpaladin aus
+  if (!e.guard && e.fear && fearStep(e, dt)) return;                    /* Angst: fliehen, Abstand, verstecken */
   if (e.afraid > now && !e.guard && dist(e, p) < 170) { seek(e, Math.atan2(e.y - p.y, e.x - p.x), 1.4 * dt / 16, dt); return; }
   if (arrestCheck(e, p, dt)) return;                   // §44: Wache stellt einen Gesuchten
   if (e.bondGuard && bondGuardStep(e, dt)) return;              // MP2 §25: Wächter des Versklavten
@@ -5996,11 +6061,12 @@ function arrestCheck(g, p, dt) {
   if (dist(g, p) > 44) { seek(g, Math.atan2(p.y - g.y, p.x - g.x), 1.3 * dt / 16, dt, p); return true; }
   S.flags.arrestCd = clock() + 90; g.vx = g.vy = 0;
   const pay = () => { S.gold -= b; delete S.bounty[fac]; S.resist = null; log(`Du zahlst ${b} Gold. Die Sache ist erledigt.`, 'faction'); UI.closeDialogue(); };
+  const heavy = b >= HEAVY_CRIME, fine = crimeFine(b), H = jailHours(b);   /* Nutzer 02.10.: ab 2000 Gold kein Freikaufen — Bußgeld und Haft */
   const chainB = g.faction === 'chain' && !S.flags.chainsBroken;   // S15 Fehlersuche: die Kette hat keinen Kerker (Eisenfeste fehlt in TOWN_PLAN → landete in Eren) — sie legt in Ketten
   const jail = () => { UI.closeDialogue(); if (chainB && enslave('chain', b)) return; goToJail(fac, b, g.post && (TOWN_PLAN[g.post] || FAC_CON[g.post]) ? g.post : townAt(g.x / TS | 0, g.y / TS | 0) || 'eren'); };   // Phase 2: echter Kerker statt „ein Tag später“
   const fight = () => { g.angry = true; g.brave = true; g.aggroId = p.id; S.bounty[fac] += 100; S.resist = { fac, until: clock() + 600 }; log('Du widersetzt dich der Festnahme. Kopfgeld +100. Die Wachen verhandeln nicht mehr — zehn Minuten lang wird gekämpft, bis du fliehst oder fällst.', 'faction'); UI.closeDialogue(); };
-  UI.dialogue(g, `„Halt! Auf deinen Kopf sind ${b} Gold ausgesetzt. Zahl, oder du kommst mit.“`, [
-    ...(S.gold >= b ? [{ text: `Zahlen (${b} Gold)`, fn: pay }] : []), { text: chainB ? `Mitkommen (in Ketten, Schuld ${b})` : `Mitkommen (Kerker, etwa ${jailMinutes(b)} Minuten)`, fn: jail }, { text: 'Widerstand leisten', fn: fight }]);
+  UI.dialogue(g, heavy ? `„Halt! ${b} Gold auf deinem Kopf. Dafür kauft man sich nicht frei. ${fine} Gold Bußgeld, und du sitzt — ${jailSpan(H[0])} bis ${jailSpan(H[1])}, je nachdem, was du zahlen kannst.“` : `„Halt! Auf deinen Kopf sind ${b} Gold ausgesetzt. Zahl, oder du kommst mit.“`, [
+    ...(S.gold >= b && !heavy ? [{ text: `Zahlen (${b} Gold)`, fn: pay }] : []), { text: chainB ? `Mitkommen (in Ketten, Schuld ${b})` : heavy ? `Mitkommen (Bußgeld ${fine} Gold, Kerker ${jailSpan(jailHoursPaid(b, Math.min(S.gold, fine)))})` : `Mitkommen (Kerker, etwa ${jailSpan(H[1])})`, fn: jail }, { text: 'Widerstand leisten', fn: fight }]);
   return true;
 }
 // ================= Die Eisenmark (Session 11, Endgame) =================
@@ -8800,7 +8866,7 @@ function arrivalTick() {
   const n = S.war?.nodes?.[k], occ = n?.owner === 'undead', sg = !!n?.siege && !occ, key = k + (occ ? ':occ' : sg ? ':siege' : '');
   const seen = (S.flags.seenTowns ||= {}); if (seen[key] != null) return; seen[key] = S.day | 0;
   const P = TOWN_PLAN[k], lord = n?.owner || P.lord;
-  const sub = occ ? 'Besetzt von den Toten' : sg ? 'Belagert' : k === 'varonheim' ? `Hauptstadt Valens · ${S.flags.varonDead ? `Reichsverweser ${S.flags.varonRegent || 'Aldhelm'}` : 'Sitz König Varons'}` : `${P.metro ? 'Metropole' : P.village ? 'Dorf' : 'Stadt'} · ${FACTIONS[lord]?.name || 'frei'}`;
+  const sub = occ ? 'Besetzt von den Toten' : sg ? 'Belagert' : k === 'varonheim' ? `Hauptstadt Valens · ${S.flags.varonDead ? (S.flags.varonRegent === 'niemand' ? 'Die Krone ist kopflos' : `Reichsverweser ${S.flags.varonRegent || 'Aldhelm'}`) : 'Sitz König Varons'}` : `${P.metro ? 'Metropole' : P.village ? 'Dorf' : 'Stadt'} · ${FACTIONS[lord]?.name || 'frei'}`;
   nameCard(townName(k).toUpperCase(), sub, 3200); sfx(occ || k === 'varonheim' ? 'bell' : 'ui', 0, k === 'varonheim' ? 0.35 : 0.6);
   const g = !occ && S.ents.world.find(e => e.kind === 'npc' && e.alive && e.guard && dist(e, p) < 260);
   if (g) { gesture(g, 'zeigen', 1400, P.square ? { x: P.square[0] * TS, y: P.square[1] * TS } : p); bubble(g, ARRIVE_SAY[(vrnd() * ARRIVE_SAY.length) | 0], 2600); }
@@ -9182,7 +9248,16 @@ function ensureDefenseMasters() {
 // Verhaftet: 10–20 Minuten Haft je nach Kopfgeld (Spielzeit läuft normal weiter). Waffe wird verwahrt. Zweimal am Tag Essen.
 // Reden mit Mitgefangenen; Kaution beim Wärter; Bestechung (Glück); Schloss knacken (Beweglichkeit, Dietrich) und ungesehen
 // zum Ausgang — wer gesehen wird, sitzt länger. Nur im Kerker von Salzhafen sitzen Leute mit Aufträgen (Diebesgilde, Rask).
-const jailMinutes = b => clamp(Math.round(10 + b / 40), 10, 20);
+const jailMinutes = b => clamp(Math.round(10 + b / 40), 10, 20);   /* Haft in Spielstunden (1 Spielstunde = 1 Minute Echtzeit) */
+// Schwere Verbrechen (Nutzer 02.10.2026): ab 2000 Gold Kopfgeld kauft man sich nicht mehr frei. Bei der Festnahme wird ein Bußgeld
+// (10 % des Kopfgelds, mindestens 200) eingezogen, so weit das Gold reicht, und man sitzt: die Haft wächst logarithmisch mit dem
+// Kopfgeld — 2000 Gold: 20–40 Stunden, 20 000: 40–80, 200 000: 60–120 Stunden (also 1–2 Stunden Echtzeit). Wer das Bußgeld ganz
+// zahlt, sitzt die untere Zahl, wer nichts zahlt, die obere. Keine Kaution; Bestechen kostet mehr und klappt seltener.
+const HEAVY_CRIME = 2000;
+const crimeFine = b => b >= HEAVY_CRIME ? Math.max(200, Math.round(b * 0.1)) : 0;
+const jailHours = b => { if (b < HEAVY_CRIME) { const h = jailMinutes(b); return [h, h]; } const hi = clamp(Math.round(40 + 40 * Math.log10(b / HEAVY_CRIME)), 40, 120); return [Math.round(hi / 2), hi]; };
+const jailHoursPaid = (b, paid) => { const [lo, hi] = jailHours(b), f = crimeFine(b); return f ? Math.round(hi - (hi - lo) * clamp(paid / f, 0, 1)) : hi; };
+const jailSpan = h => h >= 48 ? `${h} Stunden (${String(Math.round(h / 24 * 10) / 10).replace('.', ',')} Tage)` : `${h} Stunden`;
 const JAIL_LINES = ['„Was hast du angestellt? Ich hab nur ein Brot genommen.“', '„Zähl die Steine an der Decke. Es sind hundertzwölf. Ich hab dreimal gezählt.“', '„Der Wärter mit der Narbe schläft nach dem Essen.“',
   '„Die sagen, keiner kommt hier raus. Die lügen. Aber nicht oft.“', '„Wenn du rauskommst, grüß meine Frau. Oder besser nicht.“', '„Das Brot ist hart, aber es ist Brot.“'];
 // S15 Fehlersuche: wer in den Kerker oder in Ketten kommt, wird nicht weiter verfolgt (sonst kamen Kopfgeldjäger mit in die Zelle)
@@ -9202,14 +9277,15 @@ function jailWarden(g, J0, town) {
 }
 function dropPursuit() { const p = S.player; for (const e of S.ents[S.map] || []) if (e.aggroId === p.id) { e.aggroId = null; e.aiState = 'idle'; e.follow = null; e.angry = false; } S.ents[S.map] = (S.ents[S.map] || []).filter(e => !(e.encounter && e.kind === 'enemy')); }
 function goToJail(fac, bounty, town) {
-  const p = S.player, min = jailMinutes(bounty); S.resist = null;   /* Widerstand endet mit der Zelle */
+  const p = S.player, heavy = bounty >= HEAVY_CRIME, fine = crimeFine(bounty), paid = Math.max(0, Math.min(S.gold, fine)), min = jailHoursPaid(bounty, paid); S.resist = null;   /* Widerstand endet mit der Zelle */
   delete (S.bounty ||= {})[fac];
-  S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3 };   // S14: drei Dietriche im Stiefel
+  if (heavy) { S.gold -= paid; log(paid >= fine ? `Bußgeld: ${paid} Gold. Bezahlt — die Haft fällt kürzer aus.` : `Bußgeld: ${fine} Gold. Du hast nur ${paid}. Die Schuld sitzt du ab.`, 'faction'); }
+  S.jail = { fac, town, until: clock() + min * 60, bail: Math.max(100, Math.round(bounty * 1.5)), weapon: p.equip.weapon || null, cell: 0, meal: -1, picks: 3, heavy: heavy ? bounty : 0 };   // S14: drei Dietriche im Stiefel
   S.jailTown = town; jailLook(town); p.equip.weapon = null; recalc(p); dropPursuit();
   for (const o of S.ents[S.map]) if (o.angry) { o.angry = false; o.aggroId = null; }
   travel('kerker'); ensureJail(); closeCells();
   p.x = MAPS.kerker.cells[0].spot.x; p.y = MAPS.kerker.cells[0].spot.y;
-  log(`Kerker von ${townName(town)}: ${min} Minuten. Kaution ${S.jail.bail} Gold. Deine Waffe liegt beim Wärter. Im Stiefel: drei Dietriche.`, 'faction'); UI.toast(`KERKER — ${min} MINUTEN`, 3000);
+  log(`Kerker von ${townName(town)}: ${jailSpan(min)}${min >= 30 ? ` (etwa ${min} Minuten Echtzeit)` : ''}. ${heavy ? 'Schweres Verbrechen: keine Kaution.' : `Kaution ${S.jail.bail} Gold.`} Deine Waffe liegt beim Wärter. Im Stiefel: drei Dietriche.`, 'faction'); UI.toast(`KERKER — ${min} STUNDEN`, 3000);
   chronicle(`${p.name} im Kerker von ${townName(town)}`, 'crime');
 }
 function closeCells() {
@@ -9240,9 +9316,11 @@ function ensureJail() {
 function jailChoices(npc, choices) {
   const J = S.jail;
   if (npc.warden && J) {
-    choices.unshift({ text: `Kaution zahlen (${J.bail} Gold)`, fn: () => { if (S.gold < J.bail) return UI.dialogue(npc, '„Mit leeren Taschen kauft man sich nicht frei.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); S.gold -= J.bail; UI.closeDialogue(); releaseJail('Kaution bezahlt.'); } });
-    choices.unshift({ text: 'Bestechen (50 Gold)', fn: () => { UI.closeDialogue(); if (S.gold < 50) return log('Der Wärter lacht dich aus.', 'faction'); S.gold -= 50;
-      if (chance(0.45)) { S.ents.kerker = S.ents.kerker.filter(e => e.cellDoor !== J.cell); indexSolids('kerker'); J.blind = clock() + 60; log('Der Wärter steckt das Gold ein und vergisst, abzuschließen. Eine Stunde lang sieht er weg.', 'world'); }
+    if (J.heavy) choices.unshift({ text: 'Kaution? (schweres Verbrechen)', fn: () => UI.dialogue(npc, `„Kaution? Bei ${J.heavy} Gold auf deinem Kopf? Du sitzt, bis die Zeit um ist.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+    else choices.unshift({ text: `Kaution zahlen (${J.bail} Gold)`, fn: () => { if (S.gold < J.bail) return UI.dialogue(npc, '„Mit leeren Taschen kauft man sich nicht frei.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); S.gold -= J.bail; UI.closeDialogue(); releaseJail('Kaution bezahlt.'); } });
+    const bc = J.heavy ? 400 : 50;   /* schwere Verbrechen: teurer, seltener */
+    choices.unshift({ text: `Bestechen (${bc} Gold)`, fn: () => { UI.closeDialogue(); if (S.gold < bc) return log('Der Wärter lacht dich aus.', 'faction'); S.gold -= bc;
+      if (chance(J.heavy ? 0.2 : 0.45)) { S.ents.kerker = S.ents.kerker.filter(e => e.cellDoor !== J.cell); indexSolids('kerker'); J.blind = clock() + 60; log('Der Wärter steckt das Gold ein und vergisst, abzuschließen. Eine Stunde lang sieht er weg.', 'world'); }
       else { J.until += 60; log('Der Wärter nimmt das Gold — und meldet dich. Eine Stunde mehr.', 'faction'); } } });
     choices.unshift({ text: 'Wie lange noch?', fn: () => UI.dialogue(npc, `„Noch ${Math.max(1, Math.round((J.until - clock()) / 60))} Stunden. Dann bist du wieder draußen. Oder tot, wenn du Ärger machst.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   }
@@ -9538,7 +9616,7 @@ function ensureVaronExile() {
   let k; if (FL) { k = S.war?.nodes?.[FL.to]?.owner === 'valen' ? FL.to : (FL.to = SIM.exileOf()); } else { k = A.exile && S.war.nodes[A.exile]?.owner === 'valen' ? A.exile : SIM.exileOf(); A.exile = k; A.kingLost = !k; }
   if (!k || !TOWN_PLAN[k]) return;
   const [sx, sy] = TOWN_PLAN[k].square;
-  const put = (name, prof, dx, dy, o = {}) => { const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
+  const put = (name, prof, dx, dy, o = {}) => { if (courtGone(o, name)) return null; const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
     Object.assign(c, { exileCourt: true, varonCourt: true, exile: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.world.push(c); return c; };
   if (!S.flags.varonDead) { const v = put('Varon', 'König im Exil', 0, -3, { varonKing: true, level: 26, greet: '„Ein König ohne Stadt. Sieh mich nicht so an.“' }); if (v) { v.equip.weapon = mkItem('longsword'); v.equip.chest = mkItem('plate_cuirass'); recalc(v); B.fullHeal(v); } }
   put('Brandt', 'Marschall', 3, -2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Ich führe, was vom Hof übrig ist. Viel ist es nicht.“' : '„Wir sind in einem Kontor untergekommen. Ein Kontor! Für den König!“' });
@@ -9546,15 +9624,48 @@ function ensureVaronExile() {
   put('Hagen', 'Schmied', 5, 1, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Den Amboss haben wir gerettet. Die Esse nicht.“' });
   for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3, sy + 2, 3); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { exileCourt: true, guard: true, transient: true, visitor: true, post: k }); S.ents.world.push(g); }
 }
+// Hof ohne Wiederkehr (Nutzer 02.10.2026: „Aldhelm und Varon getötet, aber nichts passiert“): Der Hof ist flüchtig und wurde bei jedem
+// Laden neu gebaut — erschlagene Hofleute standen wieder da, und der tote Kanzler blieb Reichsverweser. Jetzt merkt sich S.flags.courtDead,
+// wer tot ist. Der Kanzler war Aldhelm: Sein Tod beendet den Kult (wie in der Krypta). Reichsverweser nach dem König: Kanzler Aldhelm,
+// sonst Marschall Brandt, sonst der erste lebende Adlige; ist keiner mehr da, ist die Krone kopflos. Thronwirren: In den ersten
+// 7 Tagen nach dem Königsmord (kopflos: für immer) schickt niemand Ersatz für die Garde der Hauptstadt — eine schutzlose Hauptstadt
+// wird gesetzlos und dann übernommen (Totenheer in der Nähe oder eine Bande), wie jede andere Stadt. Mit lebendem König bleibt es beim
+// alten Entscheid: der Fall der Hauptstadt kommt nur über Morvath.
+const CROWN_TURMOIL = 7;
+const courtKey = (o, name) => o.varonChancellor ? 'aldhelm' : o.varonMarshal ? 'brandt' : o.varonSpy ? 'ysmay' : o.varonJailer ? 'grimm' : o.varonNoble != null ? 'noble' + o.varonNoble : o.smith ? 'hagen' : o.shop ? 'hofmar' : null;
+const courtGone = (o, name) => { const k = courtKey(o, name); return !!k && (S.flags.courtDead || []).includes(k); };
+function capRegent() {
+  const D = S.flags.courtDead || [], C = S.cult;
+  if (!D.includes('aldhelm') && !C?.aldhelmDead && C?.end !== 'destroyed' && C?.end !== 'player') return 'Kanzler Aldhelm';
+  if (!D.includes('brandt')) return 'Marschall Brandt';
+  const i = VARON_NOBLES.findIndex((_, j) => !D.includes('noble' + j) && !(S.flags.varonExecuted || []).includes(j) && !(S.flags.varonScattered || []).includes(j));
+  return i >= 0 ? VARON_NOBLES[i][0] : null;
+}
+const capCrownless = () => !!S.flags.varonDead && (!capRegent() || (S.day | 0) - S.flags.varonDead < CROWN_TURMOIL);
+function courtDeath(c, byP) {
+  const k = courtKey(c, c.name); if (!k) return; const D = (S.flags.courtDead ||= []); if (D.includes(k)) return; D.push(k);
+  if (k === 'aldhelm') {
+    log(`Kanzler Aldhelm ist tot.${byP ? ' In seinem Gemach findet man Blutphiolen und eine rote Maske.' : ''}`, 'quest');
+    if (S.cult && !S.cult.aldhelmDead) { S.cult.aldhelmDead = S.day | 0; if (S.cult.end !== 'player') { S.flags.blutsense ??= 'kanzler'; cultEnd('destroyed'); } }   /* die Sense liegt nur in der Krypta beim Blutfürsten */
+    if (byP) { S.factions.valen = clamp((S.factions.valen || 0) - 15, -100, 100); if (!S.flags.varonDead) addBounty('valen', 600, 'Mord am Kanzler'); }
+  }
+  if (!S.flags.varonDead) return;
+  const was = S.flags.varonRegent, now = capRegent() || 'niemand';
+  if (was === now) return;
+  S.flags.varonRegent = now;
+  if (now === 'niemand') afterSay('Die Krone ist kopflos', `${c.name} ist tot. Nach König Varon gibt es niemanden mehr, der das Reich führt. Kein Ersatz für die Garde, kein Befehl, kein Gesetz — Varonheim zerfällt, wenn die Wache fällt.`, 'war');
+  else afterSay(`${now} führt das Reich`, `${c.name} ist tot. ${now} führt jetzt als Reichsverweser. ${capCrownless() ? `Bis Tag ${S.flags.varonDead + CROWN_TURMOIL} herrschen Thronwirren: Die Hauptstadt bekommt keinen Ersatz für ihre Garde.` : ''}`, 'war');
+  if (S.schutz?.varonheim) schutzCheck('varonheim');
+}
 const varonBound = () => cultWar() || SIM.capitalFallen();   /* §5g.8 (Nutzer): Kult aktiv/herrschend oder Hauptstadt besetzt = Valen gebunden; ein toter König bindet nicht (Brandt führt) — wirkt ab T40 */
 // Varons Tod (Entwickler 01.10.2026, Scout #31): Szene mit stehender Welt (Glocken, Namenskarte, der Hof reagiert), dann Folgen —
 // Reichsverweser (Aldhelm, wenn der Kult nicht zerschlagen ist, sonst Marschall Brandt), Trauer in Varonheim, und wer den König
 // erschlug, wird gejagt: Kopfgeld der Krone, die Garde in Sichtweite greift an.
 function kingDeath(k, byP) {
-  const regent = S.cult?.end === 'destroyed' || S.cult?.end === 'player' || S.cult?.aldhelmDead ? 'Marschall Brandt' : 'Kanzler Aldhelm';   /* RB-044: nur ein lebender Aldhelm regiert */
+  const regent = capRegent() || 'niemand';   /* RB-044: nur ein lebender Aldhelm regiert; Nutzer 02.10.: tote Hofleute regieren nicht */
   S.flags.varonRegent = regent;
   if (byP) { addBounty('valen', 1500, 'Königsmord'); for (const g of S.ents[k.map] || []) if (g.kind === 'npc' && g.alive && g.guard && dist(g, k) < 600) { g.angry = true; g.aggroId = S.player.id; } }
-  afterSay(byP ? 'König Varon ist tot' : 'König Varon ist gefallen', `König Varon ist tot${k.exile ? ', gefallen im Exil' : ''}${byP ? ' — erschlagen von deiner Hand' : ''}. ${regent} führt ${k.exile ? 'was vom Hof übrig ist' : 'das Reich als Reichsverweser'}.${SIM.capitalFallen() ? '' : ' In Varonheim läuten die Glocken.'}${byP ? ' Die Krone setzt 1500 Gold auf deinen Kopf.' : ''}`, 'legend', false);   /* RB-045: eine Erzählung */
+  afterSay(byP ? 'König Varon ist tot' : 'König Varon ist gefallen', `König Varon ist tot${k.exile ? ', gefallen im Exil' : ''}${byP ? ' — erschlagen von deiner Hand' : ''}. ${regent} führt ${k.exile ? 'was vom Hof übrig ist' : 'das Reich als Reichsverweser'}.${SIM.capitalFallen() ? '' : ` In Varonheim läuten die Glocken. Thronwirren: ${CROWN_TURMOIL} Tage lang schickt niemand Ersatz für die Garde der Hauptstadt — fällt die Wache, zerfällt die Stadt.`}${byP ? ' Die Krone setzt 1500 Gold auf deinen Kopf.' : ''}`, 'legend', false);   /* RB-045: eine Erzählung */
   if (S._quiet || S.coop?.role === 'guest' || S.dying) return;
   const court = (S.ents[k.map] || []).filter(e => e.kind === 'npc' && e.alive && e !== k && dist(e, k) < 420).slice(0, 6), marshal = court.find(e => e.varonMarshal), body = { x: k.x, y: k.y };
   const run = () => cinematic([
@@ -9596,7 +9707,8 @@ function schutzLawless(k) {
 function westRim(k) { return townFac(k) === 'valen' && VILLAGES.some(V => V.key === k) && VILLAGES.some(V => V.tribute && V.key !== k && TOWN_PLAN[V.key] && townGap(k, V.key) <= 160); }
 function schutzOpen(k) { for (const e of S.ents.world) if (e.schutzShut === k) { e.shopClosed = 0; delete e.schutzShut; } S.ents.world = S.ents.world.filter(e => e.milizOf !== k && e.lawless !== k); }
 function schutzTake(k, force) {
-  const Z = schutzOf(k), day = S.day | 0, name = townName(k), sq = TOWN_PLAN[k]?.square; if (!sq || k === 'varonheim' || k === 'vharnholm' || TOWN_PLAN[k]?.lord === 'undead') return null;
+  const Z = schutzOf(k), day = S.day | 0, name = townName(k), sq = TOWN_PLAN[k]?.square; if (!sq || (k === 'varonheim' && !capCrownless()) || k === 'vharnholm' || TOWN_PLAN[k]?.lord === 'undead') return null;   /* Nutzer 02.10.: ohne König zerfällt auch die Hauptstadt */
+  if (k === 'varonheim' && !Z.decayTold) { Z.decayTold = 1; chronicle('Varonheim zerfällt', 'war', 'Kein König, keine Garde, kein Gesetz. Die Hauptstadt gehört dem, der sie nimmt.'); }
   const node = S.war?.nodes?.[k], a = (!force || force === 'undead') && node && node.owner !== 'undead' && SIM.armyNear(k, 'undead', 2);
   if (a) { a.order = k; a.lawOrder = true; Z.taker = { by: 'undead', id: a.id, day }; Z.stage = 4; const cut = Math.round(node.garrison * 0.7); node.garrison -= cut; Z.gcut = cut;
     afterSay(`Die Toten wenden sich gegen ${name}`, `Die Toten wittern die offenen Tore von ${name}. ${a.name || 'Ein Heer der Toten'} wendet sich dorthin.`, 'war'); return 'undead'; }
@@ -9731,14 +9843,16 @@ function ensureSchutz() {                                             /* Läden 
 }
 const SCHUTZ_REINF = { valen: [2, 3], aurel: [1, 2], chain: [2, 2], merch: [1, 1], order: [3, 2], undead: [1, 99] };   /* [Takt in Tagen, Mann] */
 function schutzBlocked(k, f) {
-  if (f === 'valen') return SIM.capitalFallen() || (S.war?.capThreat || 0) >= 15 || heldBy(k);   /* RB-054: der Kult allein bindet den Nachschub nicht */
+  if (f === 'valen') return SIM.capitalFallen() || (S.war?.capThreat || 0) >= 15 || heldBy(k) || (k === 'varonheim' && capCrownless());   /* Nutzer 02.10.: Thronwirren */   /* RB-054: der Kult allein bindet den Nachschub nicht */
   if (f === 'aurel') return heldBy('gelenkhall') || !!(S.after?.throne && !S.after.throne.until);
   if (f === 'chain') return !!S.flags.chainsBroken;
   if (f === 'merch') return growthOf(k).prosper < 0;
   if (f === 'order') return heldBy('sonnwacht');
   return false;
 }
-function schutzReinfText(k) { const f = townFac(k), R = SCHUTZ_REINF[f]; return !R ? 'Ersatz kommt nicht.' : schutzBlocked(k, f) ? `${FACTIONS[f]?.name || 'Der Herr'} schickt vorerst keinen Ersatz.` : `${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz (${R[1] >= 99 ? 'alle' : R[1]} Mann alle ${R[0] > 1 ? R[0] + ' Tage' : 'Tage'}).`; }
+function schutzReinfText(k) { const f = townFac(k), R = SCHUTZ_REINF[f];
+  if (k === 'varonheim' && f === 'valen' && capCrownless()) { const rg = capRegent(); return rg ? `Thronwirren: Bis ${rg} die Macht gesichert hat (Tag ${S.flags.varonDead + CROWN_TURMOIL}), schickt niemand Ersatz in die Hauptstadt.` : 'Ohne König und ohne Reichsverweser schickt niemand Ersatz. Die Hauptstadt zerfällt.'; }
+  return !R ? 'Ersatz kommt nicht.' : schutzBlocked(k, f) ? `${FACTIONS[f]?.name || 'Der Herr'} schickt vorerst keinen Ersatz.` : `${FACTIONS[f]?.name || 'Der Herr'} schickt Ersatz (${R[1] >= 99 ? 'alle' : R[1]} Mann alle ${R[0] > 1 ? R[0] + ' Tage' : 'Tage'}).`; }
 function schutzDay() {
   const day = S.day | 0; burgDay();
   for (const [k, Z] of Object.entries(S.schutz || {})) {
@@ -9808,13 +9922,13 @@ function ensureVaronCourt() {
   if (S.cult?.keyB) prop('portcullis', kan.x + kan.w - 3, kan.y + kan.h - 3, { portal: 'katakomben', cellarStair: true, r: 12, label: 'Treppe im Kanzleikeller — hinab' });   /* §5g.2 Eingang B */
   const [cx] = CAPITAL.keep, yard = CAPITAL.keep[1] - 3;
   prop('stall', cx - 10, yard, { solid: true, r: 12 }); prop('well', cx + 10, yard, { solid: true, r: 12 });
-  const put = (name, prof, tx, ty, o = {}) => { const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
+  const put = (name, prof, tx, ty, o = {}) => { if (courtGone(o, name)) return null; const q = freeSpotNear('world', tx, ty, 2) || { x: tx * TS + 16, y: ty * TS + 16 }; const c = makeChar({ name, prof, x: q.x, y: q.y, map: 'world', level: 12, faction: 'valen', traits: [o.trait || 'diszipliniert'],
     pal: { skin: pick(SKIN), hair: pick(HAIR), cloth: o.cloth || '#2a2a3a' } }); Object.assign(c, { varonCourt: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); delete c.trait; W.push(c); return c; };
   const tx = thr.x + (thr.w >> 1), ty = thr.y + 3;
   const fled = !!S.flags.varonFled;   /* S2: der König ist vorzeitig geflohen — der Hof mit ihm */
   if (!S.flags.varonDead && !fled) { const k = put('Varon', 'König', tx, ty, { varonKing: true, level: 26, cloth: '#1a1a1a', greet: '„Wer hat dich vorgelassen?“' }); k.equip.weapon = mkItem('longsword'); k.equip.chest = mkItem('plate_cuirass'); recalc(k); B.fullHeal(k); }
   if ((S.cult?.stage || 0) < 4 && !fled) put('Aldhelm', 'Kanzler', tx + 3, ty + 1, { varonChancellor: true, trait: 'ehrgeizig', greet: S.flags.varonDead ? '„Der König ist tot. Die Krone … nun, jemand muss sie halten.“' : '„Der König ist beschäftigt. Er ist immer beschäftigt. Was willst du?“' });
-  if (!fled) put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }).equip.weapon = mkItem('longsword');
+  if (!fled) { const b = put('Brandt', 'Marschall', tx - 4, ty + 2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Der König ist tot. Ich halte zusammen, was noch steht.“' : '„Die Toten stehen vor Nordfurt, und am Hof wird über Tischordnung gestritten.“' }); if (b) b.equip.weapon = mkItem('longsword'); }
   if (!fled) put('Ysmay', 'Spitzelmeisterin', kan.x + 3, kan.y + 5, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Jeder am Hof lügt. Ich finde nur heraus, wer es gefährlich tut.“' });
   VARON_NOBLES.forEach(([n, pr], i) => { if (fled || (S.flags.varonExecuted || []).includes(i) || (S.flags.varonScattered || []).includes(i)) return;
     put(n, pr, nob.x + 2 + i * 3, nob.y + 4 + (i % 2), { varonNoble: i, trait: pick(['ehrgeizig', 'gierig', 'stolz']), cloth: ['#3a2a4a', '#4a1a2a', '#2a3a2a'][i], greet: ['„Der König hört zu, wenn man laut genug flüstert.“', '„Ein Ball wäre angemessener als ein Krieg, meinst du nicht?“', '„Nordfurt gehört eigentlich mir. Frag den Kanzler.“'][i] }); });
@@ -12828,7 +12942,7 @@ function dayTick() {
   if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01) : Math.min(1, S.tollMul + 0.01);   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
   save();
   log(`Tag ${S.day} bricht an.`, 'world');
-  for (const town of Object.keys(TOWN_PLAN)) if (festDay(town)) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
+  for (const town of Object.keys(TOWN_PLAN)) if (festDay(town) && (S.schutz?.[town]?.stage || 0) < 2) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town, (S.day | 0) + 1)) log(`Morgen feiert ${townName(town)} sein Stadtfest.`, 'world');
 }
 
@@ -13284,6 +13398,8 @@ function talk(npc) {
   if ((npc.prof === 'Richterin' || npc.prof === 'Gerichtsschreiber') && npc.homeTown === 'aurelheim') return holyCourt(npc);   // Nutzer S13: Heiliges Gericht
   if (npc.skyRuler === 'rat' && ((S.ranks.aurel ?? 0) >= 6 || isCouncillor())) return corvanTalk(npc);   // Nutzer S13: Hoher Rat
   if (npc.fleeing || npc.afraid > now) return npcShun(npc, '„Bleib weg von mir!“', 'angst');
+  if (!npc.guard && npc.fear && !S.party.includes(npc.id)) { const f = fearOf(npc), byP = fearByPlayer(npc);   /* Angst */
+    if (f >= 75 || (f >= 50 && byP)) return UI.dialogue(npc, byP ? (f >= 75 ? '„Nein! Nein, bitte! Ich hab Kinder! Bleib weg!“' : '„Ich … ich hab nichts gesehen. Lass mich. Bitte.“') + ` (${npc.name} ist ${FEAR_NAME[fearStage(f)]}.)` : '„Nicht jetzt! Da draußen … hast du nicht gesehen, was passiert ist?“', leave); }
   if (npc.threatId && byId(npc.threatId)?.alive) return npcShun(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', 'ausruf');
   if (npc.kind === 'npc' && !npc.robot) { if (rel >= 30) emote(npc, 'freude', 1400); else if (rel <= -20) emote(npc, 'zorn', 1400); }
   if (pactBound() && npc.faction === 'order')                // Folge des Paktes: der Orden spricht nicht mit den Toten
@@ -17579,6 +17695,11 @@ function debugSections() {
     }],
     ['Kerker', '', {
       'Ins Gefängnis': () => { toWorld(); goToJail('valen', 200, nearTown()); },
+      'Kopfgeld Valen = 200 000 (schweres Verbrechen)': () => { (S.bounty ||= {}).valen = 200000; UI.toast('Kopfgeld 200 000 — eine Wache ansprechen lassen'); },
+      'Ins Gefängnis (200 000, Bußgeld voll bezahlt)': () => { toWorld(); S.gold = Math.max(S.gold, crimeFine(200000)); goToJail('valen', 200000, nearTown()); },
+      'Ins Gefängnis (200 000, ohne Gold)': () => { toWorld(); S.gold = 0; goToJail('valen', 200000, nearTown()); },
+      'Angst: Zeugen ringsum +25 (vor dir)': () => { for (const w of S.ents[S.map]) if (w.kind === 'npc' && w.alive && !w.guard && !S.party.includes(w.id) && dist(w, p) < 600) { w.fear = Math.min(100, fearOf(w) + 25); w.fearBy = p.id; w.fearSeen = clock(); } UI.toast('Angst +25'); },
+      'Angst: alle beruhigen': () => { for (const w of Object.values(S.ents).flat()) if (w.fear) { w.fear = 0; w.fearBy = null; } UI.toast('Alle ruhig'); },
       'Dietriche = 3': () => { if (S.jail) S.jail.picks = 3; else UI.toast('Nicht im Kerker'); },
       'Schloss knacken (nächste Tür)': () => { const d0 = S.ents[S.map].filter(x => x.cellDoor != null).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (d0 && S.jail) pickCell(d0); else UI.toast('Keine Zellentür / nicht im Kerker'); },
       'Freilassen': () => { if (S.jail) { S.jail.until = clock(); jailTick(); } },
@@ -17621,6 +17742,8 @@ function debugSections() {
       'Stadt ohne Schutz: Plünderer jetzt': () => { const k = townAt(p.x / TS | 0, p.y / TS | 0, 4), Z = k && S.schutz?.[k]; if (!Z || Z.stage !== 3) return UI.toast('Keine gesetzlose Stadt hier.'); delete Z.lawN; lawlessHour(23); },
       'Burgwache töten (als Spieler)': () => { for (const g of courtEnts().filter(e => e.guard && e.alive)) die(g, 'Debug', p); UI.toast(`Burgwache: ${S.schutzBurg?.lost || 0} tot${S.flags.varonFled ? ', König geflohen' : ''}`); },
       'König-Flucht zurücksetzen': () => { if (S.flags.varonFled) { S.flags.varonEvac = S.flags.varonFled.evac0; delete S.flags.varonFled; } S.schutzBurg = { lost: 0, byP: 0 }; ensureVaronExile(); ensureVaronCourt(); UI.toast('Hof wieder in der Burg'); },
+      'Varonheim: König, Kanzler und Garde töten': () => { const W = S.ents.world; for (const e of W.filter(e => e.kind === 'npc' && e.alive && ((e.guard && e.post === 'varonheim' && !e.varonCourt) || (e.varonCourt && (e.varonKing || e.varonChancellor))))) die(e, 'Debug', p); UI.toast(`Reichsverweser: ${S.flags.varonRegent || '—'}`); },
+      'Varonheim: Hof wiederbeleben (courtDead leeren)': () => { delete S.flags.courtDead; delete S.flags.varonDead; delete S.flags.varonRegent; ensureVaronCourt(); UI.toast('Hof steht wieder'); },
       'Stadt ohne Schutz: zurücksetzen (alle)': () => { for (const k of Object.keys(S.schutz || {})) { S.schutz[k].lost = 0; schutzCheck(k); } S.schutz = {}; },
       'Gesprächig: alle NPCs (Schalter)': () => { S.flags.allTalk = S.flags.allTalk ? 0 : 1; UI.toast(S.flags.allTalk ? 'Alle reden' : 'Nur wer etwas zu sagen hat'); },
       'Gesten vorführen (Held)': () => { const G = ['salutieren', 'jubeln', 'trauern', 'knien', 'zeigen']; G.forEach((g, i) => setTimeout(() => { gesture(p, g, 1300); float(p, g, 'rgba(230,220,180,ALPHA)'); }, i * 1500)); },
@@ -22001,6 +22124,50 @@ export function selftest() {
       p.equip.weapon = mkItem('blutsense'); p.equip.weapon.afx = null; const w = spawnEnemy('wolf', '__a', 11, 9); w.x = p.x + 20; w.y = p.y; B.damagePart(p, 'torso', 20); const hb = p.hp; seedRng(3); hit(p, w, 1); const healed = p.hp > hb;
       return once && healed;
     } finally { S.cult = C0; S.flags = f0; Object.assign(S.factions, fa0); S.ents.world = W0; }
+  }));
+  ok('Angst (Nutzer 02.10.): Zeugen sammeln Angst je Toten (gesehen 18, gehört 6), ab 50 kein Gespräch mit dem Täter, ab 75 Flucht; bleibt, solange die Gefahr da ist, klingt danach 12/Stunde ab; tote Bestien erschrecken niemanden', sandbox(() => {
+    const p = stage(), w = actor(400, 300, { faction: null }), far = actor(300, 900, { faction: null }), killer = spawnEnemy('bandit', '__a', 12, 10);
+    for (const c of [w, far]) { c.traits = []; c.brave = false; c.fear = 0; }
+    const kill = () => { const v = actor(380, 320, { faction: null }); die(v, 'Probe', killer); };
+    kill(); const one = Math.round(fearOf(w)) === 18 && Math.round(fearOf(far)) === 6 && w.fearBy === killer.id;
+    const wolf = spawnEnemy('wolf', '__a', 12, 11); const f0 = fearOf(w); die(wolf, 'Probe', p); const beast = fearOf(w) === f0;
+    kill(); kill(); kill(); kill(); const panic = fearOf(w) >= 75 && fearStage(fearOf(w)) === 3;
+    UI.closeDialogue(); w.afraid = 0; w.fleeing = false; talk(w); const refuse = /Nicht jetzt/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
+    killer.x = w.x - 40; killer.y = w.y; const d0 = dist(w, killer); for (let i = 0; i < 20; i++) updateNpc(w, 16); const flees = dist(w, killer) > d0 + 10;
+    const f1 = fearOf(w); for (let i = 0; i < 10; i++) { S.minute += 6; updateNpc(w, 16); } const stays = fearOf(w) >= f1 - 0.5;
+    killer.map = '__b'; const f2 = fearOf(w); S.minute += 120; const fades = Math.abs(f2 - fearOf(w) - 24) < 0.5;
+    w.fear = 60; w.fearBy = p.id; w.fearSeen = clock(); talk(w); const byP = /nichts gesehen/.test(document.getElementById('dlg-text')?.textContent || ''); UI.closeDialogue();
+    if (!(one && beast && panic && refuse && flees && stays && fades && byP)) console.log('Angst-Probe', JSON.stringify({ one, beast, panic, refuse, flees, stays, fades, byP, w: fearOf(w), far: fearOf(far) }));
+    return one && beast && panic && refuse && flees && stays && fades && byP;
+  }));
+  ok('Schwere Verbrechen (Nutzer 02.10.): ab 2000 Gold kein Freikaufen — Bußgeld 10 %, Haft 20–40 h (2000) bis 60–120 h (200 000, 1–2 h Echtzeit), je nach gezahltem Bußgeld; darunter wie bisher', sandbox(() => {
+    const p = stage(), r0 = S.resist, g = guardChar('valen', { x: 330, y: 300 }, 'Wache', 5); g.map = '__a'; g.guard = true; S.ents.__a.push(g);
+    try { S.resist = null; S.flags.bann = {}; S.bounty = { valen: 200000 }; S.gold = 300000; S.flags.arrestCd = 0; arrestCheck(g, p, 16);
+      const btn = [...document.querySelectorAll('#dlg-choices button')].map(b => b.textContent); UI.closeDialogue();
+      const noBuy = !btn.some(t => /^Zahlen/.test(t)) && btn.some(t => /Bußgeld 20000/.test(t) && /60 Stunden/.test(t));
+      S.bounty = { valen: 500 }; S.flags.arrestCd = 0; arrestCheck(g, p, 16); const buy = [...document.querySelectorAll('#dlg-choices button')].some(b => /^Zahlen \(500/.test(b.textContent)); UI.closeDialogue();
+      const [a0, a1] = jailHours(1999), [b0, b1] = jailHours(2000), [c0, c1] = jailHours(200000);
+      const math = a1 === 20 && b0 === 20 && b1 === 40 && c0 === 60 && c1 === 120 && jailHours(20000)[1] === 80 && crimeFine(1999) === 0 && crimeFine(200000) === 20000
+        && jailHoursPaid(200000, 20000) === 60 && jailHoursPaid(200000, 0) === 120 && jailHoursPaid(200000, 10000) === 90 && jailHoursPaid(400, 0) === 20;
+      if (!(noBuy && buy && math)) console.log('Verbrechen-Probe', JSON.stringify({ noBuy, buy, math, btn }));
+      return noBuy && buy && math;
+    } finally { S.resist = r0; }
+  }));
+  ok('Hof ohne Wiederkehr (Nutzer 02.10.): tote Hofleute bleiben tot; Kanzlertod beendet den Kult (ohne Sense); Reichsverweser Aldhelm → Brandt → Adel → niemand; Thronwirren 7 Tage; ohne König wird die schutzlose Hauptstadt übernommen, mit König nie; kein Fest nach dem Königsmord', sandbox(() => {
+    const p = stage(), f0 = structuredClone(S.flags), C0 = S.cult ? structuredClone(S.cult) : null, Z0 = structuredClone(S.schutz || {}), W0 = S.ents.world, BA = structuredClone(S.bands || []), WAR = structuredClone(S.war), fa0 = { ...S.factions }; S.ents.world = W0.slice();
+    try { const day = S.day | 0; S.cult = { stage: 0, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; delete S.flags.courtDead; delete S.flags.varonFled; delete S.flags.blutsense; delete S.flags.varonExecuted; delete S.flags.varonScattered;
+      S.flags.varonDead = day; S.flags.varonRegent = 'Kanzler Aldhelm'; p.inv = [];
+      courtDeath({ varonChancellor: true, name: 'Aldhelm' }, true); const kanz = S.flags.varonRegent === 'Marschall Brandt' && S.cult.end === 'destroyed' && !p.inv.some(i => i?.key === 'blutsense');
+      courtDeath({ varonMarshal: true, name: 'Brandt' }, true); const noble = S.flags.varonRegent === VARON_NOBLES[0][0];
+      ensureVaronCourt(); const gone = !courtEnts().some(e => e.varonMarshal || e.varonChancellor);
+      for (const j of [0, 1, 2]) courtDeath({ varonNoble: j, name: 'x' }, true); S.day = day + 30; const headless = S.flags.varonRegent === 'niemand' && capCrownless();
+      S.flags.courtDead = ['aldhelm']; S.day = day + 3; const turm = capCrownless() && !festDay('varonheim', day + 3); S.day = day + 8; const over = !capCrownless();
+      S.day = day + 3; S.war.armies = []; S.bands = []; const prep = () => { S.schutz = { varonheim: { lost: 10, byP: 0, stage: 3, since: day, at: day, reinf: day } }; };
+      prep(); const taken = schutzTake('varonheim') === 'band' && S.schutz.varonheim.stage === 4;
+      delete S.flags.varonDead; S.bands = []; prep(); const kingSafe = schutzTake('varonheim') === null;
+      if (!(kanz && noble && gone && headless && turm && over && taken && kingSafe)) console.log('Hof-Probe', JSON.stringify({ kanz, noble, gone, headless, turm, over, taken, kingSafe, rg: S.flags.varonRegent }));
+      return kanz && noble && gone && headless && turm && over && taken && kingSafe;
+    } finally { S.flags = f0; S.cult = C0; S.schutz = Z0; S.ents.world = W0; S.bands = BA; S.war = WAR; Object.assign(S.factions, fa0); ensureVaronCourt(); ensureVaronExile(); }
   }));
   ok('E2: Karawanentod legt eine Täterbande mit Beute an, der Kutscher nennt sie, Anführer tot → Kiste mit der Ladung; die Karawane selbst überfallen → keine Bande, Händler −10', sandbox(() => {
     const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, f0 = structuredClone(S.flags), g0 = S.gold; S.ents.world = W0.slice();

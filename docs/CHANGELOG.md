@@ -6,6 +6,12 @@ Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHA
 - Hunt-1-Fehler HB-06 bis HB-23 behoben (Mönch-Aufträge, Weißbarts Ansprechbarkeit, Varon-Königsauftrag, Eisenmark-Pferch/Tributzug, Schuldprüfung bei befreiten Städten, Wohlstand ohne Schutz, Heiler sieht Gliedverletzungen, Schadens-Böden heben Bewusstlose nicht mehr an, Bruch/Prothese, Medizin heilt kein Messing, abgetrennte Glieder, Betriebsverlust, Kult-Doppelgänger, Zweiwaffen mit ausgefallenem Arm, kein Selbstheilen am Boden, Kette/Grubenstämme-Rang). Details: `ROTFALL_STATE/hunt/BERICHT.md`.
 - Offen (keine eigenmächtige Designentscheidung): HB-10 (Rotfall/Omega-Belohnung), HB-20 (welche Bindungen ein Erbe übernimmt).
 
+## Version 24 — 2026-10-02 (Angst, schwere Verbrechen, Zerfall der Hauptstadt)
+- Angst: Bürger sammeln Angst je gesehenem Toten; unruhig, verängstigt (verstecken sich, reden nicht) und Panik (fliehen schreiend), bis die Gefahr fort ist.
+- Schwere Verbrechen ab 2000 Gold: kein Freikaufen, Bußgeld und Haft bis 120 Spielstunden (200 000 Gold); Haftanzeige in Stunden statt fälschlich Minuten.
+- Varonheim: erschlagene Hofleute bleiben tot, Kanzlertod beendet den Kult, Reichsverweser rückt nach; Thronwirren lassen die Hauptstadt ohne König zerfallen und übernehmen.
+- Menüs: Reiter in Charakter- und Fraktionsfenster nicht mehr zusammengequetscht; Stylesheet mit Cache-Schlüssel.
+
 ## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)
 - Varonsburg in der Welt begehbar (Thronsaal, Adelsflügel, Kanzlei, Verlies, Kronschmiede), Viertel-Architektur in Varonheim, Karawanen-Absturz bei alter Route behoben.
 - Spielstand rund 20× kleiner (komprimiert), Speichern gebündelt; Seuchen-Fehler (14 000 Props im Stand) behoben; Slotwechsel und andere Tabs sicher.

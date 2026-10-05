@@ -1407,3 +1407,33 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kampfanimation Ausrollen (04.10., Entwickler: „baue für mehr Waffenarten Animationen“):** Axt, Streitkolben/Flegel, Stangenwaffe (Hellebarde, Sense, Glefe), Rapier, Peitsche und Stab haben jetzt eigene Angriffsprofile mit drei Formen, Pack A/B/C und Ganzkörperposen — vorher liefen sie auf den alten Kurven. Axt: Hack von oben (steckt kurz), Querhack, Spalter. Kolben: Seitwärts, Überkopf, Rundum-Wirbel. Stange: weiter Schwung, Stoß, Rundfegen. Rapier: Ausfall, Riposte, Schnitt. Peitsche: Knall von oben, Querzug, Doppelknall. Stab: Schwung, Stoß, Wirbel. Wirbel-Formen treffen rundum (Animation = Spiel). Zeiten vorläufig. Alle Klassen stehen im Combat Test Room (Debug).
 
 - **Gewicht in der Kampfanimation (04.10., Entwickler: „Waffen wirken leicht“):** Jede Klasse hat ein Gewicht (Dolch 0 … Kriegshammer 1,2). Je schwerer: das Ausholen erreicht die Endlage früher und wird gehalten (Anticipation), der Hieb beschleunigt wie eine Peitsche (erst langsam, dann schlagartig), die Klinge schwingt nach dem Einschlag bis 35 % über die Endlage hinaus und pendelt zurück, die Erholung beginnt später und läuft langsamer, der Körper sinkt im Einschlag nach und der Kopf nickt. Quellen: slynyrd Pixelblog 9 (Melee Attacks), GDKeys „Anatomy of an Attack“, 12 Animationsprinzipien. Werte vorläufig.
+
+## Angst (Version 24)
+- Jeder Bürger hat einen Angstwert von 0 bis 100. Jeder Tote, den er sieht, bringt +18, wer es nur hört (gleicher Ort), +6. Tapfere und grausame Leute fürchten sich halb so stark. Wachen fürchten sich nicht.
+- **Ab 25 unruhig:** hält Abstand zum Täter, Gespräche drehen sich um die Toten.
+- **Ab 50 verängstigt:** versteckt sich im Haus, plaudert nicht mehr und redet nicht mit dem Täter.
+- **Ab 75 Panik:** rennt schreiend davon, sobald die Gefahr näher als etwa 20 Schritte kommt; redet mit niemandem.
+- Die Angst bleibt, solange die Gefahr (du oder ein Feind) lebt und in der Nähe ist. Erst wenn sie fort ist, sinkt sie um 12 je Spielstunde.
+- Wer einen Angreifer erschlägt, macht niemandem Angst; tote Tiere und Monster auch nicht.
+- Das Log meldet, wenn ein Ort Angst vor dir hat oder in Panik gerät; im Gespräch steht der Zustand dabei.
+- Debug: „Angst: Zeugen ringsum +25 (vor dir)“, „Angst: alle beruhigen“.
+
+## Schwere Verbrechen (Version 24)
+- Ab 2000 Gold Kopfgeld kauft man sich bei der Festnahme nicht mehr frei. Die Wache zieht ein Bußgeld ein (10 % des Kopfgelds, mindestens 200), so weit dein Gold reicht, und du kommst in den Kerker.
+- Die Haft wächst mit dem Kopfgeld: 2000 Gold 20–40 Stunden, 20 000 Gold 40–80, 200 000 Gold 60–120 Stunden. Ganz bezahlt sitzt du die untere Zahl, ohne Gold die obere. Eine Spielstunde dauert eine Minute: 200 000 Gold heißt 1–2 Stunden Echtzeit.
+- Keine Kaution. Bestechen kostet 400 Gold und klappt nur in 20 % der Fälle. Schloss knacken und Ausbruch gehen wie immer.
+- Unter 2000 Gold bleibt alles wie bisher (zahlen oder 10–20 Stunden).
+- Die Haftanzeige sagt jetzt richtig „Stunden“ (vorher stand dort fälschlich „Minuten“).
+- Debug: „Kopfgeld Valen = 200 000“, „Ins Gefängnis (200 000, Bußgeld voll bezahlt / ohne Gold)“.
+
+## Hof ohne Wiederkehr und Zerfall der Hauptstadt (Version 24)
+- Erschlagene Hofleute (Kanzler Aldhelm, Marschall Brandt, Ysmay, Grimm, die drei Adligen, Hagen, Hofmar) bleiben tot, auch nach dem Laden.
+- Kanzler Aldhelm war der Blutfürst. Stirbt er als Kanzler, endet der Kult. Die Blutkult-Sense gibt es dann nicht, sie liegt nur beim Blutfürsten in der Krypta.
+- **Reichsverweser** nach König Varon: Kanzler Aldhelm, sonst Marschall Brandt, sonst der erste lebende Adlige. Ist keiner mehr da, ist die Krone kopflos.
+- **Thronwirren:** In den 7 Tagen nach dem Königsmord schickt niemand Ersatz für die Garde von Varonheim (ist die Krone kopflos, nie mehr). Fällt die Garde, wird die Hauptstadt schutzlos, nach der Frist gesetzlos und dann übernommen: von einem Totenheer in der Nähe oder einer Bande. Wer den Bandenführer erschlägt, befreit die Stadt.
+- Lebt der König, bleibt es beim alten Entscheid: Varonheim wird nie von einer Bande übernommen, der Fall kommt nur über Morvath.
+- Kein Stadtfest in einer schutzlosen Stadt und in Varonheim in den 7 Tagen nach dem Königsmord.
+- Debug: „Varonheim: König, Kanzler und Garde töten“, „Varonheim: Hof wiederbeleben“.
+
+## Menüs (Version 24)
+- Die Reiter oben in den Fenstern (Werte, Talente, Zauber, Effekte; Fraktionen, Chronik) haben wieder Platz und brechen nicht mehr um.
