@@ -8412,7 +8412,7 @@ function investMenu(town) {
   UI.dialogue(me, `Wohlstand ${Math.round(G.prosper)}/100 · ${G.built.filter(s => !s.ruin).length} neue Häuser.\n${state}\nDer Wohlstand steigt jeden Tag im Frieden; Überfälle und Besatzung senken ihn.`, [
     { text: 'Wohnhaus bauen (120 Gold, 20 Holz)', fn: pay(120, { wood: 20 }, () => !!growTown(town, 'house')) },
     { text: 'Werkstatt bauen (220 Gold, 30 Holz, 15 Stein)', fn: pay(220, { wood: 30, stone: 15 }, () => !!growTown(town, G.built.length % 2 ? 'smithy' : 'bakery')) },
-    { text: 'Handel fördern (100 Gold): Wohlstand +25', fn: G.prosper >= 100 ? () => UI.toast('Der Wohlstand ist schon voll.') : pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); log(`${townName(town)}: Der Handel blüht auf.`, 'economy'); if (G.prosper >= 100 && !growNow(town)) log(`${townName(town)}: Wohlstand voll, aber ${G.full === 'max' ? 'die Stadt ist ausgebaut' : 'kein Bauplatz frei'}.`, 'economy'); }) },
+    { text: `Handel fördern (100 Gold): Wohlstand +25, ${ECO.TRADE_BOOST_DAYS} Tage 20 % mehr Ware je Karawane${(G.tradeUntil || 0) > (S.day | 0) ? ` (läuft noch ${G.tradeUntil - (S.day | 0)} Tage)` : ''}`, fn: G.prosper >= 100 && (G.tradeUntil || 0) > (S.day | 0) ? () => UI.toast('Der Wohlstand ist schon voll und der Handel gefördert.') : pay(100, {}, () => { G.prosper = Math.min(100, G.prosper + 25); G.tradeUntil = (S.day | 0) + ECO.TRADE_BOOST_DAYS; log(`${townName(town)}: Der Handel blüht auf — ${ECO.TRADE_BOOST_DAYS} Tage lang bringen Karawanen 20 % mehr Ware.`, 'economy'); if (G.prosper >= 100 && !growNow(town)) log(`${townName(town)}: Wohlstand voll, aber ${G.full === 'max' ? 'die Stadt ist ausgebaut' : 'kein Bauplatz frei'}.`, 'economy'); }) },
     { text: 'Wache verstärken (150 Gold, 10 Eisen)', fn: pay(150, { iron: 10 }, () => { const P = TOWN_PLAN[town], s = freeSpotNear('world', P.square[0] + 2, P.square[1] + 2, 3), g = guardChar(GUARD_KIT[fac] ? fac : 'merch', s); Object.assign(g, { guard: true, post: town, invested: true }); S.ents.world.push(g); log(`${townName(town)} hat eine Wache mehr.`, 'world'); }) },
     { text: '[Gehen]', fn: () => UI.closeDialogue() },
   ]);
@@ -15535,14 +15535,32 @@ function ecoMenu(npc, town) {
   const biz = E.biz.filter(b => b.town === town).length, my = E.my;
   UI.dialogue(me, `Knapp und teuer: ${list(g => (t.use[g] || 0) > 0.1 && t.stock[g] < ECO.target(t, g) * 0.5)}\n` +
     `Reichlich und billig: ${list(g => t.stock[g] > ECO.target(t, g) * 1.5)}\n` +
-    (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
+    (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (ECO.tradeMul(town) > 1 ? `\nGeförderter Handel: Karawanen bringen noch ${growthOf(town).tradeUntil - (S.day | 0)} Tage 20 % mehr Ware.` : '') + (t.hunger ? '\nDie Stadt hungert.' : ''), [
     { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
     { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
+    { text: 'Vorrat liefern (Holz, Stein, Eisen, Nahrung aus der Siedlung)', fn: () => supplyMenu(npc, town) },   /* Nutzer 05.10. */
     { text: my ? `Dein Handelswagen (${my.to ? 'unterwegs nach ' + ECO.townName(my.to) : 'in ' + ECO.townName(my.at)})` : `Handelswagen kaufen (${ECO.WAGON_COST} Gold)`, fn: () => wagonMenu(npc, town) },
     { text: `Betriebe in ${ECO.townName(town)} (${biz})`, fn: () => bizMenu(npc, town) },
     { text: `Lieferaufträge (${E.orders.length})`, fn: () => ordersMenu(npc, town) },
     { text: 'Zurück', fn: () => talk(npc) },
   ]);
+}
+/* Nutzer 05.10.2026: Siedlungs-Vorrat an die Stadt liefern — Holz, Stein, Eisen, Nahrung wandern als Ware ins Stadtlager (Betriebe nutzen sie als Vorprodukt),
+   bezahlt zum Verkaufspreis des Orts. Prüfung in der Aktion (Vorrat, Ort), Akteur zuerst. */
+const RES_GOOD = { wood: 'timber', stone: 'stoneware', iron: 'ingot', food: 'grain' }, RES_NAME = { wood: 'Holz', stone: 'Stein', iron: 'Eisen', food: 'Nahrung' };
+function supplyTown(c, town, res, n) {
+  const g = RES_GOOD[res], t = S.towns?.[town]; if (!g || !t?.stock || !(n > 0)) return false;
+  if ((S.res[res] || 0) < n) { UI.toast(`So viel ${RES_NAME[res]} hast du nicht im Vorrat.`); return false; }
+  if (S.war?.nodes?.[town]?.owner === 'undead' || S.razed?.[town]) { UI.toast('Hier nimmt niemand Ware an.'); return false; }
+  const gold = n * ECO.ecoPrice(town, g, false);
+  S.res[res] -= n; t.stock[g] = (t.stock[g] || 0) + n; S.gold += gold; c.skills.trading = Math.min(100, (c.skills.trading || 0) + 0.3);
+  log(`${n} ${RES_NAME[res]} an ${townName(town)} geliefert: +${gold} Gold. Das Lager führt jetzt ${Math.round(t.stock[g])} ${ITEMS[g].name}.`, 'economy'); return true;
+}
+function supplyMenu(npc, town) {
+  const t = S.towns[town], opts = Object.keys(RES_GOOD).filter(r => (S.res[r] || 0) >= 1).map(r => { const n = Math.min(10, S.res[r] | 0), g = RES_GOOD[r], short = t.stock[g] < ECO.target(t, g) * 0.5;
+    return { text: `${n} ${RES_NAME[r]} liefern → ${ITEMS[g].name} (je ${ECO.ecoPrice(town, g, false)} Gold${short ? ', gesucht' : ''})`, fn: () => { supplyTown(S.player, town, r, n); UI.refreshHUD(); supplyMenu(npc, town); } }; });
+  UI.dialogue({ name: `Lieferung — ${ECO.townName(town)}` }, opts.length ? `Dein Vorrat: ${Object.keys(RES_GOOD).map(r => `${S.res[r] | 0} ${RES_NAME[r]}`).join(', ')}. Was die Stadt bekommt, nutzen ihre Betriebe als Vorprodukt; was knapp ist, zahlt besser.` : 'Dein Vorrat ist leer — Holz, Stein, Eisen und Nahrung aus der Siedlung lassen sich hier liefern.',
+    [...opts, { text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
 }
 function ecoPrices(npc, town) {
   const seen = Object.entries(S.priceSeen || {}).filter(([k]) => S.towns[k]);
@@ -23529,6 +23547,22 @@ export function selftest() {
     const okAll = onSq <= 45 && onSq >= 10 && inTown && freeGround && spots >= 8 && village; if (!okAll) console.warn('Hauptplatz-Probe', JSON.stringify({ n: res.length, onSq, inTown, freeGround, spots, village }));
     return okAll;
   })());
+  ok('Betriebe (Nutzer 05.10.): Vorrat liefern füllt das Stadtlager und zahlt; ohne Vorrat nichts; „Handel fördern“ setzt zehn Tage 20 % Karawanenbonus (tradeMul)', sandbox(() => {
+    const st0 = structuredClone(S.towns.eren.stock), res0 = { ...S.res }, g0 = S.gold, gr0 = structuredClone(S.growth || {}), d0 = S.day, own0 = S.war?.nodes?.eren?.owner, rz0 = S.razed?.eren; const p = stage(); const W = {};
+    const op = UI.uiHooks.dialogue; let last = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+    try {
+      if (S.war?.nodes?.eren) S.war.nodes.eren.owner = 'valen'; if (S.razed) delete S.razed.eren;   /* frühere Proben können Eren besetzt oder zerstört hinterlassen */
+      S.res.wood = 12; S.res.iron = 0; const t0 = S.towns.eren.stock.timber, g1 = S.gold, pr = ECO.ecoPrice('eren', 'timber', false);   /* Preis vor der Lieferung (danach ist das Lager voller) */
+      const rr = supplyTown(p, 'eren', 'wood', 10); W.sold = rr === true && S.res.wood === 2 && S.towns.eren.stock.timber === t0 + 10 && S.gold === g1 + 10 * pr; if (!W.sold) console.warn('Betriebe-Probe sold', JSON.stringify({ rr, wood: S.res.wood, t0, t1: S.towns.eren.stock.timber, g1, g2: S.gold, pr }));
+      W.none = supplyTown(p, 'eren', 'iron', 5) === false && S.towns.eren.stock.ingot === st0.ingot;
+      supplyMenu({ name: 'x' }, 'eren'); W.menu = Array.isArray(last) && last.some(o => /2 Holz liefern/.test(o.text)) && !last.some(o => /Eisen liefern/.test(o.text));
+      S.growth = {}; S.gold = 500; growthOf('eren').prosper = 30; investMenu('eren'); const f = last.find(o => /^Handel fördern/.test(o.text)); f.fn();
+      W.boost = growthOf('eren').tradeUntil === (S.day | 0) + ECO.TRADE_BOOST_DAYS && ECO.tradeMul('eren') === ECO.TRADE_BOOST && growthOf('eren').prosper === 55 && S.gold === 400;
+      S.day = d0 + ECO.TRADE_BOOST_DAYS; W.over = ECO.tradeMul('eren') === 1; S.day = d0;
+      const okAll = W.sold && W.none && W.menu && W.boost && W.over; if (!okAll) console.warn('Betriebe-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; S.towns.eren.stock = st0; Object.assign(S.res, res0); S.gold = g0; S.growth = gr0; S.day = d0; delete S.investDay?.eren; if (S.war?.nodes?.eren && own0 !== undefined) S.war.nodes.eren.owner = own0; if (rz0 !== undefined) (S.razed ||= {}).eren = rz0; UI.closeDialogue(); }
+  }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
@@ -23792,7 +23826,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
