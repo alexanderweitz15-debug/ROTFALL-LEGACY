@@ -397,7 +397,7 @@ function resolveNode(node) {
   let att = null, def = null;
   if (und && val) { att = und; def = val; }
   else if (und && hostile('undead', owner)) { att = und; def = garrisonArmy(node); }
-  else if (val && owner === 'undead') { att = val; def = garrisonArmy(node); }
+  else if (val && owner === 'undead') { if (val.patrol && !S.towns[node]) return; att = val; def = garrisonArmy(node); }   /* Streifen räumen keine Gruft-Knoten */
   else if ((und || val) && !owner) { if ((und || val).patrol) return; capture(node, (und || val).faction); return; }   /* Streifen nehmen keine leeren Knoten */
   if (!att) return;
   if (def.strength <= 0) { capture(node, att.faction); return; }
@@ -431,6 +431,7 @@ function afterBattle(node, win, lose) {
       if (!n.walls) { n.walls = 15; log('Der Sturm auf Varonheim ist abgeschlagen. Die Toten weichen von der Bresche.', 'faction'); H.toast('VARONHEIM HÄLT STAND'); } }
   }
   if (win.garrison) return;
+  if (win.patrol && !S.towns[node] && n.owner === 'undead') { cleanupArmies(); return; }   /* Streife schlägt ein Heer am Friedhof, nimmt die Gruft aber nicht (die Toten brauchen ihren Ausgangspunkt) */
   capture(node, win.faction);
   cleanupArmies();
 }
@@ -497,7 +498,8 @@ export const RELIEF = { days: 3, strength: 40, hold: 5, every: 6 };
    Fällt es, wird es nach `every` Tagen neu aufgestellt — solange Varonheim steht (Valen) bzw. die Kette nicht gebrochen ist. Die Toten
    marschieren erst ab Tag WAR_GRACE (davor sammeln sie sich): keine Eroberung am ersten Tag. */
 export const PATROL = { valen: { base: 'varonheim', route: ['northcity', 'road', 'eren', 'kreuzweg', 'ashford'], strength: 35, name: 'Garde-Streife aus Varonheim' },
-  chain: { base: 'road', route: ['road', 'marsh', 'fortress', 'ruins', 'eren'], strength: 35, name: 'Kettenstreife aus der Eisenfeste' } }, PATROL_EVERY = 4, WAR_GRACE = 5;
+  chain: { base: 'road', route: ['road', 'marsh', 'fortress', 'ruins', 'eren'], strength: 35, name: 'Kettenstreife aus der Eisenfeste' } }, PATROL_EVERY = 4, PATROL_MAX = 50, WAR_GRACE = 5, UNDEAD_ARMIES = 2;
+/* Damit Aktion bleibt (Nutzer 05.10.): Streifen wachsen höchstens auf PATROL_MAX, nehmen keine Gruft-Knoten (Friedhof bleibt Ausgangspunkt der Toten), und die Toten stellen bis zu UNDEAD_ARMIES Heere gleichzeitig auf. */
 const patrolOk = f => f === 'valen' ? S.war.nodes[CAPK]?.owner === 'valen' && !S.war.nodes[CAPK].siege : !S.flags.chainsBroken;
 function patrolNext(a) { const P = PATROL[a.patrol], W = S.war, zone = new Set(P.route.concat(P.route.flatMap(n => NEIGH[n] || [])));
   const foe = path(a.at, n => zone.has(n) && W.armies.some(b => b.faction === 'undead' && b.at === n)); if (foe) return foe;
@@ -518,12 +520,13 @@ export function warDay() {
   // Hunter-Befund (01.10.): ohne Gegengewicht fielen in 15 Tagen alle Knoten. Je mehr Land verloren ist, desto mehr greift Valen zu
   // den Waffen (+0,3 je Untotenknoten, bis +3); ohne Korn wächst es langsam statt gar nicht.
   for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : Math.max(0, (valenGrain > 10 ? 3 : 1) + Math.min(3, 0.3 * undNodes) - (H.cultDrain?.() || 0));   /* §5g.2: der Blutkult zehrt an Valen */
+  for (const a of W.armies) if (a.patrol) a.strength = Math.min(a.strength, PATROL_MAX);   /* Streifen bleiben schlagbar */
   clampArmies();
   // Besatzungen füllen sich täglich wieder auf (+2): Valen in Städten bis 20, sonst bis 10; höhere Startbesatzungen bleiben.
   for (const [k, n] of Object.entries(W.nodes)) if (n.owner) { if (k === CAPK) { capDay(n); continue; } const cap = n.owner === 'valen' && S.towns[k] ? 20 : 10; if (n.garrison < cap) n.garrison = Math.min(cap, n.garrison + 2); }
   // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt (die Toten nur, solange Garmadon lebt)
-  if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
-    const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard';
+  if (!dead && W.armies.filter(a => a.faction === 'undead').length < UNDEAD_ARMIES && chance(0.35)) {
+    const bases = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'undead' && !W.armies.some(a => a.faction === 'undead' && a.at === k)), base = bases.length ? pick(bases) : 'graveyard';   /* aus einer Gruft ohne Heer: beide Fronten bleiben lebendig */
     W.armies.push(newArmy('undead', base, 30));   /* Audit V17c: der Friedhof wird nicht mehr stillschweigend umgefärbt — hält Valen ihn, muss das Heer ihn erst nehmen */ log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
   }
   capThreatDay();

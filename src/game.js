@@ -20485,8 +20485,9 @@ export function selftest() {
     return h.includes('<h3>Titel</h3>') && h.includes('<li') && h.includes('<b>fett</b>') && h.includes('<td>1</td>') && !h.includes('---') && h.includes('Siehe GUIDE.') && !h.includes('](');
   })());
   ok('S13 Kutschen und Fähren: Kutscher in jeder größeren Stadt, Fährmann in Salzhafen; Reise kostet Gold und Zeit; ein Überfall hält auf halber Strecke an', (() => {
-    const p = S.player, keep = JSON.stringify({ g: S.gold, m: S.minute, d: S.day, x: p.x, y: p.y }), W0 = S.ents.world;
+    const p = S.player, keep = JSON.stringify({ g: S.gold, m: S.minute, d: S.day, x: p.x, y: p.y }), W0 = S.ents.world, fw0 = S._frozenWar;
     S.ents.world = W0.filter(e => !(e.kind === 'enemy' && e.alive && dist(e, p) < 500));   /* Feinde in der Nähe sperren journey (foesNear) — Probe prüft die Reise, nicht den Zufall */
+    S._frozenWar = true;   /* Krieg 05.10.: Streifen und Totenheere liefern sich an der Straße Schlachten, die den Wagen anhalten würden — Probe prüft die Reise, nicht den Krieg */
     try {
       ensureCoaches(); const coaches = S.ents.world.filter(e => e.coach).length >= 4 && S.ents.world.some(e => e.ferry === 'saltport');
       S.gold = 500; const T = tripOf('eren', 'northcity'); T.risk = 0; const m0 = S.day * 1440 + S.minute; journey(T, 'Die Kutsche');
@@ -20496,7 +20497,7 @@ export function selftest() {
       const F = tripOf('saltport', 'kupferhafen', true);
       if (!(coaches && arrived && mid)) console.warn('KDBG', JSON.stringify({ coaches, arrived, mid, map: S.map, pm: p.map, gold: S.gold, price: T.price, px: p.x / TS | 0, py: p.y / TS | 0, nx, ny, foes: foesNear(p), ex, ey }));
       return coaches && arrived && mid && F.risk === 0 && F.price > 0;
-    } finally { const k = JSON.parse(keep); S.gold = k.g; S.minute = k.m; S.day = k.d; p.x = k.x; p.y = k.y; S.ents.world = W0; UI.closeDialogue(); }
+    } finally { const k = JSON.parse(keep); S.gold = k.g; S.minute = k.m; S.day = k.d; p.x = k.x; p.y = k.y; S.ents.world = W0; S._frozenWar = fw0; UI.closeDialogue(); }
   })());
   ok('S13 Reise nach Aurelion: ohne Schein ins Torlager (Zelte vor der Stadt) oder nach Gesetz abgewiesen; mit Papieren hinein', (() => {
     const W0 = S.ents.world, L0 = S.laws; S.ents.world = W0.slice(); S.laws = { ...(L0 || {}) };
