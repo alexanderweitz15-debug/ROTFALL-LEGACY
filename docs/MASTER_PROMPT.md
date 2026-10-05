@@ -1,5 +1,7 @@
 # ROTFALL: LEGACY — Master-Prompt (Session 14)
 
+> **Abgelöst (05.10.2026):** Operativ gilt nur noch `CLAUDE.md` im Repo-Wurzelverzeichnis. Dieses Dokument bleibt als Lesestoff (Ziele §1, Prüffragen §8, Kernkriterien §7); seine Sitzungs-, Git-, Port- und Skill-Regeln sind veraltet.
+
 Stehender Auftrag des Nutzers. Neueste Nutzerentscheidung (`PLAN_OFFEN.md`) geht vor, dieses Dokument vor allem anderen.
 Frühere Fassungen: `archive/` (nicht bindend).
 

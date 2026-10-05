@@ -1464,3 +1464,10 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Händler:** Juweliere führen gewöhnliche und ungewöhnliche Reliquien.
 - **Sichtbar:** Rahmen der Fassung je Stufe (Gold ab V, Glimmen ab VII, Strahlen bei VIII), eigenes Medaillon je Reliquie, Auslöser mit kurzem Effekt; bei Stufe VIII ein leiser Schein am Helden. Laufende Wirkungen (Serie, Seelen, Sturm, Schattenschritt) stehen bei den Zuständen (X).
 - Debug: „Reliquien: alle ins Gepäck …“, „+50 Glut …“, „gefasste auf Stufe VIII“, „Kill-Serie 10 …“, „Erbe simulieren“.
+
+## Ermittlungen: Spuren, Befragungen, Urteil (Welttiefe Slice 1, 05.10.2026)
+- **Neue Auftragsziele:** *Spur untersuchen* (eine markierte Stelle in der Welt mit E lesen; der Befund steht im Log) und *Befragen* (beim genannten NPC erscheint „Befragen: …“, seine Aussage steht im Log). Spuren liegen nur, solange der Auftrag läuft, und verschwinden, sobald sie gelesen sind. Der Tracker zeigt Spuren mit dem Auge, Befragungen mit dem Gruppen-Symbol.
+- **Urteil mit Folgen:** Solche Aufträge enden nicht mit „Belohnung, fertig“. Der Geber fragt, wer es war; jede Antwort hat Folgen (Beziehungen, Ansehen, Wohlstand des Orts, Chronik), auch die falsche. „Ich brauche noch Zeit“ lässt die Frage offen.
+- **Erster Fall: „Blut auf dem Markt“** (Havel, Eren): Blutspur zwischen den Ständen, Spuren am Viehtrog, Borin und Elena befragen. Drei Urteile: Borin (unschuldig — das Dorf merkt es sich), Tomas (die Wahrheit), selbst zahlen (60 Gold, niemand wird verurteilt).
+- Debug: „Aufträge: Ermittlung ‚Blut auf dem Markt‘ starten“.
+

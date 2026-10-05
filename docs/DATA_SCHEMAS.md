@@ -96,3 +96,17 @@ zerstörte Dörfer `S.razed[k] = { day, rebuild }`.
 - Wirtschaft: `S.towns[k] = { stock:{ ware: n }, … }`, `S.eco`, `S.priceSeen`; Waren `GOODS` (13).
 - Tiere: `MOUNTS = { horse:{ name, spd, price }, … }`, `S.mount = { kind, name, oiled? }`, `p.mounted = { kind }`, `S.pet` (id).
 - Prop-Szenen: `scene()` in world.js, Zuordnung `SCENES[locationKey]`.
+
+## Auftrag (`QUESTS`, data.js)
+```js
+q_kingsiron: { name:'Königseisen', giver:'brann' /* NPC-Key; oder giverProf + giverMap */, desc:'…',
+  objectives:[{ type:'kill', target:'hrodvar', count:1, text:'…' }, { type:'item', target:'koenigseisen', count:1, text:'…' }],
+  reward:{ gold:80, xp:260, rep:{ valen:6 }, item:'frostblade', take:'koenigseisen' /* takeCount, unlock, rel */ },
+  turnin:'brann' /* optional: where (Kartenpunkt), chron, ask, classQ, clsTrial, rankLine, sea, dyn, pact */ }
+```
+- Zieltypen mit zentraler Auswertung: `kill`, `item`, `trial`, `dodge`, `find`, `night`, `talk` (`target` = NPC-Key, `say` = Aussage; „Befragen“ erscheint im Gespräch), `clue` (`target` = Spur-Key aus `Q.clues`); `custom` braucht einen eigenen Hook in game.js und eine Begründung. Ein neuer Zieltyp ist NEW FEATURE (CLAUDE.md §2).
+- Spuren: `clues:[{ key, town, at:[tx,ty] | square:[dx,dy] | house:'<HOUSES-typ>', label, text }]` — `ensureClues()` legt sie als flüchtige Props (`clue`), E liest sie (`clueRead`).
+- Urteil: `decide:{ prompt, options:[{ key, text, say, gold?, effects:{ rel:{npc:n}, rep:{fac:n}, gold, prosper:{ort:n}, flag, chron } }] }` — ersetzt `turnIn` durch `questDecide(npc, k)`; Ergebnis in `S.quests[k].outcome`.
+- Ablauf in game.js: `questAvailable(k) → offerQuest(npc, k) → startQuest(k) → questComplete(k) → turnIn(npc, k)`; Geber mit `giver` bietet in `talk()` automatisch an. Zustand nur in `S.quests[k] = { state, progress[] }`.
+- Dynamische Aufträge (Bretter, Verträge) leben in `S.contracts`; `registerContracts()` trägt sie bei jedem Laden als `QUESTS['c_' + id]` ein. Jeder Auftrag mit festem Ort braucht einen Kartenpunkt (`QUEST_WHERE`/`questPoint`, Probe „Karte (BUG-085)“).
+

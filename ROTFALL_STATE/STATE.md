@@ -1,5 +1,7 @@
 # STATE — ROTFALL (02.10.2026, 16:40)
 
+> **Stand veraltet (02.10.2026).** Aktueller Stand: `main` = Version 25, Selbsttest 488/488 (`docs/CHANGELOG.md`). Arbeitsregeln: `CLAUDE.md`. Offenes: `OFFEN.md`, `docs/BUGS.md`.
+
 Zuerst lesen. Kurz halten (unter 100 Zeilen). **Alles Offene steht in `OFFEN.md`.** Regeln: `GATE.md` (vor jedem Feature), `VISUAL.md`, `COMBAT_ANIM.md`, Entscheidungen in `DECISIONS.md`.
 
 ## Stand

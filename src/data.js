@@ -1503,6 +1503,26 @@ export const QUESTS = {
     objectives:[{type:'custom',count:1,text:'Den offenen Auftrag des Vorfahren abschließen'}], reward:{xp:120} },
   q_erbe_grab: { name:'Das Ahnengrab', giver:null, desc:'Dein Vorfahr liegt, wo er fiel. Besuche das Grab: dort hörst du, was von ihm bleibt — und wer seine Waffe trägt.',
     objectives:[{type:'custom',count:1,text:'Das Ahnengrab besuchen'}], reward:{xp:60} },
+  /* Ermittlung (Welttiefe Slice 1): Zieltypen talk/clue, Entscheidung mit Folgen am Ende — Vorlage für weitere Ermittlungen */
+  q_erm_markt: { name:'Blut auf dem Markt', giver:'havel', turnin:'havel',
+    desc:'„Heute Nacht hat jemand Maras Vorratskiste aufgebrochen. Ein halber Schinken fehlt, und zwischen den Ständen liegt Blut. Borin hat wieder bis spät getrunken, sagt man. Ich will keinen Verdacht, ich will Gewissheit: Sieh dir die Spuren an, rede mit den Leuten, und dann sag mir, wer es war.“',
+    objectives:[
+      { type:'clue', target:'markt_blut', count:1, text:'Die Blutspur zwischen den Marktständen untersuchen' },
+      { type:'talk', target:'borin', count:1, text:'Borin in der Schenke befragen', say:'„Ich? Ich hab bis zum Morgengrauen hier gesessen, frag den Wirt. Ja, ich war betrunken. Nein, ich stehle kein Fleisch — ich hab Sold bekommen, Fremder, ich hab’s nicht nötig.“ Er hebt die Hände: keine Kratzer, keine Bisswunde.' },
+      { type:'talk', target:'elena', count:1, text:'Elena, die Heilerin, befragen', say:'„Heute früh kam der Jägerbursche zu mir, Tomas. Eine Bisswunde an der Hand, frisch, von einem Hund oder … größer. Er wollte nicht sagen, woher. Ich hab sie gereinigt und ihn heimgeschickt.“' },
+      { type:'clue', target:'hof_spuren', count:1, text:'Die Spuren am Viehtrog lesen' } ],
+    clues:[
+      { key:'markt_blut', town:'eren', square:[1, 1], label:'Blutspur', text:'Dunkle Tropfen zwischen den Ständen, verschmiert, als hätte jemand etwas Schweres weggeschleppt. Dazwischen graue Haare — zu grob für einen Menschen. Die Spur führt nach Süden, zu den Höfen.' },
+      { key:'hof_spuren', town:'eren', at:[59, 79], label:'Spuren am Viehtrog', text:'Im Schlamm am Trog: Pfotenabdrücke, groß wie eine Hand, und daneben Stiefel — klein, ein halbes Kind. Hier wurde Fleisch hingelegt, und hier hat etwas gefressen. Die Pfoten laufen in den Wald, die Stiefel zurück ins Dorf.' } ],
+    decide:{ prompt:'„Also. Wer war es?“ Havel sieht dich an, als hinge sein Dorf an der Antwort.',
+      options:[
+        { key:'borin', text:'„Borin. Er war betrunken, er hatte Gelegenheit.“', say:'„Dann ist es entschieden. Borin zahlt Mara den Schaden und bleibt der Schenke einen Monat fern.“ Hinter dir wird es still im Dorf — die Spuren haben etwas anderes gesagt.',
+          effects:{ rel:{ borin:-45, havel:5, tomas:-10 }, prosper:{ eren:-3 }, chron:'Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.' } },
+        { key:'tomas', text:'„Tomas. Er hat den Schinken genommen, um die Wölfe von den Höfen zu locken — und wurde dafür gebissen.“', say:'„Der Junge?“ Havel atmet aus. „Dann war es Dummheit, kein Diebstahl. Er arbeitet das Fleisch bei Mara ab, und ich rede mit ihm über Wölfe. Danke — das war mehr Mühe, als ein Schinken wert ist.“',
+          effects:{ rel:{ tomas:10, mara:5, havel:10 }, rep:{ valen:2 }, prosper:{ eren:2 }, chron:'Der Fall des fehlenden Schinkens in Eren ist gelöst: Tomas lockte Wölfe von den Höfen, kein Dieb.' } },
+        { key:'zahlen', text:'„Niemand. Ich ersetze Mara den Schaden selbst, und die Sache ist vergessen.“ (60 Gold)', gold:60, say:'„Du zahlst für etwas, das du nicht getan hast?“ Havel schüttelt den Kopf. „Gut. Ich frage nicht weiter. Aber ich merke mir, dass du mir keinen Namen gegeben hast.“',
+          effects:{ rel:{ mara:15, tomas:15, havel:-5 }, chron:'Du hast in Eren für einen fremden Schinken bezahlt, damit niemand verurteilt wird.' } } ] },
+    reward:{ gold:40, xp:90 } },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
