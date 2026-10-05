@@ -397,7 +397,7 @@ Was nach einem großen Ereignis bleibt, steht im Spielstand unter `S.after` (feh
 - **Städte Aurelions fallen** (Tod der Kaiserin: Thronstreit, an manchen Tagen fällt eine Stadt, höchstens drei; oder Debug): Die Toten besetzen die Stadt (Kriegsknoten), Knochenwachen statt Automaten, Trümmer, ausgebrannte Häuser, alle Läden zu (Bionik und Magitech dort nicht zu haben), die Wirtschaft steht. Flüchtlinge ziehen in die nächste Stadt Aurelions (Preise dort +20 %, Aushang „Unterstände“, ggf. Schmuggel). **Befreiung** wie bei Menschenstädten: vor Ort die Wellen der Besatzung brechen; danach ziehen Automaten wieder auf, Läden öffnen, Häuser werden Tag für Tag aufgebaut. Ab **zwei** gefallenen Städten **zerbricht das Hochreich**: Häuserkrieg (Preise steigen, Gunst sinkt, Scharmützel von Waffenknechten in Städten — wem du hilfst, dessen Gunst steigt). Frieden vermittelt man bei einem Hausherrn (Willenskraft, 300 Gold). *Angsthase:* die Sonnenlegion erobert gefallene Städte nach 21 Tagen zurück, der Häuserkrieg endet von selbst.
 - **Seuche nicht eingedämmt** (weniger als 3 Geheilte und mindestens so viele Tote): Das Fleckfieber bleibt in den befallenen Orten. Täglich stirbt dort wohl ein Kranker (der Ort schrumpft, ein Dorf kann zur Ruine werden), Gesunde stecken sich an, Händlerzüge tragen es weiter. Nach 2 Tagen **Quarantäne**: Wachen, Läden zu, keine Händlerzüge; wer tagsüber vor ihren Augen hinausgeht, bekommt 40 Gold Kopfgeld (nachts unbemerkt); in den Nachbarorten hängen Schmuggelaufträge „Arznei nach …“. Wer sich unter Kranken aufhält, kann **selbst erkranken** (Status Fleckfieber: täglich Leben −5, Ausdauer halb; Heilerin oder Medica heilt für 40 Gold, Schlaf nicht). Ein Ort ist frei, wenn niemand mehr krank ist (Heilkraut an die Kranken). *Angsthase:* nach 10 Tagen klingt es ab, das eigene Fieber bricht nach 6 Tagen.
 - **Hexenprozess:** Die Wahl beim Prozess ist jetzt wirklich erreichbar (vorher antwortete die Angeklagte nur mit dem Gruß). *Verbrannt:* Angst im Ort (Wohlstand −15, weniger Aufträge), Kräuterkundige und Magier des Ortes fliehen nach Aurelheim (auf Angsthase kommen sie nach 21 Tagen heim, sonst wenn man dort für sie bürgt), die Akademie nennt es Barbarei (Aurelion −3, Magierkönig −6), der **Eifer** des Ordens steigt. *Gerettet* (Fürsprache oder Flucht in der Nacht): Sie bleibt bzw. versteckt sich (in der eigenen Siedlung, sonst in einem Zelt nahe dem Ort), lehrt Blutung stillen und Regeneration und kann Gefährtin werden; nach einer Flucht jagt die Inquisition die Fluchthelfer. Ab Eifer 2 zieht eine **Hexenjagd-Welle** durch andere Städte: alle 3 Tage eine Anklage, am Tag darauf der Scheiterhaufen, außer man spricht für sie (Willenskraft gegen Eifer) oder bringt sie nachts fort. Jede Rettung senkt den Eifer; die Welle endet nach zwei Anklagen, bei Eifer unter 2 oder (Angsthase) nach 21 Tagen.
-- **Omegas Ende** (4 Tage, je frischer und je näher beim Spieler, desto mehr Leute): *erschlagen* — im Osten (Totenland, Vharnholm) Panik: Bewohner rennen durcheinander und rufen, Läden bleiben zu, einige fliehen; im Westen Jubel (in den Himmel zeigen, Funken) und täglich ein Pilgerzug aus einem Westdorf zum Altar der Eisenfeste. *Avatar* — dieselben Reaktionen, andere Rufe (der Osten fürchtet die Hand des Gottes, der Westen feiert sie). *Schlaf* — der Westen kniet und betet, im Osten bleibt es ruhig.
+- **Omegas Ende** (4 Tage, je frischer und je näher beim Spieler, desto mehr Leute): *erschlagen* (seit Version 24) — der Osten (Totenland, Vharnholm) feiert dich: Jubel, in den Himmel zeigen, Funken, Ruhm im Totenland +30. Der Westen hasst dich: Kette auf −100 (Verhasst, ihre Wachen greifen an), Kopfgeld 2500 „Gottesmord“, Gläubige verfluchen dich, verstecken sich und reden nicht mehr mit dir, solange die Kette dich hasst; täglich ein Trauerzug aus einem Westdorf zum Altar der Eisenfeste. *Avatar* — im Osten Panik (Bewohner rennen, Läden zu, einige fliehen), im Westen Jubel. *Schlaf* — der Westen kniet und betet, im Osten bleibt es ruhig.
 - **Debug:** Bereich „Folgen großer Ereignisse“ — Dorf auslöschen (Tote / durch dich), Ruine 2 Tage weiter, Nest bzw. Totenruhe erledigen, Sklavenaufstand starten / gewonnen, Rachezug jetzt, Streik gewonnen, Streikwelle, Aurelion-Stadt fällt / befreien, Tod der Kaiserin, Hochreich zerbricht, Scharmützel hier, Seuche bleibt, Quarantäne, selbst erkranken, Seuche heilen, Hexe verbrannt / gerettet, Hexenjagd-Welle, Omega erschlagen / Avatar / Schlaf, 22 Tage vorspulen, Folgen anzeigen. Selbsttests „Folgen §5c/1“ bis „/7“ (je eine Probe auf einer Kopie der Welt).
 
 ## Runde: Eisenfeste bevölkert (PLAN_ROADMAP §5d.1, Version 21)
@@ -851,7 +851,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - Debug: „Varon: in den Thronsaal“.
 
 ## Burgfrieden am Tor der Varonsburg (Varonheim-Umbau, Scheibe 3)
-- Wer den Burgbezirk betritt, wird von Torwache Gerold angehalten. Ein Schild am Tor und eine Meldung beim ersten Nähern weisen darauf hin.
+- Wer den Burgbezirk betritt, wird von Torwache Gernot angehalten. Ein Schild am Tor und eine Meldung beim ersten Nähern weisen darauf hin.
 - **Durchsuchen lassen:** Waffen (auch die Zweitwaffe und Waffen im Gepäck), Dietriche, Stricke und Giftöl gehen in die Waffenkammer. Während der Kultkrise auch Blutphiolen. Schilde, Rüstung, Tränke und Essen bleiben. Gefährten in der Nähe werden mit durchsucht.
 - **Zurück:** Beim Hinausgehen durchs Burgtor kommt alles automatisch zurück, mit Zustand und Geschichte. Wer anders hinausgeht, holt es bei Gerold ab („Meine Waffen zurück“). Erben holen das Lager des Hauses ab. Fällt die Stadt, bringt ein Bote die Sachen.
 - **Bestechen:** 5000 Gold, fest 30 % Chance, höchstens einmal am Tag. Gelingt es, darfst du bewaffnet hinein. Scheitert es: Gold weg, Valen −10, Kopfgeld 250, drei Tage Verdacht (keine Bestechung). Dann Kerker oder Flucht.
@@ -1407,3 +1407,60 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Kampfanimation Ausrollen (04.10., Entwickler: „baue für mehr Waffenarten Animationen“):** Axt, Streitkolben/Flegel, Stangenwaffe (Hellebarde, Sense, Glefe), Rapier, Peitsche und Stab haben jetzt eigene Angriffsprofile mit drei Formen, Pack A/B/C und Ganzkörperposen — vorher liefen sie auf den alten Kurven. Axt: Hack von oben (steckt kurz), Querhack, Spalter. Kolben: Seitwärts, Überkopf, Rundum-Wirbel. Stange: weiter Schwung, Stoß, Rundfegen. Rapier: Ausfall, Riposte, Schnitt. Peitsche: Knall von oben, Querzug, Doppelknall. Stab: Schwung, Stoß, Wirbel. Wirbel-Formen treffen rundum (Animation = Spiel). Zeiten vorläufig. Alle Klassen stehen im Combat Test Room (Debug).
 
 - **Gewicht in der Kampfanimation (04.10., Entwickler: „Waffen wirken leicht“):** Jede Klasse hat ein Gewicht (Dolch 0 … Kriegshammer 1,2). Je schwerer: das Ausholen erreicht die Endlage früher und wird gehalten (Anticipation), der Hieb beschleunigt wie eine Peitsche (erst langsam, dann schlagartig), die Klinge schwingt nach dem Einschlag bis 35 % über die Endlage hinaus und pendelt zurück, die Erholung beginnt später und läuft langsamer, der Körper sinkt im Einschlag nach und der Kopf nickt. Quellen: slynyrd Pixelblog 9 (Melee Attacks), GDKeys „Anatomy of an Attack“, 12 Animationsprinzipien. Werte vorläufig.
+
+## Angst (Version 24)
+- Jeder Bürger hat einen Angstwert von 0 bis 100. Jeder Tote, den er sieht, bringt +18, wer es nur hört (gleicher Ort), +6. Tapfere und grausame Leute fürchten sich halb so stark. Wachen fürchten sich nicht.
+- **Ab 25 unruhig:** hält Abstand zum Täter, Gespräche drehen sich um die Toten.
+- **Ab 50 verängstigt:** versteckt sich im Haus, plaudert nicht mehr und redet nicht mit dem Täter.
+- **Ab 75 Panik:** rennt schreiend davon, sobald die Gefahr näher als etwa 20 Schritte kommt; redet mit niemandem.
+- Die Angst bleibt, solange die Gefahr (du oder ein Feind) lebt und in der Nähe ist. Erst wenn sie fort ist, sinkt sie um 12 je Spielstunde.
+- Wer einen Angreifer erschlägt, macht niemandem Angst; tote Tiere und Monster auch nicht.
+- Das Log meldet, wenn ein Ort Angst vor dir hat oder in Panik gerät; im Gespräch steht der Zustand dabei.
+- Debug: „Angst: Zeugen ringsum +25 (vor dir)“, „Angst: alle beruhigen“.
+
+## Schwere Verbrechen (Version 24)
+- Ab 2000 Gold Kopfgeld kauft man sich bei der Festnahme nicht mehr frei. Die Wache zieht ein Bußgeld ein (10 % des Kopfgelds, mindestens 200), so weit dein Gold reicht, und du kommst in den Kerker.
+- Die Haft wächst mit dem Kopfgeld: 2000 Gold 20–40 Stunden, 20 000 Gold 40–80, 200 000 Gold 60–120 Stunden. Ganz bezahlt sitzt du die untere Zahl, ohne Gold die obere. Eine Spielstunde dauert eine Minute: 200 000 Gold heißt 1–2 Stunden Echtzeit.
+- Keine Kaution. Bestechen kostet 400 Gold und klappt nur in 20 % der Fälle. Schloss knacken und Ausbruch gehen wie immer.
+- Unter 2000 Gold bleibt alles wie bisher (zahlen oder 10–20 Stunden).
+- Die Haftanzeige sagt jetzt richtig „Stunden“ (vorher stand dort fälschlich „Minuten“).
+- Debug: „Kopfgeld Valen = 200 000“, „Ins Gefängnis (200 000, Bußgeld voll bezahlt / ohne Gold)“.
+
+## Hof ohne Wiederkehr und Zerfall der Hauptstadt (Version 24)
+- Erschlagene Hofleute (Kanzler Aldhelm, Marschall Brandt, Ysmay, Grimm, die drei Adligen, Hagen, Hofmar) bleiben tot, auch nach dem Laden.
+- Kanzler Aldhelm war der Blutfürst. Stirbt er als Kanzler, endet der Kult. Die Blutkult-Sense gibt es dann nicht, sie liegt nur beim Blutfürsten in der Krypta.
+- **Reichsverweser** nach König Varon: Kanzler Aldhelm, sonst Marschall Brandt, sonst der erste lebende Adlige. Ist keiner mehr da, ist die Krone kopflos.
+- **Thronwirren:** In den 7 Tagen nach dem Königsmord schickt niemand Ersatz für die Garde von Varonheim (ist die Krone kopflos, nie mehr). Fällt die Garde, wird die Hauptstadt schutzlos, nach der Frist gesetzlos und dann übernommen: von einem Totenheer in der Nähe oder einer Bande. Wer den Bandenführer erschlägt, befreit die Stadt.
+- Lebt der König, bleibt es beim alten Entscheid: Varonheim wird nie von einer Bande übernommen, der Fall kommt nur über Morvath.
+- Kein Stadtfest in einer schutzlosen Stadt und in Varonheim in den 7 Tagen nach dem Königsmord.
+- Debug: „Varonheim: König, Kanzler und Garde töten“, „Varonheim: Hof wiederbeleben“.
+
+## Menüs (Version 24)
+- Die Reiter oben in den Fenstern (Werte, Talente, Zauber, Effekte; Fraktionen, Chronik) haben wieder Platz und brechen nicht mehr um.
+
+## Anmarsch und Angst vor Ereignissen (Version 24)
+- Figuren, die ein Ereignis erzeugt (Stunden- und Tagestakt, Weltereignisse, Burgalarm, Überfälle, Miliz, Ersatzwachen), erscheinen nicht mehr im Bild. Sie starten außerhalb und laufen zu ihrem Platz (höchstens 3 Spielstunden). Gegner brechen den Anmarsch ab, wenn sie getroffen werden oder der Held nah ist.
+- Angst geht vor Ereignissen: Hat ein Ort Angst (ab 50), fällt das Stadtfest aus. Wallfahrt, Ketzerjagd, Steuereintreiber und Flüchtlinge wählen einen anderen Ort. Wer neu in einen verängstigten Ort kommt, übernimmt 80 % der Angst.
+
+## Omegas Tod und die Sternenklinge (Version 24)
+- Stirbt Omega, läuft eine Szene (die Welt steht): das Auge bricht, Licht steigt auf, „OMEGA IST TOT“, der rote Himmel reißt auf. Danach liegt die Sternenklinge immer an seiner Stelle.
+- Die Sternenklinge hat eine eigene Zeichnung: Sternknauf aus Gold, Elfenbeingriff, Parierstange als Goldschwingen, Omegas Auge als Stein, blasse Blattklinge mit leuchtender Hohlkehle, deren Sternfunken langsam blau glimmen.
+- Reaktionen: siehe „Omegas Ende“ — der Westen hasst dich, der Osten feiert dich.
+
+## Schutz in Szenen (Version 24)
+- Solange eine Szene läuft und 1,5 Sekunden danach nehmen der Held, seine Gruppe und der Mitspieler keinen Schaden.
+## Reliquien (Version 24)
+- **Was sie sind:** Fundstücke mit Geschichte, die mit dem Helden wachsen. Sie liegen im Gepäck wie alles andere; „Anlegen“ fasst sie in eine Reliquien-Fassung. Fenster: Charakter → Reliquien (Taste O).
+- **Fassungen:** die erste ab Heldenstufe 10, die zweite nach dem ersten großen Boss, die dritte nach Garmadon oder Omega. Die Fassungen gehören dem Haus und bleiben über den Tod hinaus.
+- **Stufen:** I Roh, II Geweiht, III Gehärtet (neue Kraft), IV Geschmiedet, V Erwacht (zweite Kraft), VI Entfesselt (Pfadwahl aus zwei Spezialisierungen), VII Sternberührt (Synergien), VIII Rotfall (Verwandlung: neuer Name, letzte Kraft, Szene, Chronik, Ruhm). Die Höchststufe hängt an der Seltenheit: gewöhnlich/ungewöhnlich IV, selten/episch VI, legendär VII, mythisch VIII. Stufe VIII erst nach Garmadon oder Omega.
+- **Kosten:** II 150 Gold · III 400 Gold, 2 Glut · IV 900 Gold, 5 Glut · V 1500 Gold, 9 Glut, 1 Trophäe · VI 15 Glut, 1 Splitter · VII 20 Glut, 3 Splitter · VIII 6 Splitter. Ab Stufe V nur an einer Esse, einem Amboss, einem Schrein oder bei einem Schmied. Pfadwechsel: 2 Splitter. Kein Zufall, kein Fehlschlag.
+- **Währungen des Hauses:** Seelenglut (Elite-Gegner 2, Dungeon-Enden 4–12, Bosse 6, Garmadon/Omega 12, Regionalbosse 5) und Sternsplitter (Bosse 1–2, Garmadon/Omega 4, tiefe Dungeons, doppelte Boss-Reliquien 2). Beide bleiben über den Tod hinaus.
+- **Spielweisen:** Berserker (Schlächterherz), Tempo (Schattenfaden), Kill-Serie (Blutkranz), Seelen (Seelenkessel), Sturm im Lauf (Sturmglocke), Abklingzeiten (Uhrwerksherz), Hinrichtung (Henkerschlinge), Krit (Rotdorn), Tank (Eisenmal), Magie (Sternfunke), Gruppe (Wolfsfang). Jede hat ihre Kräfte auf I, III, V, ihren Pfad auf VI und ihre Verwandlung auf VIII. Das Fenster zeigt alle Stufen mit Text.
+- **Boss-Reliquien** (mythisch, einmal je Welt; wer den Boss noch einmal erschlägt, bekommt 2 Sternsplitter): Herz des Blutfürsten (Aldhelm), Seelenkessel des Toten Königs (Garmadon), Auge des Gefallenen (Omega, Zeitbruch nach perfektem Ausweichen), Vargs letztes Glied (Ketten), Eiskern (Hrodvar, Frost nach perfektem Ausweichen), Goraks Kriegstrommel, Weißbarts Kompassrose. Regionalbosse: Fang der Graumähne, Karraks Sandglas.
+- **Dungeon-Enden:** Schatzkammer der Grube, Tiefhall-Hort, Schrein des Himmelssplitters, Turm des Nachtglases (Nachtglasuhr), Hort des Toten Königs und jeder Gewölbe-Hort geben eine Reliquie und Glut; je gefährlicher, desto seltener die Reliquie.
+- **Synergien** (ab Stufe VII einer der beiden): Sturmläufer, Blutrausch, Gnadenstoß, Uhrwerk der Sterne, Schildwall, Seelenernte, Zeitfaden, Gewitterrausch.
+- **Grenzen:** Alle Reliquien addieren je Wert in einen Topf, der einmal wirkt. Deckel je Phase: früh (1–2 Fassungen) +25 % Schaden, +20 % Angriffs- und Lauftempo, −20 % Abklingzeit; drei Fassungen +50/+40/+35 %, −40 %; mit einer Stufe-VIII-Reliquie +120 % Schaden, +100 % Angriffstempo, +70 % Lauftempo, −70 % Abklingzeit, 20 % Lebensraub, 30 % Krit. Schwung nie unter 180 ms, Ausweichzeit nie unter 250 ms.
+- **Tod und Erbe (Nutzerentscheid):** Gefasste Reliquien liegen am Grab mit voller Stufe. Der Erbe kann sie bergen und tragen; über Stufe V schlummern sie, bis er sie an einer Esse zum halben Preis neu erweckt. Den Pfad wählt er neu. Jede Reliquie schreibt ihre Geschichte mit (gefunden, gebunden, Stufen, Verwandlung).
+- **Händler:** Juweliere führen gewöhnliche und ungewöhnliche Reliquien.
+- **Sichtbar:** Rahmen der Fassung je Stufe (Gold ab V, Glimmen ab VII, Strahlen bei VIII), eigenes Medaillon je Reliquie, Auslöser mit kurzem Effekt; bei Stufe VIII ein leiser Schein am Helden. Laufende Wirkungen (Serie, Seelen, Sturm, Schattenschritt) stehen bei den Zuständen (X).
+- Debug: „Reliquien: alle ins Gepäck …“, „+50 Glut …“, „gefasste auf Stufe VIII“, „Kill-Serie 10 …“, „Erbe simulieren“.

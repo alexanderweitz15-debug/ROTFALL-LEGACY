@@ -2,9 +2,25 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
+## Version 25 — 2026-10-05 (Zusammenführung der offenen Zweige)
+- Zusammengeführt: claude-arbeit (PR #9: Audit Phase 1–4, Wüstenbund/Zwerge, Wanderautomaten, Heiler-/Zauberfenster, Schleichmodus, Kampfanimationen) und Reliquien (Endgame-Fortschritt, Anmarsch der Ereignisfiguren, Omega-Szene).
+- PR #7 zurückgeholt (war in main verloren): Angst der Bürger, schwere Verbrechen mit Bußgeld und Haft, Zerfall Varonheims ohne König.
+- Reliquien-Fenster auf Taste O (V ist der Schleichmodus). Cache-Schlüssel v=25.
+- Behoben: Eisenfeste — neue Spiele bekamen nie Kettenzug, Torwachen und Käfig-Gefangene (die Bevölkerung zählte als „schon besiedelt“); alte Stände holen den Kettenzug nach. Ersatz für die Stadtwache war in den ersten Tagen eines Spiels gesperrt (Z.reinf 0).
+- Selbsttest 488/488. Proben gegen Zufall gehärtet (Trefferzone, Krits, Bedrohung im neuen Spiel): Wuchtschlag, Schleichen, Akademie-Duell, Duell im Kreis, Knochenritter, Stadtfest/Tagesplan (peace() ohne Heere der Toten), Betriebe-Verlusttag; Erbe-Aufträge ohne festen Kartenpunkt.
+
 ## Version 24 (in Arbeit) — Fehlerjagd Runde 1
 - Hunt-1-Fehler HB-06 bis HB-23 behoben (Mönch-Aufträge, Weißbarts Ansprechbarkeit, Varon-Königsauftrag, Eisenmark-Pferch/Tributzug, Schuldprüfung bei befreiten Städten, Wohlstand ohne Schutz, Heiler sieht Gliedverletzungen, Schadens-Böden heben Bewusstlose nicht mehr an, Bruch/Prothese, Medizin heilt kein Messing, abgetrennte Glieder, Betriebsverlust, Kult-Doppelgänger, Zweiwaffen mit ausgefallenem Arm, kein Selbstheilen am Boden, Kette/Grubenstämme-Rang). Details: `ROTFALL_STATE/hunt/BERICHT.md`.
 - Offen (keine eigenmächtige Designentscheidung): HB-10 (Rotfall/Omega-Belohnung), HB-20 (welche Bindungen ein Erbe übernimmt).
+
+## Version 24 — 2026-10-02 (Angst, schwere Verbrechen, Zerfall der Hauptstadt)
+- Angst: Bürger sammeln Angst je gesehenem Toten; unruhig, verängstigt (verstecken sich, reden nicht) und Panik (fliehen schreiend), bis die Gefahr fort ist.
+- Schwere Verbrechen ab 2000 Gold: kein Freikaufen, Bußgeld und Haft bis 120 Spielstunden (200 000 Gold); Haftanzeige in Stunden statt fälschlich Minuten.
+- Varonheim: erschlagene Hofleute bleiben tot, Kanzlertod beendet den Kult, Reichsverweser rückt nach; Thronwirren lassen die Hauptstadt ohne König zerfallen und übernehmen.
+- Menüs: Reiter in Charakter- und Fraktionsfenster nicht mehr zusammengequetscht; Stylesheet mit Cache-Schlüssel.
+- Ereignisfiguren laufen von außerhalb ins Bild statt aufzuploppen; Angst geht vor Ereignissen (kein Fest, andere Orte, Neuankömmlinge fürchten sich mit).
+- Reliquien: Endgame-Fortschritt mit drei Fassungen, 24 Reliquien (11 Spielweisen, 9 Boss-/Regionalboss-Stücke), Stufen I–VIII mit Pfaden, Synergien und Verwandlung, Seelenglut und Sternsplitter, Beute bei Bossen, Elite und Dungeon-Enden, Fenster „Reliquien (V)“; am Grab vererbt, beim Erben schlummernd bis zur Erweckung.
+- Omega: eigene Sternenklinge (Goldschwingen, Sternknauf, glimmende Hohlkehle), Todesszene, Klinge garantiert; danach im Westen verhasst, im Osten gefeiert. In Szenen nimmt die Gruppe keinen Schaden.
 
 ## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)
 - Varonsburg in der Welt begehbar (Thronsaal, Adelsflügel, Kanzlei, Verlies, Kronschmiede), Viertel-Architektur in Varonheim, Karawanen-Absturz bei alter Route behoben.

@@ -2,9 +2,9 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=24';
-import { ITEMS, GOODS, TOWNS } from './data.js?v=24';
-import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=24';
+import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=25';
+import { ITEMS, GOODS, TOWNS } from './data.js?v=25';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=25';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];
@@ -401,14 +401,16 @@ function ordersDay() {
     for (const g of GOODS) {
       if ((t.use[g] || 0) < 0.2 || t.stock[g] > target(t, g) * 0.35 || E.orders.some(o => o.town === town && o.good === g) || !chance(0.3)) continue;
       const n = clamp(Math.round(target(t, g) - t.stock[g]), 4, 15);
-      E.orders.push({ id: uid(), town, good: g, n, reward: Math.round(ITEMS[g].value * n * 1.6), until: (S.day | 0) + 7 });
+      E.orders.push({ id: uid(), town, good: g, n, reward: orderPay(town, g, n), until: (S.day | 0) + 7 });   /* Audit 3.2: Marktpreis der Zielstadt × 1,15 statt Wert × 1,6 (war ~3,5× mit Überschuss-Einkauf) */
       if (E.orders.length >= 8) return;
     }
   }
 }
+/* Audit 3.2: Lohn eines Lieferauftrags = was die Zielstadt gerade für die Ware zahlt × 1,15 (Aufschlag fürs Bringen); beim Anlegen geschätzt, bei der Abgabe neu gerechnet */
+export const orderPay = (town, g, n) => Math.max(n, Math.round(ecoPrice(town, g, false) * n * 1.15));
 export function deliver(o, have, take, fac = 'merch') {
   if (have < o.n) return `Du brauchst ${o.n} ${ITEMS[o.good].name} (du hast ${have}).`;
-  take(o.good, o.n); S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
+  o.reward = orderPay(o.town, o.good, o.n); take(o.good, o.n); S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
   S.eco.orders.splice(S.eco.orders.indexOf(o), 1);
   if (S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 2, -100, 100);   /* Entwickler 03.10.: Ruf bei der Macht der Zielstadt (vorher immer Händlergilde) */
   log(`Lieferung nach ${townName(o.town)}: ${o.n} ${ITEMS[o.good].name}, ${o.reward} Gold.`, 'economy'); return null;

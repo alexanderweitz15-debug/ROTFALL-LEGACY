@@ -1,5 +1,19 @@
 # Ist-Zustand, Bereich C: Kampf, Gegner, Charakter
 
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.2 Talentpunkte:** `TALENT_EVERY = 2` (`game.js:4382`): einer zum Start, einer je zweiter Stufe, einer je bestandener Klassenprüfung. C ist richtig, IST_alt (jede 3.) falsch.
+- **1.3 Gegnerschaden:** `BAL.lvl = 0.06` (`game.js:1885`). C richtig.
+- **1.4 Karrak:** Grundleben **340** (`REGION_BOSSES`, `game.js:2025`; vorher 240). C richtig.
+- **1.5 Zählung:** `CLASSES` 19 (inkl. wanderer und 6 Titel-/Dunkelklassen), `ABILITIES` 104 (davon 31 Zauber `sp_*`), `SKILL_TREE` 221 Einträge, `MONSTERS` 64, `ELITES` 32, `TITLE_CLASSES` 6.
+- **1.9 Boss-Intros:** `BOSS_CARDS` hat 7 Schlüssel (chain_master, hrodvar, garmadon, whitebeard, dodon, gorak, omega). **Graumähne und Karrak fehlen weiter** — C §23 richtig, „H12 erledigt“ war zu früh. Bleibt Phase 5.6.
+- **1.11 Prothesen-Werkbank:** hat seit 03.10. ein Fenster (`mechUI`); C §18 „noch Dialogliste“ ist **Doku-Fehler**.
+- **1.12 Regionalboss-Beute:** `die()` (`game.js:4132`) lässt Karrak die Klinge des Sandfürsten und Graumähne den Leitwolfzahn sicher fallen; einen eigenen `BOSS_LOOT`-Pool haben beide **nicht** (nur Grundart-Tabelle). Beide Aussagen stimmen also je zur Hälfte.
+- **1.8 Zauberlehrer:** `sp_staunch`/`sp_regen` lehrt Mutter Aldis (und die gerettete Hexe), `sp_shock` Corvinus — H7 erledigt, IST_alt falsch.
+- **C-1 ergänzt 04.10.:** Duell/Grube — Schaden kommt sichtbar an, Fechter stirbt nie (Rumpf ≥ 1), Ende erst bei echtem Rumpf < 20 %.
+- **1.14:** Elite „Irmhild vom Frostgrab“ (umbenannt).
+
+
 Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `src/game.js`, `src/body.js`, `src/render.js`, `src/ui.js`, `src/sky.js` sowie die alten Dokumente `docs/IST_ZUSTAND.md` und `docs/MECHANIKEN.md`.
 
 **Hinweis zu den Zeilennummern:** `game.js` wurde während der Prüfung parallel bearbeitet. Die Zeilen können um einige Stellen verrutscht sein. Deshalb steht immer auch der Funktionsname dabei.
@@ -1002,7 +1016,7 @@ Die Beute der Bosse steht in §23.
 | Schrottfresser Grimm | Goblin-Krieger | Goblins | 2,2 / 1,2 / – / +4 | tough | Ersatzteile |
 | Flinkfinger Zick | Goblin | Goblins | 1,4 / 1,2 / 1,35 | charge | Wurfmesser |
 | Der Knochenfürst Varsk | Skelett | Untote | 2,2 / 1,3 / – / +2 | summon | Knochenspalter |
-| Irmgard vom Frostgrab | Skelett | Untote | 1,9 / 1,25 | frost | Frostklinge |
+| Irmhild vom Frostgrab | Skelett | Untote | 1,9 / 1,25 | frost | Frostklinge |
 | Seuchenmaul | Wiedergänger | Untote | 2,0 / 1,2 / 1,15 | regen | Heiltrank |
 | Der Grabschänder Egbert | Wiedergänger (Skelett) | Untote | 1,8 / 1,35 | rally | Grabräuber |
 | Die Totenglocke | Skelett (Wiedergänger) | Untote | 2,0 / 1,2 | shock | Totenglocke |

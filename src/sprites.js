@@ -12,12 +12,12 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=24';
-import { ITEMS, RACES } from './data.js?v=24';   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=24';
+import { ATLAS } from './ref5_atlas.js?v=25';
+import { ITEMS, RACES } from './data.js?v=25';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=25';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { ATK_U } from './anim.js?v=24';   /* Kampfanimation Scheibe 1 */
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=24';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { ATK_U } from './anim.js?v=25';   /* Kampfanimation Scheibe 1 */
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=25';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -1664,7 +1664,7 @@ export function weaponSprite(key, rarity, holy, wtype, bare = false) {
   if (!OLD_WEAPONS) {                                               // G3: feines Raster (1 Welt je Pixel)
     const sc = ART === 'R' ? (['bow', 'crossbow'].includes(wtype) || key === 'longbow' || key === 'shortbow' ? 0.95 : 0.82) / RPX : 1;   // S14 Stil R: Waffen im 1,5er-Raster; S15 (Nutzer: Waffen zu groß): Nahkampf 18 % kleiner, gleiches Raster
     const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON(), sc, rarity, bare);
-    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, str: r.str, pulse: r.pulse, px: ART === 'R' ? RPX : 1 / sc };
+    g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, str: r.str, pulse: r.pulse, pulseCol: r.pulseCol, px: ART === 'R' ? RPX : 1 / sc };
   } else if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
     const L = key === 'longbow' ? 12 : 8, wood = WOOD(), grip = WRAP();
     g = new G(9, L * 2 + 3); info = { gx: 2, gy: L + 1, blade: null };
