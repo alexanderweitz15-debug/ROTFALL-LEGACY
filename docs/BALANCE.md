@@ -192,7 +192,8 @@ Messung: neues Spiel, Schwer, Held in Tiefhall (keine Schlacht vor Ort), 30 Tage
 | Eren fällt | Tag 1 | nie (kurz Tag 2–3 in einem Lauf ohne Streifen, Rückeroberung am selben Tag) |
 | Knoten der Toten Tag 15 | 13 von 16 | 3 (Schwarze Feste, Nekropole, Alt-Vharn) |
 | Nordfurt | fällt Tag 25 | hält |
-| Sonnwacht | fällt Tag 15 | fällt Tag 5 und 15, wird jeweils binnen eines Tages zurückgeholt |
+| Sonnwacht | fällt Tag 15 | fällt Tag 5, 15–18, wird zurückgeholt (Aktion bleibt) |
+| Westen (Friedhof, Moor, Feste) | alles verloren, dann tot | bleibt umkämpft: die Toten halten ihre Gruft, die Kettenstreife (max. 50) schlägt ihre Heere vor Eren |
 | Valens Heere Tag 1 | marschieren zur Nekropole | halten Eren/Straße, Streife unterwegs |
 
-Stellschrauben (`sim.js`): `WAR_GRACE` 5 Tage, `PATROL` (Stärke 35, Routen, `PATROL_EVERY` 4), `RELIEF` (3 Tage Wartezeit, Stärke 40, 5 Tage Stationierung, je Stadt alle 6 Tage). Die Kettenstreife wächst bis zum Heeresdeckel (110), weil im Westen niemand mehr gegen sie steht — bewusst: solange die Eisenfeste steht, ist der Westen sicher.
+Stellschrauben (`sim.js`): `WAR_GRACE` 5 Tage, `PATROL` (Stärke 35, Routen, `PATROL_EVERY` 4, `PATROL_MAX` 50), `UNDEAD_ARMIES` 2 (die Toten stellen bis zu zwei Heere aus Gruft-Knoten ohne Heer auf), `RELIEF` (3 Tage Wartezeit, Stärke 40, 5 Tage Stationierung, je Stadt alle 6 Tage). Streifen nehmen keine Gruft-Knoten (auch nicht nach gewonnener Feldschlacht) und wachsen höchstens auf 50, damit die Front lebendig bleibt (Nutzer: „da soll schon Aktion sein“). Lauf über 45 Tage: Sonnwacht wechselt mehrfach, Alt-Vharn wird zeitweise von Valen genommen, Eren und Nordfurt halten, kein Dauerzustand.
