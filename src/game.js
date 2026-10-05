@@ -2240,7 +2240,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin], FS = FAC_STARTS[cfg.facStart] || null, race = FS ? FS.race : 'mensch';   /* Fraktions-Starts: Ort, Rasse, Paket */
@@ -2469,7 +2469,7 @@ export function continueGame(given = null, retried = false) {                   
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
-  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureClues(); ensureEscorts(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
@@ -4087,6 +4087,7 @@ function die(c, cause = 'Wunden', source) {
   if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
   if (c.escortee) { const C = (S.contracts || []).find(x => x.id === c.contract); if (C) failContract(C, `${c.name} ist unterwegs gestorben.`, 6, true); }   // S13 (Nutzer)
+  if (c.questEscort && !c.arrived) { const st = S.quests[c.quest]; if (st?.state === 'active') { st.state = 'failed'; st.outcome = `${c.name} ist unterwegs gestorben.`; log(`${QUESTS[c.quest]?.name || c.quest}: gescheitert — ${c.name} ist unterwegs gestorben.`, 'quest'); } }   /* W3 */
   if (c.deserter && c.contract) { const RC = (S.contracts || []).find(x => x.id === c.contract && x.kind === 'rumor' && x.state === 'active'); if (RC) { RC.reward.gold = 0; rumorDone(RC, true); } }   /* Gerücht: Deserteur im Kampf gefallen statt überredet — Auftrag trotzdem abgeschlossen, kein Lohn */
   if (c.runaway && S.quests.q_runaway?.state === 'active') runawayEnd('Der Entlaufene ist tot.', 3);   // S12 A3
   if (c.robot && c.faction === 'aurel' && source && (source === S.player || S.party.includes(source.id))) startHunt(1);   // S12 E: Aurelion fahndet
@@ -8673,10 +8674,10 @@ function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contrac
 // Schritttempo des Helden. Bleibt der Held zurück (> 280 px), wartet er und ruft; bei Gefahr läuft er zum Helden. Einmal unterwegs
 // lauern Räuber (außerhalb des Bildes). Fern vom Helden wartet er — der Auftrag hängt nie, er pausiert.
 function escortStep(e, dt) {
-  const C = (S.contracts || []).find(c => c.id === e.contract && c.state === 'active'); if (!C) return false;
-  const p = S.player, dp = dist(e, p), now = performance.now();
+  const C = e.questEscort ? (S.quests[e.quest]?.state === 'active' ? e.esc : null) : (S.contracts || []).find(c => c.id === e.contract && c.state === 'active'); if (!C) return false;   /* W3: feste Aufträge führen ihr Ziel am Begleiter (e.esc) */
+  const p = S.player, dp = dist(e, p), now = performance.now(), slow = e.wounded ? 0.6 : 1;   /* W3: Verwundete gehen langsam */
   const foe = foesNow().find(f => dist(f, e) < 240);
-  if (foe) { if (!(e._cry > now)) { e._cry = now + 6000; bubble(e, '„Hilfe!“', 1800); emote(e, 'angst', 1500); }   /* N6-9: Hilferuf als Blase statt aufsteigendem Text */ seek(e, Math.atan2(p.y - e.y, p.x - e.x), 1.7 * dt / 16, dt, p); return true; }
+  if (foe) { if (!(e._cry > now)) { e._cry = now + 6000; bubble(e, '„Hilfe!“', 1800); emote(e, 'angst', 1500); }   /* N6-9: Hilferuf als Blase statt aufsteigendem Text */ seek(e, Math.atan2(p.y - e.y, p.x - e.x), 1.7 * slow * dt / 16, dt, p); return true; }
   if (dp > 280) { e.vx = e.vy = 0; e.facing = p.y > e.y ? 0 : 1; if (!(e._cry > now)) { e._cry = now + 8000; float(e, pick(['Warte auf mich!', 'Nicht so schnell!', 'Wo bist du?']), 'rgba(220,210,180,ALPHA)'); } return true; }
   const [sx, sy] = conSq(C.town);
   const route = e.route ||= SIM.roadAsync(sx | 0, sy | 0, C.tx | 0, C.ty | 0, 1.5) || null;
@@ -8689,10 +8690,10 @@ function escortStep(e, dt) {
         log(`${e.name} zieht ein Messer: „Tut mir leid. Nein — eigentlich nicht.“ Es war eine Falle!`, 'combat'); UI.toast('VERRAT', 2400);
         for (const f of S.ents.world) if (f.kind === 'enemy' && f.aggroId === e.id) f.aggroId = p.id; return false; }
       log(`${e.name}: „Da vorne! Räuber!“`, 'combat'); } return true; }
-  seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * dt / 16, dt, { x: gx, y: gy }); return true;
+  seek(e, Math.atan2(gy - e.y, gx - e.x), (dp < 90 ? 1.9 : 1.5) * slow * dt / 16, dt, { x: gx, y: gy }); return true;
 }
 function conTick() {
-  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick();   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
+  rumorTick(); fistTick(); tavernHint(); bandTick(); compTick(); vaultTick(); royalTick(); nemesisTick(); questEscortTick();   /* W3 */   /* Schenke: Faustkampf */   /* Nutzer §5e.4: Gerüchte */
   const p = S.player; if (!S.contracts || S.map !== 'world') return;
   for (const C of [...S.contracts]) {
     if (C.state === 'active' && C.until && (S.day | 0) > C.until && C.have < C.need) { failContract(C, 'Die Frist ist verstrichen.', 2); continue; }
@@ -8732,7 +8733,7 @@ function conTick() {
   }
   let anyDead = false;   /* PERF-U: nur Handelnde durchsehen und nur neu filtern, wenn wirklich einer weg muss — die neue Liste je Sekunde
                             erzwang sonst jedes Mal einen vollen Neuaufbau aller Caches über ~17 000 Einträge (dead setzt nur diese Schleife) */
-  for (const e of actorsOf('world').list) { if (e.dead) anyDead = true; if (e.escortee && e.alive) { const C = S.contracts.find(c => c.id === e.contract);   // Eskorte: Bewegung in escortStep
+  for (const e of actorsOf('world').list) { if (e.dead) anyDead = true; if (e.escortee && e.alive && !e.questEscort) { const C = S.contracts.find(c => c.id === e.contract);   // Eskorte: Bewegung in escortStep
     if (C?.state !== 'active') { e.dead = anyDead = true; continue; } e.anchor = { x: e.x, y: e.y }; e.schedulePos = null; } }
   if (anyDead) S.ents.world = S.ents.world.filter(e => !e.dead);
 }
@@ -13898,10 +13899,11 @@ function talk(npc) {
   // Quests des Gebers
   for (const [k, Q] of Object.entries(QUESTS)) {
     if (Q.clsTrial) { clsTrialChoices(npc, k, Q, choices); continue; }   /* Klassen-Prüfung: jeder Lehrer der Klasse; angeboten wird über „Kannst du mich ausbilden?“ */
-    if (Q.giver ? Q.giver !== npc.key : !(Q.giverProf && npc.prof === Q.giverProf && (Q.giverMap ? npc.map === Q.giverMap : npc.post === 'kettenfeste') && !npc.hostile)) continue;   // S14: Geber nach Beruf (Kette, Seevolk)
+    const atTurnin = !!Q.turnin && Q.turnin !== Q.giver && Q.turnin === npc.key;   /* W3: Abgabe bei einem anderen als dem Geber (Q.turnin) */
+    if (!atTurnin && (Q.giver ? Q.giver !== npc.key : !(Q.giverProf && npc.prof === Q.giverProf && (Q.giverMap ? npc.map === Q.giverMap : npc.post === 'kettenfeste') && !npc.hostile))) continue;   // S14: Geber nach Beruf (Kette, Seevolk)
     const st = S.quests[k];
-    if (!st && questAvailable(k)) choices.push({ text: `Was liegt an? (${Q.name})`, fn: () => offerQuest(npc, k) });
-    else if (st && st.state === 'active' && questComplete(k) && !Q.pact && k !== 'q_lila') choices.push({ text: `Erledigt. (${Q.name})`, fn: () => Q.decide ? questDecide(npc, k) : turnIn(npc, k) });   /* Welttiefe: Aufträge mit Entscheidung am Ende */
+    if (!st && questAvailable(k)) { if (!atTurnin) choices.push({ text: `Was liegt an? (${Q.name})`, fn: () => offerQuest(npc, k) }); }
+    else if (st && st.state === 'active' && questComplete(k) && !Q.pact && k !== 'q_lila' && (!Q.turnin || Q.turnin === npc.key)) choices.push({ text: `Erledigt. (${Q.name})`, fn: () => Q.decide ? questDecide(npc, k) : turnIn(npc, k) });   /* Welttiefe: Aufträge mit Entscheidung am Ende */
   }
   pactChoices(npc, choices); evidenceChoices(npc, choices);   /* Asservatenkammer (03.10.) */
   if (npc.key === 'jorun' && S.quests.q_lila?.state === 'active' && S.flags.lilaFound)
@@ -14430,7 +14432,7 @@ function startQuest(k) {
   if (k === 'kt_rogue2') lendAbility('backstab', 'Der Lehrer leiht dir für die Prüfung den Meuchelstich — er liegt auf deiner Leiste.');   /* Entwickler 03.10. */
   if (k === 'kt_bard2') { const p = S.player; p.hotbar ||= []; if (!p.hotbar.some(h => h?.key === 'war_song')) { const i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = { type: 'ability', key: 'war_song' }; else p.hotbar.push({ type: 'ability', key: 'war_song' }); } log('Der Lehrer leiht dir für die Prüfung das Kriegslied — es liegt auf deiner Leiste.', 'quest'); }   /* C-3: sonst war die Prüfung ohne Bardenklasse unlösbar */
   if (QUESTS[k]?.sea && k !== 'q_wb_nebel') seaQuestStart(k);   // S14: Lager, Grube
-  if (QUESTS[k]?.clues) setTimeout(ensureClues, 0);                 /* Welttiefe: Spuren liegen, sobald der Auftrag aktiv ist (nach dem Eintrag unten) */
+  if (QUESTS[k]?.clues) setTimeout(ensureClues, 0); if (QUESTS[k]?.escorts) setTimeout(ensureEscorts, 0);   /* W3 */                 /* Welttiefe: Spuren liegen, sobald der Auftrag aktiv ist (nach dem Eintrag unten) */
   if (k === 'q_grisk_lost') planLostGoblins(); if (k === 'q_grisk_rache') spawnChainRest();   // S12 A4                                   // was schon erledigt ist, zählt (Boss vorher erschlagen, Gegenstand dabei)
   (QUESTS[k]?.clsTrial ? qStore() : S.quests)[k] = { state:'active', progress: QUESTS[k].objectives.map(o =>
     o.type === 'item' ? S.player.inv.filter(x => x.key === o.target).reduce((n, x) => n + (x.count || 1), 0)
@@ -14751,6 +14753,27 @@ function inquiryChoices(npc, choices) {
     Q.objectives.forEach((o, i) => { if (o.type !== 'talk' || o.target !== npc.key || (st.progress[i] || 0) >= (o.count || 1)) return;
       choices.push({ text: `Befragen: ${o.text} (${Q.name})`, fn: () => { questEvent('talk', npc.key, 1); emote(npc, 'ausruf', 1400); addRel(npc.key, 1);
         UI.dialogue(npc, o.say || '„Ich weiß nichts davon.“', [{ text: 'Weiter', fn: () => talk(npc) }]); } }); }); }
+}
+/* W3 Eskorte (Welttiefe, 05.10.2026): Zieltyp 'escort' für feste Aufträge. Q.escorts = [{ key, name, prof, from, to, wounded, greet }]. Der Begleiter entsteht am
+   Startort (ensureEscorts, idempotent; bleibt im Spielstand), geht wie eine Vertrags-Eskorte selbst den Straßenweg (escortStep über e.esc), ist verwundet
+   langsamer, zählt am Ziel questEvent('escort') und bleibt dort wohnen; stirbt er unterwegs, scheitert der Auftrag (die). */
+function ensureEscorts() {
+  const want = new Map();
+  for (const [k, st] of Object.entries(S.quests)) { const Q = QUESTS[k]; if (st?.state !== 'active' || !Q?.escorts) continue;
+    for (const e of Q.escorts) { const i = Q.objectives.findIndex(o => o.type === 'escort' && o.target === e.key); if (i >= 0 && (st.progress[i] || 0) >= (Q.objectives[i].count || 1)) continue; want.set(e.key, { e, k }); } }
+  const gone = x => x.questEscort && !x.arrived && !want.has(x.questEscort);
+  if (S.ents.world.some(gone)) S.ents.world = S.ents.world.filter(x => !gone(x));   /* Auftrag vorbei (abgebrochen, gescheitert): der Begleiter verschwindet; Angekommene bleiben */
+  for (const [key, { e, k }] of want) { if (S.ents.world.some(x => x.questEscort === key && x.alive)) continue;
+    const [sx, sy] = conSq(e.from), q = freeSpotNear('world', sx + 2, sy + 2, 2), [tx, ty] = conSq(e.to);
+    const c = makeChar({ name: e.name, prof: e.prof || 'Reisender', x: q.x, y: q.y, level: 2, faction: null, traits: ['furchtsam'] });
+    Object.assign(c, { questEscort: key, quest: k, escortee: true, visitor: true, wounded: !!e.wounded, greet: e.greet || '„Bring mich hin. Bitte.“', anchor: { x: q.x, y: q.y }, esc: { town: e.from, to: e.to, tx, ty, ambushed: false } });
+    S.ents.world.push(c); }
+}
+function questEscortTick() {
+  if (S.map !== 'world') return;
+  for (const e of S.ents.world) { if (!e.questEscort || !e.alive || e.arrived || !e.esc) continue;
+    if (Math.hypot(e.x / TS - e.esc.tx, e.y / TS - e.esc.ty) < 8) { e.arrived = true; e.escortee = false; e.anchor = { x: e.x, y: e.y }; e.schedulePos = null; e.greet = '„Danke. Ich bleibe hier, bis es besser ist.“';
+      log(`${e.name} ist in ${townName(e.esc.to)} in Sicherheit.`, 'quest'); chronicle(`${e.name} in Sicherheit gebracht`, 'quest', `${S.player.name} brachte ${e.name} nach ${townName(e.esc.to)}.`); questEvent('escort', e.questEscort, 1); } }
 }
 function cluePos(c) {
   const P = TOWN_PLAN[c.town]; let tx, ty;                           /* at = Plan-Koordinaten (wie die Props im TOWN_PLAN) → worldPt; P.square ist zur Laufzeit schon Weltkachel */
@@ -17471,7 +17494,7 @@ function drawWorldmap(cv, zoom = 1) {                   // S12: gemalte Karte mi
   c.lineWidth = 1;
 }
 // Wo liegt ein Auftrag? Zielort (Kartenpunkt in LOCATIONS-Einheiten) — „finden“: wo die Person gerade ist
-const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
+const QUEST_WHERE = { q_erm_markt: 'eren', q_erm_nordfurt: 'northcity', q_esk_finn: 'northcity', q_wolves: 'forest', q_mine: 'mine', q_paladin1: 'graveyard', q_paladin2: 'mine', q_paladin3: 'shrine', q_undead: 'marsh',
   q_graverobbers: 'necropolis', q_kingsiron: 'deephall', q_frontier: 'hundertfeld', q_grove: 'grove', q_pact: 'necropolis', q_monk: 'graveyard',
   q_greymane: 'wolfden', q_sandlord: 'redwaste', q_hundred_song: 'hundertfeld', q_grisk_build: 'grubenhort', c_nec2: 'necropolis', c_dru1: 'wolfden', g_dod1: 'morrgrund', g_dod2: 'kettenfeste', g_dod3: 'kettenfeste', q_pferch: 'kettenfeste' };   
 function questPoint(k) {                                          // Suchaufträge ohne Ziel: die Suche ist der Auftrag (kein Verraten)
@@ -17489,6 +17512,7 @@ function questPoint(k) {                                          // Suchaufträ
   if (k === 'q_intrige') return S.intrigue ? (S.intrigue.done ? houseSeat(S.intrigue.from) : { x: S.intrigue.x / TS | 0, y: S.intrigue.y / TS | 0 }) : null;
   if (k === 'q_runaway') return S.runaway ? { x: S.runaway.x / TS | 0, y: S.runaway.y / TS | 0 } : null;
   if (k === 'q_tribut') { const l = LOCATIONS.find(l => l.key === (S.tributQuest?.village || 'grauwasser')); return l ? { x: l.x, y: l.y } : null; }
+  if (QUESTS[k].escorts) { const e = S.ents.world.find(x => x.questEscort && x.quest === k && x.alive && !x.arrived); if (e) return dist(e, S.player) > 300 ? { x: e.x / TS, y: e.y / TS } : { x: e.esc.tx, y: e.esc.ty }; }   /* W3: erst zum Begleiter, dann zum Ziel */
   if (QUESTS[k].objectives.some(o => o.type === 'find')) return null;
   const l = LOCATIONS.find(l => l.key === QUEST_WHERE[k]); return l ? { x: l.x, y: l.y } : null;
 }
@@ -18389,6 +18413,8 @@ function debugSections() {
       'Aufträge: Ermittlung „Sechs statt zehn“ starten (Brann in Nordfurt; Kontor, Südtor, Gerold und Hauke; Urteil bei Brann)': () => { if (!S.quests.q_erm_nordfurt) { startQuest('q_erm_nordfurt'); log('Auftrag angenommen: Sechs statt zehn (Debug).', 'quest'); } UI.toast('Spuren am Kontor-Lagertor und vor dem Südtor von Nordfurt; Gerold und Hauke befragen; Urteil bei Brann.', 3500); },
       'Aufträge: Auftraggeber Jorun stirbt (Nachfolger nach 3 Tagen, „Die vermisste Tochter“ bleibt abgebbar)': () => { const j = npcByKey('jorun'); if (!j) return UI.toast('Jorun nicht gefunden.'); j.alive = false; j.hp = 0; successorDay(); UI.toast(`Jorun ist tot; Nachfolger am Tag ${S.succ?.jorun}.`, 3500); },
       'Aufträge: Auftraggeber Tomas stirbt (Verwandter, kein Nachfolger — „Graumähne“ scheitert im Tageswechsel)': () => { const t = npcByKey('tomas'); if (!t) return UI.toast('Tomas nicht gefunden.'); if (!S.quests.q_greymane) startQuest('q_greymane'); t.alive = false; t.hp = 0; questGiverDeadDay(); UI.toast(`Graumähne: ${S.quests.q_greymane?.state}`, 3500); },
+      'Aufträge: Eskorte „Finn muss zur Heilerin“ starten (Brann in Nordfurt; Finn verwundet nach Eren zu Elena)': () => { if (!S.quests.q_esk_finn) { startQuest('q_esk_finn'); log('Auftrag angenommen: Finn muss zur Heilerin (Debug).', 'quest'); } ensureEscorts(); UI.toast('Finn wartet am Platz von Nordfurt. Er geht langsam — bleib bei ihm. Abgabe bei Elena in Eren.', 3500); },
+      'Aufträge: Eskorte — Begleiter ans Ziel setzen': () => { const e = S.ents.world.find(x => x.questEscort && x.alive && !x.arrived); if (!e) return UI.toast('Keine Eskorte unterwegs.'); e.x = e.esc.tx * TS; e.y = e.esc.ty * TS; questEscortTick(); UI.toast(`${e.name} ist am Ziel.`); },
       'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
       'Aufträge: Zählkerbe über dem Helden (2 von 3)': () => { questNotch(p, 2, 3); setTimeout(() => questNotch(p, 3, 3), 1600); },
@@ -23513,6 +23539,24 @@ export function selftest() {
       return okAll;
     } finally { S.contracts = c0; S.conDay = cd0; if (ct0) S.conTop = ct0; else delete S.conTop; S.day = d0; registerContracts(); }
   }));
+  ok('Welttiefe W3 Slice 1: Eskorte als Auftragsziel — Begleiter entsteht am Startort (idempotent), verwundet und langsam; am Ziel zählt das Ziel, er bleibt dort; Abgabe nur beim genannten NPC (turnin), nicht beim Geber; stirbt er unterwegs, scheitert der Auftrag', sandbox(() => {
+    const q0 = S.quests.q_esk_finn, ents0 = S.ents.world.slice(), m0 = S.map, R0 = { ...S.relations }; const W = {}; const p = stage(); S.map = 'world'; p.map = 'world';
+    const op = UI.uiHooks.dialogue; let last = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; return true; };
+    try {
+      delete S.quests.q_esk_finn; startQuest('q_esk_finn'); ensureEscorts(); ensureEscorts();
+      const F = S.ents.world.filter(e => e.questEscort === 'finn_esk'), f = F[0], [sx, sy] = conSq('northcity');
+      W.one = F.length === 1 && !!f && f.wounded && f.escortee && Math.hypot(f.x / TS - sx, f.y / TS - sy) < 12 && !questComplete('q_esk_finn');
+      const el = { key: 'elena', kind: 'npc', name: 'Elena', x: p.x, y: p.y, map: 'world', alive: true }, br = { key: 'brann', kind: 'npc', name: 'Brann', x: p.x, y: p.y, map: 'world', alive: true };
+      last = null; talk(el); W.notYet = !(last || []).some(c => /^Erledigt\. \(Finn/.test(c.text)); UI.closeDialogue();
+      const [tx, ty] = conSq('eren'); f.x = tx * TS; f.y = ty * TS; questEscortTick(); W.arrived = S.quests.q_esk_finn.progress[0] === 1 && f.arrived === true && !f.escortee && questComplete('q_esk_finn') && S.ents.world.includes(f);
+      last = null; talk(br); W.giverNo = !(last || []).some(c => /^Erledigt\. \(Finn/.test(c.text)); UI.closeDialogue();
+      last = null; talk(el); const done = (last || []).find(c => /^Erledigt\. \(Finn/.test(c.text)); W.turnin = !!done; const rb = S.relations.brann || 0; if (done) done.fn(); W.paid = S.quests.q_esk_finn.state === 'done' && (S.relations.brann || 0) === rb + 12; UI.closeDialogue();
+      delete S.quests.q_esk_finn; S.ents.world = S.ents.world.filter(e => e.questEscort !== 'finn_esk'); startQuest('q_esk_finn'); ensureEscorts(); const g = S.ents.world.find(e => e.questEscort === 'finn_esk'); die(g, 'Probe', p);
+      W.failed = S.quests.q_esk_finn.state === 'failed' && /gestorben/.test(S.quests.q_esk_finn.outcome || '');
+      const okAll = W.one && W.notYet && W.arrived && W.giverNo && W.turnin && W.paid && W.failed; if (!okAll) console.warn('W3-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_esk_finn = q0; else delete S.quests.q_esk_finn; S.ents.world = ents0; S.map = m0; S.relations = R0; UI.closeDialogue(); }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23863,7 +23907,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, successorDay, questGiverDeadDay, supplyTown, ensureEscorts, questEscortTick, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
