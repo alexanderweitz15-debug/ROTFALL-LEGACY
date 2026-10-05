@@ -1541,3 +1541,8 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 - **Händler meiden den Weg:** Ab einem Risiko von 0,4 fährt kein Zug mehr. Die Zielstadt bekommt keine Ware, ihr Vorrat sinkt, die Preise steigen (wie bei jedem Mangel). Das Kontor zeigt „Unsichere Wege: Händler meiden die Straße nach …“ (Handelspartner in Reichweite). Nach dem zweiten Überfall steht es im Log und in der Chronik.
 - **Rückkehr nach der Befreiung:** Wird eine Stadt zurückerobert, gilt ihr Weg wieder als sicher, und aus der nächsten Handelsstadt bricht ein Zug mit Korn (sonst Salz) und zwei Wachen auf: „Händler kehren nach … zurück.“
 - Schmuggelaufträge in besetzte Städte gab es schon (Anschlagbrett der Nachbarstadt). Probe „Welttiefe W9 Slice 1“.
+
+## Regionalbosse verändern ihren Kampfplatz (Welttiefe W10 Slice 1, 05.10.2026)
+- Unter 50 % Leben ruft jeder Regionalboss weiter Verstärkung — und kippt jetzt zusätzlich das Wetter seines Kampfplatzes für einige Minuten: Graumähne lässt Nebel aus der Schlucht kriechen (Sicht), Karrak ruft den Sandsturm, Varg lässt Blut aus den Ketten regnen. Einmal je Kampf, mit Ansage und Log.
+- Fällt der Boss, klart es sofort auf; läuft die Zeit ab, verzieht sich das Wetter von selbst. Alte Stände ohne das Feld sind unberührt.
+- Bossmaterial für Reliquien gibt es schon: Regionalbosse geben Seelenglut und Sternsplitter, Stufe V verlangt eine Trophäe. Probe „Welttiefe W10 Slice 1“.

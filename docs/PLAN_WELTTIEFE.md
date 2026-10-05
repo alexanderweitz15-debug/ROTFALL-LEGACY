@@ -43,7 +43,7 @@ Regel: zuerst das, was die meisten anderen Pakete tragen (Quest-Bausteine), dann
 | **W7 Gefährten-Meinung** | Kommentar zu Urteilen/Fraktionswechseln (bubble), Moral-Effekt, Warnung, Abgang; eigene Beziehungen zu NPCs | §6 |
 | **W8 Legacy-Erinnerung** | NPCs kennen das Haus (Satz je Beziehung des Vorfahren), vererbte Beziehungen gedämpft, offene Fälle als Erbe-Auftrag, Familien-Ruf | §7 |
 | **W9 Krieg ↔ Wege ↔ Händler** (begonnen) | Unsichere Routen (Karawanen meiden, Preise), Schmuggelaufträge, Rückkehr der Händler nach Befreiung | §13, §14 |
-| **W10 Bosse, Reliquien-Upgrades, Geheimorte** | Arena-Veränderungen, Bossmaterial → Reliquienstufe, restliche Geheimorte | §11, §12, §16 |
+| **W10 Bosse, Reliquien-Upgrades, Geheimorte** (begonnen) | Arena-Veränderungen, Bossmaterial → Reliquienstufe, restliche Geheimorte | §11, §12, §16 |
 | **W11 Kampfprofile Rest, UI-Fenster** | Bogen/Armbrust/Sense/Doppelklinge/Magie/Bosswaffen; Fraktionsübersicht, Schwarzmarkt, Stadtinfo | §10, §17 |
 
 ## Slice-Regel je Paket
@@ -85,3 +85,4 @@ Erst ein vollständiges Beispiel (ein Auftrag, ein NPC, eine Folge, eine Probe, 
 - **W5 Slice 1 (05.10.):** Spuren mit Jagdkunst-Anforderung (`clue.skill`, `trackEase` bei Regen/Schnee/Morgengrauen, `huntGain` beim Lesen), `clue.spawn` treibt ein Elite-Tier hervor, `kill`-Ziel auf `ELITES`-Key, `clue.near/off` im Gelände, Lohn `prosper`. Auftrag „Der Keiler von Joruns Feld“ (Jorun, Eisenhauer). Status: Probe grün (506/506), live geprüft (Sperre, Regen, Keiler erscheint). Offen in W5: seltene/legendäre Tiere als Weltsystem, Fallen, Jagd-Händler, Trophäen-Verkauf.
 - **W5 Slice 2 (05.10.):** Jagd-Händler ohne neuen NPC: Jäger-Berufe werden im Gespräch zum Abnehmer (`hunterChoices`, `huntTrade`, `fixedStock`), Preisaufschlag in `price()` nach Jagdkunst (`huntMul`). Status: Probe grün (507/507), live geprüft (Burkhard in Eren, Fell 13 statt 8). Offen in W5: Fallen, seltene Tiere als Weltsystem.
 - **W9 Slice 1 (05.10.):** `routeRisk` (Totenknoten/Räuberlager nahe der Linie, `S.eco.unsafe` nach Überfällen), `avoids` ab 0,4 in der Zugplanung, Wachen bei Risiko, `tradeReturn` über `H.afterCapture`, Kontor-Zeile. Status: Probe grün (508/508), live geprüft (Kontor-Text, Rückkehrzug nach Befreiung). Offen in W9: der sichtbare Zug der Alten Straße meidet noch nichts; Schmuggel in Ketten-Gebiete.
+- **W10 Slice 1 (05.10.):** Arena-Veränderung als Datenfeld `arena` an `REGION_BOSSES` (`bossArena` in Phase 2, `arenaClear` bei Tod/Ablauf, `S.arenaWx`). Bossmaterial → Reliquien existiert bereits (Glut/Stern, Trophäe ab Stufe V). Status: Probe grün (509/509), live geprüft. Offen in W10: weitere Geheimorte (keine Vorschlagsliste mehr im Repo, Lore nötig), Arenen für Garmadon/Omega haben eigene Phasen.
