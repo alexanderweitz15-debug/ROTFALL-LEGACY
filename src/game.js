@@ -8318,10 +8318,13 @@ function acceptContract(C) {
   if (C.kind === 'defense') C.at = clock() + ri(60, 120);
   log(`Auftrag angenommen: ${C.title}.`, 'quest'); conTick();
 }
-function conProgress(C, n = 1) {
+const PAY_ON_SITE = new Set(['escort', 'deliver']);   /* Nutzer 05.10.2026: Eskorte und Lieferung zahlen am Ziel, nicht erst beim Geber */
+function conProgress(C, n = 1, npc = null) {
   C.have = Math.min(C.need, C.have + n); const st = S.quests['c_' + C.id]; if (st) st.progress = [C.have];
-  log(`${C.title}: ${C.have}/${C.need}${C.have >= C.need ? ' — erledigt, zurück zum Auftraggeber.' : ''}`, 'quest');
+  const onSite = C.have >= C.need && PAY_ON_SITE.has(C.kind) && C.state === 'active' && C.twist !== 'traitor';   /* Verrat: der Geber hat die Falle gestellt — Abrechnung bei ihm */
+  log(`${C.title}: ${C.have}/${C.need}${C.have >= C.need ? (onSite ? ' — erledigt, der Lohn wird hier ausgezahlt.' : ' — erledigt, zurück zum Auftraggeber.') : ''}`, 'quest');
   if (C.have >= C.need) { S.ents.world = S.ents.world.filter(e => e.contract !== C.id || e.kind === 'enemy'); C.done = true; }
+  if (onSite) claimContract(C, npc);
 }
 function claimContract(C, npc) {
   if (C.state !== 'active') return false;                             // S15 (Nutzer-Bug: dieselbe Mission dreimal abgegeben): nur einmal auszahlen
@@ -8523,7 +8526,7 @@ function sealTick(dt) {                                                /* alle 0
 function conChoices(npc, choices) {
   const here = npc.vm || npc.homeTown || npc.town;                         // S13: Paket bei jedem Bewohner der Zielstadt abgeben
   for (const C of activeCons()) if (C.kind === 'deliver' && C.target === here && C.have < C.need && hasItem(S.player, 'auftragspaket'))
-    choices.unshift({ text: `Das Paket aus ${townName(C.town)} übergeben.`, fn: () => { removeItem(S.player, 'auftragspaket', 1); conProgress(C); UI.dialogue(npc, '„Endlich. Das Siegel ist heil — gut. Sag ihnen, es ist angekommen.“', [{ text: 'Weiter', fn: () => talk(npc) }]); } });
+    choices.unshift({ text: `Das Paket aus ${townName(C.town)} übergeben.`, fn: () => { removeItem(S.player, 'auftragspaket', 1); conProgress(C, 1, npc); UI.dialogue(npc, '„Endlich. Das Siegel ist heil — gut. Hier, dein Lohn — sie haben ihn mitgeschickt.“', [{ text: 'Weiter', fn: () => talk(npc) }]); } });
   const fortGiver = ['Tributoffizier', 'Kettenwache', 'Paladinmarschall', 'Eisenpaladin'].includes(npc.prof) && (npc.prof === 'Tributoffizier' || npc.post === 'kettenfeste' || npc.homeTown === 'kettenfeste' || npc.eisen);   // S14: in der Festung selbst gab es niemanden
   if (fortGiver && !S.flags.chainsBroken && !npc.hostile) choices.unshift({ text: 'Hat die Kette Arbeit? (Aufträge)', fn: () => conList(npc, 'kettenfeste', 'vm') });   // S13 (Nutzer: in der Eisenfeste gab es keine Aufträge)
   if (npc.musician) choices.unshift({ text: 'Spiel etwas. (2 Kupfer)', fn: () => { if (S.gold >= 1) S.gold -= 1; S.player.stamina = S.player.maxStamina; for (const m of partyMembers()) m.morale = Math.min(100, m.morale + 3); UI.dialogue(npc, pick(MUSIC), [{ text: '[Zuhören]', fn: () => UI.closeDialogue() }]); log('Der Spielmann spielt. Die Gruppe summt mit.', 'party'); } });
@@ -8722,7 +8725,7 @@ function conTick() {
       let t = alive[0];
       if (!t) { const [sx, sy] = conSq(C.town), q = freeSpotNear('world', sx + 2, sy + 2, 2); t = makeChar({ name: C.name, prof: 'Reisender', x: q.x, y: q.y, level: 2, faction: null, traits: ['furchtsam'] });
         Object.assign(t, { contract: C.id, transient: true, visitor: true, escortee: true, anchor: { x: q.x, y: q.y } }); S.ents.world.push(t); }
-      if (Math.hypot(t.x / TS - C.tx, t.y / TS - C.ty) < 8) { S.ents.world = S.ents.world.filter(e => e !== t); conProgress(C); }
+      if (Math.hypot(t.x / TS - C.tx, t.y / TS - C.ty) < 8) { S.ents.world = S.ents.world.filter(e => e !== t); conProgress(C, 1, t); }
     }
     if (C.kind === 'deliver' && C.smuggle && Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 6 && hasItem(p, 'auftragspaket')) { removeItem(p, 'auftragspaket', 1); conProgress(C); log('Aus einem Keller greifen Hände nach dem Bündel. „Danke. Sag ihnen, wir halten durch.“', 'quest'); }
     else if (C.kind === 'deliver' && !C.smuggle && Math.hypot(p.x / TS - C.tx, p.y / TS - C.ty) < 10 && S.ents.world.some(e => e.vm === C.target && dist(e, p) < 80) && hasItem(p, 'auftragspaket')) { removeItem(p, 'auftragspaket', 1); conProgress(C); }
@@ -20834,13 +20837,13 @@ export function selftest() {
     return wed && duel && mins;
   }));
   ok('S13 Krieg schreibt Aufträge: besetzte Nachbarstadt → Schmuggelauftrag; Paket bis auf den Platz der besetzten Stadt erfüllt ihn', (() => {
-    const p = S.player, keep = JSON.stringify({ c: S.contracts, q: S.quests, tr: S.track, x: p.x, y: p.y, inv: p.inv, own: S.war.nodes.ashford?.owner }), qk = Object.keys(QUESTS); S.contracts = [];
+    const p = S.player, keep = JSON.stringify({ c: S.contracts, q: S.quests, tr: S.track, x: p.x, y: p.y, inv: p.inv, own: S.war.nodes.ashford?.owner, g: S.gold, xp: [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints], f: S.factions, st: S.stats || null, t: S.trust || null }), qk = Object.keys(QUESTS); S.contracts = [];   /* Lieferung zahlt am Ziel (05.10.): Lohn des echten Helden zurücksetzen */
     try {
       S.war.nodes.ashford.owner = 'undead';
       const C = smuggleContract('kreuzweg') || smuggleContract('northcity'); if (!C || C.target !== 'ashford' && S.war.nodes[C.target]?.owner !== 'undead') return false;
       S.contracts.push(C); acceptContract(C); p.x = C.tx * TS; p.y = C.ty * TS; conTick();
       return C.smuggle && C.have === C.need && !hasItem(p, 'auftragspaket');
-    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; p.inv = k.inv; S.war.nodes.ashford.owner = k.own; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
+    } finally { const k = JSON.parse(keep); S.contracts = k.c; S.quests = k.q; S.track = k.tr; p.x = k.x; p.y = k.y; p.inv = k.inv; S.war.nodes.ashford.owner = k.own; S.gold = k.g; [p.xp, p.level, p.xpNext, p.attrPoints, p.skillPoints] = k.xp; S.factions = k.f; if (k.st) S.stats = k.st; else delete S.stats; if (k.t) S.trust = k.t; else delete S.trust; for (const q of Object.keys(QUESTS)) if (!qk.includes(q)) delete QUESTS[q]; }
   })());
   ok('S13 Infofeld: zeigt, was eine Figur anbietet (Handel, Ausbessern, Aufträge nach Beruf, Kutsche, Söldner)', sandbox(() => {
     const p = stage(), s = actor(p.x + 40, p.y); Object.assign(s, { shop: true, smith: true, prof: 'Schmied', homeTown: 'eren' });
@@ -23563,6 +23566,20 @@ export function selftest() {
       return okAll;
     } finally { UI.uiHooks.dialogue = op; S.towns.eren.stock = st0; Object.assign(S.res, res0); S.gold = g0; S.growth = gr0; S.day = d0; delete S.investDay?.eren; if (S.war?.nodes?.eren && own0 !== undefined) S.war.nodes.eren.owner = own0; if (rz0 !== undefined) (S.razed ||= {}).eren = rz0; UI.closeDialogue(); }
   }));
+  ok('Aufträge (Nutzer 05.10.): Eskorte und Lieferung zahlen am Ziel — mit dem letzten Schritt ist der Auftrag abgeschlossen und das Gold da; Kopfgeld wartet weiter auf den Geber', sandbox(() => {
+    const c0 = S.contracts, q0 = structuredClone(S.quests), tr0 = S.track, g0 = S.gold, W0 = S.ents.world.slice(), cm0 = S.conMax; S.contracts = []; const W = {}; const p = stage(); S.gold = 100;
+    try {
+      const D = makeContract('eren', 'deliver', 'board'); S.contracts.push(D); acceptContract(D); const g1 = S.gold; conProgress(D, 1, { key: 'havel', kind: 'npc', name: 'Havel' });
+      W.deliver = D.state === 'claimed' && S.gold > g1 && S.quests['c_' + D.id]?.state === 'done';
+      const E = makeContract('eren', 'escort', 'board'); S.contracts.push(E); acceptContract(E); const g2 = S.gold; conProgress(E, E.need - E.have, null);
+      W.escort = E.state === 'claimed' && S.gold > g2;
+      const B = makeContract('eren', 'bounty', 'board'); S.contracts.push(B); acceptContract(B); const g3 = S.gold; conProgress(B, B.need - B.have);
+      W.bountyWaits = B.state === 'active' && B.have >= B.need && S.gold === g3;
+      const okAll = W.deliver && W.escort && W.bountyWaits; if (!okAll) console.warn('Lohn-vor-Ort-Probe', JSON.stringify(W));
+      return okAll;
+    } finally { for (const k of Object.keys(QUESTS)) if (k.startsWith('c_') && !q0[k]) delete QUESTS[k]; S.contracts = c0; S.quests = q0; S.track = tr0; S.gold = g0; S.ents.world = W0; registerContracts(); }
+  }));
+  { const heroNow = JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]); if (hero0 && hero0 !== heroNow) console.warn('BUG-123 Diff', hero0, '→', heroNow); }
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
