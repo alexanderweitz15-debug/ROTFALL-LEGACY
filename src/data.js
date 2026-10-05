@@ -1517,11 +1517,11 @@ export const QUESTS = {
     decide:{ prompt:'„Also. Wer war es?“ Havel sieht dich an, als hinge sein Dorf an der Antwort.',
       options:[
         { key:'borin', text:'„Borin. Er war betrunken, er hatte Gelegenheit.“', say:'„Dann ist es entschieden. Borin zahlt Mara den Schaden und bleibt der Schenke einen Monat fern.“ Hinter dir wird es still im Dorf — die Spuren haben etwas anderes gesagt.',
-          effects:{ rel:{ borin:-45, havel:5, tomas:-10 }, prosper:{ eren:-3 }, chron:'Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.' } },
+          effects:{ rel:{ borin:-45, havel:5, tomas:-10 }, prosper:{ eren:-3 }, memory:{ borin:'blamed', tomas:'spared' }, chron:'Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.' } },
         { key:'tomas', text:'„Tomas. Er hat den Schinken genommen, um die Wölfe von den Höfen zu locken — und wurde dafür gebissen.“', say:'„Der Junge?“ Havel atmet aus. „Dann war es Dummheit, kein Diebstahl. Er arbeitet das Fleisch bei Mara ab, und ich rede mit ihm über Wölfe. Danke — das war mehr Mühe, als ein Schinken wert ist.“',
-          effects:{ rel:{ tomas:10, mara:5, havel:10 }, rep:{ valen:2 }, prosper:{ eren:2 }, chron:'Der Fall des fehlenden Schinkens in Eren ist gelöst: Tomas lockte Wölfe von den Höfen, kein Dieb.' } },
+          effects:{ rel:{ tomas:10, mara:5, havel:10 }, rep:{ valen:2 }, prosper:{ eren:2 }, memory:{ tomas:'caught', borin:'cleared' }, chron:'Der Fall des fehlenden Schinkens in Eren ist gelöst: Tomas lockte Wölfe von den Höfen, kein Dieb.' } },
         { key:'zahlen', text:'„Niemand. Ich ersetze Mara den Schaden selbst, und die Sache ist vergessen.“ (60 Gold)', gold:60, say:'„Du zahlst für etwas, das du nicht getan hast?“ Havel schüttelt den Kopf. „Gut. Ich frage nicht weiter. Aber ich merke mir, dass du mir keinen Namen gegeben hast.“',
-          effects:{ rel:{ mara:15, tomas:15, havel:-5 }, chron:'Du hast in Eren für einen fremden Schinken bezahlt, damit niemand verurteilt wird.' } } ] },
+          effects:{ rel:{ mara:15, tomas:15, havel:-5 }, memory:{ tomas:'spared', borin:'cleared' }, chron:'Du hast in Eren für einen fremden Schinken bezahlt, damit niemand verurteilt wird.' } } ] },
     reward:{ gold:40, xp:90 } },
   q_erm_nordfurt: { name:'Sechs statt zehn', giver:'brann', turnin:'brann',
     desc:'„Zehn Barren hat mir der Kontor berechnet. Sechs sind angekommen. Gerold sagt, der Fuhrmann habe vier auf der Straße verloren — bei Nacht, ohne Zeugen. Ich schmiede seit dreißig Jahren und habe noch nie einen Barren verloren gesehen. Sieh dich am Kontor um, rede mit Gerold und mit Hauke, der die Nachtwache hatte. Dann sag mir, wer mich bestiehlt.“',
@@ -1536,11 +1536,11 @@ export const QUESTS = {
     decide:{ prompt:'„Und? Wer bestiehlt mich?“ Brann legt den Hammer nicht aus der Hand.',
       options:[
         { key:'gerold', text:'„Gerold. Die Barren wurden nachts mit Schlüssel geladen und nach Süden gefahren. Hier ist einer davon.“', say:'„Mit Schlüssel. Sein Schlüssel.“ Brann nickt langsam. „Ich gehe zur Stadtwache. Der Kontor liefert nach, und Gerold zahlt die Fuhre. Die Stadt soll wissen, was ihr Händler nachts treibt.“',
-          effects:{ rel:{ gerold:-40, brann:15, hauke:5 }, rep:{ merch:-3, valen:2 }, prosper:{ northcity:2 }, stock:{ northcity:{ ingot:4 } }, chron:'Nordfurt: Der Kontorhändler Gerold verschob nachts Branns Barren nach Süden — auf dein Wort hin kam das Eisen zurück.' } },
+          effects:{ rel:{ gerold:-40, brann:15, hauke:5 }, rep:{ merch:-3, valen:2 }, prosper:{ northcity:2 }, stock:{ northcity:{ ingot:4 } }, memory:{ gerold:'caught' }, chron:'Nordfurt: Der Kontorhändler Gerold verschob nachts Branns Barren nach Süden — auf dein Wort hin kam das Eisen zurück.' } },
         { key:'fuhrmann', text:'„Der Fuhrmann hat sie verloren. Gerold trifft keine Schuld.“', say:'„Verloren.“ Brann sieht dich lange an. „Dann sind sie eben verloren. Und du bist der Nächste, dem ich nicht mehr glaube.“',
-          effects:{ rel:{ gerold:10, brann:-15 }, rep:{ merch:2 }, chron:'Nordfurt: Branns Barren blieben verschwunden — du hast den Kontor gedeckt.' } },
+          effects:{ rel:{ gerold:10, brann:-15 }, rep:{ merch:2 }, memory:{ gerold:'spared' }, chron:'Nordfurt: Branns Barren blieben verschwunden — du hast den Kontor gedeckt.' } },
         { key:'deal', text:'„Gerold liefert leise nach, und keiner redet davon. Er hat mir fünfzig Gold dafür gegeben.“', say:'„Fünfzig Gold.“ Brann spuckt aus. „Behalt sie. Die Barren nehme ich. Dich merke ich mir.“',
-          effects:{ gold:50, rel:{ gerold:15, brann:-5 }, rep:{ valen:-2 }, stock:{ northcity:{ ingot:4 } }, chron:'Nordfurt: Die Barren kamen leise zurück; Gerold kaufte dein Schweigen für fünfzig Gold.' } } ] },
+          effects:{ gold:50, rel:{ gerold:15, brann:-5 }, rep:{ valen:-2 }, stock:{ northcity:{ ingot:4 } }, memory:{ gerold:'spared' }, chron:'Nordfurt: Die Barren kamen leise zurück; Gerold kaufte dein Schweigen für fünfzig Gold.' } } ] },
     reward:{ gold:50, xp:110 } },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
@@ -1802,6 +1802,7 @@ export const MEMORY_TEXT = {
   friend_died:'war dabei, als ein Freund starb', starved:'hat mich hungern lassen',
   paid:'hat gezahlt, was versprochen war', led_to_victory:'hat uns zum Sieg geführt',
   left_to_die:'hat mich liegen lassen', killed_kin:'hat einen der Meinen getötet',
+  verdict_blamed:'mich vor allen beschuldigt hat', verdict_cleared:'für mich gesprochen hat', verdict_caught:'mich auffliegen ließ', verdict_spared:'mich gedeckt hat',   /* W2: Urteile */
 };
 
 // ---- Phase 18–20: Städte, Märkte, Krieg ----

@@ -35,7 +35,7 @@ Regel: zuerst das, was die meisten anderen Pakete tragen (Quest-Bausteine), dann
 | Paket | Inhalt | Trägt |
 |---|---|---|
 | **W1 Ermittlung** (begonnen) | Zieltypen `talk`, `clue`; Urteil mit Folgen (`decide`); erster Fall in Eren | Investigation, Social, Konsequenzen (§1, §3) |
-| **W2 Folgen-Bausteine** | `reward`/`decide`-Effekte auf Wohlstand, Preise (`S.towns[k].stock`/Markt), Gerücht (`rumor*`), Erinnerung (`S.relations` + NPC-Satz „Du warst das …“), Nachfolger für erschlagene Geber | §3, §5, §14 |
+| **W2 Folgen-Bausteine** (begonnen) | `decide`-Effekte auf Wohlstand und Markt (gebaut in W1), Erinnerung (`memory` → `remember()` + Gruß `verdictGreet`, gebaut), Gerücht (Chronik `news` → „Was gibt es Neues?“, gebaut); offen: Nachfolger für erschlagene Geber | §3, §5, §14 |
 | **W3 Eskorte, Rettung, Lieferung mit Varianten** | Generischer Begleit-Zieltyp (NPC folgt, Verwundeter langsam, Gefangener lebend), Lieferung bei Nacht/Zeitdruck/ohne Kontrolle als Varianten des Lieferauftrags | §1 |
 | **W4 Kill-Varianten und Regionen** | Vorlagen „Alpha, nicht das Rudel“, „Quelle der Auferstehung“, „nur Infizierte“; Themen-Pools je Region für Bretter (`S.contracts`-Arten) | §2, §4, §20 |
 | **W5 Jagd** | Spuren (clue-Props mit Wetter/Tageszeit), seltene/legendäre Tiere, Fallen, Trophäen, Jagd-Händler; Fertigkeit wirkt auf Spurenlesen | §9 |
@@ -74,3 +74,4 @@ Erst ein vollständiges Beispiel (ein Auftrag, ein NPC, eine Folge, eine Probe, 
 
 - **W1 Slice 1 (05.10.):** Zieltypen `talk` und `clue`, `ensureClues()`, `clueRead()`, `inquiryChoices()`, `questDecide()`; Auftrag „Blut auf dem Markt“ (Havel, Eren) mit zwei Spuren, zwei Befragungen, drei Urteilen; Probe, Debug-Eintrag, `MECHANIKEN.md`, `DATA_SCHEMAS.md`. Status: Probe grün, **live getestet** (echter Pfad: Prompt, E, Dialogknöpfe, Urteil).
 - **W1 Slice 2 (05.10.):** „Sechs statt zehn“ (Brann, Nordfurt) mit Beweisstück (`give`) und Marktfolge (`stock`); Spur-Props mit Prompt-Vorrang wie benannte Figuren. Status: Probe grün (490/490), live geprüft bis zum Urteil (Urteilspfad identisch mit Fall 1).
+- **W2 Slice 1 (05.10.):** Urteil-Erinnerung und Gerücht ohne neues System: `effects.memory` → bestehendes `remember()` (Entity-Erinnerung, auch für spätere Gefährten über `MEMORY_TEXT`), Gruß `verdictGreet` in `talk()` für 30 Tage; `chron` als Chronik-Art `news` → `recentNews` (Gossip, Sprechblasen, 5 Tage). Beide Ermittlungen tragen `memory`. Status: Probe grün (492/492), **live getestet** (Urteil per Dialog, Borins Gruß, Gerücht bei Havel, Verblassen nach 31 Tagen). Offen in W2: Nachfolger für erschlagene Geber.

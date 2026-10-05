@@ -24,11 +24,13 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - Slice 2 (6e54d3a): `q_erm_nordfurt` mit `give` (Beweisstück) und `stock` (Marktfolge); Probe grün 490/490; live geprüft bis zum Urteil.
 - Nutzerpunkte 05.10. (Commit folgt): `foundCamp` lehnt Stadtgebiet + 6 Felder ab (`townAt`), `dissolveSettlement` + Knopf in `settleUI`, Titel auf Zeit (`titleDay`, `p.titleUntil`, `TITLE_DAYS = 7`); Probe grün 491/491 headless; Knopf live geprüft (B-Fenster, Doppelklick, Kiste, Log).
 
+- W2 Slice 1 (Commit folgt): `effects.memory` → `verdictRemember`/`remember`, Gruß `verdictGreet` in `talk()` (30 Tage), Urteil als Chronik-`news` (Gerücht 5 Tage); Probe grün 492/492; live getestet (Dialogpfad, Gruß, Gerücht, Verblassen).
+
 ## Nächster Schritt
-- W2 Folgen-Bausteine (Erinnerung, Gerücht) und W1 Slice 3 aus der Vorschlagstabelle (`docs/PLAN_WELTTIEFE.md`) nach Nutzerentscheid.
+- W2 Slice 2: Nachfolger für erschlagene Geber (Auftrag bleibt abgebbar) — oder W1 Slice 3 nach Nutzerentscheid (alle Vorschläge tragen eine Designfrage). Ohne Antwort: W2 Slice 2.
 
 ## Teststatus (§5.1)
-- Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`.
+- Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
 
 ## Berührte Funktionen
-`talk` (eine Aufrufzeile), `doInteract`, `interactables`, `updatePrompt`, `startQuest`, `newGame`/`continueGame` (ensure-Kette), `QUEST_WHERE`, `debugSections`, `selftest`, `foundCamp`, `dayTick`, `SIM.H.title`, `settleUI` (ui.js); neu: `inquiryChoices`, `cluePos`, `ensureClues`, `clueRead`, `questDecide`, `dissolveSettlement`, `titleDay`.
+`talk` (eine Aufrufzeile), `doInteract`, `interactables`, `updatePrompt`, `startQuest`, `newGame`/`continueGame` (ensure-Kette), `QUEST_WHERE`, `debugSections`, `selftest`, `foundCamp`, `dayTick`, `SIM.H.title`, `settleUI` (ui.js); neu: `inquiryChoices`, `cluePos`, `ensureClues`, `clueRead`, `questDecide`, `dissolveSettlement`, `titleDay`, `verdictRemember`, `verdictGreet`, `npcByKey`; geändert: `talk` (Gruß), `newsLine`, `gossip`-Quelle.

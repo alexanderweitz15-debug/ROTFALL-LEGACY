@@ -13926,10 +13926,11 @@ function talk(npc) {
   choices.push({ text: 'Was hältst du von Omega?', fn: () => UI.dialogue(npc, faithLine(npc), [{ text: 'Weiter', fn: () => talk(npc) }]) });   // Nutzer S13
   choices.push({ text: '[Gehen]', fn: () => UI.closeDialogue() });
   // Ruf färbt die Begrüßung: nach einer Tat gegen jemanden ist der Ton kalt
-  const greet = npc.runaway ? '„Bitte … nicht zurück. Nicht in den Steinbruch.“' : fearedBy(npc) ? FEAR_GREET[fearLvl() - 1][(npc.seed * 7 | 0) % 3]
+  let greet = npc.runaway ? '„Bitte … nicht zurück. Nicht in den Steinbruch.“' : fearedBy(npc) ? FEAR_GREET[fearLvl() - 1][(npc.seed * 7 | 0) % 3]
     : rel <= -30 ? '„Du. Sag, was du willst, und dann geh.“' : npc.wary > now && npc.provoked ? '„Ich behalte dich im Auge.“'
     : pactBound() && !npc.undead && npc.faction !== 'undead' && !S.party.includes(npc.id) ? pactGreet(npc)
     : (npc.faction && S.factions[npc.faction] != null && repTier(npc.faction).greet) || contextGreet(npc, npc.greet);   // §43 Ruf färbt; sonst Kontext (Phase 1)
+  if (!npc.runaway && !fearedBy(npc)) greet = verdictGreet(npc) || greet;   /* W2: wer ein Urteil erlebt hat, grüßt danach (VERDICT_DAYS) */
   if (!talky(npc)) {                                                  /* Entwickler 01.10.2026: nicht jeder steht für Fragen bereit */
     const keep = choices.filter(c => !CHATTER.test(c.text));
     if (keep.length <= 1) { bubble(npc, greet.replace(/[„“]/g, '').slice(0, 80), 2600);
@@ -13961,7 +13962,7 @@ function newsLine(t) {
   if ((m = t.match(/^(.+) fiel bei (.+)$/))) return `${m[1]} ist bei ${locDat(m[2])} gefallen`;
   if ((m = t.match(/^(.+) (gefallen|befreit)$/))) return `${m[1]} ist ${m[2]}`;
   if ((m = t.match(/^(.+) (erschlagen|zerschlagen)$/))) return `${m[1]} wurde ${m[2]}`;
-  return t;
+  return t.replace(/\.$/, '');   /* ganze Sätze (Urteile) ohne doppelten Punkt */
 }
 function newsTalk(k) {                                               // [Sprecher, Antwort] für Sprechblasen, oder null
   const N = recentNews(); if (!N.length) return null;
@@ -14752,6 +14753,16 @@ function clueRead(t) {
   if (!S.flags.clueHint) { S.flags.clueHint = 1; log('Spuren gehören zu Aufträgen: Wer sie liest, zählt das Ziel; Aussagen der Befragten stehen im Protokoll (Log). Am Ende entscheidest du beim Geber, wer es war — und das Dorf merkt sich dein Urteil.', 'quest'); }
   questEvent('clue', t.clue, 1); ensureClues();
 }
+/* W2 Folgen-Bausteine (Welttiefe, 05.10.2026): Betroffene eines Urteils erinnern sich (bestehendes remember()/MEMORY_TEXT, VERDICT_DAYS Tage)
+   und grüßen danach; das Urteil läuft als Gerücht über die Chronik-Art 'news' („Was gibt es Neues?“, recentNews). Kein zweites System. */
+const VERDICT_DAYS = 30;
+const VERDICT_GREET = { blamed: '„Du warst das. Du hast gesagt, ich sei es gewesen — und alle haben es geglaubt. Sag, was du willst, und dann geh.“',
+  cleared: '„Du hast für mich gesprochen, als alle schon ihr Urteil hatten. Das vergesse ich nicht.“',
+  caught: '„Wegen dir zeigen sie mit dem Finger auf mich. Ich habe bezahlt. Was willst du noch?“',
+  spared: '„Wir beide wissen, was du weißt. Ich halte den Mund — halt du ihn auch.“' };
+const npcByKey = key => { for (const m in S.ents) { const e = (S.ents[m] || []).find(e => e.kind === 'npc' && e.key === key && e.alive !== false); if (e) return e; } return null; };
+function verdictRemember(key, kind, about) { const n = npcByKey(key); if (!n || !VERDICT_GREET[kind]) return false; remember(n, 'verdict_' + kind, about); return true; }
+function verdictGreet(npc) { const m = (npc.memories || []).filter(x => /^verdict_/.test(x.key) && (S.day | 0) - (x.day | 0) <= VERDICT_DAYS).pop(); return m ? VERDICT_GREET[m.key.slice(8)] || null : null; }
 function questDecide(npc, k) {
   const Q = QUESTS[k], D = Q.decide, st = qSt(k); if (!D || !st || st.state !== 'active') return turnIn(npc, k);
   const opts = D.options.map(o => ({ text: o.text, fn: () => {
@@ -14764,7 +14775,7 @@ function questDecide(npc, k) {
     for (const [t, n] of Object.entries(E.prosper || {})) growthOf(t).prosper = clamp(growthOf(t).prosper + n, -20, 100);
     for (const [t, goods] of Object.entries(E.stock || {})) for (const [g, n] of Object.entries(goods)) if (S.towns?.[t]?.stock) { S.towns[t].stock[g] = Math.max(0, (S.towns[t].stock[g] || 0) + n); log(`${townName(t)}: ${ITEMS[g]?.name || g} ${n > 0 ? '+' : ''}${n} am Markt.`, 'economy'); }   /* Urteil wirkt auf den Markt (Preise folgen über die Wirtschaft) */
     if (E.flag) S.flags[E.flag] = 1;
-    st.outcome = o.key; if (E.chron) chronicle(`${Q.name}: Urteil`, 'quest', E.chron); if (E.chron) log(E.chron, 'quest');
+    st.outcome = o.key; for (const [key, kind] of Object.entries(E.memory || {})) verdictRemember(key, kind, Q.name); if (E.chron) { chronicle(E.chron, 'news', `${Q.name}: Urteil`); log(E.chron, 'quest'); }   /* W2: Betroffene erinnern sich, der Ort trägt das Urteil als Neuigkeit */
     turnIn(npc, k); UI.dialogue(npc, o.say, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); UI.refreshHUD(); } }));
   UI.dialogue(npc, D.prompt, [...opts, { text: 'Ich brauche noch Zeit.', fn: () => UI.closeDialogue() }]);
 }
@@ -18331,6 +18342,7 @@ function debugSections() {
       'Aufträge: Brief „Erfüllt“ zeigen (ohne Folgen)': () => UI.questLetter('done', 'probe', { name: 'Wölfe vor Eren' }),
       'Aufträge: Ermittlung „Blut auf dem Markt“ starten (Havel in Eren; Spuren und Befragungen, Urteil am Ende)': () => { if (!S.quests.q_erm_markt) { startQuest('q_erm_markt'); log('Auftrag angenommen: Blut auf dem Markt (Debug).', 'quest'); } UI.toast('Spuren liegen auf dem Markt und am Viehtrog von Eren; Borin und Elena befragen; Urteil bei Havel.', 3500); },
       'Aufträge: Ermittlung „Sechs statt zehn“ starten (Brann in Nordfurt; Kontor, Südtor, Gerold und Hauke; Urteil bei Brann)': () => { if (!S.quests.q_erm_nordfurt) { startQuest('q_erm_nordfurt'); log('Auftrag angenommen: Sechs statt zehn (Debug).', 'quest'); } UI.toast('Spuren am Kontor-Lagertor und vor dem Südtor von Nordfurt; Gerold und Hauke befragen; Urteil bei Brann.', 3500); },
+      'Aufträge: Urteil-Erinnerung — Borin beschuldigt, Tomas gedeckt (Begrüßung 30 Tage + Gerücht)': () => { const a = verdictRemember('borin', 'blamed', 'Blut auf dem Markt'), b = verdictRemember('tomas', 'spared', 'Blut auf dem Markt'); chronicle('Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.', 'news', 'Blut auf dem Markt: Urteil (Debug)'); UI.toast(a && b ? 'Borin und Tomas erinnern sich; „Was gibt es Neues?“ trägt das Urteil fünf Tage.' : 'Borin oder Tomas nicht gefunden.', 3500); },
       'Aufträge: Brief zerreißt (ohne Folgen)': () => UI.questLetter('failed', 'probe', { name: 'Der vermisste Sohn' }),
       'Aufträge: Zählkerbe über dem Helden (2 von 3)': () => { questNotch(p, 2, 3); setTimeout(() => questNotch(p, 3, 3), 1600); },
       'Aufträge: nächsten Auftrag verfolgen (Tracker)': () => { const L = Object.keys(S.quests).filter(k => S.quests[k].state === 'active'); if (!L.length) return UI.toast('Kein offener Auftrag.'); S.track = L[(L.indexOf(S.track) + 1) % L.length]; UI.refreshHUD(); },
@@ -23401,6 +23413,30 @@ export function selftest() {
       return okAll;
     } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_nordfurt = q0; else delete S.quests.q_erm_nordfurt; S.relations = R0; S.growth = G0; S.towns.northcity.stock = st0; S.factions = f0; S.gold = g0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; UI.closeDialogue(); }
   }));
+  ok('Welttiefe W2 Slice 1: Urteil-Erinnerung und Gerücht — Betroffene merken sich das Urteil (remember), grüßen 30 Tage lang danach (talk), der Ort trägt es als Neuigkeit (recentNews); danach verblasst der Gruß', sandbox(() => {
+    const q0 = S.quests.q_erm_markt, R0 = { ...S.relations }, G0 = structuredClone(S.growth || {}), g0 = S.gold, f0 = { ...S.factions }, fm0 = structuredClone(S.fame || null), ents0 = S.ents.world.slice(), ch0 = S.chronicle.length, d0 = S.day;
+    const bor = npcByKey('borin'), tom = npcByKey('tomas'), mb = bor?.memories?.slice(), mt = tom?.memories?.slice(), bx = bor && { x: bor.x, y: bor.y };
+    const op = UI.uiHooks.dialogue; let last = null, text = null; UI.uiHooks.dialogue = (n, t, ch) => { last = ch; text = t; return true; };
+    const p = stage(); const W = { npcs: !!bor && !!tom };
+    try {
+      if (!W.npcs) { console.warn('W2-Probe: Borin oder Tomas fehlt'); return false; }
+      delete S.quests.q_erm_markt; S.gold = 500; startQuest('q_erm_markt'); ensureClues();
+      for (const c of S.ents.world.filter(e => e.clue)) clueRead(c);
+      for (const key of ['borin', 'elena']) { const ch = []; inquiryChoices({ key, kind: 'npc', name: key, x: p.x, y: p.y, map: p.map }, ch); ch[0]?.fn(); }
+      W.done = questComplete('q_erm_markt');
+      const hav = { key: 'havel', kind: 'npc', name: 'Havel', faction: 'valen', x: p.x, y: p.y, map: p.map }; questDecide(hav, 'q_erm_markt');
+      S._quiet = false; try { last[0].fn(); } finally { S._quiet = true; }   /* Chronik schreibt nur ohne _quiet; Einträge werden unten gekürzt */
+      W.judged = S.quests.q_erm_markt.outcome === 'borin';
+      W.mem = (bor.memories || []).slice(-1)[0]?.key === 'verdict_blamed' && (tom.memories || []).slice(-1)[0]?.key === 'verdict_spared' && !!MEMORY_TEXT.verdict_blamed && !!MEMORY_TEXT.verdict_spared;
+      W.greet = verdictGreet(bor) === VERDICT_GREET.blamed && verdictGreet(tom) === VERDICT_GREET.spared;
+      W.news = recentNews().some(c => /Unschuldiger/.test(c.text));
+      bor.x = p.x + 20; bor.y = p.y; text = null; talk(bor); W.talk = text === VERDICT_GREET.blamed; UI.closeDialogue();
+      S.day = d0 + VERDICT_DAYS + 1; W.faded = verdictGreet(bor) === null; S.day = d0;
+      const okAll = W.npcs && W.done && W.judged && W.mem && W.greet && W.news && W.talk && W.faded; if (!okAll) console.warn('W2-Probe', JSON.stringify(W), text);
+      return okAll;
+    } finally { UI.uiHooks.dialogue = op; if (q0) S.quests.q_erm_markt = q0; else delete S.quests.q_erm_markt; S.relations = R0; S.growth = G0; S.gold = g0; S.factions = f0; if (fm0) S.fame = fm0; else delete S.fame; S.ents.world = ents0; S.chronicle.length = ch0; S.day = d0;
+      if (bor) { if (mb) bor.memories = mb; else delete bor.memories; Object.assign(bor, bx); } if (tom) { if (mt) tom.memories = mt; else delete tom.memories; } UI.closeDialogue(); }
+  }));
   ok('Siedlung (Nutzer 05.10.): keine Gründung in einer Stadt oder sechs Felder davor; Auflösen räumt Gebäude, Siedler, Lagerwachen und Vieh ab, legt das Lager als Kiste ab und braucht Anwesenheit; Titel „Befreier von …“ verblasst nach 7 Tagen', sandbox(() => {
     const se0 = S.settlement, st0 = S.stash, res0 = { ...S.res }, ents0 = S.ents.world.slice(), d0 = S.day, map0 = S.map;
     const p = stage(); const W = {};
@@ -23685,7 +23721,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, armorOf, cdMul, damageOf, fearOf, guardChar, startQuest, ensureClues, clueRead, inquiryChoices, questDecide, questComplete, interactables, foundCamp, dissolveSettlement, titleDay, verdictRemember, verdictGreet, npcByKey, recentNews, relicDrop, relicEquip: (i, s) => relicEquip(S.player, i, s), relicFx, relicGain, relicKill, relicUpgrade: i => relicUpgrade(S.player, i), relicView, relicsOf, townDread, walkInNew,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
