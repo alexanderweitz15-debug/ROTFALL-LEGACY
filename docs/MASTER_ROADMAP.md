@@ -1,5 +1,7 @@
 # ROTFALL: LEGACY — Master-Anweisung und Feature-Roadmap
 
+> **Hinweis (05.10.2026):** Teil A (Arbeitsregeln) ist in `CLAUDE.md` aufgegangen und gilt dort; Teil B und C (Vision, Pakete, Prioritäten, End-to-End-Tests) bleiben als Roadmap maßgeblich.
+
 Stand: 2026-09-30. Vom Nutzer als verbindliche Arbeitsgrundlage übergeben. Diese Datei ist die Referenz für Claude und seine Agenten. Die Statustabelle der laufenden Pakete steht weiter in `PLAN_S15.md`; der Ist-Zustand des Codes in `IST_ZUSTAND.md`.
 
 ## Teil A — Arbeitsregeln (vor jeder Implementierung)
