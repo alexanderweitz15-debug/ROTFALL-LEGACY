@@ -31,8 +31,11 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - Fremder Zweig `origin/claude/exciting-cori-m6jrms` ist verwaist (kein merge-base, 39 alte Commits): nicht lesen.
 - Nutzerpunkte 05.10. (alle gemerged, PR #15–#18): BUG-144 Wuchtschlag im Schwung; Varonheim-Hauptplatz entlastet (Treffpunkte vor öffentlichen Häusern); Betriebe: Vorrat liefern + Handel fördern 20 % Karawanenbonus; Eskorte/Lieferung zahlen am Ziel. Selbsttest 498/498.
 
+- Krieg (PR #19, #20): Schonfrist, Streifen, Entsatz, Front lebendig; 45-Tage-Messung in BALANCE.md.
+- W3 Slice 1 (Commit folgt): Zieltyp `escort`, `turnin`, Finn-Auftrag; Probe grün 500/500, live getestet.
+
 ## Nächster Schritt
-- W3 Eskorte/Rettung/Lieferung mit Varianten: Bestand = Vertragsarten escort/deliver/missing (`CON`, `escortStep`, Hinterhalt auf halber Strecke, Verräter-Wendung); Lücke = Zieltyp `escort` für feste Aufträge (`QUESTS`) mit Varianten (Verwundeter langsam, Gefangener lebend) und Lieferung bei Nacht/Zeitdruck. Plan (§3) vor dem ersten Edit, Slice 1 = ein fester Auftrag mit Begleit-Ziel. Alternativ W1 Slice 3 nach Nutzerentscheid.
+- W3 Slice 2: Variante *Gefangener lebend* (Begleiter gefesselt, Flucht/Verrat) oder Lieferung bei Nacht/Zeitdruck als feste Auftragsziele; dann W4. Alternativ W1 Slice 3 nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
