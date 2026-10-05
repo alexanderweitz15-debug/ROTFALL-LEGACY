@@ -1559,3 +1559,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Der sichtbare Zug meidet unsichere Wege (Welttiefe W9 Slice 2, 05.10.2026)
 - Die Händlerkarawane zwischen Eren und Nordfurt prüft am Tor, ob die Alte Straße als unsicher gilt (Totenknoten oder Räuberlager an der Straße, jüngste Überfälle; dieselbe Regel wie für die unsichtbaren Händlerzüge). Gilt sie als unsicher, wartet der Zug in der Stadt, das Log meldet es einmal am Tag, das Kontextfeld zeigt „wartet — Weg unsicher“ und nennt, was hilft.
 - Wird der Weg wieder sicher (Knoten befreit, Lager zerschlagen, Überfälle verebbt), bricht der Zug von selbst auf. Sichtbare Überfälle auf der Alten Straße zählen jetzt ins Wegrisiko. Probe „Welttiefe W9 Slice 2“.
+
+## Schwarzmarkt-Fenster (Welttiefe W11 Slice 3, 05.10.2026)
+- Bei Rook und Nix öffnet „Hast du Messing unter dem Tisch?“ jetzt das Fenster „Schwarzmarkt“: Tagesangebot (vier Teile, selten ein Prototyp) mit Preis (+50 %), Prothesenstufe und Kaufen-Knopf; zu teure Teile sind ausgegraut. Nach dem Kauf sagt der Händler, ob das Teil neu oder gebraucht war (gebraucht: 60 % Zustand beim Einsetzen).
+- Die Regeln (Angebot, Gold, Tasche, Gebrauchtware) prüft die Aktion, nicht das Fenster. Der Koop-Gast handelt weiter über die Dialogliste. Probe „Welttiefe W11 Slice 3“.

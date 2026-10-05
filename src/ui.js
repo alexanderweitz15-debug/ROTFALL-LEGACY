@@ -919,7 +919,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    town:[ 'Stadt', townUI ], classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], relics:[ 'Reliquien', relicsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    town:[ 'Stadt', townUI ], black:[ 'Schwarzmarkt', blackUI ], classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], relics:[ 'Reliquien', relicsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1643,6 +1643,21 @@ function settleTier(st) {
 // ---- Fraktionen ----
 let selFac = 'valen';
 /* W11 Slice 1: Stadtinfo-Fenster — Daten aus A.townInfo (game.js), nur Anzeige. */
+/* W11 Slice 3: Schwarzmarkt-Fenster — Angebot aus A.blackList, Kauf über A.blackBuy (Prüfung dort), Händlerspruch als Zeile im Fenster */
+let blackSay = '';
+function blackUI(body, npc) {
+  npc = npc || blNpc; if (!npc) return; if (blNpc !== npc) blackSay = ''; blNpc = npc;
+  const L = A.blackList?.(npc) || [];
+  body.innerHTML = `<div class="ledger"><div class="ctx-head">${qa(npc.name)}</div><div class="ctx-sub">Schwarzmarkt · kein Rang nötig · +50 % Preis · manche Teile gebraucht</div>
+    <div class="ctx-line"><span>Dein Gold</span><b>${S.gold}</b></div>
+    <div class="ctx-block"><div class="ctx-sub">Unter dem Tisch</div>
+      ${L.length ? L.map(o => `<div class="ctx-line"><span>${qa(o.name)}${o.part ? ` · Stufe ${o.tier}` : ''}${o.rare ? ' · <i>selten</i>' : ''}</span><b>${o.cost} Gold <button class="mini" data-bk="${o.key}" ${S.gold < o.cost ? 'disabled' : ''}>Kaufen</button></b></div>`).join('') : '<div class="ctx-line"><span>Heute nichts mehr. Morgen liegt wieder etwas unter dem Tisch.</span></div>'}
+    </div>
+    ${blackSay ? `<div class="ctx-block ledger">${qa(blackSay)}</div>` : ''}
+    <div class="ctx-block ledger">Gebrauchte Prothesen haben beim Einsetzen nur 60 % Zustand. Das Angebot wechselt täglich.</div></div>`;
+  [...body.querySelectorAll('[data-bk]')].forEach(b => b.onclick = () => { const r = A.blackBuy?.(npc, b.dataset.bk); blackSay = r?.say || ''; refreshModal(npc); });
+}
+let blNpc = null;
 function townUI(body, k) {
   const I = A.townInfo?.(k); if (!I) { body.innerHTML = '<div class="ledger">Kein Ort gewählt. Klick im Kontextfeld rechts auf den Ortsnamen.</div>'; return; }
   const row = (a, b, cls = '') => `<div class="ctx-line"><span>${qa(a)}</span><b class="${cls}">${b}</b></div>`;
