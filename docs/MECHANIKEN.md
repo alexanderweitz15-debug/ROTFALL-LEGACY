@@ -1563,3 +1563,7 @@ Die Eisenfeste lebt nach einem festen Tagesplan. Beim ersten Betreten erklärt e
 ## Schwarzmarkt-Fenster (Welttiefe W11 Slice 3, 05.10.2026)
 - Bei Rook und Nix öffnet „Hast du Messing unter dem Tisch?“ jetzt das Fenster „Schwarzmarkt“: Tagesangebot (vier Teile, selten ein Prototyp) mit Preis (+50 %), Prothesenstufe und Kaufen-Knopf; zu teure Teile sind ausgegraut. Nach dem Kauf sagt der Händler, ob das Teil neu oder gebraucht war (gebraucht: 60 % Zustand beim Einsetzen).
 - Die Regeln (Angebot, Gold, Tasche, Gebrauchtware) prüft die Aktion, nicht das Fenster. Der Koop-Gast handelt weiter über die Dialogliste. Probe „Welttiefe W11 Slice 3“.
+
+## Stadtbevölkerung nach Betten (Nutzer 06.10.2026)
+- In jedem Wohnhaus leben so viele Bewohner, wie Betten darin stehen (Bett 1, Stockbett 2), mindestens einer. Häuser und Herrenhäuser haben ein zweites Bett, wo der Raum es hergibt. Werkstätten, Läden und Prachtbauten behalten ihr Personal wie bisher (es wohnt anderswo). Die Bewohnerzahl der Städte ist dadurch etwa halbiert; alte Stände behalten ihre Bewohner.
+- Treffpunkte neben dem Hauptplatz (Schenke, Kapelle, Läden, Bäckerei, Heiler, Schmiede, Stall) gibt es jetzt ab neun Häusern; je Ort trifft sich nur noch etwa ein Dutzend Müßiger auf dem Platz. Probe „Stadtbevölkerung (Nutzer 06.10.)“.

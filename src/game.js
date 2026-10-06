@@ -953,7 +953,11 @@ export const femTrade = prof => /(in|frau)$/.test(prof) || ['Magd', 'Witwe', 'St
 const HALL_TYPES = new Set(['palace', 'markethall', 'bank', 'academy', 'observatory', 'library', 'court', 'hospital', 'bathhouse', 'magitech', 'factoryhall', 'legion']);
 const HOUSE_CAP = { manor: 4, house: 3, cottage: 2, fisher: 2, bakery: 2, tavern: 2, smithy: 2, healer: 1, chapel: 1, store: 1, stable: 1, barn: 1,
   palace: 6, markethall: 6, bank: 3, academy: 5, observatory: 2, library: 3, court: 3, hospital: 4, bathhouse: 2, magitech: 3, factoryhall: 5, legion: 6 };   // Phase 5: Prachtbauten
-const houseCap = b => b.type === 'house' && b.w * b.h < 20 ? 2 : HOUSE_CAP[b.type] || 1;
+/* Nutzer 06.10.2026 („zu dritt in einem Haus mit einem Bett“): Bewohner je Haus = Betten im Haus (Bett 1, Stockbett 2), mindestens einer
+   (Werkstätten ohne Bett haben ihren Meister), höchstens die alte Obergrenze. Häuser ohne gesetzte Möbel (alte Stände, Probe) zählen die Möbeltabelle. */
+const BED_TYPES = { bed: 1, bunk: 2 };
+function bedsOf(b) { let n = 0, any = false; for (const e of S.ents.world) if (e.house === b.id && e.type) { any = true; n += BED_TYPES[e.type] || 0; } if (!any) for (const f of HB.FURNISH[b.type] || []) n += BED_TYPES[f[0]] || 0; return n; }
+const houseCap = b => (HB.FURNISH[b.type] || []).some(f => BED_TYPES[f[0]]) ? Math.max(1, Math.min(bedsOf(b), HOUSE_CAP[b.type] || 1)) : HOUSE_CAP[b.type] || 1;   /* Werkstätten und Prachtbauten: Personal wohnt anderswo, alte Obergrenze */
 const NAMED_HOME = { eren: ['tavern', 'smithy', 'healer'] };            // dort arbeiten schon Figuren mit Namen
 // Einwohnerzahl nach Fläche (Nutzerwunsch, Session 4): Ziel = Fläche / perHead, abzüglich Wachen und Figuren mit Namen.
 // Jedes bewohnbare Haus hat mindestens einen Bewohner; der Rest verteilt sich reihum auf die größeren Häuser bis zur Obergrenze.
@@ -999,7 +1003,7 @@ function spotsOf(b, i, prof) {
   const dist0 = P.metro && (METRO.districts || []).find(d => !d.outside && hx >= d.x0 && hx <= d.x1 && hy >= d.y0 && hy <= d.y1);   // Phase 5: Metropole — Treffpunkt im eigenen Bezirk
   /* Nutzer 05.10.2026 (Varonheim: 100+ Leute auf dem Hauptplatz): in großen Orten trifft sich nur ein Teil auf dem Platz, der Rest vor Schenken,
      Kapellen, Läden, Bäckerei, Heilerhaus, Schmiede und Ställen des Orts (HANGOUT_TYPES, fester Hash je Bewohner). Dörfer bleiben, wie sie sind. */
-  const pubs = town.length > 15 ? town.filter(h => HANGOUT_TYPES.has(h.type)) : [], hang = !dist0 && pubs.length && hsh(hx, hy, i + 13) > Math.min(1, 15 / town.length) ? pubs[Math.floor(hsh(hy, hx, i + 17) * pubs.length)] : null;
+  const pubs = town.length > 8 ? town.filter(h => HANGOUT_TYPES.has(h.type)) : [], hang = !dist0 && pubs.length && hsh(hx, hy, i + 13) > Math.min(1, 16 / town.length) ? pubs[Math.floor(hsh(hy, hx, i + 17) * pubs.length)] : null;   /* Nutzer 06.10.: ab neun Häusern, höchstens etwa zwölf am Platz */
   const hangAt = h => { const [qx, qy] = h.doorTile, ox = h.door === 'W' ? -2 : h.door === 'E' ? 2 : 0, oy = h.door === 'S' ? 2 : h.door === 'N' ? -2 : 0, lat = (hsh(hx, i, 19) - 0.5) * 4;
     const q = { x: (qx + ox + (ox ? 0 : lat) + 0.5) * TS, y: (qy + oy + (oy ? 0 : lat) + 0.5) * TS }; return SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)) || solidPropAt('world', q.x, q.y, 6) ? null : q; };
   const sq = dist0 && hsh(hx, hy, i + 11) >= 0.45 ? {   // AUDIT V-03: knapp die Hälfte der Metropole trifft sich auf dem Hauptplatz, nicht im Bezirk
@@ -1304,7 +1308,7 @@ function assignHunters() {
     const vs = VILLAGERS.filter(c => c.homeTown === town);
     const byId = (a, b) => (a.id < b.id ? -1 : 1);                  // S12: kleine Dörfer haben nicht immer Tagelöhner — dann jagt ein Bauer oder Handwerker
     const h = vs.find(c => c.prof === 'Jäger') || vs.filter(c => c.prof === 'Holzfäller' || c.prof === 'Tagelöhner').sort(byId)[0]
-      || vs.filter(c => ['Bauer', 'Handwerker', 'Kesselflicker', 'Böttcher', 'Weber', 'Edelmann', 'Graf'].includes(c.prof)).sort(byId)[0];   // im Hochreich jagt der Adel zum Vergnügen
+      || vs.filter(c => ['Bauer', 'Handwerker', 'Kesselflicker', 'Böttcher', 'Weber', 'Edelmann', 'Graf', 'Edelfrau', 'Gräfin', 'Kaufherr', 'Feinmechaniker'].includes(c.prof)).sort(byId)[0];   // im Hochreich jagt der Adel zum Vergnügen (06.10.: kleinere Orte haben nicht immer einen Edelmann)
     if (!h) continue;
     if (h.prof !== 'Jäger') { h.prof = 'Jäger'; h.greet = '„Wild gibt es genug. Nur nie da, wo man es sucht.“'; }
     if (!h.equip.weapon) h.equip.weapon = mkItem('shortbow');
@@ -23824,6 +23828,17 @@ export function selftest() {
       return okAll;
     } finally { S.gold = g0; delete S._hostHero; UI.closeModal(); UI.closeDialogue(); }
   }));
+  ok('Stadtbevölkerung (Nutzer 06.10.): kein Haus hat mehr Bewohner als Betten (mindestens einer je Haus, nie mehr als die alte Obergrenze); Häuser und Herrenhäuser haben ein zweites Bett, wo Platz ist; in Orten ab neun Häusern trifft sich nur ein Teil der Müßigen am Platz', (() => {
+    const W = {}; const V = S.ents.world.filter(c => c.villager && c.alive && c.homeId);
+    const per = {}; for (const v of V) per[v.homeId] = (per[v.homeId] || 0) + 1;
+    W.beds = HOUSES.filter(b => b.map === 'world' && per[b.id]).every(b => per[b.id] <= houseCap(b) && houseCap(b) >= 1 && houseCap(b) <= (HOUSE_CAP[b.type] || 1));
+    W.two = HB.FURNISH.house.filter(f => f[0] === 'bed').length === 2 && HB.FURNISH.manor.filter(f => f[0] === 'bed').length === 2 && HOUSES.some(b => b.type === 'house' && b.map === 'world' && bedsOf(b) === 2);
+    const share = {}; for (const [t, P] of Object.entries(TOWN_PLAN)) { const hs = HOUSES.filter(h => h.town === t && h.map === 'world'); if (hs.length < 10 || P.metro) continue;
+      let sq = 0, n = 0; for (const b of hs) for (let i = 0; i < (per[b.id] || 0); i++) { n++; const o = spotsOf(b, i, 'Bauer'); if (Math.hypot(o.sq.x / TS - P.square[0], o.sq.y / TS - P.square[1]) < 7) sq++; } share[t] = [sq, n]; }
+    W.plaza = Object.values(share).length >= 3 && Object.values(share).every(([sq]) => sq <= 22);   /* Läden und Schenken liegen oft am Platz: Treffpunkte streuen, die Zahl in Platznähe bleibt klein */
+    const okAll = W.beds && W.two && W.plaza; if (!okAll) console.warn('Bevölkerungs-Probe', JSON.stringify(W), JSON.stringify(share));
+    return okAll;
+  })());
   ok('Welttiefe W10 Slice 1: Arena-Veränderung — in Phase 2 kippt ein Regionalboss das Wetter (Graumähne Nebel, Karrak Sandsturm, Varg Blutregen) für Minuten, nur einmal; fällt er, klart es auf; jeder Regionalboss hat ein Arena-Feld', sandbox(() => {
     const w0 = S.weather, wl0 = S.weatherLeft, ax0 = S.arenaWx, f0 = { ...S.flags }, fac0 = { ...S.factions }, st0 = structuredClone(S.towns.eren.stock); const W = {}; stage();
     try {

@@ -37,6 +37,7 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W3 Slice 3 (PR #23): Lieferung mit Frist (`give`, `hours`, `questDeadlineTick`, Sanduhr), Auftrag „Die Tinktur für Elena“; Probe grün 502/502, live geprüft.
 - W4 Slice 1 (PR #24): Schon-Regel `spare` (Graumähne: Rudel schonen); Probe grün 503/503, live geprüft.
 - W4 Slice 2 (PR #25): `REGION_CON`/`warHot` in `conKinds`; Probe grün 504/504, live geprüft.
+- Stadtbevölkerung (Commit folgt): `bedsOf`/`houseCap` nach Betten, zweites Bett in `FURNISH.house/manor`, Treffpunkte ab 9 Häusern (`spotsOf`), Jäger-Rückfall im Hochreich; Probe grün 514/514, Messung vorher/nachher (pop.js), Screenshot 27.
 - W11 Slice 3 (PR #34): Schwarzmarkt-Fenster (`blackUI`, `blackBuy`, `blackList`); Probe grün 513/513, live geprüft (Shot 26).
 - W9 Slice 2 (PR #33): sichtbarer Zug wartet bei unsicherem Weg (`caravanFrame`, `ECO.noteRaid`); Probe grün 512/512, live geprüft (Shot 25). Probe „Tiefhall (BUG-009)“ fiel einmal rot und lief im nächsten Lauf grün (zufallsabhängig).
 - W11 Slice 2 (PR #32): Fernwaffen-Profile (`RANGED_DEFS`, `rangedPhase`, `rangedBody`); Probe grün 511/511, live geprüft (Shots 22–24).
@@ -48,7 +49,7 @@ Siehe `docs/PLAN_WELTTIEFE.md` (6 Punkte, je mit Empfehlung). Keine davon blocki
 - W4 Slice 3 (PR #26): Knochenquelle (`ensureBonewells`, `bonewellTick`, `propHit`, Zieltyp `destroy`), Auftrag „Was aus dem Moor steigt“; Probe grün 505/505, live getestet mit Mausangriffen. Kutschen-Probe ist zufallsanfällig (Feinde an der Straße); Diagnose-Ausgabe eingebaut, beim nächsten Fehlschlag Werte lesen.
 
 ## Nächster Schritt
-- Halt: W9/W10/W11 je nach Nutzerauftrag gebaut (W9 S1–S2, W10 S1, W11 S1–S3). Offen und nutzerabhängig: W10 S2 Garmadon/Omega kämpfen in Gewölben (Wetter wirkt dort nicht; Arena-Wechsel bräuchte Licht/Boden-Regel), Geheimorte (Lore), Fraktionsübersicht (was fehlt dem Fenster „Mächte“?), W9 S3 Schmuggel in Ketten-Gebiete, Profile Sense/Doppelklinge/Magie/Bosswaffen. Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
+- Nutzerauftrag 06.10.: Elite-Bug (Repro fehlt, Kandidaten: Flucht/`surrendered` in `think`, `isHostile` blockt Ergebene), Gegner-Variation + Gold, W9 S3 Schmuggel, W10 S2 Gewölbe-Arena (Fackeln), Quests anpassen, Dungeons. Davor: W9/W10/W11 je nach Nutzerauftrag gebaut (W9 S1–S2, W10 S1, W11 S1–S3). Offen und nutzerabhängig: W10 S2 Garmadon/Omega kämpfen in Gewölben (Wetter wirkt dort nicht; Arena-Wechsel bräuchte Licht/Boden-Regel), Geheimorte (Lore), Fraktionsübersicht (was fehlt dem Fenster „Mächte“?), W9 S3 Schmuggel in Ketten-Gebiete, Profile Sense/Doppelklinge/Magie/Bosswaffen. Offene Reste: „nur Infizierte“, Quelle kehrt zurück, Gefangener lebend, Nacht-Lieferung — nach Nutzerentscheid.
 
 ## Teststatus (§5.1)
 - Slice 1: `Probe grün`, `Live getestet`. Slice 2: `Probe grün`, live bis zum Urteil (`Code geprüft` für den Rest, gleicher Pfad). Nutzerpunkte Siedlung/Titel: `Probe grün`, `Live getestet` (Knopf); Titel-Verfall im Tageswechsel nur `Probe grün`. W2 Slice 1: `Probe grün`, `Live getestet`.
