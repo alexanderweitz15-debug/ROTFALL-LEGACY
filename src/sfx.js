@@ -162,13 +162,22 @@ function musicStep(key, town) {
 // Regionale Einzelgeräusche, etwa einmal pro Sekunde gewürfelt. Selten und leise: Atmosphäre, kein Lärm.
 // region: regionAt(); day: Tageslicht; town: in einer Siedlung.
 // under: geschlossene Karte unter Tage (Audit C4: Tropfen und Hall statt Vogelgezwitscher).
-export function ambienceTick(region, day, town, under) {
+export function ambienceTick(region, day, town, under, house = null) {
   if ((S.settings.volume ?? 0.7) <= 0 || !ac || !wind) return;
   try {
     const t = ac.currentTime, key = under ? 'under' : region;
     if (key !== lastRegion) { lastRegion = key; setMood(key); musicNext = Math.min(musicNext, t + 2); }
     musicStep(key, town);   /* 08.10.: Musik je Region */
     const r = Math.random();
+    if (house) {                                                                       /* P1.x Hausgeräusche (09.10.): drinnen klingt das Haus, nicht die Region */
+      if (house === 'tavern') { if (r < 0.35) noise(t, 0.6, 'bandpass', 520, 420, 0.035, 2); else if (r < 0.5) { tone(t, 0.05, 'sine', 2600, 2500, 0.02); tone(t + 0.07, 0.05, 'sine', 2900, 2800, 0.015); } else if (r < 0.56) noise(t, 0.25, 'bandpass', 800, 500, 0.04, 1.5); }   /* Stimmen, Krüge, Lachen */
+      else if (house === 'smithy') { if (r < 0.3) for (let i = 0; i < 3; i++) noise(t + i * 0.5, 0.05, 'bandpass', 3000, 2400, 0.06, 10); else if (r < 0.4) noise(t, 1.2, 'lowpass', 300, 200, 0.05); }   /* Hammer, Blasebalg */
+      else if (house === 'chapel' || house === 'temple') { if (r < 0.25) { tone(t, 2.4, 'sine', 220, 220, 0.012); tone(t + 0.2, 2.2, 'sine', 330, 330, 0.008); } }   /* leiser Gesang */
+      else if (house === 'bakery') { if (r < 0.25) noise(t, 0.8, 'lowpass', 500, 300, 0.03); }   /* Ofen */
+      else { if (r < 0.18) for (let i = 0; i < 4; i++) noise(t + i * 0.09, 0.04, 'bandpass', 1800 + Math.random() * 800, 1200, 0.015, 2);   /* Herdfeuer knistert */
+        else if (r < 0.24) noise(t, 0.35, 'bandpass', 260, 180, 0.03, 3); }   /* Dielen knarren */
+      return;
+    }
     if (under) {
       if (r < 0.16) { const f = 1500 + Math.random() * 900; tone(t, 0.06, 'sine', f, f * 0.6, 0.02); tone(t + 0.28, 0.06, 'sine', f, f * 0.6, 0.007); }   /* Tropfen mit Hall */
       else if (r < 0.2) noise(t, 2.2, 'lowpass', 140, 90, 0.035);                                                                                      /* fernes Grollen im Fels */

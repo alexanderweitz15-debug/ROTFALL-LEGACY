@@ -3472,7 +3472,7 @@ function update(dt, now) {
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
     ambT = 0; const tx = p.x / TS | 0, ty = p.y / TS | 0, here = locAt(tx, ty), h = S.minute / 60;
-    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright);
+    ambienceTick(DUNGEONS[S.map] ? DUNGEONS[S.map].amb : regionAt(tx, ty), h > 6 && h < 20, !!here && (here.kind === 'village' || here.kind === 'city'), !!DUNGEONS[S.map] && !DUNGEONS[S.map].open && !DUNGEONS[S.map].bright, lastHouse?.type || null);   /* P1.x Hausgeräusche (09.10.) */
   }
   respawnTimer += dt;
   if (respawnTimer > 12000) { respawnTimer = 0; respawnTick(); }
@@ -9362,7 +9362,7 @@ function conTick() {
       if (!S.ents.world.some(e => e.contract === C.id && e.soulLight === C.have)) S.ents.world.push({ id: uid(), kind: 'prop', type: 'candles', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 6, transient: true, contract: C.id, soulLight: C.have, label: 'Ein Irrlicht, kalt und grünlich' });
       if (Math.hypot(p.x / TS - x, p.y / TS - y) < 3) { fx(x * TS + 16, y * TS + 6, 'ghost', 12); sfx('magic', 0.2, 0.6); S.ents.world = S.ents.world.filter(e => !(e.contract === C.id && e.soulLight === C.have)); log(`Ein Irrlicht legt sich in deine Hand und wird still. (${C.have + 1}/${C.need})`, 'quest'); conProgress(C); if (C.have < C.need) [C.x, C.y] = C.pts[C.have]; } }
     if (C.kind === 'stake') { const [x, y] = C.pts[0]; if (Math.hypot(p.x / TS - x, p.y / TS - y) < 3) {   /* P5 A: Grenzpfahl setzen (flüchtig ⚖) */
-      act(p, 'work', 1200); S.ents.world.push({ id: uid(), kind: 'prop', type: 'bone_spire', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 8, solid: true, transient: true, contract: C.id, label: 'Grenzpfahl der Stillen' }); fx(x * TS + 16, y * TS, 'necro', 10); log('Du rammst den Knochenpfahl in den Boden. Ab hier beginnt die Stille.', 'quest'); conProgress(C); } }
+      act(p, 'work', 1200); S.ents.world.push({ id: uid(), kind: 'prop', type: 'bone_spire', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 8, solid: true, transient: true, stillStake: C.id, label: 'Grenzpfahl der Stillen' }); fx(x * TS + 16, y * TS, 'necro', 10); log('Du rammst den Knochenpfahl in den Boden. Ab hier beginnt die Stille.', 'quest'); conProgress(C); } }
     if (C.kind === 'defense' && clock() >= C.at && !C.waved) {
       const [sx, sy] = conSq(C.town);
       if (Math.hypot(p.x / TS - sx, p.y / TS - sy) > 70) { C.state = 'claimed'; const st = S.quests['c_' + C.id]; if (st) { st.state = 'failed'; st.outcome = 'Du warst nicht da. Die Siedlung hat allein gekämpft.'; } raidDamage(C.town); log(`${C.title}: gescheitert — du warst nicht da.`, 'quest'); continue; }
@@ -10593,7 +10593,35 @@ function ensureKarak() {
 // Wellen (bestehender Befreiungskampf in sim.js) mit Valens Soldaten an der Seite. Fällt die Feste, verschwindet der Hof.
 const KEEP = () => { const L = LOCATIONS.find(l => l.key === 'blackkeep'); return L ? [L.x, L.y] : null; };
 const keepHeld = () => S.war?.nodes?.blackkeep ? S.war.nodes.blackkeep.owner === 'undead' : true;
+/* P5 Variante A (Koordinator 08.10., E40 offen ⚖): Leben im Totenland ohne Kartenerweiterung und ohne Kriegsgraph. Flüchtig, idempotent, beim Laden
+   neu gebaut (aus ensureBlackKeep, das newGame und continueGame aufrufen): Knochentafel (Brett) in Vharnholm und zwei Lager der Stillen im Osten
+   (Gräberfeld, Grabwacht) mit Knochenfeuer, Zelten, Grabgut-Händler, Wache und Streife. Lage = Ort + fester Versatz, Platz per detSpot (kein Zufall). */
+const STILL_CAMPS = [{ key: 'graeberfeld', dx: 6, dy: 4, name: 'Lager am Gräberfeld' }, { key: 'grabwacht', dx: -5, dy: 6, name: 'Lager an der Grabwacht' }];
+const STILL_PAL = { skin: '#b9b3a2', cloth: '#1a1420', glow: '#4e8f7a' };
+function ensureDeadLife() {
+  const V = TOWN_PLAN.vharnholm;
+  if (V && !S.ents.world.some(e => e.stillBoard)) { const q = detSpot('world', V.square[0] + 3, V.square[1] - 2, 4); if (q) S.ents.world.push({ id: uid(), kind: 'prop', type: 'board', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, transient: true, stillBoard: true, boardOf: 'vharnholm', label: 'Knochentafel der Stillen (Anschlagbrett)' }); }
+  for (const Cm of STILL_CAMPS) {
+    if (S.ents.world.some(e => e.stillCamp === Cm.key)) continue; const L = LOCATIONS.find(l => l.key === Cm.key); if (!L) continue; const c = detSpot('world', L.x + Cm.dx, L.y + Cm.dy, 8); if (!c) continue; const [cx, cy] = c;
+    const P = (type, dx, dy, o = {}) => { const q = detSpot('world', cx + dx, cy + dy, 3); if (q) S.ents.world.push({ id: uid(), kind: 'prop', type, map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, transient: true, stillCamp: Cm.key, ...o }); };
+    P('campfire_static', 0, 0, { solid: true, label: 'Feuer aus Knochen — es brennt grün und wärmt nicht' }); P('tent_prop', -4, -2, { solid: true, r: 14, label: 'Zelt der Stillen' }); P('tent_prop', 4, -2, { solid: true, r: 14, label: 'Zelt der Stillen' });
+    P('sign', 0, 5, { r: 8, label: `${Cm.name} — ein Lager der Stillen Schar` }); P('bones', -2, 3, { r: 6 }); P('gravestone', 3, 3, { solid: true, r: 7 });
+    const npc = (name, prof, dx, dy, o = {}) => { const q = detSpot('world', cx + dx, cy + dy, 3) || [cx + dx, cy + dy], n = makeChar({ name, prof, x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, level: 10, faction: 'undead', traits: ['diszipliniert'], pal: STILL_PAL });
+      Object.assign(n, { stillCamp: Cm.key, undead: true, hooded: true, transient: true, visitor: true, anchor: { x: n.x, y: n.y } }, o); S.ents.world.push(n); return n; };
+    npc(Cm.key === 'graeberfeld' ? 'Wenzel ohne Atem' : 'Schwester Grau', 'Händler für Grabgut', 2, 1, { shop: true, market: false, pool: ['grave_seal', 'soul_vial', 'fetzenmantel', 'kuttenkapuze', 'grabraeuber', 'totenglocke', 'potion'], greet: '„Grabgut, ehrlich geborgen. Fast alles.“' });
+    const w = npc('Wache der Stillen', 'Wache der Stillen Schar', -3, 2, { brave: true, greet: '„Atme leiser. Hier schläft man lange.“' }); w.equip.weapon = mkItem('knochenspalter'); recalc(w);
+    const pt = detSpot('world', cx + 12, cy, 4) || [cx + 12, cy], s = npc('Streife der Stillen', 'Streife der Stillen Schar', 6, 0, { brave: true, stillPatrol: [[cx + 1, cy + 1], pt], spi: 1, greet: '„Die Grenze geht dorthin, wo wir sie hintragen.“' }); s.equip.weapon = mkItem('grabraeuber'); recalc(s);
+  }
+}
+function deadLifeTick() {   /* Streifen gehen zwischen Lager und Wegpunkt; Hinweise beim ersten Blick auf Feste und Lager */
+  const p = S.player; if (!p?.alive || p.map !== 'world' || S._quiet) return;
+  for (const s of actorsOf('world').list) if (s.stillPatrol && s.alive) { const [x, y] = s.stillPatrol[s.spi], gx = x * TS + TS / 2, gy = y * TS + TS / 2; if (Math.hypot(s.x - gx, s.y - gy) < 24) { s.spi = 1 - s.spi; const [x2, y2] = s.stillPatrol[s.spi]; s.anchor = { x: x2 * TS + TS / 2, y: y2 * TS + TS / 2 }; s.schedulePos = s.anchor; } else if (!s.anchor || Math.hypot(s.anchor.x - gx, s.anchor.y - gy) > 4) { s.anchor = { x: gx, y: gy }; s.schedulePos = s.anchor; } }
+  const H = (S.flags.deadHint ||= {}), k = KEEP();
+  if (k && !H.keep && keepHeld() && Math.hypot(p.x / TS - k[0], p.y / TS - k[1]) < 32) { H.keep = 1; log('Die Schwarze Feste: Kaserne, Seelenkapelle, Knochenschmiede und Beinhaus im Mauerring, Wachen am Tor, im Hof der Thron der Stillen Schar. Handel und Rat nur für die, die zur Schar gehören (Rang oder Pakt).', 'world'); }
+  for (const Cm of STILL_CAMPS) { const f = S.ents.world.find(e => e.stillCamp === Cm.key && e.type === 'campfire_static'); if (f && !H[Cm.key] && dist(f, p) < 25 * TS) { H[Cm.key] = 1; log(`${Cm.name}: Feuer aus Knochen, ein Händler für Grabgut, Wachen, die nicht atmen. Die Stillen lassen dich in Ruhe, solange du sie in Ruhe lässt.`, 'world'); } }
+}
 function ensureBlackKeep() {
+  ensureDeadLife();   /* P5 A */
   const k = KEEP(); if (!k) return; const [kx, ky] = k;
   if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege && !e.keepGuard); return; }
   if (!S.ents.world.some(e => e.keepCourt)) {
@@ -13365,7 +13393,7 @@ function gallowsScene(G, preview = false) {
   return c;
 }
 function worldCardTick(now) {
-  heroHailTick(); morrFallTick(); gallowsTick();   /* P3.x E10, T17 Szenen 3/4: im selben 0,9-s-Takt */
+  heroHailTick(); morrFallTick(); gallowsTick(); deadLifeTick();   /* P3.x E10, T17 Szenen 3/4, P5 A: im selben 0,9-s-Takt */
   if (!EV_CARDS.length || now < evCardUntil || S.cine || S.dying || S._quiet || S.map === 'prolog' || !S.player?.alive || UI.dialogueOpen() || UI.modalOpen) return;
   const c = EV_CARDS.shift(); evCardUntil = now + c.ms + 600;
   if (c.war) cinematic([{ dur: c.ms, auto: true, beats: [{ t: 0, sfx: c.snd, duck: 0.5, ms: 300 }, { t: 0.02, card: { title: c.title, sub: c.sub, ms: c.ms } }, { t: 0.85, duck: 1, ms: 400 }] }], null, { pause: true, stay: true });
