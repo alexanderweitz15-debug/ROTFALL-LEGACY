@@ -610,7 +610,7 @@ Alle festen Aufträge aus `data.js:1416` ff. mit Geber und Ruf-Lohn (`turnIn`, `
 - **Wachstum** (`warDay`, `sim.js:477`): Tote +min(4, 1 + ¼ je gehaltenem Knoten), nach Garmadons Tod 0. Valen +3 bei genug Korn (sonst +1) + Frontzuschlag − Kult. Deckel 110 (Schwer/Sehr schwer) bzw. 80. Valen-Heere essen Nordfurts Korn.
 - **Abstrakte Schlacht:** Würfel auf Stärke; Valens Stadtgarnison ×1,3.
 - **Echte Schlacht** (`materialize`, `battleCheck`): Ist der Spieler in 40 Feldern, stehen 2–7 Figuren je Seite auf dem Feld (Skelette gegen Valen-Soldaten, in Aurelion mit Dampframme). Jede tote Figur kostet ihr Heer Stärke. Ende nach 240 Minuten.
-- **Befreiung in Wellen:** 2–4 Wellen (Schwarze Feste und Varonheim 4), die letzte mit einem Hauptmann der Toten; geht man weiter als 30 Felder weg, verfällt die halbe Welle. Wer befreit, bekommt den Titel „Befreier von …“ (verblasst nach 7 Tagen, `titleDay`/`p.titleUntil`) und senkt die Bedrohung der Hauptstadt um 10.
+- **Befreiung in Wellen:** 2–4 Wellen (Schwarze Feste und Varonheim 4), die letzte mit einem Hauptmann der Toten; geht man weiter als 30 Felder weg, verfällt die halbe Welle. Wer befreit, bekommt den Titel „Befreier von …“ und senkt die Bedrohung der Hauptstadt um 10.
 - **Belohnung:** **Kein Ruf** für Feldschlachten und Befreiungen (`sim.js:577–586`, `617`) — nur Titel, Chronik, weniger Bedrohung.
 - **Fall der Untoten** (nach Garmadon, `undeadFallDay`): jeden Tag wird ein besetzter Ort mit Stadtplan frei; Wiederbesiedlung in 5 Stufen (Tag 1, 5, 15, 30, 60); das Totenland heilt.
 - **Bedienung:** Kriegskarte im Kartenfenster (`drawWarmap`).
@@ -1443,7 +1443,7 @@ Legende Prüfung: **✔** = live abgegeben, Lohn wie in den Daten angekommen · 
 
 ### 4.1 Wie Verträge funktionieren
 
-- **Was es ist:** Wiederkehrende Aufträge aus der Welt. Jede Stadt hat ein Anschlagbrett (Dorf 3, Stadt 5 Aushänge, erneuert alle 3 Tage; angenommene oder erledigte werden täglich aufgefüllt, `S.conTop`); Arten je Gegend aus `REGION_CON` (`conKinds`, `regionAt`), Totenknoten nebenan → Verteidigung/Monsterjagd zuerst (`warHot`) und einen Verteidigungsmeister (3 militärische Aufträge). Dazu vergeben Bewohner nach Beruf je einen eigenen Auftrag (`PROF_CON`). Die Eisenfeste vergibt über Kettenwachen, Tributoffizier, Paladinmarschall und Eisenpaladine; nach dem Sklavenaufstand geben die Freien in Grubenhort, in Tickmar der Arbeiterrat Aufträge.
+- **Was es ist:** Wiederkehrende Aufträge aus der Welt. Jede Stadt hat ein Anschlagbrett (Dorf 3, Stadt 5 Aushänge, erneuert alle 3 Tage) und einen Verteidigungsmeister (3 militärische Aufträge). Dazu vergeben Bewohner nach Beruf je einen eigenen Auftrag (`PROF_CON`). Die Eisenfeste vergibt über Kettenwachen, Tributoffizier, Paladinmarschall und Eisenpaladine; nach dem Sklavenaufstand geben die Freien in Grubenhort, in Tickmar der Arbeiterrat Aufträge.
 - **Ablauf:**
   1. Brett / Wache / Bewohner ansprechen → Auftragsbrief (Lohn in Gold, Frist) → „Annehmen“.
   2. Ziel steht wirklich in der Welt (Gegner werden außer Sicht nachgesetzt, Bosse nie).
@@ -3518,8 +3518,7 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
 ### Gründung und Bau
 - **Was es ist:** Ein eigenes Lager. Es wächst zur Siedlung mit Siedlern, Moral, Hof, Wachen und Überfällen. Nach dem Tod übernimmt der Erbe die Siedlung (Moral −10).
 - **Ablauf:**
-  - Gründen kostet 5 Holz (`foundCamp`); nicht im Ortsgebiet einer Stadt oder näher als sechs Felder (`townAt(tx, ty, 6)`). Name „Haus + heim“, Moral 60, ein Lagerfeuer entsteht.
-  - Auflösen (`dissolveSettlement`, Knopf im Fenster B, zweimal klicken, nur vor Ort, nicht im Überfall): Gebäude, Siedler, Lagerwachen, eigenes Vieh verschwinden, das Lager wird zur Kiste „Aufgegebene Siedlung: …“.
+  - Gründen kostet 5 Holz (`foundCamp`). Name „Haus + heim“, Moral 60, ein Lagerfeuer entsteht.
   - Bauen mit B (Baumodus, `startPlacing`).
   - Fehlendes Material kaufen Fuhrleute für Gold zu („Gold-Sog“: Holz 4, Stein 5, Eisen 12, Nahrung 3 je Einheit).
 - **Bauten (14):**

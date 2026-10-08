@@ -1,6 +1,4 @@
-# ROTFALL – Feature Readiness Gate (Entwickler, 02.10.2026; Langfassung, Regel steht in CLAUDE.md)
-
-> **Eingeflossen (05.10.2026):** Das Gate steht jetzt in `CLAUDE.md` (§1 UNDERSTAND/AUDIT, §3 PLAN mit Designentscheidungen, §6 INTEGRATE, §8 Definition of Done). Nicht mehr bindend. Diese Datei bleibt als ausführliche Fassung der Prüfbereiche (§4) und des Impact-Reports (§8).
+# ROTFALL – Feature Readiness Gate (Entwickler, 02.10.2026 — verbindlich für alle Agenten)
 
 **Ein neues Feature wird nie sofort implementiert.** Zuerst wird festgestellt, ob es im bestehenden Spiel vollständig definiert und systemisch integriert ist. Ziel ist nicht, schnell etwas Funktionierendes zu bauen, sondern dass ein Feature danach nicht an zehn anderen Stellen unfertig, inkonsistent oder halb integriert wirkt.
 

@@ -140,4 +140,3 @@ Volle Texte mit Schritten, Lösung und Test: `BUGS_bis_S13.md`. Regressionstests
 - BUG-137-Rest (S14): Ladeprobe `RF.loadProbe()` / Debug „Laden prüfen“ — serialisieren, wie „Fortsetzen“ laden, Held/Karten/Städte/Bewohner/Herden vergleichen.
 - BUG-141 (S14): Zweites Laden in derselben Sitzung stürzte ab (Aurelheim ohne Hausliste; `genWorld` ging vom veränderten Stadtplan aus) — Plan beim ersten Erzeugen gemerkt und in place zurückgesetzt.
 - BUG-113 (S15): Blutende Bewohner am Boden werden nach dem Kampf verbunden, wenn jemand bei ihnen ist (Borin, Aldric starben daran). Probe im Selbsttest.
-- BUG-144 (05.10.2026): Wuchtschlag, Grabschlag, Heiliger Schlag und Meuchelstoß verbrauchten Ausdauer, Mana und Abklingzeit, auch wenn kein Hieb kam (mitten im Schwung, erschöpft, ohne Arme). `useAbility` prüft jetzt über den Schwungzähler `swingN`, ob `attack()` wirklich begann, und gibt sonst alles zurück (Toast „noch im Schwung“). Probe im Selbsttest.

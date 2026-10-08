@@ -1,14 +1,14 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=25';
-import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=25';
-import * as HB from './buildings.js?v=25';
-import { ITEMS, MONSTERS, FACTIONS, RELIQ } from './data.js?v=25';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=25';
-import * as SP from './sprites.js?v=25';
-import { trailPt, WAGON_GAP } from './sim.js?v=25';
-import { ICON_R } from './iconsR.js?v=25';
-import { airPos, airPt } from './economy.js?v=25';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, rangedPhase } from './anim.js?v=25';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=24';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=24';
+import * as HB from './buildings.js?v=24';
+import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=24';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=24';
+import * as SP from './sprites.js?v=24';
+import { trailPt, WAGON_GAP } from './sim.js?v=24';
+import { ICON_R } from './iconsR.js?v=24';
+import { airPos, airPt } from './economy.js?v=24';
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=24';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -2210,11 +2210,10 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
     const chg = !work && !ranged && !(sw > 0) && !e.cover && e.chargeK > 0 ? e.chargeK : 0;   /* Kampfanimation: schwerer Hieb lädt — Figur steht im Ausholen des Wuchtschlags */
     const ready = own && !A && !e.mounted && e.combatT && now >= e.combatT && now - e.combatT < 2500 && !!atkStance(ac, 'ready');   /* Kampfanimation (§17 Kampf-Idle/-Bewegung): Waffe bereit, breiter Stand */
     const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : ready ? 'ready' : 'rest';
-    const rp = mode === 'aim' ? rangedPh(e, wt, sw, now) : null;   /* W11 S2: Fernwaffen-Profil */
-    const pull = wt === 'bow' && mode === 'aim' ? (rp ? (rp.ph === 'draw' ? rp.k : rp.ph === 'loose' ? 0 : 0) : Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4) : 0;   // S15: Bogen spannen, sichtbar
+    const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
     /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
     const tm = chg ? null : mode === 'swing' ? atkTiming(e, ac, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
-    W = { mode, wt, ac, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(ac, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw, rph: rp ? rp.ph : '', rk: rp ? rp.k : 0 };   /* Kampfanimation: Stangen beidhändig */
+    W = { mode, wt, ac, arc: wit.arc || 1.4, q: mode === 'swing' || mode === 'work' ? snapU(u) : 0, v: chg ? atkPlan(ac, 'A', 2).s : tm ? tm.s : 0, oct: SP.octOf(dir), two: (!!wit.twohand || wt === 'spear' || wt === 'polearm') && !ranged, low, pull, u, tm, sw };   /* Kampfanimation: Stangen beidhändig */
   }
   /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
      Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
@@ -2264,8 +2263,8 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
 /* Runde 9 (Artist): Blutkult-Sense — Adern pulsieren im Herzschlag (ba-dumm), nur Darstellung. Im gedrehten Waffen-Kontext aufrufen. */
 function weaponPulse(c, Wsp, WP, now, seed) {
   if (!Wsp.pulse || !Wsp.pulse.length) return;
-  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = Wsp.pulseCol ? 0.18 + 0.32 * (0.5 + 0.5 * Math.sin(now / 520 + (seed || 0))) : 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));   /* Sternenklinge: ruhiges Glimmen statt Herzschlag */
-  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(${Wsp.pulseCol || '210,24,30'},${k.toFixed(3)})`;
+  const ph = (now / 1100 + (seed || 0) * 0.13) % 1, g = (m) => Math.exp(-(((ph - m) / 0.05) ** 2)), k = 0.12 + 0.55 * Math.max(g(0.1), 0.7 * g(0.3));
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(210,24,30,${k.toFixed(3)})`;
   for (const [px, py] of Wsp.pulse) c.fillRect((px - Wsp.gx) * WP, (py - Wsp.gy) * WP, WP, WP);
   c.globalCompositeOperation = 'source-over';
 }
@@ -2358,8 +2357,6 @@ function drawSlash(c, e, W, AF, hx, hy, dir, it) {
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
 // Schulter; in Ruhe hängt sie locker. Fernwaffen/Zauberstab: Hand vor dem Körper (Arm im Sprite, Zielhaltung).
 const RANGED_W = new Set(['bow', 'crossbow', 'wand', 'throw', 'sling']);
-/* W11 S2: Phase einer Fernwaffe (Bogen spannen/lösen, Armbrust Rückstoß/Nachladen) aus dem Figurenzustand; null ohne Profil */
-const rangedPh = (e, wt, sw, now) => rangedPhase(wt, { sw, draw: e.draw || 0, reloadLeft: e.reloadUntil ? e.reloadUntil - now : 0, reloadTotal: e.reloadDur || 0, sinceShot: e.lastShot ? now - e.lastShot : Infinity });
 function weaponPose(e, now, it, pz) {
   const A = e.act && now >= e.act.at && now < e.act.until && !(e.vx || e.vy) && !(e.swing > 0) ? e.act : null;   // Interaktion
   const ak = A ? (now - A.at) / (A.until - A.at) : 0, low = A && A.kind !== 'work' && A.kind !== 'gesture' ? (A.kind === 'rise' ? 7 * (1 - ak) : 7) : 0;
@@ -2370,10 +2367,9 @@ function weaponPose(e, now, it, pz) {
   const side = pz.dir === 'W' || pz.dir === 'E', armSide = side ? 'near' : (Math.cos(dir) < 0 ? 'L' : 'R');
   const [sox, soy] = SP.shoulderOf(pz.dir, pz.pose, armSide === 'L' ? 'L' : 'R'), shx = e.x + sox, shy = e.y + 6 + soy;
   const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
-  const reloading = wt === 'crossbow' && aimingR && rangedPh(e, wt, sw, now)?.ph === 'reload';   /* W11 S2 */
   const upright = wt === 'spear' || wt === 'polearm', onShoulder = wt === 'great' || wt === 'hammer';   // S12: Stangenwaffen aufrecht, Zweihänder auf der Schulter
   const hand = (swv, sv) => {                                         // Hand für einen Schwungzustand
-    if (ranged) return reloading ? [e.x + Math.cos(dir) * 3, e.y - 8 + Math.sin(dir) * 2] : aimingR ? [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5] : [shx + Math.cos(dir) * 4, shy + 14 + low];   // Phase 1: in Ruhe hängt die Fernwaffe an der Seite; W11 S2: Nachladen vor dem Bauch
+    if (ranged) return aimingR ? [e.x + Math.cos(dir) * 8, e.y - 16 + Math.sin(dir) * 5] : [shx + Math.cos(dir) * 4, shy + 14 + low];   // Phase 1: in Ruhe hängt die Fernwaffe an der Seite
     const active = swv > 0 || e.cover || (A && A.kind === 'work');
     if (!active) return upright ? [shx + Math.cos(dir) * 6, shy + 11 + low] : onShoulder ? [shx + Math.cos(dir) * 3, shy + 9 + low]
       : [shx + Math.cos(dir) * 5, shy + 16 + low + Math.max(0, Math.sin(dir)) * 2];   // Ruhe: Arm hängt, Waffe locker vorn
@@ -2389,7 +2385,7 @@ function weaponPose(e, now, it, pz) {
   // Bogen (Phase 1): wird senkrecht gehalten — in der Draufsicht bleiben die Wurfarme senkrecht, nur leicht zur Zielseite geneigt
   // (vorher drehte er ganz mit dem Ziel und lag beim Blick nach unten waagrecht wie eine Armbrust vor dem Bauch).
   const bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
-  const a = wt === 'bow' ? bowA : reloading ? Math.PI / 2 - sgn * 0.35 : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
+  const a = wt === 'bow' ? bowA : ranged && !aimingR ? (wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA)
     : rest ? (upright ? -Math.PI / 2 + sgn * 0.1 : onShoulder ? -Math.PI / 2 - sgn * 0.75 : sgn > 0 ? 1.2 : Math.PI - 1.2) : dir + sv.a * sgn;
   return { A, sw, dir, wt, arc, ranged, sgn, thrust, sv, a, hx, hy, shx, shy, armSide, hand, vv, tm, uOf };
 }
@@ -2836,7 +2832,7 @@ function drawBaked(key, e, box, fn) {
    Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
 const PLACE_RANGE = 400;
 let BLDICO = null, bldImgs = {};
-import('./icons.js?v=25').then(m => { BLDICO = m; }).catch(() => {});
+import('./icons.js?v=24').then(m => { BLDICO = m; }).catch(() => {});
 function bldImage(type) {
   if (!BLDICO?.bldURL) return null;
   let im = bldImgs[type];
@@ -3510,33 +3506,10 @@ function iconR(c, it, key, w, h) {
   const k0 = Math.min((w - 2) / src.width, (h - 2) / src.height), k = k0 >= 2 ? Math.floor(k0) : k0, dw = Math.round(src.width * k), dh = Math.round(src.height * k);   // ab 2× ganzzahlig
   c.imageSmoothingEnabled = false; c.drawImage(src, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh); return true;
 }
-/* Reliquien (Nutzer 02.10.2026): Medaillon im 16er-Raster — Öse, Goldfassung, Stein in der Farbe der Reliquie, Zeichen der Spielweise. */
-const RGLYPH = {
-  heart: ['.x.x.', 'xxxxx', 'xxxxx', '.xxx.', '..x..'], thread: ['...x.', '..x..', '.x...', '..x..', '...x.'], ring: ['.xxx.', 'x...x', 'x...x', 'x...x', '.xxx.'],
-  cauldron: ['x...x', 'xxxxx', 'xxxxx', 'xxxxx', '.x.x.'], bell: ['..x..', '.xxx.', '.xxx.', 'xxxxx', '..x..'], gear: ['x.x.x', '.xxx.', 'xx.xx', '.xxx.', 'x.x.x'],
-  noose: ['.xxx.', 'x...x', '.xxx.', '..x..', '..x..'], thorn: ['..x..', '..x..', '.xxx.', '.xxx.', 'xxxxx'], mark: ['x...x', '.x.x.', '..x..', '.x.x.', 'x...x'],
-  star: ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..'], fang: ['xxxxx', 'xxxxx', '.xxx.', '.xx..', '.x...'], eye: ['.....', '.xxx.', 'xx.xx', '.xxx.', '.....'],
-  chain: ['xx...', 'x.x..', '.xxx.', '..x.x', '...xx'], crystal: ['..x..', '.xxx.', '.x.x.', '.xxx.', '..x..'], drum: ['xxxxx', 'x.x.x', 'x.x.x', 'x.x.x', 'xxxxx'],
-  compass: ['..x..', '..x..', 'xx.xx', '..x..', '..x..'], hourglass: ['xxxxx', '.xxx.', '..x..', '.xxx.', 'xxxxx'],
-};
-const rShade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, Math.round(v * k))); return `rgb(${f(n >> 16 & 255)},${f(n >> 8 & 255)},${f(n & 255)})`; };
-function relicIcon(c, key, w, h) {
-  const d = RELIQ[key] || {}, it = ITEMS[key], col = d.col || '#a08060', myth = it.rarity === 'mythic' || it.rarity === 'legendary';
-  const t = document.createElement('canvas'); t.width = t.height = 16; const g = t.getContext('2d'), px = (x, y, cl) => { g.fillStyle = cl; g.fillRect(x, y, 1, 1); };
-  const metal = myth ? ['#f0d080', '#c8a048', '#8a6a28', '#4a3814'] : ['#c8c0b0', '#9a9080', '#6a6458', '#2a2620'];
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const dx = x - 7.5, dy = y - 8.5, r = Math.hypot(dx, dy);
-    if (r <= 7.2) px(x, y, r > 5.6 ? (dy < -dx * 0.3 ? metal[0] : r > 6.6 ? metal[3] : metal[1]) : r > 5 ? metal[2] : rShade(col, 0.55 + 0.45 * Math.max(0, 1 - Math.hypot(dx + 1.5, dy + 1.5) / 6))); }
-  px(7, 0, metal[1]); px(8, 0, metal[1]); px(6, 1, metal[2]); px(9, 1, metal[2]);   /* Öse */
-  const G = RGLYPH[d.glyph] || RGLYPH.star; G.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === 'x') px(5 + i, 6 + j, rShade(col, 1.9)); }));
-  px(5, 5, 'rgba(255,255,255,.75)'); px(4, 6, 'rgba(255,255,255,.4)');                 /* Glanz */
-  if (myth) { px(1, 8, '#fff2c0'); px(14, 8, '#fff2c0'); px(7, 15, '#fff2c0'); }        /* Funken der Boss-Reliquien */
-  c.imageSmoothingEnabled = false; const s = Math.floor(Math.min(w, h) / 16) || 1, o = [(w - 16 * s) / 2, (h - 16 * s) / 2]; c.drawImage(t, o[0], o[1], 16 * s, 16 * s);
-}
 export function drawItemIconTo(canvas, key, raw) {
   const it = ITEMS[key]; const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
   c.clearRect(0, 0, w, h); if (!it) return;
-  if (it.slot === 'relic') return relicIcon(c, key, w, h);
   if (SP.drawnOn() && iconR(c, it, key, w, h)) return;               // S14 Stil R: Symbol aus dem echten Sprite
   if (raw) return drawItemVec(c, it, key, w, h);
   const A = SP.itemAtlas(key, it); if (A) { const s = Math.min((w - 4) / A.width, (h - 4) / A.height), dw = A.width * s, dh = A.height * s; c.imageSmoothingEnabled = false; c.drawImage(A, (w - dw) / 2, (h - dh) / 2, dw, dh); return; }   // Stil F: Symbol aus dem Blatt
