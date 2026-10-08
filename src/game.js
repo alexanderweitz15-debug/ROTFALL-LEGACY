@@ -2296,12 +2296,13 @@ function facStartSetup(f, p) {
   else if (f !== 'goblin' && f !== 'sea') S.ranks[f] = Math.max(0, S.ranks[f] ?? -1);   /* Grubenstämme und Seevolk: Rang über den Ruf (autoRanks) */
   autoRanks();
   const st = startHouse(f, { map: p.map, x: p.x, y: p.y });
-  if (S.startFac !== 'valen') chronicle(`${p.name} beginnt bei ${F.name}`, 'birth', `${RC.name}, ${FS.desc}`);
-  if (f !== 'valen') log(`Du beginnst in der Fraktion „${F.name}“: ${FS.desc}`, 'world');
+  const own = (p.race || 'mensch') === FS.race;                     /* Prolog: Mensch im Dienst der Toten — keine Skelett-Hinweise */
+  if (S.startFac !== 'valen') chronicle(`${p.name} beginnt bei ${F.name}`, 'birth', own ? `${RC.name}, ${FS.desc}` : `Als Lebender im Dienst: ${F.desc}`);
+  if (f !== 'valen') log(`Du beginnst in der Fraktion „${F.name}“: ${own ? FS.desc : F.desc}`, 'world');
   log(`Mitglied ab Start: ${F.ranks?.[Math.max(0, S.ranks[f] ?? 0)] || 'Mitglied'} — ${F.name} (Ansehen ${Math.round(S.factions[f])}). Den Rang findest du im Kodex (H) unter „Ränge“.`, 'faction');
-  log(`Rasse ${RC.name}: ${RC.rule}`, 'party');
+  if (own) log(`Rasse ${RC.name}: ${RC.rule}`, 'party');
   if (st) log(`Dein Haus ${st.name} liegt ${map2Dir(p, st)} — eine Hütte und ein Feuer. Siedler ziehen zu; Bauen mit B.`, 'world');
-  if (FS.race === 'skelett') log('Tipp: Behalte die Kapuze auf. Ohne Kapuze erkennt jeder deine Knochen — der Orden und die Kette weisen dich ab, Valen ruft die Wache.', 'quest');
+  if (own && FS.race === 'skelett') log('Tipp: Behalte die Kapuze auf. Ohne Kapuze erkennt jeder deine Knochen — der Orden und die Kette weisen dich ab, Valen ruft die Wache.', 'quest');
   log('Ab Ansehen 40 werben dir Wachen deiner Fraktion Gefährten und Lagerwachen an.', 'quest');
 }
 function map2Dir(a, b) { const dx = b.x - a.x, dy = b.y - a.y; if (Math.hypot(dx, dy) < 6 * TS) return 'gleich nebenan'; return 'im ' + ['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8]; }
@@ -2314,7 +2315,7 @@ export function newGame(cfg) {
   Object.assign(S, JSON.parse(JSON.stringify(S_INIT)), { settings: keep.settings });
   Object.assign(S, {
     ver: SAVE_VERSION, seed: cfg.seed ?? Math.floor(Math.random() * 1e9), day: 1, minute: 8 * 60, season: 'Später Frühling',
-    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], varonburg: [], katakomben: [], isle: [], deck: [], tower: [] }, party: [], gold: 0,
+    weather: 'clear', weatherLeft: 60, map: 'world', ents: { world: [], mine: [], deep: [], sky: [], kerker: [], garmadon: [], omega: [], vault: [], zwerge: [], varonburg: [], katakomben: [], isle: [], deck: [], tower: [], prolog: [] }, party: [], gold: 0,
     res: { wood: 0, stone: 0, iron: 0, herb: 0, food: 3 }, stash: [],
     factions: { valen: 0, order: 0, undead: -100, merch: 0, bandit: -100, chain: -20, goblin: -100, aurel: -10, sea: 0, frei: 0, wuest: 0, zwerge: 0 }, ranks: { valen: -1, order: -1, undead: -1, chain: -1, merch: -1, bandit: -1, wuest: -1, zwerge: -1 },   /* Entscheidung 03.10.: Wüstenbund, Zwerge */   /* A-02: Händler und Rooks Bande brauchen −1, sonst ist der Beitritt nie möglich */
     quests: {}, chronicle: [], legacy: { house: cfg.house || cfg.name, gen: 1, ancestors: [] },
@@ -2361,6 +2362,7 @@ export function newGame(cfg) {
   S.player = p; if (at && at.map !== 'world') { p.map = S.map = at.map; S.ents[at.map].push(p); } else S.ents.world.push(p);
   syncHotbar();
 
+  if (!FS && cfg.prolog !== false) S.flags.prologPending = 1;   /* Prolog 08.10.: neue Helden ohne Fraktions-Start beginnen an der Aschenfurt */
   if (cap) { capStart(p, o, cfg.origin); if (FS) facStartSetup(cfg.facStart, p); startGame(); coopHooks.afterNew?.(); return; }
   if (FS) { facStartSetup(cfg.facStart, p); startGame(); coopHooks.afterNew?.(); return; }
   chronicle(`${p.name} bricht auf`, 'birth', `${o.name}. Kein Name, kein Land, keine Schulden. Noch nicht.`);
@@ -2423,7 +2425,7 @@ function bindSim() {
   };
 }
 function startGame() {
-  if (pendingIntro) { pendingIntro = false; setTimeout(introFlight, 900); }
+  if (pendingIntro) { pendingIntro = false; setTimeout(S.flags.prologPending ? prologStart : introFlight, S.flags.prologPending ? 500 : 900); }
   tutorShow();
   $('titlescreen').classList.add('hidden');
   $('creation').classList.add('hidden');
@@ -2485,7 +2487,7 @@ export function continueGame(given = null, retried = false) {                   
   if (S.settings.art === 'F') S.settings.art = 'R';   /* Audit T05: Stil F gibt es nicht mehr */   // Nutzer S15: Stil R wird Standard (einmalig, danach zählt die eigene Wahl)
   if (S.settings.art !== 'D') S.settings.art = 'R'; SP.setArt(S.settings.art);   /* Nutzer S13: gewählter Grafikstil; alles außer ausdrücklich Klassisch ist R (02.10.2026) */
   seedRng(S.seed);
-  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), vault: [], zwerge: [], varonburg: [], katakomben: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
+  const fresh = genWorld(), FRESH = { world: fresh, mine: genMine(), deep: genDeep(), sky: genSky(), kerker: genKerker(), garmadon: genGarmadon(), omega: genOmega(), isle: genIsle(), deck: genDeck(), tower: genTower(), prolog: [], vault: [], zwerge: [], varonburg: [], katakomben: [] }; poiSpawns();   // Kacheln (+ Gebäudedaten) und Grundzustand der Props …
   for (const m of MAP_KEYS) S.ents[m] ||= [];
   for (const m of MAP_KEYS) if (gone?.[m]) mergeProps(m, FRESH[m], gone[m]);
   if (!gone?.sky && !S.ents.sky.some(e => e.kind === 'prop')) S.ents.sky.push(...FRESH.sky);
@@ -2575,6 +2577,7 @@ export function continueGame(given = null, retried = false) {                   
   migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
+  if (S.map === 'prolog') { if (S.prolog) { buildProlog(); prologEnsure(); } else { const p = S.player; S.ents.prolog = []; S.map = p.map = 'world'; const q = freeSpotNear('world', ...worldPt(66, 70), 3); p.x = q.x; p.y = q.y; S.ents.world.push(p); } }   /* Prolog: Karte neu bauen, Schritt bleibt */
   if (S.map === 'katakomben') { const keep = (S.ents.katakomben || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); const at = buildCatacombs('world'); for (const m of keep) { m.x = at.x; m.y = at.y; S.ents.katakomben.push(m); } }   /* §5g.2 */
   if (S.map === 'varonburg') { const keep = (S.ents.varonburg || []).filter(e => e === S.player || S.party.includes(e.id) || (e.servant && e.servant === S.player.id)); S.ents.varonburg = []; S.map = 'world';   /* Varonheim-Umbau S2: die Burg liegt in der Welt — wer in der alten Burgkarte stand, steht vor dem Burgtor */
     for (const m of keep) { m.map = 'world'; const q = freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 3); if (q) { m.x = q.x; m.y = q.y; } S.ents.world.push(m); } }
@@ -2905,7 +2908,7 @@ function update(dt, now) {
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); facHintTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
-  tutorTick(now);   /* Wegweiser (08.10.) */
+  tutorTick(now); prologTick(now);   /* Wegweiser (08.10.); Prolog */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -4193,6 +4196,7 @@ function stabilize(c, helper) {
 
 function die(c, cause = 'Wunden', source) {
   if (!c.alive) return;
+  if (c === S.player && c.map === 'prolog' && S.prolog) return prologRescue();   /* Prolog: Oswin zieht dich raus */
   if (c.simDummy) { c.alive = false; c.swing = 0; c.telegraph = 0; c.special = null; c.heavy = null; return; }   /* Balance-Runde: RF.simFight — ein gestellter Tod hat keine Weltfolgen */
   if (c.key === 'ilvar') ilvarSlain(source);                         // S15 P6: der Turm bricht ein
   if (c.traitor) { const C = (S.contracts || []).find(x => x.id === c.contract && x.state === 'active'); if (C) { conProgress(C, C.need - C.have); C.title += ' (Verrat)'; } }   // S13: der Verräter ist tot — Auftrag erfüllt
@@ -6019,7 +6023,7 @@ function doInteract(target = null) {
 
 // Ankunftspunkt je Karte: fest vor der Tür, nicht zufällig (sonst landet man teils im Eingang selbst)
 // Ankunft: im Dungeon am Treppenfuß, an der Oberfläche vor dem Eingang, durch den man kam (Grube oder Tiefhall)
-const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from === 'zwerge' && S.ents.deep.find(e => e.portal === 'zwerge'); return g ? freeSpotNear('deep', g.x / TS | 0, (g.y / TS | 0) + 2, 1) : MAPS.deep.entry; }, zwerge: () => buildDwarfCity(), varonburg: () => buildVaronburg(), katakomben: from => buildCatacombs(from), garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
+const ARRIVAL = { mine: () => MAPS.mine.entry, deep: from => { const g = from === 'zwerge' && S.ents.deep.find(e => e.portal === 'zwerge'); return g ? freeSpotNear('deep', g.x / TS | 0, (g.y / TS | 0) + 2, 1) : MAPS.deep.entry; }, zwerge: () => buildDwarfCity(), varonburg: () => buildVaronburg(), katakomben: from => buildCatacombs(from), prolog: () => buildProlog(), garmadon: () => MAPS.garmadon.entry, omega: () => { ensureOmegaBoss(); if (om().fight) omegaAllies(MAPS.omega.entry); return MAPS.omega.entry; }, sky: () => MAPS.sky.entry, kerker: () => MAPS.kerker.entry, vault: () => MAPS.vault.entry, isle: () => { S.flags.seaSeen = true; return MAPS.isle.entry; }, deck: () => MAPS.deck.entry, tower: () => MAPS.tower.entry,
   world: from => {
     if (from === 'kerker') { const sq = TOWN_PLAN[S.jailTown]?.square || (FAC_CON[S.jailTown] && conSq(S.jailTown)) || TOWN_PLAN.eren.square; return freeSpotNear('world', sq[0] + 2, sq[1] + 2, 2); }   /* 03.10.: Karak-Atar und Tiefhall entlassen vor ihrem Ort */   // Phase 2: vor dem Kerker der Stadt
     if (from === 'deck' && S.airLand) { const [ax, ay] = S.airLand; S.airLand = null; return freeSpotNear('world', ax | 0, ay | 0, 5); }   /* Roadmap P7: Luftschiff landet am Mast (oder notlandet im Land) */
@@ -8968,6 +8972,7 @@ const TUTOR = [
 let tutorNext = 0;
 const tutorBoard = p => { let best = null, bd = 120 * TS; for (const e of S.ents.world) if (e.type === 'board') { const d = dist(e, p); if (d < bd) { bd = d; best = e; } } return best; };
 function tutorShow() {
+  if (prOn()) return prologShow();
   const el = $('tutor'); if (!el) return; const i = S.flags.tutor ?? -1, T = TUTOR[i];
   if (i < 0 || !T || S.settings?.tips === false || S.coop?.role === 'guest') { el.classList.add('hidden'); return; }
   el.classList.remove('hidden'); el.innerHTML = `<b>Wegweiser ${i + 1}/${TUTOR.length}</b><span>${T.text}</span><button title="Wegweiser ausblenden (Tipps in den Einstellungen)">×</button>`;
@@ -8981,6 +8986,223 @@ function tutorTick(now, force = false) {
   let ok3 = false; try { ok3 = T.done(p); } catch (e) { ok3 = false; } if (!ok3) return;
   S.flags.tutor = i + 1; const el = $('tutor'); if (el && S.flags.tutor < TUTOR.length) { el.classList.add('ok'); setTimeout(() => { el.classList.remove('ok'); tutorShow(); }, 700); } else tutorShow();
   if (S.flags.tutor >= TUTOR.length) { log('Wegweiser beendet. Ab hier bist du auf dich gestellt — H öffnet den Kodex, Tipps kommen weiter zur rechten Zeit.', 'quest'); }
+}
+/* ================= Prolog „Die Aschenfurt“ (Entwickler 08.10.2026: eigenes kleines Startgebiet — Steuerung, Menüs, Spielziel, Kamerafahrten,
+   Wahl der Seite; Texte und Zahlen von Claude, vorläufig) =================
+   Neue Helden ohne Fraktions-Start beginnen auf einer eigenen kleinen Karte: Wagenwrack eines Flüchtlingstrecks, alte Wachstation des Königs,
+   Fluss mit Furt, dahinter Gräber der Stillen. Acht erlebte Schritte (Bewegen, Ansprechen, Durchsuchen, Menüs, Kampf, Aufheben/Heilen,
+   Spielziel, Wahl). Nichts davon ist tödlich: wer fällt, den zieht Oswin ans Feuer zurück. Am Nordtor warten drei Gesandte:
+   Krone (Fraktions-Start Valen in Varonheim), die Stillen (Fraktions-Start der Toten in Vharnholm — als Lebender) oder keiner
+   (Rebell: Start wie im Menü gewählt, Titel „Ohne Herrn“, die Freien +10, Valen −10). Danach Einflug und Wegweiser in der Welt.
+   Die Karte ist flüchtig (bei jedem Laden neu gebaut); gespeichert wird nur S.prolog = { step, back, menus, talked, fought, goal }. */
+const PR_STEPS = [
+  { k: 'move', text: 'Bewegen: WASD oder Pfeiltasten. Geh zu dem Alten am Feuer in der Wachruine (Norden).' },
+  { k: 'talk', text: 'Ansprechen: Stell dich vor Oswin und drück E.' },
+  { k: 'loot', text: 'Durchsuche die Kiste am Wagenwrack im Südwesten (E). Was du nimmst, landet im Gepäck.' },
+  { k: 'menus', text: 'Menüs: Öffne dein Gepäck (I), deinen Charakter (C) und die Karte (M). Esc schließt jedes Fenster. H öffnet den Kodex mit allen Regeln.' },
+  { k: 'fight', text: 'Kampf: Linksklick schlägt, Maustaste halten lädt einen schweren Hieb, Q weicht aus, Umschalt deckt. Wo du triffst, zählt — Kopf, Arme, Beine.' },
+  { k: 'heal', text: 'Aufheben und heilen: Heb auf, was liegen blieb (E). Verbände benutzt du im Gepäck (I) oder über die Schnellleiste (1–4).' },
+  { k: 'goal', text: 'Geh zurück zu Oswin und sprich mit ihm (E). Er weiß, was da draußen auf dich wartet.' },
+  { k: 'choice', text: 'Am Nordtor warten drei Gesandte. Sprich mit dem, dem du folgen willst — Krone, Tote oder keiner.' },
+];
+const PR_MENUS = [['inventory', 'I Gepäck'], ['character', 'C Charakter'], ['map', 'M Karte']];
+const PR_ENVOY = {
+  krone: { name: 'Hauptmann Gerold', prof: 'Hauptmann der Krone', cloth: '#33415c', at: [22, 7], card: 'DIE KRONE', sub: 'König Varon von Valen',
+    pitch: '„Im Namen König Varons. Die Krone braucht jeden Arm, der ein Schwert halten kann. Komm mit nach Varonheim: Sold, ein Dach, ein Platz in der Ordnung. Wer der Krone dient, dem öffnen sich die Tore — und wer sich ihr widersetzt, dem der Galgen.“',
+    deal: 'Du beginnst in Varonheim als Rekrut des Königreichs Valen (Rang, Ansehen 20, ein eigenes Gehöft vor der Stadt). Die Toten bleiben deine Feinde.',
+    yes: '„Gut. Halt dich gerade, Rekrut — in Varonheim sieht man genau hin.“' },
+  tote: { name: 'Ysolde', prof: 'Grabsprecherin der Stillen', cloth: '#232a28', skin: '#cfc8b4', at: [25, 7], card: 'DIE STILLEN', sub: 'Garmadon, der Tote König',
+    pitch: '„Die Lebenden haben deinen Treck hier sterben lassen. Wir nicht — wir haben nur genommen, was ohnehin fiel. Die Stillen haben Städte, Gesetze und Geduld. Diene uns lebend: Es gibt Aufgaben, die nur ein warmer Körper erledigen kann.“',
+    deal: 'Du beginnst in Vharnholm als lebender Diener der Toten (Rang, Ansehen 20, eine eigene Hütte). Untote verschonen dich — das Königreich Valen und der Orden jagen dich.',
+    yes: '„Dann komm. Hab keine Angst vor der Stille — sie ist das Ehrlichste, was diese Welt noch hat.“' },
+  rebell: { name: 'Mara', prof: 'Bannbrecherin', cloth: '#4a3a26', at: [28, 7], card: 'OHNE HERRN', sub: 'Keine Krone, kein Grab',
+    pitch: '„Krone oder Grab — beide fressen dich, nur der eine schneller. Ich sag dir, was ich jedem sag: Kein Herr, kein Tribut. Geh deinen eigenen Weg, und wenn dir einer zu nah kommt, schlag zurück.“',
+    deal: 'Du beginnst ohne Fraktion (Ort wie im Menü gewählt). Titel „Ohne Herrn“, die Freien +10, Valen −10. Alle Türen bleiben offen — und beide Mächte misstrauen dir.',
+    yes: '„Dann sind wir schon zwei. Die Welt braucht mehr Leute, die Nein sagen.“' },
+};
+let prMenuTimer = 0, prNext = 0;
+const prOn = () => !!S.prolog && S.map === 'prolog';
+const prEnt = k => S.ents.prolog?.find(e => e.prolog === k);
+function buildProlog() {
+  const w = 60, h = 44, tiles = new Uint8Array(w * h).fill(T.GRASS); MAPS.prolog = { w, h, tiles, ver: (MAPS.prolog?.ver || 0) + 1 };
+  const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < w && y < h) tiles[y * w + x] = t; }, hs = (x, y) => hsh(x, y, 77);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const edge = Math.min(x, y, w - 1 - x, h - 1 - y);
+    if (edge < 2 || (edge < 4 && hs(x, y) < 0.5)) set(x, y, T.ROCK);
+    else if (x > 44) set(x, y, hs(x, y) < 0.4 ? T.ASH : T.DIRT);                     /* Totenland-Seite: Asche und nackte Erde */
+    else if (hs(x, y) < 0.1) set(x, y, T.DIRT);
+  }
+  for (let y = 2; y < h - 2; y++) { const rx = 40 + Math.round(Math.sin(y * 0.35) * 1.2); for (let k = 0; k < 3; k++) set(rx + k, y, y >= 19 && y <= 22 ? T.MARSH : T.WATER); }   /* Fluss, Furt in der Mitte */
+  for (let y = 0; y <= 30; y++) { set(25, y, T.ROAD); set(24, y, y < 4 ? T.ROAD : tiles[y * w + 24]); set(26, y, y < 4 ? T.ROAD : tiles[y * w + 26]); }   /* Straße vom Nordtor */
+  for (let x = 11; x <= 25; x++) set(x, 31, T.ROAD); for (let y = 31; y <= 36; y++) set(11, y, T.ROAD);                 /* … zum Wagenwrack */
+  for (let x = 26; x <= 52; x++) if (tiles[20 * w + x] !== T.MARSH) set(x, 20, x > 44 ? T.DIRT : T.ROAD);             /* … und zur Furt */
+  const P = [], prop = (type, tx, ty, o = {}) => { const e = { id: uid(), kind: 'prop', type, map: 'prolog', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 11, solid: false, transient: true, ...o }; P.push(e); return e; };
+  prop('portcullis', 25, 2, { solid: true, r: 14, prolog: 'gate', label: 'Nordtor der Aschenfurt — die Straße ins Grenzland' });
+  prop('banner_pole', 23, 4, { solid: true, r: 6, label: 'Banner Valens' }); prop('banner_torn', 27, 4, { label: 'Grabbanner der Stillen' }); prop('waysign', 26, 6, { solid: true, r: 6, label: 'Wegweiser: Norden — Grenzland, Valen. Osten — Totenland.' });
+  for (let x = 19; x <= 31; x += 2) for (const y of [14, 26]) if (Math.abs(x - 25) > 1) prop('palisade_prop', x, y, { solid: true, r: 10, label: 'Palisade der Wachstation' });
+  for (let y = 16; y <= 24; y += 2) for (const x of [19, 31]) if (Math.abs(y - 20) > 1) prop('palisade_prop', x, y, { solid: true, r: 10, label: 'Palisade der Wachstation' });
+  prop('watchtower_ruin', 21, 16, { solid: true, r: 16, label: 'Ausgebrannter Wachturm des Königs' }); prop('tent_prop', 29, 16, { solid: true, r: 14, label: 'Oswins Zelt' });
+  prop('campfire', 26, 19, { solid: true, r: 10, label: 'Lagerfeuer' }); prop('crate', 22, 23, { solid: true, r: 9 }); prop('barrel', 23, 24, { solid: true, r: 8 }); prop('weapon_rack', 29, 23, { solid: true, r: 9, label: 'Leeres Waffengestell' });
+  prop('broken_cart', 9, 34, { solid: true, r: 16, label: 'Wagen des Trecks' }); prop('broken_cart', 14, 37, { solid: true, r: 16, label: 'Umgestürzter Wagen' });
+  prop('chest', 12, 34, { solid: true, r: 9, prolog: 'chest', loot: ['bread', 'bandage', 'bandage'], label: 'Kiste des Trecks' });
+  for (const [x, y] of [[8, 37], [16, 34], [10, 39]]) prop('debris', x, y, { r: 6 }); prop('sack', 15, 35, { r: 6 }); prop('ember', 13, 38, { r: 6 });
+  for (const [x, y] of [[7, 35], [17, 39]]) prop('grave_cross', x, y, { solid: true, r: 6, label: 'Frisches Grab — jemand aus dem Treck' });
+  for (let i = 0; i < 14; i++) { const x = 47 + (i * 5) % 10, y = 13 + ((i * 7) % 17); prop(i % 3 ? 'gravestone' : 'grave', x, y, { solid: i % 3 !== 0, r: 7, label: 'Grab der Stillen' }); }
+  prop('dead_tree', 54, 15, { solid: true, r: 9 }); prop('dead_tree', 49, 29, { solid: true, r: 9 }); prop('bone_spire', 55, 24, { solid: true, r: 9, label: 'Knochenmal der Stillen' }); prop('banner_torn', 46, 18, { label: 'Grabbanner der Stillen' });
+  for (let i = 0; i < 70; i++) { const x = 3 + Math.floor(hs(i, 1) * 36), y = 3 + Math.floor(hs(i, 2) * 38), t = tiles[y * w + x];
+    if (t !== T.GRASS || (x > 17 && x < 33 && y > 12 && y < 28) || (x > 5 && x < 19 && y > 30) || Math.abs(x - 25) < 3 || Math.abs(y - 20) < 2) continue;
+    prop(hs(i, 3) < 0.7 ? 'tree' : 'bush', x, y, { solid: true, r: 9 }); }
+  const os = makeChar({ name: 'Oswin', prof: 'Grenzwächter', map: 'prolog', x: 27 * TS + TS / 2, y: 20 * TS + 4, level: 8, age: 61, traits: ['diszipliniert'] });
+  Object.assign(os, { prolog: 'oswin', transient: true, anchor: { x: os.x, y: os.y }, faction: null, brave: true, greet: '„Du lebst. Gut.“' }); P.push(os);
+  P.push(...(S.ents.prolog || []).filter(e => !e.transient));        /* Held und Gefährten bleiben (Laden mitten im Prolog) */
+  S.ents.prolog = P; MAPS.prolog.entry = { x: 12 * TS + TS / 2, y: 36 * TS + TS / 2 };
+  indexSolids('prolog'); return MAPS.prolog.entry;
+}
+function prologStart() {                                              /* aus startGame: neuer Held ohne Fraktions-Start */
+  const p = S.player; if (!p || S.coop?.role) { S.flags.prologPending = 0; return introFlight(); }
+  const startLog = S.log.filter(e => e.cat === 'world').slice(-4).map(e => e.text); S.log.length = 0;   /* Startzeilen der Welt kommen erst nach dem Prolog (Weg „ohne Herrn“) */
+  S.flags.prologPending = 0; S.prolog = { step: 0, back: { map: p.map, x: p.x, y: p.y }, menus: {}, startLog };
+  travel('prolog'); prologEnsure(); prologIntro();
+}
+function prologEnsure() {                                             /* idempotent: nach Laden und nach jedem Schritt */
+  const P = S.prolog, k = PR_STEPS[P.step]?.k; if (!P) return;
+  if (!prEnt('oswin')) buildProlog();
+  if (k === 'fight' && !P.fought && !S.ents.prolog.some(e => e.prUndead && e.alive)) prologRaise();
+  if (k === 'heal' && !S.ents.prolog.some(e => e.prDrop)) prologDrop(prEnt('oswin') ? { x: 50 * TS, y: 21 * TS } : S.player);
+  if (k === 'choice') prologEnvoys();
+  clearInterval(prMenuTimer); prMenuTimer = setInterval(() => { if (!S.prolog) return clearInterval(prMenuTimer); const m = UI.modalOpen; if (m && PR_MENUS.some(([n]) => n === m) && !S.prolog.menus[m]) { S.prolog.menus[m] = 1; prologShow(); } }, 300);
+  prologShow();
+}
+function prologIntro() {
+  const p = S.player, T2 = (x, y) => ({ map: 'prolog', x: x * TS, y: y * TS });
+  cinematic([
+    { ...T2(30, 22), zoom: 0.45, dur: 5600, text: 'Vor Jahren fiel ein Stern. Rotfall nennen sie es. Seitdem bleiben die Toten nicht liegen.', beats: [{ t: 0.05, card: { title: 'ROTFALL', sub: 'Prolog — Die Aschenfurt', ms: 4600 } }] },
+    { ...T2(12, 35), zoom: 1.2, dur: 4400, text: 'Ein Flüchtlingstreck auf dem Weg nach Westen, ins Königreich. Er kam bis zur Aschenfurt.' },
+    { ...T2(50, 21), zoom: 0.9, dur: 4400, text: 'Hinter dem Fluss beginnt das Land der Stillen. Ihre Gräber sind nie ganz zu.' },
+    { ...T2(26, 19), zoom: 1.25, dur: 4000, text: 'An der ausgebrannten Wachstation des Königs brennt noch ein Feuer.' },
+    { ...T2(25, 5), zoom: 1.0, dur: 4000, text: 'Im Norden führt die Straße hinaus — zu Königen, zu Toten und zu allem dazwischen.' },
+    { map: 'prolog', x: p.x, y: p.y, zoom: 1.4, dur: 3200, text: `${p.name}. Du lebst. Noch.` },
+  ], () => { prologShow(); log('Du kommst unter einem Wagen zu dir. Rauch, Asche, Stille. Am Feuer im Norden sitzt jemand.', 'world'); });
+}
+function prologShow() {
+  const el = $('tutor'), P = S.prolog; if (!el || !P) return;
+  if (!prOn()) { tutorShow(); return; }
+  const T3 = PR_STEPS[P.step]; if (!T3 || S.cine) return el.classList.add('hidden');   /* während Kamerafahrten verborgen */
+  const menus = T3.k === 'menus' ? `<br><i style="color:#c9a45a;font-style:normal">${PR_MENUS.map(([n, t]) => (P.menus[n] ? '☑ ' : '☐ ') + t).join(' · ')}</i>` : '';
+  el.classList.remove('hidden'); el.innerHTML = `<b>Prolog ${P.step + 1}/${PR_STEPS.length}</b><span>${T3.text}${menus}</span><button title="Prolog überspringen: gleich zur Wahl der Seite">»</button>`;
+  el.querySelector('button').onclick = () => prologChoiceMenu(prEnt('oswin') || S.player, true);
+}
+function prologAdvance() {
+  const P = S.prolog; P.step++; prNext = 0;
+  const el = $('tutor'); if (el) { el.classList.add('ok'); setTimeout(() => el.classList.remove('ok'), 700); }
+  const k = PR_STEPS[P.step]?.k;
+  if (k === 'fight') return cinematic([{ map: 'prolog', x: 50 * TS, y: 21 * TS, zoom: 1.1, dur: 3800, text: 'Drüben bei den Gräbern bewegt sich die Erde.', beats: [{ t: 0.15, shake: 4, ms: 500, do: () => prologEnsure() }, { t: 0.4, flash: 'rgba(80,140,120,.5)', ms: 300 }] }], () => { prologShow(); log('Untote! Wer fällt, wird hier nicht begraben — kämpf oder lauf.', 'quest'); });
+  if (k === 'choice') return prologEnvoyScene();
+  prologEnsure();
+}
+function prologTick(now) {
+  const P = S.prolog, p = S.player; if (!P || !prOn() || !p || now < prNext) return; prNext = now + 300;
+  const card = $('tutor'); if (S.cine) { card?.classList.add('hidden'); return; } if (card?.classList.contains('hidden') && PR_STEPS[P.step]) prologShow();
+  if (p.downed || p.hp <= 0) return prologRescue();
+  const k = PR_STEPS[P.step]?.k, os = prEnt('oswin'); let done = false;
+  if (k === 'move') done = os && dist(p, os) < 110;
+  else if (k === 'talk') done = !!P.talked;
+  else if (k === 'loot') done = !!prEnt('chest')?.opened;
+  else if (k === 'menus') done = PR_MENUS.every(([n]) => P.menus[n]) && !UI.modalOpen;
+  else if (k === 'fight') { done = !S.ents.prolog.some(e => e.prUndead && e.alive); if (done) { P.fought = 1; prologDrop(S.ents.prolog.filter(e => e.kind === 'corpse').at(-1) || p); } }
+  else if (k === 'heal') done = !S.ents.prolog.some(e => e.prDrop);
+  if (done) prologAdvance();
+}
+function prologRaise() {
+  for (const [mt, x, y] of [['zombie', 50, 19], ['skeleton', 52, 23]]) { const e = spawnEnemy(mt, 'prolog', x, y, { level: 1 }); if (!e) continue;
+    Object.assign(e, { transient: true, prUndead: true, hp: 30, maxHp: 30, anchor: { x: 47 * TS, y: 21 * TS } }); fx(e.x, e.y, 'dust', 8); }
+  indexSolids('prolog');
+}
+function prologDrop(at) {
+  dropItemAt('prolog', at.x + 10, at.y + 6, mkItem('bandage')); const it = S.ents.prolog.at(-1); if (it?.kind === 'item') { it.prDrop = true; it.transient = true; }
+}
+function prologRescue() {
+  const p = S.player, os = prEnt('oswin') || { x: 26 * TS, y: 21 * TS };
+  p.alive = true; p.downed = false; B.fullHeal(p); p.hp = p.maxHp; p.x = os.x - 30; p.y = os.y + 26; p.vx = p.vy = 0;
+  for (const e of S.ents.prolog) if (e.prUndead) { e.aggroId = null; e.aiState = 'idle'; e.x = e.anchor.x; e.y = e.anchor.y; }
+  log('Oswin schleift dich zurück ans Feuer. „Langsam. Tot nützt du keinem — und hier bleibt keiner lange tot.“ (Im Prolog stirbst du nicht. Draußen schon.)', 'quest');
+  UI.toast('Gerettet — draußen in der Welt ist der Tod endgültig.', 3200);
+}
+function prologTalk(npc) {
+  const P = S.prolog, k = PR_STEPS[P.step]?.k, bye = [{ text: '[Gehen]', fn: () => UI.closeDialogue() }];
+  if (npc.prEnvoy) return prologEnvoyTalk(npc);
+  if (k === 'move' || k === 'talk') { P.talked = 1;
+    const back = () => prologTalk(npc), say = t => () => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
+    return UI.dialogue(npc, '„Du lebst. Gut — die Toten nehmen lieber die, die nicht mehr schreien. Ich bin Oswin. War mal Grenzwächter des Königs, als es hier noch einen König gab, der hersah.“', [
+      { text: 'Wo bin ich?', fn: say('„An der Aschenfurt. Früher eine Wachstation, jetzt eben Asche. Im Westen liegt das Königreich Valen, im Osten, hinter dem Fluss, das Land der Stillen — der Toten. Euer Treck wollte nach Westen. Er kam bis hierher.“') },
+      { text: 'Was ist passiert?', fn: say('„Wiedergänger aus den Gräbern drüben. Sie kamen bei Nacht. Ich hab getan, was ein alter Mann tun kann: dich unter den Wagen gezogen. Die anderen …“ Er sieht zu den frischen Kreuzen.') },
+      { text: 'Was soll ich jetzt tun?', fn: () => { UI.dialogue(npc, '„Erst mal: nimm, was im Wagen noch zu gebrauchen ist. Die Kiste am Wrack, im Südwesten. Dann reden wir weiter.“', bye); if (PR_STEPS[P.step].k === 'move') P.step = 1; } },
+    ]); }
+  if (k === 'goal') return prologGoalTalk(npc);
+  if (k === 'choice') return prologChoiceMenu(npc, false);
+  const hint = { loot: '„Die Kiste am Wrack. Südwesten. Nimm alles, was du tragen kannst — die Toten brauchen kein Brot.“', menus: '„Weißt du überhaupt, was du bei dir hast? Schau in dein Gepäck (I), sieh dich selbst an (C) und präg dir die Karte ein (M).“',
+    fight: '„Da drüben! Nimm die Waffe hoch. Schlag, wenn sie ausholen, und weich aus, wenn sie zuschlagen — Q.“', heal: '„Heb auf, was sie fallen ließen. Und wenn du blutest: Verband. Nicht erst, wenn es zu spät ist.“' }[k];
+  UI.dialogue(npc, hint || '„Na?“', bye);
+}
+function prologGoalTalk(npc) {
+  const P = S.prolog, lines = [
+    '„Hör zu, ich sag es nur einmal. Garmadon, der Tote König, herrscht im Osten — die Stillen haben Städte, Gesetze und Zeit. König Varon hält den Westen mit Galgen und Steuern. Dazwischen: freie Orte, Händler, Banden, der Orden — und Leute wie du.“',
+    '„Du wirst nicht ewig leben. Wenn du fällst, ist es vorbei. Aber was du baust, bleibt: dein Haus, dein Name, dein Erbe. Dein Nachfolger erbt Gold, Ruf — und deine Feinde. Das ist ROTFALL: nicht ein Held, sondern ein Geschlecht.“',
+    '„Was du kannst, lernst du durch Tun. Wer schmiedet, wird Schmied, wer kämpft, wird Kämpfer. Niemand gibt dir eine Liste. Aufträge hängen an Brettern, Gerüchte erzählen die Leute — und die Welt läuft weiter, ob du hinsiehst oder nicht.“',
+    '„Und jetzt sieh zum Tor. Sie sind schneller gekommen, als ich dachte. Jeder will Leute wie dich — die Frage ist nur, wem du gehören willst.“',
+  ];
+  const step = i => UI.dialogue(npc, lines[i], [{ text: i < lines.length - 1 ? 'Weiter' : 'Zum Tor sehen', fn: () => { if (i < lines.length - 1) return step(i + 1); UI.closeDialogue(); P.goal = 1; prologAdvance(); } }]);
+  step(0);
+}
+function prologEnvoys() {
+  if (S.ents.prolog.some(e => e.prEnvoy)) return;
+  for (const [k, E] of Object.entries(PR_ENVOY)) { const [x, y] = E.at;
+    const c = makeChar({ name: E.name, prof: E.prof, map: 'prolog', x: x * TS + TS / 2, y: 3 * TS + TS / 2, level: 10, age: 40, traits: ['diszipliniert'] });
+    c.pal = { ...c.pal, cloth: E.cloth, ...(E.skin ? { skin: E.skin } : {}) };
+    Object.assign(c, { prolog: 'env_' + k, prEnvoy: k, transient: true, anchor: { x: x * TS + TS / 2, y: y * TS + TS / 2 }, faction: k === 'krone' ? 'valen' : null, brave: true });
+    S.ents.prolog.push(c); }
+}
+function prologEnvoyScene() {
+  prologEnsure(); const gate = { map: 'prolog', x: 25 * TS + TS / 2, y: 6 * TS };
+  cinematic([
+    { ...gate, zoom: 1.2, dur: 6200, text: 'Durch das Nordtor kommen drei Gesandte, staubig und bewaffnet. Jeder sucht Leute für seine Seite.', beats: [
+      { t: 0.18, card: { title: PR_ENVOY.krone.card, sub: PR_ENVOY.krone.sub, ms: 1800 } }, { t: 0.46, card: { title: PR_ENVOY.tote.card, sub: PR_ENVOY.tote.sub, ms: 1800 } }, { t: 0.74, card: { title: PR_ENVOY.rebell.card, sub: PR_ENVOY.rebell.sub, ms: 1600 } }] },
+  ], () => { prologShow(); log('Am Nordtor warten Hauptmann Gerold (Krone), die Grabsprecherin Ysolde (die Stillen) und Mara, die Bannbrecherin (ohne Herrn). Sprich mit dem, dem du folgen willst.', 'quest'); });
+}
+function prologEnvoyTalk(npc) {
+  const E = PR_ENVOY[npc.prEnvoy];
+  UI.dialogue(npc, E.pitch, [
+    { text: 'Was heißt das für mich?', fn: () => UI.dialogue(npc, E.deal, [{ text: 'Ich folge dir.', fn: () => prologConfirm(npc, npc.prEnvoy) }, { text: 'Ich höre mir die anderen an.', fn: () => UI.closeDialogue() }]) },
+    { text: 'Ich folge dir.', fn: () => prologConfirm(npc, npc.prEnvoy) },
+    { text: 'Später.', fn: () => UI.closeDialogue() },
+  ]);
+}
+function prologChoiceMenu(npc, skip) {
+  UI.dialogue(npc, skip ? '„Du willst gleich los? Dann sag mir wenigstens, wohin. Krone, Grab — oder keins von beiden?“' : '„Drei Wege, drei Herren — oder keiner. Sprich mit ihnen am Tor, oder sag es mir.“', [
+    ...Object.entries(PR_ENVOY).map(([k, E]) => ({ text: `${E.card[0]}${E.card.slice(1).toLowerCase()}: ${E.deal}`, fn: () => prologConfirm(npc, k) })),
+    { text: 'Noch nicht.', fn: () => UI.closeDialogue() },
+  ]);
+}
+function prologConfirm(npc, path) {
+  const E = PR_ENVOY[path];
+  UI.dialogue(npc, `Endgültig? ${E.deal}`, [{ text: 'Ja. So sei es.', fn: () => { UI.closeDialogue(); prologEnd(path); } }, { text: 'Nein, noch einmal überlegen.', fn: () => UI.closeDialogue() }]);
+}
+function prologEnd(path) {
+  const P = S.prolog, E = PR_ENVOY[path], who = S.ents.prolog?.find(e => e.prEnvoy === path);
+  if (who && !S._quiet) bubble(who, E.yes, 3600);
+  const go = () => {
+    const p = S.player; clearInterval(prMenuTimer);
+    travel('world');
+    if (path === 'krone' || path === 'tote') { const f = path === 'krone' ? 'valen' : 'undead', at = facStartAt(FAC_STARTS[f], f); if (at.map && at.map !== 'world') travel(at.map); p.x = at.x; p.y = at.y; facStartSetup(f, p); }
+    else { const b = P.back || {}; if (b.map && b.map !== 'world' && S.ents[b.map]) travel(b.map); if (b.x) { p.x = b.x; p.y = b.y; }
+      S.factions.valen = clamp((S.factions.valen || 0) - 10, -100, 100); S.factions.frei = clamp((S.factions.frei || 0) + 10, -100, 100); (p.titles ||= []).includes('Ohne Herrn') || p.titles.push('Ohne Herrn');
+      log('Du folgst keinem. Titel „Ohne Herrn“; die Freien +10, Valen −10. Beide Mächte werden dich beobachten.', 'faction'); for (const t of P.startLog || []) log(t, 'world'); }
+    chronicle(`${p.name} verlässt die Aschenfurt`, 'birth', { krone: 'Im Dienst der Krone.', tote: 'Im Dienst der Stillen — als Lebender.', rebell: 'Ohne Herrn.' }[path]);
+    S.ents.prolog = []; S.prolog = null; S.flags.prologPath = path; S.flags.tutor = 2; S.flags.tutX = null; S.flags.introDone = 0;   /* Wegweiser ab „Händler“: Bewegen und Ansprechen sind gelernt */
+    tutorShow(); setTimeout(() => introFlight(), 600); save();
+  };
+  if (S._quiet) return go();
+  cinematic([{ map: 'prolog', x: 25 * TS + TS / 2, y: 5 * TS, zoom: 1.1, dur: 3000, text: { krone: 'Du folgst dem Hauptmann nach Westen, nach Varonheim.', tote: 'Du folgst der Grabsprecherin über die Furt, nach Osten, nach Vharnholm.', rebell: 'Du gehst allein durch das Nordtor. Mara nickt dir nach.' }[path], beats: [{ t: 0.7, flash: '#000', ms: 900 }] }], go);
 }
 const GUIDE = [
   ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
@@ -9000,7 +9222,7 @@ const GUIDE = [
   ['settle', p => !S.settlement && S.gold >= 300 && (S.flags.playMin || 0) >= 20, 'Mit genug Gold und Vorrat kannst du eine eigene Siedlung gründen. B öffnet das Bauen.'],
 ];
 function guideTick() {
-  const p = S.player; if (!p?.alive || S.settings?.tips === false || S.coop?.role === 'guest' || UI.dialogueOpen() || S.cine || S.paused) return;
+  const p = S.player; if (!p?.alive || S.settings?.tips === false || S.coop?.role === 'guest' || UI.dialogueOpen() || S.cine || S.paused || S.map === 'prolog') return;
   S.flags.playMin = (S.flags.playMin || 0) + 0.05;                     /* grob: Spielminuten in Echtzeit (alle 3 s) */
   const now = performance.now(); if (now - guideLast < 90000) return; const T = (S.flags.tips ||= ((S.day | 0) >= 5 ? { codex: 1, map: 1, board: 1, fight: 1, tavern: 1, night: 1, craft: 1 } : {}));   /* alte Stände: Grundtipps gelten als bekannt */
   for (const [k, cond, text] of GUIDE) { if (T[k]) continue; let hit = false; try { hit = cond(p); } catch (e) { hit = false; } if (!hit) continue;
@@ -11549,8 +11771,8 @@ function travel(to) {
   p.x = spot.x; p.y = spot.y;
   S.ents[to].push(p);
   for (const m of members) { m.map = to; m.x = p.x + ri(-24, 24); m.y = p.y + ri(-24, 24); if (m.servant) { m.anchor = { x: m.x, y: m.y }; m.aggroId = null; } S.ents[to].push(m); }
-  log(DUNGEONS[to] ? DUNGEONS[to].enter : 'Du kehrst an die Oberfläche zurück.', 'world');
-  UI.toast(DUNGEONS[to] ? DUNGEONS[to].name : 'Greenmark-Grenzland');
+  if (from !== 'prolog' && to !== 'prolog') { log(DUNGEONS[to] ? DUNGEONS[to].enter : 'Du kehrst an die Oberfläche zurück.', 'world');
+  UI.toast(DUNGEONS[to] ? DUNGEONS[to].name : 'Greenmark-Grenzland'); }   /* Prolog: eigene Texte */
   arrivePursuit(to);
   save();
 }
@@ -13486,6 +13708,7 @@ function npcOffers(n) {
 }
 function talk(npc) {
   if (npc?.kind === 'npc' && S.flags.tutor != null) S.flags.tutTalked = 1;   /* Wegweiser */
+  if (npc?.prolog && S.prolog) return prologTalk(npc);   /* Prolog */
   if (npc?.famKid) return UI.dialogue(npc, `${npc.greet}\n(${npc.name}, ${npc.household?.role === 'Tochter' ? 'Tochter' : 'Sohn'} der ${npc.household?.name}s.)`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);   /* Planlauf P1.10 */
   if (npc.key) ((S.codex ||= {}).met ||= {})[npc.key] = 1;             // S15 Kodex: wen man kennt
   if (npc.coreHolder) return snikkTalk(npc);                          // S15 P7 Artefakt-Konflikt
@@ -17449,6 +17672,9 @@ function debugSections() {
     }],
     ['Tutorial: Einflug und Wegweiser (08.10.2026)', '', {
       'Einflug abspielen (Kamerafahrt, Esc überspringt)': () => { S.flags.introDone = 0; toWorld(); introFlight(true); },
+      'Prolog „Aschenfurt“ starten (im laufenden Stand)': () => { toWorld(); prologStart(); },   /* Prolog 08.10. */
+      'Prolog: nächster Schritt': () => { if (S.prolog) { if (PR_STEPS[S.prolog.step]?.k === 'fight') for (const e of S.ents.prolog) if (e.prUndead) e.alive = false; if (PR_STEPS[S.prolog.step]?.k === 'heal') S.ents.prolog = S.ents.prolog.filter(e => !e.prDrop); if (PR_STEPS[S.prolog.step]?.k === 'goal') S.prolog.goal = 1; prologAdvance(); } else UI.toast('Kein Prolog aktiv.'); },
+      'Prolog: zur Wahl springen': () => { if (!S.prolog) { toWorld(); prologStart(); } prologChoiceMenu(prEnt('oswin') || S.player, true); },
       'Wegweiser neu starten': () => { S.flags.tutor = 0; delete S.flags.tutX; delete S.flags.tutTalked; delete S.flags.tutTrade; delete S.flags.tutLoot; delete S.flags.tutGoalAt; S.settings.tips = true; tutorShow(); UI.toast('Wegweiser läuft von vorn.'); },
       'Wegweiser: nächsten Schritt abhaken': () => { if (S.flags.tutor == null) S.flags.tutor = 0; S.flags.tutor = Math.min(TUTOR.length, S.flags.tutor + 1); tutorShow(); },
     }],
@@ -21464,6 +21690,22 @@ export function selftest() {
     return cells.every(c => { const at = (tx, ty) => inJailCell({ x: tx * TS, y: ty * TS }, c), d = c.door[1], top = d > c.y;
       return at(c.x + 2.5, c.y + 3) && at(c.x + 2.5, d + 0.5) && at(c.x + 2.5, top ? d + 0.95 : d + 0.05) && !at(c.x + 2.5, top ? d + 1.5 : d - 0.5) && !at(c.x + 7, c.y + 3); });
   })());
+  ok('Prolog 08.10.: Aschenfurt baut sich (Tor, Kiste mit Beute, Oswin, Furt begehbar, Start frei), Schritte gehen nur nach dem Erleben weiter, Tod im Prolog rettet statt Erbe, Laden baut neu und behält den Helden', (() => {
+    const p = S.player, P0 = S.prolog, E0 = S.ents.prolog, M0 = MAPS.prolog, m0 = S.map, x0 = p.x, y0 = p.y, pm = p.map;
+    try {
+      S.ents.prolog = []; const at = buildProlog(), M = MAPS.prolog, walkP = (x, y) => !SOLID.has(M.tiles[(y | 0) * M.w + (x | 0)]);
+      const built = M.w === 60 && walkP(at.x / TS, at.y / TS) && !!prEnt('gate') && prEnt('chest')?.loot?.length === 3 && !!prEnt('oswin') && walkP(41, 20) && !walkP(41, 10);
+      S.prolog = { step: 0, menus: {}, back: { map: 'world', x: x0, y: y0 } }; S.map = 'prolog'; p.map = 'prolog'; S.ents.prolog.push(p); p.x = at.x; p.y = at.y;
+      prNext = 0; prologTick(1e9); const stay = S.prolog.step === 0;
+      const os = prEnt('oswin'); p.x = os.x - 40; p.y = os.y; prNext = 0; prologTick(2e9); const moved = S.prolog.step === 1;
+      prNext = 0; prologTick(3e9); const waits = S.prolog.step === 1; S.prolog.talked = 1; prNext = 0; prologTick(4e9); const talked = S.prolog.step === 2;
+      prEnt('chest').opened = true; prNext = 0; prologTick(5e9); const looted = S.prolog.step === 3;
+      const hp0 = p.hp; p.hp = 0; die(p, 'Test'); const rescued = p.alive && p.hp > 0 && S.ents.prolog.includes(p) && !S.dying;
+      buildProlog(); const kept = S.ents.prolog.includes(p) && !!prEnt('oswin'); p.hp = hp0;
+      if (!(built && stay && moved && waits && talked && looted && rescued && kept)) console.warn('Prolog', { built, stay, moved, waits, talked, looted, rescued, kept });
+      return built && stay && moved && waits && talked && looted && rescued && kept;
+    } finally { clearInterval(prMenuTimer); S.ents.prolog = E0 || []; MAPS.prolog = M0; S.prolog = P0; S.map = m0; p.map = pm; p.x = x0; p.y = y0; if (!S.ents[pm].includes(p)) S.ents[pm].push(p); indexSolids('prolog'); }
+  })());
   ok('Planlauf P1.9–P1.11 (08.10.): fast alle Bewohner haben einen Schlafplatz im Ort, Haushalt = gemeinsames Wohnhaus, Kinder haben Bett/Lager und eine Mutter im Haus, nichts davon im Spielstand', (() => {
     const st = planHomes(), V = VILLAGERS.filter(c => c.homeTown !== 'vharnholm' && c.plan), kids = V.filter(c => c.famKid);
     const share = V.filter(c => c.household).every(c => c.child || c.sleepId === c.household.id || !DWELL.has(HOUSES.find(b => b.id === c.household.id)?.type));
@@ -23145,7 +23387,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
