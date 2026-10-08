@@ -600,6 +600,7 @@ function useConsumable(c, idx, target = c, part = null) {
   }
   if (it.use === 'lure') return lureWhistle(c);                     /* Scout R4: Köderpfeife (wird nicht verbraucht) */
   if (it.use === 'fish') { fishUse(c); return UI.refreshHUD(); }   /* Fischen: Angel (wird nicht verbraucht) — auswerfen bzw. anschlagen */
+  if (it.use === 'recipe') { const n = (it.learn || []).filter(k => learnDish(k, it.name)).length; if (n) removeItem(c, slot.key, 1); else UI.toast('Das kennst du schon.'); return UI.refreshHUD(); }   /* Kochen: Rezept lesen */
   if (it.use === 'blood') {                                  /* §5g.2 Blutphiole: stillt den Durst; Lebenden wird übel */
     removeItem(c, slot.key, 1); fx(c.x, c.y - 14, 'blood', 6);
     if (isVamp(c)) { setBlood(c, bloodOf(c) - 25); log(`${c.name} trinkt eine Blutphiole. Der Durst schweigt — für eine Weile.`, 'party'); }
@@ -651,6 +652,7 @@ function useConsumable(c, idx, target = c, part = null) {
   if (it.use === 'food') {                                   // Essen gibt Kraft, heilt aber keine Wunden
     c.stamina = Math.min(c.maxStamina, c.stamina + 30 + (it.food || 1) * 10);
     removeItem(c, slot.key, 1);
+    if (it.efx) { addStatus(c, { key: 'meal', name: it.name, good: true, left: (it.dur || 240) * 1000 * (1 + perkVal(c, 'cooking', 'buff')), efx: it.efx, desc: it.lore }); recalc(c); }   /* Kochen: Mahlzeit wirkt kurz (eine zur Zeit) */
     log(`${c.name} isst ${it.name}.`, 'party');
     return UI.refreshHUD();
   }
@@ -4974,7 +4976,8 @@ function fishUse(p) {
   }
   const w = waterNear(p); if (!w) { UI.toast('Zum Angeln musst du direkt am Wasser stehen.', 2200); return null; }
   const kind = waterKind(S.map, w.x, w.y), W = FISH_WATER[kind], spotK = `${S.day | 0}:${S.map}:${w.x >> 3},${w.y >> 3}`, n = FISH_SPOT.get(spotK) || 0;
-  const delay = (FISH_BITE[0] + rnd() * FISH_BITE[1]) * (1 - perkVal(p, 'fishing', 'bite')) * (n > 5 ? 1.5 : 1), win = FISH_WIN * (1 + perkVal(p, 'fishing', 'window'));
+  const tt = toolTier(p, 'fish'), delay = (FISH_BITE[0] + rnd() * FISH_BITE[1]) * (1 - perkVal(p, 'fishing', 'bite')) * (tt >= 3 ? 0.85 : 1) * (n > 5 ? 1.5 : 1),
+    win = FISH_WIN * (1 + perkVal(p, 'fishing', 'window')) * (1 + 0.15 * Math.max(0, tt - 1));   /* Werkzeug getrennt von der Fertigkeit: gute Angel +15 %, Stahlhaken +30 % Zeit, beißen eher */
   const F = FISH = { kind, spotK, bite: 0, win, x: p.x, y: p.y, wx: w.x, wy: w.y };
   act(p, 'work', delay + win + 800, { x: w.x * TS + TS / 2, y: w.y * TS + TS / 2 }); p.act.tool = 'tool_rod'; p.act.rate = 0.4;
   log(`Du wirfst die Angel aus (${W.name}). Beim Biss sofort noch einmal die Angel benutzen.`, 'world');
@@ -6530,7 +6533,8 @@ const needTxt = R => Object.entries(R.need).map(([k, n]) => `${n} ${ITEMS[k]?.na
 const houseKnows = key => !!S.legacy?.recipes?.includes(key);
 function craftQual(skill, ke) { const q = skill / 100 * 0.75 + rnd() * 0.35 - 0.05; let i = QUAL.findIndex(Q => q < Q[1]); if (ke) i = Math.min(QUAL.length - 1, i + 1); return i; }
 function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und Geste (Probe) */
-  const R = RECIPES[key], p = S.player, sk = ST_SKILL[R.st], skill = p.skills[sk] || 0;
+  const R = RECIPES[key], p = S.player, sk = R.sk || ST_SKILL[R.st], skill = p.skills[sk] || 0;   /* Kochen: eigene Fertigkeit je Rezept */
+  if (!knowsDish(key)) { UI.toast('Dieses Gericht kennst du noch nicht — Rezept, Kochbuch oder Experimentieren.'); return null; }
   if (skill < (R.min || 0) && !houseKnows(key)) { UI.toast(`Dafür brauchst du ${SKILL_NAMES[sk] || sk} ${R.min}.`); return null; }   /* Skill-Core §38–39: was das Haus schon gefertigt hat, kennt auch der Erbe (Güte nach seinem eigenen Können) */
   if (Object.entries(R.need).some(([k, n]) => matHave(k) < n) || (ke && !hasItem(p, 'koenigseisen'))) { UI.toast(`Dir fehlt Material: ${needTxt(R)}.`); return null; }
   Object.entries(R.need).forEach(([k, n]) => matTake(k, n)); if (ke) removeItem(p, 'koenigseisen', 1);
@@ -6538,7 +6542,7 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   gainSkill(p, sk, 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (S.legacy && !quick && !S._quiet) { const L = (S.legacy.recipes ||= []); if (!L.includes(key)) L.push(key); }   /* Weltwissen des Hauses (Legacy); nicht bei Auftragsarbeit oder Probe */
   const th = quick ? 0 : perkVal(p, sk, 'thrift'); if (th && R.need.iron && (p.craftN = (p.craftN || 0) + 1) % th === 0) { S.res.iron = (S.res.iron || 0) + 1; log('Sparsam gearbeitet: ein Eisen bleibt übrig.', 'economy'); }   /* Skill-Core: Meilenstein „sparsam“ */
-  if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0);
+  if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0) + (R.cook && !quick ? perkVal(p, 'cooking', 'portion') : 0);   /* Kochen: Meilenstein „größere Töpfe“ */
     if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
     questEvent('craft', key, n, p);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
     log(`${ST_NAME[R.st]}: ${n}× ${it.name} (${qn}).`, 'economy'); return { qual: qn, n }; }
@@ -6558,12 +6562,13 @@ function craftChances(skill, ke) {
 function craftView(st) {
   const p = S.player, sk = ST_SKILL[st], skill = p.skills[sk] || 0;
   return { st, name: ST_NAME[st], skillName: SKILL_NAMES[sk] || sk, skill: Math.round(skill), quals: QUAL.map(q => q[0]), ke: st === 'forge' && hasItem(p, 'koenigseisen'), mend: st !== 'kessel',
-    list: Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k]).map(([k, R]) => ({ key: k, n: R.n || 1, min: R.min || 0, need: Object.entries(R.need).map(([m, n]) => ({ key: m, n, have: matHave(m) })),
-      ok: Object.entries(R.need).every(([m, n]) => matHave(m) >= n) && (skill >= (R.min || 0) || houseKnows(k)) })),
+    exp: st === 'kessel',   /* Kochen: Experimentieren-Knopf */
+    list: Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k] && knowsDish(k)).map(([k, R]) => ({ key: k, n: R.n || 1, min: R.min || 0, need: Object.entries(R.need).map(([m, n]) => ({ key: m, n, have: matHave(m) })),
+      ok: Object.entries(R.need).every(([m, n]) => matHave(m) >= n) && ((p.skills[R.sk || sk] || 0) >= (R.min || 0) || houseKnows(k)) })),
     chances: craftChances(skill + perkVal(p, sk, 'quality'), false), chancesKE: craftChances(skill + perkVal(p, sk, 'quality'), true) };   /* Skill-Core: gleiche Regel wie craftItem */
 }
 function craftMenu(st, t) {
-  const p = S.player, sk = ST_SKILL[st], skill = Math.round(p.skills[sk] || 0), list = Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k]);
+  const p = S.player, sk = ST_SKILL[st], skill = Math.round(p.skills[sk] || 0), list = Object.entries(RECIPES).filter(([k, R]) => R.st === st && ITEMS[k] && knowsDish(k));   /* Kochen: unbekannte Gerichte bleiben verborgen */
   if (!S.flags.craftHint) { S.flags.craftHint = 1; log('Handwerk: Rezepte an Esse, Werkbank und Lagerfeuer (Kessel). Je höher die Fertigkeit, desto besser die Güte — Königseisen hebt eine Schmiedearbeit um eine Stufe.', 'quest'); }
   const ch = list.map(([k, R]) => { const ok = Object.entries(R.need).every(([m, n]) => matHave(m) >= n) && skill >= (R.min || 0);
     return { text: `${ok ? '' : '✗ '}${ITEMS[k].name}${R.n ? ` ×${R.n}` : ''} — ${needTxt(R)}${R.min && skill < R.min ? ` (braucht ${R.min})` : ''}`, fn: () => { UI.closeDialogue(); craftItem(k); } }; });
@@ -9279,7 +9284,7 @@ function conTick() {
 // Tavernen der Städte (MP2 §76): Personal und Musik — Schankmagd läuft zwischen den Tischen, der Koch steht am Herd, ein
 // Spielmann spielt. Flüchtig, beim Laden neu gesetzt. Dörfer behalten ihre kleine Schenke mit dem Wirt allein.
 const MUSIC = ['„♪ Die Toten stehen auf im Tal, der König zählt sein Gold …“', '„♪ Und die Kette klirrt, und die Kette singt …“', '„♪ Trink, bevor die Glocke schlägt …“', '„Einen Kupfer für ein Lied? Zwei für ein trauriges.“'];
-const TAVERN_POOL = ['bread', 'bread', 'dried_meat', 'herb', 'bandage'];
+const TAVERN_POOL = ['bread', 'bread', 'dried_meat', 'herb', 'bandage', 'rezept_jaegertopf', 'rezept_bergminztee', 'kochbuch'];   /* Kochen 08.10.: Rezepte gibt es in der Schenke */
 function ensureTavernStaff() {
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
     if (isVil(town) || town === 'vharnholm' || S.ents.world.some(e => e.tavernStaff === town)) continue;
@@ -16512,7 +16517,7 @@ const TC = c => c && c.titleClass ? TITLE_CLASSES[c.titleClass] : null;
 function tres(c) { const T = TC(c); if (!T) return 0; c.tres ||= {}; return c.tres[T.resource.key] ??= T.resource.start; }
 function resMax(c) { const T = TC(c); return T ? T.resource.max + (T.resource.key === 'essence' && node(c, 'n_vessel') ? 2 : 0) + (T.resource.key === 'focus' && node(c, 'o_well') ? 2 : 0) : 0; }
 function setTres(c, v) { const T = TC(c); if (T) (c.tres ||= {})[T.resource.key] = clamp(v, 0, resMax(c)); }
-const elx = (c, k) => { const s = c?.status?.find(q => q.key === 'elixir'); return s?.efx?.[k] || 0; };   // S15 P2: Wert des wirkenden Elixiers
+const elx = (c, k) => { let v = 0; for (const s of c?.status || []) if (s.key === 'elixir' || s.key === 'meal') v += s.efx?.[k] || 0; return v; };   /* Kochen 08.10.: Mahlzeit wirkt neben dem Elixier */   // S15 P2: Wert des wirkenden Elixiers
 const spellMul = c => 1 + tfx(c, 'spell') + afx(c, 'spellp') + elx(c, 'spell');
 const cdMul = c => 1 - Math.min(0.4, tfx(c, 'cdr'));
 const titleAbilities = c => { const T = TC(c); if (!T) return []; const a = T.grades ? T.grades.slice(0, gradeOf(c)).flat() : T.abilities; return gearOf(c) >= 2 ? a.concat(GEAR_ABILITY[c.titleClass]) : a; };
@@ -19110,6 +19115,13 @@ function debugSections() {
       'Fischen: je Gewässer einen Fisch geben': () => { for (const W of Object.values(FISH_WATER)) addItem(P(), W.fish[0][0], 1); UI.refreshHUD(); },
       'Fischen: Biss sofort (beim Auswerfen)': () => { if (!FISH) return UI.toast('Erst die Angel auswerfen.'); clearTimeout(FISH.t1); FISH.bite = performance.now(); float(P(), 'Biss!', 'rgba(240,220,150,ALPHA)'); },
       'Fischen: Gewässerart hier': () => { const w = waterNear(P()); log(w ? `Wasser hier: ${FISH_WATER[waterKind(S.map, w.x, w.y)].name}.` : 'Kein Wasser in Reichweite (2 Kacheln).', 'world'); },
+      'Sammeln: Baum, Erzader und Kraut neben dir': () => { const m = S.map, x = P().x, y = P().y;   /* Spec §54 Spawn Resource */
+        for (const [type, dx, o] of [['tree', 48, { solid: true, r: 12, hp: 3 }], ['rock_node', -48, { harvest: 'iron', solid: true }], ['bush', 0, { harvest: 'herb' }]]) S.ents[m].push({ id: uid(), kind: 'prop', type, map: m, x: x + dx, y: y + (dx ? 0 : 48), r: 12, transient: true, ...o });
+        indexSolids(m); UI.toast('Baum, Erzader und Kraut stehen neben dir (flüchtig).'); },
+      'Sammeln: Stahlwerkzeug geben': () => { for (const k of ['axt_stahl', 'hacke_stahl', 'angel_stahl']) addItem(P(), k, 1); UI.toast('Stahlaxt, Stahlhacke, Angel mit Stahlhaken'); },   /* §54 Give Tool */
+      'Sammeln: seltene Funde geben': () => { for (const k of ['silbererz', 'schwarzholz', 'bergminze', 'nachtschatten', 'kohle', 'hartholz']) addItem(P(), k, 2); UI.refreshHUD(); },   /* §54 Spawn Rare Ore */
+      'Kochen: alle Gerichte lernen': () => { for (const [k, R] of Object.entries(RECIPES)) if (R.cook) learnDish(k, 'Debug'); },
+      'Kochen: Experimentieren': () => cookExperiment(),
       'Hauswissen: Rezepte zeigen': () => log(`Haus ${S.legacy.house} kennt: ${(S.legacy.recipes || []).map(k => ITEMS[k]?.name || k).join(', ') || 'noch nichts'}.`, 'party'),
     }],
     ['Bionik', '', {   /* Roadmap P2–P5: Bionik-Tests */
@@ -23168,7 +23180,30 @@ export function selftest() {
       p.inv = []; addItem(p, 'forelle', 1); addItem(p, 'karpfen', 1); S.res.herb = 1; const soup = !!craftItem('fischsuppe', false, true) && hasItem(p, 'fischsuppe') && !hasItem(p, 'forelle') && !hasItem(p, 'karpfen');
       if (!(kinds && dry && early && late && caught && rareLow === 0 && rareHi > 0 && dimin && soup)) console.warn('Fischen', JSON.stringify({ kinds, dry, early, late, caught, rareLow, rareHi, dimin, soup, g, spot, coast }));
       return kinds && dry && early && late && caught && rareLow === 0 && rareHi > 0 && dimin && soup;
-    } finally { if (FISH) { clearTimeout(FISH.t1); clearTimeout(FISH.t2); FISH = null; } for (const k of [...FISH_SPOT.keys()]) if (!fs0.has(k)) FISH_SPOT.delete(k); S.map = m0; p.x = x0; p.y = y0; Object.assign(S.res, r0); }
+    } finally { if (FISH) { clearTimeout(FISH.t1); clearTimeout(FISH.t2); FISH = null; }   /* (Probe Fischen) */ for (const k of [...FISH_SPOT.keys()]) if (!fs0.has(k)) FISH_SPOT.delete(k); S.map = m0; p.x = x0; p.y = y0; Object.assign(S.res, r0); }
+  }));
+  ok('Sammeln und Kochen (08.10.): Werkzeugstufe und Fertigkeit wirken getrennt (Stahlaxt fällt schneller, ohne Spitzhacke halber Ertrag), Meilensteine bringen Hartholz und seltene Pflanzen, abnehmend am selben Ort, Ereignisse beim Sammeln; Gerichte werden entdeckt (Rezept, Experiment), Mahlzeit wirkt (meal + elx), nichts davon doppelt', sandbox(() => {
+    const p = stage(), r0 = { ...S.res }, cook0 = S.legacy.cook ? [...S.legacy.cook] : undefined; p.inv = []; p.invCap = 80; p.skills = {}; p.equip.weapon = null;
+    try {
+      const tree = () => { const t = { id: uid(), kind: 'prop', type: 'tree', map: '__a', x: 300, y: 300, r: 12, hp: 3 }; S.ents.__a.push(t); return t; };
+      const fell = () => { const t = tree(); let n = 0; while (S.ents.__a.includes(t) && n < 20) { t.chopCd = 0; gatherTree(p, t); n++; } return n; };
+      const bare = fell(), t0 = toolTier(p, 'chop'); addItem(p, 'axt_stahl', 1); const steel = fell(), tools = t0 === 0 && toolTier(p, 'chop') === 3 && bare === 6 && steel === 2 && (p.skills.woodcutting || 0) > 0;
+      p.skills.woodcutting = 40; for (let i = 0; i < 30; i++) fell(); const hard = hasItem(p, 'hartholz');
+      const gm = []; for (let i = 0; i < 8; i++) gm.push(gatherMul('test', 9000, 9000)[0]); const dimin = gm[0] === 1 && gm[7] < 1;
+      const node = h => ({ id: uid(), kind: 'prop', type: 'rock_node', map: '__a', x: 330, y: 300, harvest: h, gk: 'rock_node@' + h });
+      S.res.iron = 0; gatherNode(p, node('iron')); const noPick = S.res.iron <= 2; addItem(p, 'hacke_stahl', 1); S.res.iron = 0; gatherNode(p, node('iron')); const pick = S.res.iron >= 2;
+      let rb = null; for (let i = 0; i < 60 && !rb; i++) { const b = { id: 'hb' + i, gk: 'bush@' + i + ',1', kind: 'prop', type: 'bush', map: '__a', x: 300, y: 330, harvest: 'herb' }; if (herbRare(b)) rb = b; }
+      p.skills.herbalism = 0; gatherNode(p, { ...rb }); const blind = !hasItem(p, 'bergminze') && !hasItem(p, 'nachtschatten');
+      p.skills.herbalism = 30; gatherNode(p, { ...rb }); const herb = blind && (hasItem(p, 'bergminze') || hasItem(p, 'nachtschatten'));
+      let ev = 0; for (let i = 0; i < 400; i++) if (gatherEvent(p, 'mine', { x: 300, y: 300 })) ev++; const events = ev > 0 && ev < 60;
+      S.legacy.cook = []; p.inv = []; addItem(p, 'dried_meat', 1); addItem(p, 'herb', 1); const hidden = craftItem('jaegertopf', false, true) === null && !craftView('kessel').list.some(r => r.key === 'jaegertopf');
+      addItem(p, 'rezept_jaegertopf', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'rezept_jaegertopf')); const learned = knowsDish('jaegertopf') && !hasItem(p, 'rezept_jaegertopf') && !!craftItem('jaegertopf', false, true) && hasItem(p, 'jaegertopf');
+      useConsumable(p, p.inv.findIndex(x => x.key === 'jaegertopf')); const meal = p.status.some(s => s.key === 'meal') && elx(p, 'dmg') >= 0.06;
+      addItem(p, 'bread', 1); addItem(p, 'herb', 2); const exp = cookExperiment() === 'kraeuterbrot' && knowsDish('kraeuterbrot') && hasItem(p, 'kraeuterbrot');
+      const sd = saveData(), sv = typeof sd === 'string' ? sd : JSON.stringify(sd), once = (sv.match(/"jaegertopf"/g) || []).length <= 3;
+      if (!(tools && hard && dimin && noPick && pick && herb && events && hidden && learned && meal && exp && once)) console.warn('Sammeln/Kochen', JSON.stringify({ tools, bare, steel, hard, dimin, noPick, pick, herb, blind, ev, hidden, learned, meal, exp, once }));
+      return tools && hard && dimin && noPick && pick && herb && events && hidden && learned && meal && exp && once;
+    } finally { Object.assign(S.res, r0); if (cook0) S.legacy.cook = cook0; else delete S.legacy.cook; }
   }));
   ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
     const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;
@@ -24838,6 +24873,7 @@ function boot() {
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers, roleLine,   // S13: was eine Figur anbietet (Infofeld); P1.8: Rolle im Ort
+    cookExperiment: () => { const r = cookExperiment(); UI.refreshHUD(); return r; },   /* Kochen: Experimentieren am Kessel */
     skillInfo: (k, c = S.player) => { const v = c?.skills?.[k] || 0, P = SKILL_DEF[k]?.perks || {};   /* Skill-Core: Fenster „Fertigkeiten“ */
       return { k, name: SKILL_NAMES[k] || k, v, lv: skillLv(v), frac: (v % 2) / 2, group: SKILL_DEF[k]?.group || 'Sonstiges', what: SKILL_DEF[k]?.what || '', next: skillNext(c, k),
         perks: Object.entries(P).map(([L, [, , t]]) => ({ lv: +L, t, on: skillLv(v) >= +L })) }; },

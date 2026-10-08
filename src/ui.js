@@ -1118,7 +1118,7 @@ function invDetail(force) {
 }
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
-const USE_TXT = { fish: 'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
+const USE_TXT = { recipe: 'Lesen: du lernst das Gericht für immer (auch dein Erbe kennt es). Kochen am Kessel eines Lagerfeuers.', fish:'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
   soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
   eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.',   /* Roadmap P2 */
   mechmod: 'Modul auf eine Prothese stecken (Arm- oder Beinprothese nötig). Ein altes Modul kommt zurück in die Tasche.',   /* Roadmap P3 */
@@ -1882,13 +1882,14 @@ function craftUI(body, arg) {
   if (arg) crArg = arg; if (!crArg) return; const V = A.craftView?.(crArg.st); if (!V) return;
   $('modal-title').textContent = V.name; body.className = 'cr-body';
   if (!V.list.some(r => r.key === crSel)) crSel = (V.list.find(r => r.ok) || V.list[0])?.key || null;
-  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}</div>
+  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}${V.exp ? '<button class="mini" id="cr-exp" title="Unbekannte Gerichte entdecken: passen die Zutaten im Gepäck zu einem Gericht, ist es entdeckt — sonst verdirbt eine Zutat.">Experimentieren</button>' : ''}</div>
     <div class="cr-cols"><div><div class="cr-grid">${V.list.map(r => `<button class="cr-card${r.ok ? '' : ' cant'}${r.key === crSel ? ' sel' : ''}" data-k="${r.key}"><canvas class="cr-ic" data-ico="${r.key}"></canvas><span class="cr-n"></span>${r.n > 1 ? `<b class="cr-x">×${r.n}</b>` : ''}<span class="cr-need">${r.need.map(matPic).join('')}</span>${r.min && V.skill < r.min ? `<span class="cr-lock" title="Braucht ${qa(V.skillName)} ${r.min}">${LOCK_SVG}${r.min}</span>` : ''}</button>`).join('') || '<div class="ledger">Hier lässt sich nichts herstellen.</div>'}</div>
       <div class="ledger cr-hint">Klick: ansehen · Doppelklick: herstellen. Rote Zahl = Material fehlt, Schloss = Fertigkeit zu niedrig.</div></div>
       <div class="cr-detail" id="cr-det"></div></div>`;
   body.querySelectorAll('.cr-card').forEach(b => { const r = V.list.find(x => x.key === b.dataset.k); b.querySelector('.cr-n').textContent = ITEMS[r.key].name;
     b.onclick = () => { crSel = r.key; craftUI(body); }; b.ondblclick = () => crDo(body, r, false); });
   if ($('cr-mend')) $('cr-mend').onclick = () => { const t = crArg.t; closeModal(); A.craftMend?.(t); };
+  if ($('cr-exp')) $('cr-exp').onclick = () => { A.cookExperiment?.(); craftUI(body); };
   const r = V.list.find(x => x.key === crSel), d = $('cr-det');
   if (r) { const bar = (ch, lab) => `<div class="cr-q" title="${lab}: ${V.quals.map((q, i) => `${q} ${Math.round(ch[i] * 100)} %`).filter((_, i) => ch[i] > 0.004).join(' · ')}"><small>${lab}</small><div class="cr-qbar">${ch.map((c, i) => c > 0.004 ? `<i class="q${i}" style="width:${(c * 100).toFixed(1)}%">${c > 0.14 ? V.quals[i] : ''}</i>` : '').join('')}</div></div>`;
     d.innerHTML = itemCardHTML({ key: r.key }, { short: true }) + `<div class="cr-needl">${r.need.map(matPic).join('')}</div>` + bar(V.chances, 'Erwartete Güte')
