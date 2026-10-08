@@ -2,7 +2,7 @@
 import { S, clamp, seasonOf } from './state.js?v=25';
 import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=25';
 import * as HB from './buildings.js?v=25';
-import { ITEMS, MONSTERS, FACTIONS } from './data.js?v=25';
+import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=25';
 import { buildOf, crawling, lightR, eyeOf } from './body.js?v=25';
 import * as SP from './sprites.js?v=25';
 import { trailPt, WAGON_GAP } from './sim.js?v=25';
@@ -218,31 +218,66 @@ function drawTrack(now) {
   else { ctx.strokeText(label, lx, ly); ctx.fillText(label, lx, ly); }
   ctx.restore();
 }
-// Sprechblasen der Bewohner (Talk-Pairs): über Licht und Wetter, damit sie lesbar bleiben; dunkles Feld mit Pergamentkante
+/* E13 / N1 (Entwickler 09.10.2026: „Mischung aus Sätzen und Symbolen“): EINE Blasen-Art für alles Gesprochene — Talk-Pairs, Rufe,
+   Händler, Regiebuch. Dunkles Feld, Pergamentkante, Zipfel. Tonfall-Formen: sagen = glatte Kante, rufen = Zacken (helle Kante),
+   flüstern/zagen = gestrichelte Kante, kursiv. Einfache Bewohner zeigen fern und mittel (weiter als NEAR_SAY) nur ein Zeichen in der Blase;
+   nah, in gesprächigen Rollen (benannte Figuren, Händler, Lehrer, Wachen, Wirt, Barde, Priester …) und im Regiebuch den Satz.
+   Höchstens 4 Sätze und 8 Zeichen zugleich, die nächsten zum Spieler. ⚖ NEAR_SAY und die Rollenliste sind vorläufig. Kodex (H) → „Zeichen“. */
+export const NEAR_SAY = 220;
+const NAMED = new Set(NPCS.map(n => n.key)), CHATTY = /Wirt|Bard|Priest|Predig|Ausrufer|Händl|Herold|Prophet|Erzähl|Marktschrei/;
+export const chatty = e => !e || e === S.player || !!e.coopHero || NAMED.has(e.key) || !!e.shop || !!e.teaches || !!e.guard || !!e.boss || CHATTY.test(e.prof || '');
+const bare = t => String(t || '').replace(/[„“”"«»]/g, '').trim();
+export function sayTone(e, text) { const t = bare(text); if (/!$/.test(t) || e?.angry) return 'shout'; if (/(…|\.\.\.)$/.test(t) || e?.fleeing) return 'hush'; return 'say'; }
+export function sayGlyph(e, text, tone = sayTone(e, text)) { const t = bare(text);
+  if (/\?$/.test(t)) return 'frage'; if (e?.fleeing || /Hilfe|Lauft|Rette/i.test(t)) return 'angst'; if (e?.angry || /Dieb|Stirb|Verschwinde|Halt/i.test(t)) return 'zorn';
+  if (/Hoch|Endlich|Freude|Fest|Glück|Prost/i.test(t)) return 'freude'; if (/tot|Trauer|Grab|weint|Göttern|Gnade/i.test(t)) return 'trauer'; return tone === 'shout' ? 'ausruf' : 'rede'; }
+export const saysText = (e, d) => !!S.cine || chatty(e) || d <= NEAR_SAY;
+let bubPlaced = [], bubN = { t: 0, g: 0 };                                 /* je Bild: Lagen (ausweichen) und Zähler; drawFloats setzt zurück */
+function bubbleEdge(x0, y0, w, h, tone) {
+  const edge = tone === 'shout' ? '#e8c060' : '#c8b89a';
+  ctx.fillStyle = edge; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+  ctx.fillStyle = '#1a1612'; ctx.fillRect(x0, y0, w, h);
+  if (tone === 'shout') { ctx.fillStyle = edge;                            /* Zacken rundum */
+    for (let x = x0 + 2; x < x0 + w - 1; x += 5) { ctx.fillRect(x, y0 - 3, 2, 2); ctx.fillRect(x + 2, y0 + h + 1, 2, 2); }
+    for (let y = y0 + 2; y < y0 + h - 1; y += 5) { ctx.fillRect(x0 - 3, y, 2, 2); ctx.fillRect(x0 + w + 1, y, 2, 2); } }
+  else if (tone === 'hush') { ctx.fillStyle = '#1a1612';                  /* Lücken in der Kante = gestrichelt */
+    for (let x = x0 + 2; x < x0 + w - 2; x += 5) { ctx.fillRect(x, y0 - 1, 2, 1); ctx.fillRect(x, y0 + h, 2, 1); }
+    for (let y = y0 + 2; y < y0 + h - 2; y += 5) { ctx.fillRect(x0 - 1, y, 1, 2); ctx.fillRect(x0 + w, y, 1, 2); } }
+  return edge;
+}
+/* Eine Blase über (wx, wy) in Weltkoordinaten; glyph = Zeichen statt Satz. Gibt false zurück, wenn kein Platz mehr frei ist. */
+function sayBubble(wx, wy, text, tone, a, glyph) {
+  const z = cam.zoom, ts = Math.max(0.8, Math.min(1.8, +(S.settings?.textScale ?? 1) || 1)), fs = Math.round(Math.max(11, (10 * z * 0.75 + 4)) * ts);
+  let w, h, px = 0;
+  if (glyph) { if (bubN.g >= 8) return false; bubN.g++; px = Math.max(2, Math.round(z * 1.4)); w = 7 * px + 6; h = 7 * px + 6; }
+  else { if (bubN.t >= 4) return false; bubN.t++; ctx.font = `${tone === 'hush' ? 'italic ' : tone === 'shout' ? '600 ' : ''}${fs}px Spectral, Georgia, serif`; w = Math.ceil(ctx.measureText(text).width) + 12; h = fs + 8; }
+  const sx = Math.round((wx - cam.x) * z); let sy = Math.round((wy - cam.y) * z);   /* sy = Unterkante; überlappt eine Blase: darüber ausweichen */
+  for (let k = 0; k < 6 && bubPlaced.some(r => Math.abs(r[0] - sx) < (r[2] + w) / 2 + 2 && Math.abs(r[1] - sy) < (r[3] + h) / 2 + 2); k++) sy -= h + 3;
+  bubPlaced.push([sx, sy, w, h]);
+  ctx.globalAlpha = clamp(a, 0, 1); const x0 = Math.round(sx - w / 2), y0 = sy - h, edge = bubbleEdge(x0, y0, w, h, tone);
+  ctx.fillStyle = edge; ctx.fillRect(sx - 3, sy + 1, 6, 2); ctx.fillRect(sx - 1, sy + 3, 2, 2); ctx.fillStyle = '#1a1612'; ctx.fillRect(sx - 2, sy, 4, 2);   /* Zipfel */
+  if (glyph) { const E = EMOTE[glyph] || EMOTE.rede; ctx.fillStyle = E[0]; E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(x0 + 3 + x * px, y0 + 3 + y * px, px, px); }); if (S.flags && !S.flags.sayGlyph) S.flags.sayGlyph = 1; }
+  else { ctx.textAlign = 'center'; ctx.fillStyle = tone === 'hush' ? '#c4b89e' : '#eadcc0'; ctx.fillText(text, sx, y0 + h - 6); }
+  ctx.globalAlpha = 1; return true;
+}
+// Sprechblasen der Bewohner (Talk-Pairs): über Licht und Wetter, damit sie lesbar bleiben
 let shown = [];
 function drawBubbles(now) {
-  const z = cam.zoom, placed = []; ctx.font = `${Math.round(10 * z * 0.75 + 4)}px Cinzel, serif`; ctx.textAlign = 'center';
-  const hidden = e => { const tx = e.x / TS | 0, ty = e.y / TS | 0;   // unter einem Dach: nur hörbar, wenn man selbst im Haus ist (S14: zählt nicht gegen die 4 Plätze)
+  const hidden = e => { const tx = e.x / TS | 0, ty = e.y / TS | 0;   // unter einem Dach: nur hörbar, wenn man selbst im Haus ist (S14: zählt nicht gegen die Plätze)
     return HOUSES.some(b => b.map === S.map && tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !playerInside(b)); };
-  const P = S.player, talking = shown.filter(e => { const t = e.talk; return t && now >= t.at && now <= t.at + 2500 && now <= t.until && !hidden(e); })
-    .sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 4);   // höchstens 4 Blasen, die nächsten zum Spieler
-  for (const e of talking) {
-    const t = e.talk;
-    const a = Math.min(1, (now - t.at) / 150, (t.at + 2500 - now) / 250);
-    const sx = Math.round((e.x - cam.x) * z), w = Math.ceil(ctx.measureText(t.say).width) + 10, h = Math.round(10 * z * 0.75 + 12);
-    let sy = Math.round((e.y - 72 - cam.y) * z);                          // überlappt eine schon gezeichnete Blase: darüber ausweichen
-    for (let k = 0; k < 6 && placed.some(r => Math.abs(r[0] - sx) < (r[2] + w) / 2 + 2 && Math.abs(r[1] - sy) < h + 2); k++) sy -= h + 3;
-    placed.push([sx, sy, w]);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = '#c8b89a'; ctx.fillRect(sx - w / 2 - 1, sy - h - 1, w + 2, h + 2); ctx.fillRect(sx - 3, sy + 1, 6, 2); ctx.fillRect(sx - 1, sy + 3, 2, 2);   // Kante + Zipfel
-    ctx.fillStyle = '#1a1612'; ctx.fillRect(sx - w / 2, sy - h, w, h); ctx.fillRect(sx - 2, sy, 4, 2);
-    ctx.fillStyle = '#eadcc0'; ctx.fillText(t.say, sx, sy - h / 2 + 4);
+  const P = S.player, talking = shown.filter(e => { const t = e.talk; return t && t.say && now >= t.at && now <= t.at + 2500 && now <= t.until && !hidden(e); })
+    .map(e => [e, Math.hypot(e.x - P.x, e.y - P.y)]).sort((a, b) => a[1] - b[1]);   // die nächsten zum Spieler zuerst
+  for (const [e, d] of talking) {
+    const t = e.talk, a = Math.min(1, (now - t.at) / 150, (t.at + 2500 - now) / 250), tone = t.tone || sayTone(e, t.say);
+    const asText = saysText(e, d) && bubN.t < 4;                          /* fern/mittel oder alle Satzplätze voll: Zeichen */
+    sayBubble(e.x, e.y - 72, t.say, tone, a, asText ? null : sayGlyph(e, t.say, tone));
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
   for (const e of shown) if (e.emote && now < e.emote.until && e.emote.until - now < 6000) drawEmote(e, now);
 }
 // Visuell D (02.10.2026): Emotes als kleine Pixelzeichen (7×7) über dem Kopf, hüpfen beim Erscheinen kurz an
-const EMOTE = {
+export const EMOTE = {
+  rede: ['#d8ccb0', ['.......', '.......', '.......', '#..#..#', '#..#..#', '.......', '.......']],   /* E13: „redet“ (Satz ist zu weit weg) */
   frage: ['#e8dcb8', ['.###...', '#...#..', '....#..', '..##...', '..#....', '.......', '..#....']],
   ausruf: ['#f0c040', ['..##...', '..##...', '..##...', '..##...', '..##...', '.......', '..##...']],
   zorn: ['#d8402c', ['.#...#.', '##...##', '.......', '.......', '.......', '##...##', '.#...#.']],
@@ -3396,16 +3431,12 @@ function drawWeather(now) {
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 }
 
-// T17 Regiebuch: Sprechblase über einer Figur (folgt ihr), dunkle Box, helle Schrift
+// T17 Regiebuch und Rufe (bubble() in game.js): dieselbe Blase wie die Bewohner (E13), folgt der Figur
 function drawBubble(f) {
-  const e = f.who && S.ents[S.map]?.find(x => x.id === f.who); if (e) { f.x = e.x; f.y = e.y - 44; }
-  const a = clamp(Math.min(f.life / 300, (f.maxLife - f.life) / 200 + 0.2), 0, 1), fs = Math.max(11, 13 * cam.zoom * 0.8);
-  ctx.font = `italic ${fs}px Spectral, serif`; const w = ctx.measureText(f.text).width + 16, h = fs + 10;
-  const sx = (f.x - cam.x) * cam.zoom, sy = (f.y - cam.y) * cam.zoom - h;
-  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.fillRect(sx - w / 2, sy, w, h);
-  ctx.strokeStyle = 'rgba(200,170,110,.55)'; ctx.lineWidth = 1; ctx.strokeRect(sx - w / 2 + 0.5, sy + 0.5, w - 1, h - 1);
-  ctx.fillStyle = 'rgba(16,13,10,.88)'; ctx.beginPath(); ctx.moveTo(sx - 5, sy + h); ctx.lineTo(sx + 5, sy + h); ctx.lineTo(sx, sy + h + 6); ctx.fill();
-  ctx.fillStyle = '#e7dcc2'; ctx.fillText(f.text, sx, sy + h - 7); ctx.globalAlpha = 1;
+  const e = f.who && S.ents[S.map]?.find(x => x.id === f.who); if (e) { f.x = e.x; f.y = e.y - 72; }
+  const a = Math.min(f.life / 300, (f.maxLife - f.life) / 200 + 0.2), P = S.player, d = e && P ? Math.hypot(e.x - P.x, e.y - P.y) : 0, tone = f.tone || sayTone(e, f.text);
+  sayBubble(f.x, f.y, f.text, tone, a, !e || saysText(e, d) ? null : sayGlyph(e, f.text, tone));
+  ctx.textAlign = 'center';
 }
 // Kampf-Feedback (K4/K12): Zustand am Körper statt Text. Gewähltes Ziel: schmaler Lebensbalken + Statuszeichen; sonst zeigt der Körper (Blut, Partikel, Eis) den Zustand.
 const ST_GLYPH = { burning: ['fire', '240,140,60'], frost: ['frost', '150,205,245'], chilled: ['frost', '175,190,205'], poisoned: ['drop', '130,200,90'], bleeding: ['drop', '200,48,40'], shocked: ['bolt', '240,224,112'] };
@@ -3488,6 +3519,7 @@ function drawNotch([h, n], sx, sy, a, z) {
   ctx.globalAlpha = 1;
 }
 function drawFloats() {
+  bubPlaced = []; bubN = { t: 0, g: 0 };                                   /* E13: Blasenplätze je Bild (Rufe zuerst, dann Bewohner) */
   ctx.textAlign = 'center';
   const z = cam.zoom;
   for (const f of S.floats) {

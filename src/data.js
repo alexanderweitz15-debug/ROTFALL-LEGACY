@@ -1508,6 +1508,45 @@ export const FACTIONS = {
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
 };
 
+/* T23 „Woher die Mächte ihre Kraft nehmen“ (Spec t23_fraktionsressourcen.md, DESIGN_LOCKED 01.10.; E37 09.10.2026). Je Macht eine Zahl mit Quelle,
+   Verbrauch und Wirkung, einmal am Tag am Ende von warDay gerechnet (sim.js facResDay). Stufe 0 (niedrig) unter lt, 2 (hoch) ab ge; zurück zur Mitte erst
+   10 % jenseits der Schwelle. def = Wert ohne Daten (alter Stand = Verhalten wie vorher). say = Meldung je Stufe [niedrig, normal, hoch] mit Ursache und
+   Hebel. Alle Zahlen vorläufig ⚖ — eine Stelle für die Balance. */
+export const FAC_RES = {
+  valen:  { name: 'Korn', unit: 'Korn', lt: 10, ge: 40, def: 20,
+    does: 'Valens Heere wachsen, solange die Städte der Krone Korn haben (über 10 Korn: +3 Stärke am Tag, sonst +1). Das Feldheer isst Nordfurts Weizen.',
+    lever: 'Korn in eine Valen-Stadt liefern (Nordfurt zuerst) hilft der Krone. Wer Aurelions Gesandten Nordfurts Korn kaufen lässt, schwächt sie.',
+    say: ['Valens Kornspeicher sind leer. Die Heere der Krone wachsen kaum noch — wer Korn nach Nordfurt bringt, ändert das.', 'Valens Speicher füllen sich wieder. Die Krone hebt Männer aus wie gewohnt.', 'Valens Speicher sind voll. Die Heere der Krone wachsen schnell.'] },
+  order:  { name: 'Eifer', unit: 'von 5', lt: 2, ge: 4, def: 0, max: 5, holdNodes: 4, holdEvery: 5, decay: 0.5, decayEvery: 10, crusadeWin: 1, crusadeLoss: 1, kammer: 1,
+    does: 'Je mehr Eifer, desto öfter zieht der Kreuzzug (alle 12 − Eifer Tage) und desto sicherer siegt er. Ab Eifer 2 jagt die Inquisition Hexen, ab 3 reiten doppelte Streifen und Ordensheiler verlangen mehr, ab 4 überfällt der Orden Grubenhort fast sicher.',
+    lever: 'Eifer steigt mit verbrannten Hexen, gewonnenen Kreuzzügen und Land der Toten (4 Orte und mehr). Wer Angeklagte rettet, senkt ihn; ohne Anlass kühlt er alle 10 Tage ab.',
+    say: ['Der Eifer des Ordens ist erkaltet. Keine Hexenjagd, Andachten statt Streifen — und der Händler in Lichtenrain gibt Weihwasser billiger.', 'Der Orden predigt wie gewohnt. Der Eifer hält sich.', 'Der Orden brennt vor Eifer: Der Kreuzzug zieht früher, Inquisitoren reiten doppelt, und Grubenhort ist in Gefahr. Wer Angeklagte rettet, kühlt ihn ab.'] },
+  undead: { name: 'Seelen', unit: '', lt: 21, ge: 120, def: 60, max: 200, start: [20, 5], node: 1, battle: 0.3, newArmy: 30, armyBase: 20, armyDiv: 5, armyMax: 50, fill: 1, host: 40, kammer: 30, crusade: 10, vial: 2, raidHalf: 0.5, vialLow: 1.5, vialHigh: 0.7,
+    does: 'Seelen stellen neue Heere auf (30 Seelen je Heer, Stärke 20 + Seelen/5) und füllen die Besatzungen. Satte Gruft (120+): gemischte Heere, billige Phiolen. Leere Gruft (20 und weniger): kein neues Heer, halb so viele Dorfüberfälle.',
+    lever: 'Jede Schlacht gibt den Toten Seelen — auch eine verlorene. Wer Dörfer hält, die Seelenkammer im Turm zerschlägt und Kreuzzüge gewinnt, lässt die Gruft hungern; wer den Toten dient, füttert sie (Überfälle, Erheben, Phiolen am Totentempel).',
+    say: ['Die Gräber schweigen. Der Gruft fehlen Seelen — kein neues Heer steigt auf, die Besatzungen füllen sich nicht.', 'Die Gruft hat wieder genug Seelen, um neue Heere aufzustellen.', 'Die Gruft ist satt. Die Heere der Toten kommen gemischt — Schützen, Elite, Monster. Seelenphiolen werden billig.'] },
+  merch:  { name: 'Handelszüge', unit: 'von 100', lt: 30, ge: 81, def: 50, max: 100, arrive: 4, big: 8, deliver: 2, deliverDay: 4, raid: 6, died: 10, decay: 1, embargo: 15, embargoDays: 3, fair: 80, fairMul: 1.15, priceDiv: 250, shock: 6, shockMax: 10, shockMin: 25,
+    does: 'Der Handelswert bestimmt, wie viele Züge die Gilde am Tag losschickt (2 + Wert/25), wie gut sie bewacht sind und was die Händler der Gilde verlangen (±20 %). Unter 15 drei Tage lang: Handelssperre. Über 80: Messe in Eren und Nordfurt.',
+    lever: 'Angekommene Züge, die Große Karawane und Lieferaufträge heben ihn; Überfälle senken ihn. Geleit fahren und Banden zerschlagen hilft der Gilde — wer für Rook raubt, treibt die Geleitlöhne hoch.',
+    say: ['Die Gilde verliert Züge. Sie zahlt Söldner für jeden Wagen, und Geleitaufträge zahlen mehr. Wer die Straßen sichert, ändert das.', 'Der Handel läuft wieder in gewohnten Bahnen.', 'Die Gilde blüht: Züge rollen auf allen Straßen, die Läden der Gilde sind billig.'] },
+  chain:  { name: 'Arbeitskraft', unit: 'Köpfe', lt: 10, ge: 1e9, def: 56, village: 2, mul: { raid: 0.2, zug: 0.45, heer: 0.8 }, heer: 10, slow: 10, walls: 8, hunt: 6, huntGain: 4, huntHort: 10, huntSize: [8, 10], sold: 2,
+    does: 'Die Kette zieht so groß ins Totenland, wie sie Hände hat: Gefangene in Pferch, Grube und Steinbruch sowie jedes Tributdorf (2 Köpfe). Unter 10 Köpfen ziehen die Feldzüge seltener, ein Heerzug braucht 10, unter 8 lässt Varg Treiber in die Dörfer, unter 6 macht die Kette Sklavenjagd auf Grubenhort und die Tributdörfer.',
+    lever: 'Pferche öffnen, Gefangene freikaufen und Tributzüge rauben nimmt der Kette Hände (kleinere Feldzüge, stärkere Totenruinen). Gefangene an Vesk verkaufen gibt ihr welche.',
+    say: ['Die Kette hat kaum noch Hände in den Gruben. Die Feldzüge ziehen klein und selten — und Varg schickt Treiber nach neuen Köpfen.', 'Die Gruben der Kette sind wieder besetzt.', ''] },
+  aurel:  { name: 'Wohlstand', unit: 'Tage', lt: 4, ge: 12, def: 8, buyBelow: 6, buyMax: 12, buyKeep: 8, toll: 0.1, freight: 15, freightPay: 2, fallMul: [1.5, 1, 0.5], legion: [14, 20, 26],
+    does: 'Index aus Versorgung und Magitech: so viele Tage reichen Nahrung UND Magitech in den Städten des Hochreichs (der kleinere Wert zählt). Unter 4 Tagen steigen die Zölle, Aurelion kauft Nordfurts Korn auf und sucht Frachtfahrer; über 12 fallen die Zölle schnell, und Aurelion ist schwerer zu erschüttern (seine Städte fallen seltener, die Sonnenlegion kehrt stärker zurück).',
+    lever: 'Luftschiffe schützen und reparieren, Korn nach Kupferhafen liefern, Barren für die Werke. Wer Luftschiffe sabotiert, lässt Aurelion hungern — und treibt Nordfurts Kornpreis hoch.',
+    say: ['Aurelion hungert: Nahrung oder Magitech reichen nur noch wenige Tage. Die Zölle steigen, ein Gesandter kauft Korn in Nordfurt, und in Kupferhafen hängt ein Frachtauftrag.', 'Aurelions Speicher und Werke laufen wieder rund.', 'Aurelion schwimmt in Wohlstand. Die Zölle fallen, und das Hochreich steht fester denn je.'] },
+  sea:    { name: 'Salz', unit: 'Lasten', lt: 20, ge: 81, def: 50, ports: ['saltport', 'northcity', 'kupferhafen'], prize: 0.10, raider: 0.10, black: 0.2, blackAfter: 0.05, blackDays: 10, take: 0.3, takeMax: 12, prizesHigh: 3, inland: 6, inlandTo: ['eren', 'varonheim'], escortMul: 1.5,
+    does: 'Der Salzvorrat der Häfen (Salzhafen, Nordfurt, Kupferhafen). Die Sturmklinge kapert Salzschiffe (etwa eine Prise in 10 Tagen). Unter 20: Salz wird teuer, der Salzbund setzt ein Kopfgeld auf die Schwarzsegel aus. Über 80: Salzbund-Schiffe bringen Salz ins Binnenland.',
+    lever: 'Salzfrieden stiften beendet die Prisen. Weißbart erschlagen bringt zehn Tage Schwarzsegel. Selbst kapern zählt als Prise.',
+    say: ['Das Salz wird knapp: Die Sturmklinge kapert die Schiffe. Der Salzbund zahlt Kopfgeld auf die Schwarzsegel.', 'In den Häfen liegt wieder genug Salz.', 'Die Salzspeicher quellen über — der Salzbund bringt Salz ins Binnenland.'] },
+  goblin: { name: 'Grubenhort', unit: 'Punkte', lt: -1, ge: 1e9, def: 0, freed: 1, freedDay: 4,
+    does: 'Die Punkte des Grubenhorts bestimmen die Stufe der Goblinstadt (10/25/45/70) und die Söldner bei Grisk.',
+    lever: 'Spenden, befreite Goblins (+1 je Goblin, der den Hort erreicht) und Händler helfen. Drei Feinde: Ordensüberfälle (je mehr Eifer, desto öfter), die Sklavenjagd der Kette und die Toten.',
+    say: ['', '', ''] },
+};
+
 export const NPCS = [
   { key:'havel', name:'Havel', prof:'Dorfvorsteher', faction:'valen', age:54, home:'village', x:0, y:0,
     traits:['diszipliniert','vorsichtig'], attrs:{intelligence:11,willpower:10}, cls:'wanderer', recruit:false,

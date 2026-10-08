@@ -2,7 +2,7 @@
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=25';
 import * as CS from './cloudsave.js?v=25';
 import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=25';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=25';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf, EMOTE, NEAR_SAY } from './render.js?v=25';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=25';
 import { wearOf } from './buildings.js?v=25';
 import * as SP from './sprites.js?v=25';   /* Bestiarium: Gegnerbilder */
@@ -236,7 +236,7 @@ function guideLock(sec) {
   return null;
 }
 function codexUI(body) {
-  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
+  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['powers', 'Mächte'], ['states', 'Zustände'], ['foes', 'Gegner'], ['signs', 'Zeichen']];   /* T23: Mächte */
   body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"><input id="codex-code" placeholder="Code" style="width:90px"><button class="txtbtn" id="codex-go">Einlösen</button></div><div id="codex-body" class="codex"></div>`;
   const q = $('codex-q'), cb = $('codex-body');
   const render = () => {
@@ -256,8 +256,20 @@ function codexUI(body) {
         <table class="rank-tab">${rows.map(([k, C]) => `<tr><td>${C.name}${C.parent && C.parent !== 'wanderer' ? ` <span class="ledger">(braucht ${[C.parent, ...(C.alt || [])].map(a => CLASSES[a]?.name).join(' oder ')}${C.chainRank != null ? `, Kettenrang ${FACTIONS.chain?.ranks?.[C.chainRank] || C.chainRank}` : ''})</span>` : ''}</td><td>${L.filter(t => t.cls.includes(k)).map(t => `${t.name} — ${t.where}`).join('<br>')}</td></tr>`).join('')}</table>`;
     } else if (codexTab === 'ranks') {
       cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0) && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
+    } else if (codexTab === 'powers') {                                    /* T23: woher die Mächte ihre Kraft nehmen — nur bekannte Mächte (wie „Ränge“) */
+      const L = (A.facResKeys || []).filter(f => FACTIONS[f] && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0));
+      cb.innerHTML = `<div class="ledger">Jede Macht lebt von einer Sache. Wird sie knapp, wird die Macht schwach — und jede davon kannst du drehen. ▲/▼: seit gestern.</div>`
+        + (L.map(f => { const G = A.powerGuide?.(f); return G && hit(FACTIONS[f].name + G.name + G.does + G.lever) ? `<h3>${FACTIONS[f].name}</h3><div class="statline"><span>${G.name}</span><b>${G.val} ${G.unit}${G.stageName ? ' · ' + G.stageName : ''}</b></div>${G.extra ? `<div class="ledger">${G.extra}</div>` : ''}<div class="fx-row"><div><b>Was sie bewirkt:</b> ${G.does}</div></div><div class="fx-row"><div><b>Wie du sie änderst:</b> ${G.lever}</div></div>` : ''; }).join('')
+        || '<div class="ledger">Noch kennst du keine Macht gut genug.</div>');
     } else if (codexTab === 'states') {
       const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
+    } else if (codexTab === 'signs') {                                     /* E13 (Entwickler 09.10.): Sprechblasen — Formen und Zeichen erklärt */
+      const G = [['rede', 'Redet — zu weit weg, um es zu verstehen'], ['frage', 'Fragt etwas'], ['ausruf', 'Ruft laut'], ['zorn', 'Ist wütend, droht, ruft „Halt“ oder „Dieb“'], ['angst', 'Hat Angst, ruft um Hilfe'], ['freude', 'Freut sich, jubelt'], ['trauer', 'Trauert, klagt']];
+      const F = [['say', 'Glatte Kante', 'sagt etwas'], ['shout', 'Gezackte, helle Kante', 'ruft oder schreit'], ['hush', 'Gestrichelte Kante, schräge Schrift', 'flüstert, zögert, flieht']];
+      cb.innerHTML = `<div class="ledger">Alles Gesprochene steht in derselben Blase. Einfache Bewohner zeigen von weitem nur ein Zeichen; ab etwa ${Math.round(NEAR_SAY / 32)} Schritten hörst du den Satz. Benannte Figuren, Händler, Lehrer, Wachen, Wirte, Barden und Priester sprechen immer in Sätzen, Zwischensequenzen auch.</div>
+        <h3>Formen der Blase</h3><table class="rank-tab">${F.filter(([, a, b]) => hit(a + b)).map(([, a, b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table>
+        <h3>Zeichen</h3>${G.filter(([, t]) => hit(t)).map(([k, t]) => `<div class="fx-row"><canvas data-gl="${k}" width="27" height="27" style="image-rendering:pixelated;background:#1a1612;border:1px solid #c8b89a;margin-right:8px"></canvas><div>${t}</div></div>`).join('')}`;
+      cb.querySelectorAll('canvas[data-gl]').forEach(c => { const E = EMOTE[c.dataset.gl], g = c.getContext('2d'); if (!E) return; g.fillStyle = E[0]; E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') g.fillRect(3 + x * 3, 3 + y * 3, 3, 3); }); });
     } else {
       const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
       cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row beast-row"><canvas class="beast-pic" data-mt="${k}" width="72" height="72"></canvas><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
@@ -1634,6 +1646,7 @@ function facUI(body) {
     <div><h3>${f.name}</h3><div class="ledger">${f.desc}</div>
       <div class="statline" title="Ansehen reicht von −100 bis +100 (die befreiten Grubenstämme bis +300)."><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
+      ${(G => G ? `<div class="statline" title="${G.does} — ${G.lever}"><span>Ressource</span><b>${G.name} ${G.val}${G.stageName ? ' · ' + G.stageName : ''}</b></div>` : '')(A.powerGuide?.(selFac))}
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
       ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}

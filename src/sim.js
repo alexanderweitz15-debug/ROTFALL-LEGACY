@@ -1,6 +1,6 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
 import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=25';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS } from './data.js?v=25';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS, FAC_RES } from './data.js?v=25';
 import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=25';
 import * as ECO from './economy.js?v=25';
 
@@ -62,7 +62,7 @@ export function launchHost() {                                     // Morvaths H
 export function capThreatDay() {                                   // einmal am Tag aus warDay
   const W = S.war, n = W.nodes[CAPK];
   const day = S.day | 0, k = dk(), w = CAP_SIEGE.w;
-  if (!n || n.owner !== 'valen' || day < CAP_SIEGE.from[k] || S.flags.garmadonSlain || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > day) return;   /* Sehr schwer ab Tag 5 */
+  if (!n || n.owner !== 'valen' || day < CAP_SIEGE.from[k] || (S.flags.garmadonSlain && S.flags.deadSucc?.winner !== 'morvath') || (S.difficulty || 'schwer') === 'angsthase' || W.hostCd > day) return;   /* Sehr schwer ab Tag 5 */
   const undNodes = WAR_KEYS.filter(x => W.nodes[x]?.owner === 'undead').length;
   const d = Math.min(CAP_SIEGE.dMax[k], (undNodes >= 6 ? w.front : w.calm) + ((S.schutz?.[CAPK]?.stage || 0) >= 1 ? w.schutz : 0)
     + (W.armies.some(a => a.faction === 'valen') ? 0 : w.noArmy) + (H.cultDrain?.() || 0) + (S.flags.varonDead && S.cult?.end !== 'ruling' ? w.throne : 0));
@@ -92,6 +92,7 @@ function siegeTick(und, val) {                                     // ein Zug (6
     log(`${und.name} schließt Varonheim ein. Die Mauern halten — noch. Valens Heere eilen zum Entsatz.`, 'faction'); H.toast('VARONHEIM WIRD BELAGERT'); H.scene?.('siege', und); return; }
   if (val) return nearPlayer(CAPK) ? materialize(CAPK, und, val) : battleAbstract(CAPK, und, val, CAP_SIEGE.sally);   /* Entsatz mit Ausfall der Besatzung */
   if (n.walls > 0) {
+    if (n.siege.noHit) { n.siege.noHit = false; return; }   /* S3b: nach gelungenem Ausfall ruhen die Rammen einen Zug */
     n.walls = Math.max(0, n.walls - Math.max(CAP_SIEGE.wallMin, und.strength * CAP_SIEGE.wallHit));
     und.strength = Math.max(0, und.strength - CAP_SIEGE.attAttr);
     if (!(n.fedTill > S.day)) n.garrison = Math.max(0, n.garrison - CAP_SIEGE.garAttr);
@@ -101,9 +102,28 @@ function siegeTick(und, val) {                                     // ein Zug (6
   const def = garrisonArmy(CAPK);
   if (def.strength <= 0) { capture(CAPK, 'undead'); cleanupArmies(); return; }
   chronicle('Sturm auf Varonheim', 'battle', `${und.name} stürmt die Bresche.`);
-  if (nearPlayer(CAPK)) return materialize(CAPK, und, def);
+  if (nearPlayer(CAPK)) return capitalStorm(und, def, n.siege.phase || 1);   /* Belagerung S3b: Sturm vor Ort in zwei Phasen */
   battleAbstract(CAPK, und, def, CAP_SIEGE.inner);
 }
+/* Belagerung S3b (proposals/varonheim_belagerung_s3.md §1): Phase 1 die Bresche am Südtor (gemischtes Heer Stufe 9, mindestens ein
+   Fleischgolem, gegen Valens Soldaten Stufe 9); geht sie mit dem Spieler in der Nähe verloren, fällt die Stadt noch nicht: Phase 2 am
+   Burgtor (4–6 Untote mit Elite und Golem, Restheer × 0,5) gegen die Burgwache und die Hofgarde. Erst wer Phase 2 verliert, verliert die Burg. */
+export const CAP_STORM = { lvl1: 9, lvl2: 10, rest: 0.5, n2: [4, 6] };
+function capitalStorm(und, def, phase) {
+  const n = S.war.nodes[CAPK], G = H.capGates?.(); if (!G) return materialize(CAPK, und, def);
+  n.siege.phase = phase; const b = { node: CAPK, sides: [und.id, def.id], started: S.day * 1440 + S.minute, storm: phase };
+  const [ax, ay] = phase === 1 ? G.south : G.wall, [dx, dy] = phase === 1 ? G.southIn : G.keep, home = { x: (dx + 0.5) * TS, y: (dy + 0.5) * TS };
+  let roles = phase === 1 ? undeadMix(clamp(Math.round(und.strength / 8), 3, 7), 'town') : undeadMix(ri(...CAP_STORM.n2), 'military');
+  if (!roles.some(r => r.type === 'flesh_golem')) roles[roles.length - 1] = { role: 'siege', type: 'flesh_golem' };
+  if (phase === 2 && !roles.some(r => r.role === 'elite')) roles[0] = { role: 'elite', type: 'bone_knight' };
+  for (const r of roles) H.spawnEnemy(r.type, 'world', ...(H.pushOut ? H.pushOut('world', ax + ri(-3, 3), ay + ri(-2, 2)) : [ax + ri(-3, 3), ay + ri(-2, 2)]),
+    { armyId: und.id, worth: und.strength / roles.length, level: phase === 1 ? CAP_STORM.lvl1 : CAP_STORM.lvl2, anchor: { ...home }, marching: true });
+  const nd = phase === 1 ? clamp(Math.round(def.strength / 8), 2, 7) : 3;
+  for (let i = 0; i < nd; i++) H.spawnEnemy('valen_soldier', 'world', dx + ri(-3, 3), dy + ri(-1, 2), { armyId: def.id, worth: def.strength / nd, level: phase === 1 ? CAP_STORM.lvl1 : CAP_STORM.lvl2, anchor: { ...home } });
+  S.war.battles.push(b); H.capPhase?.(phase);
+  log(phase === 1 ? `Sturm auf Varonheim! ${und.name} drängt durch die Bresche am Südtor.` : 'Die Bresche ist verloren — die Garde hält das Burgtor.', 'combat');
+}
+export const capitalStormForTest = (und, def, ph) => capitalStorm(und, def, ph);
 export const captureNode = (k, f) => { capture(k, f); cleanupArmies(); };
 export function armyNear(k, fac, hops = 2) {                       /* Stadt ohne Schutz S2: freies Heer höchstens hops Kanten entfernt */
   const seen = new Set([k]); let front = [k];
@@ -484,7 +504,7 @@ export const ARMY_CAP = () => (S.difficulty || 'schwer') === 'sehr_schwer' || (S
 export function clampArmies() { for (const a of S.war?.armies || []) a.strength = Math.min(a.strength, ARMY_CAP()); }
 export function warDay() {
   const W = S.war;
-  const undNodes = Object.values(W.nodes).filter(n => n.owner === 'undead').length, dead = !!S.flags.garmadonSlain;
+  const undNodes = Object.values(W.nodes).filter(n => n.owner === 'undead').length, dead = !!S.flags.garmadonSlain && S.flags.deadSucc?.winner !== 'morvath';   /* E40 S3 ⚖: unter Totenkönig Morvath wachsen die Heere der Toten wieder */
   // Audit V1: Nachschub statt Lawine — Untote wachsen gedeckelt (nach Garmadon gar nicht mehr), Valen nach dem Korn aller eigenen Städte
   const valenGrain = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'valen' && S.towns[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
   // Hunter-Befund (01.10.): ohne Gegengewicht fielen in 15 Tagen alle Knoten. Je mehr Land verloren ist, desto mehr greift Valen zu
@@ -509,7 +529,69 @@ export function warDay() {
   }
   cleanupArmies();   // S15: verhungerte Heere verschwinden
   economyDay();
+  facResDay();   /* T23: nach Produktion und Zügen des Tages */
 }
+
+// ---------------- T23 Fraktionsressourcen (Spec §5.1) ----------------
+// Ein Objekt S.facRes, einmal am Tag am Ende von warDay. Jeder Verbraucher liest über facRes(f): fehlt das Feld (alter Stand), gilt FAC_RES[f].def —
+// das ist die ganze Migration. Gerechnete Werte (Korn, Arbeitskraft, Wohlstand, Salz) kommen aus S.towns/S.war bzw. dem Hook H.facSources (game.js:
+// labor, zeal, hort); Seelen und Handelszüge haben eigenen Speicher (resAdd). Kein rnd() hier — Zufall nur über Tageshash (resHash), damit Proben
+// nicht wandern. Stufenwechsel meldet H.facSay(f, neu, alt) genau einmal; der erste Lauf eines Standes setzt die Stufen still.
+export const RES_KEYS = ['valen', 'order', 'undead', 'merch', 'chain', 'aurel', 'sea', 'goblin'];
+export const resNum = v => typeof v === 'number' && isFinite(v);
+export function facResState() {
+  const R = (S.facRes ||= { day: -1 });
+  for (const f of RES_KEYS) { R[f] ||= { v: null, stage: 1 }; R[f].stage ??= 1; }
+  return R;
+}
+export function facRes(f) { const v = S.facRes?.[f]?.v; return resNum(v) ? v : FAC_RES[f].def; }
+export function resAdd(f, n) { const R = facResState()[f], C = FAC_RES[f]; R.v = clamp(Math.round((facRes(f) + n) * 10) / 10, 0, C.max ?? 1e9); return R.v; }
+export function resStage(f, v, old = 1) {
+  const C = FAC_RES[f];
+  if (v < C.lt) return 0;
+  if (v >= C.ge) return 2;
+  if (old === 0 && v < C.lt * 1.1) return 0;   /* Hysterese ±10 %: kein Hin und Her an der Schwelle */
+  if (old === 2 && v >= C.ge * 0.9) return 2;
+  return 1;
+}
+export const resStageOf = f => S.facRes?.[f]?.stage ?? resStage(f, facRes(f));
+export const resHash = (salt, n) => Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 13 + salt * 31) | 0) % n;   /* Tageshash statt rnd() */
+export const undNodeCount = () => Object.values(S.war?.nodes || {}).filter(n => n.owner === 'undead').length;
+export const valenGrainNow = () => Object.keys(S.war?.nodes || {}).filter(k => S.war.nodes[k].owner === 'valen' && S.towns?.[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
+export function aurelIndex() {                                      /* F1 (Entwickler 01.10.): Index aus Versorgung und Magitech — der kleinere zählt */
+  let food = 0, fneed = 0, magi = 0, mneed = 0;
+  for (const [k, t] of Object.entries(S.towns || {})) {
+    if (LOC[k]?.faction !== 'aurel' || S.war?.nodes?.[k]?.owner === 'undead' || S.razed?.[k]) continue;
+    food += (t.stock.grain || 0) + (t.stock.meat || 0); fneed += (t.use?.grain || 0) + (t.use?.meat || 0);
+    magi += t.stock.magitech || 0; mneed += t.use?.magitech || 0;
+  }
+  const fd = fneed > 0 ? food / fneed : 99, md = mneed > 0 ? magi / mneed : 99;
+  return { food: fd, magi: md, v: Math.min(99, fd, md) };
+}
+export const seaSalt = () => FAC_RES.sea.ports.reduce((n, k) => n + (S.towns?.[k]?.stock?.salt || 0), 0);
+export function facResDay() {
+  if (!S.war?.nodes || !S.towns) return null;
+  const R = facResState(), first = R.day == null || R.day < 0, src = H.facSources?.() || {};
+  for (const f of RES_KEYS) R[f].prev = resNum(R[f].mark) ? R[f].mark : null;
+  const set = (f, v) => { R[f].v = Math.round((resNum(v) ? v : FAC_RES[f].def) * 10) / 10; };
+  set('valen', valenGrainNow());
+  set('order', resNum(src.zeal) ? src.zeal : facRes('order'));
+  if (!resNum(R.undead.v)) set('undead', Math.min(FAC_RES.undead.max, FAC_RES.undead.start[0] + FAC_RES.undead.start[1] * undNodeCount()));
+  if (!resNum(R.merch.v)) set('merch', FAC_RES.merch.def);
+  H.resDaily?.(R, first);                                            /* Tagesquellen und -senken der Scheiben S3–S5 (game.js) */
+  set('chain', resNum(src.labor) ? src.labor : FAC_RES.chain.def);
+  set('aurel', aurelIndex().v);
+  set('sea', seaSalt());
+  set('goblin', resNum(src.hort) ? src.hort : FAC_RES.goblin.def);
+  for (const f of RES_KEYS) {
+    const st = resStage(f, R[f].v, R[f].stage), was = R[f].stage;
+    if (st !== was) { R[f].stage = st; if (!first) H.facSay?.(f, st, was); }
+    R[f].mark = R[f].v;
+  }
+  R.day = S.day | 0;
+  return R;
+}
+export const facResView = () => RES_KEYS.map(f => ({ f, v: facRes(f), prev: S.facRes?.[f]?.prev ?? null, stage: resStageOf(f), ...FAC_RES[f] }));
 
 // ---- Schlacht vor Ort (Stufe A): Heere werden zu Einheiten ----
 function materialize(node, att, def) {
@@ -558,16 +640,18 @@ export function undeadMix(n, target = 'village') {
   return roles.slice(0, n).map(role => ({ role, type: pick(UNDEAD_ROLES[role]) }));
 }
 function spawnWave(node, n, id) {
-  const L = LOC[node], [ox, oy] = waveOrigin(node, n.wave), last = n.wave >= n.waves, keep = node === 'blackkeep' || node === CAPK;
+  const L = LOC[node], last = n.wave >= n.waves, keep = node === 'blackkeep' || node === CAPK, T4 = last && node === CAPK && H.capThrone?.(), [ox, oy] = T4 ? T4.yard : waveOrigin(node, n.wave);   /* Belagerung S3d: Welle 4 hält den Thronsaal */
   const types = undeadMix(3 + (n.wave - 1) + (keep ? 2 : 0), keep ? 'military' : 'town').map(u => u.type);   // Phase 6: gemischte Heere
   if (last) types.push('death_captain');
-  const worth = n.garrison / types.length / Math.max(1, n.waves - n.wave + 1), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
+  const worth = n.garrison / types.length / Math.max(1, n.waves - n.wave + 1), home = T4 ? { ...T4.home } : { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
   for (const t of types) H.spawnEnemy(t, 'world', ...(H.pushOut ? H.pushOut('world', ox + ri(-2, 2), oy + ri(-2, 2)) : [ox + ri(-2, 2), oy + ri(-2, 2)]),   // AUDIT: Welle kommt von außerhalb des Bildes
-    { armyId: id, worth, level: t === 'death_captain' ? (keep ? 9 : 6) : 4 + n.wave, anchor: { ...home }, marching: true, boss: t === 'death_captain' || undefined });
+    { armyId: id, worth, level: t === 'death_captain' ? (keep ? 9 : 6) : 4 + n.wave, anchor: { ...home }, marching: T4 ? undefined : true, boss: t === 'death_captain' || undefined });
+  if (T4) { H.capWave4?.(id); log('Welle 4: Der Statthalter der Toten hält den Thronsaal. Die Knochenwachen am Burgtor stehen zu ihm.', 'combat'); H.toast('DER STATTHALTER HÄLT DEN THRONSAAL'); return; }
   log(last ? `Welle ${n.wave}/${n.waves}: der Hauptmann der Toten führt sie selbst.` : `Welle ${n.wave}/${n.waves} marschiert auf ${L.name}.`, 'combat');
   H.toast(last ? 'DER HAUPTMANN DER TOTEN' : `WELLE ${n.wave}/${n.waves}`);
 }
-export const materializeForTest = (node, att, def) => materialize(node, att, def);   // Selbsttest
+export const materializeForTest = (node, att, def) => materialize(node, att, def);
+export const spawnWaveForTest = (node, id) => spawnWave(node, S.war.nodes[node], id);   /* S3d-Probe */   // Selbsttest
 export function unitDied(e) {
   const a = findArmy(e.armyId); if (a) setStrength(a, a.strength - (e.worth || 5));
 }
@@ -587,6 +671,10 @@ export function battleCheck() {                              // alle paar Sekund
       if (!a || !d) continue;
       const win = timeout ? (a.strength >= d.strength ? a : d) : (na > 0 ? a : d);
       const lose = win === a ? d : a;
+      if (b.storm === 1 && win === a && a.faction === 'undead' && nearPlayer(CAPK)) {   /* S3b: Bresche verloren, Spieler nah — die Burg hält noch */
+        a.strength *= CAP_STORM.rest; for (let i = S.ents.world.length - 1; i >= 0; i--) { const e = S.ents.world[i]; if (e.kind === 'enemy' && e.armyId === a.id) S.ents.world.splice(i, 1); }
+        capitalStorm(a, d, 2); continue; }
+      if (b.storm && win.faction === 'valen') { S.war.nodes[CAPK].siege && (S.war.nodes[CAPK].siege.phase = 1); if (b.storm === 2) chronicle('Am Burgtor brach der Sturm', 'battle', `${lose.name} weicht vom Burgtor der Varonsburg.`); H.capPhase?.(0); }
       log(`Die Schlacht bei ${LOC[b.node].name} ist entschieden: ${win.name} hält das Feld.`, 'faction');
       if (win.faction !== 'undead' && lose.faction === 'undead') { const d = S.day | 0; if (W.cutDay !== d) { W.cutDay = d; W.cutN = 0; } const c = Math.min(3, CAP_SIEGE.cutDay - W.cutN); if (c > 0) { W.cutN += c; threatCut(c); } }   /* gewonnene Feldschlacht senkt die Bedrohung der Hauptstadt (höchstens 6 am Tag) */
       chronicle(`Schlacht bei ${LOC[b.node].name}`, 'battle', `${win.name} siegt. ${S.player.name} war dabei.`);

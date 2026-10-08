@@ -183,6 +183,23 @@ export const ANIM_DEFS = {
       C: { name: 'C Endgame', steps: [{ s: 0, w: 0.15, h: 0.25 }, { s: 1, w: 0.11, h: 0.21 }, { s: 2, w: 0.17, h: 0.29 }],
         fx: { stop: 1.45, shake: 1.35, trail: 10, push: 8, slash: 1, after: 1, fin: 2 } },
     },
+    /* E38 (Entwickler 09.10.2026: Katana eigene Waffenklasse mit eigenen Animationen). Iai-Zug: aus der Hüfte (Klinge tief am Gürtel) in
+       einem Zug schräg nach oben — kurzes Ausholen, schlagartiger Schnitt, langes gehaltenes Nachziehen. Kesa: der Rückweg schräg von oben.
+       Ausfallschnitt: weiter Stoß mit Ausfallschritt. Zeiten ⚖ vorläufig zwischen Dolch und Rapier (schneller Zug), Rest wie Rapier. */
+    katana: {
+      name: 'Katana',
+      shapes: [
+        { name: 'Iai-Zug', a0: 1.25, from: 2.5, hit: -0.25, end: -1.55, a1: -0.8, eW: 0, eS: 3 },
+        { name: 'Kesa-Schnitt', a0: -1.55, from: -2.45, hit: 0.3, end: 1.2, a1: 0.6, eW: -2, eS: 3 },
+        { name: 'Ausfallschnitt', kind: 'thrust', a0: 0.6, off: -0.05, back: -5, fwd: 19, a1: 0.1 },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.16, h: 0.27 }, { s: 1, w: 0.2, h: 0.33 }, { s: 2, w: 0.24, h: 0.37 }],
+        fx: { stop: 1, shake: 1, trail: 7, push: 1, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.13, h: 0.23 }, { s: 1, w: 0.17, h: 0.28 }, { s: 2, w: 0.2, h: 0.32 }],
+        fx: { stop: 1.25, shake: 1.2, trail: 9, push: 3, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.1, h: 0.19 }, { s: 1, w: 0.13, h: 0.23 }, { s: 2, w: 0.16, h: 0.27 }],
+        fx: { stop: 1.45, shake: 1.35, trail: 11, push: 8, slash: 2, after: 1, fin: 2 } },
+    },
     whip: {                                                          // Peitsche: von oben knallen, quer ziehen
       name: 'Peitsche',
       shapes: [
@@ -273,6 +290,11 @@ const BODY = {
     { w: { ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -3, st: 7, hr: 4 }, f: { by: 1, ln: -2, st: 6, hr: 3 } },
     { w: { ln: 1, st: 2, hr: -2, hd: -2 }, i: { by: 1, ln: -2, st: 4, hr: 1, hd: -1 }, f: { ln: -1, st: 4 } },
   ],
+  katana: [   /* E38: Iai = tief in den Knien, Hand an der Hüfte, mit dem Schritt hoch; Kesa = von oben in die Knie; Ausfall = weiter Schritt */
+    { w: { by: 3, ln: 2, st: 2, hr: -3, hd: 3 }, i: { by: 1, ln: -3, st: 7, hr: 4, hd: -3 }, f: { ln: -2, st: 6, hy: -1, hr: 3, hd: -5 } },
+    { w: { by: -1, ln: 2, st: 3, hy: -1, hr: -2, hd: -5 }, i: { by: 3, ln: -3, st: 6, hr: 3, hd: 4 }, f: { by: 3, ln: -3, st: 6, hr: 2, hd: 5 } },
+    { w: { by: 2, ln: 3, st: 2, hr: -3 }, i: { by: 2, ln: -4, st: 9, hr: 5 }, f: { by: 2, ln: -3, st: 8, hr: 4 } },
+  ],
   whip: [
     { w: { by: -1, ln: 2, st: 2, hy: -1, hr: -2, hd: -5 }, i: { by: 2, ln: -2, st: 5, hr: 3, hd: 3 }, f: { by: 2, ln: -2, st: 5, hr: 2, hd: 4 } },
     { w: { by: 1, ln: 2, st: 2, hr: -2 }, i: { by: 1, ln: -2, st: 5, hr: 3 }, f: { by: 1, ln: -1, st: 4, hr: 2 } },
@@ -296,6 +318,7 @@ const STANCE = {
   mace:     { ready: { a: -0.8, ext: -1, body: { by: 1, st: 3, ln: 1 } },  guard: { a: -1.4, ext: -3, body: { by: 2, st: 3 } } },
   polearm:  { ready: { a: 0.0, ext: 3, body: { by: 1, st: 3, ln: 0 } },    guard: { a: -0.6, ext: 2, body: { by: 1, st: 3 } } },
   rapier:   { ready: { a: 0.15, ext: 3, body: { by: 1, st: 3, ln: -1 } },  guard: { a: -1.2, ext: 0, body: { by: 1, st: 2 } } },
+  katana:   { ready: { a: 1.0, ext: -1, body: { by: 2, st: 3, ln: 0 } },   guard: { a: -0.9, ext: 1, body: { by: 1, st: 3 } } },   /* E38: Klinge tief an der Hüfte, bereit zum Zug */
   whip:     { ready: { a: 0.9, ext: 0, body: { by: 1, st: 2, ln: 0 } },    guard: { a: -1.2, ext: -1, body: { by: 1, st: 2 } } },
   staff:    { ready: { a: -0.2, ext: 2, body: { by: 1, st: 3, ln: 0 } },   guard: { a: -0.4, ext: 2, body: { by: 1, st: 3 } } },
 };
@@ -359,7 +382,7 @@ const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
    - nach dem Einschlag schwingt die Klinge ÜBER die Endlage hinaus (bis +35 %) und pendelt zurück;
    - die Erholung beginnt später (Follow-through wird gehalten) und läuft langsamer;
    - der Körper sinkt im Einschlag nach (Gewicht landet) und richtet sich erst spät wieder auf. Werte vorläufig. */
-const WEIGHT = { dagger: 0, rapier: 0.1, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
+const WEIGHT = { dagger: 0, rapier: 0.1, katana: 0.2, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
 export const atkWeight = wt => WEIGHT[wt] ?? 0.35;
 const windK = (u, g) => eo(Math.min(1, u / (0.4 - 0.1 * g)));                       /* Ausholen: früher fertig, dann halten */
 const whip = (t, g) => Math.pow(Math.max(0, Math.min(1, t)), 2 + g);               /* Hieb: Peitschen-Beschleunigung */

@@ -393,7 +393,7 @@ function hostTick(dt) {
   if (S.cine) broadcast({ t: 'cam', x: Math.round(A.R.cam.x), y: Math.round(A.R.cam.y), z: A.R.cam.zoom, text: S.cine.shots?.[S.cine.i]?.text || '' }); else if (camOn) { camOn = false; broadcast({ t: 'cam', off: 1 }); }   /* Kamerafahrt: Gäste sehen mit */
   if (S.cine) camOn = true;
   if (wAcc >= 500) { const qs = JSON.stringify([S.quests, S.contracts || [], S.track || null]); if (qs !== lastQuests) { lastQuests = qs; broadcast({ t: 'quests', q: qs }); } }   /* Aufträge und Wegpunkt für die Gäste (nur bei Änderung) */
-  if (wAcc >= 500) { wAcc = 0; broadcast({ t: 'world', day: S.day, minute: S.minute, weather: S.weather, paused: !!S.paused, map: S.map, gold: S.gold, res: S.res, factions: S.factions, cine: S.cine ? { text: S.cine.shots[S.cine.i]?.text } : null, dlg: A.UI.dialogueOpen(), hostName: S.player.name }); }
+  if (wAcc >= 500) { wAcc = 0; broadcast({ t: 'world', day: S.day, minute: S.minute, weather: S.weather, paused: !!S.paused, map: S.map, gold: S.gold, res: S.res, factions: S.factions, facRes: S.facRes, cine: S.cine ? { text: S.cine.shots[S.cine.i]?.text } : null, dlg: A.UI.dialogueOpen(), hostName: S.player.name }); }
 }
 // Figur ohne schwere Felder für die erste Übertragung
 function lightEnt(e) { const o = {}; for (const k of Object.keys(e)) if (!HEAVY.has(k)) o[k] = e[k]; if (e.equip) o.equip = e.equip; return o; }
@@ -435,7 +435,7 @@ function onGuestData(raw) {
   if (d.t === 'ents') { applyEnts(d); return; }
   if (d.t === 'cam') { S.coop.cam = d.off ? null : d; showCineText(d.off ? '' : d.text); return; }
   if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills, currentClass: d.currentClass, knownClasses: d.knownClasses, titleClass: d.titleClass, titleClasses: d.titleClasses, tgrade: d.tgrade, tree: d.tree, skillPoints: d.skillPoints, abilities: d.abilities, spells: d.spells, titles: d.titles }); if (d.ranks) S.ranks = d.ranks;   /* eigene Ränge des Gasts */ guestHitBar(d); A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
-  if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
+  if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); if (d.facRes) S.facRes = d.facRes;   /* T23: Kodex „Mächte“ beim Gast */ S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
   if (d.t === 'toast') { A.UI.toast(d.text); return; }
   if (d.t === 'card') { A.nameCard?.(d.title, d.sub || '', 3200); A.sfx?.(d.snd || 'bell', 0.4, 0.8); return; }   /* E22: Ereigniskarte vom Host */
   if (d.t === 'cards') { lobbyCardsData = d.cards; drawCards($('coop-cards'), d.cards); return; }

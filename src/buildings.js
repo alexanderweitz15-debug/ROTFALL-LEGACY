@@ -21,6 +21,7 @@ export const TOWN_STYLE = {
   ashford:   { roof: 'slate',   wall: 'stone', alt: 'shingle' },      // befestigter Posten: Schiefer
   sonnwacht: { roof: 'slate',   wall: 'palestone', alt: 'tile' },  // Orden: heller Stein
   vharnholm: { roof: 'bone',    wall: 'blackstone' }, // Stadt der Stillen: aschgraue Schindeln, schwarzer Basalt
+  beinhausen: { roof: 'bone', wall: 'blackstone' }, blackkeep: { roof: 'bone', wall: 'blackstone' },   /* E40 S2: Dorf der Stillen; Gebäude der Schwarzen Feste (P5 A) */
   karak: { roof: 'tile', wall: 'plaster', alt: 'shingle' },
   // Hochreich Aurelion (S12): heller Stein, Schiefer und Ziegel — sichtbar reicher als der Norden
   aurelheim: { roof: 'slate', wall: 'palestone', alt: 'tile' }, kupferhafen: { roof: 'tile', wall: 'plaster', alt: 'slate' }, gelenkhall: { roof: 'tile', wall: 'stone', alt: 'slate' },
