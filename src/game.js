@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
 import * as R from './render.js?v=25';
 import * as HB from './buildings.js?v=25';
@@ -64,7 +64,11 @@ const node = (c, k) => !!(c && c.tree && c.tree[k]);
 const dkNode = (c, k) => node(c, k) && c.currentClass === 'deathknight';   // S15: Todesritter-Schlüsselknoten nur als aktive Klasse
 /* Klassen und Talente (Entscheidung 3 + Lead 03.10.): Wertesterne wirken immer; Schlüssel- und Fähigkeitssterne nur, solange ihre Klasse
    aktiv ist — oder eine Folgeklasse davon (Krieger-Sterne wirken auch als Ritter) — bzw. solange der Titel getragen wird. */
-function clsLine(c) { const s = new Set(); let k = c?.currentClass; while (k && !s.has(k) && CLASSES[k]) { s.add(k); k = parentFor(k, c); } return s; }
+function clsLine(c) { const s = new Set(); let k = c?.currentClass; while (k && !s.has(k) && CLASSES[k]) { s.add(k); k = parentFor(k, c); }
+  for (const w of c?.knownClasses || []) if (s.has(CLASSES[w]?.way)) { let q = w; while (q && !s.has(q) && CLASSES[q]) { s.add(q); q = parentFor(q, c); } }   /* E42: ein gelernter Kettenweg wirkt mit seiner Schwesterklasse */
+  return s; }
+/* E42: Fähigkeiten einer Klasse samt gelernter Wege (Kettenbarde gehört zum Barden: beide Sätze) */
+const clsAbilities = (c, cls) => [...new Set([...(CLASSES[cls]?.abilities || []), ...(c?.knownClasses || []).filter(k => CLASSES[k]?.way === cls).flatMap(k => CLASSES[k].abilities || [])])];
 /* Fähigkeitssterne (ab): Summe je Fähigkeit, nur wenn ihr Sternbild wirkt. abBegin/abEnd klammern eine Fähigkeit: Schaden (hurt, Geschosse,
    aufgeladener Hieb), Dauer (Zustände, Fesseln, Furcht, Diener). Allgemein — keine Regel je Stern. */
 function abMod(c, key) { const m = { mult: 0, cd: 0, cost: 0, dur: 0 }; for (const k of Object.keys(c?.tree || {})) { const N = SKILL_TREE[k]; if (!N?.ab || !skyActive(c, N.branch)) continue; for (const a of N.ab) if (a.k === key) for (const f of ['mult', 'cd', 'cost', 'dur']) m[f] += a[f] || 0; } return m; }
@@ -257,6 +261,7 @@ function equip(c, idx) {
   if (prev) c.inv.push(prev);
   if (it.twohand && c.equip.offhand) { c.inv.push(c.equip.offhand); c.equip.offhand = null; }
   log(`${c.name} legt ${it.name} an.`, 'party');
+  if (c === S.player && it.skill === 'katana' && !S.flags.katanaHint) { S.flags.katanaHint = 1; log('Katana: eine eigene Waffenkunst mit eigener Fertigkeit. Mit Übung lernst du Ausweichhieb (nach der Rolle), Gegenhieb (nach der Parade), Ausfallschnitt, ein größeres Parierfenster und den Konterhieb — siehe Fenster „Fertigkeiten“. Ohne Schild geführt, öffnet sie ab Stufe 40 eine Meisterprüfung.', 'quest'); }   /* E38 */
   recalc(c); if (c === S.player && (it.classSet || (prev && ITEMS[prev.key]?.classSet))) syncHotbar(); UI.refreshHUD();   // S15 Fehlersuche: Fähigkeiten aus Klassenrüstung sofort; nur dann Leiste neu (sonst bleibt deine Belegung)
 }
 function unequip(c, slotKey) {
@@ -2672,7 +2677,7 @@ const capOf = a => REGION_BOSSES.some(b => S.flags[b.flag] && b.area(a)) ? Math.
 // S12: Banditenlager, Totengräber, Minen und Ruinen der Streuorte bekommen ihre Bewohner (je Welt neu)
 function poiSpawns() {
   for (let i = SPAWN_AREAS.length - 1; i >= 0; i--) if (SPAWN_AREAS[i].poi) SPAWN_AREAS.splice(i, 1);
-  for (const l of LOCATIONS) if (l.spawn) SPAWN_AREAS.push({ map: 'world', x: l.x, y: l.y, r: 6, types: l.spawn, cap: 3, poi: true });
+  for (const l of LOCATIONS) if (l.spawn) SPAWN_AREAS.push({ map: 'world', x: l.x, y: l.y, r: 6, types: l.spawn, cap: 3, poi: true, key: l.key });   /* key: T12 B2 Spawn-Sperre */
   for (const a of deadEdgeAreas()) SPAWN_AREAS.push(a);
 }
 /* Entwickler 02.10. (Neue Gegner): Totenland-Rand — wo der Fluch die Lebenden verdirbt, leben Mutierte. Die Grenze ist die der Region
@@ -2951,7 +2956,7 @@ function rescaleSave(fresh) {
 const PERF_KEYS = ['silenced', 'voidRage', 'darkPact', 'timeSlow', 'soulBound', 'exposed', 'cowed', 'shockImm', 'tended', 'cmdUntil', 'pathFail', 'tradeT', 'reactAt',
   'armWarn', 'castT', 'cellWarn', 'chopCd', 'comboT', 'coverOff', 'frenzyT', 'landT', 'lastCast', 'lastHit', 'lastHurt', 'lastShot', 'manaWarn', 'mistUntil', 'phased',
   'poiseUntil', 'pressT', 'reloadUntil', 'revealed', 'riposteUntil', 'spent', 'lureCd', 'guardBroken', 'shadowNext', 'momT', 'lightT',
-  'netFree', 'stabAt', 'thrallUntil'];   /* HB2-06: nachgetragen. drinkCd nur bei Gegnern (Blutschöpfer, performance.now) — beim Helden zählt die Spieluhr (Brunnen) */
+  'netFree', 'stabAt', 'thrallUntil', 'dodgeAt'];   /* HB2-06: nachgetragen. drinkCd nur bei Gegnern (Blutschöpfer, performance.now) — beim Helden zählt die Spieluhr (Brunnen) */
 const stalePerf = o => { for (const k of PERF_KEYS) if (typeof o[k] === 'number' && o[k] > 0) o[k] = 0; };
 export function continueGame(given = null, retried = false) {                        /* Koop K2: der Gast bringt den Stand des Hosts mit */
   if (!given && !retried && readRaw() == null && localStorage.getItem(SAVE_KEY)) return void unpackAll().then(() => continueGame(null, true));   /* RB-009: in einem anderen Tab gepackt */
@@ -3080,6 +3085,8 @@ export function continueGame(given = null, retried = false) {                   
   Object.assign(S.player, { dodge: null, dodgeCd: 0, invuln: false, channel: null });   // Zeitstempel alter Stände sind wertlos
   for (const c of S.player.knownClasses || []) if (OWN_PATH.has(c)) (S.player.clsPass ||= {})[c] = 1;   /* Entwickler: eigene Wege zählen rückwirkend als bestandene Prüfung */
   if (S.player.skyV == null) { if (talentSpent(S.player)) { S.player.freeRespec = 1; log('Die Talente stehen jetzt als Sternenhimmel am Himmel (T): der Wanderer für alle, je Klasse und je Titel ein Sternbild. Deine Sterne bleiben — einmal darfst du sie kostenlos neu ordnen (im Talentfenster oder bei jedem Lehrer).', 'party'); } S.player.skyV = 1; }   /* Entscheidung 9 */
+  { const P = S.player, r = skyCut(P); for (const c of [...Object.values(S.coopHeroes || {}), ...Object.values(S.ents).flat()]) if (c && c !== P && c.knownClasses) skyCut(c);   /* E42: Himmel gekürzt, Kettenklassen zusammengelegt */
+    if (r.pts || r.cls) { recalc(P); syncHotbar(); log(`Sternbild neu geordnet: doppelte Sterne sind gestrichen${r.pts ? `, ${r.pts} Talentpunkt${r.pts > 1 ? 'e' : ''} erstattet` : ''}.${r.cls ? ` ${CLASSES[r.cls].name} ist jetzt ein Weg der Klasse ${CLASSES[P.currentClass].name}: du führst beide Fähigkeitssätze, die Sterne stehen als Kettenarm in deren Sternbild.` : ''}`, 'party'); } }
   { const got = talentTopUp(S.player); if (got) { recalc(S.player); log(`Die Talentregel hat sich geändert (ein Punkt auf jeder zweiten Stufe und je bestandener Klassenprüfung): ${got} Talentpunkt${got > 1 ? 'e' : ''} nachgereicht.`, 'party'); } }   /* Scheibe 0: Punkte rückwirkend nach der neuen Regel (nie weniger als vorher) */
   for (const h of [...Object.values(S.coopHeroes || {}), ...Object.values(S.ents).flat().filter(e => e?.coopHero)]) talentTopUp(h);   /* Koop-Gastfiguren bekamen bisher keine Talentpunkte */
   B.bionicDefaults(S.player);   /* Roadmap P2: alte Linse (p.lens) wird Roboterauge Stufe 2 */
@@ -4022,6 +4029,7 @@ const FEEL = {
   mace:   { w: 0.65, stop: 78, shake: 5, lunge: 4, stag: 0.9 },    great: { w: 1,    stop: 100, shake: 7, lunge: 9, stag: 1 },
   staff:  { w: 0.3,  stop: 40, shake: 2, lunge: 3, stag: 0.3 },    bow:   { w: 0.2,  stop: 30, shake: 1.5, lunge: 0, stag: 0.15 },
   rapier: { w: 0.12, stop: 32, shake: 1.5, lunge: 8, stag: 0.15 }, hammer: { w: 1.15, stop: 118, shake: 8, lunge: 6, stag: 1.2 },
+  katana: { w: 0.25, stop: 42, shake: 2, lunge: 8, stag: 0.25 },   /* E38: zwischen Rapier und Schwert — schnell, weiter Ausfall */
   polearm:{ w: 0.7,  stop: 70, shake: 4.5, lunge: 5, stag: 0.6 },  whip: { w: 0.25, stop: 30, shake: 1.5, lunge: 3, stag: 0.15 },  crossbow: { w: 0.45, stop: 40, shake: 3, lunge: 0, stag: 0.5 },
   wand:   { w: 0.1,  stop: 25, shake: 1, lunge: 0, stag: 0.1 },
   throw:  { w: 0.2,  stop: 28, shake: 1.5, lunge: 0, stag: 0.2 },  sling: { w: 0.1, stop: 24, shake: 1, lunge: 0, stag: 0.2 },   // S13: Wurfwaffen, Schleuder
@@ -4121,6 +4129,7 @@ function attack(c, forceDir) {
   c.atkHeavy = false; if (c.heavyNext && it && !it.ranged) { c.heavyNext = false; c.atkHeavy = true; c.combo = 0; c.comboFin = true; c.comboShown = false; c.comboT = performance.now() + it.speed * 1.15; }   /* Kampfanimation: voll geladener schwerer Hieb = Wuchtschlag aus der Ruhe */
   c.swingDur = (it ? it.speed : 450) * (1 - Math.min(0.3, afx(c, 'swift'))) * (1 - Math.min(0.25, (it && c.skills ? c.skills[it.skill] || 0 : 0) * 0.0025));   // S13 (Kenshi): geübte Hand schlägt schneller
   c.swingDur *= 1 - wperk(c, 'recover');   /* Skill-Core: Meilenstein „schnellere Erholung“ */
+  if (performance.now() - (c.dodgeAt || -1e9) < 1200 && wperk(c, 'dodgeatk')) { c.swingDur *= 1 - Math.min(0.6, wperk(c, 'dodgeatk')); c.dodgeAt = 0; if (c === S.player) float(c, 'Ausweichhieb', 'rgba(220,230,240,ALPHA)'); }   /* E38 Katana: erster Hieb nach der Rolle */
   if (c.comboFin && !atkOld()) c.swingDur *= 1.15;   /* Kampfanimation (DECISIONS 02.10.): der Wuchtschlag dauert wirklich 15 % länger, wie in MECHANIKEN beschrieben */
   { const wt = it && !it.ranged ? animClassOf(w.key, it) : null, pk = atkPackOf(c);   /* Kampfanimation: Schwungplan aus anim.js — Form, Ausholen, Treffer (= sichtbarer Einschlag), Abbruchpunkt */
     c.atkStep = c.comboFin ? 2 : c.combo >= 1 ? Math.min(1, c.combo - 1) : c.atkStep === 0 ? 1 : 0;
@@ -4144,7 +4153,7 @@ function resolveSwing(c) {
   c.abilityMult = 0; c.abilityKind = null;
   const w = wpnOf(c), it = w ? ITEMS[w.key] : null;
   if (it && it.ranged) return shoot(c, it, mult);
-  const reach = (it ? it.reach : 30) + (c.r || 10);
+  const reach = (it ? it.reach * (1 + wperk(c, 'reach')) : 30) + (c.r || 10);   /* E38 Katana: Ausfallschnitt */
   let arc = it ? (it.arc || 1.4) : 1.4;
   // §82 Streitflegel: Schwung aus raschen Treffern (≤ 1,4 s Abstand) — +15 % je Stufe, ab Stufe 2 trifft der nächste Hieb rundum
   const now0 = performance.now(), mom = it && it.flail && now0 - (c.momT || 0) < 1400 ? c.momentum || 0 : 0;
@@ -4439,6 +4448,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   const riposte = it && it.riposte && attacker.riposteUntil > performance.now();   // Rapier: Stich nach der Parade
   if (attacker.shadowNext > performance.now()) { dmg *= 2.5; attacker.shadowNext = 0; float(attacker, 'Aus dem Schatten', 'rgba(150,130,190,ALPHA)'); }   // Schattenschritt
   if (riposte) { dmg *= 2.2; attacker.riposteUntil = 0; float(attacker, 'Riposte', 'rgba(240,220,150,ALPHA)'); }
+  else if (attacker.riposteUntil > performance.now() && wperk(attacker, 'counter')) { dmg *= 1 + wperk(attacker, 'counter'); attacker.riposteUntil = 0; float(attacker, 'Gegenhieb', 'rgba(240,220,150,ALPHA)'); }   /* E38 Katana: Hieb nach der Parade */
   if (attacker.titleClass === 'necromancer' && !node(attacker, 'k_lone')) dmg *= 0.85;             // Makel: Die Toten zehren
   if ((attacker.status || []).some(s => s.key === 'bloodtoll')) dmg *= 0.8;   // Phase 6: Blutzoll an Garmadon
   if (target.exposed > performance.now()) dmg *= 1.25;                   // S15 P3: offen nach einem schweren Angriff
@@ -4611,6 +4621,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   target.lastCause = cause; target.lastKiller = source ? source.id : null;
   if (source) target.aggroId = source.id;
   target.lastHurt = performance.now();
+  if (target === S.player && source && dmg > 0) source.hitPlayer = 1;   /* E38: Katana-Meisterprüfung „ohne getroffen zu werden“ */
   if (target.kind === 'enemy' && source && source.id && isHostile(target, source)) {   // Gruppe/Rudel: Gleiche eilen zu Hilfe
     for (const o of S.ents[target.map]) {
       if (o === target || o.kind !== 'enemy' || !o.alive || o.faction !== target.faction || dist(o, target) > 240) continue;
@@ -4773,7 +4784,7 @@ function die(c, cause = 'Wunden', source) {
     sfx(bony ? 'bone' : 'death', 0.5, earVol(c));
   }
   if (c.livestock && !c.herdCounted) { const H = c.livestock === 'player' ? S.settlement?.herd : ECO.herdOf(c.livestock); if (H?.[c.mtype] > 0) H[c.mtype]--; }   // S14: jedes tote Tier fehlt der Herde
-  if (c.bandId) bandKill(c);   /* Nutzer §5d.7: Banden */
+  if (c.bandId) bandKill(c, source);   /* Nutzer §5d.7: Banden */
   if (c.nemesisId) nemesisSlain(c, source);   /* T10 Ahnenfeind */
   /* §5g.2: Kult-Folgen vor dem Ausstieg für ferne/verbündete Tote — auch wer dem Kelch beitrat und Aldhelm herausfordert, beendet ihn */
   if (c.cultThrall && S.cult) { const m = S.cult.missing.find(x => x.ent.id === c.cultThrall); if (m) { m.dead = true; chronicle(`${m.ent.name} aus Varonheim ist tot`, 'news', 'Als Blutknecht in den Katakomben gefallen.'); } }
@@ -5070,6 +5081,7 @@ function masteryKill(e) {
   const w = ITEMS[p.equip?.weapon?.key], vet = !!(e.elite || e.boss || MONSTERS[e.mtype]?.boss || e.vname), strong = vet || (e.level || 1) >= (p.level || 1) + 2;
   if (w?.skill === 'onehanded' && !p.equip.offhand && strong) masterDone(p, 'onehanded');
   if (w?.skill === 'polearms' && vet) masterDone(p, 'polearms');
+  if (w?.skill === 'katana' && !p.equip.offhand && strong && !e.hitPlayer) masterDone(p, 'katana');   /* E38: Duell ohne Schild und ohne Treffer */
 }
 const wperk = (c, kind) => { const w = c?.equip?.weapon; return w ? perkVal(c, ITEMS[w.key]?.skill, kind) : 0; };
 function skillNext(c, k) { const lv = skillLv(c.skills?.[k]), P = SKILL_DEF[k]?.perks || {}; const L = SKILL_MS.find(m => m > lv && (P[m] || m === 50)); return L ? { lv: L, t: P[L]?.[2] || 'Meisterschaft' } : null; }
@@ -7620,7 +7632,8 @@ function tributeDay() {
     T.vorrat = Math.min(100, T.vorrat + 5);                                            // Ernte
     if (T.garrison && T.garrison <= S.day) { T.garrison = 0; for (let i = S.ents.world.length - 1; i >= 0; i--) if (S.ents.world[i].tribGarrison === V.key) S.ents.world.splice(i, 1);
       log(`Die Kettenkrieger ziehen aus ${V.name} ab.`, 'world'); }
-    if (!T.garrison && chance(0.1)) banditsOnTribute(V, T);
+    { const [vx, vy] = TOWN_PLAN[V.key].square, nb = bandsOf().filter(b => !b.rules && Math.hypot(b.tx - vx, b.ty - vy) < 40).sort((a, c) => Math.hypot(a.tx - vx, a.ty - vy) - Math.hypot(c.tx - vx, c.ty - vy))[0];   /* T12 B2: Überfall nur mit naher Bande */
+      if (!T.garrison && nb && chance(0.05 + nb.men * 0.02)) banditsOnTribute(V, T, nb); }
     if (S.day < T.next) continue;
     T.next = (S.day | 0) + TRIB_EVERY;
     if (T.paid) { T.paid = false; log(`${V.name}: Der Tribut ist diesmal bezahlt — von dir.`, 'world'); continue; }
@@ -7632,10 +7645,10 @@ function tributeDay() {
     if (T.harsh) T.harsh--;
   }
 }
-function banditsOnTribute(V, T) {
-  const p = S.player, [sx, sy] = TOWN_PLAN[V.key].square;
-  if (p.map === 'world' && Math.hypot(p.x / TS - sx, p.y / TS - sy) < 90) { for (let i = 0; i < 3; i++) spawnEnemy('bandit', 'world', sx + ri(8, 14), sy + ri(-6, 6)); log(`Banditen fallen über ${V.name} her!`, 'combat'); }
-  else { T.vorrat = Math.max(0, T.vorrat - 10); log(`Banditen plünderten ${V.name}.`, 'world'); }
+function banditsOnTribute(V, T, nb = null) {
+  const p = S.player, [sx, sy] = TOWN_PLAN[V.key].square, who = nb ? nb.name : 'Banditen';
+  if (p.map === 'world' && Math.hypot(p.x / TS - sx, p.y / TS - sy) < 90) { for (let i = 0; i < 3; i++) { const e = spawnEnemy('bandit', 'world', sx + ri(8, 14), sy + ri(-6, 6)); if (e && nb) Object.assign(e, { bandId: nb.id, transient: true }); } log(`${who} fallen über ${V.name} her!`, 'combat'); }   /* T12 B2: wer sie tötet, schwächt die Bande */
+  else { const got = Math.min(10, T.vorrat); T.vorrat = Math.max(0, T.vorrat - 10); if (nb) { nb.loot = (nb.loot ?? ECO.ROAD.startLoot) + got; nb.good = 'grain'; } log(`${who} plünderten ${V.name}.`, 'world'); }
   T.garrison = (S.day | 0) + 4;                                                         // die Kette schützt, was ihr zahlt
   for (let i = 0; i < 2; i++) { const g = guardChar('chain', freeSpotNear('world', sx + (i ? 3 : -3), sy + 2, 2), 'Kettenkrieger'); Object.assign(g, { guard: true, post: V.key, tribGarrison: V.key }); S.ents.world.push(g); }
   log(`Die Eiserne Kette stellt Krieger nach ${V.name}.`, 'world');
@@ -7910,7 +7923,7 @@ function campaignChoices(npc, choices) {
 // Beitritt ab Ansehen 10 bei jeder Kettenwache. Ränge Treiber → Kettenknecht → Grenzreiter → Aufseher (je 25 Ansehen).
 // Aufträge: Tributzug begleiten, Entlaufene jagen, beim Feldzug mitziehen. Ab Aufseher die Weihe zum Dunklen Hochpaladin.
 // Wer der Kette dient, wird in freien Dörfern gefürchtet (Stufe 1 ab Kettenknecht, Stufe 2 als Hochpaladin).
-const fearLvl = () => S.player.currentClass === 'darkpaladin' ? 2 : (S.ranks.chain ?? -1) >= 1 || CLASSES[S.player.currentClass]?.faction === 'chain' ? 1 : 0;   // §5d.1: dunkle Klassen werden gefürchtet
+const fearLvl = () => S.player.currentClass === 'darkpaladin' ? 2 : (S.ranks.chain ?? -1) >= 1 || [...clsLine(S.player)].some(k => CLASSES[k]?.faction === 'chain') ? 1 : 0;   // §5d.1: dunkle Klassen werden gefürchtet
 const fearedBy = c => fearLvl() > 0 && c.kind === 'npc' && c.faction !== 'chain' && c.faction !== 'undead' && !c.undead && !c.captive && !c.escort && !c.guard && !c.raidDef && !S.party.includes(c.id);   // Bewaffnete fürchten nicht
 const refusesChain = c => fearedBy(c) && (fearLvl() >= 2 && (c.traits || []).some(t => t === 'gütig' || t === 'furchtsam') || !!tribVillages().find(V => V.key === (c.homeTown || c.town)));
 const FEAR_GREET = [['„Was … was will die Kette hier?“', '„Wir haben gezahlt. Alles. Frag den Offizier.“', '„Ich will keinen Ärger.“'],
@@ -9436,7 +9449,7 @@ function caravanCulprit(c, src) {
   let b = killer?.bandId && bandsOf().find(x => x.id === killer.bandId);
   b ||= bandsOf().filter(x => !x.rules).sort((a, d) => Math.hypot(a.tx - tx, a.ty - ty) - Math.hypot(d.tx - tx, d.ty - ty)).find(x => Math.hypot(x.tx - tx, x.ty - ty) <= 60);
   if (!b && bandsOf().length < 3) { const town = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && k !== 'vharnholm').sort((a, d) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[d].square[0] - tx, TOWN_PLAN[d].square[1] - ty))[0];
-    const a = rnd() * 6.283, r = ri(25, 40); b = town && bandFound(town, [tx + Math.round(Math.cos(a) * r), ty + Math.round(Math.sin(a) * r)]); if (b) b.origin = 'caravan'; }
+    const a = rnd() * 6.283, r = ri(25, 40); b = town && bandFound(town, [tx + Math.round(Math.cos(a) * r), ty + Math.round(Math.sin(a) * r)]); if (b) { b.origin = 'caravan'; b.loot = 0; } }   /* T12: ihre Beute ist genau die Ladung */
   if (!b) return null;
   const C2 = Object.entries(c.cargo || {}).filter(([, n]) => n > 0), half = C2.reduce((s, [, n]) => s + Math.floor(n / 2), 0);
   b.loot = (b.loot || 0) + half; if (C2.length) b.good = C2.sort((x, y) => y[1] - x[1])[0][0];
@@ -9657,7 +9670,7 @@ function ensureSeafolk() {
   const captain = () => put({ name: pick(FIRST_M), prof: 'Kapitän des Salzbunds', level: 6 }, 90, 43, { seaCaptain: 'isle', weapon: 'entermesser', greet: '„Zurück aufs Festland? Salzhafen oder Kupferhafen, sechzig Gold.“' });
   if (I.some(e => e.seaFolk)) { if (!I.some(e => e.seaCaptain === 'isle' && e.alive)) captain(); return; }   // S15 Fehlersuche: ohne Kapitän säße man auf der Insel fest
   captain();
-  put({ name: 'Ysolde Kielmark', prof: 'Handelsherrin des Salzbunds', level: 9, key: 'ysolde', age: 48 }, 78, 52, { seaClan: 'trader', shop: true, pool: ['entermesser', 'harpune', 'seemantel', 'dreispitz', 'salzsiegel', 'dried_meat', 'bread', 'potion', 'bandage'],
+  put({ name: 'Ysolde Kielmark', prof: 'Handelsherrin des Salzbunds', level: 9, key: 'ysolde', age: 48 }, 78, 52, { seaClan: 'trader', shop: true, pool: ['entermesser', 'harpune', 'seemantel', 'dreispitz', 'salzsiegel', 'dried_meat', 'bread', 'potion', 'bandage', 'katana', 'gischtklinge', 'nebelkatana'],   /* E38: Katanas */
     greet: '„Salz ist Gold, das man essen kann. Die Sturmklinge versteht das nicht — sie nimmt beides und verschwendet es.“' });
   put({ name: 'Hella Kielbrecher', prof: 'Erste Maat der Sturmklinge', level: 11, key: 'hella', age: 34 }, 79, 36, { seaClan: 'raider', weapon: 'entermesser', brave: true,
     greet: '„Du stehst in der Grube, Landratte. Kämpfst du, oder guckst du nur?“' });
@@ -14485,10 +14498,33 @@ function campEnvoy(st, T) {                                         /* Fraktions
   const say = rep >= 20 ? `„${F} grüßt ${st.name}. Ein ${T.name} unter Freunden — wir werden Handel treiben.“` : rep <= -20 ? `„${F} sieht, was hier wächst. Merkt euch: Wir sehen es.“` : `„${F} nimmt zur Kenntnis, dass ${st.name} jetzt ein ${T.name} ist. Man wird sehen.“`;
   const c = keepRng(() => makeChar({ name: 'Bote', prof: `Bote (${F})`, x: st.x + 60, y: st.y + 40, map, level: 3, traits: ['gütig'] }));
   Object.assign(c, { id: 'envoy_' + (S.day | 0), transient: true, envoy: fac, faction: fac === 'undead' ? null : c.faction, greet: say, anchor: { x: st.x + 60, y: st.y + 40 } }); S.ents[map].push(c);
-  log(`Ein Bote von ${F} reitet nach ${st.name}: ${say}`, 'faction');
+  log(`Ein Bote von ${F} reitet nach ${st.name}: ${say} Er wartet am Feuer — sprich ihn an, er hat ein Angebot.`, 'faction');
   return c;
 }
-function campTribute(st) { const g = CAMP_TIERS[st.tier || 0].gold; if (g > 0) { S.gold += g; st.tribute = (st.tribute || 0) + g; } return g; }
+/* Bote mit Angebot (Koordinator 09.10.2026 ⚖, klein): je Macht ein Abkommen für die Siedlung — Händler und Handelsmächte bieten Handelsrecht
+   (+2 Gold/Tag), Krone und Orden einen Schutzbrief (3 Gold/Tag, Überfälle halb so oft), Kette/Tote/Banden/Goblins/Kelch verlangen Tribut
+   (4 Gold/Tag, dann überfallen SIE nicht mehr; Ablehnen kostet 5 Ruf). Fehlt das Gold, endet das Abkommen. Ein Abkommen zur Zeit. */
+const PACT_KIND = { merch: 'trade', sea: 'trade', wuest: 'trade', frei: 'trade', aurel: 'trade', zwerge: 'trade', valen: 'guard', order: 'guard' };
+const PACT = { trade: { name: 'Handelsrecht', gold: 2, say: 'Unsere Wagen halten bei euch. Ihr verkauft, wir kaufen — jeden Tag ein wenig.' },
+  guard: { name: 'Schutzbrief', gold: -3, say: 'Drei Gold am Tag, und unsere Reiter schauen bei euch vorbei. Wer euch anfasst, fasst uns an.' },
+  tribute: { name: 'Tribut', gold: -4, say: 'Vier Gold am Tag. Dann kommen wir nicht. Ihr versteht.' } };
+const pactKind = f => PACT_KIND[f] || 'tribute';
+function envoyChoices(npc, choices) {
+  const st = S.settlement; if (!npc.envoy || !st) return;
+  const f = npc.envoy, K = pactKind(f), P = PACT[K], F = FACTIONS[f]?.name || 'Die Macht';
+  if (st.pact?.fac === f) return void choices.unshift({ text: `Unser Abkommen (${PACT[st.pact.kind].name}) kündigen`, fn: () => { log(`${st.name}: ${PACT[st.pact.kind].name} mit ${F} gekündigt.`, 'faction'); if (st.pact.kind === 'tribute') addRep(f, -5); st.pact = null; UI.closeDialogue(); } });
+  if (st.pact) return;
+  choices.unshift({ text: 'Was bietet ihr an?', fn: () => UI.dialogue(npc, `„${P.say}“\n(${P.name}: ${P.gold > 0 ? '+' : ''}${P.gold} Gold am Tag${K === 'guard' ? ', Überfälle halb so oft' : K === 'tribute' ? `, ${F} überfällt euch nicht` : ''}.)`, [
+    { text: `Annehmen (${P.name})`, fn: () => { st.pact = { fac: f, kind: K, day: S.day | 0 }; if (K !== 'tribute') addRep(f, 3); log(`${st.name}: ${P.name} mit ${F}. ${P.gold > 0 ? `+${P.gold}` : P.gold} Gold am Tag.`, 'faction'); UI.closeDialogue(); } },
+    { text: 'Ablehnen', fn: () => { if (K === 'tribute') { addRep(f, -5); log(`${F} nimmt die Ablehnung zur Kenntnis. Ruf −5.`, 'faction'); } UI.closeDialogue(); } }]) });
+}
+function pactDay(st) {                                              /* täglich nach den Abgaben */
+  const P = st.pact && PACT[st.pact.kind]; if (!P) return 0;
+  if (P.gold > 0) { S.gold += P.gold; return P.gold; }
+  if (S.gold >= -P.gold) { S.gold += P.gold; return P.gold; }
+  log(`${st.name}: Das Gold für ${P.name} fehlt — ${FACTIONS[st.pact.fac]?.name || 'die Macht'} kündigt das Abkommen.`, 'faction'); if (st.pact.kind === 'tribute') addRep(st.pact.fac, -5); st.pact = null; return 0;
+}
+function campTribute(st) { const g = CAMP_TIERS[st.tier || 0].gold; if (g > 0) { S.gold += g; st.tribute = (st.tribute || 0) + g; } pactDay(st); return g; }
 function campUpkeep(st) {
   const n = Math.floor(st.buildings.filter(b => b.built >= 1 && b.type !== 'wohnzone').length / CAMP_UPKEEP_PER); if (!n) return 0;
   if (S.gold >= n) { S.gold -= n; st.upkeepPaid = (st.upkeepPaid || 0) + n; if (!S.flags.campUpHint) { S.flags.campUpHint = 1; log(`${st.name}: Unterhalt ${n} Gold am Tag (je drei Bauten eins). Fehlt das Gold, sinkt die Stimmung.`, 'quest'); } return n; }
@@ -14556,9 +14592,9 @@ function raidSources(st) {
   const tv = !S.flags.chainsBroken && (S.factions.chain || 0) < 0 && tribVillages().map(V => TOWN_PLAN[V.key]?.square).filter(Boolean).map(([x, y]) => d(x, y)).sort((a, b) => a - b)[0];
   if (tv && tv <= 160) out.push({ src: 'chain', w: 2, f: 'chain', label: 'Die Kette', dist: tv });
   const gh = LOCATIONS.find(l => l.key === 'grubenhort'); if (gh && !S.flags.goblinsFreed && (S.factions.goblin || 0) < 0 && d(gh.x, gh.y) <= 140) out.push({ src: 'goblin', w: 2, f: 'goblin', label: 'Goblins vom Grubenhort', dist: d(gh.x, gh.y) });
-  out.push({ src: 'wolf', w: 1, f: null, label: 'Wölfe', dist: 0 }); return out;
+  out.push({ src: 'wolf', w: 1, f: null, label: 'Wölfe', dist: 0 }); return st.pact?.kind === 'tribute' ? out.filter(x => x.f !== st.pact.fac) : out;   /* Bote: Tribut hält diese Macht fern */
 }
-function raidChance(st) { const real = raidSources(st).some(s => s.src !== 'wolf'); return (real ? Math.min(0.45, 0.06 + campWealth(st) / 300) : 0.06) * (st.stage === 2 ? 1.5 : 1); }
+function raidChance(st) { const real = raidSources(st).some(s => s.src !== 'wolf'); return (real ? Math.min(0.45, 0.06 + campWealth(st) / 300) : 0.06) * (st.stage === 2 ? 1.5 : 1) * (st.pact?.kind === 'guard' ? 0.5 : 1); }   /* Bote: Schutzbrief */
 function raidPlan(st) {                                              /* Quelle auslosen, Größe bestimmen */
   const L = raidSources(st), tot = L.reduce((s, x) => s + x.w, 0); let r = rnd() * tot, S0 = L[L.length - 1]; for (const x of L) { if ((r -= x.w) <= 0) { S0 = x; break; } }
   let n = clamp(2 + Math.floor(campWealth(st) / 15), 2, 9) + (S.difficulty === 'angsthase' ? -1 : S.difficulty === 'sehr_schwer' ? 1 : 0); n = Math.max(2, n);
@@ -14831,7 +14867,9 @@ function respawnTick() {
   /* PERF-U: Gegner je Karte einmal sammeln statt je Spawngebiet (~80) die ganze Karte (~17 000 Einträge) zu filtern — das war alle 12 s
      ein Ruckler von ~80 ms. Neu Gespawnte kommen sofort dazu, damit überlappende Gebiete wie vorher zählen. */
   const EN = {}, foesIn = m => EN[m] ||= S.ents[m].filter(e => e.kind === 'enemy' && !e.boss);
+  const bandPoi = new Set(bandsOf().map(b => b.poi).filter(Boolean));   /* T12 B2: sitzt eine Bande im Lager, stellt sie die Besatzung */
   for (const a of SPAWN_AREAS) {
+    if (a.key && bandPoi.has(a.key)) continue;
     const count = foesIn(a.map).filter(e => Math.hypot(e.x / TS - a.x, e.y / TS - a.y) < a.r + 4).length;
     if (count >= capOf(a)) continue;
     const tx = a.x + ri(-a.r, a.r), ty = a.y + ri(-a.r, a.r);
@@ -14920,7 +14958,10 @@ const BAND_NAMES = ['Die Krähen', 'Die Rote Hand', 'Die Grauen Wölfe', 'Die Sc
 const bandsOf = () => (S.bands ||= []).filter(b => !b.gone);
 function bandFound(town, at = null) {
   const T = TOWN_PLAN[town]; if (!T?.square) return null; const [sx, sy] = T.square;
-  let q = at ? freeSpotNear('world', at[0], at[1], 3) : null;
+  let q = at ? freeSpotNear('world', at[0], at[1], 3) : null, poi = null;
+  if (!at) {   /* T12 B2: zuerst ein freies Banditenlager der Karte (25–90 Felder vom Platz, keine andere Bande dort) */
+    const P = LOCATIONS.filter(l => l.poi === 'bandits' && !bandsOf().some(b => b.poi === l.key) && Math.hypot(l.x - sx, l.y - sy) >= 25 && Math.hypot(l.x - sx, l.y - sy) <= 90 && !townAt(l.x, l.y, 12));
+    poi = P.length ? pick(P) : null; if (poi) q = freeSpotNear('world', poi.x, poi.y, 3); if (!q) poi = null; }
   if (!at) for (let tries = 0; tries < 8 && !q; tries++) {   /* Fehlersuche: nicht mitten in der Stadt ansiedeln (große Städte reichen weiter als 30-50 Felder) */
     const a = rnd() * 6.283, r = ri(30, 50), cand = freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3);
     if (cand && !townAt(cand.x / TS | 0, cand.y / TS | 0, 12)) q = cand;
@@ -14928,7 +14969,7 @@ function bandFound(town, at = null) {
   if (!q) return null;
   const used = new Set(bandsOf().map(b => b.name)), tx = q.x / TS | 0, ty = q.y / TS | 0;
   const B0 = { id: uid(), name: pick(BAND_NAMES.filter(n => !used.has(n))) || 'Die Namenlosen', lead: `${pick(FIRST_M)} ${pick(['Krähenfuß', 'der Graue', 'Blutzahn', 'Schiefmaul', 'Einhand', 'der Fuchs'])}`,
-    town, tx, ty, born: S.day | 0, men: ri(4, 6), paid: -1, amb: -999, where: locAt(tx, ty)?.name || `dem Umland von ${townName(town)}` };
+    town, tx, ty, born: S.day | 0, men: ri(4, 6), paid: -1, amb: -999, where: poi?.name || locAt(tx, ty)?.name || `dem Umland von ${townName(town)}`, loot: ECO.ROAD.startLoot, starve: 0, ...(poi ? { poi: poi.key } : {}) };
   (S.bands ||= []).push(B0); log(`Gerücht: ${B0.name} unter ${B0.lead} haben bei ${B0.where} ein Lager aufgeschlagen und fordern Schutzgeld von allen, die vorbeiziehen.`, 'world'); return B0;
 }
 // Emergente Quest E1 (Entwickler 01.10.2026): Der Anführer einer Deserteurbande hat ein Geschwister bei der Valen-Wache der nächsten
@@ -14962,11 +15003,24 @@ function kinHome(b) {                                                /* heimgeho
   chronicle(`${nm} kehrt heim`, 'news', `Ein Deserteur kehrt nach ${townName(K.post)} zurück. Sein Bruder hat ihn nicht vergessen.`);
 }
 function bandGone(b, msg) { b.gone = true; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive)); if (msg) log(msg, 'world'); }
+/* T12 B3: lebende Streifen (Reisende kind 'patrol') mit Start/Ziel als Strecke in Weltkacheln */
+const roadPatrols = () => S.ents.world.filter(e => e.traveler?.kind === 'patrol' && e.alive !== false && typeof e.traveler.from === 'string' && typeof e.traveler.to === 'string')
+  .map(e => ({ fac: e.patrol, A: LOCATIONS.find(l => l.key === e.traveler.from), B: LOCATIONS.find(l => l.key === e.traveler.to) })).filter(r => r.A && r.B);
 function bandDay() {
   const act = bandsOf(), day = S.day | 0;
   for (const b of act) {
-    if (!b.rules && day - b.born > 12 && chance(0.25)) { if (b.kin?.state === 'open') b.kin.state = 'lost'; bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }
-    if (b.paid < day && chance(0.5)) { b.men = Math.min(9, b.men + 1); log(`${b.name} haben bei ${b.where} Reisende ausgeraubt. Die Bande wächst (${b.men} Mann).`, 'world'); }
+    b.loot ??= ECO.ROAD.startLoot; b.starve ??= 0;   /* T12 B2: alte Stände ohne Beute */
+    if (!b.rules && day - b.born > 12 && b.loot < 5 && chance(0.25)) { if (b.kin?.state === 'open') b.kin.state = 'lost'; bandGone(b, `${b.name} haben sich zerstritten und zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; }   /* reiche Banden bleiben */
+    if (b.rules) continue;   /* S2: eine Bande, die eine Stadt beherrscht, lebt vom Schutzgeld der Stadt */
+    const pt = roadPatrols().find(e => ECO.segDist(b.tx, b.ty, e.A, e.B) < 20);   /* T12 B3: eine Streife zieht durchs Gebiet */
+    if (pt && chance(ECO.ROAD.patrolHit)) { b.men--; const who = FACTIONS[pt.fac]?.name || 'Eine Streife'; log(`${who}: Eine Streife stellte ${b.name} bei ${b.where} (${b.men} Mann übrig).`, 'world'); chronicle(`Eine Streife stellte ${b.name} bei ${b.where}`, 'news');
+      if (b.men <= ECO.ROAD.minMen) { if (b.kin?.state === 'open') b.kin.state = 'lost'; bandGone(b, `${b.name} sind nach dem Streifenkampf zerstreut. Das Lager bei ${b.where} ist verlassen.`); continue; } }
+    /* T12 B2 „Banden leben von der Straße“: Kleinkram +1/Tag, Unterhalt 0,4 je Mann; 20 Beute = ein Mann mehr; 3 Hungertage = einer läuft davon */
+    b.loot += ECO.ROAD.small - b.men * ECO.ROAD.upkeep;
+    if (b.loot >= ECO.ROAD.grow && b.men < ECO.ROAD.maxMen) { b.men++; b.loot -= ECO.ROAD.grow; log(`${b.name} bei ${b.where} leben gut von der Straße. Die Bande wächst (${b.men} Mann).`, 'world'); }
+    if (b.loot < 0) { b.loot = 0; if (++b.starve >= ECO.ROAD.starveDays) { b.starve = 0; b.men--; log(`${b.name} hungern — auf der Straße ist nichts zu holen. Einer läuft davon (${b.men} Mann).`, 'world'); } }
+    else b.starve = 0;
+    if (b.men <= ECO.ROAD.minMen) { if (b.kin?.state === 'open') b.kin.state = 'lost'; bandGone(b, `${b.name} sind verhungert und zerstreut. Das Lager bei ${b.where} ist verlassen.`); }
   }
   if (act.length < 3 && chance(0.2)) { const ts = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square && S.war?.nodes?.[k]?.owner !== 'undead'); if (ts.length) bandFound(pick(ts)); }
 }
@@ -14996,28 +15050,40 @@ function bandTick() {
     }
   }
 }
-function bandKill(c) {
+function bandKill(c, by = null) {
   const b = (S.bands || []).find(x => x.id === c.bandId); if (!b || b.gone) return; b.men = Math.max(0, b.men - 1);
-  if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10; S.gold += g; addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
+  if (c.bandLead && (by === S.player || S.party.includes(by?.id)) && (S.ranks?.bandit ?? -1) >= 1 && !b.rules) { addRep('bandit', -10); log('Verrat am Netz. Rook wird davon hören. (Rooks Bande −10)', 'faction'); }   /* T12 B3: ab Rang Klinge */
+  if (c.bandLead) { b.leadDead = true; const g = 60 + b.men * 10 + Math.round(Math.min(20, b.loot || 0) * 2); S.gold += g;   /* T12 B2: Kopfgeld wächst mit der Beute */ addFame(2, undefined, 'Bande zerschlagen'); facAdd(townFac(b.town), 3);
     bandLootChest(b);   /* E2: geraubte Ladung */
     if (b.kin?.state === 'open') { b.kin.state = 'killed'; const g = byId(b.kin.guardId); if (g) addRel(g.key || g.id, -40); if (chance(0.35)) S.avenge = { day: (S.day | 0) + ri(2, 4), name: b.lead };   /* E1 */
       log(`${b.kin.guard} in ${townName(b.kin.post)} wird erfahren, wer ${kinFirst(b)} erschlagen hat.`, 'faction'); }
     bandGone(b, `${b.lead} ist tot. ${b.name} laufen auseinander. ${townName(b.town)} zahlt dir ${g} Gold Kopfgeld.`); UI.toast(`${b.name.toUpperCase()} ZERSCHLAGEN`, 2600);
     if (b.rules) schutzFreed(b.rules, 'player'); }   /* S2: die Stadt ist frei */
 }
+/* T12 B3 „Netz und Gegenwehr“ (Entscheidungen 01.10.): Rooks Hauptmann darf eine Straße melken (25 % der Beute als Gold, Gilde −1 je Überfall,
+   die Bande wird gefährlicher). „Wovon lebt ihr?“ erklärt die Beute-Regel in der Stimme der Bande. */
+function roadNetChoices(npc, b, choices, rk) {
+  const say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if ((b.taxGold || 0) >= 1) choices.unshift({ text: `Meinen Anteil holen (${Math.floor(b.taxGold)} Gold)`, fn: () => { const g = Math.floor(b.taxGold); S.gold += g; b.taxGold -= g; UI.refreshHUD(); say(`„${g} Gold. Die Straße zahlt gut, Hauptmann.“`); } });
+  if (rk >= 2 && !b.rules) choices.unshift(b.tax
+    ? { text: 'Wir lassen die Straße wieder in Ruhe.', fn: () => { b.tax = false; say('„Wie du meinst. Die Jungs werden murren.“'); } }
+    : { text: 'Die Straße gehört jetzt uns. (Melken: 25 % der Beute für dich, Gilde −1 je Überfall)', fn: () => { b.tax = true; log(`${b.name} melken jetzt für dich die Straße bei ${b.where}. Ein Viertel jeder Beute liegt hier für dich bereit — die Händlergilde wird es merken.`, 'faction'); say('„Ein Hauptmann, der rechnen kann. Gefällt mir.“'); } });
+  choices.unshift({ text: 'Wovon lebt ihr eigentlich?', fn: () => say(`„Von den Wagen auf der Straße${(() => { const L = ECO.routeLines(b.town).find(r => r.why.some(w => w.band === b.id)); return L ? ` nach ${ECO.townName(L.to)}` : ''; })()}. Keine Wagen, kein Brot — dann gehen die Jungs. Je fetter die Beute, desto mehr kommen.“ (${b.men} Mann${rk >= 1 ? ', Rooks Leute' : ''})`) });
+}
 function bandChoices(npc, choices) {
-  if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const cost = Math.round((20 + b.men * 8) * (styleOf() >= 40 ? 0.7 : 1)), day = S.day | 0;   /* T08: mit Barmherzigen verhandelt man */
-  if (b.paid >= day) return choices.unshift({ text: 'Gilt unsere Abmachung noch?', fn: () => UI.dialogue(npc, `„Bis Tag ${b.paid + 1}. Dann reden wir wieder.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
+  if (!npc.bandTalk) return; const b = (S.bands || []).find(x => x.id === npc.bandId); if (!b || b.gone) return; const rk = S.ranks?.bandit ?? -1, cost = Math.round((20 + b.men * 8) * (styleOf() >= 40 ? 0.7 : 1) * (rk >= 1 ? 0.5 : 1)), day = S.day | 0;   /* T08: mit Barmherzigen verhandelt man */   /* T12 B3: Rooks Klinge zahlt die Hälfte */
+  roadNetChoices(npc, b, choices, rk);
+  if (b.paid >= day) return choices.unshift({ text: 'Gilt unsere Abmachung noch?', fn: () => UI.dialogue(npc, `„Bis Tag ${b.paid + 1}. Dann reden wir wieder. Deinen Wagen lassen wir auch fahren.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
   if (b.kin?.state === 'open') { const nm = kinFirst(b), ok = (S.factions.valen || 0) >= 0 || styleOf() >= 40;
     choices.unshift({ text: `${b.kin.guard} schickt mich. Sag ${nm}, sein Bruder wartet.`, fn: () => UI.dialogue(npc, `Ein Mann in einem zerrissenen Valen-Rock tritt vor. „${b.kin.guard}? … Was will der Kerl noch von mir?“`, [
       ...(ok ? [{ text: 'Er will dich heimholen. Die Krone schuldet dir mehr als du ihr.', fn: () => { UI.closeDialogue(); kinHome(b); } }] : []),
       ...(S.gold >= 60 ? [{ text: 'Hier ist der Sold, den die Krone dir schuldet. (60 Gold)', fn: () => { S.gold -= 60; UI.closeDialogue(); kinHome(b); } }] : []),
       ...(!ok ? [{ text: 'Komm mit, oder ich hole dich.', fn: () => { UI.closeDialogue(); log(`${nm} lacht. „Für eine Krone, die nicht zahlt?“`, 'combat'); } }] : []),
       { text: '[Gehen]', fn: () => UI.closeDialogue() }]) }); }
-  choices.unshift({ text: `Schutzgeld zahlen (${cost} Gold, 5 Tage Ruhe)`, fn: () => {
+  choices.unshift({ text: `Schutzgeld zahlen (${cost} Gold, 5 Tage Ruhe — auch für deinen Wagen)`, fn: () => {
     if (S.gold < cost) return UI.dialogue(npc, '„Das reicht nicht. Komm wieder, wenn deine Taschen schwerer sind — oder lauf schnell.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
-    S.gold -= cost; b.paid = day + 5; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || e.kind !== 'enemy' || !e.alive);
-    UI.closeDialogue(); log(`Du zahlst ${b.name} ${cost} Gold. Fünf Tage lang lassen sie dich in Ruhe.`, 'economy'); } },
+    S.gold -= cost; b.paid = day + 5; if (rk >= 1) { addRep('bandit', Math.max(1, Math.floor(cost * 0.1 / 10))); log('Ein Zehntel geht an Rook — das Netz merkt sich, wer zahlt.', 'faction'); } S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || e.kind !== 'enemy' || !e.alive);
+    UI.closeDialogue(); log(`Du zahlst ${b.name} ${cost} Gold. Fünf Tage lang lassen sie dich in Ruhe — und deinen Handelswagen auch.`, 'economy'); } },
     { text: `Sag ${b.lead}, dass ich komme.`, fn: () => { UI.closeDialogue(); log(`Der Unterhändler grinst. „Er wartet am Feuer.“ ${b.name}: ${b.men} Mann.`, 'combat'); } });
 }
 // ================= Verletzungen über Tage (Nutzer §5e.7) =================
@@ -15289,7 +15355,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -15941,9 +16007,10 @@ function unlockClass(cls, npc = null) {
 }
 function setClass(cls) {
   const p = S.player;
+  const way = CLASSES[cls]?.way; if (way && p.knownClasses.includes(cls)) { if (!p.knownClasses.includes(way)) p.knownClasses.push(way); cls = way; }   /* E42: Kettenweg = Schwesterklasse */
   if (!p.knownClasses.includes(cls)) return;
   p.currentClass = cls;
-  p.abilities = [...new Set((CLASSES[cls].abilities || []))];
+  p.abilities = clsAbilities(p, cls);
   recalc(p); syncHotbar(); UI.refreshHUD(); dkSteed();                     // S15: Todesritter reitet ein Totenross
   log(`Du führst dich nun als ${CLASSES[cls].name}.`, 'party');
 }
@@ -16190,7 +16257,8 @@ function titleRite(key, grade = 0, then = null) {
 function classRite(npc, cls, o = {}) {
   if (o.title && !o.sky) o.sky = SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : '';
   const p = S.player, R0 = RITE[cls] || o.rite || { col: '#e8d6a8', say: 'Steh auf.', fx: 'spark', sfx: 'bell' }, C = o.title ? { name: o.title, desc: o.sub || '' } : CLASSES[cls];
-  const sky = o.sky || (SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : ''), hint = sky ? `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).` : '';
+  const wy = !o.title && CLASSES[cls]?.way, sky = o.sky || (wy && SKIES[wy] ? SKIES[wy].name : SKIES[cls] && Object.values(SKILL_TREE).some(n => n.sky === cls) ? SKIES[cls].name : ''),
+    hint = !sky ? '' : wy ? `${CLASSES[cls].name} ist ein Weg der Klasse ${CLASSES[wy].name}: der Kettenarm im Sternbild ${sky} ist offen. Öffne die Talente (T).` : `Ein neues Sternbild steht am Himmel: ${sky}. Öffne die Talente (T).`;   /* E42 */
   const after = () => { if (hint && !S._quiet) { log(hint, 'party'); if (!S._quiet && p.map === S.map) float(p, `✦ ${sky}`, 'rgba(240,215,140,ALPHA)', true); } o.then?.(); };
   if (S._quiet || p.coopHero || S.coop?.role === 'guest' || S.dying || S.cine || (npc && npc.map !== p.map)) { after(); return false; }   /* Gastfigur und Proben: nur die Folgen */
   if (!npc) npc = p;                                                   /* Titel ohne Meister in der Nähe: die Szene gehört dem Helden allein */
@@ -16834,7 +16902,9 @@ function ecoMenu(npc, town) {
     `Reichlich und billig: ${list(g => t.stock[g] > ECO.target(t, g) * 1.5)}\n` +
     (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : '') +
     (X => `\nAbgaben hier: Betriebssteuer ${Math.round(X.tax * 100)} % vom Gewinn, Einzahlgebühr ${Math.round(X.fee * 100)} %${X.own ? ' (Stadtrecht)' : ` (${FACTIONS[X.fac]?.name || 'ohne Herrn'})`}.`)(ECO.taxOf(town)) +
-    (ECO.DEAD_GOODS.some(g => (t.use[g] || 0) > 0 || (t.prod?.[g] || 0) > 0) ? `\nTotenware: ${ECO.DEAD_GOODS.map(g => `${ITEMS[g].name} ${ECO.ecoPrice(town, g, false)}`).join(', ')} (Verkaufspreis hier).` : ''), [
+    (ECO.DEAD_GOODS.some(g => (t.use[g] || 0) > 0 || (t.prod?.[g] || 0) > 0) ? `\nTotenware: ${ECO.DEAD_GOODS.map(g => `${ITEMS[g].name} ${ECO.ecoPrice(town, g, false)}`).join(', ')} (Verkaufspreis hier).` : '') +
+    ((R => R && R.why.some(w => w.add > 0) ? `\nGefährlichste Straße: ${R.txt.replace(/^Nach /, 'nach ')}` : '')(ECO.routeLines(town)[0])), [   /* T12 B1 */
+    { text: 'Straßen und Gefahren', fn: () => roadMenu(npc, town) },
     { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
     { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
     { text: my ? `Dein Handelswagen (${my.to ? 'unterwegs nach ' + ECO.townName(my.to) : 'in ' + ECO.townName(my.at)})` : `Handelswagen kaufen (${ECO.WAGON_COST} Gold)`, fn: () => wagonMenu(npc, town) },
@@ -16854,6 +16924,12 @@ function ecoPrices(npc, town) {
   }).filter(Boolean);
   UI.dialogue({ name: 'Preise, die du kennst' }, lines.length ? lines.join('\n') + '\n(Preise vom Tag deines letzten Besuchs.)' : 'Du kennst erst die Preise einer Stadt. Reise und frag nach.', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
 }
+/* T12 B1: jede Strecke bis 3 Tagesreisen mit Gefahr und Grund (Prozent mit 1 Wache, damit vergleichbar) */
+function roadMenu(npc, town) {
+  if (!S.flags.hintRoad) { S.flags.hintRoad = 1; log('Straßen haben Herren: Jede Gefahr auf einer Handelsstraße hat einen Grund — eine Bande nahe der Strecke, ein Ort der Toten am Weg, ein Totenheer am Ziel. Streifen und Aurelions Zölle machen Straßen sicherer. Schutzgeld an eine Bande deckt auch deinen Handelswagen, ein Umweg meidet alle Banden (+1 Tag).', 'quest'); }
+  const L = ECO.routeLines(town);
+  UI.dialogue({ name: `Straßen ab ${ECO.townName(town)}` }, (L.map(r => r.txt).join('\n') || 'Von hier fährt kein Händlerzug.') + '\n(Gefahr eines Überfalls je Fahrt, mit einer Wache.)', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+}
 function wagonMenu(npc, town) {
   const back = () => wagonMenu(npc, town), me = { name: 'Dein Handelswagen' }, E = S.eco;
   const done = r => { if (r) UI.toast(r); UI.refreshHUD(); back(); };
@@ -16870,12 +16946,13 @@ function wagonMenu(npc, town) {
   UI.dialogue(me, `Steht hier. Ladung: ${cargo} (${ECO.cargoOf(my)}/${ECO.MY_CAP}). Billigste Waren zuerst.`, opts);
 }
 function sendMenu(npc, town) {
-  const my = S.eco.my, guards = my.guardsNext ?? 1;
+  const my = S.eco.my, guards = my.guardsNext ?? 1, det = !!my.detourNext, rk = k => Math.round(ECO.riskOf(town, k, guards, { mine: true, detour: det }) * 100);   /* T12 B1 */
   const seen = Object.keys(S.priceSeen || {}).filter(k => k !== town && S.towns[k] && ECO.TOWN_LOCS.some(l => l.key === k));
   const gain = k => Object.entries(my.cargo).reduce((n, [g, c]) => n + c * (S.priceSeen[k].p[g] || 0) * 0.78, 0);
-  const opts = seen.sort((a, b) => gain(b) - gain(a)).slice(0, 7).map(k => ({ text: `Nach ${ECO.townName(k)} (erwartet ~${Math.round(gain(k))} Gold)`,
-    fn: () => { const r = ECO.sendWagon(k, guards); if (r) UI.toast(r); UI.refreshHUD(); ecoMenu(npc, town); } }));
-  opts.push({ text: `Wachen: ${guards} (je ${ECO.GUARD_COST} Gold) — ändern`, fn: () => { my.guardsNext = (guards + 1) % 5; sendMenu(npc, town); } }, { text: 'Zurück', fn: () => wagonMenu(npc, town) });
+  const opts = seen.sort((a, b) => gain(b) - gain(a)).slice(0, 7).map(k => ({ text: `Nach ${ECO.townName(k)} (erwartet ~${Math.round(gain(k))} Gold, Gefahr ${rk(k)} %)`,
+    fn: () => { const r = ECO.sendWagon(k, guards, det); if (r) UI.toast(r); UI.refreshHUD(); ecoMenu(npc, town); } }));
+  opts.push({ text: `Wachen: ${guards} (je ${ECO.GUARD_COST} Gold) — ändern`, fn: () => { my.guardsNext = (guards + 1) % 5; sendMenu(npc, town); } },
+    { text: `Umweg: ${det ? 'an' : 'aus'} (+1 Tag, Banden gemieden) — ändern`, fn: () => { my.detourNext = !det; sendMenu(npc, town); } }, { text: 'Zurück', fn: () => wagonMenu(npc, town) });
   UI.dialogue({ name: 'Wohin?' }, seen.length ? 'Ziele, deren Preise du kennst (letzter Besuch):' : 'Du kennst noch keine anderen Märkte. Besuch erst einen.', opts);
 }
 /* Gold-Senke (Audit 04.10. Phase 5, 09.10.2026 — vorläufig ⚖): Hinterlegung im Kontor. Einzahlen kostet BANK_FEE (mindestens 1 Gold), Abheben in jedem
@@ -18576,6 +18653,16 @@ function chooseSuccessor() {
 /* Klassen und Talente, Scheibe 0: der Erbe ist ein neuer Mensch — eigene Sterne (Gefährtensterne fallen weg), keine fremden Prüfungen,
    Punkte nach seiner Stufe. */
 function heirTalents(c) { c.tree = {}; c.skillPoints = 0; c.clsPass = {}; c.ktSteps = {}; c.ktQ = {}; c.skyV = 1; talentTopUp(c); }
+/* E42 (Entwickler 09.10.2026): alte Stände nach der Kürzung des Himmels. Gestrichene Sterne (CUT_STARS) geben ihren Punkt zurück; eine
+   Kettenklasse als aktive Klasse wird ihre Schwesterklasse (der Weg bleibt gelernt, beide Fähigkeitssätze). Idempotent; Rückgabe { pts, cls }. */
+function skyCut(c) {
+  const out = { pts: 0, cls: null }; if (!c) return out;
+  for (const k of Object.keys(c.tree || {})) if (CUT_STARS.has(k)) { delete c.tree[k]; out.pts++; }
+  if (out.pts) c.skillPoints = (c.skillPoints || 0) + out.pts;
+  const kc = c.knownClasses || []; for (const k of [...kc]) { const w = CLASSES[k]?.way; if (w && !kc.includes(w)) kc.push(w); }
+  const w = CLASSES[c.currentClass]?.way; if (w) { out.cls = c.currentClass; c.currentClass = w; c.abilities = clsAbilities(c, w); }
+  return out;
+}
 /* Scheibe 2: einmal kostenlos neu ordnen (alte Stände, Entscheidung 9) — wie das Vergessen beim Lehrer, nur ohne Gold */
 function freeRespec() {
   const p = S.player, n = talentSpent(p); if (!p.freeRespec) return UI.toast('Das kostenlose Neuordnen ist schon verbraucht. Lehrer helfen gegen Gold.');
@@ -18666,8 +18753,8 @@ function adoptSuccessor(c) {
   c.invCap = 24; c.attrPoints = 0; c.hotbar = [];
   for (const k of Object.keys(S.quests)) if (QUESTS[k]?.clsTrial && S.quests[k].state === 'active') delete S.quests[k];   /* Prüfungen gehören dem Vorgänger */
   heirTalents(c);   /* Scheibe 0: der Erbe hat sofort seine Talentpunkte nach der Regel (vorher 0 bis zum Neuladen, danach Stufe − 1) */
-  c.knownClasses = [...new Set([c.currentClass, ...(c.knownClasses || [])])];
-  c.abilities = [...(CLASSES[c.currentClass].abilities || [])];
+  c.knownClasses = [...new Set([c.currentClass, ...(c.knownClasses || [])])]; skyCut(c);   /* E42: Kettenweg und gestrichene Sterne auch beim Erben */
+  c.abilities = clsAbilities(c, c.currentClass);
   // Erbe: Gold, Lager, halber Ruf, Siedlung. Persönliche Waffen bleiben am Grab.
   /* Gold 70 % und Ruf (gut × 0,5, Hass × 0,8) stehen jetzt in heirRules */
   S.legacy.gen++;
@@ -19167,7 +19254,7 @@ function dodge() {
   const { dx, dy } = moveInput();
   const l = Math.hypot(dx, dy);
   const ax = l ? dx / l : -Math.cos(p.aim), ay = l ? dy / l : -Math.sin(p.aim);
-  p.stamina -= cost; p.dodgeCd = DODGE.cd + DODGE.dur;
+  p.stamina -= cost; p.dodgeCd = DODGE.cd + DODGE.dur; p.dodgeAt = performance.now();   /* E38: Ausweichhieb */
   p.dodge = { t: 0, ax, ay }; p.invuln = true; p.swing = 0; p.cover = null;   // Rolle beendet die Deckung
   fx(p.x, p.y + 4, 'dust', 6); sfx('dodge');
   return true;
@@ -19326,6 +19413,10 @@ function debugSections() {
     ['Sternenhimmel gekürzt (08.10.2026)', '', {
       'Sternenhimmel: alle Sternbilder zeigen an/aus (Vergleich)': () => { (S.flags ||= {}).skyAll = !S.flags.skyAll; UI.toast(S.flags.skyAll ? `Alle ${skyVisible(p).length} Sternbilder sichtbar (T)` : `Nur nutzbare: ${skyVisible(p).length} sichtbar, ${skyHidden(p).length} unter „Weitere Sternbilder“`, 3000); },
       'Sternenhimmel: Hinweis „neu geordnet“ wieder zeigen': () => { delete S.flags.skyTidy; UI.toast('Beim nächsten Öffnen (T) steht der Hinweis wieder da.'); },
+      'E42: Kürzung zeigen (gestrichene Sterne, Kettenwege, Zahl der Sternbilder)': () => { const n = Object.keys(SKIES).filter(s => Object.values(SKILL_TREE).some(x => x.sky === s)).length;
+        log(`E42: ${CUT_STARS.size} Sterne gestrichen, ${Object.keys(SKILL_TREE).length} Sterne in ${n} Sternbildern. Wege: ${Object.keys(CLASSES).filter(k => CLASSES[k].way).map(k => `${CLASSES[k].name} → ${CLASSES[CLASSES[k].way].name}`).join(', ')}.`, 'party'); UI.toast('E42: Zahlen im Protokoll', 2000); },
+      'E42: alten Stand nachstellen (Kettenbarde + 2 gestrichene Sterne), dann Migration': () => { const c = S.player; if (!c.knownClasses.includes('bard')) c.knownClasses.push('bard'); if (!c.knownClasses.includes('chainbard')) c.knownClasses.push('chainbard'); c.currentClass = 'chainbard'; (c.tree ||= {}).kr_grip = 1; c.tree.ba_coat = 1;
+        const r = skyCut(c); recalc(c); syncHotbar(); UI.refreshHUD(); log(`Sternbild neu geordnet: ${r.pts} Talentpunkte erstattet, aktive Klasse ${CLASSES[c.currentClass].name} (aus ${r.cls ? CLASSES[r.cls].name : '—'}), Fähigkeiten: ${c.abilities.map(a => ABILITIES[a].name).join(', ')}.`, 'party'); },
     }],
     ['Rüstung und Wunden (R1–R5, N4 S3, 08.10.2026)', '', {
       'Rüstung: Prüfstand (Zustand, Rarität, Miliz, Fraktionsschilde, Wunden)': () => armorGallery(),
@@ -19651,6 +19742,7 @@ function debugSections() {
       'Fertigkeit: +5 Wert (mit Meldung)': () => { const k = v('dbSkill'); gainSkill(P(), k, 5); log(`${SKILL_NAMES[k]}: ${Math.floor(P().skills[k])}.`, 'party'); },
       'Fertigkeit: Meilenstein freischalten (nächster)': () => { const k = v('dbSkill'), n = skillNext(P(), k); if (!n) return UI.toast('Alles freigeschaltet.'); gainSkill(P(), k, Math.max(0, n.lv * 2 - (P().skills[k] || 0))); },
       'Fertigkeit: zurücksetzen': () => { const k = v('dbSkill'); P().skills[k] = 0; recalc(P()); log(`${SKILL_NAMES[k]} zurückgesetzt.`, 'party'); },
+      'Katana: Klinge geben (Katana, Gischtklinge, Nebelklinge)': () => { for (const k of ['katana', 'gischtklinge', 'nebelkatana']) addItem(P(), k, 1); log('Katanas im Gepäck. Stufen setzen: Fertigkeit „Katana“ wählen.', 'party'); UI.refreshHUD(); },   /* E38 */
       'Fenster: Fertigkeiten': () => UI.openModal('mastery'),
       'Fischen: Angel geben': () => { addItem(P(), 'angel', 1); UI.toast('Angel im Gepäck — am Wasser benutzen.'); },
       'Fischen: je Gewässer einen Fisch geben': () => { for (const W of Object.values(FISH_WATER)) addItem(P(), W.fish[0][0], 1); UI.refreshHUD(); },
@@ -19686,6 +19778,8 @@ function debugSections() {
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
       'Banden: einen Tag vergehen lassen': () => bandDay(),
+      'Straßen (T12): Bande an die Alte Straße setzen (Eren–Nordfurt)': () => { const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity'), b = bandFound('eren', [Math.round((LA.x + LB.x) / 2), Math.round((LA.y + LB.y) / 2) + 8]); if (b) { b.men = 7; UI.toast(`${b.name} bei ${b.where} — Kontor in Eren oder Nordfurt zeigt die Gefahr`, 3500); } },
+      'Straßen (T12): Strecken-Gefahr aller Routen ins Log': () => { for (const t of Object.keys(S.towns).filter(k => ECO.routeLines(k).length)) log(`${ECO.townName(t)}: ${ECO.routeLines(t).slice(0, 3).map(r => r.txt).join(' | ')}`, 'economy'); UI.toast('Strecken im Protokoll (Handel)'); },
       'Handwerk: Material geben (Eisen, Holz, Felle, Königseisen …)': () => { S.res.iron += 30; S.res.wood += 30; S.res.herb = (S.res.herb || 0) + 12; ['pelt', 'cloth', 'ingot', 'ersatzteile', 'automatenkern', 'koenigseisen'].forEach(k => addItem(P(), k, 5)); UI.toast('Material'); },   /* Nutzer §5d.8 */
       'Handwerk: Schmieden 90': () => { P().skills.smithing = 90; P().skills.crafting = 90; UI.toast('Schmieden/Handwerk 90'); },
       'Handwerk: Esse hier öffnen': () => craftMenu('forge', P()), 'Handwerk: Werkbank hier öffnen': () => craftMenu('bench', P()), 'Handwerk: Kessel hier öffnen': () => craftMenu('kessel', P()),
@@ -21400,6 +21494,55 @@ export function selftest() {
     if (!(front && parry && block && stump)) console.warn('P3.24-Rest-Probe', { front, parry, block, stump });
     return front && parry && block && stump;
   }));
+  ok('T12 B1 Straßen haben Herren: Bande nahe der Strecke +0,08×Mann/9 mit Namen, Totenknoten am Weg +0,05, Schutzgeld/Umweg nehmen die Bande vom eigenen Wagen, Kontorzeilen rein (kein Zustand geändert)', (() => {
+    const B0 = S.bands, N0 = S.war?.nodes?.road?.owner, flags0 = S.flags.hintRoad;
+    try {
+      S.bands = []; const base = ECO.riskOf('eren', 'northcity', 0);
+      const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity');
+      const bd = { id: 'tb12', name: 'Die Probebrüder', where: 'der Probe', tx: Math.round((LA.x + LB.x) / 2), ty: Math.round((LA.y + LB.y) / 2) + 6, men: 9, paid: -1, gone: false }; S.bands.push(bd);
+      const withBand = ECO.riskOf('eren', 'northcity', 0), named = ECO.riskWhy('eren', 'northcity').some(w => w.band === 'tb12' && w.txt.includes('Probebrüder'));
+      bd.paid = (S.day | 0) + 2; const paidMine = ECO.riskOf('eren', 'northcity', 0, { mine: true }), paidOther = ECO.riskOf('eren', 'northcity', 0);
+      bd.paid = -1; const det = ECO.riskOf('eren', 'northcity', 0, { mine: true, detour: true });
+      const snap = JSON.stringify(S.bands), lines = ECO.routeLines('eren'), pure = JSON.stringify(S.bands) === snap && lines.some(l => l.txt.includes('Probebrüder') && /\d+ %/.test(l.txt));
+      bd.gone = true; const gone = ECO.riskOf('eren', 'northcity', 0);
+      let node = true; if (S.war?.nodes?.road) { S.war.nodes.road.owner = 'undead'; node = Math.abs(ECO.riskOf('eren', 'northcity', 0) - base - 0.05) < 1e-9 && ECO.riskWhy('eren', 'northcity').some(w => w.txt.includes('Alte Straße')); }
+      const res = { band: Math.abs(withBand - base - 0.08) < 1e-9, named, paid: Math.abs(paidMine - base) < 1e-9 && Math.abs(paidOther - withBand) < 1e-9, det: Math.abs(det - base) < 1e-9, pure, gone: Math.abs(gone - base) < 1e-9, node };
+      if (!Object.values(res).every(Boolean)) console.warn('T12-B1-Probe', res, { base, withBand });
+      return Object.values(res).every(Boolean);
+    } finally { S.bands = B0; if (S.war?.nodes?.road) S.war.nodes.road.owner = N0; S.flags.hintRoad = flags0; }
+  })());
+  ok('T12 B2 Banden leben von der Straße: Überfall füllt die Beute, 20 Beute = ein Mann mehr, 3 Hungertage = einer weniger, bei 2 Mann zerstreut, alter Stand ohne Beute läuft, Lager bevorzugt ein Banditenlager der Karte (Spawn-Sperre über key)', (() => {
+    const B0 = S.bands, fl = { ...S.flags }, day = S.day | 0, g0 = S.gold;
+    try {
+      const mk = (id, o) => ({ id, name: 'Probe ' + id, lead: 'X', where: 'x', town: 'eren', tx: 10, ty: 10, born: day, paid: -1, amb: -999, ...o });
+      const grow = mk('g', { men: 5, loot: 21 }), starve = mk('s', { men: 5, loot: 0, starve: 0 }), gone = mk('d', { men: 3, loot: 0, starve: 2 }), old = mk('o', { men: 5 });
+      S.bands = [grow, starve, gone, old]; ECO.onBandRaid(old, 7, 'grain', 'eine Probe'); const raid = old.loot === 12 && old.good === 'grain' && old.lastLoot === day;
+      bandDay(); const r1 = { grow: grow.men === 6 && Math.abs(grow.loot) < 1e-9, gone: gone.gone === true, old: Math.abs(old.loot - 11) < 1e-9 && !old.gone };
+      bandDay(); bandDay(); const st = starve.men === 4 && !starve.gone;
+      S.bands = []; const T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square && LOCATIONS.some(l => l.poi === 'bandits' && Math.hypot(l.x - TOWN_PLAN[k].square[0], l.y - TOWN_PLAN[k].square[1]) >= 25 && Math.hypot(l.x - TOWN_PLAN[k].square[0], l.y - TOWN_PLAN[k].square[1]) <= 90 && !townAt(l.x, l.y, 12)));
+      let poi = true; if (T0) { const b = bandFound(T0), L = b && LOCATIONS.find(l => l.key === b.poi); poi = !!L && Math.hypot(b.tx - L.x, b.ty - L.y) <= 5 && b.where === L.name && SPAWN_AREAS.some(a => a.key === L.key) && b.loot === ECO.ROAD.startLoot; }
+      const res = { raid, ...r1, st, poi };
+      if (!Object.values(res).every(Boolean)) console.warn('T12-B2-Probe', res, { grow, starve, gone, old });
+      return Object.values(res).every(Boolean);
+    } finally { S.bands = B0; S.flags = fl; S.gold = g0; }
+  })());
+  ok('T12 B3 Netz und Gegenwehr: Rooks Klinge zahlt halbes Schutzgeld (+Rook-Ruf), Verrat am Netz −10, Melken gibt ein Viertel der Beute als Gold (Gilde −1, Gefahr +0,04), Streifen auf der Strecke dezimieren die Bande', (() => {
+    const B0 = S.bands, rk0 = S.ranks.bandit, fa0 = { ...S.factions }, g0 = S.gold, fl = { ...S.flags }, day = S.day | 0, fake = { id: 'tp12', kind: 'npc', alive: true, patrol: 'valen', traveler: { kind: 'patrol', from: 'eren', to: 'northcity' } };
+    try {
+      const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity');
+      const b = { id: 'tb3', name: 'Probe-Netz', lead: 'X', where: 'x', town: 'eren', tx: Math.round((LA.x + LB.x) / 2), ty: Math.round((LA.y + LB.y) / 2) + 6, born: day, men: 6, paid: -1, amb: -999, loot: 10, starve: 0 };
+      S.bands = [b]; S.ranks.bandit = 1; S.gold = 1000; const ch = [], r0 = S.factions.bandit || 0; bandChoices({ bandTalk: true, bandId: 'tb3', name: 'U' }, ch);
+      const pay = ch.find(c => c.text.startsWith('Schutzgeld')), cost = Math.round((20 + 6 * 8) * (styleOf() >= 40 ? 0.7 : 1) * 0.5); pay?.fn(); UI.closeDialogue();
+      const rook = !!pay && pay.text.includes(`(${cost} Gold`) && S.gold === 1000 - cost && (S.factions.bandit || 0) > r0 && b.paid === day + 5;
+      b.paid = -1; const base = ECO.riskOf('eren', 'northcity', 0); b.tax = true; const m0 = S.factions.merch || 0; ECO.onBandRaid(b, 4, 'grain', 'einen Probezug');
+      const milk = Math.abs(b.taxGold - 5) < 1e-9 && (S.factions.merch || 0) === Math.max(-100, m0 - 1) && Math.abs(ECO.riskOf('eren', 'northcity', 0) - base - 0.04) < 1e-9; b.tax = false;
+      S.ents.world.push(fake); let hit = false; for (let i = 0; i < 20 && !hit; i++) { const n = b.men; b.loot = 10; bandDay(); hit = b.men === n - 1; }
+      S.ents.world.splice(S.ents.world.indexOf(fake), 1);
+      const r1 = S.factions.bandit || 0; b.good = null; bandKill({ bandId: 'tb3', bandLead: true }, S.player);   /* ohne Ware keine Beutekiste in der echten Welt */ const traitor = (S.factions.bandit || 0) === Math.max(-100, r1 - 10) && b.gone;
+      const res = { rook, milk, hit, traitor }; if (!Object.values(res).every(Boolean)) console.warn('T12-B3-Probe', res, b);
+      return Object.values(res).every(Boolean);
+    } finally { const i = S.ents.world.indexOf(fake); if (i >= 0) S.ents.world.splice(i, 1); S.bands = B0; S.ranks.bandit = rk0; Object.assign(S.factions, fa0); S.gold = g0; S.flags = fl; }
+  })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -21430,8 +21573,20 @@ export function selftest() {
       const k = Object.keys(SKILL_TREE).find(x => SKILL_TREE[x].sky === 'mage'), t = { knownClasses: ['wanderer'], titleClasses: [], tree: { [k]: 1 } }, kept = skyVisible(t).includes('mage');
       S.flags.skyAll = true; const dbg = skyVisible(w).length === all.length; S.flags.skyAll = false;
       const comp = skyVisible(w, true).every(s => SKIES[s].comp);
-      return few && grow && kept && dbg && comp && Object.keys(SKILL_TREE).length > 200;
+      return few && grow && kept && dbg && comp && Object.keys(SKILL_TREE).length > 150;   /* E42: gekürzt (vorher > 200) */
     } finally { S.flags.skyAll = f0; }
+  }));
+  ok('E42 Sternbilder gekürzt (Entwickler 09.10.): doppelte Allerwelts-Sterne gestrichen, Kettenklassen als Weg ihrer Schwesterklasse (kein eigenes Sternbild, Kettenarm versiegelt bis zur Weihe); alter Stand bekommt die Punkte zurück und führt beide Fähigkeitssätze', sandbox(() => {
+    const keys = Object.keys(SKILL_TREE), gone = [...CUT_STARS].every(k => !SKILL_TREE[k]), linked = keys.every(k => SKILL_TREE[k].requires.every(r => SKILL_TREE[r] && SKILL_TREE[r].branch === SKILL_TREE[k].branch));
+    const ways = ['chainbard', 'chainhunter', 'torturer', 'darkpriest'].every(k => CLASSES[k].way && !SKIES[k] && keys.filter(x => SKILL_TREE[x].branch === k).every(x => SKILL_TREE[x].sky === CLASSES[k].way));
+    const skies = Object.keys(SKIES).filter(s => keys.some(k => SKILL_TREE[k].sky === s)).length <= 22;
+    const p = stage(); p.knownClasses = ['wanderer', 'bard', 'chainbard']; p.currentClass = 'chainbard'; p.tree = { kr_grip: 1, ba_coat: 1, ba_voice: 1, c_tough: 1 }; p.skillPoints = 0;
+    const r = skyCut(p), again = skyCut(p), mig = r.pts === 2 && again.pts === 0 && p.skillPoints === 2 && !p.tree.kr_grip && p.tree.ba_voice && p.tree.c_tough && p.currentClass === 'bard' && r.cls === 'chainbard';
+    const ab = ['war_song', 'discord', 'march_drum', 'dirge'].every(a => p.abilities.includes(a)) && skyActive(p, 'chainbard') && skyActive(p, 'bard');
+    const q = stage(); q.knownClasses = ['wanderer', 'bard']; q.currentClass = 'bard'; q.tree = {}; const sealedArm = nodeState(q, 'kb_drum') === 'sealed' && nodeState(q, 'ba_voice') === 'open';
+    q.knownClasses = ['wanderer', 'archer']; q.knownClasses.push('chainhunter'); setClass('chainhunter'); const hunter = S.player === q ? q.currentClass === 'ranger' && q.knownClasses.includes('ranger') && q.abilities.includes('net_shot') && q.abilities.includes('mark_target') : true;
+    if (!(gone && linked && ways && skies && mig && ab && sealedArm && hunter)) console.warn('E42', { gone, linked, ways, skies, mig, ab, sealedArm, hunter, r, again, sp: p.skillPoints, ab0: p.abilities });
+    return gone && linked && ways && skies && mig && ab && sealedArm && hunter;
   }));
   ok('Rüstungsvielfalt R1/R2/R4/R5 + N4 S3 Wunden-Haltung (08.10.): seltene Rüstung zeigt eine Kante (rr), Zustand neu/verbeult/gerissen ergibt verschiedene Bilder, Miliz trägt den Kochtopf, Deserteur den zerrissenen Rock, Schilde in Fraktionsfarben; verwundeter Rumpf/Bein ändert die Haltung', sandbox(() => {
     const px = f => { const d = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let h = 0; for (let i = 0; i < d.length; i += 3) h = (h * 31 + d[i]) | 0; return h + ':' + f.width; };
@@ -22265,7 +22420,7 @@ export function selftest() {
     try {
       const CL = Object.keys(SKILL_BRANCHES).filter(b => SKILL_BRANCHES[b].cls && b !== 'deathknight');
       const data = ['warrior', 'knight', 'paladin', 'berserker', 'darkpaladin'].every(b => CL.includes(b)) && CL.every(b => { const L = Object.values(SKILL_TREE).filter(n => n.branch === b), ks = L.filter(n => n.type === 'keystone');
-        return L.length === 8 && ks.length === 2 && ks.some(n => n.excl) && L.every(n => !n.ab || n.ab.every(a => ABILITIES[a.k] && CLASSES[b].abilities.includes(a.k))) && SKIES[b]; });
+        return L.length >= 5 && L.length <= 6 && ks.length === 2 && ks.some(n => n.excl) && L.every(n => !n.ab || n.ab.every(a => ABILITIES[a.k] && CLASSES[b].abilities.includes(a.k))) && SKIES[CLASSES[b].way || b]; });   /* E42: 5–6 Sterne nach der Kürzung */
       const p = stage(); p.knownClasses = ['wanderer', 'warrior', 'knight', 'archer']; p.currentClass = 'warrior'; p.abilities = ['power_strike']; p.tree = { kr_stand: 1, kr_crush: 1, kr_tempo: 1, kr_grip: 1, kr_core: 1, k_kr_wall: 1 }; recalc(p); p.stamina = p.maxStamina = 200;
       const M = abMod(p, 'power_strike'), mods = Math.abs(M.mult - 0.35) < 1e-9 && Math.abs(M.cost + 0.25) < 1e-9 && Math.abs(M.cd + 0.15) < 1e-9;
       const s0 = p.stamina; p.cooldowns = {}; useAbility('power_strike'); const am = p.abilityMult, d1 = s0 - p.stamina; p.swing = 0; p.abilityMult = 0; p.cooldowns = {}; delete p.tree.kr_stand; p.stamina = 200; useAbility('power_strike'); const paid = Math.abs((200 - p.stamina) - d1 - 22 * 0.25) < 1e-6; p.tree.kr_stand = 1; const cd = Math.abs(p.cooldowns.power_strike - 6000 * cdMul(p) * 0.85) < 1e-6, mult = Math.abs(am - 2.1 * 1.35) < 1e-6;
@@ -22293,7 +22448,7 @@ export function selftest() {
   ok('Sterne Scheibe 4: Schütze-Linie (Falke, Hirsch, Netz); Prüfungen Schütze (3 Wölfe + 3 Felle, Bogenübung zählt nur Fernwaffen) und Waldläufer (Bär, eine ganze Nacht draußen — 10 Stunden am Stück, ein Dach setzt zurück)', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial;
     try {
-      const data = ['archer', 'ranger', 'chainhunter'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('archer').length === 2 && clsTrialOf('ranger').length === 2;
+      const data = ['archer', 'ranger', 'chainhunter'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length >= 5) && clsTrialOf('archer').length === 2 && clsTrialOf('ranger').length === 2;
       for (const k of [...clsTrialOf('archer'), ...clsTrialOf('ranger')]) delete S.quests[k];
       const t = actor(330, 300); t.key = 'kt_probe_t4'; t.teaches = ['archer', 'ranger']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
       startQuest('kt_archer1'); for (let i = 0; i < 3; i++) onKill('wolf', { kind: 'enemy' }); const noPelt = !questComplete('kt_archer1'); addItem(p, 'pelt', 3); const pelts = questComplete('kt_archer1');
@@ -22309,7 +22464,7 @@ export function selftest() {
   ok('Sterne Scheibe 5: Schurke-Linie (Dolch, Natter, Zange); Prüfungen Schurke (Diebstahl ungesehen, drei Meuchelstiche — Hacken zählt nicht) und Assassine (ein Steckbrief)', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial;
     try {
-      const data = ['rogue', 'assassin', 'torturer'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('rogue').length === 2 && clsTrialOf('assassin').length === 1;
+      const data = ['rogue', 'assassin', 'torturer'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length >= 5) && clsTrialOf('rogue').length === 2 && clsTrialOf('assassin').length === 1;
       for (const k of [...clsTrialOf('rogue'), ...clsTrialOf('assassin')]) delete S.quests[k];
       const t = actor(330, 300); t.key = 'kt_probe_t5'; t.teaches = ['rogue', 'assassin']; const p = stage(); p.knownClasses = ['wanderer', 'rogue']; p.currentClass = 'rogue'; p.abilities = ['backstab']; p.ktSteps = {}; p.clsPass = {};
       startQuest('kt_rogue1'); questEvent('steal', null, 1, S.player); const steal = questComplete('kt_rogue1');
@@ -22323,7 +22478,7 @@ export function selftest() {
   ok('Sterne Scheibe 6: Lampe (Kleriker) und Auge (Dunkler Priester); Prüfung Kleriker (5 Heilkraut + 4 Tote, Heilprüfung beim Lehrer); Heiliges Heilen heilt mit Stern mehr', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial;
     try {
-      const data = ['cleric', 'darkpriest'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('cleric').length === 2;
+      const data = ['cleric', 'darkpriest'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length >= 5) && clsTrialOf('cleric').length === 2;
       for (const k of clsTrialOf('cleric')) delete S.quests[k];
       const t = actor(330, 300); t.key = 'kt_probe_t6'; t.teaches = ['cleric']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
       startQuest('kt_cleric1'); addItem(p, 'herb', 5); for (let i = 0; i < 4; i++) onKill(i % 2 ? 'zombie' : 'skeleton', { kind: 'enemy' }); const field = questComplete('kt_cleric1');
@@ -22338,7 +22493,7 @@ export function selftest() {
   ok('Sterne Scheibe 7: Flamme (Magier); Prüfung Magier (Grabsiegel, fünf Puppen nur mit Zaubern beim Lehrer); Feuerball-Stern macht das Geschoss stärker', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial;
     try {
-      const data = SKILL_BRANCHES.mage?.cls === 'mage' && Object.values(SKILL_TREE).filter(n => n.branch === 'mage').length === 8 && clsTrialOf('mage').length === 2;
+      const data = SKILL_BRANCHES.mage?.cls === 'mage' && Object.values(SKILL_TREE).filter(n => n.branch === 'mage').length >= 5 && clsTrialOf('mage').length === 2;
       for (const k of clsTrialOf('mage')) delete S.quests[k];
       const t = actor(330, 300); t.key = 'kt_probe_t7'; t.teaches = ['mage']; const p = stage(); p.knownClasses = ['wanderer']; p.currentClass = 'wanderer'; p.ktSteps = {}; p.clsPass = {};
       startQuest('kt_mage1'); addItem(p, 'grave_seal', 1); const seal = questComplete('kt_mage1');
@@ -22352,7 +22507,7 @@ export function selftest() {
   ok('Sterne Scheibe 8: Laute (Barde) und Trommel (Kettenbarde); Prüfung Barde (ein Schenkenspiel gewinnen; fünf Siege unter dem Kriegslied mit zwei Gefährten — ohne Lied oder Gefährten zählt es nicht); Kriegslied hält mit Stern länger', sandbox(() => {
     const Q0 = structuredClone(S.quests), T0 = S.trial, g0 = S.gold;
     try {
-      const data = ['bard', 'chainbard'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length === 8) && clsTrialOf('bard').length === 2;
+      const data = ['bard', 'chainbard'].every(b => SKILL_BRANCHES[b]?.cls === b && Object.values(SKILL_TREE).filter(n => n.branch === b).length >= 5) && clsTrialOf('bard').length === 2;
       for (const k of clsTrialOf('bard')) delete S.quests[k];
       const p = stage(); p.knownClasses = ['wanderer', 'bard']; p.currentClass = 'bard'; p.abilities = ['war_song', 'discord']; p.ktSteps = {}; p.clsPass = {};
       startQuest('kt_bard1'); const g = actor(330, 300); g.key = 'kt_probe_gamer'; S.gold = 500; let n = 0; while (!questComplete('kt_bard1') && n++ < 60) armWrestle(g, 10); UI.closeDialogue(); const tav = questComplete('kt_bard1');
@@ -22368,7 +22523,7 @@ export function selftest() {
     const Q0 = structuredClone(S.quests);
     try {
       const data = SKILL_BRANCHES.alchemist?.cls === 'alchemist' && clsTrialOf('alchemist').length === 2;
-      const all = Object.keys(CLASSES).filter(k => k !== 'wanderer').every(k => SKILL_BRANCHES[k]?.cls === k && SKIES[k] && Object.values(SKILL_TREE).filter(n => n.branch === k).length === (k === 'deathknight' ? 7 : 8));
+      const all = Object.keys(CLASSES).filter(k => k !== 'wanderer').every(k => SKILL_BRANCHES[k]?.cls === k && SKIES[CLASSES[k].way || k] && Object.values(SKILL_TREE).filter(n => n.branch === k).length >= 5);   /* E42 */
       const trials = ['warrior', 'archer', 'rogue', 'cleric', 'mage', 'bard', 'alchemist', 'knight', 'ranger', 'berserker', 'assassin'].every(k => clsTrialOf(k).length) && [...OWN_PATH].every(k => !clsTrialOf(k).length);
       for (const k of clsTrialOf('alchemist')) delete S.quests[k];
       const p = stage(); p.knownClasses = ['wanderer', 'alchemist']; p.currentClass = 'alchemist'; p.abilities = ['fire_flask', 'poison_coat', 'brew']; p.ktSteps = {}; p.clsPass = {};
@@ -23989,6 +24144,37 @@ export function selftest() {
       if (!(goods && cheap && made && dig && route)) console.warn('E40.5', JSON.stringify({ goods, cheap, made, dig, route, dead, live, b0, car: S.eco.caravans.map(c => c.from + '>' + c.to + ':' + c.good) }));
       return goods && cheap && made && dig && route;
     } finally { S.towns = T0; S.eco = E0; S.gold = g0; Object.keys(S.flags).forEach(k => { if (!(k in f0)) delete S.flags[k]; }); S.day = d0; }
+  }));
+  ok('E38 (09.10.): Katana ist eine eigene Waffenklasse (wtype katana, Skill katana, 3 Klingen beim Salzbund) — Stufe 5 Ausweichhieb, 10/30 Gegenhieb nach der Parade, 15 Reichweite, 20 Parierfenster, 25 Erholung; Meisterprüfung ohne Schild und ohne Treffer', sandbox(() => {
+    const p = stage(); p.aim = 0; combat = S.ents.__a; p.skills = { ...p.skills }; p.titles = p.titles || [];
+    const blades = ['katana', 'gischtklinge', 'nebelkatana'].every(k => ITEMS[k]?.wtype === 'katana' && ITEMS[k].skill === 'katana' && FEEL.katana) && SKILL_NAMES.katana === 'Katana' && !!SKILL_DEF.katana.master;
+    p.equip.weapon = mkItem('katana'); p.equip.offhand = null; p.skills.katana = 60;
+    const perks = wperk(p, 'dodgeatk') === 0.3 && wperk(p, 'counter') === 0.5 && wperk(p, 'reach') === 0.12 && wperk(p, 'parry') === 0.35 && Math.abs(wperk(p, 'recover') - 0.1) < 1e-9;
+    p.skills.katana = 10; const low = wperk(p, 'dodgeatk') === 0.3 && wperk(p, 'counter') === 0; p.skills.katana = 60;   /* Wert 10 = Stufe 5 */
+    const mk = () => { const e = spawnEnemy('bandit', '__a', 11, 9); e.x = p.x + 30; e.y = p.y; e.stagger = 0; e.aim = Math.PI; return e; };   /* Grundleben (999 setzen verfälscht über die Trefferzonen) */
+    const e1 = mk(), h1 = e1.hp; seedRng(4); hit(p, e1, 1); const plain = h1 - e1.hp;
+    const e2 = mk(), h2 = e2.hp; p.riposteUntil = performance.now() + 1000; seedRng(4); hit(p, e2, 1); const counter = h2 - e2.hp, used = !(p.riposteUntil > 0);
+    const cnt = plain > 0 && counter > plain * 1.3 && used;
+    const swing = () => { p.swing = 0; p.atkCd = 0; p.combo = 0; p.comboT = 0; p.comboFin = false; p.heavyNext = false; p.stamina = 999; attack(p); const d = p.swingDur; p.swing = 0; p.atkCd = 0; return d; };
+    const d1 = swing(); p.dodgeAt = performance.now(); const d2 = swing(), dodge = d2 < d1 * 0.8 && p.dodgeAt === 0;
+    const foe = o => { const e = spawnEnemy('bandit', '__a', 14, 9); Object.assign(e, { level: 5, lastKiller: p.id, elite: true }, o); return e; };
+    p.skills.katana = 80; masteryKill(foe({ hitPlayer: 1 })); const touched = !p.masteries?.katana; masteryKill(foe({})); const master = touched && !!p.masteries?.katana && p.titles.includes('Meister des Katana');
+    if (!(blades && perks && low && cnt && dodge && master)) console.warn('E38', JSON.stringify({ blades, perks, low, plain, counter, used, d1, d2, dodge, touched, master }));
+    return blades && perks && low && cnt && dodge && master;
+  }));
+  ok('Bote mit Angebot (09.10.): Händler bieten Handelsrecht (+2/Tag), Krone Schutzbrief (−3/Tag, Überfälle halb), Kette Tribut (−4/Tag, sie überfällt nicht mehr); ohne Gold endet das Abkommen; Bote fragt nur ohne Abkommen', sandbox(() => {
+    const st0 = S.settlement, g0 = S.gold, f0 = { ...S.factions };
+    try {
+      S.settlement = { name: 'Probeheim', x: 300, y: 300, map: '__a', buildings: [], morale: 60, priorities: ['Ruhe'], history: [] }; const st = S.settlement;
+      const C1 = []; envoyChoices({ envoy: 'chain' }, C1); const ask = C1[0]?.text === 'Was bietet ihr an?';
+      S.gold = 10; st.pact = { fac: 'merch', kind: 'trade' }; pactDay(st); const trade = S.gold === 12;
+      st.pact = { fac: 'valen', kind: 'guard' }; const r1 = raidChance(st); st.pact = null; const r0 = raidChance(st); st.pact = { fac: 'valen', kind: 'guard' }; pactDay(st); const guard = Math.abs(r1 - r0 * 0.5) < 1e-9 && S.gold === 9;
+      st.pact = { fac: 'chain', kind: 'tribute' }; pactDay(st); const trib = S.gold === 5 && !raidSources(st).some(x => x.f === 'chain');
+      const C2 = []; envoyChoices({ envoy: 'chain' }, C2); const cancel = /kündigen/.test(C2[0]?.text || ''); const C3 = []; envoyChoices({ envoy: 'valen' }, C3); const busy = C3.length === 0;
+      S.gold = 2; pactDay(st); const broke = st.pact === null && S.gold === 2;
+      if (!(ask && trade && guard && trib && cancel && busy && broke)) console.warn('Bote', JSON.stringify({ ask, trade, guard, trib, cancel, busy, broke, r0, r1, g: S.gold }));
+      return ask && trade && guard && trib && cancel && busy && broke;
+    } finally { S.settlement = st0; S.gold = g0; Object.assign(S.factions, f0); }
   }));
   ok('Skills Phase 6/7 (09.10.): Meisterprüfungen erst ab Stufe 40 und nur unter ihrer Bedingung (Einhändig ohne Schild gegen Starke, Speer gegen Veteranen, Meisterstück, Alter vom Grund, Erz in der Tiefe), Titel + Meisterhaltung; Lehrmeister in den Skill-Städten lehren Techniken gegen Stufe + Aufgabe; Buch gibt Wissen; guter Schmied bekommt eine Anfrage', sandbox(() => {
     const p = stage(), r0 = { ...S.res }, ord0 = S.eco?.orders ? [...S.eco.orders] : null; p.inv = []; p.invCap = 80; p.skills = {}; p.level = 5; p.titles = [];
@@ -25743,7 +25929,7 @@ function boot() {
     takeFromStash,
     toHotbar: key => { const p = S.player, e = { type:'item', key }, i = p.hotbar.findIndex(s => !s); if (i >= 0) p.hotbar[i] = e; else if (p.hotbar.length < 10) p.hotbar.push(e); else p.hotbar[9] = e; UI.renderHotbar(); },   // S13: freie (entfernte) Plätze zuerst
     useSlot, spendAttr: k => { if (coopHooks.cmd?.({ kind: 'attr', key: k })) return; const p = S.player; if (p.attrPoints > 0) { p.attributes[k]++; p.attrPoints--; recalc(p); } },
-    dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campInfo: st => { const [nb, ns] = campCounts(st), t = st.tier || 0, N = CAMP_TIERS[t + 1]; return { name: CAMP_TIERS[t].name, nb, ns, attract: campAttract(st), gold: CAMP_TIERS[t].gold, up: Math.floor(nb / CAMP_UPKEEP_PER), next: N ? `${N.name}: ${N.b} Bauten, ${N.s} Siedler` : '' }; }, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
+    dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, clsWhere, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campInfo: st => { const [nb, ns] = campCounts(st), t = st.tier || 0, N = CAMP_TIERS[t + 1]; return { name: CAMP_TIERS[t].name, nb, ns, attract: campAttract(st), gold: CAMP_TIERS[t].gold, up: Math.floor(nb / CAMP_UPKEEP_PER), next: N ? `${N.name}: ${N.b} Bauten, ${N.s} Siedler` : '', pact: st.pact ? `${PACT[st.pact.kind].name} mit ${FACTIONS[st.pact.fac]?.name || st.pact.fac} (${PACT[st.pact.kind].gold > 0 ? '+' : ''}${PACT[st.pact.kind].gold} Gold/Tag)` : '' }; }, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
     offers: npcOffers, roleLine,   // S13: was eine Figur anbietet (Infofeld); P1.8: Rolle im Ort

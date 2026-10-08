@@ -331,7 +331,9 @@ const tripDays = (a, b) => Math.max(1, Math.ceil(Math.hypot(LOC[a].x - LOC[b].x,
 /* T12 B1 „Straßen haben Herren“ (APPROVED 01.10., E37 09.10.): jede Gefahr hat einen Grund mit Namen. riskWhy liefert die Gründe,
    riskOf summiert sie — eine Quelle für Würfel und Kontor-Anzeige. Banden in Lagernähe, Totenknoten am Weg, Streifen, Aurelions Zoll.
    Der eigene Wagen zählt eine Bande nicht, solange ihr Schutzgeld bezahlt ist; der Umweg meidet alle Banden (+1 Tag). */
-export const ROAD = { base: 0.06, band: 0.08, bandR: 30, node: 0.05, nodeR: 30, patrol: 0.03, patrolR: 20, toll: 0.02 };
+export const ROAD = { base: 0.06, band: 0.08, bandR: 30, node: 0.05, nodeR: 30, patrol: 0.03, patrolR: 20, toll: 0.02,
+  startLoot: 5, small: 1, upkeep: 0.4, grow: 20, starveDays: 3, minMen: 2, maxMen: 9,
+  tax: 0.04, taxShare: 0.25, unitGold: 5, patrolHit: 0.35 };   /* B3: Melken, Streifen */   /* B2: Beute, Unterhalt, Wachstum, Hunger (Spec T12 §5) */
 const LOCK = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
 export function segDist(px, py, A, B) {
   const dx = B.x - A.x, dy = B.y - A.y, L = dx * dx + dy * dy, t = L ? clamp(((px - A.x) * dx + (py - A.y) * dy) / L, 0, 1) : 0;
@@ -347,7 +349,7 @@ export function riskWhy(a, b, o = {}) {
   if (!A || !B) return out;
   if (!o.detour) for (const bd of S.bands || []) {
     if (bd.gone || !(bd.men > 0) || (o.mine && bd.paid >= day) || segDist(bd.tx, bd.ty, A, B) >= ROAD.bandR) continue;
-    out.push({ add: ROAD.band * Math.min(9, bd.men) / 9, txt: `${bd.name} bei ${bd.where} (${bd.men} Mann)`, band: bd.id });
+    out.push({ add: ROAD.band * Math.min(9, bd.men) / 9 + (bd.tax ? ROAD.tax : 0), txt: `${bd.name} bei ${bd.where} (${bd.men} Mann${bd.tax ? ', melken die Straße' : ''})`, band: bd.id });
   }
   for (const [k, n] of Object.entries(S.war?.nodes || {})) {
     const L = LOCK[k]; if (n.owner !== 'undead' || k === a || k === b || !L || segDist(L.x, L.y, A, B) >= ROAD.nodeR) continue;
@@ -361,6 +363,20 @@ export function riskOf(a, b, guards, o = {}) {
   const r = riskWhy(a, b, o).reduce((s, w) => s + w.add, ROAD.base);
   return clamp(r * (1 - 0.22 * guards), 0.01, 0.5);
 }
+/* T12 B2: Wer hat überfallen? Mit Wahrscheinlichkeit Bandenanteil / Gesamtgefahr eine Bande (gewichtet), sonst namenlose Räuber.
+   Die Bande bekommt die verlorenen Ladungen als Beute (b.loot) — davon wächst sie in bandDay (game.js). */
+export function raidBand(a, b, o = {}) {
+  const why = riskWhy(a, b, o), tot = why.reduce((s, w) => s + Math.max(0, w.add), ROAD.base);
+  let r = rnd() * tot;
+  for (const w of why) if (w.band && w.add > 0) { if (r < w.add) return (S.bands || []).find(x => x.id === w.band) || null; r -= w.add; }
+  return null;
+}
+export function onBandRaid(bd, lost, good, what) {
+  bd.loot = (bd.loot ?? 5) + lost; bd.lastLoot = S.day | 0; if (good && ITEMS[good]) bd.good = good;
+  if (bd.tax && what !== 'deinen Wagen') { bd.taxGold = (bd.taxGold || 0) + lost * ROAD.unitGold * ROAD.taxShare; S.factions.merch = clamp((S.factions.merch || 0) - 1, -100, 100); }   /* B3: Melken — dein Viertel, die Gilde merkt es */
+  log(`${bd.name} überfielen bei ${bd.where} ${what}${good && ITEMS[good] ? ` (${lost} ${ITEMS[good].name})` : ` (${lost} Ladungen)`}.`, 'economy');
+  if (!S.flags?.hintRoadRaid) { (S.flags ||= {}).hintRoadRaid = 1; log(`Banden leben von Beute: Ungestört wachsen ${bd.name}, ohne Züge auf der Straße hungern sie und zerfallen. Der Kontor zeigt jede Strecke mit ihrer Gefahr.`, 'quest'); }
+}
 /* Kontor-Anzeige: alle Handelsziele bis 3 Tagesreisen, gefährlichste zuerst, Prozent mit 1 Wache. Rein (kein Würfel, kein Zustand) — Koop-Gäste sehen dasselbe. */
 export function routeLines(town, o = {}) {
   return tradeTowns().filter(k => k !== town && LOC[town] && tripDays(town, k) <= 3)
@@ -372,8 +388,10 @@ function caravanDay() {
   for (const c of [...E.caravans]) {
     if (!c.raided && chance(riskOf(c.from, c.to, c.guards))) {
       c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost;
-      log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
-      if (chance(0.3)) chronicle(`Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
+      const bd = raidBand(c.from, c.to);   /* T12 B2: war es eine Bande, bekommt sie die Beute */
+      if (bd) onBandRaid(bd, lost, c.good, `einen Zug nach ${townName(c.to)}`);
+      else log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
+      if (chance(0.3)) chronicle(bd ? `${bd.name} überfielen einen Händlerzug nach ${townName(c.to)}` : `Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
     }
     if (S.day >= c.eta) { if (S.towns[c.to] && c.n > 0) S.towns[c.to].stock[c.good] += c.n; E.caravans.splice(E.caravans.indexOf(c), 1);
       if (c.n > 0 && DEAD_GOODS.includes(c.good) && !S.flags?.deadGoodsHint) { (S.flags ||= {}).deadGoodsHint = 1; log(`Schmuggler bringen ${c.n} ${ITEMS[c.good].name} nach ${townName(c.to)}. Totenware hat ihren Markt: Vharnholm und die Schwarze Feste geben Knochen und Seelen her und kaufen Grabgut zurück; bei den Lebenden zahlen nur Alchemisten, Apotheker und Gelehrte etwas dafür.`, 'quest'); } }
@@ -420,20 +438,23 @@ export function sellCargo(town, price) {
   for (const [g, n] of Object.entries(my.cargo)) for (let i = 0; i < n; i++) { sum += price(g); t.stock[g] = (t.stock[g] || 0) + 1; }
   my.cargo = {}; S.gold += sum; return sum;
 }
-export function sendWagon(to, guards) {
+export function sendWagon(to, guards, detour = false) {
   const my = S.eco.my; if (!my || my.to || to === my.at) return 'Der Wagen ist nicht bereit.';
   const cost = guards * GUARD_COST; if (S.gold < cost) return 'Zu wenig Gold für die Wachen.';
-  S.gold -= cost; Object.assign(my, { to, guards, eta: (S.day | 0) + tripDays(my.at, to), raided: false });
-  log(`Dein Wagen fährt nach ${townName(to)} (${guards} Wachen, ${tripDays(my.at, to)} Tage).`, 'economy'); return null;
+  const days = tripDays(my.at, to) + (detour ? 1 : 0);   /* T12: Umweg +1 Tag, Banden gemieden */
+  S.gold -= cost; Object.assign(my, { to, guards, detour: !!detour, eta: (S.day | 0) + days, raided: false });
+  log(`Dein Wagen fährt nach ${townName(to)} (${guards} Wachen, ${days} Tage${detour ? ', auf Umwegen' : ''}).`, 'economy'); return null;
 }
+export const myRiskOpt = my => ({ mine: true, detour: !!my?.detour });   /* T12: Schutzgeld deckt den eigenen Wagen, Umweg meidet Banden */
 function myCaravanDay() {
   const my = S.eco.my; if (!my?.to) return;
-  if (!my.raided && cargoOf(my) && chance(riskOf(my.at, my.to, my.guards))) {
+  if (!my.raided && cargoOf(my) && chance(riskOf(my.at, my.to, my.guards, myRiskOpt(my)))) {
     my.raided = true;
     if (my.guards >= 3 && chance(0.5)) log('Räuber griffen deinen Wagen an. Deine Wachen schlugen sie zurück.', 'economy');
     else {
-      let lost = 0; for (const g of Object.keys(my.cargo)) { const l = Math.ceil(my.cargo[g] * (0.4 + rnd() * 0.5)); my.cargo[g] -= l; lost += l; }
-      log(`Dein Wagen wurde überfallen: ${lost} Ladungen verloren.`, 'economy'); chronicle(`Räuber plünderten den Wagen von ${S.player?.name || 'dir'}`, 'news');
+      let lost = 0, top = null; for (const g of Object.keys(my.cargo)) { const l = Math.ceil(my.cargo[g] * (0.4 + rnd() * 0.5)); my.cargo[g] -= l; lost += l; if (!top || l > top[1]) top = [g, l]; }
+      log(`Dein Wagen wurde überfallen: ${lost} Ladungen verloren.`, 'economy');
+      const bd = raidBand(my.at, my.to, myRiskOpt(my)); if (bd) onBandRaid(bd, lost, top?.[0], 'deinen Wagen');   /* T12 B2 */ chronicle(`Räuber plünderten den Wagen von ${S.player?.name || 'dir'}`, 'news');
     }
   }
   if (S.day >= my.eta) {

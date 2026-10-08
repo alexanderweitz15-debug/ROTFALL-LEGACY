@@ -4128,3 +4128,16 @@ Gemessen auf Stand s14c (Kopie, Speichern gesperrt), 30 × `ECO.ecoDay()` hinter
 - „Einnahmen“ = was in der Kasse landet (Gewinn nach Lohn, Unterhalt und Steuer). Der Unterschied vorher/nachher bei den zwei starken Betrieben liegt im Marktverlauf (Preise sinken mit dem eigenen Angebot: Tag 1 ≈ 198, Tag 30 ≈ 75 Gold für beide zusammen) — der Unterhalt (4 Gold/Tag) ist bei ihnen klein.
 - Beim Median-Betrieb frisst der Unterhalt rund die Hälfte des Gewinns (ohne Unterhalt ≈ 104 in 30 Tagen). Gewollt: schwache Betriebe tragen sich knapp, starke bleiben stark.
 - Siedlung: Unterhalt 1 Gold je drei fertige Bauten (10 Bauten = 3 Gold/Tag); Abgaben Weiler 3, Dorf 8 Gold/Tag. Im Stand s14c gibt es keine Siedlung — Messung im Spiel offen (🔍).
+
+## Totenwaren als Marktgüter (E40.5) — Händlerzüge über 30 Spieltage vorher/nachher (09.10.2026, Agent)
+
+Stand s14c (Kopie, Speichern gesperrt), 30 × `ECO.ecoDay()`; gezählt werden neu losgeschickte Händlerzüge und ihr Einkaufswert.
+
+| Lauf | Züge (30 Tage) | Wert | davon Totenware | Totenorte im Handel |
+|---|---|---|---|---|
+| vorher | 181 | 13 757 Gold | – | keine (Vharnholm 19 Köpfe, Schwarze Feste 8 — vom Handel ausgeschlossen) |
+| nachher | 159 | 13 094 Gold | 5 Züge, 492 Gold | Vharnholm → Aurelheim (2 × Seelenphiolen, 1 × Knochen), Kreuzweg → Vharnholm (2 × Grabgut) |
+
+- Lager nach 30 Tagen: Vharnholm Knochen 62 (Verkauf 1 Gold), Seelen 6 (20), Grabgut 0 (48); Schwarze Feste Knochen 32, Seelen 10 (14); Aurelheim zahlt für Seelen 121, für Knochen 9; Varonheim Seelen 61; Kreuzweg Grabgut 9 (6); Orte ohne Totenkundige zahlen Mindestpreis (Seelen 14, Knochen 1).
+- Weniger Züge insgesamt (−22): die langen Wege Vharnholm ↔ Aurelheim/Kreuzweg belegen Plätze unter dem Deckel von 16 Zügen, und der Zufall verschiebt sich. Lebensmittel- und Werkzeugzüge sind weiter die Masse.
+- Spielerseite: Seelen von Vharnholm (≈ 20) nach Aurelheim (≈ 120) sind die stärkste Handelsspanne der Welt (⚖ beobachten — Deckel ist ×3 Wert, Weg gefährlich +8 % Überfall).

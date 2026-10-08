@@ -50,7 +50,7 @@ export const FAC_STARTS = {
             desc:'Hallengast der Zwerge an der Tiefhall. Die Königsstadt liegt unter der alten Halle — und dazwischen stehen Hrodvars Tote.' },
 };
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen', woodcutting:'Holzfällen', mining:'Bergbau', herbalism:'Kräuterkunde', cooking:'Kochen' };
+  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen', woodcutting:'Holzfällen', mining:'Bergbau', herbalism:'Kräuterkunde', cooking:'Kochen', katana:'Katana' };
 /* Skill-Core Phase 1 (Spec Skills §2–§12, §57; Planlauf 08.10.2026 — Werte vorläufig ⚖): zentrale Definition je Fertigkeit. Der Wert (0–100) bleibt
    wie bisher in p.skills und wächst durch Nutzung; Stufe = Wert / 2 (0–50). Meilensteine 5/10/15/20/25/30/40/50; „perks“ sind echte Freischaltungen
    [Art, Größe, Text] — zunächst für Einhändig (Schwert), Stangenwaffen (Speer) und Schmieden (Spec §58: erst 2–3 Skills testen). */
@@ -59,6 +59,11 @@ export const SKILL_DEF = {
   onehanded: { group: 'Kampf', what: 'Schwert, Axt, Kolben, Dolch', perks: { 5: ['stamina', 0.08, 'Sparsame Hiebe: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Hieb (7 % kürzer)'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'] } },
   polearms:  { group: 'Kampf', what: 'Speer, Hellebarde, Sense', perks: { 5: ['stamina', 0.08, 'Sparsame Stöße: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Stoß (7 % kürzer)'], 20: ['stagger', 0.4, 'Wuchtstoß: der schwere Hieb lässt Gegner 40 % länger taumeln'] } },
   twohanded: { group: 'Kampf', what: 'Zweihänder, Kriegshammer, Großaxt', perks: {} },
+  /* E38 (Entwickler 09.10.2026: eigene Waffenklasse; Leiter nach Spec Skills §10, Werte vorläufig ⚖): Stufen passen auf die vorhandene Kampfmechanik —
+     Ausweichhieb (Rolle → schneller Hieb), Gegenhieb (Parade → harter Hieb), Ausfallschnitt (Reichweite), Parierfenster, fließende Folge, Konterhieb. */
+  katana:    { group: 'Kampf', what: 'Katana (Seevolk, Händler im Osten)', perks: { 5: ['dodgeatk', 0.3, 'Ausweichhieb: der erste Hieb nach einer Rolle ist 30 % schneller'], 10: ['counter', 0.25, 'Gegenhieb: nach einer Parade trifft der nächste Hieb 25 % härter'],
+    15: ['reach', 0.12, 'Ausfallschnitt: 12 % mehr Reichweite'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'], 25: ['recover', 0.1, 'Fließende Folge: 10 % schnellere Erholung nach dem Hieb'],
+    30: ['counter', 0.25, 'Konterhieb: der Gegenhieb nach der Parade noch einmal 25 % härter'] } },
   archery:   { group: 'Kampf', what: 'Bogen, Armbrust', perks: {} },
   defense:   { group: 'Kampf', what: 'Abwehr von vorn', perks: {} },
   toughness: { group: 'Kampf', what: 'Treffer einstecken', perks: {} },
@@ -81,6 +86,7 @@ export const SKILL_DEF = {
 /* Phase 6 Meisterschaften (Spec Skills §11, §48; 09.10.2026 — Werte vorläufig ⚖): ab Stufe lv ist die Meisterprüfung offen; bestanden = Meistertitel und
    eine Meisterhaltung (Perk, wirkt wie die Meilensteine). Charaktergebunden — stirbt mit der Figur (§38). */
 SKILL_DEF.onehanded.master = { lv: 40, title: 'Klingenmeister', task: 'Besiege einen starken Gegner (Veteran, Anführer oder zwei Stufen über dir) mit einer Einhandwaffe und ohne Schild.', perk: ['parry', 0.15, 'Meisterhaltung: Parierfenster noch einmal +15 %'] };
+SKILL_DEF.katana.master = { lv: 40, title: 'Meister des Katana', task: 'Besiege einen starken Duellanten (Veteran, Anführer oder zwei Stufen über dir) mit dem Katana, ohne Schild und ohne in diesem Kampf getroffen zu werden.', perk: ['dodgeatk', 0.2, 'Meisterhaltung: Ausweichhieb noch 20 % schneller'] };   /* E38 */
 SKILL_DEF.polearms.master = { lv: 40, title: 'Meister des Speers', task: 'Besiege einen Veteranen oder Anführer mit einer Stangenwaffe.', perk: ['recover', 0.05, 'Meisterhaltung: noch 5 % schnellere Erholung'] };
 SKILL_DEF.smithing.master = { lv: 40, title: 'Meisterschmied', task: 'Schmiede ein Meisterstück — oder ein meisterliches Stück mit Königseisen.', perk: ['quality', 8, 'Meisterhand: Güte wie mit 8 Punkten mehr'] };
 SKILL_DEF.fishing.master = { lv: 40, title: 'Meisterfischer', task: 'Fang den „Alten vom Grund“, einen uralten Wels in einem See.', perk: ['window', 0.25, 'Meistergespür: noch 25 % mehr Zeit zum Anschlagen'] };
@@ -315,6 +321,11 @@ export const ITEMS = {
     lore:'Vargs Axt. Rote Stoffstreifen hängen am Griff, einer für jeden, der nicht mehr arbeiten konnte.' },
   // S14 Seevolk (Nutzer: Inselreich, zerstrittene Clans, Piratenkönig Weißbart — eigene Figur, eigene Waffe)
   entermesser:   { name:'Entermesser', slot:'weapon', wtype:'sword', dmg:11, reach:40, arc:1.8, speed:500, stam:8, rarity:'uncommon', value:75, skill:'onehanded', lore:'Kurz, breit, gebogen. Zwischen Tauen und Masten ist ein Langschwert zu lang.' },
+  /* E38 (09.10.2026, Werte vorläufig ⚖): Katana als eigene Waffenklasse — wtype 'katana' (Bild/Animation: Agent Figuren; bis dahin Schwert-Rückfall), Skill 'katana'.
+     Schneller als das Langschwert, schmaler Bogen, scharf (Krit). Herkunft: Salzbund (Ysolde Kielmark, Gischtinseln). */
+  katana:        { name:'Katana', slot:'weapon', wtype:'katana', dmg:13, reach:50, arc:1.3, speed:480, stam:8, crit:1.9, rarity:'rare', value:320, skill:'katana', lore:'Eine gebogene Klinge von jenseits des Meeres. Der Salzbund bringt jedes Jahr eine Handvoll — und die Kunst, sie zu führen, nur in Andeutungen.' },
+  gischtklinge:  { name:'Gischtklinge', slot:'weapon', wtype:'katana', dmg:14, reach:52, arc:1.2, speed:470, stam:8, crit:2.0, rarity:'rare', value:390, skill:'katana', lore:'Im Salzwasser gehärtet, mit Haifischhaut am Griff. Rostet nicht, sagen die Seeleute. Sie lügen selten über Klingen.' },
+  nebelkatana:   { name:'Nebelklinge', slot:'weapon', wtype:'katana', dmg:17, reach:54, arc:1.3, speed:460, stam:9, crit:2.0, rarity:'epic', value:950, skill:'katana', lore:'Die Klinge eines Kapitäns, der im Nebel verschwand. Sie singt leise, wenn man sie zieht.' },
   harpune:       { name:'Walharpune', slot:'weapon', wtype:'spear', dmg:13, reach:78, arc:0.4, speed:700, stam:9, ap:0.25, rarity:'uncommon', value:90, skill:'polearms', lore:'Widerhaken aus Walbein. Was sie trifft, kommt schwer wieder los.' },
   sturmanker:    { name:'Der Sturmanker', slot:'weapon', wtype:'hammer', dmg:34, reach:58, arc:2.2, speed:1300, stam:24, ap:0.45, stagger:2.2, crush:true, rarity:'legendary', unique:true, value:1100, skill:'twohanded', twohand:true,
     lore:'Weißbarts Anker, an einer Kette um den Unterarm. Er hat damit ein Zollschiff Valens versenkt — von innen.' },
@@ -1436,6 +1447,26 @@ export const SKIES = {
   goblinlord:  { name:'Die Grube', title:'goblinlord', at:[1880, 520], col:'#9ad05a' },
   companion:   { name:'Die Gefährten', comp:true, at:[0, 1500], col:'#c8b48a' },
 };
+/* E42 (Entwickler 09.10.2026, Auswahl ⚖ vorläufig): der Himmel wird kleiner.
+   1) Doppelte Allerwelts-Sterne fallen weg: reine Wertesterne der Klassen- und Titel-Sternbilder (Leben, Rüstung, Ausdauer, Mana, Krit),
+      die der Wanderer schon bietet, dazu zwei doppelte Fähigkeitssterne in zusammengelegten Sternbildern (kb_song = ba_voice,
+      kj_core = wl_arrow). Wer danach kam, hängt an deren Voraussetzungen; die Zeilen werden neu gezählt.
+   2) Ähnliche Klassen werden eins: jede Kettenklasse ist ein Weg (way) ihrer Schwesterklasse. Schlüssel, Lehrer, Prüfungen und
+      Fähigkeiten bleiben; wer den Weg lernt, kann die Schwesterklasse mit und führt beide Fähigkeitssätze. Die Sterne des Wegs stehen
+      als Kettenarm im Sternbild der Schwesterklasse (versiegelt bis zur Weihe). Alte Stände: game.js skyCut() gibt die Punkte zurück. */
+export const CUT_STARS = new Set(['kr_grip', 'kr_drill', 'kr_core', 'rt_mail', 'rt_shield', 'pa_faith', 'pa_halo', 'bs_scar', 'bs_hide', 'hp_iron', 'hp_core',
+  'sc_eye', 'sc_wind', 'sc_core', 'wl_hide', 'wl_bark', 'kj_boots', 'kj_hide', 'kj_core', 'su_soft', 'su_lung', 'su_core', 'as_poise', 'as_skin', 'fk_apron', 'fk_night',
+  'kl_lamp', 'kl_robe', 'kl_core', 'dp_ink', 'dp_core', 'mg_ink', 'mg_robe', 'mg_core', 'ba_lungs', 'ba_coat', 'kb_coat', 'kb_lungs', 'kb_song', 'al_glove', 'al_core',
+  'va_cold', 'va_blood', 'gb_hide', 'gb_lungs', 'dk_plate']);
+export const CLASS_WAYS = { chainbard: 'bard', chainhunter: 'ranger', torturer: 'assassin', darkpriest: 'cleric' };
+for (const [k, w] of Object.entries(CLASS_WAYS)) { CLASSES[k].way = w; delete SKIES[k]; }
+for (const n of Object.values(SKILL_TREE)) if (CLASS_WAYS[n.branch]) n.sky = CLASS_WAYS[n.branch];
+{ const res = r => CUT_STARS.has(r) ? (SKILL_TREE[r]?.requires || []).flatMap(res) : [r], touched = new Set();
+  const req = {}; for (const [k, n] of Object.entries(SKILL_TREE)) if (!CUT_STARS.has(k)) req[k] = [...new Set(n.requires.flatMap(res))];
+  for (const k of CUT_STARS) if (SKILL_TREE[k]) { touched.add(SKILL_TREE[k].branch); delete SKILL_TREE[k]; }
+  for (const [k, r] of Object.entries(req)) SKILL_TREE[k].requires = r;
+  const row = k => SKILL_TREE[k].requires.length ? 1 + Math.max(...SKILL_TREE[k].requires.map(row)) : 0;
+  for (const [k, n] of Object.entries(SKILL_TREE)) if (touched.has(n.branch) || CLASS_WAYS[n.branch]) n.row = row(k); }
 const WAND_ARM = { combat: -2.45, magic: -0.69, survival: 1.57 };   /* Wanderer: Klinge links oben, Stern rechts oben, Blatt unten */
 export function skyLayout() {                                     /* idempotent: neue Knoten bekommen Lage, alte behalten sie */
   const bySky = {};

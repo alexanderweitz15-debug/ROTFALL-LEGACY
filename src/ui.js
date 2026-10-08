@@ -1134,7 +1134,7 @@ function itemPurpose(it) {
   if (it.good) return 'Handelsware: jede Stadt zahlt einen anderen Preis — billig kaufen, wo es viel gibt, teuer verkaufen, wo es fehlt.';
   if (it.res) return 'Baustoff: kommt in deinen Vorrat (Lager, Siedlung, Ausbessern).';
   if (it.slot === 'consumable') return USE_TXT[it.use] || 'Verbrauchsgut.';
-  if (it.slot === 'weapon') return `${{ sword: 'Schwert', axe: 'Axt', great: 'Zweihänder', mace: 'Streitkolben', hammer: 'Hammer', spear: 'Speer', polearm: 'Stangenwaffe', dagger: 'Dolch', rapier: 'Rapier', bow: 'Bogen', crossbow: 'Armbrust', staff: 'Stab', wand: 'Zauberstab', whip: 'Peitsche' }[it.wtype] || 'Waffe'}${it.twohand ? ' (zweihändig)' : ''}: ${it.ranged ? 'Fernkampf — braucht freie Sicht.' : it.twohand ? 'schwer und langsam, trifft hart und unterbricht Angriffe.' : 'Nahkampf.'}`;
+  if (it.slot === 'weapon') return `${{ sword: 'Schwert', axe: 'Axt', great: 'Zweihänder', mace: 'Streitkolben', hammer: 'Hammer', spear: 'Speer', polearm: 'Stangenwaffe', dagger: 'Dolch', rapier: 'Rapier', katana: 'Katana', bow: 'Bogen', crossbow: 'Armbrust', staff: 'Stab', wand: 'Zauberstab', whip: 'Peitsche' }[it.wtype] || 'Waffe'}${it.twohand ? ' (zweihändig)' : ''}: ${it.ranged ? 'Fernkampf — braucht freie Sicht.' : it.twohand ? 'schwer und langsam, trifft hart und unterbricht Angriffe.' : 'Nahkampf.'}`;
   if (it.slot === 'offhand') return 'Schild: blockt Treffer von vorn, wenn du in Deckung gehst.';
   if (it.armor) return 'Rüstung: mindert jeden Treffer um den Rüstungswert.';
   if (it.slot === 'material') return 'Material: für Aufträge, Handwerk oder zum Verkauf.';
@@ -1372,8 +1372,9 @@ function classUI(body) {
   const p = S.player;
   body.innerHTML = `<div class="ledger">Klassen werden in der Welt gelernt, nicht im Menü gewählt. Was du beherrschst, kannst du hier führen.</div>
     <div class="inv-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
-    ${(p.knownClasses || []).map(c => `<button class="build-item" data-c="${c}">${CLASSES[c].name}
-      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${CLASSES[c].desc || ''}${CLASSES[c].weak ? ` <i>Schwäche: ${CLASSES[c].weak}</i>` : ''}</span></button>`).join('')}</div>`;
+    ${(p.knownClasses || []).filter(c => !CLASSES[c]?.way).map(c => { const w = (p.knownClasses || []).find(k => CLASSES[k]?.way === c), C = CLASSES[w || c];   /* E42: ein Kettenweg steht bei seiner Schwesterklasse */
+      return `<button class="build-item" data-c="${c}">${CLASSES[c].name}${w ? ` · ${CLASSES[w].name}` : ''}
+      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${C.desc || ''}${C.weak ? ` <i>Schwäche: ${C.weak}</i>` : ''}${w ? ` <i>Weg der Kette: beide Fähigkeitssätze, Kettenarm im Sternbild.</i>` : ''}</span></button>`; }).join('')}</div>`;
   [...body.querySelectorAll('[data-c]')].forEach(b => b.onclick = () => { A.setClass(b.dataset.c); closeModal(); });
   // Titelklassen: neben der Grundklasse getragen; freigeschaltet nur durch Taten in der Welt
   const known = p.titleClasses || [];
@@ -1529,7 +1530,7 @@ function settleUI(body) {
     <div><h3>${st.name}</h3>
       <div class="ledger">Stufe: ${A.campInfo ? A.campInfo(st).name : settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()}</div>
-      ${(() => { const C = A.campInfo?.(st); if (!C) return ''; return `<div class="ledger" title="Anziehung = Stimmung (bis 50) + Schutz durch Wachen und Palisade (bis 25) + Arbeit (Felder, Werkbank, Schmiede, Heiler, Brunnen; bis 25). Sie bestimmt, wie schnell Siedler kommen. Eine erreichte Stufe bleibt.">Anziehung <b>${C.attract}</b>/100 · Abgaben ${C.gold} Gold/Tag · Unterhalt ${C.up} Gold/Tag${C.next ? `<br><small>Nächste Stufe — ${C.next}</small>` : ''}</div>`; })()}
+      ${(() => { const C = A.campInfo?.(st); if (!C) return ''; return `<div class="ledger" title="Anziehung = Stimmung (bis 50) + Schutz durch Wachen und Palisade (bis 25) + Arbeit (Felder, Werkbank, Schmiede, Heiler, Brunnen; bis 25). Sie bestimmt, wie schnell Siedler kommen. Eine erreichte Stufe bleibt.">Anziehung <b>${C.attract}</b>/100 · Abgaben ${C.gold} Gold/Tag · Unterhalt ${C.up} Gold/Tag${C.next ? `<br><small>Nächste Stufe — ${C.next}</small>` : ''}${C.pact ? `<br><small>Abkommen: ${C.pact}</small>` : ''}</div>`; })()}
       ${st.stage === 2 ? '<div class="ledger" style="color:#d0563f">Schutzlos: Niemand arbeitet, Fremde meiden das Lager. Wirb in einer Schenke Lagerwachen an (beim Wirt, 80 Gold).</div>' : st.stage === 1 ? '<div class="ledger" style="color:#c9a24a">Geschwächt: Viele Schützer sind gefallen.</div>' : ''}
       ${A.campGuards?.() ? `<div class="ledger">Lagerwachen: ${A.campGuards()} (je 5 Gold Sold am Tag)</div>` : ''}
       ${(() => { const I = A.raidInfo?.(); if (!I) return ''; return `<div class="ledger" title="Reichtum lockt an, wer in der Nähe ist. Schutzgeld an eine Bande schützt auch das Lager.">Bedrohung · Reichtum ${I.W} · Überfallgefahr je Nacht <b>${Math.round(I.ch * 100)} %</b><br><small>${I.L.length ? I.L.map(x => `◆ ${x.label} — ${x.dist} Felder`).join(' · ') : 'Keine Macht in der Nähe, nur Wölfe.'}</small></div>`; })()}
