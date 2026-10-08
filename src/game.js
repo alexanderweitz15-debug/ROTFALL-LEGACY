@@ -7653,6 +7653,20 @@ const CON = {
 const PROF_CON = { Bauer: 'hunt', Bäuerin: 'hunt', Schmied: 'supply', Meisterschmiedin: 'supply', Priester: 'monster', Wirt: 'deliver', Kaufmann: 'escort', 'Händlerin': 'deliver', Kontorhändler: 'escort',
   Heilerin: 'herbs', Kräuterfrau: 'herbs', Fischer: 'missing', Graf: 'trail', 'Gräfin': 'deliver', Edelmann: 'bounty', Edelfrau: 'deliver', Hofbeamter: 'trail', Richterin: 'trail',
   'Offizier der Sonnenlegion': 'monster', Werkmeister: 'supply', 'Magitech-Ingenieurin': 'deliver', Wirtin: 'deliver', Holzfäller: 'supply', Ratsherr: 'bounty', Bürgermeister: 'bounty', Gelehrter: 'deliver', Jäger: 'hunt' };
+/* Spec Welt 08.10. §40–44 (Entwickler: „nicht jeder NPC braucht eine Mission“): Vorher gab jeder Bewohner mit passendem Beruf Verträge — in Varonheim
+   69 von 173, in Nordfurt 20 von 47. Jetzt vergeben je Ort nur wenige Bewohner Arbeit: 3 in Dörfern, 4 in Städten, 6 in der Hauptstadt — eine
+   feste, aus Name und Beruf gewürfelte Auswahl (bleibt über Spielstände gleich), dazu Brett, Wache und die festen Figuren mit Namen. Wer schon
+   einen laufenden Vertrag vergeben hat, nimmt ihn immer an. Alle anderen reden, arbeiten, kaufen — ohne Siegel. Zahlen vorläufig. */
+const giverHash = n => { let h = 2166136261; for (const ch of `${n.name}|${n.prof}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const conGiverCap = t => TOWN_PLAN[t]?.metro ? 6 : isVil(t) ? 3 : 4;
+function conGiverOk(npc) {
+  const t = npc.homeTown; if (!t || !PROF_CON[npc.prof]) return false;
+  if ((S.contracts || []).some(c => c.giver === npc.key && c.state === 'active')) return true;
+  const map = npc.map || 'world', now = performance.now(), M = (conGiverMemo[t + '|' + map] ||= { at: -1e9, set: new Set() });   /* je Ort alle 2 s neu — giverMark fragt je Bild */
+  if (now - M.at > 2000 || S._quiet) { M.at = now; M.set = new Set((S.ents[map] || []).filter(e => e.kind === 'npc' && e.alive && e.homeTown === t && PROF_CON[e.prof] && !S.party.includes(e.id)).sort((a, b) => giverHash(a) - giverHash(b)).slice(0, conGiverCap(t))); }
+  return M.set.has(npc);
+}
+const conGiverMemo = {};
 /* Entwickler 02.10.2026: „3 Aufträge für die Eisenkette, kein Ansehen“ — die Eisenfeste steht nicht in TOWN_PLAN/GUARD_POSTS, ihr Ansehen ging an Valen.
    Orte der Kette (LOCATIONS faction 'chain') zählen jetzt für die Kette. Andere Fraktionsorte (Grubenhort, Karak-Atar …) bleiben bewusst unverändert: offene Entscheidung. */
 /* Entwickler 03.10.2026: Varonheim ist volle Hauptstadt (Kutsche, Schankpersonal, Söldner, volles Brett) — das Dorf-Kennzeichen in TOWN_PLAN
@@ -8001,7 +8015,7 @@ function giverMark(npc) {
   const kind = PROF_CON[npc.prof], town = npc.homeTown;
   if (!offer && kind && town && TOWN_PLAN[town] && S.difficulty !== 'sehr_schwer') { const C = (S.contracts || []).find(c => c.giver === npc.key && c.state !== 'claimed');
     if (C?.state === 'active') return conReady(C) ? { k: 'turnin', near: true } : null;
-    if (!boardShut(town)) return { k: 'offer', near: true }; }
+    if (!boardShut(town) && conGiverOk(npc)) return { k: 'offer', near: true }; }
   return offer ? { k: 'offer' } : null;
 }
 /* Visuell Q-3 (quests.md Q2-1/Q8, Entscheidung 02.10.2026): Auftragsbrief im Gespräch — Ziel-Piktogramme und Lohn. Vor der Annahme fester Aufträge
@@ -8080,7 +8094,7 @@ function conChoices(npc, choices) {
     return; }
   S.contracts ||= [];
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
-  if (!(C && C.state === 'active') && (!town || !kind || !TOWN_PLAN[town] || S.party.includes(npc.id) || boardShut(town))) return;   // S15 Fehlersuche: Abgeben geht immer, neue Arbeit nur, wo das Brett offen ist
+  if (!(C && C.state === 'active') && (!town || !kind || !TOWN_PLAN[town] || S.party.includes(npc.id) || boardShut(town) || !conGiverOk(npc))) return;   // S15 Fehlersuche: Abgeben geht immer, neue Arbeit nur, wo das Brett offen ist; 08.10.: nur wenige Geber je Ort
   if (C && C.state === 'active') { if (C.have >= C.need || C.kind === 'supply' || C.kind === 'herbs') choices.unshift({ text: `Erledigt. (${C.title})`, fn: () => { claimContract(C, npc); if (C.state === 'claimed') UI.dialogue(npc, '„Gute Arbeit. Hier, dein Lohn.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } }); return; }
   choices.unshift({ text: 'Hast du Arbeit für mich?', fn: () => {
     if (!C) { C = makeContract(town, kind, npc.key); S.contracts.push(C); } C.giverName = npc.name; if (npc.prof === 'Tributoffizier') C.fac = 'chain';
@@ -22458,10 +22472,12 @@ export function selftest() {
       const town = Object.keys(TOWN_PLAN).find(t => TOWN_PLAN[t].square && !boardShut(t)), prof = Object.keys(PROF_CON)[0];
       const b = actor(330, 300, { name: 'Bewohner', prof }); b.prof = prof; b.key = 'probe_bew'; b.homeTown = town; S.contracts = [];
       S.difficulty = 'schwer'; const res = giverMark(b)?.k === 'offer' && giverMark(b).near === true; S.difficulty = 'sehr_schwer'; const hard = giverMark(b) === null;
+      S.difficulty = 'schwer'; const extra = []; for (let i = 0; i < 8; i++) { const x = actor(300 + i * 5, 340, { name: 'Bew' + i, prof }); x.prof = prof; x.key = 'probe_bew' + i; x.homeTown = town; extra.push(x); }   /* Spec Welt 08.10. §40: höchstens conGiverCap Geber je Ort */
+      const sealed = [b, ...extra].filter(x => giverMark(x)?.k === 'offer').length, capOk = sealed === Math.min(9, conGiverCap(town)); if (!capOk) console.warn('Geber-Deckel', sealed, conGiverCap(town));
       const vm = actor(340, 300, { name: 'VM' }); vm.vm = town; const vmOk = giverMark(vm)?.k === 'offer';
       const brett = { kind: 'prop', type: 'board', x: TOWN_PLAN[town].square[0] * TS, y: TOWN_PLAN[town].square[1] * TS }; const open = boardMark(brett)?.k === 'offer';
       S.razed = { ...(rz0 || {}), [town]: true }; const shut = boardMark(brett) === null;
-      return off && wait && done && res && hard && vmOk && open && shut && !S.contracts.length && JSON.stringify(S.conDay || {}) === cd0;
+      return off && wait && done && res && hard && capOk && vmOk && open && shut && !S.contracts.length && JSON.stringify(S.conDay || {}) === cd0;
     } finally { delete QUESTS.__pg; S.quests = q0; S.contracts = C0; if (d0 === undefined) delete S.difficulty; else S.difficulty = d0; if (rz0 === undefined) delete S.razed; else S.razed = rz0; } }));
   // ================= Fehlerjagd-Runde 1 (02.10.2026): HB-06 bis HB-23 =================
   ok('HB-06: Ausweichen zählt für alle aktiven Auftäge mit dodge-Ziel (c_mon1-3), nicht nur q_monk', sandbox(() => {
@@ -22973,7 +22989,7 @@ function boot() {
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
   if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit,
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
