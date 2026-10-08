@@ -1,7 +1,7 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
 import * as R from './render.js?v=25';
 import * as HB from './buildings.js?v=25';
@@ -10,7 +10,7 @@ import * as SIM from './sim.js?v=25';
 import * as B from './body.js?v=25';
 import * as SP from './sprites.js?v=25';
 import * as ECO from './economy.js?v=25';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=25';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
 import { skyVisible, skyHidden } from './sky.js?v=25';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
 import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=25';
@@ -601,6 +601,7 @@ function useConsumable(c, idx, target = c, part = null) {
   }
   if (it.use === 'lure') return lureWhistle(c);                     /* Scout R4: Köderpfeife (wird nicht verbraucht) */
   if (it.use === 'fish') { fishUse(c); return UI.refreshHUD(); }   /* Fischen: Angel (wird nicht verbraucht) — auswerfen bzw. anschlagen */
+  if (it.use === 'book') { if ((c.books ||= {})[it.book]) return UI.toast('Das Buch kennst du schon.'); c.books[it.book] = S.day | 0; removeItem(c, slot.key, 1); log(`${c.name} liest „${it.name}“. ${it.lore}`, 'quest'); return UI.refreshHUD(); }   /* Phase 7: Bücher = Wissen, keine Erfahrungspunkte */
   if (it.use === 'recipe') { const n = (it.learn || []).filter(k => learnDish(k, it.name)).length; if (n) removeItem(c, slot.key, 1); else UI.toast('Das kennst du schon.'); return UI.refreshHUD(); }   /* Kochen: Rezept lesen */
   if (it.use === 'blood') {                                  /* §5g.2 Blutphiole: stillt den Durst; Lebenden wird übel */
     removeItem(c, slot.key, 1); fx(c.x, c.y - 14, 'blood', 6);
@@ -1354,7 +1355,7 @@ function hammerFx(e, now) {                                       /* P2.15: Funk
 }
 function planDays() {
   VILLAGERS.length = 0; const jobUse = new Set();
-  ensureSmithyYards(); ensureBizHands();   /* P2.14: Schmiedehof vor den Arbeitsplätzen (der Geselle bekommt den Amboss); P2.17: Gehilfen deiner Betriebe */
+  ensureSmithyYards(); ensureBizHands(); ensureTrainers();   /* Skills Phase 7: Lehrmeister */   /* P2.14: Schmiedehof vor den Arbeitsplätzen (der Geselle bekommt den Amboss); P2.17: Gehilfen deiner Betriebe */
   const byHome = new Map(), seats = new Map();
   for (const c of S.ents.world) if (c.villager && c.homeId) { if (!byHome.has(c.homeId)) byHome.set(c.homeId, []); byHome.get(c.homeId).push(c); }
   const seatsOf = tav => {                                            // freie Innenkacheln der Schenke (ohne Möbel, nicht die Türachse)
@@ -2463,6 +2464,31 @@ function armorGallery() {
   const d = document.createElement('div'); d.id = 'dbProfGal'; d.title = 'Klick schließt';
   d.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:rgba(0,0,0,.85);cursor:pointer'; d.onclick = () => d.remove(); d.appendChild(cv); document.body.appendChild(d);
   UI.toast('Rüstungs-Prüfstand — Klick schließt.', 2500);
+}
+/* P3.24 §17 (09.10.2026, nur Debug): Kampfanimation-Prüfstand — je Waffenklasse Kampfhaltung (Wiegen i0/i1) und Deckung in drei Blickrichtungen,
+   Waffe an der Hand; letzte Zeile die Trefferposen (Zucken, Zurückkippen). Front/Rücken ohne Grätsche. Klick schließt. */
+function combatGallery() {
+  document.getElementById('dbProfGal')?.remove();
+  const spec = SP.humanSpec({ kind: 'npc', prof: 'Söldnerwache', seed: 2, pal: {}, equip: { chest: { key: 'leather_jerkin' } } });
+  const WK = [['longsword', 'Schwert'], ['greatsword', 'Zweihänder'], ['axe', 'Axt'], ['mace', 'Kolben'], ['warhammer', 'Hammer'], ['spear', 'Speer'], ['dagger', 'Dolch'], ['staff', 'Stab']];
+  const cells = [['S', 'i0', 'ready'], ['S', 'i1', 'ready'], ['S', 'guard', 'cover'], ['N', 'i0', 'ready'], ['N', 'guard', 'cover'], ['W', 'i0', 'ready'], ['W', 'i1', 'ready'], ['W', 'guard', 'cover']];
+  const Z = 1.6, cw = 78, ch = 108, cv = document.createElement('canvas'); cv.width = 110 + cells.length * cw; cv.height = 24 + (WK.length + 1) * ch; const c = cv.getContext('2d');
+  c.fillStyle = '#4f5c40'; c.fillRect(0, 0, cv.width, cv.height); c.imageSmoothingEnabled = false; c.font = '11px sans-serif'; c.fillStyle = '#fff';
+  cells.forEach(([d, ps, md], j) => c.fillText(`${d} ${md === 'cover' ? 'Deckung' : 'Haltung ' + ps}`, 110 + j * cw, 14));
+  const art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+  try {
+    WK.forEach(([wk, lab], i) => { const it = ITEMS[wk], y = 24 + i * ch, two = !!it.twohand || it.wtype === 'spear' || it.wtype === 'polearm'; c.fillStyle = '#fff'; c.fillText(lab, 4, y + ch / 2);
+      cells.forEach(([d, ps, md], j) => { const oct = { S: 2, N: 6, W: 4 }[d], W = { mode: md, wt: it.wtype, ac: animClassOf(wk, it) || it.wtype, arc: it.arc || 1.4, q: 0, v: 0, oct, two, low: 0 };
+        const f = SP.humanFrameR(spec, d, ps, W), x = 110 + j * cw, s = Z / 1.25;
+        const drawW = () => { if (!f.hand) return; const Wsp = SP.weaponSprite(wk, it.rarity, it.holy, it.wtype), a = SP.weaponAngle(W, oct * Math.PI / 4), kk = (Wsp.px || 2) * s;
+          c.save(); c.translate(x + f.hand[0] * f.px * s, y + f.hand[1] * f.px * s); c.rotate(a); c.drawImage(Wsp.cv, -Wsp.gx * kk, -Wsp.gy * kk, Wsp.cv.width * kk, Wsp.cv.height * kk); c.restore(); };
+        const behind = d === 'N'; if (behind) drawW(); c.drawImage(f, x, y, f.width * f.px * s, f.height * f.px * s); if (!behind) drawW(); }); });
+    const y = 24 + WK.length * ch; c.fillStyle = '#fff'; c.fillText('Treffer: zuckt · kippt', 4, y + ch / 2);
+    [['S', 'hit'], ['S', 'kb'], ['W', 'hit'], ['W', 'kb'], ['N', 'hit'], ['N', 'kb']].forEach(([d, ps], j) => { const f = SP.humanFrameR(spec, d, ps); c.drawImage(f, 110 + j * cw, y, f.width * f.px * Z / 1.25, f.height * f.px * Z / 1.25); });
+  } finally { SP.setArt(art0); }
+  const d = document.createElement('div'); d.id = 'dbProfGal'; d.title = 'Klick schließt';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:rgba(0,0,0,.85);cursor:pointer'; d.onclick = () => d.remove(); d.appendChild(cv); document.body.appendChild(d);
+  UI.toast('Kampfanimation-Prüfstand — Klick schließt.', 2500);
 }
 /* Goblin-Grundarten und ihre Rollen: nach der Befreiung (bzw. mit Grubenstamm-Rang) friedlich wie die Grundart */
 const isGoblinFoe = t => t === 'goblin' || t === 'goblin_warrior' || (!!MONSTERS[t]?.rolle && MONSTERS[t].faction === 'goblin');
@@ -4446,7 +4472,8 @@ function hit(attacker, target, mult, kind = 'physical') {
   const ix = target.x - Math.cos(a) * 6, iy = target.y - 14 - Math.sin(a) * 3;
   S.fx.push({ x: ix, y: iy, vx: 0, vy: 0, type: crit ? 'crit' : 'impact', a, s: 1 + fl.w, life: crit ? 260 : 170, maxLife: crit ? 260 : 170 });
   atkImpact(attacker, target);   /* Kampfanimation: Schlageffekte des Packs im selben Bild wie Schaden, Hit-Stop und Klang */
-  target.rx = { t: performance.now(), a, k: crit ? 2 : (fl.w >= 0.6 || attacker.comboFin) ? 3 : 1 };   /* Kampfanimation: Trefferreaktion leicht/krit/schwer (nur Bild, render.js) */
+  const wtR = (attacker.equip?.weapon && ITEMS[attacker.equip.weapon.key]?.wtype) || (attacker.weaponKey && ITEMS[attacker.weaponKey]?.wtype) || (isBeast(attacker) ? 'claw' : null);   /* P3.24: womit getroffen */
+  target.rx = { t: performance.now(), a, k: crit ? 2 : (fl.w >= 0.6 || attacker.comboFin) ? 3 : 1, w: hitKind(wtR) };   /* Kampfanimation: Trefferreaktion leicht/krit/schwer und je Waffe — stumpf taumeln, Klinge zucken, Stich zurückweichen (nur Bild, render.js) */
 }
 /* Kampfanimation Scheibe 1: Effekte des Packs beim Einschlag — nur Optik, einmal je Schwung (Fegen trifft mehrere). A: nichts Neues
    (Klingenspur, Stern, Wackeln wie bisher); B: Finisher mit Ring; C: Finisher mit Druckwelle und Kamerastoß. Sichelbogen, Vorschub und
@@ -4921,7 +4948,71 @@ function perkVal(c, k, kind) {
   if (!c?.skills || !k || !(c === S.player || c.kind === 'player' || S.party?.includes(c.id))) return 0;
   const P = SKILL_DEF[k]?.perks; if (!P) return 0; const lv = skillLv(c.skills[k]); let s = 0;
   for (const [L, [kd, v]] of Object.entries(P)) if (kd === kind && lv >= +L) s += v;
+  const M = SKILL_DEF[k]?.master; if (M && c.masteries?.[k] && M.perk[0] === kind) s += M.perk[1];   /* Phase 6: Meisterhaltung */
+  for (const [tk, T] of Object.entries(TECHS)) if (T.skill === k && T.perk[0] === kind && c.techs?.[tk]) s += T.perk[1];   /* Phase 7: Technik vom Lehrmeister */
+  if (k === 'mining' && kind === 'rare' && c.books?.erz) s += 0.04;   /* Buch: Erzkunde */
   return s;
+}
+/* ================= Phase 6 Meisterschaften (Spec Skills §11, §48; 09.10.2026 — ⚖) ================= ab SKILL_DEF[k].master.lv offen; Prüfungen an
+   onKill (Einhändig, Stangenwaffen), craftItem (Schmieden), fishCatch (Fischen), gatherNode (Bergbau). Bestanden: Titel, Meisterhaltung, Chronik. */
+const masterOpen = (c, k) => !!SKILL_DEF[k]?.master && skillLv(c?.skills?.[k]) >= SKILL_DEF[k].master.lv && !c.masteries?.[k];
+function masterDone(c, k) {
+  if (!masterOpen(c, k)) return false;
+  const M = SKILL_DEF[k].master; (c.masteries ||= {})[k] = S.day | 0; (c.titles ||= []).includes(M.title) || c.titles.push(M.title);
+  log(`MEISTERSCHAFT: ${c.name} ist jetzt ${M.title}. ${M.perk[2]}.`, 'quest'); if (!S._quiet) { UI.toast(`MEISTERSCHAFT — ${M.title.toUpperCase()}`, 4200); sfx('bell', 0, 0.8); chronicle(`${c.name} wird ${M.title}`, 'legacy', M.task); }
+  return true;
+}
+function smithDeeds(p, qi, ke) {
+  if (qi >= 4 || (qi >= 3 && ke)) masterDone(p, 'smithing');
+  if (S.flags.smithStory || !(qi >= 3 || skillLv(p.skills?.smithing) >= 20) || !S.eco?.orders) return;   /* §49: einmal — gute Arbeit spricht sich herum */
+  const town = Object.keys(TOWN_PLAN).filter(k => S.towns?.[k] && k !== 'vharnholm').sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS))[0];
+  if (!town) return; S.flags.smithStory = S.day | 0;
+  const o = { id: uid(), town, good: 'arms', n: 3, reward: Math.round(ECO.orderPay(town, 'arms', 3) * 1.3), until: (S.day | 0) + 10, story: true }; S.eco.orders.push(o);
+  log(`Man spricht von deiner Arbeit an der Esse. Ein Waffenhändler in ${townName(town)} will drei Waffenkisten von dir — ${o.reward} Gold, zehn Tage Zeit (Lieferauftrag im Kontor).`, 'quest');
+  if (!S._quiet) UI.toast('DEIN RUF ALS SCHMIED: EIN HÄNDLER FRAGT AN', 3600);
+}
+/* ================= Phase 7 Weltintegration: Lehrmeister in Skill-Städten (Spec Skills §45–47; 09.10.2026 — ⚖) =================
+   Zwergen-Hub vor der Tiefhall (Schmieden, Bergbau), Salzhafen (Fischen), Haselbrück (Holz, Kräuter), Gelenkhall (Bionik/Feinwerk). Je Hub ein
+   Lehrmeister mit Lehrpult: Techniken gegen Voraussetzung (Stufe) und Aufgabe (bring Material) — kein Gold gegen Stufen; Bücher gibt es dort zu kaufen.
+   Flüchtig, beim Laden neu gestellt (nicht im Spielstand); gelernte Techniken stehen am Helden (p.techs, sterben mit ihm). */
+const HUB_BOOK = { deephall: ['buch_erzkunde', 70], haselbrueck: ['buch_kraeuter', 60] };
+function hubPos(hub) { const P = TOWN_PLAN[hub]; if (P) return P.square; const l = LOCATIONS.find(x => x.key === hub); return l ? [l.x | 0, (l.y | 0) + 3] : null; }
+function ensureTrainers() {
+  S.ents.world = S.ents.world.filter(e => !e.trainerOf);
+  let n = 0;
+  for (const hub of [...new Set(Object.values(TECHS).map(T => T.hub))]) {
+    const at = hubPos(hub), T = Object.values(TECHS).find(x => x.hub === hub); if (!at) continue;
+    const q = freeSpotNear('world', at[0] + 3, at[1] + 2, 3); if (!q) continue;
+    const hk = hHash(hub), c = makeChar({ name: T.teacher, prof: T.prof, x: q.x, y: q.y, level: 9, traits: ['gütig'] });
+    Object.assign(c, { id: 'tr_' + hub, transient: true, trainerOf: hub, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, faction: null, build: hub === 'deephall' ? 'gedrungen' : c.build,
+      greet: '„Lernen willst du? Dann zeig, was du kannst — am Lehrpult neben mir.“', seed: hk % 997 });
+    S.ents.world.push(c, { id: 'trp_' + hub, kind: 'prop', type: 'desk', map: 'world', x: q.x + 28, y: q.y, r: 11, solid: true, transient: true, trainerOf: hub, teach: hub, label: `Lehrpult — ${T.teacher}` }); n++;
+  }
+  indexSolids('world');
+  return n;
+}
+function techState(p, tk) { const T = TECHS[tk]; if (p.techs?.[tk]) return 'gelernt'; if (skillLv(p.skills?.[T.skill]) < T.need) return 'stufe'; return Object.entries(T.bring).every(([m, n]) => matHave(m) >= n) ? 'bereit' : 'material'; }
+function learnTech(p, tk) {
+  const T = TECHS[tk]; if (techState(p, tk) !== 'bereit') return false;
+  for (const [m, n] of Object.entries(T.bring)) matTake(m, n);
+  (p.techs ||= {})[tk] = S.day | 0; gainSkill(p, T.skill, 1);
+  log(`${T.teacher} zeigt dir „${T.name}“. ${T.perk[2]}.`, 'quest'); if (!S._quiet) UI.toast(`TECHNIK GELERNT: ${T.name.toUpperCase()}`, 3200);
+  return true;
+}
+function trainerMenu(hub) {
+  const p = S.player, L = Object.entries(TECHS).filter(([, T]) => T.hub === hub), T0 = L[0]?.[1]; if (!T0) return;
+  const opts = L.map(([tk, T]) => { const st = techState(p, tk), need = Object.entries(T.bring).map(([m, n]) => `${n} ${ITEMS[m]?.name || ({ stone: 'Stein', iron: 'Eisenerz', wood: 'Holz' })[m] || m}`).join(', ');
+    return { text: st === 'gelernt' ? `✔ ${T.name} (gelernt)` : st === 'stufe' ? `✗ ${T.name} — braucht ${SKILL_NAMES[T.skill]} Stufe ${T.need}` : st === 'material' ? `✗ ${T.name} — Aufgabe: bring ${need}` : `${T.name} lernen (gibt ab: ${need})`,
+      fn: () => { if (st === 'bereit') learnTech(p, tk); else UI.toast(st === 'gelernt' ? 'Das kannst du schon.' : st === 'stufe' ? `Erst ${SKILL_NAMES[T.skill]} Stufe ${T.need}.` : `Bring erst: ${need}.`); trainerMenu(hub); } }; });
+  const B = HUB_BOOK[hub]; if (B && !p.books?.[ITEMS[B[0]].book] && !hasItem(p, B[0])) opts.push({ text: `${ITEMS[B[0]].name} kaufen (${B[1]} Gold)`, fn: () => { if (S.gold < B[1]) UI.toast('Zu wenig Gold.'); else { S.gold -= B[1]; addItem(p, B[0], 1); log(`Du kaufst „${ITEMS[B[0]].name}“. Lesen im Gepäck.`, 'economy'); } UI.refreshHUD(); trainerMenu(hub); } });
+  opts.push({ text: 'Gehen', fn: () => UI.closeDialogue() });
+  UI.dialogue({ name: T0.teacher }, `„Ich bringe dir keine Stufen bei — die musst du dir erarbeiten. Aber eine Technik zeige ich dem, der so weit ist und mir etwas bringt.“\n${L.map(([, T]) => `${T.name}: ${T.perk[2]}`).join('\n')}`, opts);
+}
+function masteryKill(e) {
+  const p = S.player; if (!p || !e || e.kind !== 'enemy' || e.lastKiller !== p.id) return;
+  const w = ITEMS[p.equip?.weapon?.key], vet = !!(e.elite || e.boss || MONSTERS[e.mtype]?.boss || e.vname), strong = vet || (e.level || 1) >= (p.level || 1) + 2;
+  if (w?.skill === 'onehanded' && !p.equip.offhand && strong) masterDone(p, 'onehanded');
+  if (w?.skill === 'polearms' && vet) masterDone(p, 'polearms');
 }
 const wperk = (c, kind) => { const w = c?.equip?.weapon; return w ? perkVal(c, ITEMS[w.key]?.skill, kind) : 0; };
 function skillNext(c, k) { const lv = skillLv(c.skills?.[k]), P = SKILL_DEF[k]?.perks || {}; const L = SKILL_MS.find(m => m > lv && (P[m] || m === 50)); return L ? { lv: L, t: P[L]?.[2] || 'Meisterschaft' } : null; }
@@ -4930,6 +5021,7 @@ function gainSkill(c, k, amt) {
   const v0 = c.skills[k] || 0, v1 = Math.min(100, v0 + amt); c.skills[k] = v1;
   if (c === S.player && skillLv(v1) > skillLv(v0)) {
     for (const L of SKILL_MS) if (L > skillLv(v0) && L <= skillLv(v1)) {
+      if (SKILL_DEF[k]?.master?.lv === L && !c.masteries?.[k]) { log(`${SKILL_NAMES[k] || k}: Meisterprüfung offen — ${SKILL_DEF[k].master.task}`, 'quest'); if (!S._quiet) UI.toast(`MEISTERPRÜFUNG OFFEN: ${(SKILL_NAMES[k] || k).toUpperCase()}`, 3600); }   /* Phase 6 */
       const P = SKILL_DEF[k]?.perks?.[L]; if (!P && L !== 50) continue;
       const msg = `${(SKILL_NAMES[k] || k).toUpperCase()} STUFE ${L} — ${P ? P[2] : 'Meisterschaft'}`;
       log(`${msg}.`, 'party'); if (!S._quiet) { UI.toast(msg, 3600); sfx('bell', 0, 0.5); }
@@ -4996,12 +5088,14 @@ function fishCatch(p, F) {
   if (n > 8 && rnd() < 0.5) { gainSkill(p, 'fishing', 0.1); log('Hier beißt kaum noch etwas — die Fische meiden den Platz. Versuch es an einem anderen Wasser.', 'world'); return 'leer'; }
   const L = W.fish.filter(([k]) => rare || !ITEMS[k].rare), tot = L.reduce((s, [, w]) => s + w, 0); let r = rnd() * tot, key = L[0][0];
   for (const [k, w] of L) if ((r -= w) < 0) { key = k; break; }
+  if (F.kind === 'lake' && masterOpen(p, 'fishing') && rnd() < 0.05) key = 'alter_wels';   /* Phase 6: Meisterprüfung — der Alte vom Grund */
   if (rnd() < 0.03) { const g = ri(3, 12); S.gold += g; log(`Am Haken hängt ein alter Lederbeutel: ${g} Gold.`, 'world'); }
   if (!addItem(p, key, 1)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, 1));
   const it = ITEMS[key], s = p.skills.fishing || 0;
   gainSkill(p, 'fishing', (it.rare ? 2.5 : 1) * Math.max(0.2, 1.2 - s / 100) * (n > 5 ? 5 / n : 1));
   act(p, 'kneel', 600); float(p, it.name, 'rgba(170,210,230,ALPHA)'); log(`Gefangen: ${it.name} (${W.name}).`, 'world');
   if (it.rare && !S._quiet) { UI.toast(`SELTENER FANG: ${it.name.toUpperCase()}`, 2600); sfx('loot', 2, 0.6); }
+  if (key === 'alter_wels') masterDone(p, 'fishing');
   return key;
 }
 /* ================= Sammeln: Holzfällen, Bergbau, Kräuterkunde (Spec Skills §15–21, §32–33, §36, §42; Planlauf 08.10.2026 — Zahlen vorläufig ⚖) =================
@@ -5051,6 +5145,7 @@ function gatherTree(p, t) {
   gatherEvent(p, 'wood', t);
   return 'gefällt';
 }
+const herbSees = c => !!perkVal(c, 'herbalism', 'rare') || (!!c?.books?.kraut && skillLv(c?.skills?.herbalism) >= 5);   /* Phase 7: Kräuterbuch — fünf Stufen früher */
 const herbRare = t => hHash(t.gk || t.id || '') % 5 === 0;   /* jede fünfte Kräuterstelle trägt eine seltene Pflanze — fest je Stelle */
 function gatherNode(p, t) {
   if (t.depleted) { UI.toast('Erschöpft.'); return null; }
@@ -5060,7 +5155,7 @@ function gatherNode(p, t) {
   if (kind === 'herb') {
     n = Math.max(1, n + perkVal(p, 'herbalism', 'yield') + (rnd() < perkVal(p, 'herbalism', 'side') ? 1 : 0) - less);
     addItem(p, 'herb', n); onItemGained('herb');
-    if (herbRare(t) && perkVal(p, 'herbalism', 'rare')) { const k = hHash((t.gk || t.id) + 'r') % 2 ? 'bergminze' : 'nachtschatten'; giveMat(p, k, 1); got.push(ITEMS[k].name); }
+    if (herbRare(t) && herbSees(p)) { const k = hHash((t.gk || t.id) + 'r') % 2 ? 'bergminze' : 'nachtschatten'; giveMat(p, k, 1); got.push(ITEMS[k].name); }
     gainSkill(p, 'herbalism', (herbRare(t) ? 1.2 : 0.6) * lm);
   } else {
     const tier = toolTier(p, 'mine');
@@ -5070,6 +5165,7 @@ function gatherNode(p, t) {
     if (rnd() < perkVal(p, 'mining', 'side')) { giveMat(p, 'kohle', 1); got.push('Kohle'); }
     if (rnd() < perkVal(p, 'mining', 'rare')) { giveMat(p, 'silbererz', 1); got.push('Silbererz'); }
     gainSkill(p, 'mining', (t.harvest === 'iron' ? 0.8 : 0.5) * lm);
+    if (t.harvest === 'iron' && ['mine', 'deep'].includes(t.map || S.map) && masterOpen(p, 'mining') && (p.deepOre = (p.deepOre || 0) + 1) >= 5) masterDone(p, 'mining');   /* Phase 6: Meister der Tiefe */
     if (!tier && !S.flags.pickHint && !S._quiet) { S.flags.pickHint = 1; UI.toast('Ohne Spitzhacke bekommst du nur die Hälfte heraus.', 3200); }
   }
   log(`${n}× ${({ herb: 'Heilkraut', stone: 'Stein', iron: 'Eisenerz' })[t.harvest]} gewonnen${got.length ? `, dazu ${got.join(', ')}` : ''}.`, 'world');
@@ -6345,7 +6441,7 @@ function interactables() {
   return nearEnts(p.x, p.y, 62).filter(e => e !== p && Math.abs(e.x - p.x) < 62 && Math.abs(e.y - p.y) < 62 && dist(e, p) < 62 &&   /* PERF-S: billige Vorprüfung vor hypot (17 000 Einträge, alle 180 ms) */
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') || (e.kind === 'enemy' && (takeable(e) || e.prisoner?.by === p.id)) ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
-     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate' || e.secret || e.runeStone != null || (e.dartTrap && e.dartSeen)))))   /* Geheime Orte (alle Props mit secret), P3.x Gewölbe: Runensteine, erkannte Pfeilfallen */
+     (e.kind === 'prop' && (e.feast || e.teach || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate' || e.secret || e.runeStone != null || (e.dartTrap && e.dartSeen)))))   /* Geheime Orte (alle Props mit secret), P3.x Gewölbe: Runensteine, erkannte Pfeilfallen */
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -6366,14 +6462,14 @@ function updatePrompt() {
     t.kind === 'enemy' && t.prisoner ? `<b>E</b> Gefangener — ${t.title || MONSTERS[t.mtype].name}` : t.kind === 'enemy' && takeable(t) ? '<b>E</b> Gefangenen nehmen' :
     t.portal ? `<b>E</b> Betreten — ${t.label || ''}` :
     t.type === 'tree' ? `<b>E</b> Holz schlagen` :
-    t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln${herbRare(t) && perkVal(S.player, 'herbalism', 'rare') && !t.depleted ? ' (seltene Pflanze!)' : ''}` :
+    t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln${herbRare(t) && herbSees(S.player) && !t.depleted ? ' (seltene Pflanze!)' : ''}` :
     t.harvest === 'stone' ? `<b>E</b> Stein brechen` :
     t.harvest === 'iron' ? `<b>E</b> Erz abbauen` :
     t.claim ? `<b>E</b> Ort beanspruchen` :
     t.rite ? `<b>E</b> ${t.label} untersuchen` :
     t.type === 'shrine' ? `<b>E</b> Beten` :
     t.omegaAltar ? (S.quests.q_omega?.state === 'active' ? '<b>E</b> Ritual am Altar' : '<b>E</b> Zu Omega beten (10 Gold)') :
-    t.type === 'board' ? `<b>E</b> Anschlagbrett lesen${sealWord(t)}` : furnAct(t) ? `<b>E</b> ${furnAct(t)}${t.type === 'cask_rack' ? ` (${TAP_PRICE} Gold)` : furnAct(t) === 'Durchsuchen' && furnOwned(houseOf(t)) ? ' (fremdes Eigentum)' : ''}` : `<b>E</b> Durchsuchen${t.kind === 'prop' && furnOwned(houseOf(t)) ? ' (fremdes Eigentum)' : ''}`;
+    t.teach ? `<b>E</b> Beim Lehrmeister lernen` : t.type === 'board' ? `<b>E</b> Anschlagbrett lesen${sealWord(t)}` : furnAct(t) ? `<b>E</b> ${furnAct(t)}${t.type === 'cask_rack' ? ` (${TAP_PRICE} Gold)` : furnAct(t) === 'Durchsuchen' && furnOwned(houseOf(t)) ? ' (fremdes Eigentum)' : ''}` : `<b>E</b> Durchsuchen${t.kind === 'prop' && furnOwned(houseOf(t)) ? ' (fremdes Eigentum)' : ''}`;
   UI.setPrompt(label);
 }
 // Körpersprache beim Handeln (§26 Interaktionen): kurz knien, arbeiten, aufrichten — rein sichtbar, blockiert nichts.
@@ -6506,7 +6602,7 @@ function rummage(t, b) {
 }
 // Roadmap P4: Selbstwartung von Prothesen und Auge an Werkbank oder Amboss — Feinwerkzeug (bleibt) und je Teil 1 Magitech oder 2 Ersatzteile.
 // Obergrenze 70 %, Schmiedekunst hebt sie (bis 95 %), die Greifhand +10. Mehr schafft nur der Kybernetiker.
-const selfCap = p => Math.round(Math.min(95, 70 + (p.skills?.smithing || 0) * 0.2 + (B.hasMod(p, 'greifhand') ? 10 : 0)));
+const selfCap = p => Math.round(Math.min(95, 70 + (p.skills?.smithing || 0) * 0.2 + (B.hasMod(p, 'greifhand') ? 10 : 0) + perkVal(p, 'smithing', 'bionic')));   /* Phase 7: Technik „Feinwerk“ */
 function selfRepair(t) {
   const p = S.player, cap = selfCap(p), todo = B.bionicParts(p).filter(x => x.cond < cap).sort((a, b) => a.cond - b.cond);   /* das am stärksten abgenutzte Teil zuerst */
   if (!todo.length) return UI.toast(`Nichts unter ${cap} % — mehr schafft nur ein Kybernetiker.`), false;
@@ -6543,6 +6639,7 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   gainSkill(p, sk, 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (S.legacy && !quick && !S._quiet) { const L = (S.legacy.recipes ||= []); if (!L.includes(key)) L.push(key); }   /* Weltwissen des Hauses (Legacy); nicht bei Auftragsarbeit oder Probe */
   const th = quick ? 0 : perkVal(p, sk, 'thrift'); if (th && R.need.iron && (p.craftN = (p.craftN || 0) + 1) % th === 0) { S.res.iron = (S.res.iron || 0) + 1; log('Sparsam gearbeitet: ein Eisen bleibt übrig.', 'economy'); }   /* Skill-Core: Meilenstein „sparsam“ */
+  if (R.st === 'forge' && !quick) smithDeeds(p, qi, ke);   /* Phase 6/7: Meisterprüfung Schmieden, „Skills erzeugen Geschichten“ */
   if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0) + (R.cook && !quick ? perkVal(p, 'cooking', 'portion') : 0);   /* Kochen: Meilenstein „größere Töpfe“ */
     if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
     questEvent('craft', key, n, p);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
@@ -6658,6 +6755,7 @@ function doInteract(target = null) {
   if (t.penGate) return openPen(t);                                  // §5d.1 Sklavenmarkt
   if (t.campSupply) { act(p, 'kneel', 700, t); return sabotageCampaign(t); }
   if (t.feast) { act(p, 'kneel', 600, t); return festMeal(p, t); }
+  if (t.teach) return trainerMenu(t.teach);   /* Skills Phase 7: Lehrmeister der Skill-Städte */
   if (furnAct(t) && !t.portal && !t.claim && !t.rite) return useFurniture(t);
   if (!t.portal) act(p, t.type === 'tree' || t.harvest === 'stone' || t.harvest === 'iron' ? 'work' : 'kneel', t.type === 'shrine' ? 1100 : t.type === 'board' ? 0 : 420, t);
   if (t.kind === 'item') {
@@ -8471,6 +8569,10 @@ const CON = {
   /* P3.25–26 (Spec §11, Planlauf 08.10.): zwei Zieltypen, die es vorher nicht gab — Soziales und Transport mit Rückweg. steps = Häkchen-Liste
      (Auftragsbuch, Zettel, Tracker); die letzte Zeile ist immer die Abgabe beim Auftraggeber. */
   debt:    { name: 'Schuld eintreiben', text: () => 'Die Schuld eintreiben und abgeben', mil: 0, steps: C => [`${C.name} in ${townName(C.target)} finden und ansprechen`, `${C.sum} Gold eintreiben — überzeugen, drohen oder selbst zahlen`, 'Zurück zum Auftraggeber'] },
+  /* P5 Variante A (08.10.): Aufträge der Stillen — nur am Brett von Vharnholm (dead: 1), nur mit Rang bei den Toten oder Pakt (boardShut) */
+  souls:   { name: 'Seelen bergen', text: n => `${n} Irrlichter bergen`, mil: 0, dead: 1 },
+  robbers: { name: 'Grabräuber vertreiben', text: n => `${n} Grabräuber vertreiben`, mil: 1, dead: 1 },
+  stake:   { name: 'Grenzpfahl', text: () => 'Den Grenzpfahl der Stillen setzen', mil: 1, dead: 1 },
   message: { name: 'Nachricht', text: () => 'Den Brief übergeben und die Antwort zurückbringen', mil: 0, steps: C => [`Den Brief an ${C.name} in ${townName(C.target)} übergeben`, 'Die Antwort abholen (der Empfänger braucht etwas Zeit)', 'Die Antwort zum Auftraggeber bringen'] },
 };
 /* Fortschritt je Zeile: Schritt-Aufträge haken jede Zeile einzeln ab (have zählt die Schritte, die Abgabe hakt die letzte), alle anderen eine Zahl */
@@ -8550,7 +8652,7 @@ function conWho(C) {
   let w = byId(C.who); if (w || !C.whoSig) return w || null;   /* tot bleibt tot; nur ein ganz verschwundenes flüchtiges Ziel wird neu gesucht */
   w = S.ents.world.find(e => e.kind === 'npc' && e.alive && `${e.name}|${e.prof}` === C.whoSig); if (w) C.who = w.id; return w || null;
 }
-const conKinds = town => town === 'vharnholm' ? [] : FAC_CON[town] ? [...FAC_CON[town], ...(conPeople(town).length >= 3 ? ['debt', 'message'] : [])] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal');   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
+const conKinds = town => town === 'vharnholm' ? ['souls', 'robbers', 'message', 'stake'] : FAC_CON[town] ? [...FAC_CON[town], ...(conPeople(town).length >= 3 ? ['debt', 'message'] : [])] : Object.keys(CON).filter(k => k !== 'rumor' && k !== 'comp' && k !== 'royal' && !CON[k].dead);   /* P5 A: Vharnholm hat jetzt ein Brett der Stillen (vorher keine Aufträge) */   /* Gefährten-Aufträge kommen nur von Gefährten */   /* Gerüchte kommen nur aus dem Plaudern, nicht ans Brett */
 function conPool(x, y) {                                               // Gegner nach Gegend
   const r = regionAt(x, y);
   return r === 'deadland' ? ['skeleton', 'ghoul', 'skeleton'] : r === 'desert' ? ['bandit', 'bandit_archer'] : r === 'eisen' || r === 'mountain' ? ['wolf', 'goblin_warrior', 'bandit']
@@ -8560,7 +8662,7 @@ function conPool(x, y) {                                               // Gegner
    was Bretter (Wechsel wie townContracts), Wachen (nur militärisch) und Geber (fester Beruf, Deckel 3/4/6) in `days` Tagen je Region aushängen.
    Rein lesend: kein rnd(), keine Aufträge, nichts im Spielstand. Gerüchte (rumor) entstehen im Gespräch und zählen hier nicht mit. */
 const CON_GOAL = { bounty: 'Kampf', monster: 'Kampf', hunt: 'Kampf', trail: 'Kampf', camps: 'Kampf', defense: 'Weltgeschehen', patrol: 'Erkundung', missing: 'Erkundung',
-  escort: 'Transport', deliver: 'Transport', message: 'Transport', supply: 'Wirtschaft', herbs: 'Wirtschaft', debt: 'Soziales', rumor: 'Geheimnisse' };
+  escort: 'Transport', deliver: 'Transport', message: 'Transport', supply: 'Wirtschaft', herbs: 'Wirtschaft', debt: 'Soziales', rumor: 'Geheimnisse', souls: 'Erkundung', robbers: 'Kampf', stake: 'Weltgeschehen' };
 function conMix(days = 30) {
   const R = {}, add = (r, k) => { const o = (R[r] ||= { n: 0, kinds: {}, goals: {} }); o.n++; o.kinds[k] = (o.kinds[k] || 0) + 1; const g = CON_GOAL[k] || 'Sonstiges'; o.goals[g] = (o.goals[g] || 0) + 1; };
   const towns = [...new Set([...Object.keys(TOWN_PLAN), ...Object.keys(FAC_CON)])].filter(t => t !== 'vharnholm');
@@ -8596,6 +8698,10 @@ function makeContract(town, kind, giver) {
   if (kind === 'hunt') { C.mtype = 'wolf'; C.need = ri(3, 5); C.reward.gold -= 10; }
   if (kind === 'defense') { C.need = ri(4, 7); C.mtype = pool[0]; C.reward.gold += 40; }
   if (kind === 'patrol') { C.need = 3; C.pts = [0, 1, 2].map(i => { const a = i * 2.1 + rnd(), r = ri(16, 28), p2 = freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3); return [p2.x / TS | 0, p2.y / TS | 0]; }); [C.x, C.y] = C.pts[0]; }
+  if (kind === 'souls') { C.need = 3; C.pts = [0, 1, 2].map(i => { const a = i * 2.1 + rnd(), r = ri(20, 36), p2 = freeSpotNear('world', sx + Math.round(Math.cos(a) * r), sy + Math.round(Math.sin(a) * r), 3); return [p2.x / TS | 0, p2.y / TS | 0]; }); [C.x, C.y] = C.pts[0]; }   /* P5 A */
+  if (kind === 'robbers') { C.mtype = 'bandit'; C.need = ri(3, 4); C.reward.gold += 20; }
+  if (kind === 'stake') { C.pts = [[C.x, C.y]]; C.reward.gold += 10; }
+  if (CON[kind]?.dead || town === 'vharnholm') C.fac = 'undead';   /* Ruf geht an die Toten, nicht an den Herrn der Gegend */
   if (kind === 'debt' || kind === 'message') {   /* P3.25–26: eine echte Person als Ziel — der Schuldner wohnt im eigenen Ort, der Briefempfänger in einem Nachbarort */
     const T = kind === 'debt' ? town : far, w = T && pick(conPeople(T, giver));
     if (w) { Object.assign(C, { target: T, who: w.id, whoSig: w.transient ? `${w.name}|${w.prof}` : null, name: w.name, need: 2, x: w.x / TS | 0, y: w.y / TS | 0, tx: w.x / TS | 0, ty: w.y / TS | 0 }); if (kind === 'debt') C.sum = 30 + tier * 20 + ri(0, 4) * 10; else C.reward.gold += 30; }   /* ⚖ Schuldsumme */
@@ -8625,7 +8731,10 @@ function makeContract(town, kind, giver) {
     trail: `Letzte Nacht hat ${C.name} zugeschlagen. Niemand weiß, wo er haust. Die erste Spur liegt bei ${where}. Folg ihr.` }[kind];
   if (C.elite) C.desc = `${C.name} ${ELITES[C.elite].say} Zuletzt gesehen bei ${where}. ${ELITE_POWER[ELITES[C.elite].power] || ''} Tot oder gar nicht.`;
   if (kind === 'debt') { C.title = `Schuld eintreiben: ${C.name}`; C.desc = `${C.name} aus ${tn} schuldet ${C.sum} Gold und zahlt nicht. Hol das Geld — mit Worten, mit Nachdruck oder aus der eigenen Tasche. Wie, ist deine Sache.`; }
-  if (kind === 'message') { C.title = `Brief an ${C.name} in ${tn}`; C.desc = `Dieser Brief muss persönlich zu ${C.name} nach ${tn}. Warte auf die Antwort und bring sie mir — ungeöffnet.`; }
+  if (kind === 'message') { C.title = `Brief an ${C.name} in ${tn}`; C.desc = town === 'vharnholm' ? `Die Stillen schreiben den Lebenden. Bring diesen Brief zu ${C.name} nach ${tn} und warte auf die Antwort — man wird dich ansehen, als wärst du selbst schon tot.` : `Dieser Brief muss persönlich zu ${C.name} nach ${tn}. Warte auf die Antwort und bring sie mir — ungeöffnet.`; }
+  if (kind === 'souls') { C.title = 'Verirrte Seelen bergen'; C.desc = `Drei Seelen irren um ${townName(town)}, zu jung zum Gehen, zu alt zum Bleiben. Geh zu jedem Irrlicht und nimm es mit — die Karte zeigt immer das nächste.`; }   /* P5 A */
+  if (kind === 'robbers') { C.title = `Grabräuber bei ${where}`; C.desc = `Lebende graben bei ${where} in unseren Gräbern. Vertreib sie. Wer dabei stirbt, kommt zu uns.`; }
+  if (kind === 'stake') { C.title = `Grenzpfahl setzen bei ${where}`; C.desc = `Ein Knochenpfahl zeigt, wo die Stille beginnt. Setz ihn bei ${where}. Wer ihn umwirft, weiß dann, wessen Land er betritt.`; }
   return C;
 }
 // S13 (WELT_EVENTS_S13 §3: „ignorierte Aufträge mit Folgen“): Wer ein Angebot verfallen lässt, lässt es liegen — die Welt nicht.
@@ -8695,7 +8804,7 @@ function townContracts(town, giver) {
     S.contracts = S.contracts.filter(c => !(c.town === town && c.giver === giver && c.state === 'offer' && !c.vanish));
     const n = (S.schutz?.[town]?.stage || 0) === 3 ? 0 : Math.max(1, (giver === 'vm' ? 3 : isVil(town) ? 3 : 5) + Math.min(0, S.trust?.[town] || 0)), kinds = conKinds(town).filter(k => giver === 'vm' ? CON[k].mil : true);
     for (let i = 0; i < n && kinds.length; i++) S.contracts.push(makeContract(town, kinds[(i + (S.day | 0)) % kinds.length], giver));
-    if (giver === 'board' && n) { const C = smuggleContract(town); if (C) S.contracts.push(C); const W = woundedContract(town); if (W) S.contracts.push(W); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine); P3.x: Verwundete
+    if (giver === 'board' && n && town !== 'vharnholm') { const C = smuggleContract(town); if (C) S.contracts.push(C); const W = woundedContract(town); if (W) S.contracts.push(W); }   // S13: der Krieg schreibt eigene Aushänge (S2: gesetzlos keine); P3.x: Verwundete
     S.conDay[key] = S.day | 0;
   }
   return S.contracts.filter(c => c.town === town && c.giver === giver && c.state !== 'claimed');
@@ -8703,7 +8812,7 @@ function townContracts(town, giver) {
 // S13 (Nutzer): Aufträge — höchstens CON_MAX gleichzeitig, mit Frist; selbst abbrechen (Ruf −3); stirbt der Auftraggeber: hinfällig ohne
 // Rufverlust; stirbt der Eskortierte: gescheitert, Ruf −6, das Dorf redet darüber und vertraut dir weniger (weniger Angebote).
 // Aufträge gehen nicht aufs Erbe über. conSq: Ort eines Auftraggebers — Städte aus TOWN_PLAN, sonst Orte wie die Eisenfeste.
-const CON_MAX = 5, CON_DAYS = { escort: 3, deliver: 4, missing: 3, supply: 5, herbs: 4, trail: 5, camps: 6, bounty: 5, monster: 5, hunt: 4, patrol: 2, debt: 4, message: 5 };   /* debt/message ⚖ */
+const CON_MAX = 5, CON_DAYS = { escort: 3, deliver: 4, missing: 3, supply: 5, herbs: 4, trail: 5, camps: 6, bounty: 5, monster: 5, hunt: 4, patrol: 2, debt: 4, message: 5, souls: 3, robbers: 4, stake: 3 };   /* debt/message ⚖; P5 A ⚖ */
 const conSq = town => TOWN_PLAN[town]?.square || (l => l ? [l.x, l.y] : [0, 0])(LOCATIONS.find(l => l.key === town));
 const activeCons = () => (S.contracts || []).filter(c => c.state === 'active');
 function failContract(C, why, rep = 0, talkAbout = false) {
@@ -8761,7 +8870,7 @@ function trackerInfo() {
     if (pt && pt.x != null) { o.ang = Math.atan2(pt.y - p.y / TS, pt.x - p.x / TS); o.d = Math.hypot(pt.x - p.x / TS, pt.y - p.y / TS) * TS; }
     if (C?.until && CON_DAYS[C.kind]) { o.frac = clamp(((C.until + 1) * 1440 - clock()) / (CON_DAYS[C.kind] * 1440), 0, 1); o.late = C.until <= (S.day | 0); }
     if (C?.kind === 'defense' && C.at && !C.waved) o.attack = questInfo(k).timer;
-    const ob = Q.objectives[0], kill = C ? ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind) && MONSTERS[C.mtype] : ob?.type === 'kill' && MONSTERS[ob.target];
+    const ob = Q.objectives[0], kill = C ? ['bounty', 'monster', 'hunt', 'defense', 'robbers'].includes(C.kind) && MONSTERS[C.mtype] : ob?.type === 'kill' && MONSTERS[ob.target];
     o.ico = kill ? { t: 'kill', mt: C ? C.mtype : ob.target } : !C && ob?.type === 'item' ? { t: 'item', key: ob.target } : !C && ob?.type === 'find' ? { t: 'find' } : { t: 'custom', ico: C ? CON_ICO[C.kind] || 'log_quest' : 'log_quest' };
     o.where = questInfo(k).where || ''; return o; }) };
 }
@@ -8879,6 +8988,7 @@ function investMenu(town) {
   ]);
 }
 const boardShut = town => { const lord = townFac(town);
+  if (town === 'vharnholm') return deadWelcome() ? null : 'Knochentafeln in der Schrift der Stillen. Lesen und annehmen darf nur, wer zur Schar gehört: ein Rang bei den Toten (Garmadon in seiner Gruft, Sael hier in Vharnholm) oder der Pakt (Ysra in der Großen Nekropole).';   /* P5 A: Brett der Stillen */
   if (town === 'deephall' && !S.flags.dwarfFriend) return 'Runen, die du nicht lesen sollst. Erst wenn der König dich als Freund der Halle anerkennt, hängt hier etwas für dich.';   /* 03.10.: wie der Handel der Zwerge */
   if (S.war?.nodes?.[town]?.owner === 'undead' || S.razed?.[town]) return 'Die Zettel sind abgerissen. Unter den Toten schreibt niemand Aushänge.';
   if (repTier(lord)?.price === null || (lord === 'order' && pactBound())) return 'Jemand hat deinen Namen auf einen Zettel geschrieben und durchgestrichen. Für dich hängt hier nichts.';
@@ -8946,7 +9056,7 @@ function questRew(k) {
   if (RANK_Q[k]?.[2] === 1) R.promote = FACTIONS[RANK_Q[k][0]]?.ranks?.[RANK_Q[k][1]] || '';
   return R;
 }
-const CON_ICO = { supply: 'res_wood', herbs: 'res_herb', deliver: 'log_economy', escort: 'bar_st', missing: 'nav_map', patrol: 'log_world', trail: 'bar_st', camps: 'nav_powers', rumor: 'log_quest', royal: 'set_level', comp: 'bar_hp', defense: 'log_combat', debt: 'res_gold', message: 'nav_codex' };   /* Schlüssel aus icons.js ICONS */
+const CON_ICO = { supply: 'res_wood', herbs: 'res_herb', deliver: 'log_economy', escort: 'bar_st', missing: 'nav_map', patrol: 'log_world', trail: 'bar_st', camps: 'nav_powers', rumor: 'log_quest', royal: 'set_level', comp: 'bar_hp', defense: 'log_combat', debt: 'res_gold', message: 'nav_codex', souls: 'log_world', robbers: 'log_combat', stake: 'nav_map' };   /* Schlüssel aus icons.js ICONS */
 function conRew(C) {
   const f = conFac(C), work = C.kills ? C.credit / C.kills : 1, pay = Math.min(1, 0.1 + work * 1.5);
   return { gold: C.reward?.gold || 0, xp: C.reward?.xp || 0, rep: C.reward?.rep ? [[f, C.reward.rep]] : [], share: C.state === 'claimed' && !C.failed && C.kills && pay < 1 ? pay : null, work };
@@ -8956,7 +9066,7 @@ function questBrief(k) {
   return { objs: Q.objectives.map(o => ({ t: o.type, mt: o.type === 'kill' ? o.target : null, key: o.type === 'item' ? o.target : null, n: o.count || 1, text: o.text })), rew: questRew(k), nums: false };
 }
 function conBrief(C) {
-  const kill = ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind) && MONSTERS[C.mtype];
+  const kill = ['bounty', 'monster', 'hunt', 'defense', 'robbers'].includes(C.kind) && MONSTERS[C.mtype];
   if (CON[C.kind]?.steps) { const pr = conProg(C); return { objs: CON[C.kind].steps(C).map((text, i) => ({ t: 'custom', ico: i === pr.length - 1 ? 'log_quest' : CON_ICO[C.kind], n: 1, text, done: !!pr[i] })), rew: conRew(C), nums: true, days: CON_DAYS[C.kind] || 0 }; }   /* P3.25–26: Schritte */
   return { objs: [{ t: kill ? 'kill' : 'custom', mt: kill ? C.mtype : null, ico: CON_ICO[C.kind] || 'log_quest', n: C.need || 1, text: CON[C.kind]?.text(C.need) || C.title }], rew: conRew(C), nums: true, days: CON_DAYS[C.kind] || 0 };
 }
@@ -8995,7 +9105,7 @@ function sealTick(dt) {                                                /* alle 0
     if (C ? C.have < C.need : want.length) for (const e of actorsOf(S.map).list) if (e.kind === 'enemy' && e.alive && !e.downed && Math.abs(e.x - p.x) < rx && Math.abs(e.y - p.y) < ry
       && (C ? e.contract === C.id : want.some(t => t === e.mtype || t === e.seaTag || (t === 'bandit_rival' && e.mtype === 'bandit') || MONSTERS[e.mtype]?.abart?.of === t))) SEALS.set(e, { k: 'target' });
   }
-  if (S.map === 'world') for (const C of activeCons()) if ((C.kind === 'patrol' || C.kind === 'trail') && C.pts) for (let i = 0; i < Math.min(C.have, C.pts.length); i++)   /* Q5-7: gesetzte Wegmarken */
+  if (S.map === 'world') for (const C of activeCons()) if ((C.kind === 'patrol' || C.kind === 'trail' || C.kind === 'souls') && C.pts) for (let i = 0; i < Math.min(C.have, C.pts.length); i++)   /* Q5-7: gesetzte Wegmarken */
     SEALS.set({ x: C.pts[i][0] * TS + TS / 2, y: C.pts[i][1] * TS + TS / 2, map: 'world', kind: 'flag' }, { k: 'flag' });
   for (const b of nearEnts(p.x, p.y, Math.max(rx, ry))) if (b.kind === 'prop' && b.type === 'board' && Math.abs(b.x - p.x) < rx && Math.abs(b.y - p.y) < ry) { const m = boardMark(b); if (m) SEALS.set(b, m); }
 }
@@ -9202,7 +9312,7 @@ function questNotch(e, have, need) {
 }
 function conKill(e) { const C = (S.contracts || []).find(c => c.id === e.contract && c.state === 'active');
   if (C) { C.kills = (C.kills || 0) + 1; C.credit = (C.credit || 0) + (e.dmgAll ? (e.dmgMine || 0) / e.dmgAll : 0); }   // Anteil des Helden (+ Gefährten) je Ziel
- if (C && ['bounty', 'monster', 'hunt', 'defense'].includes(C.kind)) { conProgress(C); questNotch(e, C.have, C.need); }   /* Q5-1 */
+ if (C && ['bounty', 'monster', 'hunt', 'defense', 'robbers'].includes(C.kind)) { conProgress(C); questNotch(e, C.have, C.need); }   /* Q5-1; P5 A: Grabräuber */
   if (C && C.kind === 'bounty' && e.title === C.name) C.leaderDead = true;
   if (C && C.kind === 'trail' && e.title === C.name && C.have === 3) conProgress(C);
   if (C && C.kind === 'rumor' && C.rk === 'beast') C.beastDead = true;
@@ -9244,10 +9354,15 @@ function conTick() {
       if (!w || w.alive === false) { failContract(C, `${C.name} ist tot. Der Auftrag ist hinfällig.`, 0); continue; }
       if ((w.map || 'world') === 'world') { C.x = C.tx = w.x / TS | 0; C.y = C.ty = w.y / TS | 0; } continue; }
     const alive = actorsOf('world').list.filter(e => e.contract === C.id && e.alive);   /* PERF-U: Ziele sind Figuren/Gegner */
-    if (['bounty', 'monster', 'hunt'].includes(C.kind) && !alive.length && Math.hypot(p.x / TS - C.x, p.y / TS - C.y) < (C.haunt ? 30 : 90) && (!C.haunt || S.minute >= 22 * 60 || S.minute < 5 * 60)) {   // S14 Spuk: nur nachts   // Ziele nachsetzen (flüchtig), sobald man in der Gegend ist
+    if (['bounty', 'monster', 'hunt', 'robbers'].includes(C.kind) && !alive.length && Math.hypot(p.x / TS - C.x, p.y / TS - C.y) < (C.haunt ? 30 : 90) && (!C.haunt || S.minute >= 22 * 60 || S.minute < 5 * 60)) {   // S14 Spuk: nur nachts   // Ziele nachsetzen (flüchtig), sobald man in der Gegend ist
       for (let i = C.have; i < C.need; i++) { const lead = C.kind === 'bounty' && i === C.have && !C.leaderDead; const e = spawnEnemy(lead && C.elite ? ELITES[C.elite].base : C.mtype, 'world', C.x + ri(-3, 3), C.y + ri(-3, 3), (C.kind === 'bounty' || C.twist === 'alpha') && i === C.have && !C.leaderDead ? { level: Math.max(3, (p.level || 1) + 2) } : {});
-        Object.assign(e, { contract: C.id, transient: true, anchor: { x: e.x, y: e.y } }); if (C.kind === 'bounty' && i === C.have) { e.name = C.name; e.title = C.name; e.elite = true; if (!C.elite) e.seed = faceSeed(C); if (C.elite && lead) applyElite(e, C.elite); } if (C.twist === 'alpha' && i === C.have && !C.leaderDead) { e.name = e.title = 'Leitwolf'; e.elite = true; } }
+        Object.assign(e, { contract: C.id, transient: true, anchor: { x: e.x, y: e.y } }); if (C.kind === 'bounty' && i === C.have) { e.name = C.name; e.title = C.name; e.elite = true; if (!C.elite) e.seed = faceSeed(C); if (C.elite && lead) applyElite(e, C.elite); } if (C.twist === 'alpha' && i === C.have && !C.leaderDead) { e.name = e.title = 'Leitwolf'; e.elite = true; } if (C.kind === 'robbers') e.name = 'Grabräuber'; }
     }
+    if (C.kind === 'souls') { const [x, y] = C.pts[C.have];   /* P5 A: Irrlichter bergen — das nächste leuchtet an seinem Punkt */
+      if (!S.ents.world.some(e => e.contract === C.id && e.soulLight === C.have)) S.ents.world.push({ id: uid(), kind: 'prop', type: 'candles', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 6, transient: true, contract: C.id, soulLight: C.have, label: 'Ein Irrlicht, kalt und grünlich' });
+      if (Math.hypot(p.x / TS - x, p.y / TS - y) < 3) { fx(x * TS + 16, y * TS + 6, 'ghost', 12); sfx('magic', 0.2, 0.6); S.ents.world = S.ents.world.filter(e => !(e.contract === C.id && e.soulLight === C.have)); log(`Ein Irrlicht legt sich in deine Hand und wird still. (${C.have + 1}/${C.need})`, 'quest'); conProgress(C); if (C.have < C.need) [C.x, C.y] = C.pts[C.have]; } }
+    if (C.kind === 'stake') { const [x, y] = C.pts[0]; if (Math.hypot(p.x / TS - x, p.y / TS - y) < 3) {   /* P5 A: Grenzpfahl setzen (flüchtig ⚖) */
+      act(p, 'work', 1200); S.ents.world.push({ id: uid(), kind: 'prop', type: 'bone_spire', map: 'world', x: x * TS + TS / 2, y: y * TS + TS / 2, r: 8, solid: true, transient: true, contract: C.id, label: 'Grenzpfahl der Stillen' }); fx(x * TS + 16, y * TS, 'necro', 10); log('Du rammst den Knochenpfahl in den Boden. Ab hier beginnt die Stille.', 'quest'); conProgress(C); } }
     if (C.kind === 'defense' && clock() >= C.at && !C.waved) {
       const [sx, sy] = conSq(C.town);
       if (Math.hypot(p.x / TS - sx, p.y / TS - sy) > 70) { C.state = 'claimed'; const st = S.quests['c_' + C.id]; if (st) { st.state = 'failed'; st.outcome = 'Du warst nicht da. Die Siedlung hat allein gekämpft.'; } raidDamage(C.town); log(`${C.title}: gescheitert — du warst nicht da.`, 'quest'); continue; }
@@ -10480,7 +10595,7 @@ const KEEP = () => { const L = LOCATIONS.find(l => l.key === 'blackkeep'); retur
 const keepHeld = () => S.war?.nodes?.blackkeep ? S.war.nodes.blackkeep.owner === 'undead' : true;
 function ensureBlackKeep() {
   const k = KEEP(); if (!k) return; const [kx, ky] = k;
-  if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege); return; }
+  if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege && !e.keepGuard); return; }
   if (!S.ents.world.some(e => e.keepCourt)) {
     const mk = (name, prof, dx, dy, o) => { const q = freeSpotNear('world', kx + dx, ky + dy, 1), c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'undead', traits: ['diszipliniert'], pal: { skin: '#b9b3a2', cloth: '#1a1420', glow: '#4e8f7a' } });
       Object.assign(c, { keepCourt: true, undead: true, hooded: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y } }, o); S.ents.world.push(c); return c; };
@@ -10488,6 +10603,11 @@ function ensureBlackKeep() {
     mk('Ossara', 'Seelenhändlerin', -3, 1, { shop: true, pool: ['soul_vial', 'soul_vial', 'soul_vial', 'grave_seal', 'potion'], market: false, greet: '„Seelen, abgefüllt und versiegelt. Frisch, soweit das hier möglich ist.“' });
     mk('Grimbart Knochenhand', 'Knochenschmied', 3, 1, { shop: true, pool: ['knochenspalter', 'totenglocke', 'schaedelhelm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], market: false, greet: '„Knochen hält länger als Eisen. Frag die Toten.“' });
     mk('Mutter Asch', 'Leichenpriesterin', 0, 4, { keepPriest: true, greet: '„Jede Seele, die du bringst, wärmt den Thron.“' });
+  }
+  if (!S.ents.world.some(e => e.keepGuard)) {   /* P5 A (BUG-143): Besatzung am Tor und im Hof — flüchtig wie der Hof, nur solange die Toten die Feste halten */
+    for (const [dx, dy, name] of [[-4, 10, 'Torwache'], [3, 10, 'Torwache'], [-6, -2, 'Hofwache'], [6, -2, 'Hofwache']]) { const q = detSpot('world', kx + dx, ky + dy, 3) || [kx + dx, ky + dy];
+      const g = makeChar({ name: `${name} der Stillen Schar`, prof: 'Wächter der Stillen Schar', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, level: 12, faction: 'undead', traits: ['diszipliniert'], pal: { skin: '#b9b3a2', cloth: '#1a1420', glow: '#4e8f7a' } });
+      Object.assign(g, { keepGuard: true, keepCourt: false, undead: true, hooded: true, brave: true, transient: true, visitor: true, anchor: { x: g.x, y: g.y }, greet: '„Der Thron ist leer. Die Wache nicht.“' }); g.equip.weapon = mkItem('knochenspalter'); recalc(g); S.ents.world.push(g); }
   }
   if (S.flags.keepSiege && !S.ents.world.some(e => e.keepSiege)) {   /* Heerlager Valens vor dem Tor */
     for (let i = 0; i < 6; i++) { const q = freeSpotNear('world', kx - 22 + (i % 3) * 2, ky + 4 + (i >> 1), 2), g = guardChar('valen', q, 'Belagerer', ri(8, 11));
@@ -12113,7 +12233,7 @@ function cinematic(shots, done, opts = {}) {
   if (S.cine || !shots.length) return;
   lastCine = shots.map(s => ({ ...s, setup: null, tick: null, done: false, showOnly: true, beats: (s.beats || []).filter(b => !b.do).map(b => ({ ...b })) }));
   const p = S.player; S.cine = { shots, i: -1, t: 0, back: { x: p.x, y: p.y, map: S.map }, done, pause: !!opts.pause, stay: !!opts.stay };
-  if (!opts.stay) p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); cineNext();
+  if (!opts.stay) p.cineGhost = true; p.vx = p.vy = 0; cineBars(true); prologPanel(false); cineNext();   /* Prolog-Tafel nie über der Kamerafahrt */
 }
 const cineWho = w => w == null ? null : typeof w === 'object' ? w : w === 'player' ? S.player : byId(w);
 function cineBeat(b, s, skip) {
@@ -15396,6 +15516,7 @@ function onKill(mtype, e) {
   if (e?.seaTag) mtype = e.seaTag;                                 // S14: Schwarzsegel, Grubenkämpfer
   if (e?.chainRest) mtype = 'chain_rest';                         // S12 A4: Kettenreste zählen für Grisk
   if (e?.contract) conKill(e);                                    // Phase 2: Auftragsziele
+  masteryKill(e);   /* Skills Phase 6: Meisterprüfungen Einhändig/Stangenwaffen */
   if (e?.raidOf && S.deadRaid?.v === e.raidOf && dist(e, S.player) < 400) S.deadRaid.pk = (S.deadRaid.pk || 0) + 1;   // S15: Verteidiger zählen
   if (e?.kind === 'enemy' && !e.trial) for (const h of ktHeroes()) if (h.status?.some(x => x.key === 'song') && [...new Set([S._hostHero || S.player, ...partyMembers()])].filter(m => m !== h && m.alive && !m.downed && m.map === h.map && dist(m, h) < 400).length >= 2) questEvent('songkill', null, 1, h);   /* Klassen-Prüfung Barde: Das Lied trägt (je Figur) */
   for (const [k, st] of questEntries()) {                             /* Koop: auch die Prüfungsaufträge der Gastfiguren */
@@ -18813,6 +18934,11 @@ function debugSections() {
     ['Figuren: Berufe erkennbar (08.10.2026)', '', {
       'Figuren: Berufsgalerie (alle Berufe nebeneinander)': () => profGallery(),   /* Entwickler 08.10.: „Man soll besser die verschiedenen Berufe erkennen können“ */
     }],
+    ['Kampfanimation §17-Rest (P3.24, 09.10.2026)', '', {
+      'Kampfanimation: Prüfstand (Haltung, Wiegen, Deckung je Waffe, drei Richtungen)': () => combatGallery(),
+      'Kampfanimation: Trefferreaktion am Helden (Stumpf → Klinge → Stich)': () => { const K = ['blunt', 'blade', 'pierce'], i = ((S.dbg ||= {}).rxI = ((S.dbg.rxI ?? -1) + 1) % 3);
+        p.rx = { t: performance.now(), a: (p.aim ?? 0) + Math.PI, k: 1, w: K[i] }; UI.toast(['Stumpf: Taumeln', 'Klinge: Zucken', 'Stich: Zurückweichen'][i], 1800); },
+    }],
     ['Sternenhimmel gekürzt (08.10.2026)', '', {
       'Sternenhimmel: alle Sternbilder zeigen an/aus (Vergleich)': () => { (S.flags ||= {}).skyAll = !S.flags.skyAll; UI.toast(S.flags.skyAll ? `Alle ${skyVisible(p).length} Sternbilder sichtbar (T)` : `Nur nutzbare: ${skyVisible(p).length} sichtbar, ${skyHidden(p).length} unter „Weitere Sternbilder“`, 3000); },
       'Sternenhimmel: Hinweis „neu geordnet“ wieder zeigen': () => { delete S.flags.skyTidy; UI.toast('Beim nächsten Öffnen (T) steht der Hinweis wieder da.'); },
@@ -19141,6 +19267,11 @@ function debugSections() {
       'Sammeln: seltene Funde geben': () => { for (const k of ['silbererz', 'schwarzholz', 'bergminze', 'nachtschatten', 'kohle', 'hartholz']) addItem(P(), k, 2); UI.refreshHUD(); },   /* §54 Spawn Rare Ore */
       'Kochen: alle Gerichte lernen': () => { for (const [k, R] of Object.entries(RECIPES)) if (R.cook) learnDish(k, 'Debug'); },
       'Kochen: Experimentieren': () => cookExperiment(),
+      'Meisterschaft: freischalten (gewählte Fertigkeit)': () => { const k = v('dbSkill'), M = SKILL_DEF[k]?.master; if (!M) return UI.toast('Für diese Fertigkeit gibt es noch keine Meisterschaft.'); P().skills[k] = Math.max(P().skills[k] || 0, M.lv * 2); masterDone(P(), k); },   /* §54 Unlock Mastery */
+      'Meisterschaften: Prüfungen zeigen': () => log(Object.entries(SKILL_DEF).filter(([, d]) => d.master).map(([k, d]) => `${SKILL_NAMES[k]} (ab ${d.master.lv}): ${d.master.task}${P().masteries?.[k] ? ' ✔' : ''}`).join(' · '), 'quest'),
+      'Lehrmeister: zum nächsten': () => { const t = S.ents.world.filter(e => e.teach).sort((a, b) => dist(a, P()) - dist(b, P()))[0]; if (t) tp(t.x / TS | 0, (t.y / TS | 0) + 1); else UI.toast('Kein Lehrmeister.'); },
+      'Lehrmeister: alle Techniken lernen': () => { P().techs ||= {}; for (const k of Object.keys(TECHS)) P().techs[k] = S.day | 0; log('Alle Techniken gelernt (Debug).', 'quest'); },
+      'Geschichte: Schmied-Anfrage auslösen': () => { delete S.flags.smithStory; P().skills.smithing = Math.max(P().skills.smithing || 0, 40); smithDeeds(P(), 0, false); },
       'Hauswissen: Rezepte zeigen': () => log(`Haus ${S.legacy.house} kennt: ${(S.legacy.recipes || []).map(k => ITEMS[k]?.name || k).join(', ') || 'noch nichts'}.`, 'party'),
     }],
     ['Bionik', '', {   /* Roadmap P2–P5: Bionik-Tests */
@@ -20809,6 +20940,20 @@ export function selftest() {
     const all = data && looks && called && bolt && rage && shaman && bomb && shove && circle && led && worker && trap && chief;
     if (!all) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led, worker, trap, chief });
     return all;
+  }));
+  ok('P3.24 Kampfanimation §17-Rest (09.10.): Treffer je Waffe (Kolben taumelt, Schwert zuckt, Speer weicht zurück), Kampfhaltung wiegt (i0≠i1 in drei Richtungen), Deckung je Waffenklasse verschieden, Front/Rücken ohne Grätsche', sandbox(() => {
+    const kinds = hitKind('mace') === 'blunt' && hitKind('sword') === 'blade' && hitKind('spear') === 'pierce' && hitKind(null) === 'blunt' && hitKind('claw') === 'blade' && HIT_RX.blunt.T > HIT_RX.blade.T && HIT_RX.pierce.d > HIT_RX.blade.d;
+    const p = stage(), rxOf = wk => { const sk = spawnEnemy('skeleton', '__a', 10, 10); sk.x = p.x + 20; sk.y = p.y; p.equip = { ...(p.equip || {}), weapon: { key: wk, cond: 1 } }; combat = S.ents.__a.filter(x => x.alive);
+      for (let i = 0; i < 12 && !sk.rx; i++) hit(p, sk, 1); return sk.rx?.w; };
+    const live = rxOf('mace') === 'blunt' && rxOf('longsword') === 'blade' && rxOf('spear') === 'pierce';
+    const spec = SP.humanSpec({ kind: 'npc', prof: 'Söldnerwache', seed: 2, pal: {}, equip: {} }), W = (md, oct, wt = 'sword') => ({ mode: md, wt, ac: wt, arc: 1.4, q: 0, v: 0, oct, two: wt === 'spear', low: 0 });
+    const px = f => { const d = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let h = 0; for (let i = 0; i < d.length; i += 3) h = (h * 31 + d[i]) | 0; return h; };
+    const sway = [['S', 2], ['N', 6], ['W', 4]].every(([d, o]) => px(SP.humanFrameR(spec, d, 'i0', W('ready', o))) !== px(SP.humanFrameR(spec, d, 'i1', W('ready', o))));
+    const guard = px(SP.humanFrameR(spec, 'S', 'guard', W('cover', 2))) !== px(SP.humanFrameR(spec, 'S', 'guard', W('cover', 2, 'spear')));
+    const feet = f => { const d = f.getContext('2d').getImageData(0, 0, f.width, f.height).data, w = f.width; let x0 = w, x1 = -1; for (let y = f.height - 12; y < f.height; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); } return x1 - x0; };
+    const rest = feet(SP.humanFrameR(spec, 'S', 'i0')), noSplay = ['S', 'N'].every(d => ['ready', 'cover'].every(md => feet(SP.humanFrameR(spec, d, md === 'cover' ? 'guard' : 'i0', W(md, d === 'S' ? 2 : 6))) <= rest + 3));
+    if (!(kinds && live && sway && guard && noSplay)) console.warn('Kampfanimation-Probe', { kinds, live, sway, guard, noSplay, rest });
+    return kinds && live && sway && guard && noSplay;
   }));
   ok('Sternenhimmel gekürzt (Entwickler 08.10.): ein Wanderer ohne Klasse sieht höchstens 3 Sternbilder, mit Klasse/Titel kommen genau diese dazu, gelernte Sterne bleiben sichtbar, der Rest steht unter „Weitere Sternbilder“; Knoten und Punkte unverändert', sandbox(() => {
     const f0 = S.flags.skyAll; S.flags.skyAll = false;
@@ -23235,6 +23380,27 @@ export function selftest() {
       return tools && hard && dimin && noPick && pick && herb && events && hidden && learned && meal && exp && once;
     } finally { Object.assign(S.res, r0); if (cook0) S.legacy.cook = cook0; else delete S.legacy.cook; }
   }));
+  ok('Skills Phase 6/7 (09.10.): Meisterprüfungen erst ab Stufe 40 und nur unter ihrer Bedingung (Einhändig ohne Schild gegen Starke, Speer gegen Veteranen, Meisterstück, Alter vom Grund, Erz in der Tiefe), Titel + Meisterhaltung; Lehrmeister in den Skill-Städten lehren Techniken gegen Stufe + Aufgabe; Buch gibt Wissen; guter Schmied bekommt eine Anfrage', sandbox(() => {
+    const p = stage(), r0 = { ...S.res }, ord0 = S.eco?.orders ? [...S.eco.orders] : null; p.inv = []; p.invCap = 80; p.skills = {}; p.level = 5; p.titles = [];
+    try {
+      const foe = o => { const e = spawnEnemy('bandit', '__a', 14, 9); Object.assign(e, { level: 5, lastKiller: p.id }, o); return e; };
+      p.equip.weapon = mkItem('longsword'); p.equip.offhand = null; p.skills.onehanded = 40; masteryKill(foe({ elite: true })); const early = !p.masteries?.onehanded;
+      p.skills.onehanded = 80; p.equip.offhand = mkItem('wooden_shield'); masteryKill(foe({ elite: true })); const shield = !p.masteries?.onehanded;
+      p.equip.offhand = null; masteryKill(foe({ elite: true })); const sword = !!p.masteries?.onehanded && p.titles.includes('Klingenmeister') && Math.abs(wperk(p, 'parry') - 0.5) < 1e-9;
+      p.equip.weapon = mkItem('spear'); p.skills.polearms = 80; masteryKill(foe({})); const weak = !p.masteries?.polearms; masteryKill(foe({ elite: true })); const spear = weak && !!p.masteries?.polearms;
+      p.skills.smithing = 80; S.flags.smithStory = 0; const n0 = S.eco?.orders?.length || 0; smithDeeds(p, 3, false); const noMaster = !p.masteries?.smithing, story = !S.eco?.orders || (S.eco.orders.length === n0 + 1 && S.eco.orders.at(-1).story);
+      smithDeeds(p, 4, false); const smith = noMaster && !!p.masteries?.smithing && story;
+      p.skills.fishing = 80; for (let i = 0; i < 400 && !p.masteries?.fishing; i++) fishCatch(p, { kind: 'lake', spotK: '__m' + i }); const fish = !!p.masteries?.fishing && hasItem(p, 'alter_wels');
+      p.skills.mining = 80; for (let i = 0; i < 5; i++) gatherNode(p, { id: 'dn' + i, kind: 'prop', type: 'rock_node', map: 'deep', x: 300, y: 300, harvest: 'iron', gk: 'rock_node@d' + i }); const mine = !!p.masteries?.mining;
+      const tr = ensureTrainers(), desks = S.ents.world.filter(e => e.teach).length, trainers = tr >= 3 && desks === tr;
+      p.skills.fishing = 20; delete p.masteries.fishing; addItem(p, 'hering', 3); const ready = techState(p, 'kuestenwurf') === 'bereit'; learnTech(p, 'kuestenwurf');
+      const tech = ready && !!p.techs?.kuestenwurf && !hasItem(p, 'hering') && Math.abs(perkVal(p, 'fishing', 'window') - 0.45) < 1e-9 && techState(p, 'zwergenhaertung') === 'stufe';
+      p.skills.herbalism = 10; const blind = !herbSees(p); addItem(p, 'buch_kraeuter', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'buch_kraeuter')); const book = blind && herbSees(p) && !hasItem(p, 'buch_kraeuter');
+      const heir = makeChar({ name: 'Erbe', x: 0, y: 0 }), fresh = !heir.masteries && !heir.techs;
+      if (!(early && shield && sword && spear && smith && fish && mine && trainers && tech && book && fresh)) console.warn('Meister/Lehrer', JSON.stringify({ early, shield, sword, spear, smith, story, fish, mine, tr, desks, ready, tech, book, fresh }));
+      return early && shield && sword && spear && smith && fish && mine && trainers && tech && book && fresh;
+    } finally { Object.assign(S.res, r0); if (ord0) S.eco.orders = ord0; }
+  }));
   ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
     const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;
     for (const b of HOUSES.filter(h => h.map === 'world').slice(0, 400)) { const [x, y] = doorFront(b, 1), [ex, ey] = dirs[b.door]; if (x !== b.doorTile[0] + ex || y !== b.doorTile[1] + ey) ok1 = false; }
@@ -24906,7 +25072,9 @@ function boot() {
     cookExperiment: () => { const r = cookExperiment(); UI.refreshHUD(); return r; },   /* Kochen: Experimentieren am Kessel */
     skillInfo: (k, c = S.player) => { const v = c?.skills?.[k] || 0, P = SKILL_DEF[k]?.perks || {};   /* Skill-Core: Fenster „Fertigkeiten“ */
       return { k, name: SKILL_NAMES[k] || k, v, lv: skillLv(v), frac: (v % 2) / 2, group: SKILL_DEF[k]?.group || 'Sonstiges', what: SKILL_DEF[k]?.what || '', next: skillNext(c, k),
-        perks: Object.entries(P).map(([L, [, , t]]) => ({ lv: +L, t, on: skillLv(v) >= +L })) }; },
+        perks: Object.entries(P).map(([L, [, , t]]) => ({ lv: +L, t, on: skillLv(v) >= +L })),
+        master: SKILL_DEF[k]?.master ? { ...SKILL_DEF[k].master, done: !!c?.masteries?.[k], open: masterOpen(c, k) } : null,   /* Phase 6 */
+        techs: Object.entries(TECHS).filter(([, T]) => T.skill === k).map(([tk, T]) => ({ name: T.name, t: T.perk[2], on: !!c?.techs?.[tk], where: T.teacher })) }; },   /* Phase 7 */
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
     questInfo, cancelQuest, trackQuest: k => { S.track = k; },
     shopStock, price, buy, sell, craftBandage, bandageFrom: k => BANDAGE_FROM[k] || 0,
