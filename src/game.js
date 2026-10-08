@@ -1,18 +1,18 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=24';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=24';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=24';
-import * as R from './render.js?v=24';
-import * as HB from './buildings.js?v=24';
-import * as UI from './ui.js?v=24';
-import * as SIM from './sim.js?v=24';
-import * as B from './body.js?v=24';
-import * as SP from './sprites.js?v=24';
-import * as ECO from './economy.js?v=24';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=24';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=24';
-import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=24';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
+import * as R from './render.js?v=25';
+import * as HB from './buildings.js?v=25';
+import * as UI from './ui.js?v=25';
+import * as SIM from './sim.js?v=25';
+import * as B from './body.js?v=25';
+import * as SP from './sprites.js?v=25';
+import * as ECO from './economy.js?v=25';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
+import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=25';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -1271,6 +1271,7 @@ function planDays() {
       c.plan.work = { x: st.x, y: st.y - 20, in: 0, f: { x: st.x, y: st.y + 40 }, act: null, stall: st.id }; c.plan.job = true; c.schedulePos = c.plan.work;
       Object.assign(c, { shop: true, pool: STALL_SELL[c.prof].filter(i => ITEMS[i]), till: 18 }); });
   }
+  planSocial();   /* Planlauf P1.12/P1.13: Märkte und Treffpunkte (Kinder übernehmen danach den Markt der Mutter) */
   planHomes();   /* Planlauf P1.9–P1.11: Bett, Haushalt, Kinder — vor den Beziehungen, damit Familien nicht Rivalen werden */
   planRelations();
   assignHunters();
@@ -1443,17 +1444,20 @@ function dayTargetRaw(e) {
   if (h < 6.5 || h >= 21.5) return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
   if (S.war?.nodes[e.homeTown]?.owner === 'undead' || [2, 3].includes(S.schutz?.[e.homeTown]?.stage)) return { x: e.anchor.x, y: e.anchor.y, k: 'v', in: 1 };   // BUG-099: Besatzung — alle verstecken sich im Haus (auch ohne Wache)
   if ((h < 7.5 || h >= 11.5) && townDanger(e.homeTown)) return { x: e.anchor.x, y: e.anchor.y, k: 's', in: 1 };   // S13: Gefahr — außer zur Arbeit daheim
-  if (h >= 15 && festNow(e.homeTown)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
+  if (h >= 15 && festNow(e.homeTown) && !festGoes(e) && P.plaza && Math.hypot(P.plaza.x - festSpot(e.homeTown).x, P.plaza.y - festSpot(e.homeTown).y) > 15 * TS) {   /* P1.12 ⚖: Metropole/Hauptstadt — wer nicht ans Hauptfeuer geht, feiert auf dem Markt seines Viertels */
+    const a = P.n * 2.39996, r = 48 + (P.n % 4) * 20; return { x: P.plaza.x + Math.cos(a) * r, y: P.plaza.y + Math.sin(a) * r * 0.7, k: 'f', social: 1 }; }
+  if (h >= 15 && festNow(e.homeTown) && festGoes(e)) { const c = festSpot(e.homeTown), a = P.n * 2.39996;   // Fest: im Kreis ums Feuer
     const rings = Math.max(6, Math.ceil((FEST_POP[e.homeTown] || 24) / 14)), r = 80 + (P.n % rings) * 22;   // BUG (Nutzer: Aurelion-Klumpen): Ringe wachsen mit der Einwohnerzahl, sonst quetscht sich eine Metropole auf 6 Ringe wie ein Dorf
     return { x: c.x + Math.cos(a) * r, y: c.y - 2 * TS + Math.sin(a) * r * 0.7, k: 'f', social: 1 }; }   // Mitte = Feuer (2 Kacheln nördlich des Platzes)
   if (P.hunt && h >= 7 && h < 13.5) return { x: P.hunt.x, y: P.hunt.y, k: 'j', work: 1 };            // Jäger: draußen im Jagdgebiet
   if (P.hunt && h >= 13.5 && h < 15) return { x: P.plaza.x, y: P.plaza.y, k: 'jd', deliver: 1 };     // … und mit Beute zum Markt
   if (h < 7.5) return { x: P.front.x, y: P.front.y, k: 'm' };
   if (h < 11.5) return { x: P.work.x, y: P.work.y, k: 'w', work: 1 };
-  if (h < 13) { const t = P.tav && P.n % 2 ? P.tav : P.plaza; return { x: t.x, y: t.y, k: 'l', social: 1, in: t.in, sit: t.sit }; }
+  if (h < 13) { const t = P.tav && P.n % 2 ? P.tav : P.meet && P.n % 3 === 0 ? P.meet : P.n % 3 === 1 ? P.front : P.plaza; return { x: t.x, y: t.y, k: 'l', social: 1, in: t.in, sit: t.sit }; }   /* P1.12 ⚖: mittags Schenke / Treffpunkt / daheim / Markt statt alle auf den Platz */
   if (h < 16.5) { if (P.job || alt === 0) return { x: P.work.x, y: P.work.y, k: 'a', work: 1 };
+    if (alt === 2 && P.meet && P.n % 2) return { x: P.meet.x, y: P.meet.y, k: 'am', social: 1 };   /* P1.13: nachmittags jeder Zweite am Treffpunkt (Brunnen, Tempel, Tor, Übungsplatz) */
     const t = alt === 1 ? P.visit : P.plaza; return { x: t.x, y: t.y, k: 'a' + alt, social: 1 }; }
-  if (h < 18) { const t = P.job ? P.work : P.plaza; return { x: t.x, y: t.y, k: 'k', work: P.job ? 1 : 0, social: P.job ? 0 : 1 }; }
+  if (h < 18) { const t = P.job ? P.work : P.meet && P.n % 2 ? P.meet : P.plaza; return { x: t.x, y: t.y, k: 'k', work: P.job ? 1 : 0, social: P.job ? 0 : 1 }; }   /* P1.12 ⚖: früher Abend — jeder Zweite ohne Arbeit am Treffpunkt */
   if (h < 20.5 || P.eve.in) return { x: P.eve.x, y: P.eve.y, k: 'e', social: 1, in: P.eve.in, sit: P.eve.sit };
   return { x: e.anchor.x, y: e.anchor.y, k: 'n', in: 1 };
 }
@@ -7792,6 +7796,38 @@ function conGiverOk(npc) {
   return M.set.has(npc);
 }
 const conGiverMemo = {};
+/* P1.8 Rollenverteilung je Ort (Spec Welt §40–44, Planlauf 08.10.2026 — Soll-Anteile vorläufig ⚖): jede Figur eines Ortes hat genau eine Rolle,
+   Vorrang Story > Wache > Geber > Händler/Mitarbeiter (fester Arbeitsplatz) > Reisende > Familie > Bürger. Nur Messung und Anzeige (Infofeld „Rolle“,
+   Debug „Stadt: Rollen Soll/Ist“) — Berufe werden nicht umverteilt, der Geber-Deckel 3/4/6 bleibt (Entwickler 08.10.), die Lücke wird nur gezeigt. */
+const ROLE_NAME = { S: 'Figur mit Geschichte', W: 'Wache', G: 'Auftraggeber', H: 'Händler/Mitarbeiter', R: 'Reisender', F: 'Familie', B: 'Bürger' };
+const ROLE_SOLL = { G: 15, H: 25, F: 20, W: 15, R: 10, B: 10, S: 5 };   /* Spec-Beispiel bei 20 NPCs: 3/5/4/3/2/2/1 */
+const ROLE_TRAV = new Set(['Söldner', 'Spielmann', 'Spielfrau', 'Pilger', 'Pilgerin', 'Karawanenwache', 'Wanderer', 'Hausierer', 'Bote', 'Arbeitssuchender', 'Wanderautomat']);
+const ROLE_SERV = new Set(['Wirt', 'Wirtin', 'Schankmagd', 'Koch', 'Kutscher', 'Fährmann', 'Mastwart', 'Lagerknecht', 'Stallknecht']);
+function roleOf(e) {
+  if (!e || e.kind !== 'npc') return null;
+  if (NAMED_NPC.has(e.key) || e.varonCourt || e.courtFolk) return 'S';
+  if (e.guard || e.post || e.capGuard || e.nightWatch || e.patrol || e.vm) return 'W';
+  if (conGiverOk(e)) return 'G';
+  if (e.shop || e.smith || e.plan?.job || ROLE_SERV.has(e.prof)) return 'H';
+  if (e.traveler || e.travLead || ROLE_TRAV.has(e.prof)) return 'R';
+  if (e.famKid || e.household?.members.length > 1) return 'F';
+  return 'B';
+}
+function roleLine(e) {
+  const k = roleOf(e); if (!k) return '';
+  return (k === 'H' ? (e.shop ? 'Händler' : 'Mitarbeiter') : ROLE_NAME[k]) + (e.household && !e.famKid ? ` · Haus ${e.household.name}` : '');
+}
+function townRoles(t) {
+  const r = { n: 0, S: 0, W: 0, G: 0, H: 0, R: 0, F: 0, B: 0 };
+  for (const e of S.ents.world) {
+    if (e.kind !== 'npc' || e.alive === false || e.hostile || S.party.includes(e.id)) continue;
+    if ((townAt(e.x / TS | 0, e.y / TS | 0, 0) || e.homeTown) !== t) continue;
+    r[roleOf(e)]++; r.n++;
+  }
+  r.soll = Object.fromEntries(Object.entries(ROLE_SOLL).map(([k, p]) => [k, Math.round(r.n * p / 100)]));
+  return r;
+}
+const roleTable = t => { const r = townRoles(t); return Object.keys(ROLE_SOLL).map(k => `${ROLE_NAME[k]} ${r[k]}/${r.soll[k]}`).join(' · '); };
 /* Entwickler 02.10.2026: „3 Aufträge für die Eisenkette, kein Ansehen“ — die Eisenfeste steht nicht in TOWN_PLAN/GUARD_POSTS, ihr Ansehen ging an Valen.
    Orte der Kette (LOCATIONS faction 'chain') zählen jetzt für die Kette. Andere Fraktionsorte (Grubenhort, Karak-Atar …) bleiben bewusst unverändert: offene Entscheidung. */
 /* Entwickler 03.10.2026: Varonheim ist volle Hauptstadt (Kutsche, Schankpersonal, Söldner, volles Brett) — das Dorf-Kennzeichen in TOWN_PLAN
@@ -8958,6 +8994,8 @@ function introFlight(force = false) {
     ...(ruin ? [{ ...introSpot(ruin.key), zoom: 0.8, dur: 4000, text: `${ruin.name}. Ruinen, Gräber, Gerüchte — nicht alles steht auf der Karte, und nicht alles will gefunden werden.` }] : []),
     { x: here.x, y: here.y, zoom: 1.3, dur: 3600, text: `${p.name}. Kein Name, kein Land, keine Schulden — noch nicht. Was davon interessiert dich?` },
   ];
+  shots.forEach((s, i) => { if (!s.to && !s.focus) s.to = { x: s.x + (i % 2 ? -3 : 3) * TS, y: s.y - 1.5 * TS }; });   /* Entwickler 08.10.: keine Standbilder — jede Einstellung schwenkt langsam */
+  shots[0].beats = [{ t: 0.02, card: { title: 'ROTFALL', sub: 'Die Welt wartet nicht', ms: 4200 } }];
   cinematic(shots, () => { S.flags.tutor = S.flags.tutor ?? 0; tutorShow(); });
 }
 const TUTOR = [
@@ -9074,14 +9112,17 @@ function prologEnsure() {                                             /* idempot
   prologShow();
 }
 function prologIntro() {
-  const p = S.player, T2 = (x, y) => ({ map: 'prolog', x: x * TS, y: y * TS });
+  const p = S.player, T2 = (x, y) => ({ map: 'prolog', x: x * TS, y: y * TS }), os = prEnt('oswin'), at = (x, y) => ({ x: x * TS, y: y * TS });
+  /* Kamerafahrt 08.10. (Entwickler: „mach die Kamerafahrten besser“): jede Einstellung ist ein Schwenk (to), Nahaufnahmen folgen Figuren (focus), Beats setzen Klang, Staub, Totenlicht */
   cinematic([
-    { ...T2(30, 22), zoom: 0.45, dur: 5600, text: 'Vor Jahren fiel ein Stern. Rotfall nennen sie es. Seitdem bleiben die Toten nicht liegen.', beats: [{ t: 0.05, card: { title: 'ROTFALL', sub: 'Prolog — Die Aschenfurt', ms: 4600 } }] },
-    { ...T2(12, 35), zoom: 1.2, dur: 4400, text: 'Ein Flüchtlingstreck auf dem Weg nach Westen, ins Königreich. Er kam bis zur Aschenfurt.' },
-    { ...T2(50, 21), zoom: 0.9, dur: 4400, text: 'Hinter dem Fluss beginnt das Land der Stillen. Ihre Gräber sind nie ganz zu.' },
-    { ...T2(26, 19), zoom: 1.25, dur: 4000, text: 'An der ausgebrannten Wachstation des Königs brennt noch ein Feuer.' },
-    { ...T2(25, 5), zoom: 1.0, dur: 4000, text: 'Im Norden führt die Straße hinaus — zu Königen, zu Toten und zu allem dazwischen.' },
-    { map: 'prolog', x: p.x, y: p.y, zoom: 1.4, dur: 3200, text: `${p.name}. Du lebst. Noch.` },
+    { ...T2(53, 20), to: at(30, 22), zoom: 0.7, dur: 6500, text: 'Vor Jahren fiel ein Stern vom Himmel. Rotfall nennen sie es. Seitdem bleiben die Toten nicht liegen.',
+      beats: [{ t: 0.02, card: { title: 'ROTFALL', sub: 'Prolog — Die Aschenfurt', ms: 5200 } }, { t: 0.04, sfx: 'bell', w: 0.3, vol: 0.6 }] },
+    { ...T2(25, 4), to: at(25, 17), zoom: 1.0, dur: 5400, text: 'Hier stand eine Wachstation des Königs: Palisade, Turm, ein Tor nach Norden. Jetzt Asche — und ein Feuer, das jemand am Leben hält.' },
+    { ...T2(27, 20), focus: os?.id, zoom: 1.7, dur: 4200, text: 'Oswin, Grenzwächter. Der Letzte, der hier noch Wache hält.', beats: [{ t: 0.45, who: os?.id, say: '„Noch einer, der atmet?“', ms: 2600 }] },
+    { ...T2(17, 33), to: at(11, 37), zoom: 1.4, dur: 5600, text: 'Ein Flüchtlingstreck auf dem Weg nach Westen, ins Königreich. In der Nacht kamen die Toten über die Furt.', beats: [{ t: 0.35, fx: 'dust', at: at(13, 38), n: 8 }, { t: 0.6, fx: 'dust', at: at(9, 34), n: 6 }] },
+    { ...T2(43, 21), to: at(53, 21), zoom: 1.05, dur: 5800, text: 'Hinter dem Fluss beginnt das Land der Stillen. Ihre Gräber sind nie ganz zu.',
+      beats: [{ t: 0.55, shake: 2, ms: 500 }, { t: 0.56, fx: 'necro', at: at(51, 21), n: 12 }, { t: 0.58, sfx: 'bone', w: 0.3, vol: 0.7 }] },
+    { map: 'prolog', x: p.x, y: p.y - 3 * TS, to: { x: p.x, y: p.y }, zoom: 1.9, dur: 4200, text: `${p.name}. Du lebst. Noch.`, beats: [{ t: 0.5, zoom: 1.3 }] },
   ], () => { prologShow(); log('Du kommst unter einem Wagen zu dir. Rauch, Asche, Stille. Am Feuer im Norden sitzt jemand.', 'world'); });
 }
 function prologShow() {
@@ -9096,7 +9137,9 @@ function prologAdvance() {
   const P = S.prolog; P.step++; prNext = 0;
   const el = $('tutor'); if (el) { el.classList.add('ok'); setTimeout(() => el.classList.remove('ok'), 700); }
   const k = PR_STEPS[P.step]?.k;
-  if (k === 'fight') return cinematic([{ map: 'prolog', x: 50 * TS, y: 21 * TS, zoom: 1.1, dur: 3800, text: 'Drüben bei den Gräbern bewegt sich die Erde.', beats: [{ t: 0.15, shake: 4, ms: 500, do: () => prologEnsure() }, { t: 0.4, flash: 'rgba(80,140,120,.5)', ms: 300 }] }], () => { prologShow(); log('Untote! Wer fällt, wird hier nicht begraben — kämpf oder lauf.', 'quest'); });
+  if (k === 'fight') { const foe = { map: 'prolog', x: 51 * TS, y: 21 * TS, zoom: 1.7, dur: 3600, text: 'Sie haben dich gerochen. Waffe hoch.', setup: () => { foe.focus = S.ents.prolog.find(e => e.prUndead && e.alive)?.id; } };
+    return cinematic([{ map: 'prolog', x: 44 * TS, y: 21 * TS, to: { x: 50 * TS, y: 21 * TS }, zoom: 1.15, dur: 4200, text: 'Drüben bei den Gräbern bewegt sich die Erde.',
+      beats: [{ t: 0.35, shake: 4, ms: 600, do: () => prologEnsure() }, { t: 0.36, fx: 'necro', at: { x: 50 * TS, y: 19 * TS }, n: 14 }, { t: 0.37, sfx: 'bone', w: 0.4, vol: 0.9 }, { t: 0.45, flash: 'rgba(80,140,120,.5)', ms: 300 }, { t: 0.5, fx: 'necro', at: { x: 52 * TS, y: 23 * TS }, n: 14 }] }, foe], () => { prologShow(); log('Untote! Wer fällt, wird hier nicht begraben — kämpf oder lauf.', 'quest'); }); }
   if (k === 'choice') return prologEnvoyScene();
   prologEnsure();
 }
@@ -9149,6 +9192,7 @@ function prologGoalTalk(npc) {
     '„Hör zu, ich sag es nur einmal. Garmadon, der Tote König, herrscht im Osten — die Stillen haben Städte, Gesetze und Zeit. König Varon hält den Westen mit Galgen und Steuern. Dazwischen: freie Orte, Händler, Banden, der Orden — und Leute wie du.“',
     '„Du wirst nicht ewig leben. Wenn du fällst, ist es vorbei. Aber was du baust, bleibt: dein Haus, dein Name, dein Erbe. Dein Nachfolger erbt Gold, Ruf — und deine Feinde. Das ist ROTFALL: nicht ein Held, sondern ein Geschlecht.“',
     '„Was du kannst, lernst du durch Tun. Wer schmiedet, wird Schmied, wer kämpft, wird Kämpfer. Niemand gibt dir eine Liste. Aufträge hängen an Brettern, Gerüchte erzählen die Leute — und die Welt läuft weiter, ob du hinsiehst oder nicht.“',
+    '„Und eins muss dir klar sein: Am Anfang ist es schwer. Ein einzelner Bandit kann dich töten, ein Wolfsrudel ganz sicher. Nimm Verbände mit, geh nicht allein in die Wildnis, und lauf lieber weg, als zu sterben. Mit jeder Stufe, jeder besseren Waffe und jedem Gefährten wird es leichter — leicht wird es nie.“',   /* Entwickler 08.10.: Schwierigkeit erklären */
     '„Und jetzt sieh zum Tor. Sie sind schneller gekommen, als ich dachte. Jeder will Leute wie dich — die Frage ist nur, wem du gehören willst.“',
   ];
   const step = i => UI.dialogue(npc, lines[i], [{ text: i < lines.length - 1 ? 'Weiter' : 'Zum Tor sehen', fn: () => { if (i < lines.length - 1) return step(i + 1); UI.closeDialogue(); P.goal = 1; prologAdvance(); } }]);
@@ -9164,9 +9208,15 @@ function prologEnvoys() {
 }
 function prologEnvoyScene() {
   prologEnsure(); const gate = { map: 'prolog', x: 25 * TS + TS / 2, y: 6 * TS };
-  cinematic([
-    { ...gate, zoom: 1.2, dur: 6200, text: 'Durch das Nordtor kommen drei Gesandte, staubig und bewaffnet. Jeder sucht Leute für seine Seite.', beats: [
-      { t: 0.18, card: { title: PR_ENVOY.krone.card, sub: PR_ENVOY.krone.sub, ms: 1800 } }, { t: 0.46, card: { title: PR_ENVOY.tote.card, sub: PR_ENVOY.tote.sub, ms: 1800 } }, { t: 0.74, card: { title: PR_ENVOY.rebell.card, sub: PR_ENVOY.rebell.sub, ms: 1600 } }] },
+  const env = k => S.ents.prolog.find(e => e.prEnvoy === k)?.id, os = prEnt('oswin');
+  const one = (k, say, sfx2) => ({ ...gate, focus: env(k), zoom: 1.9, dur: 3800, text: PR_ENVOY[k].name + ' — ' + PR_ENVOY[k].prof + '.',
+    beats: [{ t: 0.05, card: { title: PR_ENVOY[k].card, sub: PR_ENVOY[k].sub, ms: 3000 } }, { t: 0.35, who: env(k), say, ms: 2800 }, ...(sfx2 ? [{ t: 0.3, sfx: sfx2, w: 0.3, vol: 0.6 }] : [])] });
+  cinematic([   /* Entwickler 08.10.: jede Seite bekommt ihren eigenen Auftritt */
+    { ...gate, y: 2 * TS, to: { x: gate.x, y: 9 * TS }, zoom: 1.1, dur: 5200, text: 'Durch das Nordtor kommen drei Gesandte, staubig und bewaffnet. Jeder sucht Leute für seine Seite.', beats: [{ t: 0.1, sfx: 'horn', w: 0.3, vol: 0.7 }] },
+    one('krone', '„Im Namen König Varons!“', 'metal'),
+    one('tote', '„Die Stille wartet. Sie hat Zeit.“', 'bone'),
+    one('rebell', '„Keiner von denen ist dein Freund.“'),
+    { ...gate, y: 18 * TS, focus: os?.id, zoom: 1.6, dur: 3400, text: 'Jetzt musst du wählen. Sprich mit dem, dem du folgen willst — oder sag es Oswin.', beats: [{ t: 0.3, who: os?.id, say: '„Wähl gut. Du wählst nur einmal.“', ms: 2600 }] },
   ], () => { prologShow(); log('Am Nordtor warten Hauptmann Gerold (Krone), die Grabsprecherin Ysolde (die Stillen) und Mara, die Bannbrecherin (ohne Herrn). Sprich mit dem, dem du folgen willst.', 'quest'); });
 }
 function prologEnvoyTalk(npc) {
@@ -9189,7 +9239,7 @@ function prologConfirm(npc, path) {
 }
 function prologEnd(path) {
   const P = S.prolog, E = PR_ENVOY[path], who = S.ents.prolog?.find(e => e.prEnvoy === path);
-  if (who && !S._quiet) bubble(who, E.yes, 3600);
+  if (who && who.prEnvoy) who.anchor = { x: 25 * TS + TS / 2, y: 3 * TS };   /* der Gesandte geht voraus zum Tor */
   const go = () => {
     const p = S.player; clearInterval(prMenuTimer);
     travel('world');
@@ -9199,12 +9249,15 @@ function prologEnd(path) {
       log('Du folgst keinem. Titel „Ohne Herrn“; die Freien +10, Valen −10. Beide Mächte werden dich beobachten.', 'faction'); for (const t of P.startLog || []) log(t, 'world'); }
     chronicle(`${p.name} verlässt die Aschenfurt`, 'birth', { krone: 'Im Dienst der Krone.', tote: 'Im Dienst der Stillen — als Lebender.', rebell: 'Ohne Herrn.' }[path]);
     S.ents.prolog = []; S.prolog = null; S.flags.prologPath = path; S.flags.tutor = 2; S.flags.tutX = null; S.flags.introDone = 0;   /* Wegweiser ab „Händler“: Bewegen und Ansprechen sind gelernt */
+    log('Hinweis: Der Anfang ist schwer. Gegner sind gefährlich, Wunden heilen langsam, und wer stirbt, ist tot — dein Erbe geht weiter. Nimm Verbände mit, meide die Wildnis bei Nacht, such dir Gefährten in der Schenke und lauf weg, wenn es kippt. Mit Stufen, Ausrüstung und Gefährten wird es leichter.', 'quest');   /* Entwickler 08.10. */
     tutorShow(); setTimeout(() => introFlight(), 600); save();
   };
   if (S._quiet) return go();
-  cinematic([{ map: 'prolog', x: 25 * TS + TS / 2, y: 5 * TS, zoom: 1.1, dur: 3000, text: { krone: 'Du folgst dem Hauptmann nach Westen, nach Varonheim.', tote: 'Du folgst der Grabsprecherin über die Furt, nach Osten, nach Vharnholm.', rebell: 'Du gehst allein durch das Nordtor. Mara nickt dir nach.' }[path], beats: [{ t: 0.7, flash: '#000', ms: 900 }] }], go);
+  cinematic([{ map: 'prolog', x: 25 * TS + TS / 2, y: 7 * TS, focus: who?.id, zoom: 1.8, dur: 3200, text: `${E.name}: ${E.yes}`, beats: [{ t: 0.1, card: { title: E.card, sub: 'Dein Weg beginnt', ms: 2800 } }] },
+    { map: 'prolog', x: 25 * TS + TS / 2, y: 9 * TS, to: { x: 25 * TS + TS / 2, y: 2 * TS }, zoom: 1.1, dur: 3600, text: { krone: 'Du folgst dem Hauptmann nach Westen, nach Varonheim.', tote: 'Du folgst der Grabsprecherin über die Furt, nach Osten, nach Vharnholm.', rebell: 'Du gehst allein durch das Nordtor. Mara nickt dir nach.' }[path], beats: [{ t: 0.7, flash: '#000', ms: 900 }] }], go);
 }
 const GUIDE = [
+  ['hard', p => !S.flags.prologPath && (S.flags.playMin || 0) >= 1 && (S.day | 0) <= 3, 'Der Anfang ist schwer: Ein einzelner Bandit kann dich töten. Nimm Verbände mit, meide die Wildnis bei Nacht, such Gefährten in der Schenke und lauf weg, wenn es kippt. Mit Stufen, Ausrüstung und Gefährten wird es leichter.'],   /* Entwickler 08.10.: Schwierigkeit erklären (im Prolog sagt es Oswin) */
   ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
   ['talent', p => (p.skillPoints || 0) > 0, 'Du hast einen Talentpunkt frei. T öffnet den Sternenhimmel: Wanderer, deine Klassen, deine Titel.'],   /* Scheibe 2: wieder an */
   ['attr', p => (p.attrPoints || 0) > 0, 'Freie Attributpunkte: C öffnet deinen Charakter.'],
@@ -11337,9 +11390,24 @@ function cineNext() {
 }
 function cineTick(dt) { const C = S.cine; if (!C) return; C.t += dt; const s = C.shots[C.i]; if (s?.tick) s.tick(dt, C.t); cineBeats(s, C.t, false);   /* T17: Zeitachse */
   if (s?.to && s.x != null) { const k = Math.min(1, C.t / (s.dur || 3000)), e = k * k * (3 - 2 * k); S.player.x = s.x + (s.to.x - s.x) * e; S.player.y = s.y + (s.to.y - s.y) * e; }   // S15: sanfte Kamerafahrt
-  if (C.t >= (s?.dur || 3000)) cineNext(); }
+  if (C.t >= (s?.dur || 3000) && !C.hold) { if (cineWaits(s)) { C.hold = true; cineHoldUI(true); } else cineNext(); } }
+/* Entwickler 08.10.2026: „bei Kamerafahrten selber auf Weiter drücken“ — Einstellungen mit Text bleiben nach ihrer Dauer stehen, bis Weiter
+   (Knopf, Leertaste, Enter, E). Vorher drücken: Rest der Einstellung (Bild und Klang) sofort, dann weiter. Esc überspringt alles.
+   Ohne Text, mit auto:true, im Selbsttest (_quiet) oder mit Einstellung „Kamerafahrten automatisch“ läuft es wie bisher. */
+const cineWaits = s => !!s?.text && !s.auto && !S._quiet && !S.settings?.cineAuto;
+function cineAdvance() {
+  const C = S.cine; if (!C) return; const s = C.shots[C.i];
+  if (!C.hold) cineBeats(s, Infinity, false);
+  C.hold = false; cineHoldUI(false); cineNext();
+}
+function cineHoldUI(on) {
+  const b = document.getElementById('cineNextBtn'); if (!b) return;
+  b.style.opacity = on ? '1' : '.45'; b.textContent = on ? 'Weiter ▸' : 'Weiter ▸';
+  if (on) b.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 1400, iterations: Infinity });
+  else b.getAnimations?.().forEach(a => a.cancel());
+}
 function cineEnd() {
-  const C = S.cine; if (!C) return; S.cine = null;
+  const C = S.cine; if (!C) return; S.cine = null; cineHoldUI(false);
   for (const s of C.shots.slice(C.i + 1)) if (!s.done && !s.showOnly) try { s.setup?.(); } catch (err) { console.error(err); }   // S15 Fehlersuche: wer überspringt, verpasst keine Folgen (Befreiung, Überfall …)
   for (const s of C.shots.slice(Math.max(0, C.i))) cineBeats(s, Infinity, true);   /* T17: übersprungene Beats — nur die Folgen */
   document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel());
@@ -11349,7 +11417,8 @@ function cineEnd() {
 function cineBars(on, text = '') {
   let el = document.getElementById('cineBars');
   if (!el) { el = document.createElement('div'); el.id = 'cineBars';
-    el.innerHTML = '<div style="position:fixed;left:0;right:0;top:0;height:11vh;background:#000;z-index:60;pointer-events:none"></div><div style="position:fixed;left:0;right:0;bottom:0;height:13vh;background:#000;z-index:60;pointer-events:none;display:flex;align-items:center;justify-content:center"><span id="cineText" style="color:#e8dcc0;font:16px Georgia,serif;letter-spacing:.04em;text-align:center;max-width:80vw;text-shadow:0 1px 0 #000"></span></div><div style="position:fixed;right:14px;top:calc(11vh + 8px);z-index:61;color:#8a8070;font:11px sans-serif;pointer-events:none">ESC — überspringen</div>';
+    el.innerHTML = '<div style="position:fixed;left:0;right:0;top:0;height:11vh;background:#000;z-index:60;pointer-events:none"></div><div style="position:fixed;left:0;right:0;bottom:0;height:13vh;background:#000;z-index:60;pointer-events:none;display:flex;align-items:center;justify-content:center"><span id="cineText" style="color:#e8dcc0;font:16px Georgia,serif;letter-spacing:.04em;text-align:center;max-width:70vw;text-shadow:0 1px 0 #000"></span><button id="cineNextBtn" style="position:absolute;right:3vw;pointer-events:auto;cursor:pointer;background:#1a1510;border:1px solid #a8874f;color:#e8d6a8;font:13px Cinzel,Georgia,serif;letter-spacing:.12em;padding:7px 16px;opacity:.45">Weiter ▸</button></div><div style="position:fixed;right:14px;top:calc(11vh + 8px);z-index:61;color:#8a8070;font:11px sans-serif;pointer-events:none">Leertaste / Enter — weiter · ESC — alles überspringen</div>';
+    el.querySelector('#cineNextBtn').onclick = ev => { ev.stopPropagation(); cineAdvance(); };   /* Entwickler 08.10.: Weiter von Hand */
     el.insertAdjacentHTML('beforeend', '<div id="cineFade" style="position:fixed;inset:0;background:#000;opacity:0;z-index:59;pointer-events:none"></div>');   /* S15: Abblende zwischen Einstellungen */
     document.body.appendChild(el); }
   el.style.display = on ? 'block' : 'none'; const t = document.getElementById('cineText'); if (t) t.textContent = text;
@@ -13702,7 +13771,7 @@ function npcOffers(n) {
   if (n.shop) o.push('Handel'); if (n.smith) o.push('Ausbessern'); if (isHealer(n)) o.push(`Heilen (${healCost()} Gold)`);
   if (n.teaches) o.push('Ausbildung'); if (n.coach) o.push('Kutschfahrten'); if (n.ferry) o.push('Überfahrt'); if (n.airMaster) o.push('Luftschiff-Passagen, Flottenstatus');
   if (n.merc && !S.party.includes(n.id)) o.push(`Söldner (${n.merc.hire} Gold)`); if ((n.recruit || n.retainer) && !S.party.includes(n.id)) o.push('Kommt vielleicht mit');
-  if (n.vm || n.prof === 'Tributoffizier') o.push('Aufträge der Wache'); else if (PROF_CON[n.prof] && n.homeTown) o.push(`Auftrag: ${CON[PROF_CON[n.prof]].name}`);
+  if (n.vm || n.prof === 'Tributoffizier') o.push('Aufträge der Wache'); else if (PROF_CON[n.prof] && n.homeTown && conGiverOk(n)) o.push(`Auftrag: ${CON[PROF_CON[n.prof]].name}`);   /* P1.8: nur wer wirklich Arbeit vergibt (Deckel 3/4/6) */
   if (n.musician) o.push('Musik'); if (n.enc) o.push('Will etwas von dir');
   return o;
 }
@@ -17295,7 +17364,9 @@ function bindInput() {
     if (e.ctrlKey && e.shiftKey && k === 'd') { e.preventDefault(); toggleDebug(); return; }
     if ($('game').classList.contains('hidden')) return;
     if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
-    if (S.cine && (k === 'escape' || k === ' ')) { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
+    if (S.cine && k === 'escape') { e.preventDefault(); cineEnd(); return; }   // Nutzer S13: Kamerafahrt überspringen
+    if (S.cine && (k === ' ' || k === 'enter' || k === 'e')) { e.preventDefault(); cineAdvance(); return; }   /* Entwickler 08.10.: Weiter von Hand */
+    if (S.cine) return;   /* während der Fahrt keine Spieltasten */
     if (S.dying && (k === 'escape' || k === ' ')) { e.preventDefault(); dyingEnd(); return; }   /* T10: Heldentod überspringen */   // Nutzer S13: Kamerafahrt überspringen
     keys.add(k);
     if (coopHooks.key?.(k, e)) { e.preventDefault(); return; }   /* Koop K2: Tasten für Gast (alles) und Host (Enter = Nachricht) */
@@ -17663,6 +17734,8 @@ function debugSections() {
       'Teleport: Stadt': () => { const T2 = TOWN_PLAN[v('dbTown')]; tp(T2.square[0], T2.square[1] + 2); },
       'Stadt: Wohnraum/Familien zählen': () => { const k = v('dbTown'), st = planHomes(), V = VILLAGERS.filter(c => c.homeTown === k), H = new Set(V.filter(c => c.household).map(c => c.household.id));   /* Planlauf P1.9–P1.11 */
         log(`${townName(k)}: ${V.filter(c => !c.child).length} Bewohner, ${V.filter(c => c.child).length} Kinder, ${H.size} Haushalte (${V.filter(c => c.household?.role === 'Frau').length} Paare), ${V.filter(c => c.pallet).length} auf Strohsack, ${V.filter(c => !c.sleepId).length} ohne Schlafplatz. Welt: ${st.slept} mit Schlafplatz, ${st.pallet} Strohsack, ${st.none} ohne, ${st.kids} Kinder, ${st.couples} Paare, ${st.lodgers} Untermieter.`, 'world'); },
+      'Stadt: Rollen Soll/Ist': () => { const k = v('dbTown'), r = townRoles(k); log(`${townName(k)} (${r.n} Figuren), Ist/Soll: ${roleTable(k)}.`, 'world'); },   /* Planlauf P1.8 */
+      'Alle Orte: Rollen Soll/Ist (Konsole)': () => { const T = {}; for (const k of Object.keys(TOWN_PLAN)) { const r = townRoles(k); T[townName(k)] = Object.fromEntries([['n', r.n], ...Object.keys(ROLE_SOLL).map(q => [ROLE_NAME[q], `${r[q]}/${r.soll[q]}`])]); } console.table(T); UI.toast('Rollen je Ort: Tabelle in der Konsole (Ist/Soll)', 2500); },
       'Teleport: Ort': () => { const l = LOCATIONS.find(x => x.key === v('dbPlace')); if (l) tp(l.x, l.y); },
       'Teleport: NPC': () => { const e = byId(v('dbNpc')); if (e) tp(e.x / TS2 | 0, (e.y / TS2 | 0) + 1); },
       'Teleport: Karte/Dungeon': () => { const k = v('dbMap'); if (k !== S.map) travel(k); },
@@ -17676,6 +17749,7 @@ function debugSections() {
       'Prolog: nächster Schritt': () => { if (S.prolog) { if (PR_STEPS[S.prolog.step]?.k === 'fight') for (const e of S.ents.prolog) if (e.prUndead) e.alive = false; if (PR_STEPS[S.prolog.step]?.k === 'heal') S.ents.prolog = S.ents.prolog.filter(e => !e.prDrop); if (PR_STEPS[S.prolog.step]?.k === 'goal') S.prolog.goal = 1; prologAdvance(); } else UI.toast('Kein Prolog aktiv.'); },
       'Prolog: zur Wahl springen': () => { if (!S.prolog) { toWorld(); prologStart(); } prologChoiceMenu(prEnt('oswin') || S.player, true); },
       'Wegweiser neu starten': () => { S.flags.tutor = 0; delete S.flags.tutX; delete S.flags.tutTalked; delete S.flags.tutTrade; delete S.flags.tutLoot; delete S.flags.tutGoalAt; S.settings.tips = true; tutorShow(); UI.toast('Wegweiser läuft von vorn.'); },
+      'Kamerafahrten: Weiter von Hand ↔ automatisch': () => { S.settings.cineAuto = !S.settings.cineAuto; UI.toast(S.settings.cineAuto ? 'Kamerafahrten laufen automatisch weiter.' : 'Kamerafahrten warten auf „Weiter“ (Leertaste/Enter).'); },   /* Entwickler 08.10. */
       'Wegweiser: nächsten Schritt abhaken': () => { if (S.flags.tutor == null) S.flags.tutor = 0; S.flags.tutor = Math.min(TUTOR.length, S.flags.tutor + 1); tutorShow(); },
     }],
     ['Wanderautomaten (03.10.2026)', '', {
@@ -21714,6 +21788,15 @@ export function selftest() {
     if (!(st.none < V.length * 0.08 && share && kidOk && kids.length > 0 && saved)) console.warn('Wohnraum', st, share, kidOk, saved);
     return st.none < V.length * 0.08 && share && kidOk && kids.length > 0 && saved && V.every(c => !c.anchor || isFinite(c.anchor.x + c.anchor.y));
   })());
+  ok('Planlauf P1.8 (08.10.): jede Figur eines Ortes hat genau eine Rolle, Summe = Figuren, Geber höchstens Deckel 3/4/6 (plus laufende Verträge), Infofeld zeigt die Rolle, „Auftrag“ nur bei echten Gebern', (() => {
+    const T = Object.keys(TOWN_PLAN), act = new Set((S.contracts || []).filter(c => c.state === 'active').map(c => c.giver));
+    const sums = T.every(t => { const r = townRoles(t); return r.n === Object.keys(ROLE_SOLL).reduce((n, k) => n + r[k], 0) && Object.keys(ROLE_SOLL).every(k => r.soll[k] >= 0); });
+    const caps = T.every(t => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.homeTown === t && !act.has(e.key) && roleOf(e) === 'G').length <= conGiverCap(t));
+    const v = VILLAGERS.find(c => c.alive && !c.famKid && c.plan), line = v ? roleLine(v) : '';
+    const offersOk = S.ents.world.filter(e => e.kind === 'npc' && e.villager && e.alive && PROF_CON[e.prof]).every(e => npcOffers(e).some(o => o.startsWith('Auftrag:')) === conGiverOk(e));
+    if (!(sums && caps && line && offersOk)) console.warn('Rollen P1.8', { sums, caps, line, offersOk });
+    return sums && caps && !!line && offersOk;
+  })());
   ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
     const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;
     for (const b of HOUSES.filter(h => h.map === 'world').slice(0, 400)) { const [x, y] = doorFront(b, 1), [ex, ey] = dirs[b.door]; if (x !== b.doorTile[0] + ex || y !== b.doorTile[1] + ey) ok1 = false; }
@@ -23319,7 +23402,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -23330,7 +23413,7 @@ function boot() {
     dlgStory, dlgMood, provisions, setClass, setTitleClass, tres, resMax, learnNode, nodeState, skyActive, skyInfo, freeRespec, talentSpent, compPoints, compNodeState, learnCompNode, armorOf, damageOf, population, canAfford, missGold, moraleBand, campGuards: () => S.settlement ? S.ents[S.settlement.map || 'world'].filter(e => e.campGuard && e.alive).length : 0, raidInfo: () => S.settlement ? { L: raidSources(S.settlement).filter(x => x.src !== 'wolf'), ch: raidChance(S.settlement), W: campWealth(S.settlement) } : null,
     startPlacing, foundCamp: () => foundCamp(),
     raisePriority: i => { const pr = S.settlement.priorities; if (i > 0) { const t = pr[i]; pr[i] = pr[i - 1]; pr[i - 1] = t; } },
-    offers: npcOffers,   // S13: was eine Figur anbietet (Infofeld)
+    offers: npcOffers, roleLine,   // S13: was eine Figur anbietet (Infofeld); P1.8: Rolle im Ort
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
     questInfo, cancelQuest, trackQuest: k => { S.track = k; },
     shopStock, price, buy, sell, craftBandage, bandageFrom: k => BANDAGE_FROM[k] || 0,
@@ -23376,7 +23459,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=24').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -23387,13 +23470,14 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=24').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed,                                           // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
   if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
+  if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { town: { roles: townRoles, roleOf, roleLine, table: roleTable } });   /* Planlauf P1.8/P1.12/P1.13: Städte im Dev-Modus messen */
 }
 await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

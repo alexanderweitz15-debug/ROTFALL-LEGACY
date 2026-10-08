@@ -183,9 +183,12 @@ Beispielverteilung aus der Spec (20 NPCs): 3 Questgeber · 5 Händler/Mitarbeite
 
 
 **Stand 08.10. (Claude):** ✔ Gerücht-Szene „Hast du gehört? X sucht …“, danach Siegel auch aus der Ferne. **Fehlt:** Zahlen 3/4/6 bestätigen (⚖).
-#### P1.8 Rollenverteilung je Stadt (☐)
+#### P1.8 Rollenverteilung je Stadt (◐)
 
 Rollen: Geber / Händler / Familie / Wachen / Reisende / Bürger / Story. Rollen existieren implizit über Berufe. **Fehlt:** explizite Verteilung pro Stadt und Messung (Soll/Ist-Tabelle je Stadt).
+
+**Stand 08.10. (Agent):** `roleOf`/`townRoles` (game.js, neben `conGiverOk`): jede Figur genau eine Rolle (Vorrang Story > Wache > Geber > Händler/Mitarbeiter = fester Arbeitsplatz > Reisende > Familie > Bürger), Soll ⚖ 15/25/20/15/10/10/5 %. Infofeld zeigt „Rolle“, „Bietet: Auftrag“ nur bei echten Gebern. Debug „Stadt: Rollen Soll/Ist“ + „Alle Orte … (Konsole)“, Probe „Planlauf P1.8“. Messung Ist/Soll: Varonheim Geber 4/32, Händler/Mitarb. 113/54, Familie 56/43, Wache 11/32, Reise 1/21, Bürger 6/21, Story 23/11; Aurelheim Geber 6/44, Händler 153/73, Familie 94/58, Wache 22/44, Reise 3/29, Bürger 10/29.
+**Fehlt:** Umverteilung zum Soll (bewusst nicht: Geber-Deckel 3/4/6 bleibt, Entwickler 08.10.); Reisende in Städten (TRAVEL_MAX 14 weltweit reicht nicht für 10 %) — nur gemessen; Wachen in 4 Dörfern 0–1.
 
 #### P1.9 Haus ↔ NPC-Zuordnung (✔ mit Rest)
 
@@ -610,6 +613,8 @@ Legende: **✔** fertig gebaut (Selbsttest grün) · **🔍** muss geprüft werd
 | 08.10. | Selbsttest | 🐞 | „Duell im Kreis (04.10.)“ schlägt gelegentlich fehl (zufallsabhängig, schon vorher beobachtet) — Fehlerrunde |
 | 08.10. | P0.1/P0.3 Prolog „Die Aschenfurt“ (Entwicklerwunsch: eigenes Startgebiet) | ✔ 🔍 ⚖ | Eigene Karte (60×44, flüchtig) mit Kamerafahrten (Intro, Gräber, Gesandte, Abschied), 8 erlebte Schritte (Bewegen, Ansprechen, Durchsuchen, Menüs I/C/M, Kampf gegen 2 Untote, Aufheben, Spielziel von Oswin, Wahl). Wahl nutzt die bestehenden Fraktions-Starts: Krone → Valen/Varonheim, Stille → Untote/Vharnholm als Lebender, ohne Herrn → Menü-Start + Titel. Kein Tod im Prolog. Laden mitten im Prolog baut die Karte neu. Live geprüft bis „Tote“-Start. 🔍 einmal komplett selbst spielen (Texte, Tempo, Kamera). ⚖ alle Texte, Figuren (Oswin, Gerold, Ysolde, Mara), Ruf-Zahlen des Rebellen-Wegs. Offen: Schalter „Prolog überspringen“ im Erstellungsfenster (heute: „»“ im Prolog) |
 | 08.10. | Prolog-Schalter + Absturz neues Spiel | ✔ | Erstellungsfenster: Häkchen „Prolog spielen“. 🐞→✔ Bei manchen Weltsamen brach ein neues Spiel in `planHomes` ab (Untermieter verschoben die Paar-Erkennung → Kind ohne Mutter); Paar wird jetzt vor dem Einzug der Untermieter festgelegt. Neues Spiel mit neuem Samen geprüft |
+| 08.10. | Kamerafahrten + Cache v25 | ✔ 🔍 | „Weiter“ von Hand (Knopf/Leertaste/Enter/E, Esc = alles), Schwenks statt Standbilder, Nahaufnahmen (Oswin, jeder Gesandte mit Namenskarte und Satz), Kampf-Auftakt mit Totenlicht; Einflug schwenkt. Schwierigkeit erklärt (Oswin, Protokoll, Ratgeber). 🐞→✔ Nutzer landete trotz Prolog in Varonheim: Browser lud alte Module (Cache v24) — Schlüssel auf v25. 🔍 Kamerafahrten selbst ansehen. Offen: Schalter „Kamerafahrten automatisch“ im Optionen-Fenster (heute nur Debug) |
+| 08.10. | P1.8 Rollen je Ort (Agent) | ✔ ⚖ | `roleOf`/`townRoles`, Infofeld „Rolle“, „Auftrag“ im Infofeld nur bei echten Gebern (vorher bei jedem Beruf mit Vertragsart), Debug Soll/Ist, Probe grün (Selbsttest 490/490). ⚖ Soll-Anteile 15/25/20/15/10/10/5 %. Messbericht: Familie+Mitarbeiter 75–90 % der Städte, Geber 2–6 %, Reisende ≈ 0 |
 
 ---
 

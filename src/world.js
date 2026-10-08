@@ -1,6 +1,6 @@
 // Weltgenerierung: Greenmark-Grenzland (128x128) und die Verlassene Grube.
-import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=24';
-import { FURNISH, wearOf } from './buildings.js?v=24';
+import { S, rnd, ri, pick, chance, seedRng, uid, setPropBase } from './state.js?v=25';
+import { FURNISH, wearOf } from './buildings.js?v=25';
 
 export const TS = 32;                // Kachelgröße
 export const T = { GRASS:0, DIRT:1, ROAD:2, WATER:3, MARSH:4, STONE:5, PLANK:6, ROCK:7, WALL:8, SAND:9, DFLOOR:10, DWALL:11, ASH:12, FIELD:13 };
@@ -1401,13 +1401,27 @@ function buildCapital() {
   for (let hy = y0 + 2; hy < y1 - 3; hy += 6) for (let hx = x0 + 2; hx < x1 - 3; hx += 7) for (const tp of [district(hx, hy, k), 'house', 'cottage']) if (put(hx, hy, tp, hy < gy ? 'S' : hy < cy + 7 ? (hy < cy - 4 ? 'N' : 'S') : 'N')) { k++; break; }   /* dicht bebaut; passt der große Bau nicht, ein kleinerer */
   const P = (tp, x, y, o = {}) => { if (at(x, y) !== T.WALL && at(x, y) !== T.WATER && !HOUSES.some(b => b.map === 'world' && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) prop(tp, x, y, { planned: true, ...o }); };
   P('well', cx - 5, cy - 1, { solid: true }); P('chain_post', cx + 5, cy - 1, { solid: true, label: 'Galgen des Königs' }); P('statue', cx, cy + 2, { solid: true, r: 10, label: 'Standbild König Varons' });
+  /* P1.12 (Nutzer 08.10.: „es gibt keine Marktplätze in Varon“): drei Märkte statt eines leeren Platzes — Hauptmarkt (Mitte), Lebensmittelmarkt
+     im Händlerviertel (W), Handwerksmarkt bei Schmieden und Garnison (SO). Die Häuser stehen schon: gepflastert wird nur freie Wiese, Stände und
+     Ware stehen fest (kein rnd()). Die Bewohner verteilen sich in game.js (planSocial) auf den nächsten Markt. */
+  const MKT = [[cx - 13, gy + 3, cx + 13, cy + 5], [cx - 54, cy, cx - 25, cy + 5], [cx + 31, cy + 19, cx + 48, cy + 24]];
+  for (const [ax, ay, bx2, by2] of MKT.slice(1)) for (let y = ay; y <= by2; y++) for (let x = ax; x <= bx2; x++) if (at(x, y) === T.GRASS) t[y * W + x] = T.STONE;
+  const stall = (x, y, label) => P('stall', x, y, { tag: 'market', label });
+  for (const x of [cx - 10, cx - 6, cx + 6, cx + 10]) { stall(x, gy + 4, 'Marktstand am Hauptmarkt'); stall(x, cy + 4, 'Marktstand am Hauptmarkt'); }
+  P('sign', cx - 12, gy + 3, { label: 'Hauptmarkt von Varonheim' });
+  for (const x of [cx - 51, cx - 46, cx - 41, cx - 36, cx - 31]) stall(x, cy + 2, 'Lebensmittelstand');
+  P('sign', cx - 53, cy, { label: 'Lebensmittelmarkt — Brot, Fleisch, Kräuter' }); P('well', cx - 28, cy + 4, { solid: true });
+  P('sack', cx - 49, cy + 4, { label: 'Getreidesack' }); P('crate', cx - 44, cy + 4, { label: 'Kiste Rüben' }); P('barrel', cx - 39, cy + 4, { solid: true, r: 9, label: 'Fass Salzfisch' });
+  for (const x of [cx + 33, cx + 37, cx + 41, cx + 45]) stall(x, cy + 21, 'Stand der Handwerker');
+  P('sign', cx + 31, cy + 19, { label: 'Handwerksmarkt — Werkzeug, Holz, Eisen' }); P('weapon_rack', cx + 48, cy + 20, { solid: true, label: 'Waffenstand der Schmiede' });
+  P('crate_stack', cx + 32, cy + 23, { solid: true, label: 'Werkholz' }); P('anvil', cx + 47, cy + 23, { solid: true, label: 'Amboss zum Vorführen' });
   for (const [x, y] of [[x0 - 1, gy - 3], [x0 - 1, gy + 3], [x1 + 1, gy - 3], [x1 + 1, gy + 3], [cx - 3, y1 + 1], [cx + 3, y1 + 1], [cx - 3, by1 + 1], [cx + 3, by1 + 1]]) P('banner_torn', x, y, { label: 'Schwarzes Banner Valens' });
   for (let x = x0 + 4; x < x1 - 2; x += 6) { P('lantern', x, gy - 2); P('lantern', x + 3, gy + 2); }
   for (let y = by1 + 4; y < y1 - 2; y += 7) { P('lantern', cx - 2, y); P('lantern', cx + 2, y + 3); }
   for (const [x, y] of [[cx - 24, y0 + 8], [cx + 24, y0 + 8], [cx - 24, y0 + 17], [cx + 24, y0 + 17]]) P('tent_prop', x, y, { solid: true, label: 'Zelt der Königsgarde' });
   lay(cx, y1 + 1, CAPITAL.old.x, CAPITAL.old.y);                                                                     // Kronweg nach Süden (alte Stelle: Königsfelder)
   TOWN_PLAN[C.key] = { village: true, lord: 'valen', capital: true, area: [x0, y0, x1, y1], old: [x0, y0, x1, y1], square: [cx, cy - 3], perHead: 60, fields: [],
-    plazas: [[T.STONE, cx - 13, gy + 3, cx + 13, cy + 5]], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };
+    plazas: MKT.map(r => [T.STONE, ...r]), markets: ['Hauptmarkt', 'Lebensmittelmarkt', 'Handwerksmarkt'], spread: { s: 1, a: [0, 0] }, design: { area: [-99, -99, -99, -99] } };   /* P1.12: drei Märkte */
 }
 for (const C of AUREL_CITIES) LOCATIONS.push({ key: C.key, name: C.name, x: C.x, y: C.y, r: Math.max(C.hw, C.hh), kind: 'city', threat: 0, faction: 'aurel', town: true, fin: true });
 // Nutzer §5d.10 (01.10.2026): eigene Grundrisse der Nebenstädte. Tore bleiben an den vier Seiten (Straßen draußen), innen hat
