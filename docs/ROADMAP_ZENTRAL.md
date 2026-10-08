@@ -257,10 +257,10 @@ Ströme laut Spec: Haus→Arbeit, Arbeit→Markt, Markt→Zuhause, Arbeit→Tave
 
 | Punkt | Detail | Quelle |
 |---|---|---|
-| **Berufe erkennbar, besondere NPCs stechen heraus (Entwickler 08.10., neu)** | „Man soll besser die verschiedenen Berufe erkennen können. Besondere NPCs sollen herausstechen.“ Je Beruf ein klares Merkmal in der Silhouette (Schürze+Hammer Schmied, Mehlschürze Bäcker, Kutte Priester, Kiepe Händler, Bogen/Fell Jäger …), Händler mit Ware in der Hand; benannte Figuren/Questgeber/Story-NPCs mit stärkerer Kleidung, Farbe, Haltung, ggf. dezenter Aura/Namenszug — ohne Questmarker-Flut. → Agent Figuren, nach der Kampfanimation | Spec Welt §40–44, STYLE_GUIDE |
+| **◐ Berufe erkennbar, besondere NPCs stechen heraus (Entwickler 08.10.; gebaut 08.10., Agent — siehe Protokoll 5b; offen: Namenszug beim Hinsehen, Händlerware in der Hand)** | „Man soll besser die verschiedenen Berufe erkennen können. Besondere NPCs sollen herausstechen.“ Je Beruf ein klares Merkmal in der Silhouette (Schürze+Hammer Schmied, Mehlschürze Bäcker, Kutte Priester, Kiepe Händler, Bogen/Fell Jäger …), Händler mit Ware in der Hand; benannte Figuren/Questgeber/Story-NPCs mit stärkerer Kleidung, Farbe, Haltung, ggf. dezenter Aura/Namenszug — ohne Questmarker-Flut. → Agent Figuren, nach der Kampfanimation | Spec Welt §40–44, STYLE_GUIDE |
 | NPC-Visuals Rest | Sprechblasen vereinheitlichen (N1), Stimmungs-Idle (N4), Symbolsatz (🔶 E13) | visual/npcs.md |
 | Begehbare Zelte | Lager, Banden, Pilger, Garnison | §5g.4 / T21 |
-| NPCs mit eigenen Zielen | Händler wechselt Route, Hauptmann desertiert, Abwanderung, Kriegsmüdigkeit (APPROVED, 4 Fragen 🔶 E21) | PROPOSALS/npc_eigene_ziele |
+| NPCs mit eigenen Zielen | Händler wechselt Route, Hauptmann desertiert, Abwanderung, Kriegsmüdigkeit (APPROVED, 4 Fragen 🔶 E21). **Stand 08.10. (Claude):** ✔ Scheibe N2 „Abwanderung der Arbeit wegen“ + Leerstand-Fix (Ankündigung, Bündel, Umstimmen mit Gold/Siedlung; ⚖ Frage 4 = ja). **Fehlt:** N1 Händlergedächtnis (⛓ T12 B1), N3 Kriegsmüdigkeit/Deserteurbanden (⛓ T12 B2, Fragen 1–3), N4 Hauptmann desertiert | PROPOSALS/npc_eigene_ziele (Git c21fd64) |
 | Orte beleben | Szenen an Schrein/Hain/Ruine, besetzte Städte mit anderen Bannern/Wachen, Fraktionsarchitektur | §5g.35 / T33 |
 | Akademie-Innenleben Rest | Bücher, Anklage wegen verbotener Magie | §5g.9 |
 | Weitere Orte/Figuren | Lehrer Moorhexe, Himmelsinsel-Ratshändler, Prachtbauten nutzbar, Gefährten-Szenen untereinander, Kinder/Tiere als Stadtbevölkerung, Hausgeräusche | §5g.11/15/30/36, T29/T32/T38 |
@@ -281,6 +281,9 @@ Soll: Ofen, Feuer, Amboss, Werkbank, Werkzeuge, Waffen, Rüstungen, Rohmaterial,
 **Stand:** Props forge/hearth/chimney/anvil animiert; Arbeitsplätze mit Werkzeug (`act:'work'`).
 **Offen:** Innenausstattung je Betrieb, Hammer-Funken nicht vollständig.
 
+**Stand 08.10. (Agent):** Schmiedehof neben jeder Schmiede (`ensureSmithyYards`, flüchtig, nicht im Spielstand, nie vor Türen/auf Straßen; `yardOf` statt `house`, damit die Laufweg-Regel im Haus hält): Amboss, Waffenständer (Abgabeort des Schmieds), Löschtrog, Eisenbarren — 27 von 34 Schmieden (Rest: kein freier Boden). Meister an der Esse drinnen, Geselle am Hof-Amboss draußen (`JOB_AT.Schmied` forge → anvil → workbench). `hammerFx`: Funken und Metallklang bei jedem Schlag (vorher einmal je Arbeitsgang). Hof gehört der Schmiede (`houseOf`: Durchsuchen = Diebstahl). Debug „Schmiede: zum nächsten Schmiedehof“.
+**Fehlt:** Innenraum bleibt 3 × 2 (Esse + Werkbank) — größere Schmiede-Grundrisse nur über die Welterzeugung (Entwicklerfrage); Rauch aus der Esse; Rüstungsständer-Sprite.
+
 Der Spieler soll in der Schmiede: Waffen und Rüstung kaufen, eventuell Reparatur nutzen, Schmied beobachten, Kunden kommen und einkaufen sehen, Mitarbeiter arbeiten sehen.
 
 #### P2.16 Kunden betreten Läden (◐)
@@ -289,11 +292,17 @@ Ablauf (§30): 1. Kunde betritt Gebäude → 2. geht zum Verkaufsbereich → 3. 
 
 **Stand:** `marketBuy` nur am Marktstand. **Fehlt:** Kundenlauf ins Gebäude, Ware-weg-Effekt, Mitarbeiter-Reaktion. ⛓ P0.6
 
+**Stand 08.10. (Agent):** Vereinfachter Ablauf gebaut (`shopSpot`/`shopVisit`, Block `kv` in `dayTargetRaw`): Bewohner ohne festen Arbeitsplatz gehen an Nachmittagen mit alt = 1 (zwei von drei) in einen Laden ihres Viertels (≤ 35 Kacheln; heute Schmieden und Schenken — dort steht der Verkäufer drinnen), stellen sich zwei Schritte hinter die Tür, Verkäufer zeigt auf die Ware, „kauft …“ steigt auf, Stadtvorrat −1 (wie `marketBuy`), 2,6 s warten, dann gehen sie. Einmal am Tag; außer Sicht nur der Einkauf. 330 Bewohner haben einen Laden. Debug „Laden: Kunden jetzt (14 Uhr)“.
+**Fehlt:** Bäckerei/Lager als Laden (dort verkauft man heute am Marktstand); sichtbares Verschwinden einer Ware im Regal; Kunden in Spieler-Betrieben.
+
 #### P2.17 Mitarbeiter arbeiten sichtbar (◐)
 
 Arbeiter-Phasen fetch/work vorhanden; in Spielerbetrieben nicht sichtbar. Beispiel Spielerschmiede: einer holt Metall, einer arbeitet am Ofen, Kunde betritt, schaut Waffen an, kauft.
 
-#### P2.18 Prinzip auf alle Betriebe übertragen (☐, nach P2.14)
+**Stand 08.10. (Agent):** `ensureBizHands`: je angeworbenem Arbeiter eines eigenen Betriebs (höchstens 3) ein Gehilfe/eine Gehilfin vor dem Betriebsgebäude (`bizHouse`), mit Arbeitskreislauf (`CYCLE.Gehilfe`: Holz aus dem Lager holen, sägen, Werkzeug zum Ständer/Stand/Lager tragen) und normalem Tagesplan; flüchtig, beim Laden und nach dem Anwerben neu (Logzeile beim Anwerben). Infofeld: „arbeitet in deinem Betrieb (…)“ bei Gehilfen und bei Bewohnern, deren Beruf zum eigenen Gewerbe der Stadt gehört. Debug „Betrieb: Gehilfen neu stellen“.
+**Fehlt:** Gewerbe ohne Gebäude (Hof, Jagd, Fischerei, Holz) haben keinen Ort für Gehilfen; Kreislauf je Gewerbe (heute ein gemeinsamer); Spieler bedient Kunden (P2.19).
+
+#### P2.18 Prinzip auf alle Betriebe übertragen (◐, nach P2.14)
 
 | Betrieb | Sichtbar sein soll |
 |---|---|
@@ -306,11 +315,17 @@ Arbeiter-Phasen fetch/work vorhanden; in Spielerbetrieben nicht sichtbar. Beispi
 | Händler | Waren, Lager, Verkäufer, Kunden |
 | Bionik-Werkstatt | Prothesen, Werkzeuge, Ersatzteile, Techniker, Kunden |
 
+**Stand 08.10. (Agent):** Höfe/Vorplätze (`YARD_SETS`, `ensureSmithyYards` erweitert, flüchtig, `yardOf`) an Bäckerei (Backofen, Brottisch, Mehl), Schenke (Schankgarten), Heilerin/Apotheke (Kräutertisch, Kräuter, Beet), Lager/Kontor (Ware, Handkarren, Fass), Stall (Heu, Tränke, Wagen), Magitech (Werkbank, Zahnräder, Automat), Werkstatt in Wohnhäusern mit Handwerker/Böttcher (Hobelbank, Bretter — sie arbeiten jetzt draußen), Weber (Tuch, Zuschneidetisch): 556 Hofmöbel, keine neuen Figuren. Schankmagd der Stadtschenke bedient (Theke → Tisch, `CYCLE.Schankmagd`, `cycProps` counter/tavtable). Kunden gehen auch in Bäckerei, Lager, zur Heilerin (`SELL_IN`). Möbelregel im Haus unverändert grün.
+**Fehlt:** Bionik-Werkstatt (Kybernetiker) und Schneiderei als eigene Gebäude gibt es nicht — nur Hof am Magitech-Werk bzw. Tuch am Wohnhaus; Stall ohne Tiere; Rauch/Teig/Brot als eigene Sprites.
+
 #### P2.19 Spieler arbeitet im eigenen Betrieb (◐)
 
 Spieler kann Betrieb betreten und arbeiten, produzieren, Waren herstellen, Kunden bedienen, Aufträge erledigen, Mitarbeiter beobachten, Produktion kontrollieren. Betriebe: Schmiede, Werkstatt, Taverne, Händler, Farm, Bäckerei, Alchemielabor, Bionik-Werkstatt.
 
 **Stand:** Handwerk mit Qualität an Esse/Werkbank/Kessel; Betriebe-Reiter mit Kasse. **Fehlt:** Kunden bedienen, Aufträge. ⛓ Skills-Phase 4
+
+**Stand 08.10. (Agent):** „Im eigenen Betrieb arbeiten“ an jedem Möbel im Gebäude/Hof eines eigenen Betriebs (`ownBizAt`, `bizWorkMenu`): Kunden bedienen (1 Stunde, 1 Stück + 1 je Kunde im Laden, höchstens 3, ⚖ 60 % Marktpreis in die Kasse, danach eine Stunde Pause, `bizServe`), Bestellung des Betriebs (⚖ 2–4 Stück, 3 Tage, Lohn = `ECO.orderPay`, aus dem Gepäck, `bizOrder`/`bizDeliver`), dazu die normale Möbelnutzung (Schmieden usw.). Kein rnd().
+**Fehlt:** Gewerbe ohne Gebäude (Hof, Jagd, Fischerei) haben kein Möbel zum Arbeiten; Bestellung im Betriebe-Reiter anzeigen; Fertigkeit „Handel“ beim Bedienen; Produktion selbst steuern.
 
 #### P2.x Weitere Betriebspunkte (☐)
 
@@ -319,6 +334,8 @@ Spieler kann Betrieb betreten und arbeiten, produzieren, Waren herstellen, Kunde
 - Zollgesetz ohne Wirkung auf Überfälle (RB-010)
 - Startlager unter Zielwert nachmessen (RB-055/058)
 - Produktionsketten: Holz→Bretter, Erz→Metall→Waffe, Getreide→Mehl→Brot, Tier→Leder; Werkstücke mit Namen (`o.maker` wird nie gelesen) (MASTER_ROADMAP C.13, IDEAS 4)
+
+**Stand 08.10. (Agent):** Werkstücke mit Namen ✔ — die Gegenstandskarte zeigt „Gefertigt von …“ auch ohne Gütestufe (Auftragsarbeit des Schmieds), im Gepäck und im Händlerfenster. **Produktionsketten gemessen (economy.js `TRADES`):** vorhanden Erz (Mine) → Barren (Schmelze, + Holz) → Werkzeug/Waffen (Schmiede, Feinmechanik) → Magitech; Holz (Holzfällerei) → Holzware (Werkstatt). **Fehlt:** Getreide → Mehl → Brot (Hof liefert Getreide, das direkt gegessen wird; Bäcker ist kein Gewerbe), Tier → Leder (Jagd/Stall liefern Felle, kein Gerber), Faser → Tuch (Weberei ohne Vorprodukt), Holz → Bretter (Holzware ist ein Schritt). Nur notiert, nicht gebaut.
 
 **Abnahme (§51 Betriebe):** Mitarbeiter erscheinen und arbeiten; Kunden betreten und kaufen; Waren korrekt verarbeitet; Spieler kann betreten und arbeiten; Save/Load.
 
@@ -344,6 +361,8 @@ Spieler kann Betrieb betreten und arbeiten, produzieren, Waren herstellen, Kunde
 
 Neue Animationen für Rollen. Kampfanimation §17-Rest: Kampf-Idle, Kampfbewegung, Block/Parade-Haltung je Waffe, Ausweichen je Pack, Trefferreaktionen je Waffe, längerer Nachschwung, Ausholen mit Gewicht nach hinten. Schon gebaut (seit 04.10.): Profile aller Klassen, Gewicht, Oberkörperdrehung, Swoosh.
 
+**Stand 08.10. (Agent):** Beine im Kampf von vorn/hinten korrigiert (Entwickler: „wenn man nach oben guckt, spreizt der Charakter seine Beine so komisch auf“) — statt Grätsche mit seitlich ausgeknickten Knien ein Ausfallschritt in die Tiefe (Fuß der Waffenseite vor, anderer zurück, kaum Spreizung), für Hieb, Kampfhaltung und Deckung; `fig5.js` `bodyPose`. **Fehlt:** Abnahme im Spiel durch dich; Schrägblick (Diagonalen) nutzt dieselbe Front-/Rückenpose.
+
 #### P3.25–26 Quest-Zieltypen (◐)
 
 Spec §11 — Katalog, an dem die Reihen zu messen sind:
@@ -360,20 +379,32 @@ Spec §11 — Katalog, an dem die Reihen zu messen sind:
 
 **Stand:** Auftragsarten trail/camps/caravanSurvivors/E1–E4 gebaut; feste Reihen überwiegend gleich (`quest_agent.md` mit 27 Blättern als Vorlage). Je Questreihe: Kernaufgabe, Signaturszene, Emblem.
 
+**Stand 08.10. (Agent Quests):** Vorhanden waren 12 Brett-Arten (Kopfgeld, Monster, Jagd, Verteidigung, Patrouille, Eskorte, Lieferung, Vermisst, Vorräte, Kräuter, Spurensuche, Lager) plus Gerüchte (Schatz/Bestie/Deserteur/Bande/Groll/Erzfeind — deckt „Gerücht untersuchen“, „Gegenstand finden“), Schmuggel, Spuk, Karawanen-Überlebende. **Neu:** „Schuld eintreiben“ (Soziales: Schuldner im eigenen Ort; überzeugen = Willenskraft + W6 ≥ 14 wie im Hexenprozess, drohen = wie Wegelagerer einschüchtern, Beziehung −15, oder selbst zahlen, Beziehung +15; abgewiesen = erst morgen wieder) und „Nachricht mit Antwort“ (Transport mit Rückweg: Brief an eine echte Person im Nachbarort, Antwort nach 2 Std., Abgabe nur mit Antwortbrief). Ziel ist eine echte Figur, der Kartenpunkt folgt ihr; stirbt sie, ist der Auftrag hinfällig (ohne Rufverlust). Häkchen-Liste je Schritt im Auftragsbuch (J), auf dem Zettel am Brett und im Tracker (`CON[k].steps`, `conProg`). Geber ⚖: Wirtin + Händlerin → Schuld, Gräfin/Edelfrau/Gelehrter → Brief. Messung `conMix` (Debug „Aufträge → Zieltypen je Region zählen“, Hochrechnung 30 Tage Brett + Wache + Geber):
+
+| Region | Aushänge | Arten vorher → nachher | §11-Gruppen vorher → nachher | häufigste Art vorher → nachher |
+|---|---|---|---|---|
+| Grünmark | 360 | 12 → 14 | 5 → 6 (Soziales 0 → 9) | Jagd 22 % → 17 % |
+| Ebene | 580 | 12 → 14 | 5 → 6 (Soziales 0 → 14) | Jagd 27 % → 22 % |
+| Aurelion | 490 | 12 → 14 | 5 → 6 (Soziales 0 → 11) | Lieferung 23 % → Kopfgeld 19 % |
+| Sumpf / Ödland / Wald | 280 / 120 / 180 | 12 → 14 | 5 → 6 (Soziales 0 → 7 / 3 / 4) | Jagd 21 → 17 %, Vorräte 18 % → Jagd 20 %, Jagd 31 → 30 % |
+| Wüste / Gebirge | 100 / 50 | 8 / 4 (unverändert) | 4 / 2 | Lager 19 %, Monster 26 % |
+
+(Letzte Spalte: zweite Messung nach einem Neuladen; die Geber-Auswahl je Ort hängt am aktuellen Bewohnerstand und schwankt zwischen Ständen leicht. Kampf bleibt mit 40–55 % die größte Gruppe, Soziales ist mit 2–4 % noch klein.) **Fehlt:** Wüste (Karak-Atar/Dünenwacht) und Gebirge (Tiefhall) haben feste Artenlisten (`FAC_CON`) ohne die neuen Arten — Designfrage, ob dort Schulden/Briefe passen; „Streit lösen“, „Handel vermitteln“, „Verletzte eskortieren“, Wirtschafts- und Geheimnis-Arten am Brett; Gegner-Pools nach Rolle (P3.20–23); feste Questreihen (27 Blätter) unverändert.
+
 **Abnahme (§51 Quests):** Unterschiedliche Questtypen funktionieren; Wiederholungsmuster nachweislich reduziert (Zählung der Zieltypen je Region vorher/nachher).
 
 #### P3.x Weitere Content-Punkte (☐)
 
 - **Quests ↔ Welt:** Krieg erzeugt Aufträge (Schmuggel in belagerte Stadt), Kette mit Handelskontakt; toter benannter Geber lässt Quest offen
 - **Gegner:** 14 nicht gewählte Gegnerideen (🔶 E5); Mutanten als Reise-Hinterhalt, Blutschöpfer-Regel, Werte neuer Gegner (🔶 E6)
-- **Bosse:** Intros Graumähne/Karrak/Blutfürst; Kerkerausbruch und Ankunft Aurelheim als Szene; eigener Beutepool Graumähne/Karrak (7 Karten gebaut)
+- **Bosse:** Intros Graumähne/Karrak/Blutfürst; Kerkerausbruch und Ankunft Aurelheim als Szene; eigener Beutepool Graumähne/Karrak (7 Karten gebaut). **Stand 08.10. (Agent Quests):** Intros Graumähne und Karrak gebaut (BOSS_CARDS `alpha`/`sandlord`, Karte nach Boss-Kennung `rboss` statt Gegnertyp — `bossCardKey`; Wolf knurrt statt zu zeigen, Karrak spricht; Welt steht, einmal je Held). Blutfürst: Aldhelm hatte schon einen eigenen Krypta-Auftritt (`aldhelmAI`, Kerzen, Satz, Karte) — geprüft, nichts doppelt gebaut. Debug „Boss-Auftritt vorspielen“ kann jetzt auch Regionalbosse. ⚖ Untertitel und Karraks Satz. **Fehlt:** Kerkerausbruch/Ankunft Aurelheim als Szene, eigener Beutepool Graumähne/Karrak.
 - **Rüstungsvielfalt R1–R7:** Zustand sichtbar, improvisiert, Fraktionsregel, Rarität-Kante, Set-Hände/Beine, 7 Teile ohne Look (visual/ruestungen.md)
 - **Ressourcen-Sprites** mit Abbauzustand; 38 Knoten auf Fels (A-04) (§5g.3 / T14)
 - **Geheime Orte Rest:** Uhrmacher, Leuchtfeuer, Walknocheninsel; zweite Gischtinsel/Seevolk-Orte; Wasservolk (🔶 E25)
 - **Dungeons:** Rätsel/Fallen vertiefen, Gewölbe-Events; Aurelion sichtbar (Laternen, Automaten-Streifen, Kräne, Fabrik); Expeditionen, Krankheiten-Modell, Weltgeheimnisse ohne Marker
 - **Story:** „Ende der Brüder"-Ideen (🔶 E29); Eisenfeste zerstört → Goblins zu den Untoten; Totenland bei der Schwarzen Feste leer (BUG-143)
 - **Bossgespräche** (Weißbart, Garmadon) als Story-Fenster; Bewohner rufen den Helden; Szene bei Story-Abschluss; Hinweis auf seltene Beute (🔶 E10)
-- **Welt-Ereignisse** mit Namenskarte + Ton (`bigAnnounce` nur Log/Toast) — Details E22, entschieden 02.10.
+- **Welt-Ereignisse** mit Namenskarte + Ton (`bigAnnounce` nur Log/Toast) — Details E22, entschieden 02.10. **Stand 08.10. (Agent Quests):** gebaut — alle neun großen Ereignisse zeigen eine Namenskarte mit Glocke nebenbei (`worldCard`/`worldCardTick`, Warteschlange: wartet auf Kamerafahrt, Gespräch, Fenster, Heldentod, Prolog); Kriegsereignisse (Ort gefallen — außer Varonheim, das seine Szene hat —, Ort befreit, Schlacht) halten die Welt mit Karte + Horn/Glocke/Trommel kurz an (Kamerafahrt mit `pause`, ohne Text, läuft von selbst). Toast nur noch, wo keine Karte geht (Koop-Gast). Probe + Debug „Regie (T17)“. ⚖ Klänge, Kriegskarte 3,4 s. **Fehlt:** Ereignis-Pins auf der Karte nur in entdeckten Gebieten und dezente Fraktionsgrenzen (zweiter Teil von E22); Ereignisse aus anderen Systemen (Brand, Spuk, Anomalie, Meteor …) laufen weiter nur über Log/Toast.
 - **T17 Szenen 3/4:** Hrodvar-Frost, Garmadon-Herzschlag, Hinrichtung am Galgen, Goblinsturm Sieg/Niederlage; T20-Rest (Heimweg, Gräber, Aufstand als Kolonne); Goblin-Befreiung dynamisch; Luftschiff-Absturz mehrstufig
 
 ---
@@ -396,13 +427,15 @@ Drei Stufen laut Spec §20:
 
 **Stand:** `tierOf` stuft, Ferne ~1×/s. **Fehlt:** abstrakter Fernbereich mit Rekonstruktion.
 
-#### P4.29 Marktplatz-Performance (☐)
+#### P4.29 Marktplatz-Performance (◐)
 
 Nicht einfach NPCs entfernen. Reihenfolge der Hebel (§49): Culling → LOD → vereinfachte Simulation → Tick-Raten → Pathfinding → Event-System → Animationen → Partikel → Rendering → Kollisionsprüfung.
 Konkret (perf/PLAN.md): 3-ms-Marke belegen; Hebel paintR-Schwall, nearEnts, tierOf; Bild-Cache-Größe; Lauf-Bilder vorbacken.
 
 Gesamt-Skalierung (§48) betrachten: Welt (NPCs, Gegner, Gebäude, Animationen, Partikel), Stadt (NPCs pro Viertel/Platz, aktive NPCs, Wegfindung, Interaktionen), Kampf (Gegner, Projektile, AOE, Partikel, Hit Detection), UI (Questlisten, NPC-Daten, Inventare, Shops).
 
+
+**Stand 08.10. (Claude):** ✔ Abschnitts-Zeitmesser für `update()` (Debug „Leistung: update-Abschnitte messen“, `RF.prof(true)`). Messung Varonheims Hauptmarkt mittags (2061 Akteure, 135 Bewohner im heißen Radius): vorher update Median 4,4 ms / 95 % 10 ms (think 2,8 ms); Ursache: ruhige Bewohner bis 1150 px dachten jedes Bild, sichtbar sind nur ~±600 px. ✔ Ruhige Bewohner/Kinder über 900 px denken jedes 3. Bild (mittlere Stufe) → update Median 1,7 ms / 95 % 5,1 ms (think 1,5 ms); Zeichnen ~3 ms. **Fehlt:** 95-%-Spitzen (HUD-/Sekundenhaken) glätten; Messung im echten Fenster (Bereich war verborgen); Bild-Cache-Größe, Lauf-Bilder vorbacken.
 #### P4.31 Save/Load (☐)
 
 Tests für Tutorial, Familien, Betriebe, Städte; Spielstand-Versionierung / zentrale Felddefinition; alte Savegames laden ohne Fehler.
@@ -627,9 +660,25 @@ Legende: **✔** fertig gebaut (Selbsttest grün) · **🔍** muss geprüft werd
 | 08.10. | Kamerafahrten + Cache v25 | ✔ 🔍 | „Weiter“ von Hand (Knopf/Leertaste/Enter/E, Esc = alles), Schwenks statt Standbilder, Nahaufnahmen (Oswin, jeder Gesandte mit Namenskarte und Satz), Kampf-Auftakt mit Totenlicht; Einflug schwenkt. Schwierigkeit erklärt (Oswin, Protokoll, Ratgeber). 🐞→✔ Nutzer landete trotz Prolog in Varonheim: Browser lud alte Module (Cache v24) — Schlüssel auf v25. 🔍 Kamerafahrten selbst ansehen. Offen: Schalter „Kamerafahrten automatisch“ im Optionen-Fenster (heute nur Debug) |
 | 08.10. | P0.2 Reisender erzwingen + P0.5 Flächen durch Wände | ✔ 🐞→✔ | Einflug: ist kein Reisender in der Nähe, geht ein flüchtiger Wanderer zur Stadt und wird gezeigt. Neun Flächenfähigkeiten (Seelenernte, Leichenbersten, Rote Ernte, Schrottbombe, Dodons Echo, Stille Hand, Entfesseln, Bannkreis, Glutaura) trafen durch Wände — jetzt `clearLine`. Offen: Probe für Flächen hinter Wänden |
 | 08.10. | P1.10 Familiengespräche + Technik | ✔ | Umgebungsszene „family“ in `ambientTick`; Debug „Stadt: Familiengespräch“. Technik: SC-01 toter Code weg, SC-03 Debug Diener-Schmuggel, SW-01 7× `?.name`, SW-02 try/finally, RB-028 deleteSlot verwirft ausstehendes Speichern. P0.6 Siedlungsgebäude geprüft (keine Türen, kein Fehler) |
+| 08.10. | P1.x NPC-Ziele N2 (Abwanderung + Leerstand-Fix) | ✔ ⚖ 🐞→✔ | `announceLeave`, `leaveChoices`, `leaveToSettlement`, `S.vacant` (spawnResidents überspringt), `migrationDay` zählt `poorDays`. Bestätigter Altfehler: ausgewanderte Einzelbewohner standen nach dem Laden wieder im Haus. ⚖ Zahlen 5 Tage/25 %/7 Tage/2 je Tag/30 Gold/14 Tage, Frage 4 (Siedlung) = ja |
+| 08.10. | P4.29 Marktplatz-Leistung | ✔ 🔍 | Zeitmesser je Abschnitt in `update()`; heißer Radius für ruhige Bewohner 1150 → 900 px (`tierPut`): Varonheim-Markt update 4,4 → 1,7 ms (Median). 🔍 im sichtbaren Fenster nachmessen |
+| 08.10. | P1.x Stadttiere + Probe-Fix | ✔ ⚖ 🐞→✔ | `ensureTownAnimals` (Hühner am Feld, Katzen an Schenke/Haus, Hofhund am Platz; Sprites vom Agenten Figuren); `preyAI`: Stadttiere/Vieh fliehen nicht mehr vor Bewohnern, Suche nur noch in `combat` statt in allen Karteneinträgen. „Duell im Kreis“ wackelte (zufällige Trefferzone) → Probe trifft fest den Rumpf. 🐞→✔ Beutetiere zählten in `foesNear`/`inFight` als Feinde — ein Hofhund am Platz hätte Kutsche/Rast gesperrt; Hirsche ebenso (Altfehler) |
 | 08.10. | P1.8 Rollen je Ort (Agent) | ✔ ⚖ | `roleOf`/`townRoles`, Infofeld „Rolle“, „Auftrag“ im Infofeld nur bei echten Gebern (vorher bei jedem Beruf mit Vertragsart), Debug Soll/Ist, Probe grün (Selbsttest 490/490). ⚖ Soll-Anteile 15/25/20/15/10/10/5 %. Messbericht: Familie+Mitarbeiter 75–90 % der Städte, Geber 2–6 %, Reisende ≈ 0 |
 | 08.10. | P1.12 Märkte Varonheim + Verteilung (Agent) | ✔ 🔍 ⚖ | Drei Märkte mit Ständen (Haupt-, Lebensmittel-, Handwerksmarkt), Bewohner auf den Markt ihres Viertels, mittags/früher Abend verteilt, Fest nur jeder Zweite (höchstens 24) am Hauptfeuer. Varonheim Hauptmarkt Umkreis 8: mittags 36 → 9, 17 Uhr 15 → 6, Fest 173 → 26 (alle Figuren an echten Plätzen: 14 bzw. 29). Salzhafen mittags 42 → 18. Selbsttest 492/492. 🔍 Varonheim mittags und am Festabend ansehen. ⚖ FEST_CAP 24, Mittags-Drittelung, Schwelle 30 |
 | 08.10. | P1.13 Treffpunkte (Agent) | ✔ 🔍 ⚖ | Brunnen, Tempel, Tor, Übungsplatz, Schenkentür je Ort; Bewohner nach Beruf/Alter am nächsten Treffpunkt (≤ 40 Kacheln), eigene Gesprächszeilen, Infofeld „trifft sich am …“. 🔍 Brunnen/Tor einer Stadt am Nachmittag ansehen. ⚖ Zuordnung Beruf → Treffpunkt |
+| 08.10. | P2.14–15 Schmiede sichtbar (Agent) | ✔ 🔍 | Schmiedehof (Amboss, Waffenständer, Löschtrog, Eisen) neben 27 von 34 Schmieden, Geselle hämmert draußen, Funken + Klang je Schlag. Erster Versuch zählte die Hofmöbel als Hausmöbel („Phase 1 Häuser“ rot) → jetzt `yardOf`, Regel hält. Selbsttest 496/496. 🔍 Schmiede in Nordfurt um 10 Uhr ansehen |
+| 08.10. | P2.16 Kunden im Laden (Agent) | ✔ 🔍 ⚖ | Kunden gehen nachmittags in Schmiede/Schenke, Verkäufer zeigt, „kauft …“, Vorrat −1, gehen wieder (einmal am Tag). ⚖ zwei von drei Einkaufsnachmittagen, Laden ≤ 35 Kacheln |
+| 08.10. | P2.17 Gehilfen sichtbar (Agent) | ✔ 🔍 | Angeworbene Arbeiter eigener Betriebe erscheinen als Gehilfen mit Arbeitskreislauf vor dem Betrieb; Infofeld „arbeitet in deinem Betrieb“. 🔍 Betrieb kaufen, Arbeiter anwerben, hinsehen |
+| 08.10. | P2.18 Prinzip auf alle Betriebe (Agent) | ✔ 🔍 | Höfe an Bäckerei, Schenke, Heilerin, Lager/Kontor, Stall, Magitech, Werkstatt (Handwerker/Böttcher arbeiten draußen an der Hobelbank), Weber; Schankmagd bedient Theke → Tisch; Kunden auch in Bäckerei/Lager/Heilerin. 556 Hofmöbel, keine neuen Figuren (Leistung). 🔍 eine Stadt um 10 und 14 Uhr ansehen |
+| 08.10. | P2.19 Arbeiten im eigenen Betrieb (Agent) | ✔ 🔍 ⚖ | „Im eigenen Betrieb arbeiten“: Kunden bedienen (Kasse), Tagesbestellung 2–4 Stück aus dem Gepäck. ⚖ 60 % Marktpreis, höchstens 3 je Stunde, 3 Tage Frist. 🔍 Debug „Gewerbe hier übernehmen“ und ausprobieren |
+| 08.10. | P2.x Werkstücke mit Namen, Ketten (Agent) | ✔ | „Gefertigt von …“ auch ohne Gütestufe; Produktionsketten gemessen (fehlen: Getreide→Mehl→Brot, Fell→Leder, Faser→Tuch, Holz→Bretter). Selbsttest 496/497 — rot nur „S13 Kutschen und Fähren“ (Gegner zufällig bei Nordfurt, `foesNear` sperrt die 2. Fahrt; nicht von diesen Änderungen) |
+| 08.10. | P3.24 Kampfanimation Front/Rücken | ✔ 🔍 | Ursache: `fig5.js` `bodyPose`, Zweig vorn/hinten — Füße bis ±4 px gegrätscht und Knie per IK seitlich ausgeknickt (bei tiefer Kniebeuge ~7 px je Seite = Froschhocke). Jetzt Ausfallschritt in die Tiefe: Fuß der Waffenseite vor (S unten, N oben), anderer zurück (abgedunkelt), höchstens 1 px Spreizung, Knie verkürzt. Gilt für Hieb, Kampfhaltung, Deckung. Seitenansicht unverändert. 🔍 Hieb nach oben/unten im Test Room (Pack C) ansehen |
+| 08.10. | P1.x Berufe erkennbar, besondere NPCs (Agent) | ✔ 🔍 ⚖ | `sprites.js` `PROF_MARK`/`profMark` (nach den Zufallsschichten): helle Schürzen für Wirt/Bäcker/Koch/Schankmagd/Magd, Lederschürze + freie Unterarme Schmied, Ding in der Hand ohne Waffe (`prop`, neu in SPEC_KEYS; gemalt in `fig5.js` `propR`): Hammer, Beil, Säge, Krug, Korb, Heugabel, Angel, Buch, Geldbeutel; Kiepe für Händler/Lagerknechte. Besondere Figuren (Story-Schlüssel, Fraktionsführung): Messingborte, fester Stand, roter Umhang wenn keiner. Debug „Figuren: Berufsgalerie“. ⚖ Zuordnung Beruf → Merkmal/Ding, Farben. Offen: Namenszug beim Hinsehen, Ding auch bei Händlerware (Stoffballen, Gewürzsack) |
+| 08.10. | P1.x Stadttiere: Daten + Bilder (Agent) | ✔ ⚖ | `data.js` MONSTERS `dog` (Hofhund), `cat` (Katze), `chicken` (Huhn): prey, threat 0, faction beast, neu `town:true`; LOOT Huhn Fleisch 0,6. Bilder Stil R in `fig5.js`: Hund/Katze seitlich über BEASTR (Halsband, Katzenohren, Fahnenschwanz), vorn/hinten `paintPetNSR`; Huhn `paintFowlR` (seitlich/vorn/hinten, pickt bei Bild 3); je 4 Lauf-Bilder. `sprites.js` beastFrame leitet um; `render.js` malt sie als Tiere (vorn/hinten bei Auf-/Ab-Lauf, Fellvarianten). Probe „Sprites: alle Gegnertypen“ prüft alle 4 Richtungen × 4 Bilder. ⚖ Werte (LP, Tempo). **Offen (Claude):** Spawnen in Orten, Verhalten (nicht fliehen vor Bewohnern), Bestiarium-Liste in ui.js `BEAST_KEYS` |
+| 08.10. | P3.x Welt-Ereignisse mit Namenskarte + Ton (Agent Quests) | ✔ 🔍 ⚖ | game.js `bigAnnounce` → `worldCard`, neu `EV_CARDS`/`worldCardTick` (aus `update`, 0,9-s-Takt), `SIM.H.card`; sim.js Ort gefallen/befreit/Schlacht als Kriegskarte (Welt hält an). Probe + Debug „Regie (T17)“, live geprüft (Karte nebenbei, Kriegskarte pausiert und endet von selbst). 🔍 im Spiel hören/sehen. ⚖ Klänge Glocke/Horn/Trommel, Dauer 3,2/3,4 s. Offen: Karten-Pins (E22 Teil 2) |
+| 08.10. | P3.25–26 Quest-Zieltypen (Agent Quests) | ✔ 🔍 ⚖ | Messung `conMix` vorher/nachher (Tabelle bei P3.25–26). Neu: `debt` „Schuld eintreiben“ und `message` „Nachricht mit Antwort“ (`makeContract`, `taskChoices`/`debtTalk`/`msgHand`/`msgAnswer`, `conProg`, `CON[k].steps`); Items `auftragsbrief`/`antwortbrief`; Häkchen-Liste in Auftragsbuch, Brett (`ui.js boardUI`) und Tracker. Probe grün, live: Bewohner ohne Gesprächsrolle öffnet das Fenster mit „Ich komme wegen deiner Schulden“. ⚖ Schuldsumme 30 + 20/Stufe + 0–40, Frist 4/5 Tage, Antwort 2 Std., Geber-Berufe |
+| 08.10. | P3.x Boss-Intros Graumähne/Karrak (Agent Quests) | ✔ 🔍 ⚖ | BOSS_CARDS `alpha`/`sandlord`, `bossCardKey` (Boss-Kennung vor Gegnertyp), Tier ohne Zeigegeste; Blutfürst hatte schon seinen Krypta-Auftritt. Probe + Debug. 🔍 Auftritt in der Wolfsschlucht/Roten Wüste ansehen |
+| 08.10. | Selbsttest (Agent Quests) | ✔ 🐞 | Letzter Lauf 497 Proben, nur „Duell im Kreis“ rot (bekannt wackelig); echter Held/Gold/Märkte/Chronik unverändert. 🐞 Ein Lauf davor hatte „Beziehungen (§79)“ rot (Rivalen gingen sich in `villagerDay` nicht aus dem Weg; Daten 821/821 in Ordnung), im nächsten Lauf grün — wackelig, Fehlerrunde. Ein Lauf mitten im parallelen Umbau brach in der Krieg-Probe ab (`H.spawnEnemy` fehlte), nach Neuladen nicht wieder |
 
 ---
 

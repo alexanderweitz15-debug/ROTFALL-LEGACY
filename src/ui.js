@@ -335,7 +335,8 @@ function boardUI(body, arg) {
     <div class="bb-top">${icoImg(it.ico, 2, 'bb-ico')}<b>${qa(it.title)}</b>${it.elite ? '<span class="bb-skull" title="Gefährlicher Anführer">☠</span>' : ''}</div>
     <div class="bb-kind">${qa(it.kindName)}${it.dist != null ? ` · ${it.dist} Felder` : ''}${it.days ? ` · ${it.days} Tag${it.days === 1 ? '' : 'e'}` : ''}</div>
     <p class="bb-desc">${qa(it.desc || '')}</p>
-    <div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>
+    ${it.steps ? it.steps.map((s, i) => `<div class="bb-obj"><i class="qb-chk">${s.done ? '☑' : it.state === 'active' && it.steps.slice(0, i).every(q => q.done) ? '▸' : '☐'}</i>${qa(s.text)}</div>`).join('')   /* P3.25–26: Schritt-Aufträge als Häkchen-Liste */
+      : `<div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>`}
     <div class="bb-foot"><span class="bb-rew">${rewardHTML(it.rew, true)}</span>${it.state === 'offer' ? `<button class="mini" data-acc="${it.id}">Annehmen</button>` : it.ready ? `<button class="mini" data-claim="${it.id}">Abgeben</button>` : '<span class="ledger">läuft</span>'}</div></div>`;
   body.innerHTML = `<div class="bb-head"><b>${o.giver === 'board' ? `Anschlagbrett — ${qa(V.name)}` : qa(V.name)}</b><span class="ledger">${V.active}/${V.max} Aufträge angenommen</span></div>
     ${V.shut ? `<div class="bb-shut">${qa(V.shut)}</div>` : ''}
@@ -1140,6 +1141,7 @@ export function itemInfoHTML(slot, cmpWith = true, lite = false) {   /* lite: oh
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
   if (it.sdesc) h += `<div class="ledger" style="margin:4px 0">${it.sdesc}</div>`;   /* Schildart erklären */
   if (slot.qual) h += `<div class="ledger" style="margin:4px 0">Güte: ${slot.qual}${slot.maker ? ` · gefertigt von ${slot.maker}` : ''}</div>`;   /* Nutzer §5d.8: Handwerk */
+  else if (slot.maker) h += `<div class="ledger" style="margin:4px 0">Gefertigt von ${slot.maker}</div>`;   /* P2.x (08.10.): Werkstücke mit Namen — auch ohne Gütestufe (Auftragsarbeit beim Schmied) */
   if (it.energy) h += `<div class="ledger" style="margin:4px 0">Magitech · Energie ${slot.charge ?? 100}/100 · ${it.energy} je Schuss${it.splash ? ' · Streuung' : ''}${it.pierce ? ' · durchschlägt einen Gegner' : ''}${it.mstatus ? ` · ${it.mstatus.key === 'shocked' ? 'lähmt' : 'setzt in Brand'} (${Math.round(it.mstatus.chance * 100)} %)` : ''}. Leer schießt sie nicht — Energiezelle benutzen.</div>`;   /* Roadmap C.10 */
   if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
   if (slot.used) h += `<div class="stat" title="Gebraucht vom Schwarzmarkt: kommt beim Einsetzen mit weniger Zustand."><span>Gebraucht</span><b>${slot.used} % Zustand</b></div>`;

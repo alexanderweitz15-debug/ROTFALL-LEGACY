@@ -1274,6 +1274,9 @@ const BEASTR = {
   mule:     { body: [32, 18, 11.5, 6], fx: 24, hx: 41, leg: 16, lw: 3, head: [13, 8, 3.4, 3.2], snout: 5, neck: 2, tail: 'long', ear: 'long', hoof: 1 },
   sheep:    { body: [31, 21, 12, 8], fx: 23, hx: 39, leg: 10, lw: 2.4, head: [16, 18, 3.4, 3.6], snout: 12, neck: 0, tail: 'stub', ear: 'side', wool: 1, darkLeg: 1, hoof: 1 },
   deer:     { body: [32, 18, 11, 5.4], fx: 25, hx: 39, leg: 19, lw: 2.4, head: [14, 11, 3.6, 3], snout: 8, neck: 2, tail: 'short', ear: 'long', antler: 1, rump: 1, hoof: 1 },
+  /* Stadttiere (08.10., Roadmap P1.x „Kinder/Tiere als Stadtbevölkerung“): Hofhund kleiner und satter als der wilde Hund, Katze flach und lang mit Fahnenschwanz */
+  dog:      { body: [31, 25, 9.5, 4.6], fx: 25, hx: 37, leg: 11, lw: 2.6, head: [19, 20, 3.6, 3.2], snout: 13.5, neck: 1, tail: 'sickle', ear: 'flop', collar: 1 },
+  cat:      { body: [31, 29, 8, 3.4], fx: 26, hx: 36, leg: 8, lw: 1.9, head: [21.5, 25.5, 3.2, 2.8], snout: 18.5, neck: 0, tail: 'cat', ear: 'cat' },
 };
 // S15 (Nutzer: „wenn man nach oben läuft, guckt das Pferd nicht nach oben“): Pferd von hinten (N) und von vorn (S).
 // Von vorn verdeckt der Kopf den Reiter; darum gibt es den Kopf als eigene Ebene (only = 'head'), der Rumpf kommt ohne Kopf.
@@ -1332,6 +1335,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   else if (T.tail === 'curl') C.limb(P.tail, [[tx, ty + 1], [tx + 3, ty - 1], [tx + 2, ty - 3]], 1.6, 1.4);
   else if (T.tail === 'long') { C.limb(P.tail, [[tx, ty - 1], [tx + 4, ty + 3 - s], [tx + 6, ty + 12 - s], [tx + 5, ty + 18 - s]], 4.5, 3); }
   else if (T.tail === 'tuft') { C.limb(P.tail, [[tx, ty], [tx + 2, ty + 6], [tx + 2, ty + 13]], 1.5, 1.4); C.ell(P.mane, tx + 2, ty + 14, 1.8, 2.2); }
+  else if (T.tail === 'cat') C.limb(P.tail, [[tx, ty], [tx + 3, ty - 3], [tx + 3, ty - 8 + s * 0.5], [tx + 1, ty - 10 + s]], 1.9, 1.5);   /* Katze: Schwanz hoch, Spitze nach vorn */
   else C.ell(P.tail, tx + 2, ty, 2.2, 1.8);
   C.ell(P.body, cx, cy, brx, bry);
   if (T.boxy) C.poly(P.body, [[cx - brx + 2, cy - bry + 0.5], [cx + brx - 1, cy - bry + 1.5], [cx + brx, cy + bry - 1], [cx - brx + 1, cy + bry - 0.5]]);   // Kuh: gerader Rücken, kantige Hüfte
@@ -1355,6 +1359,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   else if (T.ear === 'long') C.poly(P.ear, [[hx + 1, hy - hry + 1], [hx + 6, hy - hry - 2], [hx + 3, hy - hry + 2]]);
   else if (T.ear === 'round') C.ell(P.ear, hx + 2, hy - hry + 0.5, 1.8, 1.6);
   else if (T.ear === 'side') C.poly(P.ear, [[hx + 2, hy - hry + 2], [hx + 7, hy - hry + 1], [hx + 6, hy - hry + 3.5], [hx + 2, hy - hry + 4]]);
+  else if (T.ear === 'cat') { C.poly(P.ear, [[hx - 2, hy - hry + 1], [hx - 1.5, hy - hry - 2.5], [hx + 0.5, hy - hry + 0.5]]); C.poly(P.ear, [[hx + 0.5, hy - hry + 1], [hx + 2, hy - hry - 2.5], [hx + 3, hy - hry + 1]]); }
   else C.poly(P.ear, [[hx, hy - hry + 1], [hx + 2, hy - hry - 2], [hx + 3, hy - hry + 1]]);
   if (T.mane && type === 'horse') C.limb(P.mane, [[hx + 4, hy - 2], [cx - brx * 0.85 + 2, cy - bry - 4], [cx - brx * 0.4, cy - bry + 1]], 3, 2.4);   // Mähne auf dem Hals
   else if (T.mane) C.poly(P.mane, [[hx + 3, hy - 2], [hx + 7, hy - 3], [cx - brx * 0.5, cy - bry - 1], [cx - brx * 0.2, cy - bry + 1], [hx + 6, hy + 3]]);
@@ -1373,10 +1378,70 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   if (T.patches || pal.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, pal.patches ? (x + y < 0 ? D.sh : D.b) : (x + y < 0 ? '#ece4d4' : '#c8c0b0'));   // Kuh: weiße Flecken / Schecke (pal.patches): braune Platten
   if (type === 'horse') { for (let y = hy - 1; y <= hy + 2; y += 1.25) set(hx - 1, y, '#e8e0d0'); }                                   // Blesse
   if (T.rump) for (let y = -2; y <= 2; y += 1.3) set(cx + brx - 1.5, cy + y, '#e0d4bc');
+  if (T.collar) for (let y = 0; y <= 3; y += 1.25) set(hx + 3.6, hy + 1 + y, '#8a2a20');   /* Hofhund: Halsband — gehört jemandem */
+  if (type === 'cat') { set(sn + 0.5, hy + 0.8, '#c88a80'); for (const dx of [3, 6]) set(cx - 2 + dx, cy - 1.5, D.b); }   /* Katze: rosa Nase, Tigerstreifen */
   if (type === 'wolf' || type === 'wild_dog') {                     /* Artist Runde 2: dunkler Sattel auf dem Rücken, Brauenschatten — Wolf hebt sich vom Boden ab */
     const W0 = Cx.w; for (let x = 0; x < W0; x++) { let y = 0; while (y < Cx.h && Cx.id[y * W0 + x] !== P.body) y++; if (y >= Cx.h - 2) continue;
       for (let d = 1; d <= 2; d++) { const i = (y + d) * W0 + x; if (Cx.id[i] === P.body) Cx.col[i] = d === 1 ? mix(D.b, F.sh, 0.3) : mix(F.sh, D.b, 0.4); } }
     set(hx - hrx * 0.35, hy - 2.2, D.dk); set(hx - hrx * 0.35 + 1.3, hy - 2.2, D.sh); set(hx - hrx * 0.35, hy - 1, eye); }
   if (type === 'wolf') for (let i = 0; i < 4; i++) set(cx - 6 + i * 4, cy - bry + 1.3, F.hi);
+  Cx.outline(); return Cx.toG();
+}
+/* Stadttiere (08.10.): Hund und Katze von vorn (S) und hinten (N) — Brust/Kruppe, zwei sichtbare Beinpaare im Wechselschritt, Kopf vorn bzw. dahinter. */
+const PET_NS = { dog: { cy: 28, brx: 6.2, bry: 5, hr: 3.9, leg: 7, lw: 2.6, ear: 'flop', tail: 'sickle' }, cat: { cy: 31, brx: 4.2, bry: 3.4, hr: 3, leg: 5, lw: 1.8, ear: 'cat', tail: 'cat' } };
+export const PET_NS_TYPES = new Set(Object.keys(PET_NS));
+export function paintPetNSR(type, pal, frame, view, ramp) {
+  const T = PET_NS[type] || PET_NS.dog, Cx = new Px(BRW, BRH), k = 0.8;
+  const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
+    limb: (p, pts, w0, w1) => Cx.limb(p, pts.map(([x, y]) => [x * k, y * k]), Math.max(1.4, w0 * k), Math.max(1.2, (w1 ?? w0) * k)) };
+  const F = ramp(pal.body || '#7a5a3a'), D = ramp(pal.dark || '#3a2a1e'), eye = pal.eye || '#2a1a10', s = [1, 0, -1, 0][frame & 3], cx = 30, cy = T.cy, ground = 37;
+  const P = { far: C.part(dimR(F, 0.3), 'cloth'), body: C.part(F, 'cloth', { grp: 'b' }), near: C.part(F, 'cloth'), head: C.part(F, 'cloth', { grp: 'h' }), ear: C.part(D, 'cloth'), tail: C.part(F, 'cloth'),
+    muzzle: C.part(ramp(mix(pal.body || '#7a5a3a', '#d8c8b0', 0.45)), 'skin', { grp: 'h' }) };
+  const legs = (pid, dx, ph) => [-1, 1].forEach(sd => { const lift = sd * ph * s > 0 ? 1.5 : 0, x = cx + sd * dx; C.limb(pid, [[x, cy + 1], [x, ground - lift]], T.lw, T.lw * 0.85); C.ell(pid, x, ground - lift, T.lw * 0.6, 0.9); });
+  const ears = (hy) => { if (T.ear === 'cat') { C.poly(P.ear, [[cx - 2.8, hy - 1], [cx - 2.4, hy - T.hr - 2.5], [cx - 0.6, hy - T.hr + 0.5]]); C.poly(P.ear, [[cx + 2.8, hy - 1], [cx + 2.4, hy - T.hr - 2.5], [cx + 0.6, hy - T.hr + 0.5]]); }
+    else { C.ell(P.ear, cx - T.hr, hy + 0.5, 1.3, 2.4); C.ell(P.ear, cx + T.hr, hy + 0.5, 1.3, 2.4); } };
+  const hy = cy - T.bry - T.hr * 0.6;
+  if (view === 'N') {                                                 // von hinten: Kopf dahinter, Kruppe, Hinterbeine, Schwanz
+    C.ell(P.head, cx, hy, T.hr, T.hr * 0.9); ears(hy); legs(P.far, T.brx * 0.45, -1); C.ell(P.body, cx, cy, T.brx, T.bry); legs(P.near, T.brx * 0.7, 1);
+    if (T.tail === 'cat') C.limb(P.tail, [[cx, cy - T.bry + 1], [cx + s * 0.8, cy - T.bry - 4], [cx + 1.5 + s, cy - T.bry - 8]], 1.9, 1.4);
+    else C.limb(P.tail, [[cx, cy - T.bry + 1], [cx + s * 1.5, cy - T.bry - 3], [cx + s * 2.5, cy - T.bry - 5]], 2.2, 1.6);   // Rute wedelt
+  } else {                                                            // von vorn: Brust, Vorderbeine, Kopf davor
+    legs(P.far, T.brx * 0.45, -1); C.ell(P.body, cx, cy, T.brx * 0.9, T.bry); legs(P.near, T.brx * 0.55, 1);
+    C.ell(P.head, cx, hy, T.hr, T.hr * 0.9); ears(hy); C.ell(P.muzzle, cx, hy + T.hr * 0.45, T.hr * 0.55, T.hr * 0.4);
+  }
+  Cx.shade();
+  const set = (x, y, c) => Cx.set(x * k, y * k, c);
+  if (view !== 'N') { set(cx - T.hr * 0.45, hy - 0.6, eye); set(cx + T.hr * 0.45, hy - 0.6, eye); set(cx, hy + T.hr * 0.25, type === 'cat' ? '#c88a80' : '#0d0b0a');
+    if (type === 'dog') for (let x = -2; x <= 2; x += 1.25) set(cx + x, hy + T.hr + 0.6, '#8a2a20'); }   // Augen, Nase, Halsband
+  Cx.outline(); return Cx.toG();
+}
+/* Stadttiere (08.10.): Huhn — eigener Zweibeiner, Seite (Blick links), vorn, hinten. Kamm und Kehllappen rot, Schnabel und Füße gelb; pickt im Stand (frame 3). */
+export function paintFowlR(pal, frame, view, act, ramp) {
+  const Cx = new Px(BRW, BRH), k = 0.8;
+  const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
+    limb: (p, pts, w0, w1) => Cx.limb(p, pts.map(([x, y]) => [x * k, y * k]), Math.max(1, w0 * k), Math.max(1, (w1 ?? w0) * k)) };
+  const F = ramp(pal.body || '#b8743a'), D = ramp(pal.dark || '#5a3418'), eye = pal.eye || '#1a120c', s = act ? 0 : [1, 0, -1, 0][frame & 3], peck = !act && frame === 3 ? 3 : 0;
+  const P = { leg: C.part(ramp('#c8a040'), 'skin'), tail: C.part(D, 'cloth'), body: C.part(F, 'cloth', { grp: 'b' }), wing: C.part(dimR(F, 0.18), 'cloth', { grp: 'b' }), head: C.part(F, 'cloth', { grp: 'h' }),
+    comb: C.part(ramp('#b02a20'), 'skin'), beak: C.part(ramp('#d8b040'), 'bone') };
+  const cx = 30, cy = 30, ground = 37;
+  const leg = (x, lift) => { C.limb(P.leg, [[x, cy + 2], [x, ground - lift]], 1.1); C.limb(P.leg, [[x - 1.5, ground - lift], [x + 1.5, ground - lift]], 1); };
+  if (view === 'W') {
+    leg(cx + 1 - s, s > 0 ? 1 : 0); leg(cx - 1 + s, s < 0 ? 1 : 0);
+    C.poly(P.tail, [[cx + 3, cy - 1], [cx + 8, cy - 7], [cx + 9, cy - 3], [cx + 6, cy + 2]]);
+    C.ell(P.body, cx, cy, 5.2, 4); C.ell(P.wing, cx + 1, cy - 0.5, 3.4, 2.4);
+    const hx = cx - 4 - peck * 0.7, hy = cy - 5 + peck * 1.6;
+    C.limb(P.head, [[cx - 2.5, cy - 2], [hx, hy]], 3, 2.6); C.ell(P.head, hx, hy, 2.2, 2.1);
+    C.poly(P.comb, [[hx - 1.5, hy - 1.8], [hx - 0.8, hy - 3.6], [hx + 0.2, hy - 2.4], [hx + 1, hy - 3.6], [hx + 1.6, hy - 1.6]]); C.ell(P.comb, hx - 1.2, hy + 2, 0.8, 1.2);
+    C.poly(P.beak, [[hx - 1.8, hy - 0.5], [hx - 4, hy + 0.4], [hx - 1.8, hy + 1]]);
+    Cx.shade(); Cx.set((hx - 0.6) * k, (hy - 0.6) * k, eye);
+  } else {
+    leg(cx - 1.6, s > 0 ? 1 : 0); leg(cx + 1.6, s < 0 ? 1 : 0);
+    if (view === 'N') { C.ell(P.head, cx, cy - 6, 2.1, 2); C.poly(P.comb, [[cx - 1, cy - 7.5], [cx, cy - 9.5], [cx + 1, cy - 7.5]]); C.ell(P.body, cx, cy, 4.4, 4.2);
+      C.poly(P.tail, [[cx - 2.5, cy - 2], [cx - 3, cy - 7], [cx, cy - 5], [cx + 3, cy - 7], [cx + 2.5, cy - 2]]); }
+    else { C.ell(P.body, cx, cy, 4.2, 4.2); C.ell(P.wing, cx - 3, cy, 1.4, 2.6); C.ell(P.wing, cx + 3, cy, 1.4, 2.6);
+      const hy = cy - 5 + peck * 1.4; C.ell(P.head, cx, hy, 2.2, 2.1); C.poly(P.comb, [[cx - 1, hy - 1.5], [cx, hy - 3.6], [cx + 1, hy - 1.5]]);
+      C.poly(P.beak, [[cx - 0.9, hy + 0.4], [cx + 0.9, hy + 0.4], [cx, hy + 1.8]]); C.ell(P.comb, cx, hy + 2.6, 0.8, 0.9); }
+    Cx.shade(); if (view === 'S') { const hy = cy - 5 + peck * 1.4; Cx.set((cx - 1.2) * k, (hy - 0.4) * k, eye); Cx.set((cx + 1.2) * k, (hy - 0.4) * k, eye); }
+  }
   Cx.outline(); return Cx.toG();
 }

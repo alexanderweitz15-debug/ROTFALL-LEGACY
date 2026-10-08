@@ -17,7 +17,7 @@ import { ITEMS, RACES } from './data.js?v=25';   // Nutzer S13: Sprites aus dem 
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=25';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 import { ATK_U } from './anim.js?v=25';   /* Kampfanimation Scheibe 1 */
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=25';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=25';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -188,7 +188,7 @@ const WTYPE_ATLAS = { sword: 'w_langschwert', rapier: 'w_kurzschwert', dagger: '
 export function itemAtlas(key, it) { if (!atlasOn()) return null; const k = ITEM_ATLAS[key] || (it?.slot === 'weapon' && WTYPE_ATLAS[it.wtype]) || (it?.slot === 'offhand' ? 'w_schild' : null); return k ? atlasSprite(k) : null; }
 // Objekte in Objektgröße aus dem Blatt (nicht aufgeblasen): Brunnen, Schrein, Pumpe, Falle, Belagerungsgerät
 export const PROP_ATLAS = { well: 'b_brunnen', shrine: 'b_heiligtum', wayshrine: 'b_heiligtum', spikes: 'u_falle', catapult: 'u_katapult', ballista: 'u_ballista', ram: 'u_rammbock' };
-export const BEAST_ATLAS = { wolf: 'wolf', wild_dog: 'wilder_hund', bear: 'baer', boar: 'wildschwein', deer: 'hirsch', bone_hound: 'leichhund', horse: 'hirsch', cow: 'wildschwein', sheep: 'wildschwein' };   // S13: Stil F hat keine eigenen Bilder für Nutz- und Reittiere (nächstes passendes)
+export const BEAST_ATLAS = { wolf: 'wolf', wild_dog: 'wilder_hund', bear: 'baer', boar: 'wildschwein', deer: 'hirsch', bone_hound: 'leichhund', horse: 'hirsch', cow: 'wildschwein', sheep: 'wildschwein', dog: 'wilder_hund', cat: 'wilder_hund', chicken: 'wilder_hund' };   // S13: Stil F hat keine eigenen Bilder für Nutz- und Reittiere (nächstes passendes)
 // Gebäude (Typ → Bild aus dem Blatt)
 export function houseAtlas(b) {
   const T = { cottage: 'b_holzhuette', tavern: 'b_taverne', smithy: 'b_schmiede', barracks: 'b_kaserne', legion: 'b_kaserne', merc: 'b_kaserne', chapel: 'b_kirche', manor: 'b_steinhaus', healer: 'b_steinhaus',
@@ -917,11 +917,29 @@ function regionFarmer(s, e, prof, key) {
     if (fem) Object.assign(s, { robe: s.cloth, apron: 1, apronCol: '#6a6250' });
   }
 }
+/* P3.20–P3.23 Banditen- und Goblin-Rollen (08.10.2026, Spec §15: neu nur, wenn sichtbar anders): je Rolle Silhouette, Kleidung, Kopf und
+   Ausrüstung fest — Späher leicht mit Kapuze und Köcher, Schläger breit mit nackten Armen, Plünderer mit Sack auf dem Rücken, Messerstecher
+   maskiert, schwerer Bandit im Kettenhemd mit Topfhelm, Bandenführer mit Federhut und rotem Mantel; Goblin-Schamane mit Tierschädel und
+   grünem Glimmen, Techniker mit Messingbrille, Lederschürze und Pulversack, Berserker nackt mit roten Augen. gob/ban: Grundaussehen. */
+const ROLE_LOOK = {
+  bandit_scout: { ban: 1, hooded: 1, hood: '#34442a', cloak: '#2a3622', face: 'cloth', scarf: '#4a5a34', armor: '', quiver: 1, strap: 1, pouch: 0, wear: 1 },
+  bandit_thug: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: '', hs: 2, beard: 2, bare: 1, armor: '', scarf: '#7a2a20', strap: 0, pouch: 0, pauld: '#5a4632', pb: 1, asy: 1, sc: 2, wraps: 1, wear: 2 },
+  bandit_looter: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'cap', helmCol: '#5a4a36', pack: 1, strap: 1, pouch: 1, scarf: '#8a6a2e', armor: 'leather', armorCol: '#5a4030', wear: 2 },
+  bandit_knife: { ban: 1, hooded: 1, hood: '#1e1c1a', cloak: '#1a1816', face: 'mask', armor: '', sash: '#7a2a20', strap: 0, pouch: 0, scarf: '', wear: 1 },
+  bandit_heavy: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'kettle', helmCol: '#6a6862', armor: 'chain', armorCol: '#5a5a56', pauld: '#6a6a66', pb: 1, glove: '#4a4640', scarf: '#5a1a1c', strap: 1, wear: 1 },
+  bandit_chief: { ban: 1, hooded: 0, face: 'human', helm: 'wide', helmCol: '#2a1a14', crest: '#b03020', cloak: '#5a1a1c', capeL: 1, armor: 'leather', armorCol: '#3a2a1c', trim: '#c8a050', sash: '#8a2a20', beard: 1, sc: 1, glove: '#3a2c20', scarf: '', wear: 0 },
+  goblin_scout: { gob: 1, hooded: 1, hood: '#2e3a24', cloak: '#26301d', helm: '', strap: 1, wear: 2 },
+  goblin_archer: { gob: 1, quiver: 1, fur: '#5a4a30', helm: '', strap: 1, wear: 2 },
+  goblin_shaman: { gob: 1, helm: 'skull', helmCol: '#cfc6b0', charm: 1, robe: '#3a2a1a', fur: '#4a3a26', ge: '#9ad05a', sil: 'motes', mc: '#9ad05a', wear: 2 },
+  goblin_tinker: { gob: 1, helm: 'mech', helmCol: '#6a5a3a', pack: 1, strap: 1, pouch: 1, glove: '#3a2c20', apron: 1, apronCol: '#4a3424', wear: 1 },
+  goblin_spear: { gob: 1, helm: 'cap', helmCol: '#6b6156', armor: 'leather', armorCol: '#4a3a28', shield: '', wraps: 1, wear: 2 },
+  goblin_berserker: { gob: 1, bare: 1, helm: '', armor: '', shield: '', ge: '#e03020', fur: '#4a3a26', wraps: 1, sc: 2, wear: 3 },
+};
 // Humanoide Gegner (Goblins, Banditen, Untote, Soldaten).
 export function monsterSpec(e, m) {
   const p = (m && m.pal) || {}, s = baseSpec(), t = e.mtype;
   s.skin = p.skin || '#b2926f'; s.cloth = p.cloth || '#3a3229'; s.hs = (((e.seed || 0) * 7) | 0) % 4;
-  if (t === 'goblin' || t === 'goblin_warrior' || t === 'dodon') {
+  if (t === 'goblin' || t === 'goblin_warrior' || t === 'dodon' || ROLE_LOOK[t]?.gob) {   /* P3.20–P3.23: Goblin-Rollen bauen auf dem Goblin auf */
     s.sp = 'goblin'; s.pants = '#3a2e1e'; s.boots = ''; s.hs = 2;
     if (t === 'dodon') Object.assign(s, { armor: 'leather', armorCol: '#3a2c1c', fur: '#4a3a26', helm: 'horned', helmCol: '#4a4038', pauld: '#c8bca0', asy: 1, pb: 2, chn: 1, wraps: 1, bd: 'bullig', ge: '#e0c24a' });   // S15 Dodon: Hörnerhelm, Knochenschulter, gesprengte Kette quer über der Brust
     if (t === 'goblin_warrior') { s.helm = 'cap'; s.helmCol = '#6b6156'; s.armor = 'leather'; s.armorCol = '#4a3a28'; s.shield = 'round'; s.shieldCol = '#3d2f20'; s.mark = 'boss'; s.markCol = '#6b6156'; }
@@ -937,7 +955,7 @@ export function monsterSpec(e, m) {
     s.hooded = 0; s.armor = 'chain'; s.armorCol = t === 'chain_master' ? '#6a6250' : '#4a3e34'; s.helm = 'great'; s.helmCol = t === 'chain_master' ? '#8a8278' : '#5a5652';
     s.crest = t === 'chain_master' ? '#6a1e18' : ''; s.tabard = '#141210'; s.mark = 'chevron'; s.markCol = '#5a1a1c'; s.cloak = t === 'chain_master' ? '#2a0e10' : ''; s.strap = 1;
     if (t === 'chain_master') { s.armor = 'plate'; s.armorCol = '#1e1f22'; s.pauld = '#4a1418'; s.helmCol = '#18181a'; s.crest = '#3a1114'; } else varyChain(s, e.seed || 0);
-  } else if (t === 'bandit' || t === 'bandit_archer' || t === 'bandit_spear' || t === 'bounty_hunter') {
+  } else if (t === 'bandit' || t === 'bandit_archer' || t === 'bandit_spear' || t === 'bounty_hunter' || ROLE_LOOK[t]?.ban) {   /* P3.20: Banditen-Rollen bauen auf dem Banditen auf */
     s.hooded = 1; s.face = 'cloth'; s.strap = 1; s.pouch = 1;
     s.hood = t === 'bandit' ? '#2e241a' : '#2f3a24'; s.cloak = t === 'bandit' ? '#261e16' : '#26301d';
     s.scarf = t === 'bandit' ? '#7a2a20' : ''; s.armor = 'leather'; s.armorCol = '#4a3525';
@@ -1028,6 +1046,7 @@ export function monsterSpec(e, m) {
   if (NEW_WEAR[t] != null) s.wear = NEW_WEAR[t] + (t === 'skel_brute' ? Math.abs(((e.seed || 0) * 37) | 0) % 2 : 0);   /* Entwickler 02.10. */
   if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
+  if (ROLE_LOOK[t]) { const { gob, ban, ...RL } = ROLE_LOOK[t]; Object.assign(s, RL); }   /* P3.20–P3.23 Rollen: Aussehen fest je Rolle (kein varyBandit/varyGoblin — die Rolle soll man erkennen) */
   s.ms = msOf(e); s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
   if (t === 'skel_brute' || t === 'mutant_brute') s.hv = 1;
@@ -1813,6 +1832,9 @@ export function beastFrame(type, pal, dir, pose, frame) {
   if (BEAST_ATLAS[type] && atlasOn()) { const f = atlasPose(BEAST_ATLAS[type], dir, pose || (frame & 1 ? 'w0' : 'i0'), true); if (f) return f; }   // Stil F
   return cacheGet('beast|' + ART + type + '|' + (pal.body || '') + dir + pose + frame, () => {
     if (ART === 'R' && type === 'horse' && (dir === 'N' || dir === 'S')) return meta(toCanvas(asG(paintHorseNSR(pal, frame, dir, pose, ramp)), false), RPX, BROX, BROY);   // S15: Pferd von vorn/hinten
+    if (type === 'chicken') { const v = dir === 'N' || dir === 'S' ? dir : 'W', g0 = asG(paintFowlR(pal, frame, pose === 'dead' ? 'W' : v, pose === 'dead' ? 'dead' : pose, ramp)), g1 = pose === 'dead' ? g0.flipY() : g0;   /* Stadttiere 08.10.: Huhn (alle Stile) */
+      return meta(toCanvas(dir === 'E' ? g1.flipX() : g1, false), RPX, BROX, pose === 'dead' ? g0.h - 12 : BROY); }
+    if (PET_NS_TYPES.has(type) && (dir === 'N' || dir === 'S') && pose !== 'dead') return meta(toCanvas(asG(paintPetNSR(type, pal, frame, dir, ramp)), false), RPX, BROX, BROY);   /* Stadttiere 08.10.: Hund/Katze von vorn/hinten */
     if (ART === 'R') { const g0 = asG(paintBeastR(type, pal, frame, pose === 'dead' ? '' : pose, ramp)), g1 = pose === 'dead' ? g0.flipY() : g0;   // S14 Stil R
       return meta(toCanvas(dir === 'E' ? g1.flipX() : g1, false), RPX, BROX, pose === 'dead' ? g0.h - 12 : BROY); }
     if (!OLD_FIGURES) {                                               // G4: Tiere im feinen Raster

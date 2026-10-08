@@ -2590,13 +2590,14 @@ function drawCreature(e, now) {
   if (e.mtype === 'carrion_wing') return drawWing(e, now, p);
   if (e.mtype === 'waechterspinne') return drawSpider(e, now, p);   /* Entwickler 02.10. */
   if (m.eye) return drawEye(e, now, 70 * m.eye);   // Omega (und Ophanim): Auge statt Figur
-  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
+  if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'dog', 'cat', 'chicken'].includes(e.mtype)) {   /* Stadttiere 08.10.: Hund, Katze, Huhn */
     const moving = e.vx || e.vy, sw = e.swing || 0, K = SP.FIGK * (SP.atlasOn() ? 1 : e.mtype === 'bear' ? 1.45 : e.mtype === 'wild_dog' ? 0.85 : e.mtype === 'horse' ? 1.35 : e.mtype === 'cow' ? 1.3 : 1) * (e.elite ? 1.15 : e.alpha || e.rboss ? 1.3 : 1);   // Leitwolf sichtbar größer   // Bär groß, Hund klein
     const V = beastVar(e, p), K2 = K * V.k;   /* Nutzer §5f: Tiere in Varianten (Fell, Größe, Jungtier, Albino) */
     if (K2 !== 1) { ctx.save(); ctx.translate(e.x, e.y); ctx.scale(K2, K2); ctx.translate(-e.x, -e.y); }
     const pose = e.telegraph > 0 ? 'a1' : e.leap ? 'a2' : sw > 0 ? (sw < 0.35 ? 'a1' : 'a2') : '';
-    const fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : 1;
-    const f = SP.beastFrame(e.mtype, V.pal, sideDir(e), pose, fr);
+    const town = MONSTERS[e.mtype]?.town, fr = e.leap ? 2 : moving ? ((now / 85 + (e.seed || 0) * 5) | 0) & 3 : town && e.mtype === 'chicken' && ((now / 400 + (e.seed || 0) * 7) | 0) % 5 === 0 ? 3 : 1;   /* Huhn pickt im Stand */
+    const vdir = town && moving && Math.abs(e.vy || 0) > Math.abs(e.vx || 0) * 1.2 ? ((e.vy || 0) > 0 ? 'S' : 'N') : sideDir(e);   /* Stadttiere: von vorn/hinten, wenn sie vor allem auf/ab laufen */
+    const f = SP.beastFrame(e.mtype, V.pal, vdir, pose, fr);
     shadow(e.x, e.y + 3, (e.r + 4) / K2, .35);
     SP.blit(ctx, f, e.x, e.y + 5);
     const fw = flashAlpha(e, now);
@@ -2631,7 +2632,8 @@ function drawCreature(e, now) {
     return;
   }
   // humanoide Gegner (Goblin, Bandit, Untoter, Soldat)
-  const scale = (e.mtype === 'goblin' ? 0.82 : e.mtype === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1) * ({ veteran: 1.06, armored: 1.08, leader: 1.1, starved: 0.94 }[e.variant] || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
+  const bt = m.abart && m.rolle ? m.abart.of : e.mtype;   /* P3.20–P3.23: Rollen haben die Größe ihrer Grundart (Goblin-Späher so klein wie ein Goblin) */
+  const scale = (bt === 'goblin' ? 0.82 : bt === 'goblin_warrior' ? 0.9 : 1) * (e.elite ? 1.12 : e.rboss ? 1.18 : 1) * (m.scale || 1) * ({ veteran: 1.06, armored: 1.08, leader: 1.1, starved: 0.94 }[e.variant] || 1);   // §71 Veteran / §73 Regionalboss: größere Silhouette
   const proxy = proxyOf(e, m);
   if (e.mtype === 'zombie') { ctx.fillStyle = 'rgba(140,170,70,.13)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, 26, 14, 0, 0, 7); ctx.fill(); }   // Seuchendunst
   if (e.shadowServ) { ctx.fillStyle = 'rgba(120,80,190,.18)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, 18, 8, 0, 0, 7); ctx.fill(); }   // Schattenskelett des Hexenmeisters
@@ -2688,7 +2690,7 @@ function drawCorpse(e, now) {
   if (!D || D.pool) { const pool = Math.min(14, 5 + age / 70);
     ctx.fillStyle = 'rgba(90,18,14,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 3, pool, pool * 0.45, 0, 0, 7); ctx.fill(); }
   const m = e.mtype && MONSTERS[e.mtype];
-  if (e.spec || (D && m && !m.eye && !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'gorak', 'carrion_wing', 'waechterspinne'].includes(e.mtype))) drawDeath(e, age, e.spec || SP.monsterSpec(e, m), SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m?.scale || 1));   /* Roadmap P8: Personen und Menschenähnliche mit Todesart */
+  if (e.spec || (D && m && !m.eye && !['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'dog', 'cat', 'chicken', 'gorak', 'carrion_wing', 'waechterspinne'].includes(e.mtype))) drawDeath(e, age, e.spec || SP.monsterSpec(e, m), SP.FIGK * (e.mtype === 'goblin' || (m?.rolle && m.abart?.of === 'goblin') ? 0.82 : 1) * (m?.scale || 1));   /* Roadmap P8: Personen und Menschenähnliche mit Todesart */
   else if (!m) {
     shadow(e.x, e.y + 2, 12, .25);
     ctx.fillStyle = e.pal || '#3a3229'; ctx.fillRect(e.x - 13, e.y - 6, 26, 10);
@@ -2699,14 +2701,14 @@ function drawCorpse(e, now) {
     ctx.fillStyle = '#4a3a26'; for (const [dx, dy] of [[-11, -1], [-9, 3], [8, -2], [10, 2], [-6, 5], [5, 5]]) ctx.fillRect(e.x + dx, e.y + dy, 4, 1);
   } else if (e.mtype === 'carrion_wing') {                     // Phase 6: gefallene Schwinge
     ctx.fillStyle = '#141012'; ctx.fillRect(e.x - 11, e.y - 1, 22, 3); ctx.fillStyle = '#2a2426'; ctx.fillRect(e.x - 3, e.y - 3, 6, 5);
-  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse'].includes(e.mtype)) {
+  } else if (['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'dog', 'cat', 'chicken'].includes(e.mtype)) {
     const f = SP.beastFrame(e.mtype, m.pal || {}, e.facing === 3 ? 'E' : 'W', age < 160 ? 'a1' : 'dead', 0);
     ctx.save(); ctx.translate(e.x, e.y + 5); ctx.scale(SP.FIGK, SP.FIGK); SP.blit(ctx, f, 0, 0); ctx.restore();
   } else if (e.mtype === 'gorak') {
     const f = SP.bruteFrame(m.pal || {}, 'E', '', 0), k = Math.min(1, age / 500);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.rotate(k * Math.PI / 2); SP.blit(ctx, f, 0, 2); ctx.restore();
   } else {
-    const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' ? 0.82 : 1) * (m.scale || 1);
+    const spec = SP.monsterSpec(e, m), sc = SP.FIGK * (e.mtype === 'goblin' || (m.rolle && m.abart?.of === 'goblin') ? 0.82 : 1) * (m.scale || 1);
     ctx.save(); ctx.translate(e.x, e.y + 6); ctx.scale(sc, sc);
     // S14 Todesablauf (Nutzer: mehr Kampfanimationen): Treffer, in die Knie, zur Seite kippen, liegen
     const kn = SP.drawnOn() ? 'die1' : 'kneel';
@@ -3273,7 +3275,7 @@ function drawAirship(x, y, s, dir, now, h, smoke) {
 // S14 Brand: Flammenzungen über dem Dach, Glut in den Fenstern, Rauchsäule — Größe nach Hitze (0–100). Pixelblöcke statt Verläufe.
 // Nutzer §5f: Tier-Varianten aus dem Seed — wenige Stufen je Art, damit der Bild-Cache klein bleibt (Schlüssel: pal.body)
 const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), Bc = p(b); return '#' + A.map((v, i) => Math.round(v + (Bc[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
-const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'], bone_hound: ['#d8d0b0', '#a8a498', '#8a7a5a', '#c8b890'] };   /* Artist Runde 6: Knochenhunde vergilbt, grau, erdig */
+const BEAST_TINT = { wolf: ['#8a8680', '#4a3a2a', '#2a2622', '#a08a6a'], boar: ['#3a2e24', '#6a4a30', '#2a2420'], bear: ['#3a2a1e', '#6a4a2a', '#1e1a18'], deer: ['#8a6a44', '#6a5238', '#a08058'], wild_dog: ['#6a5a44', '#3a3228', '#8a7a5a'], cow: ['#e8e0d0', '#6a4a30', '#2a2622'], sheep: ['#e8e4d8', '#3a3430', '#c8b8a0'], dog: ['#3a2e24', '#c8b8a0', '#8a6a44', '#2a2622'], cat: ['#2a2624', '#c87a3a', '#d8d0c4', '#8a8478'], chicken: ['#e8e0d0', '#2a2420', '#8a5a2a'], bone_hound: ['#d8d0b0', '#a8a498', '#8a7a5a', '#c8b890'] };   /* Artist Runde 6: Knochenhunde vergilbt, grau, erdig */
 function beastVar(e, p) {
   if (e.epal) return { pal: { ...p, ...e.epal }, k: 1.2 };   /* Elite-Tier: eigenes Fell, größer */
   const T = BEAST_TINT[e.mtype]; if (!T || e.alpha || e.rboss || !p.body || !/^#[0-9a-f]{6}$/i.test(p.body)) return { pal: p, k: 1 };
