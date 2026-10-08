@@ -208,11 +208,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la'];   /* Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0 };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '' };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -267,6 +267,39 @@ const CIVIC = {
   'Gefangene im Pferch': { robe: '#3a3530', wraps: 1 }, 'Am Schandpfahl': { bare: 1, wraps: 1 },
   'Sprecherin der Freien Feste': { robe: 'cloth', scarf: '#6a8a5a', pouch: 1 }, 'Hauptmann der Garnison': { cape: '#2f4260', beard: 1 },
 };
+/* Berufe erkennbar (Entwickler 08.10.2026: „Man soll besser die verschiedenen Berufe erkennen können. Besondere NPCs sollen herausstechen.“).
+   Vorher trugen Handwerker, Böttcher, Wirt, Schmied, Tagelöhner, Koch … fast dasselbe dunkle Wams; die Schürze war Leder auf dunklem Stoff und
+   verschwand. Jetzt je Beruf EIN klares Merkmal, das auch auf Spielgröße trägt: helle Schürze (Essen/Trinken), Lederschürze mit freien Unterarmen
+   (Schmiede), Ding in der Hand ohne Waffe (prop, gemalt in fig5.js propR), Kiepe (pack). Wird nach Zufallsschichten (Umhang, Tuch) gesetzt, damit
+   nichts das Merkmal überdeckt; Gegend-Bauern (regionFarmer) bleiben, wie sie sind. Benannte Figuren behalten ihr Aussehen und bekommen nur das Ding. */
+const FOOD_APRON = '#e2d9c4';
+const PROF_MARK = {
+  Schmied: { apron: 1, apronCol: '#6a4428', glove: '#2a1e16', bare: 1, prop: 'hammer' }, Meisterschmiedin: { apron: 1, apronCol: '#6a4428', glove: '#2a1e16', prop: 'hammer' },
+  'Waffenschmied der Kette': { bare: 1, prop: 'hammer' }, Runenschmiedin: { prop: 'hammer' }, 'Goblin-Schmied (versklavt)': { apron: 1, apronCol: '#6a4428', prop: 'hammer' },
+  'Böttcher': { apron: 1, apronCol: '#8a6a44', prop: 'hammer' }, Handwerker: { apron: 1, apronCol: '#9a7a50', pouch: 1, prop: 'saege' }, Kesselflicker: { pack: 1 },
+  'Bäcker': { apron: 1, apronCol: FOOD_APRON, helm: 'cap', helmCol: '#ece4d4', prop: 'korb' }, Koch: { apron: 1, apronCol: FOOD_APRON, helm: 'cap', helmCol: '#ece4d4' },
+  Wirt: { apron: 1, apronCol: FOOD_APRON, prop: 'krug' }, Wirtin: { apron: 1, apronCol: FOOD_APRON, prop: 'krug' }, Schankmagd: { apron: 1, apronCol: FOOD_APRON, prop: 'krug' }, Braumeister: { prop: 'krug' },
+  Magd: { apron: 1, apronCol: '#c8bea4', prop: 'korb' }, 'Bäuerin': { prop: 'korb' }, Marketenderin: { prop: 'korb' },
+  Bauer: { prop: 'forke' }, Knecht: { prop: 'forke' }, Stallknecht: { prop: 'forke', helm: 'cap', helmCol: '#6a5a3a' }, Stallmeister: { prop: 'forke' }, 'Pferdezüchter': { prop: 'forke' },
+  'Holzfäller': { prop: 'beil', scarf: '#8a2a20' }, Fischer: { prop: 'angel', hood: '#6e6a34', cloak: '#5e5a2c' },
+  'Jäger': { fur: '#6a5638', quiver: 1 }, Jägerin: { fur: '#6a5638', quiver: 1 }, Wildhüter: { fur: '#6a5638' },
+  Gelehrter: { prop: 'buch' }, Archivar: { prop: 'buch' }, Gerichtsschreiber: { prop: 'buch' }, Schreiberin: { prop: 'buch' }, Magister: { prop: 'buch' }, Studentin: { prop: 'buch' },
+  Sternkundiger: { prop: 'buch' }, Totenschreiber: { prop: 'buch' }, 'Schreiber der Kette': { prop: 'buch' }, 'Professor der Akademie': { prop: 'buch' },
+  Priester: { prop: 'buch' }, Ordenspriesterin: { prop: 'buch' }, 'Priesterin Omegas': { prop: 'buch' }, Kettenpriester: { prop: 'buch' },
+  Kaufmann: { prop: 'beutel' }, Kaufherr: { prop: 'beutel' }, Geldwechsler: { prop: 'beutel' }, Bankier: { prop: 'beutel' }, 'Händlerin': { pack: 1 }, Gewürzhändler: { pack: 1 }, Tuchhändlerin: { pack: 1 },
+  Lagerknecht: { pack: 1 }, 'Tagelöhner': { pack: 1, wraps: 1 },
+};
+/* Besondere Figuren (Story, Fraktionsführung, Meister mit eigenem Schlüssel): Messingborte, fester Stand, Umhang in Farbe, wenn sie keinen haben.
+   Keine Marker — man erkennt sie an der Erscheinung. Allerweltsschlüssel (n…, Passbeamte, Morr-Leute) zählen nicht. */
+const SPECIAL_PROF = new Set(['König', 'Zwergenkönig', 'Kanzler', 'Marschall', 'Hauptmann der Garnison', 'Hochpriester der Kette', 'Hochinquisitorin', 'Paladinmarschall', 'Sternenprophet']);
+const isSpecial = (e, key, prof) => e.kind === 'npc' && !e.robot && !e.undead && !e.captive && ((key && !/^(n\d+|pass_|morr_|fl_bruni)/.test(key)) || SPECIAL_PROF.has(prof));
+function profMark(s, e, prof, key) {
+  if (e.kind !== 'npc' || e.robot || e.undead || e.captive) return;
+  const M = PROF_MARK[prof], named = !!NAMED_LOOK[key];
+  if (M) { if (named) { if (M.prop) s.prop = M.prop; } else { Object.assign(s, M); if (M.apron) s.cape = ''; } }   /* Schulterumhang (Zufallsschicht) verdeckte die Schürze */
+  if (isSpecial(e, key, prof)) { s.trim = s.trim || '#c8a050'; s.stance = 1;
+    if (!named && !s.cape && !s.cloak && !s.robe && !s.armor) s.cape = '#5a1a1c'; }
+}
 // S12 Automaten des Hochreichs: Messingpanzer, Maskengesicht, bernsteinfarbene Augen
 const ROBOT_LOOK = { skin: '#8a8272', hair: '#8a8272', hs: 2, beard: 0, face: 'mask', glow: '#8a5420', armor: 'plate', armorCol: '#7a6038', pauld: '#8a7040', helm: 'great', helmCol: '#8a7a58',
   crest: '', hooded: 0, cloak: '', robe: '', cape: '', glove: '#5a5248', boots: '#3a3630', pants: '#4a4640', tabard: '#2a2a30', mark: 'chevron', markCol: '#c8a050', wraps: 0, pouch: 0, strap: 0, sil: 'boiler' };
@@ -768,6 +801,7 @@ export function humanSpec(e) {
   else if (e.kind === 'player' && (e.scars | 0) > 0) s.sc = 1;   /* Artist Runde 4: Narben des Helden sieht man */
   if (s.tabard && !s.mark) s.mark = 'cross';
   if (!s.markCol && s.tabard) s.markCol = '#9b2e26';
+  profMark(s, e, prof, key);   /* Berufe erkennbar, besondere Figuren (08.10.) */
   regionFarmer(s, e, prof, key);
   const RL = e.race && RACES[e.race]?.look;   /* Fraktions-Starts: Rasse (Skelett, Goblin, Zwerg …) — nur SPEC_KEYS-Felder (sp, face, glow, beard, skin, hs) */
   if (RL) { if (RL.sp) { s.sp = RL.sp; s.boots = ''; s.skin = e.pal?.skin || RL.skin; if (RL.sp === 'goblin') s.hs = 2; } if (RL.face) s.face = RL.face; if (RL.glow) s.glow = s.glow || RL.glow; if (RL.beard) s.beard = s.beard || 1; }
@@ -1027,6 +1061,7 @@ function resolve(s, k, soft = 1) {                                  // soft < 1:
     robe: s.robe ? ramp(dk(s.robe, 0.22)) : null, tabard: s.tabard ? ramp(dk(s.tabard, 0.15)) : null, markR: s.markCol ? ramp(s.markCol) : null,
     scarf: s.scarf ? ramp(s.scarf) : null, shieldR: s.shield ? ramp(s.shieldCol) : null, glove: s.glove ? ramp(s.glove) : null,
     bone: ramp('#cfc6b0'), metal: ramp('#5a5852'), gold: ramp('#b8963e'), wood: ramp('#5b452a'),
+    red: s.prop ? ramp('#9a3428') : null, wicker: s.prop ? ramp('#b0904e') : null, steel: s.prop ? ramp('#9a988f') : null, foam: s.prop ? ramp('#ece6d6') : null,   /* Berufsding (08.10.): Bucheinband, Weidenkorb, blankes Eisen, Schaum/Seiten */
   };
   lookCache.set(k, L); return L;
 }

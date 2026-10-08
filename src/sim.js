@@ -453,7 +453,7 @@ function capture(node, faction) {
       if (S.towns[refuge]) S.towns[refuge].pop += Math.round(lost * 0.7);
       chronicle(`${L.name} fällt an die Untoten`, 'battle', `${lost} Menschen fliehen. Die Straßen füllen sich mit Flüchtlingen.`);
       if (refuge) log(`Flüchtlinge aus ${L.name} ziehen nach ${LOC[refuge].name}.`, 'world');
-      H.toast(`${L.name.toUpperCase()} IST GEFALLEN`);
+      if (node === CAPK || !H.card?.(`${L.name.toUpperCase()} IST GEFALLEN`, `${lost} Menschen fliehen vor den Toten.`, { war: true, snd: 'horn' })) H.toast(`${L.name.toUpperCase()} IST GEFALLEN`);   /* P3.x E22: Kriegsereignis mit Namenskarte; Varonheim hat seine eigene Szene */
       if (refuge && S.player.map === 'world') for (let i = 0; i < 3; i++) H.spawnRefugee(L.x, L.y, refuge);
     }
   }
@@ -463,7 +463,7 @@ function capture(node, faction) {
   H.afterCapture?.(node, faction);
   if (was === 'undead' && faction !== 'undead') {                  // Befreiung — für jeden Ort, nicht nur für Orte mit Markt
     chronicle(`${L.name} befreit`, 'battle', `${FACTIONS[faction].name} nimmt ${L.name} zurück.`);
-    H.toast(`${L.name.toUpperCase()} BEFREIT`);
+    if (!H.card?.(`${L.name.toUpperCase()} BEFREIT`, `${FACTIONS[faction].name} nimmt ${L.name} zurück.`, { war: true, snd: 'bell' })) H.toast(`${L.name.toUpperCase()} BEFREIT`);   /* P3.x E22 */
     if (nearPlayer(node, 30)) { const [ox, oy] = waveOrigin(node, 3); for (let i = 0; i < 4; i++) H.spawnRefugee(ox, oy, node);   // §81: sichtbar — Geflohene kehren heim
       if (S.towns[node]) S.towns[node].pop += 6; log(`Die Geflohenen kehren nach ${L.name} zurück.`, 'world'); }
   }
@@ -530,7 +530,7 @@ function materialize(node, att, def) {
   }
   S.war.battles.push(b);
   log(`Schlacht bei ${L.name}! ${att.name} gegen ${def.name}.`, 'combat');
-  H.toast(`SCHLACHT BEI ${L.name.toUpperCase()}`);
+  if (!H.card?.(`SCHLACHT BEI ${L.name.toUpperCase()}`, `${att.name} gegen ${def.name}.`, { war: true, snd: 'drum' })) H.toast(`SCHLACHT BEI ${L.name.toUpperCase()}`);   /* P3.x E22 */
 }
 // Sammelpunkt einer Welle: ~14 Kacheln vor dem Ort, zu Fuß erreichbar (BFS vom Ortskern), je Welle eine andere Seite
 function waveOrigin(node, k) {

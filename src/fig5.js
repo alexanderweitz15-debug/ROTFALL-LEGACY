@@ -301,16 +301,25 @@ let CUR_BP = null; const BP0 = { by: 0, ln: 0, st: 0, hy: 0, hr: 0, hd: 0 };
 const stanceBody = W => { const st = atkStance(W.ac || W.wt, W.mode === 'cover' ? 'guard' : 'ready'); return st ? { ...BP0, ...st.body } : null; };   /* Kampfhaltung/Deckung: breiter Stand, Knie gebeugt */
 const legIK = (hip, foot, side) => [hip, ik(hip, foot, 7.6, 7.6, e => side * e[0]), foot];   // Knie: side −1 = nach links (vorn in der Seitenansicht)
 /* Kampfanimation (Lead 02.10.): Gewicht verlagern, Ausfallschritt, Rumpf kippt in den Schlag, Kniebeuge — als Gelenkpunkte im bestehenden Rig */
-function bodyPose(R, view, B, pose) {
+function bodyPose(R, view, B, pose, W) {
   const by = Math.round(B.by), ln = Math.round(B.ln), hy = Math.round(B.hy), st = B.st, stand = pose === 'i0' || pose === 'i1' || pose === 'guard', swing = pose === 'a1' || pose === 'a2' || pose === 'a3';
   R.by += by; R.hy += hy;
   for (const k of ['aN', 'aF', 'aL', 'aR']) if (R[k]) R[k] = R[k].map(([x, y]) => [x, y + by]);
   /* Schritt 1 (04.10.): Beine auch im Schlag — vorher standen sie bei a1/a2/a3 wie im Stand (nur Arm und Waffe bewegten sich). Seitlich: Ausfallschritt
-     (naher Fuß vor, ferner zurück), Kniebeuge aus der Rumpfhöhe by; vorn/hinten: Grätsche nach st, Knie gebeugt. */
+     (naher Fuß vor, ferner zurück), Kniebeuge aus der Rumpfhöhe by; vorn/hinten: seit 08.10. Ausfallschritt in die Tiefe statt Grätsche (siehe unten). */
   if (view === 'W') {
     R.lean += ln; R.cs = ln < 0 ? 3 : ln > 0 ? 1 : R.cs; R.sw = ln < 0 ? 2 : R.sw;
     if (stand || swing) { const h0 = 26 + by, lunge = swing ? st * (ln < 0 ? 1.3 : 0.8) : st; R.lN = legIK([15.5, h0], [15.5 - lunge, 41], -1); R.lF = legIK([16.5, h0], [16.5 + lunge * 0.7, 41], -1); }
-  } else if (stand || swing) { const sp = Math.min(swing ? 4 : 3, Math.abs(st) * (swing ? 0.5 : 0.35)), h0 = 26 + by; R.lL = legIK([13.5, h0], [13.5 - sp, 41], -1); R.lR = legIK([18.5, h0], [18.5 + sp, 41], 1); }
+  } else if (stand || swing) {
+    /* P3.24 (Entwickler 08.10.: „wenn man nach oben guckt, spreizt der Charakter seine Beine so komisch auf“): vorher Grätsche nach st (bis ±4 px)
+       und Knie per IK seitlich ausgeknickt (bei tiefer Kniebeuge bis ~7 px je Seite = Froschhocke). Jetzt wie seitlich ein Ausfallschritt, nur in die
+       Tiefe gedreht: Fuß der Waffenseite vor, der andere zurück — vorn = unten im Bild (S), oben (N); kaum seitliche Spreizung; Knie verkürzt
+       (Kniebeuge zeigt zur Kamera), höchstens 1 px nach außen. Der hintere Fuß (y < 40,5) wird beim Malen leicht abgedunkelt (Tiefe). */
+    const atk = !!(W && W.mode === 'swing'), z = Math.min(atk ? 2 : 1, Math.abs(st) * 0.25), sp = Math.min(atk ? 1 : 0.5, Math.abs(st) * 0.1), h0 = 26 + by;
+    const sN = view === 'N' ? -1 : 1, leadL = !!(W && Math.cos((W.oct || 0) * Math.PI / 4) < -1e-9), ko = Math.min(1, Math.max(0, by) * 0.25);
+    const leg = (hx, side, lead) => { const fy = 41 + (lead ? sN * z * 0.6 : -sN * z), fx = hx + side * sp, kx = (hx + fx) / 2 + side * ko, ky = (h0 + fy) / 2;
+      return [[hx, h0], [kx, ky], [fx, fy]]; };
+    R.lL = leg(13.5, -1, leadL); R.lR = leg(18.5, 1, !leadL);  }
 }
 export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
@@ -368,7 +377,7 @@ export function paintR(L, dir, pose, W = null) {
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
   pose = base;
   const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : W && (W.mode === 'ready' || W.mode === 'cover') ? stanceBody(W) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
-  if (BP) bodyPose(R, view, BP, base);
+  if (BP) bodyPose(R, view, BP, base, W);
   else {
   if (ph === 'wind') { R.by -= 1; if (view === 'W') { R.lean += 1; R.cs = 1; } }
   if (ph === 'strike' || ph === 'follow') { R.by += 1; if (view === 'W') { R.lean -= 1; R.cs = 3; R.sw = 2; R.lN = [[15.5, 26], [13.5, 33.5], [12, 41]]; R.lF = [[16.5, 26], [18, 33.5], [19.5, 41]]; }
@@ -535,6 +544,27 @@ function dag(xa, xb, y, d) {
   return pts;
 }
 
+/* Berufe erkennbar (Entwickler 08.10.: „Man soll besser die verschiedenen Berufe erkennen können“): Werkzeug/Ding in der Hand ohne Waffe —
+   L.prop aus sprites.js PROF_MARK. a = Arm [Schulter, Ellbogen, Hand], o = außen (+1 rechts im Bild, −1 links). Vor dem Arm gemalt: die Hand
+   liegt über dem Griff. Nur, wenn die Hand seitlich hängt (Tragen, Handeln, Salutieren: Hand vor der Brust → kein Ding). */
+function propR(C, L, a, o, side = false) {
+  if (!L.prop || !a || a.length < 3) return; const [hx, hy] = a[2]; if (side ? hy < a[0][1] + 9 : Math.abs(hx - 16) < 4.5) return;
+  const P = L.prop, wd = () => C.part(L.wood, 'wood'), mt = () => C.part(L.steel || L.metal, 'metal'), x0 = hx + o * 2.5;   /* x0: neben der Hand, nicht unter dem Arm */
+  if (P === 'hammer') { C.limb(wd(), [[hx, hy - 1], [hx + o * 0.5, hy + 6]], 1.3); C.rect(mt(), hx + o * 0.5 - 2, hy + 6, hx + o * 0.5 + 2, hy + 8); }   /* Schmied: schwerer Hammer, Kopf nach unten */
+  else if (P === 'beil') { C.limb(wd(), [[hx, hy - 1], [hx + o * 0.5, hy + 7]], 1.3); C.poly(mt(), [[hx + o, hy + 4], [hx + o * 4.5, hy + 3], [hx + o * 4.5, hy + 8], [hx + o, hy + 7]]); }   /* Holzfäller */
+  else if (P === 'saege') { C.rect(wd(), hx - 1, hy - 1, hx + 1, hy + 0.5); const b = mt(); C.poly(b, [[hx - 1, hy + 1], [hx + 2, hy + 1], [hx + 1, hy + 9], [hx - 1, hy + 9]]);
+    for (let y = 2; y <= 8; y += 2) C.clear(o > 0 ? hx - 1 : hx + 1, hy + y); }   /* Handwerker: Säge mit Zähnen */
+  else if (P === 'krug') { C.rect(C.part(L.wood, 'wood'), x0 - 1.5, hy - 2, x0 + 1.5, hy + 2); C.rect(C.part(L.steel || L.metal, 'metal'), x0 - 1.5, hy - 2, x0 + 1.5, hy - 2); C.rect(C.part(L.steel || L.metal, 'metal'), x0 - 1.5, hy + 1, x0 + 1.5, hy + 1);
+    C.rect(C.part(L.foam || L.bone, 'cloth'), x0 - 1.5, hy - 3, x0 + 1.5, hy - 3); C.rect(C.part(L.wood, 'wood'), x0 + o * 2.5, hy - 1, x0 + o * 2.5, hy + 1); }   /* Wirt: Krug mit Schaum und Eisenbändern */
+  else if (P === 'korb') { C.limb(wd(), [[hx - 2.5, hy + 3], [hx, hy - 0.5], [hx + 2.5, hy + 3]], 1); const k = C.part(L.wicker || L.wood, 'wood'); C.ell(k, hx, hy + 5, 3.5, 2.5);
+    C.rect(C.part(L.foam || L.bone, 'cloth'), hx - 2, hy + 2.5, hx + 1, hy + 2.5); }   /* Bäcker, Magd: Weidenkorb mit Brot/Wäsche */
+  else if (P === 'forke') { const tx = hx - o, ty = hy - 18; C.limb(wd(), [[hx + o * 0.5, hy + 5], [tx, ty + 1]], 1.2); const m = mt(); C.rect(m, tx - 1.5, ty + 1, tx + 1.5, ty + 1);
+    for (const dx of [-1.5, 0, 1.5]) C.rect(m, tx + dx, ty - 3, tx + dx, ty); }   /* Bauer, Stallknecht: Heugabel, Zinken über dem Kopf */
+  else if (P === 'angel') { C.limb(wd(), [[hx, hy + 2], [hx + o * 6, hy - 22]], 1.2, 0.8); }   /* Fischer: Angelrute über die Schulter */
+  else if (P === 'buch') { C.rect(C.part(L.red || L.leather, 'leather'), x0 - 1.5, hy - 2, x0 + 1.5, hy + 3); C.rect(C.part(L.foam || L.bone, 'cloth'), x0 + o * 1.5, hy - 1, x0 + o * 1.5, hy + 2);
+    C.rect(C.part(L.gold, 'metal'), x0 - o * 0.5, hy, x0 - o * 0.5, hy); }   /* Gelehrte, Priester: Buch mit Goldschließe */
+  else if (P === 'beutel') { C.ell(C.part(L.leather, 'leather'), x0, hy + 3, 2.2, 2.6); C.rect(C.part(L.gold, 'metal'), x0 - 1, hy + 0.5, x0 + 1, hy + 0.5); }   /* Kaufleute: Geldbeutel, Goldschnur */
+}
 // ---- Vorder- und Rückansicht ----
 function paintSN(C, L, R, back, plan, W, pose) {
   const X = looks(L), by = R.by, hy = R.hy + by, hx = R.hx, top = 13 + by, waist = 24 + by, meta = { behind: false, limbs: {} };
@@ -610,6 +640,7 @@ function paintSN(C, L, R, back, plan, W, pose) {
   if (back && L.quiver) { const q = C.part(L.leather, 'leather'); C.poly(q, [[19, 6 + by], [21, 5 + by], [14, 27 + by], [12, 26 + by]]); meta.quiverTop = [20, 5 + by]; }
   if (hasSil(L, 'boiler') && back) boiler(C, L, top, 'N');
   if (back && L.pack) { const pk = C.part(L.leather, 'leather'); C.rect(pk, 11, top + 1, 20, top + 11); C.rect(C.part(dimR(L.cloth, 0.05), 'cloth'), 11, top - 1, 20, top); ids.pack = pk; }
+  if (L.prop && !plan && !armBehind(aR)) propR(C, L, aR, 1);   /* Berufe erkennbar: Ding in der Hand rechts im Bild */
   // 7 Arme
   for (const [k, a] of [['L', aL], ['R', aR]]) if (!armBehind(a)) {
     const M3 = mechArm(L, (k === 'L') !== back ? 'rarm' : 'larm', X), pa = C.part(M3.s, M3.m, { grp: 'arm' + k }), ph = C.part(M3.h, M3.hm);
@@ -804,6 +835,7 @@ function paintW(C, L, R, plan, W, pose) {
     C.poly(tp, [[12 + ln, waist + 1.5], [17.5 + ln, waist + 1.5], [17 + ln, waist + d], [11 + ln, waist + d - 1]]); ids.tassets = [tp]; }
   if (L.cloak && X.cw === 'kapitaen') { const m = C.part(L.cloak, 'cloth', { grp: 'coatF' }), cH = Math.min(45, cloakHem - 1);   /* Artist R11: Rockschoß vorn */
     C.poly(m, [[12 + ln, top], [14.5 + ln, top], [14.5 + ln * 0.5, waist], [14 + cs * 0.3, cH], [11 + cs * 0.3, cH], [11.5 + ln * 0.5, waist]]); ids.coatF = m; }
+  if (L.prop && !plan) propR(C, L, sh(aN, ln), -1, true);   /* Berufe erkennbar: Ding in der nahen Hand (vorn = links) */
   // 7 naher Arm
   const MN = mechArm(L, 'rarm', X), nArm = C.part(MN.s, MN.m, { grp: 'armN' }), nHand = C.part(MN.h, MN.hm);
   arm(C, nArm, nHand, sh(aN, ln), X.aw, MN.h, X.bone); ids.armL = nArm; ids.handL = nHand; meta.limbs.rarm = aN[1]; meta.arms = [[nArm, sh(aN, ln)]];
