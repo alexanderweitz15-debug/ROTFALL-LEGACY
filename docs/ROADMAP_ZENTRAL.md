@@ -1,8 +1,8 @@
 # ROTFALL: LEGACY — Zentrale Roadmap (Stand 08.10.2026, Version 24)
 
-**Dies ist die einzige Liste offener Arbeit.** Sie ersetzt OFFEN.md, ROTFALL_STATE/ROADMAP.md, STATE.md, docs/BUGS.md, ROTFALL_STATE/BUGS.md, PLAN_OFFEN.md, PLAN_S15.md, PHASE_STATUS.md und die Hunt-Berichte (alle archiviert unter `docs/archive/`, Inventar und Begründung in `ROTFALL_STATE/DOKU_INVENTAR.md`). Was hier nicht steht, ist gebaut (siehe `docs/IST_ZUSTAND.md`, `docs/MECHANIKEN.md`) oder verworfen (`ROTFALL_STATE/DECISIONS.md`).
+**Dies ist die einzige Liste offener Arbeit.** Sie ersetzt OFFEN.md, ROTFALL_STATE/ROADMAP.md, STATE.md, docs/BUGS.md, ROTFALL_STATE/BUGS.md, PLAN_OFFEN.md, PLAN_S15.md, PHASE_STATUS.md und die Hunt-Berichte (alle gelöscht am 08.10. — Historie: Commit c21fd64, Inventar `ROTFALL_STATE/DOKU_INVENTAR.md` dort). Was hier nicht steht, ist gebaut (siehe `docs/IST_ZUSTAND.md`, `docs/MECHANIKEN.md`) oder verworfen (`ROTFALL_STATE/DECISIONS.md`).
 
-**Verbindliche Vorgaben:** `ROTFALL_STATE/SPEC_WELT_TUTORIAL_2026-10-08.md` (Welt/Tutorial/NPC/Content), `ROTFALL_STATE/SPEC_SKILLS_GRIND_2026-10-08.md` (Progression), `ROTFALL_STATE/GATE.md` (Analyse vor Code, keine erfundenen Zahlen), `ROTFALL_STATE/COMBAT_ANIM.md`, `ROTFALL_STATE/VISUAL.md`, `docs/MASTER_ROADMAP.md` Teil A (Arbeitsregeln). Quellen für Detailtexte: `docs/audit/TASKS.md` (T-Aufgaben), `ROTFALL_STATE/PROPOSALS/*.md` (offene Entwürfe), `ROTFALL_STATE/hunt/quest_agent.md` (Quest-Review), `ROTFALL_STATE/IDEAS.md`.
+**Verbindliche Vorgaben:** `docs/REGELN_UND_SPECS.md` (Gate, Team, Arbeitsregeln, Balance-Regeln, Specs Welt/Tutorial und Skills/Grind vom 08.10., Kampfanimation, Visual). Entscheidungen: `docs/ENTSCHEIDUNGEN.md`. **Detailtexte der alten Pläne** (T-Aufgaben `docs/audit/TASKS.md`, Entwürfe `ROTFALL_STATE/PROPOSALS/*.md`, Quest-Review `hunt/quest_agent.md`, Ideenspeicher `IDEAS.md`, Doku-Inventar) liegen nur noch in der Git-Historie: Commit **c21fd64** (`git show c21fd64:<pfad>`). Wer ein Paket baut, holt sich den Text von dort.
 
 **Reihenfolge (Spec Welt §55):** Tutorial → Quest/UI → NPC/Gebäude → Stadt/Familie → Betriebe → Gegner/Quest-Content → Skills/Progression (eigene Spec, Phasen 1–7) → Scaling/Performance → Gesamt-QA. Die noch offenen, früher freigegebenen Pakete (T11, T12, T15, T17 S3/4, T20, T23, Belagerung S3b–d) laufen unter dem passenden Thema mit; welche davon vor den Spec-Punkten dran sind, ist Entscheidung E37.
 
@@ -107,7 +107,7 @@ CHANGELOG (seit 02.10. abends), DATA_SCHEMAS (ELITES, STIGMA, BOSS_CARDS, FAC_ST
 
 ## Offene Entscheidungen des Entwicklers
 
-Nur Fragen ohne Antwort in `DECISIONS.md`. Vorläufig gesetzte Zahlen stehen als „bestätigen“ — sie laufen so, bis du etwas anderes sagst.
+Nur Fragen ohne Antwort in `docs/ENTSCHEIDUNGEN.md`. Vorläufig gesetzte Zahlen stehen als „bestätigen“ — sie laufen so, bis du etwas anderes sagst.
 
 **Aus dem Audit 04.10. (Antwort steht aus):**
 - E-A1 Kleriker nach Totenpakt: (a) so lassen, (b) ordensferner Lehrer, (c) Sühne beim Orden hebt die Sperre — Vorschlag (c).
@@ -120,4 +120,4 @@ Nur Fragen ohne Antwort in `DECISIONS.md`. Vorläufig gesetzte Zahlen stehen als
 
 **Design offen:** E1 Haltung/Humpeln verwundeter Gegner · E3 Händlergesicht nach Ruf · E4 schwerer Hieb (Faktor, Ladezeit, Ausdauer, Touch, Koop) · E5 14 Gegnerideen · E6 Mutanten-Hinterhalt/Blutschöpfer · E7 Skilltree-Scheiben 3/4 streichen · E8/E9 Betriebskasse · E10 Bewohner rufen/Story-Szene/Beute-Hinweis · E11 Kartenausschnitt im Brief · E13 Symbolsatz Sprechblasen · E18 Belagerung S3 (Kellerweg, Varons Strenge) · E19 Bionik im Krieg · E20 Luftbrücke (4) · E21 NPC-Ziele (4) · E22 Welt-Ereignis-Karte (4) · E23 Städte-Visual (4) · E24 Morrgrund (3) · E25 Wasservolk · E26 organische Stadtanordnung (Vorschlag: nur neue Häuser) · E27 Karraks Wüste (Vorschlag: friedlich) · E28 Bodenauflösung · E29 Ende der Brüder (8 Ideen) · E30 70 stumme Figuren · E31 Gift/Feuer/Blutung 60 % · E32 Pferde-Sprites reichen? · E33 17 Fit-Urteile · E34 Ideenspeicher freigeben? · E35 Welle 2 Reihenfolge · E37 Spec-Reihenfolge vs. alte APPROVED-Pakete · **E38 Katana:** Schwert-Unterart oder eigene Waffenklasse? · **E39 Skill-System:** Sternbild-Talente bleiben, Skills ergänzen (Vorschlag) oder zusammenlegen?
 
-Erledigt heute (E36): Doku-Pflegerichtung = diese Datei + IST_ZUSTAND (Gesamtdatei); ROTFALL_AGENT_STATE gelöscht; Archiv = `docs/archive/`.
+Erledigt heute (E36): Doku auf fünf Dateien reduziert (ROADMAP_ZENTRAL, IST_ZUSTAND, MECHANIKEN, ENTSCHEIDUNGEN, REGELN_UND_SPECS) plus STYLE_GUIDE, README, CLAUDE.md; alles andere gelöscht (Historie c21fd64).
