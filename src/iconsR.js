@@ -1,7 +1,21 @@
 // S14 Stil R: handgezeichnete 16×16-Symbole für Verbrauchsgüter und Material (Nutzer: „restliche Sprites“).
 // Zeichen → Farbe je Symbol; '.' leer, 'o' Kontur. Waffen und Rüstung kommen weiter aus den echten Sprites (render.js iconR).
 const O = '#1c1512';
+/* Fischen (08.10.2026): ein Fischumriss, je Art eigene Farben (B Rücken, b Bauch, w Auge, T Schwanz) */
+const FISH_ROWS = ['................', '................', '................', '................', '.....oooooo...oo', '...ooBBBBBBo.oTo',
+  '..oBBBBBBBBBooTo', '.oBwoBBBBBBBBTTo', 'oBBBBBBBBBBBBTTo', 'obbbbbbbbbbbbTTo', '.obbbbbbbbbbooTo', '..oobbbbbbbo.oTo',
+  '....ooooooo...oo', '................', '................', '................'];
+const fishIcon = (B, b, T) => [{ B, b, T, w: '#f0ece0' }, FISH_ROWS];
 export const ICON_R = {
+  forelle: fishIcon('#6a7a5a', '#d8c8a8', '#4a5a3e'), lachs: fishIcon('#7a8a98', '#e0a088', '#5a6a78'), hecht: fishIcon('#4a6a3a', '#c8c890', '#2e4a26'),
+  karpfen: fishIcon('#8a7a3a', '#d8c070', '#6a5a2a'), barsch: fishIcon('#5a7a4a', '#d8b878', '#c06a3a'), wels: fishIcon('#4a4440', '#9a9080', '#2e2a26'),
+  hering: fishIcon('#6a8aa0', '#e8eef0', '#4a6a80'), kabeljau: fishIcon('#8a8a70', '#e0dccc', '#6a6a56'), rotbarsch: fishIcon('#b84a3a', '#e8a088', '#8a2e22'),
+  schlammbeisser: fishIcon('#5a4a32', '#9a8a60', '#3e3222'), giftbarbe: fishIcon('#5a7a3a', '#c8d060', '#7a3a7a'), moorhecht: fishIcon('#3a4a32', '#8a9a6a', '#22301e'),
+  any_fish: fishIcon('#7a7a7a', '#c8c8c8', '#5a5a5a'),
+  angel: [{ s: '#8a5a2a', l: '#d8d0c0', h: '#9aa0a8' }, ['..............oo', '.............oso', '............oso.', '...........oso..', '..........oso.l.', '.........oso..l.',
+    '........oso...l.', '.......oso....l.', '......oso.....l.', '.....oso......l.', '....oso.......l.', '...oso........l.', '..oso.........h.', '.oso.........hh.', 'oso.............', 'oo..............']],
+  fischsuppe: [{ f: '#d8d8d0', s: '#c8a060', S: '#a8783a', B: '#6a4a2a' }, ['................', '................', '....f...f.......', '.....f...f......', '....f...f.......', '..oooooooooooo..',
+    '.osssssssssssso.', '.oSSSsSSSsSSSSo.', '..oBBBBBBBBBBo..', '...oBBBBBBBBo...', '....oooooooo....', '................', '................', '................', '................', '................']],
   potion: [{ c: '#8a6a42', g: '#a9c4bc', w: '#eef4ee', r: '#b8322a', R: '#e0685a', d: '#7a1c18' }, [
     '................', '......oooo......', '.....occcco.....', '......oggo......', '......oggo......', '.....oggggo.....',
     '....oggwgggo....', '...ogrrrrrrgo...', '...orRrrrrrro...', '..orRrrrrrrrro..', '..orRrrrrrrrro..', '..orrrrrrrrdro..',
@@ -51,3 +65,19 @@ export const ICON_R = {
     '...oSSsSSSsSSo..', '...oSSSSSSSSSo..', '..oSsSSSSSSSsSo.', '..oSSSSsSSSSSSo.', '..oSSSSSSSsSSdo.', '..odSSsSSSSSddo.',
     '...oddSSSSSddo..', '....ooddddoo....', '......oooo......', '................']],
 };
+/* Sammeln, Werkzeuge und Kochen (08.10.2026): neue Symbole, meist umgefärbte vorhandene Umrisse; Stamm und Schriftrolle neu gezeichnet */
+const LOG_ROWS = ['................', '................', '................', '................', '..oooooooooooo..', '.obbbbbbbbbbbbro',
+  '.oBbBbbBbbBbbrRo', '.obbbbbbbbbbbbro', '.oBbbBbbbBbbbrRo', '.obbbbbbbbbbbbro', '..oooooooooooo..', '................', '................', '................', '................', '................'];
+const SCROLL_ROWS = ['................', '................', '...oooooooooo...', '..oppppppppppo..', '..opllllllllpo..', '..oppppppppppo..',
+  '..opllllllpppo..', '..oppppppppppo..', '..opllllllllpo..', '..oppppppppppo..', '..opllllpppppo..', '..oppppppppppo..', '...oooooooooo...', '................', '................', '................'];
+Object.assign(ICON_R, {
+  hartholz: [{ b: '#6a4a2a', B: '#4a3220', r: '#c8a070', R: '#8a6a40' }, LOG_ROWS], schwarzholz: [{ b: '#2a2420', B: '#14100e', r: '#6a5a4a', R: '#3e342a' }, LOG_ROWS],
+  harz: [{ c: '#8a6a2a', g: '#c89a3a', w: '#f0d890', r: '#d8a040', R: '#f0c060', d: '#8a5a1a' }, ICON_R.potion[1]],
+  kohle: [{ s: '#2a2826', S: '#3e3a36', d: '#141210', r: '#4a4440', R: '#6a6460' }, ICON_R.iron[1]], silbererz: [{ s: '#6a6a70', S: '#9a9aa4', d: '#3e3e44', r: '#c8ccd8', R: '#eef0f8' }, ICON_R.iron[1]],
+  bergminze: [{ L: '#8ad0a0', l: '#4a9a6a', d: '#2a6a4a', s: '#7a6a4a' }, ICON_R.herb[1]], nachtschatten: [{ L: '#8a6aa0', l: '#5a3a7a', d: '#3a2250', s: '#5a4a3a' }, ICON_R.herb[1]],
+  angel_gut: [{ s: '#a06a32', l: '#e8e0d0', h: '#b0b8c0' }, ICON_R.angel[1]], angel_stahl: [{ s: '#5a5a62', l: '#e8e0d0', h: '#d8e0e8' }, ICON_R.angel[1]],
+  bratfisch: [{ B: '#a0602a', b: '#d8a060', T: '#7a4420', w: '#f0e0c0' }, ICON_R.forelle[1]],
+  jaegertopf: [{ f: '#d8d8d0', s: '#8a4a2a', S: '#6a3220', B: '#4a3420' }, ICON_R.fischsuppe[1]], bergminztee: [{ f: '#d8d8d0', s: '#8ad0a0', S: '#5aa070', B: '#6a5a4a' }, ICON_R.fischsuppe[1]],
+  kraeuterbrot: [{ b: '#a08a48', B: '#c8b070', d: '#6a5a2a', c: '#8ab060' }, ICON_R.bread[1]],
+  rezept_jaegertopf: [{ p: '#e8dcc0', l: '#8a6a4a' }, SCROLL_ROWS], rezept_bergminztee: [{ p: '#e8dcc0', l: '#4a8a6a' }, SCROLL_ROWS], kochbuch: [{ p: '#c8a878', l: '#6a3a2a' }, SCROLL_ROWS],
+});

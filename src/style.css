@@ -1160,3 +1160,25 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .tutor span{flex:1}
 .tutor button{background:none;border:1px solid #3b3227;color:#9a8c74;width:22px;height:22px;line-height:18px;font-size:14px;cursor:pointer}
 .tutor.ok{border-left-color:#7fae6e;background:rgba(20,30,14,.92)}
+/* Prolog-Tafel (Entwickler 08.10.: „richtiges GUI“): links oben über dem Spielbild, Pergament auf Dunkel, Messingrand, Tasten als Kappen */
+#prologPanel{position:absolute;top:58px;left:12px;width:min(300px,86vw);z-index:40;padding:10px 12px 12px;background:linear-gradient(180deg,rgba(28,22,15,.94),rgba(18,14,10,.94));
+  border:1px solid #5a4630;border-left:3px solid #a8874f;box-shadow:0 4px 18px rgba(0,0,0,.55);color:#d9cdb2;font:13px/1.45 Spectral,Georgia,serif;pointer-events:auto}
+#prologPanel .pr-head{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid #3b3227;padding-bottom:6px;margin-bottom:8px}
+#prologPanel .pr-head b{font:700 12px Cinzel,serif;letter-spacing:.18em;color:#c9a45a}
+#prologPanel .pr-head i{flex:1;color:#9a8c74;font-style:italic}
+#prologPanel button{background:#1a1510;border:1px solid #5a4630;color:#d9cdb2;cursor:pointer;font:12px Cinzel,serif;letter-spacing:.08em}
+#prologPanel .pr-fold{width:22px;height:22px;line-height:18px;padding:0}
+#prologPanel .pr-n{font-size:11px;color:#9a8c74;letter-spacing:.06em}
+#prologPanel .pr-t{font:700 15px Cinzel,serif;color:#e8d6a8;margin:2px 0 6px}
+#prologPanel .pr-keys{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+#prologPanel kbd{display:inline-block;min-width:20px;padding:1px 6px;border:1px solid #8a7048;border-bottom-width:3px;border-radius:3px;background:#2a2218;color:#f0e2bc;font:600 11px/16px Georgia,serif;text-align:center}
+#prologPanel .pr-x{color:#d9cdb2}
+#prologPanel .pr-menus{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+#prologPanel .pr-menus span.ok{color:#9fbf7f}
+#prologPanel .pr-list{list-style:none;margin:10px 0 8px;padding:8px 0 0;border-top:1px solid #3b3227;columns:2;column-gap:10px;font-size:12px}
+#prologPanel .pr-list li{color:#7d725f;white-space:nowrap}
+#prologPanel .pr-list li span{display:inline-block;width:16px}
+#prologPanel .pr-list li.done{color:#9fbf7f}
+#prologPanel .pr-list li.now{color:#e8d6a8;font-weight:700}
+#prologPanel .pr-skip{width:100%;padding:5px 0}
+@media (max-width:700px){#prologPanel{top:auto;bottom:90px;left:8px}}

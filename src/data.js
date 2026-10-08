@@ -50,7 +50,34 @@ export const FAC_STARTS = {
             desc:'Hallengast der Zwerge an der Tiefhall. Die Königsstadt liegt unter der alten Halle — und dazwischen stehen Hrodvars Tote.' },
 };
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
+  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen', woodcutting:'Holzfällen', mining:'Bergbau', herbalism:'Kräuterkunde', cooking:'Kochen' };
+/* Skill-Core Phase 1 (Spec Skills §2–§12, §57; Planlauf 08.10.2026 — Werte vorläufig ⚖): zentrale Definition je Fertigkeit. Der Wert (0–100) bleibt
+   wie bisher in p.skills und wächst durch Nutzung; Stufe = Wert / 2 (0–50). Meilensteine 5/10/15/20/25/30/40/50; „perks“ sind echte Freischaltungen
+   [Art, Größe, Text] — zunächst für Einhändig (Schwert), Stangenwaffen (Speer) und Schmieden (Spec §58: erst 2–3 Skills testen). */
+export const SKILL_MS = [5, 10, 15, 20, 25, 30, 40, 50];
+export const SKILL_DEF = {
+  onehanded: { group: 'Kampf', what: 'Schwert, Axt, Kolben, Dolch', perks: { 5: ['stamina', 0.08, 'Sparsame Hiebe: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Hieb (7 % kürzer)'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'] } },
+  polearms:  { group: 'Kampf', what: 'Speer, Hellebarde, Sense', perks: { 5: ['stamina', 0.08, 'Sparsame Stöße: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Stoß (7 % kürzer)'], 20: ['stagger', 0.4, 'Wuchtstoß: der schwere Hieb lässt Gegner 40 % länger taumeln'] } },
+  twohanded: { group: 'Kampf', what: 'Zweihänder, Kriegshammer, Großaxt', perks: {} },
+  archery:   { group: 'Kampf', what: 'Bogen, Armbrust', perks: {} },
+  defense:   { group: 'Kampf', what: 'Abwehr von vorn', perks: {} },
+  toughness: { group: 'Kampf', what: 'Treffer einstecken', perks: {} },
+  smithing:  { group: 'Handwerk', what: 'Esse und Amboss', perks: { 10: ['quality', 10, 'Sichere Hand: Güte wie mit 10 Punkten mehr'], 20: ['recipes', 40, 'Neue Rezepte: alles bis Mindestwert 40'], 30: ['thrift', 4, 'Sparsam: jedes vierte Schmiedestück gibt ein Eisen zurück'] } },
+  crafting:  { group: 'Handwerk', what: 'Werkbank', perks: {} },
+  medicine:  { group: 'Handwerk', what: 'Verbände, Kräuter, Kessel', perks: {} },
+  survival:  { group: 'Überleben', what: 'Holzfällen, Zähmen', perks: {} },
+  hunting:   { group: 'Überleben', what: 'Tiere erlegen', perks: {} },
+  fishing:   { group: 'Überleben', what: 'Angeln an Fluss, See, Küste und Sumpf', perks: { 5: ['bite', 0.15, 'Geduld: Fische beißen 15 % schneller'], 10: ['window', 0.25, 'Gutes Gespür: 25 % mehr Zeit zum Anschlagen'], 15: ['rare', 1, 'Seltene Fische gehen an den Haken'] } },
+  stealth:   { group: 'Überleben', what: 'Schleichen (V)', perks: {} },
+  /* Phase 3/4 (08.10.2026, Werte vorläufig): Sammeln und Kochen. Werkzeug (Stufe 1–3, ITEMS.ttier) und Fertigkeit sind getrennte Faktoren (§32–33):
+     das Werkzeug macht schneller und ergiebiger, die Fertigkeit schaltet Härteres, Nebenfunde und Seltenes frei. */
+  woodcutting: { group: 'Überleben', what: 'Bäume fällen (Axt)', perks: { 5: ['speed', 0.5, 'Schneller: jeder Hieb trifft tiefer'], 10: ['hard', 0.3, 'Harte Hölzer: 30 % Hartholz beim Fällen'], 15: ['side', 0.25, 'Nebenfunde: Harz (25 %)'], 20: ['rare', 0.08, 'Seltene Bäume: Schwarzholz (8 %)'] } },
+  mining:    { group: 'Überleben', what: 'Stein und Erz (Spitzhacke)', perks: { 5: ['speed', 1, 'Schneller: ein Brocken mehr je Abbau'], 10: ['hard', 0.3, 'Härtere Erze: 30 % Eisenerz auch aus Steinadern'], 15: ['side', 0.25, 'Nebenfunde: Kohle (25 %)'], 20: ['rare', 0.08, 'Seltene Erze: Silbererz (8 %)'] } },
+  herbalism: { group: 'Überleben', what: 'Kräuter sammeln', perks: { 5: ['yield', 1, 'Gute Ernte: ein Kraut mehr'], 10: ['rare', 1, 'Seltene Pflanzen erkennen (Bergminze, Nachtschatten)'], 15: ['side', 0.3, 'Nebenfund: ein weiteres Kraut (30 %)'] } },
+  cooking:   { group: 'Handwerk', what: 'Kessel am Lagerfeuer', perks: { 5: ['portion', 1, 'Größere Töpfe: eine Portion mehr'], 10: ['buff', 0.5, 'Würziger: Mahlzeiten wirken 50 % länger'], 20: ['taste', 1, 'Feine Zunge: beim Experimentieren erkennst du, was fehlt'] } },
+  trading:   { group: 'Sozial', what: 'Kaufen und Verkaufen', perks: {} },
+  leadership:{ group: 'Sozial', what: 'Gefährten führen', perks: {} },
+};
 
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
 // ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
@@ -384,6 +411,9 @@ export const ITEMS = {
   auge_proto:   { name:'Prototyp-Auge', slot:'consumable', use:'eye', tier:4, stack:1, rarity:'legendary', value:4200, desc:'Aus der Akademie, nicht zu kaufen. Sichtweite 36, Fernkampf-Krit +6 %, Nachtsicht +50 %, Wärmesicht.' },
   dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
   auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
+  auftragsbrief: { name:'Versiegelter Brief', slot:'material', stack:5, rarity:'common', value:0, lore:'Wachs, ein Siegel, ein Name. Der Empfänger soll antworten — bring die Antwort zurück.' },   /* P3.25–26: Nachricht mit Antwort */
+  fernrohr:      { name:'Hannos Fernrohr', slot:'material', stack:1, rarity:'uncommon', value:180, desc:'Messing, ein Sprung im Glas. Im Gepäck deckt sich die Karte weiter auf (Sichtweite der Karte +20 %).', lore:'Der Wärter des Leuchtfeuers hat damit dreißig Jahre lang nach Schiffen gesehen, die nicht kamen.' },   /* Geheime Orte S5 */
+  antwortbrief:  { name:'Antwortbrief', slot:'material', stack:5, rarity:'common', value:0, lore:'Die Antwort, frisch gesiegelt. Gehört dem, der den ersten Brief geschickt hat.' },   /* P3.25–26 */
   vargs_kette: { name:'Vargs Kette', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Das erste Glied, das Varg je geschmiedet hat. Kalt, schwer — und es summt, wenn man an Omega denkt.' },
   vargs_tagebuch: { name:'Vargs Tagebuch', slot:'material', stack:1, rarity:'rare', value:0, lore:'Enge Schrift, Blutflecken. Die letzte Seite beschreibt ein Ritual: Krone, Kette, Splitter, zehn Seelen, ein Freund, das eigene Blut.' },
   himmelssplitter: { name:'Splitter vom Himmel', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Ein Stück des Sterns, den Aurelion über seine Insel hob. Warm wie Haut.' },
@@ -393,6 +423,45 @@ export const ITEMS = {
   automatenkern: { name:'Automatenkern', slot:'material', stack:20, rarity:'uncommon', value:60, lore:'Ein Messingherz voller Zahnräder. Tickt noch, wenn man es ans Ohr hält.' },
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
+  /* Fischen (Spec Skills §13–14, 08.10.2026 — Werte vorläufig): Angel (wird nicht verbraucht) und je Gewässer zwei häufige und ein seltener Fisch (ab Fischen Stufe 15) */
+  angel:      { name:'Angel', slot:'consumable', use:'fish', stack:1, rarity:'common', value:24, lore:'Rute, Schnur, Haken. Am Wasser benutzen: auswerfen, auf den Biss warten, dann sofort noch einmal benutzen.' },
+  forelle:    { name:'Forelle', slot:'consumable', use:'food', heal:5, food:1, stack:9, rarity:'common', value:7, fish:'river' },
+  lachs:      { name:'Lachs', slot:'consumable', use:'food', heal:7, food:2, stack:9, rarity:'common', value:12, fish:'river' },
+  hecht:      { name:'Hecht', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:30, fish:'river', rare:true },
+  karpfen:    { name:'Karpfen', slot:'consumable', use:'food', heal:6, food:2, stack:9, rarity:'common', value:8, fish:'lake' },
+  barsch:     { name:'Barsch', slot:'consumable', use:'food', heal:5, food:1, stack:9, rarity:'common', value:7, fish:'lake' },
+  wels:       { name:'Wels', slot:'consumable', use:'food', heal:10, food:3, stack:9, rarity:'uncommon', value:32, fish:'lake', rare:true },
+  hering:     { name:'Hering', slot:'consumable', use:'food', heal:4, food:1, stack:9, rarity:'common', value:5, fish:'coast' },
+  kabeljau:   { name:'Kabeljau', slot:'consumable', use:'food', heal:7, food:2, stack:9, rarity:'common', value:11, fish:'coast' },
+  rotbarsch:  { name:'Rotbarsch', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:34, fish:'coast', rare:true },
+  schlammbeisser: { name:'Schlammbeißer', slot:'consumable', use:'food', heal:3, food:1, stack:9, rarity:'common', value:4, fish:'swamp' },
+  giftbarbe:  { name:'Giftbarbe', slot:'material', stack:20, rarity:'common', value:14, fish:'swamp', lore:'Nicht essbar. Alchemisten zahlen für das Gift.' },
+  moorhecht:  { name:'Moorhecht', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:36, fish:'swamp', rare:true },
+  fischsuppe: { name:'Fischsuppe', slot:'consumable', use:'food', heal:18, food:3, stack:9, rarity:'common', value:20 },
+  any_fish:   { name:'Fisch (beliebig)', slot:'material', value:0, hidden:true },
+  /* Sammeln (Spec Skills §15–21, 08.10.2026 — Werte vorläufig): Nebenfunde und Seltenes aus Holz, Stein und Kraut */
+  hartholz:   { name:'Hartholz', slot:'material', stack:20, rarity:'common', value:8, lore:'Aus alten Stämmen. Zäher als gewöhnliches Holz.' },
+  harz:       { name:'Harz', slot:'material', stack:20, rarity:'common', value:5, lore:'Klebt, brennt, dichtet. Fackeln, Boote, Pfeile.' },
+  schwarzholz:{ name:'Schwarzholz', slot:'material', stack:20, rarity:'rare', value:45, lore:'Fast schwarz, schwer wie Eisen. Nur wenige Holzfäller erkennen den Baum.' },
+  kohle:      { name:'Kohle', slot:'material', stack:20, rarity:'common', value:6, lore:'Heißer als Holz. Die Schmiede braucht sie für Stahl.' },
+  silbererz:  { name:'Silbererz', slot:'material', stack:20, rarity:'rare', value:40, lore:'Glänzt matt im Gestein. Gegen Tote soll es helfen.' },
+  bergminze:  { name:'Bergminze', slot:'material', stack:20, rarity:'uncommon', value:16, lore:'Kühlt im Mund und klärt den Kopf. Für Tee.' },
+  nachtschatten:{ name:'Nachtschatten', slot:'material', stack:20, rarity:'uncommon', value:22, lore:'Giftig. Alchemisten wissen, wie viel zu viel ist.' },
+  /* Werkzeugstufen (Spec Skills §32–33): ttier 1 einfach, 2 gut, 3 Stahl — Werkzeug und Fertigkeit wirken getrennt */
+  axt_gut:    { name:'Gute Axt', slot:'weapon', wtype:'axe', dmg:12, reach:38, arc:1.2, speed:660, stam:10, ap:0.25, rarity:'common', value:70, skill:'onehanded', tool:'chop', ttier:2 },
+  axt_stahl:  { name:'Stahlaxt', slot:'weapon', wtype:'axe', dmg:14, reach:40, arc:1.2, speed:640, stam:10, ap:0.3, rarity:'uncommon', value:150, skill:'onehanded', tool:'chop', ttier:3 },
+  hacke_gut:  { name:'Gute Spitzhacke', slot:'weapon', wtype:'axe', dmg:9, reach:34, arc:1.1, speed:740, stam:9, rarity:'common', value:60, skill:'onehanded', tool:'mine', ttier:2 },
+  hacke_stahl:{ name:'Stahlhacke', slot:'weapon', wtype:'axe', dmg:11, reach:36, arc:1.1, speed:720, stam:9, ap:0.3, rarity:'uncommon', value:140, skill:'onehanded', tool:'mine', ttier:3 },
+  angel_gut:  { name:'Gute Angel', slot:'consumable', use:'fish', stack:1, rarity:'common', value:50, ttier:2, lore:'Biegsame Rute, feinere Schnur: mehr Zeit zum Anschlagen.' },
+  angel_stahl:{ name:'Angel mit Stahlhaken', slot:'consumable', use:'fish', stack:1, rarity:'uncommon', value:110, ttier:3, lore:'Der Haken hält jeden Fisch, die Fische beißen eher.' },
+  /* Kochen (Spec Skills §22–23): Gerichte mit kurzen Wirkungen (efx wie Elixiere, Schlüssel „meal“); Rezepte werden entdeckt */
+  bratfisch:  { name:'Gebratener Fisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:12, efx:{ speed:0.05 }, dur:240, lore:'Leicht im Magen: +5 % Tempo.' },
+  jaegertopf: { name:'Jägertopf', slot:'consumable', use:'food', heal:16, food:3, stack:9, rarity:'common', value:24, efx:{ dmg:0.06 }, dur:300, lore:'Fleisch und Kraut, lange gekocht: +6 % Schaden.' },
+  kraeuterbrot:{ name:'Kräuterbrot', slot:'consumable', use:'food', heal:12, food:2, stack:9, rarity:'common', value:16, efx:{ armor:2 }, dur:300, lore:'Hält lange vor: +2 Rüstung.' },
+  bergminztee:{ name:'Bergminztee', slot:'consumable', use:'food', heal:4, food:1, stack:9, rarity:'uncommon', value:26, efx:{ vigor:0.25 }, dur:240, lore:'Klärt den Atem: Hiebe kosten 25 % weniger Ausdauer.' },
+  rezept_jaegertopf:  { name:'Rezept: Jägertopf', slot:'consumable', use:'recipe', learn:['jaegertopf'], stack:1, rarity:'common', value:25 },
+  rezept_bergminztee: { name:'Rezept: Bergminztee', slot:'consumable', use:'recipe', learn:['bergminztee'], stack:1, rarity:'uncommon', value:35 },
+  kochbuch:   { name:'Kochbuch der Schenke', slot:'consumable', use:'recipe', learn:['jaegertopf', 'kraeuterbrot'], stack:1, rarity:'uncommon', value:60, lore:'Fleckig, mit Randnotizen. Zwei Rezepte, die jede Schenke kennt.' },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
   kanzlerdegen: { name:'Kanzlerdegen „Rotes Siegel“', slot:'weapon', wtype:'sword', dmg:18, reach:48, arc:1.5, speed:450, stam:7, bleed:0.3, rarity:'legendary', unique:true, value:1000, skill:'onehanded', desc:'Aldhelms Degen. Wer einen Blutenden damit fällt, trinkt ein wenig von ihm: +8 % Leben.' },   /* §5g.2 */
@@ -481,6 +550,12 @@ export const LOOT = {
   whitebeard:[['sturmanker',1],['seekarte',1],['dreispitz',1],['potion',1],['potion',1]],
   chain_master:[['roter_henker',1],['chain_whip',1],['eisenfuersthelm',1],['eisenfuerst',0.6],['blutkette',0.5],['blutkettenhelm',0.5],['potion',1]],
   bandit_spear:[['spear',0.25],['leather_jerkin',0.12],['bread',0.3],['bandage',0.2]],
+  /* P3.20–P3.23 Rollen (08.10.): Beute passt zur Rolle — Waffe der Rolle, dazu Kleinkram; der Plünderer trägt zusätzlich Gold (game.js dropLoot) */
+  bandit_scout:[['shortbow',0.2],['dried_meat',0.3],['bandage',0.15]], bandit_thug:[['schrottkeule',0.15],['bread',0.3],['iron',0.2]], bandit_looter:[['axe',0.15],['bread',0.4],['cloth',0.4],['iron',0.3]],
+  bandit_knife:[['dagger',0.2],['wurfmesser',0.12],['bandage',0.2]], bandit_heavy:[['greatsword',0.12],['chain_hauberk',0.1],['iron',0.5]], bandit_chief:[['longsword',0.2],['grabraeuber',0.12],['potion',0.4]],
+  bandit_trapper:[['wurfmesser',0.1],['dried_meat',0.3],['iron',0.3]], goblin_chief:[['axe',0.3],['bone',0.8],['potion',0.3]], goblin_worker:[['iron',0.3],['bone',0.2]],
+  goblin_scout:[['goblin_hook',0.1],['bone',0.4],['bread',0.2]], goblin_archer:[['shortbow',0.15],['bone',0.4]], goblin_shaman:[['staff',0.15],['bone',0.8],['herb',0.5]],
+  goblin_tinker:[['iron',0.6],['pickaxe',0.15],['bone',0.3]], goblin_spear:[['spear',0.2],['leather_cap',0.15],['iron',0.3]], goblin_berserker:[['axe',0.25],['bone',0.5],['iron',0.3]],
   skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05],['knochenumhang',0.02]],
   skel_bomb: [['bone',0.6],['grave_seal',0.04]], skel_brute:[['bone',1],['bone',0.6],['legionaersplatte',0.08],['iron',0.3],['grave_seal',0.08]],   /* Entwickler 02.10.: vorläufig, aus dem Skelett abgeleitet */
   waechterspinne:[['iron',0.4],['automatenkern',0.1]], dampframme:[['automatenkern',0.6],['iron',0.8],['iron',0.4],['schrottbein',0.04]],   /* Entwickler 02.10.: vorläufig, aus dem Automaten abgeleitet */
@@ -504,6 +579,7 @@ export const LOOT = {
   deer:      [['dried_meat',1],['pelt',0.6]],
   cow:       [['meat',1],['meat',1],['pelt',0.5]],
   sheep:     [['meat',1],['cloth',0.8]],
+  chicken:   [['meat',0.6]],   /* Stadttiere 08.10. (Hund und Katze lassen nichts fallen) */
   bone_knight:[['kite_shield',0.15],['bone',0.8]], bone_archer:[['shortbow',0.2],['bone',0.7]], necromancer:[['soul_vial',0.6],['staff',0.1]], zombie:[['bone',0.5]],
   ash_demon:[['soul_vial',0.35]], shade:[['soul_vial',0.3]], bone_hound:[['bone',0.8]], carrion_wing:[['bone',0.3]], flesh_golem:[['bone',1],['soul_vial',0.5]],
   death_knight:[['soul_vial',0.4],['plate_cuirass',0.2],['schaedelhelm',0.08]], garmadon:[['potion',1],['soul_vial',1],['totenkrone',1],['schaedelhelm',1]], omega:[['sternenklinge',1],['potion',1]],   // Phase 6/7: Seelen für das Ritual
@@ -535,6 +611,39 @@ export const MONSTERS = {
                pal:{skin:'#b2926f',cloth:'#5a4a32',metal:'#8a8070'} },
   bounty_hunter:{ name:'Kopfgeldjäger', hp:58, dmg:12, speed:1.45, reach:36, atk:950, xp:40, sight:320, r:11, threat:2, faction:'bandit', interiors:true,   // §44/§72: jagt Gesuchte, wächst mit (gedeckelt)
                pal:{skin:'#a88a6a',cloth:'#2a2622',metal:'#6a6258'} },
+  /* P3.20–P3.23 Rollen (08.10.2026, Spec §13–16/§15): Banditen- und Goblin-Rollen als Abarten (abart = { of, p }) — erscheinen über Spawngebiete,
+     Tiefhall und Gewölbe statt der Grundart und zählen für deren Aufträge. Jede Rolle sieht anders aus (sprites.js monsterSpec) und hat ein
+     kleines eigenes Verhalten (game.js roleAI, Feld rolle). Werte vorläufig ⚖ (REGELN §D, gemessen mit RF.simFight, Protokoll 08.10.). */
+  bandit_scout:{ name:'Banditenspäher', abart:{ of:'bandit_archer', p:0.3 }, rolle:'Späher', build:'drahtig', hp:30, dmg:8, speed:1.55, reach:280, atk:1600, ranged:true, xp:20, sight:360, r:10, threat:1, faction:'bandit', interiors:true,
+               lore:'Leicht, grüne Kapuze, Kurzbogen. Sieht er dich, ruft er die Bande und rennt erst einmal weg — dann schießt er aus dem Hinterhalt. Wer ihn zuerst erwischt, kämpft gegen weniger.', pal:{skin:'#b2926f',cloth:'#3a4a2a',metal:'#7d7364'} },
+  bandit_thug:{ name:'Schläger', abart:{ of:'bandit', p:0.14 }, rolle:'Schläger', build:'bullig', heavy:{ kind:'slam', every:3, wind:750, mul:1.7, r:70 }, hp:62, dmg:13, speed:1.25, reach:34, atk:1250, telegraph:380, xp:30, sight:240, r:12, threat:2, faction:'bandit', interiors:true,
+               lore:'Breit, nackte Arme, Knüppel. Jeder dritte Hieb ist ein Erdschlag mit roter Bodenmarke — nicht blockbar, zur Seite rollen. Danach steht er kurz offen.', pal:{skin:'#a8805e',cloth:'#4a3226',metal:'#6a5a48'} },
+  bandit_looter:{ name:'Plünderer', abart:{ of:'bandit', p:0.12 }, rolle:'Plünderer', build:'gedrungen', hp:42, dmg:9, speed:1.5, reach:32, atk:900, xp:22, sight:250, r:11, threat:2, faction:'bandit', interiors:true,
+               lore:'Trägt einen prallen Sack auf dem Rücken. Wird es ernst, rennt er mit der Beute davon — wer ihn einholt, findet mehr Gold bei ihm.', pal:{skin:'#c8a07a',cloth:'#5a4a32',metal:'#7d7364'} },
+  bandit_knife:{ name:'Messerstecher', abart:{ of:'bandit', p:0.12 }, rolle:'Dolchkämpfer', build:'drahtig', hp:38, dmg:9, speed:1.75, reach:26, atk:620, xp:26, sight:260, r:10, threat:2, faction:'bandit', interiors:true,
+               lore:'Schnell, Maske, langes Messer. Umkreist dich, sticht zu und ist wieder weg. Nicht hinterherjagen — stehen bleiben und zuschlagen, wenn er hereinkommt.', pal:{skin:'#8d6644',cloth:'#2a2420',metal:'#8a8070'} },
+  bandit_heavy:{ name:'Schwerer Bandit', abart:{ of:'bandit', p:0.07 }, rolle:'Schwerer', build:'bullig', armor:4, heavy:{ kind:'slam', every:3, wind:850, mul:1.8, r:90 }, hp:90, dmg:16, speed:1.0, reach:46, atk:1500, telegraph:520, xp:70, sight:240, r:13, threat:3, faction:'bandit', interiors:true,
+               lore:'Erbeutetes Kettenhemd, Topfhelm, Zweihänder. Langsam, hart gepanzert — Wucht oder Durchschlag hilft. Holt er weit aus, kommt ein Flächenhieb: rollen.', pal:{skin:'#b2926f',cloth:'#3a3026',metal:'#5a5a56'} },
+  bandit_chief:{ name:'Bandenführer', abart:{ of:'bandit', p:0.04 }, rolle:'Anführer', leader:true, hp:90, dmg:14, speed:1.35, reach:38, atk:1000, telegraph:400, xp:80, sight:300, r:12, threat:3, faction:'bandit', interiors:true,
+               lore:'Federhut, roter Mantel. Beim ersten Treffer ruft er die Bande herbei; fällt er, laufen viele davon. Ihn zuerst — oder ihn zuletzt, wenn du allein bist.', pal:{skin:'#c8a07a',cloth:'#3a2a20',metal:'#8a8070'} },
+  bandit_trapper:{ name:'Fallensteller', abart:{ of:'bandit', p:0.06 }, rolle:'Fallensteller', hp:40, dmg:9, speed:1.45, reach:32, atk:950, xp:24, sight:280, r:11, threat:2, faction:'bandit', interiors:true,
+               lore:'Fellmütze, Seil und Fußangeln am Gürtel. Sieht er dich, wirft er eine Fußangel zwischen euch — die Eisenzähne am Boden sind sichtbar: drumherum gehen. Wer hineintritt, nimmt Schaden.', pal:{skin:'#a8805e',cloth:'#4a3a26',metal:'#7d7364'} },
+  goblin_chief:{ name:'Goblin-Anführer', abart:{ of:'goblin_warrior', p:0.05 }, rolle:'Anführer', leader:true, build:'bullig', hp:70, dmg:12, speed:1.25, reach:34, atk:1050, telegraph:380, xp:45, sight:280, r:13, threat:3, faction:'goblin', interiors:true,
+               lore:'Hörnerhelm, Fellumhang, Knochenschmuck. Beim ersten Treffer kreischt er den Stamm herbei; fällt er, laufen viele Goblins davon.', pal:{skin:'#56703a',cloth:'#3a2a1a',metal:'#8a7f6d'} },
+  goblin_worker:{ name:'Goblin-Arbeiter', abart:{ of:'goblin', p:0.1 }, rolle:'Arbeiter', hp:18, dmg:0, speed:1.4, reach:0, atk:9999, xp:2, sight:220, r:9, threat:1, faction:'goblin', interiors:true,
+               lore:'Geschorener Kopf, Lumpen, Spitzhacke und Tragekorb — ein Grubenarbeiter, kein Krieger. Er kämpft nicht, er rennt und kreischt. Wer ihn erschlägt, gewinnt nichts.', pal:{skin:'#6d7a45',cloth:'#4a4030',metal:'#6b6156'} },
+  goblin_scout:{ name:'Goblin-Späher', abart:{ of:'goblin', p:0.12 }, rolle:'Späher', hp:22, dmg:5, speed:1.65, reach:26, atk:760, xp:10, sight:320, r:9, threat:1, faction:'goblin', interiors:true,
+               lore:'Klein, Kapuze, Hakenmesser. Sieht er dich, kreischt er den Stamm herbei und rennt davon. Erst danach kämpft er.', pal:{skin:'#6d7a45',cloth:'#2e3a24',metal:'#6b6156'} },
+  goblin_archer:{ name:'Goblin-Bogenschütze', abart:{ of:'goblin', p:0.15 }, rolle:'Schütze', hp:22, dmg:7, speed:1.35, reach:260, atk:1600, ranged:true, xp:14, sight:300, r:10, threat:1, faction:'goblin', interiors:true,
+               lore:'Fellkragen, Köcher, krummer Kurzbogen. Hält Abstand und springt zurück, wenn man herankommt.', pal:{skin:'#5e7038',cloth:'#4a3a28',metal:'#6b6156'} },
+  goblin_shaman:{ name:'Goblin-Schamane', abart:{ of:'goblin', p:0.07 }, rolle:'Schamane', hp:34, dmg:7, speed:1.2, reach:240, atk:1900, ranged:true, missile:'shadow', xp:26, sight:300, r:10, threat:2, faction:'goblin', interiors:true,
+               lore:'Tierschädel auf dem Kopf, Knochenstab, Amulette. Heilt verwundete Goblins (grünes Leuchten) und flucht dich langsamer. Unterbrich ihn mit Wucht oder geh zuerst auf ihn.', pal:{skin:'#7a8a4a',cloth:'#3a2a1a',metal:'#c8bca0'} },
+  goblin_tinker:{ name:'Goblin-Techniker', abart:{ of:'goblin', p:0.07 }, rolle:'Techniker', heavy:{ kind:'slam', every:3, wind:1000, mul:1.5, r:150 }, hp:40, dmg:8, speed:1.25, reach:28, atk:1000, xp:28, sight:260, r:10, threat:2, faction:'goblin', interiors:true,
+               lore:'Messingbrille, Werkzeug, Sack voller Pulvertöpfe. Wirft aus mittlerer Entfernung eine Bombe: der rote Kreis am Boden fliegt gleich in die Luft — raus.', pal:{skin:'#6d7a45',cloth:'#4a3a28',metal:'#8a7040'} },
+  goblin_spear:{ name:'Goblin-Speerträger', abart:{ of:'goblin_warrior', p:0.25 }, rolle:'Speerträger', hp:46, dmg:11, speed:1.2, reach:60, atk:1100, telegraph:320, xp:26, sight:240, r:11, threat:2, faction:'goblin', interiors:true,
+               lore:'Langer Speer, Blechkappe. Hält dich auf Speerlänge und stößt zurück, wer zu nah kommt. Seitlich angehen.', pal:{skin:'#5f6e3c',cloth:'#3d2f20',metal:'#8a7f6d'} },
+  goblin_berserker:{ name:'Goblin-Berserker', abart:{ of:'goblin_warrior', p:0.15 }, rolle:'Berserker', build:'bullig', hp:52, dmg:11, speed:1.4, reach:30, atk:800, xp:30, sight:240, r:12, threat:2, faction:'goblin', interiors:true,
+               lore:'Nackter Oberkörper, rote Augen, Beil ohne Schild. Unter halbem Leben rast er: schneller und härter, flieht nie. Vorher erledigen oder Abstand halten.', pal:{skin:'#56703a',cloth:'#3a2018',metal:'#7a6a58'} },
   chain_brute:{ name:'Kettenknecht', heavy:{ kind:'slam', every:3, wind:800, mul:2.2, r:70 }, hp:95, dmg:15, speed:1.2, reach:40, atk:1150, telegraph:420, xp:60, sight:260, r:13, threat:3, faction:'chain', interiors:true,   // S11: Leibwache der Kette
                pal:{skin:'#9a8068',cloth:'#1c1a18',metal:'#5a5652'} },
   rotgardist:{ name:'Rotgardist', heavy:{ kind:'thrust', every:3, wind:700, mul:2.0, r:130 }, hp:120, dmg:17, speed:1.25, reach:46, atk:1100, telegraph:400, xp:80, sight:280, r:12, threat:3, faction:'chain', interiors:true,   // S12: Elite der Kette
@@ -649,6 +758,10 @@ export const MONSTERS = {
   cow:       { name:'Kuh', hp:60, dmg:0, speed:0.9, reach:0, atk:9999, xp:3, sight:120, r:15, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#8a6a4a',dark:'#3a2a1e',eye:'#1a120c'} },
   sheep:     { name:'Schaf', hp:26, dmg:0, speed:1.1, reach:0, atk:9999, xp:2, sight:140, r:11, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#d8d0bc',dark:'#4a4238',eye:'#1a120c'} },
   horse:     { name:'Pferd', hp:80, dmg:0, speed:1.8, reach:0, atk:9999, xp:0, sight:160, r:15, threat:0, faction:'beast', interiors:false, prey:true, pal:{body:'#6a4a30',dark:'#2a1e14',eye:'#1a120c'} },
+  /* Stadttiere (08.10., Roadmap P1.x „Kinder/Tiere als Stadtbevölkerung“): gehören zum Ort, fliehen wie Nutztiere; Bild fig5.js (Hund/Katze BEASTR + paintPetNSR, Huhn paintFowlR), vorn/seitlich/hinten. Spawnen/Verhalten: game.js */
+  dog:       { name:'Hofhund', hp:22, dmg:0, speed:1.5, reach:0, atk:9999, xp:0, sight:180, r:9, threat:0, faction:'beast', interiors:false, prey:true, town:true, pal:{body:'#7a5a3a',dark:'#3a2a1e',eye:'#2a1a10'} },
+  cat:       { name:'Katze', hp:8, dmg:0, speed:1.7, reach:0, atk:9999, xp:0, sight:160, r:6, threat:0, faction:'beast', interiors:true, prey:true, town:true, pal:{body:'#6a6058',dark:'#2e2a26',eye:'#c8b040'} },
+  chicken:   { name:'Huhn', hp:5, dmg:0, speed:1.2, reach:0, atk:9999, xp:0, sight:120, r:5, threat:0, faction:'beast', interiors:false, prey:true, town:true, pal:{body:'#b8743a',dark:'#5a3418',eye:'#1a120c'} },
   deer:      { name:'Hirsch', hp:30, dmg:0, speed:1.9, reach:0, atk:9999, xp:6, sight:200, r:12, threat:0, faction:'beast', interiors:false, prey:true,
                pal:{body:'#8a6040',dark:'#5a3e28',eye:'#1a120c'} },                   // Wildtier, kein Gegner: flieht, Wölfe jagen ihn
   valen_soldier:{ name:'Soldat Valens', hp:52, dmg:10, speed:1.3, reach:44, atk:950, xp:0, sight:260, r:11, threat:2, faction:'valen', interiors:true, pal:{skin:'#c9a582',cloth:'#2f4260',metal:'#9aa3b0'} },
@@ -1787,12 +1900,16 @@ export const TOWNS = {
 // say = Satz in der Sprechblase, court = Umstehende weichen zurück, beat = Herzschlag, flash = Blitz. Aldhelm hat seinen eigenen Auftritt.
 export const BOSS_CARDS = {
   chain_master: { title: 'VARG', sub: 'Kettenmeister der Eisenmark', sfx: 'chains', fx: 'spark', say: 'Dann wird deine Kette die schwerste in dieser Halle.', court: true },
-  hrodvar: { title: 'HRODVAR', sub: 'König unter dem Eis', sfx: 'crack', fx: 'frost', say: 'Der Stern fiel. Wir gruben ihm entgegen.' },
+  hrodvar: { title: 'HRODVAR', sub: 'König unter dem Eis', sfx: 'crack', fx: 'frost', say: 'Der Stern fiel. Wir gruben ihm entgegen.', ice: true },   /* T17 §3.2: Frostring beim Auftritt */
   garmadon: { title: 'KÖNIG GARMADON', sub: 'Herr der Toten', sfx: 'heartbeat', fx: 'bone', say: 'Gut. Ich war lange nicht mehr müde.', beat: true, court: true },
   whitebeard: { title: 'WEISSBART', sub: 'König der Sturmklinge', sfx: 'shout', fx: 'spark', say: 'Noch einer, der mein Meer will?', court: true },
   dodon: { title: 'DODON', sub: 'Hüter von Morrgrund', sfx: 'shout', fx: 'dust', say: 'Morrgrund vergisst nicht.' },
   gorak: { title: 'GORAK', sub: 'Grubenwart', sfx: 'growl', fx: 'dust', say: 'Meine Grube. Mein Fleisch.' },
   omega: { title: 'OMEGA', sub: 'der Gefallene', sfx: 'magic', fx: 'ghost', say: 'Ich war einmal wie du.', flash: '#ffffff' },
+  /* P3.x (Planlauf 08.10.): Regionalbosse — Schlüssel ist die Boss-Kennung (rboss), nicht der Gegnertyp (Graumähne ist ein Wolf, Karrak ein Bandit).
+     Texte ⚖. Aldhelm (Blutfürst) hat seinen eigenen Auftritt in der Krypta (aldhelmAI). */
+  alpha: { title: 'GRAUMÄHNE', sub: 'Leitwolf der Wolfsschlucht', sfx: 'growl', fx: 'dust', beat: true },
+  sandlord: { title: 'KARRAK', sub: 'der Sandfürst der Roten Wüste', sfx: 'shout', fx: 'dust', say: 'Jeder dritte Wagen gehört mir. Heute nehme ich den ganzen.', court: true },
 };
 export const WAR_NODES = {
   graveyard: { owner:'undead', garrison:10 }, marsh: { owner:null, garrison:0 }, fortress: { owner:null, garrison:0 },
@@ -1822,6 +1939,17 @@ export const WAR_EDGES = [['graveyard','marsh'], ['graveyard','fortress'], ['mar
 // Medizin). need = Vorrat (Holz, Stein, Eisen, Kräuter) oder Gegenstände aus der Tasche. min = nötige Fertigkeit, n = Anzahl.
 export const RECIPES = {
   dagger:        { st: 'forge', need: { iron: 2 } },
+  fischsuppe:    { st: 'kessel', sk: 'cooking', cook: true, need: { any_fish: 2, herb: 1 }, n: 2 },   /* Fischen: Fisch → Kochen (any_fish = zwei beliebige essbare Fische) */
+  bratfisch:     { st: 'kessel', sk: 'cooking', cook: true, need: { any_fish: 1 } },
+  jaegertopf:    { st: 'kessel', sk: 'cooking', cook: true, secret: true, need: { dried_meat: 1, herb: 1 } },   /* secret: erst nach Rezept, Buch oder Experiment */
+  kraeuterbrot:  { st: 'kessel', sk: 'cooking', cook: true, secret: true, need: { bread: 1, herb: 2 } },
+  bergminztee:   { st: 'kessel', sk: 'cooking', cook: true, secret: true, need: { bergminze: 1 }, min: 6 },
+  axt_gut:       { st: 'forge', need: { iron: 4, wood: 2 }, min: 10 },
+  axt_stahl:     { st: 'forge', need: { iron: 5, kohle: 2, hartholz: 1 }, min: 25 },
+  hacke_gut:     { st: 'forge', need: { iron: 4, wood: 2 }, min: 10 },
+  hacke_stahl:   { st: 'forge', need: { iron: 5, kohle: 2, hartholz: 1 }, min: 25 },
+  angel_gut:     { st: 'bench', need: { wood: 2, cloth: 1 }, min: 5 },
+  angel_stahl:   { st: 'bench', need: { iron: 1, hartholz: 1, cloth: 1 }, min: 15 },
   longsword:     { st: 'forge', need: { iron: 4, wood: 1 } },
   axe:           { st: 'forge', need: { iron: 3, wood: 2 } },
   spear:         { st: 'forge', need: { iron: 2, wood: 3 } },

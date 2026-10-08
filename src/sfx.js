@@ -115,6 +115,50 @@ function setMood(region) {
   pad.o.forEach((x, i) => x.frequency.linearRampToValueAtTime(f[i], t + 6));
 }
 
+/* Musik je Region (Roadmap P4 Technik, 08.10.2026): sparsame, erzeugte Phrasen über dem Zweiklang — je Region eigene Tonleiter und Stimme,
+   mit Hall (Verzögerung + Rückkopplung). Grünland/Wald: Flöte in Moll, Ebene: dorisch; Sumpf/Totenland/Fäule: tiefes Summen, phrygisch/vermindert;
+   Aurelion: Spieluhr in Dur; Eisenmark: harte Rechteckstimme; in Orten eine Laute (kurz gezupft). Pausen von 5–12 s zwischen den Phrasen,
+   damit es Stimmung bleibt. Lautstärke: Optionen → Musik (S.settings.music, 0 = aus). Zufall nur für Klang (Math.random), nie fürs Spiel. */
+const SCALE = { greenmark: [0, 2, 3, 5, 7, 8, 10], plains: [0, 2, 3, 5, 7, 9, 10], forest: [0, 3, 5, 7, 10], marsh: [0, 1, 3, 5, 7, 8], mountain: [0, 2, 5, 7, 9],
+  desert: [0, 1, 4, 5, 7, 8, 10], badland: [0, 1, 3, 6, 7], blight: [0, 1, 3, 6, 8], deadland: [0, 1, 3, 6, 8], aurel: [0, 2, 4, 7, 9, 11], eisen: [0, 1, 3, 5, 6, 8],
+  frozen: [0, 2, 3, 7, 8], coast: [0, 2, 4, 5, 7, 9], under: [0, 1, 3, 6], town: [0, 2, 3, 5, 7, 9, 10] };
+const VOICE = { aurel: 'box', deadland: 'hum', blight: 'hum', under: 'hum', marsh: 'hum', eisen: 'hard', town: 'lute' };
+let musicNext = 0, echoIn = null;
+function echoBus() {
+  if (echoIn) return echoIn;
+  const inp = ac.createGain(), d = ac.createDelay(1.5), fb = ac.createGain(), wet = ac.createGain();
+  d.delayTime.value = 0.46; fb.gain.value = 0.34; wet.gain.value = 0.55;
+  inp.connect(master); inp.connect(d); d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(master);
+  return (echoIn = inp);
+}
+function mnote(t, f, dur, voice, peak) {
+  const o = ac.createOscillator(), lp = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = voice === 'box' || voice === 'hard' ? 'square' : voice === 'lute' ? 'triangle' : 'sine'; o.frequency.value = f;
+  lp.type = 'lowpass'; lp.frequency.value = voice === 'box' ? 2200 : voice === 'hard' ? 900 : voice === 'lute' ? 1800 : 1300;
+  const att = voice === 'hum' ? 0.5 : voice === 'lute' || voice === 'box' ? 0.006 : 0.12;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(lp); lp.connect(g); g.connect(echoBus()); o.start(t); o.stop(t + dur + 0.05);
+  if (voice === 'flute' || voice === 'hum') { const v = ac.createOscillator(), vg = ac.createGain(); v.frequency.value = 5; vg.gain.value = f * 0.006; v.connect(vg); vg.connect(o.frequency); v.start(t); v.stop(t + dur); }   /* leichtes Vibrato */
+}
+export function musicNow() { musicNext = 0; }   /* Debug: nächste Phrase sofort */
+function musicStep(key, town) {
+  const vol = S.settings.music ?? 0.5; if (vol <= 0) return;
+  const t = ac.currentTime; if (t < musicNext) return;
+  const k = town ? 'town' : key, sc = SCALE[k] || SCALE.greenmark, voice = VOICE[k] || 'flute';
+  const root = ((MOOD[key] || MOOD.greenmark)[0]) * (voice === 'hum' ? 1 : voice === 'box' ? 4 : 2);
+  const n = voice === 'hum' ? 2 + (Math.random() * 2 | 0) : 3 + (Math.random() * 4 | 0), step = voice === 'lute' ? 0.32 : voice === 'box' ? 0.36 : voice === 'hum' ? 1.6 : 0.62;
+  let deg = Math.random() * sc.length | 0, at = t + 0.1;
+  for (let i = 0; i < n; i++) {
+    deg = Math.max(0, Math.min(sc.length * 2 - 1, deg + [-2, -1, -1, 1, 1, 2][Math.random() * 6 | 0]));
+    const semi = sc[deg % sc.length] + 12 * Math.floor(deg / sc.length), f = root * Math.pow(2, semi / 12);
+    const dur = (i === n - 1 ? 2.2 : 1) * step * (voice === 'lute' ? 2.2 : 1.6);
+    mnote(at, f, dur, voice, (voice === 'hum' ? 0.03 : voice === 'hard' ? 0.012 : 0.022) * vol);
+    if (voice === 'lute' && Math.random() < 0.4) mnote(at, f * 1.5, dur * 0.8, voice, 0.012 * vol);   /* Zupf-Quinte */
+    at += step * (Math.random() < 0.25 ? 2 : 1);
+  }
+  musicNext = at + 5 + Math.random() * 7;
+}
+
 // Regionale Einzelgeräusche, etwa einmal pro Sekunde gewürfelt. Selten und leise: Atmosphäre, kein Lärm.
 // region: regionAt(); day: Tageslicht; town: in einer Siedlung.
 // under: geschlossene Karte unter Tage (Audit C4: Tropfen und Hall statt Vogelgezwitscher).
@@ -122,7 +166,8 @@ export function ambienceTick(region, day, town, under) {
   if ((S.settings.volume ?? 0.7) <= 0 || !ac || !wind) return;
   try {
     const t = ac.currentTime, key = under ? 'under' : region;
-    if (key !== lastRegion) { lastRegion = key; setMood(key); }
+    if (key !== lastRegion) { lastRegion = key; setMood(key); musicNext = Math.min(musicNext, t + 2); }
+    musicStep(key, town);   /* 08.10.: Musik je Region */
     const r = Math.random();
     if (under) {
       if (r < 0.16) { const f = 1500 + Math.random() * 900; tone(t, 0.06, 'sine', f, f * 0.6, 0.02); tone(t + 0.28, 0.06, 'sine', f, f * 0.6, 0.007); }   /* Tropfen mit Hall */

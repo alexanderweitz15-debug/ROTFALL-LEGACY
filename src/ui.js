@@ -37,12 +37,12 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
+  ['char', 'Charakter', 'C', ['character', 'mastery', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
   ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
 const NAV_SHORT = { char: 'Charakter', inv: 'Inventar', party: 'Gruppe', build: 'Siedlung', map: 'Karte', quest: 'Aufträge', powers: 'Mächte', codex: 'Kodex', options: 'Optionen' };
-const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', mastery: 'Fertigkeiten', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
 // Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
@@ -335,7 +335,8 @@ function boardUI(body, arg) {
     <div class="bb-top">${icoImg(it.ico, 2, 'bb-ico')}<b>${qa(it.title)}</b>${it.elite ? '<span class="bb-skull" title="Gefährlicher Anführer">☠</span>' : ''}</div>
     <div class="bb-kind">${qa(it.kindName)}${it.dist != null ? ` · ${it.dist} Felder` : ''}${it.days ? ` · ${it.days} Tag${it.days === 1 ? '' : 'e'}` : ''}</div>
     <p class="bb-desc">${qa(it.desc || '')}</p>
-    <div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>
+    ${it.steps ? it.steps.map((s, i) => `<div class="bb-obj"><i class="qb-chk">${s.done ? '☑' : it.state === 'active' && it.steps.slice(0, i).every(q => q.done) ? '▸' : '☐'}</i>${qa(s.text)}</div>`).join('')   /* P3.25–26: Schritt-Aufträge als Häkchen-Liste */
+      : `<div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>`}
     <div class="bb-foot"><span class="bb-rew">${rewardHTML(it.rew, true)}</span>${it.state === 'offer' ? `<button class="mini" data-acc="${it.id}">Annehmen</button>` : it.ready ? `<button class="mini" data-claim="${it.id}">Abgeben</button>` : '<span class="ledger">läuft</span>'}</div></div>`;
   body.innerHTML = `<div class="bb-head"><b>${o.giver === 'board' ? `Anschlagbrett — ${qa(V.name)}` : qa(V.name)}</b><span class="ledger">${V.active}/${V.max} Aufträge angenommen</span></div>
     ${V.shut ? `<div class="bb-shut">${qa(V.shut)}</div>` : ''}
@@ -881,7 +882,7 @@ export function openModal(name, arg) {
   const body = $('modal-body'); body.innerHTML = ''; body.className = '';
   const grp = NAV.find(n => n[3].includes(name));
   [...$('nav').children].forEach(b => b.classList.toggle('active', b.dataset.g === grp?.[0]));
-  const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
+  const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], mastery:[ 'Fertigkeiten', masteryUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
     classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], board:[ 'Anschlagbrett', boardUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
@@ -1117,7 +1118,7 @@ function invDetail(force) {
 }
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
-const USE_TXT = { bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
+const USE_TXT = { recipe: 'Lesen: du lernst das Gericht für immer (auch dein Erbe kennt es). Kochen am Kessel eines Lagerfeuers.', fish:'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
   soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
   eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.',   /* Roadmap P2 */
   mechmod: 'Modul auf eine Prothese stecken (Arm- oder Beinprothese nötig). Ein altes Modul kommt zurück in die Tasche.',   /* Roadmap P3 */
@@ -1140,6 +1141,7 @@ export function itemInfoHTML(slot, cmpWith = true, lite = false) {   /* lite: oh
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
   if (it.sdesc) h += `<div class="ledger" style="margin:4px 0">${it.sdesc}</div>`;   /* Schildart erklären */
   if (slot.qual) h += `<div class="ledger" style="margin:4px 0">Güte: ${slot.qual}${slot.maker ? ` · gefertigt von ${slot.maker}` : ''}</div>`;   /* Nutzer §5d.8: Handwerk */
+  else if (slot.maker) h += `<div class="ledger" style="margin:4px 0">Gefertigt von ${slot.maker}</div>`;   /* P2.x (08.10.): Werkstücke mit Namen — auch ohne Gütestufe (Auftragsarbeit beim Schmied) */
   if (it.energy) h += `<div class="ledger" style="margin:4px 0">Magitech · Energie ${slot.charge ?? 100}/100 · ${it.energy} je Schuss${it.splash ? ' · Streuung' : ''}${it.pierce ? ' · durchschlägt einen Gegner' : ''}${it.mstatus ? ` · ${it.mstatus.key === 'shocked' ? 'lähmt' : 'setzt in Brand'} (${Math.round(it.mstatus.chance * 100)} %)` : ''}. Leer schießt sie nicht — Energiezelle benutzen.</div>`;   /* Roadmap C.10 */
   if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
   if (slot.used) h += `<div class="stat" title="Gebraucht vom Schwarzmarkt: kommt beim Einsetzen mit weniger Zustand."><span>Gebraucht</span><b>${slot.used} % Zustand</b></div>`;
@@ -1253,6 +1255,19 @@ function woundNotes(c, click) {
   }).join('');
 }
 
+// ---- Fertigkeiten (Skill-Core Phase 1, Spec Skills §4/§50, 08.10.2026): je Fertigkeit Stufe (Wert/2), Balken zur nächsten Stufe, nächste Freischaltung
+// und alle Meilensteine (erreicht hell, offen dunkel). Gruppen Kampf / Handwerk / Überleben / Sozial. Nur Fertigkeiten, die man schon geübt hat.
+function masteryUI(body) {
+  const p = S.player, info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean), shown = info.filter(s => s.v >= 1 || s.perks.length);
+  const groups = ['Kampf', 'Handwerk', 'Überleben', 'Sozial'].map(g => [g, shown.filter(s => s.group === g)]).filter(([, L]) => L.length);
+  body.innerHTML = `<div class="tafel"><p class="ledger">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). An Meilensteinen schaltet sich etwas Neues frei; starke Gegner lehren mehr als harmlose, und wer immer wieder dasselbe Ziel schlägt, lernt kaum noch etwas.</p>
+    ${groups.map(([g, L]) => `<section><h3>${g}</h3>${L.map(s => `<div class="ledger" style="margin:6px 0" title="${s.what}">
+      <b>${s.name}</b> — Stufe ${s.lv} <span style="opacity:.7">(${Math.floor(s.v)})</span>
+      <div style="height:4px;background:rgba(255,255,255,.12);margin:3px 0"><i style="display:block;height:4px;width:${Math.round(s.frac * 100)}%;background:#c8a050"></i></div>
+      ${s.next ? `<div style="opacity:.85">Nächstes Ziel: Stufe ${s.next.lv} — ${s.next.t}</div>` : '<div>Meisterschaft erreicht.</div>'}
+      ${s.perks.length ? `<div>${s.perks.map(q => `<span style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} ${q.lv}: ${q.t}</span>`).join('<br>')}</div>` : ''}
+    </div>`).join('')}</section>`).join('') || '<p>Noch ungeübt.</p>'}</div>`;
+}
 // ---- Charakterbogen: Wundarzt-Tafel ----
 function charUI(body, who) {
   const p = who || S.player, isPlayer = p === S.player;
@@ -1266,7 +1281,7 @@ function charUI(body, who) {
     defense: 'Steigt, wenn du getroffen wirst oder abwehrst. Chance, Hiebe von vorn abzuwehren (weniger Schaden).',
     medicine: 'Steigt beim Verbinden und Heilen mit Verbänden und Kräutern. Jeder Verband heilt mehr.',
     toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
-    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.',
+    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.', fishing: 'Steigt mit jedem Fang (seltene Fische mehr; am selben Platz immer weniger). Fische beißen schneller, mehr Zeit zum Anschlagen, ab Stufe 15 seltene Fische.',
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
     leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
@@ -1867,13 +1882,14 @@ function craftUI(body, arg) {
   if (arg) crArg = arg; if (!crArg) return; const V = A.craftView?.(crArg.st); if (!V) return;
   $('modal-title').textContent = V.name; body.className = 'cr-body';
   if (!V.list.some(r => r.key === crSel)) crSel = (V.list.find(r => r.ok) || V.list[0])?.key || null;
-  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}</div>
+  body.innerHTML = `<div class="cr-head"><span title="Höhere Fertigkeit: bessere Güte, schwerere Rezepte">${qa(V.skillName)} <b>${V.skill}</b></span>${V.mend ? `<button class="mini" id="cr-mend" title="${V.st === 'bench' ? 'Ausrüstung ausbessern' : 'Ausrüstung ausbessern oder Prothesen warten'}">Ausbessern</button>` : ''}${V.exp ? '<button class="mini" id="cr-exp" title="Unbekannte Gerichte entdecken: passen die Zutaten im Gepäck zu einem Gericht, ist es entdeckt — sonst verdirbt eine Zutat.">Experimentieren</button>' : ''}</div>
     <div class="cr-cols"><div><div class="cr-grid">${V.list.map(r => `<button class="cr-card${r.ok ? '' : ' cant'}${r.key === crSel ? ' sel' : ''}" data-k="${r.key}"><canvas class="cr-ic" data-ico="${r.key}"></canvas><span class="cr-n"></span>${r.n > 1 ? `<b class="cr-x">×${r.n}</b>` : ''}<span class="cr-need">${r.need.map(matPic).join('')}</span>${r.min && V.skill < r.min ? `<span class="cr-lock" title="Braucht ${qa(V.skillName)} ${r.min}">${LOCK_SVG}${r.min}</span>` : ''}</button>`).join('') || '<div class="ledger">Hier lässt sich nichts herstellen.</div>'}</div>
       <div class="ledger cr-hint">Klick: ansehen · Doppelklick: herstellen. Rote Zahl = Material fehlt, Schloss = Fertigkeit zu niedrig.</div></div>
       <div class="cr-detail" id="cr-det"></div></div>`;
   body.querySelectorAll('.cr-card').forEach(b => { const r = V.list.find(x => x.key === b.dataset.k); b.querySelector('.cr-n').textContent = ITEMS[r.key].name;
     b.onclick = () => { crSel = r.key; craftUI(body); }; b.ondblclick = () => crDo(body, r, false); });
   if ($('cr-mend')) $('cr-mend').onclick = () => { const t = crArg.t; closeModal(); A.craftMend?.(t); };
+  if ($('cr-exp')) $('cr-exp').onclick = () => { A.cookExperiment?.(); craftUI(body); };
   const r = V.list.find(x => x.key === crSel), d = $('cr-det');
   if (r) { const bar = (ch, lab) => `<div class="cr-q" title="${lab}: ${V.quals.map((q, i) => `${q} ${Math.round(ch[i] * 100)} %`).filter((_, i) => ch[i] > 0.004).join(' · ')}"><small>${lab}</small><div class="cr-qbar">${ch.map((c, i) => c > 0.004 ? `<i class="q${i}" style="width:${(c * 100).toFixed(1)}%">${c > 0.14 ? V.quals[i] : ''}</i>` : '').join('')}</div></div>`;
     d.innerHTML = itemCardHTML({ key: r.key }, { short: true }) + `<div class="cr-needl">${r.need.map(matPic).join('')}</div>` + bar(V.chances, 'Erwartete Güte')
@@ -2032,6 +2048,11 @@ function settingsUI(body) {
       <h3 style="margin-top:14px">Ton</h3>
       <div class="ctx-actions">${[[0, 'Aus'], [0.35, 'Leise'], [0.7, 'Normal'], [1, 'Laut']].map(([v, n]) =>
         `<button data-vol="${v}" class="${(S.settings.volume ?? 0.7) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <h3 style="margin-top:14px">Musik</h3>
+      <div class="ctx-actions">${[[0, 'Aus'], [0.5, 'Leise'], [1, 'Normal']].map(([v, n]) =>
+        `<button data-mus="${v}" class="${(S.settings.music ?? 0.5) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <h3 style="margin-top:14px">Kamerafahrten</h3>
+      <div class="ctx-actions"><button id="cineAuto">${S.settings.cineAuto ? 'Laufen automatisch weiter' : 'Warten auf „Weiter“ (Leertaste/Enter)'}</button></div>
       <h3 style="margin-top:14px">Textgröße</h3>
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
@@ -2058,6 +2079,8 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
+  [...body.querySelectorAll('[data-mus]')].forEach(b => b.onclick = () => { S.settings.music = +b.dataset.mus; refreshModal(); });   /* 08.10.: Musik je Region */
+  const ca = body.querySelector('#cineAuto'); if (ca) ca.onclick = () => { S.settings.cineAuto = !S.settings.cineAuto; refreshModal(); };   /* 08.10.: Kamerafahrten von Hand/automatisch */
   $('sv').onclick = async () => { const ok = await A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)
   $('quit').onclick = () => { Promise.resolve(A.saveNow()).finally(() => { S._quiet = true; location.reload(); }); };   /* komprimiert speichern, dann ohne zweites (JSON-)Speichern beim Entladen neu laden */
   $('coopb').onclick = () => { closeModal(); A.openCoop?.(); };

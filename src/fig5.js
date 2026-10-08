@@ -390,6 +390,16 @@ export function paintR(L, dir, pose, W = null) {
     R.lL = R.lL.map(([x, y], i) => [x - sp * i / 2, y]); R.lR = R.lR.map(([x, y], i) => [x + sp * i / 2, y]); }
   if (ride) { if (view === 'W') { R.lN = [[15.5, 26], [11, 29.5], [12.5, 36]]; R.lF = [[16.5, 26], [12, 30], [13.5, 36.5]]; }   // S15 Reitsitz: Knie nach vorn, Unterschenkel am Pferd
     else { R.lL = [[13.5, 26], [10, 31], [10.5, 37]]; R.lR = [[18.5, 26], [22, 31], [21.5, 37]]; } }   // von vorn/hinten: Beine gespreizt um den Rumpf
+  /* N4 Scheibe 3 (08.10.2026, Kenshi-Gefühl): Wunden-Haltung aus dem Körperzustand (L.wd, sprites.js woundOf) — Rumpf unter der Hälfte:
+     die freie Hand hält die Seite, Kopf etwas tiefer; Bein unter der Hälfte: es wird im Stand entlastet (Fuß angehoben, Knie gebeugt), die Figur
+     steht schief. Nur aus vorhandenen Gelenkpunkten gemischt (kein neues Posenbild, nur andere Gelenke im selben Rig). */
+  if (L.wd && !ride && !extra && /^(i[01]|w[0-3])$/.test(pose)) {
+    const wl = !!W && view !== 'W' && Math.cos((W.oct || 0) * Math.PI / 4) < -1e-9;
+    if ((L.wd & 1) && !(W && W.two)) { const k = view === 'W' ? (W ? 'aF' : 'aN') : wl ? 'aR' : 'aL', a = R[k];
+      if (a && a.length === 3) { const [s] = a, sg = view === 'W' ? -1 : k === 'aL' ? 1 : -1; R[k] = [s, [s[0] - sg * 0.5, s[1] + 5.5], [16 - (view === 'W' ? 2 : sg * 3), s[1] + 8.5]]; R.hy += 1; } }
+    if ((L.wd & 6) && (pose === 'i0' || pose === 'i1')) { const lefty = !!(L.wd & 2), k = view === 'W' ? (lefty ? 'lF' : 'lN') : (lefty !== (view === 'N') ? 'lL' : 'lR'), l = R[k];
+      if (l && l.length === 3) { const out = k === 'lL' ? -1 : k === 'lR' ? 1 : -1; R[k] = [l[0], [l[1][0] + out * 0.5, l[1][1] - 0.5], [l[2][0] + out * 0.5, l[2][1] - 1.5]]; R.hx += view === 'W' ? 0 : k === 'lL' ? -1 : 1; } }
+  }
   const plan = W ? armPlan(view, R, W) : null;
   if (L.la) for (const k of ['aL', 'aR', 'aN', 'aF']) { const a = R[k]; if (a && a.length === 3) { const [s0, e0, h0] = a, f = (q, k2) => [s0[0] + (q[0] - s0[0]) * k2, s0[1] + (q[1] - s0[1]) * k2]; R[k] = [s0, f(e0, 1.3), f(h0, 1.38)]; } }   /* Entwickler 02.10.: Mutierte — zu lange Arme (Glieder ohne Waffe; der Waffenarm folgt der Hand) */
   const C = new Px(RW, RH, DX, DY); STUMPS = [];
@@ -400,7 +410,7 @@ export function paintR(L, dir, pose, W = null) {
   const twist = view !== 'W' && plan && W && W.mode === 'swing' ? Math.max(-4, Math.min(4, Math.round((plan.h[0] - 16) * 0.3))) : 0, waistY = 24 + R.by, topY = 13 + R.by;
   if (twist) { C.shearTop(waistY, topY, twist); for (const k in meta.limbs) { const q = meta.limbs[k]; if (q) meta.limbs[k] = [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]]; } }
   const twX = q => q && twist ? [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]] : q;
-  C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); C.outline(); silGlow(C, L, meta, view);
+  C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); rarityEdge(C, L, meta); C.outline(); silGlow(C, L, meta, view);
   const sx = q => q && [q[0] + DX, q[1] + DY], limbs = {}; for (const k in meta.limbs) limbs[k] = sx(meta.limbs[k]);   // Bildkoordinaten (Rahmen 40)
   const lnX = view === 'W' ? R.lean : 0, shL = q => q && [q[0] + lnX, q[1]];   /* Arme werden mit der Rumpfneigung verschoben gemalt — Waffe sitzt an der gemalten Hand */
   return { g: C.toG(), hand: plan ? sx(twX(shL(plan.h))) : null, off: plan ? sx(twX(shL(plan.off))) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
@@ -755,6 +765,7 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     else if (t === 'great') C.rows(hm, y0 - 2, [[13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'bascinet') C.rows(hm, y0 - 4, [[15, 16], [14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'kettle') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0 + 1, [[10, 21], [11, 20]], hx); }
+    else if (t === 'pot') { C.rows(hm, y0 - 3, [[12, 19], [12, 19], [12, 19], [12, 19]], hx); C.rows(hm, y0 + 1, [[11, 20]], hx); C.rect(hm, 20 + hx, y0 - 2, 21 + hx, y0 - 2); }   /* R2 improvisiert: Kochtopf mit Henkel */
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); if (!back) C.rect(hm, 15 + hx, y0 + 2, 16 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }
@@ -941,6 +952,7 @@ function headW(C, L, X, hx, hy, ids, meta) {
     else if (t === 'great') C.rows(hm, y0 - 2, [[13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'bascinet') C.rows(hm, y0 - 4, [[16, 17], [15, 18], [13, 18], [12, 19], [11, 19], [11, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'kettle') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0 + 1, [[10, 21], [11, 20]], hx); }
+    else if (t === 'pot') { C.rows(hm, y0 - 3, [[12, 19], [12, 19], [12, 19], [12, 19]], hx); C.rows(hm, y0 + 1, [[11, 20]], hx); C.rect(hm, 20 + hx, y0 - 2, 21 + hx, y0 - 2); }   /* R2 improvisiert: Kochtopf mit Henkel nach hinten */
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); C.rect(hm, 12 + hx, y0 + 2, 12 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }
@@ -1246,13 +1258,34 @@ function wear(C, L, M) {
     if (hsh(x, sd) > (w - 1) * 0.3) continue; let y = C.h - 1; while (y >= 0 && C.id[y * C.w + x] !== I.skirt) y--; if (y < 0) continue;
     for (const d of [0, 1]) { const i = y * C.w + x + d; if (C.id[i] === I.skirt) { C.col[i] = null; C.id[i] = -1; } } }
   if (w >= 2 && I.torso !== undefined) { const i = pick(I.torso, 7); if (i >= 0) for (const d of [0, 1, C.w, C.w + 1]) if (C.id[i + d] === I.torso) C.col[i + d] = mix(C.col[i + d], '#7a6a4c', 0.35); }   // Flicken
-  if (I.plate !== undefined || I.helm !== undefined) for (const pid of [I.plate, I.helm]) { if (pid === undefined || C.P[pid]?.mat !== 'metal') continue;
-    for (let k = 0; k < 1 + w; k++) { const i = pick(pid, 20 + k); if (i >= 0) { C.col[i] = mix(C.col[i], '#6a3a1e', 0.5); if (C.id[i + C.w] === pid) C.col[i + C.w] = mix(C.col[i + C.w], '#5a2e18', 0.45); } } }
+  /* R1 (08.10.2026, visual/ruestungen.md): Zustand am Metall lesbar — neu (wear 0) glänzt die Oberkante (Politur), ab 1 Dellen und Kratzer,
+     bei 3 Risse; Rost nach Metallart (Eisen braun, Messing/Bronze grünspanig). Kein neues Spec-Feld: alles aus wear und wseed. */
+  const brass = pid => { const c = C.P[pid]?.R?.b; if (!c || c[0] !== '#') return false; const n = parseInt(c.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return r > b + 40 && g > b + 15; };
+  const metal = [I.plate, I.helm, I.fauld, I.chainSkirt, ...(I.pauld || []), ...(I.tassets || [])].filter(pid => pid !== undefined && pid >= 0 && C.P[pid]?.mat === 'metal');
+  if (I.plate !== undefined || I.helm !== undefined) for (const pid of [I.plate, I.helm]) { if (pid === undefined || C.P[pid]?.mat !== 'metal') continue; const g = brass(pid);
+    for (let k = 0; k < 1 + w; k++) { const i = pick(pid, 20 + k); if (i >= 0) { C.col[i] = mix(C.col[i], g ? '#3e6a56' : '#6a3a1e', 0.5); if (C.id[i + C.w] === pid) C.col[i + C.w] = mix(C.col[i + C.w], g ? '#2e5a46' : '#5a2e18', 0.45); } } }
+  if (w === 0) for (const pid of metal) { let n = 0; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid && C.col[i] && (n++ & 1) === 0) C.col[i] = mix(C.col[i], '#fff6e0', 0.38); }   // Politur
+  if (w >= 1) for (const pid of [I.plate, I.helm, ...(I.pauld || [])]) { if (pid === undefined || pid < 0 || C.P[pid]?.mat !== 'metal') continue; const R0 = C.P[pid].R;
+    for (let k = 0; k < w; k++) { const i = pick(pid, 60 + k * 7); if (i < 0) continue; C.col[i] = R0.dk; if (C.id[i + C.w + 1] === pid) C.col[i + C.w + 1] = R0.sh; if (C.id[i - 1] === pid) C.col[i - 1] = R0.hi; } }   // Dellen, Kratzer
+  if (w >= 3) for (const pid of [I.plate, I.chainSkirt, I.helm]) { if (pid === undefined || pid < 0) continue; const i = pick(pid, 90); if (i < 0) continue;   // Riss
+    for (const d of [0, C.w, 2 * C.w + 1, 3 * C.w + 1]) if (C.id[i + d] === pid) C.col[i + d] = '#0e0c0c'; }
+  if (w >= 3 && I.tabard !== undefined) { const i = pick(I.tabard, 95); if (i >= 0) for (let s = 0; s < 5; s++) { const j = i + s * (C.w + 1); if (C.id[j] === I.tabard) C.col[j] = mix(C.col[j], '#0e0c0c', 0.65); } }   /* R4: zerrissener Wappenrock (Deserteure, Lumpen) */
   if (bl) for (let s = 0; s < bl * 2; s++) { const pid = [I.torso, I.skirt, I.legL][s % 3]; if (pid === undefined) continue; const i = pick(pid, 40 + s); if (i < 0) continue;
     for (const d of [0, 1, C.w]) if (C.id[i + d] >= 0 && C.id[i + d] < 999) C.col[i + d] = d === C.w ? '#3a0a0a' : '#5e1010';
     if (C.id[i + 2 * C.w] >= 0 && C.id[i + 2 * C.w] < 999) C.col[i + 2 * C.w] = '#3a0a0a'; }
 }
 
+/* R5 (08.10.2026): Rarität der Rüstung an der Kante, dezent und wie bei Waffen (steelOf) — selten Silbernieten, episch Goldkante,
+   legendär Goldkante + Gravur, mythisch blassblaue Kante + Gravur. L.rr 0–4 aus der seltensten Brust/Kopf-Rüstung (sprites.js). */
+const RR_COL = ['', '#c8ccd0', '#c8a050', '#e0b85a', '#a9d4e8'];
+function rarityEdge(C, L, M) {
+  const r = L.rr | 0; if (!r || !L.armor) return; const I = M.ids, col = RR_COL[Math.min(4, r)];
+  const pid = L.armor === 'plate' ? I.plate : L.armor === 'leather' ? I.jerkin : I.torso; if (pid === undefined || pid < 0) return;
+  const top = []; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid) top.push(i);
+  top.forEach((i, n) => { if (r === 1 ? n % 3 === 1 : true) C.col[i] = r === 1 ? col : mix(C.col[i], col, 0.75); });
+  if (r >= 3 && top.length) { const mid = top[top.length >> 1]; for (let s = 2; s <= 6; s++) { const j = mid + s * C.w; if (C.id[j] === pid) C.col[j] = mix(C.col[j], col, s % 2 ? 0.6 : 0.35); } }
+  if (r >= 2 && I.helm !== undefined && L.rr >= 2) { for (let i = C.w; i < C.col.length; i++) if (C.id[i] === I.helm && C.id[i + C.w] !== I.helm && C.col[i]) C.col[i] = mix(C.col[i], col, 0.55); }   // Helmrand
+}
 // ---- Rolle: Kugel (Umhang/Rock, Kopf eingezogen, Knie) — der Renderer dreht in 90°-Schritten ----
 export function paintTuckR(L) {
   const C = new Px(20, 20), X = looks(L), body = C.part(L.cloak || X.coat, 'cloth'), leg = C.part(X.pants, 'cloth'), hd = C.part(L.hood || L.hair, 'cloth');
@@ -1274,6 +1307,9 @@ const BEASTR = {
   mule:     { body: [32, 18, 11.5, 6], fx: 24, hx: 41, leg: 16, lw: 3, head: [13, 8, 3.4, 3.2], snout: 5, neck: 2, tail: 'long', ear: 'long', hoof: 1 },
   sheep:    { body: [31, 21, 12, 8], fx: 23, hx: 39, leg: 10, lw: 2.4, head: [16, 18, 3.4, 3.6], snout: 12, neck: 0, tail: 'stub', ear: 'side', wool: 1, darkLeg: 1, hoof: 1 },
   deer:     { body: [32, 18, 11, 5.4], fx: 25, hx: 39, leg: 19, lw: 2.4, head: [14, 11, 3.6, 3], snout: 8, neck: 2, tail: 'short', ear: 'long', antler: 1, rump: 1, hoof: 1 },
+  /* Stadttiere (08.10., Roadmap P1.x „Kinder/Tiere als Stadtbevölkerung“): Hofhund kleiner und satter als der wilde Hund, Katze flach und lang mit Fahnenschwanz */
+  dog:      { body: [31, 25, 9.5, 4.6], fx: 25, hx: 37, leg: 11, lw: 2.6, head: [19, 20, 3.6, 3.2], snout: 13.5, neck: 1, tail: 'sickle', ear: 'flop', collar: 1 },
+  cat:      { body: [31, 29, 8, 3.4], fx: 26, hx: 36, leg: 8, lw: 1.9, head: [21.5, 25.5, 3.2, 2.8], snout: 18.5, neck: 0, tail: 'cat', ear: 'cat' },
 };
 // S15 (Nutzer: „wenn man nach oben läuft, guckt das Pferd nicht nach oben“): Pferd von hinten (N) und von vorn (S).
 // Von vorn verdeckt der Kopf den Reiter; darum gibt es den Kopf als eigene Ebene (only = 'head'), der Rumpf kommt ohne Kopf.
@@ -1332,6 +1368,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   else if (T.tail === 'curl') C.limb(P.tail, [[tx, ty + 1], [tx + 3, ty - 1], [tx + 2, ty - 3]], 1.6, 1.4);
   else if (T.tail === 'long') { C.limb(P.tail, [[tx, ty - 1], [tx + 4, ty + 3 - s], [tx + 6, ty + 12 - s], [tx + 5, ty + 18 - s]], 4.5, 3); }
   else if (T.tail === 'tuft') { C.limb(P.tail, [[tx, ty], [tx + 2, ty + 6], [tx + 2, ty + 13]], 1.5, 1.4); C.ell(P.mane, tx + 2, ty + 14, 1.8, 2.2); }
+  else if (T.tail === 'cat') C.limb(P.tail, [[tx, ty], [tx + 3, ty - 3], [tx + 3, ty - 8 + s * 0.5], [tx + 1, ty - 10 + s]], 1.9, 1.5);   /* Katze: Schwanz hoch, Spitze nach vorn */
   else C.ell(P.tail, tx + 2, ty, 2.2, 1.8);
   C.ell(P.body, cx, cy, brx, bry);
   if (T.boxy) C.poly(P.body, [[cx - brx + 2, cy - bry + 0.5], [cx + brx - 1, cy - bry + 1.5], [cx + brx, cy + bry - 1], [cx - brx + 1, cy + bry - 0.5]]);   // Kuh: gerader Rücken, kantige Hüfte
@@ -1355,6 +1392,7 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   else if (T.ear === 'long') C.poly(P.ear, [[hx + 1, hy - hry + 1], [hx + 6, hy - hry - 2], [hx + 3, hy - hry + 2]]);
   else if (T.ear === 'round') C.ell(P.ear, hx + 2, hy - hry + 0.5, 1.8, 1.6);
   else if (T.ear === 'side') C.poly(P.ear, [[hx + 2, hy - hry + 2], [hx + 7, hy - hry + 1], [hx + 6, hy - hry + 3.5], [hx + 2, hy - hry + 4]]);
+  else if (T.ear === 'cat') { C.poly(P.ear, [[hx - 2, hy - hry + 1], [hx - 1.5, hy - hry - 2.5], [hx + 0.5, hy - hry + 0.5]]); C.poly(P.ear, [[hx + 0.5, hy - hry + 1], [hx + 2, hy - hry - 2.5], [hx + 3, hy - hry + 1]]); }
   else C.poly(P.ear, [[hx, hy - hry + 1], [hx + 2, hy - hry - 2], [hx + 3, hy - hry + 1]]);
   if (T.mane && type === 'horse') C.limb(P.mane, [[hx + 4, hy - 2], [cx - brx * 0.85 + 2, cy - bry - 4], [cx - brx * 0.4, cy - bry + 1]], 3, 2.4);   // Mähne auf dem Hals
   else if (T.mane) C.poly(P.mane, [[hx + 3, hy - 2], [hx + 7, hy - 3], [cx - brx * 0.5, cy - bry - 1], [cx - brx * 0.2, cy - bry + 1], [hx + 6, hy + 3]]);
@@ -1373,10 +1411,70 @@ export function paintBeastR(type, pal, frame, act, ramp) {
   if (T.patches || pal.patches) for (const [dx, dy, r] of [[-6, -3, 3.2], [5, -1, 2.6], [1, 3, 2.2], [9, -4, 1.8]]) for (let y = -r; y <= r; y += 1.25) for (let x = -r * 1.3; x <= r * 1.3; x += 1.25) if ((x / 1.3) ** 2 + y ** 2 <= r * r && Cx.at(Math.floor((cx + dx + x) * k), Math.floor((cy + dy + y) * k)) === P.body) set(cx + dx + x, cy + dy + y, pal.patches ? (x + y < 0 ? D.sh : D.b) : (x + y < 0 ? '#ece4d4' : '#c8c0b0'));   // Kuh: weiße Flecken / Schecke (pal.patches): braune Platten
   if (type === 'horse') { for (let y = hy - 1; y <= hy + 2; y += 1.25) set(hx - 1, y, '#e8e0d0'); }                                   // Blesse
   if (T.rump) for (let y = -2; y <= 2; y += 1.3) set(cx + brx - 1.5, cy + y, '#e0d4bc');
+  if (T.collar) for (let y = 0; y <= 3; y += 1.25) set(hx + 3.6, hy + 1 + y, '#8a2a20');   /* Hofhund: Halsband — gehört jemandem */
+  if (type === 'cat') { set(sn + 0.5, hy + 0.8, '#c88a80'); for (const dx of [3, 6]) set(cx - 2 + dx, cy - 1.5, D.b); }   /* Katze: rosa Nase, Tigerstreifen */
   if (type === 'wolf' || type === 'wild_dog') {                     /* Artist Runde 2: dunkler Sattel auf dem Rücken, Brauenschatten — Wolf hebt sich vom Boden ab */
     const W0 = Cx.w; for (let x = 0; x < W0; x++) { let y = 0; while (y < Cx.h && Cx.id[y * W0 + x] !== P.body) y++; if (y >= Cx.h - 2) continue;
       for (let d = 1; d <= 2; d++) { const i = (y + d) * W0 + x; if (Cx.id[i] === P.body) Cx.col[i] = d === 1 ? mix(D.b, F.sh, 0.3) : mix(F.sh, D.b, 0.4); } }
     set(hx - hrx * 0.35, hy - 2.2, D.dk); set(hx - hrx * 0.35 + 1.3, hy - 2.2, D.sh); set(hx - hrx * 0.35, hy - 1, eye); }
   if (type === 'wolf') for (let i = 0; i < 4; i++) set(cx - 6 + i * 4, cy - bry + 1.3, F.hi);
+  Cx.outline(); return Cx.toG();
+}
+/* Stadttiere (08.10.): Hund und Katze von vorn (S) und hinten (N) — Brust/Kruppe, zwei sichtbare Beinpaare im Wechselschritt, Kopf vorn bzw. dahinter. */
+const PET_NS = { dog: { cy: 28, brx: 6.2, bry: 5, hr: 3.9, leg: 7, lw: 2.6, ear: 'flop', tail: 'sickle' }, cat: { cy: 31, brx: 4.2, bry: 3.4, hr: 3, leg: 5, lw: 1.8, ear: 'cat', tail: 'cat' } };
+export const PET_NS_TYPES = new Set(Object.keys(PET_NS));
+export function paintPetNSR(type, pal, frame, view, ramp) {
+  const T = PET_NS[type] || PET_NS.dog, Cx = new Px(BRW, BRH), k = 0.8;
+  const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
+    limb: (p, pts, w0, w1) => Cx.limb(p, pts.map(([x, y]) => [x * k, y * k]), Math.max(1.4, w0 * k), Math.max(1.2, (w1 ?? w0) * k)) };
+  const F = ramp(pal.body || '#7a5a3a'), D = ramp(pal.dark || '#3a2a1e'), eye = pal.eye || '#2a1a10', s = [1, 0, -1, 0][frame & 3], cx = 30, cy = T.cy, ground = 37;
+  const P = { far: C.part(dimR(F, 0.3), 'cloth'), body: C.part(F, 'cloth', { grp: 'b' }), near: C.part(F, 'cloth'), head: C.part(F, 'cloth', { grp: 'h' }), ear: C.part(D, 'cloth'), tail: C.part(F, 'cloth'),
+    muzzle: C.part(ramp(mix(pal.body || '#7a5a3a', '#d8c8b0', 0.45)), 'skin', { grp: 'h' }) };
+  const legs = (pid, dx, ph) => [-1, 1].forEach(sd => { const lift = sd * ph * s > 0 ? 1.5 : 0, x = cx + sd * dx; C.limb(pid, [[x, cy + 1], [x, ground - lift]], T.lw, T.lw * 0.85); C.ell(pid, x, ground - lift, T.lw * 0.6, 0.9); });
+  const ears = (hy) => { if (T.ear === 'cat') { C.poly(P.ear, [[cx - 2.8, hy - 1], [cx - 2.4, hy - T.hr - 2.5], [cx - 0.6, hy - T.hr + 0.5]]); C.poly(P.ear, [[cx + 2.8, hy - 1], [cx + 2.4, hy - T.hr - 2.5], [cx + 0.6, hy - T.hr + 0.5]]); }
+    else { C.ell(P.ear, cx - T.hr, hy + 0.5, 1.3, 2.4); C.ell(P.ear, cx + T.hr, hy + 0.5, 1.3, 2.4); } };
+  const hy = cy - T.bry - T.hr * 0.6;
+  if (view === 'N') {                                                 // von hinten: Kopf dahinter, Kruppe, Hinterbeine, Schwanz
+    C.ell(P.head, cx, hy, T.hr, T.hr * 0.9); ears(hy); legs(P.far, T.brx * 0.45, -1); C.ell(P.body, cx, cy, T.brx, T.bry); legs(P.near, T.brx * 0.7, 1);
+    if (T.tail === 'cat') C.limb(P.tail, [[cx, cy - T.bry + 1], [cx + s * 0.8, cy - T.bry - 4], [cx + 1.5 + s, cy - T.bry - 8]], 1.9, 1.4);
+    else C.limb(P.tail, [[cx, cy - T.bry + 1], [cx + s * 1.5, cy - T.bry - 3], [cx + s * 2.5, cy - T.bry - 5]], 2.2, 1.6);   // Rute wedelt
+  } else {                                                            // von vorn: Brust, Vorderbeine, Kopf davor
+    legs(P.far, T.brx * 0.45, -1); C.ell(P.body, cx, cy, T.brx * 0.9, T.bry); legs(P.near, T.brx * 0.55, 1);
+    C.ell(P.head, cx, hy, T.hr, T.hr * 0.9); ears(hy); C.ell(P.muzzle, cx, hy + T.hr * 0.45, T.hr * 0.55, T.hr * 0.4);
+  }
+  Cx.shade();
+  const set = (x, y, c) => Cx.set(x * k, y * k, c);
+  if (view !== 'N') { set(cx - T.hr * 0.45, hy - 0.6, eye); set(cx + T.hr * 0.45, hy - 0.6, eye); set(cx, hy + T.hr * 0.25, type === 'cat' ? '#c88a80' : '#0d0b0a');
+    if (type === 'dog') for (let x = -2; x <= 2; x += 1.25) set(cx + x, hy + T.hr + 0.6, '#8a2a20'); }   // Augen, Nase, Halsband
+  Cx.outline(); return Cx.toG();
+}
+/* Stadttiere (08.10.): Huhn — eigener Zweibeiner, Seite (Blick links), vorn, hinten. Kamm und Kehllappen rot, Schnabel und Füße gelb; pickt im Stand (frame 3). */
+export function paintFowlR(pal, frame, view, act, ramp) {
+  const Cx = new Px(BRW, BRH), k = 0.8;
+  const C = { part: (...a) => Cx.part(...a), poly: (p, pts) => Cx.poly(p, pts.map(([x, y]) => [x * k, y * k])), ell: (p, x, y, rx, ry) => Cx.ell(p, x * k, y * k, rx * k, ry * k),
+    limb: (p, pts, w0, w1) => Cx.limb(p, pts.map(([x, y]) => [x * k, y * k]), Math.max(1, w0 * k), Math.max(1, (w1 ?? w0) * k)) };
+  const F = ramp(pal.body || '#b8743a'), D = ramp(pal.dark || '#5a3418'), eye = pal.eye || '#1a120c', s = act ? 0 : [1, 0, -1, 0][frame & 3], peck = !act && frame === 3 ? 3 : 0;
+  const P = { leg: C.part(ramp('#c8a040'), 'skin'), tail: C.part(D, 'cloth'), body: C.part(F, 'cloth', { grp: 'b' }), wing: C.part(dimR(F, 0.18), 'cloth', { grp: 'b' }), head: C.part(F, 'cloth', { grp: 'h' }),
+    comb: C.part(ramp('#b02a20'), 'skin'), beak: C.part(ramp('#d8b040'), 'bone') };
+  const cx = 30, cy = 30, ground = 37;
+  const leg = (x, lift) => { C.limb(P.leg, [[x, cy + 2], [x, ground - lift]], 1.1); C.limb(P.leg, [[x - 1.5, ground - lift], [x + 1.5, ground - lift]], 1); };
+  if (view === 'W') {
+    leg(cx + 1 - s, s > 0 ? 1 : 0); leg(cx - 1 + s, s < 0 ? 1 : 0);
+    C.poly(P.tail, [[cx + 3, cy - 1], [cx + 8, cy - 7], [cx + 9, cy - 3], [cx + 6, cy + 2]]);
+    C.ell(P.body, cx, cy, 5.2, 4); C.ell(P.wing, cx + 1, cy - 0.5, 3.4, 2.4);
+    const hx = cx - 4 - peck * 0.7, hy = cy - 5 + peck * 1.6;
+    C.limb(P.head, [[cx - 2.5, cy - 2], [hx, hy]], 3, 2.6); C.ell(P.head, hx, hy, 2.2, 2.1);
+    C.poly(P.comb, [[hx - 1.5, hy - 1.8], [hx - 0.8, hy - 3.6], [hx + 0.2, hy - 2.4], [hx + 1, hy - 3.6], [hx + 1.6, hy - 1.6]]); C.ell(P.comb, hx - 1.2, hy + 2, 0.8, 1.2);
+    C.poly(P.beak, [[hx - 1.8, hy - 0.5], [hx - 4, hy + 0.4], [hx - 1.8, hy + 1]]);
+    Cx.shade(); Cx.set((hx - 0.6) * k, (hy - 0.6) * k, eye);
+  } else {
+    leg(cx - 1.6, s > 0 ? 1 : 0); leg(cx + 1.6, s < 0 ? 1 : 0);
+    if (view === 'N') { C.ell(P.head, cx, cy - 6, 2.1, 2); C.poly(P.comb, [[cx - 1, cy - 7.5], [cx, cy - 9.5], [cx + 1, cy - 7.5]]); C.ell(P.body, cx, cy, 4.4, 4.2);
+      C.poly(P.tail, [[cx - 2.5, cy - 2], [cx - 3, cy - 7], [cx, cy - 5], [cx + 3, cy - 7], [cx + 2.5, cy - 2]]); }
+    else { C.ell(P.body, cx, cy, 4.2, 4.2); C.ell(P.wing, cx - 3, cy, 1.4, 2.6); C.ell(P.wing, cx + 3, cy, 1.4, 2.6);
+      const hy = cy - 5 + peck * 1.4; C.ell(P.head, cx, hy, 2.2, 2.1); C.poly(P.comb, [[cx - 1, hy - 1.5], [cx, hy - 3.6], [cx + 1, hy - 1.5]]);
+      C.poly(P.beak, [[cx - 0.9, hy + 0.4], [cx + 0.9, hy + 0.4], [cx, hy + 1.8]]); C.ell(P.comb, cx, hy + 2.6, 0.8, 0.9); }
+    Cx.shade(); if (view === 'S') { const hy = cy - 5 + peck * 1.4; Cx.set((cx - 1.2) * k, (hy - 0.4) * k, eye); Cx.set((cx + 1.2) * k, (hy - 0.4) * k, eye); }
+  }
   Cx.outline(); return Cx.toG();
 }
