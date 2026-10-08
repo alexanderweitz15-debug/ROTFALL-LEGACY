@@ -111,7 +111,7 @@ Zentrale Abhängigkeiten:
 **Abnahme:** Im Einflug sind immer mindestens Reisende oder Karawane sichtbar; Skip per Esc ohne Folgefehler; kein erneutes Abspielen nach Load.
 
 
-**Stand 08.10. (Claude):** Einflug zeigt einen echten Reisenden/eine Karawane, wenn im Umkreis von 220 Feldern unterwegs; Prolog hat eigene Kamerafahrten. **Fehlt:** Reisende erzwingen, wenn keiner in der Nähe ist (Abnahme „immer sichtbar“ noch nicht erfüllt).
+**Stand 08.10. (Claude):** Einflug zeigt einen echten Reisenden/eine Karawane, wenn im Umkreis von 220 Feldern unterwegs; Prolog hat eigene Kamerafahrten. ✔ (später am 08.10.) Ist keiner unterwegs, geht ein flüchtiger Wanderer zwischen Startpunkt und Stadt los und wird gezeigt — Abnahme „immer sichtbar“ erfüllt; alle Einstellungen schwenken, „Weiter“ von Hand. **Fehlt:** nichts (🔍 ansehen).
 #### P0.3 Erste Wege/Ziele als Denkansätze (◐)
 
 **Ziel (§8):** Keine „Gehe zu Punkt A"-Anweisung. Mögliche Richtungen als Denkansätze: große Stadt in der Ferne, Schmiede, Straße mit Reisenden, gefährliches Gebiet, Markt, Taverne, Ruine, Fraktion, Händler, sichtbares Ereignis. Spieler fragt sich: „Was davon interessiert mich?" Botschaft: ROTFALL gibt Möglichkeiten, nicht nur eine Questliste.
@@ -148,6 +148,8 @@ Zentrale Abhängigkeiten:
 
 **Restprüfung (Abnahme §51 Kampf):** Nahkampf, Projektile, Magie, AOE (soweit mechanisch vorgesehen) und NPC-Angriffe in einem Probelauf durchgehen; Ausnahme „Dampframme" bewusst dokumentiert.
 
+**Stand 08.10. (Claude):** Durchsicht aller Schadensstellen: Nahkampf, Fähigkeiten und Gegnerschläge laufen über `hit()` (Wandprüfung ✔), Pfeile/Zauber prallen ab (✔), Explosionen (`blastEnd`) über `hit()` (✔). 🐞→✔ Neun Flächenfähigkeiten gingen direkt über `hurt()` und trafen durch Wände: Seelenernte, Leichenbersten, Rote Ernte, Schrottbombe, Dodons Echo, Stille Hand, Entfesseln, Bannkreis gegen Untote und die Glutaura des Aschdämons — jetzt mit `clearLine`. Gift/Blutung (Zeitschaden) bewusst ohne Wandprüfung. **Fehlt:** eigene Probe für Flächen hinter Wänden (🔍).
+
 #### P0.6 Gebäude-Eingänge und -Transparenz (◐)
 
 **Ziel (§33–35):** Tür muss zur tatsächlichen Zugangsrichtung passen. Jedes betretbare Gebäude hat definierten Eingang, Eingangsrichtung, Innen-/Außenposition, Zugangspunkt, Exit-Punkt. NPCs betreten über die echte Tür. Gebäude werden positionsabhängig transparent (hinter/seitlich ≈ 40–60 %, davor normal), damit man jederzeit sieht, wo man steht, wo NPCs sind, wo der Eingang ist.
@@ -162,7 +164,7 @@ Zentrale Abhängigkeiten:
 **Abnahme (§51 Gebäude):** Eingang stimmt mit Sprite überein, NPC nutzt die tatsächliche Tür, Spieler kann betreten, Transparenz greift bei Bedarf, keine Bewegung durch Wände.
 
 
-**Stand 08.10. (Claude):** ✔ Ursache gefunden: benannte NPCs standen immer 2 Felder unter dem Haus, auch bei W/O/N-Türen — jetzt `doorFront` in Türrichtung (auch Feldlager). **Fehlt:** Siedlungsgebäude prüfen; an einem Haus mit Seitentür ansehen (🔍).
+**Stand 08.10. (Claude):** ✔ Ursache gefunden: benannte NPCs standen immer 2 Felder unter dem Haus, auch bei W/O/N-Türen — jetzt `doorFront` in Türrichtung (auch Feldlager). ✔ Siedlungsgebäude geprüft: Bauten der eigenen Siedlung (`BUILDINGS`, kind 'building') sind Bild + Kollision ohne Innenraum — keine Tür, also kein Türfehler möglich; begehbare Siedlungshäuser wären ein neues Paket (→ P1.x „Siedlung als Stadt“). **Fehlt:** an einem Haus mit Seitentür ansehen (🔍).
 ---
 
 ### P1 — Weltqualität
@@ -211,7 +213,7 @@ Wer wohnt wo, und warum dort? Heute: `spawnResidents`/`residentPlan` verteilt na
 - **Tod eines Mitglieds erzeugt keine kaputten Referenzen**
 
 
-**Stand 08.10. (Claude):** ✔ Haushalt = wer im selben Wohnhaus schläft (abgeleitet bei jedem Laden, nichts im Spielstand): Familienname, Rollen, Paare, 0–2 Kinder je Paar unter 45 (Kinder als eigener NPC-Typ, unangreifbar, schlafen im Haus, spielen vor der Tür, gehen mit der Mutter zum Markt), Familie isst abends am Tisch, „Wer wohnt bei dir?“. ✔ Absturz bei neuem Spiel behoben (Kind ohne Mutter). **Fehlt:** Eltern reagieren auf Gefahr (Kinder ins Haus holen), Familienmitglieder sprechen miteinander (eigene Gesprächszeilen), Großeltern, Trauer beim Tod eines Mitglieds.
+**Stand 08.10. (Claude):** ✔ Haushalt = wer im selben Wohnhaus schläft (abgeleitet bei jedem Laden, nichts im Spielstand): Familienname, Rollen, Paare, 0–2 Kinder je Paar unter 45 (Kinder als eigener NPC-Typ, unangreifbar, schlafen im Haus, spielen vor der Tür, gehen mit der Mutter zum Markt), Familie isst abends am Tisch, „Wer wohnt bei dir?“. ✔ Absturz bei neuem Spiel behoben (Kind ohne Mutter). ✔ (später 08.10.) Familienmitglieder reden miteinander (Eltern–Kind, Paar, Geschwister; Umgebungsszene); bei Gefahr im Ort sind alle samt Kindern im Haus (bestehende Gefahr-Regel im Tagesplan gilt auch für Kinder). **Fehlt:** Großeltern, Trauer beim Tod eines Mitglieds, Kinder laufen der Mutter sichtbar hinterher (heute: gleiche Ziele).
 #### P1.11 Wohnraum (◐)
 
 Kapazitätsstufen laut Spec:
@@ -224,7 +226,9 @@ Ausstattung als Familienhinweis: mehrere Betten, Kinderbett, größerer Tisch, m
 
 
 **Stand 08.10. (Claude):** ✔ Betten nach Hausgröße (Haus 2–3, Kate 2, Herrenhaus bis 5, Fischerhaus 2), Kinderlager/Strohsack als eigenes Möbel. **Fehlt:** Spielzeug, größerer Familientisch, Familienhaus-Typ mit mehreren Räumen.
-#### P1.12 Marktplätze skalieren (☐)
+#### P1.12 Marktplätze skalieren (◐)
+
+**Entwickler 08.10. (dringend):** „Varonheim ist immer noch viel zu überfüllt, da sind locker wieder 200 NPCs am Marktplatz — guck, dass die sich mehr verteilen.“ und „Es gibt keine Marktplätze in Varon.“ → Agent Städte arbeitet daran (Messung: Fest = ganze Stadt am Feuer, mittags/17 Uhr alle ohne Arbeit auf den einen Platz).
 
 Problem: bis ~100 NPCs auf einem kleinen Platz. **Nicht durch Tricks kaschieren**, sondern räumlich lösen. Drei Hebel (§18):
 - A: größerer Platz
@@ -235,11 +239,17 @@ Problem: bis ~100 NPCs auf einem kleinen Platz. **Nicht durch Tricks kaschieren*
 
 **Abnahme (§51 Städte):** 100 NPCs entstehen nicht unkontrolliert auf einem Punkt; Marktplatz bleibt begehbar; NPCs verteilen sich auf mehrere soziale Räume; Performance akzeptabel.
 
+**Stand 08.10. (Agent):** Hebel B + C gebaut. Varonheim: drei Märkte mit Ständen und Schild (Hauptmarkt 8 Stände, Lebensmittelmarkt W 5 Stände + Brunnen, Handwerksmarkt SO 4 Stände + Waffenstand/Amboss; world.js `buildCapital`, nur freie Wiese gepflastert, kein rnd()); `planSocial` (game.js) gibt jedem Bewohner den Markt seines Viertels; `dayTargetRaw`: mittags Schenke/Treffpunkt/daheim/Markt, 16:30–18 jeder Zweite am Treffpunkt; Fest: jeder Zweite ans Hauptfeuer (⚖ höchstens 24), die anderen auf dem Viertelmarkt/in der Schenke/am Treffpunkt, nie auf dem Hauptplatz. **Messung Varonheim Hauptmarkt, Bewohnerziele im Umkreis 8 (Umkreis 15), Friedenstag:** vorher 8 Uhr 5 (17) · 10 Uhr 5 (26) · 12 Uhr **36 (126)** · 15 Uhr 7 (35) · 17 Uhr 15 (58) · 19 Uhr 0 (5) · Fest **173**; nachher 6 (22) · 7 (30) · **9 (23)** · 5 (23) · 6 (24) · 0 (5) · Fest **26** (alle Figuren inkl. Garde/Hof an echten Plätzen: mittags 14, Fest 29). Nebenmärkte höchstens 14. Salzhafen mittags 42 → 18, Fest 57 → 28; Aurelheim Fest 254 → 25. Probe „Planlauf P1.12“, Debug „Stadt: Marktdichte 8–19 Uhr“.
+**Fehlt:** Hebel A (größere Plätze) nicht nötig; Hafen-/Nachbarschaftsmärkte in Salzhafen/Nordfurt (dort nur zeitliche Verteilung); ⚖ FEST_CAP 24, Mittags-Drittelung.
+
 #### P1.13 NPC-Dichte und Bewegungsströme (◐)
 
 Ströme laut Spec: Haus→Arbeit, Arbeit→Markt, Markt→Zuhause, Arbeit→Taverne, Haus→Tempel, Händler→Markt, Reisende→Gasthaus, Wachen→Straßen/Plätze. Nutzen: Atmosphäre, Navigation, Simulation, Performance, Glaubwürdigkeit.
 
 **Stand:** Tagesabläufe je Beruf vorhanden. **Fehlt:** Treffpunkte Brunnen/Tempel/Tor/Trainingsplatz. Weitere soziale Räume (§46): Taverne, Schmiede, Hafen, Handwerksviertel, Wohnviertel, Handelsstraße, Nachbarschaftsplatz.
+
+**Stand 08.10. (Agent):** Treffpunkte gebaut (`meetSpots`/`planSocial`, game.js): Brunnen/Fontäne, Tempel (Kapellentür, Schrein, Altar), Tor (Wachposten, Torbanner/-räder), Übungsplatz (Waffenständer, Kaserne), Schenkentür — je Ort 2 (Dorf) bis 23 (Varonheim). Jeder Bewohner hat den nächsten Treffpunkt nach Beruf/Alter (höchstens 40 Kacheln), geht mittags, nachmittags (Block `am`) und 16:30–18 hin; dort eigene Gesprächszeilen; Infofeld „trifft sich am …“. Probe „Planlauf P1.13“, Debug „Stadt: Treffpunkte zeigen“.
+**Fehlt:** Ströme Reisende→Gasthaus und Wachen→Straßen unverändert; Hafen und Handelsstraße als eigene Räume; Kinder nutzen noch den Markt der Mutter, keinen eigenen Treffpunkt.
 
 **Stadtplanungs-Check (§47):** Verhältnis Gebäudegröße/NPC-Zahl, Straßenbreite, Platzgröße, Türpositionen, Laufwege, Märkte, Wohn-/Arbeits-/Handelsviertel, Treffpunkte, Dichte. Städte funktional beurteilen, nicht nur optisch.
 
@@ -247,6 +257,7 @@ Ströme laut Spec: Haus→Arbeit, Arbeit→Markt, Markt→Zuhause, Arbeit→Tave
 
 | Punkt | Detail | Quelle |
 |---|---|---|
+| **Berufe erkennbar, besondere NPCs stechen heraus (Entwickler 08.10., neu)** | „Man soll besser die verschiedenen Berufe erkennen können. Besondere NPCs sollen herausstechen.“ Je Beruf ein klares Merkmal in der Silhouette (Schürze+Hammer Schmied, Mehlschürze Bäcker, Kutte Priester, Kiepe Händler, Bogen/Fell Jäger …), Händler mit Ware in der Hand; benannte Figuren/Questgeber/Story-NPCs mit stärkerer Kleidung, Farbe, Haltung, ggf. dezenter Aura/Namenszug — ohne Questmarker-Flut. → Agent Figuren, nach der Kampfanimation | Spec Welt §40–44, STYLE_GUIDE |
 | NPC-Visuals Rest | Sprechblasen vereinheitlichen (N1), Stimmungs-Idle (N4), Symbolsatz (🔶 E13) | visual/npcs.md |
 | Begehbare Zelte | Lager, Banden, Pilger, Garnison | §5g.4 / T21 |
 | NPCs mit eigenen Zielen | Händler wechselt Route, Hauptmann desertiert, Abwanderung, Kriegsmüdigkeit (APPROVED, 4 Fragen 🔶 E21) | PROPOSALS/npc_eigene_ziele |
@@ -572,9 +583,9 @@ Fall Aurelions als Weltereignis (T40/§5g.8) · Kriegsgraph mit Aurelion/Diploma
 Gast-Handel per Dock (Adapter tradeUI ↔ shopData; **BLOCKIERT**) · HB-30 · Ersatz-Lebensbalken beim Gast · Live-Test Kampfanimation/Klänge/Fenster · Aufladen des schweren Hiebs für Gäste · Gäste immer Mensch (🔶 E17).
 
 ### Technik (☐)
-- Toter Code: SC-01 `buildVaronburgOld`, SC-03 ohne Debug
-- SW-01: `.find(...).name` ohne `?.` (6 Stellen); SW-02: Probe schreibt `ITEMS.__wall`
-- RB-028 deleteSlot, RB-012, RB-033 (🔶 E31), RB-059 Nachmessung
+- ✔ 08.10. (Claude) SC-01 `buildVaronburgOld` entfernt (36 Zeilen); ✔ SC-03 Debug „Varon: Diener-Schmuggel“; ✔ RB-028 `deleteSlot` verwirft ein ausstehendes Speichern des gelöschten aktiven Platzes (landete sonst im Legacy-Platz)
+- ✔ 08.10. (Claude) SW-01: 7 Stellen `AUREL_HOUSES/COUNCIL.find(...).name` mit `?.` und Ersatznamen; SW-02: Probe räumt `ITEMS.__wall` jetzt per try/finally
+- RB-012 Kutschen-Probe, RB-033 (🔶 E31), RB-059 Nachmessung
 - Musik je Region (sfx.js ohne music)
 - Touch auf Gerät; Tastenbelegung
 - Doppelte Bodenauflösung (🔶 E28)
@@ -614,7 +625,11 @@ Legende: **✔** fertig gebaut (Selbsttest grün) · **🔍** muss geprüft werd
 | 08.10. | P0.1/P0.3 Prolog „Die Aschenfurt“ (Entwicklerwunsch: eigenes Startgebiet) | ✔ 🔍 ⚖ | Eigene Karte (60×44, flüchtig) mit Kamerafahrten (Intro, Gräber, Gesandte, Abschied), 8 erlebte Schritte (Bewegen, Ansprechen, Durchsuchen, Menüs I/C/M, Kampf gegen 2 Untote, Aufheben, Spielziel von Oswin, Wahl). Wahl nutzt die bestehenden Fraktions-Starts: Krone → Valen/Varonheim, Stille → Untote/Vharnholm als Lebender, ohne Herrn → Menü-Start + Titel. Kein Tod im Prolog. Laden mitten im Prolog baut die Karte neu. Live geprüft bis „Tote“-Start. 🔍 einmal komplett selbst spielen (Texte, Tempo, Kamera). ⚖ alle Texte, Figuren (Oswin, Gerold, Ysolde, Mara), Ruf-Zahlen des Rebellen-Wegs. Offen: Schalter „Prolog überspringen“ im Erstellungsfenster (heute: „»“ im Prolog) |
 | 08.10. | Prolog-Schalter + Absturz neues Spiel | ✔ | Erstellungsfenster: Häkchen „Prolog spielen“. 🐞→✔ Bei manchen Weltsamen brach ein neues Spiel in `planHomes` ab (Untermieter verschoben die Paar-Erkennung → Kind ohne Mutter); Paar wird jetzt vor dem Einzug der Untermieter festgelegt. Neues Spiel mit neuem Samen geprüft |
 | 08.10. | Kamerafahrten + Cache v25 | ✔ 🔍 | „Weiter“ von Hand (Knopf/Leertaste/Enter/E, Esc = alles), Schwenks statt Standbilder, Nahaufnahmen (Oswin, jeder Gesandte mit Namenskarte und Satz), Kampf-Auftakt mit Totenlicht; Einflug schwenkt. Schwierigkeit erklärt (Oswin, Protokoll, Ratgeber). 🐞→✔ Nutzer landete trotz Prolog in Varonheim: Browser lud alte Module (Cache v24) — Schlüssel auf v25. 🔍 Kamerafahrten selbst ansehen. Offen: Schalter „Kamerafahrten automatisch“ im Optionen-Fenster (heute nur Debug) |
+| 08.10. | P0.2 Reisender erzwingen + P0.5 Flächen durch Wände | ✔ 🐞→✔ | Einflug: ist kein Reisender in der Nähe, geht ein flüchtiger Wanderer zur Stadt und wird gezeigt. Neun Flächenfähigkeiten (Seelenernte, Leichenbersten, Rote Ernte, Schrottbombe, Dodons Echo, Stille Hand, Entfesseln, Bannkreis, Glutaura) trafen durch Wände — jetzt `clearLine`. Offen: Probe für Flächen hinter Wänden |
+| 08.10. | P1.10 Familiengespräche + Technik | ✔ | Umgebungsszene „family“ in `ambientTick`; Debug „Stadt: Familiengespräch“. Technik: SC-01 toter Code weg, SC-03 Debug Diener-Schmuggel, SW-01 7× `?.name`, SW-02 try/finally, RB-028 deleteSlot verwirft ausstehendes Speichern. P0.6 Siedlungsgebäude geprüft (keine Türen, kein Fehler) |
 | 08.10. | P1.8 Rollen je Ort (Agent) | ✔ ⚖ | `roleOf`/`townRoles`, Infofeld „Rolle“, „Auftrag“ im Infofeld nur bei echten Gebern (vorher bei jedem Beruf mit Vertragsart), Debug Soll/Ist, Probe grün (Selbsttest 490/490). ⚖ Soll-Anteile 15/25/20/15/10/10/5 %. Messbericht: Familie+Mitarbeiter 75–90 % der Städte, Geber 2–6 %, Reisende ≈ 0 |
+| 08.10. | P1.12 Märkte Varonheim + Verteilung (Agent) | ✔ 🔍 ⚖ | Drei Märkte mit Ständen (Haupt-, Lebensmittel-, Handwerksmarkt), Bewohner auf den Markt ihres Viertels, mittags/früher Abend verteilt, Fest nur jeder Zweite (höchstens 24) am Hauptfeuer. Varonheim Hauptmarkt Umkreis 8: mittags 36 → 9, 17 Uhr 15 → 6, Fest 173 → 26 (alle Figuren an echten Plätzen: 14 bzw. 29). Salzhafen mittags 42 → 18. Selbsttest 492/492. 🔍 Varonheim mittags und am Festabend ansehen. ⚖ FEST_CAP 24, Mittags-Drittelung, Schwelle 30 |
+| 08.10. | P1.13 Treffpunkte (Agent) | ✔ 🔍 ⚖ | Brunnen, Tempel, Tor, Übungsplatz, Schenkentür je Ort; Bewohner nach Beruf/Alter am nächsten Treffpunkt (≤ 40 Kacheln), eigene Gesprächszeilen, Infofeld „trifft sich am …“. 🔍 Brunnen/Tor einer Stadt am Nachmittag ansehen. ⚖ Zuordnung Beruf → Treffpunkt |
 
 ---
 

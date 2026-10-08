@@ -18,7 +18,8 @@ export function slotIndex() {
 }
 function saveIndex(idx) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(idx)); } catch (e) { /* Übersicht ist nur Komfort */ } }
 export function newSlot(mode) { const id = (mode === 'coop' ? 'c' : 's') + Date.now().toString(36); const idx = slotIndex(); idx[id] = { id, mode, at: Date.now() }; saveIndex(idx); return id; }
-export function deleteSlot(id) { localStorage.removeItem(slotKey(id)); UNZ.delete(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
+export function deleteSlot(id) { if (SLOT === id) { clearTimeout(saveTimer); saveTimer = 0; saveGen++; }   /* RB-028: ausstehendes Speichern des gelöschten Platzes verwerfen (landete sonst nach setSlot im Legacy-Platz) */
+  localStorage.removeItem(slotKey(id)); UNZ.delete(slotKey(id)); const idx = slotIndex(); delete idx[id]; saveIndex(idx); if (SLOT === id) setSlot('legacy'); }
 /* Entwickler 03.10. (Fraktions-Starts): Wer den höchsten Rang einer Fraktion erreicht, schaltet sie für ALLE Spielstände als Start frei.
    Eigener Schlüssel neben dem Slot-Index, nie im Spielstand. key nur für Proben (Wegwerf-Schlüssel). */
 export const STARTS_KEY = 'rotfall.starts';
