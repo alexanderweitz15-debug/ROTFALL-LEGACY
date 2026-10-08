@@ -1325,8 +1325,8 @@ function planHomes() {
     /* 1. Wer in einem Wohnhaus gemeldet ist, schläft dort */
     for (const c of list) { c.sleepId = null; c.bedAt = null; c.household = null; c.pallet = false; const h = HB_ID.get(c.homeId); if (h && DWELL.has(h.type)) take(c, h); }
     /* 2. Paare unter 45 bekommen 0–2 Kinder — Bett oder Kinderlager wird vor den Untermietern reserviert */
-    const kidBeds = new Map();
-    for (const [hid, ms] of occ) { const pr = pairOf(ms); if (!pr) continue; const pAge = Math.min(pr[0].age || 30, pr[1].age || 30); if (pAge >= 45) continue;
+    const kidBeds = new Map(), pairs = new Map();   /* Paar vor dem Einzug der Untermieter festlegen — sonst Kind ohne Mutter (Absturz bei neuem Spiel) */
+    for (const [hid, ms] of occ) { const pr = pairOf(ms); pairs.set(hid, pr); if (!pr) continue; const pAge = Math.min(pr[0].age || 30, pr[1].age || 30); if (pAge >= 45) continue;
       const want = hHash(hid + 'k') % 3, L = []; for (let i = 0; i < want; i++) { const at = free.get(hid).shift() || pallet(HB_ID.get(hid), true); if (at) L.push(at); } kidBeds.set(hid, L); }
     /* 3. Übrige schlafen im nächsten Wohnhaus mit freiem Bett (Untermieter), höchstens 60 Felder weit */
     for (const c of list) if (!c.sleepId) { const h = HB_ID.get(c.homeId) || { x: c.x / TS, y: c.y / TS };
@@ -1345,7 +1345,7 @@ function planHomes() {
     }
     /* 5. Haushalte: wer im selben Wohnhaus schläft — Rollen, Kinder, gemeinsames Abendessen */
     for (const [hid, ms] of occ) {
-      const name = SURNAMES[hHash(hid) % SURNAMES.length], pr = pairOf(ms), [man, wife] = pr || [], pAge = pr ? Math.min(man.age || 30, wife.age || 30) : 0;
+      const name = SURNAMES[hHash(hid) % SURNAMES.length], pr = pairs.get(hid) || null, [man, wife] = pr || [], pAge = pr ? Math.min(man.age || 30, wife.age || 30) : 0;
       const head = pr ? man : ms.slice().sort((a, b) => (b.age || 30) - (a.age || 30))[0], ids = ms.map(c => c.id), b = HB_ID.get(hid);
       for (const c of ms) {
         const lodger = c.homeId !== hid && c !== man && c !== wife;
@@ -23240,7 +23240,7 @@ function buildCreation() {
     const house = ($('cr-house').value || name).slice(0, 18);
     if (creation.hook) { const h = creation.hook; creation.hook = creation.back = null; $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); return h({ name, house, origin, pal: { ...pal }, build }); }   /* Koop: der Gast erstellt seinen eigenen Charakter */
     bindInput();
-    newGame({ name, house, origin, pal, build, difficulty: diff, start: startAt, facStart: facStart || null });
+    newGame({ name, house, origin, pal, build, difficulty: diff, start: startAt, facStart: facStart || null, prolog: $('cr-prolog')?.checked !== false });   /* Prolog 08.10.: abwählbar */
   };
   $('cr-back').onclick = () => { $('creation').classList.add('hidden'); if (!running) $('titlescreen').classList.remove('hidden'); const b = creation.back; creation.hook = creation.back = null; b?.(); };
 }

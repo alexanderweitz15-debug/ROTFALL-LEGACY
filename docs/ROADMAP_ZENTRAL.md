@@ -80,7 +80,7 @@ Zentrale Abhängigkeiten:
 
 ### P0 — Spielerlebnis
 
-#### P0.1 Spielbares Tutorial (◐)
+#### P0.1 Spielbares Tutorial (◐ — Prolog ✔)
 
 **Ziel (§6–9):** Der Spieler wird an die Hand genommen, ohne Popup-Wand. Er versteht: was ROTFALL ist, wie die Welt funktioniert, Bewegung, Interaktion, Kampf, Loot, NPCs, Händler, Quests, Gebäude, und warum er überhaupt unterwegs ist. Informationen kommen kontextbezogen, nur das, was in diesem Moment relevant ist.
 
@@ -98,6 +98,8 @@ Zentrale Abhängigkeiten:
 - Speichern/Laden mitten im Tutorial funktioniert
 - Tutorial löst nicht mehrfach ungewollt aus (auch nicht in alten Ständen oder Folgecharakteren)
 
+
+**Stand 08.10. (Claude):** ✔ Prolog „Die Aschenfurt“ (eigenes Startgebiet, Kamerafahrten, 8 erlebte Schritte inkl. Menüs I/C/M und Kampf, Spielziel von Oswin, Wahl Krone/Stille/ohne Herrn über die Fraktions-Starts, kein Tod, Laden mitten im Prolog, im Erstellungsfenster abwählbar). ✔ Hinweise beim ersten Betreten eines Hauses und bei Kutscher/Fährmann. **Fehlt:** Schmiede-Moment (⛓ P2.14); Probe „Speichern/Laden mitten im Prolog“ als echter Rundlauf (heute: Neubau der Karte geprüft); einmal komplett von dir spielen (🔍).
 #### P0.2 Einflug nach ROTFALL (✔ mit Rest)
 
 **Ziel (§7):** Kurzer Anflug, kein langer Cinematic. Spieler blickt auf Region, Landschaft, Straßen, Stadt/Landmarken, Reisende, evtl. Karawanen, größere Siedlung. Gefühl: „Ich betrete eine bereits existierende Welt", nicht „kleine Map für meine Quest".
@@ -108,6 +110,8 @@ Zentrale Abhängigkeiten:
 
 **Abnahme:** Im Einflug sind immer mindestens Reisende oder Karawane sichtbar; Skip per Esc ohne Folgefehler; kein erneutes Abspielen nach Load.
 
+
+**Stand 08.10. (Claude):** Einflug zeigt einen echten Reisenden/eine Karawane, wenn im Umkreis von 220 Feldern unterwegs; Prolog hat eigene Kamerafahrten. **Fehlt:** Reisende erzwingen, wenn keiner in der Nähe ist (Abnahme „immer sichtbar“ noch nicht erfüllt).
 #### P0.3 Erste Wege/Ziele als Denkansätze (◐)
 
 **Ziel (§8):** Keine „Gehe zu Punkt A"-Anweisung. Mögliche Richtungen als Denkansätze: große Stadt in der Ferne, Schmiede, Straße mit Reisenden, gefährliches Gebiet, Markt, Taverne, Ruine, Fraktion, Händler, sichtbares Ereignis. Spieler fragt sich: „Was davon interessiert mich?" Botschaft: ROTFALL gibt Möglichkeiten, nicht nur eine Questliste.
@@ -119,6 +123,8 @@ Zentrale Abhängigkeiten:
 - Erster Kontakt = Brett (R8.6)
 - Herkunft mit Handlung (R8.4)
 
+
+**Stand 08.10. (Claude):** ✔ Kompass zeigt im Wegweiser-Schritt „Arbeit“ zum nächsten Brett (R8.7); ✔ jede Herkunft hat eine eigene Startzeile (R8.4); ✔ der Prolog stellt die drei Wege als Wahl. **Fehlt:** „erster Kontakt ein Gesicht statt Brett“ (R8.6) — teilweise durch Oswin im Prolog abgedeckt.
 #### P0.4 Quest-GUI (◐)
 
 **Ziel (§38–39):** Richtige GUI, nicht nur Text. Anzeige: Questname, Questgeber, Beschreibung, aktuelles Ziel, Fortschritt, Belohnung, Ort, Status, optionale Ziele, abgeschlossene Ziele. Bestehende UI-Architektur wiederverwenden. Das UI zeigt nur, was der Charakter wissen kann (Geheimnis-/Entdeckungsquests bleiben entdeckbar).
@@ -132,6 +138,8 @@ Zentrale Abhängigkeiten:
 
 **Abnahme (§51 Quests):** GUI funktioniert, Fortschritt aktualisiert sich, Belohnung wird korrekt vergeben, verschiedene Questtypen werden dargestellt.
 
+
+**Stand 08.10. (Claude):** ✔ Verträge von Wache, Kette, den Freien und dem Arbeiterrat im Zettel-Fenster; Stichprobe Geheimnis-Quests ok (find-Ziele ohne Kartenpunkt). **Fehlt:** Kartenausschnitt im Brief (🔶 E11); Abgabe bei der Wache im Spiel prüfen (🔍).
 #### P0.5 Kein Treffer durch Wände (✔)
 
 **Ziel (§36–37):** Niemand ist durch Wände treffbar: Nahkampf, Projektile, Fähigkeiten, Magie, Fernkampf, AOE, NPC-Angriffe. Eine zentrale Lösung statt Wandprüfung pro Waffe: Angreifer → Richtung → Hindernisprüfung → Ziel erreichbar? → Hit/kein Hit.
@@ -153,6 +161,8 @@ Zentrale Abhängigkeiten:
 
 **Abnahme (§51 Gebäude):** Eingang stimmt mit Sprite überein, NPC nutzt die tatsächliche Tür, Spieler kann betreten, Transparenz greift bei Bedarf, keine Bewegung durch Wände.
 
+
+**Stand 08.10. (Claude):** ✔ Ursache gefunden: benannte NPCs standen immer 2 Felder unter dem Haus, auch bei W/O/N-Türen — jetzt `doorFront` in Türrichtung (auch Feldlager). **Fehlt:** Siedlungsgebäude prüfen; an einem Haus mit Seitentür ansehen (🔍).
 ---
 
 ### P1 — Weltqualität
@@ -171,15 +181,19 @@ Beispielverteilung aus der Spec (20 NPCs): 3 Questgeber · 5 Händler/Mitarbeite
 
 **Abnahme (§51 NPCs):** NPC ohne Quest existiert korrekt; arbeitet, schläft, besucht Betrieb, kauft ein, findet Wohnhaus und Arbeitsplatz.
 
+
+**Stand 08.10. (Claude):** ✔ Gerücht-Szene „Hast du gehört? X sucht …“, danach Siegel auch aus der Ferne. **Fehlt:** Zahlen 3/4/6 bestätigen (⚖).
 #### P1.8 Rollenverteilung je Stadt (☐)
 
 Rollen: Geber / Händler / Familie / Wachen / Reisende / Bürger / Story. Rollen existieren implizit über Berufe. **Fehlt:** explizite Verteilung pro Stadt und Messung (Soll/Ist-Tabelle je Stadt).
 
-#### P1.9 Haus ↔ NPC-Zuordnung (◐)
+#### P1.9 Haus ↔ NPC-Zuordnung (✔ mit Rest)
 
 Wer wohnt wo, und warum dort? Heute: `spawnResidents`/`residentPlan` verteilt nach Beruf. **Fehlt:** Kapazität je Haus. Gebäudegröße und Ausstattung müssen erklären, warum die Bewohner dort wohnen (Problem: drei NPCs in winzigem Haus mit einem Bett).
 
-#### P1.10 Familien (☐ — GATE: Impact-Report nötig)
+
+**Stand 08.10. (Claude):** ✔ Jeder Bewohner hat einen Schlafplatz (eigenes Wohnhaus → Untermiete im nächsten Wohnhaus → Strohsack in der Werkstatt → Kammer in der Schenke); 753 von 803 versorgt, 30 ohne (kleine volle Orte). **Fehlt:** die letzten ~30; Kapazität beim Ansiedeln neuer Bewohner (Wachstum/Flüchtlinge) berücksichtigen.
+#### P1.10 Familien (◐)
 
 **Ziel (§23–25):** Echte Struktur (z. B. Vater, Mutter, zwei Kinder), nicht nur gleicher Nachname. Sichtbar: gemeinsam im Haus, gemeinsames Essen, Kinder folgen Eltern, Familienmitglieder arbeiten und besuchen den Markt, Kinder schlafen im Haus, Eltern reagieren auf Gefahr, Mitglieder sprechen miteinander. Nicht alles sofort perfekt, aber die Beziehungen müssen sichtbar sein.
 
@@ -193,7 +207,9 @@ Wer wohnt wo, und warum dort? Heute: `spawnResidents`/`residentPlan` verteilt na
 - Kinder/Eltern werden korrekt dargestellt
 - **Tod eines Mitglieds erzeugt keine kaputten Referenzen**
 
-#### P1.11 Wohnraum (☐)
+
+**Stand 08.10. (Claude):** ✔ Haushalt = wer im selben Wohnhaus schläft (abgeleitet bei jedem Laden, nichts im Spielstand): Familienname, Rollen, Paare, 0–2 Kinder je Paar unter 45 (Kinder als eigener NPC-Typ, unangreifbar, schlafen im Haus, spielen vor der Tür, gehen mit der Mutter zum Markt), Familie isst abends am Tisch, „Wer wohnt bei dir?“. ✔ Absturz bei neuem Spiel behoben (Kind ohne Mutter). **Fehlt:** Eltern reagieren auf Gefahr (Kinder ins Haus holen), Familienmitglieder sprechen miteinander (eigene Gesprächszeilen), Großeltern, Trauer beim Tod eines Mitglieds.
+#### P1.11 Wohnraum (◐)
 
 Kapazitätsstufen laut Spec:
 - Klein: 1–2 Bewohner, 1 Schlafzimmer, kleiner Wohnbereich
@@ -203,6 +219,8 @@ Kapazitätsstufen laut Spec:
 
 Ausstattung als Familienhinweis: mehrere Betten, Kinderbett, größerer Tisch, mehrere Räume, Küche, persönliche Gegenstände, Kleidung, Spielzeug, Werkzeuge. **Stand:** Möbel mit Funktion vorhanden, Kapazität fehlt.
 
+
+**Stand 08.10. (Claude):** ✔ Betten nach Hausgröße (Haus 2–3, Kate 2, Herrenhaus bis 5, Fischerhaus 2), Kinderlager/Strohsack als eigenes Möbel. **Fehlt:** Spielzeug, größerer Familientisch, Familienhaus-Typ mit mehreren Räumen.
 #### P1.12 Marktplätze skalieren (☐)
 
 Problem: bis ~100 NPCs auf einem kleinen Platz. **Nicht durch Tricks kaschieren**, sondern räumlich lösen. Drei Hebel (§18):
@@ -591,6 +609,7 @@ Legende: **✔** fertig gebaut (Selbsttest grün) · **🔍** muss geprüft werd
 | 08.10. | P1.9–P1.11 Wohnraum/Familien | ✔ 🔍 ⚖ | Messung vorher: 548 von 803 ohne Bett. Jetzt: 753 mit Schlafplatz (331 davon Strohsack in Werkstatt/Schenke), 30 ohne (kleine Orte, alles voll), 191 Haushalte, 21 Kinder (flüchtig, jedes Laden gleich), Familie isst abends am Tisch, Kinder gehen mit der Mutter zum Markt. Nichts davon im Spielstand. 🔍 eine Stadt bei Nacht/Abend ansehen. ⚖ Bettenzahl, Kinder 0–2 nur für Paare unter 45, Untermiete bis 60 Felder. Offen: Eltern reagieren auf Gefahr, Tod eines Mitglieds (Referenzen werden beim nächsten Laden neu gebaut; `famOf` filtert Tote) |
 | 08.10. | Selbsttest | 🐞 | „Duell im Kreis (04.10.)“ schlägt gelegentlich fehl (zufallsabhängig, schon vorher beobachtet) — Fehlerrunde |
 | 08.10. | P0.1/P0.3 Prolog „Die Aschenfurt“ (Entwicklerwunsch: eigenes Startgebiet) | ✔ 🔍 ⚖ | Eigene Karte (60×44, flüchtig) mit Kamerafahrten (Intro, Gräber, Gesandte, Abschied), 8 erlebte Schritte (Bewegen, Ansprechen, Durchsuchen, Menüs I/C/M, Kampf gegen 2 Untote, Aufheben, Spielziel von Oswin, Wahl). Wahl nutzt die bestehenden Fraktions-Starts: Krone → Valen/Varonheim, Stille → Untote/Vharnholm als Lebender, ohne Herrn → Menü-Start + Titel. Kein Tod im Prolog. Laden mitten im Prolog baut die Karte neu. Live geprüft bis „Tote“-Start. 🔍 einmal komplett selbst spielen (Texte, Tempo, Kamera). ⚖ alle Texte, Figuren (Oswin, Gerold, Ysolde, Mara), Ruf-Zahlen des Rebellen-Wegs. Offen: Schalter „Prolog überspringen“ im Erstellungsfenster (heute: „»“ im Prolog) |
+| 08.10. | Prolog-Schalter + Absturz neues Spiel | ✔ | Erstellungsfenster: Häkchen „Prolog spielen“. 🐞→✔ Bei manchen Weltsamen brach ein neues Spiel in `planHomes` ab (Untermieter verschoben die Paar-Erkennung → Kind ohne Mutter); Paar wird jetzt vor dem Einzug der Untermieter festgelegt. Neues Spiel mit neuem Samen geprüft |
 
 ---
 
