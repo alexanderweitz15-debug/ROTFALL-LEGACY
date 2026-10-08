@@ -1,5 +1,0 @@
-# token_optimizer
-
-Token-Optimierer (Sonnet): nicht aktiv.
-
-Token-Optimierer (Sonnet), 01.10.2026: Größen von Zustand/Handoffs/Proposals geprüft (`wc -c`/`-l`), nicht Volltexte. Größte Dateien: `proposals/*.md` 138 KB gesamt, `HANDOFFS/bug_to_implementation.md` 51 KB (Hunter 1–5), `control_to_director.md` 21 KB. `AGENT_STATUS/*.md` selbst schlank, nichts zu kürzen. Archivierung Hunter 1–5 → `archive/hunter_1-5.md` **nicht durchgeführt**: zugehörige Bugs stehen in `BUG_DATABASE.md` noch auf TESTING, nicht VERIFIED/closed (nur RB-007 REJECTED, RB-009 VERIFIED) — Auftragskriterium nicht erfüllt, nur empfohlen (nach nächster Control-Freigabe erneut prüfen). `control_to_director.md` und ein etwaiger „Hunter 6“-Abschnitt in `bug_to_implementation.md` nicht angefasst (beide laufen gerade). Fund ohne eigene Korrektur: `AGENT_STATUS/director.md`/`world_specialist.md`/`presentation_specialist.md` zeigen noch „Opus statt Fable“, obwohl Fable 5.1 für diese Rollen aktiv ist. Kein Opus-Einsatz für Kleinkram gefunden. `AGENT_SYSTEM.md` um „Lesereihenfolge je Rolle“ ergänzt (Dateiende). Details: `TOKEN_EFFICIENCY_REPORT.md`.
