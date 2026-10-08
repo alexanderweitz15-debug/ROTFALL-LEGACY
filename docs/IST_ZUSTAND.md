@@ -7,7 +7,7 @@ Dies ist der vollständige Ist-Zustand: jedes Feature mit Erklärung, Ort/Person
 - **Teil C: Kampf, Gegner, Charakter.** Kampfsystem, alle 63 Gegner, 32 Elites, Bosse, Zauber mit Lehrern, Klassen, Sterne, Körper, Bionik.
 - **Teil D: Items, Wirtschaft, Menüs.** Alle 295 Gegenstände mit Quelle, Läden, Handwerk, Schmied, Betriebe, Siedlung, alle Fenster, Koop, Speichern.
 
-Der alte, kürzere Stand liegt unter `docs/ist/IST_ZUSTAND_alt_2026-10-02.md`. Die Teildateien liegen in `docs/ist/`.
+Diese Datei ist das einzige gepflegte Inventar (Bereinigung 08.10.2026: die Teildateien `docs/ist/A–D` sind hier aufgegangen; der alte Stand v19 liegt in `docs/archive/`).
 
 ## Was nach der Prüfung schon behoben ist (03.10.2026, Commits ecf90da und folgende)
 
@@ -51,6 +51,21 @@ Die Fehlversuche in den Teilen unten sind **so dokumentiert, wie sie bei der Pr�
 <!-- Teil A aus ist/A_welt_fraktionen.md -->
 
 # Ist-Zustand Bereich A — Welt, Orte, Fraktionen, Simulation
+
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **Fraktionen `wuest` (Der Wüstenbund) und `zwerge` (Die Zwerge der Tiefhall)** existieren in `FACTIONS` (13 Fraktionen) mit je drei Rängen und Rangreihen in `RANK_LINES` (8 Fraktionen × 3 Ränge × 2 = 48 Rangquests). A-34 bleibt behoben. §2.2/§13.2 („Lücke“, „keine Aufträge, kein Ruf“) sind **Doku-Fehler**; `LOCATIONS.faction` ist für Karak-Atar `wuest`, Dünenwacht `wuest`, Tiefhall `zwerge` gesetzt (03.10.).
+- **A-10** teilweise behoben: `crimeFaction` nimmt Opferfraktion → Herr des Heimatorts → auf der Oberwelt den Herrn des Ortes im Umkreis, sonst **null** (kein Kopfgeld in der Wildnis); nur Innenkarten und heimatlose Reisende fallen noch an Valen.
+- **1.1 Rang-Lohn:** `60 + (Rang − 1) × 50` Gold, `80 + (Rang − 1) × 70` EP (`game.js` RANK_LINES-Schleife, `i` = Rang − 1). IST_alt war falsch.
+- **1.10 Pferdezüchter:** NPC-Schlüssel `wendel`, Anzeigename **Hadubrand** (`data.js:1434`). In Texten heißt er Hadubrand; `wendel` ist nur der Code-Schlüssel.
+- **1.14 Namensdopplungen:** Torwache der Burg heißt jetzt **Gernot** (war Gerold wie der Kontorhändler); Elite „Irmgard vom Frostgrab“ heißt jetzt **Irmhild vom Frostgrab**. Der **Nekromanten-Turm** (Vhals Schattenkreis, Kachel 392/350) steht jetzt in `LOCATIONS` (`necrotower`, Ruine, Gefahr 4, Tote, Streuort).
+- **1.15 EVENTS:** `evTaxman` und `evFailedHarvest` stehen nur noch einmal in der Liste (`game.js:11875`, war schon vor dem Audit bereinigt).
+- **1.13 Erbenreihenfolge** (`makeSuccessorCandidates`): erst eigene erwachsene Kinder und Ehepartner (`familyHeirs`), dann bis zu drei Gefährten, dann gewürfelte Verwandte (Sohn/Tochter/Eltern/Geschwister/Vetter) mit Glück `1 − (Generation − 1) × 0,12` (min 0,35). Beide Darstellungen waren je zur Hälfte richtig.
+
+
+Stand: 03.10.2026, Code-Version 24 (`?v=24`). Geschrieben vom Agenten für Bereich A. Grundlage: `src/world.js`, `src/game.js`, `src/sim.js`, `src/economy.js`, `src/data.js`, `src/state.js`, dazu `docs/IST_ZUSTAND.md` (alter Stand, hier übernommen, korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
+
+Zeilenangaben (`game.js:7473`) gelten für den Stand vom 03.10.2026 vormittags. Während dieser Prüfung haben andere Agenten parallel an `game.js` gearbeitet; die Zeilen sind dadurch schon um 5–10 gewandert (z. B. `townFac` steht jetzt bei 7479). Suche im Zweifel nach dem Funktionsnamen.
 
 Stand: 03.10.2026, Code-Version 24 (`?v=24`). Geschrieben vom Agenten für Bereich A. Grundlage: `src/world.js`, `src/game.js`, `src/sim.js`, `src/economy.js`, `src/data.js`, `src/state.js`, dazu `docs/IST_ZUSTAND.md` (alter Stand, hier übernommen, korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
 
@@ -1001,6 +1016,16 @@ Nach Schwere sortiert. „Bekannt“ = steht schon in `OFFEN.md` oder `hunt/BERI
 
 # Ist-Zustand B — Aufträge aller Art (Stand 03.10.2026)
 
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.7 EP-Auszahlung:** `q_omega` 1000 EP (`game.js:10459`) und `q_ratssitz` 600 EP (`game.js:11129`) werden ausgezahlt — **B-3/B-4 behoben 03.10.**; HB-10/HB-37 damit erledigt.
+- **1.5 Zählung:** `QUESTS` enthält 78 feste Einträge in `data.js` (davon 12 `c_*` Titelreihen, 20 `kt_*` Klassenprüfungen, 3 `dk_*`), dazu **48 Rangquests** aus `RANK_LINES` (8 Fraktionen × 3 Ränge × 2). „55 fest / 36 Rangquests“ (IST_alt) und „40“ (B) waren falsch.
+- **1.14:** Elite „Irmgard vom Frostgrab“ heißt jetzt „Irmhild vom Frostgrab“.
+
+
+Bereich B des detaillierten Ist-Zustands: feste Aufträge (`QUESTS` in `src/data.js`), die aus `RANK_LINES` erzeugten Rangaufträge, Klassen-Prüfungen, Verträge (`CON`) mit Lohnformeln, Gerüchte, Gefährten- und Königsaufträge, emergente Aufträge E1–E4 und Geheime Orte.
+Grundlage: `docs/IST_ZUSTAND.md` §2.13 (übernommen, korrigiert, vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`, Code-Stand vom 03.10. vormittags. Andere Agenten bearbeiten `game.js` parallel; Zeilennummern können sich um einige Zeilen verschieben, deshalb steht immer der Funktionsname dabei.
+
 Bereich B des detaillierten Ist-Zustands: feste Aufträge (`QUESTS` in `src/data.js`), die aus `RANK_LINES` erzeugten Rangaufträge, Klassen-Prüfungen, Verträge (`CON`) mit Lohnformeln, Gerüchte, Gefährten- und Königsaufträge, emergente Aufträge E1–E4 und Geheime Orte.
 Grundlage: `docs/IST_ZUSTAND.md` §2.13 (übernommen, korrigiert, vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`, Code-Stand vom 03.10. vormittags. Andere Agenten bearbeiten `game.js` parallel; Zeilennummern können sich um einige Zeilen verschieben, deshalb steht immer der Funktionsname dabei.
 
@@ -1647,6 +1672,31 @@ Nach Schwere sortiert. „live“ = im Spiel nachgestellt, „C“ = nur Code.
 <!-- Teil C aus ist/C_kampf_gegner_charakter.md -->
 
 # Ist-Zustand, Bereich C: Kampf, Gegner, Charakter
+
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.2 Talentpunkte:** `TALENT_EVERY = 2` (`game.js:4382`): einer zum Start, einer je zweiter Stufe, einer je bestandener Klassenprüfung. C ist richtig, IST_alt (jede 3.) falsch.
+- **1.3 Gegnerschaden:** `BAL.lvl = 0.06` (`game.js:1885`). C richtig.
+- **1.4 Karrak:** Grundleben **340** (`REGION_BOSSES`, `game.js:2025`; vorher 240). C richtig.
+- **1.5 Zählung:** `CLASSES` 19 (inkl. wanderer und 6 Titel-/Dunkelklassen), `ABILITIES` 104 (davon 31 Zauber `sp_*`), `SKILL_TREE` 221 Einträge, `MONSTERS` 64, `ELITES` 32, `TITLE_CLASSES` 6.
+- **1.9 Boss-Intros:** `BOSS_CARDS` hat 7 Schlüssel (chain_master, hrodvar, garmadon, whitebeard, dodon, gorak, omega). **Graumähne und Karrak fehlen weiter** — C §23 richtig, „H12 erledigt“ war zu früh. Bleibt Phase 5.6.
+- **1.11 Prothesen-Werkbank:** hat seit 03.10. ein Fenster (`mechUI`); C §18 „noch Dialogliste“ ist **Doku-Fehler**.
+- **1.12 Regionalboss-Beute:** `die()` (`game.js:4132`) lässt Karrak die Klinge des Sandfürsten und Graumähne den Leitwolfzahn sicher fallen; einen eigenen `BOSS_LOOT`-Pool haben beide **nicht** (nur Grundart-Tabelle). Beide Aussagen stimmen also je zur Hälfte.
+- **1.8 Zauberlehrer:** `sp_staunch`/`sp_regen` lehrt Mutter Aldis (und die gerettete Hexe), `sp_shock` Corvinus — H7 erledigt, IST_alt falsch.
+- **C-1 ergänzt 04.10.:** Duell/Grube — Schaden kommt sichtbar an, Fechter stirbt nie (Rumpf ≥ 1), Ende erst bei echtem Rumpf < 20 %.
+- **1.14:** Elite „Irmhild vom Frostgrab“ (umbenannt).
+
+
+Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `src/game.js`, `src/body.js`, `src/render.js`, `src/ui.js`, `src/sky.js` sowie die alten Dokumente `docs/IST_ZUSTAND.md` und `docs/MECHANIKEN.md`.
+
+**Hinweis zu den Zeilennummern:** `game.js` wurde während der Prüfung parallel bearbeitet. Die Zeilen können um einige Stellen verrutscht sein. Deshalb steht immer auch der Funktionsname dabei.
+
+**Wie geprüft wurde:**
+- Im Spiel: eigener Tab mit `?dev` und `RF.S._quiet = true`. Der Spielstand war vorher aus dem Backup zurückgesetzt und wurde am Ende wieder darauf gesetzt. Es wurde nie gespeichert, der Tab ist geschlossen.
+- Der Tab lief im Hintergrund. Die Spielschleife wurde deshalb mit `RF.tick()` von Hand weitergedreht.
+- „Live geprüft“ heißt: im Spiel ausgelöst. „Nur Code gelesen“ wird ehrlich so genannt.
+
+---
 
 Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `src/game.js`, `src/body.js`, `src/render.js`, `src/ui.js`, `src/sky.js` sowie die alten Dokumente `docs/IST_ZUSTAND.md` und `docs/MECHANIKEN.md`.
 
@@ -2775,6 +2825,20 @@ Sortiert nach Schwere. Datei:Zeile ungefähr, `game.js` war während der Prüfun
 <!-- Teil D aus ist/D_items_wirtschaft_menues.md -->
 
 # Ist-Zustand D — Items, Spielerwirtschaft, Menüs (Stand 03.10.2026)
+
+## Audit 04.10.2026 — Phase 1 (Code ist die Wahrheit)
+
+- **1.5 Zählung:** `AFFIXES` 15, `ITEMS` 295.
+- **1.10:** Pferdezüchter: Schlüssel `wendel`, Name **Hadubrand**. „Wendel“ als Anzeigename ist ein Doku-Fehler.
+- **1.11:** Prothesen-Werkbank: Fenster seit 03.10. (D richtig). Dazu seit 04.10. Fenster für Heiler und Zauber lernen.
+- **1.12:** Leitwolfzahn/Klinge des Sandfürsten fallen sicher in `die()` (D richtig); eigener Beutepool fehlt (siehe C).
+
+
+Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (Cache-Schlüssel `?v=24`), `docs/IST_ZUSTAND.md` (alter Stand, hier korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
+
+**So wurde geprüft.** Die Item-Tabelle ist aus dem Code erzeugt. Ein Skript hat jeden Schlüssel aus `ITEMS` (data.js) in allen Quelldateien gesucht und jede Fundstelle einer Quelle zugeordnet: Ladenliste, Beutetabelle, Bossbeute, Kopfgeld-Elite, Auftrag, Truhe, Rezept, Gewölbe-Truhe, Waffenständer, Geheimer Ort, Sonderbeute. Die Ladenlisten habe ich zusätzlich **im laufenden Spiel** nachgezählt, und zwar zweimal: im echten Spielstand des Entwicklers (nur gelesen) und in einem frisch begonnenen Wegwerfspiel (Platz `ztestD`, danach gelöscht). Läden, Schmiede, Tierhändler, Stall, Kutsche, Betriebe, Handwerk, Lager, Waffenständer und alle 22 Fenster habe ich im Browser bedient und dabei Gold, Gepäck und Fenstermaße gemessen. Der echte Spielstand ist danach nachweislich unverändert (Vergleich mit `rotfall.backup.s14c`: identisch).
+
+**Wichtig:** Während der Prüfung haben andere Agenten `game.js` geändert. Zeilennummern können um einige Zeilen abweichen. Deshalb steht bei jeder Fundstelle auch der Funktionsname.
 
 Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (Cache-Schlüssel `?v=24`), `docs/IST_ZUSTAND.md` (alter Stand, hier korrigiert und vertieft), `docs/MECHANIKEN.md`, `ROTFALL_STATE/OFFEN.md`, `ROTFALL_STATE/hunt/BERICHT.md`.
 

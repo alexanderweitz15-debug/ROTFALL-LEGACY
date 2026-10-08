@@ -38,7 +38,10 @@ There is no linter. After editing a file, at least parse-check it (e.g. with aco
 ## Editing rules learned the hard way
 
 - **Never put code after a `//` comment on the same line.** Scripted edits that append to a line have swallowed code several times. Use `/* … */` for inline comments.
-- `src/game.js` is ~16k lines. Make targeted edits with unique anchors; re-read the region first.
+- `src/game.js` is ~23k lines. Make targeted edits with unique anchors; re-read the region first.
+- **Line endings are mixed:** `game.js` is CRLF, most other files LF, `sim.js` mixed. Edit byte-exact (the lead's `lead_ed.py`-style edit keeps CRLF); never let a tool rewrite a whole file's line endings.
+- **RNG split:** game logic draws from the seeded `rnd()` (state.js); visuals use `vrnd` (Math.random). New `rnd()` calls shift random-dependent probes.
+- **Save format RFZ1** (gzip, 15 bit per char) since 01.10.; old JSON saves still load (`unpackAll` before `boot()`, then `loadRaw`).
 - **Cache key:** every import and `index.html` use `?v=N` (currently `v=24`). When shipping, bump it everywhere (index.html + all `import … from './x.js?v=N'` + `import('./coop.js?v=N')`), plus the visible version label in `index.html`. `src/coop.js` also has `VER`, which must match.
 - New save fields must tolerate being missing (old saves). Migrations go into `continueGame()` / the `ensure*()` functions it calls.
 - Keep world generation deterministic: `world.js` uses the seeded `rnd()` from state.js; adding RNG calls there shifts the whole world.
@@ -67,9 +70,11 @@ Map ids: `S.map` is `'world'` or a dungeon/area key; entities live in `S.ents[ma
 
 ## Docs worth knowing
 
+- `docs/ROADMAP_ZENTRAL.md` — **the one list of open work** (features, decisions, bugs) since the doc cleanup of 08.10.2026; `ROTFALL_STATE/OFFEN.md` only points there. Specs of the developer live in `ROTFALL_STATE/SPEC_*.md`.
+
 - `docs/IST_ZUSTAND.md` — inventory of every existing feature (check here before building something that may already exist).
 - `docs/MECHANIKEN.md` — player-facing rules of every mechanic, appended every round.
-- `docs/PLAN_ROADMAP.md` — current work packages and the user's design decisions (§5b–5f).
+- `docs/PLAN_ROADMAP.md` — the user's design decisions §5b–5g (protocol; open items are tracked in ROADMAP_ZENTRAL).
 - `docs/MASTER_ROADMAP.md` — the user's binding workflow and feature roadmap.
 - `docs/BALANCE.md` / `docs/BALANCE_GUIDE.md` — balance tables and rules for new content.
 - `docs/CHANGELOG.md` — one short entry per version.
