@@ -37,12 +37,12 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
+  ['char', 'Charakter', 'C', ['character', 'mastery', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
   ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
 const NAV_SHORT = { char: 'Charakter', inv: 'Inventar', party: 'Gruppe', build: 'Siedlung', map: 'Karte', quest: 'Aufträge', powers: 'Mächte', codex: 'Kodex', options: 'Optionen' };
-const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', mastery: 'Fertigkeiten', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
 // Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
@@ -882,7 +882,7 @@ export function openModal(name, arg) {
   const body = $('modal-body'); body.innerHTML = ''; body.className = '';
   const grp = NAV.find(n => n[3].includes(name));
   [...$('nav').children].forEach(b => b.classList.toggle('active', b.dataset.g === grp?.[0]));
-  const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
+  const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], mastery:[ 'Fertigkeiten', masteryUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
     classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], board:[ 'Anschlagbrett', boardUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
@@ -1255,6 +1255,19 @@ function woundNotes(c, click) {
   }).join('');
 }
 
+// ---- Fertigkeiten (Skill-Core Phase 1, Spec Skills §4/§50, 08.10.2026): je Fertigkeit Stufe (Wert/2), Balken zur nächsten Stufe, nächste Freischaltung
+// und alle Meilensteine (erreicht hell, offen dunkel). Gruppen Kampf / Handwerk / Überleben / Sozial. Nur Fertigkeiten, die man schon geübt hat.
+function masteryUI(body) {
+  const p = S.player, info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean), shown = info.filter(s => s.v >= 1 || s.perks.length);
+  const groups = ['Kampf', 'Handwerk', 'Überleben', 'Sozial'].map(g => [g, shown.filter(s => s.group === g)]).filter(([, L]) => L.length);
+  body.innerHTML = `<div class="tafel"><p class="ledger">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). An Meilensteinen schaltet sich etwas Neues frei; starke Gegner lehren mehr als harmlose, und wer immer wieder dasselbe Ziel schlägt, lernt kaum noch etwas.</p>
+    ${groups.map(([g, L]) => `<section><h3>${g}</h3>${L.map(s => `<div class="ledger" style="margin:6px 0" title="${s.what}">
+      <b>${s.name}</b> — Stufe ${s.lv} <span style="opacity:.7">(${Math.floor(s.v)})</span>
+      <div style="height:4px;background:rgba(255,255,255,.12);margin:3px 0"><i style="display:block;height:4px;width:${Math.round(s.frac * 100)}%;background:#c8a050"></i></div>
+      ${s.next ? `<div style="opacity:.85">Nächstes Ziel: Stufe ${s.next.lv} — ${s.next.t}</div>` : '<div>Meisterschaft erreicht.</div>'}
+      ${s.perks.length ? `<div>${s.perks.map(q => `<span style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} ${q.lv}: ${q.t}</span>`).join('<br>')}</div>` : ''}
+    </div>`).join('')}</section>`).join('') || '<p>Noch ungeübt.</p>'}</div>`;
+}
 // ---- Charakterbogen: Wundarzt-Tafel ----
 function charUI(body, who) {
   const p = who || S.player, isPlayer = p === S.player;

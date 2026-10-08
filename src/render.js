@@ -2039,11 +2039,14 @@ function drawProp(e, now) {
       ctx.fillStyle = '#2a2018'; ctx.fillRect(x - 1.5, y - 62, 3, 64); ctx.fillStyle = '#4a3a28'; ctx.fillRect(x - 1.5, y - 62, 1, 64);
       ctx.fillStyle = '#b8973e'; ctx.fillRect(x - 3, y - 66, 6, 3); ctx.fillRect(x - 3, y - 68, 1.5, 2); ctx.fillRect(x - 0.75, y - 69, 1.5, 3); ctx.fillRect(x + 1.5, y - 68, 1.5, 2);
       ctx.fillStyle = '#2a1a14'; ctx.fillRect(x - 12, y - 60, 24, 2);
-      ctx.fillStyle = '#5a1618'; ctx.beginPath(); ctx.moveTo(x - 11, y - 58); ctx.lineTo(x + 11, y - 58); ctx.lineTo(x + 11 + s, y - 22); ctx.lineTo(x + s * 0.8, y - 15); ctx.lineTo(x - 11 + s, y - 22); ctx.fill();
-      ctx.fillStyle = '#7a2224'; ctx.fillRect(x - 11, y - 58, 3, 35); ctx.fillStyle = '#3a0e10'; ctx.fillRect(x + 7 + s * 0.6, y - 57, 3, 34);
-      ctx.fillStyle = '#c9a24a'; ctx.fillRect(x - 11, y - 55, 22, 1.5); ctx.fillRect(x - 11 + s * 0.6, y - 26, 22, 1.5);   /* Goldborten */
-      ctx.fillRect(x - 5 + s * 0.4, y - 42, 10, 5); ctx.fillRect(x - 5 + s * 0.4, y - 46, 2, 4); ctx.fillRect(x - 1 + s * 0.4, y - 48, 2, 6); ctx.fillRect(x + 3 + s * 0.4, y - 46, 2, 4);   /* Krone */
-      ctx.fillStyle = '#5a1618'; ctx.fillRect(x - 3 + s * 0.4, y - 41, 1.5, 2); ctx.fillRect(x + 1.5 + s * 0.4, y - 41, 1.5, 2);
+      const bc = e.col?.[0] || '#5a1618', bt = e.col?.[1] || '#c9a24a';   /* T33 (08.10.): Banner in den Farben der Macht, die den Ort hält (e.col = FACTIONS[..].colors) */
+      ctx.fillStyle = bc; ctx.beginPath(); ctx.moveTo(x - 11, y - 58); ctx.lineTo(x + 11, y - 58); ctx.lineTo(x + 11 + s, y - 22); ctx.lineTo(x + s * 0.8, y - 15); ctx.lineTo(x - 11 + s, y - 22); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,220,.14)'; ctx.fillRect(x - 11, y - 58, 3, 35); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 7 + s * 0.6, y - 57, 3, 34);
+      ctx.fillStyle = bt; ctx.fillRect(x - 11, y - 55, 22, 1.5); ctx.fillRect(x - 11 + s * 0.6, y - 26, 22, 1.5);   /* Borten */
+      if (!e.col || e.crown) { ctx.fillRect(x - 5 + s * 0.4, y - 42, 10, 5); ctx.fillRect(x - 5 + s * 0.4, y - 46, 2, 4); ctx.fillRect(x - 1 + s * 0.4, y - 48, 2, 6); ctx.fillRect(x + 3 + s * 0.4, y - 46, 2, 4);   /* Krone */
+        ctx.fillStyle = bc; ctx.fillRect(x - 3 + s * 0.4, y - 41, 1.5, 2); ctx.fillRect(x + 1.5 + s * 0.4, y - 41, 1.5, 2); }
+      else if (e.sigil === 'skull') { ctx.fillRect(x - 3 + s * 0.4, y - 44, 6, 5); ctx.fillRect(x - 2 + s * 0.4, y - 39, 4, 2); ctx.fillStyle = bc; ctx.fillRect(x - 2 + s * 0.4, y - 42, 1.5, 1.5); ctx.fillRect(x + 0.5 + s * 0.4, y - 42, 1.5, 1.5); }   /* Schädel der Toten */
+      else { ctx.beginPath(); ctx.arc(x + s * 0.4, y - 40, 4, 0, 6.283); ctx.fill(); }   /* Wappenscheibe */
       break; }
     case 'barrel_stack': {                                // Fasspyramide im Handwerkerviertel
       shadow(x, y + 4, 16, .35);

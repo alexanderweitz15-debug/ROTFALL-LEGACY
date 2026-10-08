@@ -176,7 +176,9 @@ function humanAtlas(e) {
 const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', drill_fighter: 'krieger', dodon: 'ork', sea_raider: 'bandit', sea_harpooner: 'speertraeger', whitebeard: 'berserker', goblin: 'goblin', goblin_warrior: 'ork', bandit: 'bandit', bandit_archer: 'bogenschuetze', bandit_spear: 'speertraeger', bounty_hunter: 'assassine', chain_brute: 'berserker', rotgardist: 'krieger',
   kettenschuetze: 'armbrustschuetze', automat: 'scharfschuetze', chain_master: 'veteran', skeleton: 'skelett', crypt_warden: 'skelett', death_captain: 'skelett', hrodvar: 'eisgolem', valen_soldier: 'infanterist',
   cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
-  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine' };
+  flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine',
+  bandit_scout: 'bogenschuetze', bandit_thug: 'berserker', bandit_looter: 'bandit', bandit_knife: 'assassine', bandit_heavy: 'krieger', bandit_chief: 'bandit',   /* P3.20–P3.23 Rollen (Stil F, eingefroren: nächstes Blatt) */
+  goblin_scout: 'goblin', goblin_archer: 'goblin', goblin_shaman: 'schamane', goblin_tinker: 'goblin', goblin_spear: 'ork', goblin_berserker: 'ork' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
 const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
@@ -933,7 +935,7 @@ const ROLE_LOOK = {
   goblin_shaman: { gob: 1, helm: 'skull', helmCol: '#cfc6b0', charm: 1, robe: '#3a2a1a', fur: '#4a3a26', ge: '#9ad05a', sil: 'motes', mc: '#9ad05a', wear: 2 },
   goblin_tinker: { gob: 1, helm: 'mech', helmCol: '#6a5a3a', pack: 1, strap: 1, pouch: 1, glove: '#3a2c20', apron: 1, apronCol: '#4a3424', wear: 1 },
   goblin_spear: { gob: 1, helm: 'cap', helmCol: '#6b6156', armor: 'leather', armorCol: '#4a3a28', shield: '', wraps: 1, wear: 2 },
-  goblin_berserker: { gob: 1, bare: 1, helm: '', armor: '', shield: '', ge: '#e03020', fur: '#4a3a26', wraps: 1, sc: 2, wear: 3 },
+  goblin_berserker: { gob: 1, bare: 1, cloth: '#56703a', pants: '#3a2018', helm: '', armor: '', shield: '', ge: '#e03020', fur: '#6a2a1c', wraps: 1, sc: 2, wear: 3, strap: 1 },   /* nackter Oberkörper (Stoff = Haut), roter Fellkragen */
 };
 // Humanoide Gegner (Goblins, Banditen, Untote, Soldaten).
 export function monsterSpec(e, m) {

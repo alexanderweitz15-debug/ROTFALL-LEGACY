@@ -50,7 +50,28 @@ export const FAC_STARTS = {
             desc:'Hallengast der Zwerge an der Tiefhall. Die Königsstadt liegt unter der alten Halle — und dazwischen stehen Hrodvars Tote.' },
 };
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung' };
+  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen' };
+/* Skill-Core Phase 1 (Spec Skills §2–§12, §57; Planlauf 08.10.2026 — Werte vorläufig ⚖): zentrale Definition je Fertigkeit. Der Wert (0–100) bleibt
+   wie bisher in p.skills und wächst durch Nutzung; Stufe = Wert / 2 (0–50). Meilensteine 5/10/15/20/25/30/40/50; „perks“ sind echte Freischaltungen
+   [Art, Größe, Text] — zunächst für Einhändig (Schwert), Stangenwaffen (Speer) und Schmieden (Spec §58: erst 2–3 Skills testen). */
+export const SKILL_MS = [5, 10, 15, 20, 25, 30, 40, 50];
+export const SKILL_DEF = {
+  onehanded: { group: 'Kampf', what: 'Schwert, Axt, Kolben, Dolch', perks: { 5: ['stamina', 0.08, 'Sparsame Hiebe: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Hieb (7 % kürzer)'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'] } },
+  polearms:  { group: 'Kampf', what: 'Speer, Hellebarde, Sense', perks: { 5: ['stamina', 0.08, 'Sparsame Stöße: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Stoß (7 % kürzer)'], 20: ['stagger', 0.4, 'Wuchtstoß: der schwere Hieb lässt Gegner 40 % länger taumeln'] } },
+  twohanded: { group: 'Kampf', what: 'Zweihänder, Kriegshammer, Großaxt', perks: {} },
+  archery:   { group: 'Kampf', what: 'Bogen, Armbrust', perks: {} },
+  defense:   { group: 'Kampf', what: 'Abwehr von vorn', perks: {} },
+  toughness: { group: 'Kampf', what: 'Treffer einstecken', perks: {} },
+  smithing:  { group: 'Handwerk', what: 'Esse und Amboss', perks: { 10: ['quality', 10, 'Sichere Hand: Güte wie mit 10 Punkten mehr'], 20: ['recipes', 40, 'Neue Rezepte: alles bis Mindestwert 40'], 30: ['thrift', 4, 'Sparsam: jedes vierte Schmiedestück gibt ein Eisen zurück'] } },
+  crafting:  { group: 'Handwerk', what: 'Werkbank', perks: {} },
+  medicine:  { group: 'Handwerk', what: 'Verbände, Kräuter, Kessel', perks: {} },
+  survival:  { group: 'Überleben', what: 'Holzfällen, Zähmen', perks: {} },
+  hunting:   { group: 'Überleben', what: 'Tiere erlegen', perks: {} },
+  fishing:   { group: 'Überleben', what: 'Angeln an Fluss, See, Küste und Sumpf', perks: { 5: ['bite', 0.15, 'Geduld: Fische beißen 15 % schneller'], 10: ['window', 0.25, 'Gutes Gespür: 25 % mehr Zeit zum Anschlagen'], 15: ['rare', 1, 'Seltene Fische gehen an den Haken'] } },
+  stealth:   { group: 'Überleben', what: 'Schleichen (V)', perks: {} },
+  trading:   { group: 'Sozial', what: 'Kaufen und Verkaufen', perks: {} },
+  leadership:{ group: 'Sozial', what: 'Gefährten führen', perks: {} },
+};
 
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
 // ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
