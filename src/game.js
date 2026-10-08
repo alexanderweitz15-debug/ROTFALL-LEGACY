@@ -491,7 +491,22 @@ function partyBanter(force = false) {
   return kind;
 }
 let dbgMood = -1, dbgHall = -1;
+/* N4 Scheibe 2/4 (09.10.2026, nur Bild, Takt über Math.random): seltene Berufs-Stöße im Stand — Schmied wischt die Stirn, Wache stützt sich,
+   Händler zählt Münzen, Bauer streckt den Rücken — und Wetter-Haltungen draußen: Regen → geduckt, Schnee → Arme reiben. Höchstens 2 je Takt (3 s),
+   nur stehende Bewohner in Sichtweite ohne laufende Handlung. force = Debug (Name der Haltung, dann bis 6 Figuren). */
+const JOB_IDLE = { Schmied: 'stirn', Meisterschmiedin: 'stirn', 'Waffenschmied der Kette': 'stirn', 'Böttcher': 'stirn', Wache: 'stuetzen', Torwache: 'stuetzen', Streifenwache: 'stuetzen',
+  Ordenswache: 'stuetzen', 'Söldnerwache': 'stuetzen', Miliz: 'stuetzen', 'Händler': 'zaehlen', 'Händlerin': 'zaehlen', Kaufmann: 'zaehlen', Kaufherr: 'zaehlen', Kontorhändler: 'zaehlen',
+  Geldwechsler: 'zaehlen', Bankier: 'zaehlen', Wirt: 'zaehlen', Bauer: 'strecken', 'Bäuerin': 'strecken', 'Tagelöhner': 'strecken', 'Holzfäller': 'strecken', Knecht: 'strecken', Lagerknecht: 'strecken' };
+function jobIdleTick(force = null) {
+  const p = S.player; if (!p || S.map !== 'world' || S.cine) return 0; const now = performance.now(), wx = wxKey(), wet = wx === 'rain' || wx === 'bloodrain' ? 'ducken' : wx === 'snow' ? 'reiben' : null; let n = 0;
+  for (const e of VILLAGERS) { if (n >= (force ? 6 : 2)) break;
+    if (!e.alive || e.downed || e.map !== 'world' || e.vx || e.vy || e.inside || (e.act && e.act.until > now) || e.talk?.until > now || dist(e, p) > 460) continue;
+    const g = force ? (force === 'job' ? JOB_IDLE[e.prof] : force) : wet && Math.random() < 0.12 ? wet : JOB_IDLE[e.prof] && Math.random() < 0.05 ? JOB_IDLE[e.prof] : null;
+    if (!g) continue; gesture(e, g); n++; }
+  return n;
+}
 function moodIdleTick(force = null) {
+  if (!force) jobIdleTick();   /* N4 S2/S4 (09.10., Agent Figuren): Berufs-Stöße und Wetter-Haltungen im selben 3-s-Takt */
   const p = S.player; if (!p || S.map !== 'world' || S.cine) return 0;
   const town = townAt(p.x / TS | 0, p.y / TS | 0); if (!town || !TOWN_PLAN[town]) return 0;
   const h = hourNow(), mood = force || (S.mourn?.[town]?.until >= (S.day | 0) ? 'trauern' : festNow(town) && h >= 15 ? 'jubeln' : townDanger(town) || [2, 3].includes(S.schutz?.[town]?.stage) ? 'abwehren' : null);
@@ -6661,7 +6676,7 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   if (skill < (R.min || 0) && !houseKnows(key)) { UI.toast(`Dafür brauchst du ${SKILL_NAMES[sk] || sk} ${R.min}.`); return null; }   /* Skill-Core §38–39: was das Haus schon gefertigt hat, kennt auch der Erbe (Güte nach seinem eigenen Können) */
   if (Object.entries(R.need).some(([k, n]) => matHave(k) < n) || (ke && !hasItem(p, 'koenigseisen'))) { UI.toast(`Dir fehlt Material: ${needTxt(R)}.`); return null; }
   Object.entries(R.need).forEach(([k, n]) => matTake(k, n)); if (ke) removeItem(p, 'koenigseisen', 1);
-  const qi = craftQual(skill + (quick ? 0 : perkVal(p, sk, 'quality')), ke), [qn, , tier] = QUAL[qi], it = ITEMS[key];   /* Skill-Core: Meilenstein „sichere Hand“ (nur eigene Arbeit, nicht Auftrag/Probe) */
+  const qi = craftQual(skill + (quick ? 0 : perkVal(p, sk, 'quality')), ke || B.hasMod(p, 'uhrmacherhand')), [qn, , tier] = QUAL[qi], it = ITEMS[key];   /* Geheime Orte S5: Uhrmacherhand hebt die Güte wie Königseisen */   /* Skill-Core: Meilenstein „sichere Hand“ (nur eigene Arbeit, nicht Auftrag/Probe) */
   gainSkill(p, sk, 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (S.legacy && !quick && !S._quiet) { const L = (S.legacy.recipes ||= []); if (!L.includes(key)) L.push(key); }   /* Weltwissen des Hauses (Legacy); nicht bei Auftragsarbeit oder Probe */
   const th = quick ? 0 : perkVal(p, sk, 'thrift'); if (th && R.need.iron && (p.craftN = (p.craftN || 0) + 1) % th === 0) { S.res.iron = (S.res.iron || 0) + 1; log('Sparsam gearbeitet: ein Eisen bleibt übrig.', 'economy'); }   /* Skill-Core: Meilenstein „sparsam“ */
@@ -10332,8 +10347,8 @@ function stormCheck() {                                              /* RB-048: 
 function goblinStormWon() {
   S.flags.goblinStormActive = false; S.flags.goblinStormWon = true; S.factions.goblin = Math.min(100, (S.factions.goblin || 0) + 30);
   const finish = () => { const d = dodonOf(); if (d) { d.goblinStorm = false; const q = freeSpotNear('world', MORR.x, MORR.y - 3, 2); d.x = q.x; d.y = q.y; d.anchor = { x: q.x, y: q.y }; d.parley = true; d.aggroId = null; }
-    for (const g of S.ents.world.filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon')) { g.alive = false; }
-    S.ents.world = S.ents.world.filter(e => !(e.goblinStorm && !e.alive && e.mtype !== 'dodon')); };
+    const home = { x: (MORR.x + 0.5) * TS, y: (MORR.y + 0.5) * TS };   /* S5-Rest (T20): die Krieger gehen zu Fuß heim; stormHomeTick nimmt sie in Morrgrund (oder außer Sicht) heraus */
+    for (const g of S.ents.world.filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon')) Object.assign(g, { stormHome: true, aggroId: null, aiState: 'idle', anchor: { ...home }, marching: true }); };
   grantLegend('goblin', 'Sturmbruder von Morrgrund', 'Mit Dodon und den Grubenstämmen fiel die Kette.');
   chronicle('Mit Dodon fiel die Kette', 'battle', 'Die Grubenstämme haben die Eisenfeste gestürmt. Morrgrund lebt — und wird größer.');
   if (!stormWonScene(finish)) finish();   /* T17 Szene 4: erst jubeln, dann heim */
@@ -10351,6 +10366,11 @@ function stormWonScene(finish) {
     { dur: 2000, zoom: 1.0, focus: p.id, beats: [{ t: 0, card: { title: 'DIE GRUBENSTÄMME SIND FREI', sub: 'Der Sturm von Morrgrund hat gesiegt', ms: 2600 } }, { t: 0.8, duck: 1, ms: 500 }] },
   ], finish, { pause: true, stay: true });
   return true;
+}
+function stormHomeTick() {
+  const p = S.player, L = S.ents.world.filter(e => e.stormHome && e.alive); if (!L.length) return;
+  const gone = L.filter(e => Math.hypot(e.x / TS - MORR.x, e.y / TS - MORR.y) < 10 || (p.map !== 'world' || dist(e, p) > 1500));
+  if (gone.length) { S.ents.world = S.ents.world.filter(e => !gone.includes(e)); if (!S.flags.stormHomeLog && gone.some(e => Math.hypot(e.x / TS - MORR.x, e.y / TS - MORR.y) < 10)) { S.flags.stormHomeLog = 1; log('Die Krieger der Grubenstämme sind in Morrgrund angekommen. Die Hütten singen bis in die Nacht.', 'world'); } }
 }
 function morrFallScene() {
   const P = { x: (MORR.x + 0.5) * TS, y: (MORR.y + 0.5) * TS }, huts = S.ents.world.filter(e => e.kind === 'prop' && e.morr).slice(0, 5);
@@ -10665,6 +10685,7 @@ function ensureDeadLife() {
   for (const Cm of STILL_CAMPS) {
     if (S.ents.world.some(e => e.stillCamp === Cm.key)) continue; const L = LOCATIONS.find(l => l.key === Cm.key); if (!L) continue; const c = detSpot('world', L.x + Cm.dx, L.y + Cm.dy, 8); if (!c) continue; const [cx, cy] = c;
     const P = (type, dx, dy, o = {}) => { const q = detSpot('world', cx + dx, cy + dy, 3); if (q) S.ents.world.push({ id: uid(), kind: 'prop', type, map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, transient: true, stillCamp: Cm.key, ...o }); };
+    if (S.flags.garmadonSlain) { P('camp_ruin', 0, 0, { label: 'Verlassenes Lager der Stillen — kalte Knochenasche' }); P('sign', 0, 5, { r: 8, label: `${Cm.name} — geräumt. Die Stillen sind zur Schwarzen Feste gezogen.` }); continue; }   /* Totenland-Rest: nach Garmadons Tod geräumt */
     P('campfire_static', 0, 0, { solid: true, label: 'Feuer aus Knochen — es brennt grün und wärmt nicht' }); P('tent_prop', -4, -2, { solid: true, r: 14, label: 'Zelt der Stillen' }); P('tent_prop', 4, -2, { solid: true, r: 14, label: 'Zelt der Stillen' });
     P('sign', 0, 5, { r: 8, label: `${Cm.name} — ein Lager der Stillen Schar` }); P('bones', -2, 3, { r: 6 }); P('gravestone', 3, 3, { solid: true, r: 7 });
     const npc = (name, prof, dx, dy, o = {}) => { const q = detSpot('world', cx + dx, cy + dy, 3) || [cx + dx, cy + dy], n = makeChar({ name, prof, x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, level: 10, faction: 'undead', traits: ['diszipliniert'], pal: STILL_PAL });
@@ -10674,9 +10695,25 @@ function ensureDeadLife() {
     const pt = detSpot('world', cx + 12, cy, 4) || [cx + 12, cy], s = npc('Streife der Stillen', 'Streife der Stillen Schar', 6, 0, { brave: true, stillPatrol: [[cx + 1, cy + 1], pt], spi: 1, greet: '„Die Grenze geht dorthin, wo wir sie hintragen.“' }); s.equip.weapon = mkItem('grabraeuber'); recalc(s);
   }
 }
+/* Totenland Variante A Rest (⚖): Stirbt Garmadon, räumen die Stillen ihre Lager im Osten (Figuren gehen, das Feuer erlischt) und ziehen zur Feste.
+   Liegt Valen vor der Feste (S.flags.keepSiege) und halten die Toten sie noch, stehen vier zusätzliche Mauerwachen im Hof; fällt die Feste, gehen alle. */
+function deadReactTick() {
+  if (S.flags.garmadonSlain && S.ents.world.some(e => e.stillCamp && e.kind === 'npc')) {
+    S.ents.world = S.ents.world.filter(e => !(e.stillCamp && (e.kind === 'npc' || e.type === 'tent_prop' || e.type === 'campfire_static' || e.type === 'sign')));
+    for (const Cm of STILL_CAMPS) { const L = LOCATIONS.find(l => l.key === Cm.key), c = L && detSpot('world', L.x + Cm.dx, L.y + Cm.dy, 8); if (c) S.ents.world.push({ id: uid(), kind: 'prop', type: 'camp_ruin', map: 'world', x: c[0] * TS + TS / 2, y: c[1] * TS + TS / 2, r: 10, transient: true, stillCamp: Cm.key, label: 'Verlassenes Lager der Stillen — kalte Knochenasche' }); }
+    log('Garmadon ist tot: Die Stillen räumen ihre Lager im Osten und ziehen zur Schwarzen Feste.', 'world');
+  }
+  const k = KEEP(), siege = !!S.flags.keepSiege && keepHeld(), has = S.ents.world.some(e => e.keepWall);
+  if (k && siege && !has) keepRng(() => { const [kx, ky] = k; for (const [dx, dy] of [[-12, -1], [12, -1], [-12, 8], [12, 8]]) { const q = detSpot('world', kx + dx, ky + dy, 3) || [kx + dx, ky + dy];
+    const g = makeChar({ name: 'Mauerwache der Stillen Schar', prof: 'Wächter der Stillen Schar', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, level: 13, faction: 'undead', traits: ['diszipliniert'], pal: STILL_PAL });
+    Object.assign(g, { keepWall: true, keepGuard: true, undead: true, hooded: true, brave: true, transient: true, visitor: true, anchor: { x: g.x, y: g.y }, greet: '„Die Lebenden klopfen. Wir öffnen nicht.“' }); g.equip.weapon = mkItem('knochenspalter'); recalc(g); S.ents.world.push(g); }
+    log('Die Schwarze Feste verstärkt ihre Mauern: vier Mauerwachen mehr, solange Valen davor liegt.', 'world'); });
+  else if (has && !siege) S.ents.world = S.ents.world.filter(e => !e.keepWall);
+}
 function deadLifeTick() {   /* Streifen gehen zwischen Lager und Wegpunkt; Hinweise beim ersten Blick auf Feste und Lager */
   const p = S.player; if (!p?.alive || p.map !== 'world' || S._quiet) return;
   for (const s of actorsOf('world').list) if (s.stillPatrol && s.alive) { const [x, y] = s.stillPatrol[s.spi], gx = x * TS + TS / 2, gy = y * TS + TS / 2; if (Math.hypot(s.x - gx, s.y - gy) < 24) { s.spi = 1 - s.spi; const [x2, y2] = s.stillPatrol[s.spi]; s.anchor = { x: x2 * TS + TS / 2, y: y2 * TS + TS / 2 }; s.schedulePos = s.anchor; } else if (!s.anchor || Math.hypot(s.anchor.x - gx, s.anchor.y - gy) > 4) { s.anchor = { x: gx, y: gy }; s.schedulePos = s.anchor; } }
+  deadReactTick();   /* Totenland-Rest: Garmadons Tod räumt die Lager, die Belagerung verstärkt die Feste */
   const H = (S.flags.deadHint ||= {}), k = KEEP();
   if (k && !H.keep && keepHeld() && Math.hypot(p.x / TS - k[0], p.y / TS - k[1]) < 32) { H.keep = 1; log('Die Schwarze Feste: Kaserne, Seelenkapelle, Knochenschmiede und Beinhaus im Mauerring, Wachen am Tor, im Hof der Thron der Stillen Schar. Handel und Rat nur für die, die zur Schar gehören (Rang oder Pakt).', 'world'); }
   for (const Cm of STILL_CAMPS) { const f = S.ents.world.find(e => e.stillCamp === Cm.key && e.type === 'campfire_static'); if (f && !H[Cm.key] && dist(f, p) < 25 * TS) { H[Cm.key] = 1; log(`${Cm.name}: Feuer aus Knochen, ein Händler für Grabgut, Wachen, die nicht atmen. Die Stillen lassen dich in Ruhe, solange du sie in Ruhe lässt.`, 'world'); } }
@@ -13494,7 +13531,7 @@ function gallowsScene(G, preview = false) {
   return c;
 }
 function worldCardTick(now) {
-  heroHailTick(); morrFallTick(); gallowsTick(); deadLifeTick();   /* P3.x E10, T17 Szenen 3/4, P5 A: im selben 0,9-s-Takt */
+  heroHailTick(); morrFallTick(); gallowsTick(); deadLifeTick(); stormHomeTick();   /* P3.x E10, T17 Szenen 3/4, P5 A: im selben 0,9-s-Takt */
   if (!EV_CARDS.length || now < evCardUntil || S.cine || S.dying || S._quiet || S.map === 'prolog' || !S.player?.alive || UI.dialogueOpen() || UI.modalOpen) return;
   const c = EV_CARDS.shift(); evCardUntil = now + c.ms + 600;
   if (c.war) cinematic([{ dur: c.ms, auto: true, beats: [{ t: 0, sfx: c.snd, duck: 0.5, ms: 300 }, { t: 0.02, card: { title: c.title, sub: c.sub, ms: c.ms } }, { t: 0.85, duck: 1, ms: 400 }] }], null, { pause: true, stay: true });
@@ -17160,6 +17197,8 @@ function ensureSecrets() {
     for (const a of S.ents.world) if (a.kind === 'prop' && a.type === 'automat_frame' && a.label && !a.label.includes('Kopf')) a.label += ` — sein Kopf ist nach ${dirName(Uh[0] - a.x / TS, Uh[1] - a.y / TS)} gedreht`; }   /* Umgebungsweg: alle ruhenden Automaten schauen zur Werkstatt */
   const Lf = secretAt('leuchtfeuer'); if (Lf && !S.secrets.leuchtfeuer?.found) { const q = detSpot('world', Lf[0], Lf[1], 8); if (q)
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'tower_ruin', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 14, solid: false, transient: true, secret: 'leuchtfeuer', secretLight: true, label: 'Eingestürzter Leuchtturm — oben ein Becken voll kalter Asche' }); }
+  if (Lf && S.secrets.leuchtfeuer?.found && !S.ents.world.some(e => e.beaconLit)) { const q = detSpot('world', Lf[0], Lf[1], 8); if (q)   /* entzündet: das grüne Feuer brennt (Lichtquelle in render.js lightOf) */
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'tower_ruin', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 14, solid: false, transient: true, beacon: true, beaconLit: true, label: 'Das Leuchtfeuer der Nebelinsel — es brennt grün' }); }
   for (const [k, D] of Object.entries(SECRETS)) if (S.secrets[k]?.found && !LOCATIONS.some(l => l.key === 'sec_' + k)) { const P = secretAt(k); if (P) LOCATIONS.push({ key: 'sec_' + k, name: D.name, x: P[0], y: P[1], r: 6, kind: 'ruin', threat: 2, secret: true }); }
 }
 let bellSeq = [], bellT = 0;
@@ -17258,7 +17297,7 @@ function clockDoor(t) {
   if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
   sfx('metal', 0.4, 0.8); secretFound('uhrmacher'); const tx = t.x / TS | 0, ty = t.y / TS | 0;
   const e = spawnEnemy('automat', 'world', tx + 2, ty + 3, { level: Math.max(12, p.level + 2) }); if (e) Object.assign(e, { transient: true, elite: true, name: 'Der Erste Automat', title: 'Der Erste Automat', aggroId: p.id });
-  const q = detSpot('world', tx - 2, ty + 2, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Werkbank des Uhrmachers', loot: vaultLoot(4), lootBonus: 3 });
+  const q = detSpot('world', tx - 2, ty + 2, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Werkbank des Uhrmachers', loot: [...vaultLoot(4), 'bauplan_uhrmacherhand'], lootBonus: 3 });   /* S5-Rest: Bauplan der Uhrmacherhand */
   addRep('aurel', 5);
   log('Zwölf Schläge, und die Zeiger decken sich: Die Tür springt auf. Drinnen Federn, Zahnräder — und ein Messingmann, der den Kopf hebt. Der Erste Automat schaut dich an. (Aurelion +5)', 'quest');
 }
@@ -17280,10 +17319,16 @@ function walknochenChoice() {
 function secretTick4() {
   const p = S.player; if (p.map !== 'world') return; const L = secretAt('leuchtfeuer'); if (!L) return;
   const d = Math.hypot(p.x / TS - L[0], p.y / TS - L[1]), night = S.minute >= 21 * 60 || S.minute < 5 * 60;
+  { const tw = !S.secrets?.leuchtfeuer?.found && S.ents.world.find(e => e.secretLight); if (tw) tw.beacon = night && S.weather === 'fog'; }   /* vor dem Fund: das grüne Licht brennt nur in Nebelnächten */
   if (!S.secrets?.leuchtfeuer?.found && !S.flags.greenLight && night && S.weather === 'fog' && d < 45) { S.flags.greenLight = 1; log('Drüben auf der Nebelinsel brennt ein grünes Licht. Dort lebt seit dreißig Jahren niemand mehr.', 'world'); }
   if (!S.flags.vaultHint_walknochen && hasItem(p, 'seekarte') && d < 45) { S.flags.vaultHint_walknochen = 1; ensureVaultSites(); log('Das Kreuz auf Weißbarts Seekarte liegt vor der Nebelbank — gleich hinter dieser Insel. Am Nebelsteg liegt ein Boot.', 'quest'); }
 }
+const UHR_PRICE = 300;   /* ⚖ Arbeitslohn für die Uhrmacherhand */
 function secretTalk(npc, choices) {   /* Wissenswege: einmal je Figur, nur wenn das Geheimnis noch offen ist */
+  if (npc.key === 'vell' && hasItem(S.player, 'bauplan_uhrmacherhand')) choices.unshift({ text: `Kannst du diese Hand bauen? (Bauplan des Uhrmachers, ${UHR_PRICE} Gold)`, fn: () => {   /* S5-Rest */
+    if (S.gold < UHR_PRICE) return UI.dialogue(npc, `„Federn aus Kristallstahl kosten. ${UHR_PRICE} Gold, sonst nicht.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= UHR_PRICE; removeItem(S.player, 'bauplan_uhrmacherhand', 1); addItem(S.player, 'uhrmacherhand'); log(`Meisterin Vell baut die Uhrmacherhand (−${UHR_PRICE} Gold). Ein Modul für einen Prothesenarm: feinere Arbeit an Esse und Werkbank, aber schwächere Hiebe.`, 'economy');
+    UI.dialogue(npc, '„Wer hat das gezeichnet? … Der Erste. Natürlich. Hier — steck sie auf einen Prothesenarm. Deine Hand wird genauer, nicht stärker.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
   if (npc.homeTown === 'tickmar' && !npc.guard && !S.secrets?.uhrmacher?.found && /meister|Ingenieur|Mechan|Uhr|Feinmech/.test(npc.prof || '') && !npc._clockTold) choices.push({ text: 'Wer hat die ersten Automaten gebaut?', fn: () => { npc._clockTold = 1; UI.dialogue(npc, '„Der Erste Uhrmacher. Er hat einem Messingmann das Schauen beigebracht — und alle seine Automaten schauen bis heute in dieselbe Richtung. Zu seiner Werkstatt, sagt man. Östlich von Gelenkhall, hinter einer Hecke.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
   if (npc.homeTown === 'saltport' && /Fischer/.test(npc.prof || '') && !S.secrets?.leuchtfeuer?.found && !npc._lightTold) choices.push({ text: 'Was gibt es draußen auf dem Meer?', fn: () => { npc._lightTold = 1; UI.dialogue(npc, '„Auf der Nebelinsel brennt manchmal Licht. Grün. Nachts, wenn Nebel liegt. Seit dreißig Jahren ist da keiner mehr — der alte Wärter Hanno ist mit seinem Feuer gestorben.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
 }
@@ -19170,6 +19215,8 @@ function debugSections() {
       'Geheime Orte: Sandsturm endet (Brunnen frei)': () => { S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); const B = secretAt('brunnen'); if (B) tp(B[0], B[1] + 4); },
       'Geheime Orte: zu den Kreidezeichen (Stollen)': () => { const St = secretAt('stollen'); if (St) tp(St[0] + 14, St[1] + 5); },
       'Geheime Orte: zum Hundertfeld (Lanze)': () => { const H = secretAt('hundert'); if (H) tp(H[0], H[1] + 3); },
+      'Geheime Orte: Bauplan Uhrmacherhand geben (Vell in Gelenkhall baut sie)': () => { addItem(p, 'bauplan_uhrmacherhand'); UI.toast('Bauplan im Gepäck — zu Meisterin Vell (Gelenkhall).'); },   /* S5-Rest */
+      'Geheime Orte: Leuchtfeuer brennt (Nacht, zum Steg)': () => { (S.secrets ||= {}).leuchtfeuer = { ...(S.secrets.leuchtfeuer || {}), found: S.secrets.leuchtfeuer?.found || (S.day | 0) }; ensureSecrets(); S.minute = 23 * 60; const L = secretAt('leuchtfeuer'); if (L) tp(L[0], L[1] + 25); },   /* S5-Rest */
       'Geheime Orte: zur Uhrmacher-Tür (12 Uhr stellen)': () => { const U = secretAt('uhrmacher'); if (U) { tp(U[0], U[1] + 3); S.minute = 12 * 60; } },   /* S5 */
       'Geheime Orte: zum Leuchtturm (Nacht, Nebel, 3 Holz)': () => { const L = secretAt('leuchtfeuer'); if (L) { tp(L[0], L[1] + 3); S.minute = 23 * 60; S.weather = 'fog'; S.res.wood = Math.max(3, S.res.wood || 0); } },   /* S5 */
       'Geheime Orte: Boot zur Walknocheninsel (Seekarte geben, zum Nebelsteg)': () => { addItem(p, 'seekarte'); S.flags.vaultHint_walknochen = 1; ensureVaultSites(); const b = S.ents.world.find(e => e.vaultSite === 'walknochen'); if (b) tp(b.x / TS2 | 0, (b.y / TS2 | 0) + 2); },   /* S5 */
@@ -23367,6 +23414,14 @@ export function selftest() {
     return cells.every(c => { const at = (tx, ty) => inJailCell({ x: tx * TS, y: ty * TS }, c), d = c.door[1], top = d > c.y;
       return at(c.x + 2.5, c.y + 3) && at(c.x + 2.5, d + 0.5) && at(c.x + 2.5, top ? d + 0.95 : d + 0.05) && !at(c.x + 2.5, top ? d + 1.5 : d - 0.5) && !at(c.x + 7, c.y + 3); });
   })());
+  ok('P4.31 Spielstand (09.10.): flüchtige Welt der neuen Systeme (Kinder, Strohsäcke, Stadttiere, Besitzer-Banner, Moorhexe, Bündel der Abwanderer) steht nie im Stand; dauerhafte Felder (Leerstand, Haushalte als Ableitung, Hauswissen) sind lesbar', (() => {
+    const W = S.ents.world, sd = saveData(), out = JSON.parse(sd), sw = out.ents?.world || [];
+    const bad = sw.filter(e => e.famKid || e.famBed || e.townPet || e.ownerBanner || e.key === 'brakke' || e.leaveSack || e.introWalker);
+    const live = W.some(e => e.famKid) && W.some(e => e.townPet) && W.some(e => e.ownerBanner) && W.some(e => e.key === 'brakke');
+    const fields = (out.vacant === undefined || typeof out.vacant === 'object') && (!out.legacy || typeof out.legacy === 'object');
+    if (bad.length || !live || !fields) console.warn('P4.31', { bad: bad.slice(0, 5).map(e => e.type || e.prof || e.name), live, fields });
+    return !bad.length && live && fields;
+  })());
   ok('Prolog Speichern (08.10.): mitten im Prolog steht im Stand nur Schritt/Rückweg und der Held — Karte, Oswin, Gesandte und Untote sind flüchtig; beim Laden baut buildProlog alles neu um den gespeicherten Helden', (() => {
     const p = S.player, P0 = S.prolog, E0 = S.ents.prolog, M0 = MAPS.prolog, m0 = S.map, pm = p.map, x0 = p.x, y0 = p.y;
     try {
@@ -24089,7 +24144,9 @@ export function selftest() {
       const easy = hpOf('angsthase'), norm = hpOf('schwer'), hard = hpOf('sehr_schwer');
       S.difficulty = 'angsthase'; applyDifficulty(); const e = spawnEnemy('chain_brute', '__a', 11, 9); startHeavy(e, p, MONSTERS.chain_brute); const longWind = e.telegraph > MONSTERS.chain_brute.heavy.wind;
       const decay = d => { S.difficulty = d; S.bounty = { valen: 100 }; bountyDay(); return 100 - (S.bounty.valen || 0); };
-      return easy < norm && norm < hard && longWind && decay('angsthase') > decay('schwer') && decay('schwer') > decay('sehr_schwer');
+      const dc = [decay('angsthase'), decay('schwer'), decay('sehr_schwer')], res = easy < norm && norm < hard && longWind && dc[0] > dc[1] && dc[1] > dc[2];
+      if (!res) console.warn('Schwierigkeit', JSON.stringify({ easy, norm, hard, longWind, tel: e.telegraph, dc }));   /* 09.10.: Diagnose bei Rot */
+      return res;
     } finally { S.difficulty = d0; S.bounty = b0; applyDifficulty(); }
   }));
   ok('Erbfolgestreit (S15 P9): zwei Erben, deine Fürsprache hebt die Gunst des Hauses und damit seine Stimme im Rat', sandbox(() => {
@@ -24651,6 +24708,20 @@ export function selftest() {
       if (!(same && wrong && opened && off && warned && fell)) console.log('Gewölbe-Probe', { same, wrong, opened, off, warned, fell });
       return same && wrong && opened && off && warned && fell;
     } finally { MAPS.vault = M0; if (E0) { S.ents.vault = E0; indexSolids('vault'); } else delete S.ents.vault; S.vaultAt = A0; if (V0) S.vaults = V0; else delete S.vaults; Object.assign(DUNGEONS.vault, D0); S.vaultMod = mod0; }
+  }));
+  ok('S5-Rest: Uhrmacherhand (Modul hebt Handwerksgüte wie Königseisen, −10 % Nahkampf; Vell baut sie aus dem Bauplan), grünes Leuchtfeuer als Lichtquelle, Sturmkrieger gehen nach dem Sieg zu Fuß heim', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length;
+    try {
+      p.body.larm.lost = false; p.body.larm.mech = 2; p.body.larm.mechCond = 100; p.body.larm.mod = 'uhrmacherhand'; const hand = B.hasMod(p, 'uhrmacherhand') && Math.abs(B.mechBonus(p, 'arm') + 0.1) < 1e-9 && !!ITEMS.uhrmacherhand && ITEMS.uhrmacherhand.use === 'mechmod';
+      const v = actor(p.x + 30, p.y, { name: 'Meisterin Vell' }); v.key = 'vell'; S.gold = 1000; addItem(p, 'bauplan_uhrmacherhand'); const ch = []; secretTalk(v, ch); ch.find(c => c.text.startsWith('Kannst du diese Hand'))?.fn();
+      const built = hasItem(p, 'uhrmacherhand') && !hasItem(p, 'bauplan_uhrmacherhand') && S.gold === 1000 - UHR_PRICE;
+      S.ents.world = W0.slice(); S.secrets = { leuchtfeuer: { found: 1 } }; ensureSecrets(); const lit = S.ents.world.some(e => e.beaconLit && e.beacon);
+      S.ents.world = S.ents.world.filter(e => e.mtype !== 'dodon');   /* der echte Dodon bleibt unberührt */
+      const g = spawnEnemy('goblin', 'world', MORR.x + 40, MORR.y, {}); Object.assign(g, { goblinStorm: true, transient: true }); S.flags.goblinStormFired = true; goblinStormWon();
+      const walks = g.alive && g.stormHome && Math.abs(g.anchor.x - (MORR.x + 0.5) * TS) < 1; g.x = (MORR.x + 1) * TS; g.y = MORR.y * TS; stormHomeTick(); const home = !S.ents.world.includes(g);
+      if (!(hand && built && lit && walks && home)) console.log('S5-Rest-Probe', { hand, built, lit, walks, home });
+      return hand && built && lit && walks && home;
+    } finally { S.ents.world = W0; S.secrets = s0; LOCATIONS.length = L0; UI.closeDialogue(); }
   }));
   ok('Geheime Orte S5: Uhrmacher (Tür nur zur Mittagsstunde, Automaten schauen hin), Leuchtfeuer (nur nachts, 3 Holz → Fernrohr + Boot am Steg), Walknocheninsel (Beute-Wahl); 8 Geheimnisse', sandbox(() => {
     const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, m0 = S.minute, w0 = S.res.wood, btn = pre => [...document.querySelectorAll('#dlg-choices button')].find(b => b.textContent.startsWith(pre));
@@ -25389,7 +25460,7 @@ function boot() {
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed, conMix, worldCard,                                         // S15 P4: Zauber im Dev-Modus prüfen
     shot: async name => { R.resize(); R.drawFrame(performance.now()); const url = document.getElementById('game-canvas').toDataURL('image/png'); return (await fetch('http://127.0.0.1:8771/' + name + '.png', { method: 'POST', body: url })).status; } };   // Bildschirmfoto in docs/screenshots (Sichtprüfung)
   if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { arena: { enter: arenaEnter, leave: arenaLeave, weapon: arenaWeapon, foe: arenaFoe, warm: arenaWarm, plan: arenaPlanText, inArena, keep: () => arenaKeep, tc: tickCombatant, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) if (inArena()) arenaUpdate(step, performance.now()); } } });   /* Kampfanimation: Test Room für Browser-Tests */
-  if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { town: { roles: townRoles, roleOf, roleLine, table: roleTable, meet: () => MEET_SPOTS, festGoes, planSocial, dayTargetRaw, shopVisit, ensureBizHands, ensureSmithyYards, hammerFx } });   /* Planlauf P1.8/P1.12/P1.13: Städte im Dev-Modus messen */
+  if (location.search.includes('dev') && window.RF) Object.assign(window.RF, { town: { roles: townRoles, roleOf, roleLine, table: roleTable, meet: () => MEET_SPOTS, festGoes, planSocial, dayTargetRaw, shopVisit, ensureBizHands, ensureSmithyYards, hammerFx, dbg: { applyDifficulty, startHeavy, bountyDay, heirRules, addRep } } });   /* Planlauf P1.8/P1.12/P1.13: Städte im Dev-Modus messen */
 }
 await unpackAll();   /* Audit D6: komprimierte Spielstände vor dem Titelbild entpacken (Laden bleibt synchron) */
 boot();

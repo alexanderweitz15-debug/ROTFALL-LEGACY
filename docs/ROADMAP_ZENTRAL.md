@@ -441,9 +441,11 @@ Gesamt-Skalierung (§48) betrachten: Welt (NPCs, Gegner, Gebäude, Animationen, 
 
 
 **Stand 08.10. (Claude):** ✔ Abschnitts-Zeitmesser für `update()` (Debug „Leistung: update-Abschnitte messen“, `RF.prof(true)`). Messung Varonheims Hauptmarkt mittags (2061 Akteure, 135 Bewohner im heißen Radius): vorher update Median 4,4 ms / 95 % 10 ms (think 2,8 ms); Ursache: ruhige Bewohner bis 1150 px dachten jedes Bild, sichtbar sind nur ~±600 px. ✔ Ruhige Bewohner/Kinder über 900 px denken jedes 3. Bild (mittlere Stufe) → update Median 1,7 ms / 95 % 5,1 ms (think 1,5 ms); Zeichnen ~3 ms. ✔ Spitzen-Ursache gefunden: `sealTick` → `giverMark` → `conGiverOk` baute die Geberliste alle 2 s je Ort über alle ~17 000 Karteneinträge (6–13 ms) → jetzt über die ~2 000 Akteure (`actorsOf`). Danach (Spiel, nicht Testmodus) Median 2,6 ms, 95 % 6,1 ms; `think` schwankt 1,5–2,2 ms. Stresstest Fest Varonheim (19 Uhr): update Median 2,2–4 ms, 95 % 5,7–12,8 ms; seltene Spitzen 15–36 ms im Abschnitt Akteure/Wagen bzw. Sekundenhaken — Neuaufbau der Akteursliste selbst nur 1–2 ms, Rest vermutlich Speicherbereinigung/Karawanen-Wegsuche (ohne Profiler nicht trennbar). **Fehlt:** Spitzen mit dem Browser-Profiler zuordnen (🔍 im echten Fenster: F12 → Leistung); restliche Spitzen in `think` prüfen; Messung im echten Fenster (Bereich war verborgen); Bild-Cache-Größe, Lauf-Bilder vorbacken.
-#### P4.31 Save/Load (☐)
+#### P4.31 Save/Load (◐)
 
 Tests für Tutorial, Familien, Betriebe, Städte; Spielstand-Versionierung / zentrale Felddefinition; alte Savegames laden ohne Fehler.
+
+**Stand 09.10. (Claude):** ✔ Probe „Prolog Speichern“ (Stand mitten im Prolog, Neubau beim Laden), ✔ Probe „P4.31 Spielstand“ (flüchtige Welt der neuen Systeme — Kinder, Strohsäcke, Stadttiere, Banner, Moorhexe, Bündel, Einflug-Wanderer — nie im Stand; dauerhafte Felder lesbar); Betriebs-Bestellungen und Skills haben eigene Speicherproben der Agenten. Jeder Selbsttest lädt den alten Sicherungsstand (`rotfall.backup.s14c`) = Probe „alter Stand lädt“. **Fehlt:** echter Rundlauf Speichern → Laden → Vergleich im Selbsttest (heute nur über Debug „Größe messen und Rundlauf prüfen“); zentrale Felddefinition/Versionierung.
 
 #### P4.32 Regression und QA (☐)
 
@@ -648,9 +650,9 @@ Gast-Handel per Dock (Adapter tradeUI ↔ shopData; **BLOCKIERT**) · HB-30 · E
 - Doppelte Bodenauflösung (🔶 E28)
 - game.js modularisieren (23k Zeilen)
 
-### Audit 04.10. Rest (☐)
-- 3.16 `addRep()` zentral (32 direkte Schreibstellen)
-- Phase-4-Abnahmeprobe „Erbe" (alle Felder gegen die Tabelle)
+### Audit 04.10. Rest (◐)
+- 3.16 `addRep()` zentral (32 direkte Schreibstellen) — **Stand 09.10. (Agent):** gemessen sind es **239** Schreibstellen auf `S.factions` (87 mit der Formel `clamp((alt || 0) + n, -100, 100)`, 36 ohne Klammer `+=`/`-=`, 116 sonstige: feste Werte, `Math.max/min`, Goblins bis 300, Erbe-Faktoren). `addRep(f, n, lo, hi)` + `REP_HOOKS` gebaut (Verhalten gleich, Probe „Audit 3.16“); **81** Formel-Stellen umgestellt. **Fehlt:** 6 Formel-Stellen in Vharnholm/Garmadon/`die` (fremdes Arbeitsgebiet, bewusst nicht angefasst), die 36 `+=`-Stellen (Umstellung ändert Verhalten: dort gibt es heute keine Grenze ±100 → 🔶 Entscheidung: klammern ja/nein), sonstige Sonderfälle; Rang-Prüfung/Log-Haken erst nach Entscheidung in `REP_HOOKS`.
+- Phase-4-Abnahmeprobe „Erbe" (alle Felder gegen die Tabelle) — **Stand 09.10. (Agent):** Erbe-Regeln aus `adoptSuccessor` in `heirRules(old, heir)` herausgelöst (Verhalten gleich), Abnahmeprobe „Erbe“ prüft jede Zeile (Gold, Ruf gut/Hass, Kopfgeld + Schuld, Bann, Rang, Schein, Hausgunst, Titel, Zauber, Betriebskassen, Ruhm, Pferd, Gefährten, Fertigkeiten/Meisterschaften/Techniken sterben mit, Hauswissen bleibt). 🐞→✔ Doku-Abweichung: MECHANIKEN §1 und IST §9 sagten „50 % Ruf“, der Code (Audit 3.13) halbiert nur guten Ruf, Hass bleibt zu 80 % — Doku angepasst. Code-Abweichungen: keine gefunden.
 - Phase 5: Gold-Senken (Betriebssteuer, Unterhalt, Bank); Garmadon als Hauptauftrag mit `q_omega`; `factionAgenda` für alle; zweite Lehrer Frost/Blitz/Schatten/Glaube/Paladin; Zerlegen; Boss-Intro/Beute Graumähne/Karrak; Rohstoff-Dubletten
 - Phase 6: IST neu generieren (Zählungen per Skript)
 
