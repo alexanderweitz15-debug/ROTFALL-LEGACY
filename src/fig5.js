@@ -8,8 +8,8 @@
 // Metall getrennt schattiert; Details nur in Clustern (kein Einzelpixel-Rauschen).
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
-import { mix } from './sprites.js?v=25';
-import { atkShape, legacySw, atkBody, atkStance, rangedBody } from './anim.js?v=25';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
+import { mix } from './sprites.js?v=24';
+import { atkShape, legacySw, atkBody, atkStance } from './anim.js?v=24';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)
@@ -326,7 +326,7 @@ function svOf(W) {
 export function weaponAngle(W, dir) {
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, wt = W.wt, bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
   if (wt === 'bow') return bowA;
-  if (RANGED.has(wt)) return W.mode === 'aim' ? (wt === 'crossbow' && W.rph === 'reload' ? Math.PI / 2 - sgn * 0.35 : dir) : wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA;   /* W11 S2: Nachladen — Schaft gesenkt */
+  if (RANGED.has(wt)) return W.mode === 'aim' ? (wt === 'crossbow' ? dir : dir) : wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA;
   if (W.mode === 'rest') return upright(wt) ? -Math.PI / 2 + sgn * 0.1 : onShoulder(wt) ? (Math.abs(Math.cos(dir)) < 0.4 ? -Math.PI / 2 + 0.55 : -Math.PI / 2 - sgn * 0.75) : sgn > 0 ? 1.2 : Math.PI - 1.2;
   return dir + svOf(W).a * sgn;
 }
@@ -334,8 +334,7 @@ function armPlan(view, R, W) {
   const a = W.oct * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a), sgn = ca < -1e-9 ? -1 : 1, left = view !== 'W' && sgn < 0;
   const S = view === 'W' ? R.aN[0] : left ? R.aL[0] : R.aR[0], low = W.low || 0, wt = W.wt;
   let h;
-  if (W.mode === 'aim' && wt === 'crossbow' && W.rph === 'reload') h = [16 + ca * 5 * K, ROY - DY + (-16 + sa * 3) * K + R.by];   /* W11 S2: Nachladen — Waffe vor dem Bauch, Figur gebeugt */
-  else if (W.mode === 'aim') h = [16 + ca * (wt === 'bow' ? 21 : 8) * K, ROY - DY + ((wt === 'bow' ? -34 : -26) + sa * 5) * K + R.by];   // S15 P3: Bogenarm gestreckt, auf Brusthöhe
+  if (W.mode === 'aim') h = [16 + ca * (wt === 'bow' ? 21 : 8) * K, ROY - DY + ((wt === 'bow' ? -34 : -26) + sa * 5) * K + R.by];   // S15 P3: Bogenarm gestreckt, auf Brusthöhe
   else if (W.mode === 'aimRest') h = [S[0] + ca * 4 * K, S[1] + (14 + low) * K];
   else if (W.mode === 'rest') h = upright(wt) ? [S[0] + ca * 6 * K, S[1] + (11 + low) * K] : onShoulder(wt) ? [S[0] + ca * 3 * K, S[1] + (9 + low) * K]
     : [S[0] + ca * 5 * K, S[1] + (16 + low + Math.max(0, sa) * 2) * K];
@@ -349,7 +348,6 @@ function armPlan(view, R, W) {
   let off = null;
   if (W.two && !RANGED.has(wt)) off = [h[0] + Math.cos(aw) * 6 * K, h[1] + Math.sin(aw) * 6 * K];   /* Kampfanimation: beide Hände eng am Griff */
   else if (wt === 'bow' && W.mode === 'aim') { const pl = W.pull || 0; off = [h[0] - ca * (2.5 + 9 * pl), h[1] - sa * 3 - 1 - pl * 1.5]; }   // S15 (Nutzer: „man soll sehen, wie der Bogen gespannt wird“): Zughand wandert mit dem Spannen bis ans Kinn
-  else if (wt === 'crossbow' && W.mode === 'aim' && W.rph === 'reload') { const rk = W.rk || 0, pump = rk >= 0.25 && rk < 0.75 ? (rk === 0.5 ? 3 : 1) : 0; off = [h[0] - ca * 2, h[1] - 3 - pump]; }   /* W11 S2: zweite Hand spannt — hebt und senkt sich */
   else if (wt === 'crossbow' && W.mode === 'aim') off = [h[0] - ca * 3.5, h[1] - sa * 2 + 1];
   return { h, off, left, aw };
 }
@@ -369,8 +367,8 @@ export function paintR(L, dir, pose, W = null) {
   if (extra) { const A = view === 'W' ? rigW(extra) : rigS(extra), dy = R.by - A.by;   // Mischpose: Beine der Grundpose, Arme der Zusatzpose
     for (const k of ['aL', 'aR', 'aN', 'aF']) if (A[k]) R[k] = A[k].map(([x, y]) => [x, y + dy]); }
   pose = base;
-  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : W && (W.mode === 'ready' || W.mode === 'cover') ? stanceBody(W) : W && W.mode === 'aim' && W.rph ? rangedBody(W.wt, W.rph, W.rk || 0) : null; CUR_BP = BP;   /* W11 S2: Fernwaffen-Phase (spannen, lösen, nachladen) */   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
-  if (BP) bodyPose(R, view, BP, base === 'cast' ? 'i1' : base);   /* W11 S2: beim Schuss (Pose cast) stehen die Beine wie im Stand */
+  const BP = W && W.mode === 'swing' ? atkBody(W.ac || W.wt, W.v, W.q) : W && (W.mode === 'ready' || W.mode === 'cover') ? stanceBody(W) : null; CUR_BP = BP;   /* Kampfanimation: Ganzkörperpose aus anim.js (Form × Stützstelle — schon im Cache-Schlüssel) */
+  if (BP) bodyPose(R, view, BP, base);
   else {
   if (ph === 'wind') { R.by -= 1; if (view === 'W') { R.lean += 1; R.cs = 1; } }
   if (ph === 'strike' || ph === 'follow') { R.by += 1; if (view === 'W') { R.lean -= 1; R.cs = 3; R.sw = 2; R.lN = [[15.5, 26], [13.5, 33.5], [12, 41]]; R.lF = [[16.5, 26], [18, 33.5], [19.5, 41]]; }

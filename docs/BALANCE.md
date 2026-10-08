@@ -170,30 +170,3 @@ Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, 
 | 2.5 Sühne | kein Rückweg aus Verhasst | Mittler (Nix/Grisk/Sael): Gold 6 je fehlendem Punkt (min. 150) oder 20 Eisen → Ruf −59, alle 10 Tage | Softlock Bande/Goblins/Tote |
 
 Alle Werte vorläufig; messen mit `RF.simFight` und im Spiel.
-
-## Reliquien (Version 24)
-Bewusste Endgame-Ausnahme von den Ausrüstungsgrenzen (Nutzerentscheid „stark, mit Deckeln“). Ein Topf je Wert, Deckel je Phase:
-
-| Phase | Schaden | Angriffstempo | Lauftempo | Abklingzeit | Krit | Lebensraub | Rüstung | Treffer-Multiplikator |
-|---|---|---|---|---|---|---|---|---|
-| früh (1–2 Fassungen) | +25 % | +20 % | +20 % | −20 % | +8 % | 5 % | +6 | ×1,35 |
-| drei Fassungen | +50 % | +40 % | +35 % | −40 % | +15 % | 10 % | +12 | ×1,8 |
-| mit Stufe VIII | +120 % | +100 % | +70 % | −70 % | +30 % | 20 % | +25 | ×3 |
-
-Untergrenzen: Schwung ≥ 180 ms, Ausweich-Abklingzeit ≥ 250 ms. Stufenfaktor der Zahlen: 1 / 1,25 / 1,5 / 1,8 / 2,1 / 2,5 / 3 / 3,6.
-Gemessen (Stufe 30, Schlächterherz + Blutkranz + Rotdorn auf VIII, 30 % Leben, volle Serie): Schaden ×1,7–1,8, Angriffstempo +100 % (gedeckelt), Lebensraub 14 %.
-
-## Krieg: Schonfrist, Streifen, Entsatz (05.10.2026)
-
-Messung: neues Spiel, Schwer, Held in Tiefhall (keine Schlacht vor Ort), 30 Tage je 4 Kriegsrunden + Tagesschritt (`warTick`/`warDay`).
-
-| | vorher | nachher |
-|---|---|---|
-| Eren fällt | Tag 1 | nie (kurz Tag 2–3 in einem Lauf ohne Streifen, Rückeroberung am selben Tag) |
-| Knoten der Toten Tag 15 | 13 von 16 | 3 (Schwarze Feste, Nekropole, Alt-Vharn) |
-| Nordfurt | fällt Tag 25 | hält |
-| Sonnwacht | fällt Tag 15 | fällt Tag 5, 15–18, wird zurückgeholt (Aktion bleibt) |
-| Westen (Friedhof, Moor, Feste) | alles verloren, dann tot | bleibt umkämpft: die Toten halten ihre Gruft, die Kettenstreife (max. 50) schlägt ihre Heere vor Eren |
-| Valens Heere Tag 1 | marschieren zur Nekropole | halten Eren/Straße, Streife unterwegs |
-
-Stellschrauben (`sim.js`): `WAR_GRACE` 5 Tage, `PATROL` (Stärke 35, Routen, `PATROL_EVERY` 4, `PATROL_MAX` 50), `UNDEAD_ARMIES` 2 (die Toten stellen bis zu zwei Heere aus Gruft-Knoten ohne Heer auf), `RELIEF` (3 Tage Wartezeit, Stärke 40, 5 Tage Stationierung, je Stadt alle 6 Tage). Streifen nehmen keine Gruft-Knoten (auch nicht nach gewonnener Feldschlacht) und wachsen höchstens auf 50, damit die Front lebendig bleibt (Nutzer: „da soll schon Aktion sein“). Lauf über 45 Tage: Sonnwacht wechselt mehrfach, Alt-Vharn wird zeitweise von Valen genommen, Eren und Nordfurt halten, kein Dauerzustand.

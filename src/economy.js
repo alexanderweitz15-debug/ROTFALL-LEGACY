@@ -2,9 +2,9 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=25';
-import { ITEMS, GOODS, TOWNS } from './data.js?v=25';
-import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=25';
+import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=24';
+import { ITEMS, GOODS, TOWNS } from './data.js?v=24';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=24';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];
@@ -97,9 +97,6 @@ function useOf(town, c) {
   return u;
 }
 export const target = (t, g) => (t.use[g] || 0) * 6 + 4;
-/* Nutzer 05.10.2026: „Handel fördern“ (Stadtkasse) bringt zehn Tage lang 20 % mehr Ware je Karawane in diese Stadt (S.growth[t].tradeUntil). */
-export const TRADE_BOOST = 1.2, TRADE_BOOST_DAYS = 10;
-export const tradeMul = town => (S.growth?.[town]?.tradeUntil || 0) > (S.day | 0) ? TRADE_BOOST : 1;
 export const capOf = town => Math.min(400, 60 + 40 * siteCount(town, ['store', 'markethall', 'kontor']));
 
 // ---------------- Start / Altstände ----------------
@@ -298,39 +295,11 @@ export function riskOf(a, b, guards) {
   if (S.laws?.toll) r -= 0.02;
   return clamp(r * (1 - 0.22 * guards), 0.01, 0.5);
 }
-/* W9 Slice 1 „Unsichere Wege“ (Welttiefe, 05.10.2026): Das Wegrisiko eines Händlerzugs hängt an der Straße, nicht nur an den Enden — Kriegsknoten der Toten
-   und Räuberlager nahe der Linie, dazu jüngste Überfälle (S.eco.unsafe, UNSAFE_DAYS Tage). Ab UNSAFE_SKIP meiden die Händler den Weg: die Zielstadt bekommt
-   keine Ware, der Vorrat sinkt, die Preise steigen (ecoPrice). Riskante Züge fahren mit zwei Wachen. Nach einer Befreiung kehren die Händler sichtbar zurück
-   (tradeReturn: ein Zug mit Korn, der Weg gilt wieder als sicher). */
-const NODE_LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
-export const UNSAFE_DAYS = 6, UNSAFE_SKIP = 0.4;
-const pairKey = (a, b) => [a, b].sort().join('|');
-const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1, t = clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1); return Math.hypot(px - (ax + dx * t), py - (ay + dy * t)); };
-export function routeRisk(a, b, guards = 0) {
-  if (!LOC[a] || !LOC[b]) return 0.06;
-  let r = riskOf(a, b, 0); const A = LOC[a], B = LOC[b], near = (x, y) => segDist(x, y, A.x, A.y, B.x, B.y) < 60;
-  for (const [k, n] of Object.entries(S.war?.nodes || {})) if (n.owner === 'undead' && NODE_LOC[k] && k !== a && k !== b && near(NODE_LOC[k].x, NODE_LOC[k].y)) r += 0.15;   /* Totenknoten an der Straße */
-  for (const bd of S.bands || []) if (!bd.gone && bd.tx != null && near(bd.tx, bd.ty)) r += 0.08;   /* Räuberlager an der Straße */
-  const U = S.eco?.unsafe?.[pairKey(a, b)]; if (U && (S.day | 0) - U.day <= UNSAFE_DAYS) r += 0.1 * U.n;   /* jüngste Überfälle */
-  return clamp(r * (1 - 0.22 * guards), 0.01, 0.6);
-}
-export const avoids = (a, b) => routeRisk(a, b, 0) >= UNSAFE_SKIP;
-export function unsafeRoutes(town) { return tradeTowns().filter(k => k !== town && tripDays(town, k) <= 3 && avoids(town, k)); }   /* nur Handelspartner in Reichweite, keine Totenstädte */
-export function noteRaid(a, b) { const E = S.eco, key = pairKey(a, b), day = S.day | 0, U = (E.unsafe ||= {})[key]; const n = U && day - U.day <= UNSAFE_DAYS ? U.n + 1 : 1; E.unsafe[key] = { n, day };
-  if (n === 2) { log(`Die Straße zwischen ${townName(a)} und ${townName(b)} gilt als unsicher — Händler meiden sie, bis Ruhe einkehrt.`, 'economy'); chronicle(`Die Straße ${townName(a)}–${townName(b)} gilt als unsicher`, 'news'); } }
-export function tradeReturn(node) {
-  const E = S.eco; if (!E || !S.towns[node] || !LOC[node]) return null;
-  for (const k of Object.keys(E.unsafe || {})) if (k.split('|').includes(node)) delete E.unsafe[k];
-  const from = tradeTowns().filter(k => k !== node && !avoids(k, node)).sort((a, b) => tripDays(a, node) - tripDays(b, node))[0]; if (!from) return null;
-  const good = (S.towns[from].stock.grain || 0) >= 12 ? 'grain' : 'salt'; S.towns[from].stock[good] = Math.max(0, (S.towns[from].stock[good] || 0) - 12);
-  const c = { id: uid(), from, to: node, good, n: 12, guards: 2, eta: (S.day | 0) + tripDays(from, node), back: true }; E.caravans.push(c);
-  log(`Händler kehren nach ${townName(node)} zurück: ein Zug aus ${townName(from)} mit ${ITEMS[good].name} ist unterwegs.`, 'economy'); chronicle(`Die Händler kehren nach ${townName(node)} zurück`, 'news'); return c;
-}
 function caravanDay() {
   const E = S.eco;
   for (const c of [...E.caravans]) {
-    if (!c.raided && chance(routeRisk(c.from, c.to, c.guards))) {
-      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost; noteRaid(c.from, c.to);
+    if (!c.raided && chance(riskOf(c.from, c.to, c.guards))) {
+      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost;
       log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
       if (chance(0.3)) chronicle(`Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
     }
@@ -345,15 +314,14 @@ function caravanDay() {
       for (const b of T) {
         if (a === b || E.caravans.some(c => c.to === b && c.good === g)) continue;
         const tb = S.towns[b], need = target(tb, g) * 0.6 - tb.stock[g]; if (need < 3) continue;
-        const risk = routeRisk(a, b, 0); if (risk >= UNSAFE_SKIP) continue;   /* W9: unsichere Wege meidet der Handel */
         const gain = ecoPrice(b, g, false) - ecoPrice(a, g, true);
-        const score = gain * Math.min(sur, need) / tripDays(a, b) * (1 - risk);
+        const score = gain * Math.min(sur, need) / tripDays(a, b);
         if (!best || score > best.score) best = { score, g, a, b, n: Math.min(20, Math.floor(sur), Math.ceil(need) + 4) };
       }
     }
     if (!best || best.score <= 0) break;
     S.towns[best.a].stock[best.g] -= best.n;
-    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: Math.round(best.n * tradeMul(best.b)), guards: routeRisk(best.a, best.b, 0) > 0.2 ? 2 : ri(0, 2), eta: (S.day | 0) + tripDays(best.a, best.b) });   /* W9: riskante Wege mit Wachen */   /* geförderter Handel: 20 % mehr am Ziel */
+    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 2), eta: (S.day | 0) + tripDays(best.a, best.b) });
   }
 }
 

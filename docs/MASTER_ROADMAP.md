@@ -1,12 +1,8 @@
 # ROTFALL: LEGACY — Master-Anweisung und Feature-Roadmap
 
-> **Hinweis (05.10.2026):** Teil A (Arbeitsregeln) ist in `CLAUDE.md` aufgegangen und gilt dort; Teil B und C (Vision, Pakete, Prioritäten, End-to-End-Tests) bleiben als Roadmap maßgeblich.
-
 Stand: 2026-09-30. Vom Nutzer als verbindliche Arbeitsgrundlage übergeben. Diese Datei ist die Referenz für Claude und seine Agenten. Die Statustabelle der laufenden Pakete steht weiter in `PLAN_S15.md`; der Ist-Zustand des Codes in `IST_ZUSTAND.md`.
 
 ## Teil A — Arbeitsregeln (vor jeder Implementierung)
-
-> **Abgelöst (05.10.2026):** Arbeitsregeln stehen nur noch in `CLAUDE.md`; Teil A bleibt Lesestoff. Die Schritte „Skills auflisten, Plugins prüfen“ und die Opus/Sonnet-Agentenregel gelten nicht mehr.
 
 ### A.0 Reihenfolge
 1. Verfügbare Skills auflisten, relevante Skill-Anweisungen lesen und anwenden (Repository-Analyse, Coding, Architektur, Testing, Debugging, UI, Dokumentation, Performance, Agentenarbeit).

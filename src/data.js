@@ -1499,78 +1499,10 @@ export const QUESTS = {
     objectives:[{type:'find',target:'lila',text:'Lila finden'}],
     reward:{xp:60}, turnin:'jorun', branching:true },
   /* Audit 04.10. Phase 4: Erbe-Aufträge — entstehen beim Antritt des Erben (adoptSuccessor), kein Geber */
-  q_erbe_schwur: { name:'Schwur des Vorfahren', giver:null, desc:'Ein Auftrag deines Vorfahren blieb offen. Schließe ihn in seinem Namen ab — wer das Wort eines Toten hält, bekommt den doppelten Lohn.',
+  q_erbe_schwur: { name:'Schwur des Vorfahren', giver:null, heir:true, desc:'Ein Auftrag deines Vorfahren blieb offen. Schließe ihn in seinem Namen ab — wer das Wort eines Toten hält, bekommt den doppelten Lohn.',
     objectives:[{type:'custom',count:1,text:'Den offenen Auftrag des Vorfahren abschließen'}], reward:{xp:120} },
-  q_erbe_grab: { name:'Das Ahnengrab', giver:null, desc:'Dein Vorfahr liegt, wo er fiel. Besuche das Grab: dort hörst du, was von ihm bleibt — und wer seine Waffe trägt.',
+  q_erbe_grab: { name:'Das Ahnengrab', giver:null, heir:true, desc:'Dein Vorfahr liegt, wo er fiel. Besuche das Grab: dort hörst du, was von ihm bleibt — und wer seine Waffe trägt.',
     objectives:[{type:'custom',count:1,text:'Das Ahnengrab besuchen'}], reward:{xp:60} },
-  /* Ermittlung (Welttiefe Slice 1): Zieltypen talk/clue, Entscheidung mit Folgen am Ende — Vorlage für weitere Ermittlungen */
-  q_erm_markt: { name:'Blut auf dem Markt', giver:'havel', turnin:'havel',
-    desc:'„Heute Nacht hat jemand Maras Vorratskiste aufgebrochen. Ein halber Schinken fehlt, und zwischen den Ständen liegt Blut. Borin hat wieder bis spät getrunken, sagt man. Ich will keinen Verdacht, ich will Gewissheit: Sieh dir die Spuren an, rede mit den Leuten, und dann sag mir, wer es war.“',
-    objectives:[
-      { type:'clue', target:'markt_blut', count:1, text:'Die Blutspur zwischen den Marktständen untersuchen' },
-      { type:'talk', target:'borin', count:1, text:'Borin in der Schenke befragen', say:'„Ich? Ich hab bis zum Morgengrauen hier gesessen, frag den Wirt. Ja, ich war betrunken. Nein, ich stehle kein Fleisch — ich hab Sold bekommen, Fremder, ich hab’s nicht nötig.“ Er hebt die Hände: keine Kratzer, keine Bisswunde.' },
-      { type:'talk', target:'elena', count:1, text:'Elena, die Heilerin, befragen', say:'„Heute früh kam der Jägerbursche zu mir, Tomas. Eine Bisswunde an der Hand, frisch, von einem Hund oder … größer. Er wollte nicht sagen, woher. Ich hab sie gereinigt und ihn heimgeschickt.“' },
-      { type:'clue', target:'hof_spuren', count:1, text:'Die Spuren am Viehtrog lesen' } ],
-    clues:[
-      { key:'markt_blut', town:'eren', square:[1, 1], label:'Blutspur', text:'Dunkle Tropfen zwischen den Ständen, verschmiert, als hätte jemand etwas Schweres weggeschleppt. Dazwischen graue Haare — zu grob für einen Menschen. Die Spur führt nach Süden, zu den Höfen.' },
-      { key:'hof_spuren', town:'eren', at:[59, 79], label:'Spuren am Viehtrog', text:'Im Schlamm am Trog: Pfotenabdrücke, groß wie eine Hand, und daneben Stiefel — klein, ein halbes Kind. Hier wurde Fleisch hingelegt, und hier hat etwas gefressen. Die Pfoten laufen in den Wald, die Stiefel zurück ins Dorf.' } ],
-    decide:{ prompt:'„Also. Wer war es?“ Havel sieht dich an, als hinge sein Dorf an der Antwort.',
-      options:[
-        { key:'borin', text:'„Borin. Er war betrunken, er hatte Gelegenheit.“', say:'„Dann ist es entschieden. Borin zahlt Mara den Schaden und bleibt der Schenke einen Monat fern.“ Hinter dir wird es still im Dorf — die Spuren haben etwas anderes gesagt.',
-          effects:{ rel:{ borin:-45, havel:5, tomas:-10 }, prosper:{ eren:-3 }, memory:{ borin:'blamed', tomas:'spared' }, chron:'Ein Unschuldiger wurde in Eren verurteilt — auf dein Wort.' } },
-        { key:'tomas', text:'„Tomas. Er hat den Schinken genommen, um die Wölfe von den Höfen zu locken — und wurde dafür gebissen.“', say:'„Der Junge?“ Havel atmet aus. „Dann war es Dummheit, kein Diebstahl. Er arbeitet das Fleisch bei Mara ab, und ich rede mit ihm über Wölfe. Danke — das war mehr Mühe, als ein Schinken wert ist.“',
-          effects:{ rel:{ tomas:10, mara:5, havel:10 }, rep:{ valen:2 }, prosper:{ eren:2 }, memory:{ tomas:'caught', borin:'cleared' }, chron:'Der Fall des fehlenden Schinkens in Eren ist gelöst: Tomas lockte Wölfe von den Höfen, kein Dieb.' } },
-        { key:'zahlen', text:'„Niemand. Ich ersetze Mara den Schaden selbst, und die Sache ist vergessen.“ (60 Gold)', gold:60, say:'„Du zahlst für etwas, das du nicht getan hast?“ Havel schüttelt den Kopf. „Gut. Ich frage nicht weiter. Aber ich merke mir, dass du mir keinen Namen gegeben hast.“',
-          effects:{ rel:{ mara:15, tomas:15, havel:-5 }, memory:{ tomas:'spared', borin:'cleared' }, chron:'Du hast in Eren für einen fremden Schinken bezahlt, damit niemand verurteilt wird.' } } ] },
-    reward:{ gold:40, xp:90 } },
-  q_erm_nordfurt: { name:'Sechs statt zehn', giver:'brann', turnin:'brann',
-    desc:'„Zehn Barren hat mir der Kontor berechnet. Sechs sind angekommen. Gerold sagt, der Fuhrmann habe vier auf der Straße verloren — bei Nacht, ohne Zeugen. Ich schmiede seit dreißig Jahren und habe noch nie einen Barren verloren gesehen. Sieh dich am Kontor um, rede mit Gerold und mit Hauke, der die Nachtwache hatte. Dann sag mir, wer mich bestiehlt.“',
-    objectives:[
-      { type:'clue', target:'kontor_siegel', count:1, text:'Das Lagertor des Kontors untersuchen' },
-      { type:'talk', target:'gerold', count:1, text:'Gerold, den Kontorhändler, befragen', say:'„Vier Barren, ja, bedauerlich. Der Fuhrmann war neu, die Straße ist schlecht, die Nacht war dunkel. Ich habe Brann den Verlust nicht berechnet — doch, berechnet, aber ich werde … hör zu, Fremder, der Kontor hat Verträge mit halb Valen. Wenn du Ärger suchst, such ihn woanders.“ Er wischt sich die Hände an der Schürze, obwohl sie sauber sind.' },
-      { type:'talk', target:'hauke', count:1, text:'Hauke, den Waffenmeister, befragen', say:'„Nachtwache, ja. Kurz nach Mitternacht fuhr ein Wagen durchs Südtor, Plane mit dem Kontor-Siegel, Gerolds Knecht auf dem Bock. Ich hab es gemeldet. Am Morgen hieß es, das sei in Ordnung, Kontorware. Wenn Brann vier Barren fehlen, dann weiß ich, wo sie hingefahren sind — und du jetzt auch.“' },
-      { type:'clue', target:'tor_spuren', count:1, text:'Die Wagenspuren vor dem Südtor lesen' } ],
-    clues:[
-      { key:'kontor_siegel', town:'northcity', at:[134, 52], label:'Lagertor des Kontors', text:'Am Riegel Wachsreste eines Kontor-Siegels, frisch gebrochen. Schleifspuren laufen von innen nach außen zur Straße — hier wurde nachts geladen, mit Schlüssel, nicht mit Brecheisen.' },
-      { key:'tor_spuren', town:'northcity', at:[118, 75], label:'Wagenspuren vor dem Südtor', text:'Tiefe Wagenspuren im Schlamm, Richtung Süden. Im Graben daneben liegt, was vom Wagen fiel: ein Barren mit Branns Hammerzeichen. Du steckst ihn ein.', give:'ingot' } ],
-    decide:{ prompt:'„Und? Wer bestiehlt mich?“ Brann legt den Hammer nicht aus der Hand.',
-      options:[
-        { key:'gerold', text:'„Gerold. Die Barren wurden nachts mit Schlüssel geladen und nach Süden gefahren. Hier ist einer davon.“', say:'„Mit Schlüssel. Sein Schlüssel.“ Brann nickt langsam. „Ich gehe zur Stadtwache. Der Kontor liefert nach, und Gerold zahlt die Fuhre. Die Stadt soll wissen, was ihr Händler nachts treibt.“',
-          effects:{ rel:{ gerold:-40, brann:15, hauke:5 }, rep:{ merch:-3, valen:2 }, prosper:{ northcity:2 }, stock:{ northcity:{ ingot:4 } }, memory:{ gerold:'caught' }, chron:'Nordfurt: Der Kontorhändler Gerold verschob nachts Branns Barren nach Süden — auf dein Wort hin kam das Eisen zurück.' } },
-        { key:'fuhrmann', text:'„Der Fuhrmann hat sie verloren. Gerold trifft keine Schuld.“', say:'„Verloren.“ Brann sieht dich lange an. „Dann sind sie eben verloren. Und du bist der Nächste, dem ich nicht mehr glaube.“',
-          effects:{ rel:{ gerold:10, brann:-15 }, rep:{ merch:2 }, memory:{ gerold:'spared' }, chron:'Nordfurt: Branns Barren blieben verschwunden — du hast den Kontor gedeckt.' } },
-        { key:'deal', text:'„Gerold liefert leise nach, und keiner redet davon. Er hat mir fünfzig Gold dafür gegeben.“', say:'„Fünfzig Gold.“ Brann spuckt aus. „Behalt sie. Die Barren nehme ich. Dich merke ich mir.“',
-          effects:{ gold:50, rel:{ gerold:15, brann:-5 }, rep:{ valen:-2 }, stock:{ northcity:{ ingot:4 } }, memory:{ gerold:'spared' }, chron:'Nordfurt: Die Barren kamen leise zurück; Gerold kaufte dein Schweigen für fünfzig Gold.' } } ] },
-    reward:{ gold:50, xp:110 } },
-  q_esk_finn: { name:'Finn muss zur Heilerin', giver:'brann', turnin:'elena',
-    desc:'„Mein Lehrling Finn hat sich auf der Straße nach Eren einen Pfeil eingefangen. Hier kann ihm keiner helfen — Elena in Eren kann es. Er geht, aber langsam, und allein kommt er nicht durch. Bring ihn zu ihr. Elena zahlt dich aus, ich hab ihr das Geld geschickt.“',
-    objectives:[ { type:'escort', target:'finn_esk', count:1, text:'Finn lebend zu Elena nach Eren bringen (verwundet: er geht langsam, bleib bei ihm)' } ],
-    escorts:[ { key:'finn_esk', name:'Finn', prof:'Schmiedelehrling', from:'northcity', to:'eren', wounded:true, greet:'„Geh nicht zu weit voraus … ich komm schon. Nur nicht so schnell.“' } ],
-    reward:{ gold:70, xp:110, rel:{ brann:12, elena:6 } } },
-  q_rett_rekrut: { name:'Der verschleppte Rekrut', giver:'hauke', turnin:'hauke',
-    desc:'„Einer meiner Rekruten, Jes, kam von der Patrouille nicht zurück. Ein Bauer hat gesehen, wie Räuber ihn westlich der Stadt ins Gestrüpp gezerrt haben. Die wollen Lösegeld — von mir bekommen sie Stahl. Hol ihn raus und bring ihn heim. Lebend, Fremder. Tot ist er mir nichts wert.“',
-    objectives:[ { type:'escort', target:'jes_esk', count:1, text:'Jes aus dem Räuberversteck westlich von Nordfurt befreien und nach Nordfurt bringen' } ],
-    escorts:[ { key:'jes_esk', name:'Jes', prof:'Rekrut', near:'northcity', off:[-40, 22], to:'northcity', captors:{ n:3, pool:['bandit', 'bandit', 'bandit_archer'] }, greet:'„Psst — sie sind noch hier. Mach sie fertig, dann lauf ich mit.“', greetFree:'„Danke. Ich halte Schritt — bring mich heim.“' } ],
-    reward:{ gold:80, xp:120, rep:{ valen:3 }, rel:{ hauke:10 } } },
-  q_lief_tinktur: { name:'Die Tinktur für Elena', giver:'quirin', turnin:'elena', give:'elixier_regen', hours:48,
-    desc:'„Elena in Eren hat einen Trank der Erneuerung bestellt — für einen Kranken, der sonst nicht mehr lange hat. Die Mischung hält zwei Tage, dann kippt sie. Nimm ihn, geh gleich los, und lass dich nicht aufhalten. Sie zahlt dich aus, wenn er rechtzeitig ankommt.“',
-    objectives:[ { type:'item', target:'elixier_regen', count:1, text:'Den Trank der Erneuerung binnen 48 Stunden zu Elena nach Eren bringen' } ],
-    reward:{ gold:90, xp:100, take:'elixier_regen', rep:{ merch:2 }, rel:{ quirin:8, elena:8 } } },
-  q_quelle_moor: { name:'Was aus dem Moor steigt', giver:'kelan', turnin:'kelan',
-    desc:'„Am Moorrand stehen sie wieder auf, so oft man sie auch niederschlägt. Ich habe es drei Nächte versucht. Das ist keine Horde — das ist eine Quelle. Irgendwo dort steht ein Stein, den die Toten verehren, und solange er steht, bricht die Erde auf. Finde ihn. Zerschlag ihn. Mit Stahl, nicht mit Gebeten — die habe ich schon versucht.“',
-    objectives:[ { type:'destroy', target:'moorquelle', count:1, text:'Die Knochenquelle am Moorrand zerschlagen (die Toten kommen wieder, solange sie steht)' } ],
-    bonewell:{ key:'moorquelle', near:'marsh', off:[6, -6], hp:60, every:60, mtype:'skeleton', n:2, cap:4, label:'Knochenquelle' },
-    reward:{ gold:120, xp:160, rep:{ order:4 }, rel:{ kelan:10 } } },
-  q_jagd_eisenhauer: { name:'Der Keiler von Joruns Feld', giver:'jorun', turnin:'jorun',
-    desc:'„Seit drei Nächten wühlt mir ein Keiler die Felder um — kein gewöhnlicher, ein Vieh wie ein Fass, Hauer wie Sicheln. Die Hunde trauen sich nicht ran. Lies seine Spuren: erst am Feld, dann zur Suhle am Moorrand, wo er sich wälzt. Wer Spuren lesen kann, findet ihn. Wer es nicht kann, sieht nur Dreck.“',
-    objectives:[
-      { type:'clue', target:'keiler_feld', count:1, text:'Die Wühlspuren am Feld lesen (Jagdkunst 10; nach Regen oder im Morgengrauen leichter)' },
-      { type:'clue', target:'keiler_suhle', count:1, text:'Die Spur zur Suhle am Moorrand verfolgen (Jagdkunst 15)' },
-      { type:'kill', target:'eisenhauer', count:1, text:'Eisenhauer erlegen' } ],
-    clues:[
-      { key:'keiler_feld', near:'eren', off:[-16, 14], label:'Wühlspuren am Feld', text:'Aufgerissene Furchen, Borsten an den Zaunpfählen, Abdrücke so breit wie eine Hand. Die Fährte zieht nach Süden, Richtung Moor.', skill:{ hunting:10 } },
-      { key:'keiler_suhle', near:'marsh', off:[-6, 8], label:'Suhle am Moorrand', text:'Eine frische Suhle, der Schlamm noch nass. Hier wälzt er sich — und er ist nicht weit.', skill:{ hunting:15 }, spawn:{ elite:'eisenhauer', off:[6, 0] } } ],
-    reward:{ gold:100, xp:150, rel:{ jorun:12 }, prosper:{ eren:2 } } },
   q_mine: { name:'Was in der Grube haust', giver:'mara', desc:'Die alte Grube ist verloren, seit etwas Großes darin wohnt.',
     objectives:[{type:'kill',target:'gorak',count:1,text:'Gorak töten'}],
     reward:{gold:140,rep:{merch:10,valen:4},xp:150}, turnin:'mara' },
@@ -1715,9 +1647,8 @@ export const QUESTS = {
     objectives:[{type:'item',target:'ancestor_urn',count:1,text:'Ahnenurne aus der Großen Nekropole holen'}],
     reward:{xp:200}, turnin:'ysra', pact:true },
   // Session 11 (§45): Aufträge an die neuen Weltsysteme gebunden — Regionalbosse (§73), Wirtschaft, Hundertfeld
-  q_greymane: { name:'Graumähne', giver:'tomas', desc:'In der Wolfsschlucht führt ein grauer Leitwolf das Rudel. Solange er lebt, jagt in Eren keiner mehr im Westen. Ich hab es versucht. Ich komme nicht nah genug. Und hör zu: Nur ihn. Ohne Leitwolf zerstreut sich das Rudel von selbst — und ein Rudel im Wald hält die Wildschweine von unseren Feldern. Wer mir die Wölfe ausrottet, hat nichts verdient.',
-    objectives:[{type:'kill',target:'alpha',count:1,text:'Graumähne in der Wolfsschlucht erlegen — das Rudel schonen (höchstens zwei Wölfe)'}],
-    spare:{ target:'wolf', max:2, text:'Wölfe des Rudels getötet', fail:'Das Rudel ist tot. Ohne Rudel ziehen die Wildschweine auf die Felder — Tomas will davon nichts mehr wissen.', rel:{ tomas:-10 } },
+  q_greymane: { name:'Graumähne', giver:'tomas', desc:'In der Wolfsschlucht führt ein grauer Leitwolf das Rudel. Solange er lebt, jagt in Eren keiner mehr im Westen. Ich hab es versucht. Ich komme nicht nah genug.',
+    objectives:[{type:'kill',target:'alpha',count:1,text:'Graumähne in der Wolfsschlucht erlegen'}],
     reward:{gold:110,xp:180,rep:{valen:5},item:'longbow',rel:{tomas:15}}, turnin:'tomas' },
   q_sandlord: { name:'Die Straße nach Aschfurt', giver:'gerold', desc:'Karrak, der Sandfürst, nimmt jeden dritten Wagen durch die Rote Wüste. Das Kontor zahlt, wenn er fällt — und die Wüste wieder nur Wüste ist.',
     objectives:[{type:'kill',target:'sandlord',count:1,text:'Karrak, den Sandfürsten, erschlagen'}],
@@ -1832,7 +1763,6 @@ export const MEMORY_TEXT = {
   friend_died:'war dabei, als ein Freund starb', starved:'hat mich hungern lassen',
   paid:'hat gezahlt, was versprochen war', led_to_victory:'hat uns zum Sieg geführt',
   left_to_die:'hat mich liegen lassen', killed_kin:'hat einen der Meinen getötet',
-  verdict_blamed:'mich vor allen beschuldigt hat', verdict_cleared:'für mich gesprochen hat', verdict_caught:'mich auffliegen ließ', verdict_spared:'mich gedeckt hat',   /* W2: Urteile */
 };
 
 // ---- Phase 18–20: Städte, Märkte, Krieg ----
@@ -1946,78 +1876,3 @@ export const ELITES = {
   harpunenhexe:{ name: 'Harpunen-Hella', base: 'sea_harpooner', crew: 'sea_raider', where: ['bandit_spear', 'bandit'], hp: 1.7, dmg: 1.4, power: 'charge', drop: 'spear', look: { helm: 'scarf', helmCol: '#2a4a6a', sash: '#8a2a20' }, say: 'wirft ihre Harpune weiter, als andere schießen. Sie zieht ihre Opfer an Land wie Fische.' },
   messingwolf: { name: 'Das Messingungetüm', base: 'automat', crew: 'bandit', where: ['bandit', 'bandit_spear', 'bandit_archer'], regions: ['aurel'], hp: 2.2, dmg: 1.3, armor: 4, power: 'shock', drop: 'ersatzteile', look: { glow: '#ff4020', ge: '#ff4020', armorCol: '#6a3a2a' }, say: 'ist ein Automat, der seinen Herrn erschlagen hat und nun durch die Felder stampft. Blitze knistern um ihn.' },
 };
-/* ================= Reliquien (Nutzer 02.10.2026, docs/PLAN_TRINKETS.md) =================
-   Fundstücke mit Geschichte, eigene Fassungen (bis 3, nicht in GEAR), Stufen I–VIII mit neuen Mechaniken statt nur Zahlen.
-   eng = Spielweise (Logik in game.js RELIC_ENG), twist = Sonderregel einer Boss-Reliquie, col = Farbe des Steins, glyph = Bild im Symbol.
-   Stufe VI: Pfadwahl (a/b), VII: Synergien, VIII: Verwandlung (trans). Kosten je Schritt in RELIQ_COST (Index = Zielstufe − 1). */
-export const RELIQ_TIER = ['Roh', 'Geweiht', 'Gehärtet', 'Geschmiedet', 'Erwacht', 'Entfesselt', 'Sternberührt', 'Rotfall'];
-export const RELIQ_MAX = { common: 4, uncommon: 4, rare: 6, epic: 6, legendary: 7, mythic: 8 };
-export const RELIQ_START = { common: 1, uncommon: 1, rare: 1, epic: 2, legendary: 3, mythic: 3 };
-export const RELIQ_COST = [null, { gold: 150 }, { gold: 400, glut: 2 }, { gold: 900, glut: 5 }, { gold: 1500, glut: 9, trophy: 1 }, { glut: 15, stern: 1 }, { glut: 20, stern: 3 }, { stern: 6, end: 1 }];
-export const RELIQ = {
-  schlaechterherz: { eng: 'berserk', col: '#b0302a', glyph: 'heart', paths: { a: ['Raserei', 'Unter 35 % Leben läufst du schneller.'], b: ['Aderlass', 'Unter 50 % Leben heilt dich jeder Treffer.'] }, trans: 'Herz, das nicht stehen bleibt' },
-  schattenfaden:   { eng: 'shadow', col: '#4a4a6a', glyph: 'thread', paths: { a: ['Nachbild', 'Nach dem Ausweichen schlägt dein Schatten den ersten Hieb mit.'], b: ['Schwerelos', 'Ausweichen kostet keine Ausdauer.'] }, trans: 'Faden ohne Ende' },
-  blutkranz:       { eng: 'streak', col: '#8a1a24', glyph: 'ring', paths: { a: ['Zäher Kranz', 'Die Serie verfällt Stück für Stück statt auf einmal.'], b: ['Blutfontäne', 'Endet eine Serie ab 5, platzt Blut um dich und trifft alle nahen Feinde.'] }, trans: 'Kranz des Gemetzels' },
-  seelenkessel:    { eng: 'souls', col: '#5a8a7a', glyph: 'cauldron', paths: { a: ['Knochenwall', 'Jede Seele gibt Rüstung.'], b: ['Seelenhunger', 'Jede Seele stärkt auch deine Hiebe.'] }, trans: 'Kessel der Wiederkehr' },
-  sturmglocke:     { eng: 'storm', col: '#6aa0c8', glyph: 'bell', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Glocke im Sturm' },
-  uhrwerksherz:    { eng: 'clock', col: '#c8a050', glyph: 'gear', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben ein Fünftel ihres Manas zurück.'] }, trans: 'Herz aus Aurelion' },
-  henkerschlinge:  { eng: 'exec', col: '#6a5a3a', glyph: 'noose', paths: { a: ['Richtblock', 'Die Hinrichtungsschwelle steigt um 5 Punkte.'], b: ['Schreckensurteil', 'Jede Hinrichtung jagt den nahen Feinden Angst ein.'] }, trans: 'Schlinge des Richters' },
-  rotdorn:         { eng: 'crit', col: '#c83a3a', glyph: 'thorn', paths: { a: ['Tiefer Dorn', 'Kritische Treffer schlagen härter zu.'], b: ['Dornenhecke', 'Mehr kritische Treffer.'] }, trans: 'Dorn des Sterns' },
-  eisenmal:        { eng: 'iron', col: '#7a7a80', glyph: 'mark', paths: { a: ['Bollwerk', 'Der Schild nach Parade und Block hält mehr aus.'], b: ['Stachelhaut', 'Stärkere Dornen.'] }, trans: 'Mal des Unbeugsamen' },
-  sternfunke:      { eng: 'spell', col: '#8fd0ff', glyph: 'star', paths: { a: ['Weite', 'Mehr Zauberkraft.'], b: ['Quelle', 'Mana kehrt schneller zurück.'] }, trans: 'Sternregen' },
-  wolfsfang:       { eng: 'pack', col: '#9a8a6a', glyph: 'fang', paths: { a: ['Rudel', 'Deine Gefährten halten mehr aus.'], b: ['Leitwolf', 'Gefährten schlagen härter zu.'] }, trans: 'Herz des Rudels' },
-  gluecksnagel:    { eng: 'crit', col: '#a08060', glyph: 'thorn' },
-  botenfeder:      { eng: 'shadow', col: '#b8b0a0', glyph: 'thread' },
-  rostglied:       { eng: 'iron', col: '#7a5a40', glyph: 'mark' },
-  /* Boss-Reliquien (mythisch, einmal je Welt; nochmal erschlagen gibt Sternsplitter) */
-  herz_blutfuerst: { eng: 'streak', twist: 'blood', col: '#d02030', glyph: 'heart', boss: 'aldhelm', paths: { a: ['Zäher Kranz', 'Die Serie verfällt Stück für Stück.'], b: ['Blutfontäne', 'Endet eine Serie ab 5, platzt Blut um dich.'] }, trans: 'Herz des Kelchs' },
-  kessel_koenig:   { eng: 'souls', twist: 'king', col: '#3aa070', glyph: 'cauldron', boss: 'garmadon', paths: { a: ['Knochenwall', 'Jede Seele gibt Rüstung.'], b: ['Seelenhunger', 'Jede Seele stärkt deine Hiebe.'] }, trans: 'Kessel des Toten Königs' },
-  auge_gefallenen: { eng: 'clock', twist: 'timebreak', col: '#f0e0a0', glyph: 'eye', boss: 'omega', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben Mana zurück.'] }, trans: 'Auge, das nicht schläft' },
-  vargs_glied:     { eng: 'iron', twist: 'chain', col: '#5a5a62', glyph: 'chain', boss: 'chain_master', paths: { a: ['Bollwerk', 'Stärkerer Schild.'], b: ['Stachelhaut', 'Stärkere Dornen.'] }, trans: 'Letztes Glied der Kette' },
-  eiskern:         { eng: 'shadow', twist: 'frost', col: '#a8e0ff', glyph: 'crystal', boss: 'hrodvar', paths: { a: ['Nachbild', 'Dein Schatten schlägt mit.'], b: ['Schwerelos', 'Ausweichen kostet keine Ausdauer.'] }, trans: 'Herz des Winters' },
-  kriegstrommel:   { eng: 'berserk', twist: 'drum', col: '#8a5a2a', glyph: 'drum', boss: 'gorak', paths: { a: ['Raserei', 'Unter 35 % Leben schneller.'], b: ['Aderlass', 'Unter 50 % Leben heilt jeder Treffer.'] }, trans: 'Trommel der tausend Schädel' },
-  kompassrose:     { eng: 'storm', twist: 'sea', col: '#2a7a9a', glyph: 'compass', boss: 'whitebeard', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Rose der sieben Winde' },
-  graumaehnenfang: { eng: 'pack', twist: 'wolf', col: '#8a8a8a', glyph: 'fang', region: 'alpha', paths: { a: ['Rudel', 'Gefährten halten mehr aus.'], b: ['Leitwolf', 'Gefährten schlagen härter zu.'] }, trans: 'Fang der Graumähne' },
-  sandglas:        { eng: 'storm', twist: 'sand', col: '#d0b070', glyph: 'hourglass', region: 'sandlord', paths: { a: ['Rastlos', 'Sturm lädt schneller.'], b: ['Gewitterwand', 'Bis zu 5 Ladungen.'] }, trans: 'Glas des Sandfürsten' },
-  nachtglasuhr:    { eng: 'clock', col: '#4a3a7a', glyph: 'hourglass', paths: { a: ['Unruh', 'Alle Abklingzeiten kürzer.'], b: ['Feder', 'Fähigkeiten geben Mana zurück.'] }, trans: 'Uhr der letzten Nacht' },
-};
-/* Synergien (ab Stufe VII einer der beiden): [Spielweise A, Spielweise B, Name, Wirkung] */
-export const RELIQ_SYN = [
-  ['shadow', 'storm', 'Sturmläufer', 'Jedes Ausweichen lädt eine Sturm-Ladung.'],
-  ['streak', 'berserk', 'Blutrausch', 'Unter 35 % Leben zählt die Kill-Serie doppelt.'],
-  ['crit', 'exec', 'Gnadenstoß', 'Kritische Treffer richten Feinde schon 5 Punkte früher hin.'],
-  ['clock', 'spell', 'Uhrwerk der Sterne', 'Zauber-Kills kürzen alle Abklingzeiten um 1 s.'],
-  ['iron', 'pack', 'Schildwall', 'Der Schild nach Parade und Block ist halb so stark noch einmal da.'],
-  ['souls', 'exec', 'Seelenernte', 'Hinrichtungen geben 2 Seelen.'],
-  ['shadow', 'clock', 'Zeitfaden', 'Perfektes Ausweichen kürzt alle Abklingzeiten um 2 s.'],
-  ['streak', 'storm', 'Gewitterrausch', 'Jeder Kill lädt eine Sturm-Ladung.'],
-];
-/* Gegenstände: Reliquien liegen im Gepäck wie alles andere; die Stufe trägt das Exemplar (o.tier). */
-Object.assign(ITEMS, {
-  schlaechterherz: { name: 'Schlächterherz', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Berserker: je weniger Leben, desto härter.', lore: 'Ein vertrocknetes Herz in einem Eisenkäfig. Es schlägt, wenn du blutest.' },
-  schattenfaden:   { name: 'Schattenfaden', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Tempo: Ausweichen macht schnell.', lore: 'Ein Faden, der keinen Schatten wirft. Man sagt, er sei aus dem Schatten eines Diebes gesponnen.' },
-  blutkranz:       { name: 'Blutkranz', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Kill-Serie: jeder Kill macht dich schneller.', lore: 'Dornen aus geronnenem Blut. Wer ihn trägt, hört auf zu zählen.' },
-  seelenkessel:    { name: 'Seelenkessel', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Seelen: Tote stärken deine Fähigkeiten.', lore: 'Ein Kesselchen aus Grabbronze, kaum größer als eine Faust. Drinnen flüstert es.' },
-  sturmglocke:     { name: 'Sturmglocke', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Bewegung: wer läuft, lädt Blitze.', lore: 'Sie läutet nur im Lauf. Die Glöckner von Tickmar wollten sie einschmelzen.' },
-  uhrwerksherz:    { name: 'Uhrwerksherz', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Abklingzeiten: Krit und Parade spannen die Feder.', lore: 'Aurelischer Messingschlag, der nie stehen bleibt. Ein Ratsherr ließ es aus seiner Brust bauen.' },
-  henkerschlinge:  { name: 'Henkerschlinge', slot: 'relic', rarity: 'epic', value: 520, sdesc: 'Hinrichtung: Angeschlagene sterben schneller.', lore: 'Ein Stück Seil vom Galgen in Kreuzweg. Es knotet sich selbst.' },
-  rotdorn:         { name: 'Rotdorn', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Krit: Treffer laden den nächsten kritischen.', lore: 'Ein Dorn vom Rand des Kraters, rot wie der Himmel vor dem Fall.' },
-  eisenmal:        { name: 'Eisenmal', slot: 'relic', rarity: 'uncommon', value: 160, sdesc: 'Tank: Rüstung, Schild nach Parade, Dornen.', lore: 'Das Brandeisen eines Kettenaufsehers. Wer es trägt, steht.' },
-  sternfunke:      { name: 'Sternfunke', slot: 'relic', rarity: 'rare', value: 260, sdesc: 'Magie: Zauberkraft, Mana aus Zauber-Kills.', lore: 'Ein Splitter vom Rotfall, in Glas gefasst. Er ist warm.' },
-  wolfsfang:       { name: 'Wolfsfang', slot: 'relic', rarity: 'uncommon', value: 160, sdesc: 'Gruppe: deine Gefährten werden stärker.', lore: 'Der Eckzahn eines Leitwolfs, mit Sehne umwickelt.' },
-  gluecksnagel:    { name: 'Glücksnagel', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Krit: ein bisschen Glück.', lore: 'Ein krummer Sargnagel. Wer ihn findet, lebt angeblich länger.' },
-  botenfeder:      { name: 'Botenfeder', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Tempo: kurz schneller nach dem Ausweichen.', lore: 'Die Feder eines Brieftaubenträgers aus Nordfurt.' },
-  rostglied:       { name: 'Rostiges Kettenglied', slot: 'relic', rarity: 'common', value: 60, sdesc: 'Tank: etwas Rüstung.', lore: 'Ein Glied aus einer gesprengten Kette. Es erinnert sich an Gewicht.' },
-  herz_blutfuerst: { name: 'Herz des Blutfürsten', slot: 'relic', rarity: 'mythic', unique: true, value: 1800, sdesc: 'Boss-Reliquie (Aldhelm): Kill-Serie mit Lebensraub.', lore: 'Aldhelms Herz, in Wachs aus dem Kelch gegossen. Es trinkt mit dir.' },
-  kessel_koenig:   { name: 'Seelenkessel des Toten Königs', slot: 'relic', rarity: 'mythic', unique: true, value: 1800, sdesc: 'Boss-Reliquie (Garmadon): Seelen, die mit dir kämpfen.', lore: 'Garmadons Krönungskessel. Die Seelen darin haben ihn gekrönt — und ihn nie losgelassen.' },
-  auge_gefallenen: { name: 'Auge des Gefallenen', slot: 'relic', rarity: 'mythic', unique: true, value: 2200, sdesc: 'Boss-Reliquie (Omega): Zeitbruch nach perfektem Ausweichen.', lore: 'Ein Splitter von Omegas Auge. Wer hineinsieht, sieht eine Sekunde in die Zukunft.' },
-  vargs_glied:     { name: 'Vargs letztes Glied', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Varg): Ketten ziehen Feinde heran.', lore: 'Das letzte Glied der großen Kette der Eisenmark. Es zieht noch immer.' },
-  eiskern:         { name: 'Eiskern', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Hrodvar): Frost nach perfektem Ausweichen.', lore: 'Hrodvars Herz ist nie geschmolzen. Jetzt ist es deins.' },
-  kriegstrommel:   { name: 'Goraks Kriegstrommel', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Gorak): Berserker, Kills schlagen den Takt.', lore: 'Bespannt mit der Haut von Goraks erstem Feind. Sie schlägt von selbst, wenn Blut fließt.' },
-  kompassrose:     { name: 'Weißbarts Kompassrose', slot: 'relic', rarity: 'mythic', unique: true, value: 1600, sdesc: 'Boss-Reliquie (Weißbart): Sturm und Tempo.', lore: 'Die Nadel zeigt nicht nach Norden, sondern zum nächsten Kampf.' },
-  graumaehnenfang: { name: 'Fang der Graumähne', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Regionalboss (Graumähne): Rudel.', lore: 'Der größte Zahn des alten Leitwolfs. Die Wölfe im Grenzland erkennen ihn.' },
-  sandglas:        { name: 'Karraks Sandglas', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Regionalboss (Karrak): Sturm im Sand.', lore: 'Der Sand darin läuft nach oben, wenn du rennst.' },
-  nachtglasuhr:    { name: 'Nachtglasuhr', slot: 'relic', rarity: 'legendary', unique: true, value: 900, sdesc: 'Turm des Nachtglases: Abklingzeiten.', lore: 'Ilvars Uhr zeigt die Stunde, die noch nicht war.' },
-});
-export const RELIQ_BOSS = Object.fromEntries(Object.entries(RELIQ).filter(([, d]) => d.boss).map(([k, d]) => [d.boss, k]));
-export const RELIQ_REGION = Object.fromEntries(Object.entries(RELIQ).filter(([, d]) => d.region).map(([k, d]) => [d.region, k]));

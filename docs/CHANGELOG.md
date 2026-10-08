@@ -2,49 +2,9 @@
 
 Neueste oben, höchstens 5 Zeilen je Session. Ausführlich bis S13: `archive/CHANGELOG_bis_S13.md`.
 
-## Version 25 — 2026-10-05 (Zusammenführung der offenen Zweige)
-- Zusammengeführt: claude-arbeit (PR #9: Audit Phase 1–4, Wüstenbund/Zwerge, Wanderautomaten, Heiler-/Zauberfenster, Schleichmodus, Kampfanimationen) und Reliquien (Endgame-Fortschritt, Anmarsch der Ereignisfiguren, Omega-Szene).
-- PR #7 zurückgeholt (war in main verloren): Angst der Bürger, schwere Verbrechen mit Bußgeld und Haft, Zerfall Varonheims ohne König.
-- Reliquien-Fenster auf Taste O (V ist der Schleichmodus). Cache-Schlüssel v=25.
-- Siedlung: Gründung nur auf freiem Land (nicht in einer Stadt, sechs Felder Abstand); „Siedlung auflösen“ im Fenster B (Gebäude, Siedler, Wachen, Vieh weg, Lager als Kiste); Titel „Befreier von …“ verblasst nach 7 Tagen. Welttiefe Slice 2: Ermittlung „Sechs statt zehn“ (Nordfurt). Selbsttest 491/491.
-- Welttiefe W2 Slice 1: Urteile hallen nach — Beschuldigte, Freigesprochene, Überführte und Gedeckte grüßen 30 Tage anders (`memory`-Effekt, bestehendes `remember`), das Urteil läuft fünf Tage als Gerücht („Was gibt es Neues?“, Sprechblasen). Selbsttest 492/492.
-- Welttiefe W2 Slice 2: jeder Auftraggeber bekommt einen Nachfolger (bestehendes `successorDay`, jetzt alle Geber aus `QUESTS`), offene Aufträge bleiben abgebbar; stirbt ein Verwandter als Geber, scheitert der Auftrag sichtbar (`questGiverDeadDay`).
-- Aufträge: angenommene oder erledigte Angebote (Brett, Wache, Kette) werden täglich aufgefüllt; vorher gab es nach „alle drei gemacht“ bis zur 3-Tage-Rotation nichts Neues (Nutzer). Selbsttest 494/494.
-- Behoben (BUG-144): Wuchtschlag und die anderen Hieb-Fähigkeiten kosteten Ausdauer und Abklingzeit, auch wenn mitten im Schwung kein Hieb kam; jetzt Rückgabe und Hinweis. Selbsttest 495/495.
-- Varonheim: Hauptplatz entlastet — nur noch rund 30 Bewohner treffen sich dort, die übrigen vor Schenken, Kapellen, Läden (gemessen mittags im Umkreis von 10 Feldern: 89 → 22 Personen). Selbsttest 496/496.
-- Betriebe: „Vorrat liefern“ im Handelskontor (Holz, Stein, Eisen, Nahrung → Stadtlager, bezahlt zum Ortspreis); „Handel fördern“ gibt zehn Tage 20 % mehr Ware je Karawane in die Stadt (`tradeMul`). Selbsttest 497/497.
-- Aufträge: Eskorte und Lieferung zahlen Lohn, Erfahrung und Ruf direkt am Ziel (kein Rückweg zum Geber). Selbsttest 498/498.
-- Krieg: Städte fallen nicht mehr am ersten Tag — Schonfrist 5 Tage, Valens Heere verteidigen statt in die Nekropole zu ziehen, Streifen aus Varonheim und Eisenfeste, Entsatz der Krone holt gefallene Städte nach 3 Tagen zurück und bleibt 5 Tage stationiert; Streifen gedeckelt (50) und ohne Gruft-Eroberung, die Toten mit bis zu zwei Heeren, damit die Front lebendig bleibt (Messung in BALANCE.md). Selbsttest 499/499.
-- Welttiefe W3 Slice 1: Auftragsziel „Begleiten“ (`escort`) mit Begleiter am Startort, verwundet langsamer, Ankunft zählt, Tod lässt scheitern; Abgabe bei einem anderen NPC (`turnin`); Auftrag „Finn muss zur Heilerin“ (Brann → Elena). Selbsttest 500/500.
-- Welttiefe W3 Slice 2: Rettung als festes Auftragsziel — Gefangener bei Entführern, folgt erst nach deren Tod; Auftrag „Der verschleppte Rekrut“ (Hauke, Nordfurt). Selbsttest 501/501.
-- Welttiefe W3 Slice 3: Lieferung mit Frist (Gegenstand bei Annahme, Frist in Stunden, Sanduhr im Tracker, Auftragsbuch, Scheitern mit verdorbenem Gegenstand); Auftrag „Die Tinktur für Elena“ (Quirin → Elena, 48 h). Selbsttest 502/502.
-- Welttiefe W4 Slice 1: Tötungsaufträge mit Schon-Regel (`spare`): „Graumähne“ verlangt, das Rudel zu schonen (zwei Wölfe Spielraum, dann gescheitert, Tomas −10); Auftragsbuch zeigt den Spielraum. Selbsttest 503/503.
-- Welttiefe W4 Slice 2: Anschlagbretter mit Gegend-Thema (Wald: Jagd/Spuren, Hafen: Vermisste, Ödland: Steckbriefe …), Totenknoten nebenan bringt Verteidigung und Monsterjagd nach vorn. Selbsttest 504/504.
-- Welttiefe W4 Slice 3: „Quelle der Auferstehung“ — Knochen-Obelisk setzt Tote nach, nimmt Hiebe (Props mit Lebenspunkten) und zerbricht; neues Auftragsziel „Zerschlagen“; Auftrag „Was aus dem Moor steigt“ (Kelan). Selbsttest 505/505.
-- Welttiefe W5 Slice 1: Jagd — Spuren verlangen Jagdkunst (Regen/Schnee/Morgengrauen erleichtern), Lesen lehrt die Fertigkeit, die letzte Spur treibt ein Elite-Tier hervor; Auftrag „Der Keiler von Joruns Feld“ (Eisenhauer). Selbsttest 506/506.
-- Welttiefe W5 Slice 2: Jagd-Händler — Jäger kaufen Felle, Fleisch und Trophäen 25–50 % über Marktpreis (Jagdkunst) und führen Jagdzeug. Selbsttest 507/507.
-- Welttiefe W9 Slice 1: Unsichere Wege — Totenknoten und Räuberlager an der Straße sowie Überfälle heben das Wegrisiko, Händler meiden den Weg (Kontor zeigt es, Preise folgen), riskante Züge mit Wachen; nach der Befreiung kehren Händler mit einem Zug zurück. Selbsttest 508/508.
-- Welttiefe W10 Slice 1: Regionalbosse kippen in Phase 2 das Wetter ihres Kampfplatzes (Graumähne Nebel, Karrak Sandsturm, Varg Blutregen), es klart mit ihrem Tod auf. Selbsttest 509/509.
-- Welttiefe W11 Slice 1: Stadtinfo-Fenster. Klick auf den Stadtkopf im Kontextfeld öffnet Lage (Zustand, Besatzung, Einwohner, Wohlstand), Markt (knapp/reichlich, kommende Züge, unsichere Wege) und Arbeit (Aushänge, Betriebe, eigene Betriebe); nur Anzeige. Selbsttest 510/510.
-- Welttiefe W11 Slice 2: Fernwaffen-Profile. Bogen und Armbrust (auch Pistolen/Gewehre) haben eigene Phasen mit Ganzkörperposen: spannen, lösen, Rückstoß, nachladen (Waffe gesenkt, Figur gebeugt, zweite Hand spannt). Test Room kennt Langbogen und Armbrust. Selbsttest 511/511.
-- Welttiefe W9 Slice 2: Der sichtbare Zug der Alten Straße wartet am Tor (Eren oder Nordfurt), solange der Weg als unsicher gilt, meldet es täglich und bricht wieder auf, sobald er sicher ist; sichtbare Überfälle zählen ins Wegrisiko; das Kontextfeld zeigt den Wartestand. Selbsttest 512/512.
-- Welttiefe W11 Slice 3: Schwarzmarkt als Fenster (Rook, Nix): Tagesangebot mit Preis und Stufe, Kaufen-Knopf, Händlerspruch; Kaufregel als Aktion `blackBuy` (Angebot, Gold, Tasche, Gebrauchtware); Koop-Gast behält die Dialogliste. Selbsttest 513/513.
-- Welttiefe Slice 1 (Plan: `docs/PLAN_WELTTIEFE.md`): Auftragsziele *Spur untersuchen* und *Befragen*, Urteil mit Folgen am Auftragsende; Ermittlungen „Blut auf dem Markt“ (Eren) und „Sechs statt zehn“ (Nordfurt: Beweisstück aus einer Spur, Urteil wirkt auf den Marktvorrat). Spuren haben im Prompt Vorrang wie benannte Figuren. Arbeitsregeln neu in `CLAUDE.md`.
-- Behoben: Eisenfeste — neue Spiele bekamen nie Kettenzug, Torwachen und Käfig-Gefangene (die Bevölkerung zählte als „schon besiedelt“); alte Stände holen den Kettenzug nach. Ersatz für die Stadtwache war in den ersten Tagen eines Spiels gesperrt (Z.reinf 0).
-- Selbsttest 488/488. Proben gegen Zufall gehärtet (Trefferzone, Krits, Bedrohung im neuen Spiel): Wuchtschlag, Schleichen, Akademie-Duell, Duell im Kreis, Knochenritter, Stadtfest/Tagesplan (peace() ohne Heere der Toten), Betriebe-Verlusttag; Erbe-Aufträge ohne festen Kartenpunkt.
-
 ## Version 24 (in Arbeit) — Fehlerjagd Runde 1
 - Hunt-1-Fehler HB-06 bis HB-23 behoben (Mönch-Aufträge, Weißbarts Ansprechbarkeit, Varon-Königsauftrag, Eisenmark-Pferch/Tributzug, Schuldprüfung bei befreiten Städten, Wohlstand ohne Schutz, Heiler sieht Gliedverletzungen, Schadens-Böden heben Bewusstlose nicht mehr an, Bruch/Prothese, Medizin heilt kein Messing, abgetrennte Glieder, Betriebsverlust, Kult-Doppelgänger, Zweiwaffen mit ausgefallenem Arm, kein Selbstheilen am Boden, Kette/Grubenstämme-Rang). Details: `ROTFALL_STATE/hunt/BERICHT.md`.
 - Offen (keine eigenmächtige Designentscheidung): HB-10 (Rotfall/Omega-Belohnung), HB-20 (welche Bindungen ein Erbe übernimmt).
-
-## Version 24 — 2026-10-02 (Angst, schwere Verbrechen, Zerfall der Hauptstadt)
-- Angst: Bürger sammeln Angst je gesehenem Toten; unruhig, verängstigt (verstecken sich, reden nicht) und Panik (fliehen schreiend), bis die Gefahr fort ist.
-- Schwere Verbrechen ab 2000 Gold: kein Freikaufen, Bußgeld und Haft bis 120 Spielstunden (200 000 Gold); Haftanzeige in Stunden statt fälschlich Minuten.
-- Varonheim: erschlagene Hofleute bleiben tot, Kanzlertod beendet den Kult, Reichsverweser rückt nach; Thronwirren lassen die Hauptstadt ohne König zerfallen und übernehmen.
-- Menüs: Reiter in Charakter- und Fraktionsfenster nicht mehr zusammengequetscht; Stylesheet mit Cache-Schlüssel.
-- Ereignisfiguren laufen von außerhalb ins Bild statt aufzuploppen; Angst geht vor Ereignissen (kein Fest, andere Orte, Neuankömmlinge fürchten sich mit).
-- Reliquien: Endgame-Fortschritt mit drei Fassungen, 24 Reliquien (11 Spielweisen, 9 Boss-/Regionalboss-Stücke), Stufen I–VIII mit Pfaden, Synergien und Verwandlung, Seelenglut und Sternsplitter, Beute bei Bossen, Elite und Dungeon-Enden, Fenster „Reliquien (V)“; am Grab vererbt, beim Erben schlummernd bis zur Erweckung.
-- Omega: eigene Sternenklinge (Goldschwingen, Sternknauf, glimmende Hohlkehle), Todesszene, Klinge garantiert; danach im Westen verhasst, im Osten gefeiert. In Szenen nimmt die Gruppe keinen Schaden.
 
 ## Version 23 — 2026-10-01 (Audit, Agentensystem, Blutkult beginnt)
 - Varonsburg in der Welt begehbar (Thronsaal, Adelsflügel, Kanzlei, Verlies, Kronschmiede), Viertel-Architektur in Varonheim, Karawanen-Absturz bei alter Route behoben.

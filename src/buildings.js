@@ -8,7 +8,7 @@
 //   Licht     oben links: Nordhang heller, Südhang Grundton, zur Traufe dunkler; Traufkante tiefdunkel.
 //   Material  Dach: Stroh / Holzschindel / Schiefer / Ziegel. Wand: Fachwerk / Holz / Stein / Putz / heller Stein.
 //   Funktion  von außen lesbar: Schild mit Symbol, Esse mit Glut, Banner, Kräuterbündel, Rosette, Wappen.
-import { G, toCanvas, ramp, mix, drawnOn } from './sprites.js?v=25';
+import { G, toCanvas, ramp, mix, drawnOn } from './sprites.js?v=24';
 
 const hh = (x, y, s = 0) => { let n = (x * 374761393 + y * 668265263 + s * 2246822519) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 

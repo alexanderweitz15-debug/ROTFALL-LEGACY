@@ -1,18 +1,18 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=25';
-import * as CS from './cloudsave.js?v=25';
-import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=25';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=25';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=25';
-import { wearOf } from './buildings.js?v=25';
-import * as SP from './sprites.js?v=25';   /* Bestiarium: Gegnerbilder */
-import { townState, townPrice } from './sim.js?v=25';
-import { GOODS } from './data.js?v=25';
-import { target as ecoTarget } from './economy.js?v=25';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=25';
-import { sfx, ambience } from './sfx.js?v=25';
-import * as SKY from './sky.js?v=25';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
-import * as ATL from './atlas.js?v=25';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=24';
+import * as CS from './cloudsave.js?v=24';
+import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=24';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=24';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=24';
+import { wearOf } from './buildings.js?v=24';
+import * as SP from './sprites.js?v=24';   /* Bestiarium: Gegnerbilder */
+import { townState, townPrice } from './sim.js?v=24';
+import { GOODS } from './data.js?v=24';
+import { target as ecoTarget } from './economy.js?v=24';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=24';
+import { sfx, ambience } from './sfx.js?v=24';
+import * as SKY from './sky.js?v=24';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
+import * as ATL from './atlas.js?v=24';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -37,17 +37,17 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 // UI-Umbau Scheibe 1 (Entwickler 01.10.2026): 8 Gruppen mit Piktogramm statt 14 Textreitern; Unterthemen als Reiter im Fenster.
 // [Gruppe, Name (Tooltip), Taste, Fenster der Gruppe — das erste öffnet der Reiter]. Optionen bleiben als Reiter (Touch ohne Esc).
 const NAV = [
-  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'relics', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
+  ['char', 'Charakter', 'C', ['character', 'skills', 'spells', 'effects', 'classes']]   /* Entwickler 02.10.2026: Talentbäume versteckt, bis jede Klasse ihren eigenen Baum hat (Punkte sammeln sich weiter) */, ['inv', 'Gepäck', 'I', ['inventory']],
   ['party', 'Gruppe', 'G', ['party', 'stable']], ['build', 'Lager & Siedlung', 'B', ['settlement', 'business']], ['map', 'Karte', 'M', ['map']],
   ['quest', 'Aufträge', 'J', ['quests']], ['powers', 'Mächte', 'F', ['faction', 'chronicle']], ['codex', 'Kodex', 'H', ['codex']], ['options', 'Optionen', 'Esc', ['settings']],
 ];
 const NAV_SHORT = { char: 'Charakter', inv: 'Inventar', party: 'Gruppe', build: 'Siedlung', map: 'Karte', quest: 'Aufträge', powers: 'Mächte', codex: 'Kodex', options: 'Optionen' };
-const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', relics: 'Reliquien (O)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
+const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Werte (C)', skills: 'Talente (T)', spells: 'Zauber (Z)', effects: 'Effekte (X)', faction: 'Fraktionen (F)', chronicle: 'Chronik (K)' };
 // Pixel-Piktogramme (icons.js, Artist). Fehlt die Datei noch, bleibt die Schrift — nichts bricht.
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
 const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
-function loadIcons() { import('./icons.js?v=25').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function loadIcons() { import('./icons.js?v=24').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
 function paintNav() {
   for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 3);
     b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : '') + `<span class="navlbl">${NAV_SHORT[G[0]] || G[1]}</span>` + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }   /* Entwickler: größere Symbole, Beschriftung darunter */
@@ -200,56 +200,6 @@ function effectsUI(body) {
     : '<div class="ledger">Keine besonderen Effekte. Du bist ein unbeschriebenes Blatt.</div>';
 }
 
-// ---- Reliquien (Nutzer 02.10.2026, docs/PLAN_TRINKETS.md): Kranz mit drei Fassungen, Stufenleiter I–VIII, Kosten, Pfade, Synergien ----
-let relSel = 0;
-const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-const POT = { dmg: 'Schaden', atk: 'Angriffstempo', move: 'Lauftempo', cdr: 'Abklingzeit', crit: 'Krit-Chance', leech: 'Lebensraub', armor: 'Rüstung', spell: 'Zauberkraft' };
-const potTxt = (k, v) => k === 'armor' ? `+${Math.round(v)}` : `${k === 'cdr' ? '−' : '+'}${Math.round(v * 100)} %`;
-function relCost(C, cur) {
-  const out = [];
-  if (C.gold) out.push(['Gold', C.gold, cur.gold]); if (C.glut) out.push(['Seelenglut', C.glut, cur.glut]); if (C.stern) out.push(['Sternsplitter', C.stern, cur.stern]);
-  if (C.trophy) out.push(['Trophäe', C.trophy, cur.trophy]);
-  return out.map(([n, need, have]) => `<span class="rel-cost${have >= need ? '' : ' lack'}">${need} ${n}<i>${have}</i></span>`).join('') + (C.end ? '<span class="rel-cost">nach Garmadon oder Omega</span>' : '');
-}
-function relicsUI(body) {
-  const V = A.relicView?.(); if (!V) { body.textContent = '—'; return; }
-  if (!V.slots[relSel] || V.slots[relSel].locked) relSel = 0;
-  const sel = V.slots[relSel];
-  const sock = s => s.locked ? `<div class="rel-sock locked" title="Gesperrt: ${s.need}"><div class="rel-gem">✕</div><div class="rel-sname">Gesperrt</div><div class="rel-need">${s.need}</div></div>`
-    : s.empty ? `<div class="rel-sock empty${s.i === relSel ? ' sel' : ''}" data-sock="${s.i}"><div class="rel-gem">+</div><div class="rel-sname">Leere Fassung</div><div class="rel-need">Reliquie aus dem Gepäck wählen</div></div>`
-    : `<div class="rel-sock t${s.T} r-${s.rar}${s.i === relSel ? ' sel' : ''}${s.sleeping ? ' sleep' : ''}" data-sock="${s.i}" style="--rc:${s.col}"><canvas data-ic="${s.key}" width="56" height="56"></canvas><div class="rel-tier">${ROM[s.T - 1]}</div><div class="rel-sname r-${s.rar}">${s.name}</div><div class="rel-need">${s.tierName}${s.sleeping ? ' · schlummert' : ''}</div></div>`;
-  let det = '';
-  if (sel && !sel.empty && !sel.locked) {
-    const N = sel.next;
-    det = `<div class="rel-head"><h2 class="r-${sel.rar}">${sel.name}</h2><div class="ledger">${sel.rarName} · ${sel.sdesc}${sel.boss ? ' · Boss-Reliquie' : ''}</div></div>
-      ${sel.sleeping ? `<div class="rel-banner">Sie schlummert. Sie gehorchte ${sel.boundName || 'einem anderen'} — über Stufe V wirkt sie erst, wenn du sie neu erweckst (halber Preis).</div>` : ''}
-      <div class="rel-active">${sel.active.map(a => `<div>◆ ${a}</div>`).join('') || '<div class="ledger">Noch keine Wirkung.</div>'}</div>
-      <div class="rel-ladder">${sel.ladder.map(l => `<div class="rel-step ${l.state}"><b>${ROM[l.t - 1]}</b><span class="rel-sn">${l.name}</span><span class="rel-st">${l.state === 'locked' ? 'Diese Reliquie endet vorher.' : l.text}</span></div>`).join('')}</div>
-      ${N ? `<div class="rel-next"><div class="rel-nl">${N.kind === 'awaken' ? 'Neu erwecken' : `Nächste Stufe: ${ROM[N.tier - 1]} · ${N.name}`}</div><div>${relCost(N.cost, V.cur)}</div>
-        ${N.forge && !V.forge ? '<div class="ledger warn">Braucht eine Esse, einen Amboss, einen Schrein oder einen Schmied in der Nähe.</div>' : ''}${N.needPath ? '<div class="ledger warn">Erst einen Pfad wählen.</div>' : ''}
-        <div class="ctx-actions"><button id="rel-up" class="${N.lack.length || (N.forge && !V.forge) || N.needPath ? 'cant' : 'go'}">${N.kind === 'awaken' ? 'Erwecken' : 'Aufrüsten'}</button><button id="rel-off">Ablegen</button></div>
-        ${N.lack.length ? `<div class="ledger warn">Es fehlt: ${N.lack.join(', ')}.</div>` : ''}</div>`
-      : `<div class="rel-next"><div class="rel-nl">${sel.tier >= 8 ? 'Rotfall erreicht. Mehr gibt es nicht.' : 'Diese Reliquie ist am Ende ihres Weges.'}</div><div class="ctx-actions"><button id="rel-off">Ablegen</button></div></div>`}
-      ${sel.pathOpen ? `<div class="rel-paths">${['a', 'b'].map(k => `<div class="rel-path${sel.path === k ? ' on' : ''}" data-path="${k}"><b>${sel.paths[k][0]}</b><div>${sel.paths[k][1]}</div><i>${sel.path === k ? 'gewählt' : sel.path ? 'wechseln: 2 Sternsplitter' : 'wählen'}</i></div>`).join('')}</div>` : ''}
-      ${sel.history.length ? `<div class="rel-hist">${sel.history.map(h => `<div>${h}</div>`).join('')}</div>` : ''}`;
-  } else det = `<div class="rel-empty">${V.level < 10 ? 'Reliquien trägt erst, wer Stufe 10 erreicht hat. Bis dahin sammelst du schon Seelenglut und Sternsplitter — sie gehören dem Haus.' : 'Wähle rechts eine Reliquie aus dem Gepäck, um sie zu fassen. Reliquien fallen bei Bossen, Elite-Gegnern und am Ende von Dungeons — die stärksten bei den Bossen des Endgames.'}</div>`;
-  body.innerHTML = `<div class="rel">
-    <div class="rel-top"><div class="rel-crown">${V.slots.map(sock).join('')}</div>
-      <div class="rel-cur"><div><b>${V.cur.glut}</b> Seelenglut</div><div><b>${V.cur.stern}</b> Sternsplitter</div><div><b>${V.cur.trophy}</b> Trophäen</div><div class="rel-phase ph-${V.phaseKey}">${V.phase}</div><div class="ledger">${V.forge ? 'Esse in der Nähe' : 'Ab Stufe V: an einer Esse'}</div></div></div>
-    <div class="rel-main"><div class="rel-detail">${det}</div>
-      <div class="rel-side">
-        <h3>Gepäck</h3>${V.inv.length ? V.inv.map(r => `<div class="rel-inv r-${r.rar}" data-inv="${r.idx}"><canvas data-ic="${r.key}" width="34" height="34"></canvas><div><b class="r-${r.rar}">${r.name}</b><div class="ledger">${ROM[r.tier - 1]} · ${r.sdesc}${r.sleeping ? ' · schlummert' : ''}</div></div></div>`).join('') : '<div class="ledger">Keine Reliquien im Gepäck.</div>'}
-        <h3>Synergien</h3>${V.syn.length ? V.syn.map(s => `<div class="rel-syn${s.active ? ' on' : ''}"><b>${s.name}</b><div class="ledger">${s.desc}</div><i>${s.active ? 'aktiv' : s.have ? 'ab Stufe VII einer der beiden' : `fehlt: ${s.need}`}</i></div>`).join('') : '<div class="ledger">Synergien entstehen, wenn zwei passende Reliquien gefasst sind (ab Stufe VII).</div>'}
-        ${V.pots.length ? `<h3>Wirkung gesamt</h3>${V.pots.map(o => `<div class="rel-pot"><span>${POT[o.k]}</span><b>${potTxt(o.k, o.v)}</b><i style="width:${Math.min(100, o.v / o.cap * 100)}%"></i></div>`).join('')}<div class="ledger">Balken: Anteil am Deckel der Phase „${V.phase}“.</div>` : ''}
-      </div></div></div>`;
-  body.querySelectorAll('canvas[data-ic]').forEach(cv => setTimeout(() => drawItemIconTo(cv, cv.dataset.ic), 0));
-  body.querySelectorAll('[data-sock]').forEach(d => d.onclick = () => { relSel = +d.dataset.sock; refreshModal(); });
-  body.querySelectorAll('[data-inv]').forEach(d => d.onclick = () => { A.relicEquip(+d.dataset.inv, V.slots[relSel]?.empty ? relSel : undefined); refreshModal(); });
-  body.querySelectorAll('[data-path]').forEach(d => d.onclick = () => { A.relicPath(relSel, d.dataset.path); refreshModal(); });
-  const up = $('rel-up'); if (up) up.onclick = () => { if (sel.next?.kind === 'awaken') A.relicAwaken(relSel); else A.relicUpgrade(relSel); refreshModal(); };
-  const off = $('rel-off'); if (off) off.onclick = () => { A.relicUnequip(relSel); refreshModal(); };
-}
-
 // S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/GUIDE.md selbst (eine Quelle für Spieler und Doku; ohne ?dev
 // ohne den Debug-Abschnitt), dazu alle Rangfolgen, alle Zustände mit Erklärung und die Gegner, die man schon getroffen hat. Suche filtert.
 let guideMd = null, codexTab = 'guide';
@@ -372,11 +322,30 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   // Pferde-Überarbeitung (02.10.2026): echte Fellfarbe (H.coat) statt zufälliger Namenslänge — das Porträt zeigt dasselbe Pferd wie draußen im Spiel.
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=25').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=24').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
+// ---------------- Anschlagbrett (GUI, 08.10.2026) ----------------
+// Holzbrett mit angepinnten Zetteln: Art-Symbol, Titel, Text, Ziel, Lohn, Frist, Entfernung. Kopfgelder mit Totenkopf. Annehmen/Abgeben direkt.
+function boardUI(body, town) {
+  const V = A.boardView?.(town); if (!V) return;
+  const card = it => `<div class="bb-note${it.elite ? ' elite' : ''}${it.state === 'active' ? ' mine' : ''}"><i class="bb-pin"></i>
+    <div class="bb-top">${icoImg(it.ico, 2, 'bb-ico')}<b>${qa(it.title)}</b>${it.elite ? '<span class="bb-skull" title="Gefährlicher Anführer">☠</span>' : ''}</div>
+    <div class="bb-kind">${qa(it.kindName)}${it.dist != null ? ` · ${it.dist} Felder` : ''}${it.days ? ` · ${it.days} Tag${it.days === 1 ? '' : 'e'}` : ''}</div>
+    <p class="bb-desc">${qa(it.desc || '')}</p>
+    <div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>
+    <div class="bb-foot"><span class="bb-rew">${rewardHTML(it.rew, true)}</span>${it.state === 'offer' ? `<button class="mini" data-acc="${it.id}">Annehmen</button>` : it.ready ? `<button class="mini" data-claim="${it.id}">Abgeben</button>` : '<span class="ledger">läuft</span>'}</div></div>`;
+  body.innerHTML = `<div class="bb-head"><b>Anschlagbrett — ${qa(V.name)}</b><span class="ledger">${V.active}/${V.max} Aufträge angenommen</span></div>
+    ${V.shut ? `<div class="bb-shut">${qa(V.shut)}</div>` : ''}
+    <div class="bb-board">${V.items.length ? V.items.map(card).join('') : '<div class="bb-empty">Heute hängt hier nichts. Morgen wieder.</div>'}</div>
+    ${V.invest ? `<div class="ctx-actions"><button id="bb-invest">In die Stadt investieren …</button></div>` : ''}`;
+  paintIcons(body);
+  body.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { const r = A.boardAct(town, b.dataset.acc, 'accept'); if (r) toast(r); else sfx('coin', 0.3, 0.5); boardUI(body, town); });
+  body.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => { const r = A.boardAct(town, b.dataset.claim, 'claim'); if (r) toast(r); else sfx('coin', 0.6, 0.7); boardUI(body, town); });
+  if ($('bb-invest')) $('bb-invest').onclick = () => A.boardInvest(town);
+}
 // ---------------- Heiler (GUI, 03.10.2026) ----------------
 // Je Gruppenmitglied eine Karte: Leben, sechs Glieder als Balken (gebrochen rot, geschient gelb, fehlend grau), Zustände; unten die beiden
 // Behandlungen als Knöpfe. Heilen läuft wie im Gespräch als Kanal (3,5 s) und schließt das Fenster.
@@ -496,7 +465,6 @@ export function renderContext(target) {
 `;   /* UI-Umbau: Wetter, Zeit, Jahreszeit, Jahr stehen in der Kopfleiste (vorher doppelt) */
     if (here && S.towns && S.towns[here.key]) {
       const t = S.towns[here.key], owner = S.war.nodes[here.key]?.owner;
-      h = h.replace('<div class="ctx-head">', `<div class="ctx-head ctx-click" data-town="${here.key}" title="Klick: Stadtinfo">`);   /* W11: Stadtinfo-Fenster */
       h += `<div class="ctx-block"><div class="ctx-sub">Stadt</div>
         <div class="ctx-line"><span>Lage</span><b>${townState(here.key)}</b></div>
         <div class="ctx-line"><span>Herrschaft</span><b>${owner ? FACTIONS[owner].name : 'frei'}</b></div>
@@ -528,7 +496,7 @@ export function renderContext(target) {
           + (I.where || I.timer ? `<div class="ctx-line q-sub"><span>${I.where || ''}</span><b>${I.timer || ''}</b></div>` : '');
       }).join('') + '</div>';
     }
-    if (box.__h !== h) { box.innerHTML = h; { const th = box.querySelector('[data-town]'); if (th) th.onclick = () => openModal('town', th.dataset.town); } box.__h = h; }   /* PERF-S: DOM nur bei Änderung schreiben */
+    if (box.__h !== h) { box.innerHTML = h; box.__h = h; }   /* PERF-S: DOM nur bei Änderung schreiben */
     return;
   }
   box.__h = null;
@@ -536,9 +504,8 @@ export function renderContext(target) {
     box.innerHTML = `<div class="ctx-head">${target.name}</div><div class="ctx-sub">Eren — Nordfurt</div>
       ${bar('Zustand', target.hp, target.maxHp, 'hp')}
       <div class="ctx-line"><span>Richtung</span><b>${target.dir > 0 ? 'Nordfurt' : 'Eren'}</b></div>
-      ${target.waiting ? `<div class="ctx-line"><span>Stand</span><b>wartet — Weg unsicher</b></div>` : ''}
       ${Object.entries(target.cargo || {}).map(([g, n]) => `<div class="ctx-line"><span>${ITEMS[g].name}</span><b>${n}</b></div>`).join('')}
-      <div class="ctx-block ledger">${target.waiting ? 'Die Händler warten, bis die Alte Straße wieder sicher ist: Totenknoten und Räuberlager an der Straße räumen, Überfälle verebben lassen.' : 'Begleite sie bis ans Ziel. Überfälle unterwegs sind häufig.'}</div>`;
+      <div class="ctx-block ledger">Begleite sie bis ans Ziel. Überfälle unterwegs sind häufig.</div>`;
     return;
   }
   if (target.kind === 'enemy') {
@@ -789,10 +756,7 @@ export function pips(h, n) {
 function objIco(o) {
   if (o.t === 'kill') return MONSTERS[o.mt] ? `<canvas class="br-mon" data-mt="${o.mt}" width="36" height="36"></canvas>` : icoImg('log_death', 2, 'br-ico');
   if (o.t === 'item') return ITEMS[o.key] ? `<canvas class="br-itm" data-ico="${o.key}"></canvas>` : icoImg('log_economy', 2, 'br-ico');
-  if (o.t === 'find' || o.t === 'clue') return '<i class="br-eye"></i>';   /* Welttiefe: Spur */
-  if (o.t === 'talk') return icoImg('log_party', 2, 'br-ico');
-  if (o.t === 'escort') return icoImg('bar_st', 2, 'br-ico');   /* W3: Begleiten */
-  if (o.t === 'destroy') return icoImg('log_combat', 2, 'br-ico');   /* W4: Zerschlagen */
+  if (o.t === 'find') return '<i class="br-eye"></i>';
   return icoImg(o.ico || 'log_quest', 2, 'br-ico');
 }
 const qa = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -919,7 +883,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    town:[ 'Stadt', townUI ], black:[ 'Schwarzmarkt', blackUI ], classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], relics:[ 'Reliquien', relicsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], board:[ 'Anschlagbrett', boardUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1174,7 +1138,6 @@ export function itemInfoHTML(slot, cmpWith = true, lite = false) {   /* lite: oh
   let h = lite ? '' : `<h3 class="r-${rar}">${slot.name || it.name}</h3><div class="s-key">${RARITY[rar]} · ${slotLabel(it.slot)}</div>`;
   const pu = itemPurpose(it); if (pu) h += `<div class="ledger" style="margin:4px 0">${pu}</div>`;
   if (it.sdesc) h += `<div class="ledger" style="margin:4px 0">${it.sdesc}</div>`;   /* Schildart erklären */
-  if (it.slot === 'relic') h += `<div class="ledger" style="margin:4px 0;color:var(--gold)">Stufe ${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][(slot.tier || 1) - 1]}${slot.name ? ` · ${slot.name}` : ''}. Anlegen fasst sie in eine Reliquien-Fassung (Taste V).</div>`;   /* Reliquien */
   if (slot.qual) h += `<div class="ledger" style="margin:4px 0">Güte: ${slot.qual}${slot.maker ? ` · gefertigt von ${slot.maker}` : ''}</div>`;   /* Nutzer §5d.8: Handwerk */
   if (it.energy) h += `<div class="ledger" style="margin:4px 0">Magitech · Energie ${slot.charge ?? 100}/100 · ${it.energy} je Schuss${it.splash ? ' · Streuung' : ''}${it.pierce ? ' · durchschlägt einen Gegner' : ''}${it.mstatus ? ` · ${it.mstatus.key === 'shocked' ? 'lähmt' : 'setzt in Brand'} (${Math.round(it.mstatus.chance * 100)} %)` : ''}. Leer schießt sie nicht — Energiezelle benutzen.</div>`;   /* Roadmap C.10 */
   if (it.desc && ['prosthesis', 'eye', 'mechmod', 'mechkit'].includes(it.use)) h += `<div class="ledger" style="margin:4px 0">${it.desc}</div>`;   /* Bionik-Test: Wirkung des Teils zeigen (desc stand sonst nirgends) */
@@ -1239,7 +1202,7 @@ export function itemCardHTML(slot, o = {}) {
   else if (it.lore || slot.lore) h += `<div class="lore ic-lore">${slot.lore || it.lore}</div>`;
   return h + '</div>';
 }
-const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', chest:'Rumpf', hands:'Hände', legs:'Beine', feet:'Füße', cloak:'Umhang', talisman:'Talisman', consumable:'Verbrauch', material:'Material', relic:'Reliquie' }[s] || s || 'Gegenstand');   /* P5-Fehler: Hände, Beine, Talisman fehlten */
+const slotLabel = s => ({ weapon:'Waffe', offhand:'Nebenhand', head:'Kopf', chest:'Rumpf', hands:'Hände', legs:'Beine', feet:'Füße', cloak:'Umhang', talisman:'Talisman', consumable:'Verbrauch', material:'Material' }[s] || s || 'Gegenstand');   /* P5-Fehler: Hände, Beine, Talisman fehlten */
 
 // ---- Körpertafel (Trefferzonen) ----
 // Vorderansicht wie auf einer Feldschertafel: die rechte Körperseite liegt im Bild links.
@@ -1524,7 +1487,7 @@ function partyUI(body) {
 function settleUI(body) {
   const st = S.settlement;
   if (!st) {
-    body.innerHTML = `<div class="ledger">Du hast noch kein Lager. Suche einen freien Platz in der Welt und gründe eins — nicht in einer Stadt, mindestens sechs Felder vor den Häusern.
+    body.innerHTML = `<div class="ledger">Du hast noch kein Lager. Suche einen freien Platz in der Welt und gründe eins.
       <div class="ctx-actions"><button id="found">Lager hier gründen (5 Holz)</button></div>
       <p style="margin-top:10px">Mit eigenem Lager darfst du einen vierten Gefährten mitnehmen (sonst bis zu drei).</p>
       <p style="margin-top:14px;color:#6d6454">Ein Lager ist kein Menü. Es steht in der Welt, es brennt, es wächst, es kann fallen.</p></div>`;
@@ -1560,21 +1523,14 @@ function settleUI(body) {
         return `<div class="statline"><span>${icoImg('res_' + k, 1, 'ico bres')}${n}</span><b>${Math.floor(S.res[k])}</b></div>`; }).join('')}
       <h3 style="margin-top:14px">Gebäude</h3>
       ${st.buildings.map(b => `<div class="statline"><span>${BUILDINGS[b.type].name}</span><b>${b.built < 1 ? Math.round(b.built * 100) + '% Bau' : Math.round(b.cond * 100) + '%'}</b></div>`).join('') || '<div class="ledger">Nichts gebaut.</div>'}
-      <h3 style="margin-top:14px">Aufgeben</h3>
-      <div class="ledger">Auflösen trägt alle Gebäude ab; Siedler, Lagerwachen und Vieh ziehen weiter. Was im Lager liegt, bleibt in einer Kiste am Platz. Nur vor Ort, nicht während eines Überfalls.</div>
-      <div class="ctx-actions"><button id="dissolve"${A.stashHere?.() && !st.raid ? '' : ' class="cant"'}>Siedlung auflösen</button></div>
     </div></div>`;
-  confirmDissolve = false;
-  $('dissolve').onclick = () => { if (!A.stashHere?.() || st.raid) { A.dissolveSettlement(); return; }   /* die Aktion erklärt, warum nicht */
-    if (!confirmDissolve) { confirmDissolve = true; $('dissolve').textContent = 'Wirklich auflösen? Noch einmal klicken.'; return; }
-    confirmDissolve = false; A.dissolveSettlement(); closeModal(); };
   prioCards($('prio'), st);
   const place = k => { A.startPlacing(k); closeModal(); };
   const show = k => { selBld = k; [...body.querySelectorAll('[data-b]')].forEach(c => c.classList.toggle('sel', c.dataset.b === k)); bldDetail($('detail'), k, place); };
   [...body.querySelectorAll('[data-b]')].forEach(b => { b.onclick = () => show(b.dataset.b); b.ondblclick = () => place(b.dataset.b); });
   if (selBld && BUILDINGS[selBld]) show(selBld);
 }
-let selBld = null, confirmDissolve = false;
+let selBld = null;
 const RES_NAME = { wood:'Holz', stone:'Stein', iron:'Eisen' };
 const bldImg = (k, s, cls) => { let u = ''; try { u = ICO?.bldURL?.(k, s) || ''; } catch (e) {} return u ? `<img class="${cls}" src="${u}" alt="">` : `<span class="${cls} bimg-none"></span>`; };
 function costPics(cost, big) {                                          /* je Rohstoff: Piktogramm + Zahl, rot wenn es fehlt */
@@ -1642,37 +1598,6 @@ function settleTier(st) {
 
 // ---- Fraktionen ----
 let selFac = 'valen';
-/* W11 Slice 1: Stadtinfo-Fenster — Daten aus A.townInfo (game.js), nur Anzeige. */
-/* W11 Slice 3: Schwarzmarkt-Fenster — Angebot aus A.blackList, Kauf über A.blackBuy (Prüfung dort), Händlerspruch als Zeile im Fenster */
-let blackSay = '';
-function blackUI(body, npc) {
-  npc = npc || blNpc; if (!npc) return; if (blNpc !== npc) blackSay = ''; blNpc = npc;
-  const L = A.blackList?.(npc) || [];
-  body.innerHTML = `<div class="ledger"><div class="ctx-head">${qa(npc.name)}</div><div class="ctx-sub">Schwarzmarkt · kein Rang nötig · +50 % Preis · manche Teile gebraucht</div>
-    <div class="ctx-line"><span>Dein Gold</span><b>${S.gold}</b></div>
-    <div class="ctx-block"><div class="ctx-sub">Unter dem Tisch</div>
-      ${L.length ? L.map(o => `<div class="ctx-line"><span>${qa(o.name)}${o.part ? ` · Stufe ${o.tier}` : ''}${o.rare ? ' · <i>selten</i>' : ''}</span><b>${o.cost} Gold <button class="mini" data-bk="${o.key}" ${S.gold < o.cost ? 'disabled' : ''}>Kaufen</button></b></div>`).join('') : '<div class="ctx-line"><span>Heute nichts mehr. Morgen liegt wieder etwas unter dem Tisch.</span></div>'}
-    </div>
-    ${blackSay ? `<div class="ctx-block ledger">${qa(blackSay)}</div>` : ''}
-    <div class="ctx-block ledger">Gebrauchte Prothesen haben beim Einsetzen nur 60 % Zustand. Das Angebot wechselt täglich.</div></div>`;
-  [...body.querySelectorAll('[data-bk]')].forEach(b => b.onclick = () => { const r = A.blackBuy?.(npc, b.dataset.bk); blackSay = r?.say || ''; refreshModal(npc); });
-}
-let blNpc = null;
-function townUI(body, k) {
-  const I = A.townInfo?.(k); if (!I) { body.innerHTML = '<div class="ledger">Kein Ort gewählt. Klick im Kontextfeld rechts auf den Ortsnamen.</div>'; return; }
-  const row = (a, b, cls = '') => `<div class="ctx-line"><span>${qa(a)}</span><b class="${cls}">${b}</b></div>`;
-  const goods = L => L.length ? L.map(g => `${qa(g.name)} ${g.price} Gold · ${g.stock}`).join('<br>') : '—';
-  body.innerHTML = `<div class="ledger"><div class="ctx-head">${qa(I.name)}</div><div class="ctx-sub">${I.kind} · ${qa(I.lord)}${I.schutz ? ' · ' + I.schutz : ''}</div>
-    <div class="ctx-block"><div class="ctx-sub">Lage</div>
-      ${row('Zustand', qa(I.state), I.occupied || I.siege ? 'threat-high' : I.state === 'Bedroht' || I.hunger ? 'threat-med' : 'threat-low')}
-      ${I.garrison != null ? row('Besatzung', I.garrison + (I.walls != null ? ` · Mauern ${I.walls} %` : '')) : ''}
-      ${row('Einwohner', townHeads(I.key))}${row('Wohlstand', `${I.prosper}/100 · ${I.built} neue Häuser`)}
-      ${I.tradeDays ? row('Geförderter Handel', `noch ${I.tradeDays} Tage, 20 % mehr Ware je Zug`) : ''}${I.trust < 0 ? row('Vertrauen', `${I.trust} (weniger Aushänge)`, 'threat-med') : ''}</div>
-    <div class="ctx-block"><div class="ctx-sub">Markt</div>${row('Knapp und teuer', goods(I.scarce))}${row('Reichlich und billig', goods(I.plenty))}
-      ${row('Unterwegs hierher', I.coming.length ? I.coming.map(qa).join('<br>') : 'kein Händlerzug')}${I.unsafe.length ? row('Unsichere Wege', 'Händler meiden die Straße nach ' + I.unsafe.map(qa).join(', '), 'threat-med') : ''}</div>
-    <div class="ctx-block"><div class="ctx-sub">Arbeit</div>${row('Aushänge', `${I.offers} offen · ${I.active} angenommen`)}${row('Betriebe', `${I.biz}${I.mine ? ` · ${I.mine} eigene` : ''}`)}</div>
-    <p style="margin-top:10px;color:#6d6454">Alles aus den laufenden Systemen: Krieg, Wirtschaft, Aufträge. Das Fenster ändert nichts.</p></div>`;
-}
 function facUI(body) {
   const f = FACTIONS[selFac], rep = S.factions[selFac], rank = S.ranks[selFac];
   body.innerHTML = `<div class="fac-grid">
@@ -1684,7 +1609,7 @@ function facUI(body) {
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
-      ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab rank-fac">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
+      ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
       <h3 style="margin-top:14px">Krieg</h3>
       <canvas class="warmap" id="warmap" width="260" height="180"></canvas>
       <div class="ledger">${A.warStatus()}</div>
@@ -2076,10 +2001,10 @@ function questUI(body) {
   pg.innerHTML = `<div class="qb-letter st-${x.st}"><div class="qb-head">${G.npc ? '<canvas id="qb-por" width="56" height="56"></canvas>' : `<span class="qb-por0">${icoImg(G.label.startsWith('Anschlag') ? 'log_quest' : 'set_level', 3, 'qb-pi')}</span>`}
       <div class="qb-ttl"><h2></h2><div class="qb-giver"></div></div><div class="qb-stamp">${QB_WORD[x.st]}</div></div>
     <p class="qb-desc"></p>
-    <div class="qb-objs">${x.Q.objectives.map((o, i) => `<div class="qb-obj">${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`).join('')}</div>
+    <div class="qb-objs">${x.Q.objectives.map((o, i) => { const done = (x.v.progress?.[i] || 0) >= (o.count || 1), cur = !done && x.Q.objectives.slice(0, i).every((q, j) => (x.v.progress?.[j] || 0) >= (q.count || 1));
+      return `<div class="qb-obj${done ? ' done' : cur ? ' cur' : ''}"><i class="qb-chk">${done ? '☑' : cur ? '▸' : '☐'}</i>${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`; }).join('')}</div>
     ${x.I.where ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>${qa(x.I.where)}</span></div>` : active && x.Q.objectives.some(o => o.type === 'find') ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>Kein Ziel auf der Karte — die Suche ist der Auftrag.</span></div>` : ''}
     ${x.I.timer ? `<div class="qb-line">${icoImg('time', 1, 'qb-li')}<span>${qa(x.I.timer)}</span></div>` : ''}
-    ${x.I.spare ? `<div class="qb-line">${icoImg('log_world', 1, 'qb-li')}<span>${qa(x.I.spare)}</span></div>` : ''}
     ${x.v.outcome ? `<p class="qb-out"></p>` : ''}
     ${B?.rew ? `<div class="qb-rew"><span>Lohn</span>${rewardHTML(B.rew, B.nums)}</div>` : ''}
     ${active ? `<div class="qb-act"><button data-track="${x.k}">${x.I.tracked ? 'Wird verfolgt' : 'Verfolgen'}</button>${x.I.cancel ? `<button data-cancel="${x.k}">Abbrechen</button>` : ''}</div>` : ''}</div>`;
