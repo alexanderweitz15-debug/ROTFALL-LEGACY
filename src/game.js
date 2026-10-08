@@ -1,5 +1,5 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
-import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
+import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
 import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
 import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
@@ -490,7 +490,7 @@ function partyBanter(force = false) {
   if (!S.flags.hintBanter) { S.flags.hintBanter = 1; log('Deine Gefährten reden unterwegs miteinander — über Kämpfe, Verluste, Angst und Neid. Streit drückt ihre Stimmung, Freundschaft hebt sie.', 'party'); }
   return kind;
 }
-let dbgMood = -1;
+let dbgMood = -1, dbgHall = -1;
 function moodIdleTick(force = null) {
   const p = S.player; if (!p || S.map !== 'world' || S.cine) return 0;
   const town = townAt(p.x / TS | 0, p.y / TS | 0); if (!town || !TOWN_PLAN[town]) return 0;
@@ -1355,7 +1355,7 @@ function hammerFx(e, now) {                                       /* P2.15: Funk
 }
 function planDays() {
   VILLAGERS.length = 0; const jobUse = new Set();
-  ensureSmithyYards(); ensureBizHands(); ensureTrainers();   /* Skills Phase 7: Lehrmeister */   /* P2.14: Schmiedehof vor den Arbeitsplätzen (der Geselle bekommt den Amboss); P2.17: Gehilfen deiner Betriebe */
+  ensureSmithyYards(); keepRng(() => { ensureBizHands(); ensureTrainers(); });   /* Skills Phase 7: Lehrmeister; keepRng: flüchtige Figuren verschieben den Zufall nicht */   /* P2.14: Schmiedehof vor den Arbeitsplätzen (der Geselle bekommt den Amboss); P2.17: Gehilfen deiner Betriebe */
   const byHome = new Map(), seats = new Map();
   for (const c of S.ents.world) if (c.villager && c.homeId) { if (!byHome.has(c.homeId)) byHome.set(c.homeId, []); byHome.get(c.homeId).push(c); }
   const seatsOf = tav => {                                            // freie Innenkacheln der Schenke (ohne Möbel, nicht die Türachse)
@@ -5136,7 +5136,8 @@ function gatherTree(p, t) {
   gainSkill(p, 'woodcutting', 0.5 * lm); S.player.skills.survival = Math.min(100, (S.player.skills.survival || 0) + 0.1);
   if (!tier && !S.flags.axeHint && !S._quiet) { S.flags.axeHint = 1; UI.toast('Ohne Axt geht es mühsam — mit einem Beil fällst du doppelt so schnell.', 3200); }
   if (t.hp > 0) return 'hieb';
-  removeSolid(t); Object.assign(t, { type: 'stump', solid: false, hp: undefined, stumpDay: S.day | 0, label: 'Baumstumpf' }); log('Baum gefällt.', 'world');   /* P3.x Abbauzustand (09.10.): statt zu verschwinden bleibt ein Stumpf (begehbar, nur Bild) */
+  removeSolid(t); S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1); log('Baum gefällt.', 'world');
+  S.ents[S.map].push({ id: uid(), kind: 'prop', type: 'stump', map: S.map, x: t.x, y: t.y, r: 8, solid: false, stumpDay: S.day | 0, label: 'Baumstumpf' });   /* P3.x Abbauzustand (09.10.): wo der Baum stand, bleibt ein Stumpf (begehbar, nur Bild) */
   const got = [];
   if (rnd() < perkVal(p, 'woodcutting', 'hard')) { giveMat(p, 'hartholz', 1); got.push('Hartholz'); }
   if (rnd() < perkVal(p, 'woodcutting', 'side')) { giveMat(p, 'harz', 1); got.push('Harz'); }
@@ -6487,7 +6488,31 @@ const houseOf = t => (t.house || t.yardOf) && HOUSES.find(b => b.id === (t.house
 const FURN_USE = { bed: 'Schlafen', bunk: 'Schlafen', stall: 'Handeln', counter: 'Handeln', bench: 'Rasten', throne: 'Auf den Thron setzen',
   cask_rack: 'Zapfen', shelf: 'Durchsuchen', desk: 'Durchsuchen', crate_stack: 'Durchsuchen', weapon_rack: 'Durchsuchen',
   machine: 'An der Maschine arbeiten', gearpile: 'Teile sortieren', forge: 'Schmieden oder ausbessern', anvil: 'Schmieden oder ausbessern', workbench_int: 'Werkbank: bauen oder ausbessern', campfire_static: 'Am Kessel brauen', lever: 'Hebel ziehen', trough: 'Waschen und trinken', well: 'Waschen und trinken' };
-const furnAct = t => t.kind === 'prop' && !t.harvest && !t.loot && !t.feast && !t.bond && !t.mechBench ? (ownBizAt(t) ? 'Im eigenen Betrieb arbeiten' : FURN_USE[t.type] || null) : null;   /* P2.19 */
+/* §5g.36 Prachtbauten nutzbar (09.10., Preise vorläufig ⚖): Bibliothek (Lesen → alte Karte), Badehaus (Baden → Ausdauer, etwas Leben, Blutung/Gift weg),
+   Hospital (Behandlung → voll geheilt, 2 Stunden), Observatorium (nachts in die Sterne sehen → drei unbekannte Orte auf der Karte). */
+const HALL_USE = { library: { props: ['shelf', 'desk'], label: 'Lesen (5 Gold)' }, bathhouse: { props: ['trough', 'barrel'], label: 'Baden (3 Gold)' },
+  hospital: { props: ['bed', 'shelf'], label: 'Behandeln lassen (25 Gold, 2 Stunden)' }, observatory: { props: ['desk', 'shelf', 'workbench'], label: 'In die Sterne sehen' } };
+const hallOf = t => { const b = t.kind === 'prop' && t.house && HOUSES.find(h => h.id === t.house); const H = b && HALL_USE[b.type]; return H && H.props.includes(t.type) ? [b, H] : null; };
+const furnAct = t => t.kind === 'prop' && !t.harvest && !t.loot && !t.feast && !t.bond && !t.mechBench ? (ownBizAt(t) ? 'Im eigenen Betrieb arbeiten' : hallOf(t)?.[1].label || FURN_USE[t.type] || null) : null;   /* P2.19; §5g.36 */
+function hallUse(b, t) {
+  const p = S.player, pay = n => { if (S.gold < n) { UI.toast(`Dafür brauchst du ${n} Gold.`); return false; } S.gold -= n; UI.refreshHUD(); return true; }, day = S.day | 0;
+  if (b.type === 'library') { if (S.flags.libDay === day) return UI.toast('Für heute hast du genug gelesen — die Augen brennen.'); if (!pay(5)) return;
+    S.flags.libDay = day; act(p, 'kneel', 1200, t);
+    const L = LOCATIONS.filter(l => !l.poi && l.kind !== 'road' && !explored(l.x, l.y)).sort((a, c) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(c.x - p.x / TS, c.y - p.y / TS))[0];
+    if (!L) return log('Du liest in alten Reiseberichten. Nichts, was du nicht schon kennst.', 'world');
+    revealAround(L.x, L.y, (L.r || 8) + 6); log(`In einem alten Reisebericht findest du eine Karte: ${L.name}. Die Gegend ist jetzt auf deiner Karte (M).`, 'world'); return UI.toast(`Karte: ${L.name}`); }
+  if (b.type === 'bathhouse') { if ((p.bathCd || 0) > clock()) return UI.toast('Du bist noch ganz aufgeweicht.'); if (!pay(3)) return;
+    p.bathCd = clock() + 600; p.stamina = p.maxStamina; p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.15); p.status = (p.status || []).filter(x => !['bleeding', 'poisoned', 'chilled'].includes(x.key));
+    act(p, 'kneel', 900, t); fx(t.x, t.y - 10, 'heal', 6); log('Heißes Wasser, Seife, Stille. Ausdauer voll, Blutung, Gift und Kälte sind weg.', 'world'); return UI.toast('Gebadet'); }
+  if (b.type === 'hospital') { if (p.hp >= p.maxHp && !Object.values(p.body || {}).some(q => q && q.max && (q.hp < q.max || q.broken))) return UI.toast('Die Heiler sehen dich an: „Dir fehlt nichts.“'); if (!pay(25)) return;
+    B.fullHeal(p); p.hp = p.maxHp; S.minute += 120; act(p, 'kneel', 1400, t); log('Zwei Stunden im Hospital: genäht, geschient, verbunden. Du bist wieder heil. (25 Gold, 2 Stunden)', 'world'); return UI.toast('Behandelt'); }
+  if (b.type === 'observatory') { const h = S.minute / 60; if (h >= 5 && h < 20) return UI.toast('Am Tag sieht man keine Sterne. Komm nachts wieder.'); if (S.flags.obsDay === day) return UI.toast('Heute Nacht hast du den Himmel schon gelesen.');
+    S.flags.obsDay = day; act(p, 'kneel', 1400, t);
+    const L = LOCATIONS.filter(l => !l.poi && l.kind !== 'road' && !explored(l.x, l.y)).sort(() => Math.random() - 0.5).slice(0, 3);
+    for (const l of L) revealAround(l.x, l.y, (l.r || 8) + 4);
+    log(L.length ? `Der Sterndeuter zeigt dir Linien am Himmel — und wo sie auf die Erde fallen: ${L.map(l => l.name).join(', ')}. (Karte, M)` : 'Die Sterne erzählen dir nichts Neues. Vielleicht kennst du die Welt schon.', 'world');
+    if (!S.flags.loreRotfall) log('„Siehst du den roten Fleck? Da fiel Omega. Seitdem stimmen die Sterne nicht mehr.“', 'world'); return; }
+}
 const INN_PRICE = 8, TAP_PRICE = 3;
 function furnWitnesses(t) {
   const b = houseOf(t);
@@ -6498,6 +6523,7 @@ function foesNear(p, r = 420) { return S.ents[S.map].some(e => e.kind === 'enemy
 function useFurniture(t, raw = false) {
   const p = S.player, b = houseOf(t);
   if (!raw) { const ob = ownBizAt(t); if (ob) return bizWorkMenu(ob, t); }   /* P2.19: im eigenen Betrieb erst das Arbeitsmenü */
+  if (!raw) { const H = hallOf(t); if (H) return hallUse(H[0], t); }   /* §5g.36 Prachtbauten */
   switch (t.type) {
     case 'bed': case 'bunk': return sleepIn(t, b);
     case 'stall': case 'counter': return tradeAt(t);
@@ -10639,7 +10665,7 @@ function buildKeepHouses() {
   }
 }
 function ensureBlackKeep() {
-  ensureDeadLife(); buildKeepHouses();   /* P5 A */
+  keepRng(() => { ensureDeadLife(); buildKeepHouses(); });   /* P5 A; keepRng: die flüchtigen Figuren verschieben die Zufallsfolge nicht */
   const k = KEEP(); if (!k) return; const [kx, ky] = k;
   if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege && !e.keepGuard); return; }
   if (!S.ents.world.some(e => e.keepCourt)) {
@@ -10650,11 +10676,11 @@ function ensureBlackKeep() {
     mk('Grimbart Knochenhand', 'Knochenschmied', 3, 1, { shop: true, pool: ['knochenspalter', 'totenglocke', 'schaedelhelm', 'totenkrone', 'toten_handschuhe', 'toten_beinschienen'], market: false, greet: '„Knochen hält länger als Eisen. Frag die Toten.“' });
     mk('Mutter Asch', 'Leichenpriesterin', 0, 4, { keepPriest: true, greet: '„Jede Seele, die du bringst, wärmt den Thron.“' });
   }
-  if (!S.ents.world.some(e => e.keepGuard)) {   /* P5 A (BUG-143): Besatzung am Tor und im Hof — flüchtig wie der Hof, nur solange die Toten die Feste halten */
+  if (!S.ents.world.some(e => e.keepGuard)) keepRng(() => {   /* P5 A (BUG-143): Besatzung am Tor und im Hof — flüchtig wie der Hof, nur solange die Toten die Feste halten; keepRng: verschiebt die Zufallsfolge nicht */
     for (const [dx, dy, name] of [[-4, 10, 'Torwache'], [3, 10, 'Torwache'], [-6, -2, 'Hofwache'], [6, -2, 'Hofwache']]) { const q = detSpot('world', kx + dx, ky + dy, 3) || [kx + dx, ky + dy];
       const g = makeChar({ name: `${name} der Stillen Schar`, prof: 'Wächter der Stillen Schar', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, level: 12, faction: 'undead', traits: ['diszipliniert'], pal: { skin: '#b9b3a2', cloth: '#1a1420', glow: '#4e8f7a' } });
       Object.assign(g, { keepGuard: true, keepCourt: false, undead: true, hooded: true, brave: true, transient: true, visitor: true, anchor: { x: g.x, y: g.y }, greet: '„Der Thron ist leer. Die Wache nicht.“' }); g.equip.weapon = mkItem('knochenspalter'); recalc(g); S.ents.world.push(g); }
-  }
+  });
   if (S.flags.keepSiege && !S.ents.world.some(e => e.keepSiege)) {   /* Heerlager Valens vor dem Tor */
     for (let i = 0; i < 6; i++) { const q = freeSpotNear('world', kx - 22 + (i % 3) * 2, ky + 4 + (i >> 1), 2), g = guardChar('valen', q, 'Belagerer', ri(8, 11));
       Object.assign(g, { keepSiege: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: '„Die Feste fällt. Diesmal wirklich.“' }); S.ents.world.push(g); }
@@ -18951,6 +18977,7 @@ function debugSections() {
       'Musik: nächste Phrase sofort (Region/Ort)': () => { if ((S.settings.music ?? 0.5) <= 0) S.settings.music = 0.5; ambience(true); musicNow(); UI.toast('Musik: gleich kommt die nächste Phrase.'); },   /* P4 Technik 08.10. */
       'Stadt: Stimmung zeigen (Trauer/Fest/Angst)': () => { const m = ['trauern', 'jubeln', 'abwehren'][(dbgMood = (dbgMood + 1) % 3)]; UI.toast(`Stimmung „${m}“: ${moodIdleTick(m)} Bewohner.`); },   /* N4 */
       'Gruppe: Gefährten-Szene jetzt': () => { const k = partyBanter(true); UI.toast(k ? `Szene: ${k}` : 'Brauche zwei Gefährten in der Nähe.'); },   /* T38-Teil */
+      'Aurelheim: Prachtbau besuchen (Bibliothek/Bad/Hospital/Observatorium)': () => { const k = ['library', 'bathhouse', 'hospital', 'observatory'][(dbgHall = (dbgHall + 1) % 4)], b = HOUSES.find(h => h.type === k && h.map === 'world'); if (!b) return UI.toast(`Kein ${k}.`); tp(b.x + (b.w >> 1), b.y + b.h - 3); UI.toast(`Prachtbau: ${HB.BTYPES[k]?.label || k}`); },   /* §5g.36 */
       'Lehrer: zur Moorhexe (Moorland)': () => { ensureMoorhexe(); const c = S.ents.world.find(e => e.key === 'brakke'); if (!c) return UI.toast('Moorland nicht gefunden.'); toWorld(); tp(c.x / TS | 0, (c.y / TS | 0) + 2); },   /* §5g.11 */
       'Stadt: Besitzer-Banner neu setzen': () => { ensureOwnerBanners(); UI.toast('Banner nach Besitzer gesetzt.'); },   /* T33 */
       'NPC-Ziele: Leerstand ins Log': () => log(`Leerstand: ${Object.entries(S.vacant || {}).map(([h, d]) => `${h} (Tag ${d})`).join(', ') || 'keiner'}.`, 'world'),
@@ -21009,6 +21036,17 @@ export function selftest() {
     const all = data && looks && called && bolt && rage && shaman && bomb && shove && circle && led && worker && trap && chief;
     if (!all) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led, worker, trap, chief });
     return all;
+  }));
+  ok('P3.24-Rest + Abbauzustand (09.10.): von vorn Waffe in Kampfhaltung vor der Brust und Spitze nach oben; Parade/Block setzen die Abwehrbewegung; gefällter Baum hinterlässt einen begehbaren Stumpf', sandbox(() => {
+    const spec = SP.humanSpec({ kind: 'npc', prof: 'Söldnerwache', seed: 2, pal: {}, equip: {} }), W = md => ({ mode: md, wt: 'sword', ac: 'sword', arc: 1.4, q: 0, v: 0, oct: 2, two: false, low: 0 });
+    const fr = SP.humanFrameR(spec, 'S', 'i0', W('ready')), fs = SP.humanFrameR(spec, 'S', 'i0', W('rest')), front = fr.hand && fs.hand && fr.hand[1] < fs.hand[1] - 3 && SP.weaponAngle(W('ready'), Math.PI / 2) < -0.5;
+    const p = stage(), e = spawnEnemy('bandit', '__a', 10, 10); e.x = p.x + 30; e.y = p.y; p.aim = 0; e.swing = 0.5; combat = S.ents.__a.filter(x => x.alive);
+    p.cover = { since: performance.now() }; guarded(e, p, 10); const parry = p.parryT?.k === 'parry';
+    p.parryT = null; e.swing = 0.5; p.stamina = 100; p.cover = { since: performance.now() - 9000 }; guarded(e, p, 10); const block = p.parryT?.k === 'block'; p.cover = null;
+    const t = { id: uid(), kind: 'prop', type: 'tree', map: '__a', x: 400, y: 300, r: 12, hp: 0.4, solid: true }; S.ents.__a.push(t); S.map = '__a'; t.chopCd = 0; gatherTree(p, t);
+    const stump = !S.ents.__a.includes(t) && S.ents.__a.some(o => o.type === 'stump' && o.x === 400 && o.y === 300 && !o.solid && o.stumpDay === (S.day | 0));
+    if (!(front && parry && block && stump)) console.warn('P3.24-Rest-Probe', { front, parry, block, stump });
+    return front && parry && block && stump;
   }));
   ok('P3.24 Kampfanimation §17-Rest (09.10.): Treffer je Waffe (Kolben taumelt, Schwert zuckt, Speer weicht zurück), Kampfhaltung wiegt (i0≠i1 in drei Richtungen), Deckung je Waffenklasse verschieden, Front/Rücken ohne Grätsche', sandbox(() => {
     const kinds = hitKind('mace') === 'blunt' && hitKind('sword') === 'blade' && hitKind('spear') === 'pierce' && hitKind(null) === 'blunt' && hitKind('claw') === 'blade' && HIT_RX.blunt.T > HIT_RX.blade.T && HIT_RX.pierce.d > HIT_RX.blade.d;
@@ -23271,6 +23309,14 @@ export function selftest() {
       if (!(built && stay && moved && waits && talked && looted && rescued && kept)) console.warn('Prolog', { built, stay, moved, waits, talked, looted, rescued, kept });
       return built && stay && moved && waits && talked && looted && rescued && kept;
     } finally { clearInterval(prMenuTimer); S.ents.prolog = E0 || []; MAPS.prolog = M0; S.prolog = P0; S.map = m0; p.map = pm; p.x = x0; p.y = y0; if (!S.ents[pm].includes(p)) S.ents[pm].push(p); indexSolids('prolog'); tutorShow(); }
+  })());
+  ok('Prachtbauten (09.10.): Bibliothek, Badehaus, Hospital, Observatorium bieten ihre Nutzung statt „Durchsuchen“; Baden kostet 3 Gold und füllt die Ausdauer', (() => {
+    const types = ['library', 'bathhouse', 'hospital', 'observatory'], found = types.map(k => S.ents.world.find(e => e.kind === 'prop' && hallOf(e) && hallOf(e)[0].type === k));
+    if (found.some(f => !f)) return false;
+    const labels = found.every((t, i) => furnAct(t) === HALL_USE[types[i]].label);
+    const p = S.player, g0 = S.gold, st0 = p.stamina, cd0 = p.bathCd, q0 = S._quiet; S._quiet = true;
+    try { S.gold = 10; p.stamina = 1; p.bathCd = 0; hallUse(hallOf(found[1])[0], found[1]); const bath = S.gold === 7 && p.stamina === p.maxStamina; return labels && bath; }
+    finally { S.gold = g0; p.stamina = st0; p.bathCd = cd0; S._quiet = q0; }
   })());
   ok('Moorhexe (09.10.): Mutter Brakke steht im Moorland, lehrt Blutegel und Moorgriff, nur nachts, ohne Beziehungs-Hürde', (() => {
     ensureMoorhexe(); const c = S.ents.world.find(e => e.key === 'brakke'), L = LOCATIONS.find(l => l.key === 'marsh'), m0 = S.minute;
