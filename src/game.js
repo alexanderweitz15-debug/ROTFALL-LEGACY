@@ -3773,6 +3773,8 @@ const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally 
 let UNBLOCK = false, stamWarnAt = 0;
 const heavyHit = (e, t, mult) => { UNBLOCK = true; try { hit(e, t, mult); } finally { UNBLOCK = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
+  if (attacker && target && attacker !== target && attacker.map === target.map && dist(attacker, target) > 26 && !attacker.ramNow && !clearLine(attacker, target)) {   /* Sturmangriffe (Dampframme) brechen durch Hindernisse */   /* Spec Welt 08.10. §36: kein Treffer durch Wände — gilt für Nahkampf, Fähigkeiten, Flächen, Gegner */
+    if (attacker === S.player && !(attacker.wallHintAt > performance.now())) { attacker.wallHintAt = performance.now() + 1200; float(attacker, 'Wand dazwischen', 'rgba(200,190,160,ALPHA)'); } return; }
   /* Ersatz-Lebensbalken „zuletzt getroffen“: jetzt in hurt() gesetzt (HB2-04: auch Pfeile und Zauber) */   /* Entwickler 02.10.: ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Balken */
   if (target.varonCourt && !target.exileCourt && attacker && attacker !== S.player && !S.party.includes(attacker.id) && !attacker.coopPilot && !attacker.coopHero && !attacker.armyId && !attacker.keepGate && !attacker.varonCourt) return;
   if (target.varonKing && !target.exile && attacker && (attacker === S.player || S.party.includes(attacker.id) || attacker.coopPilot)) keepAlarm(attacker, 'Angriff auf den König');   /* Entwickler 02.10.: Späher und Verstärkung */   /* Belagerung S3a (F-C): Weltereignisse töten den Hof nicht nebenbei */
@@ -5029,6 +5031,7 @@ function heavyTick(e, dt, m) {
   if (Hv.t > 0) return;
   e.heavy = null; e.special = null; e.windup = false; e.telegraph = 0;
   if (Hv.kind === 'blast') return blastEnd(e, Hv, H);                    /* Entwickler 02.10.: Bomben-Skelett */
+  e.ramNow = !!H.ram;   /* Dampframme: der Stoß bricht durch Fass und Zaun — Sichtlinie in hit() nicht prüfen */
   for (const t of combat) {
     if (!t.alive || t.downed || t === e || !isHostile(e, t)) continue;
     let inside;
@@ -5038,6 +5041,7 @@ function heavyTick(e, dt, m) {
     if (t.invuln) { evaded(t); continue; }
     heavyHit(e, t, H.mul); const ka = Math.atan2(t.y - e.y, t.x - e.x); if (t.alive) { moveEnt(t, Math.cos(ka) * 22, Math.sin(ka) * 22); t.stagger = Math.max(t.stagger || 0, 450); }
   }
+  e.ramNow = false;
   if (H.ram) ramRun(e, Hv, H); else if (Hv.kind === 'thrust' || Hv.kind === 'charge') moveEnt(e, Math.cos(Hv.a) * 40, Math.sin(Hv.a) * 40);
   fx(Hv.c.x, Hv.c.y, 'dust', 14); S.fx.push({ x: Hv.c.x, y: Hv.c.y, vx: 0, vy: 0, type: 'shock', s: H.r / 70, life: 400, maxLife: 400 });
   if (dist(e, S.player) < 500) { camShake(6, 220); hitStop = Math.max(hitStop, 60); }
@@ -7187,7 +7191,9 @@ function lostGobTick() {
 const inAurel = c => { const k = townAt(c.x / TS | 0, c.y / TS | 0); return k && TOWN_PLAN[k]?.lord === 'aurel' ? k : null; };
 const hasPermit = () => !!(S.flags.aurelCitizen || S.flags.marriedHouse || (S.permit ?? -1) >= (S.day | 0) || (S.aurelJob && S.aurelJob.until >= (S.day | 0)) || S.bond?.kind === 'aurel');
 const bastion = () => S.flags.chainsBroken ? 2 : 1;
-function clearLine(a, b) { const d = dist(a, b), n = Math.ceil(d / 16); for (let i = 1; i < n; i++) if (solidTile(a.map, a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n)) return false; return true; }
+/* Sichtlinie (zentral, Spec Welt 08.10. §36–37): Kacheln (Mauern, Fels) UND feste Objekte (Zäune, Mauerstücke, Kisten) zwischen a und b blockieren.
+   Genutzt von KI-Sicht, Geschossen (updateProjectiles prüft je Schritt) und seit 08.10. von jedem Treffer in hit(). */
+function clearLine(a, b) { const d = dist(a, b), n = Math.ceil(d / 12); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (solidTile(a.map, x, y) || solidPropAt(a.map, x, y, 2)) return false; } return true; }
 function coneSees(e, p, range = 150) {
   if (dist(e, p) > range) return false;
   const a = Math.atan2(p.y - e.y, p.x - e.x), da = Math.abs(((a - (e.aim || 0) + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
@@ -21203,6 +21209,15 @@ export function selftest() {
     const rq = Object.keys(QUESTS).filter(k => /^r_[a-z]+_\d[ab]$/.test(k)).length;
     return !eliteDup && !!LOCATIONS.find(l => l.key === 'necrotower') && rq === 48 && Object.keys(RANK_LINES).length === 8 && !/'Gerold', varonCourt/.test(ensureVaronCourt.toString());
   })());
+  ok('Spec Welt 08.10. §36: kein Treffer durch Wände — Hieb auf einen Gegner hinter einer Mauerkachel geht ins Leere, ohne Mauer trifft er; Pfeile prallen an der Mauer ab', sandbox(() => {
+    const p = stage(); p.x = 10 * TS + 16; p.y = 10 * TS + 16; p.aim = 0; const e = actor(p.x + 2 * TS, p.y, { kind: 'enemy', mtype: 'bandit' }); e.map = '__a';
+    const m = MAPS.__a, wallI = 10 * m.w + 11; const h0 = e.hp;
+    m.tiles[wallI] = T.WALL; hit(p, e, 1); const blocked = e.hp === h0 && !clearLine(p, e);
+    m.tiles[wallI] = T.GRASS; hit(p, e, 1); const open = e.hp < h0 && clearLine(p, e);
+    m.tiles[wallI] = T.WALL; const n0 = S.projectiles.length; S.projectiles.push({ id: uid(), kind: 'arrow', map: '__a', x: p.x, y: p.y, vx: 6, vy: 0, owner: p.id, dmg: 5, life: 2000, team: 'player' }); const h1 = e.hp; for (let i = 0; i < 20; i++) updateProjectiles(16);
+    const arrow = e.hp === h1 && S.projectiles.length === n0; m.tiles[wallI] = T.GRASS;
+    return blocked && open && arrow;
+  }));
   ok('Audit 04.10. Phase 2: Nix lehrt Assassine (2.1); Ranggeber hat einen Nachfolger mit demselben Schlüssel (2.2); Vargs Fall nimmt der Kette Eisenmark und Steinbruch, Morrgrunds Fall gibt es der Kette (2.4); Sühne hebt Verhasst auf −59 (2.5); gemerkter Bosstod zählt für einen späteren Auftrag (2.6/HB-42); Königsreihe läuft trotz Aurelion-Ruf weiter (2.8)', sandbox(() => {
     const nix = NPCS.find(n => n.key === 'nix'), kel = NPCS.find(n => n.key === 'kelan');
     const a1 = nix.teaches.includes('assassin'), a2 = KEY_ROLE(kel) && RANK_LINES.order.giver === 'kelan';

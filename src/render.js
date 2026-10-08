@@ -1020,13 +1020,20 @@ function prefetchHouses() {
     while (HPF.q.length && (n ? dl.timeRemaining() > 12 : dl.didTimeout || dl.timeRemaining() > 6)) { const [b, lit] = HPF.q.pop(); if (b.map === S.map) { houseCanvas(b, lit); n++; } } }, { timeout: 500 });
 }
 const HOUSE_ATLAS = false;   // Nutzer S13: Blatt-Gebäude wirken aufgeblasen zu verpixelt; an, sobald große Gebäudebilder kommen
+/* Spec Welt 08.10. §35: steht der Held hinter oder seitlich am Haus (im gezeichneten Dach- und Wandbereich, aber nicht vor der Grundlinie), wird das Haus
+   auf 50 % gedimmt, damit man sich, Eingang und Leute dahinter sieht. Positionsabhängig, weich eingeblendet über roofAlpha. */
+function playerBehind(b, OV, RISE) {
+  const p = S.player; if (!p || p.map !== b.map) return false;
+  const x0 = b.x * TS - OV * PX - 10, x1 = (b.x + b.w) * TS + OV * PX + 10, yTop = b.y * TS - RISE * PX - 16, yBase = (b.y + b.h) * TS;
+  return p.x > x0 && p.x < x1 && p.y < yBase && p.y > yTop;
+}
 function drawHouse(b, now) {
   if (HOUSE_ATLAS && SP.atlasOn()) { const src = SP.atlasSprite(SP.houseAtlas(b)); if (src) {   // Gebäude aus dem Blatt — aus: im Blatt zu klein, aufgeblasen zu grob (Nutzer S13)
     const target = playerInside(b) ? 0.14 : 1, a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15; roofAlpha.set(b, a);
     const dw = b.w * TS + 12, dh = dw * src.height / src.width, x0 = b.x * TS - 6, y0 = (b.y + b.h) * TS + 6 - dh;
     ctx.globalAlpha = a * (HB.wearOf(b) === 2 ? 0.75 : 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(src, x0, y0, dw, dh); ctx.globalAlpha = 1; return; } }
   const cv = houseCanvas(b, houseLit(b));
-  const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : 1;
+  const { OV, RISE } = HB.houseDims(b), target = playerInside(b) ? 0.14 : playerBehind(b, OV, RISE) ? 0.5 : 1;   /* Spec Welt 08.10. §35: hinter/seitlich am Haus → halb durchsichtig */
   const a = (roofAlpha.get(b) ?? target) + (target - (roofAlpha.get(b) ?? target)) * 0.15;
   roofAlpha.set(b, a);
   const x0 = b.x * TS - OV * PX, y0 = b.y * TS - RISE * PX;
