@@ -320,6 +320,10 @@ function bodyPose(R, view, B, pose, W) {
     const leg = (hx, side, lead) => { const fy = 41 + (lead ? sN * z * 0.6 : -sN * z), fx = hx + side * sp, kx = (hx + fx) / 2 + side * ko, ky = (h0 + fy) / 2;
       return [[hx, h0], [kx, ky], [fx, fy]]; };
     R.lL = leg(13.5, -1, leadL); R.lR = leg(18.5, 1, !leadL);  }
+  /* P3.24 §17 Kampf-Idle (09.10.): in Kampfhaltung wiegt die Figur ihr Gewicht vor und zurück statt zu atmen — i0 vorn auf dem Fuß, i1 zurück
+     (seitlich: Rumpf neigt sich nach hinten; vorn/hinten: Kopf und Schultern einen Pixel zur Seite). Bild i1 hebt das Atem-Absenken auf. */
+  if (W && W.mode === 'ready' && pose === 'i1') { R.by -= 1; for (const k of ['aN', 'aF', 'aL', 'aR']) if (R[k]) R[k] = R[k].map(([x, y]) => [x + (view === 'W' ? 0.5 : 1), y]);
+    if (view === 'W') R.lean += 1; else R.hx += 1; }
 }
 export function phaseOf(W) {
   if (!(W.mode === 'swing' || W.mode === 'work')) return null;
@@ -336,6 +340,7 @@ export function weaponAngle(W, dir) {
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, wt = W.wt, bowA = (sgn > 0 ? 0 : Math.PI) + Math.sin(dir) * 0.3 * sgn;
   if (wt === 'bow') return bowA;
   if (RANGED.has(wt)) return W.mode === 'aim' ? (wt === 'crossbow' ? dir : dir) : wt === 'crossbow' ? Math.PI / 2 - sgn * 0.2 : bowA;
+  if (W.mode === 'ready' && Math.sin(dir) > 0.9 && !THRUST.has(W.ac || wt) && !THRUST.has(wt)) return -Math.PI / 2 + sgn * 0.55;   /* P3.24: Kampfhaltung von vorn — Spitze schräg nach oben, nicht zum Boden */
   if (W.mode === 'rest') return upright(wt) ? -Math.PI / 2 + sgn * 0.1 : onShoulder(wt) ? (Math.abs(Math.cos(dir)) < 0.4 ? -Math.PI / 2 + 0.55 : -Math.PI / 2 - sgn * 0.75) : sgn > 0 ? 1.2 : Math.PI - 1.2;
   return dir + svOf(W).a * sgn;
 }
@@ -351,6 +356,7 @@ function armPlan(view, R, W) {
     const bp = CUR_BP || BP0;   /* Kampfanimation: Hand weiter vor/zurück (hr) und tiefer/höher (hd) je Form und Phase */
     if (THRUST.has(wt)) { const r = 11 + sv.ext * 0.8 + bp.hr; h = [S[0] + ca * r * K, S[1] + (6 + low + sa * r * 0.8 + bp.hd) * K]; }
     else { const ha = a + Math.atan2(Math.sin(sv.a), Math.cos(sv.a)) * sgn * 0.55, r = 13 + sv.ext * 0.5 + bp.hr;   /* Kampfanimation: Wirbel drehen über 2π — die Hand folgt dem Winkel modulo 2π */ h = [S[0] + Math.cos(ha) * r * K, S[1] + (5 + low - (W.mode === 'cover' ? 4 : 0) + Math.sin(ha) * r * 0.75 + bp.hd) * K]; } }
+  if (W.mode === 'ready' && view === 'S' && sa > 0.9 && !THRUST.has(wt) && !RANGED.has(wt)) h = [S[0] - sgn * 2 * K, S[1] + 7 * K];   /* P3.24 (09.10.): von vorn Waffe vor der Brust statt tief an der Hüfte (Spitze schräg hoch, weaponAngle) */
   if (W.mode === 'swing' || W.mode === 'work') { const dx = h[0] - S[0], dy = h[1] - S[1], d = Math.hypot(dx, dy), M = 13.5;   /* Kampfanimation: Hand bleibt in Armreichweite — den Rest des Stoßes trägt der Ausfallschritt */
     if (d > M) h = [S[0] + dx / d * M, S[1] + dy / d * M]; }
   const aw = weaponAngle(W, a);

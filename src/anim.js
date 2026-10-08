@@ -297,6 +297,11 @@ const STANCE = {
   staff:    { ready: { a: -0.2, ext: 2, body: { by: 1, st: 3, ln: 0 } },   guard: { a: -0.4, ext: 2, body: { by: 1, st: 3 } } },
 };
 export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
+/* P3.24 §17 Trefferreaktion je Waffe (09.10.2026, nur Bild): Stumpfes (Kolben, Hammer, Stab, Faust, Schleuder) lässt TAUMELN — länger, seitlich
+   hin und her; Klingen (Schwert, Axt, Zweihänder, Stange, Peitsche, Klaue) lassen ZUCKEN — kurz und scharf; Stiche (Speer, Dolch, Rapier, Pfeil,
+   Bolzen, Wurfmesser) lassen ZURÜCKWEICHEN — weiter nach hinten. T Dauer (ms), d Weg-Faktor, wob seitliches Wanken. game.js hit() setzt rx.w. */
+export const hitKind = wt => !wt || /^(mace|hammer|staff|sling)$/.test(wt) ? 'blunt' : /^(spear|dagger|rapier|bow|crossbow|throw)$/.test(wt) ? 'pierce' : 'blade';
+export const HIT_RX = { blunt: { T: 380, d: 1.2, wob: 1 }, blade: { T: 160, d: 0.9, wob: 0 }, pierce: { T: 300, d: 2.2, wob: 0 } };
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
 export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;

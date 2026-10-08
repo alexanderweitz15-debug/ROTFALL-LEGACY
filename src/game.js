@@ -4422,7 +4422,7 @@ function hit(attacker, target, mult, kind = 'physical') {
   const cov = target.cover && !AREA && !UNBLOCK ? guarded(attacker, target, Math.max(1, dmg - armor * 0.55) * (crush ? 2 : 1)) : false;
   if (cov === true) return;
   if (off && !crush && !AREA && !UNBLOCK && !target.cover && cov !== 'broken' && chance((ITEMS[off.key]?.block || 0) * 0.7 + (setOf(target)?.bonus.block || 0)) && !target.downed) {   // gebrochene Deckung: der Hieb trifft voll
-    fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
+    fx(target.x, target.y - 12, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)'); target.parryT = { t: performance.now(), k: 'block' };   /* P3.24: Abwehrbewegung im Bild */
     if (off.cond != null) off.cond = Math.max(0.05, off.cond - 0.004);
     sfx('metal', 0.4, earVol(target)); if (target === S.player || attacker === S.player) hitStop = Math.max(hitStop, 45); return;
   }
@@ -5136,7 +5136,7 @@ function gatherTree(p, t) {
   gainSkill(p, 'woodcutting', 0.5 * lm); S.player.skills.survival = Math.min(100, (S.player.skills.survival || 0) + 0.1);
   if (!tier && !S.flags.axeHint && !S._quiet) { S.flags.axeHint = 1; UI.toast('Ohne Axt geht es mühsam — mit einem Beil fällst du doppelt so schnell.', 3200); }
   if (t.hp > 0) return 'hieb';
-  removeSolid(t); S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1); log('Baum gefällt.', 'world');
+  removeSolid(t); Object.assign(t, { type: 'stump', solid: false, hp: undefined, stumpDay: S.day | 0, label: 'Baumstumpf' }); log('Baum gefällt.', 'world');   /* P3.x Abbauzustand (09.10.): statt zu verschwinden bleibt ein Stumpf (begehbar, nur Bild) */
   const got = [];
   if (rnd() < perkVal(p, 'woodcutting', 'hard')) { giveMat(p, 'hartholz', 1); got.push('Hartholz'); }
   if (rnd() < perkVal(p, 'woodcutting', 'side')) { giveMat(p, 'harz', 1); got.push('Harz'); }
@@ -10620,8 +10620,26 @@ function deadLifeTick() {   /* Streifen gehen zwischen Lager und Wegpunkt; Hinwe
   if (k && !H.keep && keepHeld() && Math.hypot(p.x / TS - k[0], p.y / TS - k[1]) < 32) { H.keep = 1; log('Die Schwarze Feste: Kaserne, Seelenkapelle, Knochenschmiede und Beinhaus im Mauerring, Wachen am Tor, im Hof der Thron der Stillen Schar. Handel und Rat nur für die, die zur Schar gehören (Rang oder Pakt).', 'world'); }
   for (const Cm of STILL_CAMPS) { const f = S.ents.world.find(e => e.stillCamp === Cm.key && e.type === 'campfire_static'); if (f && !H[Cm.key] && dist(f, p) < 25 * TS) { H[Cm.key] = 1; log(`${Cm.name}: Feuer aus Knochen, ein Händler für Grabgut, Wachen, die nicht atmen. Die Stillen lassen dich in Ruhe, solange du sie in Ruhe lässt.`, 'world'); } }
 }
+/* P5 A — BUG-143 „Totenland bei der Schwarzen Feste leer“: vier Gebäude im Mauerring (Kaserne NW, Seelenkapelle NO, Knochenschmiede SW, Beinhaus SO),
+   gebaut beim Laden in game.js (Kacheln, HOUSES-Eintrag, Möbel nach buildings.js FURNISH) — world.js und die Weltfolge bleiben unberührt. Lage relativ zum
+   Thron (Ort blackkeep): Mauer x −17…+18, y −18…+17, Tor im Süden, Thronfläche x −6…+6, y −7…+5; der Weg Tor → Thron bleibt frei. Idempotent. */
+const KEEP_HOUSES = [['barracks', -14, -15, 'E'], ['chapel', 9, -15, 'W'], ['smithy', -14, 7, 'E'], ['store', 9, 7, 'W']];
+function buildKeepHouses() {
+  const k = KEEP(); if (!k || HOUSES.some(h => h.id === 'keep_barracks')) return; const [kx, ky] = k, w = 7, h = 6;
+  for (const [type, dx, dy, door] of KEEP_HOUSES) {
+    const x = kx + dx, y = ky + dy, inR = e => (e.map || 'world') === 'world' && e.kind === 'prop' && e.x / TS >= x && e.x / TS < x + w && e.y / TS >= y && e.y / TS < y + h;
+    for (const e of S.ents.world) if (inR(e) && e.solid) removeSolid(e); S.ents.world = S.ents.world.filter(e => !inR(e));
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) setTile('world', i, j, j === y || j === y + h - 1 || i === x || i === x + w - 1 ? T.WALL : T.PLANK);
+    const dt = door === 'E' ? [x + w - 1, y + (h >> 1)] : [x, y + (h >> 1)]; setTile('world', dt[0], dt[1], T.PLANK);
+    const b = { id: 'keep_' + type, map: 'world', x, y, w, h, door, doorTile: dt, type, town: 'blackkeep', wear: 0, seed: (x * 31 + y * 17) % 997 + 1, hx: x, hy: y }; HOUSES.push(b);
+    const used = new Set([(dt[0] + (door === 'E' ? -1 : 1)) + ',' + dt[1]]), cap = Math.max(1, Math.floor((w - 2) * (h - 2) / 2) - 1);
+    for (const [kind, ox, oy] of HB.FURNISH?.[type] || []) { if (used.size - 1 >= cap) break; const tx = ox >= 0 ? x + 1 + ox : x + w - 1 + ox, ty = oy >= 0 ? y + 1 + oy : y + h - 1 + oy;
+      if (tx < x + 1 || tx > x + w - 2 || ty < y + 1 || ty > y + h - 2 || used.has(tx + ',' + ty)) continue; used.add(tx + ',' + ty);
+      const pr = { id: uid(), kind: 'prop', type: kind, map: 'world', x: tx * TS + TS / 2, y: ty * TS + TS / 2, r: 13, gen: 2, house: b.id, transient: true, solid: !['candles', 'sack', 'debris'].includes(kind) }; S.ents.world.push(pr); if (pr.solid) addSolid(pr); }
+  }
+}
 function ensureBlackKeep() {
-  ensureDeadLife();   /* P5 A */
+  ensureDeadLife(); buildKeepHouses();   /* P5 A */
   const k = KEEP(); if (!k) return; const [kx, ky] = k;
   if (!keepHeld()) { S.ents.world = S.ents.world.filter(e => !e.keepCourt && !e.keepSiege && !e.keepGuard); return; }
   if (!S.ents.world.some(e => e.keepCourt)) {
@@ -10686,7 +10704,7 @@ function ensureScytheMilitia() {
   sm.equip.weapon = mkItem('erntesense'); S.ents.world.push(sm);
 }
 function ensureDefenseMasters() {
-  ensureTavernStaff(); ensureMercs(); ensureCoaches(); ensureVaultSites(); ensureBeastTraders(); ensureLivestock(); ensureTownAnimals(); ensureOwnerBanners(); ensureFarmAnimals(); ensureSeafolk(); ensureWhitebeard(); ensureMorrgrund(); ensureTower(); ensurePaddock(); dkSteed();                                      // S13: Söldner in den Schenken
+  ensureTavernStaff(); ensureMercs(); ensureCoaches(); ensureVaultSites(); ensureBeastTraders(); ensureLivestock(); ensureTownAnimals(); ensureOwnerBanners(); ensureMoorhexe(); ensureFarmAnimals(); ensureSeafolk(); ensureWhitebeard(); ensureMorrgrund(); ensureTower(); ensurePaddock(); dkSteed();                                      // S13: Söldner in den Schenken
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
     if (town === 'vharnholm' || S.ents.world.some(e => e.vm === town)) continue;
     const board = S.ents.world.find(e => e.type === 'board' && boardTown(e) === town), [bx, by] = board ? [board.x / TS | 0, board.y / TS | 0] : P.square;
@@ -11925,6 +11943,20 @@ function ensureOmegaShrine() {
   const pos = freeSpotNear('world', (a.x / TS | 0) + 2, (a.y / TS | 0) + 1, 2);
   const c = makeChar({ name: 'Irmgard', prof: 'Priesterin Omegas', x: pos.x, y: pos.y, level: 8, faction: 'chain', pal: { skin: SKIN[0], hair: '#2a1a14', cloth: '#3a0e10' } });
   Object.assign(c, { omegaPriest: true, key: 'irmgard', spellsTaught: FAITH_SPELLS, spellRule: 'faith', anchor: { x: pos.x, y: pos.y }, greet: '„Omega sieht dich. Er sieht uns alle — von unten jetzt.“' }); S.ents.world.push(c);
+}
+/* §5g.11 Lehrer Moorhexe (09.10., vorläufig ⚖): Mutter Brakke wohnt im Moorland in einer Hütte aus Schilf und Fellen und lehrt nachts zwei eigene
+   Schattenzauber (Blutegel, Moorgriff). Flüchtig, beim Laden neu. Schattenmagie ist beim Orden verboten (bezeugtes Zaubern kostet dort Kopfgeld). */
+function ensureMoorhexe() {
+  if (S.ents.world.some(e => e.key === 'brakke' && e.alive)) return;
+  const L = LOCATIONS.find(l => l.key === 'marsh'); if (!L) return;
+  const q = freeSpotNear('world', L.x + 3, L.y - 2, 4); if (!q) return;
+  S.ents.world.push({ id: uid(), kind: 'prop', type: 'tent_prop', map: 'world', x: q.x + 34, y: q.y - 10, r: 14, solid: true, transient: true, label: 'Hütte der Moorhexe' },
+    { id: uid(), kind: 'prop', type: 'campfire', map: 'world', x: q.x - 26, y: q.y + 14, r: 9, solid: true, transient: true, label: 'Kessel über dem Feuer' },
+    { id: uid(), kind: 'prop', type: 'candles', map: 'world', x: q.x + 10, y: q.y + 22, r: 5, solid: false, transient: true });
+  const c = makeChar({ name: 'Mutter Brakke', prof: 'Moorhexe', x: q.x, y: q.y, level: 12, age: 71, traits: ['mürrisch'], pal: { skin: '#b9b08a', hair: '#7a7a6a', cloth: '#2e3424' } });
+  Object.assign(c, { key: 'brakke', transient: true, anchor: { x: q.x, y: q.y }, faction: null, brave: true, spellsTaught: ['sp_leech', 'sp_bogmire'], spellRule: 'hexe',
+    greet: '„Am Tag schlafen die Egel, und ich auch. Gelehrt wird nachts, Kind — dann zeig ich dir, was das Moor beißt.“' });
+  S.ents.world.push(c);
 }
 function ensureDiary() {                                           // Varg tot: sein Tagebuch liegt in der Kernburg
   const O = om(); if (O.diary) return; O.diary = true;
@@ -15679,6 +15711,7 @@ const SPELL_RULES = {
   order: (p, t) => (S.ranks.order ?? -1) < (t >= 3 ? 2 : t >= 2 ? 1 : 0) ? `Rang ${FACTIONS.order.ranks[t >= 3 ? 2 : t >= 2 ? 1 : 0]} im Orden` : null,   /* S15 Fehlersuche: Text passt zur Regel (Stufe I = Novize) */
   ilvar: (p, t, key) => { const tr = S.ilvar?.trust || 0, need = ILVAR_NEED[key] ?? (t >= 3 ? 50 : t >= 2 ? 25 : 0); return need > 100 ? 'Ilvars Endprüfung' : tr < need ? `Ilvars Vertrauen ${need} (jetzt ${tr})` : null; },   // S15 P6
   faith: (p, t) => { const rk = S.ranks.chain ?? -1, fa = S.omega?.faith || 0, ok = t >= 3 ? rk >= 2 || fa >= 60 : t >= 2 ? rk >= 1 || fa >= 40 : rk >= 0 || fa >= 20; return ok ? null : t >= 3 ? 'Kettenrang 2 oder Glaube 60' : t >= 2 ? 'Kettenrang 1 oder Glaube 40' : 'Kettenrang oder Glaube 20 (am Altar beten)'; },   // S15 P7
+  hexe: () => { const h = S.minute / 60; return h >= 20 || h < 5 ? null : 'die Nacht (sie lehrt nur zwischen 20 und 5 Uhr)'; },   /* §5g.11 Moorhexe (09.10.) */
   academy: (p, t) => !hasPermit() ? 'einen Aufenthaltsschein' : t >= 3 && !S.flags.aurelCitizen && (S.acadRank || 0) < 2 ? 'Bürgerrecht oder den Akademie-Rang Adept (Prüfung)' : null,
 };
 function spellPrice(npc, key) { const f = npc.faction && S.factions[npc.faction] || 0, love = MAGIC_VIEW[npc.faction]?.love.includes(ABILITIES[key].school); return Math.round(SPELL_PRICE[ABILITIES[key].tier] * (f >= 40 ? 0.8 : f >= 15 ? 0.9 : 1) * (love ? 0.85 : 1)); }
@@ -15716,7 +15749,7 @@ function spellLack(npc, key) {                                      // was fehlt
   const p = S.player, t = ABILITIES[key].tier, out = [], price = spellPrice(npc, key);
   if (S.gold < price) out.push(`${price - S.gold} Gold`);
   if ((p.attributes.intelligence || 8) < SPELL_INT[t]) out.push(`Intelligenz ${SPELL_INT[t]}`);
-  if (!['academy', 'ilvar', 'faith'].includes(npc.spellRule) && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
+  if (!['academy', 'ilvar', 'faith', 'hexe'].includes(npc.spellRule) && (S.relations[npc.key] || 0) < 10) out.push(`dass ${npc.name} dich besser kennt (Beziehung 10)`);
   const r = SPELL_RULES[npc.spellRule]?.(p, t, key); if (r) out.push(r);
   return out;
 }
@@ -18666,7 +18699,7 @@ function guarded(attacker, target, dmg) {
     const boss = attacker.boss || MONSTERS[attacker.mtype]?.boss;
     Object.assign(attacker, { swing: 0, hitDone: true, telegraph: 0, windup: false, special: null });
     attacker.stagger = Math.max(attacker.stagger || 0, boss ? 450 : 900); attacker.atkCd = Math.max(attacker.atkCd || 0, 700);
-    fx(target.x + Math.cos(target.aim) * 14, target.y - 14 + Math.sin(target.aim) * 8, 'spark', 14); float(target, 'Parade!', 'rgba(240,220,150,ALPHA)');
+    fx(target.x + Math.cos(target.aim) * 14, target.y - 14 + Math.sin(target.aim) * 8, 'spark', 14); float(target, 'Parade!', 'rgba(240,220,150,ALPHA)'); target.parryT = { t: performance.now(), k: 'parry' };   /* P3.24: Klinge schlägt den Hieb weg (Bild) */
     sfx('metal', 1, 1); hitStop = Math.max(hitStop, 120); camShake(4, 120); target.stamina = Math.max(0, target.stamina - 8);   /* Audit 3.5: Parade kostet 8 Ausdauer (war 3) — keine kostenlose Parade-Schleife */
     g.since = -1e9;                                                  // eine Parade je Deckung, danach nur noch Block
     target.riposteUntil = now + 1200;                                // Rapier: der nächste Stich ist eine Riposte
@@ -18683,7 +18716,7 @@ function guarded(attacker, target, dmg) {
   target.stamina -= cost;
   if (SH?.thorns && melee && attacker.alive && attacker.hp != null) hurt(attacker, dmg * SH.thorns, target, target.name, false, 'physical');
   hurt(target, dmg * (shield ? (SH?.guardMul ?? GUARD.shield) : GUARD.weapon), attacker, attacker.name || MONSTERS[attacker.mtype]?.name);
-  fx(target.x + Math.cos(target.aim) * 12, target.y - 12 + Math.sin(target.aim) * 7, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)');
+  fx(target.x + Math.cos(target.aim) * 12, target.y - 12 + Math.sin(target.aim) * 7, 'spark', 6); float(target, 'Block', 'rgba(200,196,170,ALPHA)'); target.parryT = { t: performance.now(), k: 'block' };   /* P3.24 */
   if (target.equip?.offhand && shield) target.equip.offhand.cond = Math.max(0.05, (target.equip.offhand.cond ?? 1) - 0.004);
   sfx('metal', 0.5, 1); hitStop = Math.max(hitStop, 50);
   const ba = Math.atan2(target.y - attacker.y, target.x - attacker.x); if (!B.hasMod(target, 'ankerfuss')) target.kb = { x: Math.cos(ba) * 7, y: Math.sin(ba) * 7, t: 90, T: 90 };   // S14: Block-Ruck, die Deckung gibt nach
@@ -18918,6 +18951,7 @@ function debugSections() {
       'Musik: nächste Phrase sofort (Region/Ort)': () => { if ((S.settings.music ?? 0.5) <= 0) S.settings.music = 0.5; ambience(true); musicNow(); UI.toast('Musik: gleich kommt die nächste Phrase.'); },   /* P4 Technik 08.10. */
       'Stadt: Stimmung zeigen (Trauer/Fest/Angst)': () => { const m = ['trauern', 'jubeln', 'abwehren'][(dbgMood = (dbgMood + 1) % 3)]; UI.toast(`Stimmung „${m}“: ${moodIdleTick(m)} Bewohner.`); },   /* N4 */
       'Gruppe: Gefährten-Szene jetzt': () => { const k = partyBanter(true); UI.toast(k ? `Szene: ${k}` : 'Brauche zwei Gefährten in der Nähe.'); },   /* T38-Teil */
+      'Lehrer: zur Moorhexe (Moorland)': () => { ensureMoorhexe(); const c = S.ents.world.find(e => e.key === 'brakke'); if (!c) return UI.toast('Moorland nicht gefunden.'); toWorld(); tp(c.x / TS | 0, (c.y / TS | 0) + 2); },   /* §5g.11 */
       'Stadt: Besitzer-Banner neu setzen': () => { ensureOwnerBanners(); UI.toast('Banner nach Besitzer gesetzt.'); },   /* T33 */
       'NPC-Ziele: Leerstand ins Log': () => log(`Leerstand: ${Object.entries(S.vacant || {}).map(([h, d]) => `${h} (Tag ${d})`).join(', ') || 'keiner'}.`, 'world'),
       'Leistung: update-Abschnitte messen (10 s)': () => { PF = { _t: 0 }; UI.toast('Messe 10 s …'); setTimeout(() => { const P0 = PF; PF = null; const n = P0._n || 1;   /* P4.29 */
@@ -19407,6 +19441,13 @@ function debugSections() {
       'Tod erzwingen (Test-Person)': () => { const q = freeSpotNear(S.map, (p.x / TS2 | 0) + 3, p.y / TS2 | 0, 2), c = makeChar({ name: 'Probe-Opfer', prof: 'Reisender', x: q.x, y: q.y, map: S.map }); c.transient = true; S.ents[S.map].push(c); c.forceDc = v('dbDc'); die(c, 'Debug'); UI.toast(ANIM_DEFS.death[v('dbDc')].name + ' (Person: Leiche, dann Grab)'); },
       'Geste abspielen (Held und nächster NPC)': () => { gesture(p, v('dbGest')); const n = S.ents[S.map].filter(x => x.kind === 'npc' && x.alive && x !== p && dist(x, p) < 400).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (n) gesture(n, v('dbGest'), 0, p); },
       'Alle Todesarten nebeneinander': () => { DEATH_KINDS.forEach((k, i) => { const e = spawnEnemy('bandit', S.map, (p.x / TS2 | 0) - 8 + i * 2, (p.y / TS2 | 0) + 3); if (e) { e.forceDc = k; e.x = p.x - 256 + i * 64; e.y = p.y + 90; die(e, 'Debug', p); } }); UI.toast('Von links: ' + DEATH_KINDS.join(', ')); },
+    }],
+    ['Welt: Totenland (P5 Variante A)', '', {
+      'Totenland: zur Schwarzen Feste (Hof, Wachen, Gebäude)': () => { const k = KEEP(); if (k) tp(k[0], k[1] + 13); },
+      'Totenland: zur Knochentafel in Vharnholm': () => { const b = S.ents.world.find(e => e.stillBoard); if (b) tp(b.x / TS2 | 0, (b.y / TS2 | 0) + 2); else UI.toast('Keine Knochentafel (Vharnholm fehlt?).'); },
+      ...Object.fromEntries(STILL_CAMPS.map(Cm => [`Totenland: zum ${Cm.name}`, () => { const f = S.ents.world.find(e => e.stillCamp === Cm.key && e.type === 'campfire_static'); if (f) tp(f.x / TS2 | 0, (f.y / TS2 | 0) + 4); else UI.toast('Lager nicht gefunden.'); }])),
+      'Totenland: Rang bei den Toten auf Diener (Brett der Stillen öffnen)': () => { S.ranks.undead = Math.max(0, S.ranks.undead ?? -1); UI.toast('Rang bei den Toten: Diener'); },
+      'Totenland: Brett der Stillen neu beschreiben': () => { (S.conDay ||= {})['vharnholm:board'] = -99; const L = townContracts('vharnholm', 'board'); UI.toast(L.map(c => c.title).join(' · ') || 'leer', 3500); },
     }],
     ['Regie (T17)', sel('dbBoss', Object.keys(BOSS_CARDS).map(k => [k, BOSS_CARDS[k].title])), {
       'Boss-Auftritt vorspielen (gewählt)': () => { const k = v('dbBoss'), b = REGION_BOSSES.find(x => x.id === k), e = spawnEnemy(b ? b.mtype : k, S.map, (p.x / TS | 0) + 5, p.y / TS | 0); if (!e) return UI.toast('Kein Platz'); e.transient = true; e.bossCard = k; if (b) e.title = b.title; bossIntro(e, true); },   /* P3.x: auch Graumähne/Karrak (Regionalbosse) */
@@ -23231,6 +23272,13 @@ export function selftest() {
       return built && stay && moved && waits && talked && looted && rescued && kept;
     } finally { clearInterval(prMenuTimer); S.ents.prolog = E0 || []; MAPS.prolog = M0; S.prolog = P0; S.map = m0; p.map = pm; p.x = x0; p.y = y0; if (!S.ents[pm].includes(p)) S.ents[pm].push(p); indexSolids('prolog'); tutorShow(); }
   })());
+  ok('Moorhexe (09.10.): Mutter Brakke steht im Moorland, lehrt Blutegel und Moorgriff, nur nachts, ohne Beziehungs-Hürde', (() => {
+    ensureMoorhexe(); const c = S.ents.world.find(e => e.key === 'brakke'), L = LOCATIONS.find(l => l.key === 'marsh'), m0 = S.minute;
+    if (!c || !L) return false;
+    try { S.minute = 12 * 60; const day = spellLack(c, 'sp_leech').some(t => t.includes('Nacht')); S.minute = 22 * 60; const night = !spellLack(c, 'sp_leech').some(t => t.includes('Nacht') || t.includes('Beziehung'));
+      return Math.hypot(c.x / TS - L.x, c.y / TS - L.y) < 12 && c.spellsTaught.includes('sp_bogmire') && !!ABILITIES.sp_leech && day && night;
+    } finally { S.minute = m0; }
+  })());
   ok('T33 Teil (08.10.): am Platz jedes Orts steht das Banner des Besitzers in dessen Farben; wechselt der Besitzer, wechselt das Banner', (() => {
     const b = S.ents.world.find(e => e.ownerBanner && S.war?.nodes?.[e.ownerBanner]); if (!b) return S.ents.world.filter(e => e.ownerBanner).length >= Object.keys(TOWN_PLAN).length - 2;
     const N = S.war.nodes[b.ownerBanner], o0 = N.owner, q0 = S._quiet; S._quiet = true;
@@ -23421,7 +23469,7 @@ export function selftest() {
       p.skills.fishing = 80; for (let i = 0; i < 400 && !p.masteries?.fishing; i++) fishCatch(p, { kind: 'lake', spotK: '__m' + i }); const fish = !!p.masteries?.fishing && hasItem(p, 'alter_wels');
       p.skills.mining = 80; for (let i = 0; i < 5; i++) gatherNode(p, { id: 'dn' + i, kind: 'prop', type: 'rock_node', map: 'deep', x: 300, y: 300, harvest: 'iron', gk: 'rock_node@d' + i }); const mine = !!p.masteries?.mining;
       const tr = ensureTrainers(), desks = S.ents.world.filter(e => e.teach).length, trainers = tr >= 3 && desks === tr;
-      p.skills.fishing = 20; delete p.masteries.fishing; addItem(p, 'hering', 3); const ready = techState(p, 'kuestenwurf') === 'bereit'; learnTech(p, 'kuestenwurf');
+      p.skills.fishing = 20; p.skills.smithing = 0; delete p.masteries.fishing; addItem(p, 'hering', 3); const ready = techState(p, 'kuestenwurf') === 'bereit'; learnTech(p, 'kuestenwurf');
       const tech = ready && !!p.techs?.kuestenwurf && !hasItem(p, 'hering') && Math.abs(perkVal(p, 'fishing', 'window') - 0.45) < 1e-9 && techState(p, 'zwergenhaertung') === 'stufe';
       p.skills.herbalism = 10; const blind = !herbSees(p); addItem(p, 'buch_kraeuter', 1); useConsumable(p, p.inv.findIndex(x => x.key === 'buch_kraeuter')); const book = blind && herbSees(p) && !hasItem(p, 'buch_kraeuter');
       const heir = makeChar({ name: 'Erbe', x: 0, y: 0 }), fresh = !heir.masteries && !heir.techs;
@@ -24394,6 +24442,20 @@ export function selftest() {
       if (!(det && wrong && found)) console.log('Geheim-Probe', JSON.stringify({ det, n: posts.length, wrong, found }));
       return det && wrong && found;
     } finally { S.ents.world = W0; S.secrets = s0; S.factions.order = o0; LOCATIONS.length = L0; bellSeq = []; }
+  }));
+  ok('P5 Variante A: Schwarze Feste mit vier Gebäuden und Wachen (BUG-143), Knochentafel in Vharnholm nur mit Rang oder Pakt (sonst mit Grund), Aufträge der Stillen mit Ruf bei den Toten und nur dort, zwei Lager im Osten (Feuer, Händler, Wache, Streife)', sandbox(() => {
+    stage(); const C0 = S.contracts, CD = structuredClone(S.conDay || {});
+    try {
+      const houses = ['barracks', 'chapel', 'smithy', 'store'].every(t => HOUSES.some(h => h.id === 'keep_' + t && h.town === 'blackkeep' && h.map === 'world'));
+      const guards = !keepHeld() || S.ents.world.filter(e => e.keepGuard).length === 4, board = S.ents.world.some(e => e.stillBoard && e.boardOf === 'vharnholm');
+      S.ranks.undead = -1; const shut = pactBound() || !!boardShut('vharnholm'); S.ranks.undead = 0; const open = boardShut('vharnholm') === null;
+      S.contracts = []; S.conDay = {}; const L = townContracts('vharnholm', 'board'), kinds = new Set(L.map(c => c.kind));
+      const jobs = L.length >= 3 && kinds.size >= 3 && L.every(c => conFac(c) === 'undead' && ['souls', 'robbers', 'message', 'stake', 'deliver'].includes(c.kind)) && !conKinds('eren').some(k => CON[k]?.dead);
+      const sc = makeContract('vharnholm', 'souls', 'board'), shape = sc.pts.length === 3 && sc.need === 3 && makeContract('vharnholm', 'robbers', 'board').mtype === 'bandit' && makeContract('vharnholm', 'stake', 'board').pts.length === 1;
+      const camps = STILL_CAMPS.every(Cm => S.ents.world.some(e => e.stillCamp === Cm.key && e.type === 'campfire_static') && S.ents.world.some(e => e.stillCamp === Cm.key && e.shop) && S.ents.world.some(e => e.stillCamp === Cm.key && e.stillPatrol));
+      if (!(houses && guards && board && shut && open && jobs && shape && camps)) console.log('P5-Probe', { houses, guards, board, shut, open, jobs, shape, camps, kinds: [...kinds] });
+      return houses && guards && board && shut && open && jobs && shape && camps;
+    } finally { S.contracts = C0; S.conDay = CD; }
   }));
   ok('T17 Szenen 3/4: Goblinsturm-Sieg (jubeln, dann heim — auch beim Überspringen), Garmadon-Herzschlag (Hof kniet, Welt steht), Hrodvar-Frostring, Hinrichtung am Galgen (Falltür nimmt den Verurteilten, auch beim Überspringen), „Morrgrund brennt“ wartet auf freie Bahn', sandbox(() => {
     const p = stage(), c0 = S.cine, GA = S.ents.garmadon, d0 = S.day;

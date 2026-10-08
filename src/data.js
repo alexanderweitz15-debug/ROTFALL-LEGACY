@@ -78,6 +78,21 @@ export const SKILL_DEF = {
   trading:   { group: 'Sozial', what: 'Kaufen und Verkaufen', perks: {} },
   leadership:{ group: 'Sozial', what: 'Gefährten führen', perks: {} },
 };
+/* Phase 6 Meisterschaften (Spec Skills §11, §48; 09.10.2026 — Werte vorläufig ⚖): ab Stufe lv ist die Meisterprüfung offen; bestanden = Meistertitel und
+   eine Meisterhaltung (Perk, wirkt wie die Meilensteine). Charaktergebunden — stirbt mit der Figur (§38). */
+SKILL_DEF.onehanded.master = { lv: 40, title: 'Klingenmeister', task: 'Besiege einen starken Gegner (Veteran, Anführer oder zwei Stufen über dir) mit einer Einhandwaffe und ohne Schild.', perk: ['parry', 0.15, 'Meisterhaltung: Parierfenster noch einmal +15 %'] };
+SKILL_DEF.polearms.master = { lv: 40, title: 'Meister des Speers', task: 'Besiege einen Veteranen oder Anführer mit einer Stangenwaffe.', perk: ['recover', 0.05, 'Meisterhaltung: noch 5 % schnellere Erholung'] };
+SKILL_DEF.smithing.master = { lv: 40, title: 'Meisterschmied', task: 'Schmiede ein Meisterstück — oder ein meisterliches Stück mit Königseisen.', perk: ['quality', 8, 'Meisterhand: Güte wie mit 8 Punkten mehr'] };
+SKILL_DEF.fishing.master = { lv: 40, title: 'Meisterfischer', task: 'Fang den „Alten vom Grund“, einen uralten Wels in einem See.', perk: ['window', 0.25, 'Meistergespür: noch 25 % mehr Zeit zum Anschlagen'] };
+SKILL_DEF.mining.master = { lv: 40, title: 'Meister der Tiefe', task: 'Baue in der Mine oder der Tiefe fünfmal Eisenerz ab.', perk: ['speed', 1, 'Meisterschlag: noch ein Brocken mehr je Abbau'] };
+/* Phase 7 Weltintegration (§45–49): Techniken bei Lehrmeistern der Skill-Städte (Voraussetzung + Aufgabe, kein Gold gegen Stufe) und Bücher */
+export const TECHS = {
+  zwergenhaertung: { skill: 'smithing', need: 15, bring: { kohle: 3, silbererz: 1 }, perk: ['quality', 5, 'Zwergenhärtung: Güte wie mit 5 Punkten mehr'], name: 'Zwergenhärtung', hub: 'deephall', teacher: 'Hroda Eisenhand', prof: 'Schmiedemeisterin der Zwerge' },
+  aderlesen:  { skill: 'mining', need: 10, bring: { stone: 5 }, perk: ['hard', 0.2, 'Ader lesen: 20 % mehr Eisen aus Steinadern'], name: 'Ader lesen', hub: 'deephall', teacher: 'Brokk Steinohr', prof: 'Steiger der Zwerge' },
+  kuestenwurf:{ skill: 'fishing', need: 10, bring: { hering: 3 }, perk: ['window', 0.2, 'Küstenwurf: 20 % mehr Zeit zum Anschlagen'], name: 'Küstenwurf', hub: 'saltport', teacher: 'Kapitänin Wenna', prof: 'Alte Fischerin' },
+  fallkerbe:  { skill: 'woodcutting', need: 10, bring: { harz: 2 }, perk: ['speed', 0.5, 'Fallkerbe: jeder Hieb trifft noch tiefer'], name: 'Fallkerbe', hub: 'haselbrueck', teacher: 'Jorg Kerbholz', prof: 'Waldmeister' },
+  feinwerk:   { skill: 'smithing', need: 20, bring: { silbererz: 1, hartholz: 1 }, perk: ['bionic', 10, 'Feinwerk: Prothesen selbst bis 10 % höher warten'], name: 'Feinwerk', hub: 'gelenkhall', teacher: 'Meisterin Ilse Zahnrad', prof: 'Feinmechanikerin' },
+};
 
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
 // ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
@@ -461,6 +476,10 @@ export const ITEMS = {
   bergminztee:{ name:'Bergminztee', slot:'consumable', use:'food', heal:4, food:1, stack:9, rarity:'uncommon', value:26, efx:{ vigor:0.25 }, dur:240, lore:'Klärt den Atem: Hiebe kosten 25 % weniger Ausdauer.' },
   rezept_jaegertopf:  { name:'Rezept: Jägertopf', slot:'consumable', use:'recipe', learn:['jaegertopf'], stack:1, rarity:'common', value:25 },
   rezept_bergminztee: { name:'Rezept: Bergminztee', slot:'consumable', use:'recipe', learn:['bergminztee'], stack:1, rarity:'uncommon', value:35 },
+  alter_wels: { name:'Der Alte vom Grund', slot:'material', stack:5, rarity:'legendary', value:240, fish:'lake', lore:'Ein Wels, älter als jedes Dorf am Ufer. Wer ihn fängt, ist Meisterfischer.' },
+  /* Bücher (Spec Skills §47): Wissen statt Erfahrungspunkte */
+  buch_erzkunde: { name:'Erzkunde der Tiefhall', slot:'consumable', use:'book', book:'erz', stack:1, rarity:'uncommon', value:70, lore:'Zeichnungen von Adern und Gestein: wer liest, erkennt Silber eher (+4 % Silbererz beim Abbau).' },
+  buch_kraeuter: { name:'Kräuterbuch der Heilerinnen', slot:'consumable', use:'book', book:'kraut', stack:1, rarity:'uncommon', value:60, lore:'Bilder seltener Pflanzen: wer liest, erkennt sie schon ab Kräuterkunde 5 statt 10.' },
   kochbuch:   { name:'Kochbuch der Schenke', slot:'consumable', use:'recipe', learn:['jaegertopf', 'kraeuterbrot'], stack:1, rarity:'uncommon', value:60, lore:'Fleckig, mit Randnotizen. Zwei Rezepte, die jede Schenke kennt.' },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
@@ -907,6 +926,8 @@ export const ABILITIES = {
   sp_dispel:    { name:'Magieunterbrechung', school:'arcane', tier:2, mana:14, cd:10000, cast:200, spell:{ shape:'dispel', r:170 }, teach:'Akademie Aurelheim', desc:'Bricht Zauber und schwere Angriffe ab, nimmt Feinden ihre Stärkungen.' },
   sp_shadowbolt:{ name:'Schattenpfeil', school:'shadow', tier:1, mana:9, cd:2200, cast:300, spell:{ shape:'bolt', el:'shadow', dmg:[10, 1.1], speed:6, range:320 }, teach:'Ilvar Nachtglas', desc:'Ein Splitter Dunkelheit. Er trifft, was er sieht.' },   // S15 P6: Schatten
   sp_drain:     { name:'Seelenzug', school:'shadow', tier:2, mana:16, cd:6000, cast:450, spell:{ shape:'bolt', el:'shadow', dmg:[12, 1.2], speed:5, range:280, drain:0.5 }, teach:'Ilvar Nachtglas (Vertrauen 25)', desc:'Zieht Leben aus dem Ziel. Die Hälfte davon kehrt zu dir zurück.' },
+  sp_leech:     { name:'Blutegel', school:'shadow', tier:1, mana:8, cd:2600, cast:300, spell:{ shape:'bolt', el:'shadow', dmg:[6, 0.7], speed:4, range:240, drain:0.35 }, teach:'Mutter Brakke, Moorhexe im Moorland (nur nachts)', desc:'Ein Klumpen Moor mit Zähnen: Er beißt sich fest und gibt dir einen Teil des Schadens als Leben zurück.' },   /* §5g.11 Moorhexe (09.10., Werte vorläufig) */
+  sp_bogmire:   { name:'Moorgriff', school:'shadow', tier:2, mana:16, cd:9000, cast:500, spell:{ shape:'area', el:'shadow', dmg:[5, 0.5], r:70, range:240, status:{ key:'frost', chance:1 } }, teach:'Mutter Brakke, Moorhexe im Moorland (nur nachts)', desc:'Schwarzer Schlamm greift nach den Beinen: Gegner im Kreis werden langsam.' },
   sp_raise:     { name:'Skelett erheben', school:'shadow', tier:3, mana:22, cd:12000, cast:800, spell:{ shape:'raise', left:45000 }, teach:'Ilvar Nachtglas (Vertrauen 50)', desc:'Eine Leiche in der Nähe steht als Diener auf (45 s, einer). Schwächer als beim Nekromanten.' },
   sp_soulburst: { name:'Seelenbersten', school:'shadow', tier:3, mana:28, cd:14000, cast:700, spell:{ shape:'nova', el:'shadow', dmg:[22, 1.6], r:110 }, teach:'Ilvar Nachtglas (Vertrauen 75)', desc:'Gefangene Seelen brechen aus dir hervor und reißen alles in der Nähe mit.' },
   sp_nachtglas: { name:'Nachtglas', school:'shadow', tier:3, mana:40, cd:60000, cast:900, legendary:true, spell:{ shape:'timeslow', r:320, left:6000 }, teach:'Nur durch Ilvars Endprüfung', desc:'Legendär. Um dich herum verlangsamt sich die Zeit sechs Sekunden lang: Feinde bewegen sich wie durch Glas.' },

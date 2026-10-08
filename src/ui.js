@@ -1118,7 +1118,7 @@ function invDetail(force) {
 }
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
-const USE_TXT = { recipe: 'Lesen: du lernst das Gericht für immer (auch dein Erbe kennt es). Kochen am Kessel eines Lagerfeuers.', fish:'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
+const USE_TXT = { book: 'Lesen: dauerhaftes Wissen für diese Figur (keine Erfahrungspunkte).', recipe:'Lesen: du lernst das Gericht für immer (auch dein Erbe kennt es). Kochen am Kessel eines Lagerfeuers.', fish:'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
   soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
   eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.',   /* Roadmap P2 */
   mechmod: 'Modul auf eine Prothese stecken (Arm- oder Beinprothese nötig). Ein altes Modul kommt zurück in die Tasche.',   /* Roadmap P3 */
@@ -1266,6 +1266,8 @@ function masteryUI(body) {
       <div style="height:4px;background:rgba(255,255,255,.12);margin:3px 0"><i style="display:block;height:4px;width:${Math.round(s.frac * 100)}%;background:#c8a050"></i></div>
       ${s.next ? `<div style="opacity:.85">Nächstes Ziel: Stufe ${s.next.lv} — ${s.next.t}</div>` : '<div>Meisterschaft erreicht.</div>'}
       ${s.perks.length ? `<div>${s.perks.map(q => `<span style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} ${q.lv}: ${q.t}</span>`).join('<br>')}</div>` : ''}
+      ${s.master ? `<div style="opacity:${s.master.done || s.master.open ? 1 : 0.45}">${s.master.done ? '★' : '☆'} Meisterschaft ab Stufe ${s.master.lv} — ${s.master.done ? `<b>${s.master.title}</b>: ${s.master.perk[2]}` : `${s.master.task}${s.master.open ? ' <b>(offen)</b>' : ''}`}</div>` : ''}
+      ${(s.techs || []).map(q => `<div style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} Technik ${q.name} (${q.where}): ${q.t}</div>`).join('')}
     </div>`).join('')}</section>`).join('') || '<p>Noch ungeübt.</p>'}</div>`;
 }
 // ---- Charakterbogen: Wundarzt-Tafel ----
