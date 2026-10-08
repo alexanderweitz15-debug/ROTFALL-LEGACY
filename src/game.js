@@ -2198,7 +2198,9 @@ function facStartSetup(f, p) {
 }
 function map2Dir(a, b) { const dx = b.x - a.x, dy = b.y - a.y; if (Math.hypot(dx, dy) < 6 * TS) return 'gleich nebenan'; return 'im ' + ['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8]; }
 // ================= Neues Spiel =================
+let pendingIntro = false;
 export function newGame(cfg) {
+  pendingIntro = true;   /* Einflug nach dem Aufbau (startGame) */
   const keep = { settings: S.settings, difficulty: cfg.difficulty || 'schwer' };
   for (const k of Object.keys(S)) if (k !== 'coop' && k !== 'settings') delete S[k];   /* RB-055: Welt, Wirtschaft, Krieg, Folgen eines vorher geladenen Stands nicht übernehmen */
   Object.assign(S, JSON.parse(JSON.stringify(S_INIT)), { settings: keep.settings });
@@ -2311,6 +2313,8 @@ function bindSim() {
   };
 }
 function startGame() {
+  if (pendingIntro) { pendingIntro = false; setTimeout(introFlight, 900); }
+  tutorShow();
   $('titlescreen').classList.add('hidden');
   $('creation').classList.add('hidden');
   $('game').classList.remove('hidden');
@@ -2457,6 +2461,7 @@ export function continueGame(given = null, retried = false) {                   
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
+  S.flags.introDone ??= 1;   /* Einflug nur für neue Helden */
   migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
@@ -2783,6 +2788,7 @@ function update(dt, now) {
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); facHintTick(); }   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
   if ((guideT += dt) > 3000) { guideT = 0; guideTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
+  tutorTick(now);   /* Wegweiser (08.10.) */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
   (S.stats ||= {}).playMs = (S.stats.playMs || 0) + dt;   // Phase 7: Spielzeit (Omega frühestens nach 50 Stunden)
@@ -5818,7 +5824,7 @@ function doInteract(target = null) {
   if (!t.portal) act(p, t.type === 'tree' || t.harvest === 'stone' || t.harvest === 'iron' ? 'work' : 'kneel', t.type === 'shrine' ? 1100 : t.type === 'board' ? 0 : 420, t);
   if (t.kind === 'item') {
     if (giveItem(p, t.item)) {                                // das Exemplar selbst (Zustand, Rarität), nicht eine neue Kopie
-      log(`Aufgehoben: ${ITEMS[t.item.key].name}.`, 'world'); UI.pickup?.(t.item);   /* UI-Scheibe 4: Aufnahme-Stapel, Fund-Karte ab Legendär */
+      log(`Aufgehoben: ${ITEMS[t.item.key].name}.`, 'world'); UI.pickup?.(t.item); S.flags.tutLoot = 1;   /* Wegweiser */   /* UI-Scheibe 4: Aufnahme-Stapel, Fund-Karte ab Legendär */
       S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1);
       onItemGained(t.item.key);
     }
@@ -7947,7 +7953,24 @@ const boardShut = town => { const lord = townFac(town);
 /* Entwickler 03.10.2026: Tributdörfer (Grauwasser, Hohlstein, Eisenried) gehören sich selbst — Hilfe und Aufträge zählen für die Freien,
    vor und nach Vargs Fall. Verträge eines Tributoffiziers sind Kettengeschäft (C.fac = 'chain'). conFac: Fraktion eines Vertrags. */
 const conFac = C => C.fac || (C.giver === 'rat' ? 'frei' : townFac(C.town));   /* Entwickler 03.10.: Aufträge des Tickmar-Arbeiterrats zählen für die Freien, nicht für die Fabrikherren */
+/* GUI Anschlagbrett (Spec Welt 08.10. §38, Entwickler: „das Missionsfenster soll ein GUI haben“): Zettel auf einem Brett statt Gesprächsliste —
+   je Auftrag Art, Titel, Text, Ziel, Lohn, Frist, Entfernung; Annehmen/Abgeben als Knopf. Geschlossen (Besatzung, Ruf) zeigt das Brett den Grund,
+   Abgaben gehen trotzdem. Proben (S._quiet) und Koop-Gäste behalten die Gesprächsliste. boardView liefert die Daten, boardAct führt aus. */
+function boardView(town) {
+  const shut = boardShut(town), p = S.player, list = shut ? (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active') : townContracts(town, 'board');
+  const items = list.map(C => { const B0 = conBrief(C), d = C.tx != null ? Math.round(Math.hypot(C.tx * TS - p.x, C.ty * TS - p.y) / TS) : null;
+    return { id: C.id, title: C.title, desc: C.desc, kind: C.kind, kindName: CON[C.kind]?.name || C.kind, ico: CON_ICO[C.kind] || 'log_quest', elite: !!C.elite, state: C.state, have: C.have || 0, need: C.need || 1,
+      ready: C.state === 'active' && conReady(C), rew: B0.rew, days: C.until ? Math.max(0, C.until - (S.day | 0)) : (CON_DAYS[C.kind] || 0), dist: d, face: C.kind === 'bounty' ? !!bountyFace(C) : false, objText: B0.objs[0]?.text || '' }; });
+  return { town, name: townName(town), shut: shut || null, items, max: CON_MAX, active: activeCons().length, invest: !shut && growable(town) };
+}
+function boardAct(town, id, what) {
+  const C = (S.contracts || []).find(c => c.id === id); if (!C) return 'Der Zettel ist weg.';
+  if (what === 'accept') { if (C.state !== 'offer') return 'Schon vergeben.'; return acceptContract(C) === false ? `Höchstens ${CON_MAX} Aufträge gleichzeitig.` : null; }
+  if (what === 'claim') { if (!conReady(C)) return 'Noch nicht erledigt.'; claimContract(C, null); return null; }
+  return null;
+}
 function boardMenu(town) { const shut = boardShut(town);   // S14 Mechanik-Check: das Brett folgt Besatzung und Ruf wie die Geber selbst
+  if (!S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('board', town); return; }   /* Spec Welt 08.10. §38: Fenster */
   const mine = (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active');   // S15 Fehlersuche: Erledigtes kann man trotzdem abgeben
   if (shut) return UI.dialogue({ name: `Anschlagbrett — ${townName(town)}` }, shut, [...mine.filter(c => c.have >= c.need).map(c => ({ text: `Abgeben: ${c.title}`, fn: () => { claimContract(c); boardMenu(town); } })), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   conList(null, town, 'board', `Anschlagbrett — ${townName(town)}`); }
@@ -8767,6 +8790,58 @@ let arrT = 0, keepT = 0, guideT = 0, guideLast = -1e9;
 // Ratgeber (Scout R8, Entwickler 02.10.2026: „Hinweise führen hin“): statt erst zu erklären, wenn der Spieler eine Mechanik zufällig
 // auslöst, weist ein Tipp aktiv darauf hin — passend zur Lage, jeder genau einmal, höchstens einer alle 90 Sekunden. Abschaltbar
 // (Debug „Ratgeber an/aus“, S.settings.tips === false). Läuft nicht in Zwischenszenen, Dialogen oder im Koop als Gast.
+/* ================= Einflug und Wegweiser (Spec Welt 08.10.2026 §6–9, P0 1–3) =================
+   Einflug: beim ersten Start eines neuen Helden fliegt die Kamera über die Gegend — Land, Straße, Stadt/Markt, Schmiede, Gefahr, Ruine — und
+   kehrt zum Helden zurück („Du betrittst eine Welt, die schon da ist“). Esc überspringt (wie jede Kamerafahrt). Danach der Wegweiser:
+   EINE Karte am oberen Rand mit einem Satz zur nächsten Sache, die man erleben kann; sie wechselt erst, wenn man es getan hat. Keine zehn
+   Fenster, keine „Gehe zu A“-Pfeile. Abschaltbar über die Tipps-Einstellung; gespeichert in S.flags.tutor (Schritt) / introDone. */
+const introSpot = key => { const L = LOCATIONS.find(l => l.key === key); return L ? { x: L.x * TS + TS / 2, y: L.y * TS + TS / 2 } : null; };
+function introFlight(force = false) {
+  const p = S.player; if (!p || S.flags.introDone || S.cine || (S._quiet && !force) || S.coop?.role === 'guest') return; S.flags.introDone = 1;
+  const here = { x: p.x, y: p.y }, near = (kind, max = 900) => LOCATIONS.filter(l => l.kind === kind && !l.poi && Math.hypot(l.x * TS - p.x, l.y * TS - p.y) < max * TS / 32).sort((a, b) => Math.hypot(a.x * TS - p.x, a.y * TS - p.y) - Math.hypot(b.x * TS - p.x, b.y * TS - p.y))[0];
+  const town = S.flags.startCap ? LOCATIONS.find(l => l.key === 'varonheim') : (near('city') || near('village')), wild = near('wild', 1400) || LOCATIONS.find(l => l.key === 'forest'), ruin = near('ruin', 1600) || LOCATIONS.find(l => l.key === 'graveyard');
+  const tk = town?.key, forge = S.ents.world.find(e => e.kind === 'npc' && e.alive && e.smith && (e.homeTown === tk || e.town === tk)) || S.ents.world.find(e => e.kind === 'prop' && e.type === 'forge' && tk && Math.hypot(e.x - town.x * TS, e.y - town.y * TS) < 40 * TS);
+  const board = S.ents.world.find(e => e.type === 'board' && tk && Math.hypot(e.x - town.x * TS, e.y - town.y * TS) < 40 * TS);
+  const sq = tk && TOWN_PLAN[tk]?.square ? { x: TOWN_PLAN[tk].square[0] * TS, y: TOWN_PLAN[tk].square[1] * TS } : town ? introSpot(tk) : null;
+  const REG = { greenmark: 'Greenmark. Ein Grenzland zwischen dem Königreich, dem Orden und den Toten im Osten.', aurel: 'Aurelion. Kristall, Messing und Gesetz — das Hochreich im Süden.', deadland: 'Das Totenland. Hier regieren die, die nicht liegen bleiben.',
+    desert: 'Die Rote Wüste. Sand, Zoll und die Stämme des Wüstenbunds.', eisen: 'Die Eisenmark. Ketten, Steinbrüche und die Feste der Kette.', mountain: 'Der Frostkamm. Fels, Schnee und die Hallen der Zwerge.' };
+  const shots = [
+    { x: here.x, y: here.y, zoom: 0.5, dur: 4200, text: `${REG[regionAt(p.x / TS | 0, p.y / TS | 0)] || REG.greenmark} Du bist nicht der Erste, der hier ankommt — und die Welt wartet nicht auf dich.` },
+    ...(sq ? [{ x: here.x, y: here.y, to: sq, zoom: 0.8, dur: 4600, text: `Straßen führen nach ${town.name}. Händler, Pilger, Streifen und Räuber teilen sich den Weg.` },
+      { ...sq, zoom: 1.1, dur: 4200, text: `${town.name}: Markt, Schenke, Wachen — und Leute, die ihrer Arbeit nachgehen. Nicht jeder hat etwas für dich. Zuhören lohnt sich.` }] : []),
+    ...(forge ? [{ x: forge.x, y: forge.y, zoom: 1.3, dur: 4000, text: 'Die Schmiede. Waffen, Rüstung, Ausbessern — und ein Schmied, der den ganzen Tag am Amboss steht.' }] : []),
+    ...(board ? [{ x: board.x, y: board.y, zoom: 1.3, dur: 3600, text: 'Am Anschlagbrett hängt Arbeit: Eskorten, Jagd, Lieferungen, Kopfgelder. Wer Aufträge erfüllt, bekommt Gold, Ansehen — und einen Ruf.' }] : []),
+    ...(wild ? [{ ...introSpot(wild.key), zoom: 0.8, dur: 4000, text: `${wild.name}: Hier jagt, was dich frisst. Wer blutet, kehrt um. Verbände und ein Rückweg sind keine Schande.` }] : []),
+    ...(ruin ? [{ ...introSpot(ruin.key), zoom: 0.8, dur: 4000, text: `${ruin.name}. Ruinen, Gräber, Gerüchte — nicht alles steht auf der Karte, und nicht alles will gefunden werden.` }] : []),
+    { x: here.x, y: here.y, zoom: 1.3, dur: 3600, text: `${p.name}. Kein Name, kein Land, keine Schulden — noch nicht. Was davon interessiert dich?` },
+  ];
+  cinematic(shots, () => { S.flags.tutor = S.flags.tutor ?? 0; tutorShow(); });
+}
+const TUTOR = [
+  { k: 'move', text: 'Bewegen: WASD oder Pfeiltasten. Lauf ein paar Schritte.', done: p => Math.hypot(p.x - (S.flags.tutX ?? p.x), p.y - (S.flags.tutY ?? p.y)) > 140 },
+  { k: 'talk', text: 'Leute ansprechen: E, wenn du nah dran bist. Nicht jeder hat Arbeit — manche erzählen nur, was los ist.', done: () => !!S.flags.tutTalked },
+  { k: 'shop', text: 'Händler und Schmied öffnen ein Fenster: links dein Gepäck, rechts die Ware. Anschauen kostet nichts.', done: () => !!S.flags.tutTrade },
+  { k: 'board', text: 'Arbeit hängt am Anschlagbrett (E) — oder jemand bittet dich im Gespräch. Deine Aufträge stehen im Tagebuch (J).', done: () => activeCons().length > 0 || Object.values(S.quests).some(q => q.state === 'active') },
+  { k: 'fight', text: 'Kampf: Linksklick schlägt, Maustaste halten lädt den schweren Hieb, Q weicht aus, Umschalt deckt. Wo du triffst, zählt.', done: () => (S.kills || 0) > (S.flags.tutKills0 ?? 0) },
+  { k: 'loot', text: 'Gefallene lassen etwas liegen: E hebt auf, I öffnet das Gepäck. Verbände und Essen gehören auf die Schnellleiste.', done: () => !!S.flags.tutLoot },
+  { k: 'goal', text: 'Wohin jetzt? Stadt, Wald, Brett, Straße — du entscheidest. H öffnet den Kodex, wenn du etwas nachlesen willst.', done: () => (S.flags.tutGoalAt || 0) > 0 && clock() - S.flags.tutGoalAt > 1.5 },
+];
+let tutorNext = 0;
+function tutorShow() {
+  const el = $('tutor'); if (!el) return; const i = S.flags.tutor ?? -1, T = TUTOR[i];
+  if (i < 0 || !T || S.settings?.tips === false || S.coop?.role === 'guest') { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden'); el.innerHTML = `<b>Wegweiser ${i + 1}/${TUTOR.length}</b><span>${T.text}</span><button title="Wegweiser ausblenden (Tipps in den Einstellungen)">×</button>`;
+  el.querySelector('button').onclick = () => { S.flags.tutor = TUTOR.length; tutorShow(); UI.toast('Wegweiser aus. Tipps lassen sich in den Einstellungen wieder einschalten.', 2600); };
+}
+function tutorTick(now, force = false) {
+  const p = S.player, i = S.flags.tutor; if (i == null || i >= TUTOR.length || !p?.alive || S.cine || (S._quiet && !force) || now < tutorNext) return; tutorNext = now + 400;
+  const T = TUTOR[i]; if (S.flags.tutX == null) { S.flags.tutX = p.x; S.flags.tutY = p.y; S.flags.tutKills0 = S.kills || 0; }
+  if (T.k === 'goal' && !S.flags.tutGoalAt) S.flags.tutGoalAt = clock();
+  if (UI.modalOpen === 'trade') S.flags.tutTrade = 1;
+  let ok3 = false; try { ok3 = T.done(p); } catch (e) { ok3 = false; } if (!ok3) return;
+  S.flags.tutor = i + 1; const el = $('tutor'); if (el && S.flags.tutor < TUTOR.length) { el.classList.add('ok'); setTimeout(() => { el.classList.remove('ok'); tutorShow(); }, 700); } else tutorShow();
+  if (S.flags.tutor >= TUTOR.length) { log('Wegweiser beendet. Ab hier bist du auf dich gestellt — H öffnet den Kodex, Tipps kommen weiter zur rechten Zeit.', 'quest'); }
+}
 const GUIDE = [
   ['codex', p => (S.flags.playMin || 0) >= 2, 'H öffnet den Kodex: alle Regeln, Gegner, Ränge und Zustände zum Nachlesen.'],
   ['talent', p => (p.skillPoints || 0) > 0, 'Du hast einen Talentpunkt frei. T öffnet den Sternenhimmel: Wanderer, deine Klassen, deine Titel.'],   /* Scheibe 2: wieder an */
@@ -13262,6 +13337,7 @@ function npcOffers(n) {
   return o;
 }
 function talk(npc) {
+  if (npc?.kind === 'npc' && S.flags.tutor != null) S.flags.tutTalked = 1;   /* Wegweiser */
   if (npc.key) ((S.codex ||= {}).met ||= {})[npc.key] = 1;             // S15 Kodex: wen man kennt
   if (npc.coreHolder) return snikkTalk(npc);                          // S15 P7 Artefakt-Konflikt
   if (npc.key === 'ilvar') return ilvarTalk(npc);                     // S15 P6
@@ -17219,6 +17295,11 @@ function debugSections() {
       'Teleport: Koordinaten': () => { const [x, y] = v('dbXY').split(',').map(Number); if (x >= 0 && y >= 0) tp(x, y); },
       'Teleport: Auftragsziel': () => { const k = Object.keys(S.quests).find(q => S.quests[q].state === 'active' && questPoint(q)); const q = k && questPoint(k); if (q) tp(q.x | 0, q.y | 0); else UI.toast('Kein Auftrag mit Ziel'); },
       'Teleport: Schwebende Insel': () => travel('sky'), 'Teleport: Eisenfeste': () => { const l = LOCATIONS.find(x => x.key === 'kettenfeste'); if (l) tp(l.x, l.y + 6); },
+    }],
+    ['Tutorial: Einflug und Wegweiser (08.10.2026)', '', {
+      'Einflug abspielen (Kamerafahrt, Esc überspringt)': () => { S.flags.introDone = 0; toWorld(); introFlight(true); },
+      'Wegweiser neu starten': () => { S.flags.tutor = 0; delete S.flags.tutX; delete S.flags.tutTalked; delete S.flags.tutTrade; delete S.flags.tutLoot; delete S.flags.tutGoalAt; S.settings.tips = true; tutorShow(); UI.toast('Wegweiser läuft von vorn.'); },
+      'Wegweiser: nächsten Schritt abhaken': () => { if (S.flags.tutor == null) S.flags.tutor = 0; S.flags.tutor = Math.min(TUTOR.length, S.flags.tutor + 1); tutorShow(); },
     }],
     ['Wanderautomaten (03.10.2026)', '', {
       'Roboter: Wanderautomat hier (anwerbbar)': () => { toWorld(); const s = freeSpotNear('world', (p.x / TS | 0) + 2, p.y / TS | 0, 2); const c = wanderBotize(makeChar({ name: 'x', prof: 'Wanderautomat', x: s.x, y: s.y, level: 3 }), true);
@@ -21209,6 +21290,24 @@ export function selftest() {
     const rq = Object.keys(QUESTS).filter(k => /^r_[a-z]+_\d[ab]$/.test(k)).length;
     return !eliteDup && !!LOCATIONS.find(l => l.key === 'necrotower') && rq === 48 && Object.keys(RANK_LINES).length === 8 && !/'Gerold', varonCourt/.test(ensureVaronCourt.toString());
   })());
+  ok('Spec Welt 08.10. §6–9: Einflug baut Bilder über Land, Stadt, Schmiede, Brett, Gefahr, Ruine und zurück zum Helden (nur neue Helden); Wegweiser schaltet erst weiter, wenn der Schritt erlebt wurde', sandbox(() => {
+    const p = stage(), F0 = { ...S.flags }, nx = tutorNext;
+    try { S.flags.tutor = 0; S.flags.tutX = p.x; S.flags.tutY = p.y; delete S.flags.tutTalked; tutorNext = 0; tutorTick(1e6, true); const stay = S.flags.tutor === 0;
+      p.x += 200; tutorNext = 0; tutorTick(2e6, true); const moved = S.flags.tutor === 1;
+      tutorNext = 0; tutorTick(3e6, true); const wait = S.flags.tutor === 1; S.flags.tutTalked = 1; tutorNext = 0; tutorTick(4e6, true); const talked = S.flags.tutor === 2;
+      const old = S.flags.introDone; S.flags.introDone = 1; introFlight(); const once = !S.cine;   /* schon gesehen: kein zweites Mal */
+      return stay && moved && wait && talked && once && TUTOR.length === 7 && typeof introFlight === 'function';
+    } finally { S.flags = F0; tutorNext = nx; S.cine = null; }
+  }));
+  ok('Spec Welt 08.10. §38: Anschlagbrett-Fenster — boardView liefert Zettel mit Art, Lohn, Ziel und Entfernung; boardAct nimmt an und meldet den Deckel; geschlossenes Brett nennt den Grund', sandbox(() => {
+    const t = Object.keys(S.towns).find(k => !S.war?.nodes?.[k]?.owner && !boardShut(k) && TOWN_PLAN[k]); if (!t) return true;
+    const C0 = S.contracts ? S.contracts.map(c => ({ ...c })) : null, Q0 = { ...S.quests };
+    try { const V = boardView(t); if (!V.items.length) return true; const it = V.items[0];
+      const shape = typeof it.title === 'string' && it.rew && typeof it.kindName === 'string' && typeof it.objText === 'string' && it.state === 'offer';
+      const r = boardAct(t, it.id, 'accept'); const V2 = boardView(t), mine = V2.items.find(x => x.id === it.id);
+      const again = boardAct(t, it.id, 'accept');
+      return shape && r === null && mine?.state === 'active' && typeof again === 'string';
+    } finally { if (C0) S.contracts = C0; S.quests = Q0; } }));
   ok('Spec Welt 08.10. §36: kein Treffer durch Wände — Hieb auf einen Gegner hinter einer Mauerkachel geht ins Leere, ohne Mauer trifft er; Pfeile prallen an der Mauer ab', sandbox(() => {
     const p = stage(); p.x = 10 * TS + 16; p.y = 10 * TS + 16; p.aim = 0; const e = actor(p.x + 2 * TS, p.y, { kind: 'enemy', mtype: 'bandit' }); e.map = '__a';
     const m = MAPS.__a, wallI = 10 * m.w + 11; const h0 = e.hp;
@@ -22835,7 +22934,7 @@ function boot() {
     styleList: () => Object.entries(FAME_REG).filter(([k]) => styleOf(k)).map(([k, n]) => ({ n, v: Math.round(styleOf(k)), t: styleTier(styleOf(k)) })),   /* T08 Ruf der Klinge */   // S15 P8
     difficulty: () => DIFF[S.difficulty || 'schwer'],                  // S15 P12
     mountInfo: () => { const H = mountStats(); return H && { name: H.name, tempo: Math.round(H.tempo * 100), stamina: Math.round(H.stamina ?? H.staminaMax), staminaMax: H.staminaMax, mut: H.mut, kind: MOUNTS[H.kind]?.name }; }, releaseMount,   // S15 P17
-    healerView, healerAct, spellLearnView, learnFrom, mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
+    boardView, boardAct, boardInvest: town => { UI.closeModal(); investMenu(town); }, healerView, healerAct, spellLearnView, learnFrom, mechView: npc => mechMenu(npc, 'data'), beastInfo, buyBeast, releasePet, oilMount, buyFarmAnimal, stableOffers, buyHorse: (npc, id) => { const ok = buyHorse(npc, id); if (ok) mountIntro(npc); return ok; }, horseValue, mountStats,   // S15 Stall
     codexKnown: (kind, k) => !!(S.flags.codexAll || S.codex?.[kind]?.[k]), codexCode: c => { if (String(c).trim().toUpperCase() !== 'NACHTGLAS') return false; S.flags.codexAll = true; return true; },   // S15 Kodex
     teacherList: () => S.ents.world.filter(e => e.kind === 'npc' && e.alive && e.teaches).map(e => ({ key: e.key, name: e.name, prof: e.prof, cls: [].concat(e.teaches), where: LOCATIONS.slice().sort((a, b) => Math.hypot(a.x - e.x / TS, a.y - e.y / TS) - Math.hypot(b.x - e.x / TS, b.y - e.y / TS))[0]?.name || '—' })),   // S15: Kodex „Lehrer“
     saveNow: () => saveCompressed(),   /* Control-Befund: komprimiert, sonst scheitert es bei knappem Speicher */ setArt: v => SP.setArt(v), schools: SCHOOL, spellKeys: SPELL_KEYS, spellToBar: k => spellToBar(k),   // S15 P4: Zauberbuch   // Nutzer S13: Grafikstil

@@ -327,6 +327,25 @@ function stableUI(body, npc) {
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
 
+// ---------------- Anschlagbrett (GUI, 08.10.2026) ----------------
+// Holzbrett mit angepinnten Zetteln: Art-Symbol, Titel, Text, Ziel, Lohn, Frist, Entfernung. Kopfgelder mit Totenkopf. Annehmen/Abgeben direkt.
+function boardUI(body, town) {
+  const V = A.boardView?.(town); if (!V) return;
+  const card = it => `<div class="bb-note${it.elite ? ' elite' : ''}${it.state === 'active' ? ' mine' : ''}"><i class="bb-pin"></i>
+    <div class="bb-top">${icoImg(it.ico, 2, 'bb-ico')}<b>${qa(it.title)}</b>${it.elite ? '<span class="bb-skull" title="Gefährlicher Anführer">☠</span>' : ''}</div>
+    <div class="bb-kind">${qa(it.kindName)}${it.dist != null ? ` · ${it.dist} Felder` : ''}${it.days ? ` · ${it.days} Tag${it.days === 1 ? '' : 'e'}` : ''}</div>
+    <p class="bb-desc">${qa(it.desc || '')}</p>
+    <div class="bb-obj">${it.state === 'active' ? `<i class="qb-chk">${it.ready ? '☑' : '☐'}</i>` : ''}${qa(it.objText)}${it.state === 'active' ? ` <span class="ledger">${it.have}/${it.need}</span>` : ''}</div>
+    <div class="bb-foot"><span class="bb-rew">${rewardHTML(it.rew, true)}</span>${it.state === 'offer' ? `<button class="mini" data-acc="${it.id}">Annehmen</button>` : it.ready ? `<button class="mini" data-claim="${it.id}">Abgeben</button>` : '<span class="ledger">läuft</span>'}</div></div>`;
+  body.innerHTML = `<div class="bb-head"><b>Anschlagbrett — ${qa(V.name)}</b><span class="ledger">${V.active}/${V.max} Aufträge angenommen</span></div>
+    ${V.shut ? `<div class="bb-shut">${qa(V.shut)}</div>` : ''}
+    <div class="bb-board">${V.items.length ? V.items.map(card).join('') : '<div class="bb-empty">Heute hängt hier nichts. Morgen wieder.</div>'}</div>
+    ${V.invest ? `<div class="ctx-actions"><button id="bb-invest">In die Stadt investieren …</button></div>` : ''}`;
+  paintIcons(body);
+  body.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { const r = A.boardAct(town, b.dataset.acc, 'accept'); if (r) toast(r); else sfx('coin', 0.3, 0.5); boardUI(body, town); });
+  body.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => { const r = A.boardAct(town, b.dataset.claim, 'claim'); if (r) toast(r); else sfx('coin', 0.6, 0.7); boardUI(body, town); });
+  if ($('bb-invest')) $('bb-invest').onclick = () => A.boardInvest(town);
+}
 // ---------------- Heiler (GUI, 03.10.2026) ----------------
 // Je Gruppenmitglied eine Karte: Leben, sechs Glieder als Balken (gebrochen rot, geschient gelb, fehlend grau), Zustände; unten die beiden
 // Behandlungen als Knöpfe. Heilen läuft wie im Gespräch als Kanal (3,5 s) und schließt das Fenster.
@@ -864,7 +883,7 @@ export function openModal(name, arg) {
   const R = { inventory:[ 'Inventar', invUI ], character:[ 'Charakter', charUI ], party:[ 'Gruppe', partyUI ],
     settlement:[ 'Lager & Siedlung', settleUI ], faction:[ 'Fraktionen', facUI ], chronicle:[ 'Chronik', chronUI ],
     map:[ 'Weltkarte', mapUI ], trade:[ 'Handel', tradeUI ], settings:[ 'Einstellungen', settingsUI ],
-    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
+    classes:[ 'Ausbildung', classUI ], quests:[ 'Aufträge', questUI ], skills:[ 'Talente', skillUI ], effects:[ 'Aktive Effekte', effectsUI ], codex:[ 'Kodex', codexUI ], spells:[ 'Zauberbuch', spellUI ], stable:[ 'Stall', stableUI ], beasts:[ 'Tierhändler', beastsUI ], mech:[ 'Prothesen-Werkbank', mechUI ], learn:[ 'Zauber lernen', learnUI ], healer:[ 'Heiler', healerUI ], board:[ 'Anschlagbrett', boardUI ], craft:[ 'Handwerk', craftUI ], business:[ 'Betriebe', bizUI ], smith:[ 'Schmiede', smithUI ], travel:[ 'Kutsche', travelUI ] }[name];
   $('modal-title').textContent = R ? R[0] : name;
   let tabs = $('modal-tabs'); if (!tabs) { tabs = el('div', ''); tabs.id = 'modal-tabs'; $('modal-title').after(tabs); }   /* Unterthemen der Gruppe als Reiter */
   const subs = (grp?.[3] || []).filter(k => SUBTAB[k]);
@@ -1982,7 +2001,8 @@ function questUI(body) {
   pg.innerHTML = `<div class="qb-letter st-${x.st}"><div class="qb-head">${G.npc ? '<canvas id="qb-por" width="56" height="56"></canvas>' : `<span class="qb-por0">${icoImg(G.label.startsWith('Anschlag') ? 'log_quest' : 'set_level', 3, 'qb-pi')}</span>`}
       <div class="qb-ttl"><h2></h2><div class="qb-giver"></div></div><div class="qb-stamp">${QB_WORD[x.st]}</div></div>
     <p class="qb-desc"></p>
-    <div class="qb-objs">${x.Q.objectives.map((o, i) => `<div class="qb-obj">${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`).join('')}</div>
+    <div class="qb-objs">${x.Q.objectives.map((o, i) => { const done = (x.v.progress?.[i] || 0) >= (o.count || 1), cur = !done && x.Q.objectives.slice(0, i).every((q, j) => (x.v.progress?.[j] || 0) >= (q.count || 1));
+      return `<div class="qb-obj${done ? ' done' : cur ? ' cur' : ''}"><i class="qb-chk">${done ? '☑' : cur ? '▸' : '☐'}</i>${B?.objs?.[i] ? objIco(B.objs[i]) : ''}<span class="qb-ot"></span>${pips(x.v.progress?.[i] || 0, o.count || 1)}</div>`; }).join('')}</div>
     ${x.I.where ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>${qa(x.I.where)}</span></div>` : active && x.Q.objectives.some(o => o.type === 'find') ? `<div class="qb-line">${icoImg('nav_map', 1, 'qb-li')}<span>Kein Ziel auf der Karte — die Suche ist der Auftrag.</span></div>` : ''}
     ${x.I.timer ? `<div class="qb-line">${icoImg('time', 1, 'qb-li')}<span>${qa(x.I.timer)}</span></div>` : ''}
     ${x.v.outcome ? `<p class="qb-out"></p>` : ''}
