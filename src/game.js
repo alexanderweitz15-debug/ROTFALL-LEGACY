@@ -12,6 +12,7 @@ import * as SP from './sprites.js?v=25';
 import * as ECO from './economy.js?v=25';
 import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
+import { skyVisible, skyHidden } from './sky.js?v=25';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
 import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=25';
 
 const $ = id => document.getElementById(id);
@@ -9842,6 +9843,7 @@ const tutorSmith = p => { let best = null, bd = 150 * TS; for (const e of S.ents
 const tutorBoard = p => { let best = null, bd = 120 * TS; for (const e of S.ents.world) if (e.type === 'board') { const d = dist(e, p); if (d < bd) { bd = d; best = e; } } return best; };
 function tutorShow() {
   if (prOn()) return prologShow();
+  prologPanel(false);
   const el = $('tutor'); if (!el) return; const i = S.flags.tutor ?? -1, T = TUTOR[i];
   if (i < 0 || !T || S.settings?.tips === false || S.coop?.role === 'guest') { el.classList.add('hidden'); return; }
   el.classList.remove('hidden'); el.innerHTML = `<b>Wegweiser ${i + 1}/${TUTOR.length}</b><span>${T.text}</span><button title="Wegweiser ausblenden (Tipps in den Einstellungen)">×</button>`;
@@ -9864,30 +9866,27 @@ function tutorTick(now, force = false) {
    Krone (Fraktions-Start Valen in Varonheim), die Stillen (Fraktions-Start der Toten in Vharnholm — als Lebender) oder keiner
    (Rebell: Start wie im Menü gewählt, Titel „Ohne Herrn“, die Freien +10, Valen −10). Danach Einflug und Wegweiser in der Welt.
    Die Karte ist flüchtig (bei jedem Laden neu gebaut); gespeichert wird nur S.prolog = { step, back, menus, talked, fought, goal }. */
-const PR_STEPS = [
-  { k: 'move', text: 'Bewegen: WASD oder Pfeiltasten. Geh zu dem Alten am Feuer in der Wachruine (Norden).' },
-  { k: 'talk', text: 'Ansprechen: Stell dich vor Oswin und drück E.' },
-  { k: 'loot', text: 'Durchsuche die Kiste am Wagenwrack im Südwesten (E). Was du nimmst, landet im Gepäck.' },
-  { k: 'menus', text: 'Menüs: Öffne dein Gepäck (I), deinen Charakter (C) und die Karte (M). Esc schließt jedes Fenster. H öffnet den Kodex mit allen Regeln.' },
-  { k: 'fight', text: 'Kampf: Linksklick schlägt, Maustaste halten lädt einen schweren Hieb, Q weicht aus, Umschalt deckt. Wo du triffst, zählt — Kopf, Arme, Beine.' },
-  { k: 'heal', text: 'Aufheben und heilen: Heb auf, was liegen blieb (E). Verbände benutzt du im Gepäck (I) oder über die Schnellleiste (1–4).' },
-  { k: 'goal', text: 'Geh zurück zu Oswin und sprich mit ihm (E). Er weiß, was da draußen auf dich wartet.' },
-  { k: 'choice', text: 'Am Nordtor warten drei Gesandte. Sprich mit dem, dem du folgen willst — Krone, Tote oder keiner.' },
+const PR_STEPS = [   /* Entwickler 08.10. (zweite Runde): Prolog mit eigener Oberfläche — Titel und Tasten je Schritt */
+  { k: 'move', title: 'Bewegen', keys: ['W', 'A', 'S', 'D'], text: 'Lauf mit WASD oder den Pfeiltasten. Geh zu dem Alten am Feuer in der Wachruine im Norden.' },
+  { k: 'talk', title: 'Ansprechen', keys: ['E'], text: 'Stell dich vor Oswin und sprich ihn an.' },
+  { k: 'loot', title: 'Durchsuchen', keys: ['E'], text: 'Durchsuche die Kiste am Wagenwrack im Südwesten. Was du nimmst, landet im Gepäck.' },
+  { k: 'menus', title: 'Menüs', keys: ['I', 'C', 'M'], text: 'Öffne dein Gepäck, deinen Charakter und die Karte. Esc schließt jedes Fenster, H öffnet den Kodex mit allen Regeln.' },
+  { k: 'fight', title: 'Kampf', keys: ['Linksklick', 'halten', 'Q', 'Umschalt'], text: 'Linksklick schlägt, gehalten lädt er einen schweren Hieb. Q weicht aus, Umschalt deckt. Wo du triffst, zählt — Kopf, Arme, Beine.' },
+  { k: 'heal', title: 'Aufheben und heilen', keys: ['E', 'I', '1–4'], text: 'Heb auf, was liegen blieb. Verbände benutzt du im Gepäck oder über die Schnellleiste.' },
+  { k: 'goal', title: 'Das Ziel', keys: ['E'], text: 'Geh zurück zu Oswin. Er erklärt dir, was da draußen auf dich wartet.' },
+  { k: 'choice', title: 'Aufbruch', keys: ['E'], text: 'Am Nordtor stellen sich drei Mächte vor. Hör sie an — dann zieh als Nomade los (Oswin oder ein Gesandter).' },
 ];
 const PR_MENUS = [['inventory', 'I Gepäck'], ['character', 'C Charakter'], ['map', 'M Karte']];
 const PR_ENVOY = {
   krone: { name: 'Hauptmann Gerold', prof: 'Hauptmann der Krone', cloth: '#33415c', at: [22, 7], card: 'DIE KRONE', sub: 'König Varon von Valen',
     pitch: '„Im Namen König Varons. Die Krone braucht jeden Arm, der ein Schwert halten kann. Komm mit nach Varonheim: Sold, ein Dach, ein Platz in der Ordnung. Wer der Krone dient, dem öffnen sich die Tore — und wer sich ihr widersetzt, dem der Galgen.“',
-    deal: 'Du beginnst in Varonheim als Rekrut des Königreichs Valen (Rang, Ansehen 20, ein eigenes Gehöft vor der Stadt). Die Toten bleiben deine Feinde.',
-    yes: '„Gut. Halt dich gerade, Rekrut — in Varonheim sieht man genau hin.“' },
+    join: 'Der Krone dienst du in Varonheim: Melde dich bei der Garnison im Südosten oder am Burgtor. Wer Aufträge für die Stadt erfüllt, steigt auf.' },
   tote: { name: 'Ysolde', prof: 'Grabsprecherin der Stillen', cloth: '#232a28', skin: '#cfc8b4', at: [25, 7], card: 'DIE STILLEN', sub: 'Garmadon, der Tote König',
     pitch: '„Die Lebenden haben deinen Treck hier sterben lassen. Wir nicht — wir haben nur genommen, was ohnehin fiel. Die Stillen haben Städte, Gesetze und Geduld. Diene uns lebend: Es gibt Aufgaben, die nur ein warmer Körper erledigen kann.“',
-    deal: 'Du beginnst in Vharnholm als lebender Diener der Toten (Rang, Ansehen 20, eine eigene Hütte). Untote verschonen dich — das Königreich Valen und der Orden jagen dich.',
-    yes: '„Dann komm. Hab keine Angst vor der Stille — sie ist das Ehrlichste, was diese Welt noch hat.“' },
+    join: 'Die Stillen nehmen Lebende in Vharnholm auf, tief im Osten — wenn du hinkommst, ohne vorher selbst einer von ihnen zu werden. Man kniet dort vor dem Toten König.' },
   rebell: { name: 'Mara', prof: 'Bannbrecherin', cloth: '#4a3a26', at: [28, 7], card: 'OHNE HERRN', sub: 'Keine Krone, kein Grab',
     pitch: '„Krone oder Grab — beide fressen dich, nur der eine schneller. Ich sag dir, was ich jedem sag: Kein Herr, kein Tribut. Geh deinen eigenen Weg, und wenn dir einer zu nah kommt, schlag zurück.“',
-    deal: 'Du beginnst ohne Fraktion (Ort wie im Menü gewählt). Titel „Ohne Herrn“, die Freien +10, Valen −10. Alle Türen bleiben offen — und beide Mächte misstrauen dir.',
-    yes: '„Dann sind wir schon zwei. Die Welt braucht mehr Leute, die Nein sagen.“' },
+    join: 'Die Freien sitzen am Grubenhort in der Eisenmark, wo die Ketten der Goblins gebrochen wurden. Und Leute wie mich findest du überall, wo jemand Nein sagt.' },
 };
 let prMenuTimer = 0, prNext = 0;
 const prOn = () => !!S.prolog && S.map === 'prolog';
@@ -9956,13 +9955,28 @@ function prologIntro() {
     { map: 'prolog', x: p.x, y: p.y - 3 * TS, to: { x: p.x, y: p.y }, zoom: 1.9, dur: 4200, text: `${p.name}. Du lebst. Noch.`, beats: [{ t: 0.5, zoom: 1.3 }] },
   ], () => { prologShow(); log('Du kommst unter einem Wagen zu dir. Rauch, Asche, Stille. Am Feuer im Norden sitzt jemand.', 'world'); });
 }
+/* Entwickler 08.10.: „richtiges GUI“ für den Prolog — eigene Tafel links oben: Titel, alle acht Schritte mit Haken (☑ erledigt, ▸ jetzt, ☐ kommt),
+   der aktuelle Schritt groß mit Tasten als Kappen, bei „Menüs“ die drei Fenster zum Abhaken, Knopf „Prolog überspringen“. Einklappbar (−/+). */
+let prFold = false;
+function prologPanel(on) {
+  let el = document.getElementById('prologPanel');
+  if (!on) { if (el) el.style.display = 'none'; return null; }
+  if (!el) { el = document.createElement('div'); el.id = 'prologPanel'; (document.getElementById('viewport') || document.getElementById('game') || document.body).appendChild(el);   /* im Spielbild, nicht über der Seitenleiste */ }
+  el.style.display = 'block'; return el;
+}
 function prologShow() {
-  const el = $('tutor'), P = S.prolog; if (!el || !P) return;
-  if (!prOn()) { tutorShow(); return; }
-  const T3 = PR_STEPS[P.step]; if (!T3 || S.cine) return el.classList.add('hidden');   /* während Kamerafahrten verborgen */
-  const menus = T3.k === 'menus' ? `<br><i style="color:#c9a45a;font-style:normal">${PR_MENUS.map(([n, t]) => (P.menus[n] ? '☑ ' : '☐ ') + t).join(' · ')}</i>` : '';
-  el.classList.remove('hidden'); el.innerHTML = `<b>Prolog ${P.step + 1}/${PR_STEPS.length}</b><span>${T3.text}${menus}</span><button title="Prolog überspringen: gleich zur Wahl der Seite">»</button>`;
-  el.querySelector('button').onclick = () => prologChoiceMenu(prEnt('oswin') || S.player, true);
+  const P = S.prolog; const card = $('tutor');
+  if (!P || !prOn()) { prologPanel(false); if (!P) return; tutorShow(); return; }
+  card?.classList.add('hidden');
+  const T3 = PR_STEPS[P.step]; if (!T3 || S.cine) { prologPanel(false); return; }
+  const el = prologPanel(true), kb = k => `<kbd>${k}</kbd>`;
+  const list = PR_STEPS.map((s2, i) => `<li class="${i < P.step ? 'done' : i === P.step ? 'now' : ''}"><span>${i < P.step ? '☑' : i === P.step ? '▸' : '☐'}</span>${s2.title}</li>`).join('');
+  const menus = T3.k === 'menus' ? `<div class="pr-menus">${PR_MENUS.map(([n, t]) => `<span class="${P.menus[n] ? 'ok' : ''}">${P.menus[n] ? '☑' : '☐'} ${kb(t[0])} ${t.slice(2)}</span>`).join('')}</div>` : '';
+  el.innerHTML = `<div class="pr-head"><b>PROLOG</b><i>Die Aschenfurt</i><button class="pr-fold" title="${prFold ? 'Aufklappen' : 'Einklappen'}">${prFold ? '+' : '−'}</button></div>`
+    + `<div class="pr-step"><div class="pr-n">Schritt ${P.step + 1} von ${PR_STEPS.length}</div><div class="pr-t">${T3.title}</div><div class="pr-keys">${T3.keys.map(kb).join('')}</div><div class="pr-x">${T3.text}</div>${menus}</div>`
+    + (prFold ? '' : `<ol class="pr-list">${list}</ol><button class="pr-skip">Prolog überspringen ▸</button>`);
+  el.querySelector('.pr-fold').onclick = () => { prFold = !prFold; prologShow(); };
+  const sk = el.querySelector('.pr-skip'); if (sk) sk.onclick = () => prologChoiceMenu(prEnt('oswin') || S.player, true);
 }
 function prologAdvance() {
   const P = S.prolog; P.step++; prNext = 0;
@@ -9976,7 +9990,7 @@ function prologAdvance() {
 }
 function prologTick(now) {
   const P = S.prolog, p = S.player; if (!P || !prOn() || !p || now < prNext) return; prNext = now + 300;
-  const card = $('tutor'); if (S.cine) { card?.classList.add('hidden'); return; } if (card?.classList.contains('hidden') && PR_STEPS[P.step]) prologShow();
+  if (S.cine) { prologPanel(false); return; } const pn = document.getElementById('prologPanel'); if ((!pn || pn.style.display === 'none') && PR_STEPS[P.step]) prologShow();
   if (p.downed || p.hp <= 0) return prologRescue();
   const k = PR_STEPS[P.step]?.k, os = prEnt('oswin'); let done = false;
   if (k === 'move') done = os && dist(p, os) < 110;
@@ -10024,7 +10038,7 @@ function prologGoalTalk(npc) {
     '„Du wirst nicht ewig leben. Wenn du fällst, ist es vorbei. Aber was du baust, bleibt: dein Haus, dein Name, dein Erbe. Dein Nachfolger erbt Gold, Ruf — und deine Feinde. Das ist ROTFALL: nicht ein Held, sondern ein Geschlecht.“',
     '„Was du kannst, lernst du durch Tun. Wer schmiedet, wird Schmied, wer kämpft, wird Kämpfer. Niemand gibt dir eine Liste. Aufträge hängen an Brettern, Gerüchte erzählen die Leute — und die Welt läuft weiter, ob du hinsiehst oder nicht.“',
     '„Und eins muss dir klar sein: Am Anfang ist es schwer. Ein einzelner Bandit kann dich töten, ein Wolfsrudel ganz sicher. Nimm Verbände mit, geh nicht allein in die Wildnis, und lauf lieber weg, als zu sterben. Mit jeder Stufe, jeder besseren Waffe und jedem Gefährten wird es leichter — leicht wird es nie.“',   /* Entwickler 08.10.: Schwierigkeit erklären */
-    '„Und jetzt sieh zum Tor. Sie sind schneller gekommen, als ich dachte. Jeder will Leute wie dich — die Frage ist nur, wem du gehören willst.“',
+    '„Und jetzt sieh zum Tor. Sie sind schneller gekommen, als ich dachte. Jeder will Leute wie dich. Hör sie dir an — aber heute gehörst du keinem. Du ziehst als Nomade los; wem du dienst, entscheidest du da draußen.“',
   ];
   const step = i => UI.dialogue(npc, lines[i], [{ text: i < lines.length - 1 ? 'Weiter' : 'Zum Tor sehen', fn: () => { if (i < lines.length - 1) return step(i + 1); UI.closeDialogue(); P.goal = 1; prologAdvance(); } }]);
   step(0);
@@ -10047,45 +10061,46 @@ function prologEnvoyScene() {
     one('krone', '„Im Namen König Varons!“', 'metal'),
     one('tote', '„Die Stille wartet. Sie hat Zeit.“', 'bone'),
     one('rebell', '„Keiner von denen ist dein Freund.“'),
-    { ...gate, y: 18 * TS, focus: os?.id, zoom: 1.6, dur: 3400, text: 'Jetzt musst du wählen. Sprich mit dem, dem du folgen willst — oder sag es Oswin.', beats: [{ t: 0.3, who: os?.id, say: '„Wähl gut. Du wählst nur einmal.“', ms: 2600 }] },
-  ], () => { prologShow(); log('Am Nordtor warten Hauptmann Gerold (Krone), die Grabsprecherin Ysolde (die Stillen) und Mara, die Bannbrecherin (ohne Herrn). Sprich mit dem, dem du folgen willst.', 'quest'); });
+    { ...gate, y: 18 * TS, focus: os?.id, zoom: 1.6, dur: 3400, text: 'Hör sie an. Dann zieh los — als Nomade. Dienen kannst du später, wenn du willst.', beats: [{ t: 0.3, who: os?.id, say: '„Hör zu, aber unterschreib nichts.“', ms: 2600 }] },
+  ], () => { prologShow(); log('Am Nordtor stellen sich Hauptmann Gerold (Krone), die Grabsprecherin Ysolde (die Stillen) und Mara, die Bannbrecherin (die Freien), vor. Hör sie an — dann zieh als Nomade los.', 'quest'); });
 }
-function prologEnvoyTalk(npc) {
+function prologEnvoyTalk(npc) {   /* Entwickler 08.10.: im Prolog nur als Nomade weiter — die Gesandten sagen, wo man ihnen später dient */
   const E = PR_ENVOY[npc.prEnvoy];
   UI.dialogue(npc, E.pitch, [
-    { text: 'Was heißt das für mich?', fn: () => UI.dialogue(npc, E.deal, [{ text: 'Ich folge dir.', fn: () => prologConfirm(npc, npc.prEnvoy) }, { text: 'Ich höre mir die anderen an.', fn: () => UI.closeDialogue() }]) },
-    { text: 'Ich folge dir.', fn: () => prologConfirm(npc, npc.prEnvoy) },
+    { text: 'Kann ich mich euch anschließen?', fn: () => UI.dialogue(npc, `„Heute nicht. Erst machst du dir da draußen einen Namen.“ ${E.join}`, [{ text: 'Verstanden.', fn: () => prologEnvoyTalk(npc) }]) },
+    { text: 'Ich ziehe als Nomade weiter.', fn: () => prologConfirm(npc) },
     { text: 'Später.', fn: () => UI.closeDialogue() },
   ]);
 }
 function prologChoiceMenu(npc, skip) {
-  UI.dialogue(npc, skip ? '„Du willst gleich los? Dann sag mir wenigstens, wohin. Krone, Grab — oder keins von beiden?“' : '„Drei Wege, drei Herren — oder keiner. Sprich mit ihnen am Tor, oder sag es mir.“', [
-    ...Object.entries(PR_ENVOY).map(([k, E]) => ({ text: `${E.card[0]}${E.card.slice(1).toLowerCase()}: ${E.deal}`, fn: () => prologConfirm(npc, k) })),
+  UI.dialogue(npc, skip ? '„Du willst gleich los? Dann als das, was du bist: ein Nomade — kein Herr, kein Eid, keine Schulden. Wem du dienst, entscheidest du da draußen.“'
+    : '„Krone, Stille, die Freien — sie laufen dir nicht weg. Heute ziehst du als Nomade los.“', [
+    { text: 'Als Nomade aufbrechen.', fn: () => prologConfirm(npc) },
     { text: 'Noch nicht.', fn: () => UI.closeDialogue() },
   ]);
 }
-function prologConfirm(npc, path) {
-  const E = PR_ENVOY[path];
-  UI.dialogue(npc, `Endgültig? ${E.deal}`, [{ text: 'Ja. So sei es.', fn: () => { UI.closeDialogue(); prologEnd(path); } }, { text: 'Nein, noch einmal überlegen.', fn: () => UI.closeDialogue() }]);
+function prologConfirm(npc) {
+  UI.dialogue(npc, 'Als Nomade aufbrechen? Du gehst ohne Herrn und ohne Eid. Der Krone dienst du später in Varonheim, den Stillen in Vharnholm, den Freien am Grubenhort — wenn du willst.',
+    [{ text: 'Ja. Ich gehe.', fn: () => { UI.closeDialogue(); prologEnd(); } }, { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]);
 }
-function prologEnd(path) {
-  const P = S.prolog, E = PR_ENVOY[path], who = S.ents.prolog?.find(e => e.prEnvoy === path);
-  if (who && who.prEnvoy) who.anchor = { x: 25 * TS + TS / 2, y: 3 * TS };   /* der Gesandte geht voraus zum Tor */
+function prologEnd() {
+  const P = S.prolog, os = prEnt('oswin');
   const go = () => {
-    const p = S.player; clearInterval(prMenuTimer);
+    const p = S.player; clearInterval(prMenuTimer); prologPanel(false);
     travel('world');
-    if (path === 'krone' || path === 'tote') { const f = path === 'krone' ? 'valen' : 'undead', at = facStartAt(FAC_STARTS[f], f); if (at.map && at.map !== 'world') travel(at.map); p.x = at.x; p.y = at.y; facStartSetup(f, p); }
-    else { const b = P.back || {}; if (b.map && b.map !== 'world' && S.ents[b.map]) travel(b.map); if (b.x) { p.x = b.x; p.y = b.y; }
-      S.factions.valen = clamp((S.factions.valen || 0) - 10, -100, 100); S.factions.frei = clamp((S.factions.frei || 0) + 10, -100, 100); (p.titles ||= []).includes('Ohne Herrn') || p.titles.push('Ohne Herrn');
-      log('Du folgst keinem. Titel „Ohne Herrn“; die Freien +10, Valen −10. Beide Mächte werden dich beobachten.', 'faction'); for (const t of P.startLog || []) log(t, 'world'); }
-    chronicle(`${p.name} verlässt die Aschenfurt`, 'birth', { krone: 'Im Dienst der Krone.', tote: 'Im Dienst der Stillen — als Lebender.', rebell: 'Ohne Herrn.' }[path]);
-    S.ents.prolog = []; S.prolog = null; S.flags.prologPath = path; S.flags.tutor = 2; S.flags.tutX = null; S.flags.introDone = 0;   /* Wegweiser ab „Händler“: Bewegen und Ansprechen sind gelernt */
+    const b = P.back || {}; if (b.map && b.map !== 'world' && S.ents[b.map]) travel(b.map); if (b.x) { p.x = b.x; p.y = b.y; }
+    (p.titles ||= []).includes('Nomade') || p.titles.push('Nomade');
+    log('Du ziehst als Nomade los — kein Herr, kein Eid. Der Krone dienst du in Varonheim, den Stillen in Vharnholm, den Freien am Grubenhort. Oder keinem.', 'faction');
+    for (const t of P.startLog || []) log(t, 'world');
+    chronicle(`${p.name} verlässt die Aschenfurt`, 'birth', 'Als Nomade, ohne Herrn.');
+    S.ents.prolog = []; S.prolog = null; S.flags.prologPath = 'nomade'; S.flags.tutor = 2; S.flags.tutX = null; S.flags.introDone = 0;   /* Wegweiser ab „Händler“: Bewegen und Ansprechen sind gelernt */
     log('Hinweis: Der Anfang ist schwer. Gegner sind gefährlich, Wunden heilen langsam, und wer stirbt, ist tot — dein Erbe geht weiter. Nimm Verbände mit, meide die Wildnis bei Nacht, such dir Gefährten in der Schenke und lauf weg, wenn es kippt. Mit Stufen, Ausrüstung und Gefährten wird es leichter.', 'quest');   /* Entwickler 08.10. */
     tutorShow(); setTimeout(() => introFlight(), 600); save();
   };
   if (S._quiet) return go();
-  cinematic([{ map: 'prolog', x: 25 * TS + TS / 2, y: 7 * TS, focus: who?.id, zoom: 1.8, dur: 3200, text: `${E.name}: ${E.yes}`, beats: [{ t: 0.1, card: { title: E.card, sub: 'Dein Weg beginnt', ms: 2800 } }] },
-    { map: 'prolog', x: 25 * TS + TS / 2, y: 9 * TS, to: { x: 25 * TS + TS / 2, y: 2 * TS }, zoom: 1.1, dur: 3600, text: { krone: 'Du folgst dem Hauptmann nach Westen, nach Varonheim.', tote: 'Du folgst der Grabsprecherin über die Furt, nach Osten, nach Vharnholm.', rebell: 'Du gehst allein durch das Nordtor. Mara nickt dir nach.' }[path], beats: [{ t: 0.7, flash: '#000', ms: 900 }] }], go);
+  cinematic([{ map: 'prolog', x: 26 * TS, y: 19 * TS, focus: os?.id, zoom: 1.7, dur: 3000, text: 'Oswin nickt dir zu.', beats: [{ t: 0.2, who: os?.id, say: '„Geh mit offenen Augen. Und komm nicht tot zurück.“', ms: 2600 }] },
+    { map: 'prolog', x: 25 * TS + TS / 2, y: 9 * TS, to: { x: 25 * TS + TS / 2, y: 2 * TS }, zoom: 1.1, dur: 3800, text: 'Du gehst durch das Nordtor. Die Gesandten sehen dir nach. Die Straße gehört dir.',
+      beats: [{ t: 0.05, card: { title: 'NOMADE', sub: 'Kein Herr. Kein Eid. Dein Weg beginnt.', ms: 3200 } }, { t: 0.75, flash: '#000', ms: 900 }] }], go);
 }
 const GUIDE = [
   ['hard', p => !S.flags.prologPath && (S.flags.playMin || 0) >= 1 && (S.day | 0) <= 3, 'Der Anfang ist schwer: Ein einzelner Bandit kann dich töten. Nimm Verbände mit, meide die Wildnis bei Nacht, such Gefährten in der Schenke und lauf weg, wenn es kippt. Mit Stufen, Ausrüstung und Gefährten wird es leichter.'],   /* Entwickler 08.10.: Schwierigkeit erklären (im Prolog sagt es Oswin) */
@@ -18798,6 +18813,10 @@ function debugSections() {
     ['Figuren: Berufe erkennbar (08.10.2026)', '', {
       'Figuren: Berufsgalerie (alle Berufe nebeneinander)': () => profGallery(),   /* Entwickler 08.10.: „Man soll besser die verschiedenen Berufe erkennen können“ */
     }],
+    ['Sternenhimmel gekürzt (08.10.2026)', '', {
+      'Sternenhimmel: alle Sternbilder zeigen an/aus (Vergleich)': () => { (S.flags ||= {}).skyAll = !S.flags.skyAll; UI.toast(S.flags.skyAll ? `Alle ${skyVisible(p).length} Sternbilder sichtbar (T)` : `Nur nutzbare: ${skyVisible(p).length} sichtbar, ${skyHidden(p).length} unter „Weitere Sternbilder“`, 3000); },
+      'Sternenhimmel: Hinweis „neu geordnet“ wieder zeigen': () => { delete S.flags.skyTidy; UI.toast('Beim nächsten Öffnen (T) steht der Hinweis wieder da.'); },
+    }],
     ['Rüstung und Wunden (R1–R5, N4 S3, 08.10.2026)', '', {
       'Rüstung: Prüfstand (Zustand, Rarität, Miliz, Fraktionsschilde, Wunden)': () => armorGallery(),
       'Wunde: nächste Figur (Rumpf und linkes Bein auf 30 %)': () => { const t = [...S.ents[S.map]].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x.body && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0];
@@ -20790,6 +20809,17 @@ export function selftest() {
     const all = data && looks && called && bolt && rage && shaman && bomb && shove && circle && led && worker && trap && chief;
     if (!all) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led, worker, trap, chief });
     return all;
+  }));
+  ok('Sternenhimmel gekürzt (Entwickler 08.10.): ein Wanderer ohne Klasse sieht höchstens 3 Sternbilder, mit Klasse/Titel kommen genau diese dazu, gelernte Sterne bleiben sichtbar, der Rest steht unter „Weitere Sternbilder“; Knoten und Punkte unverändert', sandbox(() => {
+    const f0 = S.flags.skyAll; S.flags.skyAll = false;
+    try { const all = Object.keys(SKIES).filter(s => !SKIES[s].comp && Object.values(SKILL_TREE).some(n => n.sky === s));
+      const w = { knownClasses: ['wanderer'], titleClasses: [], tree: {} }, v0 = skyVisible(w), few = v0.length <= 3 && v0.includes('wanderer') && skyHidden(w).length === all.length - v0.length;
+      const c = { knownClasses: ['wanderer', 'warrior'], titleClasses: ['necromancer'], tree: {} }, v1 = skyVisible(c), grow = v1.includes('warrior') && v1.includes('necromancer') && v1.length === v0.length + 2 && v1.length <= 12;
+      const k = Object.keys(SKILL_TREE).find(x => SKILL_TREE[x].sky === 'mage'), t = { knownClasses: ['wanderer'], titleClasses: [], tree: { [k]: 1 } }, kept = skyVisible(t).includes('mage');
+      S.flags.skyAll = true; const dbg = skyVisible(w).length === all.length; S.flags.skyAll = false;
+      const comp = skyVisible(w, true).every(s => SKIES[s].comp);
+      return few && grow && kept && dbg && comp && Object.keys(SKILL_TREE).length > 200;
+    } finally { S.flags.skyAll = f0; }
   }));
   ok('Rüstungsvielfalt R1/R2/R4/R5 + N4 S3 Wunden-Haltung (08.10.): seltene Rüstung zeigt eine Kante (rr), Zustand neu/verbeult/gerissen ergibt verschiedene Bilder, Miliz trägt den Kochtopf, Deserteur den zerrissenen Rock, Schilde in Fraktionsfarben; verwundeter Rumpf/Bein ändert die Haltung', sandbox(() => {
     const px = f => { const d = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let h = 0; for (let i = 0; i < d.length; i += 3) h = (h * 31 + d[i]) | 0; return h + ':' + f.width; };

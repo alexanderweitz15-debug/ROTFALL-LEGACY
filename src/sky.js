@@ -47,7 +47,16 @@ const wpos = k => { const n = SKILL_TREE[k], s = SKIES[n.sky]; return { x: s.at[
 const rad = n => n.type === 'keystone' ? 13 : n.type === 'notable' ? 9.5 : n.type === 'active' ? 9 : 6.5;
 
 // who: der Held oder ein Gefährte. Der Gefährte sieht nur sein Sternbild.
-function skyList(v) { return Object.keys(SKIES).filter(s => (v.comp ? SKIES[s].comp : !SKIES[s].comp) && Object.values(SKILL_TREE).some(n => n.sky === s)); }
+/* Entwickler 08.10.2026 („Der Fähigkeitenbaum soll bisschen gekürzt werden, da sind locker 20–30 Trees“): am Himmel steht nur, was die Figur nutzen
+   kann — der Wanderer (Kampf, Magie, Überleben), die Sternbilder ihrer erlernten Klassen und ihrer Titel. Alle anderen stehen zugeklappt unter
+   „Weitere Sternbilder“ mit ihrer Bedingung. Debug S.flags.skyAll zeigt wieder alle. Knoten, Punkte und Klassen bleiben unverändert. */
+export function skyVisible(who, comp = false) {
+  return Object.keys(SKIES).filter(s => { const K = SKIES[s]; if (comp ? !K.comp : K.comp) return false; if (!Object.values(SKILL_TREE).some(n => n.sky === s)) return false;
+    if (comp || S.flags?.skyAll || (!K.cls && !K.title) || Object.keys(who?.tree || {}).some(k => SKILL_TREE[k]?.sky === s)) return true;   /* gelernte Sterne bleiben immer sichtbar */
+    return K.cls ? (who?.knownClasses || []).includes(K.cls) : (who?.titleClasses || []).includes(K.title); });
+}
+export const skyHidden = who => Object.keys(SKIES).filter(s => !SKIES[s].comp && Object.values(SKILL_TREE).some(n => n.sky === s) && !skyVisible(who).includes(s));
+function skyList(v) { return skyVisible(v.who, v.comp); }
 function nodesOf(v) { const L = new Set(skyList(v)); return Object.keys(SKILL_TREE).filter(k => L.has(SKILL_TREE[k].sky)); }
 
 export function skyUI(body, A, { refresh } = {}) {
@@ -63,6 +72,8 @@ export function skyUI(body, A, { refresh } = {}) {
     <button id="sky-free" class="gold" style="display:none" title="Einmal kostenlos: alle Punkte zurück, neu verteilen">Die Sterne neu ordnen (kostenlos)</button>
     <button id="sky-zin" title="Heranzoomen (+)">+</button><button id="sky-zout" title="Wegzoomen (−)">−</button>
     <span class="sky-pts" id="sky-pts"></span></div>
+    <div class="sky-note" id="sky-note" style="display:none;padding:4px 10px;color:#e8d8a8;font-size:12px"></div>
+    <details class="sky-more" id="sky-more" style="padding:2px 10px;font-size:12px;color:#c8bca0"></details>
     <div class="sky-wrap" id="sky-wrap"><canvas id="sky-cv"></canvas><div class="sky-card" id="sky-card"></div>
     <div class="sky-legend"><b>Klein</b> Talent · <b>mittel</b> Merkmal · <b>Goldring</b> Schlüsselstern · <b>Raute</b> aktive Fähigkeit.<br>
     <b>Gold</b> gelernt · <b>pulsierend</b> lernbar · <b>dunkel</b> gesperrt · <b>Riss</b> ausgeschlossen · <b>Umriss</b> versiegelt · <b>bläulich</b> ruht (Klasse nicht aktiv).<br>
@@ -98,6 +109,12 @@ function ui(v) {
   v.info = {}; for (const s of skyList(v)) v.info[s] = v.comp ? { open: true, sub: v.who.name } : v.A.skyInfo(v.who, s);   /* einmal je Stand, nicht je Bild */
   const p = v.body.querySelector('#sky-pts'); if (p) p.textContent = `Talentpunkte frei: ${pts(v)}${v.comp ? ` · ${v.who.name}` : ''}`;
   const f = v.body.querySelector('#sky-free'); if (f) f.style.display = !v.comp && v.who.freeRespec && v.A.talentSpent?.(v.who) ? '' : 'none';
+  const mo = v.body.querySelector('#sky-more'), hid = v.comp ? [] : skyHidden(v.who);   /* zugeklappt: was später dazukommt und wie */
+  if (mo) { mo.style.display = hid.length ? '' : 'none';
+    mo.innerHTML = `<summary style="cursor:pointer">Weitere Sternbilder (${hid.length}, später freischaltbar)</summary><div style="max-height:150px;overflow:auto;padding:4px 0">${hid.map(s => { const K = SKIES[s], I = v.A.skyInfo?.(v.who, s) || {};
+      return `<div><b style="color:${K.col}">${esc(K.name)}</b> — ${esc(K.cls ? 'Klasse ' + (CLASSES[K.cls]?.name || K.cls) : 'Titel ' + (I.titleName || K.title))}${I.where ? ': ' + esc(I.where) : ''}</div>`; }).join('')}</div>`; }
+  const no = v.body.querySelector('#sky-note');   /* einmal je Spielstand: was sich geändert hat */
+  if (no && !v.comp && !S.flags?.skyTidy) { (S.flags ||= {}).skyTidy = 1; no.style.display = ''; no.textContent = `Sternbilder neu geordnet: Du siehst nur noch den Wanderer und die Sternbilder deiner Klassen und Titel (${skyVisible(v.who).length}). Die übrigen ${hid.length} öffnen sich, sobald du die Klasse oder den Titel erwirbst — siehe „Weitere Sternbilder“. Gelernte Sterne und Punkte bleiben, wie sie sind.`; }
 }
 function resize(v) {
   const r = v.cv.getBoundingClientRect(); v.DPR = Math.min(2, devicePixelRatio || 1); v.W = r.width || 800; v.H = r.height || 500;
