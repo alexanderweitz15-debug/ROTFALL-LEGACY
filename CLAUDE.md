@@ -46,21 +46,21 @@ There is no linter. After editing a file, at least parse-check it (e.g. with aco
 - New save fields must tolerate being missing (old saves). Migrations go into `continueGame()` / the `ensure*()` functions it calls.
 - Keep world generation deterministic: `world.js` uses the seeded `rnd()` from state.js; adding RNG calls there shifts the whole world.
 - Every new mechanic needs an in-game hint for the player (log, toast, tooltip or dialogue) and a debug entry. Also add it to `docs/MECHANIKEN.md`.
-- Balance numbers follow `docs/BALANCE_GUIDE.md`. Measure with `RF.simFight(...)`.
+- Balance numbers follow `docs/REGELN_UND_SPECS.md` §D (balance rules); measurements go into the appendix of `docs/IST_ZUSTAND.md`. Measure with `RF.simFight(...)`.
 
 ## Architecture
 
 `index.html` loads `src/game.js` (entry, `boot()`). Modules, by responsibility:
 
 - **state.js** — the single mutable state object `S`, seeded RNG, log/chronicle, `saveData()`/`applySave()`/`save()`/`loadRaw()`. **Save slots:** `SAVE_KEY` is a live binding to the active slot (`setSlot`, `slotIndex`, `rotfall.slots` index). The legacy slot keeps the key `rotfall.legacy.save`. `SKIP` lists state keys never saved (e.g. `coop`, `fx`).
-- **data.js** — all content tables: `ITEMS`, `MONSTERS`, `NPCS`, `CLASSES`, `ABILITIES`, `SKILL_TREE`, `TITLE_CLASSES`, `FACTIONS`, `QUESTS`, `BOSS_LOOT`, `ELITES` (bounty mini-bosses), spells `sp_*`. See `docs/DATA_SCHEMAS.md`.
+- **data.js** — all content tables: `ITEMS`, `MONSTERS`, `NPCS`, `CLASSES`, `ABILITIES`, `SKILL_TREE`, `TITLE_CLASSES`, `FACTIONS`, `QUESTS`, `BOSS_LOOT`, `ELITES` (bounty mini-bosses), spells `sp_*`. 
 - **world.js** — deterministic map generation (`genWorld`, dungeons, sky island, sea isles, tower), tiles/collision, `TOWN_PLAN` (towns/villages), `HOUSES`, `LOCATIONS`, `regionAt()`.
 - **game.js** — everything else: main loop (`loop` → `update` → `R.drawFrame`), player control, combat (`attack`/`resolveSwing`/`hit`/`hurt`/`die`, projectiles), AI (`think` → `updateEnemy`/`updateNpc`/`partyAI`), dialogue (`talk`), quests/contracts, jail/bond/crime, big world events (`BIG`), event consequences (`S.after`), economy hooks, death and succession (`playerDeath` → `chooseSuccessor`), debug menu, self-test. Content lives in data.js; behaviour lives here.
 - **sim.js / economy.js** — off-screen world simulation: war graph (armies, fronts, occupation), town markets, caravans, prices.
 - **body.js** — hit zones and limbs (`damagePart`, knockout/revive), bionics (prosthesis tiers, modules, robot eye).
 - **render.js** — canvas renderer (tile chunks, entities, light/weather, UI overlays). **sprites.js / fig5.js / figure.js** — procedural pixel sprites. A "spec" object (`humanSpec`, `monsterSpec`) describes a figure. Only fields in `SPEC_KEYS` affect the frame cache, so new look fields must be added there. Seeded variants use `e.seed`. Art style "R" (fig5.js) is the default; D is selectable but frozen; F (reference atlas) is switched off (saved F loads as R, the PNG is not loaded). **anim.js** — death types and gestures. **buildings.js**, **atlas.js** (world map, fog), **sfx.js** (WebAudio synthesis), **cloudsave.js** (encrypted export/import).
 - **ui.js** — HUD, modals (`openModal(name)`), dialogue (`dialogue(npc, text, choices)`). `bind(actions)` receives callbacks from game.js. `uiHooks` lets coop reroute dialogues and modals.
-- **coop.js** — opt-in network co-op (PeerJS/WebRTC, lazy-loaded only from the co-op button). The host simulates everything and saves; guests send input, receive entity deltas, and never save. Guests play their own hero (`coopHero`, parked in `S.coopHeroes` when offline) or pilot a companion (`m.coopPilot`). Hooks into game.js go through `coopHooks` and the `coopAPI()` object. Full design in `docs/PLAN_COOP.md`.
+- **coop.js** — opt-in network co-op (PeerJS/WebRTC, lazy-loaded only from the co-op button). The host simulates everything and saves; guests send input, receive entity deltas, and never save. Guests play their own hero (`coopHero`, parked in `S.coopHeroes` when offline) or pilot a companion (`m.coopPilot`). Hooks into game.js go through `coopHooks` and the `coopAPI()` object. Design notes live in the code comments of coop.js (the former PLAN_COOP.md is in git history, commit c21fd64).
 
 **Transient content pattern:** many NPC groups (Aurelion, Eisenfeste life, Karak-Atar, Black Keep court, Weidenau militia, mini-boss followers) are marked `transient: true`. They are not saved; instead an idempotent `ensure*()` rebuilds them on every load. Those functions are called in both `newGame()` and `continueGame()` (search `ensureDefenseMasters();`). Add new populations the same way. NPC dialogue options are appended in `talk()` via helper hooks such as `bionicChoices`, `karakChoices` and `keepChoices`.
 
@@ -70,11 +70,11 @@ Map ids: `S.map` is `'world'` or a dungeon/area key; entities live in `S.ents[ma
 
 ## Docs worth knowing
 
-- `docs/ROADMAP_ZENTRAL.md` — **the one list of open work** (features, decisions, bugs) since the doc cleanup of 08.10.2026; `ROTFALL_STATE/OFFEN.md` only points there. Specs of the developer live in `ROTFALL_STATE/SPEC_*.md`.
+Exactly five documents plus STYLE_GUIDE (doc cleanup 08.10.2026; everything older is in git history, commit c21fd64):
 
-- `docs/IST_ZUSTAND.md` — inventory of every existing feature (check here before building something that may already exist).
+- `docs/ROADMAP_ZENTRAL.md` — **the one list of open work** and open developer decisions. Update it after every finished package or agent report; never start a parallel list.
+- `docs/IST_ZUSTAND.md` — inventory of every existing feature (check here before building something that may already exist); appendix holds the balance measurements.
 - `docs/MECHANIKEN.md` — player-facing rules of every mechanic, appended every round.
-- `docs/PLAN_ROADMAP.md` — the user's design decisions §5b–5g (protocol; open items are tracked in ROADMAP_ZENTRAL).
-- `docs/MASTER_ROADMAP.md` — the user's binding workflow and feature roadmap.
-- `docs/BALANCE.md` / `docs/BALANCE_GUIDE.md` — balance tables and rules for new content.
-- `docs/CHANGELOG.md` — one short entry per version.
+- `docs/ENTSCHEIDUNGEN.md` — every decision the developer has made (protocol); never contradict it silently.
+- `docs/REGELN_UND_SPECS.md` — binding workflow (Feature Readiness Gate, team rules, balance rules) and the developer's specs (world/tutorial, skills/grind, combat animation, visual).
+- `docs/STYLE_GUIDE.md` — art direction (style R default; references in `docs/reference/`).
