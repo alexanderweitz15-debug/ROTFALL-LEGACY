@@ -69,7 +69,7 @@ export function census() {
   const C = {};
   for (const l of TOWN_LOCS) C[l.key] = { heads: 0, noble: 0, soldier: 0, work: {} };
   for (const e of S.ents.world) {
-    if (e.kind !== 'npc' || !e.alive || /Automat/.test(e.prof || '') && !tradeOf(e, null)) continue;
+    if (e.kind !== 'npc' || !e.alive || e.child || /Automat/.test(e.prof || '') && !tradeOf(e, null)) continue;   /* Kinder (08.10.) zählen nicht als Arbeitskraft */
     const k = townKeyOf(e); if (!k || !C[k]) continue;
     const c = C[k]; c.heads++;
     if (NOBLE.test(e.prof || '')) c.noble++;

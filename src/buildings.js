@@ -612,12 +612,12 @@ export const FURNISH = {
   barracks: [['bunk', 0, 0], ['bunk', 0, 2], ['weapon_rack', -1, 0], ['table', -1, 2]],
   chapel:   [['altar_small', 1, 0], ['bench', 1, 2], ['bench', -2, 2], ['candles', 0, 0]],
   merc:     [['table', 1, 1], ['bench', 1, 2], ['weapon_rack', -1, 0], ['hearth', 0, 0]],
-  house:    [['bed', 0, 0], ['table', -1, 1], ['hearth', -1, 0], ['shelf', 1, 0]],
-  cottage:  [['bed', 0, 0], ['hearth', -1, 0], ['sack', 0, 1]],
-  manor:    [['bed', 0, 0], ['desk', -1, 0], ['shelf', 1, 0], ['hearth', 2, 0], ['table', 1, 2], ['bench', -1, 2]],
+  house:    [['bed', 0, 0], ['bed', 1, 0], ['table', -1, 1], ['hearth', -1, 0], ['bed', 0, 1], ['shelf', 2, 0]],   /* Planlauf P1.11 (08.10.): Betten zuerst — ein Haus erklärt seine Bewohner */
+  cottage:  [['bed', 0, 0], ['bed', 0, 1], ['hearth', -1, 0], ['sack', 1, 0]],
+  manor:    [['bed', 0, 0], ['bed', 1, 0], ['desk', -1, 0], ['bed', 0, 2], ['hearth', 3, 0], ['table', 2, 2], ['bench', -1, 2], ['bed', -2, 0], ['shelf', -3, 0]],
   bakery:   [['hearth', 0, 0], ['table', -1, 1], ['sack', -1, 0], ['shelf', 1, 0], ['sack', 0, 2]],
   barn:     [['hay', 0, 0], ['hay', 1, 0], ['hay', -1, 0], ['hay', 0, 1], ['sack', -1, 2]],
   stable:   [['hay', 0, 0], ['hay', -1, 0], ['barrel', 1, 0], ['hay', -1, 2]],
   store:    [['crate_stack', 0, 0], ['crate_stack', -1, 0], ['cask_rack', 1, 0], ['sack', 0, 2], ['barrel', -1, 2], ['crate_stack', -2, 0]],
-  fisher:   [['bed', 0, 0], ['barrel', -1, 0], ['table', -1, 1]],
+  fisher:   [['bed', 0, 0], ['bed', 1, 0], ['barrel', -1, 0], ['table', -1, 1]],
 };

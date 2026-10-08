@@ -2042,9 +2042,11 @@ export const DUNGEONS = {
   isle: { name: 'Tangkron, Gischtinseln', floor: 'grass', amb: 'coast', open: true, enter: 'Salz in der Luft, Möwen, Teer. Tangkron riecht nach Fisch und Streit. Auf dem Hügel liegt ein Schiff kieloben — dort wohnt Weißbart.' },   // S14 Seevolk
   tower: { name: 'Turm des Nachtglases', floor: 'dfloor', amb: 'blight', enter: 'Das Tor schließt sich lautlos. Grünes Licht wandert die Wände hinauf. Irgendwo über dir blättert jemand in einem Buch.' },   // S15 P6
   deck: { name: 'Auf See', floor: 'plank', amb: 'coast', open: true, enter: 'Die Taue knarren, das Land wird schmal. Vor euch nur Grau und Wasser.' },
+  prolog: { name: 'Die Aschenfurt', floor: 'grass', amb: 'blight', open: true, enter: '' },   /* Prolog 08.10.2026: eigenes Startgebiet, gebaut in game.js (buildProlog) */
 };
 export const MAP_KEYS = ['world', ...Object.keys(DUNGEONS)];
-MAPS.vault = { w: 8, h: 8, tiles: new Uint8Array(64).fill(T.DWALL), entry: { x: 4 * TS, y: 4 * TS } };   // Platzhalter bis zur ersten Ebene
+MAPS.vault = { w: 8, h: 8, tiles: new Uint8Array(64).fill(T.DWALL), entry: { x: 4 * TS, y: 4 * TS } };
+MAPS.prolog = { w: 8, h: 8, tiles: new Uint8Array(64).fill(T.ROCK), entry: { x: 4 * TS, y: 4 * TS } };   // Platzhalter bis buildProlog   // Platzhalter bis zur ersten Ebene
 
 // Kerker (Phase 2, Master-Prompt 2 §26): ein Gang, oben und unten je vier Zellen hinter Gittern, Wachstube im Westen mit dem
 // Ausgang. Wer verhaftet wird, sitzt hier seine Zeit ab (10–20 Minuten), isst, redet mit Mitgefangenen — oder bricht aus.
