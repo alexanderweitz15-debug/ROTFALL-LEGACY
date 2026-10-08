@@ -3074,6 +3074,7 @@ export function ambient() {
 let lightCache = { map: null, n: -1, list: [] };
 const LIGHT_T = new Set(['street_lamp', 'torch', 'campfire_static', 'lantern', 'campfire', 'smithy', 'shrine', 'candles', 'hearth', 'forge']);
 function lightOf(e, list) {                                  // Lichtquellen eines Objekts (Lampen, Feuer, Schreine, fertige Bauten)
+  if (e.beacon && e.kind === 'prop') { list.push({ x: e.x, y: e.y - 30, r: 230, green: true }); return; }   /* Geheime Orte S5 (Agent Quests): grünes Leuchtfeuer der Nebelinsel */
   if (!LIGHT_T.has(e.type)) return;
   if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
   if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
@@ -3102,7 +3103,7 @@ function staticLights() {
 // je Lampe und Bild, ~0,7–1,0 ms in beleuchteten Städten (Phase 20).
 const stamp = stops => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   for (const [o, col] of stops) gr.addColorStop(o, col); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return c; };
-let HOLE = null, WARM = null;
+let HOLE = null, WARM = null, GREENL = null;
 const LIT = [], PL_LIGHT = { x: 0, y: 0, r: 0 };
 function drawLight(now) {
   HOLE ||= stamp([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,.72)'], [1, 'rgba(0,0,0,0)']]); WARM ||= stamp([[0, 'rgba(210,140,60,.10)'], [1, 'rgba(0,0,0,0)']]);
@@ -3139,7 +3140,7 @@ function drawLight(now) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -200 || sy < -200 || sx > W + 200 || sy > H + 200) continue;
     const r = l.r * cam.zoom * 0.8;
-    ctx.drawImage(WARM, sx - r, sy - r, r * 2, r * 2);
+    ctx.drawImage(l.green ? (GREENL ||= stamp([[0, 'rgba(80,220,140,.22)'], [1, 'rgba(0,0,0,0)']])) : WARM, sx - r, sy - r, r * 2, r * 2);   /* grünes Leuchtfeuer */
   }
   ctx.globalCompositeOperation = 'source-over';
   if (pl && pl.map === S.map && a > 0.25 && eyeOf(pl)?.heat) {   /* Roadmap P2: Wärmesicht (Auge Stufe 4) — Gegner als glühender Umriss im Dunkeln, nur Anzeige */

@@ -21,6 +21,9 @@ export const ANIM_DEFS = {
   gesture: {                                                         // Mischposen in fig5 rigS/rigW; ms = Standarddauer
     zeigen: { name: 'Zeigen', ms: 1400 }, abwehren: { name: 'Abwehren', ms: 1200 }, achsel: { name: 'Achselzucken', ms: 1100 },
     salutieren: { name: 'Salutieren', ms: 900 }, jubeln: { name: 'Jubeln', ms: 1000 }, trauern: { name: 'Trauern', ms: 1800 }, knien: { name: 'Knien', ms: 1600 },   /* T17 */
+    /* N4 Scheibe 2/4 (09.10.): Berufs-Stöße und Wetter-Haltungen (nur Bild) */
+    stirn: { name: 'Stirn wischen', ms: 1300 }, stuetzen: { name: 'Sich stützen', ms: 2400 }, zaehlen: { name: 'Münzen zählen', ms: 2000 }, strecken: { name: 'Rücken strecken', ms: 1500 },
+    ducken: { name: 'Geduckt im Regen', ms: 2600 }, reiben: { name: 'Arme reiben', ms: 2200 },
   },
   /* Kampfanimation Scheibe 1 (COMBAT_ANIM, DECISIONS 02.10.): Angriffe als Daten je Animationsklasse (heute = wtype) und Pack.
      Zwei Ebenen, damit der Figuren-Cache nicht je Pack wächst:

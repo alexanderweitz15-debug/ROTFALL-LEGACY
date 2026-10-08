@@ -211,6 +211,13 @@ function rigS(pose) {
     case 'jubeln': R.by = -1; R.hy = -1; R.aL = [[10.5, 13.5], [8, 9], [8.5, 4]]; R.aR = [[21.5, 13.5], [24, 9], [23.5, 4]]; break;   /* beide Arme hoch */
     case 'trauern': R.by = 1; R.hy = 2; R.aL = [[10.5, 14.5], [11.5, 12], [14, 10]]; R.aR = [[21.5, 14.5], [20.5, 12], [18, 10]]; break;   /* Kopf gesenkt, Hände vors Gesicht */
     case 'carry': R.aL = [[10.5, 14.5], [10, 20], [14, 23]]; R.aR = [[21.5, 14.5], [22, 20], [18, 23]]; break;
+    /* N4 Scheibe 2/4 (09.10.): Berufs-Stöße und Wetter — Stirn wischen, auf die Waffe stützen, Münzen zählen, Rücken strecken, geduckt, Arme reiben */
+    case 'stirn': R.hy = -1; R.aR = [[21.5, 14.5], [22.5, 10], [17.5, 8]]; break;
+    case 'stuetzen': R.by = 1; R.aL = [[10.5, 14.5], [11.5, 20], [15, 24.5]]; R.aR = [[21.5, 14.5], [20.5, 20], [17, 24.5]]; break;
+    case 'zaehlen': R.hy = 1; R.aL = [[10.5, 14.5], [11, 19.5], [14.5, 20.5]]; R.aR = [[21.5, 14.5], [21, 19.5], [17.5, 21]]; break;
+    case 'strecken': R.by = -1; R.hy = -1; R.aL = [[10.5, 13.5], [8, 18.5], [11.5, 23]]; R.aR = [[21.5, 13.5], [24, 18.5], [20.5, 23]]; break;
+    case 'ducken': R.by = 1; R.hy = 1; R.aL = [[10.5, 14.5], [10.5, 19.5], [13.5, 16.5]]; R.aR = [[21.5, 14.5], [21.5, 19.5], [18.5, 16.5]]; break;
+    case 'reiben': R.hy = 1; R.aL = [[10.5, 14.5], [12, 19], [19.5, 17]]; R.aR = [[21.5, 14.5], [20, 19.5], [12.5, 18]]; break;
     case 'kneel': case 'knien': case 'search': case 'die1':
       R.by = 5; R.lL = [[13.5, 31], [12.5, 39], [14, 44]]; R.lR = [[18.5, 31], [19.5, 36], [19.5, 42]]; R.kneel = 1;
       R.aL = [[10.5, 19.5], [10, 25], [12, 31]]; R.aR = [[21.5, 19.5], [22.5, 25], [20.5, 32]];
@@ -249,6 +256,12 @@ function rigW(pose) {
     case 'jubeln': R.by = -1; R.hy = -1; R.aN = [[15.5, 13.5], [14, 9], [13.5, 4]]; R.aF = [[17, 13.5], [18, 9], [18, 4]]; break;
     case 'trauern': R.by = 1; R.hy = 2; R.lean = 1; R.aN = [[15.5, 14.5], [13.5, 13], [11.5, 10.5]]; R.aF = [[17, 14.5], [15, 13.5], [12.5, 11]]; break;
     case 'carry': R.aN = [[15.5, 14.5], [14.5, 20.5], [11.5, 23]]; R.aF = [[17, 14.5], [15.5, 20.5], [12.5, 23]]; break;
+    case 'stirn': R.hy = -1; R.aN = [[15.5, 14.5], [14, 10], [12, 8.5]]; break;                                                   /* N4 S2/S4 (09.10.) */
+    case 'stuetzen': R.by = 1; R.lean = -1; R.aN = [[15.5, 14.5], [14, 20], [12, 24]]; R.aF = [[17, 14.5], [15, 20.5], [12.5, 24.5]]; break;
+    case 'zaehlen': R.hy = 1; R.aN = [[15.5, 14.5], [14.5, 19.5], [12, 20]]; R.aF = [[17, 14.5], [15.5, 19.5], [13, 20.5]]; break;
+    case 'strecken': R.by = -1; R.hy = -1; R.lean = 1; R.aN = [[15.5, 14.5], [17.5, 19], [18.5, 23]]; R.aF = [[17, 14.5], [19, 19.5], [19.5, 23]]; break;
+    case 'ducken': R.by = 1; R.hy = 1; R.lean = -1; R.aN = [[15.5, 14.5], [14.5, 19.5], [13, 16.5]]; R.aF = [[17, 14.5], [15.5, 19.5], [14, 17]]; break;
+    case 'reiben': R.hy = 1; R.aN = [[15.5, 14.5], [14, 19], [13.5, 17]]; R.aF = [[17, 14.5], [15.5, 19], [14, 18]]; break;
     case 'kneel': case 'knien': case 'search': case 'die1':
       R.by = 5; R.kneel = 1; R.lN = [[15.5, 31], [11.5, 35.5], [12.5, 42]]; R.lF = [[16.5, 31], [16, 40], [20.5, 43]];
       R.aN = [[15.5, 19.5], [14, 25], [12, 31]]; R.aF = [[17, 19.5], [16, 25], [13.5, 31]];
@@ -405,6 +418,12 @@ export function paintR(L, dir, pose, W = null) {
       if (a && a.length === 3) { const [s] = a, sg = view === 'W' ? -1 : k === 'aL' ? 1 : -1; R[k] = [s, [s[0] - sg * 0.5, s[1] + 5.5], [16 - (view === 'W' ? 2 : sg * 3), s[1] + 8.5]]; R.hy += 1; } }
     if ((L.wd & 6) && (pose === 'i0' || pose === 'i1')) { const lefty = !!(L.wd & 2), k = view === 'W' ? (lefty ? 'lF' : 'lN') : (lefty !== (view === 'N') ? 'lL' : 'lR'), l = R[k];
       if (l && l.length === 3) { const out = k === 'lL' ? -1 : k === 'lR' ? 1 : -1; R[k] = [l[0], [l[1][0] + out * 0.5, l[1][1] - 0.5], [l[2][0] + out * 0.5, l[2][1] - 1.5]]; R.hx += view === 'W' ? 0 : k === 'lL' ? -1 : 1; } }
+    /* Hinken (09.10.): beim Gehen macht das verletzte Bein kürzere, flachere Schritte, und wenn es trägt, sackt der Körper einen Pixel ein und der Kopf
+       neigt sich — ein ungleicher Rhythmus, den man aus der Ferne erkennt. Gilt für NPCs, Gegner und den Helden (nur Bein-Wunden). */
+    if ((L.wd & 6) && /^w[0-3]$/.test(pose)) { const lefty = !!(L.wd & 2), k = view === 'W' ? (lefty ? 'lF' : 'lN') : (lefty !== (view === 'N') ? 'lL' : 'lR'), l = R[k];
+      if (l && l.length === 3) R[k] = [l[0], [l[0][0] + (l[1][0] - l[0][0]) * 0.6, l[1][1]], [l[0][0] + (l[2][0] - l[0][0]) * 0.5, 41 + (l[2][1] - 41) * 0.4]];
+      if ((pose === 'w0' || pose === 'w1') === lefty) { R.by += 1; R.hy += 1; for (const a of ['aL', 'aR', 'aN', 'aF']) if (R[a]) R[a] = R[a].map(([x, y]) => [x, y + 1]);
+        if (view === 'W') R.lean += 1; else R.hx += k === 'lL' ? -1 : 1; } }
   }
   const plan = W ? armPlan(view, R, W) : null;
   if (L.la) for (const k of ['aL', 'aR', 'aN', 'aF']) { const a = R[k]; if (a && a.length === 3) { const [s0, e0, h0] = a, f = (q, k2) => [s0[0] + (q[0] - s0[0]) * k2, s0[1] + (q[1] - s0[1]) * k2]; R[k] = [s0, f(e0, 1.3), f(h0, 1.38)]; } }   /* Entwickler 02.10.: Mutierte — zu lange Arme (Glieder ohne Waffe; der Waffenarm folgt der Hand) */
