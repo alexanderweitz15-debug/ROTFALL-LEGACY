@@ -2084,7 +2084,7 @@ Stand: 03.10.2026, Code-Stand v24 (Dev-Server 8770). Grundlage: `src/data.js`, `
     - Esc oder Leertaste überspringen. Der Tod ist schon gespeichert.
   - **Erbenwahl** (`playerDeath` → `chooseSuccessor`):
     - Zuerst eigene erwachsene Kinder, dann der Ehepartner, dann Gefährten. Entfernte Verwandte nur bei freiem Platz, höchstens 3 Erben.
-    - Der Erbe bekommt 70 % des Golds, 50 % jedes Rufs und den halben Ruf der Klinge.
+    - Der Erbe bekommt 70 % des Golds; guter Ruf halbiert sich, schlechter bleibt zu 80 % (Audit 3.13); den halben Ruf der Klinge. Weitere Erbe-Regeln (Kopfgeld halb, Bann endet, Rang −1, Schein verfällt, Hausgunst halb, Titel fällt, Zauber Rang I, Betriebskassen 70 %, Ruhm halb, Pferd Mut 50, Gefährten Moral −15) in `heirRules` (09.10.: Abnahmeprobe „Erbe“). Fertigkeiten, Meisterschaften, Techniken, Bücher sterben mit; Hauswissen (Rezepte, Gerichte) bleibt.
     - Er hat sofort Talentpunkte nach seiner Stufe, aber keine gelernten Sterne und keine Prüfungen.
     - Ohne Erben erlischt das Haus.
   - **Grab:** Die Ausrüstung liegt im Ahnengrab. Dort gibt es Epitaph, Epilog und „Zwanzig Jahre später“.
