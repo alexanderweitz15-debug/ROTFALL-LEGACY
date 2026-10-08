@@ -178,7 +178,7 @@ const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', drill_fighter: 
   cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
   flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine',
   bandit_scout: 'bogenschuetze', bandit_thug: 'berserker', bandit_looter: 'bandit', bandit_knife: 'assassine', bandit_heavy: 'krieger', bandit_chief: 'bandit',   /* P3.20–P3.23 Rollen (Stil F, eingefroren: nächstes Blatt) */
-  goblin_scout: 'goblin', goblin_archer: 'goblin', goblin_shaman: 'schamane', goblin_tinker: 'goblin', goblin_spear: 'ork', goblin_berserker: 'ork' };
+  goblin_scout: 'goblin', goblin_archer: 'goblin', goblin_shaman: 'schamane', goblin_tinker: 'goblin', goblin_spear: 'ork', goblin_berserker: 'ork', bandit_trapper: 'bandit', goblin_chief: 'ork', goblin_worker: 'goblin' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
 const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
@@ -210,11 +210,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop', 'rr'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop', 'rr', 'wd'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '', rr: 0 };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '', rr: 0, wd: 0 };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -686,6 +686,11 @@ export const msOf = e => !e?.body ? '' : ['larm', 'rarm', 'lleg', 'rleg'].map(k 
 export const msEq = (e, ms) => { if (!e?.body) return ms === ''; if (typeof ms !== 'string' || ms.length !== 4) return false;   /* PERF-U3: msOf(e) === ms, ohne neue Liste */
   for (let i = 0; i < 4; i++) { const P = e.body[MS_LIMB[i]]; if (ms.charCodeAt(i) - 48 !== (P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0)) return false; } return true; };
 const MS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
+/* N4 Scheibe 3 (08.10.): Wunden-Haltung — 1 Rumpf unter 50 % (hält die Seite), 2/4 linkes/rechtes Bein unter 50 % (entlastet). Lebende, stehende
+   Figuren mit Körper; Prothesen und verlorene Beine zählen nicht (eigenes Bild). Wenige Stufen: der Frame-Cache wächst nur bei Verwundeten. */
+export const woundOf = e => { const b = e?.body; if (!b || !e.alive || e.downed || e.kind === 'player') return 0;
+  const low = P => P && !P.mech && !P.lost && P.max > 0 && P.hp > 0 && P.hp < P.max * 0.5;
+  const ll = low(b.lleg), rl = low(b.rleg); return (low(b.torso) ? 1 : 0) + (ll && (!rl || b.lleg.hp <= b.rleg.hp) ? 2 : rl ? 4 : 0); };
 export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
 const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
 const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };
@@ -693,7 +698,7 @@ const PACK_PROF = new Set(['Reisender', 'Flüchtling', 'Händler', 'Kontorhändl
 function condition(s, e, eq) {
   const cs = Object.values(eq || {}).filter(i => i && i.cond != null).map(i => i.cond), avg = cs.length ? cs.reduce((a, b) => a + b, 0) / cs.length : 1;
   s.wear = Math.max(s.wear || 0, avg > 0.8 ? 0 : avg > 0.5 ? 1 : avg > 0.25 ? 2 : 3, WEAR_PROF[e.prof] || 0, e.captive ? 3 : 0);
-  s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
+  s.blood = bloodOf(e); s.wd = woundOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
   if (PACK_PROF.has(e.prof)) s.pack = 1;
   if (HAT_PROF[e.prof] && !s.helm && (((e.seed || 0) | 0) % 2)) { s.helm = HAT_PROF[e.prof]; s.helmCol = '#3a3026'; s.hooded = 0; }
   // Referenz 3: Schichten statt Einheitskittel — Schulterumhang in gedämpften Farben, Beinwickel, Handschuhe, Taschen (je Person fest)
@@ -832,7 +837,7 @@ function hsInputs(e) {
   const v = hsSig; let n = 0;
   for (let i = 0; i < HS_ENT.length; i++) v[n++] = e[HS_ENT[i]];
   const p = e.pal; if (p) for (let i = 0; i < HS_PAL.length; i++) v[n++] = p[HS_PAL[i]];
-  v[n++] = bloodOf(e);
+  v[n++] = bloodOf(e); v[n++] = woundOf(e);   /* N4 S3 */
   const b = e.body; if (b) for (let i = 0; i < 4; i++) { const P = b[HS_LIMB[i]]; v[n++] = P ? (P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0) : -1; }
   const tx = ((e.anchor?.x ?? e.x) || 0) / 32, ty = ((e.anchor?.y ?? e.y) || 0) / 32;   /* dieselben Grenzen wie regionOf und regionFarmer */
   v[n++] = (ty > 780 && tx > 560 ? 1 : 0) | (tx > 0 && tx < 200 ? 2 : 0) | (tx < 330 ? 4 : 0) | (tx > 700 ? 8 : 0);
@@ -935,6 +940,9 @@ const ROLE_LOOK = {
   bandit_knife: { ban: 1, hooded: 1, hood: '#1e1c1a', cloak: '#1a1816', face: 'mask', armor: '', sash: '#7a2a20', strap: 0, pouch: 0, scarf: '', wear: 1 },
   bandit_heavy: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'kettle', helmCol: '#6a6862', armor: 'chain', armorCol: '#5a5a56', pauld: '#6a6a66', pb: 1, glove: '#4a4640', scarf: '#5a1a1c', strap: 1, wear: 1 },
   bandit_chief: { ban: 1, hooded: 0, face: 'human', helm: 'wide', helmCol: '#2a1a14', crest: '#b03020', cloak: '#5a1a1c', capeL: 1, armor: 'leather', armorCol: '#3a2a1c', trim: '#c8a050', sash: '#8a2a20', beard: 1, sc: 1, glove: '#3a2c20', scarf: '', wear: 0 },
+  bandit_trapper: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'cap', helmCol: '#6a5638', fur: '#6a5638', armor: 'leather', armorCol: '#4a3a28', strap: 1, pouch: 1, chn: 1, scarf: '', wraps: 1, wear: 1 },   /* Fellmütze, Fußangeln an der Kette quer über der Brust */
+  goblin_chief: { gob: 1, helm: 'horned', helmCol: '#4a4038', cloak: '#4a3a26', cw: 'pelzkragen', fur: '#6a5a3a', charm: 1, pauld: '#c8bca0', pb: 1, asy: 1, armor: 'leather', armorCol: '#3a2c1c', shield: '', wear: 1 },   /* Hörnerhelm, Fellumhang, Knochenschulter */
+  goblin_worker: { gob: 1, helm: '', hs: 2, pack: 1, strap: 1, armor: '', wraps: 1, gg: 1, wear: 3 },   /* Lumpen, Tragekorb, Eisenkragen der Grube */
   goblin_scout: { gob: 1, hooded: 1, hood: '#2e3a24', cloak: '#26301d', helm: '', strap: 1, wear: 2 },
   goblin_archer: { gob: 1, quiver: 1, fur: '#5a4a30', helm: '', strap: 1, wear: 2 },
   goblin_shaman: { gob: 1, helm: 'skull', helmCol: '#cfc6b0', charm: 1, robe: '#3a2a1a', fur: '#4a3a26', ge: '#9ad05a', sil: 'motes', mc: '#9ad05a', wear: 2 },
@@ -1047,7 +1055,7 @@ export function monsterSpec(e, m) {
   if (e.shield && !s.shield) { s.shield = 'round'; s.shieldCol = '#4a3f30'; s.mark = 'boss'; s.markCol = '#8a8172'; }
   const sd = ((e.seed || 0) | 0) % 2;                                   // Referenz 3: Räuber und Tote tragen, was sie haben
   s.wear = { goblin: 2, goblin_warrior: 2, bandit: 1 + sd, bandit_archer: 1 + sd, bandit_spear: 1 + sd, bounty_hunter: 1, ghoul: 3, skeleton: 2, crypt_warden: 2, death_captain: 2, cultist: 1, chain_brute: 1, kettenschuetze: 1, valen_soldier: 1 }[t] || 0;
-  s.blood = bloodOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;
+  s.blood = bloodOf(e); s.wd = woundOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
   if (t === 'goblin' || t === 'goblin_warrior') s.wear = 2 + ((((e.seed || 0) * 5) | 0) >> 1) % 2;   /* Artist Runde 4: Goblins in Lumpen, mal geflickt, mal zerfetzt */
   if (!e.boss && (t === 'skeleton' || t === 'zombie' || t === 'ghoul' || t === 'bone_archer' || t === 'wraith')) s.wear = 1 + Math.abs(((e.seed || 0) * 37) | 0) % 3;   /* Artist Runde 6: Verwesungsgrad 1–3 je Toter */
   if (NEW_WEAR[t] != null) s.wear = NEW_WEAR[t] + (t === 'skel_brute' ? Math.abs(((e.seed || 0) * 37) | 0) % 2 : 0);   /* Entwickler 02.10. */

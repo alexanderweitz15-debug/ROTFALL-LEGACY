@@ -390,6 +390,16 @@ export function paintR(L, dir, pose, W = null) {
     R.lL = R.lL.map(([x, y], i) => [x - sp * i / 2, y]); R.lR = R.lR.map(([x, y], i) => [x + sp * i / 2, y]); }
   if (ride) { if (view === 'W') { R.lN = [[15.5, 26], [11, 29.5], [12.5, 36]]; R.lF = [[16.5, 26], [12, 30], [13.5, 36.5]]; }   // S15 Reitsitz: Knie nach vorn, Unterschenkel am Pferd
     else { R.lL = [[13.5, 26], [10, 31], [10.5, 37]]; R.lR = [[18.5, 26], [22, 31], [21.5, 37]]; } }   // von vorn/hinten: Beine gespreizt um den Rumpf
+  /* N4 Scheibe 3 (08.10.2026, Kenshi-Gefühl): Wunden-Haltung aus dem Körperzustand (L.wd, sprites.js woundOf) — Rumpf unter der Hälfte:
+     die freie Hand hält die Seite, Kopf etwas tiefer; Bein unter der Hälfte: es wird im Stand entlastet (Fuß angehoben, Knie gebeugt), die Figur
+     steht schief. Nur aus vorhandenen Gelenkpunkten gemischt (kein neues Posenbild, nur andere Gelenke im selben Rig). */
+  if (L.wd && !ride && !extra && !globalThis.__rfOld && /^(i[01]|w[0-3])$/.test(pose)) {
+    const wl = !!W && view !== 'W' && Math.cos((W.oct || 0) * Math.PI / 4) < -1e-9;
+    if ((L.wd & 1) && !(W && W.two)) { const k = view === 'W' ? (W ? 'aF' : 'aN') : wl ? 'aR' : 'aL', a = R[k];
+      if (a && a.length === 3) { const [s] = a, sg = view === 'W' ? -1 : k === 'aL' ? 1 : -1; R[k] = [s, [s[0] - sg * 0.5, s[1] + 5.5], [16 - (view === 'W' ? 2 : sg * 3), s[1] + 8.5]]; R.hy += 1; } }
+    if ((L.wd & 6) && (pose === 'i0' || pose === 'i1')) { const lefty = !!(L.wd & 2), k = view === 'W' ? (lefty ? 'lF' : 'lN') : (lefty !== (view === 'N') ? 'lL' : 'lR'), l = R[k];
+      if (l && l.length === 3) { const out = k === 'lL' ? -1 : k === 'lR' ? 1 : -1; R[k] = [l[0], [l[1][0] + out * 0.5, l[1][1] - 0.5], [l[2][0] + out * 0.5, l[2][1] - 1.5]]; R.hx += view === 'W' ? 0 : k === 'lL' ? -1 : 1; } }
+  }
   const plan = W ? armPlan(view, R, W) : null;
   if (L.la) for (const k of ['aL', 'aR', 'aN', 'aF']) { const a = R[k]; if (a && a.length === 3) { const [s0, e0, h0] = a, f = (q, k2) => [s0[0] + (q[0] - s0[0]) * k2, s0[1] + (q[1] - s0[1]) * k2]; R[k] = [s0, f(e0, 1.3), f(h0, 1.38)]; } }   /* Entwickler 02.10.: Mutierte — zu lange Arme (Glieder ohne Waffe; der Waffenarm folgt der Hand) */
   const C = new Px(RW, RH, DX, DY); STUMPS = [];
@@ -400,7 +410,7 @@ export function paintR(L, dir, pose, W = null) {
   const twist = view !== 'W' && plan && W && W.mode === 'swing' ? Math.max(-4, Math.min(4, Math.round((plan.h[0] - 16) * 0.3))) : 0, waistY = 24 + R.by, topY = 13 + R.by;
   if (twist) { C.shearTop(waistY, topY, twist); for (const k in meta.limbs) { const q = meta.limbs[k]; if (q) meta.limbs[k] = [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]]; } }
   const twX = q => q && twist ? [q[0] + C.shearAt(waistY, topY, twist, q[1]), q[1]] : q;
-  C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); C.outline(); silGlow(C, L, meta, view);
+  C.shade(); glint(C); details(C, L, R, view, meta, pose); wear(C, L, meta); rarityEdge(C, L, meta); C.outline(); silGlow(C, L, meta, view);
   const sx = q => q && [q[0] + DX, q[1] + DY], limbs = {}; for (const k in meta.limbs) limbs[k] = sx(meta.limbs[k]);   // Bildkoordinaten (Rahmen 40)
   const lnX = view === 'W' ? R.lean : 0, shL = q => q && [q[0] + lnX, q[1]];   /* Arme werden mit der Rumpfneigung verschoben gemalt — Waffe sitzt an der gemalten Hand */
   return { g: C.toG(), hand: plan ? sx(twX(shL(plan.h))) : null, off: plan ? sx(twX(shL(plan.off))) : null, eyeY: meta.eyeY + DY, behind: meta.behind, limbs };
@@ -1248,13 +1258,35 @@ function wear(C, L, M) {
     if (hsh(x, sd) > (w - 1) * 0.3) continue; let y = C.h - 1; while (y >= 0 && C.id[y * C.w + x] !== I.skirt) y--; if (y < 0) continue;
     for (const d of [0, 1]) { const i = y * C.w + x + d; if (C.id[i] === I.skirt) { C.col[i] = null; C.id[i] = -1; } } }
   if (w >= 2 && I.torso !== undefined) { const i = pick(I.torso, 7); if (i >= 0) for (const d of [0, 1, C.w, C.w + 1]) if (C.id[i + d] === I.torso) C.col[i + d] = mix(C.col[i + d], '#7a6a4c', 0.35); }   // Flicken
-  if (I.plate !== undefined || I.helm !== undefined) for (const pid of [I.plate, I.helm]) { if (pid === undefined || C.P[pid]?.mat !== 'metal') continue;
-    for (let k = 0; k < 1 + w; k++) { const i = pick(pid, 20 + k); if (i >= 0) { C.col[i] = mix(C.col[i], '#6a3a1e', 0.5); if (C.id[i + C.w] === pid) C.col[i + C.w] = mix(C.col[i + C.w], '#5a2e18', 0.45); } } }
+  /* R1 (08.10.2026, visual/ruestungen.md): Zustand am Metall lesbar — neu (wear 0) glänzt die Oberkante (Politur), ab 1 Dellen und Kratzer,
+     bei 3 Risse; Rost nach Metallart (Eisen braun, Messing/Bronze grünspanig). Kein neues Spec-Feld: alles aus wear und wseed. */
+  const brass = pid => { const c = C.P[pid]?.R?.b; if (!c || c[0] !== '#') return false; const n = parseInt(c.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return r > b + 40 && g > b + 15; };
+  const metal = [I.plate, I.helm, I.fauld, I.chainSkirt, ...(I.pauld || []), ...(I.tassets || [])].filter(pid => pid !== undefined && pid >= 0 && C.P[pid]?.mat === 'metal');
+  if (I.plate !== undefined || I.helm !== undefined) for (const pid of [I.plate, I.helm]) { if (pid === undefined || C.P[pid]?.mat !== 'metal') continue; const g = brass(pid);
+    for (let k = 0; k < 1 + w; k++) { const i = pick(pid, 20 + k); if (i >= 0) { C.col[i] = mix(C.col[i], g ? '#3e6a56' : '#6a3a1e', 0.5); if (C.id[i + C.w] === pid) C.col[i + C.w] = mix(C.col[i + C.w], g ? '#2e5a46' : '#5a2e18', 0.45); } } }
+  if (globalThis.__rfOld) return;
+  if (w === 0) for (const pid of metal) { let n = 0; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid && C.col[i] && (n++ & 1) === 0) C.col[i] = mix(C.col[i], '#fff6e0', 0.38); }   // Politur
+  if (w >= 1) for (const pid of [I.plate, I.helm, ...(I.pauld || [])]) { if (pid === undefined || pid < 0 || C.P[pid]?.mat !== 'metal') continue; const R0 = C.P[pid].R;
+    for (let k = 0; k < w; k++) { const i = pick(pid, 60 + k * 7); if (i < 0) continue; C.col[i] = R0.dk; if (C.id[i + C.w + 1] === pid) C.col[i + C.w + 1] = R0.sh; if (C.id[i - 1] === pid) C.col[i - 1] = R0.hi; } }   // Dellen, Kratzer
+  if (w >= 3) for (const pid of [I.plate, I.chainSkirt, I.helm]) { if (pid === undefined || pid < 0) continue; const i = pick(pid, 90); if (i < 0) continue;   // Riss
+    for (const d of [0, C.w, 2 * C.w + 1, 3 * C.w + 1]) if (C.id[i + d] === pid) C.col[i + d] = '#0e0c0c'; }
+  if (w >= 3 && I.tabard !== undefined) { const i = pick(I.tabard, 95); if (i >= 0) for (let s = 0; s < 5; s++) { const j = i + s * (C.w + 1); if (C.id[j] === I.tabard) C.col[j] = mix(C.col[j], '#0e0c0c', 0.65); } }   /* R4: zerrissener Wappenrock (Deserteure, Lumpen) */
   if (bl) for (let s = 0; s < bl * 2; s++) { const pid = [I.torso, I.skirt, I.legL][s % 3]; if (pid === undefined) continue; const i = pick(pid, 40 + s); if (i < 0) continue;
     for (const d of [0, 1, C.w]) if (C.id[i + d] >= 0 && C.id[i + d] < 999) C.col[i + d] = d === C.w ? '#3a0a0a' : '#5e1010';
     if (C.id[i + 2 * C.w] >= 0 && C.id[i + 2 * C.w] < 999) C.col[i + 2 * C.w] = '#3a0a0a'; }
 }
 
+/* R5 (08.10.2026): Rarität der Rüstung an der Kante, dezent und wie bei Waffen (steelOf) — selten Silbernieten, episch Goldkante,
+   legendär Goldkante + Gravur, mythisch blassblaue Kante + Gravur. L.rr 0–4 aus der seltensten Brust/Kopf-Rüstung (sprites.js). */
+const RR_COL = ['', '#c8ccd0', '#c8a050', '#e0b85a', '#a9d4e8'];
+function rarityEdge(C, L, M) {
+  const r = L.rr | 0; if (!r || !L.armor || globalThis.__rfOld) return; const I = M.ids, col = RR_COL[Math.min(4, r)];
+  const pid = L.armor === 'plate' ? I.plate : L.armor === 'leather' ? I.jerkin : I.torso; if (pid === undefined || pid < 0) return;
+  const top = []; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid) top.push(i);
+  top.forEach((i, n) => { if (r === 1 ? n % 3 === 1 : true) C.col[i] = r === 1 ? col : mix(C.col[i], col, 0.75); });
+  if (r >= 3 && top.length) { const mid = top[top.length >> 1]; for (let s = 2; s <= 6; s++) { const j = mid + s * C.w; if (C.id[j] === pid) C.col[j] = mix(C.col[j], col, s % 2 ? 0.6 : 0.35); } }
+  if (r >= 2 && I.helm !== undefined && L.rr >= 2) { for (let i = C.w; i < C.col.length; i++) if (C.id[i] === I.helm && C.id[i + C.w] !== I.helm && C.col[i]) C.col[i] = mix(C.col[i], col, 0.55); }   // Helmrand
+}
 // ---- Rolle: Kugel (Umhang/Rock, Kopf eingezogen, Knie) — der Renderer dreht in 90°-Schritten ----
 export function paintTuckR(L) {
   const C = new Px(20, 20), X = looks(L), body = C.part(L.cloak || X.coat, 'cloth'), leg = C.part(X.pants, 'cloth'), hd = C.part(L.hood || L.hair, 'cloth');

@@ -2177,7 +2177,7 @@ SPAWN_AREAS.push(
   { map:'world', x:1420, y:250, r:60, types:['skeleton', 'wraith', 'cultist', 'death_captain', 'bone_knight', 'shade', 'ash_demon', 'bone_archer'], cap:10 },
   { map:'world', x:1470, y:420, r:40, types:['death_knight', 'flesh_golem', 'bone_knight', 'necromancer', 'bone_hound'], cap:8 });   // Phase 6 §61: Vorhof der Gruft
 const HUMANOID = new Set(['aldhelm', 'blood_cultist', 'blood_mage', 'thrall', 'chalice_guard', 'acad_student', 'acad_dummy', 'drill_fighter', 'goblin', 'goblin_warrior', 'bandit', 'bandit_archer', 'bandit_spear', 'bounty_hunter', 'chain_brute', 'rotgardist', 'kettenschuetze', 'automat', 'chain_master', 'skeleton', 'crypt_warden', 'death_captain', 'hrodvar', 'valen_soldier', 'gorak', 'cultist', 'ghoul', 'wraith', 'bone_knight', 'bone_archer', 'necromancer', 'zombie', 'ash_demon', 'shade', 'flesh_golem', 'death_knight', 'garmadon', 'angel_blade', 'angel_archer', 'sea_raider', 'sea_harpooner', 'whitebeard', 'skel_bomb', 'skel_brute', 'mutant', 'mutant_brute', 'dampframme', 'blutschoepfer', 'netzwerferin', 'hofspion',
-  'bandit_scout', 'bandit_thug', 'bandit_looter', 'bandit_knife', 'bandit_heavy', 'bandit_chief', 'goblin_scout', 'goblin_archer', 'goblin_shaman', 'goblin_tinker', 'goblin_spear', 'goblin_berserker']);   /* P3.20–P3.23 Rollen (08.10.) */
+  'bandit_scout', 'bandit_thug', 'bandit_looter', 'bandit_knife', 'bandit_heavy', 'bandit_chief', 'goblin_scout', 'goblin_archer', 'goblin_shaman', 'goblin_tinker', 'goblin_spear', 'goblin_berserker', 'bandit_trapper', 'goblin_chief', 'goblin_worker']);   /* P3.20–P3.23 Rollen (08.10.) */
 // §25 Stil-Testbereich (nur Entwicklerzugang): je ein Vertreter jeder Bildklasse nebeneinander — Figuren, Gegner,
 // Gebäude (3 Typen + Ruine), Boden/Übergänge, Fels, Bäume, Kisten/Fässer in allen Varianten, Effekte. Jede
 // Stiländerung wird hier gegen den Rest geprüft. styleArea(false) räumt auf und stellt den Spieler zurück.
@@ -2414,11 +2414,33 @@ function roleGallery() {
   d.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:rgba(0,0,0,.85);cursor:pointer'; d.onclick = () => d.remove(); d.appendChild(cv); document.body.appendChild(d);
   UI.toast(`Rollen-Galerie: ${L.length - 4} Rollen neben ihren Grundarten — Klick schließt.`, 3000);
 }
+/* R1–R5 + N4 S3 (08.10.2026, nur Debug): Prüfstand — Zustand (neu → zerschlagen), Rarität, Improvisiert/Deserteur, Fraktionsschilde, Wunden-Haltung. Klick schließt. */
+function armorGallery() {
+  document.getElementById('dbProfGal')?.remove();
+  const mk = (o = {}) => SP.humanSpec({ kind: 'npc', prof: 'Söldnerwache', seed: 2, pal: {}, equip: {}, ...o }), plate = rar => ({ chest: { key: 'plate_cuirass', rar }, head: { key: 'iron_helm', rar } });
+  const base = mk({ equip: plate('common') }), ms = SP.monsterSpec({ kind: 'enemy', mtype: 'bandit', seed: 3, weaponKey: 'rusty_sword' }, MONSTERS.bandit);
+  const rows = [['Zustand: neu (Politur) · abgenutzt · verbeult · zerschlagen', [0, 1, 2, 3].map(w => ({ ...base, wear: w }))],
+    ['Rarität: gewöhnlich · selten · episch · legendär · mythisch', ['common', 'rare', 'epic', 'legendary', 'mythic'].map(r => mk({ equip: plate(r) }))],
+    ['Leder/Kette selten→mythisch', [mk({ equip: { chest: { key: 'leather_jerkin', rar: 'epic' } } }), mk({ equip: { chest: { key: 'chain_hauberk', rar: 'legendary' } } }), mk({ equip: { chest: { key: 'chain_hauberk', rar: 'mythic' } } })]],
+    ['Improvisiert: Miliz · Deserteur', [mk({ prof: 'Miliz' }), mk({ prof: 'Deserteur' })]],
+    ['Schilde nach Fraktion: Valen · Orden · Aurelion · Kette · Händler', ['valen', 'order', 'aurel', 'chain', 'merch'].map(f => mk({ faction: f, equip: { offhand: { key: 'kite_shield' }, chest: { key: 'chain_hauberk' } } }))],
+    ['Wunden: heil · Rumpf · linkes Bein · rechtes Bein · beides', [0, 1, 2, 4, 3].map(wd => ({ ...ms, wd }))]];
+  const Z = 1.7, cw = 150, ch = 120, cv = document.createElement('canvas'); cv.width = 260 + 5 * cw; cv.height = rows.length * ch + 8; const c = cv.getContext('2d');
+  c.fillStyle = '#4f5c40'; c.fillRect(0, 0, cv.width, cv.height); c.imageSmoothingEnabled = false; c.font = '11px sans-serif';
+  const art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+  try { rows.forEach(([lab, specs], i) => { const y = i * ch + 4; c.fillStyle = '#fff'; c.fillText(lab, 4, y + ch / 2, 250);
+    specs.forEach((sp, j) => ['S', 'W'].forEach((d, k) => { const f = SP.humanFrameR(sp, d, 'i0'); c.drawImage(f, 260 + j * cw + k * 70, y, f.width * f.px * Z / 1.25, f.height * f.px * Z / 1.25); })); }); }
+  finally { SP.setArt(art0); }
+  const d = document.createElement('div'); d.id = 'dbProfGal'; d.title = 'Klick schließt';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:rgba(0,0,0,.85);cursor:pointer'; d.onclick = () => d.remove(); d.appendChild(cv); document.body.appendChild(d);
+  UI.toast('Rüstungs-Prüfstand — Klick schließt.', 2500);
+}
 /* Goblin-Grundarten und ihre Rollen: nach der Befreiung (bzw. mit Grubenstamm-Rang) friedlich wie die Grundart */
 const isGoblinFoe = t => t === 'goblin' || t === 'goblin_warrior' || (!!MONSTERS[t]?.rolle && MONSTERS[t].faction === 'goblin');
 /* Waffen der Rollen (spawnEnemy legt sie in e.weaponKey; die Galerie zeigt sie) */
 const ROLE_WEAPON = { bandit_scout: 'shortbow', bandit_thug: 'schrottkeule', bandit_looter: 'axe', bandit_knife: 'dagger', bandit_heavy: 'greatsword', bandit_chief: 'longsword',
-  goblin_scout: 'goblin_hook', goblin_archer: 'shortbow', goblin_shaman: 'staff', goblin_tinker: 'pickaxe', goblin_spear: 'spear', goblin_berserker: 'axe' };
+  goblin_scout: 'goblin_hook', goblin_archer: 'shortbow', goblin_shaman: 'staff', goblin_tinker: 'pickaxe', goblin_spear: 'spear', goblin_berserker: 'axe',
+  bandit_trapper: 'axe', goblin_chief: 'schrottkeule', goblin_worker: 'pickaxe' };
 function spawnEnemy(mtype, map, tx, ty, opts = {}) {
   const m = MONSTERS[mtype];
   const pos = freeSpotNear(map, tx, ty, 3);
@@ -3903,8 +3925,8 @@ function controlPlayer(dt) {
   if (combat.some(f => f.kind === 'enemy' && f.alive && !f.downed && Math.abs(f.x - p.x) < 300 && Math.abs(f.y - p.y) < 300 && isHostile(f, p))) p.combatT = performance.now();   /* Kampfanimation: Kampfhaltung, solange Feinde nah sind (nur Bild) */
   if (chargeTick(p)) { /* Kampfanimation: schwerer Hieb lädt (Maustaste gehalten) */ } else if (!p.cover && (mouse.down || keys.has(' ') || touch.attack)) { p.forceStrike = keys.has('control') || keys.has('ctrl'); attack(p); }
   // Dungeon-Fallen
-  const haz = actorsOf().hz.find(e => dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
-  if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, 'Fallgrube'); camShake(6, 160); }
+  const haz = actorsOf().hz.find(e => e.hazard > 0 && dist(e, p) < 18 && (!e.lastHit || performance.now() - e.lastHit > 1500));
+  if (haz) { haz.lastHit = performance.now(); hurt(p, haz.hazard, null, haz.hazName || 'Fallgrube'); camShake(6, 160); if (haz.dartTrap) dartFired(haz); }   /* P3.x Gewölbe: Pfeilfalle */
 }
 
 // ================= Kampf =================
@@ -5158,7 +5180,7 @@ function sneakTick(dt) {
 const VOICE = { aldhelm: 'shout', blood_cultist: 'shout', blood_mage: 'shout', thrall: 'moan', chalice_guard: 'shout', acad_student: 'shout', acad_dummy: 'shout', drill_fighter: 'shout', dodon: 'shout', wolf: 'growl', wild_dog: 'growl', bear: 'growl', boar: 'growl', skeleton: 'rattle', crypt_warden: 'rattle', death_captain: 'rattle', hrodvar: 'rattle',
   ghoul: 'moan', wraith: 'shriek', bandit: 'shout', bandit_archer: 'shout', bandit_spear: 'shout', bounty_hunter: 'shout', chain_brute: 'shout', automat: 'rattle', rotgardist: 'shout', kettenschuetze: 'shout', chain_master: 'shout', goblin: 'shout', goblin_warrior: 'shout', gorak: 'growl', cultist: 'moan', valen_soldier: 'shout', sea_raider: 'shout', sea_harpooner: 'shout', whitebeard: 'shout',
   bone_knight: 'rattle', bone_archer: 'rattle', necromancer: 'moan', zombie: 'moan', ash_demon: 'growl', shade: 'shriek', bone_hound: 'growl', carrion_wing: 'shriek', flesh_golem: 'moan', death_knight: 'rattle', garmadon: 'shout', omega: 'shriek', angel_blade: 'shriek', angel_archer: 'shriek', angel_ophan: 'shriek', skel_bomb: 'rattle', skel_brute: 'rattle', mutant: 'shriek', mutant_brute: 'growl', waechterspinne: 'rattle', dampframme: 'rattle', blutschoepfer: 'moan', netzwerferin: 'shout', hofspion: 'shout',
-  bandit_scout: 'shout', bandit_thug: 'shout', bandit_looter: 'shout', bandit_knife: 'shout', bandit_heavy: 'shout', bandit_chief: 'shout', goblin_scout: 'shout', goblin_archer: 'shout', goblin_shaman: 'shout', goblin_tinker: 'shout', goblin_spear: 'shout', goblin_berserker: 'shout' };   // Phase 6   /* P3.20–P3.23 Rollen */
+  bandit_scout: 'shout', bandit_thug: 'shout', bandit_looter: 'shout', bandit_knife: 'shout', bandit_heavy: 'shout', bandit_chief: 'shout', goblin_scout: 'shout', goblin_archer: 'shout', goblin_shaman: 'shout', goblin_tinker: 'shout', goblin_spear: 'shout', goblin_berserker: 'shout', bandit_trapper: 'shout', goblin_chief: 'shout', goblin_worker: 'shriek' };   // Phase 6   /* P3.20–P3.23 Rollen */
 // Nutzer (S13): Untote sichtbar unterscheiden — jede Art hat ihren Dunst, ihre Funken, ihre Spur (Partikel, selten genug für das Budget)
 const UNDEAD_FX = { necromancer: 'necro', zombie: 'necro', ash_demon: 'fire', shade: 'shadow', death_knight: 'frost', garmadon: 'blood', wraith: 'ghost', flesh_golem: 'blood', cultist: 'shadow', skel_bomb: 'fire' };
 function undeadAmbient(e, dt) { const k = UNDEAD_FX[e.mtype]; if (k && chance(dt / (e.mtype === 'ash_demon' || e.mtype === 'garmadon' ? 220 : 420))) fx(e.x + ri(-8, 8), e.y - ri(4, 30), k, 1); }
@@ -5539,10 +5561,23 @@ function roleAI(e, tgt, d, reach, sp, dt, m) {
   const R = m.rolle, now = performance.now();
   if (tgt === S.player && !S._quiet && d < 420 && !(S.flags.roleSeen ||= {})[e.mtype]) { S.flags.roleSeen[e.mtype] = 1; log(`${m.name}: ${m.lore}`, 'combat'); }
   if (e.heavy || e.stagger > 0 || e.casting) return false;
+  const bandCall = txt => { e.called = true; float(e, txt, 'rgba(230,190,120,ALPHA)', true); sfx(VOICE[e.mtype] || 'shout', 0, earVol(e));
+    for (const o of S.ents[e.map]) if (o.kind === 'enemy' && o.alive && o !== e && o.faction === e.faction && !o.boss && dist(o, e) < 420) { o.aggroId = tgt.id; o.aiState = 'pursue'; o.ambush = null; } };
   if (R === 'Späher') {                                       // ruft die Seinen (420 px) und rennt erst einmal weg, dann kämpft er
-    if (!e.called) { e.called = true; e.scoutRun = 2200; float(e, m.faction === 'goblin' ? 'Kreeek! Fremder!' : 'Hierher! Ein Fremder!', 'rgba(230,190,120,ALPHA)', true); sfx('shout', 0, earVol(e));
-      for (const o of S.ents[e.map]) if (o.kind === 'enemy' && o.alive && o !== e && o.faction === e.faction && !o.boss && dist(o, e) < 420) { o.aggroId = tgt.id; o.aiState = 'pursue'; o.ambush = null; } }
+    if (!e.called) { e.scoutRun = 2200; bandCall(m.faction === 'goblin' ? 'Kreeek! Fremder!' : 'Hierher! Ein Fremder!'); }
     if (e.scoutRun > 0) { e.scoutRun -= dt; seek(e, Math.atan2(e.y - tgt.y, e.x - tgt.x), sp * 1.1, dt); return true; }
+    return false;
+  }
+  if (R === 'Arbeiter') {                                     // kämpft nicht: kreischt einmal (ruft den Stamm) und rennt, bis er weit genug weg ist
+    if (!e.called) bandCall('Iiieh! Hilfe!');
+    if (d < 320) seek(e, Math.atan2(e.y - tgt.y, e.x - tgt.x), sp * 1.1, dt); else e.vx = e.vy = 0;
+    return true;
+  }
+  if (R === 'Fallensteller') {                                // wirft einmal eine sichtbare Fußangel zwischen sich und das Ziel
+    if (!e.trapLaid && d > 60 && d < 260) { e.trapLaid = true; const x = e.x + (tgt.x - e.x) * 0.45, y = e.y + (tgt.y - e.y) * 0.45;
+      if (!solidTile(e.map, x, y)) { S.ents[e.map].push({ id: uid(), kind: 'prop', type: 'spikes', map: e.map, x, y, r: 8, solid: false, transient: true, hazard: Math.round(6 + (e.level || 1) * 0.6), hazName: 'Fußangel', label: 'Fußangel der Banditen', banditTrap: e.id });
+        fx(x, y, 'dust', 6); sfx('metal', 0.3, earVol(e)); float(e, 'Fußangel!', 'rgba(220,190,140,ALPHA)'); e.atkCd = Math.max(e.atkCd || 0, 700);
+        if (tgt === S.player && !S._quiet) log('Der Fallensteller wirft eine Fußangel aus — die Eisenzähne liegen sichtbar am Boden. Drumherum gehen.', 'combat'); return true; } }
     return false;
   }
   if (R === 'Dolchkämpfer') {                                 // umkreist eng und schnell, solange der Stich abklingt; wechselt manchmal die Richtung
@@ -6186,7 +6221,7 @@ function interactables() {
   return nearEnts(p.x, p.y, 62).filter(e => e !== p && Math.abs(e.x - p.x) < 62 && Math.abs(e.y - p.y) < 62 && dist(e, p) < 62 &&   /* PERF-S: billige Vorprüfung vor hypot (17 000 Einträge, alle 180 ms) */
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') || (e.kind === 'enemy' && (takeable(e) || e.prisoner?.by === p.id)) ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
-     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate'))))
+     (e.kind === 'prop' && (e.feast || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate' || e.secret || e.runeStone != null || (e.dartTrap && e.dartSeen)))))   /* Geheime Orte (alle Props mit secret), P3.x Gewölbe: Runensteine, erkannte Pfeilfallen */
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -6483,6 +6518,8 @@ function doInteract(target = null) {
   if (t.secretDig) return secretDig(t);                              /* Geheime Orte S2: Lanze auf dem Hundertfeld */
   if (t.chalk != null) return chalkRead(t);                          /* Geheime Orte S2: Kreidezeichen */
   if (t.secretNames) return secretNames(t);                          /* Geheime Orte S4: Kammer der Namen */
+  if (t.runeStone != null) return runeTouch(t);                      /* P3.x Gewölbe: Runentür */
+  if (t.dartTrap && t.dartSeen) return dartDisarm(t);                /* P3.x Gewölbe: Pfeilfalle entschärfen */
   if (t.secretClock) return clockDoor(t);                            /* Geheime Orte S5: Uhrmacher */
   if (t.secretLight) return lightTower(t);                           /* Geheime Orte S5: Leuchtfeuer */
   if (t.secretWell) return secretWell(t);                         /* A-04: die Treppe am Brunnen der Durstigen war nicht betretbar */
@@ -12699,6 +12736,9 @@ const VAULTS = {
     deco: ['bones', 'broken_pillar', 'candles', 'gravestone'], enter: 'Eine Treppe, die nicht aufhört. Wie tief kommst du?' },
 };
 const VAULT_MOD = { dunkel: 'Es ist stockdunkel hier unten.', 'überflutet': 'Das Wasser steht knöcheltief — jeder Schritt ist schwer.', verflucht: 'Ein Fluch liegt auf dieser Ebene: die Wächter sind stärker, der Lohn auch.' };
+/* P3.x Gewölbe: Runentür — drei Steine in der Folge, die die Inschrift am Eingang beschreibt (Texte ⚖) */
+const VAULT_RUNES = [[['Sonne', 'Mond', 'Stern'], 'Erst der Tag, dann die Nacht, zuletzt das Licht, das den Morgen ankündigt.'],
+  [['Ähre', 'Sichel', 'Brot'], 'Was wächst, wird geschnitten; was geschnitten ist, wird gegessen.'], [['Wiege', 'Ring', 'Grab'], 'Geboren, vermählt, begraben — so geht jeder hinab.']];
 function vaultRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function vaultLoot(tier) {
   const eq = Object.entries(ITEMS).filter(([k, it]) => ['weapon', 'chest', 'head', 'offhand'].includes(it.slot) && !it.unique && it.value >= [0, 20, 60, 120, 200, 260][tier] && it.value <= [0, 120, 240, 400, 700, 900][tier]).map(([k]) => k);
@@ -12747,6 +12787,19 @@ function buildVault(site, floor) {
   if (endBoss && !(prog.chests ||= {})[floor]) prop('chest', last.cx - 2, last.y + 1, { solid: true, loot: vaultLoot(Math.min(5, 2 + (floor / 5 | 0))), lootBonus: Math.min(6, 2 + (floor / 5 | 0)), label: `Truhe der Ebene ${floor}`, schlundChest: floor });
   if (floor === V.floors && !prog.looted) prop('chest', last.cx, last.y + 1, { solid: true, loot: vaultLoot(V.tier), lootBonus: V.tier, vaultHoard: site, label: `Hort — ${V.name}` });
   else if (!cleared && r() < 0.6) { const o = rooms[R(1, rooms.length - 1)]; prop('crate', o.x + 1, o.y + o.h - 2, { solid: true, loot: ['bandage', R(0, 1) ? 'potion' : 'bread'], lootBonus: Math.max(0, V.tier - 2), label: 'Vorrat' }); }
+  { /* P3.x Gewölbe (Planlauf 08.10.): Runentür (Rätsel), Pfeilfallen (Falle), Einsturz (Ereignis) — eigener Zufall r3, damit Lage, Wächter und
+       die übrigen Bausteine jeder Ebene gleich bleiben. Zahlen ⚖. */
+    const r3 = vaultRng((S.seed | 0) * 53 + floor * 613 + site.length * 4241), R3 = (a, b) => a + Math.floor(r3() * (b - a + 1)), mid = rooms.slice(1, -1), st = P.find(e => e.vaultNext);
+    MAPS.vault.runes = null; MAPS.vault.collapse = null;
+    if (st && !locked && !cleared && mid.length >= 3 && r3() < 0.35) {
+      const [names, hint] = VAULT_RUNES[Math.floor(r3() * VAULT_RUNES.length)], rs = mid.slice(); for (let i = rs.length - 1; i > 0; i--) { const j = Math.floor(r3() * (i + 1)); [rs[i], rs[j]] = [rs[j], rs[i]]; }
+      Object.assign(st, { vaultLocked: true, runeLock: true, label: 'Hinab (eine Runentür — drei Steine wollen in der richtigen Folge berührt werden)' }); MAPS.vault.runes = { seq: [], names };
+      names.forEach((nm, i) => { const o = rs[i]; prop('broken_pillar', o.x + o.w - 2, o.y + o.h - 2, { solid: true, r: 9, runeStone: i, runeName: nm, label: `Runenstein: ${nm}` }); });
+      prop('sign', first.x + 2, first.y + 1, { solid: true, r: 8, label: `Inschrift über der Runentür: „${hint}“` });
+    }
+    if (!cleared) for (const o of mid) if (r3() < 0.3) prop('rubble', R3(o.x + 1, o.x + o.w - 2), R3(o.y + 1, o.y + o.h - 2), { dartTrap: true, hazard: 4 + V.tier * 2 + floor, hazName: 'Pfeilfalle', r: 8, label: 'Loser Bodenstein' });
+    if (!cleared && mid.length && r3() < 0.25) { const o = mid[Math.floor(r3() * mid.length)]; MAPS.vault.collapse = { x: o.x, y: o.y, w: o.w, h: o.h, at: 0, done: false, dmg: 6 + V.tier * 3 }; }
+  }
   MAPS.vault.entry = { x: first.cx * TS + TS / 2, y: (first.y + first.h - 3) * TS };
   S.ents.vault = P; indexSolids('vault');
   if (!cleared) for (const o of rooms.slice(1)) for (let i = 0, n = R(1, 2 + (V.tier >= 3 ? 1 : 0)); i < n; i++) {
@@ -12769,7 +12822,7 @@ function vaultDescend() {
   const A = S.vaultAt, V = A && VAULTS[A.site]; if (!V) return;
   const left = S.ents.vault.filter(e => e.kind === 'enemy' && e.alive && !e.surrendered).length;
   if (left) return UI.toast(`Die Treppe ist versperrt. Noch ${left} Wächter auf dieser Ebene.`, 2600);
-  if (S.ents.vault.some(e => e.vaultNext && e.vaultLocked)) return UI.toast('Ein Gitter versperrt die Treppe. Irgendwo auf dieser Ebene muss ein Hebel sein.', 2800);   /* §5e.3 */
+  if (S.ents.vault.some(e => e.vaultNext && e.vaultLocked)) return UI.toast(S.ents.vault.some(e => e.vaultNext && e.runeLock) ? 'Die Runentür ist zu. Drei Runensteine auf dieser Ebene — berühre sie in der Folge, die die Inschrift am Eingang nennt.' : 'Ein Gitter versperrt die Treppe. Irgendwo auf dieser Ebene muss ein Hebel sein.', 3200);   /* §5e.3; P3.x Runentür */
   S.vaults[A.site].cleared[A.floor] = S.day | 0;
   const persons = S.ents.vault.filter(e => e === S.player || S.party.includes(e.id) || e.servant === S.player.id);
   const at = buildVault(A.site, A.floor + 1);
@@ -12792,7 +12845,29 @@ function pullLever(t) {
   for (const e of S.ents.vault || []) if (e.vaultNext && e.vaultLocked) { e.vaultLocked = false; e.label = `Hinab zur Ebene ${(S.vaultAt?.floor || 1) + 1}`; }
   log('Irgendwo rasselt ein Gitter nach oben. Der Weg hinab ist frei.', 'world');
 }
+/* P3.x Gewölbe: Runentür, Pfeilfalle, Einsturz (siehe buildVault) */
+function runeTouch(t) {
+  const M = MAPS.vault?.runes, p = S.player; if (!M) return UI.toast('Ein Runenstein. Er ist kalt und stumm.');
+  act(p, 'work', 500, t); sfx('magic', 0.3, 0.6); M.seq.push(t.runeStone);
+  if (M.seq.some((v, i) => v !== i)) { M.seq = []; fx(t.x, t.y - 12, 'spark', 10); hurt(p, 3 + (VAULTS[S.vaultAt?.site]?.tier || 1), null, 'Runenschlag'); log('Der Stein glüht rot auf und schlägt zurück. Die Folge beginnt von vorn — lies die Inschrift am Eingang.', 'combat'); return; }
+  if (M.seq.length < 3) { fx(t.x, t.y - 12, 'magic', 6); return UI.toast(`Der Stein „${t.runeName}“ leuchtet auf (${M.seq.length}/3).`, 1600); }
+  M.done = true; for (const e of S.ents.vault || []) if (e.vaultNext && e.runeLock) { e.vaultLocked = false; e.label = `Hinab zur Ebene ${(S.vaultAt?.floor || 1) + 1}`; }
+  sfx('bell', 0, 0.5); camShake(2, 200); log('Drei Steine leuchten zugleich. Die Runentür schwingt auf.', 'quest'); UI.toast('DIE RUNENTÜR IST OFFEN', 2200);
+}
+function dartFired(t) { sfx('bow', 0.4, 0.8); float(S.player, 'Pfeilfalle!', 'rgba(230,120,90,ALPHA)'); if (!t.dartSeen) { t.dartSeen = true; t.label = 'Druckplatte (Pfeilfalle) — E: entschärfen'; } }
+function dartDisarm(t) { const p = S.player; act(p, 'work', 1200, t); t.hazard = 0; t.dartTrap = false; t.label = 'Druckplatte (entschärft)'; sfx('metal', 0.2, 0.5); log('Du klemmst die Druckplatte mit einem Keil fest. Die Pfeile bleiben in der Wand.', 'world'); }
+function vaultTrapTick(p) {
+  for (const t of S.ents.vault || []) if (t.dartTrap && !t.dartSeen && dist(t, p) < 3 * TS && chance(0.15 + (p.attributes?.perception || 10) * 0.02)) {   /* wie die Geheimwand: Wahrnehmung hilft */
+    t.dartSeen = true; t.label = 'Druckplatte (Pfeilfalle) — E: entschärfen'; log('Ein Bodenstein liegt zu locker, in der Wand gegenüber kleine Löcher: eine Pfeilfalle. (E: entschärfen, oder drumherum gehen)', 'world'); }
+  const Cl = MAPS.vault?.collapse; if (!Cl || Cl.done) return; const inside = e => e.x / TS >= Cl.x && e.x / TS < Cl.x + Cl.w && e.y / TS >= Cl.y && e.y / TS < Cl.y + Cl.h;
+  if (!Cl.at && inside(p)) { Cl.at = performance.now() + 3500; camShake(2, 400); sfx('crack', 0.3, 0.6); log('Staub rieselt von der Decke, die Balken knirschen. Raus aus diesem Raum!', 'combat'); UI.toast('DIE DECKE KNIRSCHT', 1800); return; }
+  if (Cl.at && performance.now() >= Cl.at) { Cl.done = true; camShake(8, 600); sfx('crit', 1, 1);
+    for (const e of S.ents.vault || []) if ((e.kind === 'enemy' || e.kind === 'npc' || e === p) && e.alive !== false && inside(e)) hurt(e, Cl.dmg, null, 'Einsturz');
+    for (let i = 0; i < 3; i++) { const x = Cl.x + 1 + ((i * 7) % Math.max(1, Cl.w - 2)), y = Cl.y + 1 + ((i * 5) % Math.max(1, Cl.h - 2)); fx(x * TS + 16, y * TS + 16, 'dust', 14); S.ents.vault.push({ id: uid(), kind: 'prop', type: 'rubble', map: 'vault', x: x * TS + 16, y: y * TS + 16, r: 10, solid: false, transient: true, label: 'Eingestürzte Decke' }); }
+    log('Die Decke kommt herunter! Steine prasseln auf alle, die noch im Raum stehen.', 'combat'); }
+}
 function vaultTick() {
+  if (S.map === 'vault' && S.player) vaultTrapTick(S.player);   /* P3.x */
   const s = MAPS.vault?.secret, p = S.player; if (S.map !== 'vault' || !s || s.found || !p) return;
   if (Math.hypot(p.x / TS - s.x, p.y / TS - s.y) < 3 && chance(0.15 + (p.attributes?.perception || 10) * 0.02)) {
     s.found = true; MAPS.vault.tiles[s.y * MAPS.vault.w + s.x] = T.DFLOOR; MAPS.vault.ver = (MAPS.vault.ver || 0) + 1;
@@ -18616,6 +18691,12 @@ function debugSections() {
     ['Figuren: Berufe erkennbar (08.10.2026)', '', {
       'Figuren: Berufsgalerie (alle Berufe nebeneinander)': () => profGallery(),   /* Entwickler 08.10.: „Man soll besser die verschiedenen Berufe erkennen können“ */
     }],
+    ['Rüstung und Wunden (R1–R5, N4 S3, 08.10.2026)', '', {
+      'Rüstung: Prüfstand (Zustand, Rarität, Miliz, Fraktionsschilde, Wunden)': () => armorGallery(),
+      'Wunde: nächste Figur (Rumpf und linkes Bein auf 30 %)': () => { const t = [...S.ents[S.map]].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x.body && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0];
+        if (!t) return UI.toast('Niemand mit Körper in der Nähe.'); t.body.torso.hp = t.body.torso.max * 0.3; t.body.lleg.hp = t.body.lleg.max * 0.3; B.syncHp?.(t); UI.toast(`${t.name || MONSTERS[t.mtype]?.name}: hält die Seite und entlastet das linke Bein.`, 3000); },
+      'Wunde: nächste Figur heilen': () => { const t = [...S.ents[S.map]].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x.body && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (t) { B.fullHeal(t); UI.toast('Geheilt.'); } },
+    }],
     ['Gegner: Banditen- und Goblin-Rollen (P3.20–23, 08.10.2026)', `<select id="dbRole">${ROLE_TYPES().map(k => `<option value="${k}">${MONSTERS[k].name} (${MONSTERS[k].rolle})</option>`).join('')}</select>`, {
       'Gegner: Rollen-Galerie (Grundart und Rollen nebeneinander)': () => roleGallery(),
       'Gegner: Rolle spawnen (feindlich, 6 Felder vor dir)': () => { const k = $('dbRole').value, e = spawnEnemy(k, S.map, (p.x / TS | 0) + 6, p.y / TS | 0); if (e) { e.transient = true; e.aggroId = p.id; e.aiState = 'pursue'; UI.toast(`${MONSTERS[k].name}: ${MONSTERS[k].lore}`, 5000); } },
@@ -18972,6 +19053,9 @@ function debugSections() {
       'Goblins: Grubenhort Stufe 4': () => { S.flags.goblinsFreed = true; gobGrow(Math.max(0, 70 - (S.gobCity?.pts || 0)), '(Debug)'); },
       'Gewölbe: alle geheimen Gewölbe aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].hidden) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Geheime Gewölbe auf der Karte'); },   /* Nutzer §5e.3 */
       'Gewölbe: Schlund betreten': () => enterVault('schlund'),
+      'Gewölbe: Runentür — Lösung zeigen (diese Ebene)': () => { const M = MAPS.vault?.runes; UI.toast(S.map === 'vault' && M ? `Folge: ${M.names.join(' → ')}` : 'Auf dieser Ebene gibt es keine Runentür.', 3200); },   /* P3.x */
+      'Gewölbe: Pfeilfallen aufdecken (diese Ebene)': () => { let n = 0; for (const t of S.ents.vault || []) if (t.dartTrap && !t.dartSeen) { t.dartSeen = true; t.label = 'Druckplatte (Pfeilfalle) — E: entschärfen'; n++; } UI.toast(`${n} Pfeilfallen aufgedeckt`); },   /* P3.x */
+      'Gewölbe: Einsturz jetzt (Raum um den Helden)': () => { if (S.map !== 'vault') return UI.toast('Nur im Gewölbe.'); const x = (p.x / TS2 | 0) - 3, y = (p.y / TS2 | 0) - 3; MAPS.vault.collapse = { x, y, w: 7, h: 7, at: 0, done: false, dmg: 8 }; UI.toast('Die Decke knirscht gleich …'); },   /* P3.x */
       'Akademie: einschreiben (ohne Schein und Gold)': () => { S.student = { sem: 1, lec: 0, total: 0, day: -1, trialsAt: 0, trialsWon: 0, rival: null, forb: 0 }; S.flags.acadBanned = false; UI.toast('Student'); },   /* Nutzer §5e.8 */
       'Akademie: 8 Vorlesungen und eine Prüfung gutschreiben': () => { if (!S.student) return UI.toast('Erst einschreiben'); S.student.lec = 8; S.student.total += 8; S.student.trialsAt = -1; UI.toast('Semester abschließbar beim Magister'); },
       'Dynastie: nächsten NPC heiraten': () => { const p = P(), n = S.ents[S.map].filter(e => e.kind === 'npc' && e.alive && e.key && !e.guard && !S.party.includes(e.id)).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (!n) return; S.relations[n.key] = 90; S.legacy.spouse = n.id; n.spouse = n.married = true; UI.toast(`Verheiratet: ${n.name}`); },   /* Nutzer §5e.2 */
@@ -20567,9 +20651,9 @@ export function selftest() {
   }));
   ok('P3.20–P3.23 Rollen (08.10.): 12 Banditen-/Goblin-Rollen sind Abarten ihrer Grundart, sehen anders aus (Spec §15), malen sich mit Waffe und zeigen ihr Verhalten (Späher ruft, Plünderer flieht, Berserker rast, Schamane heilt und flucht, Techniker wirft, Speerträger stößt, Messerstecher umkreist, Führer ruft)', sandbox(() => {
     const R = ROLE_TYPES();
-    const data = R.length === 12 && R.every(k => { const M = MONSTERS[k]; return MONSTERS[M.abart?.of] && M.lore && VOICE[k] && HUMANOID.has(k) && LOOT[k] && ITEMS[ROLE_WEAPON[k]]; })
+    const data = R.length >= 15 && R.every(k => { const M = MONSTERS[k]; return MONSTERS[M.abart?.of] && M.lore && VOICE[k] && HUMANOID.has(k) && LOOT[k] && ITEMS[ROLE_WEAPON[k]]; })
       && ['bandit', 'bandit_archer', 'goblin', 'goblin_warrior'].every(b => R.filter(k => MONSTERS[k].abart.of === b).reduce((s, k) => s + MONSTERS[k].abart.p, 0) < 0.6)
-      && abartOf('bandit', 0.01) === 'bandit_thug' && abartOf('bandit', 0.99) === 'bandit' && abartOf('goblin_warrior', 0.01) === 'goblin_spear' && abartOf('bandit_archer', 0.01) === 'bandit_scout';
+      && abartOf('bandit', 0.01) === 'bandit_thug' && abartOf('bandit', 0.99) === 'bandit' && MONSTERS[abartOf('goblin_warrior', 0.01)]?.abart?.of === 'goblin_warrior' && abartOf('bandit_archer', 0.01) === 'bandit_scout';
     const F = ['helm', 'hooded', 'armor', 'pack', 'quiver', 'bare', 'cloak', 'robe', 'fur', 'face', 'capeL', 'apron'], sig = k => { const a = SP.monsterSpec({ mtype: k, seed: 4 }, MONSTERS[k]); return F.map(f => a[f] || '').join('|'); };
     const looks = R.every(k => sig(k) !== sig(MONSTERS[k].abart.of)) && new Set(R.map(sig)).size === R.length
       && R.every(k => { const f = SP.humanFrameR(SP.monsterSpec({ mtype: k, seed: 4 }, MONSTERS[k]), 'S', 'i0'); return f && f.width > 0; });
@@ -20585,8 +20669,27 @@ export function selftest() {
     const sp = put('goblin_spear', 20); run(sp); const shove = sp.shoveCd > 0;
     const kn = put('bandit_knife', 50); kn.atkCd = 500; const x0 = kn.x, y0 = kn.y; run(kn, 5); const circle = Math.hypot(kn.x - x0, kn.y - y0) > 1 && !(kn.swing > 0);
     const ch = put('bandit_chief', 300); hurt(ch, 1, p); const led = ch.variant === 'leader' && ch.rallied && R.every(k => spawnEnemy(k, '__a', 12, 12).weaponKey === ROLE_WEAPON[k]);
-    if (!(data && looks && called && bolt && rage && shaman && bomb && shove && circle && led)) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led });
-    return data && looks && called && bolt && rage && shaman && bomb && shove && circle && led;
+    for (const o of S.ents.__a) if (o !== p) o.alive = false;
+    const wk = put('goblin_worker', 80), wx0 = dist(wk, p); run(wk, 20); const worker = dist(wk, p) > wx0 + 5 && !(wk.swing > 0) && wk.called;
+    const tr = put('bandit_trapper', 200); run(tr); const trap = S.ents.__a.some(o => o.kind === 'prop' && o.banditTrap === tr.id && o.hazard > 0) && tr.trapLaid;
+    const gc = put('goblin_chief', 300); const chief = gc.variant === 'leader' && gc.build === 'bullig';
+    const all = data && looks && called && bolt && rage && shaman && bomb && shove && circle && led && worker && trap && chief;
+    if (!all) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led, worker, trap, chief });
+    return all;
+  }));
+  ok('Rüstungsvielfalt R1/R2/R4/R5 + N4 S3 Wunden-Haltung (08.10.): seltene Rüstung zeigt eine Kante (rr), Zustand neu/verbeult/gerissen ergibt verschiedene Bilder, Miliz trägt den Kochtopf, Deserteur den zerrissenen Rock, Schilde in Fraktionsfarben; verwundeter Rumpf/Bein ändert die Haltung', sandbox(() => {
+    const px = f => { const d = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let h = 0; for (let i = 0; i < d.length; i += 3) h = (h * 31 + d[i]) | 0; return h + ':' + f.width; };
+    const mk = (o = {}) => SP.humanSpec({ kind: 'npc', prof: 'Söldnerwache', seed: 2, pal: {}, equip: {}, ...o });
+    const leg = mk({ equip: { chest: { key: 'plate_cuirass', rar: 'legendary' } } }), com = mk({ equip: { chest: { key: 'plate_cuirass', rar: 'common' } } }), rare = mk({ equip: { chest: { key: 'plate_cuirass', rar: 'rare' } } });
+    const rr = leg.rr === 3 && com.rr === 0 && rare.rr === 1 && px(SP.humanFrameR(leg, 'S', 'i0')) !== px(SP.humanFrameR(com, 'S', 'i0'));
+    const st = [0, 1, 3].map(w => px(SP.humanFrameR({ ...com, wear: w }, 'S', 'i0'))), cond = new Set(st).size === 3;
+    const mil = mk({ prof: 'Miliz' }), des = mk({ prof: 'Deserteur' }), imp = mil.helm === 'pot' && SP.humanFrameR(mil, 'W', 'i0').width > 0 && des.tabard && des.wear === 3;
+    const sh = mk({ faction: 'order', equip: { offhand: { key: 'kite_shield' } } }), fac = sh.shieldCol === FACTIONS.order.colors[0] && sh.markCol === FACTIONS.order.colors[1];
+    const e = spawnEnemy('bandit', '__a', 10, 10), w0 = SP.woundOf(e); e.body.torso.hp = e.body.torso.max * 0.3; const w1 = SP.woundOf(e); e.body.lleg.hp = e.body.lleg.max * 0.3; const w3 = SP.woundOf(e);
+    const s0 = SP.monsterSpec({ ...e, body: null }, MONSTERS.bandit), s3 = SP.monsterSpec(e, MONSTERS.bandit);
+    const wound = w0 === 0 && w1 === 1 && w3 === 3 && s3.wd === 3 && ['S', 'W', 'N'].every(d => px(SP.humanFrameR(s3, d, 'i0')) !== px(SP.humanFrameR({ ...s3, wd: 0 }, d, 'i0'))) && SP.woundOf(S.player) === 0 && s0.wd === 0;
+    if (!(rr && cond && imp && fac && wound)) console.warn('Rüstung/Wunden-Probe', { rr, cond, imp, fac, wound, w0, w1, w3 });
+    return rr && cond && imp && fac && wound;
   }));
   ok('Gegner: Kultist heilt verwundete Untote in Reichweite, nicht jedes Bild (Abklingzeit)', sandbox(() => {
     const p = stage(), c = spawnEnemy('cultist', '__a', 10, 10), s = spawnEnemy('skeleton', '__a', 12, 10);
@@ -23946,6 +24049,24 @@ export function selftest() {
       if (!(quiet && won && gs && ice && hanged && gd && waits)) console.log('T17-Probe', { quiet, won, gs, ice, hanged, gd, waits });
       return quiet && won && gs && ice && hanged && gd && waits;
     } finally { S.cine = c0; S._quiet = true; S.day = d0; cineBars(false); if (GA) S.ents.garmadon = GA; else delete S.ents.garmadon; document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel()); }
+  }));
+  ok('P3.x Gewölbe: Runentür (falsche Folge schlägt zurück, richtige öffnet), Pfeilfalle (ausgelöst = erkannt, E entschärft), Einsturz (erst Warnung, dann Schaden im Raum); jede Ebene bleibt gleich', sandbox(() => {
+    const p = stage(), M0 = MAPS.vault, E0 = S.ents.vault, A0 = S.vaultAt, V0 = S.vaults ? structuredClone(S.vaults) : undefined, D0 = { ...DUNGEONS.vault }, mod0 = S.vaultMod;
+    try {
+      let rune = null, dart = null, col = null;
+      for (const site of Object.keys(VAULTS).filter(k => !VAULTS[k].endless)) for (let f = 1; f <= VAULTS[site].floors; f++) { S.vaults = {}; buildVault(site, f); rune ||= MAPS.vault.runes && [site, f]; dart ||= S.ents.vault.some(e => e.dartTrap) && [site, f]; col ||= MAPS.vault.collapse && [site, f]; }
+      if (!rune || !dart || !col) { console.log('Gewölbe-Probe', { rune, dart, col }); return false; }
+      const sig = () => JSON.stringify(S.ents.vault.filter(e => e.runeStone != null).map(e => [e.x, e.y, e.runeName]));
+      S.vaults = {}; buildVault(...rune); const s1 = sig(); S.vaults = {}; buildVault(...rune); const same = s1 === sig() && s1 !== '[]';
+      const stones = S.ents.vault.filter(e => e.runeStone != null).sort((a, b) => a.runeStone - b.runeStone), stair = S.ents.vault.find(e => e.vaultNext);
+      runeTouch(stones[1]); const wrong = MAPS.vault.runes.seq.length === 0 && stair.vaultLocked;
+      runeTouch(stones[0]); runeTouch(stones[1]); runeTouch(stones[2]); const opened = !stair.vaultLocked && MAPS.vault.runes.done;
+      S.vaults = {}; buildVault(...dart); const t = S.ents.vault.find(e => e.dartTrap), h0 = t.hazard > 0; dartFired(t); const seen = t.dartSeen; dartDisarm(t); const off = h0 && seen && !t.dartTrap && t.hazard === 0;
+      S.vaults = {}; buildVault(...col); const C = MAPS.vault.collapse, e = spawnEnemy('bandit', 'vault', C.x + 1, C.y + 1); p.x = (C.x + 1) * TS + 8; p.y = (C.y + 1) * TS + 8;
+      vaultTrapTick(p); const warned = C.at > 0 && !C.done; C.at = performance.now() - 1; const hp0 = e.hp; vaultTrapTick(p); const fell = C.done && e.hp < hp0;
+      if (!(same && wrong && opened && off && warned && fell)) console.log('Gewölbe-Probe', { same, wrong, opened, off, warned, fell });
+      return same && wrong && opened && off && warned && fell;
+    } finally { MAPS.vault = M0; if (E0) { S.ents.vault = E0; indexSolids('vault'); } else delete S.ents.vault; S.vaultAt = A0; if (V0) S.vaults = V0; else delete S.vaults; Object.assign(DUNGEONS.vault, D0); S.vaultMod = mod0; }
   }));
   ok('Geheime Orte S5: Uhrmacher (Tür nur zur Mittagsstunde, Automaten schauen hin), Leuchtfeuer (nur nachts, 3 Holz → Fernrohr + Boot am Steg), Walknocheninsel (Beute-Wahl); 8 Geheimnisse', sandbox(() => {
     const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, m0 = S.minute, w0 = S.res.wood, btn = pre => [...document.querySelectorAll('#dlg-choices button')].find(b => b.textContent.startsWith(pre));

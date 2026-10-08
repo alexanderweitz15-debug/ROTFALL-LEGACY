@@ -2467,7 +2467,7 @@ function drawWeapon(c, e, now, it, wp, wi = e.equip.weapon) {   // wi: Exemplar 
 
 // Gegner: Vierbeiner / Boss / humanoide Gegner — alle als Pixel-Sprites derselben Familie.
 const monsterSpecs = new WeakMap();
-function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || !SP.msEq(e, s.ms) || s.unm !== !!e.unmasked) { s = SP.pinSpec(SP.monsterSpec(e, m)); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben   /* PERF-U3: Gliedervergleich ohne neue Liste, Schlüssel gemerkt */
+function monsterSpecOf(e, m) { let s = monsterSpecs.get(e); if (!s || s.blood !== SP.bloodOf(e) || s.wd !== SP.woundOf(e) || !SP.msEq(e, s.ms) || s.unm !== !!e.unmasked) { s = SP.pinSpec(SP.monsterSpec(e, m)); monsterSpecs.set(e, s); } return s; }   // Blut folgt dem Leben   /* PERF-U3: Gliedervergleich ohne neue Liste, Schlüssel gemerkt */
 /* PERF-U3: humanoide Gegner wurden je Bild über eine volle Kopie ({ ...e }, ~60 Felder) gezeichnet. Jetzt ein bleibender Stellvertreter je Gegner,
    der alles vom Gegner liest (Prototyp) und nur spec/equip selbst trägt; die Zeichenwege schreiben nichts in die Figur. */
 const monsterProxy = new WeakMap();
