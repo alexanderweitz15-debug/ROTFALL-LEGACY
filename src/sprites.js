@@ -178,7 +178,7 @@ const MON_ATLAS = { acad_student: 'magier', acad_dummy: 'bauer', drill_fighter: 
   cultist: 'schamane', blood_cultist: 'schamane', blood_mage: 'schamane', aldhelm: 'veteran', thrall: 'untoter', chalice_guard: 'ritter', ghoul: 'untoter', wraith: 'untoter', bone_knight: 'skelett', bone_archer: 'skelett', necromancer: 'schamane', zombie: 'untoter', ash_demon: 'feuerelementar', shade: 'dunkelmann',
   flesh_golem: 'riese', death_knight: 'ritter', garmadon: 'daemon', angel_blade: 'kleriker', angel_archer: 'bogenschuetze', gorak: 'riese', skel_bomb: 'skelett', skel_brute: 'skelett', mutant: 'untoter', mutant_brute: 'riese', waechterspinne: 'scharfschuetze', dampframme: 'riese', blutschoepfer: 'schamane', netzwerferin: 'bandit', hofspion: 'assassine',
   bandit_scout: 'bogenschuetze', bandit_thug: 'berserker', bandit_looter: 'bandit', bandit_knife: 'assassine', bandit_heavy: 'krieger', bandit_chief: 'bandit',   /* P3.20–P3.23 Rollen (Stil F, eingefroren: nächstes Blatt) */
-  goblin_scout: 'goblin', goblin_archer: 'goblin', goblin_shaman: 'schamane', goblin_tinker: 'goblin', goblin_spear: 'ork', goblin_berserker: 'ork', bandit_trapper: 'bandit', goblin_chief: 'ork', goblin_worker: 'goblin' };
+  goblin_scout: 'goblin', goblin_archer: 'goblin', goblin_shaman: 'schamane', goblin_tinker: 'goblin', goblin_spear: 'ork', goblin_berserker: 'ork', bandit_trapper: 'bandit', goblin_chief: 'ork', goblin_worker: 'goblin', bandit_merc: 'krieger', bandit_toll: 'speertraeger', bandit_medic: 'bandit', goblin_thief: 'goblin', goblin_trapper: 'ork' };
 export const ATLAS_KEYS = () => ATLAS;
 // Waffen und Schilde (Stil F): Symbole im Inventar und am Boden aus dem Blatt — erst nach Name, dann nach Waffenart
 const ITEM_ATLAS = { longsword: 'w_langschwert', rusty_sword: 'w_kurzschwert', greatsword: 'w_zweihaender', dagger: 'w_dolch', axe: 'w_beil', spear: 'w_speer', halberd: 'w_hellebarde', flail: 'w_streitflegel',
@@ -688,9 +688,9 @@ export const msEq = (e, ms) => { if (!e?.body) return ms === ''; if (typeof ms !
 const MS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 /* N4 Scheibe 3 (08.10.): Wunden-Haltung — 1 Rumpf unter 50 % (hält die Seite), 2/4 linkes/rechtes Bein unter 50 % (entlastet). Lebende, stehende
    Figuren mit Körper; Prothesen und verlorene Beine zählen nicht (eigenes Bild). Wenige Stufen: der Frame-Cache wächst nur bei Verwundeten. */
-export const woundOf = e => { const b = e?.body; if (!b || !e.alive || e.downed || e.kind === 'player') return 0;
+export const woundOf = e => { const b = e?.body; if (!b || !e.alive || e.downed) return 0;
   const low = P => P && !P.mech && !P.lost && P.max > 0 && P.hp > 0 && P.hp < P.max * 0.5;
-  const ll = low(b.lleg), rl = low(b.rleg); return (low(b.torso) ? 1 : 0) + (ll && (!rl || b.lleg.hp <= b.rleg.hp) ? 2 : rl ? 4 : 0); };
+  const ll = low(b.lleg), rl = low(b.rleg); return (low(b.torso) && e.kind !== 'player' ? 1 : 0) + (ll && (!rl || b.lleg.hp <= b.rleg.hp) ? 2 : rl ? 4 : 0); };   /* 09.10.: der Held hinkt auch (nur Bein); die Seite hält er nicht (Waffenhände frei) */
 export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
 const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
 const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };
@@ -941,6 +941,12 @@ const ROLE_LOOK = {
   bandit_heavy: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'kettle', helmCol: '#6a6862', armor: 'chain', armorCol: '#5a5a56', pauld: '#6a6a66', pb: 1, glove: '#4a4640', scarf: '#5a1a1c', strap: 1, wear: 1 },
   bandit_chief: { ban: 1, hooded: 0, face: 'human', helm: 'wide', helmCol: '#2a1a14', crest: '#b03020', cloak: '#5a1a1c', capeL: 1, armor: 'leather', armorCol: '#3a2a1c', trim: '#c8a050', sash: '#8a2a20', beard: 1, sc: 1, glove: '#3a2c20', scarf: '', wear: 0 },
   bandit_trapper: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'cap', helmCol: '#6a5638', fur: '#6a5638', armor: 'leather', armorCol: '#4a3a28', strap: 1, pouch: 1, chn: 1, scarf: '', wraps: 1, wear: 1 },   /* Fellmütze, Fußangeln an der Kette quer über der Brust */
+  /* Rollen Teil 3 (09.10.) */
+  bandit_merc: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'nasal', helmCol: '#7a7874', armor: 'chain', armorCol: '#6a6a66', pauld: '#5a5a56', glove: '#4a4640', sash: '#8c3b2a', scarf: '', strap: 1, wear: 1 },   /* gute Rüstung, Bandenschärpe; Schild aus e.shield */
+  bandit_toll: { ban: 1, hooded: 0, cloak: '#3a2a1c', face: 'human', helm: 'wide', helmCol: '#3a2a1c', scarf: '#8c3b2a', chn: 1, pouch: 1, strap: 1, beard: 1, armor: 'leather', armorCol: '#4a3525', wear: 1 },   /* Hut, Zollkette quer, Geldkatze */
+  bandit_medic: { ban: 1, hooded: 0, cloak: '', face: 'human', helm: 'scarf', helmCol: '#d8d0bc', apron: 1, apronCol: '#c8b8a0', pouch: 1, strap: 1, armor: '', blood: 1, wear: 1 },   /* Kopftuch, blutige Schürze, Verbandstasche */
+  goblin_thief: { gob: 1, hooded: 1, hood: '#3a3022', cloak: '#2e2618', helm: '', pack: 1, strap: 1, wear: 2 },   /* Kapuze, Beutesack */
+  goblin_trapper: { gob: 1, helm: 'cap', helmCol: '#5a4a32', fur: '#5a4a30', chn: 1, pouch: 1, strap: 1, wear: 2 },   /* Fellkragen, Fallenkette */
   goblin_chief: { gob: 1, helm: 'horned', helmCol: '#4a4038', cloak: '#4a3a26', cw: 'pelzkragen', fur: '#6a5a3a', charm: 1, pauld: '#c8bca0', pb: 1, asy: 1, armor: 'leather', armorCol: '#3a2c1c', shield: '', wear: 1 },   /* Hörnerhelm, Fellumhang, Knochenschulter */
   goblin_worker: { gob: 1, helm: '', hs: 2, pack: 1, strap: 1, armor: '', wraps: 1, gg: 1, wear: 3 },   /* Lumpen, Tragekorb, Eisenkragen der Grube */
   goblin_scout: { gob: 1, hooded: 1, hood: '#2e3a24', cloak: '#26301d', helm: '', strap: 1, wear: 2 },
@@ -1111,7 +1117,8 @@ const POSES = {
   sit: { u: 4, leg: 0, act: 'sit' },                                  // Sitzen (Bank, Schenke): Oberschenkel waagrecht
   trade: { u: 0, leg: 0, act: 'trade' },                              // Handeln: Ware vorzeigen, Hand offen
   zeigen: { u: 0, leg: 0, act: 'trade' }, abwehren: { u: 1, leg: 1, act: 'guard' }, achsel: { u: 0, leg: 0, act: 'cast' },
-  salutieren: { u: 0, leg: 0, act: 'trade' }, jubeln: { u: -1, leg: 0, act: 'cast' }, trauern: { u: 1, leg: 1, act: 'guard' }, knien: { u: 3, leg: 0, act: 'kneel' },   /* T17 (Stil D) */   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
+  salutieren: { u: 0, leg: 0, act: 'trade' }, jubeln: { u: -1, leg: 0, act: 'cast' }, trauern: { u: 1, leg: 1, act: 'guard' }, knien: { u: 3, leg: 0, act: 'kneel' },
+  stirn: { u: 0, leg: 0, act: 'cast' }, stuetzen: { u: 1, leg: 0, act: 'trade' }, zaehlen: { u: 0, leg: 0, act: 'trade' }, strecken: { u: -1, leg: 0, act: 'cast' }, ducken: { u: 1, leg: 1, act: 'guard' }, reiben: { u: 0, leg: 0, act: 'guard' },   /* N4 S2/S4 (Stil D: nächste Haltung) */   /* T17 (Stil D) */   /* Roadmap P8 Gesten (Stil D: nächste vorhandene Haltung) */
 };
 
 // ---------------- Menschen / Goblins / Skelette ----------------

@@ -89,6 +89,8 @@ export const S_INIT = JSON.parse(JSON.stringify(S));   /* RB-055: Urzustand — 
 // ---- deterministischer RNG (mulberry32) ----
 let rngState = 1;
 export function seedRng(n) { rngState = n >>> 0 || 1; }
+/* 09.10.2026: flüchtige Figuren beim Laden (Lehrmeister, Gehilfen) ziehen sonst Zufall und verschieben zufallsabhängige Proben — keepRng stellt den Stand danach wieder her */
+export function keepRng(fn) { const s = rngState; try { return fn(); } finally { rngState = s; } }
 export function rnd() {
   rngState |= 0; rngState = (rngState + 0x6D2B79F5) | 0;
   let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);

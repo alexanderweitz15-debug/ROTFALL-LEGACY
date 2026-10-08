@@ -79,5 +79,6 @@ Object.assign(ICON_R, {
   bratfisch: [{ B: '#a0602a', b: '#d8a060', T: '#7a4420', w: '#f0e0c0' }, ICON_R.forelle[1]],
   jaegertopf: [{ f: '#d8d8d0', s: '#8a4a2a', S: '#6a3220', B: '#4a3420' }, ICON_R.fischsuppe[1]], bergminztee: [{ f: '#d8d8d0', s: '#8ad0a0', S: '#5aa070', B: '#6a5a4a' }, ICON_R.fischsuppe[1]],
   kraeuterbrot: [{ b: '#a08a48', B: '#c8b070', d: '#6a5a2a', c: '#8ab060' }, ICON_R.bread[1]],
+  alter_wels: fishIcon('#3a3430', '#c8a860', '#d8b040'), buch_erzkunde: [{ p: '#7a6a5a', l: '#c8ccd8' }, SCROLL_ROWS], buch_kraeuter: [{ p: '#6a7a4a', l: '#d8e8a0' }, SCROLL_ROWS],
   rezept_jaegertopf: [{ p: '#e8dcc0', l: '#8a6a4a' }, SCROLL_ROWS], rezept_bergminztee: [{ p: '#e8dcc0', l: '#4a8a6a' }, SCROLL_ROWS], kochbuch: [{ p: '#c8a878', l: '#6a3a2a' }, SCROLL_ROWS],
 });

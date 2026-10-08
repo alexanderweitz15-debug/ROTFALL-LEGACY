@@ -199,7 +199,7 @@ function admit(g) {
   if (S.paused && S.player && !S.player.alive) return;   /* Host wählt noch seinen Erben: afterHeir holt den Gast dann */
   if (c.mode === 'new') { const old = S.coopHeroes?.[g.name]; if (old) delete S.coopHeroes[g.name]; m = A.makeGuestHero(c.cfg, g.name); }
   else if (c.mode === 'saved') m = A.unparkCoopHero(g.name);
-  else { m = A.byId(c.entId); if (!m || !S.party.includes(m.id) || !m.alive || (m.coopPilot && m.coopPilot !== g.id)) m = null; }
+  else { m = A.byId(c.entId); if (!m || !S.party.includes(m.id) || !m.alive || (m.coopPilot && m.coopPilot !== g.id) || (A.raceOf && A.raceOf(m) !== 'mensch')) m = null; }   /* E17 */
   if (!m) { g.ready = false; g.choice = null; sendLobby(g, 'Diese Wahl geht nicht mehr. Bitte neu wählen.'); hostLobby(); return; }
   g.deadLevel = 0;
   if (!m.hotbar?.length) m.hotbar = A.GUEST_BAR.map(key => ({ type: 'item', key }));
@@ -216,7 +216,7 @@ function sendLobby(g, note) {
 const INGAME = new Set(['world', 'quests', 'cam', 'log', 'toast']);   /* nur an Gäste, die schon im Spiel sind (nicht im Warteraum) */
 function broadcast(msg) { const G = A.S.coop?.guests; if (!G) return; const s = JSON.stringify(msg); for (const g of Object.values(G)) { if (INGAME.has(msg.t) && !g.entId) continue; try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* Verbindung tot: dropGuest kommt über close */ } } }
 function sendTo(g, msg) { const s = typeof msg === 'string' ? msg : JSON.stringify(msg); try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* siehe oben */ } }
-function partyList() { return (A.S.player ? A.partyMembers() : []).filter(m => m.alive && m.kind === 'npc').map(m => ({ id: m.id, name: m.name, prof: m.prof, level: m.level, taken: !!m.coopPilot })); }
+function partyList() { return (A.S.player ? A.partyMembers() : []).filter(m => m.alive && m.kind === 'npc' && (!A.raceOf || A.raceOf(m) === 'mensch')).map(   /* E17 ⚖ (09.10.): Gäste spielen nur Menschen — Goblin-, Skelett-, Zwergen-Gefährten bleiben beim Host */m => ({ id: m.id, name: m.name, prof: m.prof, level: m.level, taken: !!m.coopPilot })); }
 function onHostData(c, raw) {
   const { S } = A; let d; try { d = JSON.parse(raw); } catch (e) { return; }
   const G = S.coop.guests;
@@ -307,7 +307,8 @@ function guestAct(m, t) {
 }
 function sendShop(m, g, npc) {
   const I = A.ITEMS, buy = A.shopStock(npc).filter(s => s.count >= 1).slice(0, 16).map(s => ({ key: s.key, count: s.count, name: I[s.key].name, price: A.price(s.key, true, npc) }));
-  const sell = m.inv.map((s, idx) => ({ idx, name: I[s.key]?.name || s.key, count: s.count || 1, price: I[s.key]?.bound ? null : A.price(s.key, false, npc, s) }));
+  const RAR = ['rare', 'epic', 'legendary', 'mythic'];   /* HB-30: gesperrt/gebunden unverkäuflich, ab Selten mit Rückfrage beim Gast */
+  const sell = m.inv.map((s, idx) => ({ idx, name: I[s.key]?.name || s.key, count: s.count || 1, price: I[s.key]?.bound || s.lock ? null : A.price(s.key, false, npc, s), lock: !!s.lock, rare: RAR.includes(s.rarity || I[s.key]?.rarity) }));
   g.shopNpc = npc.id; sendTo(g, { t: 'shop', npcId: npc.id, name: npc.name, prof: npc.prof, gold: m.coopGold || 0, buy, sell });
 }
 function guestShopDeal(m, g, d) {

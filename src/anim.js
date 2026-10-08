@@ -21,6 +21,9 @@ export const ANIM_DEFS = {
   gesture: {                                                         // Mischposen in fig5 rigS/rigW; ms = Standarddauer
     zeigen: { name: 'Zeigen', ms: 1400 }, abwehren: { name: 'Abwehren', ms: 1200 }, achsel: { name: 'Achselzucken', ms: 1100 },
     salutieren: { name: 'Salutieren', ms: 900 }, jubeln: { name: 'Jubeln', ms: 1000 }, trauern: { name: 'Trauern', ms: 1800 }, knien: { name: 'Knien', ms: 1600 },   /* T17 */
+    /* N4 Scheibe 2/4 (09.10.): Berufs-Stöße und Wetter-Haltungen (nur Bild) */
+    stirn: { name: 'Stirn wischen', ms: 1300 }, stuetzen: { name: 'Sich stützen', ms: 2400 }, zaehlen: { name: 'Münzen zählen', ms: 2000 }, strecken: { name: 'Rücken strecken', ms: 1500 },
+    ducken: { name: 'Geduckt im Regen', ms: 2600 }, reiben: { name: 'Arme reiben', ms: 2200 },
   },
   /* Kampfanimation Scheibe 1 (COMBAT_ANIM, DECISIONS 02.10.): Angriffe als Daten je Animationsklasse (heute = wtype) und Pack.
      Zwei Ebenen, damit der Figuren-Cache nicht je Pack wächst:
@@ -297,6 +300,11 @@ const STANCE = {
   staff:    { ready: { a: -0.2, ext: 2, body: { by: 1, st: 3, ln: 0 } },   guard: { a: -0.4, ext: 2, body: { by: 1, st: 3 } } },
 };
 export const atkStance = (ac, mode) => STANCE[ac]?.[mode] || null;
+/* P3.24 §17 Trefferreaktion je Waffe (09.10.2026, nur Bild): Stumpfes (Kolben, Hammer, Stab, Faust, Schleuder) lässt TAUMELN — länger, seitlich
+   hin und her; Klingen (Schwert, Axt, Zweihänder, Stange, Peitsche, Klaue) lassen ZUCKEN — kurz und scharf; Stiche (Speer, Dolch, Rapier, Pfeil,
+   Bolzen, Wurfmesser) lassen ZURÜCKWEICHEN — weiter nach hinten. T Dauer (ms), d Weg-Faktor, wob seitliches Wanken. game.js hit() setzt rx.w. */
+export const hitKind = wt => !wt || /^(mace|hammer|staff|sling)$/.test(wt) ? 'blunt' : /^(spear|dagger|rapier|bow|crossbow|throw)$/.test(wt) ? 'pierce' : 'blade';
+export const HIT_RX = { blunt: { T: 380, d: 1.2, wob: 1 }, blade: { T: 160, d: 0.9, wob: 0 }, pierce: { T: 300, d: 2.2, wob: 0 } };
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
 export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;

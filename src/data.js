@@ -78,6 +78,21 @@ export const SKILL_DEF = {
   trading:   { group: 'Sozial', what: 'Kaufen und Verkaufen', perks: {} },
   leadership:{ group: 'Sozial', what: 'Gefährten führen', perks: {} },
 };
+/* Phase 6 Meisterschaften (Spec Skills §11, §48; 09.10.2026 — Werte vorläufig ⚖): ab Stufe lv ist die Meisterprüfung offen; bestanden = Meistertitel und
+   eine Meisterhaltung (Perk, wirkt wie die Meilensteine). Charaktergebunden — stirbt mit der Figur (§38). */
+SKILL_DEF.onehanded.master = { lv: 40, title: 'Klingenmeister', task: 'Besiege einen starken Gegner (Veteran, Anführer oder zwei Stufen über dir) mit einer Einhandwaffe und ohne Schild.', perk: ['parry', 0.15, 'Meisterhaltung: Parierfenster noch einmal +15 %'] };
+SKILL_DEF.polearms.master = { lv: 40, title: 'Meister des Speers', task: 'Besiege einen Veteranen oder Anführer mit einer Stangenwaffe.', perk: ['recover', 0.05, 'Meisterhaltung: noch 5 % schnellere Erholung'] };
+SKILL_DEF.smithing.master = { lv: 40, title: 'Meisterschmied', task: 'Schmiede ein Meisterstück — oder ein meisterliches Stück mit Königseisen.', perk: ['quality', 8, 'Meisterhand: Güte wie mit 8 Punkten mehr'] };
+SKILL_DEF.fishing.master = { lv: 40, title: 'Meisterfischer', task: 'Fang den „Alten vom Grund“, einen uralten Wels in einem See.', perk: ['window', 0.25, 'Meistergespür: noch 25 % mehr Zeit zum Anschlagen'] };
+SKILL_DEF.mining.master = { lv: 40, title: 'Meister der Tiefe', task: 'Baue in der Mine oder der Tiefe fünfmal Eisenerz ab.', perk: ['speed', 1, 'Meisterschlag: noch ein Brocken mehr je Abbau'] };
+/* Phase 7 Weltintegration (§45–49): Techniken bei Lehrmeistern der Skill-Städte (Voraussetzung + Aufgabe, kein Gold gegen Stufe) und Bücher */
+export const TECHS = {
+  zwergenhaertung: { skill: 'smithing', need: 15, bring: { kohle: 3, silbererz: 1 }, perk: ['quality', 5, 'Zwergenhärtung: Güte wie mit 5 Punkten mehr'], name: 'Zwergenhärtung', hub: 'deephall', teacher: 'Hroda Eisenhand', prof: 'Schmiedemeisterin der Zwerge' },
+  aderlesen:  { skill: 'mining', need: 10, bring: { stone: 5 }, perk: ['hard', 0.2, 'Ader lesen: 20 % mehr Eisen aus Steinadern'], name: 'Ader lesen', hub: 'deephall', teacher: 'Brokk Steinohr', prof: 'Steiger der Zwerge' },
+  kuestenwurf:{ skill: 'fishing', need: 10, bring: { hering: 3 }, perk: ['window', 0.2, 'Küstenwurf: 20 % mehr Zeit zum Anschlagen'], name: 'Küstenwurf', hub: 'saltport', teacher: 'Kapitänin Wenna', prof: 'Alte Fischerin' },
+  fallkerbe:  { skill: 'woodcutting', need: 10, bring: { harz: 2 }, perk: ['speed', 0.5, 'Fallkerbe: jeder Hieb trifft noch tiefer'], name: 'Fallkerbe', hub: 'haselbrueck', teacher: 'Jorg Kerbholz', prof: 'Waldmeister' },
+  feinwerk:   { skill: 'smithing', need: 20, bring: { silbererz: 1, hartholz: 1 }, perk: ['bionic', 10, 'Feinwerk: Prothesen selbst bis 10 % höher warten'], name: 'Feinwerk', hub: 'gelenkhall', teacher: 'Meisterin Ilse Zahnrad', prof: 'Feinmechanikerin' },
+};
 
 export const RARITY = { common:'Gewöhnlich', uncommon:'Ungewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär', mythic:'Mythisch' };
 // ---- Rarität je Exemplar (Phase 8, Session 7). Ausrüstung würfelt beim Fund (Beute, Truhe); Läden verkaufen Grundware.
@@ -412,6 +427,8 @@ export const ITEMS = {
   dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
   auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
   auftragsbrief: { name:'Versiegelter Brief', slot:'material', stack:5, rarity:'common', value:0, lore:'Wachs, ein Siegel, ein Name. Der Empfänger soll antworten — bring die Antwort zurück.' },   /* P3.25–26: Nachricht mit Antwort */
+  bauplan_uhrmacherhand: { name:'Bauplan: Uhrmacherhand', slot:'material', stack:1, rarity:'epic', value:0, desc:'Zeichnungen des Ersten Uhrmachers: eine Hand aus Federn und Zahnrädern. Meisterin Vell in Gelenkhall kann sie bauen.' },   /* Geheime Orte S5 */
+  uhrmacherhand: { name:'Uhrmacherhand', slot:'consumable', use:'mechmod', mod:'uhrmacherhand', stack:1, rarity:'epic', value:1200, desc:'Modul für einen Prothesenarm. Handwerksgüte eine Stufe höher, aber −10 % Nahkampf.' },   /* Geheime Orte S5 */
   fernrohr:      { name:'Hannos Fernrohr', slot:'material', stack:1, rarity:'uncommon', value:180, desc:'Messing, ein Sprung im Glas. Im Gepäck deckt sich die Karte weiter auf (Sichtweite der Karte +20 %).', lore:'Der Wärter des Leuchtfeuers hat damit dreißig Jahre lang nach Schiffen gesehen, die nicht kamen.' },   /* Geheime Orte S5 */
   antwortbrief:  { name:'Antwortbrief', slot:'material', stack:5, rarity:'common', value:0, lore:'Die Antwort, frisch gesiegelt. Gehört dem, der den ersten Brief geschickt hat.' },   /* P3.25–26 */
   vargs_kette: { name:'Vargs Kette', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Das erste Glied, das Varg je geschmiedet hat. Kalt, schwer — und es summt, wenn man an Omega denkt.' },
@@ -461,6 +478,10 @@ export const ITEMS = {
   bergminztee:{ name:'Bergminztee', slot:'consumable', use:'food', heal:4, food:1, stack:9, rarity:'uncommon', value:26, efx:{ vigor:0.25 }, dur:240, lore:'Klärt den Atem: Hiebe kosten 25 % weniger Ausdauer.' },
   rezept_jaegertopf:  { name:'Rezept: Jägertopf', slot:'consumable', use:'recipe', learn:['jaegertopf'], stack:1, rarity:'common', value:25 },
   rezept_bergminztee: { name:'Rezept: Bergminztee', slot:'consumable', use:'recipe', learn:['bergminztee'], stack:1, rarity:'uncommon', value:35 },
+  alter_wels: { name:'Der Alte vom Grund', slot:'material', stack:5, rarity:'legendary', value:240, fish:'lake', lore:'Ein Wels, älter als jedes Dorf am Ufer. Wer ihn fängt, ist Meisterfischer.' },
+  /* Bücher (Spec Skills §47): Wissen statt Erfahrungspunkte */
+  buch_erzkunde: { name:'Erzkunde der Tiefhall', slot:'consumable', use:'book', book:'erz', stack:1, rarity:'uncommon', value:70, lore:'Zeichnungen von Adern und Gestein: wer liest, erkennt Silber eher (+4 % Silbererz beim Abbau).' },
+  buch_kraeuter: { name:'Kräuterbuch der Heilerinnen', slot:'consumable', use:'book', book:'kraut', stack:1, rarity:'uncommon', value:60, lore:'Bilder seltener Pflanzen: wer liest, erkennt sie schon ab Kräuterkunde 5 statt 10.' },
   kochbuch:   { name:'Kochbuch der Schenke', slot:'consumable', use:'recipe', learn:['jaegertopf', 'kraeuterbrot'], stack:1, rarity:'uncommon', value:60, lore:'Fleckig, mit Randnotizen. Zwei Rezepte, die jede Schenke kennt.' },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
@@ -553,7 +574,8 @@ export const LOOT = {
   /* P3.20–P3.23 Rollen (08.10.): Beute passt zur Rolle — Waffe der Rolle, dazu Kleinkram; der Plünderer trägt zusätzlich Gold (game.js dropLoot) */
   bandit_scout:[['shortbow',0.2],['dried_meat',0.3],['bandage',0.15]], bandit_thug:[['schrottkeule',0.15],['bread',0.3],['iron',0.2]], bandit_looter:[['axe',0.15],['bread',0.4],['cloth',0.4],['iron',0.3]],
   bandit_knife:[['dagger',0.2],['wurfmesser',0.12],['bandage',0.2]], bandit_heavy:[['greatsword',0.12],['chain_hauberk',0.1],['iron',0.5]], bandit_chief:[['longsword',0.2],['grabraeuber',0.12],['potion',0.4]],
-  bandit_trapper:[['wurfmesser',0.1],['dried_meat',0.3],['iron',0.3]], goblin_chief:[['axe',0.3],['bone',0.8],['potion',0.3]], goblin_worker:[['iron',0.3],['bone',0.2]],
+  bandit_trapper:[['wurfmesser',0.1],['dried_meat',0.3],['iron',0.3]], bandit_merc:[['kite_shield',0.12],['chain_hauberk',0.08],['longsword',0.12]], bandit_toll:[['spear',0.15],['bread',0.3]],
+  bandit_medic:[['bandage',0.8],['herb',0.5],['potion',0.15]], goblin_thief:[['bone',0.3]], goblin_trapper:[['bone',0.5],['iron',0.3]], goblin_chief:[['axe',0.3],['bone',0.8],['potion',0.3]], goblin_worker:[['iron',0.3],['bone',0.2]],
   goblin_scout:[['goblin_hook',0.1],['bone',0.4],['bread',0.2]], goblin_archer:[['shortbow',0.15],['bone',0.4]], goblin_shaman:[['staff',0.15],['bone',0.8],['herb',0.5]],
   goblin_tinker:[['iron',0.6],['pickaxe',0.15],['bone',0.3]], goblin_spear:[['spear',0.2],['leather_cap',0.15],['iron',0.3]], goblin_berserker:[['axe',0.25],['bone',0.5],['iron',0.3]],
   skeleton:  [['legionaersplatte',0.04],['bone',0.9],['rusty_sword',0.2],['grave_seal',0.05],['knochenumhang',0.02]],
@@ -616,9 +638,9 @@ export const MONSTERS = {
      kleines eigenes Verhalten (game.js roleAI, Feld rolle). Werte vorläufig ⚖ (REGELN §D, gemessen mit RF.simFight, Protokoll 08.10.). */
   bandit_scout:{ name:'Banditenspäher', abart:{ of:'bandit_archer', p:0.3 }, rolle:'Späher', build:'drahtig', hp:30, dmg:8, speed:1.55, reach:280, atk:1600, ranged:true, xp:20, sight:360, r:10, threat:1, faction:'bandit', interiors:true,
                lore:'Leicht, grüne Kapuze, Kurzbogen. Sieht er dich, ruft er die Bande und rennt erst einmal weg — dann schießt er aus dem Hinterhalt. Wer ihn zuerst erwischt, kämpft gegen weniger.', pal:{skin:'#b2926f',cloth:'#3a4a2a',metal:'#7d7364'} },
-  bandit_thug:{ name:'Schläger', abart:{ of:'bandit', p:0.14 }, rolle:'Schläger', build:'bullig', heavy:{ kind:'slam', every:3, wind:750, mul:1.7, r:70 }, hp:62, dmg:13, speed:1.25, reach:34, atk:1250, telegraph:380, xp:30, sight:240, r:12, threat:2, faction:'bandit', interiors:true,
+  bandit_thug:{ name:'Schläger', abart:{ of:'bandit', p:0.12 }, rolle:'Schläger', build:'bullig', heavy:{ kind:'slam', every:3, wind:750, mul:1.7, r:70 }, hp:62, dmg:13, speed:1.25, reach:34, atk:1250, telegraph:380, xp:30, sight:240, r:12, threat:2, faction:'bandit', interiors:true,
                lore:'Breit, nackte Arme, Knüppel. Jeder dritte Hieb ist ein Erdschlag mit roter Bodenmarke — nicht blockbar, zur Seite rollen. Danach steht er kurz offen.', pal:{skin:'#a8805e',cloth:'#4a3226',metal:'#6a5a48'} },
-  bandit_looter:{ name:'Plünderer', abart:{ of:'bandit', p:0.12 }, rolle:'Plünderer', build:'gedrungen', hp:42, dmg:9, speed:1.5, reach:32, atk:900, xp:22, sight:250, r:11, threat:2, faction:'bandit', interiors:true,
+  bandit_looter:{ name:'Plünderer', abart:{ of:'bandit', p:0.10 }, rolle:'Plünderer', build:'gedrungen', hp:42, dmg:9, speed:1.5, reach:32, atk:900, xp:22, sight:250, r:11, threat:2, faction:'bandit', interiors:true,
                lore:'Trägt einen prallen Sack auf dem Rücken. Wird es ernst, rennt er mit der Beute davon — wer ihn einholt, findet mehr Gold bei ihm.', pal:{skin:'#c8a07a',cloth:'#5a4a32',metal:'#7d7364'} },
   bandit_knife:{ name:'Messerstecher', abart:{ of:'bandit', p:0.12 }, rolle:'Dolchkämpfer', build:'drahtig', hp:38, dmg:9, speed:1.75, reach:26, atk:620, xp:26, sight:260, r:10, threat:2, faction:'bandit', interiors:true,
                lore:'Schnell, Maske, langes Messer. Umkreist dich, sticht zu und ist wieder weg. Nicht hinterherjagen — stehen bleiben und zuschlagen, wenn er hereinkommt.', pal:{skin:'#8d6644',cloth:'#2a2420',metal:'#8a8070'} },
@@ -628,6 +650,17 @@ export const MONSTERS = {
                lore:'Federhut, roter Mantel. Beim ersten Treffer ruft er die Bande herbei; fällt er, laufen viele davon. Ihn zuerst — oder ihn zuletzt, wenn du allein bist.', pal:{skin:'#c8a07a',cloth:'#3a2a20',metal:'#8a8070'} },
   bandit_trapper:{ name:'Fallensteller', abart:{ of:'bandit', p:0.06 }, rolle:'Fallensteller', hp:40, dmg:9, speed:1.45, reach:32, atk:950, xp:24, sight:280, r:11, threat:2, faction:'bandit', interiors:true,
                lore:'Fellmütze, Seil und Fußangeln am Gürtel. Sieht er dich, wirft er eine Fußangel zwischen euch — die Eisenzähne am Boden sind sichtbar: drumherum gehen. Wer hineintritt, nimmt Schaden.', pal:{skin:'#a8805e',cloth:'#4a3a26',metal:'#7d7364'} },
+  /* Rollen Teil 3 (09.10.2026, Spec §15): Söldner, Straßenräuber, Bandenheiler, Goblin-Plünderer, Goblin-Fallensteller — Werte vorläufig ⚖ */
+  bandit_merc:{ name:'Banditensöldner', abart:{ of:'bandit', p:0.06 }, rolle:'Söldner', shieldKey:'kite_shield', armor:4, hp:64, dmg:12, speed:1.25, reach:36, atk:1000, telegraph:300, xp:34, sight:260, r:12, threat:2, faction:'bandit', interiors:true,
+               lore:'Gekaufte Klinge: gutes Kettenhemd, Helm, Langschwert und Normannenschild. Fängt etwa jeden dritten Hieb mit dem Schild ab — von der Seite oder mit Wucht angehen.', pal:{skin:'#b2926f',cloth:'#3a3a40',metal:'#8a8a86'} },
+  bandit_toll:{ name:'Straßenräuber', abart:{ of:'bandit_spear', p:0.2 }, rolle:'Wegzoll', hp:50, dmg:11, speed:1.3, reach:60, atk:1100, telegraph:320, xp:26, sight:280, r:11, threat:2, faction:'bandit', interiors:true,
+               lore:'Spannt eine Kette über den Weg und verlangt Wegzoll. Sprich ihn an (E): zahlen, verhandeln oder kämpfen. Wer zahlt, darf vorbei; wer ablehnt, hat die ganze Bande am Hals.', pal:{skin:'#c8a07a',cloth:'#5a3a2a',metal:'#8a8070'} },
+  bandit_medic:{ name:'Bandenfeldscher', abart:{ of:'bandit_archer', p:0.1 }, rolle:'Heiler', hp:36, dmg:7, speed:1.4, reach:28, atk:950, xp:26, sight:280, r:11, threat:2, faction:'bandit', interiors:true,
+               lore:'Blutige Schürze, Verbandstasche. Verbindet verwundete Banditen (sichtbares Weiß an der Wunde) und hält sich hinten. Ihn zuerst, sonst stehen die anderen wieder auf.', pal:{skin:'#d6b089',cloth:'#4a3a2a',metal:'#7d7364'} },
+  goblin_thief:{ name:'Goblin-Plünderer', abart:{ of:'goblin', p:0.08 }, rolle:'Dieb', hp:20, dmg:4, speed:1.8, reach:24, atk:800, xp:12, sight:300, r:9, threat:1, faction:'goblin', interiors:true,
+               lore:'Flink, Sack über der Schulter, langer Arm. Schnappt sich Gold aus deinem Beutel und rennt. Holst du ihn ein und erschlägst ihn, liegt dein Gold wieder da.', pal:{skin:'#6d7a45',cloth:'#3a3022',metal:'#6b6156'} },
+  goblin_trapper:{ name:'Goblin-Fallensteller', abart:{ of:'goblin_warrior', p:0.06 }, rolle:'Fallensteller', hp:40, dmg:8, speed:1.35, reach:28, atk:950, xp:22, sight:280, r:10, threat:2, faction:'goblin', interiors:true,
+               lore:'Knochenzahnige Fußangeln am Gürtel. Wirft eine Falle zwischen sich und dich — die Zähne liegen sichtbar am Boden: drumherum.', pal:{skin:'#5f6e3c',cloth:'#4a3a28',metal:'#8a7f6d'} },
   goblin_chief:{ name:'Goblin-Anführer', abart:{ of:'goblin_warrior', p:0.05 }, rolle:'Anführer', leader:true, build:'bullig', hp:70, dmg:12, speed:1.25, reach:34, atk:1050, telegraph:380, xp:45, sight:280, r:13, threat:3, faction:'goblin', interiors:true,
                lore:'Hörnerhelm, Fellumhang, Knochenschmuck. Beim ersten Treffer kreischt er den Stamm herbei; fällt er, laufen viele Goblins davon.', pal:{skin:'#56703a',cloth:'#3a2a1a',metal:'#8a7f6d'} },
   goblin_worker:{ name:'Goblin-Arbeiter', abart:{ of:'goblin', p:0.1 }, rolle:'Arbeiter', hp:18, dmg:0, speed:1.4, reach:0, atk:9999, xp:2, sight:220, r:9, threat:1, faction:'goblin', interiors:true,
@@ -907,6 +940,8 @@ export const ABILITIES = {
   sp_dispel:    { name:'Magieunterbrechung', school:'arcane', tier:2, mana:14, cd:10000, cast:200, spell:{ shape:'dispel', r:170 }, teach:'Akademie Aurelheim', desc:'Bricht Zauber und schwere Angriffe ab, nimmt Feinden ihre Stärkungen.' },
   sp_shadowbolt:{ name:'Schattenpfeil', school:'shadow', tier:1, mana:9, cd:2200, cast:300, spell:{ shape:'bolt', el:'shadow', dmg:[10, 1.1], speed:6, range:320 }, teach:'Ilvar Nachtglas', desc:'Ein Splitter Dunkelheit. Er trifft, was er sieht.' },   // S15 P6: Schatten
   sp_drain:     { name:'Seelenzug', school:'shadow', tier:2, mana:16, cd:6000, cast:450, spell:{ shape:'bolt', el:'shadow', dmg:[12, 1.2], speed:5, range:280, drain:0.5 }, teach:'Ilvar Nachtglas (Vertrauen 25)', desc:'Zieht Leben aus dem Ziel. Die Hälfte davon kehrt zu dir zurück.' },
+  sp_leech:     { name:'Blutegel', school:'shadow', tier:1, mana:8, cd:2600, cast:300, spell:{ shape:'bolt', el:'shadow', dmg:[6, 0.7], speed:4, range:240, drain:0.35 }, teach:'Mutter Brakke, Moorhexe im Moorland (nur nachts)', desc:'Ein Klumpen Moor mit Zähnen: Er beißt sich fest und gibt dir einen Teil des Schadens als Leben zurück.' },   /* §5g.11 Moorhexe (09.10., Werte vorläufig) */
+  sp_bogmire:   { name:'Moorgriff', school:'shadow', tier:2, mana:16, cd:9000, cast:500, spell:{ shape:'area', el:'shadow', dmg:[5, 0.5], r:70, range:240, status:{ key:'frost', chance:1 } }, teach:'Mutter Brakke, Moorhexe im Moorland (nur nachts)', desc:'Schwarzer Schlamm greift nach den Beinen: Gegner im Kreis werden langsam.' },
   sp_raise:     { name:'Skelett erheben', school:'shadow', tier:3, mana:22, cd:12000, cast:800, spell:{ shape:'raise', left:45000 }, teach:'Ilvar Nachtglas (Vertrauen 50)', desc:'Eine Leiche in der Nähe steht als Diener auf (45 s, einer). Schwächer als beim Nekromanten.' },
   sp_soulburst: { name:'Seelenbersten', school:'shadow', tier:3, mana:28, cd:14000, cast:700, spell:{ shape:'nova', el:'shadow', dmg:[22, 1.6], r:110 }, teach:'Ilvar Nachtglas (Vertrauen 75)', desc:'Gefangene Seelen brechen aus dir hervor und reißen alles in der Nähe mit.' },
   sp_nachtglas: { name:'Nachtglas', school:'shadow', tier:3, mana:40, cd:60000, cast:900, legendary:true, spell:{ shape:'timeslow', r:320, left:6000 }, teach:'Nur durch Ilvars Endprüfung', desc:'Legendär. Um dich herum verlangsamt sich die Zeit sechs Sekunden lang: Feinde bewegen sich wie durch Glas.' },

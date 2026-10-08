@@ -8,7 +8,7 @@ import * as SP from './sprites.js?v=25';
 import { trailPt, WAGON_GAP } from './sim.js?v=25';
 import { ICON_R } from './iconsR.js?v=25';
 import { airPos, airPt } from './economy.js?v=25';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX } from './anim.js?v=25';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -1151,6 +1151,14 @@ function drawDecal(e) {
 // Animierte Props bekommen wenige gecachte Phasen. Box: 96×96 Welt-Einheiten = 48×48 Pixel, Fuß bei (48, 70).
 const VARIANTS = { market_stall: 4, grave_cross: 3, tomb: 2, cargo_pile: 2, crate: 3, barrel: 3, rock_node: 3, ore_node: 2, broken_pillar: 3, gravestone: 4 };                // Anzahl Detailvarianten je häufigem Prop (kein Einerlei)
 const PROP_PERIOD = { fountain_grand: 900, banner_pole: 5030, machine: 600, omega_altar: 2500, omega_rift: 1570, star_shard: 1880, magitower: 1500, astroclock: 6000, fountain: 900, telecircle: 2000, chimney: 1130, factory: 1130, big_gear: 3000, hearth: 565, forge: 565, campfire_static: 565, campfire: 565, torch: 690, shrine: 3770, banner_torn: 5030, bone_spire: 3140, obelisk: 1880, candles: 690 };
+/* P3.x Ressourcen mit Abbauzustand (§5g.3/T14, 09.10.2026, nur Bild): Baum angehauen → Kerbe je Hieb tiefer, gefällt → Stumpf (frisch hell, nach Tagen
+   grau, ab 6 Tagen Schösslinge); Fels/Erz/Kräuter abgebaut → Geröll/abgeerntete Stängel, am letzten Tag vor der Rückkehr sichtbar „wächst nach“. */
+const regrowing = e => e.depleted && e.respawn != null && e.respawn - (S.day | 0) <= 1;
+const stumpStage = e => { const a = (S.day | 0) - (e.stumpDay ?? -99); return a < 2 ? 0 : a < 6 ? 1 : 2; };
+function chopNotch(x, y, hp) {
+  ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3);
+  if (hp <= 1.5) { ctx.fillStyle = '#2a1e12'; ctx.beginPath(); ctx.moveTo(x - 5, y - 8); ctx.lineTo(x + 3, y - 4.5); ctx.lineTo(x - 5, y - 1); ctx.fill(); ctx.fillStyle = '#d8b884'; ctx.fillRect(x - 5, y - 6, 5, 1); ctx.fillRect(x - 8, y + 1, 2, 1); ctx.fillRect(x + 5, y + 2, 2, 1); }   // tiefer Keil, Späne
+}
 const PROP_BOX = { fountain_grand: 160, banner_pole: 128, street_lamp: 128, star_shard: 160, omega_rift: 128, tower_ruin: 192, boat: 128, factory: 224, big_gear: 96, palace: 320, markethall: 288, observatory: 224, bank: 192, astroclock: 160, magitower: 160, crane: 160, fountain: 128, column: 96, aqueduct: 96 };                   // Kantenlänge der Back-Box (Welt-Einheiten), Standard 96
 // Session 13 (Nutzer): Möbel und Stände in Menschengröße — gezeichnet wie bisher, um den Fußpunkt vergrößert
 const PROP_SCALE = { market_stall: 1.6, bed: 1.5, bunk: 1.5, table: 1.45, bench: 1.4, stall: 1.6, counter: 1.45, desk: 1.45, workbench_int: 1.45, shelf: 1.45, hearth: 1.4, forge: 1.4, anvil: 1.35, cask_rack: 1.45, weapon_rack: 1.4, chest: 1.3, trough: 1.4, altar_small: 1.4, sack: 1.2, crate_stack: 1.25, hay: 1.3, throne: 1.3, workbench: 1.4, workstation: 1.4, machine: 1.3, gearpile: 1.3, candles: 1.3, well: 1.3, keychest: 1.3 };
@@ -1203,10 +1211,11 @@ function drawPropPixel(e, now) {
   let key = e.type, v = 0, ph = 0;
   let sp = null;
   if (e.type === 'tree') { v = (h2(e.x | 0, e.y | 0) * 3) | 0; const list = REGION[e.map === 'world' ? regionOfProp(e) : 'greenmark'].trees;
-    sp = list[v % list.length]; key += sp + v + (e.hp < 3 ? 'c' : ''); }
+    sp = list[v % list.length]; key += sp + v + (e.hp < 3 ? 'c' + Math.ceil(Math.max(0, e.hp)) : ''); }   /* Abbauzustand: Kerbe wird mit jedem Hieb tiefer */
+  if (e.type === 'stump') key += 'a' + stumpStage(e);
   let variant = 0;
   if (VARIANTS[e.type]) { variant = e.v ?? ((h2(e.x | 0, (e.y | 0) + 3) * VARIANTS[e.type]) | 0); key += 'v' + variant; }
-  if (e.depleted) key += 'd';
+  if (e.depleted) key += 'd' + (regrowing(e) ? 'r' : '');
   if (e.intact) key += 'I';
   if (e.opened) key += 'o';
   if (e.on) key += 'n';   /* S15 Fehlersuche §5e.3: gezogener Hebel — sonst zeigt der Bild-Cache immer die ungezogene Stellung */
@@ -1337,7 +1346,7 @@ function drawProp(e, now) {
     case 'tree': {                                        // drei Arten: Eiche, Tanne, knorrige Birke
       const v = e._v ?? h2(x | 0, y | 0), sp = e._sp || ['oak', 'pine', 'birch'][(v * 3) | 0];
       shadow(x, y + 6, 14, .4);
-      if (sp !== 'oak' && SP.drawnOn() && treeR(sp, x, y, v)) { if (e.hp < 3) { ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3); } break; }   /* Artist Runde 2: eigene Baumformen im Stil R */
+      if (sp !== 'oak' && SP.drawnOn() && treeR(sp, x, y, v)) { if (e.hp < 3) chopNotch(x, y, e.hp); break; }   /* Artist Runde 2: eigene Baumformen im Stil R */
       if (sp === 'dead') {                              // toter Baum: kahle, gekrümmte Äste
         ctx.strokeStyle = '#3a2e22'; ctx.lineWidth = 4; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x - 1, y - 26); ctx.moveTo(x, y - 12); ctx.lineTo(x - 12, y - 24); ctx.lineTo(x - 16, y - 34);
@@ -1366,13 +1375,27 @@ function drawProp(e, now) {
         ctx.strokeStyle = '#2e2218'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.lineTo(x - 11, y - 30); ctx.moveTo(x + 1, y - 20); ctx.lineTo(x + 12, y - 32); ctx.stroke();
         crown(x, y - 36, 21, v > 0.8 ? LEAF.autumn : v > 0.45 ? LEAF.dark : LEAF.summer, 7 + v * 131, 16);
       }
-      if (e.hp < 3) { ctx.fillStyle = '#6b5a3a'; ctx.fillRect(x - 5, y - 6, 10, 3); }
+      if (e.hp < 3) chopNotch(x, y, e.hp);
       break; }
     case 'bush':
       shadow(x, y + 3, 9, .25);
+      if (e.depleted && e.harvest === 'herb') {           /* abgeerntet: gestutzte Stängel; am letzten Tag frische Triebe */
+        crown(x, y - 1, 6, LEAF.dark, 5 + (x | 0), 5);
+        ctx.fillStyle = '#6a5a3a'; for (const dx of [-5, -2, 1, 4]) ctx.fillRect(x + dx, y - 9, 1, 6);
+        ctx.fillStyle = '#4a3e2a'; for (const dx of [-5, 1]) ctx.fillRect(x + dx - 1, y - 9, 3, 1);
+        if (regrowing(e)) { ctx.fillStyle = '#7ab04a'; for (const [dx, dy] of [[-4, -7], [0, -8], [3, -6], [-1, -4]]) { ctx.fillRect(x + dx, y + dy, 2, 2); ctx.fillRect(x + dx + 1, y + dy - 1, 1, 1); } }
+        break; }
       crown(x, y - 3, 9, e.depleted ? LEAF.dark : LEAF.summer, 5 + (x | 0), 7);
       if (!e.depleted) { ctx.fillStyle = '#9c5a4a'; ctx.fillRect(x - 2, y - 6, 2, 2); ctx.fillRect(x + 4, y - 2, 2, 2); }
       break;
+    case 'stump': {                                       /* P3.x: gefällter Baum — frischer heller Schnitt, später grau, dann Schösslinge */
+      const st = stumpStage(e); shadow(x, y + 4, 10, .28);
+      ctx.fillStyle = '#4a3624'; ctx.fillRect(x - 7, y - 6, 14, 10); ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x + 3, y - 6, 4, 10);
+      ctx.fillStyle = '#5a4430'; ctx.fillRect(x - 9, y + 2, 4, 2); ctx.fillRect(x + 6, y + 2, 4, 2);   // Wurzelansätze
+      ctx.fillStyle = st === 0 ? '#d8b884' : '#8a8274'; ctx.beginPath(); ctx.ellipse(x, y - 6, 7, 3, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = st === 0 ? '#a8865a' : '#6a6458'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y - 6, 4, 1.6, 0, 0, 7); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle; ctx.fillRect(x - 0.5, y - 6.5, 1, 1);
+      if (st === 2) { ctx.fillStyle = '#6a9a3a'; for (const [dx, dy] of [[-6, -9], [5, -10], [7, -4]]) { ctx.fillRect(x + dx, y + dy, 1, 4); ctx.fillRect(x + dx - 1, y + dy, 2, 2); } }
+      break; }
     case 'rock_node': case 'ore_node': {                 // Findling: Facetten (Licht von links oben), Risse, Regionsgestein
       const [dk, sh, b, hi, top] = ROCK_PAL[e._reg] || ROCK_PAL.greenmark, reg = e._reg, v = e._var || 0;
       const poly = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + pts[0], y + pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i], y + pts[i + 1]); ctx.closePath(); ctx.fill(); };
@@ -1380,6 +1403,8 @@ function drawProp(e, now) {
       if (e.depleted) {                                   // abgebaut: Schutthaufen
         shadow(x, y + 4, 10, .25);
         poly(sh, [-10, 6, -7, 0, -2, 2, -1, 6]); poly(b, [-3, 6, 0, -2, 6, -1, 8, 6]); poly(hi, [0, -2, 3, -3, 6, -1, 2, 1]); poly(sh, [5, 6, 8, 2, 11, 6]);
+        if (regrowing(e)) { poly(b, [-8, 6, -7, -4, -2, -7, 3, -6, 4, 6]); poly(hi, [-7, -4, -2, -7, 3, -6, -1, -3]); line(top, [-7, -4, -2, -7, 3, -6]);   /* P3.x: wächst nach — ein neuer Block schiebt sich aus dem Geröll */
+          if (e.type === 'ore_node') { ctx.fillStyle = '#c08a4a'; ctx.fillRect(x - 4, y - 3, 2, 1); ctx.fillRect(x, y - 5, 1, 1); } }
         break;
       }
       shadow(x, y + 5, 13, .32);
@@ -2224,8 +2249,12 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
     if (A && A.dir) dir = { E: 0, W: Math.PI, S: Math.PI / 2, N: -Math.PI / 2 }[A.dir];
     const aimingR = ranged && (sw > 0 || e.draw > 0 || (e.reloadUntil && now < e.reloadUntil) || (e.castT && now - e.castT < 600) || (e.lastShot && now - e.lastShot < 1200));
     const chg = !work && !ranged && !(sw > 0) && !e.cover && e.chargeK > 0 ? e.chargeK : 0;   /* Kampfanimation: schwerer Hieb lädt — Figur steht im Ausholen des Wuchtschlags */
-    const ready = own && !A && !e.mounted && e.combatT && now >= e.combatT && now - e.combatT < 2500 && !!atkStance(ac, 'ready');   /* Kampfanimation (§17 Kampf-Idle/-Bewegung): Waffe bereit, breiter Stand */
-    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : ready ? 'ready' : 'rest';
+    /* Kampfanimation (§17 Kampf-Idle/-Bewegung): Waffe bereit, Stand und Wiegen — eigener Held bei nahem Feind; P3.24 (09.10.): auch Gefährten, solange der
+       Held kämpft, und Gegner auf der Jagd (Cache: je Figur 2 Haltungsbilder je Blickrichtung, siehe Protokoll) */
+    const fight = own ? e.combatT && now >= e.combatT && now - e.combatT < 2500 : (S.party.includes(e.id) && S.player?.combatT && now - S.player.combatT < 2500) || (e.kind === 'enemy' && e.aggroId && e.aiState === 'pursue');
+    const ready = !!fight && !A && !e.mounted && !!atkStance(ac, 'ready');
+    const PR = e.parryT && now >= e.parryT.t && now - e.parryT.t < 220 ? e.parryT : null;   /* P3.24: Abwehr gelungen — kurz in Deckung, Waffe/Schild federt zurück */
+    const mode = ranged ? (aimingR ? 'aim' : 'aimRest') : e.cover || (PR && !(sw > 0)) ? 'cover' : work ? 'work' : sw > 0 || chg ? 'swing' : ready ? 'ready' : 'rest';
     const pull = wt === 'bow' && mode === 'aim' ? Math.round(Math.min(1, e.draw > 0 ? 1 - e.draw / 520 : sw > 0 && sw < 0.75 ? sw / 0.75 : 0) * 4) / 4 : 0;   // S15: Bogen spannen, sichtbar
     /* Kampfanimation Scheibe 1: Bild an den festen Stützstellen der Formzeit u (Impact-Bild u 0,5 = Schaden), Klinge fließend (W.u) */
     const tm = chg ? null : mode === 'swing' ? atkTiming(e, ac, sw) : null, LT = work ? legacyTiming(wt) : null, u = chg ? 0.4 * chg : tm ? atkU(tm.w, tm.h, sw) : LT ? atkU(LT.w, LT.h, sw) : 0;
@@ -2245,11 +2274,16 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
     if (fin && AF.jump && S.settings.motion !== false && u > 0.25 && u < 0.62) y -= AF.jump * Math.sin((u - 0.25) / 0.37 * Math.PI);   /* B/C: Absprung beim Finisher */
   }
   let pose = pz.pose;
-  const RX = e.rx && now - e.rx.t < 240 && now >= e.rx.t ? e.rx : null;   /* Kampfanimation: Trefferreaktion — zuckt/kippt weg, schwer und krit stärker (nur Bild) */
-  if (RX) { const k = 1 - (now - RX.t) / 240, d = RX.k * 1.6 * k; x += Math.cos(RX.a) * d; y += Math.sin(RX.a) * d * 0.5; }
+  const RXK = e.rx ? HIT_RX[e.rx.w] || HIT_RX.blade : null, RXT = RXK ? RXK.T : 240;
+  const RX = e.rx && now - e.rx.t < RXT && now >= e.rx.t ? e.rx : null;   /* Kampfanimation: Trefferreaktion — schwer und krit stärker; P3.24 je Waffe: stumpf taumelt, Klinge zuckt, Stich weicht zurück (nur Bild) */
+  if (RX) { const q = (now - RX.t) / RXT, k = 1 - q, d = RX.k * 1.6 * k * RXK.d; x += Math.cos(RX.a) * d; y += Math.sin(RX.a) * d * 0.5;
+    if (RXK.wob) { const s = Math.sin(q * Math.PI * 3) * 2 * k * (RX.k >= 2 ? 1.5 : 1); x -= Math.sin(RX.a) * s; y += Math.cos(RX.a) * s * 0.4; } }
   if (/^a[123]$/.test(pose) || (pose === 'cast' && W && W.mode === 'aim')) pose = moving && W && W.mode !== 'work' ? walkP : 'i0';
   if (e.kb && e.kb.t > 0 && !e.cover) pose = 'kb';
-  else if (RX && RX.k >= 2 && !(e.swing > 0) && now - RX.t < 160 && /^(i[01]|w[0-3]|hit)$/.test(pose)) pose = 'kb';   /* schwerer/krit. Treffer: kippt zurück */
+  else if (RX && !(e.swing > 0) && /^(i[01]|w[0-3]|hit)$/.test(pose) && (RX.w === 'blunt' ? now - RX.t < 300 : RX.w === 'pierce' ? now - RX.t < 200 : now - RX.t < (RX.k >= 2 ? 160 : 90)))
+    pose = RX.w === 'blunt' ? (((now - RX.t) / 100 | 0) & 1 ? 'hit' : 'kb') : RX.w === 'pierce' || RX.k >= 2 ? 'kb' : 'hit';   /* P3.24: Taumeln wankt vor und zurück, Stich kippt zurück, Klinge zuckt kurz (schwer/krit: kippt) */
+  else if (W && W.mode === 'cover' && e.parryT && now >= e.parryT.t && now - e.parryT.t < 220 && /^(i[01]|w[0-3]|hit|guard)$/.test(pose)) {   /* P3.24: Abwehrbewegung — Waffe/Schild hoch, der Stoß drückt kurz zurück (Parade stärker) */
+    pose = 'guard'; const k = 1 - (now - e.parryT.t) / 220, f = e.parryT.k === 'parry' ? 2.2 : 1.4; x -= Math.cos(dir) * f * k; y -= k; }
   else if (e.stagger > 300 && pose === 'hit') pose = ((now / 140) | 0) & 1 ? 'kb' : 'hit';   // S14: langes Taumeln wankt vor und zurück
   if (e.carry && /^(i[01]|w[0-3])$/.test(pose)) pose += '+carry';
   if (e.mounted) pose = (/^w[0-3]$/.test(pose) ? 'i0' : pose) + '~r';   // S15 (Nutzer: „soll drauf sitzen, nicht stehen“): Reitsitz
@@ -3040,6 +3074,7 @@ export function ambient() {
 let lightCache = { map: null, n: -1, list: [] };
 const LIGHT_T = new Set(['street_lamp', 'torch', 'campfire_static', 'lantern', 'campfire', 'smithy', 'shrine', 'candles', 'hearth', 'forge']);
 function lightOf(e, list) {                                  // Lichtquellen eines Objekts (Lampen, Feuer, Schreine, fertige Bauten)
+  if (e.beacon && e.kind === 'prop') { list.push({ x: e.x, y: e.y - 30, r: 230, green: true }); return; }   /* Geheime Orte S5 (Agent Quests): grünes Leuchtfeuer der Nebelinsel */
   if (!LIGHT_T.has(e.type)) return;
   if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
   if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
@@ -3068,7 +3103,7 @@ function staticLights() {
 // je Lampe und Bild, ~0,7–1,0 ms in beleuchteten Städten (Phase 20).
 const stamp = stops => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
   for (const [o, col] of stops) gr.addColorStop(o, col); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return c; };
-let HOLE = null, WARM = null;
+let HOLE = null, WARM = null, GREENL = null;
 const LIT = [], PL_LIGHT = { x: 0, y: 0, r: 0 };
 function drawLight(now) {
   HOLE ||= stamp([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,.72)'], [1, 'rgba(0,0,0,0)']]); WARM ||= stamp([[0, 'rgba(210,140,60,.10)'], [1, 'rgba(0,0,0,0)']]);
@@ -3105,7 +3140,7 @@ function drawLight(now) {
     const sx = (l.x - cam.x) * cam.zoom, sy = (l.y - cam.y) * cam.zoom;
     if (sx < -200 || sy < -200 || sx > W + 200 || sy > H + 200) continue;
     const r = l.r * cam.zoom * 0.8;
-    ctx.drawImage(WARM, sx - r, sy - r, r * 2, r * 2);
+    ctx.drawImage(l.green ? (GREENL ||= stamp([[0, 'rgba(80,220,140,.22)'], [1, 'rgba(0,0,0,0)']])) : WARM, sx - r, sy - r, r * 2, r * 2);   /* grünes Leuchtfeuer */
   }
   ctx.globalCompositeOperation = 'source-over';
   if (pl && pl.map === S.map && a > 0.25 && eyeOf(pl)?.heat) {   /* Roadmap P2: Wärmesicht (Auge Stufe 4) — Gegner als glühender Umriss im Dunkeln, nur Anzeige */

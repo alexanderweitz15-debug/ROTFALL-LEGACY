@@ -133,6 +133,7 @@ export const MECH_MOD = {
   klingenhand: { part: 'arm', name: 'Klingenhand', arm: 0.12, desc: '+12 % Nahkampf, aber diese Hand hält keinen Schild mehr (kein Schildblock).' },
   federfuss:   { part: 'leg', name: 'Federfuß',    leg: 0.08, desc: '+8 % Tempo.' },
   ankerfuss:   { part: 'leg', name: 'Ankerfuß',    leg: -0.05, desc: 'Kein Rückstoß durch Treffer, aber −5 % Tempo.' },
+  uhrmacherhand: { part: 'arm', name: 'Uhrmacherhand', arm: -0.10, desc: 'Feinwerk des Ersten Uhrmachers: Handwerksgüte eine Stufe höher (wie Königseisen, nicht zusätzlich), aber −10 % Nahkampf.' },   /* Geheime Orte S5 (08.10.) */
 };
 export const hasMod = (c, mod) => { if (!c?.body) return false; for (const k of ['larm', 'rarm', 'lleg', 'rleg']) { const P = c.body[k]; if (P?.mech && P.mod === mod && (P.mechCond ?? 100) >= 30) return true; } return false; };
 // Bonus oder Malus der Prothesen einer Art (Summe beider Seiten): Schrott zieht ab, Meisterstück und Prototyp geben dazu, Aufrüstung +5 % je Stufe.
