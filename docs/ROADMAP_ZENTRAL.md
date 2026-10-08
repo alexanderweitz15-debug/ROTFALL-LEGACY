@@ -101,7 +101,17 @@ Status: ☐ offen · ◐ teilweise · ✔ heute erledigt (bleibt eine Runde sich
 
 ## Pflege-Docs nachziehen (keine Features)
 
-CHANGELOG (seit 02.10. abends), DATA_SCHEMAS (ELITES, STIGMA, BOSS_CARDS, FAC_STARTS, RACES, RANK_LINES), GDD (Varonheim, Blutkult, Klassenprüfung, Starts), GUIDE/GUIDE_EREIGNISSE/KLASSEN_GUIDE (seit 30.09.), WELTREGELN (Status-Zeichen), README (Modultabelle), MECHANIKEN SC-02-Absatz, IDEAS (Gebautes streichen).
+README (Modultabelle: coop, body, fig5, sim, economy; „512×512, 26 Orte“ veraltet), MECHANIKEN SC-02-Absatz („Übernahme folgt in Scheibe 2b“ ist gebaut), IST_ZUSTAND Zählungen per Skript neu (Audit Phase 6).
+
+---
+
+## Arbeitsprotokoll (Planlauf ab 08.10.2026)
+
+Legende: **✔** fertig gebaut (Selbsttest grün) · **🔍** muss geprüft werden (im Spiel/von dir) · **🐞** Bug gefunden, nicht behoben (kommt in die Fehlerrunde danach) · **⚖** vorläufige Entscheidung von mir (bitte bestätigen).
+
+| Datum | Punkt | Status | Was / wo |
+|---|---|---|---|
+
 
 ---
 
@@ -121,3 +131,10 @@ Nur Fragen ohne Antwort in `docs/ENTSCHEIDUNGEN.md`. Vorläufig gesetzte Zahlen 
 **Design offen:** E1 Haltung/Humpeln verwundeter Gegner · E3 Händlergesicht nach Ruf · E4 schwerer Hieb (Faktor, Ladezeit, Ausdauer, Touch, Koop) · E5 14 Gegnerideen · E6 Mutanten-Hinterhalt/Blutschöpfer · E7 Skilltree-Scheiben 3/4 streichen · E8/E9 Betriebskasse · E10 Bewohner rufen/Story-Szene/Beute-Hinweis · E11 Kartenausschnitt im Brief · E13 Symbolsatz Sprechblasen · E18 Belagerung S3 (Kellerweg, Varons Strenge) · E19 Bionik im Krieg · E20 Luftbrücke (4) · E21 NPC-Ziele (4) · E22 Welt-Ereignis-Karte (4) · E23 Städte-Visual (4) · E24 Morrgrund (3) · E25 Wasservolk · E26 organische Stadtanordnung (Vorschlag: nur neue Häuser) · E27 Karraks Wüste (Vorschlag: friedlich) · E28 Bodenauflösung · E29 Ende der Brüder (8 Ideen) · E30 70 stumme Figuren · E31 Gift/Feuer/Blutung 60 % · E32 Pferde-Sprites reichen? · E33 17 Fit-Urteile · E34 Ideenspeicher freigeben? · E35 Welle 2 Reihenfolge · E37 Spec-Reihenfolge vs. alte APPROVED-Pakete · **E38 Katana:** Schwert-Unterart oder eigene Waffenklasse? · **E39 Skill-System:** Sternbild-Talente bleiben, Skills ergänzen (Vorschlag) oder zusammenlegen?
 
 Erledigt heute (E36): Doku auf fünf Dateien reduziert (ROADMAP_ZENTRAL, IST_ZUSTAND, MECHANIKEN, ENTSCHEIDUNGEN, REGELN_UND_SPECS) plus STYLE_GUIDE, README, CLAUDE.md; alles andere gelöscht (Historie c21fd64).
+| 08.10. | Bugfix Kerker | ✔ | Am Zellengitter galt man als ausgebrochen (Türfeld y 9,24 > Grenze 9). `inJailCell` zählt Türfeld mit; Probe + Live-Test |
+| 08.10. | P0.1 Haus-/Reise-Hinweise | ✔ 🔍 | Erstes Betreten eines Hauses → Erklärung; GUIDE „travel“ bei Kutscher/Fährmann. 🔍 Texte im Spiel lesen |
+| 08.10. | P0.2 Reisende im Einflug | ✔ 🔍 | Kamera folgt einem echten Reisenden/einer Karawane (wenn im Umkreis 220 Felder). 🔍 neues Spiel starten und ansehen |
+| 08.10. | P0.3 Kompass + Herkunft | ✔ ⚖ | Kompass zeigt im Wegweiser-Schritt „Arbeit“ zum Brett; 5 Herkunfts-Startzeilen (Texte von mir). „Erster Kontakt ein Gesicht statt Brett“ nicht gebaut (Wegweiser 2 „Ansprechen“ deckt es teilweise) |
+| 08.10. | P0.4 Verträge als Fenster | ✔ 🔍 | Wache/Kette/Freie/Arbeiterrat nutzen das Zettel-Fenster. 🔍 Abgeben bei der Wache im Spiel prüfen. Offen: Kartenausschnitt (E11), Geheimnis-Quests „nur was die Figur weiß“ — Stichprobe ok (find-Ziele ohne Kartenpunkt) |
+| 08.10. | P0.6 Türen | ✔ 🔍 | **Ursache gefunden:** benannte NPCs standen immer 2 Felder unter der Tür, auch bei W/O/N-Türen (`doorFront`). Feldmarschall-Familien ebenso. 🔍 an einem Haus mit Seitentür ansehen |
+| 08.10. | P1.7 Gerüchte statt Siegel | ✔ ⚖ | Szene „Hast du gehört? X sucht …“; danach Siegel aus der Ferne, sonst nur nah |

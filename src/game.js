@@ -702,11 +702,14 @@ const NPC_SPOTS = {
 function spawnNPCs() {
   for (const def of NPCS) spawnNpcDef(def);
 }
+/* Spec Welt §33–34 (Entwickler: „Tür links, die Leute laufen frontal von unten aufs Haus zu“): Platz vor der Tür in Türrichtung — vorher immer
+   zwei Felder UNTER der Tür, auch bei Türen nach Westen, Osten oder Norden. n = Abstand in Feldern. */
+const doorFront = (b, n = 1) => [b.doorTile[0] + (b.door === 'W' ? -n : b.door === 'E' ? n : 0), b.doorTile[1] + (b.door === 'S' ? n : b.door === 'N' ? -n : 0)];
 function spawnNpcDef(def) {
   const spots = NPC_SPOTS;
   {
     const hs = def.atHouse && HOUSES.find(h => h.type === def.atHouse && h.map === 'world');   // S15 P5: vor einem Gebäude (Akademie)
-    const home = hs ? [hs.doorTile[0], hs.doorTile[1] + 2] : def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
+    const home = hs ? doorFront(hs, 2) : def.atTown && TOWN_PLAN[def.atTown] ? [TOWN_PLAN[def.atTown].square[0] + (def.off?.[0] || 0), TOWN_PLAN[def.atTown].square[1] + (def.off?.[1] || 0)]   // S15: Lehrer in den Städten
       : def.atFort ? def.atFort.slice()                                  /* §5d.1: Lehrer der dunklen Klassen in der Eisenfeste (Weltkacheln) */
       : worldPt(...(spots[def.home] || spots.village));      // Entwurfskoordinaten → gestreckte Siedlung
     const pos = freeSpotNear('world', home[0] + ri(-2, 2), home[1] + ri(-2, 2), 4);
@@ -2257,6 +2260,8 @@ export function newGame(cfg) {
   if (FS) { facStartSetup(cfg.facStart, p); startGame(); coopHooks.afterNew?.(); return; }
   chronicle(`${p.name} bricht auf`, 'birth', `${o.name}. Kein Name, kein Land, keine Schulden. Noch nicht.`);
   log('Du erreichst das Grenzland von Greenmark.', 'world');
+  { const ORIGIN_START = { farmhand: 'Der letzte Hof hat dich nicht mehr gebraucht. Deine Axt und dein Rücken sind alles, was du mitbringst — in Eren gibt es Felder und Holz.', hunter: 'Du bist dem Wild bis an den Waldrand von Eren gefolgt. Felle bringen hier Gold; der Jäger am Markt kauft sie.', apprentice: 'Dein Meister ist tot, seine Werkstatt verkauft. Was du gelernt hast, kannst du an jeder Esse und Werkbank zeigen.', soldier: 'Deine Einheit gibt es nicht mehr. Die Wachen in Eren erkennen den Gang eines Soldaten — und Kopfgelder hängen am Brett.', wanderer: 'Du bist schon an vielen Orten gewesen und an keinem geblieben. Vielleicht hier.' };
+    const t = ORIGIN_START[cfg.origin]; if (t) log(t, 'world'); }   /* IDEAS R8.5: Herkunft als erste Handlung, nicht nur Werte */
   { const [ex, ey] = TOWN_PLAN.eren.square, dx = ex - p.x / TS, dy = ey - p.y / TS;   // BUG-089: Richtung aus der echten Lage, nicht fest „Norden“
     const where = Math.hypot(dx, dy) < 14 ? 'Gleich vor dir liegt Eren' : `Im ${['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8]} liegt Eren`;
     log(`${where}. Dort gibt es Arbeit — und Leute, die welche brauchen.`, 'world'); }
@@ -2642,6 +2647,10 @@ function ambientTick(dt) {
   const kinds = [];
   const pair = near.map(e => [e, near.find(o => o !== e && Math.abs(o.x - e.x) < 90 && Math.abs(o.y - e.y) < 70)]).find(([, o]) => o);
   if (pair) kinds.push('argue');
+  /* Spec Welt §43 (Planlauf P1.7): Arbeit spricht sich herum — zwei Bewohner reden über jemanden, der Hilfe sucht. Der Geber bekommt einen Vermerk
+     (giverHeard) und sein Siegel zeigt sich dann schon aus der Ferne; so findet man Arbeit über Gespräche statt über Symbole über jedem Kopf. */
+  const seeker = pair && S.ents.world.find(e => e.kind === 'npc' && e.alive && e.homeTown === town && conGiverOk(e) && !e.giverHeard && !(S.contracts || []).some(c => c.giver === e.key && c.state !== 'claimed') && !pair.includes(e));
+  if (seeker) kinds.push('workhint', 'workhint');
   const guards = S.ents.world.filter(e => e.guard && e.alive && !e.angry && e.post === town && dist(e, p) < 520 && !(e.talk?.until > now));
   const drill = guards.map(g => [g, guards.find(o => o !== g && dist(o, g) < 120)]).find(([, o]) => o);
   if (drill) kinds.push('drill');
@@ -2657,6 +2666,9 @@ function ambientTick(dt) {
   if (!isVil(town) && h < 21) kinds.push('minstrels');
   const k = pick(kinds);
   if (k === 'argue') runScene(pair, pick(TOWN_PLAN[town].metro ? AMB_ARGUE_METRO : AMB_ARGUE));
+  if (k === 'workhint') { const what = { hunt: 'Wölfe an den Feldern', supply: 'Holz und Stein', monster: 'etwas, das nachts umgeht', deliver: 'jemanden, der etwas wegbringt', escort: 'Begleitschutz', herbs: 'Kräuter', missing: 'jemanden, der verschwunden ist', trail: 'jemanden, der einer Spur folgt', bounty: 'jemanden mit einer scharfen Klinge' }[PROF_CON[seeker.prof]] || 'Hilfe';
+    seeker.giverHeard = true; runScene(pair, [[0, `Hast du gehört? ${seeker.name}, ${seeker.prof === 'Bauer' || seeker.prof === 'Jäger' ? 'der' : 'die oder der'} ${seeker.prof}, sucht ${what}.`], [1, 'Zahlt auch?'], [0, 'Sagt man. Frag selbst.']], 2600);
+    log(`Du hörst: ${seeker.name} (${seeker.prof}) sucht ${what}.`, 'quest'); }
   if (k === 'drill') runScene(drill, AMB_DRILL, 2200);
   if (k === 'sermon') { const pr = crowd[0], ls = crowd.slice(1, 5); runScene([pr], AMB_SERMON.map(t => [0, t]), 2800);
     const end = now + AMB_SERMON.length * 2800; for (const l of ls) { l.talk = { with: pr.id, at: end + 1, until: end, say: '' }; l.vx = l.vy = 0; } }
@@ -2865,7 +2877,9 @@ function update(dt, now) {
     const gone = e => e && (!e.alive || e.map !== S.map || byId(e.id) !== e || dist(e, S.player) > 900);   /* PERF-U2: byId statt includes() über ~17 000 Einträge */   /* Nutzer: Tote, Entfernte und Weitgelaufene bleiben nicht im Infofenster hängen */
     if (gone(selected)) selected = null; if (gone(hovered)) hovered = null;
     hudTimer = 0; UI.renderContext(selected || hovered); updatePrompt();
-    { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k); R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : null); }   // S13: Kompass
+    { const k = S.track && S.quests[S.track]?.state === 'active' ? S.track : Object.keys(S.quests).find(q => S.quests[q].state === 'active' && q.startsWith('c_')); const pt = k && questPoint(k);
+      const tb = !pt && TUTOR[S.flags.tutor]?.k === 'board' ? tutorBoard(p) : null;   /* Spec Welt §8 / IDEAS R8.7: ohne Auftrag zeigt der Kompass im Wegweiser-Schritt „Arbeit“ zum nächsten Anschlagbrett */
+      R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : tb ? { x: tb.x / TS - 0.5, y: tb.y / TS - 0.5, name: 'Anschlagbrett' } : null); }   // S13: Kompass
     if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
     if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
     else if (tribT === 360) { myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); }
@@ -2874,7 +2888,8 @@ function update(dt, now) {
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }
     if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
-    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600); }
+    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600);
+      if (inHouse && !S.flags.houseHint && S.settings?.tips !== false && !S._quiet) { S.flags.houseHint = 1; log('Drinnen: Das Dach wird durchsichtig, solange du im Haus bist. Was in fremden Truhen und Regalen liegt, gehört jemandem — nimmst du es vor Zeugen, ist es Diebstahl. Läden und Werkstätten öffnen ihr Fenster, wenn du die Leute dort ansprichst (E).', 'quest'); } }   /* Spec Welt §9: Gebäude erklären sich beim ersten Betreten */
   }
   ambT = (ambT || 0) + dt;
   if (ambT > 1000) {                                              // regionale Umgebungsgeräusche
@@ -6206,7 +6221,7 @@ function fortAfterFall() {
 function fortTarget(e) {
   const h = S.minute / 60 + ((e.seed || 0) % 10) / 60, i = e.flI || 0, [ax, ay] = FL_AT.parade, [mx, my] = FL_AT.mess;
   const home = e.flHome && HOUSES.find(b => b.id === e.flHome), bunk = home ? [home.x + (home.w >> 1), home.y + (home.h >> 1), 'n'] : [e.anchor.x / TS | 0, e.anchor.y / TS | 0, 'n'];
-  const door = home ? [home.doorTile[0], home.doorTile[1] + (home.door === 'N' ? -2 : 2), 'd'] : bunk;
+  const door = home ? [...doorFront(home, 2), 'd'] : bunk;
   const messSeat = () => [mx - 2 + (i % 4) * 2, my + (i % 2 ? 2 : -2), 'mess'];
   const flog = S.ents.world.some(v => v.flogVictim);
   switch (e.fl) {
@@ -7883,7 +7898,9 @@ function claimContract(C, npc) {
   if (S.trust?.[C.town] < 0) S.trust[C.town]++;                        // erfüllte Aufträge bringen Vertrauen zurück
   log(`Auftrag erfüllt: ${C.title}. ${C.reward.gold} Gold, ${FACTIONS[f]?.name || f} +${C.reward.rep}.`, 'quest'); chronicle(`${C.title} erledigt`, 'quest');
 }
+let boardNpcId = null;
 function conList(npc, town, giver, title) {
+  if (!S._quiet && S.coop?.role !== 'guest') { boardNpcId = npc?.id || null; UI.closeDialogue(); UI.openModal('board', { town, giver, who: title || (npc ? `${npc.name} — Aufträge` : null) }); return; }   /* Spec Welt §38: Aufträge der Wache, der Freien, des Arbeiterrats im selben Zettel-Fenster */
   const list = townContracts(town, giver), back = () => conList(npc, town, giver, title), opts = [];
   for (const C of list) {
     if (C.state === 'offer') opts.push({ text: `${C.elite ? '☠ ' : ''}${C.title} — ${C.reward.gold} Gold`, fn: () => UI.dialogue(bountyFace(C) || npc || S.player, `„${C.desc}“\nLohn: ${C.reward.gold} Gold, Erfahrung, Ansehen.`, [
@@ -7970,21 +7987,21 @@ const conFac = C => C.fac || (C.giver === 'rat' ? 'frei' : townFac(C.town));   /
 /* GUI Anschlagbrett (Spec Welt 08.10. §38, Entwickler: „das Missionsfenster soll ein GUI haben“): Zettel auf einem Brett statt Gesprächsliste —
    je Auftrag Art, Titel, Text, Ziel, Lohn, Frist, Entfernung; Annehmen/Abgeben als Knopf. Geschlossen (Besatzung, Ruf) zeigt das Brett den Grund,
    Abgaben gehen trotzdem. Proben (S._quiet) und Koop-Gäste behalten die Gesprächsliste. boardView liefert die Daten, boardAct führt aus. */
-function boardView(town) {
-  const shut = boardShut(town), p = S.player, list = shut ? (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active') : townContracts(town, 'board');
+function boardView(town, giver = 'board', who = null) {
+  const shut = giver === 'board' ? boardShut(town) : null, p = S.player, list = shut ? (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active') : townContracts(town, giver);
   const items = list.map(C => { const B0 = conBrief(C), d = C.tx != null ? Math.round(Math.hypot(C.tx * TS - p.x, C.ty * TS - p.y) / TS) : null;
     return { id: C.id, title: C.title, desc: C.desc, kind: C.kind, kindName: CON[C.kind]?.name || C.kind, ico: CON_ICO[C.kind] || 'log_quest', elite: !!C.elite, state: C.state, have: C.have || 0, need: C.need || 1,
       ready: C.state === 'active' && conReady(C), rew: B0.rew, days: C.until ? Math.max(0, C.until - (S.day | 0)) : (CON_DAYS[C.kind] || 0), dist: d, face: C.kind === 'bounty' ? !!bountyFace(C) : false, objText: B0.objs[0]?.text || '' }; });
-  return { town, name: townName(town), shut: shut || null, items, max: CON_MAX, active: activeCons().length, invest: !shut && growable(town) };
+  return { town, giver, name: who || townName(town), shut: shut || null, items, max: CON_MAX, active: activeCons().length, invest: giver === 'board' && !shut && growable(town) };
 }
 function boardAct(town, id, what) {
   const C = (S.contracts || []).find(c => c.id === id); if (!C) return 'Der Zettel ist weg.';
   if (what === 'accept') { if (C.state !== 'offer') return 'Schon vergeben.'; return acceptContract(C) === false ? `Höchstens ${CON_MAX} Aufträge gleichzeitig.` : null; }
-  if (what === 'claim') { if (!conReady(C)) return 'Noch nicht erledigt.'; claimContract(C, null); return null; }
+  if (what === 'claim') { if (!conReady(C)) return 'Noch nicht erledigt.'; claimContract(C, byId(boardNpcId) || null); return null; }
   return null;
 }
 function boardMenu(town) { const shut = boardShut(town);   // S14 Mechanik-Check: das Brett folgt Besatzung und Ruf wie die Geber selbst
-  if (!S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('board', town); return; }   /* Spec Welt 08.10. §38: Fenster */
+  if (!S._quiet && S.coop?.role !== 'guest') { boardNpcId = null; UI.closeDialogue(); UI.openModal('board', town); return; }   /* Spec Welt 08.10. §38: Fenster */
   const mine = (S.contracts || []).filter(c => c.town === town && c.giver === 'board' && c.state === 'active');   // S15 Fehlersuche: Erledigtes kann man trotzdem abgeben
   if (shut) return UI.dialogue({ name: `Anschlagbrett — ${townName(town)}` }, shut, [...mine.filter(c => c.have >= c.need).map(c => ({ text: `Abgeben: ${c.title}`, fn: () => { claimContract(c); boardMenu(town); } })), { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
   conList(null, town, 'board', `Anschlagbrett — ${townName(town)}`); }
@@ -8015,7 +8032,7 @@ function giverMark(npc) {
   const kind = PROF_CON[npc.prof], town = npc.homeTown;
   if (!offer && kind && town && TOWN_PLAN[town] && S.difficulty !== 'sehr_schwer') { const C = (S.contracts || []).find(c => c.giver === npc.key && c.state !== 'claimed');
     if (C?.state === 'active') return conReady(C) ? { k: 'turnin', near: true } : null;
-    if (!boardShut(town) && conGiverOk(npc)) return { k: 'offer', near: true }; }
+    if (!boardShut(town) && conGiverOk(npc)) return { k: 'offer', near: !npc.giverHeard }; }   /* gehört (Gerücht): Siegel auch aus der Ferne */
   return offer ? { k: 'offer' } : null;
 }
 /* Visuell Q-3 (quests.md Q2-1/Q8, Entscheidung 02.10.2026): Auftragsbrief im Gespräch — Ziel-Piktogramme und Lohn. Vor der Annahme fester Aufträge
@@ -8823,6 +8840,8 @@ function introFlight(force = false) {
     { x: here.x, y: here.y, zoom: 0.5, dur: 4200, text: `${REG[regionAt(p.x / TS | 0, p.y / TS | 0)] || REG.greenmark} Du bist nicht der Erste, der hier ankommt — und die Welt wartet nicht auf dich.` },
     ...(sq ? [{ x: here.x, y: here.y, to: sq, zoom: 0.8, dur: 4600, text: `Straßen führen nach ${town.name}. Händler, Pilger, Streifen und Räuber teilen sich den Weg.` },
       { ...sq, zoom: 1.1, dur: 4200, text: `${town.name}: Markt, Schenke, Wachen — und Leute, die ihrer Arbeit nachgehen. Nicht jeder hat etwas für dich. Zuhören lohnt sich.` }] : []),
+    ...(() => { const tr = S.ents.world.filter(e => (e.kind === 'caravan' || (e.kind === 'npc' && (e.traveler || e.travLead))) && e.alive !== false && Math.hypot(e.x - here.x, e.y - here.y) < 220 * TS).sort((a, b) => Math.hypot(a.x - here.x, a.y - here.y) - Math.hypot(b.x - here.x, b.y - here.y))[0];   /* Spec Welt §7: Reisende/Karawane wirklich zeigen */
+      return tr ? [{ x: tr.x, y: tr.y, focus: tr.id, zoom: 1.2, dur: 3600, text: tr.kind === 'caravan' ? 'Eine Karawane auf der Straße. Wer handelt, reist — und wer reist, braucht Schutz.' : `Ein ${tr.prof || 'Reisender'} unterwegs. Die Welt bewegt sich, auch wenn du stillstehst.` }] : []; })(),
     ...(forge ? [{ x: forge.x, y: forge.y, zoom: 1.3, dur: 4000, text: 'Die Schmiede. Waffen, Rüstung, Ausbessern — und ein Schmied, der den ganzen Tag am Amboss steht.' }] : []),
     ...(board ? [{ x: board.x, y: board.y, zoom: 1.3, dur: 3600, text: 'Am Anschlagbrett hängt Arbeit: Eskorten, Jagd, Lieferungen, Kopfgelder. Wer Aufträge erfüllt, bekommt Gold, Ansehen — und einen Ruf.' }] : []),
     ...(wild ? [{ ...introSpot(wild.key), zoom: 0.8, dur: 4000, text: `${wild.name}: Hier jagt, was dich frisst. Wer blutet, kehrt um. Verbände und ein Rückweg sind keine Schande.` }] : []),
@@ -8841,6 +8860,7 @@ const TUTOR = [
   { k: 'goal', text: 'Wohin jetzt? Stadt, Wald, Brett, Straße — du entscheidest. H öffnet den Kodex, wenn du etwas nachlesen willst.', done: () => (S.flags.tutGoalAt || 0) > 0 && clock() - S.flags.tutGoalAt > 1.5 },
 ];
 let tutorNext = 0;
+const tutorBoard = p => { let best = null, bd = 120 * TS; for (const e of S.ents.world) if (e.type === 'board') { const d = dist(e, p); if (d < bd) { bd = d; best = e; } } return best; };
 function tutorShow() {
   const el = $('tutor'); if (!el) return; const i = S.flags.tutor ?? -1, T = TUTOR[i];
   if (i < 0 || !T || S.settings?.tips === false || S.coop?.role === 'guest') { el.classList.add('hidden'); return; }
@@ -8870,6 +8890,7 @@ const GUIDE = [
   ['craft', p => S.ents[p.map]?.some(e => e.kind === 'prop' && ['workbench', 'forge', 'anvil', 'workbench_int'].includes(e.type) && dist(e, p) < 120), 'Werkbank oder Esse in der Nähe: Mit E stellst du hier Dinge her.'],
   ['wanted', p => bountyTotal() > 0, 'Auf dich ist Kopfgeld ausgesetzt. Wachen halten dich an — zahlen, mitkommen oder Widerstand. Kopfgeldjäger kommen, wenn es hoch ist.'],
   ['secrets', p => (S.flags.playMin || 0) >= 30, 'Manche Orte stehen auf keiner Karte. Achte auf Glocken im Nebel, Lichter in der Nacht, Zeichen an Felsen.'],
+  ['travel', p => p.map === 'world' && S.ents.world.some(e => e.kind === 'npc' && e.alive && (e.coach || e.ferry) && dist(e, p) < 180), 'Kutscher und Fährleute bringen dich gegen Gold in andere Orte — schneller und sicherer als zu Fuß, aber die Zeit läuft. Zu Fuß findest du dafür, was an der Straße liegt. M zeigt die Wege.'],   /* Spec Welt §9: Reisen */
   ['settle', p => !S.settlement && S.gold >= 300 && (S.flags.playMin || 0) >= 20, 'Mit genug Gold und Vorrat kannst du eine eigene Siedlung gründen. B öffnet das Bauen.'],
 ];
 function guideTick() {
@@ -9427,13 +9448,20 @@ function releaseJail(why) {
 // S15 (Nutzer-Bug): Wer in Aurelion aus dem Kerker kommt, stand ohne Schein auf dem Platz und wurde sofort wieder angehalten.
 // Jetzt führen die Wärter ihn vor das Tor; die Automaten lassen ihn eine Weile in Ruhe.
 function jailOut() { if (inAurel(S.player) && !hasPermit()) { expel(); S.aurelStop = clock() + 240; log('Ohne Aufenthaltsschein führen dich die Wärter vor das Tor.', 'world'); } S.flags.arrestCd = clock() + 240; }
+/* Entwickler 08.10. (Bug): Wer in der Zelle nah an der Zellentür stand, galt als ausgebrochen — die Prüfung kannte nur die 5×6 Felder der Zelle,
+   nicht das Türfeld (Zeile 9 bzw. 12), auf das man beim Anlehnen ans Gitter mit halbem Körper rutscht. Jetzt zählt das Türfeld mit, dazu ein
+   kleiner Rand an den Seitenwänden. Draußen im Gang (Zeilen 10–11) ist man weiterhin draußen. */
+function inJailCell(p, cell) {
+  const tx = p.x / TS, ty = p.y / TS, dy = cell.door?.[1] ?? cell.y + 6, y0 = Math.min(cell.y, dy), y1 = Math.max(cell.y + 6, dy + 1);
+  return tx >= cell.x - 0.3 && tx < cell.x + 5.3 && ty >= y0 && ty < y1;
+}
 function jailTick() {
   const J = S.jail, p = S.player; if (!J) return;
   if (S.map !== 'kerker') { S.jail = null; return; }
   if (clock() >= J.until) return releaseJail('Deine Zeit ist um.');
   const h = S.minute / 60 | 0;
   if ((h === 8 || h === 18) && J.meal !== (S.day | 0) * 24 + h) { J.meal = (S.day | 0) * 24 + h; if (p.body) B.heal(p, p.maxHp * 0.1); log('Ein Wärter schiebt Brot und Wassersuppe durch die Gitter.', 'world'); }
-  const cell = MAPS.kerker.cells[J.cell], inCell = p.x / TS >= cell.x && p.x / TS < cell.x + 5 && p.y / TS >= cell.y && p.y / TS < cell.y + 6;
+  const cell = MAPS.kerker.cells[J.cell], inCell = inJailCell(p, cell);
   const w = !inCell && (J.blind || 0) < clock() && !UI.dialogueOpen() && S.ents.kerker.find(e => e.warden && e.alive && !e.angry && dist(e, p) < 170 && clearLine(e, p));
   if (w) wardenCatch(w, J, cell);
 
@@ -21322,6 +21350,18 @@ export function selftest() {
       const again = boardAct(t, it.id, 'accept');
       return shape && r === null && mine?.state === 'active' && typeof again === 'string';
     } finally { if (C0) S.contracts = C0; S.quests = Q0; } }));
+  ok('Kerker-Fix 08.10.: am Zellengitter stehen gilt als in der Zelle (Türfeld zählt mit), im Gang davor nicht', (() => {
+    const cells = MAPS.kerker?.cells; if (!cells?.length) return true;
+    return cells.every(c => { const at = (tx, ty) => inJailCell({ x: tx * TS, y: ty * TS }, c), d = c.door[1], top = d > c.y;
+      return at(c.x + 2.5, c.y + 3) && at(c.x + 2.5, d + 0.5) && at(c.x + 2.5, top ? d + 0.95 : d + 0.05) && !at(c.x + 2.5, top ? d + 1.5 : d - 0.5) && !at(c.x + 7, c.y + 3); });
+  })());
+  ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
+    const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;
+    for (const b of HOUSES.filter(h => h.map === 'world').slice(0, 400)) { const [x, y] = doorFront(b, 1), [ex, ey] = dirs[b.door]; if (x !== b.doorTile[0] + ex || y !== b.doorTile[1] + ey) ok1 = false; }
+    const side = HOUSES.find(h => h.map === 'world' && (h.door === 'W' || h.door === 'E')); const ok2 = !side || doorFront(side, 2)[1] === side.doorTile[1];
+    const p = S.player, F0 = S.flags.tutor; S.flags.tutor = TUTOR.findIndex(t => t.k === 'board'); const tb = tutorBoard(p); S.flags.tutor = F0;
+    return ok1 && ok2 && (tb === null || tb.type === 'board');
+  }));
   ok('Spec Welt 08.10. §36: kein Treffer durch Wände — Hieb auf einen Gegner hinter einer Mauerkachel geht ins Leere, ohne Mauer trifft er; Pfeile prallen an der Mauer ab', sandbox(() => {
     const p = stage(); p.x = 10 * TS + 16; p.y = 10 * TS + 16; p.aim = 0; const e = actor(p.x + 2 * TS, p.y, { kind: 'enemy', mtype: 'bandit' }); e.map = '__a';
     const m = MAPS.__a, wallI = 10 * m.w + 11; const h0 = e.hp;
