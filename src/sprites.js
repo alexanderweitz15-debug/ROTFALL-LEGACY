@@ -13,7 +13,7 @@
 
 export const PX = 2;
 import { ATLAS } from './ref5_atlas.js?v=25';
-import { ITEMS, RACES } from './data.js?v=25';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { ITEMS, RACES, FACTIONS } from './data.js?v=25';   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=25';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 import { ATK_U } from './anim.js?v=25';   /* Kampfanimation Scheibe 1 */
@@ -210,11 +210,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop', 'rr'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '' };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '', rr: 0 };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -290,6 +290,9 @@ const PROF_MARK = {
   Priester: { prop: 'buch' }, Ordenspriesterin: { prop: 'buch' }, 'Priesterin Omegas': { prop: 'buch' }, Kettenpriester: { prop: 'buch' },
   Kaufmann: { prop: 'beutel' }, Kaufherr: { prop: 'beutel' }, Geldwechsler: { prop: 'beutel' }, Bankier: { prop: 'beutel' }, 'Händlerin': { pack: 1 }, Gewürzhändler: { pack: 1 }, Tuchhändlerin: { pack: 1 },
   Lagerknecht: { pack: 1 }, 'Tagelöhner': { pack: 1, wraps: 1 },
+  /* R2 Improvisiert (08.10.): Miliz in Steppwams und Kochtopf als Helm, eine Schulter gepolstert, Seil statt Gurt; R4 Deserteur: zerrissener Valen-Rock */
+  Miliz: { armor: 'leather', armorCol: '#8a7a5c', helm: 'pot', helmCol: '#5a5650', crest: '', asy: 1, pauld: '#6a5a40', pb: 1, strap: 1, wraps: 1, tabard: '', cloak: '', wear: 2 },
+  Deserteur: { tabard: '#2f4260', mark: 'chevron', markCol: '#b9c3d2', armor: 'leather', armorCol: '#3e3428', helm: '', cloak: '', wear: 3 },
 };
 /* Besondere Figuren (Story, Fraktionsführung, Meister mit eigenem Schlüssel): Messingborte, fester Stand, Umhang in Farbe, wenn sie keinen haben.
    Keine Marker — man erkennt sie an der Erscheinung. Allerweltsschlüssel (n…, Passbeamte, Morr-Leute) zählen nicht. */
@@ -766,7 +769,9 @@ export function humanSpec(e) {
   else if (off === 'buckler') { s.shield = 'round'; s.shieldCol = '#77736a'; s.mark = 'boss'; s.markCol = '#a8a196'; }
   else if (off && ITEMS[off]?.slot === 'weapon') { /* Zweiwaffen: keine Schildzeichnung */ }
   else if (off) { s.shield = 'heater'; s.shieldCol = p.shield || '#4a3f30'; s.markCol = p.shieldBoss || '#8a8172';
-    s.mark = e.faction === 'order' ? 'cross' : e.faction === 'valen' ? 'chevron' : 'boss'; }
+    s.mark = e.faction === 'order' ? 'cross' : e.faction === 'valen' ? 'chevron' : 'boss';
+    const FC = e.kind === 'npc' && !p.shield && FACTIONS[e.faction]?.colors; if (FC) { s.shieldCol = FC[0]; s.markCol = FC[1]; } }   /* R4 Fraktionsregel (08.10.): Schild in den Farben der Fraktion (FACTIONS.colors) */
+  { const rt = it => it ? ({ rare: 1, epic: 2, legendary: 3, mythic: 4 }[it.rar || ITEMS[it.key]?.rarity] || 0) : 0; s.rr = Math.max(rt(eq.chest), rt(eq.head)); }   /* R5 (08.10.): Rarität der Rüstung → Zierkante (fig5 rarityEdge) */
   const w = eq.weapon && eq.weapon.key;
   if (w === 'shortbow' || w === 'longbow' || w === 'hunting_bow') s.quiver = 1;
   const cls = e.currentClass;

@@ -4040,6 +4040,9 @@ Reichweite, 30 Gold je 10 Schuss), die schweren Gewehre sind Spezialwerkzeuge (S
 | 20 | Fleischgolem | 19 | 19 s | 1 % / 76 % |
 | 30 | Todesritter (Roter Henker) | 5 | 5 s | 0 % / 29 % |
 | 30 | Todesritter (Frostklinge) | 11 | 7 s | — / 78 % |
+| 5 | Rollen 08.10.: Schläger / Plünderer / Messerstecher (Langschwert, Lederwams) | 7 / 4,5 / 3 | 4 / 2,7 / 2 s | 10 / 48 / 23 % · stehend 32 / 18 / 27 % |
+| 5 | Rollen 08.10.: Goblin-Späher / -Bogenschütze / -Schamane / -Techniker | 1,3 / 3 / 4,3 / 4,3 | 3–5 s | 3 / 11 / 17 / 9 % |
+| 10 | Rollen 08.10.: Schwerer Bandit / Bandenführer / Goblin-Speerträger / -Berserker | 12 / 8,5 / 3,3 / 4 | 8 / 5 / 3,6 / 2,5 s | 22 / 34 / 27 / 47 % (Berserker 3/4 Siege) |
 
 Urteil: Auf gleicher Stufe fallen die meisten Gegner in 2–6 Treffern und kosten 10–50 % — im Zielband. Wer sauber rollt,
 nimmt gegen langsame Einzelgegner kaum Schaden (so gewollt: Können zahlt sich aus). Der Bär (Revier) ist mit 13–17

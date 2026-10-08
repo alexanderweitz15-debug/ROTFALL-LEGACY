@@ -2,7 +2,7 @@
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, rnd, ri, pick, chance,
          clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
 import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES } from './data.js?v=25';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
 import * as R from './render.js?v=25';
 import * as HB from './buildings.js?v=25';
 import * as UI from './ui.js?v=25';
@@ -12,7 +12,7 @@ import * as SP from './sprites.js?v=25';
 import * as ECO from './economy.js?v=25';
 import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance } from './anim.js?v=25';   /* Roadmap P8 */
 import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
-import { sfx, ambience, ambienceTick, duck } from './sfx.js?v=25';
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=25';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -460,6 +460,21 @@ function ownerBannerTick() {
     const F = FACTIONS[o]; Object.assign(b, { owner: o, col: F?.colors, crown: o === 'valen', sigil: o === 'undead' ? 'skull' : null, label: `Banner — ${townName(b.ownerBanner)} gehört: ${F?.name || 'niemandem'}` });
     if (dist(b, p) < 900) log(`Über ${townName(b.ownerBanner)} wehen jetzt die Farben von „${F?.name || 'niemand'}“.`, 'world'); }
 }
+/* N4 Scheibe 1 „Stimmungs-Haltung der Stadt“ (visual/npcs.md, Wahl 10; 08.10.): Trauert ein Ort, senken stehende Bewohner in deiner Nähe ab und zu
+   den Kopf (Geste trauern); am Fest jubeln sie; ist der Ort in Gefahr oder ohne Schutz, wehren sie ab. Nur Darstellung (Math.random, kein Spielzufall),
+   höchstens zwei Gesten je Takt (alle 3 s). */
+let dbgMood = -1;
+function moodIdleTick(force = null) {
+  const p = S.player; if (!p || S.map !== 'world' || S.cine) return 0;
+  const town = townAt(p.x / TS | 0, p.y / TS | 0); if (!town || !TOWN_PLAN[town]) return 0;
+  const h = hourNow(), mood = force || (S.mourn?.[town]?.until >= (S.day | 0) ? 'trauern' : festNow(town) && h >= 15 ? 'jubeln' : townDanger(town) || [2, 3].includes(S.schutz?.[town]?.stage) ? 'abwehren' : null);
+  if (!mood) return 0; const now = performance.now(); let n = 0;
+  for (const e of VILLAGERS) { if (n >= (force ? 6 : 2)) break;
+    if (!e.alive || e.downed || e.map !== 'world' || e.vx || e.vy || (e.act && e.act.until > now) || e.talk?.until > now || dist(e, p) > 460) continue;
+    if (!force && Math.random() > (mood === 'jubeln' ? 0.25 : 0.15)) continue;
+    gesture(e, mood, null, mood === 'abwehren' ? p : null); n++; }
+  return n;
+}
 /* Stadttiere (Roadmap P1.x „Kinder/Tiere als Stadtbevölkerung“, 08.10.; Sprites: Agent Figuren): je Ort ein paar Hühner am Feld, Katzen an Schenke
    und Wohnhäusern, ein Hofhund am Platz — flüchtig, beim Laden neu, Anzahl fest aus dem Ort (kein Spielstand). Zahlen vorläufig ⚖. */
 function ensureTownAnimals() {
@@ -558,6 +573,7 @@ function useConsumable(c, idx, target = c, part = null) {
     return UI.refreshHUD();
   }
   if (it.use === 'lure') return lureWhistle(c);                     /* Scout R4: Köderpfeife (wird nicht verbraucht) */
+  if (it.use === 'fish') { fishUse(c); return UI.refreshHUD(); }   /* Fischen: Angel (wird nicht verbraucht) — auswerfen bzw. anschlagen */
   if (it.use === 'blood') {                                  /* §5g.2 Blutphiole: stillt den Durst; Lebenden wird übel */
     removeItem(c, slot.key, 1); fx(c.x, c.y - 14, 'blood', 6);
     if (isVamp(c)) { setBlood(c, bloodOf(c) - 25); log(`${c.name} trinkt eine Blutphiole. Der Durst schweigt — für eine Weile.`, 'party'); }
@@ -1135,7 +1151,7 @@ const JOB_AT = {
 };
 const STALL_SELL = { 'Bäcker': ['bread', 'bread', 'dried_meat'], Weber: ['traveler_cloak', 'leather_cap', 'bandage'], 'Böttcher': ['wood', 'bread'], Bauer: ['bread', 'dried_meat', 'herb'], Magd: ['herb', 'bread', 'bandage'], Handwerker: ['wood', 'stone', 'bandage'] };
 const SMITH_POOL = ['morgenstern',   /* Audit 3.3: Königseisen nicht mehr beim Stadtschmied — nur Tiefhall (Hilda, Hort) und Brann */ 'kettenkugel', 'rusty_sword', 'longsword', 'axe', 'spear', 'dagger', 'wooden_shield', 'iron_helm', 'pickaxe', 'chain_hauberk', 'kriegssichel', 'kriegssense', 'schlagkralle', 'wurfbeil'];
-const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion', 'strick'];   /* T08: Strick zum Fesseln */
+const STALL_POOL = ['bread', 'dried_meat', 'herb', 'bandage', 'traveler_cloak', 'leather_cap', 'potion', 'strick', 'angel'];   /* Fischen 08.10.: die Angel gibt es am Marktstand */   /* T08: Strick zum Fesseln */
 function spotBy(prop, b) {                                        // freier Stehplatz neben dem Möbel, drinnen zuerst Richtung Tür
   for (const [ox, oy] of [[0, 22], [0, -22], [22, 0], [-22, 0], [16, 18], [-16, 18]]) {
     const x = prop.x + ox, y = prop.y + oy, tx = x / TS | 0, ty = y / TS | 0;
@@ -3281,7 +3297,7 @@ function update(dt, now) {
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); facHintTick(); worldCardTick(now); }   /* P3.x E22: Ereigniskarten aus der Warteschlange */   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
-  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); ownerBannerTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
+  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); ownerBannerTick(); moodIdleTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
   tutorTick(now); prologTick(now);   /* Wegweiser (08.10.); Prolog */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -3350,9 +3366,9 @@ function update(dt, now) {
     placing.ghost.blocked = !canPlace(placing.ghost);
   }
 
-  drawMini(dt); reactTick(dt); ambientTick(dt); sceneTick(); sneakTick(dt);
+  drawMini(dt); pf('Minikarte'); reactTick(dt); pf('Reaktionen'); ambientTick(dt); pf('Umgebungsszenen'); sceneTick(); sneakTick(dt); pf('Szenen/Schleichen');
   sealTick(dt); R.setSeals?.(SEALS, hovered);   /* Visuell Q-2: Siegel über Gebern */
-  pf('Karte/Reaktion/Szenen/Siegel');
+  pf('Siegel');
   hudTimer += dt;
   if (hudHalf && hudTimer > 90) { hudHalf = false; UI.refreshHUD(); }   /* PERF-S: Kopf-/Balkenanzeige um einen halben Takt versetzt — nicht im selben Bild wie Infofeld, Hinweis und Sekunden-Haken */
   if (hudTimer > 180) {
@@ -3365,7 +3381,7 @@ function update(dt, now) {
       const sm = !pt && tk === 'shop' && p.map === 'world' ? tutorSmith(p) : null;   /* P0.1 Schmiede-Moment: Kompass zur nächsten Schmiede */
       if (sm && !S.flags.tutSmithSeen && dist(sm, p) < 170) { S.flags.tutSmithSeen = 1; log(`Der Schmied ${sm.name} arbeitet: Funken am Amboss, Hammerschläge, ein Geselle draußen im Hof. Schmiede verkaufen Waffen und Rüstung, bessern Beschädigtes aus und fertigen auf Bestellung. Sprich ihn an (E).`, 'quest'); emote(sm, 'ausruf', 1600); }
       R.setTrack(pt ? { x: pt.x, y: pt.y, name: QUESTS[k]?.name || '' } : tb ? { x: tb.x / TS - 0.5, y: tb.y / TS - 0.5, name: 'Anschlagbrett' } : sm ? { x: sm.x / TS - 0.5, y: sm.y / TS - 0.5, name: `Schmiede (${sm.name})` } : null); }   // S13: Kompass
-    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge */                       // S12: Nebel der Karte
+    if (S.map === 'world') revealAround(p.x / TS | 0, p.y / TS | 0, Math.round(B.fogR(p) * (wxOf(p).sight || 1) * (hasItem(p, 'fernrohr') ? 1.2 : 1)));   /* Roadmap P2: Sichtweite der Karte nach Auge; Geheime Orte S5: Hannos Fernrohr +20 % */                       // S12: Nebel der Karte
     if ((tribT += 180) >= 1000) { tribT = 0; tribTick(); campTick(); chainTick(); raidTick(); }   /* PERF-S: die Sekunden-Haken in drei Gruppen auf verschiedene HUD-Takte verteilt (vorher alle in einem Bild, 5–20 ms); jeder läuft weiter einmal je ~1,1 s */
     else if (tribT === 360) { myRaidTick(); bigSecond(); afterSecond(); lostGobTick(); aurelTick(); }
     else if (tribT === 720) { conTick(); jailTick(); }
@@ -4488,7 +4504,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
     }
   }
   if (target.aiState === 'idle' || target.aiState === 'patrol') target.aiState = 'pursue';
-  if (target.variant === 'leader') rallyCall(target, attacker);
+  if (target.variant === 'leader') rallyCall(target, source);   /* 🐞→✔ 08.10.: hieß „attacker“ (in hurt() nicht definiert) — jeder Treffer auf einen Anführer warf einen Fehler */
   dmgFloat(target, dmg, source, crit, kind, cause);   /* Kampf-Feedback: Pixelziffern in Schadensfarbe */
   const lvl = S.settings.violence;
   const bony = target.mtype === 'skeleton';
@@ -4877,6 +4893,64 @@ function combatXpMul(att, tgt) {                                  /* Spec §7/§
   if (M && (M.threat ?? 1) === 0) f *= 0.25;
   const H = SK_HITS.get(tgt) || {}, n = (H[att.id] = (H[att.id] || 0) + 1); SK_HITS.set(tgt, H);
   return n <= 8 ? f : f * 8 / n;
+}
+/* ================= Fischen (Spec Skills §13–14, §36, §42; Planlauf 08.10.2026 — Zahlen vorläufig ⚖) =================
+   Angel am Wasser benutzen = auswerfen (Rute in der Hand, Blick aufs Wasser). Nach 2,5–6,5 s beißt einer („Biss!“, Spritzer, Ton); dann bleiben
+   0,9 s zum Anschlagen (Angel noch einmal benutzen). Zu früh oder zu spät: nichts. Gewässer nach Lage: Küste (Südsee, Inseln), Sumpf (Moor ringsum),
+   See (viel Wasser) oder Fluss — je zwei häufige Fische und ein seltener ab Stufe 15. Am selben Platz (8 × 8 Kacheln, je Tag) lernt man ab dem
+   sechsten Fang weniger, ab dem neunten beißt oft nichts mehr (§42: anderswo fischen). 3 % ein alter Beutel am Haken (§36). Fisch → Kessel → Fischsuppe.
+   Zeitmessung in echter Zeit (setTimeout), der Zustand liegt nur im Speicher — nichts davon im Spielstand. */
+const FISH_WATER = { river: { name: 'Fluss', fish: [['forelle', 60], ['lachs', 30], ['hecht', 10]] }, lake: { name: 'See', fish: [['karpfen', 55], ['barsch', 35], ['wels', 10]] },
+  coast: { name: 'Küste', fish: [['hering', 55], ['kabeljau', 35], ['rotbarsch', 10]] }, swamp: { name: 'Sumpf', fish: [['schlammbeisser', 55], ['giftbarbe', 35], ['moorhecht', 10]] } };
+const FISH_BITE = [2500, 4000], FISH_WIN = 900;
+let FISH = null; const FISH_SPOT = new Map();
+function waterKind(map, tx, ty) {
+  if (map !== 'world') return 'coast';
+  if (ty >= seaLine(tx) - 2) return 'coast';
+  let w = 0, m = 0; for (let y = ty - 7; y <= ty + 7; y++) for (let x = tx - 7; x <= tx + 7; x++) { const t = tileAt(map, x, y); if (t === T.WATER) w++; else if (t === T.MARSH) m++; }
+  return m >= 12 ? 'swamp' : w >= 90 ? 'lake' : 'river';
+}
+function waterNear(p) {
+  const tx = p.x / TS | 0, ty = p.y / TS | 0; let best = null;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (tileAt(S.map, tx + dx, ty + dy) === T.WATER) { const d = dx * dx + dy * dy; if (!best || d < best.d) best = { x: tx + dx, y: ty + dy, d }; }
+  return best;
+}
+function fishUse(p) {
+  if (p !== S.player) return;
+  const now = performance.now();
+  if (FISH) {                                                      /* Anschlagen */
+    const F = FISH; FISH = null; clearTimeout(F.t1); clearTimeout(F.t2); if (p.act?.tool === 'tool_rod') p.act = null;
+    if (!F.bite) { log('Zu früh angeschlagen — der Köder ist weg, nichts hängt dran.', 'world'); UI.toast('Zu früh!', 1200); return null; }
+    if (now > F.bite + F.win) { log('Zu spät — der Fisch hat den Köder gestohlen.', 'world'); UI.toast('Zu spät!', 1200); return null; }
+    return fishCatch(p, F);
+  }
+  const w = waterNear(p); if (!w) { UI.toast('Zum Angeln musst du direkt am Wasser stehen.', 2200); return null; }
+  const kind = waterKind(S.map, w.x, w.y), W = FISH_WATER[kind], spotK = `${S.day | 0}:${S.map}:${w.x >> 3},${w.y >> 3}`, n = FISH_SPOT.get(spotK) || 0;
+  const delay = (FISH_BITE[0] + rnd() * FISH_BITE[1]) * (1 - perkVal(p, 'fishing', 'bite')) * (n > 5 ? 1.5 : 1), win = FISH_WIN * (1 + perkVal(p, 'fishing', 'window'));
+  const F = FISH = { kind, spotK, bite: 0, win, x: p.x, y: p.y, wx: w.x, wy: w.y };
+  act(p, 'work', delay + win + 800, { x: w.x * TS + TS / 2, y: w.y * TS + TS / 2 }); p.act.tool = 'tool_rod'; p.act.rate = 0.4;
+  log(`Du wirfst die Angel aus (${W.name}). Beim Biss sofort noch einmal die Angel benutzen.`, 'world');
+  if (!S.flags.fishHint && !S._quiet) { S.flags.fishHint = 1; UI.toast('Fischen: warten, bis „Biss!“ erscheint — dann schnell die Angel noch einmal benutzen.', 4200); }
+  F.t1 = setTimeout(() => {
+    if (FISH !== F) return;
+    if (Math.hypot(p.x - F.x, p.y - F.y) > 24 || p.downed || !p.alive) { FISH = null; return log('Du bist weggegangen — die Schnur hängt schlaff.', 'world'); }
+    F.bite = performance.now(); float(p, 'Biss!', 'rgba(240,220,150,ALPHA)'); fx(F.wx * TS + TS / 2, F.wy * TS + TS / 2, 'frost', 8); sfx('whistle', 0, 0.35);
+    F.t2 = setTimeout(() => { if (FISH !== F) return; FISH = null; if (p.act?.tool === 'tool_rod') p.act = null; log('Zu spät — der Fisch ist weg.', 'world'); }, F.win + 150);
+  }, delay);
+  return 'cast';
+}
+function fishCatch(p, F) {
+  const W = FISH_WATER[F.kind], rare = perkVal(p, 'fishing', 'rare') > 0, n = (FISH_SPOT.get(F.spotK) || 0) + 1; FISH_SPOT.set(F.spotK, n);
+  if (n > 8 && rnd() < 0.5) { gainSkill(p, 'fishing', 0.1); log('Hier beißt kaum noch etwas — die Fische meiden den Platz. Versuch es an einem anderen Wasser.', 'world'); return 'leer'; }
+  const L = W.fish.filter(([k]) => rare || !ITEMS[k].rare), tot = L.reduce((s, [, w]) => s + w, 0); let r = rnd() * tot, key = L[0][0];
+  for (const [k, w] of L) if ((r -= w) < 0) { key = k; break; }
+  if (rnd() < 0.03) { const g = ri(3, 12); S.gold += g; log(`Am Haken hängt ein alter Lederbeutel: ${g} Gold.`, 'world'); }
+  if (!addItem(p, key, 1)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, 1));
+  const it = ITEMS[key], s = p.skills.fishing || 0;
+  gainSkill(p, 'fishing', (it.rare ? 2.5 : 1) * Math.max(0.2, 1.2 - s / 100) * (n > 5 ? 5 / n : 1));
+  act(p, 'kneel', 600); float(p, it.name, 'rgba(170,210,230,ALPHA)'); log(`Gefangen: ${it.name} (${W.name}).`, 'world');
+  if (it.rare && !S._quiet) { UI.toast(`SELTENER FANG: ${it.name.toUpperCase()}`, 2600); sfx('loot', 2, 0.6); }
+  return key;
 }
 function huntGain() { const p = S.player; if (!p?.skills) return; const s = p.skills.hunting || 0; p.skills.hunting = Math.min(100, s + 0.4 + 1.2 * (1 - s / 100)); }
 function dropLoot(e) {
@@ -6292,8 +6366,11 @@ function selfRepair(t) {
 // Seltenheit mit Zusatzwerten). Königseisen hebt eine Schmiedearbeit um eine Stufe. Jede Arbeit übt die Fertigkeit.
 const ST_NAME = { forge: 'Esse', bench: 'Werkbank', kessel: 'Kessel' }, ST_SKILL = { forge: 'smithing', bench: 'crafting', kessel: 'medicine' };
 const QUAL = [['Grob', 0.2, null], ['Solide', 0.45, null], ['Gut', 0.7, 'uncommon'], ['Meisterlich', 0.9, 'rare'], ['Meisterstück', 9, 'epic']];
-const matHave = k => (S.res[k] || 0) + S.player.inv.filter(x => x.key === k).reduce((n, x) => n + (x.count || 1), 0);
-function matTake(k, n) { const r = Math.min(S.res[k] || 0, n); if (r) S.res[k] -= r; if (n - r > 0) removeItem(S.player, k, n - r); }
+const isFood = x => ITEMS[x?.key]?.fish && ITEMS[x.key].use === 'food';   /* Fischen: „any_fish“ = beliebige essbare Fische */
+const matHave = k => k === 'any_fish' ? S.player.inv.filter(isFood).reduce((n, x) => n + (x.count || 1), 0) : (S.res[k] || 0) + S.player.inv.filter(x => x.key === k).reduce((n, x) => n + (x.count || 1), 0);
+function matTake(k, n) {
+  if (k === 'any_fish') { for (const x of S.player.inv.filter(isFood).sort((a, b) => (ITEMS[a.key].value || 0) - (ITEMS[b.key].value || 0))) { if (n <= 0) break; const t = Math.min(n, x.count || 1); removeItem(S.player, x.key, t); n -= t; } return; }   /* billigste zuerst */
+  const r = Math.min(S.res[k] || 0, n); if (r) S.res[k] -= r; if (n - r > 0) removeItem(S.player, k, n - r); }
 const needTxt = R => Object.entries(R.need).map(([k, n]) => `${n} ${ITEMS[k]?.name || k}`).join(', ');
 const houseKnows = key => !!S.legacy?.recipes?.includes(key);
 function craftQual(skill, ke) { const q = skill / 100 * 0.75 + rnd() * 0.35 - 0.05; let i = QUAL.findIndex(Q => q < Q[1]); if (ke) i = Math.min(QUAL.length - 1, i + 1); return i; }
@@ -6302,10 +6379,10 @@ function craftItem(key, ke = false, quick = false) {   /* quick: ohne Zeit und G
   if (skill < (R.min || 0) && !houseKnows(key)) { UI.toast(`Dafür brauchst du ${SKILL_NAMES[sk] || sk} ${R.min}.`); return null; }   /* Skill-Core §38–39: was das Haus schon gefertigt hat, kennt auch der Erbe (Güte nach seinem eigenen Können) */
   if (Object.entries(R.need).some(([k, n]) => matHave(k) < n) || (ke && !hasItem(p, 'koenigseisen'))) { UI.toast(`Dir fehlt Material: ${needTxt(R)}.`); return null; }
   Object.entries(R.need).forEach(([k, n]) => matTake(k, n)); if (ke) removeItem(p, 'koenigseisen', 1);
-  const qi = craftQual(skill + perkVal(p, sk, 'quality'), ke), [qn, , tier] = QUAL[qi], it = ITEMS[key];   /* Skill-Core: Meilenstein „sichere Hand“ */
+  const qi = craftQual(skill + (quick ? 0 : perkVal(p, sk, 'quality')), ke), [qn, , tier] = QUAL[qi], it = ITEMS[key];   /* Skill-Core: Meilenstein „sichere Hand“ (nur eigene Arbeit, nicht Auftrag/Probe) */
   gainSkill(p, sk, 0.3 + 1.5 * (1 - skill / 100)); if (!quick) { act(p, 'work', 1500); passTime(R.st === 'kessel' ? 20 : 45); }
   if (S.legacy && !quick && !S._quiet) { const L = (S.legacy.recipes ||= []); if (!L.includes(key)) L.push(key); }   /* Weltwissen des Hauses (Legacy); nicht bei Auftragsarbeit oder Probe */
-  const th = perkVal(p, sk, 'thrift'); if (th && R.need.iron && (p.craftN = (p.craftN || 0) + 1) % th === 0) { S.res.iron = (S.res.iron || 0) + 1; log('Sparsam gearbeitet: ein Eisen bleibt übrig.', 'economy'); }   /* Skill-Core: Meilenstein „sparsam“ */
+  const th = quick ? 0 : perkVal(p, sk, 'thrift'); if (th && R.need.iron && (p.craftN = (p.craftN || 0) + 1) % th === 0) { S.res.iron = (S.res.iron || 0) + 1; log('Sparsam gearbeitet: ein Eisen bleibt übrig.', 'economy'); }   /* Skill-Core: Meilenstein „sparsam“ */
   if (it.stack) { const n = (R.n || 1) + (qi >= 3 ? 1 : 0);
     if (!addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n));   /* Fehlersuche: Tasche voll ließ die fertige Ware sonst verschwinden */
     questEvent('craft', key, n, p);                                        /* Klassen-Prüfung Alchemist: Drei Tränke */
@@ -6406,7 +6483,9 @@ function doInteract(target = null) {
   if (t.secretDig) return secretDig(t);                              /* Geheime Orte S2: Lanze auf dem Hundertfeld */
   if (t.chalk != null) return chalkRead(t);                          /* Geheime Orte S2: Kreidezeichen */
   if (t.secretNames) return secretNames(t);                          /* Geheime Orte S4: Kammer der Namen */
-  if (t.secretWell) return secretWell(t);                            /* A-04: die Treppe am Brunnen der Durstigen war nicht betretbar */
+  if (t.secretClock) return clockDoor(t);                            /* Geheime Orte S5: Uhrmacher */
+  if (t.secretLight) return lightTower(t);                           /* Geheime Orte S5: Leuchtfeuer */
+  if (t.secretWell) return secretWell(t);                         /* A-04: die Treppe am Brunnen der Durstigen war nicht betretbar */
   if (t.soulJar) return soulJarChoice();                             // S15 P6: Seelenkammer
   if (t.raskChest) return openRask(t);
   if (t.portal === 'world' && S.map === 'kerker' && S.jail) return jailExit();
@@ -8265,7 +8344,7 @@ function conGiverOk(npc) {
   const t = npc.homeTown; if (!t || !PROF_CON[npc.prof]) return false;
   if ((S.contracts || []).some(c => c.giver === npc.key && c.state === 'active')) return true;
   const map = npc.map || 'world', now = performance.now(), M = (conGiverMemo[t + '|' + map] ||= { at: -1e9, set: new Set() });   /* je Ort alle 2 s neu — giverMark fragt je Bild */
-  if (now - M.at > 2000 || S._quiet) { M.at = now; M.set = new Set((S.ents[map] || []).filter(e => e.kind === 'npc' && e.alive && e.homeTown === t && PROF_CON[e.prof] && !S.party.includes(e.id)).sort((a, b) => giverHash(a) - giverHash(b)).slice(0, conGiverCap(t))); }
+  if (now - M.at > 2000 || S._quiet) { M.at = now; M.set = new Set((S.ents[map] ? actorsOf(map).list : []).filter(e => e.kind === 'npc' && e.alive && e.homeTown === t && PROF_CON[e.prof] && !S.party.includes(e.id)).sort((a, b) => giverHash(a) - giverHash(b)).slice(0, conGiverCap(t))); }
   return M.set.has(npc);
 }
 const conGiverMemo = {};
@@ -8841,7 +8920,7 @@ function heirChoices(npc, choices) {
   }
 }
 function conChoices(npc, choices) {
-  taskChoices(npc, choices); heirChoices(npc, choices);   /* P3.25–26; P3.x Nachfolger */
+  taskChoices(npc, choices); heirChoices(npc, choices); secretTalk(npc, choices);   /* P3.25–26; P3.x Nachfolger; Geheime Orte S5 */
   const here = npc.vm || npc.homeTown || npc.town;                      // S13: Paket bei jedem Bewohner der Zielstadt abgeben
   for (const C of activeCons()) if (C.kind === 'deliver' && C.target === here && C.have < C.need && hasItem(S.player, 'auftragspaket'))
     choices.unshift({ text: `Das Paket aus ${townName(C.town)} übergeben.`, fn: () => { removeItem(S.player, 'auftragspaket', 1); conProgress(C); UI.dialogue(npc, '„Endlich. Das Siegel ist heil — gut. Sag ihnen, es ist angekommen.“', [{ text: 'Weiter', fn: () => talk(npc) }]); } });
@@ -9919,11 +9998,38 @@ function stormCheck() {                                              /* RB-048: 
 }
 function goblinStormWon() {
   S.flags.goblinStormActive = false; S.flags.goblinStormWon = true; S.factions.goblin = Math.min(100, (S.factions.goblin || 0) + 30);
-  const d = dodonOf(); if (d) { d.goblinStorm = false; const q = freeSpotNear('world', MORR.x, MORR.y - 3, 2); d.x = q.x; d.y = q.y; d.anchor = { x: q.x, y: q.y }; d.parley = true; d.aggroId = null; }
-  for (const g of S.ents.world.filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon')) { g.alive = false; }
-  S.ents.world = S.ents.world.filter(e => !(e.goblinStorm && !e.alive && e.mtype !== 'dodon'));
+  const finish = () => { const d = dodonOf(); if (d) { d.goblinStorm = false; const q = freeSpotNear('world', MORR.x, MORR.y - 3, 2); d.x = q.x; d.y = q.y; d.anchor = { x: q.x, y: q.y }; d.parley = true; d.aggroId = null; }
+    for (const g of S.ents.world.filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon')) { g.alive = false; }
+    S.ents.world = S.ents.world.filter(e => !(e.goblinStorm && !e.alive && e.mtype !== 'dodon')); };
   grantLegend('goblin', 'Sturmbruder von Morrgrund', 'Mit Dodon und den Grubenstämmen fiel die Kette.');
   chronicle('Mit Dodon fiel die Kette', 'battle', 'Die Grubenstämme haben die Eisenfeste gestürmt. Morrgrund lebt — und wird größer.');
+  if (!stormWonScene(finish)) finish();   /* T17 Szene 4: erst jubeln, dann heim */
+}
+/* T17 Szenen 3/4 (Planlauf 08.10., Entwurf t17_regiebuch §3.6 Teil 2/3; Kamerafahrten warten auf „Weiter“, Texte kurz). Sieg: Überlebende jubeln, Dodon
+   „Morrgrund singt.“, Karte; erst danach gehen Dodon und die Krieger heim (finish — auch beim Überspringen). Niederlage: drei Gräber vor Morrgrund und,
+   sobald der Erbe steht, einmal „Morrgrund brennt“ (S.flags.morrFallPending → morrFallShown). */
+function stormWonScene(finish) {
+  if (S._quiet || S.coop?.role === 'guest' || S.dying) return false;
+  if (S.cine) return cineLater(() => { if (!stormWonScene(finish)) finish(); }, 1500);
+  const p = S.player, d = dodonOf(), gs = S.ents.world.filter(e => e.goblinStorm && e.alive && e.mtype !== 'dodon' && dist(e, p) < 900).slice(0, 6), mid = d || gs[0] || p;
+  cinematic([
+    { dur: 2600, zoom: 1.2, focus: mid.id, text: 'Die Kette liegt im Staub.', beats: [{ t: 0, sfx: 'horn', duck: 0.6, ms: 300 }, ...gs.map((g, i) => ({ t: 0.1 + i * 0.07, gesture: 'jubeln', who: g, ms: 1600 })),
+      ...gs.slice(0, 3).map((g, i) => ({ t: 0.3 + i * 0.1, float: 'Frei!', who: g })), ...(d ? [{ t: 0.45, say: 'Morrgrund singt.', who: d, ms: 2600 }] : [])] },
+    { dur: 2000, zoom: 1.0, focus: p.id, beats: [{ t: 0, card: { title: 'DIE GRUBENSTÄMME SIND FREI', sub: 'Der Sturm von Morrgrund hat gesiegt', ms: 2600 } }, { t: 0.8, duck: 1, ms: 500 }] },
+  ], finish, { pause: true, stay: true });
+  return true;
+}
+function morrFallScene() {
+  const P = { x: (MORR.x + 0.5) * TS, y: (MORR.y + 0.5) * TS }, huts = S.ents.world.filter(e => e.kind === 'prop' && e.morr).slice(0, 5);
+  cinematic([
+    { ...P, map: 'world', dur: 3400, zoom: 0.95, text: 'Morrgrund brennt.', beats: [{ t: 0, sfx: 'bell', duck: 0.5, ms: 300 }, ...huts.map((h, i) => ({ t: 0.1 + i * 0.12, fx: 'fire', at: h, n: 14 })), { t: 0.5, sfx: 'fire' }] },
+    { ...P, map: 'world', dur: 3000, zoom: 1.15, text: 'Die Kette holt, was übrig ist.', beats: [{ t: 0.2, card: { title: 'MORRGRUND IST GEFALLEN', sub: 'Es gibt kein Dorf danach', ms: 3000 } }, { t: 0.85, duck: 1, ms: 500 }] },
+  ]);
+  return !!S.cine;
+}
+function morrFallTick() {
+  if (!S.flags.morrFallPending || S.flags.morrFallShown || S._quiet || S.cine || S.dying || !S.player?.alive || S.map !== 'world' || UI.dialogueOpen() || S.coop?.role === 'guest') return;
+  if (morrFallScene()) { S.flags.morrFallShown = S.day | 0; delete S.flags.morrFallPending; }
 }
 function morrFall() {
   S.flags.morrDead = true; S.flags.goblinStormActive = false; S.factions.goblin = -100;
@@ -9932,6 +10038,8 @@ function morrFall() {
   S.ents.world = S.ents.world.filter(e => !(e.kind !== 'prop' && (e.morr || e.goblinStorm || e.mtype === 'dodon')));
   for (const pr of S.ents.world) if (pr.kind === 'prop' && pr.morr) { pr.type = 'camp_ruin'; pr.label = 'Verbrannte Goblinhütte'; }
   chronicle('Morrgrund ist gefallen', 'death', 'Der letzte verzweifelte Sturm der Grubenstämme brach an der Eisenfeste. Die Kette holte, was vom Dorf übrig war. Es gibt kein Dorf danach.');
+  for (let i = 0; i < 3; i++) { const q = detSpot('world', MORR.x - 4 + i * 4, MORR.y + 9, 4); if (q && !S.ents.world.some(e => e.morrGrave === i)) S.ents.world.push({ id: uid(), kind: 'grave', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, morrGrave: i, label: 'Grab der Krieger von Morrgrund', epitaph: 'Krieger von Morrgrund<br>Gefallen im Sturm auf die Eisenfeste<br>Es gibt kein Dorf danach.', loot: [] }); }   /* T17 Szene 4: Gräber statt Spurlosigkeit */
+  S.flags.morrFallPending = true;   /* „Morrgrund brennt“ zeigt morrFallTick, sobald der Erbe steht */
 }
 function ensureWhitebeard() {
   if (S.flags.wbSpawned || !MAPS.isle?.hall) return;
@@ -11409,8 +11517,19 @@ function garmadonFight(p, why) {
   S.flags.garmFight = true;
   for (const e of S.ents.garmadon) if (e.alive && (e.mtype === 'garmadon' || e.gCourt)) { e.parley = false; e.aggroId = p.id; e.sawPlayer = clock(); e.aiState = 'pursue'; }
   log(why === 'challenge' ? 'Garmadon: „Gut. Ich war lange nicht mehr müde.“ Die Treppe hinter dir versiegelt sich.' : 'Garmadon erhebt sich vom Thron. Die Treppe hinter dir versiegelt sich mit Knochen.', 'combat');
-  UI.toast('KÖNIG GARMADON', 2800); camShake(6, 300);
-  if (S.flags.legionPromised && !S.flags.chainsBroken && !S.flags.legionCame) cineLater(legionArrives, 2600);   // S13: die Legion kommt erst, wenn der Kampf beginnt
+  const scene = garmadonScene(why); if (!scene) { UI.toast('KÖNIG GARMADON', 2800); camShake(6, 300); }   /* T17 Szene 3: Herzschlag */
+  if (S.flags.legionPromised && !S.flags.chainsBroken && !S.flags.legionCame) cineLater(legionArrives, scene ? 5200 : 2600);   // S13: die Legion kommt erst, wenn der Kampf beginnt (nach dem Auftritt)
+}
+/* T17 Szene 3 (Entwurf t17_regiebuch §3.3): Garmadons Auftritt mit stehender Welt — drei Herzschläge, der Hof kniet, Karte, Satz; zählt als
+   Boss-Auftritt (kein zweiter beim ersten Blick). */
+function garmadonScene(why) {
+  const g = (S.ents.garmadon || []).find(e => e.mtype === 'garmadon' && e.alive); if (!g || S._quiet || S.cine || S.coop?.role === 'guest' || S.dying || S.flags.introSeen?.garmadon === S.legacy.gen) return false;
+  (S.flags.introSeen ||= {}).garmadon = S.legacy.gen;
+  const court = S.ents.garmadon.filter(e => e.gCourt && e.alive).slice(0, 6);
+  cinematic([{ dur: 3200, zoom: 1.3, focus: g.id, beats: [{ t: 0, sfx: 'heartbeat', duck: 0.25, ms: 200 }, { t: 0, shake: 2, ms: 120 }, { t: 0.2, sfx: 'heartbeat', shake: 2, ms: 120 },
+    ...court.map((c, i) => ({ t: 0.22 + i * 0.03, gesture: 'knien', who: c, ms: 1400 })), { t: 0.4, card: { title: 'KÖNIG GARMADON', sub: 'Herr der Toten', ms: 3000 } }, { t: 0.4, fx: 'bone', at: g, n: 12 },
+    { t: 0.45, say: why === 'challenge' ? 'Gut. Ich war lange nicht mehr müde.' : 'Erhebt euch.', who: g, ms: 2600 }, { t: 0.65, sfx: 'heartbeat', shake: 3, ms: 150 }, { t: 0.9, duck: 1, ms: 500 }] }], null, { pause: true, stay: true });
+  return !!S.cine;
 }
 const garmSealed = () => S.map === 'garmadon' && S.flags.garmFight && !S.flags.garmadonSlain && S.ents.garmadon.some(e => e.mtype === 'garmadon' && e.alive && e.aggroId === S.player.id);
 // Weltevent (MP2 §64): dauerhaft im Spielstand — Ruf, Legende, Chronik; die Besatzungen der Toten wanken, Wachen und Schenken reden
@@ -11901,7 +12020,7 @@ function bossIntro(e, preview = false) {
   const p = S.player, mid = { x: (p.x + e.x) / 2, y: (p.y + e.y) / 2 };
   const court = K.court ? S.ents[e.map].filter(c => c.kind === 'npc' && c.alive && c !== p && !S.party.includes(c.id) && dist(c, e) < 300).slice(0, 6) : [];
   cinematic([
-    { dur: 1700, zoom: 1.15, focus: mid, beats: [{ t: 0, sfx: K.sfx, duck: 0.45, ms: 300 }, ...(K.flash ? [{ t: 0, flash: K.flash, ms: 160 }] : []), { t: 0.35, fx: K.fx, at: e, n: 14 },
+    { dur: 1700, zoom: 1.15, focus: mid, beats: [{ t: 0, sfx: K.sfx, duck: 0.45, ms: 300 }, ...(K.ice ? [{ t: 0.55, shake: 5, ms: 300, sfx: 'bone', do: () => S.fx.push({ x: e.x, y: e.y, vx: 0, vy: 0, type: 'shock', ice: true, s: 1, life: 520, maxLife: 520 }) }] : []),   /* T17 §3.2: Hrodvars Frostring ohne Schaden */ ...(K.flash ? [{ t: 0, flash: K.flash, ms: 160 }] : []), { t: 0.35, fx: K.fx, at: e, n: 14 },
       ...(K.beat ? [{ t: 0.1, sfx: 'heartbeat', shake: 2, ms: 120 }, { t: 0.65, sfx: 'heartbeat', shake: 2, ms: 120 }] : []),
       ...court.map((c, i) => ({ t: 0.2 + i * 0.06, gesture: 'abwehren', who: c, toward: e, ms: 1400 }))] },
     { dur: 2300, zoom: 1.5, focus: e.id, beats: [{ t: 0, card: { title: K.title, sub: K.sub, ms: 3600 } }, ...(isBeast(e) ? [{ t: 0.1, sfx: K.sfx, shake: 3, ms: 260 }] : [{ t: 0.1, gesture: 'zeigen', who: e, toward: p, ms: 1200 }]),   /* Tiere zeigen nicht — sie knurren */
@@ -12572,6 +12691,9 @@ const VAULTS = {
   /* Geheime Orte S2: der Ausbrecherstollen — gefunden über Kreidezeichen am Steinbruch, nicht über Hortkarten */
   ausbrecherstollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0, tier: 3, floors: 1, hidden: true, secretKey: 'stollen', pool: ['rotgardist', 'kettenschuetze', 'goblin', 'wolf']   /* C-5: 'chainhunter' ist eine Klasse, kein Gegner (Absturz) */, boss: 'chain_brute', bossName: 'Der Pferchmeister',
     deco: ['bones', 'crate', 'sack', 'broken_pillar'], enter: 'Ein enger Spalt im Fels, Kreide an den Wänden: ein durchgestrichenes Kettenglied. Hier sind Vierzehn entkommen.' },
+  /* Geheime Orte S5: Walknocheninsel — Weißbarts erstes Versteck im Walskelett; erreichbar über das Boot am Nebelsteg (nach dem Leuchtfeuer oder mit Weißbarts Seekarte) */
+  walknochen: { name: 'Die Walknocheninsel', at: 'mistisle', dx: 2, dy: -15, tier: 4, floors: 1, hidden: true, secretKey: 'walknochen', boat: 'Ein Boot ohne Ruderer am Nebelsteg — zur Walknocheninsel', pool: ['sea_raider', 'sea_raider', 'sea_harpooner', 'netzwerferin'], boss: 'sea_raider', bossName: 'Weißbarts Schatzwächter',
+    deco: ['bones', 'barrel', 'crate', 'sack'], enter: 'Die Nebelbank teilt sich. Rippen, so hoch wie ein Haus: ein Walskelett, zur Hütte gemacht. Hier hat Weißbart angefangen.' },
   /* Nutzer §5e.3: Endlosgewölbe — jede Ebene schwerer, alle fünf Ebenen ein Wächter und eine Truhe */
   schlund: { name: 'Der Schlund', at: 'sunkentemple', dx: -6, dy: -8, tier: 3, floors: 999, endless: true, pool: ['skeleton', 'ghoul', 'bandit', 'wraith', 'bone_knight', 'automat'], boss: 'death_knight', bossName: 'Wächter der Tiefe',
     deco: ['bones', 'broken_pillar', 'candles', 'gravestone'], enter: 'Eine Treppe, die nicht aufhört. Wie tief kommst du?' },
@@ -12589,7 +12711,7 @@ function ensureVaultSites() {
     if (S.ents.world.some(e => e.vaultSite === k) || (V.hidden && !S.flags['vaultHint_' + k])) continue;   /* §5e.3: geheime erst mit Karte */
     const L = LOCATIONS.find(l => l.key === V.at); if (!L) continue;
     const q = freeSpotNear('world', L.x + V.dx, L.y + V.dy, 6);
-    S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'vault', vaultSite: k, label: `${V.name}${V.tier >= 5 ? ' (sehr gefährlich)' : ''}` });
+    S.ents.world.push({ id: uid(), kind: 'prop', type: V.boat ? 'boat' : 'mine_entrance', map: 'world', x: q.x, y: q.y, r: 14, solid: false, portal: 'vault', vaultSite: k, label: V.boat || `${V.name}${V.tier >= 5 ? ' (sehr gefährlich)' : ''}` });   /* Geheime Orte S5: Walknocheninsel = Boot am Nebelsteg */
   }
 }
 function buildVault(site, floor) {
@@ -12640,6 +12762,7 @@ function enterVault(site) {
   const V = VAULTS[site]; if (!V) return;
   if (foesNear(S.player)) return UI.toast('Nicht jetzt — Feinde sind nah.');
   buildVault(site, 1); travel('vault');
+  if (V.secretKey && !S.secrets?.[V.secretKey]?.found) secretFound(V.secretKey);   /* Geheime Orte S5: die Walknocheninsel gilt mit dem Betreten als gefunden */
   UI.toast(`${V.name}${V.tier >= 5 ? ' — sehr gefährlich' : ''}`, 2600); if (S.vaultMod) log(VAULT_MOD[S.vaultMod], 'world');
 }
 function vaultDescend() {
@@ -12658,6 +12781,7 @@ function vaultHoardOpened(t) {
   const prog = S.vaults?.[t.vaultHoard]; if (!prog || prog.looted) return; prog.looted = true; prog.cleared[VAULTS[t.vaultHoard].floors] = S.day | 0;
   chronicle(`${VAULTS[t.vaultHoard].name} geplündert`, 'news', `${S.player.name} kam mit dem Hort wieder herauf.`);
   if (t.vaultHoard === 'ausbrecherstollen') stollenChoice();          /* Geheime Orte S2 */
+  if (t.vaultHoard === 'walknochen') walknochenChoice();              /* Geheime Orte S5 */
   const next = Object.keys(VAULTS).find(k => VAULTS[k].hidden && !VAULTS[k].secretKey && !S.flags['vaultHint_' + k]);   /* §5e.3: im Hort liegt eine Karte zum nächsten geheimen Gewölbe (nicht für Geheimorte) */
   if (next) { S.flags['vaultHint_' + next] = 1; const L = LOCATIONS.find(l => l.key === VAULTS[next].at); ensureVaultSites();
     log(`Im Hort liegt eine verblasste Karte: ein Eingang nahe ${L?.name || 'einem alten Ort'} — ${VAULTS[next].name}. Er ist jetzt auf der Karte.`, 'quest'); UI.toast(`KARTE GEFUNDEN: ${VAULTS[next].name.toUpperCase()}`, 3000); }
@@ -12896,8 +13020,36 @@ function heroHailTick() {
   const near = actorsOf('world').list.filter(e => e.kind === 'npc' && e.alive && !e.downed && !e.guard && !e.hostile && !e.angry && !e.robot && e.homeTown && !S.party.includes(e.id) && dist(e, p) < 320).sort((a, b) => dist(a, p) - dist(b, p)).slice(0, 3);
   if (near.length >= 2) heroHail(due, near, p);
 }
+/* T17 Szene 3 — Hinrichtung am Galgen (Entwurf t17_regiebuch §3.8, ⚖): Am Galgen des Königs in Varonheim wird gerichtet, wenn dort gestern oder
+   heute ein Gefangener abgeliefert wurde, sonst jeden siebten Tag (Tag % 7 = 3). Morgens ruft ein Ausrufer es aus (Log, wenn man in der Nähe ist);
+   steht man um 12 Uhr am Markt (18 Felder), läuft die Szene live (die Welt läuft weiter): Trommel, die Menge zeigt, ein Wächter liest das
+   Urteil, die Falltür. Einmal am Tag. Ohne Spielfolgen außer der Chronik — Grausamkeits-Ruf bleibt beim Abliefern (Entwurf). */
+const galgenDay = () => { const D = S.flags.deliver?.varonheim, d = S.day | 0; return (!!D && D.n > 0 && d - D.day <= 1) || d % 7 === 3; };
+const galgenOf = (map = 'world') => (S.ents[map] || []).find(e => e.kind === 'prop' && e.label === 'Galgen des Königs');
+function gallowsTick() {
+  const p = S.player; if (!p?.alive || p.map !== 'world' || S._quiet || S.cine || S.dying || S.coop?.role === 'guest' || UI.dialogueOpen() || !galgenDay()) return;
+  const day = S.day | 0, G = galgenOf(); if (!G || S.flags.galgenDone === day || heldBy('varonheim') || S.war?.nodes?.varonheim?.owner === 'undead') return;
+  if (S.minute >= 7 * 60 && S.minute < 12 * 60 && dist(p, G) < 40 * TS && S.flags.galgenHint !== day) { S.flags.galgenHint = day; log('Ein Ausrufer am Markt von Varonheim: „Mittags wird am Galgen gerichtet!“', 'world'); }
+  if (S.minute >= 12 * 60 && S.minute < 13 * 60 && dist(p, G) < 18 * TS) gallowsScene(G);
+}
+function gallowsScene(G, preview = false) {
+  const m = G.map || 'world', day = S.day | 0, D = S.flags.deliver?.varonheim, mine = !!D && D.n > 0 && day - D.day <= 1;
+  if (!preview) S.flags.galgenDone = day;
+  const q = detSpot(m, (G.x / TS | 0) + 1, (G.y / TS | 0) + 1, 4) || [G.x / TS | 0, G.y / TS | 0];
+  const c = makeChar({ name: 'Verurteilter', prof: 'Gefangener', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, map: m, level: 1 }); Object.assign(c, { map: m, transient: true, visitor: true, condemned: true, anchor: { x: c.x, y: c.y } }); S.ents[m].push(c);
+  const L = S.ents[m].filter(e => e.kind === 'npc' && e.alive && e !== c && e !== S.player && !S.party.includes(e.id) && dist(e, G) < 420), crowd = L.filter(e => !e.guard).slice(0, 8), herald = L.find(e => e.guard) || crowd[0];
+  const gone = () => { S.ents[m] = S.ents[m].filter(e => e !== c); };
+  cinematic([
+    { dur: 4200, zoom: 1.1, focus: G.id, text: 'Mittag am Galgen.', beats: [...[0, 0.08, 0.16, 0.24].map(t => ({ t, sfx: 'drum' })), ...crowd.map((e, i) => ({ t: 0.2 + i * 0.04, gesture: 'zeigen', who: e, toward: G, ms: 1200 })),
+      { t: 0.3, gesture: 'abwehren', who: c, ms: 1200 }, ...(herald ? [{ t: 0.45, say: `Im Namen König Varons: Tod durch den Strang${mine ? ' — einer, den du gebracht hast' : ''}, wegen Raub an der Straße.`, who: herald, ms: 3400 }] : [])] },
+    { dur: 2600, zoom: 1.15, focus: G.id, beats: [{ t: 0.1, sfx: 'break', shake: 2, ms: 150 }, { t: 0.15, do: gone }, { t: 0.15, fx: 'dust', at: G, n: 10 },
+      ...crowd.slice(0, 2).map((e, i) => ({ t: 0.3 + i * 0.1, gesture: 'trauern', who: e, ms: 1600 })), ...crowd.slice(2, 5).map((e, i) => ({ t: 0.35 + i * 0.08, float: '…', who: e })), { t: 0.9, duck: 1, ms: 500 }] },
+  ], gone, { stay: true });
+  if (!preview) { chronicle('Hinrichtung in Varonheim', 'crime', 'Am Galgen des Königs, zur Mittagsstunde.'); log('Am Galgen des Königs wird gerichtet. Die Menge schweigt, dann geht sie.', 'world'); }
+  return c;
+}
 function worldCardTick(now) {
-  heroHailTick();   /* P3.x E10: im selben 0,9-s-Takt */
+  heroHailTick(); morrFallTick(); gallowsTick();   /* P3.x E10, T17 Szenen 3/4: im selben 0,9-s-Takt */
   if (!EV_CARDS.length || now < evCardUntil || S.cine || S.dying || S._quiet || S.map === 'prolog' || !S.player?.alive || UI.dialogueOpen() || UI.modalOpen) return;
   const c = EV_CARDS.shift(); evCardUntil = now + c.ms + 600;
   if (c.war) cinematic([{ dur: c.ms, auto: true, beats: [{ t: 0, sfx: c.snd, duck: 0.5, ms: 300 }, { t: 0.02, card: { title: c.title, sub: c.sub, ms: c.ms } }, { t: 0.85, duck: 1, ms: 400 }] }], null, { pause: true, stay: true });
@@ -16536,9 +16688,12 @@ function vanishDay() {
 // sie findet; Lage = fester Anker aus LOCATIONS + fester Versatz, Platz per deterministischer Spiralsuche (kein Zufall, die Welt bleibt
 // gleich). Gespeichert wird nur S.secrets. Erster Ort: das Glockenmoor — nachts bei Nebel oder Regen schlägt im Moor eine Glocke; drei
 // Glockenpfähle (Taufe, Hochzeit, Tod) in der richtigen Reihenfolge läuten öffnet die versunkene Kapelle, falsch weckt Ertrunkene.
-const SECRETS = { kammer: { name: 'Die Kammer der Namen', at: 'seelenhuegel', dx: 0, dy: 6 }, brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 } };
+const SECRETS = { kammer: { name: 'Die Kammer der Namen', at: 'seelenhuegel', dx: 0, dy: 6 }, brunnen: { name: 'Der Brunnen der Durstigen', at: 'sandruinen', dx: 3, dy: 2 }, stollen: { name: 'Der Ausbrecherstollen', at: 'steinbruch', dx: -20, dy: 0 }, glockenmoor: { name: 'Versunkene Kapelle von Moorbach', at: 'marsh', dx: 6, dy: 4 }, hundert: { name: 'Das Lager der Verlorenen Hundert', at: 'hundertfeld', dx: 8, dy: -6 },
+  /* Geheime Orte S5 (Planlauf 08.10., Entwurf geheime_orte.md §2.4/2.7/2.8): Uhrmacher, Leuchtfeuer, Walknocheninsel (Kartenpunkt draußen vor der Nebelbank) */
+  uhrmacher: { name: 'Die Werkstatt des Ersten Uhrmachers', at: 'gelenkhall', dx: 35, dy: 6 }, leuchtfeuer: { name: 'Das Leuchtfeuer der Nebelinsel', at: 'mistisle', dx: 0, dy: -9 }, walknochen: { name: 'Die Walknocheninsel', at: 'mistisle', dx: -30, dy: 20 } };
 const SECRET_N = Object.keys(SECRETS).length;   /* A-20: zählt die gebauten Geheimnisse (vorher fest 8, es gibt weniger) */
 function detSpot(map, tx, ty, R = 12) { for (let r = 0; r <= R; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (!SOLID.has(tileAt(map, x, y))) return [x, y]; } return null; }
+const dirName = (dx, dy) => ['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];   /* S5: Blickrichtung in Worten */
 function secretAt(k) { const D = SECRETS[k], L = LOCATIONS.find(l => l.key === D.at); return L ? [L.x + D.dx, L.y + D.dy] : null; }
 function ensureSecrets() {
   S.ents.world = S.ents.world.filter(e => !e.secret); S.secrets ||= {};
@@ -16553,6 +16708,11 @@ function ensureSecrets() {
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 12, solid: false, transient: true, secret: 'kammer', secretNames: true, label: 'Eine niedrige Tür aus Knochen im Hang' }); }
   const H2 = secretAt('hundert'); if (H2 && !S.secrets.hundert?.found) { const q = detSpot('world', H2[0], H2[1], 10); if (q)   /* Geheime Orte S2: die Lanze auf dem Hügel */
     S.ents.world.push({ id: uid(), kind: 'prop', type: 'banner_pole', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 8, solid: false, transient: true, secret: 'hundert', secretDig: true, label: 'Eine Lanze mit Valen-Wimpel, tief im Hügel — darunter klingt es hohl (E: graben)' }); }
+  const Uh = secretAt('uhrmacher'); if (Uh && !S.secrets.uhrmacher?.found) { const q = detSpot('world', Uh[0], Uh[1], 10); if (q)   /* Geheime Orte S5: Tür mit Zifferblatt hinter der Hecke */
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'mine_entrance', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 12, solid: false, transient: true, secret: 'uhrmacher', secretClock: true, label: 'Eine Tür mit Zifferblatt, halb hinter der Hecke' });
+    for (const a of S.ents.world) if (a.kind === 'prop' && a.type === 'automat_frame' && a.label && !a.label.includes('Kopf')) a.label += ` — sein Kopf ist nach ${dirName(Uh[0] - a.x / TS, Uh[1] - a.y / TS)} gedreht`; }   /* Umgebungsweg: alle ruhenden Automaten schauen zur Werkstatt */
+  const Lf = secretAt('leuchtfeuer'); if (Lf && !S.secrets.leuchtfeuer?.found) { const q = detSpot('world', Lf[0], Lf[1], 8); if (q)
+    S.ents.world.push({ id: uid(), kind: 'prop', type: 'tower_ruin', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 14, solid: false, transient: true, secret: 'leuchtfeuer', secretLight: true, label: 'Eingestürzter Leuchtturm — oben ein Becken voll kalter Asche' }); }
   for (const [k, D] of Object.entries(SECRETS)) if (S.secrets[k]?.found && !LOCATIONS.some(l => l.key === 'sec_' + k)) { const P = secretAt(k); if (P) LOCATIONS.push({ key: 'sec_' + k, name: D.name, x: P[0], y: P[1], r: 6, kind: 'ruin', threat: 2, secret: true }); }
 }
 let bellSeq = [], bellT = 0;
@@ -16638,7 +16798,49 @@ function secretTick() {                                              /* Umgebung
   if (!night || !wet || Math.hypot(p.x / TS - G[0], p.y / TS - G[1]) > 40 || (bellT += 3) < 39) return; bellT = 0; sfx('bell', 0, 0.25);
   if (!S.flags.bellHeard) { S.flags.bellHeard = 1; log('Irgendwo im Moor schlägt eine Glocke. Es gibt dort keine Kirche.', 'world'); }
 }
-function secretTick3() { const p = S.player, K = secretAt('kammer'); if (p.map !== 'world' || !K || S.secrets?.kammer?.found || S.flags.vialHum === (S.day | 0) || !hasItem(p, 'soul_vial') || Math.hypot(p.x / TS - K[0], p.y / TS - K[1]) > 25) return; S.flags.vialHum = S.day | 0; log('Die Seelenphiole in deinem Gepäck summt. Irgendwo unter dem Seelenhügel antwortet etwas.', 'world'); }
+/* Geheime Orte S5 (Planlauf 08.10., Entwurf §2.4/2.7/2.8; ⚖ Belohnungen vereinfacht, Uhrmacherhand-Bauplan fehlt noch):
+   Uhrmacher — die Tür mit dem Zifferblatt öffnet nur zur Mittagsstunde (11:30–12:30, „wenn die Zeiger einander decken und kein Schatten fällt“);
+   drinnen wacht der Erste Automat. Finden: jeder ruhende Automat schaut zur Werkstatt; in Tickmar erzählt ein Werkmeister vom Meister.
+   Leuchtfeuer — nachts bei Nebel brennt auf der Nebelinsel ein grünes Licht (Log am Nebelsteg); ein Fischer in Salzhafen weiß davon. Nachts
+   bittet am Leuchtturm der Geist des Wärters Hanno, das Feuer zu entzünden (3 Holz): Lohn Hannos Fernrohr (Karte deckt sich weiter auf)
+   und das Boot ohne Ruderer am Nebelsteg. Walknocheninsel — mit dem Boot (oder mit Weißbarts Seekarte, die ihr Kreuz vor der Nebelbank hat)
+   zum Versteck im Walskelett (Gewölbe, eine Ebene); im Hort Weißbarts Beute — dem Seevolk melden, zurückgeben oder behalten. */
+function clockDoor(t) {
+  const p = S.player, m = S.minute;
+  if (m < 11.5 * 60 || m > 12.5 * 60) return UI.dialogue({ ...p, name: 'Tür mit Zifferblatt' }, 'Ein Zifferblatt statt eines Schlosses. Darunter, in Messing: „Öffne, wenn die Zeiger einander decken und kein Schatten fällt.“ Das Uhrwerk wartet.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (foesNear(p)) return UI.toast('Nicht jetzt — Feinde sind nah.');
+  sfx('metal', 0.4, 0.8); secretFound('uhrmacher'); const tx = t.x / TS | 0, ty = t.y / TS | 0;
+  const e = spawnEnemy('automat', 'world', tx + 2, ty + 3, { level: Math.max(12, p.level + 2) }); if (e) Object.assign(e, { transient: true, elite: true, name: 'Der Erste Automat', title: 'Der Erste Automat', aggroId: p.id });
+  const q = detSpot('world', tx - 2, ty + 2, 4) || [tx, ty]; S.ents.world.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: q[0] * TS + TS / 2, y: q[1] * TS + TS / 2, r: 10, solid: true, label: 'Werkbank des Uhrmachers', loot: vaultLoot(4), lootBonus: 3 });
+  S.factions.aurel = clamp((S.factions.aurel || 0) + 5, -100, 100);
+  log('Zwölf Schläge, und die Zeiger decken sich: Die Tür springt auf. Drinnen Federn, Zahnräder — und ein Messingmann, der den Kopf hebt. Der Erste Automat schaut dich an. (Aurelion +5)', 'quest');
+}
+function lightTower(t) {
+  const p = S.player, night = S.minute >= 21 * 60 || S.minute < 5 * 60;
+  if (!night) return UI.dialogue({ ...p, name: 'Eingestürzter Leuchtturm' }, 'Oben im Becken kalte Asche. Auf dem Stein Ruß, frischer, als er sein dürfte. Wer hier Feuer macht, tut es nachts.', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  const H = { ...p, name: 'Hanno, der Wärter (ein Geist)' }, wood = S.res.wood || 0;
+  UI.dialogue(H, '„Dreißig Jahre kein Feuer. Draußen warten noch welche. Drei Scheite, mehr brauche ich nicht — zündest du es an?“', [
+    ...(wood >= 3 ? [{ text: 'Das Feuer entzünden (3 Holz)', fn: () => { S.res.wood -= 3; secretFound('leuchtfeuer'); fx(t.x, t.y - 30, 'fire', 24); sfx('fire', 0.6, 0.9); addItem(p, 'fernrohr'); S.flags.vaultHint_walknochen = 1; ensureVaultSites();
+      log('Grünes Feuer schlägt aus dem Becken. Hanno nickt und ist fort; auf dem Stein liegt sein Fernrohr. Unten am Nebelsteg schaukelt ein Boot ohne Ruderer — es wartet auf dich.', 'quest'); UI.closeDialogue(); } }] : [{ text: `Ich habe kein Holz dabei (${wood}/3).`, fn: () => UI.closeDialogue() }]),
+    { text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+}
+function walknochenChoice() {
+  const p = S.player, g = 400;
+  UI.dialogue({ ...p, name: 'Weißbarts Beutekiste' }, `Unter den Rippen des Wals: eine Kiste mit dem weißen Anker, ${g} Gold darin und Seekarten mit Kreuzen. Wem gehört das?`, [
+    { text: `Dem Seevolk melden — Ysolde und der Salzbund holen es (Seevolk +10, ${g / 2} Gold Finderlohn)`, fn: () => { S.gold += g / 2; S.factions.sea = clamp((S.factions.sea || 0) + 10, -100, 100); S.secrets.walknochen = { ...(S.secrets.walknochen || {}), choice: 'salz' }; log(`Der Salzbund holt Weißbarts Beute. ${g / 2} Gold Finderlohn, das Seevolk merkt sich deinen Namen (+10).`, 'faction'); UI.closeDialogue(); } },
+    { text: `Behalten (${g} Gold, Seevolk −10)`, fn: () => { S.gold += g; S.factions.sea = clamp((S.factions.sea || 0) - 10, -100, 100); S.secrets.walknochen = { ...(S.secrets.walknochen || {}), choice: 'keep' }; log(`${g} Gold aus Weißbarts Kiste. In Tangkron wird man es erfahren (Seevolk −10).`, 'faction'); UI.closeDialogue(); } }]);
+}
+function secretTick4() {
+  const p = S.player; if (p.map !== 'world') return; const L = secretAt('leuchtfeuer'); if (!L) return;
+  const d = Math.hypot(p.x / TS - L[0], p.y / TS - L[1]), night = S.minute >= 21 * 60 || S.minute < 5 * 60;
+  if (!S.secrets?.leuchtfeuer?.found && !S.flags.greenLight && night && S.weather === 'fog' && d < 45) { S.flags.greenLight = 1; log('Drüben auf der Nebelinsel brennt ein grünes Licht. Dort lebt seit dreißig Jahren niemand mehr.', 'world'); }
+  if (!S.flags.vaultHint_walknochen && hasItem(p, 'seekarte') && d < 45) { S.flags.vaultHint_walknochen = 1; ensureVaultSites(); log('Das Kreuz auf Weißbarts Seekarte liegt vor der Nebelbank — gleich hinter dieser Insel. Am Nebelsteg liegt ein Boot.', 'quest'); }
+}
+function secretTalk(npc, choices) {   /* Wissenswege: einmal je Figur, nur wenn das Geheimnis noch offen ist */
+  if (npc.homeTown === 'tickmar' && !npc.guard && !S.secrets?.uhrmacher?.found && /meister|Ingenieur|Mechan|Uhr|Feinmech/.test(npc.prof || '') && !npc._clockTold) choices.push({ text: 'Wer hat die ersten Automaten gebaut?', fn: () => { npc._clockTold = 1; UI.dialogue(npc, '„Der Erste Uhrmacher. Er hat einem Messingmann das Schauen beigebracht — und alle seine Automaten schauen bis heute in dieselbe Richtung. Zu seiner Werkstatt, sagt man. Östlich von Gelenkhall, hinter einer Hecke.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+  if (npc.homeTown === 'saltport' && /Fischer/.test(npc.prof || '') && !S.secrets?.leuchtfeuer?.found && !npc._lightTold) choices.push({ text: 'Was gibt es draußen auf dem Meer?', fn: () => { npc._lightTold = 1; UI.dialogue(npc, '„Auf der Nebelinsel brennt manchmal Licht. Grün. Nachts, wenn Nebel liegt. Seit dreißig Jahren ist da keiner mehr — der alte Wärter Hanno ist mit seinem Feuer gestorben.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+}
+function secretTick3() { secretTick4(); const p = S.player, K = secretAt('kammer'); if (p.map !== 'world' || !K || S.secrets?.kammer?.found || S.flags.vialHum === (S.day | 0) || !hasItem(p, 'soul_vial') || Math.hypot(p.x / TS - K[0], p.y / TS - K[1]) > 25) return; S.flags.vialHum = S.day | 0; log('Die Seelenphiole in deinem Gepäck summt. Irgendwo unter dem Seelenhügel antwortet etwas.', 'world'); }
 function secretTick2() { const p = S.player, H = secretAt('hundert'); if (p.map !== 'world' || !H || S.secrets?.hundert?.found || S.flags.lanceSeen || Math.hypot(p.x / TS - H[0], p.y / TS - H[1]) > 20) return; S.flags.lanceSeen = 1; log('Auf einem Hügel am Rand des Hundertfelds steckt eine Lanze mit einem verblichenen Valen-Wimpel. Niemand hat hier je aufgeräumt.', 'world'); }
 function cultProps() {
   S.ents.world = S.ents.world.filter(e => !e.cultProp); const C = S.cult; if (!C || !TOWN_PLAN.varonheim) return;
@@ -18368,6 +18570,8 @@ function debugSections() {
       'NPC-Ziele: Stadt arm → Abwanderung ankündigen': () => { const k = v('dbTown'), g = growthOf(k); g.prosper = Math.min(g.prosper, -5); const c = announceLeave(k);   /* N2 */
         if (!c) return UI.toast('Kein Ziel mit Wohlstand ≥ 50 oder kein Kandidat.'); const p = P(); toWorld(); p.x = c.x + 40; p.y = c.y; UI.toast(`${c.name} packt — sprich mit ihm.`); },
       'NPC-Ziele: Abwanderung sofort ausführen': () => { const c = VILLAGERS.find(e => e.leaving); if (!c) return UI.toast('Niemand packt.'); c.leaving.day = S.day | 0; migrationDay(); },
+      'Musik: nächste Phrase sofort (Region/Ort)': () => { if ((S.settings.music ?? 0.5) <= 0) S.settings.music = 0.5; ambience(true); musicNow(); UI.toast('Musik: gleich kommt die nächste Phrase.'); },   /* P4 Technik 08.10. */
+      'Stadt: Stimmung zeigen (Trauer/Fest/Angst)': () => { const m = ['trauern', 'jubeln', 'abwehren'][(dbgMood = (dbgMood + 1) % 3)]; UI.toast(`Stimmung „${m}“: ${moodIdleTick(m)} Bewohner.`); },   /* N4 */
       'Stadt: Besitzer-Banner neu setzen': () => { ensureOwnerBanners(); UI.toast('Banner nach Besitzer gesetzt.'); },   /* T33 */
       'NPC-Ziele: Leerstand ins Log': () => log(`Leerstand: ${Object.entries(S.vacant || {}).map(([h, d]) => `${h} (Tag ${d})`).join(', ') || 'keiner'}.`, 'world'),
       'Leistung: update-Abschnitte messen (10 s)': () => { PF = { _t: 0 }; UI.toast('Messe 10 s …'); setTimeout(() => { const P0 = PF; PF = null; const n = P0._n || 1;   /* P4.29 */
@@ -18483,6 +18687,9 @@ function debugSections() {
       'Geheime Orte: Sandsturm endet (Brunnen frei)': () => { S.flags.wellOpen = (S.day | 0) + 1; ensureSecrets(); const B = secretAt('brunnen'); if (B) tp(B[0], B[1] + 4); },
       'Geheime Orte: zu den Kreidezeichen (Stollen)': () => { const St = secretAt('stollen'); if (St) tp(St[0] + 14, St[1] + 5); },
       'Geheime Orte: zum Hundertfeld (Lanze)': () => { const H = secretAt('hundert'); if (H) tp(H[0], H[1] + 3); },
+      'Geheime Orte: zur Uhrmacher-Tür (12 Uhr stellen)': () => { const U = secretAt('uhrmacher'); if (U) { tp(U[0], U[1] + 3); S.minute = 12 * 60; } },   /* S5 */
+      'Geheime Orte: zum Leuchtturm (Nacht, Nebel, 3 Holz)': () => { const L = secretAt('leuchtfeuer'); if (L) { tp(L[0], L[1] + 3); S.minute = 23 * 60; S.weather = 'fog'; S.res.wood = Math.max(3, S.res.wood || 0); } },   /* S5 */
+      'Geheime Orte: Boot zur Walknocheninsel (Seekarte geben, zum Nebelsteg)': () => { addItem(p, 'seekarte'); S.flags.vaultHint_walknochen = 1; ensureVaultSites(); const b = S.ents.world.find(e => e.vaultSite === 'walknochen'); if (b) tp(b.x / TS2 | 0, (b.y / TS2 | 0) + 2); },   /* S5 */
       'Geheime Orte: zurücksetzen': () => { S.secrets = {}; for (let i = LOCATIONS.length - 1; i >= 0; i--) if (LOCATIONS[i].secret) LOCATIONS.splice(i, 1); ensureSecrets(); UI.toast('Geheimnisse zurückgesetzt'); },
       'Ratgeber an/aus': () => { S.settings.tips = S.settings.tips === false; UI.toast(S.settings.tips === false ? 'Ratgeber aus' : 'Ratgeber an'); },
       'Ratgeber: alle Tipps zurücksetzen': () => { S.flags.tips = {}; guideLast = -1e9; UI.toast('Tipps kommen wieder'); },
@@ -18716,6 +18923,10 @@ function debugSections() {
       'Fertigkeit: Meilenstein freischalten (nächster)': () => { const k = v('dbSkill'), n = skillNext(P(), k); if (!n) return UI.toast('Alles freigeschaltet.'); gainSkill(P(), k, Math.max(0, n.lv * 2 - (P().skills[k] || 0))); },
       'Fertigkeit: zurücksetzen': () => { const k = v('dbSkill'); P().skills[k] = 0; recalc(P()); log(`${SKILL_NAMES[k]} zurückgesetzt.`, 'party'); },
       'Fenster: Fertigkeiten': () => UI.openModal('mastery'),
+      'Fischen: Angel geben': () => { addItem(P(), 'angel', 1); UI.toast('Angel im Gepäck — am Wasser benutzen.'); },
+      'Fischen: je Gewässer einen Fisch geben': () => { for (const W of Object.values(FISH_WATER)) addItem(P(), W.fish[0][0], 1); UI.refreshHUD(); },
+      'Fischen: Biss sofort (beim Auswerfen)': () => { if (!FISH) return UI.toast('Erst die Angel auswerfen.'); clearTimeout(FISH.t1); FISH.bite = performance.now(); float(P(), 'Biss!', 'rgba(240,220,150,ALPHA)'); },
+      'Fischen: Gewässerart hier': () => { const w = waterNear(P()); log(w ? `Wasser hier: ${FISH_WATER[waterKind(S.map, w.x, w.y)].name}.` : 'Kein Wasser in Reichweite (2 Kacheln).', 'world'); },
       'Hauswissen: Rezepte zeigen': () => log(`Haus ${S.legacy.house} kennt: ${(S.legacy.recipes || []).map(k => ITEMS[k]?.name || k).join(', ') || 'noch nichts'}.`, 'party'),
     }],
     ['Bionik', '', {   /* Roadmap P2–P5: Bionik-Tests */
@@ -18830,6 +19041,10 @@ function debugSections() {
       'Sprechblase am nächsten': () => { const n = S.ents[S.map].filter(x => (x.kind === 'npc' || x.kind === 'enemy') && x.alive && x !== p).sort((a, b) => dist(a, p) - dist(b, p))[0]; bubble(n || p, 'Hier ist eine Sprechblase.', 3000); },
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
+      'T17: Goblinsturm Sieg (Szene, ohne Folgen)': () => { if (!stormWonScene(() => {})) UI.toast('Geht gerade nicht (Probe/Gast/Heldentod).'); },
+      'T17: Morrgrund brennt (Szene, ohne Folgen)': () => morrFallScene(),
+      'T17: Garmadon-Herzschlag (nur in der Gruft, ohne Folgen)': () => { const s0 = S.flags.introSeen?.garmadon; if (S.flags.introSeen) delete S.flags.introSeen.garmadon; if (!garmadonScene('challenge')) UI.toast('Garmadon ist nicht hier (Debug: Teleport Karte „garmadon“).'); if (s0 != null) S.flags.introSeen.garmadon = s0; },
+      'T17: Hinrichtung am Galgen (Szene, ohne Folgen; Teleport zum Galgen)': () => { const G = galgenOf(); if (!G) return UI.toast('Kein Galgen gefunden.'); tp(G.x / TS2 | 0, (G.y / TS2 | 0) + 4); setTimeout(() => gallowsScene(G, true), 300); },
       'E10: Bewohner rufen den Helden (jetzt, nächste Bewohner, Tat Garmadon oder letzte Tat)': () => { const due = DEEDS.filter(([f]) => S.flags[f]).pop() || DEEDS[0], near = actorsOf(p.map).list.filter(e => e.kind === 'npc' && e.alive && !e.guard && !S.party.includes(e.id) && e !== p && dist(e, p) < 400).sort((a, b) => dist(a, p) - dist(b, p)).slice(0, 3); if (near.length < 2) return UI.toast('Zu wenige Bewohner in der Nähe.'); const f0 = { ...(S.flags.hailed || {}) }, d0 = S.flags.hailDay; heroHail(due, near, p); S.flags.hailed = f0; S.flags.hailDay = d0; },   /* P3.x E10, ohne Folgen */
       'Ereignis-Pins: sichtbare Liste (E22 Teil 2, Konsole; Brand/Spuk/Anomalie/Meteor unter „Ereignisse“ auslösen)': () => { const L = eventPins(); console.table(L); UI.toast(`${L.length} Ereignis-Pins in entdeckten Gebieten`, 2400); },
       'Varons Tod vorspielen (Szene, ohne Folgen am Stand)': () => { const k = S.ents[S.map].find(e => e.varonKing) || p; const f0 = { ...S.flags }, b0 = structuredClone(S.bounty || {}); kingDeath(k, false); Object.assign(S.flags, f0); S.bounty = b0; },
@@ -20363,12 +20578,13 @@ export function selftest() {
     const sc = put('goblin_scout', 150), mate = put('goblin', 400); mate.aggroId = null; mate.aiState = 'idle'; run(sc); const called = sc.called && mate.aggroId === p.id && sc.scoutRun > 0;
     const lo = put('bandit_looter', 60); lo.hp = lo.maxHp * 0.4; run(lo); const bolt = lo.bolted && lo.fleeing;
     const be = put('goblin_berserker', 60); be.hp = be.maxHp * 0.4; run(be); const rage = be.rage && be.spdMul > 1 && be.dmgMul > 1;
+    for (const o of S.ents.__a) if (o !== p) o.alive = false;   /* sonst heilt er den verwundeten Berserker von eben */
     const sh = put('goblin_shaman', 200), hg = put('goblin', 230); hg.aggroId = null; hg.aiState = 'idle'; hg.hp = hg.maxHp * 0.3; const h0 = hg.hp; sh.healCd = 0; sh.curseCd = 0; run(sh);
     const shaman = hg.hp > h0 && (p.status || []).some(q => q.name === 'Goblinfluch');
     const te = put('goblin_tinker', 120); te.bombCd = 0; run(te); const bomb = te.heavy?.kind === 'slam' && te.telegraph >= 900;
     const sp = put('goblin_spear', 20); run(sp); const shove = sp.shoveCd > 0;
     const kn = put('bandit_knife', 50); kn.atkCd = 500; const x0 = kn.x, y0 = kn.y; run(kn, 5); const circle = Math.hypot(kn.x - x0, kn.y - y0) > 1 && !(kn.swing > 0);
-    const ch = put('bandit_chief', 300), led = ch.variant === 'leader' && R.every(k => spawnEnemy(k, '__a', 12, 12).weaponKey === ROLE_WEAPON[k]);
+    const ch = put('bandit_chief', 300); hurt(ch, 1, p); const led = ch.variant === 'leader' && ch.rallied && R.every(k => spawnEnemy(k, '__a', 12, 12).weaponKey === ROLE_WEAPON[k]);
     if (!(data && looks && called && bolt && rage && shaman && bomb && shove && circle && led)) console.warn('Rollen-Probe', { data, looks, called, bolt, rage, shaman, bomb, shove, circle, led });
     return data && looks && called && bolt && rage && shaman && bomb && shove && circle && led;
   }));
@@ -22719,13 +22935,35 @@ export function selftest() {
       p.skills.onehanded = 40; const sw20 = wperk(p, 'parry') === 0.35;
       p.skills.polearms = 40; p.equip.weapon = mkItem('spear'); const t = spawnEnemy('bandit', '__a', 16, 9); p.comboFin = true; hit(p, t, 0.01); p.comboFin = false; const stag = t.stagger >= 950;
       p.skills.smithing = 20; const smith = perkVal(p, 'smithing', 'quality') === 10 && perkVal(S.ents.__a.find(e => e.kind === 'npc' && e !== p) || { skills: { smithing: 100 } }, 'smithing', 'quality') === 0;
-      const saved = JSON.stringify(saveData()).includes('"polearms":');
+      const sd = saveData(), saved = (typeof sd === 'string' ? sd : JSON.stringify(sd)).includes('"polearms":');
       p.skills.smithing = 0; S.res.iron = 20; S.res.wood = 20; S.legacy.recipes = []; const no = craftItem('kriegssichel', false, true); S.legacy.recipes = ['kriegssichel']; const yes = craftItem('kriegssichel', false, true);
       const heir = makeChar({ name: 'Erbe', x: p.x, y: p.y, level: 1 }), fresh = !(heir.skills.polearms > 0) && !(heir.skills.smithing > 0);
       const legacy = !no && !!yes && fresh;
-      if (!(indep && strength && dimin && sw10 && sw20 && stag && smith && saved && legacy)) console.warn('Skill-Core', { indep, strength, dimin, sw10, sw20, stag, smith, saved, legacy, harmless, g0: g[0], g19: g[19], st: t.stagger });
+      if (!(indep && strength && dimin && sw10 && sw20 && stag && smith && saved && legacy)) console.warn('Skill-Core', JSON.stringify({ indep, strength, dimin, sw10, sw20, stag, smith, saved, legacy, harmless, g0: g[0], g19: g[19], st: t.stagger, no: !!no, yes: !!yes, fresh }));
       return indep && strength && dimin && sw10 && sw20 && stag && smith && saved && legacy;
     } finally { if (rec0) S.legacy.recipes = rec0; else delete S.legacy.recipes; Object.assign(S.res, r0); }
+  }));
+  ok('Fischen (08.10.): Gewässerart nach Lage (Küste an der Südsee), Auswerfen nur am Wasser; zu früh/zu spät nichts, rechtzeitig ein Fisch des Gewässers; seltene erst ab Stufe 15; am selben Platz abnehmend; Fisch → Fischsuppe im Kessel', sandbox(() => {
+    const p = stage(), m0 = S.map, x0 = p.x, y0 = p.y, r0 = { ...S.res }, fs0 = new Set(FISH_SPOT.keys()); p.inv = []; p.invCap = 60; p.skills = {};
+    try {
+      const M = MAPS.world, Wd = M.w; let spot = null, coast = null;
+      for (let i = 0; i < M.tiles.length && !(spot && coast); i += 7) { if (M.tiles[i] !== T.WATER) continue; const x = i % Wd, y = i / Wd | 0;
+        if (!coast && y >= seaLine(x)) coast = [x, y];
+        if (!spot && y < seaLine(x) - 6 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !SOLID.has(tileAt('world', x + dx, y + dy)) && (spot = [x + dx, y + dy, x, y]))) {} }
+      const kinds = !!coast && waterKind('world', ...coast) === 'coast' && !!spot && ['river', 'lake', 'swamp'].includes(waterKind('world', spot[2], spot[3]));
+      S.map = 'world'; p.x = 300 * TS; p.y = 300 * TS; const dry = tileAt('world', 300, 300) === T.WATER || !!waterNear(p) || fishUse(p) === null;
+      p.x = spot[0] * TS + TS / 2; p.y = spot[1] * TS + TS / 2;
+      fishUse(p); const early = fishUse(p) === null && !FISH;
+      fishUse(p); FISH.bite = performance.now() - 5000; const late = fishUse(p) === null;
+      fishUse(p); const W = FISH_WATER[FISH.kind]; FISH.bite = performance.now() - 100; const got = fishUse(p), caught = !!got && W.fish.some(([k]) => k === got) && hasItem(p, got) && (p.skills.fishing || 0) > 0;
+      let rareLow = 0, rareHi = 0; for (let i = 0; i < 40; i++) { p.skills.fishing = 0; const k = fishCatch(p, { kind: 'river', spotK: '__lo' + i }); if (ITEMS[k]?.rare) rareLow++; }
+      p.skills.fishing = 30; for (let i = 0; i < 80; i++) { const k = fishCatch(p, { kind: 'river', spotK: '__hi' + i }); if (ITEMS[k]?.rare) rareHi++; }
+      p.skills.fishing = 10; const g = []; for (let i = 0; i < 8; i++) { const a = p.skills.fishing; fishCatch(p, { kind: 'lake', spotK: '__same' }); g.push(p.skills.fishing - a); }
+      const dimin = g[7] < g[0] * 0.8;
+      p.inv = []; addItem(p, 'forelle', 1); addItem(p, 'karpfen', 1); S.res.herb = 1; const soup = !!craftItem('fischsuppe', false, true) && hasItem(p, 'fischsuppe') && !hasItem(p, 'forelle') && !hasItem(p, 'karpfen');
+      if (!(kinds && dry && early && late && caught && rareLow === 0 && rareHi > 0 && dimin && soup)) console.warn('Fischen', JSON.stringify({ kinds, dry, early, late, caught, rareLow, rareHi, dimin, soup, g, spot, coast }));
+      return kinds && dry && early && late && caught && rareLow === 0 && rareHi > 0 && dimin && soup;
+    } finally { if (FISH) { clearTimeout(FISH.t1); clearTimeout(FISH.t2); FISH = null; } for (const k of [...FISH_SPOT.keys()]) if (!fs0.has(k)) FISH_SPOT.delete(k); S.map = m0; p.x = x0; p.y = y0; Object.assign(S.res, r0); }
   }));
   ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
     const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;
@@ -23493,7 +23731,7 @@ export function selftest() {
   ok('Varonheim-Umbau S5 (Start): jede Herkunft hat ein erreichbares Startviertel in oder an Varonheim; drei Anfängeraufträge am Brett; Kult für Hauptstädter frühestens Tag 10', sandbox(() => {
     const p = stage(), C0 = S.contracts, CD = structuredClone(S.conDay || {}), f0 = structuredClone(S.flags), cu0 = S.cult ? structuredClone(S.cult) : null;
     try { const spots = Object.keys(ORIGINS).map(capStartSpot), P = TOWN_PLAN.varonheim, [x0, y0, x1, y1] = P.area;
-      const near = spots.every(q => q && q.x / TS >= x0 - 8 && q.x / TS <= x1 + 8 && q.y / TS >= y0 - 2 && q.y / TS <= y1 + 8 && !SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)));
+      const near = spots.every(q => q && (q.x / TS | 0) >= x0 - 8 && (q.x / TS | 0) <= x1 + 8 && (q.y / TS | 0) >= y0 - 2 && (q.y / TS | 0) <= y1 + 8 && !SOLID.has(tileAt('world', q.x / TS | 0, q.y / TS | 0)));   /* Kachelgrenzen: freeSpotNear liefert Kachelmitten (+0,5) — Kachel y1+8 lag sonst je nach Zufall „außerhalb“ (12 % rot) */
       S.contracts = []; capStart(p, ORIGINS.wanderer, 'wanderer'); const B2 = S.contracts.filter(c => c.town === 'varonheim' && c.starter); const three = B2.length === 3 && B2.some(c => c.kind === 'deliver' && c.target === 'northcity') && B2.every(c => c.reward.gold <= 60);
       const kept = townContracts('varonheim', 'board').filter(c => c.starter).length === 3;
       S.cult = { stage: 0, clues: {}, missing: [], taken: 0, heat: 0, gone: [] }; S.flags.startCap = 1; const lv = p.level; p.level = 1; const d0 = S.day;
@@ -23692,6 +23930,38 @@ export function selftest() {
       if (!(det && wrong && found)) console.log('Geheim-Probe', JSON.stringify({ det, n: posts.length, wrong, found }));
       return det && wrong && found;
     } finally { S.ents.world = W0; S.secrets = s0; S.factions.order = o0; LOCATIONS.length = L0; bellSeq = []; }
+  }));
+  ok('T17 Szenen 3/4: Goblinsturm-Sieg (jubeln, dann heim — auch beim Überspringen), Garmadon-Herzschlag (Hof kniet, Welt steht), Hrodvar-Frostring, Hinrichtung am Galgen (Falltür nimmt den Verurteilten, auch beim Überspringen), „Morrgrund brennt“ wartet auf freie Bahn', sandbox(() => {
+    const p = stage(), c0 = S.cine, GA = S.ents.garmadon, d0 = S.day;
+    try {
+      const quiet = stormWonScene(() => {}) === false;
+      S._quiet = false; S.cine = null; let fin = 0; stormWonScene(() => fin++);
+      const sw = !!S.cine?.pause && S.cine.shots[1].beats.some(b => b.card?.title === 'DIE GRUBENSTÄMME SIND FREI'); cineEnd(); const won = sw && fin === 1 && !S.cine;
+      S.flags.introSeen = {}; const g = actor(300, 200, { name: 'Garmadon' }); g.mtype = 'garmadon'; const ct = [0, 1].map(i => { const a = actor(280 + i * 40, 230); a.gCourt = true; return a; }); S.ents.garmadon = [g, ...ct];
+      const gs = garmadonScene('challenge') && S.cine.pause && S.cine.shots[0].beats.filter(b => b.sfx === 'heartbeat').length === 3 && S.cine.shots[0].beats.some(b => b.gesture === 'knien') && S.flags.introSeen.garmadon === S.legacy.gen; S.cine = null; cineBars(false);
+      const h = spawnEnemy('hrodvar', '__a', 14, 9, { level: 18 }); const ice = !!h && bossIntro(h) && S.cine.shots[0].beats.some(b => b.do && b.shake === 5); S.cine = null; cineBars(false);
+      const G = { id: 'probe_galgen', kind: 'prop', type: 'chain_post', map: '__a', x: 400, y: 300, r: 8, label: 'Galgen des Königs' }; S.ents.__a.push(G); [0, 1, 2].forEach(i => actor(420 + i * 20, 340));
+      const c = gallowsScene(G, true), gal = !!S.cine && S.ents.__a.includes(c) && S.cine.shots[0].beats.filter(b => b.sfx === 'drum').length === 4; cineEnd(); const hanged = gal && !S.ents.__a.includes(c);
+      S.day = 3; const gd = galgenDay(); S._quiet = true; S.flags.morrFallPending = true; delete S.flags.morrFallShown; morrFallTick(); const waits = S.flags.morrFallPending === true && !S.flags.morrFallShown;
+      if (!(quiet && won && gs && ice && hanged && gd && waits)) console.log('T17-Probe', { quiet, won, gs, ice, hanged, gd, waits });
+      return quiet && won && gs && ice && hanged && gd && waits;
+    } finally { S.cine = c0; S._quiet = true; S.day = d0; cineBars(false); if (GA) S.ents.garmadon = GA; else delete S.ents.garmadon; document.getElementById('nameCard')?.getAnimations?.().forEach(a => a.cancel()); }
+  }));
+  ok('Geheime Orte S5: Uhrmacher (Tür nur zur Mittagsstunde, Automaten schauen hin), Leuchtfeuer (nur nachts, 3 Holz → Fernrohr + Boot am Steg), Walknocheninsel (Beute-Wahl); 8 Geheimnisse', sandbox(() => {
+    const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, m0 = S.minute, w0 = S.res.wood, btn = pre => [...document.querySelectorAll('#dlg-choices button')].find(b => b.textContent.startsWith(pre));
+    try { S.ents.world = W0.slice(); S.secrets = {}; ensureSecrets();
+      const n8 = SECRET_N === 8 && ['uhrmacher', 'leuchtfeuer', 'walknochen'].every(k => secretAt(k)), door = S.ents.world.find(e => e.secretClock), tower = S.ents.world.find(e => e.secretLight);
+      if (!door || !tower) { console.log('Geheim-S5', { n8, door: !!door, tower: !!tower }); return false; }
+      const look = S.ents.world.some(e => e.type === 'automat_frame' && /Kopf ist nach/.test(e.label || ''));
+      S.minute = 10 * 60; clockDoor(door); const shut = !S.secrets.uhrmacher?.found; UI.closeDialogue();
+      S.minute = 12 * 60; clockDoor(door); const open = !!S.secrets.uhrmacher?.found && S.ents.world.some(e => e.name === 'Der Erste Automat');
+      S.minute = 14 * 60; lightTower(tower); const dayNo = !S.secrets.leuchtfeuer?.found; UI.closeDialogue();
+      S.minute = 23 * 60; S.res.wood = 5; lightTower(tower); btn('Das Feuer')?.click();
+      const lit = !!S.secrets.leuchtfeuer?.found && hasItem(p, 'fernrohr') && S.res.wood === 2 && S.ents.world.some(e => e.vaultSite === 'walknochen' && e.type === 'boat' && e.portal === 'vault');
+      const g0 = S.gold; walknochenChoice(); btn('Behalten')?.click(); const keep = S.gold === g0 + 400 && S.secrets.walknochen?.choice === 'keep';
+      if (!(n8 && look && shut && open && dayNo && lit && keep)) console.log('Geheim-S5', { n8, look, shut, open, dayNo, lit, keep });
+      return n8 && look && shut && open && dayNo && lit && keep;
+    } finally { S.ents.world = W0; S.secrets = s0; LOCATIONS.length = L0; S.minute = m0; S.res.wood = w0; UI.closeDialogue(); }
   }));
   ok('Geheime Orte S2: Lanze auf dem Hundertfeld — graben öffnet das Lager (Wächter, Truhe), Kriegsvorrat stärkt auf Wunsch die Garnison', sandbox(() => {
     const p = stage(), W0 = S.ents.world, s0 = structuredClone(S.secrets || {}), L0 = LOCATIONS.length, WAR = structuredClone(S.war), v0 = S.factions.valen, m0 = S.minute, d0 = S.day;

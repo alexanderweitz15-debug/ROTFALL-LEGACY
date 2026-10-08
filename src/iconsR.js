@@ -1,7 +1,21 @@
 // S14 Stil R: handgezeichnete 16×16-Symbole für Verbrauchsgüter und Material (Nutzer: „restliche Sprites“).
 // Zeichen → Farbe je Symbol; '.' leer, 'o' Kontur. Waffen und Rüstung kommen weiter aus den echten Sprites (render.js iconR).
 const O = '#1c1512';
+/* Fischen (08.10.2026): ein Fischumriss, je Art eigene Farben (B Rücken, b Bauch, w Auge, T Schwanz) */
+const FISH_ROWS = ['................', '................', '................', '................', '.....oooooo...oo', '...ooBBBBBBo.oTo',
+  '..oBBBBBBBBBooTo', '.oBwoBBBBBBBBTTo', 'oBBBBBBBBBBBBTTo', 'obbbbbbbbbbbbTTo', '.obbbbbbbbbbooTo', '..oobbbbbbbo.oTo',
+  '....ooooooo...oo', '................', '................', '................'];
+const fishIcon = (B, b, T) => [{ B, b, T, w: '#f0ece0' }, FISH_ROWS];
 export const ICON_R = {
+  forelle: fishIcon('#6a7a5a', '#d8c8a8', '#4a5a3e'), lachs: fishIcon('#7a8a98', '#e0a088', '#5a6a78'), hecht: fishIcon('#4a6a3a', '#c8c890', '#2e4a26'),
+  karpfen: fishIcon('#8a7a3a', '#d8c070', '#6a5a2a'), barsch: fishIcon('#5a7a4a', '#d8b878', '#c06a3a'), wels: fishIcon('#4a4440', '#9a9080', '#2e2a26'),
+  hering: fishIcon('#6a8aa0', '#e8eef0', '#4a6a80'), kabeljau: fishIcon('#8a8a70', '#e0dccc', '#6a6a56'), rotbarsch: fishIcon('#b84a3a', '#e8a088', '#8a2e22'),
+  schlammbeisser: fishIcon('#5a4a32', '#9a8a60', '#3e3222'), giftbarbe: fishIcon('#5a7a3a', '#c8d060', '#7a3a7a'), moorhecht: fishIcon('#3a4a32', '#8a9a6a', '#22301e'),
+  any_fish: fishIcon('#7a7a7a', '#c8c8c8', '#5a5a5a'),
+  angel: [{ s: '#8a5a2a', l: '#d8d0c0', h: '#9aa0a8' }, ['..............oo', '.............oso', '............oso.', '...........oso..', '..........oso.l.', '.........oso..l.',
+    '........oso...l.', '.......oso....l.', '......oso.....l.', '.....oso......l.', '....oso.......l.', '...oso........l.', '..oso.........h.', '.oso.........hh.', 'oso.............', 'oo..............']],
+  fischsuppe: [{ f: '#d8d8d0', s: '#c8a060', S: '#a8783a', B: '#6a4a2a' }, ['................', '................', '....f...f.......', '.....f...f......', '....f...f.......', '..oooooooooooo..',
+    '.osssssssssssso.', '.oSSSsSSSsSSSSo.', '..oBBBBBBBBBBo..', '...oBBBBBBBBo...', '....oooooooo....', '................', '................', '................', '................', '................']],
   potion: [{ c: '#8a6a42', g: '#a9c4bc', w: '#eef4ee', r: '#b8322a', R: '#e0685a', d: '#7a1c18' }, [
     '................', '......oooo......', '.....occcco.....', '......oggo......', '......oggo......', '.....oggggo.....',
     '....oggwgggo....', '...ogrrrrrrgo...', '...orRrrrrrro...', '..orRrrrrrrrro..', '..orRrrrrrrrro..', '..orrrrrrrrdro..',

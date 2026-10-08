@@ -755,6 +755,7 @@ function headSN(C, L, X, hx, hy, back, ids, meta) {
     else if (t === 'great') C.rows(hm, y0 - 2, [[13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'bascinet') C.rows(hm, y0 - 4, [[15, 16], [14, 17], [13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'kettle') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0 + 1, [[10, 21], [11, 20]], hx); }
+    else if (t === 'pot') { C.rows(hm, y0 - 3, [[12, 19], [12, 19], [12, 19], [12, 19]], hx); C.rows(hm, y0 + 1, [[11, 20]], hx); C.rect(hm, 20 + hx, y0 - 2, 21 + hx, y0 - 2); }   /* R2 improvisiert: Kochtopf mit Henkel */
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); if (!back) C.rect(hm, 15 + hx, y0 + 2, 16 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }
@@ -941,6 +942,7 @@ function headW(C, L, X, hx, hy, ids, meta) {
     else if (t === 'great') C.rows(hm, y0 - 2, [[13, 18], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'bascinet') C.rows(hm, y0 - 4, [[16, 17], [15, 18], [13, 18], [12, 19], [11, 19], [11, 19], [12, 19], [12, 19], [12, 19], [12, 19], [12, 19], [13, 18]], hx);
     else if (t === 'kettle') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0 + 1, [[10, 21], [11, 20]], hx); }
+    else if (t === 'pot') { C.rows(hm, y0 - 3, [[12, 19], [12, 19], [12, 19], [12, 19]], hx); C.rows(hm, y0 + 1, [[11, 20]], hx); C.rect(hm, 20 + hx, y0 - 2, 21 + hx, y0 - 2); }   /* R2 improvisiert: Kochtopf mit Henkel nach hinten */
     else if (t === 'nasal') { C.rows(hm, y0 - 2, [[14, 17], [13, 18], [12, 19], [12, 19]], hx); C.rect(hm, 12 + hx, y0 + 2, 12 + hx, y0 + 4); }
     else if (t === 'wide') { C.rows(hm, y0 - 4, [[14, 17], [13, 18], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[8, 23], [9, 22]], hx); }
     else if (t === 'hat') { C.rows(hm, y0 - 3, [[14, 17], [13, 18], [13, 18]], hx); C.rows(hm, y0, [[10, 21]], hx); }

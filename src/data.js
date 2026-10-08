@@ -406,6 +406,7 @@ export const ITEMS = {
   dietrich: { name:'Dietrich der Diebesgilde', slot:'material', stack:1, rarity:'rare', value:40, lore:'Gebogener Draht, fein gefeilt. Macht ein Schloss nachgiebiger (+30 % beim Knacken).' },
   auftragspaket: { name:'Versiegeltes Paket', slot:'material', stack:5, rarity:'common', value:0, lore:'Ein Auftrag. Nicht öffnen, nicht verlieren, nicht fragen.' },   // S12 Phase 2
   auftragsbrief: { name:'Versiegelter Brief', slot:'material', stack:5, rarity:'common', value:0, lore:'Wachs, ein Siegel, ein Name. Der Empfänger soll antworten — bring die Antwort zurück.' },   /* P3.25–26: Nachricht mit Antwort */
+  fernrohr:      { name:'Hannos Fernrohr', slot:'material', stack:1, rarity:'uncommon', value:180, desc:'Messing, ein Sprung im Glas. Im Gepäck deckt sich die Karte weiter auf (Sichtweite der Karte +20 %).', lore:'Der Wärter des Leuchtfeuers hat damit dreißig Jahre lang nach Schiffen gesehen, die nicht kamen.' },   /* Geheime Orte S5 */
   antwortbrief:  { name:'Antwortbrief', slot:'material', stack:5, rarity:'common', value:0, lore:'Die Antwort, frisch gesiegelt. Gehört dem, der den ersten Brief geschickt hat.' },   /* P3.25–26 */
   vargs_kette: { name:'Vargs Kette', slot:'material', stack:1, rarity:'legendary', value:0, lore:'Das erste Glied, das Varg je geschmiedet hat. Kalt, schwer — und es summt, wenn man an Omega denkt.' },
   vargs_tagebuch: { name:'Vargs Tagebuch', slot:'material', stack:1, rarity:'rare', value:0, lore:'Enge Schrift, Blutflecken. Die letzte Seite beschreibt ein Ritual: Krone, Kette, Splitter, zehn Seelen, ein Freund, das eigene Blut.' },
@@ -416,6 +417,22 @@ export const ITEMS = {
   automatenkern: { name:'Automatenkern', slot:'material', stack:20, rarity:'uncommon', value:60, lore:'Ein Messingherz voller Zahnräder. Tickt noch, wenn man es ans Ohr hält.' },
   bread:      { name:'Brotlaib', slot:'consumable', use:'food', heal:6, food:1, stack:9, rarity:'common', value:4 },
   dried_meat: { name:'Dörrfleisch', slot:'consumable', use:'food', heal:10, food:2, stack:9, rarity:'common', value:9 },
+  /* Fischen (Spec Skills §13–14, 08.10.2026 — Werte vorläufig): Angel (wird nicht verbraucht) und je Gewässer zwei häufige und ein seltener Fisch (ab Fischen Stufe 15) */
+  angel:      { name:'Angel', slot:'consumable', use:'fish', stack:1, rarity:'common', value:24, lore:'Rute, Schnur, Haken. Am Wasser benutzen: auswerfen, auf den Biss warten, dann sofort noch einmal benutzen.' },
+  forelle:    { name:'Forelle', slot:'consumable', use:'food', heal:5, food:1, stack:9, rarity:'common', value:7, fish:'river' },
+  lachs:      { name:'Lachs', slot:'consumable', use:'food', heal:7, food:2, stack:9, rarity:'common', value:12, fish:'river' },
+  hecht:      { name:'Hecht', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:30, fish:'river', rare:true },
+  karpfen:    { name:'Karpfen', slot:'consumable', use:'food', heal:6, food:2, stack:9, rarity:'common', value:8, fish:'lake' },
+  barsch:     { name:'Barsch', slot:'consumable', use:'food', heal:5, food:1, stack:9, rarity:'common', value:7, fish:'lake' },
+  wels:       { name:'Wels', slot:'consumable', use:'food', heal:10, food:3, stack:9, rarity:'uncommon', value:32, fish:'lake', rare:true },
+  hering:     { name:'Hering', slot:'consumable', use:'food', heal:4, food:1, stack:9, rarity:'common', value:5, fish:'coast' },
+  kabeljau:   { name:'Kabeljau', slot:'consumable', use:'food', heal:7, food:2, stack:9, rarity:'common', value:11, fish:'coast' },
+  rotbarsch:  { name:'Rotbarsch', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:34, fish:'coast', rare:true },
+  schlammbeisser: { name:'Schlammbeißer', slot:'consumable', use:'food', heal:3, food:1, stack:9, rarity:'common', value:4, fish:'swamp' },
+  giftbarbe:  { name:'Giftbarbe', slot:'material', stack:20, rarity:'common', value:14, fish:'swamp', lore:'Nicht essbar. Alchemisten zahlen für das Gift.' },
+  moorhecht:  { name:'Moorhecht', slot:'consumable', use:'food', heal:9, food:2, stack:9, rarity:'uncommon', value:36, fish:'swamp', rare:true },
+  fischsuppe: { name:'Fischsuppe', slot:'consumable', use:'food', heal:18, food:3, stack:9, rarity:'common', value:20 },
+  any_fish:   { name:'Fisch (beliebig)', slot:'material', value:0, hidden:true },
   herb:       { name:'Heilkraut', slot:'consumable', use:'bandage', heal:10, stack:9, rarity:'common', value:12, lore:'Als Umschlag auf eine Wunde gelegt.' },
   wasserschlauch: { name:'Wasserschlauch', slot:'consumable', use:'water', stack:5, rarity:'common', value:12, desc:'Kühles Brunnenwasser aus Karak-Atar. Füllt die Ausdauer und schützt eine Stunde vor der Wüstenhitze.' },   /* Karak-Atar */
   kanzlerdegen: { name:'Kanzlerdegen „Rotes Siegel“', slot:'weapon', wtype:'sword', dmg:18, reach:48, arc:1.5, speed:450, stam:7, bleed:0.3, rarity:'legendary', unique:true, value:1000, skill:'onehanded', desc:'Aldhelms Degen. Wer einen Blutenden damit fällt, trinkt ein wenig von ihm: +8 % Leben.' },   /* §5g.2 */
@@ -575,9 +592,9 @@ export const MONSTERS = {
                lore:'Trägt einen prallen Sack auf dem Rücken. Wird es ernst, rennt er mit der Beute davon — wer ihn einholt, findet mehr Gold bei ihm.', pal:{skin:'#c8a07a',cloth:'#5a4a32',metal:'#7d7364'} },
   bandit_knife:{ name:'Messerstecher', abart:{ of:'bandit', p:0.12 }, rolle:'Dolchkämpfer', build:'drahtig', hp:38, dmg:9, speed:1.75, reach:26, atk:620, xp:26, sight:260, r:10, threat:2, faction:'bandit', interiors:true,
                lore:'Schnell, Maske, langes Messer. Umkreist dich, sticht zu und ist wieder weg. Nicht hinterherjagen — stehen bleiben und zuschlagen, wenn er hereinkommt.', pal:{skin:'#8d6644',cloth:'#2a2420',metal:'#8a8070'} },
-  bandit_heavy:{ name:'Schwerer Bandit', abart:{ of:'bandit', p:0.07 }, rolle:'Schwerer', build:'bullig', armor:5, heavy:{ kind:'slam', every:3, wind:850, mul:1.8, r:90 }, hp:120, dmg:16, speed:1.0, reach:46, atk:1500, telegraph:520, xp:70, sight:240, r:13, threat:3, faction:'bandit', interiors:true,
+  bandit_heavy:{ name:'Schwerer Bandit', abart:{ of:'bandit', p:0.07 }, rolle:'Schwerer', build:'bullig', armor:4, heavy:{ kind:'slam', every:3, wind:850, mul:1.8, r:90 }, hp:90, dmg:16, speed:1.0, reach:46, atk:1500, telegraph:520, xp:70, sight:240, r:13, threat:3, faction:'bandit', interiors:true,
                lore:'Erbeutetes Kettenhemd, Topfhelm, Zweihänder. Langsam, hart gepanzert — Wucht oder Durchschlag hilft. Holt er weit aus, kommt ein Flächenhieb: rollen.', pal:{skin:'#b2926f',cloth:'#3a3026',metal:'#5a5a56'} },
-  bandit_chief:{ name:'Bandenführer', abart:{ of:'bandit', p:0.04 }, rolle:'Anführer', leader:true, hp:110, dmg:14, speed:1.35, reach:38, atk:1000, telegraph:400, xp:80, sight:300, r:12, threat:3, faction:'bandit', interiors:true,
+  bandit_chief:{ name:'Bandenführer', abart:{ of:'bandit', p:0.04 }, rolle:'Anführer', leader:true, hp:90, dmg:14, speed:1.35, reach:38, atk:1000, telegraph:400, xp:80, sight:300, r:12, threat:3, faction:'bandit', interiors:true,
                lore:'Federhut, roter Mantel. Beim ersten Treffer ruft er die Bande herbei; fällt er, laufen viele davon. Ihn zuerst — oder ihn zuletzt, wenn du allein bist.', pal:{skin:'#c8a07a',cloth:'#3a2a20',metal:'#8a8070'} },
   goblin_scout:{ name:'Goblin-Späher', abart:{ of:'goblin', p:0.12 }, rolle:'Späher', hp:22, dmg:5, speed:1.65, reach:26, atk:760, xp:10, sight:320, r:9, threat:1, faction:'goblin', interiors:true,
                lore:'Klein, Kapuze, Hakenmesser. Sieht er dich, kreischt er den Stamm herbei und rennt davon. Erst danach kämpft er.', pal:{skin:'#6d7a45',cloth:'#2e3a24',metal:'#6b6156'} },
@@ -589,7 +606,7 @@ export const MONSTERS = {
                lore:'Messingbrille, Werkzeug, Sack voller Pulvertöpfe. Wirft aus mittlerer Entfernung eine Bombe: der rote Kreis am Boden fliegt gleich in die Luft — raus.', pal:{skin:'#6d7a45',cloth:'#4a3a28',metal:'#8a7040'} },
   goblin_spear:{ name:'Goblin-Speerträger', abart:{ of:'goblin_warrior', p:0.25 }, rolle:'Speerträger', hp:46, dmg:11, speed:1.2, reach:60, atk:1100, telegraph:320, xp:26, sight:240, r:11, threat:2, faction:'goblin', interiors:true,
                lore:'Langer Speer, Blechkappe. Hält dich auf Speerlänge und stößt zurück, wer zu nah kommt. Seitlich angehen.', pal:{skin:'#5f6e3c',cloth:'#3d2f20',metal:'#8a7f6d'} },
-  goblin_berserker:{ name:'Goblin-Berserker', abart:{ of:'goblin_warrior', p:0.15 }, rolle:'Berserker', build:'bullig', hp:52, dmg:12, speed:1.4, reach:30, atk:800, xp:30, sight:240, r:12, threat:2, faction:'goblin', interiors:true,
+  goblin_berserker:{ name:'Goblin-Berserker', abart:{ of:'goblin_warrior', p:0.15 }, rolle:'Berserker', build:'bullig', hp:52, dmg:11, speed:1.4, reach:30, atk:800, xp:30, sight:240, r:12, threat:2, faction:'goblin', interiors:true,
                lore:'Nackter Oberkörper, rote Augen, Beil ohne Schild. Unter halbem Leben rast er: schneller und härter, flieht nie. Vorher erledigen oder Abstand halten.', pal:{skin:'#56703a',cloth:'#3a2018',metal:'#7a6a58'} },
   chain_brute:{ name:'Kettenknecht', heavy:{ kind:'slam', every:3, wind:800, mul:2.2, r:70 }, hp:95, dmg:15, speed:1.2, reach:40, atk:1150, telegraph:420, xp:60, sight:260, r:13, threat:3, faction:'chain', interiors:true,   // S11: Leibwache der Kette
                pal:{skin:'#9a8068',cloth:'#1c1a18',metal:'#5a5652'} },
@@ -1847,7 +1864,7 @@ export const TOWNS = {
 // say = Satz in der Sprechblase, court = Umstehende weichen zurück, beat = Herzschlag, flash = Blitz. Aldhelm hat seinen eigenen Auftritt.
 export const BOSS_CARDS = {
   chain_master: { title: 'VARG', sub: 'Kettenmeister der Eisenmark', sfx: 'chains', fx: 'spark', say: 'Dann wird deine Kette die schwerste in dieser Halle.', court: true },
-  hrodvar: { title: 'HRODVAR', sub: 'König unter dem Eis', sfx: 'crack', fx: 'frost', say: 'Der Stern fiel. Wir gruben ihm entgegen.' },
+  hrodvar: { title: 'HRODVAR', sub: 'König unter dem Eis', sfx: 'crack', fx: 'frost', say: 'Der Stern fiel. Wir gruben ihm entgegen.', ice: true },   /* T17 §3.2: Frostring beim Auftritt */
   garmadon: { title: 'KÖNIG GARMADON', sub: 'Herr der Toten', sfx: 'heartbeat', fx: 'bone', say: 'Gut. Ich war lange nicht mehr müde.', beat: true, court: true },
   whitebeard: { title: 'WEISSBART', sub: 'König der Sturmklinge', sfx: 'shout', fx: 'spark', say: 'Noch einer, der mein Meer will?', court: true },
   dodon: { title: 'DODON', sub: 'Hüter von Morrgrund', sfx: 'shout', fx: 'dust', say: 'Morrgrund vergisst nicht.' },
@@ -1886,6 +1903,7 @@ export const WAR_EDGES = [['graveyard','marsh'], ['graveyard','fortress'], ['mar
 // Medizin). need = Vorrat (Holz, Stein, Eisen, Kräuter) oder Gegenstände aus der Tasche. min = nötige Fertigkeit, n = Anzahl.
 export const RECIPES = {
   dagger:        { st: 'forge', need: { iron: 2 } },
+  fischsuppe:    { st: 'kessel', need: { any_fish: 2, herb: 1 }, n: 2 },   /* Fischen: Fisch → Kochen (any_fish = zwei beliebige essbare Fische) */
   longsword:     { st: 'forge', need: { iron: 4, wood: 1 } },
   axe:           { st: 'forge', need: { iron: 3, wood: 2 } },
   spear:         { st: 'forge', need: { iron: 2, wood: 3 } },

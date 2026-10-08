@@ -1118,7 +1118,7 @@ function invDetail(force) {
 }
 // S13 (Nutzer: „beim Kauf ein kleines Info-Fenster, was es ist und was es macht“): Beschreibung eines Gegenstands — Werte wie im
 // Inventar plus ein Satz, wofür er gut ist. Genutzt von Inventar und Handel.
-const USE_TXT = { bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
+const USE_TXT = { fish: 'Am Wasser benutzen: auswerfen. Erscheint „Biss!“, sofort noch einmal benutzen (knapp eine Sekunde Zeit). Fluss, See, Küste und Sumpf haben eigene Fische.', bandage: 'Anlegen dauert 2,5 s: heilt das schlimmste Körperteil und stillt Blutungen.', heal: 'Trinken: heilt sofort Leben.', food: 'Essen: gibt Ausdauer zurück, heilt keine Wunden.',
   soul: 'Seelenphiole: Essenz für Totenrufer, Linderung für Hexer.', prosthesis: 'Ersetzt ein verlorenes Glied (in Gelenkhall anpassen lassen).',
   eye: 'Roboterauge einsetzen: ersetzt ein schwächeres Auge. Magie- und Schattentreffer nutzen es ab, unter 30 % wirkt es nicht.',   /* Roadmap P2 */
   mechmod: 'Modul auf eine Prothese stecken (Arm- oder Beinprothese nötig). Ein altes Modul kommt zurück in die Tasche.',   /* Roadmap P3 */
@@ -1281,7 +1281,7 @@ function charUI(body, who) {
     defense: 'Steigt, wenn du getroffen wirst oder abwehrst. Chance, Hiebe von vorn abzuwehren (weniger Schaden).',
     medicine: 'Steigt beim Verbinden und Heilen mit Verbänden und Kräutern. Jeder Verband heilt mehr.',
     toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
-    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.',
+    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.', fishing: 'Steigt mit jedem Fang (seltene Fische mehr; am selben Platz immer weniger). Fische beißen schneller, mehr Zeit zum Anschlagen, ab Stufe 15 seltene Fische.',
     trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
     leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
     smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
@@ -2047,6 +2047,11 @@ function settingsUI(body) {
       <h3 style="margin-top:14px">Ton</h3>
       <div class="ctx-actions">${[[0, 'Aus'], [0.35, 'Leise'], [0.7, 'Normal'], [1, 'Laut']].map(([v, n]) =>
         `<button data-vol="${v}" class="${(S.settings.volume ?? 0.7) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <h3 style="margin-top:14px">Musik</h3>
+      <div class="ctx-actions">${[[0, 'Aus'], [0.5, 'Leise'], [1, 'Normal']].map(([v, n]) =>
+        `<button data-mus="${v}" class="${(S.settings.music ?? 0.5) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <h3 style="margin-top:14px">Kamerafahrten</h3>
+      <div class="ctx-actions"><button id="cineAuto">${S.settings.cineAuto ? 'Laufen automatisch weiter' : 'Warten auf „Weiter“ (Leertaste/Enter)'}</button></div>
       <h3 style="margin-top:14px">Textgröße</h3>
       <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
     </div>
@@ -2073,6 +2078,8 @@ function settingsUI(body) {
   [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar
   [...body.querySelectorAll('[data-vol]')].forEach(b => b.onclick = () => { S.settings.volume = +b.dataset.vol; ambience(S.settings.volume > 0); refreshModal(); });
+  [...body.querySelectorAll('[data-mus]')].forEach(b => b.onclick = () => { S.settings.music = +b.dataset.mus; refreshModal(); });   /* 08.10.: Musik je Region */
+  const ca = body.querySelector('#cineAuto'); if (ca) ca.onclick = () => { S.settings.cineAuto = !S.settings.cineAuto; refreshModal(); };   /* 08.10.: Kamerafahrten von Hand/automatisch */
   $('sv').onclick = async () => { const ok = await A.saveNow(); toast(ok ? 'Gespeichert' : S.cine ? 'Während einer Kamerafahrt wird nicht gespeichert.' : 'Speichern fehlgeschlagen — der Browser-Speicher ist voll. Exportiere den Stand unten als Datei.', ok ? 1500 : 5000); };   // S15 (Nutzer: „speichern klappt nicht“)
   $('quit').onclick = () => { Promise.resolve(A.saveNow()).finally(() => { S._quiet = true; location.reload(); }); };   /* komprimiert speichern, dann ohne zweites (JSON-)Speichern beim Entladen neu laden */
   $('coopb').onclick = () => { closeModal(); A.openCoop?.(); };
