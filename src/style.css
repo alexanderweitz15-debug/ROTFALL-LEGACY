@@ -1182,3 +1182,10 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #prologPanel .pr-list li.now{color:#e8d6a8;font-weight:700}
 #prologPanel .pr-skip{width:100%;padding:5px 0}
 @media (max-width:700px){#prologPanel{top:auto;bottom:90px;left:8px}}
+/* Lesbarkeit (Entwickler 09.10.: „Text größer machen geht nicht; mein Vater konnte nicht alles lesen“): Textgröße als Faktor --ts (Optionen).
+   Fast alles im Spiel hat feste Pixelmaße — darum wird nicht die Grundschrift, sondern die ganze Oberfläche gezoomt; die Spalten wachsen mit. */
+:root{--ts:1}
+#stage{grid-template-columns:calc(264px*var(--ts)) 1fr calc(300px*var(--ts))}
+#game{grid-template-rows:calc(64px*var(--ts)) 1fr calc(130px*var(--ts))}
+#bottombar{grid-template-columns:1fr calc(430px*var(--ts))}
+#topbar,#leftpanel,#rightpanel,#logwrap,#hotbar,#dialogue,#modal,#toast,#tutor,#prompt,#prologPanel,#nameCard,.creation-grid,#deathscreen,#successor{zoom:var(--ts)}

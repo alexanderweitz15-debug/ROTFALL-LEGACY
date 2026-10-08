@@ -1218,6 +1218,7 @@ function drawPropPixel(e, now) {
   if (e.depleted) key += 'd' + (regrowing(e) ? 'r' : '');
   if (e.intact) key += 'I';
   if (e.opened) key += 'o';
+  if (e.type === 'street_lamp' && !lampOn(e)) key += 'x';   /* Aurelion-Rest (09.10.): Laterne bei Tag aus */
   if (e.on) key += 'n';   /* S15 Fehlersuche §5e.3: gezogener Hebel — sonst zeigt der Bild-Cache immer die ungezogene Stellung */
   const shut = stallShut(e); if (shut) key += 'z';   // §41: Markt sichtbar zu (Plane), nicht nur eine Zahl
   let reg = null;                                         // Fels trägt die Gesteinsfarbe seiner Region
@@ -2053,9 +2054,11 @@ function drawProp(e, now) {
       ctx.fillStyle = '#3a383e'; ctx.fillRect(x - 5, y - 6, 10, 8); ctx.fillStyle = '#55525a'; ctx.fillRect(x - 5, y - 6, 10, 2);
       ctx.fillStyle = '#1e1c1f'; ctx.fillRect(x - 1.5, y - 52, 3, 47); ctx.fillStyle = '#3a373c'; ctx.fillRect(x - 1.5, y - 52, 1, 47);
       ctx.fillRect(x - 12, y - 50, 24, 2); ctx.fillStyle = '#1e1c1f'; ctx.beginPath(); ctx.moveTo(x - 2, y - 52); ctx.lineTo(x, y - 58); ctx.lineTo(x + 2, y - 52); ctx.fill();
+      const lit = lampOn(e);   /* Aurelion-Rest (09.10.): bei Tag kaltes Glas mit Docht, nachts Flamme */
       for (const s of [-1, 1]) { const lx = x + s * 11;
         ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 48, 1, 3); ctx.fillRect(lx - 4, y - 45, 8, 2); ctx.fillRect(lx - 3, y - 35, 6, 2);
-        ctx.fillStyle = '#e2a95a'; ctx.fillRect(lx - 3, y - 43, 6, 8); ctx.fillStyle = '#f6d896'; ctx.fillRect(lx - 1, y - 41, 2, 4);
+        if (lit) { ctx.fillStyle = '#e2a95a'; ctx.fillRect(lx - 3, y - 43, 6, 8); ctx.fillStyle = '#f6d896'; ctx.fillRect(lx - 1, y - 41, 2, 4); }
+        else { ctx.fillStyle = '#4a5052'; ctx.fillRect(lx - 3, y - 43, 6, 8); ctx.fillStyle = '#7a8486'; ctx.fillRect(lx - 3, y - 43, 1, 8); ctx.fillStyle = '#2a2420'; ctx.fillRect(lx - 0.5, y - 39, 1, 3); }
         ctx.fillStyle = '#1e1c1f'; ctx.fillRect(lx - 0.5, y - 43, 1, 8); }
       break; }
     case 'banner_pole': {                                 // Königsbanner (heil): hoher Mast mit Kronenknauf, langes Tuch mit goldener Krone
@@ -2687,7 +2690,7 @@ function drawCreature(e, now) {
   if (m.angel) drawWings(e, now, 1);
   if (e.variant === 'frenzied') { ctx.fillStyle = `rgba(190,40,30,${0.12 + 0.06 * Math.sin(now / 140)})`; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 20, 10, 0, 0, 7); ctx.fill(); }   // S13: Raserei
   if (e.variant === 'leader') { ctx.fillStyle = '#3a2a1a'; ctx.fillRect(e.x + 9, e.y - 54, 2, 44); ctx.fillStyle = '#8a2a1e'; ctx.fillRect(e.x + 11, e.y - 54, 11, 7); ctx.fillRect(e.x + 11, e.y - 47, 7, 3); }   // S13: Feldzeichen des Anführers
-  drawHumanoid(proxy, now);
+  if (e.mounted && e.alive) drawHorse(proxy, now, e.mounted.kind || 'horse', true); else drawHumanoid(proxy, now);   /* Banditen-Reiter (09.10.): vorhandenes Pferd, Reitsitz */
   ctx.globalAlpha = 1; ctx.restore();
   if (e.mtype === 'shade') { ctx.fillStyle = 'rgba(14,12,20,.55)'; ctx.beginPath(); ctx.ellipse(e.x, e.y - 2, 12, 7, 0, 0, 7); ctx.fill(); }   // kein Fuß berührt den Boden
   if (e.mtype === 'necromancer') orbitSkulls(e, now);
@@ -3072,11 +3075,15 @@ export function ambient() {
 // Lichtquellen stehen still: einmal je Karte sammeln statt jedes Bild alle ~6500 Objekte zu prüfen.
 // Neu gesammelt, wenn sich die Objektzahl der Karte ändert (Bau, Abriss, Laden) oder die Karte wechselt.
 let lightCache = { map: null, n: -1, list: [] };
+/* Aurelion-Rest (09.10.2026): Laternen (street_lamp — Messinglaternen des Hochreichs und Kandelaber der Königsstraße) brennen nur
+   nachts. Jede Laterne hat einen festen Versatz bis 30 Minuten (Lage-Hash), so gehen sie abends nacheinander an und morgens
+   nacheinander aus — wie ein Laternenanzünder auf seiner Runde. An: ab 18:30 (+Versatz) bis 6:30 (−Versatz). */
+export const lampOn = e => { const h = (S.minute / 60) % 24, k = ((((e.x | 0) * 7 + (e.y | 0) * 13) % 30) + 30) % 30 / 60; return h >= 18.5 + k || h < 6.5 - k; };
 const LIGHT_T = new Set(['street_lamp', 'torch', 'campfire_static', 'lantern', 'campfire', 'smithy', 'shrine', 'candles', 'hearth', 'forge']);
 function lightOf(e, list) {                                  // Lichtquellen eines Objekts (Lampen, Feuer, Schreine, fertige Bauten)
   if (e.beacon && e.kind === 'prop') { list.push({ x: e.x, y: e.y - 30, r: 230, green: true }); return; }   /* Geheime Orte S5 (Agent Quests): grünes Leuchtfeuer der Nebelinsel */
   if (!LIGHT_T.has(e.type)) return;
-  if (e.kind === 'prop' && e.type === 'street_lamp') list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5 */
+  if (e.kind === 'prop' && e.type === 'street_lamp' && lampOn(e)) list.push({ x: e.x, y: e.y - 20, r: 120 });   /* Artist Runde 5; Aurelion-Rest: nur wenn an */
   if (e.kind === 'prop' && (e.type === 'torch' || e.type === 'campfire_static' || e.type === 'lantern')) list.push({ x: e.x, y: e.y, r: e.type === 'campfire_static' ? 140 : 95 });
   if (e.kind === 'building' && e.type === 'campfire' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 150 });
   if (e.kind === 'building' && e.type === 'smithy' && e.built >= 1) list.push({ x: e.x, y: e.y, r: 110 });

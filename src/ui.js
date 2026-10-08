@@ -655,6 +655,13 @@ export function sleepFade(text) {
   d.innerHTML = `<div>☾</div><p>${text}</p><small>Zzz …</small>`; d.className = 'on';
   clearTimeout(d._t); d._t = setTimeout(() => { d.className = 'off'; }, 2400);
 }
+/* Lesbarkeit (Entwickler 09.10.): Textgröße aus den Optionen als CSS-Faktor --ts (style.css zoomt Leisten, Fenster, Dialoge, Kamerafahrt-Text).
+   Beim Start und bei jeder Änderung anwenden; danach ein resize, damit das Spielbild seine neue Größe übernimmt. */
+export function applyTextScale() {
+  const v = Math.max(0.8, Math.min(1.8, +(S.settings?.textScale ?? 1) || 1));
+  document.documentElement.style.setProperty('--ts', String(v)); document.documentElement.style.fontSize = '';
+  window.dispatchEvent(new Event('resize'));
+}
 export function toast(text, ms = 2200) {
   if (S._quiet) return;                                   // Selbsttest-Sandbox: keine Einblendungen
   notify({ text: String(text), ms, loud: isLoud(String(text)) });   /* UI-Scheibe 4: jede Meldung wird eine Zeile im Meldungsfluss */
@@ -1520,8 +1527,9 @@ function settleUI(body) {
       list.map(([k, b]) => bldCard(k, b)).join('') + '</div>').join('')}
       <div class="ledger bhint">Klick: Bauplan ansehen · Doppelklick: sofort platzieren. Rote Zahl = es fehlt Material.</div></div>
     <div><h3>${st.name}</h3>
-      <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
+      <div class="ledger">Stufe: ${A.campInfo ? A.campInfo(st).name : settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()}</div>
+      ${(() => { const C = A.campInfo?.(st); if (!C) return ''; return `<div class="ledger" title="Anziehung = Stimmung (bis 50) + Schutz durch Wachen und Palisade (bis 25) + Arbeit (Felder, Werkbank, Schmiede, Heiler, Brunnen; bis 25). Sie bestimmt, wie schnell Siedler kommen. Eine erreichte Stufe bleibt.">Anziehung <b>${C.attract}</b>/100 · Abgaben ${C.gold} Gold/Tag · Unterhalt ${C.up} Gold/Tag${C.next ? `<br><small>Nächste Stufe — ${C.next}</small>` : ''}</div>`; })()}
       ${st.stage === 2 ? '<div class="ledger" style="color:#d0563f">Schutzlos: Niemand arbeitet, Fremde meiden das Lager. Wirb in einer Schenke Lagerwachen an (beim Wirt, 80 Gold).</div>' : st.stage === 1 ? '<div class="ledger" style="color:#c9a24a">Geschwächt: Viele Schützer sind gefallen.</div>' : ''}
       ${A.campGuards?.() ? `<div class="ledger">Lagerwachen: ${A.campGuards()} (je 5 Gold Sold am Tag)</div>` : ''}
       ${(() => { const I = A.raidInfo?.(); if (!I) return ''; return `<div class="ledger" title="Reichtum lockt an, wer in der Nähe ist. Schutzgeld an eine Bande schützt auch das Lager.">Bedrohung · Reichtum ${I.W} · Überfallgefahr je Nacht <b>${Math.round(I.ch * 100)} %</b><br><small>${I.L.length ? I.L.map(x => `◆ ${x.label} — ${x.dist} Felder`).join(' · ') : 'Keine Macht in der Nähe, nur Wölfe.'}</small></div>`; })()}
@@ -1623,7 +1631,7 @@ function facUI(body) {
       <div style="margin-top:10px">${Object.keys(FACTIONS).map(k => `<div class="fac-row ${k === selFac ? 'sel' : ''}" data-f="${k}">
         <span>${FACTIONS[k].name}</span><b>${S.factions[k] > 0 ? '+' : ''}${Math.round(S.factions[k])}</b></div>`).join('')}</div></div>
     <div><h3>${f.name}</h3><div class="ledger">${f.desc}</div>
-      <div class="statline"><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
+      <div class="statline" title="Ansehen reicht von −100 bis +100 (die befreiten Grubenstämme bis +300)."><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
@@ -2056,7 +2064,9 @@ function settingsUI(body) {
       <h3 style="margin-top:14px">Kamerafahrten</h3>
       <div class="ctx-actions"><button id="cineAuto">${S.settings.cineAuto ? 'Laufen automatisch weiter' : 'Warten auf „Weiter“ (Leertaste/Enter)'}</button></div>
       <h3 style="margin-top:14px">Textgröße</h3>
-      <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
+      <div class="ctx-actions">${[[0.9, 'Klein'], [1, 'Normal'], [1.2, 'Groß'], [1.4, 'Sehr groß'], [1.6, 'Riesig']].map(([v, n]) =>
+        `<button data-t="${v}" class="${(S.settings.textScale ?? 1) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:4px">Vergrößert Schrift und Leisten im ganzen Spiel, auch Kamerafahrten. Das Spielbild wird dabei etwas kleiner.</div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
       WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>V — Schleichen an/aus<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
@@ -2076,7 +2086,7 @@ function settingsUI(body) {
       <div class="ledger" id="cs-msg"></div>
     </div></div>`;
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
-  [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
+  [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { S.settings.textScale = +b.dataset.t; applyTextScale(); refreshModal(); });   /* 09.10.: wirkt jetzt wirklich (vorher nur Grundschrift, alles andere in px) */
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
   [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar

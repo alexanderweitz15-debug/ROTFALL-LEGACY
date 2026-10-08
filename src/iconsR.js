@@ -52,6 +52,10 @@ export const ICON_R = {
     '................', '................', '..oo........oo..', '.oBBo......oBBo.', '.oBbBo....oBbBo.', '..oBbBooooBbBo..',
     '...obBBBBBBbo...', '....obbbbbbo....', '....obbbbbbo....', '...obddddddbo...', '..oBbdoooodbBo..', '.oBbdo....odbBo.',
     '.oBdo......odBo.', '..oo........oo..', '................', '................']],
+  grabgut: [{ g: '#b08a40', G: '#e8d090', d: '#6a4a22', r: '#8a2a3a', R: '#d06070' }, [   /* E40.5: Ring mit Stein und zwei alte Münzen */
+    '................', '.......oo.......', '......orRo......', '.....oooooo.....', '....oGggggGo....', '...oGo....oGo...',
+    '...og......go...', '...og......go...', '...odo....odo...', '....oddddddo....', '.....oooooo.....', '................',
+    '..oooo....oooo..', '.oGggdo..oGggdo.', '..oooo....oooo..', '................']],
   dietrich: [{ m: '#8a8680', M: '#c8c4bc', d: '#4a4640', r: '#a0302a' }, [
     '................', '.....oooo.......', '....oMMMMo......', '...oMmoomMo.....', '...oMo..oMo.....', '...oMmoomMo.....',
     '....oMMMMo......', '.....oMmo.......', '.....oMmo.......', '.....oMmo.......', '.....oMmoooo....', '.....oMmMMMo....',

@@ -865,8 +865,7 @@ function paintW(C, L, R, plan, W, pose) {
   if (L.stoleR) C.rect(C.part(L.stoleR, 'cloth'), 14 + ln, top, 14 + ln, Math.min(hem + 1, 40));
   const belt = C.part(L.belt, 'leather'); C.rect(belt, 13 + ln - Math.max(0, X.be - 1), waist, 18 + ln + Math.max(0, X.wa), waist + 1); ids.belt = belt;
   if (L.strap && !ids.plate && !ids.tabard) { const s = C.part(dimR(L.leather, 0.15), 'leather'); for (let i = 0; i <= 10; i++) C.put(s, 15.5 + ln + i * 0.25, top + 1 + i); }
-  if (L.sashR) { const s = C.part(L.sashR, 'cloth'); for (let i = 0; i <= 10; i++) { C.put(s, 17 + ln - i * 0.35, top + 1 + i); C.put(s, 16 + ln - i * 0.35, top + 1 + i); } }
-  if (L.pouch) C.rect(C.part(L.leather, 'leather'), 17 + ln, waist + 1, 18 + ln, waist + 3);
+  if (L.sashR) { const s = C.part(L.sashR, 'cloth'); for (let i = 0; i <= 10; i++) { C.put(s, 17 + ln - i * 0.35, top + 1 + i); C.put(s, 16 + ln - i * 0.35, top + 1 + i); } }  if (L.pouch) C.rect(C.part(L.leather, 'leather'), 17 + ln, waist + 1, 18 + ln, waist + 3);
   if (X.ab >= 2 && (L.armor === 'plate' || L.armor === 'chain') && !L.robe) { const tp = C.part(L.armorR, 'metal', { grp: 'tasset' }), d = X.ab >= 3 ? 7 : 5;   // S15 P1: Beinplatte
     C.poly(tp, [[12 + ln, waist + 1.5], [17.5 + ln, waist + 1.5], [17 + ln, waist + d], [11 + ln, waist + d - 1]]); ids.tassets = [tp]; }
   if (L.cloak && X.cw === 'kapitaen') { const m = C.part(L.cloak, 'cloth', { grp: 'coatF' }), cH = Math.min(45, cloakHem - 1);   /* Artist R11: Rockschoß vorn */
@@ -1272,6 +1271,19 @@ function endgame(C, L, M, view) {
   if ((L.kn || (X.ab >= 2 && L.armor === 'plate')) && M.limbs) for (const k of ['lleg', 'rleg']) { const p = M.limbs[k]; if (!p) continue; const [x, y] = p, Mt = L.armorR || L.metal; C.set(x - 1, y, Mt.hi); C.set(x, y, Mt.b); C.set(x + 1, y, Mt.sh); C.set(x, y - 1, Mt.hi); C.set(x, y + 1, Mt.dk); }   // Kniekacheln
   if (L.mark === 'star' && I.tabard !== undefined && !back) { const cx = side ? 14 + M.hx : 16, cy = top + 5, G = L.markR || L.gold;   // Omega-Stern auf dem Wappenrock
     C.on(I.tabard, cx, cy, G.hi); for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) C.on(I.tabard, cx + dx, cy + dy, G.b); for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) C.on(I.tabard, cx + dx, cy + dy, G.sh); }
+  /* Aurelion-Rest (09.10.2026): Automaten-Streife (L.bot) — Messingplatten mit Fugen und hellen Nieten an Brust und Schultern,
+     dazu ein einzelnes Leuchtauge mitten im Visier statt zweier Augenschlitze (Glanzpunkt + Schein). Rücken: Nieten am Rückenblech. */
+  if (L.bot) { const A = L.armorR || L.metal, rv = mix(A.hi, '#fff4c8', 0.5);
+    for (const pid of [I.plate, ...(I.pauld || [])]) { if (pid === undefined || pid < 0) continue; let y0 = 99, x0 = 99, x1 = -1; each(pid, (x, y) => { if (y < y0) y0 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; });
+      each(pid, (x, y, i) => { const r = y - y0; if (r > 0 && r % 4 === 0) C.col[i] = A.dk; else if (r % 4 === 1 && (x === x0 + 1 || x === x1 - 1)) C.col[i] = rv; }); }
+    if (!back && I.head !== undefined) { const ey = 5 + M.hy + 3, cx = (side ? 13 : 15) + M.hx, G = L.glow || '#ffb040';
+      for (let x = side ? 11 : 13; x <= (side ? 16 : 18); x++) C.set(x + M.hx, ey, '#0a0806');
+      C.set(cx, ey, G); C.set(cx + 1, ey, mix(G, '#ffffff', 0.6)); if (!side) C.set(cx + 2, ey, G); C.set(cx, ey - 1, mix(G, '#000000', 0.5)); C.set(cx + 1, ey + 1, mix(G, '#000000', 0.5)); } }
+  /* R4 (09.10.2026): Rangzeichen des Spielers (sprites.js badgeOf) — 2×2-Brosche auf der rechten Brust (links läuft der Riemen) in der
+     Fraktionsfarbe mit dunklem Rand, ab Rang 4 Goldrand. Nach der Schattierung gesetzt, damit es klar lesbar bleibt. */
+  if (L.bdgR && !back) { const B0 = L.bdgR, x0 = side ? 14 + M.hx : 17, y0 = top + 3, rim = L.bdgHi ? L.bdgHi.b : '#0e0c0a';
+    for (let x = x0 - 1; x <= x0 + 2; x++) { C.set(x, y0 - 1, rim); C.set(x, y0 + 2, rim); } C.set(x0 - 1, y0, rim); C.set(x0 - 1, y0 + 1, rim); C.set(x0 + 2, y0, rim); C.set(x0 + 2, y0 + 1, rim);
+    C.set(x0, y0, B0.hi); C.set(x0 + 1, y0, B0.b); C.set(x0, y0 + 1, B0.b); C.set(x0 + 1, y0 + 1, B0.sh); if (L.bdgHi) C.set(x0 - 1, y0 - 1, L.bdgHi.hi); }
 }
 function wear(C, L, M) {
   const I = M.ids, w = L.wear | 0, bl = L.blood | 0, sd = (L.wseed | 0) * 97 + 13;

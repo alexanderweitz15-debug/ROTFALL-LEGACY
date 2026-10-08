@@ -3844,6 +3844,7 @@ Wunsch des Entwicklers: „die Schmiede etc. soll ein GUI haben“.
   - Kein Lager („Das Lager gehört dem Host.“), kein Speichern.
 - **Handel für Gäste** (`sendShop`, `guestShopDeal`, `guestShop`):
   - eine **Dialogliste** mit bis zu 16 Waren. Bezahlt wird aus dem eigenen Beutel (`coopGold`).
+  - **Stand 09.10. (Agent Quests): F-07/HB-30 behoben** — Gasthandel läuft über `buy`/`sell` des Hosts (Lager, `onItemGained`, Fertigkeit), Sperre/gebunden unverkäuflich, Rückfrage ab Selten, Tausch blättert; live mit `?coopLocal` geprüft. Die folgende Liste ist der alte Befund:
   - **Fehlversuche (F-07, mittel — HB-30 weiter offen):**
     - Gastkäufe von Ausrüstung buchen das Stadtlager nicht (der Host-Kauf zieht 0,5).
     - Gastverkäufe füllen es nur bei Stadtwaren.
@@ -3896,7 +3897,7 @@ Nach Schwere sortiert. „live“ = im Spiel nachgestellt, „Code“ = nur gele
 - **F-06 — 4 legendäre Sets nur durch Mord (Code und live).**
   - Sternwacht (Konrad), Rooks General (Rook), Ordensmeister (Kelan), Grundteile Hochritter (Oda) gibt es nur aus dem Grab ihres Trägers.
   - Für den Spieler gibt es keinen Hinweis. Ob das gewollt ist, muss der Entwickler entscheiden. — game.js:2844 (`ELITE_KIT`, `eliteKit`).
-- **F-07 — Koop-Gast-Handel unvollständig (Code; HB-30).**
+- **F-07 — Koop-Gast-Handel unvollständig (Code; HB-30).** ✔ behoben 09.10. (Agent Quests, siehe Koop).
   - Keine Lagerbuchung für Ausrüstung, kein `onItemGained`, kein Fertigkeitszuwachs.
   - Gesperrte Teile sind verkäuflich, keine Rückfrage ab Selten.
   - Gepäck/Tausch zeigt nur 14 bzw. 16 Teile. — coop.js:313 (`guestShopDeal`), 509, 522.
@@ -4113,3 +4114,17 @@ Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, 
 | 2.5 Sühne | kein Rückweg aus Verhasst | Mittler (Nix/Grisk/Sael): Gold 6 je fehlendem Punkt (min. 150) oder 20 Eisen → Ruf −59, alle 10 Tage | Softlock Bande/Goblins/Tote |
 
 Alle Werte vorläufig; messen mit `RF.simFight` und im Spiel.
+
+## Goldfluss über 30 Spieltage — Betriebe vor/nach Unterhalt (09.10.2026, Agent)
+
+Gemessen auf Stand s14c (Kopie, Speichern gesperrt), 30 × `ECO.ecoDay()` hintereinander, Marktpreise laufen mit (Angebot drückt den Preis).
+
+| Lauf | Betriebe | Einnahmen 30 Tage (Kasse) | Betriebssteuer | Unterhalt | ⌀ je Tag |
+|---|---|---|---|---|---|
+| vorher (nur Steuer) | Magitech Aurelheim + Hof Nordfurt, je 1 Gehilfe | 2902 | 296 | – | 97 |
+| nachher (Steuer + Unterhalt 2 × Stufe) | dieselben | 2990 | 299 | 120 | 100 |
+| Median-Betrieb nachher | Stall Nordfurt (kleiner Betrieb, ohne Gehilfe) | 44 | 0 | 60 | 1,5 |
+
+- „Einnahmen“ = was in der Kasse landet (Gewinn nach Lohn, Unterhalt und Steuer). Der Unterschied vorher/nachher bei den zwei starken Betrieben liegt im Marktverlauf (Preise sinken mit dem eigenen Angebot: Tag 1 ≈ 198, Tag 30 ≈ 75 Gold für beide zusammen) — der Unterhalt (4 Gold/Tag) ist bei ihnen klein.
+- Beim Median-Betrieb frisst der Unterhalt rund die Hälfte des Gewinns (ohne Unterhalt ≈ 104 in 30 Tagen). Gewollt: schwache Betriebe tragen sich knapp, starke bleiben stark.
+- Siedlung: Unterhalt 1 Gold je drei fertige Bauten (10 Bauten = 3 Gold/Tag); Abgaben Weiler 3, Dorf 8 Gold/Tag. Im Stand s14c gibt es keine Siedlung — Messung im Spiel offen (🔍).

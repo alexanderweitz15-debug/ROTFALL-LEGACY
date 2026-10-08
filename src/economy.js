@@ -45,6 +45,16 @@ const LOC = Object.fromEntries(TOWN_LOCS.map(l => [l.key, l]));
 const isAurel = k => LOC[k]?.faction === 'aurel';
 const occupied = k => S.war?.nodes?.[k]?.owner === 'undead' && LOC[k]?.faction !== 'undead';
 const razed = k => !!S.razed?.[k];
+/* E40.5 (Entwickler 09.10.2026, Zahlen vorläufig ⚖): Seelen, Knochen und Grabgut sind echte Marktgüter. Totenorte (Fraktion undead: Vharnholm,
+   Schwarze Feste) gewinnen Knochen und Seelenphiolen aus ihren Toten und kaufen Grabgut zurück; Grabräuber bei Kreuzweg und Aschfurt graben es aus
+   (Nekropole, Knochenwald). Bei den Lebenden kaufen nur Totenkundige (Alchemisten, Apotheker, Gelehrte, Hexen) Knochen und Seelen — anderswo
+   gibt es dafür kaum etwas. Händlerzüge zwischen Toten und Lebenden fahren nur mit diesen Waren (Schmuggel, gefährlicher). */
+export const DEAD_GOODS = ['bone', 'soul_vial', 'grabgut'];
+export const DEAD_OUT = { bone: 0.12, soul_vial: 0.03 };            /* je Kopf und Tag in Totenorten */
+export const GRAVE_DIG = { kreuzweg: 0.6, ashford: 0.4 };            /* Grabgut je Tag (Grabräuber) */
+const LORE = /Alchem|Apothek|Kräuter|Nekro|Totenrufer|Gelehrt|Professor|Hexe/;
+const isDead = k => LOC[k]?.faction === 'undead';
+const deadNoUse = (town, g) => DEAD_GOODS.includes(g) && !isDead(town) && !((S.towns[town]?.use?.[g] || 0) > 0);   /* kein Abnehmer hier */
 export const townName = k => S.towns?.[k]?.name || LOC[k]?.name || k;
 
 // Stadt eines NPCs: Heimatort, Marktort oder der nächste Ort in Reichweite
@@ -67,13 +77,14 @@ export function tradeOf(e, town) {
 // Volkszählung: Köpfe, Arbeiter je Gewerbe, Adel, Soldaten. Einmal am Tag (und beim Öffnen der Menüs) — ~700 NPCs.
 export function census() {
   const C = {};
-  for (const l of TOWN_LOCS) C[l.key] = { heads: 0, noble: 0, soldier: 0, work: {} };
+  for (const l of TOWN_LOCS) C[l.key] = { heads: 0, noble: 0, soldier: 0, lore: 0, work: {} };
   for (const e of S.ents.world) {
     if (e.kind !== 'npc' || !e.alive || e.child || /Automat/.test(e.prof || '') && !tradeOf(e, null)) continue;   /* Kinder (08.10.) zählen nicht als Arbeitskraft */
     const k = townKeyOf(e); if (!k || !C[k]) continue;
     const c = C[k]; c.heads++;
     if (NOBLE.test(e.prof || '')) c.noble++;
     if (SOLDIER.test(e.prof || '')) c.soldier++;
+    if (LORE.test(e.prof || '')) c.lore++;   /* E40.5: Abnehmer für Knochen und Seelen */
     const tr = tradeOf(e, k);
     if (tr && works(e)) c.work[tr] = (c.work[tr] || 0) + (e.ate != null && S.day * 1440 + S.minute - e.ate > 1200 ? 0.5 : 1);   // hungrig: halbe Arbeit
   }
@@ -94,9 +105,14 @@ function useOf(town, c) {
   if (LOC[town]?.faction === 'undead') u.grain = u.meat = 0;   // die Toten von Vharnholm essen nicht
   u.magitech = 0.02 * c.noble + (isAurel(town) ? 0.01 * c.heads : 0);
   u.arms = 0.02 * c.soldier + 0.3 * siteCount(town, ['barracks', 'legion']);
+  u.bone = 0.15 * (c.lore || 0); u.soul_vial = 0.05 * (c.lore || 0); u.grabgut = isDead(town) ? 0.04 * c.heads : 0;   /* E40.5 */
   return u;
 }
 export const target = (t, g) => (t.use[g] || 0) * 6 + 4;
+/* E40.5: Startlager der Totenwaren (auch für alte Stände, idempotent) — nur wo sie entstehen oder gebraucht werden, sonst 0 */
+function deadStock(town, t) {
+  for (const g of DEAD_GOODS) if (t.stock[g] == null) t.stock[g] = isDead(town) || (g === 'grabgut' && GRAVE_DIG[town]) || (t.use[g] || 0) > 0 ? Math.round(target(t, g) * 0.8) : 0;
+}
 export const capOf = town => Math.min(400, 60 + 40 * siteCount(town, ['store', 'markethall', 'kontor']));
 
 // ---------------- Start / Altstände ----------------
@@ -108,6 +124,7 @@ export function initEco() {
   for (const l of TOWN_LOCS) {
     const t = (S.towns[l.key] ||= { name: l.name, pop: Math.max(8, C[l.key].heads * 2), stock: {}, prod: {}, use: {} });
     t.use = useOf(l.key, C[l.key]);
+    deadStock(l.key, t);
     for (const g of GOODS) if (t.stock[g] == null) t.stock[g] = Math.round(target(t, g) * 0.8);
     if (fresh) for (const g of GOODS) if (!(l.key === 'northcity' && g === 'grain')) t.stock[g] = Math.max(t.stock[g], Math.round(target(t, g) * 0.8));   /* RB-042: die festen Startwerte aus TOWNS (Eren: Tuch 5, Leder 8) lagen weit unter dem Bedarf → Höchstpreis am ersten Tag; Nordfurts Kornmangel bleibt gewollt (Heeresversorgung) */
   }
@@ -127,6 +144,7 @@ export const bizWorkers = (b, C) => (C[b.town]?.work[b.trade] || 0) + b.hired * 
 export function ecoPrice(town, g, buy) {
   const t = S.towns[town]; if (!t) return ITEMS[g].value;
   let f = clamp(target(t, g) / ((t.stock[g] || 0) + 1), 0.4, 3);
+  if (deadNoUse(town, g)) f = 0.4;   /* E40.5: Totenware ohne Abnehmer am Ort — fast nichts wert */
   if (isAurel(town)) f *= 1.15 * (S.tollMul || 1);   /* T09: Aurelions Zölle (Gesetz, Kaiserin, Spaltung) */
   if (occupied(town) && buy) f *= 1.5;   // S15: Besatzung macht Kaufen teuer, nicht Verkaufen
   else if (buy && (S.schutz?.[town]?.stage || 0) === 3) f *= 1.25;   /* Stadt ohne Schutz S2: gesetzlos — Kaufen ein Viertel teurer */
@@ -240,7 +258,21 @@ export function airDay(skipId) {                                     // skipId: 
    (nur bei Gewinn, abgerundet; Verluste bleiben unbesteuert). Messung vorher: Tagesgewinn je Betrieb Median 5, Schnitt 12, beste 126 Gold;
    Kaufpreis ÷ Tagesgewinn (Amortisation) der besten Betriebe 52–68 Tage — mit Steuer gut 10 % länger. */
 export const BIZ_TAX = 0.1;
-export const bizTax = pr => (pr > 0 ? Math.floor(pr * BIZ_TAX) : 0);
+/* E43b/c (Entwickler 09.10.2026; Sätze vorläufig ⚖): Betriebssteuer und Einzahlgebühr je Gebiet und Stadt statt fest 10 %/3 % — maßgeblich ist,
+   wer den Ort gerade hält (townFac aus game.js, Besetzung zählt). [Steuer, Gebühr]. Aurelion teuer, Valen mittel (= bisher), freie Orte und Wüste billig. */
+export const TAX_FAC = { aurel: [0.15, 0.05], valen: [0.10, 0.03], order: [0.08, 0.03], chain: [0.12, 0.04], undead: [0.12, 0.04], zwerge: [0.08, 0.03],
+  merch: [0.06, 0.02], sea: [0.06, 0.02], frei: [0.05, 0.02], wuest: [0.05, 0.02], goblin: [0.05, 0.02] };
+export const TAX_TOWN = { aurelheim: [0.18, 0.06], varonheim: [0.12, 0.03], kreuzweg: [0.04, 0.02] };   /* Hauptstädte teurer, Kreuzweg als freier Marktknoten billig */
+export const taxH = {};                                              /* von game.js: townFac(town) */
+export function taxOf(town) {
+  const k = HTOWN[town] || town, f = taxH.townFac?.(k), T = TAX_TOWN[k] || TAX_FAC[f] || [BIZ_TAX, 0.03];
+  return { tax: T[0], fee: T[1], fac: f || null, own: !!TAX_TOWN[k] };
+}
+export const bizTax = (pr, town) => (pr > 0 ? Math.floor(pr * (town ? taxOf(town).tax : BIZ_TAX)) : 0);
+/* Unterhalt (09.10.2026 — vorläufig ⚖): je Arbeitstag 2 Gold × Ausbaustufe (Pacht, Werkzeug, Ausbesserung); vor der Steuer abgezogen, ruhende Betriebe
+   zahlen nichts. Messung (30 Tage, Magitech Aurelheim + Hof Nordfurt, je 1 Hand): Einnahmen 2902 Gold, Steuer 296; Unterhalt dazu 120. */
+export const BIZ_UPKEEP = 2;
+export const bizUpkeep = b => BIZ_UPKEEP * (b.level || 1);
 export function ecoDay() {
   if (!S.eco) initEco();
   const C = census(); syncBiz(C);
@@ -251,17 +283,19 @@ export function ecoDay() {
     if ((occupied(b.town) || razed(b.town)) && (b.kasse || 0) > 0) { log(`${bizName(b)}: ${razed(b.town) ? 'Die Stadt liegt in Trümmern' : 'Die Toten halten die Stadt'} — die Kasse (${Math.floor(b.kasse)} Gold) ist verloren.`, 'economy'); b.kasse = 0; } };
   for (const [town, t] of Object.entries(S.towns)) {
     if (!C[town]) continue;
-    t.use = useOf(town, C[town]); t.prod = {};
+    t.use = useOf(town, C[town]); t.prod = {}; deadStock(town, t);
     const food = FOOD.reduce((n, g) => n + (t.stock[g] || 0), 0);
     t.hunger = food < 1;
     if (occupied(town) || razed(town)) continue;
     // Umland: Aurelion bezieht Nahrung per Luftschiff aus dem Süden (außerhalb der Karte); Roadmap P6: so viel, wie Handelsschiffe fliegen (airSupply)
     if (isAurel(town)) { const sup = airSupply(); for (const g of FOOD) t.stock[g] += t.use[g] * 0.9 * sup; t.stock.ingot += 0.4 * ((C[town].work.mech || 0) + (C[town].work.magitech || 0)); }   // dazu Barren für die Werkstätten
     herdDay(town, t);
+    if (isDead(town)) for (const [g, n] of Object.entries(DEAD_OUT)) { const q = n * C[town].heads; t.stock[g] += q; t.prod[g] = (t.prod[g] || 0) + q; }   /* E40.5 */
+    if (GRAVE_DIG[town]) { t.stock.grabgut += GRAVE_DIG[town]; t.prod.grabgut = (t.prod.grabgut || 0) + GRAVE_DIG[town]; }
   }
   // Produktion mit Vorprodukten
   for (const b of S.eco.biz) {
-    b.lastTax = 0;
+    b.lastTax = 0; b.lastUp = 0;
     const t = S.towns[b.town], T = TRADES[b.trade];
     if (!t || occupied(b.town) || razed(b.town) || (S.halt?.[b.town + ':' + b.trade] || 0) > S.day) { b.made = 0; idle(b); continue; }   // S14: Unfall legt still
     const e = bizWorkers(b, C) * (1 + 0.5 * (b.level - 1)) * (t.hunger ? 0.5 : 1) * (b.trade === 'farm' ? SEASON_FARM[seasonOf()] : 1);   // S14: Ernte nach Jahreszeit
@@ -272,7 +306,7 @@ export function ecoDay() {
     let val = 0;
     for (const [g, n] of Object.entries(T.out)) { const q = n * e * frac; t.stock[g] = (t.stock[g] || 0) + q; t.prod[g] = (t.prod[g] || 0) + q; val += q * ecoPrice(b.town, g, false); }
     b.made = Math.round(val);
-    if (b.owner === 'player') { const pr0 = Math.round(val * 0.35 - b.hired * 3), tax = bizTax(pr0), pr = pr0 - tax; b.lastTax = tax; S.eco.taxPaid = (S.eco.taxPaid || 0) + tax; income += pr;   /* Gold-Senke 09.10.: Betriebssteuer am Ort */ b.lastPr = pr; b.sumPr = (b.sumPr || 0) + pr; b.daysPr = (b.daysPr || 0) + 1;
+    if (b.owner === 'player') { const up = bizUpkeep(b), pr0 = Math.round(val * 0.35 - b.hired * 3) - up, tax = bizTax(pr0, b.town), pr = pr0 - tax; b.lastTax = tax; b.lastUp = up; S.eco.upkeepPaid = (S.eco.upkeepPaid || 0) + up; S.eco.taxPaid = (S.eco.taxPaid || 0) + tax; income += pr;   /* Gold-Senke 09.10.: Betriebssteuer am Ort */ b.lastPr = pr; b.sumPr = (b.sumPr || 0) + pr; b.daysPr = (b.daysPr || 0) + 1;
       b.kasse = (b.kasse || 0) + pr; if (b.kasse < 0) { loss -= b.kasse; b.kasse = 0; } }
   }
   // Verbrauch, Lagergrenze, Hunger
@@ -286,7 +320,7 @@ export function ecoDay() {
     t.bought = {};
     if (t.hunger && t.pop > 5) { t.pop -= 1; if (chance(0.3)) log(`${t.name} hungert. Menschen wandern ab.`, 'economy'); }
   }
-  if (income || loss) { if (loss) S.gold = Math.max(0, S.gold - loss);   /* HB2-10: auch wenn sich die Tagessumme genau aufhebt */ S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute${income > 0 ? ' — in den Kassen der Betriebe' : ''}${loss ? `, ${loss} Gold Lohn aus deinem Beutel` : ''}${(tx => tx ? ` (Betriebssteuer an die Städte: ${tx} Gold)` : '')(S.eco.biz.reduce((s, b) => s + (b.owner === 'player' ? b.lastTax || 0 : 0), 0))}.`, 'economy');
+  if (income || loss) { if (loss) S.gold = Math.max(0, S.gold - loss);   /* HB2-10: auch wenn sich die Tagessumme genau aufhebt */ S.eco.income = income; log(`Deine Betriebe: ${income >= 0 ? '+' : ''}${income} Gold heute${income > 0 ? ' — in den Kassen der Betriebe' : ''}${loss ? `, ${loss} Gold Lohn aus deinem Beutel` : ''}${(([tx, up]) => tx || up ? ` (abgezogen: Unterhalt ${up}, Betriebssteuer ${tx} Gold — ${[...new Set(S.eco.biz.filter(b => b.owner === 'player' && b.lastTax).map(b => b.town))].map(t => `${townName(t)} ${Math.round(taxOf(t).tax * 100)} %`).join(', ') || 'keine Steuer'})` : '')(S.eco.biz.reduce((s, b) => b.owner === 'player' ? [s[0] + (b.lastTax || 0), s[1] + (b.lastUp || 0)] : s, [0, 0]))}.`, 'economy');
     if (!S.flags?.kasseHint && S.eco.biz.some(b => b.owner === 'player' && b.kasse > 0)) { (S.flags ||= {}).kasseHint = 1; log('Betriebe: Der Gewinn sammelt sich in der Kasse des Betriebs. Abholen kannst du ihn vor Ort in der Stadt (Siedlung → Reiter Betriebe). Fällt die Stadt an die Toten oder wird zerstört, ist die Kasse verloren.', 'quest'); } }   /* Behoben HB-18: Verlust wurde angezeigt, aber Math.max(0, income) hat ihn nie abgezogen */
   caravanDay(); myCaravanDay(); ordersDay();
 }
@@ -294,12 +328,44 @@ export function ecoDay() {
 // ---------------- Händlerzüge (abstrakt, fern vom Helden) ----------------
 const tradeTowns = () => Object.keys(S.towns).filter(k => LOC[k] && !occupied(k) && !razed(k) && LOC[k].faction !== 'undead' && !S.after?.quar?.[k]);   /* Folgen §5c: Quarantäne = kein Handel */
 const tripDays = (a, b) => Math.max(1, Math.ceil(Math.hypot(LOC[a].x - LOC[b].x, LOC[a].y - LOC[b].y) / 260));
-export function riskOf(a, b, guards) {
-  let r = 0.06;
-  for (const k of [a, b]) if (S.war?.armies?.some(x => x.faction === 'undead' && x.at === k)) r += 0.12;
-  if ([a, b].includes('karak_atar')) r += 0.05;
-  if (S.laws?.toll) r -= 0.02;
+/* T12 B1 „Straßen haben Herren“ (APPROVED 01.10., E37 09.10.): jede Gefahr hat einen Grund mit Namen. riskWhy liefert die Gründe,
+   riskOf summiert sie — eine Quelle für Würfel und Kontor-Anzeige. Banden in Lagernähe, Totenknoten am Weg, Streifen, Aurelions Zoll.
+   Der eigene Wagen zählt eine Bande nicht, solange ihr Schutzgeld bezahlt ist; der Umweg meidet alle Banden (+1 Tag). */
+export const ROAD = { base: 0.06, band: 0.08, bandR: 30, node: 0.05, nodeR: 30, patrol: 0.03, patrolR: 20, toll: 0.02 };
+const LOCK = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
+export function segDist(px, py, A, B) {
+  const dx = B.x - A.x, dy = B.y - A.y, L = dx * dx + dy * dy, t = L ? clamp(((px - A.x) * dx + (py - A.y) * dy) / L, 0, 1) : 0;
+  return Math.hypot(px - A.x - t * dx, py - A.y - t * dy);
+}
+/* ponytail: Streifen-Suche filtert die ganze Weltliste (~17 000) je Aufruf; höchstens ~30 Aufrufe am Tag — Cache erst, wenn es misst */
+const patrolsNear = (A, B) => S.ents.world.filter(e => e.traveler?.kind === 'patrol' && e.alive !== false && segDist(e.x / TS, e.y / TS, A, B) < ROAD.patrolR);
+export function riskWhy(a, b, o = {}) {
+  const A = LOC[a] || LOCK[a], B = LOC[b] || LOCK[b], out = [], day = S.day | 0;
+  for (const k of [a, b]) if (S.war?.armies?.some(x => x.faction === 'undead' && x.at === k)) out.push({ add: 0.12, txt: `Totenheer vor ${townName(k)}` });
+  if ([a, b].includes('karak_atar')) out.push({ add: 0.05, txt: 'Bergpfade nach Karak-Atar' });
+  if (isDead(a) !== isDead(b)) out.push({ add: 0.08, txt: 'Schmuggel zwischen Toten und Lebenden' });   /* E40.5 */
+  if (!A || !B) return out;
+  if (!o.detour) for (const bd of S.bands || []) {
+    if (bd.gone || !(bd.men > 0) || (o.mine && bd.paid >= day) || segDist(bd.tx, bd.ty, A, B) >= ROAD.bandR) continue;
+    out.push({ add: ROAD.band * Math.min(9, bd.men) / 9, txt: `${bd.name} bei ${bd.where} (${bd.men} Mann)`, band: bd.id });
+  }
+  for (const [k, n] of Object.entries(S.war?.nodes || {})) {
+    const L = LOCK[k]; if (n.owner !== 'undead' || k === a || k === b || !L || segDist(L.x, L.y, A, B) >= ROAD.nodeR) continue;
+    out.push({ add: ROAD.node, txt: `Die Toten halten ${L.name}` });
+  }
+  const pt = patrolsNear(A, B)[0]; if (pt) out.push({ add: -ROAD.patrol, txt: `Streife ${({ valen: 'der Krone', order: 'des Ordens', merch: 'der Gilde', chain: 'der Kette', aurel: 'Aurelions' })[pt.patrol] || ''} unterwegs`.replace('  ', ' ') });
+  if ((isAurel(a) || isAurel(b)) && (S.tollMul || 1) >= 1.05) out.push({ add: -ROAD.toll, txt: 'Zölle bezahlen Legionsstreifen' });   /* ersetzt das tote S.laws.toll (RB-010) */
+  return out;
+}
+export function riskOf(a, b, guards, o = {}) {
+  const r = riskWhy(a, b, o).reduce((s, w) => s + w.add, ROAD.base);
   return clamp(r * (1 - 0.22 * guards), 0.01, 0.5);
+}
+/* Kontor-Anzeige: alle Handelsziele bis 3 Tagesreisen, gefährlichste zuerst, Prozent mit 1 Wache. Rein (kein Würfel, kein Zustand) — Koop-Gäste sehen dasselbe. */
+export function routeLines(town, o = {}) {
+  return tradeTowns().filter(k => k !== town && LOC[town] && tripDays(town, k) <= 3)
+    .map(k => { const why = riskWhy(town, k, o), p = riskOf(town, k, 1, o); return { to: k, p, days: tripDays(town, k), why, txt: `Nach ${townName(k)} (${tripDays(town, k)} ${tripDays(town, k) > 1 ? 'Tage' : 'Tag'}): ${why.filter(w => w.add > 0).length ? `${Math.round(p * 100)} % — ${why.map(w => w.txt).join('; ')}` : `ruhig (${Math.round(p * 100)} %)${why.length ? ' — ' + why.map(w => w.txt).join('; ') : ''}`}` }; })
+    .sort((x, y) => y.p - x.p);
 }
 function caravanDay() {
   const E = S.eco;
@@ -309,15 +375,16 @@ function caravanDay() {
       log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
       if (chance(0.3)) chronicle(`Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
     }
-    if (S.day >= c.eta) { if (S.towns[c.to] && c.n > 0) S.towns[c.to].stock[c.good] += c.n; E.caravans.splice(E.caravans.indexOf(c), 1); }
+    if (S.day >= c.eta) { if (S.towns[c.to] && c.n > 0) S.towns[c.to].stock[c.good] += c.n; E.caravans.splice(E.caravans.indexOf(c), 1);
+      if (c.n > 0 && DEAD_GOODS.includes(c.good) && !S.flags?.deadGoodsHint) { (S.flags ||= {}).deadGoodsHint = 1; log(`Schmuggler bringen ${c.n} ${ITEMS[c.good].name} nach ${townName(c.to)}. Totenware hat ihren Markt: Vharnholm und die Schwarze Feste geben Knochen und Seelen her und kaufen Grabgut zurück; bei den Lebenden zahlen nur Alchemisten, Apotheker und Gelehrte etwas dafür.`, 'quest'); } }
   }
   // Neue Züge: vom Überschuss zur größten Not, bis zu sechs am Tag, höchstens sechzehn unterwegs
-  const T = tradeTowns();
+  const T = tradeTowns(), TD = [...T, ...Object.keys(S.towns).filter(k => isDead(k) && LOC[k] && !razed(k))];   /* E40.5: Totenorte handeln nur Totenwaren */
   for (let k = 0; k < 6 && E.caravans.length < 16; k++) {
     let best = null;
-    for (const g of GOODS) for (const a of T) {
+    for (const g of GOODS) for (const a of (DEAD_GOODS.includes(g) ? TD : T)) {
       const ta = S.towns[a], sur = ta.stock[g] - target(ta, g) * 1.3; if (sur < 6) continue;
-      for (const b of T) {
+      for (const b of (DEAD_GOODS.includes(g) ? TD : T)) {
         if (a === b || E.caravans.some(c => c.to === b && c.good === g)) continue;
         const tb = S.towns[b], need = target(tb, g) * 0.6 - tb.stock[g]; if (need < 3) continue;
         const gain = ecoPrice(b, g, false) - ecoPrice(a, g, true);

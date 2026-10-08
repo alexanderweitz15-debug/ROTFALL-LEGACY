@@ -323,7 +323,7 @@ function arrive(c, player) {
   const sum = Object.values(c.cargo).reduce((a, b) => a + b, 0);
   if (sum) { log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy'); chronicle(`Die Karawane ist heil in ${t.name} angekommen`, 'news'); }
   if (c.attacked && Math.hypot(player.x - c.x, player.y - c.y) < 400) {
-    S.gold += 30; S.factions.merch += 4;
+    S.gold += 30; H.addRep ? H.addRep('merch', 4) : (S.factions.merch += 4);
     log('Die Händler danken für den Geleitschutz: 30 Gold.', 'economy');
     H.toast('Geleitschutz belohnt');
   }
@@ -334,7 +334,7 @@ function arrive(c, player) {
 }
 export function caravanDied(c) {
   log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy'); chronicle('Die Karawane nach Nordfurt ist nie angekommen', 'news');
-  S.factions.merch -= 2;
+  H.addRep ? H.addRep('merch', -2) : (S.factions.merch -= 2);
   S.caravanBack = S.day + 2;
 }
 

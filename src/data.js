@@ -529,6 +529,7 @@ export const ITEMS = {
                   rarity:'legendary', unique:true, leg:'thirst', value:520, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden — es trinkt.' },
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, look:{ cape:'wappen', col:'#d9d2c0', trim:'#9b2e26', lin:'#9b2e26', fib:'#c8a050' }, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
+  grabgut:      { name:'Grabgut', slot:'material', stack:20, rarity:'uncommon', value:18, lore:'Ringe, Spangen, alte Münzen aus den Gräbern. Die Toten kaufen es zurück — teuer.' },   /* E40.5: Marktgut */
   soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
   scout_report: { name:'Späherbericht', slot:'material', stack:1, rarity:'uncommon', value:0, lore:'Kohleschrift, halb verwischt: „Sie zählen uns. Nicht wir sie. Sie warten auf eine Zahl.“' },
   /* Audit 3.3: kings_iron (Questbarren) ist in koenigseisen aufgegangen; alte Stände werden beim Laden umbenannt (migrateKingsIron) */
@@ -1925,7 +1926,7 @@ export const REP_TIERS = [
   { min: -60, name: 'Feindlich', price: 1.3, greet: '„Leute wie dich bedienen wir nur ungern.“' },
   { min: -Infinity, name: 'Verhasst', price: null, greet: '„Verschwinde, bevor ich die Wache rufe.“' },
 ];
-export const GOODS = ['grain', 'meat', 'salt', 'cloth', 'pelt', 'timber', 'woodware', 'stoneware', 'ore', 'ingot', 'tools', 'arms', 'magitech'];   // S13 Wirtschaft: economy.js
+export const GOODS = ['grain', 'meat', 'salt', 'cloth', 'pelt', 'timber', 'woodware', 'stoneware', 'ore', 'ingot', 'tools', 'arms', 'magitech', 'bone', 'soul_vial', 'grabgut'];   /* E40.5 (09.10.): Totenwaren */   // S13 Wirtschaft: economy.js
 export const TOWNS = {
   eren:      { name:'Eren', pop:40, stock:{ grain:40, salt:6, cloth:5, pelt:8 }, prod:{ grain:7, pelt:2 }, use:{ grain:3, salt:2, cloth:1 } },
   northcity: { name:'Nordfurt', pop:90, stock:{ grain:12, salt:30, cloth:25, pelt:3 }, prod:{ salt:5, cloth:4 }, use:{ grain:8, pelt:2, salt:1 } },
