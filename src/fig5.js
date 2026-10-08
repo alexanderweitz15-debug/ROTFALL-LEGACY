@@ -393,7 +393,7 @@ export function paintR(L, dir, pose, W = null) {
   /* N4 Scheibe 3 (08.10.2026, Kenshi-Gefühl): Wunden-Haltung aus dem Körperzustand (L.wd, sprites.js woundOf) — Rumpf unter der Hälfte:
      die freie Hand hält die Seite, Kopf etwas tiefer; Bein unter der Hälfte: es wird im Stand entlastet (Fuß angehoben, Knie gebeugt), die Figur
      steht schief. Nur aus vorhandenen Gelenkpunkten gemischt (kein neues Posenbild, nur andere Gelenke im selben Rig). */
-  if (L.wd && !ride && !extra && !globalThis.__rfOld && /^(i[01]|w[0-3])$/.test(pose)) {
+  if (L.wd && !ride && !extra && /^(i[01]|w[0-3])$/.test(pose)) {
     const wl = !!W && view !== 'W' && Math.cos((W.oct || 0) * Math.PI / 4) < -1e-9;
     if ((L.wd & 1) && !(W && W.two)) { const k = view === 'W' ? (W ? 'aF' : 'aN') : wl ? 'aR' : 'aL', a = R[k];
       if (a && a.length === 3) { const [s] = a, sg = view === 'W' ? -1 : k === 'aL' ? 1 : -1; R[k] = [s, [s[0] - sg * 0.5, s[1] + 5.5], [16 - (view === 'W' ? 2 : sg * 3), s[1] + 8.5]]; R.hy += 1; } }
@@ -1264,7 +1264,6 @@ function wear(C, L, M) {
   const metal = [I.plate, I.helm, I.fauld, I.chainSkirt, ...(I.pauld || []), ...(I.tassets || [])].filter(pid => pid !== undefined && pid >= 0 && C.P[pid]?.mat === 'metal');
   if (I.plate !== undefined || I.helm !== undefined) for (const pid of [I.plate, I.helm]) { if (pid === undefined || C.P[pid]?.mat !== 'metal') continue; const g = brass(pid);
     for (let k = 0; k < 1 + w; k++) { const i = pick(pid, 20 + k); if (i >= 0) { C.col[i] = mix(C.col[i], g ? '#3e6a56' : '#6a3a1e', 0.5); if (C.id[i + C.w] === pid) C.col[i + C.w] = mix(C.col[i + C.w], g ? '#2e5a46' : '#5a2e18', 0.45); } } }
-  if (globalThis.__rfOld) return;
   if (w === 0) for (const pid of metal) { let n = 0; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid && C.col[i] && (n++ & 1) === 0) C.col[i] = mix(C.col[i], '#fff6e0', 0.38); }   // Politur
   if (w >= 1) for (const pid of [I.plate, I.helm, ...(I.pauld || [])]) { if (pid === undefined || pid < 0 || C.P[pid]?.mat !== 'metal') continue; const R0 = C.P[pid].R;
     for (let k = 0; k < w; k++) { const i = pick(pid, 60 + k * 7); if (i < 0) continue; C.col[i] = R0.dk; if (C.id[i + C.w + 1] === pid) C.col[i + C.w + 1] = R0.sh; if (C.id[i - 1] === pid) C.col[i - 1] = R0.hi; } }   // Dellen, Kratzer
@@ -1280,7 +1279,7 @@ function wear(C, L, M) {
    legendär Goldkante + Gravur, mythisch blassblaue Kante + Gravur. L.rr 0–4 aus der seltensten Brust/Kopf-Rüstung (sprites.js). */
 const RR_COL = ['', '#c8ccd0', '#c8a050', '#e0b85a', '#a9d4e8'];
 function rarityEdge(C, L, M) {
-  const r = L.rr | 0; if (!r || !L.armor || globalThis.__rfOld) return; const I = M.ids, col = RR_COL[Math.min(4, r)];
+  const r = L.rr | 0; if (!r || !L.armor) return; const I = M.ids, col = RR_COL[Math.min(4, r)];
   const pid = L.armor === 'plate' ? I.plate : L.armor === 'leather' ? I.jerkin : I.torso; if (pid === undefined || pid < 0) return;
   const top = []; for (let i = C.w; i < C.col.length; i++) if (C.id[i] === pid && C.id[i - C.w] !== pid) top.push(i);
   top.forEach((i, n) => { if (r === 1 ? n % 3 === 1 : true) C.col[i] = r === 1 ? col : mix(C.col[i], col, 0.75); });

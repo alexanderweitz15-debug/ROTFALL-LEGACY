@@ -463,6 +463,32 @@ function ownerBannerTick() {
 /* N4 Scheibe 1 „Stimmungs-Haltung der Stadt“ (visual/npcs.md, Wahl 10; 08.10.): Trauert ein Ort, senken stehende Bewohner in deiner Nähe ab und zu
    den Kopf (Geste trauern); am Fest jubeln sie; ist der Ort in Gefahr oder ohne Schutz, wehren sie ab. Nur Darstellung (Math.random, kein Spielzufall),
    höchstens zwei Gesten je Takt (alle 3 s). */
+/* T38-Teil „Gefährten-Szenen untereinander“ (§5g.30, 08.10.): Zwei Gefährten reden unterwegs oder am Feuer miteinander — Streit (mutig gegen
+   furchtsam/vorsichtig), Freundschaft (zusammen gekämpft, Leben gerettet), Eifersucht (bessere Waffe vom Anführer), Trauer (gefallener Freund),
+   Nacht, Totenland. Kleine Wirkung auf die Stimmung (Streit −2, Freundschaft/Trauer +2; vorläufig ⚖). Alle 2,5–4 min, nicht im Kampf, nicht in
+   Gesprächen/Kamerafahrten. Nur Flair-Zufall (Math.random), nicht der Spiel-Zufall. */
+let banterNext = 0;
+function partyBanter(force = false) {
+  const p = S.player, now = performance.now(); if (!p?.alive || S.cine || UI.dialogueOpen() || (!force && (now < banterNext || inFight(p)))) return null;
+  banterNext = now + 150000 + Math.random() * 90000;
+  const ms = partyMembers().filter(m => m.alive && !m.downed && m.map === p.map && dist(m, p) < 260); if (ms.length < 2) return null;
+  const [a, b] = ms.sort(() => Math.random() - 0.5), has = (m, t) => (m.traits || []).includes(t), memOf = (m, k) => (m.memories || []).filter(x => x.key === k).slice(-1)[0];
+  const night = S.minute / 60 >= 21 || S.minute / 60 < 5, region = p.map === 'world' ? regionAt(p.x / TS | 0, p.y / TS | 0) : '';
+  const pool = [];
+  if ((has(a, 'mutig') || has(a, 'ehrgeizig')) && (has(b, 'furchtsam') || has(b, 'vorsichtig'))) pool.push(['streit', [[0, 'Du zitterst ja immer noch.'], [1, 'Lieber zittern als begraben werden.'], [0, 'Feigling.'], [1, 'Lebendig.']]]);
+  const ft = memOf(a, 'fought_together') || memOf(a, 'saved_life'); if (ft) pool.push(['freund', [[0, `${b.name}, weißt du noch — ${ft.about ? 'bei ' + ft.about : 'neulich'}? Ohne dich wär ich nicht mehr aufgestanden.`], [1, 'Dann schuldest du mir ein Bier.'], [0, 'Zwei.']]]);
+  if (memOf(b, 'gave_weapon') && !memOf(a, 'gave_weapon')) pool.push(['neid', [[0, 'Dir gibt der Anführer die gute Klinge — und mir den Rost.'], [1, 'Wer besser trifft, kriegt besseres Eisen.'], [0, 'Wir werden sehen.']]]);
+  const fd = memOf(a, 'friend_died'); if (fd) pool.push(['trauer', [[0, `Ich denk noch an ${fd.about || 'die, die nicht mehr da sind'}.`], [1, 'Wir alle. Hier, trink.'], [0, '…Danke.']]]);
+  if (night) pool.push(['nacht', [[0, 'Hörst du das? Da draußen.'], [1, 'Wind. Nur Wind.'], [0, 'Der Wind hat keine Füße.']]]);
+  if (region === 'deadland' || region === 'blight') pool.push(['tod', [[0, 'Hier riecht alles nach Grab.'], [1, 'Weil hier alles eins ist. Bleib dicht bei mir.']]]);
+  if (!pool.length) pool.push(['weg', [[0, 'Wie weit noch?'], [1, 'Frag den Anführer.'], [0, 'Hab ich. Er hat nur gegrinst.']]]);
+  const [kind, lines] = pool[Math.random() * pool.length | 0];
+  runScene([a, b], lines, 2600);
+  const md = kind === 'streit' || kind === 'neid' ? -2 : kind === 'freund' || kind === 'trauer' ? 2 : 0;
+  if (md) for (const m of [a, b]) m.morale = clamp((m.morale ?? 50) + md, 0, 100);
+  if (!S.flags.hintBanter) { S.flags.hintBanter = 1; log('Deine Gefährten reden unterwegs miteinander — über Kämpfe, Verluste, Angst und Neid. Streit drückt ihre Stimmung, Freundschaft hebt sie.', 'party'); }
+  return kind;
+}
 let dbgMood = -1;
 function moodIdleTick(force = null) {
   const p = S.player; if (!p || S.map !== 'world' || S.cine) return 0;
@@ -3319,7 +3345,7 @@ function update(dt, now) {
   if ((S._qtT = (S._qtT || 0) + dt) > 8000) { S._qtT = 0; questTargetTick(); }   // S15: Auftragsziele nachschieben
   if ((arrT += dt) > 900) { arrT = 0; arrivalTick(); facHintTick(); worldCardTick(now); }   /* P3.x E22: Ereigniskarten aus der Warteschlange */   /* T17: Ankunft in einer Siedlung */
   if ((keepT += dt) > 250) { keepT = 0; keepTick(); castleAlarmTick(); }      /* Umbau S3: Burgfrieden; Alarm: Späher, Verstärkung */
-  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); ownerBannerTick(); moodIdleTick(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
+  if ((guideT += dt) > 3000) { guideT = 0; guideTick(); ownerBannerTick(); moodIdleTick(); partyBanter(); secretTick(); secretTick2(); secretTick3(); }  /* Ratgeber; Geheime Orte */
   tutorTick(now); prologTick(now);   /* Wegweiser (08.10.); Prolog */
   if (S.map === 'world' && ((S._morrT = (S._morrT || 0) + dt) > 400)) { S._morrT = 0; morrTick(); }   // S15 Morrgrund
   S.minute += dt / 1000;
@@ -4974,6 +5000,100 @@ function fishCatch(p, F) {
   if (it.rare && !S._quiet) { UI.toast(`SELTENER FANG: ${it.name.toUpperCase()}`, 2600); sfx('loot', 2, 0.6); }
   return key;
 }
+/* ================= Sammeln: Holzfällen, Bergbau, Kräuterkunde (Spec Skills §15–21, §32–33, §36, §42; Planlauf 08.10.2026 — Zahlen vorläufig ⚖) =================
+   Werkzeug und Fertigkeit sind getrennte Faktoren: die Werkzeugstufe (0 ohne, 1 einfach, 2 gut, 3 Stahl; ITEMS.ttier) macht schneller und ergiebiger,
+   die Fertigkeit schaltet Härteres, Nebenfunde und Seltenes frei (Meilensteine in SKILL_DEF). Dasselbe am selben Ort (8 × 8 Kacheln, je Tag) lehrt
+   ab der siebten Tätigkeit immer weniger und gibt ab der elften einen Brocken weniger (§42: anderswo sammeln). Zufallsereignisse §36 (je ~4 %). */
+const toolTier = (c, kind) => { let t = 0; for (const s of [c?.equip?.weapon, ...(c?.inv || [])]) { const it = s && ITEMS[s.key]; if (it && (kind === 'fish' ? it.use === 'fish' : it.tool === kind)) t = Math.max(t, it.ttier || 1); } return t; };
+const GATHER = new Map();
+function gatherMul(kind, x, y) {                                  /* Rückgabe [Lern-Faktor, Ertrags-Abzug] */
+  const k = `${S.day | 0}:${S.map}:${kind}:${x / TS >> 3},${y / TS >> 3}`, n = (GATHER.get(k) || 0) + 1; GATHER.set(k, n);
+  if (GATHER.size > 400) GATHER.delete(GATHER.keys().next().value);
+  return [n <= 6 ? 1 : 6 / n, n > 10 ? 1 : 0];
+}
+const giveMat = (p, key, n = 1) => { if (n > 0 && !addItem(p, key, n)) dropItemAt(S.map, p.x, p.y + 12, mkItem(key, n)); };
+function gatherEvent(p, kind, t) {                                /* §36: kleine Überraschungen beim Sammeln */
+  if (rnd() >= 0.04) return null;
+  const r = rnd(), wild = S.map === 'world' && !townAt(p.x / TS | 0, p.y / TS | 0, 2);
+  if (kind === 'wood') {
+    if (r < 0.34 && wild) { const e = spawnEnemy('boar', S.map, (t.x / TS | 0) + 3, t.y / TS | 0); if (e) { log('Ein Wildschwein bricht aus dem Unterholz — der Lärm hat es aufgeschreckt!', 'combat'); return 'tier'; } }
+    if (r < 0.67) { const g = ri(4, 14); S.gold += g; giveMat(p, 'bread', 1); log(`In einer Astgabel steckt ein verschnürtes Bündel: ${g} Gold und Brot — ein altes Versteck.`, 'world'); return 'lager'; }
+    giveMat(p, 'schwarzholz', 1); log('Unter der Rinde: dunkles, schweres Holz. Schwarzholz!', 'world'); return 'selten';
+  }
+  if (kind === 'mine') {
+    if (r < 0.34) { hurt(p, Math.max(2, p.maxHp * 0.06), null, 'Steinschlag'); log('Steinschlag! Brocken lösen sich über dir.', 'combat'); return 'einsturz'; }
+    if (r < 0.67) { const g = ri(5, 18); S.gold += g; log(`Im Geröll liegt ein alter Münzbeutel: ${g} Gold.`, 'world'); return 'fund'; }
+    giveMat(p, 'silbererz', 1); log('Eine silbrige Ader blitzt im Gestein — Silbererz!', 'world'); return 'selten';
+  }
+  if (r < 0.5) { giveMat(p, 'nachtschatten', 1); log('Zwischen den Kräutern: Nachtschatten. Vorsicht damit.', 'world'); return 'selten'; }
+  const g = ri(2, 9); S.gold += g; log(`Unter dem Busch liegt ein verlorener Beutel: ${g} Gold.`, 'world'); return 'fund';
+}
+function gatherTree(p, t) {
+  if (t.chopCd && performance.now() < t.chopCd) return null;
+  t.chopCd = performance.now() + 400;
+  const tier = toolTier(p, 'chop'), [lm, less] = gatherMul('wood', t.x, t.y);
+  t.hp = (t.hp ?? 3) - ([0.5, 1, 1.5, 2][tier] + perkVal(p, 'woodcutting', 'speed'));
+  fx(t.x, t.y - 14, 'dust', 4);
+  S.res.wood += Math.max(1, ri(1, 2) + (tier >= 3 ? 1 : 0) - less);
+  gainSkill(p, 'woodcutting', 0.5 * lm); S.player.skills.survival = Math.min(100, (S.player.skills.survival || 0) + 0.1);
+  if (!tier && !S.flags.axeHint && !S._quiet) { S.flags.axeHint = 1; UI.toast('Ohne Axt geht es mühsam — mit einem Beil fällst du doppelt so schnell.', 3200); }
+  if (t.hp > 0) return 'hieb';
+  removeSolid(t); S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1); log('Baum gefällt.', 'world');
+  const got = [];
+  if (rnd() < perkVal(p, 'woodcutting', 'hard')) { giveMat(p, 'hartholz', 1); got.push('Hartholz'); }
+  if (rnd() < perkVal(p, 'woodcutting', 'side')) { giveMat(p, 'harz', 1); got.push('Harz'); }
+  if (rnd() < perkVal(p, 'woodcutting', 'rare')) { giveMat(p, 'schwarzholz', 1); got.push('Schwarzholz'); }
+  if (got.length) log(`Beim Fällen: ${got.join(', ')}.`, 'world');
+  gatherEvent(p, 'wood', t);
+  return 'gefällt';
+}
+const herbRare = t => hHash(t.gk || t.id || '') % 5 === 0;   /* jede fünfte Kräuterstelle trägt eine seltene Pflanze — fest je Stelle */
+function gatherNode(p, t) {
+  if (t.depleted) { UI.toast('Erschöpft.'); return null; }
+  t.depleted = true; t.respawn = S.day + 2; deplMark(t);
+  const kind = t.harvest === 'herb' ? 'herb' : 'mine', [lm, less] = gatherMul(kind, t.x, t.y), got = [];
+  let n = ri(1, 3);
+  if (kind === 'herb') {
+    n = Math.max(1, n + perkVal(p, 'herbalism', 'yield') + (rnd() < perkVal(p, 'herbalism', 'side') ? 1 : 0) - less);
+    addItem(p, 'herb', n); onItemGained('herb');
+    if (herbRare(t) && perkVal(p, 'herbalism', 'rare')) { const k = hHash((t.gk || t.id) + 'r') % 2 ? 'bergminze' : 'nachtschatten'; giveMat(p, k, 1); got.push(ITEMS[k].name); }
+    gainSkill(p, 'herbalism', (herbRare(t) ? 1.2 : 0.6) * lm);
+  } else {
+    const tier = toolTier(p, 'mine');
+    n = Math.max(1, n + perkVal(p, 'mining', 'speed') + (tier >= 2 ? 1 : 0) - less); if (!tier) n = Math.ceil(n / 2);
+    S.res[t.harvest] += n;
+    if (t.harvest === 'stone' && rnd() < perkVal(p, 'mining', 'hard')) { S.res.iron = (S.res.iron || 0) + 1; got.push('Eisenerz'); }
+    if (rnd() < perkVal(p, 'mining', 'side')) { giveMat(p, 'kohle', 1); got.push('Kohle'); }
+    if (rnd() < perkVal(p, 'mining', 'rare')) { giveMat(p, 'silbererz', 1); got.push('Silbererz'); }
+    gainSkill(p, 'mining', (t.harvest === 'iron' ? 0.8 : 0.5) * lm);
+    if (!tier && !S.flags.pickHint && !S._quiet) { S.flags.pickHint = 1; UI.toast('Ohne Spitzhacke bekommst du nur die Hälfte heraus.', 3200); }
+  }
+  log(`${n}× ${({ herb: 'Heilkraut', stone: 'Stein', iron: 'Eisenerz' })[t.harvest]} gewonnen${got.length ? `, dazu ${got.join(', ')}` : ''}.`, 'world');
+  fx(t.x, t.y - 10, 'dust', 5);
+  gatherEvent(p, kind, t);
+  return n;
+}
+/* ================= Kochen (Spec Skills §22–23; Planlauf 08.10.2026 — Zahlen vorläufig ⚖) =================
+   Eigene Fertigkeit „Kochen“ am Kessel (RECIPES mit cook/sk). Gerichte geben kurze Wirkungen (efx wie Elixiere, Zustand „meal“, eine Mahlzeit zur Zeit;
+   Dauer × Kochen-Meilenstein). Rezepte mit „secret“ werden entdeckt: Rezeptzettel beim Wirt, Kochbuch, oder Experimentieren am Kessel (stimmen die
+   Zutaten im Gepäck, ist das Gericht entdeckt und gekocht; sonst verdirbt eine Zutat). Bekannte Gerichte sind Hauswissen (S.legacy.cook, §38–39). */
+const knowsDish = k => !RECIPES[k]?.secret || !!S.legacy?.cook?.includes(k);
+function learnDish(k, how) {
+  if (!RECIPES[k] || knowsDish(k)) return false;
+  (S.legacy.cook ||= []).push(k); log(`Neues Gericht (${how}): ${ITEMS[k].name} — ${needTxt(RECIPES[k])}.`, 'quest'); if (!S._quiet) UI.toast(`REZEPT: ${ITEMS[k].name.toUpperCase()}`, 2600);
+  return true;
+}
+function cookExperiment() {
+  const p = S.player, hidden = Object.entries(RECIPES).filter(([k, R]) => R.cook && R.secret && !knowsDish(k) && ITEMS[k]);
+  const fit = hidden.find(([, R]) => Object.entries(R.need).every(([m, n]) => matHave(m) >= n));
+  if (fit) { learnDish(fit[0], 'durch Probieren'); gainSkill(p, 'cooking', 1); return craftItem(fit[0]) ? fit[0] : 'gelernt'; }
+  const food = p.inv.filter(x => x && (ITEMS[x.key]?.use === 'food' || ['herb', 'bergminze'].includes(x.key))).sort((a, b) => (ITEMS[a.key].value || 0) - (ITEMS[b.key].value || 0))[0];
+  if (!food) { UI.toast('Zum Experimentieren brauchst du Zutaten (Essen oder Kräuter).', 2600); return null; }
+  removeItem(p, food.key, 1); gainSkill(p, 'cooking', 0.3);
+  const hint = perkVal(p, 'cooking', 'taste') && hidden.map(([k, R]) => [k, Object.entries(R.need).filter(([m, n]) => matHave(m) < n)]).sort((a, b) => a[1].length - b[1].length)[0];
+  log(`Du probierst mit ${ITEMS[food.key].name} herum — ungenießbar.${hint ? ` Deine Zunge sagt: für ${ITEMS[hint[0]].name} fehlt ${hint[1].map(([m]) => ITEMS[m]?.name || m).join(', ')}.` : ''}`, 'world');
+  return 'verdorben';
+}
 function huntGain() { const p = S.player; if (!p?.skills) return; const s = p.skills.hunting || 0; p.skills.hunting = Math.min(100, s + 0.4 + 1.2 * (1 - s / 100)); }
 function dropLoot(e) {
   const table = LOOT[e.mtype] || [], tier = lootTier(e), BP = tier === 2 && BOSS_LOOT[e.mtype];
@@ -6242,7 +6362,7 @@ function updatePrompt() {
     t.kind === 'enemy' && t.prisoner ? `<b>E</b> Gefangener — ${t.title || MONSTERS[t.mtype].name}` : t.kind === 'enemy' && takeable(t) ? '<b>E</b> Gefangenen nehmen' :
     t.portal ? `<b>E</b> Betreten — ${t.label || ''}` :
     t.type === 'tree' ? `<b>E</b> Holz schlagen` :
-    t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln` :
+    t.harvest === 'herb' ? `<b>E</b> Kräuter sammeln${herbRare(t) && perkVal(S.player, 'herbalism', 'rare') && !t.depleted ? ' (seltene Pflanze!)' : ''}` :
     t.harvest === 'stone' ? `<b>E</b> Stein brechen` :
     t.harvest === 'iron' ? `<b>E</b> Erz abbauen` :
     t.claim ? `<b>E</b> Ort beanspruchen` :
@@ -6563,27 +6683,8 @@ function doInteract(target = null) {
   if (t.rite === 'soulwell') return soulWell(t);
   if (t.rite === 'cultmark' || t.rite === 'cultlist') return cultRite(t);   /* §5g.2 */
   if (t.rite === 'cultseal') return cultSealRite(t);
-  if (t.type === 'tree') {
-    if (t.chopCd && performance.now() < t.chopCd) return;
-    t.chopCd = performance.now() + 400;
-    t.hp = (t.hp ?? 3) - 1;
-    fx(t.x, t.y - 14, 'dust', 4);
-    S.res.wood += ri(1, 2);
-    if (t.hp <= 0) { removeSolid(t); S.ents[S.map].splice(S.ents[S.map].indexOf(t), 1); log('Baum gefällt.', 'world'); }
-    S.player.skills.survival = Math.min(100, (S.player.skills.survival || 0) + 0.1);
-    return;
-  }
-  if (t.harvest) {
-    if (t.depleted) return UI.toast('Erschöpft.');
-    t.depleted = true; t.respawn = S.day + 2; deplMark(t);
-    const n = ri(1, 3);
-    if (t.harvest === 'herb') { addItem(p, 'herb', n); S.res.herb += 0; }
-    else S.res[t.harvest] += n;
-    log(`${n}× ${({ herb:'Heilkraut', stone:'Stein', iron:'Eisenerz' })[t.harvest]} gewonnen.`, 'world');
-    if (t.harvest === 'herb') onItemGained('herb');
-    fx(t.x, t.y - 10, 'dust', 5);
-    return;
-  }
+  if (t.type === 'tree') { gatherTree(p, t); return; }   /* Phase 3: Holzfällen (Werkzeugstufe, Meilensteine, Ereignisse) */
+  if (t.harvest) { gatherNode(p, t); return; }            /* Phase 3: Bergbau und Kräuterkunde */
   if (t.loot && t.loot.length && !t.opened) {
     t.opened = true;
     if (t.vaultHoard) vaultHoardOpened(t);
@@ -18647,6 +18748,7 @@ function debugSections() {
       'NPC-Ziele: Abwanderung sofort ausführen': () => { const c = VILLAGERS.find(e => e.leaving); if (!c) return UI.toast('Niemand packt.'); c.leaving.day = S.day | 0; migrationDay(); },
       'Musik: nächste Phrase sofort (Region/Ort)': () => { if ((S.settings.music ?? 0.5) <= 0) S.settings.music = 0.5; ambience(true); musicNow(); UI.toast('Musik: gleich kommt die nächste Phrase.'); },   /* P4 Technik 08.10. */
       'Stadt: Stimmung zeigen (Trauer/Fest/Angst)': () => { const m = ['trauern', 'jubeln', 'abwehren'][(dbgMood = (dbgMood + 1) % 3)]; UI.toast(`Stimmung „${m}“: ${moodIdleTick(m)} Bewohner.`); },   /* N4 */
+      'Gruppe: Gefährten-Szene jetzt': () => { const k = partyBanter(true); UI.toast(k ? `Szene: ${k}` : 'Brauche zwei Gefährten in der Nähe.'); },   /* T38-Teil */
       'Stadt: Besitzer-Banner neu setzen': () => { ensureOwnerBanners(); UI.toast('Banner nach Besitzer gesetzt.'); },   /* T33 */
       'NPC-Ziele: Leerstand ins Log': () => log(`Leerstand: ${Object.entries(S.vacant || {}).map(([h, d]) => `${h} (Tag ${d})`).join(', ') || 'keiner'}.`, 'world'),
       'Leistung: update-Abschnitte messen (10 s)': () => { PF = { _t: 0 }; UI.toast('Messe 10 s …'); setTimeout(() => { const P0 = PF; PF = null; const n = P0._n || 1;   /* P4.29 */

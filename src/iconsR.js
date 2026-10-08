@@ -65,3 +65,19 @@ export const ICON_R = {
     '...oSSsSSSsSSo..', '...oSSSSSSSSSo..', '..oSsSSSSSSSsSo.', '..oSSSSsSSSSSSo.', '..oSSSSSSSsSSdo.', '..odSSsSSSSSddo.',
     '...oddSSSSSddo..', '....ooddddoo....', '......oooo......', '................']],
 };
+/* Sammeln, Werkzeuge und Kochen (08.10.2026): neue Symbole, meist umgefärbte vorhandene Umrisse; Stamm und Schriftrolle neu gezeichnet */
+const LOG_ROWS = ['................', '................', '................', '................', '..oooooooooooo..', '.obbbbbbbbbbbbro',
+  '.oBbBbbBbbBbbrRo', '.obbbbbbbbbbbbro', '.oBbbBbbbBbbbrRo', '.obbbbbbbbbbbbro', '..oooooooooooo..', '................', '................', '................', '................', '................'];
+const SCROLL_ROWS = ['................', '................', '...oooooooooo...', '..oppppppppppo..', '..opllllllllpo..', '..oppppppppppo..',
+  '..opllllllpppo..', '..oppppppppppo..', '..opllllllllpo..', '..oppppppppppo..', '..opllllpppppo..', '..oppppppppppo..', '...oooooooooo...', '................', '................', '................'];
+Object.assign(ICON_R, {
+  hartholz: [{ b: '#6a4a2a', B: '#4a3220', r: '#c8a070', R: '#8a6a40' }, LOG_ROWS], schwarzholz: [{ b: '#2a2420', B: '#14100e', r: '#6a5a4a', R: '#3e342a' }, LOG_ROWS],
+  harz: [{ c: '#8a6a2a', g: '#c89a3a', w: '#f0d890', r: '#d8a040', R: '#f0c060', d: '#8a5a1a' }, ICON_R.potion[1]],
+  kohle: [{ s: '#2a2826', S: '#3e3a36', d: '#141210', r: '#4a4440', R: '#6a6460' }, ICON_R.iron[1]], silbererz: [{ s: '#6a6a70', S: '#9a9aa4', d: '#3e3e44', r: '#c8ccd8', R: '#eef0f8' }, ICON_R.iron[1]],
+  bergminze: [{ L: '#8ad0a0', l: '#4a9a6a', d: '#2a6a4a', s: '#7a6a4a' }, ICON_R.herb[1]], nachtschatten: [{ L: '#8a6aa0', l: '#5a3a7a', d: '#3a2250', s: '#5a4a3a' }, ICON_R.herb[1]],
+  angel_gut: [{ s: '#a06a32', l: '#e8e0d0', h: '#b0b8c0' }, ICON_R.angel[1]], angel_stahl: [{ s: '#5a5a62', l: '#e8e0d0', h: '#d8e0e8' }, ICON_R.angel[1]],
+  bratfisch: [{ B: '#a0602a', b: '#d8a060', T: '#7a4420', w: '#f0e0c0' }, ICON_R.forelle[1]],
+  jaegertopf: [{ f: '#d8d8d0', s: '#8a4a2a', S: '#6a3220', B: '#4a3420' }, ICON_R.fischsuppe[1]], bergminztee: [{ f: '#d8d8d0', s: '#8ad0a0', S: '#5aa070', B: '#6a5a4a' }, ICON_R.fischsuppe[1]],
+  kraeuterbrot: [{ b: '#a08a48', B: '#c8b070', d: '#6a5a2a', c: '#8ab060' }, ICON_R.bread[1]],
+  rezept_jaegertopf: [{ p: '#e8dcc0', l: '#8a6a4a' }, SCROLL_ROWS], rezept_bergminztee: [{ p: '#e8dcc0', l: '#4a8a6a' }, SCROLL_ROWS], kochbuch: [{ p: '#c8a878', l: '#6a3a2a' }, SCROLL_ROWS],
+});
