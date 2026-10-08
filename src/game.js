@@ -1271,8 +1271,113 @@ function planDays() {
       c.plan.work = { x: st.x, y: st.y - 20, in: 0, f: { x: st.x, y: st.y + 40 }, act: null, stall: st.id }; c.plan.job = true; c.schedulePos = c.plan.work;
       Object.assign(c, { shop: true, pool: STALL_SELL[c.prof].filter(i => ITEMS[i]), till: 18 }); });
   }
+  planHomes();   /* Planlauf P1.9–P1.11: Bett, Haushalt, Kinder — vor den Beziehungen, damit Familien nicht Rivalen werden */
   planRelations();
   assignHunters();
+}
+/* ================= Wohnraum und Familien (Spec Welt §21–25, Planlauf P1.9–P1.11, 08.10.2026 — Werte vorläufig) =================
+   Messung vorher: 548 Bewohner ohne Bett (149 Wohnhäuser, 325 Bewohner, 133 Betten; in Schmieden, Lagern, Ställen schliefen Leute ohne Bett).
+   Jetzt: Wohnhäuser (Haus, Kate, Herrenhaus, Fischerhaus) haben Betten nach Größe (buildings.js FURNISH). Jeder Bewohner schläft in einem Bett eines
+   Wohnhauses seines Ortes — zuerst im eigenen, sonst im nächsten mit freiem Bett; die Arbeitsstätte (Schmiede, Lager, Stall …) bleibt Arbeitsplatz.
+   Wer zusammen schläft, ist ein Haushalt: gemeinsamer Familienname (fest aus dem Haus), Rollen (Mann/Frau, Sohn/Tochter, Bruder/Schwester,
+   Knecht/Magd). Paare mit freien Betten haben 0–2 Kinder (flüchtige Figuren, bei jedem Laden gleich neu abgeleitet). Alles wird aus dem Stand
+   abgeleitet (planDays bei jedem Laden) — nichts davon steht im Spielstand, alte Stände brauchen keine Umstellung. */
+const DWELL = new Set(['house', 'cottage', 'manor', 'fisher']), GESINDE = new Set(['Magd', 'Knecht', 'Tagelöhner']);
+const SURNAMES = ['Ackermann', 'Amsel', 'Birkner', 'Brenner', 'Distel', 'Dreher', 'Eberhardt', 'Falk', 'Fuhrmann', 'Gerber', 'Grimm', 'Hager', 'Hasel', 'Hollerbach',
+  'Kessler', 'Kohler', 'Krähe', 'Lerch', 'Lindner', 'Marder', 'Maurer', 'Moser', 'Nessel', 'Obermann', 'Otter', 'Rabe', 'Reiter', 'Rothe', 'Sauer', 'Schwarz',
+  'Specht', 'Steiner', 'Talmann', 'Vogt', 'Wagner', 'Weidner', 'Winter', 'Wolfram', 'Zimmer', 'Eichler', 'Brandt', 'Holzer'];
+const KID_M = ['Pipp', 'Ewald', 'Konni', 'Lutz', 'Mats', 'Ole', 'Tilo', 'Bodo', 'Hanno', 'Rolf'], KID_F = ['Linna', 'Mette', 'Fenja', 'Gretl', 'Ilse', 'Kaja', 'Rike', 'Wiebke', 'Thea', 'Nele'];
+const hHash = s => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const isFem = c => c.fem ?? femTrade(c.prof || '');
+let HOME_STATS = null;
+function bedSpot(bed, b) {                                         /* freie Innenkachel neben dem Bett (das Bett selbst ist fest) */
+  const bx = bed.x / TS | 0, by = bed.y / TS | 0;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1]]) { const tx = bx + dx, ty = by + dy;
+    if (tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !SOLID.has(tileAt('world', tx, ty)) && !solidPropAt('world', tx * TS + TS / 2, ty * TS + TS / 2, 4)) return { x: tx * TS + TS / 2, y: ty * TS + TS / 2 }; }
+  return null;
+}
+function planHomes() {
+  const HB_ID = new Map(HOUSES.map(b => [b.id, b])), beds = new Map();
+  for (const e of S.ents.world) if (e.kind === 'prop' && e.house && (e.type === 'bed' || e.type === 'bunk')) (beds.get(e.house) || beds.set(e.house, []).get(e.house)).push(e);
+  S.ents.world = S.ents.world.filter(e => !e.famKid && !e.famBed); for (let i = VILLAGERS.length - 1; i >= 0; i--) if (VILLAGERS[i].famKid) VILLAGERS.splice(i, 1);
+  const byTown = {}; for (const c of VILLAGERS) if (c.homeTown && c.homeTown !== 'vharnholm' && c.plan) (byTown[c.homeTown] ||= []).push(c);
+  const st = { slept: 0, pallet: 0, none: 0, kids: 0, fams: 0, couples: 0, lodgers: 0 }, usedT = new Set();
+  const tileFree = (b, tx, ty) => { const di = [b.doorTile[0] + (b.door === 'W' ? 1 : b.door === 'E' ? -1 : 0), b.doorTile[1] + (b.door === 'S' ? -1 : b.door === 'N' ? 1 : 0)];
+    return tx > b.x && tx < b.x + b.w - 1 && ty > b.y && ty < b.y + b.h - 1 && !(tx === di[0] && ty === di[1]) && !usedT.has(tx + ',' + ty)
+      && !SOLID.has(tileAt('world', tx, ty)) && !solidPropAt('world', tx * TS + TS / 2, ty * TS + TS / 2, 4); };
+  const pallet = (b, kid) => {                                      /* Strohsack auf einer freien Innenkachel — Kinderlager bzw. Schlafstelle in der Werkstatt (flüchtig, nicht gespeichert) */
+    if (!b || HB.wearOf(b) >= 2) return null;
+    for (const need of [2, 1]) for (let ty = b.y + 1; ty < b.y + b.h - 1; ty++) for (let tx = b.x + 1; tx < b.x + b.w - 1; tx++) if (tileFree(b, tx, ty)) {
+      const n4 = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => tileFree(b, tx + dx, ty + dy)).length; if (n4 < need) continue;   /* Laufweg bleibt frei (zuerst zwei freie Nachbarn, dann einer) */
+      usedT.add(tx + ',' + ty); const x = tx * TS + TS / 2, y = ty * TS + TS / 2;
+      S.ents.world.push({ id: 'fb_' + b.id + '_' + tx + '_' + ty, kind: 'prop', type: 'pallet', map: 'world', x, y, house: b.id, solid: false, r: 10, transient: true, famBed: true, kid: !!kid, alive: true });
+      return { x, y }; }
+    return null; };
+  const bedSpotU = (bed, b) => { const q = bedSpot(bed, b); if (q) usedT.add((q.x / TS | 0) + ',' + (q.y / TS | 0)); return q; };
+  for (const [town, list] of Object.entries(byTown)) {
+    const dw = HOUSES.filter(b => b.town === town && b.map === 'world' && DWELL.has(b.type) && HB.wearOf(b) < 2 && beds.get(b.id)?.length);
+    const free = new Map(dw.map(b => [b.id, beds.get(b.id).slice().sort((a, c) => (a.gk < c.gk ? -1 : 1)).map(bed => bedSpotU(bed, b)).filter(Boolean)])), occ = new Map();
+    const take = (c, b) => { const L = free.get(b.id); if (!L?.length) return false; c.sleepId = b.id; c.bedAt = L.shift(); (occ.get(b.id) || occ.set(b.id, []).get(b.id)).push(c); return true; };
+    const pairOf = ms => { const ad = ms.slice().sort((a, b) => (b.age || 30) - (a.age || 30));
+      const man = ad.find(c => !isFem(c) && !GESINDE.has(c.prof) && (c.age || 30) >= 20), wife = ad.find(c => isFem(c) && !GESINDE.has(c.prof) && (c.age || 30) >= 20 && c.prof !== 'Witwe');
+      return man && wife && Math.abs((man.age || 30) - (wife.age || 30)) <= 15 ? [man, wife] : null; };
+    list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    /* 1. Wer in einem Wohnhaus gemeldet ist, schläft dort */
+    for (const c of list) { c.sleepId = null; c.bedAt = null; c.household = null; c.pallet = false; const h = HB_ID.get(c.homeId); if (h && DWELL.has(h.type)) take(c, h); }
+    /* 2. Paare unter 45 bekommen 0–2 Kinder — Bett oder Kinderlager wird vor den Untermietern reserviert */
+    const kidBeds = new Map();
+    for (const [hid, ms] of occ) { const pr = pairOf(ms); if (!pr) continue; const pAge = Math.min(pr[0].age || 30, pr[1].age || 30); if (pAge >= 45) continue;
+      const want = hHash(hid + 'k') % 3, L = []; for (let i = 0; i < want; i++) { const at = free.get(hid).shift() || pallet(HB_ID.get(hid), true); if (at) L.push(at); } kidBeds.set(hid, L); }
+    /* 3. Übrige schlafen im nächsten Wohnhaus mit freiem Bett (Untermieter), höchstens 60 Felder weit */
+    for (const c of list) if (!c.sleepId) { const h = HB_ID.get(c.homeId) || { x: c.x / TS, y: c.y / TS };
+      const near = dw.filter(b => free.get(b.id).length && Math.hypot(b.x - h.x, b.y - h.y) < 60).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0]; if (near) take(c, near); }
+    /* 4. Sonst: Strohsack in der eigenen Arbeitsstätte (Gesellen, Knechte, Schankburschen, Dienstleute) */
+    const inns = HOUSES.filter(b => b.town === town && b.map === 'world' && b.type === 'tavern');
+    for (const c of list) if (!c.sleepId) { const h = HB_ID.get(c.homeId); let at = h && pallet(h), b = h;
+      if (!at) for (const t of inns) if ((at = pallet(t))) { b = t; break; }   /* Haus und Werkstatt voll: Kammer in der Schenke */
+      if (at) { c.sleepId = b.id; c.bedAt = at; c.pallet = true; st.pallet++; if (DWELL.has(b.type)) (occ.get(b.id) || occ.set(b.id, []).get(b.id)).push(c); } }
+    for (const c of list) {
+      if (!c.sleepId) { st.none++; continue; } st.slept++;
+      const b = HB_ID.get(c.sleepId), [fx, fy] = doorFront(b, 1), front = { x: fx * TS + TS / 2, y: fy * TS + TS / 2 };
+      c.anchor = c.bedAt;
+      if (c.sleepId !== c.homeId && DWELL.has(b.type)) { const host = c.plan.eve?.in && !c.plan.tav; c.plan.front = front; if (!host && !c.plan.tav) c.plan.eve = front; }   /* morgens und abends vor dem eigenen Wohnhaus, nicht vor der Werkstatt */
+      else if (c.sleepId !== c.homeId && !c.plan.tav) c.plan.eve = { ...c.bedAt, in: 1 };   /* Kammer in der Schenke: abends drinnen, nicht vor der Schenkentür */
+    }
+    /* 5. Haushalte: wer im selben Wohnhaus schläft — Rollen, Kinder, gemeinsames Abendessen */
+    for (const [hid, ms] of occ) {
+      const name = SURNAMES[hHash(hid) % SURNAMES.length], pr = pairOf(ms), [man, wife] = pr || [], pAge = pr ? Math.min(man.age || 30, wife.age || 30) : 0;
+      const head = pr ? man : ms.slice().sort((a, b) => (b.age || 30) - (a.age || 30))[0], ids = ms.map(c => c.id), b = HB_ID.get(hid);
+      for (const c of ms) {
+        const lodger = c.homeId !== hid && c !== man && c !== wife;
+        const role = pr && c === man ? 'Mann' : pr && c === wife ? 'Frau' : GESINDE.has(c.prof) ? (isFem(c) ? 'Magd im Haus' : 'Knecht im Haus') : lodger ? (isFem(c) ? 'Untermieterin' : 'Untermieter')
+          : pr && (c.age || 30) <= pAge - 16 ? (isFem(c) ? 'Tochter' : 'Sohn') : c === head ? (isFem(c) ? 'Hausherrin' : 'Hausherr') : (isFem(c) ? 'Schwester' : 'Bruder');
+        if (lodger) st.lodgers++;
+        c.household = { id: hid, name, role, members: ids, couple: !!pr };
+      }
+      if (ms.length > 1 || pr) st.fams++; if (pr) st.couples++;
+      const [fx, fy] = doorFront(b, 1), front = { x: fx * TS + TS / 2, y: fy * TS + TS / 2 };
+      const table = S.ents.world.find(e => e.kind === 'prop' && e.house === hid && e.type === 'table'), dine = table ? { x: table.x, y: table.y + TS * 0.6, in: 1 } : null;
+      if (pr && dine) for (const c of [man, wife]) if (!c.plan.tav || c === wife) c.plan.eve = { ...dine, x: dine.x + (c === man ? -14 : 14) };   /* Familie isst abends zusammen (wer einen Schenkenplatz hat, geht weiter hin) */
+      (kidBeds.get(hid) || []).forEach((at, i) => {
+        const hk = hHash(hid + ':' + i), fem = hk % 2 === 0, mom = wife;
+        const kid = makeChar({ name: (fem ? KID_F : KID_M)[hk % 10], prof: 'Kind', x: at.x, y: at.y, level: 1, age: 6 + hk % 7, fem, traits: ['neugierig'] }), n0 = hk % 1000;
+        const play = { x: front.x + ((hk >> 3) % 5 - 2) * TS, y: front.y + ((hk >> 6) % 3) * TS };   /* spielt vor dem Haus — nie in der Werkstatt */
+        Object.assign(kid, { child: true, famKid: true, transient: true, homeTown: town, homeId: hid, sleepId: hid, anchor: at, faction: mom.faction ?? null, momId: mom.id,
+          household: { id: hid, name, role: fem ? 'Tochter' : 'Sohn', members: [...ids], couple: true }, greet: pick(['„Wer bist du? Mama sagt, ich soll nicht mit Fremden reden.“', '„Hast du ein Schwert? Darf ich mal?“', '„Ich bin schneller als du!“']),
+          plan: { front, work: play, job: false, plaza: mom.plan.plaza, visit: hk % 2 ? mom.plan.visit : play, tav: null, eve: dine ? { ...dine, y: dine.y + 12 } : front, o: mom.plan.o, n: n0, dx: (n0 % 5) - 2, dy: ((n0 / 5 | 0) % 3) - 1 } });   /* Kinder gehen mit der Mutter zum Markt und essen mit */
+        kid.schedulePos = play; for (const c of ms) c.household.members.push(kid.id); kid.household.members.push(kid.id);
+        S.ents.world.push(kid); VILLAGERS.push(kid); st.kids++;
+      });
+    }
+  }
+  HOME_STATS = st; return st;
+}
+const famOf = c => c?.household ? c.household.members.map(byId).filter(m => m && m !== c && m.alive !== false) : [];
+function familyLine(c) {
+  const H = c.household; if (!H) return '';
+  const others = famOf(c); if (!others.length) return `Haus ${H.name}.`;
+  const say = { Mann: 'meine Frau', Frau: 'mein Mann', Sohn: 'Vater', Tochter: 'Vater' };
+  return `${H.role === 'Mann' || H.role === 'Frau' ? 'Wir sind die' : 'Ich gehöre zu den'} ${H.name}s. ` + others.slice(0, 4).map(o => `${o.name} (${o.household?.role || 'im Haus'}${o.prof && o.prof !== 'Kind' ? ', ' + o.prof : ''})`).join(', ') + '.';
 }
 // §79 Beziehungen: je Bewohner ein Freund und ein Rivale in derselben Stadt (fest, aus der Reihenfolge der ids) —
 // Rivalen reden nicht miteinander und gehen sich aus dem Weg, über den Rivalen wird gelästert, Freunde reden wärmer.
@@ -3794,6 +3899,7 @@ const areaHit = (e, t, mult) => { AREA = true; try { hit(e, t, mult); } finally 
 let UNBLOCK = false, stamWarnAt = 0;
 const heavyHit = (e, t, mult) => { UNBLOCK = true; try { hit(e, t, mult); } finally { UNBLOCK = false; } };
 function hit(attacker, target, mult, kind = 'physical') {
+  if (target?.child && target.kind === 'npc') return;   /* Planlauf P1.10: Kinder werden nie getroffen (Spielregel, kein Schaden, keine Straftat) */
   if (attacker && target && attacker !== target && attacker.map === target.map && dist(attacker, target) > 26 && !attacker.ramNow && !clearLine(attacker, target)) {   /* Sturmangriffe (Dampframme) brechen durch Hindernisse */   /* Spec Welt 08.10. §36: kein Treffer durch Wände — gilt für Nahkampf, Fähigkeiten, Flächen, Gegner */
     if (attacker === S.player && !(attacker.wallHintAt > performance.now())) { attacker.wallHintAt = performance.now() + 1200; float(attacker, 'Wand dazwischen', 'rgba(200,190,160,ALPHA)'); } return; }
   /* Ersatz-Lebensbalken „zuletzt getroffen“: jetzt in hurt() gesetzt (HB2-04: auch Pfeile und Zauber) */   /* Entwickler 02.10.: ohne Auswahl zeigt der zuletzt getroffene Gegner seinen Balken */
@@ -13380,6 +13486,7 @@ function npcOffers(n) {
 }
 function talk(npc) {
   if (npc?.kind === 'npc' && S.flags.tutor != null) S.flags.tutTalked = 1;   /* Wegweiser */
+  if (npc?.famKid) return UI.dialogue(npc, `${npc.greet}\n(${npc.name}, ${npc.household?.role === 'Tochter' ? 'Tochter' : 'Sohn'} der ${npc.household?.name}s.)`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);   /* Planlauf P1.10 */
   if (npc.key) ((S.codex ||= {}).met ||= {})[npc.key] = 1;             // S15 Kodex: wen man kennt
   if (npc.coreHolder) return snikkTalk(npc);                          // S15 P7 Artefakt-Konflikt
   if (npc.key === 'ilvar') return ilvarTalk(npc);                     // S15 P6
@@ -13452,7 +13559,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -17331,6 +17438,8 @@ function debugSections() {
       'Tempo setzen': () => { (S.dbg ||= {}).speed = +v('dbSpeed'); },
       'Flug/Noclip an/aus': () => { (S.dbg ||= {}).noclip = !S.dbg.noclip; UI.toast(S.dbg.noclip ? 'NOCLIP AN' : 'NOCLIP AUS'); },
       'Teleport: Stadt': () => { const T2 = TOWN_PLAN[v('dbTown')]; tp(T2.square[0], T2.square[1] + 2); },
+      'Stadt: Wohnraum/Familien zählen': () => { const k = v('dbTown'), st = planHomes(), V = VILLAGERS.filter(c => c.homeTown === k), H = new Set(V.filter(c => c.household).map(c => c.household.id));   /* Planlauf P1.9–P1.11 */
+        log(`${townName(k)}: ${V.filter(c => !c.child).length} Bewohner, ${V.filter(c => c.child).length} Kinder, ${H.size} Haushalte (${V.filter(c => c.household?.role === 'Frau').length} Paare), ${V.filter(c => c.pallet).length} auf Strohsack, ${V.filter(c => !c.sleepId).length} ohne Schlafplatz. Welt: ${st.slept} mit Schlafplatz, ${st.pallet} Strohsack, ${st.none} ohne, ${st.kids} Kinder, ${st.couples} Paare, ${st.lodgers} Untermieter.`, 'world'); },
       'Teleport: Ort': () => { const l = LOCATIONS.find(x => x.key === v('dbPlace')); if (l) tp(l.x, l.y); },
       'Teleport: NPC': () => { const e = byId(v('dbNpc')); if (e) tp(e.x / TS2 | 0, (e.y / TS2 | 0) + 1); },
       'Teleport: Karte/Dungeon': () => { const k = v('dbMap'); if (k !== S.map) travel(k); },
@@ -19700,9 +19809,9 @@ export function selftest() {
     }));
     ok('Bewohner: jedes Wohn- und Arbeitshaus bewohnt, ihr Nachtplatz liegt im eigenen Haus', HOUSES.every(b => {
       if (!TRADES[b.type] || !TOWN_PLAN[b.town] || HB.wearOf(b) === 2 || (b.town === 'eren' && ['tavern', 'smithy', 'healer'].includes(b.type))) return true;   // Kettenfeste: Fraktionsbau, keine Bürger
-      const rs = S.ents.world.filter(c => c.homeId === b.id);
-      const okH = rs.length > 0 && rs.every(c => { const x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0;
-        return x > b.x && x < b.x + b.w - 1 && y > b.y && y < b.y + b.h - 1 && walk(x, y); }); return okH;
+      const rs = S.ents.world.filter(c => c.homeId === b.id), HB_ = new Map(HOUSES.map(h => [h.id, h]));   /* Planlauf P1.9: Nachtplatz im Haus, in dem man schläft (eigenes oder Wohnhaus nebenan) */
+      const okH = rs.length > 0 && rs.every(c => { const x = c.anchor.x / TS | 0, y = c.anchor.y / TS | 0, h = HB_.get(c.sleepId) || b;
+        return x > h.x && x < h.x + h.w - 1 && y > h.y && y < h.y + h.h - 1 && walk(x, y); }); return okH;
     }));
     ok('Figuren mit Namen: Nachtplatz im eigenen Haus (freie Kachel), tagsüber ein Arbeitsplatz, Läden mit Ladenschluss', Object.entries(NPC_DAY).every(([k, d]) => {
       const c = S.ents.world.find(e => e.key === k); if (!c || !c.alive) return true;
@@ -21354,6 +21463,14 @@ export function selftest() {
     const cells = MAPS.kerker?.cells; if (!cells?.length) return true;
     return cells.every(c => { const at = (tx, ty) => inJailCell({ x: tx * TS, y: ty * TS }, c), d = c.door[1], top = d > c.y;
       return at(c.x + 2.5, c.y + 3) && at(c.x + 2.5, d + 0.5) && at(c.x + 2.5, top ? d + 0.95 : d + 0.05) && !at(c.x + 2.5, top ? d + 1.5 : d - 0.5) && !at(c.x + 7, c.y + 3); });
+  })());
+  ok('Planlauf P1.9–P1.11 (08.10.): fast alle Bewohner haben einen Schlafplatz im Ort, Haushalt = gemeinsames Wohnhaus, Kinder haben Bett/Lager und eine Mutter im Haus, nichts davon im Spielstand', (() => {
+    const st = planHomes(), V = VILLAGERS.filter(c => c.homeTown !== 'vharnholm' && c.plan), kids = V.filter(c => c.famKid);
+    const share = V.filter(c => c.household).every(c => c.child || c.sleepId === c.household.id || !DWELL.has(HOUSES.find(b => b.id === c.household.id)?.type));
+    const kidOk = kids.every(k => k.anchor && isFinite(k.anchor.x) && byId(k.momId)?.household?.id === k.household.id && k.household.members.includes(k.momId));
+    const sd = saveData(), sv = typeof sd === 'string' ? sd : JSON.stringify(sd), saved = !sv.includes('"famKid":true') && !sv.includes('"type":"pallet"');
+    if (!(st.none < V.length * 0.08 && share && kidOk && kids.length > 0 && saved)) console.warn('Wohnraum', st, share, kidOk, saved);
+    return st.none < V.length * 0.08 && share && kidOk && kids.length > 0 && saved && V.every(c => !c.anchor || isFinite(c.anchor.x + c.anchor.y));
   })());
   ok('Planlauf P0 (08.10.): Platz vor der Tür folgt der Türrichtung (W/E/N/S) und liegt auf freiem Boden; benannte NPCs mit Haus stehen vor ihrer Tür; Kompass zeigt im Wegweiser-Schritt „Arbeit“ ein Brett', sandbox(() => {
     const dirs = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }; let ok1 = true;

@@ -1526,6 +1526,12 @@ function drawProp(e, now) {
       ctx.fillStyle = '#3a2c1c'; ctx.fillRect(x - 12, y - 4, 3, 6); ctx.fillRect(x + 9, y - 4, 3, 6);
       ctx.fillStyle = '#6a4e34'; ctx.fillRect(x - 14, y - 8, 28, 5); ctx.fillStyle = '#80603f'; ctx.fillRect(x - 14, y - 8, 28, 1.5);
       break;
+    case 'pallet': {                                      /* Planlauf P1.11: Strohsack mit gerollter Decke (Kinderlager, Schlafstelle in der Werkstatt) */
+      shadow(x, y + 2, 12, .2);
+      ctx.fillStyle = '#8a7444'; ctx.fillRect(x - 10, y - 8, 20, 11); ctx.fillStyle = '#a08a52'; ctx.fillRect(x - 10, y - 8, 20, 2);
+      ctx.fillStyle = '#6a5a34'; for (let i = -8; i < 10; i += 4) ctx.fillRect(x + i, y - 5, 1, 7);
+      ctx.fillStyle = e.kid ? '#7a4a4a' : '#4a4e3e'; ctx.fillRect(x - 10, y - 10, 7, 6);
+      break; }
     case 'bed': case 'bunk': {                            // Bett (Etagenbett im Wachhaus)
       shadow(x, y + 4, 14, .3);
       const blanket = e.type === 'bunk' ? '#3e4a5a' : ['#6a3a30', '#3e4a3a', '#5a4a6a'][((x + y) | 0) % 3];
