@@ -8134,7 +8134,8 @@ const DEF_KINDS = { militia: { name: 'Miliz', power: 1 }, merc: { name: 'Söldne
 const defOf = k => { const D = ((S.defense ||= {})[k] ||= { militia: 0, merc: 0, robot: 0, gob: 0, until: {} });
   for (const t of ['merc', 'robot', 'gob']) if (D[t] && (D.until[t] || 0) < S.day) D[t] = 0; return D; };
 const villagersOf = k => S.ents.world.filter(c => c.kind === 'npc' && c.alive && c.homeTown === k && !c.raidDef && !S.party.includes(c.id));   // S15: Gefährten sind keine Dorfbewohner mehr
-function defPower(k) { const D = defOf(k); return villagersOf(k).length * 0.3 + Object.keys(DEF_KINDS).reduce((a, t) => a + (D[t] || 0) * DEF_KINDS[t].power, 0)
+function defPower(k) { const D = defOf(k); return (vmAway(k) ? VM_GO.weak : 1) * defPowerRaw(k, D); }   /* N4: ohne Hauptmann ¾ Stärke */
+function defPowerRaw(k, D) { return villagersOf(k).length * 0.3 + Object.keys(DEF_KINDS).reduce((a, t) => a + (D[t] || 0) * DEF_KINDS[t].power, 0)
   + S.ents.world.filter(e => e.tribGarrison === k && e.alive).length * 2; }
 function raidDay() {
   if (S.deadRaid) return;
@@ -8143,7 +8144,7 @@ function raidDay() {
   let w = V.reduce((a, v) => a + v.x + 200, 0) * rnd(), v = V[0];                    // der Osten liegt näher am Totenland
   for (const c of V) { w -= c.x + 200; if (w <= 0) { v = c; break; } }
   const n = S.flags.garmadonSlain ? ri(2, 4) : Math.min(14, ri(4, 7) + (S.day / 15 | 0));   /* Entwickler: nach Garmadon nur kleine Trupps */
-  S.deadRaid = { v: v.key, at: clock() + ri(180, 360), n };
+  S.deadRaid = { v: v.key, at: clock() + ri(180, 360), n }; vmDesertCheck(v.key, n);   /* N4 */
   log(`Späher melden: Untote ziehen gegen ${v.name} (${n}). In wenigen Stunden sind sie da.`, 'world');
   chronicle(`Untote ziehen gegen ${v.name}`, 'news');
 }
@@ -8332,7 +8333,55 @@ function rebuildRazed() {                                                       
     log(`Überlebende kehren nach ${V.name} zurück und bauen wieder auf.`, 'world'); chronicle(`${V.name} wird wieder aufgebaut`, 'news');
   }
 }
+/* ===== N4 Der Hauptmann desertiert (PROPOSALS/npc_eigene_ziele.md §5.4) =====
+   Der Verteidigungsmeister eines Dorfs hat einen festen Namen (Hash aus Ort und Generation). Wird ein Überfall angekündigt, den das Dorf kaum
+   gewinnen kann (Siegchance < 30 %), geht er mit bis zu 50 % (mehr, wenn das Dorf arm ist — der Sold fehlt). Ist Valen sehr kriegsmüde (≥ 70),
+   geht an manchen Tagen einer in einem Valen-Dorf. Er nimmt bis zu 2 Milizionäre mit, das Dorf kämpft 5 Tage mit ¾ Stärke, dann kommt ein
+   Nachfolger. Er führt eine Deserteurbande an, wenn es eine gibt oder entsteht. Wer den Sold auslegt (50 Gold), hält ihn 10 Tage. */
+const VM_TITLES = ['Hauptmann ', 'Waffenmeisterin ', 'Feldwebel '];
+const vmHash = (town, salt) => { let h = 7 + salt * 131; for (const ch of town) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+const vmName = town => { const g = S.vmGen?.[town] || 0, h = vmHash(town, g); return VM_TITLES[h % 3] + FIRST_M[(h >> 3) % FIRST_M.length]; };
+const vmAway = town => (S.vmGone?.[town]?.back || 0) > (S.day | 0);
+const VM_GO = { pWin: 0.3, max: 0.5, poor: 0.15, weary: 70, wearyDay: 0.05, days: 5, takeMil: 2, weak: 0.75, paidDays: 10, paidCost: 50, hireCost: 100 };
+function vmDesertCheck(town, n) {                                    /* bei der Ankündigung eines Überfalls (raidDay) */
+  if (!VILLAGES.some(V => V.key === town) || vmAway(town) || (S.vmPaid?.[town] || 0) > (S.day | 0)) return null;
+  const dp = defPower(town), pWin = dp / (dp + n * (S.flags.chainsBroken ? 1.2 : 1)); if (pWin >= VM_GO.pWin) return null;
+  const p = Math.min(VM_GO.max, VM_GO.max * (1 - pWin / VM_GO.pWin) + (growthOf(town).prosper < 0 ? VM_GO.poor : 0));
+  return vmHash(town, (S.day | 0) + 999) % 1000 / 1000 < p ? vmDesert(town, 'raid') : null;   /* Tageshash statt Zufallswurf */
+}
+function vmDesert(town, why) {
+  const vm = S.ents.world.find(e => e.vm === town && e.alive); if (!vm || vmAway(town)) return null;
+  const day = S.day | 0, name = vm.name, D = defOf(town), take = Math.min(VM_GO.takeMil, D.militia || 0);
+  D.militia = (D.militia || 0) - take; (S.vmGone ||= {})[town] = { name, day, back: day + VM_GO.days, why }; (S.vmGen ||= {})[town] = (S.vmGen[town] || 0) + 1;
+  const p = S.player, seen = p.map === 'world' && dist(p, vm) < 60 * TS;
+  if (seen) { bubble(vm, '„Für ein Dorf, das keinen Sold zahlt, sterbe ich nicht.“', 4000); float(vm, 'desertiert', 'rgba(200,160,90,ALPHA)', true); }
+  S.ents.world = S.ents.world.filter(e => e !== vm);
+  const t = `${name} hat ${townName(town)} verlassen${take ? ` und ${take} Milizionäre mitgenommen` : ''}. ${why === 'raid' ? 'Die Toten kommen, und der Sold kam nie.' : 'Valens Krieg frisst die Männer.'} Fünf Tage kämpft das Dorf ohne Hauptmann (¾ Stärke) — oder jemand wirbt einen neuen an (100 Gold).`;
+  log(t, 'faction'); chronicle(`${name} desertiert aus ${townName(town)}`, 'news', t);
+  let b = bandsOf().find(x => x.origin === 'deserter' && !x.vmOf);
+  if (!b && wearyOf('valen').pool >= 3) { const W = wearyOf('valen'); W.pool = Math.min(WEARY.poolCap, Math.max(WEARY.poolBand, W.pool + take + 1)); b = wearyBand('valen'); }   /* Spec: neue Bande nur, wenn der Pool schon ≥ 3 hat */
+  if (b) { b.lead = name; b.vmOf = town; b.men = Math.min(WEARY.bandMax + 2, b.men + take); log(`${name} führt jetzt ${b.name} bei ${b.where}.`, 'faction'); }
+  else log(`Am Brett von ${townName(town)} hängt ein Steckbrief: Fahnenflucht — ${name}.`, 'faction');
+  return name;
+}
+function vmWearyDay() {                                              /* zweiter Auslöser: Valen kriegsmüde ≥ 70 → an manchen Tagen geht einer (nur Valen-Dörfer) */
+  if (wearyOf('valen').v < VM_GO.weary || vmHash('weary', S.day | 0) % 100 >= VM_GO.wearyDay * 100) return null;
+  const vs = VILLAGES.filter(V => townFac(V.key) === 'valen' && !vmAway(V.key) && !((S.vmPaid?.[V.key] || 0) > (S.day | 0)) && S.ents.world.some(e => e.vm === V.key && e.alive));
+  return vs.length ? vmDesert(vs[vmHash('vm', S.day | 0) % vs.length].key, 'weary') : null;
+}
+function vmChoices(npc, choices) {
+  const day = S.day | 0;
+  if (npc.vm && VILLAGES.some(V => V.key === npc.vm) && !((S.vmPaid?.[npc.vm] || 0) > day) && growthOf(npc.vm).prosper < 0)
+    choices.unshift({ text: `„Der Sold kommt spät. Die Männer zählen nach.“ — Ich lege den Sold aus (${VM_GO.paidCost} Gold, ${VM_GO.paidDays} Tage)`, fn: () => {
+      if (S.gold < VM_GO.paidCost) return UI.dialogue(npc, '„Mit leeren Taschen versprichst du nichts.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+      S.gold -= VM_GO.paidCost; (S.vmPaid ||= {})[npc.vm] = day + VM_GO.paidDays; UI.refreshHUD(); UI.dialogue(npc, '„Dann bleibe ich. Zehn Tage — danach reden wir wieder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); } });
+  const k = npc.homeTown; if (!k || !vmAway(k) || npc.guard || npc.vm) return;
+  choices.push({ text: `Einen neuen Hauptmann anwerben (${VM_GO.hireCost} Gold)`, fn: () => {
+    if (S.gold < VM_GO.hireCost) return UI.dialogue(npc, '„Ohne Gold kommt keiner.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    S.gold -= VM_GO.hireCost; S.vmGone[k].back = day; ensureDefenseMasters(); UI.refreshHUD(); UI.closeDialogue(); log(`${vmName(k)} übernimmt die Verteidigung von ${townName(k)}.`, 'faction'); } });
+}
 function defenseChoices(npc, choices) {
+  vmChoices(npc, choices);   /* N4 */
   const k = npc.homeTown, V = VILLAGES.find(v => v.key === k);
   if (!V || S.razed?.[k] || npc.guard || S.party.includes(npc.id)) return;
   choices.push({ text: 'Wer verteidigt dieses Dorf?', fn: () => defenseTalk(npc, V) });
@@ -11325,11 +11374,11 @@ function ensureScytheMilitia() {
 function ensureDefenseMasters() {
   ensureTavernStaff(); ensureMercs(); ensureCoaches(); ensureVaultSites(); ensureBeastTraders(); ensureLivestock(); ensureTownAnimals(); ensureOwnerBanners(); ensureMoorhexe(); ensureFarmAnimals(); ensureSeafolk(); ensureWhitebeard(); ensureMorrgrund(); ensureTower(); ensurePaddock(); dkSteed();                                      // S13: Söldner in den Schenken
   for (const [town, P] of Object.entries(TOWN_PLAN)) {
-    if (town === 'vharnholm' || S.ents.world.some(e => e.vm === town)) continue;
+    if (town === 'vharnholm' || S.ents.world.some(e => e.vm === town) || vmAway(town)) continue;   /* N4: ohne Hauptmann bis zum Nachfolger */
     const board = S.ents.world.find(e => e.type === 'board' && boardTown(e) === town), [bx, by] = board ? [board.x / TS | 0, board.y / TS | 0] : P.square;
     const fac = townFac(town), kit = fac === 'aurel' ? 'merch' : GUARD_KIT[fac] ? fac : 'valen', q = freeSpotNear('world', bx + 2, by, 1);
     const g = guardChar(kit, q, 'Verteidigungsmeister', 12);
-    Object.assign(g, { vm: town, faction: fac === 'aurel' ? 'aurel' : g.faction, visitor: true, transient: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, name: pick(['Hauptmann ', 'Waffenmeisterin ', 'Feldwebel ']) + pick(FIRST_M),
+    Object.assign(g, { vm: town, faction: fac === 'aurel' ? 'aurel' : g.faction, visitor: true, transient: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, name: vmName(town),   /* N4: fester Name je Ort und Generation */
       greet: '„Verteidigungsmeister. Wer hier Arbeit sucht, findet sie bei mir — und bezahlt wird nach Köpfen.“', cloth: fac === 'aurel' ? '#c8a050' : fac === 'chain' ? '#1a1718' : '#5a2a22' });
     g.equip.chest = mkItem('plate_cuirass'); g.equip.head = mkItem('great_helm'); g.equip.weapon = mkItem(fac === 'aurel' ? 'halberd' : 'longsword'); g.robot = false; recalc(g);
     S.ents.world.push(g, { id: uid(), kind: 'prop', type: 'banner_torn', map: 'world', x: q.x + TS, y: q.y - 4, r: 6, transient: true, label: `Banner des Verteidigungsmeisters von ${townName(town)}` });
@@ -15445,7 +15494,7 @@ function dayTick() {
   rebuildTick(); growthDay(); treeRegrowDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); grudgeDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
-  wearyDay();   /* N3: Kriegsmüdigkeit vor dem Kriegstag */
+  wearyDay(); vmWearyDay();   /* N3/N4: Kriegsmüdigkeit vor dem Kriegstag */
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
   herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
   if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) SIM.initSim();   // S15: Straßen nicht täglich neu bauen
@@ -20193,6 +20242,8 @@ function debugSections() {
       'E4: Vermisstenwelle im nächsten Dorf (sofort ein Opfer)': () => { const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS));
         if (S.vanish?.state === 'on') return UI.toast('Eine Welle läuft schon.'); const k = ks.find(x => vanishStart(x)); if (!k) return UI.toast('Kein Dorf mit Unterschlupf in Reichweite.'); vanishTake(); UI.toast(`${townName(k)}: ${VANISH[S.vanish.cause].name} · ${S.vanish.loc}`, 3000); },
       'E4: Vermisstenwelle 3 Tage vorspulen (Opfer altern)': () => { for (const t of S.vanish?.taken || []) t.day -= 3; if (S.vanish) { S.vanish.day0 -= 3; S.vanish.last -= 3; } UI.toast('Opfer 3 Tage älter'); },
+      'N4: Hauptmann des nächsten Dorfs desertiert': () => { const V = VILLAGES.slice().sort((a, c) => Math.hypot(a.x - P().x / TS, a.y - P().y / TS) - Math.hypot(c.x - P().x / TS, c.y - P().y / TS)).find(v => S.ents.world.some(e => e.vm === v.key && e.alive)); const n = V && vmDesert(V.key, 'raid'); UI.toast(n ? `${n} hat ${townName(V.key)} verlassen` : 'Kein Dorf mit Hauptmann (oder schon fort).', 3000); },
+      'N4: Abwesende Hauptleute ins Log': () => log(`Ohne Hauptmann: ${Object.entries(S.vmGone || {}).filter(([k]) => vmAway(k)).map(([k, g]) => `${townName(k)} (${g.name}, bis Tag ${g.back})`).join(', ') || 'keiner'}.`, 'faction'),
       'N3: Kriegsmüdigkeit Valen +20': () => { wearyOf('valen').v = Math.min(100, wearyOf('valen').v + 20); UI.toast(`Valen müde: ${wearyOf('valen').v} (Stufe ${wearyStage('valen')}) — wirkt beim nächsten Tag`); },
       'N3: Kriegsmüdigkeit Kette +20': () => { wearyOf('chain').v = Math.min(100, wearyOf('chain').v + 20); UI.toast(`Kette müde: ${wearyOf('chain').v} (Stufe ${wearyStage('chain')})`); },
       'N3: Kriegsmüdigkeit — Tag rechnen': () => { wearyDay(); const V = wearyOf('valen'), C = wearyOf('chain'); UI.toast(`Valen ${V.v} (Pool ${V.pool.toFixed(1)}) · Kette ${C.v} (Pool ${C.pool.toFixed(1)})`, 3500); },
@@ -22493,6 +22544,20 @@ export function selftest() {
     const res = { part, bleed, ko, up, healed, full, zero, foe }; if (!Object.values(res).every(Boolean)) console.warn('Blut-Probe', JSON.stringify(res), bloodLv(n));
     return Object.values(res).every(Boolean);
   }));
+  ok('N4 Hauptmann desertiert: fester Name je Ort, geht bei aussichtslosem Überfall (Tageshash), nimmt Miliz mit, Dorf ¾ Stärke und ohne Hauptmann bis zum Nachfolger, Sold auslegen hält ihn, neuer Hauptmann für 100 Gold', (() => {
+    const W0 = S.ents.world, keep = structuredClone({ g: S.vmGone || null, n: S.vmGen || null, pd: S.vmPaid || null, d: S.defense || null, b: S.bands, w: S.weary || null, f: S.flags }), g0 = S.gold; S.ents.world = W0.slice();
+    try {
+      const V = VILLAGES.find(v => S.ents.world.some(e => e.vm === v.key && e.alive)); if (!V) return true; const k = V.key, name0 = vmName(k), fixed = name0 === vmName(k) && S.ents.world.find(e => e.vm === k).name === name0;
+      S.vmPaid = { [k]: (S.day | 0) + 3 }; const paid = vmDesertCheck(k, 999) === null; S.vmPaid = {};
+      defOf(k).militia = 3; const dp0 = defPower(k), n = vmDesert(k, 'raid'), gone = n === name0 && !S.ents.world.some(e => e.vm === k) && defOf(k).militia === 1 && vmAway(k);
+      const weak = Math.abs(defPower(k) - defPowerRaw(k, defOf(k)) * 0.75) < 1e-9 && defPower(k) < dp0; ensureDefenseMasters(); const none = !S.ents.world.some(e => e.vm === k);
+      const npc = S.ents.world.find(e => e.kind === 'npc' && e.homeTown === k && !e.guard && !e.vm && e.alive); let hired = true;
+      if (npc) { S.gold = 500; const ch = []; vmChoices(npc, ch); ch.find(c => c.text.startsWith('Einen neuen Hauptmann'))?.fn(); UI.closeDialogue(); hired = S.gold === 400 && S.ents.world.some(e => e.vm === k) && !vmAway(k); }
+      const res = { fixed, paid, gone, weak, none, hired }; if (!Object.values(res).every(Boolean)) console.warn('N4-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { S.ents.world = W0; const k2 = structuredClone(keep); S.vmGone = k2.g || undefined; S.vmGen = k2.n || undefined; S.vmPaid = k2.pd || undefined; if (k2.d) S.defense = k2.d; S.bands = keep.b; S.weary = k2.w || undefined; S.flags = keep.f; S.gold = g0;
+      for (const x of ['vmGone', 'vmGen', 'vmPaid', 'weary']) if (S[x] === undefined) delete S[x]; }
+  })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -25016,7 +25081,21 @@ export function selftest() {
       return indep && strength && dimin && sw10 && sw20 && stag && smith && saved && legacy;
     } finally { if (rec0) S.legacy.recipes = rec0; else delete S.legacy.recipes; Object.assign(S.res, r0); }
   }));
-  ok('Fischen (08.10.): Gewässerart nach Lage (Küste an der Südsee), Auswerfen nur am Wasser; zu früh/zu spät nichts, rechtzeitig ein Fisch des Gewässers; seltene erst ab Stufe 15; am selben Platz abnehmend; Fisch → Fischsuppe im Kessel', sandbox(() => {
+  ok('Fertigkeiten-Fenster (09.10., Kenshi-Liste): alle vier Gruppen, je Fertigkeit eine Zeile, Ungeübte gedimmt, Meisterprüfung markiert; Tafel zeigt Meilenstein-Zeitstrahl und Meisterschaft; Auswahl bleibt beim erneuten Öffnen; Charakterbogen verweist auf den Reiter', sandbox(() => {
+    const p = stage(); p.skills = { onehanded: 43, smithing: 81 }; p.masteries = {}; const N = Object.keys(SKILL_NAMES).length;
+    try {
+      UI.openModal('mastery'); const B = document.getElementById('modal-body'), grp = [...B.querySelectorAll('.sk-grp h4')].map(h => h.firstChild.textContent);
+      const rows = B.querySelectorAll('.sk-row').length === N && ['Kampf', 'Handwerk', 'Überleben', 'Sozial'].every(g => grp.includes(g)), dim = B.querySelectorAll('.sk-row.fresh').length === N - 2;
+      const mark = !!B.querySelector('.sk-row[data-sk="smithing"] .sk-mark.open');
+      B.querySelector('.sk-row[data-sk="smithing"]')?.click(); const D = document.getElementById('sk-det');
+      const det = D.querySelectorAll('.sk-node').length === SKILL_MS.length && D.querySelectorAll('.sk-node.on').length === 7 && !!D.querySelector('.sk-master.open') && /Meisterschmied/.test(D.textContent);
+      UI.closeModal(); UI.openModal('mastery'); const keep = !!document.querySelector('#modal-body .sk-row.sel[data-sk="smithing"]') && /Schmieden/.test(document.querySelector('#sk-det h3')?.textContent || '');
+      UI.openModal('character'); const link = !!document.getElementById('ch-mastery');
+      if (!(rows && dim && mark && det && keep && link)) console.warn('Fertigkeiten-Fenster', JSON.stringify({ rows, dim, mark, det, keep, link, grp }));
+      return rows && dim && mark && det && keep && link;
+    } finally { UI.closeModal(); }
+  }));
+  ok('Fischen (08.10.):Gewässerart nach Lage (Küste an der Südsee), Auswerfen nur am Wasser; zu früh/zu spät nichts, rechtzeitig ein Fisch des Gewässers; seltene erst ab Stufe 15; am selben Platz abnehmend; Fisch → Fischsuppe im Kessel', sandbox(() => {
     const p = stage(), m0 = S.map, x0 = p.x, y0 = p.y, r0 = { ...S.res }, fs0 = new Set(FISH_SPOT.keys()); p.inv = []; p.invCap = 60; p.skills = {};
     try {
       const M = MAPS.world, Wd = M.w; let spot = null, coast = null;

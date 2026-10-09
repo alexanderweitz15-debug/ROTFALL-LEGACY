@@ -1275,10 +1275,11 @@ function woundNotes(c, click) {
   }).join('');
 }
 
-// ---- Fertigkeiten (Umbau 09.10.2026, Entwickler: „baue definitiv das Fertigkeiten-Menü um“; Daten: A.skillInfo, Skill-Core Spec Skills §4/§50).
-// Kopf: Reiter je Gruppe mit „geübt/alle“. Links Kacheln (Symbol, Name, Stufe groß, Balken zur nächsten Stufe, Zeichen: ◆ Meilenstein nah, ★ Meisterprüfung
-// offen/errungen). Rechts die Detailtafel: Umfang, wie sie steigt, Meilenstein-Zeitstrahl, Freischaltungen, Techniken, Meisterschaft. Ungeübte stehen
-// gedimmt am Ende, damit man sieht, was es gibt. Reiter und Auswahl bleiben beim erneuten Öffnen (skTab/skSel). Aussehen: style.css „Fertigkeiten-Fenster“.
+// ---- Fertigkeiten (Umbau 09.10.2026, Entwickler: „baue definitiv das Fertigkeiten-Menü um“ und „mehr wie Kenshi, also übersichtlicher und kompakter“;
+// Daten: A.skillInfo, Skill-Core Spec Skills §4/§50). Alle Fertigkeiten auf einer Seite als dichte, zweispaltige Liste nach Gruppen: je Zeile Symbol,
+// Name, Stufe als Zahl, darunter ein schmaler Balken zur nächsten Stufe; ◆ = Meilenstein nah, ★ = Meisterprüfung offen/errungen. Ungeübte gedimmt am
+// Ende ihrer Gruppe. Einzelheiten (so steigt sie, Meilenstein-Zeitstrahl, Techniken, Meisterschaft) nur in der kleinen Tafel rechts — beim Überfahren
+// vorübergehend, beim Anklicken fest. Die Auswahl bleibt beim erneuten Öffnen (skSel). Aussehen: style.css „Fertigkeiten-Fenster“.
 const SK_GROUPS = ['Kampf', 'Handwerk', 'Überleben', 'Sozial'];
 /* Symbol je Fertigkeit: ein Gegenstand, gezeichnet wie im Gepäck — oder mit „i:“ ein Piktogramm aus icons.js */
 const SK_ICO = { onehanded: 'longsword', twohanded: 'greatsword', polearms: 'spear', archery: 'shortbow', defense: 'wooden_shield', toughness: 'iron_helm', katana: 'katana',
@@ -1301,63 +1302,63 @@ const SK_HOW = { onehanded: SK_WPN, twohanded: SK_WPN, polearms: SK_WPN, katana:
   mining: 'Steigt beim Abbau von Stein und Erz mit der Spitzhacke, bei Eisenerz mehr. Schaltet härtere Erze, Kohle und Silbererz frei.',
   herbalism: 'Steigt beim Kräutersammeln, bei seltenen Pflanzen mehr. Mehr Ernte und seltene Pflanzen.',
   cooking: 'Steigt beim Kochen am Kessel und beim Experimentieren mit Zutaten. Größere Töpfe, länger wirkende Mahlzeiten.' };
-let skTab = 'Alle', skSel = null;
+let skSel = null;
 const skUsed = s => s.v > 0;
-const skNear = s => !!s.next && s.next.lv - s.lv <= 2;   /* nur Anzeige: Meilenstein höchstens zwei Stufen entfernt */
+/* Nächstes Ziel: der nächste Meilenstein mit Freischaltung — oder früher die Stufe, an der sich die Meisterprüfung öffnet (gainSkill meldet beides) */
+const skGoal = s => { const M = s.master; return M && !M.done && M.lv > s.lv && (!s.next || M.lv < s.next.lv) ? { lv: M.lv, t: `Meisterprüfung öffnet sich (${M.title})` } : s.next; };
+const skNear = s => { const g = skGoal(s); return !!g && g.lv - s.lv <= 2; };   /* nur Anzeige: Ziel höchstens zwei Stufen entfernt */
 function skIco(k, cls) {
   const s = SK_ICO[k] || '', ch = `<span class="${cls} sk-ico0">${(SKILL_NAMES[k] || k)[0]}</span>`;
-  if (s.startsWith('i:')) return icoImg(s.slice(2), 3, cls) || ch;
+  if (s.startsWith('i:')) return icoImg(s.slice(2), 2, cls) || ch;
   return ITEMS[s] ? `<canvas class="${cls}" data-ico="${s}"></canvas>` : ch;
 }
 function skMark(s) {
-  if (s.master?.open) return `<i class="sk-mark open" title="Meisterprüfung offen: ${qa(s.master.task)}">★</i>`;
+  if (s.master?.open) return '<i class="sk-mark open" title="Meisterprüfung offen">★</i>';
   if (s.master?.done) return `<i class="sk-mark done" title="${qa(s.master.title)}">★</i>`;
-  return skUsed(s) && skNear(s) ? `<i class="sk-mark near" title="Meilenstein nah: Stufe ${s.next.lv} — ${qa(s.next.t)}">◆</i>` : '';
+  return skUsed(s) && skNear(s) ? `<i class="sk-mark near" title="Meilenstein nah: Stufe ${skGoal(s).lv}">◆</i>` : '';
 }
-function skTile(s) {
+function skRow(s) {
   const fresh = !skUsed(s), f = s.v >= 100 ? 100 : Math.round(s.frac * 100);
-  return `<button class="sk-tile${fresh ? ' fresh' : ''}${s.k === skSel ? ' sel' : ''}" data-sk="${s.k}" title="${qa(s.name)}: ${qa(s.what)}">${skIco(s.k, 'sk-ico')}
-    <span class="sk-nm">${s.name}</span><b class="sk-lv">${fresh ? '–' : s.lv}</b>${skMark(s)}<span class="sk-bar"><i style="--f:${f}%"></i></span></button>`;
+  return `<button class="sk-row${fresh ? ' fresh' : ''}${s.k === skSel ? ' sel' : ''}" data-sk="${s.k}">${skIco(s.k, 'sk-ico')}<span class="sk-nm">${s.name}</span>${skMark(s)}<b class="sk-lv">${fresh ? '–' : s.lv}</b><span class="sk-bar"><i style="--f:${f}%"></i></span></button>`;
 }
 function skDetail(s) {
   if (!s) return '<p class="sk-none">Keine Fertigkeit gewählt.</p>';
-  const fresh = !skUsed(s), M = s.master, P = Object.fromEntries(s.perks.map(q => [q.lv, q])), max = s.v >= 100;
+  const fresh = !skUsed(s), M = s.master, P = Object.fromEntries(s.perks.map(q => [q.lv, q])), max = s.v >= 100, G = skGoal(s);
   const nodes = SKILL_MS.map(L => { const q = P[L], m = M?.lv === L, tip = q ? q.t : m ? `Meisterprüfung: ${M.task}` : L === 50 ? 'Höchststufe' : 'Meilenstein ohne Freischaltung';
-    return `<li class="sk-node${s.lv >= L ? ' on' : ''}${s.next?.lv === L ? ' next' : ''}${q ? ' perk' : ''}${m ? ' mst' : ''}" style="--x:${L * 2}%" title="Stufe ${L} — ${qa(tip)}"><i>${m ? '★' : ''}</i><span>${L}</span></li>`; }).join('');
-  const goal = max ? 'Höchste Stufe erreicht.' : s.next ? `Nächstes Ziel: <b>Stufe ${s.next.lv}</b> — ${s.next.t} <small>(noch ${s.next.lv - s.lv} Stufe${s.next.lv - s.lv > 1 ? 'n' : ''})</small>` : 'Alle Meilensteine erreicht.';
-  return `<header class="sk-dh">${skIco(s.k, 'sk-dico')}<div class="sk-dt"><h3>${s.name}</h3><p>${s.group} · ${fresh ? 'noch nicht geübt' : `Stufe ${s.lv} von 50 · Wert ${Math.floor(s.v)}/100`}</p></div>
+    return `<li class="sk-node${s.lv >= L ? ' on' : ''}${G?.lv === L ? ' next' : ''}${q ? ' perk' : ''}${m ? ' mst' : ''}" style="--x:${L * 2}%" title="Stufe ${L} — ${qa(tip)}"><i>${m ? '★' : ''}</i><span>${L}</span></li>`; }).join('');
+  const goal = max ? 'Höchste Stufe erreicht.' : G ? `Nächstes Ziel: <b>Stufe ${G.lv}</b> — ${G.t}` : 'Alle Meilensteine erreicht.';
+  return `<header class="sk-dh">${skIco(s.k, 'sk-dico')}<div class="sk-dt"><h3>${s.name}</h3><p>${s.group} · ${fresh ? 'noch nicht geübt' : `Wert ${Math.floor(s.v)}/100 · ${max ? 'voll' : `${Math.round(s.frac * 100)} % bis Stufe ${s.lv + 1}`}`}</p></div>
       <b class="sk-big" title="Stufe = Wert ÷ 2">${fresh ? '–' : s.lv}</b></header>
-    <div class="sk-bar big"><i style="--f:${max ? 100 : Math.round(s.frac * 100)}%"></i></div>
-    <p class="sk-sub">${max ? 'Voll ausgebildet.' : `${Math.round(s.frac * 100)} % bis Stufe ${s.lv + 1}`}</p>
     <p class="sk-txt"><b>Umfasst:</b> ${s.what || '—'}</p>
     <p class="sk-txt${fresh ? ' sk-fresh' : ''}"><b>${fresh ? 'Noch nicht geübt — so steigt sie:' : 'So steigt sie:'}</b> ${SK_HOW[s.k] || 'Durch Tun.'}</p>
     <h4>Meilensteine</h4>
     <div class="sk-line"><div class="sk-track"><i style="--f:${Math.min(100, s.v)}%"></i></div><ol>${nodes}</ol></div>
     <p class="sk-goal">${goal}</p>
-    ${s.perks.length ? `<ul class="sk-ms">${s.perks.map(q => `<li class="${q.on ? 'on' : ''}${s.next?.lv === q.lv ? ' next' : ''}"><b>${q.lv}</b><span>${q.t}</span><em>${q.on ? '✔' : ''}</em></li>`).join('')}</ul>`
-      : '<p class="sk-note">Für diese Fertigkeit gibt es noch keine Freischaltungen an Meilensteinen — ihr Wert wirkt stetig (siehe oben).</p>'}
-    ${s.techs?.length ? `<h4>Techniken</h4><ul class="sk-tech">${s.techs.map(q => `<li class="${q.on ? 'on' : ''}"><b>${q.on ? '✔ ' : ''}${q.name}</b><span>${q.t}</span><small>${q.on ? 'gelernt' : `Lehrmeister: ${q.where}${q.need ? ` · ab Stufe ${q.need}` : ''}`}</small></li>`).join('')}</ul>` : ''}
+    ${s.perks.length ? `<ul class="sk-ms">${s.perks.map(q => `<li class="${q.on ? 'on' : ''}${G?.lv === q.lv ? ' next' : ''}"><b>${q.lv}</b><span>${q.t}</span><em>${q.on ? '✔' : ''}</em></li>`).join('')}</ul>`
+      : '<p class="sk-note">Keine Freischaltungen an Meilensteinen — der Wert wirkt stetig.</p>'}
+    ${s.techs?.length ? `<h4>Techniken</h4><ul class="sk-tech">${s.techs.map(q => `<li class="${q.on ? 'on' : ''}" title="${qa(q.t)}"><b>${q.on ? '✔ ' : ''}${q.name}</b><small>${q.on ? 'gelernt' : `${q.where}${q.need ? ` · ab Stufe ${q.need}` : ''}`}</small></li>`).join('')}</ul>` : ''}
     ${M ? `<h4>Meisterschaft</h4><div class="sk-master${M.done ? ' done' : M.open ? ' open' : ''}"><span class="sk-star">★</span><div>
       <b>${M.title}</b> <small>${M.done ? 'errungen' : M.open ? 'Prüfung offen' : `ab Stufe ${M.lv}`}</small>
-      <p>${M.done ? M.perk[2] : `Aufgabe: ${M.task}`}</p>${M.done ? '' : `<p class="sk-gain">Lohn: Titel „${M.title}“ · ${M.perk[2]}</p>`}</div></div>` : ''}`;
+      <p>${M.done ? M.perk[2] : M.task}</p>${M.done ? '' : `<p class="sk-gain">Lohn: ${M.perk[2]}</p>`}</div></div>` : ''}`;
 }
 function masteryUI(body) {
-  const info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean);
-  const tabs = ['Alle', ...SK_GROUPS.filter(g => info.some(s => s.group === g)), ...new Set(info.map(s => s.group).filter(g => !SK_GROUPS.includes(g)))];
-  if (!tabs.includes(skTab)) skTab = 'Alle';
-  const inTab = g => info.filter(s => g === 'Alle' || s.group === g);
-  const list = inTab(skTab).sort((a, b) => skUsed(b) - skUsed(a) || b.v - a.v || a.name.localeCompare(b.name)), cut = list.findIndex(s => !skUsed(s));
-  if (!list.some(s => s.k === skSel)) skSel = list[0]?.k || null;
+  const info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean), byK = Object.fromEntries(info.map(s => [s.k, s]));
+  const groups = [...SK_GROUPS, ...new Set(info.map(s => s.group).filter(g => !SK_GROUPS.includes(g)))].map(g => [g, info.filter(s => s.group === g)
+    .sort((a, b) => skUsed(b) - skUsed(a) || b.v - a.v || a.name.localeCompare(b.name))]).filter(([, L]) => L.length);
+  if (!byK[skSel]) skSel = groups.flatMap(([, L]) => L).find(skUsed)?.k || info[0]?.k || null;
+  const nUsed = info.filter(skUsed).length, open = info.filter(s => s.master?.open);
   body.innerHTML = `<div class="sk">
-    <nav class="sk-tabs">${tabs.map(g => { const L = inTab(g); return `<button data-g="${g}" class="${g === skTab ? 'on' : ''}" title="${L.filter(skUsed).length} von ${L.length} geübt">${g}<small>${L.filter(skUsed).length}/${L.length}</small></button>`; }).join('')}</nav>
-    <div class="sk-main"><div class="sk-grid">${list.map((s, i) => (i === cut ? `<p class="sk-sep">Noch nicht geübt${i ? '' : ' — hier hast du noch nichts getan'}</p>` : '') + skTile(s)).join('')}</div>
-      <section class="sk-det" id="sk-det">${skDetail(info.find(s => s.k === skSel))}</section></div>
-    <p class="sk-hint">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). Starke Gegner lehren mehr als harmlose; wer immer wieder dasselbe Ziel schlägt, lernt kaum noch etwas.</p></div>`;
+    <header class="sk-head"><span>${nUsed} von ${info.length} geübt</span>${open.length ? `<span class="sk-open">★ Meisterprüfung offen: ${open.map(s => s.name).join(', ')}</span>` : ''}
+      <span class="sk-legend"><i class="sk-mark near">◆</i> Meilenstein nah <i class="sk-mark open">★</i> Meisterprüfung</span></header>
+    <div class="sk-main"><div class="sk-list" id="sk-list">${groups.map(([g, L]) => `<section class="sk-grp"><h4>${g}<small>${L.filter(skUsed).length}/${L.length}</small></h4>${L.map(skRow).join('')}</section>`).join('')}</div>
+      <section class="sk-det" id="sk-det">${skDetail(byK[skSel])}</section></div>
+    <p class="sk-hint">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). Starke Gegner lehren mehr als harmlose; dasselbe Ziel immer wieder lehrt kaum noch etwas. Zeile überfahren: Einzelheiten, anklicken: festhalten.</p></div>`;
   paintIcons(body);
-  body.querySelectorAll('.sk-tabs [data-g]').forEach(b => b.onclick = () => { skTab = b.dataset.g; masteryUI(body); });
-  body.querySelectorAll('.sk-tile').forEach(b => b.onclick = () => {
-    skSel = b.dataset.sk; body.querySelectorAll('.sk-tile.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
-    const d = $('sk-det'); d.innerHTML = skDetail(A.skillInfo?.(skSel)); paintIcons(d); d.scrollTop = 0; });
+  const det = $('sk-det'); let shown = skSel;
+  const show = k => { if (k === shown) return; shown = k; det.innerHTML = skDetail(A.skillInfo?.(k)); paintIcons(det); det.scrollTop = 0; };
+  body.querySelectorAll('.sk-row').forEach(b => { b.onmouseenter = () => show(b.dataset.sk); b.onfocus = () => show(b.dataset.sk);
+    b.onclick = () => { skSel = b.dataset.sk; body.querySelectorAll('.sk-row.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); show(skSel); }; });
+  $('sk-list').onmouseleave = () => show(skSel);
 }
 // ---- Charakterbogen: Wundarzt-Tafel ----
 function charUI(body, who) {
