@@ -2903,6 +2903,7 @@ function bindSim() {
   };
   SIM.H.raidDamage = raidDamage;
   SIM.H.capGates = capGates; SIM.H.capPhase = capPhase;   /* Belagerung S3b */
+  ECO.ECO_H.marketName = t => S.ents.world.find(e => e.kind === 'npc' && e.alive && e.homeTown === t && ECO.MARKET_PROFS.has(e.prof))?.name || null;   /* N1: wer die Strecke meidet, hat einen Namen */
   SIM.H.weary = wearyAdd; SIM.H.wearyStage = wearyStage;   /* N3 */
   SIM.H.capThrone = capThrone; SIM.H.capWave4 = id => { for (const e of S.ents.world) if (e.keepGate && e.alive && e.kind === 'enemy') { e.armyId = id; e.worth = 1; } };   /* S3d */
   SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed; SIM.H.scene = capitalScene; SIM.H.afterCapture = () => ensureVaronExile();   /* RB-052: fällt die Exilstadt, zieht der Hof weiter */   /* Varonheim-Belagerung; T17 Szenen */
@@ -15646,7 +15647,7 @@ function kinHome(b) {                                                /* heimgeho
   bandGone(b, `${nm} legt die Waffe nieder und geht mit der Hälfte seiner Leute heim; der Rest von ${b.name} zerstreut sich.${g?.alive ? ` ${g.name} gibt dir 40 Gold Erspartes.` : ''} (Valen −2: Fahnenflucht bleibt ungestraft.)`);
   chronicle(`${nm} kehrt heim`, 'news', `Ein Deserteur kehrt nach ${townName(K.post)} zurück. Sein Bruder hat ihn nicht vergessen.`);
 }
-function bandGone(b, msg) { b.gone = true; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive)); if (msg) log(msg, 'world'); }
+function bandGone(b, msg) { if (!b.gone && S.eco) ECO.routesFreedBy(b.id);   /* N1 */ b.gone = true; S.ents.world = S.ents.world.filter(e => e.bandId !== b.id || (e.kind === 'enemy' && !e.alive)); if (msg) log(msg, 'world'); }
 /* T12 B3: lebende Streifen (Reisende kind 'patrol') mit Start/Ziel als Strecke in Weltkacheln */
 const roadPatrols = () => S.ents.world.filter(e => e.traveler?.kind === 'patrol' && e.alive !== false && typeof e.traveler.from === 'string' && typeof e.traveler.to === 'string')
   .map(e => ({ fac: e.patrol, A: LOCATIONS.find(l => l.key === e.traveler.from), B: LOCATIONS.find(l => l.key === e.traveler.to) })).filter(r => r.A && r.B);
@@ -17550,7 +17551,7 @@ function ecoMenu(npc, town) {
     (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : '') +
     (X => `\nAbgaben hier: Betriebssteuer ${Math.round(X.tax * 100)} % vom Gewinn, Einzahlgebühr ${Math.round(X.fee * 100)} %${X.own ? ' (Stadtrecht)' : ` (${FACTIONS[X.fac]?.name || 'ohne Herrn'})`}.`)(ECO.taxOf(town)) +
     (ECO.DEAD_GOODS.some(g => (t.use[g] || 0) > 0 || (t.prod?.[g] || 0) > 0) ? `\nTotenware: ${ECO.DEAD_GOODS.map(g => `${ITEMS[g].name} ${ECO.ecoPrice(town, g, false)}`).join(', ')} (Verkaufspreis hier).` : '') +
-    ((R => R && R.why.some(w => w.add > 0) ? `\nGefährlichste Straße: ${R.txt.replace(/^Nach /, 'nach ')}` : '')(ECO.routeLines(town)[0])) +
+    ((R => R && R.why.some(w => w.add > 0) ? `\nGefährlichste Straße: ${R.txt.replace(/^Nach /, 'nach ')}` : '')(ECO.routeLines(town)[0])) + ECO.routeNotes(town).map(t => '\n' + t).join('') +   /* N1 */
     ((v, R) => `\nGilde: Handelswert ${Math.round(v)} von 100${R?.embargo > (S.day | 0) ? ' — Handelssperre, die Große Karawane steht im Tor' : R?.fairDay === (S.day | 0) ? ' — heute ist Messe in Eren und Nordfurt' : v < FAC_RES.merch.lt ? ' — wir verlieren Züge, Geleit zahlt besser' : v > FAC_RES.merch.fair ? ' — die Straßen sind voll Wagen' : ''}.`)(SIM.facRes('merch'), S.facRes?.merch), [   /* T12 B1; T23 S4 */
     { text: 'Straßen und Gefahren', fn: () => roadMenu(npc, town) },
     { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
@@ -17576,7 +17577,7 @@ function ecoPrices(npc, town) {
 function roadMenu(npc, town) {
   if (!S.flags.hintRoad) { S.flags.hintRoad = 1; log('Straßen haben Herren: Jede Gefahr auf einer Handelsstraße hat einen Grund — eine Bande nahe der Strecke, ein Ort der Toten am Weg, ein Totenheer am Ziel. Streifen und Aurelions Zölle machen Straßen sicherer. Schutzgeld an eine Bande deckt auch deinen Handelswagen, ein Umweg meidet alle Banden (+1 Tag).', 'quest'); }
   const L = ECO.routeLines(town);
-  UI.dialogue({ name: `Straßen ab ${ECO.townName(town)}` }, (L.map(r => r.txt).join('\n') || 'Von hier fährt kein Händlerzug.') + '\n(Gefahr eines Überfalls je Fahrt, mit einer Wache.)', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+  UI.dialogue({ name: `Straßen ab ${ECO.townName(town)}` }, ([...ECO.routeNotes(town), ...L.map(r => r.txt)].join('\n') || 'Von hier fährt kein Händlerzug.') + '\n(Gefahr eines Überfalls je Fahrt, mit einer Wache.)', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
 }
 function wagonMenu(npc, town) {
   const back = () => wagonMenu(npc, town), me = { name: 'Dein Handelswagen' }, E = S.eco;
@@ -20438,6 +20439,8 @@ function debugSections() {
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
       'Banden: einen Tag vergehen lassen': () => bandDay(),
       'Straßen (T12): Bande an die Alte Straße setzen (Eren–Nordfurt)': () => { const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity'), b = bandFound('eren', [Math.round((LA.x + LB.x) / 2), Math.round((LA.y + LB.y) / 2) + 8]); if (b) { b.men = 7; UI.toast(`${b.name} bei ${b.where} — Kontor in Eren oder Nordfurt zeigt die Gefahr`, 3500); } },
+      'Straßen (N1): Eren–Nordfurt einmal überfallen (2× = Umweg, 3× = gemieden)': () => { ECO.noteRaid('eren', 'northcity'); const r = ECO.routeOf('eren', 'northcity'); UI.toast(`Überfälle: ${r.hits.length} · Umweg bis Tag ${r.detourTill || '—'} · gemieden bis Tag ${r.shunTill || '—'}`, 3000); },
+      'Straßen (N1): Gedächtnis der Händler ins Log': () => log(`Strecken: ${Object.entries(S.eco.routes || {}).map(([k, r]) => `${k} ${r.hits.length}× (Umweg ${r.detourTill}, gemieden ${r.shunTill})`).join(' · ') || 'nichts gemerkt'}.`, 'economy'),
       'Straßen (T12): Strecken-Gefahr aller Routen ins Log': () => { for (const t of Object.keys(S.towns).filter(k => ECO.routeLines(k).length)) log(`${ECO.townName(t)}: ${ECO.routeLines(t).slice(0, 3).map(r => r.txt).join(' | ')}`, 'economy'); UI.toast('Strecken im Protokoll (Handel)'); },
       'Handwerk: Material geben (Eisen, Holz, Felle, Königseisen …)': () => { S.res.iron += 30; S.res.wood += 30; S.res.herb = (S.res.herb || 0) + 12; ['pelt', 'cloth', 'ingot', 'ersatzteile', 'automatenkern', 'koenigseisen'].forEach(k => addItem(P(), k, 5)); UI.toast('Material'); },   /* Nutzer §5d.8 */
       'Handwerk: Schmieden 90': () => { P().skills.smithing = 90; P().skills.crafting = 90; UI.toast('Schmieden/Handwerk 90'); },
@@ -22438,6 +22441,18 @@ export function selftest() {
       const res = { add, desert, siege, band, cap, chain: sz < sz0 }; window.__n3 = res; if (!Object.values(res).every(Boolean)) console.warn('N3-Probe', JSON.stringify(res), sz, sz0);
       return Object.values(res).every(Boolean);
     } finally { S.weary = WY || undefined; if (!WY) delete S.weary; S.war = W0; S.bands = B0; S.flags = fl; if (FR) S.facRes = FR; S.contracts = C0; S.ents.world = E0; }
+  })());
+  ok('N1 Händler meiden Strecken: 2 Überfälle in 10 Tagen = Umweg, 3 in 14 = gemieden (mit Namen), Kontor zeigt es, eine zerschlagene Bande gibt die Strecke frei', (() => {
+    const R0 = structuredClone(S.eco.routes || null), fl = { ...S.flags }, B0 = S.bands, day = S.day | 0;
+    try {
+      S.eco.routes = {}; ECO.noteRaid('eren', 'northcity'); ECO.noteRaid('northcity', 'eren'); const r = ECO.routeOf('eren', 'northcity'), det = r.detourTill === day + 10 && !r.shunTill;
+      ECO.noteRaid('eren', 'northcity'); const shun = r.shunTill === day + 8 && !!r.by, note = ECO.routeNotes('eren').some(t => t.startsWith('Gemieden: nach Nordfurt'));
+      const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity');
+      S.bands = [{ id: 'tn1', name: 'Probe-N1', where: 'x', town: 'eren', tx: Math.round((LA.x + LB.x) / 2), ty: Math.round((LA.y + LB.y) / 2) + 6, men: 6, paid: -1, gone: false }];
+      bandGone(S.bands[0]); const freed = !r.shunTill && !r.detourTill && !r.hits.length;
+      const res = { det, shun, note, freed }; if (!Object.values(res).every(Boolean)) console.warn('N1-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { if (R0) S.eco.routes = R0; else delete S.eco.routes; S.flags = fl; S.bands = B0; }
   })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
