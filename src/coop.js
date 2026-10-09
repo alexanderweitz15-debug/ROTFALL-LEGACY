@@ -7,7 +7,7 @@
 
 let A = null;                                   // API aus game.js (S, R, UI, Funktionen)
 let peer = null, conn = null, muteLog = false;   /* muteLog: Chatzeilen gehen als 'chat', nicht zusätzlich als 'log' */                   // PeerJS
-const VER = 29;                                 // muss zu ?v= in index.html passen; Host und Gast müssen gleich sein
+const VER = 30;                                 // muss zu ?v= in index.html passen; Host und Gast müssen gleich sein
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
 const NEAR = 1400;                              // px um die Gastfigur, die der Host schickt
 const DYN = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'maxHp', 'barHp', 'barMax', 'downed', 'alive', 'swing', 'swingDur', 'atkS', 'atkW', 'atkH', 'atkPk', 'atkStep', 'chargeK', 'act', 'stagger', 'cover', 'telegraph', 'mounted', 'fleeing', 'angry', 'aiState', 'hDir', 'come'];
