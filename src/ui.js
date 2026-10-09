@@ -1,7 +1,7 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=27';
 import * as CS from './cloudsave.js?v=27';
-import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=27';
+import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, SKILL_MS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=27';
 import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf, EMOTE, NEAR_SAY } from './render.js?v=27';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=27';
 import { wearOf } from './buildings.js?v=27';
@@ -9,7 +9,7 @@ import * as SP from './sprites.js?v=27';   /* Bestiarium: Gegnerbilder */
 import { townState, townPrice } from './sim.js?v=27';
 import { GOODS } from './data.js?v=27';
 import { target as ecoTarget } from './economy.js?v=27';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=27';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf, lifeOf } from './body.js?v=27';
 import { sfx, ambience } from './sfx.js?v=27';
 import * as SKY from './sky.js?v=27';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
 import * as ATL from './atlas.js?v=27';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
@@ -126,7 +126,7 @@ export function refreshHUD() {
   const fr = topRank(p);
   hudSet('pc-rank', fr || 'Ohne Banner');
   drawPortraitTo($('pc-portrait'), p);
-  let html = bar('Leben', ...barOf(p), 'hp') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');
+  let html = bar('Leben', ...lifeOf(p), 'hp') + (p.lifeBlood != null && p.lifeBlood < 100 ? bar('Blut', p.lifeBlood, 100, 'bld', p.lifeBlood < 35 ? ' — Ohnmacht' : '') : '') + bar('Ausdauer', p.stamina, p.maxStamina, 'sta');   /* 09.10.: Gesamtleben; Blut erscheint, sobald welches fehlt */
   if (p.maxMana > 0) html += bar('Mana', p.mana, p.maxMana, 'mana');
   if (TT) html += bar(TT.resource.name, A.tres(p), TT.resource.max, TT.resource.css);   // Ressource der Titelklasse
   html += bar('Erfahrung', p.xp, p.xpNext, 'xp', p.level >= 60 ? ' · Höchststufe' : '');   // Balance-Runde: Höchststufe 60 (game.js MAX_LEVEL)
@@ -150,7 +150,7 @@ export function refreshHUD() {
     d.appendChild(cv);
     d.appendChild(el('div', '', `<div class="m-name">${m.name}</div>
       <div class="m-sub">St. ${m.level} ${CLASSES[m.currentClass].name} · Moral ${Math.round(m.morale)}${m.coopHero ? '' : ` · Loyalität ${Math.round(m.loyal ?? 50)}${m.friend ? ' ♥' : ''}`}</div>
-      <div class="m-bar"><div style="width:${clamp(barOf(m)[0] / barOf(m)[1] * 100, 0, 100)}%"></div></div>`));
+      <div class="m-bar"><div style="width:${clamp(lifeOf(m)[0] / lifeOf(m)[1] * 100, 0, 100)}%"></div></div>`));
     d.onclick = () => { A.select(m); };
     list.appendChild(d);
     drawPortraitTo(cv, m);
@@ -525,7 +525,7 @@ export function renderContext(target) {
     const m = MONSTERS[target.mtype];
     box.innerHTML = `<div class="ctx-head">${target.title || (target.vname ? target.vname + ' ' : target.elite ? 'Veteran: ' : '') + m.name}</div><div class="ctx-sub">${target.boss || m.boss ? 'Anführer' : target.elite ? 'Veteran — stärker als üblich' : 'Feind'}</div>
       <div class="ctx-line"><span>Stufe</span><b>${target.level}</b></div>
-      ${bar('Leben', ...barOf(target), 'hp')}
+      ${bar('Leben', ...lifeOf(target), 'hp')}
       <div class="ctx-line"><span>Gefahr</span><b class="${m.threat >= 3 ? 'threat-high' : m.threat === 2 ? 'threat-med' : 'threat-low'}">${['','Gering','Mittel','Hoch','Tödlich'][m.threat]}</b></div>
       <div class="ctx-line"><span>Rüstung</span><b>${target.armor || 0}</b></div>
       <div class="ctx-line"><span>Fraktion</span><b>${FACTIONS[m.faction] ? FACTIONS[m.faction].name : 'Wild'}</b></div>`;
@@ -1275,20 +1275,89 @@ function woundNotes(c, click) {
   }).join('');
 }
 
-// ---- Fertigkeiten (Skill-Core Phase 1, Spec Skills §4/§50, 08.10.2026): je Fertigkeit Stufe (Wert/2), Balken zur nächsten Stufe, nächste Freischaltung
-// und alle Meilensteine (erreicht hell, offen dunkel). Gruppen Kampf / Handwerk / Überleben / Sozial. Nur Fertigkeiten, die man schon geübt hat.
+// ---- Fertigkeiten (Umbau 09.10.2026, Entwickler: „baue definitiv das Fertigkeiten-Menü um“; Daten: A.skillInfo, Skill-Core Spec Skills §4/§50).
+// Kopf: Reiter je Gruppe mit „geübt/alle“. Links Kacheln (Symbol, Name, Stufe groß, Balken zur nächsten Stufe, Zeichen: ◆ Meilenstein nah, ★ Meisterprüfung
+// offen/errungen). Rechts die Detailtafel: Umfang, wie sie steigt, Meilenstein-Zeitstrahl, Freischaltungen, Techniken, Meisterschaft. Ungeübte stehen
+// gedimmt am Ende, damit man sieht, was es gibt. Reiter und Auswahl bleiben beim erneuten Öffnen (skTab/skSel). Aussehen: style.css „Fertigkeiten-Fenster“.
+const SK_GROUPS = ['Kampf', 'Handwerk', 'Überleben', 'Sozial'];
+/* Symbol je Fertigkeit: ein Gegenstand, gezeichnet wie im Gepäck — oder mit „i:“ ein Piktogramm aus icons.js */
+const SK_ICO = { onehanded: 'longsword', twohanded: 'greatsword', polearms: 'spear', archery: 'shortbow', defense: 'wooden_shield', toughness: 'iron_helm', katana: 'katana',
+  smithing: 'warhammer', crafting: 'tools', medicine: 'bandage', cooking: 'fischsuppe', survival: 'traveler_cloak', hunting: 'pelt', fishing: 'angel', stealth: 'maskenkapuze',
+  woodcutting: 'axe', mining: 'pickaxe', herbalism: 'herb', trading: 'i:res_gold', leadership: 'i:set_morale' };
+/* S15 Hinweise (vorher nur im Charakterbogen): wie jede Fertigkeit steigt und was sie bewirkt. Ohne Wirkung wird es offen gesagt. */
+const SK_WPN = 'Steigt mit jedem Treffer mit dieser Waffenart. Mehr Schaden und schnellere Hiebe.';
+const SK_HOW = { onehanded: SK_WPN, twohanded: SK_WPN, polearms: SK_WPN, katana: SK_WPN, archery: 'Steigt mit jedem Schuss. Mehr Schaden und schnelleres Spannen.',
+  defense: 'Steigt, wenn du getroffen wirst oder abwehrst. Chance, Hiebe von vorn abzuwehren (weniger Schaden).',
+  medicine: 'Steigt beim Verbinden und Heilen mit Verbänden und Kräutern. Jeder Verband heilt mehr.',
+  toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
+  survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.', fishing: 'Steigt mit jedem Fang (seltene Fische mehr; am selben Platz immer weniger). Fische beißen schneller, mehr Zeit zum Anschlagen, ab Stufe 15 seltene Fische.',
+  trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
+  leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
+  smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank und beim Schmieden. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
+  hunting: 'Steigt beim Erlegen von Tieren. Mehr Felle, Fleisch und Knochen (bis +60 %); Tiere bemerken dich später (bis 40 % kürzere Sicht).',
+  crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
+  stealth: 'Schleichen (Taste V): Gegner bemerken dich später (bis nur noch 30 % ihrer Sicht). Wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst. Hilft auch beim Hineinschleichen und Stehlen.',
+  woodcutting: 'Steigt mit jedem Hieb am Baum (Axt). Das Werkzeug macht schneller und ergiebiger; die Fertigkeit schaltet Hartholz, Harz und Schwarzholz frei.',
+  mining: 'Steigt beim Abbau von Stein und Erz mit der Spitzhacke, bei Eisenerz mehr. Schaltet härtere Erze, Kohle und Silbererz frei.',
+  herbalism: 'Steigt beim Kräutersammeln, bei seltenen Pflanzen mehr. Mehr Ernte und seltene Pflanzen.',
+  cooking: 'Steigt beim Kochen am Kessel und beim Experimentieren mit Zutaten. Größere Töpfe, länger wirkende Mahlzeiten.' };
+let skTab = 'Alle', skSel = null;
+const skUsed = s => s.v > 0;
+const skNear = s => !!s.next && s.next.lv - s.lv <= 2;   /* nur Anzeige: Meilenstein höchstens zwei Stufen entfernt */
+function skIco(k, cls) {
+  const s = SK_ICO[k] || '', ch = `<span class="${cls} sk-ico0">${(SKILL_NAMES[k] || k)[0]}</span>`;
+  if (s.startsWith('i:')) return icoImg(s.slice(2), 3, cls) || ch;
+  return ITEMS[s] ? `<canvas class="${cls}" data-ico="${s}"></canvas>` : ch;
+}
+function skMark(s) {
+  if (s.master?.open) return `<i class="sk-mark open" title="Meisterprüfung offen: ${qa(s.master.task)}">★</i>`;
+  if (s.master?.done) return `<i class="sk-mark done" title="${qa(s.master.title)}">★</i>`;
+  return skUsed(s) && skNear(s) ? `<i class="sk-mark near" title="Meilenstein nah: Stufe ${s.next.lv} — ${qa(s.next.t)}">◆</i>` : '';
+}
+function skTile(s) {
+  const fresh = !skUsed(s), f = s.v >= 100 ? 100 : Math.round(s.frac * 100);
+  return `<button class="sk-tile${fresh ? ' fresh' : ''}${s.k === skSel ? ' sel' : ''}" data-sk="${s.k}" title="${qa(s.name)}: ${qa(s.what)}">${skIco(s.k, 'sk-ico')}
+    <span class="sk-nm">${s.name}</span><b class="sk-lv">${fresh ? '–' : s.lv}</b>${skMark(s)}<span class="sk-bar"><i style="--f:${f}%"></i></span></button>`;
+}
+function skDetail(s) {
+  if (!s) return '<p class="sk-none">Keine Fertigkeit gewählt.</p>';
+  const fresh = !skUsed(s), M = s.master, P = Object.fromEntries(s.perks.map(q => [q.lv, q])), max = s.v >= 100;
+  const nodes = SKILL_MS.map(L => { const q = P[L], m = M?.lv === L, tip = q ? q.t : m ? `Meisterprüfung: ${M.task}` : L === 50 ? 'Höchststufe' : 'Meilenstein ohne Freischaltung';
+    return `<li class="sk-node${s.lv >= L ? ' on' : ''}${s.next?.lv === L ? ' next' : ''}${q ? ' perk' : ''}${m ? ' mst' : ''}" style="--x:${L * 2}%" title="Stufe ${L} — ${qa(tip)}"><i>${m ? '★' : ''}</i><span>${L}</span></li>`; }).join('');
+  const goal = max ? 'Höchste Stufe erreicht.' : s.next ? `Nächstes Ziel: <b>Stufe ${s.next.lv}</b> — ${s.next.t} <small>(noch ${s.next.lv - s.lv} Stufe${s.next.lv - s.lv > 1 ? 'n' : ''})</small>` : 'Alle Meilensteine erreicht.';
+  return `<header class="sk-dh">${skIco(s.k, 'sk-dico')}<div class="sk-dt"><h3>${s.name}</h3><p>${s.group} · ${fresh ? 'noch nicht geübt' : `Stufe ${s.lv} von 50 · Wert ${Math.floor(s.v)}/100`}</p></div>
+      <b class="sk-big" title="Stufe = Wert ÷ 2">${fresh ? '–' : s.lv}</b></header>
+    <div class="sk-bar big"><i style="--f:${max ? 100 : Math.round(s.frac * 100)}%"></i></div>
+    <p class="sk-sub">${max ? 'Voll ausgebildet.' : `${Math.round(s.frac * 100)} % bis Stufe ${s.lv + 1}`}</p>
+    <p class="sk-txt"><b>Umfasst:</b> ${s.what || '—'}</p>
+    <p class="sk-txt${fresh ? ' sk-fresh' : ''}"><b>${fresh ? 'Noch nicht geübt — so steigt sie:' : 'So steigt sie:'}</b> ${SK_HOW[s.k] || 'Durch Tun.'}</p>
+    <h4>Meilensteine</h4>
+    <div class="sk-line"><div class="sk-track"><i style="--f:${Math.min(100, s.v)}%"></i></div><ol>${nodes}</ol></div>
+    <p class="sk-goal">${goal}</p>
+    ${s.perks.length ? `<ul class="sk-ms">${s.perks.map(q => `<li class="${q.on ? 'on' : ''}${s.next?.lv === q.lv ? ' next' : ''}"><b>${q.lv}</b><span>${q.t}</span><em>${q.on ? '✔' : ''}</em></li>`).join('')}</ul>`
+      : '<p class="sk-note">Für diese Fertigkeit gibt es noch keine Freischaltungen an Meilensteinen — ihr Wert wirkt stetig (siehe oben).</p>'}
+    ${s.techs?.length ? `<h4>Techniken</h4><ul class="sk-tech">${s.techs.map(q => `<li class="${q.on ? 'on' : ''}"><b>${q.on ? '✔ ' : ''}${q.name}</b><span>${q.t}</span><small>${q.on ? 'gelernt' : `Lehrmeister: ${q.where}${q.need ? ` · ab Stufe ${q.need}` : ''}`}</small></li>`).join('')}</ul>` : ''}
+    ${M ? `<h4>Meisterschaft</h4><div class="sk-master${M.done ? ' done' : M.open ? ' open' : ''}"><span class="sk-star">★</span><div>
+      <b>${M.title}</b> <small>${M.done ? 'errungen' : M.open ? 'Prüfung offen' : `ab Stufe ${M.lv}`}</small>
+      <p>${M.done ? M.perk[2] : `Aufgabe: ${M.task}`}</p>${M.done ? '' : `<p class="sk-gain">Lohn: Titel „${M.title}“ · ${M.perk[2]}</p>`}</div></div>` : ''}`;
+}
 function masteryUI(body) {
-  const p = S.player, info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean), shown = info.filter(s => s.v >= 1 || s.perks.length);
-  const groups = ['Kampf', 'Handwerk', 'Überleben', 'Sozial'].map(g => [g, shown.filter(s => s.group === g)]).filter(([, L]) => L.length);
-  body.innerHTML = `<div class="tafel"><p class="ledger">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). An Meilensteinen schaltet sich etwas Neues frei; starke Gegner lehren mehr als harmlose, und wer immer wieder dasselbe Ziel schlägt, lernt kaum noch etwas.</p>
-    ${groups.map(([g, L]) => `<section><h3>${g}</h3>${L.map(s => `<div class="ledger" style="margin:6px 0" title="${s.what}">
-      <b>${s.name}</b> — Stufe ${s.lv} <span style="opacity:.7">(${Math.floor(s.v)})</span>
-      <div style="height:4px;background:rgba(255,255,255,.12);margin:3px 0"><i style="display:block;height:4px;width:${Math.round(s.frac * 100)}%;background:#c8a050"></i></div>
-      ${s.next ? `<div style="opacity:.85">Nächstes Ziel: Stufe ${s.next.lv} — ${s.next.t}</div>` : '<div>Meisterschaft erreicht.</div>'}
-      ${s.perks.length ? `<div>${s.perks.map(q => `<span style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} ${q.lv}: ${q.t}</span>`).join('<br>')}</div>` : ''}
-      ${s.master ? `<div style="opacity:${s.master.done || s.master.open ? 1 : 0.45}">${s.master.done ? '★' : '☆'} Meisterschaft ab Stufe ${s.master.lv} — ${s.master.done ? `<b>${s.master.title}</b>: ${s.master.perk[2]}` : `${s.master.task}${s.master.open ? ' <b>(offen)</b>' : ''}`}</div>` : ''}
-      ${(s.techs || []).map(q => `<div style="opacity:${q.on ? 1 : 0.45}">${q.on ? '✔' : '·'} Technik ${q.name} (${q.where}): ${q.t}</div>`).join('')}
-    </div>`).join('')}</section>`).join('') || '<p>Noch ungeübt.</p>'}</div>`;
+  const info = Object.keys(SKILL_NAMES).map(k => A.skillInfo?.(k)).filter(Boolean);
+  const tabs = ['Alle', ...SK_GROUPS.filter(g => info.some(s => s.group === g)), ...new Set(info.map(s => s.group).filter(g => !SK_GROUPS.includes(g)))];
+  if (!tabs.includes(skTab)) skTab = 'Alle';
+  const inTab = g => info.filter(s => g === 'Alle' || s.group === g);
+  const list = inTab(skTab).sort((a, b) => skUsed(b) - skUsed(a) || b.v - a.v || a.name.localeCompare(b.name)), cut = list.findIndex(s => !skUsed(s));
+  if (!list.some(s => s.k === skSel)) skSel = list[0]?.k || null;
+  body.innerHTML = `<div class="sk">
+    <nav class="sk-tabs">${tabs.map(g => { const L = inTab(g); return `<button data-g="${g}" class="${g === skTab ? 'on' : ''}" title="${L.filter(skUsed).length} von ${L.length} geübt">${g}<small>${L.filter(skUsed).length}/${L.length}</small></button>`; }).join('')}</nav>
+    <div class="sk-main"><div class="sk-grid">${list.map((s, i) => (i === cut ? `<p class="sk-sep">Noch nicht geübt${i ? '' : ' — hier hast du noch nichts getan'}</p>` : '') + skTile(s)).join('')}</div>
+      <section class="sk-det" id="sk-det">${skDetail(info.find(s => s.k === skSel))}</section></div>
+    <p class="sk-hint">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). Starke Gegner lehren mehr als harmlose; wer immer wieder dasselbe Ziel schlägt, lernt kaum noch etwas.</p></div>`;
+  paintIcons(body);
+  body.querySelectorAll('.sk-tabs [data-g]').forEach(b => b.onclick = () => { skTab = b.dataset.g; masteryUI(body); });
+  body.querySelectorAll('.sk-tile').forEach(b => b.onclick = () => {
+    skSel = b.dataset.sk; body.querySelectorAll('.sk-tile.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
+    const d = $('sk-det'); d.innerHTML = skDetail(A.skillInfo?.(skSel)); paintIcons(d); d.scrollTop = 0; });
 }
 // ---- Charakterbogen: Wundarzt-Tafel ----
 function charUI(body, who) {
@@ -1296,23 +1365,10 @@ function charUI(body, who) {
   const ATTRS = { strength:'Stärke', agility:'Beweglichkeit', endurance:'Ausdauer', intelligence:'Intelligenz', perception:'Wahrnehmung', willpower:'Willenskraft' };
   const ATTR_TIP = { strength: 'Nahkampfschaden', agility: 'Fernkampfschaden, Lauftempo, Ausweichen', endurance: 'Leben, Ausdauer, Erholung', intelligence: 'Mana und Zauberschaden; manche Zauber verlangen einen Mindestwert',
     perception: 'Chance auf kritische Treffer', willpower: 'Mana, Überzeugen im Rat und in Gesprächen' };   // S15 (Nutzer): erklären, was ein Punkt bringt
-  const SKILLS = SKILL_NAMES;
-  /* S15 Hinweise: jede Fertigkeit erklärt beim Überfahren, wie sie steigt und was sie bewirkt. Ohne Wirkung wird es offen gesagt. */
-  const WPN_TIP = 'Steigt mit jedem Treffer mit dieser Waffenart. Mehr Schaden und schnellere Hiebe.';
-  const SKILL_TIP = { onehanded: WPN_TIP, twohanded: WPN_TIP, polearms: WPN_TIP, archery: 'Steigt mit jedem Schuss. Mehr Schaden und schnelleres Spannen.',
-    defense: 'Steigt, wenn du getroffen wirst oder abwehrst. Chance, Hiebe von vorn abzuwehren (weniger Schaden).',
-    medicine: 'Steigt beim Verbinden und Heilen mit Verbänden und Kräutern. Jeder Verband heilt mehr.',
-    toughness: 'Steigt mit jedem Treffer, den du einsteckst. Du liegst kürzer bewusstlos.',
-    survival: 'Steigt beim Holzfällen und beim Zähmen von Tieren. Zähmen gelingt öfter.', fishing: 'Steigt mit jedem Fang (seltene Fische mehr; am selben Platz immer weniger). Fische beißen schneller, mehr Zeit zum Anschlagen, ab Stufe 15 seltene Fische.',
-    trading: 'Steigt mit jedem Kauf und Verkauf. Bessere Preise bei Händlern.',
-    leadership: 'Steigt bei Siegen mit Gefährten und bei Befehlen im Kampf. Je 10 Punkte ein Gefährte mehr in der Gruppe; Loyalität wächst schneller.',
-    smithing: 'Steigt beim Ausbessern an Esse, Amboss oder Werkbank. Hebt die Grenze der Selbstwartung von Prothesen (70 % + Wert/5).',   /* Roadmap P4 */
-    hunting: 'Steigt beim Erlegen von Tieren. Mehr Felle, Fleisch und Knochen (bis +60 %); Tiere bemerken dich später (bis 40 % kürzere Sicht).',
-    crafting: 'Steigt beim Herstellen an der Werkbank. Bessere Qualität, schwerere Rezepte; hilft beim Anpacken.',
-    stealth: 'Schleichen (Taste V): Gegner bemerken dich später (bis nur noch 30 % ihrer Sicht). Wächst, wenn du nah an ahnungslosen Gegnern vorbeischleichst. Hilft auch beim Hineinschleichen und Stehlen.' };
+  /* S15-Hinweise je Fertigkeit stehen jetzt modulweit in SK_HOW (Fertigkeiten-Fenster, 09.10.) */
   const chain = classChain(p.currentClass), bld = buildOf(p);
   const bandages = S.player.inv.filter(x => x.key === 'bandage').reduce((n, x) => n + (x.count || 1), 0);
-  const skills = Object.entries(SKILLS).filter(([k]) => (p.skills[k] || 0) >= 1);
+  const skills = Object.entries(SKILL_NAMES).filter(([k]) => (p.skills[k] || 0) >= 1).sort((a, b) => p.skills[b[0]] - p.skills[a[0]]);   /* Fertigkeiten-Fenster 09.10.: stärkste zuerst */
   const EQ = [['weapon', 'Waffe'], ['offhand', 'Nebenhand'], ['head', 'Kopf'], ['chest', 'Rumpf'], ['hands', 'Hände'], ['legs', 'Beine'], ['feet', 'Füße'], ['cloak', 'Umhang'], ['talisman', 'Talisman']];
   body.innerHTML = `<div class="tafel">
     <header class="tafel-head">
@@ -1355,7 +1411,8 @@ function charUI(body, who) {
       ${titleBlock(p, isPlayer)}
       ${isPlayer ? `<h3>Talente</h3><p class="traits">${Object.keys(p.tree || {}).map(k => SKILL_TREE[k]?.name).filter(Boolean).join(' · ') || 'Noch keine.'}${p.skillPoints ? ` · <b style="color:var(--gold)">${p.skillPoints} frei (T)</b>` : ''}</p>` : ''}
       <h3>Fertigkeiten</h3>
-      <dl class="ledger-list">${skills.map(([k, n]) => `<div title="${SKILL_TIP[k] || ''}"><dt>${n}</dt><dd>${Math.floor(p.skills[k])}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
+      <dl class="ledger-list">${skills.slice(0, 5).map(([k, n]) => `<div title="${SK_HOW[k] || ''}"><dt>${n}</dt><dd>Stufe ${Math.floor(p.skills[k] / 2)}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
+      ${isPlayer ? `<button class="txtbtn" id="ch-mastery">${skills.length > 5 ? `Alle ${skills.length} Fertigkeiten` : 'Fertigkeiten'}: Meilensteine, Meisterschaft →</button>` : ''}
     </section>
   </div>`;
   if ($('ch-figure')) drawFigureTo($('ch-figure'), p);
@@ -1363,6 +1420,7 @@ function charUI(body, who) {
   body.querySelectorAll('[data-part]').forEach(el => el.addEventListener('click', () => doBandage(el.dataset.part)));
   if ($('ap-box')) [...$('ap-box').querySelectorAll('button')].forEach(b => b.onclick = () => { A.spendAttr(b.dataset.a); refreshModal(); });
   if ($('ch-switch')) $('ch-switch').onclick = () => openModal('classes');
+  if ($('ch-mastery')) $('ch-mastery').onclick = () => openModal('mastery');   /* Fertigkeiten-Fenster 09.10.: Bogen zeigt nur die fünf stärksten */
   if ($('ch-title')) $('ch-title').onclick = () => openModal('classes');
 }
 // Titelklasse im Charakterbogen: was sie gibt, was sie nimmt, woher die Ressource kommt

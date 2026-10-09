@@ -3,7 +3,7 @@ import { S, clamp, seasonOf } from './state.js?v=27';
 import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=27';
 import * as HB from './buildings.js?v=27';
 import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=27';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=27';
+import { buildOf, crawling, lightR, eyeOf, lifeOf } from './body.js?v=27';
 import * as SP from './sprites.js?v=27';
 import { trailPt, WAGON_GAP } from './sim.js?v=27';
 import { ICON_R } from './iconsR.js?v=27';
@@ -296,7 +296,7 @@ function drawEmote(e, now) {
   E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(sx + x * px, sy + y * px, px, px); });
   ctx.globalAlpha = 1;
 }
-const barK = e => e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1);   /* HB2-01: Balken = Rumpf */
+const barK = e => { if (e.body) { const [h, m] = lifeOf(e); return h / m; } return e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1); };   /* 09.10. (Entwickler): Balken = Gesamtleben aller Körperteile (vorher HB2-01: nur Rumpf); Koop-Gäste ohne Körper: Rumpfwert vom Wirt */
 function drawBossBar() {
   const p = S.player; if (!p) return;
   const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */

@@ -394,3 +394,11 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E13 Sprechblasen:** **Mischung** aus Sätzen und Symbolen.
 - **E21 NPC-Ziele:** Deserteurbanden **zählen zum Bandendeckel**; Kriegsmüdigkeit mit **Fahnenflucht ab Stufe 60** (−2 Stärke/Tag beim stärksten Heer), **ruht während einer Belagerung Varonheims**; Abwanderer **nicht** in die eigene Siedlung umleiten.
 - **Prolog (Nachricht 08.10.):** Am Ende des Prologs nur als **Nomade** weiter; eigene Prolog-Tafel.
+
+## 09.10.2026 — Lebensanzeige und Blut (Entwickler, im Spiel)
+- **Lebensbalken = Gesamtleben** aller Körperteile („nicht nur vom Körper“). Ersetzt HB2-01 (03.10.: Balken = Rumpf) für die Anzeige; die Spiellogik (Rumpf 0 = am Boden) bleibt.
+- **Blut wie in Kenshi:** wer zu viel Blut verliert, wird erst bewusstlos (Zahlen vorläufig ⚖: 100 Blut, Treffer 35 % des Schadens, Blutung 1,2/s, K.o. unter 35 %, Aufstehen ab 50 %, 0 = verblutet, Erholung 0,25/s). Gegner vorerst ohne Blut.
+- **Prolog:** „Aufheben und heilen“ wartet, bis man sich wirklich verbunden hat.
+- **Debug-Menü:** kompakt, kleiner, übersichtlich; Gegenstände mit eigener Einteilung (Waffen, Rüstung, Talismane …).
+- **Fertigkeiten-Menü:** wird neu gebaut („holy shit ist das arsch“).
+- Pushen direkt auf main, sobald der Selbsttest grün ist.

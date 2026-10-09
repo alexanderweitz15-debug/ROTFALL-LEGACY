@@ -1239,3 +1239,4 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .dbg-foot{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
 .dbg-foot > span{display:flex;gap:4px;overflow:hidden}
 #debugpanel #dbg-close{width:28px;height:26px;flex:none;margin:0;text-align:center;padding:0}
+.bar-fill.bld{background:linear-gradient(180deg,#8a1020 0 2px,#5e0a14 2px 7px,#3a050c 7px)}   /* Blut (09.10.) */

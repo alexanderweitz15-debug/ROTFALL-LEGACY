@@ -702,6 +702,7 @@ function applyHealItem(c, key, target, part) {
     const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') || isVamp(target) ? 0.5 : 1);
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
+    if (S.prolog && target === S.player) S.prolog.healed = 1;   /* Prolog (Entwickler 09.10.): der Schritt wartet aufs Verbinden */
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
@@ -3843,12 +3844,13 @@ function tickCombatant(c, dt) {
     const near = !!S.player && c.map === S.map && dist(c, S.player) < 700;
     for (const s of c.status) { s.left -= dt; if (s.key === 'bleeding' && (c.vx || c.vy) && near && vrnd() < dt / 450) fx(c.x + vrnd() * 8 - 4, c.y + 6, 'blood', 1);   /* §5f: Blutspur — Kampf-Feedback: Darstellungszufall vrnd statt Spielzufall */
       if (near) statusFx(c, s, dt);
-      if (s.key === 'bleeding' && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }
+      if (s.key === 'bleeding' && !bleeds(c) && chance(dt / 2500)) { hurt(c, 2, null, 'Blutung'); credit(c, byId(s.src), 2); }   /* Blut (09.10.): wer Blut hat, verliert Blut statt Leben */
       if (s.key === 'regrowth' && !(c.downed && c !== S.player)) B.heal(c, s.heal * dt / 1000);   // S15 (Nutzer): am Boden heilt sich kein NPC selbst
       if (s.key === 'burning') { s.acc = (s.acc || 0) + dt / 1000 * (S.weather === 'rain' ? 1.5 : 3); if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Feuer', false, 'fire'); credit(c, byId(s.src), n); } }   // S15 P4
       if (s.key === 'poisoned') { s.acc = (s.acc || 0) + dt / 1000 * 4; if (s.acc >= 1) { const n = Math.floor(s.acc); s.acc -= n; hurt(c, n, null, 'Gift'); credit(c, byId(s.src), n); } } }
     c.status = c.status.filter(s => s.left > 0);
   }
+  if (bleeds(c)) bloodTick(c, dt);   /* Blut (09.10., Kenshi) */
   if (c.downed && koReady(c)) { c.downed = false; act(c, 'rise', 520); if (c.map === S.map) log(`${c.name} kommt wieder auf die Beine.`, 'party'); }   // S15 Fehlersuche (Kenshi): erst ab 25 % Rumpf wieder auf den Beinen
   if (c.downed && c.brawlKO) {                             // S12: nach der Prügelei aufstehen statt verbluten
     if (performance.now() > c.brawlKO) { c.brawlKO = 0; c.downed = false; if (c.body) B.healPart(c, 'torso', c.body.torso.max * 0.3 - c.body.torso.hp); act(c, 'rise', 520); }
@@ -4667,6 +4669,7 @@ export function hurt(target, dmg, source, cause = 'Wunden', crit = false, kind =
   if (target.tollAsk && source && (source === S.player || S.party.includes(source.id))) tollBreak(target, source);   /* Rollen Teil 3: wer den Zöllner schlägt, hat gewählt */
   if (target.variant === 'leader') rallyCall(target, source);   /* 🐞→✔ 08.10.: hieß „attacker“ (in hurt() nicht definiert) — jeder Treffer auf einen Anführer warf einen Fehler */
   dmgFloat(target, dmg, source, crit, kind, cause);   /* Kampf-Feedback: Pixelziffern in Schadensfarbe */
+  if (kind === 'physical' && dmg > 0 && target.alive && !brawlHit && !duelT) bloodLose(target, dmg * BLOOD.hit, cause);   /* Blut (09.10.) */
   const lvl = S.settings.violence;
   const bony = target.mtype === 'skeleton';
   if (bony) fx(target.x, target.y - 14, 'bone', crit ? 8 : 5);
@@ -4727,8 +4730,28 @@ function downed(c, cause, source) {
 // S15 Fehlersuche (Nutzer, Kenshi): Wer am Boden liegt, steht erst auf, wenn der Rumpf wieder 25 % hat (und der Kopf > 0).
 // Bis dahin bleibt er bewusstlos; Helfer heilen ihn Stück für Stück (reviveTick), statt ihn auf einen Schlag hochzuziehen.
 const KO_UP = 0.25, KO_RATE = 0.1;
-const koReady = c => c.body ? c.body.torso.hp >= c.body.torso.max * KO_UP - 0.01 && c.body.head.hp > 0 : c.hp >= c.maxHp * KO_UP;
+const koReady = c => (c.body ? c.body.torso.hp >= c.body.torso.max * KO_UP - 0.01 && c.body.head.hp > 0 : c.hp >= c.maxHp * KO_UP) && (!bleeds(c) || bloodLv(c) >= BLOOD.max * BLOOD.up - 0.01);   /* Blut: erst ab 50 % wieder auf den Beinen */
+/* Blut (Entwickler 09.10.: „ähnlich wie in Kenshi mit Blut — wenn man zu viel verliert, geht man erstmal K.o.“) ⚖ Zahlen vorläufig.
+   Held, Gefährten und Menschen (nicht Gegner, Skelette, Vampire, Automaten) haben 100 Blut. Jeder körperliche Treffer kostet 35 % des Schadens
+   als Blut, eine offene Blutung 1,2 je Sekunde (statt Leben). Unter 35 % bricht man bewusstlos zusammen, aufstehen erst ab 50 %. Ohne Blutung
+   kommt Blut langsam zurück (0,25/s; am Boden nur beim Helden, andere brauchen Hilfe). Bei 0 verblutet man. Verband stillt, Heilung und Schlaf füllen auf. */
+const BLOOD = { max: 100, hit: 0.35, bleed: 1.2, regen: 0.25, ko: 0.35, up: 0.5 };
+const bleeds = c => !!c?.body && (c.kind === 'player' || c.kind === 'npc') && !c.robot && !c.automaton && !isVamp(c) && raceOf(c) !== 'skelett';
+const bloodLv = c => c?.lifeBlood ?? BLOOD.max;
+function bloodLose(c, n, why = 'Blutverlust') {
+  if (!bleeds(c) || !(n > 0) || !c.alive || (c === S.player && S.dbg?.god)) return;
+  c.lifeBlood = Math.max(0, bloodLv(c) - n);
+  if (c === S.player && c.lifeBlood < BLOOD.max * 0.6 && !S.flags.bloodHint) { S.flags.bloodHint = 1; log('Du verlierst Blut. Unter 35 % brichst du bewusstlos zusammen, bei 0 verblutest du. Ein Verband stillt die Blutung, Heilung und Schlaf bringen Blut zurück — ohne Blutung kommt es langsam von selbst.', 'combat'); }
+  if (c.lifeBlood <= 0) { float(c, 'verblutet', 'rgba(170,30,40,ALPHA)', true); return die(c, 'Verblutet', byId(c.lastKiller)); }
+  if (c.lifeBlood < BLOOD.max * BLOOD.ko && !c.downed) { float(c, 'Blutverlust', 'rgba(170,30,40,ALPHA)', true); downed(c, why, byId(c.lastKiller)); if (c === S.player) UI.toast('BLUTVERLUST — DU BIST BEWUSSTLOS', 3000); }
+}
+function bloodTick(c, dt) {
+  const bl = (c.status || []).some(s => s.key === 'bleeding'), tended = c.tended > performance.now();
+  if (bl && !tended) bloodLose(c, BLOOD.bleed * dt / 1000, 'Blutung');
+  else if (c.lifeBlood != null && (!c.downed || c === S.player)) { c.lifeBlood = Math.min(BLOOD.max, c.lifeBlood + BLOOD.regen * dt / 1000); if (c.lifeBlood >= BLOOD.max) delete c.lifeBlood; }
+}
 function koLift(c) {                                          // genau bis zur Schwelle, nicht darüber
+  if (bleeds(c) && bloodLv(c) < BLOOD.max * BLOOD.up) c.lifeBlood = BLOOD.max * BLOOD.up;   /* Blut: kommt mit halbem Blut zu sich */
   if (!c.body) { c.hp = Math.max(c.hp, Math.ceil(c.maxHp * KO_UP)); return; }
   const T = c.body.torso; if (T.hp < T.max * KO_UP) B.healPart(c, 'torso', T.max * KO_UP - T.hp);
   if (c.body.head.hp <= 0) B.healPart(c, 'head', c.body.head.max * 0.2 - c.body.head.hp);
@@ -4736,6 +4759,7 @@ function koLift(c) {                                          // genau bis zur S
 function reviveTick(c, helper, dt) {                          // true = steht wieder; je Sekunde KO_RATE des Rumpfs (Heilkunde hilft)
   if (!c.downed) return true;
   const k = dt / 1000 * KO_RATE * (1 + (helper?.skills?.medicine || 0) / 100);
+  if (bleeds(c) && bloodLv(c) < BLOOD.max * BLOOD.up) c.lifeBlood = Math.min(BLOOD.max * BLOOD.up, bloodLv(c) + BLOOD.max * k);   /* Blut: Helfer bringen Blut zurück */
   if (!c.body) c.hp = Math.min(c.maxHp * KO_UP, c.hp + c.maxHp * k);
   else { const T = c.body.torso, H = c.body.head;
     if (T.hp < T.max * KO_UP) B.healPart(c, 'torso', Math.min(T.max * k, T.max * KO_UP - T.hp));
@@ -10299,7 +10323,7 @@ const PR_STEPS = [   /* Entwickler 08.10. (zweite Runde): Prolog mit eigener Obe
   { k: 'loot', title: 'Durchsuchen', keys: ['E'], text: 'Durchsuche die Kiste am Wagenwrack im Südwesten. Was du nimmst, landet im Gepäck.' },
   { k: 'menus', title: 'Menüs', keys: ['I', 'C', 'M'], text: 'Öffne dein Gepäck, deinen Charakter und die Karte. Esc schließt jedes Fenster, H öffnet den Kodex mit allen Regeln.' },
   { k: 'fight', title: 'Kampf', keys: ['Linksklick', 'halten', 'Q', 'Umschalt'], text: 'Linksklick schlägt, gehalten lädt er einen schweren Hieb. Q weicht aus, Umschalt deckt. Wo du triffst, zählt — Kopf, Arme, Beine.' },
-  { k: 'heal', title: 'Aufheben und heilen', keys: ['E', 'I', '1–4'], text: 'Heb auf, was liegen blieb. Verbände benutzt du im Gepäck oder über die Schnellleiste.' },
+  { k: 'heal', title: 'Aufheben und heilen', keys: ['E', 'I', '1–4'], text: 'Heb auf, was liegen blieb, und verbinde dich: Verbände benutzt du im Gepäck oder über die Schnellleiste. Erst wenn du versorgt bist, geht es weiter.' },
   { k: 'goal', title: 'Das Ziel', keys: ['E'], text: 'Geh zurück zu Oswin. Er erklärt dir, was da draußen auf dich wartet.' },
   { k: 'choice', title: 'Aufbruch', keys: ['E'], text: 'Am Nordtor stellen sich drei Mächte vor. Hör sie an — dann zieh als Nomade los (Oswin oder ein Gesandter).' },
 ];
@@ -10425,7 +10449,7 @@ function prologTick(now) {
   else if (k === 'loot') done = !!prEnt('chest')?.opened;
   else if (k === 'menus') done = PR_MENUS.every(([n]) => P.menus[n]) && !UI.modalOpen;
   else if (k === 'fight') { done = !S.ents.prolog.some(e => e.prUndead && e.alive); if (done) { P.fought = 1; prologDrop(S.ents.prolog.filter(e => e.kind === 'corpse').at(-1) || p); } }
-  else if (k === 'heal') done = !S.ents.prolog.some(e => e.prDrop);
+  else if (k === 'heal') done = !S.ents.prolog.some(e => e.prDrop) && (P.healed || (!B.worstPart(p) && !(p.status || []).some(s => s.key === 'bleeding')));   /* erst aufheben, dann wirklich verbinden (unverletzt zählt als versorgt) */
   if (done) prologAdvance();
 }
 function prologRaise() {
@@ -20260,6 +20284,9 @@ function debugSections() {
     }],
     ['Spieler', `${sel('dbFac', facs)} <input id="dbN" value="25" size="4"> ${sel('dbStat', stats)}`, {
       'Gottmodus an/aus': () => { (S.dbg ||= {}).god = !S.dbg.god; UI.toast(S.dbg.god ? 'GOTTMODUS AN' : 'GOTTMODUS AUS'); },
+      'Blut: −30 (unter 35 % = bewusstlos)': () => { bloodLose(p, 30, 'Debug'); UI.toast(`Blut ${Math.round(bloodLv(p))}`); },
+      'Blut: Blutung starten (30 s)': () => { (p.status ||= []).push({ key: 'bleeding', name: 'Blutend', left: 30000 }); UI.toast('Du blutest — Verband stillt es'); },
+      'Blut: voll': () => { delete p.lifeBlood; UI.toast('Blut 100'); },
       'Heilen': () => { B.fullHeal(p); p.downed = false; }, 'Ausdauer voll': () => { p.stamina = p.maxStamina; }, 'Mana voll': () => { p.mana = p.maxMana; },
       'XP + Zahl': () => gainXp(p, +v('dbN') || 100), 'Stufe +1': () => levelUp(p), 'Stufe = Zahl': () => { const n = Math.max(1, Math.min(60, +v('dbN') || 1)); while (p.level < n) levelUp(p); }, 'Stufe −1': () => { if (p.level > 1) { p.level--; p.xp = 0; p.xpNext = Math.round(p.xpNext / 1.35); recalc(p); } },
       'Ruf ± Zahl': () => { S.factions[v('dbFac')] = (S.factions[v('dbFac')] || 0) + (+v('dbN') || 0); checkRankUp(); },
@@ -20843,7 +20870,7 @@ export function duel(mtype, { weapon = 'longsword', chest = 'leather_jerkin', le
         controlPlayer(16); for (const x of [...S.ents.__d]) think(x, 16); updateProjectiles(16);
       }
     } finally { performance.now = pnow; keys.clear(); kb.forEach(k => keys.add(k)); mouse.down = md; mouse.seen = ms; }
-    return { tr: trace ? tr : undefined, swings: sw0.n, mtype, mode, weapon, level, win: !e.alive, dead: !p.alive || p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100) };
+    return { tr: trace ? tr : undefined, swings: sw0.n, mtype, mode, weapon, level, win: !e.alive, dead: !p.alive || p.downed, sec: +(t / 1000).toFixed(1), hpLost: Math.round((1 - B.vital(p) / hp0) * 100), bloodLost: Math.round(BLOOD.max - bloodLv(p)) };   /* Blut (09.10.): Blutung kostet Blut statt Leben — beides ist Schaden */
   } finally {
     Object.assign(S, { player: keep.player, map: keep.map, party: keep.party, gold: keep.gold, kills: keep.kills, _quiet: keep.quiet, projectiles: keep.projectiles, rising: keep.rising }); combat = keep.combat;
     delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
@@ -21285,7 +21312,7 @@ export function selftest() {
   })());
   ok('Balancing (§82): Stufe-3-Held verliert gegen einen Banditen im Stand ≥ 12 % Leben; Rückwärtslaufen ist nicht billiger als Stehen', (() => {
     const st = [1, 2, 3].map(sd => duel('bandit', { level: 3, seed: sd })), ki = [1, 2, 3].map(sd => duel('bandit', { level: 3, mode: 'kite', seed: sd }));
-    const avg = a => a.reduce((n, x) => n + x.hpLost, 0) / a.length;
+    const avg = a => a.reduce((n, x) => n + x.hpLost + x.bloodLost, 0) / a.length;   /* 09.10.: Blutung kostet Blut statt Leben — Schaden = Leben + Blut */
     if (!(avg(st) >= 12 && avg(ki) >= avg(st) * 0.8)) console.warn('Balancing', avg(st), avg(ki));
     return st.every(x => x.win) && avg(st) >= 12 && avg(ki) >= avg(st) * 0.8;
   })());
@@ -22454,6 +22481,18 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { if (R0) S.eco.routes = R0; else delete S.eco.routes; S.flags = fl; S.bands = B0; }
   })());
+  ok('Gesamtleben + Blut (Entwickler 09.10., Kenshi): Balken zeigt alle Körperteile (Rumpf 0 = leer); Treffer und Blutung kosten Blut statt Leben, unter 35 % bewusstlos, aufstehen erst ab 50 %, Helfer bringen Blut zurück, Heilung füllt auf; Gegner haben kein Blut', sandbox(() => {
+    const p = stage(), n = actor(p.x + 40, p.y, { kind: 'npc', name: 'Probe-Blut' }), [h0, m0] = B.lifeOf(n);
+    n.body.larm.hp = n.body.larm.max / 2; B.syncHp(n); const [h1] = B.lifeOf(n), part = h1 < h0 && h0 === m0;
+    const t0 = n.body.torso.hp; n.status = [{ key: 'bleeding', name: 'Blutend', left: 5000 }]; bloodTick(n, 1000); const bleed = Math.abs(bloodLv(n) - 98.8) < 1e-9 && n.body.torso.hp === t0;
+    bloodLose(n, 70); const ko = n.downed && !koReady(n); n.status = []; n.body.torso.hp = n.body.torso.max; B.syncHp(n);
+    for (let i = 0; i < 40 && n.downed; i++) if (reviveTick(n, p, 1000)) n.downed = false; const up = !n.downed && bloodLv(n) >= 50;
+    B.heal(n, 20); const healed = bloodLv(n) >= 60; B.fullHeal(n); const full = n.lifeBlood == null;
+    n.body.torso.hp = 0; B.syncHp(n); const zero = B.lifeOf(n)[0] === 0;
+    const e = spawnEnemy('bandit', '__a', 12, 12), foe = !bleeds(e);
+    const res = { part, bleed, ko, up, healed, full, zero, foe }; if (!Object.values(res).every(Boolean)) console.warn('Blut-Probe', JSON.stringify(res), bloodLv(n));
+    return Object.values(res).every(Boolean);
+  }));
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -26990,7 +27029,7 @@ function boot() {
       return { k, name: SKILL_NAMES[k] || k, v, lv: skillLv(v), frac: (v % 2) / 2, group: SKILL_DEF[k]?.group || 'Sonstiges', what: SKILL_DEF[k]?.what || '', next: skillNext(c, k),
         perks: Object.entries(P).map(([L, [, , t]]) => ({ lv: +L, t, on: skillLv(v) >= +L })),
         master: SKILL_DEF[k]?.master ? { ...SKILL_DEF[k].master, done: !!c?.masteries?.[k], open: masterOpen(c, k) } : null,   /* Phase 6 */
-        techs: Object.entries(TECHS).filter(([, T]) => T.skill === k).map(([tk, T]) => ({ name: T.name, t: T.perk[2], on: !!c?.techs?.[tk], where: T.teacher })) }; },   /* Phase 7 */
+        techs: Object.entries(TECHS).filter(([, T]) => T.skill === k).map(([tk, T]) => ({ name: T.name, t: T.perk[2], on: !!c?.techs?.[tk], where: T.teacher, need: T.need })) }; },   /* Phase 7; need: Fertigkeiten-Fenster 09.10. */
     effects: activeEffects, fxDesc: FX_DESC, rankGuide, powerGuide, facResKeys: SIM.RES_KEYS, zoneRange: (map, tx, ty) => ZONE[clamp(zoneTier(map, tx, ty), 0, 5)],   // S13: Gegnerstufen je Gebiet sichtbar
     questInfo, cancelQuest, trackQuest: k => { S.track = k; },
     shopStock, price, buy, sell, craftBandage, bandageFrom: k => BANDAGE_FROM[k] || 0,
