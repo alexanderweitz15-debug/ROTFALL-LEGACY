@@ -8750,7 +8750,7 @@ function ensureRefugees() {
       Object.assign(c, { refugee: true, visitor: true, transient: true, anchor: { x: q.x, y: q.y }, greet: pick(['„Drei Tage warten wir schon. Sie lassen nur rein, wer zahlt.“', '„Die Feste ist gefallen. Wohin sollen wir denn noch?“', '„Die Automaten sehen durch uns hindurch.“']) }); S.ents.world.push(c); } }
   log('Vor den Toren Aurelions stauen sich die Flüchtlinge. Das Hochreich macht die Tore enger.', 'world');
 }
-function aurelTick() { bondTick(); intrigueTick(); ensureRefugees(); huntTick(); ensureSaltportContacts(); aurelWealth(); }
+function aurelTick() { bondTick(); intrigueTick(); ensureRefugees(); huntTick(); ensureSaltportContacts(); aurelWealth(); if (S.coop?.role !== 'guest') aurelEnvoyTick(); }
 function aurelDay() {
   if (S.aurelJob && S.aurelJob.until >= (S.day | 0)) { S.gold += S.aurelJob.pay; S.houses[S.aurelJob.house] = favor(S.aurelJob.house) + 2; log(`Lohn von ${(AUREL_HOUSES.find(h => h.key === S.aurelJob.house)?.name || 'ein Haus')}: ${S.aurelJob.pay} Gold.`, 'economy'); }
   if (S.flags.marriedHouse) { S.gold += 25; }
@@ -8787,8 +8787,10 @@ function aurelChoices(npc, choices) {
   bondChoices(npc, choices);
   const p = S.player, back = () => talk(npc), cont = t => UI.dialogue(npc, t, [{ text: 'Weiter', fn: back }]);
   if (npc.passamt) {
-    for (const [d, c] of [[3, 150], [7, 300]]) { const cost = c * bastion();
-      choices.unshift({ text: `Aufenthaltsschein, ${d} Tage (${cost} Gold)`, fn: () => { if (S.gold < cost) return cont('„Ohne Siegelgeld kein Schein.“');
+    const toll = SIM.resStageOf('aurel') === 0 ? FAC_RES.aurel.passToll : 0;   /* T23-Rest (Spec t23 §Aurelion): im Hunger fordert das Passamt Zoll von Fremden */
+    if (toll) choices.push({ text: 'Warum Zoll?', fn: () => cont(`„Das Hochreich hungert. Fremde zahlen ${toll} Gold Zoll zum Siegelgeld. Wer nicht zahlen will, nimmt den Umweg — und erklärt den Automaten, warum er keinen Schein hat.“`) });
+    for (const [d, c] of [[3, 150], [7, 300]]) { const cost = c * bastion() + toll;
+      choices.unshift({ text: `Aufenthaltsschein, ${d} Tage (${cost} Gold${toll ? `, davon ${toll} Zoll` : ''})`, fn: () => { if (S.gold < cost) return cont('„Ohne Siegelgeld kein Schein.“');
         S.gold -= cost; S.permit = Math.max(S.permit ?? -1, S.day | 0) + d; log(`Aufenthaltsschein bis Tag ${S.permit}.`, 'economy'); cont(`„Gesiegelt. Gültig bis zum ${S.permit}. Tag. Die Automaten wissen Bescheid.“`); } }); }
     if (S.flags.chainsBroken) choices.push({ text: 'Warum so teuer?', fn: () => cont('„Die Feste ist gefallen. Halb Valoris will herein. Aurelion ist die letzte Mauer, und Mauern kosten.“') });
   }
@@ -9101,6 +9103,7 @@ function makeContract(town, kind, giver) {
     if (w) { Object.assign(C, { target: T, who: w.id, whoSig: w.transient ? `${w.name}|${w.prof}` : null, name: w.name, need: 2, x: w.x / TS | 0, y: w.y / TS | 0, tx: w.x / TS | 0, ty: w.y / TS | 0 }); if (kind === 'debt') C.sum = 30 + tier * 20 + ri(0, 4) * 10; else C.reward.gold += 30; }   /* ⚖ Schuldsumme */
     else C.kind = kind = 'deliver';   /* niemand Passendes im Ort: ein gewöhnliches Paket */
   }
+  if (kind === 'escort' && FAC_RES.sea.ports.includes(town) && SIM.resStageOf('sea') === 0) { C.reward.gold = Math.round(C.reward.gold * FAC_RES.sea.escortMul); C.saltPay = true; }   /* T23-Rest: Salz knapp — Ysolde (Salzbund) zahlt Geleit in den Häfen ×1,5 */
   if (kind === 'escort' && SIM.facRes('merch') < FAC_RES.merch.lt) C.reward.gold = Math.round(C.reward.gold * (1.5 - SIM.facRes('merch') / 100));   /* T23 S4: die Gilde verliert Züge und zahlt Söldner besser */
   if (kind === 'escort' || kind === 'deliver') { C.target = far; C.reward.gold += 30; C.name = pick(FIRST_M); const T2 = TOWN_PLAN[far]; if (T2) { C.tx = T2.square[0]; C.ty = T2.square[1]; } }
   if (kind === 'missing') C.name = pick(FIRST_M);
@@ -12367,10 +12370,11 @@ function evacChoices(npc, choices) {
     if (!evacMayAsk()) return say('„Den König vertraue ich keinem Fremden an.“ (Rang bei Valen, Ritter Varons oder eine Audienz nötig)');
     if (!dead && S.evac?.refused === day) return say('„Der König hat heute schon Nein gesagt. Morgen vielleicht.“');
     if (!dead && (S.flags.varonQ || 0) < 3 && vmHash('evac', day) % 100 < EVAC.refuse * 100) { (S.evac ||= {}).refused = day; S.evac.state = null; return say('Varon, aus dem Thronsaal: „Ich fliehe nicht vor Knochen.“ (Er lehnt heute ab — als Ritter Varons würde er dir folgen.)'); }
-    const keyB = !!S.cult?.keyB, cult = keyB && !['destroyed', 'player'].includes(S.cult?.end);
+    const keyB = !!S.cult?.keyB, cult = keyB && !['destroyed', 'player'].includes(S.cult?.end), trap = cult && !dead && (S.cult?.stage || 0) >= 3 && !S.cult?.aldhelmDead && courtEnts().some(e => e.varonChancellor && e.alive);   /* S3d: Aldhelms Falle */
     UI.dialogue(npc, `„Zwei Wege. Durch Burgtor und Westtor zum Sammelplatz an der Königsstraße — dort lauern die Streifen der Toten.${keyB ? ` Oder durch den Kanzleikeller, ungesehen bis zur Friedhofsgruft${cult ? ' — aber unter der Kanzlei wohnt nicht nur Staub' : ''}.` : ''}“ Ankunft am Sammelplatz kostet die Stadt Männer (Besatzung −10) und dem König Ansehen (Valen −3) — aber der Hof bleibt ganz.`, [
       { text: 'Burgtor und Westtor (Streife der Toten)', fn: () => { UI.closeDialogue(); evacStart('tor'); } },
       ...(keyB ? [{ text: `Kanzleikeller (ungesehen${cult ? ', Katakombenwachen' : ''})`, fn: () => { UI.closeDialogue(); evacStart('keller'); } }] : []),
+      ...(trap ? [{ text: 'Kanzler Aldhelm: „Ich kenne die Gewölbe. Folgt mir.“ (Ysmay flüstert: „Trau dem Kanzler nicht.“)', fn: () => { UI.closeDialogue(); aldhelmTrap(); } }] : []),
       { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]);
   } });
 }
@@ -12389,6 +12393,13 @@ function evacStart(route) {
     UI.toast('DURCH DEN KANZLEIKELLER', 2200); log('Ihr steigt durch die Treppe im Kanzleikeller hinab und kommt an der Friedhofsgruft wieder ans Licht.', 'quest');
     if (!['destroyed', 'player'].includes(S.cult?.end)) for (let i = 0; i < EVAC.cult; i++) { const e = spawnEnemy('blood_cultist', 'world', (at.x / TS | 0) + 4 + i, (at.y / TS | 0) - 2, { level: EVAC.clvl }); if (e) Object.assign(e, { transient: true, aggroId: (king || brandt).id }); }
   }
+}
+/* S3d: Aldhelms Falle — wer sich vom Kanzler durch den Keller führen lässt, führt den König in die Krypta: die Rote Krönung geschieht sofort.
+   Ein Verrats-Moment für Kelch-Verbündete oder eine Falle für Unwissende; keine Valen-Strafe für den Spieler, Brandt überlebt. */
+function aldhelmTrap() {
+  const C = S.cult; if (!C) return; S.evac = null;
+  log('Aldhelm führt euch hinab. Im Gewölbe unter der Kanzlei schließt sich eine Tür hinter dem König — dann nur noch Gesang. Brandt reißt dich zurück: „Verrat! Zur Treppe!“', 'quest');
+  cultCrown(); chronicle('Der König verschwand im Keller seiner Kanzlei', 'legend', 'Kanzler Aldhelm führte den Zug in die Krypta. Von König Varon fand man nur den Mantel.'); UI.toast('DIE ROTE KRÖNUNG', 3200);
 }
 function evacFollow(e, dt) {                                         /* Begleiter: dicht beim Helden, im Kampf normale KI */
   if (S.evac?.state === 'flee') { const Pt = evacPts(); if (!Pt || e.downed) return false; const [gx, gy] = Pt.gate, [mx, my] = Pt.mark, tx = e.x / TS > gx + 1 ? gx : mx, ty = e.x / TS > gx + 1 ? gy : my;   /* §2.3: sie laufen selbst zum Sammelplatz */
@@ -15441,6 +15452,26 @@ function facSay(f, st, was) {
   if (!S._quiet) UI.toast(`${nm.toUpperCase()}: ${C.name.toUpperCase()} ${RES_STAGE[st].toUpperCase()}`, 3200);
   if (!S.flags.powersHint) { S.flags.powersHint = 1; log('Im Kodex (H) unter „Mächte“ steht, woher jede Macht ihre Kraft nimmt — und wie du daran drehst.', 'quest'); }
 }
+/* T23-Rest (Spec t23 „NPCs“: „Kontorhändler, Ysolde, Grisk, Edda, Konrad sprechen die Stufe ihrer Macht an — je ein Satz“; Gesandter sichtbar in Nordfurt):
+   Ysolde nennt das Salz und das Geleitgeld, Grisk die drei Feinde des Horts, der Gesandte Aurelions den Hunger des Hochreichs. Kontor (Handelswert),
+   Konrad (Takt) und Edda (Register) sprechen es schon. */
+function resTalkChoices(npc, choices) {
+  const say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+  if (npc.key === 'ysolde') { const st = SIM.resStageOf('sea');
+    choices.push({ text: 'Wie steht es ums Salz?', fn: () => say(st === 0 ? `„Knapp. Die Sturmklinge kapert unsere Schiffe, und in den Häfen liegen ${Math.round(SIM.facRes('sea'))} Lasten. Wer in Salzhafen, Nordfurt oder Kupferhafen Geleit fährt, bekommt vom Bund das Anderthalbfache — und auf die Schwarzsegel steht ein Kopfgeld.“`
+      : st === 2 ? '„Die Speicher quellen über. Wir schicken Salz ins Binnenland, bevor es feucht wird.“' : '„Es reicht. Solange die Sturmklinge sich zurückhält, reicht es.“') }); }
+  if (npc.key === 'grisk' && S.flags.goblinsFreed) { const z = S.after?.zeal || 0, heads = campHeads();
+    choices.push({ text: 'Wer bedroht den Hort?', fn: () => say(`„Drei. Die Mönche — ${z >= 4 ? 'ihr Eifer brennt, sie kommen bald' : z >= 2 ? 'sie predigen wieder lauter' : 'gerade still'}. Die Kette — ${heads < FAC_RES.chain.hunt ? 'ihr fehlen Hände, sie jagt Köpfe bei uns' : 'satt an Gefangenen, für jetzt'}. Und die Toten, die immer kommen. Jeder Goblin, der heimfindet, macht uns stärker.“`) }); }
+  if (npc.aurelEnvoy) { const n = S.facRes?.aurel?.envoy?.n || 0;
+    choices.push({ text: 'Was kauft Ihr hier?', fn: () => say(`„Korn. ${n ? `${n} Säcke heute. ` : ''}Das Hochreich hat Nahrung für ${resFmt('aurel', SIM.facRes('aurel'))} Tage — Luftschiffe allein füttern keine Stadt. Valen wird es verschmerzen. Oder nicht.“`) }); }
+}
+function aurelEnvoyTick() {                                           /* der Gesandte steht am Tag des Kaufs (und envoyDays danach) am Platz von Nordfurt, flüchtig */
+  const E = S.facRes?.aurel?.envoy, day = S.day | 0, here = S.ents.world.filter(e => e.aurelEnvoy), want = !!E && day - E.day <= (FAC_RES.aurel.envoyDays ?? 1) && TOWN_PLAN.northcity && S.war?.nodes?.northcity?.owner !== 'undead';
+  if (!want && here.length) S.ents.world = S.ents.world.filter(e => !e.aurelEnvoy);
+  if (!want || here.length) return; const [sx, sy] = TOWN_PLAN.northcity.square, q = freeSpotNear('world', sx + 3, sy + 2, 2);
+  keepRng(() => { const c = makeChar({ name: 'Gesandter Lucan', prof: 'Gesandter Aurelions', x: q.x, y: q.y, level: 6, faction: 'aurel', traits: ['diszipliniert'] });
+    Object.assign(c, { aurelEnvoy: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, schedulePos: { x: q.x, y: q.y }, greet: '„Im Namen des Hohen Rats. Ich kaufe, Ihr verkauft — so einfach ist Diplomatie.“', cloth: '#3a3040' }); S.ents.world.push(c); });
+}
 function resDaily(R, first) {                                         /* Tagesquellen und -senken (S3–S5), aus facResDay */
   const day = S.day | 0, O = FAC_RES.order;
   if (S.after?.zeal != null || SIM.undNodeCount() >= O.holdNodes) {   /* S3 Eifer: Land der Toten (≥ 4 Orte) nährt ihn höchstens alle 5 Tage; ohne Anlass −0,5 je 10 Tage */
@@ -15520,7 +15551,8 @@ function facResDebug() {
     'Aurelion (S4): Hunger (Nahrung des Hochreichs 0) + Agendatag': () => { for (const [k, t] of Object.entries(S.towns)) if (LOCATIONS.find(l => l.key === k)?.faction === 'aurel') { t.stock.grain = 0; t.stock.meat = 0; } SIM.facResDay(); const d0 = S.day; S.day = (S.day | 0) - ((S.day | 0) % 5) + 4 + (S.day % 1); factionAgenda(); S.day = d0; UI.toast(`Wohlstand ${resFmt('aurel', SIM.facRes('aurel'))} Tage · Zoll ×${(S.tollMul || 1).toFixed(2)}`, 4000); },
     'Aurelion (E49): Stufe Hunger / normal / Wohlstand durchschalten und anwenden': () => { const R = SIM.facResState(), st = (aurelStage() + 1) % 3; R.aurel.v = [2, 8, 20][st]; R.aurel.stage = st; const r = aurelWealth(true);
       UI.toast(`Wohlstand ${['Hunger', 'normal', 'Wohlstand'][st]}: abgezogen ${r?.parked || 0}, zurück ${r?.back || 0}, zusätzlich ${r?.extra || 0}, Sicht ${aurelSight()} px, Laden ×${FAC_RES.aurel.buyMul[st]}${r?.patrol ? ', Streife unterwegs' : ''}`, 4500); },
-    'Aurelion (E49): Lage der Automaten ins Log': () => log(`Aurelion Stufe ${aurelStage()}: ${aurelTowns().map(t => `${townName(t)} ${S.ents.world.filter(e => e.robot && e.post === t && e.alive).length} (+${S.ents.world.filter(e => e.aurelExtra === t).length}, Werkhalle ${S.aurelParked?.[t]?.length || 0})`).join(' · ')}; Streifen ${S.ents.world.filter(e => e.aurelPatrol && e.traveler).length}`, 'faction'),
+    'Aurelion (T23-Rest): Gesandter steht heute in Nordfurt': () => { SIM.facResState().aurel.envoy = { day: S.day | 0, n: 0 }; aurelEnvoyTick(); UI.toast('Gesandter Lucan am Platz von Nordfurt — „Was kauft Ihr hier?“', 3500); },
+    'Aurelion (E49): Lage der Automaten ins Log':() => log(`Aurelion Stufe ${aurelStage()}: ${aurelTowns().map(t => `${townName(t)} ${S.ents.world.filter(e => e.robot && e.post === t && e.alive).length} (+${S.ents.world.filter(e => e.aurelExtra === t).length}, Werkhalle ${S.aurelParked?.[t]?.length || 0})`).join(' · ')}; Streifen ${S.ents.world.filter(e => e.aurelPatrol && e.traveler).length}`, 'faction'),
     'Seevolk (S5): Prise jetzt (erzwingt den Tageshash)':() => { const R = SIM.facResState(), d0 = S.day; let d = S.day | 0; while (SIM.resHash(11, 1000) >= 100 && d < (d0 | 0) + 3000) S.day = ++d; const s0 = SIM.seaSalt(); seaPrizeDay(R, S.day | 0); S.day = d0; UI.toast(`Salz der Häfen ${Math.round(s0)} → ${Math.round(SIM.seaSalt())} · Prisen (10 Tage) ${R.sea.prizes.length}`, 4000); },
     'Seevolk (S5): Salz knapp → Kopfgeld des Salzbunds': () => { const R = SIM.facResState(); for (const k of FAC_RES.sea.ports) if (S.towns[k]) S.towns[k].stock.salt = 3; SIM.facResDay(); R.sea.bountyWant = true; seaAgenda(); },
     'Seevolk (S5): drei Prisen → Hellas Mannschaft wächst': () => { const R = SIM.facResState(); R.sea.prizes = [S.day | 0, S.day | 0, S.day | 0]; R.sea.crewDay = -99; seaPrizeDay(R, S.day | 0); seaAgenda(); },
@@ -15584,7 +15616,7 @@ function factionAgenda() {
 function aurelEnvoyBuy() {
   const F = FAC_RES.aurel, nf = S.towns?.northcity, ah = S.towns?.aurelheim; if (!nf || !ah || S.war?.nodes?.northcity?.owner === 'undead') return 0;
   const n = Math.max(0, Math.floor(Math.min(F.buyMax, (nf.stock.grain || 0) - F.buyKeep))); if (!n) return 0;
-  nf.stock.grain -= n; ah.stock.grain = (ah.stock.grain || 0) + n; return n;
+  nf.stock.grain -= n; ah.stock.grain = (ah.stock.grain || 0) + n; SIM.facResState().aurel.envoy = { day: S.day | 0, n };   /* T23-Rest: der Gesandte steht sichtbar in Nordfurt */ return n;
 }
 /* T23 S4: Frachtauftrag in Kupferhafen — 15 Korn, doppelter Lohn (S.eco.orders-Muster, fac: aurel), einer zur Zeit */
 function aurelFreight() {
@@ -16428,7 +16460,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost(npc)} Gold)${zealHealMul(npc) > 1 ? ' — der Orden verlangt mehr, solange sein Eifer brennt' : ''}`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); evacChoices(npc, choices); crownSealChoice(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ resTalkChoices(npc, choices);   /* T23-Rest: Ysolde, Grisk, Gesandter */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); evacChoices(npc, choices); crownSealChoice(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -23101,6 +23133,22 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { S.bands = B0; Object.assign(S.factions, fa); S.gold = g0; S.ents[p.map] = W0; S.party = pa; if (WY) S.weary = WY; else delete S.weary; S.flags = fl; S._quiet = q0; }
   }));
+  ok('T23-Rest Aurelion und Salzbund: im Hunger fordert das Passamt Zoll von Fremden (20 Gold); Salz knapp → Geleit in den Häfen ×1,5; Ysolde, Grisk und der Gesandte sprechen die Lage ihrer Macht an; der Gesandte steht nach dem Kauf sichtbar in Nordfurt', keepRng(() => {
+    const R0 = structuredClone(S.facRes ?? null), W0 = S.ents.world.slice(), fl = { ...S.flags }, q0 = S._quiet, ns = structuredClone(S.towns?.northcity?.stock ?? null), as = structuredClone(S.towns?.aurelheim?.stock ?? null);
+    try {
+      S._quiet = true; const R = SIM.facResState(), pa = { passamt: 'aurelheim', name: 'P', key: 'pass_x' };
+      const costs = st => { R.aurel.stage = st; const ch = []; aurelChoices(pa, ch); return ch.filter(c => c.text.startsWith('Aufenthaltsschein')).map(c => +(c.text.match(/\((\d+) Gold/) || [0, 0])[1]); };
+      const c1 = costs(1), c0 = costs(0), toll = c0.length === 2 && c0.every((v, i) => v === c1[i] + FAC_RES.aurel.passToll);
+      const mk = st => { R.sea.stage = st; return keepRng(() => makeContract('saltport', 'escort', 'board')); }, e1 = mk(1), e0 = mk(0), salt = e0.saltPay === true && !e1.saltPay && e0.reward.gold > e1.reward.gold;
+      const lines = n => { const ch = []; resTalkChoices(n, ch); return ch.map(c => c.text); }; S.flags.goblinsFreed = true;
+      const talkers = lines({ key: 'ysolde', name: 'Y' }).includes('Wie steht es ums Salz?') && lines({ key: 'grisk', name: 'G' }).includes('Wer bedroht den Hort?');
+      let envoy = !S.towns?.northcity;
+      if (!envoy) { S.towns.northcity.stock.grain = 30; const n = aurelEnvoyBuy(); aurelEnvoyTick(); const E = S.ents.world.find(e => e.aurelEnvoy);
+        const shown = n > 0 && !!E && E.transient && lines(E).includes('Was kauft Ihr hier?'); R.aurel.envoy.day = (S.day | 0) - 5; aurelEnvoyTick(); envoy = shown && !S.ents.world.some(e => e.aurelEnvoy); }
+      const res = { toll, salt, talkers, envoy }; if (!Object.values(res).every(Boolean)) console.warn('T23-Rest-Probe', res, { c0, c1 });
+      return Object.values(res).every(Boolean);
+    } finally { if (R0 == null) delete S.facRes; else S.facRes = R0; S.ents.world = W0; S.flags = fl; S._quiet = q0; if (ns) S.towns.northcity.stock = ns; if (as) S.towns.aurelheim.stock = as; }
+  }));
   ok('E49 Aurelion nach Wohlstand: Hunger zieht zwei Automaten je Stadt in die Werkhalle (gespeichert, kehren zurück), Wohlstand stellt zwei stärkere an die Tore; Sichtweite, Ladenpreise und Automaten-Streife folgen der Stufe', (() => {
     const W0 = S.ents.world.slice(), R0 = structuredClone(S.facRes ?? null), P0 = S.aurelParked, fl = { ...S.flags }, k0 = AW.k, d0 = S.day, q = S._quiet;
     try {
@@ -25301,6 +25349,20 @@ export function selftest() {
       const res = { run, safe, load }; if (!Object.values(res).every(Boolean)) console.warn('S3c-2.3-Probe', JSON.stringify(res));
       return Object.values(res).every(Boolean);
     } finally { S.war = W0; if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = E1; S.flags = fl; Object.assign(S.factions, fa); S.evac = ev0; if (S.evac === undefined) delete S.evac; Object.assign(p, pk); ensureVaronExile(); ensureVaronCourt(); }
+  }));
+  ok('Belagerung S3d Aldhelms Falle: nur mit Kultschlüssel, unzerschlagenem Kult ab Stufe 3 und lebendem Kanzler im Angebot; angenommen → Rote Krönung sofort, Varon tot, Brandt lebt, keine Valen-Strafe', sandbox(() => {
+    const W0 = structuredClone(S.war), C0 = S.cult ? structuredClone(S.cult) : undefined, E1 = S.ents.world, fl = structuredClone(S.flags), fa = { ...S.factions }, rk = S.ranks.valen, A0 = S.after ? structuredClone(S.after) : undefined;
+    S.ents.world = E1.slice();
+    try {
+      if (SIM.capitalFallen() || !evacPts()) return true; delete S.flags.varonDead; delete S.flags.varonFled; S.evac = null;
+      S.cult = { stage: 3, keyB: true, end: null, crown: 5 }; const n = S.war.nodes.varonheim, u = { id: 'pal', faction: 'undead', at: 'varonheim', prev: 'ashford', strength: 60, name: 'P' }; S.war.armies = [u]; n.owner = 'valen'; n.siege = { day: S.day | 0, by: u.id }; n.walls = 40;
+      S.ranks.valen = 1; S.flags.varonQ = 3; ensureVaronCourt(); const br = courtEnts().find(e => e.varonMarshal); let opts = null; const UH = UI.uiHooks, hd = UH.dialogue; UH.dialogue = (np, t, c) => { opts = c; return true; };
+      try { const ch = []; evacChoices(br, ch); ch.find(x => /fortbringen/.test(x.text))?.fn(); } finally { UH.dialogue = hd; }
+      const offer = !!opts?.some(o => /Aldhelm/.test(o.text)), v0 = S.factions.valen || 0; opts?.find(o => /Aldhelm/.test(o.text))?.fn();
+      const trap = !!S.cult.crowned && !!S.flags.varonDead && courtEnts().some(e => e.varonMarshal && e.alive) && (S.factions.valen || 0) === v0;
+      const res = { offer, trap }; if (!Object.values(res).every(Boolean)) console.warn('Aldhelm-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { S.war = W0; if (C0 === undefined) delete S.cult; else S.cult = C0; S.ents.world = E1; S.flags = fl; Object.assign(S.factions, fa); S.ranks.valen = rk; if (A0 === undefined) delete S.after; else S.after = A0; S.evac = null; delete S.evac; UI.closeDialogue(); ensureVaronExile(); ensureVaronCourt(); }
   }));
   ok('Belagerung S3d Kronsiegel: liegt einmal in der besetzten Kanzlei, kein zweites nach dem Nehmen; dem Hof im Exil zurückgegeben → Valen +5', sandbox(() => {
     const A0 = S.after ? structuredClone(S.after) : undefined, W1 = S.ents.world, fa = { ...S.factions }, p = S.player, inv0 = p.inv.slice(); S.ents.world = W1.slice();
