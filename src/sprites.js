@@ -12,13 +12,13 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=26';
-import { ITEMS, RACES, FACTIONS } from './data.js?v=26';
-import { S as GS } from './state.js?v=26';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=26';
+import { ATLAS } from './ref5_atlas.js?v=27';
+import { ITEMS, RACES, FACTIONS } from './data.js?v=27';
+import { S as GS } from './state.js?v=27';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=27';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { ATK_U } from './anim.js?v=26';   /* Kampfanimation Scheibe 1 */
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=26';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { ATK_U } from './anim.js?v=27';   /* Kampfanimation Scheibe 1 */
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=27';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().

@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=26';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=26';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=26';
-import * as R from './render.js?v=26';
-import * as HB from './buildings.js?v=26';
-import * as UI from './ui.js?v=26';
-import * as SIM from './sim.js?v=26';
-import * as B from './body.js?v=26';
-import * as SP from './sprites.js?v=26';
-import * as ECO from './economy.js?v=26';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=26';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=26';
-import { skyVisible, skyHidden } from './sky.js?v=26';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=26';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=27';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=27';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=27';
+import * as R from './render.js?v=27';
+import * as HB from './buildings.js?v=27';
+import * as UI from './ui.js?v=27';
+import * as SIM from './sim.js?v=27';
+import * as B from './body.js?v=27';
+import * as SP from './sprites.js?v=27';
+import * as ECO from './economy.js?v=27';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=27';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=27';
+import { skyVisible, skyHidden } from './sky.js?v=27';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=27';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -20267,10 +20267,6 @@ function debugSections() {
       'Schwierigkeit: Angsthase / Schwer / Sehr schwer': () => { S.difficulty = ({ angsthase: 'schwer', schwer: 'sehr_schwer' })[S.difficulty || 'schwer'] || 'angsthase'; applyDifficulty(); UI.toast('SCHWIERIGKEIT: ' + DIFF[S.difficulty].name.toUpperCase()); },
       'Gold +500': () => { S.gold += 500; }, 'Material +100': () => { S.res.wood += 100; S.res.stone += 100; S.res.iron += 50; S.res.food += 20; },
     }],
-    ['Gegenstände', `${sel('dbW', items(it => it.slot === 'weapon'))} ${sel('dbA', items(it => ['head', 'chest', 'offhand', 'cloak', 'legs', 'hands', 'feet', 'ring', 'amulet'].includes(it.slot)))}
-      ${sel('dbM', items(it => it.slot === 'material' || it.slot === 'consumable'))} ${sel('dbL', items(it => it.rarity === 'legendary' || it.rarity === 'epic'))}`, {
-      'Waffe': () => addItem(p, v('dbW')), 'Rüstung': () => addItem(p, v('dbA')), 'Material/Verbrauch ×5': () => addItem(p, v('dbM'), 5), 'Selten/Legendär': () => addItem(p, v('dbL')),
-    }],
     ['Welt', `<input id="dbH" value="12" size="3"> ${sel('dbWeather', ['clear', 'cloudy', 'rain', 'fog', 'snow', 'bloodrain', 'sandstorm'].map(k => [k, k]))} ${sel('dbFoe', foes)} ${sel('dbBeast', beasts)}`, {
       'Uhrzeit = Stunde': () => { S.minute = (+v('dbH') % 24) * 60; }, 'Tag': () => { S.minute = 12 * 60; }, 'Nacht': () => { S.minute = 23 * 60; }, 'Zeit +6 Stunden': () => passTime(360), 'Einen Tag vorspulen': () => passTime(1440),
       'Wetter setzen': () => { S.weather = v('dbWeather'); S.weatherLeft = 300; },
@@ -20587,7 +20583,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=26').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=27').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -20692,37 +20688,118 @@ function dbgRun(sec, label, fn) {
 }
 function dbgRecentDraw() {
   const box = $('dbg-recent'); if (!box) return; box.innerHTML = '';
-  for (const [sec, label] of dbgRecent()) { const b = document.createElement('button'); b.className = 'dbg-chip'; b.textContent = label; b.title = sec;
+  for (const [sec, label] of dbgRecent().slice(0, 6)) { const b = document.createElement('button'); b.className = 'dbg-chip'; b.textContent = label; b.title = sec;
     b.onclick = () => { const S0 = debugSections().find(s => s[0] === sec), fn = S0?.[2]?.[label]; if (fn) dbgRun(sec, label, fn); else UI.toast('Eintrag gibt es nicht mehr.'); }; box.appendChild(b); }
   if (!box.children.length) box.innerHTML = '<span class="dbg-hint">Noch nichts benutzt.</span>';
+}
+/* Debug-GUI 09.10. (Entwickler: „richtiges GUI dafür und bessere Einteilung von Waffen, Rüstung, Talismanen“): Gegenstands-Browser.
+   Kategorien mit Unterteilung (Waffenart, Rüstungsplatz, Verwendung), Seltenheit, Suche, Menge; Kachel = Bild, Name, Werte, Karte beim
+   Überfahren. Klick legt ins Gepäck, „Anlegen“ rüstet sofort aus. Vorher fehlten Talismane und Werkzeug ganz (Filter auf ring/amulet). */
+const DBG_WT = { sword: 'Schwerter', great: 'Zweihänder', axe: 'Äxte', mace: 'Streitkolben', hammer: 'Hämmer', spear: 'Speere', polearm: 'Stangenwaffen', dagger: 'Dolche', rapier: 'Rapiere', katana: 'Katanas',
+  whip: 'Peitschen', bow: 'Bögen', crossbow: 'Armbrüste', sling: 'Schleudern', throw: 'Wurfwaffen', staff: 'Stäbe', wand: 'Zauberstäbe' };
+const DBG_ARMOR = { head: 'Kopf', chest: 'Rumpf', legs: 'Beine', hands: 'Hände', feet: 'Füße', cloak: 'Umhang' };
+const DBG_USE = { heal: 'Heilung', bandage: 'Heilung', elixir: 'Elixiere', food: 'Essen & Trinken', water: 'Essen & Trinken', blood: 'Essen & Trinken', prosthesis: 'Bionik', eye: 'Bionik', mechmod: 'Bionik',
+  mechkit: 'Bionik', cell: 'Bionik', book: 'Bücher & Rezepte', recipe: 'Bücher & Rezepte' };
+const DBG_ICATS = [
+  ['Waffen', it => it.slot === 'weapon', it => DBG_WT[it.wtype] || 'Sonstige'],
+  ['Rüstung', it => it.slot in DBG_ARMOR, it => DBG_ARMOR[it.slot]],
+  ['Schilde', it => it.slot === 'offhand', null],
+  ['Talismane', it => it.slot === 'talisman', null],
+  ['Verbrauch', it => it.slot === 'consumable', it => DBG_USE[it.use] || 'Sonstiges'],
+  ['Material & Waren', it => it.slot === 'material', it => it.good ? 'Handelswaren' : it.res ? 'Baustoffe' : 'Material'],
+  ['Werkzeug', it => it.slot === 'tool', null],
+  ['Alle', () => true, null]];
+const DBG_RAR = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'], DBG_EQUIP = new Set(['weapon', 'offhand', 'head', 'chest', 'legs', 'hands', 'feet', 'cloak', 'talisman']);
+const dbgI = { cat: 'Waffen', sub: null, rar: new Set(), q: '', n: 1 };   /* bleibt zwischen zwei Öffnungen stehen */
+const dbgStat = it => [it.dmg != null && `Schaden ${it.dmg}`, it.armor && `Rüstung ${it.armor}`, it.block && `Block ${Math.round(it.block * 100)} %`, it.heal && `Heilt ${it.heal}`, `${it.value ?? 0} Gold`].filter(Boolean).join(' · ');
+function dbgItemBrowser(host) {
+  host.innerHTML = `<div class="dbi-top"><div class="dbi-cats"></div><div class="dbi-subs"></div><div class="dbi-row"><input class="dbi-q" placeholder="Name oder Schlüssel …" autocomplete="off">
+    <span class="dbi-rars"></span><label class="dbi-n">Menge <select>${[1, 5, 20].map(n => `<option${n === dbgI.n ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div></div>
+    <div class="dbi-grid"></div><div class="dbi-foot">Klick = ins Gepäck · „Anlegen“ = sofort ausrüsten · Maus drüber = Gegenstandskarte</div>`;
+  const $q = host.querySelector('.dbi-q'), grid = host.querySelector('.dbi-grid'), cat = () => DBG_ICATS.find(c => c[0] === dbgI.cat) || DBG_ICATS[0];
+  const pool = () => Object.entries(ITEMS).filter(([, it]) => cat()[1](it));
+  const draw = () => {
+    host.querySelector('.dbi-cats').innerHTML = DBG_ICATS.map(([n, f]) => `<button class="dbi-chip${n === dbgI.cat ? ' on' : ''}" data-cat="${n}">${n} <small>${Object.values(ITEMS).filter(f).length}</small></button>`).join('');
+    const sf = cat()[2], subs = sf ? [...new Set(pool().map(([, it]) => sf(it)))].sort((a, b) => a.localeCompare(b)) : [];
+    if (dbgI.sub && !subs.includes(dbgI.sub)) dbgI.sub = null;
+    host.querySelector('.dbi-subs').innerHTML = subs.length > 1 ? [`<button class="dbi-chip sm${!dbgI.sub ? ' on' : ''}" data-sub="">Alle</button>`, ...subs.map(s => `<button class="dbi-chip sm${s === dbgI.sub ? ' on' : ''}" data-sub="${s}">${s} <small>${pool().filter(([, it]) => sf(it) === s).length}</small></button>`)].join('') : '';
+    host.querySelector('.dbi-rars').innerHTML = DBG_RAR.map(r => `<button class="dbi-chip sm r-${r}${dbgI.rar.has(r) ? ' on' : ''}" data-rar="${r}">${RARITY[r] || r}</button>`).join('');
+    const q = dbgI.q.toLowerCase(), L = pool().filter(([k, it]) => (!dbgI.sub || sf?.(it) === dbgI.sub) && (!dbgI.rar.size || dbgI.rar.has(it.rarity || 'common')) && (!q || k.toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q)))
+      .sort((a, b) => DBG_RAR.indexOf(a[1].rarity || 'common') - DBG_RAR.indexOf(b[1].rarity || 'common') || a[1].name.localeCompare(b[1].name));
+    grid.innerHTML = L.length ? L.map(([k, it]) => `<div class="dbi-tile r-${it.rarity || 'common'}" data-k="${k}" data-card="1"><canvas data-ico="${k}" width="32" height="32"></canvas><div class="dbi-txt"><b class="r-${it.rarity || 'common'}">${it.name}</b><span>${dbgStat(it)}</span><i>${k}</i></div>${DBG_EQUIP.has(it.slot) ? '<button class="dbi-eq">Anlegen</button>' : ''}</div>`).join('') : '<div class="dbg-hint">Nichts gefunden.</div>';
+    for (const t of grid.children) if (t.dataset.k) t._card = () => UI.itemCardHTML(mkItem(t.dataset.k), { short: true });
+    UI.paintItemIcons?.(grid);
+  };
+  host.onclick = e => {
+    const b = e.target.closest('button'), t = e.target.closest('.dbi-tile'), p = S.player;
+    if (b?.dataset.cat) { dbgI.cat = b.dataset.cat; dbgI.sub = null; return draw(); }
+    if (b?.dataset.sub != null) { dbgI.sub = b.dataset.sub || null; return draw(); }
+    if (b?.dataset.rar) { dbgI.rar.has(b.dataset.rar) ? dbgI.rar.delete(b.dataset.rar) : dbgI.rar.add(b.dataset.rar); return draw(); }
+    if (!t) return; const k = t.dataset.k, nm = ITEMS[k].name;
+    if (b?.classList.contains('dbi-eq')) { p.inv.push(mkItem(k)); equip(p, p.inv.length - 1); recalc(p); UI.refreshHUD?.(); return UI.toast(`Angelegt: ${nm}`, 1400); }
+    const n = dbgI.n; for (let i = 0; i < n; i++) if (!addItem(p, k)) { dropItemAt(p.map, p.x, p.y + 12, mkItem(k)); }
+    UI.refreshHUD?.(); UI.toast(`${n > 1 ? n + '× ' : ''}${nm} ins Gepäck`, 1200);
+  };
+  $q.value = dbgI.q; $q.oninput = () => { dbgI.q = $q.value; draw(); }; $q.onkeydown = e => e.stopPropagation();
+  host.querySelector('.dbi-n select').onchange = e => { dbgI.n = +e.target.value; };
+  draw();
+}
+/* Präfix-Gruppen in einer Karte: „Siedlung: Überfall jetzt“, „Siedlung: Moral −20“ … stehen unter einer Zwischenzeile „Siedlung“ und zeigen nur den Rest */
+function dbgPrefixGroups(grid) {
+  const bs = [...grid.children].filter(b => b.classList?.contains('dbg-btn')), pre = b => /^([^:]{2,34}):\s+(.+)$/.exec(b.dataset.label || '');
+  const cnt = {}; for (const b of bs) { const m = pre(b); if (m) cnt[m[1]] = (cnt[m[1]] || 0) + 1; }
+  if (!Object.values(cnt).some(n => n >= 2)) return;
+  const solo = bs.filter(b => !(pre(b) && cnt[pre(b)[1]] >= 2)), heads = [...new Set(bs.map(b => pre(b)?.[1]).filter(h => cnt[h] >= 2))];
+  grid.innerHTML = ''; for (const b of solo) grid.appendChild(b);
+  for (const h of heads) { const d = document.createElement('div'); d.className = 'dbg-sub'; d.textContent = h; grid.appendChild(d);
+    for (const b of bs) { const m = pre(b); if (m && m[1] === h) { b.textContent = m[2]; grid.appendChild(b); } } }
+}
+const dbgFavs = () => { try { return JSON.parse(localStorage.getItem('rotfall.dbg.fav') || '[]'); } catch (e) { return []; } };
+function dbgFavToggle(sec, label) {
+  const F = dbgFavs(), i = F.findIndex(f => f[0] === sec && f[1] === label); if (i >= 0) F.splice(i, 1); else F.push([sec, label]);
+  try { localStorage.setItem('rotfall.dbg.fav', JSON.stringify(F.slice(-24))); } catch (e) { /* privat: ohne Favoriten */ }
+  UI.toast(i >= 0 ? `Favorit entfernt: ${label}` : `★ Favorit: ${label}`, 1400); dbgFavDraw();
+}
+function dbgFavDraw() {
+  const box = $('dbg-fav'); if (!box) return; box.innerHTML = '';
+  for (const [sec, label] of dbgFavs()) { const b = document.createElement('button'); b.className = 'dbg-chip fav'; b.textContent = '★ ' + label; b.title = sec + ' — Rechtsklick entfernt';
+    b.onclick = () => { const S0 = debugSections().find(s => s[0] === sec), fn = S0?.[2]?.[label]; if (fn) dbgRun(sec, label, fn); else UI.toast('Eintrag gibt es nicht mehr.'); };
+    b.oncontextmenu = e => { e.preventDefault(); dbgFavToggle(sec, label); }; box.appendChild(b); }
+  if (!box.children.length) box.innerHTML = '<span class="dbg-hint">Rechtsklick auf einen Eintrag macht ihn zum Favoriten.</span>';
 }
 function toggleDebug() {
   let d = $('debugpanel');
   if (d) { d.remove(); return; }
   d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel dbg-gui';
-  const secs = debugSections(), used = new Set(secs.map(s => dbgGroup(s[0]))), groups = [...DBG_GROUPS.map(g => g[0]), 'Sonstiges'].filter(g => used.has(g)), n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
-  d.innerHTML = `<div class="dbg-head"><span class="panel-title">DEBUG</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen … (z. B. „Kult“, „Teleport“, „Siedlung“)" autocomplete="off"><button id="dbg-close" title="Schließen (Strg+Umschalt+D)">✕</button></div>
-    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"></div></div><div class="dbg-foot"><b>Zuletzt:</b> <span id="dbg-recent"></span></div>`;
+  const secs = debugSections(), used = new Set(secs.map(s => dbgGroup(s[0]))), groups = ['Gegenstände', ...[...DBG_GROUPS.map(g => g[0]), 'Sonstiges'].filter(g => used.has(g))], n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
+  d.innerHTML = `<div class="dbg-head"><span class="panel-title">DEBUG</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen … (Rechtsklick = Favorit)" autocomplete="off"><button id="dbg-close" title="Schließen (Strg+Umschalt+D)">✕</button></div>
+    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"></div><div id="dbg-items"></div></div><div class="dbg-foot"><b>★</b> <span id="dbg-fav"></span></div><div class="dbg-foot"><b>Zuletzt:</b> <span id="dbg-recent"></span></div>`;
   document.body.appendChild(d);
   const nav = $('dbg-nav'), main = $('dbg-main'), cards = [];
   const mk = (title, html, group) => { const sec = document.createElement('section'); sec.className = 'dbg-card'; sec.dataset.group = group;
-    sec.innerHTML = `<h4>${title}</h4>${html ? `<div class="dbg-in">${html}</div>` : ''}<div class="dbg-grid"></div>`; main.appendChild(sec); cards.push(sec); return sec.querySelector('.dbg-grid'); };
+    sec.innerHTML = `<h4 title="Klick klappt ein/aus">${title}<small></small></h4>${html ? `<div class="dbg-in">${html}</div>` : ''}<div class="dbg-grid"></div>`; main.appendChild(sec); cards.push(sec);
+    sec.querySelector('h4').onclick = () => sec.classList.toggle('shut'); return sec.querySelector('.dbg-grid'); };
   const moved = new Map();
   for (const [title, html, acts] of secs) {
     const grid = mk(title, html, dbgGroup(title));
-    for (const [label, fn] of Object.entries(acts)) { const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.dataset.q = label.toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
+    for (const [label, fn] of Object.entries(acts)) { const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.title = label; b.dataset.label = label; b.dataset.q = label.toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
+      b.oncontextmenu = e => { e.preventDefault(); dbgFavToggle(title, label); };
       const M = DBG_MOVE.find(([re]) => re.test(label)); if (M) { if (!moved.has(M[1])) moved.set(M[1], mk(M[1], '', M[2])); moved.get(M[1]).appendChild(b); } else grid.appendChild(b); }
   }
   for (const c of [...cards]) if (!c.querySelector('.dbg-btn') && !c.querySelector('.dbg-in')) { c.remove(); cards.splice(cards.indexOf(c), 1); }
+  for (const c of cards) { dbgPrefixGroups(c.querySelector('.dbg-grid')); c.querySelector('h4 small').textContent = ` ${c.querySelectorAll('.dbg-btn').length}`; }
+  const items = $('dbg-items'); dbgItemBrowser(items);
   let cur = (() => { try { return localStorage.getItem('rotfall.dbg.group'); } catch (e) { return null; } })(); if (!groups.includes(cur)) cur = groups[0];
   const show = () => { const q = $('dbg-search').value.trim().toLowerCase();
     for (const c of cards) { let hits = 0; for (const b of c.querySelectorAll('.dbg-btn')) { const ok = !q || b.dataset.q.includes(q); b.style.display = ok ? '' : 'none'; if (ok) hits++; }
-      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; }
+      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; if (q) c.classList.remove('shut');
+      for (const s of c.querySelectorAll('.dbg-sub')) { let n2 = s.nextElementSibling, any = false; while (n2 && !n2.classList.contains('dbg-sub')) { if (n2.style.display !== 'none') any = true; n2 = n2.nextElementSibling; } s.style.display = any ? '' : 'none'; } }
+    const iv = !q && cur === 'Gegenstände'; items.style.display = iv ? '' : 'none'; main.style.display = iv ? 'none' : '';
     for (const b of nav.children) b.classList.toggle('on', !q && b.dataset.g === cur); };
-  for (const g of groups) { const b = document.createElement('button'); b.dataset.g = g; b.textContent = `${g} (${cards.filter(c => c.dataset.group === g).length})`;
+  for (const g of groups) { const b = document.createElement('button'); b.dataset.g = g; b.textContent = g === 'Gegenstände' ? `${g} (${Object.keys(ITEMS).length})` : `${g} (${cards.filter(c => c.dataset.group === g).reduce((a, c) => a + c.querySelectorAll('.dbg-btn').length, 0)})`;
     b.onclick = () => { cur = g; $('dbg-search').value = ''; try { localStorage.setItem('rotfall.dbg.group', g); } catch (e) { /* ohne Merken */ } show(); main.scrollTop = 0; }; nav.appendChild(b); }
   $('dbg-search').oninput = show; $('dbg-search').onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') toggleDebug(); };
-  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); show(); $('dbg-search').focus();
+  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); dbgFavDraw(); show(); $('dbg-search').focus();
   for (const el of d.querySelectorAll('input,select')) if (el.id !== 'dbg-search') el.addEventListener('keydown', e => e.stopPropagation());
 }
 function toggleDebugOld() {
@@ -21535,10 +21612,11 @@ export function selftest() {
       return r0 && r1 && p1 < p0 && noAuto && g;
     } finally { Object.assign(S.ranks, keep.r); Object.assign(S.factions, keep.f); S.flags = keep.fl; S.legend = keep.lg; S.player.titles = keep.t; S.permit = keep.permit; }
   }));
-  ok('Phase 3 Debug (MP2 §70–§73): Bereiche mit Dropdowns für Städte, NPCs, Waffen, Rüstungen, Gegner, Aufträge; Noclip, Tempo, Gottmodus wirken; ganze Welt enthüllt die Karte', sandbox(() => {
+  ok('Phase 3 Debug (MP2 §70–§73): Bereiche mit Dropdowns für Städte, NPCs, Gegner, Aufträge, Gegenstands-Browser mit Kategorie für jeden Gegenstand; Noclip, Tempo, Gottmodus wirken; ganze Welt enthüllt die Karte', sandbox(() => {
     const secs = debugSections(), titles = secs.map(s => s[0]);
-    const need = ['Bewegung', 'Spieler', 'Gegenstände', 'Welt', 'Aufträge', 'Ereignisse'].every(t => titles.includes(t));
-    const html = secs.map(s => s[1]).join(''), drops = ['dbTown', 'dbNpc', 'dbW', 'dbA', 'dbFoe', 'dbQ', 'dbFac'].every(id => html.includes(`id="${id}"`));
+    const need = ['Bewegung', 'Spieler', 'Welt', 'Aufträge', 'Ereignisse'].every(t => titles.includes(t));
+    const html = secs.map(s => s[1]).join(''), drops = ['dbTown', 'dbNpc', 'dbFoe', 'dbQ', 'dbFac'].every(id => html.includes(`id="${id}"`))
+      && Object.values(ITEMS).every(it => DBG_ICATS.slice(0, -1).some(c => c[1](it)));   /* 09.10.: Gegenstands-Browser — jeder Gegenstand (auch Talismane, Werkzeug) hat eine Kategorie */
     const p = stage(); const keep = S.dbg; S.dbg = { speed: 4 }; const s4 = speedOf(p); S.dbg = {}; const s1 = speedOf(p);
     MAPS.__a.tiles[10 * 40 + 11] = T.WALL; p.x = 10 * TS + 16; p.y = 10 * TS + 16; S.dbg = { noclip: true }; for (let i = 0; i < 20; i++) moveEnt(p, 4, 0); const through = p.x > 12 * TS;
     S.dbg = { god: true }; const hp = p.hp; hurt(p, 50, null, 'Test'); const god = p.hp === hp; S.dbg = { reveal: true }; const rev = explored(1, 1); S.dbg = keep;
@@ -26690,6 +26768,7 @@ export function selftest() {
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
   S._quiet = quiet0; UI.questSnap?.();   /* Q-1: Zustandswechsel aus Proben lösen keine Briefe aus */
+  UI.refreshHUD?.();   /* 09.10.: sonst zeigt die Leiste noch den Probe-Helden und Probe-Aufträge */
   console.log('%cROTFALL Selbsttest', 'color:#bd9433', '\n' + out.join('\n'));
   UI.toast(out.every(l => l.startsWith('PASS')) ? `Selbsttest: ${out.length}/${out.length} bestanden` : 'Selbsttest: Fehler — siehe Konsole', 5000);
   return out;
@@ -26879,7 +26958,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=26').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=27').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -26942,7 +27021,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=26').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=27').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -26953,7 +27032,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=26').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=27').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
