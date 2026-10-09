@@ -6607,7 +6607,7 @@ function interactables() {
   return nearEnts(p.x, p.y, 62).filter(e => e !== p && Math.abs(e.x - p.x) < 62 && Math.abs(e.y - p.y) < 62 && dist(e, p) < 62 &&   /* PERF-S: billige Vorprüfung vor hypot (17 000 Einträge, alle 180 ms) */
     (e.kind === 'npc' || e.kind === 'item' || e.kind === 'grave' || (e.kind === 'mount' && !p.mounted && !e.decor) || (e.kind === 'enemy' && e.parley && e.alive && teamOf(e) === 'neutral') || (e.kind === 'enemy' && (takeable(e) || e.prisoner?.by === p.id)) ||
      (e.kind === 'building' && e.built >= 1 && BUILD_USE[e.type]) ||   // AUDIT S-01
-     (e.kind === 'prop' && (e.feast || e.teach || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate' || e.secret || e.runeStone != null || (e.dartTrap && e.dartSeen)))))   /* Geheime Orte (alle Props mit secret), P3.x Gewölbe: Runensteine, erkannte Pfeilfallen */
+     (e.kind === 'prop' && (e.feast || e.teach || e.fireSpot || e.campSupply || e.bond || (e.cellDoor != null && S.jail) || e.raskChest || e.tentLoot || e.mechBench || (e.fortGate && S.ranks.chain >= 0) || e.portal || e.harvest || e.loot || e.claim || e.rite || furnAct(e) || e.omegaAltar || (e.penGate && !S.flags.chainsBroken) || (e.soulJar && !S.flags.soulsFreed) || e.type === 'tree' || e.type === 'shrine' || e.type === 'board' || e.type === 'chest' || e.type === 'crate' || e.secret || e.runeStone != null || (e.dartTrap && e.dartSeen)))))   /* Geheime Orte (alle Props mit secret), P3.x Gewölbe: Runensteine, erkannte Pfeilfallen */
     .sort((a, b) => score(a) - score(b));
   // Personen vor Dingen, Figuren mit Namen vor Bewohnern, und wohin der Spieler zielt (Maus) zählt stark — BUG-080: sonst gewann
   // immer das Nächste, und Brann hinter einer Magd oder einem Kräuterbusch war nicht ansprechbar
@@ -6632,6 +6632,7 @@ function updatePrompt() {
     t.harvest === 'stone' ? `<b>E</b> Stein brechen` :
     t.harvest === 'iron' ? `<b>E</b> Erz abbauen` :
     t.claim ? `<b>E</b> Ort beanspruchen` :
+    t.tentLoot ? `<b>E</b> Beute stehlen (nur nachts und ungesehen)` :
     t.rite ? `<b>E</b> ${t.label} untersuchen` :
     t.type === 'shrine' ? `<b>E</b> Beten` :
     t.omegaAltar ? (S.quests.q_omega?.state === 'active' ? '<b>E</b> Ritual am Altar' : '<b>E</b> Zu Omega beten (10 Gold)') :
@@ -6996,7 +6997,8 @@ function doInteract(target = null) {
     return;
   }
   if (t.type === 'board') return boardMenu(boardTown(t));             // Phase 2: Aufträge annehmen und abgeben
-  if (t.bandLoot && !t.opened) return bandLootOpen(t);               /* E2 */
+  if (t.tentLoot) return tentSteal(t);                               /* T21-2 / E51: Bandenbeute im Zelt */
+  if (t.bandLoot && !t.opened) return bandLootOpen(t);               /* E2*/
   if ((t.type === 'crate' || t.type === 'chest') && !t.opened) {
     t.opened = true;
     const k = pick(['bread', 'bandage', 'herb', 'wood', 'stone']);
@@ -7661,6 +7663,42 @@ function ensureAurelGlow() {
     for (const b of HOUSES) if (b.map === 'world' && b.type === 'factoryhall' && b.x >= x0 - 30 && b.x <= x1 + 30 && b.y >= y0 - 30 && b.y <= y1 + 30) {
       put('chimney', b.x + 2, b.y - 2, 'Schlot der Werkhalle', 32); put('chimney', b.x + b.w - 3, b.y - 2, 'Schlot der Werkhalle', 32); put('crane', b.x + b.w + 2, b.y + b.h - 1, 'Lastkran', 32); }
   }
+}
+/* E49 Aurelion nach Wohlstand (Entwickler 09.10., Fragerunde 2: „soll stärker wirken — auch Wachen, Preise und Automaten-Streifen“). Stufe aus T23
+   (SIM.resStageOf('aurel'): 0 Hunger < 4 Tage, 2 Wohlstand ≥ 12). Hunger: je Stadt des Hochreichs gehen die zwei Automaten am Platz zur Wartung in die
+   Werkhalle (S.aurelParked, gespeichert; sie kehren zurück, sobald es wieder reicht). Wohlstand: zwei Automaten mehr an den Toren (flüchtig, Stufe
+   extraLvl). Sichtweite der Wachen, Ladenpreise (resPriceMul) und die tägliche Automaten-Streife zwischen den Städten (Tageshash, kein rnd) nach Stufe.
+   Zahlen in FAC_RES.aurel ⚖. Läuft aus aurelTick, handelt nur beim Stufen- oder Tageswechsel; nicht beim Koop-Gast. */
+const AW = { k: null };
+const aurelStage = () => SIM.resStageOf('aurel');
+const aurelSight = () => FAC_RES.aurel.sight?.[aurelStage()] ?? 150;
+const aurelTowns = () => Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === 'aurel' && TOWN_PLAN[k].square && !heldBy(k) && !S.razed?.[k]);
+function aurelWealth(force = false) {
+  if (S.coop?.role === 'guest' || !S.ents?.world) return null; const st = aurelStage(), day = S.day | 0, k = st + ':' + day, run = force || AW.k !== k; const turned = run && AW.k != null && AW.k.split(':')[0] !== String(st); AW.k = k;
+  const F = FAC_RES.aurel, P = (S.aurelParked ||= {}); let parked = 0, back = 0, extra = 0;
+  if (run) for (const t of aurelTowns()) {
+    if (st === 0 && !(P[t]?.length)) { const [cx, cy] = TOWN_PLAN[t].square, G = S.ents.world.filter(e => e.robot && e.post === t && e.alive && !e.aurelExtra && !e.angry && !e.downed)
+        .sort((a, b) => Math.hypot(a.x / TS - cx, a.y / TS - cy) - Math.hypot(b.x / TS - cx, b.y / TS - cy) || (a.id < b.id ? -1 : 1)).slice(0, F.parkLow);
+      if (G.length) { const ids = new Set(G.map(e => e.id)); S.ents.world = S.ents.world.filter(e => !ids.has(e.id)); P[t] = G; parked += G.length; } }
+    if (st > 0 && P[t]?.length) { for (const e of P[t]) { if (e.anchor) { e.x = e.anchor.x; e.y = e.anchor.y; } e.vx = e.vy = 0; S.ents.world.push(e); } back += P[t].length; delete P[t]; }
+    const ex = S.ents.world.filter(e => e.aurelExtra === t);
+    if (st === 2 && !ex.length) { const [x0, , x1] = TOWN_PLAN[t].area, cy = TOWN_PLAN[t].square[1];
+      keepRng(() => { for (const [x, y] of [[x0 + 2, cy], [x1 - 2, cy]].slice(0, F.extraHigh)) { const g = guardChar('aurel', freeSpotNear('world', x, y, 2), null, F.extraLvl); Object.assign(g, { guard: true, post: t, aurelExtra: t, transient: true }); S.ents.world.push(g); extra++; } }); }
+    if (st < 2 && ex.length) S.ents.world = S.ents.world.filter(e => e.aurelExtra !== t || (e.angry && e.alive));
+  }
+  if (run) for (const t of Object.keys(P)) if (!aurelTowns().includes(t)) delete P[t];   /* Stadt besetzt oder zerstört: wer in der Werkhalle stand, kommt nicht wieder */
+  let patrol = null;
+  if ((S.flags.aurelPatrolDay ?? -1) !== day && SIM.resHash(49, 1000) < (F.patrol?.[st] || 0) * 1000) { S.flags.aurelPatrolDay = day;   /* Automaten-Streife zwischen zwei Städten des Hochreichs */
+    const T = aurelTowns().filter(k => !TOWN_PLAN[k].metro); if (T.length >= 2) { const a = T[SIM.resHash(50, T.length)], b = T.filter(k => k !== a)[SIM.resHash(51, T.length - 1)];
+      patrol = keepRng(() => spawnTraveler({ k: 'patrol', prof: 'Automaten-Streife', n: 3, w: 0, fac: 'aurel', speed: 1, greet: ['„REGISTRIERTE STRECKE NACH %. WEITERGEHEN.“', '„STREIFE DES HOCHREICHS. PAPIERE BEREITHALTEN.“'] }, a, b));
+      if (patrol === 'wait') { const i = TRAV_PEND.findIndex(q => q.K?.prof === 'Automaten-Streife'); if (i >= 0) TRAV_PEND.splice(i, 1); S.flags.aurelPatrolDay = -1; }   /* Weg wird noch gesucht: beim nächsten Takt wieder (nicht als Menschen-Streife nachreichen) */
+      if (patrol && typeof patrol === 'object') for (const c of S.ents.world.filter(e => e.id === patrol.id || e.travLead === patrol.id)) Object.assign(c, { robot: true, traits: ['gehorsam'], aurelPatrol: true, name: `Automat ${String.fromCharCode(65 + (c.id.length * 7) % 26)}-${10 + ((c.x | 0) + (c.y | 0)) % 90}` }); } }
+  if (!S._quiet && (turned || force)) {
+    if (parked) log(`Aurelion hungert: In den Städten des Hochreichs stehen ${parked} Automaten ohne Magitech in der Werkhalle. Die übrigen sehen schlechter, die Läden verlangen mehr.`, 'faction');
+    if (back) log(`Aurelions Werke laufen wieder: ${back} Automaten kehren auf ihre Posten zurück.`, 'faction');
+    if (extra) log(`Aurelion schwimmt in Wohlstand: ${extra} Automaten mehr stehen an den Toren, die Läden geben nach, Automaten-Streifen ziehen über die Straßen.`, 'faction');
+  }
+  return { st, parked, back, extra, patrol: patrol && typeof patrol === 'object' ? patrol.id : null };
 }
 // ================= Tribut der Eisernen Kette (Session 12) =================
 // Alle 5 Tage nimmt die Kette jedem Tributdorf einen Teil seines Vorrats (0–100) und lässt ihn als Tributzug zur Feste tragen:
@@ -8463,7 +8501,7 @@ function aurelWatch(e, dt) {
   e.cone = illegal && dist(e, p) < 700 ? 1 : 0;
   if (!illegal || e.angry || UI.dialogueOpen()) return false;   // S15: kein Anhalten mitten im Gespräch
   if (!(e.vx || e.vy)) { e.baseAim ??= e.aim || 0; e.scan = (e.scan ?? (e.seed || 0)) + dt * 0.0009; e.aim = e.baseAim + Math.sin(e.scan) * 1.3; }
-  if (!coneSees(e, p)) return false;
+  if (!coneSees(e, p, aurelSight())) return false;   /* E49: Sichtweite nach Wohlstand ⚖ */
   e.cone = 2; if ((S.aurelStop || 0) > clock()) return false;
   S.aurelStop = clock() + 20; e.vx = e.vy = 0; e.aim = Math.atan2(p.y - e.y, p.x - e.x); robotStop(e); return true;
 }
@@ -8710,7 +8748,7 @@ function ensureRefugees() {
       Object.assign(c, { refugee: true, visitor: true, transient: true, anchor: { x: q.x, y: q.y }, greet: pick(['„Drei Tage warten wir schon. Sie lassen nur rein, wer zahlt.“', '„Die Feste ist gefallen. Wohin sollen wir denn noch?“', '„Die Automaten sehen durch uns hindurch.“']) }); S.ents.world.push(c); } }
   log('Vor den Toren Aurelions stauen sich die Flüchtlinge. Das Hochreich macht die Tore enger.', 'world');
 }
-function aurelTick() { bondTick(); intrigueTick(); ensureRefugees(); huntTick(); ensureSaltportContacts(); }
+function aurelTick() { bondTick(); intrigueTick(); ensureRefugees(); huntTick(); ensureSaltportContacts(); aurelWealth(); }
 function aurelDay() {
   if (S.aurelJob && S.aurelJob.until >= (S.day | 0)) { S.gold += S.aurelJob.pay; S.houses[S.aurelJob.house] = favor(S.aurelJob.house) + 2; log(`Lohn von ${(AUREL_HOUSES.find(h => h.key === S.aurelJob.house)?.name || 'ein Haus')}: ${S.aurelJob.pay} Gold.`, 'economy'); }
   if (S.flags.marriedHouse) { S.gold += 25; }
@@ -9261,6 +9299,7 @@ function claimContract(C, npc) {
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
   if (C.kind === 'escort' && townFac(C.town) === 'wuest' && (S.ranks.wuest ?? -1) >= 1 && !C.wuestBonus) { C.wuestBonus = true; C.reward = { ...C.reward, gold: Math.round(C.reward.gold * WUEST_ESCORT) }; log(`Der Wüstenbund zahlt seinen Karawanenwächtern mehr: +${Math.round((WUEST_ESCORT - 1) * 100)} %.`, 'quest'); }   /* Fragemenü 03.10.: Rangvorteil */
   if (conFac(C) === 'undead') (S.flags.deadTrial ||= {}).jobs = (S.flags.deadTrial.jobs || 0) + 1;   /* E40 S4: Rangprüfung der Stillen zählt Aufträge der Toten */
+  if (C.shunRoute) shunEscortDone(C);   /* N1-Rest: Geleit für die gemiedene Strecke */
   C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && conFac(C) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = conFac(C); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = CON[C.kind]?.steps ? conProg(C) : [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
@@ -9545,7 +9584,7 @@ function conChoices(npc, choices) {
   const town = npc.homeTown, kind = PROF_CON[npc.prof];
   if (npc.contract) { const C = (S.contracts || []).find(c => c.id === npc.contract);           // Vermisste: heimschicken
     if (C?.kind === 'missing' && C.state === 'active' && S.ents.world.some(e => e.contract === C.id && e.kind === 'enemy' && e.alive)) choices.unshift({ text: 'Geh heim.', fn: () => UI.dialogue(npc, '„Nicht solange die da draußen sind! Die schneiden mich ab!“', [{ text: 'Weiter', fn: () => UI.closeDialogue() }]) });
-    else if (C?.kind === 'missing' && C.state === 'active') choices.unshift({ text: 'Geh heim. Der Weg ist frei.', fn: () => { S.ents.world = S.ents.world.filter(e => e !== npc); conProgress(C); UI.closeDialogue(); if (C.bandRef) caravanLootQuest(C); } });   /* E2 */
+    else if (C?.kind === 'missing' && C.state === 'active') choices.unshift({ text: 'Geh heim. Der Weg ist frei.', fn: () => { S.ents.world = S.ents.world.filter(e => e !== npc); conProgress(C); UI.closeDialogue(); if (C.coach) coachHome();   /* N1-Rest: Kutscher retten */ if (C.bandRef) caravanLootQuest(C); } });   /* E2 */
     return; }
   S.contracts ||= [];
   let C = S.contracts.find(c => c.giver === npc.key && c.state !== 'claimed');
@@ -9688,7 +9727,7 @@ function caravanSurvivors(c, src) {
   const tx = c.x / TS | 0, ty = c.y / TS | 0, towns = Object.keys(TOWN_PLAN).filter(k => !isVil(k) && S.war?.nodes?.[k]?.owner !== 'undead' && k !== 'vharnholm');
   const town = towns.sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - tx, TOWN_PLAN[a].square[1] - ty) - Math.hypot(TOWN_PLAN[b].square[0] - tx, TOWN_PLAN[b].square[1] - ty))[0]; if (!town) return null;
   const C = makeContract(town, 'missing', 'board'), q = freeSpotNear('world', tx + ri(-12, 12), ty + ri(-12, 12), 4);
-  Object.assign(C, { x: q.x / TS | 0, y: q.y / TS | 0, name: `${pick(FIRST_M)} der Kutscher`, twist: chance(0.5) ? 'captive' : null, title: 'Überlebende der Karawane' });
+  Object.assign(C, { x: q.x / TS | 0, y: q.y / TS | 0, name: `${pick(FIRST_M)} der Kutscher`, twist: chance(0.5) ? 'captive' : null, title: 'Überlebende der Karawane', coach: true });
   C.desc = `Die Karawane wurde überfallen${band ? ` — von ${band.name}` : ''}. ${C.name} ist in die Büsche geflohen — irgendwo dort draußen, nahe der Straße. Bring ihn heim.${band ? ' Er hat gesehen, wohin die Räuber zogen.' : ''}`; C.reward.gold += 25; if (band) C.bandRef = band.id;
   (S.contracts ||= []).push(C); log(`Aushang in ${townName(town)}: Überlebende der Karawane gesucht.`, 'quest'); return C;
 }
@@ -15405,6 +15444,7 @@ function resPriceMul(key, isBuy, npc) {                              /* T23: Pre
   if (isBuy && npc.faction === 'merch') m *= 1 + (50 - SIM.facRes('merch')) / FAC_RES.merch.priceDiv;   /* S4: Läden der Gilde ±20 % nach Handelswert */
   if (!isBuy && R?.merch?.fairDay === day && ['eren', 'northcity'].includes(tk)) m *= FAC_RES.merch.fairMul;   /* S4: Messe — Verkauf +15 % für einen Tag */
   if (isBuy && R?.aurel?.festDay === day && npc.map === 'sky') m *= 0.9;   /* S4: Fest des Hohen Rats — Himmelsinsel −10 % */
+  if (tk && TOWN_PLAN[tk]?.lord === 'aurel' && townFac(tk) === 'aurel') m *= (isBuy ? FAC_RES.aurel.buyMul : FAC_RES.aurel.sellMul)?.[SIM.resStageOf('aurel')] ?? 1;   /* E49: Läden des Hochreichs nach Wohlstand ⚖ */
   return m;
 }
 const resFmt = (f, v) => f === 'order' ? String(Math.round(v * 2) / 2).replace('.', ',') : f === 'aurel' ? (v >= 99 ? '99+' : String(Math.round(v * 10) / 10).replace('.', ',')) : String(Math.round(v));
@@ -15440,7 +15480,10 @@ function facResDebug() {
     'Händler (S4): Messe jetzt (Wert 90, Agenda der Gilde)': () => { const R = SIM.facResState(); R.merch.v = 90; const d0 = S.day; S.day = (S.day | 0) - ((S.day | 0) % 5) + 2 + (S.day % 1); factionAgenda(); S.day = d0; UI.toast('Messe: Verkauf in Eren und Nordfurt +15 % (heute)', 3000); },
     'Aurelion (S4): Gesandter jetzt (kauft Nordfurts Korn)': () => { const n = aurelEnvoyBuy(); UI.toast(n ? `Aurelions Gesandter kauft ${n} Korn in Nordfurt` : 'Nordfurt hat kein Korn übrig (behält 8).', 3000); },
     'Aurelion (S4): Hunger (Nahrung des Hochreichs 0) + Agendatag': () => { for (const [k, t] of Object.entries(S.towns)) if (LOCATIONS.find(l => l.key === k)?.faction === 'aurel') { t.stock.grain = 0; t.stock.meat = 0; } SIM.facResDay(); const d0 = S.day; S.day = (S.day | 0) - ((S.day | 0) % 5) + 4 + (S.day % 1); factionAgenda(); S.day = d0; UI.toast(`Wohlstand ${resFmt('aurel', SIM.facRes('aurel'))} Tage · Zoll ×${(S.tollMul || 1).toFixed(2)}`, 4000); },
-    'Seevolk (S5): Prise jetzt (erzwingt den Tageshash)': () => { const R = SIM.facResState(), d0 = S.day; let d = S.day | 0; while (SIM.resHash(11, 1000) >= 100 && d < (d0 | 0) + 3000) S.day = ++d; const s0 = SIM.seaSalt(); seaPrizeDay(R, S.day | 0); S.day = d0; UI.toast(`Salz der Häfen ${Math.round(s0)} → ${Math.round(SIM.seaSalt())} · Prisen (10 Tage) ${R.sea.prizes.length}`, 4000); },
+    'Aurelion (E49): Stufe Hunger / normal / Wohlstand durchschalten und anwenden': () => { const R = SIM.facResState(), st = (aurelStage() + 1) % 3; R.aurel.v = [2, 8, 20][st]; R.aurel.stage = st; const r = aurelWealth(true);
+      UI.toast(`Wohlstand ${['Hunger', 'normal', 'Wohlstand'][st]}: abgezogen ${r?.parked || 0}, zurück ${r?.back || 0}, zusätzlich ${r?.extra || 0}, Sicht ${aurelSight()} px, Laden ×${FAC_RES.aurel.buyMul[st]}${r?.patrol ? ', Streife unterwegs' : ''}`, 4500); },
+    'Aurelion (E49): Lage der Automaten ins Log': () => log(`Aurelion Stufe ${aurelStage()}: ${aurelTowns().map(t => `${townName(t)} ${S.ents.world.filter(e => e.robot && e.post === t && e.alive).length} (+${S.ents.world.filter(e => e.aurelExtra === t).length}, Werkhalle ${S.aurelParked?.[t]?.length || 0})`).join(' · ')}; Streifen ${S.ents.world.filter(e => e.aurelPatrol && e.traveler).length}`, 'faction'),
+    'Seevolk (S5): Prise jetzt (erzwingt den Tageshash)':() => { const R = SIM.facResState(), d0 = S.day; let d = S.day | 0; while (SIM.resHash(11, 1000) >= 100 && d < (d0 | 0) + 3000) S.day = ++d; const s0 = SIM.seaSalt(); seaPrizeDay(R, S.day | 0); S.day = d0; UI.toast(`Salz der Häfen ${Math.round(s0)} → ${Math.round(SIM.seaSalt())} · Prisen (10 Tage) ${R.sea.prizes.length}`, 4000); },
     'Seevolk (S5): Salz knapp → Kopfgeld des Salzbunds': () => { const R = SIM.facResState(); for (const k of FAC_RES.sea.ports) if (S.towns[k]) S.towns[k].stock.salt = 3; SIM.facResDay(); R.sea.bountyWant = true; seaAgenda(); },
     'Seevolk (S5): drei Prisen → Hellas Mannschaft wächst': () => { const R = SIM.facResState(); R.sea.prizes = [S.day | 0, S.day | 0, S.day | 0]; R.sea.crewDay = -99; seaPrizeDay(R, S.day | 0); seaAgenda(); },
     'Goblins (S5): befreiten Goblin zum Hort schicken (+1)': () => { if (!S.flags.goblinsFreed) return UI.toast('Erst die Grubenstämme befreien (Fall der Eisenfeste).', 3000); freeCaptive({ goblin: true, name: 'Befreiter', kind: 'npc' }, 'freed'); UI.toast(`Grubenhort ${S.gobCity?.pts || 0} Punkte`, 2500); },
@@ -15829,7 +15872,7 @@ function raiseTent(e, kind, spot) {
   const dt = [x + (w >> 1), y + h - 1]; setTile('world', dt[0], dt[1], T.DIRT);
   const L = tentLoc(e), look = TENT_LOOK[kind], fac = kind === 'garrison' ? (L?.faction || (e.gateCamp && townFac(e.gateCamp)) || 'valen') : null;
   const b = { id, map: 'world', x, y, w, h, door: 'S', doorTile: dt, type: 'tent', town: null, wear: 0, seed: (x * 31 + y * 17) % 997 + 1, hx: x, hy: y, tentKind: kind,
-    cloth: look.cloth, stripe: look.stripe || (fac && FACTIONS[fac]?.colors?.[0]) || null, emblem: look.emblem || null, label: e.label || TENT_NAME[kind], where: L?.name || null };
+    cloth: look.cloth, stripe: look.stripe || (fac && FACTIONS[fac]?.colors?.[0]) || null, emblem: look.emblem || null, label: e.label || TENT_NAME[kind], where: L?.name || null, fac };
   HOUSES.push(b); const T0 = { b, prop: e, before, furn: [], key: null }; TENTS.set(id, T0);
   Object.defineProperty(e, '_tent', { value: id, writable: true, configurable: true, enumerable: false });
   if (e.solid) { if (solidIndex.world) removeSolid(e); e.solid = false; e.tentSolid = 1; }   /* das Prop steckt in der Zeltwand: dort fest zu sein wäre doppelt (Probe Weltmaßstab) */
@@ -15852,7 +15895,7 @@ function tentItems(T0) {                                             /* Bandenze
   if (mine !== T0) return [TENT_FURN.band, 'neben:' + B0.id];
   const n = Math.max(0, Math.floor(B0.loot || 0)), st = n < 1 ? 0 : n < TENT_LOOT[0] ? 1 : n < TENT_LOOT[1] ? 2 : 3, good = ITEMS[B0.good]?.name;
   const lab = st ? `Beute von ${B0.name}: ${n}${good ? ` (vor allem ${good})` : ''}` : `Beute von ${B0.name}: nichts — die Bande hungert`;
-  const items = [[st ? 'sack' : 'debris', lab], ...(st >= 2 ? [['barrel', `Beutefass von ${B0.name}`]] : []), ...(st >= 3 ? [['sack', `Beutesack von ${B0.name}`]] : []), ['sack', 'Strohlager']];
+  const items = [[st ? 'sack' : 'debris', lab, st ? { tentLoot: B0.id } : null], ...(st >= 2 ? [['barrel', `Beutefass von ${B0.name}`]] : []), ...(st >= 3 ? [['sack', `Beutesack von ${B0.name}`]] : []), ['sack', 'Strohlager']];
   return [items, `${B0.id}:${st}:${lab}`];
 }
 function tentFurnish(T0) {
@@ -15860,8 +15903,8 @@ function tentFurnish(T0) {
   if (T0.furn.length) { const gone = new Set(T0.furn); for (const o of T0.furn) if (o.solid && solidIndex.world) removeSolid(o); S.ents.world = S.ents.world.filter(o => !gone.has(o)); T0.furn = []; }
   const { b } = T0, { x, y, w, h } = b, mid = x + (w >> 1), slots = [], cap = Math.max(1, Math.floor((w - 2) * (h - 2) / 2) - 1); let solid = 0, k = 0;
   for (let j = y + 1; j <= y + h - 2; j++) for (let i = x + 1; i <= x + w - 2; i++) if (!(i === mid && j === y + h - 2)) slots.push([i, j]);   /* die Kachel hinter der Tür bleibt frei */
-  for (const [type, label] of items) { if (k >= slots.length) break; const so = !TENT_SOFT.has(type); if (so && solid >= cap) continue; const [i, j] = slots[k++]; if (so) solid++;
-    const pr = { id: uid(), kind: 'prop', type, map: 'world', x: i * TS + TS / 2, y: j * TS + TS / 2, r: 12, gen: 2, house: b.id, transient: true, solid: so, tentOf: b.id, label };
+  for (const [type, label, extra] of items) { if (k >= slots.length) break; const so = !TENT_SOFT.has(type); if (so && solid >= cap) continue; const [i, j] = slots[k++]; if (so) solid++;
+    const pr = { id: uid(), kind: 'prop', type, map: 'world', x: i * TS + TS / 2, y: j * TS + TS / 2, r: 12, gen: 2, house: b.id, transient: true, solid: so, tentOf: b.id, label, ...(extra || {}) };
     S.ents.world.push(pr); if (so && solidIndex.world) addSolid(pr); T0.furn.push(pr); }
 }
 function ensureTents() {                                             /* idempotent: beim Laden/Neustart und aus tentTick */
@@ -15874,7 +15917,68 @@ function ensureTents() {                                             /* idempote
   for (const T0 of TENTS.values()) if (T0.b.tentKind === 'band') tentFurnish(T0);
   return n;
 }
-function tentTick() { if (S.coop?.role !== 'guest') ensureTents(); }
+function tentTick() { if (S.coop?.role === 'guest') return; ensureTents(); tentPeople(); tentThiefTick(); }
+/* T21-1 (E51, Entwickler 09.10.): Leute in Zelten, flüchtig. Nachts (nightNow) liegt in jedem Lager-, Garnisons- und Pilgerzelt ein Schläfer auf dem
+   Schlaflager; eine Bande, die Schutzgeld bekommen hat, sitzt friedlich in ihren Zelten (so viele, wie Plätze frei sind, höchstens die Bande). Nur bis
+   TENT_NEAR Felder um den Helden ⚖, sonst und bei Tag (Schläfer) wieder fort. Keine Zufallszüge (keepRng). */
+const TENT_NEAR = 60, TENT_EYE = 200;
+const TENT_SLEEP = { camp: [['Lagerbewohner', 'Lagerbewohnerin'], '„Pst … lass mich schlafen.“'], garrison: [['Soldat', 'Soldatin'], '„Mmh … Wachwechsel? Noch nicht …“'], pilger: [['Pilger', 'Pilgerin'], '„Der Heilige wacht. Lass mich ruhen.“'] };
+function tentSeats(T0, beds = false) {                                /* freie Innenkacheln (nicht hinter der Tür); beds: zuerst die Schlaflager */
+  const { b } = T0, used = new Set(T0.furn.filter(o => o.solid || o.tentLoot).map(o => SK(o.x / TS | 0, o.y / TS | 0))), out = [], bed = T0.furn.filter(o => o.type === 'sack' && !o.tentLoot).map(o => [o.x / TS | 0, o.y / TS | 0]);
+  for (let j = b.y + 1; j <= b.y + b.h - 2; j++) for (let i = b.x + 1; i <= b.x + b.w - 2; i++) if (!(i === b.doorTile[0] && j === b.doorTile[1] - 1) && !used.has(SK(i, j))) out.push([i, j]);
+  return beds ? [...bed, ...out.filter(([i, j]) => !bed.some(([x, y]) => x === i && y === j))] : out;
+}
+function tentPeople() {
+  const p = S.player, here = !!p && (p.map || 'world') === 'world' && p.alive !== false, night = nightNow(), day = S.day | 0, have = new Map();
+  for (const e of S.ents.world) if (e.tentPerson) (have.get(e.tentPerson) || have.set(e.tentPerson, []).get(e.tentPerson)).push(e);
+  for (const [id, L] of have) if (!TENTS.has(id)) { const g = new Set(L); S.ents.world = S.ents.world.filter(e => !g.has(e)); have.delete(id); }
+  const want = new Map();
+  for (const T0 of TENTS.values()) {
+    const { b } = T0, near = here && Math.hypot(p.x / TS - (b.x + b.w / 2), p.y / TS - (b.y + b.h / 2)) < TENT_NEAR; if (!near) continue;
+    if (b.tentKind === 'band') { const B0 = tentBand(T0.prop); if (B0 && B0.paid >= day && B0.men > 0) want.set(b.id, { band: B0, seats: tentSeats(T0, true) }); }
+    else if (night && TENT_SLEEP[b.tentKind]) want.set(b.id, { seats: tentSeats(T0, true).slice(0, 1) });
+  }
+  const sitters = new Map();                                          /* je Bande höchstens so viele Sitzende wie Männer */
+  for (const [id, L] of have) { const w = want.get(id); if (w && (!w.band || w.band.id === L[0].bandId)) { if (w.band) sitters.set(w.band.id, (sitters.get(w.band.id) || 0) + L.length); continue; } const g = new Set(L); S.ents.world = S.ents.world.filter(e => !g.has(e)); have.delete(id); }
+  keepRng(() => { for (const [id, w] of want) { if (have.has(id)) continue; const b = TENTS.get(id).b;
+    for (const [i, j] of w.seats) {
+      if (w.band && (sitters.get(w.band.id) || 0) >= w.band.men) break;
+      const pos = { x: i * TS + TS / 2, y: j * TS + TS / 2, sit: true }, S2 = TENT_SLEEP[b.tentKind], fem = (i + j) % 3 === 0;
+      const c = makeChar({ name: pick(fem ? FIRST_F : FIRST_M), prof: w.band ? `Räuber (${w.band.name})` : (S2[0][fem ? 1 : 0]) + ' (schläft)', x: pos.x, y: pos.y, level: w.band ? 5 : 3, faction: w.band ? null : b.fac || null, traits: [w.band ? 'gierig' : 'vorsichtig'] });
+      Object.assign(c, { transient: true, visitor: true, tentPerson: id, anchor: pos, schedulePos: pos, sitting: true, sitDir: 'S', greet: w.band ? `„${w.band.name} haben ihr Geld. Geh weiter, solange das so bleibt.“` : S2[1], ...(w.band ? { bandId: w.band.id } : {}) });
+      S.ents.world.push(c); if (w.band) sitters.set(w.band.id, (sitters.get(w.band.id) || 0) + 1);
+    } } });
+}
+/* T21-2 (E51): Bandenbeute stehlen — nur nachts und ungesehen (kein Bandenmitglied mit freier Sicht im Umkreis TENT_EYE ⚖; die Zeltwand deckt). Beute: die
+   halbe Beute der Bande als Ware (b.good, sonst Korn ⚖). Die Bande merkt es: Schutzgeld verfällt, die Sitzenden verlassen die Zelte, b.loot sinkt, und
+   sobald du ihr Lager verlässt (10–45 Felder), fällt ein Hinterhalt über dich her (b.thief, 3 Tage ⚖). Wer gesehen wird, löst den Angriff sofort aus. */
+function tentSteal(t) {
+  const p = S.player, B0 = bandsOf().find(b => b.id === t.tentLoot); if (!B0) return UI.toast('Hier liegt nichts mehr — die Bande ist fort.');
+  const n = Math.floor((B0.loot || 0) / 2); if (n < 1) return UI.toast('Zu wenig da, um es zu stehlen.');
+  if (!nightNow()) return UI.toast('Am Tag sieht dich das ganze Lager. Komm in der Nacht wieder.', 2600);
+  const eyes = S.ents[p.map].filter(e => e.bandId === B0.id && e !== p && e.alive !== false && !e.downed && !e.tentPerson && (e.kind === 'enemy' || e.kind === 'npc') && dist(e, p) < TENT_EYE && clearLine(e, p));
+  B0.paid = -1; B0.thief = S.day | 0;
+  if (eyes.length) { for (const e of eyes) if (e.kind === 'enemy') { e.aggroId = p.id; e.aiState = 'pursue'; } log(`${eyes[0].name || 'Ein Räuber'} sieht dich an der Beute! ${B0.name} greifen an.`, 'combat'); UI.toast('ENTDECKT', 1800); tentAmbush(B0); return; }
+  const good = ITEMS[B0.good] ? B0.good : 'grain'; B0.loot = Math.max(0, (B0.loot || 0) - n);
+  if (!addItem(p, good, n)) dropItemAt(p.map, p.x, p.y + 12, mkItem(good, n)); onItemGained(good); ensureTents(); tentPeople();
+  log(`Du stiehlst ${ITEMS[good].name} ×${n} aus dem Zelt von ${B0.name}. Lange bleibt das nicht unbemerkt — wer ihr Lager verlässt, läuft in ihren Hinterhalt.`, 'quest'); UI.toast(`GESTOHLEN: ${ITEMS[good].name.toUpperCase()} ×${n}`, 2400);
+}
+function tentAmbush(B0) {
+  const p = S.player, n = Math.min(3, Math.max(0, B0.men || 0)); B0.thief = null; if (!n || (p.map || 'world') !== 'world') return 0; const a = rnd() * 6.283;
+  for (let i = 0; i < n; i++) { const e = spawnEnemy(pick(bandKinds(B0, true)), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
+    Object.assign(e, { bandId: B0.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: B0.tx * TS, y: B0.ty * TS } }); bandLook(e, B0); }
+  log(`Hinterhalt! ${B0.name} haben den Diebstahl bemerkt und holen sich ihre Beute zurück.`, 'combat'); UI.toast('HINTERHALT', 1800); return n;
+}
+/* N3-Rest (Spec npc_eigene_ziele §5.2): Deserteure kämpfen als Speerträger/Banditen (Valen) bzw. Banditen (Kette) und tragen Valen-Blau bzw. Kettenrot
+   (nur Aussehen, sprites.js monsterSpec liest e.deserter). Gleich viele Zufallszüge wie vorher (ein pick). */
+function bandKinds(b, amb = false) { return b?.origin === 'deserter' ? ['bandit_spear', 'bandit'] : b?.origin === 'chainDeserter' ? ['bandit'] : amb ? ['bandit', 'bandit_archer'] : ['bandit', 'bandit', 'bandit_archer', 'bandit_spear']; }
+function bandLook(e, b) { if (e && (b?.origin === 'deserter' || b?.origin === 'chainDeserter')) e.deserter = b.origin === 'deserter' ? 'valen' : 'chain'; return e; }
+const deserterOf = e => { const b = e?.bandId && (S.bands || []).find(x => x.id === e.bandId); return b?.origin === 'deserter' ? 'valen' : b?.origin === 'chainDeserter' ? 'chain' : e?.deserter || null; };
+function tentThiefTick() {
+  const p = S.player; if (!p || (p.map || 'world') !== 'world') return;
+  for (const B0 of bandsOf()) { if (B0.thief == null) continue; if ((S.day | 0) - B0.thief > 3) { B0.thief = null; continue; }
+    const d = Math.hypot(p.x / TS - B0.tx, p.y / TS - B0.ty); if (d >= 10 && d <= 45) tentAmbush(B0); }
+}
 function tentEnter(b) {                                              /* Hinweis beim ersten Betreten eines Zelts (Spec Welt §9) */
   if (!S.flags.tentHint && S.settings?.tips !== false && !S._quiet) { S.flags.tentHint = 1;
     log('Zelte betritt man wie Häuser: Das Tuch wird durchsichtig, solange du drinnen bist. In Räuberzelten liegt die Beute der Bande — der Haufen wächst mit jedem Überfall und schrumpft, wenn sie hungert.', 'quest'); }
@@ -15958,8 +16062,8 @@ function bandSpawn(b) {
   const q = freeSpotNear('world', b.tx - 11, b.ty, 2), n = makeChar({ name: pick(FIRST_M), prof: `Unterhändler (${b.name})`, x: q.x, y: q.y, level: 5, faction: null, traits: ['gierig'] });
   Object.assign(n, { bandId: b.id, bandTalk: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: `„Halt. Das ist Gebiet von ${b.name}. Wer hier durch will, zahlt.“` }); n.equip.weapon = mkItem('rusty_sword'); S.ents.world.push(n);
   if (b.paid >= day) return;                                  /* bezahlt: die Kämpfer bleiben in den Zelten */
-  for (let i = 0; i < b.men; i++) { const lead = i === 0 && !b.leadDead, e = spawnEnemy(lead ? 'bandit' : pick(['bandit', 'bandit', 'bandit_archer', 'bandit_spear']), 'world', b.tx + ri(-4, 4), b.ty + ri(-4, 4));
-    Object.assign(e, { bandId: b.id, transient: true, anchor: { x, y } });
+  for (let i = 0; i < b.men; i++) { const lead = i === 0 && !b.leadDead, e = spawnEnemy(lead ? 'bandit' : pick(bandKinds(b)), 'world', b.tx + ri(-4, 4), b.ty + ri(-4, 4));
+    Object.assign(e, { bandId: b.id, transient: true, anchor: { x, y } }); bandLook(e, b);
     if (lead) { Object.assign(e, { bandLead: true, elite: true, name: b.lead, title: b.lead }); e.maxHp = e.hp = Math.round(e.maxHp * 1.8); if (e.body) B.initBody(e, e.maxHp); } }
 }
 function bandTick() {
@@ -15971,8 +16075,8 @@ function bandTick() {
     if (d < 40 && d > 14 && b.paid < day && b.men > 0 && S.minute - b.amb > 180 && !townAt(p.x / TS | 0, p.y / TS | 0) && chance(styleOf() <= -40 ? 0.005 : 0.01)) {   /* T08: einen Schlächter meidet man */   /* Hinterhalt im Gebiet, nicht in der Stadt */
       const free = b.men - S.ents.world.filter(e => e.bandId === b.id && e.kind === 'enemy' && e.alive).length;   /* Fehlersuche: nie mehr Kämpfer stellen als die Bande noch hat (sonst wächst sie durchs Hin- und Herlaufen) */
       if (free > 0) { b.amb = S.minute; const a = rnd() * 6.283;
-        for (let i = 0; i < Math.min(3, free); i++) { const e = spawnEnemy(pick(['bandit', 'bandit_archer']), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
-          Object.assign(e, { bandId: b.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: b.tx * TS, y: b.ty * TS } }); }
+        for (let i = 0; i < Math.min(3, free); i++) { const e = spawnEnemy(pick(bandKinds(b, true)), 'world', (p.x / TS | 0) + Math.round(Math.cos(a) * 9) + ri(-2, 2), (p.y / TS | 0) + Math.round(Math.sin(a) * 9) + ri(-2, 2));
+          Object.assign(e, { bandId: b.id, transient: true, aggroId: p.id, aiState: 'pursue', anchor: { x: b.tx * TS, y: b.ty * TS } }); bandLook(e, b); }
         log(`Hinterhalt! Männer von ${b.name} — du bist in ihrem Gebiet und hast nicht gezahlt.`, 'combat'); UI.toast('HINTERHALT', 1800);
       }
     }
@@ -16369,6 +16473,7 @@ const WEATHER_TALK = { rain: ['„Dieser Regen hört nie auf.“'], snow: ['„S
 function worldTalk(npc) {
   const L = [], town = npc.homeTown || npc.post, p = S.player;
   L.push(faithLine(npc));   // Nutzer S13: über Omega reden viele — gläubig, fanatisch oder spöttisch
+  if (npc.guard && town && townFac(town) === 'valen' && (S.weary?.valen?.stage || 0) >= 1) L.push('„Die Hälfte meiner Rotte ist nachts gegangen. Wer bleibt, hält zwei Posten.“', '„Verlorene Schlachten, kein Korn im Lager — und oben wundert man sich, dass die Männer laufen.“');   /* N3-Rest (Spec §5.2): Wachen murren ab Müdigkeit 40 */
   if (S.hunt0) L.push(omegaStance(npc) === 'fanatic' ? '„Die Inquisition räuchert wieder aus. Gut.“' : '„Sie wollen wieder jemanden verbrennen. Im Westen. Für ein Auge.“');
   if (S.flags.chainsBroken) L.push('„Seit die Eisenfeste gefallen ist, kommen die Toten öfter. Wer hält sie jetzt auf?“');
   else L.push('„Die Eiserne Kette nimmt, was sie will. Aber sie hält die Toten im Osten.“');
@@ -17860,7 +17965,31 @@ function ecoPrices(npc, town) {
 function roadMenu(npc, town) {
   if (!S.flags.hintRoad) { S.flags.hintRoad = 1; log('Straßen haben Herren: Jede Gefahr auf einer Handelsstraße hat einen Grund — eine Bande nahe der Strecke, ein Ort der Toten am Weg, ein Totenheer am Ziel. Streifen und Aurelions Zölle machen Straßen sicherer. Schutzgeld an eine Bande deckt auch deinen Handelswagen, ein Umweg meidet alle Banden (+1 Tag).', 'quest'); }
   const L = ECO.routeLines(town);
-  UI.dialogue({ name: `Straßen ab ${ECO.townName(town)}` }, ([...ECO.routeNotes(town), ...L.map(r => r.txt)].join('\n') || 'Von hier fährt kein Händlerzug.') + '\n(Gefahr eines Überfalls je Fahrt, mit einer Wache.)', [{ text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+  UI.dialogue({ name: `Straßen ab ${ECO.townName(town)}` }, ([...ECO.routeNotes(town), ...L.map(r => r.txt)].join('\n') || 'Von hier fährt kein Händlerzug.') + '\n(Gefahr eines Überfalls je Fahrt, mit einer Wache.)', [...shunEscortChoices(npc, town), { text: 'Zurück', fn: () => ecoMenu(npc, town) }]);
+}
+/* N1-Rest (Spec npc_eigene_ziele §5.1, „Geleit“): Am Kontor einer gemiedenen Strecke bietet der Händler eine erste Fahrt mit Geleit an — ein Geleitauftrag
+   mit dem Ziel am anderen Ende der Strecke. Erfüllt: die Strecke ist nicht mehr gemieden, im Gedächtnis bleibt ein Überfall, Händler +2, und die Gilde zählt
+   die Fahrt als Ankunft (T23 ⚖). „Kutscher retten“ (coachHome): wer den Kutscher der verlorenen Großen Karawane heimbringt, nimmt der Alten Straße einen Überfall. */
+function shunEscortChoices(npc, town) {
+  const day = S.day | 0, out = [];
+  for (const [k, r] of Object.entries(S.eco?.routes || {})) { const [a, b] = k.split('|'); if ((a !== town && b !== town) || !(r.shunTill > day)) continue; const o = a === town ? b : a;
+    if (!TOWN_PLAN[o]?.square || (S.contracts || []).some(c => c.shunRoute === k && !['claimed', 'failed'].includes(c.state))) continue;
+    out.push({ text: `Geleit für die erste Fahrt nach ${ECO.townName(o)} (gemiedene Strecke)`, fn: () => { const C = makeContract(town, 'escort', 'board'), [tx, ty] = TOWN_PLAN[o].square;
+      Object.assign(C, { target: o, tx, ty, shunRoute: k, twist: null, title: `Erste Fahrt nach ${ECO.townName(o)}`, desc: `${r.by || `Die Händler von ${ECO.townName(town)}`} wagt wieder eine Fahrt nach ${ECO.townName(o)} — aber nur mit Geleit. Bring ${C.name}, den Fuhrmann, sicher hin. Kommt er an, fahren die Wagen wieder.` });
+      (S.contracts ||= []).push(C); if (acceptContract(C) === false) { S.contracts.pop(); return; } UI.closeDialogue(); log(`Auftrag: ${C.title}. ${C.name} wartet am Platz von ${ECO.townName(town)}.`, 'quest'); } });
+  }
+  return out;
+}
+function shunEscortDone(C) {
+  const r = S.eco?.routes?.[C.shunRoute]; if (!r) return false; const [a, b] = C.shunRoute.split('|');
+  r.shunTill = 0; r.hits = r.hits.slice(-1); addRep('merch', 2); ECO.merchAdd(FAC_RES.merch.arrive);
+  log(`Der Wagen ist durchgekommen. ${r.by || 'Die Händler'} lässt wieder fahren — die Straße zwischen ${ECO.townName(a)} und ${ECO.townName(b)} ist nicht mehr gemieden. (Händler +2)`, 'economy'); return true;
+}
+function coachHome() {
+  const r = ECO.routeOf('eren', 'northcity'); if (!r?.hits?.length) return false; const day = S.day | 0, M = ECO.ROUTE_MEM;
+  r.hits = r.hits.slice(0, -1); const n = d => r.hits.filter(x => day - x < d).length;
+  if (r.shunTill > day && n(M.win) < M.shunHits) r.shunTill = 0; if (r.detourTill > day && n(M.detourWin) < M.detourHits) r.detourTill = 0;
+  log(`Der Kutscher lebt. ${r.by || 'Die Händler'} wagt es noch einmal auf der Alten Straße.`, 'economy'); return true;
 }
 function wagonMenu(npc, town) {
   const back = () => wagonMenu(npc, town), me = { name: 'Dein Handelswagen' }, E = S.eco;
@@ -19012,13 +19141,14 @@ function captiveMenu(e) {
   ch.push({ text: 'Laufen lassen', fn: () => { UI.closeDialogue(); Object.assign(e, { prisoner: null, fleeing: true, surrendered: true, transient: true, letGo: true, anchor: { x: e.x, y: e.y } }); styleAct(4, 'Gnade', e); captiveLetGo(e); log(`${nm} rennt, ohne sich umzusehen.`, 'combat'); } });
   ch.push({ text: 'Hinrichten', fn: () => { UI.closeDialogue(); e.surrendered = false; e.prisoner = null; for (const m of partyMembers()) if (!(m.traits || []).includes('grausam')) m.morale -= 3; styleAct(-6, 'Hinrichtung', e); die(e, 'hingerichtet', p); } });
   ch.push({ text: '[Lassen]', fn: () => UI.closeDialogue() });
-  UI.dialogue(e, bound ? `${nm} hängt am Strick und schaut zu Boden.${C ? ' (Steckbrief: lebend bei einer Wache abliefern, +50 %.)' : ''}` : `${nm} liegt vor dir${e.downed ? ', bewusstlos' : ' und hebt die Hände'}.${C ? ' Das ist der Gesuchte vom Steckbrief.' : ''}`, ch);
+  UI.dialogue(e, bound ? `${nm} hängt am Strick und schaut zu Boden.${C ? ' (Steckbrief: lebend bei einer Wache abliefern, +50 %.)' : ''}` : `${nm} liegt vor dir${e.downed ? ', bewusstlos' : ' und hebt die Hände'}.${C ? ' Das ist der Gesuchte vom Steckbrief.' : ''}${deserterOf(e) === 'valen' ? ' Er trägt einen zerrissenen Valen-Rock — ein Fahnenflüchtiger. (Der Wache übergeben: Valen +2 · anwerben: Valen −2)' : ''}`, ch);
 }
 function captiveRecruit(e) {
   const p = S.player, q = { x: e.x, y: e.y }, c = makeChar({ name: e.title && !/[A-Z]{3}/.test(e.title) ? e.title.split(',')[0] : pick(FIRST_M), prof: 'Söldner', map: e.map, x: q.x, y: q.y, level: Math.max(1, e.level || 3) });
   Object.assign(c, { loyal: 20, morale: 40, traits: [pick(['gierig', 'mürrisch'])], anchor: { ...q }, transient: false, visitor: false });
   const wk = e.weaponKey || MONSTERS[e.mtype]?.weapon; if (wk && ITEMS[wk]) { c.equip.weapon = mkItem(wk); recalc(c); }
   S.ents[e.map] = S.ents[e.map].filter(x => x !== e); S.ents[e.map].push(c); S.party.push(c.id); styleAct(2, 'Anwerben', e);
+  if (deserterOf(e) === 'valen') { addRep('valen', -2); log(`${c.name} ist der Krone davongelaufen. Wer Fahnenflüchtige anwirbt, macht sich in Valen keine Freunde (Valen −2).`, 'faction'); }   /* N3-Rest (Spec §5.2) */
   log(`${c.name} schließt sich dir an — für Gold und Brot. Seine Loyalität ist dünn (20).`, 'party'); UI.toast(`${c.name.toUpperCase()} — SÖLDNER`, 2400);
 }
 function captiveTick(e, dt) {                                  /* gefesselt: folgen, nicht kämpfen; zurückgelassen → losreißen */
@@ -19039,7 +19169,9 @@ function captiveChoices(npc, choices) {
     for (const e of caps) { const nm = e.title || MONSTERS[e.mtype].name, C = wantedC(e);
       if (C) { C.leaderDead = true; C.alive = 'delivered'; C.reward = { ...C.reward, gold: Math.round(C.reward.gold * 1.5) }; conProgress(C, C.need - C.have); captiveGone(e); out.push(`${nm}: lebend — Steckbrief, Lohn ×1,5`); claimContract(C, npc); continue; }
       if (['bandit', 'chain'].includes(MONSTERS[e.mtype].faction) || e.bandId) { if (D.n >= 3) { out.push(`${nm}: „Heute keinen mehr — der Kerker ist voll.“`); continue; }
-        const g = 8 + (e.level || 1) * 2; D.n++; S.gold += g; if (fac && S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 1, -100, 100); captiveGone(e); out.push(`${nm}: ${g} Gold`); continue; }
+        const g = 8 + (e.level || 1) * 2; D.n++; S.gold += g; if (fac && S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 1, -100, 100);
+        const dv = deserterOf(e) === 'valen'; if (dv) addRep('valen', 2);   /* N3-Rest (Spec §5.2): Valen-Deserteur der Wache übergeben, Valen +2 zusätzlich */
+        captiveGone(e); out.push(`${nm}: ${g} Gold${dv ? ' — ein Fahnenflüchtiger der Krone (Valen +2)' : ''}`); continue; }
       out.push(`${nm}: „Den suchen wir nicht.“`); }
     UI.dialogue(npc, `„Her damit.“\n${out.join('\n')}`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); UI.refreshHUD(); } });
 }
@@ -20742,12 +20874,19 @@ function debugSections() {
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
       'Banden: einen Tag vergehen lassen': () => bandDay(),
-      'Zelte (T21): zum nächsten begehbaren Zelt (vor die Tür)': () => { const p = P(), t = [...TENTS.values()].map(T0 => T0.b).sort((a, c) => Math.hypot(a.doorTile[0] * TS - p.x, a.doorTile[1] * TS - p.y) - Math.hypot(c.doorTile[0] * TS - p.x, c.doorTile[1] * TS - p.y))[0];
+      'Straßen (N1-Rest): Eren–Nordfurt gemieden → Geleit im Kontor': () => { const d = S.day | 0, k = ECO.routeKey('eren', 'northcity'); (S.eco.routes ||= {})[k] = { hits: [d - 2, d - 1, d], detourTill: 0, shunTill: d + 8, by: S.eco.routes?.[k]?.by || 'Die Händler von Eren' }; UI.toast('Gemieden — Kontor in Eren: „Straßen und Gefahren“ → Geleit für die erste Fahrt', 4000); },
+      'Straßen (N1-Rest): Kutscher heimgebracht (Alte Straße −1 Überfall)': () => UI.toast(coachHome() ? 'Ein Überfall weniger im Gedächtnis der Alten Straße' : 'Die Alte Straße hat keinen Überfall im Gedächtnis'),
+      'N3-Rest: Valen-Deserteure neben dir (Valen-Blau)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square && townFac(k) === 'valen'); const b = bandFound(T0, [(p.x / TS | 0) + 16, p.y / TS | 0]); if (!b) return UI.toast('Kein Platz');
+        Object.assign(b, { origin: 'deserter', men: 5, loot: 0, lead: `Feldwebel ${b.lead.split(' ')[0]}` }); UI.toast(`${b.name} (Deserteure) 16 Felder östlich — gefangene übergeben: Valen +2, anwerben: Valen −2`, 4000); },
+      'Zelte (T21): zum nächsten begehbaren Zelt (vor die Tür)':() => { const p = P(), t = [...TENTS.values()].map(T0 => T0.b).sort((a, c) => Math.hypot(a.doorTile[0] * TS - p.x, a.doorTile[1] * TS - p.y) - Math.hypot(c.doorTile[0] * TS - p.x, c.doorTile[1] * TS - p.y))[0];
         if (!t) return UI.toast('Kein begehbares Zelt'); if (S.map !== 'world') travel('world'); p.x = t.doorTile[0] * TS + TS / 2; p.y = (t.doorTile[1] + 1) * TS + TS / 2; UI.toast(`${t.label}${t.where ? ' · ' + t.where : ''} (${t.tentKind}) — nach oben gehen`, 3000); },
       'Zelte (T21): nächstes Räuberzelt mit Bande und Beute 25': () => { const p = P(), t = [...TENTS.values()].filter(T0 => T0.b.tentKind === 'band' && !T0.prop.bandId).map(T0 => T0.b).sort((a, c) => Math.hypot(a.x * TS - p.x, a.y * TS - p.y) - Math.hypot(c.x * TS - p.x, c.y * TS - p.y))[0];
         if (!t) return UI.toast('Kein Räuberzelt'); let b = tentBand(TENTS.get(t.id).prop); if (!b) { const T0 = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square).sort((a, c) => Math.hypot(TOWN_PLAN[a].square[0] - t.x, TOWN_PLAN[a].square[1] - t.y) - Math.hypot(TOWN_PLAN[c].square[0] - t.x, TOWN_PLAN[c].square[1] - t.y))[0]; b = bandFound(T0, [t.x + 2, t.y + t.h + 2]); }
         if (!b) return UI.toast('Keine Bande'); b.loot = 25; b.good = 'grain'; ensureTents(); if (S.map !== 'world') travel('world'); p.x = t.doorTile[0] * TS + TS / 2; p.y = (t.doorTile[1] + 1) * TS + TS / 2; UI.toast(`${b.name}: Beute 25 — im Zelt liegt der Haufen`, 3000); },
-      'Zelte (T21): Zahl und Arten ins Log': () => { const k = {}; for (const T0 of TENTS.values()) k[T0.b.tentKind] = (k[T0.b.tentKind] || 0) + 1; log(`Begehbare Zelte: ${TENTS.size} (${Object.entries(k).map(([a, n]) => `${a} ${n}`).join(', ')}); ohne Platz: ${S.ents.world.filter(e => e._tentNo).length}`, 'world'); },
+      'Zelte (T21-1): 23 Uhr — Schläfer in die Zelte': () => { S.minute = 23 * 60; tentPeople(); UI.toast(`Nacht · ${S.ents.world.filter(e => e.tentPerson).length} Leute in Zelten`, 2500); },
+      'Zelte (T21-1): nächste Bande hat Schutzgeld (sitzt in den Zelten)': () => { const p = P(), b = bandsOf().sort((a, c) => Math.hypot(a.tx * TS - p.x, a.ty * TS - p.y) - Math.hypot(c.tx * TS - p.x, c.ty * TS - p.y))[0]; if (!b) return UI.toast('Keine Bande');
+        b.paid = (S.day | 0) + 5; tentPeople(); UI.toast(`${b.name}: bezahlt — ${S.ents.world.filter(e => e.tentPerson && e.bandId === b.id).length} sitzen in den Zelten (nur nahe dem Helden)`, 3500); },
+      'Zelte (T21): Zahl und Arten ins Log':() => { const k = {}; for (const T0 of TENTS.values()) k[T0.b.tentKind] = (k[T0.b.tentKind] || 0) + 1; log(`Begehbare Zelte: ${TENTS.size} (${Object.entries(k).map(([a, n]) => `${a} ${n}`).join(', ')}); ohne Platz: ${S.ents.world.filter(e => e._tentNo).length}`, 'world'); },
       'Straßen (T12): Bande an die Alte Straße setzen (Eren–Nordfurt)': () => { const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity'), b = bandFound('eren', [Math.round((LA.x + LB.x) / 2), Math.round((LA.y + LB.y) / 2) + 8]); if (b) { b.men = 7; UI.toast(`${b.name} bei ${b.where} — Kontor in Eren oder Nordfurt zeigt die Gefahr`, 3500); } },
       'Straßen (N1): Eren–Nordfurt einmal überfallen (2× = Umweg, 3× = gemieden)': () => { ECO.noteRaid('eren', 'northcity'); const r = ECO.routeOf('eren', 'northcity'); UI.toast(`Überfälle: ${r.hits.length} · Umweg bis Tag ${r.detourTill || '—'} · gemieden bis Tag ${r.shunTill || '—'}`, 3000); },
       'Straßen (N1): Gedächtnis der Händler ins Log': () => log(`Strecken: ${Object.entries(S.eco.routes || {}).map(([k, r]) => `${k} ${r.hits.length}× (Umweg ${r.detourTill}, gemieden ${r.shunTill})`).join(' · ') || 'nichts gemerkt'}.`, 'economy'),
@@ -21486,6 +21625,20 @@ export function selftest() {
       const strong = heavy.hv === 1 && light.hv === 0 && wide(heavy) > wide(light);                                                    // schwere Waffe: breiter
       SP.setArt('R'); const icon = (() => { const cv = document.createElement('canvas'); Object.defineProperty(cv, 'clientWidth', { value: 48 }); Object.defineProperty(cv, 'clientHeight', { value: 48 }); R.drawItemIconTo(cv, 'chain_hauberk'); const d = cv.getContext('2d').getImageData(0, 0, 48, 48).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n > 300; })();
       return figs && hands && beasts && brute && arms && back && region && strong && icon;
+    } finally { SP.setArt(art0); }
+  })());
+  ok('Gegenstandsbilder (Entwickler 09.10.): jedes Item malt ein eigenes Symbol, keins die Probefigur; jedes Nicht-Waffen-Symbol ist einmalig', (() => {
+    const art0 = SP.drawnOn() ? 'R' : SP.atlasOn() ? 'F' : 'D'; SP.setArt('R');
+    try {
+      const seen = new Set(); let ok1 = true;
+      for (const [k, it] of Object.entries(ITEMS)) {
+        const src = R.iconSourceOf(k); if (!['bild', 'waffe', 'regel'].includes(src)) { ok1 = false; break; }
+        const cv = document.createElement('canvas'); Object.defineProperty(cv, 'clientWidth', { value: 48 }); Object.defineProperty(cv, 'clientHeight', { value: 48 }); R.drawItemIconTo(cv, k);
+        const d = cv.getContext('2d').getImageData(0, 0, 48, 48).data; let n = 0, h = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3]) n++; h = (h * 31 + d[i] + d[i + 1] * 7 + d[i + 2] * 13 + d[i + 3]) | 0; }
+        if (n < 60) { ok1 = false; break; }
+        if (it.slot !== 'weapon') { if (seen.has(h)) { ok1 = false; break; } seen.add(h); }
+      }
+      return ok1;
     } finally { SP.setArt(art0); }
   })());
   ok('Sprites: Figuren aller NPCs, alle Posen', NPCS.every(n => {
@@ -22854,6 +23007,78 @@ export function selftest() {
       const res = { built, huts, noSave, up, l5, l25, l0, down }; if (!Object.values(res).every(Boolean)) console.warn('T21-Probe', res);
       return Object.values(res).every(Boolean);
     } finally { for (const e of test) { const T0 = TENTS.get(e._tent); if (T0) lowerTent(T0); if (e.solid && solidIndex.world) removeSolid(e); } S.ents.world = W0; S.bands = B0; S.flags = fl; }
+  })());
+  ok('T21-1/2 (E51) Leute und Beute in Zelten: nachts ein Schläfer je Lagerzelt nahe dem Helden, bei Tag fort; eine bezahlte Bande sitzt friedlich in ihren Zelten; Beute stehlen nur nachts — ungesehen gibt die halbe Beute als Ware (Schutzgeld verfällt, Hinterhalt beim Verlassen), gesehen sofort Angriff', keepRng(() => {
+    const B0 = S.bands, W0 = S.ents.world.slice(), fl = { ...S.flags }, m0 = S.minute, d0 = S.day, p = S.player, px = p.x, py = p.y, inv0 = JSON.parse(JSON.stringify(p.inv)), qs0 = JSON.parse(JSON.stringify(S.quests)), q0 = S._quiet, test = [];
+    const cnt = () => p.inv.filter(x => x.key === 'grain').reduce((n, x) => n + (x.count || 1), 0);
+    try {
+      S._quiet = true; const L = LOCATIONS.find(l => l.key === 'redwaste'), idx = tentIndex(), mk = (id, o) => ({ id, kind: 'prop', type: 'tent_prop', map: 'world', r: 14, solid: true, transient: true, ...o });
+      let e = null; for (let r = 0; r < 40 && !e; r += 3) { const c = mk('tp22', { x: (L.x + r) * TS + 16, y: L.y * TS + 16, label: 'Probezelt' }); if (tentSpot(c, idx) && tentSpot(mk('x', { x: c.x + 9 * TS, y: c.y }), idx)) e = c; }
+      if (!e) return false; const e2 = mk('tp22b', { x: e.x + 9 * TS, y: e.y, label: 'Räuberzelt', bandId: 'tb22' }); test.push(e, e2);
+      const tb = { id: 'tb22', name: 'Probe-Bande', lead: 'X', where: 'x', town: 'eren', tx: (e2.x / TS | 0), ty: (e2.y / TS | 0) + 4, born: S.day | 0, men: 5, paid: -1, amb: -999, loot: 12, good: 'grain', starve: 0 };
+      S.bands = [tb]; S.ents.world.push(e, e2); ensureTents(); const b = HOUSES.find(h => h.id === 'tent_tp22'), bb = HOUSES.find(h => h.id === 'tent_tp22b'); if (!b || !bb) return false;
+      const inT = (x, h) => x.x / TS >= h.x + 1 && x.x / TS < h.x + h.w - 1 && x.y / TS >= h.y + 1 && x.y / TS < h.y + h.h - 1, who = h => S.ents.world.filter(x => x.tentPerson === h.id);
+      p.x = (b.x + 2) * TS; p.y = (b.y + b.h + 4) * TS; S.minute = 23 * 60; tentPeople(); const night = who(b).length === 1 && who(b)[0].transient && inT(who(b)[0], b) && !who(bb).length;
+      S.minute = 12 * 60; tentPeople(); const dayGone = !who(b).length;
+      tb.paid = S.day | 0; tentPeople(); const sit = who(bb), paid = sit.length >= 1 && sit.length <= tb.men && sit.every(x => x.kind === 'npc' && x.bandId === 'tb22' && inT(x, bb));
+      const loot = () => S.ents.world.find(x => x.tentLoot === 'tb22'), g0 = cnt(); tentSteal(loot()); const dayNo = tb.loot === 12 && cnt() === g0 && tb.paid === (S.day | 0);
+      S.minute = 23 * 60; p.x = (bb.x + 1) * TS + 16; p.y = (bb.y + 1) * TS + 16; tentSteal(loot());
+      const stole = tb.loot === 6 && cnt() === g0 + 6 && tb.paid === -1 && tb.thief === (S.day | 0) && !who(bb).length;
+      p.x = (tb.tx + 20) * TS; p.y = tb.ty * TS; tentThiefTick(); const foes = () => S.ents.world.filter(x => x.kind === 'enemy' && x.bandId === 'tb22').length, amb = foes() === 3 && tb.thief == null;
+      tb.loot = 10; ensureTents(); p.x = (bb.x + 1) * TS + 16; p.y = (bb.y + 1) * TS + 16; const spy = { id: 'spy22', kind: 'npc', alive: true, bandId: 'tb22', map: 'world', x: p.x + 24, y: p.y, name: 'Späher' }; S.ents.world.push(spy);
+      tentSteal(loot()); const seen = tb.loot === 10 && cnt() === g0 + 6 && foes() === 6;
+      const res = { night, dayGone, paid, dayNo, stole, amb, seen }; if (!Object.values(res).every(Boolean)) console.warn('T21-12-Probe', res);
+      return Object.values(res).every(Boolean);
+    } finally { for (const e of test) { const T0 = TENTS.get(e._tent); if (T0) lowerTent(T0); if (e.solid && solidIndex.world) removeSolid(e); } S.ents.world = W0; S.bands = B0; S.flags = fl; S.minute = m0; S.day = d0; p.x = px; p.y = py; p.inv = inv0; S.quests = qs0; S._quiet = q0; }
+  }));
+  ok('N1-Rest Geleit und Kutscher: der Kontor bietet für eine gemiedene Strecke eine erste Fahrt mit Geleit an (erfüllt: nicht mehr gemieden, ein Überfall bleibt, Händler +2, Gilde zählt eine Ankunft); der heimgebrachte Kutscher nimmt der Alten Straße einen Überfall', (() => {
+    const E0 = structuredClone(S.eco.routes || null), C0 = S.contracts, fa = { ...S.factions }, FR = structuredClone(S.facRes ?? null), q0 = S._quiet, d = S.day | 0, k = ECO.routeKey('eren', 'northcity');
+    try {
+      S._quiet = true; S.contracts = []; S.eco.routes = { [k]: { hits: [d - 2, d - 1, d], detourTill: 0, shunTill: d + 8, by: 'Gerold aus Eren' } };
+      const ch = shunEscortChoices({ name: 'K' }, 'eren'), offer = ch.length === 1 && ch[0].text.includes('Nordfurt'); ch[0]?.fn(); UI.closeDialogue();
+      const C = S.contracts.find(c => c.shunRoute === k), made = !!C && C.kind === 'escort' && C.target === 'northcity' && C.tx === TOWN_PLAN.northcity.square[0] && !shunEscortChoices({ name: 'K' }, 'eren').length;
+      const m0 = S.factions.merch || 0, v0 = ECO.merchV(); shunEscortDone(C); const r = S.eco.routes[k];
+      const done = r.shunTill === 0 && r.hits.length === 1 && (S.factions.merch || 0) === Math.min(100, m0 + 2) && Math.abs(ECO.merchV() - Math.min(FAC_RES.merch.max, v0 + FAC_RES.merch.arrive)) < 1e-9;
+      S.eco.routes = { [k]: { hits: [d - 3, d - 2, d - 1], detourTill: d + 5, shunTill: d + 6, by: 'Gerold aus Eren' } }; coachHome(); const r2 = S.eco.routes[k];
+      const coach = r2.hits.length === 2 && r2.shunTill === 0 && r2.detourTill === d + 5;
+      const res = { offer, made, done, coach }; if (!Object.values(res).every(Boolean)) console.warn('N1-Rest-Probe', res);
+      return Object.values(res).every(Boolean);
+    } finally { if (E0) S.eco.routes = E0; else delete S.eco.routes; S.contracts = C0; Object.assign(S.factions, fa); if (FR) S.facRes = FR; else delete S.facRes; S._quiet = q0; }
+  })());
+  ok('N3-Rest Deserteure: Valen-Deserteure kämpfen als Speerträger/Banditen in Valen-Blau (Kette in Kettenrot); der Wache übergeben Valen +2 zusätzlich, anwerben Valen −2; Wachen in Valen-Orten murren ab Müdigkeit 40', keepRng(() => {
+    const p = S.player, B0 = S.bands, fa = { ...S.factions }, g0 = S.gold, W0 = S.ents[p.map].slice(), pa = S.party.slice(), WY = structuredClone(S.weary ?? null), fl = { ...S.flags }, q0 = S._quiet;
+    try {
+      S._quiet = true; const bv = { id: 'tb33', origin: 'deserter', name: 'Probe-Röcke', men: 4 }, bc = { id: 'tb34', origin: 'chainDeserter', name: 'Probe-Glieder', men: 4 }; S.bands = [bv, bc];
+      const kinds = bandKinds(bv).join() === 'bandit_spear,bandit' && bandKinds(bc).join() === 'bandit' && bandKinds({}).length === 4;
+      const look = SP.monsterSpec(bandLook({ mtype: 'bandit_spear', seed: 1 }, bv), MONSTERS.bandit_spear).cloak === '#2f4260' && SP.monsterSpec(bandLook({ mtype: 'bandit', seed: 1 }, bc), MONSTERS.bandit).cloak === '#2a0e10';
+      const mkCap = id => ({ id, kind: 'enemy', mtype: 'bandit', bandId: 'tb33', alive: true, map: p.map, x: p.x + 20, y: p.y, level: 3, prisoner: { by: p.id, since: S.day | 0 }, hp: 10, maxHp: 10 });
+      const cap = mkCap('cap33'), guard = { id: 'g33', kind: 'npc', guard: true, homeTown: 'northcity', alive: true, map: p.map, x: p.x + 40, y: p.y, name: 'Wache' }; S.ents[p.map].push(cap);
+      S.factions.valen = 0; delete S.flags.deliver; const ch = []; captiveChoices(guard, ch); ch.find(c => c.text.startsWith('Gefangene abliefern'))?.fn(); UI.closeDialogue();
+      const give = S.factions.valen === (townFac('northcity') === 'valen' ? 3 : 2) && !S.ents[p.map].includes(cap);
+      const cap2 = mkCap('cap34'); S.ents[p.map].push(cap2); S.factions.valen = 0; captiveRecruit(cap2); const hire = S.factions.valen === -2;
+      const wg = { id: 'w33', kind: 'npc', guard: true, homeTown: 'northcity', post: 'northcity', name: 'W', faction: 'valen', traits: [], seed: 3, map: 'world', x: TOWN_PLAN.northcity.square[0] * TS, y: TOWN_PLAN.northcity.square[1] * TS, alive: true, prof: 'Torwache' };
+      (S.weary ||= {}).valen = { v: 45, pool: 0, stage: 1 }; const talkV = worldTalk(wg).some(l => l.includes('Rotte')); S.weary.valen.stage = 0; const quiet = !worldTalk(wg).some(l => l.includes('Rotte'));
+      const res = { kinds, look, give, hire, talkV, quiet }; if (!Object.values(res).every(Boolean)) console.warn('N3-Rest-Probe', res, S.factions.valen);
+      return Object.values(res).every(Boolean);
+    } finally { S.bands = B0; Object.assign(S.factions, fa); S.gold = g0; S.ents[p.map] = W0; S.party = pa; if (WY) S.weary = WY; else delete S.weary; S.flags = fl; S._quiet = q0; }
+  }));
+  ok('E49 Aurelion nach Wohlstand: Hunger zieht zwei Automaten je Stadt in die Werkhalle (gespeichert, kehren zurück), Wohlstand stellt zwei stärkere an die Tore; Sichtweite, Ladenpreise und Automaten-Streife folgen der Stufe', (() => {
+    const W0 = S.ents.world.slice(), R0 = structuredClone(S.facRes ?? null), P0 = S.aurelParked, fl = { ...S.flags }, k0 = AW.k, d0 = S.day, q = S._quiet;
+    try {
+      S._quiet = true; S.aurelParked = {}; const R = SIM.facResState(), set = st => { R.aurel.v = [2, 8, 20][st]; R.aurel.stage = st; return aurelWealth(true); }, T = aurelTowns(), F = FAC_RES.aurel;
+      const cnt = t => S.ents.world.filter(e => e.robot && e.post === t && e.alive).length, n1 = Object.fromEntries(T.map(t => [t, cnt(t)]));
+      const shopper = t => ({ homeTown: t, map: 'world', faction: 'aurel', x: TOWN_PLAN[t].square[0] * TS, y: TS * TOWN_PLAN[t].square[1] }), t0 = T.find(t => n1[t] >= 2);
+      if (!t0) return false;
+      const a = set(0), low = a.parked >= 2 && cnt(t0) === n1[t0] - F.parkLow && S.aurelParked[t0]?.length === F.parkLow && aurelSight() === F.sight[0] && Math.abs(resPriceMul('bread', true, shopper(t0)) - F.buyMul[0]) < 1e-9;
+      const saved = JSON.parse(saveData()).aurelParked?.[t0]?.length === F.parkLow;
+      const b = set(1), mid = b.back === a.parked && cnt(t0) === n1[t0] && !Object.keys(S.aurelParked).length && aurelSight() === F.sight[1] && Math.abs(resPriceMul('bread', true, shopper(t0)) - 1) < 1e-9;
+      const c = set(2), ex = S.ents.world.filter(e => e.aurelExtra === t0), high = c.extra >= 2 && ex.length === F.extraHigh && ex.every(e => e.robot && e.transient && e.level >= F.extraLvl && e.guard) && aurelSight() === F.sight[2] && Math.abs(resPriceMul('bread', true, shopper(t0)) - F.buyMul[2]) < 1e-9;
+      const dn = set(1), gone = !S.ents.world.some(e => e.aurelExtra);
+      let d = S.day | 0; while (SIM.resHash(49, 1000) >= F.patrol[2] * 1000 && d < (d0 | 0) + 500) S.day = ++d; S.flags.aurelPatrolDay = -1; set(2); const pat = S.flags.aurelPatrolDay === (S.day | 0) || (S.flags.aurelPatrolDay === -1 && !TRAV_PEND.some(x => x.K?.prof === 'Automaten-Streife'));   /* Weg noch in Suche: kommt beim nächsten Takt */
+      S.flags.aurelPatrolDay = -1; R.aurel.stage = 0; aurelWealth(true); const none = S.flags.aurelPatrolDay !== (S.day | 0);
+      const res = { low, saved, mid, high, gone, pat, none }; if (!Object.values(res).every(Boolean)) console.warn('E49-Probe', res, { a, b, c, dn, n1 });
+      return Object.values(res).every(Boolean);
+    } finally { S.ents.world = W0; if (R0 == null) delete S.facRes; else S.facRes = R0; S.aurelParked = P0; S.flags = fl; AW.k = k0; S.day = d0; S._quiet = q; }
   })());
   /* T23 Fraktionsressourcen:jede Probe sichert S.facRes, S.towns, S.war, S.eco, S.after, S.tribute, S.gobCity, S.tollMul, Feldzug, Glaubenstakt,
      Verträge, Weltliste, Hooks und den Zufallsstand (keepRng) selbst und setzt sie zurück */

@@ -1007,6 +1007,7 @@ export function monsterSpec(e, m) {
     if (t === 'bounty_hunter') { s.hood = '#1e1c1a'; s.cloak = '#2a2622'; s.scarf = ''; s.strap = 1; s.quiver = 0;   // Kopfgeldjäger: schwarz; ab Stufe 3 (§72) Kettenhemd und Helm — sichtbar stärker
       if ((e.tier || 0) >= 3) { s.armor = 'chain'; s.armorCol = '#6a6a66'; s.hooded = 0; s.helm = 'nasal'; s.helmCol = '#7a7874'; } }
     if (t === 'bandit_spear') { s.hooded = 0; s.helm = 'cap'; s.helmCol = '#5a4e40'; s.hood = '#4a3a26'; s.cloak = '#3e3222'; s.scarf = '#b8a070'; }   // Speerträger: Kappe statt Kapuze, helles Halstuch
+    if (e.deserter === 'valen') { s.cloak = '#2f4260'; s.hood = '#24324a'; s.scarf = '#b9c3d2'; } else if (e.deserter === 'chain') { s.cloak = '#2a0e10'; s.hood = '#1e1416'; s.scarf = '#5a1a1c'; }   /* N3-Rest: Deserteure im zerrissenen Rock ihrer Macht (Valen-Blau, Kettenrot) */
   } else if (t === 'sea_raider' || t === 'sea_harpooner' || t === 'whitebeard') {   // S14 Seevolk: Teerjacke, Kopftuch, Ohrring; Weißbart riesig mit weißem Bart
     Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: t === 'sea_harpooner' ? '#3a3a2c' : '#2c3a44', pants: '#3a3226', sash: '#8a2a20', strap: 1, helm: 'scarf', helmCol: ['#7a2a20', '#2a4a6a', '#6a5a2a'][(e.seed | 0) % 3], beard: (e.seed | 0) % 2 });
     if (t === 'sea_harpooner') Object.assign(s, { helm: 'hat', helmCol: '#2a2622', quiver: 0 });

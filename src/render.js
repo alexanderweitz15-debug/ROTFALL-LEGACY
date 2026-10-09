@@ -6,7 +6,7 @@ import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=28';
 import { buildOf, crawling, lightR, eyeOf, lifeOf } from './body.js?v=28';
 import * as SP from './sprites.js?v=28';
 import { trailPt, WAGON_GAP } from './sim.js?v=28';
-import { ICON_R } from './iconsR.js?v=28';
+import { ICON_R, ruleIcon } from './iconsR.js?v=28';
 import { airPos, airPt } from './economy.js?v=28';
 import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX } from './anim.js?v=28';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
@@ -3579,8 +3579,8 @@ export function drawFigureTo(canvas, ch) {
 
 // Item-Icons: Vektor-Vorzeichnung, dann auf ein grobes Raster pixelisiert (Kontur + Randlicht) wie die Figuren.
 const iconCache = new Map();
-// S14 Stil R (Nutzer: „den Stil auf alles“): Waffen-Symbol = das Waffen-Sprite schräg; Rüstung = die Probefigur mit genau diesem Teil,
-// auf Rumpf, Kopf oder Schild zugeschnitten — das Symbol zeigt, wie es am Körper aussieht. Pixel bleiben scharf (ganzzahlig vergrößert).
+// S14 Stil R (Nutzer: „den Stil auf alles“): Waffen-Symbol = das Waffen-Sprite schräg. Rüstung war bis 09.10. ein Ausschnitt der Probefigur
+// (sah aus wie ein Mensch); jetzt malt iconsR.js ruleIcon das Stück allein, in den Farben, die es am Körper hat. Pixel bleiben scharf.
 const MANNEQUIN = { kind: 'player', pal: { skin: '#b89878', hair: '#2b2118', cloth: '#3a3026' }, seed: 1 };   // seed 1: kein Zufallsumhang
 function iconR(c, it, key, w, h) {
   let src = null;
@@ -3590,19 +3590,13 @@ function iconR(c, it, key, w, h) {
   else if (it.slot === 'weapon') { const W = SP.weaponSprite(key, it.rarity, it.holy, it.wtype), L = Math.hypot(W.cv.width, W.cv.height), n = Math.ceil(L * 0.72) + 2;
     src = document.createElement('canvas'); src.width = src.height = n; const t = src.getContext('2d'); t.imageSmoothingEnabled = false;
     t.translate(n / 2, n / 2); t.rotate(it.wtype === 'bow' ? -0.35 : -Math.PI / 4); t.drawImage(W.cv, -W.cv.width / 2, -W.cv.height / 2); }
-  else if (['chest', 'head', 'offhand', 'cloak'].includes(it.slot)) {
-    const f = SP.humanFrameR(SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }), it.slot === 'offhand' ? 'W' : it.slot === 'cloak' ? 'N' : 'S', it.slot === 'offhand' ? 'guard' : 'i0');   /* Artist 02.10.: Umhang von hinten, dort sieht man Form, Borte und Wappen */
-    const [y0, y1] = it.slot === 'head' ? (it.look?.hood ? [4, 26] : [0, 12]) : it.slot === 'offhand' ? [12, 30] : it.slot === 'cloak' ? [3, 46] : [11, 38];
-    const band = document.createElement('canvas'); band.width = f.width; band.height = y1 - y0; const bc = band.getContext('2d', { willReadFrequently: true }); bc.drawImage(f, 0, -y0);
-    const d = bc.getImageData(0, 0, band.width, band.height).data; let x0 = band.width, x1 = 0;   // S14: Zuschnitt nach Inhalt (Rahmen 40, breite Rüstung)
-    for (let i = 3; i < d.length; i += 4) if (d[i]) { const x = (i >> 2) % band.width; if (x < x0) x0 = x; if (x > x1) x1 = x; }
-    if (x1 < x0) return false;
-    if (it.slot === 'offhand') { const dx = (f.width - 32) / 2; x0 = 5 + dx; x1 = 19 + dx; }   // Schild: nur die Nebenhand, nicht der Körper
-    src = document.createElement('canvas'); src.width = x1 - x0 + 1; src.height = band.height; src.getContext('2d').drawImage(band, -x0, 0); }
+  else src = ruleIcon(key, it, () => SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } }));   /* Entwickler 09.10. („manche Items sehen aus wie Menschen“): eigenes Gegenstandsbild statt Probefigur-Ausschnitt; Farben aus dem Aussehen am Körper (iconsR.js ruleIcon) */
   if (!src) return false;
   const k0 = Math.min((w - 2) / src.width, (h - 2) / src.height), k = k0 >= 2 ? Math.floor(k0) : k0, dw = Math.round(src.width * k), dh = Math.round(src.height * k);   // ab 2× ganzzahlig
   c.imageSmoothingEnabled = false; c.drawImage(src, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh); return true;
 }
+/* Probe 09.10.: woher ein Symbol kommt — 'bild' (ICON_R), 'waffe' (Waffen-Sprite) oder 'regel' (ruleIcon); eine Probefigur gibt es nicht mehr */
+export const iconSourceOf = key => { const it = ITEMS[key]; return !it ? '' : ICON_R[key] ? 'bild' : it.slot === 'weapon' ? 'waffe' : ruleIcon(key, it, () => SP.humanSpec({ ...MANNEQUIN, equip: { [it.slot]: { key } } })) ? 'regel' : ''; };
 export function drawItemIconTo(canvas, key, raw) {
   const it = ITEMS[key]; const c = canvas.getContext('2d');
   const w = canvas.width = canvas.clientWidth || 48, h = canvas.height = canvas.clientHeight || 48;
